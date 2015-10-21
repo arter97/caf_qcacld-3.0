@@ -333,7 +333,7 @@ typedef struct tagCsrRoamStartBssParams {
 	tSirMacRateSet operationalRateSet;
 	tSirMacRateSet extendedRateSet;
 	uint8_t operationChn;
-	chan_params_t ch_params;
+	struct ch_params_s ch_params;
 	eCsrCfgDot11Mode uCfgDot11Mode;
 	uint8_t privacy;
 	bool fwdWPSPBCProbeReq;
@@ -1324,7 +1324,7 @@ bool csr_roam_is_sta_mode(tpAniSirGlobal pMac, uint32_t sessionId);
 
 /* Post Channel Change Indication */
 CDF_STATUS csr_roam_channel_change_req(tpAniSirGlobal pMac,
-		struct cdf_mac_addr bssid, chan_params_t *ch_params,
+		struct cdf_mac_addr bssid, struct ch_params_s *ch_params,
 		tCsrRoamProfile *profile);
 
 /* Post Beacon Tx Start Indication */
@@ -1334,7 +1334,7 @@ CDF_STATUS csr_roam_start_beacon_req(tpAniSirGlobal pMac,
 CDF_STATUS
 csr_roam_send_chan_sw_ie_request(tpAniSirGlobal pMac, struct cdf_mac_addr bssid,
 		uint8_t targetChannel, uint8_t csaIeReqd,
-		chan_params_t *ch_params);
+		struct ch_params_s *ch_params);
 CDF_STATUS
 csr_roam_modify_add_ies(tpAniSirGlobal pMac,
 		tSirModifyIE *pModifyIE, eUpdateIEsType updateType);

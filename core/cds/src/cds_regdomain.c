@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011,2013-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011,2013-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -557,7 +557,7 @@ void cds_fill_send_ctl_info_to_fw(struct regulatory *reg, uint32_t modesAvail,
  *
  * Return: none
  */
-void cds_set_wma_dfs_region(struct regulatory *reg)
+void cds_set_wma_dfs_region(uint8_t dfs_region)
 {
 	tp_wma_handle wma = cds_get_context(CDF_MODULE_ID_WMA);
 
@@ -566,8 +566,8 @@ void cds_set_wma_dfs_region(struct regulatory *reg)
 		return;
 	}
 
-	cdf_print("%s: dfs_region: %d", __func__, reg->dfs_region);
-	wma_set_dfs_region(wma, reg->dfs_region);
+	cdf_print("%s: dfs_region: %d", __func__, dfs_region);
+	wma_set_dfs_region(wma, dfs_region);
 }
 
 void cds_fill_and_send_ctl_to_fw(struct regulatory *reg)

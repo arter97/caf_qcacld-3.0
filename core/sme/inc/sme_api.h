@@ -693,7 +693,9 @@ eCsrPhyMode sme_get_phy_mode(tHalHandle hHal);
  * SME API to determine the channel bonding mode
  */
 CDF_STATUS sme_set_ch_params(tHalHandle hHal, eCsrPhyMode eCsrPhyMode,
-		uint8_t channel, uint8_t ht_sec_ch, chan_params_t *ch_params);
+			     uint8_t channel, uint8_t ht_sec_ch,
+			     struct ch_params_s *ch_params);
+
 CDF_STATUS sme_handoff_request(tHalHandle hHal, uint8_t sessionId,
 		tCsrHandoffRequest *pHandoffInfo);
 CDF_STATUS sme_is_sta_p2p_client_connected(tHalHandle hHal);
@@ -769,13 +771,13 @@ CDF_STATUS sme_set_auto_shutdown_cb(tHalHandle hHal, void (*pCallbackfn)(void));
 CDF_STATUS sme_set_auto_shutdown_timer(tHalHandle hHal, uint32_t timer_value);
 #endif
 CDF_STATUS sme_roam_channel_change_req(tHalHandle hHal,
-		struct cdf_mac_addr bssid, chan_params_t *ch_params,
+		struct cdf_mac_addr bssid, struct ch_params_s *ch_params,
 		tCsrRoamProfile *profile);
 CDF_STATUS sme_roam_start_beacon_req(tHalHandle hHal,
 		struct cdf_mac_addr bssid, uint8_t dfsCacWaitStatus);
 CDF_STATUS sme_roam_csa_ie_request(tHalHandle hHal, struct cdf_mac_addr bssid,
 		uint8_t targetChannel, uint8_t csaIeReqd,
-		chan_params_t *ch_params);
+		struct ch_params_s *ch_params);
 CDF_STATUS sme_init_thermal_info(tHalHandle hHal,
 		tSmeThermalParams thermalParam);
 CDF_STATUS sme_set_thermal_level(tHalHandle hHal, uint8_t level);

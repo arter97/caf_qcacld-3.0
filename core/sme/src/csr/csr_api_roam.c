@@ -48,6 +48,7 @@
 #include "cds_reg_service.h"
 #include "mac_trace.h"
 #include "csr_neighbor_roam.h"
+#include "cds_regdomain.h"
 #include "cds_regdomain_common.h"
 #include "cds_utils.h"
 #include "sir_types.h"
@@ -340,8 +341,6 @@ CDF_STATUS csr_open(tpAniSirGlobal pMac)
 CDF_STATUS csr_init_chan_list(tpAniSirGlobal mac, uint8_t *alpha2)
 {
 	CDF_STATUS status;
-	v_REGDOMAIN_t reg_id;
-	enum country_src source = SOURCE_DRIVER;
 
 	mac->scan.countryCodeDefault[0] = alpha2[0];
 	mac->scan.countryCodeDefault[1] = alpha2[1];
@@ -350,21 +349,9 @@ CDF_STATUS csr_init_chan_list(tpAniSirGlobal mac, uint8_t *alpha2)
 	sms_log(mac, LOGE, FL("init time country code %.2s"),
 		mac->scan.countryCodeDefault);
 
-	status = csr_get_regulatory_domain_for_country(mac,
-						       mac->scan.countryCodeDefault,
-						       &reg_id, source);
-	if (status != CDF_STATUS_SUCCESS) {
-		sms_log(mac, LOGE,
-			FL("csr_get_regulatory_domain_for_country failed"));
-		return status;
-	}
+	mac->scan.domainIdDefault = 0;
+	mac->scan.domainIdCurrent = 0;
 
-	if (cds_set_reg_domain(mac, reg_id) != CDF_STATUS_SUCCESS) {
-		sms_log(mac, LOGE, FL("cds_set_reg_domain failed"));
-		return CDF_STATUS_E_FAILURE;
-	}
-	mac->scan.domainIdDefault = reg_id;
-	mac->scan.domainIdCurrent = mac->scan.domainIdDefault;
 	cdf_mem_copy(mac->scan.countryCodeCurrent,
 		     mac->scan.countryCodeDefault, WNI_CFG_COUNTRY_CODE_LEN);
 	cdf_mem_copy(mac->scan.countryCodeElected,
@@ -18014,8 +18001,9 @@ CDF_STATUS csr_roam_read_tsf(tpAniSirGlobal pMac, uint8_t *pTimestamp,
  * Return: CDF_STATUS
  */
 CDF_STATUS csr_roam_channel_change_req(tpAniSirGlobal pMac,
-			struct cdf_mac_addr bssid,
-			chan_params_t *ch_params, tCsrRoamProfile *profile)
+				       struct cdf_mac_addr bssid,
+				       struct ch_params_s *ch_params,
+				       tCsrRoamProfile *profile)
 {
 	CDF_STATUS status = CDF_STATUS_SUCCESS;
 	tSirChanChangeRequest *pMsg;
@@ -18247,8 +18235,10 @@ CDF_STATUS csr_send_ext_change_channel(tpAniSirGlobal mac_ctx, uint32_t channel,
  **/
 CDF_STATUS
 csr_roam_send_chan_sw_ie_request(tpAniSirGlobal mac_ctx,
-		struct cdf_mac_addr bssid, uint8_t target_channel,
-		uint8_t csa_ie_reqd, chan_params_t *ch_params)
+				 struct cdf_mac_addr bssid,
+				 uint8_t target_channel,
+				 uint8_t csa_ie_reqd,
+				 struct ch_params_s *ch_params)
 {
 	CDF_STATUS status = CDF_STATUS_SUCCESS;
 	tSirDfsCsaIeRequest *msg;
@@ -18265,7 +18255,8 @@ csr_roam_send_chan_sw_ie_request(tpAniSirGlobal mac_ctx,
 	msg->targetChannel = target_channel;
 	msg->csaIeRequired = csa_ie_reqd;
 	cdf_mem_copy(msg->bssid, bssid.bytes, CDF_MAC_ADDR_SIZE);
-	cdf_mem_copy(&msg->ch_params, ch_params, sizeof(chan_params_t));
+	cdf_mem_copy(&msg->ch_params, ch_params,
+		     sizeof(struct ch_params_s));
 
 	status = cds_send_mb_message_to_mac(msg);
 
