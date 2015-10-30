@@ -2487,16 +2487,11 @@ CDF_STATUS csr_get_channel_and_power_list(tpAniSirGlobal pMac)
 	uint8_t num20MHzChannelsFound = 0;
 	CDF_STATUS cdf_status;
 	uint8_t Index = 0;
-	uint8_t num40MHzChannelsFound = 0;
 
-	/* TODO: this interface changed to include the 40MHz channel list */
-	/* this needs to be tied into the adapter structure somehow and referenced appropriately for CB operation */
-	/* Read the scan channel list (including the power limit) from EEPROM */
 	cdf_status =
 		cds_get_channel_list_with_power(pMac->scan.defaultPowerTable,
-						   &num20MHzChannelsFound,
-						   pMac->scan.defaultPowerTable40MHz,
-						   &num40MHzChannelsFound);
+						&num20MHzChannelsFound);
+
 	if ((CDF_STATUS_SUCCESS != cdf_status) || (num20MHzChannelsFound == 0)) {
 		sms_log(pMac, LOGE, FL("failed to get channels "));
 		status = CDF_STATUS_E_FAILURE;
@@ -2513,16 +2508,7 @@ CDF_STATUS csr_get_channel_and_power_list(tpAniSirGlobal pMac)
 		}
 		pMac->scan.base_channels.numChannels =
 			num20MHzChannelsFound;
-		if (num40MHzChannelsFound > WNI_CFG_VALID_CHANNEL_LIST_LEN) {
-			num40MHzChannelsFound = WNI_CFG_VALID_CHANNEL_LIST_LEN;
-		}
-		for (Index = 0; Index < num40MHzChannelsFound; Index++) {
-			pMac->scan.base40MHzChannels.channelList[Index] =
-				pMac->scan.defaultPowerTable40MHz[Index].
-				chan_num;
-		}
-		pMac->scan.base40MHzChannels.numChannels =
-			num40MHzChannelsFound;
+
 	}
 	return status;
 }
@@ -11919,19 +11905,6 @@ bool csr_roam_is_channel_valid(tpAniSirGlobal pMac, uint8_t channel)
 	return fValid;
 }
 
-bool csr_roam_is_valid40_mhz_channel(tpAniSirGlobal pMac, uint8_t channel)
-{
-	bool fValid = false;
-	uint8_t i;
-	for (i = 0; i < pMac->scan.base40MHzChannels.numChannels; i++) {
-		if (channel == pMac->scan.base40MHzChannels.channelList[i]) {
-			fValid = true;
-			break;
-		}
-	}
-	return fValid;
-}
-
 /* This function check and validate whether the NIC can do CB (40MHz) */
 static ePhyChanBondState csr_get_cb_mode_from_ies(tpAniSirGlobal pMac,
 						  uint8_t primaryChn,
@@ -12014,8 +11987,9 @@ static ePhyChanBondState csr_get_cb_mode_from_ies(tpAniSirGlobal pMac,
 		break;
 	}
 
-	if ((PHY_SINGLE_CHANNEL_CENTERED != eRet)
-	    && !csr_roam_is_valid40_mhz_channel(pMac, centerChn)) {
+	if ((PHY_SINGLE_CHANNEL_CENTERED != eRet) &&
+	    (CDF_STATUS_SUCCESS != sme_check_ch_in_band(pMac,
+							centerChn - 2, 2))) {
 		sms_log(pMac, LOGE,
 			"Invalid center channel (%d), disable 40MHz mode",
 			centerChn);
@@ -18421,8 +18395,6 @@ void csr_init_operating_classes(tHalHandle hHal)
 
 	csr_update_op_class_array(pMac, opClasses,
 				  &pMac->scan.base_channels, "20MHz", &i);
-	csr_update_op_class_array(pMac, opClasses,
-				  &pMac->scan.base40MHzChannels, "40MHz", &i);
 	numClasses = i;
 
 	/* As per spec the operating classes should be in ascending order.

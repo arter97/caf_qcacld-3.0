@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -219,7 +219,6 @@ void csr_release_command_set_key(tpAniSirGlobal pMac, tSmeCmd *pCommand);
 void csr_abort_command(tpAniSirGlobal pMac, tSmeCmd *pCommand, bool fStopping);
 
 CDF_STATUS csr_is_valid_channel(tpAniSirGlobal pMac, uint8_t chnNum);
-bool csr_roam_is_valid40_mhz_channel(tpAniSirGlobal pmac, uint8_t channel);
 
 CDF_STATUS sme_acquire_global_lock(tSmeStruct *psSme);
 CDF_STATUS sme_release_global_lock(tSmeStruct *psSme);
@@ -284,4 +283,8 @@ void active_list_cmd_timeout_handle(void *userData);
 void csr_process_set_dual_mac_config(tpAniSirGlobal mac, tSmeCmd *command);
 void csr_process_set_hw_mode(tpAniSirGlobal mac, tSmeCmd *command);
 void csr_process_nss_update_req(tpAniSirGlobal mac, tSmeCmd *command);
+
+CDF_STATUS sme_check_ch_in_band(tpAniSirGlobal mac_ctx, uint8_t start_ch,
+				uint8_t ch_cnt);
+
 #endif /* #if !defined( __SMEINSIDE_H ) */
