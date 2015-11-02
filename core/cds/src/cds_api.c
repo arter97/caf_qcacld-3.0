@@ -150,6 +150,18 @@ static void cds_set_nan_enable(tMacOpenParameters *param,
 }
 #endif
 
+#ifdef FEATURE_RUNTIME_PM
+static void cds_runtime_pm_config(struct ol_softc *scn, hdd_context_t *hdd_ctx)
+{
+	scn->enable_runtime_pm = hdd_ctx->config->runtime_pm;
+	scn->runtime_pm_delay = hdd_ctx->config->runtime_pm_delay;
+}
+#else
+static void cds_runtime_pm_config(struct ol_softc *scn, hdd_context_t *hdd_ctx)
+{
+}
+#endif
+
 /**
  * cds_open() - open the CDS Module
  *
@@ -262,6 +274,8 @@ CDF_STATUS cds_open(void)
 	scn->enable_ramdump_collection =
 				pHddCtx->config->is_ramdump_enabled;
 	scn->enable_self_recovery = pHddCtx->config->enableSelfRecovery;
+
+	cds_runtime_pm_config(scn, pHddCtx);
 
 	/* Initialize BMI and Download firmware */
 	cdf_status = bmi_download_firmware(scn);

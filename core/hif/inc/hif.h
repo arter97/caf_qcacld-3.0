@@ -280,6 +280,10 @@ struct ol_softc {
 #ifdef WLAN_FEATURE_LPSS
 	bool enablelpasssupport;
 #endif
+#ifdef FEATURE_RUNTIME_PM
+	bool enable_runtime_pm;
+	u_int32_t runtime_pm_delay;
+#endif
 	bool enable_ramdump_collection;
 	struct targetdef_s *targetdef;
 	struct ce_reg_def *target_ce_def;
