@@ -305,7 +305,7 @@ static const hdd_freq_chan_map_t freq_chan_map[] = {
 #define WE_GET_11W_INFO      9
 #endif
 #define WE_GET_STATES        10
-
+#define WE_GET_IBSS_STA_INFO 11
 #define WE_GET_PHYMODE       12
 #ifdef FEATURE_OEM_DATA_SUPPORT
 #define WE_GET_OEM_DATA_CAP  13
@@ -316,7 +316,7 @@ static const hdd_freq_chan_map_t freq_chan_map[] = {
 /* Private ioctls and their sub-ioctls */
 #define WLAN_PRIV_SET_NONE_GET_NONE   (SIOCIWFIRSTPRIV + 6)
 #define WE_SET_REASSOC_TRIGGER     8
-
+#define WE_IBSS_GET_PEER_INFO_ALL 10
 #define WE_DUMP_AGC_START          11
 #define WE_DUMP_AGC                12
 #define WE_DUMP_CHANINFO_START     13
@@ -339,7 +339,7 @@ static const hdd_freq_chan_map_t freq_chan_map[] = {
 #ifdef FEATURE_WLAN_TDLS
 #define WE_TDLS_CONFIG_PARAMS   5
 #endif
-
+#define WE_IBSS_GET_PEER_INFO   6
 #define WE_UNIT_TEST_CMD   7
 
 #define WE_MTRACE_DUMP_CMD    8
@@ -762,6 +762,194 @@ void hdd_wlan_get_version(hdd_adapter_t *pAdapter, union iwreq_data *wrqu,
 	}
 error:
 	return;
+}
+
+/**
+ * hdd_get_ibss_peer_info_cb() - IBSS Peer Info Callback
+ * @pUserData: user context originally passed to SME; we pass hdd adapter
+ * @pPeerInfoRsp: IBSS Peer information
+ *
+ * Return: None
+ */
+void hdd_get_ibss_peer_info_cb(void *pUserData, void *pPeerInfoRsp)
+{
+	hdd_adapter_t *pAdapter = (hdd_adapter_t *) pUserData;
+	hdd_ibss_peer_info_t *pPeerInfo = (hdd_ibss_peer_info_t *) pPeerInfoRsp;
+	hdd_station_ctx_t *pStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
+	uint8_t i;
+
+	if (NULL != pPeerInfo && CDF_STATUS_SUCCESS == pPeerInfo->status) {
+		pStaCtx->ibss_peer_info.status = pPeerInfo->status;
+		pStaCtx->ibss_peer_info.numIBSSPeers = pPeerInfo->numIBSSPeers;
+		for (i = 0; i < pPeerInfo->numIBSSPeers; i++) {
+			memcpy(&pStaCtx->ibss_peer_info.ibssPeerList[i],
+			       &pPeerInfo->ibssPeerList[i],
+			       sizeof(hdd_ibss_peer_info_params_t));
+		}
+	} else {
+		CDF_TRACE(CDF_MODULE_ID_HDD, CDF_TRACE_LEVEL_INFO,
+			  "%s] PEER_INFO_CMD_STATUS is not SUCCESS", __func__);
+	}
+
+	complete(&pAdapter->ibss_peer_info_comp);
+}
+
+/**
+ * hdd_wlan_get_ibss_mac_addr_from_staid() - Get IBSS MAC address
+ * @pAdapter: Adapter upon which the IBSS client is active
+ * @staIdx: Station index of the IBSS peer
+ *
+ * Return: a pointer to the MAC address of the IBSS peer if the peer is
+ *	   found, otherwise %NULL.
+ */
+struct cdf_mac_addr *
+hdd_wlan_get_ibss_mac_addr_from_staid(hdd_adapter_t *pAdapter,
+				      uint8_t staIdx)
+{
+	uint8_t idx;
+	hdd_station_ctx_t *pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
+
+	for (idx = 0; idx < MAX_IBSS_PEERS; idx++) {
+		if (0 != pHddStaCtx->conn_info.staId[idx] &&
+		    staIdx == pHddStaCtx->conn_info.staId[idx]) {
+			return &pHddStaCtx->conn_info.peerMacAddress[idx];
+		}
+	}
+	return NULL;
+}
+
+/**
+ * hdd_wlan_get_ibss_peer_info() - Print IBSS peer information
+ * @pAdapter: Adapter upon which the IBSS client is active
+ * @staIdx: Station index of the IBSS peer
+ *
+ * Return: CDF_STATUS_STATUS if the peer was found and displayed,
+ * otherwise an appropriate CDF_STATUS_E_* failure code.
+ */
+CDF_STATUS hdd_wlan_get_ibss_peer_info(hdd_adapter_t *pAdapter, uint8_t staIdx)
+{
+	CDF_STATUS status = CDF_STATUS_E_FAILURE;
+	tHalHandle hHal = WLAN_HDD_GET_HAL_CTX(pAdapter);
+	hdd_station_ctx_t *pStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
+	hdd_ibss_peer_info_t *pPeerInfo = &pStaCtx->ibss_peer_info;
+
+	status =
+		sme_request_ibss_peer_info(hHal, pAdapter, hdd_get_ibss_peer_info_cb,
+					   false, staIdx);
+
+	INIT_COMPLETION(pAdapter->ibss_peer_info_comp);
+
+	if (CDF_STATUS_SUCCESS == status) {
+		unsigned long rc;
+		rc = wait_for_completion_timeout
+			     (&pAdapter->ibss_peer_info_comp,
+			     msecs_to_jiffies(IBSS_PEER_INFO_REQ_TIMOEUT));
+		if (!rc) {
+			hddLog(CDF_TRACE_LEVEL_ERROR,
+			       FL("failed wait on ibss_peer_info_comp"));
+			return CDF_STATUS_E_FAILURE;
+		}
+
+		/** Print the peer info */
+		pr_info("pPeerInfo->numIBSSPeers = %d ",
+			pPeerInfo->numIBSSPeers);
+		pr_info
+			("============================================================");
+		{
+			struct cdf_mac_addr *macAddr =
+				hdd_wlan_get_ibss_mac_addr_from_staid(pAdapter,
+								      staIdx);
+			uint32_t txRateMbps =
+				((pPeerInfo->ibssPeerList[0].txRate) * 500 * 1000) /
+				1000000;
+
+			if (NULL != macAddr) {
+				pr_info("PEER ADDR :" MAC_ADDRESS_STR
+					" TxRate: %d Mbps  RSSI: %d",
+					MAC_ADDR_ARRAY(macAddr->bytes),
+					(int)txRateMbps,
+					(int)pPeerInfo->ibssPeerList[0].rssi);
+			} else {
+				CDF_TRACE(CDF_MODULE_ID_HDD,
+					  CDF_TRACE_LEVEL_ERROR,
+					  " ERROR: PEER MAC ADDRESS NOT FOUND ");
+			}
+		}
+	} else {
+		hddLog(CDF_TRACE_LEVEL_WARN,
+		       "%s: Warning: sme_request_ibss_peer_info Request failed",
+		       __func__);
+	}
+
+	return status;
+}
+
+/**
+ * hdd_wlan_get_ibss_peer_info_all() - Print all IBSS peers
+ * @pAdapter: Adapter upon which the IBSS clients are active
+ *
+ * Return: CDF_STATUS_STATUS if the peer information was retrieved and
+ * displayed, otherwise an appropriate CDF_STATUS_E_* failure code.
+ */
+CDF_STATUS hdd_wlan_get_ibss_peer_info_all(hdd_adapter_t *pAdapter)
+{
+	CDF_STATUS status = CDF_STATUS_E_FAILURE;
+	tHalHandle hHal = WLAN_HDD_GET_HAL_CTX(pAdapter);
+	hdd_station_ctx_t *pStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
+	hdd_ibss_peer_info_t *pPeerInfo = &pStaCtx->ibss_peer_info;
+	int i;
+
+	status =
+		sme_request_ibss_peer_info(hHal, pAdapter, hdd_get_ibss_peer_info_cb,
+					   true, 0xFF);
+	INIT_COMPLETION(pAdapter->ibss_peer_info_comp);
+
+	if (CDF_STATUS_SUCCESS == status) {
+		unsigned long rc;
+		rc = wait_for_completion_timeout
+			     (&pAdapter->ibss_peer_info_comp,
+			     msecs_to_jiffies(IBSS_PEER_INFO_REQ_TIMOEUT));
+		if (!rc) {
+			hddLog(CDF_TRACE_LEVEL_ERROR,
+			       FL("failed wait on ibss_peer_info_comp"));
+			return CDF_STATUS_E_FAILURE;
+		}
+
+		/** Print the peer info */
+		pr_info("pPeerInfo->numIBSSPeers = %d ",
+			(int)pPeerInfo->numIBSSPeers);
+		pr_info
+			("============================================================");
+		for (i = 0; i < pPeerInfo->numIBSSPeers; i++) {
+			uint8_t staIdx = pPeerInfo->ibssPeerList[i].staIdx;
+			struct cdf_mac_addr *macAddr =
+				hdd_wlan_get_ibss_mac_addr_from_staid(pAdapter,
+								      staIdx);
+			uint32_t txRateMbps =
+				((pPeerInfo->ibssPeerList[0].txRate) * 500 * 1000) /
+				1000000;
+
+			pr_info("STAIDX:%d ",
+				(int)pPeerInfo->ibssPeerList[i].staIdx);
+			if (NULL != macAddr) {
+				pr_info(" PEER ADDR :" MAC_ADDRESS_STR
+					" TxRate: %d Mbps RSSI: %d",
+					MAC_ADDR_ARRAY(macAddr->bytes),
+					(int)txRateMbps,
+					(int)pPeerInfo->ibssPeerList[i].rssi);
+			} else {
+				CDF_TRACE(CDF_MODULE_ID_HDD,
+					  CDF_TRACE_LEVEL_ERROR,
+					  " ERROR: PEER MAC ADDRESS NOT FOUND ");
+			}
+		}
+	} else {
+		hddLog(CDF_TRACE_LEVEL_WARN,
+		       "%s: Warning: sme_request_ibss_peer_info Request failed",
+		       __func__);
+	}
+
+	return status;
 }
 
 /**
@@ -7258,6 +7446,39 @@ static int __iw_get_char_setnone(struct net_device *dev,
 		break;
 	}
 #endif
+	case WE_GET_IBSS_STA_INFO:
+	{
+		hdd_station_ctx_t *pHddStaCtx =
+			WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
+		int idx = 0;
+		int length = 0, buf = 0;
+
+		for (idx = 0; idx < MAX_IBSS_PEERS; idx++) {
+			if (0 != pHddStaCtx->conn_info.staId[idx]) {
+				buf = snprintf
+					      ((extra + length),
+					      WE_MAX_STR_LEN - length,
+					      "\n%d .%02x:%02x:%02x:%02x:%02x:%02x\n",
+					      pHddStaCtx->conn_info.staId[idx],
+					      pHddStaCtx->conn_info.
+					      peerMacAddress[idx].bytes[0],
+					      pHddStaCtx->conn_info.
+					      peerMacAddress[idx].bytes[1],
+					      pHddStaCtx->conn_info.
+					      peerMacAddress[idx].bytes[2],
+					      pHddStaCtx->conn_info.
+					      peerMacAddress[idx].bytes[3],
+					      pHddStaCtx->conn_info.
+					      peerMacAddress[idx].bytes[4],
+					      pHddStaCtx->conn_info.
+					      peerMacAddress[idx].bytes[5]
+					      );
+				length += buf;
+			}
+		}
+		wrqu->data.length = strlen(extra) + 1;
+		break;
+	}
 	case WE_GET_PHYMODE:
 	{
 		bool ch_bond24 = false, ch_bond5g = false;
@@ -7468,6 +7689,12 @@ static int __iw_setnone_getnone(struct net_device *dev,
 				0, DBG_CMD);
 		break;
 
+	case WE_IBSS_GET_PEER_INFO_ALL:
+	{
+		hdd_wlan_get_ibss_peer_info_all(adapter);
+		break;
+	}
+
 	case WE_SET_REASSOC_TRIGGER:
 	{
 		hdd_adapter_t *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
@@ -7626,6 +7853,12 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
 	hddLog(LOG1, FL("Received length %d"), wrqu->data.length);
 
 	switch (sub_cmd) {
+	case WE_IBSS_GET_PEER_INFO:
+	{
+		pr_info("Station ID = %d\n", apps_args[0]);
+		hdd_wlan_get_ibss_peer_info(pAdapter, apps_args[0]);
+	}
+	break;
 
 	case WE_P2P_NOA_CMD:
 	{
@@ -10422,7 +10655,12 @@ static const struct iw_priv_args we_private_args[] = {
 		"getPMFInfo"
 	},
 #endif
-
+	{
+		WE_GET_IBSS_STA_INFO,
+		0,
+		IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN,
+		"getIbssSTAs"
+	},
 	{WE_GET_PHYMODE,
 	 0,
 	 IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN,
@@ -10444,6 +10682,13 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 ""},
 
+	/* handlers for sub-ioctl */
+	{
+		WE_IBSS_GET_PEER_INFO_ALL,
+		0,
+		0,
+		"ibssPeerInfoAll"
+	},
 	{WE_GET_RECOVERY_STAT,
 	 0,
 	 0,
@@ -10498,6 +10743,12 @@ static const struct iw_priv_args we_private_args[] = {
 	 IW_PRIV_TYPE_INT | MAX_VAR_ARGS,
 	 0,
 	 ""},
+
+	/* handlers for sub-ioctl */
+	{WE_IBSS_GET_PEER_INFO,
+	 IW_PRIV_TYPE_INT | MAX_VAR_ARGS,
+	 0,
+	 "ibssPeerInfo"},
 
 	/* handlers for sub-ioctl */
 	{WE_MTRACE_SELECTIVE_MODULE_LOG_ENABLE_CMD,

@@ -635,6 +635,29 @@ typedef struct hdd_cfg80211_state_s {
 	eP2PActionFrameState actionFrmState;
 } hdd_cfg80211_state_t;
 
+
+/*---------------------------------------------------------------------------
+   hdd_ibss_peer_info_params_t
+   ---------------------------------------------------------------------------*/
+typedef struct {
+	uint8_t staIdx;         /* StaIdx */
+	uint32_t txRate;        /* Current Tx Rate */
+	uint32_t mcsIndex;      /* MCS Index */
+	uint32_t txRateFlags;   /* TxRate Flags */
+	int8_t rssi;            /* RSSI */
+} hdd_ibss_peer_info_params_t;
+
+typedef struct {
+	/** Request status */
+	uint32_t status;
+
+	/** Number of peers */
+	uint8_t numIBSSPeers;
+
+	/** Peer Info parameters */
+	hdd_ibss_peer_info_params_t ibssPeerList[MAX_IBSS_PEERS];
+} hdd_ibss_peer_info_t;
+
 struct hdd_station_ctx {
 	/** Handle to the Wireless Extension State */
 	hdd_wext_state_t WextState;
@@ -661,6 +684,7 @@ struct hdd_station_ctx {
 
 	/*Save the wep/wpa-none keys */
 	tCsrRoamSetKey ibss_enc_key;
+	hdd_ibss_peer_info_t ibss_peer_info;
 
 	bool hdd_ReassocScenario;
 
@@ -903,6 +927,8 @@ struct hdd_adapter_s {
 	struct completion tdls_link_establish_req_comp;
 	CDF_STATUS tdlsAddStaStatus;
 #endif
+
+	struct completion ibss_peer_info_comp;
 
 	/* Track whether the linkup handling is needed  */
 	bool isLinkUpSvcNeeded;
@@ -1412,6 +1438,9 @@ int wlan_hdd_validate_context(hdd_context_t *pHddCtx);
 bool hdd_is_valid_mac_address(const uint8_t *pMacAddr);
 CDF_STATUS hdd_issta_p2p_clientconnected(hdd_context_t *pHddCtx);
 
+struct cdf_mac_addr *
+hdd_wlan_get_ibss_mac_addr_from_staid(hdd_adapter_t *pAdapter,
+				      uint8_t staIdx);
 void hdd_checkandupdate_phymode(hdd_context_t *pHddCtx);
 
 #ifdef MSM_PLATFORM
