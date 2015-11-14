@@ -5256,6 +5256,8 @@ hdd_context_t *hdd_init_context(struct device *dev, void *hif_sc)
 	hdd_tdls_pre_init(hdd_ctx);
 	mutex_init(&hdd_ctx->dfs_lock);
 
+	init_completion(&hdd_ctx->set_antenna_mode_cmpl);
+
 	hdd_ctx->target_type = ((struct ol_softc *)hif_sc)->target_type;
 
 	hdd_init_offloaded_packets_ctx(hdd_ctx);
@@ -6790,6 +6792,30 @@ end:
 	return;
 }
 #endif
+
+/**
+ * wlan_hdd_soc_set_antenna_mode_cb() - Callback for set dual
+ * mac scan config
+ * @status: Status of set antenna mode
+ *
+ * Callback on setting the dual mac configuration
+ *
+ * Return: None
+ */
+void wlan_hdd_soc_set_antenna_mode_cb(
+	enum set_antenna_mode_status status)
+{
+	hdd_context_t *hdd_ctx;
+
+	hdd_info("Status: %d", status);
+
+	hdd_ctx = cds_get_context(CDF_MODULE_ID_HDD);
+	if (0 != wlan_hdd_validate_context(hdd_ctx))
+		return;
+
+	/* Signal the completion of set dual mac config */
+	complete(&hdd_ctx->set_antenna_mode_cmpl);
+}
 
 /**
  * hdd_get_fw_version() - Get FW version
