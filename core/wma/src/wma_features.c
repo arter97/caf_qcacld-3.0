@@ -3698,6 +3698,9 @@ CDF_STATUS wma_resume_req(tp_wma_handle wma, enum cdf_suspend_type type)
 
 	wmi_set_runtime_pm_inprogress(wma->wmi_handle, false);
 
+	if (type == CDF_RUNTIME_SUSPEND)
+		cdf_runtime_pm_allow_suspend(wma->wma_runtime_resume_lock);
+
 	return CDF_STATUS_SUCCESS;
 }
 
@@ -6347,10 +6350,22 @@ void wma_send_regdomain_info_to_fw(uint32_t reg_dmn, uint16_t regdmn2G,
 static CDF_STATUS wma_post_runtime_resume_msg(WMA_HANDLE handle)
 {
 	cds_msg_t resume_msg;
+	CDF_STATUS status;
+	tp_wma_handle wma = (tp_wma_handle) handle;
+
+	cdf_runtime_pm_prevent_suspend(wma->wma_runtime_resume_lock);
 
 	resume_msg.bodyptr = NULL;
 	resume_msg.type    = WMA_RUNTIME_PM_RESUME_IND;
-	return cds_mq_post_message(CDF_MODULE_ID_WMA, &resume_msg);
+
+	status = cds_mq_post_message(CDF_MODULE_ID_WMA, &resume_msg);
+
+	if (!CDF_IS_STATUS_SUCCESS(status)) {
+		WMA_LOGE("Failed to post Runtime PM Resume IND to VOS");
+		cdf_runtime_pm_allow_suspend(wma->wma_runtime_resume_lock);
+	}
+
+	return status;
 }
 
 /**
@@ -6381,11 +6396,13 @@ static CDF_STATUS wma_post_runtime_suspend_msg(WMA_HANDLE handle)
 			WMA_TGT_SUSPEND_COMPLETE_TIMEOUT) !=
 			CDF_STATUS_SUCCESS) {
 		WMA_LOGE("Failed to get runtime suspend event");
-		goto failure;
+		goto msg_timed_out;
 	}
 
 	return CDF_STATUS_SUCCESS;
 
+msg_timed_out:
+	wma_post_runtime_resume_msg(wma);
 failure:
 	return CDF_STATUS_E_AGAIN;
 }
