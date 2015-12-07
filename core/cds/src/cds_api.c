@@ -1585,12 +1585,22 @@ void cds_trigger_recovery(void)
 {
 	tp_wma_handle wma_handle = cds_get_context(CDF_MODULE_ID_WMA);
 	CDF_STATUS status = CDF_STATUS_SUCCESS;
+	cdf_runtime_lock_t recovery_lock;
 
 	if (!wma_handle) {
 		CDF_TRACE(CDF_MODULE_ID_CDF, CDF_TRACE_LEVEL_ERROR,
 			"WMA context is invald!");
 		return;
 	}
+
+	recovery_lock = cdf_runtime_lock_init("cds_recovery");
+	if (!recovery_lock) {
+		CDF_TRACE(CDF_MODULE_ID_CDF, CDF_TRACE_LEVEL_ERROR,
+			"Could not acquire runtime pm lock!");
+		return;
+	}
+
+	cdf_runtime_pm_prevent_suspend(recovery_lock);
 
 	wma_crash_inject(wma_handle, RECOVERY_SIM_SELF_RECOVERY, 0);
 
@@ -1604,14 +1614,15 @@ void cds_trigger_recovery(void)
 		if (cds_is_driver_recovering()) {
 			CDF_TRACE(CDF_MODULE_ID_CDF, CDF_TRACE_LEVEL_ERROR,
 				"Recovery is in progress, ignore!");
-			return;
+		} else {
+			cds_set_recovery_in_progress(true);
+			cnss_schedule_recovery_work();
 		}
-		cds_set_recovery_in_progress(true);
-		cnss_schedule_recovery_work();
  #endif
-
-		return;
 	}
+
+	cdf_runtime_pm_allow_suspend(recovery_lock);
+	cdf_runtime_lock_deinit(recovery_lock);
 }
 
 /**
