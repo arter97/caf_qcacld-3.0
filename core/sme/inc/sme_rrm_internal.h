@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2012, 2014-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2012, 2014-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -88,10 +88,10 @@ typedef struct sRrmSMEContext {
 	tDblLinkList neighborReportCache;
 	tRrmNeighborRequestControlInfo neighborReqControlInfo;
 
-#if defined(FEATURE_WLAN_ESE) && defined(FEATURE_WLAN_ESE_UPLOAD)
+#ifdef FEATURE_WLAN_ESE
 	tCsrEseBeaconReq eseBcnReqInfo;
 	bool eseBcnReqInProgress;
-#endif /* FEATURE_WLAN_ESE && FEATURE_WLAN_ESE_UPLOAD */
+#endif /* FEATURE_WLAN_ESE */
 	tRrmMsgReqSource msgSource;
 } tRrmSMEContext, *tpRrmSMEContext;
 
