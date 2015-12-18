@@ -3432,6 +3432,7 @@ static CDF_STATUS sap_fsm_state_starting(ptSapContext sap_ctx,
 	tCsrRoamInfo *roam_info = (tCsrRoamInfo *) (sap_event->params);
 	tSapDfsInfo *sap_dfs_info;
 	CDF_STATUS cdf_status = CDF_STATUS_E_FAILURE;
+	uint8_t is_dfs = false;
 
 	if (msg == eSAP_MAC_START_BSS_SUCCESS) {
 		/*
@@ -3439,8 +3440,9 @@ static CDF_STATUS sap_fsm_state_starting(ptSapContext sap_ctx,
 		 * (both without substates)
 		 */
 		CDF_TRACE(CDF_MODULE_ID_SAP, CDF_TRACE_LEVEL_INFO_HIGH,
-			  FL("from state channel = %d %s => %s"),
-			  sap_ctx->channel, "eSAP_STARTING", "eSAP_STARTED");
+			  FL("from state channel = %d %s => %s ch_width %d"),
+			  sap_ctx->channel, "eSAP_STARTING", "eSAP_STARTED",
+			  sap_ctx->ch_params.ch_width);
 		sap_ctx->sapsMachine = eSAP_STARTED;
 
 		/* Action code for transition */
@@ -3453,8 +3455,22 @@ static CDF_STATUS sap_fsm_state_starting(ptSapContext sap_ctx,
 		 * running, however, the AP is still not beaconing, until
 		 * CAC is done if the operating channel is DFS
 		 */
-		if (CHANNEL_STATE_DFS ==
-			cds_get_channel_state(sap_ctx->channel)) {
+		if (sap_ctx->ch_params.ch_width == CH_WIDTH_160MHZ) {
+			is_dfs = true;
+		} else if (sap_ctx->ch_params.ch_width == CH_WIDTH_80P80MHZ) {
+			if (cds_get_channel_state(sap_ctx->channel) ==
+			    CHANNEL_STATE_DFS ||
+			    cds_get_channel_state(sap_ctx->
+				ch_params.center_freq_seg1 -
+				SIR_80MHZ_START_CENTER_CH_DIFF) ==
+					CHANNEL_STATE_DFS)
+				is_dfs = true;
+		} else {
+			if (cds_get_channel_state(sap_ctx->channel) ==
+							CHANNEL_STATE_DFS)
+				is_dfs = true;
+		}
+		if (is_dfs) {
 			sap_dfs_info = &mac_ctx->sap.SapDfsInfo;
 			if ((false == sap_dfs_info->ignore_cac) &&
 			    (eSAP_DFS_DO_NOT_SKIP_CAC ==
