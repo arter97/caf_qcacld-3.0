@@ -52,9 +52,7 @@
 #include "lim_admit_control.h"
 #include "wmm_apsd.h"
 #include "lim_send_messages.h"
-#if defined WLAN_FEATURE_VOWIFI
 #include "rrm_api.h"
-#endif
 #include "lim_session_utils.h"
 #include "cds_concurrency.h"
 #include "wma_types.h"
@@ -1353,7 +1351,6 @@ __lim_process_sm_power_save_update(tpAniSirGlobal pMac, uint8_t *pRxPacketInfo,
 				 pSta->staAddr, psessionEntry->smeSessionId);
 }
 
-#if defined WLAN_FEATURE_VOWIFI
 
 static void
 __lim_process_radio_measure_request(tpAniSirGlobal pMac, uint8_t *pRxPacketInfo,
@@ -1504,7 +1501,6 @@ __lim_process_neighbor_report(tpAniSirGlobal pMac, uint8_t *pRxPacketInfo,
 	cdf_mem_free(pFrm);
 }
 
-#endif
 
 #ifdef WLAN_FEATURE_11W
 /**
@@ -1914,7 +1910,6 @@ void lim_process_action_frame(tpAniSirGlobal mac_ctx,
 		}
 		break;
 
-#if defined WLAN_FEATURE_VOWIFI
 	case SIR_MAC_ACTION_RRM:
 #ifdef WLAN_FEATURE_11W
 		if (lim_drop_unprotected_action_frame(mac_ctx, session,
@@ -1951,7 +1946,7 @@ void lim_process_action_frame(tpAniSirGlobal mac_ctx,
 				FL("RRM frm ignored, it is disabled in cfg"));
 		}
 		break;
-#endif
+
 	case SIR_MAC_ACTION_VENDOR_SPECIFIC_CATEGORY:
 		vendor_specific = (tpSirMacVendorSpecificFrameHdr) action_hdr;
 		mac_hdr = NULL;

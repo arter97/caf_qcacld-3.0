@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -35,7 +35,6 @@
 
 /* $Header$ */
 
-#if defined WLAN_FEATURE_VOWIFI
 /*--------------------------------------------------------------------------
    Include Files
    ------------------------------------------------------------------------*/
@@ -1563,4 +1562,3 @@ tRrmNeighborReportDesc *sme_rrm_get_next_bss_entry_from_neighbor_cache(
 	return pTempBssEntry;
 }
 
-#endif
