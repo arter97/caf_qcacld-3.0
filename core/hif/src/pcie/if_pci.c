@@ -40,6 +40,7 @@
 #include "ce_api.h"
 #include "ce_internal.h"
 #include "ce_reg.h"
+#include "ce_bmi.h"
 #include "bmi_msg.h"            /* TARGET_TYPE_ */
 #include "regtable.h"
 #include "ol_fw.h"
@@ -1213,6 +1214,7 @@ void hif_disable_power_management(void *hif_ctx)
 CDF_STATUS hif_bus_open(struct ol_softc *ol_sc, enum ath_hal_bus_type bus_type)
 {
 	struct hif_pci_softc *sc;
+	CDF_STATUS status;
 
 	sc = cdf_mem_malloc(sizeof(*sc));
 	if (!sc) {
@@ -1226,7 +1228,88 @@ CDF_STATUS hif_bus_open(struct ol_softc *ol_sc, enum ath_hal_bus_type bus_type)
 
 	cdf_spinlock_init(&ol_sc->irq_lock);
 
-	return CDF_STATUS_SUCCESS;
+	status = hif_ce_open(ol_sc);
+	if (status)
+		cdf_mem_free(sc);
+
+	return status;
+}
+
+#ifdef BMI_RSP_POLLING
+#define BMI_RSP_CB_REGISTER 0
+#else
+#define BMI_RSP_CB_REGISTER 1
+#endif
+
+static void hif_register_bmi_callbacks(struct ol_softc *scn)
+{
+	struct HIF_CE_pipe_info *pipe_info;
+	struct HIF_CE_state *hif_state = (struct HIF_CE_state *) scn->hif_hdl;
+
+	/*
+	 * Initially, establish CE completion handlers for use with BMI.
+	 * These are overwritten with generic handlers after we exit BMI phase.
+	 */
+	pipe_info = &hif_state->pipe_info[BMI_CE_NUM_TO_TARG];
+	ce_send_cb_register(pipe_info->ce_hdl, hif_bmi_send_done, pipe_info, 0);
+
+	if (BMI_RSP_CB_REGISTER) {
+		pipe_info = &hif_state->pipe_info[BMI_CE_NUM_TO_HOST];
+		ce_recv_cb_register(
+			pipe_info->ce_hdl, hif_bmi_recv_data, pipe_info, 0);
+	}
+}
+
+/**
+ * hif_bus_configure() - configure the pcie bus
+ * @scn: pointer to the hif context.
+ *
+ * return: 0 for success. nonzero for failure.
+ */
+int hif_bus_configure(struct ol_softc *scn)
+{
+	int status = 0;
+
+	hif_ce_prepare_config();
+
+	if (ADRASTEA_BU) {
+		status = hif_wlan_enable();
+
+		if (status) {
+			HIF_ERROR("%s: hif_wlan_enable error = %d",
+					__func__, status);
+			return status;
+		}
+	}
+
+	A_TARGET_ACCESS_LIKELY(scn);
+	status = hif_config_ce(scn);
+	if (status)
+		goto config_err;
+
+	status = hif_set_hia(scn);
+	if (status)
+		goto err;
+
+	A_TARGET_ACCESS_UNLIKELY(scn);
+
+	HIF_INFO_MED("%s: hif_set_hia done", __func__);
+
+	hif_register_bmi_callbacks(scn);
+
+	status = hif_configure_irq(scn->hif_sc);
+	if (status < 0)
+		goto err;
+
+	return status;
+
+err:
+	hif_unconfig_ce(scn);
+config_err:
+	if (ADRASTEA_BU)
+		hif_wlan_disable();
+	HIF_ERROR("%s: failed, status = %d", __func__, status);
+	return status;
 }
 
 /**
@@ -1243,12 +1326,14 @@ void hif_bus_close(struct ol_softc *ol_sc)
 		return;
 	}
 	sc = ol_sc->hif_sc;
-	if (sc == NULL)
-		return;
 
-	hif_pm_runtime_close(sc);
-	cdf_mem_free(sc);
-	ol_sc->hif_sc = NULL;
+	if (sc) {
+		hif_pm_runtime_close(sc);
+		cdf_mem_free(sc);
+		ol_sc->hif_sc = NULL;
+	}
+
+	hif_ce_close(ol_sc);
 }
 
 #define BAR_NUM 0

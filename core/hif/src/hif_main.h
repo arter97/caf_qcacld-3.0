@@ -105,7 +105,14 @@ A_target_id_t hif_get_target_id(struct ol_softc *scn);
 void hif_dump_pipe_debug_count(struct ol_softc *scn);
 
 bool hif_max_num_receives_reached(unsigned int count);
-int hif_config_ce(hif_handle_t hif_hdl);
+int hif_config_ce(struct ol_softc *scn);
+void hif_unconfig_ce(struct ol_softc *scn);
+void hif_ce_prepare_config(void);
+int hif_set_hia(struct ol_softc *scn);
+CDF_STATUS hif_ce_open(struct ol_softc *scn);
+void hif_ce_close(struct ol_softc *scn);
+int hif_wlan_enable(void);
+void hif_wlan_disable(void);
 int athdiag_procfs_init(void *scn);
 void athdiag_procfs_remove(void);
 /* routine to modify the initial buffer count to be allocated on an os
@@ -132,5 +139,6 @@ CDF_STATUS hif_enable_bus(struct ol_softc *ol_sc, struct device *dev,
 	void *bdev, const hif_bus_id *bid, enum hif_enable_type type);
 void hif_disable_bus(void *bdev);
 void hif_bus_prevent_linkdown(struct ol_softc *scn, bool flag);
+int hif_bus_configure(struct ol_softc *ol_sc);
 
 #endif /* __HIF_MAIN_H__ */

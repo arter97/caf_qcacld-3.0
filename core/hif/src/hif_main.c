@@ -567,10 +567,6 @@ void hif_close(void *hif_ctx)
 		scn->athdiag_procfs_inited = false;
 	}
 
-	if (scn->hif_hdl) {
-		cdf_mem_free(scn->hif_hdl);
-		scn->hif_hdl = NULL;
-	}
 	hif_bus_close(scn);
 	cds_free_context(cds_get_global_context(),
 		CDF_MODULE_ID_HIF, hif_ctx);
@@ -610,12 +606,13 @@ CDF_STATUS hif_enable(void *hif_ctx, struct device *dev,
 	if (ADRASTEA_BU)
 		hif_vote_link_up();
 
-	if (hif_config_ce(scn)) {
+	if (hif_bus_configure(scn)) {
 		HIF_ERROR("%s: Target probe failed.", __func__);
 		hif_disable_bus(scn->aps_osdev.bdev);
 		status = CDF_STATUS_E_FAILURE;
 		return status;
 	}
+
 	/*
 	 * Flag to avoid potential unallocated memory access from MSI
 	 * interrupt handler which could get scheduled as soon as MSI
@@ -623,16 +620,6 @@ CDF_STATUS hif_enable(void *hif_ctx, struct device *dev,
 	 * in where MSI is enabled before the memory, that will be
 	 * in interrupt handlers, is allocated.
 	 */
-
-#ifdef HIF_PCI
-	status = hif_configure_irq(scn->hif_sc);
-	if (status < 0) {
-		HIF_ERROR("%s: ERROR - configure_IRQ_and_CE failed, status = %d",
-			   __func__, status);
-		return CDF_STATUS_E_FAILURE;
-	}
-#endif
-
 	scn->hif_init_done = true;
 
 	HIF_TRACE("%s: X OK", __func__);
