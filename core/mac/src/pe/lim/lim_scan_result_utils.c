@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -39,9 +39,7 @@
 #include "lim_utils.h"
 #include "lim_ser_des_utils.h"
 #include "lim_api.h"
-#ifdef WLAN_FEATURE_VOWIFI_11R
 #include "lim_ft_defs.h"
-#endif
 #include "lim_session.h"
 #if defined WLAN_FEATURE_VOWIFI
 #include "rrm_api.h"
@@ -202,7 +200,6 @@ lim_collect_bss_description(tpAniSirGlobal pMac,
 	}
 #endif
 
-#ifdef WLAN_FEATURE_VOWIFI_11R
 	/* MobilityDomain */
 	pBssDescr->mdie[0] = 0;
 	pBssDescr->mdie[1] = 0;
@@ -216,7 +213,6 @@ lim_collect_bss_description(tpAniSirGlobal pMac,
 		pBssDescr->mdie[1] = pBPR->mdie[1];
 		pBssDescr->mdie[2] = pBPR->mdie[2];
 	}
-#endif
 
 #ifdef FEATURE_WLAN_ESE
 	pBssDescr->QBSSLoad_present = false;

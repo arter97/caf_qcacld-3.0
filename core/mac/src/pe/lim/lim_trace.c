@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -71,9 +71,7 @@ static uint8_t *__lim_trace_get_timer_string(uint16_t timerId)
 		CASE_RETURN_STRING(eLIM_QUIET_TIMER);
 		CASE_RETURN_STRING(eLIM_QUIET_BSS_TIMER);
 		CASE_RETURN_STRING(eLIM_WPS_OVERLAP_TIMER);
-#ifdef WLAN_FEATURE_VOWIFI_11R
 		CASE_RETURN_STRING(eLIM_FT_PREAUTH_RSP_TIMER);
-#endif
 		CASE_RETURN_STRING(eLIM_REMAIN_CHN_TIMER);
 		CASE_RETURN_STRING(eLIM_PERIODIC_PROBE_REQ_TIMER);
 		CASE_RETURN_STRING(eLIM_DISASSOC_ACK_TIMER);
