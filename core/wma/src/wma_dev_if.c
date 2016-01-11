@@ -511,10 +511,8 @@ void wma_vdev_detach_callback(void *ctx)
 		cdf_mem_free(iface->addBssStaContext);
 
 
-#if defined WLAN_FEATURE_VOWIFI_11R
 	if (iface->staKeyParams)
 		cdf_mem_free(iface->staKeyParams);
-#endif /* WLAN_FEATURE_VOWIFI_11R */
 	cdf_mem_zero(iface, sizeof(*iface));
 	param->status = CDF_STATUS_SUCCESS;
 	sme_msg.type = eWNI_SME_DEL_STA_SELF_RSP;
@@ -653,10 +651,8 @@ static CDF_STATUS wma_handle_vdev_detach(tp_wma_handle wma_handle,
 out:
 	if (iface->addBssStaContext)
 		cdf_mem_free(iface->addBssStaContext);
-#if defined WLAN_FEATURE_VOWIFI_11R
 	if (iface->staKeyParams)
 		cdf_mem_free(iface->staKeyParams);
-#endif /* WLAN_FEATURE_VOWIFI_11R */
 	cdf_mem_zero(iface, sizeof(*iface));
 	del_sta_self_req_param->status = status;
 	if (generate_rsp) {
@@ -2746,10 +2742,8 @@ void wma_vdev_resp_timer(void *data)
 		}
 		if (iface->addBssStaContext)
 			cdf_mem_free(iface->addBssStaContext);
-#if defined WLAN_FEATURE_VOWIFI_11R
 		if (iface->staKeyParams)
 			cdf_mem_free(iface->staKeyParams);
-#endif /* WLAN_FEATURE_VOWIFI_11R */
 		cdf_mem_zero(iface, sizeof(*iface));
 	} else if (tgt_req->msg_type == WMA_ADD_BSS_REQ) {
 		tpAddBssParams params = (tpAddBssParams) tgt_req->user_data;
@@ -3295,7 +3289,6 @@ static void wma_add_bss_sta_mode(tp_wma_handle wma, tpAddBssParams add_bss)
 		cdf_mem_copy(iface->addBssStaContext, &add_bss->staContext,
 			     sizeof(tAddStaParams));
 
-#if defined WLAN_FEATURE_VOWIFI_11R
 		if (iface->staKeyParams) {
 			cdf_mem_free(iface->staKeyParams);
 			iface->staKeyParams = NULL;
@@ -3312,7 +3305,6 @@ static void wma_add_bss_sta_mode(tp_wma_handle wma, tpAddBssParams add_bss)
 				     &add_bss->extSetStaKeyParam,
 				     sizeof(tSetStaKeyParams));
 		}
-#endif /* WLAN_FEATURE_VOWIFI_11R */
 		/* Save parameters later needed by WMA_ADD_STA_REQ */
 		iface->rmfEnabled = add_bss->rmfEnabled;
 		iface->beaconInterval = add_bss->beaconInterval;
@@ -4101,7 +4093,6 @@ static void wma_add_sta_req_sta_mode(tp_wma_handle wma, tpAddStaParams params)
 			}
 		}
 #endif /* WLAN_FEATURE_11W */
-#if defined WLAN_FEATURE_VOWIFI_11R
 		/*
 		 * Set the PTK in 11r mode because we already have it.
 		 */
@@ -4109,7 +4100,6 @@ static void wma_add_sta_req_sta_mode(tp_wma_handle wma, tpAddStaParams params)
 			wma_set_stakey(wma,
 				       (tpSetStaKeyParams) iface->staKeyParams);
 		}
-#endif
 	}
 	maxTxPower = params->maxTxPower;
 	wma_vdev_set_bss_params(wma, params->smesessionId,
