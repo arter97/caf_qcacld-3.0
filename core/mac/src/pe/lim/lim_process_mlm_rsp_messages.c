@@ -622,15 +622,15 @@ void lim_process_mlm_auth_cnf(tpAniSirGlobal mac_ctx, uint32_t *msg)
 	}
 
 	if ((auth_type == eSIR_AUTO_SWITCH) &&
-		(((tLimMlmAuthCnf *) msg)->authType == eSIR_OPEN_SYSTEM)
+		(((tLimMlmAuthCnf *) msg)->authType == eSIR_SHARED_KEY)
 		&& (eSIR_MAC_AUTH_ALGO_NOT_SUPPORTED_STATUS ==
 		((tLimMlmAuthCnf *) msg)->protStatusCode)) {
 		/*
-		 * When Open authentication fails with reason
+		 * When Shared authentication fails with reason
 		 * code "13" and authType set to 'auto switch',
-		 * Try with Shared Authentication
+		 * Try with Open Authentication
 		 */
-		auth_mode = eSIR_SHARED_KEY;
+		auth_mode = eSIR_OPEN_SYSTEM;
 		/* Trigger MAC based Authentication */
 		auth_req = cdf_mem_malloc(sizeof(tLimMlmAuthReq));
 		if (NULL == auth_req) {
@@ -2410,9 +2410,9 @@ lim_process_sta_add_bss_rsp_pre_assoc(tpAniSirGlobal mac_ctx,
 			lim_log(mac_ctx, LOGP,
 			FL("could not retrieve AuthType"));
 		}
-		/* Try Open Authentication first */
+		/* Try Shared Authentication first */
 		if (cfgAuthType == eSIR_AUTO_SWITCH)
-			authMode = eSIR_OPEN_SYSTEM;
+			authMode = eSIR_SHARED_KEY;
 		else
 			authMode = cfgAuthType;
 
