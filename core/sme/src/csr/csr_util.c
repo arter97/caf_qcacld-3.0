@@ -2049,274 +2049,294 @@ uint16_t csr_calculate_mcc_beacon_interval(tpAniSirGlobal pMac, uint16_t sta_bi,
 	return go_fbi;
 }
 
-CDF_STATUS csr_validate_mcc_beacon_interval(tpAniSirGlobal pMac,
-					uint8_t channelId,
-					uint16_t *beaconInterval,
-					uint32_t cursessionId,
-					enum tCDF_ADAPTER_MODE currBssPersona)
+/**
+ * csr_validate_p2pcli_bcn_intrvl() - to validate p2pcli beacon interval
+ * @mac_ctx: pointer to mac context
+ * @chnl_id: channel id variable
+ * @bcn_interval: pointer to given beacon interval
+ * @session_id: given session id
+ * @status: fill the status in terms of CDF_STATUS to inform caller
+ *
+ * This API can provide the validation the beacon interval and re-calculate
+ * in case concurrency
+ *
+ * Return: bool
+ */
+static bool csr_validate_p2pcli_bcn_intrvl(tpAniSirGlobal mac_ctx,
+		uint8_t chnl_id, uint16_t *bcn_interval, uint32_t session_id,
+		CDF_STATUS *status)
 {
-	uint32_t sessionId = 0;
-	uint16_t new_beaconInterval = 0;
+	tCsrRoamSession *roamsession;
 
-	/* If MCC is not supported just break */
-	if (!pMac->roam.configParam.fenableMCCMode) {
-		return CDF_STATUS_E_FAILURE;
-	}
-
-	for (sessionId = 0; sessionId < CSR_ROAM_SESSION_MAX; sessionId++) {
-		if (cursessionId != sessionId) {
-			if (!CSR_IS_SESSION_VALID(pMac, sessionId)) {
-				continue;
-			}
-
-			switch (currBssPersona) {
-			case CDF_STA_MODE:
-				if (pMac->roam.roamSession[sessionId].
-					pCurRoamProfile &&
-				   (pMac->roam.roamSession[sessionId].
-					pCurRoamProfile->csrPersona ==
-				    CDF_P2P_CLIENT_MODE)) {
-					/* check for P2P client mode */
-					sms_log(pMac, LOG1,
-						FL
-							(" Beacon Interval Validation not required for STA/CLIENT"));
-				}
-				/*
-				 * IF SAP has started and STA wants to connect
-				 * on different channel MCC should
-				 *  MCC should not be enabled so making it
-				 * false to enforce on same channel
-				 */
-				else if (pMac->roam.roamSession[sessionId].
-					 bssParams.bssPersona ==
-					 CDF_SAP_MODE) {
-					if (pMac->roam.roamSession[sessionId].
-					    bssParams.operationChn !=
-					    channelId) {
-						sms_log(pMac, LOGE,
-							FL
-								("*** MCC with SAP+STA sessions ****"));
-						return CDF_STATUS_SUCCESS;
-					}
-				} else if (pMac->roam.roamSession[sessionId].
-						bssParams.bssPersona ==
-						CDF_P2P_GO_MODE) {
-					/*
-					 * Check for P2P go scenario
-					 * if GO in MCC support different
-					 * beacon interval,
-					 * change the BI of the P2P-GO
-					 */
-					if ((pMac->roam.roamSession[sessionId].
-					     bssParams.operationChn !=
-					     channelId)
-					    && (pMac->roam.
-						roamSession[sessionId].
-						bssParams.beaconInterval !=
-						*beaconInterval)) {
-						/* if GO in MCC support different beacon interval, return success */
-						if (pMac->roam.configParam.
-						    fAllowMCCGODiffBI == 0x01) {
-							return
-								CDF_STATUS_SUCCESS;
-						}
-						/* Send only Broadcast disassoc and update beaconInterval */
-						/* If configuration is set to 0x04 then dont */
-						/* disconnect all the station */
-						else if ((pMac->roam.
-							  configParam.
-							  fAllowMCCGODiffBI ==
-							  0x02)
-							 || (pMac->roam.
-							     configParam.
-							     fAllowMCCGODiffBI
-							     == 0x04)) {
-							/* Check to pass the right beacon Interval */
-							 if (pMac->roam.configParam.conc_custom_rule1 ||
-								pMac->roam.configParam.conc_custom_rule2) {
-								 new_beaconInterval = CSR_CUSTOM_CONC_GO_BI;
-							 } else {
-								 new_beaconInterval =
-									 csr_calculate_mcc_beacon_interval(pMac,
-										*beaconInterval,
-										pMac->roam.
-										roamSession
-										[sessionId].
-										bssParams.
-										beaconInterval);
-							 }
-							sms_log(pMac, LOG1,
-								FL
-									(" Peer AP BI : %d, new Beacon Interval: %d"),
-								*beaconInterval,
-								new_beaconInterval);
-							/* Update the becon Interval */
-							if (new_beaconInterval
-							    !=
-							    pMac->roam.
-							    roamSession
-							    [sessionId].
-							    bssParams.
-							    beaconInterval) {
-								/* Update the beaconInterval now */
-								sms_log(pMac,
-									LOGE,
-									FL
-										(" Beacon Interval got changed config used: %d\n"),
-									pMac->
-									roam.
-									configParam.
-									fAllowMCCGODiffBI);
-
-								pMac->roam.
-								roamSession
-								[sessionId].
-								bssParams.
-								beaconInterval
-									=
-										new_beaconInterval;
-								pMac->roam.
-								roamSession
-								[sessionId].
-								bssParams.
-								updatebeaconInterval
-									= true;
-								return
-									csr_update_mcc_p2p_beacon_interval
-										(pMac);
-							}
-							return
-								CDF_STATUS_SUCCESS;
-						}
-						/* Disconnect the P2P session */
-						else if (pMac->roam.configParam.
-							 fAllowMCCGODiffBI ==
-							 0x03) {
-							pMac->roam.roamSession[sessionId].bssParams.updatebeaconInterval = false;
-							return
-								csr_roam_call_callback
-									(pMac, sessionId,
-									NULL, 0,
-									eCSR_ROAM_SEND_P2P_STOP_BSS,
-									eCSR_ROAM_RESULT_NONE);
-						} else {
-							sms_log(pMac, LOGE,
-								FL
-									("BeaconInterval is different cannot connect to preferred AP..."));
-							return
-								CDF_STATUS_E_FAILURE;
-						}
-					}
-				}
-				break;
-
-			case CDF_P2P_CLIENT_MODE:
-				if (pMac->roam.roamSession[sessionId].
-					pCurRoamProfile &&
-				   (pMac->roam.roamSession[sessionId].
-					pCurRoamProfile->csrPersona ==
-					CDF_STA_MODE)) {
-					/* check for P2P client mode */
-					sms_log(pMac, LOG1,
-						FL
-							(" Ignore Beacon Interval Validation..."));
-				} else if (pMac->roam.roamSession[sessionId].
-						bssParams.bssPersona ==
-						CDF_P2P_GO_MODE) {
-					/* Check for P2P go scenario */
-					if ((pMac->roam.roamSession[sessionId].
-					     bssParams.operationChn !=
-					     channelId)
-					    && (pMac->roam.
-						roamSession[sessionId].
-						bssParams.beaconInterval !=
-						*beaconInterval)) {
-						sms_log(pMac, LOGE,
-							FL
-								("BeaconInterval is different cannot connect to P2P_GO network ..."));
-						return CDF_STATUS_E_FAILURE;
-					}
-				}
-				break;
-
-			case CDF_SAP_MODE:
-			case CDF_IBSS_MODE:
-				break;
-
-			case CDF_P2P_GO_MODE:
-			{
-				if (pMac->roam.roamSession[sessionId].
-					pCurRoamProfile &&
-				   ((pMac->roam.roamSession[sessionId].
-					pCurRoamProfile->csrPersona ==
-					CDF_P2P_CLIENT_MODE) ||
-				    (pMac->roam.roamSession[sessionId].
-					pCurRoamProfile->csrPersona ==
-					CDF_STA_MODE))) {
-					/* check for P2P_client scenario */
-					if ((pMac->roam.
-					     roamSession[sessionId].
-					     connectedProfile.
-					     operationChannel == 0)
-					    && (pMac->roam.
-						roamSession[sessionId].
-						connectedProfile.
-						beaconInterval == 0)) {
-						continue;
-					}
-
-					if (csr_is_conn_state_connected_infra
-						    (pMac, sessionId)
-					    && (pMac->roam.
-						roamSession[sessionId].
-						connectedProfile.
-						operationChannel !=
-						channelId)
-					    && (pMac->roam.
-						roamSession[sessionId].
-						connectedProfile.
-						beaconInterval !=
-						*beaconInterval)) {
-						/*
-						 * Updated beaconInterval should be used only when we are starting a new BSS
-						 * not incase of client or STA case
-						 */
-						/* Calculate beacon Interval for P2P-GO incase of MCC */
-						if (pMac->roam.configParam.conc_custom_rule1 ||
-							pMac->roam.configParam.conc_custom_rule2) {
-							new_beaconInterval = CSR_CUSTOM_CONC_GO_BI;
-						} else {
-							new_beaconInterval =
-								csr_calculate_mcc_beacon_interval
-								(pMac,
-								 pMac->roam.
-								 roamSession
-								 [sessionId].
-								 connectedProfile.
-								 beaconInterval,
-								 *beaconInterval);
-						}
-						if (*beaconInterval !=
-						    new_beaconInterval)
-							*beaconInterval
-								=
-									new_beaconInterval;
-						return
-							CDF_STATUS_SUCCESS;
-					}
-				}
-			}
-			break;
-
-			default:
-				sms_log(pMac, LOGE,
-					FL(" Persona not supported : %d"),
-					currBssPersona);
-				return CDF_STATUS_E_FAILURE;
-			}
+	roamsession = &mac_ctx->roam.roamSession[session_id];
+	if (roamsession->pCurRoamProfile &&
+		(roamsession->pCurRoamProfile->csrPersona ==
+			 CDF_STA_MODE)) {
+		/* check for P2P client mode */
+		sms_log(mac_ctx, LOG1,
+			FL(" Ignore Beacon Interval Validation..."));
+	} else if (roamsession->bssParams.bssPersona == CDF_P2P_GO_MODE) {
+		/* Check for P2P go scenario */
+		if ((roamsession->bssParams.operationChn != chnl_id)
+			&& (roamsession->bssParams.beaconInterval !=
+				*bcn_interval)) {
+			sms_log(mac_ctx, LOGE,
+				FL("BcnIntrvl is diff can't connect to P2P_GO network ..."));
+			*status = CDF_STATUS_E_FAILURE;
+			return true;
 		}
 	}
+	return false;
+}
 
+/**
+ * csr_validate_p2pgo_bcn_intrvl() - to validate p2pgo beacon interval
+ * @mac_ctx: pointer to mac context
+ * @chnl_id: channel id variable
+ * @bcn_interval: pointer to given beacon interval
+ * @session_id: given session id
+ * @status: fill the status in terms of CDF_STATUS to inform caller
+ *
+ * This API can provide the validation the beacon interval and re-calculate
+ * in case concurrency
+ *
+ * Return: bool
+ */
+static bool csr_validate_p2pgo_bcn_intrvl(tpAniSirGlobal mac_ctx,
+		uint8_t chnl_id, uint16_t *bcn_interval,
+		uint32_t session_id, CDF_STATUS *status)
+{
+	tCsrRoamSession *roamsession;
+	tCsrConfig *cfg_param;
+	tCsrRoamConnectedProfile *conn_profile;
+	uint16_t new_bcn_interval;
+
+	roamsession = &mac_ctx->roam.roamSession[session_id];
+	cfg_param = &mac_ctx->roam.configParam;
+	conn_profile = &roamsession->connectedProfile;
+	if (roamsession->pCurRoamProfile &&
+		((roamsession->pCurRoamProfile->csrPersona ==
+			  CDF_P2P_CLIENT_MODE) ||
+		(roamsession->pCurRoamProfile->csrPersona ==
+			  CDF_STA_MODE))) {
+		/* check for P2P_client scenario */
+		if ((conn_profile->operationChannel == 0) &&
+			(conn_profile->beaconInterval == 0))
+			return false;
+
+		if (csr_is_conn_state_connected_infra(mac_ctx, session_id) &&
+			(conn_profile->operationChannel != chnl_id) &&
+			(conn_profile->beaconInterval != *bcn_interval)) {
+			/*
+			 * Updated beaconInterval should be used only when
+			 * we are starting a new BSS not incase of
+			 * client or STA case
+			 */
+
+			/* Calculate beacon Interval for P2P-GO incase of MCC */
+			if (cfg_param->conc_custom_rule1 ||
+					cfg_param->conc_custom_rule2) {
+				new_bcn_interval = CSR_CUSTOM_CONC_GO_BI;
+			} else {
+				new_bcn_interval =
+					csr_calculate_mcc_beacon_interval(
+						mac_ctx,
+						conn_profile->beaconInterval,
+						*bcn_interval);
+			}
+			if (*bcn_interval != new_bcn_interval)
+				*bcn_interval = new_bcn_interval;
+			*status = CDF_STATUS_SUCCESS;
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * csr_validate_sta_bcn_intrvl() - to validate sta beacon interval
+ * @mac_ctx: pointer to mac context
+ * @chnl_id: channel id variable
+ * @bcn_interval: pointer to given beacon interval
+ * @session_id: given session id
+ * @status: fill the status in terms of CDF_STATUS to inform caller
+ *
+ * This API can provide the validation the beacon interval and re-calculate
+ * in case concurrency
+ *
+ * Return: bool
+ */
+static bool csr_validate_sta_bcn_intrvl(tpAniSirGlobal mac_ctx,
+			uint8_t chnl_id, uint16_t *bcn_interval,
+			uint32_t session_id, CDF_STATUS *status)
+{
+	tCsrRoamSession *roamsession;
+	tCsrConfig *cfg_param;
+	uint16_t new_bcn_interval;
+
+	roamsession = &mac_ctx->roam.roamSession[session_id];
+	cfg_param = &mac_ctx->roam.configParam;
+
+	if (roamsession->pCurRoamProfile &&
+		(roamsession->pCurRoamProfile->csrPersona ==
+				CDF_P2P_CLIENT_MODE)) {
+		/* check for P2P client mode */
+		sms_log(mac_ctx, LOG1,
+			FL("Bcn Intrvl validation not require for STA/CLIENT"));
+		return false;
+	}
+	if ((roamsession->bssParams.bssPersona == CDF_SAP_MODE) &&
+		   (roamsession->bssParams.operationChn != chnl_id)) {
+		/*
+		 * IF SAP has started and STA wants to connect
+		 * on different channel MCC should
+		 *  MCC should not be enabled so making it
+		 * false to enforce on same channel
+		 */
+		sms_log(mac_ctx, LOGE,
+			FL("*** MCC with SAP+STA sessions ****"));
+		*status = CDF_STATUS_SUCCESS;
+		return true;
+	}
+	/*
+	 * Check for P2P go scenario
+	 * if GO in MCC support different
+	 * beacon interval,
+	 * change the BI of the P2P-GO
+	 */
+	if ((roamsession->bssParams.bssPersona == CDF_P2P_GO_MODE) &&
+		(roamsession->bssParams.operationChn != chnl_id) &&
+		(roamsession->bssParams.beaconInterval != *bcn_interval)) {
+		/* if GO in MCC support diff beacon interval, return success */
+		if (cfg_param->fAllowMCCGODiffBI == 0x01) {
+			*status = CDF_STATUS_SUCCESS;
+			return true;
+		}
+		/*
+		 * Send only Broadcast disassoc and update bcn_interval
+		 * If configuration is set to 0x04 then dont
+		 * disconnect all the station
+		 */
+		if ((cfg_param->fAllowMCCGODiffBI == 0x02)
+			|| (cfg_param->fAllowMCCGODiffBI == 0x04)) {
+			/* Check to pass the right beacon Interval */
+			if (cfg_param->conc_custom_rule1 ||
+				cfg_param->conc_custom_rule2) {
+				new_bcn_interval = CSR_CUSTOM_CONC_GO_BI;
+			} else {
+				new_bcn_interval =
+				csr_calculate_mcc_beacon_interval(
+					mac_ctx, *bcn_interval,
+					roamsession->bssParams.beaconInterval);
+			}
+			sms_log(mac_ctx, LOG1,
+				FL(" Peer AP BI : %d, new Beacon Interval: %d"),
+				*bcn_interval, new_bcn_interval);
+			/* Update the becon Interval */
+			if (new_bcn_interval !=
+					roamsession->bssParams.beaconInterval) {
+				/* Update the bcn_interval now */
+				sms_log(mac_ctx, LOGE,
+					FL(" Beacon Interval got changed config used: %d\n"),
+					cfg_param->fAllowMCCGODiffBI);
+
+				roamsession->bssParams.beaconInterval =
+					new_bcn_interval;
+				roamsession->bssParams.updatebeaconInterval =
+					true;
+				*status = csr_update_mcc_p2p_beacon_interval(
+					mac_ctx);
+				return true;
+			}
+			*status = CDF_STATUS_SUCCESS;
+			return true;
+		}
+		if (cfg_param->fAllowMCCGODiffBI
+				== 0x03) {
+			/* Disconnect the P2P session */
+			roamsession->bssParams.updatebeaconInterval = false;
+			*status = csr_roam_call_callback(mac_ctx,
+					session_id, NULL, 0,
+					eCSR_ROAM_SEND_P2P_STOP_BSS,
+					eCSR_ROAM_RESULT_NONE);
+			return true;
+		}
+		sms_log(mac_ctx, LOGE,
+			FL("BcnIntrvl is diff can't connect to preferred AP..."));
+		*status = CDF_STATUS_E_FAILURE;
+		return true;
+	}
+	return false;
+}
+
+/**
+ * csr_validate_mcc_beacon_interval() - to validate the mcc beacon interval
+ * @mac_ctx: pointer to mac context
+ * @chnl_id: channel number
+ * @bcn_interval: provided beacon interval
+ * @cur_session_id: current session id
+ * @cur_bss_persona: Current BSS persona
+ *
+ * This API will validate the mcc beacon interval
+ *
+ * Return: CDF_STATUS
+ */
+CDF_STATUS csr_validate_mcc_beacon_interval(tpAniSirGlobal mac_ctx,
+					uint8_t chnl_id,
+					uint16_t *bcn_interval,
+					uint32_t cur_session_id,
+					enum tCDF_ADAPTER_MODE cur_bss_persona)
+{
+	uint32_t session_id = 0;
+	CDF_STATUS status;
+	bool is_done;
+
+	/* If MCC is not supported just break */
+	if (!mac_ctx->roam.configParam.fenableMCCMode)
+		return CDF_STATUS_E_FAILURE;
+
+	for (session_id = 0; session_id < CSR_ROAM_SESSION_MAX; session_id++) {
+		if (cur_session_id == session_id)
+			continue;
+
+		if (!CSR_IS_SESSION_VALID(mac_ctx, session_id))
+			continue;
+
+		switch (cur_bss_persona) {
+		case CDF_STA_MODE:
+			is_done = csr_validate_sta_bcn_intrvl(mac_ctx, chnl_id,
+					bcn_interval, session_id, &status);
+			if (true == is_done)
+				return status;
+			break;
+
+		case CDF_P2P_CLIENT_MODE:
+			is_done = csr_validate_p2pcli_bcn_intrvl(mac_ctx,
+					chnl_id, bcn_interval, session_id,
+					&status);
+			if (true == is_done)
+				return status;
+			break;
+
+		case CDF_SAP_MODE:
+		case CDF_IBSS_MODE:
+			break;
+
+		case CDF_P2P_GO_MODE:
+			is_done = csr_validate_p2pgo_bcn_intrvl(mac_ctx,
+					chnl_id, bcn_interval,
+					session_id, &status);
+			if (true == is_done)
+				return status;
+			break;
+
+		default:
+			sms_log(mac_ctx, LOGE,
+				FL("Persona not supported : %d"),
+				cur_bss_persona);
+			return CDF_STATUS_E_FAILURE;
+		}
+	}
 	return CDF_STATUS_SUCCESS;
 }
 
