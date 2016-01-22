@@ -287,10 +287,9 @@ CDF_STATUS cds_get_dfs_region(uint8_t *dfs_region);
 CDF_STATUS cds_put_dfs_region(uint8_t dfs_region);
 bool cds_is_dsrc_channel(uint16_t);
 enum channel_state cds_get_bonded_channel_state(uint32_t chan_num,
-					   enum channel_width chan_width);
+						enum channel_width chan_width);
 enum channel_width cds_get_max_channel_bw(uint32_t chan_num);
-
 CDF_STATUS cds_set_reg_domain(void *client_ctxt, v_REGDOMAIN_t reg_domain);
-
 CDF_STATUS cds_put_default_country(uint8_t *def_country);
+
 #endif /* __CDS_REG_SERVICE_H */
