@@ -3125,11 +3125,10 @@ CDF_STATUS sme_get_ap_channel_from_scan_cache(tHalHandle hal_handle,
 	} else {
 		CDF_TRACE(CDF_MODULE_ID_SME, CDF_TRACE_LEVEL_ERROR,
 				FL("Aquiring lock failed"));
+		csr_free_scan_filter(mac_ctx, scan_filter);
 		status = CDF_STATUS_E_FAILURE;
 	}
-
 	cdf_mem_free(scan_filter);
-
 	return status;
 }
 
