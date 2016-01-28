@@ -1510,6 +1510,39 @@ void ol_dump_target_memory(struct ol_softc *scn, void *memory_block)
 	}
 }
 
+#ifdef CONFIG_HL_SUPPORT
+
+/**
+ * ol_dump_ce_register() - cannot read the section
+ * @scn: ol_softc handler
+ * @memory_block: non-NULL reserved memory location
+ *
+ * Return: -EACCES for LL and not apllicable for HL
+ */
+static inline int
+ol_dump_ce_register(struct ol_softc *scn, void *memory_block)
+{
+	return 0;
+}
+#else
+
+static int
+ol_dump_ce_register(struct ol_softc *scn, void *memory_block)
+{
+	int ret;
+
+	BMI_ERR("Could not read dump section!");
+
+	if (hif_dump_registers(scn))
+		BMI_ERR("Failed to dump bus registers");
+
+	ol_dump_target_memory(scn, memory_block);
+	ret = -EACCES;
+
+	return ret;
+}
+#endif
+
 /**---------------------------------------------------------------------------
 *   \brief  ol_target_coredump
 *
@@ -1586,11 +1619,7 @@ static int ol_target_coredump(void *inst, void *memory_block,
 				buffer_loc += result;
 				section_count++;
 			} else {
-				BMI_ERR("Could not read dump section!");
-				if (hif_dump_registers(scn))
-					BMI_ERR("Failed to dump bus registers");
-				ol_dump_target_memory(scn, memory_block);
-				ret = -EACCES;
+				ret = ol_dump_ce_register(scn, memory_block);
 				break;  /* Could not read the section */
 			}
 		} else {
