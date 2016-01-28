@@ -390,6 +390,9 @@ static inline int htt_tx_frag_alloc(htt_pdev_handle pdev,
 	return 0;
 }
 #endif /* defined(HELIUMPLUS_PADDR64) */
+
+#if defined(CONFIG_HL_SUPPORT)
+
 /**
  * @brief Discard all tx frames in the process of being downloaded.
  * @details
@@ -401,7 +404,14 @@ static inline int htt_tx_frag_alloc(htt_pdev_handle pdev,
  * @param[OUT] frag_paddr_lo - physical address of the fragment descriptor
  *                             (MSDU Link Extension Descriptor)
  */
+static inline void htt_tx_pending_discard(htt_pdev_handle pdev)
+{
+	return;
+}
+#else
+
 void htt_tx_pending_discard(htt_pdev_handle pdev);
+#endif
 
 /**
  * @brief Download a MSDU descriptor and (a portion of) the MSDU payload.
@@ -599,6 +609,9 @@ htt_tx_desc_init(htt_pdev_handle pdev,
 		HTT_TX_DESC_EXT_TID_SET(local_word0, msdu_info->info.ext_tid);
 		HTT_TX_DESC_CKSUM_OFFLOAD_SET(local_word0,
 					      msdu_info->action.cksum_offload);
+		if (pdev->cfg.is_high_latency)
+			HTT_TX_DESC_TX_COMP_SET(local_word0, msdu_info->action.
+						tx_comp_req);
 		HTT_TX_DESC_NO_ENCRYPT_SET(local_word0,
 					   msdu_info->action.do_encrypt ?
 					   0 : 1);

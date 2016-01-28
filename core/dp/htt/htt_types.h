@@ -173,6 +173,11 @@ struct ipa_uc_rx_ring_elem_t {
 	uint32_t rx_packet_leng;
 };
 
+struct htt_tx_credit_t {
+	cdf_atomic_t bus_delta;
+	cdf_atomic_t target_delta;
+};
+
 #if defined(HELIUMPLUS_PADDR64)
 struct msdu_ext_desc_t {
 	struct cdf_tso_flags_t tso_flags;
@@ -212,6 +217,7 @@ struct htt_pdev_t {
 
 	struct htt_htc_pkt_union *htt_htc_pkt_freelist;
 	struct {
+		int is_high_latency;
 		int is_full_reorder_offload;
 		int default_tx_comp_req;
 		int ce_classify_enabled;
@@ -324,6 +330,9 @@ struct htt_pdev_t {
 		struct htt_rx_hash_bucket *hash_table;
 		uint32_t listnode_offset;
 	} rx_ring;
+#ifdef CONFIG_HL_SUPPORT
+	int rx_desc_size_hl;
+#endif
 	long rx_fw_desc_offset;
 	int rx_mpdu_range_offset_words;
 	int rx_ind_msdu_byte_idx;
@@ -354,13 +363,18 @@ struct htt_pdev_t {
 	struct {
 		int htc_err_cnt;
 	} stats;
-
+#ifdef CONFIG_HL_SUPPORT
+	int cur_seq_num_hl;
+#endif
 	struct htt_tx_mgmt_desc_ctxt tx_mgmt_desc_ctxt;
 	struct targetdef_s *targetdef;
 	struct ce_reg_def *target_ce_def;
 
 	struct htt_ipa_uc_tx_resource_t ipa_uc_tx_rsc;
 	struct htt_ipa_uc_rx_resource_t ipa_uc_rx_rsc;
+
+	struct htt_tx_credit_t htt_tx_credit;
+
 #ifdef DEBUG_RX_RING_BUFFER
 	struct rx_buf_debug *rx_buff_list;
 	int rx_buff_index;

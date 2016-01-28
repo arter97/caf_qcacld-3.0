@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -32,7 +32,11 @@
 #include <ol_ctrl_api.h>        /* ol_pdev_handle */
 #include <cds_ieee80211_common.h>   /* ieee80211_qosframe_htc_addr4 */
 #include <enet.h>               /* LLC_SNAP_HDR_LEN */
+#if defined(CONFIG_HL_SUPPORT)
+#include "wlan_tgt_def_config_hl.h"
+#else
 #include "wlan_tgt_def_config.h"
+#endif
 
 /**
  * @brief format of data frames delivered to/from the WLAN driver by/to the OS
@@ -260,6 +264,7 @@ int ol_cfg_netbuf_frags_max(ol_pdev_handle pdev);
  *      1 -> free the tx frame as soon as the download completes
  */
 int ol_cfg_tx_free_at_download(ol_pdev_handle pdev);
+void ol_cfg_set_tx_free_at_download(ol_pdev_handle pdev);
 
 /**
  * @brief Low water mark for target tx credit.

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2014-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011, 2014-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -362,5 +362,23 @@ static inline void htt_ipa_uc_detach(struct htt_pdev_t *pdev)
 	return;
 }
 #endif /* IPA_OFFLOAD */
+
+#if defined(DEBUG_HL_LOGGING) && defined(CONFIG_HL_SUPPORT)
+
+void htt_dump_bundle_stats(struct htt_pdev_t *pdev);
+void htt_clear_bundle_stats(struct htt_pdev_t *pdev);
+#else
+
+static inline void htt_dump_bundle_stats(struct htt_pdev_t *pdev)
+{
+	return;
+}
+
+static inline void htt_clear_bundle_stats(struct htt_pdev_t *pdev)
+{
+	return;
+}
+#endif
+
 
 #endif /* _OL_HTT_API__H_ */
