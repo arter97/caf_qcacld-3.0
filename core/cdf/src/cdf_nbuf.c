@@ -47,6 +47,13 @@
 #include <cdf_status.h>
 #include <cdf_lock.h>
 
+#define NBUF_TRAC_IPV4_OFFSET       14
+#define NBUF_TRAC_IPV4_HEADER_SIZE  20
+#define NBUF_TRAC_DHCP_SRV_PORT     67
+#define NBUF_TRAC_DHCP_CLI_PORT     68
+#define NBUF_TRAC_ETH_TYPE_OFFSET   12
+#define NBUF_TRAC_EAPOL_ETH_TYPE    0x888E
+
 /* Packet Counter */
 static uint32_t nbuf_tx_mgmt[NBUF_TX_PKT_STATE_MAX];
 static uint32_t nbuf_tx_data[NBUF_TX_PKT_STATE_MAX];
@@ -416,6 +423,74 @@ void __cdf_nbuf_reg_trace_cb(cdf_nbuf_trace_update_t cb_func_ptr)
 {
 	trace_update_cb = cb_func_ptr;
 	return;
+}
+
+/**
+ * __cdf_nbuf_is_ipv4_pkt() - check if packet is a ipv4 packet
+ * @skb: Pointer to network buffer
+ *
+ * This api is for Tx packets.
+ *
+ * Return: true if packet is ipv4 packet
+ *	   false otherwise
+ */
+bool __cdf_nbuf_is_ipv4_pkt(struct sk_buff *skb)
+{
+	if (cdf_nbuf_get_protocol(skb) == htons(ETH_P_IP))
+		return true;
+	else
+		return false;
+}
+
+/**
+ * __cdf_nbuf_is_ipv4_dhcp_pkt() - check if skb data is a dhcp packet
+ * @skb: Pointer to network buffer
+ *
+ * This api is for ipv4 packet.
+ *
+ * Return: true if packet is DHCP packet
+ *	   false otherwise
+ */
+bool __cdf_nbuf_is_ipv4_dhcp_pkt(struct sk_buff *skb)
+{
+	uint16_t sport;
+	uint16_t dport;
+
+	sport = (uint16_t)(*(uint16_t *)(skb->data + NBUF_TRAC_IPV4_OFFSET +
+					 NBUF_TRAC_IPV4_HEADER_SIZE));
+	dport = (uint16_t)(*(uint16_t *)(skb->data + NBUF_TRAC_IPV4_OFFSET +
+					 NBUF_TRAC_IPV4_HEADER_SIZE +
+					 sizeof(uint16_t)));
+
+	if (((sport == CDF_SWAP_U16(NBUF_TRAC_DHCP_SRV_PORT)) &&
+	     (dport == CDF_SWAP_U16(NBUF_TRAC_DHCP_CLI_PORT))) ||
+	    ((sport == CDF_SWAP_U16(NBUF_TRAC_DHCP_CLI_PORT)) &&
+	     (dport == CDF_SWAP_U16(NBUF_TRAC_DHCP_SRV_PORT))))
+		return true;
+	else
+		return false;
+}
+
+/**
+ * __cdf_nbuf_is_ipv4_eapol_pkt() - check if skb data is a eapol packet
+ * @skb: Pointer to network buffer
+ *
+ * This api is for ipv4 packet.
+ *
+ * Return: true if packet is EAPOL packet
+ *	   false otherwise.
+ */
+bool __cdf_nbuf_is_ipv4_eapol_pkt(struct sk_buff *skb)
+{
+	uint16_t ether_type;
+
+	ether_type = (uint16_t)(*(uint16_t *)(skb->data +
+				NBUF_TRAC_ETH_TYPE_OFFSET));
+
+	if (ether_type == CDF_SWAP_U16(NBUF_TRAC_EAPOL_ETH_TYPE))
+		return true;
+	else
+		return false;
 }
 
 #ifdef QCA_PKT_PROTO_TRACE

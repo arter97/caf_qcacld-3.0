@@ -385,6 +385,11 @@ void __cdf_nbuf_trace_update(struct sk_buff *buf, char *event_string);
 #define __cdf_nbuf_trace_update(skb, event_string)
 #endif /* QCA_PKT_PROTO_TRACE */
 
+bool __cdf_nbuf_is_ipv4_pkt(struct sk_buff *skb);
+bool __cdf_nbuf_is_ipv4_dhcp_pkt(struct sk_buff *skb);
+bool __cdf_nbuf_is_ipv4_eapol_pkt(struct sk_buff *skb);
+
+
 /**
  * __cdf_os_to_status() - OS to CDF status conversion
  * @error : OS error

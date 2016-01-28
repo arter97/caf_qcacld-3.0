@@ -906,6 +906,48 @@ static inline uint8_t cdf_nbuf_get_tx_parallel_dnload_frm(cdf_nbuf_t buf)
 }
 
 /**
+ * cdf_nbuf_is_ipv4_pkt() - check if packet is a ipv4 packet or not
+ * @buf:  buffer
+ *
+ * This api is for Tx packets.
+ *
+ * Return: true if packet is ipv4 packet
+ */
+static inline
+bool cdf_nbuf_is_ipv4_pkt(cdf_nbuf_t buf)
+{
+	return __cdf_nbuf_is_ipv4_pkt(buf);
+}
+
+/**
+ * cdf_nbuf_is_ipv4_dhcp_pkt() - check if packet is a dhcp packet or not
+ * @buf:  buffer
+ *
+ * This api is for ipv4 packet.
+ *
+ * Return: true if packet is DHCP packet
+ */
+static inline
+bool cdf_nbuf_is_ipv4_dhcp_pkt(cdf_nbuf_t buf)
+{
+	return __cdf_nbuf_is_ipv4_dhcp_pkt(buf);
+}
+
+/**
+ * cdf_nbuf_is_ipv4_eapol_pkt() - check if packet is a eapol packet or not
+ * @buf:  buffer
+ *
+ * This api is for ipv4 packet.
+ *
+ * Return: true if packet is EAPOL packet
+ */
+static inline
+bool cdf_nbuf_is_ipv4_eapol_pkt(cdf_nbuf_t buf)
+{
+	return __cdf_nbuf_is_ipv4_eapol_pkt(buf);
+}
+
+/**
  * cdf_invalidate_range() - invalidate the virtual address range specified by
  *			    start and end addresses.
  * Note: This does not write back the cache entries.
