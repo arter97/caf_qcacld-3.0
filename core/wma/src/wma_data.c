@@ -43,7 +43,12 @@
 #include "wni_cfg.h"
 #include "cfg_api.h"
 #include "ol_txrx_ctrl_api.h"
+#if defined(CONFIG_HL_SUPPORT)
+#include "wlan_tgt_def_config_hl.h"
+#else
 #include "wlan_tgt_def_config.h"
+#endif
+#include "ol_txrx.h"
 
 #include "cdf_nbuf.h"
 #include "cdf_types.h"
@@ -1691,7 +1696,9 @@ CDF_STATUS wma_tx_detach(tp_wma_handle wma_handle)
 	return CDF_STATUS_SUCCESS;
 }
 
-#if defined(QCA_LL_LEGACY_TX_FLOW_CONTROL) || defined(QCA_LL_TX_FLOW_CONTROL_V2)
+#if defined(QCA_LL_LEGACY_TX_FLOW_CONTROL) || \
+	defined(QCA_LL_TX_FLOW_CONTROL_V2) || defined(CONFIG_HL_SUPPORT)
+
 /**
  * wma_mcc_vdev_tx_pause_evt_handler() - pause event handler
  * @handle: wma handle
@@ -1789,6 +1796,146 @@ int wma_mcc_vdev_tx_pause_evt_handler(void *handle, uint8_t *event,
 }
 
 #endif /* QCA_LL_LEGACY_TX_FLOW_CONTROL */
+
+#if defined(CONFIG_HL_SUPPORT) && defined(QCA_BAD_PEER_TX_FLOW_CL)
+
+/**
+ * wma_set_peer_rate_report_condition -
+ *                    this function set peer rate report
+ *                    condition info to firmware.
+ * @handle:	Handle of WMA
+ * @config:	Bad peer configuration from SIR module
+ *
+ * It is a wrapper function to sent WMI_PEER_SET_RATE_REPORT_CONDITION_CMDID
+ * to the firmare\target.If the command sent to firmware failed, free the
+ * buffer that allocated.
+ *
+ * Return: CDF_STATUS based on values sent to firmware
+ */
+static
+CDF_STATUS wma_set_peer_rate_report_condition(WMA_HANDLE handle,
+			struct t_bad_peer_txtcl_config *config)
+{
+	tp_wma_handle wma_handle = (tp_wma_handle)handle;
+	wmi_peer_set_rate_report_condition_fixed_param *cmd = NULL;
+	wmi_buf_t buf = NULL;
+	int status = 0;
+	u_int32_t len = 0;
+	u_int32_t i, j;
+
+	len = sizeof(*cmd);
+	buf = wmi_buf_alloc(wma_handle->wmi_handle, len);
+	if (!buf) {
+		WMA_LOGE("Failed to alloc buf to peer_set_condition cmd\n");
+		return CDF_STATUS_E_FAILURE;
+	}
+
+	cmd = (wmi_peer_set_rate_report_condition_fixed_param *)
+		wmi_buf_data(buf);
+
+	WMITLV_SET_HDR(
+	&cmd->tlv_header,
+	WMITLV_TAG_STRUC_wmi_peer_set_rate_report_condition_fixed_param,
+	WMITLV_GET_STRUCT_TLVLEN(
+		wmi_peer_set_rate_report_condition_fixed_param));
+
+	cmd->enable_rate_report  = config->enable;
+	cmd->report_backoff_time = config->tgt_backoff;
+	cmd->report_timer_period = config->tgt_report_prd;
+	for (i = 0; i < PEER_RATE_REPORT_COND_MAX_NUM; i++) {
+		cmd->cond_per_phy[i].val_cond_flags        =
+			config->threshold[i].cond;
+		cmd->cond_per_phy[i].rate_delta.min_delta  =
+			config->threshold[i].delta;
+		cmd->cond_per_phy[i].rate_delta.percentage =
+			config->threshold[i].percentage;
+		for (j = 0; j < MAX_NUM_OF_RATE_THRESH; j++) {
+			cmd->cond_per_phy[i].rate_threshold[j] =
+			config->threshold[i].thresh[j];
+		}
+	}
+	WMA_LOGE("%s enable %d backoff_time %d period %d\n", __func__,
+		 cmd->enable_rate_report,
+		 cmd->report_backoff_time, cmd->report_timer_period);
+
+	status = wmi_unified_cmd_send(wma_handle->wmi_handle, buf, len,
+			WMI_PEER_SET_RATE_REPORT_CONDITION_CMDID);
+	if (status) {
+		cdf_nbuf_free(buf);
+		WMA_LOGE("%s:Failed to send peer_set_report_cond command",
+			 __func__);
+		return CDF_STATUS_E_FAILURE;
+	}
+	return CDF_STATUS_SUCCESS;
+}
+
+/**
+ * wma_process_init_bad_peer_tx_ctl_info -
+ *                this function to initialize peer rate report config info.
+ * @handle:	Handle of WMA
+ * @config:	Bad peer configuration from SIR module
+ *
+ * This function initializes the bad peer tx control data structure in WMA,
+ * sends down the initial configuration to the firmware and configures
+ * the peer status update seeting in the tx_rx module.
+ *
+ * Return: CDF_STATUS based on procedure status
+ */
+
+CDF_STATUS wma_process_init_bad_peer_tx_ctl_info(tp_wma_handle wma,
+					struct t_bad_peer_txtcl_config *config)
+{
+	/* Parameter sanity check */
+	ol_txrx_pdev_handle curr_pdev;
+
+	if (NULL == wma || NULL == config) {
+		WMA_LOGE("%s Invalid input\n", __func__);
+		return CDF_STATUS_E_FAILURE;
+	}
+
+	curr_pdev = cds_get_context(CDF_MODULE_ID_TXRX);
+	if (NULL == curr_pdev) {
+		WMA_LOGE("%s: Failed to get pdev\n", __func__);
+		return CDF_STATUS_E_FAILURE;
+	}
+
+	WMA_LOGE("%s enable %d period %d txq limit %d\n", __func__,
+		 config->enable,
+		 config->period,
+		 config->txq_limit);
+
+	/* Only need to initialize the setting
+	   when the feature is enabled */
+	if (config->enable) {
+		int i = 0;
+
+		ol_txrx_bad_peer_txctl_set_setting(curr_pdev,
+						   config->enable,
+						   config->period,
+						   config->txq_limit);
+
+		for (i = 0; i < WLAN_WMA_IEEE80211_MAX_LEVEL; i++) {
+			u_int32_t threshold, limit;
+			threshold =
+				config->threshold[i].thresh[0];
+			limit =	config->threshold[i].txlimit;
+			ol_txrx_bad_peer_txctl_update_threshold(curr_pdev, i,
+								threshold,
+								limit);
+		}
+	}
+
+	return wma_set_peer_rate_report_condition(wma, config);
+}
+#else
+
+CDF_STATUS wma_process_init_bad_peer_tx_ctl_info(tp_wma_handle wma,
+			struct t_bad_peer_txtcl_config *config)
+{
+	return CDF_STATUS_E_FAILURE;
+}
+#endif /* defined(CONFIG_HL_SUPPORT) && defined(QCA_BAD_PEER_TX_FLOW_CL) */
+
 
 /**
  * wma_process_init_thermal_info() - initialize thermal info
@@ -2476,6 +2623,8 @@ CDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 		return CDF_STATUS_E_FAILURE;
 	}
 
+	ol_txrx_hl_tdls_flag_reset(txrx_vdev, false);
+
 	if (frmType >= TXRX_FRM_MAX) {
 		WMA_LOGE("Invalid Frame Type Fail to send Frame");
 		return CDF_STATUS_E_FAILURE;
@@ -2667,7 +2816,11 @@ CDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 		wma_handle->last_umac_data_nbuf = skb;
 
 		/* Send the Data frame to TxRx in Non Standard Path */
+		ol_txrx_hl_tdls_flag_reset(txrx_vdev, tdlsFlag);
+
 		ret = ol_tx_non_std(txrx_vdev, ol_tx_spec_no_free, skb);
+
+		ol_txrx_hl_tdls_flag_reset(txrx_vdev, false);
 
 		if (ret) {
 			WMA_LOGE("TxRx Rejected. Fail to do Tx");
@@ -2832,6 +2985,9 @@ CDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 			 * we didn't get Download Complete for almost
 			 * WMA_TX_FRAME_COMPLETE_TIMEOUT (1 sec)
 			 */
+
+			/* display scheduler stats */
+			ol_txrx_display_stats(WLAN_SCHEDULER_STATS);
 		}
 	} else {
 		/*

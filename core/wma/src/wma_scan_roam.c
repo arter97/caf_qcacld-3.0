@@ -44,8 +44,6 @@
 #include "wni_cfg.h"
 #include "cfg_api.h"
 #include "ol_txrx_ctrl_api.h"
-#include "wlan_tgt_def_config.h"
-
 #include "cdf_nbuf.h"
 #include "cdf_types.h"
 #include "ol_txrx_api.h"

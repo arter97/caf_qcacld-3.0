@@ -44,8 +44,6 @@
 #include "wni_cfg.h"
 #include "cfg_api.h"
 #include "ol_txrx_ctrl_api.h"
-#include "wlan_tgt_def_config.h"
-
 #include "cdf_nbuf.h"
 #include "cdf_types.h"
 #include "ol_txrx_api.h"
@@ -818,6 +816,45 @@ static inline uint8_t wma_parse_mpdudensity(uint8_t mpdudensity)
 		return 0;
 }
 
+#if defined(CONFIG_HL_SUPPORT) && defined(FEATURE_WLAN_TDLS)
+
+/**
+ * wma_unified_peer_state_update() - update peer state
+ * @pdev: pdev handle
+ * @sta_mac: pointer to sta mac addr
+ * @bss_addr: bss address
+ * @sta_type: sta entry type
+ *
+ *
+ * Return: None
+ */
+static void
+wma_unified_peer_state_update(
+	struct ol_txrx_pdev_t *pdev,
+	uint8_t *sta_mac,
+	uint8_t *bss_addr,
+	uint8_t sta_type)
+{
+	if (STA_ENTRY_TDLS_PEER == sta_type)
+		ol_txrx_peer_state_update(pdev, sta_mac,
+					  ol_txrx_peer_state_auth);
+	else
+		ol_txrx_peer_state_update(pdev, bss_addr,
+					  ol_txrx_peer_state_auth);
+}
+#else
+
+static inline void
+wma_unified_peer_state_update(
+	struct ol_txrx_pdev_t *pdev,
+	uint8_t *sta_mac,
+	uint8_t *bss_addr,
+	uint8_t sta_type)
+{
+	ol_txrx_peer_state_update(pdev, bss_addr, ol_txrx_peer_state_auth);
+}
+#endif
+
 /**
  * wmi_unified_send_peer_assoc() - send peer assoc command to fw
  * @wma: wma handle
@@ -1062,7 +1099,8 @@ int32_t wmi_unified_send_peer_assoc(tp_wma_handle wma,
 	if (params->wpa_rsn >> 1)
 		cmd->peer_flags |= WMI_PEER_NEED_GTK_2_WAY;
 
-	ol_txrx_peer_state_update(pdev, params->bssId, ol_txrx_peer_state_auth);
+	wma_unified_peer_state_update(pdev, params->staMac,
+				      params->bssId, params->staType);
 
 #ifdef FEATURE_WLAN_WAPI
 	if (params->encryptType == eSIR_ED_WPI) {

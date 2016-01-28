@@ -44,8 +44,6 @@
 #include "wni_cfg.h"
 #include "cfg_api.h"
 #include "ol_txrx_ctrl_api.h"
-#include "wlan_tgt_def_config.h"
-
 #include "cdf_nbuf.h"
 #include "cdf_types.h"
 #include "ol_txrx_api.h"
@@ -70,6 +68,7 @@
 #include "dfs.h"
 #include "radar_filters.h"
 #include "wma_internal.h"
+#include "ol_txrx.h"
 
 #ifndef ARRAY_LENGTH
 #define ARRAY_LENGTH(a)         (sizeof(a) / sizeof((a)[0]))
@@ -7132,6 +7131,7 @@ int wma_update_tdls_peer_state(WMA_HANDLE handle,
 	int32_t len = sizeof(wmi_tdls_peer_update_cmd_fixed_param) +
 		      sizeof(wmi_tdls_peer_capabilities);
 	int ret = 0;
+	bool restore_last_peer = false;
 
 	if (!wma_handle || !wma_handle->wmi_handle) {
 		WMA_LOGE("%s: WMA is closed, can not issue cmd", __func__);
@@ -7241,8 +7241,8 @@ int wma_update_tdls_peer_state(WMA_HANDLE handle,
 	peer_cap->pref_offchan_bw =
 		peerStateParams->peerCap.prefOffChanBandwidth;
 
-	WMA_LOGD
-		("%s: peer_qos: 0x%x, buff_sta_support: %d, off_chan_support: %d, peer_curr_operclass: %d, self_curr_operclass: %d, peer_chan_len: %d, peer_operclass_len: %d, is_peer_responder: %d, pref_offchan_num: %d, pref_offchan_bw: %d",
+	WMA_LOGD(
+		"%s: peer_qos: 0x%x, buff_sta_support: %d, off_chan_support: %d, peer_curr_operclass: %d,self_curr_operclass: %d, peer_chan_len: %d, peer_operclass_len: %d, is_peer_responder: %d, pref_offchan_num: %d, pref_offchan_bw: %d",
 		__func__, peer_cap->peer_qos, peer_cap->buff_sta_support,
 		peer_cap->off_chan_support, peer_cap->peer_curr_operclass,
 		peer_cap->self_curr_operclass, peer_cap->peer_chan_len,
@@ -7323,12 +7323,16 @@ int wma_update_tdls_peer_state(WMA_HANDLE handle,
 			goto end_tdls_peer_state;
 		}
 
-		WMA_LOGD("%s: calling wma_remove_peer for peer " MAC_ADDRESS_STR
+		restore_last_peer = is_vdev_restore_last_peer(peer);
+
+		WMA_LOGD("%s: calling wma_remove_peer for peer" MAC_ADDRESS_STR
 			 " vdevId: %d", __func__,
 			 MAC_ADDR_ARRAY(peer->mac_addr.raw),
 			 peerStateParams->vdevId);
 		wma_remove_peer(wma_handle, peer->mac_addr.raw,
 				peerStateParams->vdevId, peer, false);
+		ol_txrx_update_last_real_peer(pdev, peer, &peer_id,
+					      restore_last_peer);
 	}
 
 end_tdls_peer_state:
