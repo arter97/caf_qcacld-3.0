@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -136,6 +136,10 @@ enum netif_reason_type {
 #define WLAN_HDD_NETIF_OPER_HISTORY 4
 #define WLAN_DUMP_TX_FLOW_POOL_INFO 5
 #define WLAN_TXRX_DESC_STATS  6
+#define WLAN_SCHEDULER_STATS        21
+#define WLAN_TX_QUEUE_STATS         22
+#define WLAN_BUNDLE_STATS           23
+#define WLAN_CREDIT_STATS           24
 
 ol_txrx_pdev_handle
 ol_txrx_pdev_alloc(ol_pdev_handle ctrl_pdev,
@@ -280,6 +284,8 @@ struct ol_tx_wmm_param_t {
 	struct ol_tx_ac_param_t ac[OL_TX_NUM_WMM_AC];
 };
 
+#if defined(CONFIG_HL_SUPPORT)
+
 /**
  * @brief Set paramters of WMM scheduler per AC settings.  .
  * @details
@@ -288,23 +294,9 @@ struct ol_tx_wmm_param_t {
  * @param data_pdev - the physical device being paused
  * @param wmm_param - the wmm parameters
  */
-#define ol_txrx_set_wmm_param(data_pdev, wmm_param)     /* no-op */
-
-/**
- * @brief notify tx data SW that a peer's transmissions are suspended.
- * @details
- *  This function applies only to HL systems - in LL systems, tx flow control
- *  is handled entirely within the target FW.
- *  The HL host tx data SW is doing tx classification and tx download
- *  scheduling, and therefore also needs to actively participate in tx
- *  flow control.  Specifically, the HL tx data SW needs to check whether a
- *  given peer is available to transmit to, or is paused.
- *  This function is used to tell the HL tx data SW when a peer is paused,
- *  so the host tx data SW can hold the tx frames for that SW.
- *
- * @param data_peer - which peer is being paused
- */
-#define ol_txrx_peer_pause(data_peer)   /* no-op */
+void
+ol_txrx_set_wmm_param(ol_txrx_pdev_handle data_pdev,
+		      struct ol_tx_wmm_param_t wmm_param);
 
 /**
  * @brief notify tx data SW that a peer-TID is ready to transmit to.
@@ -328,7 +320,8 @@ struct ol_tx_wmm_param_t {
  * @param tid - which TID within the peer is being unpaused, or -1 as a
  *      wildcard to unpause all TIDs within the peer
  */
-#define ol_txrx_peer_tid_unpause(data_peer, tid)        /* no-op */
+void
+ol_txrx_peer_tid_unpause(ol_txrx_peer_handle data_peer, int tid);
 
 /**
  * @brief Tell a paused peer to release a specified number of tx frames.
@@ -354,7 +347,88 @@ struct ol_tx_wmm_param_t {
  * @param max_frms - limit on the number of tx frames to release from the
  *      specified TID's queues within the specified peer
  */
-#define ol_txrx_tx_release(peer, tid_mask, max_frms)    /* no-op */
+void ol_txrx_tx_release(ol_txrx_peer_handle peer,
+			u_int32_t tid_mask,
+			int max_frms);
+
+/**
+ * @brief Suspend all tx data per thermal event/timer for the
+ *  specified physical device
+ * @details
+ *  This function applies only to HL systerms, and it makes pause and
+ * unpause operations happen in pairs.
+ */
+void
+ol_txrx_throttle_pause(ol_txrx_pdev_handle data_pdev);
+
+/**
+ * @brief Resume all tx data per thermal event/timer for the
+ * specified physical device
+ * @details
+ *  This function applies only to HL systerms, and it makes pause and
+ * unpause operations happen in pairs.
+ */
+void
+ol_txrx_throttle_unpause(ol_txrx_pdev_handle data_pdev);
+
+
+#else
+
+static inline
+void ol_txrx_set_wmm_param(ol_txrx_pdev_handle data_pdev,
+		      struct ol_tx_wmm_param_t wmm_param)
+{
+	return;
+}
+
+static inline void
+ol_txrx_peer_tid_unpause(ol_txrx_peer_handle data_peer, int tid)
+{
+	return;
+}
+
+static inline void
+ol_txrx_tx_release(ol_txrx_peer_handle peer,
+		   u_int32_t tid_mask,
+		   int max_frms)
+{
+	return;
+}
+
+static inline void
+ol_txrx_throttle_pause(ol_txrx_pdev_handle data_pdev)
+{
+	return;
+}
+
+static inline void
+ol_txrx_throttle_unpause(ol_txrx_pdev_handle data_pdev)
+{
+	return;
+}
+
+
+#endif /* CONFIG_HL_SUPPORT */
+
+
+/**
+ * @brief notify tx data SW that a peer's transmissions are suspended.
+ * @details
+ *  This function applies only to HL systems - in LL systems, tx flow control
+ *  is handled entirely within the target FW.
+ *  The HL host tx data SW is doing tx classification and tx download
+ *  scheduling, and therefore also needs to actively participate in tx
+ *  flow control.  Specifically, the HL tx data SW needs to check whether a
+ *  given peer is available to transmit to, or is paused.
+ *  This function is used to tell the HL tx data SW when a peer is paused,
+ *  so the host tx data SW can hold the tx frames for that SW.
+ *
+ * @param data_peer - which peer is being paused
+ */
+static inline void ol_txrx_peer_pause(struct ol_txrx_peer_t *data_peer)
+{
+	return;
+}
 
 /**
  * @brief Suspend all tx data for the specified virtual device.
@@ -370,9 +444,12 @@ struct ol_tx_wmm_param_t {
  * @param data_vdev - the virtual device being paused
  * @param reason - the reason for which vdev queue is getting paused
  */
-#if defined(QCA_LL_LEGACY_TX_FLOW_CONTROL) || defined(QCA_LL_TX_FLOW_CONTROL_V2)
+#if defined(QCA_LL_LEGACY_TX_FLOW_CONTROL) || \
+	defined(QCA_LL_TX_FLOW_CONTROL_V2) || defined(CONFIG_HL_SUPPORT)
+
 void ol_txrx_vdev_pause(ol_txrx_vdev_handle vdev, uint32_t reason);
 #else
+
 static inline
 void ol_txrx_vdev_pause(ol_txrx_vdev_handle vdev, uint32_t reason)
 {
@@ -392,10 +469,16 @@ void ol_txrx_vdev_pause(ol_txrx_vdev_handle vdev, uint32_t reason)
  *
  * @param data_vdev - the virtual device being flushed
  */
-#if defined(QCA_LL_LEGACY_TX_FLOW_CONTROL)
+#if defined(QCA_LL_LEGACY_TX_FLOW_CONTROL) || defined(CONFIG_HL_SUPPORT)
+
 void ol_txrx_vdev_flush(ol_txrx_vdev_handle data_vdev);
 #else
-#define ol_txrx_vdev_flush(data_vdev)   /* no-op */
+
+static inline void
+ol_txrx_vdev_flush(ol_txrx_vdev_handle data_vdev)
+{
+	return;
+}
 #endif /* QCA_LL_LEGACY_TX_FLOW_CONTROL */
 
 /**
@@ -407,33 +490,18 @@ void ol_txrx_vdev_flush(ol_txrx_vdev_handle data_vdev);
  * @param data_vdev - the virtual device being unpaused
  * @param reason - the reason for which vdev queue is getting unpaused
  */
-#if defined(QCA_LL_LEGACY_TX_FLOW_CONTROL) || defined(QCA_LL_TX_FLOW_CONTROL_V2)
+#if defined(QCA_LL_LEGACY_TX_FLOW_CONTROL) || \
+	defined(QCA_LL_TX_FLOW_CONTROL_V2) || defined(CONFIG_HL_SUPPORT)
+
 void ol_txrx_vdev_unpause(ol_txrx_vdev_handle data_vdev, uint32_t reason);
 #else
+
 static inline
 void ol_txrx_vdev_unpause(ol_txrx_vdev_handle data_vdev, uint32_t reason)
 {
 	return;
 }
 #endif /* QCA_LL_LEGACY_TX_FLOW_CONTROL */
-
-/**
- * @brief Suspend all tx data per thermal event/timer for the
- *  specified physical device
- * @details
- *  This function applies only to HL systerms, and it makes pause and
- * unpause operations happen in pairs.
- */
-#define ol_txrx_throttle_pause(data_pdev)       /* no-op */
-
-/**
- * @brief Resume all tx data per thermal event/timer for the
- * specified physical device
- * @details
- *  This function applies only to HL systerms, and it makes pause and
- * unpause operations happen in pairs.
- */
-#define ol_txrx_throttle_unpause(data_pdev)     /* no-op */
 
 /**
  * @brief Suspend all tx data for the specified physical device.
@@ -447,9 +515,12 @@ void ol_txrx_vdev_unpause(ol_txrx_vdev_handle data_vdev, uint32_t reason)
  *
  * @param data_pdev - the physical device being paused
  */
-#if defined(QCA_LL_LEGACY_TX_FLOW_CONTROL) || defined(QCA_LL_TX_FLOW_CONTROL_V2)
+#if defined(QCA_LL_LEGACY_TX_FLOW_CONTROL) || \
+	defined(QCA_LL_TX_FLOW_CONTROL_V2) || defined(CONFIG_HL_SUPPORT)
+
 void ol_txrx_pdev_pause(struct ol_txrx_pdev_t *data_pdev, uint32_t reason);
 #else
+
 static inline
 void ol_txrx_pdev_pause(struct ol_txrx_pdev_t *data_pdev, uint32_t reason)
 {
@@ -465,9 +536,12 @@ void ol_txrx_pdev_pause(struct ol_txrx_pdev_t *data_pdev, uint32_t reason)
  *
  * @param data_pdev - the physical device being unpaused
  */
-#if defined(QCA_LL_LEGACY_TX_FLOW_CONTROL) || defined(QCA_LL_TX_FLOW_CONTROL_V2)
+#if defined(QCA_LL_LEGACY_TX_FLOW_CONTROL) || \
+	defined(QCA_LL_TX_FLOW_CONTROL_V2) || defined(CONFIG_HL_SUPPORT)
+
 void ol_txrx_pdev_unpause(struct ol_txrx_pdev_t *pdev, uint32_t reason);
 #else
+
 static inline
 void ol_txrx_pdev_unpause(struct ol_txrx_pdev_t *pdev, uint32_t reason)
 {
@@ -1088,6 +1162,56 @@ static inline void ol_tx_throttle_init_period(struct ol_txrx_pdev_t *pdev,
 
 void ol_vdev_rx_set_intrabss_fwd(ol_txrx_vdev_handle vdev, bool val);
 
+#if defined(CONFIG_HL_SUPPORT) && defined(QCA_BAD_PEER_TX_FLOW_CL)
+
+/**
+ * @brief Configure the bad peer tx limit setting.
+ * @details
+ *
+ * @param pdev - the physics device
+ */
+void
+ol_txrx_bad_peer_txctl_set_setting(
+	struct ol_txrx_pdev_t *pdev,
+	int enable,
+	int period,
+	int txq_limit);
+
+/**
+ * @brief Configure the bad peer tx threshold limit
+ * @details
+ *
+ * @param pdev - the physics device
+ */
+void
+ol_txrx_bad_peer_txctl_update_threshold(
+	struct ol_txrx_pdev_t *pdev,
+	int level,
+	int tput_thresh,
+	int tx_limit);
+
+#else
+
+static inline void
+ol_txrx_bad_peer_txctl_set_setting(
+	struct ol_txrx_pdev_t *pdev,
+	int enable,
+	int period,
+	int txq_limit)
+{
+	return;
+}
+
+static inline void
+ol_txrx_bad_peer_txctl_update_threshold(
+	struct ol_txrx_pdev_t *pdev,
+	int level,
+	int tput_thresh,
+	int tx_limit)
+{
+	return;
+}
+#endif /* defined(CONFIG_HL_SUPPORT) && defined(QCA_BAD_PEER_TX_FLOW_CL) */
 
 #ifdef IPA_OFFLOAD
 void

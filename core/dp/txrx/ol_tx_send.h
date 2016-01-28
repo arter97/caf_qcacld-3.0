@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011, 2014, 2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -35,11 +35,20 @@
 #include <cdf_nbuf.h>           /* cdf_nbuf_t */
 #include <ol_txrx_types.h>      /* ol_tx_send_t */
 
+#if defined(CONFIG_HL_SUPPORT)
+
+static inline void ol_tx_discard_target_frms(ol_txrx_pdev_handle pdev)
+{
+	return;
+}
+#else
+
 /**
  * @flush the ol tx when surprise remove.
  *
  */
 void ol_tx_discard_target_frms(ol_txrx_pdev_handle pdev);
+#endif
 
 /**
  * @brief Send a tx frame to the target.

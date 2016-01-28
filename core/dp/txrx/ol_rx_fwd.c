@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2014-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011, 2014-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -121,7 +121,17 @@ static inline void ol_rx_fwd_to_tx(struct ol_txrx_vdev_t *vdev, cdf_nbuf_t msdu)
 	cdf_nbuf_map_single(pdev->osdev, msdu, CDF_DMA_TO_DEVICE);
 	cdf_nbuf_set_next(msdu, NULL);  /* add NULL terminator */
 
-	msdu = OL_TX_LL(vdev, msdu);
+	/* for HL, point to payload before send to tx again.*/
+	if (pdev->cfg.is_high_latency) {
+		void *rx_desc;
+
+		rx_desc = htt_rx_msdu_desc_retrieve(pdev->htt_pdev, msdu);
+		cdf_nbuf_pull_head(msdu,
+				   htt_rx_msdu_rx_desc_size_hl(pdev->htt_pdev,
+							       rx_desc));
+	}
+
+	msdu = OL_TX_SEND(vdev, msdu);
 
 	if (msdu) {
 		/*
@@ -132,6 +142,7 @@ static inline void ol_rx_fwd_to_tx(struct ol_txrx_vdev_t *vdev, cdf_nbuf_t msdu)
 		cdf_nbuf_unmap_single(pdev->osdev, msdu, CDF_DMA_TO_DEVICE);
 		cdf_nbuf_tx_free(msdu, NBUF_PKT_ERROR);
 	}
+	return;
 }
 
 void
@@ -229,4 +240,5 @@ ol_rx_fwd_check(struct ol_txrx_vdev_t *vdev,
 			ol_rx_deliver(vdev, peer, tid, deliver_list_head);
 		}
 	}
+	return;
 }
