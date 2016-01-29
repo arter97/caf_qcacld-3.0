@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -418,8 +418,7 @@ int hif_napi_poll(struct napi_struct *napi, int budget)
 		CDF_ASSERT(hif != NULL); /* emit a warning if hif NULL */
 	else {
 		rc = ce_per_engine_service(hif, NAPI_ID2PIPE(napi_info->id));
-		HIF_INFO_HI("%s: ce_per_engine_service processed %d msgs",
-			    __func__, rc);
+		NAPI_DEBUG("ce_per_engine_service processed %d msgs", rc);
 	}
 	napi_info->stats[cpu].napi_workdone += rc;
 	normalized = (rc / napi_info->scale);

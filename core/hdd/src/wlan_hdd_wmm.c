@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -1799,8 +1799,8 @@ CDF_STATUS hdd_wmm_acquire_access(hdd_adapter_t *pAdapter,
 {
 	hdd_wmm_qos_context_t *pQosContext;
 
-	CDF_TRACE(CDF_MODULE_ID_HDD, WMM_TRACE_LEVEL_INFO_LOW,
-		  "%s: Entered for AC %d", __func__, acType);
+	CDF_TRACE(CDF_MODULE_ID_HDD_DATA, CDF_TRACE_LEVEL_DEBUG,
+		"%s: Entered for AC %d", __func__, acType);
 
 	if (!hdd_wmm_is_active(pAdapter) ||
 	    !(WLAN_HDD_GET_CTX(pAdapter))->config->bImplicitQosEnabled ||
@@ -1808,8 +1808,8 @@ CDF_STATUS hdd_wmm_acquire_access(hdd_adapter_t *pAdapter,
 		/* either we don't want QoS or the AP doesn't support
 		 * QoS or we don't want to do implicit QoS
 		 */
-		CDF_TRACE(CDF_MODULE_ID_HDD, WMM_TRACE_LEVEL_INFO_LOW,
-			  "%s: QoS not configured on both ends ", __func__);
+		CDF_TRACE(CDF_MODULE_ID_HDD_DATA, CDF_TRACE_LEVEL_DEBUG,
+			"%s: QoS not configured on both ends ", __func__);
 
 		*pGranted =
 			pAdapter->hddWmmStatus.wmmAcStatus[acType].
@@ -1823,9 +1823,9 @@ CDF_STATUS hdd_wmm_acquire_access(hdd_adapter_t *pAdapter,
 		/* request already pending so we need to wait for that
 		 * response
 		 */
-		CDF_TRACE(CDF_MODULE_ID_HDD, WMM_TRACE_LEVEL_INFO_LOW,
-			  "%s: Implicit QoS for TL AC %d already scheduled",
-			  __func__, acType);
+		CDF_TRACE(CDF_MODULE_ID_HDD_DATA, CDF_TRACE_LEVEL_DEBUG,
+			"%s: Implicit QoS for TL AC %d already scheduled",
+			__func__, acType);
 
 		*pGranted = false;
 		return CDF_STATUS_SUCCESS;
@@ -1838,9 +1838,9 @@ CDF_STATUS hdd_wmm_acquire_access(hdd_adapter_t *pAdapter,
 		/* request previously failed
 		 * allow access, but we'll be downgraded
 		 */
-		CDF_TRACE(CDF_MODULE_ID_HDD, WMM_TRACE_LEVEL_INFO_LOW,
-			  "%s: Implicit QoS for TL AC %d previously failed",
-			  __func__, acType);
+		CDF_TRACE(CDF_MODULE_ID_HDD_DATA, CDF_TRACE_LEVEL_DEBUG,
+			"%s: Implicit QoS for TL AC %d previously failed",
+			__func__, acType);
 
 		if (!pAdapter->hddWmmStatus.wmmAcStatus[acType].
 		    wmmAcAccessRequired) {
@@ -1856,9 +1856,10 @@ CDF_STATUS hdd_wmm_acquire_access(hdd_adapter_t *pAdapter,
 		return CDF_STATUS_SUCCESS;
 	}
 	/* we need to establish implicit QoS */
-	CDF_TRACE(CDF_MODULE_ID_HDD, WMM_TRACE_LEVEL_INFO,
-		  "%s: Need to schedule implicit QoS for TL AC %d, pAdapter is %p",
-		  __func__, acType, pAdapter);
+	CDF_TRACE(CDF_MODULE_ID_HDD_DATA, CDF_TRACE_LEVEL_DEBUG,
+		"%s: Need to schedule implicit QoS for TL AC %d, pAdapter is %p",
+		__func__, acType, pAdapter);
+
 
 	pAdapter->hddWmmStatus.wmmAcStatus[acType].wmmAcAccessNeeded = true;
 
@@ -1867,8 +1868,8 @@ CDF_STATUS hdd_wmm_acquire_access(hdd_adapter_t *pAdapter,
 		/* no memory for QoS context.  Nothing we can do but
 		 * let data flow
 		 */
-		CDF_TRACE(CDF_MODULE_ID_HDD, WMM_TRACE_LEVEL_ERROR,
-			  "%s: Unable to allocate context", __func__);
+		CDF_TRACE(CDF_MODULE_ID_HDD_DATA, WMM_TRACE_LEVEL_ERROR,
+			"%s: Unable to allocate context", __func__);
 		pAdapter->hddWmmStatus.wmmAcStatus[acType].wmmAcAccessAllowed =
 			true;
 		*pGranted = true;
@@ -1889,9 +1890,9 @@ CDF_STATUS hdd_wmm_acquire_access(hdd_adapter_t *pAdapter,
 	INIT_WORK(&pQosContext->wmmAcSetupImplicitQos, hdd_wmm_do_implicit_qos);
 #endif
 
-	CDF_TRACE(CDF_MODULE_ID_HDD, WMM_TRACE_LEVEL_INFO,
-		  "%s: Scheduling work for AC %d, context %p",
-		  __func__, acType, pQosContext);
+	CDF_TRACE(CDF_MODULE_ID_HDD_DATA, CDF_TRACE_LEVEL_DEBUG,
+		"%s: Scheduling work for AC %d, context %p",
+		__func__, acType, pQosContext);
 
 	schedule_work(&pQosContext->wmmAcSetupImplicitQos);
 
