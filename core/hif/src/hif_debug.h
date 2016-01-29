@@ -39,4 +39,15 @@
 	CDF_TRACE(CDF_MODULE_ID_HIF, CDF_TRACE_LEVEL_ERROR, ## args)
 #define HIF_DBG(args ...) \
 	CDF_TRACE(CDF_MODULE_ID_HIF, CDF_TRACE_LEVEL_DEBUG, ## args)
+#ifdef HIF_ENTER
+#undef HIF_ENTER
+#endif
+#define HIF_ENTER(fmt, ...) CDF_TRACE(CDF_MODULE_ID_HIF, CDF_TRACE_LEVEL_INFO, \
+		"Enter: %s "fmt, __func__, ## __VA_ARGS__)
+
+#ifdef HIF_EXIT
+#undef HIF_EXIT
+#endif
+#define HIF_EXIT(fmt, ...) CDF_TRACE(CDF_MODULE_ID_HIF, CDF_TRACE_LEVEL_INFO, \
+		"Exit: %s "fmt, __func__, ## __VA_ARGS__)
 #endif /* __HIF_DEBUG_H__ */

@@ -33,6 +33,43 @@
 #include "hif.h"
 #ifdef HIF_PCI
 #include "hif_io32_pci.h"
+#elif defined(HIF_SDIO)
+/**
+ * hif_pci_cancel_deferred_target_sleep() - defer bus target sleep
+ * @scn: ol_softc
+ *
+ * Return: void
+ */
+static inline void hif_pci_cancel_deferred_target_sleep(struct ol_softc *scn)
+{
+	return;
+}
+
+/**
+ * hif_target_sleep_state_adjust() - on-demand sleep/wake
+ * @scn: ol_softc pointer.
+ * @sleep_ok: bool
+ * @wait_for_it: bool
+ *
+ * Output the pipe error counts of each pipe to log file
+ *
+ * Return: none
+ */
+static inline void hif_target_sleep_state_adjust(struct ol_softc *scn,
+						bool sleep_ok, bool wait_for_it)
+{
+	return;
+}
+
+/**
+ * soc_wake_reset() - soc_wake_reset
+ * @scn: ol_softc
+ *
+ * Return: void
+ */
+static inline void soc_wake_reset(struct ol_softc *scn)
+{
+}
 #else
 #include "hif_io32_snoc.h"
 #endif /* HIF_PCI */
