@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014,2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -49,6 +49,19 @@
 
 #include "ol_ctrl_addba_api.h"
 typedef void *hif_handle_t;
+
+#ifdef HIF_SDIO
+#define MAX_FILE_NAME     20
+struct ol_fw_files {
+	char image_file[MAX_FILE_NAME];
+	char board_data[MAX_FILE_NAME];
+	char otp_data[MAX_FILE_NAME];
+	char utf_file[MAX_FILE_NAME];
+	char utf_board_data[MAX_FILE_NAME];
+	char setup_file[MAX_FILE_NAME];
+	char epping_file[MAX_FILE_NAME];
+};
+#endif
 
 struct ol_version {
 	uint32_t host_ver;

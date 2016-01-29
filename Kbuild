@@ -620,7 +620,8 @@ BMI_INC := -I$(WLAN_ROOT)/$(BMI_DIR)/inc
 
 ifneq ($(CONFIG_ICNSS), y)
 BMI_OBJS := $(BMI_DIR)/src/bmi.o \
-            $(BMI_DIR)/src/ol_fw.o
+            $(BMI_DIR)/src/ol_fw.o \
+            $(BMI_DIR)/src/ol_fw_common.o
 ifeq ($(CONFIG_FEATURE_BMI_2), y)
 BMI_OBJS += $(BMI_DIR)/src/bmi_2.o
 else
@@ -1219,6 +1220,13 @@ endif
 ifneq ($(CONFIG_ARCH_MDM9630), y)
 ifeq ($(CONFIG_HIF_PCI), 1)
 CDEFINES += -DWLAN_FEATURE_RX_FULL_REORDER_OL
+endif
+endif
+
+#enable Code swap feature
+ifeq ($(CONFIG_CNSS), y)
+ifeq ($(CONFIG_HIF_PCI), 1)
+CDEFINES += -DCONFIG_CODESWAP_FEATURE
 endif
 endif
 

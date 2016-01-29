@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -37,9 +37,10 @@
 #include "ol_if_athvar.h"
 #include "hif.h"
 
-#ifdef HIF_PCI
+#if defined(HIF_PCI) || defined(HIF_SDIO)
 void bmi_cleanup(struct ol_softc *scn);
 CDF_STATUS bmi_done(struct ol_softc *scn);
+void bmi_target_ready(struct ol_softc *scn, void *cfg_ctx);
 CDF_STATUS bmi_download_firmware(struct ol_softc *scn);
 #else
 static inline void bmi_cleanup(struct ol_softc *scn)

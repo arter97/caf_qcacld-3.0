@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -50,7 +50,8 @@ enum ath_hal_bus_type {
 	HAL_BUS_TYPE_PCI,
 	HAL_BUS_TYPE_AHB,
 	HAL_BUS_TYPE_SNOC,
-	HAL_BUS_TYPE_SIM
+	HAL_BUS_TYPE_SIM,
+	HAL_BUS_TYPE_SDIO
 };
 
 /**

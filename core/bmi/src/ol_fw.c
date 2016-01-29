@@ -35,7 +35,12 @@
 #include "bin_sig.h"
 #include "i_ar6320v2_regtable.h"
 #include "epping_main.h"
+#ifdef HIF_PCI
 #include "ce_reg.h"
+#elif defined(HIF_SDIO)
+#include "if_sdio.h"
+#include "regtable_sdio.h"
+#endif
 #if  defined(CONFIG_CNSS)
 #include <net/cnss.h>
 #endif
@@ -481,6 +486,9 @@ int ol_copy_ramdump(struct ol_softc *scn)
 {
 	int ret;
 
+	if (scn->aps_osdev.bc.bc_bustype == HAL_BUS_TYPE_SDIO)
+		return 0;
+
 	if (!scn->ramdump_base || !scn->ramdump_size) {
 		BMI_ERR("%s:ramdump collection fail", __func__);
 		ret = -EACCES;
@@ -522,6 +530,7 @@ static void ramdump_work_handler(struct work_struct *ramdump)
 		BMI_ERR("HifDiagReadiMem FW Dump Area Pointer failed!");
 		ol_copy_ramdump(ramdump_scn);
 		cnss_device_crashed();
+
 		return;
 	}
 
@@ -540,8 +549,10 @@ static void ramdump_work_handler(struct work_struct *ramdump)
 		goto out_fail;
 
 	BMI_ERR("%s: RAM dump collecting completed!", __func__);
+
 	/* notify SSR framework the target has crashed. */
 	cnss_device_crashed();
+
 	return;
 
 out_fail:
@@ -551,6 +562,7 @@ out_fail:
 #else
 	cnss_device_crashed();
 #endif
+
 	return;
 }
 
@@ -626,13 +638,87 @@ void ol_target_failure(void *instance, CDF_STATUS status)
 	return;
 }
 
+#ifdef CONFIG_DISABLE_CDC_MAX_PERF_WAR
+static CDF_STATUS ol_disable_cdc_max_perf(struct ol_softc *scn)
+{
+	uint32_t param;
+
+	/* set the firmware to disable CDC max perf WAR */
+	if (bmi_read_memory(hif_hia_item_address(scn->target_type,
+		offsetof(struct host_interest_s,
+				hi_option_flag2)),
+				(uint8_t *) &param, 4, scn) !=
+					  CDF_STATUS_SUCCESS) {
+		BMI_ERR("BMI READ for cdc max perf failed");
+		return CDF_STATUS_E_FAILURE;
+	}
+
+	param |= HI_OPTION_DISABLE_CDC_MAX_PERF_WAR;
+	if (bmi_write_memory(
+		hif_hia_item_address(scn->target_type,
+			offsetof(struct host_interest_s,
+			hi_option_flag2)),
+		(uint8_t *)&param, 4, scn) !=
+					   CDF_STATUS_SUCCESS) {
+		BMI_ERR("setting cdc max perf failed");
+		return CDF_STATUS_E_FAILURE;
+	}
+
+	return CDF_STATUS_SUCCESS;
+}
+#else
+static CDF_STATUS ol_disable_cdc_max_perf(struct ol_softc *scn)
+{
+	return CDF_STATUS_SUCCESS;
+}
+#endif
+
+#ifdef CONFIG_CNSS
+static CDF_STATUS ol_write_ext_swreg(struct ol_softc *scn)
+{
+	uint32_t param;
+	struct cnss_platform_cap cap;
+	int ret;
+
+	ret = cnss_get_platform_cap(&cap);
+	if (ret)
+		BMI_ERR("platform capability is not available");
+
+	if (!ret && cap.cap_flag & CNSS_HAS_EXTERNAL_SWREG) {
+		if (bmi_read_memory(hif_hia_item_address(scn->target_type,
+			offsetof(struct host_interest_s,
+			hi_option_flag2)),
+			(uint8_t *)&param, 4, scn) !=
+						CDF_STATUS_SUCCESS) {
+			BMI_ERR("bmi_read_memory for setting"
+				" external SWREG failed");
+			return CDF_STATUS_E_FAILURE;
+		}
+
+		param |= HI_OPTION_USE_EXT_LDO;
+		if (bmi_write_memory(
+			hif_hia_item_address(scn->target_type,
+			offsetof(struct host_interest_s,
+				hi_option_flag2)),
+			(uint8_t *)&param, 4, scn) !=
+						 CDF_STATUS_SUCCESS) {
+			BMI_ERR("BMI WRITE for external SWREG fail");
+			return CDF_STATUS_E_FAILURE;
+		}
+	}
+
+	return CDF_STATUS_SUCCESS;
+}
+#else
+static CDF_STATUS ol_write_ext_swreg(struct ol_softc *scn)
+{
+	return CDF_STATUS_SUCCESS;
+}
+#endif
+
 CDF_STATUS ol_configure_target(struct ol_softc *scn)
 {
 	uint32_t param;
-#ifdef CONFIG_CNSS
-	struct cnss_platform_cap cap;
-	int ret;
-#endif
 
 	/* Tell target which HTC version it is used */
 	param = HTC_PROTOCOL_VERSION;
@@ -675,54 +761,12 @@ CDF_STATUS ol_configure_target(struct ol_softc *scn)
 			return CDF_STATUS_E_FAILURE;
 		}
 	}
-
-#if (CONFIG_DISABLE_CDC_MAX_PERF_WAR)
-	{
-		/* set the firmware to disable CDC max perf WAR */
-		if (bmi_read_memory(hif_hia_item_address(scn->target_type,
-			offsetof(struct host_interest_s, hi_option_flag2)),
-			(uint8_t *) &param, 4, scn) != CDF_STATUS_SUCCESS) {
-			BMI_ERR("BMI READ for setting cdc max perf failed");
+	if (scn->aps_osdev.bc.bc_bustype == HAL_BUS_TYPE_PCI) {
+		if (ol_disable_cdc_max_perf(scn))
 			return CDF_STATUS_E_FAILURE;
-		}
-
-		param |= HI_OPTION_DISABLE_CDC_MAX_PERF_WAR;
-		if (bmi_write_memory(
-			hif_hia_item_address(scn->target_type,
-			offsetof(struct host_interest_s, hi_option_flag2)),
-			(uint8_t *)&param, 4, scn) != CDF_STATUS_SUCCESS) {
-			BMI_ERR("setting cdc max perf failed");
+		if (ol_write_ext_swreg(scn))
 			return CDF_STATUS_E_FAILURE;
-		}
 	}
-#endif /* CONFIG_CDC_MAX_PERF_WAR */
-
-#ifdef CONFIG_CNSS
-
-	ret = cnss_get_platform_cap(&cap);
-	if (ret)
-		BMI_ERR("platform capability info from CNSS not available");
-
-	if (!ret && cap.cap_flag & CNSS_HAS_EXTERNAL_SWREG) {
-		if (bmi_read_memory(hif_hia_item_address(scn->target_type,
-			offsetof(struct host_interest_s, hi_option_flag2)),
-			(uint8_t *)&param, 4, scn) != CDF_STATUS_SUCCESS) {
-			BMI_ERR("bmi_read_memory for setting"
-				"external SWREG failed");
-			return CDF_STATUS_E_FAILURE;
-		}
-
-		param |= HI_OPTION_USE_EXT_LDO;
-		if (bmi_write_memory(
-			hif_hia_item_address(scn->target_type,
-			offsetof(struct host_interest_s, hi_option_flag2)),
-			(uint8_t *)&param, 4, scn) != CDF_STATUS_SUCCESS) {
-			BMI_ERR("BMI WRITE for setting external SWREG fail");
-			return CDF_STATUS_E_FAILURE;
-		}
-	}
-#endif
-
 #ifdef WLAN_FEATURE_LPSS
 	if (scn->enablelpasssupport) {
 		if (bmi_read_memory(hif_hia_item_address(scn->target_type,
@@ -1131,50 +1175,16 @@ end:
 	return status;
 }
 
-#ifdef CONFIG_CNSS
-/* AXI Start Address */
-#define TARGET_ADDR (0xa0000)
-
-void ol_transfer_codeswap_struct(struct ol_softc *scn)
-{
-	struct codeswap_codeseg_info wlan_codeswap;
-	CDF_STATUS rv;
-
-	if (!scn) {
-		BMI_ERR("%s: ol_softc is null", __func__);
-		return;
-	}
-	if (cnss_get_codeswap_struct(&wlan_codeswap)) {
-		BMI_ERR("%s: failed to get codeswap structure", __func__);
-		return;
-	}
-
-	rv = bmi_write_memory(TARGET_ADDR,
-			      (uint8_t *) &wlan_codeswap, sizeof(wlan_codeswap),
-			      scn);
-
-	if (rv != CDF_STATUS_SUCCESS) {
-		BMI_ERR("Failed to Write 0xa0000 to Target");
-		return;
-	}
-	BMI_INFO("codeswap structure is successfully downloaded");
-}
-#endif
-
 CDF_STATUS ol_download_firmware(struct ol_softc *scn)
 {
 	uint32_t param, address = 0;
 	int status = !EOK;
 	CDF_STATUS ret;
 
-#ifdef CONFIG_CNSS
-	if (0 != cnss_get_fw_files_for_target(&scn->fw_files,
-					      scn->target_type,
-					      scn->target_version)) {
-		BMI_ERR("%s: No FW files from CNSS driver", __func__);
+
+	if (0 != ol_get_fw_files(scn))
 		return CDF_STATUS_E_FAILURE;
-	}
-#endif
+
 	/* Transfer Board Data from Target EEPROM to Target RAM */
 	/* Determine where in Target RAM to write Board Data */
 	bmi_read_memory(hif_hia_item_address(scn->target_type,
@@ -1225,9 +1235,7 @@ CDF_STATUS ol_download_firmware(struct ol_softc *scn)
 		BMI_INFO("%s: Using 0x%x for the remainder of init",
 				__func__, address);
 
-#ifdef CONFIG_CNSS
 		ol_transfer_codeswap_struct(scn);
-#endif
 		status = ol_transfer_bin_file(scn, ATH_OTP_FILE,
 						address, true);
 		/* Execute the OTP code only if entry found and downloaded */
@@ -1282,7 +1290,11 @@ CDF_STATUS ol_download_firmware(struct ol_softc *scn)
 		case AR6320_REV3_2_VERSION:
 		case AR6320_REV4_VERSION:
 		case AR6320_DEV_VERSION:
+		if (scn->aps_osdev.bc.bc_bustype == HAL_BUS_TYPE_SDIO)
+			param = 19;
+		else
 			param = 6;
+
 			break;
 		default:
 			/* Configure GPIO AR9888 UART */
@@ -1330,6 +1342,7 @@ CDF_STATUS ol_download_firmware(struct ol_softc *scn)
 			offsetof(struct host_interest_s, hi_option_flag)),
 			(uint8_t *) &param, 4, scn);
 	}
+	status = ol_extra_initialization(scn);
 
 	return status;
 }
@@ -1477,6 +1490,9 @@ void ol_dump_target_memory(struct ol_softc *scn, void *memory_block)
 	u_int32_t address = 0;
 	u_int32_t size = 0;
 
+	if (scn->aps_osdev.bc.bc_bustype == HAL_BUS_TYPE_SDIO)
+		return;
+
 	for (; section_count < 2; section_count++) {
 		switch (section_count) {
 		case 0:
@@ -1555,13 +1571,16 @@ static int ol_target_coredump(void *inst, void *memory_block,
 		}
 
 		if ((block_len - amount_read) >= read_len) {
-			if (pos == REGISTER_LOCATION)
-				result = ol_diag_read_reg_loc(scn, buffer_loc,
-							      block_len -
-							      amount_read);
-			else
+			if ((scn->aps_osdev.bc.bc_bustype ==
+				HAL_BUS_TYPE_PCI) &&
+				(pos == REGISTER_LOCATION)) {
+				result = ol_diag_read_reg_loc(scn,
+						buffer_loc,
+						block_len - amount_read);
+			} else {
 				result = ol_diag_read(scn, buffer_loc,
 					      pos, read_len);
+			}
 			if (result != -EIO) {
 				amount_read += result;
 				buffer_loc += result;

@@ -143,4 +143,8 @@ CDF_STATUS bmi_done_local(struct ol_softc *scn);
 
 CDF_STATUS ol_download_firmware(struct ol_softc *scn);
 CDF_STATUS ol_configure_target(struct ol_softc *scn);
+#ifndef HIF_MESSAGE_BASED
+CDF_STATUS hif_reg_based_get_target_info(struct hif_sdio_dev *device,
+		  struct bmi_target_info *targ_info);
+#endif
 #endif

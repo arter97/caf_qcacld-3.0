@@ -777,22 +777,23 @@ int32_t cdf_mem_compare2(const void *pMemory1, const void *pMemory2,
  *
  * Return: pointer of allocated memory or null if memory alloc fails
  */
-inline void *cdf_os_mem_alloc_consistent(cdf_device_t osdev, cdf_size_t size,
+#if defined(A_SIMOS_DEVHOST) ||  defined(HIF_SDIO)
+void *cdf_os_mem_alloc_consistent(cdf_device_t osdev, cdf_size_t size,
 					 cdf_dma_addr_t *paddr,
 					 cdf_dma_context_t memctx)
 {
-#if defined(A_SIMOS_DEVHOST)
-	static int first = 1;
 	void *vaddr;
 
-	if (first) {
-		first = 0;
-		pr_err("Warning: bypassing %s\n", __func__);
-	}
 	vaddr = cdf_mem_malloc(size);
 	*paddr = ((cdf_dma_addr_t) vaddr);
+
 	return vaddr;
+}
 #else
+void *cdf_os_mem_alloc_consistent(cdf_device_t osdev, cdf_size_t size,
+					cdf_dma_addr_t *paddr,
+					cdf_dma_context_t memctx)
+{
 	int flags = GFP_KERNEL;
 	void *alloc_mem = NULL;
 
@@ -803,10 +804,10 @@ inline void *cdf_os_mem_alloc_consistent(cdf_device_t osdev, cdf_size_t size,
 	if (alloc_mem == NULL)
 		pr_err("%s Warning: unable to alloc consistent memory of size %zu!\n",
 			__func__, size);
-	return alloc_mem;
-#endif
-}
 
+	return alloc_mem;
+}
+#endif
 /**
  * cdf_os_mem_free_consistent() - free consistent cdf memory
  * @osdev: OS device handle
@@ -816,26 +817,25 @@ inline void *cdf_os_mem_alloc_consistent(cdf_device_t osdev, cdf_size_t size,
  *
  * Return: none
  */
-inline void
-cdf_os_mem_free_consistent(cdf_device_t osdev,
+#if defined(A_SIMOS_DEVHOST) ||  defined(HIF_SDIO)
+void cdf_os_mem_free_consistent(cdf_device_t osdev,
 			   cdf_size_t size,
 			   void *vaddr,
 			   cdf_dma_addr_t paddr, cdf_dma_context_t memctx)
 {
-#if defined(A_SIMOS_DEVHOST)
-	static int first = 1;
-
-	if (first) {
-		first = 0;
-		pr_err("Warning: bypassing %s\n", __func__);
-	}
 	cdf_mem_free(vaddr);
-	return;
-#else
-	dma_free_coherent(osdev->dev, size, vaddr, paddr);
-#endif
-}
 
+	return;
+}
+#else
+void cdf_os_mem_free_consistent(cdf_device_t osdev,
+			cdf_size_t size,
+			void *vaddr,
+			cdf_dma_addr_t paddr, cdf_dma_context_t memctx)
+{
+	dma_free_coherent(osdev->dev, size, vaddr, paddr);
+}
+#endif
 
 /**
  * cdf_os_mem_dma_sync_single_for_device() - assign memory to device

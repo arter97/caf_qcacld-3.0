@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014,2016,2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -46,8 +46,9 @@
 #define AR6320_REV3_2_VERSION        0x5030000
 #define AR6320_REV4_VERSION          AR6320_REV2_1_VERSION
 #define AR6320_DEV_VERSION           0x1000000
+#define QCA9377_REV1_1_VERSION       0x5020001
 
-#ifdef HIF_PCI
+#if defined(HIF_PCI) || defined(HIF_SDIO)
 void ol_target_failure(void *instance, CDF_STATUS status);
 uint8_t ol_get_number_of_peers_supported(struct ol_softc *scn);
 #else
@@ -59,6 +60,16 @@ static inline void ol_target_failure(void *instance, CDF_STATUS status)
 static inline uint8_t ol_get_number_of_peers_supported(struct ol_softc *scn)
 {
 	return 1;
+}
+#endif
+void ol_target_ready(struct ol_softc *scn, void *cfg_ctx);
+int ol_get_fw_files(struct ol_softc *scn);
+int ol_extra_initialization(struct ol_softc *scn);
+#ifdef CONFIG_CODESWAP_FEATURE
+void ol_transfer_codeswap_struct(struct ol_softc *scn);
+#else
+static inline void ol_transfer_codeswap_struct(struct ol_softc *scn)
+{
 }
 #endif
 #endif /* _OL_FW_H_ */

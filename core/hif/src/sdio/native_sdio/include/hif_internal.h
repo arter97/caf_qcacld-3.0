@@ -172,29 +172,6 @@
 	(HIF_SDIO_READ | HIF_SYNCHRONOUS | HIF_EXTENDED_IO | \
 				HIF_BLOCK_BASIS | HIF_FIXED_ADDRESS)
 
-enum hif_device_config_opcode {
-	HIF_DEVICE_POWER_STATE = 0,
-	HIF_DEVICE_GET_MBOX_BLOCK_SIZE,
-	HIF_DEVICE_GET_MBOX_ADDR,
-	HIF_DEVICE_GET_PENDING_EVENTS_FUNC,
-	HIF_DEVICE_GET_IRQ_PROC_MODE,
-	HIF_DEVICE_GET_RECV_EVENT_MASK_UNMASK_FUNC,
-	HIF_DEVICE_POWER_STATE_CHANGE,
-	HIF_DEVICE_GET_IRQ_YIELD_PARAMS,
-	HIF_CONFIGURE_QUERY_SCATTER_REQUEST_SUPPORT,
-	HIF_DEVICE_GET_OS_DEVICE,
-	HIF_DEVICE_DEBUG_BUS_STATE,
-	HIF_BMI_DONE,
-	HIF_DEVICE_SET_TARGET_TYPE,
-	HIF_DEVICE_SET_HTC_CONTEXT,
-	HIF_DEVICE_GET_HTC_CONTEXT,
-};
-
-int
-hif_configure_device(struct hif_sdio_dev *device,
-			 enum hif_device_config_opcode opcode,
-			 void *config, uint32_t config_len);
-
 struct HIF_DEVICE_OS_DEVICE_INFO {
 	void *os_dev;
 };
@@ -342,7 +319,6 @@ struct HIF_DEVICE_SCATTER_SUPPORT_INFO {
 	int                             max_tx_size_per_scatter_req;
 };
 
-void hif_set_mailbox_swap(struct hif_sdio_dev  *device);
 void hif_get_target_revision(struct ol_softc *ol_sc);
 struct HIF_SCATTER_REQ_PRIV;
 

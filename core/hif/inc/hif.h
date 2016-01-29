@@ -552,8 +552,46 @@ struct hif_msg_callbacks {
 	void (*fwEventHandler)(void *context, CDF_STATUS status);
 };
 
-void hif_claim_device(struct ol_softc *scn, void *claimedContext);
+enum hif_device_config_opcode {
+		HIF_DEVICE_POWER_STATE = 0,
+		HIF_DEVICE_GET_MBOX_BLOCK_SIZE,
+		HIF_DEVICE_GET_MBOX_ADDR,
+		HIF_DEVICE_GET_PENDING_EVENTS_FUNC,
+		HIF_DEVICE_GET_IRQ_PROC_MODE,
+		HIF_DEVICE_GET_RECV_EVENT_MASK_UNMASK_FUNC,
+		HIF_DEVICE_POWER_STATE_CHANGE,
+		HIF_DEVICE_GET_IRQ_YIELD_PARAMS,
+		HIF_CONFIGURE_QUERY_SCATTER_REQUEST_SUPPORT,
+		HIF_DEVICE_GET_OS_DEVICE,
+		HIF_DEVICE_DEBUG_BUS_STATE,
+		HIF_BMI_DONE,
+		HIF_DEVICE_SET_TARGET_TYPE,
+		HIF_DEVICE_SET_HTC_CONTEXT,
+		HIF_DEVICE_GET_HTC_CONTEXT,
+};
 
+#ifdef HIF_SDIO
+void hif_claim_device(struct ol_softc *scn, void *claimedContext);
+void hif_set_mailbox_swap(struct hif_sdio_dev *device);
+int hif_configure_device(struct hif_sdio_dev *device,
+			enum hif_device_config_opcode opcode,
+			void *config, uint32_t configLen);
+#else
+static inline void hif_claim_device(struct ol_softc *scn, void *claimedContext)
+{
+}
+
+static inline void hif_set_mailbox_swap(struct hif_sdio_dev *device)
+{
+}
+
+static inline int hif_configure_device(struct hif_sdio_dev *device,
+			 enum hif_device_config_opcode opcode,
+			 void *config, uint32_t configLen)
+{
+	return 0;
+}
+#endif
 #define HIF_DATA_ATTR_SET_TX_CLASSIFY(attr, v) \
 	(attr |= (v & 0x01) << 5)
 #define HIF_DATA_ATTR_SET_ENCAPSULATION_TYPE(attr, v) \

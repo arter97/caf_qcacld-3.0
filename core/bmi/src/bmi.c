@@ -111,6 +111,7 @@ CDF_STATUS bmi_done(struct ol_softc *scn)
 {
 	CDF_STATUS status = CDF_STATUS_SUCCESS;
 
+	hif_claim_device(scn, scn);
 	if (NO_BMI)
 		return status;
 
@@ -121,13 +122,17 @@ CDF_STATUS bmi_done(struct ol_softc *scn)
 	return status;
 }
 
-CDF_STATUS
-bmi_get_target_info(struct bmi_target_info *targ_info,
-						struct ol_softc *scn)
+void bmi_target_ready(struct ol_softc *scn, void *cfg_ctx)
 {
-	int status = 0;
+	ol_target_ready(scn, cfg_ctx);
+}
+#ifdef HIF_MESSAGE_BASED
+CDF_STATUS bmi_get_target_info(struct bmi_target_info *targ_info,
+			      struct ol_softc *scn)
+{
 	uint8_t *bmi_cmd_buff = scn->bmi_cmd_buff;
 	uint8_t *bmi_rsp_buff = scn->bmi_rsp_buff;
+	int status = 0;
 	uint32_t cid, length;
 
 	if (scn->bmi_done) {
@@ -139,6 +144,7 @@ bmi_get_target_info(struct bmi_target_info *targ_info,
 		BMI_ERR("%s:BMI CMD/RSP Buffer is NULL", __func__);
 		return CDF_STATUS_NOT_INITIALIZED;
 	}
+
 	cid = BMI_GET_TARGET_INFO;
 
 	cdf_mem_copy(bmi_cmd_buff, &cid, sizeof(cid));
@@ -155,6 +161,23 @@ bmi_get_target_info(struct bmi_target_info *targ_info,
 	cdf_mem_copy(targ_info, bmi_rsp_buff, length);
 	return CDF_STATUS_SUCCESS;
 }
+#else
+CDF_STATUS
+bmi_get_target_info(struct bmi_target_info *targ_info,
+						struct ol_softc *scn)
+{
+	if (scn->bmi_done) {
+		BMI_ERR("BMI Phase is Already Done");
+		return CDF_STATUS_E_PERM;
+	}
+
+	/* getting the target ID requires special handling because of
+	 * the variable length message
+	 */
+	return hif_reg_based_get_target_info((struct hif_sdio_dev *)scn->hif_hdl,
+				targ_info);
+}
+#endif
 
 #ifdef FEATURE_BMI_2
 static inline uint32_t bmi_get_test_addr(void)
@@ -183,6 +206,8 @@ CDF_STATUS bmi_download_firmware(struct ol_softc *scn)
 		return CDF_STATUS_NOT_INITIALIZED;
 	}
 #ifdef CONFIG_CNSS
+	if (scn->aps_osdev.bc.bc_bustype != HAL_BUS_TYPE_PCI)
+		goto end;
 	if (BMI_TEST_ENABLE == cnss_get_bmi_setup()) {
 		ret = snprintf(data, 10, "ABCDEFGHI");
 		BMI_DBG("ret:%d writing data:%s\n", ret, data);
@@ -193,11 +218,13 @@ CDF_STATUS bmi_download_firmware(struct ol_softc *scn)
 			goto end;
 		}
 		bmi_command_test(BMI_NO_COMMAND, address, data, 9, scn);
-		bmi_command_test(BMI_WRITE_MEMORY, address, data, 9, scn);
+		bmi_command_test(BMI_WRITE_MEMORY, address, data, 9,
+				 scn);
 		bmi_command_test(BMI_READ_MEMORY, address, out, 9, scn);
 		BMI_DBG("Output:%s", out);
 	}
 #endif
+
 end:
 	return bmi_firmware_download(scn);
 }
