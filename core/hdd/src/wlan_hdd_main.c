@@ -5014,6 +5014,30 @@ static CDF_STATUS wlan_hdd_disable_all_dual_mac_features(hdd_context_t *hdd_ctx)
 	return CDF_STATUS_SUCCESS;
 }
 
+#ifdef HIF_SDIO
+/**
+ * set_fw_debug_mode() - set_fw_debug_mode
+ * @mode: fw debug mode, 0 for QXDM, 1 for WMI
+ *
+ * Return: int
+ */
+static inline int set_fw_debug_mode(bool mode)
+{
+	return 0;
+}
+#else
+/**
+ * set_fw_debug_mode() - set_fw_debug_mode
+ * @mode: fw debug mode, 0 for QXDM, 1 for WMI
+ *
+ * Return: int
+ */
+static inline int set_fw_debug_mode(bool mode)
+{
+	return icnss_set_fw_debug_mode(mode);
+}
+#endif
+
 /**
  * hdd_override_ini_config - Override INI config
  * @hdd_ctx: HDD context
@@ -5163,7 +5187,7 @@ hdd_context_t *hdd_init_context(struct device *dev, void *hif_sc)
 
 	hdd_init_offloaded_packets_ctx(hdd_ctx);
 
-	icnss_set_fw_debug_mode(hdd_ctx->config->enablefwlog);
+	set_fw_debug_mode(hdd_ctx->config->enablefwlog);
 
 	hdd_ctx->max_intf_count = CSR_ROAM_SESSION_MAX;
 

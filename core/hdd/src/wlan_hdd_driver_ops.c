@@ -30,7 +30,8 @@
 
 #include <linux/platform_device.h>
 #include <linux/pci.h>
-#ifdef HIF_PCI
+#include <linux/mmc/sdio_func.h>
+#if defined(HIF_PCI) || defined(HIF_SDIO)
 #ifdef CONFIG_CNSS
 #include <net/cnss.h>
 #endif /* CONFIG_CNSS */
@@ -71,13 +72,21 @@
 #define WLAN_HDD_UNREGISTER_DRIVER(wlan_drv_ops) \
 	pci_unregister_driver(wlan_drv_ops)
 #endif /* CONFIG_CNSS */
-#else
+#endif /* HIF_PCI */
+#ifdef HIF_SDIO
+#define WLAN_HDD_REGISTER_DRIVER(wlan_drv_ops) \
+	cnss_sdio_wlan_register_driver(wlan_drv_ops)
+#define WLAN_HDD_UNREGISTER_DRIVER(wlan_drv_ops) \
+	cnss_sdio_wlan_unregister_driver(wlan_drv_ops)
+#endif /* HIF_SDIO */
+
+#ifdef CONFIG_ICNSS
 #define WLAN_HDD_REGISTER_DRIVER(wlan_drv_ops) \
 	icnss_register_driver(wlan_drv_ops)
 #define WLAN_HDD_UNREGISTER_DRIVER(wlan_drv_ops) \
 	icnss_unregister_driver(wlan_drv_ops)
-#endif /* HIF_PCI */
-#define DISABLE_KRAIT_IDLE_PS_VAL	1
+#endif /* CONFIG_ICNSS */
+#define DISABLE_KRAIT_IDLE_PS_VAL      1
 
 /*
  * In BMI Phase we are only sending small chunk (256 bytes) of the FW image at
@@ -760,6 +769,90 @@ static int wlan_hdd_pci_runtime_resume(struct pci_dev *pdev)
 }
 #endif
 
+#elif defined HIF_SDIO
+/**
+ * wlan_hdd_sdio_probe() - wlan_hdd_sdio_probe
+ * @sdio_func: pointer to sdio device function
+ * @id: pointer to sdio device id structure
+ *
+ * Return: int
+ */
+static int wlan_hdd_sdio_probe(struct sdio_func *sdio_func,
+			       const struct sdio_device_id *id)
+{
+	struct device *dev = &sdio_func->dev;
+	return wlan_hdd_probe(dev, sdio_func, id, HAL_BUS_TYPE_SDIO, false);
+}
+
+/**
+ * wlan_hdd_sdio_remove() - wlan_hdd_sdio_remove
+ * @sdio_func: pointer to sdio device function
+ *
+ * Return: void
+ */
+void wlan_hdd_sdio_remove(struct sdio_func *sdio_func)
+{
+	wlan_hdd_remove();
+}
+
+/**
+ * wlan_hdd_sdio_shutdown() - wlan_hdd_sdio_shutdown
+ * @dev: pointer to device structure
+ *
+ * Return: void
+ */
+void wlan_hdd_sdio_shutdown(struct sdio_func *sdio_func)
+{
+	wlan_hdd_shutdown();
+}
+
+/**
+ * wlan_hdd_sdio_reinit() - wlan_hdd_sdio_reinit
+ * @sdio_func: pointer to sdio device function
+ * @id: pointer to sdio device id structure
+ *
+ * Return: int
+ */
+int wlan_hdd_sdio_reinit(struct sdio_func *sdio_func,
+			 const struct sdio_device_id *id)
+{
+	struct device *dev = &sdio_func->dev;
+	return wlan_hdd_probe(dev, NULL, NULL, HAL_BUS_TYPE_SDIO, true);
+}
+
+/**
+ * wlan_hdd_sdio_crash_shutdown() - wlan_hdd_sdio_crash_shutdown
+ *
+ * Return: void
+ */
+void wlan_hdd_sdio_crash_shutdown(struct sdio_func *sdio_func)
+{
+	wlan_hdd_crash_shutdown();
+}
+
+/**
+ * wlan_hdd_sdio_suspend() - wlan_hdd_sdio_suspend
+ * @dev: pointer to device structure
+ * @state: state
+ *
+ * Return: int
+ */
+static int wlan_hdd_sdio_suspend(struct device *dev)
+{
+	pm_message_t state = { .event = PM_EVENT_SUSPEND };
+	return wlan_hdd_bus_suspend(state);
+}
+
+/**
+ * wlan_hdd_sdio_resume() - wlan_hdd_sdio_resume
+ * @dev: pointer to device structure
+ *
+ * Return: int
+ */
+static int wlan_hdd_sdio_resume(struct device *dev)
+{
+	return wlan_hdd_bus_resume();
+}
 #else
 /**
  * wlan_hdd_snoc_probe() - wlan_hdd_snoc_probe
@@ -889,8 +982,23 @@ struct pci_driver wlan_drv_ops = {
 #endif /* ATH_BUS_PM */
 
 };
-#endif /* CONFIG_CNSS */
-#else
+#endif /* CONFIG_CNSS_PCI */
+#endif /* HIF_PCI */
+
+#ifdef HIF_SDIO
+struct cnss_sdio_wlan_driver wlan_drv_ops = {
+	.name       = "wlan_hdd_drv",
+	.probe      = wlan_hdd_sdio_probe,
+	.remove     = wlan_hdd_sdio_remove,
+	.shutdown   = wlan_hdd_sdio_shutdown,
+	.reinit     = wlan_hdd_sdio_reinit,
+	.crash_shutdown = wlan_hdd_sdio_crash_shutdown,
+	.suspend    = wlan_hdd_sdio_suspend,
+	.resume     = wlan_hdd_sdio_resume,
+};
+#endif
+
+#ifdef CONFIG_ICNSS
 struct icnss_driver_ops wlan_drv_ops = {
 	.name       = "wlan_hdd_drv",
 	.probe      = wlan_hdd_snoc_probe,
