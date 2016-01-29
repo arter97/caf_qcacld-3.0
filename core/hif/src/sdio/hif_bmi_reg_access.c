@@ -192,7 +192,7 @@ bmi_buffer_receive(struct hif_sdio_dev *device,
 					break;
 				}
 
-				if (hifPendingEvents.AvailableRecvBytes >=
+				if (hifPendingEvents.available_recv_bytes >=
 				    sizeof(A_UINT32)) {
 					word_available = 1;
 				}

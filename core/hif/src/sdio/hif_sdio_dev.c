@@ -435,7 +435,7 @@ A_STATUS hif_dev_setup(HIF_SDIO_DEVICE *pDev)
 {
 	A_STATUS status;
 	A_UINT32 blocksizes[MAILBOX_COUNT];
-	HTC_CALLBACKS htcCallbacks;
+	HTC_CALLBACKS htc_callbacks;
 	struct hif_sdio_dev *hif_device = pDev->HIFDevice;
 
 	HIF_ENTER();
@@ -485,11 +485,11 @@ A_STATUS hif_dev_setup(HIF_SDIO_DEVICE *pDev)
 				     &pDev->HifIRQYieldParams,
 				     sizeof(pDev->HifIRQYieldParams));
 
-		if (pDev->HifIRQYieldParams.RecvPacketYieldCount > 0) {
+		if (pDev->HifIRQYieldParams.recv_packet_yield_count > 0) {
 			AR_DEBUG_PRINTF(ATH_DEBUG_WARN,
 				("HIF req of DSR yield per %d RECV packets\n",
 				 pDev->HifIRQYieldParams.
-				 RecvPacketYieldCount));
+				 recv_packet_yield_count));
 			pDev->DSRCanYield = true;
 		}
 		break;
@@ -513,12 +513,12 @@ A_STATUS hif_dev_setup(HIF_SDIO_DEVICE *pDev)
 
 	status = hif_dev_disable_interrupts(pDev);
 
-	A_MEMZERO(&htcCallbacks, sizeof(HTC_CALLBACKS));
+	A_MEMZERO(&htc_callbacks, sizeof(HTC_CALLBACKS));
 	/* the device layer handles these */
-	htcCallbacks.rwCompletionHandler = hif_dev_rw_completion_handler;
-	htcCallbacks.dsrHandler = hif_dev_dsr_handler;
-	htcCallbacks.context = pDev;
-	status = hif_attach_htc(pDev->HIFDevice, &htcCallbacks);
+	htc_callbacks.rwCompletionHandler = hif_dev_rw_completion_handler;
+	htc_callbacks.dsrHandler = hif_dev_dsr_handler;
+	htc_callbacks.context = pDev;
+	status = hif_attach_htc(pDev->HIFDevice, &htc_callbacks);
 
 	HIF_EXIT();
 	return status;

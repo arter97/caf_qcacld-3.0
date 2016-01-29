@@ -291,7 +291,7 @@ static int hif_sdio_register_driver(struct osdrv_callbacks *callbacks)
 	AR_DEBUG_PRINTF(ATH_DEBUG_TRACE, ("%s: hif sdio registering\n",
 					__func__));
 	registered = 1;
-	if (callbacks->deviceSuspendHandler && callbacks->deviceResumeHandler)
+	if (callbacks->device_suspend_handler && callbacks->device_resume_handler)
 		ar6k_driver.drv.pm = &ar6k_device_pm_ops;
 	status = sdio_register_driver(&ar6k_driver);
 
@@ -405,19 +405,19 @@ __hif_read_write(struct hif_sdio_dev *device,
 			if (address >= 0x800 && address < 0xC00) {
 				/* Host control register and CIS Window */
 				mboxLength = 0;
-			} else if (address == MailBoxInfo.MboxAddresses[0]
-				   || address == MailBoxInfo.MboxAddresses[1]
-				   || address == MailBoxInfo.MboxAddresses[2]
-				   || address == MailBoxInfo.MboxAddresses[3]) {
+			} else if (address == MailBoxInfo.mbox_addresses[0]
+				   || address == MailBoxInfo.mbox_addresses[1]
+				   || address == MailBoxInfo.mbox_addresses[2]
+				   || address == MailBoxInfo.mbox_addresses[3]) {
 				mboxLength = HIF_MBOX_WIDTH;
 			} else if (address ==
-				   MailBoxInfo.MboxProp[0].ExtendedAddress) {
+				   MailBoxInfo.mbox_prop[0].extended_address) {
 				mboxLength =
-					MailBoxInfo.MboxProp[0].ExtendedSize;
+					MailBoxInfo.mbox_prop[0].extended_size;
 			} else if (address ==
-				   MailBoxInfo.MboxProp[1].ExtendedAddress) {
+				   MailBoxInfo.mbox_prop[1].extended_address) {
 				mboxLength =
-					MailBoxInfo.MboxProp[1].ExtendedSize;
+					MailBoxInfo.mbox_prop[1].extended_size;
 			} else {
 				AR_DEBUG_PRINTF(ATH_DEBUG_ERROR,
 					("Invalid written address: 0x%08x\n",
@@ -641,7 +641,7 @@ hif_read_write(struct hif_sdio_dev *device,
 
 	/*sdio r/w action is not needed when suspend, so just return */
 	if ((device->is_suspend == true)
-	    && (device->powerConfig == HIF_DEVICE_POWER_CUT)) {
+	    && (device->power_config == HIF_DEVICE_POWER_CUT)) {
 		AR_DEBUG_PRINTF(ATH_DEBUG_TRACE, ("skip io when suspending\n"));
 		return A_OK;
 	}
@@ -767,7 +767,7 @@ static int async_task(void *param)
 				("%s: async_task processing req: 0x%lX\n",
 				 __func__, (unsigned long)request));
 
-			if (request->pScatterReq != NULL) {
+			if (request->scatter_req != NULL) {
 				A_ASSERT(device->scatter_enabled);
 				/* pass the request to scatter routine which
 				 * executes it synchronously, note, no need
@@ -797,7 +797,7 @@ static int async_task(void *param)
 				      ("%s: async_task completion req 0x%lX\n",
 						 __func__, (unsigned long)
 						 request));
-					device->htcCallbacks.
+					device->htc_callbacks.
 					rwCompletionHandler(context,
 							    status);
 				} else {
@@ -1076,18 +1076,18 @@ power_state_change_notify(struct hif_sdio_dev *device,
 		status = hif_disable_func(device, func);
 		reset_sdio_on_unload = old_reset_val;
 		if (!device->is_suspend) {
-			device->powerConfig = config;
+			device->power_config = config;
 			mmc_detect_change(device->host, HZ / 3);
 		}
 		break;
 	case HIF_DEVICE_POWER_UP:
-		if (device->powerConfig == HIF_DEVICE_POWER_CUT) {
+		if (device->power_config == HIF_DEVICE_POWER_CUT) {
 			if (device->is_suspend) {
 				status = reinit_sdio(device);
-				/* set powerConfig before EnableFunc to
+				/* set power_config before EnableFunc to
 				 * passthrough sdio r/w action when resuming
 				 * from cut power */
-				device->powerConfig = config;
+				device->power_config = config;
 				if (status == A_OK)
 					status = hif_enable_func(device, func);
 			} else {
@@ -1095,18 +1095,144 @@ power_state_change_notify(struct hif_sdio_dev *device,
 				mmc_detect_change(device->host, 0);
 				return A_PENDING;
 			}
-		} else if (device->powerConfig == HIF_DEVICE_POWER_DOWN) {
+		} else if (device->power_config == HIF_DEVICE_POWER_DOWN) {
 			int ret = sdio_enable4bits(device, 1);
 			status = (ret == 0) ? A_OK : A_ERROR;
 		}
 		break;
 	}
-	device->powerConfig = config;
+	device->power_config = config;
 
 	AR_DEBUG_PRINTF(ATH_DEBUG_TRACE,
 		("%s: \n", __func__));
 
 	return status;
+}
+
+#ifdef SDIO_3_0
+/**
+ * set_extended_mbox_size() - set extended MBOX size
+ * @pinfo: sdio mailbox info
+ *
+ * Return: none.
+ */
+static void set_extended_mbox_size(struct hif_device_mbox_info *pinfo)
+{
+	pinfo->mbox_prop[0].extended_size =
+		HIF_MBOX0_EXTENDED_WIDTH_AR6320_ROME_2_0;
+	pinfo->mbox_prop[1].extended_size =
+		HIF_MBOX1_EXTENDED_WIDTH_AR6320;
+}
+
+/**
+ * set_extended_mbox_address() - set extended MBOX address
+ * @pinfo: sdio mailbox info
+ *
+ * Return: none.
+ */
+static void set_extended_mbox_address(struct hif_device_mbox_info *pinfo)
+{
+	pinfo->mbox_prop[1].extended_address =
+		pinfo->mbox_prop[0].extended_address +
+		pinfo->mbox_prop[0].extended_size +
+		HIF_MBOX_DUMMY_SPACE_SIZE_AR6320;
+}
+#else
+static void set_extended_mbox_size(struct hif_device_mbox_info *pinfo)
+{
+	pinfo->mbox_prop[0].extended_size =
+		HIF_MBOX0_EXTENDED_WIDTH_AR6320;
+}
+static inline void
+set_extended_mbox_address(struct hif_device_mbox_info *pinfo)
+{
+
+}
+#endif
+
+/**
+ * set_extended_mbox_window_info() - set extended MBOX window
+ * information for SDIO interconnects
+ * @manf_id: manufacturer id
+ * @pinfo: sdio mailbox info
+ *
+ * Return: none.
+ */
+static void set_extended_mbox_window_info(A_UINT16 manf_id,
+			 struct hif_device_mbox_info *pinfo)
+{
+	switch (manf_id & MANUFACTURER_ID_AR6K_BASE_MASK) {
+	case MANUFACTURER_ID_AR6002_BASE:
+		/* MBOX 0 has an extended range */
+
+		pinfo->mbox_prop[0].extended_address =
+			HIF_MBOX0_EXTENDED_BASE_ADDR_AR6003_V1;
+		pinfo->mbox_prop[0].extended_size =
+			HIF_MBOX0_EXTENDED_WIDTH_AR6003_V1;
+
+		pinfo->mbox_prop[0].extended_address =
+			HIF_MBOX0_EXTENDED_BASE_ADDR_AR6003_V1;
+		pinfo->mbox_prop[0].extended_size =
+			HIF_MBOX0_EXTENDED_WIDTH_AR6003_V1;
+
+		pinfo->mbox_prop[0].extended_address =
+			HIF_MBOX0_EXTENDED_BASE_ADDR_AR6004;
+		pinfo->mbox_prop[0].extended_size =
+			HIF_MBOX0_EXTENDED_WIDTH_AR6004;
+
+		break;
+	case MANUFACTURER_ID_AR6003_BASE:
+		/* MBOX 0 has an extended range */
+		pinfo->mbox_prop[0].extended_address =
+			HIF_MBOX0_EXTENDED_BASE_ADDR_AR6003_V1;
+		pinfo->mbox_prop[0].extended_size =
+			HIF_MBOX0_EXTENDED_WIDTH_AR6003_V1;
+		pinfo->gmbox_address = HIF_GMBOX_BASE_ADDR;
+		pinfo->gmbox_size = HIF_GMBOX_WIDTH;
+		break;
+	case MANUFACTURER_ID_AR6004_BASE:
+		pinfo->mbox_prop[0].extended_address =
+			HIF_MBOX0_EXTENDED_BASE_ADDR_AR6004;
+		pinfo->mbox_prop[0].extended_size =
+			HIF_MBOX0_EXTENDED_WIDTH_AR6004;
+		pinfo->gmbox_address = HIF_GMBOX_BASE_ADDR;
+		pinfo->gmbox_size = HIF_GMBOX_WIDTH;
+		break;
+	case MANUFACTURER_ID_AR6320_BASE: {
+		A_UINT16 ManuRevID =
+			manf_id & MANUFACTURER_ID_AR6K_REV_MASK;
+		pinfo->mbox_prop[0].extended_address =
+			HIF_MBOX0_EXTENDED_BASE_ADDR_AR6320;
+		if (ManuRevID < 4) {
+			pinfo->mbox_prop[0].extended_size =
+				HIF_MBOX0_EXTENDED_WIDTH_AR6320;
+		} else {
+		/* from rome 2.0(0x504), the width has been extended to 56K */
+			set_extended_mbox_size(pinfo);
+		}
+		set_extended_mbox_address(pinfo);
+		pinfo->gmbox_address = HIF_GMBOX_BASE_ADDR;
+		pinfo->gmbox_size = HIF_GMBOX_WIDTH;
+		break;
+	}
+	case MANUFACTURER_ID_QCA9377_BASE:
+		pinfo->mbox_prop[0].extended_address =
+			HIF_MBOX0_EXTENDED_BASE_ADDR_AR6320;
+		pinfo->mbox_prop[0].extended_size =
+			HIF_MBOX0_EXTENDED_WIDTH_AR6320_ROME_2_0;
+		pinfo->mbox_prop[1].extended_address =
+			pinfo->mbox_prop[0].extended_address +
+			pinfo->mbox_prop[0].extended_size +
+			HIF_MBOX_DUMMY_SPACE_SIZE_AR6320;
+		pinfo->mbox_prop[1].extended_size =
+			HIF_MBOX1_EXTENDED_WIDTH_AR6320;
+		pinfo->gmbox_address = HIF_GMBOX_BASE_ADDR;
+		pinfo->gmbox_size = HIF_GMBOX_WIDTH;
+		break;
+	default:
+		A_ASSERT(false);
+		break;
+	}
 }
 
 /**
@@ -1120,7 +1246,7 @@ power_state_change_notify(struct hif_sdio_dev *device,
  */
 A_STATUS
 hif_configure_device(struct hif_sdio_dev *device,
-		     HIF_DEVICE_CONFIG_OPCODE opcode,
+		     enum hif_device_config_opcode opcode,
 		     void *config, A_UINT32 configLen)
 {
 	A_UINT32 count;
@@ -1155,7 +1281,7 @@ hif_configure_device(struct hif_sdio_dev *device,
 		status = A_ERROR;
 		break;
 	case HIF_DEVICE_GET_IRQ_PROC_MODE:
-		*((HIF_DEVICE_IRQ_PROCESSING_MODE *) config) =
+		*((enum hif_device_irq_mode *) config) =
 			HIF_DEVICE_IRQ_SYNC_ONLY;
 		break;
 	case HIF_DEVICE_GET_RECV_EVENT_MASK_UNMASK_FUNC:
@@ -1176,7 +1302,7 @@ hif_configure_device(struct hif_sdio_dev *device,
 		break;
 	case HIF_DEVICE_GET_OS_DEVICE:
 		/* pass back a pointer to the SDIO function's "dev" struct */
-		((struct HIF_DEVICE_OS_DEVICE_INFO *) config)->pOSDevice =
+		((struct HIF_DEVICE_OS_DEVICE_INFO *) config)->os_dev =
 			&device->func->dev;
 		break;
 	case HIF_DEVICE_POWER_STATE_CHANGE:
@@ -1192,7 +1318,7 @@ hif_configure_device(struct hif_sdio_dev *device,
 		status = A_ERROR;
 		break;
 	case HIF_DEVICE_SET_HTC_CONTEXT:
-		device->htcContext = config;
+		device->htc_context = config;
 		break;
 	case HIF_DEVICE_GET_HTC_CONTEXT:
 		if (config == NULL) {
@@ -1201,7 +1327,7 @@ hif_configure_device(struct hif_sdio_dev *device,
 				__func__));
 			return A_ERROR;
 		}
-		*(void **)config = device->htcContext;
+		*(void **)config = device->htc_context;
 		break;
 	case HIF_BMI_DONE:
 	{
@@ -1220,19 +1346,19 @@ hif_configure_device(struct hif_sdio_dev *device,
 }
 
 /**
- * hif_shut_down_device() - hif-sdio shutdown routine
+ * hif_shutdown_device() - hif-sdio shutdown routine
  * @scn: pointer to ol_softc structore
  *
  * Return: None.
  */
-void hif_shut_down_device(struct ol_softc *scn)
+void hif_shutdown_device(struct ol_softc *scn)
 {
 	struct hif_sdio_dev *hif_device = (struct hif_sdio_dev *)scn->hif_hdl;
 
 	AR_DEBUG_PRINTF(ATH_DEBUG_TRACE,
 			("%s: Enter\n", __func__));
 	if (hif_device != NULL) {
-		AR_DEBUG_ASSERT(hif_device->powerConfig == HIF_DEVICE_POWER_CUT
+		AR_DEBUG_ASSERT(hif_device->power_config == HIF_DEVICE_POWER_CUT
 				|| hif_device->func != NULL);
 	} else {
 		int i;
@@ -1287,13 +1413,13 @@ static void hif_irq_handler(struct sdio_func *func)
 			("%s: Enter\n", __func__));
 
 	device = get_hif_device(func);
-	atomic_set(&device->irqHandling, 1);
+	atomic_set(&device->irq_handling, 1);
 	/* release the host during intr so we can use
 	 * it when we process cmds */
 	sdio_release_host(device->func);
-	status = device->htcCallbacks.dsrHandler(device->htcCallbacks.context);
+	status = device->htc_callbacks.dsrHandler(device->htc_callbacks.context);
 	sdio_claim_host(device->func);
-	atomic_set(&device->irqHandling, 0);
+	atomic_set(&device->irq_handling, 0);
 	AR_DEBUG_ASSERT(status == A_OK || status == A_ECANCELED);
 	AR_DEBUG_PRINTF(ATH_DEBUG_TRACE,
 			("%s: Exit\n", __func__));
@@ -1315,7 +1441,7 @@ static int startup_task(void *param)
 			__func__));
 	/* start  up inform DRV layer */
 	if ((osdrv_callbacks.
-	     deviceInsertedHandler(osdrv_callbacks.context,
+	     device_inserted_handler(osdrv_callbacks.context,
 				device)) != A_OK) {
 		AR_DEBUG_PRINTF(ATH_DEBUG_TRACE,
 			("%s: Device rejected\n", __func__));
@@ -1334,9 +1460,9 @@ static int enable_task(void *param)
 
 	/* start  up inform DRV layer */
 	if (device &&
-	    device->claimedContext &&
-	    osdrv_callbacks.devicePowerChangeHandler &&
-	    osdrv_callbacks.devicePowerChangeHandler(device->claimedContext,
+	    device->claimed_ctx &&
+	    osdrv_callbacks.device_power_change_handler &&
+	    osdrv_callbacks.device_power_change_handler(device->claimed_ctx,
 						    HIF_DEVICE_POWER_UP) !=
 	    A_OK) {
 		AR_DEBUG_PRINTF(ATH_DEBUG_TRACE,
@@ -1522,10 +1648,10 @@ static int hif_device_inserted(struct sdio_func *func,
 	}
 	for (i = 0; i < MAX_HIF_DEVICES; ++i) {
 		struct hif_sdio_dev *hifdevice = hif_devices[i];
-		if (hifdevice && hifdevice->powerConfig == HIF_DEVICE_POWER_CUT
+		if (hifdevice && hifdevice->power_config == HIF_DEVICE_POWER_CUT
 		    && hifdevice->host == func->card->host) {
 			hifdevice->func = func;
-			hifdevice->powerConfig = HIF_DEVICE_POWER_UP;
+			hifdevice->power_config = HIF_DEVICE_POWER_UP;
 			sdio_set_drvdata(func, hifdevice);
 			device = get_hif_device(func);
 
@@ -1817,7 +1943,7 @@ static int hif_device_inserted(struct sdio_func *func,
 
 	spin_lock_init(&device->asynclock);
 
-	DL_LIST_INIT(&device->ScatterReqHead);
+	DL_LIST_INIT(&device->scatter_req_head);
 
 	if (!nohifscattersupport) {
 		/* try to allow scatter operation on all instances,
@@ -1827,10 +1953,10 @@ static int hif_device_inserted(struct sdio_func *func,
 		device->scatter_enabled = false;
 
 	/* Initialize the bus requests to be used later */
-	A_MEMZERO(device->busRequest, sizeof(device->busRequest));
+	A_MEMZERO(device->bus_request, sizeof(device->bus_request));
 	for (count = 0; count < BUS_REQUEST_MAX_NUM; count++) {
-		sema_init(&device->busRequest[count].sem_req, 0);
-		hif_free_bus_request(device, &device->busRequest[count]);
+		sema_init(&device->bus_request[count].sem_req, 0);
+		hif_free_bus_request(device, &device->bus_request[count]);
 	}
 	sema_init(&device->sem_async, 0);
 
@@ -1843,6 +1969,11 @@ static int hif_device_inserted(struct sdio_func *func,
  * hif_ack_interrupt() - Acknowledge hif device irq
  * @device: pointer to struct hif_sdio_dev
  *
+ * This should translate to an acknowledgment to the bus driver indicating that
+ * the previous interrupt request has been serviced and the all the relevant
+ * sources have been cleared. HTC is ready to process more interrupts.
+ * This should prevent the bus driver from raising an interrupt unless the
+ * previous one has been serviced and acknowledged using the previous API.
  *
  * Return: None.
  */
@@ -1904,7 +2035,7 @@ void hif_mask_interrupt(struct hif_sdio_dev *device)
 
 	/* Mask our function IRQ */
 	sdio_claim_host(device->func);
-	while (atomic_read(&device->irqHandling)) {
+	while (atomic_read(&device->irq_handling)) {
 		sdio_release_host(device->func);
 		schedule_timeout_interruptible(HZ / 10);
 		sdio_claim_host(device->func);
@@ -1939,10 +2070,10 @@ struct bus_request *hif_allocate_bus_request(struct hif_sdio_dev *device)
 	unsigned long flag;
 
 	spin_lock_irqsave(&device->lock, flag);
-	busrequest = device->s_busRequestFreeQueue;
+	busrequest = device->bus_request_free_queue;
 	/* Remove first in list */
 	if (busrequest != NULL)
-		device->s_busRequestFreeQueue = busrequest->next;
+		device->bus_request_free_queue = busrequest->next;
 
 	/* Release lock */
 	spin_unlock_irqrestore(&device->lock, flag);
@@ -1970,9 +2101,9 @@ void hif_free_bus_request(struct hif_sdio_dev *device,
 	spin_lock_irqsave(&device->lock, flag);
 
 	/* Insert first in list */
-	busrequest->next = device->s_busRequestFreeQueue;
+	busrequest->next = device->bus_request_free_queue;
 	busrequest->inusenext = NULL;
-	device->s_busRequestFreeQueue = busrequest;
+	device->bus_request_free_queue = busrequest;
 
 	/* Release lock */
 	spin_unlock_irqrestore(&device->lock, flag);
@@ -2202,7 +2333,7 @@ static A_STATUS hif_enable_func(struct hif_sdio_dev *device,
 		}
 	}
 
-	if (!device->claimedContext) {
+	if (!device->claimed_ctx) {
 		taskFunc = startup_task;
 		taskName = "AR6K startup";
 		ret = A_OK;
@@ -2246,11 +2377,11 @@ int hif_device_suspend(struct device *dev)
 #endif
 
 	HIF_ENTER();
-	if (device && device->claimedContext
-	    && osdrv_callbacks.deviceSuspendHandler) {
+	if (device && device->claimed_ctx
+	    && osdrv_callbacks.device_suspend_handler) {
 		device->is_suspend = true;
 		status =
-		osdrv_callbacks.deviceSuspendHandler(device->claimedContext);
+		osdrv_callbacks.device_suspend_handler(device->claimed_ctx);
 
 #if defined(MMC_PM_KEEP_POWER)
 		switch (forcesleepmode) {
@@ -2271,17 +2402,17 @@ int hif_device_suspend(struct device *dev)
 		}
 		if (!(pm_flag & MMC_PM_KEEP_POWER)) {
 			/* cut power support */
-			/* setting powerConfig before hif_configure_device to
+			/* setting power_config before hif_configure_device to
 			 * skip sdio r/w when suspending with cut power */
 			AR_DEBUG_PRINTF(ATH_DEBUG_INFO,
 				("hif_device_suspend: cut power enter\n"));
 			config = HIF_DEVICE_POWER_CUT;
-			device->powerConfig = config;
-			if ((device->claimedContext != NULL)
-			    && osdrv_callbacks.deviceRemovedHandler) {
+			device->power_config = config;
+			if ((device->claimed_ctx != NULL)
+			    && osdrv_callbacks.device_removed_handler) {
 				status =
-					osdrv_callbacks.deviceRemovedHandler(device->
-							    claimedContext,
+					osdrv_callbacks.device_removed_handler(device->
+							    claimed_ctx,
 							    device);
 			}
 			ret = hif_configure_device(device,
@@ -2297,7 +2428,7 @@ int hif_device_suspend(struct device *dev)
 			}
 
 			hif_mask_interrupt(device);
-			device->DeviceState = HIF_DEVICE_STATE_CUTPOWER;
+			device->device_state = HIF_DEVICE_STATE_CUTPOWER;
 			AR_DEBUG_PRINTF(ATH_DEBUG_INFO,
 				("hif_device_suspend: cut power success\n"));
 			return ret;
@@ -2337,7 +2468,7 @@ int hif_device_suspend(struct device *dev)
 					return ret;
 				}
 				hif_mask_interrupt(device);
-				device->DeviceState = HIF_DEVICE_STATE_WOW;
+				device->device_state = HIF_DEVICE_STATE_WOW;
 				AR_DEBUG_PRINTF(ATH_DEBUG_INFO,
 					("hif_device_suspend: wow success\n"));
 				return ret;
@@ -2357,7 +2488,7 @@ int hif_device_suspend(struct device *dev)
 				 */
 				msleep(100);
 				hif_mask_interrupt(device);
-				device->DeviceState =
+				device->device_state =
 					HIF_DEVICE_STATE_DEEPSLEEP;
 				AR_DEBUG_PRINTF(ATH_DEBUG_INFO,
 					("%s: deep sleep done\n",
@@ -2407,7 +2538,7 @@ int hif_device_resume(struct device *dev)
 
 	device = get_hif_device(func);
 
-	if (device->DeviceState == HIF_DEVICE_STATE_CUTPOWER) {
+	if (device->device_state == HIF_DEVICE_STATE_CUTPOWER) {
 		config = HIF_DEVICE_POWER_UP;
 		status = hif_configure_device(device,
 					      HIF_DEVICE_POWER_STATE_CHANGE,
@@ -2420,15 +2551,15 @@ int hif_device_resume(struct device *dev)
 				 __func__));
 			return status;
 		}
-	} else if (device->DeviceState == HIF_DEVICE_STATE_DEEPSLEEP) {
+	} else if (device->device_state == HIF_DEVICE_STATE_DEEPSLEEP) {
 		hif_un_mask_interrupt(device);
-	} else if (device->DeviceState == HIF_DEVICE_STATE_WOW) {
+	} else if (device->device_state == HIF_DEVICE_STATE_WOW) {
 		/*TODO:WOW support */
 		hif_un_mask_interrupt(device);
 	}
 
 	/*
-	 * deviceResumeHandler do nothing now. If some operation
+	 * device_resume_handler do nothing now. If some operation
 	 * should be added to this handler in power cut
 	 * resume flow, do make sure those operation is not
 	 * depent on what startup_task has done,or the resume
@@ -2437,16 +2568,16 @@ int hif_device_resume(struct device *dev)
 	AR_DEBUG_PRINTF(ATH_DEBUG_TRACE,
 			("%s: +hif_device_resume\n",
 			 __func__));
-	if (device && device->claimedContext
-	    && osdrv_callbacks.deviceSuspendHandler) {
+	if (device && device->claimed_ctx
+	    && osdrv_callbacks.device_suspend_handler) {
 		status =
-		osdrv_callbacks.deviceResumeHandler(device->claimedContext);
+		osdrv_callbacks.device_resume_handler(device->claimed_ctx);
 		device->is_suspend = false;
 	}
 	AR_DEBUG_PRINTF(ATH_DEBUG_TRACE,
 			("%s: -hif_device_resume\n",
 			 __func__));
-	device->DeviceState = HIF_DEVICE_STATE_ON;
+	device->device_state = HIF_DEVICE_STATE_ON;
 
 	return A_SUCCESS(status) ? 0 : status;
 }
@@ -2461,7 +2592,7 @@ static void hif_device_removed(struct sdio_func *func)
 
 	device = get_hif_device(func);
 
-	if (device->powerConfig == HIF_DEVICE_POWER_CUT) {
+	if (device->power_config == HIF_DEVICE_POWER_CUT) {
 		device->func = NULL;    /* func will be free by mmc stack */
 		return;         /* Just return for cut-off mode */
 	} else {
@@ -2472,9 +2603,9 @@ static void hif_device_removed(struct sdio_func *func)
 		}
 	}
 
-	if (device->claimedContext != NULL)
+	if (device->claimed_ctx != NULL)
 		status =
-		osdrv_callbacks.deviceRemovedHandler(device->claimedContext,
+		osdrv_callbacks.device_removed_handler(device->claimed_ctx,
 							    device);
 
 	hif_mask_interrupt(device);
@@ -2504,7 +2635,7 @@ A_STATUS hif_wait_for_pending_recv(struct hif_sdio_dev *device)
 	A_STATUS status = A_OK;
 
 	do {
-		while (atomic_read(&device->irqHandling)) {
+		while (atomic_read(&device->irq_handling)) {
 			/* wait until irq handler finished all the jobs */
 			schedule_timeout_interruptible(HZ / 10);
 		}
@@ -2567,8 +2698,8 @@ static struct hif_sdio_dev *add_hif_device(struct sdio_func *func)
 	AR_DEBUG_ASSERT(hifdevice->dma_buffer != NULL);
 #endif
 	hifdevice->func = func;
-	hifdevice->powerConfig = HIF_DEVICE_POWER_UP;
-	hifdevice->DeviceState = HIF_DEVICE_STATE_ON;
+	hifdevice->power_config = HIF_DEVICE_POWER_UP;
+	hifdevice->device_state = HIF_DEVICE_STATE_ON;
 	ret = hif_sdio_set_drvdata(func, hifdevice);
 	HIF_EXIT("status %d", ret);
 
@@ -2602,7 +2733,7 @@ void hif_claim_device(struct ol_softc *scn, void *context)
 {
 	struct hif_sdio_dev *hif_device = (struct hif_sdio_dev *)scn->hif_hdl;
 
-	hif_device->claimedContext = context;
+	hif_device->claimed_ctx = context;
 }
 
 void hif_set_mailbox_swap(struct hif_sdio_dev *device)
@@ -2614,16 +2745,16 @@ void hif_release_device(struct ol_softc *scn)
 {
 	struct hif_sdio_dev *hif_device = (struct hif_sdio_dev *)scn->hif_hdl;
 
-	hif_device->claimedContext = NULL;
+	hif_device->claimed_ctx = NULL;
 }
 
 A_STATUS hif_attach_htc(struct hif_sdio_dev *device,
 				HTC_CALLBACKS *callbacks)
 {
-	if (device->htcCallbacks.context != NULL)
+	if (device->htc_callbacks.context != NULL)
 		/* already in use! */
 		return A_ERROR;
-	device->htcCallbacks = *callbacks;
+	device->htc_callbacks = *callbacks;
 
 	return A_OK;
 }
@@ -2632,8 +2763,8 @@ void hif_detach_htc(struct ol_softc *scn)
 {
 	struct hif_sdio_dev *hif_device = (struct hif_sdio_dev *)scn->hif_hdl;
 
-	A_MEMZERO(&hif_device->htcCallbacks,
-			  sizeof(hif_device->htcCallbacks));
+	A_MEMZERO(&hif_device->htc_callbacks,
+			  sizeof(hif_device->htc_callbacks));
 }
 
 #define SDIO_SET_CMD52_ARG(arg, rw, func, raw, address, writedata) \

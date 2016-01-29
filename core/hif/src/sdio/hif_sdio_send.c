@@ -172,8 +172,8 @@ A_STATUS hif_dev_send_buffer(HIF_SDIO_DEVICE *pDev, unsigned int transferID,
 	/* Reset pData pointer and send out */
 	pData = (unsigned char *)pSendContext + sizeof(struct hif_sendContext);
 	status = hif_read_write(pDev->HIFDevice,
-				pDev->MailBoxInfo.MboxProp[mboxIndex].
-				ExtendedAddress, (char *)pData, paddedLength,
+				pDev->MailBoxInfo.mbox_prop[mboxIndex].
+				extended_address, (char *)pData, paddedLength,
 				request, (void *)pSendContext);
 
 	if (status == A_PENDING)

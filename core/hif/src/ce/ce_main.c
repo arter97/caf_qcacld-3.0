@@ -64,6 +64,11 @@
 #include "cds_concurrency.h"
 
 #define CE_POLL_TIMEOUT 10      /* ms */
+#define HIF_AGC_DUMP         1
+#define HIF_CHANINFO_DUMP    2
+#define HIF_BB_WATCHDOG_DUMP 3
+#define HIF_PCIE_ACCESS_DUMP 4
+#include "mp_dev.h"
 
 /* Forward references */
 static int hif_post_recv_buffers_for_pipe(struct HIF_CE_pipe_info *pipe_info);
@@ -2464,3 +2469,197 @@ int hif_dump_ce_registers(struct ol_softc *scn)
 
 	return 0;
 }
+
+/**
+ * hif_target_access_log_dump() - dump access log
+ *
+ * dump access log
+ *
+ * Return: n/a
+ */
+#ifdef CONFIG_ATH_PCIE_ACCESS_DEBUG
+static void hif_target_access_log_dump(void)
+{
+	hif_target_dump_access_log();
+}
+#else
+static void hif_target_access_log_dump(void)
+{
+}
+#endif
+
+/**
+ * hif_trigger_dump() - trigger various dump cmd
+ * @scn: struct ol_softc
+ * @cmd_id: dump command id
+ * @start: start or stop dump
+ *
+ * Dumps agc start, channel info start, pcie access log and
+ * BB watchdog information.
+ *
+ * Return: None
+ */
+void hif_trigger_dump(struct ol_softc *scn, uint8_t cmd_id, bool start)
+{
+	switch (cmd_id) {
+	case HIF_AGC_DUMP:
+		if (start)
+			priv_start_agc(scn);
+		else
+			priv_dump_agc(scn);
+		break;
+	case HIF_CHANINFO_DUMP:
+		if (start)
+			priv_start_cap_chaninfo(scn);
+		else
+			priv_dump_chaninfo(scn);
+		break;
+	case HIF_BB_WATCHDOG_DUMP:
+		priv_dump_bbwatchdog(scn);
+		break;
+	case HIF_PCIE_ACCESS_DUMP:
+		hif_target_access_log_dump();
+		break;
+	default:
+		HIF_ERROR("%s: Invalid htc dump command %d",
+				  __func__, cmd_id);
+		break;
+	}
+}
+
+/**
+ * hif_shutdown_device() - shutdown hif device
+ * @scn: ol_softc
+ *
+ * stop hif device and free the associtaed structures.
+ *
+ * Return: none
+ */
+void hif_shutdown_device(struct ol_softc *scn)
+{
+	if (scn && scn->hif_hdl) {
+		struct HIF_CE_state *hif_state =
+			(struct HIF_CE_state *)scn->hif_hdl;
+
+		hif_stop(scn);
+		cdf_mem_free(hif_state);
+		scn->hif_hdl = NULL;
+	}
+
+}
+
+/**
+ * hif_target_forced_awake() - check if target is awake
+ * @scn: scn
+ *
+ * Check if target is in awake state. This is to verify if
+ * the target can be accessed.
+ *
+ * Return: true if traget is in awake state, else false.
+ */
+bool hif_target_forced_awake(struct ol_softc *scn)
+{
+	A_target_id_t addr = scn->mem;
+	bool awake;
+	bool forced_awake;
+
+	awake = hif_targ_is_awake(scn, addr);
+
+	forced_awake =
+		!!(hif_read32_mb(addr + PCIE_LOCAL_BASE_ADDRESS +
+			   PCIE_SOC_WAKE_ADDRESS) & PCIE_SOC_WAKE_V_MASK);
+
+	return awake && forced_awake;
+}
+
+/**
+ * hif_fw_event_handler() - hif fw event handler
+ * @hif_state: pointer to hif ce state structure
+ *
+ * Process fw events and raise HTC callback to process fw events.
+ *
+ * Return: none
+ */
+static inline void hif_fw_event_handler(struct HIF_CE_state *hif_state)
+{
+	struct hif_msg_callbacks *msg_callbacks =
+		&hif_state->msg_callbacks_current;
+
+	if (!msg_callbacks->fwEventHandler)
+		return;
+
+	msg_callbacks->fwEventHandler(msg_callbacks->Context,
+			CDF_STATUS_E_FAILURE);
+}
+
+#ifndef QCA_WIFI_3_0
+/**
+ * hif_fw_interrupt_handler() - FW interrupt handler
+ * @irq: irq number
+ * @arg: the user pointer
+ *
+ * Called from the PCI interrupt handler when a
+ * firmware-generated interrupt to the Host.
+ *
+ * Return: status of handled irq
+ */
+irqreturn_t hif_fw_interrupt_handler(int irq, void *arg)
+{
+	struct ol_softc *scn = arg;
+	struct HIF_CE_state *hif_state = (struct HIF_CE_state *)scn->hif_hdl;
+	uint32_t fw_indicator_address, fw_indicator;
+
+	A_TARGET_ACCESS_BEGIN_RET(scn);
+
+	fw_indicator_address = hif_state->fw_indicator_address;
+	/* For sudden unplug this will return ~0 */
+	fw_indicator = A_TARGET_READ(scn, fw_indicator_address);
+
+	if ((fw_indicator != ~0) && (fw_indicator & FW_IND_EVENT_PENDING)) {
+		/* ACK: clear Target-side pending event */
+		A_TARGET_WRITE(scn, fw_indicator_address,
+			       fw_indicator & ~FW_IND_EVENT_PENDING);
+		A_TARGET_ACCESS_END_RET(scn);
+
+		if (hif_state->started) {
+			hif_fw_event_handler(hif_state);
+		} else {
+			/*
+			 * Probable Target failure before we're prepared
+			 * to handle it.  Generally unexpected.
+			 */
+			AR_DEBUG_PRINTF(ATH_DEBUG_ERR,
+				("%s: Early firmware event indicated\n",
+				 __func__));
+		}
+	} else {
+		A_TARGET_ACCESS_END_RET(scn);
+	}
+
+	return ATH_ISR_SCHED;
+}
+#endif
+
+/**
+ * hif_wlan_disable() - call the platform driver to disable wlan
+ *
+ * This function passes the con_mode to platform driver to disable
+ * wlan.
+ *
+ * Return: void
+ */
+void hif_wlan_disable(void)
+{
+	enum icnss_driver_mode mode;
+	uint32_t con_mode = cds_get_conparam();
+
+	if (CDF_GLOBAL_FTM_MODE == con_mode)
+		mode = ICNSS_FTM;
+	else if (WLAN_IS_EPPING_ENABLED(cds_get_conparam()))
+		mode = ICNSS_EPPING;
+	else
+		mode = ICNSS_MISSION;
+
+	icnss_wlan_disable(mode);
+}
+

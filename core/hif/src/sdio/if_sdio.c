@@ -100,7 +100,7 @@ static A_STATUS hif_sdio_probe(void *context, void *hif_handle)
 			     &os_dev_info,
 			     sizeof(os_dev_info));
 
-	scn->aps_osdev.device = os_dev_info.pOSDevice;
+	scn->aps_osdev.device = os_dev_info.os_dev;
 	scn->aps_osdev.bc.bc_bustype = HAL_BUS_TYPE_SDIO;
 	spin_lock_init(&scn->target_lock);
 	ol_sc = cdf_mem_malloc(sizeof(*ol_sc));
@@ -319,11 +319,11 @@ static int init_ath_hif_sdio(void)
 	HIF_ENTER();
 
 	A_MEMZERO(&osdrv_callbacks, sizeof(osdrv_callbacks));
-	osdrv_callbacks.deviceInsertedHandler = hif_sdio_probe;
-	osdrv_callbacks.deviceRemovedHandler = hif_sdio_remove;
-	osdrv_callbacks.deviceSuspendHandler = hif_sdio_suspend;
-	osdrv_callbacks.deviceResumeHandler = hif_sdio_resume;
-	osdrv_callbacks.devicePowerChangeHandler = hif_sdio_power_change;
+	osdrv_callbacks.device_inserted_handler = hif_sdio_probe;
+	osdrv_callbacks.device_removed_handler = hif_sdio_remove;
+	osdrv_callbacks.device_suspend_handler = hif_sdio_suspend;
+	osdrv_callbacks.device_resume_handler = hif_sdio_resume;
+	osdrv_callbacks.device_power_change_handler = hif_sdio_power_change;
 
 	if (probed)
 		return -ENODEV;
@@ -364,7 +364,7 @@ int hif_register_driver(void)
 void hif_unregister_driver(void)
 {
 	HIF_ENTER();
-	hif_shut_down_device(NULL);
+	hif_shutdown_device(NULL);
 	HIF_EXIT();
 
 	return;
@@ -705,3 +705,35 @@ int hif_config_target(void *hif_hdl)
 {
 	return 0;
 }
+
+/**
+ * hif_disable_power_management() - disable power management
+ * @hif_ctx: hif handle
+ *
+ * Return: none
+ */
+void hif_disable_power_management(void *hif_ctx)
+{
+}
+
+/**
+ * hif_enable_power_management() - disable power management
+ * @hif_ctx: hif handle
+ *
+ * Return: none
+ */
+void hif_enable_power_management(void *hif_ctx)
+{
+}
+
+/**
+ * hif_bus_configure() - configure the sdio bus
+ * @scn: pointer to the hif context.
+ *
+ * return: 0 for success. nonzero for failure.
+ */
+int hif_bus_configure(struct ol_softc *scn)
+{
+	return 0;
+}
+

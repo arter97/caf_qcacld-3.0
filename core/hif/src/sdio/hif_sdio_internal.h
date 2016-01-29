@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014, 2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -32,6 +32,7 @@
 #include "hif_sdio_dev.h"
 #include "htc_packet.h"
 #include "htc_api.h"
+#include "hif_internal.h"
 
 #define HIF_SDIO_RX_BUFFER_SIZE            1792
 #define HIF_SDIO_RX_DATA_OFFSET            64
@@ -103,7 +104,7 @@ struct TAG_HIF_SDIO_DEVICE {
 	struct hif_device_mbox_info MailBoxInfo;
 	A_UINT32 BlockSize;
 	A_UINT32 BlockMask;
-	HIF_DEVICE_IRQ_PROCESSING_MODE HifIRQProcessingMode;
+	enum hif_device_irq_mode HifIRQProcessingMode;
 	struct hif_device_irq_yield_params HifIRQYieldParams;
 	A_BOOL DSRCanYield;
 	HIF_MASK_UNMASK_RECV_EVENT HifMaskUmaskRecvEvent;

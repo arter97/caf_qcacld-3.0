@@ -94,7 +94,7 @@ static void hif_dev_dump_registers(HIF_SDIO_DEVICE *pDev,
 				 pIrqProcRegs->rx_lookahead[3]));
 		AR_DEBUG_PRINTF(ATH_DEBUG_ANY, ("\nRegTable->"));
 
-		if (pDev->MailBoxInfo.GMboxAddress != 0) {
+		if (pDev->MailBoxInfo.gmbox_address != 0) {
 			/* if the target supports GMBOX hardware,
 			 * dump some additional state */
 			AR_DEBUG_PRINTF(ATH_DEBUG_ANY,
@@ -313,9 +313,9 @@ static inline A_STATUS hif_dev_recv_packet(HIF_SDIO_DEVICE *pDev,
 			 (unsigned long)pPacket,
 			 pPacket->PktInfo.AsRx.ExpectedHdr, RecvLength,
 			 paddedLength,
-			 pDev->MailBoxInfo.MboxAddresses[mboxIndex]));
+			 pDev->MailBoxInfo.mbox_addresses[mboxIndex]));
 	status = hif_read_write(pDev->HIFDevice,
-			 pDev->MailBoxInfo.MboxAddresses[mboxIndex],
+			 pDev->MailBoxInfo.mbox_addresses[mboxIndex],
 			 pPacket->pBuffer, paddedLength,
 		     (sync ? HIF_RD_SYNC_BLOCK_FIX : HIF_RD_ASYNC_BLOCK_FIX),
 		     sync ? NULL : pPacket);
@@ -407,7 +407,7 @@ static inline A_STATUS hif_dev_process_trailer(HIF_SDIO_DEVICE *pDev,
 			    && (pNextLookAheads != NULL)) {
 
 				AR_DEBUG_PRINTF(ATH_DEBUG_RECV,
-					(" LookAhead Report (pre valid:0x%X,"
+					(" look_ahead Report (pre valid:0x%X,"
 					" post valid:0x%X) %d %d\n",
 					 pLookAhead->PreValid,
 					 pLookAhead->PostValid,
@@ -449,7 +449,7 @@ static inline A_STATUS hif_dev_process_trailer(HIF_SDIO_DEVICE *pDev,
 				if (AR_DEBUG_LVL_CHECK(ATH_DEBUG_RECV)) {
 					debug_dump_bytes(pRecordBuf,
 							 pRecord->Length,
-							 "Bundle LookAhead");
+							 "Bundle look_ahead");
 				}
 
 				if ((pRecord->Length /
@@ -595,7 +595,7 @@ static A_STATUS hif_dev_process_recv_header(HIF_SDIO_DEVICE *pDev,
 #ifdef ATH_DEBUG_MODULE
 			debug_dump_bytes((A_UINT8 *) &pPacket->PktInfo.AsRx.
 				 ExpectedHdr, 4,
-				 "Expected Message LookAhead");
+				 "Expected Message look_ahead");
 			debug_dump_bytes(pBuf, sizeof(HTC_FRAME_HDR),
 				 "Current Frame Header");
 #ifdef HTC_CAPTURE_LAST_FRAME
@@ -741,8 +741,9 @@ static A_STATUS hif_dev_issue_recv_packet_bundle(HIF_SDIO_DEVICE *pDev,
 
 	status = hif_read_write(pDev->HIFDevice,
 				pDev->MailBoxInfo.
-				MboxAddresses[(int)MailBoxIndex], pBundleBuffer,
-				totalLength, HIF_RD_SYNC_BLOCK_FIX, NULL);
+				mbox_addresses[(int)MailBoxIndex],
+				pBundleBuffer, totalLength,
+				HIF_RD_SYNC_BLOCK_FIX, NULL);
 
 	if (status != A_OK) {
 		AR_DEBUG_PRINTF(ATH_DEBUG_ERR,
@@ -1246,7 +1247,7 @@ static A_STATUS hif_dev_process_pending_irqs(HIF_SDIO_DEVICE *pDev,
 				if (lookAhead[i] == 0)
 					continue;
 				AR_DEBUG_PRINTF(ATH_DEBUG_IRQ,
-					("Pending mailbox[%d] message, LookAhead: 0x%X\n",
+					("Pending mailbox[%d] message, look_ahead: 0x%X\n",
 					 i, lookAhead[i]));
 				/* Mailbox Interrupt, the HTC layer may issue
 				 * async requests to empty the mailbox...
@@ -1330,7 +1331,7 @@ static A_STATUS hif_dev_process_pending_irqs(HIF_SDIO_DEVICE *pDev,
 
 #define DEV_CHECK_RECV_YIELD(pDev) \
 	((pDev)->CurrentDSRRecvCount >= \
-	 (pDev)->HifIRQYieldParams.RecvPacketYieldCount)
+	 (pDev)->HifIRQYieldParams.recv_packet_yield_count)
 
 /**
  * hif_dev_dsr_handler() - Synchronous interrupt handler

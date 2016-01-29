@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -32,5 +32,5 @@ void priv_dump_agc(struct ol_softc *scn);
 void priv_start_cap_chaninfo(struct ol_softc *scn);
 void priv_dump_chaninfo(struct ol_softc *scn);
 void priv_dump_bbwatchdog(struct ol_softc *scn);
-void hif_shut_down_device(struct ol_softc *scn);
+void hif_shutdown_device(struct ol_softc *scn);
 #endif /* __MP_DEV_H__ */

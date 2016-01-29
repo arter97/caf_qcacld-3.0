@@ -388,3 +388,15 @@ void hif_enable_power_management(void *hif_ctx)
 void hif_disable_power_management(void *hif_ctx)
 {
 }
+
+/* hif_bus_pkt_dl_len_set() set the HTT packet download length
+ * @hif_sc: HIF context
+ * @pkt_download_len: download length
+ *
+ * Return: None
+ */
+void hif_bus_pkt_dl_len_set(void *hif_sc, u_int32_t pkt_download_len)
+{
+	ce_pkt_dl_len_set(hif_sc, pkt_download_len);
+}
+

@@ -67,7 +67,7 @@ static void free_scatter_req(struct hif_sdio_dev *device,
 
 	spin_lock_irqsave(&device->lock, flag);
 
-	dl_list_insert_tail(&device->ScatterReqHead, &pReq->ListLink);
+	dl_list_insert_tail(&device->scatter_req_head, &pReq->list_link);
 
 	spin_unlock_irqrestore(&device->lock, flag);
 
@@ -87,13 +87,13 @@ static struct _HIF_SCATTER_REQ *alloc_scatter_req(struct hif_sdio_dev *device)
 
 	spin_lock_irqsave(&device->lock, flag);
 
-	pItem = dl_list_remove_item_from_head(&device->ScatterReqHead);
+	pItem = dl_list_remove_item_from_head(&device->scatter_req_head);
 
 	spin_unlock_irqrestore(&device->lock, flag);
 
 	if (pItem != NULL)
 		return A_CONTAINING_STRUCT(pItem,
-			struct _HIF_SCATTER_REQ, ListLink);
+			struct _HIF_SCATTER_REQ, list_link);
 
 	return NULL;
 }
@@ -123,27 +123,27 @@ A_STATUS do_hif_read_write_scatter(struct hif_sdio_dev *device,
 
 	HIF_ENTER();
 
-	pReqPriv = busrequest->pScatterReq;
+	pReqPriv = busrequest->scatter_req;
 
 	A_ASSERT(pReqPriv != NULL);
 
-	pReq = pReqPriv->pHifScatterReq;
+	pReq = pReqPriv->hif_scatter_req;
 
 	memset(&mmcreq, 0, sizeof(struct mmc_request));
 	memset(&cmd, 0, sizeof(struct mmc_command));
 	memset(&data, 0, sizeof(struct mmc_data));
 
 	data.blksz = HIF_MBOX_BLOCK_SIZE;
-	data.blocks = pReq->TotalLength / HIF_MBOX_BLOCK_SIZE;
+	data.blocks = pReq->total_length / HIF_MBOX_BLOCK_SIZE;
 
 	AR_DEBUG_PRINTF(ATH_DEBUG_SCATTER,
 			("HIF-SCATTER: (%s) Address: 0x%X, (BlockLen: %d, "
 			 "BlockCount: %d), (tot:%d,sg:%d)\n",
-			 (pReq->Request & HIF_SDIO_WRITE) ? "WRITE" : "READ",
-			 pReq->Address, data.blksz, data.blocks,
-			 pReq->TotalLength, pReq->ValidScatterEntries));
+			 (pReq->request & HIF_SDIO_WRITE) ? "WRITE" : "READ",
+			 pReq->address, data.blksz, data.blocks,
+			 pReq->total_length, pReq->valid_scatter_entries));
 
-	if (pReq->Request & HIF_SDIO_WRITE) {
+	if (pReq->request & HIF_SDIO_WRITE) {
 		rw = _CMD53_ARG_WRITE;
 		data.flags = MMC_DATA_WRITE;
 	} else {
@@ -151,46 +151,46 @@ A_STATUS do_hif_read_write_scatter(struct hif_sdio_dev *device,
 		data.flags = MMC_DATA_READ;
 	}
 
-	if (pReq->Request & HIF_FIXED_ADDRESS)
+	if (pReq->request & HIF_FIXED_ADDRESS)
 		opcode = _CMD53_ARG_FIXED_ADDRESS;
 	else
 		opcode = _CMD53_ARG_INCR_ADDRESS;
 
 	/* fill SG entries */
 	pSg = pReqPriv->sgentries;
-	sg_init_table(pSg, pReq->ValidScatterEntries);
+	sg_init_table(pSg, pReq->valid_scatter_entries);
 
 	/* assemble SG list */
-	for (i = 0; i < pReq->ValidScatterEntries; i++, pSg++) {
+	for (i = 0; i < pReq->valid_scatter_entries; i++, pSg++) {
 		/* setup each sg entry */
-		if ((unsigned long)pReq->ScatterList[i].pBuffer & 0x3) {
+		if ((unsigned long)pReq->scatter_list[i].buffer & 0x3) {
 			/* note some scatter engines can handle unaligned
 			 * buffers, print this as informational only */
 			AR_DEBUG_PRINTF(ATH_DEBUG_SCATTER,
 				("HIF: (%s) Scatter Buf is unaligned 0x%lx\n",
 				 pReq->
-				 Request & HIF_SDIO_WRITE ? "WRITE" : "READ",
-				 (unsigned long)pReq->ScatterList[i].
-				 pBuffer));
+				 request & HIF_SDIO_WRITE ? "WRITE" : "READ",
+				 (unsigned long)pReq->scatter_list[i].
+				 buffer));
 		}
 
 		AR_DEBUG_PRINTF(ATH_DEBUG_SCATTER,
 				("  %d:  Addr:0x%lX, Len:%d\n", i,
-				 (unsigned long)pReq->ScatterList[i].pBuffer,
-				 pReq->ScatterList[i].Length));
+				 (unsigned long)pReq->scatter_list[i].buffer,
+				 pReq->scatter_list[i].length));
 
-		sg_set_buf(pSg, pReq->ScatterList[i].pBuffer,
-			   pReq->ScatterList[i].Length);
+		sg_set_buf(pSg, pReq->scatter_list[i].buffer,
+			   pReq->scatter_list[i].length);
 	}
 	/* set scatter-gather table for request */
 	data.sg = pReqPriv->sgentries;
-	data.sg_len = pReq->ValidScatterEntries;
+	data.sg_len = pReq->valid_scatter_entries;
 	/* set command argument */
 	SDIO_SET_CMD53_ARG(cmd.arg,
 			   rw,
 			   device->func->num,
 			   _CMD53_ARG_BLOCK_BASIS,
-			   opcode, pReq->Address, data.blocks);
+			   opcode, pReq->address, data.blocks);
 
 	cmd.opcode = SD_IO_RW_EXTENDED;
 	cmd.flags = MMC_RSP_SPI_R5 | MMC_RSP_R5 | MMC_CMD_ADTC;
@@ -218,21 +218,21 @@ A_STATUS do_hif_read_write_scatter(struct hif_sdio_dev *device,
 		AR_DEBUG_PRINTF(ATH_DEBUG_ERROR,
 			("HIF-SCATTER: FAILED!!! (%s) Address: 0x%X, "
 			 "Block mode (BlockLen: %d, BlockCount: %d)\n",
-			 (pReq->Request & HIF_SDIO_WRITE) ? "WRITE" : "READ",
-			 pReq->Address, data.blksz, data.blocks));
+			 (pReq->request & HIF_SDIO_WRITE) ? "WRITE" : "READ",
+			 pReq->address, data.blksz, data.blocks));
 	}
 
 	/* set completion status, fail or success */
-	pReq->CompletionStatus = status;
+	pReq->completion_status = status;
 
-	if (pReq->Request & HIF_ASYNCHRONOUS) {
+	if (pReq->request & HIF_ASYNCHRONOUS) {
 		AR_DEBUG_PRINTF(ATH_DEBUG_SCATTER,
 				("HIF-SCATTER: async_task completion routine "
 				 "req: 0x%lX (%d)\n",
 				 (unsigned long)busrequest, status));
 		/* complete the request */
-		A_ASSERT(pReq->CompletionRoutine != NULL);
-		pReq->CompletionRoutine(pReq);
+		A_ASSERT(pReq->completion_routine != NULL);
+		pReq->completion_routine(pReq);
 	} else {
 		AR_DEBUG_PRINTF(ATH_DEBUG_SCATTER,
 			("HIF-SCATTER async_task upping busreq : 0x%lX (%d)\n",
@@ -257,9 +257,9 @@ static A_STATUS hif_read_write_scatter(struct hif_sdio_dev *device,
 				   struct _HIF_SCATTER_REQ *pReq)
 {
 	A_STATUS status = A_EINVAL;
-	A_UINT32 request = pReq->Request;
+	A_UINT32 request = pReq->request;
 	struct HIF_SCATTER_REQ_PRIV *pReqPriv =
-		(struct HIF_SCATTER_REQ_PRIV *) pReq->HIFPrivate[0];
+		(struct HIF_SCATTER_REQ_PRIV *) pReq->hif_private[0];
 
 	do {
 
@@ -267,7 +267,8 @@ static A_STATUS hif_read_write_scatter(struct hif_sdio_dev *device,
 
 		AR_DEBUG_PRINTF(ATH_DEBUG_SCATTER,
 			("HIF-SCATTER: total len: %d Scatter Entries: %d\n",
-				 pReq->TotalLength, pReq->ValidScatterEntries));
+				 pReq->total_length,
+				 pReq->valid_scatter_entries));
 
 		if (!(request & HIF_EXTENDED_IO)) {
 			AR_DEBUG_PRINTF(ATH_DEBUG_ERROR,
@@ -290,14 +291,14 @@ static A_STATUS hif_read_write_scatter(struct hif_sdio_dev *device,
 			break;
 		}
 
-		if (pReq->TotalLength > MAX_SCATTER_REQ_TRANSFER_SIZE) {
+		if (pReq->total_length > MAX_SCATTER_REQ_TRANSFER_SIZE) {
 			AR_DEBUG_PRINTF(ATH_DEBUG_ERROR,
 				("HIF-SCATTER: Invalid length: %d\n",
-					 pReq->TotalLength));
+					 pReq->total_length));
 			break;
 		}
 
-		if (pReq->TotalLength == 0) {
+		if (pReq->total_length == 0) {
 			A_ASSERT(false);
 			break;
 		}
@@ -320,7 +321,7 @@ static A_STATUS hif_read_write_scatter(struct hif_sdio_dev *device,
 				status = A_ERROR;
 				break;
 			} else {
-				status = pReq->CompletionStatus;
+				status = pReq->completion_status;
 			}
 		} else {
 			AR_DEBUG_PRINTF(ATH_DEBUG_SCATTER,
@@ -335,8 +336,8 @@ static A_STATUS hif_read_write_scatter(struct hif_sdio_dev *device,
 	} while (false);
 
 	if (A_FAILED(status) && (request & HIF_ASYNCHRONOUS)) {
-		pReq->CompletionStatus = status;
-		pReq->CompletionRoutine(pReq);
+		pReq->completion_status = status;
+		pReq->completion_routine(pReq);
 		status = A_OK;
 	}
 
@@ -387,34 +388,34 @@ A_STATUS setup_hif_scatter_support(struct hif_sdio_dev *device,
 			/* save the device instance */
 			pReqPriv->device = device;
 			/* allocate the scatter request */
-			pReqPriv->pHifScatterReq =
+			pReqPriv->hif_scatter_req =
 				(struct _HIF_SCATTER_REQ *)
 				cdf_mem_malloc(sizeof(struct _HIF_SCATTER_REQ) +
 					       (MAX_SCATTER_ENTRIES_PER_REQ -
 				       1) * (sizeof(struct _HIF_SCATTER_ITEM)));
 
-			if (NULL == pReqPriv->pHifScatterReq) {
+			if (NULL == pReqPriv->hif_scatter_req) {
 				cdf_mem_free(pReqPriv);
 				break;
 			}
 			/* just zero the main part of the scatter request */
-			A_MEMZERO(pReqPriv->pHifScatterReq,
+			A_MEMZERO(pReqPriv->hif_scatter_req,
 				  sizeof(struct _HIF_SCATTER_REQ));
 			/* back pointer to the private struct */
-			pReqPriv->pHifScatterReq->HIFPrivate[0] = pReqPriv;
+			pReqPriv->hif_scatter_req->hif_private[0] = pReqPriv;
 			/* allocate a bus request for this scatter request */
 			busrequest = hif_allocate_bus_request(device);
 			if (NULL == busrequest) {
-				cdf_mem_free(pReqPriv->pHifScatterReq);
+				cdf_mem_free(pReqPriv->hif_scatter_req);
 				cdf_mem_free(pReqPriv);
 				break;
 			}
 			/* assign the scatter request to this bus request */
-			busrequest->pScatterReq = pReqPriv;
+			busrequest->scatter_req = pReqPriv;
 			/* point back to the request */
 			pReqPriv->busrequest = busrequest;
 			/* add it to the scatter pool */
-			free_scatter_req(device, pReqPriv->pHifScatterReq);
+			free_scatter_req(device, pReqPriv->hif_scatter_req);
 		}
 
 		if (i != MAX_SCATTER_REQUESTS) {
@@ -425,11 +426,11 @@ A_STATUS setup_hif_scatter_support(struct hif_sdio_dev *device,
 		}
 
 		/* set scatter function pointers */
-		pInfo->pAllocateReqFunc = alloc_scatter_req;
-		pInfo->pFreeReqFunc = free_scatter_req;
-		pInfo->pReadWriteScatterFunc = hif_read_write_scatter;
-		pInfo->MaxScatterEntries = MAX_SCATTER_ENTRIES_PER_REQ;
-		pInfo->MaxTransferSizePerScatterReq =
+		pInfo->allocate_req_func = alloc_scatter_req;
+		pInfo->free_req_func = free_scatter_req;
+		pInfo->read_write_scatter_func = hif_read_write_scatter;
+		pInfo->max_scatter_entries = MAX_SCATTER_ENTRIES_PER_REQ;
+		pInfo->max_tx_size_per_scatter_req =
 			MAX_SCATTER_REQ_TRANSFER_SIZE;
 
 		status = A_OK;
@@ -464,19 +465,19 @@ void cleanup_hif_scatter_resources(struct hif_sdio_dev *device)
 		if (NULL == pReq)
 			break;
 
-		pReqPriv = (struct HIF_SCATTER_REQ_PRIV *) pReq->HIFPrivate[0];
+		pReqPriv = (struct HIF_SCATTER_REQ_PRIV *) pReq->hif_private[0];
 		A_ASSERT(pReqPriv != NULL);
 
 		if (pReqPriv->busrequest != NULL) {
-			pReqPriv->busrequest->pScatterReq = NULL;
+			pReqPriv->busrequest->scatter_req = NULL;
 			/* free bus request */
 			hif_free_bus_request(device, pReqPriv->busrequest);
 			pReqPriv->busrequest = NULL;
 		}
 
-		if (pReqPriv->pHifScatterReq != NULL) {
-			cdf_mem_free(pReqPriv->pHifScatterReq);
-			pReqPriv->pHifScatterReq = NULL;
+		if (pReqPriv->hif_scatter_req != NULL) {
+			cdf_mem_free(pReqPriv->hif_scatter_req);
+			pReqPriv->hif_scatter_req = NULL;
 		}
 
 		cdf_mem_free(pReqPriv);

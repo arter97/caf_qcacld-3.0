@@ -49,6 +49,7 @@ extern "C" {
 typedef struct htc_callbacks HTC_CALLBACKS;
 typedef void __iomem *A_target_id_t;
 
+struct hif_sdio_dev;
 #define HIF_TYPE_AR6002   2
 #define HIF_TYPE_AR6003   3
 #define HIF_TYPE_AR6004   5
@@ -208,6 +209,8 @@ struct ol_softc {
 	hif_handle_t hif_hdl;
 #ifdef HIF_PCI
 	struct hif_pci_softc *hif_sc;
+#elif defined(HIF_SDIO)
+	struct ath_hif_sdio_softc    *hif_sc;
 #endif
 
 #ifdef WLAN_FEATURE_FASTPATH
@@ -268,8 +271,10 @@ struct ol_softc {
 	/*CWM enable/disable state */
 	bool scn_cwmenable;
 	uint8_t max_no_of_peers;
-#ifdef CONFIG_CNSS
+#ifdef HIF_PCI
 	struct cnss_fw_files fw_files;
+#elif defined(HIF_SDIO)
+	struct ol_fw_files fw_files;
 #endif
 #if defined(CONFIG_CNSS)
 	void *ramdump_base;
@@ -374,33 +379,8 @@ struct htc_callbacks {
 	int (*rwCompletionHandler)(void *rwContext, int status);
 	int (*dsrHandler)(void *context);
 };
-
-typedef struct osdrv_callbacks {
-	void *context;          /* context to pass for all callbacks
-				 * except deviceRemovedHandler
-				 * the deviceRemovedHandler is only
-				 * called if the device is claimed */
-	int (*deviceInsertedHandler)(void *context, void *hif_handle);
-	int (*deviceRemovedHandler)(void *claimedContext,
-				    void *hif_handle);
-	int (*deviceSuspendHandler)(void *context);
-	int (*deviceResumeHandler)(void *context);
-	int (*deviceWakeupHandler)(void *context);
-	int (*devicePowerChangeHandler)(void *context,
-					HIF_DEVICE_POWER_CHANGE_TYPE
-					config);
-} OSDRV_CALLBACKS;
-
-/*
- * This API is used to perform any global initialization of the HIF layer
- * and to set OS driver callbacks (i.e. insertion/removal) to the HIF layer
- *
- */
-int hif_init(OSDRV_CALLBACKS *callbacks);
-
 /* This API detaches the HTC layer from the HIF device */
 void hif_detach_htc(struct ol_softc *scn);
-
 /****************************************************************/
 /* BMI and Diag window abstraction                              */
 /****************************************************************/
@@ -421,14 +401,12 @@ CDF_STATUS hif_exchange_bmi_msg(struct ol_softc *scn,
 			 uint32_t *pResponseLength, uint32_t TimeoutMS);
 
 /*
- * APIs to handle HIF specific diagnostic read accesses. These APIs are
- * synchronous and only allowed to be called from a context that
- * can block (sleep). They are not high performance APIs.
- *
- * hif_diag_read_access reads a 4 Byte aligned/length value from a
- * Target register or memory word.
- *
- * hif_diag_read_mem reads an arbitrary length of arbitrarily aligned memory.
+ * APIs to handle HIF specific diagnostic reads accesses.
+ * These APIs are synchronous and only allowed to be called
+ * from a context that can block (sleep).
+ * hif_diag_read_access writes a 4 Byte aligned/length value to a
+ * Target register or memory word. hif_diag_read_mem reads
+ * an arbitrary length of arbitrarily aligned memory.
  */
 CDF_STATUS hif_diag_read_access(struct ol_softc *scn, uint32_t address,
 			 uint32_t *data);
@@ -437,15 +415,12 @@ CDF_STATUS hif_diag_read_mem(struct ol_softc *scn, uint32_t address,
 void hif_dump_target_memory(struct ol_softc *scn, void *ramdump_base,
 			    uint32_t address, uint32_t size);
 /*
- * APIs to handle HIF specific diagnostic write accesses. These APIs are
- * synchronous and only allowed to be called from a context that
- * can block (sleep).
- * They are not high performance APIs.
- *
+ * APIs to handle HIF specific diagnostic write accesses.
+ * These APIs are synchronous and only allowed to be called
+ * from a context that can block (sleep).
  * hif_diag_write_access writes a 4 Byte aligned/length value to a
- * Target register or memory word.
- *
- * hif_diag_write_mem writes an arbitrary length of arbitrarily aligned memory.
+ * Target register or memory word. hif_diag_write_mem writes
+ * an arbitrary length of arbitrarily aligned memory.
  */
 CDF_STATUS hif_diag_write_access(struct ol_softc *scn, uint32_t address,
 			  uint32_t data);
@@ -577,6 +552,8 @@ struct hif_msg_callbacks {
 	void (*fwEventHandler)(void *context, CDF_STATUS status);
 };
 
+void hif_claim_device(struct ol_softc *scn, void *claimedContext);
+
 #define HIF_DATA_ATTR_SET_TX_CLASSIFY(attr, v) \
 	(attr |= (v & 0x01) << 5)
 #define HIF_DATA_ATTR_SET_ENCAPSULATION_TYPE(attr, v) \
@@ -594,6 +571,8 @@ struct hif_msg_callbacks {
 
 #ifdef HIF_PCI
 typedef struct pci_device_id hif_bus_id;
+#elif defined(HIF_SDIO)
+typedef struct sdio_device_id hif_bus_id;
 #else
 typedef struct device hif_bus_id;
 #endif
@@ -604,6 +583,8 @@ CDF_STATUS hif_start(struct ol_softc *scn);
 void hif_stop(struct ol_softc *scn);
 void hif_flush_surprise_remove(struct ol_softc *scn);
 void hif_dump(struct ol_softc *scn, uint8_t CmdId, bool start);
+void hif_wlan_disable(void);
+void hif_trigger_dump(struct ol_softc *scn, uint8_t CmdId, bool start);
 CDF_STATUS hif_send_head(struct ol_softc *scn, uint8_t PipeID,
 				  uint32_t transferID, uint32_t nbytes,
 				  cdf_nbuf_t wbuf, uint32_t data_attr);
@@ -704,6 +685,8 @@ int hif_dump_registers(struct ol_softc *scn);
 int ol_copy_ramdump(struct ol_softc *scn);
 void hif_pktlogmod_exit(void *hif_ctx);
 void hif_crash_shutdown(void *hif_ctx);
+int hif_register_driver(void);
+void hif_bus_pkt_dl_len_set(void *hif_sc, unsigned int pkt_download_len);
 #ifdef __cplusplus
 }
 #endif
