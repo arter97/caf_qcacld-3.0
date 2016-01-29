@@ -3594,6 +3594,25 @@ static CDF_STATUS sap_fsm_state_started(ptSapContext sap_ctx,
 						(void *) temp_sap_ctx);
 			}
 		}
+	} else if (eSAP_CHANNEL_SWITCH_ANNOUNCEMENT_START == msg) {
+		enum tCDF_ADAPTER_MODE persona;
+
+		if (!sap_ctx) {
+			CDF_TRACE(CDF_MODULE_ID_SAP, CDF_TRACE_LEVEL_ERROR,
+					FL("Invalid sap_ctx"));
+			return cdf_status;
+		}
+
+		persona = mac_ctx->sap.sapCtxList[sap_ctx->sessionId].
+								sapPersona;
+
+		CDF_TRACE(CDF_MODULE_ID_SAP, CDF_TRACE_LEVEL_INFO_MED,
+				FL("app trigger chan switch: mode:%d vdev:%d"),
+				persona, sap_ctx->sessionId);
+
+		if ((CDF_SAP_MODE == persona) || (CDF_P2P_GO_MODE == persona))
+			cdf_status = wlansap_dfs_send_csa_ie_request(
+					(void *) sap_ctx);
 	} else {
 		CDF_TRACE(CDF_MODULE_ID_SAP, CDF_TRACE_LEVEL_ERROR,
 			  FL("in state %s, invalid event msg %d"),
