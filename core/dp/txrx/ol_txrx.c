@@ -33,8 +33,10 @@
 #include <cdf_lock.h>           /* cdf_spinlock */
 #include <cdf_atomic.h>         /* cdf_atomic_read */
 
+#ifndef HIF_SDIO
 /* Required for WLAN_FEATURE_FASTPATH */
 #include <ce_api.h>
+#endif
 /* header files for utilities */
 #include <cds_queue.h>          /* TAILQ */
 
@@ -71,6 +73,7 @@
 #include <ol_tx_queue.h>
 #include <ol_txrx.h>
 #include "wma.h"
+#include "hif.h"
 
 
 
@@ -494,8 +497,8 @@ ol_txrx_pdev_attach(ol_txrx_pdev_handle pdev)
 	if (ret)
 		goto ol_attach_fail;
 
-	/* Update CE's pkt download length */
-	ce_pkt_dl_len_set((void *)osc, htt_pkt_dl_len_get(pdev->htt_pdev));
+	/* Update bus pkt download length */
+	hif_bus_pkt_dl_len_set((void *)osc, htt_pkt_dl_len_get(pdev->htt_pdev));
 
 	/* Attach micro controller data path offload resource */
 	if (ol_cfg_ipa_uc_offload_enabled(pdev->ctrl_pdev))
