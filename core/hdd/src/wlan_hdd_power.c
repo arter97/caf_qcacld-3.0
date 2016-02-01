@@ -1539,9 +1539,6 @@ CDF_STATUS hdd_wlan_re_init(void *hif_sc)
 	if (pAdapter)
 		hdd_wlan_get_version(pAdapter, NULL, NULL);
 
-	/* Pass FW version to HIF layer */
-	hif_set_fw_info(hif_sc, pHddCtx->target_fw_version);
-
 	/* Restart all adapters */
 	hdd_start_all_adapters(pHddCtx);
 
@@ -1628,10 +1625,9 @@ err_cds_close:
 	if (pHddCtx) {
 		/* Unregister the Net Device Notifier */
 		unregister_netdevice_notifier(&hdd_netdev_notifier);
-#ifdef WLAN_KD_READY_NOTIFIER
 		cnss_diag_notify_wlan_close();
 		ptt_sock_deactivate_svc();
-#endif /* WLAN_KD_READY_NOTIFIER */
+
 		nl_srv_exit();
 
 		/* Free up dynamically allocated members inside HDD Adapter */
