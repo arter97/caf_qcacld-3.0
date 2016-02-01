@@ -1317,7 +1317,6 @@ struct hdd_context_s {
 	bool memdump_in_progress;
 #endif /* WLAN_FEATURE_MEMDUMP */
 
-	cdf_mc_timer_t dbs_opportunistic_timer;
 	bool connection_in_progress;
 	cdf_spinlock_t connection_status_lock;
 

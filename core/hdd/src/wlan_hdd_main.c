@@ -3727,17 +3727,6 @@ void hdd_wlan_exit(hdd_context_t *hdd_ctx)
 		       FL("Cannot deallocate ACS Skip timer"));
 	}
 #endif
-	if (CDF_TIMER_STATE_RUNNING ==
-		cdf_mc_timer_get_current_state(
-			&hdd_ctx->dbs_opportunistic_timer)) {
-		cdf_mc_timer_stop(&hdd_ctx->dbs_opportunistic_timer);
-	}
-
-	if (!CDF_IS_STATUS_SUCCESS
-			(cdf_mc_timer_destroy(
-				&hdd_ctx->dbs_opportunistic_timer))) {
-		hdd_err("Cannot deallocate dbs opportunistic timer");
-	}
 
 	/*
 	 * Powersave Offload Case

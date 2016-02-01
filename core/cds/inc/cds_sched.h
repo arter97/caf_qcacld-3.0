@@ -48,6 +48,7 @@
 #include <cds_mq.h>
 #include <cdf_types.h>
 #include "cdf_lock.h"
+#include "cdf_mc_timer.h"
 
 #define TX_POST_EVENT_MASK               0x001
 #define TX_SUSPEND_EVENT_MASK            0x002
@@ -285,6 +286,7 @@ typedef struct _cds_context_type {
 	cdf_spinlock_t bug_report_lock;
 	cdf_event_t connection_update_done_evt;
 	cdf_mutex_t cdf_conc_list_lock;
+	cdf_mc_timer_t dbs_opportunistic_timer;
 
 } cds_context_type, *p_cds_contextType;
 
