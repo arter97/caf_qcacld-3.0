@@ -1497,85 +1497,6 @@ static void wma_delete_all_ap_remote_peers(tp_wma_handle wma, A_UINT32 vdev_id)
 	cdf_spin_unlock_bh(&vdev->pdev->peer_ref_mutex);
 }
 
-#ifdef QCA_IBSS_SUPPORT
-
-/**
- * wma_recreate_ibss_vdev_and_bss_peer() - recreate IBSS vdev and create peer
- * @wma: wma handle
- * @vdev_id: vdev id
- *
- * Return: none
- */
-static void wma_recreate_ibss_vdev_and_bss_peer(tp_wma_handle wma,
-						uint8_t vdev_id)
-{
-	ol_txrx_vdev_handle vdev;
-	struct add_sta_self_params add_sta_self_param;
-	struct del_sta_self_params del_sta_param;
-	CDF_STATUS status;
-
-	if (!wma) {
-		WMA_LOGE("%s: Null wma handle", __func__);
-		return;
-	}
-
-	vdev = wma_find_vdev_by_id(wma, vdev_id);
-	if (!vdev) {
-		WMA_LOGE("%s: Can't find vdev with id %d", __func__, vdev_id);
-		return;
-	}
-
-	cdf_copy_macaddr(
-		(struct cdf_mac_addr *) &(add_sta_self_param.self_mac_addr),
-		(struct cdf_mac_addr *) &(vdev->mac_addr));
-	add_sta_self_param.session_id = vdev_id;
-	add_sta_self_param.type = WMI_VDEV_TYPE_IBSS;
-	add_sta_self_param.sub_type = 0;
-	add_sta_self_param.status = 0;
-
-	/* delete old ibss vdev */
-	del_sta_param.session_id = vdev_id;
-	cdf_mem_copy((void *)del_sta_param.self_mac_addr,
-		     (void *)&(vdev->mac_addr), CDF_MAC_ADDR_SIZE);
-	wma_vdev_detach(wma, &del_sta_param, 0);
-
-	/* create new vdev for ibss */
-	vdev = wma_vdev_attach(wma, &add_sta_self_param, 0);
-	if (!vdev) {
-		WMA_LOGE("%s: Failed to create vdev", __func__);
-		return;
-	}
-
-	/* Register with TxRx Module for Data Ack Complete Cb */
-	ol_txrx_data_tx_cb_set(vdev, wma_data_tx_ack_comp_hdlr, wma);
-	WMA_LOGA("new IBSS vdev created with mac %pM",
-		 add_sta_self_param.self_mac_addr);
-
-	/* create ibss bss peer */
-	status = wma_create_peer(wma, vdev->pdev, vdev, vdev->mac_addr.raw,
-				 WMI_PEER_TYPE_DEFAULT, vdev_id, false);
-	if (status != CDF_STATUS_SUCCESS)
-		WMA_LOGE("%s: Failed to create IBSS bss peer", __func__);
-	else
-		WMA_LOGA("IBSS BSS peer created with mac %pM",
-			 vdev->mac_addr.raw);
-}
-#else
-/**
- * wma_recreate_ibss_vdev_and_bss_peer() - dummy function
- * @wma: wma handle
- * @vdev_id: vdev id
- *
- * Dummy for when IBSS not supported
- *
- * Return: none
- */
-static void wma_recreate_ibss_vdev_and_bss_peer(tp_wma_handle wma,
-						uint8_t vdev_id)
-{
-}
-#endif /* QCA_IBSS_SUPPORT */
-
 /**
  * wma_hidden_ssid_vdev_restart_on_vdev_stop() - restart vdev to set hidden ssid
  * @wma_handle: wma handle
@@ -1786,11 +1707,6 @@ int wma_vdev_stop_resp_handler(void *handle, uint8_t *cmd_param_info,
 			cdf_mem_free(bcn);
 			wma->interfaces[resp_event->vdev_id].beacon = NULL;
 		}
-
-		/* recreate ibss vdev and bss peer for scan purpose */
-		if (wma_is_vdev_in_ibss_mode(wma, resp_event->vdev_id))
-			wma_recreate_ibss_vdev_and_bss_peer(wma,
-						resp_event->vdev_id);
 
 		/* Timeout status means its WMA generated DEL BSS REQ when ADD
 		 * BSS REQ was timed out to stop the VDEV in this case no need
@@ -2795,12 +2711,6 @@ void wma_vdev_resp_timer(void *data)
 			cdf_mem_free(bcn);
 			wma->interfaces[tgt_req->vdev_id].beacon = NULL;
 		}
-
-		/* recreate ibss vdev and bss peer for scan purpose */
-		if (wma_is_vdev_in_ibss_mode(wma, tgt_req->vdev_id))
-			wma_recreate_ibss_vdev_and_bss_peer(wma,
-							    tgt_req->vdev_id);
-
 		params->status = CDF_STATUS_E_TIMEOUT;
 		WMA_LOGA("%s: WMA_DELETE_BSS_REQ timedout", __func__);
 		wma_send_msg(wma, WMA_DELETE_BSS_RSP, (void *)params, 0);
