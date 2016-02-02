@@ -4133,6 +4133,8 @@ CDF_STATUS cds_update_connection_info(uint32_t vdev_id)
 		return status;
 	}
 
+	cds_debug("update PM connection table for vdev:%d", vdev_id);
+
 	/* add the entry */
 	cds_update_conc_list(conn_index,
 			cds_get_mode(wma_conn_table_entry->type,
