@@ -656,4 +656,5 @@ CDF_STATUS cdf_wait_for_connection_update(void);
 CDF_STATUS cdf_reset_connection_update(void);
 CDF_STATUS cdf_set_connection_update(void);
 CDF_STATUS cdf_init_connection_update(void);
+CDF_STATUS cds_stop_start_opportunistic_timer(void);
 #endif /* __CDS_CONCURRENCY_H */
