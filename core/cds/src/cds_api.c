@@ -1512,6 +1512,9 @@ CDF_STATUS cds_get_vdev_types(enum tCDF_ADAPTER_MODE mode, uint32_t *type,
 		*type = WMI_VDEV_TYPE_AP;
 		*sub_type = WMI_UNIFIED_VDEV_SUBTYPE_P2P_GO;
 		break;
+	case CDF_IBSS_MODE:
+		*type = WMI_VDEV_TYPE_IBSS;
+		break;
 	case CDF_OCB_MODE:
 		*type = WMI_VDEV_TYPE_OCB;
 		break;

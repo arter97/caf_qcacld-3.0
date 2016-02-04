@@ -1865,7 +1865,7 @@ ol_txrx_vdev_handle wma_vdev_attach(tp_wma_handle wma_handle,
 	if (((self_sta_req->type == WMI_VDEV_TYPE_AP) &&
 	    (self_sta_req->sub_type == WMI_UNIFIED_VDEV_SUBTYPE_P2P_DEVICE)) ||
 	    (self_sta_req->type == WMI_VDEV_TYPE_OCB)) {
-		WMA_LOGA("P2P Device: creating self peer %pM, vdev_id %hu",
+		WMA_LOGA("Creating self peer %pM, vdev_id %hu",
 			 self_sta_req->self_mac_addr, self_sta_req->session_id);
 		status = wma_create_peer(wma_handle, txrx_pdev,
 					 txrx_vdev_handle,
@@ -3105,8 +3105,6 @@ static void wma_add_bss_ibss_mode(tp_wma_handle wma, tpAddBssParams add_bss)
 	struct wma_target_req *msg;
 	uint8_t vdev_id, peer_id;
 	CDF_STATUS status;
-	struct add_sta_self_params add_sta_self_param;
-	struct del_sta_self_params del_sta_param;
 	tSetBssKeyParams key_info;
 	struct sir_hw_mode_params hw_mode = {0};
 
@@ -3125,61 +3123,16 @@ static void wma_add_bss_ibss_mode(tp_wma_handle wma, tpAddBssParams add_bss)
 	}
 	wma_set_bss_rate_flags(&wma->interfaces[vdev_id], add_bss);
 
-	/* only change vdev type to ibss during 1st time join_ibss handling */
-
-	if (false == wma_is_vdev_in_ibss_mode(wma, vdev_id)) {
-
-		WMA_LOGD("%s: vdev found for vdev id %d. deleting the vdev",
-			 __func__, vdev_id);
-
-		/* remove peers on the existing non-ibss vdev */
-		TAILQ_FOREACH(peer, &vdev->peer_list, peer_list_elem) {
-			WMA_LOGE("%s: peer found for vdev id %d. deleting the peer",
-				__func__, vdev_id);
-			wma_remove_peer(wma, (uint8_t *) &vdev->mac_addr,
-					vdev_id, peer, false);
-		}
-
-		/* remove the non-ibss vdev */
-		cdf_copy_macaddr(
-			(struct cdf_mac_addr *) &(del_sta_param.self_mac_addr),
-			(struct cdf_mac_addr *) &(vdev->mac_addr));
-		del_sta_param.session_id = vdev_id;
-		del_sta_param.status = 0;
-
-		wma_vdev_detach(wma, &del_sta_param, 0);
-
-		/* create new vdev for ibss */
-		cdf_copy_macaddr((struct cdf_mac_addr *) &
-			 (add_sta_self_param.self_mac_addr),
-			 (struct cdf_mac_addr *) &(add_bss->selfMacAddr));
-		add_sta_self_param.session_id = vdev_id;
-		add_sta_self_param.type = WMI_VDEV_TYPE_IBSS;
-		add_sta_self_param.sub_type = 0;
-		add_sta_self_param.status = 0;
-
-		vdev = wma_vdev_attach(wma, &add_sta_self_param, 0);
-		if (!vdev) {
-			WMA_LOGE("%s: Failed to create vdev", __func__);
-			goto send_fail_resp;
-		}
-
-		/* Register with TxRx Module for Data Ack Complete Cb */
-		ol_txrx_data_tx_cb_set(vdev, wma_data_tx_ack_comp_hdlr, wma);
-		WMA_LOGA("new IBSS vdev created with mac %pM",
-			 add_bss->selfMacAddr);
-
-		/* create ibss bss peer */
-		status = wma_create_peer(wma, pdev, vdev, add_bss->selfMacAddr,
-					 WMI_PEER_TYPE_DEFAULT, vdev_id,
-					 false);
-		if (status != CDF_STATUS_SUCCESS) {
-			WMA_LOGE("%s: Failed to create peer", __func__);
-			goto send_fail_resp;
-		}
-		WMA_LOGA("IBSS BSS peer created with mac %pM",
-			 add_bss->selfMacAddr);
+	/* create ibss bss peer */
+	status = wma_create_peer(wma, pdev, vdev, add_bss->selfMacAddr,
+				 WMI_PEER_TYPE_DEFAULT, vdev_id,
+				 false);
+	if (status != CDF_STATUS_SUCCESS) {
+		WMA_LOGE("%s: Failed to create peer", __func__);
+		goto send_fail_resp;
 	}
+	WMA_LOGA("IBSS BSS peer created with mac %pM",
+		 add_bss->selfMacAddr);
 
 	peer = ol_txrx_find_peer_by_addr(pdev, add_bss->selfMacAddr, &peer_id);
 	if (!peer) {
