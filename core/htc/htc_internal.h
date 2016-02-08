@@ -58,6 +58,7 @@ extern "C" {
 #define HTC_MAX_MSG_PER_BUNDLE              16
 #define HTC_MAX_MSG_PER_BUNDLE_TX           32
 #endif
+
 /*
  * HTC_MAX_TX_BUNDLE_SEND_LIMIT -
  * This value is in units of tx frame fragments.
@@ -188,9 +189,12 @@ typedef struct _HTC_TARGET {
 	A_UINT32 TX_comp_cnt;
 	A_UINT8 MaxMsgsPerHTCBundle;
 	cdf_work_t queue_kicker;
+#ifdef HIF_SDIO
+	A_UINT16 AltDataCreditSize;
+#endif
 #if defined(DEBUG_HL_LOGGING) && defined(CONFIG_HL_SUPPORT)
-	A_UINT32                    rx_bundle_stats[HTC_MAX_MSG_PER_BUNDLE_RX];
-	A_UINT32                    tx_bundle_stats[HTC_MAX_MSG_PER_BUNDLE_TX];
+	A_UINT32 rx_bundle_stats[HTC_MAX_MSG_PER_BUNDLE_RX];
+	A_UINT32 tx_bundle_stats[HTC_MAX_MSG_PER_BUNDLE_TX];
 #endif
 } HTC_TARGET;
 

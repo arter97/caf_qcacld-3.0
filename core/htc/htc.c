@@ -35,6 +35,9 @@
 #include "hif_io32.h"
 #include "cds_concurrency.h"
 #include <cds_api.h>
+#ifdef HIF_SDIO
+#include "hif_internal.h"
+#endif
 
 #ifdef DEBUG
 static ATH_DEBUG_MASK_DESCRIPTION g_htc_debug_description[] = {
@@ -142,6 +145,30 @@ void htc_dump(HTC_HANDLE HTCHandle, uint8_t CmdId, bool start)
 	hif_dump(target->hif_dev, CmdId, start);
 }
 
+#ifdef HIF_SDIO
+
+/**
+ * htc_hif_mask_interrupt_call() - disbale hif device irq
+ * @scn: pointr to softc structure
+ *
+ * Return: None
+ */
+static inline void
+htc_hif_mask_interrupt_call(struct ol_softc *scn)
+{
+	struct hif_sdio_dev *hif_device = (struct hif_sdio_dev *)scn->hif_hdl;
+	hif_mask_interrupt(hif_device);
+	return;
+}
+#else
+
+static inline void
+htc_hif_mask_interrupt_call(struct ol_softc *scn)
+{
+	return;
+}
+#endif
+
 /* cleanup the HTC instance */
 static void htc_cleanup(HTC_TARGET *target)
 {
@@ -150,6 +177,7 @@ static void htc_cleanup(HTC_TARGET *target)
 
 	if (target->hif_dev != NULL) {
 		hif_detach_htc(target->hif_dev);
+		htc_hif_mask_interrupt_call(target->hif_dev);
 		target->hif_dev = NULL;
 	}
 
@@ -305,6 +333,42 @@ void htc_control_tx_complete(void *Context, HTC_PACKET *pPacket)
 /* TODO, this is just a temporary max packet size */
 #define MAX_MESSAGE_SIZE 1536
 
+#if defined(HIF_SDIO)
+
+/**
+ * htc_setup_target_buff_credit_alloc() - allocate credits/HTC buffers to WMI
+ * @pEntry: pointer to tx credit allocation entry
+ *
+ * Return: None
+ */
+static void
+htc_setup_target_buff_credit_alloc(HTC_SERVICE_TX_CREDIT_ALLOCATION *pEntry,
+				   int credits)
+{
+	pEntry++;
+	pEntry->service_id = WMI_DATA_BE_SVC;
+	pEntry->CreditAllocation = credits;
+
+	return;
+}
+#elif defined(HIF_PCI) || defined(HIF_USB)
+
+static void
+htc_setup_target_buff_credit_alloc(HTC_SERVICE_TX_CREDIT_ALLOCATION *pEntry,
+				   int credits)
+{
+	pEntry++;
+	pEntry->service_id = WMI_DATA_BE_SVC;
+	pEntry->CreditAllocation = (credits >> 1);
+
+	pEntry++;
+	pEntry->service_id = WMI_DATA_BK_SVC;
+	pEntry->CreditAllocation = (credits >> 1);
+
+	return;
+}
+#endif
+
 /**
  * htc_setup_target_buffer_assignments() - setup target buffer assignments
  * @target: HTC Target Pointer
@@ -362,12 +426,8 @@ A_STATUS htc_setup_target_buffer_assignments(HTC_TARGET *target)
 		 * BE and BK services to stress the bus so that the total credits
 		 * are equally distributed to BE and BK services.
 		 */
-		pEntry->service_id = WMI_DATA_BE_SVC;
-		pEntry->CreditAllocation = (credits >> 1);
 
-		pEntry++;
-		pEntry->service_id = WMI_DATA_BK_SVC;
-		pEntry->CreditAllocation = (credits >> 1);
+		htc_setup_target_buff_credit_alloc(pEntry, credits);
 	}
 
 	if (A_SUCCESS(status)) {
@@ -879,3 +939,58 @@ void htc_ipa_get_ce_resource(HTC_HANDLE htc_handle,
 	}
 }
 #endif /* IPA_OFFLOAD */
+
+#if defined(DEBUG_HL_LOGGING) && defined(CONFIG_HL_SUPPORT)
+
+void htc_dump_bundle_stats(HTC_HANDLE HTCHandle)
+{
+	HTC_TARGET *target = GET_HTC_TARGET_FROM_HANDLE(HTCHandle);
+	int total, i;
+
+	total = 0;
+	for (i = 0; i < HTC_MAX_MSG_PER_BUNDLE_RX; i++)
+		total += target->rx_bundle_stats[i];
+
+	if (total) {
+		AR_DEBUG_PRINTF(ATH_DEBUG_ANY, ("RX Bundle stats:\n"));
+		AR_DEBUG_PRINTF(ATH_DEBUG_ANY, ("Total RX packets: %d\n",
+						total));
+		AR_DEBUG_PRINTF(ATH_DEBUG_ANY, (
+				"Number of bundle: Number of packets\n"));
+		for (i = 0; i < HTC_MAX_MSG_PER_BUNDLE_RX; i++)
+			AR_DEBUG_PRINTF(ATH_DEBUG_ANY,
+					("%10d:%10d(%2d%s)\n", (i+1),
+					 target->rx_bundle_stats[i],
+					 ((target->rx_bundle_stats[i]*100)/
+					  total), "%"));
+	}
+
+
+	total = 0;
+	for (i = 0; i < HTC_MAX_MSG_PER_BUNDLE_TX; i++)
+		total += target->tx_bundle_stats[i];
+
+	if (total) {
+		AR_DEBUG_PRINTF(ATH_DEBUG_ANY, ("TX Bundle stats:\n"));
+		AR_DEBUG_PRINTF(ATH_DEBUG_ANY, ("Total TX packets: %d\n",
+						total));
+		AR_DEBUG_PRINTF(ATH_DEBUG_ANY,
+				("Number of bundle: Number of packets\n"));
+		for (i = 0; i < HTC_MAX_MSG_PER_BUNDLE_TX; i++)
+			AR_DEBUG_PRINTF(ATH_DEBUG_ANY,
+					("%10d:%10d(%2d%s)\n", (i+1),
+					 target->tx_bundle_stats[i],
+					 ((target->tx_bundle_stats[i]*100)/
+					  total), "%"));
+	}
+}
+
+void htc_clear_bundle_stats(HTC_HANDLE HTCHandle)
+{
+	HTC_TARGET *target = GET_HTC_TARGET_FROM_HANDLE(HTCHandle);
+
+	cdf_mem_zero(&target->rx_bundle_stats, sizeof(target->rx_bundle_stats));
+	cdf_mem_zero(&target->tx_bundle_stats, sizeof(target->tx_bundle_stats));
+}
+#endif
+
