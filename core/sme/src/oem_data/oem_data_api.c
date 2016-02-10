@@ -209,8 +209,7 @@ CDF_STATUS oem_data_send_mb_oem_data_req(tpAniSirGlobal pMac,
 {
 	CDF_STATUS status = CDF_STATUS_SUCCESS;
 	tSirOemDataReq *pMsg;
-	tCsrRoamSession *pSession =
-		CSR_GET_SESSION(pMac, pOemDataReq->sessionId);
+	tCsrRoamSession *pSession;
 	uint16_t msgLen;
 
 	sms_log(pMac, LOGW, "OEM_DATA: entering Function %s", __func__);
@@ -220,6 +219,7 @@ CDF_STATUS oem_data_send_mb_oem_data_req(tpAniSirGlobal pMac,
 		return CDF_STATUS_E_INVAL;
 	}
 
+	pSession = CSR_GET_SESSION(pMac, pOemDataReq->sessionId);
 	pMsg = cdf_mem_malloc(sizeof(*pMsg));
 	if (NULL == pMsg) {
 		sms_log(pMac, LOGP, FL("cdf_mem_malloc failed"));
