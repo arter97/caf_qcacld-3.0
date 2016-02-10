@@ -999,6 +999,8 @@ CDF_STATUS sme_set_peer_authorized(uint8_t *peer_addr,
 				   uint32_t vdev_id);
 CDF_STATUS sme_soc_set_dual_mac_config(tHalHandle hal,
 		struct sir_dual_mac_config msg);
+CDF_STATUS sme_soc_set_antenna_mode(tHalHandle hal,
+		struct sir_antenna_mode_param *msg);
 
 void sme_set_scan_disable(tHalHandle h_hal, int value);
 void sme_setdef_dot11mode(tHalHandle hal);
