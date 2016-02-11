@@ -89,8 +89,6 @@
 #include "cds_regdomain.h"
 
 #include "wlan_hdd_ocb.h"
-
-extern int hdd_hostapd_stop(struct net_device *dev);
 #endif /* FEATURE_WLAN_CH_AVOID */
 
 #include "wlan_hdd_nan.h"
@@ -314,6 +312,8 @@ static int __hdd_netdev_notifier_call(struct notifier_block *nb,
 #endif
 	hdd_adapter_t *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	hdd_context_t *hdd_ctx;
+
+	ENTER_DEV(dev);
 
 	/* Make sure that this callback corresponds to our device. */
 	if ((strncmp(dev->name, "wlan", 4)) && (strncmp(dev->name, "p2p", 3)))
@@ -1440,6 +1440,8 @@ static int __hdd_open(struct net_device *dev)
 	hdd_context_t *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	int ret;
 
+	ENTER_DEV(dev);
+
 	MTRACE(cdf_trace(CDF_MODULE_ID_HDD, TRACE_CODE_HDD_OPEN_REQUEST,
 			 adapter->sessionId, adapter->device_mode));
 
@@ -1494,7 +1496,7 @@ static int __hdd_stop(struct net_device *dev)
 	hdd_context_t *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	int ret;
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	MTRACE(cdf_trace(CDF_MODULE_ID_HDD, TRACE_CODE_HDD_STOP_REQUEST,
 			 adapter->sessionId, adapter->device_mode));
@@ -1573,7 +1575,7 @@ static void __hdd_uninit(struct net_device *dev)
 {
 	hdd_adapter_t *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	do {
 		if (WLAN_HDD_ADAPTER_MAGIC != adapter->magic) {
@@ -1638,7 +1640,7 @@ static int __hdd_set_mac_address(struct net_device *dev, void *addr)
 	CDF_STATUS cdf_ret_status = CDF_STATUS_SUCCESS;
 	int ret;
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -1723,10 +1725,10 @@ static void __hdd_set_multicast_list(struct net_device *dev)
 	static const uint8_t ipv6_router_solicitation[]
 			= {0x33, 0x33, 0x00, 0x00, 0x00, 0x02};
 
+	ENTER_DEV(dev);
+
 	if (CDF_GLOBAL_FTM_MODE == hdd_get_conparam())
 		return;
-
-	ENTER();
 
 	status = wlan_hdd_validate_context(hdd_ctx);
 	if (0 != status)
