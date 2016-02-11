@@ -657,4 +657,7 @@ CDF_STATUS cdf_reset_connection_update(void);
 CDF_STATUS cdf_set_connection_update(void);
 CDF_STATUS cdf_init_connection_update(void);
 CDF_STATUS cds_stop_start_opportunistic_timer(void);
+CDF_STATUS cds_handle_hw_mode_change_on_csa(uint16_t session_id,
+		uint8_t channel, uint8_t *bssid, void *dst, void *src,
+		uint32_t numbytes);
 #endif /* __CDS_CONCURRENCY_H */
