@@ -2099,10 +2099,7 @@ static __iw_softap_set_ini_cfg(struct net_device *dev,
 	hdd_adapter_t *pAdapter = (netdev_priv(dev));
 	hdd_context_t *pHddCtx;
 
-	if (pAdapter == NULL) {
-		hddLog(LOGE, FL("pAdapter is NULL!"));
-		return -EINVAL;
-	}
+	ENTER_DEV(dev);
 
 	pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
 	ret = wlan_hdd_validate_context(pHddCtx);
@@ -2144,12 +2141,13 @@ static __iw_softap_get_ini_cfg(struct net_device *dev,
 	hdd_context_t *pHddCtx;
 	int ret = 0;
 
+	ENTER_DEV(dev);
+
 	pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
 	ret = wlan_hdd_validate_context(pHddCtx);
-	if (ret != 0) {
-		hddLog(LOGE, FL("HDD context is not valid"));
+	if (ret != 0)
 		return ret;
-	}
+
 	hddLog(LOG1, FL("Printing CLD global INI Config"));
 	hdd_cfg_get_global_config(pHddCtx, extra, QCSAP_IOCTL_MAX_STR_LEN);
 	wrqu->data.length = strlen(extra) + 1;
@@ -2189,6 +2187,8 @@ static int __iw_softap_set_two_ints_getnone(struct net_device *dev,
 	int *value = (int *)extra;
 	int sub_cmd = value[0];
 	hdd_context_t *hdd_ctx;
+
+	ENTER_DEV(dev);
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -2333,7 +2333,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	v_CONTEXT_t p_cds_context;
 	hdd_context_t *hdd_ctx;
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	hdd_ctx = WLAN_HDD_GET_CTX(pHostapdAdapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -2996,7 +2996,7 @@ static __iw_softap_getparam(struct net_device *dev,
 	int ret;
 	hdd_context_t *hdd_ctx;
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	hdd_ctx = WLAN_HDD_GET_CTX(pHostapdAdapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -3241,7 +3241,7 @@ int __iw_softap_modify_acl(struct net_device *dev,
 	CDF_STATUS cdf_status = CDF_STATUS_SUCCESS;
 	hdd_context_t *hdd_ctx;
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	hdd_ctx = WLAN_HDD_GET_CTX(pHostapdAdapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -3309,7 +3309,7 @@ static __iw_softap_getchannel(struct net_device *dev,
 	int *value = (int *)extra;
 	int ret;
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	hdd_ctx = WLAN_HDD_GET_CTX(pHostapdAdapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -3352,7 +3352,7 @@ static __iw_softap_set_max_tx_power(struct net_device *dev,
 	struct cdf_mac_addr bssid = CDF_MAC_ADDR_BROADCAST_INITIALIZER;
 	struct cdf_mac_addr selfMac = CDF_MAC_ADDR_BROADCAST_INITIALIZER;
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	if (NULL == value)
 		return -ENOMEM;
@@ -3403,7 +3403,7 @@ static __iw_softap_set_tx_power(struct net_device *dev,
 	struct cdf_mac_addr bssid;
 	int ret;
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	hdd_ctx = WLAN_HDD_GET_CTX(pHostapdAdapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -3457,7 +3457,7 @@ static __iw_softap_getassoc_stamacaddr(struct net_device *dev,
 	/* maclist_index must be u32 to match userspace */
 	u32 maclist_index;
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	/*
 	 * NOTE WELL: this is a "get" ioctl but it uses an even ioctl
@@ -3557,7 +3557,7 @@ static __iw_softap_disassoc_sta(struct net_device *dev,
 	uint8_t *peerMacAddr;
 	int ret;
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	if (!capable(CAP_NET_ADMIN)) {
 		CDF_TRACE(CDF_MODULE_ID_HDD, CDF_TRACE_LEVEL_ERROR,
@@ -3614,7 +3614,7 @@ static int __iw_get_char_setnone(struct net_device *dev,
 	int sub_cmd = wrqu->data.flags;
 	hdd_context_t *hdd_ctx;
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -3656,6 +3656,8 @@ static int wlan_hdd_set_force_acs_ch_range(struct net_device *dev,
 	hdd_adapter_t *adapter = (netdev_priv(dev));
 	hdd_context_t *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	int *value = (int *)extra;
+
+	ENTER_DEV(dev);
 
 	if (!capable(CAP_NET_ADMIN)) {
 		hddLog(LOGE, FL("permission check failed"));
@@ -3701,6 +3703,8 @@ static int __iw_softap_get_channel_list(struct net_device *dev,
 	hdd_context_t *hdd_ctx;
 	int ret;
 
+	ENTER_DEV(dev);
+
 	hdd_ctx = WLAN_HDD_GET_CTX(pHostapdAdapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
 	if (0 != ret)
@@ -3711,7 +3715,6 @@ static int __iw_softap_get_channel_list(struct net_device *dev,
 		return -EIO;
 	}
 	wrqu->data.length = sizeof(tChannelListInfo);
-	ENTER();
 
 	if (eCSR_BAND_24 == curBand) {
 		bandStartChannel = RF_CHAN_1;
@@ -3773,7 +3776,7 @@ int __iw_get_genie(struct net_device *dev,
 	uint32_t length = DOT11F_IE_RSN_MAX_LEN;
 	uint8_t genIeBytes[DOT11F_IE_RSN_MAX_LEN];
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	hdd_ctx = WLAN_HDD_GET_CTX(pHostapdAdapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -3845,7 +3848,7 @@ int __iw_get_wpspbc_probe_req_ies(struct net_device *dev,
 	hdd_context_t *hdd_ctx;
 	int ret;
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	hdd_ctx = WLAN_HDD_GET_CTX(pHostapdAdapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -4458,7 +4461,7 @@ __iw_softap_setwpsie(struct net_device *dev,
 	hdd_context_t *hdd_ctx;
 	int ret;
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	if (!capable(CAP_NET_ADMIN)) {
 		CDF_TRACE(CDF_MODULE_ID_HDD, CDF_TRACE_LEVEL_ERROR,
@@ -5043,7 +5046,7 @@ __iw_softap_stopbss(struct net_device *dev,
 	CDF_STATUS status = CDF_STATUS_SUCCESS;
 	hdd_context_t *hdd_ctx;
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	hdd_ctx = WLAN_HDD_GET_CTX(pHostapdAdapter);
 	status = wlan_hdd_validate_context(hdd_ctx);
@@ -5106,7 +5109,7 @@ __iw_softap_version(struct net_device *dev,
 	hdd_context_t *hdd_ctx;
 	int ret;
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	hdd_ctx = WLAN_HDD_GET_CTX(pHostapdAdapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -5192,7 +5195,7 @@ static int __iw_softap_get_sta_info(struct net_device *dev,
 	hdd_context_t *hdd_ctx;
 	int ret;
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	hdd_ctx = WLAN_HDD_GET_CTX(pHostapdAdapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -5339,7 +5342,7 @@ int __iw_get_softap_linkspeed(struct net_device *dev,
 	CDF_STATUS status = CDF_STATUS_E_FAILURE;
 	int rc, valid, i;
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	hdd_ctx = WLAN_HDD_GET_CTX(pHostapdAdapter);
 	valid = wlan_hdd_validate_context(hdd_ctx);
