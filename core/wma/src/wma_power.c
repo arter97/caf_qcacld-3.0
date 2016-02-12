@@ -1929,6 +1929,10 @@ CDF_STATUS wma_set_mimops(tp_wma_handle wma, uint8_t vdev_id, int value)
 
 	cmd->vdev_id = vdev_id;
 
+	/* WMI_SMPS_FORCED_MODE values do not directly map
+	 * to SM power save values defined in the specification.
+	 * Make sure to send the right mapping.
+	 */
 	switch (value) {
 	case 0:
 		cmd->forced_mode = WMI_SMPS_FORCED_MODE_NONE;
