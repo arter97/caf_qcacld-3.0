@@ -3562,7 +3562,7 @@ static int __iw_get_linkspeed(struct net_device *dev,
 	hdd_context_t *hdd_ctx;
 	int rc, valid;
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	hdd_ctx = WLAN_HDD_GET_CTX(pAdapter);
 	valid = wlan_hdd_validate_context(hdd_ctx);
@@ -4940,7 +4940,7 @@ static int __iw_setint_getnone(struct net_device *dev,
 	int enable_pbm, enable_mp;
 	CDF_STATUS status;
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	INIT_COMPLETION(pWextState->completion_var);
 	memset(&smeConfig, 0x00, sizeof(smeConfig));
@@ -6185,13 +6185,13 @@ static int __iw_setchar_getnone(struct net_device *dev,
 	struct hdd_config *pConfig = hdd_ctx->config;
 	struct iw_point s_priv_data;
 
+	ENTER_DEV(dev);
+
 	if (!capable(CAP_NET_ADMIN)) {
 		CDF_TRACE(CDF_MODULE_ID_HDD, CDF_TRACE_LEVEL_ERROR,
 		FL("permission check failed"));
 		return -EPERM;
 	}
-
-	ENTER();
 
 	ret = wlan_hdd_validate_context(hdd_ctx);
 	if (0 != ret)
@@ -6325,7 +6325,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 	tSmeConfigParams smeConfig;
 	hdd_context_t *hdd_ctx;
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	hdd_ctx = WLAN_HDD_GET_CTX(pAdapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -6829,7 +6829,7 @@ static int __iw_set_three_ints_getnone(struct net_device *dev,
 	int ret;
 	hdd_context_t *hdd_ctx = WLAN_HDD_GET_CTX(pAdapter);
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	ret = wlan_hdd_validate_context(hdd_ctx);
 	if (0 != ret)
@@ -6936,7 +6936,7 @@ static int __iw_get_char_setnone(struct net_device *dev,
 	pWextState = WLAN_HDD_GET_WEXT_STATE_PTR(pAdapter);
 #endif
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	hdd_ctx = WLAN_HDD_GET_CTX(pAdapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -7442,7 +7442,7 @@ static int __iw_setnone_getnone(struct net_device *dev,
 	int ret;
 	int sub_cmd;
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	hdd_ctx = WLAN_HDD_GET_CTX(pAdapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -7606,7 +7606,7 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
 	hdd_context_t *hdd_ctx;
 	int ret, num_args;
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	hdd_ctx = WLAN_HDD_GET_CTX(pAdapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -8058,7 +8058,7 @@ static int __iw_add_tspec(struct net_device *dev, struct iw_request_info *info,
 	hdd_context_t *hdd_ctx;
 	int ret;
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	hdd_ctx = WLAN_HDD_GET_CTX(pAdapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -8230,7 +8230,7 @@ static int __iw_del_tspec(struct net_device *dev, struct iw_request_info *info,
 	uint32_t handle;
 	int ret;
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	hdd_ctx = WLAN_HDD_GET_CTX(pAdapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -8294,7 +8294,7 @@ static int __iw_get_tspec(struct net_device *dev, struct iw_request_info *info,
 	uint32_t handle;
 	int ret;
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	hdd_ctx = WLAN_HDD_GET_CTX(pAdapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -8352,7 +8352,7 @@ static int __iw_set_fties(struct net_device *dev, struct iw_request_info *info,
 	hdd_context_t *hdd_ctx;
 	int ret;
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	hdd_ctx = WLAN_HDD_GET_CTX(pAdapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -8416,7 +8416,7 @@ static int __iw_set_host_offload(struct net_device *dev,
 	hdd_context_t *hdd_ctx;
 	int ret;
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	hdd_ctx = WLAN_HDD_GET_CTX(pAdapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -8531,7 +8531,7 @@ static int __iw_set_keepalive_params(struct net_device *dev,
 	hdd_context_t *hdd_ctx;
 	int ret;
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	hdd_ctx = WLAN_HDD_GET_CTX(pAdapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -8749,7 +8749,7 @@ static int __iw_set_packet_filter_params(struct net_device *dev,
 		return -EPERM;
 	}
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -8823,7 +8823,7 @@ static int __iw_get_statistics(struct net_device *dev,
 	tCsrGlobalClassDStatsInfo *dStats = &(pAdapter->hdd_stats.ClassD_stat);
 	int ret;
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	ret = wlan_hdd_validate_context(hdd_ctx);
 	if (0 != ret)
@@ -9074,7 +9074,7 @@ static int __iw_set_pno(struct net_device *dev,
 	 */
 	static tSirPNOScanReq request;
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -9419,7 +9419,7 @@ static int __iw_set_band_config(struct net_device *dev,
 {
 	int *value = (int *)extra;
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	if (!capable(CAP_NET_ADMIN)) {
 		CDF_TRACE(CDF_MODULE_ID_HDD, CDF_TRACE_LEVEL_ERROR,
@@ -9452,6 +9452,8 @@ static int __iw_set_two_ints_getnone(struct net_device *dev,
 	int sub_cmd = value[0];
 	int ret;
 	hdd_context_t *hdd_ctx = WLAN_HDD_GET_CTX(pAdapter);
+
+	ENTER_DEV(dev);
 
 	ret = wlan_hdd_validate_context(hdd_ctx);
 	if (0 != ret)
