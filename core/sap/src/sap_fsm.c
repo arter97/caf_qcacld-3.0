@@ -2214,29 +2214,20 @@ CDF_STATUS sap_goto_channel_sel(ptSapContext sap_context,
 	return CDF_STATUS_SUCCESS;
 }
 
-/*==========================================================================
-   FUNCTION    sap_OpenSession
+/**
+ * sap_open_session() - Opens a SAP session
+ * @hHal: Hal handle
+ * @sapContext:  Sap Context value
+ * @session_id: Pointer to the session id
+ *
+ * Function for opening SME and SAP sessions when system is in SoftAP role
+ *
+ * Return: CDF_STATUS
+ */
 
-   DESCRIPTION
-    Function for opening SME and SAP sessions when system is in SoftAP role
-
-   DEPENDENCIES
-    NA.
-
-   PARAMETERS
-
-    IN
-    hHal        : Hal handle
-    sapContext  : Sap Context value
-
-   RETURN VALUE
-    The CDF_STATUS code associated with performing the operation
-
-    CDF_STATUS_SUCCESS: Success
-
-   SIDE EFFECTS
-   ============================================================================*/
-CDF_STATUS sap_open_session(tHalHandle hHal, ptSapContext sapContext)
+#define SAP_OPEN_SESSION_TIMEOUT 500
+CDF_STATUS sap_open_session(tHalHandle hHal, ptSapContext sapContext,
+				uint32_t *session_id)
 {
 	uint32_t type, subType;
 	CDF_STATUS cdf_ret_status;
@@ -2253,6 +2244,8 @@ CDF_STATUS sap_open_session(tHalHandle hHal, ptSapContext sapContext)
 			  "failed to get vdev type");
 		return CDF_STATUS_E_FAILURE;
 	}
+
+	cdf_event_reset(&sapContext->sap_session_opened_evt);
 	/* Open SME Session for Softap */
 	cdf_ret_status = sme_open_session(hHal,
 					  &wlansap_roam_callback,
@@ -2268,11 +2261,22 @@ CDF_STATUS sap_open_session(tHalHandle hHal, ptSapContext sapContext)
 		return CDF_STATUS_E_FAILURE;
 	}
 
+	status = cdf_wait_single_event(
+			&sapContext->sap_session_opened_evt,
+			SAP_OPEN_SESSION_TIMEOUT);
+
+	if (!CDF_IS_STATUS_SUCCESS(status)) {
+		cds_err("wait for sap open session event timed out");
+		return CDF_STATUS_E_FAILURE;
+	}
+
 	pMac->sap.sapCtxList[sapContext->sessionId].sessionID =
 		sapContext->sessionId;
 	pMac->sap.sapCtxList[sapContext->sessionId].pSapContext = sapContext;
 	pMac->sap.sapCtxList[sapContext->sessionId].sapPersona =
 		sapContext->csr_roamProfile.csrPersona;
+	*session_id = sapContext->sessionId;
+	sapContext->isSapSessionOpen = eSAP_TRUE;
 	return CDF_STATUS_SUCCESS;
 }
 
@@ -2325,16 +2329,17 @@ sap_goto_starting
 		return CDF_STATUS_E_FAULT;
 	}
 
-	cdf_ret_status = sap_open_session(hHal, sapContext);
+	CDF_TRACE(CDF_MODULE_ID_SAP, CDF_TRACE_LEVEL_INFO,
+			"%s: session: %d", __func__, sapContext->sessionId);
 
-	if (CDF_STATUS_SUCCESS != cdf_ret_status) {
+	cdf_ret_status = sme_roam_connect(hHal, sapContext->sessionId,
+						&sapContext->csr_roamProfile,
+						  &sapContext->csr_roamId);
+	if (CDF_STATUS_SUCCESS != cdf_ret_status)
 		CDF_TRACE(CDF_MODULE_ID_SAP, CDF_TRACE_LEVEL_ERROR,
-			  "Error: In %s calling sap_open_session status = %d",
-			  __func__, cdf_ret_status);
-		return CDF_STATUS_E_FAILURE;
-	}
+			"%s: Failed to issue sme_roam_connect", __func__);
 
-	return CDF_STATUS_SUCCESS;
+	return cdf_ret_status;
 } /* sapGotoStarting */
 
 /*==========================================================================
@@ -2844,6 +2849,7 @@ CDF_STATUS sap_close_session(tHalHandle hHal,
 	sapContext->isCacStartNotified = false;
 	sapContext->isCacEndNotified = false;
 	pMac->sap.sapCtxList[sapContext->sessionId].pSapContext = NULL;
+	sapContext->isSapSessionOpen = false;
 
 	if (NULL == sap_find_valid_concurrent_session(hHal)) {
 		/* If timer is running then stop the timer and destory it */
@@ -3071,36 +3077,40 @@ static CDF_STATUS sap_fsm_state_disconnected(ptSapContext sap_ctx,
 		 * (both without substates)
 		 */
 		CDF_TRACE(CDF_MODULE_ID_SAP, CDF_TRACE_LEVEL_INFO_HIGH,
-			  FL("new from state %s => %s"),
-			  "eSAP_DISCONNECTED", "eSAP_CH_SELECT");
+			  FL("new from state %s => %s: session:%d"),
+			  "eSAP_DISCONNECTED", "eSAP_CH_SELECT",
+			  sap_ctx->sessionId);
 
-		/* There can be one SAP Session for softap */
-		if (sap_ctx->isSapSessionOpen == eSAP_TRUE) {
-			CDF_TRACE(CDF_MODULE_ID_SAP, CDF_TRACE_LEVEL_FATAL,
-				  FL("SME Session is already opened"));
-			return CDF_STATUS_E_EXISTS;
-		}
-
-		sap_ctx->sessionId = 0xff;
-
-		if ((sap_ctx->channel == AUTO_CHANNEL_SELECT) &&
-		    (sap_ctx->isScanSessionOpen == eSAP_FALSE)) {
+		if (sap_ctx->isSapSessionOpen == eSAP_FALSE) {
 			uint32_t type, subtype;
-			if (CDF_STATUS_SUCCESS == cds_get_vdev_types(
-					CDF_STA_MODE, &type, &subtype)) {
-				/* Open SME Session for scan */
-				cdf_status = sme_open_session(hal, NULL,
-					    sap_ctx, sap_ctx->self_mac_addr,
-					    &sap_ctx->sessionId, type, subtype);
-				if (CDF_STATUS_SUCCESS != cdf_status) {
-					CDF_TRACE(CDF_MODULE_ID_SAP,
-						  CDF_TRACE_LEVEL_ERROR,
-						  FL("Error: calling sme_open_session"));
-				} else {
-					sap_ctx->isScanSessionOpen = eSAP_TRUE;
-				}
+			if (sap_ctx->csr_roamProfile.csrPersona ==
+								CDF_P2P_GO_MODE)
+				cdf_status = cds_get_vdev_types(CDF_P2P_GO_MODE,
+							&type, &subtype);
+			else
+				cdf_status = cds_get_vdev_types(CDF_SAP_MODE,
+							&type, &subtype);
+
+			if (CDF_STATUS_SUCCESS != cdf_status) {
+				CDF_TRACE(CDF_MODULE_ID_SAP,
+						CDF_TRACE_LEVEL_FATAL,
+						"failed to get vdev type");
+				return CDF_STATUS_E_FAILURE;
 			}
+			/* Open SME Session for scan */
+			cdf_status = sme_open_session(hal, NULL,
+					sap_ctx, sap_ctx->self_mac_addr,
+					&sap_ctx->sessionId, type, subtype);
+			if (CDF_STATUS_SUCCESS != cdf_status) {
+				CDF_TRACE(CDF_MODULE_ID_SAP,
+					 CDF_TRACE_LEVEL_ERROR,
+					 FL("Error: calling sme_open_session"));
+				return CDF_STATUS_E_FAILURE;
+			}
+
+			sap_ctx->isSapSessionOpen = eSAP_TRUE;
 		}
+
 		/* init dfs channel nol */
 		sap_init_dfs_channel_nol_list(sap_ctx);
 
@@ -3178,18 +3188,6 @@ static CDF_STATUS sap_fsm_state_ch_select(ptSapContext sap_ctx,
 	uint8_t temp_chan;
 	tSapDfsNolInfo *p_nol;
 #endif
-
-	if (sap_ctx->isScanSessionOpen == eSAP_TRUE) {
-		/* scan completed, so close the session */
-		cdf_status = sme_close_session(hal, sap_ctx->sessionId,
-				NULL, NULL);
-		if (CDF_STATUS_SUCCESS != cdf_status)
-			CDF_TRACE(CDF_MODULE_ID_SAP, CDF_TRACE_LEVEL_ERROR,
-				FL("CloseSession error event msg %d"), msg);
-		else
-			sap_ctx->isScanSessionOpen = eSAP_FALSE;
-		sap_ctx->sessionId = 0xff;
-	}
 
 	if (msg == eSAP_MAC_SCAN_COMPLETE) {
 		/* get the bonding mode */

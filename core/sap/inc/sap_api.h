@@ -806,7 +806,8 @@ CDF_STATUS wlansap_stop_Wps(void *p_cds_gctx);
 CDF_STATUS wlansap_get_wps_state(void *p_cds_gctx, bool *pbWPSState);
 
 void *wlansap_open(void *p_cds_gctx);
-CDF_STATUS wlansap_start(void *p_cds_gctx);
+CDF_STATUS wlansap_start(void *p_cds_gctx, enum tCDF_ADAPTER_MODE mode,
+			uint8_t *addr, uint32_t *session_id);
 CDF_STATUS wlansap_stop(void *p_cds_gctx);
 CDF_STATUS wlansap_close(void *p_cds_gctx);
 typedef CDF_STATUS (*tpWLAN_SAPEventCB)(tpSap_Event pSapEvent,

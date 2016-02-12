@@ -134,6 +134,9 @@ void *wlansap_open(void *p_cds_gctx)
  *        control block can be extracted from its context
  *        When MBSSID feature is enabled, SAP context is directly
  *        passed to SAP APIs
+ * @mode: Device mode
+ * @addr: MAC address of the SAP
+ * @session_id: Pointer to the session id
  *
  * Called as part of the overall start procedure (cds_enable). SAP will
  * use this call to register with TL as the SAP entity for SAP RSN frames.
@@ -143,9 +146,12 @@ void *wlansap_open(void *p_cds_gctx)
  *                             access would cause a page fault.
  *         CDF_STATUS_SUCCESS: Success
  */
-CDF_STATUS wlansap_start(void *pCtx)
+CDF_STATUS wlansap_start(void *pCtx, enum tCDF_ADAPTER_MODE mode,
+			uint8_t *addr, uint32_t *session_id)
 {
 	ptSapContext pSapCtx = NULL;
+	CDF_STATUS cdf_ret_status;
+	tHalHandle hal;
 
 	/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
@@ -181,6 +187,9 @@ CDF_STATUS wlansap_start(void *pCtx)
 
 	pSapCtx->csr_roamProfile.BSSIDs.numOfBSSIDs = 1; /* This is true for now. */
 	pSapCtx->csr_roamProfile.BSSIDs.bssid = &pSapCtx->bssid;
+	pSapCtx->csr_roamProfile.csrPersona = mode;
+	cdf_mem_copy(pSapCtx->self_mac_addr, addr, CDF_MAC_ADDR_SIZE);
+	cdf_event_init(&pSapCtx->sap_session_opened_evt);
 
 	/* Now configure the auth type in the roaming profile. To open. */
 	pSapCtx->csr_roamProfile.negotiatedAuthType = eCSR_AUTH_TYPE_OPEN_SYSTEM;        /* open is the default */
@@ -189,6 +198,16 @@ CDF_STATUS wlansap_start(void *pCtx)
 		CDF_TRACE(CDF_MODULE_ID_SAP, CDF_TRACE_LEVEL_ERROR,
 			  "wlansap_start failed init lock");
 		return CDF_STATUS_E_FAULT;
+	}
+
+	hal = (tHalHandle) CDS_GET_HAL_CB(pSapCtx->p_cds_gctx);
+	cdf_ret_status = sap_open_session(hal, pSapCtx, session_id);
+
+	if (CDF_STATUS_SUCCESS != cdf_ret_status) {
+		CDF_TRACE(CDF_MODULE_ID_SAP, CDF_TRACE_LEVEL_ERROR,
+			"Error: In %s calling sap_open_session status = %d",
+			__func__, cdf_ret_status);
+		return CDF_STATUS_E_FAILURE;
 	}
 
 	return CDF_STATUS_SUCCESS;
@@ -295,6 +314,8 @@ CDF_STATUS wlansap_close(void *pCtx)
  */
 CDF_STATUS wlansap_clean_cb(ptSapContext pSapCtx, uint32_t freeFlag      /* 0 / *do not empty* /); */
 			    ) {
+	tHalHandle hal;
+
 	/*------------------------------------------------------------------------
 	    Sanity check SAP control block
 	   ------------------------------------------------------------------------*/
@@ -311,6 +332,13 @@ CDF_STATUS wlansap_clean_cb(ptSapContext pSapCtx, uint32_t freeFlag      /* 0 / 
 	CDF_TRACE(CDF_MODULE_ID_SAP, CDF_TRACE_LEVEL_INFO_HIGH,
 		  "wlansap_clean_cb");
 
+	hal = (tHalHandle) CDS_GET_HAL_CB(pSapCtx->p_cds_gctx);
+	if (eSAP_TRUE == pSapCtx->isSapSessionOpen && hal) {
+		CDF_TRACE(CDF_MODULE_ID_SAP, CDF_TRACE_LEVEL_INFO,
+				"close existing SAP session");
+		sap_close_session(hal, pSapCtx, NULL, false);
+	}
+
 	cdf_mem_zero(pSapCtx, sizeof(tSapContext));
 
 	pSapCtx->p_cds_gctx = NULL;
@@ -322,7 +350,6 @@ CDF_STATUS wlansap_clean_cb(ptSapContext pSapCtx, uint32_t freeFlag      /* 0 / 
 		  pSapCtx->sapsMachine, pSapCtx);
 	pSapCtx->sessionId = 0;
 	pSapCtx->channel = 0;
-	pSapCtx->isSapSessionOpen = eSAP_FALSE;
 
 	return CDF_STATUS_SUCCESS;
 } /* wlansap_clean_cb */
@@ -3167,116 +3194,66 @@ wlansap_acs_chselect(void *pvos_gctx,
 		return CDF_STATUS_E_FAULT;
 	}
 
-	if (sap_context->isSapSessionOpen == eSAP_TRUE) {
-		CDF_TRACE(CDF_MODULE_ID_SAP, CDF_TRACE_LEVEL_FATAL,
-			"%s:SME Session is already opened\n", __func__);
-		return CDF_STATUS_E_EXISTS;
-	}
-
-	sap_context->sessionId = 0xff;
-
 	pmac = PMAC_STRUCT(h_hal);
 	sap_context->acs_cfg = &pconfig->acs_cfg;
 	sap_context->ch_width_orig = pconfig->acs_cfg.ch_width;
 	sap_context->csr_roamProfile.phyMode = pconfig->acs_cfg.hw_mode;
 
-	if (sap_context->isScanSessionOpen == eSAP_FALSE) {
-		uint32_t type, subType;
-
-		/*
-		* Now, configure the scan and ACS channel params
-		* to issue a scan request.
-		*/
-		wlansap_set_scan_acs_channel_params(pconfig, sap_context,
+	/*
+	 * Now, configure the scan and ACS channel params
+	 * to issue a scan request.
+	 */
+	wlansap_set_scan_acs_channel_params(pconfig, sap_context,
 						pusr_context);
 
-		if (CDF_STATUS_SUCCESS ==
-			cds_get_vdev_types(CDF_STA_MODE, &type, &subType)) {
-			/*
-			* Open SME Session for scan
-			*/
-			if (CDF_STATUS_SUCCESS  != sme_open_session(h_hal,
-						NULL, sap_context,
-						sap_context->self_mac_addr,
-						&sap_context->sessionId,
-						type, subType)) {
-				CDF_TRACE(CDF_MODULE_ID_SAP,
-					CDF_TRACE_LEVEL_ERROR,
-					"Error: In %s calling sme_OpenSession",
-					__func__);
-				return CDF_STATUS_E_FAILURE;
-			} else {
-				sap_context->isScanSessionOpen = eSAP_TRUE;
-			}
-		}
+	/*
+	 * Copy the HDD callback function to report the
+	 * ACS result after scan in SAP context callback function.
+	 */
+	sap_context->pfnSapEventCallback = pacs_event_callback;
+	/*
+	 * init dfs channel nol
+	 */
+	sap_init_dfs_channel_nol_list(sap_context);
 
-		/*
-		* Copy the HDD callback function to report the
-		* ACS result after scan in SAP context callback function.
-		*/
-		sap_context->pfnSapEventCallback = pacs_event_callback;
-		/*
-		* init dfs channel nol
-		*/
-		sap_init_dfs_channel_nol_list(sap_context);
+	/*
+	 * Issue the scan request. This scan request is
+	 * issued before the start BSS is done so
+	 *
+	 * 1. No need to pass the second parameter
+	 * as the SAP state machine is not started yet
+	 * and there is no need for any event posting.
+	 *
+	 * 2. Set third parameter to TRUE to indicate the
+	 * channel selection function to register a
+	 * different scan callback fucntion to process
+	 * the results pre start BSS.
+	 */
+	cdf_status = sap_goto_channel_sel(sap_context, NULL, true);
 
-		/*
-		* Issue the scan request. This scan request is
-		* issued before the start BSS is done so
-		*
-		* 1. No need to pass the second parameter
-		* as the SAP state machine is not started yet
-		* and there is no need for any event posting.
-		*
-		* 2. Set third parameter to TRUE to indicate the
-		* channel selection function to register a
-		* different scan callback fucntion to process
-		* the results pre start BSS.
-		*/
-		cdf_status = sap_goto_channel_sel(sap_context, NULL, true);
-
-		if (CDF_STATUS_E_ABORTED == cdf_status) {
-			CDF_TRACE(CDF_MODULE_ID_SAP, CDF_TRACE_LEVEL_ERROR,
+	if (CDF_STATUS_E_ABORTED == cdf_status) {
+		CDF_TRACE(CDF_MODULE_ID_SAP, CDF_TRACE_LEVEL_ERROR,
 			"In %s,DFS not supported in the current operating mode",
 			__func__);
-			return CDF_STATUS_E_FAILURE;
-		} else if (CDF_STATUS_E_CANCELED == cdf_status) {
-			/*
-			* ERROR is returned when either the SME scan request
-			* failed or ACS is overridden due to other constrainst
-			* So send selected channel to HDD
-			*/
-			CDF_TRACE(CDF_MODULE_ID_SAP, CDF_TRACE_LEVEL_ERROR,
-				FL("Scan Req Failed/ACS Overridden"));
-			CDF_TRACE(CDF_MODULE_ID_SAP, CDF_TRACE_LEVEL_ERROR,
-				FL("Selected channel = %d"),
-				sap_context->channel);
-			if (sap_context->isScanSessionOpen == eSAP_TRUE) {
-				/* ACS scan not needed so close session */
-				tHalHandle h_hal = CDS_GET_HAL_CB(
-						sap_context->p_cds_gctx);
-				if (h_hal == NULL)
-					return CDF_STATUS_E_FAILURE;
+		return CDF_STATUS_E_FAILURE;
+	} else if (CDF_STATUS_E_CANCELED == cdf_status) {
+		/*
+		* ERROR is returned when either the SME scan request
+		* failed or ACS is overridden due to other constrainst
+		* So send selected channel to HDD
+		*/
+		CDF_TRACE(CDF_MODULE_ID_SAP, CDF_TRACE_LEVEL_ERROR,
+			FL("Scan Req Failed/ACS Overridden"));
+		CDF_TRACE(CDF_MODULE_ID_SAP, CDF_TRACE_LEVEL_ERROR,
+			FL("Selected channel = %d"),
+			sap_context->channel);
 
-				if (sme_close_session(h_hal,
-					sap_context->sessionId, NULL, NULL) ==
-							 CDF_STATUS_SUCCESS)
-					sap_context->isScanSessionOpen =
-								eSAP_FALSE;
-				else
-					CDF_TRACE(CDF_MODULE_ID_SAP,
-						CDF_TRACE_LEVEL_ERROR,
-						"ACS Scan Session close fail");
-				sap_context->sessionId = 0xff;
-			}
-
-			return sap_signal_hdd_event(sap_context, NULL,
-					eSAP_ACS_CHANNEL_SELECTED,
-					(void *) eSAP_STATUS_SUCCESS);
-		} else if (CDF_STATUS_SUCCESS == cdf_status) {
-			CDF_TRACE(CDF_MODULE_ID_SAP, CDF_TRACE_LEVEL_INFO_HIGH,
+		return sap_signal_hdd_event(sap_context, NULL,
+				eSAP_ACS_CHANNEL_SELECTED,
+				(void *) eSAP_STATUS_SUCCESS);
+	} else if (CDF_STATUS_SUCCESS == cdf_status) {
+		CDF_TRACE(CDF_MODULE_ID_SAP, CDF_TRACE_LEVEL_INFO_HIGH,
 			FL("Successfully Issued a Pre Start Bss Scan Request"));
-		}
 	}
 	return cdf_status;
 }

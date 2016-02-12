@@ -14772,6 +14772,8 @@ CDF_STATUS csr_roam_open_session(tpAniSirGlobal pMac,
 	*pbSessionId = CSR_SESSION_ID_INVALID;
 
 	for (i = 0; i < pMac->sme.max_intf_count; i++) {
+		sms_log(pMac, LOG1, FL("session:%d active:%d"), i,
+			pMac->roam.roamSession[i].sessionActive);
 		if (!CSR_IS_SESSION_VALID(pMac, i)) {
 			pSession = CSR_GET_SESSION(pMac, i);
 			if (!pSession) {

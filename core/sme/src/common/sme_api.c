@@ -5639,7 +5639,8 @@ CDF_STATUS sme_open_session(tHalHandle hHal, csr_roam_completeCallback callback,
 	tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
 
 	CDF_TRACE(CDF_MODULE_ID_SAP, CDF_TRACE_LEVEL_INFO_HIGH,
-		  "%s: type=%d, subType=%d", __func__, type, subType);
+		  "%s: type=%d, subType=%d addr:%pM",
+		  __func__, type, subType, pSelfMacAddr);
 
 	if (NULL == pbSessionId) {
 		status = CDF_STATUS_E_INVAL;

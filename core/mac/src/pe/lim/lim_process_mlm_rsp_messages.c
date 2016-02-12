@@ -2041,7 +2041,8 @@ void lim_process_mlm_del_sta_rsp(tpAniSirGlobal mac_ctx,
 				del_sta_params->sessionId);
 	if (NULL == session_entry) {
 		lim_log(mac_ctx, LOGP,
-			FL("Session Doesn't exist"));
+			FL("Session Doesn't exist: %d"),
+			del_sta_params->sessionId);
 		cdf_mem_free(del_sta_params);
 		msg->bodyptr = NULL;
 		return;
