@@ -5,12 +5,17 @@ ifeq ($(MODNAME),)
 else
 	KERNEL_BUILD := 0
 endif
+ifeq ($(CONFIG_CLD_HL_SDIO_CORE), y)
+	CONFIG_QCA_WIFI_SDIO := 1
+endif
 
-ifeq ($(CONFIG_CNSS), y)
+ifeq ($(CONFIG_QCA_WIFI_SDIO), 1)
+	CONFIG_ROME_IF = sdio
+endif
+
 ifndef CONFIG_ROME_IF
 	#use pci as default interface
 	CONFIG_ROME_IF = pci
-endif
 endif
 
 ifeq ($(KERNEL_BUILD),1)
@@ -105,6 +110,7 @@ ifeq ($(KERNEL_BUILD), 0)
 	#Flag to enable offload packets feature
 	CONFIG_WLAN_OFFLOAD_PACKETS := y
 
+ifeq ($(CONFIG_ROME_IF),pci)
 	#Flag to enable memdump feature
 	CONFIG_WLAN_FEATURE_MEMDUMP := y
 
@@ -130,6 +136,8 @@ ifeq ($(KERNEL_BUILD), 0)
 			CONFIG_WLAN_LRO := n
 		endif
 	endif
+
+endif
 
 	# Flag to enable LFR Subnet Detection
 	CONFIG_LFR_SUBNET_DETECTION := y
@@ -270,6 +278,41 @@ UAPI_INC :=	-I$(WLAN_ROOT)/$(UAPI_DIR)/linux
 ############ COMMON ############
 COMMON_DIR :=	core/common
 COMMON_INC :=	-I$(WLAN_ROOT)/$(COMMON_DIR)
+
+ifeq ($(CONFIG_QCA_WIFI_SDIO), 1)
+############ HIF ############
+HIF_DIR := core/hif
+HIF_SDIO_DIR := $(HIF_DIR)/src/sdio
+
+HIF_INC := -I$(WLAN_ROOT)/$(HIF_DIR)/inc \
+	   -I$(WLAN_ROOT)/$(HIF_DIR)/src \
+	   -I$(WLAN_ROOT)/$(HIF_PCIE_DIR)
+
+HIF_OBJS := $(HIF_DIR)/src/ath_procfs.o
+
+HIF_SDIO_OBJS := $(HIF_SDIO_DIR)/hif_sdio_send.o \
+		 $(HIF_SDIO_DIR)/hif_bmi_reg_access.o \
+		 $(HIF_SDIO_DIR)/hif_diag_reg_access.o \
+		 $(HIF_DIR)/src/hif_main.o \
+		 $(HIF_SDIO_DIR)/hif_sdio_dev.o \
+		 $(HIF_SDIO_DIR)/hif_sdio.o \
+		 $(HIF_SDIO_DIR)/hif_sdio_recv.o \
+		 $(HIF_SDIO_DIR)/regtable_sdio.o \
+		 $(HIF_SDIO_DIR)/if_sdio.o
+
+HIF_SDIO_NATIVE_DIR := $(HIF_SDIO_DIR)/native_sdio
+HIF_SDIO_NATIVE_INC_DIR := $(HIF_SDIO_NATIVE_DIR)/include
+HIF_SDIO_NATIVE_SRC_DIR := $(HIF_SDIO_NATIVE_DIR)/src
+
+HIF_SDIO_NATIVE_OBJS := $(HIF_SDIO_NATIVE_SRC_DIR)/hif.o \
+			$(HIF_SDIO_NATIVE_SRC_DIR)/hif_scatter.o
+
+HIF_INC += -I$(WLAN_ROOT)/$(HIF_SDIO_DIR) \
+	   -I$(WLAN_ROOT)/$(HIF_SDIO_NATIVE_INC_DIR)
+
+HIF_OBJS += $(HIF_SDIO_OBJS) \
+	    $(HIF_SDIO_NATIVE_OBJS)
+endif
 
 ############ HDD ############
 HDD_DIR :=	core/hdd
@@ -654,6 +697,7 @@ TXRX_OBJS := $(TXRX_DIR)/ol_txrx.o \
                 $(TXRX_DIR)/ol_txrx.o \
                 $(TXRX_DIR)/ol_rx_defrag.o \
                 $(TXRX_DIR)/ol_tx_desc.o \
+		$(TXRX_DIR)/ol_tx_classify.o \
                 $(TXRX_DIR)/ol_tx.o \
                 $(TXRX_DIR)/ol_rx_reorder_timeout.o \
                 $(TXRX_DIR)/ol_rx_reorder.o \
@@ -662,7 +706,8 @@ TXRX_OBJS := $(TXRX_DIR)/ol_txrx.o \
                 $(TXRX_DIR)/ol_txrx_peer_find.o \
                 $(TXRX_DIR)/ol_txrx_event.o \
                 $(TXRX_DIR)/ol_txrx_encap.o \
-                $(TXRX_DIR)/ol_tx_send.o
+                $(TXRX_DIR)/ol_tx_send.o \
+		$(TXRX_DIR)/ol_tx_sched.o
 
 ifeq ($(CONFIG_WLAN_TX_FLOW_CONTROL_V2), y)
 TXRX_OBJS +=     $(TXRX_DIR)/ol_txrx_flow_control.o
@@ -701,6 +746,7 @@ HTC_OBJS := $(HTC_DIR)/htc.o \
             $(HTC_DIR)/htc_services.o
 
 ########### HIF ###########
+ifneq ($(CONFIG_QCA_WIFI_SDIO), 1)
 HIF_DIR := core/hif
 HIF_CE_DIR := $(HIF_DIR)/src/ce
 HIF_CNSS_STUB_DIR := $(HIF_DIR)/src/icnss_stub
@@ -712,9 +758,9 @@ HIF_SNOC_DIR := $(HIF_DIR)/src/snoc
 endif
 
 HIF_INC := -I$(WLAN_ROOT)/$(HIF_DIR)/inc \
-				-I$(WLAN_ROOT)/$(HIF_DIR)/src \
-				-I$(WLAN_ROOT)/$(HIF_CE_DIR) \
-				-I$(WLAN_ROOT)/$(HIF_CNSS_STUB_DIR)
+	   -I$(WLAN_ROOT)/$(HIF_DIR)/src \
+	   -I$(WLAN_ROOT)/$(HIF_CE_DIR) \
+	   -I$(WLAN_ROOT)/$(HIF_CNSS_STUB_DIR)
 
 ifeq ($(CONFIG_HIF_PCI), 1)
 HIF_INC += -I$(WLAN_ROOT)/$(HIF_PCIE_DIR)
@@ -749,7 +795,7 @@ HIF_SNOC_OBJS := $(HIF_SNOC_DIR)/if_snoc.o
 
 HIF_OBJS += $(HIF_SNOC_OBJS)
 endif
-
+endif
 ############ WMA ############
 WMA_DIR :=	core/wma
 
@@ -1080,6 +1126,26 @@ endif
 ifeq ($(CONFIG_HIF_PCI), 1)
 CDEFINES += -DHIF_PCI
 endif
+
+ifeq ($(CONFIG_QCA_WIFI_SDIO), 1)
+CDEFINES +=     -DCONFIG_HL_SUPPORT \
+		-DCONFIG_AR6320_SUPPORT \
+		-DSDIO_3_0 \
+		-DHIF_SDIO \
+		-DCONFIG_DISABLE_CDC_MAX_PERF_WAR=0 \
+		-DCONFIG_ATH_PROCFS_DIAG_SUPPORT \
+		-DFEATURE_HL_GROUP_CREDIT_FLOW_CONTROL \
+		-DHIF_MBOX_SLEEP_WAR \
+		-DDEBUG_HL_LOGGING \
+		-DQCA_BAD_PEER_TX_FLOW_CL \
+		-DCONFIG_TX_DESC_HI_PRIO_RESERVE \
+		-DCONFIG_PER_VDEV_TX_DESC_POOL
+endif
+
+ifeq ($(CONFIG_QCA_WIFI_SDIO), 1)
+CDEFINES += -DFEATURE_WLAN_FORCE_SAP_SCC
+endif
+
 
 #Enable USB specific APIS
 ifeq ($(CONFIG_HIF_USB), 1)
