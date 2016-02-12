@@ -88,9 +88,9 @@
 #endif
 #include "cds_regdomain.h"
 
-#include "wlan_hdd_ocb.h"
 #endif /* FEATURE_WLAN_CH_AVOID */
 
+#include "wlan_hdd_ocb.h"
 #include "wlan_hdd_nan.h"
 #include "wlan_hdd_debugfs.h"
 #include "wlan_hdd_driver_ops.h"
