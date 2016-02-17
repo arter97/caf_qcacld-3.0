@@ -374,9 +374,17 @@ void hif_nointrs(struct ol_softc *scn)
  * hif_enable_power_management(): enable power management
  * @hif_ctx: hif context
  *
- * Dummy place holder implementation for SNOC
  */
 void hif_enable_power_management(void *hif_ctx)
 {
 }
 
+/**
+ * hif_disable_power_management(): disable power management
+ * @hif_ctx: hif context
+ *
+ * Dummy place holder implementation for SNOC
+ */
+void hif_disable_power_management(void *hif_ctx)
+{
+}
