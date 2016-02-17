@@ -369,3 +369,14 @@ void hif_nointrs(struct ol_softc *scn)
 		scn->request_irq_done = false;
 	}
 }
+
+/**
+ * hif_enable_power_management(): enable power management
+ * @hif_ctx: hif context
+ *
+ * Dummy place holder implementation for SNOC
+ */
+void hif_enable_power_management(void *hif_ctx)
+{
+}
+
