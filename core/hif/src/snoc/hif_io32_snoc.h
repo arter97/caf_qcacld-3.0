@@ -125,12 +125,6 @@ static inline uint32_t hif_read32_mb(void __iomem *addr)
 #define A_TARGET_WRITE(scn, offset, value) \
 	hif_write32_mb((scn->mem + offset), (value))
 
-#define ADRASTEA_CE_INTR_ENABLES 0x002F00A8
-#define ADRASTEA_CE_INTR_ENABLES_SET "COMING IN REGISTER SET36"
-#define ADRASTEA_CE_INTR_ENABLES_CLEAR "COMING IN REGISTER SET36"
-
-#define ADRASTEA_CE_INTR_STATUS 0x002F00AC
-
 static inline void ce_enable_irq_in_individual_register(struct ol_softc *scn,
 		int ce_id)
 {
@@ -149,62 +143,6 @@ static inline void ce_disable_irq_in_individual_register(struct ol_softc *scn,
 	hif_read32_mb(scn->mem + offset);
 }
 
-static inline void ce_read_irq_group_status(struct ol_softc *scn)
-{
-	uint32_t group_status = 0;
-	group_status = hif_read32_mb(scn->mem +
-			ADRASTEA_CE_INTR_STATUS);
-}
-
-static inline void ce_clear_irq_group_status(struct ol_softc *scn, int mask)
-{
-	uint32_t group_status = 0;
-	group_status = hif_read32_mb(scn->mem +
-			ADRASTEA_CE_INTR_STATUS);
-
-	hif_write32_mb(scn->mem +
-			ADRASTEA_CE_INTR_STATUS, mask);
-
-	group_status = hif_read32_mb(scn->mem +
-			ADRASTEA_CE_INTR_STATUS);
-}
-
-/* this will need to be changed when we move to reg set 36
- * because we will have set & clear registers provided
- */
-static inline void ce_enable_irq_in_group_reg(struct ol_softc *scn,
-		int mask)
-{
-	int new_mask = 0;
-	new_mask = hif_read32_mb(scn->mem +
-			ADRASTEA_CE_INTR_ENABLES);
-
-	new_mask |= mask;
-
-	hif_write32_mb(scn->mem +
-			ADRASTEA_CE_INTR_ENABLES, new_mask);
-	mask = hif_read32_mb(scn->mem +
-			ADRASTEA_CE_INTR_ENABLES);
-}
-
-/* this will need to be changed when we move to reg set 36
- * because we will have set & clear registers provided
- */
-static inline void ce_disable_irq_in_group_reg(struct ol_softc *scn,
-		int mask)
-{
-	int new_mask = 0;
-	new_mask = hif_read32_mb(scn->mem +
-			ADRASTEA_CE_INTR_ENABLES);
-
-	new_mask &= ~mask;
-
-	hif_write32_mb(scn->mem +
-			ADRASTEA_CE_INTR_ENABLES, new_mask);
-	mask = hif_read32_mb(scn->mem +
-			ADRASTEA_CE_INTR_ENABLES);
-}
-
 /**
  * ce_irq_enable() - enable copy engine IRQ
  * @scn: struct ol_softc
@@ -215,9 +153,7 @@ static inline void ce_disable_irq_in_group_reg(struct ol_softc *scn,
 static inline void ce_irq_enable(struct ol_softc *scn,
 		int ce_id)
 {
-	icnss_enable_irq(ce_id);
 	ce_enable_irq_in_individual_register(scn, ce_id);
-	ce_enable_irq_in_group_reg(scn, 1<<ce_id);
 }
 
 /**
@@ -229,8 +165,6 @@ static inline void ce_irq_enable(struct ol_softc *scn,
  */
 static inline void ce_irq_disable(struct ol_softc *scn, int ce_id)
 {
-	ce_disable_irq_in_group_reg(scn, 1<<ce_id);
-	ce_clear_irq_group_status(scn, 1<<ce_id);
 	ce_disable_irq_in_individual_register(scn, ce_id);
 }
 #endif
