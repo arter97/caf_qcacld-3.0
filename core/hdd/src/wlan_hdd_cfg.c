@@ -2009,7 +2009,6 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     CFG_MC_ADDR_LIST_ENABLE_MIN,
 		     CFG_MC_ADDR_LIST_ENABLE_MAX),
 
-#ifdef WLAN_FEATURE_11AC
 	REG_VARIABLE(CFG_VHT_CHANNEL_WIDTH, WLAN_PARAM_Integer,
 		     struct hdd_config, vhtChannelWidth,
 		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK,
@@ -2072,7 +2071,6 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     CFG_VHT_ENABLE_GID_FEATURE_DEFAULT,
 		     CFG_VHT_ENABLE_GID_FEATURE_MIN,
 		     CFG_VHT_ENABLE_GID_FEATURE_MAX),
-#endif
 
 	REG_VARIABLE(CFG_VHT_ENABLE_1x1_TX_CHAINMASK, WLAN_PARAM_Integer,
 		     struct hdd_config, txchainmask1x1,
@@ -2462,14 +2460,12 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     CFG_SAP_ALLOW_ALL_CHANNEL_PARAM_MIN,
 		     CFG_SAP_ALLOW_ALL_CHANNEL_PARAM_MAX),
 
-#ifdef WLAN_FEATURE_11AC
 	REG_VARIABLE(CFG_DISABLE_LDPC_WITH_TXBF_AP, WLAN_PARAM_Integer,
 		     struct hdd_config, disableLDPCWithTxbfAP,
 		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
 		     CFG_DISABLE_LDPC_WITH_TXBF_AP_DEFAULT,
 		     CFG_DISABLE_LDPC_WITH_TXBF_AP_MIN,
 		     CFG_DISABLE_LDPC_WITH_TXBF_AP_MAX),
-#endif
 
 	REG_DYNAMIC_VARIABLE(CFG_ENABLE_SSR, WLAN_PARAM_Integer,
 			     struct hdd_config, enableSSR,
@@ -2487,16 +2483,12 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     CFG_MAX_MEDIUM_TIME_STAMIN,
 		     CFG_MAX_MEDIUM_TIME_STAMAX),
 
-
-
-#ifdef WLAN_FEATURE_11AC
 	REG_VARIABLE(CFG_ENABLE_VHT_FOR_24GHZ_NAME, WLAN_PARAM_Integer,
 		     struct hdd_config, enableVhtFor24GHzBand,
 		     VAR_FLAGS_OPTIONAL,
 		     CFG_ENABLE_VHT_FOR_24GHZ_DEFAULT,
 		     CFG_ENABLE_VHT_FOR_24GHZ_MIN,
 		     CFG_ENABLE_VHT_FOR_24GHZ_MAX),
-#endif
 
 	REG_DYNAMIC_VARIABLE(CFG_ENABLE_FAST_ROAM_IN_CONCURRENCY,
 			     WLAN_PARAM_Integer,
@@ -2644,7 +2636,6 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     CFG_IPA_LOW_BANDWIDTH_MBPS_MAX),
 #endif
 
-#ifdef WLAN_FEATURE_11AC
 	REG_VARIABLE(CFG_VHT_AMPDU_LEN_EXPONENT_NAME, WLAN_PARAM_Integer,
 		     struct hdd_config, fVhtAmpduLenExponent,
 		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK,
@@ -2658,7 +2649,6 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     CFG_VHT_MPDU_LEN_DEFAULT,
 		     CFG_VHT_MPDU_LEN_MIN,
 		     CFG_VHT_MPDU_LEN_MAX),
-#endif
 
 	REG_VARIABLE(CFG_MAX_WOW_FILTERS_NAME, WLAN_PARAM_Integer,
 		     struct hdd_config, maxWoWFilters,
@@ -4945,11 +4935,9 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
 	CDF_TRACE(CDF_MODULE_ID_HDD, CDF_TRACE_LEVEL_INFO_HIGH,
 		  "Name = [thermalMitigationEnable] Value = [%u] ",
 		  pHddCtx->config->thermalMitigationEnable);
-#ifdef WLAN_FEATURE_11AC
 	CDF_TRACE(CDF_MODULE_ID_HDD, CDF_TRACE_LEVEL_INFO_HIGH,
 		  "Name = [gVhtChannelWidth] value = [%u]",
 		  pHddCtx->config->vhtChannelWidth);
-#endif
 	CDF_TRACE(CDF_MODULE_ID_HDD, CDF_TRACE_LEVEL_INFO_HIGH,
 		  "Name = [enableFirstScan2GOnly] Value = [%u] ",
 		  pHddCtx->config->enableFirstScan2GOnly);
@@ -5525,17 +5513,10 @@ eCsrPhyMode hdd_cfg_xlate_to_csr_phy_mode(eHddDot11Mode dot11Mode)
 		return eCSR_DOT11_MODE_11n_ONLY;
 	case (eHDD_DOT11_MODE_11b_ONLY):
 		return eCSR_DOT11_MODE_11b_ONLY;
-#ifdef WLAN_FEATURE_11AC
 	case (eHDD_DOT11_MODE_11ac_ONLY):
 		return eCSR_DOT11_MODE_11ac_ONLY;
 	case (eHDD_DOT11_MODE_11ac):
 		return eCSR_DOT11_MODE_11ac;
-#else
-	/* If 11AC support is not compiled set Auto mode */
-	case (eHDD_DOT11_MODE_11ac):
-	case (eHDD_DOT11_MODE_11ac_ONLY):
-		return eCSR_DOT11_MODE_AUTO;
-#endif
 	case (eHDD_DOT11_MODE_AUTO):
 		return eCSR_DOT11_MODE_AUTO;
 	case (eHDD_DOT11_MODE_11a):
@@ -6525,7 +6506,6 @@ CDF_STATUS hdd_set_sme_config(hdd_context_t *pHddCtx)
 	/* Remaining config params not obtained from registry
 	 * On RF EVB beacon using channel 1.
 	 */
-#ifdef WLAN_FEATURE_11AC
 	smeConfig->csrConfig.nVhtChannelWidth = pConfig->vhtChannelWidth;
 	smeConfig->csrConfig.enableTxBF = pConfig->enableTxBF;
 	smeConfig->csrConfig.enable_txbf_sap_mode =
@@ -6536,7 +6516,6 @@ CDF_STATUS hdd_set_sme_config(hdd_context_t *pHddCtx)
 	smeConfig->csrConfig.enableMuBformee = pConfig->enableMuBformee;
 	smeConfig->csrConfig.enableVhtpAid = pConfig->enableVhtpAid;
 	smeConfig->csrConfig.enableVhtGid = pConfig->enableVhtGid;
-#endif
 	smeConfig->csrConfig.enableAmpduPs = pConfig->enableAmpduPs;
 	smeConfig->csrConfig.enableHtSmps = pConfig->enableHtSmps;
 	smeConfig->csrConfig.htSmps = pConfig->htSmps;

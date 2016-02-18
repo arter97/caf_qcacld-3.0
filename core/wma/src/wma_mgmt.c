@@ -1000,7 +1000,6 @@ int32_t wmi_unified_send_peer_assoc(tp_wma_handle wma,
 		}
 	}
 
-#ifdef WLAN_FEATURE_11AC
 	if (params->vhtCapable) {
 		cmd->peer_flags |= (WMI_PEER_HT | WMI_PEER_VHT | WMI_PEER_QOS);
 		cmd->peer_rate_caps |= WMI_RC_HT_FLAG;
@@ -1014,7 +1013,6 @@ int32_t wmi_unified_send_peer_assoc(tp_wma_handle wma,
 		cmd->peer_flags |= WMI_PEER_160MHZ;
 
 	cmd->peer_vht_caps = params->vht_caps;
-#endif /* WLAN_FEATURE_11AC */
 
 	if (params->rmfEnabled)
 		cmd->peer_flags |= WMI_PEER_PMF;
@@ -2767,7 +2765,6 @@ void wma_process_update_rx_nss(tp_wma_handle wma_handle,
 			   update_rx_nss->smesessionId);
 }
 
-#ifdef WLAN_FEATURE_11AC
 /**
  * wma_process_update_membership() - process update group membership cmd
  * @wma_handle: wma handle
@@ -2807,7 +2804,6 @@ void wma_process_update_userpos(tp_wma_handle wma_handle,
 	wma_set_ppsconfig(userpos->smesessionId, WMA_VHT_PPS_GID_MATCH, 1);
 
 }
-#endif /* WLAN_FEATURE_11AC */
 
 /**
  * wma_set_htconfig() - set ht config parameters to target
