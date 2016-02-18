@@ -2530,7 +2530,7 @@ CDF_STATUS cds_soc_set_hw_mode(uint32_t session_id,
 		enum hw_mode_bandwidth mac1_bw,
 		enum hw_mode_dbs_capab dbs,
 		enum hw_mode_agile_dfs_capab dfs,
-		enum cds_conn_update_reason reason)
+		enum sir_conn_update_reason reason)
 {
 	int8_t hw_mode_index;
 	struct sir_hw_mode msg;
@@ -2555,8 +2555,8 @@ CDF_STATUS cds_soc_set_hw_mode(uint32_t session_id,
 	msg.reason = reason;
 	msg.session_id = session_id;
 
-	cds_info("set hw mode to sme: hw_mode_index: %d",
-		msg.hw_mode_index);
+	cds_info("set hw mode to sme: hw_mode_index: %d session:%d reason:%d",
+		msg.hw_mode_index, msg.session_id, msg.reason);
 
 	status = sme_soc_set_hw_mode(hdd_ctx->hHal, msg);
 	if (status != CDF_STATUS_SUCCESS) {
@@ -3818,7 +3818,7 @@ void cds_dbs_opportunistic_timer_handler(void *data)
 		 * So, session id 0 is ok here.
 		 */
 		cds_next_actions(0, action,
-				CDS_UPDATE_REASON_OPPORTUNISTIC);
+				SIR_UPDATE_REASON_OPPORTUNISTIC);
 	}
 	cdf_mutex_release(&cds_ctx->cdf_conc_list_lock);
 
@@ -5556,7 +5556,7 @@ enum cds_two_connection_mode cds_get_third_connection_pcl_table_index(void)
  */
 CDF_STATUS cds_current_connections_update(uint32_t session_id,
 				uint8_t channel,
-				enum cds_conn_update_reason reason)
+				enum sir_conn_update_reason reason)
 {
 	enum cds_conc_next_action next_action = CDS_NOP;
 	uint32_t num_connections = 0;
@@ -5710,6 +5710,7 @@ bool cds_wait_for_nss_update(uint8_t action)
  * @vdev_id: vdev id for the specific connection
  * @next_action: next action to happen at policy mgr after
  *		beacon update
+ * @reason: Reason for nss update
  *
  * This function is the callback registered with SME at nss
  * update request time
@@ -5717,7 +5718,8 @@ bool cds_wait_for_nss_update(uint8_t action)
  * Return: None
  */
 void cds_nss_update_cb(void *context, uint8_t tx_status, uint8_t vdev_id,
-				uint8_t next_action)
+				uint8_t next_action,
+				enum sir_conn_update_reason reason)
 {
 	cds_context_type *cds_ctx;
 	uint32_t conn_index = 0;
@@ -5759,10 +5761,13 @@ void cds_nss_update_cb(void *context, uint8_t tx_status, uint8_t vdev_id,
 		cds_err("unexpected action %d", next_action);
 		break;
 	}
+
+	cds_debug("vdev:%d wait:%d", vdev_id, wait);
+
 	if (!wait)
 		cds_next_actions(vdev_id,
 				next_action,
-				CDS_UPDATE_REASON_NSS_UPDATE);
+				reason);
 	cdf_mutex_release(&cds_ctx->cdf_conc_list_lock);
 	return;
 }
@@ -5784,7 +5789,7 @@ void cds_nss_update_cb(void *context, uint8_t tx_status, uint8_t vdev_id,
  * Return: CDF_STATUS enum
  */
 CDF_STATUS cds_complete_action(uint8_t  new_nss, uint8_t next_action,
-				enum cds_conn_update_reason reason,
+				enum sir_conn_update_reason reason,
 				uint32_t session_id)
 {
 	CDF_STATUS status = CDF_STATUS_E_FAILURE;
@@ -5825,7 +5830,7 @@ CDF_STATUS cds_complete_action(uint8_t  new_nss, uint8_t next_action,
 					conc_connection_list
 					[list[index]].vdev_id, new_nss,
 					cds_nss_update_cb,
-					next_action, hdd_ctx);
+					next_action, hdd_ctx, reason);
 			if (!CDF_IS_STATUS_SUCCESS(status)) {
 				cds_err("sme_nss_update_request() failed for vdev %d",
 				conc_connection_list[list[index]].vdev_id);
@@ -5843,7 +5848,7 @@ CDF_STATUS cds_complete_action(uint8_t  new_nss, uint8_t next_action,
 					conc_connection_list
 					[list[index]].vdev_id, new_nss,
 					cds_nss_update_cb,
-					next_action, hdd_ctx);
+					next_action, hdd_ctx, reason);
 			if (!CDF_IS_STATUS_SUCCESS(status)) {
 				cds_err("sme_nss_update_request() failed for vdev %d",
 				conc_connection_list[list[index]].vdev_id);
@@ -5874,7 +5879,7 @@ CDF_STATUS cds_complete_action(uint8_t  new_nss, uint8_t next_action,
  */
 CDF_STATUS cds_next_actions(uint32_t session_id,
 				enum cds_conc_next_action action,
-				enum cds_conn_update_reason reason)
+				enum sir_conn_update_reason reason)
 {
 	CDF_STATUS status = CDF_STATUS_E_FAILURE;
 	struct sir_hw_mode_params hw_mode;
@@ -6606,7 +6611,7 @@ CDF_STATUS cds_handle_conc_multiport(uint8_t session_id, uint8_t channel)
 
 	status = cds_current_connections_update(session_id,
 			channel,
-			CDS_UPDATE_REASON_NORMAL_STA);
+			SIR_UPDATE_REASON_NORMAL_STA);
 	if (CDF_STATUS_E_FAILURE == status) {
 		cds_err("connections update failed");
 		return status;
@@ -8074,7 +8079,7 @@ CDF_STATUS cds_handle_hw_mode_change_on_csa(uint16_t session_id,
 	 *     2. Do vdev restart on the new channel (on getting hw mode resp)
 	 */
 	status = cds_next_actions(session_id, action,
-				CDS_UPDATE_REASON_CHANNEL_SWITCH_STA);
+				SIR_UPDATE_REASON_CHANNEL_SWITCH_STA);
 	if (!CDF_IS_STATUS_SUCCESS(status)) {
 		cds_err("no set hw mode command was issued");
 		/* Proceed with processing csa params. So, not freeing it */

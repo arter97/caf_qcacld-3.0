@@ -569,7 +569,7 @@ static CDF_STATUS wlansap_set_hw_mode_on_channel_switch(tpAniSirGlobal mac_ctx,
 	 * 2. Do vdev restart on the new channel
 	 */
 	status = cds_next_actions(sap_ctx->sessionId, action,
-				CDS_UPDATE_REASON_CHANNEL_SWITCH);
+				SIR_UPDATE_REASON_CHANNEL_SWITCH);
 	if (!CDF_IS_STATUS_SUCCESS(status)) {
 		CDF_TRACE(CDF_MODULE_ID_SAP, CDF_TRACE_LEVEL_ERROR,
 			FL("no set hw mode command was issued"));
