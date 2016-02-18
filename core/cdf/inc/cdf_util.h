@@ -115,6 +115,15 @@ CDF_INLINE_FN int cdf_status_to_os_return(CDF_STATUS status)
 #define CDF_IS_PWR2(value) (((value) ^ ((value)-1)) == ((value) << 1) - 1)
 
 /**
+ * cdf_roundup() - roundup the input value
+ * @x: value to roundup
+ * @y: input value rounded to multiple of this
+ *
+ * Return: rounded value
+ */
+#define cdf_roundup(x, y) __cdf_roundup(x, y)
+
+/**
  * cdf_is_macaddr_equal() - compare two CDF MacAddress
  * @pMacAddr1: Pointer to one cdf MacAddress to compare
  * @pMacAddr2: Pointer to the other cdf MacAddress to compare
@@ -351,5 +360,4 @@ CDF_INLINE_FN int cdf_get_pwr2(int value)
 	}
 	return 1 << log2;
 }
-
 #endif /*_CDF_UTIL_H*/

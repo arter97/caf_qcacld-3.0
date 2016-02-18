@@ -106,5 +106,6 @@ static inline int __cdf_status_to_os_return(CDF_STATUS status)
 #define __cdf_le16_to_cpu                le16_to_cpu
 #define __cdf_le32_to_cpu                le32_to_cpu
 #define __cdf_container_of(ptr, type, member) container_of(ptr, type, member)
+#define __cdf_roundup(x, y) roundup(x, y)
 
 #endif /*_I_CDF_UTIL_H*/
