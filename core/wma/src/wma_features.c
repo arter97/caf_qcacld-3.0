@@ -2586,7 +2586,7 @@ CDF_STATUS wma_pktlog_wmi_send_cmd(WMA_HANDLE handle,
 			       WMITLV_TAG_STRUC_wmi_pdev_pktlog_disable_cmd_fixed_param,
 			       WMITLV_GET_STRUCT_TLVLEN
 				       (wmi_pdev_pktlog_disable_cmd_fixed_param));
-		disable_cmd->reserved0 = 0;
+		disable_cmd->pdev_id = 0;
 		if (wmi_unified_cmd_send(wma_handle->wmi_handle, buf, len,
 					 WMI_PDEV_PKTLOG_DISABLE_CMDID)) {
 			WMA_LOGE("failed to send pktlog disable cmdid");
