@@ -15129,7 +15129,9 @@ bool sme_is_session_id_valid(tHalHandle hal, uint32_t session_id)
 {
 	tpAniSirGlobal mac = PMAC_STRUCT(hal);
 	if (!mac) {
-		sms_log(mac, LOGE, FL("null mac pointer"));
+		/* Using CDF_TRACE since mac is not available for sms_log */
+		CDF_TRACE(CDF_MODULE_ID_SME, CDF_TRACE_LEVEL_ERROR,
+			"%s: null mac pointer", __func__);
 		return false;
 	}
 
