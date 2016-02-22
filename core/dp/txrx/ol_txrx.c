@@ -2935,15 +2935,23 @@ void ol_txrx_clear_stats(uint16_t value)
  *
  * Return: None
  */
-static void ol_rx_data_cb(struct ol_txrx_peer_t *peer,
-			  cdf_nbuf_t buf_list)
+static void ol_rx_data_cb(struct ol_txrx_pdev_t *pdev,
+			  cdf_nbuf_t buf_list, uint16_t staid)
 {
 	void *cds_ctx = cds_get_global_context();
 	cdf_nbuf_t buf, next_buf;
 	CDF_STATUS ret;
 	ol_rx_callback_fp data_rx = NULL;
+	struct ol_txrx_peer_t *peer;
 
-	if (cdf_unlikely(!cds_ctx))
+	if (cdf_unlikely(!cds_ctx) || cdf_unlikely(!pdev))
+		goto free_buf;
+
+	/* Do not use peer directly. Derive peer from staid to
+	 * make sure that peer is valid.
+	 */
+	peer = ol_txrx_peer_find_by_local_id(pdev, staid);
+	if (!peer)
 		goto free_buf;
 
 	cdf_spin_lock_bh(&peer->peer_info_lock);
@@ -3045,7 +3053,7 @@ void ol_rx_data_process(struct ol_txrx_peer_t *peer,
 		 * better use multicores.
 		 */
 		if (!ol_cfg_is_rx_thread_enabled(pdev->ctrl_pdev)) {
-			ol_rx_data_cb(peer, rx_buf_list);
+			ol_rx_data_cb(pdev, rx_buf_list, peer->local_id);
 		} else {
 			p_cds_sched_context sched_ctx =
 				get_cds_sched_ctxt();
@@ -3062,13 +3070,13 @@ void ol_rx_data_process(struct ol_txrx_peer_t *peer,
 			}
 			pkt->callback = (cds_ol_rx_thread_cb)
 					ol_rx_data_cb;
-			pkt->context = (void *)peer;
+			pkt->context = (void *)pdev;
 			pkt->Rxpkt = (void *)rx_buf_list;
 			pkt->staId = peer->local_id;
 			cds_indicate_rxpkt(sched_ctx, pkt);
 		}
 #else                           /* QCA_CONFIG_SMP */
-		ol_rx_data_cb(peer, rx_buf_list, 0);
+		ol_rx_data_cb(pdev, rx_buf_list, peer->local_id);
 #endif /* QCA_CONFIG_SMP */
 	}
 
