@@ -179,20 +179,29 @@ struct htt_tx_credit_t {
 };
 
 #if defined(HELIUMPLUS_PADDR64)
+/**
+ * msdu_ext_frag_desc:
+ * semantically, this is an array of 6 of 2-tuples of
+ * a 48-bit physical address and a 16 bit len field
+ * with the following layout:
+ * 31               16       8       0
+ * |        p t r - l o w 3 2         |
+ * | len             | ptr-high5+pad  |
+ */
+struct msdu_ext_frag_desc {
+	union {
+		uint64_t desc64;
+		struct {
+			uint32_t ptr_low;
+			uint32_t ptr_hi:16,
+				len:16;
+		} frag32;
+	} u;
+};
+#define MSDU_EXT_DESC_FRAGS 6
 struct msdu_ext_desc_t {
 	struct cdf_tso_flags_t tso_flags;
-	u_int32_t frag_ptr0;
-	u_int32_t frag_len0;
-	u_int32_t frag_ptr1;
-	u_int32_t frag_len1;
-	u_int32_t frag_ptr2;
-	u_int32_t frag_len2;
-	u_int32_t frag_ptr3;
-	u_int32_t frag_len3;
-	u_int32_t frag_ptr4;
-	u_int32_t frag_len4;
-	u_int32_t frag_ptr5;
-	u_int32_t frag_len5;
+	struct msdu_ext_frag_desc frags[MSDU_EXT_DESC_FRAGS];
 };
 #endif  /* defined(HELIUMPLUS_PADDR64) */
 

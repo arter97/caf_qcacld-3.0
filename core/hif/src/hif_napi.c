@@ -76,11 +76,11 @@ int hif_napi_create(struct ol_softc   *hif,
 	struct qca_napi_data *napid;
 	struct qca_napi_info *napii;
 
-	NAPI_DEBUG("-->(pipe=%d, budget=%d, scale=%d)\n",
+	NAPI_DEBUG("-->(pipe=%d, budget=%d, scale=%d)",
 		   pipe_id, budget, scale);
-	NAPI_DEBUG("hif->napi_data.state = 0x%08x\n",
+	NAPI_DEBUG("hif->napi_data.state = 0x%08x",
 		   hif->napi_data.state);
-	NAPI_DEBUG("hif->napi_data.ce_map = 0x%08x\n",
+	NAPI_DEBUG("hif->napi_data.ce_map = 0x%08x",
 		   hif->napi_data.ce_map);
 
 	napid = &(hif->napi_data);
@@ -91,36 +91,36 @@ int hif_napi_create(struct ol_softc   *hif,
 		init_dummy_netdev(&(napid->netdev));
 
 		napid->state |= HIF_NAPI_INITED;
-		HIF_INFO("%s: NAPI structures initialized\n", __func__);
+		HIF_INFO("%s: NAPI structures initialized", __func__);
 
-		NAPI_DEBUG("NAPI structures initialized\n");
+		NAPI_DEBUG("NAPI structures initialized");
 	}
 	napii = &(napid->napis[pipe_id]);
 	memset(napii, 0, sizeof(struct qca_napi_info));
 	napii->scale = scale;
 	napii->id    = NAPI_PIPE2ID(pipe_id);
 
-	NAPI_DEBUG("adding napi=%p to netdev=%p (poll=%p, bdgt=%d)\n",
+	NAPI_DEBUG("adding napi=%p to netdev=%p (poll=%p, bdgt=%d)",
 		   &(napii->napi), &(napid->netdev), poll, budget);
 	netif_napi_add(&(napid->netdev), &(napii->napi), poll, budget);
 
-	NAPI_DEBUG("after napi_add\n");
-	NAPI_DEBUG("napi=0x%p, netdev=0x%p\n",
+	NAPI_DEBUG("after napi_add");
+	NAPI_DEBUG("napi=0x%p, netdev=0x%p",
 		   &(napii->napi), &(napid->netdev));
-	NAPI_DEBUG("napi.dev_list.prev=0x%p, next=0x%p\n",
+	NAPI_DEBUG("napi.dev_list.prev=0x%p, next=0x%p",
 		   napii->napi.dev_list.prev, napii->napi.dev_list.next);
-	NAPI_DEBUG("dev.napi_list.prev=0x%p, next=0x%p\n",
+	NAPI_DEBUG("dev.napi_list.prev=0x%p, next=0x%p",
 		   napid->netdev.napi_list.prev, napid->netdev.napi_list.next);
 
 	/* It is OK to change the state variable below without protection
 	 * as there should be no-one around yet
 	 */
 	napid->ce_map |= (0x01 << pipe_id);
-	HIF_INFO("%s: NAPI id %d created for pipe %d\n", __func__,
+	HIF_INFO("%s: NAPI id %d created for pipe %d", __func__,
 		 napii->id, pipe_id);
 
-	NAPI_DEBUG("NAPI id %d created for pipe %d\n", napii->id, pipe_id);
-	NAPI_DEBUG("<--napi_id=%d]\n", napii->id);
+	NAPI_DEBUG("NAPI id %d created for pipe %d", napii->id, pipe_id);
+	NAPI_DEBUG("<--napi_id=%d]", napii->id);
 	return napii->id;
 }
 
@@ -150,7 +150,7 @@ int hif_napi_destroy(struct ol_softc *hif,
 	uint8_t ce = NAPI_ID2PIPE(id);
 	int rc = 0;
 
-	NAPI_DEBUG("-->(id=%d, force=%d)\n", id, force);
+	NAPI_DEBUG("-->(id=%d, force=%d)", id, force);
 
 	if (0 == (hif->napi_data.state & HIF_NAPI_INITED)) {
 		HIF_ERROR("%s: NAPI not initialized or entry %d not created\n",
@@ -172,7 +172,7 @@ int hif_napi_destroy(struct ol_softc *hif,
 				napi_disable(&(napii->napi));
 				HIF_INFO("%s: NAPI entry %d force disabled\n",
 					 __func__, id);
-				NAPI_DEBUG("NAPI %d force disabled\n", id);
+				NAPI_DEBUG("NAPI %d force disabled", id);
 			} else {
 				HIF_ERROR("%s: Cannot destroy active NAPI %d\n",
 					  __func__, id);
@@ -180,11 +180,11 @@ int hif_napi_destroy(struct ol_softc *hif,
 			}
 		}
 		if (0 == rc) {
-			NAPI_DEBUG("before napi_del\n");
-			NAPI_DEBUG("napi.dlist.prv=0x%p, next=0x%p\n",
+			NAPI_DEBUG("before napi_del");
+			NAPI_DEBUG("napi.dlist.prv=0x%p, next=0x%p",
 				  napii->napi.dev_list.prev,
 				  napii->napi.dev_list.next);
-			NAPI_DEBUG("dev.napi_l.prv=0x%p, next=0x%p\n",
+			NAPI_DEBUG("dev.napi_l.prv=0x%p, next=0x%p",
 				   napid->netdev.napi_list.prev,
 				   napid->netdev.napi_list.next);
 
@@ -253,7 +253,7 @@ int hif_napi_event(struct ol_softc *hif, enum qca_napi_event event, void *data)
 	int      i;
 	struct napi_struct *napi;
 
-	NAPI_DEBUG("-->(event=%d, aux=%p)\n", event, data);
+	NAPI_DEBUG("-->(event=%d, aux=%p)", event, data);
 
 	mutex_lock(&(hif->napi_data.mutex));
 	prev_state = hif->napi_data.state;
@@ -303,7 +303,7 @@ int hif_napi_event(struct ol_softc *hif, enum qca_napi_event event, void *data)
 			for (i = 0; i < CE_COUNT_MAX; i++)
 				if ((hif->napi_data.ce_map & (0x01 << i))) {
 					napi = &(hif->napi_data.napis[i].napi);
-					NAPI_DEBUG("enabling NAPI %d\n", i);
+					NAPI_DEBUG("enabling NAPI %d", i);
 					napi_enable(napi);
 				}
 		} else {
@@ -311,7 +311,7 @@ int hif_napi_event(struct ol_softc *hif, enum qca_napi_event event, void *data)
 			for (i = 0; i < CE_COUNT_MAX; i++)
 				if (hif->napi_data.ce_map & (0x01 << i)) {
 					napi = &(hif->napi_data.napis[i].napi);
-					NAPI_DEBUG("disabling NAPI %d\n", i);
+					NAPI_DEBUG("disabling NAPI %d", i);
 					napi_disable(napi);
 				}
 		}
@@ -321,7 +321,7 @@ int hif_napi_event(struct ol_softc *hif, enum qca_napi_event event, void *data)
 		rc = (hif->napi_data.state == ENABLE_NAPI_MASK);
 	}
 
-	NAPI_DEBUG("<--[rc=%d]\n", rc);
+	NAPI_DEBUG("<--[rc=%d]", rc);
 	return rc;
 }
 
@@ -370,7 +370,7 @@ int hif_napi_schedule(struct ol_softc *scn, int ce_id)
 	int cpu = smp_processor_id();
 
 	scn->napi_data.napis[ce_id].stats[cpu].napi_schedules++;
-	NAPI_DEBUG("scheduling napi %d (ce:%d)\n",
+	NAPI_DEBUG("scheduling napi %d (ce:%d)",
 		   scn->napi_data.napis[ce_id].id, ce_id);
 	napi_schedule(&(scn->napi_data.napis[ce_id].napi));
 
@@ -407,7 +407,7 @@ int hif_napi_poll(struct napi_struct *napi, int budget)
 	struct qca_napi_info *napi_info;
 	struct CE_state *ce_state;
 
-	NAPI_DEBUG("%s -->(.., budget=%d)\n", budget);
+	NAPI_DEBUG("%s -->(.., budget=%d)", __func__, budget);
 
 	napi_info = (struct qca_napi_info *)
 		container_of(napi, struct qca_napi_info, napi);
@@ -440,7 +440,7 @@ int hif_napi_poll(struct napi_struct *napi, int budget)
 
 	/* if ce_per engine reports 0, then poll should be terminated */
 	if (0 == rc)
-		NAPI_DEBUG("%s:%d: nothing processed by CE. Completing NAPI\n",
+		NAPI_DEBUG("%s:%d: nothing processed by CE. Completing NAPI",
 			   __func__, __LINE__);
 
 	if (rc <= HIF_NAPI_MAX_RECEIVES) {
@@ -454,10 +454,10 @@ int hif_napi_poll(struct napi_struct *napi, int budget)
 			cdf_atomic_dec(&(hif->active_tasklet_cnt));
 		}
 
-		NAPI_DEBUG("%s:%d: napi_complete + enabling the interrupts\n",
+		NAPI_DEBUG("%s:%d: napi_complete + enabling the interrupts",
 			   __func__, __LINE__);
 	}
 
-	NAPI_DEBUG("%s <--[normalized=%d]\n", _func__, normalized);
+	NAPI_DEBUG("%s <--[normalized=%d]", __func__, normalized);
 	return normalized;
 }
