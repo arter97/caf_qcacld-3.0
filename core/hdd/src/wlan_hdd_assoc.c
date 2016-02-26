@@ -1556,6 +1556,9 @@ static CDF_STATUS hdd_roam_set_key_complete_handler(hdd_adapter_t *pAdapter,
 	bool fConnected = false;
 	CDF_STATUS cdf_status = CDF_STATUS_E_FAILURE;
 	hdd_station_ctx_t *pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
+	tHalHandle hal_ctx = WLAN_HDD_GET_HAL_CTX(pAdapter);
+	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal_ctx);
+
 	ENTER();
 
 	if (NULL == pRoamInfo) {
@@ -1603,10 +1606,23 @@ static CDF_STATUS hdd_roam_set_key_complete_handler(hdd_adapter_t *pAdapter,
 			 * At this time we don't handle the state in detail.
 			 * Related CR: 174048 - TL not in authenticated state
 			*/
-			if (eCSR_ROAM_RESULT_AUTHENTICATED == roamResult)
+			if (eCSR_ROAM_RESULT_AUTHENTICATED == roamResult) {
 				pHddStaCtx->conn_info.gtk_installed = true;
-			else
+				/*
+				 * PTK exchange happens in preauthentication
+				 * itself if key_mgmt is FT-PSK, ptk_installed
+				 * was false as there is no set PTK after
+				 * roaming. STA TL state moves to authenticated
+				 * only if ptk_installed is true. So, make
+				 * ptk_installed to true in case of 11R roaming.
+				 */
+				if (csr_neighbor_roam_is11r_assoc(mac_ctx,
+							pAdapter->sessionId))
+					pHddStaCtx->conn_info.ptk_installed =
+						true;
+			} else {
 				pHddStaCtx->conn_info.ptk_installed = true;
+			}
 
 			/* In WPA case move STA to authenticated when
 			 * ptk is installed.Earlier in WEP case STA
