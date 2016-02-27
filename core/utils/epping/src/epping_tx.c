@@ -375,7 +375,7 @@ void epping_tx_complete_multiple(void *ctx, HTC_PACKET_QUEUE *pPacketQueue)
 		pktSkb = cdf_nbuf_queue_remove(&skb_queue);
 		if (pktSkb == NULL)
 			break;
-		cdf_nbuf_free(pktSkb);
+		cdf_nbuf_tx_free(pktSkb, NBUF_PKT_ERROR);
 		pEpping_ctx->total_tx_acks++;
 	}
 
