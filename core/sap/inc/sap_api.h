@@ -621,8 +621,8 @@ typedef struct sSapDfsInfo {
 	 * New channel width and new channel bonding mode
 	 * will only be updated via channel fallback mechanism
 	 */
-	enum ch_width orig_chanWidth;
-	enum ch_width new_chanWidth;
+	enum phy_ch_width orig_chanWidth;
+	enum phy_ch_width new_chanWidth;
 	struct ch_params_s new_ch_params;
 
 	/*
@@ -828,7 +828,7 @@ CDF_STATUS wlansap_disassoc_sta(void *p_cds_gctx,
 CDF_STATUS wlansap_deauth_sta(void *p_cds_gctx,
 			struct tagCsrDelStaParams *pDelStaParams);
 CDF_STATUS wlansap_set_channel_change_with_csa(void *p_cds_gctx,
-			uint32_t targetChannel, enum ch_width target_bw);
+			uint32_t targetChannel, enum phy_ch_width target_bw);
 CDF_STATUS wlansap_set_key_sta(void *p_cds_gctx,
 	tCsrRoamSetKey *pSetKeyInfo);
 CDF_STATUS wlansap_get_assoc_stations(void *p_cds_gctx,
