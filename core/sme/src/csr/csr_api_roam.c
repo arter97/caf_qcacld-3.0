@@ -6356,7 +6356,6 @@ static void csr_roam_process_join_res(tpAniSirGlobal mac_ctx,
 	tSirBssDescription *bss_desc = NULL;
 	tCsrScanResult *scan_res = NULL;
 	sme_qos_csr_event_indType ind_qos;
-	csr_roam_offload_synch_params *roam_offload_params = NULL;
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 	tSirSmeHTProfile *src_profile = NULL;
 	tCsrRoamHTProfile *dst_profile = NULL;
@@ -6368,7 +6367,6 @@ static void csr_roam_process_join_res(tpAniSirGlobal mac_ctx,
 	tSirSmeJoinRsp *join_rsp = (tSirSmeJoinRsp *) context;
 	uint32_t len;
 
-	roam_offload_params = &session->roamOffloadSynchParams;
 	conn_profile = &session->connectedProfile;
 	if (eCsrReassocSuccess == res)
 		ind_qos = SME_QOS_CSR_REASSOC_COMPLETE;
@@ -6497,17 +6495,6 @@ static void csr_roam_process_join_res(tpAniSirGlobal mac_ctx,
 				bss_desc, &bcast_mac, false, false,
 				eSIR_TX_RX, 0, 0, NULL, 0);
 		} else {
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
-			if (session->roam_synch_in_progress
-				&& (roam_offload_params->authStatus
-				== CSR_ROAM_AUTH_STATUS_AUTHENTICATED)) {
-				CDF_TRACE(CDF_MODULE_ID_SME,
-					CDF_TRACE_LEVEL_DEBUG,
-					FL("LFR3:Don't start waitforkey timer"));
-				csr_roam_substate_change(mac_ctx,
-					eCSR_ROAM_SUBSTATE_NONE, session_id);
-			} else {
-#endif
 				/* Need to wait for supplicant authtication */
 				roam_info.fAuthRequired = true;
 				/*
@@ -6551,9 +6538,6 @@ static void csr_roam_process_join_res(tpAniSirGlobal mac_ctx,
 						eCSR_ROAM_SUBSTATE_NONE,
 						session_id);
 				}
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
-			}
-#endif
 		}
 
 		assoc_info.pBssDesc = bss_desc;       /* could be NULL */
@@ -6700,29 +6684,6 @@ static void csr_roam_process_join_res(tpAniSirGlobal mac_ctx,
 				(csr_is_concurrent_session_running(mac_ctx))) {
 				mac_ctx->roam.configParam.doBMPSWorkaround = 1;
 			}
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
-			if (session->roam_synch_in_progress) {
-				roam_info.roamSynchInProgress = 1;
-				roam_info.synchAuthStatus =
-					roam_offload_params->authStatus;
-				cdf_mem_copy(roam_info.kck,
-					roam_offload_params->kck,
-					SIR_KCK_KEY_LEN);
-				cdf_mem_copy(roam_info.kek,
-					roam_offload_params->kek,
-					SIR_KEK_KEY_LEN);
-				cdf_mem_copy(roam_info.replay_ctr,
-					roam_offload_params->replay_ctr,
-					SIR_REPLAY_CTR_LEN);
-				CDF_TRACE(CDF_MODULE_ID_SME,
-					CDF_TRACE_LEVEL_DEBUG,
-					FL
-					("LFR3: Copy KCK, KEK and Replay Ctr"));
-			}
-
-			roam_info.subnet_change_status =
-				CSR_GET_SUBNET_STATUS(roam_offload_params->roamReason);
-#endif
 			csr_roam_call_callback(mac_ctx, session_id, &roam_info,
 				cmd->u.roamCmd.roamId,
 				eCSR_ROAM_ASSOCIATION_COMPLETION,
@@ -16184,6 +16145,74 @@ CDF_STATUS csr_get_statistics(tpAniSirGlobal pMac,
 	return CDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+CDF_STATUS csr_roam_set_key_mgmt_offload(tpAniSirGlobal pMac,
+					 uint32_t sessionId,
+					 bool nRoamKeyMgmtOffloadEnabled)
+{
+	tCsrRoamSession *pSession = CSR_GET_SESSION(pMac, sessionId);
+	if (!pSession) {
+		sms_log(pMac, LOGE, FL("session %d not found"), sessionId);
+		return CDF_STATUS_E_FAILURE;
+	}
+	pSession->RoamKeyMgmtOffloadEnabled = nRoamKeyMgmtOffloadEnabled;
+	return CDF_STATUS_SUCCESS;
+}
+
+/**
+ * csr_update_roam_scan_offload_request() - updates req msg with roam offload
+ * paramters
+ * @pMac:          mac global context
+ * @req_buf:       out param, roam offload scan request packet
+ * @session:       roam session
+ *
+ * Return: void
+ */
+static void
+csr_update_roam_scan_offload_request(tpAniSirGlobal mac_ctx,
+				     tSirRoamOffloadScanReq *req_buf,
+				     tCsrRoamSession *session)
+{
+	cdf_mem_copy(req_buf->PSK_PMK, session->psk_pmk,
+		     sizeof(req_buf->PSK_PMK));
+	req_buf->pmk_len = session->pmk_len;
+	CDF_TRACE(CDF_MODULE_ID_SME, CDF_TRACE_LEVEL_DEBUG,
+		  "LFR3: PMK Length = %d", req_buf->pmk_len);
+	req_buf->R0KH_ID_Length = session->ftSmeContext.r0kh_id_len;
+	cdf_mem_copy(req_buf->R0KH_ID,
+		     session->ftSmeContext.r0kh_id,
+		     req_buf->R0KH_ID_Length);
+	req_buf->Prefer5GHz = mac_ctx->roam.configParam.nRoamPrefer5GHz;
+	req_buf->RoamRssiCatGap = mac_ctx->roam.configParam.bCatRssiOffset;
+	req_buf->Select5GHzMargin = mac_ctx->roam.configParam.nSelect5GHzMargin;
+	if (wlan_cfg_get_int(mac_ctx, WNI_CFG_REASSOCIATION_FAILURE_TIMEOUT,
+			     (uint32_t *) &req_buf->ReassocFailureTimeout)
+	    != eSIR_SUCCESS) {
+		sms_log(mac_ctx, LOGE,
+			FL("could not retrieve ReassocFailureTimeout value"));
+		req_buf->ReassocFailureTimeout =
+			DEFAULT_REASSOC_FAILURE_TIMEOUT;
+	}
+#ifdef FEATURE_WLAN_ESE
+	if (csr_is_auth_type_ese(req_buf->ConnectedNetwork.authentication)) {
+		cdf_mem_copy(req_buf->KRK, session->eseCckmInfo.krk,
+			     SIR_KRK_KEY_LEN);
+		cdf_mem_copy(req_buf->BTK, session->eseCckmInfo.btk,
+			     SIR_BTK_KEY_LEN);
+	}
+#endif
+	req_buf->AcUapsd.acbe_uapsd =
+		SIR_UAPSD_GET(ACBE, mac_ctx->lim.gUapsdPerAcBitmask);
+	req_buf->AcUapsd.acbk_uapsd =
+		SIR_UAPSD_GET(ACBK, mac_ctx->lim.gUapsdPerAcBitmask);
+	req_buf->AcUapsd.acvi_uapsd =
+		SIR_UAPSD_GET(ACVI, mac_ctx->lim.gUapsdPerAcBitmask);
+	req_buf->AcUapsd.acvo_uapsd =
+		SIR_UAPSD_GET(ACVO, mac_ctx->lim.gUapsdPerAcBitmask);
+}
+#endif /* WLAN_FEATURE_ROAM_OFFLOAD */
+
+#if defined(WLAN_FEATURE_HOST_ROAM) || defined(WLAN_FEATURE_ROAM_OFFLOAD)
 static tSirRetStatus
 csr_roam_scan_offload_populate_mac_header(tpAniSirGlobal pMac,
 					  uint8_t *pBD,
@@ -16299,74 +16328,6 @@ csr_roam_scan_offload_prepare_probe_req_template(tpAniSirGlobal pMac,
 	*pusLen = nPayload + sizeof(tSirMacMgmtHdr);
 	return eSIR_SUCCESS;
 }
-
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
-CDF_STATUS csr_roam_set_key_mgmt_offload(tpAniSirGlobal pMac,
-					 uint32_t sessionId,
-					 bool nRoamKeyMgmtOffloadEnabled)
-{
-	tCsrRoamSession *pSession = CSR_GET_SESSION(pMac, sessionId);
-	if (!pSession) {
-		sms_log(pMac, LOGE, FL("session %d not found"), sessionId);
-		return CDF_STATUS_E_FAILURE;
-	}
-	pSession->RoamKeyMgmtOffloadEnabled = nRoamKeyMgmtOffloadEnabled;
-	return CDF_STATUS_SUCCESS;
-}
-
-/**
- * csr_update_roam_scan_offload_request() - updates req msg with roam offload
- * paramters
- * @pMac:          mac global context
- * @req_buf:       out param, roam offload scan request packet
- * @session:       roam session
- *
- * Return: void
- */
-static void
-csr_update_roam_scan_offload_request(tpAniSirGlobal mac_ctx,
-				     tSirRoamOffloadScanReq *req_buf,
-				     tCsrRoamSession *session)
-{
-	cdf_mem_copy(req_buf->PSK_PMK, session->psk_pmk,
-		     sizeof(req_buf->PSK_PMK));
-	req_buf->pmk_len = session->pmk_len;
-	CDF_TRACE(CDF_MODULE_ID_SME, CDF_TRACE_LEVEL_DEBUG,
-		  "LFR3: PMK Length = %d", req_buf->pmk_len);
-	req_buf->R0KH_ID_Length = session->ftSmeContext.r0kh_id_len;
-	cdf_mem_copy(req_buf->R0KH_ID,
-		     session->ftSmeContext.r0kh_id,
-		     req_buf->R0KH_ID_Length);
-	req_buf->Prefer5GHz = mac_ctx->roam.configParam.nRoamPrefer5GHz;
-	req_buf->RoamRssiCatGap = mac_ctx->roam.configParam.bCatRssiOffset;
-	req_buf->Select5GHzMargin = mac_ctx->roam.configParam.nSelect5GHzMargin;
-	if (wlan_cfg_get_int(mac_ctx, WNI_CFG_REASSOCIATION_FAILURE_TIMEOUT,
-			     (uint32_t *) &req_buf->ReassocFailureTimeout)
-	    != eSIR_SUCCESS) {
-		sms_log(mac_ctx, LOGE,
-			FL("could not retrieve ReassocFailureTimeout value"));
-		req_buf->ReassocFailureTimeout =
-			DEFAULT_REASSOC_FAILURE_TIMEOUT;
-	}
-#ifdef FEATURE_WLAN_ESE
-	if (csr_is_auth_type_ese(req_buf->ConnectedNetwork.authentication)) {
-		cdf_mem_copy(req_buf->KRK, session->eseCckmInfo.krk,
-			     SIR_KRK_KEY_LEN);
-		cdf_mem_copy(req_buf->BTK, session->eseCckmInfo.btk,
-			     SIR_BTK_KEY_LEN);
-	}
-#endif
-	req_buf->AcUapsd.acbe_uapsd =
-		SIR_UAPSD_GET(ACBE, mac_ctx->lim.gUapsdPerAcBitmask);
-	req_buf->AcUapsd.acbk_uapsd =
-		SIR_UAPSD_GET(ACBK, mac_ctx->lim.gUapsdPerAcBitmask);
-	req_buf->AcUapsd.acvi_uapsd =
-		SIR_UAPSD_GET(ACVI, mac_ctx->lim.gUapsdPerAcBitmask);
-	req_buf->AcUapsd.acvo_uapsd =
-		SIR_UAPSD_GET(ACVO, mac_ctx->lim.gUapsdPerAcBitmask);
-}
-#endif /* WLAN_FEATURE_ROAM_OFFLOAD */
-
 /**
  * csr_check_band_channel_match() - check if passed band and channel match
  * paramters
@@ -17123,6 +17084,7 @@ CDF_STATUS csr_roam_offload_scan_rsp_hdlr(tpAniSirGlobal pMac,
 	}
 	return CDF_STATUS_SUCCESS;
 }
+#endif
 
 tCsrPeStatsReqInfo *csr_roam_check_pe_stats_req_list(tpAniSirGlobal pMac,
 						     uint32_t statsMask,
@@ -18723,6 +18685,7 @@ void csr_roam_fill_tdls_info(tCsrRoamInfo *roam_info, tpSirSmeJoinRsp join_rsp)
 }
 #endif
 
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
  * csr_roam_synch_callback() - SME level callback for roam synch propagation
  * @mac_ctx: MAC Context
@@ -18985,3 +18948,4 @@ void csr_roam_synch_callback(tpAniSirGlobal mac_ctx,
 	cdf_mem_free(roam_info);
 	sme_release_global_lock(&mac_ctx->sme);
 }
+#endif

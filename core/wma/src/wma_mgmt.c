@@ -3371,6 +3371,7 @@ CDF_STATUS wma_de_register_mgmt_frm_client(void *cds_ctx)
 	return CDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
  * wma_register_roaming_callbacks() - Register roaming callbacks
  * @cds_ctx: CDS Context
@@ -3402,6 +3403,8 @@ CDF_STATUS wma_register_roaming_callbacks(void *cds_ctx,
 	WMA_LOGD("Registered roam synch callbacks with WMA successfully");
 	return CDF_STATUS_SUCCESS;
 }
+#endif
+
 /**
  * wma_register_mgmt_frm_client() - register management frame callback
  * @cds_ctx: cds context

@@ -1324,12 +1324,14 @@ typedef struct {
 	 * the serialized MC thread context with a timer.
 	 */
 	cdf_mc_timer_t service_ready_ext_timer;
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
 	void (*csr_roam_synch_cb)(tpAniSirGlobal mac,
 		roam_offload_synch_ind *roam_synch_data,
 		tpSirBssDescription  bss_desc_ptr, uint8_t reason);
 	CDF_STATUS (*pe_roam_synch_cb)(tpAniSirGlobal mac,
 		roam_offload_synch_ind *roam_synch_data,
 		tpSirBssDescription  bss_desc_ptr);
+#endif
 	cdf_wake_lock_t wmi_cmd_rsp_wake_lock;
 	cdf_runtime_lock_t wmi_cmd_rsp_runtime_lock;
 	cdf_runtime_lock_t wma_runtime_resume_lock;

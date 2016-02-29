@@ -1645,9 +1645,9 @@ CDF_STATUS csr_neighbor_roam_indicate_connect(
 {
 	tpCsrNeighborRoamControlInfo ngbr_roam_info =
 		&pMac->roam.neighborRoamInfo[session_id];
+	tCsrRoamSession *session = &pMac->roam.roamSession[session_id];
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 	tCsrRoamInfo roamInfo;
-	tCsrRoamSession *session = &pMac->roam.roamSession[session_id];
 	tpSirSetActiveModeSetBncFilterReq msg;
 #endif
 	CDF_STATUS status = CDF_STATUS_SUCCESS;
