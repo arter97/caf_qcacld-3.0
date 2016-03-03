@@ -757,7 +757,7 @@ static CDF_STATUS sap_get_channel_list(ptSapContext sapContext,
 
    SIDE EFFECTS
    ============================================================================*/
-static CDF_STATUS sap_get5_g_hz_channel_list(ptSapContext sapContext);
+static CDF_STATUS sap_get_5ghz_channel_list(ptSapContext sapContext);
 
 /*==========================================================================
    FUNCTION    sapStopDfsCacTimer
@@ -1278,7 +1278,7 @@ static uint8_t sap_random_channel_sel(ptSapContext sapContext)
 		ch_width = pMac->sap.SapDfsInfo.orig_chanWidth;
 	}
 
-	if (sap_get5_g_hz_channel_list(sapContext)) {
+	if (sap_get_5ghz_channel_list(sapContext)) {
 		CDF_TRACE(CDF_MODULE_ID_SAP, CDF_TRACE_LEVEL_INFO_LOW,
 			  FL("Getting 5Ghz channel list failed"));
 		return target_channel;
@@ -4438,10 +4438,14 @@ static CDF_STATUS sap_get_channel_list(ptSapContext sap_ctx,
  * Function for initializing list of  2.4/5 Ghz [NON-DFS/DFS]
  * available channels in the current regulatory domain.
  */
-static CDF_STATUS sap_get5_g_hz_channel_list(ptSapContext sapContext)
+static CDF_STATUS sap_get_5ghz_channel_list(ptSapContext sapContext)
 {
 	uint8_t count = 0;
 	int i;
+	struct sir_pcl_list pcl;
+	CDF_STATUS status;
+	enum channel_state ch_state;
+	pcl.pcl_len = 0;
 	if (NULL == sapContext) {
 		CDF_TRACE(CDF_MODULE_ID_SAP, CDF_TRACE_LEVEL_ERROR,
 			  "Invalid sapContext pointer on sap_get_channel_list");
@@ -4462,15 +4466,23 @@ static CDF_STATUS sap_get5_g_hz_channel_list(ptSapContext sapContext)
 		return CDF_STATUS_E_NOMEM;
 	}
 
-	for (i = CHAN_ENUM_36; i <= CHAN_ENUM_165; i++) {
-		if (CDS_CHANNEL_STATE(i) == CHANNEL_STATE_ENABLE ||
-		    CDS_CHANNEL_STATE(i) == CHANNEL_STATE_DFS) {
+	status = cds_get_pcl_for_existing_conn(CDS_SAP_MODE,
+			pcl.pcl_list, &pcl.pcl_len);
+	if (status != CDF_STATUS_SUCCESS) {
+		cds_err("Get PCL failed");
+		return status;
+	}
+	for (i = 0; i <= pcl.pcl_len; i++) {
+		if (CDS_IS_CHANNEL_5GHZ(pcl.pcl_list[i])) {
+			ch_state = cds_get_channel_state(pcl.pcl_list[i]);
+			if (!(ch_state == CHANNEL_STATE_ENABLE ||
+				ch_state == CHANNEL_STATE_DFS))
+				continue;
 			sapContext->SapAllChnlList.channelList[count].channel =
-				CDS_CHANNEL_NUM(i);
+				pcl.pcl_list[i];
 			CDF_TRACE(CDF_MODULE_ID_SAP, CDF_TRACE_LEVEL_INFO_LOW,
 				  "%s[%d] CHANNEL = %d", __func__, __LINE__,
-				  sapContext->SapAllChnlList.channelList[count].
-				  channel);
+				  pcl.pcl_list[i]);
 			sapContext->SapAllChnlList.channelList[count].valid =
 				true;
 			count++;
@@ -4531,8 +4543,6 @@ uint8_t sap_indicate_radar(ptSapContext sapContext,
 
 	/* set the Radar Found flag in SapDfsInfo */
 	pMac->sap.SapDfsInfo.sap_radar_found_status = true;
-
-	sap_get5_g_hz_channel_list(sapContext);
 
 	if (dfs_event->chan_list.nchannels > SIR_DFS_MAX_20M_SUB_CH) {
 		CDF_TRACE(CDF_MODULE_ID_SAP, CDF_TRACE_LEVEL_WARN,

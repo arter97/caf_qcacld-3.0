@@ -3680,6 +3680,40 @@ static void cds_set_pcl_for_existing_combo(enum cds_con_mode mode)
 }
 
 /**
+ * cds_get_pcl_for_existing_conn() - Get PCL for existing connection
+ * @mode: Connection mode of type 'cds_con_mode'
+ *
+ * Get the PCL for an existing connection
+ *
+ * Return: None
+ */
+CDF_STATUS cds_get_pcl_for_existing_conn(enum cds_con_mode mode,
+			uint8_t *pcl_ch, uint32_t *len)
+{
+	struct cds_conc_connection_info info;
+
+	cds_context_type *cds_ctx;
+	CDF_STATUS status = CDF_STATUS_SUCCESS;
+	cds_ctx = cds_get_context(CDF_MODULE_ID_CDF);
+	if (!cds_ctx) {
+		cds_err("Invalid CDS Context");
+		return CDF_STATUS_E_INVAL;
+	}
+	cdf_mutex_acquire(&cds_ctx->cdf_conc_list_lock);
+	if (cds_mode_specific_connection_count(mode, NULL) > 0) {
+		/* Check, store and temp delete the mode's parameter */
+		cds_store_and_del_conn_info(mode, &info);
+		/* Set the PCL to the FW since connection got updated */
+		status = cds_get_pcl(mode, pcl_ch, len);
+		cds_info("Get PCL to FW for mode:%d", mode);
+		/* Restore the connection info */
+		cds_restore_deleted_conn_info(&info);
+	}
+	cdf_mutex_release(&cds_ctx->cdf_conc_list_lock);
+	return status;
+}
+
+/**
  * cds_decr_session_set_pcl() - Decrement session count and set PCL
  * @mode: Adapter mode
  * @session_id: Session id

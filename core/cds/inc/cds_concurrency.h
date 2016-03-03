@@ -690,4 +690,6 @@ CDF_STATUS cds_handle_hw_mode_change_on_csa(uint16_t session_id,
 CDF_STATUS cds_register_sap_restart_channel_switch_cb(
 		void (*sap_restart_chan_switch_cb)(void *, uint32_t, uint32_t));
 #endif
+CDF_STATUS cds_get_pcl_for_existing_conn(enum cds_con_mode mode,
+			uint8_t *pcl_ch, uint32_t *len);
 #endif /* __CDS_CONCURRENCY_H */
