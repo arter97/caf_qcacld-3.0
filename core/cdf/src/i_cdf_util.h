@@ -82,6 +82,17 @@ static inline int __cdf_status_to_os_return(CDF_STATUS status)
 	}
 }
 
+/**
+ * __cdf_set_bit() - set bit in address
+ * @nr: bit number to be set
+ * @addr: address buffer pointer
+ *
+ * Return: none
+ */
+static inline void __cdf_set_bit(unsigned int nr, unsigned long *addr)
+{
+	__set_bit(nr, addr);
+}
 
 /**
  * @brief memory barriers.

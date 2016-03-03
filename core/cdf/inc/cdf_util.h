@@ -96,6 +96,15 @@ CDF_INLINE_FN int cdf_status_to_os_return(CDF_STATUS status)
 #define cdf_in_interrupt          in_interrupt
 
 /**
+ * cdf_set_bit() - set bit in address
+ * @nr: bit number to be set
+ * @addr: address buffer pointer
+ *
+ * Return: none
+ */
+#define cdf_set_bit(nr, addr)    __cdf_set_bit(nr, addr)
+
+/**
  * cdf_container_of - cast a member of a structure out to the containing
  *                    structure
  * @ptr:        the pointer to the member.
