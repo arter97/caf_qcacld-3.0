@@ -72,11 +72,10 @@ include $(DLKM_DIR)/AndroidKernelModule.mk
 ###########################################################
 
 # Create Symbolic link
-ifeq ($(WLAN_PROPRIETARY),1)
 $(shell mkdir -p $(TARGET_OUT)/lib/modules; \
         ln -sf /system/lib/modules/$(WLAN_CHIPSET)/$(LOCAL_MODULE) \
                $(TARGET_OUT)/lib/modules/wlan.ko)
-endif
+
 $(shell ln -sf /persist/wlan_mac.bin $(TARGET_OUT_ETC)/firmware/wlan/qca_cld/wlan_mac.bin)
 
 ifeq ($(call is-board-platform-in-list, msm8960),true)
