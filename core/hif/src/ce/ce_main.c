@@ -1258,7 +1258,6 @@ void hif_stop(struct ol_softc *scn)
 #define ADRASTEA_SRC_WR_INDEX_OFFSET 0x3C
 #define ADRASTEA_DST_WR_INDEX_OFFSET 0x40
 
-
 static struct shadow_reg_cfg target_shadow_reg_cfg_map[] = {
 	{ 0, ADRASTEA_SRC_WR_INDEX_OFFSET},
 	{ 3, ADRASTEA_SRC_WR_INDEX_OFFSET},
@@ -1271,7 +1270,17 @@ static struct shadow_reg_cfg target_shadow_reg_cfg_map[] = {
 	{ 8, ADRASTEA_DST_WR_INDEX_OFFSET},
 };
 
-
+static struct shadow_reg_cfg target_shadow_reg_cfg_epping[] = {
+	{ 0, ADRASTEA_SRC_WR_INDEX_OFFSET},
+	{ 3, ADRASTEA_SRC_WR_INDEX_OFFSET},
+	{ 4, ADRASTEA_SRC_WR_INDEX_OFFSET},
+	{ 7, ADRASTEA_SRC_WR_INDEX_OFFSET},
+	{ 1, ADRASTEA_DST_WR_INDEX_OFFSET},
+	{ 2, ADRASTEA_DST_WR_INDEX_OFFSET},
+	{ 5, ADRASTEA_DST_WR_INDEX_OFFSET},
+	{ 7, ADRASTEA_DST_WR_INDEX_OFFSET},
+	{ 8, ADRASTEA_DST_WR_INDEX_OFFSET},
+};
 
 /* CE_PCI TABLE */
 /*
@@ -1842,6 +1851,8 @@ void hif_ce_prepare_config(void)
 		    target_service_to_ce_map_wlan_epping;
 		target_service_to_ce_map_sz =
 			sizeof(target_service_to_ce_map_wlan_epping);
+		target_shadow_reg_cfg = target_shadow_reg_cfg_epping;
+		shadow_cfg_sz = sizeof(target_shadow_reg_cfg_epping);
 	}
 }
 
@@ -2206,6 +2217,9 @@ u32 shadow_dst_wr_ind_addr(struct ol_softc *scn, u32 ctrl_addr)
 		break;
 	case 2:
 		addr = SHADOW_VALUE14;
+		break;
+	case 5:
+		addr = SHADOW_VALUE17;
 		break;
 	case 7:
 		addr = SHADOW_VALUE19;
