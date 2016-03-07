@@ -1627,6 +1627,15 @@ enum ch_width hdd_map_nl_chan_width(enum nl80211_chan_width ch_width);
 uint8_t wlan_hdd_find_opclass(tHalHandle hal, uint8_t channel,
 			uint8_t bw_offset);
 
+#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
+CDF_STATUS hdd_register_for_sap_restart_with_channel_switch(void);
+#else
+static inline CDF_STATUS hdd_register_for_sap_restart_with_channel_switch(void)
+{
+	return CDF_STATUS_SUCCESS;
+}
+#endif
+
 #ifdef FEATURE_TSO
 /**
  * hdd_set_tso_flags() - enable TSO flags in the network device
