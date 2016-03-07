@@ -6604,6 +6604,9 @@ static void cds_check_sta_ap_concurrent_ch_intf(void *data)
 	hdd_ap_ctx_t *hdd_ap_ctx;
 	uint16_t intf_ch = 0;
 
+	cds_info("cds_concurrent_open_sessions_running: %d",
+		cds_concurrent_open_sessions_running());
+
 	if ((hdd_ctx->config->WlanMccToSccSwitchMode ==
 				CDF_MCC_TO_SCC_SWITCH_DISABLE)
 			|| !(cds_concurrent_open_sessions_running()
@@ -6625,6 +6628,7 @@ static void cds_check_sta_ap_concurrent_ch_intf(void *data)
 		return;
 
 	intf_ch = wlansap_check_cc_intf(hdd_ap_ctx->sapContext);
+	cds_info("intf_ch:%d", intf_ch);
 
 	if (intf_ch == 0)
 		return;
@@ -6656,6 +6660,12 @@ void cds_check_concurrent_intf_and_restart_sap(hdd_station_ctx_t *hdd_sta_ctx,
 		cds_err("HDD context is NULL");
 		return;
 	}
+
+	cds_info("mode:%d rule1:%d rule2:%d chan:%d",
+		hdd_ctx->config->WlanMccToSccSwitchMode,
+		hdd_ctx->config->conc_custom_rule1,
+		hdd_ctx->config->conc_custom_rule2,
+		hdd_sta_ctx->conn_info.operationChannel);
 
 	if ((hdd_ctx->config->WlanMccToSccSwitchMode
 				!= CDF_MCC_TO_SCC_SWITCH_DISABLE) &&
@@ -7180,7 +7190,7 @@ void cds_restart_sap(hdd_adapter_t *ap_adapter)
 	void *sap_ctx;
 
 	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter);
-	sap_config = &hdd_ap_ctx.sapConfig;
+	sap_config = &hdd_ap_ctx->sapConfig;
 	sap_ctx = hdd_ap_ctx->sapContext;
 
 	mutex_lock(&hdd_ctx->sap_lock);

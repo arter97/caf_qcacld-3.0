@@ -1804,25 +1804,28 @@ void lim_fill_join_rsp_ht_caps(tpPESession session, tpSirSmeJoinRsp join_rsp)
 {
 	tSirSmeHTProfile *ht_profile;
 	if (session == NULL) {
-		lim_log(mac_ctx, LOGE, FL("Invalid Session"));
+		CDF_TRACE(CDF_MODULE_ID_PE, CDF_TRACE_LEVEL_ERROR,
+			"Invalid Session");
 		return;
 	}
 	if (join_rsp == NULL) {
-		lim_log(mac_ctx, LOGE, FL("Invalid Join Response"));
+		CDF_TRACE(CDF_MODULE_ID_PE, CDF_TRACE_LEVEL_ERROR,
+			"Invalid Join Response");
 		return;
 	}
-	if (session->cc_switch_mode !=
-			CDF_MCC_TO_SCC_SWITCH_DISABLE) {
-		ht_profile = &join_rsp->HTProfile;
-		ht_profile->htSupportedChannelWidthSet =
-			session->htSupportedChannelWidthSet;
-		ht_profile->htRecommendedTxWidthSet =
-			session->htRecommendedTxWidthSet;
-		ht_profile->htSecondaryChannelOffset =
-			session->htSecondaryChannelOffset;
-		ht_profile->dot11mode = session->dot11mode;
-		ht_profile->htCapability = session->htCapability;
-	}
+
+	if (session->cc_switch_mode == CDF_MCC_TO_SCC_SWITCH_DISABLE)
+		return;
+
+	ht_profile = &join_rsp->HTProfile;
+	ht_profile->htSupportedChannelWidthSet =
+		session->htSupportedChannelWidthSet;
+	ht_profile->htRecommendedTxWidthSet =
+		session->htRecommendedTxWidthSet;
+	ht_profile->htSecondaryChannelOffset =
+		session->htSecondaryChannelOffset;
+	ht_profile->dot11mode = session->dot11mode;
+	ht_profile->htCapability = session->htCapability;
 	ht_profile->vhtCapability = session->vhtCapability;
 	ht_profile->vhtTxChannelWidthSet =
 		session->vhtTxChannelWidthSet;
