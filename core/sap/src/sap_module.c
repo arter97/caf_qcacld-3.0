@@ -2437,6 +2437,13 @@ CDF_STATUS wlansap_dfs_send_csa_ie_request(void *pSapCtx)
 				pMac->sap.SapDfsInfo.target_channel, 0,
 				&pMac->sap.SapDfsInfo.new_ch_params);
 
+	CDF_TRACE(CDF_MODULE_ID_SAP, CDF_TRACE_LEVEL_INFO,
+			"%s: chan:%d req:%d width:%d off:%d",
+			__func__, pMac->sap.SapDfsInfo.target_channel,
+			pMac->sap.SapDfsInfo.csaIERequired,
+			pMac->sap.SapDfsInfo.new_ch_params.ch_width,
+			pMac->sap.SapDfsInfo.new_ch_params.sec_ch_offset);
+
 	cdf_ret_status = sme_roam_csa_ie_request(hHal,
 				sapContext->bssid,
 				pMac->sap.SapDfsInfo.target_channel,
