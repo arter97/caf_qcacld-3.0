@@ -57,5 +57,9 @@ static inline CDF_STATUS bmi_download_firmware(struct ol_softc *scn)
 {
 	return CDF_STATUS_SUCCESS;
 }
+static inline void bmi_target_ready(struct ol_softc *scn, void *cfg_ctx)
+{
+	return;
+}
 #endif
 #endif /* _BMI_H_ */

@@ -6955,21 +6955,17 @@ int wma_suspend_target(WMA_HANDLE handle, int disable_target_intr)
 	uint32_t len = sizeof(*cmd);
 	struct ol_softc *scn;
 	int ret;
-#ifdef CONFIG_CNSS
 	tpAniSirGlobal pmac = cds_get_context(CDF_MODULE_ID_PE);
-#endif
 
 	if (!wma_handle || !wma_handle->wmi_handle) {
 		WMA_LOGE("WMA is closed. can not issue suspend cmd");
 		return -EINVAL;
 	}
 
-#ifdef CONFIG_CNSS
 	if (NULL == pmac) {
 		WMA_LOGE("%s: Unable to get PE context", __func__);
 		return -EINVAL;
 	}
-#endif
 
 	/*
 	 * send the comand to Target to ignore the

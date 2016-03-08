@@ -367,6 +367,13 @@ htc_setup_target_buff_credit_alloc(HTC_SERVICE_TX_CREDIT_ALLOCATION *pEntry,
 
 	return;
 }
+#else
+static inline void
+htc_setup_target_buff_credit_alloc(HTC_SERVICE_TX_CREDIT_ALLOCATION *pEntry,
+				   int credits)
+{
+	return;
+}
 #endif
 
 /**

@@ -37,6 +37,7 @@
 #include "hif_io32.h"
 #include "ce_main.h"
 #include "ce_tasklet.h"
+#include "ce_api.h"
 
 /**
  * hif_bus_prevent_linkdown(): prevent linkdown
