@@ -39,6 +39,7 @@
 #include <ol_txrx_types.h>      /* ol_tx_desc_t, ol_txrx_msdu_info_t */
 
 cdf_nbuf_t ol_tx_ll(ol_txrx_vdev_handle vdev, cdf_nbuf_t msdu_list);
+cdf_nbuf_t ol_tx_ll_wrapper(ol_txrx_vdev_handle vdev, cdf_nbuf_t msdu_list);
 #ifdef WLAN_FEATURE_FASTPATH
 cdf_nbuf_t ol_tx_ll_fast(ol_txrx_vdev_handle vdev, cdf_nbuf_t msdu_list);
 #endif
@@ -54,7 +55,7 @@ cdf_nbuf_t ol_tx_ll_queue(ol_txrx_vdev_handle vdev, cdf_nbuf_t msdu_list);
 #ifdef QCA_LL_LEGACY_TX_FLOW_CONTROL
 #define OL_TX_LL ol_tx_ll_queue
 #else
-#define OL_TX_LL ol_tx_ll
+#define OL_TX_LL ol_tx_ll_wrapper
 #endif
 
 #ifdef QCA_LL_LEGACY_TX_FLOW_CONTROL

@@ -732,7 +732,7 @@ ol_tx_ll_fast(ol_txrx_vdev_handle vdev, cdf_nbuf_t msdu_list)
  * ol_tx_ll_wrapper() wrapper to ol_tx_ll
  *
  */
-static inline cdf_nbuf_t
+cdf_nbuf_t
 ol_tx_ll_wrapper(ol_txrx_vdev_handle vdev, cdf_nbuf_t msdu_list)
 {
 	struct ol_softc *hif_device =
@@ -746,7 +746,7 @@ ol_tx_ll_wrapper(ol_txrx_vdev_handle vdev, cdf_nbuf_t msdu_list)
 	return msdu_list;
 }
 #else
-static inline cdf_nbuf_t
+cdf_nbuf_t
 ol_tx_ll_wrapper(ol_txrx_vdev_handle vdev, cdf_nbuf_t msdu_list)
 {
 	return ol_tx_ll(vdev, msdu_list);
