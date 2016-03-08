@@ -226,6 +226,7 @@ typedef void (*cdf_softirq_timer_func_t)(void *);
  * @CDF_MODULE_ID_CFG: CFG module ID
  * @CDF_MODULE_ID_BMI: BMI module ID
  * @CDF_MODULE_ID_EPPING: EPPING module ID
+ * @CDF_MODULE_ID_QVIT: QVIT module ID
  * @CDF_MODULE_ID_MAX: Max place holder module ID
  *
  * These are generic IDs that identify the various modules in the software
@@ -256,6 +257,7 @@ typedef enum {
 	CDF_MODULE_ID_CFG = 20,
 	CDF_MODULE_ID_BMI = 21,
 	CDF_MODULE_ID_EPPING = 22,
+	CDF_MODULE_ID_QVIT   = 23,
 
 	CDF_MODULE_ID_MAX
 } CDF_MODULE_ID;
@@ -275,8 +277,9 @@ typedef enum {
  * @CDF_FTM_MODE: FTM mode
  * @CDF_IBSS_MODE: IBSS mode
  * @CDF_P2P_DEVICE_MODE: P2P device mode
- * @CDF_EPPING_MODE: EPPING device mode
  * @CDF_OCB_MODE: OCB device mode
+ * @CDF_EPPING_MODE: EPPING device mode
+ * @CDF_QVIT_MODE: QVIT device mode
  * @CDF_MAX_NO_OF_MODE: Max place holder
  *
  * These are generic IDs that identify the various roles
@@ -292,6 +295,7 @@ enum tCDF_ADAPTER_MODE {
 	CDF_P2P_DEVICE_MODE,
 	CDF_OCB_MODE,
 	CDF_EPPING_MODE,
+	CDF_QVIT_MODE,
 	CDF_MAX_NO_OF_MODE
 };
 
@@ -302,12 +306,14 @@ enum tCDF_ADAPTER_MODE {
  * @CDF_GLOBAL_MISSION_MODE: mission mode (STA, SAP...)
  * @CDF_GLOBAL_FTM_MODE: FTM mode
  * @CDF_GLOBAL_EPPING_MODE: EPPING mode
+ * @CDF_GLOBAL_QVIT_MODE: QVIT global mode
  * @CDF_GLOBAL_MAX_MODE: Max place holder
  */
 enum tCDF_GLOBAL_CON_MODE {
 	CDF_GLOBAL_MISSION_MODE,
 	CDF_GLOBAL_FTM_MODE = 5,
 	CDF_GLOBAL_EPPING_MODE = 8,
+	CDF_GLOBAL_QVIT_MODE = 9,
 	CDF_GLOBAL_MAX_MODE
 };
 
