@@ -105,6 +105,7 @@
 #include "wlan_hdd_green_ap.h"
 #include "platform_icnss.h"
 #include "wlan_hdd_regulatory.h"
+#include "pktlog_ac.h"
 
 #ifdef MODULE
 #define WLAN_MODULE_NAME  module_name(THIS_MODULE)
@@ -5689,6 +5690,9 @@ int hdd_wlan_startup(struct device *dev, void *hif_sc)
 		goto err_cds_close;
 	}
 
+	hif_enable_power_gating(hif_sc);
+	pktlog_htc_attach();
+
 	status = cds_pre_enable(hdd_ctx->pcds_context);
 	if (!CDF_IS_STATUS_SUCCESS(status)) {
 		hddLog(CDF_TRACE_LEVEL_FATAL, FL("cds_pre_enable failed"));
@@ -5997,8 +6001,6 @@ int hdd_wlan_startup(struct device *dev, void *hif_sc)
 			goto err_unreg_netdev_notifier;
 		}
 	}
-
-	hif_enable_power_gating(hif_sc);
 
 	memdump_init();
 

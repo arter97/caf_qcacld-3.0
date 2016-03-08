@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -46,6 +46,7 @@
 #include "pktlog_ac_i.h"
 #include "cds_api.h"
 #include "wma_types.h"
+#include "htc.h"
 
 wdi_event_subscribe PKTLOG_TX_SUBSCRIBER;
 wdi_event_subscribe PKTLOG_RX_SUBSCRIBER;
@@ -446,4 +447,200 @@ int pktlog_setsize(struct ol_softc *scn, int32_t size)
 
 	return 0;
 }
+
+/**
+ * pktlog_process_fw_msg() - process packetlog message
+ * @buff: buffer
+ *
+ * Return: None
+ */
+void pktlog_process_fw_msg(uint32_t *buff)
+{
+	uint32_t *pl_hdr;
+	uint32_t log_type;
+	struct ol_txrx_pdev_t *txrx_pdev = cds_get_context(CDF_MODULE_ID_TXRX);
+
+	if (!txrx_pdev) {
+		cdf_print("%s: txrx_pdev is NULL", __func__);
+		return;
+	}
+
+	pl_hdr = buff;
+	log_type =
+		(*(pl_hdr + 1) & ATH_PKTLOG_HDR_LOG_TYPE_MASK) >>
+		ATH_PKTLOG_HDR_LOG_TYPE_SHIFT;
+	if ((log_type == PKTLOG_TYPE_TX_CTRL)
+		|| (log_type == PKTLOG_TYPE_TX_STAT)
+		|| (log_type == PKTLOG_TYPE_TX_MSDU_ID)
+		|| (log_type == PKTLOG_TYPE_TX_FRM_HDR)
+		|| (log_type == PKTLOG_TYPE_TX_VIRT_ADDR))
+		wdi_event_handler(WDI_EVENT_TX_STATUS,
+				  txrx_pdev, pl_hdr);
+	else if (log_type == PKTLOG_TYPE_RC_FIND)
+		wdi_event_handler(WDI_EVENT_RATE_FIND,
+				  txrx_pdev, pl_hdr);
+	else if (log_type == PKTLOG_TYPE_RC_UPDATE)
+		wdi_event_handler(WDI_EVENT_RATE_UPDATE,
+				  txrx_pdev, pl_hdr);
+	else if (log_type == PKTLOG_TYPE_RX_STAT)
+		wdi_event_handler(WDI_EVENT_RX_DESC,
+				  txrx_pdev, pl_hdr);
+
+}
+
+/**
+ * pktlog_t2h_msg_handler() - Target to host message handler
+ * @context: pdev context
+ * @pkt: HTC packet
+ *
+ * Return: None
+ */
+void pktlog_t2h_msg_handler(void *context, HTC_PACKET *pkt)
+{
+	struct ol_pktlog_dev_t *pdev = (struct ol_pktlog_dev_t *)context;
+	cdf_nbuf_t pktlog_t2h_msg = (cdf_nbuf_t) pkt->pPktContext;
+	uint32_t *msg_word;
+
+	/* check for successful message reception */
+	if (pkt->Status != A_OK) {
+		if (pkt->Status != A_ECANCELED)
+			pdev->htc_err_cnt++;
+		cdf_nbuf_free(pktlog_t2h_msg);
+		return;
+	}
+
+	/* confirm alignment */
+	cdf_assert((((unsigned long)cdf_nbuf_data(pktlog_t2h_msg)) & 0x3) == 0);
+
+	msg_word = (uint32_t *) cdf_nbuf_data(pktlog_t2h_msg);
+	pktlog_process_fw_msg(msg_word);
+
+	cdf_nbuf_free(pktlog_t2h_msg);
+}
+
+/**
+ * pktlog_tx_resume_handler() - resume callback
+ * @context: pdev context
+ *
+ * Return: None
+ */
+void pktlog_tx_resume_handler(void *context)
+{
+	cdf_print("%s: Not expected", __func__);
+	cdf_assert(0);
+	return;
+}
+
+/**
+ * pktlog_h2t_send_complete() - send complete indication
+ * @context: pdev context
+ * @htc_pkt: HTC packet
+ *
+ * Return: None
+ */
+void pktlog_h2t_send_complete(void *context, HTC_PACKET *htc_pkt)
+{
+	cdf_print("%s: Not expected", __func__);
+	cdf_assert(0);
+	return;
+}
+
+/**
+ * pktlog_h2t_full() - queue full indication
+ * @context: pdev context
+ * @pkt: HTC packet
+ *
+ * Return: HTC action
+ */
+HTC_SEND_FULL_ACTION pktlog_h2t_full(void *context, HTC_PACKET *pkt)
+{
+	return HTC_SEND_FULL_KEEP;
+}
+
+/**
+ * pktlog_htc_connect_service() - create new endpoint for packetlog
+ * @pdev - pktlog pdev
+ *
+ * Return: 0 for success/failure
+ */
+int pktlog_htc_connect_service(struct ol_pktlog_dev_t *pdev)
+{
+	HTC_SERVICE_CONNECT_REQ connect;
+	HTC_SERVICE_CONNECT_RESP response;
+	A_STATUS status;
+
+	cdf_mem_set(&connect, sizeof(connect), 0);
+	cdf_mem_set(&response, sizeof(response), 0);
+
+	connect.pMetaData = NULL;
+	connect.MetaDataLength = 0;
+	connect.EpCallbacks.pContext = pdev;
+	connect.EpCallbacks.EpTxComplete = pktlog_h2t_send_complete;
+	connect.EpCallbacks.EpTxCompleteMultiple = NULL;
+	connect.EpCallbacks.EpRecv = pktlog_t2h_msg_handler;
+	connect.EpCallbacks.ep_resume_tx_queue = pktlog_tx_resume_handler;
+
+	/* rx buffers currently are provided by HIF, not by EpRecvRefill */
+	connect.EpCallbacks.EpRecvRefill = NULL;
+	connect.EpCallbacks.RecvRefillWaterMark = 1;
+	/* N/A, fill is done by HIF */
+
+	connect.EpCallbacks.EpSendFull = pktlog_h2t_full;
+	/*
+	 * Specify how deep to let a queue get before htc_send_pkt will
+	 * call the EpSendFull function due to excessive send queue depth.
+	 */
+	connect.MaxSendQueueDepth = PKTLOG_MAX_SEND_QUEUE_DEPTH;
+
+	/* disable flow control for HTT data message service */
+	connect.ConnectionFlags |= HTC_CONNECT_FLAGS_DISABLE_CREDIT_FLOW_CTRL;
+
+	/* connect to control service */
+	connect.service_id = PACKET_LOG_SVC;
+
+	status = htc_connect_service(pdev->htc_pdev, &connect, &response);
+
+	if (status != A_OK) {
+		pdev->mt_pktlog_enabled = false;
+		return -EIO;       /* failure */
+	}
+
+	pdev->htc_endpoint = response.Endpoint;
+	pdev->mt_pktlog_enabled = true;
+
+	return 0;               /* success */
+}
+
+#if defined(QCA_WIFI_3_0_ADRASTEA)
+/**
+ * pktlog_htc_attach() - attach pktlog HTC service
+ *
+ * Return: 0 for success/failure
+ */
+int pktlog_htc_attach(void)
+{
+	struct ol_txrx_pdev_t *txrx_pdev = cds_get_context(CDF_MODULE_ID_TXRX);
+	struct ol_pktlog_dev_t *pdev = NULL;
+	void *htc_pdev = cds_get_context(CDF_MODULE_ID_HTC);
+
+	if ((!txrx_pdev) || (!txrx_pdev->pl_dev) || (!htc_pdev))
+		return -EINVAL;
+
+	pdev = txrx_pdev->pl_dev;
+	pdev->htc_pdev = htc_pdev;
+	return pktlog_htc_connect_service(pdev);
+}
+#else
+int pktlog_htc_attach(void)
+{
+	struct ol_txrx_pdev_t *txrx_pdev = cds_get_context(CDF_MODULE_ID_TXRX);
+	struct ol_pktlog_dev_t *pdev = NULL;
+
+	if (!txrx_pdev)
+		return -EINVAL;
+	pdev = txrx_pdev->pl_dev;
+	pdev->mt_pktlog_enabled = false;
+	return 0;
+}
+#endif
 #endif /* REMOVE_PKT_LOG */

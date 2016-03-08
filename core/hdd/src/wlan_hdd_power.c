@@ -70,6 +70,7 @@
 #include "hif.h"
 #include "sme_power_save_api.h"
 #include "cds_concurrency.h"
+#include "pktlog_ac.h"
 
 /* Preprocessor definitions and constants */
 #define HDD_SSR_BRING_UP_TIME 30000
@@ -1453,6 +1454,9 @@ CDF_STATUS hdd_wlan_re_init(void *hif_sc)
 		goto err_cds_close;
 	}
 
+	hif_enable_power_gating(hif_sc);
+	pktlog_htc_attach();
+
 	cdf_status = cds_pre_enable(pHddCtx->pcds_context);
 	if (!CDF_IS_STATUS_SUCCESS(cdf_status)) {
 		hdd_alert("cds_pre_enable failed");
@@ -1611,7 +1615,6 @@ CDF_STATUS hdd_wlan_re_init(void *hif_sc)
 				  pHddCtx->target_hw_name);
 #endif
 
-	hif_enable_power_gating(hif_sc);
 	hddLog(LOGE,
 		"%s: WLAN host driver reinitiation completed!", __func__);
 	goto success;

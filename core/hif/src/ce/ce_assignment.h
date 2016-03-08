@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014, 2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -99,8 +99,8 @@ static struct CE_attr host_ce_config_wlan[] = {
 	{ /* CE9 */ CE_ATTR_FLAGS, 0, 0,  2048, 512, NULL,},
 	/* target->host HTT */
 	{ /* CE10 */ CE_ATTR_FLAGS, 0, 0,  2048, 512, NULL,},
-	/*The following CEs are not being used yet */
-	{ /* CE11 */ CE_ATTR_FLAGS, 0, 0, 0, 0, NULL,},
+	/* Target -> host PKTLOG */
+	{ /* CE11 */ CE_ATTR_FLAGS, 0, 0, 2048, 512, NULL,},
 };
 
 static struct CE_pipe_config target_ce_config_wlan[] = {
@@ -130,8 +130,8 @@ static struct CE_pipe_config target_ce_config_wlan[] = {
 	{ /* CE9 */ 9, PIPEDIR_IN,  32, 2048, CE_ATTR_FLAGS, 0,},
 	/* CE10 target->host HTT */
 	{ /* CE10 */ 10, PIPEDIR_IN,  32, 2048, CE_ATTR_FLAGS, 0,},
-	/*The following CEs are not being used yet*/
-	{ /* CE11 */ 11, PIPEDIR_IN,  0, 0, CE_ATTR_FLAGS, 0,},
+	/* Target -> host PKTLOG */
+	{ /* CE11 */ 11, PIPEDIR_IN,  32, 2048, CE_ATTR_FLAGS, 0,},
 };
 
 static struct CE_attr host_ce_config_wlan_epping_poll[] = {
