@@ -5384,6 +5384,7 @@ CDF_STATUS wma_mc_process_msg(void *cds_context, cds_msg_t *msg)
 	case WMA_SET_IE_INFO:
 		wma_process_set_ie_info(wma_handle,
 			(struct vdev_ie_info *)msg->bodyptr);
+		cdf_mem_free(msg->bodyptr);
 		break;
 	case SIR_HAL_SOC_ANTENNA_MODE_REQ:
 		wma_send_pdev_set_antenna_mode(wma_handle,
@@ -5398,6 +5399,7 @@ CDF_STATUS wma_mc_process_msg(void *cds_context, cds_msg_t *msg)
 	case WMA_GW_PARAM_UPDATE_REQ:
 		wma_set_gateway_params(wma_handle,
 			(struct gateway_param_update_req *)msg->bodyptr);
+		cdf_mem_free(msg->bodyptr);
 		break;
 	case WMA_SET_EGAP_CONF_PARAMS:
 		wma_send_egap_conf_params(wma_handle,
