@@ -430,7 +430,7 @@ static ssize_t __wcnss_patterngen_write(struct file *file,
 	 * patterns
 	 */
 	hdd_info("device mode %d", pAdapter->device_mode);
-	if ((WLAN_HDD_INFRA_STATION == pAdapter->device_mode) &&
+	if ((CDF_STA_MODE == pAdapter->device_mode) &&
 	    (!hdd_conn_is_connected(WLAN_HDD_GET_STATION_CTX_PTR(pAdapter)))) {
 			CDF_TRACE(CDF_MODULE_ID_HDD, CDF_TRACE_LEVEL_ERROR,
 				"%s: Not in Connected state!", __func__);

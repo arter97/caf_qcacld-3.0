@@ -598,9 +598,9 @@ err_cdf_status_failure:
 static int hdd_ftm_service_registration(hdd_context_t *hdd_ctx)
 {
 	hdd_adapter_t *adapter;
-	adapter = hdd_open_adapter(hdd_ctx, WLAN_HDD_FTM, "wlan%d",
+	adapter = hdd_open_adapter(hdd_ctx, CDF_FTM_MODE, "wlan%d",
 				    wlan_hdd_get_intf_addr(hdd_ctx),
-				    NET_NAME_UNKNOWN, false);
+					NET_NAME_UNKNOWN, false);
 	if (NULL == adapter) {
 		hddLog(CDF_TRACE_LEVEL_ERROR, "%s: hdd_open_adapter failed",
 		       __func__);
@@ -646,7 +646,7 @@ int wlan_hdd_ftm_close(hdd_context_t *hdd_ctx)
 	CDF_STATUS cdf_status;
 	v_CONTEXT_t cds_context = hdd_ctx->pcds_context;
 
-	hdd_adapter_t *adapter = hdd_get_adapter(hdd_ctx, WLAN_HDD_FTM);
+	hdd_adapter_t *adapter = hdd_get_adapter(hdd_ctx, CDF_FTM_MODE);
 	ENTER();
 	if (adapter == NULL) {
 		CDF_TRACE(CDF_MODULE_ID_HDD, CDF_TRACE_LEVEL_FATAL,
