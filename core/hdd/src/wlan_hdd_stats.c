@@ -518,15 +518,15 @@ static bool put_wifi_iface_stats(tpSirWifiIfaceStat pWifiIfaceStat,
 static tSirWifiInterfaceMode hdd_map_device_to_ll_iface_mode(int deviceMode)
 {
 	switch (deviceMode) {
-	case WLAN_HDD_INFRA_STATION:
+	case CDF_STA_MODE:
 		return WIFI_INTERFACE_STA;
-	case WLAN_HDD_SOFTAP:
+	case CDF_SAP_MODE:
 		return WIFI_INTERFACE_SOFTAP;
-	case WLAN_HDD_P2P_CLIENT:
+	case CDF_P2P_CLIENT_MODE:
 		return WIFI_INTERFACE_P2P_CLIENT;
-	case WLAN_HDD_P2P_GO:
+	case CDF_P2P_GO_MODE:
 		return WIFI_INTERFACE_P2P_GO;
-	case WLAN_HDD_IBSS:
+	case CDF_IBSS_MODE:
 		return WIFI_INTERFACE_IBSS;
 	default:
 		/* Return Interface Mode as STA for all the unsupported modes */
@@ -553,9 +553,9 @@ static bool hdd_get_interface_info(hdd_adapter_t *pAdapter,
 
 	cdf_copy_macaddr(&pInfo->macAddr, &pAdapter->macAddressCurrent);
 
-	if (((WLAN_HDD_INFRA_STATION == pAdapter->device_mode) ||
-	     (WLAN_HDD_P2P_CLIENT == pAdapter->device_mode) ||
-	     (WLAN_HDD_P2P_DEVICE == pAdapter->device_mode))) {
+	if (((CDF_STA_MODE == pAdapter->device_mode) ||
+	     (CDF_P2P_CLIENT_MODE == pAdapter->device_mode) ||
+	     (CDF_P2P_DEVICE_MODE == pAdapter->device_mode))) {
 		pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
 		if (eConnectionState_NotConnected ==
 		    pHddStaCtx->conn_info.connState) {
