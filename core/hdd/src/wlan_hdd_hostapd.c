@@ -387,7 +387,7 @@ CDF_STATUS hdd_set_sap_ht2040_mode(hdd_adapter_t *pHostapdAdapter,
 
 	hddLog(LOGE, FL("change HT20/40 mode"));
 
-	if (WLAN_HDD_SOFTAP == pHostapdAdapter->device_mode) {
+	if (CDF_SAP_MODE == pHostapdAdapter->device_mode) {
 		hHal = WLAN_HDD_GET_HAL_CTX(pHostapdAdapter);
 		if (NULL == hHal) {
 			hddLog(LOGE, FL("Hal ctx is null"));
@@ -1139,9 +1139,9 @@ CDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 			pHddCtx->dev_dfs_cac_status = DFS_CAC_NEVER_DONE;
 		}
 		if (pHddCtx->config->conc_custom_rule2 &&
-			(WLAN_HDD_P2P_GO == pHostapdAdapter->device_mode)) {
+			(CDF_P2P_GO_MODE == pHostapdAdapter->device_mode)) {
 			hdd_adapter_t *sta_adapter = hdd_get_adapter(pHddCtx,
-					WLAN_HDD_INFRA_STATION);
+					CDF_STA_MODE);
 			hddLog(LOG2,
 				FL("P2PGO is going down now"));
 			hdd_issue_stored_joinreq(sta_adapter, pHddCtx);
@@ -1430,7 +1430,7 @@ CDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 			hdd_abort_mac_scan(pHddCtx, pHostapdAdapter->sessionId,
 					   eCSR_SCAN_ABORT_DEFAULT);
 		}
-		if (pHostapdAdapter->device_mode == WLAN_HDD_P2P_GO) {
+		if (pHostapdAdapter->device_mode == CDF_P2P_GO_MODE) {
 			/* send peer status indication to oem app */
 			hdd_send_peer_status_ind_to_oem_app(&pSapEvent->sapevt.
 							    sapStationAssocReassocCompleteEvent.
@@ -1550,7 +1550,7 @@ CDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 			hddLog(LOGE, FL("failed to update Beacon interval %d"),
 				cdf_status);
 		}
-		if (pHostapdAdapter->device_mode == WLAN_HDD_P2P_GO) {
+		if (pHostapdAdapter->device_mode == CDF_P2P_GO_MODE) {
 			/* send peer status indication to oem app */
 			hdd_send_peer_status_ind_to_oem_app(&pSapEvent->sapevt.
 							    sapStationDisassocCompleteEvent.
@@ -1714,7 +1714,7 @@ CDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 		/* Indicate operating channel change to hostapd
 		 * only for non driver override acs
 		 */
-		if (pHostapdAdapter->device_mode == WLAN_HDD_SOFTAP &&
+		if (pHostapdAdapter->device_mode == CDF_SAP_MODE &&
 						pHddCtx->config->force_sap_acs)
 			return CDF_STATUS_SUCCESS;
 		else
@@ -2032,7 +2032,7 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_channel,
 		return ret;
 	}
 
-	sta_adapter = hdd_get_adapter(pHddCtx, WLAN_HDD_INFRA_STATION);
+	sta_adapter = hdd_get_adapter(pHddCtx, CDF_STA_MODE);
 	/*
 	 * conc_custom_rule1:
 	 * Force SCC for SAP + STA
@@ -2431,8 +2431,8 @@ static __iw_softap_setparam(struct net_device *dev,
 		break;
 
 	case QCSAP_PARAM_SET_CHANNEL_CHANGE:
-		if ((WLAN_HDD_SOFTAP == pHostapdAdapter->device_mode) ||
-		   (WLAN_HDD_P2P_GO == pHostapdAdapter->device_mode)) {
+		if ((CDF_SAP_MODE == pHostapdAdapter->device_mode) ||
+		   (CDF_P2P_GO_MODE == pHostapdAdapter->device_mode)) {
 			hddLog(LOG1,
 			       "SET Channel Change to new channel= %d",
 			       set_value);
@@ -2854,7 +2854,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	{
 		hddLog(LOG1, "Set Dfs ignore CAC  %d", set_value);
 
-		if (pHostapdAdapter->device_mode != WLAN_HDD_SOFTAP)
+		if (pHostapdAdapter->device_mode != CDF_SAP_MODE)
 			return -EINVAL;
 
 		ret = wlansap_set_dfs_ignore_cac(hHal, set_value);
@@ -2865,7 +2865,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	{
 		hddLog(LOG1, "Set Dfs target channel  %d", set_value);
 
-		if (pHostapdAdapter->device_mode != WLAN_HDD_SOFTAP)
+		if (pHostapdAdapter->device_mode != CDF_SAP_MODE)
 			return -EINVAL;
 
 		ret = wlansap_set_dfs_target_chnl(hHal, set_value);
@@ -6058,9 +6058,9 @@ CDF_STATUS hdd_init_ap_mode(hdd_adapter_t *pAdapter)
 
 	pAdapter->sessionCtx.ap.sapContext = sapContext;
 
-	if (pAdapter->device_mode == WLAN_HDD_P2P_GO) {
+	if (pAdapter->device_mode == CDF_P2P_GO_MODE) {
 		mode = CDF_P2P_GO_MODE;
-	} else if (pAdapter->device_mode == WLAN_HDD_SOFTAP) {
+	} else if (pAdapter->device_mode == CDF_SAP_MODE) {
 		mode = CDF_SAP_MODE;
 	} else {
 		hdd_err("Invalid mode for AP: %d", pAdapter->device_mode);
@@ -6470,8 +6470,8 @@ static int wlan_hdd_set_channel(struct wiphy *wiphy,
 
 	num_ch = WNI_CFG_VALID_CHANNEL_LIST_LEN;
 
-	if ((WLAN_HDD_SOFTAP != pAdapter->device_mode) &&
-	    (WLAN_HDD_P2P_GO != pAdapter->device_mode)) {
+	if ((CDF_SAP_MODE != pAdapter->device_mode) &&
+	    (CDF_P2P_GO_MODE != pAdapter->device_mode)) {
 		if (CDF_STATUS_SUCCESS !=
 		    wlan_hdd_validate_operation_channel(pAdapter, channel)) {
 			hddLog(LOGE, FL("Invalid Channel [%d]"), channel);
@@ -6484,8 +6484,8 @@ static int wlan_hdd_set_channel(struct wiphy *wiphy,
 		       pAdapter->device_mode);
 	}
 
-	if ((pAdapter->device_mode == WLAN_HDD_INFRA_STATION)
-	    || (pAdapter->device_mode == WLAN_HDD_P2P_CLIENT)
+	if ((pAdapter->device_mode == CDF_STA_MODE)
+	    || (pAdapter->device_mode == CDF_P2P_CLIENT_MODE)
 	    ) {
 		hdd_wext_state_t *pWextState =
 			WLAN_HDD_GET_WEXT_STATE_PTR(pAdapter);
@@ -6505,11 +6505,11 @@ static int wlan_hdd_set_channel(struct wiphy *wiphy,
 		pHddStaCtx->conn_info.operationChannel = channel;
 		pRoamProfile->ChannelInfo.ChannelList =
 			&pHddStaCtx->conn_info.operationChannel;
-	} else if ((pAdapter->device_mode == WLAN_HDD_SOFTAP)
-		   || (pAdapter->device_mode == WLAN_HDD_P2P_GO)
+	} else if ((pAdapter->device_mode == CDF_SAP_MODE)
+		   || (pAdapter->device_mode == CDF_P2P_GO_MODE)
 		   ) {
 		sap_config = &((WLAN_HDD_GET_AP_CTX_PTR(pAdapter))->sapConfig);
-		if (WLAN_HDD_P2P_GO == pAdapter->device_mode) {
+		if (CDF_P2P_GO_MODE == pAdapter->device_mode) {
 			if (CDF_STATUS_SUCCESS !=
 			    wlan_hdd_validate_operation_channel(pAdapter,
 								channel)) {
@@ -6945,14 +6945,14 @@ int wlan_hdd_cfg80211_update_apies(hdd_adapter_t *adapter)
 #endif
 
 #ifdef FEATURE_WLAN_WAPI
-	if (WLAN_HDD_SOFTAP == adapter->device_mode) {
+	if (CDF_SAP_MODE == adapter->device_mode) {
 		wlan_hdd_add_extra_ie(adapter, genie, &total_ielen,
 				      WLAN_EID_WAPI);
 	}
 #endif
 
-	if (adapter->device_mode == WLAN_HDD_SOFTAP ||
-		adapter->device_mode == WLAN_HDD_P2P_GO)
+	if (adapter->device_mode == CDF_SAP_MODE ||
+		adapter->device_mode == CDF_P2P_GO_MODE)
 		wlan_hdd_add_hostapd_conf_vsie(adapter, genie,
 					       &total_ielen);
 
@@ -6964,7 +6964,7 @@ int wlan_hdd_cfg80211_update_apies(hdd_adapter_t *adapter)
 	}
 
 #ifdef QCA_HT_2040_COEX
-	if (WLAN_HDD_SOFTAP == adapter->device_mode) {
+	if (CDF_SAP_MODE == adapter->device_mode) {
 		tSmeConfigParams smeConfig;
 		cdf_mem_zero(&smeConfig, sizeof(smeConfig));
 		sme_get_config_param(WLAN_HDD_GET_HAL_CTX(adapter),
@@ -7255,7 +7255,7 @@ int wlan_hdd_setup_driver_overrides(hdd_adapter_t *ap_adapter)
 	hdd_context_t *hdd_ctx = WLAN_HDD_GET_CTX(ap_adapter);
 	tHalHandle h_hal = WLAN_HDD_GET_HAL_CTX(ap_adapter);
 
-	if (ap_adapter->device_mode == WLAN_HDD_SOFTAP &&
+	if (ap_adapter->device_mode == CDF_SAP_MODE &&
 				hdd_ctx->config->force_sap_acs)
 		goto setup_acs_overrides;
 
@@ -7433,7 +7433,7 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 	hddLog(LOG2, FL("****pConfig->dtim_period=%d***"),
 		pConfig->dtim_period);
 
-	if (pHostapdAdapter->device_mode == WLAN_HDD_SOFTAP) {
+	if (pHostapdAdapter->device_mode == CDF_SAP_MODE) {
 		pIe =
 			wlan_hdd_cfg80211_get_ie_ptr(pBeacon->tail,
 						     pBeacon->tail_len,
@@ -7485,7 +7485,7 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 		wlan_sap_set_channel_avoidance(hHal,
 					iniConfig->sap_channel_avoidance);
 #endif
-	} else if (pHostapdAdapter->device_mode == WLAN_HDD_P2P_GO) {
+	} else if (pHostapdAdapter->device_mode == CDF_P2P_GO_MODE) {
 		pConfig->countryCode[0] = pHddCtx->reg.alpha2[0];
 		pConfig->countryCode[1] = pHddCtx->reg.alpha2[1];
 		pConfig->ieee80211d = 0;
@@ -7673,7 +7673,7 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 	 */
 	if ((0 == pHddCtx->config->conc_custom_rule1) ||
 		(pHddCtx->config->conc_custom_rule1 &&
-		WLAN_HDD_SOFTAP == pHostapdAdapter->device_mode))
+		CDF_SAP_MODE == pHostapdAdapter->device_mode))
 		pConfig->cc_switch_mode = iniConfig->WlanMccToSccSwitchMode;
 #endif
 
@@ -7788,7 +7788,7 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 	/* Enable OBSS protection */
 	pConfig->obssProtEnabled = iniConfig->apOBSSProtEnabled;
 
-	if (pHostapdAdapter->device_mode == WLAN_HDD_SOFTAP)
+	if (pHostapdAdapter->device_mode == CDF_SAP_MODE)
 		pConfig->sap_dot11mc =
 		    (WLAN_HDD_GET_CTX(pHostapdAdapter))->config->sap_dot11mc;
 	else /* for P2P-Go case */
@@ -7826,7 +7826,7 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 	}
 
 	if (!cds_allow_concurrency(
-				cds_convert_device_mode_to_hdd_type(
+				cds_convert_device_mode_to_cdf_type(
 				pHostapdAdapter->device_mode),
 				pConfig->channel, HW_MODE_20_MHZ)) {
 		hddLog(LOGW,
@@ -7894,7 +7894,7 @@ static int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 #endif /* DHCP_SERVER_OFFLOAD */
 
 #ifdef WLAN_FEATURE_P2P_DEBUG
-	if (pHostapdAdapter->device_mode == WLAN_HDD_P2P_GO) {
+	if (pHostapdAdapter->device_mode == CDF_P2P_GO_MODE) {
 		if (global_p2p_connection_status == P2P_GO_NEG_COMPLETED) {
 			global_p2p_connection_status = P2P_GO_COMPLETED_STATE;
 			hddLog(LOGE,
@@ -7952,8 +7952,8 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	if (0 != ret)
 		return ret;
 
-	if (!(pAdapter->device_mode == WLAN_HDD_SOFTAP ||
-	      pAdapter->device_mode == WLAN_HDD_P2P_GO)) {
+	if (!(pAdapter->device_mode == CDF_SAP_MODE ||
+	      pAdapter->device_mode == CDF_P2P_GO_MODE)) {
 		return -EOPNOTSUPP;
 	}
 
@@ -7965,9 +7965,9 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	while (NULL != pAdapterNode && CDF_STATUS_SUCCESS == status) {
 		staAdapter = pAdapterNode->pAdapter;
 
-		if (WLAN_HDD_INFRA_STATION == staAdapter->device_mode ||
-		    (WLAN_HDD_P2P_CLIENT == staAdapter->device_mode) ||
-		    (WLAN_HDD_P2P_GO == staAdapter->device_mode)) {
+		if (CDF_STA_MODE == staAdapter->device_mode ||
+		    (CDF_P2P_CLIENT_MODE == staAdapter->device_mode) ||
+		    (CDF_P2P_GO_MODE == staAdapter->device_mode)) {
 			pScanInfo = &staAdapter->scan_info;
 
 			if (pScanInfo && pScanInfo->mScanPending) {
@@ -7998,7 +7998,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	 * then lets finish it and go ahead from there.
 	 */
 	if (pHddCtx->config->conc_custom_rule1 &&
-	    (WLAN_HDD_SOFTAP == pAdapter->device_mode)) {
+	    (CDF_SAP_MODE == pAdapter->device_mode)) {
 		cds_flush_work(&pHddCtx->sap_start_work);
 		hddLog(LOGW, FL("Canceled the pending restart work"));
 		spin_lock(&pHddCtx->sap_update_info_lock);
@@ -8080,7 +8080,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	wlan_hdd_reset_prob_rspies(pAdapter);
 
 #ifdef WLAN_FEATURE_P2P_DEBUG
-	if ((pAdapter->device_mode == WLAN_HDD_P2P_GO) &&
+	if ((pAdapter->device_mode == CDF_P2P_GO_MODE) &&
 	    (global_p2p_connection_status == P2P_GO_COMPLETED_STATE)) {
 		hddLog(LOGE,
 			"[P2P State] From GO completed to Inactive state GO got removed");
@@ -8195,7 +8195,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 
 	/* check if concurrency is allowed */
 	if (!cds_allow_concurrency(
-				cds_convert_device_mode_to_hdd_type(
+				cds_convert_device_mode_to_cdf_type(
 				pAdapter->device_mode),
 				channel,
 				channel_width)) {
@@ -8224,8 +8224,8 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		}
 	}
 
-	if ((pAdapter->device_mode == WLAN_HDD_SOFTAP)
-	    || (pAdapter->device_mode == WLAN_HDD_P2P_GO)
+	if ((pAdapter->device_mode == CDF_SAP_MODE)
+	    || (pAdapter->device_mode == CDF_P2P_GO_MODE)
 	    ) {
 		beacon_data_t *old, *new;
 		enum nl80211_channel_type channel_type;
@@ -8342,8 +8342,8 @@ static int __wlan_hdd_cfg80211_change_beacon(struct wiphy *wiphy,
 	if (0 != status)
 		return status;
 
-	if (!(pAdapter->device_mode == WLAN_HDD_SOFTAP ||
-	      pAdapter->device_mode == WLAN_HDD_P2P_GO)) {
+	if (!(pAdapter->device_mode == CDF_SAP_MODE ||
+	      pAdapter->device_mode == CDF_P2P_GO_MODE)) {
 		return -EOPNOTSUPP;
 	}
 
