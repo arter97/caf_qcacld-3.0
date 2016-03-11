@@ -1890,7 +1890,7 @@ int wma_oem_capability_event_callback(void *handle,
 	}
 
 	/*
-	 *  wma puts 4 bytes prefix for msg subtype, so length
+	 * wma puts 4 bytes prefix for msg subtype, so length
 	 * of data received from target should be 4 bytes less
 	 * then max allowed
 	 */
@@ -1905,12 +1905,21 @@ int wma_oem_capability_event_callback(void *handle,
 		WMA_LOGE("%s: Failed to alloc pStartOemDataRsp", __func__);
 		return -ENOMEM;
 	}
+
 	pStartOemDataRsp->rsp_len = datalen + OEM_MESSAGE_SUBTYPE_LEN;
-	pStartOemDataRsp->oem_data_rsp = cdf_mem_malloc(datalen);
-	if (!pStartOemDataRsp->oem_data_rsp) {
-		WMA_LOGE(FL("malloc failed for oem_data_rsp"));
+	if (pStartOemDataRsp->rsp_len) {
+		pStartOemDataRsp->oem_data_rsp =
+				cdf_mem_malloc(pStartOemDataRsp->rsp_len);
+		if (!pStartOemDataRsp->oem_data_rsp) {
+			WMA_LOGE(FL("malloc failed for oem_data_rsp"));
+			cdf_mem_free(pStartOemDataRsp);
+			return -ENOMEM;
+		}
+	} else {
+		WMA_LOGE(FL("Invalid rsp length: %d"),
+			 pStartOemDataRsp->rsp_len);
 		cdf_mem_free(pStartOemDataRsp);
-		return -ENOMEM;
+		return -EINVAL;
 	}
 
 	pStartOemDataRsp->target_rsp = true;
@@ -1976,12 +1985,21 @@ int wma_oem_measurement_report_event_callback(void *handle,
 		WMA_LOGE("%s: Failed to alloc pStartOemDataRsp", __func__);
 		return -ENOMEM;
 	}
+
 	pStartOemDataRsp->rsp_len = datalen + OEM_MESSAGE_SUBTYPE_LEN;
-	pStartOemDataRsp->oem_data_rsp = cdf_mem_malloc(datalen);
-	if (!pStartOemDataRsp->oem_data_rsp) {
-		WMA_LOGE(FL("malloc failed for oem_data_rsp"));
+	if (pStartOemDataRsp->rsp_len) {
+		pStartOemDataRsp->oem_data_rsp =
+				cdf_mem_malloc(pStartOemDataRsp->rsp_len);
+		if (!pStartOemDataRsp->oem_data_rsp) {
+			WMA_LOGE(FL("malloc failed for oem_data_rsp"));
+			cdf_mem_free(pStartOemDataRsp);
+			return -ENOMEM;
+		}
+	} else {
+		WMA_LOGE(FL("Invalid rsp length: %d"),
+			 pStartOemDataRsp->rsp_len);
 		cdf_mem_free(pStartOemDataRsp);
-		return -ENOMEM;
+		return -EINVAL;
 	}
 
 	pStartOemDataRsp->target_rsp = true;
@@ -1989,10 +2007,10 @@ int wma_oem_measurement_report_event_callback(void *handle,
 	*msg_subtype = WMI_OEM_MEASUREMENT_RSP;
 	/* copy data after msg sub type */
 	cdf_mem_copy(pStartOemDataRsp->oem_data_rsp + OEM_MESSAGE_SUBTYPE_LEN,
-		     data, pStartOemDataRsp->rsp_len);
+		     data, datalen);
 
 	WMA_LOGI("%s: Sending WMA_START_OEM_DATA_RSP, data len (%d)",
-		 __func__, datalen);
+		 __func__, pStartOemDataRsp->rsp_len);
 
 	wma_send_msg(wma, WMA_START_OEM_DATA_RSP, (void *)pStartOemDataRsp, 0);
 	return 0;
@@ -2046,12 +2064,21 @@ int wma_oem_error_report_event_callback(void *handle,
 		WMA_LOGE("%s: Failed to alloc pStartOemDataRsp", __func__);
 		return -ENOMEM;
 	}
+
 	pStartOemDataRsp->rsp_len = datalen + OEM_MESSAGE_SUBTYPE_LEN;
-	pStartOemDataRsp->oem_data_rsp = cdf_mem_malloc(datalen);
-	if (!pStartOemDataRsp->oem_data_rsp) {
-		WMA_LOGE(FL("malloc failed for oem_data_rsp"));
+	if (pStartOemDataRsp->rsp_len) {
+		pStartOemDataRsp->oem_data_rsp =
+				cdf_mem_malloc(pStartOemDataRsp->rsp_len);
+		if (!pStartOemDataRsp->oem_data_rsp) {
+			WMA_LOGE(FL("malloc failed for oem_data_rsp"));
+			cdf_mem_free(pStartOemDataRsp);
+			return -ENOMEM;
+		}
+	} else {
+		WMA_LOGE(FL("Invalid rsp length: %d"),
+			 pStartOemDataRsp->rsp_len);
 		cdf_mem_free(pStartOemDataRsp);
-		return -ENOMEM;
+		return -EINVAL;
 	}
 
 	pStartOemDataRsp->target_rsp = true;
@@ -2059,10 +2086,10 @@ int wma_oem_error_report_event_callback(void *handle,
 	*msg_subtype = WMI_OEM_ERROR_REPORT_RSP;
 	/* copy data after msg sub type */
 	cdf_mem_copy(pStartOemDataRsp->oem_data_rsp + OEM_MESSAGE_SUBTYPE_LEN,
-		     data, pStartOemDataRsp->rsp_len);
+		     data, datalen);
 
 	WMA_LOGI("%s: Sending WMA_START_OEM_DATA_RSP, data len (%d)",
-		 __func__, datalen);
+		 __func__, pStartOemDataRsp->rsp_len);
 
 	wma_send_msg(wma, WMA_START_OEM_DATA_RSP, (void *)pStartOemDataRsp, 0);
 	return 0;
@@ -2111,11 +2138,18 @@ int wma_oem_data_response_handler(void *handle,
 		return -ENOMEM;
 	}
 	oem_rsp->rsp_len = datalen;
-	oem_rsp->oem_data_rsp = cdf_mem_malloc(datalen);
-	if (!oem_rsp->rsp_len) {
-		WMA_LOGE(FL("malloc failed for oem_data_rsp"));
+	if (oem_rsp->rsp_len) {
+		oem_rsp->oem_data_rsp = cdf_mem_malloc(oem_rsp->rsp_len);
+		if (!oem_rsp->oem_data_rsp) {
+			WMA_LOGE(FL("malloc failed for oem_data_rsp"));
+			cdf_mem_free(oem_rsp);
+			return -ENOMEM;
+		}
+	} else {
+		WMA_LOGE(FL("Invalid rsp length: %d"),
+			 oem_rsp->rsp_len);
 		cdf_mem_free(oem_rsp);
-		return -ENOMEM;
+		return -EINVAL;
 	}
 
 	oem_rsp->target_rsp = true;
