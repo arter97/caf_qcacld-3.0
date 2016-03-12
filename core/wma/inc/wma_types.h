@@ -528,6 +528,7 @@ typedef struct sUapsd_Params {
 	uint8_t beTriggerEnabled:1;
 	uint8_t viTriggerEnabled:1;
 	uint8_t voTriggerEnabled:1;
+	bool enable_ps;
 } tUapsd_Params, *tpUapsd_Params;
 
 /**
