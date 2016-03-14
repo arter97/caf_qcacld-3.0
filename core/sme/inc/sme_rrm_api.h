@@ -56,11 +56,6 @@ CDF_STATUS rrm_change_default_config_param(tpAniSirGlobal pMac,
 CDF_STATUS sme_rrm_neighbor_report_request(tpAniSirGlobal pMac,
 		uint8_t sessionId, tpRrmNeighborReq pNeighborReq,
 		tpRrmNeighborRspCallbackInfo callbackInfo);
-tRrmNeighborReportDesc *sme_rrm_get_first_bss_entry_from_neighbor_cache(
-		tpAniSirGlobal pMac);
-tRrmNeighborReportDesc *sme_rrm_get_next_bss_entry_from_neighbor_cache(
-		tpAniSirGlobal pMac,
-		tpRrmNeighborReportDesc pBssEntry);
 CDF_STATUS sme_rrm_process_beacon_report_req_ind(tpAniSirGlobal pMac,
 		void *pMsgBuf);
 
