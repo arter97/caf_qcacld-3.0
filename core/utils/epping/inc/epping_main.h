@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -39,12 +39,13 @@
    Include files
    -------------------------------------------------------------------------*/
 #include <cdf_lock.h>
+#include <cdf_types.h>
 
 #define WLAN_EPPING_ENABLE_BIT          (1 << 8)
 #define WLAN_EPPING_IRQ_BIT             (1 << 9)
 #define WLAN_EPPING_FW_UART_BIT         (1 << 10)
-#define WLAN_IS_EPPING_ENABLED(x)       (x & WLAN_EPPING_ENABLE_BIT)
-#define WLAN_IS_EPPING_IRQ(x)           (x & WLAN_EPPING_IRQ_BIT)
+#define WLAN_IS_EPPING_ENABLED(x)       (x == CDF_GLOBAL_EPPING_MODE)
+#define WLAN_IS_EPPING_IRQ(x)           1
 #define WLAN_IS_EPPING_FW_UART(x)       (x & WLAN_EPPING_FW_UART_BIT)
 
 /* epping_main signatures */
