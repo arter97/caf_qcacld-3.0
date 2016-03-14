@@ -766,6 +766,8 @@ CDF_STATUS wma_update_channel_list(WMA_HANDLE handle,
 	WMA_LOGD("no of channels = %d, len = %d", chan_list->numChan, len);
 
 	cmd->num_scan_chans = chan_list->numChan;
+	wma_handle->saved_chan.num_channels = chan_list->numChan;
+
 	WMITLV_SET_HDR((buf_ptr + sizeof(wmi_scan_chan_list_cmd_fixed_param)),
 		       WMITLV_TAG_ARRAY_STRUC,
 		       sizeof(wmi_channel) * chan_list->numChan);
@@ -779,8 +781,11 @@ CDF_STATUS wma_update_channel_list(WMA_HANDLE handle,
 			cds_chan_to_freq(chan_list->chanParam[i].chanId);
 		chan_info->band_center_freq1 = chan_info->mhz;
 		chan_info->band_center_freq2 = 0;
+		wma_handle->saved_chan.channel_list[i] =
+					chan_list->chanParam[i].chanId;
 
-		WMA_LOGD("chan[%d] = %u", i, chan_info->mhz);
+		WMA_LOGD("chan[%d] = freq:%u chan:%d", i, chan_info->mhz,
+			chan_list->chanParam[i].chanId);
 		if (chan_list->chanParam[i].dfsSet) {
 			WMI_SET_CHANNEL_FLAG(chan_info, WMI_CHAN_FLAG_PASSIVE);
 			WMA_LOGI("chan[%d] DFS[%d]\n",

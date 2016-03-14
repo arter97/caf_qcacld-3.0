@@ -3437,16 +3437,16 @@ void cds_clear_concurrency_mode(enum tCDF_ADAPTER_MODE mode)
 }
 
 /**
- * cds_soc_set_pcl() - Sets PCL to FW
+ * cds_pdev_set_pcl() - Sets PCL to FW
  * @mode: adapter mode
  *
  * Fetches the PCL and sends the PCL to SME
  * module which in turn will send the WMI
- * command WMI_SOC_SET_PCL_CMDID to the fw
+ * command WMI_PDEV_SET_PCL_CMDID to the fw
  *
  * Return: None
  */
-static void cds_soc_set_pcl(enum tCDF_ADAPTER_MODE mode)
+static void cds_pdev_set_pcl(enum tCDF_ADAPTER_MODE mode)
 {
 	CDF_STATUS status;
 	enum cds_con_mode con_mode;
@@ -3484,13 +3484,14 @@ static void cds_soc_set_pcl(enum tCDF_ADAPTER_MODE mode)
 	cds_debug("get pcl to set it to the FW");
 
 	status = cds_get_pcl(con_mode,
-			pcl.pcl_list, &pcl.pcl_len);
+			pcl.pcl_list, &pcl.pcl_len,
+			pcl.weight_list, CDF_ARRAY_SIZE(pcl.weight_list));
 	if (status != CDF_STATUS_SUCCESS) {
 		cds_err("Unable to set PCL to FW, Get PCL failed");
 		return;
 	}
 
-	status = sme_soc_set_pcl(hdd_ctx->hHal, pcl);
+	status = sme_pdev_set_pcl(hdd_ctx->hHal, pcl);
 	if (status != CDF_STATUS_SUCCESS)
 		cds_err("Send soc set PCL to SME failed");
 	else
@@ -3551,7 +3552,7 @@ void cds_incr_active_session(enum tCDF_ADAPTER_MODE mode,
 	 */
 	if (mode == CDF_STA_MODE) {
 		/* Set PCL of STA to the FW */
-		cds_soc_set_pcl(mode);
+		cds_pdev_set_pcl(mode);
 		cds_info("Set PCL of STA to FW");
 	}
 	cds_incr_connection_count(session_id);
@@ -3670,7 +3671,7 @@ static void cds_set_pcl_for_existing_combo(enum cds_con_mode mode)
 		/* Check, store and temp delete the mode's parameter */
 		cds_store_and_del_conn_info(mode, &info);
 		/* Set the PCL to the FW since connection got updated */
-		cds_soc_set_pcl(pcl_mode);
+		cds_pdev_set_pcl(pcl_mode);
 		cds_info("Set PCL to FW for mode:%d", mode);
 		/* Restore the connection info */
 		cds_restore_deleted_conn_info(&info);
@@ -3680,13 +3681,18 @@ static void cds_set_pcl_for_existing_combo(enum cds_con_mode mode)
 /**
  * cds_get_pcl_for_existing_conn() - Get PCL for existing connection
  * @mode: Connection mode of type 'cds_con_mode'
+ * @pcl_ch: Pointer to the PCL
+ * @len: Pointer to the length of the PCL
+ * @pcl_weight: Pointer to the weights of the PCL
+ * @weight_len: Max length of the weights list
  *
  * Get the PCL for an existing connection
  *
  * Return: None
  */
 CDF_STATUS cds_get_pcl_for_existing_conn(enum cds_con_mode mode,
-			uint8_t *pcl_ch, uint32_t *len)
+			uint8_t *pcl_ch, uint32_t *len,
+			uint8_t *pcl_weight, uint32_t weight_len)
 {
 	struct cds_conc_connection_info info;
 
@@ -3702,7 +3708,7 @@ CDF_STATUS cds_get_pcl_for_existing_conn(enum cds_con_mode mode,
 		/* Check, store and temp delete the mode's parameter */
 		cds_store_and_del_conn_info(mode, &info);
 		/* Set the PCL to the FW since connection got updated */
-		status = cds_get_pcl(mode, pcl_ch, len);
+		status = cds_get_pcl(mode, pcl_ch, len, pcl_weight, weight_len);
 		cds_info("Get PCL to FW for mode:%d", mode);
 		/* Restore the connection info */
 		cds_restore_deleted_conn_info(&info);
@@ -4286,6 +4292,10 @@ CDF_STATUS cds_decr_connection_count(uint32_t vdev_id)
  * @order:	no order OR 2.4 Ghz channel followed by 5 Ghz
  *	channel OR 5 Ghz channel followed by 2.4 Ghz channel
  * @skip_dfs_channel: if this flag is true then skip the dfs channel
+ * @pcl_weight: Pointer to the weights of PCL
+ * @weight_len: Max length of the weight list
+ * @index: Index from which the weight list needs to be populated
+ * @group_id: Next available groups for weight assignment
  *
  * This function provides the channel(s) on which current
  * connection(s) is/are
@@ -4293,11 +4303,14 @@ CDF_STATUS cds_decr_connection_count(uint32_t vdev_id)
  * Return: CDF_STATUS
  */
 CDF_STATUS cds_get_connection_channels(uint8_t *channels,
-			uint32_t *len, uint8_t order,
-			bool skip_dfs_channel)
+			uint32_t *len, enum cds_pcl_channel_order order,
+			bool skip_dfs_channel,
+			uint8_t *pcl_weight, uint32_t weight_len,
+			uint32_t *index, enum cds_pcl_group_id group_id)
 {
 	CDF_STATUS status = CDF_STATUS_SUCCESS;
 	uint32_t conn_index = 0, num_channels = 0;
+	uint32_t weight1, weight2;
 
 	if ((NULL == channels) || (NULL == len)) {
 		cds_err("channels or len is NULL");
@@ -4305,58 +4318,99 @@ CDF_STATUS cds_get_connection_channels(uint8_t *channels,
 		return status;
 	}
 
-	if (0 == order) {
+	/* CDS_PCL_GROUP_ID1_ID2 indicates that all three weights are
+	 * available for assignment. i.e., WEIGHT_OF_GROUP1_PCL_CHANNELS,
+	 * WEIGHT_OF_GROUP2_PCL_CHANNELS and WEIGHT_OF_GROUP3_PCL_CHANNELS
+	 * are all available. Since in this function only two weights are
+	 * assigned at max, only group1 and group2 weights are considered.
+	 *
+	 * The other possible group id CDS_PCL_GROUP_ID2_ID3 indicates that
+	 * group1 was assigned the weight WEIGHT_OF_GROUP1_PCL_CHANNELS and
+	 * only weights WEIGHT_OF_GROUP2_PCL_CHANNELS and
+	 * WEIGHT_OF_GROUP3_PCL_CHANNELS are available for further weight
+	 * assignments.
+	 *
+	 * e.g., when order is CDS_PCL_ORDER_24G_THEN_5G and group id is
+	 * CDS_PCL_GROUP_ID2_ID3, WEIGHT_OF_GROUP2_PCL_CHANNELS is assigned to
+	 * 2.4GHz channels and the weight WEIGHT_OF_GROUP3_PCL_CHANNELS is
+	 * assigned to the 5GHz channels.
+	 */
+	if (group_id == CDS_PCL_GROUP_ID1_ID2) {
+		weight1 = WEIGHT_OF_GROUP1_PCL_CHANNELS;
+		weight2 = WEIGHT_OF_GROUP2_PCL_CHANNELS;
+	} else {
+		weight1 = WEIGHT_OF_GROUP2_PCL_CHANNELS;
+		weight2 = WEIGHT_OF_GROUP3_PCL_CHANNELS;
+	}
+
+	if (CDS_PCL_ORDER_NONE == order) {
 		while (CONC_CONNECTION_LIST_VALID_INDEX(conn_index)) {
 			if (skip_dfs_channel && CDS_IS_DFS_CH(
-					conc_connection_list[conn_index].chan))
+				    conc_connection_list[conn_index].chan)) {
 				conn_index++;
-			else
+			} else {
 				channels[num_channels++] =
 					conc_connection_list[conn_index++].chan;
+				if (*index < weight_len)
+					pcl_weight[(*index)++] = weight1;
+			}
 		}
 		*len = num_channels;
-	} else if (1 == order) {
+	} else if (CDS_PCL_ORDER_24G_THEN_5G == order) {
 		while (CONC_CONNECTION_LIST_VALID_INDEX(conn_index)) {
 			if (CDS_IS_CHANNEL_24GHZ(
-					conc_connection_list[conn_index].chan))
+				    conc_connection_list[conn_index].chan)) {
 				channels[num_channels++] =
 					conc_connection_list[conn_index++].chan;
-			else
+				if (*index < weight_len)
+					pcl_weight[(*index)++] = weight1;
+			} else {
 				conn_index++;
+			}
 		}
 		conn_index = 0;
 		while (CONC_CONNECTION_LIST_VALID_INDEX(conn_index)) {
 			if (skip_dfs_channel && CDS_IS_DFS_CH(
-					conc_connection_list[conn_index].chan))
+				    conc_connection_list[conn_index].chan)) {
 				conn_index++;
-			else if (CDS_IS_CHANNEL_5GHZ(
-					conc_connection_list[conn_index].chan))
+			} else if (CDS_IS_CHANNEL_5GHZ(
+				    conc_connection_list[conn_index].chan)) {
 				channels[num_channels++] =
 					conc_connection_list[conn_index++].chan;
-			else
+				if (*index < weight_len)
+					pcl_weight[(*index)++] = weight2;
+			} else {
 				conn_index++;
+			}
 		}
 		*len = num_channels;
-	} else if (2 == order) {
+	} else if (CDS_PCL_ORDER_5G_THEN_2G == order) {
 		while (CONC_CONNECTION_LIST_VALID_INDEX(conn_index)) {
 			if (skip_dfs_channel && CDS_IS_DFS_CH(
-					conc_connection_list[conn_index].chan))
+				conc_connection_list[conn_index].chan)) {
 				conn_index++;
-			else if (CDS_IS_CHANNEL_5GHZ(
-					conc_connection_list[conn_index].chan))
+			} else if (CDS_IS_CHANNEL_5GHZ(
+				    conc_connection_list[conn_index].chan)) {
 				channels[num_channels++] =
 					conc_connection_list[conn_index++].chan;
-			else
+				if (*index < weight_len)
+					pcl_weight[(*index)++] = weight1;
+			} else {
 				conn_index++;
+			}
 		}
 		conn_index = 0;
 		while (CONC_CONNECTION_LIST_VALID_INDEX(conn_index)) {
 			if (CDS_IS_CHANNEL_24GHZ(
-					conc_connection_list[conn_index].chan))
+				    conc_connection_list[conn_index].chan)) {
 				channels[num_channels++] =
 					conc_connection_list[conn_index++].chan;
-			else
+				if (*index < weight_len)
+					pcl_weight[(*index)++] = weight2;
+
+			} else {
 				conn_index++;
+			}
 		}
 		*len = num_channels;
 	} else {
@@ -4371,6 +4425,8 @@ CDF_STATUS cds_get_connection_channels(uint8_t *channels,
  * channel list
  * @pcl_channels: channel list
  * @len: length of the list
+ * @weight_list: Weights of the PCL
+ * @weight_len: Max length of the weights list
  *
  * This function provides the safe channel list from the list
  * provided after consulting the channel avoidance list
@@ -4378,10 +4434,12 @@ CDF_STATUS cds_get_connection_channels(uint8_t *channels,
  * Return: None
  */
 #ifdef CONFIG_CNSS
-void cds_update_with_safe_channel_list(uint8_t *pcl_channels, uint32_t *len)
+void cds_update_with_safe_channel_list(uint8_t *pcl_channels, uint32_t *len,
+				uint8_t *weight_list, uint32_t weight_len)
 {
 	uint16_t unsafe_channel_list[MAX_NUM_CHAN];
 	uint8_t current_channel_list[MAX_NUM_CHAN];
+	uint8_t org_weight_list[MAX_NUM_CHAN];
 	uint16_t unsafe_channel_count = 0;
 	uint8_t is_unsafe = 1;
 	uint8_t i, j;
@@ -4404,6 +4462,9 @@ void cds_update_with_safe_channel_list(uint8_t *pcl_channels, uint32_t *len)
 		cdf_mem_zero(pcl_channels,
 			sizeof(*pcl_channels)*current_channel_count);
 
+		cdf_mem_copy(org_weight_list, weight_list, MAX_NUM_CHAN);
+		cdf_mem_zero(weight_list, weight_len);
+
 		for (i = 0; i < current_channel_count; i++) {
 			is_unsafe = 0;
 			for (j = 0; j < unsafe_channel_count; j++) {
@@ -4419,6 +4480,9 @@ void cds_update_with_safe_channel_list(uint8_t *pcl_channels, uint32_t *len)
 			if (!is_unsafe) {
 				pcl_channels[safe_channel_count++] =
 					current_channel_list[i];
+				if (safe_channel_count < weight_len)
+					weight_list[safe_channel_count++] =
+						org_weight_list[i];
 			}
 		}
 		*len = safe_channel_count;
@@ -4426,7 +4490,8 @@ void cds_update_with_safe_channel_list(uint8_t *pcl_channels, uint32_t *len)
 	return;
 }
 #else
-void cds_update_with_safe_channel_list(uint8_t *pcl_channels, uint32_t *len)
+void cds_update_with_safe_channel_list(uint8_t *pcl_channels, uint32_t *len,
+				uint8_t *weight_list, uint32_t weight_len)
 {
 	return;
 }
@@ -4434,11 +4499,12 @@ void cds_update_with_safe_channel_list(uint8_t *pcl_channels, uint32_t *len)
 /**
  * cds_get_channel_list() - provides the channel list
  * suggestion for new connection
- * @hdd_ctx:	HDD Context
  * @pcl:	The preferred channel list enum
  * @pcl_channels: PCL channels
  * @len: length of the PCL
  * @mode: concurrency mode for which channel list is requested
+ * @pcl_weights: Weights of the PCL
+ * @weight_len: Max length of the weight list
  *
  * This function provides the actual channel list based on the
  * current regulatory domain derived using preferred channel
@@ -4447,7 +4513,9 @@ void cds_update_with_safe_channel_list(uint8_t *pcl_channels, uint32_t *len)
  * Return: Channel List
  */
 CDF_STATUS cds_get_channel_list(enum cds_pcl_type pcl,
-		uint8_t *pcl_channels, uint32_t *len, enum cds_con_mode mode)
+			uint8_t *pcl_channels, uint32_t *len,
+			enum cds_con_mode mode,
+			uint8_t *pcl_weights, uint32_t weight_len)
 {
 	CDF_STATUS status = CDF_STATUS_E_FAILURE;
 	uint32_t num_channels = WNI_CFG_VALID_CHANNEL_LIST_LEN;
@@ -4457,6 +4525,7 @@ CDF_STATUS cds_get_channel_list(enum cds_pcl_type pcl,
 	uint8_t channel_list_5[MAX_NUM_CHAN] = {0};
 	bool skip_dfs_channel = false;
 	hdd_context_t *hdd_ctx;
+	uint32_t i = 0, j = 0;
 
 	hdd_ctx = cds_get_context(CDF_MODULE_ID_HDD);
 	if (!hdd_ctx) {
@@ -4521,23 +4590,61 @@ CDF_STATUS cds_get_channel_list(enum cds_pcl_type pcl,
 	}
 
 	num_channels = 0;
+	/* In the below switch case, the channel list is populated based on the
+	 * pcl. e.g., if the pcl is CDS_SCC_CH_24G, the SCC channel group is
+	 * populated first followed by the 2.4GHz channel group. Along with
+	 * this, the weights are also populated in the same order for each of
+	 * these groups. There are three weight groups:
+	 * WEIGHT_OF_GROUP1_PCL_CHANNELS, WEIGHT_OF_GROUP2_PCL_CHANNELS and
+	 * WEIGHT_OF_GROUP3_PCL_CHANNELS.
+	 *
+	 * e.g., if pcl is CDS_SCC_ON_5_SCC_ON_24_24G: scc on 5GHz (group1)
+	 * channels take the weight WEIGHT_OF_GROUP1_PCL_CHANNELS, scc on 2.4GHz
+	 * (group2) channels take the weight WEIGHT_OF_GROUP2_PCL_CHANNELS and
+	 * 2.4GHz (group3) channels take the weight
+	 * WEIGHT_OF_GROUP3_PCL_CHANNELS.
+	 *
+	 * When the weight to be assigned to the group is known along with the
+	 * number of channels, the weights are directly assigned to the
+	 * pcl_weights list. But, the channel list is populated using
+	 * cds_get_connection_channels(), the order of weights to be used is
+	 * passed as an argument to the function cds_get_connection_channels()
+	 * using 'enum cds_pcl_group_id' which indicates the next available
+	 * weights to be used and cds_get_connection_channels() will take care
+	 * of the weight assignments.
+	 *
+	 * e.g., 'enum cds_pcl_group_id' value of CDS_PCL_GROUP_ID2_ID3
+	 * indicates that the next available groups for weight assignment are
+	 * WEIGHT_OF_GROUP2_PCL_CHANNELS and WEIGHT_OF_GROUP3_PCL_CHANNELS and
+	 * that the weight WEIGHT_OF_GROUP1_PCL_CHANNELS was already allocated.
+	 * So, in the same example, when order is CDS_PCL_ORDER_24G_THEN_5G,
+	 * cds_get_connection_channels() will assign the weight
+	 * WEIGHT_OF_GROUP2_PCL_CHANNELS to 2.4GHz channels and assign the
+	 * weight WEIGHT_OF_GROUP3_PCL_CHANNELS to 5GHz channels.
+	 */
 	switch (pcl) {
 	case CDS_24G:
 		cdf_mem_copy(pcl_channels, channel_list_24,
 			chan_index_24);
 		*len = chan_index_24;
+		for (i = 0; ((i < *len) && (i < weight_len)); i++)
+			pcl_weights[i] = WEIGHT_OF_GROUP1_PCL_CHANNELS;
 		status = CDF_STATUS_SUCCESS;
 		break;
 	case CDS_5G:
 		cdf_mem_copy(pcl_channels, channel_list_5,
 			chan_index_5);
 		*len = chan_index_5;
+		for (i = 0; ((i < *len) && (i < weight_len)); i++)
+			pcl_weights[i] = WEIGHT_OF_GROUP1_PCL_CHANNELS;
 		status = CDF_STATUS_SUCCESS;
 		break;
 	case CDS_SCC_CH:
 	case CDS_MCC_CH:
 		cds_get_connection_channels(
-			channel_list, &num_channels, 0, skip_dfs_channel);
+			channel_list, &num_channels, CDS_PCL_ORDER_NONE,
+			skip_dfs_channel, pcl_weights, weight_len, &i,
+			CDS_PCL_GROUP_ID1_ID2);
 		cdf_mem_copy(pcl_channels, channel_list, num_channels);
 		*len = num_channels;
 		status = CDF_STATUS_SUCCESS;
@@ -4545,24 +4652,33 @@ CDF_STATUS cds_get_channel_list(enum cds_pcl_type pcl,
 	case CDS_SCC_CH_24G:
 	case CDS_MCC_CH_24G:
 		cds_get_connection_channels(
-			channel_list, &num_channels, 0, skip_dfs_channel);
+			channel_list, &num_channels, CDS_PCL_ORDER_NONE,
+			skip_dfs_channel, pcl_weights, weight_len, &i,
+			CDS_PCL_GROUP_ID1_ID2);
 		cdf_mem_copy(pcl_channels, channel_list, num_channels);
 		*len = num_channels;
 		cdf_mem_copy(&pcl_channels[num_channels],
 			channel_list_24, chan_index_24);
 		*len += chan_index_24;
+		for (j = 0; ((j < chan_index_24) && (i < weight_len)); i++, j++)
+			pcl_weights[i] = WEIGHT_OF_GROUP2_PCL_CHANNELS;
+
 		status = CDF_STATUS_SUCCESS;
 		break;
 	case CDS_SCC_CH_5G:
 	case CDS_MCC_CH_5G:
 		cds_get_connection_channels(
-			channel_list, &num_channels, 0, skip_dfs_channel);
+			channel_list, &num_channels, CDS_PCL_ORDER_NONE,
+			skip_dfs_channel, pcl_weights, weight_len, &i,
+			CDS_PCL_GROUP_ID1_ID2);
 		cdf_mem_copy(pcl_channels, channel_list,
 			num_channels);
 		*len = num_channels;
 		cdf_mem_copy(&pcl_channels[num_channels],
 			channel_list_5, chan_index_5);
 		*len += chan_index_5;
+		for (j = 0; ((j < chan_index_5) && (i < weight_len)); i++, j++)
+			pcl_weights[i] = WEIGHT_OF_GROUP2_PCL_CHANNELS;
 		status = CDF_STATUS_SUCCESS;
 		break;
 	case CDS_24G_SCC_CH:
@@ -4570,8 +4686,12 @@ CDF_STATUS cds_get_channel_list(enum cds_pcl_type pcl,
 		cdf_mem_copy(pcl_channels, channel_list_24,
 			chan_index_24);
 		*len = chan_index_24;
+		for (i = 0; ((i < chan_index_24) && (i < weight_len)); i++)
+			pcl_weights[i] = WEIGHT_OF_GROUP1_PCL_CHANNELS;
 		cds_get_connection_channels(
-			channel_list, &num_channels, 0, skip_dfs_channel);
+			channel_list, &num_channels, CDS_PCL_ORDER_NONE,
+			skip_dfs_channel, pcl_weights, weight_len, &i,
+			CDS_PCL_GROUP_ID2_ID3);
 		cdf_mem_copy(&pcl_channels[chan_index_24],
 			channel_list, num_channels);
 		*len += num_channels;
@@ -4582,8 +4702,12 @@ CDF_STATUS cds_get_channel_list(enum cds_pcl_type pcl,
 		cdf_mem_copy(pcl_channels, channel_list_5,
 			chan_index_5);
 		*len = chan_index_5;
+		for (i = 0; ((i < chan_index_5) && (i < weight_len)); i++)
+			pcl_weights[i] = WEIGHT_OF_GROUP1_PCL_CHANNELS;
 		cds_get_connection_channels(
-			channel_list, &num_channels, 0, skip_dfs_channel);
+			channel_list, &num_channels, CDS_PCL_ORDER_NONE,
+			skip_dfs_channel, pcl_weights, weight_len, &i,
+			CDS_PCL_GROUP_ID2_ID3);
 		cdf_mem_copy(&pcl_channels[chan_index_5],
 			channel_list, num_channels);
 		*len += num_channels;
@@ -4591,7 +4715,9 @@ CDF_STATUS cds_get_channel_list(enum cds_pcl_type pcl,
 		break;
 	case CDS_SCC_ON_24_SCC_ON_5:
 		cds_get_connection_channels(
-			channel_list, &num_channels, 1, skip_dfs_channel);
+			channel_list, &num_channels, CDS_PCL_ORDER_24G_THEN_5G,
+			skip_dfs_channel, pcl_weights, weight_len, &i,
+			CDS_PCL_GROUP_ID1_ID2);
 		cdf_mem_copy(pcl_channels, channel_list,
 			num_channels);
 		*len = num_channels;
@@ -4599,49 +4725,67 @@ CDF_STATUS cds_get_channel_list(enum cds_pcl_type pcl,
 		break;
 	case CDS_SCC_ON_5_SCC_ON_24:
 		cds_get_connection_channels(
-			channel_list, &num_channels, 2, skip_dfs_channel);
+			channel_list, &num_channels, CDS_PCL_ORDER_5G_THEN_2G,
+			skip_dfs_channel, pcl_weights, weight_len, &i,
+			CDS_PCL_GROUP_ID1_ID2);
 		cdf_mem_copy(pcl_channels, channel_list, num_channels);
 		*len = num_channels;
 		status = CDF_STATUS_SUCCESS;
 		break;
 	case CDS_SCC_ON_24_SCC_ON_5_24G:
 		cds_get_connection_channels(
-			channel_list, &num_channels, 1, skip_dfs_channel);
+			channel_list, &num_channels, CDS_PCL_ORDER_24G_THEN_5G,
+			skip_dfs_channel, pcl_weights, weight_len, &i,
+			CDS_PCL_GROUP_ID1_ID2);
 		cdf_mem_copy(pcl_channels, channel_list, num_channels);
 		*len = num_channels;
 		cdf_mem_copy(&pcl_channels[num_channels],
 			channel_list_24, chan_index_24);
 		*len += chan_index_24;
+		for (j = 0; ((j < chan_index_24) && (i < weight_len)); i++, j++)
+			pcl_weights[i] = WEIGHT_OF_GROUP3_PCL_CHANNELS;
 		status = CDF_STATUS_SUCCESS;
 		break;
 	case CDS_SCC_ON_24_SCC_ON_5_5G:
 		cds_get_connection_channels(
-			channel_list, &num_channels, 1, skip_dfs_channel);
+			channel_list, &num_channels, CDS_PCL_ORDER_24G_THEN_5G,
+			skip_dfs_channel, pcl_weights, weight_len, &i,
+			CDS_PCL_GROUP_ID1_ID2);
 		cdf_mem_copy(pcl_channels, channel_list, num_channels);
 		*len = num_channels;
 		cdf_mem_copy(&pcl_channels[num_channels],
 			channel_list_5, chan_index_5);
 		*len += chan_index_5;
+		for (j = 0; ((j < chan_index_5) && (i < weight_len)); i++, j++)
+			pcl_weights[i] = WEIGHT_OF_GROUP3_PCL_CHANNELS;
 		status = CDF_STATUS_SUCCESS;
 		break;
 	case CDS_SCC_ON_5_SCC_ON_24_24G:
 		cds_get_connection_channels(
-			channel_list, &num_channels, 2, skip_dfs_channel);
+			channel_list, &num_channels, CDS_PCL_ORDER_5G_THEN_2G,
+			skip_dfs_channel, pcl_weights, weight_len, &i,
+			CDS_PCL_GROUP_ID1_ID2);
 		cdf_mem_copy(pcl_channels, channel_list, num_channels);
 		*len = num_channels;
 		cdf_mem_copy(&pcl_channels[num_channels],
 			channel_list_24, chan_index_24);
 		*len += chan_index_24;
+		for (j = 0; ((j < chan_index_24) && (i < weight_len)); i++, j++)
+			pcl_weights[i] = WEIGHT_OF_GROUP3_PCL_CHANNELS;
 		status = CDF_STATUS_SUCCESS;
 		break;
 	case CDS_SCC_ON_5_SCC_ON_24_5G:
 		cds_get_connection_channels(
-			channel_list, &num_channels, 2, skip_dfs_channel);
+			channel_list, &num_channels, CDS_PCL_ORDER_5G_THEN_2G,
+			skip_dfs_channel, pcl_weights, weight_len, &i,
+			CDS_PCL_GROUP_ID1_ID2);
 		cdf_mem_copy(pcl_channels, channel_list, num_channels);
 		*len = num_channels;
 		cdf_mem_copy(&pcl_channels[num_channels],
 			channel_list_5, chan_index_5);
 		*len += chan_index_5;
+		for (j = 0; ((j < chan_index_5) && (i < weight_len)); i++, j++)
+			pcl_weights[i] = WEIGHT_OF_GROUP3_PCL_CHANNELS;
 		status = CDF_STATUS_SUCCESS;
 		break;
 	default:
@@ -4649,8 +4793,13 @@ CDF_STATUS cds_get_channel_list(enum cds_pcl_type pcl,
 		break;
 	}
 
+	if ((*len != 0) && (*len != i))
+		cds_info("pcl len (%d) and weight list len mismatch (%d)",
+			*len, i);
+
 	/* check the channel avoidance list */
-	cds_update_with_safe_channel_list(pcl_channels, len);
+	cds_update_with_safe_channel_list(pcl_channels, len,
+				pcl_weights, weight_len);
 
 	return status;
 }
@@ -4700,6 +4849,8 @@ bool cds_map_concurrency_mode(enum tCDF_ADAPTER_MODE *old_mode,
  * @mode:	Device mode
  * @pcl_channels: PCL channels
  * @len: lenght of the PCL
+ * @pcl_weight: Weights of the PCL
+ * @weight_len: Max length of the weights list
  *
  * This function provides the preferred channel list on which
  * policy manager wants the new connection to come up. Various
@@ -4709,7 +4860,8 @@ bool cds_map_concurrency_mode(enum tCDF_ADAPTER_MODE *old_mode,
  * Return: CDF_STATUS
  */
 CDF_STATUS cds_get_pcl(enum cds_con_mode mode,
-			uint8_t *pcl_channels, uint32_t *len)
+			uint8_t *pcl_channels, uint32_t *len,
+			uint8_t *pcl_weight, uint32_t weight_len)
 {
 	CDF_STATUS status = CDF_STATUS_E_FAILURE;
 	uint32_t num_connections = 0;
@@ -4797,12 +4949,14 @@ CDF_STATUS cds_get_pcl(enum cds_con_mode mode,
 	/* once the PCL enum is obtained find out the exact channel list with
 	 * help from sme_get_cfg_valid_channels
 	 */
-	status = cds_get_channel_list(pcl, pcl_channels, len, mode);
+	status = cds_get_channel_list(pcl, pcl_channels, len, mode,
+					pcl_weight, weight_len);
 	if (status == CDF_STATUS_SUCCESS) {
 		uint32_t i;
 		cds_debug("pcl len:%d", *len);
 		for (i = 0; i < *len; i++)
-			cds_debug("chan:%d", pcl_channels[i]);
+			cds_debug("chan:%d weight:%d",
+				pcl_channels[i], pcl_weight[i]);
 	}
 
 	return status;
@@ -8205,6 +8359,8 @@ cds_get_nondfs_preferred_channel(enum cds_con_mode mode,
 		bool for_existing_conn)
 {
 	uint8_t pcl_channels[NUM_CHANNELS];
+	uint8_t pcl_weight[NUM_CHANNELS];
+
 	/*
 	 * in worst case if we can't find any channel at all
 	 * then return 2.4G channel, so atleast we won't fall
@@ -8223,11 +8379,13 @@ cds_get_nondfs_preferred_channel(enum cds_con_mode mode,
 			return channel;
 
 		if (CDF_STATUS_SUCCESS != cds_get_pcl_for_existing_conn(mode,
-					&pcl_channels[0], &pcl_len))
+					&pcl_channels[0], &pcl_len,
+					pcl_weight, CDF_ARRAY_SIZE(pcl_weight)))
 			return channel;
 	} else {
 		if (CDF_STATUS_SUCCESS != cds_get_pcl(mode,
-					&pcl_channels[0], &pcl_len))
+					&pcl_channels[0], &pcl_len,
+					pcl_weight, CDF_ARRAY_SIZE(pcl_weight)))
 			return channel;
 	}
 
@@ -8251,6 +8409,8 @@ cds_get_nondfs_preferred_channel(enum cds_con_mode mode,
 	}
 	return channel;
 }
+
+
 /**
  * cds_is_any_nondfs_chnl_present() - Find any non-dfs channel from conc table
  * @channel: pointer to channel which needs to be filled
@@ -8282,4 +8442,49 @@ bool cds_is_any_nondfs_chnl_present(uint8_t *channel)
 	}
 	cdf_mutex_release(&cds_ctx->cdf_conc_list_lock);
 	return status;
+}
+
+/**
+ * cds_get_valid_chan_weights() - Get the weightage for all valid channels
+ * @weight: Pointer to the structure containing pcl, saved channel list and
+ * weighed channel list
+ *
+ * Provides the weightage for all valid channels. This compares the PCL list
+ * with the valid channel list. The channels present in the PCL get their
+ * corresponding weightage and the non-PCL channels get the default weightage
+ * of WEIGHT_OF_NON_PCL_CHANNELS.
+ *
+ * Return: CDF_STATUS
+ */
+CDF_STATUS cds_get_valid_chan_weights(struct sir_pcl_chan_weights *weight)
+{
+	uint32_t i, j;
+
+	if (!weight->pcl_list) {
+		cds_err("Invalid pcl");
+		return CDF_STATUS_E_FAILURE;
+	}
+
+	if (!weight->saved_chan_list) {
+		cds_err("Invalid valid channel list");
+		return CDF_STATUS_E_FAILURE;
+	}
+
+	if (!weight->weighed_valid_list) {
+		cds_err("Invalid weighed valid channel list");
+		return CDF_STATUS_E_FAILURE;
+	}
+
+	for (i = 0; i < weight->saved_num_chan; i++) {
+		weight->weighed_valid_list[i] = WEIGHT_OF_NON_PCL_CHANNELS;
+		for (j = 0; j < weight->pcl_len; j++) {
+			if (weight->saved_chan_list[i] == weight->pcl_list[j]) {
+				weight->weighed_valid_list[i] =
+						weight->weight_list[j];
+				break;
+			}
+		}
+	}
+
+	return CDF_STATUS_SUCCESS;
 }

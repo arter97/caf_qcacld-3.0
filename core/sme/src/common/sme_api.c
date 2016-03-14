@@ -14853,14 +14853,14 @@ CDF_STATUS sme_fw_mem_dump(tHalHandle hHal, void *recvd_req)
 #endif /* WLAN_FEATURE_MEMDUMP */
 
 /*
- * sme_soc_set_pcl() - Send WMI_SOC_SET_PCL_CMDID to the WMA
+ * sme_pdev_set_pcl() - Send WMI_PDEV_SET_PCL_CMDID to the WMA
  * @hal: Handle returned by macOpen
  * @msg: PCL channel list and length structure
  *
- * Sends the command to WMA to send WMI_SOC_SET_PCL_CMDID to FW
+ * Sends the command to WMA to send WMI_PDEV_SET_PCL_CMDID to FW
  * Return: CDF_STATUS_SUCCESS on successful posting
  */
-CDF_STATUS sme_soc_set_pcl(tHalHandle hal,
+CDF_STATUS sme_pdev_set_pcl(tHalHandle hal,
 		struct sir_pcl_list msg)
 {
 	CDF_STATUS status = CDF_STATUS_SUCCESS;
@@ -14879,8 +14879,10 @@ CDF_STATUS sme_soc_set_pcl(tHalHandle hal,
 
 	cdf_mem_zero(req_msg, len);
 
-	for (i = 0; i < msg.pcl_len; i++)
+	for (i = 0; i < msg.pcl_len; i++) {
 		req_msg->pcl_list[i] =  msg.pcl_list[i];
+		req_msg->weight_list[i] =  msg.weight_list[i];
+	}
 
 	req_msg->pcl_len = msg.pcl_len;
 
@@ -14895,7 +14897,7 @@ CDF_STATUS sme_soc_set_pcl(tHalHandle hal,
 
 	/* Serialize the req through MC thread */
 	cds_message.bodyptr = req_msg;
-	cds_message.type    = SIR_HAL_SOC_SET_PCL_TO_FW;
+	cds_message.type    = SIR_HAL_PDEV_SET_PCL_TO_FW;
 	status = cds_mq_post_message(CDS_MQ_ID_WMA, &cds_message);
 	if (!CDF_IS_STATUS_SUCCESS(status)) {
 		sms_log(mac, LOGE,

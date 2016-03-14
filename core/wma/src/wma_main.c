@@ -1737,6 +1737,7 @@ CDF_STATUS wma_open(void *cds_context,
 	wma_handle->old_hw_mode_index = WMA_DEFAULT_HW_MODE_INDEX;
 	wma_handle->new_hw_mode_index = WMA_DEFAULT_HW_MODE_INDEX;
 	wma_handle->saved_wmi_init_cmd.buf = NULL;
+	wma_handle->saved_chan.num_channels = 0;
 
 	cdf_status = cdf_event_init(&wma_handle->wma_ready_event);
 	if (cdf_status != CDF_STATUS_SUCCESS) {
@@ -5363,8 +5364,8 @@ CDF_STATUS wma_mc_process_msg(void *cds_context, cds_msg_t *msg)
 			(struct fw_dump_req *)msg->bodyptr);
 		cdf_mem_free(msg->bodyptr);
 		break;
-	case SIR_HAL_SOC_SET_PCL_TO_FW:
-		wma_send_soc_set_pcl_cmd(wma_handle,
+	case SIR_HAL_PDEV_SET_PCL_TO_FW:
+		wma_send_pdev_set_pcl_cmd(wma_handle,
 					(struct sir_pcl_list *)msg->bodyptr);
 		cdf_mem_free(msg->bodyptr);
 		break;
@@ -5495,26 +5496,35 @@ void wma_log_completion_timeout(void *data)
 }
 
 /**
- * wma_send_soc_set_pcl_cmd() - Send WMI_SOC_SET_PCL_CMDID to FW
+ * wma_send_pdev_set_pcl_cmd() - Send WMI_PDEV_SET_PCL_CMDID to FW
  * @wma_handle: WMA handle
  * @msg: PCL structure containing the PCL and the number of channels
  *
- * WMI_SOC_SET_PCL_CMDID provides a Preferred Channel List (PCL) to the WLAN
+ * WMI_PDEV_SET_PCL_CMDID provides a Preferred Channel List (PCL) to the WLAN
  * firmware. The DBS Manager is the consumer of this information in the WLAN
  * firmware. The channel list will be used when a Virtual DEVice (VDEV) needs
  * to migrate to a new channel without host driver involvement. An example of
  * this behavior is Legacy Fast Roaming (LFR 3.0). Generally, the host will
  * manage the channel selection without firmware involvement.
  *
+ * WMI_PDEV_SET_PCL_CMDID will carry only the weight list and not the actual
+ * channel list. The weights corresponds to the channels sent in
+ * WMI_SCAN_CHAN_LIST_CMDID. The channels from PCL would be having a higher
+ * weightage compared to the non PCL channels.
+ *
  * Return: Success if the cmd is sent successfully to the firmware
  */
-CDF_STATUS wma_send_soc_set_pcl_cmd(tp_wma_handle wma_handle,
+CDF_STATUS wma_send_pdev_set_pcl_cmd(tp_wma_handle wma_handle,
 				struct sir_pcl_list *msg)
 {
-	wmi_soc_set_pcl_cmd_fixed_param *cmd;
+	wmi_pdev_set_pcl_cmd_fixed_param *cmd;
 	wmi_buf_t buf;
 	uint8_t *buf_ptr;
 	uint32_t *cmd_args, i, len;
+	uint32_t chan_len;
+	uint8_t weighed_valid_list[MAX_NUM_CHAN];
+	CDF_STATUS status;
+	struct sir_pcl_chan_weights weight;
 
 	if (!wma_handle) {
 		WMA_LOGE("%s: WMA handle is NULL. Cannot issue command",
@@ -5522,8 +5532,25 @@ CDF_STATUS wma_send_soc_set_pcl_cmd(tp_wma_handle wma_handle,
 		return CDF_STATUS_E_NULL_VALUE;
 	}
 
+	/* wma_handle->saved_chan.num_channels is the channel list updated
+	 * as part of WMA_UPDATE_CHAN_LIST_REQ.
+	 */
+	weight.pcl_list = msg->pcl_list;
+	weight.pcl_len = msg->pcl_len;
+	weight.saved_chan_list = wma_handle->saved_chan.channel_list;
+	weight.saved_num_chan = wma_handle->saved_chan.num_channels;
+	weight.weighed_valid_list = weighed_valid_list;
+	weight.weight_list = msg->weight_list;
+	status = cds_get_valid_chan_weights(&weight);
+	if (!CDF_IS_STATUS_SUCCESS(status)) {
+		WMA_LOGE("%s: Error in creating weighed pcl", __func__);
+		return status;
+	}
+
+	chan_len = wma_handle->saved_chan.num_channels;
+
 	len = sizeof(*cmd) +
-		WMI_TLV_HDR_SIZE + (msg->pcl_len * sizeof(uint32_t));
+		WMI_TLV_HDR_SIZE + (chan_len * sizeof(uint32_t));
 
 	buf = wmi_buf_alloc(wma_handle->wmi_handle, len);
 	if (!buf) {
@@ -5531,25 +5558,28 @@ CDF_STATUS wma_send_soc_set_pcl_cmd(tp_wma_handle wma_handle,
 		return CDF_STATUS_E_NOMEM;
 	}
 
-	cmd = (wmi_soc_set_pcl_cmd_fixed_param *) wmi_buf_data(buf);
+	cmd = (wmi_pdev_set_pcl_cmd_fixed_param *) wmi_buf_data(buf);
 	buf_ptr = (uint8_t *) cmd;
 	WMITLV_SET_HDR(&cmd->tlv_header,
-		WMITLV_TAG_STRUC_wmi_soc_set_pcl_cmd_fixed_param,
-		WMITLV_GET_STRUCT_TLVLEN(wmi_soc_set_pcl_cmd_fixed_param));
-	cmd->num_chan = msg->pcl_len;
-	WMA_LOGI("%s: PCL len:%d", __func__, cmd->num_chan);
+		WMITLV_TAG_STRUC_wmi_pdev_set_pcl_cmd_fixed_param,
+		WMITLV_GET_STRUCT_TLVLEN(wmi_pdev_set_pcl_cmd_fixed_param));
 
-	buf_ptr += sizeof(wmi_soc_set_pcl_cmd_fixed_param);
+	cmd->pdev_id = WMI_PDEV_ID_SOC;
+	cmd->num_chan = chan_len;
+	WMA_LOGI("%s: Total chan (PCL) len:%d", __func__, cmd->num_chan);
+
+	buf_ptr += sizeof(wmi_pdev_set_pcl_cmd_fixed_param);
 	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_UINT32,
-			(msg->pcl_len * sizeof(uint32_t)));
+			(chan_len * sizeof(uint32_t)));
 	cmd_args = (uint32_t *) (buf_ptr + WMI_TLV_HDR_SIZE);
-	for (i = 0; i < msg->pcl_len ; i++) {
-		cmd_args[i] = msg->pcl_list[i];
-		WMA_LOGI("%s: PCL chan:%d", __func__, cmd_args[i]);
+	for (i = 0; i < chan_len ; i++) {
+		cmd_args[i] = weighed_valid_list[i];
+		WMA_LOGI("%s: chan:%d weight:%d", __func__,
+			wma_handle->saved_chan.channel_list[i], cmd_args[i]);
 	}
 	if (wmi_unified_cmd_send(wma_handle->wmi_handle, buf, len,
-				WMI_SOC_SET_PCL_CMDID)) {
-		WMA_LOGE("%s: Failed to send WMI_SOC_SET_PCL_CMDID", __func__);
+				WMI_PDEV_SET_PCL_CMDID)) {
+		WMA_LOGE("%s: Failed to send WMI_PDEV_SET_PCL_CMDID", __func__);
 		cdf_nbuf_free(buf);
 		return CDF_STATUS_E_FAILURE;
 	}
