@@ -197,12 +197,14 @@ ifeq ($(CONFIG_ROME_IF),pci)
 	CONFIG_HIF_PCI := 1
 endif
 
+#Enable USB specific APIS
+ifeq ($(CONFIG_ROME_IF),usb)
+	CONFIG_HIF_USB := 1
+endif
+
 #Enable pci read/write config functions
 ifeq ($(CONFIG_ROME_IF),pci)
 	CONFIG_ATH_PCI := 1
-endif
-ifeq ($(CONFIG_ROME_IF),usb)
-#CONFIG_ATH_PCI := 1
 endif
 
 ifneq ($(CONFIG_MOBILE_ROUTER), y)
@@ -285,41 +287,6 @@ UAPI_INC :=	-I$(WLAN_ROOT)/$(UAPI_DIR)/linux
 ############ COMMON ############
 COMMON_DIR :=	core/common
 COMMON_INC :=	-I$(WLAN_ROOT)/$(COMMON_DIR)
-
-ifeq ($(CONFIG_QCA_WIFI_SDIO), 1)
-############ HIF ############
-HIF_DIR := core/hif
-HIF_SDIO_DIR := $(HIF_DIR)/src/sdio
-
-HIF_INC := -I$(WLAN_ROOT)/$(HIF_DIR)/inc \
-	   -I$(WLAN_ROOT)/$(HIF_DIR)/src \
-	   -I$(WLAN_ROOT)/$(HIF_PCIE_DIR)
-
-HIF_OBJS := $(HIF_DIR)/src/ath_procfs.o
-
-HIF_SDIO_OBJS := $(HIF_SDIO_DIR)/hif_sdio_send.o \
-		 $(HIF_SDIO_DIR)/hif_bmi_reg_access.o \
-		 $(HIF_SDIO_DIR)/hif_diag_reg_access.o \
-		 $(HIF_DIR)/src/hif_main.o \
-		 $(HIF_SDIO_DIR)/hif_sdio_dev.o \
-		 $(HIF_SDIO_DIR)/hif_sdio.o \
-		 $(HIF_SDIO_DIR)/hif_sdio_recv.o \
-		 $(HIF_SDIO_DIR)/regtable_sdio.o \
-		 $(HIF_SDIO_DIR)/if_sdio.o
-
-HIF_SDIO_NATIVE_DIR := $(HIF_SDIO_DIR)/native_sdio
-HIF_SDIO_NATIVE_INC_DIR := $(HIF_SDIO_NATIVE_DIR)/include
-HIF_SDIO_NATIVE_SRC_DIR := $(HIF_SDIO_NATIVE_DIR)/src
-
-HIF_SDIO_NATIVE_OBJS := $(HIF_SDIO_NATIVE_SRC_DIR)/hif.o \
-			$(HIF_SDIO_NATIVE_SRC_DIR)/hif_scatter.o
-
-HIF_INC += -I$(WLAN_ROOT)/$(HIF_SDIO_DIR) \
-	   -I$(WLAN_ROOT)/$(HIF_SDIO_NATIVE_INC_DIR)
-
-HIF_OBJS += $(HIF_SDIO_OBJS) \
-	    $(HIF_SDIO_NATIVE_OBJS)
-endif
 
 ############ HDD ############
 HDD_DIR :=	core/hdd
@@ -518,7 +485,7 @@ SAP_OBJS :=	$(SAP_SRC_DIR)/sap_api_link_cntl.o \
 		$(SAP_SRC_DIR)/sap_fsm.o \
 		$(SAP_SRC_DIR)/sap_module.o
 
-############ DFS ############ 350
+############ DFS ############
 DFS_DIR :=	$(SAP_DIR)/dfs
 DFS_INC_DIR :=	$(DFS_DIR)/inc
 DFS_SRC_DIR :=	$(DFS_DIR)/src
@@ -760,8 +727,49 @@ HTC_OBJS := $(HTC_DIR)/htc.o \
             $(HTC_DIR)/htc_services.o
 
 ########### HIF ###########
-ifneq ($(CONFIG_QCA_WIFI_SDIO), 1)
 HIF_DIR := core/hif
+HIF_INC := -I$(WLAN_ROOT)/$(HIF_DIR)/inc \
+	   -I$(WLAN_ROOT)/$(HIF_DIR)/src
+
+HIF_OBJS := $(HIF_DIR)/src/ath_procfs.o \
+	 $(HIF_DIR)/src/hif_main.o \
+
+HIF_SDIO_DIR := $(HIF_DIR)/src/sdio
+HIF_SDIO_OBJS := $(HIF_SDIO_DIR)/hif_sdio_send.o \
+		 $(HIF_SDIO_DIR)/hif_bmi_reg_access.o \
+		 $(HIF_SDIO_DIR)/hif_diag_reg_access.o \
+		 $(HIF_SDIO_DIR)/hif_sdio_dev.o \
+		 $(HIF_SDIO_DIR)/hif_sdio.o \
+		 $(HIF_SDIO_DIR)/hif_sdio_recv.o \
+		 $(HIF_SDIO_DIR)/regtable_sdio.o \
+		 $(HIF_SDIO_DIR)/if_sdio.o
+
+HIF_SDIO_NATIVE_DIR := $(HIF_SDIO_DIR)/native_sdio
+HIF_SDIO_NATIVE_INC_DIR := $(HIF_SDIO_NATIVE_DIR)/include
+HIF_SDIO_NATIVE_SRC_DIR := $(HIF_SDIO_NATIVE_DIR)/src
+HIF_SDIO_NATIVE_OBJS := $(HIF_SDIO_NATIVE_SRC_DIR)/hif.o \
+			$(HIF_SDIO_NATIVE_SRC_DIR)/hif_scatter.o
+
+ifeq ($(CONFIG_QCA_WIFI_SDIO), 1)
+HIF_INC += -I$(WLAN_ROOT)/$(HIF_PCIE_DIR)
+HIF_INC += -I$(WLAN_ROOT)/$(HIF_SDIO_DIR) \
+	   -I$(WLAN_ROOT)/$(HIF_SDIO_NATIVE_INC_DIR)
+HIF_OBJS += $(HIF_SDIO_OBJS) \
+	    $(HIF_SDIO_NATIVE_OBJS)
+endif
+
+HIF_USB_DIR := $(HIF_DIR)/src/usb
+HIF_USB_OBJS := $(HIF_USB_DIR)/usbdrv.o \
+		$(HIF_USB_DIR)/hif_usb.o \
+		$(HIF_USB_DIR)/if_usb.o \
+		$(HIF_USB_DIR)/regtable_usb.o
+ifeq ($(CONFIG_HIF_USB), 1)
+HIF_INC += -I$(WLAN_ROOT)/$(HIF_USB_DIR)
+HIF_OBJS += $(HIF_USB_OBJS)
+endif
+
+ifneq ($(CONFIG_QCA_WIFI_SDIO), 1)
+ifneq ($(CONFIG_ROME_IF),usb)
 HIF_CE_DIR := $(HIF_DIR)/src/ce
 HIF_CNSS_STUB_DIR := $(HIF_DIR)/src/icnss_stub
 
@@ -771,9 +779,7 @@ else
 HIF_SNOC_DIR := $(HIF_DIR)/src/snoc
 endif
 
-HIF_INC := -I$(WLAN_ROOT)/$(HIF_DIR)/inc \
-	   -I$(WLAN_ROOT)/$(HIF_DIR)/src \
-	   -I$(WLAN_ROOT)/$(HIF_CE_DIR) \
+HIF_INC += -I$(WLAN_ROOT)/$(HIF_CE_DIR) \
 	   -I$(WLAN_ROOT)/$(HIF_CNSS_STUB_DIR)
 
 ifeq ($(CONFIG_HIF_PCI), 1)
@@ -782,12 +788,10 @@ else
 HIF_INC += -I$(WLAN_ROOT)/$(HIF_SNOC_DIR)
 endif
 
-HIF_OBJS := $(HIF_DIR)/src/ath_procfs.o \
-		$(HIF_CE_DIR)/ce_diag.o \
+HIF_OBJS += 	$(HIF_CE_DIR)/ce_diag.o \
 		$(HIF_CE_DIR)/ce_main.o \
 		$(HIF_CE_DIR)/ce_service.o \
 		$(HIF_CE_DIR)/ce_tasklet.o \
-		$(HIF_DIR)/src/hif_main.o \
 		$(HIF_DIR)/src/mp_dev.o \
 		$(HIF_DIR)/src/regtable.o
 
@@ -808,6 +812,7 @@ else
 HIF_SNOC_OBJS := $(HIF_SNOC_DIR)/if_snoc.o
 
 HIF_OBJS += $(HIF_SNOC_OBJS)
+endif
 endif
 endif
 ############ WMA ############
@@ -950,10 +955,13 @@ CDEFINES :=	-DANI_LITTLE_BYTE_ENDIAN \
 		-DWMI_INTERFACE_EVENT_LOGGING \
 		-DATH_SUPPORT_WAPI \
 		-DWLAN_FEATURE_LINK_LAYER_STATS \
-		-DWLAN_LOGGING_SOCK_SVC_ENABLE \
 		-DFEATURE_WLAN_EXTSCAN \
 		-DWLAN_FEATURE_MBSSID \
 		-DCONFIG_160MHZ_SUPPORT
+
+ifneq ($(CONFIG_ROME_IF),usb)
+	CDEFINES += -DWLAN_LOGGING_SOCK_SVC_ENABLE
+endif
 
 ifeq (y,$(filter y,$(CONFIG_CNSS_EOS) $(CONFIG_ICNSS)))
 CDEFINES += -DQCA_WIFI_3_0
@@ -1070,7 +1078,6 @@ ifeq ($(CONFIG_HIF_USB), 1)
 CDEFINES += -DCONFIG_ATH_PROCFS_DIAG_SUPPORT
 CDEFINES += -DQCA_SUPPORT_OL_RX_REORDER_TIMEOUT
 CDEFINES += -DCONFIG_ATH_PCIE_MAX_PERF=0 -DCONFIG_ATH_PCIE_AWAKE_WHILE_DRIVER_LOAD=0 -DCONFIG_DISABLE_CDC_MAX_PERF_WAR=0
-CDEFINES += -DQCA_TX_HTT2_SUPPORT
 endif
 
 # enable the MAC Address auto-generation feature
