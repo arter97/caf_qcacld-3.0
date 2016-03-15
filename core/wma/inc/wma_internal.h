@@ -796,13 +796,17 @@ CDF_STATUS wma_tx_detach(tp_wma_handle wma_handle);
 int wma_mcc_vdev_tx_pause_evt_handler(void *handle, uint8_t *event,
 					     uint32_t len);
 #endif
-
 #if defined(CONFIG_HL_SUPPORT) && defined(QCA_BAD_PEER_TX_FLOW_CL)
 CDF_STATUS wma_process_init_bad_peer_tx_ctl_info(tp_wma_handle wma,
 					struct t_bad_peer_txtcl_config *config);
-
+#else
+static inline CDF_STATUS
+wma_process_init_bad_peer_tx_ctl_info(tp_wma_handle wma,
+			struct t_bad_peer_txtcl_config *config)
+{
+	return CDF_STATUS_E_FAILURE;
+}
 #endif
-
 
 CDF_STATUS wma_process_init_thermal_info(tp_wma_handle wma,
 					 t_thermal_mgmt *pThermalParams);
