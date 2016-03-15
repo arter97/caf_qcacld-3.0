@@ -40,9 +40,8 @@ extern "C" {
 #include "cdf_nbuf.h"
 #include "ol_if_athvar.h"
 #include <linux/platform_device.h>
-#ifdef HIF_PCI
 #include <linux/pci.h>
-#endif /* HIF_PCI */
+#include <linux/usb.h>
 
 #define ENABLE_MBOX_DUMMY_SPACE_FEATURE 1
 
@@ -211,6 +210,8 @@ struct ol_softc {
 	struct hif_pci_softc *hif_sc;
 #elif defined(HIF_SDIO)
 	struct ath_hif_sdio_softc    *hif_sc;
+#elif defined(HIF_USB)
+	struct hif_usb_softc *hif_sc;
 #endif
 
 #ifdef WLAN_FEATURE_FASTPATH
@@ -273,7 +274,7 @@ struct ol_softc {
 	uint8_t max_no_of_peers;
 #ifdef HIF_PCI
 	struct cnss_fw_files fw_files;
-#elif defined(HIF_SDIO)
+#elif defined(HIF_SDIO) || defined(HIF_USB)
 	struct ol_fw_files fw_files;
 #endif
 #if defined(CONFIG_CNSS)
@@ -281,6 +282,11 @@ struct ol_softc {
 	unsigned long ramdump_address;
 	unsigned long ramdump_size;
 #endif
+	/* structure to save FW RAM dump (Rome USB) */
+	struct fw_ramdump *ramdump[FW_RAM_SEG_CNT];
+	uint8_t ramdump_index;
+	bool fw_ram_dumping;
+	/* enable FW self-recovery for Rome USB */
 	bool enable_self_recovery;
 #ifdef WLAN_FEATURE_LPSS
 	bool enablelpasssupport;
@@ -579,17 +585,22 @@ enum hif_device_config_opcode {
 		HIF_DEVICE_GET_HTC_CONTEXT,
 };
 
-#ifdef HIF_SDIO
+#if defined(HIF_SDIO) || defined HIF_USB
 void hif_claim_device(struct ol_softc *scn, void *claimedContext);
-void hif_set_mailbox_swap(struct hif_sdio_dev *device);
-int hif_configure_device(struct hif_sdio_dev *device,
-			enum hif_device_config_opcode opcode,
-			void *config, uint32_t configLen);
 #else
 static inline void hif_claim_device(struct ol_softc *scn, void *claimedContext)
 {
 }
 
+#endif
+
+
+#if defined(HIF_SDIO)
+void hif_set_mailbox_swap(struct hif_sdio_dev *device);
+int hif_configure_device(struct hif_sdio_dev *device,
+			enum hif_device_config_opcode opcode,
+			void *config, uint32_t configLen);
+#else
 static inline void hif_set_mailbox_swap(struct hif_sdio_dev *device)
 {
 }
@@ -620,6 +631,8 @@ static inline int hif_configure_device(struct hif_sdio_dev *device,
 typedef struct pci_device_id hif_bus_id;
 #elif defined(HIF_SDIO)
 typedef struct sdio_device_id hif_bus_id;
+#elif defined(HIF_USB)
+typedef struct usb_device_id hif_bus_id;
 #else
 typedef struct device hif_bus_id;
 #endif
@@ -734,6 +747,18 @@ void hif_pktlogmod_exit(void *hif_ctx);
 void hif_crash_shutdown(void *hif_ctx);
 int hif_register_driver(void);
 void hif_bus_pkt_dl_len_set(void *hif_sc, unsigned int pkt_download_len);
+#if defined(HIF_USB)
+void hif_set_bundle_mode(struct ol_softc *scn, bool enabled,
+				int rx_bundle_cnt);
+int hif_bus_reset_resume(void);
+#else
+static inline void hif_set_bundle_mode(struct ol_softc *scn, bool enabled,
+						int rx_bundle_cnt) {}
+static inline int hif_bus_reset_resume(void)
+{
+	return 0;
+}
+#endif
 #ifdef __cplusplus
 }
 #endif

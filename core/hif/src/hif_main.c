@@ -43,7 +43,7 @@
 #include <a_debug.h>
 #include "hif_main.h"
 #include "hif_hw_version.h"
-#ifndef HIF_SDIO
+#if !defined(HIF_SDIO) && !defined(HIF_USB)
 #include "ce_api.h"
 #include "ce_tasklet.h"
 #endif
@@ -58,7 +58,7 @@
 #include "mp_dev.h"
 #ifdef HIF_PCI
 #include "icnss_stub.h"
-#elif !defined(HIF_SDIO)
+#elif !defined(HIF_SDIO) && !defined(HIF_USB)
 #include <soc/qcom/icnss.h>
 #endif
 
@@ -67,7 +67,6 @@
 #endif
 
 #include "cds_concurrency.h"
-
 void hif_dump(struct ol_softc *scn, uint8_t cmd_id, bool start)
 {
 	hif_trigger_dump(scn, cmd_id, start);
@@ -362,8 +361,12 @@ const char *hif_get_hw_name(struct ol_softc *scn)
 void hif_get_hw_info(void *scn, u32 *version, u32 *revision,
 			const char **target_name)
 {
-	*version = ((struct ol_softc *)scn)->target_version;
-	*revision = ((struct ol_softc *)scn)->target_revision;
+	if (((struct ol_softc *)scn)->bus_type != HAL_BUS_TYPE_USB) {
+		*version = ((struct ol_softc *)scn)->target_version;
+		*revision = ((struct ol_softc *)scn)->target_revision;
+	} else
+		hif_usb_get_hw_info((struct ol_softc *)scn, version, revision);
+
 	*target_name = hif_get_hw_name((struct ol_softc *)scn);
 }
 
@@ -495,7 +498,7 @@ CDF_STATUS hif_enable(void *hif_ctx, struct device *dev,
 	 */
 	scn->hif_init_done = true;
 
-	HIF_TRACE("%s: X OK", __func__);
+	HIF_TRACE("%s: OK", __func__);
 
 	return CDF_STATUS_SUCCESS;
 }

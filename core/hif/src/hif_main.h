@@ -141,4 +141,15 @@ void hif_disable_bus(void *bdev);
 void hif_bus_prevent_linkdown(struct ol_softc *scn, bool flag);
 int hif_bus_configure(struct ol_softc *ol_sc);
 
+#ifdef HIF_USB
+void hif_usb_get_hw_info(struct ol_softc *ol_sc,
+						uint32_t *version,
+						uint32_t *revision);
+#else
+static inline void hif_usb_get_hw_info(struct ol_softc *ol_sc,
+						uint32_t *version,
+						uint32_t *revision){}
+
+#endif
+
 #endif /* __HIF_MAIN_H__ */

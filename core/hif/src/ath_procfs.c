@@ -50,7 +50,8 @@
  * This structure hold information about the /proc file
  *
  */
-static struct proc_dir_entry *proc_file, *proc_dir;
+static struct proc_dir_entry *proc_file;
+static struct proc_dir_entry *proc_dir;
 
 static void *get_hif_hdl_from_file(struct file *file)
 {
@@ -154,6 +155,13 @@ static const struct file_operations athdiag_fops = {
  */
 int athdiag_procfs_init(void *scn)
 {
+	HIF_ENTER();
+	if (proc_dir != NULL) {
+		HIF_ERROR("%s: Error: already initialized /proc/%s",
+			__func__, PROCFS_DIR);
+		return 0;
+	}
+
 	proc_dir = proc_mkdir(PROCFS_DIR, NULL);
 	if (proc_dir == NULL) {
 		remove_proc_entry(PROCFS_DIR, NULL);
@@ -172,7 +180,7 @@ int athdiag_procfs_init(void *scn)
 		return -ENOMEM;
 	}
 
-	HIF_DBG("/proc/%s/%s created", PROCFS_DIR, PROCFS_NAME);
+	HIF_EXIT("/proc/%s/%s created", PROCFS_DIR, PROCFS_NAME);
 	return 0;               /* everything is ok */
 }
 
@@ -182,13 +190,16 @@ int athdiag_procfs_init(void *scn)
  */
 void athdiag_procfs_remove(void)
 {
+	HIF_ENTER();
 	if (proc_dir != NULL) {
 		remove_proc_entry(PROCFS_NAME, proc_dir);
 		HIF_DBG("/proc/%s/%s removed", PROCFS_DIR, PROCFS_NAME);
 		remove_proc_entry(PROCFS_DIR, NULL);
 		HIF_DBG("/proc/%s removed", PROCFS_DIR);
 		proc_dir = NULL;
+		proc_file = NULL;
 	}
+	HIF_EXIT();
 }
 #else
 int athdiag_procfs_init(void *scn)

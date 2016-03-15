@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014, 2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -36,7 +36,7 @@
 #define HIF_INFO_LO(args ...) \
 	CDF_TRACE(CDF_MODULE_ID_HIF, CDF_TRACE_LEVEL_INFO_LOW, ## args)
 #define HIF_TRACE(args ...) \
-	CDF_TRACE(CDF_MODULE_ID_HIF, CDF_TRACE_LEVEL_ERROR, ## args)
+	CDF_TRACE(CDF_MODULE_ID_HIF, CDF_TRACE_LEVEL_INFO, ## args)
 #define HIF_DBG(args ...) \
 	CDF_TRACE(CDF_MODULE_ID_HIF, CDF_TRACE_LEVEL_DEBUG, ## args)
 #ifdef HIF_ENTER

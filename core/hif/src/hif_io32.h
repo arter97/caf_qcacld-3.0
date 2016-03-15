@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -33,7 +33,7 @@
 #include "hif.h"
 #ifdef HIF_PCI
 #include "hif_io32_pci.h"
-#elif defined(HIF_SDIO)
+#elif defined(HIF_SDIO) || defined(HIF_USB)
 /**
  * hif_pci_cancel_deferred_target_sleep() - defer bus target sleep
  * @scn: ol_softc

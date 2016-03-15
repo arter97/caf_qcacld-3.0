@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -27,11 +27,11 @@
 
 #ifndef _PLATFORM_ICNSS_H_
 #define _PLATFORM_ICNSS_H_
-
+#ifdef MSM_PLATFORM
 #ifdef HIF_PCI
 #include "icnss_stub.h"
 #else
 #include <soc/qcom/icnss.h>
 #endif
-
+#endif
 #endif
