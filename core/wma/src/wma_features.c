@@ -474,6 +474,35 @@ error:
 		cdf_nbuf_free(buf);
 	return status;
 }
+
+/**
+ * wma_set_tsf_gpio_pin() - send wmi cmd to configure gpio pin
+ *
+ * @handle: wma handler
+ * @pin: GPIO pin id
+ *
+ * Return: VOS_STATUS
+ */
+CDF_STATUS wma_set_tsf_gpio_pin(WMA_HANDLE handle, uint32_t pin)
+{
+	tp_wma_handle wma = (tp_wma_handle)handle;
+	int32_t ret;
+
+	if (!wma || !wma->wmi_handle) {
+		WMA_LOGE("%s: WMA is closed, can not set gpio", __func__);
+		return CDF_STATUS_E_INVAL;
+	}
+
+	WMA_LOGD("%s: set tsf gpio pin: %d", __func__, pin);
+
+	ret = wmi_unified_pdev_set_param(wma->wmi_handle,
+	WMI_PDEV_PARAM_WNTS_CONFIG, pin);
+	if (ret) {
+		WMA_LOGE("%s: Failed to set tsf gpio pin (%d)", __func__, ret);
+		return CDF_STATUS_E_FAILURE;
+	}
+	return CDF_STATUS_SUCCESS;
+}
 #else
 CDF_STATUS wma_capture_tsf(tp_wma_handle wma_handle, uint32_t vdev_id)
 {
@@ -488,6 +517,11 @@ CDF_STATUS wma_reset_tsf_gpio(tp_wma_handle wma_handle, uint32_t vdev_id)
 int wma_vdev_tsf_handler(void *handle, uint8_t *data, uint32_t data_len)
 {
 	return 0;
+}
+
+CDF_STATUS wma_set_tsf_gpio_pin(WMA_HANDLE handle, uint32_t pin)
+{
+	return CDF_STATUS_E_INVAL;
 }
 #endif
 

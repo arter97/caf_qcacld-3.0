@@ -1107,6 +1107,7 @@ CDF_STATUS wma_set_auto_shutdown_timer_req(tp_wma_handle wma_handle,
 int wma_vdev_tsf_handler(void *handle, uint8_t *data, uint32_t data_len);
 CDF_STATUS wma_capture_tsf(tp_wma_handle wma_handle, uint32_t vdev_id);
 CDF_STATUS wma_reset_tsf_gpio(tp_wma_handle wma_handle, uint32_t vdev_id);
+CDF_STATUS wma_set_tsf_gpio_pin(WMA_HANDLE handle, uint32_t pin);
 
 #ifdef WLAN_FEATURE_NAN
 

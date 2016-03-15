@@ -599,6 +599,7 @@ typedef struct sSirMbMsgP2p {
 
 #define SIR_HAL_SET_EGAP_CONF_PARAMS        (SIR_HAL_ITC_MSG_TYPES_BEGIN + 336)
 #define SIR_HAL_HT40_OBSS_SCAN_IND          (SIR_HAL_ITC_MSG_TYPES_BEGIN + 337)
+#define SIR_HAL_TSF_GPIO_PIN_REQ            (SIR_HAL_ITC_MSG_TYPES_BEGIN + 338)
 #define SIR_HAL_MSG_TYPES_END                (SIR_HAL_MSG_TYPES_BEGIN + 0x1FF)
 
 /* CFG message types */

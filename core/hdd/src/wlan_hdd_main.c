@@ -5902,6 +5902,10 @@ int hdd_wlan_startup(struct device *dev, void *hif_sc)
 	if (CDF_IS_STATUS_SUCCESS(status))
 		hdd_err("Error setting txlimit in sme: %d", status);
 
+	status = sme_set_tsf_gpio(hdd_ctx->hHal, hdd_ctx->config->tsf_gpio_pin);
+	if (!CDF_IS_STATUS_SUCCESS(status))
+		hdd_err("set tsf GPIO fail");
+
 #ifdef MSM_PLATFORM
 	spin_lock_init(&hdd_ctx->bus_bw_lock);
 	cdf_mc_timer_init(&hdd_ctx->bus_bw_timer,

@@ -1093,6 +1093,15 @@ CDF_STATUS sme_ht40_stop_obss_scan(tHalHandle hHal,
 CDF_STATUS sme_set_tsfcb(tHalHandle hHal,
 	int (*cb_fn)(void *cb_ctx, struct stsf *ptsf), void *cb_ctx);
 
+#ifdef WLAN_FEATURE_TSF
+CDF_STATUS sme_set_tsf_gpio(tHalHandle h_hal, uint32_t pinvalue);
+#else
+static inline CDF_STATUS sme_set_tsf_gpio(tHalHandle h_hal, uint32_t pinvalue)
+{
+	return CDF_STATUS_E_FAILURE;
+}
+#endif
+
 CDF_STATUS sme_update_mimo_power_save(tHalHandle hHal,
 				      uint8_t is_ht_smps_enabled,
 				      uint8_t ht_smps_mode,
