@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -181,7 +181,8 @@ void ol_rx_reorder_timeout_init(struct ol_txrx_pdev_t *pdev)
 		cdf_softirq_timer_init(pdev->osdev,
 				       &rx_reorder_timeout_ac->timer,
 				       ol_rx_reorder_timeout,
-				       rx_reorder_timeout_ac);
+				       rx_reorder_timeout_ac,
+				       CDF_TIMER_TYPE_SW);
 		/* init the virtual timer list */
 		TAILQ_INIT(&rx_reorder_timeout_ac->virtual_timer_list);
 		rx_reorder_timeout_ac->pdev = pdev;

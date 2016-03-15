@@ -382,6 +382,7 @@ ol_txrx_peer_tid_pause_base(
 		txq->flag = ol_tx_queue_paused;
 	}
 }
+#ifdef QCA_BAD_PEER_TX_FLOW_CL
 
 /**
  * ol_txrx_peer_pause_but_no_mgmt_q_base() - suspend/pause all txqs except
@@ -400,6 +401,7 @@ ol_txrx_peer_pause_but_no_mgmt_q_base(
 	for (i = 0; i < OL_TX_MGMT_TID; i++)
 		ol_txrx_peer_tid_pause_base(pdev, peer, i);
 }
+#endif
 
 /**
  * ol_txrx_peer_pause_base() - suspend/pause all txqs for a given peer
@@ -468,7 +470,7 @@ ol_txrx_peer_tid_unpause_base(
 		}
 	}
 }
-
+#ifdef QCA_BAD_PEER_TX_FLOW_CL
 /**
  * ol_txrx_peer_unpause_but_no_mgmt_q_base() - unpause all txqs except
  *					       management queue for a given peer
@@ -486,6 +488,7 @@ ol_txrx_peer_unpause_but_no_mgmt_q_base(
 	for (i = 0; i < OL_TX_MGMT_TID; i++)
 		ol_txrx_peer_tid_unpause_base(pdev, peer, i);
 }
+#endif
 
 void
 ol_txrx_peer_tid_unpause(ol_txrx_peer_handle peer, int tid)

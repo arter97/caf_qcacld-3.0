@@ -149,7 +149,7 @@ void htt_htc_misc_pkt_pool_free(struct htt_pdev_t *pdev)
  *
  * Return: None
  */
-static void
+void
 htt_htc_tx_htt2_service_start(struct htt_pdev_t *pdev,
 			      HTC_SERVICE_CONNECT_REQ *connect_req,
 			      HTC_SERVICE_CONNECT_RESP *connect_resp)
@@ -170,7 +170,7 @@ htt_htc_tx_htt2_service_start(struct htt_pdev_t *pdev,
 	/* Enable HTC schedule mechanism for TX HTT2 service. */
 	connect_req->ConnectionFlags |= HTC_CONNECT_FLAGS_ENABLE_HTC_SCHEDULE;
 
-	connect_req->ServiceID = HTT_DATA2_MSG_SVC;
+	connect_req->service_id = HTT_DATA2_MSG_SVC;
 
 	status = htc_connect_service(pdev->htc_pdev, connect_req, connect_resp);
 

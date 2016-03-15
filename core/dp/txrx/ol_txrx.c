@@ -33,7 +33,7 @@
 #include <cdf_lock.h>           /* cdf_spinlock */
 #include <cdf_atomic.h>         /* cdf_atomic_read */
 
-#ifndef HIF_SDIO
+#if !defined(HIF_SDIO) && !defined(HIF_USB)
 /* Required for WLAN_FEATURE_FASTPATH */
 #include <ce_api.h>
 #endif

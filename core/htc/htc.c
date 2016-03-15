@@ -645,13 +645,14 @@ A_STATUS htc_start(HTC_HANDLE HTCHandle)
 					("HTC using TX credit flow control\n"));
 		}
 
-#ifdef HIF_SDIO
-#if ENABLE_BUNDLE_RX
-		if (HTC_ENABLE_BUNDLE(target))
-			pSetupComp->SetupFlags |=
+		if ((target->hif_dev->bus_type == HAL_BUS_TYPE_SDIO) ||
+			(target->hif_dev->bus_type == HAL_BUS_TYPE_USB)) {
+			if (HTC_RX_BUNDLE_ENABLED(target))
+				pSetupComp->SetupFlags |=
 				HTC_SETUP_COMPLETE_FLAGS_ENABLE_BUNDLE_RECV;
-#endif /* ENABLE_BUNDLE_RX */
-#endif /* HIF_SDIO */
+			hif_set_bundle_mode(target->hif_dev, true,
+				HTC_MAX_MSG_PER_BUNDLE_RX);
+		}
 
 		SET_HTC_PACKET_INFO_TX(pSendPacket,
 				       NULL,

@@ -401,7 +401,11 @@ static void htc_issue_packets_bundle(HTC_TARGET *target,
 	cdf_nbuf_t netbuf, bundleBuf;
 	unsigned char *pBundleBuffer = NULL;
 	HTC_PACKET *pPacket = NULL, *pPacketTx = NULL;
+
 	HTC_FRAME_HDR *pHtcHdr;
+
+	int last_credit_pad = 0;
+
 	int creditPad, creditRemainder, transferLength, bundlesSpaceRemaining =
 		0;
 	HTC_PACKET_QUEUE *pQueueSave = NULL;
@@ -439,7 +443,8 @@ static void htc_issue_packets_bundle(HTC_TARGET *target,
 
 		if (bundlesSpaceRemaining < transferLength) {
 			/* send out previous buffer */
-			htc_send_bundled_netbuf(target, pEndpoint, pBundleBuffer,
+			htc_send_bundled_netbuf(target, pEndpoint,
+						pBundleBuffer - last_credit_pad,
 						pPacketTx);
 			if (HTC_PACKET_QUEUE_DEPTH(pPktQueue) <
 			    HTC_MIN_MSG_PER_BUNDLE) {
@@ -463,20 +468,27 @@ static void htc_issue_packets_bundle(HTC_TARGET *target,
 
 		bundlesSpaceRemaining -= transferLength;
 		netbuf = GET_HTC_PACKET_NET_BUF_CONTEXT(pPacket);
-		pHtcHdr = (HTC_FRAME_HDR *) cdf_nbuf_get_frag_vaddr(netbuf, 0);
-		HTC_WRITE32(pHtcHdr,
-			    SM(pPacket->ActualLength,
-			       HTC_FRAME_HDR_PAYLOADLEN) | SM(pPacket->PktInfo.
-							      AsTx.
-							      SendFlags |
-							      HTC_FLAGS_SEND_BUNDLE,
-							      HTC_FRAME_HDR_FLAGS)
-			    | SM(pPacket->Endpoint, HTC_FRAME_HDR_ENDPOINTID));
-		HTC_WRITE32((A_UINT32 *) pHtcHdr + 1,
-			    SM(pPacket->PktInfo.AsTx.SeqNo,
-			       HTC_FRAME_HDR_CONTROLBYTES1) | SM(creditPad,
-								 HTC_FRAME_HDR_RESERVED));
-		pHtcHdr->reserved = creditPad;
+
+		if (target->hif_dev->bus_type != HAL_BUS_TYPE_USB) {
+			pHtcHdr =
+				(HTC_FRAME_HDR *)cdf_nbuf_get_frag_vaddr(netbuf,
+									0);
+			HTC_WRITE32(pHtcHdr,
+					SM(pPacket->ActualLength,
+						HTC_FRAME_HDR_PAYLOADLEN) |
+					SM(pPacket->PktInfo.AsTx.SendFlags |
+						HTC_FLAGS_SEND_BUNDLE,
+						HTC_FRAME_HDR_FLAGS) |
+					SM(pPacket->Endpoint,
+						HTC_FRAME_HDR_ENDPOINTID)
+				);
+			HTC_WRITE32((A_UINT32 *) pHtcHdr + 1,
+					SM(pPacket->PktInfo.AsTx.SeqNo,
+						 HTC_FRAME_HDR_CONTROLBYTES1) |
+					SM(creditPad, HTC_FRAME_HDR_RESERVED));
+			pHtcHdr->reserved = creditPad;
+		}
+
 		frag_count = cdf_nbuf_get_num_frags(netbuf);
 		nbytes = pPacket->ActualLength + HTC_HDR_LENGTH;
 		for (i = 0; i < frag_count && nbytes > 0; i++) {
@@ -492,16 +504,29 @@ static void htc_issue_packets_bundle(HTC_TARGET *target,
 		}
 		HTC_PACKET_ENQUEUE(pQueueSave, pPacket);
 		pBundleBuffer += creditPad;
+
+		if (target->hif_dev->bus_type == HAL_BUS_TYPE_USB) {
+			/* last one can't be packed. */
+			last_credit_pad = creditPad;
+		}
+
 	}
 	if (pBundleBuffer != cdf_nbuf_data(bundleBuf)) {
 		/* send out remaining buffer */
-		htc_send_bundled_netbuf(target, pEndpoint, pBundleBuffer,
+		htc_send_bundled_netbuf(target, pEndpoint,
+					pBundleBuffer - last_credit_pad,
 					pPacketTx);
 	} else {
 		free_htc_bundle_packet(target, pPacketTx);
 	}
 }
 #endif /* ENABLE_BUNDLE_TX */
+#else
+static void htc_issue_packets_bundle(HTC_TARGET *target,
+				     HTC_ENDPOINT *pEndpoint,
+				     HTC_PACKET_QUEUE *pPktQueue)
+{
+}
 #endif
 
 static A_STATUS htc_issue_packets(HTC_TARGET *target,
@@ -514,21 +539,30 @@ static A_STATUS htc_issue_packets(HTC_TARGET *target,
 	uint16_t payloadLen;
 	HTC_FRAME_HDR *pHtcHdr;
 	uint32_t data_attr = 0;
+	enum ath_hal_bus_type bus_type;
+
+	bus_type = target->hif_dev->bus_type;
 
 	AR_DEBUG_PRINTF(ATH_DEBUG_SEND,
-			("+htc_issue_packets: Queue: %p, Pkts %d \n", pPktQueue,
-			 HTC_PACKET_QUEUE_DEPTH(pPktQueue)));
+		("+htc_issue_packets: Queue: %p, Pkts %d\n",
+		pPktQueue, HTC_PACKET_QUEUE_DEPTH(pPktQueue)));
 	while (true) {
-#if defined(HIF_USB) || defined(HIF_SDIO)
-#ifdef ENABLE_BUNDLE_TX
-		if (IS_TX_CREDIT_FLOW_ENABLED(pEndpoint) &&
-		    HTC_ENABLE_BUNDLE(target) &&
-		    HTC_PACKET_QUEUE_DEPTH(pPktQueue) >=
-		    HTC_MIN_MSG_PER_BUNDLE) {
-			htc_issue_packets_bundle(target, pEndpoint, pPktQueue);
+		if (HTC_TX_BUNDLE_ENABLED(target) &&
+			HTC_PACKET_QUEUE_DEPTH(pPktQueue) >=
+						HTC_MIN_MSG_PER_BUNDLE) {
+			switch (bus_type) {
+			case HAL_BUS_TYPE_SDIO:
+				if (!IS_TX_CREDIT_FLOW_ENABLED(pEndpoint))
+					break;
+			case HAL_BUS_TYPE_USB:
+				htc_issue_packets_bundle(target,
+							pEndpoint,
+							pPktQueue);
+				break;
+			default:
+				break;
+			}
 		}
-#endif
-#endif
 		/* if not bundling or there was a packet that could not be placed in a bundle,
 		 * and send it by normal way
 		 */
@@ -616,18 +650,8 @@ static A_STATUS htc_issue_packets(HTC_TARGET *target,
 			pEndpoint->ul_outstanding_cnt--;
 			HTC_PACKET_REMOVE(&pEndpoint->TxLookupQueue, pPacket);
 			/* reclaim credits */
-#if defined(HIF_USB)
-			if (pEndpoint->Id >= ENDPOINT_2
-			    && pEndpoint->Id <= ENDPOINT_5)
-				target->avail_tx_credits +=
-					pPacket->PktInfo.AsTx.CreditsUsed;
-			else
-				pEndpoint->TxCredits +=
-					pPacket->PktInfo.AsTx.CreditsUsed;
-#else
 			pEndpoint->TxCredits +=
 				pPacket->PktInfo.AsTx.CreditsUsed;
-#endif
 			/* put it back into the callers queue */
 			HTC_PACKET_ENQUEUE_TO_HEAD(pPktQueue, pPacket);
 			UNLOCK_HTC_TX(target);
@@ -643,14 +667,6 @@ static A_STATUS htc_issue_packets(HTC_TARGET *target,
 			hif_pm_runtime_put(target->hif_dev);
 	}
 	if (cdf_unlikely(A_FAILED(status))) {
-#if defined(HIF_USB)
-		if (pEndpoint->Id >= ENDPOINT_2 && pEndpoint->Id <= ENDPOINT_5)
-			target->avail_tx_credits +=
-				pPacket->PktInfo.AsTx.CreditsUsed;
-		else
-			pEndpoint->TxCredits +=
-				pPacket->PktInfo.AsTx.CreditsUsed;
-#endif
 		AR_DEBUG_PRINTF(ATH_DEBUG_ERR,
 			("htc_issue_packets, failed pkt:0x%p status:%d",
 			 pPacket, status));
@@ -783,26 +799,11 @@ void get_htc_send_packets_credit_based(HTC_TARGET *target,
 				 creditsRequired, pEndpoint->TxCredits));
 
 		if (pEndpoint->Id == ENDPOINT_0) {
-			/* endpoint 0 is special, it always has a credit and does not require credit based
-			 * flow control */
+			/*
+			 * endpoint 0 is special, it always has a credit and
+			 * does not require credit based flow control
+			 */
 			creditsRequired = 0;
-#if defined(HIF_USB)
-		} else if (pEndpoint->Id >= ENDPOINT_2
-			   && pEndpoint->Id <= ENDPOINT_5) {
-			if (target->avail_tx_credits < creditsRequired)
-				break;
-
-			target->avail_tx_credits -= creditsRequired;
-
-			if (target->avail_tx_credits < 9) {
-				/* tell the target we need credits ASAP! */
-				sendFlags |= HTC_FLAGS_NEED_CREDIT_UPDATE;
-				INC_HTC_EP_STAT(pEndpoint,
-						TxCreditLowIndications, 1);
-				AR_DEBUG_PRINTF(ATH_DEBUG_SEND,
-						(" Host Needs Credits  \n"));
-			}
-#endif
 		} else {
 
 			if (pEndpoint->TxCredits < creditsRequired) {
@@ -1009,7 +1010,7 @@ static HTC_SEND_QUEUE_RESULT htc_try_send(HTC_TARGET *target,
 			/* all packets will fit or caller did not provide send full indication handler
 			 * --  just move all of them to the local sendQueue object */
 			HTC_PACKET_QUEUE_TRANSFER_TO_TAIL(&sendQueue,
-							  pCallersSendQueue);
+							pCallersSendQueue);
 		} else {
 			int i;
 			int goodPkts =
@@ -1077,7 +1078,8 @@ static HTC_SEND_QUEUE_RESULT htc_try_send(HTC_TARGET *target,
 	} while (false);
 
 	if (result != HTC_SEND_QUEUE_OK) {
-		AR_DEBUG_PRINTF(ATH_DEBUG_SEND, ("-htc_try_send:  \n"));
+		AR_DEBUG_PRINTF(ATH_DEBUG_SEND, ("-htc_try_send: %d\n",
+			result));
 		return result;
 	}
 
@@ -1140,6 +1142,16 @@ static HTC_SEND_QUEUE_RESULT htc_try_send(HTC_TARGET *target,
 			}
 #endif
 		} else {
+
+		/*
+		* Header and payload belongs to the different fragments and
+		* consume 2 resource for one HTC package but USB combine into
+		* one transfer.
+		*/
+		if (HTC_TX_BUNDLE_ENABLED(target) && tx_resources &&
+			target->hif_dev->bus_type == HAL_BUS_TYPE_USB)
+			tx_resources = (HTC_MAX_MSG_PER_BUNDLE_TX * 2);
+
 			/* get all the packets for this endpoint that we can for this pass */
 			get_htc_send_packets(target, pEndpoint, &sendQueue,
 					     tx_resources);
@@ -1183,8 +1195,7 @@ static HTC_SEND_QUEUE_RESULT htc_try_send(HTC_TARGET *target,
 	cdf_atomic_init(&pEndpoint->TxProcessCount);
 
 	UNLOCK_HTC_TX(target);
-
-	AR_DEBUG_PRINTF(ATH_DEBUG_SEND, ("-htc_try_send:  \n"));
+	AR_DEBUG_PRINTF(ATH_DEBUG_SEND, ("-htc_try_send: SEND OK\n"));
 
 	return HTC_SEND_QUEUE_OK;
 }
@@ -1537,12 +1548,10 @@ A_STATUS htc_send_data_pkt(HTC_HANDLE HTCHandle, HTC_PACKET *pPacket,
 
 		/* append new packet to pEndpoint->TxQueue */
 		HTC_PACKET_ENQUEUE(&pEndpoint->TxQueue, pPacket);
-#ifdef ENABLE_BUNDLE_TX
-		if (HTC_ENABLE_BUNDLE(target) && (more_data)) {
+		if (HTC_TX_BUNDLE_ENABLED(target) && (more_data)) {
 			UNLOCK_HTC_TX(target);
 			return A_OK;
 		}
-#endif
 	} else {
 		LOCK_HTC_TX(target);
 		pEndpoint = &target->endpoint[1];
@@ -1582,14 +1591,27 @@ A_STATUS htc_send_data_pkt(HTC_HANDLE HTCHandle, HTC_PACKET *pPacket,
 #endif
 		UNLOCK_HTC_TX(target);
 	}
-#ifdef ENABLE_BUNDLE_TX
-	else if (HTC_ENABLE_BUNDLE(target)) {
-		/* Dequeue max packets from endpoint tx queue */
-		get_htc_send_packets(target, pEndpoint, &sendQueue,
-				     HTC_MAX_TX_BUNDLE_SEND_LIMIT);
+
+	else if (HTC_TX_BUNDLE_ENABLED(target)) {
+
+		if ((target->hif_dev->bus_type == HAL_BUS_TYPE_USB) &&
+			hif_get_free_queue_number(target->hif_dev,
+						pEndpoint->UL_PipeID)) {
+			/*
+			* Header and payload belongs to the different fragments
+			* and consume 2 resource for one HTC package but USB
+			* combine into one transfer.
+			*/
+			get_htc_send_packets(target, pEndpoint, &sendQueue,
+				(HTC_MAX_MSG_PER_BUNDLE_TX * 2));
+		} else {
+			/* Dequeue max packets from endpoint tx queue */
+			get_htc_send_packets(target, pEndpoint, &sendQueue,
+						HTC_MAX_TX_BUNDLE_SEND_LIMIT);
+		}
+
 		UNLOCK_HTC_TX(target);
 	}
-#endif
 	else {
 		/*
 		 * Now drain the endpoint TX queue for transmission as long as we have
@@ -1608,15 +1630,13 @@ A_STATUS htc_send_data_pkt(HTC_HANDLE HTCHandle, HTC_PACKET *pPacket,
 
 	/* send what we can */
 	while (true) {
-#if defined(HIF_USB) || defined(HIF_SDIO)
-#ifdef ENABLE_BUNDLE_TX
-		if (HTC_ENABLE_BUNDLE(target) &&
-		    HTC_PACKET_QUEUE_DEPTH(&sendQueue) >=
-		    HTC_MIN_MSG_PER_BUNDLE) {
+		if (HTC_TX_BUNDLE_ENABLED(target) &&
+		    (HTC_PACKET_QUEUE_DEPTH(&sendQueue) >=
+		     HTC_MIN_MSG_PER_BUNDLE) &&
+		    (target->hif_dev->bus_type == HAL_BUS_TYPE_SDIO ||
+		     target->hif_dev->bus_type == HAL_BUS_TYPE_USB)) {
 			htc_issue_packets_bundle(target, pEndpoint, &sendQueue);
 		}
-#endif
-#endif
 		pPacket = htc_packet_dequeue(&sendQueue);
 		if (pPacket == NULL) {
 			break;
@@ -1798,6 +1818,12 @@ CDF_STATUS htc_tx_completion_handler(void *Context,
 			}
 			HTC_PACKET_QUEUE_ITERATE_END;
 			free_htc_bundle_packet(target, pPacket);
+
+			if (target->hif_dev->bus_type == HAL_BUS_TYPE_USB) {
+				if (!IS_TX_CREDIT_FLOW_ENABLED(pEndpoint))
+					htc_try_send(target, pEndpoint, NULL);
+			}
+
 			return CDF_STATUS_SUCCESS;
 		}
 		/* will be giving this buffer back to upper layers */
@@ -1985,35 +2011,7 @@ void htc_process_credit_rpt(HTC_TARGET *target, HTC_CREDIT_REPORT *pRpt,
 		}
 
 #endif
-#if defined(HIF_USB)
-		if (pEndpoint->Id >= ENDPOINT_2 && pEndpoint->Id <= ENDPOINT_5) {
-			HTC_ENDPOINT_ID eid[DATA_EP_SIZE] =
-			{ ENDPOINT_5, ENDPOINT_4, ENDPOINT_2, ENDPOINT_3 };
-			int epid_idx;
 
-			target->avail_tx_credits += rpt_credits;
-
-			for (epid_idx = 0; epid_idx < DATA_EP_SIZE; epid_idx++) {
-				pEndpoint = &target->endpoint[eid[epid_idx]];
-				if (HTC_PACKET_QUEUE_DEPTH(&pEndpoint->TxQueue)) {
-					break;
-				}
-
-			}
-			UNLOCK_HTC_TX(target);
-			htc_try_send(target, pEndpoint, NULL);
-			LOCK_HTC_TX(target);
-		} else {
-			pEndpoint->TxCredits += rpt_credits;
-
-			if (pEndpoint->TxCredits
-			    && HTC_PACKET_QUEUE_DEPTH(&pEndpoint->TxQueue)) {
-				UNLOCK_HTC_TX(target);
-				htc_try_send(target, pEndpoint, NULL);
-				LOCK_HTC_TX(target);
-			}
-		}
-#else
 		pEndpoint->TxCredits += rpt_credits;
 
 		if (pEndpoint->service_id == WMI_CONTROL_SVC) {
@@ -2039,7 +2037,6 @@ void htc_process_credit_rpt(HTC_TARGET *target, HTC_CREDIT_REPORT *pRpt,
 #endif
 			LOCK_HTC_TX(target);
 		}
-#endif
 		totalCredits += rpt_credits;
 	}
 
