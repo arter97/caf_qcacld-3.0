@@ -915,6 +915,12 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 						privcmd->param_value,
 						privcmd->param_sec_value);
 			break;
+		case GEN_PARAM_CAPTURE_TSF:
+			ret = wma_capture_tsf(wma, privcmd->param_value);
+			break;
+		case GEN_PARAM_RESET_TSF_GPIO:
+			ret = wma_reset_tsf_gpio(wma, privcmd->param_value);
+			break;
 #ifdef CONFIG_ATH_PCIE_ACCESS_DEBUG
 		case GEN_PARAM_DUMP_PCIE_ACCESS_LOG:
 			htc_dump(wma->htc_handle, PCIE_DUMP, false);
@@ -2764,6 +2770,15 @@ CDF_STATUS wma_start(void *cds_ctx)
 						    wma_pdev_temperature_evt_handler);
 	if (status != CDF_STATUS_SUCCESS) {
 		WMA_LOGE("Failed to register get_temperature event cb");
+		cdf_status = CDF_STATUS_E_FAILURE;
+		goto end;
+	}
+
+	status = wmi_unified_register_event_handler(wma_handle->wmi_handle,
+						WMI_VDEV_TSF_REPORT_EVENTID,
+						wma_vdev_tsf_handler);
+	if (0 != status) {
+		WMA_LOGP("%s: Failed to register tsf callback", __func__);
 		cdf_status = CDF_STATUS_E_FAILURE;
 		goto end;
 	}
