@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -69,6 +69,8 @@
  * @CDF_STATUS_FT_PREAUTH_KEY_FAILED: ft preauth key failed
  * @CDF_STATUS_CMD_NOT_QUEUED: command not queued
  * @CDF_STATUS_FW_MSG_TIMEDOUT: target message timeout
+ * @CDF_STATUS_E_USB_ERROR: usb transaction error
+ * @CDF_STATUS_E_IO: generic IO error
  * @CDF_STATUS_MAX: not a realy value just a place holder for max
  */
 typedef enum {
@@ -103,6 +105,8 @@ typedef enum {
 	CDF_STATUS_FT_PREAUTH_KEY_FAILED,
 	CDF_STATUS_CMD_NOT_QUEUED,
 	CDF_STATUS_FW_MSG_TIMEDOUT,
+	CDF_STATUS_E_USB_ERROR,
+	CDF_STATUS_E_IO,
 	CDF_STATUS_MAX
 } CDF_STATUS;
 

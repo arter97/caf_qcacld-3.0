@@ -779,16 +779,19 @@ int32_t cdf_mem_compare2(const void *pMemory1, const void *pMemory2,
  *
  * Return: pointer of allocated memory or null if memory alloc fails
  */
-#if defined(A_SIMOS_DEVHOST) ||  defined(HIF_SDIO)
+#if defined(A_SIMOS_DEVHOST) || defined(HIF_SDIO) || defined(HIF_USB)
 void *cdf_os_mem_alloc_consistent(cdf_device_t osdev, cdf_size_t size,
-					 cdf_dma_addr_t *paddr,
-					 cdf_dma_context_t memctx)
+					cdf_dma_addr_t *paddr,
+					cdf_dma_context_t memctx)
 {
 	void *vaddr;
 
 	vaddr = cdf_mem_malloc(size);
-	*paddr = ((cdf_dma_addr_t) vaddr);
-
+	*paddr = ((uintptr_t) vaddr);
+	/* using this type conversion to suppress "cast from pointer to integer
+	 * of different size" warning on some platforms
+	 */
+	BUILD_BUG_ON(sizeof(*paddr) < sizeof(vaddr));
 	return vaddr;
 }
 #else
@@ -819,7 +822,7 @@ void *cdf_os_mem_alloc_consistent(cdf_device_t osdev, cdf_size_t size,
  *
  * Return: none
  */
-#if defined(A_SIMOS_DEVHOST) ||  defined(HIF_SDIO)
+#if defined(A_SIMOS_DEVHOST) || defined(HIF_SDIO) || defined(HIF_USB)
 void cdf_os_mem_free_consistent(cdf_device_t osdev,
 			   cdf_size_t size,
 			   void *vaddr,

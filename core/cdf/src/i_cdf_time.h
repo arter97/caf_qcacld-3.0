@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -36,7 +36,9 @@
 
 #include <linux/jiffies.h>
 #include <linux/delay.h>
+#ifdef MSM_PLATFORM
 #include <asm/arch_timer.h>
+#endif
 #ifdef CONFIG_CNSS
 #include <net/cnss.h>
 #endif

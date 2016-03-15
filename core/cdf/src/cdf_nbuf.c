@@ -299,8 +299,10 @@ __cdf_nbuf_map_single(cdf_device_t osdev, cdf_nbuf_t buf, cdf_dma_dir_t dir)
 	cdf_dma_addr_t paddr;
 
 /* tempory hack for simulation */
-#ifdef A_SIMOS_DEVHOST
-	NBUF_CB_PADDR(buf) = paddr = buf->data;
+#if defined(A_SIMOS_DEVHOST) || defined(HIF_USB)
+	NBUF_CB_PADDR(buf) = paddr = (uintptr_t)buf->data;
+	BUILD_BUG_ON(sizeof(paddr) < sizeof(buf->data));
+	BUILD_BUG_ON(sizeof(NBUF_CB_PADDR(buf)) < sizeof(buf->data));
 	return CDF_STATUS_SUCCESS;
 #else
 	/* assume that the OS only provides a single fragment */
@@ -324,7 +326,7 @@ __cdf_nbuf_map_single(cdf_device_t osdev, cdf_nbuf_t buf, cdf_dma_dir_t dir)
 void
 __cdf_nbuf_unmap_single(cdf_device_t osdev, cdf_nbuf_t buf, cdf_dma_dir_t dir)
 {
-#if !defined(A_SIMOS_DEVHOST)
+#if !defined(A_SIMOS_DEVHOST) && !defined(HIF_USB)
 	dma_unmap_single(osdev->dev, NBUF_CB_PADDR(buf),
 			 skb_end_pointer(buf) - buf->data, dir);
 #endif /* #if !defined(A_SIMOS_DEVHOST) */
