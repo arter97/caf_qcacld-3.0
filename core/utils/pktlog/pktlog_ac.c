@@ -67,8 +67,18 @@ struct ol_pktlog_dev_t ol_pl_dev = {
 
 void ol_pl_sethandle(ol_pktlog_dev_handle *pl_handle, struct ol_softc *scn)
 {
+
+	if (scn == NULL) {
+		pr_err("%s invalid scn \n", __func__);
+		return;
+	}
+
 	ol_pl_dev.scn = (ol_ath_generic_softc_handle) scn;
-	*pl_handle = &ol_pl_dev;
+
+	if (pl_handle == NULL)
+		pr_err("%s invalid pl_handle \n", __func__);
+	else
+		*pl_handle = &ol_pl_dev;
 }
 
 static A_STATUS pktlog_wma_post_msg(WMI_PKTLOG_EVENT event_types,
