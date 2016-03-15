@@ -36,6 +36,7 @@
 /* Enable BMI_TEST COMMANDs; The Value 0x09 is randomly choosen */
 #define BMI_TEST_ENABLE (0x09)
 
+#ifdef CONFIG_CNSS
 static CDF_STATUS
 bmi_command_test(uint32_t command, uint32_t address, uint8_t *data,
 				uint32_t length, struct ol_softc *scn)
@@ -54,6 +55,7 @@ bmi_command_test(uint32_t command, uint32_t address, uint8_t *data,
 	}
 	return CDF_STATUS_SUCCESS;
 }
+#endif
 
 CDF_STATUS bmi_init(struct ol_softc *scn)
 {
@@ -191,23 +193,16 @@ static inline uint32_t bmi_get_test_addr(void)
 }
 #endif
 
-CDF_STATUS bmi_download_firmware(struct ol_softc *scn)
+#ifdef CONFIG_CNSS
+void bmi_test_setup(struct ol_softc *scn)
 {
 	uint8_t data[10], out[10];
 	uint32_t address;
 	int32_t ret;
 
-	if (NO_BMI)
-		return CDF_STATUS_SUCCESS; /* no BMI for Q6 bring up */
-
-	if (!scn) {
-		BMI_ERR("Invalid scn context");
-		bmi_assert(0);
-		return CDF_STATUS_NOT_INITIALIZED;
-	}
-#ifdef CONFIG_CNSS
 	if (scn->aps_osdev.bc.bc_bustype != HAL_BUS_TYPE_PCI)
 		goto end;
+
 	if (BMI_TEST_ENABLE == cnss_get_bmi_setup()) {
 		ret = snprintf(data, 10, "ABCDEFGHI");
 		BMI_DBG("ret:%d writing data:%s\n", ret, data);
@@ -223,9 +218,28 @@ CDF_STATUS bmi_download_firmware(struct ol_softc *scn)
 		bmi_command_test(BMI_READ_MEMORY, address, out, 9, scn);
 		BMI_DBG("Output:%s", out);
 	}
-#endif
-
 end:
+	return;
+}
+#else
+static inline void bmi_test_setup(struct ol_softc *scn)
+{
+}
+#endif
+CDF_STATUS bmi_download_firmware(struct ol_softc *scn)
+{
+
+	if (NO_BMI)
+		return CDF_STATUS_SUCCESS; /* no BMI for Q6 bring up */
+
+	if (!scn) {
+		BMI_ERR("Invalid scn context");
+		bmi_assert(0);
+		return CDF_STATUS_NOT_INITIALIZED;
+	}
+
+	bmi_test_setup(scn);
+
 	return bmi_firmware_download(scn);
 }
 

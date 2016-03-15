@@ -37,7 +37,7 @@
 #include "ol_if_athvar.h"
 #include "hif.h"
 
-#if defined(HIF_PCI) || defined(HIF_SDIO)
+#if defined(HIF_PCI) || defined(HIF_SDIO) || defined(HIF_USB)
 void bmi_cleanup(struct ol_softc *scn);
 CDF_STATUS bmi_done(struct ol_softc *scn);
 void bmi_target_ready(struct ol_softc *scn, void *cfg_ctx);

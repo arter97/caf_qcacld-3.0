@@ -28,11 +28,7 @@
 #ifndef _AR6320V2_DBG_REGTABLE_H_
 #define _AR6320V2_DBG_REGTABLE_H_
 
-#ifdef HIF_SDIO
-#include "regtable_sdio.h"
-#else
 #include "regtable.h"
-#endif
 
 #define AR6320_REV2_1_REG_SIZE 0x0007F820
 #define AR6320_REV3_REG_SIZE   0x0007F820

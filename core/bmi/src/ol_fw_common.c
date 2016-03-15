@@ -41,7 +41,7 @@
 #endif
 #include "i_bmi.h"
 
-#ifdef HIF_SDIO
+#if defined(HIF_SDIO) || defined(HIF_USB)
 static struct ol_fw_files FW_FILES_QCA6174_FW_1_1 = {
 	"qwlan11.bin", "bdwlan11.bin", "otp11.bin", "utf11.bin",
 	"utfbd11.bin", "qsetup11.bin", "epping11.bin"};
@@ -102,7 +102,7 @@ static inline int ol_get_fw_files_for_target(struct cnss_fw_files *pfw_files,
 	return 0;
 }
 #endif
-
+#if defined(CONFIG_CNSS) && defined(HIF_PCI)
 int ol_get_fw_files(struct ol_softc *scn)
 {
 	int status = 0;
@@ -116,23 +116,39 @@ int ol_get_fw_files(struct ol_softc *scn)
 			BMI_ERR("%s: No FW files from CNSS driver", __func__);
 			status = CDF_STATUS_E_FAILURE;
 		}
-	break;
+		break;
+	default:
+		BMI_ERR("%s: No FW files from CNSS driver for bus type %u",
+			__func__, scn->aps_osdev.bc.bc_bustype);
+		status = CDF_STATUS_E_FAILURE;
+		break;
+	}
+
+	return status;
+}
+#else
+int ol_get_fw_files(struct ol_softc *scn)
+{
+	int status = 0;
+
+	switch (scn->aps_osdev.bc.bc_bustype) {
 	case HAL_BUS_TYPE_SDIO:
+	case HAL_BUS_TYPE_USB:
 		if (0 != ol_get_fw_files_for_target(&scn->fw_files,
 				scn->target_version)) {
 			BMI_ERR("%s: No FW files from driver\n", __func__);
 			status = CDF_STATUS_E_FAILURE;
 		}
-	break;
+		break;
 	default:
-		BMI_ERR("%s: No FW files from CNSS driver", __func__);
+		BMI_ERR("%s: No FW files for bus type %u", __func__,
+			scn->aps_osdev.bc.bc_bustype);
 		status = CDF_STATUS_E_FAILURE;
-	break;
+		break;
 	}
-
 	return status;
 }
-
+#endif
 /* AXI Start Address */
 #define TARGET_ADDR (0xa0000)
 #ifdef CONFIG_CODESWAP_FEATURE
@@ -264,11 +280,26 @@ exit:
 	return status;
 }
 
+static CDF_STATUS
+ol_usb_extra_initialization(struct ol_softc *scn)
+{
+	CDF_STATUS status = !CDF_STATUS_SUCCESS;
+	u_int32_t param = 0;
+
+	param |= HI_ACS_FLAGS_ALT_DATA_CREDIT_SIZE;
+	status = bmi_write_memory(
+				hif_hia_item_address(scn->target_type,
+				offsetof(struct host_interest_s, hi_acs_flags)),
+				(u_int8_t *)&param, 4, scn);
+
+	return status;
+}
 int ol_extra_initialization(struct ol_softc *scn)
 {
 	if (scn->aps_osdev.bc.bc_bustype == HAL_BUS_TYPE_SDIO)
 		return ol_sdio_extra_initialization(scn);
-
+	else if (scn->aps_osdev.bc.bc_bustype == HAL_BUS_TYPE_USB)
+		return ol_usb_extra_initialization(scn);
 	return 0;
 }
 

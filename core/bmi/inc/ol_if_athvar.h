@@ -50,7 +50,7 @@
 #include "ol_ctrl_addba_api.h"
 typedef void *hif_handle_t;
 
-#ifdef HIF_SDIO
+#if defined HIF_SDIO || defined HIF_USB
 #define MAX_FILE_NAME     20
 struct ol_fw_files {
 	char image_file[MAX_FILE_NAME];
@@ -95,6 +95,34 @@ enum ol_ath_tx_ecodes {
 struct ol_ath_stats {
 	int hif_pipe_no_resrc_count;
 	int ce_ring_delta_fail_count;
+};
+
+/* Magic patterns for FW to report crash information (Rome USB) */
+#define FW_ASSERT_PATTERN       0x0000c600
+#define FW_REG_PATTERN          0x0000d600
+#define FW_REG_END_PATTERN      0x0000e600
+#define FW_RAMDUMP_PATTERN      0x0000f600
+#define FW_RAMDUMP_END_PATTERN  0x0000f601
+#define FW_RAMDUMP_PATTERN_MASK 0xfffffff0
+
+#define FW_REG_DUMP_CNT       60
+
+/* FW RAM segments (Rome USB) */
+enum {
+	FW_RAM_SEG_DRAM,
+	FW_RAM_SEG_IRAM,
+	FW_RAM_SEG_AXI,
+	FW_RAM_SEG_CNT
+};
+
+/* Allocate 384K memory to save each segment of ram dump */
+#define FW_RAMDUMP_SEG_SIZE     393216
+
+/* structure to save RAM dump information */
+struct fw_ramdump {
+	uint32_t start_addr;
+	uint32_t length;
+	uint8_t *mem;
 };
 
 #endif /* _DEV_OL_ATH_ATHVAR_H  */

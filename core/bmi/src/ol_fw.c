@@ -35,19 +35,22 @@
 #include "bin_sig.h"
 #include "i_ar6320v2_regtable.h"
 #include "epping_main.h"
+#include "i_bmi.h"
+#include "qwlan_version.h"
+#include "cds_concurrency.h"
+#include "dbglog_host.h"
 #ifdef HIF_PCI
 #include "ce_reg.h"
 #elif defined(HIF_SDIO)
 #include "if_sdio.h"
 #include "regtable_sdio.h"
+#elif defined(HIF_USB)
+#include "if_usb.h"
+#include "regtable_usb.h"
 #endif
 #if  defined(CONFIG_CNSS)
 #include <net/cnss.h>
 #endif
-
-#include "i_bmi.h"
-#include "qwlan_version.h"
-#include "cds_concurrency.h"
 
 #ifdef FEATURE_SECURE_FIRMWARE
 static struct hash_fw fw_hash;
@@ -64,8 +67,10 @@ static uint32_t refclk_speed_to_hz[] = {
 	52000000,               /* SOC_REFCLK_52_MHZ */
 };
 
+#ifdef CONFIG_CNSS
 static int ol_target_coredump(void *inst, void *memory_block,
 					uint32_t block_len);
+#endif
 #ifdef FEATURE_SECURE_FIRMWARE
 static int ol_check_fw_hash(const u8 *data, u32 fw_size, ATH_BIN_FILE file)
 {
@@ -585,21 +590,243 @@ void ol_schedule_fw_indication_work(struct ol_softc *scn)
 {
 	schedule_work(&fw_indication_work);
 }
+static inline void ol_target_register_dump(struct ol_softc *scn) {}
+#else
+#define REGISTER_DUMP_LEN_MAX   60
+#define REG_DUMP_COUNT		60
+
+void ol_target_register_dump(struct ol_softc *scn)
+{
+	uint32_t reg_dump_area = 0;
+	uint32_t reg_dump_values[REGISTER_DUMP_LEN_MAX];
+	uint32_t reg_dump_cnt = 0;
+	uint32_t i;
+	uint32_t dbglog_hdr_address;
+	struct dbglog_hdr_host dbglog_hdr;
+	struct dbglog_buf_host dbglog_buf;
+	uint8_t *dbglog_data;
+	tp_wma_handle wma = cds_get_context(CDF_MODULE_ID_WMA);
+
+	if (hif_diag_read_mem(scn->hif_hdl,
+				HOST_INTEREST_ITEM_ADDRESS(scn->target_type,
+							hi_failure_state),
+				(uint8_t *)&reg_dump_area,
+				sizeof(A_UINT32)) != CDF_STATUS_SUCCESS) {
+		pr_err("hif_diag_read_mem FW Dump Area Pointer failed\n");
+		return;
+	}
+
+	pr_info("Target Register Dump Location 0x%08X\n", reg_dump_area);
+
+	reg_dump_cnt = REG_DUMP_COUNT;
+
+	if (hif_diag_read_mem(scn->hif_hdl,
+				reg_dump_area,
+				(uint8_t *)&reg_dump_values[0],
+				reg_dump_cnt * sizeof(A_UINT32)) !=
+							CDF_STATUS_SUCCESS) {
+		pr_err("hif_diag_read_mem for FW Dump Area failed\n");
+		return;
+	}
+
+	pr_err("Target Register Dump\n");
+	for (i = 0; i < reg_dump_cnt; i++)
+		pr_err("[%02d]	 :  0x%08X\n", i, reg_dump_values[i]);
+
+	if (hif_diag_read_mem(scn->hif_hdl,
+				HOST_INTEREST_ITEM_ADDRESS(scn->target_type,
+							hi_dbglog_hdr),
+				(A_UCHAR *)&dbglog_hdr_address,
+		sizeof(dbglog_hdr_address)) != CDF_STATUS_SUCCESS) {
+		pr_err("hif_diag_read_mem FW dbglog_hdr_address failed\n");
+		return;
+	}
+
+	if (hif_diag_read_mem(scn->hif_hdl,
+				dbglog_hdr_address,
+				(A_UCHAR *)&dbglog_hdr,
+				sizeof(dbglog_hdr)) != CDF_STATUS_SUCCESS) {
+		pr_err("hif_diag_read_mem FW dbglog_hdr failed\n");
+		return;
+	}
+
+	if (hif_diag_read_mem(scn->hif_hdl,
+				(uint32_t)dbglog_hdr.dbuf,
+				(unsigned char *)&dbglog_buf,
+				sizeof(dbglog_buf)) != CDF_STATUS_SUCCESS) {
+		pr_err("hif_diag_read_mem FW dbglog_buf failed\n");
+		return;
+	}
+
+	dbglog_data = cdf_mem_malloc(dbglog_buf.length + 4);
+	if (dbglog_data) {
+		if (hif_diag_read_mem(scn->hif_hdl,
+			(uint32_t)dbglog_buf.buffer,
+			dbglog_data + 4,
+			dbglog_buf.length) != CDF_STATUS_SUCCESS) {
+			pr_err("hif_diag_read_mem FW dbglog_data failed\n");
+		} else {
+			pr_info("dbglog_hdr.dbuf=%u dbglog_data=%p dbglog_buf.buffer=%u dbglog_buf.length=%u\n",
+				dbglog_hdr.dbuf, dbglog_data, dbglog_buf.buffer,
+				dbglog_buf.length);
+
+			cdf_mem_copy(dbglog_data, &dbglog_hdr.dropped, 4);
+			wma->is_fw_assert = 1;
+			(void)dbglog_parse_debug_logs(wma,
+						dbglog_data,
+						dbglog_buf.length + 4);
+		}
+
+		cdf_mem_free(dbglog_data);
+	}
+}
 #endif
+
+/* Save memory addresses where we save FW ram dump, and then we could obtain
+ * them by symbol table.
+ */
+uint32_t fw_stack_addr;
+void *fw_ram_seg_addr[FW_RAM_SEG_CNT];
+#ifdef HIF_USB
+/* ol_ramdump_handler is to receive information of firmware crash dump, and
+ * save it in host memory. It consists of 5 parts: registers, call stack,
+ * DRAM dump, IRAM dump, and AXI dump, and they are reported to host in order.
+ *
+ * registers: wrapped in a USB packet by starting as FW_ASSERT_PATTERN and
+ *            60 registers.
+ * call stack: wrapped in multiple USB packets, and each of them starts as
+ *             FW_REG_PATTERN and contains multiple double-words. The tail
+ *             of the last packet is FW_REG_END_PATTERN.
+ * DRAM dump: wrapped in multiple USB pakcets, and each of them start as
+ *            FW_RAMDUMP_PATTERN and contains multiple double-wors. The tail
+ *            of the last packet is FW_RAMDUMP_END_PATTERN;
+ * IRAM dump and AXI dump are with the same format as DRAM dump.
+ */
+void ol_ramdump_handler(struct ol_softc *scn)
+{
+	uint32_t *reg, pattern, i, start_addr = 0;
+	uint32_t MSPId = 0, mSPId = 0, SIId = 0, CRMId = 0, len;
+	uint8_t *data;
+	uint8_t str_buf[128];
+	uint8_t *ram_ptr = NULL;
+	uint32_t remaining;
+	char *fw_ram_seg_name[FW_RAM_SEG_CNT] = {"DRAM", "IRAM", "AXI"};
+
+	data = scn->hif_sc->fw_data;
+	len = scn->hif_sc->fw_data_len;
+	pattern = *((A_UINT32 *) data);
+
+	if (pattern == FW_ASSERT_PATTERN) {
+		MSPId = (scn->target_fw_version & 0xf0000000) >> 28;
+		mSPId = (scn->target_fw_version & 0xf000000) >> 24;
+		SIId = (scn->target_fw_version & 0xf00000) >> 20;
+		CRMId = scn->target_fw_version & 0x7fff;
+		pr_err("Firmware crash detected...\n");
+		pr_err("Host SW version: %s\n", QWLAN_VERSIONSTR);
+		pr_err("FW version: %d.%d.%d.%d", MSPId, mSPId, SIId, CRMId);
+
+		reg = (uint32_t *) (data + 4);
+		print_hex_dump(KERN_DEBUG, " ", DUMP_PREFIX_OFFSET, 16, 4, reg,
+				min_t(A_UINT32, len - 4, FW_REG_DUMP_CNT * 4),
+				false);
+		scn->fw_ram_dumping = 0;
+
+	} else if (pattern == FW_REG_PATTERN) {
+		reg = (A_UINT32 *) (data + 4);
+		start_addr = *reg++;
+		if (scn->fw_ram_dumping == 0) {
+			pr_err("Firmware stack dump:");
+			scn->fw_ram_dumping = 1;
+			fw_stack_addr = start_addr;
+		}
+		remaining = len - 8;
+		/* len is in byte, but it's printed in double-word. */
+		for (i = 0; i < (len - 8); i += 16) {
+			if ((*reg == FW_REG_END_PATTERN) && (i == len - 12)) {
+				scn->fw_ram_dumping = 0;
+				pr_err("Stack start address = %#08x\n",
+					fw_stack_addr);
+				break;
+			}
+			hex_dump_to_buffer(reg, remaining, 16, 4, str_buf,
+						sizeof(str_buf), false);
+			pr_err("%#08x: %s\n", start_addr + i, str_buf);
+			remaining -= 16;
+			reg += 4;
+		}
+	} else if ((!scn->enable_self_recovery) &&
+			((pattern & FW_RAMDUMP_PATTERN_MASK) ==
+						FW_RAMDUMP_PATTERN)) {
+		cdf_assert(scn->ramdump_index < FW_RAM_SEG_CNT);
+		i = scn->ramdump_index;
+		reg = (A_UINT32 *) (data + 4);
+		if (scn->fw_ram_dumping == 0) {
+			scn->fw_ram_dumping = 1;
+			pr_err("Firmware %s dump:\n", fw_ram_seg_name[i]);
+			scn->ramdump[i] =
+				cdf_mem_malloc(sizeof(struct fw_ramdump) +
+						FW_RAMDUMP_SEG_SIZE);
+			if (!scn->ramdump[i]) {
+				pr_err("Fail to allocate memory for ram dump");
+				CDF_BUG(0);
+			}
+			(scn->ramdump[i])->mem =
+				(A_UINT8 *) (scn->ramdump[i] + 1);
+			fw_ram_seg_addr[i] = (scn->ramdump[i])->mem;
+			pr_err("FW %s start addr = %#08x\n",
+				fw_ram_seg_name[i], *reg);
+			pr_err("Memory addr for %s = %p\n",
+				fw_ram_seg_name[i],
+				(scn->ramdump[i])->mem);
+			(scn->ramdump[i])->start_addr = *reg;
+			(scn->ramdump[i])->length = 0;
+		}
+		reg++;
+		ram_ptr = (scn->ramdump[i])->mem + (scn->ramdump[i])->length;
+		(scn->ramdump[i])->length += (len - 8);
+		cdf_mem_copy(ram_ptr, (A_UINT8 *) reg, len - 8);
+
+		if (pattern == FW_RAMDUMP_END_PATTERN) {
+			pr_err("%s memory size = %d\n", fw_ram_seg_name[i],
+					(scn->ramdump[i])->length);
+			if (i == (FW_RAM_SEG_CNT - 1))
+				CDF_BUG(0);
+
+			scn->ramdump_index++;
+			scn->fw_ram_dumping = 0;
+		}
+	}
+}
+#else
+static inline void ol_ramdump_handler(struct ol_softc *scn) {}
+#endif /* HIF_USB */
 
 void ol_target_failure(void *instance, CDF_STATUS status)
 {
+#ifdef CONFIG_CNSS
+	int ret;
+#endif
 	struct ol_softc *scn = (struct ol_softc *)instance;
 	tp_wma_handle wma = cds_get_context(CDF_MODULE_ID_WMA);
-	int ret;
 
 	cdf_event_set(&wma->recovery_event);
 
 	if (OL_TRGET_STATUS_RESET == scn->target_status) {
-		BMI_ERR("Target is already asserted, ignore!");
+		BMI_ERR("%s: Target is already asserted, ignore!", __func__);
 		return;
 	}
 	scn->target_status = OL_TRGET_STATUS_RESET;
+
+	if (scn->bus_type == HAL_BUS_TYPE_USB) {
+			/*
+			 * Currently, only firmware crash triggers
+			 * ol_target_failure, in case, we need to dump RAM data.
+			 */
+			if (status == CDF_STATUS_E_USB_ERROR) {
+				ol_ramdump_handler(scn);
+				return;
+			}
+		}
 
 	if (cds_is_driver_recovering()) {
 		BMI_ERR("%s: Recovery in progress, ignore!\n", __func__);
@@ -612,6 +839,7 @@ void ol_target_failure(void *instance, CDF_STATUS status)
 		return;
 	}
 	cds_set_recovery_in_progress(true);
+
 
 #ifdef CONFIG_CNSS
 	ret = hif_check_fw_reg(scn);
@@ -626,6 +854,8 @@ void ol_target_failure(void *instance, CDF_STATUS status)
 #endif
 
 	BMI_ERR("XXX TARGET ASSERTED XXX");
+
+	ol_target_register_dump(scn);
 
 #if  defined(CONFIG_CNSS)
 	/* Collect the RAM dump through a workqueue */
@@ -1196,10 +1426,13 @@ CDF_STATUS ol_download_firmware(struct ol_softc *scn)
 		BMI_DBG("%s: Target address not known! Using 0x%x",
 						__func__, address);
 	}
-	ret = ol_patch_pll_switch(scn);
-	if (ret != CDF_STATUS_SUCCESS) {
-		BMI_ERR("pll switch failed. status %d", ret);
-		return ret;
+
+	if (scn->bus_type != HAL_BUS_TYPE_USB) {
+			ret = ol_patch_pll_switch(scn);
+		if (ret != CDF_STATUS_SUCCESS) {
+			BMI_ERR("pll switch failed. status %d", ret);
+			return ret;
+		}
 	}
 	if (scn->cal_in_flash) {
 		/* Write EEPROM or Flash data to Target RAM */
@@ -1384,6 +1617,7 @@ int ol_diag_read(struct ol_softc *scn, uint8_t *buffer,
 		return -EIO;
 }
 
+#ifdef CONFIG_CNSS
 static int ol_ath_get_reg_table(uint32_t target_version,
 				tgt_reg_table *reg_table)
 {
@@ -1482,6 +1716,7 @@ static int ol_diag_read_reg_loc(struct ol_softc *scn, uint8_t *buffer,
 out:
 	return result;
 }
+#endif
 
 void ol_dump_target_memory(struct ol_softc *scn, void *memory_block)
 {
@@ -1490,7 +1725,8 @@ void ol_dump_target_memory(struct ol_softc *scn, void *memory_block)
 	u_int32_t address = 0;
 	u_int32_t size = 0;
 
-	if (scn->aps_osdev.bc.bc_bustype == HAL_BUS_TYPE_SDIO)
+	if ((scn->aps_osdev.bc.bc_bustype == HAL_BUS_TYPE_SDIO) ||
+		(scn->aps_osdev.bc.bc_bustype == HAL_BUS_TYPE_USB))
 		return;
 
 	for (; section_count < 2; section_count++) {
@@ -1543,6 +1779,7 @@ ol_dump_ce_register(struct ol_softc *scn, void *memory_block)
 }
 #endif
 
+#ifdef CONFIG_CNSS
 /**---------------------------------------------------------------------------
 *   \brief  ol_target_coredump
 *
@@ -1629,6 +1866,7 @@ static int ol_target_coredump(void *inst, void *memory_block,
 	}
 	return ret;
 }
+#endif
 
 #define MAX_SUPPORTED_PEERS_REV1_1 14
 #define MAX_SUPPORTED_PEERS_REV1_3 32
