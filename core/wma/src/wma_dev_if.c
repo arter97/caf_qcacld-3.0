@@ -242,6 +242,7 @@ int wma_unified_vdev_create_send(wmi_unified_t wmi_handle, uint8_t if_id,
 	cmd->vdev_id = if_id;
 	cmd->vdev_type = type;
 	cmd->vdev_subtype = subtype;
+	cmd->pdev_id = WMI_PDEV_ID_SOC;
 	WMI_CHAR_ARRAY_TO_MAC_ADDR(macaddr, &cmd->vdev_macaddr);
 	WMA_LOGE("%s: ID = %d VAP Addr = %02x:%02x:%02x:%02x:%02x:%02x",
 		 __func__, if_id,
@@ -934,8 +935,19 @@ int wma_vdev_start_resp_handler(void *handle, uint8_t *cmd_param_info,
 			resp_event->cfgd_rx_streams;
 		wma->interfaces[resp_event->vdev_id].chain_mask =
 			resp_event->chain_mask;
-		wma->interfaces[resp_event->vdev_id].mac_id =
-			resp_event->mac_id;
+		if (wma->wlan_resource_config.use_pdev_id) {
+			if (resp_event->pdev_id == WMI_PDEV_ID_SOC) {
+				WMA_LOGE("%s: soc level id received for mac id",
+					__func__);
+				CDF_BUG(0);
+				return -EINVAL;
+			}
+			wma->interfaces[resp_event->vdev_id].mac_id =
+				WMA_PDEV_TO_MAC_MAP(resp_event->pdev_id);
+		} else {
+			wma->interfaces[resp_event->vdev_id].mac_id =
+				resp_event->mac_id;
+		}
 		WMA_LOGI("%s: vdev:%d tx ss=%d rx ss=%d chain mask=%d mac=%d",
 				__func__,
 				resp_event->vdev_id,

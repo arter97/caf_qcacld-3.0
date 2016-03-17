@@ -2113,6 +2113,7 @@ static int wma_set_base_macaddr_indicate(tp_wma_handle wma_handle,
 		       WMITLV_GET_STRUCT_TLVLEN
 			       (wmi_pdev_set_base_macaddr_cmd_fixed_param));
 	WMI_CHAR_ARRAY_TO_MAC_ADDR(*customAddr, &cmd->base_macaddr);
+	cmd->pdev_id = WMI_PDEV_ID_SOC;
 	err = wmi_unified_cmd_send(wma_handle->wmi_handle, buf,
 				   sizeof(*cmd),
 				   WMI_PDEV_SET_BASE_MACADDR_CMDID);
@@ -3985,6 +3986,20 @@ void wma_rx_service_ready_event(WMA_HANDLE handle, void *cmd_param_info)
 			("Failed to register WMI_TBTTOFFSET_UPDATE_EVENTID callback");
 		return;
 	}
+
+	/* mac_id is replaced with pdev_id in converged firmware to have
+	 * multi-radio support. In order to maintain backward compatibility
+	 * with old fw, host needs to check WMI_SERVICE_DEPRECATED_REPLACE
+	 * in service bitmap from FW and host needs to set use_pdev_id in
+	 * wmi_resource_config to true. If WMI_SERVICE_DEPRECATED_REPLACE
+	 * service is not set, then host shall not expect MAC ID from FW in
+	 * VDEV START RESPONSE event and host shall use PDEV ID.
+	 */
+	 if (WMI_SERVICE_IS_ENABLED(wma_handle->wmi_service_bitmap,
+			WMI_SERVICE_DEPRECATED_REPLACE))
+		wma_handle->wlan_resource_config.use_pdev_id = true;
+	else
+		wma_handle->wlan_resource_config.use_pdev_id = false;
 
 	/* register the Enhanced Green AP event handler */
 	wma_register_egap_event_handle(wma_handle);

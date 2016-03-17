@@ -2939,6 +2939,7 @@ CDF_STATUS wma_pktlog_wmi_send_cmd(WMA_HANDLE handle,
 			       WMITLV_GET_STRUCT_TLVLEN
 				       (wmi_pdev_pktlog_enable_cmd_fixed_param));
 		cmd->evlist = PKTLOG_EVENT;
+		cmd->pdev_id = WMI_PDEV_ID_SOC;
 		if (wmi_unified_cmd_send(wma_handle->wmi_handle, buf, len,
 					 WMI_PDEV_PKTLOG_ENABLE_CMDID)) {
 			WMA_LOGE("failed to send pktlog enable cmdid");
@@ -2959,6 +2960,7 @@ CDF_STATUS wma_pktlog_wmi_send_cmd(WMA_HANDLE handle,
 			       WMITLV_GET_STRUCT_TLVLEN
 				       (wmi_pdev_pktlog_disable_cmd_fixed_param));
 		disable_cmd->pdev_id = 0;
+		disable_cmd->pdev_id = WMI_PDEV_ID_SOC;
 		if (wmi_unified_cmd_send(wma_handle->wmi_handle, buf, len,
 					 WMI_PDEV_PKTLOG_DISABLE_CMDID)) {
 			WMA_LOGE("failed to send pktlog disable cmdid");
@@ -7486,7 +7488,7 @@ int wma_resume_target(WMA_HANDLE handle)
 		       WMITLV_TAG_STRUC_wmi_pdev_resume_cmd_fixed_param,
 		       WMITLV_GET_STRUCT_TLVLEN
 			       (wmi_pdev_resume_cmd_fixed_param));
-	cmd->pdev_id = 0;
+	cmd->pdev_id = WMI_PDEV_ID_SOC;
 	cdf_event_reset(&wma->wma_resume_event);
 	ret = wmi_unified_cmd_send(wma->wmi_handle, wmibuf, sizeof(*cmd),
 				   WMI_PDEV_RESUME_CMDID);

@@ -1025,6 +1025,14 @@ CDF_STATUS wma_set_enable_disable_mcc_adaptive_scheduler(uint32_t
 		       WMITLV_GET_STRUCT_TLVLEN
 			       (wmi_resmgr_adaptive_ocs_enable_disable_cmd_fixed_param));
 	cmd->enable = mcc_adaptive_scheduler;
+	/* In WMI_RESMGR_ADAPTIVE_OCS_ENABLE_DISABLE_CMDID fw cannot
+	 * determine the PDEV on its own, Host needs to specify the PDEV
+	 * ID in the command.
+	 */
+	if (wma->wlan_resource_config.use_pdev_id)
+		cmd->pdev_id = WMA_MAC_TO_PDEV_MAP(0);
+	else
+		cmd->pdev_id = WMI_PDEV_ID_SOC;
 
 	ret = wmi_unified_cmd_send(wma->wmi_handle, buf, len,
 				   WMI_RESMGR_ADAPTIVE_OCS_ENABLE_DISABLE_CMDID);
