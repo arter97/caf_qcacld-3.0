@@ -1042,7 +1042,7 @@ static void hif_pm_runtime_start(struct hif_pci_softc *sc)
 		return;
 	}
 
-	if (cds_get_conparam() == CDF_FTM_MODE ||
+	if (cds_get_conparam() == CDF_GLOBAL_FTM_MODE ||
 			WLAN_IS_EPPING_ENABLED(cds_get_conparam())) {
 		HIF_INFO("%s: RUNTIME PM is disabled for FTM/EPPING mode\n",
 				__func__);
@@ -1074,7 +1074,7 @@ static void hif_pm_runtime_stop(struct hif_pci_softc *sc)
 	if (!ol_sc->enable_runtime_pm)
 		return;
 
-	if (cds_get_conparam() == CDF_FTM_MODE ||
+	if (cds_get_conparam() == CDF_GLOBAL_FTM_MODE ||
 			WLAN_IS_EPPING_ENABLED(cds_get_conparam()))
 		return;
 
