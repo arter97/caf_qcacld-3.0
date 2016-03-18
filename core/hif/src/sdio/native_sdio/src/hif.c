@@ -76,10 +76,6 @@
 #endif
 
 extern struct ath_hif_sdio_softc *sc;
-unsigned int mmcbusmode = 0;
-module_param(mmcbusmode, uint, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-MODULE_PARM_DESC(mmcbusmode,
-	"Set MMC driver Bus Mode: 1-SDR12, 2-SDR25, 3-SDR50, 4-DDR50, 5-SDR104");
 
 unsigned int mmcbuswidth = 0;
 module_param(mmcbuswidth, uint, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
@@ -1628,9 +1624,6 @@ static int hif_device_inserted(struct sdio_func *func,
 	struct hif_sdio_dev *device = NULL;
 	int count;
 	uint32_t clock, clock_set = 12500000;
-	uint32_t bus_speed = 0, timing = 0;
-	uint8_t speed = 0;
-
 
 	AR_DEBUG_PRINTF(ATH_DEBUG_TRACE,
 			("%s: Function: "
@@ -1797,144 +1790,6 @@ static int hif_device_inserted(struct sdio_func *func,
 		}
 		if (debugcccr)
 			hif_dump_cccr(device);
-		/* Set MMC Bus Mode: 1-SDR12, 2-SDR25, 3-SDR50,
-		 * 4-DDR50, 5-SDR104 */
-		if (mmcbusmode > 0) {
-			AR_DEBUG_PRINTF(ATH_DEBUG_INFO,
-				("host caps:0x%08X, card_sd3_bus_mode:0x%08X\n",
-				(unsigned int)func->card->host->caps,
-				(unsigned int)func->card->sw_caps.
-				sd3_bus_mode));
-			if (mmcbusmode == 5
-			    && (func->card->host->
-				caps & MMC_CAP_UHS_SDR104)
-			    &&
-			    ((func->card->sw_caps.
-			      sd3_bus_mode & SD_MODE_UHS_SDR104)
-			     || forcecard)) {
-				bus_speed = SDIO_SPEED_SDR104;
-				timing = MMC_TIMING_UHS_SDR104;
-				func->card->sw_caps.uhs_max_dtr =
-					UHS_SDR104_MAX_DTR;
-				AR_DEBUG_PRINTF(ATH_DEBUG_ANY,
-					("%s: Set MMC bus mode to SDR104.\n",
-						 __func__));
-			} else if (mmcbusmode == 4
-				   && (func->card->host->
-				       caps & MMC_CAP_UHS_DDR50)
-				   &&
-				   ((func->card->sw_caps.
-				     sd3_bus_mode & SD_MODE_UHS_DDR50)
-				    || forcecard)) {
-				bus_speed = SDIO_SPEED_DDR50;
-				timing = MMC_TIMING_UHS_DDR50;
-				func->card->sw_caps.uhs_max_dtr =
-					UHS_DDR50_MAX_DTR;
-				AR_DEBUG_PRINTF(ATH_DEBUG_ANY,
-					("%s: Set MMC bus mode to DDR50.\n",
-					 __func__));
-			} else if (mmcbusmode == 3
-				   && (func->card->host->
-				       caps & (MMC_CAP_UHS_SDR104 |
-					       MMC_CAP_UHS_SDR50))
-				   &&
-				   ((func->card->sw_caps.
-				     sd3_bus_mode & SD_MODE_UHS_SDR50)
-				    || forcecard)) {
-				bus_speed = SDIO_SPEED_SDR50;
-				timing = MMC_TIMING_UHS_SDR50;
-				func->card->sw_caps.uhs_max_dtr =
-					UHS_SDR50_MAX_DTR;
-				AR_DEBUG_PRINTF(ATH_DEBUG_ANY,
-					("%s: Set MMC bus mode to SDR50.\n",
-						 __func__));
-			} else if (mmcbusmode == 2
-				   && (func->card->host->
-				       caps & (MMC_CAP_UHS_SDR104 |
-					       MMC_CAP_UHS_SDR50 |
-					       MMC_CAP_UHS_SDR25))
-				   &&
-				   ((func->card->sw_caps.
-				     sd3_bus_mode & SD_MODE_UHS_SDR25)
-				    || forcecard)) {
-				bus_speed = SDIO_SPEED_SDR25;
-				timing = MMC_TIMING_UHS_SDR25;
-				func->card->sw_caps.uhs_max_dtr =
-					UHS_SDR25_MAX_DTR;
-				AR_DEBUG_PRINTF(ATH_DEBUG_ANY,
-					("%s: Set MMC bus mode to SDR25.\n",
-					 __func__));
-			} else if (mmcbusmode == 1
-				   && (func->card->host->
-				       caps & (MMC_CAP_UHS_SDR104 |
-					       MMC_CAP_UHS_SDR50 |
-					       MMC_CAP_UHS_SDR25 |
-					       MMC_CAP_UHS_SDR12))
-				   &&
-				   ((func->card->sw_caps.
-				     sd3_bus_mode & SD_MODE_UHS_SDR12)
-				    || forcecard)) {
-				bus_speed = SDIO_SPEED_SDR12;
-				timing = MMC_TIMING_UHS_SDR12;
-				func->card->sw_caps.uhs_max_dtr =
-					UHS_SDR12_MAX_DTR;
-				AR_DEBUG_PRINTF(ATH_DEBUG_ANY,
-					("%s: Set MMC bus mode to SDR12.\n",
-					 __func__));
-			} else {
-				AR_DEBUG_PRINTF(ATH_DEBUG_ERR,
-					("%s: MMC bus mode %d not supported.\n",
-						 __func__, mmcbusmode));
-				return ret = A_ERROR;
-			}
-
-			ret =
-				func0_cmd52_read_byte(func->card,
-						      SDIO_CCCR_SPEED,
-						      &speed);
-			if (ret) {
-				AR_DEBUG_PRINTF(ATH_DEBUG_ERR,
-					("%s: CMD52 to get CCCR SPEED failed: "
-					"%d, cap_uhs: %lu, sd3_bus_mode: %x\n",
-						 __func__, ret,
-						 (long unsigned
-						  int)(func->card->
-						       host->
-						       caps &
-						       (MMC_CAP_UHS_SDR104
-							|
-							MMC_CAP_UHS_SDR50
-							|
-							MMC_CAP_UHS_SDR25
-							|
-							MMC_CAP_UHS_SDR12)),
-						 func->card->sw_caps.
-						 sd3_bus_mode));
-				return ret;
-			}
-
-			speed &= ~SDIO_SPEED_BSS_MASK;
-			speed |= bus_speed;
-			ret =
-				func0_cmd52_write_byte(func->card,
-						       SDIO_CCCR_SPEED,
-						       speed);
-			if (ret) {
-				AR_DEBUG_PRINTF(ATH_DEBUG_ERR,
-					("%s: CMD52 to CCCR SPEED failed: %d\n",
-						 __func__, ret));
-				return ret;
-			}
-
-			if (bus_speed) {
-				device->host->ios.timing = timing;
-				device->host->ops->set_ios(device->host,
-							   &device->
-							   host->ios);
-				/* mmc_set_clock(func->card->host,
-					func->card->sw_caps.uhs_max_dtr); */
-			}
-		}
 
 		sdio_release_host(func);
 	}
