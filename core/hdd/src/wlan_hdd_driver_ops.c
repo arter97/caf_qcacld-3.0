@@ -36,7 +36,9 @@
 #include <net/cnss.h>
 #endif /* CONFIG_CNSS */
 #else
+#ifdef MSM_PLATFORM
 #include <soc/qcom/icnss.h>
+#endif
 #endif /* HIF_PCI */
 #include "cds_api.h"
 #include "cdf_status.h"
@@ -53,6 +55,7 @@
 #include "wlan_hdd_napi.h"
 #include "cds_concurrency.h"
 #include "qwlan_version.h"
+#include "cdf_atomic.h"
 
 #ifdef MODULE
 #define WLAN_MODULE_NAME  module_name(THIS_MODULE)
@@ -86,6 +89,13 @@
 #define WLAN_HDD_UNREGISTER_DRIVER(wlan_drv_ops) \
 	icnss_unregister_driver(wlan_drv_ops)
 #endif /* CONFIG_ICNSS */
+
+#ifdef HIF_USB
+#define WLAN_HDD_REGISTER_DRIVER(wlan_drv_ops) \
+	cnss_wlan_register_driver(wlan_drv_ops)
+#define WLAN_HDD_UNREGISTER_DRIVER(wlan_drv_ops) \
+	cnss_wlan_unregister_driver(wlan_drv_ops)
+#endif
 #define DISABLE_KRAIT_IDLE_PS_VAL      1
 
 /*
@@ -153,7 +163,7 @@ static int hdd_hif_open(struct device *dev, void *bdev, const hif_bus_id *bid,
 	} else {
 		ret = hdd_napi_create();
 		hdd_info("hdd_napi_create returned: %d", status);
-		if (ret <= 0) {
+		if ((ret != -EPERM) && (ret <= 0)) {
 			hdd_err("NAPI creation error, rc: 0x%x, reinit = %d",
 				status, reinit);
 			ret = -EFAULT;
@@ -303,7 +313,7 @@ static void wlan_hdd_remove(void)
 {
 	void *hif_ctx;
 
-	pr_info("%s: Removing driver v%s\n", WLAN_MODULE_NAME,
+	pr_info("%s: De-initializing driver %s\n", WLAN_MODULE_NAME,
 		QWLAN_VERSIONSTR);
 
 	/* Wait for recovery to complete */
@@ -336,9 +346,10 @@ static void wlan_hdd_remove(void)
 
 	hdd_deinit();
 
-	pr_info("%s: Driver Removed\n", WLAN_MODULE_NAME);
+	pr_info("%s: Driver De-initialized\n", WLAN_MODULE_NAME);
 }
 
+#ifdef CONFIG_CNSS
 /**
  * wlan_hdd_shutdown() - wlan_hdd_shutdown
  *
@@ -372,6 +383,7 @@ static void wlan_hdd_shutdown(void)
 
 	hdd_hif_close(hif_ctx);
 }
+#endif
 
 /**
  * wlan_hdd_crash_shutdown() - wlan_hdd_crash_shutdown
@@ -645,6 +657,27 @@ static int wlan_hdd_runtime_resume(void)
 }
 #endif
 
+#ifdef HIF_USB
+/**
+ * wlan_hdd_bus_reset_resume() - resume the wlan bus from after reset
+ *
+ * This function is called to tell the driver that the device has been resumed
+ * and it has also been reset. The driver should redo any necessary
+ * initialization. It is mainly used by the USB bus
+ *
+ * Return: int 0 for success, non zero for failure
+ */
+static int wlan_hdd_bus_reset_resume(void)
+{
+	int ret;
+
+	cds_ssr_protect(__func__);
+	ret = hif_bus_reset_resume();
+	cds_ssr_unprotect(__func__);
+	return ret;
+}
+#endif
+
 #ifdef HIF_PCI
 /**
  * wlan_hdd_pci_probe() - probe callback for pci platform driver
@@ -849,7 +882,7 @@ static int wlan_hdd_sdio_resume(struct device *dev)
 {
 	return wlan_hdd_bus_resume();
 }
-#else
+#elif defined(MSM_PLATFORM)
 /**
  * wlan_hdd_snoc_probe() - wlan_hdd_snoc_probe
  * @dev: dev
@@ -927,6 +960,122 @@ static int wlan_hdd_snoc_resume(struct device *dev)
 {
 	return wlan_hdd_bus_resume();
 }
+#elif defined(HIF_USB)
+static cdf_atomic_t cnss_reg_done;
+
+/**
+ * cnss_wlan_register_driver() - registration routine for wlan driver
+ * @drv_ops: functions used by WLAN driver to register as a bus driver
+ *
+ * Return: int negative error code on failure and 0 on success
+ */
+int cnss_wlan_register_driver(void *drv_ops)
+{
+	int status;
+
+	status = usb_register(drv_ops);
+
+	if (0 != status) {
+		pr_err("%s , usb_register failed\n", __func__);
+		cdf_atomic_set(&cnss_reg_done, false);
+	} else {
+		cdf_atomic_set(&cnss_reg_done, true);
+		pr_info("%s usb_register done!\n", __func__);
+	}
+
+	return status;
+}
+
+/**
+ * cnss_wlan_unregister_driver() - de-registration routine for wlan driver
+ * @drv_ops: functions used by WLAN driver to de-register as a bus driver
+ *
+ * Return: void
+ */
+void cnss_wlan_unregister_driver(void *drv_ops)
+{
+	if (cdf_atomic_read(&cnss_reg_done) == false)
+		return;
+
+	wlan_hdd_remove();
+	cdf_atomic_set(&cnss_reg_done, false);
+	usb_deregister(drv_ops);
+	pr_info("%s usb_deregister done!\n", __func__);
+}
+
+/**
+ * wlan_hdd_usb_probe() - wlan_hdd_usb_probe
+ * @interface: pointer to usb_interface structure
+ * @id: pointer to usb_device_id obtained from the enumerated device
+
+ * Return: int 0 on success and errno on failure.
+ */
+static int wlan_hdd_usb_probe(struct usb_interface *interface,
+					const struct usb_device_id *id)
+{
+	int status;
+	struct usb_device *pdev = interface_to_usbdev(interface);
+
+	status = wlan_hdd_probe(&pdev->dev, interface, (void *)id,
+			HAL_BUS_TYPE_USB, false);
+	if (status != 0)
+		pr_err("%s, wlan_hdd_probe returned %d", __func__, status);
+	else
+		cdf_atomic_set(&cnss_reg_done, true);
+
+	return status;
+}
+
+/**
+ * wlan_hdd_usb_remove() - wlan_hdd_usb_remove
+ * @interface: pointer to usb_interface for the usb device being removed
+ *
+ * Return: void
+ */
+void wlan_hdd_usb_remove(struct usb_interface *interface)
+{
+	if (cdf_atomic_read(&cnss_reg_done) == true) {
+		wlan_hdd_remove();
+	}
+	cdf_atomic_set(&cnss_reg_done, false);
+	pr_info("%s: done!", __func__);
+}
+
+/**
+ * wlan_hdd_usb_suspend() - wlan_hdd_usb_suspend
+ * @interface: pointer to usb_interface for the usb device being suspended
+ * @state: state
+ *
+ * Return: int 0 on success and errno on failure
+ */
+static int wlan_hdd_usb_suspend(struct usb_interface *interface,
+						pm_message_t state)
+{
+	return wlan_hdd_bus_suspend(state);
+}
+
+/**
+ * wlan_hdd_usb_resume() - wlan_hdd_usb_resume
+ * @interface: pointer to usb_interface for the usb device being resumed
+ *
+ * Return: int 0 on success and errno on failure
+ */
+static int wlan_hdd_usb_resume(struct usb_interface *interface)
+{
+	return wlan_hdd_bus_resume();
+}
+
+/**
+ * wlan_hdd_usb_reset_resume() - wlan_hdd_usb_reset_resume
+ * @interface: pointer to usb_interface for usb device being resumed
+ *
+ * Return: int 0 on success and errno on failure
+ */
+static int wlan_hdd_usb_reset_resume(struct usb_interface *intf)
+{
+	return wlan_hdd_bus_reset_resume();
+}
+
 #endif /* HIF_PCI */
 
 #ifdef HIF_PCI
@@ -1005,6 +1154,29 @@ struct icnss_driver_ops wlan_drv_ops = {
 	.suspend    = wlan_hdd_snoc_suspend,
 	.resume     = wlan_hdd_snoc_resume,
 };
+#endif
+
+#ifdef HIF_USB
+#define VENDOR_ATHR             0x0CF3
+static struct usb_device_id wlan_hdd_usb_id_table[] = {
+	{USB_DEVICE_AND_INTERFACE_INFO(VENDOR_ATHR, 0x9378, 0xFF, 0xFF, 0xFF)},
+	{}			/* Terminating entry */
+};
+
+MODULE_DEVICE_TABLE(usb, wlan_hdd_usb_id_table);
+struct usb_driver wlan_drv_ops = {
+	.name = "wlan_hdd_usb",
+	.id_table = wlan_hdd_usb_id_table,
+	.probe = wlan_hdd_usb_probe,
+	.disconnect = wlan_hdd_usb_remove,
+#ifdef ATH_BUS_PM
+	.suspend = wlan_hdd_usb_suspend,
+	.resume = wlan_hdd_usb_resume,
+	.reset_resume = wlan_hdd_usb_reset_resume,
+#endif
+	.supports_autosuspend = true,
+};
+
 #endif
 
 /**

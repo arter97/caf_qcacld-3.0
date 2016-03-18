@@ -981,7 +981,7 @@ static CDF_STATUS hdd_dis_connect_handler(hdd_adapter_t *pAdapter,
 
 	if (hdd_ipa_is_enabled(pHddCtx))
 		hdd_ipa_wlan_evt(pAdapter, pHddStaCtx->conn_info.staId[0],
-				 WLAN_STA_DISCONNECT,
+				 HDD_IPA_STA_DISCONNECT,
 				 pHddStaCtx->conn_info.bssId.bytes);
 
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
@@ -1828,7 +1828,7 @@ static CDF_STATUS hdd_association_completion_handler(hdd_adapter_t *pAdapter,
 
 		if (hdd_ipa_is_enabled(pHddCtx))
 			hdd_ipa_wlan_evt(pAdapter, pRoamInfo->staId,
-					 WLAN_STA_CONNECT,
+					 HDD_IPA_STA_CONNECT,
 					 pRoamInfo->bssid.bytes);
 
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN

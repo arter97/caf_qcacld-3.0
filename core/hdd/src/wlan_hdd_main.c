@@ -5121,7 +5121,7 @@ static CDF_STATUS wlan_hdd_disable_all_dual_mac_features(hdd_context_t *hdd_ctx)
 	return CDF_STATUS_SUCCESS;
 }
 
-#ifdef HIF_SDIO
+#if defined(HIF_SDIO) || defined(HIF_USB)
 /**
  * set_fw_debug_mode() - set_fw_debug_mode
  * @mode: fw debug mode, 0 for QXDM, 1 for WMI
@@ -7034,7 +7034,8 @@ static int __hdd_module_init(void)
 
 	ret = wlan_hdd_register_driver();
 	if (ret) {
-		pr_err("%s: driver load failure\n", WLAN_MODULE_NAME);
+		pr_err("%s: driver load failure, err %d\n", WLAN_MODULE_NAME,
+			ret);
 		goto out;
 	}
 
