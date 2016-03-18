@@ -1190,6 +1190,9 @@ struct ol_txrx_peer_t {
 	u_int16_t tx_limit_flag;
 	u_int16_t tx_pause_flag;
 #endif
+	cdf_time_t last_assoc_rcvd;
+	cdf_time_t last_disassoc_rcvd;
+	cdf_time_t last_deauth_rcvd;
 };
 
 enum ol_rx_err_type {
