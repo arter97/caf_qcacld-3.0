@@ -411,6 +411,24 @@ static inline void cdf_nbuf_free(cdf_nbuf_t buf)
 
 #endif
 
+#ifdef WLAN_FEATURE_FASTPATH
+/**
+ * cdf_nbuf_init_fast() - before put buf into pool,turn it to init state
+ *
+ * @buf: buf instance
+ * Return: data pointer of this buf where new data has to be
+ *         put, or NULL if there is not enough room in this buf.
+ */
+
+static inline void
+cdf_nbuf_init_fast(cdf_nbuf_t nbuf)
+{
+	atomic_set(&nbuf->users, 1);
+	nbuf->data = nbuf->head + NET_SKB_PAD;
+	skb_reset_tail_pointer(nbuf);
+}
+#endif /* WLAN_FEATURE_FASTPATH */
+
 /**
  * cdf_nbuf_tx_free() - free a list of cdf_nbufs and tell the OS their tx
  *			status (if req'd)

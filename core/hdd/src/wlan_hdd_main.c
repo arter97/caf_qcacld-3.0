@@ -5630,6 +5630,8 @@ int hdd_wlan_startup(struct device *dev, void *hif_sc)
 	if (IS_ERR(hdd_ctx))
 		return PTR_ERR(hdd_ctx);
 
+	hif_update_fastpath_recv_bufs_cnt(hif_sc);
+
 	if (CDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
 		ret = hdd_enable_ftm(hdd_ctx);
 
