@@ -14,6 +14,14 @@ endif # platform
 # Build/Package only in case of supported target
 ifneq ($(WLAN_CHIPSET),)
 
+# If TARGET_KERNEL_VERSION is not defined, using default kernel path,
+# otherwise kernel path should come from top level Android makefiles.
+ifeq ($(TARGET_KERNEL_VERSION),)
+$(info "WLAN: TARGET_KERNEL_VERSION not defined, assuming default")
+TARGET_KERNEL_SOURCE := kernel
+KERNEL_TO_BUILD_ROOT_OFFSET := ../
+endif
+
 LOCAL_PATH := $(call my-dir)
 
 # This makefile is only for DLKM
@@ -46,9 +54,9 @@ endif
 ###########################################################
 # This is set once per LOCAL_PATH, not per (kernel) module
 ifeq ($(WLAN_PROPRIETARY),1)
-	KBUILD_OPTIONS := WLAN_ROOT=../$(WLAN_BLD_DIR)/qcacld-new
+	KBUILD_OPTIONS := WLAN_ROOT=$(KERNEL_TO_BUILD_ROOT_OFFSET)$(WLAN_BLD_DIR)/qcacld-new
 else
-	KBUILD_OPTIONS := WLAN_ROOT=../$(WLAN_BLD_DIR)/qcacld-3.0
+	KBUILD_OPTIONS := WLAN_ROOT=$(KERNEL_TO_BUILD_ROOT_OFFSET)$(WLAN_BLD_DIR)/qcacld-3.0
 endif # WLAN_PROPRIETARY
 # We are actually building wlan.ko here, as per the
 # requirement we are specifying <chipset>_wlan.ko as LOCAL_MODULE.
