@@ -50,8 +50,6 @@ typedef enum {
 	TWO_BYTE = 2
 } eSizeOfLenField;
 
-#define MIN_TX_PWR_CAP    8
-#define MAX_TX_PWR_CAP    22
 
 #define LIM_STA_ID_MASK                        0x00FF
 #define LIM_AID_MASK                              0xC000
