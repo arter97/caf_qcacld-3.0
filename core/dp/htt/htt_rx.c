@@ -2815,7 +2815,7 @@ int htt_rx_ipa_uc_alloc_wdi2_rsc(struct htt_pdev_t *pdev,
 		cdf_os_mem_alloc_consistent(
 			pdev->osdev,
 			rx_ind_ring_elements *
-			sizeof(struct ipa_uc_rx_ring_elem_t),
+			sizeof(cdf_dma_addr_t),
 			&pdev->ipa_uc_rx_rsc.rx2_ind_ring_base.paddr,
 			cdf_get_dma_mem_context((&pdev->ipa_uc_rx_rsc.
 						 rx2_ind_ring_base),
@@ -2827,7 +2827,7 @@ int htt_rx_ipa_uc_alloc_wdi2_rsc(struct htt_pdev_t *pdev,
 
 	/* RX indication ring size, by bytes */
 	pdev->ipa_uc_rx_rsc.rx2_ind_ring_size =
-		rx_ind_ring_elements * sizeof(struct ipa_uc_rx_ring_elem_t);
+		rx_ind_ring_elements * sizeof(cdf_dma_addr_t);
 	cdf_mem_zero(pdev->ipa_uc_rx_rsc.rx2_ind_ring_base.vaddr,
 		pdev->ipa_uc_rx_rsc.rx2_ind_ring_size);
 
