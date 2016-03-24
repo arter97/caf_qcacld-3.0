@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -56,6 +56,7 @@
 
 #define CDS_24_GHZ_BASE_FREQ   (2407)
 #define CDS_5_GHZ_BASE_FREQ    (5000)
+#define CDS_24_GHZ_CHANNEL_6   (6)
 #define CDS_24_GHZ_CHANNEL_14  (14)
 #define CDS_24_GHZ_CHANNEL_15  (15)
 #define CDS_24_GHZ_CHANNEL_27  (27)

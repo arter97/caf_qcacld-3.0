@@ -1224,7 +1224,6 @@ allow_suspend:
 	return 0;
 }
 
-
 /**
  * wlan_hdd_cfg80211_scan_block_cb() - scan block work handler
  * @work: Pointer to work
@@ -1316,8 +1315,7 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 		if (con_dfs_ch == AUTO_CHANNEL_SELECT)
 			con_dfs_ch =
 				con_sap_adapter->sessionCtx.ap.operatingChannel;
-
-		if (CDS_IS_DFS_CH(con_dfs_ch)) {
+		if (!wma_is_hw_dbs_capable() && CDS_IS_DFS_CH(con_dfs_ch)) {
 			/* Provide empty scan result during DFS operation since
 			 * scanning not supported during DFS. Reason is
 			 * following case:
