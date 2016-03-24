@@ -109,8 +109,7 @@ lim_compare_capabilities(tpAniSirGlobal pMac,
 {
 	uint32_t val;
 
-	if ((LIM_IS_AP_ROLE(psessionEntry) ||
-	     LIM_IS_BT_AMP_AP_ROLE(psessionEntry)) &&
+	if (LIM_IS_AP_ROLE(psessionEntry) &&
 	    (pAssocReq->capabilityInfo.ibss)) {
 		/* Requesting STA asserting IBSS capability. */
 		lim_log(pMac, LOG1,
@@ -152,8 +151,7 @@ lim_compare_capabilities(tpAniSirGlobal pMac,
 	 * then AP must reject any station that does not support
 	 * shortSlot
 	 */
-	if ((LIM_IS_AP_ROLE(psessionEntry) ||
-	     LIM_IS_BT_AMP_AP_ROLE(psessionEntry)) &&
+	if (LIM_IS_AP_ROLE(psessionEntry) &&
 	    (pLocalCapabs->shortSlotTime == 1)) {
 		if (wlan_cfg_get_int
 			    (pMac, WNI_CFG_ACCEPT_SHORT_SLOT_ASSOC_ONLY,
@@ -586,8 +584,7 @@ lim_cleanup_rx_path(tpAniSirGlobal pMac, tpDphHashNode pStaDs,
 			 * There is no context at Polaris to delete.
 			 * Release our assigned AID back to the free pool
 			 */
-			if (LIM_IS_AP_ROLE(psessionEntry) ||
-			    LIM_IS_BT_AMP_AP_ROLE(psessionEntry)) {
+			if (LIM_IS_AP_ROLE(psessionEntry)) {
 				lim_release_peer_idx(pMac, pStaDs->assocId,
 						     psessionEntry);
 			}
@@ -612,8 +609,7 @@ lim_cleanup_rx_path(tpAniSirGlobal pMac, tpDphHashNode pStaDs,
 		return eSIR_SUCCESS;
 	pStaDs->mlmStaContext.mlmState = eLIM_MLM_WT_DEL_STA_RSP_STATE;
 
-	if (LIM_IS_STA_ROLE(psessionEntry) ||
-	    LIM_IS_BT_AMP_STA_ROLE(psessionEntry)) {
+	if (LIM_IS_STA_ROLE(psessionEntry)) {
 		MTRACE(mac_trace
 		       (pMac, TRACE_CODE_MLM_STATE, psessionEntry->peSessionId,
 		       eLIM_MLM_WT_DEL_STA_RSP_STATE));
@@ -671,8 +667,7 @@ lim_send_del_sta_cnf(tpAniSirGlobal pMac, struct cdf_mac_addr sta_dsaddr,
 		mlmStaContext.cleanupTrigger, statusCode,
 		MAC_ADDR_ARRAY(sta_dsaddr.bytes));
 
-	if (LIM_IS_STA_ROLE(psessionEntry) ||
-	    LIM_IS_BT_AMP_STA_ROLE(psessionEntry)) {
+	if (LIM_IS_STA_ROLE(psessionEntry)) {
 		/* Set BSSID at CFG to null */
 		tSirMacAddr nullAddr = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
@@ -2113,8 +2108,7 @@ lim_add_sta(tpAniSirGlobal mac_ctx,
 	}
 	cdf_mem_set((uint8_t *) add_sta_params, sizeof(tAddStaParams), 0);
 
-	if (LIM_IS_AP_ROLE(session_entry) || LIM_IS_IBSS_ROLE(session_entry) ||
-	    LIM_IS_BT_AMP_AP_ROLE(session_entry))
+	if (LIM_IS_AP_ROLE(session_entry) || LIM_IS_IBSS_ROLE(session_entry))
 		sta_Addr = &sta_ds->staAddr;
 #ifdef FEATURE_WLAN_TDLS
 	/* SystemRole shouldn't be matter if staType is TDLS peer */
@@ -2186,7 +2180,6 @@ lim_add_sta(tpAniSirGlobal mac_ctx,
 	/* Update HT Capability */
 
 	if (LIM_IS_AP_ROLE(session_entry) ||
-	    LIM_IS_BT_AMP_AP_ROLE(session_entry) ||
 	    LIM_IS_IBSS_ROLE(session_entry)) {
 		add_sta_params->htCapable = sta_ds->mlmStaContext.htCapability;
 		add_sta_params->vhtCapable =
@@ -2530,12 +2523,10 @@ lim_del_sta(tpAniSirGlobal pMac,
 	/* */
 
 #ifdef FEATURE_WLAN_TDLS
-	if ((LIM_IS_STA_ROLE(psessionEntry) &&
-	    (pStaDs->staType != STA_ENTRY_TDLS_PEER)) ||
-	    LIM_IS_BT_AMP_STA_ROLE(psessionEntry))
+	if (LIM_IS_STA_ROLE(psessionEntry) &&
+	    (pStaDs->staType != STA_ENTRY_TDLS_PEER))
 #else
-	if (LIM_IS_STA_ROLE(psessionEntry) ||
-	    LIM_IS_BT_AMP_STA_ROLE(psessionEntry))
+	if (LIM_IS_STA_ROLE(psessionEntry))
 #endif
 		pDelStaParams->staIdx = psessionEntry->staId;
 
@@ -2558,8 +2549,7 @@ lim_del_sta(tpAniSirGlobal pMac,
 			SET_LIM_STA_CONTEXT_MLM_STATE(pStaDs,
 						      eLIM_MLM_WT_DEL_STA_RSP_STATE);
 		}
-		if (LIM_IS_STA_ROLE(psessionEntry) ||
-		    LIM_IS_BT_AMP_STA_ROLE(psessionEntry)) {
+		if (LIM_IS_STA_ROLE(psessionEntry)) {
 			MTRACE(mac_trace
 				       (pMac, TRACE_CODE_MLM_STATE,
 				       psessionEntry->peSessionId,
@@ -2979,8 +2969,7 @@ void lim_handle_cnf_wait_timeout(tpAniSirGlobal pMac, uint16_t staId)
 		       )
 		lim_print_mac_addr(pMac, pStaDs->staAddr, LOGW);
 
-		if (LIM_IS_AP_ROLE(psessionEntry) ||
-		    LIM_IS_BT_AMP_AP_ROLE(psessionEntry)) {
+		if (LIM_IS_AP_ROLE(psessionEntry)) {
 			lim_reject_association(pMac, pStaDs->staAddr,
 					       pStaDs->mlmStaContext.subType,
 					       true,
@@ -3141,8 +3130,7 @@ lim_check_and_announce_join_success(tpAniSirGlobal mac_ctx,
 		return;
 	}
 
-	if (!(LIM_IS_BT_AMP_STA_ROLE(session_entry) ||
-		LIM_IS_STA_ROLE(session_entry)))
+	if (!LIM_IS_STA_ROLE(session_entry))
 		return;
 
 	lim_log(mac_ctx, LOG1,
@@ -3542,11 +3530,7 @@ tSirRetStatus lim_sta_send_add_bss(tpAniSirGlobal pMac, tpSirAssocRsp pAssocRsp,
 	lim_log(pMac, LOG1, FL("BSSID: " MAC_ADDRESS_STR),
 		MAC_ADDR_ARRAY(pAddBssParams->bssId));
 
-	if (psessionEntry->bssType == eSIR_BTAMP_AP_MODE) {
-		pAddBssParams->bssType = eSIR_BTAMP_AP_MODE;
-	} else {
-		pAddBssParams->bssType = eSIR_INFRASTRUCTURE_MODE;
-	}
+	pAddBssParams->bssType = eSIR_INFRASTRUCTURE_MODE;
 
 	pAddBssParams->operMode = BSS_OPERATIONAL_MODE_STA;
 
@@ -4590,15 +4574,13 @@ lim_prepare_and_send_del_sta_cnf(tpAniSirGlobal pMac, tpDphHashNode pStaDs,
 		     pStaDs->staAddr, CDF_MAC_ADDR_SIZE);
 
 	mlmStaContext = pStaDs->mlmStaContext;
-	if (LIM_IS_AP_ROLE(psessionEntry) ||
-	    LIM_IS_BT_AMP_AP_ROLE(psessionEntry)) {
+	if (LIM_IS_AP_ROLE(psessionEntry)) {
 		lim_release_peer_idx(pMac, pStaDs->assocId, psessionEntry);
 	}
 	lim_delete_dph_hash_entry(pMac, pStaDs->staAddr, pStaDs->assocId,
 				  psessionEntry);
 
-	if (LIM_IS_STA_ROLE(psessionEntry) ||
-	    LIM_IS_BT_AMP_STA_ROLE(psessionEntry)) {
+	if (LIM_IS_STA_ROLE(psessionEntry)) {
 		psessionEntry->limMlmState = eLIM_MLM_IDLE_STATE;
 		MTRACE(mac_trace(pMac, TRACE_CODE_MLM_STATE,
 				 psessionEntry->peSessionId,
