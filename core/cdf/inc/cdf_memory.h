@@ -236,6 +236,10 @@ cdf_os_mem_dma_sync_single_for_device(cdf_device_t osdev,
 				      cdf_size_t size,
 				      enum dma_data_direction direction);
 
+void cdf_os_mem_dma_sync_single_for_cpu(cdf_device_t osdev,
+					cdf_dma_addr_t bus_addr,
+					cdf_size_t size,
+					enum dma_data_direction direction);
 /**
  * cdf_str_len() - returns the length of a string
  * @str:	input string

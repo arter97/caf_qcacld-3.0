@@ -340,6 +340,8 @@ htt_pdev_alloc(ol_txrx_pdev_handle txrx_pdev,
 		;
 	/* TODO: enable the following line once FW is ready */
 	/* goto fail2; */
+	if (hif_ce_fastpath_cb_register(htt_t2h_msg_handler_fast, pdev))
+		cdf_print("failed to register fastpath callback\n");
 #endif
 
 	return pdev;
@@ -626,10 +628,6 @@ int htt_htc_attach(struct htt_pdev_t *pdev, uint16_t service_id)
 	HTC_SERVICE_CONNECT_REQ connect;
 	HTC_SERVICE_CONNECT_RESP response;
 	A_STATUS status;
-
-	if (CDF_STATUS_SUCCESS !=
-	    hif_ce_fastpath_cb_register(htt_t2h_msg_handler_fast, pdev))
-		cdf_print("failed to register fastpath callback\n");
 
 	cdf_mem_set(&connect, sizeof(connect), 0);
 	cdf_mem_set(&response, sizeof(response), 0);

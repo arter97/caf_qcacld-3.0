@@ -427,13 +427,21 @@ CDF_STATUS hif_diag_write_access(struct ol_softc *scn, uint32_t address,
 CDF_STATUS hif_diag_write_mem(struct ol_softc *scn, uint32_t address,
 		       uint8_t *data, int nbytes);
 
+typedef void (*fastpath_msg_handler)(void *, cdf_nbuf_t *, uint32_t);
+
 /*
  * Set the FASTPATH_mode_on flag in sc, for use by data path
  */
 #ifdef WLAN_FEATURE_FASTPATH
 void hif_enable_fastpath(struct ol_softc *hif_dev);
+int hif_ce_fastpath_cb_register(fastpath_msg_handler handler, void *context);
+#else
+static inline int hif_ce_fastpath_cb_register(fastpath_msg_handler handler,
+					      void *context)
+{
+	return CDF_STATUS_E_FAILURE;
+}
 #endif
-void hif_update_fastpath_recv_bufs_cnt(struct ol_softc *scn);
 
 #if defined(HIF_PCI) && !defined(A_SIMOS_DEVHOST)
 /*
@@ -616,10 +624,6 @@ typedef struct sdio_device_id hif_bus_id;
 typedef struct device hif_bus_id;
 #endif
 
-typedef int (*fastpath_msg_handler)(void *, cdf_nbuf_t *, uint32_t);
-int
-hif_ce_fastpath_cb_register(fastpath_msg_handler, void *context);
-
 void hif_post_init(struct ol_softc *scn, void *hHTC,
 		   struct hif_msg_callbacks *callbacks);
 CDF_STATUS hif_start(struct ol_softc *scn);
@@ -730,8 +734,6 @@ void hif_pktlogmod_exit(void *hif_ctx);
 void hif_crash_shutdown(void *hif_ctx);
 int hif_register_driver(void);
 void hif_bus_pkt_dl_len_set(void *hif_sc, unsigned int pkt_download_len);
-bool ce_is_fastpath_enabled(struct ol_softc *scn);
-bool ce_is_fastpath_handler_registered(struct CE_state *ce_state);
 #ifdef __cplusplus
 }
 #endif

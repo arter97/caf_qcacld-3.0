@@ -844,20 +844,36 @@ void cdf_os_mem_free_consistent(cdf_device_t osdev,
  * @osdev: OS device handle
  * @bus_addr: dma address to give to the device
  * @size: Size of the memory block
- * @direction: direction data will be dma'ed
+ * @direction: direction data will be DMAed
  *
- * Assgin memory to the remote device.
+ * Assign memory to the remote device.
  * The cache lines are flushed to ram or invalidated as needed.
  *
  * Return: none
  */
-
-inline void
-cdf_os_mem_dma_sync_single_for_device(cdf_device_t osdev,
-				      cdf_dma_addr_t bus_addr,
-				      cdf_size_t size,
-				      enum dma_data_direction direction)
+void cdf_os_mem_dma_sync_single_for_device(cdf_device_t osdev,
+					   cdf_dma_addr_t bus_addr,
+					   cdf_size_t size,
+					   enum dma_data_direction direction)
 {
 	dma_sync_single_for_device(osdev->dev, bus_addr,  size, direction);
 }
 
+/**
+ * cdf_os_mem_dma_sync_single_for_cpu() - assign memory to CPU
+ * @osdev: OS device handle
+ * @bus_addr: dma address to give to the cpu
+ * @size: Size of the memory block
+ * @direction: direction data will be DMAed
+ *
+ * Assign memory to the CPU.
+ *
+ * Return: none
+ */
+void cdf_os_mem_dma_sync_single_for_cpu(cdf_device_t osdev,
+					cdf_dma_addr_t bus_addr,
+					cdf_size_t size,
+					enum dma_data_direction direction)
+{
+	dma_sync_single_for_cpu(osdev->dev, bus_addr,  size, direction);
+}
