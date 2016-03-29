@@ -229,27 +229,37 @@ static int epping_set_mac_address(struct net_device *dev, void *addr)
 
 static void epping_stop_adapter(epping_adapter_t *pAdapter)
 {
+	struct device *dev;
+
 	if (pAdapter && pAdapter->started) {
 		EPPING_LOG(LOG1, FL("Disabling queues"));
 		netif_tx_disable(pAdapter->dev);
 		netif_carrier_off(pAdapter->dev);
 		pAdapter->started = false;
+		dev = pAdapter->pEpping_ctx->parent_dev;
 #if defined(MSM_PLATFORM) && defined(HIF_PCI) && defined(CONFIG_CNSS)
-		cnss_request_bus_bandwidth(CNSS_BUS_WIDTH_LOW);
+		if (dev)
+			cnss_common_request_bus_bandwidth(dev,
+						CNSS_BUS_WIDTH_LOW);
 #endif
 	}
 }
 
 static int epping_start_adapter(epping_adapter_t *pAdapter)
 {
+	struct device *dev;
+
 	if (!pAdapter) {
 		EPPING_LOG(CDF_TRACE_LEVEL_FATAL,
 			   "%s: pAdapter= NULL\n", __func__);
 		return -1;
 	}
+	dev = pAdapter->pEpping_ctx->parent_dev;
 	if (!pAdapter->started) {
 #if defined(MSM_PLATFORM) && defined(HIF_PCI) && defined(CONFIG_CNSS)
-		cnss_request_bus_bandwidth(CNSS_BUS_WIDTH_HIGH);
+		if (dev)
+			cnss_common_request_bus_bandwidth(dev,
+						CNSS_BUS_WIDTH_HIGH);
 #endif
 		netif_carrier_on(pAdapter->dev);
 		EPPING_LOG(LOG1, FL("Enabling queues"));

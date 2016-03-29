@@ -1583,6 +1583,7 @@ bool cds_is_packet_log_enabled(void)
  */
 void cds_trigger_recovery(void)
 {
+	struct device *dev;
 	tp_wma_handle wma_handle = cds_get_context(CDF_MODULE_ID_WMA);
 	CDF_STATUS status = CDF_STATUS_SUCCESS;
 	cdf_runtime_lock_t recovery_lock;
@@ -1592,6 +1593,7 @@ void cds_trigger_recovery(void)
 			"WMA context is invald!");
 		return;
 	}
+	dev = wma_handle->cdf_dev->dev;
 
 	recovery_lock = cdf_runtime_lock_init("cds_recovery");
 	if (!recovery_lock) {
@@ -1616,7 +1618,8 @@ void cds_trigger_recovery(void)
 				"Recovery is in progress, ignore!");
 		} else {
 			cds_set_recovery_in_progress(true);
-			cnss_schedule_recovery_work();
+			if (dev)
+				cnss_common_schedule_recovery_work(dev);
 		}
  #endif
 	}

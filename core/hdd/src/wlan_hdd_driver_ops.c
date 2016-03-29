@@ -106,16 +106,29 @@
  * So prevent APPS IDLE/SA PS durint driver load for reducing interrupt latency.
  */
 #ifdef CONFIG_CNSS
+#ifdef HIF_PCI
 static inline void hdd_request_pm_qos(int val)
 {
-	cnss_request_pm_qos(val);
+	cnss_pci_request_pm_qos(val);
 }
-
 static inline void hdd_remove_pm_qos(void)
 {
-	cnss_remove_pm_qos();
+	cnss_pci_remove_pm_qos();
 }
-#else
+#endif
+
+#ifdef HIF_SDIO
+static inline void hdd_request_pm_qos(int val)
+{
+	cnss_sdio_request_pm_qos(val);
+}
+static inline void hdd_remove_pm_qos(void)
+{
+	cnss_sdio_remove_pm_qos();
+}
+#endif
+
+#else /* !defined CONFIG_CNSS */
 static inline void hdd_request_pm_qos(int val)
 {
 }

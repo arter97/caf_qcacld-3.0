@@ -4402,6 +4402,7 @@ void hdd_cnss_request_bus_bandwidth(hdd_context_t *hdd_ctx,
 	enum cnss_bus_width_type next_vote_level = CNSS_BUS_WIDTH_NONE;
 	enum wlan_tp_level next_rx_level = WLAN_SVC_TP_NONE;
 	enum wlan_tp_level next_tx_level = WLAN_SVC_TP_NONE;
+	struct device *dev = hdd_ctx->parent_dev;
 
 
 	if (total > hdd_ctx->config->busBandwidthHighThreshold)
@@ -4420,7 +4421,7 @@ void hdd_cnss_request_bus_bandwidth(hdd_context_t *hdd_ctx,
 		hdd_debug("trigger level %d, tx_packets: %lld, rx_packets: %lld",
 			 next_vote_level, tx_packets, rx_packets);
 		hdd_ctx->cur_vote_level = next_vote_level;
-		cnss_request_bus_bandwidth(next_vote_level);
+		cnss_common_request_bus_bandwidth(dev, next_vote_level);
 	}
 
 	/* fine-tuning parameters for RX Flows */

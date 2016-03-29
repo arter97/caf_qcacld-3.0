@@ -1732,6 +1732,7 @@ static int __wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 	CDF_STATUS status = CDF_STATUS_SUCCESS;
 	int result;
 	p_cds_sched_context cds_sched_context = get_cds_sched_ctxt();
+	struct device *dev;
 
 	ENTER();
 
@@ -1743,8 +1744,9 @@ static int __wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 	result = wlan_hdd_validate_context(pHddCtx);
 	if (0 != result)
 		return result;
+	dev = pHddCtx->parent_dev;
 #ifdef CONFIG_CNSS
-	cnss_request_bus_bandwidth(CNSS_BUS_WIDTH_MEDIUM);
+	cnss_common_request_bus_bandwidth(dev, CNSS_BUS_WIDTH_MEDIUM);
 #endif
 
 	/* Resume MC thread */
@@ -1868,6 +1870,7 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 	hdd_scaninfo_t *pScanInfo;
 	CDF_STATUS status;
 	int rc;
+	struct device *dev;
 
 	ENTER();
 
@@ -1879,6 +1882,7 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 	rc = wlan_hdd_validate_context(pHddCtx);
 	if (0 != rc)
 		return rc;
+	dev = pHddCtx->parent_dev;
 
 	/* If RADAR detection is in progress (HDD), prevent suspend. The flag
 	 * "dfs_cac_block_tx" is set to true when RADAR is found and stay true
@@ -2015,7 +2019,7 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 	pHddCtx->isWiphySuspended = true;
 
 #ifdef CONFIG_CNSS
-	cnss_request_bus_bandwidth(CNSS_BUS_WIDTH_NONE);
+	cnss_common_request_bus_bandwidth(dev, CNSS_BUS_WIDTH_NONE);
 #endif
 
 	EXIT();

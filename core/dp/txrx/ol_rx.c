@@ -75,9 +75,14 @@ void ol_rx_data_process(struct ol_txrx_peer_t *peer,
 
 static void ol_rx_restore_handler(struct work_struct *htt_rx)
 {
+	struct device *dev = NULL;
+
 	CDF_TRACE(CDF_MODULE_ID_TXRX, CDF_TRACE_LEVEL_INFO,
 		  "Enter: %s", __func__);
-	cnss_device_self_recovery();
+	if (ramdump_scn->cdf_dev)
+		dev = ramdump_scn->cdf_dev->dev;
+	if (dev)
+		cnss_common_device_self_recovery(dev);
 	CDF_TRACE(CDF_MODULE_ID_TXRX, CDF_TRACE_LEVEL_INFO,
 		  "Exit: %s", __func__);
 }

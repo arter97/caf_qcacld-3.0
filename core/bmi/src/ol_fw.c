@@ -511,11 +511,16 @@ static void ramdump_work_handler(struct work_struct *ramdump)
 	int ret;
 	uint32_t host_interest_address;
 	uint32_t dram_dump_values[4];
+	struct device *dev = NULL;
 
 	if (!ramdump_scn) {
 		BMI_ERR("%s:Ramdump_scn is null:", __func__);
 		goto out_fail;
 	}
+
+	if (ramdump_scn->cdf_dev)
+		dev = ramdump_scn->cdf_dev->dev;
+
 #ifdef DEBUG
 	ret = hif_check_soc_status(ramdump_scn);
 	if (ret)
@@ -534,7 +539,7 @@ static void ramdump_work_handler(struct work_struct *ramdump)
 			sizeof(uint32_t)) != CDF_STATUS_SUCCESS) {
 		BMI_ERR("HifDiagReadiMem FW Dump Area Pointer failed!");
 		ol_copy_ramdump(ramdump_scn);
-		cnss_device_crashed();
+		cnss_common_device_crashed(dev);
 
 		return;
 	}
@@ -556,16 +561,16 @@ static void ramdump_work_handler(struct work_struct *ramdump)
 	BMI_ERR("%s: RAM dump collecting completed!", __func__);
 
 	/* notify SSR framework the target has crashed. */
-	cnss_device_crashed();
+	cnss_common_device_crashed(dev);
 
 	return;
 
 out_fail:
 	/* Silent SSR on dump failure */
 #ifdef CNSS_SELF_RECOVERY
-	cnss_device_self_recovery();
+	cnss_common_device_self_recovery(dev);
 #else
-	cnss_device_crashed();
+	cnss_common_device_crashed(dev);
 #endif
 
 	return;
@@ -581,7 +586,12 @@ void ol_schedule_ramdump_work(struct ol_softc *scn)
 
 static void fw_indication_work_handler(struct work_struct *fw_indication)
 {
-	cnss_device_self_recovery();
+	struct device *dev = NULL;
+
+	if (ramdump_scn->cdf_dev)
+		dev = ramdump_scn->cdf_dev->dev;
+	if (dev)
+		cnss_common_device_self_recovery(dev);
 }
 
 static DECLARE_WORK(fw_indication_work, fw_indication_work_handler);

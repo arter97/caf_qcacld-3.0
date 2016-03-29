@@ -51,15 +51,16 @@
 #endif
 
 #if defined(CONFIG_CNSS) && !defined(QCA_WIFI_3_0)
-#define GET_VIRT_RAMDUMP_MEM(ol_sc) \
+#define GET_VIRT_RAMDUMP_MEM(dev, ol_sc) \
 { \
-	ol_sc->ramdump_base = cnss_get_virt_ramdump_mem(&ol_sc->ramdump_size); \
+	ol_sc->ramdump_base = cnss_common_get_virt_ramdump_mem(dev, \
+						&ol_sc->ramdump_size); \
 	if (ol_sc->ramdump_base == NULL || !ol_sc->ramdump_size) \
 		HIF_ERROR("%s: Failed to get RAM dump memory addr or size!", \
 			__func__); \
 }
 #else
-#define GET_VIRT_RAMDUMP_MEM(ol_sc)
+#define GET_VIRT_RAMDUMP_MEM(dev, ol_sc)
 #endif
 
 #ifdef QCA_WIFI_3_0

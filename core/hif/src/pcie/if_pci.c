@@ -1346,6 +1346,7 @@ int hif_enable_pci(struct hif_pci_softc *sc,
 	int ret = 0;
 	uint16_t device_id;
 	struct ol_softc *ol_sc = sc->ol_sc;
+	struct device *dev;
 
 	pci_read_config_word(pdev,PCI_DEVICE_ID,&device_id);
 	if(device_id != id->device)  {
@@ -1427,7 +1428,8 @@ int hif_enable_pci(struct hif_pci_softc *sc,
 	sc->devid = id->device;
 	sc->cacheline_sz = dma_get_cache_alignment();
 	/* Get RAM dump memory address and size */
-	GET_VIRT_RAMDUMP_MEM(ol_sc);
+	dev = &pdev->dev;
+	GET_VIRT_RAMDUMP_MEM(dev, ol_sc);
 	ol_sc->mem = mem;
 	sc->pci_enabled = true;
 	return ret;
