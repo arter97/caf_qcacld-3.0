@@ -1151,10 +1151,12 @@ static inline void ol_tx_throttle_set_level(struct ol_txrx_pdev_t *pdev,
  *
  * @param pdev - the physics device being throttled
  */
-void ol_tx_throttle_init_period(struct ol_txrx_pdev_t *pdev, int period);
+void ol_tx_throttle_init_period(struct ol_txrx_pdev_t *pdev, int period,
+				uint8_t *dutycycle_level);
 #else
 static inline void ol_tx_throttle_init_period(struct ol_txrx_pdev_t *pdev,
-					      int period)
+					      int period,
+					      uint8_t *dutycycle_level)
 {
 	/* no-op */
 }
