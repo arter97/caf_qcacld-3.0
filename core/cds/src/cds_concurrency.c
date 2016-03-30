@@ -2045,6 +2045,7 @@ bool cds_set_connection_in_progress(bool value)
  * @conn_index: Connection index
  * @mode: Mode
  * @chan: Channel
+ * @bw: Bandwidth
  * @mac: Mac id
  * @chain_mask: Chain mask
  * @tx_spatial_stream: Tx spatial stream
@@ -2059,6 +2060,7 @@ bool cds_set_connection_in_progress(bool value)
 static void cds_update_conc_list(uint32_t conn_index,
 		enum cds_con_mode mode,
 		uint8_t chan,
+		enum hw_mode_bandwidth bw,
 		uint8_t mac,
 		enum cds_chain_mode chain_mask,
 		uint8_t tx_spatial_stream,
@@ -2074,6 +2076,7 @@ static void cds_update_conc_list(uint32_t conn_index,
 	}
 	conc_connection_list[conn_index].mode = mode;
 	conc_connection_list[conn_index].chan = chan;
+	conc_connection_list[conn_index].bw = bw;
 	conc_connection_list[conn_index].mac = mac;
 	conc_connection_list[conn_index].chain_mask = chain_mask;
 	conc_connection_list[conn_index].tx_spatial_stream = tx_spatial_stream;
@@ -2705,7 +2708,6 @@ static uint32_t cds_dump_current_concurrency_one_connection(char *cc_mode,
 					length);
 		break;
 	default:
-		/* err msg */
 		cds_err("unexpected mode %d", conc_connection_list[0].mode);
 		break;
 	}
@@ -2759,7 +2761,6 @@ static uint32_t cds_dump_current_concurrency_two_connection(char *cc_mode,
 					length);
 		break;
 	default:
-		/* err msg */
 		cds_err("unexpected mode %d", conc_connection_list[1].mode);
 		break;
 	}
@@ -2813,7 +2814,6 @@ static uint32_t cds_dump_current_concurrency_three_connection(char *cc_mode,
 					length);
 		break;
 	default:
-		/* err msg */
 		cds_err("unexpected mode %d", conc_connection_list[2].mode);
 		break;
 	}
@@ -2932,7 +2932,6 @@ static void cds_dump_current_concurrency(void)
 		cds_err("%s", cc_mode);
 		break;
 	default:
-		/* err msg */
 		cds_err("unexpected num_connections value %d",
 			num_connections);
 		break;
@@ -2975,7 +2974,6 @@ static bool cds_current_concurrency_is_scc(void)
 		}
 		break;
 	default:
-		/* err msg */
 		cds_err("unexpected num_connections value %d",
 			num_connections);
 		break;
@@ -4007,9 +4005,10 @@ uint32_t cds_get_connection_count(void)
  *
  * Return: cds_con_mode
  */
-enum cds_con_mode cds_get_mode(uint8_t type, uint8_t subtype)
+static enum cds_con_mode cds_get_mode(uint8_t type, uint8_t subtype)
 {
 	enum cds_con_mode mode = CDS_MAX_NUM_OF_MODE;
+
 	if (type == WMI_VDEV_TYPE_AP) {
 		switch (subtype) {
 		case 0:
@@ -4019,7 +4018,6 @@ enum cds_con_mode cds_get_mode(uint8_t type, uint8_t subtype)
 			mode = CDS_P2P_GO_MODE;
 			break;
 		default:
-		/* err msg*/
 			cds_err("Unknown subtype %d for type %d",
 				subtype, type);
 			break;
@@ -4033,7 +4031,6 @@ enum cds_con_mode cds_get_mode(uint8_t type, uint8_t subtype)
 			mode = CDS_P2P_CLIENT_MODE;
 			break;
 		default:
-		/* err msg*/
 			cds_err("Unknown subtype %d for type %d",
 				subtype, type);
 			break;
@@ -4041,11 +4038,52 @@ enum cds_con_mode cds_get_mode(uint8_t type, uint8_t subtype)
 	} else if (type == WMI_VDEV_TYPE_IBSS) {
 		mode = CDS_IBSS_MODE;
 	} else {
-		/* err msg */
 		cds_err("Unknown type %d", type);
 	}
 
 	return mode;
+}
+
+/**
+ * cds_get_bw() - Get channel bandwidth type used by WMI
+ * @chan_width: channel bandwidth type defined by host
+ *
+ * Get the channel bandwidth type used by WMI
+ *
+ * Return: hw_mode_bandwidth
+ */
+static enum hw_mode_bandwidth cds_get_bw(enum phy_ch_width chan_width)
+{
+	enum hw_mode_bandwidth bw = HW_MODE_BW_NONE;
+
+	switch (chan_width) {
+	case CH_WIDTH_20MHZ:
+		bw = HW_MODE_20_MHZ;
+		break;
+	case CH_WIDTH_40MHZ:
+		bw = HW_MODE_40_MHZ;
+		break;
+	case CH_WIDTH_80MHZ:
+		bw = HW_MODE_80_MHZ;
+		break;
+	case CH_WIDTH_160MHZ:
+		bw = HW_MODE_160_MHZ;
+		break;
+	case CH_WIDTH_80P80MHZ:
+		bw = HW_MODE_80_PLUS_80_MHZ;
+		break;
+	case CH_WIDTH_5MHZ:
+		bw = HW_MODE_5_MHZ;
+		break;
+	case CH_WIDTH_10MHZ:
+		bw = HW_MODE_10_MHZ;
+		break;
+	default:
+		cds_err("Unknown channel BW type %d", chan_width);
+		break;
+	}
+
+	return bw;
 }
 
 /**
@@ -4081,7 +4119,6 @@ CDF_STATUS cds_incr_connection_count(uint32_t vdev_id)
 
 	conn_index = cds_get_connection_count();
 	if (hdd_ctx->config->gMaxConcurrentActiveSessions < conn_index) {
-		/* err msg */
 		cds_err("exceeded max connection limit %d",
 			hdd_ctx->config->gMaxConcurrentActiveSessions);
 		return status;
@@ -4090,7 +4127,6 @@ CDF_STATUS cds_incr_connection_count(uint32_t vdev_id)
 	wma_conn_table_entry = wma_get_interface_by_vdev_id(vdev_id);
 
 	if (NULL == wma_conn_table_entry) {
-		/* err msg*/
 		cds_err("can't find vdev_id %d in WMA table", vdev_id);
 		return status;
 	}
@@ -4100,6 +4136,7 @@ CDF_STATUS cds_incr_connection_count(uint32_t vdev_id)
 			cds_get_mode(wma_conn_table_entry->type,
 					wma_conn_table_entry->sub_type),
 			cds_freq_to_chan(wma_conn_table_entry->mhz),
+			cds_get_bw(wma_conn_table_entry->chan_width),
 			wma_conn_table_entry->mac_id,
 			wma_conn_table_entry->chain_mask,
 			wma_conn_table_entry->tx_streams,
@@ -4150,7 +4187,6 @@ CDF_STATUS cds_update_connection_info(uint32_t vdev_id)
 		conn_index++;
 	}
 	if (!found) {
-		/* err msg */
 		cdf_mutex_release(&cds_ctx->cdf_conc_list_lock);
 		cds_err("can't find vdev_id %d in conc_connection_list",
 			vdev_id);
@@ -4160,7 +4196,6 @@ CDF_STATUS cds_update_connection_info(uint32_t vdev_id)
 	wma_conn_table_entry = wma_get_interface_by_vdev_id(vdev_id);
 
 	if (NULL == wma_conn_table_entry) {
-		/* err msg*/
 		cdf_mutex_release(&cds_ctx->cdf_conc_list_lock);
 		cds_err("can't find vdev_id %d in WMA table", vdev_id);
 		return status;
@@ -4173,6 +4208,7 @@ CDF_STATUS cds_update_connection_info(uint32_t vdev_id)
 			cds_get_mode(wma_conn_table_entry->type,
 					wma_conn_table_entry->sub_type),
 			cds_freq_to_chan(wma_conn_table_entry->mhz),
+			cds_get_bw(wma_conn_table_entry->chan_width),
 			wma_conn_table_entry->mac_id,
 			wma_conn_table_entry->chain_mask,
 			wma_conn_table_entry->tx_streams,
@@ -4208,7 +4244,6 @@ CDF_STATUS cds_decr_connection_count(uint32_t vdev_id)
 		conn_index++;
 	}
 	if (!found) {
-		/* err msg */
 		cds_err("can't find vdev_id %d in conc_connection_list",
 			vdev_id);
 		return status;
@@ -4265,7 +4300,6 @@ CDF_STATUS cds_get_connection_channels(uint8_t *channels,
 	uint32_t conn_index = 0, num_channels = 0;
 
 	if ((NULL == channels) || (NULL == len)) {
-		/* err msg*/
 		cds_err("channels or len is NULL");
 		status = CDF_STATUS_E_FAILURE;
 		return status;
@@ -4431,7 +4465,6 @@ CDF_STATUS cds_get_channel_list(enum cds_pcl_type pcl,
 	}
 
 	if ((NULL == pcl_channels) || (NULL == len)) {
-		/* err msg*/
 		cds_err("pcl_channels or len is NULL");
 		return status;
 	}
@@ -4451,7 +4484,6 @@ CDF_STATUS cds_get_channel_list(enum cds_pcl_type pcl,
 	status = sme_get_cfg_valid_channels(hdd_ctx->hHal, channel_list,
 			&num_channels);
 	if (CDF_STATUS_SUCCESS != status) {
-		/* err msg*/
 		cds_err("No valid channel");
 		return status;
 	}
@@ -4613,7 +4645,6 @@ CDF_STATUS cds_get_channel_list(enum cds_pcl_type pcl,
 		status = CDF_STATUS_SUCCESS;
 		break;
 	default:
-		/* err msg */
 		cds_err("unknown pcl value %d", pcl);
 		break;
 	}
@@ -4711,7 +4742,6 @@ CDF_STATUS cds_get_pcl(enum cds_con_mode mode,
 		conc_system_pref = CDS_LATENCY;
 		break;
 	default:
-		/* err msg */
 		cds_err("unknown conc_system_pref value %d",
 			hdd_ctx->config->conc_system_pref);
 		break;
@@ -4727,7 +4757,6 @@ CDF_STATUS cds_get_pcl(enum cds_con_mode mode,
 		second_index =
 			cds_get_second_connection_pcl_table_index();
 		if (CDS_MAX_ONE_CONNECTION_MODE == second_index) {
-			/* err msg */
 			cds_err("couldn't find index for 2nd connection pcl table");
 			return status;
 		}
@@ -4744,7 +4773,6 @@ CDF_STATUS cds_get_pcl(enum cds_con_mode mode,
 		third_index =
 			cds_get_third_connection_pcl_table_index();
 		if (CDS_MAX_TWO_CONNECTION_MODE == third_index) {
-			/* err msg */
 			cds_err("couldn't find index for 3rd connection pcl table");
 			return status;
 		}
@@ -4757,7 +4785,6 @@ CDF_STATUS cds_get_pcl(enum cds_con_mode mode,
 		}
 		break;
 	default:
-		/* err msg */
 		cds_err("unexpected num_connections value %d",
 			num_connections);
 		break;
@@ -4847,7 +4874,6 @@ bool cds_allow_new_home_channel(uint8_t channel, uint32_t num_connections)
 		if (wma_is_hw_dbs_capable() == false) {
 			if ((channel != conc_connection_list[0].chan) &&
 				(channel != conc_connection_list[1].chan)) {
-				/* err msg */
 				cds_err("don't allow 3rd home channel on same MAC");
 				status = false;
 			}
@@ -4861,7 +4887,6 @@ bool cds_allow_new_home_channel(uint8_t channel, uint32_t num_connections)
 				(conc_connection_list[0].chan)) &&
 				(CDS_IS_CHANNEL_5GHZ
 				(conc_connection_list[1].chan)))) {
-			/* err msg */
 			cds_err("don't allow 3rd home channel on same MAC");
 			status = false;
 		}
@@ -4877,7 +4902,6 @@ bool cds_allow_new_home_channel(uint8_t channel, uint32_t num_connections)
 			   ((CDS_IS_CHANNEL_5GHZ(channel)) &&
 			(CDS_IS_CHANNEL_5GHZ
 			(conc_connection_list[0].chan)))) {
-			/* err msg */
 			cds_err("don't allow 2nd home channel on same MAC");
 			status = false;
 		}
@@ -4918,6 +4942,35 @@ bool cds_is_ibss_conn_exist(uint8_t *ibss_channel)
 		cds_notice("Multiple IBSS connections, picking first one");
 		status = true;
 	}
+	return status;
+}
+
+/**
+ * cds_vht160_conn_exist() - to check if we have a connection
+ * already using vht160 or vht80+80
+ *
+ * This routine will check if vht160 connection already exist or
+ * no. If it exist then this routine will return true.
+ *
+ * Return: true if vht160 connection exist else false
+ */
+bool cds_vht160_conn_exist(void)
+{
+	uint32_t conn_index;
+	bool status = false;
+
+	for (conn_index = 0; conn_index < MAX_NUMBER_OF_CONC_CONNECTIONS;
+		conn_index++) {
+		if (conc_connection_list[conn_index].in_use &&
+			((conc_connection_list[conn_index].bw ==
+			HW_MODE_80_PLUS_80_MHZ) ||
+			(conc_connection_list[conn_index].bw ==
+			HW_MODE_160_MHZ))) {
+			 status = true;
+			 break;
+		}
+	}
+
 	return status;
 }
 
@@ -4981,7 +5034,6 @@ bool cds_allow_concurrency(enum cds_con_mode mode,
 		count = cds_mode_specific_connection_count(CDS_STA_MODE,
 								list);
 		if ((count > 0) && CDS_IS_DFS_CH(channel)) {
-			/* err msg */
 			cds_err("STA active, don't allow DFS channel for 2nd connection");
 #ifndef QCA_WIFI_3_0_EMU
 			/*
@@ -5013,7 +5065,6 @@ bool cds_allow_concurrency(enum cds_con_mode mode,
 				(CDS_IS_CHANNEL_5GHZ(channel)) &&
 				(channel !=
 				conc_connection_list[list[index]].chan)) {
-				/* err msg */
 				cds_err("don't allow MCC if SAP/GO on DFS channel");
 				goto done;
 			}
@@ -5029,7 +5080,6 @@ bool cds_allow_concurrency(enum cds_con_mode mode,
 				(CDS_IS_CHANNEL_5GHZ(channel)) &&
 				(channel !=
 				conc_connection_list[list[index]].chan)) {
-				/* err msg */
 				cds_err("don't allow MCC if SAP/GO on DFS channel");
 				goto done;
 			}
@@ -5054,33 +5104,28 @@ bool cds_allow_concurrency(enum cds_con_mode mode,
 	if ((CDS_IBSS_MODE == mode) &&
 		(cds_mode_specific_connection_count(
 		CDS_IBSS_MODE, list)) && count) {
-		/* err msg */
 		cds_err("No 2nd IBSS, we already have STA + IBSS");
 		goto done;
 	}
 	if ((CDS_IBSS_MODE == mode) &&
 		(CDS_IS_DFS_CH(channel)) && count) {
-		/* err msg */
 		cds_err("No IBSS + STA SCC/MCC, IBSS is on DFS channel");
 		goto done;
 	}
 	if (CDS_IBSS_MODE == mode) {
 		if (wma_is_hw_dbs_capable() == true) {
 			if (num_connections > 1) {
-				/* err msg */
 				cds_err("No IBSS, we have concurrent connections already");
 				goto done;
 			}
 #ifndef QCA_WIFI_3_0_EMU
 			if (CDS_STA_MODE != conc_connection_list[0].mode) {
-				/* err msg */
 				cds_err("No IBSS, we've a non-STA connection");
 				goto done;
 			}
 #else
 			if (CDS_STA_MODE != conc_connection_list[0].mode &&
 				CDS_SAP_MODE != conc_connection_list[0].mode) {
-				/* err msg */
 				cds_err("No IBSS, we've a non-STA/SAP conn");
 				goto done;
 			}
@@ -5094,12 +5139,10 @@ bool cds_allow_concurrency(enum cds_con_mode mode,
 				(conc_connection_list[0].chan != channel) &&
 				CDS_IS_SAME_BAND_CHANNELS(
 				conc_connection_list[0].chan, channel)) {
-				/* err msg */
 				cds_err("No IBSS + STA MCC");
 				goto done;
 			}
 		} else if (num_connections) {
-			/* err msg */
 			cds_err("No IBSS, we have one connection already");
 			goto done;
 		}
@@ -5108,7 +5151,6 @@ bool cds_allow_concurrency(enum cds_con_mode mode,
 	if ((CDS_STA_MODE == mode) &&
 		(cds_mode_specific_connection_count(
 		CDS_IBSS_MODE, list)) && count) {
-		/* err msg */
 		cds_err("No 2nd STA, we already have STA + IBSS");
 		goto done;
 	}
@@ -5117,14 +5159,12 @@ bool cds_allow_concurrency(enum cds_con_mode mode,
 		(cds_mode_specific_connection_count(CDS_IBSS_MODE, list))) {
 		if (wma_is_hw_dbs_capable() == true) {
 			if (num_connections > 1) {
-				/* err msg */
 				cds_err("No 2nd STA, we already have IBSS concurrency");
 				goto done;
 			}
 			if (channel &&
 				(CDS_IS_DFS_CH(conc_connection_list[0].chan))
 				&& (CDS_IS_CHANNEL_5GHZ(channel))) {
-				/* err msg */
 				cds_err("No IBSS + STA SCC/MCC, IBSS is on DFS channel");
 				goto done;
 			}
@@ -5136,22 +5176,24 @@ bool cds_allow_concurrency(enum cds_con_mode mode,
 			if ((conc_connection_list[0].chan != channel) &&
 				CDS_IS_SAME_BAND_CHANNELS(
 				conc_connection_list[0].chan, channel)) {
-				/* err msg */
 				cds_err("No IBSS + STA MCC");
 				goto done;
 			}
 		} else {
-			/* err msg */
 			cds_err("No STA, we have IBSS connection already");
 			goto done;
 		}
 	}
 
-	/* can we allow vht160 */
+	/* don't allow concurrency on vht160 or vht 80+80 */
 	if (num_connections &&
 		((bw == HW_MODE_80_PLUS_80_MHZ) || (bw == HW_MODE_160_MHZ))) {
-		/* err msg */
 		cds_err("No VHT160, we have one connection already");
+		goto done;
+	}
+
+	if (cds_vht160_conn_exist()) {
+		cds_err("VHT160/80+80 connection exists, no concurrency");
 		goto done;
 	}
 
@@ -5702,7 +5744,6 @@ CDF_STATUS cds_current_connections_update(uint32_t session_id,
 		second_index =
 			cds_get_second_connection_pcl_table_index();
 		if (CDS_MAX_ONE_CONNECTION_MODE == second_index) {
-			/* err msg */
 			cds_err("couldn't find index for 2nd connection next action table");
 			goto done;
 		}
@@ -5713,7 +5754,6 @@ CDF_STATUS cds_current_connections_update(uint32_t session_id,
 		third_index =
 			cds_get_third_connection_pcl_table_index();
 		if (CDS_MAX_TWO_CONNECTION_MODE == third_index) {
-			/* err msg */
 			cds_err("couldn't find index for 3rd connection next action table");
 			goto done;
 		}
@@ -5721,7 +5761,6 @@ CDF_STATUS cds_current_connections_update(uint32_t session_id,
 			next_action_three_connection_table[third_index][band];
 		break;
 	default:
-		/* err msg */
 		cds_err("unexpected num_connections value %d", num_connections);
 		break;
 	}
@@ -6039,7 +6078,6 @@ CDF_STATUS cds_next_actions(uint32_t session_id,
 						reason);
 		break;
 	default:
-		/* err msg */
 		cds_err("unexpected action value %d", action);
 		status = CDF_STATUS_E_FAILURE;
 		break;
@@ -7434,7 +7472,6 @@ CDF_STATUS cds_update_connection_info_utfw(
 		conn_index++;
 	}
 	if (!found) {
-		/* err msg */
 		cdf_mutex_release(&cds_ctx->cdf_conc_list_lock);
 		cds_err("can't find vdev_id %d in conc_connection_list",
 			vdev_id);
@@ -7444,7 +7481,8 @@ CDF_STATUS cds_update_connection_info_utfw(
 
 	cds_update_conc_list(conn_index,
 			cds_get_mode(type, sub_type),
-			channelid, mac_id, chain_mask, tx_streams,
+			channelid, HW_MODE_20_MHZ,
+			mac_id, chain_mask, tx_streams,
 			rx_streams, 0, vdev_id, true);
 	cdf_mutex_release(&cds_ctx->cdf_conc_list_lock);
 
@@ -7476,7 +7514,6 @@ CDF_STATUS cds_incr_connection_count_utfw(
 	cdf_mutex_acquire(&cds_ctx->cdf_conc_list_lock);
 	conn_index = cds_get_connection_count();
 	if (MAX_NUMBER_OF_CONC_CONNECTIONS <= conn_index) {
-		/* err msg */
 		cdf_mutex_release(&cds_ctx->cdf_conc_list_lock);
 		cds_err("exceeded max connection limit %d",
 			MAX_NUMBER_OF_CONC_CONNECTIONS);
@@ -7485,9 +7522,10 @@ CDF_STATUS cds_incr_connection_count_utfw(
 	cds_info("--> filling entry at index[%d]", conn_index);
 
 	cds_update_conc_list(conn_index,
-			     cds_get_mode(type, sub_type),
-			     channelid, mac_id, chain_mask, tx_streams,
-			     rx_streams, 0, vdev_id, true);
+				cds_get_mode(type, sub_type),
+				channelid, HW_MODE_20_MHZ,
+				mac_id, chain_mask, tx_streams,
+				rx_streams, 0, vdev_id, true);
 	cdf_mutex_release(&cds_ctx->cdf_conc_list_lock);
 
 	return CDF_STATUS_SUCCESS;
