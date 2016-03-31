@@ -2195,8 +2195,7 @@ int hif_config_ce(struct ol_softc *scn)
 		if (pipe_num == DIAG_CE_ID) {
 			/* Reserve the ultimate CE for
 			 * Diagnostic Window support */
-			hif_state->ce_diag =
-				hif_state->pipe_info[scn->ce_count - 1].ce_hdl;
+			hif_state->ce_diag = pipe_info->ce_hdl;
 			continue;
 		}
 
