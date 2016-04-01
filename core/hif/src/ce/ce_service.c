@@ -1580,8 +1580,6 @@ more_completions:
 			 */
 			if (cdf_unlikely(CE_state->force_break)) {
 				cdf_atomic_set(&CE_state->rx_pending, 1);
-				CE_ENGINE_INT_STATUS_CLEAR(scn, ctrl_addr,
-					HOST_IS_COPY_COMPLETE_MASK);
 				if (Q_TARGET_ACCESS_END(scn) < 0)
 					HIF_ERROR("<--[premature rc=%d]\n",
 						  CE_state->receive_count);
