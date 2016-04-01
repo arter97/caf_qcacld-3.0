@@ -418,7 +418,7 @@ int hif_napi_poll(struct napi_struct *napi, int budget)
 	int    cpu = smp_processor_id();
 	struct ol_softc      *hif;
 	struct qca_napi_info *napi_info;
-	struct CE_state *ce_state;
+	struct CE_state *ce_state = NULL;
 
 	NAPI_DEBUG("%s -->(.., budget=%d)", __func__, budget);
 
@@ -456,7 +456,7 @@ int hif_napi_poll(struct napi_struct *napi, int budget)
 		NAPI_DEBUG("%s:%d: nothing processed by CE. Completing NAPI",
 			   __func__, __LINE__);
 
-	if (rc <= HIF_NAPI_MAX_RECEIVES) {
+	if ((ce_state != NULL && !ce_check_rx_pending(ce_state)) || 0 == rc) {
 		napi_info->stats[cpu].napi_completes++;
 		/* enable interrupts */
 		napi_complete(napi);
