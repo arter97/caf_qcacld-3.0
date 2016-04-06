@@ -212,7 +212,11 @@ static inline uint64_t __cdf_get_monotonic_boottime(void)
  */
 static inline uint64_t __cdf_get_qtimer_ticks(void)
 {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0))
+	return arch_counter_get_cntvct();
+#else
 	return arch_counter_get_cntpct();
+#endif /* LINUX_VERSION_CODE */
 }
 #endif /* QCA_WIFI_3_0_ADRASTEA */
 
