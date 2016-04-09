@@ -175,10 +175,12 @@ static int hdd_hif_open(struct device *dev, void *bdev, const hif_bus_id *bid,
 		goto err_hif_close;
 	} else {
 		ret = hdd_napi_create();
-		hdd_info("hdd_napi_create returned: %d", status);
-		if ((ret != -EPERM) && (ret <= 0)) {
+		hdd_info("hdd_napi_create returned: %d", ret);
+		if (ret == 0)
+			hdd_warn("NAPI: no instances are created");
+		else if (ret < 0) {
 			hdd_err("NAPI creation error, rc: 0x%x, reinit = %d",
-				status, reinit);
+				ret, reinit);
 			ret = -EFAULT;
 			goto err_hif_close;
 		}
