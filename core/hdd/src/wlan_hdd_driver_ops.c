@@ -362,7 +362,7 @@ static void wlan_hdd_remove(void)
 	pr_info("%s: Driver De-initialized\n", WLAN_MODULE_NAME);
 }
 
-#ifdef CONFIG_CNSS
+#if defined CONFIG_CNSS || defined CONFIG_ICNSS
 /**
  * wlan_hdd_shutdown() - wlan_hdd_shutdown
  *
