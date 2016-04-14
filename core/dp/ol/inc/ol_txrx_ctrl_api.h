@@ -1410,7 +1410,7 @@ void ol_tx_flow_pool_unmap_handler(uint8_t flow_id, uint8_t flow_type,
 				   uint8_t flow_pool_id);
 struct ol_tx_flow_pool_t *ol_tx_create_flow_pool(uint8_t flow_pool_id,
 						 uint16_t flow_pool_size);
-int ol_tx_delete_flow_pool(struct ol_tx_flow_pool_t *pool);
+int ol_tx_delete_flow_pool(struct ol_tx_flow_pool_t *pool, bool force);
 void ol_tx_set_desc_global_pool_size(uint32_t num_msdu_desc);
 #else
 
@@ -1445,7 +1445,8 @@ static inline struct ol_tx_flow_pool_t *ol_tx_create_flow_pool(
 {
 	return NULL;
 }
-static inline int ol_tx_delete_flow_pool(struct ol_tx_flow_pool_t *pool)
+static inline int ol_tx_delete_flow_pool(struct ol_tx_flow_pool_t *pool,
+		bool force)
 {
 	return 0;
 }
