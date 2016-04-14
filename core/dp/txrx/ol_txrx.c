@@ -2365,6 +2365,62 @@ void ol_txrx_peer_unref_delete(ol_txrx_peer_handle peer)
 	}
 }
 
+/**
+ * ol_txrx_clear_peer_internal() - ol internal function to clear peer
+ * @peer: pointer to ol txrx peer structure
+ *
+ * Return: CDF Status
+ */
+static CDF_STATUS
+ol_txrx_clear_peer_internal(struct ol_txrx_peer_t *peer)
+{
+	p_cds_sched_context sched_ctx = get_cds_sched_ctxt();
+	/* Drop pending Rx frames in CDS */
+	if (sched_ctx)
+		cds_drop_rxpkt_by_staid(sched_ctx, peer->local_id);
+
+	/* Purge the cached rx frame queue */
+	ol_txrx_flush_rx_frames(peer, 1);
+
+	cdf_spin_lock_bh(&peer->peer_info_lock);
+	peer->osif_rx = NULL;
+	peer->state = ol_txrx_peer_state_disc;
+	cdf_spin_unlock_bh(&peer->peer_info_lock);
+
+	return CDF_STATUS_SUCCESS;
+}
+
+/**
+ * ol_txrx_clear_peer() - clear peer
+ * @sta_id: sta id
+ *
+ * Return: CDF Status
+ */
+CDF_STATUS ol_txrx_clear_peer(uint8_t sta_id)
+{
+	struct ol_txrx_peer_t *peer;
+	struct ol_txrx_pdev_t *pdev = cds_get_context(CDF_MODULE_ID_TXRX);
+
+	if (!pdev) {
+		TXRX_PRINT(TXRX_PRINT_LEVEL_ERR, "%s: Unable to find pdev!",
+			   __func__);
+		return CDF_STATUS_E_FAILURE;
+	}
+
+	if (sta_id >= WLAN_MAX_STA_COUNT) {
+		TXRX_PRINT(TXRX_PRINT_LEVEL_ERR, "Invalid sta id %d", sta_id);
+		return CDF_STATUS_E_INVAL;
+	}
+
+
+	peer = ol_txrx_peer_find_by_local_id(pdev, sta_id);
+	if (!peer)
+		return CDF_STATUS_E_FAULT;
+
+	return ol_txrx_clear_peer_internal(peer);
+
+}
+
 void ol_txrx_peer_detach(ol_txrx_peer_handle peer)
 {
 	struct ol_txrx_vdev_t *vdev = peer->vdev;
@@ -2374,6 +2430,8 @@ void ol_txrx_peer_detach(ol_txrx_peer_handle peer)
 
 	peer->valid = 0;
 
+	/* flush all rx packets before clearing up the peer local_id */
+	ol_txrx_clear_peer_internal(peer);
 	ol_txrx_local_peer_id_free(peer->vdev->pdev, peer);
 
 	/* debug print to dump rx reorder state */
@@ -2385,7 +2443,6 @@ void ol_txrx_peer_detach(ol_txrx_peer_handle peer)
 		   peer->mac_addr.raw[0], peer->mac_addr.raw[1],
 		   peer->mac_addr.raw[2], peer->mac_addr.raw[3],
 		   peer->mac_addr.raw[4], peer->mac_addr.raw[5]);
-	ol_txrx_flush_rx_frames(peer, 1);
 
 	if (peer->vdev->last_real_peer == peer)
 		peer->vdev->last_real_peer = NULL;
@@ -3605,7 +3662,8 @@ static void ol_rx_data_cb(struct ol_txrx_pdev_t *pdev,
 		goto free_buf;
 
 	cdf_spin_lock_bh(&peer->peer_info_lock);
-	if (cdf_unlikely(!(peer->state >= ol_txrx_peer_state_conn))) {
+	if ((cdf_unlikely(!(peer->state >= ol_txrx_peer_state_conn))) ||
+		cdf_unlikely(peer->osif_rx == NULL)) {
 		cdf_spin_unlock_bh(&peer->peer_info_lock);
 		goto free_buf;
 	}
@@ -3624,7 +3682,7 @@ static void ol_rx_data_cb(struct ol_txrx_pdev_t *pdev,
 	while (buf) {
 		next_buf = cdf_nbuf_queue_next(buf);
 		cdf_nbuf_set_next(buf, NULL);   /* Add NULL terminator */
-		ret = data_rx(cds_ctx, buf, peer->local_id);
+		ret = data_rx(cds_ctx, buf, staid);
 		if (ret != CDF_STATUS_SUCCESS) {
 			TXRX_PRINT(TXRX_PRINT_LEVEL_ERR, "Frame Rx to HDD failed");
 			cdf_nbuf_free(buf);
@@ -3790,52 +3848,6 @@ CDF_STATUS ol_txrx_register_peer(ol_rx_callback_fp rxcb,
 	}
 
 	ol_txrx_flush_rx_frames(peer, 0);
-	return CDF_STATUS_SUCCESS;
-}
-
-/**
- * ol_txrx_clear_peer() - clear peer
- * @sta_id: sta id
- *
- * Return: CDF Status
- */
-CDF_STATUS ol_txrx_clear_peer(uint8_t sta_id)
-{
-	struct ol_txrx_peer_t *peer;
-	struct ol_txrx_pdev_t *pdev = cds_get_context(CDF_MODULE_ID_TXRX);
-
-	if (!pdev) {
-		TXRX_PRINT(TXRX_PRINT_LEVEL_ERR, "%s: Unable to find pdev!",
-			   __func__);
-		return CDF_STATUS_E_FAILURE;
-	}
-
-	if (sta_id >= WLAN_MAX_STA_COUNT) {
-		TXRX_PRINT(TXRX_PRINT_LEVEL_ERR, "Invalid sta id %d", sta_id);
-		return CDF_STATUS_E_INVAL;
-	}
-
-#ifdef QCA_CONFIG_SMP
-	{
-		p_cds_sched_context sched_ctx = get_cds_sched_ctxt();
-		/* Drop pending Rx frames in CDS */
-		if (sched_ctx)
-			cds_drop_rxpkt_by_staid(sched_ctx, sta_id);
-	}
-#endif
-
-	peer = ol_txrx_peer_find_by_local_id(pdev, sta_id);
-	if (!peer)
-		return CDF_STATUS_E_FAULT;
-
-	/* Purge the cached rx frame queue */
-	ol_txrx_flush_rx_frames(peer, 1);
-
-	cdf_spin_lock_bh(&peer->peer_info_lock);
-	peer->osif_rx = NULL;
-	peer->state = ol_txrx_peer_state_disc;
-	cdf_spin_unlock_bh(&peer->peer_info_lock);
-
 	return CDF_STATUS_SUCCESS;
 }
 
