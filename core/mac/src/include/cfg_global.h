@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -41,8 +41,6 @@
 #include "sir_common.h"
 #include "sir_types.h"
 #include "wni_cfg.h"
-
-#define CFG_MAX_NUM_STA      SIR_MAX_NUM_STA_IN_IBSS
 
 #define CFG_MAX_STATIC_STRING   70
 /* as the number of channels grows, 128 is not big enough */

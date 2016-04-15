@@ -1674,7 +1674,8 @@ CDF_STATUS wma_open(void *cds_context,
 		goto err_scn_context;
 	}
 
-	mac_params->maxStation = ol_get_number_of_peers_supported(scn);
+	if (scn->bus_type != HAL_BUS_TYPE_SNOC)
+		mac_params->maxStation = ol_get_number_of_peers_supported(scn);
 
 	mac_params->maxBssId = WMA_MAX_SUPPORTED_BSS;
 	mac_params->frameTransRequired = 0;
