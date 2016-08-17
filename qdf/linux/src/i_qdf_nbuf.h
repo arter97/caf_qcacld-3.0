@@ -1614,4 +1614,16 @@ __qdf_nbuf_get_priv_ptr(struct sk_buff *skb)
 	return &skb->cb[8];
 }
 
+/**
+ * __qdf_nbuf_get_queue_mapping() - get the queue mapping set by linux kernel
+ *
+ * @buf: sk buff
+ *
+ * Return: Queue mapping
+ */
+static inline uint16_t
+__qdf_nbuf_get_queue_mapping(struct sk_buff *skb)
+{
+	return skb->queue_mapping;
+}
 #endif /*_I_QDF_NET_BUF_H */

@@ -421,4 +421,10 @@ int qdf_get_cpu(void)
 	return __qdf_get_cpu();
 }
 
+static inline
+uint64_t qdf_get_totalramsize(void)
+{
+	return __qdf_get_totalramsize();
+}
+
 #endif /*_QDF_UTIL_H*/
