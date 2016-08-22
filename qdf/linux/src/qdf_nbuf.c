@@ -1766,6 +1766,7 @@ __qdf_nbuf_sync_for_cpu(qdf_device_t osdev,
 EXPORT_SYMBOL(__qdf_nbuf_sync_for_cpu);
 #endif
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0)
 /**
  * qdf_nbuf_update_radiotap_vht_flags() - Update radiotap header VHT flags
  * @rx_status: Pointer to rx_status.
@@ -1902,3 +1903,19 @@ unsigned int qdf_nbuf_update_radiotap(struct mon_rx_status *rx_status,
 	qdf_mem_copy(qdf_nbuf_data(nbuf), rtap_buf, rtap_len);
 	return rtap_len;
 }
+#else
+static unsigned int qdf_nbuf_update_radiotap_vht_flags(
+					struct mon_rx_status *rx_status,
+					int8_t *rtap_buf,
+					uint32_t rtap_len)
+{
+	qdf_print("ERROR: not supported for this kernel version\n");
+	return 0;
+}
+unsigned int qdf_nbuf_update_radiotap(struct mon_rx_status *rx_status,
+				      qdf_nbuf_t nbuf, u_int32_t headroom_sz)
+{
+	qdf_print("ERROR: not supported for this kernel version\n");
+	return 0;
+}
+#endif

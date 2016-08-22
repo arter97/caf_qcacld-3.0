@@ -34,6 +34,7 @@
 #define __I_QDF_LIST_H
 
 #include <linux/list.h>
+#include <linux/export.h>
 
 /* Type declarations */
 typedef struct list_head __qdf_list_node_t;

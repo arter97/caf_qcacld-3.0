@@ -34,6 +34,7 @@
 #define __I_QDF_EVENT_H
 
 #include <linux/completion.h>
+#include <linux/export.h>
 
 /**
  * qdf_event_t - manages events
