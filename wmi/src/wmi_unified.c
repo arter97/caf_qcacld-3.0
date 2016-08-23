@@ -61,6 +61,11 @@ int qcacld_bp_seq_printf(struct seq_file *m, const char *f, ...)
 
 #define WMI_MIN_HEAD_ROOM 64
 
+#ifdef LEGACY_WIN_HTC
+#define htc_connect_service HTCConnectService
+#define htc_send_pkt HTCSendPkt
+#endif
+
 #ifdef WMI_INTERFACE_EVENT_LOGGING
 #ifndef MAX_WMI_INSTANCES
 #ifdef CONFIG_MCL
@@ -1670,6 +1675,7 @@ int wmi_unified_cmd_send(wmi_unified_t wmi_handle, wmi_buf_t buf, uint32_t len,
 	A_STATUS status;
 	uint16_t htc_tag = 0;
 
+#ifndef LEGACY_WIN_HTC
 	if (wmi_get_runtime_pm_inprogress(wmi_handle)) {
 		if (wmi_is_runtime_pm_cmd(cmd_id))
 			htc_tag = HTC_TX_PACKET_TAG_AUTO_PM;
@@ -1680,6 +1686,8 @@ int wmi_unified_cmd_send(wmi_unified_t wmi_handle, wmi_buf_t buf, uint32_t len,
 		QDF_ASSERT(0);
 		return QDF_STATUS_E_BUSY;
 	}
+#endif
+
 	if (wmi_handle->wmi_stopinprogress) {
 		QDF_TRACE(QDF_MODULE_ID_WMI, QDF_TRACE_LEVEL_ERROR,
 			"WMI  stop in progress\n");
@@ -1715,7 +1723,9 @@ int wmi_unified_cmd_send(wmi_unified_t wmi_handle, wmi_buf_t buf, uint32_t len,
 		QDF_TRACE(QDF_MODULE_ID_WMI, QDF_TRACE_LEVEL_ERROR,
 		    "\n%s: hostcredits = %d", __func__,
 		wmi_get_host_credits(wmi_handle));
+#ifndef LEGACY_WIN_HTC
 		htc_dump_counter_info(wmi_handle->htc_handle);
+#endif
 		qdf_atomic_dec(&wmi_handle->pending_cmds);
 		QDF_TRACE(QDF_MODULE_ID_WMI, QDF_TRACE_LEVEL_ERROR,
 		    "%s: MAX 1024 WMI Pending cmds reached.", __func__);
@@ -1963,6 +1973,12 @@ void wmi_control_rx(void *ctx, HTC_PACKET *htc_packet)
 	uint32_t idx = 0;
 	enum wmi_rx_exec_ctx exec_ctx;
 
+#ifdef LEGACY_WIN_HTC
+	evt_buf = (wmi_buf_t) htc_packet->pPktContext;
+	qdf_nbuf_set_pktlen(evt_buf, htc_packet->ActualLength +
+				HTC_HEADER_LEN);
+	qdf_nbuf_pull_head(evt_buf, HTC_HEADER_LEN);
+#endif
 	evt_buf = (wmi_buf_t) htc_packet->pPktContext;
 	id = WMI_GET_FIELD(qdf_nbuf_data(evt_buf), WMI_CMD_HDR, COMMANDID);
 	idx = wmi_unified_get_event_handler_ix(wmi_handle, id);
@@ -2347,7 +2363,11 @@ wmi_unified_connect_htc_service(struct wmi_unified *wmi_handle,
 		wmi_htc_tx_complete /* ar6000_tx_queue_full */;
 
 	/* connect to control service */
+#ifdef LEGACY_WIN_HTC
+	connect.ServiceID = WMI_CONTROL_SVC;
+#else
 	connect.service_id = WMI_CONTROL_SVC;
+#endif
 	status = htc_connect_service(htc_handle, &connect,
 				&response);
 
@@ -2375,8 +2395,10 @@ int wmi_get_host_credits(wmi_unified_t wmi_handle)
 {
 	int host_credits = 0;
 
+#ifndef LEGACY_WIN_HTC
 	htc_get_control_endpoint_tx_host_credits(wmi_handle->htc_handle,
 						 &host_credits);
+#endif
 	return host_credits;
 }
 
@@ -2415,8 +2437,10 @@ void wmi_set_target_suspend(wmi_unified_t wmi_handle, A_BOOL val)
 void
 wmi_flush_endpoint(wmi_unified_t wmi_handle)
 {
-	htc_flush_endpoint(wmi_handle->htc_handle,
+#if LEGACY_WIN_HTC
+	HTCFlushEndpoint(wmi_handle->htc_handle,
 		wmi_handle->wmi_endpoint_id, 0);
+#endif
 }
 
 /**
