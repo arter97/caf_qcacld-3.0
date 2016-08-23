@@ -125,6 +125,14 @@
 #define WMI_HOST_PDEV_BEACON_PRIORITY_BIT (1<<4)
 #define WMI_HOST_PDEV_MGMT_PRIORITY_BIT   (1<<5)
 
+#ifdef CONFIG_WIN
+#if ATH_SUPPORT_FIPS
+#define FIPS_ALIGN 4
+#define FIPS_ALIGNTO(__addr, __to) ((((unsigned long int)(__addr)) + (__to) -  1) & ~((__to) - 1))
+#define FIPS_IS_ALIGNED(__addr, __to) (!(((unsigned long int)(__addr)) & ((__to)-1)))
+#endif
+#endif
+
 #define WMI_HOST_F_MS(_v, _f)	\
 	(((_v) & (_f)) >> (_f##_S))
 
