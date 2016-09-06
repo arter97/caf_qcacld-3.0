@@ -7627,6 +7627,7 @@ struct wmi_ops non_tlv_ops =  {
 			send_get_peer_mumimo_tx_count_cmd_non_tlv,
 	.send_pdev_caldata_version_check_cmd =
 			send_pdev_caldata_version_check_cmd_non_tlv,
+	.send_btcoex_wlan_priority_cmd = send_btcoex_wlan_priority_cmd_non_tlv,
 
 	.get_target_cap_from_service_ready = extract_service_ready_non_tlv,
 	.extract_fw_version = extract_fw_version_non_tlv,
