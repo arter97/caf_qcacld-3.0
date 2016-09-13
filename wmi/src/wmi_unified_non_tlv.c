@@ -1281,7 +1281,8 @@ send_dbglog_cmd_non_tlv(wmi_unified_t wmi_handle,
 
 	cmd->config.cfgvalid[0] = dbglog_param->cfgvalid[0];
 	cmd->config.cfgvalid[1] = dbglog_param->cfgvalid[1];
-	cmd->config.config.mod_id[0] = dbglog_param->module_id_bitmap[0];
+	qdf_mem_copy(&cmd->config.config.mod_id[0], dbglog_param->module_id_bitmap,
+				 sizeof(uint32_t) * DBGLOG_MODULE_BITMAP_SIZE);
 	cmd->config.config.dbg_config = dbglog_param->val;
 
 	status = wmi_unified_cmd_send(wmi_handle, osbuf,
