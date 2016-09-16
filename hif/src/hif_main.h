@@ -145,6 +145,7 @@ struct hif_softc {
 #ifdef QCA_NSS_WIFI_OFFLOAD_SUPPORT
 	uint32_t nss_wifi_ol_mode;
 #endif
+	uint32_t hif_attribute;
 };
 
 #ifdef QCA_NSS_WIFI_OFFLOAD_SUPPORT
@@ -158,6 +159,11 @@ static inline bool hif_is_nss_wifi_enabled(struct hif_softc *sc)
 	return false;
 }
 #endif
+
+static inline uint8_t hif_is_attribute_set(struct hif_softc *sc,uint32_t hif_attrib)
+{
+       return (sc->hif_attribute == hif_attrib);
+}
 
 A_target_id_t hif_get_target_id(struct hif_softc *scn);
 void hif_dump_pipe_debug_count(struct hif_softc *scn);
