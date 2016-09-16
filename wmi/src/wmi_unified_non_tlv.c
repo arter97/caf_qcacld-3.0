@@ -5010,12 +5010,13 @@ send_pdev_caldata_version_check_cmd_non_tlv(wmi_unified_t wmi_handle, uint32_t p
 /**
  * send_btcoex_wlan_priority_cmd_non_tlv() - send btcoex wlan priority fw
  * @wmi_handle: wmi handle
- * @value:	priority value
+ * @param: btcoex config params
  *
  * Return: 0 for success or error code
  */
 QDF_STATUS
-send_btcoex_wlan_priority_cmd_non_tlv(wmi_unified_t wmi_handle, int value)
+send_btcoex_wlan_priority_cmd_non_tlv(wmi_unified_t wmi_handle,
+        struct btcoex_cfg_params *param)
 {
 	wmi_buf_t buf;
 	wmi_btcoex_cfg_cmd *cmd;
@@ -5027,7 +5028,37 @@ send_btcoex_wlan_priority_cmd_non_tlv(wmi_unified_t wmi_handle, int value)
 		return QDF_STATUS_E_FAILURE;
 	}
 	cmd = (wmi_btcoex_cfg_cmd *) wmi_buf_data(buf);
-	cmd->btcoex_wlan_priority_bitmap = value;
+	cmd->btcoex_wlan_priority_bitmap = param->btcoex_wlan_priority_bitmap;
+	cmd->btcoex_param_flags = param->btcoex_param_flags;
+	if (wmi_unified_cmd_send(wmi_handle, buf, len, WMI_BTCOEX_CFG_CMDID))
+		return QDF_STATUS_E_FAILURE;
+
+	return QDF_STATUS_SUCCESS;
+}
+/**
+ * send_btcoex_duty_cycle_cmd_non_tlv() - send btcoex wlan priority fw
+ * @wmi_handle: wmi handle
+ * @param:  	period and duration
+ *
+ * Return: 0 for success or error code
+ */
+QDF_STATUS
+send_btcoex_duty_cycle_cmd_non_tlv(wmi_unified_t wmi_handle,
+        struct btcoex_cfg_params *param)
+{
+	wmi_buf_t buf;
+	wmi_btcoex_cfg_cmd *cmd;
+	int len = sizeof(wmi_btcoex_cfg_cmd);
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf) {
+		qdf_print("%s:wmi_buf_alloc failed\n", __func__);
+		return QDF_STATUS_E_FAILURE;
+	}
+	cmd = (wmi_btcoex_cfg_cmd *) wmi_buf_data(buf);
+        cmd->wlan_duration = param->wlan_duration;
+        cmd->period = param->period;
+        cmd->btcoex_param_flags = param->btcoex_param_flags;
 	if (wmi_unified_cmd_send(wmi_handle, buf, len, WMI_BTCOEX_CFG_CMDID))
 		return QDF_STATUS_E_FAILURE;
 
@@ -7638,6 +7669,7 @@ struct wmi_ops non_tlv_ops =  {
 	.send_pdev_caldata_version_check_cmd =
 			send_pdev_caldata_version_check_cmd_non_tlv,
 	.send_btcoex_wlan_priority_cmd = send_btcoex_wlan_priority_cmd_non_tlv,
+        .send_btcoex_duty_cycle_cmd = send_btcoex_duty_cycle_cmd_non_tlv,
 
 	.get_target_cap_from_service_ready = extract_service_ready_non_tlv,
 	.extract_fw_version = extract_fw_version_non_tlv,
@@ -7797,6 +7829,7 @@ static void populate_non_tlv_service(uint32_t *wmi_service)
 	wmi_service[wmi_service_tx_mode_dynamic] = WMI_SERVICE_TX_MODE_DYNAMIC;
 	wmi_service[wmi_service_check_cal_version] =
 				WMI_SERVICE_CHECK_CAL_VERSION;
+	wmi_service[wmi_service_btcoex_duty_cycle] = WMI_SERVICE_BTCOEX_DUTY_CYCLE;
 
 	wmi_service[wmi_service_roam_scan_offload] = WMI_SERVICE_UNAVAILABLE;
 	wmi_service[wmi_service_arpns_offload] = WMI_SERVICE_UNAVAILABLE;

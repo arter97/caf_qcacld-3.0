@@ -463,6 +463,7 @@ typedef enum _ol_ath_param_t {
 	OL_ATH_PARAM_CHANNEL_SWITCH_COUNT = 338,
 	OL_ATH_PARAM_ALWAYS_PRIMARY = 339,
 	OL_ATH_PARAM_FAST_LANE = 340,
+	OL_ATH_GET_BTCOEX_DUTY_CYCLE = 341,
 } ol_ath_param_t;
 
 /*
