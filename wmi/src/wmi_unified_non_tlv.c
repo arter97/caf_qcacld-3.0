@@ -7501,7 +7501,7 @@ static QDF_STATUS extract_tx_data_traffic_ctrl_ev_non_tlv(
  * from event
  * @wmi_handle: wmi handle
  * @param evt_buf: pointer to event buffer
- * @param ev: Pointer to hold data traffic control
+ * @param ev: Pointer to hold atf stats event data
  *
  * Return: 0 for success or error code
  */
@@ -7511,16 +7511,38 @@ static QDF_STATUS extract_atf_peer_stats_ev_non_tlv(
 {
 	wmi_atf_peer_stats_event *evt =
 		(wmi_atf_peer_stats_event *)evt_buf;
-	int i=0;
 
 	ev->num_atf_peers = evt->num_atf_peers;
 	ev->comp_usable_airtime = evt->comp_usable_airtime;
 	qdf_mem_copy(&ev->reserved[0], &evt->reserved[0], sizeof(evt->reserved));
-	for (i = 0; i < evt->num_atf_peers; i++) {
-		qdf_mem_copy((void *)&(ev->token_info_list[i]),
-				(void *)&(evt->token_info_list[i]),
-				sizeof(wmi_atf_peer_stats_info));
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * extract_atf_token_info_ev_non_tlv() - extract atf token info
+ * from event
+ * @wmi_handle: wmi handle
+ * @param evt_buf: pointer to event buffer
+ * @idx: Index indicating the peer number
+ * @param atf_token_info: Pointer to hold atf token info
+ *
+ * Return: 0 for success or error code
+ */
+static QDF_STATUS extract_atf_token_info_ev_non_tlv(
+	wmi_unified_t wmi_handle, void *evt_buf,
+	uint8_t idx, wmi_host_atf_peer_stats_info *atf_token_info)
+{
+	wmi_atf_peer_stats_event *evt =
+		(wmi_atf_peer_stats_event *)evt_buf;
+
+	if (idx > evt->num_atf_peers) {
+		return QDF_STATUS_E_INVAL;
 	}
+
+	atf_token_info->field1 = evt->token_info_list[idx].field1;
+	atf_token_info->field2 = evt->token_info_list[idx].field2;
+	atf_token_info->field3 = evt->token_info_list[idx].field3;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -7748,6 +7770,7 @@ struct wmi_ops non_tlv_ops =  {
 				extract_pdev_caldata_version_check_ev_param_non_tlv,
 	.extract_mu_db_entry = extract_mu_db_entry_non_tlv,
 	.extract_atf_peer_stats_ev = extract_atf_peer_stats_ev_non_tlv,
+	.extract_atf_token_info_ev = extract_atf_token_info_ev_non_tlv,
 
 };
 

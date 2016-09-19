@@ -1153,6 +1153,9 @@ QDF_STATUS (*extract_tx_data_traffic_ctrl_ev)(wmi_unified_t wmi_handle,
 QDF_STATUS (*extract_atf_peer_stats_ev)(wmi_unified_t wmi_handle,
 		void *evt_buf, wmi_host_atf_peer_stats_event *ev);
 
+QDF_STATUS (*extract_atf_token_info_ev)(wmi_unified_t wmi_handle,
+		void *evt_buf, uint8_t idx, wmi_host_atf_peer_stats_info *atf_token_info);
+
 QDF_STATUS (*extract_vdev_extd_stats)(wmi_unified_t wmi_handle, void *evt_buf,
 		uint32_t index, wmi_host_vdev_extd_stats *vdev_extd_stats);
 

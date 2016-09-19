@@ -6208,6 +6208,28 @@ QDF_STATUS wmi_extract_atf_peer_stats_ev(void *wmi_hdl, void *evt_buf,
 }
 
 /**
+ * wmi_extract_atf_token_info_ev() - extract atf token info
+ * from event
+ * @wmi_handle: wmi handle
+ * @param evt_buf: pointer to event buffer
+ * @param idx: Index indicating the peer number
+ * @param ev: Pointer to hold atf token info
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_extract_atf_token_info_ev(void *wmi_hdl, void *evt_buf,
+			uint8_t idx, wmi_host_atf_peer_stats_info *ev)
+{
+	wmi_unified_t wmi = (wmi_unified_t) wmi_hdl;
+
+	if (wmi->ops->extract_atf_token_info_ev)
+		return wmi->ops->extract_atf_token_info_ev(wmi,
+				evt_buf, idx, ev);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+/**
  * wmi_extract_vdev_extd_stats() - extract extended vdev stats from event
  * @wmi_handle: wmi handle
  * @param evt_buf: pointer to event buffer
