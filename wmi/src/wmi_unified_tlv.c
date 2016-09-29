@@ -11618,8 +11618,7 @@ static QDF_STATUS extract_channel_hopping_event_tlv(wmi_unified_t wmi_handle,
 #ifdef WMI_INTERFACE_EVENT_LOGGING
 static bool is_management_record_tlv(uint32_t cmd_id)
 {
-	if ((cmd_id == WMI_MGMT_TX_SEND_CMDID) ||
-			(cmd_id == WMI_MGMT_TX_COMPLETION_EVENTID))
+	if (cmd_id == WMI_MGMT_TX_COMPLETION_EVENTID)
 		return true;
 
 	return false;
@@ -12000,6 +11999,7 @@ static void populate_tlv_service(uint32_t *wmi_service)
 	wmi_service[wmi_service_tx_mode_push_only] = WMI_SERVICE_UNAVAILABLE;
 	wmi_service[wmi_service_tx_mode_push_pull] = WMI_SERVICE_UNAVAILABLE;
 	wmi_service[wmi_service_tx_mode_dynamic] = WMI_SERVICE_UNAVAILABLE;
+	wmi_service[wmi_service_btcoex_duty_cycle] = WMI_SERVICE_UNAVAILABLE;
 }
 
 /**

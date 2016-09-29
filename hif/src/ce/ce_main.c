@@ -2008,7 +2008,13 @@ void hif_ce_prepare_config(struct hif_softc *scn)
 	case TARGET_TYPE_QCA9984:
 	case TARGET_TYPE_IPQ4019:
 	case TARGET_TYPE_QCA9888:
-		host_ce_config = host_ce_config_wlan_ar900b;
+                if(hif_is_attribute_set(scn,HIF_LOWDESC_CE_NO_PKTLOG_CFG)) {
+		    host_ce_config = host_lowdesc_ce_cfg_wlan_ar900b_nopktlog;
+                } else if (hif_is_attribute_set(scn,HIF_LOWDESC_CE_CFG)) {
+		    host_ce_config = host_lowdesc_ce_cfg_wlan_ar900b;
+                } else {
+		   host_ce_config = host_ce_config_wlan_ar900b;
+                }
 		target_ce_config = target_ce_config_wlan_ar900b;
 		target_ce_config_sz = sizeof(target_ce_config_wlan_ar900b);
 
@@ -2019,7 +2025,11 @@ void hif_ce_prepare_config(struct hif_softc *scn)
 
 	case TARGET_TYPE_AR9888:
 	case TARGET_TYPE_AR9888V2:
-		host_ce_config = host_ce_config_wlan_ar9888;
+                if (hif_is_attribute_set(scn,HIF_LOWDESC_CE_CFG)) {
+		    host_ce_config = host_lowdesc_ce_cfg_wlan_ar9888;
+                } else {
+		    host_ce_config = host_ce_config_wlan_ar9888;
+                }
 		target_ce_config = target_ce_config_wlan_ar9888;
 		target_ce_config_sz = sizeof(target_ce_config_wlan_ar9888);
 
@@ -2816,6 +2826,12 @@ uint32_t hif_set_nss_wifiol_mode(struct hif_opaque_softc *osc, uint32_t mode)
 }
 
 #endif
+
+void hif_set_attribute(struct hif_opaque_softc *osc, uint8_t hif_attrib)
+{
+       struct hif_softc *scn = HIF_GET_SOFTC(osc);
+       scn->hif_attribute = hif_attrib;
+}
 
 void hif_disable_interrupt(struct hif_opaque_softc *osc, uint32_t pipe_num)
 {

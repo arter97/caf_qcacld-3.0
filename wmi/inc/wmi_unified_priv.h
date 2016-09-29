@@ -714,6 +714,9 @@ QDF_STATUS (*send_get_buf_extscan_hotlist_cmd)(wmi_unified_t wmi_handle,
 QDF_STATUS (*send_pdev_get_tpc_config_cmd)(wmi_unified_t wmi_handle,
 		uint32_t param);
 
+QDF_STATUS (*send_set_bwf_cmd)(wmi_unified_t wmi_handle,
+		struct set_bwf_params *param);
+
 QDF_STATUS (*send_set_atf_cmd)(wmi_unified_t wmi_handle,
 		struct set_atf_params *param);
 
@@ -968,6 +971,22 @@ QDF_STATUS
 (*send_set_atf_grouping_cmd)(wmi_unified_t wmi_handle,
 			struct atf_grouping_params *param);
 
+QDF_STATUS (*send_get_user_position_cmd)(wmi_unified_t wmi_handle, uint32_t value);
+
+QDF_STATUS
+(*send_reset_peer_mumimo_tx_count_cmd)(wmi_unified_t wmi_handle, uint32_t value);
+
+QDF_STATUS (*send_get_peer_mumimo_tx_count_cmd)(wmi_unified_t wmi_handle, uint32_t value);
+
+QDF_STATUS
+(*send_pdev_caldata_version_check_cmd)(wmi_unified_t wmi_handle, uint32_t value);
+
+QDF_STATUS
+(*send_btcoex_wlan_priority_cmd)(wmi_unified_t wmi_handle, struct btcoex_cfg_params *param);
+
+QDF_STATUS
+(*send_btcoex_duty_cycle_cmd)(wmi_unified_t wmi_handle, struct btcoex_cfg_params *param);
+
 QDF_STATUS (*extract_wds_addr_event)(wmi_unified_t wmi_handle,
 	void *evt_buf, uint16_t len, wds_addr_event_t *wds_ev);
 
@@ -1005,6 +1024,18 @@ QDF_STATUS (*extract_vdev_scan_ev_param)(wmi_unified_t wmi_handle,
 
 QDF_STATUS (*extract_mu_ev_param)(wmi_unified_t wmi_handle, void *evt_buf,
 	wmi_host_mu_report_event *param);
+
+QDF_STATUS (*extract_mu_db_entry)(wmi_unified_t wmi_hdl, void *evt_buf,
+        uint8_t idx, wmi_host_mu_db_entry *param);
+
+QDF_STATUS (*extract_mumimo_tx_count_ev_param)(wmi_unified_t wmi_handle, void *evt_buf,
+	wmi_host_peer_txmu_cnt_event *param);
+
+QDF_STATUS (*extract_peer_gid_userpos_list_ev_param)(wmi_unified_t wmi_handle, void *evt_buf,
+	wmi_host_peer_gid_userpos_list_event *param);
+
+QDF_STATUS (*extract_pdev_caldata_version_check_ev_param)(wmi_unified_t wmi_handle, void *evt_buf,
+	wmi_host_pdev_check_cal_version_event *param);
 
 QDF_STATUS (*extract_pdev_tpc_config_ev_param)(wmi_unified_t wmi_handle,
 		void *evt_buf, wmi_host_pdev_tpc_config_event *param);
@@ -1118,6 +1149,12 @@ QDF_STATUS (*extract_inst_rssi_stats_event)(wmi_unified_t wmi_handle,
 
 QDF_STATUS (*extract_tx_data_traffic_ctrl_ev)(wmi_unified_t wmi_handle,
 		void *evt_buf, wmi_host_tx_data_traffic_ctrl_event *ev);
+
+QDF_STATUS (*extract_atf_peer_stats_ev)(wmi_unified_t wmi_handle,
+		void *evt_buf, wmi_host_atf_peer_stats_event *ev);
+
+QDF_STATUS (*extract_atf_token_info_ev)(wmi_unified_t wmi_handle,
+		void *evt_buf, uint8_t idx, wmi_host_atf_peer_stats_info *atf_token_info);
 
 QDF_STATUS (*extract_vdev_extd_stats)(wmi_unified_t wmi_handle, void *evt_buf,
 		uint32_t index, wmi_host_vdev_extd_stats *vdev_extd_stats);
