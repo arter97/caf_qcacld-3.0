@@ -626,6 +626,10 @@ typedef void (*hdd_fake_resume_callback)(uint32_t val);
 void hif_fake_apps_suspend(hdd_fake_resume_callback callback);
 #endif
 
+void hif_update_pipe_callback(struct hif_opaque_softc *osc,
+				u_int8_t pipeid,
+				struct hif_msg_callbacks *callbacks);
+
 #ifdef __cplusplus
 }
 #endif

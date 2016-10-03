@@ -1337,7 +1337,7 @@ hif_pci_ce_send_done(struct CE_handle *copyeng, void *ce_context,
 	struct hif_softc *scn = HIF_GET_SOFTC(hif_state);
 	unsigned int sw_idx = sw_index, hw_idx = hw_index;
 	struct hif_msg_callbacks *msg_callbacks =
-		&hif_state->msg_callbacks_current;
+		&pipe_info->pipe_callbacks;
 
 	do {
 		/*
@@ -1407,7 +1407,7 @@ hif_pci_ce_recv_data(struct CE_handle *copyeng, void *ce_context,
 	struct hif_pci_softc *hif_pci_sc = HIF_GET_PCI_SOFTC(hif_state);
 #endif
 	struct hif_msg_callbacks *msg_callbacks =
-		&hif_state->msg_callbacks_current;
+		 &pipe_info->pipe_callbacks;
 
 	do {
 #ifdef HIF_PCI
@@ -1505,6 +1505,9 @@ int hif_completion_thread_startup(struct HIF_CE_state *hif_state)
 
 		if (attr.src_nentries)
 			qdf_spinlock_create(&pipe_info->completion_freeq_lock);
+
+		qdf_mem_copy(&pipe_info->pipe_callbacks, hif_msg_callbacks,
+					sizeof(pipe_info->pipe_callbacks));
 	}
 
 	A_TARGET_ACCESS_UNLIKELY(scn);
@@ -1809,9 +1812,11 @@ void hif_send_buffer_cleanup_on_pipe(struct HIF_CE_pipe_info *pipe_info)
 				return;
 			/* Indicate the completion to higher
 			 * layer to free the buffer */
-			hif_state->msg_callbacks_current.
-			txCompletionHandler(hif_state->
-					    msg_callbacks_current.Context,
+		if (pipe_info->pipe_callbacks.
+					txCompletionHandler)
+				pipe_info->pipe_callbacks.
+				    txCompletionHandler(pipe_info->
+					    pipe_callbacks.Context,
 					    netbuf, id, toeplitz_hash_result);
 		}
 	}
