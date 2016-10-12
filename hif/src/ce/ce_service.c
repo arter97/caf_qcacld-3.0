@@ -570,6 +570,7 @@ int ce_send_fast(struct CE_handle *copyeng, qdf_nbuf_t msdu,
 	qdf_spin_lock_bh(&ce_state->ce_index_lock);
 	Q_TARGET_ACCESS_BEGIN(scn);
 
+	src_ring->sw_index = CE_SRC_RING_READ_IDX_GET_FROM_DDR(scn, ctrl_addr);
 	write_index = src_ring->write_index;
 	sw_index = src_ring->sw_index;
 
