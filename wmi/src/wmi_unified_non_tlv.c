@@ -4846,22 +4846,30 @@ send_lci_set_cmd_non_tlv(wmi_unified_t wmi_handle,
 	int len;
 	int colocated_bss_len = 0;
 	wmi_rtt_lci_cfg_head *rtt_req;
+
 	rtt_req = (wmi_rtt_lci_cfg_head *) param->lci_data;
 
-	len = sizeof(wmi_oem_measreq_head)+sizeof(wmi_rtt_lci_cfg_head);
+	len = param->msg_len;
 
-        /* colocated_bss[1] contains num of vaps */
-        /* Provide colocated bssid subIE only when there are 2 vaps or more */
-        if(param->colocated_bss[1] > 1) {
-            qdf_print("%s: Adding %d co-located BSSIDs to LCI data\n", __func__, param->colocated_bss[1]);
-            /* Convert num_vaps to octets: 6*Num_of_vap + 1 (Max BSSID Indicator field) */
-            param->colocated_bss[1] = (param->colocated_bss[1]*IEEE80211_ADDR_LEN)+1;
-            colocated_bss_len =  param->colocated_bss[1]+2;
-            qdf_mem_copy(rtt_req->colocated_bssids_info, param->colocated_bss, param->colocated_bss[1]+2);
-            rtt_req->co_located_bssid_len = param->colocated_bss[1]+2;
-            qdf_print("%s: co_located_bssid_len: %d \n", __func__, param->colocated_bss[1]+2);
-        }
-        else { qdf_print("No co-located BSSID was added to LCI data\n"); }
+	/* colocated_bss[1] contains num of vaps */
+	/* Provide colocated bssid subIE only when there are 2 vaps or more */
+	if (param->colocated_bss[1] > 1) {
+		qdf_print("%s: Adding %d co-located BSSIDs to LCI data\n",
+				 __func__, param->colocated_bss[1]);
+		/* Convert num_vaps to octets:
+		   6*Num_of_vap + 1 (Max BSSID Indicator field) */
+		param->colocated_bss[1] =
+			(param->colocated_bss[1]*IEEE80211_ADDR_LEN)+1;
+		colocated_bss_len =  param->colocated_bss[1]+2;
+		qdf_mem_copy(rtt_req->colocated_bssids_info,
+				param->colocated_bss,
+				colocated_bss_len);
+		rtt_req->co_located_bssid_len = colocated_bss_len;
+		qdf_print("%s: co_located_bssid_len: %d\n", __func__,
+				param->colocated_bss[1]+2);
+	} else {
+		qdf_print("No co-located BSSID was added to LCI data\n");
+	}
 
 	buf = wmi_buf_alloc(wmi_handle, len);
 	if (!buf) {
@@ -4873,9 +4881,7 @@ send_lci_set_cmd_non_tlv(wmi_unified_t wmi_handle,
 	qdf_mem_set(p, len, 0);
 
 	head = (wmi_oem_measreq_head *)p;
-	head->sub_type = TARGET_OEM_CONFIGURE_LCI;
-	WMI_HOST_IF_MSG_COPY_CHAR_ARRAY(&(head->head), param->lci_data,
-		sizeof(wmi_rtt_lci_cfg_head));
+	WMI_HOST_IF_MSG_COPY_CHAR_ARRAY(head, param->lci_data, len);
 	if (wmi_unified_cmd_send(wmi_handle, buf, len, WMI_OEM_REQ_CMDID))
 		return QDF_STATUS_E_FAILURE;
 
@@ -4931,7 +4937,7 @@ send_lcr_set_cmd_non_tlv(wmi_unified_t wmi_handle,
 	wmi_oem_measreq_head *head;
 	int len;
 
-	len = sizeof(wmi_oem_measreq_head)+sizeof(wmi_rtt_lcr_cfg_head);
+	len = param->msg_len;
 
 	buf = wmi_buf_alloc(wmi_handle, len);
 	if (!buf) {
@@ -4943,12 +4949,47 @@ send_lcr_set_cmd_non_tlv(wmi_unified_t wmi_handle,
 	qdf_mem_set(p, len, 0);
 
 	head = (wmi_oem_measreq_head *)p;
-	head->sub_type = TARGET_OEM_CONFIGURE_LCR;
-	WMI_HOST_IF_MSG_COPY_CHAR_ARRAY(&(head->head), param->lcr_data,
-		sizeof(wmi_rtt_lcr_cfg_head));
+	WMI_HOST_IF_MSG_COPY_CHAR_ARRAY(head, param->lcr_data, len);
 
 	if (wmi_unified_cmd_send(wmi_handle, buf, len, WMI_OEM_REQ_CMDID))
 		return QDF_STATUS_E_FAILURE;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+ /**
+ * send_start_oem_data_cmd_non_tlv() - send oem req cmd to fw
+ * @wmi_handle: wmi handle
+ * @param: pointer to hold oem req param
+ */
+QDF_STATUS
+send_start_oem_data_cmd_non_tlv(wmi_unified_t wmi_handle,
+				uint32_t data_len,
+				uint8_t *data)
+{
+	wmi_buf_t buf;
+	uint8_t *p;
+	wmi_oem_measreq_head *head;
+
+	buf = wmi_buf_alloc(wmi_handle, data_len);
+	if (!buf) {
+		qdf_print("%s: No WMI resource!\n", __func__);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	p = (uint8_t *) wmi_buf_data(buf);
+	qdf_mem_set(p, data_len, 0);
+
+	head = (wmi_oem_measreq_head *)p;
+	WMI_HOST_IF_MSG_COPY_CHAR_ARRAY(head, data, data_len);
+
+	if (wmi_unified_cmd_send(wmi_handle, buf,
+				data_len, WMI_OEM_REQ_CMDID)) {
+		qdf_print("%s: ERROR: Host unable to send LOWI request to FW\n",
+				__func__);
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -6478,6 +6519,7 @@ static uint8_t *copy_rtt_report_cfr(wmi_host_rtt_meas_event *ev,
 	}
 	return p;
 }
+
 /**
  * extract_rtt_ev_non_tlv() - extract rtt event
  * @wmi_handle: wmi handle
@@ -7744,6 +7786,7 @@ struct wmi_ops non_tlv_ops =  {
 	.send_rtt_meas_req_cmd = send_rtt_meas_req_cmd_non_tlv,
 	.send_lci_set_cmd = send_lci_set_cmd_non_tlv,
 	.send_lcr_set_cmd = send_lcr_set_cmd_non_tlv,
+	.send_start_oem_data_cmd = send_start_oem_data_cmd_non_tlv,
 	.send_rtt_keepalive_req_cmd = send_rtt_keepalive_req_cmd_non_tlv,
 	.send_periodic_chan_stats_config_cmd =
 			send_periodic_chan_stats_config_cmd_non_tlv,
