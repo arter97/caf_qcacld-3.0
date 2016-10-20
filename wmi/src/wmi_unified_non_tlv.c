@@ -31,11 +31,12 @@
 #include "a_debug.h"
 #include "ol_if_athvar.h"
 #include "ol_defines.h"
-#include "wmi.h"
 #include "wmi_unified_api.h"
 #include "wmi_unified_priv.h"
 
 #ifdef WMI_NON_TLV_SUPPORT
+#include "wmi.h"
+#include "wmi_unified.h"
 /**
  * send_vdev_create_cmd_non_tlv() - send VDEV create command to fw
  * @wmi_handle: wmi handle
@@ -1319,7 +1320,6 @@ QDF_STATUS send_vdev_set_param_cmd_non_tlv(wmi_unified_t wmi_handle,
 	if ((param->param_id < wmi_vdev_param_max) &&
 		(wmi_handle->vdev_param[param->param_id] !=
 				WMI_UNAVAILABLE_PARAM)) {
-
 		buf = wmi_buf_alloc(wmi_handle, len);
 		if (!buf) {
 			qdf_print("%s:wmi_buf_alloc failed\n", __func__);
@@ -8467,6 +8467,8 @@ static void populate_vdev_param_non_tlv(uint32_t *vdev_param)
 		WMI_VDEV_PARAM_ATF_SSID_SCHED_POLICY;
 	vdev_param[wmi_vdev_param_disable_dyn_bw_rts] =
 		WMI_VDEV_PARAM_DISABLE_DYN_BW_RTS;
+	vdev_param[wmi_vdev_param_capabilities] =
+		WMI_VDEV_PARAM_CAPABILITIES;
 
 }
 #endif
