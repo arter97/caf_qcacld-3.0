@@ -31,11 +31,12 @@
 #include "a_debug.h"
 #include "ol_if_athvar.h"
 #include "ol_defines.h"
-#include "wmi.h"
 #include "wmi_unified_api.h"
 #include "wmi_unified_priv.h"
 
 #ifdef WMI_NON_TLV_SUPPORT
+#include "wmi.h"
+#include "wmi_unified.h"
 /**
  * send_vdev_create_cmd_non_tlv() - send VDEV create command to fw
  * @wmi_handle: wmi handle
@@ -1319,7 +1320,6 @@ QDF_STATUS send_vdev_set_param_cmd_non_tlv(wmi_unified_t wmi_handle,
 	if ((param->param_id < wmi_vdev_param_max) &&
 		(wmi_handle->vdev_param[param->param_id] !=
 				WMI_UNAVAILABLE_PARAM)) {
-
 		buf = wmi_buf_alloc(wmi_handle, len);
 		if (!buf) {
 			qdf_print("%s:wmi_buf_alloc failed\n", __func__);
@@ -4557,13 +4557,6 @@ send_rtt_meas_req_test_cmd_non_tlv(wmi_unified_t wmi_handle,
 	WMI_RTT_SPS_SET(head->req_id, 1);
 
 	WMI_RTT_NUM_STA_SET(head->sta_num, param->req_num_req);
-	if (param->req_report_type < WMI_RTT_AGGREAGET_REPORT_NON_CFR) {
-		/* In command line, 0 - FAC, 1 - CFR, need to revert here */
-		param->req_report_type ^= 1;
-	}
-
-	if (param->num_measurements == 0)
-		param->num_measurements = 25;
 
 	body = &(head->body[0]);
 	WMI_RTT_VDEV_ID_SET(body->measure_info, 0);
@@ -6547,6 +6540,8 @@ QDF_STATUS extract_rtt_ev_non_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 
 		ev->chain_mask = WMI_RTT_REPORT_RX_CHAIN_GET(body->rx_chain);
 		ev->bw = WMI_RTT_REPORT_RX_BW_GET(body->rx_chain);
+		/* If report type is not WMI_RTT_REPORT_CFR */
+		ev->txrxchain_mask = 0;
 
 		ev->tod = ((u_int64_t) body->tod.time32) << 32;
 		ev->tod |= body->tod.time0; /*tmp1 is the 64 bit tod*/
@@ -8467,6 +8462,8 @@ static void populate_vdev_param_non_tlv(uint32_t *vdev_param)
 		WMI_VDEV_PARAM_ATF_SSID_SCHED_POLICY;
 	vdev_param[wmi_vdev_param_disable_dyn_bw_rts] =
 		WMI_VDEV_PARAM_DISABLE_DYN_BW_RTS;
+	vdev_param[wmi_vdev_param_capabilities] =
+		WMI_VDEV_PARAM_CAPABILITIES;
 
 }
 #endif
