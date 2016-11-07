@@ -3692,7 +3692,7 @@ send_set_ctl_table_cmd_non_tlv(wmi_unified_t wmi_handle,
             param->target_type == TARGET_TYPE_IPQ4019 || param->target_type == TARGET_TYPE_QCA9888) {
 		if (param->is_2g) {
 			/* For 2G, CTL array length should be 688*/
-			if (!param->is_acfg_ctl && param->ctl_len !=
+			if (param->ctl_cmd_len !=
 				(4 + (WHAL_NUM_CTLS_2G_11B * 2) + (WHAL_NUM_BAND_EDGES_2G_11B * 3) +
 				1 + (WHAL_NUM_CTLS_2G_11B * WHAL_NUM_BAND_EDGES_2G_11B) +
 				(WHAL_NUM_CTLS_2G_20MHZ * 2) + (WHAL_NUM_BAND_EDGES_2G_20MHZ * 3) +
@@ -3704,7 +3704,7 @@ send_set_ctl_table_cmd_non_tlv(wmi_unified_t wmi_handle,
 			}
 		} else {
 			/* For 5G, CTL array length should be 1540 */
-			if (!param->is_acfg_ctl && param->ctl_len !=
+			if (param->ctl_cmd_len !=
 				(4 + (WHAL_NUM_CTLS_5G_11A * 2) + (WHAL_NUM_BAND_EDGES_5G_11A * 3) +
 				1 + (WHAL_NUM_CTLS_5G_11A * WHAL_NUM_BAND_EDGES_5G_11A) + 1 +
 				(WHAL_NUM_CTLS_5G_HT20 * 2) + (WHAL_NUM_BAND_EDGES_5G_HT20 * 3) +
@@ -3720,7 +3720,7 @@ send_set_ctl_table_cmd_non_tlv(wmi_unified_t wmi_handle,
 			}
 		}
 	} else {
-		if (!param->is_acfg_ctl && param->ctl_len !=
+		if (param->ctl_cmd_len !=
 			WHAL_NUM_CTLS_2G * WHAL_NUM_BAND_EDGES_2G * 2 +
 			WHAL_NUM_CTLS_5G * WHAL_NUM_BAND_EDGES_5G * 2) {
 			qdf_print("CTL array len not correct\n");
@@ -3729,7 +3729,7 @@ send_set_ctl_table_cmd_non_tlv(wmi_unified_t wmi_handle,
 	}
 
 	len = sizeof(wmi_pdev_set_ctl_table_cmd);
-	len += roundup(param->ctl_len, sizeof(A_UINT32)) - sizeof(A_UINT32);
+	len += roundup(param->ctl_cmd_len, sizeof(A_UINT32)) - sizeof(A_UINT32);
 	qdf_print("wmi buf len = %d\n", len);
 	buf = wmi_buf_alloc(wmi_handle, len);
 	if (!buf) {
@@ -3738,12 +3738,11 @@ send_set_ctl_table_cmd_non_tlv(wmi_unified_t wmi_handle,
 	}
 	cmd = (wmi_pdev_set_ctl_table_cmd *)wmi_buf_data(buf);
 
-	cmd->ctl_len = param->ctl_len;
-	WMI_HOST_IF_MSG_COPY_CHAR_ARRAY(&cmd->ctl_info[0], param->ctl_array,
-		param->ctl_len);
-
-	if (param->is_acfg_ctl)
-		len = param->ctl_len;
+	cmd->ctl_len = param->ctl_cmd_len;
+	WMI_HOST_IF_MSG_COPY_CHAR_ARRAY(&cmd->ctl_info[0], &param->ctl_band,
+		sizeof(param->ctl_band));
+	WMI_HOST_IF_MSG_COPY_CHAR_ARRAY(&cmd->ctl_info[1], param->ctl_array,
+		param->ctl_cmd_len - sizeof(param->ctl_band));
 
 	if (wmi_unified_cmd_send(wmi_handle, buf, len,
 			WMI_PDEV_SET_CTL_TABLE_CMDID)) {
