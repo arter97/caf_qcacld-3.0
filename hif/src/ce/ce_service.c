@@ -97,7 +97,7 @@ void hif_ce_war_enable(void)
 	hif_ce_war1 = 1;
 }
 
-#ifdef CONFIG_SLUB_DEBUG_ON
+#ifdef HIF_CONFIG_SLUB_DEBUG_ON
 
 /**
  * struct hif_ce_event - structure for detailing a ce event
