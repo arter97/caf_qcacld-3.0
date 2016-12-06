@@ -97,7 +97,7 @@ void hif_ce_war_enable(void)
 	hif_ce_war1 = 1;
 }
 
-#ifdef CONFIG_SLUB_DEBUG_ON
+#ifdef HIF_CONFIG_SLUB_DEBUG_ON
 
 /**
  * struct hif_ce_event - structure for detailing a ce event
@@ -198,6 +198,14 @@ inline void ce_init_ce_desc_event_log(int ce_id, int size)
 }
 #endif
 
+#ifdef NAPI_YIELD_BUDGET_BASED
+bool hif_ce_service_should_yield(struct hif_softc *scn,
+				 struct CE_state *ce_state)
+{
+	bool yield =  hif_max_num_receives_reached(scn, ce_state->receive_count);
+	return yield;
+}
+#else
 /**
  * hif_ce_service_should_yield() - return true if the service is hogging the cpu
  * @scn: hif context
@@ -213,7 +221,7 @@ bool hif_ce_service_should_yield(struct hif_softc *scn,
 		     hif_max_num_receives_reached(scn, ce_state->receive_count);
 	return yield;
 }
-
+#endif
 /*
  * Support for Copy Engine hardware, which is mainly used for
  * communication between Host and Target over a PCIe interconnect.
@@ -1770,6 +1778,12 @@ more_data:
 				  CE_DEST_RING_READ_IDX_GET(scn, ctrl_addr));
 		}
 	}
+#ifdef NAPI_YIELD_BUDGET_BASED
+	/* Caution : Before you modify this code, please refer hif_napi_poll function
+	to understand how napi_complete gets called and make the necessary changes
+	Force break has to be done till WIN disables the interrupt at source */
+	ce_state->force_break = 1;
+#endif
 }
 
 #else

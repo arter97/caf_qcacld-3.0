@@ -200,7 +200,8 @@ struct _NIC_DEV {
 	void *osdev_acfg_handle;
 #endif /* ACFG_NETLINK_TX */
 #endif /* UMAC_SUPPORT_ACFG */
-
+/* Tx function specific to the radio (OL/DA), initiailzed during VAP create */
+int (*vap_hardstart)(struct sk_buff *skb, struct net_device *dev);
 };
 
 #define __QDF_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer, lenp, ppos) \
