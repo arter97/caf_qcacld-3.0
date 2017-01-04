@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -239,12 +239,12 @@ typedef void (*qdf_timer_func_t)(void *);
  * @QDF_MODULE_ID_BMI: BMI module ID
  * @QDF_MODULE_ID_EPPING: EPPING module ID
  * @QDF_MODULE_ID_QVIT: QVIT module ID
+ * @QDF_MODULE_ID_ANY: Generic module ID
  * @QDF_MODULE_ID_MAX: Max place holder module ID
  *
  * These are generic IDs that identify the various modules in the software
  * system
- * 0 is unused for historical purposes
- * 3 & 4 are unused for historical purposes
+ * 0 & 4 are unused for historical purposes
  */
 typedef enum {
 	QDF_MODULE_ID_TLSHIM = 1,
@@ -269,6 +269,7 @@ typedef enum {
 	QDF_MODULE_ID_BMI = 21,
 	QDF_MODULE_ID_EPPING = 22,
 	QDF_MODULE_ID_QVIT = 23,
+	QDF_MODULE_ID_ANY = 24,
 	QDF_MODULE_ID_MAX
 } QDF_MODULE_ID;
 
