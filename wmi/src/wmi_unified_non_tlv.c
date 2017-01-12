@@ -149,6 +149,57 @@ QDF_STATUS send_vdev_down_cmd_non_tlv(wmi_unified_t wmi_handle,
 }
 
 /**
+ * convert_host_peer_id_to_target_id_non_tlv - convert host peer param_id
+ * to target id.
+ * @targ_paramid: Target parameter id to hold the result.
+ * @peer_param_id: host param id.
+ *
+ * Return: QDF_STATUS_SUCCESS for success
+ *         QDF_STATUS_E_NOSUPPORT when the param_id in not supported in tareget
+ */
+static QDF_STATUS convert_host_peer_id_to_target_id_non_tlv(
+		uint32_t *targ_paramid,
+		uint32_t peer_param_id)
+{
+	switch (peer_param_id) {
+	case WMI_HOST_PEER_MIMO_PS_STATE:
+		*targ_paramid = WMI_PEER_MIMO_PS_STATE;
+		break;
+	case WMI_HOST_PEER_AMPDU:
+		*targ_paramid = WMI_PEER_AMPDU;
+		break;
+	case WMI_HOST_PEER_AUTHORIZE:
+		*targ_paramid = WMI_PEER_AUTHORIZE;
+		break;
+	case WMI_HOST_PEER_CHWIDTH:
+		*targ_paramid = WMI_PEER_CHWIDTH;
+		break;
+	case WMI_HOST_PEER_NSS:
+		*targ_paramid = WMI_PEER_NSS;
+		break;
+	case WMI_HOST_PEER_USE_4ADDR:
+		*targ_paramid = WMI_PEER_USE_4ADDR;
+		break;
+	case WMI_HOST_PEER_USE_FIXED_PWR:
+		*targ_paramid = WMI_PEER_USE_FIXED_PWR;
+		break;
+	case WMI_HOST_PEER_PARAM_FIXED_RATE:
+		*targ_paramid = WMI_PEER_PARAM_FIXED_RATE;
+		break;
+	case WMI_HOST_PEER_SET_MU_WHITELIST:
+		*targ_paramid = WMI_PEER_SET_MU_WHITELIST;
+		break;
+	case WMI_HOST_PEER_EXT_STATS_ENABLE:
+		*targ_paramid = WMI_PEER_EXT_STATS_ENABLE;
+		break;
+	default:
+		return QDF_STATUS_E_NOSUPPORT;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * send_vdev_start_cmd_non_tlv() - send vdev start command to fw
  * @wmi: wmi handle
  * @vdev_id: vdev id
@@ -534,6 +585,11 @@ QDF_STATUS send_peer_param_cmd_non_tlv(wmi_unified_t wmi_handle,
 	wmi_peer_set_param_cmd *cmd;
 	wmi_buf_t buf;
 	int len = sizeof(wmi_peer_set_param_cmd);
+	uint32_t param_id;
+
+	if (convert_host_peer_id_to_target_id_non_tlv(&param_id,
+		param->param_id) != QDF_STATUS_SUCCESS)
+		return QDF_STATUS_E_NOSUPPORT;
 
 	buf = wmi_buf_alloc(wmi_handle, len);
 	if (!buf) {
@@ -542,7 +598,7 @@ QDF_STATUS send_peer_param_cmd_non_tlv(wmi_unified_t wmi_handle,
 	}
 	cmd = (wmi_peer_set_param_cmd *)wmi_buf_data(buf);
 	WMI_CHAR_ARRAY_TO_MAC_ADDR(peer_addr, &cmd->peer_macaddr);
-	cmd->param_id = param->param_id;
+	cmd->param_id = param_id;
 	cmd->param_value = param->param_value;
 	cmd->vdev_id = param->vdev_id;
 	return wmi_unified_cmd_send(wmi_handle, buf, len,
