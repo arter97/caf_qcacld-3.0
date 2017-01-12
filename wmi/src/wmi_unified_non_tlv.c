@@ -192,6 +192,12 @@ static QDF_STATUS convert_host_peer_id_to_target_id_non_tlv(
 	case WMI_HOST_PEER_EXT_STATS_ENABLE:
 		*targ_paramid = WMI_PEER_EXT_STATS_ENABLE;
 		break;
+	case WMI_HOST_PEER_NSS_VHT160:
+		*targ_paramid = WMI_PEER_NSS_VHT160;
+		break;
+	case WMI_HOST_PEER_NSS_VHT80_80:
+		*targ_paramid = WMI_PEER_NSS_VHT80_80;
+		break;
 	default:
 		return QDF_STATUS_E_NOSUPPORT;
 	}
@@ -8110,6 +8116,7 @@ static void populate_non_tlv_service(uint32_t *wmi_service)
 	wmi_service[wmi_service_mgmt_tx_wmi] = WMI_SERVICE_UNAVAILABLE;
 	wmi_service[wmi_service_ext_msg] = WMI_SERVICE_UNAVAILABLE;
 	wmi_service[wmi_service_mawc] = WMI_SERVICE_UNAVAILABLE;
+        wmi_service[wmi_service_extended_nss_support] = WMI_SERVICE_EXTENDED_NSS_SUPPORT;
 
 }
 

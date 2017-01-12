@@ -5250,6 +5250,7 @@ typedef enum {
 	wmi_service_check_cal_version,
 	wmi_service_btcoex_duty_cycle,
 	wmi_service_4_wire_coex_support,
+	wmi_service_extended_nss_support,
 
 	wmi_services_max,
 } wmi_conv_service_ids;
@@ -5943,6 +5944,10 @@ typedef enum {
 	/* set group membership status */
 	WMI_HOST_PEER_MEMBERSHIP = 0xb,
 	WMI_HOST_PEER_USERPOS = 0xc,
+	/* peer NSS for 160Mhx */
+	WMI_HOST_PEER_NSS_VHT160 = 0xd,
+	/* peer NSS for 160Mhx */
+	WMI_HOST_PEER_NSS_VHT80_80 = 0xe,
 } PEER_PARAM_ENUM;
 #define WMI_HOST_PEER_MIMO_PS_NONE	0x0
 #define WMI_HOST_PEER_MIMO_PS_STATIC	0x1

@@ -12004,6 +12004,7 @@ static void populate_tlv_service(uint32_t *wmi_service)
 	wmi_service[wmi_service_tx_mode_dynamic] = WMI_SERVICE_UNAVAILABLE;
 	wmi_service[wmi_service_btcoex_duty_cycle] = WMI_SERVICE_UNAVAILABLE;
 	wmi_service[wmi_service_4_wire_coex_support] = WMI_SERVICE_UNAVAILABLE;
+        wmi_service[wmi_service_extended_nss_support] = WMI_SERVICE_UNAVAILABLE;
 }
 
 /**
