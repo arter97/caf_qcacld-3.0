@@ -548,6 +548,16 @@ struct vdev_set_params {
 };
 
 /**
+ * struct sifs_trigger_param - sifs_trigger cmd parameter
+ * @if_id: vdev id
+ * @param_value: parameter value
+ */
+struct sifs_trigger_param {
+	uint32_t if_id;
+	uint32_t param_value;
+};
+
+/**
  * struct vdev_install_key_params - vdev key set cmd parameter
  * @wk_keylen: key length
  * @wk_flags: key flags
