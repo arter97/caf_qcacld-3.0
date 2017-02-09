@@ -4889,6 +4889,7 @@ typedef enum {
 	wmi_peer_gid_userpos_list_event_id,
 	wmi_pdev_check_cal_version_event_id,
 	wmi_atf_peer_stats_event_id,
+	wmi_pdev_wds_entry_list_event_id,
 
 	wmi_events_max,
 } wmi_conv_event_id;

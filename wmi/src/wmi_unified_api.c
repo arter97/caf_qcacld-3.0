@@ -6349,3 +6349,22 @@ QDF_STATUS wmi_unified_send_coex_ver_cfg_cmd(void *wmi_hdl,
 
 	return QDF_STATUS_E_FAILURE;
 }
+
+/**
+ * wmi_unified_send_wds_entry_list_cmd() - WMI function to get list of
+ *  wds entries from FW
+ * @wmi_handle: wmi handle
+ *
+ * Send WMI_PDEV_WDS_ENTRY_LIST_CMDID parameters to fw.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
+ */
+QDF_STATUS wmi_unified_send_dump_wds_table_cmd(void *wmi_hdl)
+{
+	wmi_unified_t wmi_handle = (wmi_unified_t) wmi_hdl;
+
+	if (wmi_handle->ops->send_wds_entry_list_cmd)
+		return wmi_handle->ops->send_wds_entry_list_cmd(wmi_handle);
+
+	return QDF_STATUS_E_FAILURE;
+}

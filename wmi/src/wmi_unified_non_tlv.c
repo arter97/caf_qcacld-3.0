@@ -7698,6 +7698,37 @@ static bool is_management_record_non_tlv(uint32_t cmd_id)
 }
 #endif
 
+/**
+ *  send_wds_entry_list_cmd_non_tlv() - WMI function to get list of
+ *  wds entries from FW
+ *
+ *  @param wmi_handle	  : handle to WMI.
+ *  @return QDF_STATUS_SUCCESS  on success and -ve on failure.
+ */
+QDF_STATUS send_wds_entry_list_cmd_non_tlv(wmi_unified_t wmi_handle)
+{
+	wmi_buf_t buf;
+
+	/*
+	 * Passing a NULL pointer to wmi_unified_cmd_send() panics it,
+	 * so let's just use a 32 byte fake array for now.
+	 */
+	buf = wmi_buf_alloc(wmi_handle, 32);
+	if (buf == NULL) {
+		return QDF_STATUS_E_NOMEM;
+	}
+	WMI_LOGD("%s: about to send\n", __func__);
+	if (wmi_unified_cmd_send(wmi_handle, buf, 32,
+	  WMI_PDEV_WDS_ENTRY_LIST_CMDID) != A_OK) {
+		qdf_print("%s: send failed\n", __func__);
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+
 struct wmi_ops non_tlv_ops =  {
 	.send_vdev_create_cmd = send_vdev_create_cmd_non_tlv,
 	.send_vdev_delete_cmd = send_vdev_delete_cmd_non_tlv,
@@ -7911,6 +7942,7 @@ struct wmi_ops non_tlv_ops =  {
 	.extract_mu_db_entry = extract_mu_db_entry_non_tlv,
 	.extract_atf_peer_stats_ev = extract_atf_peer_stats_ev_non_tlv,
 	.extract_atf_token_info_ev = extract_atf_token_info_ev_non_tlv,
+	.send_wds_entry_list_cmd = send_wds_entry_list_cmd_non_tlv,
 
 };
 
@@ -8151,6 +8183,8 @@ static void populate_non_tlv_events_id(uint32_t *event_ids)
 					WMI_PDEV_CHECK_CAL_VERSION_EVENTID;
 	event_ids[wmi_atf_peer_stats_event_id] =
 					WMI_ATF_PEER_STATS_EVENTID;
+	event_ids[wmi_pdev_wds_entry_list_event_id] =
+					WMI_PDEV_WDS_ENTRY_LIST_EVENTID;
 }
 
 /**
