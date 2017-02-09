@@ -1167,6 +1167,8 @@ QDF_STATUS (*send_power_dbg_cmd)(wmi_unified_t wmi_handle,
 
 QDF_STATUS (*send_adapt_dwelltime_params_cmd)(wmi_unified_t wmi_handle,
 			struct wmi_adaptive_dwelltime_params *dwelltime_params);
+
+QDF_STATUS (*send_wds_entry_list_cmd)(wmi_unified_t wmi_handle);
 };
 
 struct target_abi_version {
