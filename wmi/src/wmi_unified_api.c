@@ -6368,3 +6368,25 @@ QDF_STATUS wmi_unified_send_dump_wds_table_cmd(void *wmi_hdl)
 
 	return QDF_STATUS_E_FAILURE;
 }
+
+/**
+ * wmi_unified_send_band_filter_select_cmd() - send bandfilter select command.
+ * @wmi_handle: wmi handle
+ * @param:      wmi bandfilter select gpio params
+ *
+ * Send WMI_SERVICE_PROG_GPIO_BAND_SELECT parameters to fw.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
+ */
+QDF_STATUS wmi_unified_send_band_filter_select_cmd(void *wmi_hdl,
+				struct band_filter_select_params *param)
+{
+
+	wmi_unified_t wmi_handle = (wmi_unified_t) wmi_hdl;
+
+	if (wmi_handle->ops->send_band_filter_select_cmd)
+		return wmi_handle->ops->send_band_filter_select_cmd(wmi_handle,
+			param);
+
+	return QDF_STATUS_E_FAILURE;
+}

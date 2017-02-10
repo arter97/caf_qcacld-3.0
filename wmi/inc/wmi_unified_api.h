@@ -1295,4 +1295,7 @@ QDF_STATUS wmi_unified_send_adapt_dwelltime_params_cmd(void *wmi_hdl,
 				   struct wmi_adaptive_dwelltime_params *
 				   wmi_param);
 QDF_STATUS wmi_unified_send_dump_wds_table_cmd(void *wmi_hdl);
+
+QDF_STATUS wmi_unified_send_band_filter_select_cmd(void *wmi_hdl,
+				   struct band_filter_select_params *param);
 #endif /* _WMI_UNIFIED_API_H_ */
