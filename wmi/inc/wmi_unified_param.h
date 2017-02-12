@@ -4217,6 +4217,15 @@ typedef struct {
 	uint32_t config_buf[WMI_HOST_COEX_CONFIG_BUF_MAX_LEN];
 } coex_ver_cfg_t;
 
+/**
+ * struct band_filter_select_params  - Bandfilter select gpio param
+ * @gpio_pin_number: GPIO number to configure for bandfilter on a
+ *		     dual band radio.
+ */
+struct band_filter_select_params {
+	uint32_t gpio_pin_number;
+};
+
 #define WMI_HOST_RTT_REPORT_CFR	0
 #define WMI_HOST_RTT_NO_REPORT_CFR	1
 #define WMI_HOST_RTT_AGGREGATE_REPORT_NON_CFR	2
@@ -5253,7 +5262,7 @@ typedef enum {
 	wmi_service_btcoex_duty_cycle,
 	wmi_service_4_wire_coex_support,
 	wmi_service_extended_nss_support,
-
+	wmi_service_band_filter_switch_support,
 	wmi_services_max,
 } wmi_conv_service_ids;
 #define WMI_SERVICE_UNAVAILABLE 0xFFFF

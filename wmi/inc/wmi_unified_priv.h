@@ -990,6 +990,9 @@ QDF_STATUS
 QDF_STATUS
 (*send_coex_ver_cfg_cmd)(wmi_unified_t wmi_handle, coex_ver_cfg_t *param);
 
+QDF_STATUS (*send_band_filter_select_cmd)(wmi_unified_t wmi_handle,
+			struct band_filter_select_params *param);
+
 QDF_STATUS (*extract_wds_addr_event)(wmi_unified_t wmi_handle,
 	void *evt_buf, uint16_t len, wds_addr_event_t *wds_ev);
 

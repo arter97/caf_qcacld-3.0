@@ -5256,6 +5256,37 @@ send_coex_ver_cfg_cmd_non_tlv(wmi_unified_t wmi_handle, coex_ver_cfg_t *param)
 }
 
 /**
+ * send_band_filter_select_cmd_non_tlv() - send bandfilter select command.
+ * @wmi_handle: wmi handle
+ * @param: bandfilter select gpio number.
+ *
+ * Return: 0 for success or error code
+ */
+QDF_STATUS
+send_band_filter_select_cmd_non_tlv(wmi_unified_t wmi_handle,
+	struct band_filter_select_params *param)
+{
+
+	wmi_buf_t buf;
+	wmi_prog_gpio_band_select_cmd *cmd;
+	int len = sizeof(wmi_prog_gpio_band_select_cmd);
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf) {
+		qdf_print("%s:wmi_buf_alloc failed\n", __func__);
+		return QDF_STATUS_E_FAILURE;
+	}
+	cmd = (wmi_prog_gpio_band_select_cmd *) wmi_buf_data(buf);
+	cmd->gpio_pin_number = param->gpio_pin_number;
+	if (wmi_unified_cmd_send(wmi_handle, buf, len,
+				WMI_PROG_GPIO_BAND_SELECT_CMDID)) {
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+/**
  * wmi_copy_resource_config_non_tlv() - copy resource configuration function
  * @param resource_cfg: pointer to resource configuration
  * @param tgt_res_cfg: pointer to target resource configuration
@@ -7925,6 +7956,7 @@ struct wmi_ops non_tlv_ops =  {
 	.send_btcoex_wlan_priority_cmd = send_btcoex_wlan_priority_cmd_non_tlv,
 	.send_btcoex_duty_cycle_cmd = send_btcoex_duty_cycle_cmd_non_tlv,
 	.send_coex_ver_cfg_cmd = send_coex_ver_cfg_cmd_non_tlv,
+	.send_band_filter_select_cmd = send_band_filter_select_cmd_non_tlv,
 
 	.get_target_cap_from_service_ready = extract_service_ready_non_tlv,
 	.extract_fw_version = extract_fw_version_non_tlv,
@@ -8089,7 +8121,8 @@ static void populate_non_tlv_service(uint32_t *wmi_service)
 	wmi_service[wmi_service_btcoex_duty_cycle] = WMI_SERVICE_BTCOEX_DUTY_CYCLE;
 	wmi_service[wmi_service_4_wire_coex_support] =
 				WMI_SERVICE_4_WIRE_COEX_SUPPORT;
-
+	wmi_service[wmi_service_band_filter_switch_support] =
+				WMI_SERVICE_PROG_GPIO_BAND_SELECT;
 	wmi_service[wmi_service_roam_scan_offload] = WMI_SERVICE_UNAVAILABLE;
 	wmi_service[wmi_service_arpns_offload] = WMI_SERVICE_UNAVAILABLE;
 	wmi_service[wmi_service_nlo] = WMI_SERVICE_UNAVAILABLE;
