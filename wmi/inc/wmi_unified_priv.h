@@ -993,6 +993,13 @@ QDF_STATUS
 QDF_STATUS (*send_band_filter_select_cmd)(wmi_unified_t wmi_handle,
 			struct band_filter_select_params *param);
 
+QDF_STATUS
+(*send_smart_logging_enable_cmd)(wmi_unified_t wmi_handle, uint32_t param);
+
+QDF_STATUS
+(*send_smart_logging_fatal_cmd)(wmi_unified_t wmi_handle,
+				struct wmi_debug_fatal_events_t *param);
+
 QDF_STATUS (*extract_wds_addr_event)(wmi_unified_t wmi_handle,
 	void *evt_buf, uint16_t len, wds_addr_event_t *wds_ev);
 
@@ -1164,6 +1171,8 @@ QDF_STATUS (*extract_atf_token_info_ev)(wmi_unified_t wmi_handle,
 
 QDF_STATUS (*extract_vdev_extd_stats)(wmi_unified_t wmi_handle, void *evt_buf,
 		uint32_t index, wmi_host_vdev_extd_stats *vdev_extd_stats);
+QDF_STATUS (*extract_smartlog_event)(wmi_unified_t wmi_handle, void *evt_buf,
+		struct wmi_debug_fatal_events_t *event);
 
 QDF_STATUS (*send_power_dbg_cmd)(wmi_unified_t wmi_handle,
 				struct wmi_power_dbg_params *param);

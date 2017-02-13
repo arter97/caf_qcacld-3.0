@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -471,6 +471,9 @@ typedef enum _ol_ath_param_t {
 	OL_ATH_PARAM_PRECAC_TIMEOUT = 346,
 	OL_ATH_COEX_VER_CFG = 347,
         OL_ATH_PARAM_TXCHAINSOFT = 348,
+	OL_ATH_PARAM_SMARTLOG_ENABLE = 349,
+	OL_ATH_PARAM_SMARTLOG_FATAL_EVENT = 350,
+
 } ol_ath_param_t;
 
 /*
