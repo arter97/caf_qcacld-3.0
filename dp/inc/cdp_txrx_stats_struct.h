@@ -479,6 +479,9 @@ typedef enum _ol_ath_param_t {
 #if OL_ATH_CE_DEBUG
 	OL_ATH_PARAM_CE_DESC_DBG_EN = 354,
 #endif /* OL_ATH_CE_DEBUG */
+#if OL_ATH_SMART_LOGGING
+	OL_ATH_PARAM_SMARTLOG_SKB_SZ = 355,
+#endif /* OL_ATH_SMART_LOGGING */
 } ol_ath_param_t;
 
 /*
