@@ -473,7 +473,7 @@ typedef enum _ol_ath_param_t {
         OL_ATH_PARAM_TXCHAINSOFT = 348,
 	OL_ATH_PARAM_SMARTLOG_ENABLE = 349,
 	OL_ATH_PARAM_SMARTLOG_FATAL_EVENT = 350,
-
+	OL_ATH_PARAM_AMSDU_ENABLE = 351,
 } ol_ath_param_t;
 
 /*

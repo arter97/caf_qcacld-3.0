@@ -8791,6 +8791,9 @@ static void populate_vdev_param_non_tlv(uint32_t *vdev_param)
 		WMI_VDEV_PARAM_CAPABILITIES;
 	vdev_param[wmi_vdev_param_ampdu_subframe_size_per_ac] =
 		WMI_VDEV_PARAM_AMPDU_SUBFRAME_SIZE_PER_AC;
+	vdev_param[wmi_vdev_param_amsdu_subframe_size_per_ac] =
+		WMI_VDEV_PARAM_AMSDU_SUBFRAME_SIZE_PER_AC;
+
 }
 #endif
 
