@@ -148,6 +148,9 @@ struct hif_softc {
 	uint32_t nss_wifi_ol_mode;
 #endif
 	uint32_t hif_attribute;
+#if OL_ATH_CE_DEBUG
+	uint32_t hif_desc_trace;
+#endif /* OL_ATH_CE_DEBUG */
 };
 
 #ifdef QCA_NSS_WIFI_OFFLOAD_SUPPORT

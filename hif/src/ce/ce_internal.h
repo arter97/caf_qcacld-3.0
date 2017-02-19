@@ -42,6 +42,18 @@ enum ol_ath_hif_ce_ecodes {
 
 struct CE_src_desc;
 
+#if OL_ATH_CE_DEBUG
+struct ce_debug_buf_t;
+
+#define MAX_CE_DEBUG_BUFS 256
+
+struct ce_debug_buf_state {
+	struct ce_debug_buf_t *start;
+	struct ce_debug_buf_t *cur;
+	bool initialised;
+};
+#endif /* OL_ATH_CE_DEBUG */
+
 /* Copy Engine Ring internal state */
 struct CE_ring_state {
 
@@ -96,6 +108,9 @@ struct CE_ring_state {
 	unsigned int high_water_mark_nentries;
 	void **per_transfer_context;
 	OS_DMA_MEM_CONTEXT(ce_dmacontext) /* OS Specific DMA context */
+#if OL_ATH_CE_DEBUG
+	struct ce_debug_buf_state dbg_buf;
+#endif /* OL_ATH_CE_DEBUG */
 };
 
 /* Copy Engine internal state */
@@ -404,6 +419,29 @@ static inline void ce_t2h_msg_ce_cleanup(struct CE_handle *ce_hdl)
 }
 #endif
 
+#if OL_ATH_CE_DEBUG
+/*
+ * CE debug buffer structure to store ce descriptors and skb
+ * pointed by the descriptor
+ */
+struct ce_debug_buf_t {
+	struct CE_src_desc desc;
+	char buf[64];
+};
+
+enum ce_buf_type {
+	CE_SKB,
+	CE_MISC,
+};
+void ce_desc_trace(struct CE_ring_state *ring,
+					struct CE_src_desc *desc,
+					void *nbuf, enum ce_buf_type type, unsigned int len);
+
+uint32_t hif_debug_desc_tracebuf_init(struct hif_softc *scn);
+
+
+void hif_debug_desc_tracebuf_deinit(struct hif_softc *scn);
+#endif /* OL_ATH_CE_DEBUG */
 /* which ring of a CE? */
 #define CE_RING_SRC  0
 #define CE_RING_DEST 1

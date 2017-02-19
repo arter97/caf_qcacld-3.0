@@ -1883,6 +1883,12 @@ void hif_ce_stop(struct hif_softc *scn)
 
 	hif_buffer_cleanup(hif_state);
 
+#if OL_ATH_CE_DEBUG
+	if (scn->hif_desc_trace == 1) {
+		hif_debug_desc_tracebuf_deinit(scn);
+	}
+#endif /* OL_ATH_CE_DEBUG */
+
 	for (pipe_num = 0; pipe_num < scn->ce_count; pipe_num++) {
 		struct HIF_CE_pipe_info *pipe_info;
 
@@ -2080,6 +2086,12 @@ void hif_unconfig_ce(struct hif_softc *hif_sc)
 	int pipe_num;
 	struct HIF_CE_pipe_info *pipe_info;
 	struct HIF_CE_state *hif_state = HIF_GET_CE_STATE(hif_sc);
+
+#if OL_ATH_CE_DEBUG
+	if (hif_sc->hif_desc_trace == 1) {
+		hif_debug_desc_tracebuf_deinit(hif_sc);
+	}
+#endif /* OL_ATH_CE_DEBUG */
 
 	for (pipe_num = 0; pipe_num < hif_sc->ce_count; pipe_num++) {
 		pipe_info = &hif_state->pipe_info[pipe_num];

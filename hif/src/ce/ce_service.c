@@ -381,6 +381,12 @@ ce_send_nolock(struct CE_handle *copyeng,
 		src_ring->per_transfer_context[write_index] =
 			per_transfer_context;
 
+#if OL_ATH_CE_DEBUG
+		if(src_ring->dbg_buf.initialised == 1) {
+			ce_desc_trace(src_ring, src_desc, per_transfer_context, CE_MISC, nbytes);
+		}
+#endif /* OL_ATH_CE_DEBUG */
+
 		/* Update Source Ring Write Index */
 		write_index = CE_RING_IDX_INCR(nentries_mask, write_index);
 
@@ -646,6 +652,13 @@ int ce_send_fast(struct CE_handle *copyeng, qdf_nbuf_t msdu,
 		 */
 		src_ring->per_transfer_context[write_index] =
 			CE_SENDLIST_ITEM_CTXT;
+
+#if OL_ATH_CE_DEBUG
+		if(src_ring->dbg_buf.initialised == 1) {
+			ce_desc_trace(src_ring, src_desc, CE_SENDLIST_ITEM_CTXT, CE_MISC, 0);
+		}
+#endif /* OL_ATH_CE_DEBUG */
+
 		write_index = CE_RING_IDX_INCR(nentries_mask, write_index);
 
 		src_desc = CE_SRC_RING_TO_DESC(src_ring_base, write_index);
@@ -678,6 +691,13 @@ int ce_send_fast(struct CE_handle *copyeng, qdf_nbuf_t msdu,
 		shadow_src_desc->gather    = 0;
 		*src_desc = *shadow_src_desc;
 		src_ring->per_transfer_context[write_index] = msdu;
+
+#if OL_ATH_CE_DEBUG
+		if(src_ring->dbg_buf.initialised == 1) {
+			ce_desc_trace(src_ring, src_desc, msdu, CE_SKB, 0);
+		}
+#endif /* OL_ATH_CE_DEBUG */
+
 		write_index = CE_RING_IDX_INCR(nentries_mask, write_index);
 
 		DPTRACE(qdf_dp_trace(msdu,
@@ -839,6 +859,13 @@ qdf_nbuf_t ce_batch_send(struct CE_handle *ce_tx_hdl,  qdf_nbuf_t msdu,
 
 
 		src_ring->per_transfer_context[write_index] = msdu;
+
+#if OL_ATH_CE_DEBUG
+		if(src_ring->dbg_buf.initialised == 1) {
+			ce_desc_trace(src_ring, (struct CE_src_desc *) src_desc, msdu, CE_SKB, 0);
+		}
+#endif /* OL_ATH_CE_DEBUG */
+
 		write_index = CE_RING_IDX_INCR(nentries_mask, write_index);
 
 		if (sendhead)
@@ -943,6 +970,13 @@ int ce_send_single(struct CE_handle *ce_tx_hdl, qdf_nbuf_t msdu,
 
 
 	src_ring->per_transfer_context[write_index] = msdu;
+
+#if OL_ATH_CE_DEBUG
+	if(src_ring->dbg_buf.initialised == 1) {
+		ce_desc_trace(src_ring, (struct CE_src_desc *) src_desc, msdu, CE_SKB, 0);
+	}
+#endif /* OL_ATH_CE_DEBUG */
+
 	write_index = CE_RING_IDX_INCR(nentries_mask, write_index);
 
 	src_ring->write_index = write_index;
@@ -2314,3 +2348,300 @@ void ce_ipa_get_resource(struct CE_handle *ce,
 }
 #endif /* IPA_OFFLOAD */
 
+#if OL_ATH_CE_DEBUG
+/*
+ * hif_debug_desc_tracebuf_init() - Initialse CE debug storage buffer for each CE ring
+ * @scn: hif context
+ *
+ * Initialises the buffer for each CE ring descriptors and the data
+ * pointed by the descriptor.
+ *
+ * Return: 0
+ */
+uint32_t hif_debug_desc_tracebuf_init(struct hif_softc *scn)
+{
+	struct CE_handle *ce_hdl;
+	struct CE_state *CE_state;
+	struct CE_ring_state *src_ring;
+	struct CE_ring_state *dest_ring;
+	uint32_t pipe_num = 0;
+	uint32_t bufs_sz = 0;
+	struct HIF_CE_pipe_info *pipe_info;
+	struct HIF_CE_state *hif_state = HIF_GET_CE_STATE(scn);
+
+	for (pipe_num = 0; pipe_num < scn->ce_count; pipe_num++) {
+		pipe_info = &hif_state->pipe_info[pipe_num];
+		ce_hdl = pipe_info->ce_hdl;
+		CE_state = (struct CE_state *)ce_hdl;
+
+		src_ring = CE_state->src_ring;
+		dest_ring = CE_state->dest_ring;
+
+		if (src_ring != NULL) {
+			(src_ring->nentries < MAX_CE_DEBUG_BUFS)?
+				(bufs_sz = src_ring->nentries):(bufs_sz = MAX_CE_DEBUG_BUFS);
+
+			src_ring->dbg_buf.start = qdf_mem_malloc(bufs_sz *
+											sizeof(struct ce_debug_buf_t));
+
+			if (src_ring->dbg_buf.start != NULL) {
+				qdf_mem_zero(src_ring->dbg_buf.start, bufs_sz *
+											sizeof(struct ce_debug_buf_t));
+				src_ring->dbg_buf.cur = src_ring->dbg_buf.start;
+				src_ring->dbg_buf.initialised = 1;
+			}
+		}
+
+		if (dest_ring != NULL) {
+			(dest_ring->nentries < MAX_CE_DEBUG_BUFS)?
+				(bufs_sz = dest_ring->nentries):(bufs_sz = MAX_CE_DEBUG_BUFS);
+
+			dest_ring->dbg_buf.start = qdf_mem_malloc(bufs_sz *
+											sizeof(struct ce_debug_buf_t));
+
+			if (dest_ring->dbg_buf.start != NULL) {
+				qdf_mem_zero(dest_ring->dbg_buf.start, bufs_sz *
+											sizeof(struct ce_debug_buf_t));
+				dest_ring->dbg_buf.cur = dest_ring->dbg_buf.start;
+				dest_ring->dbg_buf.initialised = 1;
+			}
+		}
+	}
+
+	scn->hif_desc_trace = 1;
+
+	return 0;
+}
+
+/*
+ * hif_debug_desc_tracebuf_deinit() - deinitialse CE debug storage buffer for each CE ring
+ * @scn: hif context
+ *
+ * Frees the buffers allocated for each CE ring descriptors and the data
+ * pointed by the descriptor.
+ *
+ * Return: None
+ */
+void hif_debug_desc_tracebuf_deinit(struct hif_softc *scn)
+{
+	struct CE_handle *ce_hdl;
+	struct CE_state *CE_state;
+	struct CE_ring_state *src_ring;
+	struct CE_ring_state *dest_ring;
+	uint32_t pipe_num = 0;
+	struct HIF_CE_pipe_info *pipe_info;
+	struct HIF_CE_state *hif_state = HIF_GET_CE_STATE(scn);
+
+	for (pipe_num = 0; pipe_num < scn->ce_count; pipe_num++) {
+		pipe_info = &hif_state->pipe_info[pipe_num];
+		ce_hdl = pipe_info->ce_hdl;
+		CE_state = (struct CE_state *)ce_hdl;
+
+		src_ring = CE_state->src_ring;
+		dest_ring = CE_state->dest_ring;
+
+		if (src_ring != NULL) {
+			if (src_ring->dbg_buf.initialised) {
+				qdf_mem_free(src_ring->dbg_buf.start);
+				src_ring->dbg_buf.initialised = 0;
+			}
+		}
+
+		if (dest_ring != NULL) {
+			if (dest_ring->dbg_buf.initialised) {
+				qdf_mem_free(dest_ring->dbg_buf.start);
+				dest_ring->dbg_buf.initialised = 0;
+			}
+		}
+	}
+
+	scn->hif_desc_trace = 0;
+
+}
+
+/*
+ * ce_desc_trace() - API to store the CE debug information
+ * @ring: CE ring to store data in.
+ * @desc: CE descriptor to store.
+ * @nbuf: data buffer to store.
+ * @type: type of data
+ * @len: length of data to store
+ *
+ * Stores the descriptor and buffer pointed by it in to the
+ * storage buffer of corresponding CE ring
+ *
+ * Return: None
+ */
+void ce_desc_trace(struct CE_ring_state *ring, struct CE_src_desc *desc,
+						void *nbuf, uint32_t type, uint32_t len)
+{
+	struct ce_debug_buf_t *cur = ring->dbg_buf.cur;
+	char *data = NULL;
+
+	if (ring->dbg_buf.initialised != 1)
+		return;
+
+	if(type == CE_SKB) {
+		qdf_nbuf_t skb = (qdf_nbuf_t)nbuf;
+		len = sizeof(cur->buf);
+		if(skb != NULL && qdf_nbuf_data(skb) != NULL) {
+			if (skb->len < sizeof(cur->buf)) {
+				len = skb->len;
+			}
+			data = skb->data;
+		}
+	} else if (type == CE_MISC) {
+		if(nbuf != NULL) {
+			data = nbuf;
+		}
+	}
+
+	if (data != NULL)
+	{
+		if (ring->dbg_buf.cur == (ring->dbg_buf.start +
+							((ring->nentries < MAX_CE_DEBUG_BUFS)?
+							(ring->nentries):(MAX_CE_DEBUG_BUFS)) - 1)) {
+			ring->dbg_buf.cur = ring->dbg_buf.start;
+		}
+
+		qdf_mem_copy(&cur->desc, desc, sizeof(struct CE_src_desc));
+
+		if(data != NULL) {
+			qdf_mem_copy(cur->buf, data, len);
+		}
+		else {
+			qdf_mem_zero(cur->buf, len);
+		}
+
+		ring->dbg_buf.cur = ring->dbg_buf.cur + 1;
+	}
+}
+
+/*
+ * hif_dump_desc_trace_buf() - API to dump the CE debug storage buffer of all CE rings
+ * @dev: network device
+ * @attr: sysfs attribute
+ * @buf: buffer to copy the data.
+ *
+ * Prints all the CE debug buffer to the console.
+ *
+ * Return None
+ */
+ssize_t hif_dump_desc_trace_buf(struct device *dev,
+                               struct device_attribute *attr, char *buf)
+{
+	struct CE_handle *ce_hdl;
+	struct CE_state *CE_state;
+	struct CE_ring_state *src_ring;
+	struct CE_ring_state *dest_ring;
+	uint32_t pipe_num = 0;
+	struct HIF_CE_pipe_info *pipe_info;
+	struct ce_debug_buf_t *cur;
+	struct hif_softc *hif_scn;
+	struct hif_opaque_softc *hif_hdl;
+	struct HIF_CE_state *hif_state;
+	uint32_t buf_cnt = 0;
+	struct net_device *net = to_net_dev(dev);
+	struct ol_ath_softc_net80211 *scn = ath_netdev_priv(net);
+	uint32_t buffers = 0;
+
+	hif_hdl = (struct hif_opaque_softc *)(scn->hif_hdl);
+
+	hif_scn = HIF_GET_SOFTC(hif_hdl);
+	hif_state = HIF_GET_CE_STATE(hif_scn);
+
+	if (hif_scn->hif_desc_trace == 0) {
+		return 0;
+	}
+
+	for (pipe_num = 0; pipe_num < hif_scn->ce_count; pipe_num++) {
+		pipe_info = &hif_state->pipe_info[pipe_num];
+		ce_hdl = pipe_info->ce_hdl;
+		CE_state = (struct CE_state *)ce_hdl;
+
+		src_ring = CE_state->src_ring;
+		dest_ring = CE_state->dest_ring;
+
+		if (src_ring != NULL) {
+
+			if (src_ring->dbg_buf.initialised == 1) {
+				qdf_print("-------------------------------------CE:%d-----------------------------------\n", pipe_num);
+				buffers =  ((src_ring->nentries < MAX_CE_DEBUG_BUFS)?
+									(src_ring->nentries):(MAX_CE_DEBUG_BUFS));
+
+				cur = src_ring->dbg_buf.start;
+				for(buf_cnt = 1 ; buf_cnt < buffers; buf_cnt++) {
+					qdf_print("Buffer%d\n", buf_cnt);
+					print_hex_dump(KERN_ERR, " ", DUMP_PREFIX_NONE, 16, 1,
+									cur,
+									sizeof(struct ce_debug_buf_t), false);
+					cur = cur+1;
+				}
+			}
+		}
+
+		if (dest_ring != NULL) {
+
+			if (dest_ring->dbg_buf.initialised == 1) {
+				qdf_print("-------------------------------------CE:%d-----------------------------------\n", pipe_num);
+				buffers =  ((dest_ring->nentries < MAX_CE_DEBUG_BUFS)?
+									(dest_ring->nentries):(MAX_CE_DEBUG_BUFS));
+
+				cur = dest_ring->dbg_buf.start;
+				for(buf_cnt = 1 ; buf_cnt < buffers; buf_cnt++) {
+					qdf_print("Buffer%d\n", buf_cnt);
+					print_hex_dump(KERN_ERR, " ", DUMP_PREFIX_NONE, 16, 1,
+									cur, sizeof(struct ce_debug_buf_t), false);
+					cur = cur+1;
+				}
+			}
+		}
+	}
+    return 0;
+}
+
+/*
+ * hif_enable_desc_trace() - Enable/disable CE debug feature
+ * @scn: OL radio device
+ * @cfg: enable/disable configuration
+ *
+ * Return 0
+ */
+uint32_t hif_enable_desc_trace(struct hif_opaque_softc *hif_hdl, uint32_t cfg)
+{
+	struct hif_softc *hif_scn = HIF_GET_SOFTC(hif_hdl);
+
+	if (cfg == 1) {
+		if (hif_scn->hif_desc_trace == 1) {
+			qdf_print("\nAlready Enabled\n");
+		}
+		else {
+			hif_debug_desc_tracebuf_init(hif_scn);
+		}
+	}
+	else if (cfg == 0) {
+		if (hif_scn->hif_desc_trace == 0) {
+			qdf_print("\nAlready Disabled\n");
+		}
+		else {
+			hif_debug_desc_tracebuf_deinit(hif_scn);
+		}
+	}
+
+	return 0;
+
+}
+
+/*
+ * hif_get_desc_trace_enabled - Get state of CE debug feature
+ * @scn: OL radio device
+ *
+ * Return : State of CE debug
+ */
+uint32_t hif_get_desc_trace_enabled(struct hif_opaque_softc *hif_hdl)
+{
+	struct hif_softc *hif_scn = HIF_GET_SOFTC(hif_hdl);
+
+	return hif_scn->hif_desc_trace;
+}
+#endif /* OL_ATH_CE_DEBUG */

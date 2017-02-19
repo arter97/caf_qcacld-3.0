@@ -636,7 +636,12 @@ void hif_fake_apps_suspend(hdd_fake_resume_callback callback);
 void hif_update_pipe_callback(struct hif_opaque_softc *osc,
 				u_int8_t pipeid,
 				struct hif_msg_callbacks *callbacks);
-
+#if OL_ATH_CE_DEBUG
+uint32_t hif_enable_desc_trace(struct hif_opaque_softc *hif_hdl, uint32_t cfg);
+uint32_t hif_get_desc_trace_enabled(struct hif_opaque_softc *hif_hdl);
+ssize_t hif_dump_desc_trace_buf(struct device *dev,
+                               struct device_attribute *attr, char *buf);
+#endif /* OL_ATH_CE_DEBUG */
 #ifdef __cplusplus
 }
 #endif

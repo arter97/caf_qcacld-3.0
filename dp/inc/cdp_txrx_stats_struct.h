@@ -476,7 +476,9 @@ typedef enum _ol_ath_param_t {
 	OL_ATH_PARAM_AMSDU_ENABLE = 351,
 	OL_ATH_PARAM_ACS_RANK = 352,
 	OL_ATH_PARAM_DUMP_TARGET = 353,
-
+#if OL_ATH_CE_DEBUG
+	OL_ATH_PARAM_CE_DESC_DBG_EN = 354,
+#endif /* OL_ATH_CE_DEBUG */
 } ol_ath_param_t;
 
 /*
