@@ -4899,6 +4899,7 @@ typedef enum {
 	wmi_pdev_check_cal_version_event_id,
 	wmi_atf_peer_stats_event_id,
 	wmi_pdev_wds_entry_list_event_id,
+	wmi_debug_fatal_condition_eventid,
 
 	wmi_events_max,
 } wmi_conv_event_id;
@@ -5263,6 +5264,8 @@ typedef enum {
 	wmi_service_4_wire_coex_support,
 	wmi_service_extended_nss_support,
 	wmi_service_band_filter_switch_support,
+	wmi_service_smart_logging_support,
+
 	wmi_services_max,
 } wmi_conv_service_ids;
 #define WMI_SERVICE_UNAVAILABLE 0xFFFF
@@ -6850,6 +6853,31 @@ typedef struct {
     uint8_t board_mcn_detail[WMI_HOST_BOARD_MCN_STRING_BUF_SIZE];
     uint32_t cal_ok; /* filled with CALIBRATION_STATUS enum value */
 } wmi_host_pdev_check_cal_version_event;
+
+/*
+ * struct wmi_fatal_condition_event: Fatal condition event param
+ * @type: Type of event
+ * @subtype: subtype of event
+ * @reserved: reserved
+ */
+struct wmi_fatal_condition_event {
+	uint32_t type;
+	uint32_t subtype;
+	uint32_t reserved0;
+};
+
+/*Currently the Max fatal events is 3 */
+#define FATAL_EVENTS_MAX 3
+
+/*
+ * struct wmi_debug_fatal_events_t: Fatal events list
+ * @num_events:Number of events
+ * @event[FATAL_EVENTS_MAX]: Each event data
+ */
+struct wmi_debug_fatal_events_t {
+	uint32_t num_events;
+	struct wmi_fatal_condition_event event[FATAL_EVENTS_MAX];
+};
 
 #endif /* _WMI_UNIFIED_PARAM_H_ */
 
