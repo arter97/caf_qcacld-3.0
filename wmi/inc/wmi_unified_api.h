@@ -1298,4 +1298,12 @@ QDF_STATUS wmi_unified_send_dump_wds_table_cmd(void *wmi_hdl);
 
 QDF_STATUS wmi_unified_send_band_filter_select_cmd(void *wmi_hdl,
 				   struct band_filter_select_params *param);
+QDF_STATUS wmi_unified_send_smart_logging_enable_cmd(void *wmi_hdl,
+				uint32_t param);
+QDF_STATUS wmi_unified_send_smart_logging_fatal_cmd(void *wmi_hdl,
+				struct wmi_debug_fatal_events_t *param);
+
+QDF_STATUS wmi_extract_smartlog_ev(void *wmi_hdl, void *evt_buf,
+			struct wmi_debug_fatal_events_t *ev);
+
 #endif /* _WMI_UNIFIED_API_H_ */
