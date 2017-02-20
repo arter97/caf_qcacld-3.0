@@ -497,6 +497,41 @@ bool __qdf_nbuf_is_ipv4_dhcp_pkt(struct sk_buff *skb);
 bool __qdf_nbuf_is_ipv4_eapol_pkt(struct sk_buff *skb);
 bool __qdf_nbuf_is_ipv4_arp_pkt(struct sk_buff *skb);
 
+#if QDF_NBUF_GLOBAL_COUNT
+int qdf_nbuf_count_get(void);
+void qdf_nbuf_count_inc(struct sk_buff *skb);
+void qdf_nbuf_count_dec(struct sk_buff *skb);
+void qdf_nbuf_mod_init(void);
+void qdf_nbuf_mod_exit(void);
+
+#else
+
+static inline int qdf_nbuf_count_get(void)
+{
+	return 0;
+}
+
+static inline void qdf_nbuf_count_inc(struct sk_buff *skb)
+{
+	return;
+}
+
+static inline void qdf_nbuf_count_dec(struct sk_buff *skb)
+{
+	return;
+}
+
+static inline void qdf_nbuf_mod_init(void)
+{
+	return;
+}
+
+static inline void qdf_nbuf_mod_exit(void)
+{
+	return;
+}
+#endif
+
 /**
  * __qdf_to_status() - OS to QDF status conversion
  * @error : OS error
@@ -706,7 +741,13 @@ int __qdf_nbuf_shared(struct sk_buff *skb);
  */
 static inline struct sk_buff *__qdf_nbuf_clone(struct sk_buff *skb)
 {
-	return skb_clone(skb, GFP_ATOMIC);
+	struct sk_buff *skb_new = NULL;
+
+	skb_new = skb_clone(skb, GFP_ATOMIC);
+	if (skb_new)
+		qdf_nbuf_count_inc(skb_new);
+
+	return skb_new;
 }
 
 /**
@@ -720,7 +761,13 @@ static inline struct sk_buff *__qdf_nbuf_clone(struct sk_buff *skb)
  */
 static inline struct sk_buff *__qdf_nbuf_copy(struct sk_buff *skb)
 {
-	return skb_copy(skb, GFP_ATOMIC);
+	struct sk_buff *skb_new = NULL;
+
+	skb_new = skb_copy(skb, GFP_ATOMIC);
+	if (skb_new)
+		qdf_nbuf_count_inc(skb_new);
+
+	return skb_new;
 }
 
 #define __qdf_nbuf_reserve      skb_reserve
