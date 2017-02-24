@@ -1345,15 +1345,15 @@ send_dbglog_cmd_non_tlv(wmi_unified_t wmi_handle,
 	qdf_nbuf_put_tail(osbuf, sizeof(*cmd));
 
 	cmd = (WMI_DBGLOG_CFG_CMD *)(wmi_buf_data(osbuf));
-
 	qdf_print("wmi_dbg_cfg_send: mod[0]%08x dbgcfg%08x cfgvalid[0] %08x"
-			" cfgvalid[1] %08x\n",
+			" cfgvalid[1] %08x, cfgvalid[2] %x\n",
 		dbglog_param->module_id_bitmap[0],
 		dbglog_param->val, dbglog_param->cfgvalid[0],
-		dbglog_param->cfgvalid[1]);
+		dbglog_param->cfgvalid[1], dbglog_param->cfgvalid[2]);
 
 	cmd->config.cfgvalid[0] = dbglog_param->cfgvalid[0];
 	cmd->config.cfgvalid[1] = dbglog_param->cfgvalid[1];
+	cmd->config.cfgvalid[2] = dbglog_param->cfgvalid[2];
 	qdf_mem_copy(&cmd->config.config.mod_id[0], dbglog_param->module_id_bitmap,
 				 sizeof(uint32_t) * DBGLOG_MODULE_BITMAP_SIZE);
 	cmd->config.config.dbg_config = dbglog_param->val;
