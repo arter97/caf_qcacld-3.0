@@ -34,6 +34,8 @@
 #include <linux/version.h>
 #include <linux/skbuff.h>
 #include <linux/module.h>
+#include <linux/proc_fs.h>
+#include <qdf_atomic.h>
 #include <qdf_types.h>
 #include <qdf_nbuf.h>
 #include <qdf_mem.h>
@@ -53,6 +55,15 @@
 /* Packet Counter */
 static uint32_t nbuf_tx_mgmt[QDF_NBUF_TX_PKT_STATE_MAX];
 static uint32_t nbuf_tx_data[QDF_NBUF_TX_PKT_STATE_MAX];
+#if QDF_NBUF_GLOBAL_COUNT
+#ifdef MULTI_IF_NAME
+#define QDF_PROC_DIR         "qdf" MULTI_IF_NAME
+#else
+#define QDF_PROC_DIR         "qdf"
+#endif
+#define QDF_PROCFS_NAME      "nbuf_counters"
+qdf_atomic_t nbuf_count;
+#endif
 
 /**
  * qdf_nbuf_tx_desc_count_display() - Displays the packet counter
@@ -167,6 +178,27 @@ EXPORT_SYMBOL(qdf_nbuf_set_state);
 /* globals do not need to be initialized to NULL/0 */
 qdf_nbuf_trace_update_t qdf_trace_update_cb;
 
+#if QDF_NBUF_GLOBAL_COUNT
+int qdf_nbuf_count_get(void)
+{
+	return qdf_atomic_read(&nbuf_count);
+}
+EXPORT_SYMBOL(qdf_nbuf_count_get);
+
+void qdf_nbuf_count_inc(qdf_nbuf_t nbuf)
+{
+	qdf_atomic_inc(&nbuf_count);
+}
+EXPORT_SYMBOL(qdf_nbuf_count_inc);
+
+void qdf_nbuf_count_dec(qdf_nbuf_t nbuf)
+{
+	qdf_atomic_dec(&nbuf_count);
+}
+EXPORT_SYMBOL(qdf_nbuf_count_dec);
+#endif
+
+
 /**
  * __qdf_nbuf_alloc() - Allocate nbuf
  * @hdl: Device handle
@@ -221,6 +253,7 @@ struct sk_buff *__qdf_nbuf_alloc(qdf_device_t osdev, size_t size, int reserve,
 	 * pointer
 	 */
 	skb_reserve(skb, reserve);
+	qdf_nbuf_count_inc(skb);
 
 	return skb;
 }
@@ -245,7 +278,8 @@ void __qdf_nbuf_free(struct sk_buff *skb)
 #else
 void __qdf_nbuf_free(struct sk_buff *skb)
 {
-    dev_kfree_skb_any(skb);
+	qdf_nbuf_count_dec(skb);
+	dev_kfree_skb_any(skb);
 }
 #endif
 
@@ -1927,4 +1961,75 @@ unsigned int qdf_nbuf_update_radiotap(struct mon_rx_status *rx_status,
 	qdf_print("ERROR: not supported for this kernel version\n");
 	return 0;
 }
+#endif
+
+#if QDF_NBUF_GLOBAL_COUNT
+#ifdef CONFIG_PROC_FS
+static struct proc_dir_entry *proc_net_qdf;
+
+static int qdf_nbuf_seq_show(struct seq_file *seq, void *v)
+{
+	seq_printf(seq, "NBUF ACTIVE COUNT --> %d\n", qdf_nbuf_count_get());
+	return 0;
+}
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 10, 0)
+static int qdf_nbuf_seq_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, qdf_nbuf_seq_show, PDE(inode)->data);
+}
+
+#else
+
+static int qdf_nbuf_seq_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, qdf_nbuf_seq_show, PDE_DATA(inode));
+}
+#endif
+
+static const struct file_operations qdf_nbuf_seq_fops = {
+		.owner   = THIS_MODULE,
+		.open    = qdf_nbuf_seq_open,
+		.read    = seq_read,
+		.llseek  = seq_lseek,
+		.release = single_release,
+};
+
+void qdf_nbuf_mod_init(void)
+{
+	qdf_atomic_init(&nbuf_count);
+	qdf_print("Creating qdf proc entry\n");
+	proc_net_qdf = proc_mkdir(QDF_PROC_DIR, init_net.proc_net);
+	if (!proc_net_qdf) {
+		qdf_print("cannot create qdf proc dir\n");
+		return;
+	}
+
+	if (!proc_create(QDF_PROCFS_NAME, S_IRUGO, proc_net_qdf,
+				&qdf_nbuf_seq_fops)) {
+		remove_proc_entry(QDF_PROC_DIR, init_net.proc_net);
+		qdf_print("cannot create nbuf_counters proc file\n");
+		return;
+	}
+}
+
+void qdf_nbuf_mod_exit(void)
+{
+	remove_proc_entry(QDF_PROCFS_NAME, proc_net_qdf);
+	remove_proc_entry(QDF_PROC_DIR, init_net.proc_net);
+	qdf_print("Removing qdf proc entry\n");
+}
+
+#else
+
+void qdf_nbuf_mod_init(void)
+{
+	qdf_atomic_init(&nbuf_count);
+}
+
+void qdf_nbuf_mod_exit(void)
+{
+}
+
+#endif
 #endif

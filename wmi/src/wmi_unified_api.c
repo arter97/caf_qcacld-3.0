@@ -558,6 +558,25 @@ QDF_STATUS wmi_unified_vdev_set_param_send(void *wmi_hdl,
 }
 
 /**
+ *  wmi_unified_sifs_trigger_send() - WMI vdev sifs trigger parameter function
+ *  @param wmi_handle      : handle to WMI.
+ *  @param param    : pointer to hold sifs trigger parameter
+ *
+ *  Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_sifs_trigger_send(void *wmi_hdl,
+				struct sifs_trigger_param *param)
+{
+	wmi_unified_t wmi_handle = (wmi_unified_t) wmi_hdl;
+
+	if (wmi_handle->ops->send_vdev_sifs_trigger_cmd)
+		return wmi_handle->ops->send_vdev_sifs_trigger_cmd(wmi_handle,
+				param);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+/**
  *  wmi_unified_stats_request_send() - WMI request stats function
  *  @param wmi_handle      : handle to WMI.
  *  @param macaddr        : MAC address
@@ -6387,6 +6406,69 @@ QDF_STATUS wmi_unified_send_band_filter_select_cmd(void *wmi_hdl,
 	if (wmi_handle->ops->send_band_filter_select_cmd)
 		return wmi_handle->ops->send_band_filter_select_cmd(wmi_handle,
 			param);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+/*
+ * wmi_unified_send_smart_logging_enable_cmd() - send smartlog enable command
+ * @wmi_handle: wmi handle
+ * @param:      enable/disable
+ *
+ * Send WMI_CONFIG_SMART_LOGGING_CMDID parameters to fw.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
+ */
+QDF_STATUS wmi_unified_send_smart_logging_enable_cmd(void *wmi_hdl,
+				uint32_t param)
+{
+	wmi_unified_t wmi_handle = (wmi_unified_t) wmi_hdl;
+
+	if (wmi_handle->ops->send_smart_logging_enable_cmd)
+		return wmi_handle->ops->send_smart_logging_enable_cmd(
+				wmi_handle,
+				param);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+/**
+ * wmi_unified_send_smart_logging_fatal_cmd() - send smartlog fatal command
+ * @wmi_handle: wmi handle
+ * @param:      wmi smartlog fatal params
+ *
+ * Send WMI_DEBUG_FATAL_CONDITION_CMDID parameters to fw.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
+ */
+QDF_STATUS wmi_unified_send_smart_logging_fatal_cmd(void *wmi_hdl,
+				struct wmi_debug_fatal_events_t *param)
+{
+	wmi_unified_t wmi_handle = (wmi_unified_t) wmi_hdl;
+
+	if (wmi_handle->ops->send_smart_logging_fatal_cmd)
+		return wmi_handle->ops->send_smart_logging_fatal_cmd(wmi_handle,
+			param);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+/**
+ * wmi_extract_smartlog_ev() - extract smartlog event info
+ * from event
+ * @wmi_handle: wmi handle
+ * @param evt_buf: pointer to event buffer
+ * @param ev: Pointer to hold atf token info
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_extract_smartlog_ev(void *wmi_hdl,
+			void *evt_buf, struct wmi_debug_fatal_events_t *ev)
+{
+	wmi_unified_t wmi = (wmi_unified_t) wmi_hdl;
+
+	if (wmi->ops->extract_smartlog_event)
+		return wmi->ops->extract_smartlog_event(wmi, evt_buf, ev);
 
 	return QDF_STATUS_E_FAILURE;
 }

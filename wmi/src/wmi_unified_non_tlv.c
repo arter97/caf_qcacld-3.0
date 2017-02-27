@@ -1398,6 +1398,36 @@ QDF_STATUS send_vdev_set_param_cmd_non_tlv(wmi_unified_t wmi_handle,
 }
 
 /**
+ *  send_vdev_sifs_trigger_cmd_non_tlv() - WMI vdev sifs trigger param function
+ *
+ *  @param wmi_handle     : handle to WMI.
+ *  @param param        : pointer to hold sifs trigger parameter
+ *  @return QDF_STATUS_SUCCESS  on success and -ve on failure.
+ */
+QDF_STATUS send_vdev_sifs_trigger_cmd_non_tlv(wmi_unified_t wmi_handle,
+				struct sifs_trigger_param *param)
+{
+	wmi_vdev_sifs_trigger_time_cmd *cmd;
+	wmi_buf_t buf;
+	int len = sizeof(wmi_vdev_sifs_trigger_time_cmd);
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf) {
+		qdf_print("%s:wmi_buf_alloc failed\n", __func__);
+		return QDF_STATUS_E_NOMEM;
+	}
+	cmd = (wmi_vdev_sifs_trigger_time_cmd *)wmi_buf_data(buf);
+	cmd->vdev_id = param->if_id;
+	cmd->sifs_trigger_time = param->param_value;
+
+	if (wmi_unified_cmd_send(wmi_handle, buf, len,
+		WMI_VDEV_SIFS_TRIGGER_TIME_CMDID)) {
+		return QDF_STATUS_E_FAILURE;
+	}
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  *  get_stats_id_non_tlv() - Get stats identifier function
  *
  *  @param host_stats_id: host stats identifier value
@@ -5287,6 +5317,88 @@ send_band_filter_select_cmd_non_tlv(wmi_unified_t wmi_handle,
 	return QDF_STATUS_SUCCESS;
 }
 /**
+ * send_smart_logging_enable_cmd_non_tlv() - send smartlog enable/disable
+ * @wmi_handle: wmi handle
+ * @param:     enable/disable
+ *
+ * Return: 0 for success or error code
+ */
+QDF_STATUS
+send_smart_logging_enable_cmd_non_tlv(wmi_unified_t wmi_handle,
+						unsigned int enable)
+{
+	wmi_buf_t buf;
+	wmi_smart_logging *cmd;
+	int len = sizeof(wmi_smart_logging);
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+
+	if (!buf) {
+		qdf_print("%s:wmi_buf_alloc failed\n", __func__);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	cmd = (wmi_smart_logging *) wmi_buf_data(buf);
+	cmd->enable = enable;
+
+	if (wmi_unified_cmd_send(wmi_handle, buf, len,
+		WMI_CONFIG_SMART_LOGGING_CMDID)) {
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * send_smart_logging_fatal_cmd_non_tlv() - send smartlog fatal event
+ * @wmi_handle: wmi handle
+ * @param:     number of fatal events
+ * of type struct wmi_debug_fatal_condition_list_t followed by
+ * events of type wmi_fatal_condition
+ *
+ * Return: 0 for success or error code
+ */
+
+QDF_STATUS
+send_smart_logging_fatal_cmd_non_tlv(wmi_unified_t wmi_handle,
+					struct wmi_debug_fatal_events_t *param)
+{
+	wmi_buf_t buf;
+	wmi_debug_fatal_condition_list *list;
+	int len = 0, ev = 0;
+	wmi_fatal_condition *event;
+
+	len = sizeof(wmi_debug_fatal_condition_list) +
+			((param->num_events) * (sizeof(wmi_fatal_condition)));
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+
+	if (!buf) {
+		qdf_print("%s:wmi_buf_alloc failed\n", __func__);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	list = (wmi_debug_fatal_condition_list *) wmi_buf_data(buf);
+	list->num_events = param->num_events;
+	event =  (wmi_fatal_condition *)(list+1);
+
+	for (ev = 0; ev < param->num_events; ev++) {
+		event[ev].type = param->event[ev].type;
+		event[ev].subtype = param->event[ev].subtype;
+		event[ev].reserved0 = param->event[ev].reserved0;
+	}
+
+	if (wmi_unified_cmd_send(wmi_handle, buf, len,
+		WMI_DEBUG_FATAL_CONDITION_CMDID)) {
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * wmi_copy_resource_config_non_tlv() - copy resource configuration function
  * @param resource_cfg: pointer to resource configuration
  * @param tgt_res_cfg: pointer to target resource configuration
@@ -7776,6 +7888,36 @@ static QDF_STATUS extract_atf_token_info_ev_non_tlv(
 	return QDF_STATUS_SUCCESS;
 }
 
+/**
+ * extract_smartlog_event_non_tlv() - extract smartlog event
+ * from event
+ * @wmi_handle: wmi handle
+ * @param evt_buf: pointer to event buffer
+ * @param atf_token_info: Pointer to hold fatal event
+ *
+ * Return: 0 for success or error code
+ */
+static QDF_STATUS extract_smartlog_event_non_tlv(wmi_unified_t wmi_handle,
+		void *evt_buf,
+		struct wmi_debug_fatal_events_t *evt_list)
+{
+	uint32_t ev = 0;
+	wmi_fatal_condition *event;
+	wmi_debug_fatal_condition_list *list =
+				(wmi_debug_fatal_condition_list *) evt_buf;
+
+	evt_list->num_events = list->num_events;
+	event = (wmi_fatal_condition *) &list[1];
+
+	for (ev = 0; ev < evt_list->num_events; ev++) {
+		evt_list->event[ev].type = event[ev].type;
+		evt_list->event[ev].subtype = event[ev].subtype;
+		evt_list->event[ev].reserved0 = event[ev].reserved0;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 #ifdef WMI_INTERFACE_EVENT_LOGGING
 static bool is_management_record_non_tlv(uint32_t cmd_id)
 {
@@ -7842,6 +7984,7 @@ struct wmi_ops non_tlv_ops =  {
 	.send_crash_inject_cmd = send_crash_inject_cmd_non_tlv,
 	.send_dbglog_cmd = send_dbglog_cmd_non_tlv,
 	.send_vdev_set_param_cmd = send_vdev_set_param_cmd_non_tlv,
+	.send_vdev_sifs_trigger_cmd = send_vdev_sifs_trigger_cmd_non_tlv,
 	.send_stats_request_cmd = send_stats_request_cmd_non_tlv,
 	.send_packet_log_enable_cmd = send_packet_log_enable_cmd_non_tlv,
 	.send_packet_log_disable_cmd = send_packet_log_disable_cmd_non_tlv,
@@ -7957,6 +8100,9 @@ struct wmi_ops non_tlv_ops =  {
 	.send_btcoex_duty_cycle_cmd = send_btcoex_duty_cycle_cmd_non_tlv,
 	.send_coex_ver_cfg_cmd = send_coex_ver_cfg_cmd_non_tlv,
 	.send_band_filter_select_cmd = send_band_filter_select_cmd_non_tlv,
+	.send_smart_logging_enable_cmd = send_smart_logging_enable_cmd_non_tlv,
+	.send_smart_logging_fatal_cmd = send_smart_logging_fatal_cmd_non_tlv,
+
 
 	.get_target_cap_from_service_ready = extract_service_ready_non_tlv,
 	.extract_fw_version = extract_fw_version_non_tlv,
@@ -8037,6 +8183,7 @@ struct wmi_ops non_tlv_ops =  {
 	.extract_atf_peer_stats_ev = extract_atf_peer_stats_ev_non_tlv,
 	.extract_atf_token_info_ev = extract_atf_token_info_ev_non_tlv,
 	.send_wds_entry_list_cmd = send_wds_entry_list_cmd_non_tlv,
+	.extract_smartlog_event = extract_smartlog_event_non_tlv,
 
 };
 
@@ -8123,6 +8270,9 @@ static void populate_non_tlv_service(uint32_t *wmi_service)
 				WMI_SERVICE_4_WIRE_COEX_SUPPORT;
 	wmi_service[wmi_service_band_filter_switch_support] =
 				WMI_SERVICE_PROG_GPIO_BAND_SELECT;
+	wmi_service[wmi_service_smart_logging_support] =
+				WMI_SERVICE_SMART_LOGGING_SUPPORT;
+
 	wmi_service[wmi_service_roam_scan_offload] = WMI_SERVICE_UNAVAILABLE;
 	wmi_service[wmi_service_arpns_offload] = WMI_SERVICE_UNAVAILABLE;
 	wmi_service[wmi_service_nlo] = WMI_SERVICE_UNAVAILABLE;
@@ -8281,6 +8431,9 @@ static void populate_non_tlv_events_id(uint32_t *event_ids)
 					WMI_ATF_PEER_STATS_EVENTID;
 	event_ids[wmi_pdev_wds_entry_list_event_id] =
 					WMI_PDEV_WDS_ENTRY_LIST_EVENTID;
+	event_ids[wmi_debug_fatal_condition_eventid] =
+					WMI_DEBUG_FATAL_CONDITION_EVENTID;
+
 }
 
 /**
@@ -8638,6 +8791,9 @@ static void populate_vdev_param_non_tlv(uint32_t *vdev_param)
 		WMI_VDEV_PARAM_CAPABILITIES;
 	vdev_param[wmi_vdev_param_ampdu_subframe_size_per_ac] =
 		WMI_VDEV_PARAM_AMPDU_SUBFRAME_SIZE_PER_AC;
+	vdev_param[wmi_vdev_param_amsdu_subframe_size_per_ac] =
+		WMI_VDEV_PARAM_AMSDU_SUBFRAME_SIZE_PER_AC;
+
 }
 #endif
 
