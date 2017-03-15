@@ -2672,7 +2672,6 @@ uint8_t * hif_log_src_ce_dump(struct CE_ring_state *src_ring, uint8_t *buf_cur,
 	src_ring_base = (struct CE_src_desc *)src_ring->base_addr_owner_space;
 	len = sizeof(struct CE_ring_state);
 	if((buf_sz - (buf_cur - buf_init)) < (len + 10)) {
-		buf_cur += snprintf(buf_cur, 4, "END");
 		buf_cur = buf_init;
 	}
 
@@ -2685,7 +2684,6 @@ uint8_t * hif_log_src_ce_dump(struct CE_ring_state *src_ring, uint8_t *buf_cur,
 		if (nbuf) {
 			len = sizeof(struct CE_src_desc) + skb_sz +4;
 			if((buf_sz - (buf_cur - buf_init)) < (len + 10)) {
-				buf_cur += snprintf(buf_cur, 4, "END");
 				buf_cur = buf_init;
 			}
 			qdf_mem_copy(buf_cur, src_desc, sizeof(struct CE_src_desc));
@@ -2705,7 +2703,6 @@ uint8_t * hif_log_src_ce_dump(struct CE_ring_state *src_ring, uint8_t *buf_cur,
 		else {
 			len = sizeof(struct CE_src_desc) + 4;
 			if((buf_sz - (buf_cur - buf_init)) < (len + 10)) {
-				buf_cur += snprintf(buf_cur, 4, "END");
 				buf_cur = buf_init;
 			}
 			qdf_mem_copy(buf_cur, src_desc, sizeof(struct CE_src_desc));
@@ -2743,7 +2740,6 @@ uint8_t * hif_log_dest_ce_dump(struct CE_ring_state *dest_ring, uint8_t *buf_cur
 
 	len = sizeof(struct CE_ring_state);
 	if((buf_sz - (buf_cur - buf_init)) < (len + 10)) {
-		buf_cur += snprintf(buf_cur, 4, "END");
 		buf_cur = buf_init;
 	}
 
@@ -2752,11 +2748,11 @@ uint8_t * hif_log_dest_ce_dump(struct CE_ring_state *dest_ring, uint8_t *buf_cur
 
 	for(entry = 0; entry < dest_ring->nentries; entry++) {
 		dest_desc = CE_DEST_RING_TO_DESC(dest_ring_base, entry);
+
 		nbuf = dest_ring->per_transfer_context[entry];
 		if (nbuf) {
-			len = sizeof(struct CE_dest_desc) + skb_sz +4;
+			len = sizeof(struct CE_dest_desc) + skb_sz + 4;
 			if((buf_sz - (buf_cur - buf_init)) < (len + 10)) {
-				buf_cur += snprintf(buf_cur, 4, "END");
 				buf_cur = buf_init;
 			}
 
@@ -2770,7 +2766,6 @@ uint8_t * hif_log_dest_ce_dump(struct CE_ring_state *dest_ring, uint8_t *buf_cur
 		else {
 			len = sizeof(struct CE_dest_desc) + 4;
 			if((buf_sz - (buf_cur - buf_init)) < (len + 10)) {
-				buf_cur += snprintf(buf_cur, 4, "END");
 				buf_cur = buf_init;
 			}
 			qdf_mem_copy(buf_cur, dest_desc, sizeof(struct CE_dest_desc));
@@ -2814,9 +2809,6 @@ uint8_t * hif_log_dump_ce(struct hif_softc *scn, uint8_t *buf_cur,
 	else if(dest_ring != NULL) {
 		buf_cur = hif_log_dest_ce_dump(dest_ring, buf_cur, buf_init, buf_sz,
 															skb_sz);
-	}
-	else {
-		qdf_print("Cannot print Ring for Unused CE%d\n", ce);
 	}
 
 	return (buf_cur);
