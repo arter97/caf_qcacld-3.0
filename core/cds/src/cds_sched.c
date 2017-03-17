@@ -1161,11 +1161,16 @@ QDF_STATUS cds_sched_close(void *p_cds_context)
 {
 	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO_HIGH,
 		  "%s: invoked", __func__);
+
 	if (gp_cds_sched_context == NULL) {
 		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
 			  "%s: gp_cds_sched_context == NULL", __func__);
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	if (gp_cds_sched_context->McThread == 0)
+		return QDF_STATUS_SUCCESS;
+
 	/* shut down MC Thread */
 	set_bit(MC_SHUTDOWN_EVENT, &gp_cds_sched_context->mcEventFlag);
 	set_bit(MC_POST_EVENT, &gp_cds_sched_context->mcEventFlag);
@@ -1393,8 +1398,7 @@ void cds_ssr_protect_init(void)
  * Return:
  *        void
  */
-
-static void cds_print_external_threads(void)
+void cds_print_external_threads(void)
 {
 	int i = 0;
 	unsigned long irq_flags;
@@ -1659,6 +1663,11 @@ bool cds_wait_for_external_threads_completion(const char *caller_func)
 		  "Allowing SSR/Driver unload for %s", caller_func);
 
 	return true;
+}
+
+int cds_return_external_threads_count(void)
+{
+	return  atomic_read(&ssr_protect_entry_count);
 }
 
 /**
