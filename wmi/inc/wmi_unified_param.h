@@ -5161,6 +5161,7 @@ typedef enum {
 	wmi_vdev_param_capabilities,
 	wmi_vdev_param_ampdu_subframe_size_per_ac,
 	wmi_vdev_param_amsdu_subframe_size_per_ac,
+	wmi_vdev_param_disable_cabq,
 
 	wmi_vdev_param_max,
 } wmi_conv_vdev_param_id;
