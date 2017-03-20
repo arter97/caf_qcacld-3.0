@@ -1554,4 +1554,5 @@ void sme_set_5g_band_pref(tHalHandle hal_handle,
  */
 int sme_cli_set_command(int vdev_id, int param_id, int sval, int vpdev);
 
+QDF_STATUS sme_delete_all_tdls_peers(tHalHandle hal, uint8_t session_id);
 #endif /* #if !defined( __SME_API_H ) */
