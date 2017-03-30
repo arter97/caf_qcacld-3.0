@@ -63,10 +63,8 @@ typedef enum {
 #endif /* FEATURE_WLAN_WAPI */
 	eCSR_AUTH_TYPE_CCKM_WPA,
 	eCSR_AUTH_TYPE_CCKM_RSN,
-#ifdef WLAN_FEATURE_11W
 	eCSR_AUTH_TYPE_RSN_PSK_SHA256,
 	eCSR_AUTH_TYPE_RSN_8021X_SHA256,
-#endif
 	eCSR_NUM_OF_SUPPORT_AUTH_TYPE,
 	eCSR_AUTH_TYPE_FAILED = 0xff,
 	eCSR_AUTH_TYPE_UNKNOWN = eCSR_AUTH_TYPE_FAILED,
@@ -297,6 +295,12 @@ typedef struct tagCsrScanRequest {
 	bool enable_scan_randomization;
 	uint8_t mac_addr[QDF_MAC_ADDR_SIZE];
 	uint8_t mac_addr_mask[QDF_MAC_ADDR_SIZE];
+
+	/* probe req ie whitelisting attrs */
+	bool ie_whitelist;
+	uint32_t probe_req_ie_bitmap[PROBE_REQ_BITMAP_LEN];
+	uint32_t num_vendor_oui;
+	struct vendor_oui *voui;
 } tCsrScanRequest;
 
 typedef struct tagCsrScanResultInfo {
@@ -1240,8 +1244,9 @@ typedef struct tagCsrConfigParam {
 	bool isRoamOffloadScanEnabled;
 	bool bFastRoamInConIniFeatureEnabled;
 	uint8_t scanCfgAgingTime;
-	uint8_t enableTxLdpc;
-	uint8_t enableRxLDPC;
+	uint8_t enable_tx_ldpc;
+	uint8_t enable_rx_ldpc;
+	uint8_t rx_ldpc_support_for_2g;
 	uint8_t max_amsdu_num;
 	uint8_t nSelect5GHzMargin;
 	uint8_t isCoalesingInIBSSAllowed;
@@ -1561,12 +1566,6 @@ typedef struct tagCsrGlobalClassDStatsInfo {
 	uint32_t rx_rate;
 
 } tCsrGlobalClassDStatsInfo;
-
-typedef struct tagCsrPerStaStatsInfo {
-	uint32_t tx_frag_cnt[4];
-	uint32_t tx_ampdu_cnt;
-	uint32_t tx_mpdu_in_ampdu_cnt;
-} tCsrPerStaStatsInfo;
 
 /**
  * struct csr_per_chain_rssi_stats_info - stores chain rssi

@@ -148,6 +148,18 @@ static inline void wlan_hdd_clear_link_layer_stats(hdd_adapter_t *adapter) {}
 #define USE_CFG80211_DEL_STA_V2
 #endif
 
+#define MAX_CANDIDATE_INFO 10
+/**
+ * struct bss_candidate_info - Candidate bss information
+ *
+ * @bssid : BSSID of candidate bss
+ * @status : status code for candidate bss
+ */
+struct bss_candidate_info {
+	struct qdf_mac_addr bssid;
+	uint32_t status;
+};
+
 /**
  * enum eDFS_CAC_STATUS: CAC status
  *
@@ -295,6 +307,8 @@ typedef enum {
  *     indicated through an event using the same sub command through
  *     @QCA_WLAN_VENDOR_ATTR_SAP_CONDITIONAL_CHAN_SWITCH_STATUS. Attributes are
  *     listed in qca_wlan_vendor_attr_sap_conditional_chan_switch
+ * @QCA_NL80211_VENDOR_SUBCMD_LL_STATS_EXT: Command/event used to config
+ *      indication period and threshold for MAC layer counters.
  * @QCA_NL80211_VENDOR_SUBCMD_CONFIGURE_TDLS: Configure the TDLS behavior
  *	in the host driver. The different TDLS configurations are defined
  *	by the attributes in enum qca_wlan_vendor_attr_tdls_configuration.
@@ -302,6 +316,22 @@ typedef enum {
  *	(SAR) power limits. A critical regulation for FCC compliance, OEMs
  *	require methods to set SAR limits on TX power of WLAN/WWAN.
  *	enum qca_vendor_attr_sar_limits attributes are used with this command.
+ * @QCA_NL80211_VENDOR_SUBCMD_NUD_STATS_SET
+ *	Start / Stop the NUD stats collections
+ * @QCA_NL80211_VENDOR_SUBCMD_NUD_STATS_GET
+ *	Get the NUD stats, represented by the enum qca_attr_nud_stats_get
+ * @QCA_NL80211_VENDOR_SUBCMD_FETCH_BSS_TRANSITION_STATUS: Sub-command to fetch
+ *	the BSS transition status, whether accept or reject, for a list of
+ *	candidate BSSIDs provided by the userspace. This uses the vendor
+ *	attributes QCA_WLAN_VENDOR_ATTR_BTM_MBO_TRANSITION_REASON and
+ *	QCA_WLAN_VENDOR_ATTR_BTM_CANDIDATE_INFO. The userspace shall specify
+ *	the attributes QCA_WLAN_VENDOR_ATTR_BTM_MBO_TRANSITION_REASON and an
+ *	array of QCA_WLAN_VENDOR_ATTR_BTM_CANDIDATE_INFO_BSSID nested in
+ *	QCA_WLAN_VENDOR_ATTR_BTM_CANDIDATE_INFO in the request. In the response
+ *	the driver shall specify array of
+ *	QCA_WLAN_VENDOR_ATTR_BTM_CANDIDATE_INFO_BSSID and
+ *	QCA_WLAN_VENDOR_ATTR_BTM_CANDIDATE_INFO_STATUS pairs nested in
+ *	QCA_WLAN_VENDOR_ATTR_BTM_CANDIDATE_INFO.
  */
 
 enum qca_nl80211_vendor_subcmds {
@@ -445,6 +475,8 @@ enum qca_nl80211_vendor_subcmds {
 	QCA_NL80211_VENDOR_SUBCMD_P2P_LISTEN_OFFLOAD_STOP = 123,
 	QCA_NL80211_VENDOR_SUBCMD_SAP_CONDITIONAL_CHAN_SWITCH = 124,
 
+	QCA_NL80211_VENDOR_SUBCMD_LL_STATS_EXT = 127,
+
 	/* Encrypt/Decrypt command */
 	QCA_NL80211_VENDOR_SUBCMD_ENCRYPTION_TEST = 137,
 
@@ -456,6 +488,11 @@ enum qca_nl80211_vendor_subcmds {
 
 	/* Set Specific Absorption Rate(SAR) Power Limits */
 	QCA_NL80211_VENDOR_SUBCMD_SET_SAR_LIMITS = 146,
+	QCA_NL80211_VENDOR_SUBCMD_NUD_STATS_SET = 149,
+	QCA_NL80211_VENDOR_SUBCMD_NUD_STATS_GET = 150,
+
+	/* Fetch BSS transition status */
+	QCA_NL80211_VENDOR_SUBCMD_FETCH_BSS_TRANSITION_STATUS = 151,
 };
 
 /**
@@ -640,6 +677,7 @@ enum qca_wlan_vendor_attr_get_station_info {
  * @QCA_NL80211_VENDOR_SUBCMD_LL_RADIO_STATS_INDEX: Radio stats
  * @QCA_NL80211_VENDOR_SUBCMD_LL_IFACE_STATS_INDEX: Iface stats
  * @QCA_NL80211_VENDOR_SUBCMD_LL_PEER_INFO_STATS_INDEX: Peer info stats
+ * @QCA_NL80211_VENDOR_SUBCMD_LL_STATS_EXT_INDEX: MAC layer counters
  * @QCA_NL80211_VENDOR_SUBCMD_TDLS_STATE_CHANGE_INDEX: Ext tdls state change
  * @QCA_NL80211_VENDOR_SUBCMD_DO_ACS_INDEX: ACS command
  * @QCA_NL80211_VENDOR_SUBCMD_KEY_MGMT_ROAM_AUTH_INDEX: Pass Roam and Auth info
@@ -660,6 +698,7 @@ enum qca_wlan_vendor_attr_get_station_info {
  *      P2P listen offload index
  * @QCA_NL80211_VENDOR_SUBCMD_SAP_CONDITIONAL_CHAN_SWITCH_INDEX: SAP
  *      conditional channel switch index
+ * @QCA_NL80211_VENDOR_SUBCMD_NUD_STATS_GET_INDEX: NUD DEBUG Stats index
  */
 
 enum qca_nl80211_vendor_subcmds_index {
@@ -698,6 +737,7 @@ enum qca_nl80211_vendor_subcmds_index {
 	QCA_NL80211_VENDOR_SUBCMD_LL_RADIO_STATS_INDEX,
 	QCA_NL80211_VENDOR_SUBCMD_LL_IFACE_STATS_INDEX,
 	QCA_NL80211_VENDOR_SUBCMD_LL_PEER_INFO_STATS_INDEX,
+	QCA_NL80211_VENDOR_SUBCMD_LL_STATS_EXT_INDEX,
 #endif /* WLAN_FEATURE_LINK_LAYER_STATS */
 
 	QCA_NL80211_VENDOR_SUBCMD_TDLS_STATE_CHANGE_INDEX,
@@ -733,6 +773,71 @@ enum qca_nl80211_vendor_subcmds_index {
 #endif /* WLAN_FEATURE_NAN_DATAPATH */
 	QCA_NL80211_VENDOR_SUBCMD_P2P_LO_EVENT_INDEX,
 	QCA_NL80211_VENDOR_SUBCMD_SAP_CONDITIONAL_CHAN_SWITCH_INDEX,
+	QCA_NL80211_VENDOR_SUBCMD_NUD_STATS_GET_INDEX,
+};
+
+/**
+ * enum qca_attr_nud_stats_set - attribute to vendor subcmd
+ *	QCA_NL80211_VENDOR_SUBCMD_NUD_STATS_SET. This carry the requisite
+ *	information to start / stop the NUD stats collection.
+ * @QCA_ATTR_NUD_STATS_SET_START: set nud debug stats
+ *	Flag to Start / Stop the NUD stats collection
+ *	Start - If included , Stop - If not included
+ * @QCA_ATTR_NUD_STATS_GW_IPV4: set gatway ipv4 address
+ *	IPv4 address of Default Gateway (in network byte order)
+ */
+enum qca_attr_nud_stats_set {
+	QCA_ATTR_NUD_STATS_SET_INVALID = 0,
+	QCA_ATTR_NUD_STATS_SET_START = 1,
+	QCA_ATTR_NUD_STATS_GW_IPV4 = 2,
+	/* keep last */
+	QCA_ATTR_NUD_STATS_SET_LAST,
+	QCA_ATTR_NUD_STATS_SET_MAX =
+		QCA_ATTR_NUD_STATS_SET_LAST - 1,
+};
+
+/**
+ * enum qca_attr_nud_stats_get - attribute to vendor subcmd
+ *	QCA_NL80211_VENDOR_SUBCMD_NUD_STATS_GET. This carry the requisite
+ *	NUD stats collected when queried.
+ * @QCA_ATTR_NUD_STATS_ARP_REQ_COUNT_FROM_NETDEV: ARP Request Count from net
+ *	dev
+ * @QCA_ATTR_NUD_STATS_ARP_REQ_COUNT_TO_LOWER_MAC: ARP Request Count sent
+ *	to lower MAC from upper MAC
+ * @QCA_ATTR_NUD_STATS_ARP_REQ_RX_COUNT_BY_LOWER_MAC: ARP Request Count
+ *	received by lower MAC from upper MAC
+ * @QCA_ATTR_NUD_STATS_ARP_REQ_COUNT_TX_SUCCESS: ARP Request Count successfully
+ *	transmitted by the device
+ * @QCA_ATTR_NUD_STATS_ARP_RSP_RX_COUNT_BY_LOWER_MAC: ARP Response Count
+ *	received by lower MAC
+ * @QCA_ATTR_NUD_STATS_ARP_RSP_RX_COUNT_BY_UPPER_MAC: ARP Response Count
+ *	received by upper MAC
+ * @QCA_ATTR_NUD_STATS_ARP_RSP_COUNT_TO_NETDEV: ARP Response Count delivered
+ *	to netdev
+ * @QCA_ATTR_NUD_STATS_ARP_RSP_COUNT_OUT_OF_ORDER_DROP: ARP Response Count
+ *	delivered to netdev
+ * @QCA_ATTR_NUD_STATS_AP_LINK_ACTIVE: Flag indicating if the Stations
+ *	Link to AP is active.
+ *	Active Link - If exists, Inactive link - If not included
+ * @QCA_ATTR_NUD_STATS_AP_LINK_DAD: Flag indicating if the Stations
+ *	Duplicate Address detected.
+ */
+enum qca_attr_nud_stats_get {
+	QCA_ATTR_NUD_STATS_GET_INVALID = 0,
+	QCA_ATTR_NUD_STATS_ARP_REQ_COUNT_FROM_NETDEV = 1,
+	QCA_ATTR_NUD_STATS_ARP_REQ_COUNT_TO_LOWER_MAC = 2,
+	QCA_ATTR_NUD_STATS_ARP_REQ_RX_COUNT_BY_LOWER_MAC = 3,
+	QCA_ATTR_NUD_STATS_ARP_REQ_COUNT_TX_SUCCESS = 4,
+	QCA_ATTR_NUD_STATS_ARP_RSP_RX_COUNT_BY_LOWER_MAC = 5,
+	QCA_ATTR_NUD_STATS_ARP_RSP_RX_COUNT_BY_UPPER_MAC = 6,
+	QCA_ATTR_NUD_STATS_ARP_RSP_COUNT_TO_NETDEV = 7,
+	QCA_ATTR_NUD_STATS_ARP_RSP_COUNT_OUT_OF_ORDER_DROP = 8,
+	QCA_ATTR_NUD_STATS_AP_LINK_ACTIVE = 9,
+	QCA_ATTR_NUD_STATS_AP_LINK_DAD = 10,
+	/* keep last */
+	QCA_ATTR_NUD_STATS_GET_LAST,
+	QCA_ATTR_NUD_STATS_GET_MAX =
+		QCA_ATTR_NUD_STATS_GET_LAST - 1,
 };
 
 /**
@@ -865,6 +970,18 @@ enum qca_wlan_vendor_attr_get_tdls_capabilities {
  * @QCA_WLAN_VENDOR_ATTR_FEATURE_FLAGS: Supported Features
  *@QCA_WLAN_VENDOR_ATTR_SETBAND_VALUE: setband attribute which is used by
  *	QCA_NL80211_VENDOR_SUBCMD_SETBAND
+ * @QCA_WLAN_VENDOR_ATTR_BTM_MBO_TRANSITION_REASON : Unsigned 8-bit value
+ *	representing MBO transition reason code as provided by the AP used by
+ *	subcommand QCA_NL80211_VENDOR_SUBCMD_FETCH_BSS_TRANSITION_STATUS.
+ *	This is specified by the userspace in the request to the driver.
+ *@QCA_WLAN_VENDOR_ATTR_BTM_CANDIDATE_INFO : Array of nested attributes, BSSID
+ *	and status code, used by subcommand
+ *	QCA_NL80211_VENDOR_SUBCMD_FETCH_BSS_TRANSITION_STATUS, where each entry
+ *	is taken from enum qca_wlan_vendor_attr_btm_candidate_info. The
+ *	userspace space specifies the list/array of candidate BSSIDs in the
+ *	order of preference in the request. The driver specifies the status
+ *	code, for each BSSID in the list, in the response. The acceptable
+ *	candidates are listed in the order preferred by the driver.
  * @QCA_WLAN_VENDOR_ATTR_AFTER_LAST: After last
  * @QCA_WLAN_VENDOR_ATTR_MAX: Max value
  */
@@ -881,6 +998,9 @@ enum qca_wlan_vendor_attr {
 	QCA_WLAN_VENDOR_ATTR_MAX_CONCURRENT_CHANNELS_2_4_BAND = 10,
 	QCA_WLAN_VENDOR_ATTR_MAX_CONCURRENT_CHANNELS_5_0_BAND = 11,
 	QCA_WLAN_VENDOR_ATTR_SETBAND_VALUE = 12,
+
+	QCA_WLAN_VENDOR_ATTR_BTM_MBO_TRANSITION_REASON = 36,
+	QCA_WLAN_VENDOR_ATTR_BTM_CANDIDATE_INFO = 37,
 
 	/* keep last */
 	QCA_WLAN_VENDOR_ATTR_AFTER_LAST,
@@ -1667,6 +1787,15 @@ enum qca_wlan_vendor_attr_ll_stats_results {
 	 */
 	QCA_WLAN_VENDOR_ATTR_LL_STATS_RADIO_TX_TIME_PER_LEVEL,
 
+	/* Unsigned 32bit value */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_RTS_SUCC_CNT,
+	/* Unsigned 32bit value */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_RTS_FAIL_CNT,
+	/* Unsigned 32bit value */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_PPDU_SUCC_CNT,
+	/* Unsigned 32bit value */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_PPDU_FAIL_CNT,
+
 	/* keep last */
 	QCA_WLAN_VENDOR_ATTR_LL_STATS_AFTER_LAST,
 	QCA_WLAN_VENDOR_ATTR_LL_STATS_MAX =
@@ -2257,6 +2386,9 @@ enum qca_wlan_vendor_attr_sap_conditional_chan_switch {
 #define WIFI_FEATURE_MKEEP_ALIVE        0x100000  /* WiFi mkeep_alive */
 #define WIFI_FEATURE_CONFIG_NDO         0x200000  /* ND offload configure */
 #define WIFI_FEATURE_TX_TRANSMIT_POWER  0x400000  /* Tx transmit power levels */
+#define WIFI_FEATURE_CONTROL_ROAMING    0x800000  /* Enable/Disable roaming */
+#define WIFI_FEATURE_IE_WHITELIST       0x1000000 /* Support Probe IE white listing */
+#define WIFI_FEATURE_SCAN_RAND          0x2000000 /* Support MAC & Probe Sequence Number randomization */
 
 /**
  * enum wifi_logger_supported_features - values for supported logger features
@@ -3288,6 +3420,86 @@ enum qca_vendor_attr_sar_limits {
 		QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_AFTER_LAST - 1
 };
 
+/**
+ * enum qca_wlan_vendor_attr_ll_stats_ext - Attributes for MAC layer monitoring
+ *    offload which is an extension for LL_STATS.
+ * @QCA_WLAN_VENDOR_ATTR_LL_STATS_CFG_PERIOD: Monitoring period. Unit in ms.
+ *    If MAC counters do not exceed the threshold, FW will report monitored
+ *    link layer counters periodically as this setting. The first report is
+ *    always triggered by this timer.
+ * @QCA_WLAN_VENDOR_ATTR_LL_STATS_CFG_THRESHOLD: It is a percentage(1 ~ 99).
+ *    For each MAC layer counter, FW holds two copies. One is the current value.
+ *    The other is the last report. Once a current counter's increment is larger
+ *    than the theshold, FW will indicate that counter to host even the
+ *    monitoring timer does not expire.
+ * @QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_PEER_MAC_ADDRESS: Peer sta's MAC address
+ * @QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_PEER_PS_CHG: Peer sta power state change
+ * @QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_PEER_PS_STATE: Current power state of
+ *    peer STA.
+ * @QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_TID: TID of msdu
+ * @QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_NUM_MSDU: Count of msdu with the same
+ *    failure code.
+ * @QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_TX_STATUS: TX failure code
+ *    1: TX packet discarded
+ *    2: No ACK
+ *    3: Postpone
+ * @QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_PEER_MAC_ADDRESS: peer MAC address
+ * @QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_PEER_PS_STATE: Peer STA current state
+ * @QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_PEER_NUM: number of peers
+*/
+enum qca_wlan_vendor_attr_ll_stats_ext {
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_INVALID = 0,
+
+	/* Attributes for configurations */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_CFG_PERIOD,
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_CFG_THRESHOLD,
+
+	/* Peer STA power state change */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_PEER_PS_CHG,
+
+	/* TX failure event */
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_TID,
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_NUM_MSDU,
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_TX_STATUS,
+
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_PEER_PS_STATE,
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_PEER_MAC_ADDRESS,
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_PEER_NUM,
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_LAST,
+	QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_MAX =
+		QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_LAST - 1
+};
+
+enum qca_wlan_btm_candidate_status {
+	QCA_STATUS_ACCEPT,
+	QCA_STATUS_REJECT_EXCESSIVE_FRAME_LOSS_EXPECTED,
+	QCA_STATUS_REJECT_EXCESSIVE_DELAY_EXPECTED,
+	QCA_STATUS_REJECT_INSUFFICIENT_QOS_CAPACITY,
+	QCA_STATUS_REJECT_LOW_RSSI,
+	QCA_STATUS_REJECT_HIGH_INTERFERENCE,
+	QCA_STATUS_REJECT_UNKNOWN,
+};
+
+enum qca_wlan_vendor_attr_btm_candidate_info {
+	QCA_WLAN_VENDOR_ATTR_BTM_CANDIDATE_INFO_INVALID = 0,
+
+	/* 6-byte MAC address representing the bssid of transition candidate */
+	QCA_WLAN_VENDOR_ATTR_BTM_CANDIDATE_INFO_BSSID = 1,
+	/* Unsigned 32-bit value from enum qca_wlan_btm_candidate_status
+	 * returned by the driver. It says whether the bssid provided in
+	 * QCA_WLAN_VENDOR_ATTR_BTM_CANDIDATE_INFO_BSSID is acceptable by
+	 * the driver, if not it specifies the reason for rejection.
+	 * Note that the user-space can overwrite the transition reject reason
+	 * codes provided by driver based on more information.
+	 */
+	QCA_WLAN_VENDOR_ATTR_BTM_CANDIDATE_INFO_STATUS = 2,
+
+	/* keep last */
+	QCA_WLAN_VENDOR_ATTR_BTM_CANDIDATE_INFO_AFTER_LAST,
+	QCA_WLAN_VENDOR_ATTR_BTM_CANDIDATE_INFO_MAX =
+	QCA_WLAN_VENDOR_ATTR_BTM_CANDIDATE_INFO_AFTER_LAST - 1,
+};
+
 struct cfg80211_bss *wlan_hdd_cfg80211_update_bss_db(hdd_adapter_t *pAdapter,
 						tCsrRoamInfo *pRoamInfo);
 
@@ -3554,4 +3766,13 @@ void hdd_process_defer_disconnect(hdd_adapter_t *adapter);
  * Return: 0 for success, non-zero for failure
  */
 int wlan_hdd_try_disconnect(hdd_adapter_t *adapter);
+
+/**
+ * hdd_bt_activity_cb() - callback function to receive bt activity
+ * @context: HDD context
+ * @bt_activity: specifies the kind of bt activity
+ *
+ * Return: none
+ */
+void hdd_bt_activity_cb(void *context, uint32_t bt_activity);
 #endif

@@ -54,13 +54,29 @@
   Preprocessor definitions and constants
   ------------------------------------------------------------------------*/
 
-#define SME_SUMMARY_STATS         1
-#define SME_GLOBAL_CLASSA_STATS   2
-#define SME_GLOBAL_CLASSB_STATS   4
-#define SME_GLOBAL_CLASSC_STATS   8
-#define SME_GLOBAL_CLASSD_STATS  16
-#define SME_PER_STA_STATS        32
-#define SME_PER_CHAIN_RSSI_STATS 64
+#define SME_SUMMARY_STATS         (1 << eCsrSummaryStats)
+#define SME_GLOBAL_CLASSA_STATS   (1 << eCsrGlobalClassAStats)
+#define SME_GLOBAL_CLASSB_STATS   (1 << eCsrGlobalClassBStats)
+#define SME_GLOBAL_CLASSC_STATS   (1 << eCsrGlobalClassCStats)
+#define SME_GLOBAL_CLASSD_STATS   (1 << eCsrGlobalClassDStats)
+#define SME_PER_CHAIN_RSSI_STATS  (1 << csr_per_chain_rssi_stats)
+
+#define sme_log(level, args...) QDF_TRACE(QDF_MODULE_ID_SME, level, ## args)
+#define sme_logfl(level, format, args...) sme_log(level, FL(format), ## args)
+
+#define sme_alert(format, args...) \
+		sme_logfl(QDF_TRACE_LEVEL_FATAL, format, ## args)
+#define sme_err(format, args...) \
+		sme_logfl(QDF_TRACE_LEVEL_ERROR, format, ## args)
+#define sme_warn(format, args...) \
+		sme_logfl(QDF_TRACE_LEVEL_WARN, format, ## args)
+#define sme_info(format, args...) \
+		sme_logfl(QDF_TRACE_LEVEL_INFO, format, ## args)
+#define sme_debug(format, args...) \
+		sme_logfl(QDF_TRACE_LEVEL_DEBUG, format, ## args)
+
+#define SME_ENTER() sme_logfl(QDF_TRACE_LEVEL_DEBUG, "enter")
+#define SME_EXIT() sme_logfl(QDF_TRACE_LEVEL_DEBUG, "exit")
 
 #define SME_SESSION_ID_ANY        50
 
@@ -932,6 +948,9 @@ QDF_STATUS sme_ll_stats_get_req(tHalHandle hHal,
 QDF_STATUS sme_set_link_layer_stats_ind_cb(tHalHandle hHal,
 		void (*callbackRoutine)(void *callbackCtx,
 				int indType, void *pRsp));
+QDF_STATUS sme_set_link_layer_ext_cb(tHalHandle hal,
+		     void (*ll_stats_ext_cb)(tHddHandle callback_ctx,
+					     tSirLLStatsResults * rsp));
 QDF_STATUS sme_reset_link_layer_stats_ind_cb(tHalHandle hhal);
 #endif /* WLAN_FEATURE_LINK_LAYER_STATS */
 
@@ -1273,7 +1292,10 @@ QDF_STATUS sme_create_mon_session(tHalHandle hal_handle, uint8_t *bssid);
 QDF_STATUS sme_set_adaptive_dwelltime_config(tHalHandle hal,
 			struct adaptive_dwelltime_params *dwelltime_params);
 
-void sme_set_vdev_ies_per_band(tHalHandle hal, uint8_t vdev_id);
+void sme_set_vdev_ies_per_band(uint8_t vdev_id,
+			       uint8_t is_hw_mode_dbs);
+bool sme_check_enable_rx_ldpc_sta_ini_item(void);
+QDF_STATUS sme_issue_same_ap_reassoc_cmd(uint8_t session_id);
 void sme_set_pdev_ht_vht_ies(tHalHandle hHal, bool enable2x2);
 
 void sme_update_vdev_type_nss(tHalHandle hal, uint8_t max_supp_nss,
@@ -1446,6 +1468,16 @@ void sme_set_cc_src(tHalHandle hal_handle, enum country_src);
 #ifdef WLAN_FEATURE_WOW_PULSE
 QDF_STATUS sme_set_wow_pulse(struct wow_pulse_mode *wow_pulse_set_info);
 #endif
+/* ARP DEBUG STATS */
+QDF_STATUS sme_set_nud_debug_stats(tHalHandle hal,
+				   struct set_arp_stats_params
+				   *set_stats_param);
+QDF_STATUS sme_get_nud_debug_stats(tHalHandle hal,
+				   struct get_arp_stats_params
+				   *get_stats_param);
+QDF_STATUS sme_set_nud_debug_stats_cb(tHalHandle hal,
+				      void (*cb)(void *, struct rsp_stats *));
+
 
 #ifdef WLAN_FEATURE_UDP_RESPONSE_OFFLOAD
 QDF_STATUS sme_set_udp_resp_offload(struct udp_resp_offload *pudp_resp_cmd);
@@ -1498,4 +1530,24 @@ QDF_STATUS sme_rso_cmd_status_cb(tHalHandle hal,
 void sme_set_5g_band_pref(tHalHandle hal_handle,
 			  struct sme_5g_band_pref_params *pref_params);
 
+/**
+ * sme_set_bt_activity_info_cb - set the callback handler for bt events
+ * @hal: handle returned by mac_open
+ * @cb: callback handler
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_set_bt_activity_info_cb(tHalHandle hal,
+				void (*cb)(void *, uint32_t profile_info));
+
+/**
+ * sme_scan_get_result_for_bssid - gets the scan result from scan cache for the
+ *	bssid specified
+ * @hal: handle returned by mac_open
+ * @bssid: bssid to get the scan result for
+ *
+ * Return: tCsrScanResultInfo * or NULL if no result
+ */
+tCsrScanResultInfo *sme_scan_get_result_for_bssid(tHalHandle hal_handle,
+						  struct qdf_mac_addr *bssid);
 #endif /* #if !defined( __SME_API_H ) */

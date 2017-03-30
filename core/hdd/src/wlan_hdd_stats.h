@@ -81,6 +81,21 @@ struct index_data_rate_type {
 };
 
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS
+
+/**
+ * struct hdd_ll_stats_context - hdd link layer stats context
+ *
+ * @request_id: userspace-assigned link layer stats request id
+ * @request_bitmap: userspace-assigned link layer stats request bitmap
+ * @response_event: LL stats request wait event
+ */
+struct hdd_ll_stats_context {
+	uint32_t request_id;
+	uint32_t request_bitmap;
+	struct completion response_event;
+	spinlock_t context_lock;
+};
+
 /*
  * Used to allocate the size of 4096 for the link layer stats.
  * The size of 4096 is considered assuming that all data per
@@ -139,6 +154,27 @@ static inline bool hdd_link_layer_stats_supported(void)
 {
 	return true;
 }
+
+/**
+ * hdd_get_interface_info() - get interface info
+ * @adapter: Pointer to device adapter
+ * @info: Pointer to interface info
+ *
+ * Return: bool
+ */
+bool hdd_get_interface_info(hdd_adapter_t *adapter,
+			    tpSirWifiInterfaceInfo info);
+
+/**
+ * wlan_hdd_ll_stats_get() - Get Link Layer statistics from FW
+ * @adapter: Pointer to device adapter
+ * @req_id: request id
+ * @req_mask: bitmask used by FW for the request
+ *
+ * Return: 0 on success and error code otherwise
+ */
+int wlan_hdd_ll_stats_get(hdd_adapter_t *adapter, uint32_t req_id,
+			  uint32_t req_mask);
 
 #else
 
@@ -238,5 +274,19 @@ int wlan_hdd_get_rcpi(hdd_adapter_t *adapter, uint8_t *mac,
 		      int32_t *rcpi_value,
 		      enum rcpi_measurement_type measurement_type);
 
+/**
+ * wlan_hdd_cfg80211_link_layer_stats_ext_callback() - Callback for LL ext
+ * @ctx: HDD context
+ * @rsp: msg from FW
+ *
+ * This function is an extension of
+ * wlan_hdd_cfg80211_link_layer_stats_callback. It converts
+ * monitoring parameters offloaded to NL data and send the same to the
+ * kernel/upper layers.
+ *
+ * Return: None.
+ */
+void wlan_hdd_cfg80211_link_layer_stats_ext_callback(tHddHandle ctx,
+						     tSirLLStatsResults *rsp);
 #endif /* end #if !defined(WLAN_HDD_STATS_H) */
 

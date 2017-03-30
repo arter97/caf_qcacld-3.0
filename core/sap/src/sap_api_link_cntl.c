@@ -1025,6 +1025,11 @@ wlansap_roam_callback(void *ctx, tCsrRoamInfo *csr_roam_info, uint32_t roamId,
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_HIGH,
 				FL("Received set channel Indication"));
 		break;
+	case eCSR_ROAM_UPDATE_SCAN_RESULT:
+		sap_signal_hdd_event(sap_ctx, csr_roam_info,
+				     eSAP_UPDATE_SCAN_RESULT,
+				     (void *) eSAP_STATUS_SUCCESS);
+		break;
 	default:
 		break;
 	}
@@ -1136,6 +1141,7 @@ wlansap_roam_callback(void *ctx, tCsrRoamInfo *csr_roam_info, uint32_t roamId,
 		 */
 		sap_event.event = eSAP_MAC_START_BSS_SUCCESS;
 		sap_event.params = csr_roam_info;
+		sap_ctx->sap_sta_id = csr_roam_info->staId;
 		sap_event.u1 = roam_status;
 		sap_event.u2 = roam_result;
 		qdf_status = sap_fsm(sap_ctx, &sap_event);

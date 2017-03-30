@@ -861,11 +861,14 @@ int wma_vdev_start_resp_handler(void *handle, uint8_t *cmd_param_info,
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE
 	tpAniSirGlobal mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
 	if (NULL == mac_ctx) {
+		wma_release_wmi_resp_wakelock(wma);
 		WMA_LOGE("%s: Failed to get mac_ctx", __func__);
 		cds_set_do_hw_mode_change_flag(false);
 		return -EINVAL;
 	}
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
+
+	wma_release_wmi_resp_wakelock(wma);
 
 	WMA_LOGD("%s: Enter", __func__);
 	param_buf = (WMI_VDEV_START_RESP_EVENTID_param_tlvs *) cmd_param_info;
@@ -1478,13 +1481,17 @@ int wma_vdev_stop_resp_handler(void *handle, uint8_t *cmd_param_info,
 	uint8_t peer_id;
 	struct wma_txrx_node *iface;
 	int32_t status = 0;
+
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE
 	tpAniSirGlobal mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
 	if (NULL == mac_ctx) {
+		wma_release_wmi_resp_wakelock(wma);
 		WMA_LOGE("%s: Failed to get mac_ctx", __func__);
 		return -EINVAL;
 	}
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
+
+	wma_release_wmi_resp_wakelock(wma);
 
 	WMA_LOGD("%s: Enter", __func__);
 	param_buf = (WMI_VDEV_STOPPED_EVENTID_param_tlvs *) cmd_param_info;
@@ -1513,7 +1520,6 @@ int wma_vdev_stop_resp_handler(void *handle, uint8_t *cmd_param_info,
 			return -EINVAL;
 		}
 
-		wma_release_wmi_resp_wakelock(wma);
 		wma_hidden_ssid_vdev_restart_on_vdev_stop(wma,
 							  resp_event->vdev_id);
 	}
@@ -1539,8 +1545,6 @@ int wma_vdev_stop_resp_handler(void *handle, uint8_t *cmd_param_info,
 		tpDeleteBssParams params =
 			(tpDeleteBssParams) req_msg->user_data;
 		struct beacon_info *bcn;
-
-		wma_release_wmi_resp_wakelock(wma);
 
 		if (resp_event->vdev_id > wma->max_bssid) {
 			WMA_LOGE("%s: Invalid vdev_id %d", __func__,
@@ -1642,8 +1646,6 @@ int wma_vdev_stop_resp_handler(void *handle, uint8_t *cmd_param_info,
 	} else if (req_msg->msg_type == WMA_SET_LINK_STATE) {
 		tpLinkStateParams params =
 			(tpLinkStateParams) req_msg->user_data;
-
-		wma_release_wmi_resp_wakelock(wma);
 
 		peer = ol_txrx_find_peer_by_addr(pdev, params->bssid, &peer_id);
 		if (peer) {
@@ -2219,8 +2221,7 @@ QDF_STATUS wma_vdev_start(tp_wma_handle wma,
 		wma->interfaces[params.vdev_id].pause_bitmap = 0;
 	}
 
-	return wmi_unified_vdev_start_send(wma->wmi_handle, &params);
-
+	return wma_send_vdev_start_to_fw(wma, &params);
 }
 
 /**
@@ -2280,7 +2281,7 @@ int wma_peer_assoc_conf_handler(void *handle, uint8_t *cmd_param_info,
 
 		/* peer assoc conf event means the cmd succeeds */
 		params->status = QDF_STATUS_SUCCESS;
-		WMA_LOGE(FL("Send ADD_STA_RSP: statype %d vdev_id %d aid %d bssid %pM staIdx %d status %d"),
+		WMA_LOGD(FL("Send ADD_STA_RSP: statype %d vdev_id %d aid %d bssid %pM staIdx %d status %d"),
 			 params->staType, params->smesessionId,
 			 params->assocId, params->bssId, params->staIdx,
 			 params->status);
@@ -2296,7 +2297,8 @@ int wma_peer_assoc_conf_handler(void *handle, uint8_t *cmd_param_info,
 
 		/* peer assoc conf event means the cmd succeeds */
 		params->status = QDF_STATUS_SUCCESS;
-		WMA_LOGE(FL("Send ADD BSS RSP: opermode %d update_bss %d nw_type %d bssid %pM"
+		WMA_LOGD(FL("Send ADD BSS RSP: opermode: %d update_bss: %d"
+			" nw_type: %d bssid: %pM"
 			" staIdx %d status %d"), params->operMode,
 			params->updateBss, params->nwType, params->bssId,
 			params->staContext.staIdx, params->status);
@@ -2420,6 +2422,8 @@ int wma_peer_delete_handler(void *handle, uint8_t *cmd_param_info,
 			WMA_LOGD(FL("Sending peer del rsp to umac"));
 			wma_send_msg(wma, WMA_DELETE_STA_RSP,
 				(void *)del_sta, QDF_STATUS_SUCCESS);
+		} else {
+			qdf_mem_free(del_sta);
 		}
 	} else if (req_msg->type == WMA_DEL_P2P_SELF_STA_RSP_START) {
 		struct del_sta_self_rsp_params *data;
@@ -2976,6 +2980,33 @@ wma_vdev_set_bss_params(tp_wma_handle wma, int vdev_id,
 	wma_update_protection_mode(wma, vdev_id, llbCoexist);
 }
 
+#ifdef WLAN_FEATURE_11W
+static void wma_set_mgmt_frame_protection(tp_wma_handle wma)
+{
+	struct pdev_params param = {0};
+	QDF_STATUS ret;
+
+	/*
+	 * when 802.11w PMF is enabled for hw encr/decr
+	 * use hw MFP Qos bits 0x10
+	 */
+	param.param_id = WMI_PDEV_PARAM_PMF_QOS;
+	param.param_value = true;
+	ret = wmi_unified_pdev_param_send(wma->wmi_handle,
+					 &param, WMA_WILDCARD_PDEV_ID);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		WMA_LOGE("%s: Failed to set QOS MFP/PMF (%d)",
+			 __func__, ret);
+	} else {
+		WMA_LOGD("%s: QOS MFP/PMF set", __func__);
+	}
+}
+#else
+static inline void wma_set_mgmt_frame_protection(tp_wma_handle wma)
+{
+}
+#endif /* WLAN_FEATURE_11W */
+
 /**
  * wma_add_bss_ap_mode() - process add bss request in ap mode
  * @wma: wma handle
@@ -2993,10 +3024,6 @@ static void wma_add_bss_ap_mode(tp_wma_handle wma, tpAddBssParams add_bss)
 	uint8_t vdev_id, peer_id;
 	QDF_STATUS status;
 	int8_t maxTxPower;
-	struct pdev_params param = {0};
-#ifdef WLAN_FEATURE_11W
-	QDF_STATUS ret;
-#endif /* WLAN_FEATURE_11W */
 	struct sir_hw_mode_params hw_mode = {0};
 
 	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
@@ -3056,24 +3083,9 @@ static void wma_add_bss_ap_mode(tp_wma_handle wma, tpAddBssParams add_bss)
 	req.vht_capable = add_bss->vhtCapable;
 	req.max_txpow = add_bss->maxTxPower;
 	maxTxPower = add_bss->maxTxPower;
-#ifdef WLAN_FEATURE_11W
-	if (add_bss->rmfEnabled) {
-		/*
-		 * when 802.11w PMF is enabled for hw encr/decr
-		 * use hw MFP Qos bits 0x10
-		 */
-		param.param_id = WMI_PDEV_PARAM_PMF_QOS;
-		param.param_value = true;
-		ret = wmi_unified_pdev_param_send(wma->wmi_handle,
-						 &param, WMA_WILDCARD_PDEV_ID);
-		if (QDF_IS_STATUS_ERROR(ret)) {
-			WMA_LOGE("%s: Failed to set QOS MFP/PMF (%d)",
-				 __func__, ret);
-		} else {
-			WMA_LOGD("%s: QOS MFP/PMF set to %d", __func__, true);
-		}
-	}
-#endif /* WLAN_FEATURE_11W */
+
+	if (add_bss->rmfEnabled)
+		wma_set_mgmt_frame_protection(wma);
 
 	req.beacon_intval = add_bss->beaconInterval;
 	req.dtim_period = add_bss->dtimPeriod;
@@ -3293,7 +3305,6 @@ static void wma_add_bss_sta_mode(tp_wma_handle wma, tpAddBssParams add_bss)
 	tpAniSirGlobal pMac = cds_get_context(QDF_MODULE_ID_PE);
 	struct sir_hw_mode_params hw_mode = {0};
 	bool peer_assoc_sent = false;
-	struct pdev_params param = {0};
 	uint8_t vdev_id = add_bss->staContext.smesessionId;
 
 	if (NULL == pMac) {
@@ -3495,24 +3506,9 @@ static void wma_add_bss_sta_mode(tp_wma_handle wma, tpAddBssParams add_bss)
 		wma_send_peer_assoc(wma, add_bss->nwType,
 					    &add_bss->staContext);
 		peer_assoc_sent = true;
-#ifdef WLAN_FEATURE_11W
-		if (add_bss->rmfEnabled) {
-			/* when 802.11w PMF is enabled for hw encr/decr
-			   use hw MFP Qos bits 0x10 */
-			param.param_id = WMI_PDEV_PARAM_PMF_QOS;
-			param.param_value = true;
-			status = wmi_unified_pdev_param_send(wma->wmi_handle,
-							 &param,
-							 WMA_WILDCARD_PDEV_ID);
-			if (QDF_IS_STATUS_ERROR(status)) {
-				WMA_LOGE("%s: Failed to set QOS MFP/PMF (%d)",
-					 __func__, status);
-			} else {
-				WMA_LOGD("%s: QOS MFP/PMF set to %d",
-					 __func__, true);
-			}
-		}
-#endif /* WLAN_FEATURE_11W */
+
+		if (add_bss->rmfEnabled)
+			wma_set_mgmt_frame_protection(wma);
 
 		wma_vdev_set_bss_params(wma, add_bss->staContext.smesessionId,
 					add_bss->beaconInterval,
@@ -3637,7 +3633,6 @@ static void wma_add_sta_req_ap_mode(tp_wma_handle wma, tpAddStaParams add_sta)
 	struct wma_txrx_node *iface = NULL;
 	struct wma_target_req *msg;
 	bool peer_assoc_cnf = false;
-	struct pdev_params param;
 
 	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 
@@ -3772,30 +3767,8 @@ static void wma_add_sta_req_ap_mode(tp_wma_handle wma, tpAddStaParams add_sta)
 	}
 #endif
 
-#ifdef WLAN_FEATURE_11W
-	if (add_sta->rmfEnabled) {
-		/*
-		 * We have to store the state of PMF connection
-		 * per STA for SAP case
-		 * We will isolate the ifaces based on vdevid
-		 */
-		iface->rmfEnabled = add_sta->rmfEnabled;
-		/*
-		 * when 802.11w PMF is enabled for hw encr/decr
-		 * use hw MFP Qos bits 0x10
-		 */
-		param.param_id = WMI_PDEV_PARAM_PMF_QOS;
-		param.param_value = true;
-		status = wmi_unified_pdev_param_send(wma->wmi_handle,
-						 &param, WMA_WILDCARD_PDEV_ID);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			WMA_LOGE("%s: Failed to set QOS MFP/PMF (%d)",
-				 __func__, status);
-		} else {
-			WMA_LOGD("%s: QOS MFP/PMF set to %d", __func__, true);
-		}
-	}
-#endif /* WLAN_FEATURE_11W */
+	if (add_sta->rmfEnabled)
+		wma_set_mgmt_frame_protection(wma);
 
 	if (add_sta->uAPSD) {
 		status = wma_set_ap_peer_uapsd(wma, add_sta->smesessionId,
@@ -4007,7 +3980,6 @@ static void wma_add_sta_req_sta_mode(tp_wma_handle wma, tpAddStaParams params)
 	struct wma_target_req *msg;
 	bool peer_assoc_cnf = false;
 	struct vdev_up_params param = {0};
-	struct pdev_params pdev_param = {0};
 	int smps_param;
 
 #ifdef FEATURE_WLAN_TDLS
@@ -4122,24 +4094,10 @@ static void wma_add_sta_req_sta_mode(tp_wma_handle wma, tpAddStaParams params)
 					params->smesessionId, peer, false);
 			goto out;
 		}
-#ifdef WLAN_FEATURE_11W
-		if (params->rmfEnabled) {
-			/* when 802.11w PMF is enabled for hw encr/decr
-			   use hw MFP Qos bits 0x10 */
-			pdev_param.param_id = WMI_PDEV_PARAM_PMF_QOS;
-			pdev_param.param_value = true;
-			status = wmi_unified_pdev_param_send(wma->wmi_handle,
-							 &pdev_param,
-							 WMA_WILDCARD_PDEV_ID);
-			if (QDF_IS_STATUS_ERROR(status)) {
-				WMA_LOGE("%s: Failed to set QOS MFP/PMF (%d)",
-					 __func__, status);
-			} else {
-				WMA_LOGD("%s: QOS MFP/PMF set to %d",
-					 __func__, true);
-			}
-		}
-#endif /* WLAN_FEATURE_11W */
+
+		if (params->rmfEnabled)
+			wma_set_mgmt_frame_protection(wma);
+
 		/*
 		 * Set the PTK in 11r mode because we already have it.
 		 */

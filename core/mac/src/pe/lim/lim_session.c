@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -39,7 +39,6 @@
    Include Files
    ------------------------------------------------------------------------*/
 #include "ani_global.h"
-#include "lim_debug.h"
 #include "lim_ft_defs.h"
 #include "lim_ft.h"
 #include "lim_session.h"
@@ -141,7 +140,7 @@ static void pe_reset_protection_callback(void *ptr)
 	       pe_session_entry->gLimOlbcParams.protectionEnabled         << 4;
 
 	QDF_TRACE(QDF_MODULE_ID_PE,
-		  QDF_TRACE_LEVEL_INFO,
+		  QDF_TRACE_LEVEL_DEBUG,
 		  FL("old protection state: 0x%04X, new protection state: 0x%04X"),
 		  pe_session_entry->old_protection_state,
 		  current_protection_state);
@@ -202,7 +201,7 @@ static void pe_reset_protection_callback(void *ptr)
 		pe_session_entry->old_protection_state) &&
 		(false == mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running)) {
 		QDF_TRACE(QDF_MODULE_ID_PE,
-			  QDF_TRACE_LEVEL_ERROR,
+			  QDF_TRACE_LEVEL_DEBUG,
 			  FL("protection changed, update beacon template"));
 		/* update beacon fix params and send update to FW */
 		qdf_mem_zero(&beacon_params, sizeof(tUpdateBeaconParams));
@@ -247,6 +246,36 @@ static void pe_reset_protection_callback(void *ptr)
 			FL("cannot create or start protectionFieldsResetTimer"));
 	}
 }
+
+#ifdef WLAN_FEATURE_11W
+/**
+ * pe_init_pmf_comeback_timer: init PMF comeback timer
+ * @mac_ctx: pointer to global adapter context
+ * @session: pe session
+ * @session_id: session ID
+ *
+ * Return: void
+ */
+static void pe_init_pmf_comeback_timer(tpAniSirGlobal mac_ctx,
+tpPESession session, uint8_t session_id)
+{
+	QDF_STATUS status;
+
+	session->pmfComebackTimerInfo.pMac = mac_ctx;
+	session->pmfComebackTimerInfo.sessionID = session_id;
+	status = qdf_mc_timer_init(&session->pmfComebackTimer,
+			QDF_TIMER_TYPE_SW, lim_pmf_comeback_timer_callback,
+			(void *)&session->pmfComebackTimerInfo);
+	if (!QDF_IS_STATUS_SUCCESS(status))
+		lim_log(mac_ctx, LOGE, FL("cannot init pmf comeback timer."));
+}
+#else
+static inline void
+pe_init_pmf_comeback_timer(tpAniSirGlobal mac_ctx,
+	tpPESession session, uint8_t session_id)
+{
+}
+#endif
 
 /**
  * pe_create_session() creates a new PE session given the BSSID
@@ -401,14 +430,7 @@ pe_create_session(tpAniSirGlobal pMac, uint8_t *bssid, uint8_t *sessionId,
 			QDF_TRACE(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_ERROR,
 				FL("cannot create or start protectionFieldsResetTimer"));
 	}
-
-	session_ptr->pmfComebackTimerInfo.pMac = pMac;
-	session_ptr->pmfComebackTimerInfo.sessionID = *sessionId;
-	status = qdf_mc_timer_init(&session_ptr->pmfComebackTimer,
-			QDF_TIMER_TYPE_SW, lim_pmf_comeback_timer_callback,
-			(void *)&session_ptr->pmfComebackTimerInfo);
-	if (!QDF_IS_STATUS_SUCCESS(status))
-		lim_log(pMac, LOGE, FL("cannot init pmf comeback timer."));
+	pe_init_pmf_comeback_timer(pMac, session_ptr, *sessionId);
 
 	return &pMac->lim.gpSession[i];
 }
@@ -442,8 +464,8 @@ tpPESession pe_find_session_by_bssid(tpAniSirGlobal pMac, uint8_t *bssid,
 		}
 	}
 
-	lim_log(pMac, LOG4, FL("Session lookup fails for BSSID:"));
-	lim_print_mac_addr(pMac, bssid, LOG4);
+	lim_log(pMac, LOGD, FL("Session lookup fails for BSSID:"));
+	lim_print_mac_addr(pMac, bssid, LOGD);
 	return NULL;
 
 }
@@ -468,7 +490,7 @@ tpPESession pe_find_session_by_bss_idx(tpAniSirGlobal pMac, uint8_t bssIdx)
 			return &pMac->lim.gpSession[i];
 		}
 	}
-	lim_log(pMac, LOG4, FL("Session lookup fails for bssIdx: %d"), bssIdx);
+	lim_log(pMac, LOGD, FL("Session lookup fails for bssIdx: %d"), bssIdx);
 	return NULL;
 }
 
@@ -533,7 +555,7 @@ pe_find_session_by_sta_id(tpAniSirGlobal mac_ctx,
 		}
 	}
 
-	lim_log(mac_ctx, LOG4,
+	lim_log(mac_ctx, LOGD,
 		FL("Session lookup fails for StaId: %d"), staid);
 	return NULL;
 }
@@ -749,8 +771,8 @@ tpPESession pe_find_session_by_peer_sta(tpAniSirGlobal pMac, uint8_t *sa,
 		}
 	}
 
-	lim_log(pMac, LOG1, FL("Session lookup fails for Peer StaId:"));
-	lim_print_mac_addr(pMac, sa, LOG1);
+	lim_log(pMac, LOGD, FL("Session lookup fails for Peer StaId:"));
+	lim_print_mac_addr(pMac, sa, LOGD);
 	return NULL;
 }
 
@@ -775,7 +797,7 @@ tpPESession pe_find_session_by_sme_session_id(tpAniSirGlobal mac_ctx,
 			return &mac_ctx->lim.gpSession[i];
 		}
 	}
-	lim_log(mac_ctx, LOG4,
+	lim_log(mac_ctx, LOGW,
 		FL("Session lookup fails for smeSessionID: %d"),
 		sme_session_id);
 	return NULL;

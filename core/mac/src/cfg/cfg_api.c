@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -38,7 +38,6 @@
 
 #include "cds_api.h"
 #include "cfg_priv.h"
-#include "cfg_debug.h"
 #include "wma_types.h"
 #include "cfg_api.h"
 
@@ -139,10 +138,10 @@ tSirRetStatus cfg_init(tpAniSirGlobal pMac)
 	/* Allocate a combined memory */
 	combined_buff_size = max_s_count + (3 * sizeof(uint32_t) * max_i_count);
 
-	cfg_log(pMac, LOGE, FL("Size of cfg I buffer:%d  S buffer: %d"),
+	cfg_log(pMac, LOG1, FL("Size of cfg I buffer:%d  S buffer: %d"),
 		max_i_count, max_s_count);
 
-	cfg_log(pMac, LOGE, FL("Allocation for cfg buffers: %d bytes"),
+	cfg_log(pMac, LOG1, FL("Allocation for cfg buffers: %d bytes"),
 		combined_buff_size);
 
 	if (combined_buff_size > 4 * PAGE_SIZE) {
@@ -818,7 +817,7 @@ tSirRetStatus cfg_get_capability_info(tpAniSirGlobal pMac, uint16_t *pCap,
 		pCapInfo->apsd = 1;
 
 	pCapInfo->rrm = pMac->rrm.rrmSmeContext.rrmConfig.rrm_enabled;
-	cfg_log(pMac, LOG1, FL("RRM = %d"), pCapInfo->rrm);
+	cfg_log(pMac, LOGD, FL("RRM: %d"), pCapInfo->rrm);
 	/* DSSS-OFDM */
 	/* FIXME : no config defined yet. */
 
@@ -978,4 +977,16 @@ uint8_t *cfg_get_vendor_ie_ptr_from_oui(tpAniSirGlobal mac_ctx,
 	}
 	return NULL;
 }
+
+void cfg_log(tpAniSirGlobal pMac, uint32_t loglevel, const char *pString, ...)
+{
+#ifdef WLAN_DEBUG
+	va_list marker;
+
+	va_start(marker, pString);
+	log_debug(pMac, SIR_CFG_MODULE_ID, loglevel, pString, marker);
+	va_end(marker);
+#endif
+}
+
 /* --------------------------------------------------------------------- */
