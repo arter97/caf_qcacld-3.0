@@ -828,6 +828,26 @@ static void hdd_update_vdev_nss(hdd_context_t *hdd_ctx)
 			cfg_ini->vdev_type_nss_5g, eCSR_BAND_5G);
 }
 
+/**
+ * hdd_update_hw_dbs_capable() - sets the dbs capability of the device
+ * @hdd_ctx: HDD context
+ *
+ * Sets the DBS capability as per INI and firmware capability
+ *
+ * Return: None
+ */
+static void hdd_update_hw_dbs_capable(hdd_context_t *hdd_ctx)
+{
+	struct hdd_config *cfg_ini = hdd_ctx->config;
+	uint8_t hw_dbs_capable = 0;
+
+	if ((!cfg_ini->dual_mac_feature_disable)
+	    && wma_is_hw_dbs_capable())
+		hw_dbs_capable = 1;
+
+	sme_update_hw_dbs_capable(hdd_ctx->hHal, hw_dbs_capable);
+}
+
 static void hdd_update_tgt_ht_cap(hdd_context_t *hdd_ctx,
 				  struct wma_tgt_ht_cap *cfg)
 {
@@ -1448,6 +1468,8 @@ void hdd_update_tgt_cfg(void *context, void *param)
 	hdd_update_tgt_vht_cap(hdd_ctx, &cfg->vht_cap);
 
 	hdd_update_vdev_nss(hdd_ctx);
+
+	hdd_update_hw_dbs_capable(hdd_ctx);
 
 	hdd_ctx->config->fine_time_meas_cap &= cfg->fine_time_measurement_cap;
 	hdd_ctx->fine_time_meas_cap_target = cfg->fine_time_measurement_cap;
@@ -4858,7 +4880,7 @@ out:
  *
  * Return: None.
  */
-static void hdd_unregister_notifiers(hdd_context_t *hdd_ctx)
+void hdd_unregister_notifiers(hdd_context_t *hdd_ctx)
 {
 	hdd_wlan_unregister_ip6_notifier(hdd_ctx);
 
@@ -5136,9 +5158,9 @@ static void hdd_wlan_exit(hdd_context_t *hdd_ctx)
 	}
 
 	/*
-	 * Close the scheduler before calling cds_close to make sure no thread
-	 * is scheduled after the each module close is called i.e after all the
-	 * data structures are freed.
+	 * Close the scheduler before calling cds_close to make sure
+	 * no thread is scheduled after the each module close is
+	 * is called i.e after all the data structures are freed.
 	 */
 	qdf_status = cds_sched_close(p_cds_context);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
@@ -5169,10 +5191,15 @@ static void hdd_wlan_exit(hdd_context_t *hdd_ctx)
 	cds_flush_work(&hdd_ctx->roc_req_work);
 
 	wlansap_global_deinit();
-	wiphy_unregister(wiphy);
-	wlan_hdd_cfg80211_deinit(wiphy);
-
-	hdd_lpass_notify_stop(hdd_ctx);
+	/*
+	 * If there is re_init failure wiphy would have already de-registered
+	 * check the wiphy status status before un-registering again
+	 */
+	if (wiphy && wiphy->registered) {
+		wiphy_unregister(wiphy);
+		wlan_hdd_cfg80211_deinit(wiphy);
+		hdd_lpass_notify_stop(hdd_ctx);
+	}
 
 	hdd_exit_netlink_services(hdd_ctx);
 	mutex_destroy(&hdd_ctx->iface_change_lock);
@@ -5865,10 +5892,11 @@ static int wlan_hdd_init_tx_rx_histogram(hdd_context_t *hdd_ctx)
  */
 void wlan_hdd_deinit_tx_rx_histogram(hdd_context_t *hdd_ctx)
 {
-	if (hdd_ctx->hdd_txrx_hist) {
-		qdf_mem_free(hdd_ctx->hdd_txrx_hist);
-		hdd_ctx->hdd_txrx_hist = NULL;
-	}
+	if (!hdd_ctx || hdd_ctx->hdd_txrx_hist == NULL)
+		return;
+
+	qdf_mem_free(hdd_ctx->hdd_txrx_hist);
+	hdd_ctx->hdd_txrx_hist = NULL;
 }
 
 static uint8_t *convert_level_to_string(uint32_t level)
@@ -6582,13 +6610,17 @@ void hdd_ch_avoid_cb(void *hdd_context, void *indi_param)
 	 * first update the unsafe channel list to the platform driver and
 	 * send the avoid freq event to the application
 	 */
-	wlan_hdd_send_avoid_freq_event(hdd_ctxt, &hdd_avoid_freq_list);
+	if (hdd_ctxt->config->sap_restart_on_ch_avoid) {
+		wlan_hdd_send_avoid_freq_event(hdd_ctxt, &hdd_avoid_freq_list);
 
-	if (!hdd_ctxt->unsafe_channel_count) {
-		hdd_info("no unsafe channels - not restarting SAP");
-		return;
+		if (!hdd_ctxt->unsafe_channel_count) {
+			hdd_info("no unsafe channels - not restarting SAP");
+			return;
+		}
+
+		hdd_unsafe_channel_restart_sap(hdd_ctxt);
 	}
-	hdd_unsafe_channel_restart_sap(hdd_ctxt);
+
 	return;
 }
 
@@ -8390,11 +8422,6 @@ int hdd_wlan_stop_modules(hdd_context_t *hdd_ctx)
 		return -EINVAL;
 	}
 
-	cds_sched_context = get_cds_sched_ctxt();
-	if (!cds_sched_context) {
-		hdd_err("cds scheduler context NULL");
-		return -EINVAL;
-	}
 	mutex_lock(&hdd_ctx->iface_change_lock);
 	hdd_ctx->stop_modules_in_progress = true;
 
@@ -8442,8 +8469,11 @@ int hdd_wlan_stop_modules(hdd_context_t *hdd_ctx)
 		QDF_ASSERT(0);
 	}
 	/* Clean up message queues of TX, RX and MC thread */
-	if (!cds_is_driver_recovering())
-		cds_sched_flush_mc_mqs(cds_sched_context);
+	if (!cds_is_driver_recovering()) {
+		cds_sched_context = get_cds_sched_ctxt();
+		if (cds_sched_context)
+			cds_sched_flush_mc_mqs(cds_sched_context);
+	}
 
 	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
 	if (!hif_ctx) {
