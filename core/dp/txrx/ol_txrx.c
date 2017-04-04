@@ -1300,7 +1300,7 @@ ol_txrx_pdev_post_attach(ol_txrx_pdev_handle pdev)
 
 	ret = htt_attach(pdev->htt_pdev, desc_pool_size);
 	if (ret)
-		goto ol_attach_fail;
+		goto htt_attach_fail;
 
 	/* Attach micro controller data path offload resource */
 	if (ol_cfg_ipa_uc_offload_enabled(pdev->ctrl_pdev)) {
@@ -1701,6 +1701,7 @@ reorder_trace_attach_fail:
 	qdf_spinlock_destroy(&pdev->peer_ref_mutex);
 	qdf_spinlock_destroy(&pdev->rx.mutex);
 	qdf_spinlock_destroy(&pdev->last_real_peer_mutex);
+	qdf_spinlock_destroy(&pdev->peer_map_unmap_lock);
 	OL_TXRX_PEER_STATS_MUTEX_DESTROY(pdev);
 
 control_init_fail:
@@ -1717,7 +1718,8 @@ page_alloc_fail:
 		htt_ipa_uc_detach(pdev->htt_pdev);
 uc_attach_fail:
 	htt_detach(pdev->htt_pdev);
-
+htt_attach_fail:
+	ol_tx_desc_dup_detect_deinit(pdev);
 ol_attach_fail:
 	return ret;            /* fail */
 }
@@ -2468,6 +2470,8 @@ ol_txrx_peer_attach(ol_txrx_vdev_handle vdev, uint8_t *peer_mac_addr)
 	OL_TXRX_PEER_INC_REF_CNT(peer);
 
 	peer->valid = 1;
+	qdf_mc_timer_init(&peer->peer_unmap_timer, QDF_TIMER_TYPE_SW,
+			  peer_unmap_timer_handler, peer);
 
 	ol_txrx_peer_find_hash_add(pdev, peer);
 
@@ -3129,10 +3133,8 @@ int ol_txrx_peer_unref_delete(ol_txrx_peer_handle peer,
 			vdev->wait_on_peer_id = OL_TXRX_INVALID_LOCAL_PEER_ID;
 		}
 
-		if (vdev->opmode == wlan_op_mode_sta) {
-			qdf_mc_timer_stop(&peer->peer_unmap_timer);
-			qdf_mc_timer_destroy(&peer->peer_unmap_timer);
-		}
+		qdf_mc_timer_destroy(&peer->peer_unmap_timer);
+
 		/* check whether the parent vdev has no peers left */
 		if (TAILQ_EMPTY(&vdev->peer_list)) {
 			/*
@@ -3348,8 +3350,6 @@ void ol_txrx_peer_detach(ol_txrx_peer_handle peer)
 	 * Create a timer to track unmap events when the sta peer gets deleted.
 	 */
 	if (vdev->opmode == wlan_op_mode_sta) {
-		qdf_mc_timer_init(&peer->peer_unmap_timer, QDF_TIMER_TYPE_SW,
-				  peer_unmap_timer_handler, peer);
 		qdf_mc_timer_start(&peer->peer_unmap_timer,
 				   OL_TXRX_PEER_UNMAP_TIMEOUT);
 		TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,

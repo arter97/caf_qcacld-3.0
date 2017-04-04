@@ -1635,8 +1635,8 @@ static QDF_STATUS hdd_dis_connect_handler(hdd_adapter_t *pAdapter,
 		hdd_info("roamResult: %d", roamResult);
 
 		/* clear scan cache for Link Lost */
-		if ((eCSR_ROAM_RESULT_DEAUTH_IND == roamResult ||
-		    eCSR_ROAM_RESULT_DISASSOC_IND == roamResult)) {
+		if (pRoamInfo && !pRoamInfo->reasonCode &&
+		    eCSR_ROAM_LOSTLINK == roamStatus) {
 			wlan_hdd_cfg80211_update_bss_list(pAdapter,
 				pHddStaCtx->conn_info.bssId.bytes);
 			sme_remove_bssid_from_scan_list(pHddCtx->hHal,
@@ -3733,7 +3733,8 @@ hdd_roam_tdls_status_update_handler(hdd_adapter_t *pAdapter,
 					hdd_roam_deregister_tdlssta
 						(pAdapter,
 						pRoamInfo->staId);
-				    }
+				    } else
+					mutex_unlock(&pHddCtx->tdls_lock);
 				} else
 				    mutex_unlock(&pHddCtx->tdls_lock);
 
@@ -4719,6 +4720,11 @@ hdd_sme_roam_callback(void *pContext, tCsrRoamInfo *pRoamInfo, uint32_t roamId,
 	case eCSR_ROAM_DISASSOCIATED:
 	{
 		hdd_info("****eCSR_ROAM_DISASSOCIATED****");
+		hdd_napi_serialize(0);
+		cds_set_connection_in_progress(false);
+		hdd_set_roaming_in_progress(false);
+		pAdapter->defer_disconnect = 0;
+
 		qdf_ret_status =
 			hdd_dis_connect_handler(pAdapter, pRoamInfo, roamId,
 						roamStatus, roamResult);

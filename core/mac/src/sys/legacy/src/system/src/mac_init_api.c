@@ -136,10 +136,8 @@ tSirRetStatus mac_open(tHalHandle *pHalHandle, tHddHandle hHdd,
 		}
 
 		/* Call routine to initialize CFG data structures */
-		if (eSIR_SUCCESS != cfg_init(p_mac)) {
-			qdf_mem_free(p_mac);
+		if (eSIR_SUCCESS != cfg_init(p_mac))
 			return eSIR_FAILURE;
-		}
 
 		sys_init_globals(p_mac);
 	}
@@ -149,10 +147,8 @@ tSirRetStatus mac_open(tHalHandle *pHalHandle, tHddHandle hHdd,
 	p_mac->first_scan_done = false;
 
 	status =  pe_open(p_mac, cds_cfg);
-	if (eSIR_SUCCESS != status) {
-		sys_log(p_mac, LOGE, FL("mac_open failure\n"));
-		qdf_mem_free(p_mac);
-	}
+	if (eSIR_SUCCESS != status)
+		sys_log(p_mac, LOGE, FL("mac_open failure"));
 
 	return status;
 }
