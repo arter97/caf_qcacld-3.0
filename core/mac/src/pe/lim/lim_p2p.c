@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014,2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014,2016-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -70,8 +70,6 @@ extern tSirRetStatus lim_set_link_state(tpAniSirGlobal pMac, tSirLinkState state
 					tpSetLinkStateCallback callback,
 					void *callbackArg);
 
-QDF_STATUS lim_p2p_action_cnf(tpAniSirGlobal pMac, uint32_t txCompleteSuccess);
-
 /*------------------------------------------------------------------
  *
  * Below function is called if hdd requests a remain on channel.
@@ -82,7 +80,7 @@ static QDF_STATUS lim_send_hal_req_remain_on_chan_offload(tpAniSirGlobal pMac,
 							  pRemOnChnReq)
 {
 	tSirScanOffloadReq *pScanOffloadReq;
-	tSirMsgQ msg;
+	struct scheduler_msg msg;
 	tSirRetStatus rc = eSIR_SUCCESS;
 
 	pScanOffloadReq = qdf_mem_malloc(sizeof(tSirScanOffloadReq));
@@ -91,8 +89,6 @@ static QDF_STATUS lim_send_hal_req_remain_on_chan_offload(tpAniSirGlobal pMac,
 			FL("Memory allocation failed for pScanOffloadReq"));
 		return QDF_STATUS_E_NOMEM;
 	}
-
-	qdf_mem_zero(pScanOffloadReq, sizeof(tSirScanOffloadReq));
 
 	msg.type = WMA_START_SCAN_OFFLOAD_REQ;
 	msg.bodyptr = pScanOffloadReq;
@@ -177,11 +173,11 @@ void lim_process_insert_single_shot_noa_timeout(tpAniSirGlobal pMac)
  *------------------------------------------------------------------*/
 void lim_convert_active_channel_to_passive_channel(tpAniSirGlobal pMac)
 {
-	uint32_t currentTime;
-	uint32_t lastTime = 0;
-	uint32_t timeDiff;
+	uint64_t currentTime;
+	uint64_t lastTime = 0;
+	uint64_t timeDiff;
 	uint8_t i;
-	currentTime = qdf_mc_timer_get_system_time();
+	currentTime = (uint64_t)qdf_mc_timer_get_system_time();
 	for (i = 1; i < SIR_MAX_24G_5G_CHANNEL_RANGE; i++) {
 		if ((pMac->lim.dfschannelList.timeStamp[i]) != 0) {
 			lastTime = pMac->lim.dfschannelList.timeStamp[i];
@@ -363,9 +359,8 @@ void lim_remain_on_chn_rsp(tpAniSirGlobal pMac, QDF_STATUS status, uint32_t *dat
 
 	/* If remain on channel timer expired and action frame is pending then
 	 * indicaiton confirmation with status failure */
-	if (pMac->lim.mgmtFrameSessionId != 0xff) {
-		lim_p2p_action_cnf(pMac, 0);
-	}
+	if (pMac->lim.mgmtFrameSessionId != 0xff)
+		lim_p2p_action_cnf(pMac, NULL, false, NULL);
 
 	return;
 }
@@ -392,7 +387,6 @@ void lim_send_sme_mgmt_frame_ind(tpAniSirGlobal pMac, uint8_t frameType,
 			FL("AllocateMemory failed for eWNI_SME_LISTEN_RSP"));
 		return;
 	}
-	qdf_mem_set((void *)pSirSmeMgmtFrame, length, 0);
 
 	pSirSmeMgmtFrame->frame_len = frameLen;
 	pSirSmeMgmtFrame->sessionId = sessionId;
@@ -412,19 +406,39 @@ void lim_send_sme_mgmt_frame_ind(tpAniSirGlobal pMac, uint8_t frameType,
 	return;
 }
 
-QDF_STATUS lim_p2p_action_cnf(tpAniSirGlobal pMac, uint32_t txCompleteSuccess)
+QDF_STATUS lim_p2p_action_cnf(void *context, qdf_nbuf_t buf,
+			      uint32_t tx_status, void *params)
 {
-	if (pMac->lim.mgmtFrameSessionId != 0xff) {
-		/* The session entry might be invalid(0xff) action confirmation received after
-		 * remain on channel timer expired */
-		lim_send_sme_rsp(pMac, eWNI_SME_ACTION_FRAME_SEND_CNF,
-				 (txCompleteSuccess ? eSIR_SME_SUCCESS :
-				  eSIR_SME_SEND_ACTION_FAIL),
-				 pMac->lim.mgmtFrameSessionId, 0);
+	QDF_STATUS status;
+	uint32_t mgmt_frame_sessionId;
+	bool tx_complete_ack = (tx_status) ? true : false;
+	tpAniSirGlobal pMac = (tpAniSirGlobal)context;
+
+	status = pe_acquire_global_lock(&pMac->lim);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		mgmt_frame_sessionId = pMac->lim.mgmtFrameSessionId;
 		pMac->lim.mgmtFrameSessionId = 0xff;
+		pe_release_global_lock(&pMac->lim);
+
+		if (mgmt_frame_sessionId != 0xff) {
+			/*
+			 * The session entry might be invalid(0xff)
+			 * action confirmation received after
+			 * remain on channel timer expired.
+			 */
+			lim_log(pMac, LOG1,
+				FL("mgmt_frame_sessionId %d"),
+					 mgmt_frame_sessionId);
+			if (pMac->p2p_ack_ind_cb)
+				pMac->p2p_ack_ind_cb(mgmt_frame_sessionId,
+						     tx_complete_ack);
+		}
 	}
 
-	return QDF_STATUS_SUCCESS;
+	if (buf)
+		qdf_nbuf_free(buf);
+
+	return status;
 }
 
 /**
@@ -456,6 +470,7 @@ static void lim_tx_action_frame(tpAniSirGlobal mac_ctx,
 	 * need to go at OFDM rates. And BD rate2 we configured at 6Mbps.
 	 */
 	tx_flag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
+	mac_ctx->lim.mgmtFrameSessionId = sme_session_id;
 
 	if ((SIR_MAC_MGMT_PROBE_RSP == fc->subType) ||
 		(mb_msg->noack)) {
@@ -466,12 +481,11 @@ static void lim_tx_action_frame(tpAniSirGlobal mac_ctx,
 			channel_freq);
 
 		if (!mb_msg->noack)
-			lim_send_sme_rsp(mac_ctx,
-				eWNI_SME_ACTION_FRAME_SEND_CNF,
-				qdf_status, mb_msg->sessionId, 0);
+			lim_p2p_action_cnf(mac_ctx, packet,
+				(QDF_IS_STATUS_SUCCESS(qdf_status)) ?
+				true : false, NULL);
 		mac_ctx->lim.mgmtFrameSessionId = 0xff;
 	} else {
-		mac_ctx->lim.mgmtFrameSessionId = mb_msg->sessionId;
 		qdf_status =
 			wma_tx_frameWithTxComplete(mac_ctx, packet,
 				(uint16_t) msg_len,
@@ -484,9 +498,7 @@ static void lim_tx_action_frame(tpAniSirGlobal mac_ctx,
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 			lim_log(mac_ctx, LOGE,
 				FL("couldn't send action frame"));
-			lim_send_sme_rsp(mac_ctx,
-				eWNI_SME_ACTION_FRAME_SEND_CNF,
-				qdf_status, mb_msg->sessionId, 0);
+			lim_p2p_action_cnf(mac_ctx, packet, false, NULL);
 			mac_ctx->lim.mgmtFrameSessionId = 0xff;
 		} else {
 			mac_ctx->lim.mgmtFrameSessionId = mb_msg->sessionId;
@@ -499,6 +511,52 @@ static void lim_tx_action_frame(tpAniSirGlobal mac_ctx,
 	return;
 }
 
+#ifdef WLAN_FEATURE_11W
+static void lim_check_rmf_and_set_protected(tpAniSirGlobal mac_ctx,
+	tSirMbMsgP2p *mb_msg, uint8_t *frame)
+{
+	uint8_t session_id = 0;
+	tpPESession session_entry;
+	tpSirMacMgmtHdr mac_hdr;
+	tpSirMacActionFrameHdr action_hdr;
+	tpSirMacFrameCtl fc = (tpSirMacFrameCtl) mb_msg->data;
+
+	action_hdr = (tpSirMacActionFrameHdr)
+		(frame + sizeof(tSirMacMgmtHdr));
+	mac_hdr = (tpSirMacMgmtHdr) frame;
+	session_entry = pe_find_session_by_bssid(mac_ctx,
+		(uint8_t *) mb_msg->data + BSSID_OFFSET,
+		&session_id);
+
+	/*
+	 * Check for session corresponding to ADDR2 as supplicant
+	 * is filling ADDR2  with BSSID
+	 */
+	if (!session_entry) {
+		session_entry = pe_find_session_by_bssid(mac_ctx,
+			(uint8_t *) mb_msg->data + ADDR2_OFFSET,
+			 &session_id);
+	}
+	/*
+	 * Setting Protected bit only for Robust Action Frames
+	 * This has to be based on the current Connection with the
+	 * station. lim_set_protected_bit API will set the protected
+	 * bit if connection is PMF
+	 */
+	if (session_entry && (SIR_MAC_MGMT_ACTION == fc->subType) &&
+		session_entry->limRmfEnabled &&
+		(!lim_is_group_addr(mac_hdr->da)) &&
+		lim_is_robust_mgmt_action_frame(action_hdr->category))
+		lim_set_protected_bit(mac_ctx, session_entry,
+					mac_hdr->da, mac_hdr);
+}
+#else
+static inline void lim_check_rmf_and_set_protected(tpAniSirGlobal mac_ctx,
+	tSirMbMsgP2p *mb_msg, uint8_t *frame)
+{
+}
+#endif
+
 /**
  * lim_send_p2p_action_frame() - Process action frame request
  * @mac_ctx:  Pointer to mac context
@@ -510,7 +568,7 @@ static void lim_tx_action_frame(tpAniSirGlobal mac_ctx,
  * Return: NULL
  */
 void lim_send_p2p_action_frame(tpAniSirGlobal mac_ctx,
-		tpSirMsgQ msg)
+		struct scheduler_msg *msg)
 {
 	tSirMbMsgP2p *mb_msg = (tSirMbMsgP2p *) msg->bodyptr;
 	uint32_t msg_len;
@@ -521,17 +579,12 @@ void lim_send_p2p_action_frame(tpAniSirGlobal mac_ctx,
 	uint8_t noa_len = 0;
 	uint8_t noa_stream[SIR_MAX_NOA_ATTR_LEN + (2 * SIR_P2P_IE_HEADER_LEN)];
 	uint8_t orig_len = 0;
-	uint8_t session_id = 0;
 	uint8_t *p2p_ie = NULL;
 	tpPESession session_entry = NULL;
 	uint8_t *presence_noa_attr = NULL;
 	uint8_t *tmp_p2p_ie = NULL;
 	uint16_t remain_len = 0;
 	uint8_t sme_session_id = 0;
-#ifdef WLAN_FEATURE_11W
-	tpSirMacMgmtHdr mac_hdr;
-	tpSirMacActionFrameHdr action_hdr;
-#endif
 
 	msg_len = mb_msg->msgLen - sizeof(tSirMbMsgP2p);
 	lim_log(mac_ctx, LOG1, FL("sending fc->type=%d fc->subType=%d"),
@@ -539,9 +592,10 @@ void lim_send_p2p_action_frame(tpAniSirGlobal mac_ctx,
 
 	if ((!mac_ctx->lim.gpLimRemainOnChanReq) && (0 != mb_msg->wait)) {
 		lim_log(mac_ctx, LOGE,
-			FL("RemainOnChannel is not running\n"));
-		lim_send_sme_rsp(mac_ctx, eWNI_SME_ACTION_FRAME_SEND_CNF,
-			QDF_STATUS_E_FAILURE, mb_msg->sessionId, 0);
+			FL("RemainOnChannel is not running"));
+		mac_ctx->lim.mgmtFrameSessionId = mb_msg->sessionId;
+		lim_p2p_action_cnf(mac_ctx, NULL, false, NULL);
+		mac_ctx->lim.mgmtFrameSessionId = 0xff;
 		return;
 	}
 	sme_session_id = mb_msg->sessionId;
@@ -685,46 +739,10 @@ void lim_send_p2p_action_frame(tpAniSirGlobal mac_ctx,
 		qdf_mem_copy(frame, mb_msg->data, msg_len);
 	}
 
-#ifdef WLAN_FEATURE_11W
-	action_hdr = (tpSirMacActionFrameHdr)
-		(frame + sizeof(tSirMacMgmtHdr));
-	mac_hdr = (tpSirMacMgmtHdr) frame;
-	session_entry = pe_find_session_by_bssid(mac_ctx,
-		(uint8_t *) mb_msg->data + BSSID_OFFSET,
-		&session_id);
-
-	/*
-	 * Check for session corresponding to ADDR2 as supplicant
-	 * is filling ADDR2  with BSSID
-	 */
-	if (NULL == session_entry) {
-		session_entry = pe_find_session_by_bssid(mac_ctx,
-			(uint8_t *) mb_msg->data + ADDR2_OFFSET,
-			 &session_id);
-	}
-	/*
-	 * Setting Protected bit only for Robust Action Frames
-	 * This has to be based on the current Connection with the
-	 * station. lim_set_protected_bit API will set the protected
-	 * bit if connection is PMF
-	 */
-	if (session_entry && (SIR_MAC_MGMT_ACTION == fc->subType) &&
-		session_entry->limRmfEnabled &&
-		(!lim_is_group_addr(mac_hdr->da)) &&
-		lim_is_robust_mgmt_action_frame(action_hdr->category))
-		lim_set_protected_bit(mac_ctx, session_entry,
-					mac_hdr->da, mac_hdr);
-#endif
+	lim_check_rmf_and_set_protected(mac_ctx, mb_msg, frame);
 
 	lim_tx_action_frame(mac_ctx, mb_msg, msg_len, packet, frame);
 	return;
-}
-
-void lim_abort_remain_on_chan(tpAniSirGlobal pMac, uint8_t sessionId,
-	uint32_t scan_id)
-{
-	lim_process_abort_scan_ind(pMac, sessionId, scan_id,
-		ROC_SCAN_REQUESTOR_ID);
 }
 
 /* Power Save Related Functions */
@@ -732,7 +750,7 @@ tSirRetStatus __lim_process_sme_no_a_update(tpAniSirGlobal pMac, uint32_t *pMsgB
 {
 	tpP2pPsConfig pNoA;
 	tpP2pPsParams pMsgNoA;
-	tSirMsgQ msg;
+	struct scheduler_msg msg;
 
 	pNoA = (tpP2pPsConfig) pMsgBuf;
 
@@ -743,7 +761,6 @@ tSirRetStatus __lim_process_sme_no_a_update(tpAniSirGlobal pMac, uint32_t *pMsgB
 		return eSIR_MEM_ALLOC_FAILED;
 	}
 
-	qdf_mem_set((uint8_t *) pMsgNoA, sizeof(tP2pPsConfig), 0);
 	pMsgNoA->opp_ps = pNoA->opp_ps;
 	pMsgNoA->ctWindow = pNoA->ctWindow;
 	pMsgNoA->duration = pNoA->duration;

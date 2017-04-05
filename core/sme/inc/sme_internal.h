@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -60,8 +60,6 @@ typedef enum eSmeCommandType {
 	eSmeCommandRoam,
 	eSmeCommandWmStatusChange,
 	eSmeCommandSetKey,
-	eSmeCommandAddStaSession,
-	eSmeCommandDelStaSession,
 #ifdef FEATURE_WLAN_TDLS
 	/*
 	 * eSmeTdlsCommandMask = 0x80000,
@@ -85,9 +83,6 @@ typedef enum eSmeCommandType {
 	eSmeQosCommandMask = 0x40000,   /* To identify Qos commands */
 	eSmeCommandAddTs,
 	eSmeCommandDelTs,
-#ifdef FEATURE_OEM_DATA_SUPPORT
-	eSmeCommandOemDataReq = 0x80000, /* To identify the oem data commands */
-#endif
 	eSmeCommandRemainOnChannel,
 	e_sme_command_set_hw_mode,
 	e_sme_command_nss_update,
@@ -137,12 +132,6 @@ typedef struct sSelfRecoveryStats {
 	uint8_t cmdStatsIndx;
 } tSelfRecoveryStats;
 
-#ifdef WLAN_FEATURE_GTK_OFFLOAD
-/* GTK Offload Information Callback declaration */
-typedef void (*gtk_offload_get_info_callback)(void *callback_context,
-		tpSirGtkOffloadGetInfoRspParams
-		pGtkOffloadGetInfoRsp);
-#endif
 #ifdef FEATURE_WLAN_SCAN_PNO
 /*Pref netw found Cb declaration*/
 typedef void (*preferred_network_found_ind_cb)(void *callback_context,
@@ -153,6 +142,31 @@ typedef void (*preferred_network_found_ind_cb)(void *callback_context,
 typedef void (*ocb_callback)(void *context, void *response);
 typedef void (*sme_set_thermal_level_callback)(void *context, u_int8_t level);
 typedef void (*p2p_lo_callback)(void *context, void *event);
+#ifdef FEATURE_OEM_DATA_SUPPORT
+typedef void (*sme_send_oem_data_rsp_msg)(struct oem_data_rsp *);
+#endif
+
+/**
+ * typedef bpf_get_offload_cb - BPF offload callback signature
+ * @context: Opaque context that the client can use to associate the
+ *    callback with the request
+ * @caps: BPF offload capabilities as reported by firmware
+ */
+struct sir_bpf_get_offload;
+typedef void (*bpf_get_offload_cb)(void *context,
+				   struct sir_bpf_get_offload *caps);
+
+/**
+ * typedef sme_encrypt_decrypt_callback - encrypt/decrypt callback
+ *    signature
+ * @context: Opaque context that the client can use to associate the
+ *    callback with the request
+ * @response: Encrypt/Decrypt response from firmware
+ */
+struct sir_encrypt_decrypt_rsp_params;
+typedef void (*sme_encrypt_decrypt_callback)(
+			void *context,
+			struct sir_encrypt_decrypt_rsp_params *response);
 
 typedef struct tagSmeStruct {
 	eSmeState state;
@@ -160,17 +174,11 @@ typedef struct tagSmeStruct {
 	uint32_t totalSmeCmd;
 	/* following pointer contains array of pointers for tSmeCmd* */
 	void **pSmeCmdBufAddr;
-	tDblLinkList smeCmdActiveList;
-	tDblLinkList smeCmdPendingList;
 	tDblLinkList smeCmdFreeList;    /* preallocated roam cmd list */
 	enum tQDF_ADAPTER_MODE currDeviceMode;
 #ifdef FEATURE_WLAN_LPHB
 	void (*pLphbIndCb)(void *pHddCtx, tSirLPHBInd *indParam);
 #endif /* FEATURE_WLAN_LPHB */
-	/* pending scan command list */
-	tDblLinkList smeScanCmdPendingList;
-	/* active scan command list */
-	tDblLinkList smeScanCmdActiveList;
 	tSmePeerInfoHddCbkInfo peerInfoParams;
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_CSR
 	host_event_wlan_status_payload_type eventPayload;
@@ -182,6 +190,12 @@ typedef struct tagSmeStruct {
 	void (*pLinkLayerStatsIndCallback)(void *callbackContext,
 			int indType, void *pRsp);
 #endif /* WLAN_FEATURE_LINK_LAYER_STATS */
+
+#ifdef WLAN_POWER_DEBUGFS
+	void *power_debug_stats_context;
+	void (*power_stats_resp_callback)(struct power_stats_response *rsp,
+						void *callback_context);
+#endif
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
 	void (*pAutoShutdownNotificationCb)(void);
 #endif
@@ -208,12 +222,6 @@ typedef struct tagSmeStruct {
 	void (*pGetTemperatureCb)(int temperature, void *context);
 	uint8_t miracast_value;
 	struct ps_global_info  ps_global_info;
-#ifdef WLAN_FEATURE_GTK_OFFLOAD
-	/* routine to call for GTK Offload Information */
-	gtk_offload_get_info_callback gtk_offload_get_info_cb;
-	/* value to be passed as parameter to routine specified above */
-	void *gtk_offload_get_info_cb_context;
-#endif /* WLAN_FEATURE_GTK_OFFLOAD */
 #ifdef FEATURE_WLAN_SCAN_PNO
 	/* routine to call for Preferred Network Found Indication */
 	preferred_network_found_ind_cb pref_netw_found_cb;
@@ -238,10 +246,20 @@ typedef struct tagSmeStruct {
 	ocb_callback dcc_stats_event_callback;
 	sme_set_thermal_level_callback set_thermal_level_cb;
 	void *saved_scan_cmd;
-	void (*pbpf_get_offload_cb)(void *context,
-			struct sir_bpf_get_offload *);
+	void *bpf_get_offload_context;
+	bpf_get_offload_cb bpf_get_offload_cb;
 	p2p_lo_callback p2p_lo_event_callback;
 	void *p2p_lo_event_context;
+#ifdef FEATURE_OEM_DATA_SUPPORT
+	sme_send_oem_data_rsp_msg oem_data_rsp_callback;
+#endif
+	sme_encrypt_decrypt_callback encrypt_decrypt_cb;
+	void *encrypt_decrypt_context;
+	void (*lost_link_info_cb)(void *context,
+			struct sir_lost_link_info *lost_link_info);
+	bool (*set_connection_info_cb)(bool);
+	bool (*get_connection_info_cb)(uint8_t *session_id,
+			enum scan_reject_states *reason);
 } tSmeStruct, *tpSmeStruct;
 
 #endif /* #if !defined( __SMEINTERNAL_H ) */

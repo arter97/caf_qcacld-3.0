@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -44,7 +44,9 @@
 #include <csr_api.h>
 #include <wlan_hdd_misc.h>
 #include <wlan_hdd_napi.h>
-#include <cds_concurrency.h>
+#include <cds_api.h>
+#include "wlan_hdd_he.h"
+#include <wlan_policy_mgr_api.h>
 
 static void
 cb_notify_set_roam_prefer5_g_hz(hdd_context_t *pHddCtx, unsigned long notifyId)
@@ -78,7 +80,8 @@ cb_notify_set_roam_intra_band(hdd_context_t *pHddCtx, unsigned long notifyId)
 static void cb_notify_set_wes_mode(hdd_context_t *pHddCtx, unsigned long notifyId)
 {
 	/* At the point this routine is called, the value in the hdd config
-	   table has already been updated */
+	 * table has already been updated
+	 */
 	sme_update_wes_mode(pHddCtx->hHal, pHddCtx->config->isWESModeEnabled, 0);
 }
 
@@ -96,21 +99,13 @@ cb_notify_set_roam_scan_home_away_time(hdd_context_t *pHddCtx, unsigned long not
 					    true);
 }
 
-#ifdef FEATURE_WLAN_OKC
-static void
-cb_notify_set_okc_feature_enabled(hdd_context_t *pHddCtx, unsigned long notifyId)
-{
-	/* At the point this routine is called, the value in the hdd config
-	   table has already been updated */
-}
-#endif
-
 static void
 notify_is_fast_roam_ini_feature_enabled(hdd_context_t *pHddCtx,
 					unsigned long notifyId)
 {
 	/* At the point this routine is called, the value in the hdd config
-	   table has already been updated */
+	 * table has already been updated
+	 */
 	sme_update_is_fast_roam_ini_feature_enabled(pHddCtx->hHal, 0,
 						    pHddCtx->config->
 						    isFastRoamIniFeatureEnabled);
@@ -120,7 +115,8 @@ static void
 notify_is_mawc_ini_feature_enabled(hdd_context_t *pHddCtx, unsigned long notifyId)
 {
 	/* At the point this routine is called, the value in the hdd config
-	   table has already been updated */
+	 * table has already been updated
+	 */
 	sme_update_is_mawc_ini_feature_enabled(pHddCtx->hHal,
 					       pHddCtx->config->MAWCEnabled);
 }
@@ -130,7 +126,8 @@ static void
 cb_notify_set_ese_feature_enabled(hdd_context_t *pHddCtx, unsigned long notifyId)
 {
 	/* At the point this routine is called, the value in the hdd config
-	   table has already been updated */
+	 * table has already been updated
+	 */
 	sme_update_is_ese_feature_enabled(pHddCtx->hHal, 0,
 					  pHddCtx->config->isEseIniFeatureEnabled);
 }
@@ -140,7 +137,8 @@ static void
 cb_notify_set_fw_rssi_monitoring(hdd_context_t *pHddCtx, unsigned long notifyId)
 {
 	/* At the point this routine is called, the value in the hdd config
-	   table has already been updated */
+	 * table has already been updated
+	 */
 	sme_update_config_fw_rssi_monitoring(pHddCtx->hHal,
 					     pHddCtx->config->
 					     fEnableFwRssiMonitoring);
@@ -150,7 +148,8 @@ static void cb_notify_set_opportunistic_scan_threshold_diff(hdd_context_t *pHddC
 							    unsigned long notifyId)
 {
 	/* At the point this routine is called, the value in the hdd config
-	   table has already been updated */
+	 * table has already been updated
+	 */
 	sme_set_roam_opportunistic_scan_threshold_diff(pHddCtx->hHal, 0,
 						       pHddCtx->config->
 						       nOpportunisticThresholdDiff);
@@ -160,7 +159,8 @@ static void cb_notify_set_roam_rescan_rssi_diff(hdd_context_t *pHddCtx,
 						unsigned long notifyId)
 {
 	/* At the point this routine is called, the value in the hdd config
-	   table has already been updated */
+	 * table has already been updated
+	 */
 	sme_set_roam_rescan_rssi_diff(pHddCtx->hHal,
 				      0, pHddCtx->config->nRoamRescanRssiDiff);
 }
@@ -170,7 +170,8 @@ cb_notify_set_neighbor_lookup_rssi_threshold(hdd_context_t *pHddCtx,
 					     unsigned long notifyId)
 {
 	/* At the point this routine is called, the value in the hdd config
-	   table has already been updated */
+	 * table has already been updated
+	 */
 	sme_set_neighbor_lookup_rssi_threshold(pHddCtx->hHal, 0,
 					       pHddCtx->config->
 					       nNeighborLookupRssiThreshold);
@@ -192,7 +193,8 @@ static void
 cb_notify_set_neighbor_scan_period(hdd_context_t *pHddCtx, unsigned long notifyId)
 {
 	/* At the point this routine is called, the value in the hdd config
-	   table has already been updated */
+	 * table has already been updated
+	 */
 	sme_set_neighbor_scan_period(pHddCtx->hHal, 0,
 				     pHddCtx->config->nNeighborScanPeriod);
 }
@@ -202,7 +204,8 @@ cb_notify_set_neighbor_results_refresh_period(hdd_context_t *pHddCtx,
 					      unsigned long notifyId)
 {
 	/* At the point this routine is called, the value in the hdd config
-	   table has already been updated */
+	 * table has already been updated
+	 */
 	sme_set_neighbor_scan_refresh_period(pHddCtx->hHal, 0,
 					     pHddCtx->config->
 					     nNeighborResultsRefreshPeriod);
@@ -213,7 +216,8 @@ cb_notify_set_empty_scan_refresh_period(hdd_context_t *pHddCtx,
 					unsigned long notifyId)
 {
 	/* At the point this routine is called, the value in the hdd config
-	   table has already been updated */
+	 * table has already been updated
+	 */
 	sme_update_empty_scan_refresh_period(pHddCtx->hHal, 0,
 					     pHddCtx->config->
 					     nEmptyScanRefreshPeriod);
@@ -224,7 +228,8 @@ cb_notify_set_neighbor_scan_min_chan_time(hdd_context_t *pHddCtx,
 					  unsigned long notifyId)
 {
 	/* At the point this routine is called, the value in the hdd config
-	   table has already been updated */
+	 * table has already been updated
+	 */
 	sme_set_neighbor_scan_min_chan_time(pHddCtx->hHal,
 					    pHddCtx->config->
 					    nNeighborScanMinChanTime, 0);
@@ -243,7 +248,8 @@ static void cb_notify_set_roam_bmiss_first_bcnt(hdd_context_t *pHddCtx,
 						unsigned long notifyId)
 {
 	/* At the point this routine is called, the value in the hdd config
-	   table has already been updated */
+	 * table has already been updated
+	 */
 	sme_set_roam_bmiss_first_bcnt(pHddCtx->hHal,
 				      0, pHddCtx->config->nRoamBmissFirstBcnt);
 }
@@ -266,7 +272,8 @@ static void
 cb_notify_set_dfs_scan_mode(hdd_context_t *pHddCtx, unsigned long notifyId)
 {
 	/* At the point this routine is called, the value in the hdd config
-	   table has already been updated */
+	 * table has already been updated
+	 */
 	sme_update_dfs_scan_mode(pHddCtx->hHal, 0,
 				 pHddCtx->config->allowDFSChannelRoam);
 }
@@ -437,6 +444,13 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     CFG_ENABLE_PS_MIN,
 		     CFG_ENABLE_PS_MAX),
 
+	REG_VARIABLE(CFG_AUTO_PS_ENABLE_TIMER_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, auto_bmps_timer_val,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_AUTO_PS_ENABLE_TIMER_DEFAULT,
+		     CFG_AUTO_PS_ENABLE_TIMER_MIN,
+		     CFG_AUTO_PS_ENABLE_TIMER_MAX),
+
 	REG_VARIABLE(CFG_BMPS_MINIMUM_LI_NAME, WLAN_PARAM_Integer,
 		     struct hdd_config, nBmpsMinListenInterval,
 		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -488,7 +502,7 @@ REG_TABLE_ENTRY g_registry_table[] = {
 
 	REG_VARIABLE(CFG_HT_MPDU_DENSITY_NAME, WLAN_PARAM_Integer,
 		     struct hdd_config, ht_mpdu_density,
-		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK ,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK,
 		     CFG_HT_MPDU_DENSITY_DEFAULT,
 		     CFG_HT_MPDU_DENSITY_MIN,
 		     CFG_HT_MPDU_DENSITY_MAX),
@@ -513,34 +527,6 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     CFG_SCAN_RESULT_AGE_COUNT_DEFAULT,
 		     CFG_SCAN_RESULT_AGE_COUNT_MIN,
 		     CFG_SCAN_RESULT_AGE_COUNT_MAX),
-
-	REG_VARIABLE(CFG_SCAN_RESULT_AGE_TIME_NCNPS_NAME, WLAN_PARAM_Integer,
-		     struct hdd_config, nScanAgeTimeNCNPS,
-		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK,
-		     CFG_SCAN_RESULT_AGE_TIME_NCNPS_DEFAULT,
-		     CFG_SCAN_RESULT_AGE_TIME_NCNPS_MIN,
-		     CFG_SCAN_RESULT_AGE_TIME_NCNPS_MAX),
-
-	REG_VARIABLE(CFG_SCAN_RESULT_AGE_TIME_NCPS_NAME, WLAN_PARAM_Integer,
-		     struct hdd_config, nScanAgeTimeNCPS,
-		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK,
-		     CFG_SCAN_RESULT_AGE_TIME_NCPS_DEFAULT,
-		     CFG_SCAN_RESULT_AGE_TIME_NCPS_MIN,
-		     CFG_SCAN_RESULT_AGE_TIME_NCPS_MAX),
-
-	REG_VARIABLE(CFG_SCAN_RESULT_AGE_TIME_CNPS_NAME, WLAN_PARAM_Integer,
-		     struct hdd_config, nScanAgeTimeCNPS,
-		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK,
-		     CFG_SCAN_RESULT_AGE_TIME_CNPS_DEFAULT,
-		     CFG_SCAN_RESULT_AGE_TIME_CNPS_MIN,
-		     CFG_SCAN_RESULT_AGE_TIME_CNPS_MAX),
-
-	REG_VARIABLE(CFG_SCAN_RESULT_AGE_TIME_CPS_NAME, WLAN_PARAM_Integer,
-		     struct hdd_config, nScanAgeTimeCPS,
-		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK,
-		     CFG_SCAN_RESULT_AGE_TIME_CPS_DEFAULT,
-		     CFG_SCAN_RESULT_AGE_TIME_CPS_MIN,
-		     CFG_SCAN_RESULT_AGE_TIME_CPS_MAX),
 
 	REG_VARIABLE(CFG_RSSI_CATEGORY_GAP_NAME, WLAN_PARAM_Integer,
 		     struct hdd_config, nRssiCatGap,
@@ -696,13 +682,6 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     CFG_BEACON_INTERVAL_MIN,
 		     CFG_BEACON_INTERVAL_MAX),
 
-	REG_VARIABLE(CFG_ROAMING_TIME_NAME, WLAN_PARAM_Integer,
-		     struct hdd_config, nRoamingTime,
-		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-		     CFG_ROAMING_TIME_DEFAULT,
-		     CFG_ROAMING_TIME_MIN,
-		     CFG_ROAMING_TIME_MAX),
-
 	REG_VARIABLE(CFG_VCC_RSSI_TRIGGER_NAME, WLAN_PARAM_Integer,
 		     struct hdd_config, nVccRssiTrigger,
 		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -809,12 +788,12 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		      CFG_MIN_REST_TIME_MIN,
 		      CFG_MIN_REST_TIME_MAX),
 
-	REG_VARIABLE(CFG_IDLE_TIME_NAME , WLAN_PARAM_Integer,
+	REG_VARIABLE(CFG_IDLE_TIME_NAME, WLAN_PARAM_Integer,
 		      struct hdd_config, idle_time_conc,
 		      VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
 		      CFG_IDLE_TIME_DEFAULT,
 		      CFG_IDLE_TIME_MIN,
-		      CFG_IDLE_TIME_MAX) ,
+		      CFG_IDLE_TIME_MAX),
 
 	REG_VARIABLE(CFG_NUM_STA_CHAN_COMBINED_CONC_NAME, WLAN_PARAM_Integer,
 		     struct hdd_config, nNumStaChanCombinedConc,
@@ -845,6 +824,13 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     CFG_MAX_TX_POWER_MIN,
 		     CFG_MAX_TX_POWER_MAX),
 
+	REG_VARIABLE(CFG_TX_POWER_CTRL_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, allow_tpc_from_ap,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_TX_POWER_CTRL_DEFAULT,
+		     CFG_TX_POWER_CTRL_MIN,
+		     CFG_TX_POWER_CTRL_MAX),
+
 	REG_VARIABLE(CFG_LOW_GAIN_OVERRIDE_NAME, WLAN_PARAM_Integer,
 		     struct hdd_config, fIsLowGainOverride,
 		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -872,13 +858,6 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     CFG_MAX_LI_MODULATED_DTIM_DEFAULT,
 		     CFG_MAX_LI_MODULATED_DTIM_MIN,
 		     CFG_MAX_LI_MODULATED_DTIM_MAX),
-
-	REG_VARIABLE(CFG_RX_ANT_CONFIGURATION_NAME, WLAN_PARAM_Integer,
-		     struct hdd_config, nRxAnt,
-		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-		     CFG_RX_ANT_CONFIGURATION_NAME_DEFAULT,
-		     CFG_RX_ANT_CONFIGURATION_NAME_MIN,
-		     CFG_RX_ANT_CONFIGURATION_NAME_MAX),
 
 	REG_VARIABLE(CFG_FW_HEART_BEAT_MONITORING_NAME, WLAN_PARAM_Integer,
 		     struct hdd_config, fEnableFwHeartBeatMonitoring,
@@ -1060,8 +1039,9 @@ REG_TABLE_ENTRY g_registry_table[] = {
 			     CFG_FAST_TRANSITION_ENABLED_NAME_MAX,
 			     cb_notify_set_fast_transition_enabled, 0),
 
-	/* Variable to specify the delta/difference between the RSSI of current AP
-	 * and roamable AP while roaming */
+	/* Variable to specify the delta/difference between the RSSI
+	 * of current AP and roamable AP while roaming
+	 */
 	REG_DYNAMIC_VARIABLE(CFG_ROAM_RSSI_DIFF_NAME, WLAN_PARAM_Integer,
 			     struct hdd_config, RoamRssiDiff,
 			     VAR_FLAGS_OPTIONAL |
@@ -1079,16 +1059,13 @@ REG_TABLE_ENTRY g_registry_table[] = {
 			     CFG_ENABLE_WES_MODE_NAME_MIN,
 			     CFG_ENABLE_WES_MODE_NAME_MAX,
 			     cb_notify_set_wes_mode, 0),
-#ifdef FEATURE_WLAN_OKC
-	REG_DYNAMIC_VARIABLE(CFG_OKC_FEATURE_ENABLED_NAME, WLAN_PARAM_Integer,
-			     struct hdd_config, isOkcIniFeatureEnabled,
-			     VAR_FLAGS_OPTIONAL |
-			     VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-			     CFG_OKC_FEATURE_ENABLED_DEFAULT,
-			     CFG_OKC_FEATURE_ENABLED_MIN,
-			     CFG_OKC_FEATURE_ENABLED_MAX,
-			     cb_notify_set_okc_feature_enabled, 0),
-#endif
+	REG_VARIABLE(CFG_OKC_FEATURE_ENABLED_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, isOkcIniFeatureEnabled,
+		     VAR_FLAGS_OPTIONAL |
+		     VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_OKC_FEATURE_ENABLED_DEFAULT,
+		     CFG_OKC_FEATURE_ENABLED_MIN,
+		     CFG_OKC_FEATURE_ENABLED_MAX),
 	REG_DYNAMIC_VARIABLE(CFG_ROAM_SCAN_OFFLOAD_ENABLED, WLAN_PARAM_Integer,
 			     struct hdd_config, isRoamOffloadScanEnabled,
 			     VAR_FLAGS_OPTIONAL |
@@ -1269,13 +1246,6 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     CFG_QOS_IMPLICIT_SETUP_ENABLED_MIN,
 		     CFG_QOS_IMPLICIT_SETUP_ENABLED_MAX),
 
-	REG_VARIABLE(CFG_AP_LISTEN_MODE_NAME, WLAN_PARAM_Integer,
-		     struct hdd_config, nEnableListenMode,
-		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-		     CFG_AP_LISTEN_MODE_DEFAULT,
-		     CFG_AP_LISTEN_MODE_MIN,
-		     CFG_AP_LISTEN_MODE_MAX),
-
 	REG_VARIABLE(CFG_AP_AUTO_SHUT_OFF, WLAN_PARAM_Integer,
 		     struct hdd_config, nAPAutoShutOff,
 		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -1305,22 +1275,6 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     CFG_RRM_ENABLE_DEFAULT,
 		     CFG_RRM_ENABLE_MIN,
 		     CFG_RRM_ENABLE_MAX),
-
-	REG_VARIABLE(CFG_RRM_OPERATING_CHAN_MAX_DURATION_NAME,
-		     WLAN_PARAM_Integer,
-		     struct hdd_config, nInChanMeasMaxDuration,
-		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-		     CFG_RRM_OPERATING_CHAN_MAX_DURATION_DEFAULT,
-		     CFG_RRM_OPERATING_CHAN_MAX_DURATION_MIN,
-		     CFG_RRM_OPERATING_CHAN_MAX_DURATION_MAX),
-
-	REG_VARIABLE(CFG_RRM_NON_OPERATING_CHAN_MAX_DURATION_NAME,
-		     WLAN_PARAM_Integer,
-		     struct hdd_config, nOutChanMeasMaxDuration,
-		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-		     CFG_RRM_NON_OPERATING_CHAN_MAX_DURATION_DEFAULT,
-		     CFG_RRM_NON_OPERATING_CHAN_MAX_DURATION_MIN,
-		     CFG_RRM_NON_OPERATING_CHAN_MAX_DURATION_MAX),
 
 	REG_VARIABLE(CFG_RRM_MEAS_RANDOMIZATION_INTVL_NAME, WLAN_PARAM_Integer,
 		     struct hdd_config, nRrmRandnIntvl,
@@ -1639,6 +1593,13 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     CFG_INFRA_STA_KEEP_ALIVE_PERIOD_MIN,
 		     CFG_INFRA_STA_KEEP_ALIVE_PERIOD_MAX),
 
+	REG_VARIABLE(CFG_STA_KEEPALIVE_METHOD_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, sta_keepalive_method,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_STA_KEEPALIVE_METHOD_DEFAULT,
+		     CFG_STA_KEEPALIVE_METHOD_MIN,
+		     CFG_STA_KEEPALIVE_METHOD_MAX),
+
 	REG_VARIABLE(CFG_QOS_ADDTS_WHEN_ACM_IS_OFF_NAME, WLAN_PARAM_Integer,
 		     struct hdd_config, AddTSWhenACMIsOff,
 		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -1673,14 +1634,6 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     CFG_BAND_CAPABILITY_DEFAULT,
 		     CFG_BAND_CAPABILITY_MIN,
 		     CFG_BAND_CAPABILITY_MAX),
-
-	REG_VARIABLE(CFG_ENABLE_BEACON_EARLY_TERMINATION_NAME,
-		     WLAN_PARAM_Integer,
-		     struct hdd_config, fEnableBeaconEarlyTermination,
-		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-		     CFG_ENABLE_BEACON_EARLY_TERMINATION_DEFAULT,
-		     CFG_ENABLE_BEACON_EARLY_TERMINATION_MIN,
-		     CFG_ENABLE_BEACON_EARLY_TERMINATION_MAX),
 
 /* CFG_QDF_TRACE_ENABLE Parameters */
 	REG_VARIABLE(CFG_QDF_TRACE_ENABLE_WDI_NAME, WLAN_PARAM_Integer,
@@ -1809,6 +1762,13 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     CFG_QDF_TRACE_ENABLE_MIN,
 		     CFG_QDF_TRACE_ENABLE_MAX),
 
+	REG_VARIABLE(CFG_QDF_TRACE_ENABLE_WIFI_POS, WLAN_PARAM_Integer,
+		     struct hdd_config, qdf_trace_enable_wifi_pos,
+		     VAR_FLAGS_OPTIONAL,
+		     CFG_QDF_TRACE_ENABLE_DEFAULT,
+		     CFG_QDF_TRACE_ENABLE_MIN,
+		     CFG_QDF_TRACE_ENABLE_MAX),
+
 	REG_VARIABLE(CFG_TELE_BCN_TRANS_LI_NAME, WLAN_PARAM_Integer,
 		     struct hdd_config, nTeleBcnTransListenInterval,
 		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -1838,27 +1798,6 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     CFG_TELE_BCN_MAX_LI_NUM_IDLE_BCNS_MIN,
 		     CFG_TELE_BCN_MAX_LI_NUM_IDLE_BCNS_MAX),
 
-	REG_VARIABLE(CFG_BCN_EARLY_TERM_WAKE_NAME, WLAN_PARAM_Integer,
-		     struct hdd_config, bcnEarlyTermWakeInterval,
-		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-		     CFG_BCN_EARLY_TERM_WAKE_DEFAULT,
-		     CFG_BCN_EARLY_TERM_WAKE_MIN,
-		     CFG_BCN_EARLY_TERM_WAKE_MAX),
-
-	REG_VARIABLE(CFG_AP_DATA_AVAIL_POLL_PERIOD_NAME, WLAN_PARAM_Integer,
-		     struct hdd_config, apDataAvailPollPeriodInMs,
-		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-		     CFG_AP_DATA_AVAIL_POLL_PERIOD_DEFAULT,
-		     CFG_AP_DATA_AVAIL_POLL_PERIOD_MIN,
-		     CFG_AP_DATA_AVAIL_POLL_PERIOD_MAX),
-
-	REG_VARIABLE(CFG_ENABLE_CLOSE_LOOP_NAME, WLAN_PARAM_Integer,
-		     struct hdd_config, enableCloseLoop,
-		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-		     CFG_ENABLE_CLOSE_LOOP_DEFAULT,
-		     CFG_ENABLE_CLOSE_LOOP_MIN,
-		     CFG_ENABLE_CLOSE_LOOP_MAX),
-
 	REG_VARIABLE(CFG_ENABLE_BYPASS_11D_NAME, WLAN_PARAM_Integer,
 		     struct hdd_config, enableBypass11d,
 		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -1886,14 +1825,6 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     CFG_ENABLE_DYNAMIC_DTIM_DEFAULT,
 		     CFG_ENABLE_DYNAMIC_DTIM_MIN,
 		     CFG_ENABLE_DYNAMIC_DTIM_MAX),
-
-	REG_VARIABLE(CFG_ENABLE_AUTOMATIC_TX_POWER_CONTROL_NAME,
-		     WLAN_PARAM_Integer,
-		     struct hdd_config, enableAutomaticTxPowerControl,
-		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-		     CFG_ENABLE_AUTOMATIC_TX_POWER_CONTROL_DEFAULT,
-		     CFG_ENABLE_AUTOMATIC_TX_POWER_CONTROL_MIN,
-		     CFG_ENABLE_AUTOMATIC_TX_POWER_CONTROL_MAX),
 
 	REG_VARIABLE(CFG_SHORT_GI_40MHZ_NAME, WLAN_PARAM_Integer,
 		     struct hdd_config, ShortGI40MhzEnable,
@@ -2101,6 +2032,13 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     CFG_VDEV_TYPE_NSS_2G_MIN,
 		     CFG_VDEV_TYPE_NSS_2G_MAX),
 
+	REG_VARIABLE(CFG_STA_PREFER_80MHZ_OVER_160MHZ, WLAN_PARAM_Integer,
+		     struct hdd_config, sta_prefer_80MHz_over_160MHz,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_STA_PREFER_80MHZ_OVER_160MHZ_DEFAULT,
+		     CFG_STA_PREFER_80MHZ_OVER_160MHZ_MIN,
+		     CFG_STA_PREFER_80MHZ_OVER_160MHZ_MAX),
+
 	REG_VARIABLE(CFG_VDEV_TYPE_NSS_5G, WLAN_PARAM_Integer,
 		     struct hdd_config, vdev_type_nss_5g,
 		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -2195,6 +2133,28 @@ REG_TABLE_ENTRY g_registry_table[] = {
 			     CFG_DISABLE_DFS_JAPAN_W53_MIN,
 			     CFG_DISABLE_DFS_JAPAN_W53_MAX,
 			     ch_notify_set_g_disable_dfs_japan_w53, 0),
+
+	REG_VARIABLE(CFG_MAX_HT_MCS_FOR_TX_DATA, WLAN_PARAM_HexInteger,
+		     struct hdd_config, max_ht_mcs_txdata,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_MAX_HT_MCS_FOR_TX_DATA_DEFAULT,
+		     CFG_MAX_HT_MCS_FOR_TX_DATA_MIN,
+		     CFG_MAX_HT_MCS_FOR_TX_DATA_MAX),
+
+	REG_VARIABLE(CFG_DISABLE_ABG_RATE_FOR_TX_DATA, WLAN_PARAM_Integer,
+		     struct hdd_config, disable_abg_rate_txdata,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_DISABLE_ABG_RATE_FOR_TX_DATA_DEFAULT,
+		     CFG_DISABLE_ABG_RATE_FOR_TX_DATA_MIN,
+		     CFG_DISABLE_ABG_RATE_FOR_TX_DATA_MAX),
+
+	REG_VARIABLE(CFG_RATE_FOR_TX_MGMT, WLAN_PARAM_HexInteger,
+		     struct hdd_config, rate_for_tx_mgmt,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_RATE_FOR_TX_MGMT_DEFAULT,
+		     CFG_RATE_FOR_TX_MGMT_MIN,
+		     CFG_RATE_FOR_TX_MGMT_MAX),
+
 	REG_VARIABLE(CFG_ENABLE_FIRST_SCAN_2G_ONLY_NAME, WLAN_PARAM_Integer,
 		     struct hdd_config, enableFirstScan2GOnly,
 		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -2454,13 +2414,6 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     CFG_ENABLE_MCC_ADATIVE_SCHEDULER_ENABLED_MIN,
 		     CFG_ENABLE_MCC_ADATIVE_SCHEDULER_ENABLED_MAX),
 
-	REG_VARIABLE(CFG_ANDRIOD_POWER_SAVE_NAME, WLAN_PARAM_Integer,
-		     struct hdd_config, isAndroidPsEn,
-		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-		     CFG_ANDRIOD_POWER_SAVE_DEFAULT,
-		     CFG_ANDRIOD_POWER_SAVE_MIN,
-		     CFG_ANDRIOD_POWER_SAVE_MAX),
-
 	REG_VARIABLE(CFG_IBSS_ADHOC_CHANNEL_5GHZ_NAME, WLAN_PARAM_Integer,
 		     struct hdd_config, AdHocChannel5G,
 		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -2547,6 +2500,14 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     CFG_ENABLE_VHT_FOR_24GHZ_MIN,
 		     CFG_ENABLE_VHT_FOR_24GHZ_MAX),
 
+
+	REG_VARIABLE(CFG_ENABLE_VENDOR_VHT_FOR_24GHZ_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, enable_sap_vendor_vht,
+		     VAR_FLAGS_OPTIONAL,
+		     CFG_ENABLE_VENDOR_VHT_FOR_24GHZ_DEFAULT,
+		     CFG_ENABLE_VENDOR_VHT_FOR_24GHZ_MIN,
+		     CFG_ENABLE_VENDOR_VHT_FOR_24GHZ_MAX),
+
 	REG_DYNAMIC_VARIABLE(CFG_ENABLE_FAST_ROAM_IN_CONCURRENCY,
 			     WLAN_PARAM_Integer,
 			     struct hdd_config, bFastRoamInConIniFeatureEnabled,
@@ -2563,13 +2524,6 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     CFG_ENABLE_ADAPT_RX_DRAIN_DEFAULT,
 		     CFG_ENABLE_ADAPT_RX_DRAIN_MIN,
 		     CFG_ENABLE_ADAPT_RX_DRAIN_MAX),
-
-	REG_VARIABLE(CFG_FLEX_CONNECT_POWER_FACTOR_NAME, WLAN_PARAM_Integer,
-		     struct hdd_config, flexConnectPowerFactor,
-		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_MINMAX,
-		     CFG_FLEX_CONNECT_POWER_FACTOR_DEFAULT,
-		     CFG_FLEX_CONNECT_POWER_FACTOR_MIN,
-		     CFG_FLEX_CONNECT_POWER_FACTOR_MAX),
 
 	REG_VARIABLE(CFG_ENABLE_HEART_BEAT_OFFLOAD, WLAN_PARAM_Integer,
 		     struct hdd_config, enableIbssHeartBeatOffload,
@@ -2654,7 +2608,7 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
 		     CFG_ENABLE_FW_LOG_DEFAULT,
 		     CFG_ENABLE_FW_LOG_DISABLE,
-		     CFG_ENABLE_FW_LOG_ENABLE),
+		     CFG_ENABLE_FW_LOG_MAX),
 
 #ifdef IPA_OFFLOAD
 	REG_VARIABLE(CFG_IPA_OFFLOAD_CONFIG_NAME, WLAN_PARAM_HexInteger,
@@ -2869,13 +2823,6 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     CFG_ENABLE_DEBUG_CONNECT_ISSUE_DEFAULT,
 		     CFG_ENABLE_DEBUG_CONNECT_ISSUE_MIN,
 		     CFG_ENABLE_DEBUG_CONNECT_ISSUE_MAX),
-
-	REG_VARIABLE(CFG_ENABLE_RX_THREAD, WLAN_PARAM_Integer,
-		     struct hdd_config, enableRxThread,
-		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-		     CFG_ENABLE_RX_THREAD_DEFAULT,
-		     CFG_ENABLE_RX_THREAD_MIN,
-		     CFG_ENABLE_RX_THREAD_MAX),
 
 	REG_VARIABLE(CFG_ENABLE_DFS_PHYERR_FILTEROFFLOAD_NAME,
 		     WLAN_PARAM_Integer,
@@ -3108,13 +3055,19 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     CFG_TCP_DELACK_THRESHOLD_LOW_MIN,
 		     CFG_TCP_DELACK_THRESHOLD_LOW_MAX),
 
-	REG_VARIABLE(CFG_TCP_TX_HIGH_TPUT_THRESHOLD_NAME, WLAN_PARAM_Integer,
-		struct hdd_config, tcp_tx_high_tput_thres,
-		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-		CFG_TCP_TX_HIGH_TPUT_THRESHOLD_DEFAULT,
-		CFG_TCP_TX_HIGH_TPUT_THRESHOLD_MIN,
-		CFG_TCP_TX_HIGH_TPUT_THRESHOLD_MAX),
+	REG_VARIABLE(CFG_TCP_DELACK_TIMER_COUNT, WLAN_PARAM_Integer,
+		     struct hdd_config, tcp_delack_timer_count,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_TCP_DELACK_TIMER_COUNT_DEFAULT,
+		     CFG_TCP_DELACK_TIMER_COUNT_MIN,
+		     CFG_TCP_DELACK_TIMER_COUNT_MAX),
 
+	REG_VARIABLE(CFG_TCP_TX_HIGH_TPUT_THRESHOLD_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, tcp_tx_high_tput_thres,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_TCP_TX_HIGH_TPUT_THRESHOLD_DEFAULT,
+		     CFG_TCP_TX_HIGH_TPUT_THRESHOLD_MIN,
+		     CFG_TCP_TX_HIGH_TPUT_THRESHOLD_MAX),
 #endif
 
 	REG_VARIABLE(CFG_ENABLE_FW_LOG_TYPE, WLAN_PARAM_Integer,
@@ -3130,6 +3083,13 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     CFG_ENABLE_FW_DEBUG_LOG_LEVEL_DEFAULT,
 		     CFG_ENABLE_FW_DEBUG_LOG_LEVEL_MIN,
 		     CFG_ENABLE_FW_DEBUG_LOG_LEVEL_MAX),
+
+	REG_VARIABLE(CFG_ENABLE_FW_RTS_PROFILE, WLAN_PARAM_Integer,
+		     struct hdd_config, rts_profile,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_ENABLE_FW_RTS_PROFILE_DEFAULT,
+		     CFG_ENABLE_FW_RTS_PROFILE_MIN,
+		     CFG_ENABLE_FW_RTS_PROFILE_MAX),
 
 	REG_VARIABLE_STRING(CFG_ENABLE_FW_MODULE_LOG_LEVEL, WLAN_PARAM_String,
 			    struct hdd_config, enableFwModuleLogLevel,
@@ -3532,6 +3492,27 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     CFG_LRO_ENABLED_MIN,
 		     CFG_LRO_ENABLED_MAX),
 
+	REG_VARIABLE(CFG_BPF_PACKET_FILTER_OFFLOAD, WLAN_PARAM_Integer,
+		     struct hdd_config, bpf_packet_filter_enable,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_BPF_PACKET_FILTER_OFFLOAD_DEFAULT,
+		     CFG_BPF_PACKET_FILTER_OFFLOAD_MIN,
+		     CFG_BPF_PACKET_FILTER_OFFLOAD_MAX),
+
+	REG_VARIABLE(CFG_TDLS_ENABLE_DEFER_TIMER, WLAN_PARAM_Integer,
+		     struct hdd_config, tdls_enable_defer_time,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_TDLS_ENABLE_DEFER_TIMER_DEFAULT,
+		     CFG_TDLS_ENABLE_DEFER_TIMER_MIN,
+		     CFG_TDLS_ENABLE_DEFER_TIMER_MAX),
+
+	REG_VARIABLE(CFG_FLOW_STEERING_ENABLED_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, flow_steering_enable,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_FLOW_STEERING_ENABLED_DEFAULT,
+		     CFG_FLOW_STEERING_ENABLED_MIN,
+		     CFG_FLOW_STEERING_ENABLED_MAX),
+
 	REG_VARIABLE(CFG_ACTIVE_MODE_OFFLOAD, WLAN_PARAM_Integer,
 		     struct hdd_config, active_mode_offload,
 		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -3568,16 +3549,15 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     CFG_DOT11P_MODE_MIN,
 		     CFG_DOT11P_MODE_MAX),
 
-#ifdef FEATURE_NAPI
-	REG_VARIABLE(CFG_NAPI_NAME, WLAN_PARAM_Integer,
-		     struct hdd_config, napi_enable,
-		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-		     CFG_NAPI_DEFAULT,
-		     CFG_NAPI_MIN,
-		     CFG_NAPI_MAX),
-#endif /* FEATURE_NAPI */
-
 #ifdef FEATURE_WLAN_EXTSCAN
+	REG_VARIABLE(CFG_EXTSCAN_ALLOWED_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, extscan_enabled,
+		     VAR_FLAGS_OPTIONAL |
+		     VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_EXTSCAN_ALLOWED_DEF,
+		     CFG_EXTSCAN_ALLOWED_MIN,
+		     CFG_EXTSCAN_ALLOWED_MAX),
+
 	REG_VARIABLE(CFG_EXTSCAN_PASSIVE_MAX_CHANNEL_TIME_NAME,
 		     WLAN_PARAM_Integer,
 		     struct hdd_config, extscan_passive_max_chn_time,
@@ -3610,6 +3590,37 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     CFG_EXTSCAN_ACTIVE_MIN_CHANNEL_TIME_MIN,
 		     CFG_EXTSCAN_ACTIVE_MIN_CHANNEL_TIME_MAX),
 #endif
+
+#ifdef WLAN_FEATURE_WOW_PULSE
+	REG_VARIABLE(CFG_WOW_PULSE_SUPPORT_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, wow_pulse_support,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_WOW_PULSE_SUPPORT_DEFAULT,
+		CFG_WOW_PULSE_SUPPORT_MIN,
+		CFG_WOW_PULSE_SUPPORT_MAX),
+
+	REG_VARIABLE(CFG_WOW_PULSE_PIN_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, wow_pulse_pin,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_WOW_PULSE_PIN_DEFAULT,
+		CFG_WOW_PULSE_PIN_MIN,
+		CFG_WOW_PULSE_PIN_MAX),
+
+	REG_VARIABLE(CFG_WOW_PULSE_INTERVAL_LOW_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, wow_pulse_interval_low,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_WOW_PULSE_INTERVAL_LOW_DEFAULT,
+		CFG_WOW_PULSE_INTERVAL_LOW_MIN,
+		CFG_WOW_PULSE_INTERVAL_LOW_MAX),
+
+	REG_VARIABLE(CFG_WOW_PULSE_INTERVAL_HIGH_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, wow_pulse_interval_high,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_WOW_PULSE_INTERVAL_HIGH_DEFAULT,
+		CFG_WOW_PULSE_INTERVAL_HIGH_MIN,
+		CFG_WOW_PULSE_INTERVAL_HIGH_MAX),
+#endif
+
 
 	REG_VARIABLE(CFG_CE_CLASSIFY_ENABLE_NAME, WLAN_PARAM_Integer,
 		     struct hdd_config, ce_classify_enabled,
@@ -3676,6 +3687,20 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     CFG_TX_CHAIN_MASK_1SS_DEFAULT,
 		     CFG_TX_CHAIN_MASK_1SS_MIN,
 		     CFG_TX_CHAIN_MASK_1SS_MAX),
+
+	REG_VARIABLE(CFG_ENABLE_SMART_CHAINMASK_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, smart_chainmask_enabled,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_ENABLE_SMART_CHAINMASK_DEFAULT,
+		     CFG_ENABLE_SMART_CHAINMASK_MIN,
+		     CFG_ENABLE_SMART_CHAINMASK_MAX),
+
+	REG_VARIABLE(CFG_ENABLE_COEX_ALT_CHAINMASK_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, alternative_chainmask_enabled,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_ENABLE_COEX_ALT_CHAINMASK_DEFAULT,
+		     CFG_ENABLE_COEX_ALT_CHAINMASK_MIN,
+		     CFG_ENABLE_COEX_ALT_CHAINMASK_MAX),
 
 	REG_VARIABLE(CFG_SELF_GEN_FRM_PWR, WLAN_PARAM_Integer,
 		     struct hdd_config, self_gen_frm_pwr,
@@ -3808,6 +3833,14 @@ REG_TABLE_ENTRY g_registry_table[] = {
 			CFG_ENABLE_EDCA_INI_MIN,
 			CFG_ENABLE_EDCA_INI_MAX),
 
+	REG_VARIABLE(CFG_ENABLE_GO_CTS2SELF_FOR_STA, WLAN_PARAM_Integer,
+			struct hdd_config, enable_go_cts2self_for_sta,
+			VAR_FLAGS_OPTIONAL |
+			VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+			CFG_ENABLE_GO_CTS2SELF_FOR_STA_DEFAULT,
+			CFG_ENABLE_GO_CTS2SELF_FOR_STA_MIN,
+			CFG_ENABLE_GO_CTS2SELF_FOR_STA_MAX),
+
 	REG_VARIABLE(CFG_EDCA_VO_CWMIN_VALUE_NAME, WLAN_PARAM_Integer,
 			struct hdd_config, edca_vo_cwmin,
 			VAR_FLAGS_OPTIONAL |
@@ -3903,6 +3936,31 @@ REG_TABLE_ENTRY g_registry_table[] = {
 			CFG_EDCA_BE_AIFS_VALUE_DEFAULT,
 			CFG_EDCA_BE_AIFS_VALUE_MIN,
 			CFG_EDCA_BE_AIFS_VALUE_MAX),
+
+	REG_VARIABLE_STRING(CFG_ENABLE_TX_SCHED_WRR_VO_NAME,
+			WLAN_PARAM_String,
+			struct hdd_config, tx_sched_wrr_vo,
+			VAR_FLAGS_OPTIONAL,
+			(void *) CFG_ENABLE_TX_SCHED_WRR_VO_DEFAULT),
+
+	REG_VARIABLE_STRING(CFG_ENABLE_TX_SCHED_WRR_VI_NAME,
+			WLAN_PARAM_String,
+			struct hdd_config, tx_sched_wrr_vi,
+			VAR_FLAGS_OPTIONAL,
+			(void *) CFG_ENABLE_TX_SCHED_WRR_VI_DEFAULT),
+
+	REG_VARIABLE_STRING(CFG_ENABLE_TX_SCHED_WRR_BE_NAME,
+			WLAN_PARAM_String,
+			struct hdd_config, tx_sched_wrr_be,
+			VAR_FLAGS_OPTIONAL,
+			(void *) CFG_ENABLE_TX_SCHED_WRR_BE_DEFAULT),
+
+	REG_VARIABLE_STRING(CFG_ENABLE_TX_SCHED_WRR_BK_NAME,
+			WLAN_PARAM_String,
+			struct hdd_config, tx_sched_wrr_bk,
+			VAR_FLAGS_OPTIONAL,
+			(void *) CFG_ENABLE_TX_SCHED_WRR_BK_DEFAULT),
+
 #ifdef WLAN_FEATURE_NAN_DATAPATH
 	REG_VARIABLE(CFG_ENABLE_NAN_DATAPATH_NAME, WLAN_PARAM_Integer,
 		struct hdd_config, enable_nan_datapath,
@@ -3918,6 +3976,26 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		CFG_ENABLE_NAN_NDI_CHANNEL_MIN,
 		CFG_ENABLE_NAN_NDI_CHANNEL_MAX),
 #endif
+	REG_VARIABLE(CFG_CREATE_BUG_REPORT_FOR_SCAN, WLAN_PARAM_Integer,
+		struct hdd_config, bug_report_for_no_scan_results,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_CREATE_BUG_REPORT_FOR_SCAN_DEFAULT,
+		CFG_CREATE_BUG_REPORT_FOR_SCAN_DISABLE,
+		CFG_CREATE_BUG_REPORT_FOR_SCAN_ENABLE),
+
+	REG_VARIABLE(CFG_USER_AUTO_CHANNEL_SELECTION, WLAN_PARAM_Integer,
+		struct hdd_config, vendor_acs_support,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_USER_AUTO_CHANNEL_SELECTION_DEFAULT,
+		CFG_USER_AUTO_CHANNEL_SELECTION_DISABLE,
+		CFG_USER_AUTO_CHANNEL_SELECTION_ENABLE),
+
+	REG_VARIABLE(CFG_USER_ACS_DFS_LTE, WLAN_PARAM_Integer,
+		struct hdd_config, acs_support_for_dfs_ltecoex,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_USER_ACS_DFS_LTE_DEFAULT,
+		CFG_USER_ACS_DFS_LTE_DISABLE,
+		CFG_USER_ACS_DFS_LTE_ENABLE),
 
 	REG_VARIABLE(CFG_ENABLE_DP_TRACE, WLAN_PARAM_Integer,
 		struct hdd_config, enable_dp_trace,
@@ -3968,6 +4046,20 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		CFG_ADAPT_DWELL_LPF_WEIGHT_MIN,
 		CFG_ADAPT_DWELL_LPF_WEIGHT_MAX),
 
+	REG_VARIABLE(CFG_SUB_20_CHANNEL_WIDTH_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, enable_sub_20_channel_width,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_SUB_20_CHANNEL_WIDTH_DEFAULT,
+		     CFG_SUB_20_CHANNEL_WIDTH_MIN,
+		     CFG_SUB_20_CHANNEL_WIDTH_MAX),
+
+	REG_VARIABLE(CFG_TGT_GTX_USR_CFG_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, tgt_gtx_usr_cfg,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_TGT_GTX_USR_CFG_DEFAULT,
+		     CFG_TGT_GTX_USR_CFG_MIN,
+		     CFG_TGT_GTX_USR_CFG_MAX),
+
 	REG_VARIABLE(CFG_ADAPT_DWELL_PASMON_INTVAL_NAME, WLAN_PARAM_Integer,
 		struct hdd_config, adapt_dwell_passive_mon_intval,
 		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -3981,8 +4073,228 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		CFG_ADAPT_DWELL_WIFI_THRESH_DEFAULT,
 		CFG_ADAPT_DWELL_WIFI_THRESH_MIN,
 		CFG_ADAPT_DWELL_WIFI_THRESH_MAX),
-};
 
+	REG_VARIABLE(CFG_RX_MODE_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, rx_mode,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_RX_MODE_DEFAULT,
+		CFG_RX_MODE_MIN,
+		CFG_RX_MODE_MAX),
+
+	REG_VARIABLE_STRING(CFG_RPS_RX_QUEUE_CPU_MAP_LIST_NAME,
+				 WLAN_PARAM_String,
+				 struct hdd_config, cpu_map_list,
+				 VAR_FLAGS_OPTIONAL,
+				 (void *)CFG_RPS_RX_QUEUE_CPU_MAP_LIST_DEFAULT),
+
+	REG_VARIABLE(CFG_INDOOR_CHANNEL_SUPPORT_NAME,
+		     WLAN_PARAM_Integer,
+		     struct hdd_config, indoor_channel_support,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_INDOOR_CHANNEL_SUPPORT_DEFAULT,
+		     CFG_INDOOR_CHANNEL_SUPPORT_MIN,
+		     CFG_INDOOR_CHANNEL_SUPPORT_MAX),
+
+	REG_VARIABLE(CFG_SAP_TX_LEAKAGE_THRESHOLD_NAME,
+		WLAN_PARAM_Integer,
+		struct hdd_config, sap_tx_leakage_threshold,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_SAP_TX_LEAKAGE_THRESHOLD_DEFAULT,
+		CFG_SAP_TX_LEAKAGE_THRESHOLD_MIN,
+		CFG_SAP_TX_LEAKAGE_THRESHOLD_MAX),
+
+	REG_VARIABLE(CFG_BUG_ON_REINIT_FAILURE_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, bug_on_reinit_failure,
+		     VAR_FLAGS_OPTIONAL |
+		     VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_BUG_ON_REINIT_FAILURE_DEFAULT,
+		     CFG_BUG_ON_REINIT_FAILURE_MIN,
+		     CFG_BUG_ON_REINIT_FAILURE_MAX),
+
+	REG_VARIABLE(CFG_SAP_FORCE_11N_FOR_11AC_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, sap_force_11n_for_11ac,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_SAP_FORCE_11N_FOR_11AC_DEFAULT,
+		     CFG_SAP_FORCE_11N_FOR_11AC_MIN,
+		     CFG_SAP_FORCE_11N_FOR_11AC_MAX),
+
+	REG_VARIABLE(CFG_INTERFACE_CHANGE_WAIT_NAME, WLAN_PARAM_Integer,
+			struct hdd_config, iface_change_wait_time,
+			VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK,
+			CFG_INTERFACE_CHANGE_WAIT_DEFAULT,
+			CFG_INTERFACE_CHANGE_WAIT_MIN,
+			CFG_INTERFACE_CHANGE_WAIT_MAX),
+
+	REG_VARIABLE(CFG_FILTER_MULTICAST_REPLAY_NAME,
+		WLAN_PARAM_Integer,
+		struct hdd_config, multicast_replay_filter,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_FILTER_MULTICAST_REPLAY_DEFAULT,
+		CFG_FILTER_MULTICAST_REPLAY_MIN,
+		CFG_FILTER_MULTICAST_REPLAY_MAX),
+
+	REG_VARIABLE(CFG_SIFS_BURST_DURATION_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, sifs_burst_duration,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_SIFS_BURST_DURATION_DEFAULT,
+		     CFG_SIFS_BURST_DURATION_MIN,
+		     CFG_SIFS_BURST_DURATION_MAX),
+	REG_VARIABLE(CFG_OPTIMIZE_CA_EVENT_NAME, WLAN_PARAM_Integer,
+			struct hdd_config, goptimize_chan_avoid_event,
+			VAR_FLAGS_OPTIONAL |
+			VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+			CFG_OPTIMIZE_CA_EVENT_DEFAULT,
+			CFG_OPTIMIZE_CA_EVENT_DISABLE,
+			CFG_OPTIMIZE_CA_EVENT_ENABLE),
+
+	REG_VARIABLE(CFG_TX_AGGREGATION_SIZE, WLAN_PARAM_Integer,
+		struct hdd_config, tx_aggregation_size,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_TX_AGGREGATION_SIZE_DEFAULT,
+		CFG_TX_AGGREGATION_SIZE_MIN,
+		CFG_TX_AGGREGATION_SIZE_MAX),
+
+	REG_VARIABLE(CFG_RX_AGGREGATION_SIZE, WLAN_PARAM_Integer,
+		struct hdd_config, rx_aggregation_size,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_RX_AGGREGATION_SIZE_DEFAULT,
+		CFG_RX_AGGREGATION_SIZE_MIN,
+		CFG_RX_AGGREGATION_SIZE_MAX),
+	REG_VARIABLE(CFG_SAP_MAX_INACTIVITY_OVERRIDE_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, sap_max_inactivity_override,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_SAP_MAX_INACTIVITY_OVERRIDE_DEFAULT,
+		CFG_SAP_MAX_INACTIVITY_OVERRIDE_MIN,
+		CFG_SAP_MAX_INACTIVITY_OVERRIDE_MAX),
+	REG_VARIABLE(CFG_CRASH_FW_TIMEOUT_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, fw_timeout_crash,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_CRASH_FW_TIMEOUT_DEFAULT,
+		CFG_CRASH_FW_TIMEOUT_DISABLE,
+		CFG_CRASH_FW_TIMEOUT_ENABLE),
+	REG_VARIABLE(CFG_RX_WAKELOCK_TIMEOUT_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, rx_wakelock_timeout,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_RX_WAKELOCK_TIMEOUT_DEFAULT,
+		CFG_RX_WAKELOCK_TIMEOUT_MIN,
+		CFG_RX_WAKELOCK_TIMEOUT_MAX),
+	REG_VARIABLE(CFG_MAX_SCHED_SCAN_PLAN_INT_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, max_sched_scan_plan_interval,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_MAX_SCHED_SCAN_PLAN_INT_DEFAULT,
+		CFG_MAX_SCHED_SCAN_PLAN_INT_MIN,
+		CFG_MAX_SCHED_SCAN_PLAN_INT_MAX),
+	REG_VARIABLE(CFG_MAX_SCHED_SCAN_PLAN_ITRNS_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, max_sched_scan_plan_iterations,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_MAX_SCHED_SCAN_PLAN_ITRNS_DEFAULT,
+		CFG_MAX_SCHED_SCAN_PLAN_ITRNS_MIN,
+		CFG_MAX_SCHED_SCAN_PLAN_ITRNS_MAX),
+
+	REG_VARIABLE(CFG_STANDARD_WEXT_CONTROL_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, standard_wext_control,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_STANDARD_WEXT_CONTROL_DEFAULT,
+		     CFG_STANDARD_WEXT_CONTROL_MIN,
+		     CFG_STANDARD_WEXT_CONTROL_MAX),
+	REG_VARIABLE(CFG_PRIVATE_WEXT_CONTROL_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, private_wext_control,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_PRIVATE_WEXT_CONTROL_DEFAULT,
+		     CFG_PRIVATE_WEXT_CONTROL_MIN,
+		     CFG_PRIVATE_WEXT_CONTROL_MAX),
+
+	REG_VARIABLE(CFG_SAP_INTERNAL_RESTART_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, sap_internal_restart,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_SAP_INTERNAL_RESTART_DEFAULT,
+		CFG_SAP_INTERNAL_RESTART_MIN,
+		CFG_SAP_INTERNAL_RESTART_MAX),
+
+	REG_VARIABLE(CFG_PER_ROAM_ENABLE_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, is_per_roam_enabled,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_PER_ROAM_ENABLE_DEFAULT,
+		CFG_PER_ROAM_ENABLE_MIN,
+		CFG_PER_ROAM_ENABLE_MAX),
+
+	REG_VARIABLE(CFG_PER_ROAM_CONFIG_HIGH_RATE_TH_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, per_roam_high_rate_threshold,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_PER_ROAM_CONFIG_HIGH_RATE_TH_DEFAULT,
+		CFG_PER_ROAM_CONFIG_HIGH_RATE_TH_MIN,
+		CFG_PER_ROAM_CONFIG_HIGH_RATE_TH_MAX),
+
+	REG_VARIABLE(CFG_PER_ROAM_CONFIG_LOW_RATE_TH_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, per_roam_low_rate_threshold,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_PER_ROAM_CONFIG_LOW_RATE_TH_DEFAULT,
+		CFG_PER_ROAM_CONFIG_LOW_RATE_TH_MIN,
+		CFG_PER_ROAM_CONFIG_LOW_RATE_TH_MAX),
+
+	REG_VARIABLE(CFG_PER_ROAM_CONFIG_RATE_TH_PERCENT_NAME,
+		WLAN_PARAM_Integer, struct hdd_config, per_roam_th_percent,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_PER_ROAM_CONFIG_RATE_TH_PERCENT_DEFAULT,
+		CFG_PER_ROAM_CONFIG_RATE_TH_PERCENT_MIN,
+		CFG_PER_ROAM_CONFIG_RATE_TH_PERCENT_MAX),
+
+	REG_VARIABLE(CFG_PER_ROAM_REST_TIME_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, per_roam_rest_time,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_PER_ROAM_REST_TIME_DEFAULT,
+		CFG_PER_ROAM_REST_TIME_MIN,
+		CFG_PER_ROAM_REST_TIME_MAX),
+
+	REG_VARIABLE(CFG_PER_ROAM_MONITOR_TIME, WLAN_PARAM_Integer,
+		struct hdd_config, per_roam_mon_time,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_PER_ROAM_MONTIOR_TIME_DEFAULT,
+		CFG_PER_ROAM_MONITOR_TIME_MIN,
+		CFG_PER_ROAM_MONITOR_TIME_MAX),
+
+	REG_VARIABLE(CFG_ACTIVE_BPF_MODE_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, active_bpf_mode,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_ACTIVE_BPF_MODE_DEFAULT,
+		CFG_ACTIVE_BPF_MODE_MIN,
+		CFG_ACTIVE_BPF_MODE_MAX),
+	REG_VARIABLE(CFG_ENABLE_BCAST_PROBE_RESP_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, enable_bcast_probe_rsp,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_ENABLE_BCAST_PROBE_RESP_DEFAULT,
+		CFG_ENABLE_BCAST_PROBE_RESP_MIN,
+		CFG_ENABLE_BCAST_PROBE_RESP_MAX),
+#ifdef WLAN_FEATURE_11AX
+	REG_VARIABLE(CFG_ENABLE_UL_MIMO_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, enable_ul_mimo,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_ENABLE_UL_MIMO_DEFAULT,
+		     CFG_ENABLE_UL_MIMO_MIN,
+		     CFG_ENABLE_UL_MIMO_MAX),
+
+	REG_VARIABLE(CFG_ENABLE_UL_OFDMA_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, enable_ul_ofdma,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_ENABLE_UL_OFDMA_DEFAULT,
+		     CFG_ENABLE_UL_OFDMA_MIN,
+		     CFG_ENABLE_UL_OFDMA_MAX),
+#endif
+
+	REG_VARIABLE(CFG_L1SS_SLEEP_ALLOWED_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, l1ss_sleep_allowed,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_L1SS_SLEEP_ALLOWED_DEFAULT,
+		CFG_L1SS_SLEEP_ALLOWED_MIN,
+		CFG_L1SS_SLEEP_ALLOWED_MAX),
+
+	REG_VARIABLE(CFG_ARP_AC_CATEGORY, WLAN_PARAM_Integer,
+		struct hdd_config, arp_ac_category,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_ARP_AC_CATEGORY_DEFAULT,
+		CFG_ARP_AC_CATEGORY_MIN,
+		CFG_ARP_AC_CATEGORY_MAX),
+};
 
 /**
  * get_next_line() - find and locate the new line pointer
@@ -4009,14 +4321,12 @@ static char *get_next_line(char *str)
 		c = *str;
 	}
 
-	if (c == '\0') {
+	if (c == '\0')
 		return NULL;
-	} else {
-		*str = '\0';
-		return str + 1;
-	}
 
-	return NULL;
+	*str = '\0';
+
+	return str + 1;
 }
 
 /** look for space. Ascii values to look are
@@ -4145,7 +4455,7 @@ static QDF_STATUS hdd_cfg_get_config(REG_TABLE_ENTRY *reg_table,
 		 * however the config is too big so we just printk() for now
 		 */
 #ifdef RETURN_IN_BUFFER
-		if (curlen <= buflen) {
+		if (curlen < buflen) {
 			/* copy string + '\0' */
 			memcpy(pCur, configStr, curlen + 1);
 
@@ -4199,8 +4509,7 @@ static QDF_STATUS find_cfg_item(tCfgIniEntry *iniTable, unsigned long entries,
 	for (i = 0; i < entries; i++) {
 		if (strcmp(iniTable[i].name, name) == 0) {
 			*value = iniTable[i].value;
-			QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-				  "Found %s entry for Name=[%s] Value=[%s] ",
+			hdd_info("Found %s entry for Name=[%s] Value=[%s] ",
 				  WLAN_INI_FILE, name, *value);
 			return QDF_STATUS_SUCCESS;
 		}
@@ -4295,7 +4604,7 @@ static QDF_STATUS hdd_apply_cfg_ini(hdd_context_t *pHddCtx,
 	int rv;
 
 	if (MAX_CFG_INI_ITEMS < cRegTableEntries) {
-		hddLog(LOGE, FL("MAX_CFG_INI_ITEMS too small, must be at least %ld"),
+		hdd_err("MAX_CFG_INI_ITEMS too small, must be at least %ld",
 		       cRegTableEntries);
 		WARN_ON(1);
 	}
@@ -4311,9 +4620,7 @@ static QDF_STATUS hdd_apply_cfg_ini(hdd_context_t *pHddCtx,
 		if ((match_status != QDF_STATUS_SUCCESS)
 		    && (pRegEntry->Flags & VAR_FLAGS_REQUIRED)) {
 			/* If we could not read the cfg item and it is required, this is an error. */
-			hddLog(LOGE,
-			       "%s: Failed to read required config parameter %s",
-			       __func__, pRegEntry->RegName);
+			hdd_err("Failed to read required config parameter %s", pRegEntry->RegName);
 			ret_status = QDF_STATUS_E_FAILURE;
 			break;
 		}
@@ -4327,9 +4634,7 @@ static QDF_STATUS hdd_apply_cfg_ini(hdd_context_t *pHddCtx,
 			    && (WLAN_PARAM_Integer == pRegEntry->RegType)) {
 				rv = kstrtou32(value_str, 10, &value);
 				if (rv < 0) {
-					hddLog(LOGE,
-					       "%s: Reg Parameter %s invalid. Enforcing default",
-					       __func__, pRegEntry->RegName);
+					hdd_err("Reg Parameter %s invalid. Enforcing default", pRegEntry->RegName);
 					value = pRegEntry->VarDefault;
 				}
 			} else if (match_status == QDF_STATUS_SUCCESS
@@ -4337,49 +4642,41 @@ static QDF_STATUS hdd_apply_cfg_ini(hdd_context_t *pHddCtx,
 				       pRegEntry->RegType)) {
 				rv = kstrtou32(value_str, 16, &value);
 				if (rv < 0) {
-					hddLog(LOGE,
-					       "%s: Reg paramter %s invalid. Enforcing default",
-					       __func__, pRegEntry->RegName);
+					hdd_err("Reg paramter %s invalid. Enforcing default", pRegEntry->RegName);
 					value = pRegEntry->VarDefault;
 				}
 			} else {
 				value = pRegEntry->VarDefault;
 			}
 
-			/* If this parameter needs range checking, do it here. */
-			if (pRegEntry->Flags & VAR_FLAGS_RANGE_CHECK) {
+			/* Only if the parameter is set in the ini file, do the range check here */
+			if (match_status == QDF_STATUS_SUCCESS &&
+			    pRegEntry->Flags & VAR_FLAGS_RANGE_CHECK) {
 				if (value > pRegEntry->VarMax) {
-					hddLog(LOGE,
-					       "%s: Reg Parameter %s > allowed Maximum [%u > %lu]. Enforcing Maximum",
-					       __func__, pRegEntry->RegName,
+					hdd_err("Reg Parameter %s > allowed Maximum [%u > %lu]. Enforcing Maximum", pRegEntry->RegName,
 					       value, pRegEntry->VarMax);
 					value = pRegEntry->VarMax;
 				}
 
 				if (value < pRegEntry->VarMin) {
-					hddLog(LOGE,
-					       "%s: Reg Parameter %s < allowed Minimum [%u < %lu]. Enforcing Minimum",
-					       __func__, pRegEntry->RegName,
+					hdd_err("Reg Parameter %s < allowed Minimum [%u < %lu]. Enforcing Minimum", pRegEntry->RegName,
 					       value, pRegEntry->VarMin);
 					value = pRegEntry->VarMin;
 				}
 			}
-			/* If this parameter needs range checking, do it here. */
-			else if (pRegEntry->
-				 Flags & VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT) {
+			/* Only if the parameter is set in the ini file, do the range check here */
+			else if (match_status == QDF_STATUS_SUCCESS &&
+				 pRegEntry->Flags &
+					VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT) {
 				if (value > pRegEntry->VarMax) {
-					hddLog(LOGE,
-					       "%s: Reg Parameter %s > allowed Maximum [%u > %lu]. Enforcing Default= %lu",
-					       __func__, pRegEntry->RegName,
+					hdd_err("Reg Parameter %s > allowed Maximum [%u > %lu]. Enforcing Default= %lu", pRegEntry->RegName,
 					       value, pRegEntry->VarMax,
 					       pRegEntry->VarDefault);
 					value = pRegEntry->VarDefault;
 				}
 
 				if (value < pRegEntry->VarMin) {
-					hddLog(LOGE,
-					       "%s: Reg Parameter %s < allowed Minimum [%u < %lu]. Enforcing Default= %lu",
-					       __func__, pRegEntry->RegName,
+					hdd_err("Reg Parameter %s < allowed Minimum [%u < %lu]. Enforcing Default= %lu", pRegEntry->RegName,
 					       value, pRegEntry->VarMin,
 					       pRegEntry->VarDefault);
 					value = pRegEntry->VarDefault;
@@ -4394,9 +4691,7 @@ static QDF_STATUS hdd_apply_cfg_ini(hdd_context_t *pHddCtx,
 			if (QDF_STATUS_SUCCESS == match_status) {
 				rv = kstrtos32(value_str, 10, &svalue);
 				if (rv < 0) {
-					hddLog(QDF_TRACE_LEVEL_WARN,
-					       "%s: Reg Parameter %s invalid. Enforcing Default",
-					       __func__, pRegEntry->RegName);
+					hdd_warn("Reg Parameter %s invalid. Enforcing Default", pRegEntry->RegName);
 					svalue =
 						(int32_t) pRegEntry->VarDefault;
 				}
@@ -4404,34 +4699,30 @@ static QDF_STATUS hdd_apply_cfg_ini(hdd_context_t *pHddCtx,
 				svalue = (int32_t) pRegEntry->VarDefault;
 			}
 
-			/* If this parameter needs range checking, do it here. */
-			if (pRegEntry->Flags & VAR_FLAGS_RANGE_CHECK) {
+			/* Only if the parameter is set in the ini file, do the range check here */
+			if (match_status == QDF_STATUS_SUCCESS &&
+			    pRegEntry->Flags & VAR_FLAGS_RANGE_CHECK) {
 				if (svalue > (int32_t) pRegEntry->VarMax) {
-					hddLog(LOGE,
-					       "%s: Reg Parameter %s > allowed Maximum "
-					       "[%d > %d]. Enforcing Maximum",
-					       __func__, pRegEntry->RegName,
+					hdd_err("Reg Parameter %s > allowed Maximum "
+					       "[%d > %d]. Enforcing Maximum", pRegEntry->RegName,
 					       svalue, (int)pRegEntry->VarMax);
 					svalue = (int32_t) pRegEntry->VarMax;
 				}
 
 				if (svalue < (int32_t) pRegEntry->VarMin) {
-					hddLog(LOGE,
-					       "%s: Reg Parameter %s < allowed Minimum "
-					       "[%d < %d]. Enforcing Minimum",
-					       __func__, pRegEntry->RegName,
+					hdd_err("Reg Parameter %s < allowed Minimum "
+					       "[%d < %d]. Enforcing Minimum", pRegEntry->RegName,
 					       svalue, (int)pRegEntry->VarMin);
 					svalue = (int32_t) pRegEntry->VarMin;
 				}
 			}
-			/* If this parameter needs range checking, do it here. */
-			else if (pRegEntry->
-				 Flags & VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT) {
+			/* Only if the parameter is set in the ini file, do the range check here */
+			else if (match_status == QDF_STATUS_SUCCESS &&
+				 pRegEntry->Flags &
+					VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT) {
 				if (svalue > (int32_t) pRegEntry->VarMax) {
-					hddLog(LOGE,
-					       "%s: Reg Parameter %s > allowed Maximum "
-					       "[%d > %d]. Enforcing Default= %d",
-					       __func__, pRegEntry->RegName,
+					hdd_err("Reg Parameter %s > allowed Maximum "
+					       "[%d > %d]. Enforcing Default= %d", pRegEntry->RegName,
 					       svalue, (int)pRegEntry->VarMax,
 					       (int)pRegEntry->VarDefault);
 					svalue =
@@ -4439,10 +4730,8 @@ static QDF_STATUS hdd_apply_cfg_ini(hdd_context_t *pHddCtx,
 				}
 
 				if (svalue < (int32_t) pRegEntry->VarMin) {
-					hddLog(LOGE,
-					       "%s: Reg Parameter %s < allowed Minimum "
-					       "[%d < %d]. Enforcing Default= %d",
-					       __func__, pRegEntry->RegName,
+					hdd_err("Reg Parameter %s < allowed Minimum "
+					       "[%d < %d]. Enforcing Default= %d", pRegEntry->RegName,
 					       svalue, (int)pRegEntry->VarMin,
 					       (int)pRegEntry->VarDefault);
 					svalue = pRegEntry->VarDefault;
@@ -4454,8 +4743,7 @@ static QDF_STATUS hdd_apply_cfg_ini(hdd_context_t *pHddCtx,
 		/* Handle string parameters */
 		else if (WLAN_PARAM_String == pRegEntry->RegType) {
 #ifdef WLAN_CFG_DEBUG
-			QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-				  "RegName = %s, VarOffset %u VarSize %u VarDefault %s",
+			hdd_info("RegName = %s, VarOffset %u VarSize %u VarDefault %s",
 				  pRegEntry->RegName, pRegEntry->VarOffset,
 				  pRegEntry->VarSize,
 				  (char *)pRegEntry->VarDefault);
@@ -4465,9 +4753,7 @@ static QDF_STATUS hdd_apply_cfg_ini(hdd_context_t *pHddCtx,
 				len_value_str = strlen(value_str);
 
 				if (len_value_str > (pRegEntry->VarSize - 1)) {
-					hddLog(LOGE,
-					       "%s: Invalid Value=[%s] specified for Name=[%s] in %s",
-					       __func__, value_str,
+					hdd_err("Invalid Value=[%s] specified for Name=[%s] in %s", value_str,
 					       pRegEntry->RegName,
 					       WLAN_INI_FILE);
 					cbOutString =
@@ -4497,9 +4783,7 @@ static QDF_STATUS hdd_apply_cfg_ini(hdd_context_t *pHddCtx,
 			}
 		} else if (WLAN_PARAM_MacAddr == pRegEntry->RegType) {
 			if (pRegEntry->VarSize != QDF_MAC_ADDR_SIZE) {
-				hddLog(LOGE,
-				       "%s: Invalid VarSize %u for Name=[%s]",
-				       __func__, pRegEntry->VarSize,
+				hdd_err("Invalid VarSize %u for Name=[%s]", pRegEntry->VarSize,
 				       pRegEntry->RegName);
 				continue;
 			}
@@ -4507,9 +4791,7 @@ static QDF_STATUS hdd_apply_cfg_ini(hdd_context_t *pHddCtx,
 			if (match_status == QDF_STATUS_SUCCESS) {
 				len_value_str = strlen(value_str);
 				if (len_value_str != (QDF_MAC_ADDR_SIZE * 2)) {
-					hddLog(LOGE,
-					       "%s: Invalid MAC addr [%s] specified for Name=[%s] in %s",
-					       __func__, value_str,
+					hdd_err("Invalid MAC addr [%s] specified for Name=[%s] in %s", value_str,
 					       pRegEntry->RegName,
 					       WLAN_INI_FILE);
 				} else
@@ -4523,9 +4805,7 @@ static QDF_STATUS hdd_apply_cfg_ini(hdd_context_t *pHddCtx,
 					       parse_hex_digit(candidate[i * 2 + 1]));
 			}
 		} else {
-			hddLog(LOGE,
-			       "%s: Unknown param type for name[%s] in registry table",
-			       __func__, pRegEntry->RegName);
+			hdd_err("Unknown param type for name[%s] in registry table", pRegEntry->RegName);
 		}
 
 		/* did we successfully parse a cfg item for this parameter? */
@@ -4575,9 +4855,7 @@ static QDF_STATUS hdd_execute_config_command(REG_TABLE_ENTRY *reg_table,
 	/* clone the command so that we can manipulate it */
 	clone = kstrdup(command, GFP_ATOMIC);
 	if (NULL == clone) {
-		hddLog(LOGE,
-		       "%s: memory allocation failure, unable to process [%s]",
-		       __func__, command);
+		hdd_err("memory allocation failure, unable to process [%s]", command);
 		return vstatus;
 	}
 	/* 'clone' will point to the beginning of the string so it can be freed
@@ -4589,8 +4867,7 @@ static QDF_STATUS hdd_execute_config_command(REG_TABLE_ENTRY *reg_table,
 	pCmd = i_trim(pCmd);
 	if ('\0' == *pCmd) {
 		/* only whitespace */
-		hddLog(LOGE, "%s: invalid command, only whitespace:[%s]",
-		       __func__, command);
+		hdd_err("invalid command, only whitespace:[%s]", command);
 		goto done;
 	}
 	/* parse the <name> = <value> */
@@ -4600,8 +4877,7 @@ static QDF_STATUS hdd_execute_config_command(REG_TABLE_ENTRY *reg_table,
 	}
 	if ('\0' == *pCmd) {
 		/* did not find '=' */
-		hddLog(LOGE, "%s: invalid command, no '=':[%s]",
-		       __func__, command);
+		hdd_err("invalid command, no '=':[%s]", command);
 		goto done;
 	}
 	/* replace '=' with NUL to terminate the <name> */
@@ -4609,16 +4885,14 @@ static QDF_STATUS hdd_execute_config_command(REG_TABLE_ENTRY *reg_table,
 	name = i_trim(name);
 	if ('\0' == *name) {
 		/* did not find a name */
-		hddLog(LOGE, "%s: invalid command, no <name>:[%s]",
-		       __func__, command);
+		hdd_err("invalid command, no <name>:[%s]", command);
 		goto done;
 	}
 
 	value_str = i_trim(pCmd);
 	if ('\0' == *value_str) {
 		/* did not find a value */
-		hddLog(LOGE, "%s: invalid command, no <value>:[%s]",
-		       __func__, command);
+		hdd_err("invalid command, no <value>:[%s]", command);
 		goto done;
 	}
 	/* lookup the configuration item */
@@ -4630,17 +4904,15 @@ static QDF_STATUS hdd_execute_config_command(REG_TABLE_ENTRY *reg_table,
 	}
 	if (tableSize == idx) {
 		/* did not match the name */
-		hddLog(LOGE,
-		       "%s: invalid command, unknown configuration item:[%s]",
-		       __func__, command);
+		hdd_err("invalid command, unknown configuration item:[%s]", command);
 		goto done;
 	}
 
 	pRegEntry = &reg_table[idx];
 	if (!(pRegEntry->Flags & VAR_FLAGS_DYNAMIC_CFG)) {
 		/* does not support dynamic configuration */
-		hddLog(LOGE, "%s: Global_Registry_Table.%s does not support "
-		       "dynamic configuration", __func__, name);
+		hdd_err("Global_Registry_Table.%s does not support "
+		       "dynamic configuration", name);
 		vstatus = QDF_STATUS_E_PERM;
 		goto done;
 	}
@@ -4654,16 +4926,12 @@ static QDF_STATUS hdd_execute_config_command(REG_TABLE_ENTRY *reg_table,
 			goto done;
 		if (value < pRegEntry->VarMin) {
 			/* out of range */
-			hddLog(LOGE,
-			       "%s: invalid command, value %u < min value %lu",
-			       __func__, value, pRegEntry->VarMin);
+			hdd_err("invalid command, value %u < min value %lu", value, pRegEntry->VarMin);
 			goto done;
 		}
 		if (value > pRegEntry->VarMax) {
 			/* out of range */
-			hddLog(LOGE,
-			       "%s: invalid command, value %u > max value %lu",
-			       __func__, value, pRegEntry->VarMax);
+			hdd_err("invalid command, value %u > max value %lu", value, pRegEntry->VarMax);
 			goto done;
 		}
 		memcpy(pField, &value, pRegEntry->VarSize);
@@ -4675,16 +4943,12 @@ static QDF_STATUS hdd_execute_config_command(REG_TABLE_ENTRY *reg_table,
 			goto done;
 		if (value < pRegEntry->VarMin) {
 			/* out of range */
-			hddLog(LOGE,
-			       "%s: invalid command, value %x < min value %lx",
-			       __func__, value, pRegEntry->VarMin);
+			hdd_err("invalid command, value %x < min value %lx", value, pRegEntry->VarMin);
 			goto done;
 		}
 		if (value > pRegEntry->VarMax) {
 			/* out of range */
-			hddLog(LOGE,
-			       "%s: invalid command, value %x > max value %lx",
-			       __func__, value, pRegEntry->VarMax);
+			hdd_err("invalid command, value %x > max value %lx", value, pRegEntry->VarMax);
 			goto done;
 		}
 		memcpy(pField, &value, pRegEntry->VarSize);
@@ -4696,16 +4960,12 @@ static QDF_STATUS hdd_execute_config_command(REG_TABLE_ENTRY *reg_table,
 			goto done;
 		if (svalue < (int32_t) pRegEntry->VarMin) {
 			/* out of range */
-			hddLog(LOGE,
-			       "%s: invalid command, value %d < min value %d",
-			       __func__, svalue, (int)pRegEntry->VarMin);
+			hdd_err("invalid command, value %d < min value %d", svalue, (int)pRegEntry->VarMin);
 			goto done;
 		}
 		if (svalue > (int32_t) pRegEntry->VarMax) {
 			/* out of range */
-			hddLog(LOGE,
-			       "%s: invalid command, value %d > max value %d",
-			       __func__, svalue, (int)pRegEntry->VarMax);
+			hdd_err("invalid command, value %d > max value %d", svalue, (int)pRegEntry->VarMax);
 			goto done;
 		}
 		memcpy(pField, &svalue, pRegEntry->VarSize);
@@ -4715,10 +4975,8 @@ static QDF_STATUS hdd_execute_config_command(REG_TABLE_ENTRY *reg_table,
 		len_value_str = strlen(value_str);
 		if (len_value_str > (pRegEntry->VarSize - 1)) {
 			/* too big */
-			hddLog(LOGE,
-			       "%s: invalid command, string [%s] length "
-			       "%zu exceeds maximum length %u",
-			       __func__, value_str,
+			hdd_err("invalid command, string [%s] length "
+			       "%zu exceeds maximum length %u", value_str,
 			       len_value_str, (pRegEntry->VarSize - 1));
 			goto done;
 		}
@@ -4730,10 +4988,8 @@ static QDF_STATUS hdd_execute_config_command(REG_TABLE_ENTRY *reg_table,
 		len_value_str = strlen(value_str);
 		if (len_value_str != (QDF_MAC_ADDR_SIZE * 2)) {
 			/* out of range */
-			hddLog(LOGE,
-			       "%s: invalid command, MAC address [%s] length "
-			       "%zu is not expected length %u",
-			       __func__, value_str,
+			hdd_err("invalid command, MAC address [%s] length "
+			       "%zu is not expected length %u", value_str,
 			       len_value_str, (QDF_MAC_ADDR_SIZE * 2));
 			goto done;
 		}
@@ -4817,6 +5073,35 @@ static void hdd_cfg_print_runtime_pm(hdd_context_t *hdd_ctx)
 #endif
 
 /**
+ * hdd_per_roam_print_ini_config()- Print PER roam specific INI configuration
+ * @hdd_ctx: handle to hdd context
+ *
+ * Return: None
+ */
+static void hdd_per_roam_print_ini_config(hdd_context_t *hdd_ctx)
+{
+	hdd_info("Name = [%s] Value = [%u]",
+		CFG_PER_ROAM_ENABLE_NAME,
+		hdd_ctx->config->is_per_roam_enabled);
+	hdd_info("Name = [%s] Value = [%u]",
+		CFG_PER_ROAM_CONFIG_HIGH_RATE_TH_NAME,
+		hdd_ctx->config->per_roam_high_rate_threshold);
+	hdd_info("Name = [%s] Value = [%u]",
+		CFG_PER_ROAM_CONFIG_LOW_RATE_TH_NAME,
+		hdd_ctx->config->per_roam_low_rate_threshold);
+	hdd_info("Name = [%s] Value = [%u]",
+		CFG_PER_ROAM_CONFIG_RATE_TH_PERCENT_NAME,
+		hdd_ctx->config->per_roam_th_percent);
+	hdd_info("Name = [%s] Value = [%u]",
+		CFG_PER_ROAM_REST_TIME_NAME,
+		hdd_ctx->config->per_roam_rest_time);
+	hdd_info("Name = [%s] Value = [%u]",
+		CFG_PER_ROAM_MONITOR_TIME,
+		hdd_ctx->config->per_roam_mon_time);
+
+}
+
+/**
  * hdd_cfg_print() - print the hdd configuration
  * @iniTable: pointer to hdd context
  *
@@ -4826,741 +5111,520 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
 {
 	int i;
 
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "*********Config values in HDD Adapter*******");
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [RTSThreshold] Value = %u",
+	hdd_info("*********Config values in HDD Adapter*******");
+	hdd_info("Name = [RTSThreshold] Value = %u",
 		  pHddCtx->config->RTSThreshold);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [OperatingChannel] Value = [%u]",
+	hdd_info("Name = [OperatingChannel] Value = [%u]",
 		  pHddCtx->config->OperatingChannel);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [PowerUsageControl] Value = [%s]",
+	hdd_info("Name = [PowerUsageControl] Value = [%s]",
 		  pHddCtx->config->PowerUsageControl);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [fIsImpsEnabled] Value = [%u]",
+	hdd_info("Name = [fIsImpsEnabled] Value = [%u]",
 		  pHddCtx->config->fIsImpsEnabled);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [nVccRssiTrigger] Value = [%u]",
+	hdd_info("Name = [nVccRssiTrigger] Value = [%u]",
 		  pHddCtx->config->nVccRssiTrigger);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gIbssBssid] Value =[" MAC_ADDRESS_STR "]",
+	hdd_info("Name = [gIbssBssid] Value =[" MAC_ADDRESS_STR "]",
 		  MAC_ADDR_ARRAY(pHddCtx->config->IbssBssid.bytes));
 
 	for (i = 0; i < QDF_MAX_CONCURRENCY_PERSONA; i++) {
-		QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-			  "Name = [Intf%dMacAddress] Value =[" MAC_ADDRESS_STR "]",
+		hdd_info("Name = [Intf%dMacAddress] Value =[" MAC_ADDRESS_STR "]",
 			  i, MAC_ADDR_ARRAY(pHddCtx->config->intfMacAddr[i].bytes));
 	}
 
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gApEnableUapsd] value = [%u]",
+	hdd_info("Name = [gApEnableUapsd] value = [%u]",
 		  pHddCtx->config->apUapsdEnabled);
 
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gEnableApProt] value = [%u]",
+	hdd_info("Name = [gEnableApProt] value = [%u]",
 		  pHddCtx->config->apProtEnabled);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gAPAutoShutOff] Value = [%u]",
+	hdd_info("Name = [gAPAutoShutOff] Value = [%u]",
 		  pHddCtx->config->nAPAutoShutOff);
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gWlanMccToSccSwitchMode] Value = [%u]",
+	hdd_info("Name = [gWlanMccToSccSwitchMode] Value = [%u]",
 		  pHddCtx->config->WlanMccToSccSwitchMode);
 #endif
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gWlanAutoShutdown] Value = [%u]",
+	hdd_info("Name = [gWlanAutoShutdown] Value = [%u]",
 		  pHddCtx->config->WlanAutoShutdown);
 #endif
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gEnableListenMode] Value = [%u]",
-		  pHddCtx->config->nEnableListenMode);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gApProtection] value = [%u]",
+	hdd_info("Name = [gApProtection] value = [%u]",
 		  pHddCtx->config->apProtection);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gEnableApOBSSProt] value = [%u]",
+	hdd_info("Name = [gEnableApOBSSProt] value = [%u]",
 		  pHddCtx->config->apOBSSProtEnabled);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		"Name = [%s] value = [%u]", CFG_FORCE_SAP_ACS,
+	hdd_info("Name = [%s] value = [%u]", CFG_FORCE_SAP_ACS,
 		pHddCtx->config->force_sap_acs);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		"Name = [%s] value = [%u]", CFG_FORCE_SAP_ACS_START_CH,
+	hdd_info("Name = [%s] value = [%u]", CFG_FORCE_SAP_ACS_START_CH,
 		pHddCtx->config->force_sap_acs_st_ch);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		"Name = [%s] value = [%u]", CFG_FORCE_SAP_ACS_END_CH,
+	hdd_info("Name = [%s] value = [%u]", CFG_FORCE_SAP_ACS_END_CH,
 		pHddCtx->config->force_sap_acs_end_ch);
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE
-	QDF_TRACE(QDF_MODULE_ID_HDD,
-		  QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [sap_channel_avoidance] value = [%u]",
+	hdd_info("Name = [sap_channel_avoidance] value = [%u]",
 		  pHddCtx->config->sap_channel_avoidance);
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		"Name = [%s] value = [%u]", CFG_SAP_P2P_11AC_OVERRIDE_NAME,
+	hdd_info("Name = [%s] value = [%u]", CFG_SAP_P2P_11AC_OVERRIDE_NAME,
 				pHddCtx->config->sap_p2p_11ac_override);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [ChannelBondingMode] Value = [%u]",
+	hdd_info("Name = [ChannelBondingMode] Value = [%u]",
 		  pHddCtx->config->nChannelBondingMode24GHz);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [ChannelBondingMode] Value = [%u]",
+	hdd_info("Name = [ChannelBondingMode] Value = [%u]",
 		  pHddCtx->config->nChannelBondingMode5GHz);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [dot11Mode] Value = [%u]",
+	hdd_info("Name = [dot11Mode] Value = [%u]",
 		  pHddCtx->config->dot11Mode);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [WmmMode] Value = [%u] ", pHddCtx->config->WmmMode);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [UapsdMask] Value = [0x%x] ",
+	hdd_info("Name = [WmmMode] Value = [%u] ", pHddCtx->config->WmmMode);
+	hdd_info("Name = [UapsdMask] Value = [0x%x] ",
 		  pHddCtx->config->UapsdMask);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [ImplicitQosIsEnabled] Value = [%u]",
+	hdd_info("Name = [ImplicitQosIsEnabled] Value = [%u]",
 		  (int)pHddCtx->config->bImplicitQosEnabled);
 
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [InfraUapsdVoSrvIntv] Value = [%u] ",
+	hdd_info("Name = [InfraUapsdVoSrvIntv] Value = [%u] ",
 		  pHddCtx->config->InfraUapsdVoSrvIntv);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [InfraUapsdVoSuspIntv] Value = [%u] ",
+	hdd_info("Name = [InfraUapsdVoSuspIntv] Value = [%u] ",
 		  pHddCtx->config->InfraUapsdVoSuspIntv);
 
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [InfraUapsdViSrvIntv] Value = [%u] ",
+	hdd_info("Name = [InfraUapsdViSrvIntv] Value = [%u] ",
 		  pHddCtx->config->InfraUapsdViSrvIntv);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [InfraUapsdViSuspIntv] Value = [%u] ",
+	hdd_info("Name = [InfraUapsdViSuspIntv] Value = [%u] ",
 		  pHddCtx->config->InfraUapsdViSuspIntv);
 
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [InfraUapsdBeSrvIntv] Value = [%u] ",
+	hdd_info("Name = [InfraUapsdBeSrvIntv] Value = [%u] ",
 		  pHddCtx->config->InfraUapsdBeSrvIntv);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [InfraUapsdBeSuspIntv] Value = [%u] ",
+	hdd_info("Name = [InfraUapsdBeSuspIntv] Value = [%u] ",
 		  pHddCtx->config->InfraUapsdBeSuspIntv);
 
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [InfraUapsdBkSrvIntv] Value = [%u] ",
+	hdd_info("Name = [InfraUapsdBkSrvIntv] Value = [%u] ",
 		  pHddCtx->config->InfraUapsdBkSrvIntv);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [InfraUapsdBkSuspIntv] Value = [%u] ",
+	hdd_info("Name = [InfraUapsdBkSuspIntv] Value = [%u] ",
 		  pHddCtx->config->InfraUapsdBkSuspIntv);
 #ifdef FEATURE_WLAN_ESE
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [InfraInactivityInterval] Value = [%u] ",
+	hdd_info("Name = [InfraInactivityInterval] Value = [%u] ",
 		  pHddCtx->config->InfraInactivityInterval);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [EseEnabled] Value = [%u] ",
+	hdd_info("Name = [EseEnabled] Value = [%u] ",
 		  pHddCtx->config->isEseIniFeatureEnabled);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [FastTransitionEnabled] Value = [%u] ",
+	hdd_info("Name = [FastTransitionEnabled] Value = [%u] ",
 		  pHddCtx->config->isFastTransitionEnabled);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gTxPowerCap] Value = [%u] dBm ",
+	hdd_info("Name = [gTxPowerCap] Value = [%u] dBm ",
 		  pHddCtx->config->nTxPowerCap);
 #endif
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [FastRoamEnabled] Value = [%u] ",
+	hdd_info("Name = [gAllowTPCfromAP] Value = [%u] ",
+		  pHddCtx->config->allow_tpc_from_ap);
+	hdd_info("Name = [FastRoamEnabled] Value = [%u] ",
 		  pHddCtx->config->isFastRoamIniFeatureEnabled);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [MAWCEnabled] Value = [%u] ",
+	hdd_info("Name = [MAWCEnabled] Value = [%u] ",
 		  pHddCtx->config->MAWCEnabled);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [RoamRssiDiff] Value = [%u] ",
+	hdd_info("Name = [RoamRssiDiff] Value = [%u] ",
 		  pHddCtx->config->RoamRssiDiff);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [isWESModeEnabled] Value = [%u] ",
+	hdd_info("Name = [isWESModeEnabled] Value = [%u] ",
 		  pHddCtx->config->isWESModeEnabled);
-#ifdef FEATURE_WLAN_OKC
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [OkcEnabled] Value = [%u] ",
+	hdd_info("Name = [OkcEnabled] Value = [%u] ",
 		  pHddCtx->config->isOkcIniFeatureEnabled);
-#endif
 #ifdef FEATURE_WLAN_SCAN_PNO
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [configPNOScanSupport] Value = [%u] ",
+	hdd_info("Name = [configPNOScanSupport] Value = [%u] ",
 		  pHddCtx->config->configPNOScanSupport);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [configPNOScanTimerRepeatValue] Value = [%u] ",
+	hdd_info("Name = [configPNOScanTimerRepeatValue] Value = [%u] ",
 		  pHddCtx->config->configPNOScanTimerRepeatValue);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gPNOSlowScanMultiplier] Value = [%u] ",
+	hdd_info("Name = [gPNOSlowScanMultiplier] Value = [%u] ",
 		  pHddCtx->config->pno_slow_scan_multiplier);
 #endif
 #ifdef FEATURE_WLAN_TDLS
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [fEnableTDLSSupport] Value = [%u] ",
+	hdd_info("Name = [fEnableTDLSSupport] Value = [%u] ",
 		  pHddCtx->config->fEnableTDLSSupport);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [fEnableTDLSImplicitTrigger] Value = [%u] ",
+	hdd_info("Name = [fEnableTDLSImplicitTrigger] Value = [%u] ",
 		  pHddCtx->config->fEnableTDLSImplicitTrigger);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [fTDLSExternalControl] Value = [%u] ",
+	hdd_info("Name = [fTDLSExternalControl] Value = [%u] ",
 		  pHddCtx->config->fTDLSExternalControl);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [fTDLSUapsdMask] Value = [%u] ",
+	hdd_info("Name = [fTDLSUapsdMask] Value = [%u] ",
 		  pHddCtx->config->fTDLSUapsdMask);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [fEnableTDLSBufferSta] Value = [%u] ",
+	hdd_info("Name = [fEnableTDLSBufferSta] Value = [%u] ",
 		  pHddCtx->config->fEnableTDLSBufferSta);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [fEnableTDLSWmmMode] Value = [%u] ",
+	hdd_info("Name = [fEnableTDLSWmmMode] Value = [%u] ",
 		  pHddCtx->config->fEnableTDLSWmmMode);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [enable_tdls_scan] Value = [%u]",
+	hdd_info("Name = [enable_tdls_scan] Value = [%u]",
 		  pHddCtx->config->enable_tdls_scan);
 #endif
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [InfraDirAcVo] Value = [%u] ",
+	hdd_info("Name = [InfraDirAcVo] Value = [%u] ",
 		  pHddCtx->config->InfraDirAcVo);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [InfraNomMsduSizeAcVo] Value = [0x%x] ",
+	hdd_info("Name = [InfraNomMsduSizeAcVo] Value = [0x%x] ",
 		  pHddCtx->config->InfraNomMsduSizeAcVo);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [InfraMeanDataRateAcVo] Value = [0x%x] ",
+	hdd_info("Name = [InfraMeanDataRateAcVo] Value = [0x%x] ",
 		  pHddCtx->config->InfraMeanDataRateAcVo);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [InfraMinPhyRateAcVo] Value = [0x%x] ",
+	hdd_info("Name = [InfraMinPhyRateAcVo] Value = [0x%x] ",
 		  pHddCtx->config->InfraMinPhyRateAcVo);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [InfraSbaAcVo] Value = [0x%x] ",
+	hdd_info("Name = [InfraSbaAcVo] Value = [0x%x] ",
 		  pHddCtx->config->InfraSbaAcVo);
 
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [InfraDirAcVi] Value = [%u] ",
+	hdd_info("Name = [InfraDirAcVi] Value = [%u] ",
 		  pHddCtx->config->InfraDirAcVi);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [InfraNomMsduSizeAcVi] Value = [0x%x] ",
+	hdd_info("Name = [InfraNomMsduSizeAcVi] Value = [0x%x] ",
 		  pHddCtx->config->InfraNomMsduSizeAcVi);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [InfraMeanDataRateAcVi] Value = [0x%x] ",
+	hdd_info("Name = [InfraMeanDataRateAcVi] Value = [0x%x] ",
 		  pHddCtx->config->InfraMeanDataRateAcVi);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [InfraMinPhyRateAcVi] Value = [0x%x] ",
+	hdd_info("Name = [InfraMinPhyRateAcVi] Value = [0x%x] ",
 		  pHddCtx->config->InfraMinPhyRateAcVi);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [InfraSbaAcVi] Value = [0x%x] ",
+	hdd_info("Name = [InfraSbaAcVi] Value = [0x%x] ",
 		  pHddCtx->config->InfraSbaAcVi);
 
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [InfraDirAcBe] Value = [%u] ",
+	hdd_info("Name = [InfraDirAcBe] Value = [%u] ",
 		  pHddCtx->config->InfraDirAcBe);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [InfraNomMsduSizeAcBe] Value = [0x%x] ",
+	hdd_info("Name = [InfraNomMsduSizeAcBe] Value = [0x%x] ",
 		  pHddCtx->config->InfraNomMsduSizeAcBe);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [InfraMeanDataRateAcBe] Value = [0x%x] ",
+	hdd_info("Name = [InfraMeanDataRateAcBe] Value = [0x%x] ",
 		  pHddCtx->config->InfraMeanDataRateAcBe);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [InfraMinPhyRateAcBe] Value = [0x%x] ",
+	hdd_info("Name = [InfraMinPhyRateAcBe] Value = [0x%x] ",
 		  pHddCtx->config->InfraMinPhyRateAcBe);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [InfraSbaAcBe] Value = [0x%x] ",
+	hdd_info("Name = [InfraSbaAcBe] Value = [0x%x] ",
 		  pHddCtx->config->InfraSbaAcBe);
 
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [InfraDirAcBk] Value = [%u] ",
+	hdd_info("Name = [InfraDirAcBk] Value = [%u] ",
 		  pHddCtx->config->InfraDirAcBk);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [InfraNomMsduSizeAcBk] Value = [0x%x] ",
+	hdd_info("Name = [InfraNomMsduSizeAcBk] Value = [0x%x] ",
 		  pHddCtx->config->InfraNomMsduSizeAcBk);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [InfraMeanDataRateAcBk] Value = [0x%x] ",
+	hdd_info("Name = [InfraMeanDataRateAcBk] Value = [0x%x] ",
 		  pHddCtx->config->InfraMeanDataRateAcBk);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [InfraMinPhyRateAcBk] Value = [0x%x] ",
+	hdd_info("Name = [InfraMinPhyRateAcBk] Value = [0x%x] ",
 		  pHddCtx->config->InfraMinPhyRateAcBk);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [InfraSbaAcBk] Value = [0x%x] ",
+	hdd_info("Name = [InfraSbaAcBk] Value = [0x%x] ",
 		  pHddCtx->config->InfraSbaAcBk);
 
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [DelayedTriggerFrmInt] Value = [%u] ",
+	hdd_info("Name = [DelayedTriggerFrmInt] Value = [%u] ",
 		  pHddCtx->config->DelayedTriggerFrmInt);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [mcastBcastFilterSetting] Value = [%u] ",
+	hdd_info("Name = [mcastBcastFilterSetting] Value = [%u] ",
 		  pHddCtx->config->mcastBcastFilterSetting);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [fhostArpOffload] Value = [%u] ",
+	hdd_info("Name = [fhostArpOffload] Value = [%u] ",
 		  pHddCtx->config->fhostArpOffload);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [ssdp] Value = [%u] ", pHddCtx->config->ssdp);
+	hdd_info("Name = [ssdp] Value = [%u] ", pHddCtx->config->ssdp);
 	hdd_cfg_print_runtime_pm(pHddCtx);
 #ifdef FEATURE_WLAN_RA_FILTERING
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [RArateLimitInterval] Value = [%u] ",
+	hdd_info("Name = [RArateLimitInterval] Value = [%u] ",
 		  pHddCtx->config->RArateLimitInterval);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [IsRArateLimitEnabled] Value = [%u] ",
+	hdd_info("Name = [IsRArateLimitEnabled] Value = [%u] ",
 		  pHddCtx->config->IsRArateLimitEnabled);
 #endif
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [fFTResourceReqSupported] Value = [%u] ",
+	hdd_info("Name = [fFTResourceReqSupported] Value = [%u] ",
 		  pHddCtx->config->fFTResourceReqSupported);
 
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [nNeighborLookupRssiThreshold] Value = [%u] ",
+	hdd_info("Name = [nNeighborLookupRssiThreshold] Value = [%u] ",
 		  pHddCtx->config->nNeighborLookupRssiThreshold);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [delay_before_vdev_stop] Value = [%u] ",
+	hdd_info("Name = [delay_before_vdev_stop] Value = [%u] ",
 		  pHddCtx->config->delay_before_vdev_stop);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [nOpportunisticThresholdDiff] Value = [%u] ",
+	hdd_info("Name = [nOpportunisticThresholdDiff] Value = [%u] ",
 		  pHddCtx->config->nOpportunisticThresholdDiff);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [nRoamRescanRssiDiff] Value = [%u] ",
+	hdd_info("Name = [nRoamRescanRssiDiff] Value = [%u] ",
 		  pHddCtx->config->nRoamRescanRssiDiff);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [nNeighborScanMinChanTime] Value = [%u] ",
+	hdd_info("Name = [nNeighborScanMinChanTime] Value = [%u] ",
 		  pHddCtx->config->nNeighborScanMinChanTime);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [nNeighborScanMaxChanTime] Value = [%u] ",
+	hdd_info("Name = [nNeighborScanMaxChanTime] Value = [%u] ",
 		  pHddCtx->config->nNeighborScanMaxChanTime);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [nMaxNeighborRetries] Value = [%u] ",
+	hdd_info("Name = [nMaxNeighborRetries] Value = [%u] ",
 		  pHddCtx->config->nMaxNeighborReqTries);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [nNeighborScanPeriod] Value = [%u] ",
+	hdd_info("Name = [nNeighborScanPeriod] Value = [%u] ",
 		  pHddCtx->config->nNeighborScanPeriod);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [nNeighborScanResultsRefreshPeriod] Value = [%u] ",
+	hdd_info("Name = [nNeighborScanResultsRefreshPeriod] Value = [%u] ",
 		  pHddCtx->config->nNeighborResultsRefreshPeriod);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [nEmptyScanRefreshPeriod] Value = [%u] ",
+	hdd_info("Name = [nEmptyScanRefreshPeriod] Value = [%u] ",
 		  pHddCtx->config->nEmptyScanRefreshPeriod);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [nRoamBmissFirstBcnt] Value = [%u] ",
+	hdd_info("Name = [nRoamBmissFirstBcnt] Value = [%u] ",
 		  pHddCtx->config->nRoamBmissFirstBcnt);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [nRoamBmissFinalBcnt] Value = [%u] ",
+	hdd_info("Name = [nRoamBmissFinalBcnt] Value = [%u] ",
 		  pHddCtx->config->nRoamBmissFinalBcnt);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [nRoamBeaconRssiWeight] Value = [%u] ",
+	hdd_info("Name = [nRoamBeaconRssiWeight] Value = [%u] ",
 		  pHddCtx->config->nRoamBeaconRssiWeight);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [allowDFSChannelRoam] Value = [%u] ",
+	hdd_info("Name = [allowDFSChannelRoam] Value = [%u] ",
 		  pHddCtx->config->allowDFSChannelRoam);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [nhi_rssi_scan_max_count] Value = [%u] ",
+	hdd_info("Name = [nhi_rssi_scan_max_count] Value = [%u] ",
 		  pHddCtx->config->nhi_rssi_scan_max_count);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [nhi_rssi_scan_rssi_delta] Value = [%u] ",
+	hdd_info("Name = [nhi_rssi_scan_rssi_delta] Value = [%u] ",
 		  pHddCtx->config->nhi_rssi_scan_rssi_delta);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [nhi_rssi_scan_delay] Value = [%u] ",
+	hdd_info("Name = [nhi_rssi_scan_delay] Value = [%u] ",
 		  pHddCtx->config->nhi_rssi_scan_delay);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [nhi_rssi_scan_rssi_ub] Value = [%u] ",
+	hdd_info("Name = [nhi_rssi_scan_rssi_ub] Value = [%u] ",
 		  pHddCtx->config->nhi_rssi_scan_rssi_ub);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [burstSizeDefinition] Value = [0x%x] ",
+	hdd_info("Name = [burstSizeDefinition] Value = [0x%x] ",
 		  pHddCtx->config->burstSizeDefinition);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [tsInfoAckPolicy] Value = [0x%x] ",
+	hdd_info("Name = [tsInfoAckPolicy] Value = [0x%x] ",
 		  pHddCtx->config->tsInfoAckPolicy);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [rfSettlingTimeUs] Value = [%u] ",
+	hdd_info("Name = [rfSettlingTimeUs] Value = [%u] ",
 		  pHddCtx->config->rfSettlingTimeUs);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [bSingleTidRc] Value = [%u] ",
+	hdd_info("Name = [bSingleTidRc] Value = [%u] ",
 		  pHddCtx->config->bSingleTidRc);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gDynamicPSPollvalue] Value = [%u] ",
+	hdd_info("Name = [gDynamicPSPollvalue] Value = [%u] ",
 		  pHddCtx->config->dynamicPsPollValue);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gAddTSWhenACMIsOff] Value = [%u] ",
+	hdd_info("Name = [gAddTSWhenACMIsOff] Value = [%u] ",
 		  pHddCtx->config->AddTSWhenACMIsOff);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gValidateScanList] Value = [%u] ",
+	hdd_info("Name = [gValidateScanList] Value = [%u] ",
 		  pHddCtx->config->fValidateScanList);
 
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gStaKeepAlivePeriod] Value = [%u] ",
+	hdd_info("Name = [gStaKeepAlivePeriod] Value = [%u] ",
 		  pHddCtx->config->infraStaKeepAlivePeriod);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gApDataAvailPollInterVal] Value = [%u] ",
+	hdd_info("Name = [gApDataAvailPollInterVal] Value = [%u] ",
 		  pHddCtx->config->apDataAvailPollPeriodInMs);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [BandCapability] Value = [%u] ",
+	hdd_info("Name = [BandCapability] Value = [%u] ",
 		  pHddCtx->config->nBandCapability);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [fEnableBeaconEarlyTermination] Value = [%u] ",
-		  pHddCtx->config->fEnableBeaconEarlyTermination);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [teleBcnWakeupEnable] Value = [%u] ",
+	hdd_info("Name = [teleBcnWakeupEnable] Value = [%u] ",
 		  pHddCtx->config->teleBcnWakeupEn);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [transListenInterval] Value = [%u] ",
+	hdd_info("Name = [transListenInterval] Value = [%u] ",
 		  pHddCtx->config->nTeleBcnTransListenInterval);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [transLiNumIdleBeacons] Value = [%u] ",
+	hdd_info("Name = [transLiNumIdleBeacons] Value = [%u] ",
 		  pHddCtx->config->nTeleBcnTransLiNumIdleBeacons);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [maxListenInterval] Value = [%u] ",
+	hdd_info("Name = [maxListenInterval] Value = [%u] ",
 		  pHddCtx->config->nTeleBcnMaxListenInterval);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [maxLiNumIdleBeacons] Value = [%u] ",
+	hdd_info("Name = [maxLiNumIdleBeacons] Value = [%u] ",
 		  pHddCtx->config->nTeleBcnMaxLiNumIdleBeacons);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [bcnEarlyTermWakeInterval] Value = [%u] ",
-		  pHddCtx->config->bcnEarlyTermWakeInterval);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gApDataAvailPollInterVal] Value = [%u] ",
-		  pHddCtx->config->apDataAvailPollPeriodInMs);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gEnableBypass11d] Value = [%u] ",
+	hdd_info("Name = [gEnableBypass11d] Value = [%u] ",
 		  pHddCtx->config->enableBypass11d);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gEnableDFSChnlScan] Value = [%u] ",
+	hdd_info("Name = [gEnableDFSChnlScan] Value = [%u] ",
 		  pHddCtx->config->enableDFSChnlScan);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gEnableDFSPnoChnlScan] Value = [%u] ",
+	hdd_info("Name = [gEnableDFSPnoChnlScan] Value = [%u] ",
 		  pHddCtx->config->enable_dfs_pno_chnl_scan);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gReportMaxLinkSpeed] Value = [%u] ",
+	hdd_info("Name = [gReportMaxLinkSpeed] Value = [%u] ",
 		  pHddCtx->config->reportMaxLinkSpeed);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [thermalMitigationEnable] Value = [%u] ",
+	hdd_info("Name = [thermalMitigationEnable] Value = [%u] ",
 		  pHddCtx->config->thermalMitigationEnable);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gVhtChannelWidth] value = [%u]",
+	hdd_info("Name = [gVhtChannelWidth] value = [%u]",
 		  pHddCtx->config->vhtChannelWidth);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [enableFirstScan2GOnly] Value = [%u] ",
+	hdd_info("Name = [enableFirstScan2GOnly] Value = [%u] ",
 		  pHddCtx->config->enableFirstScan2GOnly);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [skipDfsChnlInP2pSearch] Value = [%u] ",
+	hdd_info("Name = [skipDfsChnlInP2pSearch] Value = [%u] ",
 		  pHddCtx->config->skipDfsChnlInP2pSearch);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [ignoreDynamicDtimInP2pMode] Value = [%u] ",
+	hdd_info("Name = [ignoreDynamicDtimInP2pMode] Value = [%u] ",
 		  pHddCtx->config->ignoreDynamicDtimInP2pMode);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [enableRxSTBC] Value = [%u] ",
+	hdd_info("Name = [enableRxSTBC] Value = [%u] ",
 		  pHddCtx->config->enableRxSTBC);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gEnableLpwrImgTransition] Value = [%u] ",
+	hdd_info("Name = [gEnableLpwrImgTransition] Value = [%u] ",
 		  pHddCtx->config->enableLpwrImgTransition);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gEnableSSR] Value = [%u] ",
+	hdd_info("Name = [gEnableSSR] Value = [%u] ",
 		  pHddCtx->config->enableSSR);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gEnableVhtFor24GHzBand] Value = [%u] ",
+	hdd_info("Name = [gEnableVhtFor24GHzBand] Value = [%u] ",
 		  pHddCtx->config->enableVhtFor24GHzBand);
-
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gFlexConnectPowerFactor] Value = [%u] ",
-		  pHddCtx->config->flexConnectPowerFactor);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gEnableIbssHeartBeatOffload] Value = [%u] ",
+	hdd_info("Name = [gEnableIbssHeartBeatOffload] Value = [%u] ",
 		  pHddCtx->config->enableIbssHeartBeatOffload);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gAntennaDiversity] Value = [%u] ",
+	hdd_info("Name = [gAntennaDiversity] Value = [%u] ",
 		  pHddCtx->config->antennaDiversity);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gGoLinkMonitorPeriod] Value = [%u]",
+	hdd_info("Name = [gGoLinkMonitorPeriod] Value = [%u]",
 		  pHddCtx->config->goLinkMonitorPeriod);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gApLinkMonitorPeriod] Value = [%u]",
+	hdd_info("Name = [gApLinkMonitorPeriod] Value = [%u]",
 		  pHddCtx->config->apLinkMonitorPeriod);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gGoKeepAlivePeriod] Value = [%u]",
+	hdd_info("Name = [gGoKeepAlivePeriod] Value = [%u]",
 		  pHddCtx->config->goKeepAlivePeriod);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gApKeepAlivePeriod]Value = [%u]",
+	hdd_info("Name = [gApKeepAlivePeriod]Value = [%u]",
 		  pHddCtx->config->apKeepAlivePeriod);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gAmsduSupportInAMPDU] Value = [%u] ",
+	hdd_info("Name = [gAmsduSupportInAMPDU] Value = [%u] ",
 		  pHddCtx->config->isAmsduSupportInAMPDU);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [nSelect5GHzMargin] Value = [%u] ",
+	hdd_info("Name = [nSelect5GHzMargin] Value = [%u] ",
 		  pHddCtx->config->nSelect5GHzMargin);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gCoalesingInIBSS] Value = [%u] ",
+	hdd_info("Name = [gCoalesingInIBSS] Value = [%u] ",
 		  pHddCtx->config->isCoalesingInIBSSAllowed);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gIbssATIMWinSize] Value = [%u] ",
+	hdd_info("Name = [gIbssATIMWinSize] Value = [%u] ",
 		  pHddCtx->config->ibssATIMWinSize);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gIbssIsPowerSaveAllowed] Value = [%u] ",
+	hdd_info("Name = [gIbssIsPowerSaveAllowed] Value = [%u] ",
 		  pHddCtx->config->isIbssPowerSaveAllowed);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gIbssIsPowerCollapseAllowed] Value = [%u] ",
+	hdd_info("Name = [gIbssIsPowerCollapseAllowed] Value = [%u] ",
 		  pHddCtx->config->isIbssPowerCollapseAllowed);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gIbssAwakeOnTxRx] Value = [%u] ",
+	hdd_info("Name = [gIbssAwakeOnTxRx] Value = [%u] ",
 		  pHddCtx->config->isIbssAwakeOnTxRx);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gIbssInactivityTime] Value = [%u] ",
+	hdd_info("Name = [gIbssInactivityTime] Value = [%u] ",
 		  pHddCtx->config->ibssInactivityCount);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gIbssTxSpEndInactivityTime] Value = [%u] ",
+	hdd_info("Name = [gIbssTxSpEndInactivityTime] Value = [%u] ",
 		  pHddCtx->config->ibssTxSpEndInactivityTime);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gIbssPsWarmupTime] Value = [%u] ",
+	hdd_info("Name = [gIbssPsWarmupTime] Value = [%u] ",
 		  pHddCtx->config->ibssPsWarmupTime);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gIbssPs1RxChainInAtim] Value = [%u] ",
+	hdd_info("Name = [gIbssPs1RxChainInAtim] Value = [%u] ",
 		  pHddCtx->config->ibssPs1RxChainInAtimEnable);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [fDfsPhyerrFilterOffload] Value = [%u] ",
+	hdd_info("Name = [fDfsPhyerrFilterOffload] Value = [%u] ",
 		  pHddCtx->config->fDfsPhyerrFilterOffload);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gIgnorePeerErpInfo] Value = [%u] ",
+	hdd_info("Name = [gIgnorePeerErpInfo] Value = [%u] ",
 		  pHddCtx->config->ignore_peer_erp_info);
 #ifdef IPA_OFFLOAD
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gIPAConfig] Value = [0x%x] ",
+	hdd_info("Name = [gIPAConfig] Value = [0x%x] ",
 		  pHddCtx->config->IpaConfig);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gIPADescSize] Value = [%u] ",
+	hdd_info("Name = [gIPADescSize] Value = [%u] ",
 		  pHddCtx->config->IpaDescSize);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [IpaHighBandwidthMbpsg] Value = [%u] ",
+	hdd_info("Name = [IpaHighBandwidthMbpsg] Value = [%u] ",
 		  pHddCtx->config->IpaHighBandwidthMbps);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [IpaMediumBandwidthMbps] Value = [%u] ",
+	hdd_info("Name = [IpaMediumBandwidthMbps] Value = [%u] ",
 		  pHddCtx->config->IpaMediumBandwidthMbps);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [IpaLowBandwidthMbps] Value = [%u] ",
+	hdd_info("Name = [IpaLowBandwidthMbps] Value = [%u] ",
 		  pHddCtx->config->IpaLowBandwidthMbps);
 #endif
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gEnableOverLapCh] Value = [%u] ",
+	hdd_info("Name = [gEnableOverLapCh] Value = [%u] ",
 		  pHddCtx->config->gEnableOverLapCh);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gMaxOffloadPeers] Value = [%u] ",
+	hdd_info("Name = [gMaxOffloadPeers] Value = [%u] ",
 		  pHddCtx->config->apMaxOffloadPeers);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gMaxOffloadReorderBuffs] value = [%u] ",
+	hdd_info("Name = [gMaxOffloadReorderBuffs] value = [%u] ",
 		  pHddCtx->config->apMaxOffloadReorderBuffs);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gAllowDFSChannelRoam] Value = [%u] ",
+	hdd_info("Name = [gAllowDFSChannelRoam] Value = [%u] ",
 		  pHddCtx->config->allowDFSChannelRoam);
-	hddLog(QDF_TRACE_LEVEL_INFO_HIGH,
-	       "Name = [gMaxConcurrentActiveSessions] Value = [%u] ",
+	hdd_info("Name = [gMaxConcurrentActiveSessions] Value = [%u] ",
 	       pHddCtx->config->gMaxConcurrentActiveSessions);
 
 #ifdef MSM_PLATFORM
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gBusBandwidthHighThreshold] Value = [%u] ",
+	hdd_info("Name = [gBusBandwidthHighThreshold] Value = [%u] ",
 		  pHddCtx->config->busBandwidthHighThreshold);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gBusBandwidthMediumThreshold] Value = [%u] ",
+	hdd_info("Name = [gBusBandwidthMediumThreshold] Value = [%u] ",
 		  pHddCtx->config->busBandwidthMediumThreshold);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gBusBandwidthLowThreshold] Value = [%u] ",
+	hdd_info("Name = [gBusBandwidthLowThreshold] Value = [%u] ",
 		  pHddCtx->config->busBandwidthLowThreshold);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gbusBandwidthComputeInterval] Value = [%u] ",
+	hdd_info("Name = [gbusBandwidthComputeInterval] Value = [%u] ",
 		  pHddCtx->config->busBandwidthComputeInterval);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [%s] Value = [%u] ",
+	hdd_info("Name = [%s] Value = [%u] ",
 		  CFG_ENABLE_TCP_DELACK,
 		  pHddCtx->config->enable_tcp_delack);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gTcpDelAckThresholdHigh] Value = [%u] ",
+	hdd_info("Name = [gTcpDelAckThresholdHigh] Value = [%u] ",
 		  pHddCtx->config->tcpDelackThresholdHigh);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gTcpDelAckThresholdLow] Value = [%u] ",
+	hdd_info("Name = [gTcpDelAckThresholdLow] Value = [%u] ",
 		  pHddCtx->config->tcpDelackThresholdLow);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		"Name = [%s] Value = [%u] ",
-		CFG_TCP_TX_HIGH_TPUT_THRESHOLD_NAME,
-		pHddCtx->config->tcp_tx_high_tput_thres);
+	hdd_info("Name = [%s] Value = [%u] ",
+		  CFG_TCP_DELACK_TIMER_COUNT,
+		  pHddCtx->config->tcp_delack_timer_count);
+	hdd_info("Name = [%s] Value = [%u] ",
+		  CFG_TCP_TX_HIGH_TPUT_THRESHOLD_NAME,
+		  pHddCtx->config->tcp_tx_high_tput_thres);
 
 #endif
 
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gIgnoreCAC] Value = [%u] ",
+	hdd_info("Name = [gIgnoreCAC] Value = [%u] ",
 		  pHddCtx->config->ignoreCAC);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gSapPreferredChanLocation] Value = [%u] ",
+	hdd_info("Name = [gSapPreferredChanLocation] Value = [%u] ",
 		  pHddCtx->config->gSapPreferredChanLocation);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gDisableDfsJapanW53] Value = [%u] ",
+	hdd_info("Name = [gDisableDfsJapanW53] Value = [%u] ",
 		  pHddCtx->config->gDisableDfsJapanW53);
 #ifdef FEATURE_GREEN_AP
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gEnableGreenAp] Value = [%u] ",
+	hdd_info("Name = [gEnableGreenAp] Value = [%u] ",
 		  pHddCtx->config->enableGreenAP);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gEenableEGAP] Value = [%u] ",
+	hdd_info("Name = [gEenableEGAP] Value = [%u] ",
 		  pHddCtx->config->enable_egap);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gEGAPInactTime] Value = [%u] ",
+	hdd_info("Name = [gEGAPInactTime] Value = [%u] ",
 		  pHddCtx->config->egap_inact_time);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gEGAPWaitTime] Value = [%u] ",
+	hdd_info("Name = [gEGAPWaitTime] Value = [%u] ",
 		  pHddCtx->config->egap_wait_time);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gEGAPFeatures] Value = [%u] ",
+	hdd_info("Name = [gEGAPFeatures] Value = [%u] ",
 		  pHddCtx->config->egap_feature_flag);
 #endif
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [isRoamOffloadEnabled] Value = [%u]",
+	hdd_info("Name = [isRoamOffloadEnabled] Value = [%u]",
 		  pHddCtx->config->isRoamOffloadEnabled);
 #endif
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gEnableSifsBurst] Value = [%u]",
+	hdd_info("Name = [gEnableSifsBurst] Value = [%u]",
 		  pHddCtx->config->enableSifsBurst);
 
 #ifdef WLAN_FEATURE_LPSS
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gEnableLpassSupport] Value = [%u] ",
+	hdd_info("Name = [gEnableLpassSupport] Value = [%u] ",
 		  pHddCtx->config->enable_lpass_support);
 #endif
 
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gEnableSelfRecovery] Value = [%u]",
+	hdd_info("Name = [gEnableSelfRecovery] Value = [%u]",
 		  pHddCtx->config->enableSelfRecovery);
 
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gEnableSapSuspend] Value = [%u]",
+	hdd_info("Name = [gEnableSapSuspend] Value = [%u]",
 		  pHddCtx->config->enableSapSuspend);
 
 #ifdef WLAN_FEATURE_EXTWOW_SUPPORT
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gExtWoWgotoSuspend] Value = [%u]",
+	hdd_info("Name = [gExtWoWgotoSuspend] Value = [%u]",
 		  pHddCtx->config->extWowGotoSuspend);
 
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gExtWowApp1WakeupPinNumber] Value = [%u]",
+	hdd_info("Name = [gExtWowApp1WakeupPinNumber] Value = [%u]",
 		  pHddCtx->config->extWowApp1WakeupPinNumber);
 
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gExtWowApp2WakeupPinNumber] Value = [%u]",
+	hdd_info("Name = [gExtWowApp2WakeupPinNumber] Value = [%u]",
 		  pHddCtx->config->extWowApp2WakeupPinNumber);
 
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gExtWoWApp2KAInitPingInterval] Value = [%u]",
+	hdd_info("Name = [gExtWoWApp2KAInitPingInterval] Value = [%u]",
 		  pHddCtx->config->extWowApp2KAInitPingInterval);
 
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gExtWoWApp2KAMinPingInterval] Value = [%u]",
+	hdd_info("Name = [gExtWoWApp2KAMinPingInterval] Value = [%u]",
 		  pHddCtx->config->extWowApp2KAMinPingInterval);
 
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gExtWoWApp2KAMaxPingInterval] Value = [%u]",
+	hdd_info("Name = [gExtWoWApp2KAMaxPingInterval] Value = [%u]",
 		  pHddCtx->config->extWowApp2KAMaxPingInterval);
 
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gExtWoWApp2KAIncPingInterval] Value = [%u]",
+	hdd_info("Name = [gExtWoWApp2KAIncPingInterval] Value = [%u]",
 		  pHddCtx->config->extWowApp2KAIncPingInterval);
 
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gExtWoWApp2TcpSrcPort] Value = [%u]",
+	hdd_info("Name = [gExtWoWApp2TcpSrcPort] Value = [%u]",
 		  pHddCtx->config->extWowApp2TcpSrcPort);
 
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gExtWoWApp2TcpDstPort] Value = [%u]",
+	hdd_info("Name = [gExtWoWApp2TcpDstPort] Value = [%u]",
 		  pHddCtx->config->extWowApp2TcpDstPort);
 
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gExtWoWApp2TcpTxTimeout] Value = [%u]",
+	hdd_info("Name = [gExtWoWApp2TcpTxTimeout] Value = [%u]",
 		  pHddCtx->config->extWowApp2TcpTxTimeout);
 
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gExtWoWApp2TcpRxTimeout] Value = [%u]",
+	hdd_info("Name = [gExtWoWApp2TcpRxTimeout] Value = [%u]",
 		  pHddCtx->config->extWowApp2TcpRxTimeout);
 #endif
 
 #ifdef DHCP_SERVER_OFFLOAD
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gDHCPServerOffloadEnable] Value = [%u]",
+	hdd_info("Name = [gDHCPServerOffloadEnable] Value = [%u]",
 		  pHddCtx->config->enableDHCPServerOffload);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gDHCPMaxNumClients] Value = [%u]",
+	hdd_info("Name = [gDHCPMaxNumClients] Value = [%u]",
 		  pHddCtx->config->dhcpMaxNumClients);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gDHCPServerIP] Value = [%s]",
+	hdd_info("Name = [gDHCPServerIP] Value = [%s]",
 		  pHddCtx->config->dhcpServerIP);
 #endif
 
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gEnableDumpCollect] Value = [%u]",
+	hdd_info("Name = [gEnableDumpCollect] Value = [%u]",
 			pHddCtx->config->is_ramdump_enabled);
 
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [gP2PListenDeferInterval] Value = [%u]",
+	hdd_info("Name = [gP2PListenDeferInterval] Value = [%u]",
 		  pHddCtx->config->p2p_listen_defer_interval);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_ERROR,
-		  "Name = [is_ps_enabled] value = [%d]",
-		  pHddCtx->config->is_ps_enabled);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_ERROR,
-		  "Name = [tso_enable] value = [%d]",
+	hdd_notice("Name = [is_ps_enabled] value = [%d]",
+		   pHddCtx->config->is_ps_enabled);
+	hdd_notice("Name = [tso_enable] value = [%d]",
 		  pHddCtx->config->tso_enable);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_ERROR,
-		  "Name = [LROEnable] value = [%d]",
+	hdd_notice("Name = [LROEnable] value = [%d]",
 		  pHddCtx->config->lro_enable);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_ERROR,
-		  "Name = [active_mode_offload] value = [%d]",
+	hdd_notice("Name = [active_mode_offload] value = [%d]",
 		  pHddCtx->config->active_mode_offload);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_ERROR,
-		  "Name = [gfine_time_meas_cap] value = [%u]",
+	hdd_notice("Name = [gfine_time_meas_cap] value = [%u]",
 		  pHddCtx->config->fine_time_meas_cap);
 #ifdef WLAN_FEATURE_FASTPATH
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [fastpath_enable] Value = [%u]",
+	hdd_info("Name = [fastpath_enable] Value = [%u]",
 		  pHddCtx->config->fastpath_enable);
 #endif
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_ERROR,
-		  "Name = [max_scan_count] value = [%d]",
+	hdd_notice("Name = [max_scan_count] value = [%d]",
 		  pHddCtx->config->max_scan_count);
-#ifdef FEATURE_NAPI_DEBUG
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_ERROR,
-		  "Name = [%s] value = [%d]",
-		  CFG_ENABLE_RX_THREAD, pHddCtx->config->enableRxThread);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_ERROR,
-		  "Name = [%s] value = [%d]",
-		  CFG_NAPI_NAME, pHddCtx->config->napi_enable);
-#endif
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "Name = [%s] Value = [%u]",
+	hdd_notice("Name = [%s] value = [%d]",
+		  CFG_RX_MODE_NAME, pHddCtx->config->rx_mode);
+	hdd_info("Name = [%s] Value = [%u]",
 		  CFG_CE_CLASSIFY_ENABLE_NAME,
 		  pHddCtx->config->ce_classify_enabled);
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_ERROR,
-		  "Name = [%s] value = [%u]",
+	hdd_notice("Name = [%s] value = [%u]",
 		  CFG_DUAL_MAC_FEATURE_DISABLE,
 		  pHddCtx->config->dual_mac_feature_disable);
 #ifdef FEATURE_WLAN_SCAN_PNO
-	hddLog(LOGE, "Name = [%s] Value = [%u]",
-			CFG_PNO_CHANNEL_PREDICTION_NAME,
-			pHddCtx->config->pno_channel_prediction);
-	hddLog(LOGE, "Name = [%s] Value = [%u]",
-			CFG_TOP_K_NUM_OF_CHANNELS_NAME,
-			pHddCtx->config->top_k_num_of_channels);
-	hddLog(LOGE, "Name = [%s] Value = [%u]",
-			CFG_STATIONARY_THRESHOLD_NAME,
-			pHddCtx->config->stationary_thresh);
-	hddLog(LOGE, "Name = [%s] Value = [%u]",
-			CFG_CHANNEL_PREDICTION_FULL_SCAN_MS_NAME,
-			pHddCtx->config->channel_prediction_full_scan);
-	hddLog(LOGE, "Name = [%s] Value = [%u]",
-			CFG_ADAPTIVE_PNOSCAN_DWELL_MODE_NAME,
-			pHddCtx->config->pnoscan_adaptive_dwell_mode);
+	hdd_notice("Name = [%s] Value = [%u]",
+		   CFG_PNO_CHANNEL_PREDICTION_NAME,
+		   pHddCtx->config->pno_channel_prediction);
+	hdd_notice("Name = [%s] Value = [%u]",
+		   CFG_TOP_K_NUM_OF_CHANNELS_NAME,
+		   pHddCtx->config->top_k_num_of_channels);
+	hdd_notice("Name = [%s] Value = [%u]",
+		   CFG_STATIONARY_THRESHOLD_NAME,
+		   pHddCtx->config->stationary_thresh);
+	hdd_notice("Name = [%s] Value = [%u]",
+		   CFG_CHANNEL_PREDICTION_FULL_SCAN_MS_NAME,
+		   pHddCtx->config->channel_prediction_full_scan);
+	hdd_notice("Name = [%s] Value = [%u]",
+		   CFG_ADAPTIVE_PNOSCAN_DWELL_MODE_NAME,
+		   pHddCtx->config->pnoscan_adaptive_dwell_mode);
 #endif
-	hddLog(LOGE, "Name = [%s] Value = [%d]",
-		  CFG_EARLY_STOP_SCAN_ENABLE,
-		  pHddCtx->config->early_stop_scan_enable);
-	hddLog(LOGE, "Name = [%s] Value = [%d]",
-		CFG_EARLY_STOP_SCAN_MIN_THRESHOLD,
-		pHddCtx->config->early_stop_scan_min_threshold);
-	hddLog(LOGE, "Name = [%s] Value = [%d]",
-		CFG_EARLY_STOP_SCAN_MAX_THRESHOLD,
-		pHddCtx->config->early_stop_scan_max_threshold);
-	hddLog(LOGE, "Name = [%s] Value = [%d]",
-		CFG_FIRST_SCAN_BUCKET_THRESHOLD_NAME,
-		pHddCtx->config->first_scan_bucket_threshold);
-	hddLog(LOGE, "Name = [%s] Value = [%u]",
-		CFG_HT_MPDU_DENSITY_NAME,
-		pHddCtx->config->ht_mpdu_density);
+	hdd_notice("Name = [%s] Value = [%d]",
+		   CFG_EARLY_STOP_SCAN_ENABLE,
+		   pHddCtx->config->early_stop_scan_enable);
+	hdd_notice("Name = [%s] Value = [%d]",
+		   CFG_EARLY_STOP_SCAN_MIN_THRESHOLD,
+		   pHddCtx->config->early_stop_scan_min_threshold);
+	hdd_notice("Name = [%s] Value = [%d]",
+		   CFG_EARLY_STOP_SCAN_MAX_THRESHOLD,
+		   pHddCtx->config->early_stop_scan_max_threshold);
+	hdd_notice("Name = [%s] Value = [%d]",
+		   CFG_FIRST_SCAN_BUCKET_THRESHOLD_NAME,
+		   pHddCtx->config->first_scan_bucket_threshold);
+	hdd_notice("Name = [%s] Value = [%u]",
+		   CFG_HT_MPDU_DENSITY_NAME,
+		   pHddCtx->config->ht_mpdu_density);
 
 
 #ifdef FEATURE_LFR_SUBNET_DETECTION
-	hddLog(LOGE, "Name = [%s] Value = [%d]",
-		CFG_ENABLE_LFR_SUBNET_DETECTION,
-		pHddCtx->config->enable_lfr_subnet_detection);
+	hdd_notice("Name = [%s] Value = [%d]",
+		   CFG_ENABLE_LFR_SUBNET_DETECTION,
+		   pHddCtx->config->enable_lfr_subnet_detection);
 #endif
 	hdd_info("Name = [%s] Value = [%u]",
 		CFG_ROAM_DENSE_TRAFFIC_THRESHOLD,
@@ -5571,6 +5635,9 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
 	hdd_info("Name = [%s] Value = [%u]",
 		CFG_IGNORE_PEER_HT_MODE_NAME,
 		pHddCtx->config->ignore_peer_ht_opmode);
+	hdd_info("Name = [%s] Value = [%u]",
+		 CFG_ENABLE_VENDOR_VHT_FOR_24GHZ_NAME,
+		 pHddCtx->config->enable_sap_vendor_vht);
 	hdd_info("Name = [%s] Value = [%u]",
 		CFG_ENABLE_FATAL_EVENT_TRIGGER,
 		pHddCtx->config->enable_fatal_event);
@@ -5583,6 +5650,12 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
 	hdd_info("Name = [%s] Value = [%u]",
 		CFG_IDLE_TIME_NAME,
 		pHddCtx->config->idle_time_conc);
+	hdd_info("Name = [%s] Value = [%d]",
+		CFG_BUG_ON_REINIT_FAILURE_NAME,
+		pHddCtx->config->bug_on_reinit_failure);
+	hdd_info("Name = [%s] Value = [%u]",
+		CFG_INTERFACE_CHANGE_WAIT_NAME,
+		pHddCtx->config->iface_change_wait_time);
 
 	hdd_info("Name = [%s] Value = [%u]",
 		CFG_ENABLE_EDCA_INI_NAME,
@@ -5626,6 +5699,20 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
 	hdd_info("Name = [%s] Value = [%u]",
 		CFG_EDCA_BE_AIFS_VALUE_NAME,
 		pHddCtx->config->edca_be_aifs);
+
+	hdd_info("Name = [%s] Value = [%s]",
+		CFG_ENABLE_TX_SCHED_WRR_VO_NAME,
+		pHddCtx->config->tx_sched_wrr_vo);
+	hdd_info("Name = [%s] Value = [%s]",
+		CFG_ENABLE_TX_SCHED_WRR_VI_NAME,
+		pHddCtx->config->tx_sched_wrr_vi);
+	hdd_info("Name = [%s] Value = [%s]",
+		CFG_ENABLE_TX_SCHED_WRR_BK_NAME,
+		pHddCtx->config->tx_sched_wrr_bk);
+	hdd_info("Name = [%s] Value = [%s]",
+		CFG_ENABLE_TX_SCHED_WRR_BE_NAME,
+		pHddCtx->config->tx_sched_wrr_be);
+
 	hdd_info("Name = [%s] Value = [%u]",
 		CFG_ENABLE_DP_TRACE,
 		pHddCtx->config->enable_dp_trace);
@@ -5653,7 +5740,45 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
 	hdd_info("Name = [%s] Value = [%u]",
 		CFG_ADAPT_DWELL_WIFI_THRESH_NAME,
 		pHddCtx->config->adapt_dwell_wifi_act_threshold);
+	hdd_info("Name = [%s] value = [%u]",
+		 CFG_SUB_20_CHANNEL_WIDTH_NAME,
+		 pHddCtx->config->enable_sub_20_channel_width);
+	hdd_info("Name = [%s] Value = [%u]",
+		 CFG_TGT_GTX_USR_CFG_NAME,
+		 pHddCtx->config->tgt_gtx_usr_cfg);
+	hdd_info("Name = [%s] Value = [%u]",
+		CFG_SAP_MAX_INACTIVITY_OVERRIDE_NAME,
+		pHddCtx->config->sap_max_inactivity_override);
 	hdd_ndp_print_ini_config(pHddCtx);
+	hdd_info("Name = [%s] Value = [%s]",
+		CFG_RM_CAPABILITY_NAME,
+		pHddCtx->config->rm_capability);
+	hdd_info("Name = [%s] Value = [%d]",
+		CFG_SAP_FORCE_11N_FOR_11AC_NAME,
+		pHddCtx->config->sap_force_11n_for_11ac);
+	hdd_info("Name = [%s] Value = [%d]",
+		CFG_BPF_PACKET_FILTER_OFFLOAD,
+		pHddCtx->config->bpf_packet_filter_enable);
+	hdd_info("Name = [%s] Value = [%u]",
+		CFG_TDLS_ENABLE_DEFER_TIMER,
+		pHddCtx->config->tdls_enable_defer_time);
+	hdd_info("Name = [%s] Value = [%d]",
+		CFG_FILTER_MULTICAST_REPLAY_NAME,
+		pHddCtx->config->multicast_replay_filter);
+	hdd_info("Name = [%s] Value = [%u]",
+		CFG_ENABLE_GO_CTS2SELF_FOR_STA,
+		pHddCtx->config->enable_go_cts2self_for_sta);
+	hdd_info("Name = [%s] Value = [%u]",
+		CFG_CRASH_FW_TIMEOUT_NAME,
+		pHddCtx->config->fw_timeout_crash);
+	hdd_info("Name = [%s] Value = [%d]",
+		CFG_SAP_INTERNAL_RESTART_NAME,
+		pHddCtx->config->sap_internal_restart);
+	hdd_per_roam_print_ini_config(pHddCtx);
+	hdd_he_print_ini_config(pHddCtx);
+	hdd_info("Name = [%s] Value = [%d]",
+		CFG_ARP_AC_CATEGORY,
+		pHddCtx->config->arp_ac_category);
 }
 
 
@@ -5671,6 +5796,7 @@ QDF_STATUS hdd_update_mac_config(hdd_context_t *pHddCtx)
 	int status, i = 0;
 	const struct firmware *fw = NULL;
 	char *line, *buffer = NULL;
+	char *temp = NULL;
 	char *name, *value;
 	tCfgIniEntry macTable[QDF_MAX_CONCURRENCY_PERSONA];
 	tSirMacAddr customMacAddr;
@@ -5681,18 +5807,28 @@ QDF_STATUS hdd_update_mac_config(hdd_context_t *pHddCtx)
 	status = request_firmware(&fw, WLAN_MAC_FILE, pHddCtx->parent_dev);
 
 	if (status) {
-		hddLog(QDF_TRACE_LEVEL_WARN, "%s: request_firmware failed %d",
-		       __func__, status);
+		hdd_warn("request_firmware failed %d", status);
 		qdf_status = QDF_STATUS_E_FAILURE;
 		return qdf_status;
 	}
 	if (!fw || !fw->data || !fw->size) {
-		hddLog(QDF_TRACE_LEVEL_FATAL, "%s: invalid firmware", __func__);
+		hdd_alert("invalid firmware");
 		qdf_status = QDF_STATUS_E_INVAL;
 		goto config_exit;
 	}
 
-	buffer = (char *)fw->data;
+	hdd_debug("wlan_mac.bin size %zu", fw->size);
+
+	temp = qdf_mem_malloc(fw->size + 1);
+
+	if (temp == NULL) {
+		hdd_err("fail to alloc memory");
+		qdf_status = QDF_STATUS_E_NOMEM;
+		goto config_exit;
+	}
+	buffer = temp;
+	qdf_mem_copy(buffer, fw->data, fw->size);
+	buffer[fw->size + 1] = 0x0;
 
 	/* data format:
 	 * Intf0MacAddress=00AA00BB00CC
@@ -5729,12 +5865,9 @@ QDF_STATUS hdd_update_mac_config(hdd_context_t *pHddCtx)
 		buffer = line;
 	}
 	if (i <= QDF_MAX_CONCURRENCY_PERSONA) {
-		hddLog(QDF_TRACE_LEVEL_INFO, "%s: %d Mac addresses provided",
-		       __func__, i);
+		hdd_notice("%d Mac addresses provided", i);
 	} else {
-		hddLog(QDF_TRACE_LEVEL_ERROR,
-		       "%s: invalid number of Mac address provided, nMac = %d",
-		       __func__, i);
+		hdd_err("invalid number of Mac address provided, nMac = %d", i);
 		qdf_status = QDF_STATUS_E_INVAL;
 		goto config_exit;
 	}
@@ -5747,6 +5880,7 @@ QDF_STATUS hdd_update_mac_config(hdd_context_t *pHddCtx)
 	sme_set_custom_mac_addr(customMacAddr);
 
 config_exit:
+	qdf_mem_free(temp);
 	release_firmware(fw);
 	return qdf_status;
 }
@@ -5812,6 +5946,30 @@ static void hdd_override_all_ps(hdd_context_t *hdd_ctx)
 }
 
 /**
+ * hdd_set_rx_mode_value() - set rx_mode values
+ * @hdd_ctx: hdd context
+ *
+ * Return: none
+ */
+static void hdd_set_rx_mode_value(hdd_context_t *hdd_ctx)
+{
+	if (hdd_ctx->config->rx_mode & CFG_ENABLE_RX_THREAD &&
+		 hdd_ctx->config->rx_mode & CFG_ENABLE_RPS) {
+		hdd_err("rx_mode wrong configuration. Make it default");
+		hdd_ctx->config->rx_mode = CFG_RX_MODE_DEFAULT;
+	}
+
+	if (hdd_ctx->config->rx_mode & CFG_ENABLE_RX_THREAD)
+		hdd_ctx->enableRxThread = true;
+
+	if (hdd_ctx->config->rx_mode & CFG_ENABLE_RPS)
+		hdd_ctx->rps = true;
+
+	if (hdd_ctx->config->rx_mode & CFG_ENABLE_NAPI)
+		hdd_ctx->napi_enable = true;
+}
+
+/**
  * hdd_parse_config_ini() - parse the ini configuration file
  * @pHddCtx: the pointer to hdd context
  *
@@ -5838,24 +5996,22 @@ QDF_STATUS hdd_parse_config_ini(hdd_context_t *pHddCtx)
 	status = request_firmware(&fw, WLAN_INI_FILE, pHddCtx->parent_dev);
 
 	if (status) {
-		hddLog(QDF_TRACE_LEVEL_FATAL, "%s: request_firmware failed %d",
-		       __func__, status);
+		hdd_alert("request_firmware failed %d", status);
 		qdf_status = QDF_STATUS_E_FAILURE;
 		goto config_exit;
 	}
 	if (!fw || !fw->data || !fw->size) {
-		hddLog(QDF_TRACE_LEVEL_FATAL, "%s: %s download failed",
-		       __func__, WLAN_INI_FILE);
+		hdd_alert("%s download failed", WLAN_INI_FILE);
 		qdf_status = QDF_STATUS_E_FAILURE;
 		goto config_exit;
 	}
 
-	hddLog(LOG1, "%s: qcom_cfg.ini Size %zu", __func__, fw->size);
+	hdd_notice("qcom_cfg.ini Size %zu", fw->size);
 
 	buffer = (char *)qdf_mem_malloc(fw->size);
 
 	if (NULL == buffer) {
-		hddLog(QDF_TRACE_LEVEL_FATAL, FL("qdf_mem_malloc failure"));
+		hdd_alert("qdf_mem_malloc failure");
 		release_firmware(fw);
 		return QDF_STATUS_E_NOMEM;
 	}
@@ -5868,38 +6024,37 @@ QDF_STATUS hdd_parse_config_ini(hdd_context_t *pHddCtx)
 		line = get_next_line(buffer);
 		buffer = i_trim(buffer);
 
-		hddLog(LOG1, "%s: item", buffer);
+		hdd_notice("%s: item", buffer);
 
 		if (strlen((char *)buffer) == 0 || *buffer == '#') {
 			buffer = line;
 			continue;
-		} else if (strncmp(buffer, "END", 3) == 0) {
+		}
+
+		if (strncmp(buffer, "END", 3) == 0)
 			break;
-		} else {
-			name = buffer;
-			while (*buffer != '=' && *buffer != '\0')
-				buffer++;
-			if (*buffer != '\0') {
-				*buffer++ = '\0';
-				i_trim(name);
-				if (strlen(name) != 0) {
-					buffer = i_trim(buffer);
-					if (strlen(buffer) > 0) {
-						value = buffer;
-						while (!i_isspace(*buffer)
-						       && *buffer != '\0')
-							buffer++;
-						*buffer = '\0';
-						cfgIniTable[i].name = name;
-						cfgIniTable[i++].value = value;
-						if (i >= MAX_CFG_INI_ITEMS) {
-							hddLog(LOGE,
-							       "%s: Number of items in %s > %d",
-							       __func__,
-							       WLAN_INI_FILE,
-							       MAX_CFG_INI_ITEMS);
-							break;
-						}
+
+		name = buffer;
+		while (*buffer != '=' && *buffer != '\0')
+			buffer++;
+		if (*buffer != '\0') {
+			*buffer++ = '\0';
+			i_trim(name);
+			if (strlen(name) != 0) {
+				buffer = i_trim(buffer);
+				if (strlen(buffer) > 0) {
+					value = buffer;
+					while (!i_isspace(*buffer)
+					       && *buffer != '\0')
+						buffer++;
+					*buffer = '\0';
+					cfgIniTable[i].name = name;
+					cfgIniTable[i++].value = value;
+					if (i >= MAX_CFG_INI_ITEMS) {
+						hdd_err("Number of items in %s > %d",
+							WLAN_INI_FILE,
+							MAX_CFG_INI_ITEMS);
+						break;
 					}
 				}
 			}
@@ -5909,11 +6064,7 @@ QDF_STATUS hdd_parse_config_ini(hdd_context_t *pHddCtx)
 
 	/* Loop through the registry table and apply all these configs */
 	qdf_status = hdd_apply_cfg_ini(pHddCtx, cfgIniTable, i);
-#ifdef FEATURE_NAPI
-	if (QDF_STATUS_SUCCESS == qdf_status)
-		hdd_napi_event(NAPI_EVT_INI_FILE,
-			       (void *)pHddCtx->config->napi_enable);
-#endif /* FEATURE_NAPI */
+	hdd_set_rx_mode_value(pHddCtx);
 	if (QDF_GLOBAL_MONITOR_MODE == cds_get_conparam())
 		hdd_override_all_ps(pHddCtx);
 
@@ -5933,6 +6084,9 @@ config_exit:
  */
 eCsrPhyMode hdd_cfg_xlate_to_csr_phy_mode(eHddDot11Mode dot11Mode)
 {
+	if (cds_is_sub_20_mhz_enabled())
+		return eCSR_DOT11_MODE_abg;
+
 	switch (dot11Mode) {
 	case (eHDD_DOT11_MODE_abg):
 		return eCSR_DOT11_MODE_abg;
@@ -5957,6 +6111,10 @@ eCsrPhyMode hdd_cfg_xlate_to_csr_phy_mode(eHddDot11Mode dot11Mode)
 		return eCSR_DOT11_MODE_AUTO;
 	case (eHDD_DOT11_MODE_11a):
 		return eCSR_DOT11_MODE_11a;
+	case (eHDD_DOT11_MODE_11ax_ONLY):
+		return eCSR_DOT11_MODE_11ax_ONLY;
+	case (eHDD_DOT11_MODE_11ax):
+		return eCSR_DOT11_MODE_11ax;
 	}
 
 }
@@ -5973,12 +6131,12 @@ QDF_STATUS hdd_set_idle_ps_config(hdd_context_t *pHddCtx, uint32_t val)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
-	hddLog(LOG1, "hdd_set_idle_ps_config: Enter Val %d", val);
+	hdd_notice("hdd_set_idle_ps_config: Enter Val %d", val);
 
 	status = sme_set_idle_powersave_config(pHddCtx->pcds_context,
 			pHddCtx->hHal, val);
 	if (QDF_STATUS_SUCCESS != status)
-		hddLog(LOGE, "Fail to Set Idle PS Config val %d", val);
+		hdd_err("Fail to Set Idle PS Config val %d", val);
 	return status;
 }
 
@@ -6003,7 +6161,7 @@ static void hdd_set_fine_time_meas_cap(hdd_context_t *hdd_ctx,
 	capability &= CFG_FINE_TIME_MEAS_CAPABILITY_MAX;
 	sme_config->csrConfig.fine_time_meas_cap = capability;
 
-	hddLog(LOG1, FL("fine time meas capability - INI: %04x Enabled: %04x"),
+	hdd_notice("fine time meas capability - INI: %04x Enabled: %04x",
 		config->fine_time_meas_cap,
 		sme_config->csrConfig.fine_time_meas_cap);
 
@@ -6039,7 +6197,8 @@ static QDF_STATUS hdd_convert_string_to_array(char *str, uint8_t *array,
 		int val;
 		/* Increment length only if sscanf successfully extracted
 		 * one element. Any other return value means error.
-		 * Ignore it. */
+		 * Ignore it.
+		 */
 		if (sscanf(s, format, &val) == 1) {
 			array[*len] = (uint8_t) val;
 			*len += 1;
@@ -6065,8 +6224,9 @@ static QDF_STATUS hdd_convert_string_to_array(char *str, uint8_t *array,
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS hdd_hex_string_to_u8_array(char *str, uint8_t *hex_array,
-				      uint8_t *len, uint8_t array_max_len)
+static QDF_STATUS hdd_hex_string_to_u8_array(char *str, uint8_t *hex_array,
+					     uint8_t *len,
+					     uint8_t array_max_len)
 {
 	return hdd_convert_string_to_array(str, hex_array, len,
 					   array_max_len, true);
@@ -6093,690 +6253,663 @@ QDF_STATUS hdd_string_to_u8_array(char *str, uint8_t *array,
 }
 
 /**
- * hdd_update_config_dat() - scan the string and convery to u8 array
- * @str: the pointer to the string
- * @intArray: the pointer of buffer to store the u8 value
- * @len: size of the buffer
+ * hdd_hex_string_to_u16_array() - convert a hex string to a uint16 array
+ * @str: input string
+ * @int_array: pointer to input array of type uint16
+ * @len: pointer to number of elements which the function adds to the array
+ * @int_array_max_len: maximum number of elements in input uint16 array
  *
- * Return: QDF_STATUS_SUCCESS if the configuration could be updated corectly,
- *		otherwise QDF_STATUS_E_INVAL
+ * This function is used to convert a space separated hex string to an array of
+ * uint16_t. For example, an input string str = "a b c d" would be converted to
+ * a unint16 array, int_array = {0xa, 0xb, 0xc, 0xd}, *len = 4.
+ * This assumes that input value int_array_max_len >= 4.
+ *
+ * Return: QDF_STATUS_SUCCESS - if the conversion is successful
+ *         non zero value     - if the conversion is a failure
  */
-bool hdd_update_config_dat(hdd_context_t *pHddCtx)
+QDF_STATUS hdd_hex_string_to_u16_array(char *str,
+		uint16_t *int_array, uint8_t *len, uint8_t int_array_max_len)
 {
-	bool fStatus = true;
-	uint32_t val;
+	char *s = str;
+	uint32_t val = 0;
+
+	if (str == NULL || int_array == NULL || len == NULL)
+		return QDF_STATUS_E_INVAL;
+
+	hdd_err("str %p intArray %p intArrayMaxLen %d",
+		s, int_array, int_array_max_len);
+
+	*len = 0;
+
+	while ((s != NULL) && (*len < int_array_max_len)) {
+		/*
+		 * Increment length only if sscanf successfully extracted one
+		 * element. Any other return value means error. Ignore it.
+		 */
+		if (sscanf(s, "%x", &val) == 1) {
+			int_array[*len] = (uint16_t) val;
+			hdd_debug("s %p val %x intArray[%d]=0x%x",
+				s, val, *len, int_array[*len]);
+			*len += 1;
+		}
+		s = strpbrk(s, " ");
+		if (s)
+			s++;
+	}
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * hdd_update_ht_cap_in_cfg() - to update HT cap in global CFG
+ * @hdd_ctx: pointer to hdd context
+ *
+ * This API will update the HT config in CFG after taking intersection
+ * of INI and firmware capabilities provided reading CFG
+ *
+ * Return: true or false
+ */
+static bool hdd_update_ht_cap_in_cfg(hdd_context_t *hdd_ctx)
+{
+	uint32_t val32;
 	uint16_t val16;
+	bool status = true;
+	tSirMacHTCapabilityInfo *ht_cap_info;
 
-	struct hdd_config *pConfig = pHddCtx->config;
-	tSirMacHTCapabilityInfo *phtCapInfo;
-
-	/*
-	 * During the initialization both 2G and 5G capabilities should be same.
-	 * So read 5G HT capablity and update 2G and 5G capablities.
-	 */
-	if (sme_cfg_get_int(pHddCtx->hHal, WNI_CFG_HT_CAP_INFO,
-			    &val) ==
+	if (sme_cfg_get_int(hdd_ctx->hHal, WNI_CFG_HT_CAP_INFO,
+				&val32) ==
 			QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hdd_err("Could not pass on WNI_CFG_HT_CAP_INFO to CFG");
+		status = false;
+		hdd_err("Could not get WNI_CFG_HT_CAP_INFO");
 	}
-	if (pConfig->ShortGI20MhzEnable)
-		val |= HT_CAPS_SHORT_GI20;
-	else
-		val &= ~(HT_CAPS_SHORT_GI20);
-
-	if (pConfig->ShortGI40MhzEnable)
-		val |= HT_CAPS_SHORT_GI40;
-	else
-		val &= ~(HT_CAPS_SHORT_GI40);
-
-	if (sme_cfg_set_int(pHddCtx->hHal, WNI_CFG_HT_CAP_INFO,
-			  val) ==
+	val16 = (uint16_t) val32;
+	ht_cap_info = (tSirMacHTCapabilityInfo *) &val16;
+	ht_cap_info->advCodingCap &= hdd_ctx->config->enableRxLDPC;
+	ht_cap_info->rxSTBC = QDF_MIN(ht_cap_info->rxSTBC,
+			hdd_ctx->config->enableRxSTBC);
+	ht_cap_info->txSTBC &= hdd_ctx->config->enableTxSTBC;
+	ht_cap_info->shortGI20MHz &= hdd_ctx->config->ShortGI20MhzEnable;
+	ht_cap_info->shortGI40MHz &= hdd_ctx->config->ShortGI40MhzEnable;
+	val32 = val16;
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_HT_CAP_INFO, val32) ==
 			QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hdd_err("Could not pass on WNI_CFG_HT_CAP_INFO to CFG");
+		status = false;
+		hdd_err("Could not set WNI_CFG_HT_CAP_INFO");
 	}
+	return status;
+}
 
-	if (sme_cfg_set_int(pHddCtx->hHal, WNI_CFG_FIXED_RATE, pConfig->TxRate)
-			    == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE, "Could not pass on WNI_CFG_FIXED_RATE to CFG");
-	}
+/**
+ * hdd_update_vht_cap_in_cfg() - to update VHT cap in global CFG
+ * @hdd_ctx: pointer to hdd context
+ *
+ * This API will update the VHT config in CFG after taking intersection
+ * of INI and firmware capabilities provided reading CFG
+ *
+ * Return: true or false
+ */
+static bool hdd_update_vht_cap_in_cfg(hdd_context_t *hdd_ctx)
+{
+	bool status = true;
+	uint32_t val;
+	struct hdd_config *config = hdd_ctx->config;
 
-	if (sme_cfg_set_int(pHddCtx->hHal, WNI_CFG_MAX_RX_AMPDU_FACTOR,
-			    pConfig->MaxRxAmpduFactor) ==
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_VHT_ENABLE_TXBF_20MHZ,
+			    config->enableTxBFin20MHz) ==
 			QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_HT_AMPDU_PARAMS_MAX_RX_AMPDU_FACTOR to CFG");
-	}
-
-	if (sme_cfg_set_int(pHddCtx->hHal, WNI_CFG_MPDU_DENSITY,
-			    pConfig->ht_mpdu_density) ==
-			QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_MPDU_DENSITY to CFG");
-	}
-
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_SHORT_PREAMBLE,
-		     pConfig->fIsShortPreamble) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-			"Could not pass on WNI_CFG_SHORT_PREAMBLE to CFG");
-	}
-
-	if (sme_cfg_set_int(pHddCtx->hHal,
-				WNI_CFG_PASSIVE_MINIMUM_CHANNEL_TIME,
-				pConfig->nPassiveMinChnTime)
-				== QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_PASSIVE_MINIMUM_CHANNEL_TIME"
-		       " to CFG");
-	}
-
-	if (sme_cfg_set_int(pHddCtx->hHal,
-				WNI_CFG_PASSIVE_MAXIMUM_CHANNEL_TIME,
-				pConfig->nPassiveMaxChnTime)
-				== QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_PASSIVE_MAXIMUM_CHANNEL_TIME"
-		       " to CFG");
-	}
-
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_BEACON_INTERVAL,
-		     pConfig->nBeaconInterval) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_BEACON_INTERVAL to CFG");
-	}
-
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_MAX_PS_POLL,
-		     pConfig->nMaxPsPoll) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE, "Could not pass on WNI_CFG_MAX_PS_POLL to CFG");
-	}
-
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_CURRENT_RX_ANTENNA,
-		     pConfig->nRxAnt) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_CURRENT_RX_ANTENNA to CFG");
-	}
-
-	if (sme_cfg_set_int (pHddCtx->hHal, WNI_CFG_LOW_GAIN_OVERRIDE,
-		    pConfig->fIsLowGainOverride) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_LOW_GAIN_OVERRIDE to HAL");
-	}
-
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_RSSI_FILTER_PERIOD,
-		    pConfig->nRssiFilterPeriod) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_RSSI_FILTER_PERIOD to CFG");
-	}
-
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_IGNORE_DTIM,
-		     pConfig->fIgnoreDtim) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_IGNORE_DTIM to CFG");
-	}
-
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_PS_ENABLE_HEART_BEAT,
-		    pConfig->fEnableFwHeartBeatMonitoring)
-		    == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_PS_HEART_BEAT to CFG");
-	}
-
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_PS_ENABLE_BCN_FILTER,
-		    pConfig->fEnableFwBeaconFiltering) ==
-		    QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_PS_BCN_FILTER to CFG");
-	}
-
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_PS_ENABLE_RSSI_MONITOR,
-		    pConfig->fEnableFwRssiMonitoring) ==
-		    QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_PS_RSSI_MONITOR to CFG");
-	}
-
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_PS_DATA_INACTIVITY_TIMEOUT,
-		    pConfig->nDataInactivityTimeout) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_PS_DATA_INACTIVITY_TIMEOUT to CFG");
-	}
-
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_ENABLE_LTE_COEX,
-		     pConfig->enableLTECoex) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_ENABLE_LTE_COEX to CFG");
-	}
-
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_ENABLE_PHY_AGC_LISTEN_MODE,
-		    pConfig->nEnableListenMode) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_ENABLE_PHY_AGC_LISTEN_MODE to CFG");
-	}
-
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_AP_KEEP_ALIVE_TIMEOUT,
-		    pConfig->apKeepAlivePeriod) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_AP_KEEP_ALIVE_TIMEOUT to CFG");
-	}
-
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_GO_KEEP_ALIVE_TIMEOUT,
-		    pConfig->goKeepAlivePeriod) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_GO_KEEP_ALIVE_TIMEOUT to CFG");
-	}
-
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_AP_LINK_MONITOR_TIMEOUT,
-		    pConfig->apLinkMonitorPeriod) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_AP_LINK_MONITOR_TIMEOUT to CFG");
-	}
-
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_GO_LINK_MONITOR_TIMEOUT,
-		    pConfig->goLinkMonitorPeriod) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_GO_LINK_MONITOR_TIMEOUT to CFG");
-	}
-
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_MCAST_BCAST_FILTER_SETTING,
-		    pConfig->mcastBcastFilterSetting) == QDF_STATUS_E_FAILURE)
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_MCAST_BCAST_FILTER_SETTING to CFG");
-
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_SINGLE_TID_RC,
-		    pConfig->bSingleTidRc) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_SINGLE_TID_RC to CFG");
-	}
-
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_TELE_BCN_WAKEUP_EN,
-		    pConfig->teleBcnWakeupEn) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_TELE_BCN_WAKEUP_EN to CFG");
-	}
-
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_TELE_BCN_TRANS_LI,
-		    pConfig->nTeleBcnTransListenInterval) ==
-		    QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_TELE_BCN_TRANS_LI to CFG");
-	}
-
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_TELE_BCN_MAX_LI,
-		    pConfig->nTeleBcnMaxListenInterval) ==
-		    QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_TELE_BCN_MAX_LI to CFG");
-	}
-
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_TELE_BCN_TRANS_LI_IDLE_BCNS,
-		    pConfig->nTeleBcnTransLiNumIdleBeacons) ==
-		    QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_TELE_BCN_TRANS_LI_IDLE_BCNS to CFG");
-	}
-
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_TELE_BCN_MAX_LI_IDLE_BCNS,
-		    pConfig->nTeleBcnMaxLiNumIdleBeacons) ==
-		    QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_TELE_BCN_MAX_LI_IDLE_BCNS to CFG");
-	}
-
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_RF_SETTLING_TIME_CLK,
-		    pConfig->rfSettlingTimeUs) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_RF_SETTLING_TIME_CLK to CFG");
-	}
-
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_INFRA_STA_KEEP_ALIVE_PERIOD,
-		    pConfig->infraStaKeepAlivePeriod) ==
-		    QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_INFRA_STA_KEEP_ALIVE_PERIOD to CFG");
-	}
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_DYNAMIC_PS_POLL_VALUE,
-		    pConfig->dynamicPsPollValue) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_DYNAMIC_PS_POLL_VALUE to CFG");
-	}
-
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_PS_NULLDATA_AP_RESP_TIMEOUT,
-		    pConfig->nNullDataApRespTimeout) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_PS_NULLDATA_DELAY_TIMEOUT to CFG");
-	}
-
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_AP_DATA_AVAIL_POLL_PERIOD,
-		    pConfig->apDataAvailPollPeriodInMs) ==
-		    QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_AP_DATA_AVAIL_POLL_PERIOD to CFG");
-	}
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_FRAGMENTATION_THRESHOLD,
-		    pConfig->FragmentationThreshold) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_FRAGMENTATION_THRESHOLD to CFG");
-	}
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_RTS_THRESHOLD,
-		     pConfig->RTSThreshold) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_RTS_THRESHOLD to CFG");
-	}
-
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_11D_ENABLED,
-		     pConfig->Is11dSupportEnabled) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_11D_ENABLED to CFG");
-	}
-
-	if (sme_cfg_set_int(pHddCtx->hHal, WNI_CFG_DFS_MASTER_ENABLED,
-			    pConfig->enableDFSMasterCap) ==
-			QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Failure: Could not set value for WNI_CFG_DFS_MASTER_ENABLED");
-	}
-
-	if (sme_cfg_set_int(pHddCtx->hHal, WNI_CFG_VHT_ENABLE_TXBF_20MHZ,
-			    pConfig->enableTxBFin20MHz) ==
-			QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not set value for WNI_CFG_VHT_ENABLE_TXBF_20MHZ");
-	}
-
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_HEART_BEAT_THRESHOLD,
-		    pConfig->HeartbeatThresh24) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_HEART_BEAT_THRESHOLD to CFG");
-	}
-
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_AP_DATA_AVAIL_POLL_PERIOD,
-		    pConfig->apDataAvailPollPeriodInMs) ==
-		    QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_AP_DATA_AVAIL_POLL_PERIOD to CFG");
-	}
-
-	if (sme_cfg_set_int(pHddCtx->hHal, WNI_CFG_ENABLE_CLOSE_LOOP,
-			    pConfig->enableCloseLoop) ==
-			QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_ENABLE_CLOSE_LOOP to CFG");
-	}
-
-	if (sme_cfg_set_int(pHddCtx->hHal, WNI_CFG_TX_PWR_CTRL_ENABLE,
-			    pConfig->enableAutomaticTxPowerControl)
-			== QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_TX_PWR_CTRL_ENABLE to CFG");
-	}
-
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_ENABLE_MC_ADDR_LIST,
-		    pConfig->fEnableMCAddrList) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_ENABLE_MC_ADDR_LIST to CFG");
+		status = false;
+		hdd_err("Couldn't set value for WNI_CFG_VHT_ENABLE_TXBF_20MHZ");
 	}
 	/* Based on cfg.ini, update the Basic MCS set, RX/TX MCS map
 	 * in the cfg.dat. Valid values are 0(MCS0-7), 1(MCS0-8), 2(MCS0-9)
 	 * we update only the least significant 2 bits in the
 	 * corresponding fields.
 	 */
-	if ((pConfig->dot11Mode == eHDD_DOT11_MODE_AUTO) ||
-	    (pConfig->dot11Mode == eHDD_DOT11_MODE_11ac_ONLY) ||
-	    (pConfig->dot11Mode == eHDD_DOT11_MODE_11ac)) {
+	if ((config->dot11Mode == eHDD_DOT11_MODE_AUTO) ||
+	    (config->dot11Mode == eHDD_DOT11_MODE_11ac_ONLY) ||
+	    (config->dot11Mode == eHDD_DOT11_MODE_11ac)) {
 		/* Currently shortGI40Mhz is used for shortGI80Mhz */
-		if (sme_cfg_set_int
-			    (pHddCtx->hHal, WNI_CFG_VHT_SHORT_GI_80MHZ,
-			    pConfig->ShortGI40MhzEnable) ==
-			    QDF_STATUS_E_FAILURE) {
-			fStatus = false;
-			hddLog(LOGE,
-			       "Could not pass WNI_VHT_SHORT_GI_80MHZ to CFG");
+		if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_VHT_SHORT_GI_80MHZ,
+			config->ShortGI40MhzEnable) == QDF_STATUS_E_FAILURE) {
+			status = false;
+			hdd_err("Couldn't pass WNI_VHT_SHORT_GI_80MHZ to CFG");
 		}
-		/* Hardware is capable of doing
-		 * 128K AMPDU in 11AC mode */
-		if (sme_cfg_set_int(pHddCtx->hHal,
+		/* Hardware is capable of doing 128K AMPDU in 11AC mode */
+		if (sme_cfg_set_int(hdd_ctx->hHal,
 			     WNI_CFG_VHT_AMPDU_LEN_EXPONENT,
-			     pConfig->fVhtAmpduLenExponent) ==
+			     config->fVhtAmpduLenExponent) ==
 			    QDF_STATUS_E_FAILURE) {
-			fStatus = false;
-			hddLog(LOGE,
-			       "Could not pass on WNI_CFG_VHT_AMPDU_LEN_EXPONENT to CFG");
+			status = false;
+			hdd_err("Couldn't pass on WNI_CFG_VHT_AMPDU_LEN_EXPONENT to CFG");
 		}
 		/* Change MU Bformee only when TxBF is enabled */
-		if (pConfig->enableTxBF) {
-			sme_cfg_get_int(pHddCtx->hHal,
+		if (config->enableTxBF) {
+			sme_cfg_get_int(hdd_ctx->hHal,
 				WNI_CFG_VHT_MU_BEAMFORMEE_CAP, &val);
 
-			if (val != pConfig->enableMuBformee) {
-				if (sme_cfg_set_int(pHddCtx->hHal,
+			if (val != config->enableMuBformee) {
+				if (sme_cfg_set_int(hdd_ctx->hHal,
 					    WNI_CFG_VHT_MU_BEAMFORMEE_CAP,
-					    pConfig->enableMuBformee
+					    config->enableMuBformee
 					    ) == QDF_STATUS_E_FAILURE) {
-					fStatus = false;
-					hddLog(LOGE,
-						"Could not pass on WNI_CFG_VHT_MU_BEAMFORMEE_CAP to CFG");
+					status = false;
+					hdd_err("Couldn't pass on WNI_CFG_VHT_MU_BEAMFORMEE_CAP to CFG");
 				}
 			}
 		}
-		if (sme_cfg_set_int(pHddCtx->hHal, WNI_CFG_VHT_MAX_MPDU_LENGTH,
-			    pConfig->vhtMpduLen) == QDF_STATUS_E_FAILURE) {
-			fStatus = false;
-			hddLog(LOGE,
-			       "Could not pass on WNI_CFG_VHT_MAX_MPDU_LENGTH to CFG");
+		if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_VHT_MAX_MPDU_LENGTH,
+			    config->vhtMpduLen) == QDF_STATUS_E_FAILURE) {
+			status = false;
+			hdd_err("Couldn't pass on WNI_CFG_VHT_MAX_MPDU_LENGTH to CFG");
 		}
 
-		if (pConfig->enable2x2 && pConfig->enable_su_tx_bformer) {
-			if (sme_cfg_set_int(pHddCtx->hHal,
+		if (config->enable2x2 && config->enable_su_tx_bformer) {
+			if (sme_cfg_set_int(hdd_ctx->hHal,
 					WNI_CFG_VHT_SU_BEAMFORMER_CAP,
-					pConfig->enable_su_tx_bformer) ==
+					config->enable_su_tx_bformer) ==
 				QDF_STATUS_E_FAILURE) {
-				fStatus = false;
+				status = false;
 				hdd_err("set SU_BEAMFORMER_CAP to CFG failed");
 			}
-			if (sme_cfg_set_int(pHddCtx->hHal,
+			if (sme_cfg_set_int(hdd_ctx->hHal,
 					WNI_CFG_VHT_NUM_SOUNDING_DIMENSIONS,
 					NUM_OF_SOUNDING_DIMENSIONS) ==
 				QDF_STATUS_E_FAILURE) {
-				fStatus = false;
+				status = false;
 				hdd_err("failed to set NUM_OF_SOUNDING_DIM");
 			}
 		}
 	}
 
-	sme_cfg_get_int(pHddCtx->hHal, WNI_CFG_HT_CAP_INFO, &val);
-	val16 = (uint16_t) val;
-	phtCapInfo = (tSirMacHTCapabilityInfo *) &val16;
-	phtCapInfo->rxSTBC = pConfig->enableRxSTBC;
-	phtCapInfo->advCodingCap = pConfig->enableRxLDPC;
-	val = val16;
-	if (sme_cfg_set_int(pHddCtx->hHal, WNI_CFG_HT_CAP_INFO, val)
-			== QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE, "Could not pass on WNI_CFG_HT_CAP_INFO to CFG");
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_VHT_RXSTBC,
+			    config->enableRxSTBC) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_VHT_RXSTBC to CFG");
 	}
 
-	if (sme_cfg_set_int(pHddCtx->hHal, WNI_CFG_VHT_RXSTBC,
-			    pConfig->enableRxSTBC) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE, "Could not pass on WNI_CFG_VHT_RXSTBC to CFG");
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_VHT_TXSTBC,
+			    config->enableTxSTBC) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_VHT_TXSTBC to CFG");
 	}
 
-	if (sme_cfg_set_int(pHddCtx->hHal, WNI_CFG_VHT_TXSTBC,
-			    pConfig->enableTxSTBC) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE, "Could not pass on WNI_CFG_VHT_TXSTBC to CFG");
+	if (sme_cfg_get_int(hdd_ctx->hHal, WNI_CFG_VHT_LDPC_CODING_CAP, &val) ==
+							QDF_STATUS_E_FAILURE) {
+		status &= false;
+		hdd_err("Could not get WNI_CFG_VHT_LDPC_CODING_CAP");
+	}
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_VHT_LDPC_CODING_CAP,
+			config->enableRxLDPC & val) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_VHT_LDPC_CODING_CAP to CFG");
 	}
 
-	if (sme_cfg_set_int(pHddCtx->hHal, WNI_CFG_VHT_LDPC_CODING_CAP,
-			    pConfig->enableRxLDPC) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_VHT_LDPC_CODING_CAP to CFG");
+	if (sme_cfg_set_int(hdd_ctx->hHal,
+		WNI_CFG_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED,
+		config->txBFCsnValue) ==
+			QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED to CFG");
 	}
+	return status;
+
+}
+
+/**
+ * hdd_update_config_cfg() - API to update INI setting based on hw/fw caps
+ * @hdd_ctx: pointer to hdd_ctx
+ *
+ * This API reads the cfg file which is updated with hardware/firmware
+ * capabilities and intersect it with INI setting provided by user. After
+ * taking intersection it adjust cfg it self. For example, if user has enabled
+ * RX LDPC through INI but hardware/firmware doesn't support it then disable
+ * it in CFG file here.
+ *
+ * Return: true or false based on outcome.
+ */
+bool hdd_update_config_cfg(hdd_context_t *hdd_ctx)
+{
+	bool status = true;
+	uint32_t val;
+	struct hdd_config *config = hdd_ctx->config;
+
+	/*
+	 * During the initialization both 2G and 5G capabilities should be same.
+	 * So read 5G HT capablity and update 2G and 5G capablities.
+	 */
+	if (!hdd_update_ht_cap_in_cfg(hdd_ctx)) {
+		status = false;
+		hdd_err("Couldn't set HT CAP in cfg");
+	}
+
+	if (!hdd_update_vht_cap_in_cfg(hdd_ctx)) {
+		status = false;
+		hdd_err("Couldn't set VHT CAP in cfg");
+	}
+
+	if (0 != hdd_update_he_cap_in_cfg(hdd_ctx)) {
+		status = false;
+		hdd_err("Couldn't set HE CAP in cfg");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_FIXED_RATE, config->TxRate)
+			    == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_FIXED_RATE to CFG");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_MAX_RX_AMPDU_FACTOR,
+			    config->MaxRxAmpduFactor) ==
+			QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_HT_AMPDU_PARAMS_MAX_RX_AMPDU_FACTOR to CFG");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_MPDU_DENSITY,
+			    config->ht_mpdu_density) ==
+			QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_MPDU_DENSITY to CFG");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_SHORT_PREAMBLE,
+		     config->fIsShortPreamble) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_SHORT_PREAMBLE to CFG");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal,
+				WNI_CFG_PASSIVE_MINIMUM_CHANNEL_TIME,
+				config->nPassiveMinChnTime)
+				== QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_PASSIVE_MINIMUM_CHANNEL_TIME to CFG");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal,
+				WNI_CFG_PASSIVE_MAXIMUM_CHANNEL_TIME,
+				config->nPassiveMaxChnTime)
+				== QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_PASSIVE_MAXIMUM_CHANNEL_TIME to CFG");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_BEACON_INTERVAL,
+		     config->nBeaconInterval) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_BEACON_INTERVAL to CFG");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_MAX_PS_POLL,
+		     config->nMaxPsPoll) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_MAX_PS_POLL to CFG");
+	}
+
+	if (sme_cfg_set_int (hdd_ctx->hHal, WNI_CFG_LOW_GAIN_OVERRIDE,
+		    config->fIsLowGainOverride) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_LOW_GAIN_OVERRIDE to HAL");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_RSSI_FILTER_PERIOD,
+		    config->nRssiFilterPeriod) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_RSSI_FILTER_PERIOD to CFG");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_IGNORE_DTIM,
+		     config->fIgnoreDtim) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_IGNORE_DTIM to CFG");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_PS_ENABLE_HEART_BEAT,
+		    config->fEnableFwHeartBeatMonitoring)
+		    == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_PS_HEART_BEAT to CFG");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_PS_ENABLE_BCN_FILTER,
+		    config->fEnableFwBeaconFiltering) ==
+		    QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_PS_BCN_FILTER to CFG");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_PS_ENABLE_RSSI_MONITOR,
+		    config->fEnableFwRssiMonitoring) ==
+		    QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_PS_RSSI_MONITOR to CFG");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_PS_DATA_INACTIVITY_TIMEOUT,
+		    config->nDataInactivityTimeout) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_PS_DATA_INACTIVITY_TIMEOUT to CFG");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_ENABLE_LTE_COEX,
+		     config->enableLTECoex) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_ENABLE_LTE_COEX to CFG");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_AP_KEEP_ALIVE_TIMEOUT,
+		    config->apKeepAlivePeriod) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_AP_KEEP_ALIVE_TIMEOUT to CFG");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_GO_KEEP_ALIVE_TIMEOUT,
+		    config->goKeepAlivePeriod) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_GO_KEEP_ALIVE_TIMEOUT to CFG");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_AP_LINK_MONITOR_TIMEOUT,
+		    config->apLinkMonitorPeriod) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_AP_LINK_MONITOR_TIMEOUT to CFG");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_GO_LINK_MONITOR_TIMEOUT,
+		    config->goLinkMonitorPeriod) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_GO_LINK_MONITOR_TIMEOUT to CFG");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_MCAST_BCAST_FILTER_SETTING,
+		    config->mcastBcastFilterSetting) == QDF_STATUS_E_FAILURE)
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_MCAST_BCAST_FILTER_SETTING to CFG");
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_SINGLE_TID_RC,
+		    config->bSingleTidRc) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_SINGLE_TID_RC to CFG");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_TELE_BCN_WAKEUP_EN,
+		    config->teleBcnWakeupEn) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_TELE_BCN_WAKEUP_EN to CFG");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_TELE_BCN_TRANS_LI,
+		    config->nTeleBcnTransListenInterval) ==
+		    QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_TELE_BCN_TRANS_LI to CFG");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_TELE_BCN_MAX_LI,
+		    config->nTeleBcnMaxListenInterval) ==
+		    QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_TELE_BCN_MAX_LI to CFG");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_TELE_BCN_TRANS_LI_IDLE_BCNS,
+		    config->nTeleBcnTransLiNumIdleBeacons) ==
+		    QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_TELE_BCN_TRANS_LI_IDLE_BCNS to CFG");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_TELE_BCN_MAX_LI_IDLE_BCNS,
+		    config->nTeleBcnMaxLiNumIdleBeacons) ==
+		    QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_TELE_BCN_MAX_LI_IDLE_BCNS to CFG");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_RF_SETTLING_TIME_CLK,
+		    config->rfSettlingTimeUs) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_RF_SETTLING_TIME_CLK to CFG");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_INFRA_STA_KEEP_ALIVE_PERIOD,
+		    config->infraStaKeepAlivePeriod) ==
+		    QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_INFRA_STA_KEEP_ALIVE_PERIOD to CFG");
+	}
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_DYNAMIC_PS_POLL_VALUE,
+		    config->dynamicPsPollValue) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_DYNAMIC_PS_POLL_VALUE to CFG");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_PS_NULLDATA_AP_RESP_TIMEOUT,
+		    config->nNullDataApRespTimeout) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_PS_NULLDATA_DELAY_TIMEOUT to CFG");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_AP_DATA_AVAIL_POLL_PERIOD,
+		    config->apDataAvailPollPeriodInMs) ==
+		    QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_AP_DATA_AVAIL_POLL_PERIOD to CFG");
+	}
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_FRAGMENTATION_THRESHOLD,
+		    config->FragmentationThreshold) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_FRAGMENTATION_THRESHOLD to CFG");
+	}
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_RTS_THRESHOLD,
+		     config->RTSThreshold) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_RTS_THRESHOLD to CFG");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_11D_ENABLED,
+		     config->Is11dSupportEnabled) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_11D_ENABLED to CFG");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_DFS_MASTER_ENABLED,
+			    config->enableDFSMasterCap) ==
+			QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Failure: Couldn't set value for WNI_CFG_DFS_MASTER_ENABLED");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_HEART_BEAT_THRESHOLD,
+		    config->HeartbeatThresh24) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_HEART_BEAT_THRESHOLD to CFG");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_ENABLE_MC_ADDR_LIST,
+		    config->fEnableMCAddrList) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_ENABLE_MC_ADDR_LIST to CFG");
+	}
+
 #ifdef WLAN_SOFTAP_VSTA_FEATURE
-	if (pConfig->fEnableVSTASupport) {
-		sme_cfg_get_int(pHddCtx->hHal, WNI_CFG_ASSOC_STA_LIMIT, &val);
+	if (config->fEnableVSTASupport) {
+		sme_cfg_get_int(hdd_ctx->hHal, WNI_CFG_ASSOC_STA_LIMIT, &val);
 		if (val <= WNI_CFG_ASSOC_STA_LIMIT_STADEF)
 			val = WNI_CFG_ASSOC_STA_LIMIT_STAMAX;
 	} else {
-		val = pConfig->maxNumberOfPeers;
+		val = config->maxNumberOfPeers;
 
 	}
-	if (sme_cfg_set_int(pHddCtx->hHal, WNI_CFG_ASSOC_STA_LIMIT, val) ==
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_ASSOC_STA_LIMIT, val) ==
 			QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_ASSOC_STA_LIMIT to CFG");
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_ASSOC_STA_LIMIT to CFG");
 	}
 #endif
-	if (sme_cfg_set_int(pHddCtx->hHal, WNI_CFG_ENABLE_LPWR_IMG_TRANSITION,
-			    pConfig->enableLpwrImgTransition)
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_ENABLE_LPWR_IMG_TRANSITION,
+			    config->enableLpwrImgTransition)
 			== QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_ENABLE_LPWR_IMG_TRANSITION to CFG");
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_ENABLE_LPWR_IMG_TRANSITION to CFG");
 	}
 
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_ENABLE_MCC_ADAPTIVE_SCHED,
-		    pConfig->enableMCCAdaptiveScheduler) ==
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_ENABLE_MCC_ADAPTIVE_SCHED,
+		    config->enableMCCAdaptiveScheduler) ==
 		    QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_ENABLE_MCC_ADAPTIVE_SCHED to CFG");
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_ENABLE_MCC_ADAPTIVE_SCHED to CFG");
 	}
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_DISABLE_LDPC_WITH_TXBF_AP,
-		    pConfig->disableLDPCWithTxbfAP) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_DISABLE_LDPC_WITH_TXBF_AP to CFG");
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_DISABLE_LDPC_WITH_TXBF_AP,
+		    config->disableLDPCWithTxbfAP) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_DISABLE_LDPC_WITH_TXBF_AP to CFG");
 	}
 
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_DYNAMIC_THRESHOLD_ZERO,
-		    pConfig->retryLimitZero) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_DYNAMIC_THRESHOLD_ZERO to CFG");
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_DYNAMIC_THRESHOLD_ZERO,
+		    config->retryLimitZero) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_DYNAMIC_THRESHOLD_ZERO to CFG");
 	}
 
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_DYNAMIC_THRESHOLD_ONE,
-		    pConfig->retryLimitOne) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_DYNAMIC_THRESHOLD_ONE to CFG");
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_DYNAMIC_THRESHOLD_ONE,
+		    config->retryLimitOne) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_DYNAMIC_THRESHOLD_ONE to CFG");
 	}
 
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_DYNAMIC_THRESHOLD_TWO,
-		    pConfig->retryLimitTwo) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_DYNAMIC_THRESHOLD_TWO to CFG");
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_DYNAMIC_THRESHOLD_TWO,
+		    config->retryLimitTwo) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_DYNAMIC_THRESHOLD_TWO to CFG");
 	}
 
-	if (sme_cfg_set_int
-		    (pHddCtx->hHal, WNI_CFG_MAX_MEDIUM_TIME,
-		     pConfig->cfgMaxMediumTime) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_MAX_MEDIUM_TIME to CFG");
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_MAX_MEDIUM_TIME,
+		     config->cfgMaxMediumTime) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_MAX_MEDIUM_TIME to CFG");
 	}
 #ifdef FEATURE_WLAN_TDLS
 
-	if (sme_cfg_set_int(pHddCtx->hHal, WNI_CFG_TDLS_QOS_WMM_UAPSD_MASK,
-			    pConfig->fTDLSUapsdMask) == QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_TDLS_QOS_WMM_UAPSD_MASK to CFG");
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_TDLS_QOS_WMM_UAPSD_MASK,
+			    config->fTDLSUapsdMask) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_TDLS_QOS_WMM_UAPSD_MASK to CFG");
 	}
-	if (sme_cfg_set_int(pHddCtx->hHal, WNI_CFG_TDLS_BUF_STA_ENABLED,
-			    pConfig->fEnableTDLSBufferSta) ==
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_TDLS_BUF_STA_ENABLED,
+			    config->fEnableTDLSBufferSta) ==
 			QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_TDLS_BUF_STA_ENABLED to CFG");
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_TDLS_BUF_STA_ENABLED to CFG");
 	}
-	if (sme_cfg_set_int(pHddCtx->hHal, WNI_CFG_TDLS_PUAPSD_INACT_TIME,
-			    pConfig->fTDLSPuapsdInactivityTimer) ==
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_TDLS_PUAPSD_INACT_TIME,
+			    config->fTDLSPuapsdInactivityTimer) ==
 			QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_TDLS_PUAPSD_INACT_TIME to CFG");
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_TDLS_PUAPSD_INACT_TIME to CFG");
 	}
-	if (sme_cfg_set_int(pHddCtx->hHal, WNI_CFG_TDLS_RX_FRAME_THRESHOLD,
-			    pConfig->fTDLSRxFrameThreshold) ==
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_TDLS_RX_FRAME_THRESHOLD,
+			    config->fTDLSRxFrameThreshold) ==
 			QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_TDLS_RX_FRAME_THRESHOLD to CFG");
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_TDLS_RX_FRAME_THRESHOLD to CFG");
 	}
 
-	if (sme_cfg_set_int(pHddCtx->hHal, WNI_CFG_TDLS_OFF_CHANNEL_ENABLED,
-			    pConfig->fEnableTDLSOffChannel) ==
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_TDLS_OFF_CHANNEL_ENABLED,
+			    config->fEnableTDLSOffChannel) ==
 			QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_TDLS_BUF_STA_ENABLED to CFG");
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_TDLS_BUF_STA_ENABLED to CFG");
 	}
-	if (sme_cfg_set_int(pHddCtx->hHal, WNI_CFG_TDLS_WMM_MODE_ENABLED,
-			    pConfig->fEnableTDLSWmmMode) ==
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_TDLS_WMM_MODE_ENABLED,
+			    config->fEnableTDLSWmmMode) ==
 			QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_TDLS_WMM_MODE_ENABLED to CFG");
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_TDLS_WMM_MODE_ENABLED to CFG");
 	}
 #endif
 
-	if (sme_cfg_set_int(pHddCtx->hHal, WNI_CFG_ENABLE_ADAPT_RX_DRAIN,
-			    pConfig->fEnableAdaptRxDrain) ==
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_ENABLE_ADAPT_RX_DRAIN,
+			    config->fEnableAdaptRxDrain) ==
 			QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_ENABLE_ADAPT_RX_DRAIN to CFG");
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_ENABLE_ADAPT_RX_DRAIN to CFG");
 	}
 
-	if (sme_cfg_set_int(pHddCtx->hHal, WNI_CFG_FLEX_CONNECT_POWER_FACTOR,
-			    pConfig->flexConnectPowerFactor) ==
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_ANTENNA_DIVESITY,
+			    config->antennaDiversity) ==
 			QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE, "Failure: Could not pass on "
-		       "WNI_CFG_FLEX_CONNECT_POWER_FACTOR to CFG");
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_ANTENNA_DIVESITY to CFG");
 	}
 
-	if (sme_cfg_set_int(pHddCtx->hHal, WNI_CFG_ANTENNA_DIVESITY,
-			    pConfig->antennaDiversity) ==
-			QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_ANTENNA_DIVESITY to CFG");
-	}
-
-	if (sme_cfg_set_int(pHddCtx->hHal,
+	if (sme_cfg_set_int(hdd_ctx->hHal,
 			    WNI_CFG_DEFAULT_RATE_INDEX_24GHZ,
-			    pConfig->defaultRateIndex24Ghz) ==
+			    config->defaultRateIndex24Ghz) ==
 			QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_DEFAULT_RATE_INDEX_24GHZ to CFG");
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_DEFAULT_RATE_INDEX_24GHZ to CFG");
 	}
 
-	if (sme_cfg_set_int(pHddCtx->hHal,
+	if (sme_cfg_set_int(hdd_ctx->hHal,
 			    WNI_CFG_DEBUG_P2P_REMAIN_ON_CHANNEL,
-			    pConfig->debugP2pRemainOnChannel) ==
+			    config->debugP2pRemainOnChannel) ==
 			QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_DEBUG_P2P_REMAIN_ON_CHANNEL to CFG");
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_DEBUG_P2P_REMAIN_ON_CHANNEL to CFG");
 	}
 #ifdef WLAN_FEATURE_11W
-	if (sme_cfg_set_int(pHddCtx->hHal, WNI_CFG_PMF_SA_QUERY_MAX_RETRIES,
-			    pConfig->pmfSaQueryMaxRetries) ==
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_PMF_SA_QUERY_MAX_RETRIES,
+			    config->pmfSaQueryMaxRetries) ==
 			QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_SA_QUERY_MAX_RETRIES to CFG");
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_SA_QUERY_MAX_RETRIES to CFG");
 	}
 
-	if (sme_cfg_set_int(pHddCtx->hHal, WNI_CFG_PMF_SA_QUERY_RETRY_INTERVAL,
-			    pConfig->pmfSaQueryRetryInterval) ==
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_PMF_SA_QUERY_RETRY_INTERVAL,
+			    config->pmfSaQueryRetryInterval) ==
 			QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_SA_QUERY_RETRY_INTERVAL to CFG");
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_SA_QUERY_RETRY_INTERVAL to CFG");
 	}
 #endif
 
-	if (sme_cfg_set_int(pHddCtx->hHal, WNI_CFG_IBSS_ATIM_WIN_SIZE,
-			    pConfig->ibssATIMWinSize) ==
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_IBSS_ATIM_WIN_SIZE,
+			    config->ibssATIMWinSize) ==
 			QDF_STATUS_E_FAILURE) {
-		fStatus = false;
-		hddLog(LOGE,
-		       "Could not pass on WNI_CFG_IBSS_ATIM_WIN_SIZE to CFG");
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_IBSS_ATIM_WIN_SIZE to CFG");
 	}
-	return fStatus;
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_TGT_GTX_USR_CFG,
+	    config->tgt_gtx_usr_cfg) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_TGT_GTX_USR_CFG to CCM");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_MAX_HT_MCS_TX_DATA,
+			    config->max_ht_mcs_txdata) ==
+			    QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_MAX_HT_MCS_TX_DATA to CCM");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_DISABLE_ABG_RATE_FOR_TX_DATA,
+			    config->disable_abg_rate_txdata) ==
+			    QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_DISABLE_ABG_RATE_FOR_TX_DATA to CCM");
+	}
+
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_RATE_FOR_TX_MGMT,
+			    config->rate_for_tx_mgmt) ==
+			    QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Couldn't pass on WNI_CFG_RATE_FOR_TX_MGMT to CCM");
+	}
+
+	return status;
 }
+
 #ifdef FEATURE_WLAN_SCAN_PNO
 /**
  * hdd_set_pno_channel_prediction_config() - Set PNO configuration
@@ -6805,6 +6938,79 @@ void hdd_set_pno_channel_prediction_config(
 		hdd_ctx->config->pnoscan_adaptive_dwell_mode;
 }
 #endif
+
+/**
+ * hdd_update_per_config_to_sme() -initializes the sme config for PER roam
+ *
+ * @hdd_ctx: the pointer to hdd context
+ * @sme_config: sme configuation pointer
+ *
+ * Return: None
+ */
+static void hdd_update_per_config_to_sme(hdd_context_t *hdd_ctx,
+					 tSmeConfigParams *sme_config)
+{
+	sme_config->csrConfig.per_roam_config.enable =
+			hdd_ctx->config->is_per_roam_enabled;
+
+	/* Assigning Tx and Rx for same value */
+	sme_config->csrConfig.per_roam_config.tx_high_rate_thresh =
+			hdd_ctx->config->per_roam_high_rate_threshold;
+	sme_config->csrConfig.per_roam_config.rx_high_rate_thresh =
+			hdd_ctx->config->per_roam_high_rate_threshold;
+
+	/* Assigning Tx and Rx for same value */
+	sme_config->csrConfig.per_roam_config.tx_low_rate_thresh =
+			hdd_ctx->config->per_roam_low_rate_threshold;
+	sme_config->csrConfig.per_roam_config.rx_low_rate_thresh =
+			hdd_ctx->config->per_roam_low_rate_threshold;
+
+	/* Assigning Tx and Rx for same value */
+	sme_config->csrConfig.per_roam_config.tx_rate_thresh_percnt =
+			hdd_ctx->config->per_roam_th_percent;
+	sme_config->csrConfig.per_roam_config.rx_rate_thresh_percnt =
+			hdd_ctx->config->per_roam_th_percent;
+
+	sme_config->csrConfig.per_roam_config.per_rest_time =
+			hdd_ctx->config->per_roam_rest_time;
+	sme_config->csrConfig.per_roam_config.tx_per_mon_time =
+			hdd_ctx->config->per_roam_mon_time;
+	sme_config->csrConfig.per_roam_config.rx_per_mon_time =
+			hdd_ctx->config->per_roam_mon_time;
+}
+
+/**
+ * hdd_set_policy_mgr_user_cfg() -initializes the policy manager
+ * configuration parameters
+ *
+ * @pHddCtx: the pointer to hdd context
+ *
+ * Return: QDF_STATUS_SUCCESS if configuration is correctly applied,
+ *		otherwise the appropriate QDF_STATUS would be returned
+ */
+QDF_STATUS hdd_set_policy_mgr_user_cfg(hdd_context_t *hdd_ctx)
+{
+	QDF_STATUS status;
+	struct policy_mgr_user_cfg *user_cfg;
+
+	user_cfg = qdf_mem_malloc(sizeof(*user_cfg));
+	if (NULL == user_cfg) {
+		hdd_err("unable to allocate user_cfg");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	user_cfg->conc_system_pref = hdd_ctx->config->conc_system_pref;
+	user_cfg->enable_mcc_adaptive_scheduler =
+		hdd_ctx->config->enableMCCAdaptiveScheduler;
+	user_cfg->max_concurrent_active_sessions =
+		hdd_ctx->config->gMaxConcurrentActiveSessions;
+	user_cfg->enable2x2 = hdd_ctx->config->enable2x2;
+	status = policy_mgr_set_user_cfg(hdd_ctx->hdd_psoc, user_cfg);
+
+	qdf_mem_free(user_cfg);
+
+	return status;
+}
 /**
  * hdd_set_sme_config() -initializes the sme configuration parameters
  *
@@ -6823,14 +7029,11 @@ QDF_STATUS hdd_set_sme_config(hdd_context_t *pHddCtx)
 
 	smeConfig = qdf_mem_malloc(sizeof(*smeConfig));
 	if (NULL == smeConfig) {
-		QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_ERROR,
-			  "%s: unable to allocate smeConfig", __func__);
+		hdd_err("unable to allocate smeConfig");
 		return QDF_STATUS_E_NOMEM;
 	}
-	qdf_mem_zero(smeConfig, sizeof(*smeConfig));
 
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "%s bWmmIsEnabled=%d 802_11e_enabled=%d dot11Mode=%d",
+	hdd_info("%s bWmmIsEnabled=%d 802_11e_enabled=%d dot11Mode=%d",
 		  __func__, pConfig->WmmMode, pConfig->b80211eIsEnabled,
 		  pConfig->dot11Mode);
 
@@ -6863,10 +7066,6 @@ QDF_STATUS hdd_set_sme_config(hdd_context_t *pHddCtx)
 	}
 	smeConfig->csrConfig.TxRate = pConfig->TxRate;
 	smeConfig->csrConfig.nScanResultAgeCount = pConfig->ScanResultAgeCount;
-	smeConfig->csrConfig.scanAgeTimeNCNPS = pConfig->nScanAgeTimeNCNPS;
-	smeConfig->csrConfig.scanAgeTimeNCPS = pConfig->nScanAgeTimeNCPS;
-	smeConfig->csrConfig.scanAgeTimeCNPS = pConfig->nScanAgeTimeCNPS;
-	smeConfig->csrConfig.scanAgeTimeCPS = pConfig->nScanAgeTimeCPS;
 	smeConfig->csrConfig.AdHocChannel24 = pConfig->OperatingChannel;
 	smeConfig->csrConfig.fSupplicantCountryCodeHasPriority =
 		pConfig->fSupplicantCountryCodeHasPriority;
@@ -6874,7 +7073,6 @@ QDF_STATUS hdd_set_sme_config(hdd_context_t *pHddCtx)
 	smeConfig->csrConfig.vccRssiThreshold = pConfig->nVccRssiTrigger;
 	smeConfig->csrConfig.vccUlMacLossThreshold =
 		pConfig->nVccUlMacLossThreshold;
-	smeConfig->csrConfig.nRoamingTime = pConfig->nRoamingTime;
 	smeConfig->csrConfig.nInitialDwellTime = pConfig->nInitialDwellTime;
 	smeConfig->csrConfig.initial_scan_no_dfs_chnl =
 					pConfig->initial_scan_no_dfs_chnl;
@@ -6915,9 +7113,10 @@ QDF_STATUS hdd_set_sme_config(hdd_context_t *pHddCtx)
 	smeConfig->csrConfig.enableTxBF = pConfig->enableTxBF;
 	smeConfig->csrConfig.enable_txbf_sap_mode =
 		pConfig->enable_txbf_sap_mode;
-	smeConfig->csrConfig.txBFCsnValue = pConfig->txBFCsnValue;
 	smeConfig->csrConfig.enable2x2 = pConfig->enable2x2;
 	smeConfig->csrConfig.enableVhtFor24GHz = pConfig->enableVhtFor24GHzBand;
+	smeConfig->csrConfig.vendor_vht_sap =
+		pConfig->enable_sap_vendor_vht;
 	smeConfig->csrConfig.enableMuBformee = pConfig->enableMuBformee;
 	smeConfig->csrConfig.enableVhtpAid = pConfig->enableVhtpAid;
 	smeConfig->csrConfig.enableVhtGid = pConfig->enableVhtGid;
@@ -6940,6 +7139,7 @@ QDF_STATUS hdd_set_sme_config(hdd_context_t *pHddCtx)
 	smeConfig->csrConfig.cbChoice = 0;
 	smeConfig->csrConfig.eBand = pConfig->nBandCapability;
 	smeConfig->csrConfig.nTxPowerCap = pConfig->nTxPowerCap;
+	smeConfig->csrConfig.allow_tpc_from_ap = pConfig->allow_tpc_from_ap;
 	smeConfig->csrConfig.fEnableBypass11d = pConfig->enableBypass11d;
 	smeConfig->csrConfig.fEnableDFSChnlScan = pConfig->enableDFSChnlScan;
 	smeConfig->csrConfig.nRoamPrefer5GHz = pConfig->nRoamPrefer5GHz;
@@ -7036,6 +7236,7 @@ QDF_STATUS hdd_set_sme_config(hdd_context_t *pHddCtx)
 	smeConfig->csrConfig.scanCfgAgingTime = pConfig->scanAgingTimeout;
 
 	smeConfig->csrConfig.enableTxLdpc = pConfig->enableTxLdpc;
+	smeConfig->csrConfig.enableRxLDPC = pConfig->enableRxLDPC;
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 	smeConfig->csrConfig.cc_switch_mode = pConfig->WlanMccToSccSwitchMode;
 #endif
@@ -7089,6 +7290,8 @@ QDF_STATUS hdd_set_sme_config(hdd_context_t *pHddCtx)
 		pHddCtx->config->prefer_non_dfs_on_radar;
 
 	smeConfig->csrConfig.is_ps_enabled = pHddCtx->config->is_ps_enabled;
+	smeConfig->csrConfig.auto_bmps_timer_val =
+		pHddCtx->config->auto_bmps_timer_val;
 	hdd_set_fine_time_meas_cap(pHddCtx, smeConfig);
 
 	cds_set_multicast_logging(pHddCtx->config->multicast_host_fw_msgs);
@@ -7133,6 +7336,8 @@ QDF_STATUS hdd_set_sme_config(hdd_context_t *pHddCtx)
 	smeConfig->csrConfig.roamscan_adaptive_dwell_mode =
 			pHddCtx->config->roamscan_adaptive_dwell_mode;
 
+	hdd_update_per_config_to_sme(pHddCtx, smeConfig);
+
 	smeConfig->csrConfig.enable_edca_params =
 			pConfig->enable_edca_params;
 
@@ -7162,10 +7367,24 @@ QDF_STATUS hdd_set_sme_config(hdd_context_t *pHddCtx)
 			pConfig->edca_bk_aifs;
 	smeConfig->csrConfig.edca_be_aifs =
 			pConfig->edca_be_aifs;
+	smeConfig->csrConfig.sta_roam_policy_params.dfs_mode =
+		CSR_STA_ROAM_POLICY_DFS_ENABLED;
+	smeConfig->csrConfig.sta_roam_policy_params.skip_unsafe_channels = 0;
+
+	smeConfig->snr_monitor_enabled = pHddCtx->config->fEnableSNRMonitoring;
+
+	smeConfig->csrConfig.tx_aggregation_size =
+			pHddCtx->config->tx_aggregation_size;
+	smeConfig->csrConfig.rx_aggregation_size =
+			pHddCtx->config->rx_aggregation_size;
+	smeConfig->csrConfig.enable_bcast_probe_rsp =
+			pHddCtx->config->enable_bcast_probe_rsp;
+
+	hdd_he_set_sme_config(smeConfig, pConfig);
 
 	status = sme_update_config(pHddCtx->hHal, smeConfig);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		hddLog(LOGE, "sme_update_config() return failure %d",
+		hdd_err("sme_update_config() return failure %d",
 		       status);
 	}
 
@@ -7216,14 +7435,10 @@ QDF_STATUS hdd_cfg_get_global_config(hdd_context_t *pHddCtx, char *pBuf,
 bool hdd_is_okc_mode_enabled(hdd_context_t *pHddCtx)
 {
 	if (NULL == pHddCtx) {
-		hddLog(QDF_TRACE_LEVEL_FATAL, "%s: pHddCtx is NULL", __func__);
+		hdd_alert("pHddCtx is NULL");
 		return -EINVAL;
 	}
-#ifdef FEATURE_WLAN_OKC
 	return pHddCtx->config->isOkcIniFeatureEnabled;
-#else
-	return false;
-#endif
 }
 
 /**
@@ -7248,24 +7463,24 @@ QDF_STATUS hdd_update_nss(hdd_context_t *hdd_ctx, uint8_t nss)
 	tSirMacHTCapabilityInfo *ht_cap_info;
 	uint8_t mcs_set[SIZE_OF_SUPPORTED_MCS_SET] = {0};
 	uint8_t mcs_set_temp[SIZE_OF_SUPPORTED_MCS_SET];
-	uint32_t val;
+	uint32_t val, val32;
 	uint16_t val16;
 	uint8_t enable2x2;
 
 	if ((nss == 2) && (hdd_ctx->num_rf_chains != 2)) {
-		hddLog(LOGE, "No support for 2 spatial streams");
+		hdd_err("No support for 2 spatial streams");
 		return QDF_STATUS_E_INVAL;
 	}
 
 	enable2x2 = (nss == 1) ? 0 : 1;
 
 	if (hdd_config->enable2x2 == enable2x2) {
-		hddLog(LOGE, "NSS same as requested");
+		hdd_err("NSS same as requested");
 		return QDF_STATUS_SUCCESS;
 	}
 
 	if (true == sme_is_any_session_in_connected_state(hdd_ctx->hHal)) {
-		hddLog(LOGE, "Connected sessions present, Do not change NSS");
+		hdd_err("Connected sessions present, Do not change NSS");
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -7286,8 +7501,7 @@ QDF_STATUS hdd_update_nss(hdd_context_t *hdd_ctx, uint8_t nss)
 			    WNI_CFG_VHT_RX_HIGHEST_SUPPORTED_DATA_RATE,
 			    rx_supp_data_rate) == QDF_STATUS_E_FAILURE) {
 		status = false;
-		hddLog(LOGE,
-			"Could not pass on WNI_CFG_VHT_RX_HIGHEST_SUPPORTED_DATA_RATE to CFG");
+		hdd_err("Could not pass on WNI_CFG_VHT_RX_HIGHEST_SUPPORTED_DATA_RATE to CFG");
 	}
 
 	/* Update Tx Highest Long GI data Rate */
@@ -7295,22 +7509,24 @@ QDF_STATUS hdd_update_nss(hdd_context_t *hdd_ctx, uint8_t nss)
 			    WNI_CFG_VHT_TX_HIGHEST_SUPPORTED_DATA_RATE,
 			    tx_supp_data_rate) == QDF_STATUS_E_FAILURE) {
 		status = false;
-		hddLog(LOGE,
-			"Could not pass on WNI_CFG_VHT_TX_HIGHEST_SUPPORTED_DATA_RATE to CFG");
+		hdd_err("Could not pass on WNI_CFG_VHT_TX_HIGHEST_SUPPORTED_DATA_RATE to CFG");
 	}
 
 	sme_cfg_get_int(hdd_ctx->hHal, WNI_CFG_HT_CAP_INFO, &temp);
 	val16 = (uint16_t)temp;
 	ht_cap_info = (tSirMacHTCapabilityInfo *)&val16;
-	if (!(hdd_ctx->ht_tx_stbc_supported && hdd_config->enable2x2))
+	if (!(hdd_ctx->ht_tx_stbc_supported && hdd_config->enable2x2)) {
 		ht_cap_info->txSTBC = 0;
-	else
-		ht_cap_info->txSTBC = hdd_config->enableTxSTBC;
+	} else {
+		sme_cfg_get_int(hdd_ctx->hHal, WNI_CFG_VHT_TXSTBC, &val32);
+		hdd_notice("STBC %d", val32);
+		ht_cap_info->txSTBC = val32;
+	}
 	temp = val16;
 	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_HT_CAP_INFO,
 			    temp) == QDF_STATUS_E_FAILURE) {
 		status = false;
-		hddLog(LOGE, "Could not pass on WNI_CFG_HT_CAP_INFO to CFG");
+		hdd_err("Could not pass on WNI_CFG_HT_CAP_INFO to CFG");
 	}
 
 	sme_cfg_get_int(hdd_ctx->hHal, WNI_CFG_VHT_BASIC_MCS_SET, &temp);
@@ -7323,8 +7539,7 @@ QDF_STATUS hdd_update_nss(hdd_context_t *hdd_ctx, uint8_t nss)
 	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_VHT_BASIC_MCS_SET,
 			    temp) == QDF_STATUS_E_FAILURE) {
 		status = false;
-		hddLog(LOGE,
-			"Could not pass on WNI_CFG_VHT_BASIC_MCS_SET to CFG");
+		hdd_err("Could not pass on WNI_CFG_VHT_BASIC_MCS_SET to CFG");
 	}
 
 	sme_cfg_get_int(hdd_ctx->hHal, WNI_CFG_VHT_RX_MCS_MAP, &temp);
@@ -7337,7 +7552,7 @@ QDF_STATUS hdd_update_nss(hdd_context_t *hdd_ctx, uint8_t nss)
 	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_VHT_RX_MCS_MAP,
 			    temp) == QDF_STATUS_E_FAILURE) {
 		status = false;
-		hddLog(LOGE, "Could not pass on WNI_CFG_VHT_RX_MCS_MAP to CFG");
+		hdd_err("Could not pass on WNI_CFG_VHT_RX_MCS_MAP to CFG");
 	}
 
 	sme_cfg_get_int(hdd_ctx->hHal, WNI_CFG_VHT_TX_MCS_MAP, &temp);
@@ -7350,7 +7565,7 @@ QDF_STATUS hdd_update_nss(hdd_context_t *hdd_ctx, uint8_t nss)
 	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_VHT_TX_MCS_MAP,
 			    temp) == QDF_STATUS_E_FAILURE) {
 		status = false;
-		hddLog(LOGE, "Could not pass on WNI_CFG_VHT_TX_MCS_MAP to CFG");
+		hdd_err("Could not pass on WNI_CFG_VHT_TX_MCS_MAP to CFG");
 	}
 
 #define WLAN_HDD_RX_MCS_ALL_NSTREAM_RATES 0xff
@@ -7368,12 +7583,14 @@ QDF_STATUS hdd_update_nss(hdd_context_t *hdd_ctx, uint8_t nss)
 			    SIZE_OF_SUPPORTED_MCS_SET) ==
 				QDF_STATUS_E_FAILURE) {
 		status = false;
-		hddLog(LOGE, "Could not pass on MCS SET to CFG");
+		hdd_err("Could not pass on MCS SET to CFG");
 	}
 #undef WLAN_HDD_RX_MCS_ALL_NSTREAM_RATES
 
 	if (QDF_STATUS_SUCCESS != sme_update_nss(hdd_ctx->hHal, nss))
 		status = false;
+
+	hdd_set_policy_mgr_user_cfg(hdd_ctx);
 
 	return (status == false) ? QDF_STATUS_E_FAILURE : QDF_STATUS_SUCCESS;
 }

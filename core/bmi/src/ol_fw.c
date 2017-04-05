@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -42,11 +42,17 @@
 #include "if_sdio.h"
 #include "regtable_sdio.h"
 #endif
+#if defined(HIF_USB)
+#include "if_usb.h"
+#include "regtable_usb.h"
+#endif
 #include "pld_common.h"
+#include "hif_main.h"
 
 #include "i_bmi.h"
 #include "qwlan_version.h"
-#include "cds_concurrency.h"
+#include "wlan_policy_mgr_api.h"
+#include "dbglog_host.h"
 
 #ifdef FEATURE_SECURE_FIRMWARE
 static struct hash_fw fw_hash;
@@ -121,7 +127,7 @@ static int ol_check_fw_hash(struct device *dev,
 		goto end;
 	}
 
-	if (qdf_mem_cmp(hash, digest, SHA256_DIGEST_SIZE) == 0) {
+	if (qdf_mem_cmp(hash, digest, SHA256_DIGEST_SIZE)) {
 		BMI_ERR("Hash Mismatch");
 		qdf_trace_hex_dump(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_FATAL,
 				   digest, SHA256_DIGEST_SIZE);
@@ -188,7 +194,13 @@ __ol_transfer_bin_file(struct ol_context *ol_ctx, ATH_BIN_FILE file,
 			break;
 		}
 #endif
-		filename = bmi_ctx->fw_files.image_file;
+		if (cds_get_conparam() == QDF_GLOBAL_IBSS_MODE &&
+		    (bmi_ctx->fw_files.ibss_image_file[0] != '\0')) {
+			filename = bmi_ctx->fw_files.ibss_image_file;
+		} else {
+			filename = bmi_ctx->fw_files.image_file;
+		}
+
 		if (SIGNED_SPLIT_BINARY_VALUE)
 			bin_sign = true;
 		break;
@@ -283,7 +295,7 @@ __ol_transfer_bin_file(struct ol_context *ol_ctx, ATH_BIN_FILE file,
 #endif
 
 	if (file == ATH_BOARD_DATA_FILE) {
-		uint32_t board_ext_address;
+		uint32_t board_ext_address = 0;
 		int32_t board_ext_data_size;
 
 		temp_eeprom = qdf_mem_malloc(fw_entry_size);
@@ -297,16 +309,17 @@ __ol_transfer_bin_file(struct ol_context *ol_ctx, ATH_BIN_FILE file,
 			  fw_entry_size);
 
 		switch (target_type) {
-		default:
-			board_data_size = 0;
-			board_ext_data_size = 0;
-			break;
 		case TARGET_TYPE_AR6004:
 			board_data_size = AR6004_BOARD_DATA_SZ;
 			board_ext_data_size = AR6004_BOARD_EXT_DATA_SZ;
+			break;
 		case TARGET_TYPE_AR9888:
 			board_data_size = AR9888_BOARD_DATA_SZ;
 			board_ext_data_size = AR9888_BOARD_EXT_DATA_SZ;
+			break;
+		default:
+			board_data_size = 0;
+			board_ext_data_size = 0;
 			break;
 		}
 
@@ -473,17 +486,13 @@ static inline void ol_get_ramdump_mem(struct device *dev,
 int ol_copy_ramdump(struct hif_opaque_softc *scn)
 {
 	int ret = -1;
-	struct hif_opaque_softc **ol_ctx_ptr = &scn;
-	struct ol_context *ol_ctx;
-	qdf_device_t qdf_dev;
 	struct ramdump_info *info;
+	qdf_device_t qdf_dev = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
 
-	ol_ctx = container_of(ol_ctx_ptr, struct ol_context , scn);
-	if (!ol_ctx) {
-		BMI_ERR("%s: Invalid ol_ctx\n", __func__);
+	if (!qdf_dev) {
+		BMI_ERR("%s qdf_dev is NULL", __func__);
 		return -EINVAL;
 	}
-	qdf_dev = ol_ctx->qdf_dev;
 
 	if (hif_get_bus_type(scn) == QDF_BUS_TYPE_SDIO)
 		return 0;
@@ -525,7 +534,7 @@ void ramdump_work_handler(void *data)
 	}
 	tgt_info = hif_get_target_info_handle(ramdump_scn);
 	target_type = tgt_info->target_type;
-#ifdef DEBUG
+#ifdef WLAN_DEBUG
 	ret = hif_check_soc_status(ramdump_scn);
 	if (ret)
 		goto out_fail;
@@ -571,7 +580,8 @@ void ramdump_work_handler(void *data)
 out_fail:
 	/* Silent SSR on dump failure */
 	if (ini_cfg->enable_self_recovery)
-		pld_device_self_recovery(qdf_dev->dev);
+		pld_device_self_recovery(qdf_dev->dev,
+					 PLD_REASON_DEFAULT);
 	else
 		pld_device_crashed(qdf_dev->dev);
 	return;
@@ -582,7 +592,8 @@ void fw_indication_work_handler(void *data)
 	struct ol_context *ol_ctx = data;
 	qdf_device_t qdf_dev = ol_ctx->qdf_dev;
 
-	pld_device_self_recovery(qdf_dev->dev);
+	pld_device_self_recovery(qdf_dev->dev,
+				 PLD_REASON_DEFAULT);
 }
 
 void ol_target_failure(void *instance, QDF_STATUS status)
@@ -591,6 +602,7 @@ void ol_target_failure(void *instance, QDF_STATUS status)
 	struct hif_opaque_softc *scn = ol_ctx->scn;
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
 	struct ol_config_info *ini_cfg = ol_get_ini_handle(ol_ctx);
+	qdf_device_t qdf_dev = ol_ctx->qdf_dev;
 	int ret;
 	enum hif_target_status target_status = hif_get_target_status(scn);
 
@@ -607,6 +619,12 @@ void ol_target_failure(void *instance, QDF_STATUS status)
 	}
 
 	hif_set_target_status(scn, TARGET_STATUS_RESET);
+
+	if (hif_get_bus_type(scn) == QDF_BUS_TYPE_USB) {
+		if (status == QDF_STATUS_E_USB_ERROR)
+			hif_ramdump_handler(scn);
+		return;
+	}
 
 	if (cds_is_driver_recovering()) {
 		BMI_ERR("%s: Recovery in progress, ignore!\n", __func__);
@@ -632,6 +650,7 @@ void ol_target_failure(void *instance, QDF_STATUS status)
 
 	BMI_ERR("XXX TARGET ASSERTED XXX");
 
+	cds_svc_fw_shutdown_ind(qdf_dev->dev);
 	/* Collect the RAM dump through a workqueue */
 	if (ini_cfg->enable_ramdump_collection)
 		qdf_sched_work(0, &ol_ctx->ramdump_work);
@@ -838,8 +857,8 @@ ol_check_dataset_patch(struct hif_opaque_softc *scn, uint32_t *address)
 }
 
 
-QDF_STATUS ol_fw_populate_clk_settings(A_refclk_speed_t refclk,
-				     struct cmnos_clock_s *clock_s)
+static QDF_STATUS ol_fw_populate_clk_settings(A_refclk_speed_t refclk,
+					      struct cmnos_clock_s *clock_s)
 {
 	if (!clock_s)
 		return QDF_STATUS_E_FAILURE;
@@ -903,7 +922,7 @@ QDF_STATUS ol_fw_populate_clk_settings(A_refclk_speed_t refclk,
 	return QDF_STATUS_SUCCESS;
 }
 
-QDF_STATUS ol_patch_pll_switch(struct ol_context *ol_ctx)
+static QDF_STATUS ol_patch_pll_switch(struct ol_context *ol_ctx)
 {
 	struct hif_opaque_softc *hif = ol_ctx->scn;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
@@ -932,6 +951,8 @@ QDF_STATUS ol_patch_pll_switch(struct ol_context *ol_ctx)
 		break;
 	case AR6320_REV3_VERSION:
 	case AR6320_REV3_2_VERSION:
+	case QCA9379_REV1_VERSION:
+	case QCA9377_REV1_1_VERSION:
 		cmnos_core_clk_div_addr = AR6320V3_CORE_CLK_DIV_ADDR;
 		cmnos_cpu_pll_init_done_addr = AR6320V3_CPU_PLL_INIT_DONE_ADDR;
 		cmnos_cpu_speed_addr = AR6320V3_CPU_SPEED_ADDR;
@@ -1194,31 +1215,6 @@ end:
 	return status;
 }
 
-/* AXI Start Address */
-#define TARGET_ADDR (0xa0000)
-
-void ol_transfer_codeswap_struct(struct ol_context *ol_ctx)
-{
-	struct pld_codeswap_codeseg_info wlan_codeswap;
-	QDF_STATUS rv;
-	qdf_device_t qdf_dev = ol_ctx->qdf_dev;
-
-	if (pld_get_codeswap_struct(qdf_dev->dev, &wlan_codeswap)) {
-		BMI_ERR("%s: failed to get codeswap structure", __func__);
-		return;
-	}
-
-	rv = bmi_write_memory(TARGET_ADDR,
-			      (uint8_t *) &wlan_codeswap, sizeof(wlan_codeswap),
-			      ol_ctx);
-
-	if (rv != QDF_STATUS_SUCCESS) {
-		BMI_ERR("Failed to Write 0xa0000 to Target");
-		return;
-	}
-	BMI_INFO("codeswap structure is successfully downloaded");
-}
-
 QDF_STATUS ol_download_firmware(struct ol_context *ol_ctx)
 {
 	struct hif_opaque_softc *scn = ol_ctx->scn;
@@ -1252,11 +1248,12 @@ QDF_STATUS ol_download_firmware(struct ol_context *ol_ctx)
 						__func__, address);
 	}
 
-	ret = ol_patch_pll_switch(ol_ctx);
-
-	if (ret != QDF_STATUS_SUCCESS) {
-		BMI_ERR("pll switch failed. status %d", ret);
-		return ret;
+	if (hif_get_bus_type(scn) != QDF_BUS_TYPE_USB) {
+		ret = ol_patch_pll_switch(ol_ctx);
+		if (ret != QDF_STATUS_SUCCESS) {
+			BMI_ERR("pll switch failed. status %d", ret);
+			return ret;
+		}
 	}
 
 	if (ol_ctx->cal_in_flash) {
@@ -1292,8 +1289,6 @@ QDF_STATUS ol_download_firmware(struct ol_context *ol_ctx)
 		address = BMI_SEGMENTED_WRITE_ADDR;
 		BMI_INFO("%s: Using 0x%x for the remainder of init",
 				__func__, address);
-
-		ol_transfer_codeswap_struct(ol_ctx);
 
 		status = ol_transfer_bin_file(ol_ctx, ATH_OTP_FILE,
 						address, true);
@@ -1341,6 +1336,7 @@ QDF_STATUS ol_download_firmware(struct ol_context *ol_ctx)
 		case AR6320_REV2_VERSION:
 		case AR6320_REV3_VERSION:
 		case AR6320_REV3_2_VERSION:
+		case QCA9379_REV1_VERSION:
 		case AR6320_REV4_VERSION:
 		case AR6320_DEV_VERSION:
 		if (hif_get_bus_type(scn) == QDF_BUS_TYPE_SDIO)
@@ -1400,8 +1396,8 @@ QDF_STATUS ol_download_firmware(struct ol_context *ol_ctx)
 	return status;
 }
 
-int ol_diag_read(struct hif_opaque_softc *scn, uint8_t *buffer,
-		 uint32_t pos, size_t count)
+static int ol_diag_read(struct hif_opaque_softc *scn, uint8_t *buffer,
+			uint32_t pos, size_t count)
 {
 	int result = 0;
 
@@ -1457,6 +1453,7 @@ static int ol_ath_get_reg_table(uint32_t target_version,
 		break;
 	case AR6320_REV3_VERSION:
 	case AR6320_REV3_2_VERSION:
+	case QCA9379_REV1_VERSION:
 		reg_table->section =
 			(tgt_reg_section *) &ar6320v3_reg_table[0];
 		reg_table->section_size = sizeof(ar6320v3_reg_table)
@@ -1538,6 +1535,7 @@ out:
 	return result;
 }
 
+static
 void ol_dump_target_memory(struct hif_opaque_softc *scn, void *memory_block)
 {
 	char *buffer_loc = memory_block;
@@ -1545,7 +1543,8 @@ void ol_dump_target_memory(struct hif_opaque_softc *scn, void *memory_block)
 	u_int32_t address = 0;
 	u_int32_t size = 0;
 
-	if (hif_get_bus_type(scn) == QDF_BUS_TYPE_SDIO)
+	if (hif_get_bus_type(scn) == QDF_BUS_TYPE_SDIO ||
+	    hif_get_bus_type(scn) == QDF_BUS_TYPE_USB)
 		return;
 
 	for (; section_count < 2; section_count++) {

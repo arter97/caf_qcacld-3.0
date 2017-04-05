@@ -105,6 +105,7 @@ int hdd_napi_create(void)
 {
 	struct  hif_opaque_softc *hif_ctx;
 	int     rc = 0;
+	hdd_context_t *hdd_ctx;
 
 	NAPI_DEBUG("-->");
 
@@ -116,11 +117,20 @@ int hdd_napi_create(void)
 		rc = hif_napi_create(hif_ctx, hdd_napi_poll,
 				     QCA_NAPI_BUDGET,
 				     QCA_NAPI_DEF_SCALE);
-		if (rc < 0)
+		if (rc < 0) {
 			hdd_err("ERR(%d) creating NAPI instances",
 				rc);
-		else
+		} else {
 			hdd_info("napi instances were created. Map=0x%x", rc);
+			hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+			if (unlikely(NULL == hdd_ctx)) {
+				QDF_ASSERT(0);
+				rc = -EFAULT;
+			} else {
+				rc = hdd_napi_event(NAPI_EVT_INI_FILE,
+					(void *)hdd_ctx->napi_enable);
+			}
+		}
 
 	}
 	NAPI_DEBUG("<-- [rc=%d]", rc);
@@ -204,20 +214,16 @@ int hdd_napi_enabled(int id)
 }
 
 /**
- * hdd_napi_event() - relay the event detected by HDD to HIF NAPI decision maker
+ * hdd_napi_event() - relay the event detected by HDD to HIF NAPI event handler
  * @event: event code
  * @data : event-specific auxiliary data
  *
- * Return code does not indicate a change, but whether or not NAPI is
- * enabled at the time of the return of the function. That is, if NAPI
- * was disabled before the call, and the event does not cause NAPI to be
- * enabled, a value of 0 will be returned indicating that it is (still)
- * disabled.
+ * See function documentation in hif_napi.c::hif_napi_event for list of events
+ * and how each of them is handled.
  *
  * Return:
  *  < 0: error code
- *  = 0: NAPI state = disabled (after processing the event)
- *  = 1: NAPI state = enabled  (after processing the event)
+ *  = 0: event handled successfully
  */
 int hdd_napi_event(enum qca_napi_event event, void *data)
 {
@@ -235,6 +241,119 @@ int hdd_napi_event(enum qca_napi_event event, void *data)
 	NAPI_DEBUG("<--[rc=%d]", rc);
 	return rc;
 }
+
+#ifdef HELIUMPLUS
+/**
+ * hdd_napi_apply_throughput_policy() - implement the throughput action policy
+ * @hddctx:     HDD context
+ * @tx_packets: number of tx packets in the last interval
+ * @rx_packets: number of rx packets in the last interval
+ *
+ * Called by hdd_bus_bw_compute_cb, checks the number of packets in the last
+ * interval, and determines the desired napi throughput state (HI/LO). If
+ * the desired state is different from the current, then it invokes the
+ * event handler to switch to the desired state.
+ *
+ * The policy implementation is limited to this function and
+ * The current policy is: determine the NAPI mode based on the condition:
+ *      (total number of packets > medium threshold)
+ * - tx packets are included because:
+ *   a- tx-completions arrive at one of the rx CEs
+ *   b- in TCP, a lof of TX implies ~(tx/2) rx (ACKs)
+ *   c- so that we can use the same normalized criteria in ini file
+ * - medium-threshold (default: 500 packets / 10 ms), because
+ *   we would like to be more reactive.
+ *
+ * Return: 0 : no action taken, or action return code
+ *         !0: error, or action error code
+ */
+static int napi_tput_policy_delay;
+int hdd_napi_apply_throughput_policy(struct hdd_context_s *hddctx,
+				     uint64_t              tx_packets,
+				     uint64_t              rx_packets)
+{
+	int rc = 0;
+	uint64_t packets = tx_packets + rx_packets;
+	enum qca_napi_tput_state req_state;
+	struct qca_napi_data *napid = hdd_napi_get_all();
+	int enabled;
+
+	NAPI_DEBUG("-->%s(tx=%lld, rx=%lld)", __func__, tx_packets, rx_packets);
+
+	if (unlikely(napi_tput_policy_delay < 0))
+		napi_tput_policy_delay = 0;
+	if (napi_tput_policy_delay > 0) {
+		NAPI_DEBUG("%s: delaying policy; delay-count=%d",
+			  __func__, napi_tput_policy_delay);
+		napi_tput_policy_delay--;
+
+		/* make sure the next timer call calls us */
+		hddctx->cur_vote_level = -1;
+
+		return rc;
+	}
+
+	if (!napid) {
+		hdd_err("ERR: napid NULL");
+		return rc;
+	}
+
+	enabled = hdd_napi_enabled(HDD_NAPI_ANY);
+	if (!enabled) {
+		hdd_err("ERR: napi not enabled");
+		return rc;
+	}
+
+	if (packets > hddctx->config->busBandwidthHighThreshold)
+		req_state = QCA_NAPI_TPUT_HI;
+	else
+		req_state = QCA_NAPI_TPUT_LO;
+
+	if (req_state != napid->napi_mode)
+		rc = hdd_napi_event(NAPI_EVT_TPUT_STATE, (void *)req_state);
+	return rc;
+}
+
+/**
+ * hdd_napi_serialize() - serialize all NAPI activities
+ * @is_on: 1="serialize" or 0="de-serialize"
+ *
+ * Start/stop "serial-NAPI-mode".
+ * NAPI serial mode describes a state where all NAPI operations are forced to be
+ * run serially. This is achieved by ensuring all NAPI instances are run on the
+ * same CPU, so forced to be serial.
+ * NAPI life-cycle:
+ * - Interrupt is received for a given CE.
+ * - In the ISR, the interrupt is masked and corresponding NAPI instance
+ *   is scheduled, to be run as a bottom-half.
+ * - Bottom-half starts with a poll call (by the net_rx softirq). There may be
+ *   one of more subsequent calls until the work is complete.
+ * - Once the work is complete, the poll handler enables the interrupt and
+ *   the cycle re-starts.
+ *
+ * Return: <0: error-code (operation failed)
+ *         =0: success
+ *         >0: status (not used)
+ */
+int hdd_napi_serialize(int is_on)
+{
+	int rc;
+	hdd_context_t *hdd_ctx;
+#define POLICY_DELAY_FACTOR (1)
+	rc = hif_napi_serialize(cds_get_context(QDF_MODULE_ID_HIF), is_on);
+	if ((rc == 0) && (is_on == 0)) {
+		/* apply throughput policy after one timeout */
+		napi_tput_policy_delay = POLICY_DELAY_FACTOR;
+
+		/* make sure that bus_bandwidth trigger is executed */
+		hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+		if (hdd_ctx != NULL)
+			hdd_ctx->cur_vote_level = -1;
+
+	}
+	return rc;
+}
+#endif /* HELIUMPLUS */
 
 /**
  * hdd_napi_poll() - NAPI poll function

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -137,14 +137,14 @@ typedef struct {
 #define QCSAP_IOCTL_SET_NONE_GET_THREE (SIOCIWFIRSTPRIV + 3)
 #define WE_GET_TSF 1
 #define QCSAP_IOCTL_GET_STAWPAIE      (SIOCIWFIRSTPRIV + 4)
-#define QCSAP_IOCTL_SETWPAIE          (SIOCIWFIRSTPRIV + 5)
 #define QCSAP_IOCTL_STOPBSS           (SIOCIWFIRSTPRIV + 6)
 #define QCSAP_IOCTL_VERSION           (SIOCIWFIRSTPRIV + 7)
 #define QCSAP_IOCTL_GET_WPS_PBC_PROBE_REQ_IES       (SIOCIWFIRSTPRIV + 8)
 #define QCSAP_IOCTL_GET_CHANNEL       (SIOCIWFIRSTPRIV + 9)
 #define QCSAP_IOCTL_ASSOC_STA_MACADDR (SIOCIWFIRSTPRIV + 10)
 #define QCSAP_IOCTL_DISASSOC_STA      (SIOCIWFIRSTPRIV + 11)
-/* (SIOCIWFIRSTPRIV+12) is unused */
+#define QCSAP_IOCTL_SET_PKTLOG        (SIOCIWFIRSTPRIV + 12)
+
 /* Private ioctls and their sub-ioctls */
 #define QCSAP_PRIV_GET_CHAR_SET_NONE   (SIOCIWFIRSTPRIV + 13)
 #define QCSAP_GET_STATS 1
@@ -169,12 +169,16 @@ typedef struct {
 #define QCSAP_IOCTL_GET_INI_CFG         (SIOCIWFIRSTPRIV + 25)
 #define QCSAP_IOCTL_SET_INI_CFG         (SIOCIWFIRSTPRIV + 26)
 #define QCSAP_IOCTL_SET_TWO_INT_GET_NONE (SIOCIWFIRSTPRIV + 28)
-#ifdef DEBUG
+#ifdef WLAN_DEBUG
 #define QCSAP_IOCTL_SET_FW_CRASH_INJECT 1
 #endif
 #define QCSAP_IOCTL_DUMP_DP_TRACE_LEVEL 2
 #define QCSAP_ENABLE_FW_PROFILE          3
 #define QCSAP_SET_FW_PROFILE_HIST_INTVL  4
+
+/* Private sub-ioctl for initiating WoW suspend without Apps suspend */
+#define QCSAP_SET_WLAN_SUSPEND  5
+#define QCSAP_SET_WLAN_RESUME   6
 
 #define MAX_VAR_ARGS         7
 #define QCSAP_IOCTL_PRIV_GET_SOFTAP_LINK_SPEED (SIOCIWFIRSTPRIV + 31)
@@ -186,6 +190,9 @@ typedef struct {
 
 #define RC_2_RATE_IDX_11AC(_rc)         ((_rc) & 0xf)
 #define HT_RC_2_STREAMS_11AC(_rc)       ((((_rc) & 0x30) >> 4) + 1)
+
+#define RC_2_RATE_IDX_11AX(_rc)         ((_rc) & 0x1f)
+#define HT_RC_2_STREAMS_11AX(_rc)       (((_rc) >> 5) & 0x7)
 
 enum {
 	QCSAP_PARAM_MAX_ASSOC = 1,
@@ -242,12 +249,21 @@ enum {
 	QCSAP_START_FW_PROFILING,
 	QCSAP_CAP_TSF,
 	QCSAP_GET_TSF,
-	QCSAP_PARAM_CONC_SYSTEM_PREF
+	QCSAP_PARAM_CONC_SYSTEM_PREF,
+	QCASAP_PARAM_LDPC,
+	QCASAP_PARAM_TX_STBC,
+	QCASAP_PARAM_RX_STBC,
+	QCSAP_PARAM_CHAN_WIDTH,
+	QCSAP_PARAM_SET_TXRX_STATS,
+	QCASAP_SET_11AX_RATE,
+	QCASAP_SET_PEER_RATE,
+	QCASAP_PARAM_DCM,
+	QCASAP_PARAM_RANGE_EXT,
 };
 
-int iw_softap_get_channel_list(struct net_device *dev,
-			       struct iw_request_info *info,
-			       union iwreq_data *wrqu, char *extra);
+int iw_get_channel_list(struct net_device *dev,
+		struct iw_request_info *info,
+		union iwreq_data *wrqu, char *extra);
 
 #endif /* __linux__ */
 

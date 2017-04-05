@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -46,6 +46,7 @@
 #ifdef QCA_SUPPORT_SW_TXRX_ENCAP
 #include <ol_txrx_encap.h>      /* ol_rx_decap_info_t, etc */
 #endif
+#include <ol_rx.h>
 
 /* FIX THIS: txrx should not include private header files of other modules */
 #include <htt_types.h>
@@ -57,13 +58,55 @@
 #include <ipv6_defs.h>          /* IPv6 header defs */
 #include <ol_vowext_dbg_defs.h>
 #include <wma.h>
-#include <cds_concurrency.h>
-
+#include <wlan_policy_mgr_api.h>
+#include "pktlog_ac_fmt.h"
+#include <cdp_txrx_handle.h>
 #include <pld_common.h>
 
 void ol_rx_data_process(struct ol_txrx_peer_t *peer,
 			qdf_nbuf_t rx_buf_list);
 
+/**
+ * ol_rx_send_pktlog_event() - send rx packetlog event
+ * @pdev: pdev handle
+ * @peer: peer handle
+ * @msdu: skb list
+ * @pktlog_bit: packetlog bit from firmware
+ *
+ * Return: none
+ */
+#ifdef HELIUMPLUS
+void ol_rx_send_pktlog_event(struct ol_txrx_pdev_t *pdev,
+	struct ol_txrx_peer_t *peer, qdf_nbuf_t msdu, uint8_t pktlog_bit)
+{
+	struct ol_rx_remote_data data;
+
+	if (!pktlog_bit)
+		return;
+
+	data.msdu = msdu;
+	if (peer)
+		data.mac_id = peer->vdev->mac_id;
+	else
+		data.mac_id = 0;
+
+	wdi_event_handler(WDI_EVENT_RX_DESC_REMOTE, pdev, &data);
+}
+#else
+void ol_rx_send_pktlog_event(struct ol_txrx_pdev_t *pdev,
+	struct ol_txrx_peer_t *peer, qdf_nbuf_t msdu, uint8_t pktlog_bit)
+{
+	struct ol_rx_remote_data data;
+
+	data.msdu = msdu;
+	if (peer)
+		data.mac_id = peer->vdev->mac_id;
+	else
+		data.mac_id = 0;
+
+	wdi_event_handler(WDI_EVENT_RX_DESC_REMOTE, pdev, &data);
+}
+#endif
 
 #ifdef HTT_RX_RESTORE
 
@@ -173,10 +216,8 @@ static void ol_rx_process_inv_peer(ol_txrx_pdev_handle pdev,
 	/* ignore frames for non-existent bssids */
 	qdf_mem_copy(a1, wh->i_addr1, IEEE80211_ADDR_LEN);
 	TAILQ_FOREACH(vdev, &pdev->vdev_list, vdev_list_elem) {
-		if (qdf_mem_cmp(a1, vdev->mac_addr.raw, IEEE80211_ADDR_LEN)
-		    != 0) {
+		if (qdf_mem_cmp(a1, vdev->mac_addr.raw, IEEE80211_ADDR_LEN))
 			break;
-		}
 	}
 	if (!vdev)
 		return;
@@ -232,9 +273,9 @@ ol_rx_mpdu_rssi_update(struct ol_txrx_peer_t *peer, void *rx_mpdu_desc)
 #define ol_rx_mpdu_rssi_update(peer, rx_mpdu_desc)      /* no-op */
 #endif /* QCA_SUPPORT_PEER_DATA_RX_RSSI */
 
-void discard_msdus(htt_pdev_handle htt_pdev,
-		   qdf_nbuf_t head_msdu,
-		   qdf_nbuf_t tail_msdu)
+static void discard_msdus(htt_pdev_handle htt_pdev,
+			  qdf_nbuf_t head_msdu,
+			  qdf_nbuf_t tail_msdu)
 {
 	while (1) {
 		qdf_nbuf_t next;
@@ -252,9 +293,9 @@ void discard_msdus(htt_pdev_handle htt_pdev,
 	return;
 }
 
-void chain_msdus(htt_pdev_handle htt_pdev,
-		 qdf_nbuf_t head_msdu,
-		 qdf_nbuf_t tail_msdu)
+static void chain_msdus(htt_pdev_handle htt_pdev,
+			qdf_nbuf_t head_msdu,
+			qdf_nbuf_t tail_msdu)
 {
 	while (1) {
 		qdf_nbuf_t next;
@@ -269,16 +310,15 @@ void chain_msdus(htt_pdev_handle htt_pdev,
 	return;
 }
 
-void process_reorder(ol_txrx_pdev_handle pdev,
-		     void *rx_mpdu_desc,
-		     uint8_t tid,
-		     struct ol_txrx_peer_t *peer,
-		     qdf_nbuf_t head_msdu,
-		     qdf_nbuf_t tail_msdu,
-		     int num_mpdu_ranges,
-		     int num_pdus,
-		     bool rx_ind_release
-	)
+static void process_reorder(ol_txrx_pdev_handle pdev,
+			    void *rx_mpdu_desc,
+			    uint8_t tid,
+			    struct ol_txrx_peer_t *peer,
+			    qdf_nbuf_t head_msdu,
+			    qdf_nbuf_t tail_msdu,
+			    int num_mpdu_ranges,
+			    int num_pdus,
+			    bool rx_ind_release)
 {
 	htt_pdev_handle htt_pdev = pdev->htt_pdev;
 	enum htt_rx_status mpdu_status;
@@ -508,8 +548,7 @@ ol_rx_indication_handler(ol_txrx_pdev_handle pdev,
 
 				/* Pktlog */
 #ifdef WDI_EVENT_ENABLE
-				wdi_event_handler(WDI_EVENT_RX_DESC_REMOTE,
-						  pdev, head_msdu);
+		ol_rx_send_pktlog_event(pdev, peer, head_msdu, 1);
 #endif
 
 				if (msdu_chaining) {
@@ -586,9 +625,8 @@ ol_rx_indication_handler(ol_txrx_pdev_handle pdev,
 #ifdef WDI_EVENT_ENABLE
 				if (status != htt_rx_status_ctrl_mgmt_null) {
 					/* Pktlog */
-					wdi_event_handler(
-						WDI_EVENT_RX_DESC_REMOTE, pdev,
-						msdu);
+					ol_rx_send_pktlog_event(pdev,
+						 peer, msdu, 1);
 				}
 #endif
 				if (status == htt_rx_status_err_inv_peer) {
@@ -741,7 +779,7 @@ static void transcap_nwifi_to_8023(qdf_nbuf_t msdu)
 }
 #endif
 
-void ol_rx_notify(ol_pdev_handle pdev,
+void ol_rx_notify(struct cdp_cfg *cfg_pdev,
 		  uint8_t vdev_id,
 		  uint8_t *peer_mac_addr,
 		  int tid,
@@ -770,7 +808,7 @@ void ol_rx_notify(ol_pdev_handle pdev,
  *      by sniffing the IGMP frame.
  */
 #define SIZEOF_80211_HDR (sizeof(struct ieee80211_frame))
-void
+static void
 ol_rx_inspect(struct ol_txrx_vdev_t *vdev,
 	      struct ol_txrx_peer_t *peer,
 	      unsigned tid, qdf_nbuf_t msdu, void *rx_desc)
@@ -814,27 +852,45 @@ ol_rx_offload_deliver_ind_handler(ol_txrx_pdev_handle pdev,
 	htt_pdev_handle htt_pdev = pdev->htt_pdev;
 
 	while (msdu_cnt) {
-		htt_rx_offload_msdu_pop(htt_pdev, msg, &vdev_id, &peer_id,
-					&tid, &fw_desc, &head_buf, &tail_buf);
-
-		peer = ol_txrx_peer_find_by_id(pdev, peer_id);
-		if (peer) {
-			ol_rx_data_process(peer, head_buf);
-		} else {
-			buf = head_buf;
-			while (1) {
-				qdf_nbuf_t next;
-				next = qdf_nbuf_next(buf);
-				htt_rx_desc_frame_free(htt_pdev, buf);
-				if (buf == tail_buf)
-					break;
-				buf = next;
+		if (!htt_rx_offload_msdu_pop(htt_pdev, msg, &vdev_id, &peer_id,
+					&tid, &fw_desc, &head_buf, &tail_buf)) {
+			peer = ol_txrx_peer_find_by_id(pdev, peer_id);
+			if (peer) {
+				ol_rx_data_process(peer, head_buf);
+			} else {
+				buf = head_buf;
+				while (1) {
+					qdf_nbuf_t next;
+					next = qdf_nbuf_next(buf);
+					htt_rx_desc_frame_free(htt_pdev, buf);
+					if (buf == tail_buf)
+						break;
+					buf = next;
+				}
 			}
 		}
 		msdu_cnt--;
 	}
 	htt_rx_msdu_buff_replenish(htt_pdev);
 }
+
+#ifdef WDI_EVENT_ENABLE
+static inline
+void ol_rx_mic_error_send_pktlog_event(struct ol_txrx_pdev_t *pdev,
+	struct ol_txrx_peer_t *peer, qdf_nbuf_t msdu, uint8_t pktlog_bit)
+{
+	ol_rx_send_pktlog_event(pdev, peer, msdu, pktlog_bit);
+}
+
+#else
+static inline
+void ol_rx_mic_error_send_pktlog_event(struct ol_txrx_pdev_t *pdev,
+	struct ol_txrx_peer_t *peer, qdf_nbuf_t msdu, uint8_t pktlog_bit)
+{
+}
+
+#endif
+
 
 void
 ol_rx_mic_error_handler(
@@ -870,13 +926,15 @@ ol_rx_mic_error_handler(
 				}
 			}
 		}
+		/* Pktlog */
+		ol_rx_mic_error_send_pktlog_event(pdev, peer, msdu, 1);
 	}
 }
 
 /**
  * @brief Check the first msdu to decide whether the a-msdu should be accepted.
  */
-bool
+static bool
 ol_rx_filter(struct ol_txrx_vdev_t *vdev,
 	     struct ol_txrx_peer_t *peer, qdf_nbuf_t msdu, void *rx_desc)
 {
@@ -1290,6 +1348,9 @@ ol_rx_in_order_indication_handler(ol_txrx_pdev_handle pdev,
 	htt_pdev_handle htt_pdev = NULL;
 	int status;
 	qdf_nbuf_t head_msdu, tail_msdu = NULL;
+#ifdef WDI_EVENT_ENABLE
+	uint8_t pktlog_bit;
+#endif
 
 	if (pdev) {
 		if (qdf_unlikely(QDF_GLOBAL_MONITOR_MODE == cds_get_conparam()))
@@ -1307,6 +1368,10 @@ ol_rx_in_order_indication_handler(ol_txrx_pdev_handle pdev,
 #if defined(HELIUMPLUS_DEBUG)
 	qdf_print("%s %d: rx_ind_msg 0x%p peer_id %d tid %d is_offload %d\n",
 		  __func__, __LINE__, rx_ind_msg, peer_id, tid, is_offload);
+#endif
+
+#ifdef WDI_EVENT_ENABLE
+	pktlog_bit = (htt_rx_amsdu_rx_in_order_get_pktlog(rx_ind_msg) == 0x01);
 #endif
 
 	/*
@@ -1332,7 +1397,7 @@ ol_rx_in_order_indication_handler(ol_txrx_pdev_handle pdev,
 
 	/* Pktlog */
 #ifdef WDI_EVENT_ENABLE
-	wdi_event_handler(WDI_EVENT_RX_DESC_REMOTE, pdev, head_msdu);
+	ol_rx_send_pktlog_event(pdev, peer, head_msdu, pktlog_bit);
 #endif
 
 	/* if this is an offload indication, peer id is carried in the
@@ -1354,6 +1419,52 @@ ol_rx_in_order_indication_handler(ol_txrx_pdev_handle pdev,
 	}
 
 	peer->rx_opt_proc(vdev, peer, tid, head_msdu);
+}
+
+/**
+ * ol_rx_pkt_dump_call() - updates status and
+ * calls packetdump callback to log rx packet
+ *
+ * @msdu: rx packet
+ * @peer_id: peer id
+ * @status: status of rx packet
+ *
+ * This function is used to update the status of rx packet
+ * and then calls packetdump callback to log that packet.
+ *
+ * Return: None
+ *
+ */
+void ol_rx_pkt_dump_call(
+	qdf_nbuf_t msdu,
+	uint8_t peer_id,
+	uint8_t status)
+{
+	v_CONTEXT_t vos_context;
+	ol_txrx_pdev_handle pdev;
+	struct ol_txrx_peer_t *peer = NULL;
+	tp_ol_packetdump_cb packetdump_cb;
+
+	vos_context = cds_get_global_context();
+	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
+
+	if (!pdev) {
+		TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
+			"%s: pdev is NULL", __func__);
+		return;
+	}
+
+	peer = ol_txrx_peer_find_by_id(pdev, peer_id);
+	if (!peer) {
+		TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
+			"%s: peer with peer id %d is NULL", __func__,
+			peer_id);
+		return;
+	}
+
+	packetdump_cb = pdev->ol_rx_packetdump_cb;
+	if (packetdump_cb)
+		packetdump_cb(msdu, status, peer->vdev->vdev_id, RX_DATA_PKT);
 }
 
 /* the msdu_list passed here must be NULL terminated */
@@ -1425,7 +1536,10 @@ ol_rx_offload_paddr_deliver_ind_handler(htt_pdev_handle htt_pdev,
 
 		peer = ol_txrx_peer_find_by_id(htt_pdev->txrx_pdev, peer_id);
 		if (peer) {
+			QDF_NBUF_CB_DP_TRACE_PRINT(head_buf) = false;
 			qdf_dp_trace_set_track(head_buf, QDF_RX);
+			QDF_NBUF_CB_TX_PACKET_TRACK(head_buf) =
+						QDF_NBUF_TX_PKT_DATA_TRACK;
 			qdf_dp_trace_log_pkt(peer->vdev->vdev_id,
 				head_buf, QDF_RX);
 			DPTRACE(qdf_dp_trace(head_buf,
@@ -1457,8 +1571,9 @@ ol_rx_offload_paddr_deliver_ind_handler(htt_pdev_handle htt_pdev,
  *
  * Return: None
  */
-void ol_htt_mon_note_chan(ol_txrx_pdev_handle pdev, int mon_ch)
+void ol_htt_mon_note_chan(struct cdp_pdev *ppdev, int mon_ch)
 {
+	struct ol_txrx_pdev_t *pdev = (struct ol_txrx_pdev_t *)ppdev;
 	htt_rx_mon_note_capture_channel(pdev->htt_pdev, mon_ch);
 }
 

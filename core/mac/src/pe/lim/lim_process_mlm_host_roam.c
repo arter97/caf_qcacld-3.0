@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -361,7 +361,7 @@ void lim_process_mlm_reassoc_cnf(tpAniSirGlobal mac_ctx, uint32_t *msg_buf)
  *Return: None
  */
 void lim_process_sta_mlm_add_bss_rsp_ft(tpAniSirGlobal pMac,
-		tpSirMsgQ limMsgQ, tpPESession psessionEntry)
+		struct scheduler_msg *limMsgQ, tpPESession psessionEntry)
 {
 	tLimMlmReassocCnf mlmReassocCnf; /* keep sme */
 	tpDphHashNode pStaDs = NULL;
@@ -425,9 +425,6 @@ void lim_process_sta_mlm_add_bss_rsp_ft(tpAniSirGlobal pMac,
 			if (NULL ==
 				pMac->lim.pSessionEntry->pLimMlmReassocRetryReq)
 				goto end;
-			qdf_mem_set(pMac->lim.pSessionEntry->
-					pLimMlmReassocRetryReq,
-					sizeof(tLimMlmReassocReq), 0);
 			qdf_mem_copy(pMac->lim.pSessionEntry->
 					pLimMlmReassocRetryReq,
 					psessionEntry->pLimMlmReassocReq,
@@ -472,7 +469,6 @@ void lim_process_sta_mlm_add_bss_rsp_ft(tpAniSirGlobal pMac,
 			FL("Unable to allocate memory during ADD_STA"));
 		goto end;
 	}
-	qdf_mem_set((uint8_t *) pAddStaParams, sizeof(tAddStaParams), 0);
 
 	/* / Add STA context at MAC HW (BMU, RHP & TFP) */
 	qdf_mem_copy((uint8_t *) pAddStaParams->staMac,
@@ -500,7 +496,7 @@ void lim_process_sta_mlm_add_bss_rsp_ft(tpAniSirGlobal pMac,
 	pAddStaParams->shortPreambleSupported =
 		(uint8_t) psessionEntry->beaconParams.fShortPreamble;
 	lim_populate_peer_rate_set(pMac, &pAddStaParams->supportedRates, NULL,
-				   false, psessionEntry, NULL);
+				   false, psessionEntry, NULL, NULL);
 
 	if (psessionEntry->htCapability) {
 		pAddStaParams->htCapable = psessionEntry->htCapability;
@@ -610,7 +606,7 @@ void lim_process_mlm_ft_reassoc_req(tpAniSirGlobal pMac, uint32_t *pMsgBuf,
 	tLimMlmReassocReq *pMlmReassocReq;
 	uint16_t caps;
 	uint32_t val;
-	tSirMsgQ msgQ;
+	struct scheduler_msg msgQ;
 	tSirRetStatus retCode;
 	uint32_t teleBcnEn = 0;
 
@@ -668,6 +664,11 @@ void lim_process_mlm_ft_reassoc_req(tpAniSirGlobal pMac, uint32_t *pMsgBuf,
 		qdf_mem_free(pMlmReassocReq);
 		return;
 	}
+
+	lim_update_caps_info_for_bss(pMac, &caps,
+		psessionEntry->pLimReAssocReq->bssDescription.capabilityInfo);
+	lim_log(pMac, LOG1, FL("Capabilities info FT Reassoc: 0x%X"), caps);
+
 	pMlmReassocReq->capabilityInfo = caps;
 
 	/* Update PE sessionId */

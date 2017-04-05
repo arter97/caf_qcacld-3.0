@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -30,16 +30,11 @@
  * WLAN HDD LRO interface implementation
  */
 
-/* denote that this file does not allow legacy hddLog */
-#define HDD_DISALLOW_LEGACY_HDDLOG 1
-
 #include <wlan_hdd_includes.h>
 #include <qdf_types.h>
 #include <wlan_hdd_lro.h>
 #include <wlan_hdd_napi.h>
 #include <wma_api.h>
-#include <ol_txrx_types.h>
-#include <ol_cfg.h>
 #include <cdp_txrx_lro.h>
 
 #include <linux/inet_lro.h>
@@ -102,7 +97,6 @@ static void hdd_lro_desc_pool_init(struct hdd_lro_desc_pool *lro_desc_pool,
 		list_add_tail(&lro_desc_pool->lro_desc_array[i].lro_node,
 			 &lro_desc_pool->lro_free_list_head);
 	}
-	qdf_spinlock_create(&lro_desc_pool->lro_pool_lock);
 }
 
 /**
@@ -129,39 +123,6 @@ static void hdd_lro_desc_info_init(struct hdd_lro_s *hdd_info)
 			 lro_hash_table[i].lro_desc_list);
 	}
 
-	qdf_spinlock_create(&hdd_info->lro_desc_info.lro_hash_lock);
-}
-
-/**
- * hdd_lro_desc_pool_deinit() - Free the LRO descriptor list
- * @hdd_info: HDD LRO data structure
- *
- * Free the pool of LRO descriptors
- *
- * Return: none
- */
-static void hdd_lro_desc_pool_deinit(struct hdd_lro_desc_pool *lro_desc_pool)
-{
-	INIT_LIST_HEAD(&lro_desc_pool->lro_free_list_head);
-	qdf_spinlock_destroy(&lro_desc_pool->lro_pool_lock);
-}
-
-/**
- * hdd_lro_desc_info_deinit() - Deinitialize the LRO descriptors
- *
- * @hdd_info: HDD LRO data structure
- *
- * Deinitialize the free pool of LRO descriptors and the entries
- * of the hash table
- *
- * Return: none
- */
-static void hdd_lro_desc_info_deinit(struct hdd_lro_s *hdd_info)
-{
-	struct hdd_lro_desc_info *desc_info = &hdd_info->lro_desc_info;
-
-	hdd_lro_desc_pool_deinit(&desc_info->lro_desc_pool);
-	qdf_spinlock_destroy(&desc_info->lro_hash_lock);
 }
 
 /**
@@ -204,7 +165,7 @@ static inline bool hdd_lro_tcp_flow_match(struct net_lro_desc *lro_desc,
  *
  * Return: 0 - success, < 0 - failure
  */
-static int hdd_lro_desc_find(hdd_adapter_t *adapter,
+static int hdd_lro_desc_find(struct hdd_lro_s *lro_info,
 	 struct sk_buff *skb, struct iphdr *iph, struct tcphdr *tcph,
 	 struct net_lro_desc **lro_desc)
 {
@@ -212,8 +173,8 @@ static int hdd_lro_desc_find(hdd_adapter_t *adapter,
 	struct hdd_lro_desc_table *lro_hash_table;
 	struct list_head *ptr;
 	struct hdd_lro_desc_entry *entry;
-	struct hdd_lro_desc_pool free_pool;
-	struct hdd_lro_desc_info *desc_info = &adapter->lro_info.lro_desc_info;
+	struct hdd_lro_desc_pool *free_pool;
+	struct hdd_lro_desc_info *desc_info = &lro_info->lro_desc_info;
 
 	*lro_desc = NULL;
 	i = QDF_NBUF_CB_RX_FLOW_ID_TOEPLITZ(skb) & LRO_DESC_TABLE_SZ_MASK;
@@ -226,7 +187,6 @@ static int hdd_lro_desc_find(hdd_adapter_t *adapter,
 		return -EINVAL;
 	}
 
-	qdf_spin_lock_bh(&desc_info->lro_hash_lock);
 	/* Check if this flow exists in the descriptor list */
 	list_for_each(ptr, &lro_hash_table->lro_desc_list) {
 		struct net_lro_desc *tmp_lro_desc = NULL;
@@ -235,30 +195,25 @@ static int hdd_lro_desc_find(hdd_adapter_t *adapter,
 		if (tmp_lro_desc->active) {
 			if (hdd_lro_tcp_flow_match(tmp_lro_desc, iph, tcph)) {
 				*lro_desc = entry->lro_desc;
-				qdf_spin_unlock_bh(&desc_info->lro_hash_lock);
 				return 0;
 			}
 		}
 	}
-	qdf_spin_unlock_bh(&desc_info->lro_hash_lock);
 
 	/* no existing flow found, a new LRO desc needs to be allocated */
-	free_pool = adapter->lro_info.lro_desc_info.lro_desc_pool;
-	qdf_spin_lock_bh(&free_pool.lro_pool_lock);
+	free_pool = &lro_info->lro_desc_info.lro_desc_pool;
 	entry = list_first_entry_or_null(
-		 &free_pool.lro_free_list_head,
+		 &free_pool->lro_free_list_head,
 		 struct hdd_lro_desc_entry, lro_node);
 	if (NULL == entry) {
 		hdd_err("Could not allocate LRO desc!");
-		qdf_spin_unlock_bh(&free_pool.lro_pool_lock);
 		return -ENOMEM;
 	}
 
 	list_del_init(&entry->lro_node);
-	qdf_spin_unlock_bh(&free_pool.lro_pool_lock);
 
 	if (NULL == entry->lro_desc) {
-		hdd_err("entry->lro_desc is NULL!\n");
+		hdd_err("entry->lro_desc is NULL!");
 		return -EINVAL;
 	}
 
@@ -268,10 +223,8 @@ static int hdd_lro_desc_find(hdd_adapter_t *adapter,
 	 * lro_desc->active should be 0 and lro_desc->tcp_rcv_tsval
 	 * should be 0 for newly allocated lro descriptors
 	 */
-	qdf_spin_lock_bh(&desc_info->lro_hash_lock);
 	list_add_tail(&entry->lro_node,
 		 &lro_hash_table->lro_desc_list);
-	qdf_spin_unlock_bh(&desc_info->lro_hash_lock);
 	*lro_desc = entry->lro_desc;
 
 	return 0;
@@ -317,7 +270,7 @@ static struct net_lro_desc *hdd_lro_get_desc(struct net_lro_mgr *lro_mgr,
  * Return: true - LRO eligible frame, false - frame is not LRO
  * eligible
  */
-static bool hdd_lro_eligible(hdd_adapter_t *adapter, struct sk_buff *skb,
+static bool hdd_lro_eligible(struct hdd_lro_s *lro_info, struct sk_buff *skb,
 	 struct iphdr *iph, struct tcphdr *tcph, struct net_lro_desc **desc)
 {
 	struct net_lro_desc *lro_desc = NULL;
@@ -328,7 +281,7 @@ static bool hdd_lro_eligible(hdd_adapter_t *adapter, struct sk_buff *skb,
 	if (!hw_lro_eligible)
 		return false;
 
-	if (0 != hdd_lro_desc_find(adapter, skb, iph, tcph, desc)) {
+	if (0 != hdd_lro_desc_find(lro_info, skb, iph, tcph, desc)) {
 		hdd_err("finding the LRO desc failed");
 		return false;
 	}
@@ -374,11 +327,12 @@ static bool hdd_lro_eligible(hdd_adapter_t *adapter, struct sk_buff *skb,
  * Return: none
  */
 static void hdd_lro_desc_free(struct net_lro_desc *desc,
-	 hdd_adapter_t *adapter)
+	struct hdd_lro_s *lro_info)
 {
 	struct hdd_lro_desc_entry *entry;
-	struct net_lro_desc *arr_base = adapter->lro_info.lro_mgr->lro_arr;
-	struct hdd_lro_desc_info *desc_info = &adapter->lro_info.lro_desc_info;
+	struct net_lro_mgr *lro_mgr = lro_info->lro_mgr;
+	struct net_lro_desc *arr_base = lro_mgr->lro_arr;
+	struct hdd_lro_desc_info *desc_info = &lro_info->lro_desc_info;
 	int i = desc - arr_base;
 
 	if (i >= LRO_DESC_POOL_SZ) {
@@ -388,14 +342,10 @@ static void hdd_lro_desc_free(struct net_lro_desc *desc,
 
 	entry = &desc_info->lro_desc_pool.lro_desc_array[i];
 
-	qdf_spin_lock_bh(&desc_info->lro_hash_lock);
 	list_del_init(&entry->lro_node);
-	qdf_spin_unlock_bh(&desc_info->lro_hash_lock);
 
-	qdf_spin_lock_bh(&desc_info->lro_desc_pool.lro_pool_lock);
 	list_add_tail(&entry->lro_node, &desc_info->
 		 lro_desc_pool.lro_free_list_head);
-	qdf_spin_unlock_bh(&desc_info->lro_desc_pool.lro_pool_lock);
 }
 
 /**
@@ -410,18 +360,19 @@ static void hdd_lro_desc_free(struct net_lro_desc *desc,
  *
  * Return: none
  */
-void hdd_lro_flush_pkt(struct net_lro_mgr *lro_mgr,
-	 struct iphdr *iph, struct tcphdr *tcph, hdd_adapter_t *adapter)
+static void hdd_lro_flush_pkt(struct net_lro_mgr *lro_mgr,
+			      struct iphdr *iph, struct tcphdr *tcph,
+			      struct hdd_lro_s *lro_info)
 {
 	struct net_lro_desc *lro_desc;
 
 	lro_desc = hdd_lro_get_desc(lro_mgr, lro_mgr->lro_arr, iph, tcph);
 
-	if (!lro_desc)
-		return;
-
-	hdd_lro_desc_free(lro_desc, adapter);
-	lro_flush_desc(lro_mgr, lro_desc);
+	if (lro_desc) {
+		/* statistics */
+		hdd_lro_desc_free(lro_desc, lro_info);
+		lro_flush_desc(lro_mgr, lro_desc);
+	}
 }
 
 /**
@@ -433,18 +384,16 @@ void hdd_lro_flush_pkt(struct net_lro_mgr *lro_mgr,
  *
  * Return: none
  */
-void hdd_lro_flush(void *data)
+static void hdd_lro_flush(void *data)
 {
-	hdd_adapter_t *adapter = (hdd_adapter_t *)data;
+	struct hdd_lro_s *hdd_lro = data;
+	struct net_lro_mgr *lro_mgr = hdd_lro->lro_mgr;
 	int i;
 
-	for (i = 0; i < adapter->lro_info.lro_mgr->max_desc; i++) {
-		if (adapter->lro_info.lro_mgr->lro_arr[i].active) {
-			hdd_lro_desc_free(
-				 &adapter->lro_info.lro_mgr->lro_arr[i],
-				 (void *)adapter);
-			lro_flush_desc(adapter->lro_info.lro_mgr,
-				 &adapter->lro_info.lro_mgr->lro_arr[i]);
+	for (i = 0; i < lro_mgr->max_desc; i++) {
+		if (lro_mgr->lro_arr[i].active) {
+			hdd_lro_desc_free(&lro_mgr->lro_arr[i], hdd_lro);
+			lro_flush_desc(lro_mgr, &lro_mgr->lro_arr[i]);
 		}
 	}
 }
@@ -455,15 +404,18 @@ void hdd_lro_flush(void *data)
  *
  * This function sends the LRO configuration to the firmware
  * via WMA
+ * Make sure that this function gets called after NAPI
+ * instances have been created.
  *
  * Return: 0 - success, < 0 - failure
  */
 int hdd_lro_init(hdd_context_t *hdd_ctx)
 {
-	struct wma_lro_config_cmd_t lro_config;
+	struct cdp_lro_hash_config lro_config;
 
-	if (!hdd_ctx->config->lro_enable) {
-		hdd_err("LRO Disabled");
+	if ((!hdd_ctx->config->lro_enable) &&
+	    (hdd_napi_enabled(HDD_NAPI_ANY) == 0)) {
+		hdd_err("LRO and NAPI are both disabled.");
 		return 0;
 	}
 
@@ -490,52 +442,39 @@ int hdd_lro_init(hdd_context_t *hdd_ctx)
 	return 0;
 }
 
-/**
- * hdd_lro_enable() - enable LRO
- * @hdd_ctx: HDD context
- * @adapter: HDD adapter
- *
- * This function enables LRO in the network device attached to
- * the HDD adapter. It also allocates the HDD LRO instance for
- * that network device
- *
- * Return: 0 - success, < 0 - failure
- */
-int hdd_lro_enable(hdd_context_t *hdd_ctx,
-	 hdd_adapter_t *adapter)
+static void *hdd_init_lro_mgr(void)
 {
 	struct hdd_lro_s *hdd_lro;
-	size_t lro_mgr_sz, desc_arr_sz, desc_pool_sz, hash_table_sz;
+	hdd_context_t *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	size_t lro_info_sz, lro_mgr_sz, desc_arr_sz, desc_pool_sz;
+	size_t hash_table_sz;
 	uint8_t *lro_mem_ptr;
 
-	if (!hdd_ctx->config->lro_enable ||
-		 NL80211_IFTYPE_STATION != adapter->wdev.iftype) {
-		hdd_info("LRO Disabled");
-		return 0;
+	if (NULL == hdd_ctx) {
+		hdd_err("hdd_ctx is NULL");
+		return NULL;
 	}
-
-	hdd_info("LRO Enabled");
-
-	hdd_lro = &adapter->lro_info;
-	qdf_mem_zero((void *)hdd_lro, sizeof(struct hdd_lro_s));
 	/*
-	* Allocate all the LRO data structures at once and then carve
-	* them up as needed
-	*/
+	 * Allocate all the LRO data structures at once and then carve
+	 * them up as needed
+	 */
+	lro_info_sz = sizeof(struct hdd_lro_s);
 	lro_mgr_sz = sizeof(struct net_lro_mgr);
 	desc_arr_sz = (LRO_DESC_POOL_SZ * sizeof(struct net_lro_desc));
 	desc_pool_sz = (LRO_DESC_POOL_SZ * sizeof(struct hdd_lro_desc_entry));
 	hash_table_sz = (sizeof(struct hdd_lro_desc_table) * LRO_DESC_TABLE_SZ);
 
-	lro_mem_ptr = qdf_mem_malloc(lro_mgr_sz + desc_arr_sz + desc_pool_sz +
-		 hash_table_sz);
+	lro_mem_ptr = qdf_mem_malloc(lro_info_sz + lro_mgr_sz + desc_arr_sz +
+					desc_pool_sz + hash_table_sz);
 
 	if (NULL == lro_mem_ptr) {
 		hdd_err("Unable to allocate memory for LRO");
 		hdd_ctx->config->lro_enable = 0;
-		return -ENOMEM;
+		return NULL;
 	}
 
+	hdd_lro = (struct hdd_lro_s *)lro_mem_ptr;
+	lro_mem_ptr += lro_info_sz;
 	/* LRO manager */
 	hdd_lro->lro_mgr = (struct net_lro_mgr *)lro_mem_ptr;
 	lro_mem_ptr += lro_mgr_sz;
@@ -554,10 +493,9 @@ int hdd_lro_enable(hdd_context_t *hdd_ctx,
 		 (struct hdd_lro_desc_table *)lro_mem_ptr;
 
 	/* Initialize the LRO descriptors */
-	 hdd_lro_desc_info_init(hdd_lro);
+	hdd_lro_desc_info_init(hdd_lro);
 
-	hdd_lro->lro_mgr->dev = adapter->dev;
-	if (hdd_ctx->config->enableRxThread)
+	if (hdd_ctx->enableRxThread)
 		hdd_lro->lro_mgr->features = LRO_F_NI;
 
 	if (hdd_napi_enabled(HDD_NAPI_ANY))
@@ -569,12 +507,45 @@ int hdd_lro_enable(hdd_context_t *hdd_ctx,
 	hdd_lro->lro_mgr->ip_summed = CHECKSUM_UNNECESSARY;
 	hdd_lro->lro_mgr->max_desc = LRO_DESC_POOL_SZ;
 
-	adapter->dev->features |= NETIF_F_LRO;
+	return hdd_lro;
+}
+
+/**
+ * hdd_lro_enable() - enable LRO
+ * @hdd_ctx: HDD context
+ * @adapter: HDD adapter
+ *
+ * This function enables LRO in the network device attached to
+ * the HDD adapter. It also allocates the HDD LRO instance for
+ * that network device
+ *
+ * Return: 0 - success, < 0 - failure
+ */
+int hdd_lro_enable(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter)
+{
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+
+	if (!hdd_ctx->config->lro_enable ||
+		 QDF_STA_MODE != adapter->device_mode) {
+		hdd_info("LRO Disabled");
+		return 0;
+	}
 
 	/* Register the flush callback */
-	ol_register_lro_flush_cb(hdd_lro_flush, adapter);
+	cdp_register_lro_flush_cb(soc, hdd_lro_flush, hdd_init_lro_mgr);
+	adapter->dev->features |= NETIF_F_LRO;
+
+	hdd_info("LRO Enabled");
 
 	return 0;
+}
+
+static void hdd_deinit_lro_mgr(void *lro_info)
+{
+	if (lro_info) {
+		hdd_err("LRO instance %p is being freed", lro_info);
+		qdf_mem_free(lro_info);
+	}
 }
 
 /**
@@ -589,22 +560,14 @@ int hdd_lro_enable(hdd_context_t *hdd_ctx,
  */
 void hdd_lro_disable(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter)
 {
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+
 	if (!hdd_ctx->config->lro_enable ||
-		 NL80211_IFTYPE_STATION != adapter->wdev.iftype)
+		 QDF_STA_MODE != adapter->device_mode)
 		return;
 
 	/* Deregister the flush callback */
-	ol_deregister_lro_flush_cb();
-
-	if (adapter->lro_info.lro_mgr) {
-		hdd_lro_desc_info_deinit(&adapter->lro_info);
-		qdf_mem_free(adapter->lro_info.lro_mgr);
-		adapter->lro_info.lro_mgr = NULL;
-		adapter->lro_info.lro_desc_info.
-			lro_desc_pool.lro_desc_array = NULL;
-		adapter->lro_info.lro_desc_info.
-			lro_hash_table = NULL;
-	}
+	cdp_deregister_lro_flush_cb(soc, hdd_deinit_lro_mgr);
 	return;
 }
 
@@ -629,9 +592,26 @@ enum hdd_lro_rx_status hdd_lro_rx(hdd_context_t *hdd_ctx,
 		struct iphdr *iph;
 		struct tcphdr *tcph;
 		struct net_lro_desc *lro_desc = NULL;
+		struct hdd_lro_s *lro_info;
+		struct hif_opaque_softc *hif_hdl =
+			(struct hif_opaque_softc *)cds_get_context(
+							QDF_MODULE_ID_HIF);
+		if (hif_hdl == NULL) {
+			hdd_err("hif_hdl is NULL");
+			return status;
+		}
+
+		lro_info = hif_get_lro_info(QDF_NBUF_CB_RX_CTX_ID(skb),
+					hif_hdl);
+		if (lro_info == NULL) {
+			hdd_err("LRO mgr is NULL, vdev could be going down");
+			return status;
+		}
+
 		iph = (struct iphdr *)skb->data;
 		tcph = (struct tcphdr *)(skb->data + QDF_NBUF_CB_RX_TCP_OFFSET(skb));
-		if (hdd_lro_eligible(adapter, skb, iph, tcph, &lro_desc)) {
+		lro_info->lro_mgr->dev = adapter->dev;
+		if (hdd_lro_eligible(lro_info, skb, iph, tcph, &lro_desc)) {
 			struct net_lro_info hdd_lro_info;
 
 			hdd_lro_info.valid_fields = LRO_VALID_FIELDS;
@@ -644,17 +624,29 @@ enum hdd_lro_rx_status hdd_lro_rx(hdd_context_t *hdd_ctx,
 			hdd_lro_info.tcp_seq_num = QDF_NBUF_CB_RX_TCP_SEQ_NUM(skb);
 			hdd_lro_info.tcp_win = QDF_NBUF_CB_RX_TCP_WIN(skb);
 
-			lro_receive_skb_ext(adapter->lro_info.lro_mgr, skb,
+			lro_receive_skb_ext(lro_info->lro_mgr, skb,
 				 (void *)adapter, &hdd_lro_info);
 
-			if (!hdd_lro_info.lro_desc->active)
-				hdd_lro_desc_free(lro_desc, adapter);
+			if (!hdd_lro_info.lro_desc->active) {
+				hdd_lro_desc_free(lro_desc, lro_info);
+			}
 
 			status = HDD_LRO_RX;
 		} else {
-			hdd_lro_flush_pkt(adapter->lro_info.lro_mgr,
-				 iph, tcph, adapter);
+			hdd_lro_flush_pkt(lro_info->lro_mgr,
+				 iph, tcph, lro_info);
 		}
 	}
 	return status;
+}
+
+/**
+ * wlan_hdd_display_lro_stats() - display LRO statistics
+ * @hdd_ctx: hdd context
+ *
+ * Return: none
+ */
+void hdd_lro_display_stats(hdd_context_t *hdd_ctx)
+{
+	hdd_err("LRO stats is broken, will fix it");
 }

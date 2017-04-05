@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -31,6 +31,14 @@
 #include <qdf_nbuf.h>           /* qdf_nbuf_t */
 #include <cdp_txrx_cmn.h>       /* ol_txrx_vdev_t, etc. */
 #include "cds_sched.h"
+#include <cdp_txrx_handle.h>
+#include <ol_txrx_types.h>
+/*
+ * Pool of tx descriptors reserved for
+ * high-priority traffic, such as ARP/EAPOL etc
+ * only for forwarding path.
+ */
+#define OL_TX_NON_FWD_RESERVE	100
 
 void ol_txrx_peer_unref_delete(struct ol_txrx_peer_t *peer);
 
@@ -41,7 +49,7 @@ void ol_txrx_peer_unref_delete(struct ol_txrx_peer_t *peer);
  * Return: allocated pool size
  */
 u_int16_t
-ol_tx_desc_pool_size_hl(ol_pdev_handle ctrl_pdev);
+ol_tx_desc_pool_size_hl(struct cdp_cfg *ctrl_pdev);
 
 #ifndef OL_TX_AVG_FRM_BYTES
 #define OL_TX_AVG_FRM_BYTES 1000
@@ -68,69 +76,52 @@ ol_tx_desc_pool_size_hl(ol_pdev_handle ctrl_pdev);
 #if defined(CONFIG_HL_SUPPORT) && defined(FEATURE_WLAN_TDLS)
 
 void
-ol_txrx_hl_tdls_flag_reset(struct ol_txrx_vdev_t *vdev, bool flag);
+ol_txrx_hl_tdls_flag_reset(struct cdp_vdev *vdev, bool flag);
 #else
 
 static inline void
-ol_txrx_hl_tdls_flag_reset(struct ol_txrx_vdev_t *vdev, bool flag)
+ol_txrx_hl_tdls_flag_reset(struct cdp_vdev *vdev, bool flag)
 {
 	return;
 }
 #endif
 
-#ifdef CONFIG_HL_SUPPORT
-
+/*
+ * @nbuf: buffer which contains data to be displayed
+ * @nbuf_paddr: physical address of the buffer
+ * @len: defines the size of the data to be displayed
+ *
+ * Return: None
+ */
 void
-ol_txrx_copy_mac_addr_raw(ol_txrx_vdev_handle vdev, uint8_t *bss_addr);
+ol_txrx_dump_pkt(qdf_nbuf_t nbuf, uint32_t nbuf_paddr, int len);
 
-void
-ol_txrx_add_last_real_peer(ol_txrx_pdev_handle pdev,
-			   ol_txrx_vdev_handle vdev,
-			   uint8_t *peer_id);
+/**
+ * ol_txrx_fwd_desc_thresh_check() - check to forward packet to tx path
+ * @vdev: which virtual device the frames were addressed to
+ *
+ * This API is to check whether enough descriptors are available or not
+ * to forward packet to tx path. If not enough descriptors left,
+ * start dropping tx-path packets.
+ * Do not pause netif queues as still a pool of descriptors is reserved
+ * for high-priority traffic such as EAPOL/ARP etc.
+ * In case of intra-bss forwarding, it could be possible that tx-path can
+ * consume all the tx descriptors and pause netif queues. Due to this,
+ * there would be some left for stack triggered packets such as ARP packets
+ * which could lead to disconnection of device. To avoid this, reserved
+ * a pool of descriptors for high-priority packets, i.e., reduce the
+ * threshold of drop in the intra-bss forwarding path.
+ *
+ * Return: true ; forward the packet, i.e., below threshold
+ *         false; not enough descriptors, drop the packet
+ */
+bool ol_txrx_fwd_desc_thresh_check(struct ol_txrx_vdev_t *vdev);
 
-bool
-is_vdev_restore_last_peer(struct ol_txrx_peer_t *peer);
+struct cdp_vdev *ol_txrx_get_vdev_from_vdev_id(uint8_t vdev_id);
 
-void
-ol_txrx_update_last_real_peer(
-	ol_txrx_pdev_handle pdev,
-	struct ol_txrx_peer_t *peer,
-	uint8_t *peer_id, bool restore_last_peer);
-#else
+void *ol_txrx_find_peer_by_addr(struct cdp_pdev *pdev,
+				uint8_t *peer_addr,
+				uint8_t *peer_id);
 
-static inline void
-ol_txrx_copy_mac_addr_raw(ol_txrx_vdev_handle vdev, uint8_t *bss_addr)
-{
-	return;
-}
-
-static inline void
-ol_txrx_add_last_real_peer(ol_txrx_pdev_handle pdev,
-			   ol_txrx_vdev_handle vdev, uint8_t *peer_id)
-{
-	return;
-}
-
-static inline bool
-is_vdev_restore_last_peer(struct ol_txrx_peer_t *peer)
-{
-	return  false;
-}
-
-static inline void
-ol_txrx_update_last_real_peer(
-	ol_txrx_pdev_handle pdev,
-	struct ol_txrx_peer_t *peer,
-	uint8_t *peer_id, bool restore_last_peer)
-
-{
-	return;
-}
-#endif
-
-ol_txrx_vdev_handle ol_txrx_get_vdev_from_vdev_id(uint8_t vdev_id);
-
-void htt_pkt_log_init(struct ol_txrx_pdev_t *handle, void *scn);
-QDF_STATUS ol_txrx_set_wisa_mode(ol_txrx_vdev_handle vdev,
-			bool enable);
+void htt_pkt_log_init(struct cdp_pdev *pdev_handle, void *scn);
 #endif /* _OL_TXRX__H_ */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -312,7 +312,7 @@ void lim_wpspbc_close(tpAniSirGlobal pMac, tpPESession psessionEntry)
  * @return BOOLEAN
  */
 
-bool lim_check11b_rates(uint8_t rate)
+static bool lim_check11b_rates(uint8_t rate)
 {
 	if ((0x02 == (rate))
 	    || (0x04 == (rate))
@@ -383,6 +383,20 @@ lim_process_probe_req_frame(tpAniSirGlobal mac_ctx, uint8_t *rx_pkt_info,
 			lim_print_mac_addr(mac_ctx, mac_hdr->sa, LOG3);
 		/* Get pointer to Probe Request frame body */
 		body_ptr = WMA_GET_RX_MPDU_DATA(rx_pkt_info);
+
+		/* check for vendor IE presence */
+		if ((session->access_policy_vendor_ie) &&
+			(session->access_policy ==
+			LIM_ACCESS_POLICY_RESPOND_IF_IE_IS_PRESENT)) {
+			if (!cfg_get_vendor_ie_ptr_from_oui(mac_ctx,
+				&session->access_policy_vendor_ie[2],
+				3, body_ptr, frame_len)) {
+				lim_log(mac_ctx, LOG1, FL(
+					"Vendor IE is not present and access policy is %x, dropping probe request"),
+					session->access_policy);
+				return;
+			}
+		}
 
 		/* Parse Probe Request frame */
 		if (sir_convert_probe_req_frame2_struct(mac_ctx, body_ptr,
@@ -643,7 +657,7 @@ lim_send_sme_probe_req_ind(tpAniSirGlobal pMac,
 			   uint32_t ProbeReqIELen, tpPESession psessionEntry)
 {
 	tSirSmeProbeReqInd *pSirSmeProbeReqInd;
-	tSirMsgQ msgQ;
+	struct scheduler_msg msgQ;
 
 	pSirSmeProbeReqInd = qdf_mem_malloc(sizeof(tSirSmeProbeReqInd));
 	if (NULL == pSirSmeProbeReqInd) {
@@ -667,7 +681,8 @@ lim_send_sme_probe_req_ind(tpAniSirGlobal pMac,
 	qdf_mem_copy(pSirSmeProbeReqInd->WPSPBCProbeReq.peer_macaddr.bytes,
 		     peerMacAddr, QDF_MAC_ADDR_SIZE);
 
-	MTRACE(mac_trace_msg_tx(pMac, psessionEntry->peSessionId, msgQ.type));
+	MTRACE(mac_trace(pMac, TRACE_CODE_TX_SME_MSG,
+				psessionEntry->peSessionId, msgQ.type));
 	pSirSmeProbeReqInd->WPSPBCProbeReq.probeReqIELen =
 		(uint16_t) ProbeReqIELen;
 	qdf_mem_copy(pSirSmeProbeReqInd->WPSPBCProbeReq.probeReqIE, pProbeReqIE,

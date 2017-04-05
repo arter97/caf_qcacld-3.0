@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -37,17 +37,18 @@
 #include <qdf_types.h>
 #include <qdf_status.h>
 #include <qdf_mem.h>
+#include <qdf_debugfs.h>
 #include <qdf_list.h>
 #include <qdf_trace.h>
 #include <qdf_event.h>
 #include <qdf_lock.h>
 #include <cds_reg_service.h>
-#include <cds_mq.h>
 #include <cds_packet.h>
 #include <cds_sched.h>
 #include <qdf_threads.h>
 #include <qdf_mc_timer.h>
-#include <cds_pack_align.h>
+#include <wlan_objmgr_psoc_obj.h>
+#include <cdp_txrx_handle.h>
 
 /* Amount of time to wait for WMA to perform an asynchronous activity.
  * This value should be larger than the timeout used by WMI to wait for
@@ -76,8 +77,7 @@ enum cds_driver_state {
 /**
  * struct cds_sme_cbacks - list of sme functions registered with
  * CDS
- * @sme_get_valid_channels: gets the valid channel list for
- *  				   current reg domain
+ * @sme_get_valid_channels: gets the valid channel list for current reg domain
  * @sme_get_nss_for_vdev: gets the nss allowed for the vdev type
  */
 struct cds_sme_cbacks {
@@ -200,20 +200,20 @@ void cds_deinit(void);
 
 QDF_STATUS cds_pre_enable(v_CONTEXT_t cds_context);
 
-QDF_STATUS cds_open(void);
+QDF_STATUS cds_open(struct wlan_objmgr_psoc *psoc);
 
-QDF_STATUS cds_enable(v_CONTEXT_t cds_context);
+QDF_STATUS cds_enable(struct wlan_objmgr_psoc *psoc, v_CONTEXT_t cds_context);
 
-QDF_STATUS cds_disable(v_CONTEXT_t cds_context);
+QDF_STATUS cds_disable(struct wlan_objmgr_psoc *psoc, v_CONTEXT_t cds_context);
 
-QDF_STATUS cds_close(v_CONTEXT_t cds_context);
+QDF_STATUS cds_post_disable(v_CONTEXT_t cds_context);
 
-QDF_STATUS cds_shutdown(v_CONTEXT_t cds_context);
-
-void cds_core_return_msg(void *pVContext, p_cds_msg_wrapper pMsgWrapper);
+QDF_STATUS cds_close(struct wlan_objmgr_psoc *psoc, v_CONTEXT_t cds_context);
 
 void *cds_get_context(QDF_MODULE_ID moduleId);
 
+uint8_t cds_get_datapath_handles(void **soc, struct cdp_pdev **pdev,
+			 struct cdp_vdev **vdev, uint8_t sessionId);
 v_CONTEXT_t cds_get_global_context(void);
 
 QDF_STATUS cds_alloc_context(void *p_cds_context, QDF_MODULE_ID moduleID,
@@ -234,7 +234,7 @@ bool cds_is_packet_log_enabled(void);
 
 uint64_t cds_get_monotonic_boottime(void);
 
-void cds_trigger_recovery(void);
+void cds_trigger_recovery(bool);
 
 void cds_set_wakelock_logging(bool value);
 bool cds_is_wakelock_enabled(void);
@@ -264,7 +264,7 @@ QDF_STATUS cds_flush_logs(uint32_t is_fatal,
 		bool dump_mac_trace,
 		bool recovery_needed);
 void cds_logging_set_fw_flush_complete(void);
-
+void cds_svc_fw_shutdown_ind(struct device *dev);
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
 void cds_tdls_tx_rx_mgmt_event(uint8_t event_id, uint8_t tx_rx,
 			uint8_t type, uint8_t sub_type, uint8_t *peer_mac);
@@ -279,4 +279,14 @@ void cds_tdls_tx_rx_mgmt_event(uint8_t event_id, uint8_t tx_rx,
 
 int cds_get_radio_index(void);
 QDF_STATUS cds_set_radio_index(int radio_index);
+void cds_init_ini_config(struct cds_config_info *cds_cfg);
+void cds_deinit_ini_config(void);
+struct cds_config_info *cds_get_ini_config(void);
+
+bool cds_is_5_mhz_enabled(void);
+bool cds_is_10_mhz_enabled(void);
+bool cds_is_sub_20_mhz_enabled(void);
+bool cds_is_self_recovery_enabled(void);
+void cds_pkt_stats_to_logger_thread(void *pl_hdr, void *pkt_dump, void *data);
+enum tQDF_GLOBAL_CON_MODE cds_get_conparam(void);
 #endif /* if !defined __CDS_API_H */

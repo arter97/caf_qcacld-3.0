@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -25,7 +25,6 @@
  */
 
 #include "wma_types.h"
-#include "cds_mq.h"
 #include "csr_inside_api.h"
 #include "sms_debug.h"
 #include "sme_qos_internal.h"
@@ -36,7 +35,7 @@
 #include "sme_api.h"
 #include "csr_neighbor_roam.h"
 #include "mac_trace.h"
-#include "cds_concurrency.h"
+#include "wlan_policy_mgr_api.h"
 
 /**
  * csr_roam_issue_reassociate() - Issue Reassociate
@@ -78,7 +77,7 @@ QDF_STATUS csr_roam_issue_reassociate_cmd(tpAniSirGlobal pMac,
 	bool fHighPriority = true;
 	bool fRemoveCmd = false;
 	tListElem *pEntry;
-	pEntry = csr_ll_peek_head(&pMac->sme.smeCmdActiveList, LL_ACCESS_LOCK);
+	pEntry = csr_nonscan_active_ll_peek_head(pMac, LL_ACCESS_LOCK);
 	if (pEntry) {
 		pCommand = GET_BASE_ADDR(pEntry, tSmeCmd, Link);
 		if (!pCommand) {
@@ -89,8 +88,7 @@ QDF_STATUS csr_roam_issue_reassociate_cmd(tpAniSirGlobal pMac,
 			if (pCommand->u.roamCmd.roamReason ==
 			    eCsrSmeIssuedAssocToSimilarAP)
 				fRemoveCmd =
-					csr_ll_remove_entry(&pMac->sme.
-							    smeCmdActiveList,
+					csr_nonscan_active_ll_remove_entry(pMac,
 							    pEntry,
 							    LL_ACCESS_LOCK);
 			else
@@ -119,7 +117,7 @@ QDF_STATUS csr_roam_issue_reassociate_cmd(tpAniSirGlobal pMac,
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			sms_log(pMac, LOGE,
 				FL("fail to send message status=%d"), status);
-			csr_release_command_roam(pMac, pCommand);
+			csr_release_command(pMac, pCommand);
 		}
 	} while (0);
 
@@ -142,18 +140,14 @@ QDF_STATUS csr_roam_issue_reassociate_cmd(tpAniSirGlobal pMac,
  * Return: void
  */
 
-static void
-csr_neighbor_roam_process_scan_results(tpAniSirGlobal mac_ctx,
-		uint8_t sessionid,
-		tScanResultHandle *scan_results_list)
+void csr_neighbor_roam_process_scan_results(tpAniSirGlobal mac_ctx,
+		uint8_t sessionid, tScanResultHandle *scan_results_list)
 {
 	tCsrScanResultInfo *scan_result;
 	tpCsrNeighborRoamControlInfo n_roam_info =
 		&mac_ctx->roam.neighborRoamInfo[sessionid];
 	tpCsrNeighborRoamBSSInfo bss_info;
-	uint32_t age_ticks = 0;
-	uint32_t limit_ticks =
-		qdf_system_msecs_to_ticks(ROAM_AP_AGE_LIMIT_MS);
+	uint64_t age = 0;
 	uint8_t num_candidates = 0;
 	uint8_t num_dropped = 0;
 	/*
@@ -189,9 +183,9 @@ csr_neighbor_roam_process_scan_results(tpAniSirGlobal mac_ctx,
 			descr = &scan_result->BssDescriptor;
 			QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
 				  FL("Scan result: BSSID " MAC_ADDRESS_STR
-				     " (Rssi %ld, Ch:%d)"),
+				     " (Rssi %d, Ch:%d)"),
 				  MAC_ADDR_ARRAY(descr->bssId),
-				  abs(descr->rssi), descr->channelId);
+				  (int)abs(descr->rssi), descr->channelId);
 
 			if (!qdf_mem_cmp(descr->bssId,
 					n_roam_info->currAPbssid.bytes,
@@ -204,6 +198,26 @@ csr_neighbor_roam_process_scan_results(tpAniSirGlobal mac_ctx,
 					  QDF_TRACE_LEVEL_INFO,
 					  "SKIP-currently associated AP");
 				continue;
+			}
+
+			/*
+			 * Continue if MCC is disabled in INI and if AP
+			 * will create MCC
+			 */
+			if (policy_mgr_concurrent_open_sessions_running(
+				mac_ctx->psoc) &&
+				!mac_ctx->roam.configParam.fenableMCCMode) {
+				uint8_t conc_channel;
+
+				conc_channel =
+				  csr_get_concurrent_operation_channel(mac_ctx);
+				if (conc_channel &&
+				   (conc_channel !=
+				   scan_result->BssDescriptor.channelId)) {
+					sms_log(mac_ctx, LOG1, FL("MCC not supported so Ignore AP on channel %d"),
+					  scan_result->BssDescriptor.channelId);
+					continue;
+				}
 			}
 			/*
 			 * In case of reassoc requested by upper layer, look
@@ -279,9 +293,10 @@ csr_neighbor_roam_process_scan_results(tpAniSirGlobal mac_ctx,
 			}
 
 			/* check the age of the AP */
-			age_ticks = (uint32_t) qdf_mc_timer_get_system_ticks() -
-					descr->nReceivedTime;
-			if (age_constraint == true && age_ticks > limit_ticks) {
+			age = (uint64_t) qdf_mc_timer_get_system_time() -
+					descr->received_time;
+			if (age_constraint == true &&
+				age > ROAM_AP_AGE_LIMIT_MS) {
 				num_dropped++;
 				QDF_TRACE(QDF_MODULE_ID_SME,
 					QDF_TRACE_LEVEL_WARN,
@@ -356,8 +371,8 @@ csr_neighbor_roam_process_scan_results(tpAniSirGlobal mac_ctx,
  *
  * Return: None
  */
-static void csr_neighbor_roam_trigger_handoff(tpAniSirGlobal mac_ctx,
-					      uint8_t session_id)
+void csr_neighbor_roam_trigger_handoff(tpAniSirGlobal mac_ctx,
+				      uint8_t session_id)
 {
 	if (csr_roam_is_fast_roam_enabled(mac_ctx, session_id))
 		csr_neighbor_roam_issue_preauth_req(mac_ctx, session_id);

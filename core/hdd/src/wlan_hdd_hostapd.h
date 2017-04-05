@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -67,6 +67,39 @@ int hdd_softap_set_channel_change(struct net_device *dev,
 void hdd_sap_restart_with_channel_switch(hdd_adapter_t *adapter,
 				uint32_t target_channel,
 				uint32_t target_bw);
+/**
+ * sap_restart_chan_switch_cb() - Function to restart SAP with
+ * a different channel
+ * @psoc: PSOC object information
+ * @vdev_id: vdev id
+ * @channel: channel to switch
+ *
+ * This function restarts SAP with a different channel
+ *
+ * Return: None
+ *
+ */
+void sap_restart_chan_switch_cb (struct wlan_objmgr_psoc *psoc,
+				uint8_t vdev_id, uint32_t channel,
+				uint32_t channel_bw);
+/**
+ * wlan_hdd_get_channel_for_sap_restart() - Function to get
+ * suitable channel and restart SAP
+ * @psoc: PSOC object information
+ * @vdev_id: vdev id
+ * @channel: channel to be returned
+ * @sec_ch: secondary channel to be returned
+ * @restart_sap: restsart SAP as a part of channel switch
+ *
+ * This function gets the channel parameters to restart SAP
+ *
+ * Return: None
+ *
+ */
+QDF_STATUS wlan_hdd_get_channel_for_sap_restart(
+				struct wlan_objmgr_psoc *psoc,
+				uint8_t vdev_id, uint8_t *channel,
+				uint8_t *sec_ch, bool restart_sap);
 #endif
 
 eCsrEncryptionType
@@ -83,7 +116,7 @@ hdd_translate_wpa_to_csr_encryption_type(uint8_t cipher_suite[4]);
 
 QDF_STATUS hdd_softap_sta_deauth(hdd_adapter_t *,
 		struct tagCsrDelStaParams *);
-void hdd_softap_sta_disassoc(hdd_adapter_t *, uint8_t *);
+void hdd_softap_sta_disassoc(hdd_adapter_t *, struct tagCsrDelStaParams *);
 void hdd_softap_tkip_mic_fail_counter_measure(hdd_adapter_t *, bool);
 int hdd_softap_unpack_ie(tHalHandle halHandle,
 			 eCsrEncryptionType *pEncryptType,
@@ -95,7 +128,7 @@ int hdd_softap_unpack_ie(tHalHandle halHandle,
 
 QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 				    void *usrDataForCallback);
-QDF_STATUS hdd_init_ap_mode(hdd_adapter_t *pAdapter);
+QDF_STATUS hdd_init_ap_mode(hdd_adapter_t *pAdapter, bool reinit);
 void hdd_set_ap_ops(struct net_device *pWlanHostapdDev);
 int hdd_hostapd_stop(struct net_device *dev);
 int hdd_sap_context_init(hdd_context_t *hdd_ctx);
@@ -121,4 +154,6 @@ int wlan_hdd_cfg80211_change_beacon(struct wiphy *wiphy,
 				    struct cfg80211_beacon_data *params);
 
 QDF_STATUS wlan_hdd_config_acs(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter);
+void hdd_sap_indicate_disconnect_for_sta(hdd_adapter_t *adapter);
+void hdd_sap_destroy_events(hdd_adapter_t *adapter);
 #endif /* end #if !defined(WLAN_HDD_HOSTAPD_H) */

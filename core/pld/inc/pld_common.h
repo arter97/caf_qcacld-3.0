@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -31,6 +31,7 @@
 #include <linux/device.h>
 #include <linux/interrupt.h>
 #include <linux/pm.h>
+#include <osapi_linux.h>
 
 #define PLD_IMAGE_FILE               "athwlan.bin"
 #define PLD_UTF_FIRMWARE_FILE        "utf.bin"
@@ -50,7 +51,8 @@ enum pld_bus_type {
 	PLD_BUS_TYPE_NONE = -1,
 	PLD_BUS_TYPE_PCIE = 0,
 	PLD_BUS_TYPE_SNOC,
-	PLD_BUS_TYPE_SDIO
+	PLD_BUS_TYPE_SDIO,
+	PLD_BUS_TYPE_USB
 };
 
 #define PLD_MAX_FIRMWARE_SIZE (1 * 1024 * 1024)
@@ -69,7 +71,7 @@ enum pld_bus_width_type {
 	PLD_BUS_WIDTH_HIGH
 };
 
-#define PLD_MAX_FILE_NAME 20
+#define PLD_MAX_FILE_NAME NAME_MAX
 
 /**
  * struct pld_fw_file - WLAN FW file names
@@ -93,44 +95,7 @@ struct pld_fw_files {
 	char epping_file[PLD_MAX_FILE_NAME];
 	char evicted_data[PLD_MAX_FILE_NAME];
 	char setup_file[PLD_MAX_FILE_NAME];
-};
-
-/**
- * struct pld_image_desc_info - FW image description
- * @fw_addr: FW image address
- * @fw_size: FW image size
- * @bdata_addr: FW board data address
- * @bdata_size: FW board data size
- *
- * pld_image_desc_info is used to store FW image description
- * information.
- */
-struct pld_image_desc_info {
-	dma_addr_t fw_addr;
-	u32 fw_size;
-	dma_addr_t bdata_addr;
-	u32 bdata_size;
-};
-
-#define PLD_CODESWAP_MAX_CODESEGS 16
-
-/**
- * struct pld_codeswap_codeseg_info - code swap segment information
- * @codeseg_total_bytes: total bytes of segments
- * @num_codesegs: number of code segments
- * @codeseg_size: code segment size
- * @codeseg_size_log2: log2 of code segment size
- * @codeseg_busaddr: array of addresses of each code segment
- *
- * pld_codeswap_codeseg_info is used to store code swap segment
- * information.
- */
-struct pld_codeswap_codeseg_info {
-	u32   codeseg_total_bytes;
-	u32   num_codesegs;
-	u32   codeseg_size;
-	u32   codeseg_size_log2;
-	void *codeseg_busaddr[PLD_CODESWAP_MAX_CODESEGS];
+	char ibss_image_file[PLD_MAX_FILE_NAME];
 };
 
 /**
@@ -163,7 +128,8 @@ struct pld_platform_cap {
 enum pld_driver_status {
 	PLD_UNINITIALIZED,
 	PLD_INITIALIZED,
-	PLD_LOAD_UNLOAD
+	PLD_LOAD_UNLOAD,
+	PLD_RECOVERY,
 };
 
 /**
@@ -215,6 +181,17 @@ struct pld_shadow_reg_cfg {
 };
 
 /**
+ * struct pld_shadow_reg_v2_cfg - shadow register version 2 configuration
+ * @addr: shadow register physical address
+ *
+ * pld_shadow_reg_v2_cfg is used to store shadow register version 2
+ * configuration.
+ */
+struct pld_shadow_reg_v2_cfg {
+	u32 addr;
+};
+
+/**
  * struct pld_wlan_enable_cfg - WLAN FW configuration
  * @num_ce_tgt_cfg: number of CE target configuration
  * @ce_tgt_cfg: CE target configuration
@@ -222,6 +199,8 @@ struct pld_shadow_reg_cfg {
  * @ce_svc_cfg: CE service configuration
  * @num_shadow_reg_cfg: number of shadow register configuration
  * @shadow_reg_cfg: shadow register configuration
+ * @num_shadow_reg_v2_cfg: number of shadow register version 2 configuration
+ * @shadow_reg_v2_cfg: shadow register version 2 configuration
  *
  * pld_wlan_enable_cfg stores WLAN FW configurations. It will be
  * passed to WLAN FW when WLAN host driver calls wlan_enable.
@@ -233,6 +212,8 @@ struct pld_wlan_enable_cfg {
 	struct pld_ce_svc_pipe_cfg *ce_svc_cfg;
 	u32 num_shadow_reg_cfg;
 	struct pld_shadow_reg_cfg *shadow_reg_cfg;
+	u32 num_shadow_reg_v2_cfg;
+	struct pld_shadow_reg_v2_cfg *shadow_reg_v2_cfg;
 };
 
 /**
@@ -251,18 +232,40 @@ enum pld_driver_mode {
 	PLD_OFF
 };
 
+#define PLD_MAX_TIMESTAMP_LEN 32
+
 /**
  * struct pld_soc_info - SOC information
  * @v_addr: virtual address of preallocated memory
  * @p_addr: physical address of preallcoated memory
- * @version: version number
+ * @chip_id: chip ID
+ * @chip_family: chip family
+ * @board_id: board ID
+ * @soc_id: SOC ID
+ * @fw_version: FW version
+ * @fw_build_timestamp: FW build timestamp
  *
  * pld_soc_info is used to store WLAN SOC information.
  */
 struct pld_soc_info {
 	void __iomem *v_addr;
 	phys_addr_t p_addr;
-	u32 version;
+	u32 chip_id;
+	u32 chip_family;
+	u32 board_id;
+	u32 soc_id;
+	u32 fw_version;
+	char fw_build_timestamp[PLD_MAX_TIMESTAMP_LEN + 1];
+};
+
+/**
+ * enum pld_recovery_reason - WLAN host driver recovery reason
+ * @PLD_REASON_DEFAULT: default
+ * @PLD_REASON_LINK_DOWN: PCIe link down
+ */
+enum pld_recovery_reason {
+	PLD_REASON_DEFAULT,
+	PLD_REASON_LINK_DOWN
 };
 
 /**
@@ -279,12 +282,16 @@ struct pld_soc_info {
  *          is enabled
  * @modem_status: optional operation, will be called when platform driver
  *                sending modem power status to WLAN FW
+ * @update_status: optional operation, will be called when platform driver
+ *                 updating driver status
  * @runtime_suspend: optional operation, prepare the device for a condition
  *                   in which it won't be able to communicate with the CPU(s)
  *                   and RAM due to power management.
  * @runtime_resume: optional operation, put the device into the fully
  *                  active state in response to a wakeup event generated by
  *                  hardware or at the request of software.
+ * @suspend_noirq: optional operation, complete the actions started by suspend().
+ * @resume_noirq: optional operation, prepare for the execution of resume()
  */
 struct pld_driver_ops {
 	int (*probe)(struct device *dev,
@@ -304,13 +311,20 @@ struct pld_driver_ops {
 		       pm_message_t state);
 	int (*resume)(struct device *dev,
 		      enum pld_bus_type bus_type);
+	int (*reset_resume)(struct device *dev,
+		      enum pld_bus_type bus_type);
 	void (*modem_status)(struct device *dev,
 			     enum pld_bus_type bus_type,
 			     int state);
+	void (*update_status)(struct device *dev, uint32_t status);
 	int (*runtime_suspend)(struct device *dev,
 			       enum pld_bus_type bus_type);
 	int (*runtime_resume)(struct device *dev,
 			      enum pld_bus_type bus_type);
+	int (*suspend_noirq)(struct device *dev,
+			     enum pld_bus_type bus_type);
+	int (*resume_noirq)(struct device *dev,
+			    enum pld_bus_type bus_type);
 };
 
 int pld_init(void);
@@ -322,28 +336,26 @@ void pld_unregister_driver(void);
 int pld_wlan_enable(struct device *dev, struct pld_wlan_enable_cfg *config,
 		    enum pld_driver_mode mode, const char *host_version);
 int pld_wlan_disable(struct device *dev, enum pld_driver_mode mode);
-int pld_set_fw_debug_mode(struct device *dev, bool enablefwlog);
+int pld_set_fw_log_mode(struct device *dev, u8 fw_log_mode);
 void pld_get_default_fw_files(struct pld_fw_files *pfw_files);
 int pld_get_fw_files_for_target(struct device *dev,
 				struct pld_fw_files *pfw_files,
 				u32 target_type, u32 target_version);
-int pld_get_fw_image(struct device *dev,
-		     struct pld_image_desc_info *image_desc_info);
 void pld_is_pci_link_down(struct device *dev);
 int pld_shadow_control(struct device *dev, bool enable);
-int pld_get_codeswap_struct(struct device *dev,
-			    struct pld_codeswap_codeseg_info *swap_seg);
 int pld_set_wlan_unsafe_channel(struct device *dev, u16 *unsafe_ch_list,
 				u16 ch_count);
 int pld_get_wlan_unsafe_channel(struct device *dev, u16 *unsafe_ch_list,
 				u16 *ch_count, u16 buf_len);
 int pld_wlan_set_dfs_nol(struct device *dev, void *info, u16 info_len);
 int pld_wlan_get_dfs_nol(struct device *dev, void *info, u16 info_len);
-void pld_schedule_recovery_work(struct device *dev);
+void pld_schedule_recovery_work(struct device *dev,
+				enum pld_recovery_reason reason);
 int pld_wlan_pm_control(struct device *dev, bool vote);
 void *pld_get_virt_ramdump_mem(struct device *dev, unsigned long *size);
 void pld_device_crashed(struct device *dev);
-void pld_device_self_recovery(struct device *dev);
+void pld_device_self_recovery(struct device *dev,
+			      enum pld_recovery_reason reason);
 void pld_intr_notify_q6(struct device *dev);
 void pld_request_pm_qos(struct device *dev, u32 qos_val);
 void pld_remove_pm_qos(struct device *dev);
@@ -364,7 +376,26 @@ void pld_enable_irq(struct device *dev, unsigned int ce_id);
 void pld_disable_irq(struct device *dev, unsigned int ce_id);
 int pld_get_soc_info(struct device *dev, struct pld_soc_info *info);
 int pld_get_ce_id(struct device *dev, int irq);
+int pld_get_irq(struct device *dev, int ce_id);
 void pld_lock_pm_sem(struct device *dev);
 void pld_release_pm_sem(struct device *dev);
+int pld_power_on(struct device *dev);
+int pld_power_off(struct device *dev);
+int pld_athdiag_read(struct device *dev, uint32_t offset, uint32_t memtype,
+		     uint32_t datalen, uint8_t *output);
+int pld_athdiag_write(struct device *dev, uint32_t offset, uint32_t memtype,
+		      uint32_t datalen, uint8_t *input);
+void *pld_smmu_get_mapping(struct device *dev);
+int pld_smmu_map(struct device *dev, phys_addr_t paddr,
+		 uint32_t *iova_addr, size_t size);
+int pld_get_user_msi_assignment(struct device *dev, char *user_name,
+				int *num_vectors, uint32_t *user_base_data,
+				uint32_t *base_vector);
+int pld_get_msi_irq(struct device *dev, unsigned int vector);
+void pld_get_msi_address(struct device *dev, uint32_t *msi_addr_low,
+			 uint32_t *msi_addr_high);
+unsigned int pld_socinfo_get_serial_number(struct device *dev);
+uint8_t *pld_get_wlan_mac_address(struct device *dev, uint32_t *num);
+int pld_is_qmi_disable(struct device *dev);
 
 #endif

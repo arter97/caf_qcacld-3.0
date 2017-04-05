@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -31,6 +31,7 @@
 #include <lim_prop_exts_utils.h>
 #include <lim_assoc_utils.h>
 #include <lim_session.h>
+#include <lim_session_utils.h>
 #include <lim_admit_control.h>
 #include "wma.h"
 
@@ -125,7 +126,8 @@ void lim_ft_cleanup_pre_auth_info(tpAniSirGlobal pMac,
  *
  * Return: value to indicate if buffer was consumed
  */
-int lim_process_ft_pre_auth_req(tpAniSirGlobal mac_ctx, tpSirMsgQ msg)
+int lim_process_ft_pre_auth_req(tpAniSirGlobal mac_ctx,
+				struct scheduler_msg *msg)
 {
 	int buf_consumed = false;
 	tpPESession session;
@@ -191,9 +193,13 @@ int lim_process_ft_pre_auth_req(tpAniSirGlobal mac_ctx, tpSirMsgQ msg)
 			      session, 0, 0);
 #endif
 
-	/* Dont need to suspend if APs are in same channel */
-	if (session->currentOperChannel !=
-	    session->ftPEContext.pFTPreAuthReq->preAuthchannelNum) {
+	/*
+	 * Dont need to suspend if APs are in same channel and DUT
+	 * is not in MCC state
+	 */
+	if ((session->currentOperChannel !=
+	    session->ftPEContext.pFTPreAuthReq->preAuthchannelNum)
+	    || lim_is_in_mcc(mac_ctx)) {
 		/* Need to suspend link only if the channels are different */
 		lim_log(mac_ctx, LOG2,
 			FL("Performing pre-auth on diff channel(session %p)"),
@@ -228,16 +234,23 @@ void lim_perform_ft_pre_auth(tpAniSirGlobal pMac, QDF_STATUS status,
 			     uint32_t *data, tpPESession psessionEntry)
 {
 	tSirMacAuthFrameBody authFrame;
+	unsigned int session_id;
+	eCsrAuthType auth_type;
 
 	if (NULL == psessionEntry) {
 		PELOGE(lim_log(pMac, LOGE, FL("psessionEntry is NULL"));)
 		return;
 	}
+	session_id = psessionEntry->smeSessionId;
+	auth_type =
+		pMac->roam.roamSession[session_id].connectedProfile.AuthType;
 
 	if (psessionEntry->is11Rconnection &&
 	    psessionEntry->ftPEContext.pFTPreAuthReq) {
 		/* Only 11r assoc has FT IEs */
-		if (psessionEntry->ftPEContext.pFTPreAuthReq->ft_ies == NULL) {
+		if ((auth_type != eCSR_AUTH_TYPE_OPEN_SYSTEM) &&
+			(psessionEntry->ftPEContext.pFTPreAuthReq->ft_ies_length
+									== 0)) {
 			lim_log(pMac, LOGE,
 				FL("FTIEs for Auth Req Seq 1 is absent"));
 			goto preauth_fail;
@@ -270,6 +283,9 @@ void lim_perform_ft_pre_auth(tpAniSirGlobal pMac, QDF_STATUS status,
 	}
 	authFrame.authTransactionSeqNumber = SIR_MAC_AUTH_FRAME_1;
 	authFrame.authStatusCode = 0;
+
+	pMac->lim.limTimers.g_lim_periodic_auth_retry_timer.sessionId =
+				psessionEntry->peSessionId;
 
 	/* Start timer here to come back to operating channel */
 	pMac->lim.limTimers.gLimFTPreAuthRspTimer.sessionId =
@@ -347,12 +363,13 @@ tSirRetStatus lim_ft_setup_auth_session(tpAniSirGlobal pMac,
  * lim_ft_process_pre_auth_result() - Process the Auth frame
  * @pMac: Global MAC context
  * @status: Status code
- * psessionEntry: PE Session
+ * @psessionEntry: PE Session
  *
  * Return: None
  */
-void lim_ft_process_pre_auth_result(tpAniSirGlobal pMac, QDF_STATUS status,
-				    tpPESession psessionEntry)
+static void lim_ft_process_pre_auth_result(tpAniSirGlobal pMac,
+					   QDF_STATUS status,
+					   tpPESession psessionEntry)
 {
 	if (NULL == psessionEntry ||
 	    NULL == psessionEntry->ftPEContext.pFTPreAuthReq)
@@ -464,6 +481,12 @@ void lim_handle_ft_pre_auth_rsp(tpAniSirGlobal pMac, tSirRetStatus status,
 			     &(psessionEntry->htConfig),
 			     sizeof(psessionEntry->htConfig));
 		pftSessionEntry->limSmeState = eLIM_SME_WT_REASSOC_STATE;
+
+		if (IS_5G_CH(psessionEntry->ftPEContext.pFTPreAuthReq->
+			preAuthchannelNum))
+			pftSessionEntry->vdev_nss = pMac->vdev_type_nss_5g.sta;
+		else
+			pftSessionEntry->vdev_nss = pMac->vdev_type_nss_2g.sta;
 
 		lim_log(pMac, LOG1, FL("created session (%p) with id = %d"),
 			pftSessionEntry, pftSessionEntry->peSessionId);
@@ -584,7 +607,7 @@ void lim_post_ft_pre_auth_rsp(tpAniSirGlobal mac_ctx,
 			      tpPESession session)
 {
 	tpSirFTPreAuthRsp ft_pre_auth_rsp;
-	tSirMsgQ mmh_msg;
+	struct scheduler_msg mmh_msg;
 	uint16_t rsp_len = sizeof(tSirFTPreAuthRsp);
 
 	ft_pre_auth_rsp = (tpSirFTPreAuthRsp) qdf_mem_malloc(rsp_len);
@@ -593,7 +616,6 @@ void lim_post_ft_pre_auth_rsp(tpAniSirGlobal mac_ctx,
 		QDF_ASSERT(ft_pre_auth_rsp != NULL);
 		return;
 	}
-	qdf_mem_zero(ft_pre_auth_rsp, rsp_len);
 
 	lim_log(mac_ctx, LOG1, FL("Auth Rsp = %p"), ft_pre_auth_rsp);
 	if (session) {
@@ -666,7 +688,7 @@ QDF_STATUS lim_send_preauth_scan_offload(tpAniSirGlobal mac_ctx,
 {
 	tSirScanOffloadReq *scan_offload_req;
 	tSirRetStatus rc = eSIR_SUCCESS;
-	tSirMsgQ msg;
+	struct scheduler_msg msg;
 
 	scan_offload_req = qdf_mem_malloc(sizeof(tSirScanOffloadReq));
 	if (NULL == scan_offload_req) {
@@ -674,8 +696,6 @@ QDF_STATUS lim_send_preauth_scan_offload(tpAniSirGlobal mac_ctx,
 			FL("Memory allocation failed for pScanOffloadReq"));
 		return QDF_STATUS_E_NOMEM;
 	}
-
-	qdf_mem_zero(scan_offload_req, sizeof(tSirScanOffloadReq));
 
 	msg.type = WMA_START_SCAN_OFFLOAD_REQ;
 	msg.bodyptr = scan_offload_req;

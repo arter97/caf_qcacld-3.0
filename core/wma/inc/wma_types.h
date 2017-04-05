@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -132,6 +132,13 @@
 #define WMA_GET_RX_RSSI_RAW(pRxMeta) \
 		       (((t_packetmeta *)pRxMeta)->rssi_raw)
 
+/*
+ * the repeat_cnt is reserved by FW team, the current value
+ * is always 0xffffffff
+ */
+#define WMI_WOW_PULSE_REPEAT_CNT 0xffffffff
+
+
 /* WMA Messages */
 #define WMA_MSG_TYPES_BEGIN            SIR_HAL_MSG_TYPES_BEGIN
 #define WMA_ITC_MSG_TYPES_BEGIN        SIR_HAL_ITC_MSG_TYPES_BEGIN
@@ -145,7 +152,9 @@
 #define WMA_ADD_BSS_REQ                SIR_HAL_ADD_BSS_REQ
 #define WMA_ADD_BSS_RSP                SIR_HAL_ADD_BSS_RSP
 #define WMA_DELETE_BSS_REQ             SIR_HAL_DELETE_BSS_REQ
+#define WMA_DELETE_BSS_HO_FAIL_REQ     SIR_HAL_DELETE_BSS_HO_FAIL_REQ
 #define WMA_DELETE_BSS_RSP             SIR_HAL_DELETE_BSS_RSP
+#define WMA_DELETE_BSS_HO_FAIL_RSP     SIR_HAL_DELETE_BSS_HO_FAIL_RSP
 #define WMA_SEND_BEACON_REQ            SIR_HAL_SEND_BEACON_REQ
 #define WMA_SEND_PROBE_RSP_TMPL        SIR_HAL_SEND_PROBE_RSP_TMPL
 
@@ -165,8 +174,6 @@
 
 #define WMA_ENTER_PS_REQ               SIR_HAL_ENTER_PS_REQ
 #define WMA_EXIT_PS_REQ                SIR_HAL_EXIT_PS_REQ
-
-#define WMA_CFG_RXP_FILTER_REQ         SIR_HAL_CFG_RXP_FILTER_REQ
 
 #define WMA_SWITCH_CHANNEL_RSP         SIR_HAL_SWITCH_CHANNEL_RSP
 #define WMA_P2P_NOA_ATTR_IND           SIR_HAL_P2P_NOA_ATTR_IND
@@ -228,15 +235,9 @@
 #define WMA_BTC_SET_CFG                SIR_HAL_BTC_SET_CFG
 #define WMA_HANDLE_FW_MBOX_RSP         SIR_HAL_HANDLE_FW_MBOX_RSP
 
-#ifdef FEATURE_OEM_DATA_SUPPORT
-/* PE <-> HAL OEM_DATA RELATED MESSAGES */
-#define WMA_START_OEM_DATA_REQ         SIR_HAL_START_OEM_DATA_REQ
-#define WMA_START_OEM_DATA_RSP         SIR_HAL_START_OEM_DATA_RSP
-#endif
-
 #define WMA_SET_MAX_TX_POWER_REQ       SIR_HAL_SET_MAX_TX_POWER_REQ
 #define WMA_SET_MAX_TX_POWER_RSP       SIR_HAL_SET_MAX_TX_POWER_RSP
-#define WMA_SET_TX_POWER_REQ           SIR_HAL_SET_TX_POWER_REQ
+#define WMA_SET_DTIM_PERIOD            SIR_HAL_SET_DTIM_PERIOD
 
 #define WMA_SET_MAX_TX_POWER_PER_BAND_REQ \
 	SIR_HAL_SET_MAX_TX_POWER_PER_BAND_REQ
@@ -477,6 +478,15 @@
 #define WDA_BPF_SET_INSTRUCTIONS_REQ         SIR_HAL_BPF_SET_INSTRUCTIONS_REQ
 
 #define WMA_SET_PDEV_IE_REQ                  SIR_HAL_SET_PDEV_IE_REQ
+#define WMA_UPDATE_WEP_DEFAULT_KEY           SIR_HAL_UPDATE_WEP_DEFAULT_KEY
+#define WMA_SEND_FREQ_RANGE_CONTROL_IND      SIR_HAL_SEND_FREQ_RANGE_CONTROL_IND
+#define WMA_ENCRYPT_DECRYPT_MSG              SIR_HAL_ENCRYPT_DECRYPT_MSG
+#define WMA_POWER_DEBUG_STATS_REQ            SIR_HAL_POWER_DEBUG_STATS_REQ
+
+#define WMA_SET_WOW_PULSE_CMD                SIR_HAL_SET_WOW_PULSE_CMD
+
+#define WMA_SET_PER_ROAM_CONFIG_CMD          SIR_HAL_SET_PER_ROAM_CONFIG_CMD
+
 /* Bit 6 will be used to control BD rate for Management frames */
 #define HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME 0x40
 
@@ -599,13 +609,32 @@ typedef struct sDisableUapsdParams {
 	uint32_t status;
 } tDisableUapsdParams, *tpDisableUapsdParams;
 
-typedef void (*pWMATxRxCompFunc)(void *pContext, void *pData,
+/**
+ * wma_tx_dwnld_comp_callback - callback function for TX dwnld complete
+ * @context: global pMac pointer
+ * @buf: buffer
+ * @bFreeData: to free/not free the buffer
+ *
+ * callback function for mgmt tx download completion.
+ *
+ * Return: QDF_STATUS_SUCCESS in case of success
+ */
+typedef QDF_STATUS (*wma_tx_dwnld_comp_callback)(void *context, qdf_nbuf_t buf,
 				 bool bFreeData);
 
-/* callback function for TX complete */
-/* parameter 1 - global pMac pointer */
-/* parameter 2 - txComplete status : 1- success, 0 - failure. */
-typedef QDF_STATUS (*pWMAAckFnTxComp)(tpAniSirGlobal, uint32_t);
+/**
+ * wma_tx_ota_comp_callback - callback function for TX complete
+ * @context: global pMac pointer
+ * @buf: buffer
+ * @status: tx completion status
+ * @params: tx completion params
+ *
+ * callback function for mgmt tx ota completion.
+ *
+ * Return: QDF_STATUS_SUCCESS in case of success
+ */
+typedef QDF_STATUS (*wma_tx_ota_comp_callback)(void *context, qdf_nbuf_t buf,
+				      uint32_t status, void *params);
 
 typedef void (*wma_txFailIndCallback)(uint8_t *, uint8_t);
 
@@ -672,7 +701,8 @@ typedef enum {
 
 #endif /* FEATURE_WLAN_TDLS */
 
-tSirRetStatus wma_post_ctrl_msg(tpAniSirGlobal pMac, tSirMsgQ *pMsg);
+tSirRetStatus wma_post_ctrl_msg(tpAniSirGlobal pMac,
+				struct scheduler_msg *pMsg);
 
 tSirRetStatus u_mac_post_ctrl_msg(void *pSirGlobal, tSirMbMsg *pMb);
 
@@ -692,27 +722,23 @@ QDF_STATUS wma_tx_packet(void *pWMA,
 			 eFrameType frmType,
 			 eFrameTxDir txDir,
 			 uint8_t tid,
-			 pWMATxRxCompFunc pCompFunc,
+			 wma_tx_dwnld_comp_callback pCompFunc,
 			 void *pData,
-			 pWMAAckFnTxComp pAckTxComp,
+			 wma_tx_ota_comp_callback pAckTxComp,
 			 uint8_t txFlag, uint8_t sessionId, bool tdlsflag,
 			 uint16_t channel_freq);
 
-QDF_STATUS wma_open(void *p_cds_context,
+QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc, void *p_cds_context,
 		    wma_tgt_cfg_cb pTgtUpdCB,
 		    wma_dfs_radar_indication_cb radar_ind_cb,
-		    tMacOpenParameters *pMacParams);
+		    struct cds_config_info *cds_cfg);
 
-typedef QDF_STATUS (*wma_mgmt_frame_rx_callback)(void *p_cds_gctx,
-					     void *cds_buff);
+QDF_STATUS wma_register_mgmt_frm_client(void);
 
-QDF_STATUS wma_register_mgmt_frm_client(void *p_cds_gctx,
-				wma_mgmt_frame_rx_callback mgmt_rx_cb);
-
-QDF_STATUS wma_de_register_mgmt_frm_client(void *p_cds_gctx);
-QDF_STATUS wma_register_roaming_callbacks(void *cds_ctx,
+QDF_STATUS wma_de_register_mgmt_frm_client(void);
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
-		void (*csr_roam_synch_cb)(tpAniSirGlobal mac,
+QDF_STATUS wma_register_roaming_callbacks(void *cds_ctx,
+		QDF_STATUS (*csr_roam_synch_cb)(tpAniSirGlobal mac,
 			roam_offload_synch_ind *roam_synch_data,
 			tpSirBssDescription  bss_desc_ptr,
 			enum sir_roam_op_code reason),
@@ -721,7 +747,7 @@ QDF_STATUS wma_register_roaming_callbacks(void *cds_ctx,
 			tpSirBssDescription  bss_desc_ptr));
 #else
 static inline QDF_STATUS wma_register_roaming_callbacks(void *cds_ctx,
-		void (*csr_roam_synch_cb)(tpAniSirGlobal mac,
+		QDF_STATUS (*csr_roam_synch_cb)(tpAniSirGlobal mac,
 			roam_offload_synch_ind *roam_synch_data,
 			tpSirBssDescription  bss_desc_ptr,
 			enum sir_roam_op_code reason),

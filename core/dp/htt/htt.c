@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2014-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011, 2014-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -46,13 +46,15 @@
 #include <ol_htt_tx_api.h>
 #include <cds_api.h>
 #include "hif.h"
+#include <cdp_txrx_handle.h>
 
 #define HTT_HTC_PKT_POOL_INIT_SIZE 100  /* enough for a large A-MPDU */
 
 QDF_STATUS(*htt_h2t_rx_ring_cfg_msg)(struct htt_pdev_t *pdev);
+QDF_STATUS(*htt_h2t_rx_ring_rfs_cfg_msg)(struct htt_pdev_t *pdev);
 
 #ifdef IPA_OFFLOAD
-A_STATUS htt_ipa_config(htt_pdev_handle pdev, A_STATUS status)
+static A_STATUS htt_ipa_config(htt_pdev_handle pdev, A_STATUS status)
 {
 	if ((A_OK == status) &&
 	    ol_cfg_ipa_uc_offload_enabled(pdev->ctrl_pdev))
@@ -79,6 +81,11 @@ struct htt_htc_pkt *htt_htc_pkt_alloc(struct htt_pdev_t *pdev)
 	if (pkt == NULL)
 		pkt = qdf_mem_malloc(sizeof(*pkt));
 
+	if (!pkt) {
+		qdf_print("%s: HTC packet allocation failed\n", __func__);
+		return NULL;
+	}
+	htc_packet_set_magic_cookie(&(pkt->u.pkt.htc_pkt), 0);
 	return &pkt->u.pkt;     /* not actually a dereference */
 }
 
@@ -86,7 +93,13 @@ void htt_htc_pkt_free(struct htt_pdev_t *pdev, struct htt_htc_pkt *pkt)
 {
 	struct htt_htc_pkt_union *u_pkt = (struct htt_htc_pkt_union *)pkt;
 
+	if (!u_pkt) {
+		qdf_print("%s: HTC packet is NULL\n", __func__);
+		return;
+	}
+
 	HTT_TX_MUTEX_ACQUIRE(&pdev->htt_tx_mutex);
+	htc_packet_set_magic_cookie(&(u_pkt->u.pkt.htc_pkt), 0);
 	u_pkt->u.next = pdev->htt_htc_pkt_freelist;
 	pdev->htt_htc_pkt_freelist = u_pkt;
 	HTT_TX_MUTEX_RELEASE(&pdev->htt_tx_mutex);
@@ -105,6 +118,34 @@ void htt_htc_pkt_pool_free(struct htt_pdev_t *pdev)
 }
 
 #ifdef ATH_11AC_TXCOMPACT
+
+void
+htt_htc_misc_pkt_list_trim(struct htt_pdev_t *pdev, int level)
+{
+	struct htt_htc_pkt_union *pkt, *next, *prev = NULL;
+	int i = 0;
+	qdf_nbuf_t netbuf;
+
+	HTT_TX_MUTEX_ACQUIRE(&pdev->htt_tx_mutex);
+	pkt = pdev->htt_htc_pkt_misclist;
+	while (pkt) {
+		next = pkt->u.next;
+		/* trim the out grown list*/
+		if (++i > level) {
+			netbuf = (qdf_nbuf_t)(pkt->u.pkt.htc_pkt.pNetBufContext);
+			qdf_nbuf_unmap(pdev->osdev, netbuf, QDF_DMA_TO_DEVICE);
+			qdf_nbuf_free(netbuf);
+			qdf_mem_free(pkt);
+			pkt = NULL;
+			if (prev)
+				prev->u.next = NULL;
+		}
+		prev = pkt;
+		pkt = next;
+	}
+	HTT_TX_MUTEX_RELEASE(&pdev->htt_tx_mutex);
+}
+
 void htt_htc_misc_pkt_list_add(struct htt_pdev_t *pdev, struct htt_htc_pkt *pkt)
 {
 	struct htt_htc_pkt_union *u_pkt = (struct htt_htc_pkt_union *)pkt;
@@ -117,6 +158,8 @@ void htt_htc_misc_pkt_list_add(struct htt_pdev_t *pdev, struct htt_htc_pkt *pkt)
 		pdev->htt_htc_pkt_misclist = u_pkt;
 	}
 	HTT_TX_MUTEX_RELEASE(&pdev->htt_tx_mutex);
+
+	htt_htc_misc_pkt_list_trim(pdev, HTT_HTC_PKT_MISCLIST_SIZE);
 }
 
 void htt_htc_misc_pkt_pool_free(struct htt_pdev_t *pdev)
@@ -127,6 +170,12 @@ void htt_htc_misc_pkt_pool_free(struct htt_pdev_t *pdev)
 
 	while (pkt) {
 		next = pkt->u.next;
+		if (htc_packet_get_magic_cookie(&(pkt->u.pkt.htc_pkt)) !=
+				HTC_PACKET_MAGIC_COOKIE) {
+			pkt = next;
+			continue;
+		}
+
 		netbuf = (qdf_nbuf_t) (pkt->u.pkt.htc_pkt.pNetBufContext);
 		qdf_nbuf_unmap(pdev->osdev, netbuf, QDF_DMA_TO_DEVICE);
 		qdf_nbuf_free(netbuf);
@@ -178,7 +227,7 @@ htt_htc_tx_htt2_service_start(struct htt_pdev_t *pdev,
 	/* Enable HTC schedule mechanism for TX HTT2 service. */
 	connect_req->ConnectionFlags |= HTC_CONNECT_FLAGS_ENABLE_HTC_SCHEDULE;
 
-	connect_req->ServiceID = HTT_DATA2_MSG_SVC;
+	connect_req->service_id = HTT_DATA2_MSG_SVC;
 
 	status = htc_connect_service(pdev->htc_pdev, connect_req, connect_resp);
 
@@ -275,7 +324,7 @@ void htt_clear_bundle_stats(htt_pdev_handle pdev)
  */
 htt_pdev_handle
 htt_pdev_alloc(ol_txrx_pdev_handle txrx_pdev,
-	   ol_pdev_handle ctrl_pdev,
+	   struct cdp_cfg *ctrl_pdev,
 	   HTC_HANDLE htc_pdev, qdf_device_t osdev)
 {
 	struct htt_pdev_t *pdev;
@@ -293,7 +342,6 @@ htt_pdev_alloc(ol_txrx_pdev_handle txrx_pdev,
 	pdev->txrx_pdev = txrx_pdev;
 	pdev->htc_pdev = htc_pdev;
 
-	qdf_mem_set(&pdev->stats, sizeof(pdev->stats), 0);
 	pdev->htt_htc_pkt_freelist = NULL;
 #ifdef ATH_11AC_TXCOMPACT
 	pdev->htt_htc_pkt_misclist = NULL;
@@ -322,10 +370,9 @@ htt_pdev_alloc(ol_txrx_pdev_handle txrx_pdev,
 	}
 
 	pdev->targetdef = htc_get_targetdef(htc_pdev);
-#if defined(HELIUMPLUS_PADDR64)
-	/* TODO: OKA: Remove hard-coding */
+#if defined(HELIUMPLUS)
 	HTT_SET_WIFI_IP(pdev, 2, 0);
-#endif /* defined(HELIUMPLUS_PADDR64) */
+#endif /* defined(HELIUMPLUS) */
 
 	if (NO_HTT_NEEDED)
 		goto success;
@@ -425,6 +472,7 @@ htt_attach(struct htt_pdev_t *pdev, int desc_pool_size)
 					- HTT_RX_IND_HL_BYTES);
 
 		htt_h2t_rx_ring_cfg_msg = htt_h2t_rx_ring_cfg_msg_hl;
+		htt_h2t_rx_ring_rfs_cfg_msg = htt_h2t_rx_ring_rfs_cfg_msg_hl;
 
 		/* initialize the txrx credit count */
 		ol_tx_target_credit_update(
@@ -497,6 +545,7 @@ htt_attach(struct htt_pdev_t *pdev, int desc_pool_size)
 		pdev->rx_fw_desc_offset = RX_STD_DESC_FW_MSDU_OFFSET;
 
 		htt_h2t_rx_ring_cfg_msg = htt_h2t_rx_ring_cfg_msg_ll;
+		htt_h2t_rx_ring_rfs_cfg_msg = htt_h2t_rx_ring_rfs_cfg_msg_ll;
 	}
 
 	return 0;
@@ -516,12 +565,12 @@ A_STATUS htt_attach_target(htt_pdev_handle pdev)
 	if (status != A_OK)
 		return status;
 
-#if defined(HELIUMPLUS_PADDR64)
+#if defined(HELIUMPLUS)
 	/*
 	 * Send the frag_desc info to target.
 	 */
 	htt_h2t_frag_desc_bank_cfg_msg(pdev);
-#endif /* defined(HELIUMPLUS_PADDR64) */
+#endif /* defined(HELIUMPLUS) */
 
 
 	/*
@@ -533,6 +582,7 @@ A_STATUS htt_attach_target(htt_pdev_handle pdev)
 	 * handshaking.
 	 */
 
+	status = htt_h2t_rx_ring_rfs_cfg_msg(pdev);
 	status = htt_h2t_rx_ring_cfg_msg(pdev);
 	status = HTT_IPA_CONFIG(pdev, status);
 
@@ -663,13 +713,15 @@ void htt_display(htt_pdev_handle pdev, int indent)
 	qdf_print("%*srx ring: space for %d elems, filled with %d buffers\n",
 		  indent + 4, " ",
 		  pdev->rx_ring.size, pdev->rx_ring.fill_level);
-	qdf_print("%*sat %p (%#x paddr)\n", indent + 8, " ",
-		  pdev->rx_ring.buf.paddrs_ring, pdev->rx_ring.base_paddr);
+	qdf_print("%*sat %p (%llx paddr)\n", indent + 8, " ",
+		  pdev->rx_ring.buf.paddrs_ring,
+		  (unsigned long long)pdev->rx_ring.base_paddr);
 	qdf_print("%*snetbuf ring @ %p\n", indent + 8, " ",
 		  pdev->rx_ring.buf.netbufs_ring);
-	qdf_print("%*sFW_IDX shadow register: vaddr = %p, paddr = %#x\n",
+	qdf_print("%*sFW_IDX shadow register: vaddr = %p, paddr = %llx\n",
 		  indent + 8, " ",
-		  pdev->rx_ring.alloc_idx.vaddr, pdev->rx_ring.alloc_idx.paddr);
+		  pdev->rx_ring.alloc_idx.vaddr,
+		  (unsigned long long)pdev->rx_ring.alloc_idx.paddr);
 	qdf_print("%*sSW enqueue idx= %d, SW dequeue idx: desc= %d, buf= %d\n",
 		  indent + 8, " ", *pdev->rx_ring.alloc_idx.vaddr,
 		  pdev->rx_ring.sw_rd_idx.msdu_desc,
@@ -813,3 +865,23 @@ htt_ipa_uc_set_doorbell_paddr(htt_pdev_handle pdev,
 	return 0;
 }
 #endif /* IPA_OFFLOAD */
+
+/**
+ * htt_mark_first_wakeup_packet() - set flag to indicate that
+ *    fw is compatible for marking first packet after wow wakeup
+ * @pdev: pointer to htt pdev
+ * @value: 1 for enabled/ 0 for disabled
+ *
+ * Return: None
+ */
+void htt_mark_first_wakeup_packet(htt_pdev_handle pdev,
+			uint8_t value)
+{
+	if (!pdev) {
+		qdf_print("%s: htt pdev is NULL", __func__);
+		return;
+	}
+
+	pdev->cfg.is_first_wakeup_packet = value;
+}
+

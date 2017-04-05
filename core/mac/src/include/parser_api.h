@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -57,6 +57,23 @@
 
 #define NSS_1x1_MODE 1
 #define NSS_2x2_MODE 2
+#define MBO_IE_ASSOC_DISALLOWED_SUBATTR_ID 0x04
+
+/* QCN IE definitions */
+#define QCN_IE_VERSION_SUBATTR_ID   1
+#define QCN_IE_VERSION_SUBATTR_LEN  2
+#define QCN_IE_VERSION_SUPPORTED    1
+#define QCN_IE_SUBVERSION_SUPPORTED 0
+
+#define SIZE_OF_FIXED_PARAM 12
+#define SIZE_OF_TAG_PARAM_NUM 1
+#define SIZE_OF_TAG_PARAM_LEN 1
+#define RSNIEID 0x30
+#define RSNIE_CAPABILITY_LEN 2
+#define DEFAULT_RSNIE_CAP_VAL 0x00
+
+#define SIZE_MASK 0x7FFF
+#define FIXED_MASK 0x8000
 
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE
 #define QCOM_VENDOR_IE_MCC_AVOID_CH 0x01
@@ -82,6 +99,12 @@ typedef struct sSirCountryInformation {
 		uint8_t maxTransmitPower;
 	} channelTransmitPower[COUNTRY_INFO_MAX_CHANNEL];
 } tSirCountryInformation, *tpSirCountryInformation;
+
+typedef struct sSirQCNIE {
+	bool    is_present;
+	uint8_t version;
+	uint8_t sub_version;
+} tSirQCNIE, *tpSirQCNIE;
 
 /* Structure common to Beacons & Probe Responses */
 typedef struct sSirProbeRespBeacon {
@@ -156,7 +179,7 @@ typedef struct sSirProbeRespBeacon {
 	uint8_t WiderBWChanSwitchAnnPresent;
 	tDot11fIEWiderBWChanSwitchAnn WiderBWChanSwitchAnn;
 	uint8_t Vendor1IEPresent;
-	tDot11fIEvendor2_ie vendor2_ie;
+	tDot11fIEvendor_vht_ie vendor_vht_ie;
 	uint8_t Vendor3IEPresent;
 	tDot11fIEhs20vendor_ie hs20vendor_ie;
 	tDot11fIEIBSSParams IBSSParams;
@@ -167,6 +190,13 @@ typedef struct sSirProbeRespBeacon {
 	uint8_t    is_ese_ver_ie_present;
 #endif
 	tDot11fIEOBSSScanParameters obss_scanparams;
+	bool MBO_IE_present;
+	uint8_t MBO_capability;
+	bool assoc_disallowed;
+	uint8_t assoc_disallowed_reason;
+	tSirQCNIE QCN_IE;
+	tDot11fIEvendor_he_cap vendor_he_cap;
+	tDot11fIEvendor_he_op vendor_he_op;
 } tSirProbeRespBeacon, *tpSirProbeRespBeacon;
 
 /* probe Request structure */
@@ -182,6 +212,7 @@ typedef struct sSirProbeReq {
 	uint8_t wscIePresent;
 	uint8_t p2pIePresent;
 	tDot11fIEVHTCaps VHTCaps;
+	tDot11fIEvendor_he_cap vendor_he_cap;
 } tSirProbeReq, *tpSirProbeReq;
 
 /* / Association Request structure (one day to be replaced by */
@@ -233,7 +264,9 @@ typedef struct sSirAssocReq {
 	tDot11fIEVHTCaps VHTCaps;
 	tDot11fIEOperatingMode operMode;
 	tDot11fIEExtCap ExtCap;
+	tDot11fIEvendor_vht_ie vendor_vht_ie;
 	tDot11fIEhs20vendor_ie hs20vendor_ie;
+	tDot11fIEvendor_he_cap he_cap;
 } tSirAssocReq, *tpSirAssocReq;
 
 /* / Association Response structure (one day to be replaced by */
@@ -282,8 +315,11 @@ typedef struct sSirAssocRsp {
 #ifdef WLAN_FEATURE_11W
 	tDot11fIETimeoutInterval TimeoutInterval;
 #endif
-	tDot11fIEvendor2_ie vendor2_ie;
+	tDot11fIEvendor_vht_ie vendor_vht_ie;
 	tDot11fIEOBSSScanParameters obss_scanparams;
+	tSirQCNIE QCN_IE;
+	tDot11fIEvendor_he_cap vendor_he_cap;
+	tDot11fIEvendor_he_op vendor_he_op;
 } tSirAssocRsp, *tpSirAssocRsp;
 
 #ifdef FEATURE_WLAN_ESE
@@ -667,7 +703,7 @@ populate_dot11f_qos_caps_ap(tpAniSirGlobal pMac,
 			tpPESession psessionEntry);
 
 void
-populate_dot11f_qos_caps_station(tpAniSirGlobal pMac,
+populate_dot11f_qos_caps_station(tpAniSirGlobal pMac, tpPESession session,
 				tDot11fIEQOSCapsStation *pDot11f);
 
 tSirRetStatus
@@ -752,7 +788,8 @@ populate_dot11f_supp_rates(tpAniSirGlobal pMac,
 tSirRetStatus
 populate_dot11f_rates_tdls(tpAniSirGlobal p_mac,
 			tDot11fIESuppRates *p_supp_rates,
-			tDot11fIEExtSuppRates *p_ext_supp_rates);
+			tDot11fIEExtSuppRates *p_ext_supp_rates,
+			uint8_t curr_oper_channel);
 
 tSirRetStatus populate_dot11f_tpc_report(tpAniSirGlobal pMac,
 					tDot11fIETPCReport *pDot11f,
@@ -789,6 +826,19 @@ tSirRetStatus
 sir_beacon_ie_ese_bcn_report(tpAniSirGlobal pMac,
 		uint8_t *pPayload, const uint32_t payloadLength,
 		uint8_t **outIeBuf, uint32_t *pOutIeLen);
+
+/**
+ * ese_populate_wmm_tspec() - Populates TSPEC info for
+ * reassoc
+ * @source: source structure
+ * @dest: destination structure
+ *
+ * This function copies TSPEC parameters from source
+ * structure to destination structure.
+ *
+ * Return: None
+ */
+void ese_populate_wmm_tspec(tSirMacTspecIE *source, ese_wmm_tspec_ie *dest);
 
 #endif
 
@@ -901,6 +951,8 @@ void populate_dot11f_assoc_rsp_rates(tpAniSirGlobal pMac,
 
 int find_ie_location(tpAniSirGlobal pMac, tpSirRSNie pRsnIe, uint8_t EID);
 
+void lim_log_vht_cap(tpAniSirGlobal pMac, tDot11fIEVHTCaps *pDot11f);
+
 tSirRetStatus
 populate_dot11f_vht_caps(tpAniSirGlobal pMac, tpPESession psessionEntry,
 			tDot11fIEVHTCaps *pDot11f);
@@ -917,6 +969,8 @@ populate_dot11f_vht_ext_bss_load(tpAniSirGlobal pMac,
 tSirRetStatus
 populate_dot11f_ext_cap(tpAniSirGlobal pMac, bool isVHTEnabled,
 			tDot11fIEExtCap *pDot11f, tpPESession psessionEntry);
+
+void populate_dot11f_qcn_ie(tDot11fIEQCN_IE *pDot11f);
 
 tSirRetStatus
 populate_dot11f_operating_mode(tpAniSirGlobal pMac,
@@ -945,4 +999,29 @@ tSirRetStatus populate_dot11f_timing_advert_frame(tpAniSirGlobal pMac,
 void populate_dot11_supp_operating_classes(tpAniSirGlobal mac_ptr,
 	tDot11fIESuppOperatingClasses *dot_11_ptr, tpPESession session_entry);
 
+tSirRetStatus
+sir_validate_and_rectify_ies(tpAniSirGlobal mac_ctx,
+				uint8_t *mgmt_frame,
+				uint32_t frame_bytes,
+				uint32_t *missing_rsn_bytes);
+
+#ifdef WLAN_FEATURE_11AX
+QDF_STATUS populate_dot11f_he_caps(tpAniSirGlobal , tpPESession ,
+				   tDot11fIEvendor_he_cap *);
+QDF_STATUS populate_dot11f_he_operation(tpAniSirGlobal , tpPESession ,
+					tDot11fIEvendor_he_op *);
+#else
+static inline QDF_STATUS populate_dot11f_he_caps(tpAniSirGlobal mac_ctx,
+			tpPESession session, tDot11fIEvendor_he_cap *he_cap)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS populate_dot11f_he_operation(tpAniSirGlobal mac_ctx,
+			tpPESession session, tDot11fIEvendor_he_op *he_op)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+#endif
 #endif /* __PARSE_H__ */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -29,7 +29,6 @@
 #define WMA_API_H
 
 #include "osdep.h"
-#include "cds_mq.h"
 #include "ani_global.h"
 #include "a_types.h"
 #include "osapi_linux.h"
@@ -38,6 +37,10 @@
 #include "htc_api.h"
 #endif
 #include "lim_global.h"
+#include "cds_utils.h"
+#include "scheduler_api.h"
+#include "wlan_policy_mgr_api.h"
+#include <cdp_txrx_ops.h>
 
 typedef void *WMA_HANDLE;
 
@@ -45,31 +48,40 @@ typedef void *WMA_HANDLE;
  * enum GEN_PARAM - general parameters
  * @GEN_VDEV_PARAM_AMPDU: Set ampdu size
  * @GEN_VDEV_PARAM_AMSDU: Set amsdu size
- * @GEN_PARAM_DUMP_AGC_START: dump agc start
- * @GEN_PARAM_DUMP_AGC: dump agc
- * @GEN_PARAM_DUMP_CHANINFO_START: dump channel info start
- * @GEN_PARAM_DUMP_CHANINFO: dump channel info
  * @GEN_PARAM_CRASH_INJECT: inject crash
- * @GEN_PARAM_DUMP_PCIE_ACCESS_LOG: dump pcie access log
- * @GEN_PARAM_TX_CHAIN_MASK_CCK: cck tx chain mask
+ * @GEN_PARAM_MODULATED_DTIM: moduled dtim
+ * @GEN_PARAM_CAPTURE_TSF: read tsf
+ * @GEN_PARAM_RESET_TSF_GPIO: reset tsf gpio
+ * @GEN_VDEV_ROAM_SYNCH_DELAY: roam sync delay
  */
 typedef enum {
 	GEN_VDEV_PARAM_AMPDU = 0x1,
 	GEN_VDEV_PARAM_AMSDU,
-	GEN_PARAM_DUMP_AGC_START,
-	GEN_PARAM_DUMP_AGC,
-	GEN_PARAM_DUMP_CHANINFO_START,
-	GEN_PARAM_DUMP_CHANINFO,
-	GEN_PARAM_DUMP_WATCHDOG,
 	GEN_PARAM_CRASH_INJECT,
-#ifdef CONFIG_ATH_PCIE_ACCESS_DEBUG
-	GEN_PARAM_DUMP_PCIE_ACCESS_LOG,
-#endif
 	GEN_PARAM_MODULATED_DTIM,
 	GEN_PARAM_CAPTURE_TSF,
 	GEN_PARAM_RESET_TSF_GPIO,
 	GEN_VDEV_ROAM_SYNCH_DELAY,
 } GEN_PARAM;
+
+/**
+ * struct wma_caps_per_phy - various caps per phy
+ * @ht_2g: entire HT cap for 2G band in terms of 32 bit flag
+ * @ht_5g: entire HT cap for 5G band in terms of 32 bit flag
+ * @vht_2g: entire VHT cap for 2G band in terms of 32 bit flag
+ * @vht_5g: entire VHT cap for 5G band in terms of 32 bit flag
+ * @he_2g: entire HE cap for 2G band in terms of 32 bit flag
+ * @he_5g: entire HE cap for 5G band in terms of 32 bit flag
+ */
+struct wma_caps_per_phy {
+	uint32_t ht_2g;
+	uint32_t ht_5g;
+	uint32_t vht_2g;
+	uint32_t vht_5g;
+	uint32_t he_2g;
+	uint32_t he_5g;
+};
+
 
 #define VDEV_CMD 1
 #define PDEV_CMD 2
@@ -84,7 +96,9 @@ typedef void (*wma_peer_authorized_fp) (uint32_t vdev_id);
 
 QDF_STATUS wma_pre_start(void *cds_context);
 
-QDF_STATUS wma_mc_process_msg(void *cds_context, cds_msg_t *msg);
+QDF_STATUS wma_mc_process_msg(void *cds_context, struct scheduler_msg *msg);
+
+QDF_STATUS wma_mc_process_handler(struct scheduler_msg *msg);
 
 QDF_STATUS wma_start(void *cds_context);
 
@@ -121,18 +135,10 @@ QDF_STATUS wma_set_reg_domain(void *clientCtxt, v_REGDOMAIN_t regId);
 QDF_STATUS wma_get_wcnss_software_version(void *p_cds_gctx,
 					  uint8_t *pVersion,
 					  uint32_t versionBufferSize);
-int wma_runtime_suspend(void);
+
+int wma_runtime_suspend(struct wow_enable_params wow_params);
 int wma_runtime_resume(void);
-int wma_bus_suspend(void);
-QDF_STATUS wma_suspend_target(WMA_HANDLE handle, int disable_target_intr);
-void wma_target_suspend_acknowledge(void *context, bool wow_nack);
-int wma_bus_resume(void);
-QDF_STATUS wma_resume_target(WMA_HANDLE handle);
-QDF_STATUS wma_disable_wow_in_fw(WMA_HANDLE handle);
-QDF_STATUS wma_disable_d0wow_in_fw(WMA_HANDLE handle);
-bool wma_is_wow_mode_selected(WMA_HANDLE handle);
-QDF_STATUS wma_enable_wow_in_fw(WMA_HANDLE handle);
-QDF_STATUS wma_enable_d0wow_in_fw(WMA_HANDLE handle);
+
 bool wma_check_scan_in_progress(WMA_HANDLE handle);
 void wma_set_peer_authorized_cb(void *wma_ctx, wma_peer_authorized_fp auth_cb);
 QDF_STATUS wma_set_peer_param(void *wma_ctx, uint8_t *peer_addr,
@@ -144,88 +150,32 @@ QDF_STATUS wma_update_channel_list(WMA_HANDLE handle, void *scan_chan_info);
 
 uint8_t *wma_get_vdev_address_by_vdev_id(uint8_t vdev_id);
 struct wma_txrx_node *wma_get_interface_by_vdev_id(uint8_t vdev_id);
+QDF_STATUS wma_get_connection_info(uint8_t vdev_id,
+		struct policy_mgr_vdev_entry_info *conn_table_entry);
+
 bool wma_is_vdev_up(uint8_t vdev_id);
 
 void *wma_get_beacon_buffer_by_vdev_id(uint8_t vdev_id, uint32_t *buffer_size);
 
-uint8_t wma_get_fw_wlan_feat_caps(uint8_t featEnumValue);
-tSirRetStatus wma_post_ctrl_msg(tpAniSirGlobal pMac, tSirMsgQ *pMsg);
+bool wma_get_fw_wlan_feat_caps(enum cap_bitmap feature);
+void wma_set_fw_wlan_feat_caps(enum cap_bitmap feature);
+tSirRetStatus wma_post_ctrl_msg(tpAniSirGlobal pMac,
+				struct scheduler_msg *pMsg);
 
-void wma_enable_disable_wakeup_event(WMA_HANDLE handle,
-				uint32_t vdev_id,
-				uint32_t bitmap,
-				bool enable);
 void wma_register_wow_wakeup_events(WMA_HANDLE handle, uint8_t vdev_id,
 					uint8_t vdev_type, uint8_t sub_type);
 void wma_register_wow_default_patterns(WMA_HANDLE handle, uint8_t vdev_id);
-int8_t wma_get_hw_mode_idx_from_dbs_hw_list(enum hw_mode_ss_config mac0_ss,
-		enum hw_mode_bandwidth mac0_bw,
-		enum hw_mode_ss_config mac1_ss,
-		enum hw_mode_bandwidth mac1_bw,
-		enum hw_mode_dbs_capab dbs,
-		enum hw_mode_agile_dfs_capab dfs);
-QDF_STATUS wma_get_hw_mode_from_idx(uint32_t idx,
-		struct sir_hw_mode_params *hw_mode);
-int8_t wma_get_num_dbs_hw_modes(void);
-bool wma_is_hw_dbs_capable(void);
-bool wma_is_hw_agile_dfs_capable(void);
 int8_t wma_get_mac_id_of_vdev(uint32_t vdev_id);
 void wma_update_intf_hw_mode_params(uint32_t vdev_id, uint32_t mac_id,
 				uint32_t cfgd_hw_mode_index);
-QDF_STATUS wma_get_old_and_new_hw_index(uint32_t *old_hw_mode_index,
-		uint32_t *new_hw_mode_index);
 void wma_set_dbs_capability_ut(uint32_t dbs);
-QDF_STATUS wma_get_dbs_hw_modes(bool *one_by_one_dbs, bool *two_by_two_dbs);
-QDF_STATUS wma_get_current_hw_mode(struct sir_hw_mode_params *hw_mode);
-bool wma_is_dbs_enable(void);
-bool wma_is_agile_dfs_enable(void);
-QDF_STATUS wma_get_updated_scan_config(uint32_t *scan_config,
-		bool dbs_scan,
-		bool dbs_plus_agile_scan,
-		bool single_mac_scan_with_dfs);
-QDF_STATUS wma_get_updated_fw_mode_config(uint32_t *fw_mode_config,
-		bool dbs,
-		bool agile_dfs);
-bool wma_get_dbs_scan_config(void);
-bool wma_get_dbs_plus_agile_scan_config(void);
-bool wma_get_single_mac_scan_with_dfs_config(void);
-bool wma_get_dbs_config(void);
-bool wma_get_agile_dfs_config(void);
-bool wma_is_dual_mac_disabled_in_ini(void);
-bool wma_get_prev_dbs_config(void);
-bool wma_get_prev_agile_dfs_config(void);
-bool wma_get_prev_dbs_scan_config(void);
-bool wma_get_prev_dbs_plus_agile_scan_config(void);
-bool wma_get_prev_single_mac_scan_with_dfs_config(void);
-
-#define LRO_IPV4_SEED_ARR_SZ 5
-#define LRO_IPV6_SEED_ARR_SZ 11
-
-/**
- * struct wma_lro_init_cmd_t - set LRO init parameters
- * @lro_enable: indicates whether lro is enabled
- * @tcp_flag: If the TCP flags from the packet do not match
- * the values in this field after masking with TCP flags mask
- * below, packet is not LRO eligible
- * @tcp_flag_mask: field for comparing the TCP values provided
- * above with the TCP flags field in the received packet
- * @toeplitz_hash_ipv4: contains seed needed to compute the flow id
- * 5-tuple toeplitz hash for ipv4 packets
- * @toeplitz_hash_ipv6: contains seed needed to compute the flow id
- * 5-tuple toeplitz hash for ipv6 packets
- */
-struct wma_lro_config_cmd_t {
-	uint32_t lro_enable;
-	uint32_t tcp_flag:9,
-		tcp_flag_mask:9;
-	uint32_t toeplitz_hash_ipv4[LRO_IPV4_SEED_ARR_SZ];
-	uint32_t toeplitz_hash_ipv6[LRO_IPV6_SEED_ARR_SZ];
-};
+QDF_STATUS wma_get_caps_for_phyidx_hwmode(struct wma_caps_per_phy *caps_per_phy,
+		enum hw_mode_dbs_capab hw_mode, enum cds_band_type band);
+bool wma_is_rx_ldpc_supported_for_channel(uint32_t channel);
 
 #if defined(FEATURE_LRO)
-int wma_lro_init(struct wma_lro_config_cmd_t *lro_config);
+int wma_lro_init(struct cdp_lro_hash_config *lro_config);
 #endif
-bool wma_is_scan_simultaneous_capable(void);
 
 QDF_STATUS wma_remove_beacon_filter(WMA_HANDLE wma,
 				struct beacon_filter_param *filter_params);
@@ -255,11 +205,11 @@ QDF_STATUS wma_set_tx_power_scale_decr_db(uint8_t vdev_id, int value);
 #ifdef WLAN_FEATURE_NAN_DATAPATH
 QDF_STATUS wma_register_ndp_cb(QDF_STATUS (*pe_ndp_event_handler)
 					  (tpAniSirGlobal mac_ctx,
-					  cds_msg_t *msg));
+					  struct scheduler_msg *msg));
 #else
 static inline QDF_STATUS wma_register_ndp_cb(QDF_STATUS (*pe_ndp_event_handler)
 							(tpAniSirGlobal mac_ctx,
-							cds_msg_t *msg))
+						struct scheduler_msg *msg))
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -268,4 +218,56 @@ static inline QDF_STATUS wma_register_ndp_cb(QDF_STATUS (*pe_ndp_event_handler)
 bool wma_is_p2p_lo_capable(void);
 QDF_STATUS wma_p2p_lo_start(struct sir_p2p_lo_start *params);
 QDF_STATUS wma_p2p_lo_stop(u_int32_t vdev_id);
+QDF_STATUS wma_get_wakelock_stats(struct sir_wake_lock_stats *wake_lock_stats);
+void wma_process_pdev_hw_mode_trans_ind(void *wma,
+	wmi_pdev_hw_mode_transition_event_fixed_param *fixed_param,
+	wmi_pdev_set_hw_mode_response_vdev_mac_entry *vdev_mac_entry,
+	struct sir_hw_mode_trans_ind *hw_mode_trans_ind);
+
+#ifdef WLAN_FEATURE_DISA
+QDF_STATUS wma_encrypt_decrypt_msg(WMA_HANDLE wma,
+		struct encrypt_decrypt_req_params *encrypt_decrypt_params);
+#else
+static inline QDF_STATUS wma_encrypt_decrypt_msg(WMA_HANDLE wma,
+		struct encrypt_decrypt_req_params *encrypt_decrypt_params)
+{
+	return 0;
+}
+#endif
+
+/**
+ * wma_set_cts2self_for_p2p_go() - set CTS2SELF command for P2P GO.
+ * @wma_handle:                  pointer to wma handle.
+ * @cts2self_for_p2p_go:         value needs to set to firmware.
+ *
+ * At the time of driver startup, inform about ini parma to FW that
+ * if legacy client connects to P2P GO, stop using NOA for P2P GO.
+ *
+ * Return: QDF_STATUS.
+ */
+QDF_STATUS wma_set_cts2self_for_p2p_go(void *wma_handle,
+		uint32_t cts2self_for_p2p_go);
+QDF_STATUS wma_set_tx_rx_aggregation_size
+	(struct sir_set_tx_rx_aggregation_size *tx_rx_aggregation_size);
+/**
+ * wma_set_sar_limit() - set sar limits in the target
+ * @handle: wma handle
+ * @sar_limit_cmd_params: sar limit cmd params
+ *
+ *  This function sends WMI command to set SAR limits.
+ *
+ *  Return: QDF_STATUS enumeration
+ */
+QDF_STATUS wma_set_sar_limit(WMA_HANDLE handle,
+		struct sar_limit_cmd_params *sar_limit_params);
+/**
+ * wma_set_qpower_config() - update qpower config in wma
+ * @vdev_id:	the Id of the vdev to configure
+ * @qpower:	new qpower value
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error number otherwise
+ */
+QDF_STATUS wma_set_qpower_config(uint8_t vdev_id, uint8_t qpower);
+
+bool wma_is_service_enabled(WMI_SERVICE service_type);
 #endif

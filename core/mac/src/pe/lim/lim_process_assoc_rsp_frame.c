@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -154,6 +154,7 @@ void lim_update_assoc_sta_datas(tpAniSirGlobal mac_ctx,
 	uint32_t phy_mode;
 	bool qos_mode;
 	tDot11fIEVHTCaps *vht_caps = NULL;
+	tDot11fIEvendor_he_cap *he_cap = NULL;
 
 	lim_get_phy_mode(mac_ctx, &phy_mode, session_entry);
 	sta_ds->staType = STA_ENTRY_SELF;
@@ -172,8 +173,8 @@ void lim_update_assoc_sta_datas(tpAniSirGlobal mac_ctx,
 
 	if (assoc_rsp->VHTCaps.present)
 		vht_caps = &assoc_rsp->VHTCaps;
-	else if (assoc_rsp->vendor2_ie.VHTCaps.present)
-		vht_caps = &assoc_rsp->vendor2_ie.VHTCaps;
+	else if (assoc_rsp->vendor_vht_ie.VHTCaps.present)
+		vht_caps = &assoc_rsp->vendor_vht_ie.VHTCaps;
 
 	if (IS_DOT11_MODE_VHT(session_entry->dot11mode)) {
 		if ((vht_caps != NULL) && vht_caps->present) {
@@ -196,10 +197,17 @@ void lim_update_assoc_sta_datas(tpAniSirGlobal mac_ctx,
 			}
 		}
 	}
+
+	if (IS_DOT11_MODE_HE(session_entry->dot11mode))
+		lim_update_stads_he_caps(sta_ds, assoc_rsp, session_entry);
+
+	if (lim_is_sta_he_capable(sta_ds))
+		he_cap = &assoc_rsp->vendor_he_cap;
+
 	if (lim_populate_peer_rate_set(mac_ctx, &sta_ds->supportedRates,
 				assoc_rsp->HTCaps.supportedMCSSet,
 				false, session_entry,
-				vht_caps) != eSIR_SUCCESS) {
+				vht_caps, he_cap) != eSIR_SUCCESS) {
 		lim_log(mac_ctx, LOGP,
 			FL("could not get rateset and extended rate set"));
 		return;
@@ -207,6 +215,7 @@ void lim_update_assoc_sta_datas(tpAniSirGlobal mac_ctx,
 	sta_ds->vhtSupportedRxNss =
 		((sta_ds->supportedRates.vhtRxMCSMap & MCSMAPMASK2x2)
 		 == MCSMAPMASK2x2) ? 1 : 2;
+
 	/* If one of the rates is 11g rates, set the ERP mode. */
 	if ((phy_mode == WNI_CFG_PHY_MODE_11G) &&
 		sirIsArate(sta_ds->supportedRates.llaRates[0] & 0x7f))
@@ -473,7 +482,7 @@ static void lim_update_stads_ext_cap(tpAniSirGlobal mac_ctx,
  *
  *  Return: None
  */
-void lim_stop_reassoc_retry_timer(tpAniSirGlobal mac_ctx)
+static void lim_stop_reassoc_retry_timer(tpAniSirGlobal mac_ctx)
 {
 	mac_ctx->lim.reAssocRetryAttempt = 0;
 	if ((NULL != mac_ctx->lim.pSessionEntry)
@@ -532,10 +541,6 @@ lim_process_assoc_rsp_frame(tpAniSirGlobal mac_ctx,
 	if (hdr == NULL) {
 		lim_log(mac_ctx, LOGE,
 			FL("LFR3: Reassoc response packet header is NULL"));
-		return;
-	} else if (hdr->sa == NULL) {
-		lim_log(mac_ctx, LOGE,
-			FL("LFR3: Reassoc resp packet source address is NULL"));
 		return;
 	}
 
@@ -740,7 +745,7 @@ lim_process_assoc_rsp_frame(tpAniSirGlobal mac_ctx,
 
 	if (assoc_rsp->statusCode != eSIR_MAC_SUCCESS_STATUS
 #ifdef WLAN_FEATURE_11W
-		&& (session_entry->limRmfEnabled ||
+		&& (!session_entry->limRmfEnabled ||
 			assoc_rsp->statusCode != eSIR_MAC_TRY_AGAIN_LATER)
 #endif
 	    ) {
@@ -810,11 +815,34 @@ lim_process_assoc_rsp_frame(tpAniSirGlobal mac_ctx,
 					timeout_value)) {
 				lim_log(mac_ctx, LOGE,
 					FL("Failed to start comeback timer."));
+
+				assoc_cnf.resultCode = eSIR_SME_ASSOC_REFUSED;
+				assoc_cnf.protStatusCode =
+					eSIR_MAC_UNSPEC_FAILURE_STATUS;
+
+				/*
+				 * Delete Pre-auth context for the
+				 * associated BSS
+				 */
+				if (lim_search_pre_auth_list(mac_ctx, hdr->sa))
+					lim_delete_pre_auth_node(mac_ctx,
+						hdr->sa);
+
+				goto assocReject;
 			}
 		} else {
 			lim_log(mac_ctx, LOGW,
-				FL("ASSOC resp with try again event recvd. "
-				"But try again time interval IE is wrong."));
+				FL("ASSOC resp with try again event recvd, but try again time interval IE is wrong"));
+
+			assoc_cnf.resultCode = eSIR_SME_ASSOC_REFUSED;
+			assoc_cnf.protStatusCode =
+				eSIR_MAC_UNSPEC_FAILURE_STATUS;
+
+			/* Delete Pre-auth context for the associated BSS */
+			if (lim_search_pre_auth_list(mac_ctx, hdr->sa))
+				lim_delete_pre_auth_node(mac_ctx, hdr->sa);
+
+			goto assocReject;
 		}
 		qdf_mem_free(beacon);
 		qdf_mem_free(assoc_rsp);
@@ -834,6 +862,17 @@ lim_process_assoc_rsp_frame(tpAniSirGlobal mac_ctx,
 			return;
 		}
 	}
+
+	if (assoc_rsp->QosMapSet.present)
+		qdf_mem_copy(&session_entry->QosMapSet,
+			&assoc_rsp->QosMapSet, sizeof(tSirQosMapSet));
+	 else
+		qdf_mem_zero(&session_entry->QosMapSet, sizeof(tSirQosMapSet));
+
+	if (assoc_rsp->obss_scanparams.present)
+		lim_update_obss_scanparams(session_entry,
+				&assoc_rsp->obss_scanparams);
+
 	if (subtype == LIM_REASSOC) {
 		lim_log
 		(mac_ctx, LOG1, FL("Successfully Reassociated with BSS"));
@@ -881,6 +920,8 @@ lim_process_assoc_rsp_frame(tpAniSirGlobal mac_ctx,
 			lim_log(mac_ctx, LOG1, FL("Sending self sta"));
 			lim_update_assoc_sta_datas(mac_ctx, sta_ds, assoc_rsp,
 				session_entry);
+			lim_update_stads_ext_cap(mac_ctx, session_entry,
+						 assoc_rsp, sta_ds);
 			/* Store assigned AID for TIM processing */
 			session_entry->limAID = assoc_rsp->aid & 0x3FFF;
 			/* Downgrade the EDCA parameters if needed */
@@ -973,6 +1014,17 @@ lim_process_assoc_rsp_frame(tpAniSirGlobal mac_ctx,
 		ie_len,
 		beacon);
 
+	if (beacon->VHTCaps.present)
+		sta_ds->parsed_ies.vht_caps = beacon->VHTCaps;
+	if (beacon->HTCaps.present)
+		sta_ds->parsed_ies.ht_caps = beacon->HTCaps;
+	if (beacon->hs20vendor_ie.present)
+		sta_ds->parsed_ies.hs20vendor_ie = beacon->hs20vendor_ie;
+	if (beacon->HTInfo.present)
+		sta_ds->parsed_ies.ht_operation = beacon->HTInfo;
+	if (beacon->VHTOperation.present)
+		sta_ds->parsed_ies.vht_operation = beacon->VHTOperation;
+
 	if (mac_ctx->lim.gLimProtectionControl !=
 		WNI_CFG_FORCE_POLICY_PROTECTION_DISABLE)
 		lim_decide_sta_protection_on_assoc(mac_ctx, beacon,
@@ -989,16 +1041,6 @@ lim_process_assoc_rsp_frame(tpAniSirGlobal mac_ctx,
 	lim_diag_event_report(mac_ctx, WLAN_PE_DIAG_CONNECTED, session_entry,
 			      eSIR_SUCCESS, eSIR_SUCCESS);
 #endif
-	if (assoc_rsp->obss_scanparams.present)
-		lim_update_obss_scanparams(session_entry,
-				&assoc_rsp->obss_scanparams);
-
-	if (assoc_rsp->QosMapSet.present)
-		qdf_mem_copy(&session_entry->QosMapSet,
-			&assoc_rsp->QosMapSet, sizeof(tSirQosMapSet));
-	 else
-		qdf_mem_zero(&session_entry->QosMapSet, sizeof(tSirQosMapSet));
-
 	lim_update_stads_ext_cap(mac_ctx, session_entry, assoc_rsp, sta_ds);
 	/* Update the BSS Entry, this entry was added during preassoc. */
 	if (eSIR_SUCCESS == lim_sta_send_add_bss(mac_ctx, assoc_rsp,

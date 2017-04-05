@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2014-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011, 2014-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -35,7 +35,8 @@
 #include <qdf_atomic.h>         /* qdf_atomic_inc */
 #include <qdf_nbuf.h>           /* qdf_nbuf_t */
 #include <htc_api.h>            /* HTC_PACKET */
-
+#include <ol_htt_api.h>
+#include <cdp_txrx_handle.h>
 #define DEBUG_DMA_DONE
 
 #define HTT_TX_MUTEX_TYPE qdf_spinlock_t
@@ -47,6 +48,7 @@
 #endif
 #endif /* QCA_TX_HTT2_SUPPORT */
 
+#define HTT_HTC_PKT_MISCLIST_SIZE           32
 
 struct htt_htc_pkt {
 	void *pdev_ctxt;
@@ -176,7 +178,7 @@ struct htt_tx_credit_t {
 	qdf_atomic_t target_delta;
 };
 
-#if defined(HELIUMPLUS_PADDR64)
+#if defined(HELIUMPLUS)
 /**
  * msdu_ext_frag_desc:
  * semantically, this is an array of 6 of 2-tuples of
@@ -215,7 +217,7 @@ struct msdu_ext_desc_t {
 	u_int32_t frag_len5;
 */
 };
-#endif  /* defined(HELIUMPLUS_PADDR64) */
+#endif  /* defined(HELIUMPLUS) */
 
 /**
  * struct mon_channel
@@ -228,7 +230,7 @@ struct mon_channel {
 };
 
 struct htt_pdev_t {
-	ol_pdev_handle ctrl_pdev;
+	struct cdp_cfg *ctrl_pdev;
 	ol_txrx_pdev_handle txrx_pdev;
 	HTC_HANDLE htc_pdev;
 	qdf_device_t osdev;
@@ -252,17 +254,18 @@ struct htt_pdev_t {
 		int is_full_reorder_offload;
 		int default_tx_comp_req;
 		int ce_classify_enabled;
+		uint8_t is_first_wakeup_packet;
 	} cfg;
 	struct {
 		uint8_t major;
 		uint8_t minor;
 	} tgt_ver;
-#if defined(HELIUMPLUS_PADDR64)
+#if defined(HELIUMPLUS)
 	struct {
 		u_int8_t major;
 		u_int8_t minor;
 	} wifi_ip_ver;
-#endif /* defined(HELIUMPLUS_PADDR64) */
+#endif /* defined(HELIUMPLUS) */
 	struct {
 		struct {
 			/*
@@ -290,9 +293,9 @@ struct htt_pdev_t {
 		 * Base address of ring, as a "physical" device address rather
 		 * than a CPU address.
 		 */
-		uint32_t base_paddr;
-		int size;       /* how many elems in the ring (power of 2) */
-		unsigned size_mask;     /* size - 1 */
+		qdf_dma_addr_t base_paddr;
+		int32_t  size;       /* how many elems in the ring (power of 2) */
+		uint32_t size_mask;  /* size - 1, at least 16 bits long */
 
 		int fill_level; /* how many rx buffers to keep in the ring */
 		int fill_cnt;   /* # of rx buffers (full+empty) in the ring */
@@ -307,7 +310,7 @@ struct htt_pdev_t {
 		 */
 		struct {
 			uint32_t *vaddr;
-			uint32_t paddr;
+			qdf_dma_addr_t paddr;
 			qdf_dma_mem_context(memctx);
 		} target_idx;
 
@@ -323,7 +326,7 @@ struct htt_pdev_t {
 		 */
 		struct {
 			uint32_t *vaddr;
-			uint32_t paddr;
+			qdf_dma_addr_t paddr;
 			qdf_dma_mem_context(memctx);
 		} alloc_idx;
 
@@ -358,6 +361,7 @@ struct htt_pdev_t {
 		int rx_reset;
 		uint8_t htt_rx_restore;
 #endif
+		qdf_spinlock_t rx_hash_lock;
 		struct htt_rx_hash_bucket **hash_table;
 		uint32_t listnode_offset;
 	} rx_ring;
@@ -376,14 +380,14 @@ struct htt_pdev_t {
 		uint32_t *freelist;
 		qdf_dma_mem_context(memctx);
 	} tx_descs;
-#if defined(HELIUMPLUS_PADDR64)
+#if defined(HELIUMPLUS)
 	struct {
 		int size; /* of each Fragment/MSDU-Ext descriptor */
 		int pool_elems;
 		struct qdf_mem_multi_page_t desc_pages;
 		qdf_dma_mem_context(memctx);
 	} frag_descs;
-#endif /* defined(HELIUMPLUS_PADDR64) */
+#endif /* defined(HELIUMPLUS) */
 
 	int download_len;
 	void (*tx_send_complete_part2)(void *pdev, A_STATUS status,
@@ -408,20 +412,25 @@ struct htt_pdev_t {
 
 #ifdef DEBUG_RX_RING_BUFFER
 	struct rx_buf_debug *rx_buff_list;
+	qdf_spinlock_t       rx_buff_list_lock;
 	int rx_buff_index;
 #endif
+
+	/* callback function for packetdump */
+	tp_rx_pkt_dump_cb rx_pkt_dump_cb;
+
 	struct mon_channel mon_ch_info;
 };
 
 #define HTT_EPID_GET(_htt_pdev_hdl)  \
 	(((struct htt_pdev_t *)(_htt_pdev_hdl))->htc_tx_endpoint)
 
-#if defined(HELIUMPLUS_PADDR64)
+#if defined(HELIUMPLUS)
 #define HTT_WIFI_IP(pdev, x, y) (((pdev)->wifi_ip_ver.major == (x)) &&	\
 				 ((pdev)->wifi_ip_ver.minor == (y)))
 
 #define HTT_SET_WIFI_IP(pdev, x, y) (((pdev)->wifi_ip_ver.major = (x)) && \
 				     ((pdev)->wifi_ip_ver.minor = (y)))
-#endif /* defined(HELIUMPLUS_PADDR64) */
+#endif /* defined(HELIUMPLUS) */
 
 #endif /* _HTT_TYPES__H_ */

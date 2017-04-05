@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -46,7 +46,7 @@
 static void lim_send_ndp_event_to_sme(tpAniSirGlobal mac_ctx, uint32_t msg_type,
 				void *body_ptr, uint32_t len, uint32_t body_val)
 {
-	tSirMsgQ mmh_msg = {0};
+	struct scheduler_msg mmh_msg = {0};
 
 	mmh_msg.type = msg_type;
 	if (len && body_ptr) {
@@ -128,20 +128,17 @@ static QDF_STATUS lim_add_ndi_peer(tpAniSirGlobal mac_ctx,
 static QDF_STATUS lim_handle_ndp_indication_event(tpAniSirGlobal mac_ctx,
 					struct ndp_indication_event *ndp_ind)
 {
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	lim_log(mac_ctx, LOG1,
-		FL("role: %d, vdev: %d, peer_mac_addr "MAC_ADDRESS_STR),
-		ndp_ind->role, ndp_ind->vdev_id,
+		FL("role: %d, vdev: %d, csid: %d, peer_mac_addr "
+			MAC_ADDRESS_STR),
+		ndp_ind->role, ndp_ind->vdev_id, ndp_ind->ncs_sk_type,
 		MAC_ADDR_ARRAY(ndp_ind->peer_mac_addr.bytes));
 
 	if ((ndp_ind->role == NDP_ROLE_INITIATOR) ||
 	   ((NDP_ROLE_RESPONDER == ndp_ind->role) &&
 	   (NDP_ACCEPT_POLICY_ALL == ndp_ind->policy))) {
-		/* Free config only for INITIATOR role */
-		qdf_mem_free(ndp_ind->ndp_config.ndp_cfg);
-		qdf_mem_free(ndp_ind->ndp_info.ndp_app_info);
-
 		status = lim_add_ndi_peer(mac_ctx, ndp_ind->vdev_id,
 				ndp_ind->peer_mac_addr);
 		if (QDF_STATUS_SUCCESS != status) {
@@ -168,10 +165,12 @@ ndp_indication_failed:
 	 * As for success responder case this info is sent till HDD
 	 * and will be freed in sme.
 	 */
-	if ((status != QDF_STATUS_SUCCESS) ||
-			(NDP_ROLE_INITIATOR == ndp_ind->role)) {
+	if (status != QDF_STATUS_SUCCESS ||
+			NDP_ROLE_INITIATOR == ndp_ind->role) {
 		qdf_mem_free(ndp_ind->ndp_config.ndp_cfg);
 		qdf_mem_free(ndp_ind->ndp_info.ndp_app_info);
+		ndp_ind->ndp_config.ndp_cfg = NULL;
+		ndp_ind->ndp_info.ndp_app_info = NULL;
 	}
 	return status;
 }
@@ -198,7 +197,8 @@ static QDF_STATUS lim_ndp_responder_rsp_handler(tpAniSirGlobal mac_ctx,
 		goto responder_rsp;
 	}
 
-	if (QDF_STATUS_SUCCESS == rsp_ind->status) {
+	if (QDF_STATUS_SUCCESS == rsp_ind->status &&
+		rsp_ind->create_peer == true) {
 		ret_val = lim_add_ndi_peer(mac_ctx, rsp_ind->vdev_id,
 				rsp_ind->peer_mac_addr);
 		if (QDF_STATUS_SUCCESS != ret_val) {
@@ -225,8 +225,8 @@ responder_rsp:
  *
  * Return: None
  */
-void lim_ndp_delete_peer_by_addr(tpAniSirGlobal mac_ctx, uint8_t vdev_id,
-				 struct qdf_mac_addr peer_ndi_mac_addr)
+static void lim_ndp_delete_peer_by_addr(tpAniSirGlobal mac_ctx, uint8_t vdev_id,
+					struct qdf_mac_addr peer_ndi_mac_addr)
 {
 	tpPESession session;
 	tpDphHashNode sta_ds;
@@ -288,7 +288,6 @@ static void lim_ndp_delete_peers(tpAniSirGlobal mac_ctx,
 		return;
 	}
 
-	qdf_mem_zero(deleted_peers, num_peers * sizeof(*deleted_peers));
 	for (i = 0; i < num_peers; i++) {
 		lim_log(mac_ctx, LOG1,
 			FL("ndp_map[%d]: MAC: " MAC_ADDRESS_STR " num_active %d"),
@@ -312,7 +311,7 @@ static void lim_ndp_delete_peers(tpAniSirGlobal mac_ctx,
 		/* Check if this peer is already in the deleted list */
 		found = false;
 		for (j = 0; j < deleted_num && !found; j++) {
-			if (qdf_mem_cmp(
+			if (!qdf_mem_cmp(
 				&deleted_peers[j].bytes,
 				&ndp_map[i].peer_ndi_mac_addr.bytes,
 				QDF_MAC_ADDR_SIZE)) {
@@ -390,8 +389,9 @@ static QDF_STATUS lim_ndp_end_indication_handler(tpAniSirGlobal mac_ctx,
  *
  * Return: None
  */
-void lim_process_ndi_del_sta_rsp(tpAniSirGlobal mac_ctx, tpSirMsgQ lim_msg,
-						tpPESession pe_session)
+void lim_process_ndi_del_sta_rsp(tpAniSirGlobal mac_ctx,
+				 struct scheduler_msg *lim_msg,
+				 tpPESession pe_session)
 {
 	tpDeleteStaParams del_sta_params = (tpDeleteStaParams) lim_msg->bodyptr;
 	tpDphHashNode sta_ds;
@@ -461,7 +461,8 @@ skip_event:
  *
  * Return: QDF_STATUS_SUCCESS on success; error number otherwise
  */
-QDF_STATUS lim_handle_ndp_event_message(tpAniSirGlobal mac_ctx, cds_msg_t *msg)
+QDF_STATUS lim_handle_ndp_event_message(tpAniSirGlobal mac_ctx,
+					struct scheduler_msg *msg)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
@@ -496,8 +497,6 @@ QDF_STATUS lim_handle_ndp_event_message(tpAniSirGlobal mac_ctx, cds_msg_t *msg)
 	case SIR_HAL_NDP_INDICATION: {
 		struct ndp_indication_event *ndp_ind = msg->bodyptr;
 		status = lim_handle_ndp_indication_event(mac_ctx, ndp_ind);
-		qdf_mem_free(ndp_ind->ndp_config.ndp_cfg);
-		qdf_mem_free(ndp_ind->ndp_info.ndp_app_info);
 		break;
 	}
 	case SIR_HAL_NDP_RESPONDER_RSP:
@@ -505,17 +504,10 @@ QDF_STATUS lim_handle_ndp_event_message(tpAniSirGlobal mac_ctx, cds_msg_t *msg)
 					msg->bodyval);
 		break;
 	case SIR_HAL_NDP_END_RSP: {
-		struct ndp_end_rsp_event *ndp_end_rsp = msg->bodyptr;
-		uint32_t rsp_len = sizeof(*ndp_end_rsp);
-
-		if (ndp_end_rsp && ndp_end_rsp->ndp_map) {
-			lim_ndp_delete_peers(mac_ctx, ndp_end_rsp->ndp_map,
-					     ndp_end_rsp->num_peers);
-			rsp_len += (ndp_end_rsp->num_peers *
-					sizeof(struct peer_ndp_map));
-		}
 		lim_send_ndp_event_to_sme(mac_ctx, eWNI_SME_NDP_END_RSP,
-				msg->bodyptr, rsp_len, msg->bodyval);
+					  msg->bodyptr,
+					  sizeof(struct ndp_end_rsp_event),
+					  msg->bodyval);
 		break;
 	}
 	case SIR_HAL_NDP_END_IND:
@@ -542,10 +534,10 @@ QDF_STATUS lim_handle_ndp_event_message(tpAniSirGlobal mac_ctx, cds_msg_t *msg)
  *
  * Return: Status of operation
  */
-QDF_STATUS lim_process_sme_ndp_initiator_req(tpAniSirGlobal mac_ctx,
-					     void *ndp_msg)
+static QDF_STATUS lim_process_sme_ndp_initiator_req(tpAniSirGlobal mac_ctx,
+						    void *ndp_msg)
 {
-	tSirMsgQ msg;
+	struct scheduler_msg msg;
 	QDF_STATUS status;
 
 	struct sir_sme_ndp_initiator_req *sme_req =
@@ -594,7 +586,7 @@ send_initiator_rsp:
 static QDF_STATUS lim_process_sme_ndp_responder_req(tpAniSirGlobal mac_ctx,
 	struct sir_sme_ndp_responder_req *lim_msg)
 {
-	tSirMsgQ msg;
+	struct scheduler_msg msg;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct ndp_responder_req *responder_req;
 
@@ -641,10 +633,10 @@ send_failure_rsp:
  *
  * Return: Status of operation
  */
-QDF_STATUS lim_process_sme_ndp_data_end_req(tpAniSirGlobal mac_ctx,
-					    struct sir_sme_ndp_end_req *sme_msg)
+static QDF_STATUS lim_process_sme_ndp_data_end_req(tpAniSirGlobal mac_ctx,
+					struct sir_sme_ndp_end_req *sme_msg)
 {
-	tSirMsgQ msg;
+	struct scheduler_msg msg;
 	uint32_t len;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
@@ -689,7 +681,7 @@ QDF_STATUS lim_process_sme_ndp_data_end_req(tpAniSirGlobal mac_ctx,
  * Return: QDF_STATUS_SUCCESS on success; error number otherwise
  */
 QDF_STATUS lim_handle_ndp_request_message(tpAniSirGlobal mac_ctx,
-					  tpSirMsgQ msg)
+					  struct scheduler_msg *msg)
 {
 	QDF_STATUS status;
 
@@ -723,17 +715,18 @@ QDF_STATUS lim_handle_ndp_request_message(tpAniSirGlobal mac_ctx,
  *
  * Return: None
  */
-void lim_process_ndi_mlm_add_bss_rsp(tpAniSirGlobal mac_ctx, tpSirMsgQ lim_msgq,
-		tpPESession session_entry)
+void lim_process_ndi_mlm_add_bss_rsp(tpAniSirGlobal mac_ctx,
+				     struct scheduler_msg *lim_msgq,
+				     tpPESession session_entry)
 {
 	tLimMlmStartCnf mlm_start_cnf;
 	tpAddBssParams add_bss_params = (tpAddBssParams) lim_msgq->bodyptr;
 
-	lim_log(mac_ctx, LOG1, FL("Status %d"), add_bss_params->status);
 	if (NULL == add_bss_params) {
 		lim_log(mac_ctx, LOGE, FL("Invalid body pointer in message"));
 		goto end;
 	}
+	lim_log(mac_ctx, LOG1, FL("Status %d"), add_bss_params->status);
 	if (QDF_STATUS_SUCCESS == add_bss_params->status) {
 		lim_log(mac_ctx, LOG1,
 		       FL("WDA_ADD_BSS_RSP returned QDF_STATUS_SUCCESS"));
@@ -744,6 +737,7 @@ void lim_process_ndi_mlm_add_bss_rsp(tpAniSirGlobal mac_ctx, tpSirMsgQ lim_msgq,
 		session_entry->bssIdx = (uint8_t) add_bss_params->bssIdx;
 		session_entry->limSystemRole = eLIM_NDI_ROLE;
 		session_entry->statypeForBss = STA_ENTRY_SELF;
+		session_entry->staId = add_bss_params->staContext.staIdx;
 		/* Apply previously set configuration at HW */
 		lim_apply_configuration(mac_ctx, session_entry);
 		mlm_start_cnf.resultCode = eSIR_SME_SUCCESS;
@@ -834,7 +828,7 @@ static QDF_STATUS lim_send_sme_ndp_add_sta_rsp(tpAniSirGlobal mac_ctx,
 					       tpPESession session,
 					       tAddStaParams *add_sta_rsp)
 {
-	tSirMsgQ  mmh_msg = {0};
+	struct scheduler_msg  mmh_msg = {0};
 	struct sme_ndp_peer_ind *new_peer_ind;
 
 	mmh_msg.type = eWNI_SME_NDP_NEW_PEER_IND;

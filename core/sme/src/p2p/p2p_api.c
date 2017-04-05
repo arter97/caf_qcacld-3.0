@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -51,14 +51,14 @@ QDF_STATUS p2p_process_remain_on_channel_cmd(tpAniSirGlobal pMac,
 	if (!pSession) {
 		sms_log(pMac, LOGE, FL("  session %d not found "),
 			p2pRemainonChn->sessionId);
-		goto error;
+		return status;
 	}
 
 	if (!pSession->sessionActive) {
 		sms_log(pMac, LOGE,
 			FL("  session %d is invalid or listen is disabled "),
 			p2pRemainonChn->sessionId);
-		goto error;
+		return status;
 	}
 	len = sizeof(tSirRemainOnChnReq) + pMac->p2pContext.probeRspIeLength;
 
@@ -66,35 +66,30 @@ QDF_STATUS p2p_process_remain_on_channel_cmd(tpAniSirGlobal pMac,
 		/*In coming len for Msg is more then 16bit value */
 		sms_log(pMac, LOGE, FL("  Message length is very large, %d"),
 			len);
-		goto error;
+		return status;
 	}
 
 	pMsg = qdf_mem_malloc(len);
 	if (NULL == pMsg)
-		goto error;
-	else {
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_INFO, "%s call",
-			  __func__);
-		qdf_mem_set(pMsg, sizeof(tSirRemainOnChnReq), 0);
-		pMsg->messageType = eWNI_SME_REMAIN_ON_CHANNEL_REQ;
-		pMsg->length = (uint16_t) len;
-		qdf_copy_macaddr(&pMsg->selfMacAddr, &pSession->selfMacAddr);
-		pMsg->chnNum = p2pRemainonChn->u.remainChlCmd.chn;
-		pMsg->phyMode = p2pRemainonChn->u.remainChlCmd.phyMode;
-		pMsg->duration = p2pRemainonChn->u.remainChlCmd.duration;
-		pMsg->sessionId = p2pRemainonChn->sessionId;
-		pMsg->isProbeRequestAllowed =
-			p2pRemainonChn->u.remainChlCmd.isP2PProbeReqAllowed;
-		pMsg->scan_id = p2pRemainonChn->u.remainChlCmd.scan_id;
-		if (pMac->p2pContext.probeRspIeLength)
-			qdf_mem_copy((void *)pMsg->probeRspIe,
-				     (void *)pMac->p2pContext.probeRspIe,
-				     pMac->p2pContext.probeRspIeLength);
-		status = cds_send_mb_message_to_mac(pMsg);
-	}
-error:
-	if (QDF_STATUS_E_FAILURE == status)
-		csr_release_roc_req_cmd(pMac);
+		return status;
+	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_INFO, "%s call",
+		  __func__);
+	pMsg->messageType = eWNI_SME_REMAIN_ON_CHANNEL_REQ;
+	pMsg->length = (uint16_t) len;
+	qdf_copy_macaddr(&pMsg->selfMacAddr, &pSession->selfMacAddr);
+	pMsg->chnNum = p2pRemainonChn->u.remainChlCmd.chn;
+	pMsg->phyMode = p2pRemainonChn->u.remainChlCmd.phyMode;
+	pMsg->duration = p2pRemainonChn->u.remainChlCmd.duration;
+	pMsg->sessionId = p2pRemainonChn->sessionId;
+	pMsg->isProbeRequestAllowed =
+		p2pRemainonChn->u.remainChlCmd.isP2PProbeReqAllowed;
+	pMsg->scan_id = p2pRemainonChn->u.remainChlCmd.scan_id;
+	if (pMac->p2pContext.probeRspIeLength)
+		qdf_mem_copy((void *)pMsg->probeRspIe,
+			     (void *)pMac->p2pContext.probeRspIe,
+			     pMac->p2pContext.probeRspIeLength);
+	status = umac_send_mb_message_to_mac(pMsg);
+
 	return status;
 }
 
@@ -128,13 +123,12 @@ QDF_STATUS sme_remain_on_chn_rsp(tpAniSirGlobal pMac, uint8_t *pMsg)
 		callback(pMac, pCommand->u.remainChlCmd.callbackCtx,
 			rsp->status, rsp->scan_id);
 
-	fFound = csr_ll_remove_entry(&pMac->sme.smeScanCmdActiveList, pEntry,
+	fFound = csr_scan_active_ll_remove_entry(pMac, pEntry,
 				     LL_ACCESS_LOCK);
 	if (fFound) {
 		/* Now put this command back on the avilable command list */
-		sme_release_command(pMac, pCommand);
+		csr_release_command(pMac, pCommand);
 	}
-	sme_process_pending_queue(pMac);
 	return status;
 }
 
@@ -170,22 +164,6 @@ QDF_STATUS sme_remain_on_chn_ready(tHalHandle hHal, uint8_t *pMsg)
 				       eCSR_ROAM_REMAIN_CHAN_READY, 0);
 	}
 
-	return status;
-}
-
-QDF_STATUS sme_send_action_cnf(tHalHandle hHal, uint8_t *pMsg)
-{
-	tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	tCsrRoamInfo RoamInfo;
-	tSirSmeRsp *pSmeRsp = (tSirSmeRsp *) pMsg;
-
-	/* forward the indication to HDD */
-	/* RoamInfo can be passed as NULL....todo */
-	csr_roam_call_callback(pMac, pSmeRsp->sessionId, &RoamInfo, 0,
-			       eCSR_ROAM_SEND_ACTION_CNF,
-			       (pSmeRsp->statusCode == eSIR_SME_SUCCESS) ? 0 :
-			       eCSR_ROAM_RESULT_SEND_ACTION_FAIL);
 	return status;
 }
 
@@ -269,7 +247,7 @@ QDF_STATUS p2p_remain_on_channel(tHalHandle hHal, uint8_t sessionId,
 	tSmeCmd *pRemainChlCmd = NULL;
 	uint32_t phyMode;
 
-	pRemainChlCmd = sme_get_command_buffer(pMac);
+	pRemainChlCmd = csr_get_command_buffer(pMac);
 	if (pRemainChlCmd == NULL)
 		return QDF_STATUS_E_FAILURE;
 
@@ -317,7 +295,6 @@ QDF_STATUS p2p_send_action(tHalHandle hHal, uint8_t sessionId,
 	if (NULL == pMsg)
 		status = QDF_STATUS_E_NOMEM;
 	else {
-		qdf_mem_set((void *)pMsg, msgLen, 0);
 		pMsg->type = eWNI_SME_SEND_ACTION_FRAME_IND;
 		pMsg->msgLen = msgLen;
 		pMsg->sessionId = sessionId;
@@ -325,7 +302,7 @@ QDF_STATUS p2p_send_action(tHalHandle hHal, uint8_t sessionId,
 		pMsg->channel_freq = channel_freq;
 		pMsg->wait = (uint16_t) wait;
 		qdf_mem_copy(pMsg->data, pBuf, len);
-		status = cds_send_mb_message_to_mac(pMsg);
+		status = umac_send_mb_message_to_mac(pMsg);
 	}
 	return status;
 }
@@ -349,7 +326,7 @@ QDF_STATUS p2p_cancel_remain_on_channel(tHalHandle hHal,
 		pMsg->msgLen = msgLen;
 		pMsg->sessionId = sessionId;
 		pMsg->scan_id = scan_id;
-		status = cds_send_mb_message_to_mac(pMsg);
+		status = umac_send_mb_message_to_mac(pMsg);
 	}
 
 	return status;
@@ -358,7 +335,7 @@ QDF_STATUS p2p_cancel_remain_on_channel(tHalHandle hHal,
 QDF_STATUS p2p_set_ps(tHalHandle hHal, tP2pPsConfig *pNoA)
 {
 	tpP2pPsConfig pNoAParam;
-	tSirMsgQ msg;
+	struct scheduler_msg msg;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
 
@@ -366,7 +343,6 @@ QDF_STATUS p2p_set_ps(tHalHandle hHal, tP2pPsConfig *pNoA)
 	if (NULL == pNoAParam)
 		status = QDF_STATUS_E_NOMEM;
 	else {
-		qdf_mem_set(pNoAParam, sizeof(tP2pPsConfig), 0);
 		qdf_mem_copy(pNoAParam, pNoA, sizeof(tP2pPsConfig));
 		msg.type = eWNI_SME_UPDATE_NOA;
 		msg.bodyval = 0;

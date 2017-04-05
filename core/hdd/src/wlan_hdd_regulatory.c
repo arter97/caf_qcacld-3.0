@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -32,16 +32,12 @@
  */
 
 #include "qdf_types.h"
-#include "cds_reg_service.h"
 #include "qdf_trace.h"
+#include "cds_reg_service.h"
+#include "cds_regdomain.h"
 #include "sme_api.h"
 #include "wlan_hdd_main.h"
-#include "cds_regdomain.h"
 #include "wlan_hdd_regulatory.h"
-
-#define WORLD_SKU_MASK      0x00F0
-#define WORLD_SKU_PREFIX    0x0060
-#define REG_WAIT_TIME       50
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0)) || defined(WITH_BACKPORTS)
 #define IEEE80211_CHAN_PASSIVE_SCAN IEEE80211_CHAN_NO_IR
@@ -173,13 +169,13 @@ struct regulatory *reg)
  *
  * Return: bool
  */
-bool hdd_is_world_regdomain(uint32_t reg_domain)
+static bool hdd_is_world_regdomain(uint32_t reg_domain)
 {
-	uint32_t temp_regd = reg_domain & ~WORLDWIDE_ROAMING_FLAG;
+	uint32_t temp_regd = reg_domain & ~WORLD_ROAMING_FLAG;
 
-	return ((temp_regd & COUNTRY_ERD_FLAG) != COUNTRY_ERD_FLAG) &&
-		(((temp_regd & WORLD_SKU_MASK) == WORLD_SKU_PREFIX) ||
-		 (temp_regd == WORLD));
+	return ((temp_regd & CTRY_FLAG) != CTRY_FLAG) &&
+		((temp_regd & WORLD_ROAMING_MASK) ==
+		 WORLD_ROAMING_PREFIX);
 }
 
 
@@ -195,7 +191,7 @@ static void hdd_update_regulatory_info(hdd_context_t *hdd_ctx)
 
 	country_code = cds_get_country_from_alpha2(hdd_ctx->reg.alpha2);
 
-	hdd_ctx->reg.reg_domain = COUNTRY_ERD_FLAG;
+	hdd_ctx->reg.reg_domain = CTRY_FLAG;
 	hdd_ctx->reg.reg_domain |= country_code;
 
 	cds_fill_some_regulatory_info(&hdd_ctx->reg);
@@ -230,6 +226,8 @@ static void hdd_regulatory_wiphy_init(hdd_context_t *hdd_ctx,
 				     struct wiphy *wiphy)
 {
 	const struct ieee80211_regdomain *reg_rules;
+	int chan_num;
+	struct ieee80211_channel *chan;
 
 	if (hdd_is_world_regdomain(reg->reg_domain)) {
 		reg_rules = hdd_get_world_regrules(reg);
@@ -247,6 +245,17 @@ static void hdd_regulatory_wiphy_init(hdd_context_t *hdd_ctx,
 	 */
 	hdd_ctx->reg.reg_flags = wiphy->regulatory_flags;
 	wiphy_apply_custom_regulatory(wiphy, reg_rules);
+
+	/*
+	 * disable 2.4 Ghz channels that dont have 20 mhz bw
+	 */
+	for (chan_num = 0;
+	     chan_num < wiphy->bands[NL80211_BAND_2GHZ]->n_channels;
+	     chan_num++) {
+		chan = &(wiphy->bands[NL80211_BAND_2GHZ]->channels[chan_num]);
+		if (chan->flags & IEEE80211_CHAN_NO_20MHZ)
+			chan->flags |= IEEE80211_CHAN_DISABLED;
+	}
 
 	/*
 	 * restore the driver regulatory flags since
@@ -365,26 +374,28 @@ static void hdd_process_regulatory_data(hdd_context_t *hdd_ctx,
 {
 	int band_num;
 	int chan_num;
-	int chan_enum = 0;
-	struct ieee80211_channel *wiphy_chan;
+	enum channel_enum chan_enum = CHAN_ENUM_1;
+	struct ieee80211_channel *wiphy_chan, *wiphy_chan_144 = NULL;
 	struct regulatory_channel *cds_chan;
 	uint8_t band_capability;
 
 	band_capability = hdd_ctx->config->nBandCapability;
-	hdd_ctx->isVHT80Allowed = 0;
 
-	for (band_num = 0; band_num < IEEE80211_NUM_BANDS; band_num++) {
+	for (band_num = 0; band_num < NUM_NL80211_BANDS; band_num++) {
 
 		if (wiphy->bands[band_num] == NULL)
 			continue;
 
 		for (chan_num = 0;
-		     chan_num < wiphy->bands[band_num]->n_channels;
+		     chan_num < wiphy->bands[band_num]->n_channels &&
+		     chan_enum < NUM_CHANNELS;
 		     chan_num++) {
 
 			wiphy_chan =
 				&(wiphy->bands[band_num]->channels[chan_num]);
 			cds_chan = &(reg_channels[chan_enum]);
+			if (CHAN_ENUM_144 == chan_enum)
+				wiphy_chan_144 = wiphy_chan;
 
 			chan_enum++;
 
@@ -393,24 +404,22 @@ static void hdd_process_regulatory_data(hdd_context_t *hdd_ctx,
 
 			if (wiphy_chan->flags & IEEE80211_CHAN_DISABLED) {
 				cds_chan->state = CHANNEL_STATE_DISABLE;
-			} else if (wiphy_chan->flags &
-				   (IEEE80211_CHAN_RADAR |
-				    IEEE80211_CHAN_PASSIVE_SCAN |
-				    IEEE80211_CHAN_INDOOR_ONLY)) {
-
-				if (wiphy_chan->flags &
-				    IEEE80211_CHAN_INDOOR_ONLY)
+			} else if ((wiphy_chan->flags &
+				    (IEEE80211_CHAN_RADAR |
+				     IEEE80211_CHAN_PASSIVE_SCAN)) ||
+				   ((hdd_ctx->config->indoor_channel_support
+				     == false) &&
+				    (wiphy_chan->flags &
+				     IEEE80211_CHAN_INDOOR_ONLY))) {
+				if ((wiphy_chan->flags &
+				     IEEE80211_CHAN_INDOOR_ONLY) &&
+				    (false ==
+				     hdd_ctx->config->indoor_channel_support))
 					wiphy_chan->flags |=
 						IEEE80211_CHAN_PASSIVE_SCAN;
 				cds_chan->state = CHANNEL_STATE_DFS;
-				if ((wiphy_chan->flags &
-				     IEEE80211_CHAN_NO_80MHZ) == 0)
-					hdd_ctx->isVHT80Allowed = 1;
 			} else {
 				cds_chan->state = CHANNEL_STATE_ENABLE;
-				if ((wiphy_chan->flags &
-				     IEEE80211_CHAN_NO_80MHZ) == 0)
-					hdd_ctx->isVHT80Allowed = 1;
 			}
 			cds_chan->pwr_limit = wiphy_chan->max_power;
 			cds_chan->flags = wiphy_chan->flags;
@@ -419,73 +428,15 @@ static void hdd_process_regulatory_data(hdd_context_t *hdd_ctx,
 	}
 
 	if (0 == (hdd_ctx->reg.eeprom_rd_ext &
-		  (1 << WHAL_REG_EXT_FCC_CH_144))) {
+		  (1 << WMI_REG_EXT_FCC_CH_144))) {
 		cds_chan = &(reg_channels[CHAN_ENUM_144]);
 		cds_chan->state = CHANNEL_STATE_DISABLE;
+		if (NULL != wiphy_chan_144)
+			wiphy_chan_144->flags |= IEEE80211_CHAN_DISABLED;
 	}
 
 	wlan_hdd_cfg80211_update_band(wiphy, band_capability);
 }
-
-
-/**
- * hdd_regulatory_init() - regulatory_init
- * @hdd_ctx: hdd context
- * @wiphy: wiphy
- *
- * Return: int
- */
-int hdd_regulatory_init(hdd_context_t *hdd_ctx, struct wiphy *wiphy)
-{
-	int ret_val;
-	struct regulatory *reg_info;
-
-	reg_info = &hdd_ctx->reg;
-
-	hdd_regulatory_wiphy_init(hdd_ctx, reg_info, wiphy);
-
-	hdd_process_regulatory_data(hdd_ctx, wiphy, true);
-
-	reg_info->cc_src = SOURCE_DRIVER;
-
-	ret_val = cds_fill_some_regulatory_info(reg_info);
-	if (ret_val) {
-		hdd_err("incorrect BDF regulatory data");
-		return ret_val;
-	}
-
-	cds_put_default_country(reg_info->alpha2);
-
-	init_completion(&hdd_ctx->reg_init);
-
-	cds_fill_and_send_ctl_to_fw(reg_info);
-
-	return 0;
-}
-
-/**
- * hdd_program_country_code() - process channel information from country code
- * @hdd_ctx: hddc context
- *
- * Return: void
- */
-void hdd_program_country_code(hdd_context_t *hdd_ctx)
-{
-	struct wiphy *wiphy = hdd_ctx->wiphy;
-	uint8_t *country_alpha2 = hdd_ctx->reg.alpha2;
-
-	if (false == init_by_reg_core) {
-		init_by_driver = true;
-		if (('0' != country_alpha2[0]) ||
-		    ('0' != country_alpha2[1])) {
-			INIT_COMPLETION(hdd_ctx->reg_init);
-			regulatory_hint(wiphy, country_alpha2);
-			wait_for_completion_timeout(&hdd_ctx->reg_init,
-					      msecs_to_jiffies(REG_WAIT_TIME));
-		}
-	}
-}
-
 
 /**
  * hdd_set_dfs_region() - set the dfs_region
@@ -495,13 +446,13 @@ void hdd_program_country_code(hdd_context_t *hdd_ctx)
  */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0)) || defined(WITH_BACKPORTS)
 static void hdd_set_dfs_region(hdd_context_t *hdd_ctx,
-			       uint8_t dfs_reg)
+			       enum dfs_region dfs_reg)
 {
 	cds_put_dfs_region(dfs_reg);
 }
 #else
 static void hdd_set_dfs_region(hdd_context_t *hdd_ctx,
-				     uint8_t dfs_reg)
+				     enum dfs_region dfs_reg)
 {
 
 	/* remap the ctl code to dfs region code */
@@ -524,6 +475,65 @@ static void hdd_set_dfs_region(hdd_context_t *hdd_ctx,
 }
 #endif
 
+
+/**
+ * hdd_regulatory_init() - regulatory_init
+ * @hdd_ctx: hdd context
+ * @wiphy: wiphy
+ *
+ * Return: int
+ */
+int hdd_regulatory_init(hdd_context_t *hdd_ctx, struct wiphy *wiphy)
+{
+	int ret_val;
+	struct regulatory *reg_info;
+	enum dfs_region dfs_reg;
+
+	reg_info = &hdd_ctx->reg;
+
+	ret_val = cds_fill_some_regulatory_info(reg_info);
+	if (ret_val) {
+		hdd_err("incorrect BDF regulatory data");
+		return ret_val;
+	}
+
+	hdd_regulatory_wiphy_init(hdd_ctx, reg_info, wiphy);
+
+	hdd_process_regulatory_data(hdd_ctx, wiphy, true);
+
+	reg_info->cc_src = SOURCE_DRIVER;
+
+	cds_put_default_country(reg_info->alpha2);
+
+	cds_fill_and_send_ctl_to_fw(reg_info);
+
+	hdd_set_dfs_region(hdd_ctx, DFS_FCC_REGION);
+	cds_get_dfs_region(&dfs_reg);
+	cds_set_wma_dfs_region(dfs_reg);
+
+	return 0;
+}
+
+/**
+ * hdd_program_country_code() - process channel information from country code
+ * @hdd_ctx: hddc context
+ *
+ * Return: void
+ */
+void hdd_program_country_code(hdd_context_t *hdd_ctx)
+{
+	struct wiphy *wiphy = hdd_ctx->wiphy;
+	uint8_t *country_alpha2 = hdd_ctx->reg.alpha2;
+
+	if (!init_by_reg_core && !init_by_driver) {
+		init_by_driver = true;
+		if (('0' != country_alpha2[0]) ||
+		    ('0' != country_alpha2[1]))
+			regulatory_hint(wiphy, country_alpha2);
+	}
+}
+
+
 /**
  * hdd_restore_custom_reg_settings() - restore custom reg settings
  * @wiphy: wiphy structure
@@ -544,7 +554,7 @@ static void hdd_restore_custom_reg_settings(struct wiphy *wiphy,
 					    bool *reset)
 {
 	struct ieee80211_supported_band *sband;
-	enum ieee80211_band band;
+	enum nl80211_band band;
 	struct ieee80211_channel *chan;
 	int i;
 
@@ -552,7 +562,7 @@ static void hdd_restore_custom_reg_settings(struct wiphy *wiphy,
 	    (country_alpha2[1] == '0') &&
 	    (wiphy->flags & WIPHY_FLAG_CUSTOM_REGULATORY)) {
 
-		for (band = 0; band < IEEE80211_NUM_BANDS; band++) {
+		for (band = 0; band < NUM_NL80211_BANDS; band++) {
 			sband = wiphy->bands[band];
 			if (!sband)
 				continue;
@@ -599,9 +609,8 @@ void hdd_reg_notifier(struct wiphy *wiphy,
 		      struct regulatory_request *request)
 {
 	hdd_context_t *hdd_ctx = wiphy_priv(wiphy);
-	bool vht80_allowed;
 	bool reset = false;
-	uint8_t dfs_reg;
+	enum dfs_region dfs_reg;
 
 	hdd_info("country: %c%c, initiator %d, dfs_region: %d",
 		  request->alpha2[0],
@@ -619,6 +628,24 @@ void hdd_reg_notifier(struct wiphy *wiphy,
 			__func__);
 		return;
 	}
+
+	if (hdd_ctx->driver_status == DRIVER_MODULES_CLOSED) {
+		hdd_err("Driver module is closed; dropping request");
+		return;
+	}
+
+	if (hdd_ctx->isWiphySuspended == true) {
+		hdd_err("%s: system/cfg80211 is already suspend", __func__);
+		return;
+	}
+
+	if (('K' == request->alpha2[0]) &&
+	    ('R' == request->alpha2[1]))
+		request->dfs_region = DFS_KR_REGION;
+
+	if (('C' == request->alpha2[0]) &&
+	    ('N' == request->alpha2[1]))
+		request->dfs_region = DFS_CN_REGION;
 
 	/* first check if this callback is in response to the driver callback */
 
@@ -650,9 +677,10 @@ void hdd_reg_notifier(struct wiphy *wiphy,
 			hdd_ctx->reg.cc_src = SOURCE_CORE;
 			if (is_wiphy_custom_regulatory(wiphy))
 				reset = true;
-		} else if (NL80211_REGDOM_SET_BY_DRIVER == request->initiator)
+		} else if (NL80211_REGDOM_SET_BY_DRIVER == request->initiator) {
 			hdd_ctx->reg.cc_src = SOURCE_DRIVER;
-		else {
+			sme_set_cc_src(hdd_ctx->hHal, SOURCE_DRIVER);
+		} else {
 			hdd_ctx->reg.cc_src = SOURCE_USERSPACE;
 			hdd_restore_custom_reg_settings(wiphy,
 							request->alpha2,
@@ -664,15 +692,7 @@ void hdd_reg_notifier(struct wiphy *wiphy,
 
 		hdd_update_regulatory_info(hdd_ctx);
 
-		vht80_allowed = hdd_ctx->isVHT80Allowed;
-
 		hdd_process_regulatory_data(hdd_ctx, wiphy, reset);
-
-		if (hdd_ctx->isVHT80Allowed != vht80_allowed)
-			hdd_checkandupdate_phymode(hdd_ctx);
-
-		if (NL80211_REGDOM_SET_BY_DRIVER == request->initiator)
-			complete(&hdd_ctx->reg_init);
 
 		sme_generic_change_country_code(hdd_ctx->hHal,
 						hdd_ctx->reg.alpha2);

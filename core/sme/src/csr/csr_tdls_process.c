@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -36,7 +36,6 @@
 #ifdef FEATURE_WLAN_TDLS
 
 #include "ani_global.h"          /* for tpAniSirGlobal */
-#include "cds_mq.h"
 #include "csr_inside_api.h"
 #include "sme_inside.h"
 #include "sms_debug.h"
@@ -51,22 +50,22 @@
  * common routine to remove TDLS cmd from SME command list..
  * commands are removed after getting reponse from PE.
  */
-QDF_STATUS csr_tdls_remove_sme_cmd(tpAniSirGlobal pMac, eSmeCommandType cmdType)
+static QDF_STATUS csr_tdls_remove_sme_cmd(tpAniSirGlobal pMac,
+			eSmeCommandType cmdType, uint8_t session_id)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	tListElem *pEntry;
 	tSmeCmd *pCommand;
 
-	pEntry = csr_ll_peek_head(&pMac->sme.smeCmdActiveList, LL_ACCESS_LOCK);
+	pEntry = csr_nonscan_active_ll_peek_head(pMac, LL_ACCESS_LOCK);
 	if (pEntry) {
 		pCommand = GET_BASE_ADDR(pEntry, tSmeCmd, Link);
 		if (cmdType == pCommand->command) {
-			if (csr_ll_remove_entry(&pMac->sme.smeCmdActiveList,
+			if (csr_nonscan_active_ll_remove_entry(pMac,
 						pEntry, LL_ACCESS_LOCK)) {
 				qdf_mem_zero(&pCommand->u.tdlsCmd,
 					     sizeof(tTdlsCmd));
 				csr_release_command(pMac, pCommand);
-				sme_process_pending_queue(pMac);
 				status = QDF_STATUS_SUCCESS;
 			}
 		}
@@ -127,7 +126,7 @@ QDF_STATUS csr_tdls_send_mgmt_req(tHalHandle hHal, uint8_t sessionId,
 
 	tdlsSendMgmtCmd->command = eSmeCommandTdlsSendMgmt;
 	tdlsSendMgmtCmd->u.tdlsCmd.size = sizeof(tTdlsSendMgmtCmdInfo);
-	sme_push_command(pMac, tdlsSendMgmtCmd, false);
+	csr_queue_sme_command(pMac, tdlsSendMgmtCmd, false);
 	status = QDF_STATUS_SUCCESS;
 	sms_log(pMac, LOG1,
 		FL("Successfully posted eSmeCommandTdlsSendMgmt to SME"));
@@ -201,7 +200,7 @@ QDF_STATUS csr_tdls_change_peer_sta(tHalHandle hHal, uint8_t sessionId,
 			tdlsAddStaCmd->command = eSmeCommandTdlsAddPeer;
 			tdlsAddStaCmd->u.tdlsCmd.size =
 				sizeof(tTdlsAddStaCmdInfo);
-			sme_push_command(pMac, tdlsAddStaCmd, false);
+			csr_queue_sme_command(pMac, tdlsAddStaCmd, false);
 			status = QDF_STATUS_SUCCESS;
 			sms_log(pMac, LOG1,
 			FL("Successfully posted eSmeCommandTdlsAddPeer to SME to modify peer "));
@@ -273,7 +272,8 @@ QDF_STATUS csr_tdls_send_link_establish_params(tHalHandle hHal,
 				eSmeCommandTdlsLinkEstablish;
 			tdlsLinkEstablishCmd->u.tdlsCmd.size =
 				sizeof(tTdlsLinkEstablishCmdInfo);
-			sme_push_command(pMac, tdlsLinkEstablishCmd, false);
+			csr_queue_sme_command(pMac, tdlsLinkEstablishCmd,
+						false);
 			status = QDF_STATUS_SUCCESS;
 			sms_log(pMac, LOG1,
 			FL("Successfully posted eSmeCommandTdlsLinkEstablish to SME"));
@@ -312,7 +312,7 @@ QDF_STATUS csr_tdls_add_peer_sta(tHalHandle hHal, uint8_t sessionId,
 			tdlsAddStaCmd->command = eSmeCommandTdlsAddPeer;
 			tdlsAddStaCmd->u.tdlsCmd.size =
 				sizeof(tTdlsAddStaCmdInfo);
-			sme_push_command(pMac, tdlsAddStaCmd, false);
+			csr_queue_sme_command(pMac, tdlsAddStaCmd, false);
 			status = QDF_STATUS_SUCCESS;
 			sms_log(pMac, LOG1,
 			FL("Successfully posted eSmeCommandTdlsAddPeer to SME"));
@@ -350,7 +350,7 @@ QDF_STATUS csr_tdls_del_peer_sta(tHalHandle hHal, uint8_t sessionId,
 			tdlsDelStaCmd->command = eSmeCommandTdlsDelPeer;
 			tdlsDelStaCmd->u.tdlsCmd.size =
 				sizeof(tTdlsDelStaCmdInfo);
-			sme_push_command(pMac, tdlsDelStaCmd, false);
+			csr_queue_sme_command(pMac, tdlsDelStaCmd, false);
 			status = QDF_STATUS_SUCCESS;
 			sms_log(pMac, LOG1,
 			FL("Successfully posted eSmeCommandTdlsDelPeer to SME"));
@@ -363,8 +363,8 @@ QDF_STATUS csr_tdls_del_peer_sta(tHalHandle hHal, uint8_t sessionId,
 /*
  * TDLS messages sent to PE .
  */
-QDF_STATUS tdls_send_message(tpAniSirGlobal pMac, uint16_t msg_type,
-			     void *msg_data, uint32_t msg_size)
+static QDF_STATUS tdls_send_message(tpAniSirGlobal pMac, uint16_t msg_type,
+				    void *msg_data, uint32_t msg_size)
 {
 
 	tSirMbMsg *pMsg = (tSirMbMsg *) msg_data;
@@ -374,7 +374,7 @@ QDF_STATUS tdls_send_message(tpAniSirGlobal pMac, uint16_t msg_type,
 	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_INFO,
 		  ("sending msg = %d"), pMsg->type);
 	/* Send message. */
-	if (cds_send_mb_message_to_mac(pMsg) != QDF_STATUS_SUCCESS) {
+	if (umac_send_mb_message_to_mac(pMsg) != QDF_STATUS_SUCCESS) {
 		sms_log(pMac, LOGE, FL("Cannot send message"));
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -382,7 +382,7 @@ QDF_STATUS tdls_send_message(tpAniSirGlobal pMac, uint16_t msg_type,
 	return QDF_STATUS_SUCCESS;
 }
 
-QDF_STATUS csr_tdls_process_send_mgmt(tpAniSirGlobal pMac, tSmeCmd *cmd)
+static QDF_STATUS csr_tdls_process_send_mgmt(tpAniSirGlobal pMac, tSmeCmd *cmd)
 {
 	tTdlsSendMgmtCmdInfo *tdlsSendMgmtCmdInfo =
 		&cmd->u.tdlsCmd.u.tdlsSendMgmtCmdInfo;
@@ -451,7 +451,7 @@ QDF_STATUS csr_tdls_process_send_mgmt(tpAniSirGlobal pMac, tSmeCmd *cmd)
 	return status;
 }
 
-QDF_STATUS csr_tdls_process_add_sta(tpAniSirGlobal pMac, tSmeCmd *cmd)
+static QDF_STATUS csr_tdls_process_add_sta(tpAniSirGlobal pMac, tSmeCmd *cmd)
 {
 	tTdlsAddStaCmdInfo *tdlsAddStaCmdInfo =
 		&cmd->u.tdlsCmd.u.tdlsAddStaCmdInfo;
@@ -522,7 +522,7 @@ QDF_STATUS csr_tdls_process_add_sta(tpAniSirGlobal pMac, tSmeCmd *cmd)
 	return status;
 }
 
-QDF_STATUS csr_tdls_process_del_sta(tpAniSirGlobal pMac, tSmeCmd *cmd)
+static QDF_STATUS csr_tdls_process_del_sta(tpAniSirGlobal pMac, tSmeCmd *cmd)
 {
 	tTdlsDelStaCmdInfo *tdlsDelStaCmdInfo =
 		&cmd->u.tdlsCmd.u.tdlsDelStaCmdInfo;
@@ -688,6 +688,7 @@ QDF_STATUS tdls_msg_processor(tpAniSirGlobal pMac, uint16_t msgType,
 {
 	tCsrRoamInfo roamInfo = { 0 };
 	eCsrRoamResult roamResult;
+	tSirSmeRsp *sme_rsp = pMsgBuf;
 	tSirTdlsAddStaRsp *addStaRsp = (tSirTdlsAddStaRsp *) pMsgBuf;
 	tSirTdlsDelStaRsp *delStaRsp = (tSirTdlsDelStaRsp *) pMsgBuf;
 	tpSirTdlsDelStaInd pSirTdlsDelStaInd = (tpSirTdlsDelStaInd) pMsgBuf;
@@ -701,9 +702,28 @@ QDF_STATUS tdls_msg_processor(tpAniSirGlobal pMac, uint16_t msgType,
 
 	switch (msgType) {
 	case eWNI_SME_TDLS_SEND_MGMT_RSP:
+	{
+		tSirSmeRsp *msg = (tSirSmeRsp *) pMsgBuf;
+		tCsrRoamInfo roam_info = {0};
+
 		/* remove pending eSmeCommandTdlsDiscovery command */
-		csr_tdls_remove_sme_cmd(pMac, eSmeCommandTdlsSendMgmt);
+		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_INFO,
+			FL("sme_rsp->sessionId[%d] eSmeCommandTdlsSendMgmt"),
+			sme_rsp->sessionId);
+		csr_tdls_remove_sme_cmd(pMac, eSmeCommandTdlsSendMgmt,
+				sme_rsp->sessionId);
+
+		if (eSIR_SME_SUCCESS != msg->statusCode) {
+			/* Tx failed, so there wont be any ack confirmation*/
+			/* Indicate ack failure to upper layer */
+			roamInfo.reasonCode = 0;
+			csr_roam_call_callback(pMac, msg->sessionId,
+					&roam_info, 0,
+					eCSR_ROAM_RESULT_MGMT_TX_COMPLETE_IND,
+					0);
+		}
 		break;
+	}
 	case eWNI_SME_TDLS_ADD_STA_RSP:
 		qdf_copy_macaddr(&roamInfo.peerMac, &addStaRsp->peermac);
 		roamInfo.staId = addStaRsp->staId;
@@ -723,7 +743,8 @@ QDF_STATUS tdls_msg_processor(tpAniSirGlobal pMac, uint16_t msgType,
 				roamResult);
 
 		/* remove pending eSmeCommandTdlsDiscovery command */
-		csr_tdls_remove_sme_cmd(pMac, eSmeCommandTdlsAddPeer);
+		csr_tdls_remove_sme_cmd(pMac, eSmeCommandTdlsAddPeer,
+					addStaRsp->sessionId);
 		break;
 	case eWNI_SME_TDLS_DEL_STA_RSP:
 		qdf_copy_macaddr(&roamInfo.peerMac, &delStaRsp->peermac);
@@ -738,7 +759,8 @@ QDF_STATUS tdls_msg_processor(tpAniSirGlobal pMac, uint16_t msgType,
 				eCSR_ROAM_TDLS_STATUS_UPDATE,
 				eCSR_ROAM_RESULT_DELETE_TDLS_PEER);
 
-		csr_tdls_remove_sme_cmd(pMac, eSmeCommandTdlsDelPeer);
+		csr_tdls_remove_sme_cmd(pMac, eSmeCommandTdlsDelPeer,
+					delStaRsp->sessionId);
 		break;
 	case eWNI_SME_TDLS_DEL_STA_IND:
 		qdf_copy_macaddr(&roamInfo.peerMac,
@@ -777,7 +799,8 @@ QDF_STATUS tdls_msg_processor(tpAniSirGlobal pMac, uint16_t msgType,
 				eCSR_ROAM_TDLS_STATUS_UPDATE,
 				eCSR_ROAM_RESULT_LINK_ESTABLISH_REQ_RSP);
 		/* remove pending eSmeCommandTdlsLinkEstablish command */
-		csr_tdls_remove_sme_cmd(pMac, eSmeCommandTdlsLinkEstablish);
+		csr_tdls_remove_sme_cmd(pMac, eSmeCommandTdlsLinkEstablish,
+				linkEstablishReqRsp->sessionId);
 		break;
 	case eWNI_SME_TDLS_SHOULD_DISCOVER:
 		qdf_copy_macaddr(&roamInfo.peerMac, &tevent->peermac);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -102,11 +102,12 @@ struct ndp_peer_node {
 
 /* Function to process NDP requests */
 QDF_STATUS lim_handle_ndp_request_message(tpAniSirGlobal mac_ctx,
-					tpSirMsgQ msg);
+					struct scheduler_msg *msg);
 /* Function to process NDP events */
-QDF_STATUS lim_handle_ndp_event_message(tpAniSirGlobal mac_ctx, cds_msg_t *msg);
+QDF_STATUS lim_handle_ndp_event_message(tpAniSirGlobal mac_ctx,
+					struct scheduler_msg *msg);
 void lim_process_ndi_mlm_add_bss_rsp(tpAniSirGlobal mac_ctx,
-				     tpSirMsgQ lim_msg_q,
+				     struct scheduler_msg *lim_msg_q,
 				     tpPESession session_entry);
 /* Handler for DEL BSS resp for NDI interface */
 void lim_ndi_del_bss_rsp(tpAniSirGlobal  mac_ctx,
@@ -115,29 +116,30 @@ void lim_ndi_del_bss_rsp(tpAniSirGlobal  mac_ctx,
 void lim_ndp_add_sta_rsp(tpAniSirGlobal mac_ctx, tpPESession session_entry,
 			 tAddStaParams *add_sta_rsp);
 
-void lim_process_ndi_del_sta_rsp(tpAniSirGlobal mac_ctx, tpSirMsgQ lim_msg,
-						tpPESession pe_session);
+void lim_process_ndi_del_sta_rsp(tpAniSirGlobal mac_ctx,
+				 struct scheduler_msg *lim_msg,
+				 tpPESession pe_session);
 
 #else
 
 /* Function to process NDP requests */
 static inline QDF_STATUS lim_handle_ndp_request_message(tpAniSirGlobal mac_ctx,
-					tpSirMsgQ msg)
+					struct scheduler_msg *msg)
 {
 	return QDF_STATUS_SUCCESS;
 }
 
 /* Function to process NDP events */
 static inline QDF_STATUS lim_handle_ndp_event_message(tpAniSirGlobal mac_ctx,
-						      cds_msg_t *msg)
+						      struct scheduler_msg *msg)
 {
 	return QDF_STATUS_SUCCESS;
 }
 
 /* Function to process NDP events */
 static inline void lim_process_ndi_mlm_add_bss_rsp(tpAniSirGlobal mac_ctx,
-						   tpSirMsgQ lim_msg_q,
-						   tpPESession session_entry)
+					struct scheduler_msg *lim_msg_q,
+					tpPESession session_entry)
 {
 }
 static inline void lim_ndi_del_bss_rsp(tpAniSirGlobal mac_ctx,
@@ -145,7 +147,8 @@ static inline void lim_ndi_del_bss_rsp(tpAniSirGlobal mac_ctx,
 {
 }
 static inline void lim_process_ndi_del_sta_rsp(tpAniSirGlobal mac_ctx,
-				tpSirMsgQ lim_msg, tpPESession pe_session)
+				struct scheduler_msg *lim_msg,
+				tpPESession pe_session)
 {
 }
 

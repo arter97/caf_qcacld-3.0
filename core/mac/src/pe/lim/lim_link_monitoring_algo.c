@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -76,7 +76,6 @@ static void lim_delete_sta_util(tpAniSirGlobal mac_ctx, tpDeleteStaContext msg,
 		msg->staId, msg->reasonCode);
 
 	if (LIM_IS_IBSS_ROLE(session_entry)) {
-		qdf_mem_free(msg);
 		return;
 	}
 
@@ -87,7 +86,6 @@ static void lim_delete_sta_util(tpAniSirGlobal mac_ctx, tpDeleteStaContext msg,
 		lim_log(mac_ctx, LOGE,
 			FL("Invalid STA limSystemRole=%d"),
 			GET_LIM_SYSTEM_ROLE(session_entry));
-		qdf_mem_free(msg);
 		return;
 	}
 	stads->del_sta_ctx_rssi = msg->rssi;
@@ -98,7 +96,6 @@ static void lim_delete_sta_util(tpAniSirGlobal mac_ctx, tpDeleteStaContext msg,
 	if (stads->staIndex != msg->staId) {
 		lim_log(mac_ctx, LOGE, FL("staid mismatch: %d vs %d "),
 			stads->staIndex, msg->staId);
-		qdf_mem_free(msg);
 		return;
 	}
 
@@ -122,7 +119,6 @@ static void lim_delete_sta_util(tpAniSirGlobal mac_ctx, tpDeleteStaContext msg,
 			lim_log(mac_ctx, LOGE,
 				FL("Inv Del STA staId:%d, assocId:%d"),
 				msg->staId, msg->assocId);
-			qdf_mem_free(msg);
 			return;
 		} else {
 			lim_send_disassoc_mgmt_frame(mac_ctx,
@@ -169,7 +165,6 @@ static void lim_delete_sta_util(tpAniSirGlobal mac_ctx, tpDeleteStaContext msg,
 					"in some transit state, Addr = "
 					MAC_ADDRESS_STR),
 					MAC_ADDR_ARRAY(msg->bssId));
-			qdf_mem_free(msg);
 			return;
 		}
 
@@ -190,7 +185,8 @@ static void lim_delete_sta_util(tpAniSirGlobal mac_ctx, tpDeleteStaContext msg,
 		/* Delete all TDLS peers connected before leaving BSS */
 		lim_delete_tdls_peers(mac_ctx, session_entry);
 #endif
-		lim_post_sme_message(mac_ctx, LIM_MLM_DEAUTH_IND,
+		if (LIM_IS_STA_ROLE(session_entry))
+			lim_post_sme_message(mac_ctx, LIM_MLM_DEAUTH_IND,
 				     (uint32_t *) &mlm_deauth_ind);
 
 		lim_send_sme_deauth_ind(mac_ctx, stads,	session_entry);
@@ -212,7 +208,8 @@ static void lim_delete_sta_util(tpAniSirGlobal mac_ctx, tpDeleteStaContext msg,
  *
  * Return: none
  */
-void lim_delete_sta_context(tpAniSirGlobal mac_ctx, tpSirMsgQ lim_msg)
+void lim_delete_sta_context(tpAniSirGlobal mac_ctx,
+			    struct scheduler_msg *lim_msg)
 {
 	tpDeleteStaContext msg = (tpDeleteStaContext) lim_msg->bodyptr;
 	tpPESession session_entry;
@@ -233,6 +230,15 @@ void lim_delete_sta_context(tpAniSirGlobal mac_ctx, tpSirMsgQ lim_msg)
 	switch (msg->reasonCode) {
 	case HAL_DEL_STA_REASON_CODE_KEEP_ALIVE:
 		if (LIM_IS_STA_ROLE(session_entry) && !msg->is_tdls) {
+			if (session_entry->limMlmState !=
+			    eLIM_MLM_LINK_ESTABLISHED_STATE) {
+				lim_log(mac_ctx, LOGE,
+				  FL("Do not process in limMlmState %s(%x)"),
+				  lim_mlm_state_str(session_entry->limMlmState),
+				  session_entry->limMlmState);
+				qdf_mem_free(msg);
+				return;
+			}
 			sta_ds = dph_get_hash_entry(mac_ctx,
 					DPH_STA_HASH_INDEX_PEER,
 					&session_entry->dph.dphHashTable);
@@ -267,6 +273,7 @@ void lim_delete_sta_context(tpAniSirGlobal mac_ctx, tpSirMsgQ lim_msg)
 		break;
 	}
 	qdf_mem_free(msg);
+	lim_msg->bodyptr = NULL;
 	return;
 }
 
@@ -293,13 +300,16 @@ lim_trigger_sta_deletion(tpAniSirGlobal mac_ctx, tpDphHashNode sta_ds,
 
 	if ((sta_ds->mlmStaContext.mlmState == eLIM_MLM_WT_DEL_STA_RSP_STATE) ||
 		(sta_ds->mlmStaContext.mlmState ==
-			eLIM_MLM_WT_DEL_BSS_RSP_STATE)) {
+			eLIM_MLM_WT_DEL_BSS_RSP_STATE) ||
+		sta_ds->sta_deletion_in_progress) {
 		/* Already in the process of deleting context for the peer */
-		lim_log(mac_ctx, LOGE,
-			FL("Deletion is in progress for peer:%pM"),
-			sta_ds->staAddr);
+		lim_log(mac_ctx, LOG1,
+			FL("Deletion is in progress (%d) for peer:%p in mlmState %d"),
+			sta_ds->sta_deletion_in_progress, sta_ds->staAddr,
+			sta_ds->mlmStaContext.mlmState);
 		return;
 	}
+	sta_ds->sta_deletion_in_progress = true;
 
 	sta_ds->mlmStaContext.disassocReason =
 		eSIR_MAC_DISASSOC_DUE_TO_INACTIVITY_REASON;
@@ -410,7 +420,8 @@ lim_tear_down_link_with_ap(tpAniSirGlobal pMac, uint8_t sessionId,
 		mlmDeauthInd.deauthTrigger =
 			pStaDs->mlmStaContext.cleanupTrigger;
 
-		lim_post_sme_message(pMac, LIM_MLM_DEAUTH_IND,
+		if (LIM_IS_STA_ROLE(psessionEntry))
+			lim_post_sme_message(pMac, LIM_MLM_DEAUTH_IND,
 				     (uint32_t *) &mlmDeauthInd);
 
 		lim_send_sme_deauth_ind(pMac, pStaDs, psessionEntry);
@@ -433,6 +444,7 @@ void lim_handle_heart_beat_failure(tpAniSirGlobal mac_ctx,
 				   tpPESession session)
 {
 	uint8_t curr_chan;
+	tpSirAddie scan_ie = NULL;
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_LIM    /* FEATURE_WLAN_DIAG_SUPPORT */
 	host_log_beacon_update_pkt_type *log_ptr = NULL;
@@ -456,7 +468,15 @@ void lim_handle_heart_beat_failure(tpAniSirGlobal mac_ctx,
 		if (!mac_ctx->sys.gSysEnableLinkMonitorMode)
 			return;
 
-		 /* Beacon frame not received within heartbeat timeout. */
+		/* Ignore HB if channel switch is in progress */
+		if (session->gLimSpecMgmt.dot11hChanSwState ==
+		   eLIM_11H_CHANSW_RUNNING) {
+			lim_log(mac_ctx, LOGE,
+				FL("Ignore Heartbeat failure as Channel switch is in progress"));
+			session->pmmOffloadInfo.bcnmiss = false;
+			return;
+		}
+		/* Beacon frame not received within heartbeat timeout. */
 		lim_log(mac_ctx, LOGW, FL("Heartbeat Failure"));
 		mac_ctx->lim.gLimHBfailureCntInLinkEstState++;
 
@@ -480,9 +500,21 @@ void lim_handle_heart_beat_failure(tpAniSirGlobal mac_ctx,
 			lim_log(mac_ctx, LOGW,
 				FL("HB missed from AP. Sending Probe Req"));
 			/* for searching AP, we don't include any more IE */
-			lim_send_probe_req_mgmt_frame(mac_ctx, &session->ssId,
-				session->bssId, curr_chan, session->selfMacAddr,
-				session->dot11mode, 0, NULL);
+			if (session->pLimJoinReq != NULL) {
+				scan_ie = &session->pLimJoinReq->addIEScan;
+				lim_send_probe_req_mgmt_frame(mac_ctx,
+					&session->ssId,
+					session->bssId, curr_chan,
+					session->selfMacAddr,
+					session->dot11mode,
+					scan_ie->length, scan_ie->addIEdata);
+			} else {
+				lim_send_probe_req_mgmt_frame(mac_ctx,
+					&session->ssId,
+					session->bssId, curr_chan,
+					session->selfMacAddr,
+					session->dot11mode, 0, NULL);
+			}
 		} else {
 			lim_log(mac_ctx, LOGW,
 			    FL("HB missed from AP on DFS chanel moving to passive"));

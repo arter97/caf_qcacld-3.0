@@ -38,7 +38,6 @@
 #include <wlan_hdd_includes.h>
 #include <cds_api.h>
 #include <linux/skbuff.h>
-#include "ol_txrx_osif_api.h"
 #include "cdp_txrx_flow_ctrl_legacy.h"
 
 #define HDD_ETHERTYPE_802_1_X              0x888E
@@ -113,4 +112,42 @@ const char *hdd_action_type_to_string(enum netif_action_type action);
 void wlan_hdd_netif_queue_control(hdd_adapter_t *adapter,
 		enum netif_action_type action, enum netif_reason_type reason);
 int hdd_set_mon_rx_cb(struct net_device *dev);
+void hdd_send_rps_ind(hdd_adapter_t *adapter);
+void wlan_hdd_classify_pkt(struct sk_buff *skb);
+
+#ifdef MSM_PLATFORM
+void hdd_reset_tcp_delack(hdd_context_t *hdd_ctx);
+#else
+static inline void hdd_reset_tcp_delack(hdd_context_t *hdd_ctx) {}
+#endif
+
+#ifdef FEATURE_WLAN_DIAG_SUPPORT
+void hdd_event_eapol_log(struct sk_buff *skb, enum qdf_proto_dir dir);
+#else
+static inline
+void hdd_event_eapol_log(struct sk_buff *skb, enum qdf_proto_dir dir)
+{}
+#endif
+
+/*
+ * As of the 4.7 kernel, net_device->trans_start is removed. Create shims to
+ * support compiling against older versions of the kernel.
+ */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0))
+static inline void netif_trans_update(struct net_device *dev)
+{
+	dev->trans_start = jiffies;
+}
+
+#define TX_TIMEOUT_TRACE(dev, module_id) QDF_TRACE( \
+	module_id, QDF_TRACE_LEVEL_ERROR, \
+	"%s: Transmission timeout occurred jiffies %lu trans_start %lu", \
+	__func__, jiffies, dev->trans_start)
+#else
+#define TX_TIMEOUT_TRACE(dev, module_id) QDF_TRACE( \
+	module_id, QDF_TRACE_LEVEL_ERROR, \
+	"%s: Transmission timeout occurred jiffies %lu", \
+	__func__, jiffies)
+#endif
+
 #endif /* end #if !defined(WLAN_HDD_TX_RX_H) */

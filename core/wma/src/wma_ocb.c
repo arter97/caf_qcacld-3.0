@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -35,6 +35,7 @@
 #include "wmi_unified_api.h"
 #include "cds_utils.h"
 #include <cdp_txrx_ocb.h>
+#include <cdp_txrx_handle.h>
 
 /**
  * wma_ocb_resp() - send the OCB set config response via callback
@@ -45,18 +46,20 @@ int wma_ocb_set_config_resp(tp_wma_handle wma_handle, uint8_t status)
 {
 	QDF_STATUS qdf_status;
 	struct sir_ocb_set_config_response *resp;
-	cds_msg_t msg = {0};
+	struct scheduler_msg msg = {0};
 	struct sir_ocb_config *req = wma_handle->ocb_config_req;
-	ol_txrx_vdev_handle vdev = (req ?
+	void *vdev = (req ?
 		wma_handle->interfaces[req->session_id].handle : NULL);
 	struct ol_txrx_ocb_set_chan ocb_set_chan;
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 
 	/*
 	 * If the command was successful, save the channel information in the
 	 * vdev.
 	 */
 	if (status == QDF_STATUS_SUCCESS && vdev && req) {
-		ocb_set_chan.ocb_channel_info = ol_txrx_get_ocb_chan_info(vdev);
+		ocb_set_chan.ocb_channel_info = cdp_get_ocb_chan_info(soc,
+						(struct cdp_vdev *)vdev);
 		if (ocb_set_chan.ocb_channel_info)
 			qdf_mem_free(ocb_set_chan.ocb_channel_info);
 		ocb_set_chan.ocb_channel_count =
@@ -82,7 +85,9 @@ int wma_ocb_set_config_resp(tp_wma_handle wma_handle, uint8_t status)
 			ocb_set_chan.ocb_channel_info = 0;
 			ocb_set_chan.ocb_channel_count = 0;
 		}
-		ol_txrx_set_ocb_chan_info(vdev, ocb_set_chan);
+		cdp_set_ocb_chan_info(soc,
+			(struct cdp_vdev *)vdev,
+			ocb_set_chan);
 	}
 
 	/* Free the configuration that was saved in wma_ocb_set_config. */
@@ -98,7 +103,7 @@ int wma_ocb_set_config_resp(tp_wma_handle wma_handle, uint8_t status)
 	msg.type = eWNI_SME_OCB_SET_CONFIG_RSP;
 	msg.bodyptr = resp;
 
-	qdf_status = cds_mq_post_message(QDF_MODULE_ID_SME, &msg);
+	qdf_status = scheduler_post_msg(QDF_MODULE_ID_SME, &msg);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		WMA_LOGE(FL("Fail to post msg to SME"));
 		qdf_mem_free(resp);
@@ -170,7 +175,7 @@ int wma_ocb_set_config_req(tp_wma_handle wma_handle,
 	 * OCB set_config request should be sent on receiving
 	 * vdev start response message
 	 */
-	if (!wma_handle->interfaces[config_req->session_id].vdev_up) {
+	if (!wma_is_vdev_up(config_req->session_id)) {
 		qdf_mem_zero(&req, sizeof(req));
 		/* Enqueue OCB Set Schedule request message */
 		msg = wma_fill_vdev_req(wma_handle, config_req->session_id,
@@ -417,14 +422,15 @@ int wma_ocb_get_tsf_timer(tp_wma_handle wma_handle,
  *
  * Return: 0 on success
  */
-int wma_ocb_get_tsf_timer_resp_event_handler(void *handle, uint8_t *event_buf,
-					     uint32_t len)
+static int wma_ocb_get_tsf_timer_resp_event_handler(void *handle,
+						    uint8_t *event_buf,
+						    uint32_t len)
 {
 	QDF_STATUS qdf_status;
 	struct sir_ocb_get_tsf_timer_response *response;
 	WMI_OCB_GET_TSF_TIMER_RESP_EVENTID_param_tlvs *param_tlvs;
 	wmi_ocb_get_tsf_timer_resp_event_fixed_param *fix_param;
-	cds_msg_t msg = {0};
+	struct scheduler_msg msg = {0};
 
 	param_tlvs = (WMI_OCB_GET_TSF_TIMER_RESP_EVENTID_param_tlvs *)event_buf;
 	fix_param = param_tlvs->fixed_param;
@@ -440,7 +446,7 @@ int wma_ocb_get_tsf_timer_resp_event_handler(void *handle, uint8_t *event_buf,
 	msg.type = eWNI_SME_OCB_GET_TSF_TIMER_RSP;
 	msg.bodyptr = response;
 
-	qdf_status = cds_mq_post_message(QDF_MODULE_ID_SME, &msg);
+	qdf_status = scheduler_post_msg(QDF_MODULE_ID_SME, &msg);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		WMA_LOGE(FL("Failed to post msg to SME"));
 		qdf_mem_free(response);
@@ -487,14 +493,15 @@ int wma_dcc_get_stats(tp_wma_handle wma_handle,
  *
  * Return: 0 on success
  */
-int wma_dcc_get_stats_resp_event_handler(void *handle, uint8_t *event_buf,
-				uint32_t len)
+static int wma_dcc_get_stats_resp_event_handler(void *handle,
+						uint8_t *event_buf,
+						uint32_t len)
 {
 	QDF_STATUS qdf_status;
 	struct sir_dcc_get_stats_response *response;
 	WMI_DCC_GET_STATS_RESP_EVENTID_param_tlvs *param_tlvs;
 	wmi_dcc_get_stats_resp_event_fixed_param *fix_param;
-	cds_msg_t msg = {0};
+	struct scheduler_msg msg = {0};
 
 	param_tlvs = (WMI_DCC_GET_STATS_RESP_EVENTID_param_tlvs *)event_buf;
 	fix_param = param_tlvs->fixed_param;
@@ -517,7 +524,7 @@ int wma_dcc_get_stats_resp_event_handler(void *handle, uint8_t *event_buf,
 	msg.type = eWNI_SME_DCC_GET_STATS_RSP;
 	msg.bodyptr = response;
 
-	qdf_status = cds_mq_post_message(QDF_MODULE_ID_SME, &msg);
+	qdf_status = scheduler_post_msg(QDF_MODULE_ID_SME, &msg);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		WMA_LOGE(FL("Failed to post msg to SME"));
 		qdf_mem_free(response);
@@ -586,14 +593,15 @@ int wma_dcc_update_ndl(tp_wma_handle wma_handle,
  *
  * Return: 0 on success
  */
-int wma_dcc_update_ndl_resp_event_handler(void *handle, uint8_t *event_buf,
-					  uint32_t len)
+static int wma_dcc_update_ndl_resp_event_handler(void *handle,
+						 uint8_t *event_buf,
+						 uint32_t len)
 {
 	QDF_STATUS qdf_status;
 	struct sir_dcc_update_ndl_response *resp;
 	WMI_DCC_UPDATE_NDL_RESP_EVENTID_param_tlvs *param_tlvs;
 	wmi_dcc_update_ndl_resp_event_fixed_param *fix_param;
-	cds_msg_t msg = {0};
+	struct scheduler_msg msg = {0};
 
 	param_tlvs = (WMI_DCC_UPDATE_NDL_RESP_EVENTID_param_tlvs *)event_buf;
 	fix_param = param_tlvs->fixed_param;
@@ -609,7 +617,7 @@ int wma_dcc_update_ndl_resp_event_handler(void *handle, uint8_t *event_buf,
 	msg.type = eWNI_SME_DCC_UPDATE_NDL_RSP;
 	msg.bodyptr = resp;
 
-	qdf_status = cds_mq_post_message(QDF_MODULE_ID_SME, &msg);
+	qdf_status = scheduler_post_msg(QDF_MODULE_ID_SME, &msg);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status))	{
 		WMA_LOGE(FL("Failed to post msg to SME"));
 		qdf_mem_free(resp);
@@ -627,14 +635,14 @@ int wma_dcc_update_ndl_resp_event_handler(void *handle, uint8_t *event_buf,
  *
  * Return: 0 on success
  */
-int wma_dcc_stats_event_handler(void *handle, uint8_t *event_buf,
-				uint32_t len)
+static int wma_dcc_stats_event_handler(void *handle, uint8_t *event_buf,
+				       uint32_t len)
 {
 	QDF_STATUS qdf_status;
 	struct sir_dcc_get_stats_response *response;
 	WMI_DCC_STATS_EVENTID_param_tlvs *param_tlvs;
 	wmi_dcc_stats_event_fixed_param *fix_param;
-	cds_msg_t msg = {0};
+	struct scheduler_msg msg = {0};
 
 	param_tlvs = (WMI_DCC_STATS_EVENTID_param_tlvs *)event_buf;
 	fix_param = param_tlvs->fixed_param;
@@ -655,7 +663,7 @@ int wma_dcc_stats_event_handler(void *handle, uint8_t *event_buf,
 	msg.type = eWNI_SME_DCC_STATS_EVENT;
 	msg.bodyptr = response;
 
-	qdf_status = cds_mq_post_message(QDF_MODULE_ID_SME, &msg);
+	qdf_status = scheduler_post_msg(QDF_MODULE_ID_SME, &msg);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status))	{
 		WMA_LOGE(FL("Failed to post msg to SME"));
 		qdf_mem_free(response);

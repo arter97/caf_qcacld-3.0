@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -58,6 +58,7 @@
 #include "cds_regdomain.h"
 #include "lim_send_messages.h"
 #include "nan_datapath.h"
+#include "lim_assoc_utils.h"
 
 static void lim_handle_join_rsp_status(tpAniSirGlobal mac_ctx,
 	tpPESession session_entry, tSirResultCodes result_code,
@@ -83,7 +84,7 @@ lim_send_sme_rsp(tpAniSirGlobal mac_ctx, uint16_t msg_type,
 	 tSirResultCodes result_code, uint8_t sme_session_id,
 	 uint16_t sme_transaction_id)
 {
-	tSirMsgQ msg;
+	struct scheduler_msg msg;
 	tSirSmeRsp *sme_rsp;
 
 	lim_log(mac_ctx, LOG1, FL("Sending message %s with reasonCode %s"),
@@ -107,7 +108,8 @@ lim_send_sme_rsp(tpAniSirGlobal mac_ctx, uint16_t msg_type,
 	msg.type = msg_type;
 	msg.bodyptr = sme_rsp;
 	msg.bodyval = 0;
-	MTRACE(mac_trace_msg_tx(mac_ctx, sme_session_id, msg.type));
+	MTRACE(mac_trace(mac_ctx, TRACE_CODE_TX_SME_MSG,
+			 sme_session_id, msg.type));
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_LIM    /* FEATURE_WLAN_DIAG_SUPPORT */
 	switch (msg_type) {
@@ -140,7 +142,7 @@ lim_send_sme_roc_rsp(tpAniSirGlobal mac_ctx, uint16_t msg_type,
 	 tSirResultCodes result_code, uint8_t sme_session_id,
 	 uint32_t scan_id)
 {
-	tSirMsgQ msg;
+	struct scheduler_msg msg;
 	struct sir_roc_rsp *sme_rsp;
 
 	lim_log(mac_ctx, LOG1,
@@ -234,13 +236,13 @@ uint32_t lim_get_max_rate_flags(tpAniSirGlobal mac_ctx, tpDphHashNode sta_ds)
 static void lim_send_sme_join_reassoc_rsp_after_resume(tpAniSirGlobal mac_ctx,
 	QDF_STATUS status, uint32_t *ctx)
 {
-	tSirMsgQ msg;
+	struct scheduler_msg msg;
 	tpSirSmeJoinRsp sme_join_rsp = (tpSirSmeJoinRsp) ctx;
 
 	msg.type = sme_join_rsp->messageType;
 	msg.bodyptr = sme_join_rsp;
 	msg.bodyval = 0;
-	MTRACE(mac_trace_msg_tx(mac_ctx, NO_SESSION, msg.type));
+	MTRACE(mac_trace(mac_ctx, TRACE_CODE_TX_SME_MSG, NO_SESSION, msg.type));
 	lim_sys_process_mmh_msg_api(mac_ctx, &msg, ePROT);
 }
 
@@ -388,6 +390,30 @@ static void lim_handle_join_rsp_status(tpAniSirGlobal mac_ctx,
 #endif
 	}
 }
+
+/**
+ * lim_add_bss_info() - copy data from session entry to join rsp
+ * @sta_ds: Station dph entry
+ * @sme_join_rsp: Join response buffer to be filled up
+ *
+ * Return: None
+ */
+static void lim_add_bss_info(tpDphHashNode sta_ds, tpSirSmeJoinRsp sme_join_rsp)
+{
+	struct parsed_ies *parsed_ies = &sta_ds->parsed_ies;
+
+	if (parsed_ies->hs20vendor_ie.present)
+		sme_join_rsp->hs20vendor_ie = parsed_ies->hs20vendor_ie;
+	if (parsed_ies->vht_caps.present)
+		sme_join_rsp->vht_caps = parsed_ies->vht_caps;
+	if (parsed_ies->ht_caps.present)
+		sme_join_rsp->ht_caps = parsed_ies->ht_caps;
+	if (parsed_ies->ht_operation.present)
+		sme_join_rsp->ht_operation = parsed_ies->ht_operation;
+	if (parsed_ies->vht_operation.present)
+		sme_join_rsp->vht_operation = parsed_ies->vht_operation;
+}
+
 /**
  * lim_send_sme_join_reassoc_rsp() - Send Response to Upper Layers
  * @mac_ctx:            Pointer to Global MAC structure
@@ -436,7 +462,6 @@ lim_send_sme_join_reassoc_rsp(tpAniSirGlobal mac_ctx, uint16_t msg_type,
 			return;
 		}
 
-		qdf_mem_set((uint8_t *) sme_join_rsp, rsp_len, 0);
 		sme_join_rsp->beaconLength = 0;
 		sme_join_rsp->assocReqLength = 0;
 		sme_join_rsp->assocRspLength = 0;
@@ -454,7 +479,6 @@ lim_send_sme_join_reassoc_rsp(tpAniSirGlobal mac_ctx, uint16_t msg_type,
 				FL("MemAlloc fail - JOIN/REASSOC_RSP"));
 			return;
 		}
-		qdf_mem_set((uint8_t *) sme_join_rsp, rsp_len, 0);
 		if (result_code == eSIR_SME_SUCCESS) {
 			sta_ds = dph_get_hash_entry(mac_ctx,
 				DPH_STA_HASH_INDEX_PEER,
@@ -480,6 +504,7 @@ lim_send_sme_join_reassoc_rsp(tpAniSirGlobal mac_ctx, uint16_t msg_type,
 				sme_join_rsp->nss = sta_ds->nss;
 				sme_join_rsp->max_rate_flags =
 					lim_get_max_rate_flags(mac_ctx, sta_ds);
+				lim_add_bss_info(sta_ds, sme_join_rsp);
 			}
 		}
 		sme_join_rsp->beaconLength = 0;
@@ -489,7 +514,6 @@ lim_send_sme_join_reassoc_rsp(tpAniSirGlobal mac_ctx, uint16_t msg_type,
 #ifdef FEATURE_WLAN_ESE
 		sme_join_rsp->tspecIeLen = 0;
 #endif
-
 		lim_handle_join_rsp_status(mac_ctx, session_entry, result_code,
 			sme_join_rsp);
 
@@ -546,7 +570,7 @@ lim_send_sme_start_bss_rsp(tpAniSirGlobal pMac,
 {
 
 	uint16_t size = 0;
-	tSirMsgQ mmhMsg;
+	struct scheduler_msg mmhMsg;
 	tSirSmeStartBssRsp *pSirSmeRsp;
 	uint16_t ieLen;
 	uint16_t ieOffset, curLen;
@@ -566,8 +590,6 @@ lim_send_sme_start_bss_rsp(tpAniSirGlobal pMac,
 					("call to AllocateMemory failed for eWNI_SME_START_BSS_RSP"));
 			return;
 		}
-		qdf_mem_set((uint8_t *) pSirSmeRsp, size, 0);
-
 	} else {
 		/* subtract size of beaconLength + Mac Hdr + Fixed Fields before SSID */
 		ieOffset = sizeof(tAniBeaconStruct) + SIR_MAC_B_PR_SSID_OFFSET;
@@ -585,7 +607,6 @@ lim_send_sme_start_bss_rsp(tpAniSirGlobal pMac,
 
 			return;
 		}
-		qdf_mem_set((uint8_t *) pSirSmeRsp, size, 0);
 		size = sizeof(tSirSmeStartBssRsp);
 		if (resultCode == eSIR_SME_SUCCESS) {
 
@@ -626,10 +647,10 @@ lim_send_sme_start_bss_rsp(tpAniSirGlobal pMac,
 				     (uint32_t) psessionEntry->
 				     schBeaconOffsetEnd);
 
-			/* subtracting size of length indicator itself and size of pointer to ieFields */
-			pSirSmeRsp->bssDescription.length =
-				sizeof(tSirBssDescription) - sizeof(uint16_t) -
-				sizeof(uint32_t) + ieLen;
+			pSirSmeRsp->bssDescription.length = (uint16_t)
+				(offsetof(tSirBssDescription, ieFields[0])
+				- sizeof(pSirSmeRsp->bssDescription.length)
+				+ ieLen);
 			/* This is the size of the message, subtracting the size of the pointer to ieFields */
 			size += ieLen - sizeof(uint32_t);
 		}
@@ -671,10 +692,11 @@ lim_send_sme_start_bss_rsp(tpAniSirGlobal pMac,
 	mmhMsg.bodyptr = pSirSmeRsp;
 	mmhMsg.bodyval = 0;
 	if (psessionEntry == NULL) {
-		MTRACE(mac_trace_msg_tx(pMac, NO_SESSION, mmhMsg.type));
+		MTRACE(mac_trace(pMac, TRACE_CODE_TX_SME_MSG,
+				 NO_SESSION, mmhMsg.type));
 	} else {
-		MTRACE(mac_trace_msg_tx
-			       (pMac, psessionEntry->peSessionId, mmhMsg.type));
+		MTRACE(mac_trace(pMac, TRACE_CODE_TX_SME_MSG,
+				 psessionEntry->peSessionId, mmhMsg.type));
 	}
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_LIM    /* FEATURE_WLAN_DIAG_SUPPORT */
 	lim_diag_event_report(pMac, WLAN_PE_DIAG_START_BSS_RSP_EVENT,
@@ -731,7 +753,7 @@ lim_post_sme_scan_rsp_message(tpAniSirGlobal pMac,
 			uint32_t scan_id)
 {
 	tpSirSmeScanRsp pSirSmeScanRsp;
-	tSirMsgQ mmhMsg;
+	struct scheduler_msg mmhMsg;
 
 	lim_log(pMac, LOG1, FL("send SME_SCAN_RSP (reasonCode %s)."),
 		lim_result_code_str(resultCode));
@@ -742,7 +764,6 @@ lim_post_sme_scan_rsp_message(tpAniSirGlobal pMac,
 			FL("AllocateMemory failed for eWNI_SME_SCAN_RSP"));
 		return;
 	}
-	qdf_mem_set((void *)pSirSmeScanRsp, sizeof(tSirSmeScanRsp), 0);
 
 	pSirSmeScanRsp->messageType = eWNI_SME_SCAN_RSP;
 	pSirSmeScanRsp->statusCode = resultCode;
@@ -756,7 +777,7 @@ lim_post_sme_scan_rsp_message(tpAniSirGlobal pMac,
 	mmhMsg.bodyptr = pSirSmeScanRsp;
 	mmhMsg.bodyval = 0;
 
-	MTRACE(mac_trace_msg_tx(pMac, NO_SESSION, mmhMsg.type));
+	MTRACE(mac_trace(pMac, TRACE_CODE_TX_SME_MSG, NO_SESSION, mmhMsg.type));
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_LIM    /* FEATURE_WLAN_DIAG_SUPPORT */
 	lim_diag_event_report(pMac, WLAN_PE_DIAG_SCAN_RSP_EVENT, NULL,
 			      (uint16_t) resultCode, 0);
@@ -767,110 +788,17 @@ lim_post_sme_scan_rsp_message(tpAniSirGlobal pMac,
 
 } /*** lim_post_sme_scan_rsp_message ***/
 
-#ifdef FEATURE_OEM_DATA_SUPPORT
-
-/**
- * lim_send_sme_oem_data_rsp()
- *
- ***FUNCTION:
- * This function is called by lim_process_sme_req_messages() to send
- * eWNI_SME_OEM_DATA_RSP message to applications above MAC
- * Software.
- *
- ***PARAMS:
- *
- ***LOGIC:
- *
- ***ASSUMPTIONS:
- * NA
- *
- ***NOTE:
- * NA
- *
- * @param pMac         Pointer to Global MAC structure
- * @param pMsgBuf      Indicates the mlm message
- * @param resultCode   Indicates the result of previously issued
- *                     eWNI_SME_OEM_DATA_RSP message
- *
- * @return None
- */
-
-void lim_send_sme_oem_data_rsp(tpAniSirGlobal pMac, uint32_t *pMsgBuf,
-			       tSirResultCodes resultCode)
-{
-	tSirMsgQ mmhMsg;
-	tSirOemDataRsp *pSirSmeOemDataRsp = NULL;
-	tLimMlmOemDataRsp *pMlmOemDataRsp = NULL;
-	uint16_t msgLength;
-
-	/* get the pointer to the mlm message */
-	pMlmOemDataRsp = (tLimMlmOemDataRsp *) (pMsgBuf);
-
-	msgLength = sizeof(*pSirSmeOemDataRsp);
-	/* now allocate memory for the char buffer */
-	pSirSmeOemDataRsp = qdf_mem_malloc(sizeof(*pSirSmeOemDataRsp));
-	if (NULL == pSirSmeOemDataRsp) {
-		lim_log(pMac, LOGP,
-			FL("malloc failed for pSirSmeOemDataRsp"));
-		qdf_mem_free(pMlmOemDataRsp->oem_data_rsp);
-		qdf_mem_free(pMlmOemDataRsp);
-		return;
-	}
-
-	if (pMlmOemDataRsp->rsp_len) {
-		pSirSmeOemDataRsp->oem_data_rsp =
-			qdf_mem_malloc(pMlmOemDataRsp->rsp_len);
-		if (!pSirSmeOemDataRsp->oem_data_rsp) {
-			lim_log(pMac, LOGE,
-				FL("malloc failed for oem_data_rsp"));
-			qdf_mem_free(pSirSmeOemDataRsp);
-			qdf_mem_free(pMlmOemDataRsp->oem_data_rsp);
-			qdf_mem_free(pMlmOemDataRsp);
-			return;
-		}
-	}
-
-#if defined (ANI_LITTLE_BYTE_ENDIAN)
-	sir_store_u16_n((uint8_t *) &pSirSmeOemDataRsp->length, msgLength);
-	sir_store_u16_n((uint8_t *) &pSirSmeOemDataRsp->messageType,
-			eWNI_SME_OEM_DATA_RSP);
-#else
-	pSirSmeOemDataRsp->length = msgLength;
-	pSirSmeOemDataRsp->messageType = eWNI_SME_OEM_DATA_RSP;
-#endif
-	pSirSmeOemDataRsp->target_rsp = pMlmOemDataRsp->target_rsp;
-	pSirSmeOemDataRsp->rsp_len = pMlmOemDataRsp->rsp_len;
-	if (pSirSmeOemDataRsp->rsp_len)
-		qdf_mem_copy(pSirSmeOemDataRsp->oem_data_rsp,
-			     pMlmOemDataRsp->oem_data_rsp,
-			     pSirSmeOemDataRsp->rsp_len);
-
-	/* Now free the memory from MLM Rsp Message */
-	qdf_mem_free(pMlmOemDataRsp->oem_data_rsp);
-	qdf_mem_free(pMlmOemDataRsp);
-
-	mmhMsg.type = eWNI_SME_OEM_DATA_RSP;
-	mmhMsg.bodyptr = pSirSmeOemDataRsp;
-	mmhMsg.bodyval = 0;
-
-	lim_sys_process_mmh_msg_api(pMac, &mmhMsg, ePROT);
-
-	return;
-} /*** lim_send_sme_oem_data_rsp ***/
-
-#endif
-
 void lim_send_sme_disassoc_deauth_ntf(tpAniSirGlobal pMac,
 				      QDF_STATUS status, uint32_t *pCtx)
 {
-	tSirMsgQ mmhMsg;
-	tSirMsgQ *pMsg = (tSirMsgQ *) pCtx;
+	struct scheduler_msg mmhMsg;
+	struct scheduler_msg *pMsg = (struct scheduler_msg *) pCtx;
 
 	mmhMsg.type = pMsg->type;
 	mmhMsg.bodyptr = pMsg;
 	mmhMsg.bodyval = 0;
 
-	MTRACE(mac_trace_msg_tx(pMac, NO_SESSION, mmhMsg.type));
+	MTRACE(mac_trace(pMac, TRACE_CODE_TX_SME_MSG, NO_SESSION, mmhMsg.type));
 
 	lim_sys_process_mmh_msg_api(pMac, &mmhMsg, ePROT);
 }
@@ -916,18 +844,51 @@ lim_send_sme_disassoc_ntf(tpAniSirGlobal pMac,
 	uint8_t *pBuf;
 	tSirSmeDisassocRsp *pSirSmeDisassocRsp;
 	tSirSmeDisassocInd *pSirSmeDisassocInd;
-	uint32_t *pMsg;
+	uint32_t *pMsg = NULL;
 	bool failure = false;
+	tpPESession session = NULL;
+	uint16_t i, assoc_id;
+	tpDphHashNode sta_ds = NULL;
+	struct sir_sme_discon_done_ind *sir_sme_dis_ind;
 
 	lim_log(pMac, LOG1, FL("Disassoc Ntf with trigger : %d reasonCode: %d"),
 		disassocTrigger, reasonCode);
 
 	switch (disassocTrigger) {
-	case eLIM_PEER_ENTITY_DISASSOC:
-		if (reasonCode != eSIR_SME_STA_NOT_ASSOCIATED) {
-			failure = true;
-			goto error;
+	case eLIM_DUPLICATE_ENTRY:
+		/*
+		 * Duplicate entry is removed at LIM.
+		 * Initiate new entry for other session
+		 */
+		lim_log(pMac, LOG1,
+			FL("Rcvd eLIM_DUPLICATE_ENTRY for " MAC_ADDRESS_STR),
+			MAC_ADDR_ARRAY(peerMacAddr));
+
+		for (i = 0; i < pMac->lim.maxBssId; i++) {
+			if ((&pMac->lim.gpSession[i] != NULL) &&
+					(pMac->lim.gpSession[i].valid) &&
+					(pMac->lim.gpSession[i].pePersona ==
+								QDF_SAP_MODE)) {
+				/* Find the sta ds entry in another session */
+				session = &pMac->lim.gpSession[i];
+				sta_ds = dph_lookup_hash_entry(pMac,
+						peerMacAddr, &assoc_id,
+						&session->dph.dphHashTable);
+			}
 		}
+		if (sta_ds
+#ifdef WLAN_FEATURE_11W
+			&& (!sta_ds->rmfEnabled)
+#endif
+		) {
+			if (lim_add_sta(pMac, sta_ds, false, session) !=
+					eSIR_SUCCESS)
+					lim_log(pMac, LOGE,
+					FL("could not Add STA with assocId=%d"),
+					sta_ds->assocId);
+		}
+		failure = true;
+		break;
 
 	case eLIM_HOST_DISASSOC:
 		/**
@@ -973,6 +934,42 @@ lim_send_sme_disassoc_ntf(tpAniSirGlobal pMac,
 				      psessionEntry, (uint16_t) reasonCode, 0);
 #endif
 		pMsg = (uint32_t *) pSirSmeDisassocRsp;
+		break;
+
+	case eLIM_PEER_ENTITY_DISASSOC:
+	case eLIM_LINK_MONITORING_DISASSOC:
+		sir_sme_dis_ind =
+			qdf_mem_malloc(sizeof(*sir_sme_dis_ind));
+		if (!sir_sme_dis_ind) {
+			lim_log(pMac, LOGE,
+				FL("call to AllocateMemory failed for disconnect indication"));
+			return;
+		}
+
+		lim_log(pMac, LOG1,
+			FL("send  eWNI_SME_DISCONNECT_DONE_IND with retCode: %d"),
+				reasonCode);
+
+		sir_sme_dis_ind->message_type =
+			eWNI_SME_DISCONNECT_DONE_IND;
+		sir_sme_dis_ind->length =
+			sizeof(*sir_sme_dis_ind);
+		qdf_mem_copy(sir_sme_dis_ind->peer_mac, peerMacAddr,
+			     sizeof(tSirMacAddr));
+		sir_sme_dis_ind->session_id   = smesessionId;
+		sir_sme_dis_ind->reason_code  = reasonCode;
+		/*
+		 * Instead of sending deauth reason code as 505 which is
+		 * internal value(eSIR_SME_LOST_LINK_WITH_PEER_RESULT_CODE)
+		 * Send reason code as zero to Supplicant
+		 */
+		if (reasonCode == eSIR_SME_LOST_LINK_WITH_PEER_RESULT_CODE)
+			sir_sme_dis_ind->reason_code = 0;
+		else
+			sir_sme_dis_ind->reason_code = reasonCode;
+
+		pMsg = (uint32_t *)sir_sme_dis_ind;
+
 		break;
 
 	default:
@@ -1043,7 +1040,7 @@ void
 lim_send_sme_disassoc_ind(tpAniSirGlobal pMac, tpDphHashNode pStaDs,
 			  tpPESession psessionEntry)
 {
-	tSirMsgQ mmhMsg;
+	struct scheduler_msg mmhMsg;
 	tSirSmeDisassocInd *pSirSmeDisassocInd;
 
 	pSirSmeDisassocInd = qdf_mem_malloc(sizeof(tSirSmeDisassocInd));
@@ -1058,7 +1055,7 @@ lim_send_sme_disassoc_ind(tpAniSirGlobal pMac, tpDphHashNode pStaDs,
 
 	pSirSmeDisassocInd->sessionId = psessionEntry->smeSessionId;
 	pSirSmeDisassocInd->transactionId = psessionEntry->transactionId;
-	pSirSmeDisassocInd->statusCode = pStaDs->mlmStaContext.disassocReason;
+	pSirSmeDisassocInd->statusCode = eSIR_SME_DEAUTH_STATUS;
 	pSirSmeDisassocInd->reasonCode = pStaDs->mlmStaContext.disassocReason;
 
 	qdf_mem_copy(pSirSmeDisassocInd->bssid.bytes, psessionEntry->bssId,
@@ -1073,7 +1070,8 @@ lim_send_sme_disassoc_ind(tpAniSirGlobal pMac, tpDphHashNode pStaDs,
 	mmhMsg.bodyptr = pSirSmeDisassocInd;
 	mmhMsg.bodyval = 0;
 
-	MTRACE(mac_trace_msg_tx(pMac, psessionEntry->peSessionId, mmhMsg.type));
+	MTRACE(mac_trace(pMac, TRACE_CODE_TX_SME_MSG,
+			 psessionEntry->peSessionId, mmhMsg.type));
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_LIM    /* FEATURE_WLAN_DIAG_SUPPORT */
 	lim_diag_event_report(pMac, WLAN_PE_DIAG_DISASSOC_IND_EVENT, psessionEntry,
 			      0, (uint16_t) pStaDs->mlmStaContext.disassocReason);
@@ -1099,7 +1097,7 @@ void
 lim_send_sme_deauth_ind(tpAniSirGlobal pMac, tpDphHashNode pStaDs,
 			tpPESession psessionEntry)
 {
-	tSirMsgQ mmhMsg;
+	struct scheduler_msg mmhMsg;
 	tSirSmeDeauthInd *pSirSmeDeauthInd;
 
 	pSirSmeDeauthInd = qdf_mem_malloc(sizeof(tSirSmeDeauthInd));
@@ -1173,7 +1171,7 @@ void
 lim_send_sme_tdls_del_sta_ind(tpAniSirGlobal pMac, tpDphHashNode pStaDs,
 			      tpPESession psessionEntry, uint16_t reasonCode)
 {
-	tSirMsgQ mmhMsg;
+	struct scheduler_msg mmhMsg;
 	tSirTdlsDelStaInd *pSirTdlsDelStaInd;
 
 	pSirTdlsDelStaInd = qdf_mem_malloc(sizeof(tSirTdlsDelStaInd));
@@ -1183,6 +1181,9 @@ lim_send_sme_tdls_del_sta_ind(tpAniSirGlobal pMac, tpDphHashNode pStaDs,
 				("AllocateMemory failed for eWNI_SME_TDLS_DEL_STA_IND "));
 		return;
 	}
+	lim_log(pMac, LOG1, FL("Delete TDLS Peer "MAC_ADDRESS_STR
+				  "with reason code %d"),
+			MAC_ADDR_ARRAY(pStaDs->staAddr), reasonCode);
 	/* messageType */
 	pSirTdlsDelStaInd->messageType = eWNI_SME_TDLS_DEL_STA_IND;
 	pSirTdlsDelStaInd->length = sizeof(tSirTdlsDelStaInd);
@@ -1230,7 +1231,7 @@ lim_send_sme_tdls_del_sta_ind(tpAniSirGlobal pMac, tpDphHashNode pStaDs,
 void
 lim_send_sme_tdls_delete_all_peer_ind(tpAniSirGlobal pMac, tpPESession psessionEntry)
 {
-	tSirMsgQ mmhMsg;
+	struct scheduler_msg mmhMsg;
 	tSirTdlsDelAllPeerInd *pSirTdlsDelAllPeerInd;
 
 	pSirTdlsDelAllPeerInd = qdf_mem_malloc(sizeof(tSirTdlsDelAllPeerInd));
@@ -1276,9 +1277,10 @@ lim_send_sme_tdls_delete_all_peer_ind(tpAniSirGlobal pMac, tpPESession psessionE
  */
 void
 lim_send_sme_mgmt_tx_completion(tpAniSirGlobal pMac,
-				tpPESession psessionEntry, uint32_t txCompleteStatus)
+				uint32_t sme_session_id,
+				uint32_t txCompleteStatus)
 {
-	tSirMsgQ mmhMsg;
+	struct scheduler_msg mmhMsg;
 	tSirMgmtTxCompletionInd *pSirMgmtTxCompletionInd;
 
 	pSirMgmtTxCompletionInd =
@@ -1295,7 +1297,7 @@ lim_send_sme_mgmt_tx_completion(tpAniSirGlobal pMac,
 	pSirMgmtTxCompletionInd->length = sizeof(tSirMgmtTxCompletionInd);
 
 	/* sessionId */
-	pSirMgmtTxCompletionInd->sessionId = psessionEntry->smeSessionId;
+	pSirMgmtTxCompletionInd->sessionId = sme_session_id;
 
 	pSirMgmtTxCompletionInd->txCompleteStatus = txCompleteStatus;
 
@@ -1310,7 +1312,7 @@ lim_send_sme_mgmt_tx_completion(tpAniSirGlobal pMac,
 void lim_send_sme_tdls_event_notify(tpAniSirGlobal pMac, uint16_t msgType,
 				    void *events)
 {
-	tSirMsgQ mmhMsg;
+	struct scheduler_msg mmhMsg;
 
 	switch (msgType) {
 	case SIR_HAL_TDLS_SHOULD_DISCOVER:
@@ -1373,12 +1375,10 @@ lim_send_sme_deauth_ntf(tpAniSirGlobal pMac, tSirMacAddr peerMacAddr,
 	tpPESession psessionEntry;
 	uint8_t sessionId;
 	uint32_t *pMsg;
+	struct sir_sme_discon_done_ind *sir_sme_dis_ind;
 
 	psessionEntry = pe_find_session_by_bssid(pMac, peerMacAddr, &sessionId);
 	switch (deauthTrigger) {
-	case eLIM_PEER_ENTITY_DEAUTH:
-		return;
-
 	case eLIM_HOST_DEAUTH:
 		/**
 		 * Deauthentication response to host triggered
@@ -1410,6 +1410,42 @@ lim_send_sme_deauth_ntf(tpAniSirGlobal pMac, tSirMacAddr peerMacAddr,
 				      psessionEntry, 0, (uint16_t) reasonCode);
 #endif
 		pMsg = (uint32_t *) pSirSmeDeauthRsp;
+
+		break;
+
+	case eLIM_PEER_ENTITY_DEAUTH:
+	case eLIM_LINK_MONITORING_DEAUTH:
+		sir_sme_dis_ind =
+			qdf_mem_malloc(sizeof(*sir_sme_dis_ind));
+		if (!sir_sme_dis_ind) {
+			lim_log(pMac, LOGE,
+				FL("call to AllocateMemory failed for disconnect indication"));
+			return;
+		}
+
+		lim_log(pMac, LOG1,
+		       FL("send  eWNI_SME_DISCONNECT_DONE_IND withretCode: %d"),
+				reasonCode);
+
+		sir_sme_dis_ind->message_type =
+			eWNI_SME_DISCONNECT_DONE_IND;
+		sir_sme_dis_ind->length =
+			sizeof(*sir_sme_dis_ind);
+		sir_sme_dis_ind->session_id = smesessionId;
+		sir_sme_dis_ind->reason_code = reasonCode;
+		qdf_mem_copy(sir_sme_dis_ind->peer_mac, peerMacAddr,
+			 ETH_ALEN);
+		/*
+		 * Instead of sending deauth reason code as 505 which is
+		 * internal value(eSIR_SME_LOST_LINK_WITH_PEER_RESULT_CODE)
+		 * Send reason code as zero to Supplicant
+		 */
+		if (reasonCode == eSIR_SME_LOST_LINK_WITH_PEER_RESULT_CODE)
+			sir_sme_dis_ind->reason_code = 0;
+		else
+			sir_sme_dis_ind->reason_code = reasonCode;
+
+		pMsg = (uint32_t *)sir_sme_dis_ind;
 
 		break;
 
@@ -1494,8 +1530,9 @@ lim_send_sme_wm_status_change_ntf(tpAniSirGlobal mac_ctx,
 	tSirSmeStatusChangeCode status_change_code,
 	uint32_t *status_change_info, uint16_t info_len, uint8_t session_id)
 {
-	tSirMsgQ msg;
+	struct scheduler_msg msg;
 	tSirSmeWmStatusChangeNtf *wm_status_change_ntf;
+	uint32_t max_info_len;
 
 	wm_status_change_ntf = qdf_mem_malloc(sizeof(tSirSmeWmStatusChangeNtf));
 	if (NULL == wm_status_change_ntf) {
@@ -1509,6 +1546,18 @@ lim_send_sme_wm_status_change_ntf(tpAniSirGlobal mac_ctx,
 	msg.bodyptr = wm_status_change_ntf;
 
 	switch (status_change_code) {
+	case eSIR_SME_AP_CAPS_CHANGED:
+		max_info_len = sizeof(tSirSmeApNewCaps);
+		break;
+	case eSIR_SME_JOINED_NEW_BSS:
+		max_info_len = sizeof(tSirSmeNewBssInfo);
+		break;
+	default:
+		max_info_len = sizeof(wm_status_change_ntf->statusChangeInfo);
+		break;
+	}
+
+	switch (status_change_code) {
 	case eSIR_SME_RADAR_DETECTED:
 		break;
 	default:
@@ -1517,8 +1566,7 @@ lim_send_sme_wm_status_change_ntf(tpAniSirGlobal mac_ctx,
 		wm_status_change_ntf->statusChangeCode = status_change_code;
 		wm_status_change_ntf->length = sizeof(tSirSmeWmStatusChangeNtf);
 		wm_status_change_ntf->sessionId = session_id;
-		if (sizeof(wm_status_change_ntf->statusChangeInfo) >=
-			info_len) {
+		if (info_len <= max_info_len && status_change_info) {
 			qdf_mem_copy(
 			    (uint8_t *) &wm_status_change_ntf->statusChangeInfo,
 			    (uint8_t *) status_change_info, info_len);
@@ -1529,7 +1577,7 @@ lim_send_sme_wm_status_change_ntf(tpAniSirGlobal mac_ctx,
 		break;
 	}
 
-	MTRACE(mac_trace_msg_tx(mac_ctx, session_id, msg.type));
+	MTRACE(mac_trace(mac_ctx, TRACE_CODE_TX_SME_MSG, session_id, msg.type));
 	if (eSIR_SUCCESS != lim_sys_process_mmh_msg_api(mac_ctx, &msg, ePROT)) {
 		qdf_mem_free(wm_status_change_ntf);
 		lim_log(mac_ctx, LOGP,
@@ -1571,7 +1619,7 @@ lim_send_sme_set_context_rsp(tpAniSirGlobal pMac,
 			     tpPESession psessionEntry, uint8_t smesessionId,
 			     uint16_t smetransactionId)
 {
-	tSirMsgQ mmhMsg;
+	struct scheduler_msg mmhMsg;
 	tSirSmeSetContextRsp *pSirSmeSetContextRsp;
 
 	pSirSmeSetContextRsp = qdf_mem_malloc(sizeof(tSirSmeSetContextRsp));
@@ -1598,10 +1646,11 @@ lim_send_sme_set_context_rsp(tpAniSirGlobal pMac,
 	mmhMsg.bodyptr = pSirSmeSetContextRsp;
 	mmhMsg.bodyval = 0;
 	if (NULL == psessionEntry) {
-		MTRACE(mac_trace_msg_tx(pMac, NO_SESSION, mmhMsg.type));
+		MTRACE(mac_trace(pMac, TRACE_CODE_TX_SME_MSG,
+				 NO_SESSION, mmhMsg.type));
 	} else {
-		MTRACE(mac_trace_msg_tx
-			       (pMac, psessionEntry->peSessionId, mmhMsg.type));
+		MTRACE(mac_trace(pMac, TRACE_CODE_TX_SME_MSG,
+				 psessionEntry->peSessionId, mmhMsg.type));
 	}
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_LIM    /* FEATURE_WLAN_DIAG_SUPPORT */
@@ -1638,7 +1687,7 @@ lim_send_sme_set_context_rsp(tpAniSirGlobal pMac,
 void
 lim_send_sme_neighbor_bss_ind(tpAniSirGlobal pMac, tLimScanResultNode *pBssDescr)
 {
-	tSirMsgQ msgQ;
+	struct scheduler_msg msgQ;
 	uint32_t val;
 	tSirSmeNeighborBssInd *pNewBssInd;
 
@@ -1692,7 +1741,7 @@ lim_send_sme_neighbor_bss_ind(tpAniSirGlobal pMac, tLimScanResultNode *pBssDescr
 	msgQ.type = eWNI_SME_NEIGHBOR_BSS_IND;
 	msgQ.bodyptr = pNewBssInd;
 	msgQ.bodyval = 0;
-	MTRACE(mac_trace_msg_tx(pMac, NO_SESSION, msgQ.type));
+	MTRACE(mac_trace(pMac, TRACE_CODE_TX_SME_MSG, NO_SESSION, msgQ.type));
 	lim_sys_process_mmh_msg_api(pMac, &msgQ, ePROT);
 } /*** end lim_send_sme_neighbor_bss_ind() ***/
 
@@ -1712,7 +1761,7 @@ lim_send_sme_addts_rsp(tpAniSirGlobal pMac, uint8_t rspReqd, uint32_t status,
 		       uint8_t smesessionId, uint16_t smetransactionId)
 {
 	tpSirAddtsRsp rsp;
-	tSirMsgQ mmhMsg;
+	struct scheduler_msg mmhMsg;
 
 	if (!rspReqd)
 		return;
@@ -1723,7 +1772,6 @@ lim_send_sme_addts_rsp(tpAniSirGlobal pMac, uint8_t rspReqd, uint32_t status,
 		return;
 	}
 
-	qdf_mem_set((uint8_t *) rsp, sizeof(*rsp), 0);
 	rsp->messageType = eWNI_SME_ADDTS_RSP;
 	rsp->rc = status;
 	rsp->rsp.status = (enum eSirMacStatusCodes)status;
@@ -1736,10 +1784,11 @@ lim_send_sme_addts_rsp(tpAniSirGlobal pMac, uint8_t rspReqd, uint32_t status,
 	mmhMsg.bodyptr = rsp;
 	mmhMsg.bodyval = 0;
 	if (NULL == psessionEntry) {
-		MTRACE(mac_trace_msg_tx(pMac, NO_SESSION, mmhMsg.type));
+		MTRACE(mac_trace(pMac, TRACE_CODE_TX_SME_MSG,
+				 NO_SESSION, mmhMsg.type));
 	} else {
-		MTRACE(mac_trace_msg_tx
-			       (pMac, psessionEntry->peSessionId, mmhMsg.type));
+		MTRACE(mac_trace(pMac, TRACE_CODE_TX_SME_MSG,
+				 psessionEntry->peSessionId, mmhMsg.type));
 	}
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_LIM    /* FEATURE_WLAN_DIAG_SUPPORT */
 	lim_diag_event_report(pMac, WLAN_PE_DIAG_ADDTS_RSP_EVENT, psessionEntry, 0,
@@ -1756,7 +1805,7 @@ lim_send_sme_delts_rsp(tpAniSirGlobal pMac, tpSirDeltsReq delts, uint32_t status
 		       uint16_t smetransactionId)
 {
 	tpSirDeltsRsp rsp;
-	tSirMsgQ mmhMsg;
+	struct scheduler_msg mmhMsg;
 
 	lim_log(pMac, LOGW, "SendSmeDeltsRsp (aid %d, tsid %d, up %d) status %d",
 		delts->aid,
@@ -1771,7 +1820,6 @@ lim_send_sme_delts_rsp(tpAniSirGlobal pMac, tpSirDeltsReq delts, uint32_t status
 		lim_log(pMac, LOGP, FL("AllocateMemory failed for DELTS_RSP"));
 		return;
 	}
-	qdf_mem_set((uint8_t *) rsp, sizeof(*rsp), 0);
 
 	if (psessionEntry != NULL) {
 
@@ -1792,10 +1840,11 @@ lim_send_sme_delts_rsp(tpAniSirGlobal pMac, tpSirDeltsReq delts, uint32_t status
 	mmhMsg.bodyptr = rsp;
 	mmhMsg.bodyval = 0;
 	if (NULL == psessionEntry) {
-		MTRACE(mac_trace_msg_tx(pMac, NO_SESSION, mmhMsg.type));
+		MTRACE(mac_trace(pMac, TRACE_CODE_TX_SME_MSG,
+				 NO_SESSION, mmhMsg.type));
 	} else {
-		MTRACE(mac_trace_msg_tx
-			       (pMac, psessionEntry->peSessionId, mmhMsg.type));
+		MTRACE(mac_trace(pMac, TRACE_CODE_TX_SME_MSG,
+				 psessionEntry->peSessionId, mmhMsg.type));
 	}
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_LIM    /* FEATURE_WLAN_DIAG_SUPPORT */
 	lim_diag_event_report(pMac, WLAN_PE_DIAG_DELTS_RSP_EVENT, psessionEntry,
@@ -1810,7 +1859,7 @@ lim_send_sme_delts_ind(tpAniSirGlobal pMac, tpSirDeltsReqInfo delts, uint16_t ai
 		       tpPESession psessionEntry)
 {
 	tpSirDeltsRsp rsp;
-	tSirMsgQ mmhMsg;
+	struct scheduler_msg mmhMsg;
 
 	lim_log(pMac, LOGW, "SendSmeDeltsInd (aid %d, tsid %d, up %d)",
 		aid, delts->tsinfo.traffic.tsid, delts->tsinfo.traffic.userPrio);
@@ -1821,7 +1870,6 @@ lim_send_sme_delts_ind(tpAniSirGlobal pMac, tpSirDeltsReqInfo delts, uint16_t ai
 		lim_log(pMac, LOGP, FL("AllocateMemory failed for DELTS_IND"));
 		return;
 	}
-	qdf_mem_set((uint8_t *) rsp, sizeof(*rsp), 0);
 
 	rsp->messageType = eWNI_SME_DELTS_IND;
 	rsp->rc = eSIR_SUCCESS;
@@ -1874,7 +1922,7 @@ lim_send_sme_delts_ind(tpAniSirGlobal pMac, tpSirDeltsReqInfo delts, uint16_t ai
 void
 lim_send_sme_pe_statistics_rsp(tpAniSirGlobal pMac, uint16_t msgType, void *stats)
 {
-	tSirMsgQ mmhMsg;
+	struct scheduler_msg mmhMsg;
 	uint8_t sessionId;
 	tAniGetPEStatsRsp *pPeStats = (tAniGetPEStatsRsp *) stats;
 	tpPESession pPeSessionEntry;
@@ -1896,7 +1944,7 @@ lim_send_sme_pe_statistics_rsp(tpAniSirGlobal pMac, uint16_t msgType, void *stat
 
 	mmhMsg.bodyptr = stats;
 	mmhMsg.bodyval = 0;
-	MTRACE(mac_trace_msg_tx(pMac, NO_SESSION, mmhMsg.type));
+	MTRACE(mac_trace(pMac, TRACE_CODE_TX_SME_MSG, NO_SESSION, mmhMsg.type));
 	lim_sys_process_mmh_msg_api(pMac, &mmhMsg, ePROT);
 
 	return;
@@ -1918,7 +1966,7 @@ lim_send_sme_pe_statistics_rsp(tpAniSirGlobal pMac, uint16_t msgType, void *stat
 void lim_send_sme_pe_ese_tsm_rsp(tpAniSirGlobal pMac,
 				 tAniGetTsmStatsRsp *pStats)
 {
-	tSirMsgQ mmhMsg;
+	struct scheduler_msg mmhMsg;
 	uint8_t sessionId;
 	tAniGetTsmStatsRsp *pPeStats = (tAniGetTsmStatsRsp *) pStats;
 	tpPESession pPeSessionEntry = NULL;
@@ -1947,7 +1995,7 @@ void lim_send_sme_pe_ese_tsm_rsp(tpAniSirGlobal pMac,
 	mmhMsg.type = eWNI_SME_GET_TSM_STATS_RSP;
 	mmhMsg.bodyptr = pStats;
 	mmhMsg.bodyval = 0;
-	MTRACE(mac_trace_msg_tx(pMac, sessionId, mmhMsg.type));
+	MTRACE(mac_trace(pMac, TRACE_CODE_TX_SME_MSG, sessionId, mmhMsg.type));
 	lim_sys_process_mmh_msg_api(pMac, &mmhMsg, ePROT);
 
 	return;
@@ -1964,7 +2012,7 @@ lim_send_sme_ibss_peer_ind(tpAniSirGlobal pMac,
 			   uint8_t *beacon,
 			   uint16_t beaconLen, uint16_t msgType, uint8_t sessionId)
 {
-	tSirMsgQ mmhMsg;
+	struct scheduler_msg mmhMsg;
 	tSmeIbssPeerInd *pNewPeerInd;
 
 	pNewPeerInd = qdf_mem_malloc(sizeof(tSmeIbssPeerInd) + beaconLen);
@@ -1972,9 +2020,6 @@ lim_send_sme_ibss_peer_ind(tpAniSirGlobal pMac,
 		PELOGE(lim_log(pMac, LOGE, FL("Failed to allocate memory"));)
 		return;
 	}
-
-	qdf_mem_set((void *)pNewPeerInd, (sizeof(tSmeIbssPeerInd) + beaconLen),
-		    0);
 
 	qdf_mem_copy((uint8_t *) pNewPeerInd->peer_addr.bytes,
 		     peerMacAddr, QDF_MAC_ADDR_SIZE);
@@ -1993,11 +2038,81 @@ lim_send_sme_ibss_peer_ind(tpAniSirGlobal pMac,
 
 	mmhMsg.type = msgType;
 	mmhMsg.bodyptr = pNewPeerInd;
-	MTRACE(mac_trace_msg_tx(pMac, sessionId, mmhMsg.type));
+	MTRACE(mac_trace(pMac, TRACE_CODE_TX_SME_MSG, sessionId, mmhMsg.type));
 	lim_sys_process_mmh_msg_api(pMac, &mmhMsg, ePROT);
 
 }
 
+/**
+ * lim_process_csa_wbw_ie() - Process CSA Wide BW IE
+ * @mac_ctx:         pointer to global adapter context
+ * @csa_params:      pointer to CSA parameters
+ * @chnl_switch_info:pointer to channel switch parameters
+ * @session_entry:   session pointer
+ *
+ * Return: None
+ */
+static void lim_process_csa_wbw_ie(tpAniSirGlobal mac_ctx,
+		struct csa_offload_params *csa_params,
+		tLimWiderBWChannelSwitchInfo *chnl_switch_info,
+		tpPESession session_entry)
+{
+	struct ch_params_s ch_params = {0};
+	uint8_t ap_new_ch_width;
+	bool new_ch_width_dfn = false;
+	uint8_t center_freq_diff;
+
+	ap_new_ch_width = csa_params->new_ch_width + 1;
+	if ((ap_new_ch_width == CH_WIDTH_80MHZ) &&
+			csa_params->new_ch_freq_seg2) {
+		new_ch_width_dfn = true;
+		if (csa_params->new_ch_freq_seg2 >
+				csa_params->new_ch_freq_seg1)
+			center_freq_diff = csa_params->new_ch_freq_seg2 -
+				csa_params->new_ch_freq_seg1;
+		else
+			center_freq_diff = csa_params->new_ch_freq_seg1 -
+				csa_params->new_ch_freq_seg2;
+		if (center_freq_diff == CENTER_FREQ_DIFF_160MHz)
+			ap_new_ch_width = CH_WIDTH_160MHZ;
+		else if (center_freq_diff > CENTER_FREQ_DIFF_80P80MHz)
+			ap_new_ch_width = CH_WIDTH_80P80MHZ;
+		else
+			ap_new_ch_width = CH_WIDTH_80MHZ;
+	}
+	session_entry->gLimChannelSwitch.state =
+		eLIM_CHANNEL_SWITCH_PRIMARY_AND_SECONDARY;
+	if ((ap_new_ch_width == CH_WIDTH_160MHZ) &&
+			!new_ch_width_dfn) {
+		ch_params.ch_width = CH_WIDTH_160MHZ;
+		cds_set_channel_params(csa_params->channel, 0,
+				&ch_params);
+		ap_new_ch_width = ch_params.ch_width;
+		csa_params->new_ch_freq_seg1 = ch_params.center_freq_seg0;
+		csa_params->new_ch_freq_seg2 = ch_params.center_freq_seg1;
+	}
+	chnl_switch_info->newChanWidth = ap_new_ch_width;
+	chnl_switch_info->newCenterChanFreq0 = csa_params->new_ch_freq_seg1;
+	chnl_switch_info->newCenterChanFreq1 = csa_params->new_ch_freq_seg2;
+
+	if (session_entry->ch_width == ap_new_ch_width)
+		goto prnt_log;
+
+	if (session_entry->ch_width == CH_WIDTH_80MHZ) {
+		chnl_switch_info->newChanWidth = CH_WIDTH_80MHZ;
+		chnl_switch_info->newCenterChanFreq1 = 0;
+	} else {
+		session_entry->ch_width = ap_new_ch_width;
+		chnl_switch_info->newChanWidth = ap_new_ch_width;
+	}
+prnt_log:
+	lim_log(mac_ctx, LOG1,
+			FL("new channel: %d new_ch_width:%d seg0:%d seg1:%d"),
+			csa_params->channel,
+			chnl_switch_info->newChanWidth,
+			chnl_switch_info->newCenterChanFreq0,
+			chnl_switch_info->newCenterChanFreq1);
+}
 /**
  * lim_handle_csa_offload_msg() - Handle CSA offload message
  * @mac_ctx:         pointer to global adapter context
@@ -2005,10 +2120,11 @@ lim_send_sme_ibss_peer_ind(tpAniSirGlobal pMac,
  *
  * Return: None
  */
-void lim_handle_csa_offload_msg(tpAniSirGlobal mac_ctx, tpSirMsgQ msg)
+void lim_handle_csa_offload_msg(tpAniSirGlobal mac_ctx,
+				struct scheduler_msg *msg)
 {
 	tpPESession session_entry;
-	tSirMsgQ mmh_msg;
+	struct scheduler_msg mmh_msg;
 	struct csa_offload_params *csa_params =
 				(struct csa_offload_params *) (msg->bodyptr);
 	tpSmeCsaOffloadInd csa_offload_ind;
@@ -2047,182 +2163,181 @@ void lim_handle_csa_offload_msg(tpAniSirGlobal mac_ctx, tpSirMsgQ msg)
 		goto err;
 	}
 
-	if (LIM_IS_STA_ROLE(session_entry)) {
-		/*
-		 * on receiving channel switch announcement from AP, delete all
-		 * TDLS peers before leaving BSS and proceed for channel switch
-		 */
-		lim_delete_tdls_peers(mac_ctx, session_entry);
+	if (!LIM_IS_STA_ROLE(session_entry)) {
+		lim_log(mac_ctx, LOG1, FL("Invalid role to handle CSA"));
+		goto err;
+	}
 
-		lim_ch_switch = &session_entry->gLimChannelSwitch;
-		session_entry->gLimChannelSwitch.switchMode =
-			csa_params->switch_mode;
-		/* timer already started by firmware, switch immediately */
-		session_entry->gLimChannelSwitch.switchCount = 0;
-		session_entry->gLimChannelSwitch.primaryChannel =
-			csa_params->channel;
-		session_entry->gLimChannelSwitch.state =
-			eLIM_CHANNEL_SWITCH_PRIMARY_ONLY;
-		session_entry->gLimChannelSwitch.ch_width = CH_WIDTH_20MHZ;
-		lim_ch_switch->sec_ch_offset =
-			session_entry->htSecondaryChannelOffset;
-		session_entry->gLimChannelSwitch.ch_center_freq_seg0 = 0;
-		session_entry->gLimChannelSwitch.ch_center_freq_seg1 = 0;
-		chnl_switch_info =
-			&session_entry->gLimWiderBWChannelSwitch;
+	/*
+	 * on receiving channel switch announcement from AP, delete all
+	 * TDLS peers before leaving BSS and proceed for channel switch
+	 */
+	lim_delete_tdls_peers(mac_ctx, session_entry);
 
-		lim_log(mac_ctx, LOG1,
-			FL("vht:%d ht:%d flag:%x chan:%d seg1:%d seg2:%d width:%d country:%s class:%d"),
+	lim_ch_switch = &session_entry->gLimChannelSwitch;
+	session_entry->gLimChannelSwitch.switchMode =
+		csa_params->switch_mode;
+	/* timer already started by firmware, switch immediately */
+	session_entry->gLimChannelSwitch.switchCount = 0;
+	session_entry->gLimChannelSwitch.primaryChannel =
+		csa_params->channel;
+	session_entry->gLimChannelSwitch.state =
+		eLIM_CHANNEL_SWITCH_PRIMARY_ONLY;
+	session_entry->gLimChannelSwitch.ch_width = CH_WIDTH_20MHZ;
+	lim_ch_switch->sec_ch_offset =
+		session_entry->htSecondaryChannelOffset;
+	session_entry->gLimChannelSwitch.ch_center_freq_seg0 = 0;
+	session_entry->gLimChannelSwitch.ch_center_freq_seg1 = 0;
+	chnl_switch_info =
+		&session_entry->gLimWiderBWChannelSwitch;
+
+	lim_log(mac_ctx, LOG1,
+			FL("vht:%d ht:%d flag:%x chan:%d"),
 			session_entry->vhtCapability,
 			session_entry->htSupportedChannelWidthSet,
 			csa_params->ies_present_flag,
-			csa_params->channel, csa_params->new_ch_freq_seg1,
+			csa_params->channel);
+	lim_log(mac_ctx, LOG1,
+			FL("seg1:%d seg2:%d width:%d country:%s class:%d"),
+			csa_params->new_ch_freq_seg1,
 			csa_params->new_ch_freq_seg2,
 			csa_params->new_ch_width,
 			mac_ctx->scan.countryCodeCurrent,
 			csa_params->new_op_class);
 
-		if (session_entry->vhtCapability &&
-				session_entry->htSupportedChannelWidthSet) {
-			if (csa_params->ies_present_flag & lim_wbw_ie_present) {
+	if (session_entry->vhtCapability &&
+			session_entry->htSupportedChannelWidthSet) {
+		if (csa_params->ies_present_flag & lim_wbw_ie_present) {
+			lim_process_csa_wbw_ie(mac_ctx, csa_params,
+					chnl_switch_info, session_entry);
+			lim_ch_switch->sec_ch_offset =
+				csa_params->sec_chan_offset;
+		} else if (csa_params->ies_present_flag
+				& lim_xcsa_ie_present) {
+			chan_space =
+				cds_reg_dmn_get_chanwidth_from_opclass(
+						mac_ctx->scan.countryCodeCurrent,
+						csa_params->channel,
+						csa_params->new_op_class);
+			session_entry->gLimChannelSwitch.state =
+				eLIM_CHANNEL_SWITCH_PRIMARY_AND_SECONDARY;
+
+			if (chan_space == 80) {
 				chnl_switch_info->newChanWidth =
-					csa_params->new_ch_width;
-				chnl_switch_info->newCenterChanFreq0 =
-					csa_params->new_ch_freq_seg1;
-				chnl_switch_info->newCenterChanFreq1 =
-					csa_params->new_ch_freq_seg2;
-				session_entry->gLimChannelSwitch.state =
-				   eLIM_CHANNEL_SWITCH_PRIMARY_AND_SECONDARY;
-				session_entry->gLimChannelSwitch.ch_width =
-					csa_params->new_ch_width + 1;
-			} else if (csa_params->ies_present_flag
-			    & lim_xcsa_ie_present) {
-				chan_space =
-					cds_reg_dmn_get_chanwidth_from_opclass(
-					    mac_ctx->scan.countryCodeCurrent,
-					    csa_params->channel,
-					    csa_params->new_op_class);
-				session_entry->gLimChannelSwitch.state =
-				    eLIM_CHANNEL_SWITCH_PRIMARY_AND_SECONDARY;
-
-				if (chan_space == 80) {
-					chnl_switch_info->newChanWidth =
-								CH_WIDTH_80MHZ;
-				} else if (chan_space == 40) {
-					chnl_switch_info->newChanWidth =
-								CH_WIDTH_40MHZ;
-				} else {
-					chnl_switch_info->newChanWidth =
-								CH_WIDTH_20MHZ;
-					lim_ch_switch->state =
-					    eLIM_CHANNEL_SWITCH_PRIMARY_ONLY;
-				}
-
-				ch_params.ch_width =
-					chnl_switch_info->newChanWidth;
-				cds_set_channel_params(csa_params->channel,
-						0, &ch_params);
-				chnl_switch_info->newCenterChanFreq0 =
-					ch_params.center_freq_seg0;
-				/*
-				* This is not applicable for 20/40/80 MHz.
-				* Only used when we support 80+80 MHz operation.
-				* In case of 80+80 MHz, this parameter indicates
-				* center channel frequency index of 80 MHz
-				* channel offrequency segment 1.
-				*/
-				chnl_switch_info->newCenterChanFreq1 =
-					ch_params.center_freq_seg1;
-				lim_ch_switch->sec_ch_offset =
-					ch_params.sec_ch_offset;
-
-			}
-			session_entry->gLimChannelSwitch.ch_center_freq_seg0 =
-				chnl_switch_info->newCenterChanFreq0;
-			session_entry->gLimChannelSwitch.ch_center_freq_seg1 =
-				chnl_switch_info->newCenterChanFreq1;
-			session_entry->gLimChannelSwitch.ch_width =
-				chnl_switch_info->newChanWidth;
-
-		} else if (session_entry->htSupportedChannelWidthSet) {
-			if (csa_params->ies_present_flag
-			    & lim_xcsa_ie_present) {
-				chan_space =
-					cds_reg_dmn_get_chanwidth_from_opclass(
-					mac_ctx->scan.countryCodeCurrent,
-					csa_params->channel,
-					csa_params->new_op_class);
-				lim_ch_switch->state =
-				    eLIM_CHANNEL_SWITCH_PRIMARY_AND_SECONDARY;
-				if (chan_space == 40) {
-					lim_ch_switch->ch_width =
-								CH_WIDTH_40MHZ;
-					chnl_switch_info->newChanWidth =
-								CH_WIDTH_40MHZ;
-					ch_params.ch_width =
-						chnl_switch_info->newChanWidth;
-					cds_set_channel_params(
-							csa_params->channel,
-							0, &ch_params);
-					lim_ch_switch->ch_center_freq_seg0 =
-						ch_params.center_freq_seg0;
-					lim_ch_switch->sec_ch_offset =
-						ch_params.sec_ch_offset;
-				} else {
-					lim_ch_switch->ch_width =
-								CH_WIDTH_20MHZ;
-					chnl_switch_info->newChanWidth =
-								CH_WIDTH_40MHZ;
-					lim_ch_switch->state =
-					    eLIM_CHANNEL_SWITCH_PRIMARY_ONLY;
-					lim_ch_switch->sec_ch_offset =
-						PHY_SINGLE_CHANNEL_CENTERED;
-				}
+					CH_WIDTH_80MHZ;
+			} else if (chan_space == 40) {
+				chnl_switch_info->newChanWidth =
+					CH_WIDTH_40MHZ;
 			} else {
+				chnl_switch_info->newChanWidth =
+					CH_WIDTH_20MHZ;
+				lim_ch_switch->state =
+					eLIM_CHANNEL_SWITCH_PRIMARY_ONLY;
+			}
+
+			ch_params.ch_width =
+				chnl_switch_info->newChanWidth;
+			cds_set_channel_params(csa_params->channel,
+					0, &ch_params);
+			chnl_switch_info->newCenterChanFreq0 =
+				ch_params.center_freq_seg0;
+			/*
+			 * This is not applicable for 20/40/80 MHz.
+			 * Only used when we support 80+80 MHz operation.
+			 * In case of 80+80 MHz, this parameter indicates
+			 * center channel frequency index of 80 MHz
+			 * channel offrequency segment 1.
+			 */
+			chnl_switch_info->newCenterChanFreq1 =
+				ch_params.center_freq_seg1;
+			lim_ch_switch->sec_ch_offset =
+				ch_params.sec_ch_offset;
+
+		}
+		session_entry->gLimChannelSwitch.ch_center_freq_seg0 =
+			chnl_switch_info->newCenterChanFreq0;
+		session_entry->gLimChannelSwitch.ch_center_freq_seg1 =
+			chnl_switch_info->newCenterChanFreq1;
+		session_entry->gLimChannelSwitch.ch_width =
+			chnl_switch_info->newChanWidth;
+
+	} else if (session_entry->htSupportedChannelWidthSet) {
+		if (csa_params->ies_present_flag
+				& lim_xcsa_ie_present) {
+			chan_space =
+				cds_reg_dmn_get_chanwidth_from_opclass(
+						mac_ctx->scan.countryCodeCurrent,
+						csa_params->channel,
+						csa_params->new_op_class);
+			lim_ch_switch->state =
+				eLIM_CHANNEL_SWITCH_PRIMARY_AND_SECONDARY;
+			if (chan_space == 40) {
 				lim_ch_switch->ch_width =
 					CH_WIDTH_40MHZ;
-				lim_ch_switch->state =
-				     eLIM_CHANNEL_SWITCH_PRIMARY_AND_SECONDARY;
-				ch_params.ch_width = CH_WIDTH_40MHZ;
-				cds_set_channel_params(csa_params->channel,
+				chnl_switch_info->newChanWidth =
+					CH_WIDTH_40MHZ;
+				ch_params.ch_width =
+					chnl_switch_info->newChanWidth;
+				cds_set_channel_params(
+						csa_params->channel,
 						0, &ch_params);
 				lim_ch_switch->ch_center_freq_seg0 =
 					ch_params.center_freq_seg0;
 				lim_ch_switch->sec_ch_offset =
 					ch_params.sec_ch_offset;
+			} else {
+				lim_ch_switch->ch_width =
+					CH_WIDTH_20MHZ;
+				chnl_switch_info->newChanWidth =
+					CH_WIDTH_40MHZ;
+				lim_ch_switch->state =
+					eLIM_CHANNEL_SWITCH_PRIMARY_ONLY;
+				lim_ch_switch->sec_ch_offset =
+					PHY_SINGLE_CHANNEL_CENTERED;
 			}
-
+		} else {
+			lim_ch_switch->ch_width =
+				CH_WIDTH_40MHZ;
+			lim_ch_switch->state =
+				eLIM_CHANNEL_SWITCH_PRIMARY_AND_SECONDARY;
+			ch_params.ch_width = CH_WIDTH_40MHZ;
+			cds_set_channel_params(csa_params->channel,
+					0, &ch_params);
+			lim_ch_switch->ch_center_freq_seg0 =
+				ch_params.center_freq_seg0;
+			lim_ch_switch->sec_ch_offset =
+				ch_params.sec_ch_offset;
 		}
-		lim_log(mac_ctx, LOG1, FL("new ch width = %d space:%d"),
+
+	}
+	lim_log(mac_ctx, LOG1, FL("new ch width = %d space:%d"),
 			session_entry->gLimChannelSwitch.ch_width, chan_space);
 
-		lim_prepare_for11h_channel_switch(mac_ctx, session_entry);
-		csa_offload_ind = qdf_mem_malloc(sizeof(tSmeCsaOffloadInd));
-		if (NULL == csa_offload_ind) {
-			lim_log(mac_ctx, LOGE,
+	lim_prepare_for11h_channel_switch(mac_ctx, session_entry);
+	csa_offload_ind = qdf_mem_malloc(sizeof(tSmeCsaOffloadInd));
+	if (NULL == csa_offload_ind) {
+		lim_log(mac_ctx, LOGE,
 				FL("memalloc fail eWNI_SME_CSA_OFFLOAD_EVENT"));
-			goto err;
-		}
+		goto err;
+	}
 
-		qdf_mem_set(csa_offload_ind, sizeof(tSmeCsaOffloadInd), 0);
-		csa_offload_ind->mesgType = eWNI_SME_CSA_OFFLOAD_EVENT;
-		csa_offload_ind->mesgLen = sizeof(tSmeCsaOffloadInd);
-		qdf_mem_copy(csa_offload_ind->bssid.bytes, session_entry->bssId,
-				QDF_MAC_ADDR_SIZE);
-		mmh_msg.type = eWNI_SME_CSA_OFFLOAD_EVENT;
-		mmh_msg.bodyptr = csa_offload_ind;
-		mmh_msg.bodyval = 0;
-		lim_log(mac_ctx, LOG1,
+	csa_offload_ind->mesgType = eWNI_SME_CSA_OFFLOAD_EVENT;
+	csa_offload_ind->mesgLen = sizeof(tSmeCsaOffloadInd);
+	qdf_mem_copy(csa_offload_ind->bssid.bytes, session_entry->bssId,
+			QDF_MAC_ADDR_SIZE);
+	mmh_msg.type = eWNI_SME_CSA_OFFLOAD_EVENT;
+	mmh_msg.bodyptr = csa_offload_ind;
+	mmh_msg.bodyval = 0;
+	lim_log(mac_ctx, LOG1,
 			FL("Sending eWNI_SME_CSA_OFFLOAD_EVENT to SME."));
-		MTRACE(mac_trace_msg_tx
+	MTRACE(mac_trace_msg_tx
 			(mac_ctx, session_entry->peSessionId, mmh_msg.type));
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
-		lim_diag_event_report(mac_ctx,
+	lim_diag_event_report(mac_ctx,
 			WLAN_PE_DIAG_SWITCH_CHL_IND_EVENT, session_entry,
 			eSIR_SUCCESS, eSIR_SUCCESS);
 #endif
-		lim_sys_process_mmh_msg_api(mac_ctx, &mmh_msg, ePROT);
-	}
+	lim_sys_process_mmh_msg_api(mac_ctx, &mmh_msg, ePROT);
 
 err:
 	qdf_mem_free(csa_params);
@@ -2237,7 +2352,7 @@ err:
    \sa
    --------------------------------------------------------------------------*/
 
-void lim_handle_delete_bss_rsp(tpAniSirGlobal pMac, tpSirMsgQ MsgQ)
+void lim_handle_delete_bss_rsp(tpAniSirGlobal pMac, struct scheduler_msg *MsgQ)
 {
 	tpPESession psessionEntry;
 	tpDeleteBssParams pDelBss = (tpDeleteBssParams) (MsgQ->bodyptr);
@@ -2251,6 +2366,13 @@ void lim_handle_delete_bss_rsp(tpAniSirGlobal pMac, tpSirMsgQ MsgQ)
 		qdf_mem_free(MsgQ->bodyptr);
 		return;
 	}
+	/*
+	 * During DEL BSS handling, the PE Session will be deleted, but it is
+	 * better to clear this flag if the session is hanging around due
+	 * to some error conditions so that the next DEL_BSS request does
+	 * not take the HO_FAIL path
+	 */
+	psessionEntry->process_ho_fail = false;
 	if (LIM_IS_IBSS_ROLE(psessionEntry))
 		lim_ibss_del_bss_rsp(pMac, MsgQ->bodyptr, psessionEntry);
 	else if (LIM_IS_UNKNOWN_ROLE(psessionEntry))
@@ -2276,12 +2398,13 @@ void
 lim_send_sme_aggr_qos_rsp(tpAniSirGlobal pMac, tpSirAggrQosRsp aggrQosRsp,
 			  uint8_t smesessionId)
 {
-	tSirMsgQ mmhMsg;
+	struct scheduler_msg mmhMsg;
 
 	mmhMsg.type = eWNI_SME_FT_AGGR_QOS_RSP;
 	mmhMsg.bodyptr = aggrQosRsp;
 	mmhMsg.bodyval = 0;
-	MTRACE(mac_trace_msg_tx(pMac, smesessionId, mmhMsg.type));
+	MTRACE(mac_trace(pMac, TRACE_CODE_TX_SME_MSG,
+			 smesessionId, mmhMsg.type));
 	lim_sys_process_mmh_msg_api(pMac, &mmhMsg, ePROT);
 
 	return;
@@ -2290,7 +2413,7 @@ lim_send_sme_aggr_qos_rsp(tpAniSirGlobal pMac, tpSirAggrQosRsp aggrQosRsp,
 void lim_send_sme_max_assoc_exceeded_ntf(tpAniSirGlobal pMac, tSirMacAddr peerMacAddr,
 					 uint8_t smesessionId)
 {
-	tSirMsgQ mmhMsg;
+	struct scheduler_msg mmhMsg;
 	tSmeMaxAssocInd *pSmeMaxAssocInd;
 
 	pSmeMaxAssocInd = qdf_mem_malloc(sizeof(tSmeMaxAssocInd));
@@ -2298,7 +2421,6 @@ void lim_send_sme_max_assoc_exceeded_ntf(tpAniSirGlobal pMac, tSirMacAddr peerMa
 		PELOGE(lim_log(pMac, LOGE, FL("Failed to allocate memory"));)
 		return;
 	}
-	qdf_mem_set((void *)pSmeMaxAssocInd, sizeof(tSmeMaxAssocInd), 0);
 	qdf_mem_copy((uint8_t *) pSmeMaxAssocInd->peer_mac.bytes,
 		     (uint8_t *) peerMacAddr, QDF_MAC_ADDR_SIZE);
 	pSmeMaxAssocInd->mesgType = eWNI_SME_MAX_ASSOC_EXCEEDED;
@@ -2311,7 +2433,8 @@ void lim_send_sme_max_assoc_exceeded_ntf(tpAniSirGlobal pMac, tSirMacAddr peerMa
 		       "eWNI_SME_MAX_ASSOC_EXCEEDED",
 		       MAC_ADDR_ARRAY(peerMacAddr));
 	       )
-	MTRACE(mac_trace_msg_tx(pMac, smesessionId, mmhMsg.type));
+	MTRACE(mac_trace(pMac, TRACE_CODE_TX_SME_MSG,
+			 smesessionId, mmhMsg.type));
 	lim_sys_process_mmh_msg_api(pMac, &mmhMsg, ePROT);
 
 	return;
@@ -2333,7 +2456,7 @@ void lim_send_sme_max_assoc_exceeded_ntf(tpAniSirGlobal pMac, tSirMacAddr peerMa
 void
 lim_send_sme_dfs_event_notify(tpAniSirGlobal pMac, uint16_t msgType, void *event)
 {
-	tSirMsgQ mmhMsg;
+	struct scheduler_msg mmhMsg;
 	mmhMsg.type = eWNI_SME_DFS_RADAR_FOUND;
 	mmhMsg.bodyptr = event;
 	mmhMsg.bodyval = 0;
@@ -2385,7 +2508,7 @@ lim_send_sme_ap_channel_switch_resp(tpAniSirGlobal pMac,
 				    tpPESession psessionEntry,
 				    tpSwitchChannelParams pChnlParams)
 {
-	tSirMsgQ mmhMsg;
+	struct scheduler_msg mmhMsg;
 	tpSwitchChannelParams pSmeSwithChnlParams;
 	uint8_t channelId;
 	bool is_ch_dfs = false;
@@ -2399,9 +2522,6 @@ lim_send_sme_ap_channel_switch_resp(tpAniSirGlobal pMac,
 			FL("AllocateMemory failed for pSmeSwithChnlParams\n"));
 		return;
 	}
-
-	qdf_mem_set((void *)pSmeSwithChnlParams,
-		    sizeof(tSwitchChannelParams), 0);
 
 	qdf_mem_copy(pSmeSwithChnlParams, pChnlParams,
 		     sizeof(tSwitchChannelParams));
@@ -2476,7 +2596,7 @@ lim_process_beacon_tx_success_ind(tpAniSirGlobal pMac, uint16_t msgType, void *e
 	 * add appropriate code by introducing a state variable
 	 */
 	tpPESession psessionEntry;
-	tSirMsgQ mmhMsg;
+	struct scheduler_msg mmhMsg;
 	tSirSmeCSAIeTxCompleteRsp *pChanSwTxResponse;
 	struct sir_beacon_tx_complete_rsp *beacon_tx_comp_rsp_ptr;
 	uint8_t length = sizeof(tSirSmeCSAIeTxCompleteRsp);
@@ -2523,7 +2643,6 @@ lim_process_beacon_tx_success_ind(tpAniSirGlobal pMac, uint16_t msgType, void *e
 				return;
 			}
 
-			qdf_mem_set((void *)pChanSwTxResponse, length, 0);
 			pChanSwTxResponse->sessionId =
 				psessionEntry->smeSessionId;
 			pChanSwTxResponse->chanSwIeTxStatus =
@@ -2548,8 +2667,6 @@ lim_process_beacon_tx_success_ind(tpAniSirGlobal pMac, uint16_t msgType, void *e
 				("AllocateMemory failed for beacon_tx_comp_rsp_ptr"));
 			return;
 		}
-		qdf_mem_set((void *)beacon_tx_comp_rsp_ptr,
-					sizeof(*beacon_tx_comp_rsp_ptr), 0);
 		beacon_tx_comp_rsp_ptr->session_id =
 			psessionEntry->smeSessionId;
 		beacon_tx_comp_rsp_ptr->tx_status = QDF_STATUS_SUCCESS;

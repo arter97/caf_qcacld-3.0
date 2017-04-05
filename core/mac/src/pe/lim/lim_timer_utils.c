@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -39,6 +39,7 @@
 #include "lim_utils.h"
 #include "lim_assoc_utils.h"
 #include "lim_security_utils.h"
+#include <lim_api.h>
 
 /* channel Switch Timer in ticks */
 #define LIM_CHANNEL_SWITCH_TIMER_TICKS           1
@@ -264,20 +265,6 @@ uint32_t lim_create_timers(tpAniSirGlobal pMac)
 		if (false == lim_create_non_ap_timers(pMac))
 			goto err_timer;
 
-	cfgValue = SYS_MS_TO_TICKS(LIM_HASH_MISS_TIMER_MS);
-
-	if (tx_timer_create(pMac,
-		&pMac->lim.limTimers.gLimSendDisassocFrameThresholdTimer,
-		"Disassoc throttle TIMEOUT",
-		lim_send_disassoc_frame_threshold_handler,
-		SIR_LIM_HASH_MISS_THRES_TIMEOUT, cfgValue, cfgValue,
-		TX_AUTO_ACTIVATE) != TX_SUCCESS) {
-		lim_log(pMac, LOGP,
-			FL("create Disassociate throttle timer failed"));
-		goto err_timer;
-	}
-	PELOG1(lim_log(pMac, LOG1, FL("Created Disassociate throttle timer "));)
-
 	/* Create all CNF_WAIT Timers upfront */
 	if (wlan_cfg_get_int(pMac, WNI_CFG_WT_CNF_TIMEOUT, &cfgValue)
 		!= eSIR_SUCCESS) {
@@ -309,8 +296,6 @@ uint32_t lim_create_timers(tpAniSirGlobal pMac)
 		lim_log(pMac, LOGP, FL("AllocateMemory failed!"));
 		goto err_timer;
 	}
-	qdf_mem_zero(pMac->lim.gLimPreAuthTimerTable.pTable,
-		     cfgValue * sizeof(tLimPreAuthNode *));
 
 	for (i = 0; i < cfgValue; i++) {
 		pMac->lim.gLimPreAuthTimerTable.pTable[i] =
@@ -410,8 +395,6 @@ err_timer:
 	while (((int32_t)-- i) >= 0) {
 		tx_timer_delete(&pMac->lim.limTimers.gpLimCnfWaitTimer[i]);
 	}
-	tx_timer_delete(&pMac->lim.limTimers.
-			gLimSendDisassocFrameThresholdTimer);
 	tx_timer_delete(&pMac->lim.limTimers.gLimProbeAfterHBTimer);
 	tx_timer_delete(&pMac->lim.limTimers.gLimAuthFailureTimer);
 	tx_timer_delete(&pMac->lim.limTimers.gLimAddtsRspTimer);
@@ -465,7 +448,7 @@ err_timer:
 void lim_timer_handler(void *pMacGlobal, uint32_t param)
 {
 	uint32_t statusCode;
-	tSirMsgQ msg;
+	struct scheduler_msg msg;
 	tpAniSirGlobal pMac = (tpAniSirGlobal) pMacGlobal;
 
 	/* Prepare and post message to LIM Message Queue */
@@ -474,7 +457,7 @@ void lim_timer_handler(void *pMacGlobal, uint32_t param)
 	msg.bodyptr = NULL;
 	msg.bodyval = 0;
 
-	statusCode = lim_post_msg_api(pMac, &msg);
+	statusCode = lim_post_msg_high_priority(pMac, &msg);
 	if (statusCode != eSIR_SUCCESS)
 		lim_log(pMac, LOGE,
 			FL("posting message %X to LIM failed, reason=%d"),
@@ -504,7 +487,7 @@ void lim_timer_handler(void *pMacGlobal, uint32_t param)
 
 void lim_addts_response_timer_handler(void *pMacGlobal, uint32_t param)
 {
-	tSirMsgQ msg;
+	struct scheduler_msg msg;
 	tpAniSirGlobal pMac = (tpAniSirGlobal) pMacGlobal;
 
 	/* Prepare and post message to LIM Message Queue */
@@ -539,7 +522,7 @@ void lim_addts_response_timer_handler(void *pMacGlobal, uint32_t param)
 
 void lim_auth_response_timer_handler(void *pMacGlobal, uint32_t param)
 {
-	tSirMsgQ msg;
+	struct scheduler_msg msg;
 	tpAniSirGlobal pMac = (tpAniSirGlobal) pMacGlobal;
 
 	/* Prepare and post message to LIM Message Queue */
@@ -565,7 +548,7 @@ void lim_auth_response_timer_handler(void *pMacGlobal, uint32_t param)
  */
 void lim_assoc_failure_timer_handler(void *mac_global, uint32_t param)
 {
-	tSirMsgQ msg;
+	struct scheduler_msg msg;
 	tpAniSirGlobal mac_ctx = (tpAniSirGlobal) mac_global;
 	tpPESession session = NULL;
 
@@ -622,7 +605,7 @@ void lim_assoc_failure_timer_handler(void *mac_global, uint32_t param)
  */
 void lim_update_olbc_cache_timer_handler(void *pMacGlobal, uint32_t param)
 {
-	tSirMsgQ msg;
+	struct scheduler_msg msg;
 	tpAniSirGlobal pMac = (tpAniSirGlobal) pMacGlobal;
 
 	/* Prepare and post message to LIM Message Queue */
@@ -661,9 +644,6 @@ void lim_deactivate_and_change_timer(tpAniSirGlobal pMac, uint32_t timerId)
 	uint32_t val = 0;
 	tpPESession  session_entry;
 
-	MTRACE(mac_trace
-		       (pMac, TRACE_CODE_TIMER_DEACTIVATE, NO_SESSION, timerId));
-
 	switch (timerId) {
 	case eLIM_REASSOC_FAIL_TIMER:
 	case eLIM_FT_PREAUTH_RSP_TIMER:
@@ -694,14 +674,22 @@ void lim_deactivate_and_change_timer(tpAniSirGlobal pMac, uint32_t timerId)
 		val =
 			SYS_MS_TO_TICKS(pMac->lim.gpLimMlmScanReq->minChannelTime) /
 			2;
-		if (tx_timer_change
-			    (&pMac->lim.limTimers.gLimPeriodicProbeReqTimer, val,
-			    0) != TX_SUCCESS) {
-			/* Could not change min channel timer. */
-			/* Log error */
-			lim_log(pMac, LOGP,
+		if (val) {
+			if (tx_timer_change(
+			    &pMac->lim.limTimers.gLimPeriodicProbeReqTimer,
+			    val, 0) != TX_SUCCESS) {
+				/* Could not change min channel timer. */
+				/* Log error */
+				lim_log(pMac, LOGP,
 				FL("Unable to change periodic timer"));
-		}
+			}
+		} else
+			lim_log(pMac, LOGE,
+			       FL("Do not change gLimPeriodicProbeReqTimer values,"
+			       "value = %d minchannel time = %d"
+			       "maxchannel time = %d"), val,
+			       pMac->lim.gpLimMlmScanReq->minChannelTime,
+			       pMac->lim.gpLimMlmScanReq->maxChannelTime);
 
 		break;
 
@@ -1063,8 +1051,6 @@ lim_deactivate_and_change_per_sta_id_timer(tpAniSirGlobal pMac, uint32_t timerId
 					   uint16_t staId)
 {
 	uint32_t val;
-	MTRACE(mac_trace
-		       (pMac, TRACE_CODE_TIMER_DEACTIVATE, NO_SESSION, timerId));
 
 	switch (timerId) {
 	case eLIM_CNF_WAIT_TIMER:
@@ -1181,9 +1167,6 @@ lim_deactivate_and_change_per_sta_id_timer(tpAniSirGlobal pMac, uint32_t timerId
 void lim_activate_cnf_timer(tpAniSirGlobal pMac, uint16_t staId,
 			    tpPESession psessionEntry)
 {
-	MTRACE(mac_trace
-		       (pMac, TRACE_CODE_TIMER_ACTIVATE, psessionEntry->peSessionId,
-		       eLIM_CNF_WAIT_TIMER));
 	pMac->lim.limTimers.gpLimCnfWaitTimer[staId].sessionId =
 		psessionEntry->peSessionId;
 	if (tx_timer_activate(&pMac->lim.limTimers.gpLimCnfWaitTimer[staId])
@@ -1214,49 +1197,11 @@ void lim_activate_cnf_timer(tpAniSirGlobal pMac, uint16_t staId,
 
 void lim_activate_auth_rsp_timer(tpAniSirGlobal pMac, tLimPreAuthNode *pAuthNode)
 {
-	MTRACE(mac_trace
-		       (pMac, TRACE_CODE_TIMER_ACTIVATE, NO_SESSION,
-		       eLIM_AUTH_RESP_TIMER));
 	if (tx_timer_activate(&pAuthNode->timer) != TX_SUCCESS) {
 		/* / Could not activate auth rsp timer. */
 		/* Log error */
 		lim_log(pMac, LOGP, FL("could not activate auth rsp timer"));
 	}
-}
-
-/**
- * lim_send_disassoc_frame_threshold_handler()
- *
- ***FUNCTION:
- *        This function reloads the credit to the send disassociate frame bucket
- *
- ***LOGIC:
- *
- ***ASSUMPTIONS:
- *
- ***NOTE:
- * NA
- *
- * @param
- *
- * @return None
- */
-
-void lim_send_disassoc_frame_threshold_handler(void *pMacGlobal, uint32_t param)
-{
-	tSirMsgQ msg;
-	uint32_t statusCode;
-	tpAniSirGlobal pMac = (tpAniSirGlobal) pMacGlobal;
-
-	msg.type = SIR_LIM_HASH_MISS_THRES_TIMEOUT;
-	msg.bodyval = 0;
-	msg.bodyptr = NULL;
-
-	statusCode = lim_post_msg_api(pMac, &msg);
-	if (statusCode != eSIR_SUCCESS)
-		lim_log(pMac, LOGE,
-			FL("posting to LIM failed, reason=%d"), statusCode);
-
 }
 
 /**
@@ -1279,7 +1224,7 @@ void lim_send_disassoc_frame_threshold_handler(void *pMacGlobal, uint32_t param)
 
 void lim_cnf_wait_tmer_handler(void *pMacGlobal, uint32_t param)
 {
-	tSirMsgQ msg;
+	struct scheduler_msg msg;
 	uint32_t statusCode;
 	tpAniSirGlobal pMac = (tpAniSirGlobal) pMacGlobal;
 
@@ -1296,7 +1241,7 @@ void lim_cnf_wait_tmer_handler(void *pMacGlobal, uint32_t param)
 
 void lim_channel_switch_timer_handler(void *pMacGlobal, uint32_t param)
 {
-	tSirMsgQ msg;
+	struct scheduler_msg msg;
 	tpAniSirGlobal pMac = (tpAniSirGlobal) pMacGlobal;
 
 	PELOG1(lim_log(pMac, LOG1,
@@ -1312,7 +1257,7 @@ void lim_channel_switch_timer_handler(void *pMacGlobal, uint32_t param)
 
 void lim_quiet_timer_handler(void *pMacGlobal, uint32_t param)
 {
-	tSirMsgQ msg;
+	struct scheduler_msg msg;
 	tpAniSirGlobal pMac = (tpAniSirGlobal) pMacGlobal;
 
 	msg.type = SIR_LIM_QUIET_TIMEOUT;
@@ -1325,7 +1270,7 @@ void lim_quiet_timer_handler(void *pMacGlobal, uint32_t param)
 
 void lim_quiet_bss_timer_handler(void *pMacGlobal, uint32_t param)
 {
-	tSirMsgQ msg;
+	struct scheduler_msg msg;
 	tpAniSirGlobal pMac = (tpAniSirGlobal) pMacGlobal;
 
 	msg.type = SIR_LIM_QUIET_BSS_TIMEOUT;

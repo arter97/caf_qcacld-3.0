@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -28,12 +28,59 @@
 #ifndef __WLAN_HDD_DRIVER_OPS_H__
 #define __WLAN_HDD_DRIVER_OPS_H__
 
+#include "hif.h"
+
 /**
  * DOC: wlan_hdd_driver_ops.h
  *
  * Functions to register the wlan driver.
-*/
+ */
 int wlan_hdd_register_driver(void);
 void wlan_hdd_unregister_driver(void);
-int wlan_hdd_bus_suspend(pm_message_t state);
+
+/**
+ * wlan_hdd_bus_suspend() - suspend the wlan bus
+ *
+ * This function is called by the platform driver to suspend the
+ * wlan bus
+ *
+ * Return: QDF_STATUS
+ */
+int wlan_hdd_bus_suspend(void);
+
+/**
+ * wlan_hdd_bus_suspend_noirq() - handle .suspend_noirq callback
+ *
+ * This function is called by the platform driver to complete the
+ * bus suspend callback when device interrupts are disabled by kernel.
+ * Call HIF and WMA suspend_noirq callbacks to make sure there is no
+ * wake up pending from FW before allowing suspend.
+ *
+ * Return: 0 for success and -EBUSY if FW is requesting wake up
+ */
+int wlan_hdd_bus_suspend_noirq(void);
+
+/**
+ * wlan_hdd_bus_resume(): wake up the bus
+ *
+ * This function is called by the platform driver to resume wlan
+ * bus
+ *
+ * Return: void
+ */
+int wlan_hdd_bus_resume(void);
+
+/**
+ * wlan_hdd_bus_resume_noirq(): handle bus resume no irq
+ *
+ * This function is called by the platform driver to do bus
+ * resume no IRQ before calling resume callback. Call WMA and HIF
+ * layers to complete the resume_noirq.
+ *
+ * Return: 0 for success and negative error code for failure
+ */
+int wlan_hdd_bus_resume_noirq(void);
+void hdd_hif_close(void *hif_ctx);
+int hdd_hif_open(struct device *dev, void *bdev, const hif_bus_id *bid,
+		 enum qdf_bus_type bus_type, bool reinit);
 #endif /* __WLAN_HDD_DRIVER_OPS_H__ */

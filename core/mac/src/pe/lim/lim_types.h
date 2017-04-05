@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -46,6 +46,7 @@
 
 #include "lim_api.h"
 #include "lim_debug.h"
+#include "lim_trace.h"
 #include "lim_send_sme_rsp_messages.h"
 #include "sys_global.h"
 #include "dph_global.h"
@@ -93,10 +94,6 @@
  * Values (LIM_MLM_MSG_START + 32) through
  * (LIM_MLM_MSG_START + 40) are unused.
  */
-#ifdef FEATURE_OEM_DATA_SUPPORT
-#define LIM_MLM_OEM_DATA_REQ            (LIM_MLM_MSG_START + 41)
-#define LIM_MLM_OEM_DATA_CNF            (LIM_MLM_MSG_START + 42)
-#endif
 
 #define LIM_HASH_ADD            0
 #define LIM_HASH_UPDATE         1
@@ -161,7 +158,8 @@ enum eLimDisassocTrigger {
 	eLIM_PEER_ENTITY_DEAUTH,
 	eLIM_LINK_MONITORING_DEAUTH,
 	eLIM_JOIN_FAILURE,
-	eLIM_REASSOC_REJECT
+	eLIM_REASSOC_REJECT,
+	eLIM_DUPLICATE_ENTRY
 };
 
 /* Reason code to determine the channel change context while sending
@@ -200,6 +198,7 @@ typedef struct sLimMlmStartReq {
 	uint8_t ssidHidden;
 	uint8_t wps_state;
 	uint8_t obssProtEnabled;
+	uint8_t beacon_tx_rate;
 } tLimMlmStartReq, *tpLimMlmStartReq;
 
 typedef struct sLimMlmStartCnf {
@@ -370,11 +369,20 @@ typedef struct sLimMlmPurgeStaInd {
 	uint8_t sessionId;
 } tLimMlmPurgeStaInd, *tpLimMlmPurgeStaInd;
 
+/**
+ * struct sLimMlmSetKeysCnf - set key confirmation parameters
+ * @peer_macaddr: peer mac address
+ * @resultCode: Result of set key operation
+ * @aid: association id
+ * @sessionId: PE session id
+ * @key_len_nonzero: Keys are non-zero length
+ */
 typedef struct sLimMlmSetKeysCnf {
 	struct qdf_mac_addr peer_macaddr;
 	uint16_t resultCode;
 	uint16_t aid;
 	uint8_t sessionId;
+	bool key_len_nonzero;
 } tLimMlmSetKeysCnf, *tpLimMlmSetKeysCnf;
 
 typedef struct sLimMlmResetReq {
@@ -396,8 +404,8 @@ typedef struct sLimMlmLinkTestStopReq {
 
 /* Function templates */
 
-bool lim_process_sme_req_messages(tpAniSirGlobal, tpSirMsgQ);
-void lim_process_mlm_req_messages(tpAniSirGlobal, tpSirMsgQ);
+bool lim_process_sme_req_messages(tpAniSirGlobal, struct scheduler_msg *);
+void lim_process_mlm_req_messages(tpAniSirGlobal, struct scheduler_msg *);
 void lim_process_mlm_rsp_messages(tpAniSirGlobal, uint32_t, uint32_t *);
 void lim_process_sme_del_bss_rsp(tpAniSirGlobal, uint32_t, tpPESession);
 
@@ -428,7 +436,13 @@ void lim_process_beacon_frame(tpAniSirGlobal, uint8_t *, tpPESession);
 void lim_process_beacon_frame_no_session(tpAniSirGlobal, uint8_t *);
 void lim_process_probe_req_frame(tpAniSirGlobal, uint8_t *, tpPESession);
 void lim_process_probe_rsp_frame(tpAniSirGlobal, uint8_t *, tpPESession);
+#ifndef NAPIER_SCAN
 void lim_process_probe_rsp_frame_no_session(tpAniSirGlobal, uint8_t *);
+#else
+static inline
+void lim_process_probe_rsp_frame_no_session(tpAniSirGlobal mac_ctx,
+	uint8_t *pkt){}
+#endif
 void lim_process_probe_req_frame_multiple_bss(tpAniSirGlobal, uint8_t *,
 					      tpPESession);
 
@@ -501,6 +515,9 @@ tSirRetStatus lim_send_channel_switch_mgmt_frame(tpAniSirGlobal, tSirMacAddr,
 tSirRetStatus lim_send_extended_chan_switch_action_frame(tpAniSirGlobal mac_ctx,
 	tSirMacAddr peer, uint8_t mode, uint8_t new_op_class,
 	uint8_t new_channel, uint8_t count, tpPESession session_entry);
+tSirRetStatus lim_p2p_oper_chan_change_confirm_action_frame(
+	tpAniSirGlobal mac_ctx, tSirMacAddr peer,
+	tpPESession session_entry);
 
 tSirRetStatus lim_send_vht_opmode_notification_frame(tpAniSirGlobal pMac,
 						     tSirMacAddr peer, uint8_t nMode,
@@ -529,16 +546,26 @@ tSirRetStatus lim_process_sme_tdls_del_sta_req(tpAniSirGlobal pMac,
 					       uint32_t *pMsgBuf);
 void lim_send_sme_tdls_delete_all_peer_ind(tpAniSirGlobal pMac,
 					   tpPESession psessionEntry);
-void lim_send_sme_mgmt_tx_completion(tpAniSirGlobal pMac, tpPESession psessionEntry,
-				     uint32_t txCompleteStatus);
+void lim_send_sme_mgmt_tx_completion(
+		tpAniSirGlobal pMac,
+		uint32_t sme_session_id,
+		uint32_t txCompleteStatus);
 tSirRetStatus lim_delete_tdls_peers(tpAniSirGlobal mac_ctx,
 				    tpPESession session_entry);
 QDF_STATUS lim_process_tdls_add_sta_rsp(tpAniSirGlobal pMac, void *msg, tpPESession);
+void lim_process_tdls_del_sta_rsp(tpAniSirGlobal mac_ctx,
+				  struct scheduler_msg *lim_msg,
+				  tpPESession session_entry);
 #else
 static inline tSirRetStatus lim_delete_tdls_peers(tpAniSirGlobal mac_ctx,
 						tpPESession session_entry)
 {
 	return eSIR_SUCCESS;
+}
+static inline void lim_init_tdls_data(tpAniSirGlobal pMac,
+					tpPESession pSessionEntry)
+{
+
 }
 #endif
 
@@ -552,11 +579,8 @@ void lim_tear_down_link_with_ap(tpAniSirGlobal, uint8_t, tSirMacReasonCodes);
 /* / Function that processes Max retries interrupt from TFP */
 void limHandleMaxRetriesInterrupt(uint32_t);
 
-/* / Function that processes messages deferred during Learn mode */
-void lim_process_deferred_message_queue(tpAniSirGlobal);
-
 /* / Function that defers the messages received */
-uint32_t lim_defer_msg(tpAniSirGlobal, tSirMsgQ *);
+uint32_t lim_defer_msg(tpAniSirGlobal, struct scheduler_msg *);
 
 /* / Function that Switches the Channel and sets the CB Mode */
 void lim_set_channel(tpAniSirGlobal pMac, uint8_t channel,
@@ -583,20 +607,29 @@ void lim_send_tpc_request_frame(tpAniSirGlobal, tSirMacAddr,
 				tpPESession psessionEntry);
 
 /* Function(s) to handle responses received from HAL */
-void lim_process_mlm_add_bss_rsp(tpAniSirGlobal pMac, tpSirMsgQ limMsgQ);
-void lim_process_mlm_add_sta_rsp(tpAniSirGlobal pMac, tpSirMsgQ limMsgQt,
+void lim_process_mlm_add_bss_rsp(tpAniSirGlobal pMac,
+				 struct scheduler_msg *limMsgQ);
+void lim_process_mlm_add_sta_rsp(tpAniSirGlobal pMac,
+				struct scheduler_msg *limMsgQt,
 				 tpPESession psessionEntry);
-void lim_process_mlm_del_sta_rsp(tpAniSirGlobal pMac, tpSirMsgQ limMsgQ);
-void lim_process_mlm_del_bss_rsp(tpAniSirGlobal pMac, tpSirMsgQ limMsgQ,
+void lim_process_mlm_del_sta_rsp(tpAniSirGlobal pMac,
+				 struct scheduler_msg *limMsgQ);
+void lim_process_mlm_del_bss_rsp(tpAniSirGlobal pMac,
+				 struct scheduler_msg *limMsgQ,
 				 tpPESession);
-void lim_process_sta_mlm_add_sta_rsp(tpAniSirGlobal pMac, tpSirMsgQ limMsgQ,
+void lim_process_sta_mlm_add_sta_rsp(tpAniSirGlobal pMac,
+				     struct scheduler_msg *limMsgQ,
 				     tpPESession psessionEntry);
-void lim_process_sta_mlm_del_sta_rsp(tpAniSirGlobal pMac, tpSirMsgQ limMsgQ,
+void lim_process_sta_mlm_del_sta_rsp(tpAniSirGlobal pMac,
+				     struct scheduler_msg *limMsgQ,
 				     tpPESession psessionEntry);
-void lim_process_sta_mlm_del_bss_rsp(tpAniSirGlobal pMac, tpSirMsgQ limMsgQ,
+void lim_process_sta_mlm_del_bss_rsp(tpAniSirGlobal pMac,
+				     struct scheduler_msg *limMsgQ,
 				     tpPESession psessionEntry);
-void lim_process_mlm_set_sta_key_rsp(tpAniSirGlobal pMac, tpSirMsgQ limMsgQ);
-void lim_process_mlm_set_bss_key_rsp(tpAniSirGlobal pMac, tpSirMsgQ limMsgQ);
+void lim_process_mlm_set_sta_key_rsp(tpAniSirGlobal pMac,
+				     struct scheduler_msg *limMsgQ);
+void lim_process_mlm_set_bss_key_rsp(tpAniSirGlobal pMac,
+				     struct scheduler_msg *limMsgQ);
 
 /* Function to process WMA_SWITCH_CHANNEL_RSP message */
 void lim_process_switch_channel_rsp(tpAniSirGlobal pMac, void *);
@@ -649,7 +682,7 @@ tSirRetStatus lim_send_sa_query_response_frame(tpAniSirGlobal pMac,
 static inline void
 lim_post_sme_message(tpAniSirGlobal pMac, uint32_t msgType, uint32_t *pMsgBuf)
 {
-	tSirMsgQ msg;
+	struct scheduler_msg msg;
 
 	if (pMsgBuf == NULL) {
 		lim_log(pMac, LOGE, FL("Buffer is Pointing to NULL"));
@@ -659,10 +692,13 @@ lim_post_sme_message(tpAniSirGlobal pMac, uint32_t msgType, uint32_t *pMsgBuf)
 	msg.type = (uint16_t) msgType;
 	msg.bodyptr = pMsgBuf;
 	msg.bodyval = 0;
-	if (msgType > eWNI_SME_MSG_TYPES_BEGIN)
+	if (msgType > eWNI_SME_MSG_TYPES_BEGIN) {
+		MTRACE(mac_trace(pMac, TRACE_CODE_TX_SME_MSG, NO_SESSION,
+				 msg.type));
 		lim_process_sme_req_messages(pMac, &msg);
-	else
+	} else {
 		lim_process_mlm_rsp_messages(pMac, msgType, pMsgBuf);
+	}
 } /*** end lim_post_sme_message() ***/
 
 /**
@@ -694,7 +730,7 @@ static inline void
 lim_post_mlm_message(tpAniSirGlobal pMac, uint32_t msgType, uint32_t *pMsgBuf)
 {
 
-	tSirMsgQ msg;
+	struct scheduler_msg msg;
 	if (pMsgBuf == NULL) {
 		lim_log(pMac, LOGE, FL("Buffer is Pointing to NULL"));
 		return;
@@ -702,6 +738,7 @@ lim_post_mlm_message(tpAniSirGlobal pMac, uint32_t msgType, uint32_t *pMsgBuf)
 	msg.type = (uint16_t) msgType;
 	msg.bodyptr = pMsgBuf;
 	msg.bodyval = 0;
+	MTRACE(mac_trace_msg_rx(pMac, NO_SESSION, msg.type));
 	lim_process_mlm_req_messages(pMac, &msg);
 } /*** end lim_post_mlm_message() ***/
 
@@ -824,9 +861,7 @@ void lim_send_sme_mgmt_frame_ind(tpAniSirGlobal pMac, uint8_t frameType,
 void lim_process_remain_on_chn_timeout(tpAniSirGlobal pMac);
 void lim_process_insert_single_shot_noa_timeout(tpAniSirGlobal pMac);
 void lim_convert_active_channel_to_passive_channel(tpAniSirGlobal pMac);
-void lim_send_p2p_action_frame(tpAniSirGlobal pMac, tpSirMsgQ pMsg);
-void lim_abort_remain_on_chan(tpAniSirGlobal pMac, uint8_t sessionId,
-	uint32_t scan_id);
+void lim_send_p2p_action_frame(tpAniSirGlobal pMac, struct scheduler_msg *pMsg);
 tSirRetStatus __lim_process_sme_no_a_update(tpAniSirGlobal pMac, uint32_t *pMsgBuf);
 void lim_process_regd_defd_sme_req_after_noa_start(tpAniSirGlobal pMac);
 
@@ -834,10 +869,38 @@ void lim_process_disassoc_ack_timeout(tpAniSirGlobal pMac);
 void lim_process_deauth_ack_timeout(tpAniSirGlobal pMac);
 QDF_STATUS lim_send_disassoc_cnf(tpAniSirGlobal pMac);
 QDF_STATUS lim_send_deauth_cnf(tpAniSirGlobal pMac);
-QDF_STATUS lim_disassoc_tx_complete_cnf(tpAniSirGlobal pMac,
-					uint32_t txCompleteSuccess);
-QDF_STATUS lim_deauth_tx_complete_cnf(tpAniSirGlobal pMac,
-				      uint32_t txCompleteSuccess);
+
+/**
+ * lim_disassoc_tx_complete_cnf() - callback to indicate Tx completion
+ * @context: pointer to mac structure
+ * @buf: buffer
+ * @txCompleteSuccess: indicates tx success/failure
+ * @params: tx completion params
+ *
+ * function will be invoked on receiving tx completion indication
+ *
+ * return: success: QDF_STATUS_SUCCESS failure: QDF_STATUS_E_FAILURE
+ */
+QDF_STATUS lim_disassoc_tx_complete_cnf(void *context,
+					qdf_nbuf_t buf,
+					uint32_t txCompleteSuccess,
+					void *params);
+
+/**
+ * lim_deauth_tx_complete_cnf() - callback to indicate Tx completion
+ * @context: pointer to mac structure
+ * @buf: buffer
+ * @txCompleteSuccess: indicates tx success/failure
+ * @params: tx completion params
+ *
+ * function will be invoked on receiving tx completion indication
+ *
+ * return: success: QDF_STATUS_SUCCESS failure: QDF_STATUS_E_FAILURE
+ */
+QDF_STATUS lim_deauth_tx_complete_cnf(void *context,
+				      qdf_nbuf_t buf,
+				      uint32_t txCompleteSuccess,
+				      void *params);
 
 typedef struct sSetLinkCbackParams {
 	void *cbackDataPtr;
@@ -849,7 +912,8 @@ int lim_process_remain_on_chnl_req(tpAniSirGlobal pMac, uint32_t *pMsg);
 void lim_remain_on_chn_rsp(tpAniSirGlobal pMac, QDF_STATUS status, uint32_t *data);
 void lim_send_sme_disassoc_deauth_ntf(tpAniSirGlobal mac_ctx,
 				QDF_STATUS status, uint32_t *ctx);
-
+tSirRetStatus lim_process_sme_del_all_tdls_peers(tpAniSirGlobal p_mac,
+						 uint32_t *msg_buf);
 /* / Bit value data structure */
 typedef enum sHalBitVal         /* For Bit operations */
 {
@@ -863,4 +927,6 @@ enum {
 	eDBG
 };
 
+QDF_STATUS lim_send_addba_response_frame(tpAniSirGlobal mac_ctx,
+		tSirMacAddr peer_mac, uint16_t tid, tpPESession session);
 #endif /* __LIM_TYPES_H */

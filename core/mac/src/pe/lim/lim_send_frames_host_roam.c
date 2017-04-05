@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -161,7 +161,8 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(tpAniSirGlobal mac_ctx,
 	}
 
 	if (qos_enabled)
-		populate_dot11f_qos_caps_station(mac_ctx, &frm.QOSCapsStation);
+		populate_dot11f_qos_caps_station(mac_ctx, pe_session,
+						&frm.QOSCapsStation);
 
 	populate_dot11f_ext_supp_rates(mac_ctx,
 		POPULATE_DOT11F_RATES_OPERATIONAL, &frm.ExtSuppRates,
@@ -304,16 +305,23 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(tpAniSirGlobal mac_ctx,
 			pe_session->is_vendor_specific_vhtcaps) {
 		lim_log(mac_ctx, LOG1,
 			FL("Populate Vendor VHT IEs in Re-Assoc Request"));
-		frm.vendor2_ie.present = 1;
-		frm.vendor2_ie.type =
+		frm.vendor_vht_ie.present = 1;
+		frm.vendor_vht_ie.type =
 			pe_session->vendor_specific_vht_ie_type;
-		frm.vendor2_ie.sub_type =
+		frm.vendor_vht_ie.sub_type =
 			pe_session->vendor_specific_vht_ie_sub_type;
-		frm.vendor2_ie.VHTCaps.present = 1;
+		frm.vendor_vht_ie.VHTCaps.present = 1;
 		populate_dot11f_vht_caps(mac_ctx, pe_session,
-				&frm.vendor2_ie.VHTCaps);
+				&frm.vendor_vht_ie.VHTCaps);
 		vht_enabled = true;
 	}
+
+	if (lim_is_session_he_capable(pe_session)) {
+		lim_log(mac_ctx, LOG1, FL("Populate HE IEs"));
+		populate_dot11f_he_caps(mac_ctx, pe_session,
+					&frm.vendor_he_cap);
+	}
+
 	status = dot11f_get_packed_re_assoc_request_size(mac_ctx, &frm,
 			&payload);
 	if (DOT11F_FAILED(status)) {
@@ -407,12 +415,16 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(tpAniSirGlobal mac_ctx,
 	lim_log(mac_ctx, LOG1, FL("Re-assoc Req Frame is: "));
 	       sir_dump_buf(mac_ctx, SIR_LIM_MODULE_ID, LOG1,
 			    (uint8_t *) frame, (bytes + ft_ies_length));
-	if ((SIR_BAND_5_GHZ ==
-	     lim_get_rf_band(pe_session->currentOperChannel)) ||
-	    (pe_session->pePersona == QDF_P2P_CLIENT_MODE) ||
-	    (pe_session->pePersona == QDF_P2P_GO_MODE)) {
+
+	if ((NULL != pe_session->ftPEContext.pFTPreAuthReq) &&
+	    (SIR_BAND_5_GHZ == lim_get_rf_band(
+	     pe_session->ftPEContext.pFTPreAuthReq->preAuthchannelNum)))
 		tx_flag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
-	}
+	else if ((SIR_BAND_5_GHZ ==
+		  lim_get_rf_band(pe_session->currentOperChannel))
+		 || (pe_session->pePersona == QDF_P2P_CLIENT_MODE)
+		 || (pe_session->pePersona == QDF_P2P_GO_MODE))
+		tx_flag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
 
 	if (NULL != pe_session->assocReq) {
 		qdf_mem_free(pe_session->assocReq);
@@ -483,7 +495,6 @@ void lim_send_retry_reassoc_req_frame(tpAniSirGlobal pMac,
 		pTmpMlmReassocReq = qdf_mem_malloc(sizeof(tLimMlmReassocReq));
 		if (NULL == pTmpMlmReassocReq)
 			goto end;
-		qdf_mem_set(pTmpMlmReassocReq, sizeof(tLimMlmReassocReq), 0);
 		qdf_mem_copy(pTmpMlmReassocReq, pMlmReassocReq,
 			     sizeof(tLimMlmReassocReq));
 	}
@@ -621,7 +632,8 @@ void lim_send_reassoc_req_mgmt_frame(tpAniSirGlobal pMac,
 	}
 
 	if (fQosEnabled)
-		populate_dot11f_qos_caps_station(pMac, &frm.QOSCapsStation);
+		populate_dot11f_qos_caps_station(pMac, psessionEntry,
+						&frm.QOSCapsStation);
 
 	populate_dot11f_ext_supp_rates(pMac, POPULATE_DOT11F_RATES_OPERATIONAL,
 				       &frm.ExtSuppRates, psessionEntry);
@@ -684,6 +696,13 @@ void lim_send_reassoc_req_mgmt_frame(tpAniSirGlobal pMac,
 		isVHTEnabled = true;
 	}
 	populate_dot11f_ext_cap(pMac, isVHTEnabled, &frm.ExtCap, psessionEntry);
+
+	if (lim_is_session_he_capable(psessionEntry)) {
+		lim_log(pMac, LOG1, FL("Populate HE IEs"));
+		populate_dot11f_he_caps(pMac, psessionEntry,
+					&frm.vendor_he_cap);
+	}
+
 	nStatus =
 		dot11f_get_packed_re_assoc_request_size(pMac, &frm, &nPayload);
 	if (DOT11F_FAILED(nStatus)) {

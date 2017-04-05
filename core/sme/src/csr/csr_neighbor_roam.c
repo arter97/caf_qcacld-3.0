@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -35,7 +35,6 @@
    ========================================================================== */
 
 #include "wma_types.h"
-#include "cds_mq.h"
 #include "csr_inside_api.h"
 #include "sms_debug.h"
 #include "sme_qos_internal.h"
@@ -46,7 +45,7 @@
 #include "sme_api.h"
 #include "csr_neighbor_roam.h"
 #include "mac_trace.h"
-#include "cds_concurrency.h"
+#include "wlan_policy_mgr_api.h"
 
 #define NEIGHBOR_ROAM_DEBUG sms_log
 static const char *lfr_get_config_item_string(uint8_t reason)
@@ -132,38 +131,47 @@ void csr_neighbor_roam_send_lfr_metric_event(
 }
 #endif
 
-QDF_STATUS
-csr_neighbor_roam_update_fast_roaming_enabled(tpAniSirGlobal pMac,
-					      uint8_t sessionId,
-					      const bool fastRoamEnabled)
+/**
+ * csr_neighbor_roam_update_fast_roaming_enabled() - update roaming capability
+ *
+ * @mac_ctx: Global MAC context
+ * @session_id: Session
+ * @fast_roam_enabled: Is fast roaming enabled on this device?
+ *                     This capability can be changed dynamically.
+ *
+ * Return: None
+ */
+QDF_STATUS csr_neighbor_roam_update_fast_roaming_enabled(tpAniSirGlobal mac_ctx,
+						uint8_t session_id,
+						const bool fast_roam_enabled)
 {
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
-	tpCsrNeighborRoamControlInfo pNeighborRoamInfo =
-		&pMac->roam.neighborRoamInfo[sessionId];
+	tpCsrNeighborRoamControlInfo neighbor_roam_info =
+		&mac_ctx->roam.neighborRoamInfo[session_id];
 
-	switch (pNeighborRoamInfo->neighborRoamState) {
+	switch (neighbor_roam_info->neighborRoamState) {
 	case eCSR_NEIGHBOR_ROAM_STATE_CONNECTED:
-		if (true == fastRoamEnabled) {
-			csr_roam_offload_scan(pMac, sessionId,
+		if (fast_roam_enabled) {
+			csr_roam_offload_scan(mac_ctx, session_id,
 					      ROAM_SCAN_OFFLOAD_START,
 					      REASON_CONNECT);
 		} else {
-			csr_roam_offload_scan(pMac, sessionId,
+			csr_roam_offload_scan(mac_ctx, session_id,
 					      ROAM_SCAN_OFFLOAD_STOP,
 					      REASON_DISCONNECTED);
 		}
 	break;
 	case eCSR_NEIGHBOR_ROAM_STATE_INIT:
-		NEIGHBOR_ROAM_DEBUG(pMac, LOG2,
-				FL
-				("Currently in INIT state, Nothing to do"));
+		NEIGHBOR_ROAM_DEBUG(mac_ctx, LOG2,
+				    FL
+				    ("Currently in INIT state, Nothing to do"));
 		break;
 	default:
-		NEIGHBOR_ROAM_DEBUG(pMac, LOGE,
-				FL
-				("Unexpected state %s, returning failure"),
-				mac_trace_get_neighbour_roam_state
-				(pNeighborRoamInfo->neighborRoamState));
+		NEIGHBOR_ROAM_DEBUG(mac_ctx, LOGE,
+				    FL
+				    ("Unexpected state %s, returning failure"),
+				    mac_trace_get_neighbour_roam_state
+				    (neighbor_roam_info->neighborRoamState));
 		qdf_status = QDF_STATUS_E_FAILURE;
 		break;
 	}
@@ -270,8 +278,9 @@ static void csr_neighbor_roam_reset_channel_info(tpCsrNeighborRoamChannelInfo
  *
  * Return: None
  */
-void csr_neighbor_roam_reset_connected_state_control_info(tpAniSirGlobal pMac,
-							  uint8_t sessionId)
+static void csr_neighbor_roam_reset_connected_state_control_info(
+							tpAniSirGlobal pMac,
+							uint8_t sessionId)
 {
 	tpCsrNeighborRoamControlInfo pNeighborRoamInfo =
 		&pMac->roam.neighborRoamInfo[sessionId];
@@ -294,8 +303,9 @@ void csr_neighbor_roam_reset_connected_state_control_info(tpAniSirGlobal pMac,
 		     sizeof(tCsrHandoffRequest));
 }
 
-void csr_neighbor_roam_reset_report_scan_state_control_info(tpAniSirGlobal pMac,
-							    uint8_t sessionId)
+static void csr_neighbor_roam_reset_report_scan_state_control_info(
+							tpAniSirGlobal pMac,
+							uint8_t sessionId)
 {
 	tpCsrNeighborRoamControlInfo pNeighborRoamInfo =
 		&pMac->roam.neighborRoamInfo[sessionId];
@@ -325,8 +335,8 @@ void csr_neighbor_roam_reset_report_scan_state_control_info(tpAniSirGlobal pMac,
  *
  * Return: None
  */
-void csr_neighbor_roam_reset_init_state_control_info(tpAniSirGlobal pMac,
-						     uint8_t sessionId)
+static void csr_neighbor_roam_reset_init_state_control_info(tpAniSirGlobal pMac,
+							    uint8_t sessionId)
 {
 	csr_neighbor_roam_reset_connected_state_control_info(pMac, sessionId);
 
@@ -371,6 +381,8 @@ csr_neighbor_roam_prepare_scan_profile_filter(tpAniSirGlobal pMac,
 	pScanFilter->scan_filter_for_roam = 1;
 	/* only for HDD requested handoff fill in the BSSID in the filter */
 	if (nbr_roam_info->uOsRequestedHandoff) {
+		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
+			FL("OS Requested Handoff"));
 		pScanFilter->BSSIDs.numOfBSSIDs = 1;
 		pScanFilter->BSSIDs.bssid =
 			qdf_mem_malloc(sizeof(tSirMacAddr) *
@@ -380,10 +392,6 @@ csr_neighbor_roam_prepare_scan_profile_filter(tpAniSirGlobal pMac,
 				FL("Scan Filter BSSID mem alloc failed"));
 			return QDF_STATUS_E_NOMEM;
 		}
-
-		qdf_mem_zero(pScanFilter->BSSIDs.bssid,
-			     sizeof(tSirMacAddr) *
-			     pScanFilter->BSSIDs.numOfBSSIDs);
 
 		/* Populate the BSSID from handoff info received from HDD */
 		for (i = 0; i < pScanFilter->BSSIDs.numOfBSSIDs; i++) {
@@ -507,7 +515,7 @@ csr_neighbor_roam_prepare_scan_profile_filter(tpAniSirGlobal pMac,
  * @output_ch_list: The output channel list
  * @output_num_of_ch: The number of channels in output channel list
  * @merged_output_num_of_ch: The final number of channels in the
- * 				output channel list.
+ *				output channel list.
  *
  * This function is used to filter out the channels based on the
  * currently associated AP channel
@@ -563,13 +571,13 @@ QDF_STATUS csr_neighbor_roam_channels_filter_by_current_band(tpAniSirGlobal pMac
  * @mac_ctx: Pointer to Global MAC structure
  * @session_id: Session ID
  * @input_ch_list: The additional channels to merge in to the
- * 			"merged" channels list.
+ *			"merged" channels list.
  * @input_num_of_ch: The number of additional channels.
  * @output_ch_list: The place to put the "merged" channel list.
  * @output_num_of_ch: The original number of channels in the
- * 			"merged" channels list.
+ *			"merged" channels list.
  * @merged_output_num_of_ch: The final number of channels in the
- * 				"merged" channel list.
+ *				"merged" channel list.
  *
  * This function is used to merge two channel list.
  * NB: If called with outputNumOfChannels == 0, this routines simply
@@ -653,7 +661,7 @@ QDF_STATUS csr_neighbor_roam_merge_channel_lists(tpAniSirGlobal pMac,
  *
  * Return: bool
  */
-bool csr_neighbor_roam_is_ssid_and_security_match(tpAniSirGlobal pMac,
+static bool csr_neighbor_roam_is_ssid_and_security_match(tpAniSirGlobal pMac,
 		tCsrRoamConnectedProfile *pCurProfile,
 		tSirBssDescription *pBssDesc, tDot11fBeaconIEs *pIes)
 {
@@ -898,6 +906,7 @@ QDF_STATUS csr_neighbor_roam_indicate_disconnect(tpAniSirGlobal pMac,
 				eCSR_NEIGHBOR_ROAM_STATE_INIT, sessionId);
 			pNeighborRoamInfo->roamChannelInfo.
 				IAPPNeighborListReceived = false;
+			pNeighborRoamInfo->uOsRequestedHandoff = 0;
 		}
 		break;
 
@@ -938,6 +947,7 @@ QDF_STATUS csr_neighbor_roam_indicate_disconnect(tpAniSirGlobal pMac,
 				eCSR_NEIGHBOR_ROAM_STATE_INIT, sessionId);
 			pNeighborRoamInfo->roamChannelInfo.
 			IAPPNeighborListReceived = false;
+			pNeighborRoamInfo->uOsRequestedHandoff = 0;
 		break;
 	}
 	/*Inform the Firmware to STOP Scanning as the host has a disconnect. */
@@ -1034,7 +1044,7 @@ static void csr_neighbor_roam_info_ctx_init(
 	/* Initialize all the data structures needed for the 11r FT Preauth */
 	ngbr_roam_info->FTRoamInfo.currentNeighborRptRetryNum = 0;
 	csr_neighbor_roam_purge_preauth_failed_list(pMac);
-	if (!cds_is_multiple_active_sta_sessions() &&
+	if (!policy_mgr_is_multiple_active_sta_sessions(pMac->psoc) &&
 		csr_roam_is_roam_offload_scan_enabled(pMac)) {
 		/*
 		 * If this is not a INFRA type BSS, then do not send the command
@@ -1131,9 +1141,11 @@ QDF_STATUS csr_neighbor_roam_indicate_connect(
 			return QDF_STATUS_E_NOMEM;
 		}
 		msg->messageType = eWNI_SME_SET_BCN_FILTER_REQ;
-		msg->length = sizeof(uint8_t);
+		msg->length = sizeof(tSirSetActiveModeSetBncFilterReq);
 		msg->seesionId = session_id;
-		status = cds_send_mb_message_to_mac(msg);
+		qdf_copy_macaddr(&msg->bssid,
+			&session->connectedProfile.bssid);
+		status = umac_send_mb_message_to_mac(msg);
 		qdf_copy_macaddr(&roamInfo.peerMac,
 			&session->connectedProfile.bssid);
 		roamInfo.roamSynchInProgress =
@@ -1160,6 +1172,7 @@ QDF_STATUS csr_neighbor_roam_indicate_connect(
 				eCSR_NEIGHBOR_ROAM_STATE_INIT, session_id);
 			ngbr_roam_info->roamChannelInfo.IAPPNeighborListReceived =
 				false;
+			ngbr_roam_info->uOsRequestedHandoff = 0;
 			break;
 		}
 	/* Fall through if the status is SUCCESS */
@@ -1190,7 +1203,7 @@ QDF_STATUS csr_neighbor_roam_indicate_connect(
     \return QDF_STATUS_SUCCESS on success, corresponding error code otherwise
 
    ---------------------------------------------------------------------------*/
-QDF_STATUS csr_neighbor_roam_init11r_assoc_info(tpAniSirGlobal pMac)
+static QDF_STATUS csr_neighbor_roam_init11r_assoc_info(tpAniSirGlobal pMac)
 {
 	QDF_STATUS status;
 	uint8_t i;
@@ -1284,6 +1297,9 @@ QDF_STATUS csr_neighbor_roam_init(tpAniSirGlobal pMac, uint8_t sessionId)
 	pNeighborRoamInfo->cfgParams.channelInfo.numOfChannels =
 		pMac->roam.configParam.neighborRoamConfig.neighborScanChanList.
 		numChannels;
+	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
+			FL("number of channels: %u"),
+			pNeighborRoamInfo->cfgParams.channelInfo.numOfChannels);
 	if (pNeighborRoamInfo->cfgParams.channelInfo.numOfChannels != 0) {
 		pNeighborRoamInfo->cfgParams.channelInfo.ChannelList =
 		qdf_mem_malloc(pMac->roam.configParam.neighborRoamConfig.
@@ -1296,9 +1312,6 @@ QDF_STATUS csr_neighbor_roam_init(tpAniSirGlobal pMac, uint8_t sessionId)
 		}
 	} else {
 		pNeighborRoamInfo->cfgParams.channelInfo.ChannelList = NULL;
-		sms_log(pMac, LOGE,
-			FL("invalid neighbor roam channel list: %u"),
-			pNeighborRoamInfo->cfgParams.channelInfo.numOfChannels);
 	}
 
 	/* Update the roam global structure from CFG */
@@ -1366,6 +1379,7 @@ QDF_STATUS csr_neighbor_roam_init(tpAniSirGlobal pMac, uint8_t sessionId)
 	csr_neighbor_roam_state_transition(pMac,
 			eCSR_NEIGHBOR_ROAM_STATE_INIT, sessionId);
 	pNeighborRoamInfo->roamChannelInfo.IAPPNeighborListReceived = false;
+	pNeighborRoamInfo->uOsRequestedHandoff = 0;
 	/* Set the Last Sent Cmd as RSO_STOP */
 	pNeighborRoamInfo->last_sent_cmd = ROAM_SCAN_OFFLOAD_STOP;
 	return QDF_STATUS_SUCCESS;
@@ -1483,7 +1497,7 @@ bool csr_neighbor_middle_of_roaming(tpAniSirGlobal pMac, uint8_t sessionId)
  *
  * Return: status
  */
-QDF_STATUS csr_neighbor_roam_process_handoff_req(
+static QDF_STATUS csr_neighbor_roam_process_handoff_req(
 			tpAniSirGlobal mac_ctx,
 			uint8_t session_id)
 {
@@ -1494,6 +1508,10 @@ QDF_STATUS csr_neighbor_roam_process_handoff_req(
 	tCsrRoamProfile *profile = NULL;
 	tCsrRoamSession *session = CSR_GET_SESSION(mac_ctx, session_id);
 	uint8_t i = 0;
+	uint8_t roam_now = 0;
+	uint8_t roamable_ap_count = 0;
+	tCsrScanResultFilter    scan_filter;
+	tScanResultHandle       scan_result;
 
 	if (NULL == session) {
 		sms_log(mac_ctx, LOGE, FL("session is NULL "));
@@ -1506,7 +1524,6 @@ QDF_STATUS csr_neighbor_roam_process_handoff_req(
 		sms_log(mac_ctx, LOGE, FL("Memory alloc failed"));
 		return QDF_STATUS_E_NOMEM;
 	}
-	qdf_mem_set(profile, sizeof(tCsrRoamProfile), 0);
 	status =
 		csr_roam_copy_profile(mac_ctx, profile,
 				      session->pCurRoamProfile);
@@ -1526,10 +1543,6 @@ QDF_STATUS csr_neighbor_roam_process_handoff_req(
 			goto end;
 		}
 	}
-
-	qdf_mem_zero(profile->BSSIDs.bssid,
-		sizeof(tSirMacAddr) *
-		profile->BSSIDs.numOfBSSIDs);
 
 	/* Populate the BSSID from handoff info received from HDD */
 	for (i = 0; i < profile->BSSIDs.numOfBSSIDs; i++) {
@@ -1553,11 +1566,36 @@ QDF_STATUS csr_neighbor_roam_process_handoff_req(
 	profile->ChannelInfo.ChannelList[0] =
 		roam_ctrl_info->handoffReqInfo.channel;
 
-	/* do a SSID scan */
-	status =
-		csr_scan_for_ssid(mac_ctx, session_id, profile, roam_id, false);
-	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		sms_log(mac_ctx, LOGE, FL("SSID scan failed"));
+	/*
+	 * For User space connect requests, the scan has already been done.
+	 * So, check if the BSS descriptor exists in the scan cache and
+	 * proceed with the handoff instead of a redundant scan again.
+	 */
+	if (roam_ctrl_info->handoffReqInfo.src == CONNECT_CMD_USERSPACE) {
+		sms_log(mac_ctx, LOG1,
+			FL("Connect cmd with bssid within same ESS"));
+		status = csr_neighbor_roam_prepare_scan_profile_filter(mac_ctx,
+								&scan_filter,
+								session_id);
+		sms_log(mac_ctx, LOG1, FL("Filter creation status = %d"),
+			status);
+		status = csr_scan_get_result(mac_ctx, &scan_filter,
+					     &scan_result);
+		csr_neighbor_roam_process_scan_results(mac_ctx, session_id,
+							&scan_result);
+		roamable_ap_count = csr_ll_count(
+					&roam_ctrl_info->roamableAPList);
+		csr_free_scan_filter(mac_ctx, &scan_filter);
+		sms_log(mac_ctx, LOG1, FL("roam_now=%d, roamable_ap_count=%d"),
+			roam_now, roamable_ap_count);
+	}
+	if (roam_now && roamable_ap_count) {
+		csr_neighbor_roam_trigger_handoff(mac_ctx, session_id);
+	} else {
+		status = csr_scan_for_ssid(mac_ctx, session_id, profile,
+					   roam_id, false);
+		if (status != QDF_STATUS_SUCCESS)
+			sms_log(mac_ctx, LOGE, FL("SSID scan failed"));
 	}
 
 end:
@@ -1664,7 +1702,7 @@ QDF_STATUS csr_neighbor_roam_handoff_req_hdlr(
 	}
 
 	/* sanity check */
-	if (true != qdf_mem_cmp(handoff_req->bssid,
+	if (!qdf_mem_cmp(handoff_req->bssid,
 		roam_ctrl_info->currAPbssid.bytes,
 		sizeof(tSirMacAddr))) {
 		sms_log(mac_ctx, LOGE,
@@ -1712,8 +1750,9 @@ QDF_STATUS csr_neighbor_roam_proceed_with_handoff_req(tpAniSirGlobal pMac,
 	     pNeighborRoamInfo->neighborRoamState)
 	    || (!pNeighborRoamInfo->uOsRequestedHandoff)) {
 		sms_log(pMac, LOGE,
-			FL
-				("Received in not CONNECTED state or uOsRequestedHandoff is not set. Ignore it"));
+			FL("Received in not CONNECTED state(%d) or uOsRequestedHandoff(%d) is not set. Ignore it"),
+			pNeighborRoamInfo->neighborRoamState,
+			pNeighborRoamInfo->uOsRequestedHandoff);
 		status = QDF_STATUS_E_FAILURE;
 	} else {
 		/* Let's go ahead with handoff */

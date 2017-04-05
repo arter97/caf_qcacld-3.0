@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2007, 2014-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2006-2007, 2014-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -120,6 +120,7 @@ const EID_AID                        =  197;
 const EID_EXT_CAP           	     =  127;
 const EID_OPERATING_MODE             =  199;
 const EID_WIDER_BW_CHANNEL_SWITCH_ANN=  194;
+const VHT_TRANSMIT_POWER_ENVELOPE    = 195;
 const EID_CHANNEL_SWITCH_WRAPPER     = 196;
 const EID_VENDOR_SPECIFIC            = 221;
 
@@ -301,6 +302,16 @@ FF StatusCode (1)                         // WMM Spec 2.2.10
     statusCode, 1;
 }
 
+FF p2p_action_oui (4)
+{
+    oui_data[4];
+}
+
+FF p2p_action_subtype (1)
+{
+    subtype, 1;
+}
+
 FF OperatingMode (1)
 {
    {
@@ -398,6 +409,38 @@ FF ext_chan_switch_ann_action(4)
      new_channel: 8;
      switch_count: 8;
    }
+}
+
+FF addba_param_set(2)
+{
+   {
+     amsdu_supp: 1;
+     policy: 1;
+     tid: 4;
+     buff_size: 10;
+   }
+}
+
+FF ba_timeout(2)
+{
+    timeout, 2;
+}
+
+FF ba_start_seq_ctrl(2)
+{
+    {
+      frag_number: 4;
+      ssn: 12;
+    }
+}
+
+FF delba_param_set(2)
+{
+    {
+      reserved: 11;
+      initiator: 1;
+      tid: 4;
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1860,9 +1903,8 @@ IE Vendor3IE (EID_VENDOR_SPECIFIC) OUI (0x00, 0x16, 0x32)
 {
 }
 
-IE hs20vendor_ie (EID_VENDOR_SPECIFIC) OUI (0x50, 0x6F, 0x9A)
+IE hs20vendor_ie (EID_VENDOR_SPECIFIC) OUI (0x50, 0x6F, 0x9A, 0x10)
 {
-    type,                       1;
     /* hotspot_configurations */
     {
         dgaf_dis:               1;
@@ -2248,13 +2290,19 @@ IE WiderBWChanSwitchAnn (EID_WIDER_BW_CHANNEL_SWITCH_ANN)
    newCenterChanFreq1,    1;
 }
 
+IE vht_transmit_power_env (VHT_TRANSMIT_POWER_ENVELOPE)
+{
+    bytes[2..5];
+}
+
 IE ChannelSwitchWrapper (EID_CHANNEL_SWITCH_WRAPPER)
 {
     OPTIE IE  WiderBWChanSwitchAnn;
+    OPTIE IE  vht_transmit_power_env;
 }
 IE ExtCap (EID_EXT_CAP)
 {
-    bytes[8..9];
+    bytes[1..9];
 }
 
 IE HTCaps (EID_HT_CAPABILITIES)
@@ -2413,6 +2461,17 @@ IE TimeAdvertisement (EID_TIME_ADVERTISEMENT)   // 8.4.2.63
     time_error[5];
 }
 
+IE MBO_IE (EID_VENDOR_SPECIFIC) OUI ( 0x50, 0x6F, 0x9A, 0x16 )
+{
+    mbo_cap[3];
+    assoc_disallowed[0..3];
+}
+
+IE QCN_IE (EID_VENDOR_SPECIFIC) OUI ( 0x8C, 0xFD, 0xF0, 0x01 )
+{
+    version[4];
+}
+
 const EID_RRM_BEACON_REPORTING     = 1;
 const EID_RRM_BCN_REPORTING_DETAIL = 2;
 
@@ -2560,6 +2619,123 @@ IE MeasurementRequest (EID_MEAS_REQUEST)  // 7.3.2.21
        }
 
     };
+}
+
+const SUB_EID_PPET = 1;
+const SUB_EID_VHT_INFO = 2;
+
+IE vendor_he_cap (EID_VENDOR_SPECIFIC) OUI (0x00, 0x13, 0x74, 0x01)
+{
+    {
+      htc_he:1;
+      twt_request:1;
+      twt_responder:1;
+      fragmentation:2;
+      max_num_frag_msdu:3;
+      min_frag_size:2;
+      trigger_frm_mac_pad:2;
+      multi_tid_aggr:3;
+      he_link_adaptation:2;
+      all_ack:1;
+      ul_mu_rsp_sched:1;
+      a_bsr:1;
+      broadcast_twt:1;
+      ba_32bit_bitmap:1;
+      mu_cascade:1;
+      ack_enabled_multitid:1;
+      dl_mu_ba:1;
+      omi_a_ctrl:1;
+      ofdma_ra:1;
+      max_ampdu_len:2;
+      amsdu_frag:1;
+      flex_twt_sched:1;
+      rx_ctrl_frame:1;
+    }
+    {
+      bsrp_ampdu_aggr:1;
+      qtp:1;
+      a_bqr:1;
+      reserved1:5;
+    }
+    {
+      dual_band:1;
+      chan_width:7;
+      rx_pream_puncturing:4;
+      device_class:1;
+      ldpc_coding:1;
+      he_ltf_gi_ppdu:2;
+      he_ltf_gi_ndp:2;
+      stbc:2;
+      doppler:2;
+      ul_mu:2;
+      dcm_enc_tx:3;
+      dcm_enc_rx:3;
+      ul_he_mu:1;
+      su_beamformer:1;
+    }
+    {
+      su_beamformee:1;
+      mu_beamformer:1;
+      bfee_sts_lt_80:3;
+      nsts_tol_lt_80:3;
+      bfee_sta_gt_80:3;
+      nsts_tot_gt_80:3;
+      num_sounding_lt_80:3;
+      num_sounding_gt_80:3;
+      su_feedback_tone16:1;
+      mu_feedback_tone16:1;
+      codebook_su:1;
+      codebook_mu:1;
+      beamforming_feedback:3;
+      he_er_su_ppdu:1;
+      dl_mu_mimo_part_bw:1;
+      ppet_present:1;
+      srp:1;
+      power_boost:1;
+    }
+    {
+      he_ltf_gi_4x:1;
+      reserved2:7;
+    }
+    {
+      nss_supported:3;
+      mcs_supported:3;
+      tx_bw_bitmap:5;
+      rx_bw_bitmap:5;
+    }
+    OPTIE IE ppe_threshold (SUB_EID_PPET)
+    {
+      {
+        nss_count:3;
+        ru_idx_mask:4;
+        ppet_b1:1;
+      }
+      ppet[1..24];
+    }
+}
+
+IE vht_info(SUB_EID_VHT_INFO)
+{
+  chan_width, 1;
+  center_freq_seg0, 1;
+  center_freq_seg1, 1;
+}
+
+IE vendor_he_op (EID_VENDOR_SPECIFIC) OUI (0x00, 0x13, 0x74, 0x02)
+{
+    {
+        bss_color: 6;
+        default_pe: 3;
+        twt_required: 1;
+        rts_threshold: 10;
+        partial_bss_col: 1;
+        maxbssid_ind: 8;
+        tx_bssid_ind: 1;
+        bss_col_disabled: 1;
+        dual_beacon: 1;
+    }
+    basic_mcs_nss[3];
+    MANDIE IE vht_info;
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -2882,7 +3058,7 @@ MULTIIE P2PDisAssoc ( EID_VENDOR_SPECIFIC ) OUI( 0x50, 0x6F, 0x9A, 0x09 )
    MANDATORYTLV MinorReasonCode;
 }
 
-IE vendor2_ie (EID_VENDOR_SPECIFIC) OUI (0x00, 0x90, 0x4c)
+IE vendor_vht_ie (EID_VENDOR_SPECIFIC) OUI (0x00, 0x90, 0x4c)
 {
    type, 1;
    sub_type, 1;
@@ -2945,12 +3121,16 @@ FRAME Beacon                              // C.f. Sec. 7.2.3.1
     OPTIE  WiderBWChanSwitchAnn;
     OPTIE  OBSSScanParameters;
     OPTIE  Vendor1IE;
-    OPTIE  vendor2_ie;
+    OPTIE  vendor_vht_ie;
     OPTIE  Vendor3IE;
     OPTIE  hs20vendor_ie;
     OPTIE  ChannelSwitchWrapper;
     OPTIE  QComVendorIE;
     OPTIE  ESEVersion;
+    OPTIE  MBO_IE;
+    OPTIE  QCN_IE;
+    OPTIE  vendor_he_cap;
+    OPTIE  vendor_he_op;
 } // End frame Beacon.
 
 // Ok, here's  the story on  Beacon1 & Beacon2.   We presumably beacon  a lot
@@ -3033,12 +3213,15 @@ FRAME Beacon2
     OPTIE  WiderBWChanSwitchAnn;
     OPTIE  OBSSScanParameters;
     OPTIE  Vendor1IE;
-    OPTIE  vendor2_ie;
+    OPTIE  vendor_vht_ie;
     OPTIE  Vendor3IE;
     OPTIE  hs20vendor_ie;
     OPTIE  ChannelSwitchWrapper;
     OPTIE  QComVendorIE;
     OPTIE  ESEVersion;
+    OPTIE  QCN_IE;
+    OPTIE  vendor_he_cap;
+    OPTIE  vendor_he_op;
 }
 
 // This frame is just Beacon with its Fixed Fields stripped out.  It's handy
@@ -3098,11 +3281,15 @@ FRAME BeaconIEs
     OPTIE  WiderBWChanSwitchAnn;
     OPTIE  OBSSScanParameters;
     OPTIE  Vendor1IE;
-    OPTIE  vendor2_ie;
+    OPTIE  vendor_vht_ie;
     OPTIE  Vendor3IE;
     OPTIE  hs20vendor_ie;
     OPTIE  ChannelSwitchWrapper;
     OPTIE  QComVendorIE;
+    OPTIE  MBO_IE;
+    OPTIE  QCN_IE;
+    OPTIE  vendor_he_cap;
+    OPTIE  vendor_he_op;
 } // End frame BeaconIEs.
 
 FRAME Disassociation                      // 7.3.3.3
@@ -3117,30 +3304,33 @@ FRAME AssocRequest                        // 7.2.3.4
     FF     ListenInterval;
     MANDIE SSID;
     MANDIE SuppRates;
-    OPTIE  ExtSuppRates;
+    OPTIE  OperatingMode;
     OPTIE  PowerCaps;
     OPTIE  SuppChannels;
-    OPTIE  RSNOpaque;
-    OPTIE  QOSCapsStation;
-    OPTIE  RRMEnabledCap;
-    OPTIE  MobilityDomain;
-    OPTIE  WPAOpaque;
     OPTIE  HTCaps;
+    OPTIE  QOSCapsStation;
+    OPTIE  RSNOpaque;
+    OPTIE  ExtSuppRates;
+    OPTIE  MobilityDomain;
+    OPTIE  SuppOperatingClasses;
+    OPTIE  WAPIOpaque;
+    OPTIE  WAPI;
+    OPTIE  RRMEnabledCap;
+    OPTIE  QosMapSet;
+    OPTIE  ExtCap;
+    OPTIE  VHTCaps;
+    OPTIE  WPAOpaque;
     OPTIE  WMMCaps;
     OPTIE  WMMInfoStation;
     OPTIE  WscIEOpaque;
-    OPTIE  WAPIOpaque;
-    OPTIE  WAPI;
     OPTIE  ESERadMgmtCap;
     OPTIE  ESEVersion;
     OPTIE  P2PIEOpaque;
     OPTIE  WFDIEOpaque;
-    OPTIE  VHTCaps;
-    OPTIE  ExtCap;
-    OPTIE  OperatingMode;
-    OPTIE  QosMapSet;
-    OPTIE  vendor2_ie;
+    OPTIE  vendor_vht_ie;
     OPTIE  hs20vendor_ie;
+    OPTIE  QCN_IE;
+    OPTIE  vendor_he_cap;
 } // End frame AssocRequest.
 
 FRAME AssocResponse                       // 7.2.3.5
@@ -3174,7 +3364,10 @@ FRAME AssocResponse                       // 7.2.3.5
     OPTIE  ExtCap;
     OPTIE  OBSSScanParameters;
     OPTIE  QosMapSet;
-    OPTIE  vendor2_ie;
+    OPTIE  vendor_vht_ie;
+    OPTIE  QCN_IE;
+    OPTIE  vendor_he_cap;
+    OPTIE  vendor_he_op;
 } // End frame AssocResponse.
 
 FRAME ReAssocRequest                      // 7.2.3.6
@@ -3211,8 +3404,9 @@ FRAME ReAssocRequest                      // 7.2.3.6
     OPTIE  ExtCap;
     OPTIE  OperatingMode;
     OPTIE  QosMapSet;
-    OPTIE  vendor2_ie;
+    OPTIE  vendor_vht_ie;
     OPTIE  hs20vendor_ie;
+    OPTIE  vendor_he_cap;
 } // End frame ReAssocRequest.
 
 FRAME ReAssocResponse                     // 7.2.3.7
@@ -3247,7 +3441,9 @@ FRAME ReAssocResponse                     // 7.2.3.7
     OPTIE  ExtCap;
     OPTIE  OBSSScanParameters;
     OPTIE  QosMapSet;
-    OPTIE  vendor2_ie;
+    OPTIE  vendor_vht_ie;
+    OPTIE  vendor_he_cap;
+    OPTIE  vendor_he_op;
 } // End frame ReAssocResponse.
 
 FRAME ProbeRequest                        // 7.2.3.8
@@ -3263,6 +3459,8 @@ FRAME ProbeRequest                        // 7.2.3.8
     OPTIE  P2PProbeReq;
     OPTIE  VHTCaps;
     OPTIE  ExtCap;
+    OPTIE  QCN_IE;
+    OPTIE  vendor_he_cap;
 } // End frame ProbeRequest.
 
 FRAME ProbeResponse                       // 7.2.3.9
@@ -3314,12 +3512,16 @@ FRAME ProbeResponse                       // 7.2.3.9
     OPTIE  ExtCap;
     OPTIE  OBSSScanParameters;
     OPTIE  Vendor1IE;
-    OPTIE  vendor2_ie;
+    OPTIE  vendor_vht_ie;
     OPTIE  Vendor3IE;
     OPTIE  hs20vendor_ie;
     OPTIE  ChannelSwitchWrapper;
     OPTIE  QComVendorIE;
     OPTIE  ESEVersion;
+    OPTIE  MBO_IE;
+    OPTIE  QCN_IE;
+    OPTIE  vendor_he_cap;
+    OPTIE  vendor_he_op;
 } // End frame ProbeResponse.
 
 FRAME Authentication                      // 7.2.3.10
@@ -3720,6 +3922,45 @@ FRAME ext_channel_switch_action_frame
     FF     Category;
     FF     Action;
     FF     ext_chan_switch_ann_action;
+}
+
+FRAME p2p_oper_chan_change_confirm
+{
+    FF Category;
+    FF p2p_action_oui;
+    FF p2p_action_subtype;
+    FF DialogToken;
+    OPTIE HTCaps;
+    OPTIE VHTCaps;
+    OPTIE OperatingMode;
+}
+
+FRAME addba_req
+{
+    FF    Category;
+    FF    Action;
+    FF    DialogToken;
+    FF    addba_param_set;
+    FF    ba_timeout;
+    FF    ba_start_seq_ctrl;
+}
+
+FRAME addba_rsp
+{
+    FF    Category;
+    FF    Action;
+    FF    DialogToken;
+    FF    Status;
+    FF    addba_param_set;
+    FF    ba_timeout;
+}
+
+FRAME delba_req
+{
+    FF    Category;
+    FF    Action;
+    FF    delba_param_set;
+    FF    Reason;
 }
 
 // Local Variables:

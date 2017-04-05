@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -50,10 +50,6 @@
 #include "sap_api.h"
 #include "dot11f.h"
 #include "wma_if.h"
-
-/* Sending Disassociate frames threshold */
-#define LIM_SEND_DISASSOC_FRAME_THRESHOLD       2
-#define LIM_HASH_MISS_TIMER_MS                  10000
 
 /* Deferred Message Queue Length */
 #define MAX_DEFERRED_QUEUE_LEN                  80
@@ -291,7 +287,7 @@ struct tLimScanResultNode {
 /* OEM Data related structure definitions */
 typedef struct sLimMlmOemDataReq {
 	struct qdf_mac_addr selfMacAddr;
-	uint8_t data_len;
+	uint32_t data_len;
 	uint8_t *data;
 } tLimMlmOemDataReq, *tpLimMlmOemDataReq;
 
@@ -344,11 +340,14 @@ typedef struct sLimMlmStaContext {
 	/* 802.11n HT Capability in Station: Enabled 1 or DIsabled 0 */
 	uint8_t htCapability:1;
 	uint8_t vhtCapability:1;
+#ifdef WLAN_FEATURE_11AX
+	bool he_capable;
+#endif
 } tLimMlmStaContext, *tpLimMlmStaContext;
 
 /* Structure definition to hold deferred messages queue parameters */
 typedef struct sLimDeferredMsgQParams {
-	tSirMsgQ deferredQueue[MAX_DEFERRED_QUEUE_LEN];
+	struct scheduler_msg deferredQueue[MAX_DEFERRED_QUEUE_LEN];
 	uint16_t size;
 	uint16_t read;
 	uint16_t write;

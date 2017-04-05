@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -103,11 +103,12 @@ tSirRetStatus mac_stop(tHalHandle hHal, tHalStopType stopType)
    \return tSirRetStatus
    -------------------------------------------------------------*/
 
-tSirRetStatus mac_open(tHalHandle *pHalHandle, tHddHandle hHdd,
-		       tMacOpenParameters *pMacOpenParms)
+tSirRetStatus mac_open(struct wlan_objmgr_psoc *psoc, tHalHandle *pHalHandle,
+			tHddHandle hHdd, struct cds_config_info *cds_cfg)
 {
 	tpAniSirGlobal p_mac = NULL;
 	tSirRetStatus status = eSIR_SUCCESS;
+	QDF_STATUS qdf_status;
 
 	if (pHalHandle == NULL)
 		return eSIR_FAILURE;
@@ -124,15 +125,20 @@ tSirRetStatus mac_open(tHalHandle *pHalHandle, tHddHandle hHdd,
 	if (NULL == p_mac)
 		return eSIR_MEM_ALLOC_FAILED;
 
-	/* Initialize the p_mac structure */
-	qdf_mem_set(p_mac, sizeof(tAniSirGlobal), 0);
-
 	/*
 	 * Set various global fields of p_mac here
 	 * (Could be platform dependant as some variables in p_mac are platform
 	 * dependant)
 	 */
 	p_mac->hHdd = hHdd;
+
+	qdf_status = wlan_objmgr_psoc_try_get_ref(psoc, WLAN_LEGACY_MAC_ID);
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		sys_log(p_mac, LOGE, FL("PSOC get ref failure\n"));
+		return eSIR_FAILURE;
+	}
+
+	p_mac->psoc = psoc;
 	*pHalHandle = (tHalHandle) p_mac;
 
 	{
@@ -155,7 +161,7 @@ tSirRetStatus mac_open(tHalHandle *pHalHandle, tHddHandle hHdd,
 	p_mac->mgmtSeqNum = WLAN_HOST_SEQ_NUM_MIN - 1;
 	p_mac->first_scan_done = false;
 
-	status =  pe_open(p_mac, pMacOpenParms);
+	status =  pe_open(p_mac, cds_cfg);
 	if (eSIR_SUCCESS != status) {
 		sys_log(p_mac, LOGE, FL("mac_open failure\n"));
 		qdf_mem_free(p_mac);
@@ -187,6 +193,8 @@ tSirRetStatus mac_close(tHalHandle hHal)
 
 	log_deinit(pMac);
 
+	wlan_objmgr_psoc_release_ref(pMac->psoc, WLAN_LEGACY_MAC_ID);
+	pMac->psoc = NULL;
 	/* Finally, de-allocate the global MAC datastructure: */
 	qdf_mem_free(pMac);
 

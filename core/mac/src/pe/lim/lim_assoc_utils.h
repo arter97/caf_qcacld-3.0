@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -67,14 +67,16 @@ tSirRetStatus lim_populate_peer_rate_set(tpAniSirGlobal pMac,
 					 uint8_t *pSupportedMCSSet,
 					 uint8_t basicOnly,
 					 tpPESession psessionEntry,
-					 tDot11fIEVHTCaps * pVHTCaps);
+					 tDot11fIEVHTCaps *pVHTCaps,
+					 tDot11fIEvendor_he_cap *he_caps);
 
 tSirRetStatus lim_populate_own_rate_set(tpAniSirGlobal pMac,
 					tpSirSupportedRates pRates,
 					uint8_t *pSupportedMCSSet,
 					uint8_t basicOnly,
 					tpPESession psessionEntry,
-					tDot11fIEVHTCaps * pVHTCaps);
+					tDot11fIEVHTCaps *pVHTCaps,
+					tDot11fIEvendor_he_cap *he_caps);
 
 tSirRetStatus
 lim_populate_matching_rate_set(tpAniSirGlobal pMac,
@@ -83,10 +85,8 @@ lim_populate_matching_rate_set(tpAniSirGlobal pMac,
 			       tSirMacRateSet *pExtRateSet,
 			       uint8_t *pSupportedMCSSet,
 			       tpPESession psessionEntry,
-			       tDot11fIEVHTCaps * pVHTCaps);
-
-#define MCSMAPMASK1x1 0x3
-#define MCSMAPMASK2x2 0xC
+			       tDot11fIEVHTCaps *pVHTCaps,
+			       tDot11fIEvendor_he_cap *he_caps);
 
 tSirRetStatus lim_add_sta(tpAniSirGlobal, tpDphHashNode, uint8_t, tpPESession);
 tSirRetStatus lim_del_bss(tpAniSirGlobal, tpDphHashNode, uint16_t, tpPESession);
@@ -218,5 +218,11 @@ static inline void lim_send_sme_tsm_ie_ind(tpAniSirGlobal pMac,
 	uint8_t state, uint16_t measInterval)
 {}
 #endif /* FEATURE_WLAN_ESE */
+
+tSirRetStatus lim_populate_vht_mcs_set(tpAniSirGlobal pMac,
+				       tpSirSupportedRates pRates,
+				       tDot11fIEVHTCaps *pPeerVHTCaps,
+				       tpPESession psessionEntry,
+				       uint8_t nss);
 
 #endif /* __LIM_ASSOC_UTILS_H */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -325,6 +325,11 @@ typedef struct {
 	uint32_t peerAtimWindowLength;
 	uint8_t nonRoamReassoc;
 	uint32_t nss;
+#ifdef WLAN_FEATURE_11AX
+	bool he_capable;
+	tDot11fIEvendor_he_cap he_config;
+	tDot11fIEvendor_he_op he_op;
+#endif
 } tAddStaParams, *tpAddStaParams;
 
 /**
@@ -450,6 +455,7 @@ typedef struct sLimMlmSetKeysReq {
  * @chainMask: chain mask
  * @smpsMode: SMPS mode
  * @dot11_mode: 802.11 mode
+ * @he_capable: HE Capability
  */
 typedef struct {
 	tSirMacAddr bssId;
@@ -513,6 +519,14 @@ typedef struct {
 	uint8_t nss;
 	uint8_t nss_2g;
 	uint8_t nss_5g;
+	uint8_t beacon_tx_rate;
+	uint32_t tx_aggregation_size;
+	uint32_t rx_aggregation_size;
+#ifdef WLAN_FEATURE_11AX
+	bool he_capable;
+	tDot11fIEvendor_he_cap he_config;
+	tDot11fIEvendor_he_op he_op;
+#endif
 } tAddBssParams, *tpAddBssParams;
 
 /**
@@ -668,19 +682,6 @@ typedef struct {
 #ifndef OEM_DATA_RSP_SIZE
 #define OEM_DATA_RSP_SIZE 1724
 #endif
-
-/**
- * struct tStartOemDataReq - start OEM Data request
- * @selfMacAddr: self mac address
- * @status: return status
- * @oemDataReq: OEM Data request
- */
-typedef struct {
-	struct qdf_mac_addr selfMacAddr;
-	QDF_STATUS status;
-	uint8_t data_len;
-	uint8_t *data;
-} tStartOemDataReq, *tpStartOemDataReq;
 
 /**
  * struct tStartOemDataRsp - start OEM Data response
@@ -920,6 +921,9 @@ typedef struct {
 
 	uint8_t restart_on_chan_switch;
 	uint8_t nss;
+#ifdef WLAN_FEATURE_11AX
+	bool he_capable;
+#endif
 } tSwitchChannelParams, *tpSwitchChannelParams;
 
 typedef void (*tpSetLinkStateCallback)(tpAniSirGlobal pMac, void *msgParam,
@@ -1153,6 +1157,9 @@ typedef struct sMaxTxPowerPerBandParams {
  * @nss_2g: vdev nss in 2.4G
  * @nss_5g: vdev nss in 5G
  * @status: response status code
+ * @tx_aggregation_size: Tx aggregation size
+ * @rx_aggregation_size: Rx aggregation size
+ * @enable_bcast_probe_rsp: enable broadcast probe response
  */
 struct add_sta_self_params {
 	tSirMacAddr self_mac_addr;
@@ -1163,6 +1170,9 @@ struct add_sta_self_params {
 	uint8_t nss_2g;
 	uint8_t nss_5g;
 	uint32_t status;
+	uint32_t tx_aggregation_size;
+	uint32_t rx_aggregation_size;
+	bool enable_bcast_probe_rsp;
 };
 
 /**
@@ -1181,6 +1191,16 @@ struct set_ie_param {
 	uint8_t nss;
 	uint8_t ie_len;
 	uint8_t *ie_ptr;
+};
+
+/**
+ * struct set_dtim_params - dtim params
+ * @session_id: SME Session ID
+ * @dtim_period: dtim period
+ */
+struct set_dtim_params {
+	uint8_t session_id;
+	uint8_t dtim_period;
 };
 
 #define DOT11_HT_IE     1
@@ -1236,6 +1256,7 @@ typedef struct sTdlsPeerStateParams {
 	tSirMacAddr peerMacAddr;
 	uint32_t peerState;
 	tTdlsPeerCapParams peerCap;
+	bool resp_reqd;
 } tTdlsPeerStateParams;
 
 /**
@@ -1275,11 +1296,15 @@ typedef struct sAbortScanParams {
  * struct del_sta_self_params - Del Sta Self params
  * @session_id: SME Session ID
  * @status: response status code
+ * @sme_callback: callback to be called from WMA to SME
+ * @sme_ctx: pointer to context provided by SME
  */
 struct del_sta_self_params {
 	tSirMacAddr self_mac_addr;
 	uint8_t session_id;
 	uint32_t status;
+	QDF_STATUS (*sme_callback) (void *sme_ctx);
+	void *sme_ctx;
 };
 
 /**
@@ -1357,7 +1382,8 @@ typedef struct tHalHiddenSsidVdevRestart {
 } tHalHiddenSsidVdevRestart, *tpHalHiddenSsidVdevRestart;
 
 
-extern void sys_process_mmh_msg(tpAniSirGlobal pMac, tSirMsgQ *pMsg);
+extern void sys_process_mmh_msg(tpAniSirGlobal pMac,
+				struct scheduler_msg *pMsg);
 
 /**
  * struct tBeaconFilterMsg - Beacon Filtering data structure

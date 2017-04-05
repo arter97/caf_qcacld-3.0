@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -52,7 +52,7 @@
 #include "lim_trace.h"
 #include "wma_types.h"
 
-tSirRetStatus postPTTMsgApi(tpAniSirGlobal pMac, tSirMsgQ *pMsg);
+tSirRetStatus postPTTMsgApi(tpAniSirGlobal pMac, struct scheduler_msg *pMsg);
 
 #include "qdf_types.h"
 #include "cds_packet.h"
@@ -99,7 +99,7 @@ tSirRetStatus sys_init_globals(tpAniSirGlobal pMac)
  * Return: None
  */
 tSirRetStatus
-sys_bbt_process_message_core(tpAniSirGlobal mac_ctx, tpSirMsgQ msg,
+sys_bbt_process_message_core(tpAniSirGlobal mac_ctx, struct scheduler_msg *msg,
 		uint32_t type, uint32_t subtype)
 {
 	uint32_t framecount;
@@ -180,8 +180,19 @@ sys_bbt_process_message_core(tpAniSirGlobal mac_ctx, tpSirMsgQ msg,
 				mac_ctx->sys.gSysFrameCount[type][subtype]);
 		}
 
-		/* Post the message to PE Queue */
-		ret = (tSirRetStatus) lim_post_msg_api(mac_ctx, msg);
+		/*
+		 * Post the message to PE Queue. Prioritize the
+		 * Auth and assoc frames.
+		 */
+		if ((subtype == SIR_MAC_MGMT_AUTH) ||
+		   (subtype == SIR_MAC_MGMT_ASSOC_RSP) ||
+		   (subtype == SIR_MAC_MGMT_REASSOC_RSP) ||
+		   (subtype == SIR_MAC_MGMT_ASSOC_REQ) ||
+		   (subtype == SIR_MAC_MGMT_REASSOC_REQ))
+			ret = (tSirRetStatus)
+				   lim_post_msg_high_priority(mac_ctx, msg);
+		else
+			ret = (tSirRetStatus) lim_post_msg_api(mac_ctx, msg);
 		if (ret != eSIR_SUCCESS) {
 			sys_log(mac_ctx, LOGE,
 				FL("posting to LIM2 failed, ret %d\n"), ret);

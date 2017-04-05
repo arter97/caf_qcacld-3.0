@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -28,6 +28,7 @@
 #include <sms_debug.h>
 #include <csr_inside_api.h>
 #include <csr_neighbor_roam.h>
+#include <sir_api.h>
 
 /*--------------------------------------------------------------------------
    Initialize the FT context.
@@ -267,11 +268,8 @@ QDF_STATUS sme_ft_send_update_key_ind(tHalHandle hal, uint32_t session_id,
 	tSirKeyMaterial *keymaterial = NULL;
 	tAniEdType ed_type;
 	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal);
-	int i = 0;
 
 	sms_log(mac_ctx, LOG1, FL("keyLength %d"), ftkey_info->keyLength);
-	for (i = 0; i < ftkey_info->keyLength; i++)
-		sms_log(mac_ctx, LOG1, FL("%02x"), ftkey_info->Key[i]);
 
 	if (ftkey_info->keyLength > CSR_MAX_KEY_LEN) {
 		sms_log(mac_ctx, LOGE, FL("invalid keyLength %d"),
@@ -284,7 +282,6 @@ QDF_STATUS sme_ft_send_update_key_ind(tHalHandle hal, uint32_t session_id,
 	if (NULL == msg)
 		return QDF_STATUS_E_NOMEM;
 
-	qdf_mem_set(msg, msglen, 0);
 	msg->messageType = eWNI_SME_FT_UPDATE_KEY;
 	msg->length = msglen;
 
@@ -302,38 +299,15 @@ QDF_STATUS sme_ft_send_update_key_ind(tHalHandle hal, uint32_t session_id,
 	keymaterial->key[0].paeRole = ftkey_info->paeRole;
 	keymaterial->key[0].keyLength = ftkey_info->keyLength;
 
-	if (ftkey_info->keyLength && ftkey_info->Key) {
+	if (ftkey_info->keyLength)
 		qdf_mem_copy(&keymaterial->key[0].key, ftkey_info->Key,
 				ftkey_info->keyLength);
-		if (ftkey_info->keyLength == 16) {
-			sms_log(mac_ctx, LOG1,
-				FL("set update ind keyidx(%d) encType(%d) key = %02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X"),
-				msg->keyMaterial.key[0].keyId,
-				(tAniEdType) msg->keyMaterial.edType,
-				msg->keyMaterial.key[0].key[0],
-				msg->keyMaterial.key[0].key[1],
-				msg->keyMaterial.key[0].key[2],
-				msg->keyMaterial.key[0].key[3],
-				msg->keyMaterial.key[0].key[4],
-				msg->keyMaterial.key[0].key[5],
-				msg->keyMaterial.key[0].key[6],
-				msg->keyMaterial.key[0].key[7],
-				msg->keyMaterial.key[0].key[8],
-				msg->keyMaterial.key[0].key[9],
-				msg->keyMaterial.key[0].key[10],
-				msg->keyMaterial.key[0].key[11],
-				msg->keyMaterial.key[0].key[12],
-				msg->keyMaterial.key[0].key[13],
-				msg->keyMaterial.key[0].key[14],
-				msg->keyMaterial.key[0].key[15]);
-		}
-	}
 
 	qdf_copy_macaddr(&msg->bssid, &ftkey_info->peerMac);
 	msg->smeSessionId = session_id;
 	sms_log(mac_ctx, LOG1, "BSSID = " MAC_ADDRESS_STR,
 		MAC_ADDR_ARRAY(msg->bssid.bytes));
-	status = cds_send_mb_message_to_mac(msg);
+	status = umac_send_mb_message_to_mac(msg);
 
 	return status;
 }

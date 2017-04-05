@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2014-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011, 2014-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -73,11 +73,14 @@
 
 #define MAX_CHANNELS_PER_OPERATING_CLASS  25
 #define CDS_MAX_SUPP_OPER_CLASSES 32
-#define	CTRY_DEFAULT            0
-#define COUNTRY_ERD_FLAG        0x8000
-#define WORLDWIDE_ROAMING_FLAG  0x4000
 #define MIN_TX_PWR_CAP    8
 #define MAX_TX_PWR_CAP    22
+
+#define CTRY_DEFAULT          0
+#define CTRY_FLAG             0x8000
+#define WORLD_ROAMING_FLAG    0x4000
+#define WORLD_ROAMING_MASK    0x00F0
+#define WORLD_ROAMING_PREFIX  0x0060
 
 enum country_code {
 	CTRY_AFGHANISTAN = 4,
@@ -189,6 +192,7 @@ enum country_code {
 	CTRY_MONGOLIA = 496,
 	CTRY_MONTENEGRO = 499,
 	CTRY_MOROCCO = 504,
+	CTRY_NAMIBIA = 516,
 	CTRY_NEPAL = 524,
 	CTRY_NETHERLANDS = 528,
 	CTRY_NETHERLANDS_ANTILLES = 530,
@@ -355,6 +359,9 @@ enum reg_domain {
 	APL11_FCCA = 0x4F,
 	APL12_WORLD = 0x51,
 	APL13_WORLD = 0x5A,
+	APL14_WORLD = 0x57,
+	APL15_WORLD = 0x59,
+	APL16_WORLD = 0x70,
 
 	WOR0_WORLD = 0x60,
 	WOR1_WORLD = 0x61,
@@ -439,6 +446,9 @@ enum reg_domain {
 	APL11 = 0x1150,
 	APL12 = 0x1160,
 	APL13 = 0x1170,
+	APL14 = 0x1180,
+	APL15 = 0x1190,
+	APL16 = 0x1200,
 
 	NULL1 = 0x0198,
 	MKK3 = 0x0340,
@@ -467,20 +477,6 @@ enum ctl_val {
 	MKK = 0x40,
 	ETSI = 0x30,
 	NO_CTL = 0xff
-};
-
-/**
- * enum dfs_region - DFS region
- * @DFS_UNINIT_REGION: un-initialized region
- * @DFS_FCC_REGION: FCC region
- * @DFS_ETSI_REGION: ETSI region
- * @DFS_MKK_REGION: MKK region
- */
-enum dfs_region {
-	DFS_UNINIT_REGION = 0,
-	DFS_FCC_REGION = 1,
-	DFS_ETSI_REGION = 2,
-	DFS_MKK_REGION = 3
 };
 
 /**

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -300,24 +300,29 @@ static void __sch_beacon_process_no_session(tpAniSirGlobal pMac,
 		lim_handle_ibss_coalescing(pMac, pBeacon, pRxPacketInfo,
 					   psessionEntry);
 	}
-	/* If station(STA/BT-STA/BT-AP/IBSS) mode, Always save the beacon in the scan results, if atleast one session is active */
-	/* sch_beacon_processNoSession will be called only when there is atleast one session active, so not checking */
-	/* it again here. */
+#ifndef NAPIER_SCAN
+	/* If station(STA/BT-STA/BT-AP/IBSS) mode, Always save the
+	 * beacon in the scan results, if atleast one session is
+	 * active.  sch_beacon_process_no_session will be called only
+	 * when there is atleast one session active, so not checking
+	 * it again here.
+	 */
 	lim_check_and_add_bss_description(pMac, pBeacon, pRxPacketInfo, false,
 					  false);
+#endif
 	return;
 }
 
 /**
  * get_operating_channel_width() - Get operating channel width
- * @pStaDs - station entry.
+ * @stads - station entry.
  *
- * This function returns the oeprating channgl width based on
+ * This function returns the operating channel width based on
  * the supported channel width entry.
  *
  * Return: tSirMacHTChannelWidth on success
  */
-tSirMacHTChannelWidth get_operating_channel_width(tpDphHashNode stads)
+static tSirMacHTChannelWidth get_operating_channel_width(tpDphHashNode stads)
 {
 	tSirMacHTChannelWidth ch_width = eHT_CHANNEL_WIDTH_20MHZ;
 
@@ -393,9 +398,12 @@ sch_bcn_process_sta(tpAniSirGlobal mac_ctx,
 	qdf_mem_copy((uint8_t *) &session->lastBeaconTimeStamp,
 			(uint8_t *) bcn->timeStamp, sizeof(uint64_t));
 	session->lastBeaconDtimCount = bcn->tim.dtimCount;
-	session->lastBeaconDtimPeriod = bcn->tim.dtimPeriod;
 	session->currentBssBeaconCnt++;
-
+	if (session->lastBeaconDtimPeriod != bcn->tim.dtimPeriod) {
+		session->lastBeaconDtimPeriod = bcn->tim.dtimPeriod;
+		lim_send_set_dtim_period(mac_ctx, bcn->tim.dtimPeriod,
+				session);
+	}
 	MTRACE(mac_trace(mac_ctx, TRACE_CODE_RX_MGMT_TSF,
 	       session->peSessionId, bcn->timeStamp[0]);)
 	MTRACE(mac_trace(mac_ctx, TRACE_CODE_RX_MGMT_TSF,
@@ -486,9 +494,9 @@ sch_bcn_process_sta(tpAniSirGlobal mac_ctx,
  *
  * Return: none
  */
-void update_nss(tpAniSirGlobal mac_ctx, tpDphHashNode sta_ds,
-		tpSchBeaconStruct beacon, tpPESession session_entry,
-		tpSirMacMgmtHdr mgmt_hdr)
+static void update_nss(tpAniSirGlobal mac_ctx, tpDphHashNode sta_ds,
+		       tpSchBeaconStruct beacon, tpPESession session_entry,
+		       tpSirMacMgmtHdr mgmt_hdr)
 {
 	if (sta_ds->vhtSupportedRxNss != (beacon->OperatingMode.rxNSS + 1)) {
 		sta_ds->vhtSupportedRxNss =
@@ -552,7 +560,9 @@ sch_bcn_process_sta_ibss(tpAniSirGlobal mac_ctx,
 			skip_opmode_update = true;
 
 		if (!skip_opmode_update &&
-		    (operMode != bcn->OperatingMode.chanWidth)) {
+			((operMode != bcn->OperatingMode.chanWidth) ||
+			(pStaDs->vhtSupportedRxNss !=
+			(bcn->OperatingMode.rxNSS + 1)))) {
 			PELOGE(sch_log(mac_ctx, LOGE,
 			       FL("received OpMode Chanwidth %d, staIdx = %d"),
 			       bcn->OperatingMode.chanWidth, pStaDs->staIndex);)
@@ -669,6 +679,31 @@ sch_bcn_process_sta_ibss(tpAniSirGlobal mac_ctx,
 	return;
 }
 
+/**
+ * get_local_power_constraint_beacon() - extracts local constraint
+ * from beacon
+ * @bcn: beacon structure
+ * @local_constraint: local constraint pointer
+ *
+ * Return: None
+ */
+#ifdef FEATURE_WLAN_ESE
+static void get_local_power_constraint_beacon(
+		tpSchBeaconStruct bcn,
+		int8_t *local_constraint)
+{
+	if (bcn->eseTxPwr.present)
+		*local_constraint = bcn->eseTxPwr.power_limit;
+}
+#else
+static void get_local_power_constraint_beacon(
+		tpSchBeaconStruct bcn,
+		int8_t *local_constraint)
+{
+
+}
+#endif
+
 /*
  * __sch_beacon_process_for_session() - Process the received beacon frame when
  * station is not scanning and corresponding session is found
@@ -713,12 +748,11 @@ static void __sch_beacon_process_for_session(tpAniSirGlobal mac_ctx,
 					     uint8_t *rx_pkt_info,
 					     tpPESession session)
 {
-	int8_t localRRMConstraint = 0;
 	uint8_t bssIdx = 0;
 	tUpdateBeaconParams beaconParams;
 	uint8_t sendProbeReq = false;
 	tpSirMacMgmtHdr pMh = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
-	int8_t regMax = 0, maxTxPower = 0;
+	int8_t regMax = 0, maxTxPower = 0, local_constraint;
 	qdf_mem_zero(&beaconParams, sizeof(tUpdateBeaconParams));
 	beaconParams.paramChangeBitmap = 0;
 
@@ -731,7 +765,8 @@ static void __sch_beacon_process_for_session(tpAniSirGlobal mac_ctx,
 			return;
 	}
 
-	if (session->htCapability && bcn->HTInfo.present)
+	if (session->htCapability && bcn->HTInfo.present &&
+			!LIM_IS_IBSS_ROLE(session))
 		lim_update_sta_run_time_ht_switch_chnl_params(mac_ctx,
 						&bcn->HTInfo, bssIdx, session);
 
@@ -762,35 +797,35 @@ static void __sch_beacon_process_for_session(tpAniSirGlobal mac_ctx,
 	regMax = cfg_get_regulatory_max_transmit_power(mac_ctx,
 					session->currentOperChannel);
 
-	if (mac_ctx->rrm.rrmPEContext.rrmEnable
-	    && bcn->powerConstraintPresent)
-		localRRMConstraint =
-			bcn->localPowerConstraint.localPowerConstraints;
-	else
-		localRRMConstraint = 0;
-	maxTxPower = lim_get_max_tx_power(regMax, regMax - localRRMConstraint,
+	local_constraint = regMax;
+
+	if (mac_ctx->roam.configParam.allow_tpc_from_ap) {
+		get_local_power_constraint_beacon(bcn, &local_constraint);
+		sch_log(mac_ctx, LOG1, "ESE localPowerConstraint = %d,",
+						local_constraint);
+
+		if (mac_ctx->rrm.rrmPEContext.rrmEnable &&
+				bcn->powerConstraintPresent) {
+			local_constraint = regMax;
+			local_constraint -=
+				bcn->localPowerConstraint.localPowerConstraints;
+			sch_log(mac_ctx, LOG1, "localPowerConstraint = %d,",
+					local_constraint);
+			}
+	}
+
+	maxTxPower = lim_get_max_tx_power(regMax, local_constraint,
 					mac_ctx->roam.configParam.nTxPowerCap);
 
-#if defined FEATURE_WLAN_ESE
-	if (session->isESEconnection) {
-		int8_t localESEConstraint = 0;
-		if (bcn->eseTxPwr.present) {
-			localESEConstraint = bcn->eseTxPwr.power_limit;
-			maxTxPower = lim_get_max_tx_power(maxTxPower,
-					localESEConstraint,
-					mac_ctx->roam.configParam.nTxPowerCap);
-		}
-		sch_log(mac_ctx, LOG1,
-			FL("RegMax = %d, localEseCons = %d, MaxTx = %d"),
-			regMax, localESEConstraint, maxTxPower);
-	}
-#endif
+	sch_log(mac_ctx, LOG1, "RegMax = %d, MaxTx pwr = %d",
+			regMax, maxTxPower);
+
 
 	/* If maxTxPower is increased or decreased */
 	if (maxTxPower != session->maxTxPower) {
 		sch_log(mac_ctx, LOG1,
-			FL("Local power constraint change..updating new maxTx power %d to HAL"),
-			maxTxPower);
+			FL("Local power constraint change, Updating new maxTx power %d from old pwr %d"),
+			maxTxPower, session->maxTxPower);
 		if (lim_send_set_max_tx_power_req(mac_ctx, maxTxPower, session)
 		    == eSIR_SUCCESS)
 			session->maxTxPower = maxTxPower;
@@ -822,6 +857,13 @@ static void __sch_beacon_process_for_session(tpAniSirGlobal mac_ctx,
 		       FL("sending beacon param change bitmap: 0x%x "),
 		       beaconParams.paramChangeBitmap);)
 		lim_send_beacon_params(mac_ctx, &beaconParams, session);
+	}
+
+	if ((session->pePersona == QDF_P2P_CLIENT_MODE) &&
+		session->send_p2p_conf_frame) {
+		lim_p2p_oper_chan_change_confirm_action_frame(mac_ctx,
+				session->bssId, session);
+		session->send_p2p_conf_frame = false;
 	}
 }
 

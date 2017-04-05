@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -33,12 +33,12 @@
 
 #include <net/cfg80211.h>
 #include "qdf_types.h"
-#include "cds_reg_service.h"
 #include "qdf_trace.h"
-#include "sme_api.h"
 #include "cds_api.h"
 #include "cds_reg_service.h"
 #include "cds_regdomain.h"
+#include "cds_ieee80211_common_i.h"
+#include "sme_api.h"
 
 const struct chan_map chan_mapping[NUM_CHANNELS] = {
 	[CHAN_ENUM_1] = {2412, 1},
@@ -152,7 +152,7 @@ static const enum phy_ch_width next_lower_bw[] = {
 
 struct regulatory_channel reg_channels[NUM_CHANNELS];
 static uint8_t default_country[CDS_COUNTRY_CODE_LEN + 1];
-static uint8_t dfs_region;
+static enum dfs_region dfs_region;
 
 /**
  * cds_get_channel_list_with_power() - retrieve channel list with power
@@ -210,7 +210,7 @@ QDF_STATUS cds_read_default_country(uint8_t *def_ctry)
  *
  * Return: enum for the channel
  */
-static enum channel_enum cds_get_channel_enum(uint32_t chan_num)
+enum channel_enum cds_get_channel_enum(uint32_t chan_num)
 {
 	uint32_t loop;
 
@@ -242,6 +242,141 @@ enum channel_state cds_get_channel_state(uint32_t chan_num)
 		return reg_channels[chan_enum].state;
 }
 
+int8_t cds_get_channel_reg_power(uint32_t chan_num)
+{
+	enum channel_enum chan_enum;
+
+	chan_enum = cds_get_channel_enum(chan_num);
+	if (chan_enum == INVALID_CHANNEL)
+		return CHANNEL_STATE_INVALID;
+	else
+		return reg_channels[chan_enum].pwr_limit;
+}
+
+uint32_t cds_get_channel_flags(uint32_t chan_num)
+{
+	enum channel_enum chan_enum;
+
+	chan_enum = cds_get_channel_enum(chan_num);
+	if (chan_enum == INVALID_CHANNEL)
+		return CHANNEL_STATE_INVALID;
+	else
+		return reg_channels[chan_enum].flags;
+}
+
+uint32_t cds_get_vendor_reg_flags(uint32_t chan, uint16_t bandwidth,
+				bool is_ht_enabled, bool is_vht_enabled,
+				uint8_t sub_20_channel_width)
+{
+	uint32_t flags = 0;
+	enum channel_state state;
+	struct ch_params_s ch_params;
+
+	state = cds_get_channel_state(chan);
+	if (state == CHANNEL_STATE_INVALID)
+		return flags;
+	if (state == CHANNEL_STATE_DFS) {
+		flags |= IEEE80211_CHAN_PASSIVE;
+		flags |= IEEE80211_CHAN_DFS;
+	}
+	if (state == CHANNEL_STATE_DISABLE)
+		flags |= IEEE80211_CHAN_BLOCKED;
+
+	if (CDS_IS_CHANNEL_24GHZ(chan)) {
+		if ((bandwidth == CH_WIDTH_80P80MHZ) ||
+			(bandwidth == CH_WIDTH_160MHZ) ||
+			(bandwidth == CH_WIDTH_80MHZ)) {
+			bandwidth = CH_WIDTH_40MHZ;
+		}
+	}
+
+	switch (bandwidth) {
+
+	case CH_WIDTH_80P80MHZ:
+		if (cds_get_5g_bonded_channel_state(chan,
+				  bandwidth) != CHANNEL_STATE_INVALID) {
+			if (is_vht_enabled)
+				flags |= IEEE80211_CHAN_VHT80_80;
+		}
+		bandwidth = CH_WIDTH_160MHZ;
+		/* FALLTHROUGH */
+	case CH_WIDTH_160MHZ:
+		if (cds_get_5g_bonded_channel_state(chan,
+				  bandwidth) != CHANNEL_STATE_INVALID) {
+			if (is_vht_enabled)
+				flags |= IEEE80211_CHAN_VHT160;
+		}
+		bandwidth = CH_WIDTH_80MHZ;
+		/* FALLTHROUGH */
+	case CH_WIDTH_80MHZ:
+		if (cds_get_5g_bonded_channel_state(chan,
+				  bandwidth) != CHANNEL_STATE_INVALID) {
+			if (is_vht_enabled)
+				flags |= IEEE80211_CHAN_VHT80;
+		}
+		bandwidth = CH_WIDTH_40MHZ;
+		/* FALLTHROUGH */
+	case CH_WIDTH_40MHZ:
+		qdf_mem_zero(&ch_params, sizeof(ch_params));
+		ch_params.ch_width = bandwidth;
+		cds_set_channel_params(chan, 0, &ch_params);
+
+		if (cds_get_bonded_channel_state(chan, bandwidth,
+		    ch_params.sec_ch_offset) != CHANNEL_STATE_INVALID) {
+			if (ch_params.sec_ch_offset ==
+			    PHY_DOUBLE_CHANNEL_LOW_PRIMARY) {
+				flags |= IEEE80211_CHAN_HT40PLUS;
+				if (is_vht_enabled)
+					flags |= IEEE80211_CHAN_VHT40PLUS;
+			} else if (ch_params.sec_ch_offset ==
+				   PHY_DOUBLE_CHANNEL_HIGH_PRIMARY) {
+				flags |= IEEE80211_CHAN_HT40MINUS;
+				if (is_vht_enabled)
+					flags |= IEEE80211_CHAN_VHT40MINUS;
+			}
+		}
+
+		bandwidth = CH_WIDTH_20MHZ;
+		/* FALLTHROUGH */
+	case CH_WIDTH_20MHZ:
+		if (is_vht_enabled)
+			flags |= IEEE80211_CHAN_VHT20;
+		if (is_ht_enabled)
+			flags |= IEEE80211_CHAN_HT20;
+		bandwidth = CH_WIDTH_10MHZ;
+		/* FALLTHROUGH */
+	case CH_WIDTH_10MHZ:
+		if ((cds_get_bonded_channel_state(chan,
+			bandwidth, 0) != CHANNEL_STATE_INVALID) &&
+			(sub_20_channel_width ==
+				WLAN_SUB_20_CH_WIDTH_10))
+			flags |= IEEE80211_CHAN_HALF;
+		/* FALLTHROUGH */
+	case CH_WIDTH_5MHZ:
+		if ((cds_get_bonded_channel_state(chan,
+			bandwidth, 0) != CHANNEL_STATE_INVALID) &&
+			(sub_20_channel_width ==
+				WLAN_SUB_20_CH_WIDTH_5))
+			flags |= IEEE80211_CHAN_QUARTER;
+		break;
+	default:
+	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO,
+		"invalid channel width value %d", bandwidth);
+	}
+
+	return flags;
+}
+
+uint32_t cds_get_channel_freq(uint32_t chan_num)
+{
+	enum channel_enum chan_enum;
+
+	chan_enum = cds_get_channel_enum(chan_num);
+	if (chan_enum == INVALID_CHANNEL)
+		return CHANNEL_STATE_INVALID;
+	else
+		return chan_mapping[chan_enum].center_freq;
+}
 
 /**
  * cds_search_5g_bonded_chan_array() - get ptr to bonded channel
@@ -323,6 +458,18 @@ static enum channel_state cds_search_5g_bonded_channel(uint32_t chan_num,
 						       bonded_chan_ptr_ptr);
 	else
 		return cds_get_channel_state(chan_num);
+}
+
+enum channel_state cds_get_bonded_channel_state(uint16_t oper_ch,
+						enum phy_ch_width ch_width,
+						uint16_t sec_ch)
+{
+	if (CDS_IS_CHANNEL_5GHZ(oper_ch))
+		return cds_get_5g_bonded_channel_state(oper_ch,
+							ch_width);
+	else
+		return cds_get_2g_bonded_channel_state(oper_ch,
+							ch_width, sec_ch);
 }
 
 /**
@@ -435,6 +582,23 @@ enum channel_state cds_get_5g_bonded_channel_state(
 		return CHANNEL_STATE_DISABLE;
 }
 
+/**
+ * cds_combine_channel_states() - combine channel states
+ * @chan_state1: channel state1
+ * @chan_state2: channel state2
+ *
+ * Return: enum channel_state
+ */
+ static enum channel_state cds_combine_channel_states(
+		 enum channel_state chan_state1,
+		 enum channel_state chan_state2)
+{
+	if ((CHANNEL_STATE_INVALID == chan_state1) ||
+	    (CHANNEL_STATE_INVALID == chan_state2))
+		return CHANNEL_STATE_INVALID;
+	else
+		return min(chan_state1, chan_state2);
+}
 
 /**
  * cds_set_5g_channel_params() - set the 5G bonded channel parameters
@@ -448,13 +612,19 @@ static void cds_set_5g_channel_params(uint16_t oper_ch,
 {
 	enum channel_state chan_state = CHANNEL_STATE_ENABLE;
 	enum channel_state chan_state2 = CHANNEL_STATE_ENABLE;
-	const struct bonded_chan *bonded_chan_ptr;
-	const struct bonded_chan *bonded_chan_ptr2;
+	const struct bonded_chan *bonded_chan_ptr = NULL;
+	const struct bonded_chan *bonded_chan_ptr2 = NULL;
 
-	if (CH_WIDTH_MAX <= ch_params->ch_width)
-		ch_params->ch_width = CH_WIDTH_80P80MHZ;
+	if (CH_WIDTH_MAX <= ch_params->ch_width) {
+		if (0 != ch_params->center_freq_seg1)
+			ch_params->ch_width = CH_WIDTH_80P80MHZ;
+		else
+			ch_params->ch_width = CH_WIDTH_160MHZ;
+	}
 
 	while (ch_params->ch_width != CH_WIDTH_INVALID) {
+		bonded_chan_ptr = NULL;
+		bonded_chan_ptr2 = NULL;
 		chan_state = cds_search_5g_bonded_channel(oper_ch,
 							  ch_params->ch_width,
 							  &bonded_chan_ptr);
@@ -462,36 +632,42 @@ static void cds_set_5g_channel_params(uint16_t oper_ch,
 		chan_state = cds_get_5g_bonded_channel_state(oper_ch,
 							  ch_params->ch_width);
 
-		if (CH_WIDTH_80P80MHZ == ch_params->ch_width)
+		if (CH_WIDTH_80P80MHZ == ch_params->ch_width) {
 			chan_state2 = cds_get_5g_bonded_channel_state(
 				ch_params->center_freq_seg1 - 2,
 				CH_WIDTH_80MHZ);
 
-		if (chan_state2 < chan_state)
-			chan_state = chan_state2;
+			chan_state = cds_combine_channel_states(chan_state,
+								chan_state2);
+		}
+
 		if ((CHANNEL_STATE_ENABLE == chan_state) ||
 		    (CHANNEL_STATE_DFS == chan_state)) {
 			if (CH_WIDTH_20MHZ >= ch_params->ch_width) {
 				ch_params->sec_ch_offset
 					= PHY_SINGLE_CHANNEL_CENTERED;
 				ch_params->center_freq_seg0 = oper_ch;
+				break;
 			} else if (CH_WIDTH_40MHZ <= ch_params->ch_width) {
 				cds_search_5g_bonded_chan_array(oper_ch,
 							bonded_chan_40mhz_array,
 					QDF_ARRAY_SIZE(bonded_chan_40mhz_array),
 							     &bonded_chan_ptr2);
-				if (oper_ch == bonded_chan_ptr2->start_ch)
-					ch_params->sec_ch_offset =
+				if (bonded_chan_ptr && bonded_chan_ptr2) {
+					if (oper_ch ==
+					    bonded_chan_ptr2->start_ch)
+						ch_params->sec_ch_offset =
 						PHY_DOUBLE_CHANNEL_LOW_PRIMARY;
-				else
-					ch_params->sec_ch_offset =
+					else
+						ch_params->sec_ch_offset =
 						PHY_DOUBLE_CHANNEL_HIGH_PRIMARY;
 
-				ch_params->center_freq_seg0 =
-					(bonded_chan_ptr->start_ch +
-					 bonded_chan_ptr->end_ch)/2;
+					ch_params->center_freq_seg0 =
+						(bonded_chan_ptr->start_ch +
+						 bonded_chan_ptr->end_ch)/2;
+					break;
+				}
 			}
-			break;
 		}
 		ch_params->ch_width = next_lower_bw[ch_params->ch_width];
 	}
@@ -500,8 +676,10 @@ static void cds_set_5g_channel_params(uint16_t oper_ch,
 		chan_state = cds_search_5g_bonded_channel(oper_ch,
 							  CH_WIDTH_80MHZ,
 							  &bonded_chan_ptr);
-		ch_params->center_freq_seg0 = (bonded_chan_ptr->start_ch +
-				bonded_chan_ptr->end_ch)/2;
+		if (bonded_chan_ptr)
+			ch_params->center_freq_seg0 =
+				(bonded_chan_ptr->start_ch +
+				 bonded_chan_ptr->end_ch)/2;
 	}
 	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO,
 			"ch %d ch_wd %d freq0 %d freq1 %d", oper_ch,
@@ -580,7 +758,7 @@ void cds_set_channel_params(uint16_t oper_ch, uint16_t sec_ch_2g,
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS cds_get_dfs_region(uint8_t *dfs_reg)
+QDF_STATUS cds_get_dfs_region(enum dfs_region *dfs_reg)
 {
 	*dfs_reg = dfs_region;
 
@@ -670,7 +848,7 @@ QDF_STATUS cds_set_reg_domain(void *client_ctxt, v_REGDOMAIN_t reg_domain)
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS cds_put_dfs_region(uint8_t dfs_reg)
+QDF_STATUS cds_put_dfs_region(enum dfs_region dfs_reg)
 {
 	dfs_region = dfs_reg;
 

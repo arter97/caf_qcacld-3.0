@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -43,7 +43,7 @@
 #include <ip_prot.h>
 #include <enet.h>             /* ETHERTYPE_VLAN, etc. */
 #include <cds_ieee80211_common.h>        /* ieee80211_frame */
-
+#include <cdp_txrx_handle.h>
 /*
  * In theory, this tx classify code could be used on the host or in the target.
  * Thus, this code uses generic OS primitives, that can be aliased to either
@@ -350,7 +350,7 @@ struct ol_txrx_peer_t *ol_tx_tdls_peer_find(struct ol_txrx_pdev_t *pdev,
 	struct ol_txrx_peer_t *peer = NULL;
 
 	if (vdev->hlTdlsFlag) {
-		peer = ol_txrx_find_peer_by_addr(pdev,
+		peer = ol_txrx_find_peer_by_addr((struct cdp_pdev *)pdev,
 						vdev->hl_tdls_ap_mac_addr.raw,
 						peer_id);
 		if (peer &&  (peer->peer_ids[0] == HTT_INVALID_PEER_ID)) {
@@ -392,9 +392,7 @@ ol_tx_classify(
 	struct ol_tx_frms_queue_t *txq = NULL;
 	A_UINT8 *dest_addr;
 	A_UINT8 tid;
-#if defined(CONFIG_HL_SUPPORT) && defined(FEATURE_WLAN_TDLS)
 	u_int8_t peer_id;
-#endif
 
 	TX_SCHED_DEBUG_PRINT("Enter %s\n", __func__);
 	dest_addr = ol_tx_dest_addr_find(pdev, tx_nbuf);
@@ -428,7 +426,8 @@ ol_tx_classify(
 				OL_TXRX_PEER_SECURITY_MULTICAST].sec_type
 						!= htt_sec_type_wapi) &&
 				   (qdf_nbuf_is_ipv4_pkt(tx_nbuf) == true)) {
-				if (true == qdf_nbuf_is_ipv4_dhcp_pkt(
+				if (QDF_NBUF_CB_PACKET_TYPE_DHCP ==
+						QDF_NBUF_CB_GET_PACKET_TYPE(
 								tx_nbuf)) {
 					/* DHCP frame to go with
 					 * voice priority
@@ -561,7 +560,8 @@ ol_tx_classify(
 				OL_TXRX_PEER_SECURITY_UNICAST].sec_type
 					!= htt_sec_type_wapi) &&
 			   (qdf_nbuf_is_ipv4_pkt(tx_nbuf) == true)) {
-			if (true == qdf_nbuf_is_ipv4_dhcp_pkt(tx_nbuf))
+			if (QDF_NBUF_CB_PACKET_TYPE_DHCP ==
+					QDF_NBUF_CB_GET_PACKET_TYPE(tx_nbuf))
 				/* DHCP frame to go with voice priority */
 				tid = TX_DHCP_TID;
 		}
@@ -692,6 +692,12 @@ ol_tx_classify_mgmt(
 							mac_addr,
 							&peer->mac_addr) != 0) {
 					qdf_atomic_dec(&peer->ref_cnt);
+					QDF_TRACE(QDF_MODULE_ID_TXRX,
+						 QDF_TRACE_LEVEL_INFO_HIGH,
+						 "%s: peer %p peer->ref_cnt %d",
+						 __func__, peer,
+						 qdf_atomic_read
+							(&peer->ref_cnt));
 					peer = NULL;
 				}
 			}

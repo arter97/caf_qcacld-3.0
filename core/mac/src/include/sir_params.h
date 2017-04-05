@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -70,8 +70,34 @@ typedef enum {
 } ePhyChanBondState;
 
 #define MAX_BONDED_CHANNELS 8
-
-typedef enum {
+/**
+ * enum cap_bitmap - bit field for FW capability
+ * MCC - indicate MCC
+ * P2P - indicate P2P
+ * DOT11AC - indicate 11AC
+ * SLM_SESSIONIZATION - indicate SLM_SESSIONIZATION
+ * DOT11AC_OPMODE - indicate 11ac opmode
+ * SAP32STA - indicate SAP32STA
+ * TDLS - indicate TDLS
+ * P2P_GO_NOA_DECOUPLE_INIT_SCAN - indicate P2P_GO_NOA_DECOUPLE_INIT_SCAN
+ * WLANACTIVE_OFFLOAD - indicate active offload
+ * EXTENDED_SCAN - indicate extended scan
+ * PNO - indicate PNO
+ * NAN - indicate NAN
+ * RTT - indicate RTT
+ * DOT11AX - indicate 11ax
+ * WOW - indicate WOW
+ * WLAN_ROAM_SCAN_OFFLOAD - indicate Roam scan offload
+ * IBSS_HEARTBEAT_OFFLOAD - indicate IBSS HB offload
+ * WLAN_PERIODIC_TX_PTRN - indicate WLAN_PERIODIC_TX_PTRN
+ * ADVANCE_TDLS - indicate advanced TDLS
+ * TDLS_OFF_CHANNEL - indicate TDLS off channel
+ *
+ * This definition is independent of any other modules.
+ * We can use any unused numbers.
+ */
+#define MAX_SUPPORTED_FEATURE 32
+enum cap_bitmap {
 	MCC = 0,
 	P2P = 1,
 	DOT11AC = 2,
@@ -91,6 +117,7 @@ typedef enum {
 	NAN = 11,
 #endif
 	RTT = 12,
+	DOT11AX = 13,
 	WOW = 22,
 	WLAN_ROAM_SCAN_OFFLOAD = 23,
 	IBSS_HEARTBEAT_OFFLOAD = 26,
@@ -100,8 +127,8 @@ typedef enum {
 	TDLS_OFF_CHANNEL = 30,
 #endif
 
-	/* MAX_FEATURE_SUPPORTED = 128 */
-} placeHolderInCapBitmap;
+	/* MAX_FEATURE_SUPPORTED = 32 */
+};
 
 typedef enum eSriLinkState {
 	eSIR_LINK_IDLE_STATE = 0,
@@ -111,35 +138,6 @@ typedef enum eSriLinkState {
 	eSIR_LINK_IBSS_STATE = 4,
 	eSIR_LINK_DOWN_STATE = 5,
 } tSirLinkState;
-
-/* / Message queue structure used across Sirius project. */
-/* / NOTE: this structure should be multiples of a word size (4bytes) */
-/* / as this is used in tx_queue where it expects to be multiples of 4 bytes. */
-typedef struct sSirMsgQ {
-	uint16_t type;
-	/*
-	 * This field can be used as sequence number/dialog token for matching
-	 * requests and responses.
-	 */
-	uint16_t reserved;
-	/**
-	 * Based on the type either a bodyptr pointer into
-	 * memory or bodyval as a 32 bit data is used.
-	 * bodyptr: is always a freeable pointer, one should always
-	 * make sure that bodyptr is always freeable.
-	 *
-	 * Messages should use either bodyptr or bodyval; not both !!!.
-	 */
-	void *bodyptr;
-	uint32_t bodyval;
-
-	/*
-	 * Some messages provide a callback function.  The function signature
-	 * must be agreed upon between the two entities exchanging the message
-	 */
-	void *callback;
-
-} tSirMsgQ, *tpSirMsgQ;
 
 /* / Mailbox Message Structure Define */
 typedef struct sSirMbMsg {
@@ -253,9 +251,11 @@ typedef struct sSirMbMsgP2p {
 #define SIR_HAL_TIMER_ADJUST_ADAPTIVE_THRESHOLD_IND \
 					   (SIR_HAL_ITC_MSG_TYPES_BEGIN + 44)
 #define SIR_HAL_SET_LINK_STATE             (SIR_HAL_ITC_MSG_TYPES_BEGIN + 45)
+#define SIR_HAL_DELETE_BSS_HO_FAIL_REQ     (SIR_HAL_ITC_MSG_TYPES_BEGIN + 46)
+#define SIR_HAL_DELETE_BSS_HO_FAIL_RSP     (SIR_HAL_ITC_MSG_TYPES_BEGIN + 47)
 
 /*
- * (SIR_HAL_ITC_MSG_TYPES_BEGIN + 46) to
+ * (SIR_HAL_ITC_MSG_TYPES_BEGIN + 48) to
  * (SIR_HAL_ITC_MSG_TYPES_BEGIN + 57) are unused
  */
 
@@ -606,6 +606,7 @@ typedef struct sSirMbMsgP2p {
 #define SIR_HAL_ADD_BCN_FILTER_CMDID        (SIR_HAL_ITC_MSG_TYPES_BEGIN + 339)
 #define SIR_HAL_REMOVE_BCN_FILTER_CMDID     (SIR_HAL_ITC_MSG_TYPES_BEGIN + 340)
 
+
 #define SIR_HAL_BPF_GET_CAPABILITIES_REQ    (SIR_HAL_ITC_MSG_TYPES_BEGIN + 341)
 #define SIR_HAL_BPF_SET_INSTRUCTIONS_REQ    (SIR_HAL_ITC_MSG_TYPES_BEGIN + 342)
 
@@ -628,8 +629,22 @@ typedef struct sSirMbMsgP2p {
 #define SIR_HAL_NDP_INDICATION              (SIR_HAL_ITC_MSG_TYPES_BEGIN + 355)
 #define SIR_HAL_NDP_CONFIRM                 (SIR_HAL_ITC_MSG_TYPES_BEGIN + 356)
 #define SIR_HAL_NDP_END_IND                 (SIR_HAL_ITC_MSG_TYPES_BEGIN + 357)
+#define SIR_HAL_UPDATE_WEP_DEFAULT_KEY      (SIR_HAL_ITC_MSG_TYPES_BEGIN + 358)
 
-#define SIR_HAL_POWER_DBG_CMD               (SIR_HAL_ITC_MSG_TYPES_BEGIN + 347)
+#define SIR_HAL_SEND_FREQ_RANGE_CONTROL_IND (SIR_HAL_ITC_MSG_TYPES_BEGIN + 360)
+#define SIR_HAL_POWER_DBG_CMD               (SIR_HAL_ITC_MSG_TYPES_BEGIN + 362)
+#define SIR_HAL_SET_DTIM_PERIOD             (SIR_HAL_ITC_MSG_TYPES_BEGIN + 363)
+#define SIR_HAL_ENCRYPT_DECRYPT_MSG         (SIR_HAL_ITC_MSG_TYPES_BEGIN + 364)
+#define SIR_HAL_SHORT_RETRY_LIMIT_CNT       (SIR_HAL_ITC_MSG_TYPES_BEGIN + 365)
+#define SIR_HAL_LONG_RETRY_LIMIT_CNT        (SIR_HAL_ITC_MSG_TYPES_BEGIN + 366)
+#define SIR_HAL_UPDATE_TX_FAIL_CNT_TH       (SIR_HAL_ITC_MSG_TYPES_BEGIN + 367)
+#define SIR_HAL_POWER_DEBUG_STATS_REQ       (SIR_HAL_ITC_MSG_TYPES_BEGIN + 368)
+
+#define SIR_HAL_SET_WOW_PULSE_CMD           (SIR_HAL_ITC_MSG_TYPES_BEGIN + 369)
+
+#define SIR_HAL_SET_UDP_RESP_OFFLOAD        (SIR_HAL_ITC_MSG_TYPES_BEGIN + 370)
+
+#define SIR_HAL_SET_PER_ROAM_CONFIG_CMD     (SIR_HAL_ITC_MSG_TYPES_BEGIN + 371)
 
 #define SIR_HAL_MSG_TYPES_END                (SIR_HAL_MSG_TYPES_BEGIN + 0x1FF)
 
@@ -686,7 +701,6 @@ typedef struct sSirMbMsgP2p {
 #define SIR_LIM_PROBE_HB_FAILURE_TIMEOUT (SIR_LIM_TIMEOUT_MSG_START + 0xB)
 #define SIR_LIM_ADDTS_RSP_TIMEOUT        (SIR_LIM_TIMEOUT_MSG_START + 0xC)
 #define SIR_LIM_LINK_TEST_DURATION_TIMEOUT (SIR_LIM_TIMEOUT_MSG_START + 0x13)
-#define SIR_LIM_HASH_MISS_THRES_TIMEOUT  (SIR_LIM_TIMEOUT_MSG_START + 0x16)
 #define SIR_LIM_CNF_WAIT_TIMEOUT         (SIR_LIM_TIMEOUT_MSG_START + 0x17)
 /* currently unused			(SIR_LIM_TIMEOUT_MSG_START + 0x18) */
 #define SIR_LIM_UPDATE_OLBC_CACHEL_TIMEOUT (SIR_LIM_TIMEOUT_MSG_START + 0x19)

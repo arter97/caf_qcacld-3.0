@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -49,6 +49,7 @@
 #include "lim_global.h"
 #include "wma_if.h"
 #include "wma_types.h"
+#include "scheduler_api.h"
 
 /* Macro to count heartbeat */
 #define limResetHBPktCount(psessionEntry)   (psessionEntry->LimRxedBeaconCntDuringHB = 0)
@@ -83,6 +84,22 @@
 /* LIM exported function templates */
 #define LIM_MIN_BCN_PR_LENGTH  12
 #define LIM_BCN_PR_CAPABILITY_OFFSET 10
+#define LIM_ASSOC_REQ_IE_OFFSET 4
+
+/**
+ * enum lim_vendor_ie_access_policy - vendor ie access policy
+ * @LIM_ACCESS_POLICY_NONE: access policy not valid
+ * @LIM_ACCESS_POLICY_RESPOND_IF_IE_IS_PRESENT: respond only if vendor ie
+ *         is present in probe request and assoc request frames
+ * @LIM_ACCESS_POLICY_DONOT_RESPOND_IF_IE_IS_PRESENT: do not respond if vendor
+ *         ie is present in probe request or assoc request frames
+ */
+enum lim_vendor_ie_access_policy {
+	LIM_ACCESS_POLICY_NONE,
+	LIM_ACCESS_POLICY_RESPOND_IF_IE_IS_PRESENT,
+	LIM_ACCESS_POLICY_DONOT_RESPOND_IF_IE_IS_PRESENT,
+};
+
 typedef enum eMgmtFrmDropReason {
 	eMGMT_DROP_NO_DROP,
 	eMGMT_DROP_NOT_LAST_IBSS_BCN,
@@ -98,27 +115,66 @@ typedef enum eMgmtFrmDropReason {
  * This called upon LIM thread creation.
  */
 extern tSirRetStatus lim_initialize(tpAniSirGlobal);
-tSirRetStatus pe_open(tpAniSirGlobal pMac, tMacOpenParameters *pMacOpenParam);
+tSirRetStatus pe_open(tpAniSirGlobal pMac, struct cds_config_info *cds_cfg);
 tSirRetStatus pe_close(tpAniSirGlobal pMac);
 void pe_register_tl_handle(tpAniSirGlobal pMac);
 tSirRetStatus lim_start(tpAniSirGlobal pMac);
 tSirRetStatus pe_start(tpAniSirGlobal pMac);
 void pe_stop(tpAniSirGlobal pMac);
-tSirRetStatus pe_post_msg_api(tpAniSirGlobal pMac, tSirMsgQ *pMsg);
-tSirRetStatus peProcessMsg(tpAniSirGlobal pMac, tSirMsgQ *limMsg);
+tSirRetStatus pe_post_msg_api(tpAniSirGlobal pMac, struct scheduler_msg *pMsg);
+tSirRetStatus peProcessMsg(tpAniSirGlobal pMac, struct scheduler_msg *limMsg);
+
+/**
+ * pe_register_mgmt_rx_frm_callback() - registers callback for receiving
+ *                                      mgmt rx frames
+ * @mac_ctx: mac global ctx
+ *
+ * This function registers a PE function to mgmt txrx component and a WMA
+ * function to WMI layer as event handler for receiving mgmt frames.
+ *
+ * Return: None
+ */
+void pe_register_mgmt_rx_frm_callback(tpAniSirGlobal mac_ctx);
+
+/**
+ * pe_deregister_mgmt_rx_frm_callback() - degisters callback for receiving
+ *                                        mgmt rx frames
+ * @mac_ctx: mac global ctx
+ *
+ * This function deregisters the PE function registered to mgmt txrx component
+ * and the WMA function registered to WMI layer as event handler for receiving
+ * mgmt frames.
+ *
+ * Return: None
+ */
+void pe_deregister_mgmt_rx_frm_callback(tpAniSirGlobal mac_ctx);
+
+/**
+ * pe_register_callbacks_with_wma() - register SME and PE callback functions to
+ * WMA.
+ * @pMac: mac global ctx
+ * @ready_req: Ready request parameters, containing callback pointers
+ *
+ * Return: None
+ */
+void pe_register_callbacks_with_wma(tpAniSirGlobal pMac,
+				    tSirSmeReadyReq *ready_req);
+
 /**
  * Function to cleanup LIM state.
  * This called upon reset/persona change etc
  */
 extern void lim_cleanup(tpAniSirGlobal);
 /* / Function to post messages to LIM thread */
-extern uint32_t lim_post_msg_api(tpAniSirGlobal, tSirMsgQ *);
+extern uint32_t lim_post_msg_api(tpAniSirGlobal, struct scheduler_msg *);
+uint32_t lim_post_msg_high_priority(tpAniSirGlobal mac,
+				    struct scheduler_msg *msg);
+
 /**
  * Function to process messages posted to LIM thread
  * and dispatch to various sub modules within LIM module.
  */
-extern void lim_message_processor(tpAniSirGlobal, tpSirMsgQ);
-extern void lim_process_messages(tpAniSirGlobal, tpSirMsgQ);      /* DT test alt deferred 2 */
+extern void lim_message_processor(tpAniSirGlobal, struct scheduler_msg *);
 /**
  * Function to check the LIM state if system is in Scan/Learn state.
  */
@@ -147,6 +203,23 @@ extern void lim_trigger_sta_deletion(tpAniSirGlobal pMac, tpDphHashNode pStaDs,
 extern void lim_send_sme_tdls_del_sta_ind(tpAniSirGlobal pMac, tpDphHashNode pStaDs,
 					  tpPESession psessionEntry,
 					  uint16_t reasonCode);
+/**
+ * lim_set_tdls_flags() - update tdls flags based on newer STA connection
+ * information
+ * @roam_sync_ind_ptr: pointer to roam offload structure
+ * @ft_session_ptr: pointer to PE session
+ *
+ * Set TDLS flags as per new STA connection capabilities.
+ *
+ * Return: None
+ */
+void lim_set_tdls_flags(roam_offload_synch_ind *roam_sync_ind_ptr,
+		   tpPESession ft_session_ptr);
+#else
+static inline void lim_set_tdls_flags(roam_offload_synch_ind *roam_sync_ind_ptr,
+		   tpPESession ft_session_ptr)
+{
+}
 #endif
 
 /* / Function that checks for change in AP's capabilties on STA */
@@ -157,7 +230,8 @@ tSirRetStatus lim_update_short_slot(tpAniSirGlobal pMac,
 				    tpUpdateBeaconParams pBeaconParams,
 				    tpPESession);
 
-void lim_ps_offload_handle_missed_beacon_ind(tpAniSirGlobal pMac, tpSirMsgQ pMsg);
+void lim_ps_offload_handle_missed_beacon_ind(tpAniSirGlobal pMac,
+					     struct scheduler_msg *pMsg);
 void lim_send_heart_beat_timeout_ind(tpAniSirGlobal pMac, tpPESession psessionEntry);
 tMgmtFrmDropReason lim_is_pkt_candidate_for_drop(tpAniSirGlobal pMac,
 						 uint8_t *pRxPacketInfo,
@@ -174,6 +248,17 @@ static inline QDF_STATUS pe_roam_synch_callback(tpAniSirGlobal mac_ctx,
 	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
+
+/**
+ * lim_update_lost_link_info() - update lost link information to SME
+ * @mac: global MAC handle
+ * @session: PE session
+ * @rssi: rssi value from the received frame
+ *
+ * Return: None
+ */
+void lim_update_lost_link_info(tpAniSirGlobal mac, tpPESession session,
+				int32_t rssi);
 
 /**
  * lim_mon_init_session() - create PE session for monitor mode operation
@@ -217,7 +302,10 @@ static inline void lim_get_rf_band_new(tpAniSirGlobal pMac, tSirRFBand *band,
    \return  uint32_t - TX_SUCCESS for success.
 
    --------------------------------------------------------------------------*/
-tSirRetStatus pe_process_messages(tpAniSirGlobal pMac, tSirMsgQ *pMsg);
+tSirRetStatus pe_process_messages(tpAniSirGlobal pMac,
+				  struct scheduler_msg *pMsg);
+QDF_STATUS pe_mc_process_handler(struct scheduler_msg *msg);
+
 /** -------------------------------------------------------------
    \fn pe_free_msg
    \brief Called by CDS scheduler (function cds_sched_flush_mc_mqs)
@@ -225,10 +313,10 @@ tSirRetStatus pe_process_messages(tpAniSirGlobal pMac, tSirMsgQ *pMsg);
  \      This happens when there are messages pending in the PE
  \      queue when system is being stopped and reset.
    \param   tpAniSirGlobal pMac
-   \param   tSirMsgQ       pMsg
+   \param   struct scheduler_msg       pMsg
    \return none
    -----------------------------------------------------------------*/
-void pe_free_msg(tpAniSirGlobal pMac, tSirMsgQ *pMsg);
+void pe_free_msg(tpAniSirGlobal pMac, struct scheduler_msg *pMsg);
 
 /*--------------------------------------------------------------------------
 
@@ -249,12 +337,46 @@ void lim_process_abort_scan_ind(tpAniSirGlobal pMac, uint8_t sessionId,
 	uint32_t scan_id, uint32_t scan_requestor_id);
 
 void __lim_process_sme_assoc_cnf_new(tpAniSirGlobal, uint32_t, uint32_t *);
+
+/**
+ * lim_process_sme_addts_rsp_timeout(): Send addts rsp timeout to SME
+ * @pMac: Pointer to Global MAC structure
+ * @param: Addts rsp timer count
+ *
+ * This function is used to reset the addts sent flag and
+ * send addts rsp timeout to SME
+ *
+ * Return: None
+ */
+void lim_process_sme_addts_rsp_timeout(tpAniSirGlobal pMac, uint32_t param);
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 void lim_fill_join_rsp_ht_caps(tpPESession session, tpSirSmeJoinRsp rsp);
 #else
 static inline void lim_fill_join_rsp_ht_caps(tpPESession session,
 	tpSirSmeJoinRsp rsp)
 {}
+#endif
+QDF_STATUS lim_update_ext_cap_ie(tpAniSirGlobal mac_ctx,
+	uint8_t *ie_data, uint8_t *local_ie_buf, uint16_t *local_ie_len);
+
+#ifdef WLAN_FEATURE_11AX
+#define LIM_HE_SU_BEAMFORMER_BYTE_IDX 8
+#define LIM_HE_SU_BEAMFORMEE_BYTE_IDX 9
+#define LIM_HE_MU_BEAMFORMER_BYTE_IDX 9
+#define LIM_HE_SU_BEAMFORMER_BIT_POS 8
+#define LIM_HE_SU_BEAMFORMEE_BIT_POS 1
+#define LIM_HE_MU_BEAMFORMER_BIT_POS 2
+
+#define LIM_GET_BIT_VALUE(arr, byte, bit) ((arr[byte-1] >> (bit - 1)) & 0x01)
+#define LIM_GET_SU_BEAMFORMER(he_cap) \
+	LIM_GET_BIT_VALUE(he_cap, LIM_HE_SU_BEAMFORMER_BYTE_IDX, \
+			  LIM_HE_SU_BEAMFORMER_BIT_POS)
+#define LIM_GET_SU_BEAMFORMEE(he_cap) \
+	LIM_GET_BIT_VALUE(he_cap, LIM_HE_SU_BEAMFORMEE_BYTE_IDX, \
+			  LIM_HE_SU_BEAMFORMEE_BIT_POS)
+#define LIM_GET_MU_BEAMFORMER(he_cap) \
+	LIM_GET_BIT_VALUE(he_cap, LIM_HE_MU_BEAMFORMER_BYTE_IDX, \
+			  LIM_HE_MU_BEAMFORMER_BIT_POS)
 #endif
 
 /************************************************************/

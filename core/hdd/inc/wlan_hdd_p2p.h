@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -27,13 +27,13 @@
 
 #ifndef __P2P_H
 #define __P2P_H
-/**===========================================================================
 
-   \file         wlan_hdd_p2p.h
+/**
+ * DOC: wlan_hdd_p2p.h
+ *
+ * Linux HDD P2P include file
+ */
 
-   \brief       Linux HDD P2P include file
-
-   ==========================================================================*/
 #define ACTION_FRAME_TX_TIMEOUT 2000
 #define WAIT_CANCEL_REM_CHAN    1000
 #define WAIT_REM_CHAN_READY     1000
@@ -69,6 +69,9 @@
 #define P2P_POWER_SAVE_TYPE_OPPORTUNISTIC        (1 << 0)
 #define P2P_POWER_SAVE_TYPE_PERIODIC_NOA         (1 << 1)
 #define P2P_POWER_SAVE_TYPE_SINGLE_NOA           (1 << 2)
+
+#define ACTION_FRAME_RSP_WAIT 500
+#define ACTION_FRAME_ACK_WAIT 300
 
 #ifdef WLAN_FEATURE_P2P_DEBUG
 typedef enum { P2P_NOT_ACTIVE,
@@ -119,6 +122,7 @@ void hdd_remain_chan_ready_handler(hdd_adapter_t *pAdapter,
 	uint32_t scan_id);
 void hdd_send_action_cnf(hdd_adapter_t *pAdapter, bool actionSendSuccess);
 int wlan_hdd_check_remain_on_channel(hdd_adapter_t *pAdapter);
+void hdd_send_action_cnf_cb(uint32_t session_id, bool status);
 void wlan_hdd_cancel_existing_remain_on_channel(hdd_adapter_t *pAdapter);
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))
@@ -155,4 +159,91 @@ int __wlan_hdd_del_virtual_intf(struct wiphy *wiphy, struct wireless_dev *wdev);
 void wlan_hdd_cleanup_remain_on_channel_ctx(hdd_adapter_t *pAdapter);
 
 void wlan_hdd_roc_request_dequeue(struct work_struct *work);
+
+/**
+ * wlan_hdd_set_power_save() - hdd set power save
+ * @adapter:    adapter context
+ * @pnoa:       pointer to noa parameters
+ *
+ * This function sets power save parameters.
+ *
+ * Return: 0 - success
+ *    others - failure
+ */
+int wlan_hdd_set_power_save(hdd_adapter_t *adapter,
+	tpP2pPsConfig pnoa);
+
+/**
+ * wlan_hdd_listen_offload_start() - hdd set listen offload start
+ * @adapter:  adapter context
+ * @params:   listen offload parameters
+ *
+ * This function sets listen offload start parameters.
+ *
+ * Return: 0 - success
+ *    others - failure
+ */
+int wlan_hdd_listen_offload_start(hdd_adapter_t *adapter,
+	struct sir_p2p_lo_start *params);
+
+/**
+ * wlan_hdd_listen_offload_stop() - hdd set listen offload stop
+ * @adapter:  adapter context
+ *
+ * This function sets listen offload stop parameters.
+ *
+ * Return: 0 - success
+ *    others - failure
+ */
+int wlan_hdd_listen_offload_stop(hdd_adapter_t *adapter);
+
+/**
+ * wlan_hdd_set_mas() - Function to set MAS value to FW
+ * @adapter:            Pointer to HDD adapter
+ * @mas_value:          0-Disable, 1-Enable MAS
+ *
+ * This function passes down the value of MAS to FW
+ *
+ * Return: Configuration message posting status, SUCCESS or Fail
+ *
+ */
+int32_t wlan_hdd_set_mas(hdd_adapter_t *adapter, uint8_t mas_value);
+
+/**
+ * wlan_hdd_set_mcc_p2p_quota() - Function to set quota for P2P
+ * to FW
+ * @adapter:            Pointer to HDD adapter
+ * @set_value:          Quota value for the interface
+ *
+ * This function is used to set the quota for P2P cases
+ *
+ * Return: Configuration message posting status, SUCCESS or Fail
+ *
+ */
+int wlan_hdd_set_mcc_p2p_quota(hdd_adapter_t *adapter,
+			       uint32_t set_value);
+
+/**
+ * wlan_hdd_go_set_mcc_p2p_quota() - Function to set quota for
+ * P2P GO to FW
+ * @hostapd_adapter:    Pointer to HDD adapter
+ * @set_value:          Quota value for the interface
+ *
+ * This function is used to set the quota for P2P GO cases
+ *
+ * Return: Configuration message posting status, SUCCESS or Fail
+ *
+ */
+int wlan_hdd_go_set_mcc_p2p_quota(hdd_adapter_t *hostapd_adapter,
+				  uint32_t set_value);
+/**
+ * wlan_hdd_set_mcc_latency() - Set MCC latency to FW
+ * @adapter: Pointer to HDD adapter
+ * @set_value: Latency value
+ *
+ * Sets the MCC latency value during STA-P2P concurrency
+ *
+ * Return: None
+ */
+void wlan_hdd_set_mcc_latency(hdd_adapter_t *adapter, int set_value);
 #endif /* __P2P_H */

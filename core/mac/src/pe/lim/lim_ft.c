@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -156,8 +156,6 @@ void lim_ft_prepare_add_bss_req(tpAniSirGlobal pMac,
 			FL("Unable to allocate memory for creating ADD_BSS"));
 		return;
 	}
-
-	qdf_mem_set((uint8_t *) pAddBssParams, sizeof(tAddBssParams), 0);
 
 	lim_extract_ap_capabilities(pMac, (uint8_t *) bssDescription->ieFields,
 			lim_get_ielen_from_bss_description(bssDescription),
@@ -371,13 +369,18 @@ void lim_ft_prepare_add_bss_req(tpAniSirGlobal pMac,
 				pAddBssParams->staContext.vhtCapable = 1;
 				if ((pBeaconStruct->VHTCaps.suBeamFormerCap ||
 				     pBeaconStruct->VHTCaps.muBeamformerCap) &&
-				    pftSessionEntry->txBFIniFeatureEnabled)
+				    pftSessionEntry->vht_config.su_beam_formee)
 					sta_ctx->vhtTxBFCapable
 						= 1;
 				if (pBeaconStruct->VHTCaps.suBeamformeeCap &&
-				    pftSessionEntry->enable_su_tx_bformer)
+				    pftSessionEntry->vht_config.su_beam_former)
 					sta_ctx->enable_su_tx_bformer = 1;
 			}
+			if (lim_is_session_he_capable(pftSessionEntry) &&
+				pBeaconStruct->vendor_he_cap.present)
+				lim_intersect_ap_he_caps(pftSessionEntry,
+					pAddBssParams, pBeaconStruct, NULL);
+
 			if ((pBeaconStruct->HTCaps.supportedChannelWidthSet) &&
 			    (chanWidthSupp)) {
 				sta_ctx->ch_width = (uint8_t)
@@ -437,7 +440,8 @@ void lim_ft_prepare_add_bss_req(tpAniSirGlobal pMac,
 					   supportedRates,
 					   pBeaconStruct->HTCaps.supportedMCSSet,
 					   false, pftSessionEntry,
-					   &pBeaconStruct->VHTCaps);
+					   &pBeaconStruct->VHTCaps,
+					   &pBeaconStruct->vendor_he_cap);
 	}
 
 	pAddBssParams->maxTxPower = pftSessionEntry->maxTxPower;
@@ -804,50 +808,11 @@ bool lim_process_ft_update_key(tpAniSirGlobal pMac, uint32_t *pMsgBuf)
 
 		pAddBssParams->extSetStaKeyParam.sendRsp = false;
 
-		if (pAddBssParams->extSetStaKeyParam.key[0].keyLength == 16) {
-			PELOG1(lim_log(pMac, LOG1,
-				       FL
-					       ("BSS key = %02X-%02X-%02X-%02X-%02X-%02X-%02X- "
-					       "%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X"),
-				       pAddBssParams->extSetStaKeyParam.key[0].
-				       key[0],
-				       pAddBssParams->extSetStaKeyParam.key[0].
-				       key[1],
-				       pAddBssParams->extSetStaKeyParam.key[0].
-				       key[2],
-				       pAddBssParams->extSetStaKeyParam.key[0].
-				       key[3],
-				       pAddBssParams->extSetStaKeyParam.key[0].
-				       key[4],
-				       pAddBssParams->extSetStaKeyParam.key[0].
-				       key[5],
-				       pAddBssParams->extSetStaKeyParam.key[0].
-				       key[6],
-				       pAddBssParams->extSetStaKeyParam.key[0].
-				       key[7],
-				       pAddBssParams->extSetStaKeyParam.key[0].
-				       key[8],
-				       pAddBssParams->extSetStaKeyParam.key[0].
-				       key[9],
-				       pAddBssParams->extSetStaKeyParam.key[0].
-				       key[10],
-				       pAddBssParams->extSetStaKeyParam.key[0].
-				       key[11],
-				       pAddBssParams->extSetStaKeyParam.key[0].
-				       key[12],
-				       pAddBssParams->extSetStaKeyParam.key[0].
-				       key[13],
-				       pAddBssParams->extSetStaKeyParam.key[0].
-				       key[14],
-				       pAddBssParams->extSetStaKeyParam.key[0].
-				       key[15]);
-			       )
-		}
 	}
 	return true;
 }
 
-void
+static void
 lim_ft_send_aggr_qos_rsp(tpAniSirGlobal pMac, uint8_t rspReqd,
 			 tpAggrAddTsParams aggrQosRsp, uint8_t smesessionId)
 {
@@ -862,7 +827,6 @@ lim_ft_send_aggr_qos_rsp(tpAniSirGlobal pMac, uint8_t rspReqd,
 			FL("AllocateMemory failed for tSirAggrQosRsp"));
 		return;
 	}
-	qdf_mem_set((uint8_t *) rsp, sizeof(*rsp), 0);
 	rsp->messageType = eWNI_SME_FT_AGGR_QOS_RSP;
 	rsp->sessionId = smesessionId;
 	rsp->length = sizeof(*rsp);
@@ -877,7 +841,8 @@ lim_ft_send_aggr_qos_rsp(tpAniSirGlobal pMac, uint8_t rspReqd,
 	return;
 }
 
-void lim_process_ft_aggr_qo_s_rsp(tpAniSirGlobal pMac, tpSirMsgQ limMsg)
+void lim_process_ft_aggr_qo_s_rsp(tpAniSirGlobal pMac,
+				  struct scheduler_msg *limMsg)
 {
 	tpAggrAddTsParams pAggrQosRspMsg = NULL;
 	tAddTsParams addTsParam = { 0 };
@@ -943,7 +908,7 @@ void lim_process_ft_aggr_qo_s_rsp(tpAniSirGlobal pMac, tpSirMsgQ limMsg)
 
 tSirRetStatus lim_process_ft_aggr_qos_req(tpAniSirGlobal pMac, uint32_t *pMsgBuf)
 {
-	tSirMsgQ msg;
+	struct scheduler_msg msg;
 	tSirAggrQosReq *aggrQosReq = (tSirAggrQosReq *) pMsgBuf;
 	tpAggrAddTsParams pAggrAddTsParam;
 	tpPESession psessionEntry = NULL;
@@ -991,7 +956,6 @@ tSirRetStatus lim_process_ft_aggr_qos_req(tpAniSirGlobal pMac, uint32_t *pMsgBuf
 		return eSIR_FAILURE;
 	}
 
-	qdf_mem_set((uint8_t *) pAggrAddTsParam, sizeof(tAggrAddTsParams), 0);
 	pAggrAddTsParam->staIdx = psessionEntry->staId;
 	/* Fill in the sessionId specific to PE */
 	pAggrAddTsParam->sessionId = sessionId;

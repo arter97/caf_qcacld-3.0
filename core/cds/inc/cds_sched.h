@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -45,37 +45,25 @@
 #if defined(WLAN_OPEN_SOURCE) && defined(CONFIG_HAS_WAKELOCK)
 #include <linux/wakelock.h>
 #endif
-#include <cds_mq.h>
 #include <qdf_types.h>
 #include "qdf_lock.h"
 #include "qdf_mc_timer.h"
+#include "cds_config.h"
 
-#define TX_POST_EVENT_MASK               0x001
-#define TX_SUSPEND_EVENT_MASK            0x002
-#define MC_POST_EVENT_MASK               0x001
-#define MC_SUSPEND_EVENT_MASK            0x002
-#define RX_POST_EVENT_MASK               0x001
-#define RX_SUSPEND_EVENT_MASK            0x002
-#define TX_SHUTDOWN_EVENT_MASK           0x010
-#define MC_SHUTDOWN_EVENT_MASK           0x010
-#define RX_SHUTDOWN_EVENT_MASK           0x010
-#define WD_POST_EVENT_MASK               0x001
-#define WD_SHUTDOWN_EVENT_MASK           0x002
-#define WD_CHIP_RESET_EVENT_MASK         0x004
-#define WD_WLAN_SHUTDOWN_EVENT_MASK      0x008
-#define WD_WLAN_REINIT_EVENT_MASK        0x010
-
-/*
- * Maximum number of messages in the system
- * These are buffers to account for all current messages
- * with some accounting of what we think is a
- * worst-case scenario.  Must be able to handle all
- * incoming frames, as well as overhead for internal
- * messaging
- *
- * Increased to 8000 to handle more RX frames
- */
-#define CDS_CORE_MAX_MESSAGES 8000
+#define TX_POST_EVENT               0x001
+#define TX_SUSPEND_EVENT            0x002
+#define MC_POST_EVENT               0x001
+#define MC_SUSPEND_EVENT            0x002
+#define RX_POST_EVENT               0x001
+#define RX_SUSPEND_EVENT            0x002
+#define TX_SHUTDOWN_EVENT           0x010
+#define MC_SHUTDOWN_EVENT           0x010
+#define RX_SHUTDOWN_EVENT           0x010
+#define WD_POST_EVENT               0x001
+#define WD_SHUTDOWN_EVENT           0x002
+#define WD_CHIP_RESET_EVENT         0x004
+#define WD_WLAN_SHUTDOWN_EVENT      0x008
+#define WD_WLAN_REINIT_EVENT        0x010
 
 #ifdef QCA_CONFIG_SMP
 /*
@@ -83,23 +71,10 @@
 ** OL Rx thread.
 */
 #define CDS_MAX_OL_RX_PKT 4000
-
-typedef void (*cds_ol_rx_thread_cb)(void *context, void *rxpkt, uint16_t staid);
 #endif
 
-/*
-** QDF Message queue definition.
-*/
-typedef struct _cds_mq_type {
-	/* Lock use to synchronize access to this message queue */
-	spinlock_t mqLock;
+typedef void (*cds_ol_rx_thread_cb)(void *context, void *rxpkt, uint16_t staid);
 
-	/* List of vOS Messages waiting on this queue */
-	struct list_head mqList;
-
-} cds_mq_type, *p_cds_mq_type;
-
-#ifdef QCA_CONFIG_SMP
 /*
 ** CDS message wrapper for data rx from TXRX
 */
@@ -117,7 +92,6 @@ struct cds_ol_rx_pkt {
 	cds_ol_rx_thread_cb callback;
 
 };
-#endif
 
 /*
 ** CDS Scheduler context
@@ -130,36 +104,6 @@ struct cds_ol_rx_pkt {
 typedef struct _cds_sched_context {
 	/* Place holder to the CDS Context */
 	void *pVContext;
-	/* WMA Message queue on the Main thread */
-	cds_mq_type wmaMcMq;
-
-	/* PE Message queue on the Main thread */
-	cds_mq_type peMcMq;
-
-	/* SME Message queue on the Main thread */
-	cds_mq_type smeMcMq;
-
-	/* SYS Message queue on the Main thread */
-	cds_mq_type sysMcMq;
-
-	/* Handle of Event for MC thread to signal startup */
-	struct completion McStartEvent;
-
-	struct task_struct *McThread;
-
-	/* completion object for MC thread shutdown */
-	struct completion McShutdown;
-
-	/* Wait queue for MC thread */
-	wait_queue_head_t mcWaitQueue;
-
-	unsigned long mcEventFlag;
-
-	/* Completion object to resume Mc thread */
-	struct completion ResumeMcEvent;
-
-	/* lock to make sure that McThread suspend/resume mechanism is in sync */
-	spinlock_t McThreadLock;
 #ifdef QCA_CONFIG_SMP
 	spinlock_t ol_rx_thread_lock;
 
@@ -202,7 +146,7 @@ typedef struct _cds_sched_context {
 	struct notifier_block *cpu_hot_plug_notifier;
 
 	/* affinity lock */
-	spinlock_t affinity_lock;
+	struct mutex affinity_lock;
 
 	/* rx thread affinity cpu */
 	unsigned long rx_thread_cpu;
@@ -230,29 +174,7 @@ struct cds_log_complete {
 	bool recovery_needed;
 };
 
-/*
-** CDS Sched Msg Wrapper
-** Wrapper messages so that they can be chained to their respective queue
-** in the scheduler.
-*/
-typedef struct _cds_msg_wrapper {
-	/* Message node */
-	struct list_head msgNode;
-
-	/* the Vos message it is associated to */
-	cds_msg_t *pVosMsg;
-
-} cds_msg_wrapper, *p_cds_msg_wrapper;
-
 typedef struct _cds_context_type {
-	/* Messages buffers */
-	cds_msg_t aMsgBuffers[CDS_CORE_MAX_MESSAGES];
-
-	cds_msg_wrapper aMsgWrappers[CDS_CORE_MAX_MESSAGES];
-
-	/* Free Message queue */
-	cds_mq_type freeVosMq;
-
 	/* Scheduler Context */
 	cds_sched_context qdf_sched;
 
@@ -283,10 +205,11 @@ typedef struct _cds_context_type {
 	 */
 	qdf_device_t qdf_ctx;
 
-	void *pdev_txrx_ctx;
+	struct cdp_pdev *pdev_txrx_ctx;
+	void *dp_soc;
 
 	/* Configuration handle used to get system configuration */
-	void *cfg_ctx;
+	struct cdp_cfg *cfg_ctx;
 
 	/* radio index per driver */
 	int radio_index;
@@ -299,24 +222,11 @@ typedef struct _cds_context_type {
 	uint32_t fw_debug_log_level;
 	struct cds_log_complete log_complete;
 	qdf_spinlock_t bug_report_lock;
-	qdf_event_t connection_update_done_evt;
-	qdf_mutex_t qdf_conc_list_lock;
-	qdf_mc_timer_t dbs_opportunistic_timer;
-#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
-	void (*sap_restart_chan_switch_cb)(void *, uint32_t, uint32_t);
-#endif
-	QDF_STATUS (*sme_get_valid_channels)(void*, uint8_t *, uint32_t *);
-	void (*sme_get_nss_for_vdev)(void*, enum tQDF_ADAPTER_MODE,
-		uint8_t *, uint8_t *);
 
-	/* This list is not sessionized. This mandatory channel list would be
-	 * as per OEMs preference as per the regulatory/other considerations.
-	 * So, this would remain same for all the interfaces.
-	 */
-	uint8_t sap_mandatory_channels[QDF_MAX_NUM_CHAN];
-	uint32_t sap_mandatory_channels_len;
-	bool do_hw_mode_change;
 	bool enable_fatal_event;
+	struct cds_config_info *cds_cfg;
+
+	struct ol_tx_sched_wrr_ac_specs_t ac_specs[TX_WMM_AC_NUM];
 } cds_context_type, *p_cds_contextType;
 
 /*---------------------------------------------------------------------------
@@ -423,6 +333,7 @@ void cds_indicate_rxpkt(p_cds_sched_context pSchedContext,
 static inline
 struct cds_ol_rx_pkt *cds_alloc_ol_rx_pkt(p_cds_sched_context pSchedContext)
 {
+	return NULL;
 }
 
 /**
@@ -525,22 +436,50 @@ QDF_STATUS cds_sched_open(void *p_cds_context,
    ---------------------------------------------------------------------------*/
 QDF_STATUS cds_sched_close(void *p_cds_context);
 
-/* Helper routines provided to other CDS API's */
-QDF_STATUS cds_mq_init(p_cds_mq_type pMq);
-void cds_mq_deinit(p_cds_mq_type pMq);
-void cds_mq_put(p_cds_mq_type pMq, p_cds_msg_wrapper pMsgWrapper);
-p_cds_msg_wrapper cds_mq_get(p_cds_mq_type pMq);
-bool cds_is_mq_empty(p_cds_mq_type pMq);
 p_cds_sched_context get_cds_sched_ctxt(void);
-QDF_STATUS cds_sched_init_mqs(p_cds_sched_context pSchedContext);
-void cds_sched_deinit_mqs(p_cds_sched_context pSchedContext);
-void cds_sched_flush_mc_mqs(p_cds_sched_context pSchedContext);
 
 void qdf_timer_module_init(void);
+void qdf_timer_module_deinit(void);
 void cds_ssr_protect_init(void);
 void cds_ssr_protect(const char *caller_func);
 void cds_ssr_unprotect(const char *caller_func);
 bool cds_wait_for_external_threads_completion(const char *caller_func);
 int cds_get_gfp_flags(void);
+
+/**
+ * cds_return_external_threads_count() - return active external thread calls
+ *
+ * Return: total number of active extrenal threads in driver
+ */
+int cds_return_external_threads_count(void);
+
+/**
+ * cds_shutdown_notifier_register() - Register for shutdown notification
+ * @cb          : Call back to be called
+ * @priv        : Private pointer to be passed back to call back
+ *
+ * During driver remove or shutdown (recovery), external threads might be stuck
+ * waiting on some event from firmware at lower layers. Remove or shutdown can't
+ * proceed till the thread completes to avoid any race condition. Call backs can
+ * be registered here to get early notification of remove or shutdown so that
+ * waiting thread can be unblocked and hence remove or shutdown can proceed
+ * further as waiting there may not make sense when FW may already have been
+ * down.
+ *
+ * Return: CDS status
+ */
+QDF_STATUS cds_shutdown_notifier_register(void (*cb)(void *priv), void *priv);
+
+/**
+ * cds_shutdown_notifier_purge() - Purge all the notifiers
+ *
+ * Shutdown notifiers are added to provide the early notification of remove or
+ * shutdown being initiated. Adding this API to purge all the registered call
+ * backs as they are not useful any more while all the lower layers are being
+ * shutdown.
+ *
+ * Return: None
+ */
+void cds_shutdown_notifier_purge(void);
 
 #endif /* #if !defined __CDS_SCHED_H */

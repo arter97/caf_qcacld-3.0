@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -48,16 +48,11 @@
 #include "wma_types.h"
 #include "cds_utils.h"
 #include "lim_types.h"
-#include "cds_concurrency.h"
+#include "wlan_policy_mgr_api.h"
 #include "nan_datapath.h"
 
 #define MAX_SUPPORTED_PEERS_WEP 16
 
-static void lim_handle_sme_join_result(tpAniSirGlobal, tSirResultCodes, uint16_t,
-				       tpPESession);
-#ifdef FEATURE_OEM_DATA_SUPPORT
-void lim_process_mlm_oem_data_req_cnf(tpAniSirGlobal, uint32_t *);
-#endif
 void lim_process_mlm_join_cnf(tpAniSirGlobal, uint32_t *);
 void lim_process_mlm_auth_cnf(tpAniSirGlobal, uint32_t *);
 void lim_process_mlm_start_cnf(tpAniSirGlobal, uint32_t *);
@@ -102,14 +97,6 @@ lim_process_mlm_rsp_messages(tpAniSirGlobal pMac, uint32_t msgType,
 	}
 	MTRACE(mac_trace(pMac, TRACE_CODE_TX_LIM_MSG, 0, msgType));
 	switch (msgType) {
-
-#ifdef FEATURE_OEM_DATA_SUPPORT
-	case LIM_MLM_OEM_DATA_CNF:
-		lim_process_mlm_oem_data_req_cnf(pMac, pMsgBuf);
-		pMsgBuf = NULL;
-		break;
-#endif
-
 	case LIM_MLM_AUTH_CNF:
 		lim_process_mlm_auth_cnf(pMac, pMsgBuf);
 		break;
@@ -153,44 +140,6 @@ lim_process_mlm_rsp_messages(tpAniSirGlobal pMac, uint32_t msgType,
 	} /* switch (msgType) */
 	return;
 } /*** end lim_process_mlm_rsp_messages() ***/
-
-#ifdef FEATURE_OEM_DATA_SUPPORT
-
-/**
- * lim_process_mlm_oem_data_req_cnf()
- *
- ***FUNCTION:
- * This function is called to processes LIM_MLM_OEM_DATA_REQ_CNF
- * message from MLM State machine.
- *
- ***LOGIC:
- *
- ***ASSUMPTIONS:
- *
- ***NOTE:
- *
- * @param pMac       Pointer to Global MAC structure
- * @param pMsgBuf    A pointer to the MLM message buffer
- *
- * @return None
- */
-
-void lim_process_mlm_oem_data_req_cnf(tpAniSirGlobal pMac, uint32_t *pMsgBuf)
-{
-	tLimMlmOemDataRsp *measRsp;
-
-	tSirResultCodes resultCode = eSIR_SME_SUCCESS;
-
-	measRsp = (tLimMlmOemDataRsp *) (pMsgBuf);
-
-	/* Now send the meas confirm message to the sme */
-	lim_send_sme_oem_data_rsp(pMac, (uint32_t *) measRsp, resultCode);
-
-	/* Dont free the memory here. It will be freed up by the callee */
-
-	return;
-}
-#endif
 
 /**
  * lim_process_mlm_start_cnf()
@@ -388,7 +337,7 @@ void lim_process_mlm_join_cnf(tpAniSirGlobal mac_ctx,
  * Return: None
  */
 
-void lim_send_mlm_assoc_req(tpAniSirGlobal mac_ctx,
+static void lim_send_mlm_assoc_req(tpAniSirGlobal mac_ctx,
 	tpPESession session_entry)
 {
 	tLimMlmAssocReq *assoc_req;
@@ -438,11 +387,10 @@ void lim_send_mlm_assoc_req(tpAniSirGlobal mac_ctx,
 		 */
 		caps &= (~LIM_SPECTRUM_MANAGEMENT_BIT_MASK);
 
-	/*
-	 * RM capability should be independent of AP's capabilities
-	 * Refer 8.4.1.4 Capability Information field in 802.11-2012
-	 * Do not modify it.
-	 */
+	/* Clear rrm bit if AP doesn't support it */
+	if (!(session_entry->pLimJoinReq->bssDescription.capabilityInfo &
+		LIM_RRM_BIT_MASK))
+		caps &= (~LIM_RRM_BIT_MASK);
 
 	/* Clear short preamble bit if AP does not support it */
 	if (!(session_entry->pLimJoinReq->bssDescription.capabilityInfo &
@@ -580,7 +528,7 @@ void lim_process_mlm_auth_cnf(tpAniSirGlobal mac_ctx, uint32_t *msg)
 		return;
 	}
 
-	if (((tLimMlmAuthCnf *) msg)->resultCode == eSIR_SME_SUCCESS) {
+	if (auth_cnf->resultCode == eSIR_SME_SUCCESS) {
 		if (session_entry->limSmeState == eLIM_SME_WT_AUTH_STATE) {
 			lim_send_mlm_assoc_req(mac_ctx, session_entry);
 		} else {
@@ -617,9 +565,10 @@ void lim_process_mlm_auth_cnf(tpAniSirGlobal mac_ctx, uint32_t *msg)
 	}
 
 	if ((auth_type == eSIR_AUTO_SWITCH) &&
-		(((tLimMlmAuthCnf *) msg)->authType ==  eSIR_SHARED_KEY)
-		&& (eSIR_MAC_AUTH_ALGO_NOT_SUPPORTED_STATUS ==
-		((tLimMlmAuthCnf *) msg)->protStatusCode)) {
+		(auth_cnf->authType == eSIR_SHARED_KEY) &&
+		((eSIR_MAC_AUTH_ALGO_NOT_SUPPORTED_STATUS ==
+			auth_cnf->protStatusCode) ||
+		(auth_cnf->resultCode == eSIR_SME_AUTH_TIMEOUT_RESULT_CODE))) {
 		/*
 		 * When shared authentication fails with reason
 		 * code "13" and authType set to 'auto switch',
@@ -634,8 +583,6 @@ void lim_process_mlm_auth_cnf(tpAniSirGlobal mac_ctx, uint32_t *msg)
 				FL("mlmAuthReq :Memory alloc failed "));
 			return;
 		}
-		qdf_mem_set((uint8_t *) auth_req,
-			sizeof(tLimMlmAuthReq), 0);
 		if (session_entry->limSmeState ==
 			eLIM_SME_WT_AUTH_STATE) {
 			sir_copy_mac_addr(auth_req->peerMacAddr,
@@ -683,8 +630,8 @@ void lim_process_mlm_auth_cnf(tpAniSirGlobal mac_ctx, uint32_t *msg)
 			 * auth failure to Host.
 			 */
 			lim_handle_sme_join_result(mac_ctx,
-				((tLimMlmAuthCnf *)msg)->resultCode,
-				((tLimMlmAuthCnf *)msg)->protStatusCode,
+				auth_cnf->resultCode,
+				auth_cnf->protStatusCode,
 				session_entry);
 		} else {
 			/*
@@ -743,9 +690,21 @@ void lim_process_mlm_assoc_cnf(tpAniSirGlobal mac_ctx,
 	}
 	if (((tLimMlmAssocCnf *) msg)->resultCode != eSIR_SME_SUCCESS) {
 		/* Association failure */
-		lim_log(mac_ctx, LOG1, FL("SessionId:%d Association failure"),
-			session_entry->peSessionId);
-		session_entry->limSmeState = eLIM_SME_JOIN_FAILURE_STATE;
+		lim_log(mac_ctx, LOG1, FL("SessionId:%d Association failure resultCode: %d limSmeState:%d"),
+			session_entry->peSessionId,
+			((tLimMlmAssocCnf *) msg)->resultCode,
+			session_entry->limSmeState);
+
+		/* If driver gets deauth when its waiting for ADD_STA_RSP then
+		 * we need to do DEL_STA followed by DEL_BSS. So based on below
+		 * reason-code here we decide whether to do only DEL_BSS or
+		 * DEL_STA + DEL_BSS.
+		 */
+		if (((tLimMlmAssocCnf *) msg)->resultCode !=
+		    eSIR_SME_JOIN_DEAUTH_FROM_AP_DURING_ADD_STA)
+			session_entry->limSmeState =
+				eLIM_SME_JOIN_FAILURE_STATE;
+
 		MTRACE(mac_trace(mac_ctx, TRACE_CODE_SME_STATE,
 			session_entry->peSessionId, mac_ctx->lim.gLimSmeState));
 		/*
@@ -788,7 +747,7 @@ void lim_process_mlm_assoc_cnf(tpAniSirGlobal mac_ctx,
  * Return: None
  */
 
-void
+static void
 lim_fill_assoc_ind_params(tpAniSirGlobal mac_ctx,
 	tpLimMlmAssocInd assoc_ind, tSirSmeAssocInd *sme_assoc_ind,
 	tpPESession session_entry)
@@ -874,7 +833,7 @@ lim_fill_assoc_ind_params(tpAniSirGlobal mac_ctx,
 void lim_process_mlm_assoc_ind(tpAniSirGlobal pMac, uint32_t *pMsgBuf)
 {
 	uint32_t len;
-	tSirMsgQ msgQ;
+	struct scheduler_msg msgQ;
 	tSirSmeAssocInd *pSirSmeAssocInd;
 	tpDphHashNode pStaDs = 0;
 	tpPESession psessionEntry;
@@ -922,7 +881,8 @@ void lim_process_mlm_assoc_ind(tpAniSirGlobal pMac, uint32_t *pMsgBuf)
 	pSirSmeAssocInd->staId = pStaDs->staIndex;
 	pSirSmeAssocInd->reassocReq = pStaDs->mlmStaContext.subType;
 	pSirSmeAssocInd->timingMeasCap = pStaDs->timingMeasCap;
-	MTRACE(mac_trace_msg_tx(pMac, psessionEntry->peSessionId, msgQ.type));
+	MTRACE(mac_trace(pMac, TRACE_CODE_TX_SME_MSG,
+			 psessionEntry->peSessionId, msgQ.type));
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_LIM    /* FEATURE_WLAN_DIAG_SUPPORT */
 	lim_diag_event_report(pMac, WLAN_PE_DIAG_ASSOC_IND_EVENT, psessionEntry, 0,
 			      0);
@@ -1354,15 +1314,20 @@ void lim_process_mlm_set_keys_cnf(tpAniSirGlobal pMac, uint32_t *pMsgBuf)
 	* Firmware so we can set the protection bit
 	*/
 	if (eSIR_SME_SUCCESS == pMlmSetKeysCnf->resultCode) {
-		psessionEntry->is_key_installed = 1;
+		if (pMlmSetKeysCnf->key_len_nonzero)
+			psessionEntry->is_key_installed = 1;
 		if (LIM_IS_AP_ROLE(psessionEntry)) {
 			sta_ds = dph_lookup_hash_entry(pMac,
 				pMlmSetKeysCnf->peer_macaddr.bytes,
 				&aid, &psessionEntry->dph.dphHashTable);
-			if (sta_ds != NULL)
+			if (sta_ds != NULL && pMlmSetKeysCnf->key_len_nonzero)
 				sta_ds->is_key_installed = 1;
 		}
 	}
+	lim_log(pMac, LOG1,
+		FL("is_key_installed = %d"),
+		psessionEntry->is_key_installed);
+
 	lim_send_sme_set_context_rsp(pMac,
 				     pMlmSetKeysCnf->peer_macaddr,
 				     1,
@@ -1370,6 +1335,46 @@ void lim_process_mlm_set_keys_cnf(tpAniSirGlobal pMac, uint32_t *pMsgBuf)
 				     psessionEntry, psessionEntry->smeSessionId,
 				     psessionEntry->transactionId);
 } /*** end lim_process_mlm_set_keys_cnf() ***/
+
+/**
+ * lim_join_result_callback() - Callback to handle join rsp
+ * @mac: Pointer to Global MAC structure
+ * @param: callback argument
+ * @status: status
+ *
+ * This callback function is used to delete PE session
+ * entry and send join response to sme.
+ *
+ * Return: None
+ */
+static void lim_join_result_callback(tpAniSirGlobal mac, void *param,
+				     bool status)
+{
+	join_params *link_state_params = (join_params *) param;
+	tpPESession session;
+	uint8_t sme_session_id;
+	uint16_t sme_trans_id;
+
+	if (!link_state_params) {
+		lim_log(mac, LOGE,
+			FL("Link state params is NULL"));
+		return;
+	}
+	session = pe_find_session_by_session_id(mac, link_state_params->
+						pe_session_id);
+	if (!session) {
+		qdf_mem_free(link_state_params);
+		return;
+	}
+	sme_session_id = session->smeSessionId;
+	sme_trans_id = session->transactionId;
+	lim_send_sme_join_reassoc_rsp(mac, eWNI_SME_JOIN_RSP,
+				      link_state_params->result_code,
+				      link_state_params->prot_status_code,
+				      NULL, sme_session_id, sme_trans_id);
+	pe_delete_session(mac, session);
+	qdf_mem_free(link_state_params);
+}
 
 /**
  * lim_handle_sme_join_result() - Handles sme join result
@@ -1385,14 +1390,14 @@ void lim_process_mlm_set_keys_cnf(tpAniSirGlobal pMac, uint32_t *pMsgBuf)
  *
  * Return: None
  */
-static void
-lim_handle_sme_join_result(tpAniSirGlobal mac_ctx,
+void lim_handle_sme_join_result(tpAniSirGlobal mac_ctx,
 	tSirResultCodes result_code, uint16_t prot_status_code,
 	tpPESession session_entry)
 {
 	tpDphHashNode sta_ds = NULL;
 	uint8_t sme_session_id;
 	uint16_t sme_trans_id;
+	join_params *param = NULL;
 
 	if (session_entry == NULL) {
 		lim_log(mac_ctx, LOGE, FL("psessionEntry is NULL "));
@@ -1421,6 +1426,8 @@ lim_handle_sme_join_result(tpAniSirGlobal mac_ctx,
 			 * to SME
 			 */
 			lim_cleanup_rx_path(mac_ctx, sta_ds, session_entry);
+			qdf_mem_free(session_entry->pLimJoinReq);
+			session_entry->pLimJoinReq = NULL;
 			/* Cleanup if add bss failed */
 			if (session_entry->add_bss_failed) {
 				dph_delete_hash_entry(mac_ctx,
@@ -1428,25 +1435,28 @@ lim_handle_sme_join_result(tpAniSirGlobal mac_ctx,
 					 &session_entry->dph.dphHashTable);
 				goto error;
 			}
-			qdf_mem_free(session_entry->pLimJoinReq);
-			session_entry->pLimJoinReq = NULL;
 			return;
 		}
+		qdf_mem_free(session_entry->pLimJoinReq);
+		session_entry->pLimJoinReq = NULL;
 	}
 error:
-	qdf_mem_free(session_entry->pLimJoinReq);
-	session_entry->pLimJoinReq = NULL;
-	/* Delete teh session if JOIN failure occurred. */
+	/* Delete the session if JOIN failure occurred. */
 	if (result_code != eSIR_SME_SUCCESS) {
+		param = qdf_mem_malloc(sizeof(join_params));
+		if (param != NULL) {
+			param->result_code = result_code;
+			param->prot_status_code = prot_status_code;
+			param->pe_session_id = session_entry->peSessionId;
+		}
 		if (lim_set_link_state
 			(mac_ctx, eSIR_LINK_DOWN_STATE,
 			session_entry->bssId,
-			session_entry->selfMacAddr, NULL,
-			NULL) != eSIR_SUCCESS)
+			session_entry->selfMacAddr, lim_join_result_callback,
+			param) != eSIR_SUCCESS)
 			lim_log(mac_ctx, LOGE,
 				FL("Failed to set the LinkState."));
-		pe_delete_session(mac_ctx, session_entry);
-		session_entry = NULL;
+		return;
 	}
 
 	lim_send_sme_join_reassoc_rsp(mac_ctx, eWNI_SME_JOIN_RSP, result_code,
@@ -1467,11 +1477,13 @@ error:
  ***NOTE:
  *
  * @param  pMac      Pointer to Global MAC structure
- * @param  tSirMsgQ  The MsgQ header, which contains the response buffer
+ * @param  struct scheduler_msg  The MsgQ header, which contains the
+ *  response buffer
  *
  * @return None
  */
-void lim_process_mlm_add_sta_rsp(tpAniSirGlobal pMac, tpSirMsgQ limMsgQ,
+void lim_process_mlm_add_sta_rsp(tpAniSirGlobal pMac,
+				 struct scheduler_msg *limMsgQ,
 				 tpPESession psessionEntry)
 {
 	/* we need to process the deferred message since the initiating req. there might be nested request. */
@@ -1488,7 +1500,7 @@ void lim_process_mlm_add_sta_rsp(tpAniSirGlobal pMac, tpSirMsgQ limMsgQ,
 /**
  * lim_process_sta_mlm_add_sta_rsp () - Process add sta response
  * @mac_ctx:  Pointer to mac context
- * @msg:  tpSirMsgQan Message structure
+ * @msg:  struct scheduler_msg *an Message structure
  * @session_entry: PE session entry
  *
  * Process ADD STA response sent from WMA and posts results
@@ -1498,7 +1510,7 @@ void lim_process_mlm_add_sta_rsp(tpAniSirGlobal pMac, tpSirMsgQ limMsgQ,
  */
 
 void lim_process_sta_mlm_add_sta_rsp(tpAniSirGlobal mac_ctx,
-	tpSirMsgQ msg, tpPESession session_entry)
+	struct scheduler_msg *msg, tpPESession session_entry)
 {
 	tLimMlmAssocCnf mlm_assoc_cnf;
 	tpDphHashNode sta_ds;
@@ -1632,7 +1644,8 @@ end:
 	return;
 }
 
-void lim_process_mlm_del_bss_rsp(tpAniSirGlobal pMac, tpSirMsgQ limMsgQ,
+void lim_process_mlm_del_bss_rsp(tpAniSirGlobal pMac,
+				 struct scheduler_msg *limMsgQ,
 				 tpPESession psessionEntry)
 {
 	/* we need to process the deferred message since the initiating req. there might be nested request. */
@@ -1660,7 +1673,8 @@ void lim_process_mlm_del_bss_rsp(tpAniSirGlobal pMac, tpSirMsgQ limMsgQ,
 #endif
 }
 
-void lim_process_sta_mlm_del_bss_rsp(tpAniSirGlobal pMac, tpSirMsgQ limMsgQ,
+void lim_process_sta_mlm_del_bss_rsp(tpAniSirGlobal pMac,
+				     struct scheduler_msg *limMsgQ,
 				     tpPESession psessionEntry)
 {
 	tpDeleteBssParams pDelBssParams = (tpDeleteBssParams) limMsgQ->bodyptr;
@@ -1738,8 +1752,9 @@ end:
 	return;
 }
 
-void lim_process_ap_mlm_del_bss_rsp(tpAniSirGlobal pMac, tpSirMsgQ limMsgQ,
-					   tpPESession psessionEntry)
+void lim_process_ap_mlm_del_bss_rsp(tpAniSirGlobal pMac,
+				    struct scheduler_msg *limMsgQ,
+				    tpPESession psessionEntry)
 {
 	tSirResultCodes rc = eSIR_SME_SUCCESS;
 	tSirRetStatus status;
@@ -1815,7 +1830,7 @@ end:
  * Return: None
  */
 void lim_process_mlm_del_sta_rsp(tpAniSirGlobal mac_ctx,
-	tpSirMsgQ msg)
+	struct scheduler_msg *msg)
 {
 	/*
 	 * we need to process the deferred message since the
@@ -1867,7 +1882,7 @@ void lim_process_mlm_del_sta_rsp(tpAniSirGlobal mac_ctx,
  * Retunrn: None
  */
 void lim_process_ap_mlm_del_sta_rsp(tpAniSirGlobal mac_ctx,
-					   tpSirMsgQ msg,
+					   struct scheduler_msg *msg,
 					   tpPESession session_entry)
 {
 	tpDeleteStaParams del_sta_params = (tpDeleteStaParams) msg->bodyptr;
@@ -1961,7 +1976,8 @@ end:
 	return;
 }
 
-void lim_process_sta_mlm_del_sta_rsp(tpAniSirGlobal pMac, tpSirMsgQ limMsgQ,
+void lim_process_sta_mlm_del_sta_rsp(tpAniSirGlobal pMac,
+				     struct scheduler_msg *limMsgQ,
 				     tpPESession psessionEntry)
 {
 	tSirResultCodes statusCode = eSIR_SME_SUCCESS;
@@ -1974,6 +1990,13 @@ void lim_process_sta_mlm_del_sta_rsp(tpAniSirGlobal pMac, tpSirMsgQ limMsgQ,
 	lim_log(pMac, LOG1, FL("Del STA RSP received. Status:%d AssocID:%d"),
 			pDelStaParams->status, pDelStaParams->assocId);
 
+#ifdef FEATURE_WLAN_TDLS
+	if (pDelStaParams->staType == STA_ENTRY_TDLS_PEER) {
+		lim_log(pMac, LOG1, FL("TDLS Del STA RSP received."));
+		lim_process_tdls_del_sta_rsp(pMac, limMsgQ, psessionEntry);
+		return;
+	}
+#endif
 	if (QDF_STATUS_SUCCESS != pDelStaParams->status)
 		lim_log(pMac, LOGE, FL(
 			"Del STA failed! Status:%d, proceeding with Del BSS"),
@@ -2016,8 +2039,9 @@ end:
 	return;
 }
 
-void lim_process_ap_mlm_add_sta_rsp(tpAniSirGlobal pMac, tpSirMsgQ limMsgQ,
-					   tpPESession psessionEntry)
+void lim_process_ap_mlm_add_sta_rsp(tpAniSirGlobal pMac,
+				    struct scheduler_msg *limMsgQ,
+				    tpPESession psessionEntry)
 {
 	tpAddStaParams pAddStaParams = (tpAddStaParams) limMsgQ->bodyptr;
 	tpDphHashNode pStaDs = NULL;
@@ -2036,13 +2060,7 @@ void lim_process_ap_mlm_add_sta_rsp(tpAniSirGlobal pMac, tpSirMsgQ limMsgQ,
 			pAddStaParams->assocId);
 		goto end;
 	}
-	/* */
-	/* TODO & FIXME_GEN4 */
-	/* Need to inspect tSirMsgQ.reserved for a valid Dialog token! */
-	/* */
-	/* TODO: any check for pMac->lim.gLimMlmState ? */
 	if (eLIM_MLM_WT_ADD_STA_RSP_STATE != pStaDs->mlmStaContext.mlmState) {
-		/* TODO: any response to be sent out here ? */
 		lim_log(pMac, LOGE,
 			FL("Received unexpected WMA_ADD_STA_RSP in state %X"),
 			pStaDs->mlmStaContext.mlmState);
@@ -2112,17 +2130,20 @@ end:
  * LIM responds with eWNI_SME_START_BSS_RSP to SME
  *
  ***ASSUMPTIONS:
- * tSirMsgQ.body is allocated by MLME during lim_process_mlm_start_req
- * tSirMsgQ.body will now be freed by this routine
+ * struct scheduler_msg.body is allocated by MLME during
+ * lim_process_mlm_start_req
+ * struct scheduler_msg.body will now be freed by this routine
  *
  ***NOTE:
  *
  * @param  pMac      Pointer to Global MAC structure
- * @param  tSirMsgQ  The MsgQ header, which contains the response buffer
+ * @param  struct scheduler_msg  The MsgQ header, which contains
+ *  the response buffer
  *
  * @return None
  */
-static void lim_process_ap_mlm_add_bss_rsp(tpAniSirGlobal pMac, tpSirMsgQ limMsgQ)
+static void lim_process_ap_mlm_add_bss_rsp(tpAniSirGlobal pMac,
+					   struct scheduler_msg *limMsgQ)
 {
 	tLimMlmStartCnf mlmStartCnf;
 	tpPESession psessionEntry;
@@ -2191,12 +2212,12 @@ static void lim_process_ap_mlm_add_bss_rsp(tpAniSirGlobal pMac, tpSirMsgQ limMsg
 			if ((psessionEntry->gStartBssRSNIe.present)
 			    || (psessionEntry->gStartBssWPAIe.present))
 				lim_log(pMac, LOG1,
-					FL("WPA/WPA2 SAP configuration\n"));
+					FL("WPA/WPA2 SAP configuration"));
 			else {
 				if (pMac->lim.gLimAssocStaLimit >
 				    MAX_SUPPORTED_PEERS_WEP) {
 					lim_log(pMac, LOG1,
-						FL("WEP SAP Configuration\n"));
+						FL("WEP SAP Configuration"));
 					pMac->lim.gLimAssocStaLimit =
 						MAX_SUPPORTED_PEERS_WEP;
 					isWepEnabled = true;
@@ -2259,18 +2280,21 @@ end:
  * LIM responds with eWNI_SME_START_BSS_RSP to SME
  *
  ***ASSUMPTIONS:
- * tSirMsgQ.body is allocated by MLME during lim_process_mlm_start_req
- * tSirMsgQ.body will now be freed by this routine
+ * struct scheduler_msg.body is allocated by MLME during
+ * lim_process_mlm_start_req
+ * struct scheduler_msg.body will now be freed by this routine
  *
  ***NOTE:
  *
  * @param  pMac      Pointer to Global MAC structure
- * @param  tSirMsgQ  The MsgQ header, which contains the response buffer
+ * @param  struct scheduler_msg  The MsgQ header, which contains
+ *  the response buffer
  *
  * @return None
  */
 static void
-lim_process_ibss_mlm_add_bss_rsp(tpAniSirGlobal pMac, tpSirMsgQ limMsgQ,
+lim_process_ibss_mlm_add_bss_rsp(tpAniSirGlobal pMac,
+				 struct scheduler_msg *limMsgQ,
 				 tpPESession psessionEntry)
 {
 	tLimMlmStartCnf mlmStartCnf;
@@ -2348,7 +2372,7 @@ end:
  */
 static void
 lim_process_sta_add_bss_rsp_pre_assoc(tpAniSirGlobal mac_ctx,
-	tpSirMsgQ msg, tpPESession session_entry)
+	struct scheduler_msg *msg, tpPESession session_entry)
 {
 	tpAddBssParams pAddBssParams = (tpAddBssParams) msg->bodyptr;
 	tAniAuthType cfgAuthType, authMode;
@@ -2464,14 +2488,15 @@ joinFailure:
  * HAL responded with WMA_ADD_BSS_RSP to MLME
  * MLME now sends WMA_ADD_STA_REQ to HAL
  * ASSUMPTIONS:
- * tSirMsgQ.body is allocated by MLME during lim_process_mlm_join_req
- * tSirMsgQ.body will now be freed by this routine
+ * struct scheduler_msg.body is allocated by MLME during
+ * lim_process_mlm_join_req
+ * struct scheduler_msg.body will now be freed by this routine
  *
  * Return: None
  */
 static void
 lim_process_sta_mlm_add_bss_rsp(tpAniSirGlobal mac_ctx,
-	tpSirMsgQ msg, tpPESession session_entry)
+	struct scheduler_msg *msg, tpPESession session_entry)
 {
 	tpAddBssParams add_bss_params = (tpAddBssParams) msg->bodyptr;
 	tLimMlmAssocCnf mlm_assoc_cnf;
@@ -2640,7 +2665,7 @@ end:
  * Return None
  */
 void lim_process_mlm_add_bss_rsp(tpAniSirGlobal mac_ctx,
-	tpSirMsgQ msg)
+	struct scheduler_msg *msg)
 {
 	tLimMlmStartCnf mlm_start_cnf;
 	tpPESession session_entry;
@@ -2673,7 +2698,6 @@ void lim_process_mlm_add_bss_rsp(tpAniSirGlobal mac_ctx,
 		return;
 	}
 
-	session_entry->nss = add_bss_param->nss;
 	bss_type = session_entry->bssType;
 	/* update PE session Id */
 	mlm_start_cnf.sessionId = session_entry->peSessionId;
@@ -2751,12 +2775,14 @@ void lim_process_mlm_add_bss_rsp(tpAniSirGlobal mac_ctx,
  * Return: None
  */
 void lim_process_mlm_set_sta_key_rsp(tpAniSirGlobal mac_ctx,
-	tpSirMsgQ msg)
+	struct scheduler_msg *msg)
 {
 	uint8_t resp_reqd = 1;
 	tLimMlmSetKeysCnf mlm_set_key_cnf;
 	uint8_t session_id = 0;
 	tpPESession session_entry;
+	uint16_t key_len;
+	uint16_t result_status;
 
 	SET_LIM_PROCESS_DEFD_MESGS(mac_ctx, true);
 	qdf_mem_set((void *)&mlm_set_key_cnf, sizeof(tLimMlmSetKeysCnf), 0);
@@ -2784,6 +2810,15 @@ void lim_process_mlm_set_sta_key_rsp(tpAniSirGlobal mac_ctx,
 		mlm_set_key_cnf.resultCode =
 			(uint16_t)(((tpSetStaKeyParams) msg->bodyptr)->status);
 	}
+
+	result_status = (uint16_t)(((tpSetStaKeyParams) msg->bodyptr)->status);
+	key_len = ((tpSetStaKeyParams)msg->bodyptr)->key[0].keyLength;
+
+	if (result_status == eSIR_SME_SUCCESS && key_len)
+		mlm_set_key_cnf.key_len_nonzero = true;
+	else
+		mlm_set_key_cnf.key_len_nonzero = false;
+
 
 	qdf_mem_free(msg->bodyptr);
 	msg->bodyptr = NULL;
@@ -2823,13 +2858,14 @@ void lim_process_mlm_set_sta_key_rsp(tpAniSirGlobal mac_ctx,
  * Return: NULL
  */
 void lim_process_mlm_set_bss_key_rsp(tpAniSirGlobal mac_ctx,
-	tpSirMsgQ msg)
+	struct scheduler_msg *msg)
 {
 	tLimMlmSetKeysCnf set_key_cnf;
 	uint16_t result_status;
 	uint8_t session_id = 0;
 	tpPESession session_entry;
 	tpLimMlmSetKeysReq set_key_req;
+	uint16_t key_len;
 
 	SET_LIM_PROCESS_DEFD_MESGS(mac_ctx, true);
 	qdf_mem_set((void *)&set_key_cnf, sizeof(tLimMlmSetKeysCnf), 0);
@@ -2847,16 +2883,24 @@ void lim_process_mlm_set_bss_key_rsp(tpAniSirGlobal mac_ctx,
 		msg->bodyptr = NULL;
 		return;
 	}
-	if (eLIM_MLM_WT_SET_BSS_KEY_STATE == session_entry->limMlmState)
+	if (eLIM_MLM_WT_SET_BSS_KEY_STATE == session_entry->limMlmState) {
 		result_status =
 			(uint16_t)(((tpSetBssKeyParams)msg->bodyptr)->status);
-	else
+		key_len = ((tpSetBssKeyParams)msg->bodyptr)->key[0].keyLength;
+	} else {
 		/*
 		 * BCAST key also uses tpSetStaKeyParams.
 		 * Done this way for readabilty.
 		 */
 		result_status =
 			(uint16_t)(((tpSetStaKeyParams)msg->bodyptr)->status);
+		key_len = ((tpSetStaKeyParams)msg->bodyptr)->key[0].keyLength;
+	}
+
+	if (result_status == eSIR_SME_SUCCESS && key_len)
+		set_key_cnf.key_len_nonzero = true;
+	else
+		set_key_cnf.key_len_nonzero = false;
 
 	/* Validate MLME state */
 	if (eLIM_MLM_WT_SET_BSS_KEY_STATE != session_entry->limMlmState &&
@@ -3165,7 +3209,6 @@ void lim_process_switch_channel_rsp(tpAniSirGlobal pMac, void *body)
 	channelChangeReasonCode = psessionEntry->channelChangeReasonCode;
 	/* initialize it back to invalid id */
 	psessionEntry->chainMask = pChnlParams->chainMask;
-	psessionEntry->nss = pChnlParams->nss;
 	psessionEntry->smpsMode = pChnlParams->smpsMode;
 	psessionEntry->channelChangeReasonCode = 0xBAD;
 	lim_log(pMac, LOG1, FL("channelChangeReasonCode %d"),
@@ -3198,7 +3241,13 @@ void lim_process_switch_channel_rsp(tpAniSirGlobal pMac, void *body)
 		/* If MCC upgrade/DBS downgrade happended during channel switch,
 		 * the policy manager connection table needs to be updated.
 		 */
-		cds_update_connection_info(psessionEntry->smeSessionId);
+		policy_mgr_update_connection_info(pMac->psoc,
+			psessionEntry->smeSessionId);
+		if (psessionEntry->pePersona == QDF_P2P_CLIENT_MODE) {
+			lim_log(pMac, LOG1,
+				FL("Send p2p operating channel change conf action frame once first beacon is received on new channel"));
+			psessionEntry->send_p2p_conf_frame = true;
+		}
 		break;
 	case LIM_SWITCH_CHANNEL_SAP_DFS:
 	{
@@ -3211,12 +3260,13 @@ void lim_process_switch_channel_rsp(tpAniSirGlobal pMac, void *body)
 		 * SAP.
 		 */
 		lim_send_sme_ap_channel_switch_resp(pMac, psessionEntry,
-						    pChnlParams);
+						pChnlParams);
 		/* If MCC upgrade/DBS downgrade happended during channel switch,
 		 * the policy manager connection table needs to be updated.
 		 */
-		cds_update_connection_info(psessionEntry->smeSessionId);
-		cds_set_do_hw_mode_change_flag(true);
+		policy_mgr_update_connection_info(pMac->psoc,
+						psessionEntry->smeSessionId);
+		policy_mgr_set_do_hw_mode_change_flag(pMac->psoc, true);
 	}
 	break;
 	default:
@@ -3228,7 +3278,7 @@ void lim_process_switch_channel_rsp(tpAniSirGlobal pMac, void *body)
 void lim_send_beacon_ind(tpAniSirGlobal pMac, tpPESession psessionEntry)
 {
 	tBeaconGenParams *pBeaconGenParams = NULL;
-	tSirMsgQ limMsg;
+	struct scheduler_msg limMsg;
 	/** Allocate the Memory for Beacon Pre Message and for Stations in PoweSave*/
 	if (psessionEntry == NULL) {
 		PELOGE(lim_log(pMac, LOGE,
@@ -3244,7 +3294,6 @@ void lim_send_beacon_ind(tpAniSirGlobal pMac, tpPESession psessionEntry)
 		       )
 		return;
 	}
-	qdf_mem_set(pBeaconGenParams, sizeof(*pBeaconGenParams), 0);
 	qdf_mem_copy((void *)pBeaconGenParams->bssId,
 		     (void *)psessionEntry->bssId, QDF_MAC_ADDR_SIZE);
 	limMsg.bodyptr = pBeaconGenParams;
@@ -3271,9 +3320,9 @@ void lim_send_beacon_ind(tpAniSirGlobal pMac, tpPESession psessionEntry)
  *
  * @return None
  */
-void lim_send_sme_scan_cache_updated_ind(uint8_t sessionId)
+static void lim_send_sme_scan_cache_updated_ind(uint8_t sessionId)
 {
-	cds_msg_t msg;
+	struct scheduler_msg msg;
 
 	msg.type = WMA_SME_SCAN_CACHE_UPDATED;
 	msg.reserved = 0;
@@ -3281,15 +3330,15 @@ void lim_send_sme_scan_cache_updated_ind(uint8_t sessionId)
 	msg.bodyval = sessionId;
 
 	if (!QDF_IS_STATUS_SUCCESS
-		    (cds_mq_post_message(QDF_MODULE_ID_WMA, &msg)))
+		    (scheduler_post_msg(QDF_MODULE_ID_WMA, &msg)))
 		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
 			  "%s: Not able to post WMA_SME_SCAN_CACHE_UPDATED message to WMA",
 			  __func__);
 }
 #endif
 
-void lim_send_scan_offload_complete(tpAniSirGlobal pMac,
-				    tSirScanOffloadEvent *pScanEvent)
+static void lim_send_scan_offload_complete(tpAniSirGlobal pMac,
+					   tSirScanOffloadEvent *pScanEvent)
 {
 
 	pMac->lim.gLimRspReqd = false;
@@ -3307,8 +3356,19 @@ void lim_process_rx_scan_event(tpAniSirGlobal pMac, void *buf)
 	switch (pScanEvent->event) {
 	case SIR_SCAN_EVENT_STARTED:
 		break;
-	case SIR_SCAN_EVENT_START_FAILED:
 	case SIR_SCAN_EVENT_COMPLETED:
+	lim_log(pMac, LOG1, FL("No.of beacons and probe response received per scan %d"),
+		pMac->lim.beacon_probe_rsp_cnt_per_scan);
+#ifdef FEATURE_WLAN_DIAG_SUPPORT_LIM    /* FEATURE_WLAN_DIAG_SUPPORT */
+	lim_diag_event_report(pMac, WLAN_PE_DIAG_SCAN_COMPLETE_EVENT, NULL,
+			      eSIR_SUCCESS, eSIR_SUCCESS);
+	if (pMac->lim.beacon_probe_rsp_cnt_per_scan)
+		lim_diag_event_report(pMac,
+				      WLAN_PE_DIAG_SCAN_RESULT_FOUND_EVENT,
+				      NULL, eSIR_SUCCESS, eSIR_SUCCESS);
+#endif
+	/* Fall through */
+	case SIR_SCAN_EVENT_START_FAILED:
 		if (ROC_SCAN_REQUESTOR_ID == pScanEvent->requestor) {
 			lim_send_sme_roc_rsp(pMac, eWNI_SME_REMAIN_ON_CHN_RSP,
 					 QDF_STATUS_SUCCESS,
@@ -3322,10 +3382,7 @@ void lim_process_rx_scan_event(tpAniSirGlobal pMac, void *buf)
 			 * failure.
 			 */
 			if (pMac->lim.mgmtFrameSessionId != 0xff) {
-				lim_send_sme_rsp(pMac,
-					eWNI_SME_ACTION_FRAME_SEND_CNF,
-					eSIR_SME_SEND_ACTION_FAIL,
-					pMac->lim.mgmtFrameSessionId, 0);
+				lim_p2p_action_cnf(pMac, NULL, false, NULL);
 				pMac->lim.mgmtFrameSessionId = 0xff;
 			}
 		} else if (PREAUTH_REQUESTOR_ID == pScanEvent->requestor) {

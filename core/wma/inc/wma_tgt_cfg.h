@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -44,6 +44,7 @@
  * @en_tdls_uapsd_buf_sta: enable sta tdls uapsd buf
  * @en_tdls_uapsd_sleep_sta: enable sta tdls uapsd sleep
  * @en_roam_offload: enable roam offload
+ * @en_11ax: enable 11ax
  */
 struct wma_tgt_services {
 	uint32_t sta_power_save;
@@ -67,8 +68,7 @@ struct wma_tgt_services {
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 	bool en_roam_offload;
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
-	/* per band chain mask support */
-	bool per_band_chainmask_supp;
+	bool en_11ax;
 };
 
 /**
@@ -138,6 +138,7 @@ struct wma_dfs_radar_ind {
 /**
  * struct wma_tgt_cfg - target config
  * @target_fw_version: target fw version
+ * @target_fw_vers_ext: target fw extended sub version
  * @band_cap: band capability
  * @reg_domain: reg domain
  * @eeprom_rd_ext: eeprom rd ext
@@ -149,9 +150,12 @@ struct wma_dfs_radar_ind {
  * @lpss_support: lpass support
  * @egap_support: enhanced green ap support
  * @nan_datapath_enabled: nan data path support
+ * @bool is_ra_rate_limit_enabled: RA filter support
+ * @he_cap: HE capability received from FW
  */
 struct wma_tgt_cfg {
 	uint32_t target_fw_version;
+	uint32_t target_fw_vers_ext;
 	uint8_t band_cap;
 	uint32_t reg_domain;
 	uint32_t eeprom_rd_ext;
@@ -169,8 +173,16 @@ struct wma_tgt_cfg {
 #endif
 	uint32_t fine_time_measurement_cap;
 	bool bpf_enabled;
+#ifdef FEATURE_WLAN_RA_FILTERING
+	bool is_ra_rate_limit_enabled;
+#endif
 #ifdef WLAN_FEATURE_NAN_DATAPATH
 	bool nan_datapath_enabled;
+#endif
+	bool sub_20_support;
+	uint16_t wmi_max_len;
+#ifdef WLAN_FEATURE_11AX
+	tDot11fIEvendor_he_cap he_cap;
 #endif
 };
 #endif /* WMA_TGT_CFG_H */

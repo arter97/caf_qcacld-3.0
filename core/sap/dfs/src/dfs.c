@@ -253,6 +253,24 @@ error:
 	return status;
 }
 
+/**
+ * dfs_free_filter() - free memory allocated for dfs ft_filters
+ * @radarf: pointer holding ft_filters
+ *
+ * Return: NA
+*/
+static void dfs_free_filter(struct dfs_filtertype *radarf)
+{
+	int i;
+
+	for (i = 0; i < DFS_MAX_NUM_RADAR_FILTERS; i++) {
+		if (radarf->ft_filters[i]) {
+			qdf_mem_free(radarf->ft_filters[i]);
+			radarf->ft_filters[i] = NULL;
+		}
+	}
+}
+
 int dfs_attach(struct ieee80211com *ic)
 {
 	int i, n;
@@ -380,13 +398,14 @@ int dfs_attach(struct ieee80211com *ic)
 	}
 	/* Allocate memory for radar table */
 	dfs->dfs_radartable =
-		(int8_t **) os_malloc(NULL, 256 * sizeof(int8_t *), GFP_ATOMIC);
+		(int8_t **) os_malloc(NULL,
+		MAX_DFS_RADAR_TABLE_TYPE * sizeof(int8_t *), GFP_ATOMIC);
 	if (dfs->dfs_radartable == NULL) {
 		DFS_PRINTK("%s: cannot allocate memory for radar table\n",
 			   __func__);
 		goto bad1;
 	}
-	for (n = 0; n < 256; n++) {
+	for (n = 0; n < MAX_DFS_RADAR_TABLE_TYPE; n++) {
 		dfs->dfs_radartable[n] =
 			os_malloc(NULL, DFS_MAX_RADAR_OVERLAP * sizeof(int8_t),
 				  GFP_ATOMIC);
@@ -440,11 +459,18 @@ int dfs_attach(struct ieee80211com *ic)
 	return 0;
 
 bad2:
+	for (n = 0; n < MAX_DFS_RADAR_TABLE_TYPE; n++) {
+		if (dfs->dfs_radartable[n] != NULL) {
+			OS_FREE(dfs->dfs_radartable[n]);
+			dfs->dfs_radartable[n] = NULL;
+		}
+	}
 	OS_FREE(dfs->dfs_radartable);
 	dfs->dfs_radartable = NULL;
 bad1:
 	for (n = 0; n < DFS_MAX_RADAR_TYPES; n++) {
 		if (dfs->dfs_radarf[n] != NULL) {
+			dfs_free_filter(dfs->dfs_radarf[n]);
 			OS_FREE(dfs->dfs_radarf[n]);
 			dfs->dfs_radarf[n] = NULL;
 		}
@@ -471,23 +497,6 @@ bad1:
 #undef N
 }
 
-/**
- * dfs_free_filter() - free memory allocated for dfs ft_filters
- * @radarf: pointer holding ft_filters
- *
- * Return: NA
-*/
-static void dfs_free_filter(struct dfs_filtertype *radarf)
-{
-	int i;
-
-	for (i = 0; i < DFS_MAX_NUM_RADAR_FILTERS; i++) {
-		if (radarf->ft_filters[i]) {
-			qdf_mem_free(radarf->ft_filters[i]);
-			radarf->ft_filters[i] = NULL;
-		}
-	}
-}
 void dfs_detach(struct ieee80211com *ic)
 {
 	struct ath_dfs *dfs = (struct ath_dfs *)ic->ic_dfs;
@@ -560,7 +569,7 @@ void dfs_detach(struct ieee80211com *ic)
 	}
 
 	if (dfs->dfs_radartable != NULL) {
-		for (n = 0; n < 256; n++) {
+		for (n = 0; n < MAX_DFS_RADAR_TABLE_TYPE; n++) {
 			if (dfs->dfs_radartable[n] != NULL) {
 				OS_FREE(dfs->dfs_radartable[n]);
 				dfs->dfs_radartable[n] = NULL;

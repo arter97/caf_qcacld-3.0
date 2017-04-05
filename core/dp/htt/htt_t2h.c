@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -51,7 +51,7 @@
 #include <ol_txrx_peer_find.h>
 #include <cdp_txrx_ipa.h>
 #include "pktlog_ac.h"
-
+#include <cdp_txrx_handle.h>
 /*--- target->host HTT message dispatch function ----------------------------*/
 
 #ifndef DEBUG_CREDIT
@@ -153,8 +153,8 @@ static uint8_t *htt_t2h_mac_addr_deswizzle(uint8_t *tgt_mac_addr,
 }
 
 /* Target to host Msg/event  handler  for low priority messages*/
-void htt_t2h_lp_msg_handler(void *context, qdf_nbuf_t htt_t2h_msg,
-			    bool free_msg_buf)
+static void htt_t2h_lp_msg_handler(void *context, qdf_nbuf_t htt_t2h_msg,
+				   bool free_msg_buf)
 {
 	struct htt_pdev_t *pdev = (struct htt_pdev_t *)context;
 	uint32_t *msg_word;
@@ -165,7 +165,7 @@ void htt_t2h_lp_msg_handler(void *context, qdf_nbuf_t htt_t2h_msg,
 	switch (msg_type) {
 	case HTT_T2H_MSG_TYPE_VERSION_CONF:
 	{
-		qdf_runtime_pm_put();
+		htc_pm_runtime_put(pdev->htc_pdev);
 		pdev->tgt_ver.major = HTT_VER_CONF_MAJOR_GET(*msg_word);
 		pdev->tgt_ver.minor = HTT_VER_CONF_MINOR_GET(*msg_word);
 		qdf_print
@@ -213,7 +213,15 @@ void htt_t2h_lp_msg_handler(void *context, qdf_nbuf_t htt_t2h_msg,
 		ol_rx_offload_deliver_ind_handler(pdev->txrx_pdev,
 						  htt_t2h_msg,
 						  msdu_cnt);
-		break;
+		if (pdev->cfg.is_high_latency) {
+			/*
+			 * return here for HL to avoid double free on
+			 * htt_t2h_msg
+			 */
+			return;
+		} else {
+			break;
+		}
 	}
 	case HTT_T2H_MSG_TYPE_RX_FRAG_IND:
 	{
@@ -224,9 +232,43 @@ void htt_t2h_lp_msg_handler(void *context, qdf_nbuf_t htt_t2h_msg,
 		tid = HTT_RX_FRAG_IND_EXT_TID_GET(*msg_word);
 		htt_rx_frag_set_last_msdu(pdev, htt_t2h_msg);
 
+		/* If packet len is invalid, will discard this frame. */
+		if (pdev->cfg.is_high_latency) {
+			u_int32_t rx_pkt_len = 0;
+
+			rx_pkt_len = qdf_nbuf_len(htt_t2h_msg);
+
+			if (rx_pkt_len < (HTT_RX_FRAG_IND_BYTES +
+				sizeof(struct hl_htt_rx_ind_base)+
+				sizeof(struct ieee80211_frame))) {
+
+				qdf_print("%s: invalid packet len, %u\n",
+						__func__,
+						rx_pkt_len);
+				/*
+				* This buf will be freed before
+				* exiting this function.
+				*/
+				break;
+			}
+		}
+
 		ol_rx_frag_indication_handler(pdev->txrx_pdev,
 					      htt_t2h_msg,
 					      peer_id, tid);
+
+		if (pdev->cfg.is_high_latency) {
+			/*
+			* For high latency solution,
+			* HTT_T2H_MSG_TYPE_RX_FRAG_IND message and RX packet
+			* share the same buffer. All buffer will be freed by
+			* ol_rx_frag_indication_handler or upper layer to
+			* avoid double free issue.
+			*
+			*/
+			return;
+		}
+
 		break;
 	}
 	case HTT_T2H_MSG_TYPE_RX_ADDBA:
@@ -328,7 +370,7 @@ void htt_t2h_lp_msg_handler(void *context, qdf_nbuf_t htt_t2h_msg,
 			ol_tx_single_completion_handler(pdev->txrx_pdev,
 							compl_msg->status,
 							compl_msg->desc_id);
-			qdf_runtime_pm_put();
+			htc_pm_runtime_put(pdev->htc_pdev);
 			HTT_TX_SCHED(pdev);
 		} else {
 			qdf_print("Ignoring HTT_T2H_MSG_TYPE_MGMT_TX_COMPL_IND indication");
@@ -344,7 +386,7 @@ void htt_t2h_lp_msg_handler(void *context, qdf_nbuf_t htt_t2h_msg,
 		cookie |= ((uint64_t) (*(msg_word + 2))) << 32;
 
 		stats_info_list = (uint8_t *) (msg_word + 3);
-		qdf_runtime_pm_put();
+		htc_pm_runtime_put(pdev->htc_pdev);
 		ol_txrx_fw_stats_handler(pdev->txrx_pdev, cookie,
 					 stats_info_list);
 		break;
@@ -387,7 +429,7 @@ void htt_t2h_lp_msg_handler(void *context, qdf_nbuf_t htt_t2h_msg,
 		uint8_t *op_msg_buffer;
 		uint8_t *msg_start_ptr;
 
-		qdf_runtime_pm_put();
+		htc_pm_runtime_put(pdev->htc_pdev);
 		msg_start_ptr = (uint8_t *) msg_word;
 		op_code =
 			HTT_WDI_IPA_OP_RESPONSE_OP_CODE_GET(*msg_word);
@@ -406,8 +448,9 @@ void htt_t2h_lp_msg_handler(void *context, qdf_nbuf_t htt_t2h_msg,
 			     msg_start_ptr,
 			     sizeof(struct htt_wdi_ipa_op_response_t) +
 			     len);
-		ol_txrx_ipa_uc_op_response(pdev->txrx_pdev,
-					   op_msg_buffer);
+		cdp_ipa_op_response(cds_get_context(QDF_MODULE_ID_SOC),
+				(struct cdp_pdev *)pdev->txrx_pdev,
+				op_msg_buffer);
 		break;
 	}
 

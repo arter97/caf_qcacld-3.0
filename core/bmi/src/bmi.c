@@ -200,6 +200,7 @@ bmi_get_target_info(struct bmi_target_info *targ_info,
 	switch (hif_get_bus_type(scn)) {
 	case QDF_BUS_TYPE_PCI:
 	case QDF_BUS_TYPE_SNOC:
+	case QDF_BUS_TYPE_USB:
 		status = bmi_get_target_info_message_based(targ_info, ol_ctx);
 		break;
 #ifdef HIF_SDIO
@@ -332,7 +333,7 @@ QDF_STATUS bmi_write_soc_register(uint32_t address, uint32_t param,
 	return QDF_STATUS_SUCCESS;
 }
 
-QDF_STATUS
+static QDF_STATUS
 bmilz_data(uint8_t *buffer, uint32_t length, struct ol_context *ol_ctx)
 {
 	uint32_t cid;
@@ -454,7 +455,7 @@ QDF_STATUS bmi_sign_stream_start(uint32_t address, uint8_t *buffer,
 	return QDF_STATUS_SUCCESS;
 }
 
-QDF_STATUS
+static QDF_STATUS
 bmilz_stream_start(uint32_t address, struct ol_context *ol_ctx)
 {
 	uint32_t cid;

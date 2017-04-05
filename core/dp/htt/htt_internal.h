@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2014-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011, 2014-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -57,6 +57,7 @@ struct htt_host_fw_desc_base {
 		A_UINT32 dummy_pad;     /* make sure it is DOWRD aligned */
 	} u;
 };
+
 
 /*
  * This struct defines the basic descriptor information used by host,
@@ -131,11 +132,20 @@ struct htt_host_rx_desc_base {
 	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.map_index)
 
 #define HTT_RX_RING_BUFF_DBG_LIST          1024
+
+#ifdef MSM_PLATFORM
+#define HTT_ADDRESS_MASK   0xfffffffffffffffe
+#else
+#define HTT_ADDRESS_MASK   0xfffffffe
+#endif /* MSM_PLATFORM */
+
 struct rx_buf_debug {
 	qdf_dma_addr_t paddr;
 	qdf_nbuf_t     nbuf;
-	void     *nbuf_data;
-	bool     in_use;
+	void     *nbuf_data; /* lsb of this field is used for "in_use" */
+			     /* bool     in_use; */
+	uint64_t  ts;        /* timestamp */
+
 };
 #endif
 
@@ -472,12 +482,16 @@ void htt_h2t_send_complete(void *context, HTC_PACKET *pkt);
 
 A_STATUS htt_h2t_ver_req_msg(struct htt_pdev_t *pdev);
 
-#if defined(HELIUMPLUS_PADDR64)
+#if defined(HELIUMPLUS)
 A_STATUS
 htt_h2t_frag_desc_bank_cfg_msg(struct htt_pdev_t *pdev);
-#endif /* defined(HELIUMPLUS_PADDR64) */
+#endif /* defined(HELIUMPLUS) */
 
 extern QDF_STATUS htt_h2t_rx_ring_cfg_msg_ll(struct htt_pdev_t *pdev);
+
+extern QDF_STATUS htt_h2t_rx_ring_rfs_cfg_msg_ll(struct htt_pdev_t *pdev);
+
+extern QDF_STATUS htt_h2t_rx_ring_rfs_cfg_msg_hl(struct htt_pdev_t *pdev);
 
 extern QDF_STATUS htt_h2t_rx_ring_cfg_msg_hl(struct htt_pdev_t *pdev);
 
@@ -492,6 +506,8 @@ void htt_htc_pkt_free(struct htt_pdev_t *pdev, struct htt_htc_pkt *pkt);
 void htt_htc_pkt_pool_free(struct htt_pdev_t *pdev);
 
 #ifdef ATH_11AC_TXCOMPACT
+void htt_htc_misc_pkt_list_trim(struct htt_pdev_t *pdev, int level);
+
 void
 htt_htc_misc_pkt_list_add(struct htt_pdev_t *pdev, struct htt_htc_pkt *pkt);
 
@@ -614,6 +630,8 @@ void htt_rx_dbg_rxbuf_init(struct htt_pdev_t *pdev)
 	if (!pdev->rx_buff_list) {
 		qdf_print("HTT: debug RX buffer allocation failed\n");
 		QDF_ASSERT(0);
+	} else {
+		qdf_spinlock_create(&(pdev->rx_buff_list_lock));
 	}
 }
 
@@ -629,16 +647,24 @@ static inline
 void htt_rx_dbg_rxbuf_set(struct htt_pdev_t *pdev, qdf_dma_addr_t paddr,
 			  qdf_nbuf_t rx_netbuf)
 {
+	void *tmp;
 	if (pdev->rx_buff_list) {
+		qdf_spin_lock_bh(&(pdev->rx_buff_list_lock));
 		pdev->rx_buff_list[pdev->rx_buff_index].paddr = paddr;
-		pdev->rx_buff_list[pdev->rx_buff_index].in_use = true;
 		pdev->rx_buff_list[pdev->rx_buff_index].nbuf_data =
 							rx_netbuf->data;
+		/* pdev->rx_buff_list[pdev->rx_buff_index].in_use = true; */
+		tmp = pdev->rx_buff_list[pdev->rx_buff_index].nbuf_data;
+		tmp = (void *)((uintptr_t) tmp | 0x01);
+		pdev->rx_buff_list[pdev->rx_buff_index].nbuf_data = tmp;
 		pdev->rx_buff_list[pdev->rx_buff_index].nbuf = rx_netbuf;
+		pdev->rx_buff_list[pdev->rx_buff_index].ts =
+						qdf_get_log_timestamp();
 		NBUF_MAP_ID(rx_netbuf) = pdev->rx_buff_index;
 		if (++pdev->rx_buff_index ==
 				HTT_RX_RING_BUFF_DBG_LIST)
 			pdev->rx_buff_index = 0;
+		qdf_spin_unlock_bh(&(pdev->rx_buff_list_lock));
 	}
 }
 
@@ -653,12 +679,20 @@ void htt_rx_dbg_rxbuf_reset(struct htt_pdev_t *pdev,
 				qdf_nbuf_t netbuf)
 {
 	uint32_t index;
+	void *tmp;
 
 	if (pdev->rx_buff_list) {
+		qdf_spin_lock_bh(&(pdev->rx_buff_list_lock));
 		index = NBUF_MAP_ID(netbuf);
 		if (index < HTT_RX_RING_BUFF_DBG_LIST) {
-			pdev->rx_buff_list[index].in_use = false;
+			/* in_use = false */
+			tmp = pdev->rx_buff_list[index].nbuf_data;
+			tmp = (void *)((uintptr_t)tmp & ~((uintptr_t)0x1));
+			pdev->rx_buff_list[index].nbuf_data = tmp;
+			pdev->rx_buff_list[index].ts     =
+				qdf_get_log_timestamp();
 		}
+		qdf_spin_unlock_bh(&(pdev->rx_buff_list_lock));
 	}
 }
 /**
@@ -672,6 +706,7 @@ void htt_rx_dbg_rxbuf_deinit(struct htt_pdev_t *pdev)
 {
 	if (pdev->rx_buff_list)
 		qdf_mem_free(pdev->rx_buff_list);
+	qdf_spinlock_destroy(&(pdev->rx_buff_list_lock));
 }
 #else
 static inline

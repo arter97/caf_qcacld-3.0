@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -47,11 +47,8 @@
 #include "sme_qos_api.h"
 #include "sme_qos_internal.h"
 
-#ifdef FEATURE_OEM_DATA_SUPPORT
-#include "oem_data_internal.h"
-#endif
-
 #include "sme_rrm_api.h"
+#include "wlan_serialization_legacy_api.h"
 ePhyChanBondState csr_convert_cb_ini_value_to_phy_cb_state(uint32_t cbIniValue);
 
 /*--------------------------------------------------------------------------
@@ -63,6 +60,8 @@ ePhyChanBondState csr_convert_cb_ini_value_to_phy_cb_state(uint32_t cbIniValue);
  * to make sure we have space for these cmds + some additional cmds.
  */
 #define SME_TOTAL_COMMAND                (HAL_NUM_STA * 3)
+/* default sme timeout is set to 30 secs */
+#define SME_DEFAULT_CMD_TIMEOUT  30000
 
 typedef struct sGenericPmcCmd {
 	uint32_t size;          /* sizeof the data in the union, if any */
@@ -178,9 +177,6 @@ typedef struct tagSmeCmd {
 		tSetKeyCmd setKeyCmd;
 		tGenericPmcCmd pmcCmd;
 		tGenericQosCmd qosCmd;
-#ifdef FEATURE_OEM_DATA_SUPPORT
-		tOemDataCmd oemDataCmd;
-#endif
 		tRemainChlCmd remainChlCmd;
 		tNoACmd NoACmd;
 		tAddStaForSessionCmd addStaSessionCmd;
@@ -188,7 +184,7 @@ typedef struct tagSmeCmd {
 #ifdef FEATURE_WLAN_TDLS
 		tTdlsCmd tdlsCmd;
 #endif
-		struct sir_hw_mode set_hw_mode_cmd;
+		struct policy_mgr_hw_mode set_hw_mode_cmd;
 		struct s_nss_update_cmd nss_update_cmd;
 		struct sir_dual_mac_config set_dual_mac_cmd;
 		struct sir_antenna_mode_param set_antenna_mode_cmd;
@@ -203,15 +199,33 @@ typedef struct tagSmeCmd {
 /*--------------------------------------------------------------------------
   Internal to SME
   ------------------------------------------------------------------------*/
+/**
+ * csr_get_cmd_type() - to convert sme command type to serialization cmd type
+ * @sme_cmd: sme command pointer
+ *
+ * This API will convert SME command type to serialization command type which
+ * new serialization module understands
+ *
+ * Return: serialization cmd type based on sme command type
+ */
+enum wlan_serialization_cmd_type csr_get_cmd_type(tSmeCmd *sme_cmd);
+/**
+ * csr_set_serialization_params_to_cmd() - take sme params and create new
+ *						serialization command
+ * @mac_ctx: pointer to mac context
+ * @sme_cmd: sme command pointer
+ * @cmd: serialization command pointer
+ * @high_priority: if command is high priority
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_E_FAILURE
+ */
+QDF_STATUS csr_set_serialization_params_to_cmd(tpAniSirGlobal mac_ctx,
+		tSmeCmd *sme_cmd, struct wlan_serialization_command *cmd,
+		uint8_t high_priority);
 tSmeCmd *sme_get_command_buffer(tpAniSirGlobal pMac);
-void sme_push_command(tpAniSirGlobal pMac, tSmeCmd *pCmd, bool fHighPriority);
-void sme_process_pending_queue(tpAniSirGlobal pMac);
 void sme_release_command(tpAniSirGlobal pMac, tSmeCmd *pCmd);
-void purge_sme_session_cmd_list(tpAniSirGlobal pMac, uint32_t sessionId,
-		tDblLinkList *pList);
-bool sme_command_pending(tpAniSirGlobal pMac);
-bool pmc_process_command(tpAniSirGlobal pMac, tSmeCmd *pCommand);
 bool qos_process_command(tpAniSirGlobal pMac, tSmeCmd *pCommand);
+void qos_release_command(tpAniSirGlobal pMac, tSmeCmd *pCommand);
 QDF_STATUS csr_process_scan_command(tpAniSirGlobal pMac, tSmeCmd *pCommand);
 QDF_STATUS csr_roam_process_command(tpAniSirGlobal pMac, tSmeCmd *pCommand);
 void csr_roam_process_wm_status_change_command(tpAniSirGlobal pMac,
@@ -222,7 +236,7 @@ void csr_reinit_set_key_cmd(tpAniSirGlobal pMac, tSmeCmd *pCommand);
 QDF_STATUS csr_roam_process_set_key_command(tpAniSirGlobal pMac,
 		tSmeCmd *pCommand);
 void csr_release_command_set_key(tpAniSirGlobal pMac, tSmeCmd *pCommand);
-void csr_abort_command(tpAniSirGlobal pMac, tSmeCmd *pCommand, bool fStopping);
+void csr_cancel_command(tpAniSirGlobal mac_ctx, tSmeCmd *sme_cmd);
 
 QDF_STATUS csr_is_valid_channel(tpAniSirGlobal pMac, uint8_t chnNum);
 bool csr_roam_is_valid40_mhz_channel(tpAniSirGlobal pmac, uint8_t channel);
@@ -230,16 +244,7 @@ bool csr_roam_is_valid40_mhz_channel(tpAniSirGlobal pmac, uint8_t channel);
 QDF_STATUS sme_acquire_global_lock(tSmeStruct *psSme);
 QDF_STATUS sme_release_global_lock(tSmeStruct *psSme);
 
-#ifdef FEATURE_OEM_DATA_SUPPORT
-QDF_STATUS oem_data_process_oem_data_req_command(tpAniSirGlobal pMac,
-		tSmeCmd *pCommand);
-#endif
-
-QDF_STATUS csr_process_add_sta_session_command(tpAniSirGlobal pMac,
-		tSmeCmd *pCommand);
 QDF_STATUS csr_process_add_sta_session_rsp(tpAniSirGlobal pMac, uint8_t *pMsg);
-QDF_STATUS csr_process_del_sta_session_command(tpAniSirGlobal pMac,
-		tSmeCmd *pCommand);
 QDF_STATUS csr_process_del_sta_session_rsp(tpAniSirGlobal pMac, uint8_t *pMsg);
 
 #ifdef FEATURE_WLAN_SCAN_PNO
@@ -274,8 +279,6 @@ QDF_STATUS csr_flush_cfg_bg_scan_roam_channel_list(tpAniSirGlobal pMac,
 QDF_STATUS csr_create_bg_scan_roam_channel_list(tpAniSirGlobal pMac,
 		uint8_t sessionId, const uint8_t *pChannelList,
 		const uint8_t numChannels);
-QDF_STATUS csr_update_bg_scan_config_ini_channel_list(tpAniSirGlobal pMac,
-		uint8_t sessionId, eCsrBand eBand);
 
 #ifdef FEATURE_WLAN_ESE
 QDF_STATUS csr_create_roam_scan_channel_list(tpAniSirGlobal pMac,
@@ -285,8 +288,9 @@ QDF_STATUS csr_create_roam_scan_channel_list(tpAniSirGlobal pMac,
 		const eCsrBand eBand);
 #endif
 
+QDF_STATUS p2p_process_remain_on_channel_cmd(tpAniSirGlobal pMac,
+					     tSmeCmd *p2pRemainonChn);
 ePhyChanBondState csr_convert_cb_ini_value_to_phy_cb_state(uint32_t cbIniValue);
-void active_list_cmd_timeout_handle(void *userData);
 void csr_process_set_dual_mac_config(tpAniSirGlobal mac, tSmeCmd *command);
 void csr_process_set_antenna_mode(tpAniSirGlobal mac, tSmeCmd *command);
 void csr_process_set_hw_mode(tpAniSirGlobal mac, tSmeCmd *command);

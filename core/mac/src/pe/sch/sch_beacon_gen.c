@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -53,15 +53,11 @@
 
 #include "sch_debug.h"
 
-/* */
-/* March 15, 2006 */
-/* Temporarily (maybe for all of Alpha-1), assuming TIM = 0 */
-/* */
-
 const uint8_t p2p_oui[] = { 0x50, 0x6F, 0x9A, 0x9 };
 
-tSirRetStatus sch_get_p2p_ie_offset(uint8_t *pExtraIe, uint32_t extraIeLen,
-				    uint16_t *pP2pIeOffset)
+static tSirRetStatus sch_get_p2p_ie_offset(uint8_t *pExtraIe,
+					   uint32_t extraIeLen,
+					   uint16_t *pP2pIeOffset)
 {
 	tSirRetStatus status = eSIR_FAILURE;
 	*pP2pIeOffset = 0;
@@ -99,7 +95,7 @@ tSirRetStatus sch_get_p2p_ie_offset(uint8_t *pExtraIe, uint32_t extraIeLen,
  *
  * Return: status of operation
  */
-tSirRetStatus
+static tSirRetStatus
 sch_append_addn_ie(tpAniSirGlobal mac_ctx, tpPESession session,
 		   uint8_t *frm, uint32_t max_bcn_size, uint32_t *num_bytes,
 		   uint8_t *addn_ie, uint16_t addn_ielen)
@@ -223,12 +219,9 @@ sch_set_fixed_beacon_fields(tpAniSirGlobal mac_ctx, tpPESession session)
 	mac->fc.fromDS = 0;
 	mac->fc.toDS = 0;
 
-	/* Now set the beacon body */
-	qdf_mem_set((uint8_t *) bcn_1, sizeof(tDot11fBeacon1), 0);
-
 	/* Skip over the timestamp (it'll be updated later). */
 	bcn_1->BeaconInterval.interval =
-		mac_ctx->sch.schObject.gSchBeaconInterval;
+		session->beaconParams.beaconInterval;
 	populate_dot11f_capabilities(mac_ctx, &bcn_1->Capabilities, session);
 	if (session->ssidHidden) {
 		bcn_1->SSID.present = 1;
@@ -283,8 +276,6 @@ sch_set_fixed_beacon_fields(tpAniSirGlobal mac_ctx, tpPESession session)
 			FL("Warnings while packing a tDot11fBeacon1(0x%08x.)."),
 			n_status);
 	}
-	/*changed  to correct beacon corruption */
-	qdf_mem_set((uint8_t *) bcn_2, sizeof(tDot11fBeacon2), 0);
 	session->schBeaconOffsetBegin = offset + (uint16_t) n_bytes;
 	sch_log(mac_ctx, LOG1, FL("Initialized beacon begin, offset %d"),
 		offset);
@@ -395,8 +386,18 @@ sch_set_fixed_beacon_fields(tpAniSirGlobal mac_ctx, tpPESession session)
 			populate_dot11f_operating_mode(mac_ctx,
 						&bcn_2->OperatingMode, session);
 	}
-	populate_dot11f_ext_cap(mac_ctx, is_vht_enabled, &bcn_2->ExtCap,
-				session);
+
+	if (lim_is_session_he_capable(session)) {
+		sch_log(mac_ctx, LOGW, FL("Populate HE IEs"));
+		populate_dot11f_he_caps(mac_ctx, session,
+					&bcn_2->vendor_he_cap);
+		populate_dot11f_he_operation(mac_ctx, session,
+					&bcn_2->vendor_he_op);
+	}
+
+	if (session->limSystemRole != eLIM_STA_IN_IBSS_ROLE)
+		populate_dot11f_ext_cap(mac_ctx, is_vht_enabled, &bcn_2->ExtCap,
+					session);
 	populate_dot11f_ext_supp_rates(mac_ctx,
 				POPULATE_DOT11F_RATES_OPERATIONAL,
 				&bcn_2->ExtSuppRates, session);
@@ -498,9 +499,11 @@ sch_set_fixed_beacon_fields(tpAniSirGlobal mac_ctx, tpPESession session)
 			sch_log(mac_ctx, LOG1, FL("extcap not extracted"));
 		}
 		/* merge extcap IE */
-		if (extcap_present)
+		if (extcap_present &&
+			session->limSystemRole != eLIM_STA_IN_IBSS_ROLE)
 			lim_merge_extcap_struct(&bcn_2->ExtCap,
-						&extracted_extcap);
+						&extracted_extcap,
+						true);
 
 	}
 
@@ -762,6 +765,21 @@ void lim_update_probe_rsp_template_ie_bitmap_beacon2(tpAniSirGlobal pMac,
 			     sizeof(beacon2->ExtCap));
 	}
 
+	if (beacon2->vendor_he_cap.present) {
+		set_probe_rsp_ie_bitmap(DefProbeRspIeBitmap,
+					DOT11F_EID_VENDOR_HE_CAP);
+		qdf_mem_copy((void *)&prb_rsp->vendor_he_cap,
+			     (void *)&beacon2->vendor_he_cap,
+			     sizeof(beacon2->vendor_he_cap));
+	}
+	if (beacon2->vendor_he_op.present) {
+		set_probe_rsp_ie_bitmap(DefProbeRspIeBitmap,
+					DOT11F_EID_VENDOR_HE_OP);
+		qdf_mem_copy((void *)&prb_rsp->vendor_he_op,
+			     (void *)&beacon2->vendor_he_op,
+			     sizeof(beacon2->vendor_he_op));
+	}
+
 }
 
 void set_probe_rsp_ie_bitmap(uint32_t *IeBitmap, uint32_t pos)
@@ -797,8 +815,8 @@ void set_probe_rsp_ie_bitmap(uint32_t *IeBitmap, uint32_t pos)
  * @return None
  */
 
-void write_beacon_to_memory(tpAniSirGlobal pMac, uint16_t size, uint16_t length,
-			    tpPESession psessionEntry)
+static void write_beacon_to_memory(tpAniSirGlobal pMac, uint16_t size,
+				   uint16_t length, tpPESession psessionEntry)
 {
 	uint16_t i;
 	tpAniBeaconStruct pBeacon;
@@ -925,7 +943,8 @@ void sch_generate_tim(tpAniSirGlobal pMac, uint8_t **pPtr, uint16_t *timLength,
  * @return None
  */
 
-void sch_process_pre_beacon_ind(tpAniSirGlobal pMac, tpSirMsgQ limMsg)
+void sch_process_pre_beacon_ind(tpAniSirGlobal pMac,
+				struct scheduler_msg *limMsg)
 {
 	tpBeaconGenParams pMsg = (tpBeaconGenParams) limMsg->bodyptr;
 	uint32_t beaconSize;

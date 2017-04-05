@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -58,11 +58,7 @@
  * multicast key the peer uses, and another ID to represent the
  * unicast key the peer uses.
  */
-#define MAX_NUM_PEER_ID_PER_PEER 8
-
-#define OL_TXRX_INVALID_NUM_PEERS (-1)
-
-#define OL_TXRX_MAC_ADDR_LEN 6
+#define MAX_NUM_PEER_ID_PER_PEER 16
 
 /* OL_TXRX_NUM_EXT_TIDS -
  * 16 "real" TIDs + 3 pseudo-TIDs for mgmt, mcast/bcast & non-QoS data
@@ -88,6 +84,8 @@
 /* TXRX Histogram defines */
 #define TXRX_DATA_HISTROGRAM_GRANULARITY      1000
 #define TXRX_DATA_HISTROGRAM_NUM_INTERVALS    100
+
+#define OL_TXRX_INVALID_VDEV_ID		(-1)
 
 struct ol_txrx_pdev_t;
 struct ol_txrx_vdev_t;
@@ -121,6 +119,7 @@ enum ol_tx_frm_type {
 	OL_TX_FRM_TSO,     /* TSO segment, with a modified IP header added */
 	OL_TX_FRM_AUDIO,   /* audio frames, with a custom LLC/SNAP hdr added */
 	OL_TX_FRM_NO_FREE, /* frame requires special tx completion callback */
+	ol_tx_frm_freed = 0xff, /* the tx desc is in free list */
 };
 
 #if defined(CONFIG_HL_SUPPORT) && defined(QCA_BAD_PEER_TX_FLOW_CL)
@@ -187,9 +186,11 @@ struct ol_tx_desc_t {
 	 * This field is filled in with the ol_tx_frm_type enum.
 	 */
 	uint8_t pkt_type;
-#if defined(CONFIG_HL_SUPPORT)
+
+	u_int8_t vdev_id;
+
 	struct ol_txrx_vdev_t *vdev;
-#endif
+
 	void *txq;
 
 #ifdef QCA_SUPPORT_SW_TXRX_ENCAP
@@ -202,6 +203,7 @@ struct ol_tx_desc_t {
 	struct ol_tx_flow_pool_t *pool;
 #endif
 	void *tso_desc;
+	void *tso_num_desc;
 };
 
 typedef TAILQ_HEAD(some_struct_name, ol_tx_desc_t) ol_tx_desc_list;
@@ -351,11 +353,6 @@ struct ol_mac_addr {
 
 struct ol_tx_sched_t;
 
-
-#ifndef OL_TXRX_NUM_LOCAL_PEER_IDS
-#define OL_TXRX_NUM_LOCAL_PEER_IDS 33   /* default */
-#endif
-
 #ifndef ol_txrx_local_peer_id_t
 #define ol_txrx_local_peer_id_t uint8_t /* default */
 #endif
@@ -381,16 +378,6 @@ struct ol_tx_delay_data {
 #endif /* QCA_COMPUTE_TX_DELAY */
 
 /* Thermal Mitigation */
-
-enum throttle_level {
-	THROTTLE_LEVEL_0,
-	THROTTLE_LEVEL_1,
-	THROTTLE_LEVEL_2,
-	THROTTLE_LEVEL_3,
-	/* Invalid */
-	THROTTLE_LEVEL_MAX,
-};
-
 enum throttle_phase {
 	THROTTLE_PHASE_OFF,
 	THROTTLE_PHASE_ON,
@@ -484,9 +471,19 @@ struct ol_tx_flow_pool_t {
 
 #endif
 
+/*
+ * struct ol_txrx_peer_id_map - Map of firmware peer_ids to peers on host
+ * @peer: Pointer to peer object
+ * @peer_id_ref_cnt: No. of firmware references to the peer_id
+ * @del_peer_id_ref_cnt: No. of outstanding unmap events for peer_id
+ *                       after the peer object is deleted on the host.
+ *
+ * peer_id is used as an index into the array of ol_txrx_peer_id_map.
+ */
 struct ol_txrx_peer_id_map {
 	struct ol_txrx_peer_t *peer;
 	qdf_atomic_t peer_id_ref_cnt;
+	qdf_atomic_t del_peer_id_ref_cnt;
 };
 
 /*
@@ -544,7 +541,7 @@ struct ol_txrx_peer_id_map {
  */
 struct ol_txrx_pdev_t {
 	/* ctrl_pdev - handle for querying config info */
-	ol_pdev_handle ctrl_pdev;
+	struct cdp_cfg *ctrl_pdev;
 
 	/* osdev - handle for mem alloc / free, map / unmap */
 	qdf_device_t osdev;
@@ -653,6 +650,10 @@ struct ol_txrx_pdev_t {
 		} callbacks[OL_TXRX_MGMT_NUM_TYPES];
 	} tx_mgmt;
 
+	/* packetdump callback functions */
+	tp_ol_packetdump_cb ol_tx_packetdump_cb;
+	tp_ol_packetdump_cb ol_rx_packetdump_cb;
+
 	struct {
 		uint16_t pool_size;
 		uint16_t num_free;
@@ -669,7 +670,7 @@ struct ol_txrx_pdev_t {
 		uint32_t offset_filter;
 		struct qdf_mem_multi_page_t desc_pages;
 #ifdef DESC_DUP_DETECT_DEBUG
-		uint32_t *free_list_bitmap;
+		unsigned long *free_list_bitmap;
 #endif
 	} tx_desc;
 
@@ -711,6 +712,8 @@ struct ol_txrx_pdev_t {
 	 * benefit to having a per-vdev lock.
 	 */
 	OL_RX_MUTEX_TYPE last_real_peer_mutex;
+
+	qdf_spinlock_t peer_map_unmap_lock;
 
 	struct {
 		struct {
@@ -897,6 +900,13 @@ struct ol_txrx_pdev_t {
 		/* tso mutex */
 		OL_TX_MUTEX_TYPE tso_mutex;
 	} tso_seg_pool;
+	struct {
+		uint16_t num_seg_pool_size;
+		uint16_t num_free;
+		struct qdf_tso_num_seg_elem_t *freelist;
+		/* tso mutex */
+		OL_TX_MUTEX_TYPE tso_num_seg_mutex;
+	} tso_num_seg_pool;
 #endif
 
 #if defined(CONFIG_HL_SUPPORT) && defined(QCA_BAD_PEER_TX_FLOW_CL)
@@ -932,15 +942,10 @@ struct ol_txrx_pdev_t {
 	ol_tx_pause_callback_fp pause_cb;
 
 	struct {
-		void *lro_data;
 		void (*lro_flush_cb)(void *);
+		qdf_atomic_t lro_dev_cnt;
 	} lro_info;
 	struct ol_txrx_peer_t *self_peer;
-};
-
-struct ol_txrx_ocb_chan_info {
-	uint32_t chan_freq;
-	uint16_t disable_rx_stats_hdr:1;
 };
 
 struct ol_txrx_vdev_t {
@@ -1058,6 +1063,7 @@ struct ol_txrx_vdev_t {
 	uint64_t fwd_tx_packets;
 	uint64_t fwd_rx_packets;
 	bool is_wisa_mode_enable;
+	uint8_t mac_id;
 };
 
 struct ol_rx_reorder_array_elem_t {
@@ -1203,52 +1209,12 @@ struct ol_txrx_peer_t {
 	qdf_time_t last_assoc_rcvd;
 	qdf_time_t last_disassoc_rcvd;
 	qdf_time_t last_deauth_rcvd;
+	qdf_atomic_t fw_create_pending;
 };
 
-enum ol_rx_err_type {
-	OL_RX_ERR_DEFRAG_MIC,
-	OL_RX_ERR_PN,
-	OL_RX_ERR_UNKNOWN_PEER,
-	OL_RX_ERR_MALFORMED,
-	OL_RX_ERR_TKIP_MIC,
-	OL_RX_ERR_DECRYPT,
-	OL_RX_ERR_MPDU_LENGTH,
-	OL_RX_ERR_ENCRYPT_REQUIRED,
-	OL_RX_ERR_DUP,
-	OL_RX_ERR_UNKNOWN,
-	OL_RX_ERR_FCS,
-	OL_RX_ERR_PRIVACY,
-	OL_RX_ERR_NONE_FRAG,
-	OL_RX_ERR_NONE = 0xFF
+struct ol_rx_remote_data {
+	qdf_nbuf_t msdu;
+	uint8_t mac_id;
 };
 
-/**
- * ol_mic_error_info - carries the information associated with
- * a MIC error
- * @vdev_id: virtual device ID
- * @key_id: Key ID
- * @pn: packet number
- * @sa: source address
- * @da: destination address
- * @ta: transmitter address
- */
-struct ol_mic_error_info {
-	uint8_t vdev_id;
-	uint32_t key_id;
-	uint64_t pn;
-	uint8_t sa[OL_TXRX_MAC_ADDR_LEN];
-	uint8_t da[OL_TXRX_MAC_ADDR_LEN];
-	uint8_t ta[OL_TXRX_MAC_ADDR_LEN];
-};
-
-/**
- * ol_error_info - carries the information associated with an
- * error indicated by the firmware
- * @mic_err: MIC error information
- */
-struct ol_error_info {
-	union {
-		struct ol_mic_error_info mic_err;
-	} u;
-};
 #endif /* _OL_TXRX_TYPES__H_ */

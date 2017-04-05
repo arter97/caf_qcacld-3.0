@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -178,7 +178,7 @@ void hdd_send_peer_status_ind_to_oem_app(struct qdf_mac_addr *peerMac,
 					 uint8_t peerStatus,
 					 uint8_t peerTimingMeasCap,
 					 uint8_t sessionId,
-					 tSirSmeChanInfo * chan_info,
+					 struct sSirSmeChanInfo *chan_info,
 					 enum tQDF_ADAPTER_MODE dev_mode);
 
 int iw_get_oem_data_cap(struct net_device *dev, struct iw_request_info *info,
@@ -186,11 +186,13 @@ int iw_get_oem_data_cap(struct net_device *dev, struct iw_request_info *info,
 
 int oem_activate_service(struct hdd_context_s *hdd_ctx);
 
-void hdd_send_oem_data_rsp_msg(int length, uint8_t *oemDataRsp);
+void hdd_send_oem_data_rsp_msg(struct oem_data_rsp *oem_rsp);
 #else
 static inline int oem_activate_service(struct hdd_context_s *hdd_ctx)
 {
 	return 0;
 }
+
+static inline void hdd_send_oem_data_rsp_msg(void *oem_rsp) {}
 #endif /* FEATURE_OEM_DATA_SUPPORT */
 #endif /* __WLAN_HDD_OEM_DATA_H__ */

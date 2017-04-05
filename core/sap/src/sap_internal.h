@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -41,6 +41,8 @@
 #include "sap_api.h"
 #include "sap_fsm_ext.h"
 #include "sap_ch_select.h"
+#include <wlan_scan_public_structs.h>
+#include <wlan_objmgr_pdev_obj.h>
 
 /*----------------------------------------------------------------------------
  * Preprocessor Definitions and Constants
@@ -210,6 +212,7 @@ typedef struct sSapContext {
 	uint32_t nStaAddIeLength;
 	uint8_t pStaAddIE[MAX_ASSOC_IND_IE_LEN];
 	uint8_t *channelList;
+	uint8_t num_of_channel;
 	tSapChannelListInfo SapChnlList;
 	uint16_t ch_width_orig;
 	struct ch_params_s ch_params;
@@ -264,6 +267,19 @@ typedef struct sSapContext {
 	uint32_t roc_ind_scan_id;
 
 	qdf_event_t sap_session_opened_evt;
+	bool is_pre_cac_on;
+	bool pre_cac_complete;
+	bool vendor_acs_enabled;
+	uint8_t dfs_vendor_channel;
+	uint8_t dfs_vendor_chan_bw;
+	uint8_t chan_before_pre_cac;
+	uint8_t beacon_tx_rate;
+	tSirMacRateSet supp_rate_set;
+	tSirMacRateSet extended_rate_set;
+	enum sap_acs_dfs_mode dfs_mode;
+	wlan_scan_requester req_id;
+	uint8_t sap_acs_pre_start_bss;
+	uint8_t sap_sta_id;
 } *ptSapContext;
 
 /*----------------------------------------------------------------------------
@@ -379,8 +395,6 @@ void sap_dfs_cac_timer_callback(void *data);
 
 void sap_cac_reset_notify(tHalHandle hHal);
 
-bool sap_acs_channel_check(ptSapContext sapContext, uint8_t channelNumber);
-
 bool
 sap_channel_matrix_check(ptSapContext sapContext,
 			 ePhyChanBondState cbMode,
@@ -421,11 +435,36 @@ void sap_config_acs_result(tHalHandle hal, ptSapContext sap_ctx,
 bool
 sap_check_in_avoid_ch_list(ptSapContext sap_ctx, uint8_t channel);
 QDF_STATUS sap_open_session(tHalHandle hHal, ptSapContext sapContext,
-				uint32_t *session_id);
+				uint32_t session_id);
 QDF_STATUS sap_close_session(tHalHandle hHal,
 			     ptSapContext sapContext,
 			     csr_roamSessionCloseCallback callback, bool valid);
+/**
+ * sap_mark_leaking_ch() - to mark channel leaking in to nol
+ * @sap_ctx: pointer to SAP context
+ * @ch_width: channel width
+ * @nol: nol info
+ * @temp_ch_lst_sz: the target channel list
+ * @temp_ch_lst: the target channel list
+ *
+ * This function removes the channels from temp channel list that
+ * (if selected as target channel) will cause leakage in one of
+ * the NOL channels
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+sap_mark_leaking_ch(ptSapContext sap_ctx,
+		enum phy_ch_width ch_width,
+		tSapDfsNolInfo *nol,
+		uint8_t temp_ch_lst_sz,
+		uint8_t *temp_ch_lst);
+
+void sap_scan_event_callback(struct wlan_objmgr_vdev *vdev,
+			struct scan_event *event, void *arg);
+
 #ifdef __cplusplus
 }
 #endif
+uint8_t sap_select_default_oper_chan(tHalHandle hal, uint32_t acs_hwmode);
 #endif

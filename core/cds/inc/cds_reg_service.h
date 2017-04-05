@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -40,6 +40,7 @@
 
 #define CDS_COUNTRY_CODE_LEN  2
 #define CDS_MAC_ADDRESS_LEN 6
+#define CDS_SBS_SEPARATION_THRESHOLD 100
 
 #define CDS_CHANNEL_STATE(chan_enum) reg_channels[chan_enum].state
 #define CDS_CHANNEL_NUM(chan_enum) chan_mapping[chan_enum].chan_num
@@ -74,6 +75,16 @@
 	(CDS_IS_CHANNEL_5GHZ(chan_num1) == CDS_IS_CHANNEL_5GHZ(chan_num2)))
 
 #define CDS_MIN_11P_CHANNEL chan_mapping[MIN_59GHZ_CHANNEL].chan_num
+
+/* assumption is the 2 channels passed are 5G channels */
+#define CDS_IS_CHANNEL_VALID_5G_SBS(curchan, newchan) \
+	(curchan > newchan ? \
+	CDS_CHANNEL_FREQ(cds_get_channel_enum(curchan)) \
+	- CDS_CHANNEL_FREQ(cds_get_channel_enum(newchan)) \
+	 > CDS_SBS_SEPARATION_THRESHOLD : \
+	CDS_CHANNEL_FREQ(cds_get_channel_enum(newchan)) \
+	- CDS_CHANNEL_FREQ(cds_get_channel_enum(curchan)) \
+	 > CDS_SBS_SEPARATION_THRESHOLD)
 
 typedef enum {
 	REGDOMAIN_FCC,
@@ -272,6 +283,7 @@ struct channel_power {
  * @SOURCE_11D: source 11D
  */
 enum country_src {
+	SOURCE_UNKNOWN,
 	SOURCE_QUERY,
 	SOURCE_CORE,
 	SOURCE_DRIVER,
@@ -343,6 +355,26 @@ struct ch_params_s {
 	uint8_t center_freq_seg1;
 };
 
+/**
+ * enum dfs_region - DFS region
+ * @DFS_UNINIT_REGION: un-initialized region
+ * @DFS_FCC_REGION: FCC region
+ * @DFS_ETSI_REGION: ETSI region
+ * @DFS_MKK_REGION: MKK region
+ * @DFS_CN_REGION: China region
+ * @DFS_KR_REGION: Korea region
+ * @DFS_UNDEF_REGION: Undefined region
+ */
+enum dfs_region {
+	DFS_UNINIT_REGION = 0,
+	DFS_FCC_REGION = 1,
+	DFS_ETSI_REGION = 2,
+	DFS_MKK_REGION = 3,
+	DFS_CN_REGION = 4,
+	DFS_KR_REGION = 5,
+	DFS_UNDEF_REGION
+};
+
 extern const struct chan_map chan_mapping[NUM_CHANNELS];
 extern struct regulatory_channel reg_channels[NUM_CHANNELS];
 
@@ -356,9 +388,46 @@ QDF_STATUS cds_get_channel_list_with_power(struct channel_power
 					   *base_channels,
 					   uint8_t *num_base_channels);
 
+enum channel_enum cds_get_channel_enum(uint32_t chan_num);
+
 enum channel_state cds_get_channel_state(uint32_t chan_num);
-QDF_STATUS cds_get_dfs_region(uint8_t *dfs_region);
-QDF_STATUS cds_put_dfs_region(uint8_t dfs_region);
+
+/**
+ * cds_get_channel_reg_power() - get max power based on regulatory
+ * @chan_num: channel number
+ *
+ * Return: tx power
+ */
+int8_t cds_get_channel_reg_power(uint32_t chan_num);
+
+/**
+ * cds_get_channel_flags() - This API returns regulatory channel flags
+ * @chan_num: channel number
+ *
+ * Return: channel flags
+ */
+uint32_t cds_get_channel_flags(uint32_t chan_num);
+
+/**
+ * cds_get_vendor_reg_flags() - This API returns vendor specific regulatory
+ * channel flags
+ * @chan_num: channel number
+ *
+ * Return: channel flags
+ */
+uint32_t cds_get_vendor_reg_flags(uint32_t chan, uint16_t bandwidth,
+				bool is_ht_enabled, bool is_vht_enabled,
+				uint8_t is_sub_20_channel_width);
+
+/**
+ * cds_get_channel_freq() - This API returns frequency for channel
+ * @chan_num: channel number
+ *
+ * Return: frequency
+ */
+uint32_t cds_get_channel_freq(uint32_t chan_num);
+QDF_STATUS cds_get_dfs_region(enum dfs_region *dfs_reg);
+QDF_STATUS cds_put_dfs_region(enum dfs_region dfs_reg);
 
 bool cds_is_dsrc_channel(uint16_t center_freq);
 enum channel_state cds_get_5g_bonded_channel_state(uint16_t chan_num,
@@ -367,7 +436,17 @@ enum channel_state cds_get_5g_bonded_channel_state(uint16_t chan_num,
 enum channel_state cds_get_2g_bonded_channel_state(uint16_t chan_num,
 						   enum phy_ch_width chan_width,
 						   uint16_t sec_ch);
-
+/**
+ * cds_get_2g_bonded_channel_state() - get the channel bonded channel state
+ * @oper_ch: operating channel
+ * @ch_width: channel width
+ * @sec_ch: secondary channel
+ *
+ * Return: channel state
+ */
+enum channel_state cds_get_bonded_channel_state(uint16_t oper_ch,
+						enum phy_ch_width ch_width,
+						uint16_t sec_ch);
 void cds_set_channel_params(uint16_t oper_ch, uint16_t ht_offset_2g,
 			    struct ch_params_s *ch_params);
 

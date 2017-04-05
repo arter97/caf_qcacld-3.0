@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -76,6 +76,7 @@ ol_tx_queue_log_dequeue(struct ol_txrx_pdev_t *pdev,
  * @tid: tid value
  * @frms: number of frames for which logs need to be freed
  * @bytes: number of bytes
+ * @is_peer_txq - peer queue or not
  *
  *
  * Return: None
@@ -83,7 +84,7 @@ ol_tx_queue_log_dequeue(struct ol_txrx_pdev_t *pdev,
 void
 ol_tx_queue_log_free(struct ol_txrx_pdev_t *pdev,
 		     struct ol_tx_frms_queue_t *txq,
-		     int tid, int frms, int bytes);
+		     int tid, int frms, int bytes, bool is_peer_txq);
 
 #else
 
@@ -105,7 +106,7 @@ ol_tx_queue_log_dequeue(struct ol_txrx_pdev_t *pdev,
 static inline void
 ol_tx_queue_log_free(struct ol_txrx_pdev_t *pdev,
 		     struct ol_tx_frms_queue_t *txq,
-		     int tid, int frms, int bytes)
+		     int tid, int frms, int bytes, bool is_peer_txq)
 {
 	return;
 }
@@ -171,12 +172,13 @@ ol_tx_dequeue(
  * @param pdev - the physical device object, which stores the txqs
  * @param txq - which tx queue to free frames from
  * @param tid - the extended TID that the queue belongs to
+ * @param is_peer_txq - peer queue or not
  */
 void
 ol_tx_queue_free(
 		struct ol_txrx_pdev_t *pdev,
 		struct ol_tx_frms_queue_t *txq,
-		int tid);
+		int tid, bool is_peer_txq);
 
 /**
  * @brief - discard pending tx frames from the tx queue
@@ -224,7 +226,7 @@ static inline void
 ol_tx_queue_free(
 		struct ol_txrx_pdev_t *pdev,
 		struct ol_tx_frms_queue_t *txq,
-		int tid)
+		int tid, bool is_peer_txq)
 {
 	return;
 }
@@ -238,6 +240,15 @@ ol_tx_queue_discard(
 	return;
 }
 #endif /* defined(CONFIG_HL_SUPPORT) */
+
+void ol_txrx_vdev_flush(struct cdp_vdev *pvdev);
+
+#if defined(QCA_LL_LEGACY_TX_FLOW_CONTROL) || \
+   (defined(QCA_LL_TX_FLOW_CONTROL_V2) && !defined(CONFIG_ICNSS)) || \
+   defined(CONFIG_HL_SUPPORT)
+void ol_txrx_vdev_pause(struct cdp_vdev *pvdev, uint32_t reason);
+void ol_txrx_vdev_unpause(struct cdp_vdev *pvdev, uint32_t reason);
+#endif /* QCA_LL_LEGACY_TX_FLOW_CONTROL */
 
 #if defined(CONFIG_HL_SUPPORT) && defined(QCA_BAD_PEER_TX_FLOW_CL)
 
@@ -440,13 +451,17 @@ ol_tx_queues_display(struct ol_txrx_pdev_t *pdev)
 #define ol_tx_queue_decs_reinit(peer, peer_id)  /* no-op */
 
 #ifdef QCA_SUPPORT_TX_THROTTLE
+void ol_tx_throttle_set_level(struct cdp_pdev *ppdev, int level);
+void ol_tx_throttle_init_period(struct cdp_pdev *ppdev, int period,
+				uint8_t *dutycycle_level);
+
 /**
  * @brief - initialize the throttle context
  * @param pdev - the physical device object, which stores the txqs
  */
 void ol_tx_throttle_init(struct ol_txrx_pdev_t *pdev);
 #else
-#define ol_tx_throttle_init(pdev)       /*no op */
+static inline void ol_tx_throttle_init(struct ol_txrx_pdev_t *pdev) {}
 #endif
 
 #ifdef FEATURE_HL_GROUP_CREDIT_FLOW_CONTROL

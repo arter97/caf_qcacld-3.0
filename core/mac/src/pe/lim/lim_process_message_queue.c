@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -62,12 +62,12 @@
 #include "qdf_types.h"
 #include "cds_packet.h"
 #include "qdf_mem.h"
-#include "cds_concurrency.h"
+#include "wlan_policy_mgr_api.h"
 #include "nan_datapath.h"
 
 void lim_log_session_states(tpAniSirGlobal pMac);
 static void lim_process_normal_hdd_msg(tpAniSirGlobal mac_ctx,
-	struct sSirMsgQ *msg, uint8_t rsp_reqd);
+	struct scheduler_msg *msg, uint8_t rsp_reqd);
 
 /**
  * lim_process_dual_mac_cfg_resp() - Process set dual mac config response
@@ -84,7 +84,7 @@ static void lim_process_dual_mac_cfg_resp(tpAniSirGlobal mac, void *body)
 {
 	struct sir_dual_mac_config_resp *resp, *param;
 	uint32_t len, fail_resp = 0;
-	tSirMsgQ msg;
+	struct scheduler_msg msg;
 
 	resp = (struct sir_dual_mac_config_resp *)body;
 	if (!resp) {
@@ -139,7 +139,7 @@ static void lim_process_set_hw_mode_resp(tpAniSirGlobal mac, void *body)
 {
 	struct sir_set_hw_mode_resp *resp, *param;
 	uint32_t len, i, fail_resp = 0;
-	tSirMsgQ msg;
+	struct scheduler_msg msg;
 
 	resp = (struct sir_set_hw_mode_resp *)body;
 	if (!resp) {
@@ -206,7 +206,7 @@ static void lim_process_set_antenna_resp(tpAniSirGlobal mac, void *body)
 {
 	struct sir_antenna_mode_resp *resp, *param;
 	bool fail_resp = false;
-	tSirMsgQ msg;
+	struct scheduler_msg msg;
 
 	resp = (struct sir_antenna_mode_resp *)body;
 	if (!resp) {
@@ -242,6 +242,73 @@ static void lim_process_set_antenna_resp(tpAniSirGlobal mac, void *body)
 }
 
 /**
+ * lim_process_set_default_scan_ie_request() - Process the Set default
+ * Scan IE request from HDD.
+ * @mac_ctx: Pointer to Global MAC structure
+ * @msg_buf: Pointer to incoming data
+ *
+ * This function receives the default scan IEs and updates the ext cap IE
+ * (if present) with FTM capabilities and pass the Scan IEs to WMA.
+ *
+ * Return: None
+ */
+static void lim_process_set_default_scan_ie_request(tpAniSirGlobal mac_ctx,
+							uint32_t *msg_buf)
+{
+	struct hdd_default_scan_ie *set_ie_params;
+	struct vdev_ie_info *wma_ie_params;
+	uint8_t *local_ie_buf;
+	uint16_t local_ie_len;
+	struct scheduler_msg msg_q;
+	tSirRetStatus ret_code;
+
+	if (!msg_buf) {
+		lim_log(mac_ctx, LOGE, FL("msg_buf is NULL"));
+		return;
+	}
+
+	set_ie_params = (struct hdd_default_scan_ie *) msg_buf;
+	local_ie_len = set_ie_params->ie_len;
+
+	local_ie_buf = qdf_mem_malloc(MAX_DEFAULT_SCAN_IE_LEN);
+	if (!local_ie_buf) {
+		lim_log(mac_ctx, LOGE,
+			FL("Scan IE Update fails due to malloc failure"));
+		return;
+	}
+
+	if (lim_update_ext_cap_ie(mac_ctx,
+			(uint8_t *)set_ie_params->ie_data,
+			local_ie_buf, &local_ie_len)) {
+		lim_log(mac_ctx, LOGE, FL("Update ext cap IEs fails"));
+		goto scan_ie_send_fail;
+	}
+
+	wma_ie_params = qdf_mem_malloc(sizeof(*wma_ie_params) + local_ie_len);
+	if (!wma_ie_params) {
+		lim_log(mac_ctx, LOGE, FL("fail to alloc wma_ie_params"));
+		goto scan_ie_send_fail;
+	}
+	wma_ie_params->vdev_id = set_ie_params->session_id;
+	wma_ie_params->ie_id = DEFAULT_SCAN_IE_ID;
+	wma_ie_params->length = local_ie_len;
+	wma_ie_params->data = (uint8_t *)(wma_ie_params)
+					+ sizeof(*wma_ie_params);
+	qdf_mem_copy(wma_ie_params->data, local_ie_buf, local_ie_len);
+
+	msg_q.type = WMA_SET_IE_INFO;
+	msg_q.bodyptr = wma_ie_params;
+	msg_q.bodyval = 0;
+	ret_code = wma_post_ctrl_msg(mac_ctx, &msg_q);
+	if (eSIR_SUCCESS != ret_code) {
+		lim_log(mac_ctx, LOGE, FL("fail to send WMA_SET_IE_INFO"));
+		qdf_mem_free(wma_ie_params);
+	}
+scan_ie_send_fail:
+	qdf_mem_free(local_ie_buf);
+}
+
+/**
  * lim_process_hw_mode_trans_ind() - Process set HW mode transition indication
  * @mac: Global MAC pointer
  * @body: Set HW mode response in sir_hw_mode_trans_ind format
@@ -256,7 +323,7 @@ static void lim_process_hw_mode_trans_ind(tpAniSirGlobal mac, void *body)
 {
 	struct sir_hw_mode_trans_ind *ind, *param;
 	uint32_t len, i;
-	tSirMsgQ msg;
+	struct scheduler_msg msg;
 
 	ind = (struct sir_hw_mode_trans_ind *)body;
 	if (!ind) {
@@ -297,12 +364,12 @@ static void lim_process_hw_mode_trans_ind(tpAniSirGlobal mac, void *body)
    \fn def_msg_decision
    \brief The function decides whether to defer a message or not in limProcessMessage function
    \param   tpAniSirGlobal pMac
-   \param       tSirMsgQ  limMsg
+   \param       struct scheduler_msg  limMsg
    \param       tSirMacTspecIE   *ppInfo
    \return none
    -------------------------------------------------------------*/
 
-uint8_t static def_msg_decision(tpAniSirGlobal pMac, tpSirMsgQ limMsg)
+uint8_t static def_msg_decision(tpAniSirGlobal pMac, struct scheduler_msg *limMsg)
 {
 
 /* this function should not changed */
@@ -322,6 +389,7 @@ uint8_t static def_msg_decision(tpAniSirGlobal pMac, tpSirMsgQ limMsg)
 	    && !pMac->lim.gLimSystemInScanLearnMode) {
 		if ((limMsg->type != WMA_ADD_BSS_RSP)
 		    && (limMsg->type != WMA_DELETE_BSS_RSP)
+		    && (limMsg->type != WMA_DELETE_BSS_HO_FAIL_RSP)
 		    && (limMsg->type != WMA_ADD_STA_RSP)
 		    && (limMsg->type != WMA_DELETE_STA_RSP)
 		    && (limMsg->type != WMA_SET_BSSKEY_RSP)
@@ -332,9 +400,6 @@ uint8_t static def_msg_decision(tpAniSirGlobal pMac, tpSirMsgQ limMsg)
 		    && (limMsg->type != WMA_SWITCH_CHANNEL_RSP)
 		    && (limMsg->type != WMA_P2P_NOA_ATTR_IND)
 		    && (limMsg->type != WMA_P2P_NOA_START_IND) &&
-#ifdef FEATURE_OEM_DATA_SUPPORT
-		    (limMsg->type != WMA_START_OEM_DATA_RSP) &&
-#endif
 		    (limMsg->type != WMA_ADD_TS_RSP) &&
 		    /*
 		     * LIM won't process any defer queue commands if gLimAddtsSent is
@@ -384,7 +449,7 @@ __lim_pno_match_fwd_bcn_probepsp(tpAniSirGlobal pmac, uint8_t *rx_pkt_info,
 {
 	struct pno_match_found  *result;
 	uint8_t                 *body;
-	tSirMsgQ                mmh_msg;
+	struct scheduler_msg    mmh_msg;
 	tpSirMacMgmtHdr         hdr;
 	uint32_t num_results = 1, len, i;
 
@@ -400,7 +465,6 @@ __lim_pno_match_fwd_bcn_probepsp(tpAniSirGlobal pmac, uint8_t *rx_pkt_info,
 	}
 	hdr = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
 	body = WMA_GET_RX_MPDU_DATA(rx_pkt_info);
-	qdf_mem_zero(result, sizeof(*result) + ie_len);
 
 	/* Received frame does not have request id, hence set 0 */
 	result->request_id = 0;
@@ -443,8 +507,10 @@ __lim_ext_scan_forward_bcn_probe_rsp(tpAniSirGlobal pmac, uint8_t *rx_pkt_info,
 {
 	tpSirWifiFullScanResultEvent result;
 	uint8_t                     *body;
-	tSirMsgQ                     mmh_msg;
+	struct scheduler_msg         mmh_msg;
 	tpSirMacMgmtHdr              hdr;
+	uint32_t frame_len;
+	tSirBssDescription *bssdescr;
 
 	result = qdf_mem_malloc(sizeof(*result) + ie_len);
 	if (NULL == result) {
@@ -453,7 +519,6 @@ __lim_ext_scan_forward_bcn_probe_rsp(tpAniSirGlobal pmac, uint8_t *rx_pkt_info,
 	}
 	hdr = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
 	body = WMA_GET_RX_MPDU_DATA(rx_pkt_info);
-	qdf_mem_zero(result, sizeof(*result) + ie_len);
 
 	/* Received frame does not have request id, hence set 0 */
 	result->requestId = 0;
@@ -478,6 +543,31 @@ __lim_ext_scan_forward_bcn_probe_rsp(tpAniSirGlobal pmac, uint8_t *rx_pkt_info,
 	/* Copy IE fields */
 	qdf_mem_copy((uint8_t *) &result->ap.ieData,
 			body + SIR_MAC_B_PR_SSID_OFFSET, ie_len);
+
+	frame_len = sizeof(*bssdescr) + ie_len - sizeof(bssdescr->ieFields[1]);
+	bssdescr = (tSirBssDescription *) qdf_mem_malloc(frame_len);
+
+	if (NULL == bssdescr) {
+		lim_log(pmac, LOGE,
+			FL("qdf_mem_malloc(length=%d) failed"), frame_len);
+		return;
+	}
+
+	qdf_mem_zero(bssdescr, frame_len);
+
+	lim_collect_bss_description(pmac, bssdescr, frame, rx_pkt_info, false);
+	/*
+	 * Send the beacon to CSR with registered callback routine.
+	 * scan_id and flags parameters are currently unused and set to 0.
+	 * EXT scan results will also be added to scan cache in SME
+	 */
+	if (pmac->lim.add_bssdescr_callback) {
+		(pmac->lim.add_bssdescr_callback) (pmac, bssdescr, 0, 0);
+	} else {
+		lim_log(pmac, LOGE,
+			FL("No CSR callback routine to send beacon/probe response"));
+	}
+	qdf_mem_free(bssdescr);
 
 	mmh_msg.type = msg_type;
 	mmh_msg.bodyptr = result;
@@ -556,7 +646,7 @@ __lim_process_ext_scan_beacon_probe_rsp(tpAniSirGlobal pmac,
  * Not Scanning,
  */
 static void
-__lim_handle_beacon(tpAniSirGlobal pMac, tpSirMsgQ pMsg,
+__lim_handle_beacon(tpAniSirGlobal pMac, struct scheduler_msg *pMsg,
 		    tpPESession psessionEntry)
 {
 	/* checking for global SME state... */
@@ -595,11 +685,11 @@ __lim_handle_beacon(tpAniSirGlobal pMac, tpSirMsgQ pMsg,
  * NA
  *
  * @param  pMac - Pointer to Global MAC structure
- * @param  pMsg of type tSirMsgQ - Pointer to the message structure
+ * @param  pMsg of type struct scheduler_msg - Pointer to the message structure
  * @return None
  */
 
-uint32_t lim_defer_msg(tpAniSirGlobal pMac, tSirMsgQ *pMsg)
+uint32_t lim_defer_msg(tpAniSirGlobal pMac, struct scheduler_msg *pMsg)
 {
 	uint32_t retCode = TX_SUCCESS;
 
@@ -782,12 +872,13 @@ lim_check_mgmt_registered_frames(tpAniSirGlobal mac_ctx, uint8_t *buff_desc,
  * NA
  *
  * @param  pMac - Pointer to Global MAC structure
- * @param  pMsg of type tSirMsgQ - Pointer to the message structure
+ * @param  pMsg of type struct scheduler_msg - Pointer to the message structure
  * @return None
  */
 
 static void
-lim_handle80211_frames(tpAniSirGlobal pMac, tpSirMsgQ limMsg, uint8_t *pDeferMsg)
+lim_handle80211_frames(tpAniSirGlobal pMac, struct scheduler_msg *limMsg,
+		       uint8_t *pDeferMsg)
 {
 	uint8_t *pRxPacketInfo = NULL;
 	tSirMacFrameCtl fc;
@@ -1075,10 +1166,10 @@ end:
  * @param  pMac      Pointer to Global MAC structure
  * @return QDF_STATUS_SUCCESS or QDF_STATUS_E_FAILURE
  */
-QDF_STATUS lim_send_stop_scan_offload_req(tpAniSirGlobal pMac,
+static QDF_STATUS lim_send_stop_scan_offload_req(tpAniSirGlobal pMac,
 	uint8_t SessionId, uint32_t scan_id, uint32_t scan_requestor_id)
 {
-	tSirMsgQ msg;
+	struct scheduler_msg msg;
 	tSirRetStatus rc = eSIR_SUCCESS;
 	tAbortScanParams *pAbortScanParams;
 
@@ -1135,82 +1226,8 @@ void lim_process_abort_scan_ind(tpAniSirGlobal mac_ctx,
 	return;
 }
 
-/**
- * lim_message_processor() - Process messages from LIM.
- *
- * @mac_ctx:          Pointer to the Global Mac Context.
- * @msg:              Received LIM message.
- *
- * Wrapper function for lim_process_messages when handling messages received by
- * LIM.Could either defer messages or process them.
- *
- * Return:  None.
- */
-void lim_message_processor(tpAniSirGlobal mac_ctx, tpSirMsgQ msg)
-{
-	if (eLIM_MLM_OFFLINE_STATE == mac_ctx->lim.gLimMlmState) {
-		pe_free_msg(mac_ctx, msg);
-		return;
-	}
-
-	if (!def_msg_decision(mac_ctx, msg)) {
-		lim_process_messages(mac_ctx, msg);
-		/* process deferred message queue if allowed */
-		if ((!(mac_ctx->lim.gLimAddtsSent)) &&
-			(!(lim_is_system_in_scan_state(mac_ctx))) &&
-			(true == GET_LIM_PROCESS_DEFD_MESGS(mac_ctx)))
-			lim_process_deferred_message_queue(mac_ctx);
-	}
-}
-
-#ifdef FEATURE_OEM_DATA_SUPPORT
-
-void lim_oem_data_rsp_handle_resume_link_rsp(tpAniSirGlobal pMac, QDF_STATUS status,
-					     uint32_t *mlmOemDataRsp)
-{
-	if (status != QDF_STATUS_SUCCESS) {
-		lim_log(pMac, LOGE,
-			FL
-				("OEM Data Rsp failed to get the response for resume link"));
-	}
-
-	if (NULL != pMac->lim.gpLimMlmOemDataReq) {
-		qdf_mem_free(pMac->lim.gpLimMlmOemDataReq);
-		pMac->lim.gpLimMlmOemDataReq = NULL;
-	}
-	/* "Failure" status doesn't mean that Oem Data Rsp did not happen */
-	/* and hence we need to respond to upper layers. Only Resume link is failed, but */
-	/* we got the oem data response already. */
-	/* Post the meessage to MLM */
-	lim_post_sme_message(pMac, LIM_MLM_OEM_DATA_CNF,
-			     (uint32_t *) (mlmOemDataRsp));
-
-	return;
-}
-
-void lim_process_oem_data_rsp(tpAniSirGlobal pMac, uint32_t *body)
-{
-	tpLimMlmOemDataRsp mlmOemDataRsp = NULL;
-
-	/* Process all the messages for the lim queue */
-	SET_LIM_PROCESS_DEFD_MESGS(pMac, true);
-
-	mlmOemDataRsp = (tpLimMlmOemDataRsp) body;
-
-	PELOG1(lim_log
-		       (pMac, LOG1, FL("%s: sending oem data response msg to sme"),
-		       __func__);
-	       )
-	lim_post_sme_message(pMac, LIM_MLM_OEM_DATA_CNF,
-			     (uint32_t *) (mlmOemDataRsp));
-
-	return;
-}
-
-#endif
-
 static void lim_process_sme_obss_scan_ind(tpAniSirGlobal mac_ctx,
-							struct sSirMsgQ *msg)
+					  struct scheduler_msg *msg)
 {
 	struct sPESession *session;
 	uint8_t session_id;
@@ -1244,12 +1261,13 @@ static void lim_process_sme_obss_scan_ind(tpAniSirGlobal mac_ctx,
 /**
  * lim_process_messages() - Process messages from upper layers.
  *
- * @mac_ctx:          Pointer to the Global Mac Context.
- * @msg:              Received message.
+ * @mac_ctx: Pointer to the Global Mac Context.
+ * @msg: Received message.
  *
  * Return:  None.
  */
-void lim_process_messages(tpAniSirGlobal mac_ctx, tpSirMsgQ msg)
+static void lim_process_messages(tpAniSirGlobal mac_ctx,
+				 struct scheduler_msg *msg)
 {
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE
 	uint8_t vdev_id = 0;
@@ -1263,7 +1281,7 @@ void lim_process_messages(tpAniSirGlobal mac_ctx, tpSirMsgQ msg)
 	uint16_t pkt_len = 0;
 	cds_pkt_t *body_ptr = NULL;
 	QDF_STATUS qdf_status;
-	tSirMsgQ new_msg;
+	struct scheduler_msg new_msg;
 	tSirSmeScanAbortReq *req_msg = NULL;
 	uint8_t session_id;
 	uint32_t scan_id;
@@ -1274,6 +1292,8 @@ void lim_process_messages(tpAniSirGlobal mac_ctx, tpSirMsgQ msg)
 	tTdlsLinkEstablishParams *tdls_link_params = NULL;
 #endif
 	tSirMbMsgP2p *p2p_msg = NULL;
+	tSirSetActiveModeSetBncFilterReq *bcn_filter_req = NULL;
+
 	if (ANI_DRIVER_TYPE(mac_ctx) == eDRIVER_TYPE_MFG) {
 		qdf_mem_free(msg->bodyptr);
 		msg->bodyptr = NULL;
@@ -1287,8 +1307,29 @@ void lim_process_messages(tpAniSirGlobal mac_ctx, tpSirMsgQ msg)
 #ifdef WLAN_DEBUG
 	mac_ctx->lim.numTot++;
 #endif
-	MTRACE(mac_trace_msg_rx(mac_ctx, NO_SESSION,
-		LIM_TRACE_MAKE_RXMSG(msg->type, LIM_MSG_PROCESSED));)
+	/*
+	 * MTRACE logs not captured for events received from SME
+	 * SME enums (eWNI_SME_START_REQ) starts with 0x16xx.
+	 * Compare received SME events with SIR_SME_MODULE_ID
+	 */
+	if ((SIR_SME_MODULE_ID ==
+	    (uint8_t)MAC_TRACE_GET_MODULE_ID(msg->type)) &&
+	    (msg->type != eWNI_SME_REGISTER_MGMT_FRAME_REQ)) {
+		MTRACE(mac_trace(mac_ctx, TRACE_CODE_RX_SME_MSG,
+				 NO_SESSION, msg->type));
+	} else {
+		/*
+		 * Omitting below message types as these are too frequent
+		 * and when crash happens we loose critical trace logs
+		 * if these are also logged
+		 */
+		if (msg->type != SIR_CFG_PARAM_UPDATE_IND &&
+		    msg->type != SIR_BB_XPORT_MGMT_MSG &&
+		    msg->type != WMA_RX_SCAN_EVENT)
+			MTRACE(mac_trace_msg_rx(mac_ctx, NO_SESSION,
+				LIM_TRACE_MAKE_RXMSG(msg->type,
+				LIM_MSG_PROCESSED));)
+	}
 
 	switch (msg->type) {
 
@@ -1311,12 +1352,6 @@ void lim_process_messages(tpAniSirGlobal mac_ctx, tpSirMsgQ msg)
 			lim_print_msg_name(mac_ctx, LOGE, msg->type);
 		}
 		break;
-#ifdef FEATURE_OEM_DATA_SUPPORT
-	case WMA_START_OEM_DATA_RSP:
-		lim_process_oem_data_rsp(mac_ctx, msg->bodyptr);
-		msg->bodyptr = NULL;
-		break;
-#endif
 	case WMA_SWITCH_CHANNEL_RSP:
 		lim_process_switch_channel_rsp(mac_ctx, msg->bodyptr);
 		msg->bodyptr = NULL;
@@ -1344,7 +1379,7 @@ void lim_process_messages(tpAniSirGlobal mac_ctx, tpSirMsgQ msg)
 			break;
 		}
 		qdf_mem_copy((uint8_t *) &new_msg,
-			(uint8_t *) msg, sizeof(tSirMsgQ));
+			(uint8_t *) msg, sizeof(struct scheduler_msg));
 		body_ptr = (cds_pkt_t *) new_msg.bodyptr;
 		cds_pkt_get_packet_length(body_ptr, &pkt_len);
 
@@ -1352,6 +1387,7 @@ void lim_process_messages(tpAniSirGlobal mac_ctx, tpSirMsgQ msg)
 			(void **) &new_msg.bodyptr, false);
 
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
+			lim_decrement_pending_mgmt_count(mac_ctx);
 			cds_pkt_return_packet(body_ptr);
 			break;
 		}
@@ -1373,23 +1409,23 @@ void lim_process_messages(tpAniSirGlobal mac_ctx, tpSirMsgQ msg)
 				QDF_TRACE(QDF_MODULE_ID_PE, LOGE,
 						FL("Unable to Defer Msg"));
 				lim_log_session_states(mac_ctx);
+				lim_decrement_pending_mgmt_count(mac_ctx);
 				cds_pkt_return_packet(body_ptr);
 			}
-		} else
+		} else {
 			/* PE is not deferring this 802.11 frame so we need to
 			 * call cds_pkt_return. Asumption here is when Rx mgmt
 			 * frame processing is done, cds packet could be
 			 * freed here.
 			 */
+			lim_decrement_pending_mgmt_count(mac_ctx);
 			cds_pkt_return_packet(body_ptr);
+		}
 		break;
 	case eWNI_SME_SCAN_REQ:
 	case eWNI_SME_REMAIN_ON_CHANNEL_REQ:
 	case eWNI_SME_DISASSOC_REQ:
 	case eWNI_SME_DEAUTH_REQ:
-#ifdef FEATURE_OEM_DATA_SUPPORT
-	case eWNI_SME_OEM_DATA_REQ:
-#endif
 #ifdef FEATURE_WLAN_TDLS
 	case eWNI_SME_TDLS_SEND_MGMT_REQ:
 	case eWNI_SME_TDLS_ADD_STA_REQ:
@@ -1400,10 +1436,14 @@ void lim_process_messages(tpAniSirGlobal mac_ctx, tpSirMsgQ msg)
 	case eWNI_SME_SET_HW_MODE_REQ:
 	case eWNI_SME_SET_DUAL_MAC_CFG_REQ:
 	case eWNI_SME_SET_ANTENNA_MODE_REQ:
+	case eWNI_SME_UPDATE_ACCESS_POLICY_VENDOR_IE:
 		/* These messages are from HDD. Need to respond to HDD */
 		lim_process_normal_hdd_msg(mac_ctx, msg, true);
 		break;
-
+	case eWNI_SME_SEND_DISASSOC_FRAME:
+		/* Need to response to hdd */
+		lim_process_normal_hdd_msg(mac_ctx, msg, true);
+		break;
 	case eWNI_SME_SCAN_ABORT_IND:
 		req_msg = msg->bodyptr;
 		if (req_msg) {
@@ -1416,6 +1456,7 @@ void lim_process_messages(tpAniSirGlobal mac_ctx, tpSirMsgQ msg)
 		}
 		break;
 	case eWNI_SME_PDEV_SET_HT_VHT_IE:
+	case eWNI_SME_SET_VDEV_IES_PER_BAND:
 	case eWNI_SME_SYS_READY_IND:
 	case eWNI_SME_JOIN_REQ:
 	case eWNI_SME_REASSOC_REQ:
@@ -1431,7 +1472,7 @@ void lim_process_messages(tpAniSirGlobal mac_ctx, tpSirMsgQ msg)
 	case eWNI_SME_GET_ASSOC_STAS_REQ:
 	case eWNI_SME_TKIP_CNTR_MEAS_REQ:
 	case eWNI_SME_UPDATE_APWPSIE_REQ:
-	case eWNI_SME_HIDE_SSID_REQ:
+	case eWNI_SME_SESSION_UPDATE_PARAM:
 	case eWNI_SME_GET_WPSPBC_SESSION_REQ:
 	case eWNI_SME_SET_APWPARSNIEs_REQ:
 	case eWNI_SME_CHNG_MCC_BEACON_INTERVAL:
@@ -1452,18 +1493,13 @@ void lim_process_messages(tpAniSirGlobal mac_ctx, tpSirMsgQ msg)
 #endif  /* FEATURE_WLAN_ESE */
 	case eWNI_SME_REGISTER_MGMT_FRAME_CB:
 	case eWNI_SME_EXT_CHANGE_CHANNEL:
+	case eWNI_SME_ROAM_SCAN_OFFLOAD_REQ:
 	case eWNI_SME_NDP_INITIATOR_REQ:
 	case eWNI_SME_NDP_RESPONDER_REQ:
 	case eWNI_SME_NDP_END_REQ:
+	case eWNI_SME_REGISTER_P2P_ACK_CB:
 		/* These messages are from HDD.No need to respond to HDD */
 		lim_process_normal_hdd_msg(mac_ctx, msg, false);
-		break;
-
-	case eWNI_PMC_SMPS_STATE_IND:
-		if (msg->bodyptr) {
-			qdf_mem_free(msg->bodyptr);
-			msg->bodyptr = NULL;
-		}
 		break;
 	case eWNI_SME_SEND_ACTION_FRAME_IND:
 		lim_send_p2p_action_frame(mac_ctx, msg);
@@ -1655,8 +1691,6 @@ void lim_process_messages(tpAniSirGlobal mac_ctx, tpSirMsgQ msg)
 	case SIR_LIM_PROBE_HB_FAILURE_TIMEOUT:
 		lim_handle_heart_beat_failure_timeout(mac_ctx);
 		break;
-	case SIR_LIM_HASH_MISS_THRES_TIMEOUT:
-		mac_ctx->lim.gLimDisassocFrameCredit = 0;
 		break;
 	case SIR_LIM_CNF_WAIT_TIMEOUT:
 		/* Does not receive CNF or dummy packet */
@@ -1706,6 +1740,7 @@ void lim_process_messages(tpAniSirGlobal mac_ctx, tpSirMsgQ msg)
 		lim_process_mlm_del_sta_rsp(mac_ctx, msg);
 		break;
 	case WMA_DELETE_BSS_RSP:
+	case WMA_DELETE_BSS_HO_FAIL_RSP:
 		lim_handle_delete_bss_rsp(mac_ctx, msg);
 		break;
 	case WMA_CSA_OFFLOAD_EVENT:
@@ -1765,8 +1800,10 @@ void lim_process_messages(tpAniSirGlobal mac_ctx, tpSirMsgQ msg)
 		msg->bodyptr = NULL;
 		break;
 	case eWNI_SME_SET_BCN_FILTER_REQ:
-		session_id = (uint8_t) msg->bodyval;
-		session_entry = &mac_ctx->lim.gpSession[session_id];
+		bcn_filter_req =
+			(tSirSetActiveModeSetBncFilterReq *) msg->bodyptr;
+		session_entry = pe_find_session_by_bssid(mac_ctx,
+			bcn_filter_req->bssid.bytes, &session_id);
 		if ((session_entry != NULL) &&
 			(lim_send_beacon_filter_info(mac_ctx, session_entry) !=
 			 eSIR_SUCCESS))
@@ -1819,10 +1856,10 @@ void lim_process_messages(tpAniSirGlobal mac_ctx, tpSirMsgQ msg)
 		msg->bodyptr = NULL;
 		break;
 	case WMA_DISASSOC_TX_COMP:
-		lim_disassoc_tx_complete_cnf(mac_ctx, msg->bodyval);
+		lim_disassoc_tx_complete_cnf(mac_ctx, NULL, msg->bodyval, NULL);
 		break;
 	case WMA_DEAUTH_TX_COMP:
-		lim_deauth_tx_complete_cnf(mac_ctx, msg->bodyval);
+		lim_deauth_tx_complete_cnf(mac_ctx, NULL, msg->bodyval, NULL);
 		break;
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE
 	case WMA_UPDATE_Q2Q_IE_IND:
@@ -1928,6 +1965,16 @@ void lim_process_messages(tpAniSirGlobal mac_ctx, tpSirMsgQ msg)
 		qdf_mem_free((void *)msg->bodyptr);
 		msg->bodyptr = NULL;
 		break;
+	case eWNI_SME_DEFAULT_SCAN_IE:
+		lim_process_set_default_scan_ie_request(mac_ctx, msg->bodyptr);
+		qdf_mem_free((void *)msg->bodyptr);
+		msg->bodyptr = NULL;
+		break;
+	case eWNI_SME_DEL_ALL_TDLS_PEERS:
+		lim_process_sme_del_all_tdls_peers(mac_ctx, msg->bodyptr);
+		qdf_mem_free((void *)msg->bodyptr);
+		msg->bodyptr = NULL;
+		break;
 	default:
 		qdf_mem_free((void *)msg->bodyptr);
 		msg->bodyptr = NULL;
@@ -1942,30 +1989,21 @@ void lim_process_messages(tpAniSirGlobal mac_ctx, tpSirMsgQ msg)
 } /*** end lim_process_messages() ***/
 
 /**
- * lim_process_deferred_message_queue
+ * lim_process_deferred_message_queue()
  *
- ***FUNCTION:
  * This function is called by LIM while exiting from Learn
  * mode. This function fetches messages posted to the LIM
  * deferred message queue limDeferredMsgQ.
  *
- ***LOGIC:
- *
- ***ASSUMPTIONS:
- * NA
- *
- ***NOTE:
- * NA
- *
- * @param  pMac - Pointer to Global MAC structure
+ * @pMac: Pointer to Global MAC structure
  * @return None
  */
 
-void lim_process_deferred_message_queue(tpAniSirGlobal pMac)
+static void lim_process_deferred_message_queue(tpAniSirGlobal pMac)
 {
-	tSirMsgQ limMsg = { 0, 0, 0 };
+	struct scheduler_msg limMsg = { 0, 0, 0 };
 
-	tSirMsgQ *readMsg;
+	struct scheduler_msg *readMsg;
 	uint16_t size;
 
 	/*
@@ -1975,7 +2013,8 @@ void lim_process_deferred_message_queue(tpAniSirGlobal pMac)
 	if (size > 0) {
 		while ((readMsg = lim_read_deferred_msg_q(pMac)) != NULL) {
 			qdf_mem_copy((uint8_t *) &limMsg,
-				     (uint8_t *) readMsg, sizeof(tSirMsgQ));
+				     (uint8_t *) readMsg,
+				     sizeof(struct scheduler_msg));
 			size--;
 			lim_process_messages(pMac, &limMsg);
 
@@ -1989,6 +2028,33 @@ void lim_process_deferred_message_queue(tpAniSirGlobal pMac)
 } /*** end lim_process_deferred_message_queue() ***/
 
 /**
+ * lim_message_processor() - Process messages from LIM.
+ * @mac_ctx: Pointer to the Global Mac Context.
+ * @msg: Received LIM message.
+ *
+ * Wrapper function for lim_process_messages when handling messages received by
+ * LIM. Could either defer messages or process them.
+ *
+ * Return:  None.
+ */
+void lim_message_processor(tpAniSirGlobal mac_ctx, struct scheduler_msg *msg)
+{
+	if (eLIM_MLM_OFFLINE_STATE == mac_ctx->lim.gLimMlmState) {
+		pe_free_msg(mac_ctx, msg);
+		return;
+	}
+
+	if (!def_msg_decision(mac_ctx, msg)) {
+		lim_process_messages(mac_ctx, msg);
+		/* process deferred message queue if allowed */
+		if ((!(mac_ctx->lim.gLimAddtsSent)) &&
+		    (!(lim_is_system_in_scan_state(mac_ctx))) &&
+		    (true == GET_LIM_PROCESS_DEFD_MESGS(mac_ctx)))
+			lim_process_deferred_message_queue(mac_ctx);
+	}
+}
+
+/**
  * lim_process_normal_hdd_msg() - Process the message and defer if needed
  * @mac_ctx :     Pointer to Global MAC structure
  * @msg     :     The message need to be processed
@@ -1999,8 +2065,9 @@ void lim_process_deferred_message_queue(tpAniSirGlobal pMac)
  *
  * Return: None
  */
-static void lim_process_normal_hdd_msg(tpAniSirGlobal mac_ctx, tSirMsgQ *msg,
-	uint8_t rsp_reqd)
+static void lim_process_normal_hdd_msg(tpAniSirGlobal mac_ctx,
+				       struct scheduler_msg *msg,
+				       uint8_t rsp_reqd)
 {
 	bool defer_msg = true;
 

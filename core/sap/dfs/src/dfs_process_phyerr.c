@@ -143,7 +143,7 @@ dfs_get_event_freqcentre(struct ath_dfs *dfs, int is_pri, int is_ext, int is_dc)
  *
  * Return 1 on success or 0 on failure.
  */
-int
+static int
 dfs_process_phyerr_owl(struct ath_dfs *dfs, void *buf, uint16_t datalen,
 		       uint8_t rssi, uint8_t ext_rssi, uint32_t rs_tstamp,
 		       uint64_t fulltsf, struct dfs_phy_err *e)
@@ -205,7 +205,7 @@ dfs_process_phyerr_owl(struct ath_dfs *dfs, void *buf, uint16_t datalen,
 /*
  * Process a Sowl/Howl style phy error.
  */
-int
+static int
 dfs_process_phyerr_sowl(struct ath_dfs *dfs, void *buf, uint16_t datalen,
 			uint8_t rssi, uint8_t ext_rssi, uint32_t rs_tstamp,
 			uint64_t fulltsf, struct dfs_phy_err *e)
@@ -357,7 +357,7 @@ dfs_process_phyerr_sowl(struct ath_dfs *dfs, void *buf, uint16_t datalen,
 /*
  * Process a Merlin/Osprey style phy error.
  */
-int
+static int
 dfs_process_phyerr_merlin(struct ath_dfs *dfs, void *buf,
 			  uint16_t datalen, uint8_t rssi, uint8_t ext_rssi,
 			  uint32_t rs_tstamp, uint64_t fulltsf,
@@ -463,7 +463,7 @@ static void dump_phyerr_contents(const char *d, int len)
 	 * Print the final line if we didn't print it above.
 	 */
 	if (n != 0)
-		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO, "%s: %s\n",
+		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO, "%s: %s",
 			  __func__, buf);
 #endif /* def CONFIG_ENABLE_DUMP_PHYERR_CONTENTS */
 }
@@ -481,7 +481,7 @@ dfs_process_phyerr(struct ieee80211com *ic, void *buf, uint16_t datalen,
 
 	if (dfs == NULL) {
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
-			  "%s: sc_dfs is NULL\n", __func__);
+			  "%s: sc_dfs is NULL", __func__);
 		return;
 	}
 
@@ -509,8 +509,8 @@ dfs_process_phyerr(struct ieee80211com *ic, void *buf, uint16_t datalen,
 		dump_phyerr_contents(buf, datalen);
 
 	if (chan == NULL) {
-		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
-			  "%s: chan is NULL\n", __func__);
+		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO,
+			  "%s: chan is NULL", __func__);
 		return;
 	}
 
@@ -561,7 +561,7 @@ dfs_process_phyerr(struct ieee80211com *ic, void *buf, uint16_t datalen,
 					      enable_log) == 0) {
 			dfs->dfs_phyerr_reject_count++;
 			QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO,
-				  "%s:Rejected phyerr count after parsing=%d\n",
+				  "%s:Rejected phyerr count after parsing=%d",
 				  __func__, dfs->dfs_phyerr_reject_count);
 			return;
 		} else {
@@ -592,7 +592,7 @@ dfs_process_phyerr(struct ieee80211com *ic, void *buf, uint16_t datalen,
 	}
 
 	QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO,
-		  "\n %s: Frequency at which the phyerror was injected = %d",
+		  "%s: Frequency at which the phyerror was injected = %d",
 		  __func__, e.freq);
 	/*
 	 * If the hardware supports radar reporting on the extension channel
@@ -812,13 +812,19 @@ dfs_process_phyerr(struct ieee80211com *ic, void *buf, uint16_t datalen,
 						    rn_minrssithresh);
 					return;
 				}
-			} else {
-				if (e.rssi < dfs->dfs_rinfo.rn_minrssithresh ||
-				    e.dur > dfs->dfs_rinfo.rn_maxpulsedur) {
-					/* XXX TODO add a debug statement? */
-					dfs->ath_dfs_stats.rssi_discards++;
-					return;
-				}
+			} else if (e.rssi < dfs->dfs_rinfo.rn_minrssithresh ||
+					e.dur > dfs->dfs_rinfo.rn_maxpulsedur) {
+
+				QDF_TRACE(QDF_MODULE_ID_SAP,
+					QDF_TRACE_LEVEL_INFO,
+					"%s [%d] : Rejecting: dur = %d maxpulsedur = %d, rssi = %d minrssithresh = %d",
+					__func__, __LINE__,
+					e.dur, dfs->dfs_rinfo.rn_maxpulsedur,
+					e.rssi,
+					dfs->dfs_rinfo.rn_minrssithresh);
+
+				dfs->ath_dfs_stats.rssi_discards++;
+				return;
 			}
 
 			/*

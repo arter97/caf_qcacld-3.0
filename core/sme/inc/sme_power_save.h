@@ -41,6 +41,11 @@
 /* Auto Deferred Ps Entry Timer value - 20000 ms */
 #define AUTO_DEFERRED_PS_ENTRY_TIMER_DEFAULT_VALUE 20000
 
+/*
+ * Auto Ps Entry User default timeout value, used instead of negative timeouts
+ * from user space - 5000ms
+ */
+#define AUTO_PS_ENTRY_USER_TIMER_DEFAULT_VALUE 5000
 
 
 /**
@@ -122,6 +127,7 @@ struct ps_params {
  */
 struct ps_global_info {
 	bool ps_enabled;
+	uint32_t auto_bmps_timer_val;
 	struct ps_params ps_params[MAX_SME_SESSIONS];
 	/* Remain in Power active till DHCP completes */
 	bool remain_in_power_active_till_dhcp;

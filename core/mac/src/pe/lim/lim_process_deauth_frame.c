@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -81,10 +81,12 @@ lim_process_deauth_frame(tpAniSirGlobal pMac, uint8_t *pRxPacketInfo,
 #ifdef WLAN_FEATURE_11W
 	uint32_t frameLen;
 #endif
+	int32_t frame_rssi;
 
 	pHdr = WMA_GET_RX_MAC_HEADER(pRxPacketInfo);
 
 	pBody = WMA_GET_RX_MPDU_DATA(pRxPacketInfo);
+	frame_rssi = (int32_t)WMA_GET_RX_RSSI_NORMALIZED(pRxPacketInfo);
 
 	if (LIM_IS_STA_ROLE(psessionEntry) &&
 	    ((eLIM_SME_WT_DISASSOC_STATE == psessionEntry->limSmeState) ||
@@ -170,15 +172,17 @@ lim_process_deauth_frame(tpAniSirGlobal pMac, uint8_t *pRxPacketInfo,
 
 	PELOGE(lim_log(pMac, LOGE,
 		       FL("Received Deauth frame for Addr: " MAC_ADDRESS_STR
-			" (mlm state = %s,"
-			" sme state = %d systemrole  = %d) with reason code %d [%s] from "
+			"(mlm state = %s, sme state = %d systemrole = %d "
+			"RSSI = %d) with reason code %d [%s] from "
 			MAC_ADDRESS_STR), MAC_ADDR_ARRAY(pHdr->da),
 			lim_mlm_state_str(psessionEntry->limMlmState),
 			psessionEntry->limSmeState,
-			GET_LIM_SYSTEM_ROLE(psessionEntry),
+			GET_LIM_SYSTEM_ROLE(psessionEntry), frame_rssi,
 			reasonCode, lim_dot11_reason_str(reasonCode),
 			MAC_ADDR_ARRAY(pHdr->sa));
 	       )
+	lim_diag_event_report(pMac, WLAN_PE_DIAG_DEAUTH_FRAME_EVENT,
+		psessionEntry, 0, reasonCode);
 
 	if (lim_check_disassoc_deauth_ack_pending(pMac, (uint8_t *) pHdr->sa)) {
 		PELOGE(lim_log(pMac, LOGE,
@@ -263,11 +267,10 @@ lim_process_deauth_frame(tpAniSirGlobal pMac, uint8_t *pRxPacketInfo,
 	 *     AP we're currently associated with (case a), then proceed
 	 *     with normal deauth processing.
 	 */
-	if (psessionEntry->limReAssocbssId != NULL) {
-		pRoamSessionEntry =
-			pe_find_session_by_bssid(pMac, psessionEntry->limReAssocbssId,
-						 &roamSessionId);
-	}
+	pRoamSessionEntry =
+		pe_find_session_by_bssid(pMac, psessionEntry->limReAssocbssId,
+							&roamSessionId);
+
 	if (lim_is_reassoc_in_progress(pMac, psessionEntry)
 	    || lim_is_reassoc_in_progress(pMac, pRoamSessionEntry)) {
 		if (!IS_REASSOC_BSSID(pMac, pHdr->sa, psessionEntry)) {
@@ -594,8 +597,11 @@ lim_process_deauth_frame(tpAniSirGlobal pMac, uint8_t *pRxPacketInfo,
 	if (LIM_IS_STA_ROLE(psessionEntry))
 		wma_tx_abort(psessionEntry->smeSessionId);
 
+	lim_update_lost_link_info(pMac, psessionEntry, frame_rssi);
+
 	/* / Deauthentication from peer MAC entity */
-	lim_post_sme_message(pMac, LIM_MLM_DEAUTH_IND,
+	if (LIM_IS_STA_ROLE(psessionEntry))
+		lim_post_sme_message(pMac, LIM_MLM_DEAUTH_IND,
 			     (uint32_t *) &mlmDeauthInd);
 
 	/* send eWNI_SME_DEAUTH_IND to SME */

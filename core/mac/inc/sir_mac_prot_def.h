@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -144,6 +144,7 @@
 #define SIR_MAC_ACTION_WME            17
 #define SIR_MAC_ACTION_FST            18
 #define SIR_MAC_ACTION_VHT            21
+#define SIR_MAC_ACTION_MAX            256
 
 #define SIR_MAC_ACTION_TX             1
 #define SIR_MAC_ACTION_RX             2
@@ -158,6 +159,14 @@
 /* and these are proprietary */
 #define SIR_MAC_QOS_DEF_BA_REQ      4
 #define SIR_MAC_QOS_DEF_BA_RSP      5
+
+#define SIR_MAC_ADDBA_REQ     0
+#define SIR_MAC_ADDBA_RSP     1
+#define SIR_MAC_DELBA_REQ     2
+
+#define SIR_MAC_BA_POLICY_DELAYED      0
+#define SIR_MAC_BA_POLICY_IMMEDIATE    1
+#define SIR_MAC_BA_AMSDU_SUPPORTED     1
 
 #ifdef ANI_SUPPORT_11H
 #define SIR_MAC_ACTION_MEASURE_REQUEST_ID      0
@@ -242,6 +251,12 @@
 #define SIR_MAC_WNM_BSS_TM_RESPONSE      8
 #define SIR_MAC_WNM_NOTIF_REQUEST        26
 #define SIR_MAC_WNM_NOTIF_RESPONSE       27
+
+/* Protected Dual of Public Action(PDPA) frames Action field */
+#define SIR_MAC_PDPA_GAS_INIT_REQ      10
+#define SIR_MAC_PDPA_GAS_INIT_RSP      11
+#define SIR_MAC_PDPA_GAS_COMEBACK_REQ  12
+#define SIR_MAC_PDPA_GAS_COMEBACK_RSP  13
 
 #define SIR_MAC_MAX_RANDOM_LENGTH   2306
 
@@ -395,6 +410,9 @@
 #define VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_2_2       780
 #define VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_2_2       780
 
+#define VHT_CAP_160_SUPP 1
+#define VHT_CAP_160_AND_80P80_SUPP 2
+
 #define VHT_MCS_1x1 0xFFFC
 #define VHT_MCS_2x2 0xFFF3
 
@@ -416,7 +434,6 @@
 
 /* / Maximum length of each IE */
 #define SIR_MAC_RSN_IE_MAX_LENGTH   255
-#define SIR_MAC_WPA_IE_MAX_LENGTH   255
 /* / Minimum length of each IE */
 #define SIR_MAC_RSN_IE_MIN_LENGTH   2
 #define SIR_MAC_WPA_IE_MIN_LENGTH   6
@@ -497,6 +514,8 @@
 #define SIR_MAC_NUM_TARGET_IPV6_NS_OFFLOAD_NA   16
 #define SIR_MAC_IPV6_ADDR_LEN               16
 #define SIR_IPV6_ADDR_VALID                 1
+#define SIR_IPV6_ADDR_UC_TYPE               0
+#define SIR_IPV6_ADDR_AC_TYPE               1
 #endif /* WLAN_NS_OFFLOAD */
 
 /* ----------------------------------------------------------------------------- */
@@ -2034,6 +2053,155 @@ typedef struct sSirMacRadioMeasureReport {
 	} report;
 
 } tSirMacRadioMeasureReport, *tpSirMacRadioMeasureReport;
+
+#ifdef WLAN_FEATURE_11AX
+/* HE Capabilities Info */
+struct he_capability_info {
+#ifndef ANI_LITTLE_BIT_ENDIAN
+	uint32_t rx_ctrl_frame:1;
+	uint32_t flex_twt_sched:1;
+	uint32_t amsdu_frag:1;
+	uint32_t max_ampdu_len:2;
+	uint32_t ofdma_ra:1;
+	uint32_t omi_a_ctrl:1;
+	uint32_t dl_mu_ba:1;
+	uint32_t ack_enabled_multitid:1;
+	uint32_t mu_cascade:1;
+	uint32_t ba_32bit_bitmap:1;
+	uint32_t broadcast_twt:1;
+	uint32_t a_bsr:1;
+	uint32_t ul_mu_rsp_sched:1;
+	uint32_t all_ack:1;
+	uint32_t he_link_adaptation:2;
+	uint32_t multi_tid_aggr:3;
+	uint32_t trigger_frm_mac_pad:2;
+	uint32_t min_frag_size:2;
+	uint32_t max_num_frag_msdu:3;
+	uint32_t fragmentation:2;
+	uint32_t twt_responder:1;
+	uint32_t twt_request:1;
+	uint32_t htc_he:1;
+
+	uint8_t reserved1:5;
+	uint8_t a_bqr:1;
+	uint8_t qtp:1;
+	uint8_t bsrp_ampdu_aggr:1;
+
+	uint32_t su_beamformer:1;
+	uint32_t ul_he_mu:1;
+	uint32_t dcm_enc_rx:3;
+	uint32_t dcm_enc_tx:3;
+	uint32_t ul_mu:2;
+	uint32_t doppler:2;
+	uint32_t stbc:2;
+	uint32_t he_ltf_gi_ndp:2;
+	uint32_t he_ltf_gi_ppdu:2;
+	uint32_t ldpc_coding:1;
+	uint32_t device_class:1;
+	uint32_t rx_pream_puncturing:4;
+	uint32_t chan_width:7;
+	uint32_t dual_band:1;
+
+	uint32_t power_boost:1;
+	uint32_t srp:1;
+	uint32_t ppet_present:1;
+	uint32_t dl_mu_mimo_part_bw:1;
+	uint32_t he_er_su_ppdu:1;
+	uint32_t beamforming_feedback:3;
+	uint32_t codebook_mu:1;
+	uint32_t codebook_su:1;
+	uint32_t mu_feedback_tone16:1;
+	uint32_t su_feedback_tone16:1;
+	uint32_t num_sounding_gt_80:3;
+	uint32_t num_sounding_lt_80:3;
+	uint32_t nsts_tot_gt_80:3;
+	uint32_t bfee_sta_gt_80:3;
+	uint32_t nsts_tol_lt_80:3;
+	uint32_t bfee_sts_lt_80:3;
+	uint32_t mu_beamformer:1;
+	uint32_t su_beamformee:1;
+
+	uint8_t reserved2:7;
+	uint8_t he_ltf_gi_4x:1;
+
+	uint16_t rx_bw_bitmap:5;
+	uint16_t tx_bw_bitmap:5;
+	uint16_t mcs_supported:3;
+	uint16_t nss_supported:3;
+#else
+	uint32_t htc_he:1;
+	uint32_t twt_request:1;
+	uint32_t twt_responder:1;
+	uint32_t fragmentation:2;
+	uint32_t max_num_frag_msdu:3;
+	uint32_t min_frag_size:2;
+	uint32_t trigger_frm_mac_pad:2;
+	uint32_t multi_tid_aggr:3;
+	uint32_t he_link_adaptation:2;
+	uint32_t all_ack:1;
+	uint32_t ul_mu_rsp_sched:1;
+	uint32_t a_bsr:1;
+	uint32_t broadcast_twt:1;
+	uint32_t ba_32bit_bitmap:1;
+	uint32_t mu_cascade:1;
+	uint32_t ack_enabled_multitid:1;
+	uint32_t dl_mu_ba:1;
+	uint32_t omi_a_ctrl:1;
+	uint32_t ofdma_ra:1;
+	uint32_t max_ampdu_len:2;
+	uint32_t amsdu_frag:1;
+	uint32_t flex_twt_sched:1;
+	uint32_t rx_ctrl_frame:1;
+
+	uint8_t bsrp_ampdu_aggr:1;
+	uint8_t qtp:1;
+	uint8_t a_bqr:1;
+	uint8_t reserved1:5;
+
+	uint32_t dual_band:1;
+	uint32_t chan_width:7;
+	uint32_t rx_pream_puncturing:4;
+	uint32_t device_class:1;
+	uint32_t ldpc_coding:1;
+	uint32_t he_ltf_gi_ppdu:2;
+	uint32_t he_ltf_gi_ndp:2;
+	uint32_t stbc:2;
+	uint32_t doppler:2;
+	uint32_t ul_mu:2;
+	uint32_t dcm_enc_tx:3;
+	uint32_t dcm_enc_rx:3;
+	uint32_t ul_he_mu:1;
+	uint32_t su_beamformer:1;
+
+	uint32_t su_beamformee:1;
+	uint32_t mu_beamformer:1;
+	uint32_t bfee_sts_lt_80:3;
+	uint32_t nsts_tol_lt_80:3;
+	uint32_t bfee_sta_gt_80:3;
+	uint32_t nsts_tot_gt_80:3;
+	uint32_t num_sounding_lt_80:3;
+	uint32_t num_sounding_gt_80:3;
+	uint32_t su_feedback_tone16:1;
+	uint32_t mu_feedback_tone16:1;
+	uint32_t codebook_su:1;
+	uint32_t codebook_mu:1;
+	uint32_t beamforming_feedback:3;
+	uint32_t he_er_su_ppdu:1;
+	uint32_t dl_mu_mimo_part_bw:1;
+	uint32_t ppet_present:1;
+	uint32_t srp:1;
+	uint32_t power_boost:1;
+
+	uint8_t he_ltf_gi_4x:1;
+	uint8_t reserved2:7;
+
+	uint16_t nss_supported:3;
+	uint16_t mcs_supported:3;
+	uint16_t tx_bw_bitmap:5;
+	uint16_t rx_bw_bitmap:5;
+#endif
+} qdf_packed;
+#endif
 
 /* QOS action frame definitions */
 

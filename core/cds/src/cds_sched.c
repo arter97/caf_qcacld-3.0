@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -32,7 +32,6 @@
  */
 
  /* Include Files */
-#include <cds_mq.h>
 #include <cds_api.h>
 #include <ani_global.h>
 #include <sir_types.h>
@@ -73,16 +72,26 @@ struct ssr_protect {
 static spinlock_t ssr_protect_lock;
 static struct ssr_protect ssr_protect_log[MAX_SSR_PROTECT_LOG];
 
-static p_cds_sched_context gp_cds_sched_context;
+struct shutdown_notifier {
+	struct list_head list;
+	void (*cb)(void *priv);
+	void *priv;
+};
 
-static int cds_mc_thread(void *Arg);
+struct list_head shutdown_notifier_head;
+
+enum notifier_state {
+	NOTIFIER_STATE_NONE,
+	NOTIFIER_STATE_NOTIFYING,
+} notifier_state;
+
+
+static p_cds_sched_context gp_cds_sched_context;
 #ifdef QCA_CONFIG_SMP
 static int cds_ol_rx_thread(void *arg);
 static unsigned long affine_cpu;
 static QDF_STATUS cds_alloc_ol_rx_pkt_freeq(p_cds_sched_context pSchedContext);
-#endif
 
-#ifdef QCA_CONFIG_SMP
 #define CDS_CORE_PER_CLUSTER (4)
 /*Maximum 2 clusters supported*/
 #define CDS_MAX_CPU_CLUSTERS 2
@@ -270,15 +279,15 @@ int cds_sched_handle_cpu_hot_plug(void)
 	if (cds_is_load_or_unload_in_progress())
 		return 0;
 
-	spin_lock_bh(&pSchedContext->affinity_lock);
+	mutex_lock(&pSchedContext->affinity_lock);
 	if (cds_sched_find_attach_cpu(pSchedContext,
 		pSchedContext->high_throughput_required)) {
 		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
 			"%s: handle hot plug fail", __func__);
-		spin_unlock_bh(&pSchedContext->affinity_lock);
+		mutex_unlock(&pSchedContext->affinity_lock);
 		return 1;
 	}
-	spin_unlock_bh(&pSchedContext->affinity_lock);
+	mutex_unlock(&pSchedContext->affinity_lock);
 	return 0;
 }
 
@@ -308,15 +317,15 @@ int cds_sched_handle_throughput_req(bool high_tput_required)
 		return 0;
 	}
 
-	spin_lock_bh(&pSchedContext->affinity_lock);
+	mutex_lock(&pSchedContext->affinity_lock);
 	pSchedContext->high_throughput_required = high_tput_required;
 	if (cds_sched_find_attach_cpu(pSchedContext, high_tput_required)) {
 		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
 			"%s: handle throughput req fail", __func__);
-		spin_unlock_bh(&pSchedContext->affinity_lock);
+		mutex_unlock(&pSchedContext->affinity_lock);
 		return 1;
 	}
-	spin_unlock_bh(&pSchedContext->affinity_lock);
+	mutex_unlock(&pSchedContext->affinity_lock);
 	return 0;
 }
 
@@ -455,7 +464,6 @@ QDF_STATUS cds_sched_open(void *p_cds_context,
 		p_cds_sched_context pSchedContext,
 		uint32_t SchedCtxSize)
 {
-	QDF_STATUS vStatus = QDF_STATUS_SUCCESS;
 	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO_HIGH,
 		  "%s: Opening the CDS Scheduler", __func__);
 	/* Sanity checks */
@@ -472,27 +480,8 @@ QDF_STATUS cds_sched_open(void *p_cds_context,
 	}
 	qdf_mem_zero(pSchedContext, sizeof(cds_sched_context));
 	pSchedContext->pVContext = p_cds_context;
-	vStatus = cds_sched_init_mqs(pSchedContext);
-	if (!QDF_IS_STATUS_SUCCESS(vStatus)) {
-		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
-			  "%s: Failed to initialize CDS Scheduler MQs",
-			  __func__);
-		return vStatus;
-	}
-	/* Initialize the helper events and event queues */
-	init_completion(&pSchedContext->McStartEvent);
-	init_completion(&pSchedContext->McShutdown);
-	init_completion(&pSchedContext->ResumeMcEvent);
-
-	spin_lock_init(&pSchedContext->McThreadLock);
 #ifdef QCA_CONFIG_SMP
 	spin_lock_init(&pSchedContext->ol_rx_thread_lock);
-#endif
-
-	init_waitqueue_head(&pSchedContext->mcWaitQueue);
-	pSchedContext->mcEventFlag = 0;
-
-#ifdef QCA_CONFIG_SMP
 	init_waitqueue_head(&pSchedContext->ol_rx_wait_queue);
 	init_completion(&pSchedContext->ol_rx_start_event);
 	init_completion(&pSchedContext->ol_suspend_rx_event);
@@ -505,28 +494,14 @@ QDF_STATUS cds_sched_open(void *p_cds_context,
 	spin_lock_bh(&pSchedContext->cds_ol_rx_pkt_freeq_lock);
 	INIT_LIST_HEAD(&pSchedContext->cds_ol_rx_pkt_freeq);
 	spin_unlock_bh(&pSchedContext->cds_ol_rx_pkt_freeq_lock);
-	if (cds_alloc_ol_rx_pkt_freeq(pSchedContext) != QDF_STATUS_SUCCESS) {
-		return QDF_STATUS_E_FAILURE;
-	}
+	if (cds_alloc_ol_rx_pkt_freeq(pSchedContext) != QDF_STATUS_SUCCESS)
+		goto pkt_freeqalloc_failure;
 	register_hotcpu_notifier(&cds_cpu_hotplug_notifier);
 	pSchedContext->cpu_hot_plug_notifier = &cds_cpu_hotplug_notifier;
-	spin_lock_init(&pSchedContext->affinity_lock);
+	mutex_init(&pSchedContext->affinity_lock);
 	pSchedContext->high_throughput_required = false;
 #endif
 	gp_cds_sched_context = pSchedContext;
-
-	/* Create the CDS Main Controller thread */
-	pSchedContext->McThread = kthread_create(cds_mc_thread, pSchedContext,
-						 "cds_mc_thread");
-	if (IS_ERR(pSchedContext->McThread)) {
-		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_FATAL,
-			  "%s: Could not Create CDS Main Thread Controller",
-			  __func__);
-		goto MC_THREAD_START_FAILURE;
-	}
-	wake_up_process(pSchedContext->McThread);
-	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "%s: CDS Main Controller thread Created", __func__);
 
 #ifdef QCA_CONFIG_SMP
 	pSchedContext->ol_rx_thread = kthread_create(cds_ol_rx_thread,
@@ -543,15 +518,6 @@ QDF_STATUS cds_sched_open(void *p_cds_context,
 	wake_up_process(pSchedContext->ol_rx_thread);
 	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO_HIGH,
 		  ("CDS OL RX thread Created"));
-#endif
-	/*
-	 * Now make sure all threads have started before we exit.
-	 * Each thread should normally ACK back when it starts.
-	 */
-	wait_for_completion_interruptible(&pSchedContext->McStartEvent);
-	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "%s: CDS MC Thread has started", __func__);
-#ifdef QCA_CONFIG_SMP
 	wait_for_completion_interruptible(&pSchedContext->ol_rx_start_event);
 	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO_HIGH,
 		  "%s: CDS OL Rx Thread has started", __func__);
@@ -563,274 +529,17 @@ QDF_STATUS cds_sched_open(void *p_cds_context,
 
 #ifdef QCA_CONFIG_SMP
 OL_RX_THREAD_START_FAILURE:
-	/* Try and force the Main thread controller to exit */
-	set_bit(MC_SHUTDOWN_EVENT_MASK, &pSchedContext->mcEventFlag);
-	set_bit(MC_POST_EVENT_MASK, &pSchedContext->mcEventFlag);
-	wake_up_interruptible(&pSchedContext->mcWaitQueue);
-	/* Wait for MC to exit */
-	wait_for_completion_interruptible(&pSchedContext->McShutdown);
 #endif
-
-MC_THREAD_START_FAILURE:
-	/* De-initialize all the message queues */
-	cds_sched_deinit_mqs(pSchedContext);
 
 #ifdef QCA_CONFIG_SMP
 	unregister_hotcpu_notifier(&cds_cpu_hotplug_notifier);
 	cds_free_ol_rx_pkt_freeq(gp_cds_sched_context);
+pkt_freeqalloc_failure:
 #endif
 
 	return QDF_STATUS_E_RESOURCES;
 
 } /* cds_sched_open() */
-
-/**
- * cds_mc_thread() - cds main controller thread execution handler
- * @Arg: Pointer to the global CDS Sched Context
- *
- * Return: thread exit code
- */
-static int cds_mc_thread(void *Arg)
-{
-	p_cds_sched_context pSchedContext = (p_cds_sched_context) Arg;
-	p_cds_msg_wrapper pMsgWrapper = NULL;
-	tpAniSirGlobal pMacContext = NULL;
-	tSirRetStatus macStatus = eSIR_SUCCESS;
-	QDF_STATUS vStatus = QDF_STATUS_SUCCESS;
-	int retWaitStatus = 0;
-	bool shutdown = false;
-	hdd_context_t *pHddCtx = NULL;
-	v_CONTEXT_t p_cds_context = NULL;
-
-	if (Arg == NULL) {
-		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
-			  "%s: Bad Args passed", __func__);
-		return 0;
-	}
-	set_user_nice(current, -2);
-
-	/* Ack back to the context from which the main controller thread
-	 * has been created
-	 */
-	complete(&pSchedContext->McStartEvent);
-	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO,
-		  "%s: MC Thread %d (%s) starting up", __func__, current->pid,
-		  current->comm);
-
-	/* Get the Global CDS Context */
-	p_cds_context = cds_get_global_context();
-	if (!p_cds_context) {
-		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_FATAL,
-			  "%s: Global CDS context is Null", __func__);
-		return 0;
-	}
-
-	pHddCtx = cds_get_context(QDF_MODULE_ID_HDD);
-	if (!pHddCtx) {
-		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_FATAL,
-			  "%s: HDD context is Null", __func__);
-		return 0;
-	}
-
-	while (!shutdown) {
-		/* This implements the execution model algorithm */
-		retWaitStatus =
-			wait_event_interruptible(pSchedContext->mcWaitQueue,
-						 test_bit(MC_POST_EVENT_MASK,
-							  &pSchedContext->mcEventFlag)
-						 || test_bit(MC_SUSPEND_EVENT_MASK,
-							     &pSchedContext->mcEventFlag));
-
-		if (retWaitStatus == -ERESTARTSYS) {
-			QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
-				  "%s: wait_event_interruptible returned -ERESTARTSYS",
-				  __func__);
-			QDF_BUG(0);
-		}
-		clear_bit(MC_POST_EVENT_MASK, &pSchedContext->mcEventFlag);
-
-		while (1) {
-			/* Check if MC needs to shutdown */
-			if (test_bit
-				    (MC_SHUTDOWN_EVENT_MASK,
-				    &pSchedContext->mcEventFlag)) {
-				QDF_TRACE(QDF_MODULE_ID_QDF,
-					  QDF_TRACE_LEVEL_INFO,
-					  "%s: MC thread signaled to shutdown",
-					  __func__);
-				shutdown = true;
-				/* Check for any Suspend Indication */
-				if (test_bit
-					    (MC_SUSPEND_EVENT_MASK,
-					    &pSchedContext->mcEventFlag)) {
-					clear_bit(MC_SUSPEND_EVENT_MASK,
-						  &pSchedContext->mcEventFlag);
-
-					/* Unblock anyone waiting on suspend */
-					complete(&pHddCtx->mc_sus_event_var);
-				}
-				break;
-			}
-			/* Check the SYS queue first */
-			if (!cds_is_mq_empty(&pSchedContext->sysMcMq)) {
-				/* Service the SYS message queue */
-				pMsgWrapper =
-					cds_mq_get(&pSchedContext->sysMcMq);
-				if (pMsgWrapper == NULL) {
-					QDF_TRACE(QDF_MODULE_ID_QDF,
-						  QDF_TRACE_LEVEL_ERROR,
-						  "%s: pMsgWrapper is NULL",
-						  __func__);
-					QDF_ASSERT(0);
-					break;
-				}
-				vStatus =
-					sys_mc_process_msg(pSchedContext->pVContext,
-							   pMsgWrapper->pVosMsg);
-				if (!QDF_IS_STATUS_SUCCESS(vStatus)) {
-					QDF_TRACE(QDF_MODULE_ID_QDF,
-						  QDF_TRACE_LEVEL_ERROR,
-						  "%s: Issue Processing SYS message",
-						  __func__);
-				}
-				/* return message to the Core */
-				cds_core_return_msg(pSchedContext->pVContext,
-						    pMsgWrapper);
-				continue;
-			}
-			/* Check the WMA queue */
-			if (!cds_is_mq_empty(&pSchedContext->wmaMcMq)) {
-				/* Service the WMA message queue */
-				pMsgWrapper =
-					cds_mq_get(&pSchedContext->wmaMcMq);
-				if (pMsgWrapper == NULL) {
-					QDF_TRACE(QDF_MODULE_ID_QDF,
-						  QDF_TRACE_LEVEL_ERROR,
-						  "%s: pMsgWrapper is NULL",
-						  __func__);
-					QDF_ASSERT(0);
-					break;
-				}
-				vStatus =
-					wma_mc_process_msg(pSchedContext->pVContext,
-							 pMsgWrapper->pVosMsg);
-				if (!QDF_IS_STATUS_SUCCESS(vStatus)) {
-					QDF_TRACE(QDF_MODULE_ID_QDF,
-						  QDF_TRACE_LEVEL_ERROR,
-						  "%s: Issue Processing WMA message",
-						  __func__);
-				}
-				/* return message to the Core */
-				cds_core_return_msg(pSchedContext->pVContext,
-						    pMsgWrapper);
-				continue;
-			}
-			/* Check the PE queue */
-			if (!cds_is_mq_empty(&pSchedContext->peMcMq)) {
-				/* Service the PE message queue */
-				pMsgWrapper =
-					cds_mq_get(&pSchedContext->peMcMq);
-				if (NULL == pMsgWrapper) {
-					QDF_TRACE(QDF_MODULE_ID_QDF,
-						  QDF_TRACE_LEVEL_ERROR,
-						  "%s: pMsgWrapper is NULL",
-						  __func__);
-					QDF_ASSERT(0);
-					break;
-				}
-				/* Need some optimization */
-				pMacContext =
-					cds_get_context(QDF_MODULE_ID_PE);
-				if (NULL == pMacContext) {
-					QDF_TRACE(QDF_MODULE_ID_QDF,
-						  QDF_TRACE_LEVEL_INFO,
-						  "MAC Context not ready yet");
-					cds_core_return_msg
-						(pSchedContext->pVContext,
-						pMsgWrapper);
-					continue;
-				}
-
-				macStatus =
-					pe_process_messages(pMacContext,
-							    (tSirMsgQ *)
-							    pMsgWrapper->pVosMsg);
-				if (eSIR_SUCCESS != macStatus) {
-					QDF_TRACE(QDF_MODULE_ID_QDF,
-						  QDF_TRACE_LEVEL_ERROR,
-						  "%s: Issue Processing PE message",
-						  __func__);
-				}
-				/* return message to the Core */
-				cds_core_return_msg(pSchedContext->pVContext,
-						    pMsgWrapper);
-				continue;
-			}
-			/** Check the SME queue **/
-			if (!cds_is_mq_empty(&pSchedContext->smeMcMq)) {
-				/* Service the SME message queue */
-				pMsgWrapper =
-					cds_mq_get(&pSchedContext->smeMcMq);
-				if (NULL == pMsgWrapper) {
-					QDF_TRACE(QDF_MODULE_ID_QDF,
-						  QDF_TRACE_LEVEL_ERROR,
-						  "%s: pMsgWrapper is NULL",
-						  __func__);
-					QDF_ASSERT(0);
-					break;
-				}
-				/* Need some optimization */
-				pMacContext =
-					cds_get_context(QDF_MODULE_ID_SME);
-				if (NULL == pMacContext) {
-					QDF_TRACE(QDF_MODULE_ID_QDF,
-						  QDF_TRACE_LEVEL_INFO,
-						  "MAC Context not ready yet");
-					cds_core_return_msg
-						(pSchedContext->pVContext,
-						pMsgWrapper);
-					continue;
-				}
-
-				vStatus =
-					sme_process_msg((tHalHandle) pMacContext,
-							pMsgWrapper->pVosMsg);
-				if (!QDF_IS_STATUS_SUCCESS(vStatus)) {
-					QDF_TRACE(QDF_MODULE_ID_QDF,
-						  QDF_TRACE_LEVEL_ERROR,
-						  "%s: Issue Processing SME message",
-						  __func__);
-				}
-				/* return message to the Core */
-				cds_core_return_msg(pSchedContext->pVContext,
-						    pMsgWrapper);
-				continue;
-			}
-			/* Check for any Suspend Indication */
-			if (test_bit
-				    (MC_SUSPEND_EVENT_MASK,
-				    &pSchedContext->mcEventFlag)) {
-				clear_bit(MC_SUSPEND_EVENT_MASK,
-					  &pSchedContext->mcEventFlag);
-				spin_lock(&pSchedContext->McThreadLock);
-				INIT_COMPLETION(pSchedContext->ResumeMcEvent);
-				/* Mc Thread Suspended */
-				complete(&pHddCtx->mc_sus_event_var);
-
-				spin_unlock(&pSchedContext->McThreadLock);
-
-				/* Wait foe Resume Indication */
-				wait_for_completion_interruptible
-					(&pSchedContext->ResumeMcEvent);
-			}
-			break;  /* All queues are empty now */
-		} /* while message loop processing */
-	} /* while true */
-	/* If we get here the MC thread must exit */
-	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO,
-		  "%s: MC Thread exiting!!!!", __func__);
-	complete_and_exit(&pSchedContext->McShutdown, 0);
-} /* cds_mc_thread() */
 
 #ifdef QCA_CONFIG_SMP
 /**
@@ -880,7 +589,6 @@ static QDF_STATUS cds_alloc_ol_rx_pkt_freeq(p_cds_sched_context pSchedContext)
 				  __func__);
 			goto free;
 		}
-		memset(pkt, 0, sizeof(*pkt));
 		spin_lock_bh(&pSchedContext->cds_ol_rx_pkt_freeq_lock);
 		list_add_tail(&pkt->list, &pSchedContext->cds_ol_rx_pkt_freeq);
 		spin_unlock_bh(&pSchedContext->cds_ol_rx_pkt_freeq_lock);
@@ -961,7 +669,7 @@ cds_indicate_rxpkt(p_cds_sched_context pSchedContext,
 	spin_lock_bh(&pSchedContext->ol_rx_queue_lock);
 	list_add_tail(&pkt->list, &pSchedContext->ol_rx_thread_queue);
 	spin_unlock_bh(&pSchedContext->ol_rx_queue_lock);
-	set_bit(RX_POST_EVENT_MASK, &pSchedContext->ol_rx_event_flag);
+	set_bit(RX_POST_EVENT, &pSchedContext->ol_rx_event_flag);
 	wake_up_interruptible(&pSchedContext->ol_rx_wait_queue);
 }
 
@@ -1080,22 +788,22 @@ static int cds_ol_rx_thread(void *arg)
 	while (!shutdown) {
 		status =
 			wait_event_interruptible(pSchedContext->ol_rx_wait_queue,
-						 test_bit(RX_POST_EVENT_MASK,
+						 test_bit(RX_POST_EVENT,
 							  &pSchedContext->ol_rx_event_flag)
-						 || test_bit(RX_SUSPEND_EVENT_MASK,
+						 || test_bit(RX_SUSPEND_EVENT,
 							     &pSchedContext->ol_rx_event_flag));
 		if (status == -ERESTARTSYS)
 			break;
 
-		clear_bit(RX_POST_EVENT_MASK, &pSchedContext->ol_rx_event_flag);
+		clear_bit(RX_POST_EVENT, &pSchedContext->ol_rx_event_flag);
 		while (true) {
-			if (test_bit(RX_SHUTDOWN_EVENT_MASK,
+			if (test_bit(RX_SHUTDOWN_EVENT,
 				     &pSchedContext->ol_rx_event_flag)) {
-				clear_bit(RX_SHUTDOWN_EVENT_MASK,
+				clear_bit(RX_SHUTDOWN_EVENT,
 					  &pSchedContext->ol_rx_event_flag);
-				if (test_bit(RX_SUSPEND_EVENT_MASK,
+				if (test_bit(RX_SUSPEND_EVENT,
 					     &pSchedContext->ol_rx_event_flag)) {
-					clear_bit(RX_SUSPEND_EVENT_MASK,
+					clear_bit(RX_SUSPEND_EVENT,
 						  &pSchedContext->ol_rx_event_flag);
 					complete
 						(&pSchedContext->ol_suspend_rx_event);
@@ -1109,9 +817,9 @@ static int cds_ol_rx_thread(void *arg)
 			}
 			cds_rx_from_queue(pSchedContext);
 
-			if (test_bit(RX_SUSPEND_EVENT_MASK,
+			if (test_bit(RX_SUSPEND_EVENT,
 				     &pSchedContext->ol_rx_event_flag)) {
-				clear_bit(RX_SUSPEND_EVENT_MASK,
+				clear_bit(RX_SUSPEND_EVENT,
 					  &pSchedContext->ol_rx_event_flag);
 				spin_lock(&pSchedContext->ol_rx_thread_lock);
 				INIT_COMPLETION
@@ -1152,193 +860,20 @@ QDF_STATUS cds_sched_close(void *p_cds_context)
 			  "%s: gp_cds_sched_context == NULL", __func__);
 		return QDF_STATUS_E_FAILURE;
 	}
-	/* shut down MC Thread */
-	set_bit(MC_SHUTDOWN_EVENT_MASK, &gp_cds_sched_context->mcEventFlag);
-	set_bit(MC_POST_EVENT_MASK, &gp_cds_sched_context->mcEventFlag);
-	wake_up_interruptible(&gp_cds_sched_context->mcWaitQueue);
-	/* Wait for MC to exit */
-	wait_for_completion(&gp_cds_sched_context->McShutdown);
-	gp_cds_sched_context->McThread = 0;
-
-	/* Clean up message queues of MC thread */
-	cds_sched_flush_mc_mqs(gp_cds_sched_context);
-
-	/* Deinit all the queues */
-	cds_sched_deinit_mqs(gp_cds_sched_context);
-
 #ifdef QCA_CONFIG_SMP
 	/* Shut down Tlshim Rx thread */
-	set_bit(RX_SHUTDOWN_EVENT_MASK, &gp_cds_sched_context->ol_rx_event_flag);
-	set_bit(RX_POST_EVENT_MASK, &gp_cds_sched_context->ol_rx_event_flag);
+	set_bit(RX_SHUTDOWN_EVENT, &gp_cds_sched_context->ol_rx_event_flag);
+	set_bit(RX_POST_EVENT, &gp_cds_sched_context->ol_rx_event_flag);
 	wake_up_interruptible(&gp_cds_sched_context->ol_rx_wait_queue);
 	wait_for_completion(&gp_cds_sched_context->ol_rx_shutdown);
 	gp_cds_sched_context->ol_rx_thread = NULL;
 	cds_drop_rxpkt_by_staid(gp_cds_sched_context, WLAN_MAX_STA_COUNT);
 	cds_free_ol_rx_pkt_freeq(gp_cds_sched_context);
 	unregister_hotcpu_notifier(&cds_cpu_hotplug_notifier);
+	gp_cds_sched_context->cpu_hot_plug_notifier = NULL;
 #endif
 	return QDF_STATUS_SUCCESS;
 } /* cds_sched_close() */
-
-/**
- * cds_sched_init_mqs() - initialize the cds scheduler message queues
- * @p_cds_sched_context: Pointer to the Scheduler Context.
- *
- * This api initializes the cds scheduler message queues.
- *
- * Return: QDF status
- */
-QDF_STATUS cds_sched_init_mqs(p_cds_sched_context pSchedContext)
-{
-	QDF_STATUS vStatus = QDF_STATUS_SUCCESS;
-	/* Now intialize all the message queues */
-	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "%s: Initializing the WMA MC Message queue", __func__);
-	vStatus = cds_mq_init(&pSchedContext->wmaMcMq);
-	if (!QDF_IS_STATUS_SUCCESS(vStatus)) {
-		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
-			  "%s: Failed to init WMA MC Message queue", __func__);
-		QDF_ASSERT(0);
-		return vStatus;
-	}
-	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "%s: Initializing the PE MC Message queue", __func__);
-	vStatus = cds_mq_init(&pSchedContext->peMcMq);
-	if (!QDF_IS_STATUS_SUCCESS(vStatus)) {
-		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
-			  "%s: Failed to init PE MC Message queue", __func__);
-		QDF_ASSERT(0);
-		return vStatus;
-	}
-	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "%s: Initializing the SME MC Message queue", __func__);
-	vStatus = cds_mq_init(&pSchedContext->smeMcMq);
-	if (!QDF_IS_STATUS_SUCCESS(vStatus)) {
-		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
-			  "%s: Failed to init SME MC Message queue", __func__);
-		QDF_ASSERT(0);
-		return vStatus;
-	}
-	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "%s: Initializing the SYS MC Message queue", __func__);
-	vStatus = cds_mq_init(&pSchedContext->sysMcMq);
-	if (!QDF_IS_STATUS_SUCCESS(vStatus)) {
-		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
-			  "%s: Failed to init SYS MC Message queue", __func__);
-		QDF_ASSERT(0);
-		return vStatus;
-	}
-
-	return QDF_STATUS_SUCCESS;
-} /* cds_sched_init_mqs() */
-
-/**
- * cds_sched_deinit_mqs() - Deinitialize the cds scheduler message queues
- * @p_cds_sched_context: Pointer to the Scheduler Context.
- *
- * Return: none
- */
-void cds_sched_deinit_mqs(p_cds_sched_context pSchedContext)
-{
-	/* Now de-intialize all message queues */
-
-	/* MC WMA */
-	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "%s De-Initializing the WMA MC Message queue", __func__);
-	cds_mq_deinit(&pSchedContext->wmaMcMq);
-	/* MC PE */
-	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "%s De-Initializing the PE MC Message queue", __func__);
-	cds_mq_deinit(&pSchedContext->peMcMq);
-	/* MC SME */
-	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "%s De-Initializing the SME MC Message queue", __func__);
-	cds_mq_deinit(&pSchedContext->smeMcMq);
-	/* MC SYS */
-	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO_HIGH,
-		  "%s De-Initializing the SYS MC Message queue", __func__);
-	cds_mq_deinit(&pSchedContext->sysMcMq);
-
-} /* cds_sched_deinit_mqs() */
-
-/**
- * cds_sched_flush_mc_mqs() - flush all the MC thread message queues
- * @pSchedContext: Pointer to global cds context
- *
- * Return: none
- */
-void cds_sched_flush_mc_mqs(p_cds_sched_context pSchedContext)
-{
-	p_cds_msg_wrapper pMsgWrapper = NULL;
-	p_cds_contextType cds_ctx;
-
-	/* Here each of the MC thread MQ shall be drained and returned to the
-	 * Core. Before returning a wrapper to the Core, the CDS message shall
-	 * be freed first
-	 */
-	QDF_TRACE(QDF_MODULE_ID_QDF,
-		  QDF_TRACE_LEVEL_INFO,
-		  ("Flushing the MC Thread message queue"));
-
-	if (NULL == pSchedContext) {
-		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
-			  "%s: pSchedContext is NULL", __func__);
-		return;
-	}
-
-	cds_ctx = (p_cds_contextType) (pSchedContext->pVContext);
-	if (NULL == cds_ctx) {
-		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
-			  "%s: cds_ctx is NULL", __func__);
-		return;
-	}
-
-	/* Flush the SYS Mq */
-	while (NULL != (pMsgWrapper = cds_mq_get(&pSchedContext->sysMcMq))) {
-		QDF_TRACE(QDF_MODULE_ID_QDF,
-			  QDF_TRACE_LEVEL_INFO,
-			  "%s: Freeing MC SYS message type %d ", __func__,
-			  pMsgWrapper->pVosMsg->type);
-		cds_core_return_msg(pSchedContext->pVContext, pMsgWrapper);
-	}
-	/* Flush the WMA Mq */
-	while (NULL != (pMsgWrapper = cds_mq_get(&pSchedContext->wmaMcMq))) {
-		if (pMsgWrapper->pVosMsg != NULL) {
-			QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO,
-				  "%s: Freeing MC WMA MSG message type %d",
-				  __func__, pMsgWrapper->pVosMsg->type);
-			if (pMsgWrapper->pVosMsg->bodyptr) {
-				qdf_mem_free((void *)pMsgWrapper->
-					     pVosMsg->bodyptr);
-			}
-
-			pMsgWrapper->pVosMsg->bodyptr = NULL;
-			pMsgWrapper->pVosMsg->bodyval = 0;
-			pMsgWrapper->pVosMsg->type = 0;
-		}
-		cds_core_return_msg(pSchedContext->pVContext, pMsgWrapper);
-	}
-
-	/* Flush the PE Mq */
-	while (NULL != (pMsgWrapper = cds_mq_get(&pSchedContext->peMcMq))) {
-		QDF_TRACE(QDF_MODULE_ID_QDF,
-			  QDF_TRACE_LEVEL_INFO,
-			  "%s: Freeing MC PE MSG message type %d", __func__,
-			  pMsgWrapper->pVosMsg->type);
-		pe_free_msg(cds_ctx->pMACContext,
-			    (tSirMsgQ *) pMsgWrapper->pVosMsg);
-		cds_core_return_msg(pSchedContext->pVContext, pMsgWrapper);
-	}
-	/* Flush the SME Mq */
-	while (NULL != (pMsgWrapper = cds_mq_get(&pSchedContext->smeMcMq))) {
-		QDF_TRACE(QDF_MODULE_ID_QDF,
-			  QDF_TRACE_LEVEL_INFO,
-			  "%s: Freeing MC SME MSG message type %d", __func__,
-			  pMsgWrapper->pVosMsg->type);
-		sme_free_msg(cds_ctx->pMACContext, pMsgWrapper->pVosMsg);
-		cds_core_return_msg(pSchedContext->pVContext, pMsgWrapper);
-	}
-} /* cds_sched_flush_mc_mqs() */
 
 /**
  * get_cds_sched_ctxt() - get cds scheduler context
@@ -1373,6 +908,8 @@ void cds_ssr_protect_init(void)
 		ssr_protect_log[i].pid =  0;
 		i++;
 	}
+
+	INIT_LIST_HEAD(&shutdown_notifier_head);
 }
 
 /**
@@ -1392,8 +929,9 @@ static void cds_print_external_threads(void)
 	while (i < MAX_SSR_PROTECT_LOG) {
 		if (!ssr_protect_log[i].free) {
 			QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
-			"PID %d is stuck at %s", ssr_protect_log[i].pid,
-			ssr_protect_log[i].func);
+				  "PID %d is executing %s",
+				  ssr_protect_log[i].pid,
+				  ssr_protect_log[i].func);
 		}
 		i++;
 	}
@@ -1433,10 +971,22 @@ void cds_ssr_protect(const char *caller_func)
 
 	spin_unlock_irqrestore(&ssr_protect_lock, irq_flags);
 
+	/*
+	 * Dump the protect log at intervals if count is consistently growing.
+	 * Long running functions should tend to dominate the protect log, so
+	 * hopefully, dumping at multiples of log size will prevent spamming the
+	 * logs while telling us which calls are taking a long time to finish.
+	 */
+	if (count >= MAX_SSR_PROTECT_LOG && count % MAX_SSR_PROTECT_LOG == 0) {
+		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
+			  "Protect Log overflow; Dumping contents:");
+		cds_print_external_threads();
+	}
+
 	if (!status)
 		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
-		"Could not track PID %d call %s: log is full",
-		current->pid, caller_func);
+			  "%s can not be protected; PID:%d, entry_count:%d",
+			  caller_func, current->pid, count);
 }
 
 /**
@@ -1474,7 +1024,115 @@ void cds_ssr_unprotect(const char *caller_func)
 
 	if (!status)
 		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
-			"Untracked call %s", caller_func);
+			  "%s was not protected; PID:%d, entry_count:%d",
+			  caller_func, current->pid, count);
+}
+
+/**
+ * cds_shutdown_notifier_register() - Register for shutdown notification
+ * @cb          : Call back to be called
+ * @priv        : Private pointer to be passed back to call back
+ *
+ * During driver remove or shutdown (recovery), external threads might be stuck
+ * waiting on some event from firmware at lower layers. Remove or shutdown can't
+ * proceed till the thread completes to avoid any race condition. Call backs can
+ * be registered here to get early notification of remove or shutdown so that
+ * waiting thread can be unblocked and hence remove or shutdown can proceed
+ * further as waiting there may not make sense when FW may already have been
+ * down.
+ *
+ * This is intended for early notification of remove() or shutdown() only so
+ * that lower layers can take care of stuffs like external waiting thread.
+ *
+ * Return: CDS status
+ */
+QDF_STATUS cds_shutdown_notifier_register(void (*cb)(void *priv), void *priv)
+{
+	struct shutdown_notifier *notifier;
+	unsigned long irq_flags;
+
+	notifier = qdf_mem_malloc(sizeof(*notifier));
+
+	if (notifier == NULL)
+		return QDF_STATUS_E_NOMEM;
+
+	/*
+	 * This logic can be simpilfied if there is separate state maintained
+	 * for shutdown and reinit. Right now there is only recovery in progress
+	 * state and it doesn't help to check against it as during reinit some
+	 * of the modules may need to register the call backs.
+	 * For now this logic added to avoid notifier registration happen while
+	 * this function is trying to call the call back with the notification.
+	 */
+	spin_lock_irqsave(&ssr_protect_lock, irq_flags);
+	if (notifier_state == NOTIFIER_STATE_NOTIFYING) {
+		spin_unlock_irqrestore(&ssr_protect_lock, irq_flags);
+		qdf_mem_free(notifier);
+		return -EINVAL;
+	}
+
+	notifier->cb = cb;
+	notifier->priv = priv;
+
+	list_add_tail(&notifier->list, &shutdown_notifier_head);
+	spin_unlock_irqrestore(&ssr_protect_lock, irq_flags);
+
+	return 0;
+}
+
+/**
+ * cds_shutdown_notifier_purge() - Purge all the notifiers
+ *
+ * Shutdown notifiers are added to provide the early notification of remove or
+ * shutdown being initiated. Adding this API to purge all the registered call
+ * backs as they are not useful any more while all the lower layers are being
+ * shutdown.
+ *
+ * Return: None
+ */
+void cds_shutdown_notifier_purge(void)
+{
+	struct shutdown_notifier *notifier, *temp;
+	unsigned long irq_flags;
+
+	spin_lock_irqsave(&ssr_protect_lock, irq_flags);
+	list_for_each_entry_safe(notifier, temp,
+				 &shutdown_notifier_head, list) {
+		list_del(&notifier->list);
+		spin_unlock_irqrestore(&ssr_protect_lock, irq_flags);
+
+		qdf_mem_free(notifier);
+
+		spin_lock_irqsave(&ssr_protect_lock, irq_flags);
+	}
+
+	spin_unlock_irqrestore(&ssr_protect_lock, irq_flags);
+}
+
+/**
+ * cds_shutdown_notifier_call() - Call shutdown notifier call back
+ *
+ * Call registered shutdown notifier call back to indicate about remove or
+ * shutdown.
+ */
+static void cds_shutdown_notifier_call(void)
+{
+	struct shutdown_notifier *notifier;
+	unsigned long irq_flags;
+
+	spin_lock_irqsave(&ssr_protect_lock, irq_flags);
+	notifier_state = NOTIFIER_STATE_NOTIFYING;
+
+	list_for_each_entry(notifier, &shutdown_notifier_head, list) {
+		spin_unlock_irqrestore(&ssr_protect_lock, irq_flags);
+
+		notifier->cb(notifier->priv);
+
+		spin_lock_irqsave(&ssr_protect_lock, irq_flags);
+	}
+
+	notifier_state = NOTIFIER_STATE_NONE;
+	spin_unlock_irqrestore(&ssr_protect_lock, irq_flags);
 }
 
 /**
@@ -1488,21 +1146,29 @@ void cds_ssr_unprotect(const char *caller_func)
 bool cds_wait_for_external_threads_completion(const char *caller_func)
 {
 	int count = MAX_SSR_WAIT_ITERATIONS;
+	int r;
+
+	cds_shutdown_notifier_call();
 
 	while (count) {
 
-		if (!atomic_read(&ssr_protect_entry_count))
+		r = atomic_read(&ssr_protect_entry_count);
+
+		if (!r)
 			break;
 
 		if (--count) {
 			QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
-				  "%s: Waiting for active entry points to exit",
-				  __func__);
+				  "%s: Waiting for %d active entry points to exit",
+				  __func__, r);
 			msleep(SSR_WAIT_SLEEP_TIME);
 		}
 	}
+
 	/* at least one external thread is executing */
 	if (!count) {
+		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
+			  "Timed-out waiting for active entry points:");
 		cds_print_external_threads();
 		return false;
 	}
@@ -1511,6 +1177,11 @@ bool cds_wait_for_external_threads_completion(const char *caller_func)
 		  "Allowing SSR/Driver unload for %s", caller_func);
 
 	return true;
+}
+
+int cds_return_external_threads_count(void)
+{
+	return  atomic_read(&ssr_protect_entry_count);
 }
 
 /**

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -46,7 +46,7 @@
  * Returns:
  * void
  *****************************************************************************/
-void sme_nan_register_callback(tHalHandle hHal, NanCallback callback)
+void sme_nan_register_callback(tHalHandle hHal, nan_callback callback)
 {
 	tpAniSirGlobal pMac = NULL;
 
@@ -58,6 +58,28 @@ void sme_nan_register_callback(tHalHandle hHal, NanCallback callback)
 	pMac = PMAC_STRUCT(hHal);
 	pMac->sme.nanCallback = callback;
 }
+
+/**
+ * sme_nan_deregister_callback() - NAN De-register cb function
+ * @h_hal: Hal handle
+ *
+ * De-register nan rsp callback with sme layer.
+ *
+ * Return: void
+ */
+void sme_nan_deregister_callback(tHalHandle h_hal)
+{
+	tpAniSirGlobal pmac;
+
+	if (!h_hal) {
+		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
+			  FL("hHal is not valid"));
+		return;
+	}
+	pmac = PMAC_STRUCT(h_hal);
+	pmac->sme.nanCallback = NULL;
+}
+
 
 /******************************************************************************
  * Function: sme_nan_request
@@ -74,7 +96,7 @@ void sme_nan_register_callback(tHalHandle hHal, NanCallback callback)
  *****************************************************************************/
 QDF_STATUS sme_nan_request(tpNanRequestReq input)
 {
-	cds_msg_t msg;
+	struct scheduler_msg msg;
 	tpNanRequest data;
 	size_t data_len;
 
@@ -86,8 +108,6 @@ QDF_STATUS sme_nan_request(tpNanRequestReq input)
 			  FL("Memory allocation failure"));
 		return QDF_STATUS_E_NOMEM;
 	}
-
-	qdf_mem_zero(data, data_len);
 	data->request_data_len = input->request_data_len;
 	if (input->request_data_len) {
 		qdf_mem_copy(data->request_data,
@@ -98,7 +118,8 @@ QDF_STATUS sme_nan_request(tpNanRequestReq input)
 	msg.reserved = 0;
 	msg.bodyptr = data;
 
-	if (QDF_STATUS_SUCCESS != cds_mq_post_message(QDF_MODULE_ID_WMA, &msg)) {
+	if (QDF_STATUS_SUCCESS != scheduler_post_msg(QDF_MODULE_ID_WMA,
+						      &msg)) {
 		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
 			  FL
 				  ("Not able to post WMA_NAN_REQUEST message to WMA"));

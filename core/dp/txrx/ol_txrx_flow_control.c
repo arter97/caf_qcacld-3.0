@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -47,7 +47,7 @@
 #include <ol_txrx_encap.h>      /* OL_TX_ENCAP, etc */
 #include <ol_tx.h>
 #include <ol_cfg.h>
-
+#include <cdp_txrx_handle.h>
 #define INVALID_FLOW_ID 0xFF
 #define MAX_INVALID_BIN 3
 
@@ -157,6 +157,11 @@ void ol_tx_dump_flow_pool_info(void)
 
 
 	TXRX_PRINT(TXRX_PRINT_LEVEL_ERR, "Global Pool");
+	if (!pdev) {
+		TXRX_PRINT(TXRX_PRINT_LEVEL_ERR, "ERROR: pdev NULL");
+		QDF_ASSERT(0); /* traceback */
+		return;
+	}
 	TXRX_PRINT(TXRX_PRINT_LEVEL_ERR, "Total %d :: Available %d",
 		pdev->tx_desc.pool_size, pdev->tx_desc.num_free);
 	TXRX_PRINT(TXRX_PRINT_LEVEL_ERR, "Invalid flow_pool %d",
@@ -284,7 +289,7 @@ static int ol_tx_move_desc_n(struct ol_tx_flow_pool_t *src_pool,
  *
  * Return: 0 for sucess
  */
-int
+static int
 ol_tx_distribute_descs_to_deficient_pools(struct ol_tx_flow_pool_t *src_pool)
 {
 	struct ol_txrx_pdev_t *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
@@ -413,6 +418,13 @@ int ol_tx_delete_flow_pool(struct ol_tx_flow_pool_t *pool, bool force)
 	if (!pool) {
 		TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
 		   "%s: pool is NULL\n", __func__);
+		QDF_ASSERT(0);
+		return -ENOMEM;
+	}
+	if (!pdev) {
+		TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
+		   "%s: pdev is NULL\n", __func__);
+		QDF_ASSERT(0);
 		return -ENOMEM;
 	}
 
@@ -506,11 +518,17 @@ int ol_tx_free_invalid_flow_pool(struct ol_tx_flow_pool_t *pool)
  *
  * Return: flow_pool ptr / NULL if not found
  */
-struct ol_tx_flow_pool_t *ol_tx_get_flow_pool(uint8_t flow_pool_id)
+static struct ol_tx_flow_pool_t *ol_tx_get_flow_pool(uint8_t flow_pool_id)
 {
 	struct ol_txrx_pdev_t *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 	struct ol_tx_flow_pool_t *pool = NULL;
 	bool is_found = false;
+
+	if (!pdev) {
+		TXRX_PRINT(TXRX_PRINT_LEVEL_ERR, "ERROR: pdev NULL");
+		QDF_ASSERT(0); /* traceback */
+		return NULL;
+	}
 
 	qdf_spin_lock_bh(&pdev->tx_desc.flow_pool_list_lock);
 	TAILQ_FOREACH(pool, &pdev->tx_desc.flow_pool_list,
@@ -529,7 +547,6 @@ struct ol_tx_flow_pool_t *ol_tx_get_flow_pool(uint8_t flow_pool_id)
 		pool = NULL;
 
 	return pool;
-
 }
 
 
@@ -540,12 +557,12 @@ struct ol_tx_flow_pool_t *ol_tx_get_flow_pool(uint8_t flow_pool_id)
  *
  * Return: none
  */
-void ol_tx_flow_pool_vdev_map(struct ol_tx_flow_pool_t *pool,
-			      uint8_t vdev_id)
+static void ol_tx_flow_pool_vdev_map(struct ol_tx_flow_pool_t *pool,
+				     uint8_t vdev_id)
 {
-	ol_txrx_vdev_handle vdev;
+	struct ol_txrx_vdev_t *vdev;
 
-	vdev = ol_txrx_get_vdev_from_vdev_id(vdev_id);
+	vdev = (struct ol_txrx_vdev_t *)ol_txrx_get_vdev_from_vdev_id(vdev_id);
 	if (!vdev) {
 		TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
 		   "%s: invalid vdev_id %d\n",
@@ -568,12 +585,12 @@ void ol_tx_flow_pool_vdev_map(struct ol_tx_flow_pool_t *pool,
  *
  * Return: none
  */
-void ol_tx_flow_pool_vdev_unmap(struct ol_tx_flow_pool_t *pool,
-				uint8_t vdev_id)
+static void ol_tx_flow_pool_vdev_unmap(struct ol_tx_flow_pool_t *pool,
+				       uint8_t vdev_id)
 {
-	ol_txrx_vdev_handle vdev;
+	struct ol_txrx_vdev_t *vdev;
 
-	vdev = ol_txrx_get_vdev_from_vdev_id(vdev_id);
+	vdev = (struct ol_txrx_vdev_t *)ol_txrx_get_vdev_from_vdev_id(vdev_id);
 	if (!vdev) {
 		TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
 		   "%s: invalid vdev_id %d\n",

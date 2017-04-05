@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -67,50 +67,6 @@
 
 /* -------------------------------------------------------------------- */
 /**
- * sch_get_cfp_count
- *
- * FUNCTION:
- * Function used by other Sirius modules to read CFPcount
- *
- * LOGIC:
- *
- * ASSUMPTIONS:
- *
- * NOTE:
- *
- * @param None
- * @return None
- */
-
-uint8_t sch_get_cfp_count(tpAniSirGlobal pMac)
-{
-	return pMac->sch.schObject.gSchCFPCount;
-}
-
-/* -------------------------------------------------------------------- */
-/**
- * sch_get_cfp_dur_remaining
- *
- * FUNCTION:
- * Function used by other Sirius modules to read CFPDuration remaining
- *
- * LOGIC:
- *
- * ASSUMPTIONS:
- *
- * NOTE:
- *
- * @param None
- * @return None
- */
-
-uint16_t sch_get_cfp_dur_remaining(tpAniSirGlobal pMac)
-{
-	return pMac->sch.schObject.gSchCFPDurRemaining;
-}
-
-/* -------------------------------------------------------------------- */
-/**
  * sch_init_globals
  *
  * FUNCTION:
@@ -172,7 +128,7 @@ void sch_init_globals(tpAniSirGlobal pMac)
  * @return None
  */
 
-tSirRetStatus sch_post_message(tpAniSirGlobal pMac, tpSirMsgQ pMsg)
+tSirRetStatus sch_post_message(tpAniSirGlobal pMac, struct scheduler_msg *pMsg)
 {
 	sch_process_message(pMac, pMsg);
 
@@ -197,7 +153,7 @@ tSirRetStatus sch_post_message(tpAniSirGlobal pMac, tpSirMsgQ pMsg)
 
 void sch_send_start_scan_rsp(tpAniSirGlobal pMac)
 {
-	tSirMsgQ msgQ;
+	struct scheduler_msg msgQ;
 	uint32_t retCode;
 
 	PELOG1(sch_log(pMac, LOG1, FL("Sending LIM message to go into scan"));)
@@ -237,14 +193,25 @@ void sch_send_start_scan_rsp(tpAniSirGlobal pMac)
 tSirRetStatus sch_send_beacon_req(tpAniSirGlobal pMac, uint8_t *beaconPayload,
 				  uint16_t size, tpPESession psessionEntry)
 {
-	tSirMsgQ msgQ;
+	struct scheduler_msg msgQ;
 	tpSendbeaconParams beaconParams = NULL;
 	tSirRetStatus retCode;
 
 	sch_log(pMac, LOG2,
-		FL
-			("Indicating HAL to copy the beacon template [%d bytes] to memory"),
+		FL("Indicating HAL to copy the beacon template [%d bytes] to memory"),
 		size);
+
+	if (LIM_IS_AP_ROLE(psessionEntry) &&
+	   (pMac->sch.schObject.fBeaconChanged)) {
+		retCode = lim_send_probe_rsp_template_to_hal(pMac,
+				psessionEntry,
+				&psessionEntry->DefProbeRspIeBitmap[0]);
+		if (eSIR_SUCCESS != retCode) {
+			sch_log(pMac, LOGE,
+				FL("FAILED to send probe response template with retCode %d"),
+				retCode);
+		}
+	}
 
 	beaconParams = qdf_mem_malloc(sizeof(tSendbeaconParams));
 	if (NULL == beaconParams)
@@ -310,31 +277,15 @@ tSirRetStatus sch_send_beacon_req(tpAniSirGlobal pMac, uint8_t *beaconPayload,
 	} else {
 		sch_log(pMac, LOG2,
 			FL("Successfully posted WMA_SEND_BEACON_REQ to HAL"));
-
-		if (LIM_IS_AP_ROLE(psessionEntry) &&
-		   (pMac->sch.schObject.fBeaconChanged)) {
-			retCode = lim_send_probe_rsp_template_to_hal(pMac,
-								     psessionEntry,
-								     &psessionEntry->
-								     DefProbeRspIeBitmap
-								     [0]);
-			if (eSIR_SUCCESS != retCode) {
-				/* check whether we have to free any memory */
-				sch_log(pMac, LOGE,
-					FL
-						("FAILED to send probe response template with retCode %d"),
-					retCode);
-			}
-		}
 	}
 
 	return retCode;
 }
 
-uint32_t lim_remove_p2p_ie_from_add_ie(tpAniSirGlobal pMac,
-					tpPESession psessionEntry,
-					uint8_t *addIeWoP2pIe,
-					uint32_t *addnIELenWoP2pIe)
+static uint32_t lim_remove_p2p_ie_from_add_ie(tpAniSirGlobal pMac,
+					      tpPESession psessionEntry,
+					      uint8_t *addIeWoP2pIe,
+					      uint32_t *addnIELenWoP2pIe)
 {
 	uint32_t left = psessionEntry->addIeParams.probeRespDataLen;
 	uint8_t *ptr = psessionEntry->addIeParams.probeRespData_buff;
@@ -375,11 +326,11 @@ uint32_t lim_send_probe_rsp_template_to_hal(tpAniSirGlobal pMac,
 					    tpPESession psessionEntry,
 					    uint32_t *IeBitmap)
 {
-	tSirMsgQ msgQ;
+	struct scheduler_msg msgQ;
 	uint8_t *pFrame2Hal = psessionEntry->pSchProbeRspTemplate;
 	tpSendProbeRespParams pprobeRespParams = NULL;
 	uint32_t retCode = eSIR_FAILURE;
-	uint32_t nPayload, nBytes, nStatus;
+	uint32_t nPayload, nBytes = 0, nStatus;
 	tpSirMacMgmtHdr pMacHdr;
 	uint32_t addnIEPresent = false;
 	uint8_t *addIE = NULL;
@@ -387,26 +338,10 @@ uint32_t lim_send_probe_rsp_template_to_hal(tpAniSirGlobal pMac,
 	uint32_t addnIELenWoP2pIe = 0;
 	uint32_t retStatus;
 	tDot11fIEExtCap extracted_extcap;
-	bool extcap_present = true;
+	bool extcap_present = false;
 	tDot11fProbeResponse *prb_rsp_frm;
 	tSirRetStatus status;
 	uint16_t addn_ielen = 0;
-
-	nStatus = dot11f_get_packed_probe_response_size(pMac,
-			&psessionEntry->probeRespFrame, &nPayload);
-	if (DOT11F_FAILED(nStatus)) {
-		sch_log(pMac, LOGE, FL("Failed to calculate the packed size f"
-				       "or a Probe Response (0x%08x)."),
-			nStatus);
-		/* We'll fall back on the worst case scenario: */
-		nPayload = sizeof(tDot11fProbeResponse);
-	} else if (DOT11F_WARNED(nStatus)) {
-		sch_log(pMac, LOGE, FL("There were warnings while calculating"
-				       "the packed size for a Probe Response "
-				       "(0x%08x)."), nStatus);
-	}
-
-	nBytes = nPayload + sizeof(tSirMacMgmtHdr);
 
 	/* Check if probe response IE is present or not */
 	addnIEPresent = (psessionEntry->addIeParams.probeRespDataLen != 0);
@@ -458,8 +393,9 @@ uint32_t lim_send_probe_rsp_template_to_hal(tpAniSirGlobal pMac,
 		status = lim_strip_extcap_update_struct(pMac, addIE,
 				&addn_ielen, &extracted_extcap);
 		if (eSIR_SUCCESS != status) {
-			extcap_present = false;
 			sch_log(pMac, LOG1, FL("extcap not extracted"));
+		} else {
+			extcap_present = true;
 		}
 	}
 
@@ -469,6 +405,34 @@ uint32_t lim_send_probe_rsp_template_to_hal(tpAniSirGlobal pMac,
 		else
 			addnIEPresent = false;  /* Dont include the IE. */
 	}
+
+	/*
+	 * Extcap IE now support variable length, merge Extcap IE from addn_ie
+	 * may change the frame size. Therefore, MUST merge ExtCap IE before
+	 * dot11f get packed payload size.
+	 */
+	prb_rsp_frm = &psessionEntry->probeRespFrame;
+	if (extcap_present)
+		lim_merge_extcap_struct(&prb_rsp_frm->ExtCap,
+					&extracted_extcap,
+					true);
+
+	nStatus = dot11f_get_packed_probe_response_size(pMac,
+			&psessionEntry->probeRespFrame, &nPayload);
+	if (DOT11F_FAILED(nStatus)) {
+		sch_log(pMac, LOGE,
+			FL("Failed to calculate the packed size for a Probe Response (0x%08x)."),
+			nStatus);
+		/* We'll fall back on the worst case scenario: */
+		nPayload = sizeof(tDot11fProbeResponse);
+	} else if (DOT11F_WARNED(nStatus)) {
+		sch_log(pMac, LOGE,
+			FL("There were warnings while calculating the packed size for a Probe Response (0x%08x)."),
+			nStatus);
+	}
+
+	nBytes += nPayload + sizeof(tSirMacMgmtHdr);
+
 	/* Paranoia: */
 	qdf_mem_set(pFrame2Hal, nBytes, 0);
 
@@ -481,12 +445,6 @@ uint32_t lim_send_probe_rsp_template_to_hal(tpAniSirGlobal pMac,
 	pMacHdr = (tpSirMacMgmtHdr) pFrame2Hal;
 
 	sir_copy_mac_addr(pMacHdr->bssId, psessionEntry->bssId);
-
-	/* merge extcap IE */
-	prb_rsp_frm = &psessionEntry->probeRespFrame;
-	if (extcap_present)
-		lim_merge_extcap_struct(&prb_rsp_frm->ExtCap,
-					&extracted_extcap);
 
 	/* That done, pack the Probe Response: */
 	nStatus =
@@ -596,7 +554,6 @@ int sch_gen_timing_advert_frame(tpAniSirGlobal mac_ctx, tSirMacAddr self_addr,
 		sch_log(mac_ctx, LOGE, FL("Cannot allocate memory"));
 		return eSIR_FAILURE;
 	}
-	qdf_mem_zero(*buf, buf_size);
 
 	payload_size = 0;
 	status = dot11f_pack_timing_advertisement_frame(mac_ctx, &frame,

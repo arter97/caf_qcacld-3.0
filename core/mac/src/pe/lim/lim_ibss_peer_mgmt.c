@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -329,7 +329,7 @@ ibss_sta_rates_update(tpAniSirGlobal pMac,
 	lim_populate_matching_rate_set(pMac, pStaDs, &pPeer->supportedRates,
 				       &pPeer->extendedRates,
 				       pPeer->supportedMCSSet, psessionEntry,
-				       &pPeer->VHTCaps);
+				       &pPeer->VHTCaps, NULL);
 	pStaDs->mlmStaContext.capabilityInfo = pPeer->capabilityInfo;
 } /*** end ibss_sta_info_update() ***/
 
@@ -668,7 +668,8 @@ void lim_ibss_init(tpAniSirGlobal pMac)
  * @return None
  */
 
-void lim_ibss_delete_all_peers(tpAniSirGlobal pMac, tpPESession psessionEntry)
+static void lim_ibss_delete_all_peers(tpAniSirGlobal pMac,
+				      tpPESession psessionEntry)
 {
 	tLimIbssPeerNode *pCurrNode, *pTempNode;
 	tpDphHashNode pStaDs;
@@ -1122,6 +1123,8 @@ __lim_ibss_search_and_delete_peer(tpAniSirGlobal mac_ptr,
 						mac_ptr->lim.gLimIbssPeerList;
 				} else
 					prev_node->next = temp_node->next;
+				if (temp_node->beacon)
+					qdf_mem_free(temp_node->beacon);
 
 				qdf_mem_free(temp_node);
 				mac_ptr->lim.gLimNumIbssPeers--;
@@ -1666,6 +1669,8 @@ void lim_ibss_heart_beat_handle(tpAniSirGlobal mac_ctx, tpPESession session)
 				prevnode->next = tempnode->next;
 			}
 
+			if (tempnode->beacon)
+				qdf_mem_free(tempnode->beacon);
 			qdf_mem_free(tempnode);
 			mac_ctx->lim.gLimNumIbssPeers--;
 

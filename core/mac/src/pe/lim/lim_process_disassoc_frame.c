@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -81,9 +81,12 @@ lim_process_disassoc_frame(tpAniSirGlobal pMac, uint8_t *pRxPacketInfo,
 #ifdef WLAN_FEATURE_11W
 	uint32_t frameLen;
 #endif
+	int32_t frame_rssi;
 
 	pHdr = WMA_GET_RX_MAC_HEADER(pRxPacketInfo);
 	pBody = WMA_GET_RX_MPDU_DATA(pRxPacketInfo);
+
+	frame_rssi = (int32_t)WMA_GET_RX_RSSI_NORMALIZED(pRxPacketInfo);
 
 	if (lim_is_group_addr(pHdr->sa)) {
 		/* Received Disassoc frame from a BC/MC address */
@@ -165,14 +168,15 @@ lim_process_disassoc_frame(tpAniSirGlobal pMac, uint8_t *pRxPacketInfo,
 
 	PELOG2(lim_log(pMac, LOGE,
 		       FL("Received Disassoc frame for Addr: " MAC_ADDRESS_STR
-			  "(mlm state=%s, sme state=%d),"
+			  "(mlm state=%s, sme state=%d RSSI=%d),"
 			  "with reason code %d [%s] from " MAC_ADDRESS_STR),
 		       MAC_ADDR_ARRAY(pHdr->da),
 		       lim_mlm_state_str(psessionEntry->limMlmState),
-		       psessionEntry->limSmeState, reasonCode,
+		       psessionEntry->limSmeState, frame_rssi, reasonCode,
 		       lim_dot11_reason_str(reasonCode), MAC_ADDR_ARRAY(pHdr->sa));
 	       )
-
+	lim_diag_event_report(pMac, WLAN_PE_DIAG_DISASSOC_FRAME_EVENT,
+		psessionEntry, 0, reasonCode);
 	/**
 	 * Extract 'associated' context for STA, if any.
 	 * This is maintained by DPH and created by LIM.
@@ -266,20 +270,6 @@ lim_process_disassoc_frame(tpAniSirGlobal pMac, uint8_t *pRxPacketInfo,
 		   (psessionEntry->limSmeState != eLIM_SME_WT_ASSOC_STATE) &&
 		   (psessionEntry->limSmeState != eLIM_SME_WT_REASSOC_STATE))) {
 		switch (reasonCode) {
-		case eSIR_MAC_UNSPEC_FAILURE_REASON:
-		case eSIR_MAC_DISASSOC_DUE_TO_INACTIVITY_REASON:
-		case eSIR_MAC_DISASSOC_DUE_TO_DISABILITY_REASON:
-		case eSIR_MAC_CLASS2_FRAME_FROM_NON_AUTH_STA_REASON:
-		case eSIR_MAC_CLASS3_FRAME_FROM_NON_ASSOC_STA_REASON:
-		case eSIR_MAC_MIC_FAILURE_REASON:
-		case eSIR_MAC_4WAY_HANDSHAKE_TIMEOUT_REASON:
-		case eSIR_MAC_GR_KEY_UPDATE_TIMEOUT_REASON:
-		case eSIR_MAC_RSN_IE_MISMATCH_REASON:
-		case eSIR_MAC_1X_AUTH_FAILURE_REASON:
-		case eSIR_MAC_PREV_AUTH_NOT_VALID_REASON:
-			/* Valid reasonCode in received Disassociation frame */
-			break;
-
 		case eSIR_MAC_DEAUTH_LEAVING_BSS_REASON:
 		case eSIR_MAC_DISASSOC_LEAVING_BSS_REASON:
 			/* Valid reasonCode in received Disassociation frame */
@@ -297,15 +287,7 @@ lim_process_disassoc_frame(tpAniSirGlobal pMac, uint8_t *pRxPacketInfo,
 			break;
 
 		default:
-			/* Invalid reasonCode in received Disassociation frame */
-			/* Log error and ignore the frame */
-			PELOGE(lim_log(pMac, LOGE,
-				       FL
-					       ("received Disassoc frame with invalid reasonCode "
-					       "%d from " MAC_ADDRESS_STR), reasonCode,
-				       MAC_ADDR_ARRAY(pHdr->sa));
-			       )
-			return;
+			break;
 		}
 	} else {
 		/* Received Disassociation frame in either IBSS */
@@ -335,6 +317,19 @@ lim_process_disassoc_frame(tpAniSirGlobal pMac, uint8_t *pRxPacketInfo,
 
 		return;
 	}
+#ifdef FEATURE_WLAN_TDLS
+		/**
+		 *  Delete all the TDLS peers only if Disassoc is received
+		 *  from the AP
+		 */
+		if ((LIM_IS_STA_ROLE(psessionEntry)) &&
+			((pStaDs->mlmStaContext.mlmState ==
+					eLIM_MLM_LINK_ESTABLISHED_STATE) ||
+			(pStaDs->mlmStaContext.mlmState ==
+					eLIM_MLM_IDLE_STATE)) &&
+			(IS_CURRENT_BSSID(pMac, pHdr->sa, psessionEntry)))
+			lim_delete_tdls_peers(pMac, psessionEntry);
+#endif
 
 	if (pStaDs->mlmStaContext.mlmState != eLIM_MLM_LINK_ESTABLISHED_STATE) {
 		/**
@@ -390,6 +385,7 @@ lim_process_disassoc_frame(tpAniSirGlobal pMac, uint8_t *pRxPacketInfo,
 		return;
 	}
 
+	lim_update_lost_link_info(pMac, psessionEntry, frame_rssi);
 	lim_post_sme_message(pMac, LIM_MLM_DISASSOC_IND,
 			     (uint32_t *) &mlmDisassocInd);
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -71,7 +71,7 @@ uint32_t cfg_need_restart(tpAniSirGlobal pMac, uint16_t cfgId)
 	return !!(pMac->cfg.gCfgEntry[cfgId].control & CFG_CTL_RESTART);
 }
 
-void cfg_get_strindex(tpAniSirGlobal pMac, uint16_t cfgId)
+static void cfg_get_strindex(tpAniSirGlobal pMac, uint16_t cfgId)
 {
 	uint16_t i = 0;
 
@@ -913,13 +913,11 @@ void cfg_cleanup(tpAniSirGlobal pMac)
 static void notify(tpAniSirGlobal pMac, uint16_t cfgId, uint32_t ntfMask)
 {
 
-	tSirMsgQ mmhMsg;
+	struct scheduler_msg mmhMsg;
 
 	mmhMsg.type = SIR_CFG_PARAM_UPDATE_IND;
 	mmhMsg.bodyval = (uint32_t) cfgId;
 	mmhMsg.bodyptr = NULL;
-
-	MTRACE(mac_trace_msg_tx(pMac, NO_SESSION, mmhMsg.type));
 
 	if ((ntfMask & CFG_CTL_NTF_SCH) != 0)
 		sch_post_message(pMac, &mmhMsg);

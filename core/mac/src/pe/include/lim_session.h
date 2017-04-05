@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -89,6 +89,12 @@ typedef struct {
 	uint8_t fLsigTXOPProtectionFullSupport;
 	uint8_t gHTObssMode;
 } tBeaconParams, *tpBeaconParams;
+
+typedef struct join_params {
+	uint16_t prot_status_code;
+	uint16_t pe_session_id;
+	tSirResultCodes result_code;
+} join_params;
 
 typedef struct sPESession       /* Added to Support BT-AMP */
 {
@@ -261,6 +267,7 @@ typedef struct sPESession       /* Added to Support BT-AMP */
 	uint8_t ssidHidden;
 	bool fwdWPSPBCProbeReq;
 	uint8_t wps_state;
+	bool wps_registration;
 
 	uint8_t limQosEnabled:1;        /* 11E */
 	uint8_t limWmeEnabled:1;        /* WME */
@@ -314,12 +321,8 @@ typedef struct sPESession       /* Added to Support BT-AMP */
 	uint8_t ch_center_freq_seg0;
 	enum phy_ch_width ch_width;
 	uint8_t ch_center_freq_seg1;
-	uint8_t txBFIniFeatureEnabled;
-	uint8_t txbf_csn_value;
-	uint8_t txMuBformee;
 	uint8_t enableVhtpAid;
 	uint8_t enableVhtGid;
-	uint8_t enable_su_tx_bformer;
 	tLimWiderBWChannelSwitchInfo gLimWiderBWChannelSwitch;
 	uint8_t enableAmpduPs;
 	uint8_t enableHtSmps;
@@ -347,6 +350,10 @@ typedef struct sPESession       /* Added to Support BT-AMP */
 	uint8_t freePeerIdxTail;
 	uint16_t gLimNumOfCurrentSTAs;
 #ifdef FEATURE_WLAN_TDLS
+	 /* TDLS parameters to check whether TDLS
+	  * and TDLS channel switch is allowed in the
+	  * AP network
+	  */
 	uint32_t peerAIDBitmap[2];
 	bool tdls_prohibited;
 	bool tdls_chan_swit_prohibited;
@@ -361,7 +368,7 @@ typedef struct sPESession       /* Added to Support BT-AMP */
 	uint8_t isCoalesingInIBSSAllowed;
 
 	tSirHTConfig htConfig;
-
+	struct sir_vht_config vht_config;
 	/*
 	 * Place holder for StartBssReq message
 	 * received by SME state machine
@@ -467,6 +474,7 @@ typedef struct sPESession       /* Added to Support BT-AMP */
 	bool is_vendor_specific_vhtcaps;
 	uint8_t vendor_specific_vht_ie_type;
 	uint8_t vendor_specific_vht_ie_sub_type;
+	bool vendor_vht_sap;
 	/* HS 2.0 Indication */
 	tDot11fIEhs20vendor_ie hs20vendor_ie;
 	/* flag to indicate country code in beacon */
@@ -479,6 +487,17 @@ typedef struct sPESession       /* Added to Support BT-AMP */
 	/* Supported NSS is intersection of self and peer NSS */
 	bool supported_nss_1x1;
 	bool is_ext_caps_present;
+	uint8_t beacon_tx_rate;
+	uint8_t *access_policy_vendor_ie;
+	uint8_t access_policy;
+	bool ignore_assoc_disallowed;
+	bool send_p2p_conf_frame;
+	bool process_ho_fail;
+#ifdef WLAN_FEATURE_11AX
+	bool he_capable;
+	tDot11fIEvendor_he_cap he_config;
+	tDot11fIEvendor_he_op he_op;
+#endif
 } tPESession, *tpPESession;
 
 /*-------------------------------------------------------------------------

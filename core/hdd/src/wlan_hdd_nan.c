@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -25,9 +25,6 @@
  * WLAN Host Device Driver NAN API implementation
  */
 
-/* denote that this file does not allow legacy hddLog */
-#define HDD_DISALLOW_LEGACY_HDDLOG 1
-
 #include <linux/version.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -37,6 +34,7 @@
 #include "nan_api.h"
 #include "wlan_hdd_main.h"
 #include "wlan_hdd_nan.h"
+#include <qca_vendor.h>
 
 /**
  * __wlan_hdd_cfg80211_nan_request() - cfg80211 NAN request handler
@@ -127,7 +125,7 @@ int wlan_hdd_cfg80211_nan_request(struct wiphy *wiphy,
  *
  * Return: nothing
  */
-static void wlan_hdd_cfg80211_nan_callback(void *ctx, tSirNanEvent *msg)
+void wlan_hdd_cfg80211_nan_callback(void *ctx, tSirNanEvent *msg)
 {
 	hdd_context_t *hdd_ctx = ctx;
 	struct sk_buff *vendor_event;
@@ -173,19 +171,4 @@ static void wlan_hdd_cfg80211_nan_callback(void *ctx, tSirNanEvent *msg)
 bool wlan_hdd_nan_is_supported(void)
 {
 	return sme_is_feature_supported_by_fw(NAN);
-}
-
-/**
- * wlan_hdd_nan_init() - HDD NAN initialization function
- * @hdd_ctx: Global HDD context
- *
- * This function is called to initialize the HDD NAN feature.  Currently
- * the only operation required is to register a callback with SME.
- *
- * Return: void
- */
-void wlan_hdd_nan_init(hdd_context_t *hdd_ctx)
-{
-	sme_nan_register_callback(hdd_ctx->hHal,
-				  wlan_hdd_cfg80211_nan_callback);
 }

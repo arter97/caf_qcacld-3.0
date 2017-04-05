@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -35,6 +35,8 @@
 #include <net/iw_handler.h>
 #include <linux/timer.h>
 #include "qdf_event.h"
+
+struct sap_Config;
 
 /*
  * order of parameters in addTs private ioctl
@@ -150,10 +152,9 @@ typedef enum {
 #define DISABLE_11D 0
 
 /*
-   refer wpa.h in wpa supplicant code for REASON_MICHAEL_MIC_FAILURE
-
-   supplicant sets REASON_MICHAEL_MIC_FAILURE as the reason code when it sends the MLME deauth IOCTL
-   for TKIP counter measures
+ * refer wpa.h in wpa supplicant code for REASON_MICHAEL_MIC_FAILURE.
+ * supplicant sets REASON_MICHAEL_MIC_FAILURE as the reason code when
+ * it sends the MLME deauth IOCTL for TKIP counter measures
  */
 #define HDD_REASON_MICHAEL_MIC_FAILURE 14
 
@@ -215,6 +216,9 @@ typedef enum {
 #define WFD_OUI_TYPE_SIZE  4
 #endif
 
+#define MBO_OUI_TYPE   "\x50\x6f\x9a\x16"
+#define MBO_OUI_TYPE_SIZE  4
+
 typedef enum {
 	eWEXT_WPS_OFF = 0,
 	eWEXT_WPS_ON = 1,
@@ -252,18 +256,12 @@ typedef struct hdd_wext_state_s {
 	/* qdf event */
 	qdf_event_t hdd_qdf_event;
 
-	qdf_event_t scanevent;
-
 	/**Counter measure state, Started/Stopped*/
 	bool mTKIPCounterMeasures;
-
-	/**Completion Variable*/
-	struct completion completion_var;
 
 #ifdef FEATURE_WLAN_ESE
 	/* ESE state variables */
 	bool isESEConnection;
-	eCsrAuthType collectedAuthType; /* Collected from ALL SIOCSIWAUTH Ioctls. Will be negotiatedAuthType - in tCsrProfile */
 #endif
 } hdd_wext_state_t;
 
@@ -288,20 +286,36 @@ typedef struct ccp_freq_chan_map_s {
 	wlan_hdd_get_vendor_oui_ie_ptr(WFD_OUI_TYPE, WFD_OUI_TYPE_SIZE, ie, ie_len)
 #endif
 
+#define wlan_hdd_get_mbo_ie_ptr(ie, ie_len) \
+	wlan_hdd_get_vendor_oui_ie_ptr(MBO_OUI_TYPE, MBO_OUI_TYPE_SIZE, ie, ie_len)
+/*
+ * Defines for fw_test command
+ */
+#define HDD_FWTEST_PARAMS 3
+#define HDD_FWTEST_SU_PARAM_ID 53
+#define HDD_FWTEST_MU_PARAM_ID 2
+#define HDD_FWTEST_SU_DEFAULT_VALUE 100
+#define HDD_FWTEST_MU_DEFAULT_VALUE 40
+#define HDD_FWTEST_MAX_VALUE 500
+
 extern int hdd_unregister_wext(struct net_device *dev);
 extern int hdd_register_wext(struct net_device *dev);
 extern int hdd_wlan_get_freq(uint32_t chan, uint32_t *freq);
-extern int hdd_wlan_get_rts_threshold(hdd_adapter_t *pAdapter,
-				      union iwreq_data *wrqu);
-extern int hdd_wlan_get_frag_threshold(hdd_adapter_t *pAdapter,
-				       union iwreq_data *wrqu);
-extern void hdd_wlan_get_version(hdd_adapter_t *pAdapter,
+extern void hdd_wlan_get_version(hdd_context_t *hdd_ctx,
 				 union iwreq_data *wrqu, char *extra);
 
 extern void hdd_wlan_get_stats(hdd_adapter_t *pAdapter, uint16_t *length,
 			       char *buffer, uint16_t buf_len);
 extern void hdd_wlan_list_fw_profile(uint16_t *length,
 			       char *buffer, uint16_t buf_len);
+
+int iw_get_rts_threshold(struct net_device *dev,
+			 struct iw_request_info *info,
+			 union iwreq_data *wrqu, char *extra);
+
+int iw_get_frag_threshold(struct net_device *dev,
+			  struct iw_request_info *info,
+			  union iwreq_data *wrqu, char *extra);
 
 extern int iw_set_essid(struct net_device *dev,
 			struct iw_request_info *info,
@@ -338,8 +352,20 @@ extern int hdd_priv_get_data(struct iw_point *p_priv_data,
 
 extern void *mem_alloc_copy_from_user_helper(const void *wrqu_data, size_t len);
 
-extern QDF_STATUS wlan_hdd_get_linkspeed_for_peermac(hdd_adapter_t *pAdapter,
-					     struct qdf_mac_addr mac_address);
+/**
+ * wlan_hdd_get_linkspeed_for_peermac() - Get link speed for a peer
+ * @adapter: adapter upon which the peer is active
+ * @mac_address: MAC address of the peer
+ * @linkspeed: pointer to memory where returned link speed is to be placed
+ *
+ * This function will send a query to SME for the linkspeed of the
+ * given peer, and then wait for the callback to be invoked.
+ *
+ * Return: 0 if linkspeed data is available, negative errno otherwise
+ */
+int wlan_hdd_get_linkspeed_for_peermac(hdd_adapter_t *adapter,
+				       struct qdf_mac_addr *mac_address,
+				       uint32_t *linkspeed);
 void hdd_clear_roam_profile_ie(hdd_adapter_t *pAdapter);
 
 uint8_t *wlan_hdd_get_vendor_oui_ie_ptr(uint8_t *oui, uint8_t oui_size,
@@ -353,11 +379,46 @@ QDF_STATUS wlan_hdd_get_rssi(hdd_adapter_t *pAdapter, int8_t *rssi_value);
 
 QDF_STATUS wlan_hdd_get_snr(hdd_adapter_t *pAdapter, int8_t *snr);
 
-#ifdef FEATURE_WLAN_TDLS
-QDF_STATUS iw_set_tdls_params(struct net_device *dev,
-			      struct iw_request_info *info,
-			      union iwreq_data *wrqu, char *extra, int nOffset);
-#endif
+int hdd_get_ldpc(hdd_adapter_t *adapter, int *value);
+int hdd_set_ldpc(hdd_adapter_t *adapter, int value);
+int hdd_get_tx_stbc(hdd_adapter_t *adapter, int *value);
+int hdd_set_tx_stbc(hdd_adapter_t *adapter, int value);
+int hdd_get_rx_stbc(hdd_adapter_t *adapter, int *value);
+int hdd_set_rx_stbc(hdd_adapter_t *adapter, int value);
+
+/**
+ * hdd_assemble_rate_code() - assemble rate code to be sent to FW
+ * @preamble: rate preamble
+ * @nss: number of streams
+ * @rate: rate index
+ *
+ * Rate code assembling is different for targets which are 11ax capable.
+ * Check for the target support and assemble the rate code accordingly.
+ *
+ * Return: assembled rate code
+ */
+int hdd_assemble_rate_code(uint8_t preamble, uint8_t nss, uint8_t rate);
+
+/**
+ * hdd_set_11ax_rate() - set 11ax rate
+ * @adapter: adapter being modified
+ * @value: new 11ax rate code
+ * @sap_config: pointer to SAP config to check HW mode
+ *              this will be NULL for call from STA persona
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int hdd_set_11ax_rate(hdd_adapter_t *adapter, int value,
+		      struct sap_Config *sap_config);
+
+/**
+ * hdd_set_peer_rate() - set peer rate
+ * @adapter: adapter being modified
+ * @value: rate code with AID
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int hdd_set_peer_rate(hdd_adapter_t *adapter, int value);
 
 void wlan_hdd_change_country_code_callback(void *pAdapter);
 
@@ -368,4 +429,42 @@ int wlan_hdd_update_phymode(struct net_device *net, tHalHandle hal,
 
 int wlan_hdd_get_temperature(hdd_adapter_t *pAdapter, int *temperature);
 int wlan_hdd_get_link_speed(hdd_adapter_t *sta_adapter, uint32_t *link_speed);
+
+struct iw_request_info;
+/**
+ * hdd_check_standard_wext_control() - Check to see if standard
+ *      wireless extensions ioctls are allowed
+ * @hdd_ctx: Global HDD context
+ * @info: Wireless extensions ioctl information passed by the kernel
+ *
+ * This function will examine the "standard_wext_control" configuration
+ * item to determine whether or not standard wireless extensions ioctls
+ * are allowed.
+ *
+ * Return: 0 if the ioctl is allowed to be processed, -ENOTSUPP if the
+ * ioctls have been disabled. Note that in addition to returning
+ * status, this function will log a message if the ioctls are disabled
+ * or deprecated.
+ */
+int hdd_check_standard_wext_control(struct hdd_context_s *hdd_ctx,
+				    struct iw_request_info *info);
+
+/**
+ * hdd_check_private_wext_control() - Check to see if private
+ *      wireless extensions ioctls are allowed
+ * @hdd_ctx: Global HDD context
+ * @info: Wireless extensions ioctl information passed by the kernel
+ *
+ * This function will examine the "private_wext_control" configuration
+ * item to determine whether or not private wireless extensions ioctls
+ * are allowed.
+ *
+ * Return: 0 if the ioctl is allowed to be processed, -ENOTSUPP if the
+ * ioctls have been disabled. Note that in addition to returning
+ * status, this function will log a message if the ioctls are disabled
+ * or deprecated.
+ */
+int hdd_check_private_wext_control(struct hdd_context_s *hdd_ctx,
+				   struct iw_request_info *info);
+
 #endif /* __WEXT_IW_H__ */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -43,7 +43,7 @@
    -------------------------------------------------------------------------*/
 #include <qdf_types.h>
 #include <qdf_status.h>
-#include <cds_mq.h>
+#include <scheduler_api.h>
 
 /*---------------------------------------------------------------------------
    Preprocessor definitions and constants
@@ -69,16 +69,6 @@
 
    --------------------------------------------------------------------------*/
 typedef void (*sysResponseCback)(void *pUserData);
-
-typedef enum {
-	SYS_MSG_ID_MC_START,
-	SYS_MSG_ID_MC_THR_PROBE,
-	SYS_MSG_ID_MC_TIMER,
-	SYS_MSG_ID_MC_STOP,
-	SYS_MSG_ID_FTM_RSP,
-	SYS_MSG_ID_QVIT,
-
-} SYS_MSG_ID;
 
 /*---------------------------------------------------------------------------
    Preprocessor definitions and constants
@@ -112,7 +102,8 @@ typedef enum {
    \sa
 
    --------------------------------------------------------------------------*/
-QDF_STATUS sys_build_message_header(SYS_MSG_ID sysMsgId, cds_msg_t *pMsg);
+QDF_STATUS sys_build_message_header(SYS_MSG_ID sysMsgId,
+				    struct scheduler_msg *pMsg);
 
 /*----------------------------------------------------------------------------
 
@@ -188,7 +179,8 @@ QDF_STATUS sys_stop(v_CONTEXT_t p_cds_context);
    \sa
 
    --------------------------------------------------------------------------*/
-QDF_STATUS sys_mc_process_msg(v_CONTEXT_t p_cds_context, cds_msg_t *pMsg);
+QDF_STATUS sys_mc_process_msg(v_CONTEXT_t p_cds_context, struct scheduler_msg *pMsg);
+QDF_STATUS sys_mc_process_handler(struct scheduler_msg *msg);
 
 void wlan_sys_probe(void);
 

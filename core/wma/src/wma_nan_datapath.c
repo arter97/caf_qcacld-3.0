@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -31,7 +31,10 @@
 #include "wma_nan_datapath.h"
 #include "wma_internal.h"
 #include "cds_utils.h"
-
+#include "cdp_txrx_peer_ops.h"
+#include "cdp_txrx_tx_delay.h"
+#include "cdp_txrx_misc.h"
+#include <cdp_txrx_handle.h>
 /**
  * wma_handle_ndp_initiator_req() - NDP initiator request handler
  * @wma_handle: wma handle
@@ -44,15 +47,15 @@ QDF_STATUS wma_handle_ndp_initiator_req(tp_wma_handle wma_handle, void *req)
 	QDF_STATUS status;
 	int ret;
 	uint16_t len;
-	uint32_t vdev_id, ndp_cfg_len, ndp_app_info_len;
+	uint32_t vdev_id, ndp_cfg_len, ndp_app_info_len, pmk_len;
 	struct ndp_initiator_rsp ndp_rsp = {0};
-	uint8_t *cfg_info, *app_info;
-	ol_txrx_vdev_handle vdev;
+	void *vdev;
 	wmi_buf_t buf;
 	wmi_ndp_initiator_req_fixed_param *cmd;
-	cds_msg_t pe_msg = {0};
+	struct scheduler_msg pe_msg = {0};
 	struct ndp_initiator_req *ndp_req = req;
 	wmi_channel *ch_tlv;
+	uint8_t *tlv_ptr;
 
 	if (NULL == ndp_req) {
 		WMA_LOGE(FL("Invalid ndp_req."));
@@ -76,9 +79,11 @@ QDF_STATUS wma_handle_ndp_initiator_req(tp_wma_handle wma_handle, void *req)
 	 */
 	ndp_cfg_len = qdf_roundup(ndp_req->ndp_config.ndp_cfg_len, 4);
 	ndp_app_info_len = qdf_roundup(ndp_req->ndp_info.ndp_app_info_len, 4);
+	pmk_len = qdf_roundup(ndp_req->pmk.pmk_len, 4);
 	/* allocated memory for fixed params as well as variable size data */
-	len = sizeof(*cmd) + ndp_cfg_len + ndp_app_info_len +
-		(2 * WMI_TLV_HDR_SIZE) + sizeof(*ch_tlv);
+	len = sizeof(*cmd) + sizeof(*ch_tlv) + (3 * WMI_TLV_HDR_SIZE)
+		+ ndp_cfg_len + ndp_app_info_len + pmk_len;
+
 	buf = wmi_buf_alloc(wma_handle->wmi_handle, len);
 	if (!buf) {
 		WMA_LOGE(FL("wmi_buf_alloc failed"));
@@ -97,6 +102,9 @@ QDF_STATUS wma_handle_ndp_initiator_req(tp_wma_handle wma_handle, void *req)
 
 	cmd->ndp_cfg_len = ndp_req->ndp_config.ndp_cfg_len;
 	cmd->ndp_app_info_len = ndp_req->ndp_info.ndp_app_info_len;
+	cmd->ndp_channel_cfg = ndp_req->channel_cfg;
+	cmd->nan_pmk_len = ndp_req->pmk.pmk_len;
+	cmd->nan_csid = ndp_req->ncs_sk_type;
 
 	ch_tlv = (wmi_channel *)&cmd[1];
 	WMITLV_SET_HDR(ch_tlv, WMITLV_TAG_STRUC_wmi_channel,
@@ -104,21 +112,26 @@ QDF_STATUS wma_handle_ndp_initiator_req(tp_wma_handle wma_handle, void *req)
 	ch_tlv->mhz = ndp_req->channel;
 	ch_tlv->band_center_freq1 =
 		cds_chan_to_freq(cds_freq_to_chan(ndp_req->channel));
+	tlv_ptr = (uint8_t *)&ch_tlv[1];
 
-	cfg_info = (uint8_t *)&ch_tlv[1];
-	WMITLV_SET_HDR(cfg_info, WMITLV_TAG_ARRAY_BYTE, ndp_cfg_len);
-	qdf_mem_copy(&cfg_info[WMI_TLV_HDR_SIZE], ndp_req->ndp_config.ndp_cfg,
-		     cmd->ndp_cfg_len);
+	WMITLV_SET_HDR(tlv_ptr, WMITLV_TAG_ARRAY_BYTE, ndp_cfg_len);
+	qdf_mem_copy(&tlv_ptr[WMI_TLV_HDR_SIZE],
+		     ndp_req->ndp_config.ndp_cfg, cmd->ndp_cfg_len);
+	tlv_ptr = tlv_ptr + WMI_TLV_HDR_SIZE + ndp_cfg_len;
 
-	app_info = &cfg_info[WMI_TLV_HDR_SIZE + ndp_cfg_len];
-	WMITLV_SET_HDR(app_info, WMITLV_TAG_ARRAY_BYTE, ndp_app_info_len);
-	qdf_mem_copy(&app_info[WMI_TLV_HDR_SIZE],
-		     ndp_req->ndp_info.ndp_app_info,
-		     cmd->ndp_app_info_len);
+	WMITLV_SET_HDR(tlv_ptr, WMITLV_TAG_ARRAY_BYTE, ndp_app_info_len);
+	qdf_mem_copy(&tlv_ptr[WMI_TLV_HDR_SIZE],
+		     ndp_req->ndp_info.ndp_app_info, cmd->ndp_app_info_len);
+	tlv_ptr = tlv_ptr + WMI_TLV_HDR_SIZE + ndp_app_info_len;
 
-	WMA_LOGE(FL("vdev_id = %d, transaction_id: %d, service_instance_id, %d channel: %d"),
+	WMITLV_SET_HDR(tlv_ptr, WMITLV_TAG_ARRAY_BYTE, pmk_len);
+	qdf_mem_copy(&tlv_ptr[WMI_TLV_HDR_SIZE], ndp_req->pmk.pmk,
+		     cmd->nan_pmk_len);
+	tlv_ptr = tlv_ptr + WMI_TLV_HDR_SIZE + pmk_len;
+
+	WMA_LOGE(FL("vdev_id = %d, transaction_id: %d, service_instance_id: %d, ch: %d, ch_cfg: %d, csid: %d"),
 		cmd->vdev_id, cmd->transaction_id, cmd->service_instance_id,
-		ch_tlv->mhz);
+		ch_tlv->mhz, cmd->ndp_channel_cfg, cmd->nan_csid);
 	WMA_LOGE(FL("peer mac addr: mac_addr31to0: 0x%x, mac_addr47to32: 0x%x"),
 		cmd->peer_discovery_mac_addr.mac_addr31to0,
 		cmd->peer_discovery_mac_addr.mac_addr47to32);
@@ -133,8 +146,12 @@ QDF_STATUS wma_handle_ndp_initiator_req(tp_wma_handle wma_handle, void *req)
 			   ndp_req->ndp_info.ndp_app_info,
 			   ndp_req->ndp_info.ndp_app_info_len);
 
+	WMA_LOGE(FL("pmk len: %d"), cmd->nan_pmk_len);
+	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_DEBUG,
+			   ndp_req->pmk.pmk, cmd->nan_pmk_len);
 	WMA_LOGE(FL("sending WMI_NDP_INITIATOR_REQ_CMDID(0x%X)"),
 		WMI_NDP_INITIATOR_REQ_CMDID);
+
 	ret = wmi_unified_cmd_send(wma_handle->wmi_handle, buf, len,
 				   WMI_NDP_INITIATOR_REQ_CMDID);
 	if (ret < 0) {
@@ -175,14 +192,14 @@ QDF_STATUS wma_handle_ndp_responder_req(tp_wma_handle wma_handle,
 					struct ndp_responder_req *req_params)
 {
 	wmi_buf_t buf;
-	ol_txrx_vdev_handle vdev;
-	uint32_t vdev_id = 0, ndp_cfg_len, ndp_app_info_len;
-	uint8_t *cfg_info, *app_info;
+	void *vdev;
+	uint32_t vdev_id = 0, ndp_cfg_len, ndp_app_info_len, pmk_len;
+	uint8_t *tlv_ptr;
 	int ret;
 	wmi_ndp_responder_req_fixed_param *cmd;
 	uint16_t len;
 	struct ndp_responder_rsp_event rsp = {0};
-	cds_msg_t pe_msg = {0};
+	struct scheduler_msg pe_msg = {0};
 
 	if (NULL == req_params) {
 		WMA_LOGE(FL("Invalid req_params."));
@@ -211,11 +228,12 @@ QDF_STATUS wma_handle_ndp_responder_req(tp_wma_handle wma_handle,
 	 * round up ndp_cfg_len and ndp_app_info_len to 4 bytes
 	 */
 	ndp_cfg_len = qdf_roundup(req_params->ndp_config.ndp_cfg_len, 4);
-	ndp_app_info_len =
-		qdf_roundup(req_params->ndp_info.ndp_app_info_len, 4);
+	ndp_app_info_len = qdf_roundup(req_params->ndp_info.ndp_app_info_len, 4);
+	pmk_len = qdf_roundup(req_params->pmk.pmk_len, 4);
 	/* allocated memory for fixed params as well as variable size data */
-	len = sizeof(*cmd) + ndp_cfg_len + ndp_app_info_len +
-		(2 * WMI_TLV_HDR_SIZE);
+	len = sizeof(*cmd) + 3*WMI_TLV_HDR_SIZE + ndp_cfg_len + ndp_app_info_len
+		+ pmk_len;
+
 	buf = wmi_buf_alloc(wma_handle->wmi_handle, len);
 	if (!buf) {
 		WMA_LOGE(FL("wmi_buf_alloc failed"));
@@ -233,19 +251,29 @@ QDF_STATUS wma_handle_ndp_responder_req(tp_wma_handle wma_handle,
 
 	cmd->ndp_cfg_len = req_params->ndp_config.ndp_cfg_len;
 	cmd->ndp_app_info_len = req_params->ndp_info.ndp_app_info_len;
+	cmd->nan_pmk_len = req_params->pmk.pmk_len;
+	cmd->nan_csid = req_params->ncs_sk_type;
 
-	cfg_info = (uint8_t *)&cmd[1];
-	/* WMI command expects 4 byte alligned len */
-	WMITLV_SET_HDR(cfg_info, WMITLV_TAG_ARRAY_BYTE, ndp_cfg_len);
-	qdf_mem_copy(&cfg_info[WMI_TLV_HDR_SIZE],
-		     req_params->ndp_config.ndp_cfg, cmd->ndp_cfg_len);
+	tlv_ptr = (uint8_t *)&cmd[1];
 
-	app_info = &cfg_info[WMI_TLV_HDR_SIZE + ndp_cfg_len];
-	/* WMI command expects 4 byte alligned len */
-	WMITLV_SET_HDR(app_info, WMITLV_TAG_ARRAY_BYTE, ndp_app_info_len);
-	qdf_mem_copy(&app_info[WMI_TLV_HDR_SIZE],
+	WMITLV_SET_HDR(tlv_ptr, WMITLV_TAG_ARRAY_BYTE, ndp_cfg_len);
+	qdf_mem_copy(&tlv_ptr[WMI_TLV_HDR_SIZE],
+		req_params->ndp_config.ndp_cfg, cmd->ndp_cfg_len);
+	tlv_ptr = tlv_ptr + WMI_TLV_HDR_SIZE + ndp_cfg_len;
+
+	WMITLV_SET_HDR(tlv_ptr, WMITLV_TAG_ARRAY_BYTE, ndp_app_info_len);
+	qdf_mem_copy(&tlv_ptr[WMI_TLV_HDR_SIZE],
 		     req_params->ndp_info.ndp_app_info,
 		     req_params->ndp_info.ndp_app_info_len);
+	tlv_ptr = tlv_ptr + WMI_TLV_HDR_SIZE + ndp_app_info_len;
+
+	WMITLV_SET_HDR(tlv_ptr, WMITLV_TAG_ARRAY_BYTE, pmk_len);
+	qdf_mem_copy(&tlv_ptr[WMI_TLV_HDR_SIZE], req_params->pmk.pmk,
+		     cmd->nan_pmk_len);
+	tlv_ptr = tlv_ptr + WMI_TLV_HDR_SIZE + pmk_len;
+
+	WMA_LOGE(FL("vdev_id = %d, transaction_id: %d, csid: %d"),
+		cmd->vdev_id, cmd->transaction_id, cmd->nan_csid);
 
 	WMA_LOGD(FL("ndp_config len: %d"),
 		req_params->ndp_config.ndp_cfg_len);
@@ -259,6 +287,12 @@ QDF_STATUS wma_handle_ndp_responder_req(tp_wma_handle wma_handle,
 			req_params->ndp_info.ndp_app_info,
 			req_params->ndp_info.ndp_app_info_len);
 
+	WMA_LOGE(FL("pmk len: %d"), cmd->nan_pmk_len);
+	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_DEBUG,
+			   req_params->pmk.pmk, cmd->nan_pmk_len);
+
+	WMA_LOGE(FL("sending WMI_NDP_RESPONDER_REQ_CMDID(0x%X)"),
+		WMI_NDP_RESPONDER_REQ_CMDID);
 	ret = wmi_unified_cmd_send(wma_handle->wmi_handle, buf, len,
 				   WMI_NDP_RESPONDER_REQ_CMDID);
 	if (ret < 0) {
@@ -295,7 +329,7 @@ QDF_STATUS wma_handle_ndp_end_req(tp_wma_handle wma_handle, void *ptr)
 	uint32_t ndp_end_req_len, i;
 	wmi_ndp_end_req *ndp_end_req_lst;
 	wmi_buf_t buf;
-	cds_msg_t pe_msg = {0};
+	struct scheduler_msg pe_msg = {0};
 	wmi_ndp_end_req_fixed_param *cmd;
 	struct ndp_end_rsp_event end_rsp = {0};
 	struct ndp_end_req *req = ptr;
@@ -362,19 +396,6 @@ send_ndp_end_fail:
 }
 
 /**
- * wma_handle_ndp_sched_update_req() - NDP schedule update request handler
- * @wma_handle: wma handle
- * @req_params: request parameters
- *
- * Return: QDF_STATUS_SUCCESS on success; error number otherwise
- */
-QDF_STATUS wma_handle_ndp_sched_update_req(tp_wma_handle wma_handle,
-					struct ndp_end_req *req_params)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-/**
  * wma_ndp_indication_event_handler() - NDP indication event handler
  * @handle: wma handle
  * @event_info: event handler data
@@ -386,7 +407,7 @@ QDF_STATUS wma_handle_ndp_sched_update_req(tp_wma_handle wma_handle,
 static int wma_ndp_indication_event_handler(void *handle, uint8_t *event_info,
 					    uint32_t len)
 {
-	cds_msg_t pe_msg = {0};
+	struct scheduler_msg pe_msg = {0};
 	WMI_NDP_INDICATION_EVENTID_param_tlvs *event;
 	wmi_ndp_indication_event_fixed_param *fixed_params;
 	struct ndp_indication_event ind_event = {0};
@@ -407,11 +428,14 @@ static int wma_ndp_indication_event_handler(void *handle, uint8_t *event_info,
 	WMI_MAC_ADDR_TO_CHAR_ARRAY(&fixed_params->peer_discovery_mac_addr,
 				ind_event.peer_discovery_mac_addr.bytes);
 
-	WMA_LOGD(FL("WMI_NDP_INDICATION_EVENTID(0x%X) received. vdev %d, service_instance %d, ndp_instance %d, role %d, policy %d, peer_mac_addr: %pM, peer_disc_mac_addr: %pM"),
+	WMA_LOGD(FL("WMI_NDP_INDICATION_EVENTID(0x%X) received. vdev %d, \n"
+		"service_instance %d, ndp_instance %d, role %d, policy %d, \n"
+		"csid: %d, scid_len: %d, peer_mac_addr: %pM, peer_disc_mac_addr: %pM"),
 		 WMI_NDP_INDICATION_EVENTID, fixed_params->vdev_id,
 		 fixed_params->service_instance_id,
 		 fixed_params->ndp_instance_id, fixed_params->self_ndp_role,
 		 fixed_params->accept_policy,
+		 fixed_params->nan_csid, fixed_params->nan_scid_len,
 		 ind_event.peer_mac_addr.bytes,
 		 ind_event.peer_discovery_mac_addr.bytes);
 
@@ -425,6 +449,8 @@ static int wma_ndp_indication_event_handler(void *handle, uint8_t *event_info,
 
 	ind_event.ndp_config.ndp_cfg_len = fixed_params->ndp_cfg_len;
 	ind_event.ndp_info.ndp_app_info_len = fixed_params->ndp_app_info_len;
+	ind_event.ncs_sk_type = fixed_params->nan_csid;
+	ind_event.scid.scid_len = fixed_params->nan_scid_len;
 
 	if (ind_event.ndp_config.ndp_cfg_len) {
 		ind_event.ndp_config.ndp_cfg =
@@ -450,6 +476,22 @@ static int wma_ndp_indication_event_handler(void *handle, uint8_t *event_info,
 			     ind_event.ndp_info.ndp_app_info_len);
 	}
 
+	if (ind_event.scid.scid_len) {
+		ind_event.scid.scid =
+			qdf_mem_malloc(ind_event.scid.scid_len);
+		if (NULL == ind_event.scid.scid) {
+			WMA_LOGE(FL("malloc failed"));
+			qdf_mem_free(ind_event.ndp_config.ndp_cfg);
+			qdf_mem_free(ind_event.ndp_info.ndp_app_info);
+			return QDF_STATUS_E_NOMEM;
+		}
+		qdf_mem_copy(ind_event.scid.scid,
+			     event->ndp_scid, ind_event.scid.scid_len);
+		WMA_LOGD(FL("scid hex dump:"));
+		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_DEBUG,
+			ind_event.scid.scid, ind_event.scid.scid_len);
+	}
+
 	pe_msg.type = SIR_HAL_NDP_INDICATION;
 	pe_msg.bodyptr = &ind_event;
 	return wma_handle->pe_ndp_event_handler(wma_handle->mac_context,
@@ -468,7 +510,7 @@ static int wma_ndp_indication_event_handler(void *handle, uint8_t *event_info,
 static int wma_ndp_responder_rsp_event_handler(void *handle,
 					uint8_t *event_info, uint32_t len)
 {
-	cds_msg_t pe_msg = {0};
+	struct scheduler_msg pe_msg = {0};
 	tp_wma_handle wma_handle = handle;
 	WMI_NDP_RESPONDER_RSP_EVENTID_param_tlvs *event;
 	wmi_ndp_responder_rsp_event_fixed_param  *fixed_params;
@@ -481,8 +523,15 @@ static int wma_ndp_responder_rsp_event_handler(void *handle,
 	rsp.transaction_id = fixed_params->transaction_id;
 	rsp.reason = fixed_params->reason_code;
 	rsp.status = fixed_params->rsp_status;
+	rsp.create_peer = fixed_params->create_peer;
 	WMI_MAC_ADDR_TO_CHAR_ARRAY(&fixed_params->peer_ndi_mac_addr,
 				rsp.peer_mac_addr.bytes);
+
+	WMA_LOGD(FL("WMI_NDP_RESPONDER_RSP_EVENTID(0x%X) received. vdev_id: %d, peer_mac_addr: %pM,transaction_id: %d, status_code %d, reason_code: %d, create_peer: %d"),
+			WMI_NDP_RESPONDER_RSP_EVENTID, rsp.vdev_id,
+			rsp.peer_mac_addr.bytes, rsp.transaction_id,
+			rsp.status, rsp.reason, rsp.create_peer);
+
 	pe_msg.bodyptr = &rsp;
 	pe_msg.type = SIR_HAL_NDP_RESPONDER_RSP;
 	return wma_handle->pe_ndp_event_handler(wma_handle->mac_context,
@@ -502,7 +551,7 @@ static int wma_ndp_confirm_event_handler(void *handle, uint8_t *event_info,
 					 uint32_t len)
 {
 	struct ndp_confirm_event ndp_confirm = {0};
-	cds_msg_t msg = {0};
+	struct scheduler_msg msg = {0};
 	WMI_NDP_CONFIRM_EVENTID_param_tlvs *event;
 	wmi_ndp_confirm_event_fixed_param *fixed_params;
 	tp_wma_handle wma_handle = handle;
@@ -565,13 +614,10 @@ static int wma_ndp_end_response_event_handler(void *handle,
 {
 	int ret = 0;
 	QDF_STATUS status;
-	cds_msg_t pe_msg = {0};
+	struct scheduler_msg pe_msg = {0};
 	struct ndp_end_rsp_event *end_rsp;
 	WMI_NDP_END_RSP_EVENTID_param_tlvs *event;
 	wmi_ndp_end_rsp_event_fixed_param *fixed_params = NULL;
-	wmi_ndp_end_rsp_per_ndi *end_rsp_tlv;
-	uint32_t i;
-	uint32_t len_end_rsp;
 	tp_wma_handle wma_handle = handle;
 
 	event = (WMI_NDP_END_RSP_EVENTID_param_tlvs *) event_info;
@@ -580,9 +626,7 @@ static int wma_ndp_end_response_event_handler(void *handle,
 		 WMI_NDP_END_RSP_EVENTID, fixed_params->transaction_id,
 		 fixed_params->rsp_status, fixed_params->reason_code);
 
-	len_end_rsp = sizeof(*end_rsp) + (event->num_ndp_end_rsp_per_ndi_list *
-						sizeof(struct peer_ndp_map));
-	end_rsp = qdf_mem_malloc(len_end_rsp);
+	end_rsp = qdf_mem_malloc(sizeof(*end_rsp));
 	if (NULL == end_rsp) {
 		WMA_LOGE("malloc failed");
 		pe_msg.bodyval = true;
@@ -590,37 +634,11 @@ static int wma_ndp_end_response_event_handler(void *handle,
 		goto send_ndp_end_rsp;
 	}
 	pe_msg.bodyptr = end_rsp;
-	qdf_mem_zero(end_rsp, len_end_rsp);
+	qdf_mem_zero(end_rsp, sizeof(*end_rsp));
 
 	end_rsp->transaction_id = fixed_params->transaction_id;
 	end_rsp->reason = fixed_params->reason_code;
 	end_rsp->status = fixed_params->rsp_status;
-
-	if (end_rsp->status == NDP_CMD_RSP_STATUS_SUCCESS) {
-		WMA_LOGD(FL("NDP end rsp, num_peers: %d"),
-			event->num_ndp_end_rsp_per_ndi_list);
-		end_rsp->num_peers = event->num_ndp_end_rsp_per_ndi_list;
-		if (end_rsp->num_peers == 0) {
-			WMA_LOGE(FL("num_peers in NDP rsp should not be 0."));
-			end_rsp->status = NDP_CMD_RSP_STATUS_ERROR;
-			end_rsp->reason = NDP_END_FAILED;
-			goto send_ndp_end_rsp;
-		}
-		/* copy per peer response to return path buffer */
-		end_rsp_tlv = event->ndp_end_rsp_per_ndi_list;
-		for (i = 0; i < end_rsp->num_peers; i++) {
-			end_rsp->ndp_map[i].vdev_id = end_rsp_tlv[i].vdev_id;
-			WMI_MAC_ADDR_TO_CHAR_ARRAY(
-				&end_rsp_tlv[i].peer_mac_addr,
-				end_rsp->ndp_map[i].peer_ndi_mac_addr.bytes);
-			end_rsp->ndp_map[i].num_active_ndp_sessions =
-					end_rsp_tlv[i].num_active_ndps_on_ndi;
-			WMA_LOGD(FL("vdev_id: %d, peer_addr: %pM, active_ndp_left: %d"),
-				end_rsp->ndp_map[i].vdev_id,
-				&end_rsp->ndp_map[i].peer_ndi_mac_addr,
-				end_rsp->ndp_map[i].num_active_ndp_sessions);
-		}
-	}
 
 send_ndp_end_rsp:
 	pe_msg.type = SIR_HAL_NDP_END_RSP;
@@ -648,7 +666,7 @@ static int wma_ndp_end_indication_event_handler(void *handle,
 	tp_wma_handle wma_handle = handle;
 	WMI_NDP_END_INDICATION_EVENTID_param_tlvs *event;
 	wmi_ndp_end_indication *ind;
-	cds_msg_t pe_msg;
+	struct scheduler_msg pe_msg;
 	struct ndp_end_indication_event *ndp_event_buf;
 	int i, ret, buf_size;
 	struct qdf_mac_addr peer_addr;
@@ -722,7 +740,7 @@ static int wma_ndp_end_indication_event_handler(void *handle,
 static int wma_ndp_initiator_rsp_event_handler(void *handle,
 					uint8_t *event_info, uint32_t len)
 {
-	cds_msg_t pe_msg = {0};
+	struct scheduler_msg pe_msg = {0};
 	WMI_NDP_INITIATOR_RSP_EVENTID_param_tlvs *event;
 	wmi_ndp_initiator_rsp_event_fixed_param  *fixed_params;
 	struct ndp_initiator_rsp ndp_rsp = {0};
@@ -826,27 +844,6 @@ void wma_ndp_unregister_all_event_handlers(tp_wma_handle wma_handle)
 }
 
 /**
- * wma_ndp_add_wow_wakeup_event() - Add Wake on Wireless event for NDP
- * @wma_handle: WMA context
- * @vdev_id: vdev id
- *
- * Enables the firmware to wake up the host on NAN data path event.
- * All NDP events such as NDP_INDICATION, NDP_CONFIRM, etc. use the
- * same event. They can be distinguished using their TLV tags.
- *
- * Return: none
- */
-void wma_ndp_add_wow_wakeup_event(tp_wma_handle wma_handle,
-					uint8_t vdev_id)
-{
-	uint32_t event_bitmap;
-	event_bitmap = (1 << WOW_NAN_DATA_EVENT);
-	WMA_LOGI("NDI specific default wake up event 0x%x vdev id %d",
-		event_bitmap, vdev_id);
-	wma_add_wow_wakeup_event(wma_handle, vdev_id, event_bitmap, true);
-}
-
-/**
  * wma_ndp_get_eventid_from_tlvtag() - map tlv tag to event id
  * @tag: WMI TLV tag
  *
@@ -856,7 +853,7 @@ void wma_ndp_add_wow_wakeup_event(tp_wma_handle wma_handle,
  * Return: 0 if TLV tag is invalid
  *           else return corresponding WMI event id
  */
-static int wma_ndp_get_eventid_from_tlvtag(uint32_t tag)
+uint32_t wma_ndp_get_eventid_from_tlvtag(uint32_t tag)
 {
 	uint32_t event_id;
 
@@ -900,6 +897,7 @@ static int wma_ndp_get_eventid_from_tlvtag(uint32_t tag)
  * @handle: WMA handle
  * @event: event buffer
  * @len: length of @event buffer
+ * @event_id: event id for ndp wow event
  *
  * The wow event WOW_REASON_NAN_DATA is followed by the payload of the event
  * which generated the wow event.
@@ -910,66 +908,41 @@ static int wma_ndp_get_eventid_from_tlvtag(uint32_t tag)
  *
  * Return: none
  */
-void wma_ndp_wow_event_callback(void *handle, void *event,
-						  uint32_t len)
+void wma_ndp_wow_event_callback(void *handle, void *event, uint32_t len,
+				uint32_t event_id)
 {
-	uint32_t id;
-	int tlv_ok_status = 0;
-	void *wmi_cmd_struct_ptr = NULL;
-	uint32_t tag = WMITLV_GET_TLVTAG(WMITLV_GET_HDR(event));
-
-	/* Reverse map fixed params tag to EVENT_ID */
-	id = wma_ndp_get_eventid_from_tlvtag(tag);
-	if (!id) {
-		WMA_LOGE(FL("Invalid  Tag: %d"), tag);
-		return;
-	}
-
-	tlv_ok_status = wmitlv_check_and_pad_event_tlvs(handle, event, len,
-							id,
-							&wmi_cmd_struct_ptr);
-	if (tlv_ok_status != 0) {
-		WMA_LOGE(FL("Invalid Tag: %d could not check and pad tlvs"),
-			 tag);
-		return;
-	}
-
-	switch (id) {
+	WMA_LOGD(FL("ndp_wow_event dump"));
+	qdf_trace_hex_dump(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_DEBUG,
+			   event, len);
+	switch (event_id) {
 	case WMI_NDP_INITIATOR_RSP_EVENTID:
-		wma_ndp_initiator_rsp_event_handler(handle,
-						wmi_cmd_struct_ptr, len);
+		wma_ndp_initiator_rsp_event_handler(handle, event, len);
 		break;
 
 	case WMI_NDP_RESPONDER_RSP_EVENTID:
-		wma_ndp_responder_rsp_event_handler(handle,
-						wmi_cmd_struct_ptr, len);
+		wma_ndp_responder_rsp_event_handler(handle, event, len);
 		break;
 
 	case WMI_NDP_END_RSP_EVENTID:
-		wma_ndp_end_response_event_handler(handle,
-						wmi_cmd_struct_ptr, len);
+		wma_ndp_end_response_event_handler(handle, event, len);
 		break;
 
 	case WMI_NDP_INDICATION_EVENTID:
-		wma_ndp_indication_event_handler(handle,
-						wmi_cmd_struct_ptr, len);
+		wma_ndp_indication_event_handler(handle, event, len);
 		break;
 
 	case WMI_NDP_CONFIRM_EVENTID:
-		wma_ndp_confirm_event_handler(handle,
-						wmi_cmd_struct_ptr, len);
+		wma_ndp_confirm_event_handler(handle, event, len);
 		break;
 
 	case WMI_NDP_END_INDICATION_EVENTID:
-		wma_ndp_end_indication_event_handler(handle,
-						wmi_cmd_struct_ptr, len);
+		wma_ndp_end_indication_event_handler(handle, event, len);
 		break;
 
 	default:
-		WMA_LOGE(FL("Unknown tag: %d"), tag);
+		WMA_LOGE(FL("Unknown event: %d"), event_id);
 		break;
 	}
-	wmitlv_free_allocated_event_tlvs(id, &wmi_cmd_struct_ptr);
 }
 
 /**
@@ -983,13 +956,14 @@ void wma_ndp_wow_event_callback(void *handle, void *event,
  */
 void wma_add_bss_ndi_mode(tp_wma_handle wma, tpAddBssParams add_bss)
 {
-	ol_txrx_pdev_handle pdev;
+	struct cdp_pdev *pdev;
 	struct wma_vdev_start_req req;
-	ol_txrx_peer_handle peer = NULL;
+	void *peer = NULL;
 	struct wma_target_req *msg;
 	uint8_t vdev_id, peer_id;
 	QDF_STATUS status;
 	struct vdev_set_params param = {0};
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 
 	WMA_LOGI("%s: enter", __func__);
 	if (NULL == wma_find_vdev_by_addr(wma, add_bss->bssId, &vdev_id)) {
@@ -998,14 +972,16 @@ void wma_add_bss_ndi_mode(tp_wma_handle wma, tpAddBssParams add_bss)
 	}
 	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 
-	if (pdev) {
+	if (!pdev) {
 		WMA_LOGE("%s: Failed to get pdev", __func__);
 		goto send_fail_resp;
 	}
 
 	wma_set_bss_rate_flags(&wma->interfaces[vdev_id], add_bss);
 
-	peer = ol_txrx_find_peer_by_addr(pdev, add_bss->selfMacAddr, &peer_id);
+	peer = cdp_peer_find_by_addr(soc,
+			pdev,
+			add_bss->selfMacAddr, &peer_id);
 	if (!peer) {
 		WMA_LOGE("%s Failed to find peer %pM", __func__,
 			add_bss->selfMacAddr);
@@ -1021,7 +997,7 @@ void wma_add_bss_ndi_mode(tp_wma_handle wma, tpAddBssParams add_bss)
 		goto send_fail_resp;
 	}
 
-	add_bss->staContext.staIdx = ol_txrx_local_peer_id(peer);
+	add_bss->staContext.staIdx = cdp_peer_get_local_peer_id(soc, peer);
 
 	/*
 	 * beacon_intval, dtim_period, hidden_ssid, is_dfs, ssid
@@ -1059,59 +1035,6 @@ send_fail_resp:
 }
 
 /**
- * wma_delete_all_nan_remote_peers() - Delete all nan peers
- * @wma:  wma handle
- * @vdev_id: vdev id
- *
- * Return: None
- */
-void wma_delete_all_nan_remote_peers(tp_wma_handle wma, uint32_t vdev_id)
-{
-	ol_txrx_vdev_handle vdev;
-	ol_txrx_peer_handle peer, temp;
-
-	if (vdev_id > wma->max_bssid) {
-		WMA_LOGE("%s: invalid vdev_id = %d", __func__, vdev_id);
-		return;
-	}
-
-	vdev = wma->interfaces[vdev_id].handle;
-	if (!vdev) {
-		WMA_LOGE("%s: vdev is NULL for vdev_id = %d",
-			 __func__, vdev_id);
-		return;
-	}
-
-	/* remove all remote peers of ndi */
-	qdf_spin_lock_bh(&vdev->pdev->peer_ref_mutex);
-
-	temp = NULL;
-	TAILQ_FOREACH_REVERSE(peer, &vdev->peer_list,
-		peer_list_t, peer_list_elem) {
-		if (temp) {
-			qdf_spin_unlock_bh(&vdev->pdev->peer_ref_mutex);
-			if (qdf_atomic_read(
-				&temp->delete_in_progress) == 0)
-				wma_remove_peer(wma, temp->mac_addr.raw,
-					vdev_id, temp, false);
-			qdf_spin_lock_bh(&vdev->pdev->peer_ref_mutex);
-		}
-		/* self peer is deleted last */
-		if (peer == TAILQ_FIRST(&vdev->peer_list)) {
-			WMA_LOGE("%s: self peer removed", __func__);
-			break;
-		} else
-			temp = peer;
-	}
-	qdf_spin_unlock_bh(&vdev->pdev->peer_ref_mutex);
-
-	/* remove ndi self peer last */
-	peer = TAILQ_FIRST(&vdev->peer_list);
-	wma_remove_peer(wma, peer->mac_addr.raw, vdev_id, peer,
-			false);
-}
-
-/**
  * wma_register_ndp_cb() - Register NDP callbacks
  * @pe_ndp_event_handler: PE NDP callback routine pointer
  *
@@ -1121,7 +1044,7 @@ void wma_delete_all_nan_remote_peers(tp_wma_handle wma, uint32_t vdev_id)
  * Return: Success or Failure Status
  */
 QDF_STATUS wma_register_ndp_cb(QDF_STATUS (*pe_ndp_event_handler)
-				(tpAniSirGlobal mac_ctx, cds_msg_t *msg))
+				(tpAniSirGlobal mac_ctx, struct scheduler_msg *msg))
 {
 
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
@@ -1146,9 +1069,10 @@ QDF_STATUS wma_register_ndp_cb(QDF_STATUS (*pe_ndp_event_handler)
 void wma_add_sta_ndi_mode(tp_wma_handle wma, tpAddStaParams add_sta)
 {
 	enum ol_txrx_peer_state state = OL_TXRX_PEER_STATE_CONN;
-	ol_txrx_pdev_handle pdev;
-	ol_txrx_vdev_handle vdev;
-	ol_txrx_peer_handle peer;
+	struct cdp_pdev *pdev;
+	struct cdp_vdev *vdev;
+	void *peer;
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	u_int8_t peer_id;
 	QDF_STATUS status;
 	struct wma_txrx_node *iface;
@@ -1168,12 +1092,13 @@ void wma_add_sta_ndi_mode(tp_wma_handle wma, tpAddStaParams add_sta)
 		goto send_rsp;
 	}
 
-	iface = &wma->interfaces[vdev->vdev_id];
+	iface = &wma->interfaces[cdp_get_vdev_id(soc, vdev)];
 	WMA_LOGD(FL("vdev: %d, peer_mac_addr: "MAC_ADDRESS_STR),
 		add_sta->smesessionId, MAC_ADDR_ARRAY(add_sta->staMac));
 
-	peer = ol_txrx_find_peer_by_addr_and_vdev(pdev, vdev, add_sta->staMac,
-						  &peer_id);
+	peer = cdp_peer_find_by_addr_and_vdev(soc,
+			pdev, vdev,
+			add_sta->staMac, &peer_id);
 	if (peer) {
 		WMA_LOGE(FL("NDI peer already exists, peer_addr %pM"),
 			 add_sta->staMac);
@@ -1188,10 +1113,13 @@ void wma_add_sta_ndi_mode(tp_wma_handle wma, tpAddStaParams add_sta)
 	 * exists on the pDev. As this peer belongs to other vDevs, just return
 	 * here.
 	 */
-	peer = ol_txrx_find_peer_by_addr(pdev, add_sta->staMac, &peer_id);
+	peer = cdp_peer_find_by_addr(soc,
+			pdev,
+			add_sta->staMac, &peer_id);
 	if (peer) {
 		WMA_LOGE(FL("vdev:%d, peer exists on other vdev with peer_addr %pM and peer_id %d"),
-			 vdev->vdev_id, add_sta->staMac, peer_id);
+			cdp_get_vdev_id(soc, vdev),
+			add_sta->staMac, peer_id);
 		add_sta->status = QDF_STATUS_E_EXISTS;
 		goto send_rsp;
 	}
@@ -1205,8 +1133,9 @@ void wma_add_sta_ndi_mode(tp_wma_handle wma, tpAddStaParams add_sta)
 		goto send_rsp;
 	}
 
-	peer = ol_txrx_find_peer_by_addr_and_vdev(pdev, vdev, add_sta->staMac,
-						  &peer_id);
+	peer = cdp_peer_find_by_addr_and_vdev(soc,
+			pdev, vdev,
+			add_sta->staMac, &peer_id);
 	if (!peer) {
 		WMA_LOGE(FL("Failed to find peer handle using peer mac %pM"),
 			 add_sta->staMac);
@@ -1217,9 +1146,9 @@ void wma_add_sta_ndi_mode(tp_wma_handle wma, tpAddStaParams add_sta)
 	}
 
 	WMA_LOGD(FL("Moving peer %pM to state %d"), add_sta->staMac, state);
-	ol_txrx_peer_state_update(pdev, add_sta->staMac, state);
+	cdp_peer_state_update(soc, pdev, add_sta->staMac, state);
 
-	add_sta->staIdx = ol_txrx_local_peer_id(peer);
+	add_sta->staIdx = cdp_peer_get_local_peer_id(soc, peer);
 	add_sta->nss    = iface->nss;
 	add_sta->status = QDF_STATUS_SUCCESS;
 send_rsp:
@@ -1240,18 +1169,19 @@ send_rsp:
 void wma_delete_sta_req_ndi_mode(tp_wma_handle wma,
 					tpDeleteStaParams del_sta)
 {
-	ol_txrx_pdev_handle pdev;
-	struct ol_txrx_peer_t *peer;
+	struct cdp_pdev *pdev;
+	void *peer;
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 
 	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
-
 	if (!pdev) {
 		WMA_LOGE(FL("Failed to get pdev"));
 		del_sta->status = QDF_STATUS_E_FAILURE;
 		goto send_del_rsp;
 	}
 
-	peer = ol_txrx_peer_find_by_local_id(pdev, del_sta->staIdx);
+	peer = cdp_peer_find_by_local_id(cds_get_context(QDF_MODULE_ID_SOC),
+			pdev, del_sta->staIdx);
 	if (!peer) {
 		WMA_LOGE(FL("Failed to get peer handle using peer id %d"),
 			 del_sta->staIdx);
@@ -1259,8 +1189,8 @@ void wma_delete_sta_req_ndi_mode(tp_wma_handle wma,
 		goto send_del_rsp;
 	}
 
-	wma_remove_peer(wma, peer->mac_addr.raw, del_sta->smesessionId, peer,
-			false);
+	wma_remove_peer(wma, cdp_peer_get_peer_mac_addr(soc, peer),
+			del_sta->smesessionId, peer, false);
 	del_sta->status = QDF_STATUS_SUCCESS;
 
 send_del_rsp:

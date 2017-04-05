@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -71,7 +71,7 @@
 #define RRM_ROAM_SCORE_NEIGHBOR_IAPP_LIST                       30
 #endif
 
-unsigned long rrm_scan_timer;
+uint64_t rrm_scan_timer;
 
 /**
  * rrm_ll_purge_neighbor_cache() -Purges all the entries in the neighbor cache
@@ -113,7 +113,8 @@ static void rrm_ll_purge_neighbor_cache(tpAniSirGlobal pMac,
  *
  * Return: void
  */
-void rrm_indicate_neighbor_report_result(tpAniSirGlobal pMac, QDF_STATUS qdf_status)
+static void rrm_indicate_neighbor_report_result(tpAniSirGlobal pMac,
+						QDF_STATUS qdf_status)
 {
 	NeighborReportRspCallback callback;
 	void *callbackContext;
@@ -172,7 +173,7 @@ sme_rrm_send_beacon_report_xmit_ind(tpAniSirGlobal mac_ctx,
 {
 	tpSirBssDescription bss_desc = NULL;
 	tpSirBeaconReportXmitInd beacon_rep;
-	uint16_t length, ie_len;
+	uint16_t length, ie_len, tot_len;
 	uint8_t  i = 0, j = 0;
 	tCsrScanResultInfo *cur_result = NULL;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
@@ -194,7 +195,6 @@ sme_rrm_send_beacon_report_xmit_ind(tpAniSirGlobal mac_ctx,
 				"Unable to allocate memory for beacon report");
 			return QDF_STATUS_E_NOMEM;
 		}
-		qdf_mem_zero(beacon_rep, length);
 		beacon_rep->messageType = eWNI_SME_BEACON_REPORT_RESP_XMIT_IND;
 		beacon_rep->length = length;
 		beacon_rep->uDialogToken = rrm_ctx->token;
@@ -209,9 +209,9 @@ sme_rrm_send_beacon_report_xmit_ind(tpAniSirGlobal mac_ctx,
 			if (bss_desc == NULL)
 				break;
 			ie_len = GET_IE_LEN_IN_BSS(bss_desc->length);
+			tot_len = ie_len + sizeof(*bss_desc);
 			beacon_rep->pBssDescription[i] =
-				qdf_mem_malloc(ie_len +
-					sizeof(tSirBssDescription));
+				qdf_mem_malloc(tot_len);
 			if (NULL ==
 				beacon_rep->pBssDescription[i])
 				break;
@@ -250,7 +250,7 @@ sme_rrm_send_beacon_report_xmit_ind(tpAniSirGlobal mac_ctx,
 		sms_log(mac_ctx, LOG1,
 			"SME Sending BcnRepXmit to PE numBss %d i %d j %d",
 			beacon_rep->numBssDesc, i, j);
-		status = cds_send_mb_message_to_mac(beacon_rep);
+		status = umac_send_mb_message_to_mac(beacon_rep);
 	} while (cur_result);
 
 	return status;
@@ -429,6 +429,7 @@ static QDF_STATUS sme_rrm_send_scan_result(tpAniSirGlobal mac_ctx,
 	uint8_t counter = 0;
 	tpRrmSMEContext rrm_ctx = &mac_ctx->rrm.rrmSmeContext;
 	uint32_t session_id;
+	tCsrRoamInfo *roam_info;
 
 	qdf_mem_zero(&filter, sizeof(filter));
 	qdf_mem_zero(scanresults_arr,
@@ -443,7 +444,6 @@ static QDF_STATUS sme_rrm_send_scan_result(tpAniSirGlobal mac_ctx,
 			sms_log(mac_ctx, LOGP, FL("qdf_mem_malloc failed"));
 			return QDF_STATUS_E_NOMEM;
 		}
-		qdf_mem_zero(filter.SSIDs.SSIDList, sizeof(tCsrSSIDInfo));
 
 		filter.SSIDs.SSIDList->SSID.length =
 			rrm_ctx->ssId.length;
@@ -519,16 +519,30 @@ static QDF_STATUS sme_rrm_send_scan_result(tpAniSirGlobal mac_ctx,
 						NULL, measurementdone, 0);
 	}
 	counter = 0;
+
+	roam_info = qdf_mem_malloc(sizeof(*roam_info));
+	if (NULL == roam_info) {
+		sms_log(mac_ctx, LOGP, FL("vos_mem_malloc failed"));
+		status = QDF_STATUS_E_NOMEM;
+		goto rrm_send_scan_results_done;
+	}
+
 	while (scan_results) {
 		next_result = sme_scan_result_get_next(mac_ctx, result_handle);
-		sms_log(mac_ctx, LOG1, "Scan res timer:%lu, rrm scan timer:%lu",
+		sms_log(mac_ctx, LOG1, "Scan res timer:%lu, rrm scan timer:%llu",
 				scan_results->timer, rrm_scan_timer);
-		if (scan_results->timer >= rrm_scan_timer)
+		if (scan_results->timer >= rrm_scan_timer) {
+			roam_info->pBssDesc = &scan_results->BssDescriptor;
+			csr_roam_call_callback(mac_ctx, session_id, roam_info,
+						0, eCSR_ROAM_UPDATE_SCAN_RESULT,
+						eCSR_ROAM_RESULT_NONE);
 			scanresults_arr[counter++] = scan_results;
+		}
 		scan_results = next_result;
 		if (counter >= SIR_BCN_REPORT_MAX_BSS_DESC)
 			break;
 	}
+	qdf_mem_free(roam_info);
 	/*
 	 * The beacon report should be sent whether the counter is zero or
 	 * non-zero. There might be a few scan results in the cache but not
@@ -554,7 +568,9 @@ static QDF_STATUS sme_rrm_send_scan_result(tpAniSirGlobal mac_ctx,
 					scanresults_arr, measurementdone,
 					counter);
 	}
-	sme_scan_result_purge(mac_ctx, result_handle);
+
+rrm_send_scan_results_done:
+	sme_scan_result_purge(result_handle);
 	return status;
 }
 
@@ -627,14 +643,16 @@ static QDF_STATUS sme_rrm_scan_request_callback(tHalHandle halHandle,
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS sme_rrm_issue_scan_req(tpAniSirGlobal mac_ctx)
+static QDF_STATUS sme_rrm_issue_scan_req(tpAniSirGlobal mac_ctx)
 {
 	/* Issue scan request. */
 	tCsrScanRequest scan_req;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	tpRrmSMEContext sme_rrm_ctx = &mac_ctx->rrm.rrmSmeContext;
 	uint32_t session_id;
+	uint32_t max_chan_time;
 	tSirScanType scan_type;
+	uint64_t current_time;
 
 	status = csr_roam_get_session_id_from_bssid(mac_ctx,
 			&sme_rrm_ctx->sessionBssId, &session_id);
@@ -671,8 +689,6 @@ QDF_STATUS sme_rrm_issue_scan_req(tpAniSirGlobal mac_ctx)
 					FL("qdf_mem_malloc failed"));
 				return QDF_STATUS_E_NOMEM;
 			}
-			qdf_mem_zero(scan_req.SSIDs.SSIDList,
-					sizeof(tCsrSSIDInfo));
 			scan_req.SSIDs.SSIDList->SSID.length =
 				sme_rrm_ctx->ssId.length;
 			qdf_mem_copy(scan_req.SSIDs.SSIDList->SSID.ssId,
@@ -694,8 +710,46 @@ QDF_STATUS sme_rrm_issue_scan_req(tpAniSirGlobal mac_ctx)
 
 		sms_log(mac_ctx, LOG1, FL("Scan Type(%d) Max Dwell Time(%d)"),
 				scan_req.scanType, scan_req.maxChnTime);
+		/*
+		 * Use gPassive/gActiveMaxChannelTime if maxChanTime is less
+		 * than default.
+		 */
+		if (eSIR_ACTIVE_SCAN == scan_type)
+			max_chan_time =
+				mac_ctx->roam.configParam.nActiveMaxChnTime;
+		else
+			max_chan_time =
+				mac_ctx->roam.configParam.nPassiveMaxChnTime;
 
-		rrm_scan_timer = qdf_mc_timer_get_system_time();
+		if (scan_req.maxChnTime < max_chan_time) {
+			scan_req.maxChnTime = max_chan_time;
+			sms_log(mac_ctx, LOG1,
+				FL("Setting default max %d ChanTime"),
+				max_chan_time);
+		}
+
+		/*
+		 * For RRM scans timing is very important especially when the
+		 * request is for limited channels. There is no need for
+		 * firmware to rest for about 100-200 ms on the home channel.
+		 * Instead, it can start the scan right away which will make the
+		 * host to respond with the beacon report as quickly as
+		 * possible. Ensure that the scan requests are not back to back
+		 * and hence there is a check to see if the requests are atleast
+		 * 1 second apart.
+		 */
+		current_time = (uint64_t)qdf_mc_timer_get_system_time();
+		sms_log(mac_ctx, LOG1, "prev scan triggered before %llu ms, totalchannels %d",
+				current_time - rrm_scan_timer,
+				sme_rrm_ctx->channelList.numOfChannels);
+		if ((abs(current_time - rrm_scan_timer) > 1000) &&
+				(sme_rrm_ctx->channelList.numOfChannels == 1)) {
+			scan_req.restTime = 1;
+			scan_req.min_rest_time = 1;
+			scan_req.idle_time = 1;
+		}
+
+		rrm_scan_timer = (uint64_t)qdf_mc_timer_get_system_time();
 
 		/* set BSSType to default type */
 		scan_req.BSSType = eCSR_BSS_TYPE_ANY;
@@ -862,6 +916,11 @@ QDF_STATUS sme_rrm_process_beacon_report_req_ind(tpAniSirGlobal pMac, void *pMsg
 		     (uint8_t *) &pBeaconReq->measurementDuration,
 		     SIR_ESE_MAX_MEAS_IE_REQS);
 
+	sms_log(pMac, LOG1,
+		FL("token %d regClass %d randnIntvl %d msgSource %d"),
+		pSmeRrmContext->token, pSmeRrmContext->regClass,
+		pSmeRrmContext->randnIntvl, pSmeRrmContext->msgSource);
+
 	status = sme_rrm_issue_scan_req(pMac);
 
 	return status;
@@ -910,7 +969,6 @@ QDF_STATUS sme_rrm_neighbor_report_request(tpAniSirGlobal pMac, uint8_t sessionI
 		return QDF_STATUS_E_NOMEM;
 	}
 
-	qdf_mem_zero(pMsg, sizeof(tSirNeighborReportReqInd));
 	rrm_ll_purge_neighbor_cache(pMac,
 			    &pMac->rrm.rrmSmeContext.neighborReportCache);
 
@@ -921,7 +979,7 @@ QDF_STATUS sme_rrm_neighbor_report_request(tpAniSirGlobal pMac, uint8_t sessionI
 	pMsg->noSSID = pNeighborReq->no_ssid;
 	qdf_mem_copy(&pMsg->ucSSID, &pNeighborReq->ssid, sizeof(tSirMacSSid));
 
-	status = cds_send_mb_message_to_mac(pMsg);
+	status = umac_send_mb_message_to_mac(pMsg);
 	if (status != QDF_STATUS_SUCCESS)
 		return QDF_STATUS_E_FAILURE;
 
@@ -1037,8 +1095,8 @@ check_11r_assoc:
  *
  * Return: void.
  */
-void rrm_store_neighbor_rpt_by_roam_score(tpAniSirGlobal pMac,
-					  tpRrmNeighborReportDesc pNeighborReportDesc)
+static void rrm_store_neighbor_rpt_by_roam_score(tpAniSirGlobal pMac,
+				tpRrmNeighborReportDesc pNeighborReportDesc)
 {
 	tpRrmSMEContext pSmeRrmContext = &pMac->rrm.rrmSmeContext;
 	tListElem *pEntry;
@@ -1104,20 +1162,21 @@ void rrm_store_neighbor_rpt_by_roam_score(tpAniSirGlobal pMac,
  *
  * Return: QDF_STATUS_SUCCESS - Validation is successful
  */
-QDF_STATUS sme_rrm_process_neighbor_report(tpAniSirGlobal pMac, void *pMsgBuf)
+static QDF_STATUS sme_rrm_process_neighbor_report(tpAniSirGlobal pMac,
+						  void *pMsgBuf)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	tpSirNeighborReportInd pNeighborRpt = (tpSirNeighborReportInd) pMsgBuf;
 	tpRrmNeighborReportDesc pNeighborReportDesc;
 	uint8_t i = 0;
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
-	uint8_t sessionId;
+	uint32_t sessionId;
 
 	/* Get the session id */
 	status =
 		csr_roam_get_session_id_from_bssid(pMac,
 			   (struct qdf_mac_addr *) pNeighborRpt->bssId,
-			   (uint32_t *) &sessionId);
+			   &sessionId);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 #ifdef FEATURE_WLAN_ESE
 		/* Clear the cache for ESE. */
@@ -1140,8 +1199,6 @@ QDF_STATUS sme_rrm_process_neighbor_report(tpAniSirGlobal pMac, void *pMsgBuf)
 
 		}
 
-		qdf_mem_zero(pNeighborReportDesc,
-			     sizeof(tRrmNeighborReportDesc));
 		pNeighborReportDesc->pNeighborBssDescription =
 			qdf_mem_malloc(sizeof(tSirNeighborBssDescription));
 		if (NULL == pNeighborReportDesc->pNeighborBssDescription) {
@@ -1151,8 +1208,6 @@ QDF_STATUS sme_rrm_process_neighbor_report(tpAniSirGlobal pMac, void *pMsgBuf)
 			status = QDF_STATUS_E_NOMEM;
 			goto end;
 		}
-		qdf_mem_zero(pNeighborReportDesc->pNeighborBssDescription,
-			     sizeof(tSirNeighborBssDescription));
 		qdf_mem_copy(pNeighborReportDesc->pNeighborBssDescription,
 			     &pNeighborRpt->sNeighborBssDescription[i],
 			     sizeof(tSirNeighborBssDescription));
@@ -1240,7 +1295,7 @@ QDF_STATUS sme_rrm_msg_processor(tpAniSirGlobal pMac, uint16_t msg_type,
  *
  * Return: NULL
  */
-void rrm_iter_meas_timer_handle(void *userData)
+static void rrm_iter_meas_timer_handle(void *userData)
 {
 	tpAniSirGlobal pMac = (tpAniSirGlobal) userData;
 	sms_log(pMac, LOGE,
@@ -1257,7 +1312,7 @@ void rrm_iter_meas_timer_handle(void *userData)
  *
  * Return: NULL
  */
-void rrm_neighbor_rsp_timeout_handler(void *userData)
+static void rrm_neighbor_rsp_timeout_handler(void *userData)
 {
 	tpAniSirGlobal pMac = (tpAniSirGlobal) userData;
 	sms_log(pMac, LOGE, "Neighbor Response timed out ");

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -30,7 +30,9 @@
  */
 
 #include "wlan_hdd_main.h"
+#include "wlan_hdd_tsf.h"
 #include "wma_api.h"
+#include <qca_vendor.h>
 
 static struct completion tsf_sync_get_completion_evt;
 #define WLAN_TSF_SYNC_GET_TIMEOUT 2000
@@ -110,13 +112,13 @@ int hdd_capture_tsf(struct hdd_adapter_s *adapter, uint32_t *buf, int len)
  * Return: TSF_RETURN on Success, TSF_RESET_GPIO_FAIL on failure
  */
 #ifdef QCA_WIFI_3_0
-int hdd_tsf_reset_gpio(struct hdd_adapter_s *adapter)
+static int hdd_tsf_reset_gpio(struct hdd_adapter_s *adapter)
 {
 	/* No GPIO Host timer sync for integrated WIFI Device */
 	return TSF_RETURN;
 }
 #else
-int hdd_tsf_reset_gpio(struct hdd_adapter_s *adapter)
+static int hdd_tsf_reset_gpio(struct hdd_adapter_s *adapter)
 {
 	int ret;
 	ret = wma_cli_set_command((int)adapter->sessionId,
@@ -201,7 +203,7 @@ int hdd_indicate_tsf(struct hdd_adapter_s *adapter, uint32_t *buf, int len)
  *
  * Return: 0 for success or non-zero negative failure code
  */
-static int hdd_get_tsf_cb(void *pcb_cxt, struct stsf *ptsf)
+int hdd_get_tsf_cb(void *pcb_cxt, struct stsf *ptsf)
 {
 	struct hdd_context_s *hddctx;
 	struct hdd_adapter_s *adapter;
@@ -341,12 +343,13 @@ static int __wlan_hdd_cfg80211_handle_tsf_cmd(struct wiphy *wiphy,
 			status = -ENOMEM;
 			goto end;
 		}
-		if (nla_put_u64(reply_skb, QCA_WLAN_VENDOR_ATTR_TSF_TIMER_VALUE,
+		if (hdd_wlan_nla_put_u64(reply_skb,
+				QCA_WLAN_VENDOR_ATTR_TSF_TIMER_VALUE,
 				((uint64_t) adapter->tsf_high << 32 |
 				adapter->tsf_low)) ||
-				nla_put_u64(reply_skb,
+		    hdd_wlan_nla_put_u64(reply_skb,
 				QCA_WLAN_VENDOR_ATTR_TSF_SOC_TIMER_VALUE,
-				adapter->tsf_sync_soc_timer)){
+				adapter->tsf_sync_soc_timer)) {
 			hdd_err("nla put fail");
 			kfree_skb(reply_skb);
 			status = -EINVAL;

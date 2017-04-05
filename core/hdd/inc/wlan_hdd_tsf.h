@@ -68,6 +68,7 @@ int wlan_hdd_cfg80211_handle_tsf_cmd(struct wiphy *wiphy,
 					struct wireless_dev *wdev,
 					const void *data,
 					int data_len);
+int hdd_get_tsf_cb(void *pcb_cxt, struct stsf *ptsf);
 #else
 static inline void wlan_hdd_tsf_init(struct hdd_context_s *hdd_ctx)
 {
@@ -93,6 +94,11 @@ static inline int wlan_hdd_cfg80211_handle_tsf_cmd(struct wiphy *wiphy,
 {
 	return -ENOTSUPP;
 }
+static inline int hdd_get_tsf_cb(void *pcb_cxt, struct stsf *ptsf)
+{
+	return -ENOTSUPP;
+}
+
 #endif
 
 #endif

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -54,10 +54,10 @@
  * Return: Success or Failure
  */
 
-tSirRetStatus wma_post_ctrl_msg(tpAniSirGlobal pMac, tSirMsgQ *pMsg)
+tSirRetStatus wma_post_ctrl_msg(tpAniSirGlobal pMac, struct scheduler_msg *pMsg)
 {
 	if (QDF_STATUS_SUCCESS !=
-	    cds_mq_post_message(CDS_MQ_ID_WMA, (cds_msg_t *) pMsg))
+	    scheduler_post_msg(QDF_MODULE_ID_WMA,  pMsg))
 		return eSIR_FAILURE;
 	else
 		return eSIR_SUCCESS;
@@ -71,7 +71,8 @@ tSirRetStatus wma_post_ctrl_msg(tpAniSirGlobal pMac, tSirMsgQ *pMsg)
  * Return: Success or Failure
  */
 
-tSirRetStatus wma_post_cfg_msg(tpAniSirGlobal pMac, tSirMsgQ *pMsg)
+static tSirRetStatus wma_post_cfg_msg(tpAniSirGlobal pMac,
+				      struct scheduler_msg *pMsg)
 {
 	tSirRetStatus rc = eSIR_SUCCESS;
 
@@ -107,7 +108,7 @@ tSirRetStatus wma_post_cfg_msg(tpAniSirGlobal pMac, tSirMsgQ *pMsg)
 
 tSirRetStatus u_mac_post_ctrl_msg(void *pSirGlobal, tSirMbMsg *pMb)
 {
-	tSirMsgQ msg;
+	struct scheduler_msg msg;
 	tpAniSirGlobal pMac = (tpAniSirGlobal) pSirGlobal;
 
 	tSirMbMsg *pMbLocal;
@@ -155,3 +156,29 @@ tSirRetStatus u_mac_post_ctrl_msg(void *pSirGlobal, tSirMbMsg *pMb)
 
 } /* u_mac_post_ctrl_msg() */
 
+/**
+ * umac_send_mb_message_to_mac() - post a message to a message queue
+ * @pBuf: Pointer to buffer allocated by caller
+ *
+ * Return: qdf status
+ */
+QDF_STATUS umac_send_mb_message_to_mac(void *pBuf)
+{
+	QDF_STATUS qdf_ret_status = QDF_STATUS_E_FAILURE;
+	tSirRetStatus sirStatus;
+	void *hHal;
+
+	hHal = cds_get_context(QDF_MODULE_ID_SME);
+	if (NULL == hHal) {
+		QDF_TRACE(QDF_MODULE_ID_SYS, QDF_TRACE_LEVEL_ERROR,
+			  "%s: invalid hHal", __func__);
+	} else {
+		sirStatus = u_mac_post_ctrl_msg(hHal, pBuf);
+		if (eSIR_SUCCESS == sirStatus)
+			qdf_ret_status = QDF_STATUS_SUCCESS;
+	}
+
+	qdf_mem_free(pBuf);
+
+	return qdf_ret_status;
+}

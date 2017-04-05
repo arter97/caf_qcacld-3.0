@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -155,7 +155,6 @@ typedef enum {
 	/* Event send on WPS PBC probe request is received */
 	eSAP_WPS_PBC_PROBE_REQ_EVENT,
 	eSAP_REMAIN_CHAN_READY,
-	eSAP_SEND_ACTION_CNF,
 	eSAP_DISCONNECT_ALL_P2P_CLIENT,
 	eSAP_MAC_TRIG_STOP_BSS_EVENT,
 	/*
@@ -171,18 +170,19 @@ typedef enum {
 	eSAP_DFS_CAC_START,
 	eSAP_DFS_CAC_INTERRUPTED,
 	eSAP_DFS_CAC_END,
+	eSAP_DFS_PRE_CAC_END,
 	eSAP_DFS_RADAR_DETECT,
+	eSAP_DFS_RADAR_DETECT_DURING_PRE_CAC,
 	/* Event sent when user need to get the DFS NOL from CNSS */
 	eSAP_DFS_NOL_GET,
 	/* Event sent when user need to set the DFS NOL to CNSS */
 	eSAP_DFS_NOL_SET,
 	/* No ch available after DFS RADAR detect */
 	eSAP_DFS_NO_AVAILABLE_CHANNEL,
-#ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
 	eSAP_ACS_SCAN_SUCCESS_EVENT,
-#endif
 	eSAP_ACS_CHANNEL_SELECTED,
 	eSAP_ECSA_CHANGE_CHAN_IND,
+	eSAP_DFS_NEXT_CHANNEL_REQ,
 } eSapHddEvent;
 
 typedef enum {
@@ -405,6 +405,18 @@ struct sap_roc_ready_ind_s {
 };
 
 /**
+ * struct sap_acs_scan_complete_event - acs scan complete event
+ * @status: status of acs scan
+ * @channellist: acs scan channels
+ * @num_of_channels: number of channels
+ */
+struct sap_acs_scan_complete_event{
+	uint8_t status;
+	uint8_t *channellist;
+	uint8_t num_of_channels;
+};
+
+/**
  * struct sap_ch_change_ind - channel change indication
  * @new_chan: channel to change
  */
@@ -443,7 +455,6 @@ typedef struct sap_Event_s {
 		tSap_GetWPSPBCSessionEvent sapGetWPSPBCSessionEvent;
 		/*eSAP_WPS_PBC_PROBE_REQ_EVENT */
 		tSap_WPSPBCProbeReqEvent sapPBCProbeReqEvent;
-		/* eSAP_SEND_ACTION_CNF */
 		tSap_SendActionCnf sapActionCnf;
 		/* eSAP_UNKNOWN_STA_JOIN */
 		tSap_UnknownSTAJoinEvent sapUnknownSTAJoin;
@@ -454,6 +465,7 @@ typedef struct sap_Event_s {
 		struct sap_ch_selected_s sap_ch_selected;
 		struct sap_roc_ready_ind_s sap_roc_ind;
 		struct sap_ch_change_ind sap_chan_cng_ind;
+		struct sap_acs_scan_complete_event sap_acs_scan_comp;
 	} sapevt;
 } tSap_Event, *tpSap_Event;
 
@@ -485,13 +497,44 @@ struct sap_acs_cfg {
 #endif
 
 	uint16_t   ch_width;
-	uint8_t    pcl_channels[NUM_CHANNELS];
+	uint8_t    pcl_channels[QDF_MAX_NUM_CHAN];
+	uint8_t    pcl_channels_weight_list[QDF_MAX_NUM_CHAN];
 	uint32_t   pcl_ch_count;
+	uint8_t    is_ht_enabled;
+	uint8_t    is_vht_enabled;
 	/* ACS Algo Output */
 	uint8_t    pri_ch;
 	uint8_t    ht_sec_ch;
 	uint8_t    vht_seg0_center_ch;
 	uint8_t    vht_seg1_center_ch;
+};
+
+/*
+ * enum vendor_ie_access_policy- access policy
+ * @ACCESS_POLICY_NONE: access policy attribute is not valid
+ * @ACCESS_POLICY_RESPOND_IF_IE_IS_PRESENT: respond to probe req/assoc req
+ *  only if ie is present
+ * @ACCESS_POLICY_DONOT_RESPOND_IF_IE_IS_PRESENT: do not respond to probe req/
+ *  assoc req if ie is present
+*/
+enum vendor_ie_access_policy {
+	ACCESS_POLICY_NONE,
+	ACCESS_POLICY_RESPOND_IF_IE_IS_PRESENT,
+	ACCESS_POLICY_DONOT_RESPOND_IF_IE_IS_PRESENT,
+};
+
+/*
+ * enum sap_acs_dfs_mode- state of DFS mode
+ * @ACS_DFS_MODE_NONE: DFS mode attribute is not valid
+ * @ACS_DFS_MODE_ENABLE:  DFS mode is enabled
+ * @ACS_DFS_MODE_DISABLE: DFS mode is disabled
+ * @ACS_DFS_MODE_DEPRIORITIZE: Deprioritize DFS channels in scanning
+ */
+enum  sap_acs_dfs_mode {
+	ACS_DFS_MODE_NONE,
+	ACS_DFS_MODE_ENABLE,
+	ACS_DFS_MODE_DISABLE,
+	ACS_DFS_MODE_DEPRIORITIZE
 };
 
 typedef struct sap_Config {
@@ -553,6 +596,18 @@ typedef struct sap_Config {
 	/* buffer for addn ies comes from hostapd */
 	void *pProbeRespBcnIEsBuffer;
 	uint8_t sap_dot11mc; /* Specify if 11MC is enabled or disabled*/
+	uint8_t beacon_tx_rate;
+	uint8_t *vendor_ie;
+	enum vendor_ie_access_policy vendor_ie_access_policy;
+	uint16_t sta_inactivity_timeout;
+	uint16_t tx_pkt_fail_cnt_threshold;
+	uint8_t short_retry_limit;
+	uint8_t long_retry_limit;
+	uint8_t ampdu_size;
+	tSirMacRateSet supported_rates;
+	tSirMacRateSet extended_rates;
+	enum sap_acs_dfs_mode acs_dfs_mode;
+	struct hdd_channel_info *channel_info;
 } tsap_Config_t;
 
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
@@ -658,6 +713,7 @@ typedef struct sSapDfsInfo {
 	 * channel switch is disabled.
 	 */
 	uint8_t disable_dfs_ch_switch;
+	uint16_t tx_leakage_threshold;
 } tSapDfsInfo;
 
 typedef struct tagSapCtxList {
@@ -800,6 +856,15 @@ typedef struct {
 #endif /* FEATURE_WLAN_CH_AVOID */
 void sap_cleanup_channel_list(void *sapContext);
 void sapCleanupAllChannelList(void);
+
+/**
+ * sap_is_auto_channel_select() - is channel AUTO_CHANNEL_SELECT
+ * @pvos_gctx: Pointer to vos global context structure
+ *
+ * Return: true on AUTO_CHANNEL_SELECT, false otherwise
+ */
+bool sap_is_auto_channel_select(void *pvos_gctx);
+
 QDF_STATUS wlansap_set_wps_ie(void *p_cds_gctx, tSap_WPSIE *pWPSIe);
 QDF_STATUS wlansap_update_wps_ie(void *p_cds_gctx);
 QDF_STATUS wlansap_stop_Wps(void *p_cds_gctx);
@@ -808,24 +873,65 @@ void *wlansap_open(void *p_cds_gctx);
 QDF_STATUS wlansap_global_init(void);
 QDF_STATUS wlansap_global_deinit(void);
 QDF_STATUS wlansap_start(void *p_cds_gctx, enum tQDF_ADAPTER_MODE mode,
-			 uint8_t *addr, uint32_t *session_id);
+			 uint8_t *addr, uint32_t session_id);
 QDF_STATUS wlansap_stop(void *p_cds_gctx);
 QDF_STATUS wlansap_close(void *p_cds_gctx);
 typedef QDF_STATUS (*tpWLAN_SAPEventCB)(tpSap_Event pSapEvent,
 					void *pUsrContext);
 uint8_t wlansap_get_state(void *p_cds_gctx);
 
+/**
+ * wlansap_is_channel_in_nol_list() - This API checks if channel is
+ * in nol list
+ * @ctx: context pointer
+ * @channel: channel
+ * @chanBondState: channel bonding state
+ *
+ * Return: True/False
+ */
+bool wlansap_is_channel_in_nol_list(void *p_cds_gctx, uint8_t channel_no,
+				    ePhyChanBondState chanBondState);
+/**
+ * wlansap_is_channel_leaking_in_nol() - This API checks if channel is leaking
+ * in nol list
+ * @ctx: context pointer
+ * @channel: channel
+ * @chan_bw: channel bandwidth
+ *
+ * Return: True/False
+ */
+bool wlansap_is_channel_leaking_in_nol(void *ctx, uint8_t channel,
+				       uint8_t chan_bw);
+
 QDF_STATUS wlansap_start_bss(void *p_cds_gctx,
 	 tpWLAN_SAPEventCB pSapEventCallback,
 	 tsap_Config_t *pConfig, void *pUsrContext);
 
+/**
+ * wlan_sap_update_next_channel() - Update next channel configured using vendor
+ * command in SAP context
+ * @ctx: SAP context
+ * @channel: channel number
+ * @chan_bw: channel width
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_sap_update_next_channel(void *ctx, uint8_t channel,
+				       enum phy_ch_width chan_bw);
+QDF_STATUS wlan_sap_set_pre_cac_status(void *ctx, bool status,
+		tHalHandle handle);
+QDF_STATUS wlan_sap_set_chan_before_pre_cac(void *ctx,
+		uint8_t chan_before_pre_cac);
+QDF_STATUS wlan_sap_set_pre_cac_complete_status(void *ctx, bool status);
+bool wlan_sap_is_pre_cac_active(tHalHandle handle);
+QDF_STATUS wlan_sap_get_pre_cac_vdev_id(tHalHandle handle, uint8_t *vdev_id);
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 uint16_t wlansap_check_cc_intf(void *Ctx);
 #endif
 QDF_STATUS wlansap_set_mac_acl(void *p_cds_gctx, tsap_Config_t *pConfig);
 QDF_STATUS wlansap_stop_bss(void *p_cds_gctx);
 QDF_STATUS wlansap_disassoc_sta(void *p_cds_gctx,
-				const uint8_t *pPeerStaMac);
+				struct tagCsrDelStaParams *p_del_sta_params);
 QDF_STATUS wlansap_deauth_sta(void *p_cds_gctx,
 			struct tagCsrDelStaParams *pDelStaParams);
 QDF_STATUS wlansap_set_channel_change_with_csa(void *p_cds_gctx,
@@ -898,8 +1004,17 @@ void wlansap_extend_to_acs_range(uint8_t *startChannelNum,
 		uint8_t *endChannelNum,
 		uint8_t *bandStartChannel,
 		uint8_t *bandEndChannel);
-QDF_STATUS wlansap_get_dfs_nol(void *pSapCtx);
+QDF_STATUS wlansap_get_dfs_nol(void *pSapCtx, uint8_t *nol, uint32_t *nol_len);
 QDF_STATUS wlansap_set_dfs_nol(void *pSapCtx, eSapDfsNolType conf);
+
+/**
+ * wlan_sap_set_vendor_acs() - Set vendor specific acs in sap context
+ * @pSapCtx: SAP context
+ * @is_vendor_acs: if vendor specific acs is enabled
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_sap_set_vendor_acs(void *sap_ctx, bool is_vendor_acs);
 void wlansap_populate_del_sta_params(const uint8_t *mac,
 		uint16_t reason_code,
 		uint8_t subtype,
@@ -908,6 +1023,14 @@ QDF_STATUS wlansap_acs_chselect(void *pvos_gctx,
 		tpWLAN_SAPEventCB pacs_event_callback,
 		tsap_Config_t *pconfig,
 		void *pusr_context);
+
+uint32_t wlansap_get_chan_width(void *cds_ctx);
+
+QDF_STATUS wlansap_set_tx_leakage_threshold(tHalHandle hal,
+			uint16_t tx_leakage_threshold);
+
+QDF_STATUS wlansap_set_invalid_session(void *cds_ctx);
+
 #ifdef __cplusplus
 }
 #endif

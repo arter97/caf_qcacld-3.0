@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -67,11 +67,12 @@ QDF_STATUS sme_set_ps_ns_offload(tHalHandle hal_ctx,
 
 #endif /* WLAN_NS_OFFLOAD */
 /* / Post a message to PE module */
-tSirRetStatus sme_post_pe_message(tpAniSirGlobal mac_ctx, tpSirMsgQ pMsg);
+tSirRetStatus sme_post_pe_message(tpAniSirGlobal mac_ctx,
+				  struct scheduler_msg *pMsg);
 
 QDF_STATUS sme_ps_enable_auto_ps_timer(tHalHandle hal_ctx,
 		uint32_t sessionId,
-		bool isReassoc);
+		uint32_t timeout);
 QDF_STATUS sme_ps_disable_auto_ps_timer(tHalHandle hal_ctx,
 		uint32_t sessionId);
 
@@ -96,7 +97,7 @@ static inline void sme_set_pno_channel_prediction(void *request_buf,
 {}
 #endif
 
-QDF_STATUS sme_is_auto_ps_timer_running(tHalHandle hal_ctx,
+bool sme_is_auto_ps_timer_running(tHalHandle hal_ctx,
 		uint32_t session_id);
 
 #endif /* #if !defined(__SME_POWER_SAVE_API_H) */

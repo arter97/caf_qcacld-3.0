@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2014-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011, 2014-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -116,6 +116,40 @@ static inline struct ol_tx_desc_t *ol_tx_desc_find(
 }
 
 /**
+ * @brief Use a tx descriptor ID to find the corresponding desriptor object
+ *    and add sanity check.
+ *
+ * @param pdev - the data physical device sending the data
+ * @param tx_desc_id - the ID of the descriptor in question
+ * @return the descriptor object that has the specified ID,
+ *    if failure, will return NULL.
+ */
+
+#ifdef QCA_SUPPORT_TXDESC_SANITY_CHECKS
+static inline struct ol_tx_desc_t *
+ol_tx_desc_find_check(struct ol_txrx_pdev_t *pdev, u_int16_t tx_desc_id)
+{
+	struct ol_tx_desc_t *tx_desc;
+
+	tx_desc = ol_tx_desc_find(pdev, tx_desc_id);
+
+	if (tx_desc->pkt_type == ol_tx_frm_freed) {
+		return NULL;
+	}
+
+	return tx_desc;
+}
+
+#else
+
+static inline struct ol_tx_desc_t *
+ol_tx_desc_find_check(struct ol_txrx_pdev_t *pdev, u_int16_t tx_desc_id)
+{
+	return ol_tx_desc_find(pdev, tx_desc_id);
+}
+#endif
+
+/**
  * @brief Free a list of tx descriptors and the tx frames they refer to.
  * @details
  *  Free a batch of "standard" tx descriptors and their tx frames.
@@ -175,7 +209,7 @@ ol_tx_desc_id(struct ol_txrx_pdev_t *pdev, struct ol_tx_desc_t *tx_desc)
  * @return void pointer to the beacon header for the given vdev
  */
 
-void *ol_ath_get_bcn_header(ol_pdev_handle pdev, A_UINT32 vdev_id);
+void *ol_ath_get_bcn_header(struct cdp_cfg *cfg_pdev, A_UINT32 vdev_id);
 
 /*
  * @brief Free a tx descriptor, without freeing the matching frame.
@@ -194,9 +228,17 @@ struct qdf_tso_seg_elem_t *ol_tso_alloc_segment(struct ol_txrx_pdev_t *pdev);
 
 void ol_tso_free_segment(struct ol_txrx_pdev_t *pdev,
 	 struct qdf_tso_seg_elem_t *tso_seg);
+struct qdf_tso_num_seg_elem_t *ol_tso_num_seg_alloc(
+				struct ol_txrx_pdev_t *pdev);
+void ol_tso_num_seg_free(struct ol_txrx_pdev_t *pdev,
+	 struct qdf_tso_num_seg_elem_t *tso_num_seg);
+
 #else
 #define ol_tso_alloc_segment(pdev) /*no-op*/
 #define ol_tso_free_segment(pdev, tso_seg) /*no-op*/
+#define ol_tso_num_seg_alloc(pdev) /*no-op*/
+#define ol_tso_num_seg_free(pdev, tso_num_seg) /*no-op*/
+
 #endif
 
 /**
@@ -296,7 +338,7 @@ static inline
 void ol_tx_desc_dup_detect_init(struct ol_txrx_pdev_t *pdev, uint16_t pool_size)
 {
 	uint16_t size = (pool_size >> DIV_BY_8) +
-			((pool_size & MOD_BY_8) ? 1 : 0);
+		sizeof(*pdev->tx_desc.free_list_bitmap);
 	pdev->tx_desc.free_list_bitmap = qdf_mem_malloc(size);
 	if (!pdev->tx_desc.free_list_bitmap)
 		qdf_print("%s: malloc failed", __func__);
@@ -329,13 +371,19 @@ void ol_tx_desc_dup_detect_set(struct ol_txrx_pdev_t *pdev,
 				struct ol_tx_desc_t *tx_desc)
 {
 	uint16_t msdu_id = ol_tx_desc_id(pdev, tx_desc);
-	uint16_t index = msdu_id >> DIV_BY_32;
-	uint8_t pos = msdu_id & MOD_BY_32;
+	bool test;
 
 	if (!pdev->tx_desc.free_list_bitmap)
 		return;
 
-	if (qdf_unlikely(pdev->tx_desc.free_list_bitmap[index] & (1 << pos))) {
+	if (qdf_unlikely(msdu_id > pdev->tx_desc.pool_size)) {
+		qdf_print("%s: msdu_id %d > pool_size %d",
+			  __func__, msdu_id, pdev->tx_desc.pool_size);
+		QDF_BUG(0);
+	}
+
+	test = test_and_set_bit(msdu_id, pdev->tx_desc.free_list_bitmap);
+	if (qdf_unlikely(test)) {
 		uint16_t size = (pdev->tx_desc.pool_size >> DIV_BY_8) +
 			((pdev->tx_desc.pool_size & MOD_BY_8) ? 1 : 0);
 		qdf_print("duplicate msdu_id %d detected !!\n", msdu_id);
@@ -343,7 +391,6 @@ void ol_tx_desc_dup_detect_set(struct ol_txrx_pdev_t *pdev,
 		(void *)pdev->tx_desc.free_list_bitmap, size);
 		QDF_BUG(0);
 	}
-	pdev->tx_desc.free_list_bitmap[index] |= (1 << pos);
 }
 
 /**
@@ -358,14 +405,19 @@ void ol_tx_desc_dup_detect_reset(struct ol_txrx_pdev_t *pdev,
 				 struct ol_tx_desc_t *tx_desc)
 {
 	uint16_t msdu_id = ol_tx_desc_id(pdev, tx_desc);
-	uint16_t index = msdu_id >> DIV_BY_32;
-	uint8_t pos = msdu_id & MOD_BY_32;
+	bool test;
 
 	if (!pdev->tx_desc.free_list_bitmap)
 		return;
 
-	if (qdf_unlikely(!
-		(pdev->tx_desc.free_list_bitmap[index] & (1 << pos)))) {
+	if (qdf_unlikely(msdu_id > pdev->tx_desc.pool_size)) {
+		qdf_print("%s: msdu_id %d > pool_size %d",
+			  __func__, msdu_id, pdev->tx_desc.pool_size);
+		QDF_BUG(0);
+	}
+
+	test = !test_and_clear_bit(msdu_id, pdev->tx_desc.free_list_bitmap);
+	if (qdf_unlikely(test)) {
 		uint16_t size = (pdev->tx_desc.pool_size >> DIV_BY_8) +
 			((pdev->tx_desc.pool_size & MOD_BY_8) ? 1 : 0);
 		qdf_print("duplicate free msg received for msdu_id %d!!\n",
@@ -374,7 +426,6 @@ void ol_tx_desc_dup_detect_reset(struct ol_txrx_pdev_t *pdev,
 		(void *)pdev->tx_desc.free_list_bitmap, size);
 		QDF_BUG(0);
 	}
-	pdev->tx_desc.free_list_bitmap[index] &= ~(1 << pos);
 }
 #else
 static inline

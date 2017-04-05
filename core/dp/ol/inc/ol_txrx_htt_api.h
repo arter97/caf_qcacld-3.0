@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -37,13 +37,21 @@
 #include <qdf_nbuf.h>           /* qdf_nbuf_t */
 
 #include <cdp_txrx_cmn.h>      /* ol_txrx_pdev_handle */
+#include <ol_defines.h>
 
+#ifdef CONFIG_HL_SUPPORT
+static inline uint16_t *ol_tx_msdu_id_storage(qdf_nbuf_t msdu)
+{
+	return (uint16_t *) (&QDF_NBUF_CB_TX_DESC_ID(msdu));
+
+}
+#else
 static inline uint16_t *ol_tx_msdu_id_storage(qdf_nbuf_t msdu)
 {
 	qdf_assert(qdf_nbuf_headroom(msdu) >= (sizeof(uint16_t) * 2 - 1));
 	return (uint16_t *) (((qdf_size_t) (qdf_nbuf_head(msdu) + 1)) & ~0x1);
 }
-
+#endif
 /**
  * @brief Tx MSDU download completion for a LL system
  * @details

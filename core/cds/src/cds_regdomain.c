@@ -187,10 +187,14 @@ static const struct reg_dmn_pair g_reg_dmn_pairs[] = {
 	{APL1_ETSIC, APL1, ETSIC, CTRY_DEFAULT},
 	{APL6_WORLD, APL6, WORLD, CTRY_DEFAULT},
 	{APL7_FCCA, APL7, FCCA, CTRY_DEFAULT},
+	{APL8_WORLD, APL8, WORLD, CTRY_DEFAULT},
 	{APL9_WORLD, APL9, WORLD, CTRY_DEFAULT},
 	{APL10_WORLD, APL10, WORLD, CTRY_DEFAULT},
 	{APL12_WORLD, APL12, WORLD, CTRY_DEFAULT},
 	{APL13_WORLD, APL13, WORLD, CTRY_DEFAULT},
+	{APL14_WORLD, APL14, WORLD, CTRY_DEFAULT},
+	{APL15_WORLD, APL15, WORLD, CTRY_DEFAULT},
+	{APL16_WORLD, APL16, WORLD, CTRY_DEFAULT},
 	{WOR0_WORLD, WOR0_WORLD, WOR0_WORLD, CTRY_DEFAULT},
 	{WOR1_WORLD, WOR1_WORLD, WOR1_WORLD, CTRY_DEFAULT},
 	{WOR2_WORLD, WOR2_WORLD, WOR2_WORLD, CTRY_DEFAULT},
@@ -213,19 +217,19 @@ static const struct country_code_to_reg_dmn g_all_countries[] = {
 	{CTRY_ALGERIA, APL13_WORLD, "DZ", "ALGERIA"},
 	{CTRY_AMERICAN_SAMOA, FCC3_FCCA, "AS", "AMERICAN SAMOA"},
 	{CTRY_ANGUILLA, ETSI1_WORLD, "AI", "ANGUILLA"},
-	{CTRY_ARGENTINA, FCC6_WORLD, "AR", "ARGENTINA"},
+	{CTRY_ARGENTINA, APL16_WORLD, "AR", "ARGENTINA"},
 	{CTRY_ARMENIA, ETSI4_WORLD, "AM", "ARMENIA"},
 	{CTRY_ARUBA, ETSI1_WORLD, "AW", "ARUBA"},
 	{CTRY_AUSTRALIA, FCC6_WORLD, "AU", "AUSTRALIA"},
 	{CTRY_AUSTRIA, ETSI1_WORLD, "AT", "AUSTRIA"},
 	{CTRY_AZERBAIJAN, ETSI4_WORLD, "AZ", "AZERBAIJAN"},
 	{CTRY_BAHAMAS, FCC3_WORLD, "BS", "BAHAMAS"},
-	{CTRY_BAHRAIN, APL6_WORLD, "BH", "BAHRAIN"},
+	{CTRY_BAHRAIN, APL15_WORLD, "BH", "BAHRAIN"},
 	{CTRY_BANGLADESH, APL1_WORLD, "BD", "BANGLADESH"},
 	{CTRY_BARBADOS, FCC2_WORLD, "BB", "BARBADOS"},
 	{CTRY_BELARUS, ETSI1_WORLD, "BY", "BELARUS"},
 	{CTRY_BELGIUM, ETSI1_WORLD, "BE", "BELGIUM"},
-	{CTRY_BELIZE, APL1_ETSIC, "BZ", "BELIZE"},
+	{CTRY_BELIZE, FCC3_ETSIC, "BZ", "BELIZE"},
 	{CTRY_BERMUDA, FCC3_FCCA, "BM", "BERMUDA"},
 	{CTRY_BHUTAN, ETSI1_WORLD, "BT", "BHUTAN"},
 	{CTRY_BOLIVIA, APL8_WORLD, "BO", "BOLIVIA"},
@@ -240,7 +244,7 @@ static const struct country_code_to_reg_dmn g_all_countries[] = {
 	{CTRY_CENTRAL_AFRICA_REPUBLIC, FCC3_WORLD, "CF", "AFRICA REPUBLIC"},
 	{CTRY_CHAD, ETSI1_WORLD, "TD", "CHAD"},
 	{CTRY_CHILE, APL6_WORLD, "CL", "CHILE"},
-	{CTRY_CHINA, FCC2_WORLD, "CN", "CHINA"},
+	{CTRY_CHINA, APL14_WORLD, "CN", "CHINA"},
 	{CTRY_CHRISTMAS_ISLAND, FCC3_WORLD, "CX", "CHRISTMAS ISLAND"},
 	{CTRY_COLOMBIA, FCC3_WORLD, "CO", "COLOMBIA"},
 	{CTRY_COSTA_RICA, FCC3_WORLD, "CR", "COSTA RICA"},
@@ -275,7 +279,7 @@ static const struct country_code_to_reg_dmn g_all_countries[] = {
 	{CTRY_HONG_KONG, FCC3_WORLD, "HK", "HONG KONG"},
 	{CTRY_HUNGARY, ETSI1_WORLD, "HU", "HUNGARY"},
 	{CTRY_ICELAND, ETSI1_WORLD, "IS", "ICELAND"},
-	{CTRY_INDIA, APL6_WORLD, "IN", "INDIA"},
+	{CTRY_INDIA, APL15_WORLD, "IN", "INDIA"},
 	{CTRY_INDONESIA, APL2_ETSIC, "ID", "INDONESIA"},
 	{CTRY_IRAN, APL1_WORLD, "IR", "IRAN"},
 	{CTRY_IRELAND, ETSI1_WORLD, "IE", "IRELAND"},
@@ -312,6 +316,7 @@ static const struct country_code_to_reg_dmn g_all_countries[] = {
 	{CTRY_MONGOLIA, FCC3_WORLD, "MN", "MONGOLIA"},
 	{CTRY_MONTENEGRO, ETSI1_WORLD, "ME", "MONTENEGRO"},
 	{CTRY_MOROCCO, ETSI3_WORLD, "MA", "MOROCCO"},
+	{CTRY_NAMIBIA, APL9_WORLD, "NA", "NAMIBIA"},
 	{CTRY_NEPAL, APL6_WORLD, "NP", "NEPAL"},
 	{CTRY_NETHERLANDS, ETSI1_WORLD, "NL", "NETHERLANDS"},
 	{CTRY_NETHERLANDS_ANTILLES, ETSI1_WORLD, "AN", "NETHERLANDS ANTILLES"},
@@ -321,7 +326,7 @@ static const struct country_code_to_reg_dmn g_all_countries[] = {
 	{CTRY_NICARAGUA, FCC3_FCCA, "NI", "NICARAGUA"},
 	{CTRY_NORWAY, ETSI1_WORLD, "NO", "NORWAY"},
 	{CTRY_OMAN, ETSI1_WORLD, "OM", "OMAN"},
-	{CTRY_PAKISTAN, APL1_WORLD, "PK", "PAKISTAN"},
+	{CTRY_PAKISTAN, APL1_ETSIC, "PK", "PAKISTAN"},
 	{CTRY_PALAU, FCC3_FCCA, "PW", "PALAU"},
 	{CTRY_PANAMA, FCC1_FCCA, "PA", "PANAMA"},
 	{CTRY_PAPUA_NEW_GUINEA, FCC3_WORLD, "PG", "PAPUA NEW GUINEA"},
@@ -368,7 +373,7 @@ static const struct country_code_to_reg_dmn g_all_countries[] = {
 	{CTRY_UKRAINE, ETSI9_WORLD, "UA", "UKRAINE"},
 	{CTRY_UAE, FCC3_WORLD, "AE", "UNITED ARAB EMIRATES"},
 	{CTRY_UNITED_KINGDOM, ETSI1_WORLD, "GB", "UNITED KINGDOM"},
-	{CTRY_UNITED_STATES, FCC8_FCCA, "US", "UNITED STATES"},
+	{CTRY_UNITED_STATES, FCC3_FCCA, "US", "UNITED STATES"},
 	{CTRY_UNITED_STATES_PS, FCC4_FCCA, "PS", "US PUBLIC SAFETY"},
 	{CTRY_URUGUAY, FCC2_WORLD, "UY", "URUGUAY"},
 	{CTRY_UZBEKISTAN, ETSI3_WORLD, "UZ", "UZBEKISTAN"},
@@ -418,6 +423,9 @@ static const struct reg_dmn g_reg_dmns[] = {
 	{APL11, ETSI},
 	{APL12, ETSI},
 	{APL13, ETSI},
+	{APL14, FCC},
+	{APL15, FCC},
+	{APL16, FCC},
 	{NULL1, NO_CTL},
 	{MKK3, MKK},
 	{MKK4, MKK},
@@ -463,7 +471,7 @@ struct reg_dmn_tables g_reg_dmn_tbl = {
  */
 static uint16_t get_bdf_reg_dmn(uint16_t reg_dmn)
 {
-	return reg_dmn & ~WORLDWIDE_ROAMING_FLAG;
+	return reg_dmn & ~WORLD_ROAMING_FLAG;
 }
 
 /**
@@ -476,8 +484,8 @@ static bool is_reg_dmn_valid(uint16_t reg_dmn)
 {
 	int32_t i;
 
-	if (reg_dmn & COUNTRY_ERD_FLAG) {
-		uint16_t cc = reg_dmn & ~COUNTRY_ERD_FLAG;
+	if (reg_dmn & CTRY_FLAG) {
+		uint16_t cc = reg_dmn & ~CTRY_FLAG;
 		for (i = 0; i < g_reg_dmn_tbl.all_countries_cnt; i++)
 			if (g_reg_dmn_tbl.all_countries[i].country_code == cc)
 				return true;
@@ -541,9 +549,9 @@ static uint16_t reg_dmn_get_default_country(uint16_t reg_dmn)
 {
 	int32_t i;
 	const struct country_code_to_reg_dmn *country = NULL;
-	uint16_t cc = reg_dmn & ~COUNTRY_ERD_FLAG;
+	uint16_t cc = reg_dmn & ~CTRY_FLAG;
 
-	if (reg_dmn & COUNTRY_ERD_FLAG) {
+	if (reg_dmn & CTRY_FLAG) {
 		country = find_country(cc);
 		if (country)
 			return cc;
@@ -624,7 +632,7 @@ static const struct country_code_to_reg_dmn *get_country_from_rd(
  */
 static void reg_dmn_sanitize(struct regulatory *reg)
 {
-	if (reg->reg_domain != COUNTRY_ERD_FLAG)
+	if (reg->reg_domain != CTRY_FLAG)
 		return;
 
 	reg->reg_domain = WOR0_WORLD;
@@ -686,25 +694,6 @@ int32_t cds_fill_some_regulatory_info(struct regulatory *reg)
 	}
 
 	return 0;
-}
-
-/**
- * get_reg_dmn_for_country() - get regulatory domain for country
- * @alpha2: country alpha2
- *
- * Return: regulatory domain
- */
-int32_t get_reg_dmn_for_country(uint8_t *alpha2)
-{
-	uint8_t i;
-
-	for (i = 0; i < g_reg_dmn_tbl.all_countries_cnt; i++) {
-		if ((g_reg_dmn_tbl.all_countries[i].alpha2[0] == alpha2[0]) &&
-		    (g_reg_dmn_tbl.all_countries[i].alpha2[1] == alpha2[1]))
-			return g_reg_dmn_tbl.all_countries[i].reg_dmn_pair;
-	}
-
-	return -1;
 }
 
 /**
@@ -776,28 +765,6 @@ void cds_set_wma_dfs_region(uint8_t dfs_region)
 }
 
 /**
- * cds_get_reg_dmn_5g() - get the 5G reg-domain
- * @reg_dmn: the complete reg domain
- *
- * Return: 5 G reg domain
- */
-uint16_t cds_get_reg_dmn_5g(uint32_t reg_dmn)
-{
-	uint16_t i;
-
-	for (i = 0; i < g_reg_dmn_tbl.reg_dmn_pairs_cnt; i++) {
-		if (g_reg_dmn_tbl.reg_dmn_pairs[i].reg_dmn_pair == reg_dmn)
-			return g_reg_dmn_tbl.reg_dmn_pairs[i].reg_dmn_5ghz;
-	}
-
-	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
-		  "invalid regulatory domain/country code 0x%x",
-		  reg_dmn);
-
-	return 0;
-}
-
-/**
  * cds_reg_dmn_get_chanwidth_from_opclass() - return chan width based on opclass
  * @country: country name
  * @channel: operating channel
@@ -816,11 +783,11 @@ uint16_t cds_reg_dmn_get_chanwidth_from_opclass(uint8_t *country,
 	const struct reg_dmn_op_class_map_t *class;
 	uint16_t i;
 
-	if (true != qdf_mem_cmp(country, "US", 2))
+	if (!qdf_mem_cmp(country, "US", 2))
 		class = us_op_class;
-	else if (true != qdf_mem_cmp(country, "EU", 2))
+	else if (!qdf_mem_cmp(country, "EU", 2))
 		class = euro_op_class;
-	else if (true != qdf_mem_cmp(country, "JP", 2))
+	else if (!qdf_mem_cmp(country, "JP", 2))
 		class = japan_op_class;
 	else
 		class = global_op_class;
@@ -856,11 +823,11 @@ uint16_t cds_reg_dmn_get_opclass_from_channel(uint8_t *country, uint8_t channel,
 	const struct reg_dmn_op_class_map_t *class = NULL;
 	uint16_t i = 0;
 
-	if (true != qdf_mem_cmp(country, "US", 2)) {
+	if (!qdf_mem_cmp(country, "US", 2)) {
 		class = us_op_class;
-	} else if (true != qdf_mem_cmp(country, "EU", 2)) {
+	} else if (!qdf_mem_cmp(country, "EU", 2)) {
 		class = euro_op_class;
-	} else if (true != qdf_mem_cmp(country, "JP", 2)) {
+	} else if (!qdf_mem_cmp(country, "JP", 2)) {
 		class = japan_op_class;
 	} else {
 		class = global_op_class;
