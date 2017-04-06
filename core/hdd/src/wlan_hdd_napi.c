@@ -302,7 +302,7 @@ static int hdd_napi_perfd_cpufreq(enum qca_napi_tput_state req_state)
 		goto hnpc_ret;
 	} /* switch */
 
-	NAPI_DEBUG("CPU min freq to %d",
+	NAPI_DEBUG("CPU min freq to %s %d",
 		   (req.freq == 0)?"Resetting":"Setting", req.freq);
 	/* the following service function returns void */
 	wlan_hdd_send_svc_nlink_msg(hdd_ctx->radio_index,
@@ -479,8 +479,11 @@ int hdd_display_napi_stats(void)
 
 	for (i = 0; i < CE_COUNT_MAX; i++)
 		if (napid->ce_map & (0x01 << i)) {
-			napii = &(napid->napis[i]);
-			for (j = 0; j < NR_CPUS; j++) {
+			napii = napid->napis[i];
+			if (!napii)
+				continue;
+
+			for (j = 0; j < num_possible_cpus(); j++) {
 				napis = &(napii->stats[j]);
 				n = 0;
 				max = sizeof(buf);

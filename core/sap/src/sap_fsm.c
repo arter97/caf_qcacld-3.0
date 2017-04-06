@@ -1279,6 +1279,37 @@ bool sap_check_in_avoid_ch_list(ptSapContext sap_ctx, uint8_t channel)
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
 
 /**
+ * sap_is_valid_acs_channel() - checks if given channel is in acs channel range
+ * @sap_ctx: sap context.
+ * @channel: channel to be checked in acs range
+ *
+ * Return: true, if channel is valid, false otherwise.
+ */
+static bool sap_is_valid_acs_channel(ptSapContext sap_ctx, uint8_t channel)
+{
+	int i = 0;
+
+	/* Check whether acs is enabled */
+	if (!sap_ctx->acs_cfg->acs_mode)
+		return true;
+
+	if ((channel < sap_ctx->acs_cfg->start_ch) ||
+			(channel > sap_ctx->acs_cfg->end_ch)) {
+		return false;
+	}
+	if (!sap_ctx->acs_cfg->ch_list) {
+		/* List not present, return */
+		return true;
+	} else {
+		for (i = 0; i < sap_ctx->acs_cfg->ch_list_count; i++)
+			if (channel == sap_ctx->acs_cfg->ch_list[i])
+				return true;
+	}
+
+	return false;
+}
+
+/**
  * sap_apply_rules() - validates channels in sap_ctx channel list
  * @sap_ctx: sap context pointer
  *
@@ -1297,7 +1328,7 @@ static uint8_t sap_apply_rules(ptSapContext sap_ctx)
 	uint8_t num_valid_ch, i = 0, ch_id;
 	tAll5GChannelList *sap_all_ch = &sap_ctx->SapAllChnlList;
 	bool is_ch_nol = false;
-	bool is_out_of_range = false;
+	bool is_valid_acs_chan = false;
 	tpAniSirGlobal mac_ctx;
 	tHalHandle hal = CDS_GET_HAL_CB(sap_ctx->p_cds_gctx);
 	uint8_t preferred_location;
@@ -1408,15 +1439,16 @@ static uint8_t sap_apply_rules(ptSapContext sap_ctx)
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
 
 		/* check if the channel is within ACS channel range */
-		is_out_of_range = sap_acs_channel_check(sap_ctx, ch_id);
-		if (true == is_out_of_range) {
+		is_valid_acs_chan = sap_is_valid_acs_channel(sap_ctx, ch_id);
+		if (is_valid_acs_chan == false) {
 			/*
 			 * mark this channel invalid since it is out of ACS
 			 * channel range
 			 */
 			QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_LOW,
-				  FL("index: %d, Channel = %d out of ACS channel range"),
-				  i, ch_id);
+				  FL("index=%d, Channel=%d out of ACS chan range %d-%d"),
+				  i, ch_id, sap_ctx->acs_cfg->start_ch,
+				  sap_ctx->acs_cfg->end_ch);
 			sap_all_ch->channelList[i].valid = false;
 			num_valid_ch--;
 			continue;
@@ -1790,26 +1822,6 @@ static uint8_t sap_random_channel_sel(ptSapContext sap_ctx)
 	return target_channel;
 }
 
-bool sap_acs_channel_check(ptSapContext sapContext, uint8_t channelNumber)
-{
-	int i = 0;
-	if (!sapContext->acs_cfg->acs_mode)
-		return false;
-
-	if ((channelNumber >= sapContext->acs_cfg->start_ch) &&
-		(channelNumber <= sapContext->acs_cfg->end_ch)) {
-		if (!sapContext->acs_cfg->ch_list) {
-			return false;
-		} else {
-			for (i = 0; i < sapContext->acs_cfg->ch_list_count; i++)
-				if (channelNumber ==
-						sapContext->acs_cfg->ch_list[i])
-					return false;
-		}
-	}
-	return true;
-}
-
 /**
  * sap_mark_dfs_channels() - to mark dfs channel
  * @sapContext: pointer sap context
@@ -1921,7 +1933,7 @@ static uint8_t sap_get_bonding_channels(ptSapContext sapContext,
 	} else
 		return 0;
 
-	QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO,
+	QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_DEBUG,
 		  FL("cbmode: %d, channel: %d"), chanBondState, channel);
 
 	switch (chanBondState) {
@@ -2072,7 +2084,7 @@ sap_dfs_is_channel_in_nol_list(ptSapContext sap_context,
 			       uint8_t channel_number,
 			       ePhyChanBondState chan_bondState)
 {
-	int i, j;
+	int i = 0, j;
 	tHalHandle h_hal = CDS_GET_HAL_CB(sap_context->p_cds_gctx);
 	tpAniSirGlobal mac_ctx;
 	uint8_t channels[MAX_BONDED_CHANNELS];
@@ -2595,9 +2607,6 @@ static QDF_STATUS sap_goto_starting(ptSapContext sapContext,
 	qdf_mem_copy(sapContext->key_material, key_material,
 		     sizeof(key_material));
 
-	QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_HIGH, "In %s",
-		  __func__);
-
 	if (NULL == hHal) {
 		/* we have a serious problem */
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_FATAL,
@@ -2605,7 +2614,7 @@ static QDF_STATUS sap_goto_starting(ptSapContext sapContext,
 		return QDF_STATUS_E_FAULT;
 	}
 
-	QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO, "%s: session: %d",
+	QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_DEBUG, "%s: session: %d",
 		  __func__, sapContext->sessionId);
 
 	qdf_ret_status = sme_roam_connect(hHal, sapContext->sessionId,
@@ -2821,6 +2830,7 @@ QDF_STATUS sap_signal_hdd_event(ptSapContext sap_ctx,
 		assoc_ind->assocReqLength = csr_roaminfo->assocReqLength;
 		assoc_ind->assocReqPtr = csr_roaminfo->assocReqPtr;
 		assoc_ind->fWmmEnabled = csr_roaminfo->wmmEnabledSta;
+		assoc_ind->ecsa_capable = csr_roaminfo->ecsa_capable;
 		if (csr_roaminfo->u.pConnectedProfile != NULL) {
 			assoc_ind->negotiatedAuthType =
 				csr_roaminfo->u.pConnectedProfile->AuthType;
@@ -2836,10 +2846,7 @@ QDF_STATUS sap_signal_hdd_event(ptSapContext sap_ctx,
 		bss_complete = &sap_ap_event.sapevt.sapStartBssCompleteEvent;
 
 		bss_complete->status = (eSapStatus) context;
-		if (csr_roaminfo != NULL)
-			bss_complete->staId = csr_roaminfo->staId;
-		else
-			bss_complete->staId = 0;
+		bss_complete->staId = sap_ctx->sap_sta_id;
 
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_HIGH,
 			  FL("(eSAP_START_BSS_EVENT): staId = %d"),
@@ -2946,6 +2953,7 @@ QDF_STATUS sap_signal_hdd_event(ptSapContext sap_ctx,
 		reassoc_complete->wmmEnabled = csr_roaminfo->wmmEnabledSta;
 		reassoc_complete->status = (eSapStatus) context;
 		reassoc_complete->timingMeasCap = csr_roaminfo->timingMeasCap;
+		reassoc_complete->ecsa_capable = csr_roaminfo->ecsa_capable;
 		break;
 
 	case eSAP_STA_DISASSOC_EVENT:
@@ -3123,6 +3131,15 @@ QDF_STATUS sap_signal_hdd_event(ptSapContext sap_ctx,
 		sap_ap_event.sapHddEventCode = eSAP_ECSA_CHANGE_CHAN_IND;
 		sap_ap_event.sapevt.sap_chan_cng_ind.new_chan =
 					   csr_roaminfo->target_channel;
+		break;
+	case eSAP_UPDATE_SCAN_RESULT:
+		if (!csr_roaminfo) {
+			QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
+				  FL("Invalid CSR Roam Info"));
+			return QDF_STATUS_E_INVAL;
+		}
+		sap_ap_event.sapHddEventCode = eSAP_UPDATE_SCAN_RESULT;
+		sap_ap_event.sapevt.bss_desc = csr_roaminfo->pBssDesc;
 		break;
 	default:
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
@@ -3756,6 +3773,8 @@ static QDF_STATUS sap_fsm_state_ch_select(ptSapContext sap_ctx,
 		sap_ctx->sapsMachine = eSAP_DISCONNECTED;
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
 		FL("Cannot start BSS, ACS Fail"));
+		sap_signal_hdd_event(sap_ctx, NULL, eSAP_START_BSS_EVENT,
+					(void *)eSAP_STATUS_FAILURE);
 	} else if (msg == eSAP_HDD_STOP_INFRA_BSS) {
 		sap_ctx->sapsMachine = eSAP_DISCONNECTED;
 		sap_signal_hdd_event(sap_ctx, NULL, eSAP_START_BSS_EVENT,

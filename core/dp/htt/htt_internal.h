@@ -525,6 +525,8 @@ void htt_htc_pkt_free(struct htt_pdev_t *pdev, struct htt_htc_pkt *pkt);
 void htt_htc_pkt_pool_free(struct htt_pdev_t *pdev);
 
 #ifdef ATH_11AC_TXCOMPACT
+void htt_htc_misc_pkt_list_trim(struct htt_pdev_t *pdev, int level);
+
 void
 htt_htc_misc_pkt_list_add(struct htt_pdev_t *pdev, struct htt_htc_pkt *pkt);
 
@@ -532,10 +534,12 @@ void htt_htc_misc_pkt_pool_free(struct htt_pdev_t *pdev);
 #endif
 
 int
-htt_rx_hash_list_insert(struct htt_pdev_t *pdev, uint32_t paddr,
+htt_rx_hash_list_insert(struct htt_pdev_t *pdev,
+			qdf_dma_addr_t paddr,
 			qdf_nbuf_t netbuf);
 
-qdf_nbuf_t htt_rx_hash_list_lookup(struct htt_pdev_t *pdev, uint32_t paddr);
+qdf_nbuf_t
+htt_rx_hash_list_lookup(struct htt_pdev_t *pdev, qdf_dma_addr_t paddr);
 
 #ifdef IPA_OFFLOAD
 int
@@ -636,27 +640,25 @@ void htt_tx_group_credit_process(struct htt_pdev_t *pdev, u_int32_t *msg_word)
  * htt_rx_dbg_rxbuf_init() - init debug rx buff list
  * @pdev: pdev handle
  *
+ * Allocation is done from bss segment. This uses vmalloc and has a bit
+ * of an overhead compared to kmalloc (which qdf_mem_alloc wraps). The impact
+ * of the overhead to performance will need to be quantified.
+ *
  * Return: none
  */
+static struct rx_buf_debug rx_buff_list_bss[HTT_RX_RING_BUFF_DBG_LIST];
 static inline
 void htt_rx_dbg_rxbuf_init(struct htt_pdev_t *pdev)
 {
-	pdev->rx_buff_list = qdf_mem_malloc(
-				 HTT_RX_RING_BUFF_DBG_LIST *
-				 sizeof(struct rx_buf_debug));
-	if (!pdev->rx_buff_list) {
-		qdf_print("HTT: debug RX buffer allocation failed\n");
-		QDF_ASSERT(0);
-	} else {
-		qdf_spinlock_create(&(pdev->rx_buff_list_lock));
-		pdev->rx_buff_index = 0;
-		pdev->rx_buff_posted_cum = 0;
-		pdev->rx_buff_recvd_cum  = 0;
-		pdev->rx_buff_recvd_err  = 0;
-		pdev->refill_retry_timer_starts = 0;
-		pdev->refill_retry_timer_calls = 0;
-		pdev->refill_retry_timer_doubles = 0;
-	}
+	pdev->rx_buff_list = rx_buff_list_bss;
+	qdf_spinlock_create(&(pdev->rx_buff_list_lock));
+	pdev->rx_buff_index = 0;
+	pdev->rx_buff_posted_cum = 0;
+	pdev->rx_buff_recvd_cum  = 0;
+	pdev->rx_buff_recvd_err  = 0;
+	pdev->refill_retry_timer_starts = 0;
+	pdev->refill_retry_timer_calls = 0;
+	pdev->refill_retry_timer_doubles = 0;
 }
 
 /**
@@ -675,8 +677,8 @@ static inline int htt_display_rx_buf_debug(struct htt_pdev_t *pdev)
 		buf = pdev->rx_buff_list;
 		for (i = 0; i < HTT_RX_RING_BUFF_DBG_LIST; i++) {
 			if (buf[i].posted != 0)
-				QDF_TRACE(QDF_MODULE_ID_TXRX,
-					  QDF_TRACE_LEVEL_ERROR,
+				QDF_TRACE(QDF_MODULE_ID_HTT,
+					  QDF_TRACE_LEVEL_INFO,
 					  "[%d][0x%x] %p %lu %p %llu %llu",
 					  i, buf[i].cpu,
 					  buf[i].nbuf_data,
@@ -686,14 +688,14 @@ static inline int htt_display_rx_buf_debug(struct htt_pdev_t *pdev)
 					  buf[i].recved);
 		}
 
-		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
+		QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_INFO,
 		"rxbuf_idx %d all_posted: %d all_recvd: %d recv_err: %d",
 		pdev->rx_buff_index,
 		pdev->rx_buff_posted_cum,
 		pdev->rx_buff_recvd_cum,
 		pdev->rx_buff_recvd_err);
 
-		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
+		QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_INFO,
 		"timer kicks :%d actual  :%d restarts:%d debtors: %d fill_n: %d",
 		pdev->refill_retry_timer_starts,
 		pdev->refill_retry_timer_calls,
@@ -828,7 +830,7 @@ static inline
 void htt_rx_dbg_rxbuf_deinit(struct htt_pdev_t *pdev)
 {
 	if (pdev->rx_buff_list)
-		qdf_mem_free(pdev->rx_buff_list);
+		pdev->rx_buff_list = NULL;
 	qdf_spinlock_destroy(&(pdev->rx_buff_list_lock));
 }
 #else

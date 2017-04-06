@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -272,6 +272,7 @@ typedef struct sSapContext {
 	tSirMacRateSet supp_rate_set;
 	tSirMacRateSet extended_rate_set;
 	enum sap_acs_dfs_mode dfs_mode;
+	uint8_t sap_sta_id;
 } *ptSapContext;
 
 /*----------------------------------------------------------------------------
@@ -386,8 +387,6 @@ bool sap_dfs_is_channel_in_nol_list(ptSapContext sapContext,
 void sap_dfs_cac_timer_callback(void *data);
 
 void sap_cac_reset_notify(tHalHandle hHal);
-
-bool sap_acs_channel_check(ptSapContext sapContext, uint8_t channelNumber);
 
 bool
 sap_channel_matrix_check(ptSapContext sapContext,

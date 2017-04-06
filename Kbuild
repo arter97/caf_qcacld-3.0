@@ -49,6 +49,18 @@ ifeq ($(KERNEL_BUILD), 0)
 	CONFIG_MOBILE_ROUTER := y
 	endif
 
+	ifeq ($(CONFIG_ARCH_SDX20), y)
+	CONFIG_MOBILE_ROUTER := y
+	endif
+
+	# If platform wants to support two driver base on this source
+	# code, below feature WLAN_DISABLE_EXPORT_SYMBOL needs to be
+	# enabled, otherwise when loading the second the driver,
+	# it will hit error of duplicate symbol.
+	ifeq ($(CONFIG_ARCH_SDXHEDGEHOG), y)
+	CONFIG_WLAN_DISABLE_EXPORT_SYMBOL := y
+	endif
+
 	# As per target team, build is done as follows:
 	# Defconfig : build with default flags
 	# Slub      : defconfig  + CONFIG_SLUB_DEBUG=y +
@@ -78,7 +90,7 @@ ifeq ($(KERNEL_BUILD), 0)
 	#Flag to enable Legacy Fast Roaming2(LFR2)
 	CONFIG_QCACLD_WLAN_LFR2 := y
 	#Flag to enable Legacy Fast Roaming3(LFR3)
-	ifneq ($(CONFIG_ARCH_SDXHEDGEHOG), y)
+	ifneq ($(CONFIG_ARCH_SDX20), y)
 	CONFIG_QCACLD_WLAN_LFR3 := y
 	endif
 
@@ -112,6 +124,7 @@ ifeq ($(KERNEL_BUILD), 0)
 	endif
 
 	ifeq ($(CONFIG_ARCH_SDM660), y)
+	CONFIG_QCACLD_FEATURE_GREEN_AP := y
 	CONFIG_QCACLD_FEATURE_METERING := y
 	endif
 
@@ -405,10 +418,12 @@ HDD_OBJS := 	$(HDD_SRC_DIR)/wlan_hdd_assoc.o \
 		$(HDD_SRC_DIR)/wlan_hdd_trace.o \
 		$(HDD_SRC_DIR)/wlan_hdd_wext.o \
 		$(HDD_SRC_DIR)/wlan_hdd_wmm.o \
-		$(HDD_SRC_DIR)/wlan_hdd_wowl.o
+		$(HDD_SRC_DIR)/wlan_hdd_wowl.o \
+		$(HDD_SRC_DIR)/wlan_hdd_packet_filter.o
 
 ifeq ($(CONFIG_WLAN_DEBUGFS), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_debugfs.o
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_debugfs_llstat.o
 endif
 
 ifeq ($(CONFIG_WLAN_FEATURE_DSRC), y)
@@ -512,7 +527,6 @@ MAC_INC := 	-I$(WLAN_ROOT)/$(MAC_INC_DIR) \
 		-I$(WLAN_ROOT)/$(MAC_SRC_DIR)/pe/nan
 
 MAC_CFG_OBJS := $(MAC_SRC_DIR)/cfg/cfg_api.o \
-		$(MAC_SRC_DIR)/cfg/cfg_debug.o \
 		$(MAC_SRC_DIR)/cfg/cfg_param_name.o \
 		$(MAC_SRC_DIR)/cfg/cfg_proc_msg.o \
 		$(MAC_SRC_DIR)/cfg/cfg_send_msg.o
@@ -523,7 +537,6 @@ MAC_LIM_OBJS := $(MAC_SRC_DIR)/pe/lim/lim_aid_mgmt.o \
 		$(MAC_SRC_DIR)/pe/lim/lim_admit_control.o \
 		$(MAC_SRC_DIR)/pe/lim/lim_api.o \
 		$(MAC_SRC_DIR)/pe/lim/lim_assoc_utils.o \
-		$(MAC_SRC_DIR)/pe/lim/lim_debug.o \
 		$(MAC_SRC_DIR)/pe/lim/lim_ft.o \
 		$(MAC_SRC_DIR)/pe/lim/lim_ibss_peer_mgmt.o \
 		$(MAC_SRC_DIR)/pe/lim/lim_link_monitoring_algo.o \
@@ -576,7 +589,6 @@ endif
 MAC_SCH_OBJS := $(MAC_SRC_DIR)/pe/sch/sch_api.o \
 		$(MAC_SRC_DIR)/pe/sch/sch_beacon_gen.o \
 		$(MAC_SRC_DIR)/pe/sch/sch_beacon_process.o \
-		$(MAC_SRC_DIR)/pe/sch/sch_debug.o \
 		$(MAC_SRC_DIR)/pe/sch/sch_message.o
 
 MAC_RRM_OBJS :=	$(MAC_SRC_DIR)/pe/rrm/rrm_api.o
@@ -713,10 +725,8 @@ SYS_OBJS :=	$(SYS_COMMON_SRC_DIR)/wlan_qct_sys.o \
 		$(SYS_LEGACY_SRC_DIR)/system/src/mac_init_api.o \
 		$(SYS_LEGACY_SRC_DIR)/system/src/sys_entry_func.o \
 		$(SYS_LEGACY_SRC_DIR)/utils/src/dot11f.o \
-		$(SYS_LEGACY_SRC_DIR)/utils/src/log_api.o \
 		$(SYS_LEGACY_SRC_DIR)/utils/src/mac_trace.o \
 		$(SYS_LEGACY_SRC_DIR)/utils/src/parser_api.o \
-		$(SYS_LEGACY_SRC_DIR)/utils/src/utils_api.o \
 		$(SYS_LEGACY_SRC_DIR)/utils/src/utils_parser.o
 
 ############ Qca-wifi-host-cmn ############
@@ -1135,7 +1145,8 @@ CDEFINES :=	-DANI_LITTLE_BYTE_ENDIAN \
 		-DFEATURE_WLAN_EXTSCAN \
 		-DWLAN_FEATURE_MBSSID \
 		-DCONFIG_160MHZ_SUPPORT \
-		-DCONFIG_MCL
+		-DCONFIG_MCL \
+		-DWMI_CMD_STRINGS
 
 ifneq ($(CONFIG_HIF_USB), 1)
 CDEFINES += -DWLAN_LOGGING_SOCK_SVC_ENABLE
@@ -1241,6 +1252,10 @@ endif
 
 ifeq ($(CONFIG_QCACLD_WLAN_LFR3),y)
 CDEFINES += -DWLAN_FEATURE_ROAM_OFFLOAD
+endif
+
+ifeq ($(CONFIG_CNSS_GENL), y)
+CDEFINES += -DCNSS_GENL
 endif
 
 ifeq ($(CONFIG_QCACLD_WLAN_LFR2),y)
@@ -1363,6 +1378,14 @@ ifeq ($(CONFIG_WLAN_FEATURE_DSRC), y)
 CDEFINES += -DWLAN_FEATURE_DSRC
 endif
 
+ifeq ($(CONFIG_ARCH_SDX20), y)
+ifeq ($(CONFIG_QCA_WIFI_SDIO), 1)
+ifeq ($(CONFIG_WCNSS_SKB_PRE_ALLOC), y)
+CDEFINES += -DFEATURE_SKB_PRE_ALLOC
+endif
+endif
+endif
+
 #Enable USB specific APIS
 ifeq ($(CONFIG_HIF_USB), 1)
 CDEFINES += -DHIF_USB \
@@ -1428,10 +1451,8 @@ ifeq ($(CONFIG_IPA_OFFLOAD), 1)
 CDEFINES += -DIPA_OFFLOAD
 endif
 
-ifneq ($(CONFIG_ARCH_MDM9630), y)
-ifeq ($(CONFIG_ARCH_MDM9640), y)
-CDEFINES += -DQCA_CONFIG_SMP
-endif
+ifeq ($(CONFIG_ARCH_SDX20), y)
+CDEFINES += -DSYNC_IPA_READY
 endif
 
 #Enable GTK Offload
@@ -1574,6 +1595,11 @@ CDEFINES += -DAR900B
 ifeq ($(CONFIG_64BIT_PADDR),y)
 CDEFINES += -DHTT_PADDR64
 endif
+
+ifeq ($(CONFIG_SLUB_DEBUG_ON),y)
+CDEFINES += -DOL_RX_INDICATION_RECORD
+endif
+
 endif
 endif
 
@@ -1593,6 +1619,10 @@ endif
 
 ifeq ($(CONFIG_MOBILE_ROUTER), y)
 CDEFINES += -DFEATURE_AP_MCC_CH_AVOIDANCE
+endif
+
+ifeq ($(CONFIG_WLAN_DISABLE_EXPORT_SYMBOL), y)
+CDEFINES += -DWLAN_DISABLE_EXPORT_SYMBOL
 endif
 
 ifeq ($(CONFIG_MPC_UT_FRAMEWORK), y)

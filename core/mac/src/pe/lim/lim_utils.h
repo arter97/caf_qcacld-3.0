@@ -69,6 +69,8 @@ typedef enum {
 
 #define IS_VHT_NSS_1x1(__mcs_map)	((__mcs_map & 0xFFFC) == 0xFFFC)
 
+#define MGMT_RX_PACKETS_THRESHOLD 200
+
 #ifdef WLAN_FEATURE_11W
 typedef union uPmfSaQueryTimerId {
 	struct {
@@ -630,7 +632,8 @@ QDF_STATUS lim_send_ext_cap_ie(tpAniSirGlobal mac_ctx, uint32_t session_id,
 			       tDot11fIEExtCap *extracted_extcap, bool merge);
 
 QDF_STATUS lim_send_ies_per_band(tpAniSirGlobal mac_ctx,
-				 tpPESession session, uint8_t vdev_id);
+				 tpPESession session, uint8_t vdev_id,
+				 uint8_t is_hw_mode_dbs);
 
 tSirRetStatus lim_strip_extcap_ie(tpAniSirGlobal mac_ctx, uint8_t *addn_ie,
 			  uint16_t *addn_ielen, uint8_t *extracted_extcap);
@@ -693,4 +696,17 @@ tSirRetStatus lim_strip_ie(tpAniSirGlobal mac_ctx,
 		uint8_t eid, eSizeOfLenField size_of_len_field,
 		uint8_t *oui, uint8_t out_len, uint8_t *extracted_ie,
 		uint32_t eid_max_len);
+bool lim_get_rx_ldpc(tpAniSirGlobal mac_ctx, uint8_t ch,
+			   uint8_t is_hw_mode_dbs);
+
+/**
+ * lim_decrement_pending_mgmt_count: Decrement mgmt frame count
+ * @mac_ctx: Pointer to global MAC structure
+ *
+ * This function is used to decrement pe mgmt count once frame
+ * removed from queue
+ *
+ * Return: None
+ */
+void lim_decrement_pending_mgmt_count(tpAniSirGlobal mac_ctx);
 #endif /* __LIM_UTILS_H */

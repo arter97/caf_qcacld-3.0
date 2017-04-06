@@ -182,6 +182,7 @@ typedef enum {
 	eSAP_ACS_SCAN_SUCCESS_EVENT,
 	eSAP_ACS_CHANNEL_SELECTED,
 	eSAP_ECSA_CHANGE_CHAN_IND,
+	eSAP_UPDATE_SCAN_RESULT,
 } eSapHddEvent;
 
 typedef enum {
@@ -262,6 +263,7 @@ typedef struct sap_StationAssocIndication_s {
 	eCsrEncryptionType negotiatedUCEncryptionType;
 	eCsrEncryptionType negotiatedMCEncryptionType;
 	bool fAuthRequired;
+	uint8_t      ecsa_capable;
 } tSap_StationAssocIndication;
 
 typedef struct sap_StationAssocReassocCompleteEvent_s {
@@ -282,6 +284,7 @@ typedef struct sap_StationAssocReassocCompleteEvent_s {
 	uint8_t *assocRespPtr;
 	uint8_t timingMeasCap;
 	tSirSmeChanInfo chan_info;
+	uint8_t      ecsa_capable;
 } tSap_StationAssocReassocCompleteEvent;
 
 typedef struct sap_StationDisassocCompleteEvent_s {
@@ -465,6 +468,7 @@ typedef struct sap_Event_s {
 		struct sap_roc_ready_ind_s sap_roc_ind;
 		struct sap_ch_change_ind sap_chan_cng_ind;
 		struct sap_acs_scan_complete_event sap_acs_scan_comp;
+		tSirBssDescription *bss_desc;
 	} sapevt;
 } tSap_Event, *tpSap_Event;
 
@@ -603,6 +607,8 @@ typedef struct sap_Config {
 	tSirMacRateSet supported_rates;
 	tSirMacRateSet extended_rates;
 	enum sap_acs_dfs_mode acs_dfs_mode;
+	/* beacon count before channel switch */
+	uint8_t          sap_chanswitch_beacon_cnt;
 } tsap_Config_t;
 
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
@@ -709,6 +715,8 @@ typedef struct sSapDfsInfo {
 	 */
 	uint8_t disable_dfs_ch_switch;
 	uint16_t tx_leakage_threshold;
+	/* beacon count before channel switch */
+	uint8_t sap_ch_switch_beacon_cnt;
 } tSapDfsInfo;
 
 typedef struct tagSapCtxList {
@@ -867,12 +875,13 @@ QDF_STATUS wlansap_get_wps_state(void *p_cds_gctx, bool *pbWPSState);
 void *wlansap_open(void *p_cds_gctx);
 QDF_STATUS wlansap_global_init(void);
 QDF_STATUS wlansap_global_deinit(void);
-QDF_STATUS wlansap_start(void *p_cds_gctx, enum tQDF_ADAPTER_MODE mode,
-			 uint8_t *addr, uint32_t *session_id);
 QDF_STATUS wlansap_stop(void *p_cds_gctx);
 QDF_STATUS wlansap_close(void *p_cds_gctx);
 typedef QDF_STATUS (*tpWLAN_SAPEventCB)(tpSap_Event pSapEvent,
 					void *pUsrContext);
+QDF_STATUS wlansap_start(void *p_cds_gctx, tpWLAN_SAPEventCB pSapEventCallback,
+			 enum tQDF_ADAPTER_MODE mode, uint8_t *addr,
+			 uint32_t *session_id, void *pUsrContext);
 uint8_t wlansap_get_state(void *p_cds_gctx);
 
 QDF_STATUS wlansap_start_bss(void *p_cds_gctx,

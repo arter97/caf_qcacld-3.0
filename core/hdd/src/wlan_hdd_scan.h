@@ -41,7 +41,7 @@
  *
  * @NL_SCAN: Scan initiated from NL
  * @VENDOR_SCAN: Scan intiated from vendor command
-*/
+ */
 enum scan_source {
 	NL_SCAN,
 	VENDOR_SCAN,
@@ -125,9 +125,28 @@ int wlan_hdd_vendor_abort_scan(
 void hdd_cleanup_scan_queue(hdd_context_t *hdd_ctx);
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)) || \
-    defined(CFG80211_ABORT_SCAN)
+	defined(CFG80211_ABORT_SCAN)
 void wlan_hdd_cfg80211_abort_scan(struct wiphy *wiphy,
 				  struct wireless_dev *wdev);
 #endif
-#endif /* end #if !defined(WLAN_HDD_SCAN_H) */
 
+/**
+ * wlan_hdd_fill_whitelist_ie_attrs - fill the white list members
+ * @ie_whitelist: enables whitelist
+ * @probe_req_ie_bitmap: bitmap to be filled
+ * @num_vendor_oui: pointer to no of ouis
+ * @voui: pointer to ouis to be filled
+ * @hdd_ctx: pointer to hdd ctx
+ *
+ * This function fills the ie bitmap and vendor oui fields with the
+ * corresponding values present in config and hdd_ctx
+ *
+ * Return: None
+ */
+void wlan_hdd_fill_whitelist_ie_attrs(bool *ie_whitelist,
+				      uint32_t *probe_req_ie_bitmap,
+				      uint32_t *num_vendor_oui,
+				      struct vendor_oui *voui,
+				      hdd_context_t *hdd_ctx);
+
+#endif /* end #if !defined(WLAN_HDD_SCAN_H) */

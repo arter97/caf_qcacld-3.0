@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -122,20 +122,19 @@ lim_extract_ap_capability(tpAniSirGlobal mac_ctx, uint8_t *p_ie,
 
 	beacon_struct = qdf_mem_malloc(sizeof(tSirProbeRespBeacon));
 	if (NULL == beacon_struct) {
-		lim_log(mac_ctx, LOGE, FL("Unable to allocate memory"));
+		pe_err("Unable to allocate memory");
 		return;
 	}
 
 	*qos_cap = 0;
 	*prop_cap = 0;
 	*uapsd = 0;
-	lim_log(mac_ctx, LOG3,
-		FL("In lim_extract_ap_capability: The IE's being received:"));
-	sir_dump_buf(mac_ctx, SIR_LIM_MODULE_ID, LOG3, p_ie, ie_len);
+	pe_debug("In lim_extract_ap_capability: The IE's being received:");
+	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
+			   p_ie, ie_len);
 	if (sir_parse_beacon_ie(mac_ctx, beacon_struct, p_ie,
 		(uint32_t) ie_len) != eSIR_SUCCESS) {
-		lim_log(mac_ctx, LOGE, FL(
-			"sir_parse_beacon_ie failed to parse beacon"));
+		pe_err("sir_parse_beacon_ie failed to parse beacon");
 		qdf_mem_free(beacon_struct);
 		return;
 	}
@@ -153,8 +152,7 @@ lim_extract_ap_capability(tpAniSirGlobal mac_ctx, uint8_t *p_ie,
 	else
 		mac_ctx->lim.htCapabilityPresentInBeacon = 0;
 
-	lim_log(mac_ctx, LOG1, FL(
-		"Bcon: VHTCap.present %d SU Beamformer %d BSS_VHT_CAPABLE %d"),
+	pe_debug("Bcon: VHTCap.present: %d SU Beamformer: %d BSS_VHT_CAPABLE: %d",
 		beacon_struct->VHTCaps.present,
 		beacon_struct->VHTCaps.suBeamFormerCap,
 		IS_BSS_VHT_CAPABLE(beacon_struct->VHTCaps));
@@ -270,8 +268,7 @@ lim_extract_ap_capability(tpAniSirGlobal mac_ctx, uint8_t *p_ie,
 				session->ch_center_freq_seg1 = 0;
 		}
 		session->ch_width = vht_ch_wd + 1;
-		lim_log(mac_ctx, LOGE, FL(
-				"cntr_freq0 %d, cntr_freq1 %d, width %d"),
+		pe_debug("cntr_freq0: %d cntr_freq1: %d width: %d",
 				session->ch_center_freq_seg0,
 				session->ch_center_freq_seg1,
 				session->ch_width);
@@ -295,8 +292,7 @@ lim_extract_ap_capability(tpAniSirGlobal mac_ctx, uint8_t *p_ie,
 				session->gLimOperatingMode.chanWidth =
 					CH_WIDTH_160MHZ;
 		} else {
-			lim_log(mac_ctx, LOGE, FL(
-					"AP does not support op_mode rx"));
+			pe_err("AP does not support op_mode rx");
 		}
 	}
 	/* Extract the UAPSD flag from WMM Parameter element */
@@ -322,8 +318,7 @@ lim_extract_ap_capability(tpAniSirGlobal mac_ctx, uint8_t *p_ie,
 		session->is_ext_caps_present = true;
 	/* Update HS 2.0 Information Element */
 	if (beacon_struct->hs20vendor_ie.present) {
-		lim_log(mac_ctx, LOG1,
-			FL("HS20 Indication Element Present, rel#:%u, id:%u\n"),
+		pe_debug("HS20 Indication Element Present, rel#: %u id: %u",
 			beacon_struct->hs20vendor_ie.release_num,
 			beacon_struct->hs20vendor_ie.hs_id_present);
 		qdf_mem_copy(&session->hs20vendor_ie,

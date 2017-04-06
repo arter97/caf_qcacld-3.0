@@ -44,8 +44,6 @@
 
 #include "sir_types.h"
 
-#define CSR_MAX_STA (HAL_NUM_STA)
-
 /* define scan return criteria. LIM should use these define as well */
 #define CSR_SCAN_RETURN_AFTER_ALL_CHANNELS          (0)
 #define CSR_SCAN_RETURN_AFTER_FIRST_MATCH           (0x01)
@@ -236,10 +234,7 @@ typedef enum {
 typedef enum {
 	eCsrSummaryStats = 0,
 	eCsrGlobalClassAStats,
-	eCsrGlobalClassBStats,
-	eCsrGlobalClassCStats,
 	eCsrGlobalClassDStats,
-	eCsrPerStaStats,
 	csr_per_chain_rssi_stats,
 	eCsrMaxStats
 } eCsrRoamStatsClassTypes;
@@ -605,8 +600,9 @@ typedef struct tagCsrConfig {
 	uint8_t enableHtSmps;
 	uint8_t htSmps;
 	bool send_smps_action;
-	uint8_t txLdpcEnable;
-	uint8_t rxLdpcEnable;
+	uint8_t tx_ldpc_enable;
+	uint8_t rx_ldpc_enable;
+	uint8_t rx_ldpc_support_for_2g;
 	/*
 	 * Enable/Disable heartbeat offload
 	 */
@@ -666,6 +662,7 @@ typedef struct tagCsrConfig {
 	bool enable_bcast_probe_rsp;
 	bool qcn_ie_support;
 	uint8_t fils_max_chan_guard_time;
+	uint16_t pkt_err_disconn_th;
 } tCsrConfig;
 
 typedef struct tagCsrChannelPowerInfo {
@@ -999,6 +996,7 @@ typedef struct tagCsrRoamSession {
 	bool dhcp_done;
 	uint8_t disconnect_reason;
 	uint8_t uapsd_mask;
+	qdf_mc_timer_t roaming_offload_timer;
 } tCsrRoamSession;
 
 typedef struct tagCsrRoamStruct {
@@ -1021,10 +1019,7 @@ typedef struct tagCsrRoamStruct {
 	qdf_mc_timer_t hTimerWaitForKey; /* support timeout for WaitForKey */
 	tCsrSummaryStatsInfo summaryStatsInfo;
 	tCsrGlobalClassAStatsInfo classAStatsInfo;
-	tCsrGlobalClassBStatsInfo classBStatsInfo;
-	tCsrGlobalClassCStatsInfo classCStatsInfo;
 	tCsrGlobalClassDStatsInfo classDStatsInfo;
-	tCsrPerStaStatsInfo perStaStatsInfo[CSR_MAX_STA];
 	struct csr_per_chain_rssi_stats_info  per_chain_rssi_stats;
 	tDblLinkList statsClientReqList;
 	tDblLinkList peStatsReqList;

@@ -104,7 +104,6 @@ void hdd_tx_resume_timer_expired_handler(void *adapter_context)
 	hdd_notice("Enabling queues");
 	wlan_hdd_netif_queue_control(pAdapter, WLAN_WAKE_ALL_NETIF_QUEUE,
 				     WLAN_CONTROL_PATH);
-	return;
 }
 #if defined(CONFIG_PER_VDEV_TX_DESC_POOL)
 
@@ -131,6 +130,7 @@ hdd_tx_resume_false(hdd_adapter_t *pAdapter, bool tx_resume)
 			qdf_mc_timer_get_current_state(&pAdapter->
 						       tx_flow_control_timer)) {
 		QDF_STATUS status;
+
 		status = qdf_mc_timer_start(&pAdapter->tx_flow_control_timer,
 				WLAN_HDD_TX_FLOW_CONTROL_OS_Q_BLOCK_TIME);
 
@@ -142,15 +142,12 @@ hdd_tx_resume_false(hdd_adapter_t *pAdapter, bool tx_resume)
 
 	pAdapter->hdd_stats.hddTxRxStats.txflow_pause_cnt++;
 	pAdapter->hdd_stats.hddTxRxStats.is_txflow_paused = true;
-
-	return;
 }
 #else
 
 static inline void
 hdd_tx_resume_false(hdd_adapter_t *pAdapter, bool tx_resume)
 {
-	return;
 }
 #endif
 
@@ -159,9 +156,8 @@ static inline struct sk_buff *hdd_skb_orphan(hdd_adapter_t *pAdapter,
 {
 	if (pAdapter->tx_flow_low_watermark > 0)
 		skb_orphan(skb);
-	else {
+	else
 		skb = skb_unshare(skb, GFP_ATOMIC);
-	}
 
 	return skb;
 }
@@ -200,8 +196,6 @@ void hdd_tx_resume_cb(void *adapter_context, bool tx_resume)
 					     WLAN_DATA_FLOW_CONTROL);
 	}
 	hdd_tx_resume_false(pAdapter, tx_resume);
-
-	return;
 }
 
 /**
@@ -226,7 +220,6 @@ void hdd_register_tx_flow_control(hdd_adapter_t *adapter,
 	ol_txrx_register_tx_flow_control(adapter->sessionId,
 					flow_control_fp,
 					adapter);
-
 }
 
 /**
@@ -279,13 +272,30 @@ void hdd_get_tx_resource(hdd_adapter_t *adapter,
 }
 
 #else
-
+/**
+ * hdd_skb_orphan() - skb_unshare a cloned packed else skb_orphan
+ * @pAdapter: pointer to HDD adapter
+ * @skb: pointer to skb data packet
+ *
+ * Return: pointer to skb structure
+ */
 static inline struct sk_buff *hdd_skb_orphan(hdd_adapter_t *pAdapter,
-		struct sk_buff *skb)
-{
-	return skb_unshare(skb, GFP_ATOMIC);
-}
+		struct sk_buff *skb) {
 
+	struct sk_buff *nskb;
+
+	nskb = skb_unshare(skb, GFP_ATOMIC);
+	if (nskb == skb) {
+		/*
+		 * For UDP packets we want to orphan the packet to allow the app
+		 * to send more packets. The flow would ultimately be controlled
+		 * by the limited number of tx descriptors for the vdev.
+		 */
+		++pAdapter->hdd_stats.hddTxRxStats.txXmitOrphaned;
+		skb_orphan(skb);
+	}
+	return nskb;
+}
 #endif /* QCA_LL_LEGACY_TX_FLOW_CONTROL */
 
 /**
@@ -426,11 +436,12 @@ static int __hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	bool granted;
 	uint8_t STAId;
+	hdd_context_t *hdd_ctx = WLAN_HDD_GET_CTX(pAdapter);
 	hdd_station_ctx_t *pHddStaCtx = &pAdapter->sessionCtx.station;
 #ifdef QCA_PKT_PROTO_TRACE
 	uint8_t proto_type = 0;
-	hdd_context_t *hdd_ctx = WLAN_HDD_GET_CTX(pAdapter);
 #endif /* QCA_PKT_PROTO_TRACE */
+	bool is_arp;
 
 #ifdef QCA_WIFI_FTM
 	if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE) {
@@ -439,20 +450,31 @@ static int __hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 #endif
 
+	wlan_hdd_classify_pkt(skb);
+
 	++pAdapter->hdd_stats.hddTxRxStats.txXmitCalled;
+
+	if (QDF_NBUF_CB_GET_PACKET_TYPE(skb) == QDF_NBUF_CB_PACKET_TYPE_ARP) {
+		is_arp = true;
+		if (qdf_nbuf_data_is_arp_req(skb) &&
+		    (hdd_ctx->track_arp_ip == qdf_nbuf_get_arp_tgt_ip(skb))) {
+			++pAdapter->hdd_stats.hdd_arp_stats.tx_arp_req_count;
+			QDF_TRACE(QDF_MODULE_ID_HDD_DATA, LOG1,
+					"%s : ARP packet", __func__);
+		}
+	}
+
 	if (cds_is_driver_recovering()) {
 		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_WARN,
 			"Recovery in progress, dropping the packet");
 		goto drop_pkt;
 	}
 
-	wlan_hdd_classify_pkt(skb);
-
 	STAId = HDD_WLAN_INVALID_STA_ID;
 
 	hdd_get_transmit_sta_id(pAdapter, skb, &STAId);
 	if (STAId >= WLAN_MAX_STA_COUNT) {
-		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, LOGE,
+		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_INFO,
 			  "Invalid station id, transmit operation suspended");
 		goto drop_pkt;
 	}
@@ -466,18 +488,18 @@ static int __hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (!qdf_nbuf_ipa_owned_get(skb)) {
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 19, 0))
 		/*
-		* The TCP TX throttling logic is changed a little after
-		* 3.19-rc1 kernel, the TCP sending limit will be smaller,
-		* which will throttle the TCP packets to the host driver.
-		* The TCP UP LINK throughput will drop heavily. In order to
-		* fix this issue, need to orphan the socket buffer asap, which
-		* will call skb's destructor to notify the TCP stack that the
-		* SKB buffer is unowned. And then the TCP stack will pump more
-		* packets to host driver.
-		*
-		* The TX packets might be dropped for UDP case in the iperf
-		* testing. So need to be protected by follow control.
-		*/
+		 * The TCP TX throttling logic is changed a little after
+		 * 3.19-rc1 kernel, the TCP sending limit will be smaller,
+		 * which will throttle the TCP packets to the host driver.
+		 * The TCP UP LINK throughput will drop heavily. In order to
+		 * fix this issue, need to orphan the socket buffer asap, which
+		 * will call skb's destructor to notify the TCP stack that the
+		 * SKB buffer is unowned. And then the TCP stack will pump more
+		 * packets to host driver.
+		 *
+		 * The TX packets might be dropped for UDP case in the iperf
+		 * testing. So need to be protected by follow control.
+		 */
 		skb = hdd_skb_orphan(pAdapter, skb);
 #else
 		/* Check if the buffer has enough header room */
@@ -496,7 +518,7 @@ static int __hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	++pAdapter->hdd_stats.hddTxRxStats.txXmitClassifiedAC[ac];
 #ifdef HDD_WMM_DEBUG
-	QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_FATAL,
+	QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_DEBUG,
 		  "%s: Classified as ac %d up %d", __func__, ac, up);
 #endif /* HDD_WMM_DEBUG */
 
@@ -570,11 +592,10 @@ static int __hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		proto_type = cds_pkt_get_proto_type(skb,
 						    hdd_ctx->config->gEnableDebugLog,
 						    0);
-		if (CDS_PKT_TRAC_TYPE_EAPOL & proto_type) {
+		if (CDS_PKT_TRAC_TYPE_EAPOL & proto_type)
 			cds_pkt_trace_buf_update("ST:T:EPL");
-		} else if (CDS_PKT_TRAC_TYPE_DHCP & proto_type) {
+		else if (CDS_PKT_TRAC_TYPE_DHCP & proto_type)
 			cds_pkt_trace_buf_update("ST:T:DHC");
-		}
 	}
 #endif /* QCA_PKT_PROTO_TRACE */
 
@@ -584,9 +605,8 @@ static int __hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	if (qdf_nbuf_is_tso(skb))
 		pAdapter->stats.tx_packets += qdf_nbuf_get_tso_num_seg(skb);
-	else {
+	else
 		++pAdapter->stats.tx_packets;
-	}
 
 	hdd_event_eapol_log(skb, QDF_TX);
 	qdf_dp_trace_log_pkt(pAdapter->sessionId, skb, QDF_TX);
@@ -610,7 +630,7 @@ static int __hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		 pAdapter->aStaInfo[STAId].tlSTAState) {
 			QDF_TRACE(QDF_MODULE_ID_HDD_DATA,
 				 QDF_TRACE_LEVEL_WARN,
-				 "%s: station is not connected..dropping pkt",
+				 "%s: station is not connected. drop the pkt",
 				 __func__);
 		++pAdapter->hdd_stats.hddTxRxStats.txXmitDroppedAC[ac];
 		goto drop_pkt;
@@ -630,11 +650,12 @@ static int __hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (pAdapter->tx_fn(ol_txrx_get_vdev_by_sta_id(STAId),
 		 (qdf_nbuf_t) skb) != NULL) {
 		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_WARN,
-			  "%s: Failed to send packet to txrx for staid:%d",
+			  "%s: Failed to send packet to txrx for staid: %d",
 			  __func__, STAId);
 		++pAdapter->hdd_stats.hddTxRxStats.txXmitDroppedAC[ac];
 		goto drop_pkt;
 	}
+
 	netif_trans_update(dev);
 
 	return NETDEV_TX_OK;
@@ -658,6 +679,11 @@ drop_pkt_accounting:
 
 	++pAdapter->stats.tx_dropped;
 	++pAdapter->hdd_stats.hddTxRxStats.txXmitDropped;
+	if (is_arp) {
+		++pAdapter->hdd_stats.hdd_arp_stats.tx_dropped;
+		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, LOGE,
+			"%s : ARP packet dropped", __func__);
+	}
 
 	return NETDEV_TX_OK;
 }
@@ -710,12 +736,12 @@ QDF_STATUS hdd_get_peer_sta_id(hdd_station_ctx_t *pHddStaCtx,
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
 /**
-* hdd_wlan_datastall_sta_event()- send sta datastall information
-*
-* This Function send send sta datastall status diag event
-*
-* Return: void.
-*/
+ * hdd_wlan_datastall_sta_event()- send sta datastall information
+ *
+ * This Function send send sta datastall status diag event
+ *
+ * Return: void.
+ */
 static void hdd_wlan_datastall_sta_event(void)
 {
 	WLAN_HOST_DIAG_EVENT_DEF(sta_data_stall,
@@ -727,7 +753,6 @@ static void hdd_wlan_datastall_sta_event(void)
 #else
 static inline void hdd_wlan_datastall_sta_event(void)
 {
-
 }
 #endif
 
@@ -761,8 +786,8 @@ static void __hdd_tx_timeout(struct net_device *dev)
 
 	for (i = 0; i < NUM_TX_QUEUES; i++) {
 		txq = netdev_get_tx_queue(dev, i);
-		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_ERROR,
-			  "Queue%d status: %d txq->trans_start %lu",
+		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_DEBUG,
+			  "Queue: %d status: %d txq->trans_start: %lu",
 			   i, netif_tx_queue_stopped(txq), txq->trans_start);
 	}
 
@@ -952,11 +977,71 @@ static bool hdd_is_mcast_replay(struct sk_buff *skb)
 }
 
 /**
-* hdd_is_arp_local() - check if local or non local arp
-* @skb: pointer to sk_buff
-*
-* Return: true if local arp or false otherwise.
-*/
+ * hdd_get_arp_src_ip() - get ARP packet src IP address
+ * @skb: pointer to sk_buff
+ *
+ * Return: return src IP address field value of ARP packet.
+ */
+static uint32_t hdd_get_arp_src_ip(struct sk_buff *skb)
+{
+	struct arphdr *arp;
+	unsigned char *arp_ptr;
+	uint32_t src_ip;
+
+	arp = (struct arphdr *)skb->data;
+	arp_ptr = (unsigned char *)(arp + 1);
+	arp_ptr += skb->dev->addr_len;
+
+	memcpy(&src_ip, arp_ptr, QDF_IPV4_ADDR_SIZE);
+
+	return src_ip;
+}
+
+/**
+ * hdd_is_duplicate_ip_arp() - duplicate address detection
+ * @skb: pointer to sk_buff
+ *
+ * Return: true if duplicate address detected or false otherwise.
+ */
+static bool hdd_is_duplicate_ip_arp(struct sk_buff *skb)
+{
+	struct in_ifaddr **ifap = NULL;
+	struct in_ifaddr *ifa = NULL;
+	struct in_device *in_dev;
+	uint32_t arp_ip, if_ip;
+
+	if (NULL == skb)
+		return false;
+
+	arp_ip = hdd_get_arp_src_ip(skb);
+
+	if (!skb->dev)
+		return false;
+
+	in_dev = __in_dev_get_rtnl(skb->dev);
+	if (in_dev) {
+		for (ifap = &in_dev->ifa_list; (ifa = *ifap) != NULL;
+			ifap = &ifa->ifa_next) {
+			if (!strcmp(skb->dev->name, ifa->ifa_label))
+				break;
+		}
+	}
+
+	if (ifa && ifa->ifa_local) {
+		if_ip = ifa->ifa_local;
+		if (if_ip == arp_ip)
+			return true;
+	}
+
+	return false;
+}
+
+/**
+ * hdd_is_arp_local() - check if local or non local arp
+ * @skb: pointer to sk_buff
+ *
+ * Return: true if local arp or false otherwise.
+ */
 static bool hdd_is_arp_local(struct sk_buff *skb)
 {
 	struct arphdr *arp;
@@ -993,11 +1078,11 @@ static bool hdd_is_arp_local(struct sk_buff *skb)
 }
 
 /**
-* hdd_is_rx_wake_lock_needed() - check if wake lock is needed
-* @skb: pointer to sk_buff
-*
-* Return: true if wake lock is needed or false otherwise.
-*/
+ * hdd_is_rx_wake_lock_needed() - check if wake lock is needed
+ * @skb: pointer to sk_buff
+ *
+ * Return: true if wake lock is needed or false otherwise.
+ */
 static bool hdd_is_rx_wake_lock_needed(struct sk_buff *skb)
 {
 	if ((skb->pkt_type != PACKET_BROADCAST &&
@@ -1028,6 +1113,8 @@ QDF_STATUS hdd_rx_packet_cbk(void *context, qdf_nbuf_t rxBuf)
 	hdd_station_ctx_t *pHddStaCtx = NULL;
 	unsigned int cpu_index;
 	bool wake_lock = false;
+	bool is_arp = false;
+	bool track_arp = false;
 
 	/* Sanity check on inputs */
 	if (unlikely((NULL == context) || (NULL == rxBuf))) {
@@ -1038,7 +1125,7 @@ QDF_STATUS hdd_rx_packet_cbk(void *context, qdf_nbuf_t rxBuf)
 
 	pAdapter = (hdd_adapter_t *)context;
 	if (unlikely(WLAN_HDD_ADAPTER_MAGIC != pAdapter->magic)) {
-		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_FATAL,
+		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_ERROR,
 			  "Magic cookie(%x) for adapter sanity verification is invalid",
 			  pAdapter->magic);
 		return QDF_STATUS_E_FAILURE;
@@ -1054,6 +1141,17 @@ QDF_STATUS hdd_rx_packet_cbk(void *context, qdf_nbuf_t rxBuf)
 	cpu_index = wlan_hdd_get_cpu();
 
 	skb = (struct sk_buff *)rxBuf;
+
+	if (QDF_NBUF_CB_PACKET_TYPE_ARP == QDF_NBUF_CB_GET_PACKET_TYPE(skb)) {
+		is_arp = true;
+		if (qdf_nbuf_data_is_arp_rsp(skb) &&
+		    (pHddCtx->track_arp_ip == qdf_nbuf_get_arp_src_ip(skb))) {
+			++pAdapter->hdd_stats.hdd_arp_stats.rx_arp_rsp_count;
+			QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_INFO,
+					"%s: ARP packet received", __func__);
+			track_arp = true;
+		}
+	}
 
 	pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
 	if ((pHddStaCtx->conn_info.proxyARPService) &&
@@ -1089,11 +1187,18 @@ QDF_STATUS hdd_rx_packet_cbk(void *context, qdf_nbuf_t rxBuf)
 	++pAdapter->stats.rx_packets;
 	pAdapter->stats.rx_bytes += skb->len;
 
+	if (is_arp) {
+		pAdapter->dad |= hdd_is_duplicate_ip_arp(skb);
+		if (pAdapter->dad)
+			QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_ERROR,
+				"%s: Duplicate IP detected", __func__);
+	}
+
 	/* Check & drop replayed mcast packets (for IPV6) */
 	if (pHddCtx->config->multicast_replay_filter &&
 			hdd_is_mcast_replay(skb)) {
 		++pAdapter->hdd_stats.hddTxRxStats.rxDropped[cpu_index];
-		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_INFO,
+		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_DEBUG,
 			"%s: Dropping multicast replay pkt", __func__);
 		qdf_nbuf_free(skb);
 		return QDF_STATUS_SUCCESS;
@@ -1125,12 +1230,19 @@ QDF_STATUS hdd_rx_packet_cbk(void *context, qdf_nbuf_t rxBuf)
 		else
 			rxstat = netif_rx_ni(skb);
 
-		if (NET_RX_SUCCESS == rxstat)
+		if (NET_RX_SUCCESS == rxstat) {
 			++pAdapter->hdd_stats.hddTxRxStats.
 				 rxDelivered[cpu_index];
-		else
+			if (track_arp)
+				++pAdapter->hdd_stats.hdd_arp_stats.
+						rx_delivered;
+		} else {
 			++pAdapter->hdd_stats.hddTxRxStats.
-				 rxRefused[cpu_index];
+				rxRefused[cpu_index];
+			if (track_arp)
+				++pAdapter->hdd_stats.hdd_arp_stats.
+						rx_refused;
+		}
 
 	} else {
 		++pAdapter->hdd_stats.hddTxRxStats.
@@ -1217,8 +1329,6 @@ static void wlan_hdd_update_queue_oper_stats(hdd_adapter_t *adapter,
 	default:
 		break;
 	}
-
-	return;
 }
 
 /**
@@ -1417,8 +1527,6 @@ void wlan_hdd_netif_queue_control(hdd_adapter_t *adapter,
 							adapter->pause_map;
 	if (++adapter->history_index == WLAN_HDD_MAX_HISTORY_ENTRY)
 		adapter->history_index = 0;
-
-	return;
 }
 
 /**

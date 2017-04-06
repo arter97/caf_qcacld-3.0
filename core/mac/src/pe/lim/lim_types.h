@@ -45,7 +45,6 @@
 #include "utils_api.h"
 
 #include "lim_api.h"
-#include "lim_debug.h"
 #include "lim_trace.h"
 #include "lim_send_sme_rsp_messages.h"
 #include "sys_global.h"
@@ -260,6 +259,7 @@ typedef struct sLimMlmAssocInd {
 	uint32_t assocReqLength;
 	uint8_t *assocReqPtr;
 	tSirSmeChanInfo chan_info;
+	uint8_t              ecsa_capable;
 } tLimMlmAssocInd, *tpLimMlmAssocInd;
 
 typedef struct sLimMlmReassocReq {
@@ -297,6 +297,7 @@ typedef struct sLimMlmReassocInd {
 	uint8_t *beaconPtr;
 	uint32_t assocReqLength;
 	uint8_t *assocReqPtr;
+	uint8_t              ecsa_capable;
 } tLimMlmReassocInd, *tpLimMlmReassocInd;
 
 typedef struct sLimMlmAuthCnf {
@@ -669,7 +670,7 @@ lim_post_sme_message(tpAniSirGlobal pMac, uint32_t msgType, uint32_t *pMsgBuf)
 	tSirMsgQ msg;
 
 	if (pMsgBuf == NULL) {
-		lim_log(pMac, LOGE, FL("Buffer is Pointing to NULL"));
+		pe_err("Buffer is Pointing to NULL");
 		return;
 	}
 
@@ -713,10 +714,10 @@ lim_post_sme_message(tpAniSirGlobal pMac, uint32_t msgType, uint32_t *pMsgBuf)
 static inline void
 lim_post_mlm_message(tpAniSirGlobal pMac, uint32_t msgType, uint32_t *pMsgBuf)
 {
-
 	tSirMsgQ msg;
+
 	if (pMsgBuf == NULL) {
-		lim_log(pMac, LOGE, FL("Buffer is Pointing to NULL"));
+		pe_err("Buffer is Pointing to NULL");
 		return;
 	}
 	msg.type = (uint16_t) msgType;
@@ -846,8 +847,6 @@ void lim_process_remain_on_chn_timeout(tpAniSirGlobal pMac);
 void lim_process_insert_single_shot_noa_timeout(tpAniSirGlobal pMac);
 void lim_convert_active_channel_to_passive_channel(tpAniSirGlobal pMac);
 void lim_send_p2p_action_frame(tpAniSirGlobal pMac, tpSirMsgQ pMsg);
-void lim_abort_remain_on_chan(tpAniSirGlobal pMac, uint8_t sessionId,
-	uint32_t scan_id);
 tSirRetStatus __lim_process_sme_no_a_update(tpAniSirGlobal pMac, uint32_t *pMsgBuf);
 void lim_process_regd_defd_sme_req_after_noa_start(tpAniSirGlobal pMac);
 
@@ -870,7 +869,8 @@ int lim_process_remain_on_chnl_req(tpAniSirGlobal pMac, uint32_t *pMsg);
 void lim_remain_on_chn_rsp(tpAniSirGlobal pMac, QDF_STATUS status, uint32_t *data);
 void lim_send_sme_disassoc_deauth_ntf(tpAniSirGlobal mac_ctx,
 				QDF_STATUS status, uint32_t *ctx);
-
+tSirRetStatus lim_process_sme_del_all_tdls_peers(tpAniSirGlobal p_mac,
+						 uint32_t *msg_buf);
 /* / Bit value data structure */
 typedef enum sHalBitVal         /* For Bit operations */
 {
