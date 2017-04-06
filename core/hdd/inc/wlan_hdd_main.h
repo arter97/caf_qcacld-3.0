@@ -157,6 +157,8 @@
 /* Maximum time(ms) to wait for RSO CMD status event */
 #define WAIT_TIME_RSO_CMD_STATUS 2000
 
+#define WLAN_WAIT_TIME_SET_RND 100
+
 #define MAX_NUMBER_OF_ADAPTERS 4
 
 #define MAX_CFG_STRING_LEN  255
@@ -295,6 +297,12 @@ typedef enum {
 #define MAX_PROBE_REQ_OUIS 16
 
 /*
+ * Maximum no.of random mac addresses supported by firmware
+ * for transmitting management action frames
+ */
+#define MAX_RANDOM_MAC_ADDRS 4
+
+/*
  * Generic asynchronous request/response support
  *
  * Many of the APIs supported by HDD require a call to SME to
@@ -338,6 +346,20 @@ struct linkspeedContext {
 	unsigned int magic;
 };
 
+/**
+ * struct random_mac_context - Context used with hdd_random_mac_callback
+ * @random_mac_completion: Event on which hdd_set_random_mac will wait
+ * @adapter: Pointer to adapter
+ * @magic: For valid context this is set to ACTION_FRAME_RANDOM_CONTEXT_MAGIC
+ * @set_random_addr: Status of random filter set
+ */
+struct random_mac_context {
+	struct completion random_mac_completion;
+	hdd_adapter_t *adapter;
+	unsigned int magic;
+	bool set_random_addr;
+};
+
 extern spinlock_t hdd_context_lock;
 
 #define STATS_CONTEXT_MAGIC 0x53544154  /* STAT */
@@ -350,6 +372,7 @@ extern spinlock_t hdd_context_lock;
 #define BPF_CONTEXT_MAGIC 0x4575354    /* BPF */
 #define POWER_STATS_MAGIC 0x14111990
 #define RCPI_CONTEXT_MAGIC  0x7778888  /* RCPI */
+#define ACTION_FRAME_RANDOM_CONTEXT_MAGIC 0x87878787
 
 /* MAX OS Q block time value in msec
  * Prevent from permanent stall, resume OS Q if timer expired */
@@ -418,15 +441,14 @@ typedef struct hdd_pmf_stats_s {
 #endif
 
 struct hdd_arp_stats_s {
-	uint16_t tx_count;
-	uint16_t rx_count;
+	uint16_t tx_arp_req_count;
+	uint16_t rx_arp_rsp_count;
 	uint16_t tx_dropped;
 	uint16_t rx_dropped;
 	uint16_t rx_delivered;
 	uint16_t rx_refused;
 	uint16_t tx_host_fw_sent;
 	uint16_t rx_host_drop_reorder;
-	uint16_t tx_fw_cnt;
 	uint16_t rx_fw_cnt;
 	uint16_t tx_ack_cnt;
 };
@@ -434,10 +456,7 @@ struct hdd_arp_stats_s {
 typedef struct hdd_stats_s {
 	tCsrSummaryStatsInfo summary_stat;
 	tCsrGlobalClassAStatsInfo ClassA_stat;
-	tCsrGlobalClassBStatsInfo ClassB_stat;
-	tCsrGlobalClassCStatsInfo ClassC_stat;
 	tCsrGlobalClassDStatsInfo ClassD_stat;
-	tCsrPerStaStatsInfo perStaStats;
 	struct csr_per_chain_rssi_stats_info  per_chain_rssi_stats;
 	hdd_tx_rx_stats_t hddTxRxStats;
 	struct hdd_arp_stats_s hdd_arp_stats;
@@ -689,6 +708,31 @@ struct hdd_mon_set_ch_info {
 	uint8_t cb_mode;
 	uint32_t channel_width;
 	eCsrPhyMode phy_mode;
+};
+
+/**
+ * struct action_frame_cookie - Action frame cookie item in cookie list
+ * @cookie_node: List item
+ * @cookie: Cookie value
+ */
+struct action_frame_cookie {
+	struct list_head cookie_node;
+	uint64_t cookie;
+};
+
+/**
+ * struct action_frame_random_mac - Action Frame random mac addr &
+ * related attrs
+ * @in_use: Checks whether random mac is in use
+ * @addr: Contains random mac addr
+ * @freq: Channel frequency
+ * @cookie_list: List of cookies tied with random mac
+ */
+struct action_frame_random_mac {
+	bool in_use;
+	uint8_t addr[QDF_MAC_ADDR_SIZE];
+	uint32_t freq;
+	struct list_head cookie_list;
 };
 
 struct hdd_station_ctx {
@@ -1216,6 +1260,9 @@ struct hdd_adapter_s {
 	struct lfr_firmware_status lfr_fw_status;
 	bool con_status;
 	bool dad;
+	/* random address management for management action frames */
+	spinlock_t random_mac_lock;
+	struct action_frame_random_mac random_mac[MAX_RANDOM_MAC_ADDRS];
 };
 
 /*
@@ -1695,6 +1742,9 @@ struct hdd_context_s {
 	uint32_t no_of_probe_req_ouis;
 	struct vendor_oui *probe_req_voui;
 	struct hdd_nud_stats_context nud_stats_context;
+	uint32_t track_arp_ip;
+	uint8_t bt_a2dp_active:1;
+	uint8_t bt_vo_active:1;
 };
 
 /*---------------------------------------------------------------------------
@@ -1743,6 +1793,20 @@ hdd_adapter_t *hdd_get_adapter_by_vdev(hdd_context_t *pHddCtx,
 				       uint32_t vdev_id);
 hdd_adapter_t *hdd_get_adapter_by_macaddr(hdd_context_t *pHddCtx,
 					  tSirMacAddr macAddr);
+/**
+ * hdd_get_adapter_by_rand_macaddr() - Get adapter using random DA of MA frms
+ * @hdd_ctx: Pointer to hdd context
+ * @mac_addr: random mac address
+ *
+ * This function is used to get adapter from randomized destination mac
+ * address present in management action frames
+ *
+ * Return: If randomized addr is present then return pointer to adapter
+ *         else NULL
+ */
+hdd_adapter_t *hdd_get_adapter_by_rand_macaddr(hdd_context_t *hdd_ctx,
+						tSirMacAddr mac_addr);
+
 QDF_STATUS hdd_init_station_mode(hdd_adapter_t *pAdapter);
 hdd_adapter_t *hdd_get_adapter(hdd_context_t *pHddCtx,
 			enum tQDF_ADAPTER_MODE mode);
@@ -1848,6 +1912,52 @@ hdd_adapter_t *hdd_get_con_sap_adapter(hdd_adapter_t *this_sap_adapter,
 bool hdd_is_5g_supported(hdd_context_t *pHddCtx);
 
 int wlan_hdd_scan_abort(hdd_adapter_t *pAdapter);
+
+#ifdef FEATURE_WLAN_LFR
+static inline bool hdd_driver_roaming_supported(hdd_context_t *hdd_ctx)
+{
+	return hdd_ctx->cfg_ini->isFastRoamIniFeatureEnabled;
+}
+#else
+static inline bool hdd_driver_roaming_supported(hdd_context_t *hdd_ctx)
+{
+	return false;
+}
+#endif
+
+#ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
+static inline bool hdd_firmware_roaming_supported(hdd_context_t *hdd_ctx)
+{
+	return hdd_ctx->cfg_ini->isRoamOffloadScanEnabled;
+}
+#else
+static inline bool hdd_firmware_roaming_supported(hdd_context_t *hdd_ctx)
+{
+	return false;
+}
+#endif
+
+static inline bool hdd_roaming_supported(hdd_context_t *hdd_ctx)
+{
+	bool val;
+
+	val = hdd_driver_roaming_supported(hdd_ctx) ||
+		hdd_firmware_roaming_supported(hdd_ctx);
+
+	return val;
+}
+
+#ifdef CFG80211_SCAN_RANDOM_MAC_ADDR
+static inline bool hdd_scan_random_mac_addr_supported(void)
+{
+	return true;
+}
+#else
+static inline bool hdd_scan_random_mac_addr_supported(void)
+{
+	return false;
+}
+#endif
 
 void hdd_get_fw_version(hdd_context_t *hdd_ctx,
 			uint32_t *major_spid, uint32_t *minor_spid,
@@ -2164,4 +2274,16 @@ static inline void hdd_init_nud_stats_ctx(hdd_context_t *hdd_ctx)
 	init_completion(&hdd_ctx->nud_stats_context.response_event);
 	return;
 }
+
+/**
+ * hdd_start_complete()- complete the start event
+ * @ret: return value for complete event.
+ *
+ * complete the startup event and set the return in
+ * global variable
+ *
+ * Return: void
+ */
+
+void hdd_start_complete(int ret);
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

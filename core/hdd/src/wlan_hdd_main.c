@@ -131,6 +131,12 @@
 #define MEMORY_DEBUG_STR ""
 #endif
 
+int wlan_start_ret_val;
+static DECLARE_COMPLETION(wlan_start_comp);
+static unsigned int dev_num = 1;
+static struct cdev wlan_hdd_state_cdev;
+static struct class *class;
+static dev_t device;
 #ifndef MODULE
 static struct gwlan_loader *wlan_loader;
 static ssize_t wlan_boot_cb(struct kobject *kobj,
@@ -199,10 +205,16 @@ static const struct wiphy_wowlan_support wowlan_support_reg_init = {
 /* internal function declaration */
 
 struct sock *cesium_nl_srv_sock;
-struct completion wlan_start_comp;
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
 void wlan_hdd_auto_shutdown_cb(void);
 #endif
+
+void hdd_start_complete(int ret)
+{
+	wlan_start_ret_val = ret;
+
+	complete(&wlan_start_comp);
+}
 
 /**
  * hdd_set_rps_cpu_mask - set RPS CPU mask for interfaces
@@ -820,6 +832,26 @@ static void hdd_update_vdev_nss(hdd_context_t *hdd_ctx)
 			cfg_ini->vdev_type_nss_5g, eCSR_BAND_5G);
 }
 
+/**
+ * hdd_update_hw_dbs_capable() - sets the dbs capability of the device
+ * @hdd_ctx: HDD context
+ *
+ * Sets the DBS capability as per INI and firmware capability
+ *
+ * Return: None
+ */
+static void hdd_update_hw_dbs_capable(hdd_context_t *hdd_ctx)
+{
+	struct hdd_config *cfg_ini = hdd_ctx->config;
+	uint8_t hw_dbs_capable = 0;
+
+	if ((!cfg_ini->dual_mac_feature_disable)
+	    && wma_is_hw_dbs_capable())
+		hw_dbs_capable = 1;
+
+	sme_update_hw_dbs_capable(hdd_ctx->hHal, hw_dbs_capable);
+}
+
 static void hdd_update_tgt_ht_cap(hdd_context_t *hdd_ctx,
 				  struct wma_tgt_ht_cap *cfg)
 {
@@ -1429,6 +1461,8 @@ void hdd_update_tgt_cfg(void *context, void *param)
 	hdd_update_tgt_vht_cap(hdd_ctx, &cfg->vht_cap);
 
 	hdd_update_vdev_nss(hdd_ctx);
+
+	hdd_update_hw_dbs_capable(hdd_ctx);
 
 	hdd_ctx->config->fine_time_meas_cap &= cfg->fine_time_measurement_cap;
 	hdd_ctx->fine_time_meas_cap_target = cfg->fine_time_measurement_cap;
@@ -2479,6 +2513,20 @@ static void hdd_runtime_suspend_context_deinit(hdd_context_t *hdd_ctx) {}
 static inline void hdd_adapter_runtime_suspend_init(hdd_adapter_t *adapter) {}
 static inline void hdd_adapter_runtime_suspend_denit(hdd_adapter_t *adapter) {}
 #endif /* FEATURE_RUNTIME_PM */
+
+/**
+ * hdd_adapter_init_action_frame_random_mac() - Initialze attributes needed for
+ * randomization of SA in management action frames
+ * @adapter: Pointer to adapter
+ *
+ * Return: None
+ */
+static void hdd_adapter_init_action_frame_random_mac(hdd_adapter_t *adapter)
+{
+	spin_lock_init(&adapter->random_mac_lock);
+	qdf_mem_zero(adapter->random_mac, sizeof(adapter->random_mac));
+}
+
 /**
  * hdd_alloc_station_adapter() - allocate the station hdd adapter
  * @hdd_ctx: global hdd context
@@ -3298,6 +3346,9 @@ hdd_adapter_t *hdd_open_adapter(hdd_context_t *hdd_ctx, uint8_t session_type,
 			if (QDF_STATUS_SUCCESS != status)
 				goto err_free_netdev;
 		}
+
+		/* initialize action frame random mac info */
+		hdd_adapter_init_action_frame_random_mac(adapter);
 
 		/*
 		 * Workqueue which gets scheduled in IPv4 notification
@@ -8415,6 +8466,16 @@ int hdd_wlan_stop_modules(hdd_context_t *hdd_ctx)
 	mutex_lock(&hdd_ctx->iface_change_lock);
 	hdd_ctx->stop_modules_in_progress = true;
 
+	if (cds_return_external_threads_count() || hdd_ctx->isWiphySuspended) {
+		mutex_unlock(&hdd_ctx->iface_change_lock);
+		hdd_warn("External threads %d wiphy suspend %d",
+			cds_return_external_threads_count(),
+			hdd_ctx->isWiphySuspended);
+		qdf_mc_timer_start(&hdd_ctx->iface_change_timer,
+				   hdd_ctx->config->iface_change_wait_time);
+		return 0;
+	}
+
 	hdd_info("Present Driver Status: %d", hdd_ctx->driver_status);
 
 	switch (hdd_ctx->driver_status) {
@@ -8738,7 +8799,7 @@ int hdd_wlan_startup(struct device *dev)
 	qdf_mc_timer_start(&hdd_ctx->iface_change_timer,
 			   hdd_ctx->config->iface_change_wait_time);
 
-	complete(&wlan_start_comp);
+	hdd_start_complete(0);
 	goto success;
 
 err_close_adapters:
@@ -8757,10 +8818,12 @@ err_stop_modules:
 	hdd_wlan_stop_modules(hdd_ctx);
 
 err_exit_nl_srv:
-	status = cds_sched_close(hdd_ctx->pcds_context);
-	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		hdd_err("Failed to close CDS Scheduler");
-		QDF_ASSERT(QDF_IS_STATUS_SUCCESS(status));
+	if (DRIVER_MODULES_CLOSED == hdd_ctx->driver_status) {
+		status = cds_sched_close(hdd_ctx->pcds_context);
+		if (!QDF_IS_STATUS_SUCCESS(status)) {
+			hdd_err("Failed to close CDS Scheduler");
+			QDF_ASSERT(QDF_IS_STATUS_SUCCESS(status));
+		}
 	}
 
 	hdd_green_ap_deinit(hdd_ctx);
@@ -8768,11 +8831,11 @@ err_exit_nl_srv:
 
 	cds_deinit_ini_config();
 err_hdd_free_context:
+	hdd_start_complete(ret);
 	qdf_mc_timer_destroy(&hdd_ctx->iface_change_timer);
 	mutex_destroy(&hdd_ctx->iface_change_lock);
 	hdd_context_destroy(hdd_ctx);
 	QDF_BUG(1);
-
 	return -EIO;
 
 success:
@@ -8845,9 +8908,7 @@ static void hdd_get_nud_stats_cb(void *data, struct rsp_stats *rsp)
 	hdd_notice("rsp->ba_session_establishment_status :%x",
 		   rsp->ba_session_establishment_status);
 
-	adapter->hdd_stats.hdd_arp_stats.tx_fw_cnt = rsp->arp_req_enqueue;
 	adapter->hdd_stats.hdd_arp_stats.rx_fw_cnt = rsp->arp_rsp_recvd;
-	adapter->hdd_stats.hdd_arp_stats.tx_ack_cnt = rsp->arp_req_tx_success;
 	adapter->dad |= rsp->dad_detected;
 	adapter->con_status = rsp->connect_status;
 
@@ -8936,6 +8997,11 @@ int hdd_register_cb(hdd_context_t *hdd_ctx)
 		hdd_err("set lost link info callback failed");
 
 	wlan_hdd_dcc_register_for_dcc_stats_event(hdd_ctx);
+
+	status = sme_set_bt_activity_info_cb(hdd_ctx->hHal,
+					     hdd_bt_activity_cb);
+	if (!QDF_IS_STATUS_SUCCESS(status))
+		hdd_err("set bt activity info callback failed");
 
 	EXIT();
 
@@ -9783,6 +9849,121 @@ void hdd_deinit(void)
 
 #define HDD_WLAN_START_WAIT_TIME (CDS_WMA_TIMEOUT + 5000)
 
+static int wlan_hdd_state_ctrl_param_open(struct inode *inode,
+					  struct file *file)
+{
+	return 0;
+}
+
+static ssize_t wlan_hdd_state_ctrl_param_write(struct file *filp,
+						const char __user *user_buf,
+						size_t count,
+						loff_t *f_pos)
+{
+	char buf;
+	static const char wlan_off_str[] = "OFF";
+	static const char wlan_on_str[] = "ON";
+	int ret;
+	unsigned long rc;
+
+	if (copy_from_user(&buf, user_buf, 3)) {
+		pr_err("Failed to read buffer\n");
+		return -EINVAL;
+	}
+
+	if (strncmp(&buf, wlan_off_str, strlen(wlan_off_str)) == 0) {
+		pr_debug("Wifi turning off from UI\n");
+		goto exit;
+	}
+
+	if (strncmp(&buf, wlan_on_str, strlen(wlan_on_str)) != 0) {
+		pr_err("Invalid value received from framework");
+		goto exit;
+	}
+
+	if (!cds_is_driver_loaded()) {
+		rc = wait_for_completion_timeout(&wlan_start_comp,
+				msecs_to_jiffies(HDD_WLAN_START_WAIT_TIME));
+		if (!rc) {
+			hdd_alert("Timed-out waiting in wlan_hdd_state_ctrl_param_write");
+			ret = -EINVAL;
+			hdd_start_complete(ret);
+			return ret;
+		}
+
+		hdd_start_complete(0);
+	}
+
+exit:
+	return count;
+}
+
+
+const struct file_operations wlan_hdd_state_fops = {
+	.owner = THIS_MODULE,
+	.open = wlan_hdd_state_ctrl_param_open,
+	.write = wlan_hdd_state_ctrl_param_write,
+};
+
+static int  wlan_hdd_state_ctrl_param_create(void)
+{
+	unsigned int wlan_hdd_state_major = 0;
+	int ret;
+	struct device *dev;
+
+	device = MKDEV(wlan_hdd_state_major, 0);
+
+	ret = alloc_chrdev_region(&device, 0, dev_num, "qcwlanstate");
+	if (ret) {
+		pr_err("Failed to register qcwlanstate");
+		goto dev_alloc_err;
+	}
+	wlan_hdd_state_major = MAJOR(device);
+
+	class = class_create(THIS_MODULE, WLAN_MODULE_NAME);
+	if (IS_ERR(class)) {
+		pr_err("wlan_hdd_state class_create error");
+		goto class_err;
+	}
+
+	dev = device_create(class, NULL, device, NULL, WLAN_MODULE_NAME);
+	if (IS_ERR(dev)) {
+		pr_err("wlan_hdd_statedevice_create error");
+		goto err_class_destroy;
+	}
+
+	cdev_init(&wlan_hdd_state_cdev, &wlan_hdd_state_fops);
+	ret = cdev_add(&wlan_hdd_state_cdev, device, dev_num);
+	if (ret) {
+		pr_err("Failed to add cdev error");
+		goto cdev_add_err;
+	}
+
+	pr_info("wlan_hdd_state %s major(%d) initialized",
+		WLAN_MODULE_NAME, wlan_hdd_state_major);
+
+	return 0;
+
+cdev_add_err:
+	device_destroy(class, device);
+err_class_destroy:
+	class_destroy(class);
+class_err:
+	unregister_chrdev_region(device, dev_num);
+dev_alloc_err:
+	return -ENODEV;
+}
+
+static void wlan_hdd_state_ctrl_param_destroy(void)
+{
+	cdev_del(&wlan_hdd_state_cdev);
+	device_destroy(class, device);
+	class_destroy(class);
+	unregister_chrdev_region(device, dev_num);
+
+	pr_info("Device node unregistered");
+}
+
 /**
  * __hdd_module_init - Module init helper
  *
@@ -9797,6 +9978,12 @@ static int __hdd_module_init(void)
 
 	pr_err("%s: Loading driver v%s\n", WLAN_MODULE_NAME,
 		QWLAN_VERSIONSTR TIMER_MANAGER_STR MEMORY_DEBUG_STR);
+
+	ret = wlan_hdd_state_ctrl_param_create();
+	if (ret) {
+		pr_err("wlan_hdd_state_create:%x\n", ret);
+		goto err_dev_state;
+	}
 
 	pld_init();
 
@@ -9818,11 +10005,14 @@ static int __hdd_module_init(void)
 		goto out;
 	}
 
+	/*
+	 * This wait is temporarily introduced till
+	 * boardconfig changes for dev node are merged
+	 */
 	rc = wait_for_completion_timeout(&wlan_start_comp,
-				msecs_to_jiffies(HDD_WLAN_START_WAIT_TIME));
-
+			msecs_to_jiffies(HDD_WLAN_START_WAIT_TIME));
 	if (!rc) {
-		hdd_err("Timed-out waiting for wlan_hdd_register_driver");
+		hdd_alert("Timed-out waiting for wlan_hdd_register_driver");
 		ret = -ETIMEDOUT;
 		wlan_hdd_unregister_driver();
 		goto out;
@@ -9836,6 +10026,8 @@ out:
 	hdd_deinit();
 err_hdd_init:
 	pld_deinit();
+	wlan_hdd_state_ctrl_param_destroy();
+err_dev_state:
 	return ret;
 }
 
@@ -9879,7 +10071,7 @@ static void __hdd_module_exit(void)
 
 	hdd_deinit();
 	pld_deinit();
-
+	wlan_hdd_state_ctrl_param_destroy();
 	return;
 }
 
@@ -10558,6 +10750,25 @@ bool hdd_is_roaming_in_progress(hdd_adapter_t *adapter)
 	ret_status = ((adapter->device_mode == QDF_STA_MODE) &&
 			hdd_ctx->roaming_in_progress);
 	return ret_status;
+}
+
+hdd_adapter_t *hdd_get_adapter_by_rand_macaddr(hdd_context_t *hdd_ctx,
+						tSirMacAddr mac_addr)
+{
+	hdd_adapter_list_node_t *adapter_node = NULL, *next = NULL;
+	hdd_adapter_t *adapter;
+	QDF_STATUS status;
+
+	status = hdd_get_front_adapter(hdd_ctx, &adapter_node);
+	while (adapter_node && status == QDF_STATUS_SUCCESS) {
+		adapter = adapter_node->pAdapter;
+		if (adapter && hdd_check_random_mac(adapter, mac_addr))
+			return adapter;
+		status = hdd_get_next_adapter(hdd_ctx, adapter_node, &next);
+		adapter_node = next;
+	}
+
+	return NULL;
 }
 
 /* Register the module init/exit functions */
