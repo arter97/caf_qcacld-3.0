@@ -832,6 +832,26 @@ static void hdd_update_vdev_nss(hdd_context_t *hdd_ctx)
 			cfg_ini->vdev_type_nss_5g, eCSR_BAND_5G);
 }
 
+/**
+ * hdd_update_hw_dbs_capable() - sets the dbs capability of the device
+ * @hdd_ctx: HDD context
+ *
+ * Sets the DBS capability as per INI and firmware capability
+ *
+ * Return: None
+ */
+static void hdd_update_hw_dbs_capable(hdd_context_t *hdd_ctx)
+{
+	struct hdd_config *cfg_ini = hdd_ctx->config;
+	uint8_t hw_dbs_capable = 0;
+
+	if ((!cfg_ini->dual_mac_feature_disable)
+	    && wma_is_hw_dbs_capable())
+		hw_dbs_capable = 1;
+
+	sme_update_hw_dbs_capable(hdd_ctx->hHal, hw_dbs_capable);
+}
+
 static void hdd_update_tgt_ht_cap(hdd_context_t *hdd_ctx,
 				  struct wma_tgt_ht_cap *cfg)
 {
@@ -1441,6 +1461,8 @@ void hdd_update_tgt_cfg(void *context, void *param)
 	hdd_update_tgt_vht_cap(hdd_ctx, &cfg->vht_cap);
 
 	hdd_update_vdev_nss(hdd_ctx);
+
+	hdd_update_hw_dbs_capable(hdd_ctx);
 
 	hdd_ctx->config->fine_time_meas_cap &= cfg->fine_time_measurement_cap;
 	hdd_ctx->fine_time_meas_cap_target = cfg->fine_time_measurement_cap;
@@ -2491,6 +2513,20 @@ static void hdd_runtime_suspend_context_deinit(hdd_context_t *hdd_ctx) {}
 static inline void hdd_adapter_runtime_suspend_init(hdd_adapter_t *adapter) {}
 static inline void hdd_adapter_runtime_suspend_denit(hdd_adapter_t *adapter) {}
 #endif /* FEATURE_RUNTIME_PM */
+
+/**
+ * hdd_adapter_init_action_frame_random_mac() - Initialze attributes needed for
+ * randomization of SA in management action frames
+ * @adapter: Pointer to adapter
+ *
+ * Return: None
+ */
+static void hdd_adapter_init_action_frame_random_mac(hdd_adapter_t *adapter)
+{
+	spin_lock_init(&adapter->random_mac_lock);
+	qdf_mem_zero(adapter->random_mac, sizeof(adapter->random_mac));
+}
+
 /**
  * hdd_alloc_station_adapter() - allocate the station hdd adapter
  * @hdd_ctx: global hdd context
@@ -3310,6 +3346,9 @@ hdd_adapter_t *hdd_open_adapter(hdd_context_t *hdd_ctx, uint8_t session_type,
 			if (QDF_STATUS_SUCCESS != status)
 				goto err_free_netdev;
 		}
+
+		/* initialize action frame random mac info */
+		hdd_adapter_init_action_frame_random_mac(adapter);
 
 		/*
 		 * Workqueue which gets scheduled in IPv4 notification
@@ -10711,6 +10750,25 @@ bool hdd_is_roaming_in_progress(hdd_adapter_t *adapter)
 	ret_status = ((adapter->device_mode == QDF_STA_MODE) &&
 			hdd_ctx->roaming_in_progress);
 	return ret_status;
+}
+
+hdd_adapter_t *hdd_get_adapter_by_rand_macaddr(hdd_context_t *hdd_ctx,
+						tSirMacAddr mac_addr)
+{
+	hdd_adapter_list_node_t *adapter_node = NULL, *next = NULL;
+	hdd_adapter_t *adapter;
+	QDF_STATUS status;
+
+	status = hdd_get_front_adapter(hdd_ctx, &adapter_node);
+	while (adapter_node && status == QDF_STATUS_SUCCESS) {
+		adapter = adapter_node->pAdapter;
+		if (adapter && hdd_check_random_mac(adapter, mac_addr))
+			return adapter;
+		status = hdd_get_next_adapter(hdd_ctx, adapter_node, &next);
+		adapter_node = next;
+	}
+
+	return NULL;
 }
 
 /* Register the module init/exit functions */

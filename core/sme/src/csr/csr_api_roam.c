@@ -213,8 +213,10 @@ static QDF_STATUS csr_roam_start_roaming_timer(tpAniSirGlobal pMac,
 static QDF_STATUS csr_roam_stop_roaming_timer(tpAniSirGlobal pMac,
 					      uint32_t sessionId);
 static void csr_roam_roaming_timer_handler(void *pv);
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
 static void csr_roam_roaming_offload_timer_action(tpAniSirGlobal mac_ctx,
 		uint32_t interval, uint8_t session_id, uint8_t action);
+#endif
 static void csr_roam_roaming_offload_timeout_handler(void *timer_data);
 QDF_STATUS csr_roam_start_wait_for_key_timer(tpAniSirGlobal pMac, uint32_t interval);
 static void csr_roam_wait_for_key_time_out_handler(void *pv);
@@ -2222,6 +2224,8 @@ QDF_STATUS csr_change_default_config_param(tpAniSirGlobal pMac,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	if (pParam) {
+		pMac->roam.configParam.pkt_err_disconn_th =
+			pParam->pkt_err_disconn_th;
 		pMac->roam.configParam.WMMSupportMode = pParam->WMMSupportMode;
 		cfg_set_int(pMac, WNI_CFG_WME_ENABLED,
 			(pParam->WMMSupportMode == eCsrRoamWmmNoQos) ? 0 : 1);
@@ -2690,6 +2694,7 @@ QDF_STATUS csr_get_config_param(tpAniSirGlobal pMac, tCsrConfigParam *pParam)
 	if (!pParam)
 		return QDF_STATUS_E_INVAL;
 
+	pParam->pkt_err_disconn_th = cfg_params->pkt_err_disconn_th;
 	pParam->WMMSupportMode = cfg_params->WMMSupportMode;
 	pParam->Is11eSupportEnabled = cfg_params->Is11eSupportEnabled;
 	pParam->FragmentationThreshold = cfg_params->FragmentationThreshold;
@@ -11711,6 +11716,7 @@ void csr_roam_wait_for_key_time_out_handler(void *pv)
 
 }
 
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
  * csr_roam_roaming_offload_timer_action() - API to start/stop the timer
  * @mac_ctx: MAC Context
@@ -11752,6 +11758,7 @@ void csr_roam_roaming_offload_timer_action(tpAniSirGlobal mac_ctx,
 
 	return;
 }
+#endif
 
 QDF_STATUS csr_roam_start_wait_for_key_timer(tpAniSirGlobal pMac, uint32_t interval)
 {
@@ -15521,7 +15528,8 @@ QDF_STATUS csr_process_add_sta_session_command(tpAniSirGlobal pMac,
 			pMac->roam.configParam.enable_bcast_probe_rsp;
 	add_sta_self_req->fils_max_chan_guard_time =
 			pMac->roam.configParam.fils_max_chan_guard_time;
-
+	add_sta_self_req->pkt_err_disconn_th =
+			pMac->roam.configParam.pkt_err_disconn_th;
 	msg.type = WMA_ADD_STA_SELF_REQ;
 	msg.reserved = 0;
 	msg.bodyptr = add_sta_self_req;
@@ -16286,20 +16294,6 @@ csr_update_stats(tpAniSirGlobal mac, uint8_t stats_type,
 			     sizeof(tCsrGlobalClassAStatsInfo));
 		*stats += sizeof(tCsrGlobalClassAStatsInfo);
 		*length -= sizeof(tCsrGlobalClassAStatsInfo);
-		break;
-	case eCsrGlobalClassBStats:
-		sme_debug("ClassB stats");
-		qdf_mem_copy((uint8_t *) &mac->roam.classBStatsInfo, *stats,
-			     sizeof(tCsrGlobalClassBStatsInfo));
-		*stats += sizeof(tCsrGlobalClassBStatsInfo);
-		*length -= sizeof(tCsrGlobalClassBStatsInfo);
-		break;
-	case eCsrGlobalClassCStats:
-		sme_debug("ClassC stats");
-		qdf_mem_copy((uint8_t *) &mac->roam.classCStatsInfo, *stats,
-			     sizeof(tCsrGlobalClassCStatsInfo));
-		*stats += sizeof(tCsrGlobalClassCStatsInfo);
-		*length -= sizeof(tCsrGlobalClassCStatsInfo);
 		break;
 	case csr_per_chain_rssi_stats:
 		sme_debug("csrRoamStatsRspProcessor:Per Chain RSSI stats");
@@ -18438,22 +18432,6 @@ void csr_roam_report_statistics(tpAniSirGlobal pMac, uint32_t statsMask,
 					     classAStatsInfo,
 					     sizeof(tCsrGlobalClassAStatsInfo));
 				pStats += sizeof(tCsrGlobalClassAStatsInfo);
-				break;
-			case eCsrGlobalClassBStats:
-				sme_debug("ClassB stats");
-				qdf_mem_copy(pStats,
-					     (uint8_t *) &pMac->roam.
-					     classBStatsInfo,
-					     sizeof(tCsrGlobalClassBStatsInfo));
-				pStats += sizeof(tCsrGlobalClassBStatsInfo);
-				break;
-			case eCsrGlobalClassCStats:
-				sme_debug("ClassC stats");
-				qdf_mem_copy(pStats,
-					     (uint8_t *) &pMac->roam.
-					     classCStatsInfo,
-					     sizeof(tCsrGlobalClassCStatsInfo));
-				pStats += sizeof(tCsrGlobalClassCStatsInfo);
 				break;
 			case eCsrGlobalClassDStats:
 				sme_debug("ClassD stats");

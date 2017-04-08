@@ -2323,7 +2323,6 @@ static void wma_roam_update_vdev(tp_wma_handle wma,
 }
 
 
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
  * wma_roam_remove_self_reassoc() - post a message to SME module to indicate
  *				    to remove self reassociation command from
@@ -2353,11 +2352,6 @@ static void wma_roam_remove_self_reassoc(tp_wma_handle wma, uint32_t vdev_id)
 	}
 	return;
 }
-#else
-static void wma_roam_remove_self_reassoc(tp_wma_handle wma, uint32_t vdev_id)
-{
-}
-#endif
 
 /**
  * wma_roam_synch_event_handler() - roam synch event handler
@@ -2711,6 +2705,12 @@ void wma_set_ric_req(tp_wma_handle wma, void *msg, uint8_t is_add_ts)
 
 	return;
 }
+
+#else
+static void wma_roam_remove_self_reassoc(tp_wma_handle wma, uint32_t vdev_id)
+{
+}
+
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
 
 /**
@@ -3033,6 +3033,7 @@ void wma_set_channel(tp_wma_handle wma, tpSwitchChannelParams params)
 	req.beacon_intval = 100;
 	req.dtim_period = 1;
 	req.is_dfs = params->isDfsChannel;
+	req.ldpc_rx_enabled = params->rx_ldpc;
 
 	/* In case of AP mode, once radar is detected, we need to
 	 * issuse VDEV RESTART, so we making is_channel_switch as
