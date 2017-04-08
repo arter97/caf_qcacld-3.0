@@ -2413,7 +2413,10 @@ ol_txrx_peer_attach(ol_txrx_vdev_handle vdev, uint8_t *peer_mac_addr)
 				vdev->wait_on_peer_id, (int) rc);
 			/* Added for debugging only */
 			wma_peer_debug_dump();
-			QDF_ASSERT(0);
+			if (cds_is_self_recovery_enabled())
+				cds_trigger_recovery(false);
+			else
+				QDF_ASSERT(0);
 			vdev->wait_on_peer_id = OL_TXRX_INVALID_LOCAL_PEER_ID;
 			return NULL;
 		}
@@ -3187,6 +3190,9 @@ int ol_txrx_peer_unref_delete(ol_txrx_peer_handle peer,
 
 		ol_txrx_peer_tx_queue_free(pdev, peer);
 
+		/* Remove mappings from peer_id to peer object */
+		ol_txrx_peer_clear_map_peer(pdev, peer);
+
 		/*
 		 * 'array' is allocated in addba handler and is supposed to be
 		 * freed in delba handler. There is the case (for example, in
@@ -3291,7 +3297,10 @@ void peer_unmap_timer_handler(void *data)
 		 peer->mac_addr.raw[2], peer->mac_addr.raw[3],
 		 peer->mac_addr.raw[4], peer->mac_addr.raw[5]);
 	wma_peer_debug_dump();
-	QDF_BUG(0);
+	if (cds_is_self_recovery_enabled())
+		cds_trigger_recovery(false);
+	else
+		QDF_BUG(0);
 }
 
 

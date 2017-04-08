@@ -4947,7 +4947,7 @@ typedef enum {
  * for valid values of module ids check enum WLAN_MODULE_ID.
  */
 #define CFG_ENABLE_FW_MODULE_LOG_LEVEL    "gFwDebugModuleLoglevel"
-#define CFG_ENABLE_FW_MODULE_LOG_DEFAULT  "2,1,3,1,5,1,9,1,13,1,14,1,18,1,19,1,26,1,28,1,29,1,31,1,36,1,38,1,46,1,47,1,50,1,52,1,53,1,56,1,60,1,61,1"
+#define CFG_ENABLE_FW_MODULE_LOG_DEFAULT  "2,1,3,1,5,1,9,1,13,1,14,1,18,1,19,1,26,1,28,1,29,1,31,1,36,1,38,1,46,1,47,1,50,1,52,1,53,1,56,1,60,1,61,1,4,1"
 
 /*
  * <ini>
@@ -9075,7 +9075,7 @@ enum dot11p_mode {
 #define CFG_PER_ROAM_ENABLE_NAME           "gper_roam_enabled"
 #define CFG_PER_ROAM_ENABLE_MIN            (0)
 #define CFG_PER_ROAM_ENABLE_MAX            (3)
-#define CFG_PER_ROAM_ENABLE_DEFAULT        (0)
+#define CFG_PER_ROAM_ENABLE_DEFAULT        (3)
 
 /*
  * <ini>

@@ -12355,6 +12355,8 @@ static int wlan_hdd_cfg80211_connect_start(hdd_adapter_t *pAdapter,
 		goto ret_status;
 	}
 
+	wlan_hdd_tdls_disable_offchan_and_teardown_links(pHddCtx);
+
 	pRoamProfile = &pWextState->roamProfile;
 	qdf_mem_zero(&hdd_sta_ctx->conn_info.conn_flag,
 		     sizeof(hdd_sta_ctx->conn_info.conn_flag));
@@ -14628,14 +14630,6 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 						pAdapter->aStaInfo[i].
 							macAddrSTA.bytes,
 						QDF_MAC_ADDR_SIZE);
-					if (hdd_ipa_uc_is_enabled(pHddCtx)) {
-						hdd_ipa_wlan_evt(pAdapter,
-							pAdapter->
-								 aStaInfo[i].
-								 ucSTAId,
-							HDD_IPA_CLIENT_DISCONNECT,
-							mac);
-					}
 					hdd_notice("Delete STA with MAC::"
 						  MAC_ADDRESS_STR,
 					       MAC_ADDR_ARRAY(mac));
@@ -14674,11 +14668,6 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 					  MAC_ADDRESS_STR,
 				       MAC_ADDR_ARRAY(mac));
 				return -ENOENT;
-			}
-
-			if (hdd_ipa_uc_is_enabled(pHddCtx)) {
-				hdd_ipa_wlan_evt(pAdapter, staId,
-					HDD_IPA_CLIENT_DISCONNECT, mac);
 			}
 
 			if (pAdapter->aStaInfo[staId].isDeauthInProgress ==
