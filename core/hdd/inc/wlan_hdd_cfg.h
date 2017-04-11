@@ -1558,6 +1558,29 @@ typedef enum {
 
 /*
  * <ini>
+ * gDroppedPktDisconnectTh - Sets dropped packet threshold in firmware
+ * @Min: 0
+ * @Max: 512
+ * @Default: 512
+ *
+ * This INI is the packet drop threshold will trigger disconnect from remote
+ * peer.
+ *
+ * Related: None
+ *
+ * Supported Feature: connection
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_DROPPED_PKT_DISCONNECT_TH_NAME      "gDroppedPktDisconnectTh"
+#define CFG_DROPPED_PKT_DISCONNECT_TH_MIN       (0)
+#define CFG_DROPPED_PKT_DISCONNECT_TH_MAX       (512)
+#define CFG_DROPPED_PKT_DISCONNECT_TH_DEFAULT   (512)
+
+/*
+ * <ini>
  * gEnableFastRoamInConcurrency - Enable LFR roaming on STA during concurrency
  * @Min: 0
  * @Max: 1
@@ -4947,7 +4970,7 @@ typedef enum {
  * for valid values of module ids check enum WLAN_MODULE_ID.
  */
 #define CFG_ENABLE_FW_MODULE_LOG_LEVEL    "gFwDebugModuleLoglevel"
-#define CFG_ENABLE_FW_MODULE_LOG_DEFAULT  "2,1,3,1,5,1,9,1,13,1,14,1,18,1,19,1,26,1,28,1,29,1,31,1,36,1,38,1,46,1,47,1,50,1,52,1,53,1,56,1,60,1,61,1"
+#define CFG_ENABLE_FW_MODULE_LOG_DEFAULT  "2,1,3,1,5,1,9,1,13,1,14,1,18,1,19,1,26,1,28,1,29,1,31,1,36,1,38,1,46,1,47,1,50,1,52,1,53,1,56,1,60,1,61,1,4,1"
 
 /*
  * <ini>
@@ -9075,7 +9098,7 @@ enum dot11p_mode {
 #define CFG_PER_ROAM_ENABLE_NAME           "gper_roam_enabled"
 #define CFG_PER_ROAM_ENABLE_MIN            (0)
 #define CFG_PER_ROAM_ENABLE_MAX            (3)
-#define CFG_PER_ROAM_ENABLE_DEFAULT        (0)
+#define CFG_PER_ROAM_ENABLE_DEFAULT        (3)
 
 /*
  * <ini>
@@ -10316,7 +10339,7 @@ struct hdd_config {
 	uint32_t ibssPs1RxChainInAtimEnable;
 
 	bool enable_ip_tcp_udp_checksum_offload;
-	bool enablePowersaveOffload;
+	uint8_t enablePowersaveOffload;
 	bool enablefwprint;
 	uint8_t enable_fw_log;
 	uint8_t fVhtAmpduLenExponent;
@@ -10650,6 +10673,8 @@ struct hdd_config {
 	uint8_t                     max_rssi_penalize_5g;
 
 	uint8_t packet_filters_bitmap;
+	/* threshold of packet drops at which FW initiates disconnect */
+	uint16_t pkt_err_disconn_th;
 };
 
 #define VAR_OFFSET(_Struct, _Var) (offsetof(_Struct, _Var))

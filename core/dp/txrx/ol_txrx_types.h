@@ -475,6 +475,7 @@ struct ol_txrx_pool_stats {
  * @start_th: start threshold
  * @freelist: tx descriptor freelist
  * @pkt_drop_no_desc: drop due to no descriptors
+ * @ref_cnt: pool's ref count
  */
 struct ol_tx_flow_pool_t {
 	TAILQ_ENTRY(ol_tx_flow_pool_t) flow_pool_list_elem;
@@ -490,6 +491,7 @@ struct ol_tx_flow_pool_t {
 	uint16_t start_th;
 	union ol_tx_desc_list_elem_t *freelist;
 	uint16_t pkt_drop_no_desc;
+	qdf_atomic_t ref_cnt;
 };
 
 #endif
@@ -1244,7 +1246,7 @@ struct ol_txrx_peer_t {
 	qdf_time_t last_disassoc_rcvd;
 	qdf_time_t last_deauth_rcvd;
 	qdf_atomic_t fw_create_pending;
-	qdf_mc_timer_t peer_unmap_timer;
+	qdf_timer_t peer_unmap_timer;
 };
 
 enum ol_rx_err_type {
