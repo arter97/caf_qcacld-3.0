@@ -4637,6 +4637,7 @@ free_buf:
 	TXRX_PRINT(TXRX_PRINT_LEVEL_WARN, "%s:Dropping frames", __func__);
 	buf = buf_list;
 	while (buf) {
+		QDF_NBUF_CB_RX_LRO_INELIGIBLE(buf) = 1;
 		next_buf = qdf_nbuf_queue_next(buf);
 		if (pdev)
 			TXRX_STATS_MSDU_INCR(pdev,
