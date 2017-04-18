@@ -2396,4 +2396,16 @@ void wma_update_sta_inactivity_timeout(tp_wma_handle wma,
 
 QDF_STATUS wma_send_udp_resp_offload_cmd(tp_wma_handle wma_handle,
 					struct udp_resp_offload *udp_response);
+/**
+ * wma_process_roaming_config() - process roam request
+ * @wma_handle: wma handle
+ * @roam_req: roam request parameters
+ *
+ * Main routine to handle ROAM commands coming from CSR module.
+ *
+ * Return: QDF status
+ */
+QDF_STATUS wma_process_roaming_config(tp_wma_handle wma_handle,
+				     tSirRoamOffloadScanReq *roam_req);
+
 #endif
