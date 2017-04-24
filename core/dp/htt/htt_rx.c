@@ -960,6 +960,7 @@ static inline qdf_nbuf_t htt_rx_netbuf_pop(htt_pdev_handle pdev)
 	return msdu;
 }
 
+#ifndef CONFIG_HL_SUPPORT
 static inline qdf_nbuf_t
 htt_rx_in_order_netbuf_pop(htt_pdev_handle pdev, qdf_dma_addr_t paddr)
 {
@@ -968,6 +969,7 @@ htt_rx_in_order_netbuf_pop(htt_pdev_handle pdev, qdf_dma_addr_t paddr)
 	paddr = htt_paddr_trim_to_37(paddr);
 	return htt_rx_hash_list_lookup(pdev, paddr);
 }
+#endif
 
 /* FIX ME: this function applies only to LL rx descs.
    An equivalent for HL rx descs is needed. */
@@ -2998,7 +3000,6 @@ int htt_rx_msdu_buff_in_order_replenish(htt_pdev_handle pdev, uint32_t num)
 
 	return filled;
 }
-#endif
 
 #define AR600P_ASSEMBLE_HW_RATECODE(_rate, _nss, _pream)     \
 	(((_pream) << 6) | ((_nss) << 4) | (_rate))
@@ -3198,6 +3199,7 @@ qdf_nbuf_t htt_rx_hash_list_lookup(struct htt_pdev_t *pdev,
 
 	return netbuf;
 }
+#endif
 
 #ifndef CONFIG_HL_SUPPORT
 /* Initialization function of the rx buffer hash table. This function will
@@ -3359,7 +3361,7 @@ int htt_rx_attach(struct htt_pdev_t *pdev)
 				 &paddr);
 
 		if (!pdev->rx_ring.target_idx.vaddr)
-			goto fail1;
+			goto fail2;
 
 		pdev->rx_ring.target_idx.paddr = paddr;
 		*pdev->rx_ring.target_idx.vaddr = 0;
@@ -3379,7 +3381,7 @@ int htt_rx_attach(struct htt_pdev_t *pdev)
 			 pdev->rx_ring.size * ring_elem_size,
 			 &paddr);
 	if (!pdev->rx_ring.buf.paddrs_ring)
-		goto fail2;
+		goto fail3;
 
 	pdev->rx_ring.base_paddr = paddr;
 	pdev->rx_ring.alloc_idx.vaddr =
@@ -3388,7 +3390,7 @@ int htt_rx_attach(struct htt_pdev_t *pdev)
 			 sizeof(uint32_t), &paddr);
 
 	if (!pdev->rx_ring.alloc_idx.vaddr)
-		goto fail3;
+		goto fail4;
 
 	pdev->rx_ring.alloc_idx.paddr = paddr;
 	*pdev->rx_ring.alloc_idx.vaddr = 0;
@@ -3458,7 +3460,7 @@ int htt_rx_attach(struct htt_pdev_t *pdev)
 
 	return 0;               /* success */
 
-fail3:
+fail4:
 	qdf_mem_free_consistent(pdev->osdev, pdev->osdev->dev,
 				   pdev->rx_ring.size * sizeof(target_paddr_t),
 				   pdev->rx_ring.buf.paddrs_ring,
@@ -3466,8 +3468,8 @@ fail3:
 				   qdf_get_dma_mem_context((&pdev->rx_ring.buf),
 							   memctx));
 
-fail2:
-	if (pdev->cfg.is_full_reorder_offload) {
+fail3:
+	if (pdev->cfg.is_full_reorder_offload)
 		qdf_mem_free_consistent(pdev->osdev, pdev->osdev->dev,
 					   sizeof(uint32_t),
 					   pdev->rx_ring.target_idx.vaddr,
@@ -3476,10 +3478,12 @@ fail2:
 								    rx_ring.
 								    target_idx),
 								   memctx));
-		htt_rx_hash_deinit(pdev);
-	} else {
+	else
 		qdf_mem_free(pdev->rx_ring.buf.netbufs_ring);
-	}
+
+fail2:
+	if (pdev->cfg.is_full_reorder_offload)
+		htt_rx_hash_deinit(pdev);
 
 fail1:
 	return 1;               /* failure */

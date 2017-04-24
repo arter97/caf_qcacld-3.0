@@ -5563,8 +5563,12 @@ static int hdd_wiphy_init(hdd_context_t *hdd_ctx)
 
 	/* registration of wiphy dev with cfg80211 */
 	ret_val = wlan_hdd_cfg80211_register(wiphy);
-	if (0 > ret_val)
+	if (0 > ret_val) {
 		hdd_err("wiphy registration failed");
+		return ret_val;
+	}
+
+	hdd_program_country_code(hdd_ctx);
 
 	return ret_val;
 }
@@ -6611,7 +6615,7 @@ void hdd_ch_avoid_cb(void *hdd_context, void *indi_param)
 	 * first update the unsafe channel list to the platform driver and
 	 * send the avoid freq event to the application
 	 */
-	if (hdd_ctxt->config->sap_restart_on_ch_avoid) {
+	if (hdd_ctxt->config->restart_beaconing_on_chan_avoid_event) {
 		wlan_hdd_send_avoid_freq_event(hdd_ctxt, &hdd_avoid_freq_list);
 
 		if (!hdd_ctxt->unsafe_channel_count) {
@@ -7463,6 +7467,8 @@ static int hdd_update_cds_config(hdd_context_t *hdd_ctx)
 	cds_cfg->self_recovery_enabled = hdd_ctx->config->enableSelfRecovery;
 	cds_cfg->fw_timeout_crash = hdd_ctx->config->fw_timeout_crash;
 	cds_cfg->active_bpf_mode = hdd_ctx->config->active_bpf_mode;
+	cds_cfg->auto_power_save_fail_mode =
+		hdd_ctx->config->auto_pwr_save_fail_mode;
 
 	hdd_ra_populate_cds_config(cds_cfg, hdd_ctx);
 	hdd_txrx_populate_cds_config(cds_cfg, hdd_ctx);
@@ -7963,6 +7969,21 @@ static int hdd_set_alternative_chainmask_enabled(hdd_context_t *hdd_ctx)
 	return ret;
 }
 
+static int hdd_set_ani_enabled(hdd_context_t *hdd_ctx)
+{
+	int vdev_id = 0;
+	int param_id = WMI_PDEV_PARAM_ANI_ENABLE;
+	int value = hdd_ctx->config->ani_enabled;
+	int vpdev = PDEV_CMD;
+	int ret;
+
+	ret = wma_cli_set_command(vdev_id, param_id, value, vpdev);
+	if (ret)
+		hdd_err("WMI_PDEV_PARAM_ANI_ENABLE failed %d", ret);
+
+	return ret;
+}
+
 /**
  * hdd_pre_enable_configure() - Configurations prior to cds_enable
  * @hdd_ctx:	HDD context
@@ -8017,7 +8038,9 @@ static int hdd_pre_enable_configure(hdd_context_t *hdd_ctx)
 	if (ret)
 		goto out;
 
-	hdd_program_country_code(hdd_ctx);
+	ret = hdd_set_ani_enabled(hdd_ctx);
+	if (ret)
+		goto out;
 
 	ret = wma_cli_set_command(0, WMI_PDEV_PARAM_ARP_AC_OVERRIDE,
 				  hdd_ctx->config->arp_ac_category,
@@ -8833,6 +8856,23 @@ int hdd_wlan_startup(struct device *dev)
 					    set_value, PDEV_CMD);
 	}
 
+	/* set chip power save failure detected callback */
+	sme_set_chip_pwr_save_fail_cb(hdd_ctx->hHal,
+				      hdd_chip_pwr_save_fail_detected_cb);
+
+	if (hdd_ctx->config->max_mpdus_inampdu) {
+		set_value = hdd_ctx->config->max_mpdus_inampdu;
+		wma_cli_set_command(0, (int)WMI_PDEV_PARAM_MAX_MPDUS_IN_AMPDU,
+				    set_value, PDEV_CMD);
+	}
+
+	if (hdd_ctx->config->enable_rts_sifsbursting) {
+		set_value = hdd_ctx->config->enable_rts_sifsbursting;
+		wma_cli_set_command(0,
+				    (int)WMI_PDEV_PARAM_ENABLE_RTS_SIFS_BURSTING,
+				    set_value, PDEV_CMD);
+	}
+
 	qdf_mc_timer_start(&hdd_ctx->iface_change_timer,
 			   hdd_ctx->config->iface_change_wait_time);
 
@@ -8921,16 +8961,18 @@ static void hdd_get_nud_stats_cb(void *data, struct rsp_stats *rsp)
 
 	ENTER();
 
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx, rsp->vdev_id);
-	if (NULL == adapter)
+	if (!rsp) {
+		hdd_err("data is null");
 		return;
+	}
 
 	status = wlan_hdd_validate_context(hdd_ctx);
 	if (0 != status)
 		return;
 
-	if (!rsp) {
-		hdd_err("data is null");
+	adapter = hdd_get_adapter_by_vdev(hdd_ctx, rsp->vdev_id);
+	if ((NULL == adapter) || (WLAN_HDD_ADAPTER_MAGIC != adapter->magic)) {
+		hdd_err("Invalid adapter or adapter has invalid magic");
 		return;
 	}
 

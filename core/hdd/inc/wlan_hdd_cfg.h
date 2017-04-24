@@ -5010,7 +5010,7 @@ enum hdd_link_speed_rpt_type {
  * for valid values of module ids check enum WLAN_MODULE_ID.
  */
 #define CFG_ENABLE_FW_MODULE_LOG_LEVEL    "gFwDebugModuleLoglevel"
-#define CFG_ENABLE_FW_MODULE_LOG_DEFAULT  "2,1,3,1,5,1,9,1,13,1,14,1,18,1,19,1,26,1,28,1,29,1,31,1,36,1,38,1,46,1,47,1,50,1,52,1,53,1,56,1,60,1,61,1"
+#define CFG_ENABLE_FW_MODULE_LOG_DEFAULT  "2,1,3,1,5,1,9,1,13,1,14,1,18,1,19,1,26,1,28,1,29,1,31,1,36,1,38,1,46,1,47,1,50,1,52,1,53,1,56,1,60,1,61,1,4,1"
 
 /*
  * <ini>
@@ -8731,14 +8731,18 @@ enum dot11p_mode {
 
 /*
  * <ini>
- * sap_restart_on_ch_avoid - control SAP restart on channel avoidance
+ * restart_beaconing_on_chan_avoid_event - control the beaconing entity to move
+ * away from active LTE channels
  * @Min: 0
  * @Max: 1
  * @Default: 1
  *
- * This ini is used to control SAP restart on channel avoidance
- * sap_restart_on_ch_avoid=0: Don't restart SAP on channel avoidance indication
- * sap_restart_on_ch_avoid=1: restart SAP on channel avoidance indication
+ * This ini is used to control the beaconing entity (SAP/GO) to move away from
+ * active LTE channels when channel avoidance event is received
+ * restart_beaconing_on_chan_avoid_event=0: Don't allow beaconing entity move
+ * from active LTE channels
+ * restart_beaconing_on_chan_avoid_event=1: Allow beaconing entity move from
+ * active LTE channels
  *
  * Related: None
  *
@@ -8748,10 +8752,10 @@ enum dot11p_mode {
  *
  * </ini>
  */
-#define CFG_SAP_RESTART_ON_CH_AVOID_NAME    "sap_restart_on_ch_avoid"
-#define CFG_SAP_RESTART_ON_CH_AVOID_MIN     (0)
-#define CFG_SAP_RESTART_ON_CH_AVOID_MAX     (1)
-#define CFG_SAP_RESTART_ON_CH_AVOID_DEFAULT (1)
+#define CFG_RESTART_BEACONING_ON_CH_AVOID_NAME    "restart_beaconing_on_chan_avoid_event"
+#define CFG_RESTART_BEACONING_ON_CH_AVOID_MIN     (0)
+#define CFG_RESTART_BEACONING_ON_CH_AVOID_MAX     (1)
+#define CFG_RESTART_BEACONING_ON_CH_AVOID_DEFAULT (1)
 /*
  * This parameter will avoid updating ap_sta_inactivity from hostapd.conf
  * file. If a station does not send anything in ap_max_inactivity seconds, an
@@ -10468,6 +10472,147 @@ enum dot11p_mode {
 #define CFG_SAP_CH_SWITCH_BEACON_CNT_MAX     (5)
 #define CFG_SAP_CH_SWITCH_BEACON_CNT_DEFAULT (5)
 
+/*
+ * <ini>
+ * g_auto_detect_power_failure_mode - auto detect power save failure mode
+ * @Min: 0 : Recovery
+ * @Max: 1 : WMI
+ * @Default: 0
+ *
+ * This ini specifies the behavior of FW in case of
+ * CHIP_POWER_SAVE_FAIL_DETECTED event
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_AUTO_DETECT_POWER_FAIL_MODE_NAME "g_auto_detect_power_failure_mode"
+#define CFG_AUTO_DETECT_POWER_FAIL_MODE_MIN             (0)
+#define CFG_AUTO_DETECT_POWER_FAIL_MODE_MAX             (1)
+#define CFG_AUTO_DETECT_POWER_FAIL_MODE_DEFAULT         (0)
+
+/*
+ * <ini>
+ * g_sap_chanswitch_mode - channel switch mode
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to configure channel switch mode
+ *
+ * Related: none
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_SAP_CH_SWITCH_MODE         "g_sap_chanswitch_mode"
+#define CFG_SAP_CH_SWITCH_MODE_MIN     (0)
+#define CFG_SAP_CH_SWITCH_MODE_MAX     (1)
+#define CFG_SAP_CH_SWITCH_MODE_DEFAULT (1)
+
+/*
+ * <ini>
+ * gReducedBeaconInterval - beacon interval reduced
+ * @Min: 0
+ * @Max: 100
+ * @Default: 0
+ *
+ * This ini is used to reduce beacon interval before channel
+ * switch (when val great than 0, or the feature is disabled).
+ * It would reduce the downtime on the STA side which is
+ * waiting for beacons from the AP to resume back transmission.
+ * Switch back the beacon_interval to its original value after
+ * channel switch based on the timeout.
+ *
+ * Related: none
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_REDUCED_BEACON_INTERVAL         "gReducedBeaconInterval"
+#define CFG_REDUCED_BEACON_INTERVAL_MIN     (0)
+#define CFG_REDUCED_BEACON_INTERVAL_MAX     (100)
+#define CFG_REDUCED_BEACON_INTERVAL_DEFAULT (0)
+
+/*
+ * <ini>
+ * gEnableANI - Enable Adaptive Noise Immunity
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to enable or disable Adaptive Noise Immunity.
+ *
+ * Related: None
+ *
+ * Supported Feature: ANI
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_ANI_NAME              "gEnableANI"
+#define CFG_ENABLE_ANI_MIN               (0)
+#define CFG_ENABLE_ANI_MAX               (1)
+#define CFG_ENABLE_ANI_DEFAULT           (1)
+
+/**
+ * gSetRTSForSIFSBursting - set rts for sifs bursting
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini set rts for sifs bursting
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_SET_RTS_FOR_SIFS_BURSTING           "gSetRTSForSIFSBursting"
+#define CFG_SET_RTS_FOR_SIFS_BURSTING_MIN       (0)
+#define CFG_SET_RTS_FOR_SIFS_BURSTING_MAX       (1)
+#define CFG_SET_RTS_FOR_SIFS_BURSTING_DEFAULT   (0)
+
+/**
+ * <ini>
+ * gMaxMPDUsInAMPDU - max mpdus in ampdu
+ * @Min: 0
+ * @Max: 64
+ * @Default: 0
+ *
+ * This ini configure max mpdus in ampdu
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_MAX_MPDUS_IN_AMPDU                  "gMaxMPDUsInAMPDU"
+#define CFG_MAX_MPDUS_IN_AMPDU_MIN              (0)
+#define CFG_MAX_MPDUS_IN_AMPDU_MAX              (64)
+#define CFG_MAX_MPDUS_IN_AMPDU_DEFAULT          (0)
+
+/*
+ * gSapMaxMCSForTxData - sap 11n max mcs
+ * @Min: 0
+ * @Max: 383
+ * @Default: 0
+ *
+ * This ini configure SAP 11n max mcs
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_SAP_MAX_MCS_FOR_TX_DATA                 "gSapMaxMCSForTxData"
+#define CFG_SAP_MAX_MCS_FOR_TX_DATA_MIN             (0)
+#define CFG_SAP_MAX_MCS_FOR_TX_DATA_MAX             (383)
+#define CFG_SAP_MAX_MCS_FOR_TX_DATA_DEFAULT         (0)
+
+/*---------------------------------------------------------------------------
+   Type declarations
+   -------------------------------------------------------------------------*/
 
 struct hdd_config {
 	/* Bitmap to track what is explicitly configured */
@@ -10859,7 +11004,7 @@ struct hdd_config {
 	uint32_t ibssPs1RxChainInAtimEnable;
 
 	bool enable_ip_tcp_udp_checksum_offload;
-	bool enablePowersaveOffload;
+	uint8_t enablePowersaveOffload;
 	bool enablefwprint;
 	uint8_t enable_fw_log;
 	uint8_t fVhtAmpduLenExponent;
@@ -11163,6 +11308,7 @@ struct hdd_config {
 	bool fw_timeout_crash;
 	/* beacon count before channel switch */
 	uint8_t sap_chanswitch_beacon_cnt;
+	uint8_t sap_chanswitch_mode;
 	uint32_t rx_wakelock_timeout;
 #ifdef WLAN_FEATURE_WOW_PULSE
 	bool wow_pulse_support;
@@ -11182,7 +11328,7 @@ struct hdd_config {
 	enum active_bpf_mode active_bpf_mode;
 	bool hw_broadcast_filter;
 	bool sap_internal_restart;
-	bool sap_restart_on_ch_avoid;
+	bool restart_beaconing_on_chan_avoid_event;
 	bool enable_bcast_probe_rsp;
 	bool qcn_ie_support;
 	uint8_t fils_max_chan_guard_time;
@@ -11196,6 +11342,7 @@ struct hdd_config {
 	uint8_t                     rssi_penalize_factor_5g;
 	uint8_t                     max_rssi_penalize_5g;
 
+	uint8_t                     auto_pwr_save_fail_mode;
 	uint8_t packet_filters_bitmap;
 	uint32_t                    arp_ac_category;
 
@@ -11219,6 +11366,11 @@ struct hdd_config {
 	int8_t mbo_candidate_rssi_btc_thres;
 	/* threshold of packet drops at which FW initiates disconnect */
 	uint16_t pkt_err_disconn_th;
+	uint16_t reduced_beacon_interval;
+	bool ani_enabled;
+	uint8_t enable_rts_sifsbursting;
+	uint8_t max_mpdus_inampdu;
+	uint16_t sap_max_mcs_txdata;
 };
 
 #define VAR_OFFSET(_Struct, _Var) (offsetof(_Struct, _Var))
