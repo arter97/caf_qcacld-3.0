@@ -419,7 +419,7 @@ static bool put_wifi_iface_stats(tpSirWifiIfaceStat pWifiIfaceStat,
 
 	average_tsf_offset =  pWifiIfaceStat->avg_bcn_spread_offset_high;
 	average_tsf_offset =  (average_tsf_offset << 32) |
-		pWifiIfaceStat->avg_bcn_spread_offset_low ;
+		pWifiIfaceStat->avg_bcn_spread_offset_low;
 
 	if (nla_put_u32(vendor_event,
 			QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE,
@@ -656,6 +656,7 @@ static void hdd_link_layer_process_peer_stats(hdd_adapter_t *pAdapter,
 
 	if (pWifiPeerStat->numPeers) {
 		struct nlattr *peerInfo;
+
 		peerInfo = nla_nest_start(vendor_event,
 					  QCA_WLAN_VENDOR_ATTR_LL_STATS_PEER_INFO);
 		if (peerInfo == NULL) {
@@ -695,9 +696,9 @@ static void hdd_link_layer_process_peer_stats(hdd_adapter_t *pAdapter,
 		}
 		nla_nest_end(vendor_event, peerInfo);
 	}
+
 	cfg80211_vendor_cmd_reply(vendor_event);
 	EXIT();
-	return;
 }
 
 /**
@@ -761,7 +762,6 @@ static void hdd_link_layer_process_iface_stats(hdd_adapter_t *pAdapter,
 
 	cfg80211_vendor_cmd_reply(vendor_event);
 	EXIT();
-	return;
 }
 
 /**
@@ -998,8 +998,8 @@ static void hdd_link_layer_process_radio_stats(hdd_adapter_t *pAdapter,
 
 		pWifiRadioStat++;
 	}
+
 	EXIT();
-	return;
 }
 
 /**
@@ -1190,8 +1190,6 @@ void wlan_hdd_cfg80211_link_layer_stats_callback(void *ctx,
 		hdd_warn("invalid event type %d", indType);
 		break;
 	}
-
-	return;
 }
 
 void hdd_lost_link_info_cb(void *context,
@@ -1345,7 +1343,8 @@ nla_policy
 	[QCA_WLAN_VENDOR_ATTR_LL_STATS_GET_CONFIG_REQ_ID] = {.type = NLA_U32},
 
 	/* Unsigned 32bit value . bit mask to identify what statistics are
-	   requested for retrieval */
+	 * requested for retrieval
+	 */
 	[QCA_WLAN_VENDOR_ATTR_LL_STATS_GET_CONFIG_REQ_MASK] = {.type = NLA_U32}
 };
 
@@ -1755,8 +1754,12 @@ static int hdd_populate_wifi_peer_ps_info(tSirWifiPeerStat *data,
 		wifi_peer_info = &data->peerInfo[i];
 		peers = nla_nest_start(vendor_event, i);
 
-		if (hdd_populate_per_peer_ps_info(wifi_peer_info,
-						  vendor_event))
+		if (peers == NULL) {
+			hdd_err("nla_nest_start failed");
+			return -EINVAL;
+		}
+
+		if (hdd_populate_per_peer_ps_info(wifi_peer_info, vendor_event))
 			return -EINVAL;
 
 		nla_nest_end(vendor_event, peers);
@@ -1853,7 +1856,7 @@ void wlan_hdd_cfg80211_link_layer_stats_ext_callback(tHddHandle ctx,
 			index, GFP_KERNEL);
 	if (!skb) {
 		hdd_err("cfg80211_vendor_event_alloc failed.");
-		goto exit;
+		return;
 	}
 
 	results = linkLayer_stats_results->results;
@@ -1872,11 +1875,12 @@ void wlan_hdd_cfg80211_link_layer_stats_ext_callback(tHddHandle ctx,
 		status = hdd_populate_tx_failure_info(tx_fail, skb);
 	} else if (param_id & WMI_LL_STATS_EXT_MAC_COUNTER) {
 		hdd_info("MAC counters stats");
+		status = -EINVAL;
 	} else {
 		hdd_info("Unknown link layer stats");
+		status = -EINVAL;
 	}
 
-exit:
 	if (status == 0)
 		cfg80211_vendor_event(skb, GFP_KERNEL);
 	else
@@ -2256,8 +2260,9 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 				(currentRate > maxRate) ? currentRate : maxRate;
 		}
 		/* Get MCS Rate Set --
-		   Only if we are connected in non legacy mode and not reporting
-		   actual speed */
+		 * Only if we are connected in non legacy mode and not reporting
+		 * actual speed
+		 */
 		if ((3 != rssidx) && !(rate_flags & eHAL_TX_RATE_LEGACY)) {
 			if (0 !=
 			    sme_cfg_get_str(WLAN_HDD_GET_HAL_CTX(pAdapter),
@@ -2846,8 +2851,6 @@ inline void hdd_init_ll_stats_ctx(void)
 	spin_lock_init(&ll_stats_context.context_lock);
 	init_completion(&ll_stats_context.response_event);
 	ll_stats_context.request_bitmap = 0;
-
-	return;
 }
 
 /**
@@ -2862,6 +2865,7 @@ void hdd_display_hif_stats(void)
 
 	if (!hif_ctx)
 		return;
+
 	hif_display_stats(hif_ctx);
 }
 
