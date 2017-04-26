@@ -2482,8 +2482,8 @@ ol_txrx_peer_attach(ol_txrx_vdev_handle vdev, uint8_t *peer_mac_addr)
 	OL_TXRX_PEER_INC_REF_CNT(peer);
 
 	peer->valid = 1;
-	qdf_mc_timer_init(&peer->peer_unmap_timer, QDF_TIMER_TYPE_SW,
-			  peer_unmap_timer_handler, peer);
+	qdf_timer_init(pdev->osdev, &peer->peer_unmap_timer,
+		       peer_unmap_timer_handler, peer, QDF_TIMER_TYPE_SW);
 
 	ol_txrx_peer_find_hash_add(pdev, peer);
 
@@ -3145,7 +3145,8 @@ int ol_txrx_peer_unref_delete(ol_txrx_peer_handle peer,
 			vdev->wait_on_peer_id = OL_TXRX_INVALID_LOCAL_PEER_ID;
 		}
 
-		qdf_mc_timer_destroy(&peer->peer_unmap_timer);
+		qdf_timer_sync_cancel(&peer->peer_unmap_timer);
+		qdf_timer_free(&peer->peer_unmap_timer);
 
 		/* check whether the parent vdev has no peers left */
 		if (TAILQ_EMPTY(&vdev->peer_list)) {
@@ -3305,11 +3306,12 @@ void peer_unmap_timer_handler(void *data)
 		 peer->mac_addr.raw[0], peer->mac_addr.raw[1],
 		 peer->mac_addr.raw[2], peer->mac_addr.raw[3],
 		 peer->mac_addr.raw[4], peer->mac_addr.raw[5]);
-	wma_peer_debug_dump();
-	if (cds_is_self_recovery_enabled())
-		cds_trigger_recovery(false);
-	else
+	if (!cds_is_driver_recovering()) {
+		wma_peer_debug_dump();
 		QDF_BUG(0);
+	} else {
+		WMA_LOGE("%s: Recovery is in progress, ignore!", __func__);
+	}
 }
 
 
@@ -3368,8 +3370,8 @@ void ol_txrx_peer_detach(ol_txrx_peer_handle peer)
 	 * Create a timer to track unmap events when the sta peer gets deleted.
 	 */
 	if (vdev->opmode == wlan_op_mode_sta) {
-		qdf_mc_timer_start(&peer->peer_unmap_timer,
-				   OL_TXRX_PEER_UNMAP_TIMEOUT);
+		qdf_timer_start(&peer->peer_unmap_timer,
+				OL_TXRX_PEER_UNMAP_TIMEOUT);
 		TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
 			   "%s: started peer_unmap_timer for peer %p",
 			   __func__, peer);
@@ -4771,6 +4773,7 @@ static QDF_STATUS ol_txrx_enqueue_rx_frames(
 
 	buf = rx_buf_list;
 	while (buf) {
+		QDF_NBUF_CB_RX_LRO_INELIGIBLE(buf) = 1;
 		next_buf = qdf_nbuf_queue_next(buf);
 		cache_buf = qdf_mem_malloc(sizeof(*cache_buf));
 		if (!cache_buf) {
