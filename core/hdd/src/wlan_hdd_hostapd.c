@@ -3296,6 +3296,19 @@ static __iw_softap_setparam(struct net_device *dev,
 	case QCASAP_PARAM_RX_STBC:
 		ret = hdd_set_rx_stbc(pHostapdAdapter, set_value);
 		break;
+	case QCSAP_SET_DEFAULT_AMPDU:
+		hdd_notice("QCSAP_SET_DEFAULT_AMPDU val %d", set_value);
+		ret = wma_cli_set_command((int)pHostapdAdapter->sessionId,
+					(int)WMI_PDEV_PARAM_MAX_MPDUS_IN_AMPDU,
+					set_value, PDEV_CMD);
+		break;
+
+	case QCSAP_ENABLE_RTS_BURSTING:
+		hdd_notice("QCSAP_ENABLE_RTS_BURSTING val %d", set_value);
+		ret = wma_cli_set_command((int)pHostapdAdapter->sessionId,
+					(int)WMI_PDEV_PARAM_ENABLE_RTS_SIFS_BURSTING,
+					set_value, PDEV_CMD);
+		break;
 
 	default:
 		hdd_err("Invalid setparam command %d value %d",
@@ -4974,25 +4987,29 @@ QDF_STATUS hdd_softap_get_sta_info(hdd_adapter_t *pAdapter, uint8_t *pBuf,
 	maxSta = hdd_ctx->config->maxNumberOfPeers;
 
 	for (i = 0; i <= maxSta; i++) {
-		if (pAdapter->aStaInfo[i].isUsed) {
-			len =
-				scnprintf(pBuf, buf_len,
-					  "%5d .%02x:%02x:%02x:%02x:%02x:%02x"
-					  " \t ecsa=%d\n",
-					  pAdapter->aStaInfo[i].ucSTAId,
-					  pAdapter->aStaInfo[i].macAddrSTA.bytes[0],
-					  pAdapter->aStaInfo[i].macAddrSTA.bytes[1],
-					  pAdapter->aStaInfo[i].macAddrSTA.bytes[2],
-					  pAdapter->aStaInfo[i].macAddrSTA.bytes[3],
-					  pAdapter->aStaInfo[i].macAddrSTA.bytes[4],
-					  pAdapter->aStaInfo[i].macAddrSTA.
-					  bytes[5],
-					  pAdapter->aStaInfo[i].ecsa_capable);
-			pBuf += len;
-			buf_len -= len;
-		}
+		if (!pAdapter->aStaInfo[i].isUsed)
+			continue;
+
+		if (CHAN_HOP_ALL_BANDS_ENABLE &&
+		    (i == (WLAN_HDD_GET_AP_CTX_PTR(pAdapter))->uBCStaId))
+			continue;
+
 		if (WE_GET_STA_INFO_SIZE > buf_len)
 			break;
+
+		len = scnprintf(pBuf, buf_len,
+				"%5d .%02x:%02x:%02x:%02x:%02x:%02x "
+				"\t ecsa=%d\n",
+				pAdapter->aStaInfo[i].ucSTAId,
+				pAdapter->aStaInfo[i].macAddrSTA.bytes[0],
+				pAdapter->aStaInfo[i].macAddrSTA.bytes[1],
+				pAdapter->aStaInfo[i].macAddrSTA.bytes[2],
+				pAdapter->aStaInfo[i].macAddrSTA.bytes[3],
+				pAdapter->aStaInfo[i].macAddrSTA.bytes[4],
+				pAdapter->aStaInfo[i].macAddrSTA.bytes[5],
+				pAdapter->aStaInfo[i].ecsa_capable);
+		pBuf += len;
+		buf_len -= len;
 	}
 
 	EXIT();
@@ -5753,6 +5770,19 @@ static const struct iw_priv_args hostapd_private_args[] = {
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,
 		0, "set_hist_intvl"
 	}
+	,
+	{	QCSAP_SET_DEFAULT_AMPDU,
+		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+		0,
+		"def_ampdu"
+	}
+	,
+	{	QCSAP_ENABLE_RTS_BURSTING,
+		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+		0,
+		"rts_bursting"
+	}
+	,
 };
 
 static const iw_handler hostapd_private[] = {
@@ -7334,6 +7364,7 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 		return -EINVAL;
 	}
 
+	wlan_hdd_tdls_disable_offchan_and_teardown_links(pHddCtx);
 	if (cds_is_hw_mode_change_in_progress()) {
 		status = qdf_wait_for_connection_update();
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
@@ -7359,6 +7390,10 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 	pConfig->disableDFSChSwitch = iniConfig->disableDFSChSwitch;
 	pConfig->sap_chanswitch_beacon_cnt =
 			    iniConfig->sap_chanswitch_beacon_cnt;
+	pConfig->sap_chanswitch_mode = iniConfig->sap_chanswitch_mode;
+
+	pConfig->reduced_beacon_interval =
+			iniConfig->reduced_beacon_interval;
 
 	/* channel is already set in the set_channel Call back */
 	/* pConfig->channel = pCommitConfig->channel; */

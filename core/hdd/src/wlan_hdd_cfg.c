@@ -4204,6 +4204,13 @@ struct reg_table_entry g_registry_table[] = {
 		     CFG_SAP_CH_SWITCH_BEACON_CNT_MIN,
 		     CFG_SAP_CH_SWITCH_BEACON_CNT_MAX),
 
+	REG_VARIABLE(CFG_SAP_CH_SWITCH_MODE, WLAN_PARAM_Integer,
+		     struct hdd_config, sap_chanswitch_mode,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_SAP_CH_SWITCH_MODE_DEFAULT,
+		     CFG_SAP_CH_SWITCH_MODE_MIN,
+		     CFG_SAP_CH_SWITCH_MODE_MAX),
+
 #ifdef WLAN_FEATURE_UDP_RESPONSE_OFFLOAD
 	REG_VARIABLE(CFG_UDP_RESP_OFFLOAD_SUPPORT_NAME, WLAN_PARAM_Integer,
 		struct hdd_config, udp_resp_offload_support,
@@ -4306,12 +4313,12 @@ struct reg_table_entry g_registry_table[] = {
 		CFG_SAP_INTERNAL_RESTART_MIN,
 		CFG_SAP_INTERNAL_RESTART_MAX),
 
-	REG_VARIABLE(CFG_SAP_RESTART_ON_CH_AVOID_NAME, WLAN_PARAM_Integer,
-		struct hdd_config, sap_restart_on_ch_avoid,
+	REG_VARIABLE(CFG_RESTART_BEACONING_ON_CH_AVOID_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, restart_beaconing_on_chan_avoid_event,
 		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-		CFG_SAP_RESTART_ON_CH_AVOID_DEFAULT,
-		CFG_SAP_RESTART_ON_CH_AVOID_MIN,
-		CFG_SAP_RESTART_ON_CH_AVOID_MAX),
+		CFG_RESTART_BEACONING_ON_CH_AVOID_DEFAULT,
+		CFG_RESTART_BEACONING_ON_CH_AVOID_MIN,
+		CFG_RESTART_BEACONING_ON_CH_AVOID_MAX),
 
 	REG_VARIABLE(CFG_ENABLE_BCAST_PROBE_RESP_NAME, WLAN_PARAM_Integer,
 		struct hdd_config, enable_bcast_probe_rsp,
@@ -4500,6 +4507,48 @@ struct reg_table_entry g_registry_table[] = {
 		CFG_DROPPED_PKT_DISCONNECT_TH_DEFAULT,
 		CFG_DROPPED_PKT_DISCONNECT_TH_MIN,
 		CFG_DROPPED_PKT_DISCONNECT_TH_MAX),
+
+	REG_VARIABLE(CFG_AUTO_DETECT_POWER_FAIL_MODE_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, auto_pwr_save_fail_mode,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_AUTO_DETECT_POWER_FAIL_MODE_DEFAULT,
+		CFG_AUTO_DETECT_POWER_FAIL_MODE_MIN,
+		CFG_AUTO_DETECT_POWER_FAIL_MODE_MAX),
+
+	REG_VARIABLE(CFG_REDUCED_BEACON_INTERVAL, WLAN_PARAM_Integer,
+		struct hdd_config, reduced_beacon_interval,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_REDUCED_BEACON_INTERVAL_DEFAULT,
+		CFG_REDUCED_BEACON_INTERVAL_MIN,
+		CFG_REDUCED_BEACON_INTERVAL_MAX),
+
+	REG_VARIABLE(CFG_ENABLE_ANI_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, ani_enabled,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_ENABLE_ANI_DEFAULT,
+		     CFG_ENABLE_ANI_MIN,
+		     CFG_ENABLE_ANI_MAX),
+
+	REG_VARIABLE(CFG_SET_RTS_FOR_SIFS_BURSTING, WLAN_PARAM_Integer,
+		struct hdd_config, enable_rts_sifsbursting,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_SET_RTS_FOR_SIFS_BURSTING_DEFAULT,
+		CFG_SET_RTS_FOR_SIFS_BURSTING_MIN,
+		CFG_SET_RTS_FOR_SIFS_BURSTING_MAX),
+
+	REG_VARIABLE(CFG_MAX_MPDUS_IN_AMPDU, WLAN_PARAM_Integer,
+		struct hdd_config, max_mpdus_inampdu,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_MAX_MPDUS_IN_AMPDU_DEFAULT,
+		CFG_MAX_MPDUS_IN_AMPDU_MIN,
+		CFG_MAX_MPDUS_IN_AMPDU_MAX),
+
+	REG_VARIABLE(CFG_SAP_MAX_MCS_FOR_TX_DATA, WLAN_PARAM_Integer,
+		struct hdd_config, sap_max_mcs_txdata,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_SAP_MAX_MCS_FOR_TX_DATA_DEFAULT,
+		CFG_SAP_MAX_MCS_FOR_TX_DATA_MIN,
+		CFG_SAP_MAX_MCS_FOR_TX_DATA_MAX),
 };
 
 /**
@@ -5979,13 +6028,16 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
 	hdd_debug("Name = [%s] Value = [%u]",
 		CFG_HW_BC_FILTER_NAME,
 		pHddCtx->config->hw_broadcast_filter);
+	hdd_err("Name = [%s] Value = [%u]",
+		CFG_AUTO_DETECT_POWER_FAIL_MODE_NAME,
+		pHddCtx->config->auto_pwr_save_fail_mode);
 	hdd_per_roam_print_ini_config(pHddCtx);
 	hdd_debug("Name = [%s] Value = [%d]",
 		CFG_SAP_INTERNAL_RESTART_NAME,
 		pHddCtx->config->sap_internal_restart);
 	hdd_debug("Name = [%s] Value = [%d]",
-		CFG_SAP_RESTART_ON_CH_AVOID_NAME,
-		pHddCtx->config->sap_restart_on_ch_avoid);
+		CFG_RESTART_BEACONING_ON_CH_AVOID_NAME,
+		pHddCtx->config->restart_beaconing_on_chan_avoid_event);
 	hdd_debug("Name = [%s] Value = [%d]",
 		CFG_ARP_AC_CATEGORY,
 		pHddCtx->config->arp_ac_category);
@@ -6062,7 +6114,7 @@ QDF_STATUS hdd_update_mac_config(hdd_context_t *pHddCtx)
 
 	hdd_debug("wlan_mac.bin size %zu", fw->size);
 
-	temp = qdf_mem_malloc(fw->size);
+	temp = qdf_mem_malloc(fw->size + 1);
 
 	if (temp == NULL) {
 		hdd_err("fail to alloc memory");
@@ -6071,6 +6123,7 @@ QDF_STATUS hdd_update_mac_config(hdd_context_t *pHddCtx)
 	}
 	buffer = temp;
 	qdf_mem_copy(buffer, fw->data, fw->size);
+	buffer[fw->size] = 0x0;
 
 	/* data format:
 	 * Intf0MacAddress=00AA00BB00CC
@@ -7147,6 +7200,13 @@ bool hdd_update_config_cfg(hdd_context_t *hdd_ctx)
 		hdd_err("Couldn't pass on WNI_CFG_RATE_FOR_TX_MGMT to CCM");
 	}
 
+	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_SAP_MAX_MCS_DATA,
+				config->sap_max_mcs_txdata) ==
+			QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Could not pass on WNI_CFG_SAP_MAX_MCS_DATA to CCM");
+	}
+
 	return status;
 }
 #ifdef FEATURE_WLAN_SCAN_PNO
@@ -7923,18 +7983,19 @@ int hdd_parse_probe_req_ouis(hdd_context_t *hdd_ctx)
 				memcpy(temp, &str[i - 8], 8);
 				i++;
 				temp[8] = '\0';
-				if (hdd_probe_req_voui_convert_to_hex(temp,
-				    &voui[oui_indx]) == 0) {
+				if (!hdd_probe_req_voui_convert_to_hex(temp,
+				    &voui[oui_indx])) {
+					end = start = 0;
 					continue;
 				}
 				oui_indx++;
-				if (oui_indx > MAX_PROBE_REQ_OUIS) {
+				if (oui_indx >= MAX_PROBE_REQ_OUIS) {
 					/*
 					 * Max number of OUIs supported is 16,
 					 * ignoring the rest
 					 */
 					hdd_info("Max OUIs-supported: 16");
-					return 0;
+					break;
 				}
 			}
 			start = end = 0;
@@ -7944,11 +8005,11 @@ int hdd_parse_probe_req_ouis(hdd_context_t *hdd_ctx)
 		}
 	}
 
-	if ((end - start) == 8) {
+	if (((end - start) == 8) && oui_indx < MAX_PROBE_REQ_OUIS) {
 		memcpy(temp, &str[i - 8], 8);
 		temp[8] = '\0';
 		if (hdd_probe_req_voui_convert_to_hex(temp,
-		    &voui[oui_indx]) == 1)
+		    &voui[oui_indx]))
 			oui_indx++;
 	}
 
