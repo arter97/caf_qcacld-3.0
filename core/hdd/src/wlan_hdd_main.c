@@ -5175,6 +5175,8 @@ static void hdd_wlan_exit(hdd_context_t *hdd_ctx)
 
 	hdd_wlan_stop_modules(hdd_ctx);
 
+	qdf_nbuf_deinit_replenish_timer();
+
 	qdf_spinlock_destroy(&hdd_ctx->hdd_adapter_lock);
 	qdf_spinlock_destroy(&hdd_ctx->sta_update_info_lock);
 	qdf_spinlock_destroy(&hdd_ctx->connection_status_lock);

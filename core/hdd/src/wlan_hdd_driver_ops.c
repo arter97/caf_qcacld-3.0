@@ -30,6 +30,7 @@
 #include "cds_api.h"
 #include "qdf_status.h"
 #include "qdf_lock.h"
+#include "qdf_nbuf.h"
 #include "cds_sched.h"
 #include "osdep.h"
 #include "hif.h"
@@ -315,6 +316,8 @@ static void hdd_init_qdf_ctx(struct device *dev, void *bdev,
 	qdf_dev->drv_hdl = bdev;
 	qdf_dev->bus_type = bus_type;
 	qdf_dev->bid = bid;
+
+	qdf_nbuf_init_replenish_timer();
 }
 
 /**
