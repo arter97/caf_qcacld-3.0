@@ -36,6 +36,9 @@
 
 #include <wlan_cfg80211_scan.h>
 #include <wlan_cfg80211.h>
+#ifdef CONVERGED_TDLS_ENABLE
+#include <wlan_cfg80211_tdls.h>
+#endif
 
 /* value for initial part of frames and number of bytes to be compared */
 #define GAS_INITIAL_REQ "\x04\x0a"
@@ -194,6 +197,7 @@ typedef struct sHddAvoidFreqList {
 #define CFG_MGMT_RETRY_MAX                     (31)
 #define CFG_CTRL_RETRY_MAX                     (31)
 #define CFG_PROPAGATION_DELAY_MAX              (63)
+#define CFG_PROPAGATION_DELAY_BASE             (64)
 #define CFG_AGG_RETRY_MIN                      (5)
 
 struct cfg80211_bss *wlan_hdd_cfg80211_update_bss_db(hdd_adapter_t *pAdapter,
@@ -259,7 +263,7 @@ int wlan_hdd_cfg80211_send_tdls_discover_req(struct wiphy *wiphy,
 
 void *wlan_hdd_change_country_code_cb(void *pAdapter);
 void hdd_select_cbmode(hdd_adapter_t *pAdapter, uint8_t operationChannel,
-		       struct ch_params_s *ch_params);
+		       struct ch_params *ch_params);
 
 uint8_t *wlan_hdd_cfg80211_get_ie_ptr(const uint8_t *ies_ptr, int length,
 				      uint8_t eid);
@@ -296,6 +300,18 @@ int wlan_hdd_send_avoid_freq_event(hdd_context_t *pHddCtx,
 void wlan_hdd_cfg80211_extscan_callback(void *ctx,
 					const uint16_t evType, void *pMsg);
 #endif /* FEATURE_WLAN_EXTSCAN */
+
+/**
+ * wlan_hdd_rso_cmd_status_cb() - HDD callback to read RSO command status
+ * @ctx: void pointer to hdd context
+ * @rso_status: rso command status
+ *
+ * This callback function is invoked by firmware to update
+ * the RSO(ROAM SCAN OFFLOAD) command status.
+ *
+ * Return: None
+ */
+void wlan_hdd_rso_cmd_status_cb(void *ctx, struct rso_cmd_status *rso_status);
 
 void hdd_rssi_threshold_breached(void *hddctx,
 				 struct rssi_breach_event *data);
@@ -335,7 +351,7 @@ int wlan_hdd_disable_dfs_chan_scan(hdd_context_t *hdd_ctx,
 				   hdd_adapter_t *adapter,
 				   uint32_t no_dfs_flag);
 
-int wlan_hdd_cfg80211_update_band(struct wiphy *wiphy,
+int wlan_hdd_cfg80211_update_band(hdd_context_t *hdd_ctx, struct wiphy *wiphy,
 				  eCsrBand eBand);
 
 /**
@@ -418,4 +434,70 @@ int wlan_hdd_try_disconnect(hdd_adapter_t *adapter);
  */
 void hdd_process_defer_disconnect(hdd_adapter_t *adapter);
 
+#ifndef CONVERGED_TDLS_ENABLE
+static inline void
+hdd_notify_sta_connect(uint8_t session_id,
+		       bool tdls_chan_swit_prohibited,
+		       bool tdls_prohibited,
+		       struct wlan_objmgr_vdev *vdev)
+{
+}
+
+static inline
+void hdd_notify_sta_disconnect(uint8_t session_id,
+			       bool lfr_roam,
+			       struct wlan_objmgr_vdev *vdev)
+{
+
+}
+
+static inline
+int wlan_cfg80211_tdls_configure_mode(struct wlan_objmgr_vdev *vdev,
+						uint32_t trigger_mode)
+{
+	return 0;
+}
+
+static inline
+void hdd_notify_teardown_tdls_links(struct wlan_objmgr_vdev *vdev)
+{
+
+}
+
+static inline
+void ucfg_tdls_update_rx_pkt_cnt(struct wlan_objmgr_vdev *vdev,
+				 struct qdf_mac_addr *mac_addr)
+{
+
+}
+
+static inline
+void ucfg_tdls_update_tx_pkt_cnt(struct wlan_objmgr_vdev *vdev,
+				 struct qdf_mac_addr *mac_addr)
+{
+
+}
+
+static inline
+int wlan_cfg80211_tdls_mgmt(struct wlan_objmgr_pdev *pdev,
+				struct net_device *dev, const uint8_t *peer,
+				uint8_t action_code, uint8_t dialog_token,
+				uint16_t status_code, uint32_t peer_capability,
+				const uint8_t *buf, size_t len)
+{
+	return 0;
+}
+
+#endif
+
+/**
+ * hdd_update_cca_info_cb() - stores congestion value in station context
+ * @context : HDD context
+ * @congestion : congestion
+ * @vdev_id : vdev id
+ *
+ * Return: None
+ */
+void hdd_update_cca_info_cb(void *context, uint32_t congestion,
+			uint32_t vdev_id);
 #endif

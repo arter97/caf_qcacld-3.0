@@ -119,17 +119,15 @@ lim_process_probe_rsp_frame(tpAniSirGlobal mac_ctx, uint8_t *rx_Packet_info,
 	uint8_t wme_enabled = false;
 
 	if (!session_entry) {
-		lim_log(mac_ctx, LOGE, FL("session_entry is NULL"));
+		pe_err("session_entry is NULL");
 		return;
 	}
-	lim_log(mac_ctx, LOG1, "SessionId:%d ProbeRsp Frame is received",
+	pe_debug("SessionId: %d ProbeRsp Frame is received",
 		session_entry->peSessionId);
 
 	probe_rsp = qdf_mem_malloc(sizeof(tSirProbeRespBeacon));
 	if (NULL == probe_rsp) {
-		lim_log(mac_ctx, LOGE,
-			FL
-			("Unable to allocate memory "));
+		pe_err("Unable to allocate memory");
 		return;
 	}
 
@@ -138,8 +136,7 @@ lim_process_probe_rsp_frame(tpAniSirGlobal mac_ctx, uint8_t *rx_Packet_info,
 
 	header = WMA_GET_RX_MAC_HEADER(rx_Packet_info);
 
-	lim_log(mac_ctx, LOG2,
-		FL("Rx Probe Response with length = %d from "MAC_ADDRESS_STR),
+	pe_debug("Rx Probe Response with length = %d from "MAC_ADDRESS_STR,
 		WMA_GET_RX_MPDU_LEN(rx_Packet_info),
 		MAC_ADDR_ARRAY(header->sa));
 
@@ -147,14 +144,13 @@ lim_process_probe_rsp_frame(tpAniSirGlobal mac_ctx, uint8_t *rx_Packet_info,
 	if (lim_validate_ie_information_in_probe_rsp_frame(mac_ctx,
 				rx_Packet_info) !=
 		eSIR_SUCCESS) {
-		lim_log(mac_ctx, LOG1,
-			FL("Parse error ProbeResponse, length=%d"), frame_len);
+		pe_err("Parse error ProbeResponse, length=%d", frame_len);
 		qdf_mem_free(probe_rsp);
 		return;
 	}
 
 	frame_len = WMA_GET_RX_PAYLOAD_LEN(rx_Packet_info);
-	QDF_TRACE(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_INFO,
+	QDF_TRACE(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
 		FL("Probe Resp Frame Received: BSSID "
 		MAC_ADDRESS_STR " (RSSI %d)"),
 		MAC_ADDR_ARRAY(header->bssId),
@@ -165,24 +161,12 @@ lim_process_probe_rsp_frame(tpAniSirGlobal mac_ctx, uint8_t *rx_Packet_info,
 	if ((sir_convert_probe_frame2_struct(mac_ctx,
 		body, frame_len, probe_rsp) == eSIR_FAILURE) ||
 		!probe_rsp->ssidPresent) {
-		lim_log(mac_ctx, LOG1,
-			FL("Parse error ProbeResponse, length=%d"), frame_len);
+		pe_err("Parse error ProbeResponse, length=%d", frame_len);
 		qdf_mem_free(probe_rsp);
 		return;
 	}
 
-	lim_check_and_add_bss_description(mac_ctx, probe_rsp,
-			  rx_Packet_info, false, true);
-	/* To Support BT-AMP */
-	if ((mac_ctx->lim.gLimMlmState ==
-			eLIM_MLM_WT_PROBE_RESP_STATE) ||
-	    (mac_ctx->lim.gLimMlmState ==
-			eLIM_MLM_PASSIVE_SCAN_STATE)) {
-		lim_check_and_add_bss_description(mac_ctx, probe_rsp,
-			rx_Packet_info, ((mac_ctx->lim.
-			gLimHalScanState == eLIM_HAL_SCANNING_STATE)
-			? true : false), true);
-	} else if (session_entry->limMlmState ==
+	if (session_entry->limMlmState ==
 			eLIM_MLM_WT_JOIN_BEACON_STATE) {
 		/*
 		 * Either Beacon/probe response is required.
@@ -198,8 +182,7 @@ lim_process_probe_rsp_frame(tpAniSirGlobal mac_ctx, uint8_t *rx_Packet_info,
 			session_entry->beacon =
 			qdf_mem_malloc(session_entry->bcnLen);
 		if (NULL == session_entry->beacon) {
-			lim_log(mac_ctx, LOGE,
-				FL("No Memory to store beacon"));
+			pe_err("No Memory to store beacon");
 		} else {
 			/*
 			 * Store the Beacon/ProbeRsp.
@@ -229,8 +212,7 @@ lim_process_probe_rsp_frame(tpAniSirGlobal mac_ctx, uint8_t *rx_Packet_info,
 			return;
 		}
 		if (!LIM_IS_CONNECTION_ACTIVE(session_entry)) {
-			lim_log(mac_ctx, LOGW,
-				FL("Recved Probe Resp from AP,AP-alive"));
+			pe_warn("Recved Probe Resp from AP,AP-alive");
 			if (probe_rsp->HTInfo.present)
 				lim_received_hb_handler(mac_ctx,
 					probe_rsp->HTInfo.primaryChannel,
@@ -272,18 +254,15 @@ lim_process_probe_rsp_frame(tpAniSirGlobal mac_ctx, uint8_t *rx_Packet_info,
 				&session_entry->dph.dphHashTable);
 		limGetQosMode(session_entry, &qos_enabled);
 		limGetWmeMode(session_entry, &wme_enabled);
-		lim_log(mac_ctx, LOG2,
-			FL("wmeEdcaPresent: %d wme_enabled: %d"),
-			probe_rsp->wmeEdcaPresent, wme_enabled);
-		lim_log(mac_ctx, LOG2,
-			FL("edcaPresent: %d, qos_enabled: %d"),
-			probe_rsp->edcaPresent, qos_enabled);
-		lim_log(mac_ctx, LOG2,
-			FL("edcaParams.qosInfo.count: %d"),
-			probe_rsp->edcaParams.qosInfo.count);
-		lim_log(mac_ctx, LOG2,
-			FL("schObject.gLimEdcaParamSetCount: %d"),
+		pe_debug("wmeEdcaPresent: %d wme_enabled: %d"
+			"edcaPresent: %d, qos_enabled: %d"
+			"edcaParams.qosInfo.count: %d"
+			"schObject.gLimEdcaParamSetCount: %d",
+			probe_rsp->wmeEdcaPresent, wme_enabled,
+			probe_rsp->edcaPresent, qos_enabled,
+			probe_rsp->edcaParams.qosInfo.count,
 			session_entry->gLimEdcaParamSetCount);
+
 		if (((probe_rsp->wmeEdcaPresent && wme_enabled) ||
 		     (probe_rsp->edcaPresent && qos_enabled)) &&
 		    (probe_rsp->edcaParams.qosInfo.count !=
@@ -291,8 +270,7 @@ lim_process_probe_rsp_frame(tpAniSirGlobal mac_ctx, uint8_t *rx_Packet_info,
 			if (sch_beacon_edca_process(mac_ctx,
 				&probe_rsp->edcaParams,
 				session_entry) != eSIR_SUCCESS) {
-				lim_log(mac_ctx, LOGE,
-					FL("EDCA param process error"));
+				pe_err("EDCA param process error");
 			} else if (sta_ds != NULL) {
 				/*
 				 * If needed, downgrade the
@@ -307,13 +285,11 @@ lim_process_probe_rsp_frame(tpAniSirGlobal mac_ctx, uint8_t *rx_Packet_info,
 					gLimEdcaParamsActive,
 					sta_ds->bssId);
 			} else {
-				lim_log(mac_ctx, LOGE,
-					FL("SelfEntry missing in Hash"));
+				pe_err("SelfEntry missing in Hash");
 			}
 		}
 		if (session_entry->fWaitForProbeRsp == true) {
-			lim_log(mac_ctx, LOGW,
-				FL("Check probe resp for caps change"));
+			pe_warn("Check probe resp for caps change");
 			lim_detect_change_in_ap_capabilities(
 				mac_ctx, probe_rsp, session_entry);
 		}
@@ -329,76 +305,3 @@ lim_process_probe_rsp_frame(tpAniSirGlobal mac_ctx, uint8_t *rx_Packet_info,
 	/* Ignore Probe Response frame in all other states */
 	return;
 }
-#ifndef NAPIER_SCAN
-/**
- * lim_process_probe_rsp_frame_no_session() - process Probe Response frame
- * @mac_ctx: Pointer to Global MAC structure
- * @rx_packet_info: A pointer to Buffer descriptor + associated PDUs
- *
- * This function processes received Probe Response frame with no session.
- *
- * Return: None
- */
-void
-lim_process_probe_rsp_frame_no_session(tpAniSirGlobal mac_ctx,
-						uint8_t *rx_packet_info)
-{
-	uint8_t *body;
-	uint32_t frame_len = 0;
-	tpSirMacMgmtHdr header;
-	tSirProbeRespBeacon *probe_rsp;
-
-	probe_rsp = qdf_mem_malloc(sizeof(tSirProbeRespBeacon));
-	if (NULL == probe_rsp) {
-		lim_log(mac_ctx, LOGE,
-			FL("Unable to allocate memory"));
-		return;
-	}
-
-	probe_rsp->ssId.length = 0;
-	probe_rsp->wpa.length = 0;
-
-	header = WMA_GET_RX_MAC_HEADER(rx_packet_info);
-
-	lim_log(mac_ctx, LOG2,
-		FL("Received Probe Response frame with length=%d from "),
-		WMA_GET_RX_MPDU_LEN(rx_packet_info));
-	lim_print_mac_addr(mac_ctx, header->sa, LOG2);
-
-	/* Validate IE information before processing Probe Response Frame */
-	if (lim_validate_ie_information_in_probe_rsp_frame(mac_ctx,
-				rx_packet_info) !=
-								eSIR_SUCCESS) {
-		lim_log(mac_ctx, LOG1,
-			FL("Parse error ProbeResponse, length=%d"), frame_len);
-		qdf_mem_free(probe_rsp);
-		return;
-	}
-
-	frame_len = WMA_GET_RX_PAYLOAD_LEN(rx_packet_info);
-	lim_log(mac_ctx, LOG2,
-		  FL("Probe Resp Frame Received: BSSID "
-		  MAC_ADDRESS_STR " (RSSI %d)"),
-		  MAC_ADDR_ARRAY(header->bssId),
-		  (uint) abs((int8_t)WMA_GET_RX_RSSI_NORMALIZED(
-					rx_packet_info)));
-	/*
-	 * Get pointer to Probe Response frame body
-	 */
-	body = WMA_GET_RX_MPDU_DATA(rx_packet_info);
-	if (sir_convert_probe_frame2_struct(mac_ctx, body, frame_len,
-		probe_rsp) == eSIR_FAILURE) {
-		lim_log(mac_ctx, LOG1,
-			FL("Parse error ProbeResponse, length=%d\n"),
-			frame_len);
-		qdf_mem_free(probe_rsp);
-		return;
-	}
-
-	lim_log(mac_ctx, LOG2, FL("Save this probe rsp in LFR cache"));
-	lim_check_and_add_bss_description(mac_ctx, probe_rsp,
-		  rx_packet_info, false, true);
-	qdf_mem_free(probe_rsp);
-	return;
-}
-#endif

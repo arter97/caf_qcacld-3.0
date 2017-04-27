@@ -27,11 +27,13 @@
 #ifndef __MAC_NAN_DATAPATH_H
 #define __MAC_NAN_DATAPATH_H
 
-#ifdef WLAN_FEATURE_NAN_DATAPATH
+#if defined(WLAN_FEATURE_NAN_DATAPATH) || defined(WLAN_FEATURE_NAN_CONVERGENCE)
 
 #include "sir_common.h"
 #include "ani_global.h"
 #include "sir_params.h"
+
+struct peer_nan_datapath_map;
 
 /**
  * struct ndp_peer_node - structure for holding per-peer context
@@ -100,12 +102,6 @@ struct ndp_peer_node {
 #endif
 };
 
-/* Function to process NDP requests */
-QDF_STATUS lim_handle_ndp_request_message(tpAniSirGlobal mac_ctx,
-					struct scheduler_msg *msg);
-/* Function to process NDP events */
-QDF_STATUS lim_handle_ndp_event_message(tpAniSirGlobal mac_ctx,
-					struct scheduler_msg *msg);
 void lim_process_ndi_mlm_add_bss_rsp(tpAniSirGlobal mac_ctx,
 				     struct scheduler_msg *lim_msg_q,
 				     tpPESession session_entry);
@@ -120,23 +116,16 @@ void lim_process_ndi_del_sta_rsp(tpAniSirGlobal mac_ctx,
 				 struct scheduler_msg *lim_msg,
 				 tpPESession pe_session);
 
+QDF_STATUS lim_add_ndi_peer_converged(uint32_t vdev_id,
+				struct qdf_mac_addr peer_mac_addr);
+
+void lim_ndp_delete_peers_converged(struct peer_nan_datapath_map *ndp_map,
+				    uint8_t num_peers);
+
+void lim_ndp_delete_peers_by_addr_converged(uint8_t vdev_id,
+					struct qdf_mac_addr peer_ndi_mac_addr);
+
 #else
-
-/* Function to process NDP requests */
-static inline QDF_STATUS lim_handle_ndp_request_message(tpAniSirGlobal mac_ctx,
-					struct scheduler_msg *msg)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-/* Function to process NDP events */
-static inline QDF_STATUS lim_handle_ndp_event_message(tpAniSirGlobal mac_ctx,
-						      struct scheduler_msg *msg)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-/* Function to process NDP events */
 static inline void lim_process_ndi_mlm_add_bss_rsp(tpAniSirGlobal mac_ctx,
 					struct scheduler_msg *lim_msg_q,
 					tpPESession session_entry)
@@ -158,7 +147,28 @@ static inline void lim_ndp_add_sta_rsp(tpAniSirGlobal mac_ctx,
 {
 }
 
-#endif /* WLAN_FEATURE_NAN_DATAPATH */
+#endif /* WLAN_FEATURE_NAN_DATAPATH || WLAN_FEATURE_NAN_CONVERGENCE */
+
+#if defined(WLAN_FEATURE_NAN_DATAPATH) && !defined(WLAN_FEATURE_NAN_CONVERGENCE)
+/* Function to process NDP requests */
+QDF_STATUS lim_handle_ndp_request_message(tpAniSirGlobal mac_ctx,
+					struct scheduler_msg *msg);
+/* Function to process NDP events */
+QDF_STATUS lim_handle_ndp_event_message(tpAniSirGlobal mac_ctx,
+				      struct scheduler_msg *msg);
+#else
+static inline QDF_STATUS lim_handle_ndp_request_message(tpAniSirGlobal mac_ctx,
+					struct scheduler_msg *msg)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS lim_handle_ndp_event_message(tpAniSirGlobal mac_ctx,
+						      struct scheduler_msg *msg)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_FEATURE_NAN_DATAPATH && !WLAN_FEATURE_NAN_CONVERGENCE */
 
 #endif /* __MAC_NAN_DATAPATH_H */
 

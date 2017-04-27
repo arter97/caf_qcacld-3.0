@@ -65,12 +65,12 @@
 #include "csr_api.h"
 #include "ol_fw.h"
 
-#include "dfs.h"
-#include "radar_filters.h"
 #include "wma_internal.h"
 #include "wma_nan_datapath.h"
 #include <cdp_txrx_handle.h>
 #include "wlan_pmo_ucfg_api.h"
+#include <target_if_scan.h>
+#include "wlan_reg_services_api.h"
 
 #ifndef ARRAY_LENGTH
 #define ARRAY_LENGTH(a)         (sizeof(a) / sizeof((a)[0]))
@@ -483,353 +483,6 @@ error:
 	return status;
 }
 
-#ifdef FEATURE_WLAN_LPHB
-/**
- * wma_lphb_conf_hbenable() - enable command of LPHB configuration requests
- * @wma_handle: WMA handle
- * @lphb_conf_req: configuration info
- * @by_user: whether this call is from user or cached resent
- *
- * Return: QDF status
- */
-static QDF_STATUS wma_lphb_conf_hbenable(tp_wma_handle wma_handle,
-					 tSirLPHBReq *lphb_conf_req,
-					 bool by_user)
-{
-	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
-	int status = 0;
-	tSirLPHBEnableStruct *ts_lphb_enable;
-	wmi_hb_set_enable_cmd_fixed_param hb_enable_fp;
-	int i;
-
-	if (lphb_conf_req == NULL) {
-		WMA_LOGE("%s : LPHB configuration is NULL", __func__);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	ts_lphb_enable = &(lphb_conf_req->params.lphbEnableReq);
-	WMA_LOGI("%s: WMA --> WMI_HB_SET_ENABLE enable=%d, item=%d, session=%d",
-		 __func__,
-		 ts_lphb_enable->enable,
-		 ts_lphb_enable->item, ts_lphb_enable->session);
-
-	if ((ts_lphb_enable->item != 1) && (ts_lphb_enable->item != 2)) {
-		WMA_LOGE("%s : LPHB configuration wrong item %d",
-			 __func__, ts_lphb_enable->item);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-
-	/* fill in values */
-	hb_enable_fp.vdev_id = ts_lphb_enable->session;
-	hb_enable_fp.enable = ts_lphb_enable->enable;
-	hb_enable_fp.item = ts_lphb_enable->item;
-	hb_enable_fp.session = ts_lphb_enable->session;
-
-	status = wmi_unified_lphb_config_hbenable_cmd(wma_handle->wmi_handle,
-				      &hb_enable_fp);
-	if (status != EOK) {
-		qdf_status = QDF_STATUS_E_FAILURE;
-		goto error;
-	}
-
-	if (by_user) {
-		/* target already configured, now cache command status */
-		if (ts_lphb_enable->enable) {
-			i = ts_lphb_enable->item - 1;
-			wma_handle->wow.lphb_cache[i].cmd
-				= LPHB_SET_EN_PARAMS_INDID;
-			wma_handle->wow.lphb_cache[i].params.lphbEnableReq.
-			enable = ts_lphb_enable->enable;
-			wma_handle->wow.lphb_cache[i].params.lphbEnableReq.
-			item = ts_lphb_enable->item;
-			wma_handle->wow.lphb_cache[i].params.lphbEnableReq.
-			session = ts_lphb_enable->session;
-
-			WMA_LOGI("%s: cached LPHB status in WMA context for item %d",
-				__func__, i);
-		} else {
-			qdf_mem_zero((void *)&wma_handle->wow.lphb_cache,
-				     sizeof(wma_handle->wow.lphb_cache));
-			WMA_LOGI("%s: cleared all cached LPHB status in WMA context",
-				__func__);
-		}
-	}
-
-	return QDF_STATUS_SUCCESS;
-error:
-	return qdf_status;
-}
-
-/**
- * wma_lphb_conf_tcp_params() - set tcp params of LPHB configuration requests
- * @wma_handle: wma handle
- * @lphb_conf_req: lphb config request
- *
- * Return: QDF status
- */
-static QDF_STATUS wma_lphb_conf_tcp_params(tp_wma_handle wma_handle,
-					   tSirLPHBReq *lphb_conf_req)
-{
-	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
-	int status = 0;
-	tSirLPHBTcpParamStruct *ts_lphb_tcp_param;
-	wmi_hb_set_tcp_params_cmd_fixed_param hb_tcp_params_fp = {0};
-
-
-	if (lphb_conf_req == NULL) {
-		WMA_LOGE("%s : LPHB configuration is NULL", __func__);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	ts_lphb_tcp_param = &(lphb_conf_req->params.lphbTcpParamReq);
-	WMA_LOGI("%s: WMA --> WMI_HB_SET_TCP_PARAMS srv_ip=%08x, "
-		"dev_ip=%08x, src_port=%d, dst_port=%d, timeout=%d, "
-		"session=%d, gateway_mac="MAC_ADDRESS_STR", timePeriodSec=%d, "
-		"tcpSn=%d", __func__, ts_lphb_tcp_param->srv_ip,
-		ts_lphb_tcp_param->dev_ip, ts_lphb_tcp_param->src_port,
-		ts_lphb_tcp_param->dst_port, ts_lphb_tcp_param->timeout,
-		ts_lphb_tcp_param->session,
-		MAC_ADDR_ARRAY(ts_lphb_tcp_param->gateway_mac.bytes),
-		ts_lphb_tcp_param->timePeriodSec, ts_lphb_tcp_param->tcpSn);
-
-	/* fill in values */
-	hb_tcp_params_fp.vdev_id = ts_lphb_tcp_param->session;
-	hb_tcp_params_fp.srv_ip = ts_lphb_tcp_param->srv_ip;
-	hb_tcp_params_fp.dev_ip = ts_lphb_tcp_param->dev_ip;
-	hb_tcp_params_fp.seq = ts_lphb_tcp_param->tcpSn;
-	hb_tcp_params_fp.src_port = ts_lphb_tcp_param->src_port;
-	hb_tcp_params_fp.dst_port = ts_lphb_tcp_param->dst_port;
-	hb_tcp_params_fp.interval = ts_lphb_tcp_param->timePeriodSec;
-	hb_tcp_params_fp.timeout = ts_lphb_tcp_param->timeout;
-	hb_tcp_params_fp.session = ts_lphb_tcp_param->session;
-	WMI_CHAR_ARRAY_TO_MAC_ADDR(ts_lphb_tcp_param->gateway_mac.bytes,
-				   &hb_tcp_params_fp.gateway_mac);
-
-	status = wmi_unified_lphb_config_tcp_params_cmd(wma_handle->wmi_handle,
-				      &hb_tcp_params_fp);
-	if (status != EOK) {
-		qdf_status = QDF_STATUS_E_FAILURE;
-		goto error;
-	}
-
-	return QDF_STATUS_SUCCESS;
-error:
-	return qdf_status;
-}
-
-/**
- * wma_lphb_conf_tcp_pkt_filter() - configure tcp packet filter command of LPHB
- * @wma_handle: wma handle
- * @lphb_conf_req: lphb config request
- *
- * Return: QDF status
- */
-static QDF_STATUS wma_lphb_conf_tcp_pkt_filter(tp_wma_handle wma_handle,
-					       tSirLPHBReq *lphb_conf_req)
-{
-	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
-	int status = 0;
-	tSirLPHBTcpFilterStruct *ts_lphb_tcp_filter;
-	wmi_hb_set_tcp_pkt_filter_cmd_fixed_param hb_tcp_filter_fp = {0};
-
-	if (lphb_conf_req == NULL) {
-		WMA_LOGE("%s : LPHB configuration is NULL", __func__);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	ts_lphb_tcp_filter = &(lphb_conf_req->params.lphbTcpFilterReq);
-	WMA_LOGI("%s: WMA --> WMI_HB_SET_TCP_PKT_FILTER length=%d, offset=%d, session=%d, "
-		"filter=%2x:%2x:%2x:%2x:%2x:%2x ...", __func__,
-		ts_lphb_tcp_filter->length, ts_lphb_tcp_filter->offset,
-		ts_lphb_tcp_filter->session, ts_lphb_tcp_filter->filter[0],
-		ts_lphb_tcp_filter->filter[1], ts_lphb_tcp_filter->filter[2],
-		ts_lphb_tcp_filter->filter[3], ts_lphb_tcp_filter->filter[4],
-		ts_lphb_tcp_filter->filter[5]);
-
-	/* fill in values */
-	hb_tcp_filter_fp.vdev_id = ts_lphb_tcp_filter->session;
-	hb_tcp_filter_fp.length = ts_lphb_tcp_filter->length;
-	hb_tcp_filter_fp.offset = ts_lphb_tcp_filter->offset;
-	hb_tcp_filter_fp.session = ts_lphb_tcp_filter->session;
-	memcpy((void *)&hb_tcp_filter_fp.filter,
-	       (void *)&ts_lphb_tcp_filter->filter,
-	       WMI_WLAN_HB_MAX_FILTER_SIZE);
-
-	status = wmi_unified_lphb_config_tcp_pkt_filter_cmd(wma_handle->wmi_handle,
-				      &hb_tcp_filter_fp);
-	if (status != EOK) {
-		qdf_status = QDF_STATUS_E_FAILURE;
-		goto error;
-	}
-
-	return QDF_STATUS_SUCCESS;
-error:
-	return qdf_status;
-}
-
-/**
- * wma_lphb_conf_udp_params() - configure udp param command of LPHB
- * @wma_handle: wma handle
- * @lphb_conf_req: lphb config request
- *
- * Return: QDF status
- */
-static QDF_STATUS wma_lphb_conf_udp_params(tp_wma_handle wma_handle,
-					   tSirLPHBReq *lphb_conf_req)
-{
-	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
-	int status = 0;
-	tSirLPHBUdpParamStruct *ts_lphb_udp_param;
-	wmi_hb_set_udp_params_cmd_fixed_param hb_udp_params_fp = {0};
-
-
-	if (lphb_conf_req == NULL) {
-		WMA_LOGE("%s : LPHB configuration is NULL", __func__);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	ts_lphb_udp_param = &(lphb_conf_req->params.lphbUdpParamReq);
-	WMA_LOGI("%s: WMA --> WMI_HB_SET_UDP_PARAMS srv_ip=%d, dev_ip=%d, src_port=%d, "
-		"dst_port=%d, interval=%d, timeout=%d, session=%d, "
-		"gateway_mac="MAC_ADDRESS_STR, __func__,
-		ts_lphb_udp_param->srv_ip, ts_lphb_udp_param->dev_ip,
-		ts_lphb_udp_param->src_port, ts_lphb_udp_param->dst_port,
-		ts_lphb_udp_param->interval, ts_lphb_udp_param->timeout,
-		ts_lphb_udp_param->session,
-		MAC_ADDR_ARRAY(ts_lphb_udp_param->gateway_mac.bytes));
-
-
-	/* fill in values */
-	hb_udp_params_fp.vdev_id = ts_lphb_udp_param->session;
-	hb_udp_params_fp.srv_ip = ts_lphb_udp_param->srv_ip;
-	hb_udp_params_fp.dev_ip = ts_lphb_udp_param->dev_ip;
-	hb_udp_params_fp.src_port = ts_lphb_udp_param->src_port;
-	hb_udp_params_fp.dst_port = ts_lphb_udp_param->dst_port;
-	hb_udp_params_fp.interval = ts_lphb_udp_param->interval;
-	hb_udp_params_fp.timeout = ts_lphb_udp_param->timeout;
-	hb_udp_params_fp.session = ts_lphb_udp_param->session;
-	WMI_CHAR_ARRAY_TO_MAC_ADDR(ts_lphb_udp_param->gateway_mac.bytes,
-				   &hb_udp_params_fp.gateway_mac);
-
-	status = wmi_unified_lphb_config_udp_params_cmd(wma_handle->wmi_handle,
-				      &hb_udp_params_fp);
-	if (status != EOK) {
-		qdf_status = QDF_STATUS_E_FAILURE;
-		goto error;
-	}
-
-	return QDF_STATUS_SUCCESS;
-error:
-	return qdf_status;
-}
-
-/**
- * wma_lphb_conf_udp_pkt_filter() - configure udp pkt filter command of LPHB
- * @wma_handle: wma handle
- * @lphb_conf_req: lphb config request
- *
- * Return: QDF status
- */
-static QDF_STATUS wma_lphb_conf_udp_pkt_filter(tp_wma_handle wma_handle,
-					       tSirLPHBReq *lphb_conf_req)
-{
-	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
-	int status = 0;
-	tSirLPHBUdpFilterStruct *ts_lphb_udp_filter;
-	wmi_hb_set_udp_pkt_filter_cmd_fixed_param hb_udp_filter_fp = {0};
-
-	if (lphb_conf_req == NULL) {
-		WMA_LOGE("%s : LPHB configuration is NULL", __func__);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	ts_lphb_udp_filter = &(lphb_conf_req->params.lphbUdpFilterReq);
-	WMA_LOGI("%s: WMA --> WMI_HB_SET_UDP_PKT_FILTER length=%d, offset=%d, session=%d, "
-		"filter=%2x:%2x:%2x:%2x:%2x:%2x ...", __func__,
-		ts_lphb_udp_filter->length, ts_lphb_udp_filter->offset,
-		ts_lphb_udp_filter->session, ts_lphb_udp_filter->filter[0],
-		ts_lphb_udp_filter->filter[1], ts_lphb_udp_filter->filter[2],
-		ts_lphb_udp_filter->filter[3], ts_lphb_udp_filter->filter[4],
-		ts_lphb_udp_filter->filter[5]);
-
-
-	/* fill in values */
-	hb_udp_filter_fp.vdev_id = ts_lphb_udp_filter->session;
-	hb_udp_filter_fp.length = ts_lphb_udp_filter->length;
-	hb_udp_filter_fp.offset = ts_lphb_udp_filter->offset;
-	hb_udp_filter_fp.session = ts_lphb_udp_filter->session;
-	memcpy((void *)&hb_udp_filter_fp.filter,
-	       (void *)&ts_lphb_udp_filter->filter,
-	       WMI_WLAN_HB_MAX_FILTER_SIZE);
-
-	status = wmi_unified_lphb_config_udp_pkt_filter_cmd(wma_handle->wmi_handle,
-				      &hb_udp_filter_fp);
-	if (status != EOK) {
-		qdf_status = QDF_STATUS_E_FAILURE;
-		goto error;
-	}
-
-	return QDF_STATUS_SUCCESS;
-error:
-	return qdf_status;
-}
-
-/**
- * wma_process_lphb_conf_req() - handle LPHB configuration requests
- * @wma_handle: wma handle
- * @lphb_conf_req: lphb config request
- *
- * Return: QDF status
- */
-QDF_STATUS wma_process_lphb_conf_req(tp_wma_handle wma_handle,
-				     tSirLPHBReq *lphb_conf_req)
-{
-	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
-
-	if (lphb_conf_req == NULL) {
-		WMA_LOGE("%s : LPHB configuration is NULL", __func__);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	WMA_LOGI("%s : LPHB configuration cmd id is %d", __func__,
-		 lphb_conf_req->cmd);
-	switch (lphb_conf_req->cmd) {
-	case LPHB_SET_EN_PARAMS_INDID:
-		qdf_status = wma_lphb_conf_hbenable(wma_handle,
-						    lphb_conf_req, true);
-		break;
-
-	case LPHB_SET_TCP_PARAMS_INDID:
-		qdf_status = wma_lphb_conf_tcp_params(wma_handle,
-						      lphb_conf_req);
-		break;
-
-	case LPHB_SET_TCP_PKT_FILTER_INDID:
-		qdf_status = wma_lphb_conf_tcp_pkt_filter(wma_handle,
-							  lphb_conf_req);
-		break;
-
-	case LPHB_SET_UDP_PARAMS_INDID:
-		qdf_status = wma_lphb_conf_udp_params(wma_handle,
-						      lphb_conf_req);
-		break;
-
-	case LPHB_SET_UDP_PKT_FILTER_INDID:
-		qdf_status = wma_lphb_conf_udp_pkt_filter(wma_handle,
-							  lphb_conf_req);
-		break;
-
-	case LPHB_SET_NETWORK_INFO_INDID:
-	default:
-		break;
-	}
-
-	qdf_mem_free(lphb_conf_req);
-	return qdf_status;
-}
-#endif /* FEATURE_WLAN_LPHB */
-
 /**
  * wma_process_dhcp_ind() - process dhcp indication from SME
  * @wma_handle: wma handle
@@ -857,7 +510,7 @@ QDF_STATUS wma_process_dhcp_ind(tp_wma_handle wma_handle,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	WMA_LOGI("%s: WMA --> WMI_PEER_SET_PARAM triggered by DHCP, "
+	WMA_LOGD("%s: WMA --> WMI_PEER_SET_PARAM triggered by DHCP, "
 		 "msgType=%s,"
 		 "device_mode=%d, macAddr=" MAC_ADDRESS_STR,
 		 __func__,
@@ -897,9 +550,9 @@ WLAN_PHY_MODE wma_chan_phy_mode(u8 chan, enum phy_ch_width chan_width,
 				u8 dot11_mode)
 {
 	WLAN_PHY_MODE phymode = MODE_UNKNOWN;
-	uint16_t bw_val = cds_bw_value(chan_width);
+	uint16_t bw_val = wlan_reg_get_bw_value(chan_width);
 
-	if (CDS_IS_CHANNEL_24GHZ(chan)) {
+	if (WLAN_REG_IS_24GHZ_CH(chan)) {
 		if (((CH_WIDTH_5MHZ == chan_width) ||
 		     (CH_WIDTH_10MHZ == chan_width)) &&
 		    ((WNI_CFG_DOT11_MODE_11B == dot11_mode) ||
@@ -952,7 +605,7 @@ WLAN_PHY_MODE wma_chan_phy_mode(u8 chan, enum phy_ch_width chan_width,
 				break;
 			}
 		}
-	} else if (CDS_IS_CHANNEL_DSRC(chan))
+	} else if (WLAN_REG_IS_11P_CH(chan))
 		phymode = MODE_11A;
 	else {
 		if (((CH_WIDTH_5MHZ == chan_width) ||
@@ -1336,56 +989,6 @@ QDF_STATUS wma_unified_fw_profiling_cmd(wmi_unified_t wmi_handle,
 	return QDF_STATUS_SUCCESS;
 }
 
-#ifdef FEATURE_WLAN_LPHB
-/**
- * wma_lphb_handler() - send LPHB indication to SME
- * @wma: wma handle
- * @event: event handler
- *
- * Return: 0 for success or error code
- */
-static int wma_lphb_handler(tp_wma_handle wma, uint8_t *event)
-{
-	wmi_hb_ind_event_fixed_param *hb_fp;
-	tSirLPHBInd *slphb_indication;
-	QDF_STATUS qdf_status;
-	struct scheduler_msg sme_msg = { 0 };
-
-	hb_fp = (wmi_hb_ind_event_fixed_param *) event;
-	if (!hb_fp) {
-		WMA_LOGE("Invalid wmi_hb_ind_event_fixed_param buffer");
-		return -EINVAL;
-	}
-
-	WMA_LOGD("lphb indication received with vdev_id=%d, session=%d, reason=%d",
-		hb_fp->vdev_id, hb_fp->session, hb_fp->reason);
-
-	slphb_indication = (tSirLPHBInd *) qdf_mem_malloc(sizeof(tSirLPHBInd));
-
-	if (!slphb_indication) {
-		WMA_LOGE("Invalid LPHB indication buffer");
-		return -ENOMEM;
-	}
-
-	slphb_indication->sessionIdx = hb_fp->session;
-	slphb_indication->protocolType = hb_fp->reason;
-	slphb_indication->eventReason = hb_fp->reason;
-
-	sme_msg.type = eWNI_SME_LPHB_IND;
-	sme_msg.bodyptr = slphb_indication;
-	sme_msg.bodyval = 0;
-
-	qdf_status = scheduler_post_msg(QDF_MODULE_ID_SME, &sme_msg);
-	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
-		WMA_LOGE("Fail to post eWNI_SME_LPHB_IND msg to SME");
-		qdf_mem_free(slphb_indication);
-		return -EINVAL;
-	}
-
-	return 0;
-}
-#endif /* FEATURE_WLAN_LPHB */
-
 /**
  * wmi_unified_nat_keepalive_enable() - enable NAT keepalive filter
  * @wma: wma handle
@@ -1437,7 +1040,7 @@ int wma_nan_rsp_event_handler(void *handle, uint8_t *event_buf,
 	tSirNanEvent *nan_rsp_event;
 	wmi_nan_event_hdr *nan_rsp_event_hdr;
 	QDF_STATUS status;
-	struct scheduler_msg message;
+	struct scheduler_msg message = {0};
 	uint8_t *buf_ptr;
 	uint32_t alloc_len;
 
@@ -1660,7 +1263,7 @@ int wma_oem_data_response_handler(void *handle,
 
 	qdf_mem_copy(oem_rsp->data, data, datalen);
 
-	WMA_LOGI(FL("Sending OEM_DATA_RSP(len: %d) to upper layer"), datalen);
+	WMA_LOGD("Sending OEM_DATA_RSP(len: %d) to upper layer", datalen);
 
 	pmac->sme.oem_data_rsp_callback(oem_rsp);
 
@@ -1706,472 +1309,6 @@ QDF_STATUS wma_start_oem_data_req(tp_wma_handle wma_handle,
 	return ret;
 }
 #endif /* FEATURE_OEM_DATA_SUPPORT */
-
-
-/**
- * wma_unified_dfs_radar_rx_event_handler() - dfs radar rx event handler
- * @handle: wma handle
- * @data: data buffer
- * @datalen: data length
- *
- * WMI handler for WMI_DFS_RADAR_EVENTID
- * This handler is registered for handling
- * filtered DFS Phyerror. This handler is
- * will be invoked only when DFS Phyerr
- * filtering offload is enabled.
- *
- * Return: 1 for Success and 0 for error
- */
-static int wma_unified_dfs_radar_rx_event_handler(void *handle,
-						  uint8_t *data,
-						  uint32_t datalen)
-{
-	tp_wma_handle wma = (tp_wma_handle) handle;
-	struct ieee80211com *ic;
-	struct ath_dfs *dfs;
-	struct dfs_event *event;
-	struct dfs_ieee80211_channel *chan;
-	int empty;
-	int do_check_chirp = 0;
-	int is_hw_chirp = 0;
-	int is_sw_chirp = 0;
-	int is_pri = 0;
-	bool is_ch_dfs = false;
-
-	WMI_DFS_RADAR_EVENTID_param_tlvs *param_tlvs;
-	wmi_dfs_radar_event_fixed_param *radar_event;
-
-	ic = wma->dfs_ic;
-	if (NULL == ic) {
-		WMA_LOGE("%s: dfs_ic is  NULL ", __func__);
-		return 0;
-	}
-
-	dfs = (struct ath_dfs *)ic->ic_dfs;
-	param_tlvs = (WMI_DFS_RADAR_EVENTID_param_tlvs *) data;
-
-	if (NULL == dfs) {
-		WMA_LOGE("%s: dfs is  NULL ", __func__);
-		return 0;
-	}
-	/*
-	 * This parameter holds the number
-	 * of phyerror interrupts to the host
-	 * after the phyerrors have passed through
-	 * false detect filters in the firmware.
-	 */
-	dfs->dfs_phyerr_count++;
-
-	if (!param_tlvs) {
-		WMA_LOGE("%s: Received NULL data from FW", __func__);
-		return 0;
-	}
-
-	radar_event = param_tlvs->fixed_param;
-
-	qdf_spin_lock_bh(&ic->chan_lock);
-	chan = ic->ic_curchan;
-	if (ic->disable_phy_err_processing) {
-		WMA_LOGD("%s: radar indication done,drop phyerror event",
-			__func__);
-		qdf_spin_unlock_bh(&ic->chan_lock);
-		return 0;
-	}
-
-	if (IEEE80211_IS_CHAN_11AC_VHT160(chan)) {
-		is_ch_dfs = true;
-	} else if (IEEE80211_IS_CHAN_11AC_VHT80P80(chan)) {
-		if (cds_get_channel_state(chan->ic_ieee) == CHANNEL_STATE_DFS ||
-		    cds_get_channel_state(chan->ic_ieee_ext -
-					  WMA_80MHZ_START_CENTER_CH_DIFF) ==
-							CHANNEL_STATE_DFS)
-			is_ch_dfs = true;
-	} else {
-		if (cds_get_channel_state(chan->ic_ieee) == CHANNEL_STATE_DFS)
-			is_ch_dfs = true;
-	}
-	if (!is_ch_dfs) {
-		WMA_LOGE
-			("%s: Invalid DFS Phyerror event. Channel=%d is Non-DFS",
-			__func__, chan->ic_ieee);
-		qdf_spin_unlock_bh(&ic->chan_lock);
-		return 0;
-	}
-
-	qdf_spin_unlock_bh(&ic->chan_lock);
-	dfs->ath_dfs_stats.total_phy_errors++;
-
-	if (dfs->dfs_caps.ath_chip_is_bb_tlv) {
-		do_check_chirp = 1;
-		is_pri = 1;
-		is_hw_chirp = radar_event->pulse_is_chirp;
-
-		if ((uint32_t) dfs->dfs_phyerr_freq_min >
-		    radar_event->pulse_center_freq) {
-			dfs->dfs_phyerr_freq_min =
-				(int)radar_event->pulse_center_freq;
-		}
-
-		if (dfs->dfs_phyerr_freq_max <
-		    (int)radar_event->pulse_center_freq) {
-			dfs->dfs_phyerr_freq_max =
-				(int)radar_event->pulse_center_freq;
-		}
-	}
-
-	/*
-	 * Now, add the parsed, checked and filtered
-	 * radar phyerror event radar pulse event list.
-	 * This event will then be processed by
-	 * dfs_radar_processevent() to see if the pattern
-	 * of pulses in radar pulse list match any radar
-	 * singnature in the current regulatory domain.
-	 */
-
-	ATH_DFSEVENTQ_LOCK(dfs);
-	empty = STAILQ_EMPTY(&(dfs->dfs_eventq));
-	ATH_DFSEVENTQ_UNLOCK(dfs);
-	if (empty) {
-		return 0;
-	}
-	/*
-	 * Add the event to the list, if there's space.
-	 */
-	ATH_DFSEVENTQ_LOCK(dfs);
-	event = STAILQ_FIRST(&(dfs->dfs_eventq));
-	if (event == NULL) {
-		ATH_DFSEVENTQ_UNLOCK(dfs);
-		WMA_LOGE("%s: No more space left for queuing DFS Phyerror events",
-			__func__);
-		return 0;
-	}
-	STAILQ_REMOVE_HEAD(&(dfs->dfs_eventq), re_list);
-	ATH_DFSEVENTQ_UNLOCK(dfs);
-	dfs->dfs_phyerr_queued_count++;
-	dfs->dfs_phyerr_w53_counter++;
-	event->re_dur = (uint8_t) radar_event->pulse_duration;
-	event->re_rssi = radar_event->rssi;
-	event->re_ts = radar_event->pulse_detect_ts & DFS_TSMASK;
-	event->re_full_ts = (((uint64_t) radar_event->upload_fullts_high) << 32)
-			    | radar_event->upload_fullts_low;
-
-	/*
-	 * Index of peak magnitude
-	 */
-	event->sidx = radar_event->peak_sidx;
-	event->re_flags = 0;
-
-	/*
-	 * Handle chirp flags.
-	 */
-	if (do_check_chirp) {
-		event->re_flags |= DFS_EVENT_CHECKCHIRP;
-		if (is_hw_chirp) {
-			event->re_flags |= DFS_EVENT_HW_CHIRP;
-		}
-		if (is_sw_chirp) {
-			event->re_flags |= DFS_EVENT_SW_CHIRP;
-		}
-	}
-	/*
-	 * Correctly set which channel is being reported on
-	 */
-	if (is_pri) {
-		event->re_chanindex = (uint8_t) dfs->dfs_curchan_radindex;
-	} else {
-		if (dfs->dfs_extchan_radindex == -1) {
-			WMA_LOGI("%s phyerr on ext channel", __func__);
-		}
-		event->re_chanindex = (uint8_t) dfs->dfs_extchan_radindex;
-		WMA_LOGI("%s:New extension channel event is added to queue",
-			 __func__);
-	}
-
-	ATH_DFSQ_LOCK(dfs);
-
-	STAILQ_INSERT_TAIL(&(dfs->dfs_radarq), event, re_list);
-
-	empty = STAILQ_EMPTY(&dfs->dfs_radarq);
-
-	ATH_DFSQ_UNLOCK(dfs);
-
-	if (!empty && !dfs->ath_radar_tasksched) {
-		dfs->ath_radar_tasksched = 1;
-		OS_SET_TIMER(&dfs->ath_dfs_task_timer, 0);
-	}
-
-	return 1;
-
-}
-
-/**
- * wma_unified_phyerr_rx_event_handler() - phyerr event handler
- * @handle: wma handle
- * @data: data buffer
- * @datalen: buffer length
- *
- * WMI Handler for WMI_PHYERR_EVENTID event from firmware.
- * This handler is currently handling only DFS phy errors.
- * This handler will be invoked only when the DFS phyerror
- * filtering offload is disabled.
- *
- * Return:  1:Success, 0:Failure
- */
-static int wma_unified_phyerr_rx_event_handler(void *handle,
-					       uint8_t *data, uint32_t datalen)
-{
-	tp_wma_handle wma = (tp_wma_handle) handle;
-	WMI_PHYERR_EVENTID_param_tlvs *param_tlvs;
-	wmi_comb_phyerr_rx_hdr *pe_hdr;
-	uint8_t *bufp;
-	wmi_single_phyerr_rx_event *ev;
-	struct ieee80211com *ic = wma->dfs_ic;
-	qdf_size_t n;
-	A_UINT64 tsf64 = 0;
-	int phy_err_code = 0;
-	A_UINT32 phy_err_mask = 0;
-	int error = 0;
-	tpAniSirGlobal mac_ctx =
-		(tpAniSirGlobal)cds_get_context(QDF_MODULE_ID_PE);
-	bool enable_log = false;
-	int max_dfs_buf_length = 0;
-
-	if (NULL == mac_ctx) {
-		WMA_LOGE("%s: mac_ctx is NULL", __func__);
-		return 0;
-	}
-	enable_log = mac_ctx->sap.enable_dfs_phy_error_logs;
-
-	param_tlvs = (WMI_PHYERR_EVENTID_param_tlvs *) data;
-
-	if (!param_tlvs) {
-		WMA_LOGE("%s: Received NULL data from FW", __func__);
-		return 0;
-	}
-
-	pe_hdr = param_tlvs->hdr;
-	if (pe_hdr == NULL) {
-		WMA_LOGE("%s: Received Data PE Header is NULL", __func__);
-		return 0;
-	}
-
-	/* Ensure it's at least the size of the header */
-	if (datalen < sizeof(*pe_hdr)) {
-		WMA_LOGE("%s:  Expected minimum size %zu, received %d",
-			 __func__, sizeof(*pe_hdr), datalen);
-		return 0;
-	}
-	/*
-	 * The max buffer lenght is larger for DFS-3 than DFS-2.
-	 * So, accordingly use the correct max buffer size.
-	 */
-	if (wma->hw_bd_id != WMI_HWBD_QCA6174)
-		max_dfs_buf_length = DFS3_MAX_BUF_LENGTH;
-	else
-		max_dfs_buf_length = DFS_MAX_BUF_LENGTH;
-
-	if (pe_hdr->buf_len > max_dfs_buf_length) {
-		WMA_LOGE("%s: Received Invalid Phyerror event buffer length = %d"
-			"Maximum allowed buf length = %d", __func__,
-			pe_hdr->buf_len, max_dfs_buf_length);
-
-		return 0;
-	}
-
-	/*
-	 * Reconstruct the 64 bit event TSF. This isn't from the MAC, it's
-	 * at the time the event was sent to us, the TSF value will be
-	 * in the future.
-	 */
-	tsf64 = pe_hdr->tsf_l32;
-	tsf64 |= (((uint64_t) pe_hdr->tsf_u32) << 32);
-
-	/*
-	 * Check the HW board ID to figure out
-	 * if DFS-3 is supported. In DFS-3
-	 * phyerror mask indicates the type of
-	 * phyerror, whereas in DFS-2 phyerrorcode
-	 * indicates the type of phyerror. If the
-	 * board is NOT WMI_HWBD_QCA6174, for now
-	 * assume that it supports DFS-3.
-	 */
-	if (wma->hw_bd_id != WMI_HWBD_QCA6174) {
-		phy_err_mask = pe_hdr->rsPhyErrMask0;
-		WMA_LOGD("%s: DFS-3 phyerror mask = 0x%x",
-			  __func__, phy_err_mask);
-	}
-
-	/*
-	 * Loop over the bufp, extracting out phyerrors
-	 * wmi_unified_comb_phyerr_rx_event.bufp is a char pointer,
-	 * which isn't correct here - what we have received here
-	 * is an array of TLV-style PHY errors.
-	 */
-	n = 0;                  /* Start just after the header */
-	bufp = param_tlvs->bufp;
-	while (n < pe_hdr->buf_len) {
-		/* ensure there's at least space for the header */
-		if ((pe_hdr->buf_len - n) < sizeof(ev->hdr)) {
-			WMA_LOGE("%s: Not enough space.(datalen=%d, n=%zu, hdr=%zu bytes",
-				__func__, pe_hdr->buf_len, n, sizeof(ev->hdr));
-			error = 1;
-			break;
-		}
-		/*
-		 * Obtain a pointer to the beginning of the current event.
-		 * data[0] is the beginning of the WMI payload.
-		 */
-		ev = (wmi_single_phyerr_rx_event *) &bufp[n];
-
-		/*
-		 * Sanity check the buffer length of the event against
-		 * what we currently have.
-		 * Since buf_len is 32 bits, we check if it overflows
-		 * a large 32 bit value. It's not 0x7fffffff because
-		 * we increase n by (buf_len + sizeof(hdr)), which would
-		 * in itself cause n to overflow.
-		 * If "int" is 64 bits then this becomes a moot point.
-		 */
-		if (ev->hdr.buf_len > 0x7f000000) {
-			WMA_LOGE("%s:buf_len is garbage (0x%x)", __func__,
-				 ev->hdr.buf_len);
-			error = 1;
-			break;
-		}
-		if (n + ev->hdr.buf_len > pe_hdr->buf_len) {
-			WMA_LOGE("%s: buf_len exceeds available space n=%zu,"
-				 "buf_len=%d, datalen=%d",
-				 __func__, n, ev->hdr.buf_len, pe_hdr->buf_len);
-			error = 1;
-			break;
-		}
-		/*
-		 * If the board id is WMI_HWBD_QCA6174
-		 * then it supports only DFS-2. So, fetch
-		 * phyerror code in order to know the type
-		 * of phyerror.
-		 */
-		if (wma->hw_bd_id == WMI_HWBD_QCA6174) {
-			phy_err_code = WMI_UNIFIED_PHYERRCODE_GET(&ev->hdr);
-			WMA_LOGD("%s: DFS-2 phyerror code = 0x%x",
-				  __func__, phy_err_code);
-		}
-
-		/*
-		 * phy_err_code is set for DFS-2 and phy_err_mask
-		 * is set for DFS-3. Checking both to support
-		 * compatability for older platforms.
-		 * If the phyerror or phyerrmask category matches,
-		 * pass radar events to the dfs pattern matching code.
-		 * Don't pass radar events with no buffer payload.
-		 */
-		if (((phy_err_mask & WMI_PHY_ERROR_MASK0_RADAR) ||
-		     (phy_err_mask & WMI_PHY_ERROR_MASK0_FALSE_RADAR_EXT)) ||
-		    (phy_err_code == WMA_DFS2_PHYERROR_CODE ||
-		     phy_err_code == WMA_DFS2_FALSE_RADAR_EXT)) {
-			if (ev->hdr.buf_len > 0) {
-				/* Calling in to the DFS module to process the phyerr */
-				dfs_process_phyerr(ic, &ev->bufp[0],
-						   ev->hdr.buf_len,
-						   WMI_UNIFIED_RSSI_COMB_GET
-							   (&ev->hdr) & 0xff,
-						   /* Extension RSSI */
-						   WMI_UNIFIED_RSSI_COMB_GET
-							   (&ev->hdr) & 0xff,
-						   ev->hdr.tsf_timestamp,
-						   tsf64, enable_log);
-			}
-		}
-
-		/*
-		 * Advance the buffer pointer to the next PHY error.
-		 * buflen is the length of this payload, so we need to
-		 * advance past the current header _AND_ the payload.
-		 */
-		n += sizeof(*ev) + ev->hdr.buf_len;
-
-	} /*end while() */
-	if (error)
-		return 0;
-	else
-		return 1;
-}
-
-/**
- * wma_register_dfs_event_handler() - register dfs event handler
- * @wma_handle: wma handle
- *
- * Register appropriate dfs phyerror event handler
- * based on phyerror filtering offload is enabled
- * or disabled.
- *
- * Return: none
- */
-void wma_register_dfs_event_handler(tp_wma_handle wma_handle)
-{
-	if (NULL == wma_handle) {
-		WMA_LOGE("%s:wma_handle is NULL", __func__);
-		return;
-	}
-
-	if (false == wma_handle->dfs_phyerr_filter_offload) {
-		/*
-		 * Register the wma_unified_phyerr_rx_event_handler
-		 * for filtering offload disabled case to handle
-		 * the DFS phyerrors.
-		 */
-		WMA_LOGD("%s:Phyerror Filtering offload is Disabled in ini",
-			 __func__);
-		wmi_unified_register_event_handler(wma_handle->wmi_handle,
-					WMI_PHYERR_EVENTID,
-					wma_unified_phyerr_rx_event_handler,
-					WMA_RX_WORK_CTX);
-		WMA_LOGD("%s: WMI_PHYERR_EVENTID event handler registered",
-			 __func__);
-	} else {
-		WMA_LOGD("%s:Phyerror Filtering offload is Enabled in ini",
-			 __func__);
-		wmi_unified_register_event_handler(wma_handle->wmi_handle,
-					WMI_DFS_RADAR_EVENTID,
-					wma_unified_dfs_radar_rx_event_handler,
-					WMA_RX_WORK_CTX);
-		WMA_LOGD("%s:WMI_DFS_RADAR_EVENTID event handler registered",
-			 __func__);
-	}
-
-	return;
-}
-
-
-/**
- * wma_unified_dfs_phyerr_filter_offload_enable() - enable dfs phyerr filter
- * @wma_handle: wma handle
- *
- * Send WMI_DFS_PHYERR_FILTER_ENA_CMDID or
- * WMI_DFS_PHYERR_FILTER_DIS_CMDID command
- * to firmware based on phyerr filtering
- * offload status.
- *
- * Return: 1 success, 0 failure
- */
-int
-wma_unified_dfs_phyerr_filter_offload_enable(tp_wma_handle wma_handle)
-{
-	int ret;
-
-	if (NULL == wma_handle) {
-		WMA_LOGE("%s:wma_handle is NULL", __func__);
-		return 0;
-	}
-
-	ret = wmi_unified_dfs_phyerr_filter_offload_en_cmd(wma_handle->wmi_handle,
-					   wma_handle->dfs_phyerr_filter_offload);
-	if (ret)
-		return QDF_STATUS_E_FAILURE;
-
-
-	return QDF_STATUS_SUCCESS;
-}
 
 #if !defined(REMOVE_PKT_LOG)
 /**
@@ -2511,10 +1648,6 @@ static int wma_extscan_get_eventid_from_tlvtag(uint32_t tag)
 
 	case WMITLV_TAG_STRUC_wmi_extscan_capabilities_event_fixed_param:
 		event_id = WMI_EXTSCAN_CAPABILITIES_EVENTID;
-		break;
-
-	case WMITLV_TAG_STRUC_wmi_extscan_hotlist_ssid_match_event_fixed_param:
-		event_id = WMI_EXTSCAN_HOTLIST_SSID_MATCH_EVENTID;
 		break;
 
 	default:
@@ -2959,7 +2092,7 @@ static void wma_wow_dump_mgmt_buffer(uint8_t *wow_packet_buffer,
 
 	WMA_LOGD("wow_buf_pkt_len: %u", buf_len);
 	wh = (struct ieee80211_frame_addr4 *)
-		(wow_packet_buffer + 4);
+		(wow_packet_buffer);
 	if (buf_len >= sizeof(struct ieee80211_frame)) {
 		uint8_t to_from_ds, frag_num;
 		uint32_t seq_num;
@@ -3120,69 +2253,68 @@ static const char *wma_vdev_type_str(uint32_t vdev_type)
  * Handler to catch wow wakeup host event. This event will have
  * reason why the firmware has woken the host.
  *
- * Return: 0 for success or error
+ * Return: Errno
  */
-int wma_wow_wakeup_host_event(void *handle, uint8_t *event,
-			      uint32_t len)
+int wma_wow_wakeup_host_event(void *handle, uint8_t *event, uint32_t len)
 {
-	tp_wma_handle wma = (tp_wma_handle) handle;
-	struct wma_txrx_node *wma_vdev;
+	t_wma_handle *wma = (t_wma_handle *)handle;
+	struct wma_txrx_node *wma_vdev = NULL;
 	WMI_WOW_WAKEUP_HOST_EVENTID_param_tlvs *param_buf;
 	WOW_EVENT_INFO_fixed_param *wake_info;
 	uint32_t wakelock_duration;
 	void *wmi_cmd_struct_ptr = NULL;
-	uint32_t tlv_hdr, tag, wow_buf_pkt_len = 0, event_id = 0;
-	uint8_t *wow_buf_data = NULL;
-	int tlv_ok_status;
+	uint8_t *wow_buf = NULL;
+	uint32_t wow_buf_len = 0;
+	uint32_t event_id = 0;
 
-	param_buf = (WMI_WOW_WAKEUP_HOST_EVENTID_param_tlvs *) event;
+	param_buf = (WMI_WOW_WAKEUP_HOST_EVENTID_param_tlvs *)event;
 	if (!param_buf) {
 		WMA_LOGE("Invalid wow wakeup host event buf");
 		return -EINVAL;
 	}
 
 	wake_info = param_buf->fixed_param;
-	wma_vdev = &wma->interfaces[wake_info->vdev_id];
 
-	if ((wake_info->wake_reason != WOW_REASON_UNSPECIFIED) ||
-	    (wake_info->wake_reason == WOW_REASON_UNSPECIFIED &&
-	     !wmi_get_runtime_pm_inprogress(wma->wmi_handle))) {
-		WMA_LOGA("WOW wakeup host event received; reason: %s(%d), vdev_id: %d, vdev_type: %s",
+	if (wake_info->wake_reason != WOW_REASON_UNSPECIFIED) {
+		wma_vdev = &wma->interfaces[wake_info->vdev_id];
+		WMA_LOGA("WOW wakeup for reason: %s(%d) on vdev %d (%s)",
 			 wma_wow_wake_reason_str(wake_info->wake_reason),
 			 wake_info->wake_reason,
 			 wake_info->vdev_id,
 			 wma_vdev ? wma_vdev_type_str(wma_vdev->type) : "null");
 		qdf_wow_wakeup_host_event(wake_info->wake_reason);
+	} else if (!wmi_get_runtime_pm_inprogress(wma->wmi_handle)) {
+		WMA_LOGA("WOW wakeup for reason: %s(%d)",
+			 wma_wow_wake_reason_str(wake_info->wake_reason),
+			 wake_info->wake_reason);
+		qdf_wow_wakeup_host_event(wake_info->wake_reason);
 	}
 
 	pmo_ucfg_psoc_wakeup_host_event_received(wma->psoc);
 
-	if (param_buf->wow_packet_buffer &&
-	    tlv_check_required(wake_info->wake_reason)) {
-		/*
-		 * In case of wow_packet_buffer, first 4 bytes is the length.
-		 * Following the length is the actual buffer.
-		 */
-		wow_buf_pkt_len = *(uint32_t *)param_buf->wow_packet_buffer;
-		tlv_hdr = WMITLV_GET_HDR(
-				(uint8_t *)param_buf->wow_packet_buffer + 4);
+	if (param_buf->wow_packet_buffer) {
+		/* first 4 bytes are the length, followed by the buffer */
+		wow_buf_len = *(uint32_t *)param_buf->wow_packet_buffer;
+		wow_buf = param_buf->wow_packet_buffer + 4;
 
-		tag = WMITLV_GET_TLVTAG(tlv_hdr);
-		event_id = wow_get_wmi_eventid(wake_info->wake_reason, tag);
-		if (!event_id) {
-			WMA_LOGE(FL("Unable to find matching ID"));
-			return -EINVAL;
-		}
+		if (tlv_check_required(wake_info->wake_reason)) {
+			int ret_code;
 
-		tlv_ok_status = wmitlv_check_and_pad_event_tlvs(
-				    handle, param_buf->wow_packet_buffer + 4,
-				    wow_buf_pkt_len, event_id,
-				    &wmi_cmd_struct_ptr);
+			event_id = wow_get_wmi_eventid(wake_info->wake_reason,
+				WMITLV_GET_TLVTAG(WMITLV_GET_HDR(wow_buf)));
+			if (!event_id) {
+				WMA_LOGE(FL("Unable to find matching ID"));
+				return -EINVAL;
+			}
 
-		if (tlv_ok_status != 0) {
-			WMA_LOGE(FL("Invalid TLVs, Length:%d event_id:%d status: %d"),
-				 wow_buf_pkt_len, event_id, tlv_ok_status);
-			return -EINVAL;
+			ret_code = wmitlv_check_and_pad_event_tlvs(
+				handle, wow_buf, wow_buf_len, event_id,
+				&wmi_cmd_struct_ptr);
+			if (ret_code) {
+				WMA_LOGE(FL("Invalid TLVs, Length:%d event_id:%d status: %d"),
+					 wow_buf_len, event_id, ret_code);
+				return -EINVAL;
+			}
 		}
 	}
 
@@ -3196,67 +2328,61 @@ int wma_wow_wakeup_host_event(void *handle, uint8_t *event,
 	case WOW_REASON_REASSOC_RES_RECV:
 	case WOW_REASON_BEACON_RECV:
 	case WOW_REASON_ACTION_FRAME_RECV:
-		if (param_buf->wow_packet_buffer) {
-			/* First 4-bytes of wow_packet_buffer is the length */
-			qdf_mem_copy((uint8_t *) &wow_buf_pkt_len,
-				param_buf->wow_packet_buffer, 4);
-			if (wow_buf_pkt_len)
-				wma_wow_dump_mgmt_buffer(
-					param_buf->wow_packet_buffer,
-					wow_buf_pkt_len);
-			else
-				WMA_LOGE("wow packet buffer is empty");
-		} else {
+		if (!wow_buf) {
 			WMA_LOGE("No wow packet buffer present");
+			break;
 		}
+
+		if (!wow_buf_len) {
+			WMA_LOGE("wow packet buffer is empty");
+			break;
+		}
+
+		wma_wow_dump_mgmt_buffer(wow_buf, wow_buf_len);
 		break;
 
 	case WOW_REASON_AP_ASSOC_LOST:
 		wma_wow_ap_lost_helper(wma, param_buf);
 		break;
+
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
 	case WOW_REASON_HOST_AUTO_SHUTDOWN:
-		WMA_LOGA("Received WOW Auto Shutdown trigger in suspend");
 		if (wma_post_auto_shutdown_msg())
 			return -EINVAL;
 		break;
 #endif /* FEATURE_WLAN_AUTO_SHUTDOWN */
+
 #ifdef FEATURE_WLAN_SCAN_PNO
 	case WOW_REASON_NLOD:
 		if (wma_vdev) {
+			WMI_NLO_MATCH_EVENTID_param_tlvs nlo_param;
+			wmi_nlo_event nlo_event;
+
 			WMA_LOGD("NLO match happened");
-			wma_vdev->nlo_match_evt_received = true;
-			cds_host_diag_log_work(&wma->pno_wake_lock,
-					WMA_PNO_MATCH_WAKE_LOCK_TIMEOUT,
-					WIFI_POWER_EVENT_WAKELOCK_PNO);
-			qdf_wake_lock_timeout_acquire(&wma->pno_wake_lock,
-					WMA_PNO_MATCH_WAKE_LOCK_TIMEOUT);
+			nlo_param.fixed_param = &nlo_event;
+			nlo_event.vdev_id = wake_info->vdev_id;
+			target_if_nlo_match_event_handler(handle,
+							  (uint8_t *)&nlo_param,
+							  sizeof(nlo_param));
 		}
+
 		break;
 
 	case WOW_REASON_NLO_SCAN_COMPLETE:
-		WMA_LOGD("Host woken up due to pno scan complete reason");
-		if (param_buf->wow_packet_buffer)
-			wma_nlo_scan_cmp_evt_handler(handle,
-					wmi_cmd_struct_ptr, wow_buf_pkt_len);
-		else
+		if (!wow_buf) {
 			WMA_LOGD("No wow_packet_buffer present");
+			break;
+		}
+
+		target_if_nlo_complete_handler(handle, wmi_cmd_struct_ptr,
+					       wow_buf_len);
+
 		break;
 #endif /* FEATURE_WLAN_SCAN_PNO */
 
 	case WOW_REASON_CSA_EVENT:
-		WMA_LOGD("Host woken up because of CSA IE");
 		wma_csa_offload_handler(handle, wmi_cmd_struct_ptr,
-					wow_buf_pkt_len);
-		break;
-
-#ifdef FEATURE_WLAN_LPHB
-	case WOW_REASON_WLAN_HB:
-		wma_lphb_handler(wma, (uint8_t *) param_buf->hb_indevt);
-		break;
-#endif /* FEATURE_WLAN_LPHB */
-
-	case WOW_REASON_HTT_EVENT:
+					wow_buf_len);
 		break;
 
 	case WOW_REASON_BPF_ALLOW:
@@ -3268,25 +2394,20 @@ int wma_wow_wakeup_host_event(void *handle, uint8_t *event,
 		if (wma_vdev)
 			wma_wow_stats_display(&wma_vdev->wow_stats);
 
-		WMA_LOGD("Wake up for Rx packet, dump starting from ethernet hdr");
-		if (!param_buf->wow_packet_buffer) {
+		if (!wow_buf) {
 			WMA_LOGE("No wow packet buffer present");
 			break;
 		}
 
-		/* First 4-bytes of wow_packet_buffer is the length */
-		qdf_mem_copy((uint8_t *)&wow_buf_pkt_len,
-			     param_buf->wow_packet_buffer, 4);
-		if (wow_buf_pkt_len == 0) {
+		if (!wow_buf_len) {
 			WMA_LOGE("wow packet buffer is empty");
 			break;
 		}
 
-		wow_buf_data = (uint8_t *)(param_buf->wow_packet_buffer + 4);
+		WMA_LOGD("Dump starting from ethernet hdr");
 		qdf_trace_hex_dump(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_DEBUG,
-				   wow_buf_data, wow_buf_pkt_len);
-		wma_wow_parse_data_pkt_buffer(wow_buf_data, wow_buf_pkt_len);
-
+				   wow_buf, wow_buf_len);
+		wma_wow_parse_data_pkt_buffer(wow_buf, wow_buf_len);
 		break;
 
 	case WOW_REASON_LOW_RSSI:
@@ -3296,98 +2417,99 @@ int wma_wow_wakeup_host_event(void *handle, uint8_t *event,
 		 * wma_roam_event_callback().
 		 */
 		WMA_LOGD("Host woken up because of roam event");
-		if (param_buf->wow_packet_buffer) {
-			/* Roam event is embedded in wow_packet_buffer */
-			WMA_LOGD("wow_packet_buffer dump");
-			qdf_trace_hex_dump(QDF_MODULE_ID_WMA,
-					   QDF_TRACE_LEVEL_DEBUG,
-					   param_buf->wow_packet_buffer,
-					   wow_buf_pkt_len);
-			wma_roam_event_callback(handle, wmi_cmd_struct_ptr,
-						wow_buf_pkt_len);
-		} else {
+		if (!wow_buf) {
 			/*
-			 * No wow_packet_buffer means a better AP beacon
+			 * No wow packet buffer means a better AP beacon
 			 * will follow in a later event.
 			 */
 			WMA_LOGD("Host woken up because of better AP beacon");
+			break;
 		}
+
+		/* Roam event is embedded in wow_packet_buffer */
+		WMA_LOGD("wow_packet_buffer dump");
+		qdf_trace_hex_dump(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_DEBUG,
+				   wow_buf, wow_buf_len);
+		wma_roam_event_callback(handle, wmi_cmd_struct_ptr,
+					wow_buf_len);
 		break;
+
 	case WOW_REASON_CLIENT_KICKOUT_EVENT:
-		WMA_LOGD("Host woken up because of sta_kickout event");
-		if (param_buf->wow_packet_buffer) {
-			WMA_LOGD("wow_packet_buffer dump");
-			qdf_trace_hex_dump(QDF_MODULE_ID_WMA,
-				QDF_TRACE_LEVEL_DEBUG,
-				param_buf->wow_packet_buffer, wow_buf_pkt_len);
-			wma_peer_sta_kickout_event_handler(handle,
-				wmi_cmd_struct_ptr, wow_buf_pkt_len);
-		} else {
-		    WMA_LOGD("No wow_packet_buffer present");
+		if (!wow_buf) {
+			WMA_LOGD("No wow_packet_buffer present");
+			break;
 		}
+
+		WMA_LOGD("wow_packet_buffer dump");
+		qdf_trace_hex_dump(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_DEBUG,
+				   wow_buf, wow_buf_len);
+		wma_peer_sta_kickout_event_handler(handle, wmi_cmd_struct_ptr,
+						   wow_buf_len);
 		break;
+
 #ifdef FEATURE_WLAN_EXTSCAN
 	case WOW_REASON_EXTSCAN:
-		WMA_LOGD("Host woken up because of extscan reason");
-		if (param_buf->wow_packet_buffer)
-			wma_extscan_wow_event_callback(handle,
-				wmi_cmd_struct_ptr, wow_buf_pkt_len);
-		else
+		if (!wow_buf) {
 			WMA_LOGE("wow_packet_buffer is empty");
+			break;
+		}
+
+		wma_extscan_wow_event_callback(handle, wmi_cmd_struct_ptr,
+					       wow_buf_len);
 		break;
+
 #endif
 	case WOW_REASON_RSSI_BREACH_EVENT:
-		WMA_LOGD("Host woken up because of rssi breach reason");
 		/* rssi breach event is embedded in wow_packet_buffer */
-		if (param_buf->wow_packet_buffer)
-			wma_rssi_breached_event_handler(handle,
-				wmi_cmd_struct_ptr, wow_buf_pkt_len);
-		else
-		    WMA_LOGD("No wow_packet_buffer present");
-		break;
-	case WOW_REASON_NAN_EVENT:
-		WMA_LOGA("Host woken up due to NAN event reason");
-		wma_nan_rsp_event_handler(handle,
-				wmi_cmd_struct_ptr, wow_buf_pkt_len);
-		break;
-	case WOW_REASON_NAN_DATA:
-		WMA_LOGD(FL("Host woken up for NAN data path event from FW"));
-		if (param_buf->wow_packet_buffer) {
-			wma_ndp_wow_event_callback(handle, wmi_cmd_struct_ptr,
-						   wow_buf_pkt_len, event_id);
-		} else {
-			WMA_LOGE(FL("wow_packet_buffer is empty"));
+		if (!wow_buf) {
+			WMA_LOGD("No wow_packet_buffer present");
+			break;
 		}
+
+		wma_rssi_breached_event_handler(handle, wmi_cmd_struct_ptr,
+						wow_buf_len);
 		break;
+
+	case WOW_REASON_NAN_EVENT:
+		wma_nan_rsp_event_handler(handle, wmi_cmd_struct_ptr,
+					  wow_buf_len);
+		break;
+
+	case WOW_REASON_NAN_DATA:
+		if (!wow_buf) {
+			WMA_LOGE(FL("wow_packet_buffer is empty"));
+			break;
+		}
+
+		wma_ndp_wow_event_callback(handle, wmi_cmd_struct_ptr,
+					   wow_buf_len, event_id);
+		break;
+
 	case WOW_REASON_OEM_RESPONSE_EVENT:
 		/*
 		 * Actual OEM Response event will follow after this
 		 * WOW Wakeup event
 		 */
-		WMA_LOGD(FL("Host woken up for OEM Response event"));
 		break;
+
 #ifdef FEATURE_WLAN_TDLS
 	case WOW_REASON_TDLS_CONN_TRACKER_EVENT:
-		WMA_LOGD("Host woken up because of TDLS event");
-		if (param_buf->wow_packet_buffer)
-			wma_tdls_event_handler(handle,
-				wmi_cmd_struct_ptr, wow_buf_pkt_len);
-		else
+		if (!wow_buf) {
 			WMA_LOGD("No wow_packet_buffer present");
+			break;
+		}
+
+		wma_tdls_event_handler(handle, wmi_cmd_struct_ptr, wow_buf_len);
 		break;
 #endif
-	default:
-		break;
 	}
 
 	/* Log wake reason at appropriate (global/vdev) level  */
 	if (wake_info->wake_reason == WOW_REASON_UNSPECIFIED)
 		wma->wow_unspecified_wake_count++;
 	else if (wma_vdev)
-		wma_inc_wow_stats(&wma_vdev->wow_stats,
-				  wow_buf_data,
-				  wow_buf_data ? wow_buf_pkt_len : 0,
-				  wake_info->wake_reason);
+		wma_inc_wow_stats(&wma_vdev->wow_stats, wow_buf,
+				  wow_buf_len, wake_info->wake_reason);
 	else
 		WMA_LOGE("Vdev is NULL, but wake reason is vdev related");
 
@@ -3593,7 +2715,6 @@ void wma_del_ts_req(tp_wma_handle wma, tDelTsParams *msg)
 	if (msg->setRICparams == true)
 		wma_set_ric_req(wma, msg, false);
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
-
 	qdf_mem_free(msg);
 }
 
@@ -4375,7 +3496,7 @@ static void wma_send_status_of_ext_wow(tp_wma_handle wma, bool status)
 {
 	tSirReadyToExtWoWInd *ready_to_extwow;
 	QDF_STATUS vstatus;
-	struct scheduler_msg message;
+	struct scheduler_msg message = {0};
 	uint8_t len;
 
 	WMA_LOGD("Posting ready to suspend indication to umac");
@@ -4771,35 +3892,18 @@ QDF_STATUS wma_process_ch_avoid_update_req(tp_wma_handle wma_handle,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	WMA_LOGI("%s: WMA --> WMI_CHAN_AVOID_UPDATE", __func__);
+	WMA_LOGD("%s: WMA --> WMI_CHAN_AVOID_UPDATE", __func__);
 
 	status = wmi_unified_process_ch_avoid_update_cmd(
 					wma_handle->wmi_handle);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
 
-	WMA_LOGI("%s: WMA --> WMI_CHAN_AVOID_UPDATE sent through WMI",
+	WMA_LOGD("%s: WMA --> WMI_CHAN_AVOID_UPDATE sent through WMI",
 		 __func__);
 	return status;
 }
 #endif /* FEATURE_WLAN_CH_AVOID */
-
-/**
- * wma_set_reg_domain() - set reg domain
- * @clientCtxt: client context
- * @regId: reg id
- *
- * Return: QDF status
- */
-QDF_STATUS wma_set_reg_domain(void *clientCtxt, v_REGDOMAIN_t regId)
-{
-	if (QDF_STATUS_SUCCESS !=
-	    cds_set_reg_domain(clientCtxt, regId))
-		return QDF_STATUS_E_INVAL;
-
-	return QDF_STATUS_SUCCESS;
-}
-
 /**
  * wma_send_regdomain_info_to_fw() - send regdomain info to fw
  * @reg_dmn: reg domain
@@ -4859,7 +3963,7 @@ void wma_send_regdomain_info_to_fw(uint32_t reg_dmn, uint16_t regdmn2G,
  */
 static QDF_STATUS wma_post_runtime_resume_msg(WMA_HANDLE handle)
 {
-	struct scheduler_msg resume_msg;
+	struct scheduler_msg resume_msg = {0};
 	QDF_STATUS status;
 	tp_wma_handle wma = (tp_wma_handle) handle;
 
@@ -5317,487 +4421,6 @@ end_tdls_peer_state:
 }
 #endif /* FEATURE_WLAN_TDLS */
 
-
-/**
- * wma_dfs_attach() - Attach DFS methods to the umac state.
- * @dfs_ic: ieee80211com ptr
- *
- * Return: Return ieee80211com ptr with updated info
- */
-struct ieee80211com *wma_dfs_attach(struct ieee80211com *dfs_ic)
-{
-	/*Allocate memory for dfs_ic before passing it up to dfs_attach() */
-	dfs_ic = (struct ieee80211com *)
-		 os_malloc(NULL, sizeof(struct ieee80211com), GFP_ATOMIC);
-	if (dfs_ic == NULL) {
-		WMA_LOGE("%s:Allocation of dfs_ic failed %zu",
-			 __func__, sizeof(struct ieee80211com));
-		return NULL;
-	}
-	OS_MEMZERO(dfs_ic, sizeof(struct ieee80211com));
-	/* DFS pattern matching hooks */
-	dfs_ic->ic_dfs_attach = ol_if_dfs_attach;
-	dfs_ic->ic_dfs_disable = ol_if_dfs_disable;
-	dfs_ic->ic_find_channel = ieee80211_find_channel;
-	dfs_ic->ic_dfs_enable = ol_if_dfs_enable;
-	dfs_ic->ic_ieee2mhz = ieee80211_ieee2mhz;
-
-	/* Hardware facing hooks */
-	dfs_ic->ic_get_ext_busy = ol_if_dfs_get_ext_busy;
-	dfs_ic->ic_get_mib_cycle_counts_pct =
-		ol_if_dfs_get_mib_cycle_counts_pct;
-	dfs_ic->ic_get_TSF64 = ol_if_get_tsf64;
-
-	/* NOL related hooks */
-	dfs_ic->ic_dfs_usenol = ol_if_dfs_usenol;
-	/*
-	 * Hooks from wma/dfs/ back
-	 * into the PE/SME
-	 * and shared DFS code
-	 */
-	dfs_ic->ic_dfs_notify_radar = ieee80211_mark_dfs;
-	qdf_spinlock_create(&dfs_ic->chan_lock);
-	/* Initializes DFS Data Structures and queues */
-	dfs_attach(dfs_ic);
-
-	return dfs_ic;
-}
-
-/**
- * wma_dfs_detach() - Detach DFS methods
- * @dfs_ic: ieee80211com ptr
- *
- * Return: none
- */
-void wma_dfs_detach(struct ieee80211com *dfs_ic)
-{
-	dfs_detach(dfs_ic);
-
-	qdf_spinlock_destroy(&dfs_ic->chan_lock);
-	if (NULL != dfs_ic->ic_curchan) {
-		OS_FREE(dfs_ic->ic_curchan);
-		dfs_ic->ic_curchan = NULL;
-	}
-
-	OS_FREE(dfs_ic);
-}
-
-/**
- * wma_dfs_configure() - configure dfs
- * @ic: ieee80211com ptr
- *
- * Configures Radar Filters during
- * vdev start/channel change/regulatory domain
- * change.This Configuration enables to program
- * the DFS pattern matching module.
- *
- * Return: none
- */
-void wma_dfs_configure(struct ieee80211com *ic)
-{
-	struct ath_dfs_radar_tab_info rinfo;
-	int dfsdomain;
-	int radar_enabled_status = 0;
-	if (ic == NULL) {
-		WMA_LOGE("%s: DFS ic is Invalid", __func__);
-		return;
-	}
-
-	dfsdomain = ic->current_dfs_regdomain;
-
-	/* Fetch current radar patterns from the lmac */
-	OS_MEMZERO(&rinfo, sizeof(rinfo));
-
-	/*
-	 * Look up the current DFS
-	 * regulatory domain and decide
-	 * which radar pulses to use.
-	 */
-	switch (dfsdomain) {
-	case DFS_FCC_REGION:
-		WMA_LOGI("%s: DFS-FCC domain", __func__);
-		rinfo.dfsdomain = DFS_FCC_REGION;
-		rinfo.dfs_radars = dfs_fcc_radars;
-		rinfo.numradars = QDF_ARRAY_SIZE(dfs_fcc_radars);
-		rinfo.b5pulses = dfs_fcc_bin5pulses;
-		rinfo.numb5radars = QDF_ARRAY_SIZE(dfs_fcc_bin5pulses);
-		break;
-	case DFS_ETSI_REGION:
-		WMA_LOGI("%s: DFS-ETSI domain", __func__);
-		rinfo.dfsdomain = DFS_ETSI_REGION;
-		rinfo.dfs_radars = dfs_etsi_radars;
-		rinfo.numradars = QDF_ARRAY_SIZE(dfs_etsi_radars);
-		rinfo.b5pulses = NULL;
-		rinfo.numb5radars = 0;
-		break;
-	case DFS_MKK_REGION:
-		WMA_LOGI("%s: DFS-MKK domain", __func__);
-		rinfo.dfsdomain = DFS_MKK_REGION;
-		rinfo.dfs_radars = dfs_mkk4_radars;
-		rinfo.numradars = QDF_ARRAY_SIZE(dfs_mkk4_radars);
-		rinfo.b5pulses = dfs_jpn_bin5pulses;
-		rinfo.numb5radars = QDF_ARRAY_SIZE(dfs_jpn_bin5pulses);
-		break;
-	case DFS_CN_REGION:
-		WMA_LOGI("%s: DFS-CN domain", __func__);
-		rinfo.dfsdomain = DFS_CN_REGION;
-		rinfo.dfs_radars = dfs_china_radars;
-		rinfo.numradars = QDF_ARRAY_SIZE(dfs_china_radars);
-		rinfo.b5pulses = NULL;
-		rinfo.numb5radars = 0;
-		break;
-	case DFS_KR_REGION:
-		WMA_LOGI("%s: DFS-KR domain", __func__);
-		rinfo.dfsdomain = DFS_KR_REGION;
-		rinfo.dfs_radars = dfs_korea_radars;
-		rinfo.numradars = QDF_ARRAY_SIZE(dfs_korea_radars);
-		rinfo.b5pulses = NULL;
-		rinfo.numb5radars = 0;
-		break;
-	default:
-		WMA_LOGI("%s: DFS-UNINT domain", __func__);
-		rinfo.dfsdomain = DFS_UNINIT_REGION;
-		rinfo.dfs_radars = NULL;
-		rinfo.numradars = 0;
-		rinfo.b5pulses = NULL;
-		rinfo.numb5radars = 0;
-		break;
-	}
-
-	rinfo.dfs_pri_multiplier = ic->dfs_pri_multiplier;
-
-	/*
-	 * Set the regulatory domain,
-	 * radar pulse table and enable
-	 * radar events if required.
-	 * dfs_radar_enable() returns
-	 * 0 on success and non-zero
-	 * failure.
-	 */
-	radar_enabled_status = dfs_radar_enable(ic, &rinfo);
-	if (radar_enabled_status != DFS_STATUS_SUCCESS) {
-		WMA_LOGE("%s[%d]: DFS- Radar Detection Enabling Failed",
-			 __func__, __LINE__);
-	}
-}
-
-/**
- * wma_dfs_configure_channel() - configure DFS channel
- * @dfs_ic: ieee80211com ptr
- * @band_center_freq1: center frequency 1
- * @band_center_freq2: center frequency 2
- *       (valid only for 11ac vht 80plus80 mode)
- * @ req: vdev start request
- *
- * Set the Channel parameters in to DFS module
- * Also,configure the DFS radar filters for
- * matching the DFS phyerrors.
- *
- * Return: dfs_ieee80211_channel / NULL for error
- */
-struct dfs_ieee80211_channel *wma_dfs_configure_channel(
-						struct ieee80211com *dfs_ic,
-						uint32_t band_center_freq1,
-						uint32_t band_center_freq2,
-						struct wma_vdev_start_req
-						*req)
-{
-	uint8_t ext_channel;
-
-	if (dfs_ic == NULL) {
-		WMA_LOGE("%s: DFS ic is Invalid", __func__);
-		return NULL;
-	}
-
-	if (!dfs_ic->ic_curchan) {
-		dfs_ic->ic_curchan = (struct dfs_ieee80211_channel *)os_malloc(
-					NULL,
-					sizeof(struct dfs_ieee80211_channel),
-					GFP_ATOMIC);
-		if (dfs_ic->ic_curchan == NULL) {
-			WMA_LOGE(
-			    "%s: allocation of dfs_ic->ic_curchan failed %zu",
-			    __func__, sizeof(struct dfs_ieee80211_channel));
-			return NULL;
-		}
-	}
-
-	OS_MEMZERO(dfs_ic->ic_curchan, sizeof(struct dfs_ieee80211_channel));
-
-	dfs_ic->ic_curchan->ic_ieee = req->chan;
-	dfs_ic->ic_curchan->ic_freq = cds_chan_to_freq(req->chan);
-	dfs_ic->ic_curchan->ic_vhtop_ch_freq_seg1 = band_center_freq1;
-	dfs_ic->ic_curchan->ic_vhtop_ch_freq_seg2 = band_center_freq2;
-	dfs_ic->ic_curchan->ic_pri_freq_center_freq_mhz_separation =
-					dfs_ic->ic_curchan->ic_freq -
-				dfs_ic->ic_curchan->ic_vhtop_ch_freq_seg1;
-
-	if ((dfs_ic->ic_curchan->ic_ieee >= WMA_11A_CHANNEL_BEGIN) &&
-	    (dfs_ic->ic_curchan->ic_ieee <= WMA_11A_CHANNEL_END)) {
-		dfs_ic->ic_curchan->ic_flags |= IEEE80211_CHAN_5GHZ;
-	}
-
-	switch (req->chan_width) {
-	case CH_WIDTH_20MHZ:
-		dfs_ic->ic_curchan->ic_flags |=
-				(req->vht_capable ? IEEE80211_CHAN_VHT20 :
-							IEEE80211_CHAN_HT20);
-		break;
-	case CH_WIDTH_40MHZ:
-		if (req->chan < req->ch_center_freq_seg0)
-			dfs_ic->ic_curchan->ic_flags |=
-					(req->vht_capable ?
-					IEEE80211_CHAN_VHT40PLUS :
-					IEEE80211_CHAN_HT40PLUS);
-		else
-			dfs_ic->ic_curchan->ic_flags |=
-					(req->vht_capable ?
-					IEEE80211_CHAN_VHT40MINUS :
-					IEEE80211_CHAN_HT40MINUS);
-		break;
-	case CH_WIDTH_80MHZ:
-		dfs_ic->ic_curchan->ic_flags |= IEEE80211_CHAN_VHT80;
-		break;
-	case CH_WIDTH_80P80MHZ:
-		ext_channel = cds_freq_to_chan(band_center_freq2);
-		dfs_ic->ic_curchan->ic_flags |=
-					IEEE80211_CHAN_VHT80P80;
-		dfs_ic->ic_curchan->ic_freq_ext =
-						band_center_freq2;
-		dfs_ic->ic_curchan->ic_ieee_ext = ext_channel;
-
-		/* verify both the 80MHz are DFS bands or not */
-		if ((CHANNEL_STATE_DFS ==
-		     cds_get_5g_bonded_channel_state(req->chan ,
-						     CH_WIDTH_80MHZ)) &&
-		    (CHANNEL_STATE_DFS == cds_get_5g_bonded_channel_state(
-			    ext_channel - WMA_80MHZ_START_CENTER_CH_DIFF,
-			    CH_WIDTH_80MHZ)))
-			dfs_ic->ic_curchan->ic_80p80_both_dfs = true;
-		break;
-	case CH_WIDTH_160MHZ:
-		dfs_ic->ic_curchan->ic_flags |=
-					IEEE80211_CHAN_VHT160;
-		break;
-	default:
-		WMA_LOGE(
-		    "%s: Recieved a wrong channel width %d",
-		    __func__, req->chan_width);
-		break;
-	}
-
-	dfs_ic->ic_curchan->ic_flagext |= IEEE80211_CHAN_DFS;
-
-	if (req->oper_mode == BSS_OPERATIONAL_MODE_AP) {
-		dfs_ic->ic_opmode = IEEE80211_M_HOSTAP;
-		dfs_ic->vdev_id = req->vdev_id;
-	}
-
-	dfs_ic->dfs_pri_multiplier = req->dfs_pri_multiplier;
-
-	/*
-	 * Configuring the DFS with current channel and the radar filters
-	 */
-	wma_dfs_configure(dfs_ic);
-	WMA_LOGI("%s: DFS- CHANNEL CONFIGURED", __func__);
-	return dfs_ic->ic_curchan;
-}
-
-
-/**
- * wma_set_dfs_region() - set DFS region
- * @wma: wma handle
- *
- * Configure the DFS region for DFS radar filter initialization
- *
- * Return: none
- */
-void wma_set_dfs_region(tp_wma_handle wma, enum dfs_region dfs_region)
-{
-	if (dfs_region >= DFS_UNDEF_REGION ||
-	    dfs_region == DFS_UNINIT_REGION)
-
-		/* assign DFS_FCC_REGION as default region*/
-		wma->dfs_ic->current_dfs_regdomain = DFS_FCC_REGION;
-	else
-		wma->dfs_ic->current_dfs_regdomain = dfs_region;
-
-	WMA_LOGI("%s: DFS Region Domain: %d", __func__,
-			 wma->dfs_ic->current_dfs_regdomain);
-}
-
-/**
- * wma_get_channels() - prepare dfs radar channel list
- * @ichan: channel
- * @chan_list: return channel list
- *
- * Return: return number of channels
- */
-static int wma_get_channels(struct dfs_ieee80211_channel *ichan,
-			    struct wma_dfs_radar_channel_list *chan_list)
-{
-	uint8_t center_chan = cds_freq_to_chan(ichan->ic_vhtop_ch_freq_seg1);
-	int count = 0;
-	int start_channel = 0;
-	int loop;
-
-	chan_list->nchannels = 0;
-
-	if (IEEE80211_IS_CHAN_11AC_VHT160(ichan)) {
-
-		/*
-		 * as per the latest draft for BSS bandwidth 160MHz,
-		 * channel frequency segment 2 represents the center
-		 * channel frequency.
-		 */
-		if (ichan->ic_vhtop_ch_freq_seg2)
-			center_chan =
-				cds_freq_to_chan(ichan->ic_vhtop_ch_freq_seg2);
-		/*
-		 * In 160MHz channel width, need to
-		 * check if each of the 8 20MHz channel
-		 * is DFS before adding to the NOL list.
-		 * As it is possible that part of the
-		 * 160MHz can be Non-DFS channels.
-		 */
-		start_channel = center_chan - WMA_160MHZ_START_CENTER_CH_DIFF;
-		for (loop = 0; loop < WMA_DFS_MAX_20M_SUB_CH; loop++) {
-			if (cds_get_channel_state(start_channel +
-				    (loop * WMA_NEXT_20MHZ_START_CH_DIFF)) ==
-							CHANNEL_STATE_DFS) {
-				chan_list->channels[count] = start_channel +
-					(loop * WMA_NEXT_20MHZ_START_CH_DIFF);
-				count++;
-			}
-		}
-		chan_list->nchannels = count;
-	} else if (IEEE80211_IS_CHAN_11AC_VHT80P80(ichan)) {
-		chan_list->nchannels = 4;
-		/*
-		 * If SAP is operating in 80p80 mode, either
-		 * one of the two 80 segments or both the 80
-		 * segments can be DFS channels, so need to
-		 * identify on which 80 segment radar has
-		 * been detected and only add those channels
-		 * to the NOL list. center frequency should be
-		 * based on the segment id passed as part of
-		 * channel information in radar indication.
-		 */
-		if (ichan->ic_radar_found_segid == DFS_80P80_SEG1)
-			center_chan =
-				cds_freq_to_chan(ichan->ic_vhtop_ch_freq_seg2);
-		chan_list->channels[0] = center_chan - 6;
-		chan_list->channels[1] = center_chan - 2;
-		chan_list->channels[2] = center_chan + 2;
-		chan_list->channels[3] = center_chan + 6;
-	} else if (IEEE80211_IS_CHAN_11AC_VHT80(ichan)) {
-		chan_list->nchannels = 4;
-		chan_list->channels[0] = center_chan - 6;
-		chan_list->channels[1] = center_chan - 2;
-		chan_list->channels[2] = center_chan + 2;
-		chan_list->channels[3] = center_chan + 6;
-	} else if (IEEE80211_IS_CHAN_11N_HT40(ichan) ||
-		   IEEE80211_IS_CHAN_11AC_VHT40(ichan)) {
-		chan_list->nchannels = 2;
-		chan_list->channels[0] = center_chan - 2;
-		chan_list->channels[1] = center_chan + 2;
-	} else {
-		chan_list->nchannels = 1;
-		chan_list->channels[0] = center_chan;
-	}
-
-	return chan_list->nchannels;
-}
-
-
-/**
- * wma_dfs_indicate_radar() - Indicate Radar to SAP/HDD
- * @ic: ieee80211com ptr
- * @ichan: ieee 80211 channel
- *
- * Return: 0 for success or error code
- */
-int wma_dfs_indicate_radar(struct ieee80211com *ic,
-			   struct dfs_ieee80211_channel *ichan)
-{
-	tp_wma_handle wma;
-	void *hdd_ctx;
-	struct wma_dfs_radar_indication *radar_event;
-	struct wma_dfs_radar_ind wma_radar_event;
-	tpAniSirGlobal pmac = NULL;
-	bool indication_status;
-
-	wma = cds_get_context(QDF_MODULE_ID_WMA);
-	if (wma == NULL) {
-		WMA_LOGE("%s: DFS- Invalid wma", __func__);
-		return -ENOENT;
-	}
-
-	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	pmac = (tpAniSirGlobal)
-		cds_get_context(QDF_MODULE_ID_PE);
-
-	if (!pmac) {
-		WMA_LOGE("%s: Invalid MAC handle", __func__);
-		return -ENOENT;
-	}
-
-	if (wma->dfs_ic != ic) {
-		WMA_LOGE("%s:DFS- Invalid WMA handle", __func__);
-		return -ENOENT;
-	}
-
-	/*
-	 * Do not post multiple Radar events on the same channel.
-	 * But, when DFS test mode is enabled, allow multiple dfs
-	 * radar events to be posted on the same channel.
-	 */
-	qdf_spin_lock_bh(&ic->chan_lock);
-	if (!pmac->sap.SapDfsInfo.disable_dfs_ch_switch)
-		wma->dfs_ic->disable_phy_err_processing = true;
-
-	if ((ichan->ic_ieee != (wma->dfs_ic->last_radar_found_chan)) ||
-	    (pmac->sap.SapDfsInfo.disable_dfs_ch_switch == true)) {
-		radar_event = (struct wma_dfs_radar_indication *)
-			qdf_mem_malloc(sizeof(struct wma_dfs_radar_indication));
-		if (radar_event == NULL) {
-			WMA_LOGE(FL("Failed to allocate memory for radar_event"));
-			qdf_spin_unlock_bh(&ic->chan_lock);
-			return -ENOMEM;
-		}
-		wma->dfs_ic->last_radar_found_chan = ichan->ic_ieee;
-		/* Indicate the radar event to HDD to stop the netif Tx queues */
-		wma_radar_event.chan_freq = ichan->ic_freq;
-		wma_radar_event.dfs_radar_status = WMA_DFS_RADAR_FOUND;
-		indication_status =
-			wma->dfs_radar_indication_cb(hdd_ctx, &wma_radar_event);
-		if (indication_status == false) {
-			WMA_LOGE("%s:Application triggered channel switch in progress!.. drop radar event indiaction to SAP",
-				__func__);
-			qdf_mem_free(radar_event);
-			qdf_spin_unlock_bh(&ic->chan_lock);
-			return 0;
-		}
-
-		WMA_LOGE("%s:DFS- RADAR INDICATED TO HDD", __func__);
-
-		wma_radar_event.ieee_chan_number = ichan->ic_ieee;
-		/*
-		 * Indicate to the radar event to SAP to
-		 * select a new channel and set CSA IE
-		 */
-		radar_event->vdev_id = ic->vdev_id;
-		wma_get_channels(ichan, &radar_event->chan_list);
-		radar_event->dfs_radar_status = WMA_DFS_RADAR_FOUND;
-		radar_event->use_nol = ic->ic_dfs_usenol(ic);
-		wma_send_msg(wma, WMA_DFS_RADAR_IND, (void *)radar_event, 0);
-		WMA_LOGE("%s:DFS- WMA_DFS_RADAR_IND Message Posted", __func__);
-	}
-	qdf_spin_unlock_bh(&ic->chan_lock);
-
-	return 0;
-}
-
 #ifdef WLAN_FEATURE_MEMDUMP
 /*
  * wma_process_fw_mem_dump_req() - Function to request fw memory dump from
@@ -5957,8 +4580,9 @@ QDF_STATUS wma_process_set_ie_info(tp_wma_handle wma,
 	cmd.data = ie_info->data;
 	cmd.ie_source = WMA_SET_VDEV_IE_SOURCE_HOST;
 
-	WMA_LOGD(FL("ie_id: %d, band: %d, len: %d"),
-		ie_info->ie_id, ie_info->band, ie_info->length);
+	WMA_LOGD(FL("vdev id: %d, ie_id: %d, band: %d, len: %d"),
+		 ie_info->vdev_id, ie_info->ie_id, ie_info->band,
+		 ie_info->length);
 
 	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_DEBUG,
 		ie_info->data, ie_info->length);
@@ -6188,7 +4812,7 @@ QDF_STATUS wma_set_tx_rx_aggregation_size(
 	cmd->tx_aggr_size = tx_rx_aggregation_size->tx_aggregation_size;
 	cmd->rx_aggr_size = tx_rx_aggregation_size->rx_aggregation_size;
 
-	WMA_LOGI("tx aggr: %d rx aggr: %d vdev: %d",
+	WMA_LOGD("tx aggr: %d rx aggr: %d vdev: %d",
 		cmd->tx_aggr_size, cmd->rx_aggr_size, cmd->vdev_id);
 
 	ret = wmi_unified_cmd_send(wma_handle->wmi_handle, buf, len,

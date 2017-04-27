@@ -37,12 +37,6 @@ struct wireless_dev;
 #define NAN_SOCIAL_CHANNEL_5GHZ_LOWER_BAND 44
 #define NAN_SOCIAL_CHANNEL_5GHZ_UPPER_BAND 149
 
-#define NDP_APP_INFO_LEN 255
-#define NDP_QOS_INFO_LEN 255
-#define NDP_PMK_LEN 32
-#define NDP_SCID_BUF_LEN 256
-#define NDP_NUM_INSTANCE_ID 255
-
 #define NDP_BROADCAST_STAID           (0)
 
 #ifdef WLAN_FEATURE_NAN_DATAPATH
@@ -55,6 +49,14 @@ struct wireless_dev;
 #define WLAN_HDD_IS_NDI(adapter)	(false)
 #define WLAN_HDD_IS_NDI_CONNECTED(adapter) (false)
 #endif /* WLAN_FEATURE_NAN_DATAPATH */
+
+#ifndef WLAN_FEATURE_NAN_CONVERGENCE
+
+#define NDP_QOS_INFO_LEN 255
+#define NDP_APP_INFO_LEN 255
+#define NDP_PMK_LEN 32
+#define NDP_SCID_BUF_LEN 256
+#define NDP_NUM_INSTANCE_ID 255
 
 /**
  * enum qca_wlan_vendor_attr_ndp_params - vendor attribute parameters
@@ -204,6 +206,7 @@ struct nan_datapath_ctx {
 	uint32_t ndi_delete_rsp_reason;
 	uint32_t ndi_delete_rsp_status;
 };
+#endif
 
 #ifdef WLAN_FEATURE_NAN_DATAPATH
 void hdd_ndp_print_ini_config(struct hdd_context_s *hdd_ctx);
@@ -242,5 +245,21 @@ static inline void hdd_ndp_session_end_handler(hdd_adapter_t *adapter)
 {
 }
 #endif /* WLAN_FEATURE_NAN_DATAPATH */
+
+enum nan_datapath_state;
+struct nan_datapath_inf_create_rsp;
+
+struct wlan_objmgr_vdev *hdd_ndi_open(char *iface_name);
+int hdd_ndi_start(uint8_t vdev_id);
+int hdd_ndi_delete(uint8_t vdev_id, char *iface_name, uint16_t transaction_id);
+void hdd_ndi_close(uint8_t vdev_id);
+void hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
+			       struct nan_datapath_inf_create_rsp *ndi_rsp);
+void hdd_ndi_drv_ndi_delete_rsp_handler(uint8_t vdev_id);
+int hdd_ndp_get_peer_idx(uint8_t vdev_id, struct qdf_mac_addr *addr);
+int hdd_ndp_new_peer_handler(uint8_t vdev_id, uint16_t sta_id,
+			struct qdf_mac_addr *peer_mac_addr, bool fist_peer);
+void hdd_ndp_peer_departed_handler(uint8_t vdev_id, uint16_t sta_id,
+			struct qdf_mac_addr *peer_mac_addr, bool last_peer);
 
 #endif /* __WLAN_HDD_NAN_DATAPATH_H */

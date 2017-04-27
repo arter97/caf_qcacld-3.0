@@ -57,6 +57,8 @@
 #include "wma.h"
 #include <wlan_objmgr_vdev_obj.h>
 #include <wlan_objmgr_pdev_obj.h>
+#include "wlan_reg_services_api.h"
+
 /*----------------------------------------------------------------------------
  * Preprocessor Definitions and Constants
  * -------------------------------------------------------------------------*/
@@ -108,6 +110,7 @@ QDF_STATUS wlansap_scan_callback(tHalHandle hal_handle,
 	uint8_t operChannel = 0;
 	QDF_STATUS sap_sm_status;
 	uint32_t event;
+	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal_handle);
 
 
 	if (NULL == hal_handle) {
@@ -197,7 +200,7 @@ QDF_STATUS wlansap_scan_callback(tHalHandle hal_handle,
 	}
 
 	sap_ctx->ch_params.ch_width = sap_ctx->acs_cfg->ch_width;
-	cds_set_channel_params(sap_ctx->channel,
+	wlan_reg_set_channel_params(mac_ctx->pdev, sap_ctx->channel,
 		sap_ctx->secondary_ch,
 		&sap_ctx->ch_params);
 #ifdef SOFTAP_CHANNEL_RANGE
@@ -245,10 +248,12 @@ void sap_config_acs_result(tHalHandle hal, ptSapContext sap_ctx,
 							uint32_t sec_ch)
 {
 	uint32_t channel = sap_ctx->acs_cfg->pri_ch;
-	struct ch_params_s ch_params = {0};
+	struct ch_params ch_params = {0};
+	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal);
 
 	ch_params.ch_width = sap_ctx->acs_cfg->ch_width;
-	cds_set_channel_params(channel, sec_ch, &ch_params);
+	wlan_reg_set_channel_params(mac_ctx->pdev, channel, sec_ch,
+			&ch_params);
 	sap_ctx->acs_cfg->ch_width = ch_params.ch_width;
 	if (sap_ctx->acs_cfg->ch_width > CH_WIDTH_40MHZ)
 		sap_ctx->acs_cfg->vht_seg0_center_ch =
@@ -459,14 +464,17 @@ wlansap_roam_process_ch_change_success(tpAniSirGlobal mac_ctx,
 	if (sap_ctx->ch_params.ch_width == CH_WIDTH_160MHZ) {
 		is_ch_dfs = true;
 	} else if (sap_ctx->ch_params.ch_width == CH_WIDTH_80P80MHZ) {
-		if (cds_get_channel_state(sap_ctx->channel) ==
+		if (wlan_reg_get_channel_state(mac_ctx->pdev,
+					sap_ctx->channel) ==
 						CHANNEL_STATE_DFS ||
-		    cds_get_channel_state(sap_ctx->ch_params.center_freq_seg1 -
+		    wlan_reg_get_channel_state(mac_ctx->pdev,
+			    sap_ctx->ch_params.center_freq_seg1 -
 					  SIR_80MHZ_START_CENTER_CH_DIFF) ==
 							CHANNEL_STATE_DFS)
 			is_ch_dfs = true;
 	} else {
-		if (cds_get_channel_state(sap_ctx->channel) ==
+		if (wlan_reg_get_channel_state(mac_ctx->pdev,
+					sap_ctx->channel) ==
 						CHANNEL_STATE_DFS)
 			is_ch_dfs = true;
 	}
@@ -596,8 +604,9 @@ wlansap_roam_process_dfs_chansw_update(tHalHandle hHal,
 	 * currently. For e.g. 20/40/80 MHz operation
 	 */
 	if (mac_ctx->sap.SapDfsInfo.target_channel)
-		cds_set_channel_params(mac_ctx->sap.SapDfsInfo.target_channel,
-			0, &sap_ctx->ch_params);
+		wlan_reg_set_channel_params(mac_ctx->pdev,
+				mac_ctx->sap.SapDfsInfo.target_channel,
+				0, &sap_ctx->ch_params);
 
 	/*
 	 * Fetch the number of SAP interfaces. If the number of sap Interface
@@ -706,8 +715,12 @@ wlansap_roam_process_dfs_radar_found(tpAniSirGlobal mac_ctx,
 		 * and destroy the CAC timer and post a
 		 * eSAP_DFS_CHANNEL_CAC_RADAR_FOUND  to sapFsm.
 		 */
-		qdf_mc_timer_stop(&mac_ctx->sap.SapDfsInfo.sap_dfs_cac_timer);
-		qdf_mc_timer_destroy(&mac_ctx->sap.SapDfsInfo.sap_dfs_cac_timer);
+		if (!sap_ctx->dfs_cac_offload) {
+			qdf_mc_timer_stop(&mac_ctx->
+					sap.SapDfsInfo.sap_dfs_cac_timer);
+			qdf_mc_timer_destroy(&mac_ctx->
+					sap.SapDfsInfo.sap_dfs_cac_timer);
+		}
 		mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running = false;
 
 		/*
@@ -918,7 +931,6 @@ wlansap_roam_callback(void *ctx, tCsrRoamInfo *csr_roam_info, uint32_t roamId,
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_HIGH,
 			  FL("Session %d opened successfully"),
 			  sap_ctx->sessionId);
-		sap_ctx->isSapSessionOpen = eSAP_TRUE;
 		qdf_event_set(&sap_ctx->sap_session_opened_evt);
 		break;
 	case eCSR_ROAM_INFRA_IND:
@@ -1012,10 +1024,12 @@ wlansap_roam_callback(void *ctx, tCsrRoamInfo *csr_roam_info, uint32_t roamId,
 			QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_MED,
 				FL("sapdfs: Radar detect on pre cac:%d"),
 				sap_ctx->sessionId);
-			qdf_mc_timer_stop(
+			if (!sap_ctx->dfs_cac_offload) {
+				qdf_mc_timer_stop(
 				&mac_ctx->sap.SapDfsInfo.sap_dfs_cac_timer);
-			qdf_mc_timer_destroy(
+				qdf_mc_timer_destroy(
 				&mac_ctx->sap.SapDfsInfo.sap_dfs_cac_timer);
+			}
 			mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running =
 				false;
 			sap_signal_hdd_event(sap_ctx, NULL,
@@ -1028,11 +1042,8 @@ wlansap_roam_callback(void *ctx, tCsrRoamInfo *csr_roam_info, uint32_t roamId,
 			  FL("sapdfs: Indicate eSAP_DFS_RADAR_DETECT to HDD"));
 		sap_signal_hdd_event(sap_ctx, NULL, eSAP_DFS_RADAR_DETECT,
 				     (void *) eSAP_STATUS_SUCCESS);
-		/* sync to latest DFS-NOL */
-		sap_signal_hdd_event(sap_ctx, NULL, eSAP_DFS_NOL_GET,
-				    (void *) eSAP_STATUS_SUCCESS);
 		mac_ctx->sap.SapDfsInfo.target_channel =
-		    sap_indicate_radar(sap_ctx, &csr_roam_info->dfs_event);
+			sap_indicate_radar(sap_ctx);
 		/* if there is an assigned next channel hopping */
 		if (0 < mac_ctx->sap.SapDfsInfo.user_provided_target_channel) {
 			mac_ctx->sap.SapDfsInfo.target_channel =
@@ -1081,6 +1092,10 @@ wlansap_roam_callback(void *ctx, tCsrRoamInfo *csr_roam_info, uint32_t roamId,
 	case eCSR_ROAM_SET_CHANNEL_RSP:
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_HIGH,
 			  FL("Received set channel response"));
+		break;
+	case eCSR_ROAM_CAC_COMPLETE_IND:
+		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_HIGH,
+			  FL("Received cac complete indication"));
 		break;
 	case eCSR_ROAM_EXT_CHG_CHNL_IND:
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_HIGH,
@@ -1278,6 +1293,9 @@ wlansap_roam_callback(void *ctx, tCsrRoamInfo *csr_roam_info, uint32_t roamId,
 	case eCSR_ROAM_RESULT_DFS_CHANSW_UPDATE_SUCCESS:
 		wlansap_roam_process_dfs_chansw_update(hal, sap_ctx,
 				&qdf_ret_status);
+		break;
+	case eCSR_ROAM_RESULT_CAC_END_IND:
+		sap_dfs_cac_timer_callback(hal);
 		break;
 	case eCSR_ROAM_RESULT_CHANNEL_CHANGE_SUCCESS:
 		wlansap_roam_process_ch_change_success(mac_ctx, sap_ctx,

@@ -550,7 +550,7 @@ typedef struct sap_Config {
 	struct qdf_mac_addr self_macaddr;       /* self macaddress or BSSID */
 	uint8_t channel;          /* Operation channel */
 	uint8_t sec_ch;
-	struct ch_params_s ch_params;
+	struct ch_params ch_params;
 	uint32_t ch_width_orig;
 	uint8_t max_num_sta;      /* maximum number of STAs in station table */
 	uint8_t dtim_period;      /* dtim interval */
@@ -608,6 +608,7 @@ typedef struct sap_Config {
 	tSirMacRateSet extended_rates;
 	enum sap_acs_dfs_mode acs_dfs_mode;
 	struct hdd_channel_info *channel_info;
+	bool dfs_cac_offload;
 } tsap_Config_t;
 
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
@@ -678,7 +679,7 @@ typedef struct sSapDfsInfo {
 	 */
 	enum phy_ch_width orig_chanWidth;
 	enum phy_ch_width new_chanWidth;
-	struct ch_params_s new_ch_params;
+	struct ch_params new_ch_params;
 
 	/*
 	 * INI param to enable/disable SAP W53
@@ -1000,12 +1001,19 @@ QDF_STATUS wlansap_update_sap_config_add_ie(tsap_Config_t *pConfig,
 		eUpdateIEsType updateType);
 QDF_STATUS wlansap_reset_sap_config_add_ie(tsap_Config_t *pConfig,
 			eUpdateIEsType updateType);
-void wlansap_extend_to_acs_range(uint8_t *startChannelNum,
-		uint8_t *endChannelNum,
-		uint8_t *bandStartChannel,
+void wlansap_extend_to_acs_range(tHalHandle hal, uint8_t *startChannelNum,
+		uint8_t *endChannelNum, uint8_t *bandStartChannel,
 		uint8_t *bandEndChannel);
 QDF_STATUS wlansap_get_dfs_nol(void *pSapCtx, uint8_t *nol, uint32_t *nol_len);
-QDF_STATUS wlansap_set_dfs_nol(void *pSapCtx, eSapDfsNolType conf);
+
+/**
+ * wlansap_set_dfs_nol() - Set dfs nol
+ * @sap_ctx: SAP context
+ * @conf: set type
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlansap_set_dfs_nol(void *sap_ctx, eSapDfsNolType conf);
 
 /**
  * wlan_sap_set_vendor_acs() - Set vendor specific acs in sap context
@@ -1031,6 +1039,16 @@ QDF_STATUS wlansap_set_tx_leakage_threshold(tHalHandle hal,
 
 QDF_STATUS wlansap_set_invalid_session(void *cds_ctx);
 
+/**
+ * sap_dfs_set_current_channel() - Set current channel params in dfs component
+ * @sap_ctx: sap context
+ *
+ * Set current channel params in dfs component, this info will be used to mark
+ * the channels in nol when radar is detected.
+ *
+ * Return: None
+ */
+void sap_dfs_set_current_channel(void *sap_ctx);
 #ifdef __cplusplus
 }
 #endif

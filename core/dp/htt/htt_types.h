@@ -48,11 +48,15 @@
 #endif
 #endif /* QCA_TX_HTT2_SUPPORT */
 
-#define HTT_HTC_PKT_MISCLIST_SIZE           32
+/* Set the base misclist size to the size of the htt tx copy engine
+ * to guarantee that a packet on the misclist wont be freed while it
+ * is sitting in the copy engine.
+ */
+#define HTT_HTC_PKT_MISCLIST_SIZE          2048
 
 struct htt_htc_pkt {
 	void *pdev_ctxt;
-	dma_addr_t nbuf_paddr;
+	target_paddr_t nbuf_paddr;
 	HTC_PACKET htc_pkt;
 	uint16_t msdu_id;
 };
@@ -98,7 +102,7 @@ struct htt_list_node {
 };
 
 struct htt_rx_hash_entry {
-	A_UINT32 paddr;
+	qdf_dma_addr_t paddr;
 	qdf_nbuf_t netbuf;
 	A_UINT8 fromlist;
 	struct htt_list_node listnode;
@@ -168,7 +172,7 @@ struct htt_ipa_uc_rx_resource_t {
  * @rx_packet_leng: packet length
  */
 struct ipa_uc_rx_ring_elem_t {
-	qdf_dma_addr_t rx_packet_paddr;
+	target_paddr_t rx_packet_paddr;
 	uint32_t vdev_id;
 	uint32_t rx_packet_leng;
 };
@@ -348,7 +352,9 @@ struct htt_pdev_t {
 		 * variable is used to guarantee that only one thread tries
 		 * to replenish Rx ring.
 		 */
-		qdf_atomic_t refill_ref_cnt;
+		qdf_atomic_t   refill_ref_cnt;
+		qdf_spinlock_t refill_lock;
+		qdf_atomic_t   refill_debt;
 #ifdef DEBUG_DMA_DONE
 		uint32_t dbg_initial_msdu_payld;
 		uint32_t dbg_mpdu_range;
@@ -414,6 +420,14 @@ struct htt_pdev_t {
 	struct rx_buf_debug *rx_buff_list;
 	qdf_spinlock_t       rx_buff_list_lock;
 	int rx_buff_index;
+	int rx_buff_posted_cum;
+	int rx_buff_recvd_cum;
+	int rx_buff_recvd_err;
+	int rx_buff_debt_invoked;
+	int rx_buff_fill_n_invoked;
+	int refill_retry_timer_starts;
+	int refill_retry_timer_calls;
+	int refill_retry_timer_doubles;
 #endif
 
 	/* callback function for packetdump */

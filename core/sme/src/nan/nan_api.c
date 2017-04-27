@@ -96,7 +96,7 @@ void sme_nan_deregister_callback(tHalHandle h_hal)
  *****************************************************************************/
 QDF_STATUS sme_nan_request(tpNanRequestReq input)
 {
-	struct scheduler_msg msg;
+	struct scheduler_msg msg = {0};
 	tpNanRequest data;
 	size_t data_len;
 
@@ -154,7 +154,7 @@ QDF_STATUS sme_nan_event(tHalHandle hHal, void *pMsg)
 			  FL("msg ptr is NULL"));
 		status = QDF_STATUS_E_FAILURE;
 	} else {
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_INFO_MED,
+		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
 			  FL("SME: Received sme_nan_event"));
 		if (pMac->sme.nanCallback) {
 			pMac->sme.nanCallback(pMac->hHdd,

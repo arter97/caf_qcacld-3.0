@@ -267,7 +267,7 @@ typedef struct tagCsrStaParams {
 	uint8_t supported_channels_len;
 	uint8_t supported_channels[SIR_MAC_MAX_SUPP_CHANNELS];
 	uint8_t supported_oper_classes_len;
-	uint8_t supported_oper_classes[CDS_MAX_SUPP_OPER_CLASSES];
+	uint8_t supported_oper_classes[REG_MAX_SUPP_OPER_CLASSES];
 } tCsrStaParams;
 
 typedef struct tagCsrScanRequest {
@@ -515,6 +515,7 @@ typedef enum {
 	eCSR_ROAM_ABORT,
 	eCSR_ROAM_NAPI_OFF,
 	eCSR_ROAM_CHANNEL_COMPLETE_IND,
+	eCSR_ROAM_CAC_COMPLETE_IND,
 } eRoamCmdStatus;
 
 /* comment inside indicates what roaming callback gets */
@@ -623,6 +624,7 @@ typedef enum {
 	eCSR_ROAM_RESULT_NDP_END_RSP,
 	eCSR_ROAM_RESULT_NDP_PEER_DEPARTED_IND,
 	eCSR_ROAM_RESULT_NDP_END_IND,
+	eCSR_ROAM_RESULT_CAC_END_IND,
 	/* If Scan for SSID failed to found proper BSS */
 	eCSR_ROAM_RESULT_SCAN_FOR_SSID_FAILURE,
 } eCsrRoamResult;
@@ -916,7 +918,7 @@ typedef struct tagCsrRoamProfile {
 	eCsrCBChoice CBMode;
 	tCsrChannelInfo ChannelInfo;
 	uint8_t operationChannel;
-	struct ch_params_s ch_params;
+	struct ch_params ch_params;
 	/* If this is 0, SME will fill in for caller. */
 	uint16_t beaconInterval;
 	/*
@@ -974,6 +976,8 @@ typedef struct tagCsrRoamProfile {
 	tSirMacRateSet  extended_rates;
 	struct qdf_mac_addr bssid_hint;
 	bool do_not_roam;
+	uint32_t cac_duration_ms;
+	uint32_t dfs_regdomain;
 
 } tCsrRoamProfile;
 
@@ -1258,18 +1262,10 @@ typedef struct tagCsrConfigParam {
 	/* 802.11p enable */
 	bool enable_dot11p;
 	uint8_t max_scan_count;
-#ifdef FEATURE_WLAN_SCAN_PNO
-	bool pno_channel_prediction;
-	uint8_t top_k_num_of_channels;
-	uint8_t stationary_thresh;
-	enum wmi_dwelltime_adaptive_mode pnoscan_adaptive_dwell_mode;
-	uint32_t channel_prediction_full_scan;
-#endif
 	bool early_stop_scan_enable;
 	int8_t early_stop_scan_min_threshold;
 	int8_t early_stop_scan_max_threshold;
 	int8_t first_scan_bucket_threshold;
-	bool pnoOffload;
 	uint8_t fEnableDebugLog;
 	uint8_t max_intf_count;
 	bool enable5gEBT;
@@ -1315,6 +1311,8 @@ typedef struct tagCsrConfigParam {
 	bool enable_ul_ofdma;
 	bool enable_ul_mimo;
 #endif
+	bool qcn_ie_support;
+	uint8_t fils_max_chan_guard_time;
 } tCsrConfigParam;
 
 /* Tush */
@@ -1562,7 +1560,7 @@ typedef struct tagCsrLinkEstablishParams {
 	uint8_t supportedChannelsLen;
 	uint8_t supportedChannels[SIR_MAC_MAX_SUPP_CHANNELS];
 	uint8_t supportedOperClassesLen;
-	uint8_t supportedOperClasses[CDS_MAX_SUPP_OPER_CLASSES];
+	uint8_t supportedOperClasses[REG_MAX_SUPP_OPER_CLASSES];
 	uint8_t qos;
 } tCsrTdlsLinkEstablishParams;
 

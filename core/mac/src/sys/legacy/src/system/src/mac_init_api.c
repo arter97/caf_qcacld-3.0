@@ -41,7 +41,6 @@
 #include "cfg_api.h"             /* cfg_cleanup */
 #include "lim_api.h"             /* lim_cleanup */
 #include "sir_types.h"
-#include "sys_debug.h"
 #include "sys_entry_func.h"
 #include "mac_init_api.h"
 
@@ -65,8 +64,6 @@ tSirRetStatus mac_start(tHalHandle hHal, void *pHalMacStartParams)
 
 	pMac->gDriverType =
 		((tHalMacStartParameters *) pHalMacStartParams)->driverType;
-
-	sys_log(pMac, LOG2, FL("called\n"));
 
 	if (ANI_DRIVER_TYPE(pMac) != eDRIVER_TYPE_MFG) {
 		status = pe_start(pMac);
@@ -134,7 +131,7 @@ tSirRetStatus mac_open(struct wlan_objmgr_psoc *psoc, tHalHandle *pHalHandle,
 
 	qdf_status = wlan_objmgr_psoc_try_get_ref(psoc, WLAN_LEGACY_MAC_ID);
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {
-		sys_log(p_mac, LOGE, FL("PSOC get ref failure\n"));
+		pe_err("PSOC get ref failure");
 		return eSIR_FAILURE;
 	}
 
@@ -142,12 +139,6 @@ tSirRetStatus mac_open(struct wlan_objmgr_psoc *psoc, tHalHandle *pHalHandle,
 	*pHalHandle = (tHalHandle) p_mac;
 
 	{
-		/* Call various PE (and other layer init here) */
-		if (eSIR_SUCCESS != log_init(p_mac)) {
-			qdf_mem_free(p_mac);
-			return eSIR_FAILURE;
-		}
-
 		/* Call routine to initialize CFG data structures */
 		if (eSIR_SUCCESS != cfg_init(p_mac)) {
 			qdf_mem_free(p_mac);
@@ -163,7 +154,7 @@ tSirRetStatus mac_open(struct wlan_objmgr_psoc *psoc, tHalHandle *pHalHandle,
 
 	status =  pe_open(p_mac, cds_cfg);
 	if (eSIR_SUCCESS != status) {
-		sys_log(p_mac, LOGE, FL("mac_open failure\n"));
+		pe_err("pe_open() failure");
 		qdf_mem_free(p_mac);
 	}
 
@@ -191,8 +182,10 @@ tSirRetStatus mac_close(tHalHandle hHal)
 	/* Call routine to free-up all CFG data structures */
 	cfg_de_init(pMac);
 
-	log_deinit(pMac);
-
+	if (pMac->pdev) {
+		wlan_objmgr_pdev_release_ref(pMac->pdev, WLAN_LEGACY_MAC_ID);
+		pMac->pdev = NULL;
+	}
 	wlan_objmgr_psoc_release_ref(pMac->psoc, WLAN_LEGACY_MAC_ID);
 	pMac->psoc = NULL;
 	/* Finally, de-allocate the global MAC datastructure: */

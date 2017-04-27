@@ -46,7 +46,6 @@ typedef struct sAniSirGlobal *tpAniSirGlobal;
 #endif
 
 #include "qdf_types.h"
-#include "cds_reg_service.h"
 #include "cds_regdomain.h"
 #include "sir_types.h"
 #include "sir_mac_prot_def.h"
@@ -55,6 +54,8 @@ typedef struct sAniSirGlobal *tpAniSirGlobal;
 #include "cds_regdomain.h"
 #include "wmi_unified.h"
 #include "wmi_unified_param.h"
+#include "ol_txrx_htt_api.h"
+#include "wlan_reg_services_api.h"
 #include <dot11f.h>
 #include "wlan_policy_mgr_api.h"
 
@@ -104,7 +105,6 @@ typedef uint8_t tSirVersionString[SIR_VERSION_STRING_LEN];
 #define WLAN_EXTSCAN_MAX_BUCKETS                  16
 #define WLAN_EXTSCAN_MAX_HOTLIST_APS              128
 #define WLAN_EXTSCAN_MAX_SIGNIFICANT_CHANGE_APS   64
-#define WLAN_EXTSCAN_MAX_HOTLIST_SSIDS            8
 
 /* This should not be greater than MAX_NUMBER_OF_CONC_CONNECTIONS */
 #define MAX_VDEV_SUPPORTED                        4
@@ -164,7 +164,6 @@ typedef enum {
 	eSIR_PASSPOINT_NETWORK_FOUND_IND,
 	eSIR_EXTSCAN_SET_SSID_HOTLIST_RSP,
 	eSIR_EXTSCAN_RESET_SSID_HOTLIST_RSP,
-	eSIR_EXTSCAN_HOTLIST_SSID_MATCH_IND,
 
 	/* Keep this last */
 	eSIR_EXTSCAN_CALLBACK_TYPE_MAX,
@@ -370,8 +369,8 @@ typedef struct sSirSupportedRates {
 	uint16_t vhtTxMCSMap;
 	uint16_t vhtTxHighestDataRate;
 #ifdef WLAN_FEATURE_11AX
-	uint16_t he_rx_mcs;
-	uint16_t he_tx_mcs;
+	uint32_t he_rx_mcs;
+	uint32_t he_tx_mcs;
 #endif
 } tSirSupportedRates, *tpSirSupportedRates;
 
@@ -428,6 +427,9 @@ typedef struct sSirSmeRsp {
 	uint8_t sessionId;      /* To support BT-AMP */
 	uint16_t transactionId; /* To support BT-AMP */
 	tSirResultCodes statusCode;
+#ifdef CONVERGED_TDLS_ENABLE
+	struct wlan_objmgr_psoc *psoc;
+#endif
 } tSirSmeRsp, *tpSirSmeRsp;
 
 /* / Definition for indicating all modules ready on STA */
@@ -693,6 +695,8 @@ typedef struct sSirSmeStartBssReq {
 	uint8_t sap_dot11mc;
 	uint8_t beacon_tx_rate;
 	bool vendor_vht_sap;
+	uint32_t cac_duration_ms;
+	uint32_t dfs_regdomain;
 
 } tSirSmeStartBssReq, *tpSirSmeStartBssReq;
 
@@ -1658,7 +1662,7 @@ typedef struct sSirSmeSwitchChannelInd {
 	uint16_t length;
 	uint8_t sessionId;
 	uint16_t newChannelId;
-	struct ch_params_s chan_params;
+	struct ch_params chan_params;
 	struct qdf_mac_addr bssid;      /* BSSID */
 } tSirSmeSwitchChannelInd, *tpSirSmeSwitchChannelInd;
 
@@ -2852,103 +2856,6 @@ typedef struct sAniIbssRouteTable {
 	tAniDestIpNextHopMacPair destIpNextHopPair[1];
 } tAniIbssRouteTable;
 
-#ifdef FEATURE_WLAN_SCAN_PNO
-/* */
-/* PNO Messages */
-/* */
-
-
-/* Set PNO */
-#define SIR_PNO_MAX_PLAN_REQUEST   2
-#define SIR_PNO_MAX_NETW_CHANNELS  26
-#define SIR_PNO_MAX_NETW_CHANNELS_EX  60
-#define SIR_PNO_MAX_SUPP_NETWORKS  16
-
-/*
- * size based of dot11 declaration without extra IEs as we will not carry those
- * for PNO
- */
-#define SIR_PNO_MAX_PB_REQ_SIZE    450
-
-#define SIR_PNO_24G_DEFAULT_CH     1
-#define SIR_PNO_5G_DEFAULT_CH      36
-
-typedef enum {
-	SIR_PNO_MODE_IMMEDIATE,
-	SIR_PNO_MODE_ON_SUSPEND,
-	SIR_PNO_MODE_ON_RESUME,
-	SIR_PNO_MODE_MAX
-} eSirPNOMode;
-
-typedef struct {
-	tSirMacSSid ssId;
-	uint32_t authentication;
-	uint32_t encryption;
-	uint32_t bcastNetwType;
-	uint8_t ucChannelCount;
-	uint8_t aChannels[SIR_PNO_MAX_NETW_CHANNELS_EX];
-	int32_t rssiThreshold;
-} tSirNetworkType;
-
-/**
- * struct sSirPNOScanReq - PNO Scan request structure
- * @enable: flag to enable or disable
- * @modePNO: PNO Mode
- * @ucNetworksCount: Number of networks
- * @aNetworks: Preferred network list
- * @sessionId: Session identifier
- * @fast_scan_period: Fast Scan period
- * @slow_scan_period: Slow scan period
- * @delay_start_time: delay in seconds to use before starting the first scan
- * @fast_scan_max_cycles: Fast scan max cycles
- * @us24GProbeTemplateLen: 2.4G probe template length
- * @p24GProbeTemplate: 2.4G probe template
- * @us5GProbeTemplateLen: 5G probe template length
- * @p5GProbeTemplate: 5G probe template
- */
-typedef struct sSirPNOScanReq {
-	uint8_t enable;
-	eSirPNOMode modePNO;
-	uint8_t ucNetworksCount;
-	tSirNetworkType aNetworks[SIR_PNO_MAX_SUPP_NETWORKS];
-	uint8_t sessionId;
-	uint32_t fast_scan_period;
-	uint32_t slow_scan_period;
-	uint32_t delay_start_time;
-	uint8_t fast_scan_max_cycles;
-
-	uint32_t        active_min_time;
-	uint32_t        active_max_time;
-	uint32_t        passive_min_time;
-	uint32_t        passive_max_time;
-
-#ifdef FEATURE_WLAN_SCAN_PNO
-	bool pno_channel_prediction;
-	uint8_t top_k_num_of_channels;
-	uint8_t stationary_thresh;
-	enum wmi_dwelltime_adaptive_mode pnoscan_adaptive_dwell_mode;
-	uint32_t channel_prediction_full_scan;
-#endif
-} tSirPNOScanReq, *tpSirPNOScanReq;
-
-/* Preferred Network Found Indication */
-typedef struct {
-	uint16_t mesgType;
-	uint16_t mesgLen;
-	/* Network that was found with the highest RSSI */
-	tSirMacSSid ssId;
-	/* Indicates the RSSI */
-	uint8_t rssi;
-	/* Length of the beacon or probe response
-	 * corresponding to the candidate found by PNO */
-	uint32_t frameLength;
-	uint8_t sessionId;
-	/* Index to memory location where the contents of
-	 * beacon or probe response frame will be copied */
-	uint8_t data[1];
-} tSirPrefNetworkFoundInd, *tpSirPrefNetworkFoundInd;
-#endif /* FEATURE_WLAN_SCAN_PNO */
-
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 typedef struct {
 	uint8_t acvo_uapsd:1;
@@ -3238,6 +3145,7 @@ typedef struct {
  * @ini_triggered: triggered using ini
  * @user_triggered: triggered by user
  * @size: pktlog buffer size
+ * @is_pktlog_buff_clear: clear the pktlog buffer
  */
 struct sir_wifi_start_log {
 	uint32_t ring_id;
@@ -3246,6 +3154,7 @@ struct sir_wifi_start_log {
 	bool ini_triggered;
 	uint8_t user_triggered;
 	int size;
+	bool is_pktlog_buff_clear;
 };
 
 
@@ -3463,6 +3372,9 @@ typedef struct sSirTdlsAddStaRsp {
 	uint8_t ucastSig;
 	uint8_t bcastSig;
 	eTdlsAddOper tdlsAddOper;
+#ifdef CONVERGED_TDLS_ENABLE
+	struct wlan_objmgr_psoc *psoc;
+#endif
 } tSirTdlsAddStaRsp;
 
 /* TDLS Request struct SME-->PE */
@@ -3483,7 +3395,7 @@ typedef struct {
 	uint8_t supportedChannelsLen;
 	uint8_t supportedChannels[SIR_MAC_MAX_SUPP_CHANNELS];
 	uint8_t supportedOperClassesLen;
-	uint8_t supportedOperClasses[CDS_MAX_SUPP_OPER_CLASSES];
+	uint8_t supportedOperClasses[REG_MAX_SUPP_OPER_CLASSES];
 } tSirTdlsLinkEstablishReq, *tpSirTdlsLinkEstablishReq;
 
 /* TDLS Request struct SME-->PE */
@@ -3514,6 +3426,9 @@ typedef struct sSirTdlsDelStaRsp {
 	tSirResultCodes statusCode;
 	struct qdf_mac_addr peermac;
 	uint16_t staId;
+#ifdef CONVERGED_TDLS_ENABLE
+	struct wlan_objmgr_psoc *psoc;
+#endif
 } tSirTdlsDelStaRsp, *tpSirTdlsDelStaRsp;
 /* TDLS Delete Indication struct PE-->SME */
 typedef struct sSirTdlsDelStaInd {
@@ -3534,6 +3449,9 @@ typedef struct sSirMgmtTxCompletionInd {
 	uint16_t length;
 	uint8_t sessionId;      /* Session ID */
 	uint32_t txCompleteStatus;
+#ifdef CONVERGED_TDLS_ENABLE
+	struct wlan_objmgr_psoc *psoc;
+#endif
 } tSirMgmtTxCompletionInd, *tpSirMgmtTxCompletionInd;
 
 typedef struct sSirTdlsEventnotify {
@@ -3712,80 +3630,6 @@ typedef enum eSirAddonPsReq {
 	eSIR_ADDON_DISABLE_UAPSD
 } tSirAddonPsReq;
 
-#ifdef FEATURE_WLAN_LPHB
-#define SIR_LPHB_FILTER_LEN   64
-
-typedef enum {
-	LPHB_SET_EN_PARAMS_INDID,
-	LPHB_SET_TCP_PARAMS_INDID,
-	LPHB_SET_TCP_PKT_FILTER_INDID,
-	LPHB_SET_UDP_PARAMS_INDID,
-	LPHB_SET_UDP_PKT_FILTER_INDID,
-	LPHB_SET_NETWORK_INFO_INDID,
-} LPHBIndType;
-
-typedef struct sSirLPHBEnableStruct {
-	uint8_t enable;
-	uint8_t item;
-	uint8_t session;
-} tSirLPHBEnableStruct;
-
-typedef struct sSirLPHBTcpParamStruct {
-	uint32_t srv_ip;
-	uint32_t dev_ip;
-	uint16_t src_port;
-	uint16_t dst_port;
-	uint16_t timeout;
-	uint8_t session;
-	struct qdf_mac_addr gateway_mac;
-	uint16_t timePeriodSec; /* in seconds */
-	uint32_t tcpSn;
-} tSirLPHBTcpParamStruct;
-
-typedef struct sSirLPHBTcpFilterStruct {
-	uint16_t length;
-	uint8_t offset;
-	uint8_t session;
-	uint8_t filter[SIR_LPHB_FILTER_LEN];
-} tSirLPHBTcpFilterStruct;
-
-typedef struct sSirLPHBUdpParamStruct {
-	uint32_t srv_ip;
-	uint32_t dev_ip;
-	uint16_t src_port;
-	uint16_t dst_port;
-	uint16_t interval;
-	uint16_t timeout;
-	uint8_t session;
-	struct qdf_mac_addr gateway_mac;
-} tSirLPHBUdpParamStruct;
-
-typedef struct sSirLPHBUdpFilterStruct {
-	uint16_t length;
-	uint8_t offset;
-	uint8_t session;
-	uint8_t filter[SIR_LPHB_FILTER_LEN];
-} tSirLPHBUdpFilterStruct;
-
-typedef struct sSirLPHBReq {
-	uint16_t cmd;
-	uint16_t dummy;
-	union {
-		tSirLPHBEnableStruct lphbEnableReq;
-		tSirLPHBTcpParamStruct lphbTcpParamReq;
-		tSirLPHBTcpFilterStruct lphbTcpFilterReq;
-		tSirLPHBUdpParamStruct lphbUdpParamReq;
-		tSirLPHBUdpFilterStruct lphbUdpFilterReq;
-	} params;
-} tSirLPHBReq;
-
-typedef struct sSirLPHBInd {
-	uint8_t sessionIdx;
-	uint8_t protocolType;   /*TCP or UDP */
-	uint8_t eventReason;
-} tSirLPHBInd;
-#endif /* FEATURE_WLAN_LPHB */
-
 #ifdef FEATURE_WLAN_CH_AVOID
 typedef struct sSirChAvoidUpdateReq {
 	uint32_t reserved_param;
@@ -3952,6 +3796,8 @@ typedef struct sSirChanChangeRequest {
 	uint32_t dot11mode;
 	tSirMacRateSet operational_rateset;
 	tSirMacRateSet extended_rateset;
+	uint32_t cac_duration_ms;
+	uint32_t dfs_regdomain;
 } tSirChanChangeRequest, *tpSirChanChangeRequest;
 
 typedef struct sSirChanChangeResponse {
@@ -4027,7 +3873,7 @@ typedef struct sSirDfsCsaIeRequest {
 	uint8_t targetChannel;
 	uint8_t csaIeRequired;
 	uint8_t bssid[QDF_MAC_ADDR_SIZE];
-	struct ch_params_s ch_params;
+	struct ch_params ch_params;
 } tSirDfsCsaIeRequest, *tpSirDfsCsaIeRequest;
 
 /* Indication from lower layer indicating the completion of first beacon send
@@ -4585,36 +4431,6 @@ struct sir_wisa_params {
 	bool mode;
 	uint8_t vdev_id;
 };
-/**
- * struct sir_ssid_hotlist_param - param for SSID Hotlist
- * @ssid: SSID which is being hotlisted
- * @band: Band in which the given SSID should be scanned
- * @rssi_low: Low bound on RSSI
- * @rssi_high: High bound on RSSI
- */
-struct sir_ssid_hotlist_param {
-	tSirMacSSid ssid;
-	uint8_t band;
-	int32_t rssi_low;
-	int32_t rssi_high;
-};
-
-/**
- * struct sir_set_ssid_hotlist_request - set SSID hotlist request struct
- * @request_id: ID of the request
- * @session_id: ID of the session
- * @lost_ssid_sample_size: Number of consecutive scans in which the SSID
- *	must not be seen in order to consider the SSID "lost"
- * @ssid_count: Number of valid entries in the @ssids array
- * @ssids: Array that defines the SSIDs that are in the hotlist
- */
-struct sir_set_ssid_hotlist_request {
-	uint32_t request_id;
-	uint8_t session_id;
-	uint32_t lost_ssid_sample_size;
-	uint32_t ssid_count;
-	struct sir_ssid_hotlist_param ssids[WLAN_EXTSCAN_MAX_HOTLIST_SSIDS];
-};
 
 typedef struct {
 	uint32_t requestId;
@@ -4813,6 +4629,26 @@ struct power_stats_response {
 	uint32_t *debug_registers;
 };
 #endif
+
+/**
+ * struct lfr_firmware_status - LFR status in firmware
+ * @is_disabled: Is LFR disabled in FW
+ * @disable_lfr_event: Disable attempt done in FW
+ */
+struct lfr_firmware_status {
+	uint32_t is_disabled;
+	struct completion disable_lfr_event;
+};
+
+/**
+ * struct rso_cmd_status - RSO Command status
+ * @vdev_id: Vdev ID for which RSO command sent
+ * @status: Status of RSO command sent to FW
+ */
+struct rso_cmd_status {
+	uint32_t vdev_id;
+	bool status;
+};
 
 typedef struct {
 	uint8_t oui[WIFI_SCANNING_MAC_OUI_LENGTH];
@@ -5083,8 +4919,12 @@ typedef struct {
 	struct qdf_mac_addr peerMacAddress;
 	/* peer WIFI_CAPABILITY_XXX */
 	uint32_t capabilities;
-	/* number of rates */
-	uint32_t numRate;
+	union {
+		/* peer power saving mode */
+		uint32_t power_saving;
+		/* number of rates */
+		uint32_t numRate;
+	};
 	/* per rate statistics, number of entries  = num_rate */
 	tSirWifiRateStat rateStats[0];
 } tSirWifiPeerInfo, *tpSirWifiPeerInfo;
@@ -5183,6 +5023,10 @@ typedef struct {
 	 *  a data frame with PM bit set.
 	 */
 	uint32_t rx_leak_window;
+	uint32_t rts_succ_cnt;
+	uint32_t rts_fail_cnt;
+	uint32_t ppdu_succ_cnt;
+	uint32_t ppdu_fail_cnt;
 	/* per ac data packet statistics */
 	tSirWifiWmmAcStat AccessclassStats[WIFI_AC_MAX];
 } tSirWifiIfaceStat, *tpSirWifiIfaceStat;
@@ -5225,6 +5069,19 @@ typedef struct {
 /* Clear particular peer stats depending on the peer_mac */
 #define WIFI_STATS_IFACE_PER_PEER      0x00000200
 
+/**
+ * struct sir_wifi_iface_tx_fail - TX failure event
+ * @tid: TX TID
+ * @msdu_num: TX MSDU failed counter
+ * @status: TX status from HTT message.
+ *          Only failure status will be involved.
+ */
+struct sir_wifi_iface_tx_fail {
+	uint8_t  tid;
+	uint16_t msdu_num;
+	enum htt_tx_status status;
+};
+
 typedef struct {
 	uint32_t paramId;
 	uint8_t ifaceId;
@@ -5241,6 +5098,10 @@ typedef struct {
 	uint8_t results[0];
 } tSirLLStatsResults, *tpSirLLStatsResults;
 
+/* Result ID for LL stats extension */
+#define WMI_LL_STATS_EXT_PS_CHG             0x00000100
+#define WMI_LL_STATS_EXT_TX_FAIL            0x00000200
+#define WMI_LL_STATS_EXT_MAC_COUNTER        0x00000400
 #endif /* WLAN_FEATURE_LINK_LAYER_STATS */
 
 typedef struct sAniGetLinkStatus {

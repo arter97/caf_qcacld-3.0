@@ -59,6 +59,11 @@
 #include "lim_send_messages.h"
 #include "nan_datapath.h"
 #include "lim_assoc_utils.h"
+#include "wlan_reg_services_api.h"
+
+#ifdef CONVERGED_TDLS_ENABLE
+#include "wlan_tdls_tgt_api.h"
+#endif
 
 static void lim_handle_join_rsp_status(tpAniSirGlobal mac_ctx,
 	tpPESession session_entry, tSirResultCodes result_code,
@@ -84,7 +89,7 @@ lim_send_sme_rsp(tpAniSirGlobal mac_ctx, uint16_t msg_type,
 	 tSirResultCodes result_code, uint8_t sme_session_id,
 	 uint16_t sme_transaction_id)
 {
-	struct scheduler_msg msg;
+	struct scheduler_msg msg = {0};
 	tSirSmeRsp *sme_rsp;
 
 	lim_log(mac_ctx, LOG1, FL("Sending message %s with reasonCode %s"),
@@ -93,7 +98,7 @@ lim_send_sme_rsp(tpAniSirGlobal mac_ctx, uint16_t msg_type,
 	sme_rsp = qdf_mem_malloc(sizeof(tSirSmeRsp));
 	if (NULL == sme_rsp) {
 		/* Buffer not available. Log error */
-		QDF_TRACE(QDF_MODULE_ID_PE, LOGP,
+		QDF_TRACE(QDF_MODULE_ID_PE, LOGE,
 			FL("call to AllocateMemory failed for eWNI_SME_*_RSP"));
 		return;
 	}
@@ -142,7 +147,7 @@ lim_send_sme_roc_rsp(tpAniSirGlobal mac_ctx, uint16_t msg_type,
 	 tSirResultCodes result_code, uint8_t sme_session_id,
 	 uint32_t scan_id)
 {
-	struct scheduler_msg msg;
+	struct scheduler_msg msg = {0};
 	struct sir_roc_rsp *sme_rsp;
 
 	lim_log(mac_ctx, LOG1,
@@ -152,7 +157,7 @@ lim_send_sme_roc_rsp(tpAniSirGlobal mac_ctx, uint16_t msg_type,
 
 	sme_rsp = qdf_mem_malloc(sizeof(struct sir_roc_rsp));
 	if (NULL == sme_rsp) {
-		QDF_TRACE(QDF_MODULE_ID_PE, LOGP,
+		QDF_TRACE(QDF_MODULE_ID_PE, LOGE,
 			FL("call to AllocateMemory failed for eWNI_SME_*_RSP"));
 		return;
 	}
@@ -236,7 +241,7 @@ uint32_t lim_get_max_rate_flags(tpAniSirGlobal mac_ctx, tpDphHashNode sta_ds)
 static void lim_send_sme_join_reassoc_rsp_after_resume(tpAniSirGlobal mac_ctx,
 	QDF_STATUS status, uint32_t *ctx)
 {
-	struct scheduler_msg msg;
+	struct scheduler_msg msg = {0};
 	tpSirSmeJoinRsp sme_join_rsp = (tpSirSmeJoinRsp) ctx;
 
 	msg.type = sme_join_rsp->messageType;
@@ -457,7 +462,7 @@ lim_send_sme_join_reassoc_rsp(tpAniSirGlobal mac_ctx, uint16_t msg_type,
 		rsp_len = sizeof(tSirSmeJoinRsp);
 		sme_join_rsp = qdf_mem_malloc(rsp_len);
 		if (NULL == sme_join_rsp) {
-			lim_log(mac_ctx, LOGP,
+			lim_log(mac_ctx, LOGE,
 				FL("Mem Alloc fail - JOIN/REASSOC_RSP"));
 			return;
 		}
@@ -475,7 +480,7 @@ lim_send_sme_join_reassoc_rsp(tpAniSirGlobal mac_ctx, uint16_t msg_type,
 			sizeof(tSirSmeJoinRsp) - sizeof(uint8_t);
 		sme_join_rsp = qdf_mem_malloc(rsp_len);
 		if (NULL == sme_join_rsp) {
-			lim_log(mac_ctx, LOGP,
+			lim_log(mac_ctx, LOGE,
 				FL("MemAlloc fail - JOIN/REASSOC_RSP"));
 			return;
 		}
@@ -570,7 +575,7 @@ lim_send_sme_start_bss_rsp(tpAniSirGlobal pMac,
 {
 
 	uint16_t size = 0;
-	struct scheduler_msg mmhMsg;
+	struct scheduler_msg mmhMsg = {0};
 	tSirSmeStartBssRsp *pSirSmeRsp;
 	uint16_t ieLen;
 	uint16_t ieOffset, curLen;
@@ -585,7 +590,7 @@ lim_send_sme_start_bss_rsp(tpAniSirGlobal pMac,
 		pSirSmeRsp = qdf_mem_malloc(size);
 		if (NULL == pSirSmeRsp) {
 			/* / Buffer not available. Log error */
-			lim_log(pMac, LOGP,
+			lim_log(pMac, LOGE,
 				FL
 					("call to AllocateMemory failed for eWNI_SME_START_BSS_RSP"));
 			return;
@@ -601,7 +606,7 @@ lim_send_sme_start_bss_rsp(tpAniSirGlobal pMac,
 		pSirSmeRsp = qdf_mem_malloc(size);
 		if (NULL == pSirSmeRsp) {
 			/* / Buffer not available. Log error */
-			lim_log(pMac, LOGP,
+			lim_log(pMac, LOGE,
 				FL
 					("call to AllocateMemory failed for eWNI_SME_START_BSS_RSP"));
 
@@ -623,7 +628,7 @@ lim_send_sme_start_bss_rsp(tpAniSirGlobal pMac,
 				    (pMac, &pSirSmeRsp->bssDescription.capabilityInfo,
 				    psessionEntry)
 			    != eSIR_SUCCESS)
-				lim_log(pMac, LOGP,
+				lim_log(pMac, LOGE,
 					FL
 						("could not retrieve Capabilities value"));
 
@@ -753,14 +758,14 @@ lim_post_sme_scan_rsp_message(tpAniSirGlobal pMac,
 			uint32_t scan_id)
 {
 	tpSirSmeScanRsp pSirSmeScanRsp;
-	struct scheduler_msg mmhMsg;
+	struct scheduler_msg mmhMsg = {0};
 
 	lim_log(pMac, LOG1, FL("send SME_SCAN_RSP (reasonCode %s)."),
 		lim_result_code_str(resultCode));
 
 	pSirSmeScanRsp = qdf_mem_malloc(sizeof(tSirSmeScanRsp));
 	if (NULL == pSirSmeScanRsp) {
-		lim_log(pMac, LOGP,
+		lim_log(pMac, LOGE,
 			FL("AllocateMemory failed for eWNI_SME_SCAN_RSP"));
 		return;
 	}
@@ -791,7 +796,7 @@ lim_post_sme_scan_rsp_message(tpAniSirGlobal pMac,
 void lim_send_sme_disassoc_deauth_ntf(tpAniSirGlobal pMac,
 				      QDF_STATUS status, uint32_t *pCtx)
 {
-	struct scheduler_msg mmhMsg;
+	struct scheduler_msg mmhMsg = {0};
 	struct scheduler_msg *pMsg = (struct scheduler_msg *) pCtx;
 
 	mmhMsg.type = pMsg->type;
@@ -899,7 +904,7 @@ lim_send_sme_disassoc_ntf(tpAniSirGlobal pMac,
 		pSirSmeDisassocRsp = qdf_mem_malloc(sizeof(tSirSmeDisassocRsp));
 		if (NULL == pSirSmeDisassocRsp) {
 			/* Log error */
-			lim_log(pMac, LOGP, FL("Memory allocation failed"));
+			lim_log(pMac, LOGE, FL("Memory allocation failed"));
 			failure = true;
 			goto error;
 		}
@@ -981,7 +986,7 @@ lim_send_sme_disassoc_ntf(tpAniSirGlobal pMac,
 		pSirSmeDisassocInd = qdf_mem_malloc(sizeof(tSirSmeDisassocInd));
 		if (NULL == pSirSmeDisassocInd) {
 			/* Log error */
-			lim_log(pMac, LOGP, FL("Memory allocation failed"));
+			lim_log(pMac, LOGE, FL("Memory allocation failed"));
 			failure = true;
 			goto error;
 		}
@@ -1040,12 +1045,12 @@ void
 lim_send_sme_disassoc_ind(tpAniSirGlobal pMac, tpDphHashNode pStaDs,
 			  tpPESession psessionEntry)
 {
-	struct scheduler_msg mmhMsg;
+	struct scheduler_msg mmhMsg = {0};
 	tSirSmeDisassocInd *pSirSmeDisassocInd;
 
 	pSirSmeDisassocInd = qdf_mem_malloc(sizeof(tSirSmeDisassocInd));
 	if (NULL == pSirSmeDisassocInd) {
-		lim_log(pMac, LOGP,
+		lim_log(pMac, LOGE,
 			FL("AllocateMemory failed for eWNI_SME_DISASSOC_IND"));
 		return;
 	}
@@ -1097,12 +1102,12 @@ void
 lim_send_sme_deauth_ind(tpAniSirGlobal pMac, tpDphHashNode pStaDs,
 			tpPESession psessionEntry)
 {
-	struct scheduler_msg mmhMsg;
+	struct scheduler_msg mmhMsg = {0};
 	tSirSmeDeauthInd *pSirSmeDeauthInd;
 
 	pSirSmeDeauthInd = qdf_mem_malloc(sizeof(tSirSmeDeauthInd));
 	if (NULL == pSirSmeDeauthInd) {
-		lim_log(pMac, LOGP,
+		lim_log(pMac, LOGE,
 			FL("AllocateMemory failed for eWNI_SME_DEAUTH_IND "));
 		return;
 	}
@@ -1171,12 +1176,12 @@ void
 lim_send_sme_tdls_del_sta_ind(tpAniSirGlobal pMac, tpDphHashNode pStaDs,
 			      tpPESession psessionEntry, uint16_t reasonCode)
 {
-	struct scheduler_msg mmhMsg;
+	struct scheduler_msg mmhMsg = {0};
 	tSirTdlsDelStaInd *pSirTdlsDelStaInd;
 
 	pSirTdlsDelStaInd = qdf_mem_malloc(sizeof(tSirTdlsDelStaInd));
 	if (NULL == pSirTdlsDelStaInd) {
-		lim_log(pMac, LOGP,
+		lim_log(pMac, LOGE,
 			FL
 				("AllocateMemory failed for eWNI_SME_TDLS_DEL_STA_IND "));
 		return;
@@ -1231,12 +1236,12 @@ lim_send_sme_tdls_del_sta_ind(tpAniSirGlobal pMac, tpDphHashNode pStaDs,
 void
 lim_send_sme_tdls_delete_all_peer_ind(tpAniSirGlobal pMac, tpPESession psessionEntry)
 {
-	struct scheduler_msg mmhMsg;
+	struct scheduler_msg mmhMsg = {0};
 	tSirTdlsDelAllPeerInd *pSirTdlsDelAllPeerInd;
 
 	pSirTdlsDelAllPeerInd = qdf_mem_malloc(sizeof(tSirTdlsDelAllPeerInd));
 	if (NULL == pSirTdlsDelAllPeerInd) {
-		lim_log(pMac, LOGP,
+		lim_log(pMac, LOGE,
 			FL
 				("AllocateMemory failed for eWNI_SME_TDLS_DEL_ALL_PEER_IND"));
 		return;
@@ -1280,13 +1285,13 @@ lim_send_sme_mgmt_tx_completion(tpAniSirGlobal pMac,
 				uint32_t sme_session_id,
 				uint32_t txCompleteStatus)
 {
-	struct scheduler_msg mmhMsg;
+	struct scheduler_msg mmhMsg = {0};
 	tSirMgmtTxCompletionInd *pSirMgmtTxCompletionInd;
 
 	pSirMgmtTxCompletionInd =
 		qdf_mem_malloc(sizeof(tSirMgmtTxCompletionInd));
 	if (NULL == pSirMgmtTxCompletionInd) {
-		lim_log(pMac, LOGP,
+		lim_log(pMac, LOGE,
 			FL
 				("AllocateMemory failed for eWNI_SME_MGMT_FRM_TX_COMPLETION_IND"));
 		return;
@@ -1305,14 +1310,21 @@ lim_send_sme_mgmt_tx_completion(tpAniSirGlobal pMac,
 	mmhMsg.bodyptr = pSirMgmtTxCompletionInd;
 	mmhMsg.bodyval = 0;
 
+#ifdef CONVERGED_TDLS_ENABLE
+	pSirMgmtTxCompletionInd->psoc = pMac->psoc;
+	mmhMsg.callback = tgt_tdls_send_mgmt_tx_completion;
+	scheduler_post_msg(QDF_MODULE_ID_TARGET_IF, &mmhMsg);
+	return;
+#else
 	lim_sys_process_mmh_msg_api(pMac, &mmhMsg, ePROT);
 	return;
+#endif
 } /*** end lim_send_sme_tdls_delete_all_peer_ind() ***/
 
 void lim_send_sme_tdls_event_notify(tpAniSirGlobal pMac, uint16_t msgType,
 				    void *events)
 {
-	struct scheduler_msg mmhMsg;
+	struct scheduler_msg mmhMsg = {0};
 
 	switch (msgType) {
 	case SIR_HAL_TDLS_SHOULD_DISCOVER:
@@ -1387,7 +1399,7 @@ lim_send_sme_deauth_ntf(tpAniSirGlobal pMac, tSirMacAddr peerMacAddr,
 		pSirSmeDeauthRsp = qdf_mem_malloc(sizeof(tSirSmeDeauthRsp));
 		if (NULL == pSirSmeDeauthRsp) {
 			/* Log error */
-			lim_log(pMac, LOGP,
+			lim_log(pMac, LOGE,
 				FL
 					("call to AllocateMemory failed for eWNI_SME_DEAUTH_RSP"));
 
@@ -1458,7 +1470,7 @@ lim_send_sme_deauth_ntf(tpAniSirGlobal pMac, tSirMacAddr peerMacAddr,
 		pSirSmeDeauthInd = qdf_mem_malloc(sizeof(tSirSmeDeauthInd));
 		if (NULL == pSirSmeDeauthInd) {
 			/* Log error */
-			lim_log(pMac, LOGP,
+			lim_log(pMac, LOGE,
 				FL
 					("call to AllocateMemory failed for eWNI_SME_DEAUTH_Ind"));
 
@@ -1530,7 +1542,7 @@ lim_send_sme_wm_status_change_ntf(tpAniSirGlobal mac_ctx,
 	tSirSmeStatusChangeCode status_change_code,
 	uint32_t *status_change_info, uint16_t info_len, uint8_t session_id)
 {
-	struct scheduler_msg msg;
+	struct scheduler_msg msg = {0};
 	tSirSmeWmStatusChangeNtf *wm_status_change_ntf;
 	uint32_t max_info_len;
 
@@ -1580,7 +1592,7 @@ lim_send_sme_wm_status_change_ntf(tpAniSirGlobal mac_ctx,
 	MTRACE(mac_trace(mac_ctx, TRACE_CODE_TX_SME_MSG, session_id, msg.type));
 	if (eSIR_SUCCESS != lim_sys_process_mmh_msg_api(mac_ctx, &msg, ePROT)) {
 		qdf_mem_free(wm_status_change_ntf);
-		lim_log(mac_ctx, LOGP,
+		lim_log(mac_ctx, LOGE,
 			FL("lim_sys_process_mmh_msg_api failed"));
 	}
 
@@ -1619,13 +1631,13 @@ lim_send_sme_set_context_rsp(tpAniSirGlobal pMac,
 			     tpPESession psessionEntry, uint8_t smesessionId,
 			     uint16_t smetransactionId)
 {
-	struct scheduler_msg mmhMsg;
+	struct scheduler_msg mmhMsg = {0};
 	tSirSmeSetContextRsp *pSirSmeSetContextRsp;
 
 	pSirSmeSetContextRsp = qdf_mem_malloc(sizeof(tSirSmeSetContextRsp));
 	if (NULL == pSirSmeSetContextRsp) {
 		/* Log error */
-		lim_log(pMac, LOGP,
+		lim_log(pMac, LOGE,
 			FL
 				("call to AllocateMemory failed for SmeSetContextRsp"));
 
@@ -1687,7 +1699,7 @@ lim_send_sme_set_context_rsp(tpAniSirGlobal pMac,
 void
 lim_send_sme_neighbor_bss_ind(tpAniSirGlobal pMac, tLimScanResultNode *pBssDescr)
 {
-	struct scheduler_msg msgQ;
+	struct scheduler_msg msgQ = {0};
 	uint32_t val;
 	tSirSmeNeighborBssInd *pNewBssInd;
 
@@ -1702,7 +1714,7 @@ lim_send_sme_neighbor_bss_ind(tpAniSirGlobal pMac, tLimScanResultNode *pBssDescr
 
 	if (wlan_cfg_get_int(pMac, WNI_CFG_NEW_BSS_FOUND_IND, &val) !=
 	    eSIR_SUCCESS) {
-		lim_log(pMac, LOGP,
+		lim_log(pMac, LOGE,
 			FL("could not get NEIGHBOR_BSS_IND from CFG"));
 
 		return;
@@ -1723,7 +1735,7 @@ lim_send_sme_neighbor_bss_ind(tpAniSirGlobal pMac, tLimScanResultNode *pBssDescr
 	pNewBssInd = qdf_mem_malloc(val);
 	if (NULL == pNewBssInd) {
 		/* Log error */
-		lim_log(pMac, LOGP,
+		lim_log(pMac, LOGE,
 			FL
 				("call to AllocateMemory failed for eWNI_SME_NEIGHBOR_BSS_IND"));
 
@@ -1761,14 +1773,14 @@ lim_send_sme_addts_rsp(tpAniSirGlobal pMac, uint8_t rspReqd, uint32_t status,
 		       uint8_t smesessionId, uint16_t smetransactionId)
 {
 	tpSirAddtsRsp rsp;
-	struct scheduler_msg mmhMsg;
+	struct scheduler_msg mmhMsg = {0};
 
 	if (!rspReqd)
 		return;
 
 	rsp = qdf_mem_malloc(sizeof(tSirAddtsRsp));
 	if (NULL == rsp) {
-		lim_log(pMac, LOGP, FL("AllocateMemory failed for ADDTS_RSP"));
+		lim_log(pMac, LOGE, FL("AllocateMemory failed for ADDTS_RSP"));
 		return;
 	}
 
@@ -1805,9 +1817,9 @@ lim_send_sme_delts_rsp(tpAniSirGlobal pMac, tpSirDeltsReq delts, uint32_t status
 		       uint16_t smetransactionId)
 {
 	tpSirDeltsRsp rsp;
-	struct scheduler_msg mmhMsg;
+	struct scheduler_msg mmhMsg = {0};
 
-	lim_log(pMac, LOGW, "SendSmeDeltsRsp (aid %d, tsid %d, up %d) status %d",
+	lim_log(pMac, LOGD, "SendSmeDeltsRsp (aid %d, tsid %d, up %d) status %d",
 		delts->aid,
 		delts->req.tsinfo.traffic.tsid,
 		delts->req.tsinfo.traffic.userPrio, status);
@@ -1817,7 +1829,7 @@ lim_send_sme_delts_rsp(tpAniSirGlobal pMac, tpSirDeltsReq delts, uint32_t status
 	rsp = qdf_mem_malloc(sizeof(tSirDeltsRsp));
 	if (NULL == rsp) {
 		/* Log error */
-		lim_log(pMac, LOGP, FL("AllocateMemory failed for DELTS_RSP"));
+		lim_log(pMac, LOGE, FL("AllocateMemory failed for DELTS_RSP"));
 		return;
 	}
 
@@ -1859,15 +1871,15 @@ lim_send_sme_delts_ind(tpAniSirGlobal pMac, tpSirDeltsReqInfo delts, uint16_t ai
 		       tpPESession psessionEntry)
 {
 	tpSirDeltsRsp rsp;
-	struct scheduler_msg mmhMsg;
+	struct scheduler_msg mmhMsg = {0};
 
-	lim_log(pMac, LOGW, "SendSmeDeltsInd (aid %d, tsid %d, up %d)",
+	lim_log(pMac, LOGD, "SendSmeDeltsInd (aid %d, tsid %d, up %d)",
 		aid, delts->tsinfo.traffic.tsid, delts->tsinfo.traffic.userPrio);
 
 	rsp = qdf_mem_malloc(sizeof(tSirDeltsRsp));
 	if (NULL == rsp) {
 		/* Log error */
-		lim_log(pMac, LOGP, FL("AllocateMemory failed for DELTS_IND"));
+		lim_log(pMac, LOGE, FL("AllocateMemory failed for DELTS_IND"));
 		return;
 	}
 
@@ -1922,7 +1934,7 @@ lim_send_sme_delts_ind(tpAniSirGlobal pMac, tpSirDeltsReqInfo delts, uint16_t ai
 void
 lim_send_sme_pe_statistics_rsp(tpAniSirGlobal pMac, uint16_t msgType, void *stats)
 {
-	struct scheduler_msg mmhMsg;
+	struct scheduler_msg mmhMsg = {0};
 	uint8_t sessionId;
 	tAniGetPEStatsRsp *pPeStats = (tAniGetPEStatsRsp *) stats;
 	tpPESession pPeSessionEntry;
@@ -1966,7 +1978,7 @@ lim_send_sme_pe_statistics_rsp(tpAniSirGlobal pMac, uint16_t msgType, void *stat
 void lim_send_sme_pe_ese_tsm_rsp(tpAniSirGlobal pMac,
 				 tAniGetTsmStatsRsp *pStats)
 {
-	struct scheduler_msg mmhMsg;
+	struct scheduler_msg mmhMsg = {0};
 	uint8_t sessionId;
 	tAniGetTsmStatsRsp *pPeStats = (tAniGetTsmStatsRsp *) pStats;
 	tpPESession pPeSessionEntry = NULL;
@@ -1980,9 +1992,10 @@ void lim_send_sme_pe_ese_tsm_rsp(tpAniSirGlobal pMac,
 		/* Fill the Session Id */
 		pPeStats->sessionId = pPeSessionEntry->smeSessionId;
 	} else {
-		PELOGE(lim_log
-		       (pMac, LOGE, FL("Session not found for the Sta id(%d)"),
-		       pPeStats->staId);)
+		lim_log(pMac, LOGE, FL("Session not found for the Sta id(%d)"),
+		       pPeStats->staId);
+		qdf_mem_free(pPeStats->tsmStatsReq);
+		qdf_mem_free(pPeStats);
 		return;
 	}
 
@@ -2012,12 +2025,12 @@ lim_send_sme_ibss_peer_ind(tpAniSirGlobal pMac,
 			   uint8_t *beacon,
 			   uint16_t beaconLen, uint16_t msgType, uint8_t sessionId)
 {
-	struct scheduler_msg mmhMsg;
+	struct scheduler_msg mmhMsg = {0};
 	tSmeIbssPeerInd *pNewPeerInd;
 
 	pNewPeerInd = qdf_mem_malloc(sizeof(tSmeIbssPeerInd) + beaconLen);
 	if (NULL == pNewPeerInd) {
-		PELOGE(lim_log(pMac, LOGE, FL("Failed to allocate memory"));)
+		lim_log(pMac, LOGE, FL("Failed to allocate memory"));
 		return;
 	}
 
@@ -2057,7 +2070,7 @@ static void lim_process_csa_wbw_ie(tpAniSirGlobal mac_ctx,
 		tLimWiderBWChannelSwitchInfo *chnl_switch_info,
 		tpPESession session_entry)
 {
-	struct ch_params_s ch_params = {0};
+	struct ch_params ch_params = {0};
 	uint8_t ap_new_ch_width;
 	bool new_ch_width_dfn = false;
 	uint8_t center_freq_diff;
@@ -2085,8 +2098,8 @@ static void lim_process_csa_wbw_ie(tpAniSirGlobal mac_ctx,
 	if ((ap_new_ch_width == CH_WIDTH_160MHZ) &&
 			!new_ch_width_dfn) {
 		ch_params.ch_width = CH_WIDTH_160MHZ;
-		cds_set_channel_params(csa_params->channel, 0,
-				&ch_params);
+		wlan_reg_set_channel_params(mac_ctx->pdev,
+					    csa_params->channel, 0, &ch_params);
 		ap_new_ch_width = ch_params.ch_width;
 		csa_params->new_ch_freq_seg1 = ch_params.center_freq_seg0;
 		csa_params->new_ch_freq_seg2 = ch_params.center_freq_seg1;
@@ -2124,7 +2137,7 @@ void lim_handle_csa_offload_msg(tpAniSirGlobal mac_ctx,
 				struct scheduler_msg *msg)
 {
 	tpPESession session_entry;
-	struct scheduler_msg mmh_msg;
+	struct scheduler_msg mmh_msg = {0};
 	struct csa_offload_params *csa_params =
 				(struct csa_offload_params *) (msg->bodyptr);
 	tpSmeCsaOffloadInd csa_offload_ind;
@@ -2132,7 +2145,7 @@ void lim_handle_csa_offload_msg(tpAniSirGlobal mac_ctx,
 	uint8_t session_id;
 	uint16_t aid = 0;
 	uint16_t chan_space = 0;
-	struct ch_params_s ch_params;
+	struct ch_params ch_params;
 
 	tLimWiderBWChannelSwitchInfo *chnl_switch_info = NULL;
 	tLimChannelSwitchInfo *lim_ch_switch = NULL;
@@ -2215,7 +2228,7 @@ void lim_handle_csa_offload_msg(tpAniSirGlobal mac_ctx,
 		} else if (csa_params->ies_present_flag
 				& lim_xcsa_ie_present) {
 			chan_space =
-				cds_reg_dmn_get_chanwidth_from_opclass(
+				wlan_reg_dmn_get_chanwidth_from_opclass(
 						mac_ctx->scan.countryCodeCurrent,
 						csa_params->channel,
 						csa_params->new_op_class);
@@ -2237,8 +2250,8 @@ void lim_handle_csa_offload_msg(tpAniSirGlobal mac_ctx,
 
 			ch_params.ch_width =
 				chnl_switch_info->newChanWidth;
-			cds_set_channel_params(csa_params->channel,
-					0, &ch_params);
+			wlan_reg_set_channel_params(mac_ctx->pdev,
+					csa_params->channel, 0, &ch_params);
 			chnl_switch_info->newCenterChanFreq0 =
 				ch_params.center_freq_seg0;
 			/*
@@ -2265,7 +2278,7 @@ void lim_handle_csa_offload_msg(tpAniSirGlobal mac_ctx,
 		if (csa_params->ies_present_flag
 				& lim_xcsa_ie_present) {
 			chan_space =
-				cds_reg_dmn_get_chanwidth_from_opclass(
+				wlan_reg_dmn_get_chanwidth_from_opclass(
 						mac_ctx->scan.countryCodeCurrent,
 						csa_params->channel,
 						csa_params->new_op_class);
@@ -2278,7 +2291,7 @@ void lim_handle_csa_offload_msg(tpAniSirGlobal mac_ctx,
 					CH_WIDTH_40MHZ;
 				ch_params.ch_width =
 					chnl_switch_info->newChanWidth;
-				cds_set_channel_params(
+				wlan_reg_set_channel_params(mac_ctx->pdev,
 						csa_params->channel,
 						0, &ch_params);
 				lim_ch_switch->ch_center_freq_seg0 =
@@ -2301,8 +2314,8 @@ void lim_handle_csa_offload_msg(tpAniSirGlobal mac_ctx,
 			lim_ch_switch->state =
 				eLIM_CHANNEL_SWITCH_PRIMARY_AND_SECONDARY;
 			ch_params.ch_width = CH_WIDTH_40MHZ;
-			cds_set_channel_params(csa_params->channel,
-					0, &ch_params);
+			wlan_reg_set_channel_params(mac_ctx->pdev,
+					csa_params->channel, 0, &ch_params);
 			lim_ch_switch->ch_center_freq_seg0 =
 				ch_params.center_freq_seg0;
 			lim_ch_switch->sec_ch_offset =
@@ -2398,7 +2411,7 @@ void
 lim_send_sme_aggr_qos_rsp(tpAniSirGlobal pMac, tpSirAggrQosRsp aggrQosRsp,
 			  uint8_t smesessionId)
 {
-	struct scheduler_msg mmhMsg;
+	struct scheduler_msg mmhMsg = {0};
 
 	mmhMsg.type = eWNI_SME_FT_AGGR_QOS_RSP;
 	mmhMsg.bodyptr = aggrQosRsp;
@@ -2413,12 +2426,12 @@ lim_send_sme_aggr_qos_rsp(tpAniSirGlobal pMac, tpSirAggrQosRsp aggrQosRsp,
 void lim_send_sme_max_assoc_exceeded_ntf(tpAniSirGlobal pMac, tSirMacAddr peerMacAddr,
 					 uint8_t smesessionId)
 {
-	struct scheduler_msg mmhMsg;
+	struct scheduler_msg mmhMsg = {0};
 	tSmeMaxAssocInd *pSmeMaxAssocInd;
 
 	pSmeMaxAssocInd = qdf_mem_malloc(sizeof(tSmeMaxAssocInd));
 	if (NULL == pSmeMaxAssocInd) {
-		PELOGE(lim_log(pMac, LOGE, FL("Failed to allocate memory"));)
+		lim_log(pMac, LOGE, FL("Failed to allocate memory"));
 		return;
 	}
 	qdf_mem_copy((uint8_t *) pSmeMaxAssocInd->peer_mac.bytes,
@@ -2440,30 +2453,6 @@ void lim_send_sme_max_assoc_exceeded_ntf(tpAniSirGlobal pMac, tSirMacAddr peerMa
 	return;
 }
 
-/** -----------------------------------------------------------------
-   \brief lim_send_sme_dfs_event_notify() - sends
-   eWNI_SME_DFS_RADAR_FOUND
-   After receiving WMI_PHYERR_EVENTID indication frame from FW, this
-   function sends a eWNI_SME_DFS_RADAR_FOUND to SME to notify
-   that a RADAR is found on current operating channel and SAP-
-   has to move to a new channel.
-   \param pMac - global mac structure
-   \param msgType - message type received from lower layer
-   \param event - event data received from lower layer
-   \return none
-   \sa
-   ----------------------------------------------------------------- */
-void
-lim_send_sme_dfs_event_notify(tpAniSirGlobal pMac, uint16_t msgType, void *event)
-{
-	struct scheduler_msg mmhMsg;
-	mmhMsg.type = eWNI_SME_DFS_RADAR_FOUND;
-	mmhMsg.bodyptr = event;
-	mmhMsg.bodyval = 0;
-	lim_sys_process_mmh_msg_api(pMac, &mmhMsg, ePROT);
-	return;
-}
-
 /*--------------------------------------------------------------------------
    \brief lim_send_dfs_chan_sw_ie_update()
    This timer handler updates the channel switch IE in beacon template
@@ -2478,7 +2467,7 @@ lim_send_dfs_chan_sw_ie_update(tpAniSirGlobal pMac, tpPESession psessionEntry)
 
 	/* Update the beacon template and send to FW */
 	if (sch_set_fixed_beacon_fields(pMac, psessionEntry) != eSIR_SUCCESS) {
-		PELOGE(lim_log(pMac, LOGE, FL("Unable to set CSA IE in beacon"));)
+		lim_log(pMac, LOGE, FL("Unable to set CSA IE in beacon"));
 		return;
 	}
 
@@ -2508,7 +2497,7 @@ lim_send_sme_ap_channel_switch_resp(tpAniSirGlobal pMac,
 				    tpPESession psessionEntry,
 				    tpSwitchChannelParams pChnlParams)
 {
-	struct scheduler_msg mmhMsg;
+	struct scheduler_msg mmhMsg = {0};
 	tpSwitchChannelParams pSmeSwithChnlParams;
 	uint8_t channelId;
 	bool is_ch_dfs = false;
@@ -2518,7 +2507,7 @@ lim_send_sme_ap_channel_switch_resp(tpAniSirGlobal pMac,
 	pSmeSwithChnlParams = (tSwitchChannelParams *)
 			      qdf_mem_malloc(sizeof(tSwitchChannelParams));
 	if (NULL == pSmeSwithChnlParams) {
-		lim_log(pMac, LOGP,
+		lim_log(pMac, LOGE,
 			FL("AllocateMemory failed for pSmeSwithChnlParams\n"));
 		return;
 	}
@@ -2551,13 +2540,16 @@ lim_send_sme_ap_channel_switch_resp(tpAniSirGlobal pMac,
 	if (ch_width == CH_WIDTH_160MHZ) {
 		is_ch_dfs = true;
 	} else if (ch_width == CH_WIDTH_80P80MHZ) {
-		if (cds_get_channel_state(channelId) == CHANNEL_STATE_DFS ||
-		    cds_get_channel_state(ch_center_freq_seg1 -
-					SIR_80MHZ_START_CENTER_CH_DIFF) ==
+		if (wlan_reg_get_channel_state(pMac->pdev, channelId) ==
+				CHANNEL_STATE_DFS ||
+		    wlan_reg_get_channel_state(pMac->pdev,
+			    ch_center_freq_seg1 -
+			    SIR_80MHZ_START_CENTER_CH_DIFF) ==
 							CHANNEL_STATE_DFS)
 			is_ch_dfs = true;
 	} else {
-		if (cds_get_channel_state(channelId) == CHANNEL_STATE_DFS)
+		if (wlan_reg_get_channel_state(pMac->pdev, channelId) ==
+				CHANNEL_STATE_DFS)
 			is_ch_dfs = true;
 	}
 
@@ -2596,7 +2588,7 @@ lim_process_beacon_tx_success_ind(tpAniSirGlobal pMac, uint16_t msgType, void *e
 	 * add appropriate code by introducing a state variable
 	 */
 	tpPESession psessionEntry;
-	struct scheduler_msg mmhMsg;
+	struct scheduler_msg mmhMsg = {0};
 	tSirSmeCSAIeTxCompleteRsp *pChanSwTxResponse;
 	struct sir_beacon_tx_complete_rsp *beacon_tx_comp_rsp_ptr;
 	uint8_t length = sizeof(tSirSmeCSAIeTxCompleteRsp);
@@ -2637,7 +2629,7 @@ lim_process_beacon_tx_success_ind(tpAniSirGlobal pMac, uint16_t msgType, void *e
 					    qdf_mem_malloc(length);
 
 			if (NULL == pChanSwTxResponse) {
-				lim_log(pMac, LOGP,
+				lim_log(pMac, LOGE,
 					FL
 						("AllocateMemory failed for tSirSmeCSAIeTxCompleteRsp"));
 				return;
@@ -2662,7 +2654,7 @@ lim_process_beacon_tx_success_ind(tpAniSirGlobal pMac, uint16_t msgType, void *e
 		beacon_tx_comp_rsp_ptr = (struct sir_beacon_tx_complete_rsp *)
 				qdf_mem_malloc(sizeof(*beacon_tx_comp_rsp_ptr));
 		if (NULL == beacon_tx_comp_rsp_ptr) {
-			lim_log(pMac, LOGP,
+			lim_log(pMac, LOGE,
 				FL
 				("AllocateMemory failed for beacon_tx_comp_rsp_ptr"));
 			return;

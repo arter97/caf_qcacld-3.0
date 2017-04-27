@@ -60,8 +60,11 @@
 #define MBO_IE_ASSOC_DISALLOWED_SUBATTR_ID 0x04
 
 /* QCN IE definitions */
-#define QCN_IE_VERSION_SUBATTR_ID   1
-#define QCN_IE_VERSION_SUBATTR_LEN  2
+#define QCN_IE_HDR_LEN     6
+
+#define QCN_IE_VERSION_SUBATTR_ID        1
+#define QCN_IE_VERSION_SUBATTR_DATA_LEN  2
+#define QCN_IE_VERSION_SUBATTR_LEN       4
 #define QCN_IE_VERSION_SUPPORTED    1
 #define QCN_IE_SUBVERSION_SUPPORTED 0
 
@@ -425,16 +428,15 @@ struct s_ext_cap {
 	uint8_t chan_avail_query:1;
 	uint8_t fine_time_meas_responder:1;
 	uint8_t fine_time_meas_initiator:1;
+	uint8_t fils_capability:1;
 };
 
 uint8_t sirIsPropCapabilityEnabled(struct sAniSirGlobal *pMac, uint32_t bitnum);
 
-void dot11f_log(tpAniSirGlobal pMac, int nSev, const char *lpszFormat, ...);
-
 #define CFG_GET_INT(nStatus, pMac, nItem, cfg)  do { \
 		(nStatus) = wlan_cfg_get_int((pMac), (nItem), &(cfg)); \
 		if (eSIR_SUCCESS != (nStatus)) { \
-			dot11f_log((pMac), LOGP, FL("Failed to retrieve nItem from CFG (%d)."), (nStatus)); \
+			pe_err("Failed to retrieve nItem from CFG status: %d", (nStatus)); \
 			return nStatus; \
 		} \
 } while (0)
@@ -442,7 +444,7 @@ void dot11f_log(tpAniSirGlobal pMac, int nSev, const char *lpszFormat, ...);
 #define CFG_GET_INT_NO_STATUS(nStatus, pMac, nItem, cfg) do { \
 		(nStatus) = wlan_cfg_get_int((pMac), (nItem), &(cfg)); \
 		if (eSIR_SUCCESS != (nStatus)) { \
-			dot11f_log((pMac), LOGP, FL("Failed to retrieve nItem  from CFG (%d)."), (nStatus)); \
+			pe_err("Failed to retrieve nItem from CFG status: %d", (nStatus)); \
 			return; \
 		} \
 } while (0)
@@ -451,7 +453,7 @@ void dot11f_log(tpAniSirGlobal pMac, int nSev, const char *lpszFormat, ...);
 		(nCfg) = (nMaxCfg); \
 		(nStatus) = wlan_cfg_get_str((pMac), (nItem), (cfg), &(nCfg)); \
 		if (eSIR_SUCCESS != (nStatus)) { \
-			dot11f_log((pMac), LOGP, FL("Failed to retrieve nItem  from CFG (%d)."), (nStatus)); \
+			pe_err("Failed to retrieve nItem from CFG status: %d", (nStatus)); \
 			return nStatus; \
 		} \
 } while (0)
@@ -460,7 +462,7 @@ void dot11f_log(tpAniSirGlobal pMac, int nSev, const char *lpszFormat, ...);
 		(nCfg) = (nMaxCfg); \
 		(nStatus) = wlan_cfg_get_str((pMac), (nItem), (cfg), &(nCfg)); \
 		if (eSIR_SUCCESS != (nStatus)) { \
-			dot11f_log((pMac), LOGP, FL("Failed to retrieve nItem  from CFG (%d)."), (nStatus)); \
+			pe_err("Failed to retrieve nItem from CFG status: %d", (nStatus)); \
 			return; \
 		} \
 } while (0)

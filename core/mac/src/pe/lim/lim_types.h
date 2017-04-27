@@ -45,7 +45,6 @@
 #include "utils_api.h"
 
 #include "lim_api.h"
-#include "lim_debug.h"
 #include "lim_trace.h"
 #include "lim_send_sme_rsp_messages.h"
 #include "sys_global.h"
@@ -199,6 +198,8 @@ typedef struct sLimMlmStartReq {
 	uint8_t wps_state;
 	uint8_t obssProtEnabled;
 	uint8_t beacon_tx_rate;
+	uint32_t cac_duration_ms;
+	uint32_t dfs_regdomain;
 } tLimMlmStartReq, *tpLimMlmStartReq;
 
 typedef struct sLimMlmStartCnf {
@@ -433,16 +434,8 @@ void lim_cleanup_mlm(tpAniSirGlobal);
 
 /* Management frame handling functions */
 void lim_process_beacon_frame(tpAniSirGlobal, uint8_t *, tpPESession);
-void lim_process_beacon_frame_no_session(tpAniSirGlobal, uint8_t *);
 void lim_process_probe_req_frame(tpAniSirGlobal, uint8_t *, tpPESession);
 void lim_process_probe_rsp_frame(tpAniSirGlobal, uint8_t *, tpPESession);
-#ifndef NAPIER_SCAN
-void lim_process_probe_rsp_frame_no_session(tpAniSirGlobal, uint8_t *);
-#else
-static inline
-void lim_process_probe_rsp_frame_no_session(tpAniSirGlobal mac_ctx,
-	uint8_t *pkt){}
-#endif
 void lim_process_probe_req_frame_multiple_bss(tpAniSirGlobal, uint8_t *,
 					      tpPESession);
 
@@ -586,7 +579,8 @@ uint32_t lim_defer_msg(tpAniSirGlobal, struct scheduler_msg *);
 void lim_set_channel(tpAniSirGlobal pMac, uint8_t channel,
 		uint8_t ch_center_freq_seg0, uint8_t ch_center_freq_seg1,
 		enum phy_ch_width ch_width, int8_t maxTxPower,
-		uint8_t peSessionId);
+		uint8_t peSessionId, uint32_t cac_duration_ms,
+		uint32_t dfs_regdomain);
 
 
 /* / Function that completes channel scan */
@@ -682,7 +676,7 @@ tSirRetStatus lim_send_sa_query_response_frame(tpAniSirGlobal pMac,
 static inline void
 lim_post_sme_message(tpAniSirGlobal pMac, uint32_t msgType, uint32_t *pMsgBuf)
 {
-	struct scheduler_msg msg;
+	struct scheduler_msg msg = {0};
 
 	if (pMsgBuf == NULL) {
 		lim_log(pMac, LOGE, FL("Buffer is Pointing to NULL"));
@@ -730,7 +724,7 @@ static inline void
 lim_post_mlm_message(tpAniSirGlobal pMac, uint32_t msgType, uint32_t *pMsgBuf)
 {
 
-	struct scheduler_msg msg;
+	struct scheduler_msg msg = {0};
 	if (pMsgBuf == NULL) {
 		lim_log(pMac, LOGE, FL("Buffer is Pointing to NULL"));
 		return;

@@ -119,6 +119,7 @@ ifeq ($(KERNEL_BUILD), 0)
 	endif
 	ifeq ($(CONFIG_ARCH_MSM8998), y)
 	CONFIG_QCACLD_FEATURE_GREEN_AP := y
+	CONFIG_QCACLD_FEATURE_METERING := y
 	endif
 
 	ifeq ($(CONFIG_ARCH_SDM660), y)
@@ -167,6 +168,7 @@ ifeq ($(KERNEL_BUILD), 0)
 	ifneq ($(CONFIG_MOBILE_ROUTER), y)
 		#Flag to enable NAN Data path
 		CONFIG_WLAN_FEATURE_NAN_DATAPATH := y
+		CONFIG_NAN_CONVERGENCE := y
 	endif
 
 	#Flag to enable Linux QCMBR feature as default feature
@@ -530,7 +532,6 @@ MAC_INC := 	-I$(WLAN_ROOT)/$(MAC_INC_DIR) \
 		-I$(WLAN_ROOT)/$(MAC_SRC_DIR)/pe/nan
 
 MAC_CFG_OBJS := $(MAC_SRC_DIR)/cfg/cfg_api.o \
-		$(MAC_SRC_DIR)/cfg/cfg_debug.o \
 		$(MAC_SRC_DIR)/cfg/cfg_param_name.o \
 		$(MAC_SRC_DIR)/cfg/cfg_proc_msg.o \
 		$(MAC_SRC_DIR)/cfg/cfg_send_msg.o
@@ -541,7 +542,6 @@ MAC_LIM_OBJS := $(MAC_SRC_DIR)/pe/lim/lim_aid_mgmt.o \
 		$(MAC_SRC_DIR)/pe/lim/lim_admit_control.o \
 		$(MAC_SRC_DIR)/pe/lim/lim_api.o \
 		$(MAC_SRC_DIR)/pe/lim/lim_assoc_utils.o \
-		$(MAC_SRC_DIR)/pe/lim/lim_debug.o \
 		$(MAC_SRC_DIR)/pe/lim/lim_ft.o \
 		$(MAC_SRC_DIR)/pe/lim/lim_ibss_peer_mgmt.o \
 		$(MAC_SRC_DIR)/pe/lim/lim_link_monitoring_algo.o \
@@ -594,7 +594,6 @@ endif
 MAC_SCH_OBJS := $(MAC_SRC_DIR)/pe/sch/sch_api.o \
 		$(MAC_SRC_DIR)/pe/sch/sch_beacon_gen.o \
 		$(MAC_SRC_DIR)/pe/sch/sch_beacon_process.o \
-		$(MAC_SRC_DIR)/pe/sch/sch_debug.o \
 		$(MAC_SRC_DIR)/pe/sch/sch_message.o
 
 MAC_RRM_OBJS :=	$(MAC_SRC_DIR)/pe/rrm/rrm_api.o
@@ -620,24 +619,48 @@ SAP_OBJS :=	$(SAP_SRC_DIR)/sap_api_link_cntl.o \
 		$(SAP_SRC_DIR)/sap_module.o
 
 ############ DFS ############ 350
-DFS_DIR :=	$(SAP_DIR)/dfs
-DFS_INC_DIR :=	$(DFS_DIR)/inc
-DFS_SRC_DIR :=	$(DFS_DIR)/src
+DFS_DIR :=     $(WLAN_COMMON_ROOT)/umac/dfs
+DFS_CORE_INC_DIR := $(DFS_DIR)/core/inc
+DFS_CORE_SRC_DIR := $(DFS_DIR)/core/src
 
-DFS_INC :=	-I$(WLAN_ROOT)/$(DFS_INC_DIR) \
-		-I$(WLAN_ROOT)/$(DFS_SRC_DIR)
+DFS_DISP_INC_DIR := $(DFS_DIR)/dispatcher/inc
+DFS_DISP_SRC_DIR := $(DFS_DIR)/dispatcher/src
+DFS_TARGET_INC_DIR := $(WLAN_COMMON_ROOT)/target_if/dfs/inc
+DFS_CMN_SERVICES_INC_DIR := $(WLAN_COMMON_ROOT)/umac/cmn_services/dfs/inc
 
-DFS_OBJS :=	$(DFS_SRC_DIR)/dfs_bindetects.o \
-		$(DFS_SRC_DIR)/dfs.o \
-		$(DFS_SRC_DIR)/dfs_debug.o\
-		$(DFS_SRC_DIR)/dfs_fcc_bin5.o\
-		$(DFS_SRC_DIR)/dfs_init.o\
-		$(DFS_SRC_DIR)/dfs_misc.o\
-		$(DFS_SRC_DIR)/dfs_nol.o\
-		$(DFS_SRC_DIR)/dfs_phyerr_tlv.o\
-		$(DFS_SRC_DIR)/dfs_process_phyerr.o\
-		$(DFS_SRC_DIR)/dfs_process_radarevent.o\
-		$(DFS_SRC_DIR)/dfs_staggered.o
+DFS_INC :=	-I$(WLAN_ROOT)/$(DFS_DISP_INC_DIR) \
+		-I$(WLAN_ROOT)/$(DFS_TARGET_INC_DIR) \
+		-I$(WLAN_ROOT)/$(DFS_CMN_SERVICES_INC_DIR)
+
+DFS_OBJS :=	$(DFS_CORE_SRC_DIR)/filtering/dfs_bindetects.o \
+		$(DFS_CORE_SRC_DIR)/filtering/dfs_debug.o\
+		$(DFS_CORE_SRC_DIR)/filtering/dfs_fcc_bin5.o\
+		$(DFS_CORE_SRC_DIR)/filtering/dfs_init.o\
+		$(DFS_CORE_SRC_DIR)/filtering/dfs_misc.o\
+		$(DFS_CORE_SRC_DIR)/filtering/dfs_radar.o\
+		$(DFS_CORE_SRC_DIR)/filtering/dfs_ar.o\
+		$(DFS_CORE_SRC_DIR)/filtering/ar5416_radar.o\
+		$(DFS_CORE_SRC_DIR)/filtering/ar9300_radar.o\
+		$(DFS_CORE_SRC_DIR)/filtering/ar5212_radar.o\
+		$(DFS_CORE_SRC_DIR)/filtering/dfs_phyerr_tlv.o\
+		$(DFS_CORE_SRC_DIR)/filtering/dfs_process_phyerr.o\
+		$(DFS_CORE_SRC_DIR)/filtering/dfs_process_radarevent.o\
+		$(DFS_CORE_SRC_DIR)/filtering/dfs_staggered.o \
+		$(DFS_CORE_SRC_DIR)/misc/dfs.o \
+		$(DFS_CORE_SRC_DIR)/misc/dfs_cac.o\
+		$(DFS_CORE_SRC_DIR)/misc/dfs_nol.o\
+		$(DFS_CORE_SRC_DIR)/misc/dfs_nol.o\
+		$(DFS_CORE_SRC_DIR)/misc/dfs_zero_cac.o\
+		$(DFS_CORE_SRC_DIR)/misc/dfs_random_chan_sel.o\
+		$(DFS_CORE_SRC_DIR)/misc/dfs_process_radar_found_ind.o\
+		$(DFS_DISP_SRC_DIR)/wlan_dfs_init_deinit_api.o\
+		$(DFS_DISP_SRC_DIR)/wlan_dfs_lmac_api.o\
+		$(DFS_DISP_SRC_DIR)/wlan_dfs_mlme_api.o\
+		$(DFS_DISP_SRC_DIR)/wlan_dfs_tgt_api.o\
+		$(DFS_DISP_SRC_DIR)/wlan_dfs_ucfg_api.o\
+		$(DFS_DISP_SRC_DIR)/wlan_dfs_tgt_api.o\
+		$(DFS_DISP_SRC_DIR)/wlan_dfs_utils_api.o\
+		$(WLAN_COMMON_ROOT)/target_if/dfs/src/target_if_dfs.o
 
 ############ SME ############
 SME_DIR :=	core/sme
@@ -734,7 +757,6 @@ SYS_OBJS :=	$(SYS_COMMON_SRC_DIR)/wlan_qct_sys.o \
 		$(SYS_LEGACY_SRC_DIR)/utils/src/log_api.o \
 		$(SYS_LEGACY_SRC_DIR)/utils/src/mac_trace.o \
 		$(SYS_LEGACY_SRC_DIR)/utils/src/parser_api.o \
-		$(SYS_LEGACY_SRC_DIR)/utils/src/utils_api.o \
 		$(SYS_LEGACY_SRC_DIR)/utils/src/utils_parser.o
 
 ############ Qca-wifi-host-cmn ############
@@ -766,7 +788,8 @@ OS_IF_DIR := $(WLAN_COMMON_ROOT)/os_if
 
 OS_IF_INC := -I$(WLAN_COMMON_INC)/os_if/linux \
             -I$(WLAN_COMMON_INC)/os_if/linux/scan/inc \
-             -I$(WLAN_COMMON_INC)/os_if/linux/p2p/inc
+            -I$(WLAN_COMMON_INC)/os_if/linux/p2p/inc \
+            -I$(WLAN_COMMON_INC)/os_if/linux/tdls/inc
 
 OS_IF_OBJ := $(OS_IF_DIR)/linux/p2p/src/wlan_cfg80211_p2p.o
 
@@ -803,6 +826,10 @@ UMAC_SCAN_OBJS := $(UMAC_SCAN_CORE_DIR)/wlan_scan_cache_db.o \
 UMAC_COMMON_INC := -I$(WLAN_COMMON_INC)/umac/cmn_services/cmn_defs/inc \
 		-I$(WLAN_COMMON_INC)/umac/cmn_services/utils/inc
 UMAC_COMMON_OBJS := $(WLAN_COMMON_ROOT)/umac/cmn_services/utils/src/wlan_utility.o
+
+ifeq ($(CONFIG_WLAN_LRO), y)
+QDF_OBJS +=     $(QDF_OBJ_DIR)/qdf_lro.o
+endif
 
 ############ CDS (Connectivity driver services) ############
 CDS_DIR :=	core/cds
@@ -860,6 +887,7 @@ PMO_OBJS :=     $(PMO_DIR)/core/src/wlan_pmo_main.o \
 		$(PMO_DIR)/core/src/wlan_pmo_wow.o \
 		$(PMO_DIR)/core/src/wlan_pmo_lphb.o \
 		$(PMO_DIR)/core/src/wlan_pmo_suspend_resume.o \
+		$(PMO_DIR)/core/src/wlan_pmo_hw_bcast_fltr.o \
 		$(PMO_DIR)/dispatcher/src/wlan_pmo_obj_mgmt_api.o \
 		$(PMO_DIR)/dispatcher/src/wlan_pmo_ucfg_api.o \
 		$(PMO_DIR)/dispatcher/src/wlan_pmo_tgt_arp.o \
@@ -869,7 +897,8 @@ PMO_OBJS :=     $(PMO_DIR)/core/src/wlan_pmo_main.o \
 		$(PMO_DIR)/dispatcher/src/wlan_pmo_tgt_static_config.o \
 		$(PMO_DIR)/dispatcher/src/wlan_pmo_tgt_mc_addr_filtering.o \
 		$(PMO_DIR)/dispatcher/src/wlan_pmo_tgt_lphb.o \
-		$(PMO_DIR)/dispatcher/src/wlan_pmo_tgt_suspend_resume.o
+		$(PMO_DIR)/dispatcher/src/wlan_pmo_tgt_suspend_resume.o \
+		$(PMO_DIR)/dispatcher/src/wlan_pmo_tgt_non_arp_bcast_fltr.o
 
 ############## UMAC P2P ###########
 P2P_DIR := umac/p2p
@@ -900,6 +929,21 @@ UMAC_POLICY_MGR_OBJS := $(UMAC_POLICY_MGR_DIR)/src/wlan_policy_mgr_action.o \
 	$(UMAC_POLICY_MGR_DIR)/src/wlan_policy_mgr_init_deinit.o \
 	$(UMAC_POLICY_MGR_DIR)/src/wlan_policy_mgr_pcl.o \
 
+###### UMAC TDLS ########
+UMAC_TDLS_DIR := $(WLAN_COMMON_ROOT)/umac/tdls
+
+UMAC_TDLS_INC := -I$(WLAN_COMMON_INC)/umac/tdls/dispatcher/inc
+
+UMAC_TDLS_OBJS := $(UMAC_TDLS_DIR)/core/src/wlan_tdls_main.o \
+       $(UMAC_TDLS_DIR)/core/src/wlan_tdls_cmds_process.o \
+       $(UMAC_TDLS_DIR)/core/src/wlan_tdls_peer.o \
+       $(UMAC_TDLS_DIR)/core/src/wlan_tdls_mgmt.o \
+       $(UMAC_TDLS_DIR)/core/src/wlan_tdls_ct.o \
+       $(UMAC_TDLS_DIR)/dispatcher/src/wlan_tdls_tgt_api.o \
+       $(UMAC_TDLS_DIR)/dispatcher/src/wlan_tdls_ucfg_api.o \
+       $(UMAC_TDLS_DIR)/dispatcher/src/wlan_tdls_utils_api.o \
+       $(WLAN_COMMON_ROOT)/os_if/linux/tdls/src/wlan_cfg80211_tdls.o
+
 ########### BMI ###########
 BMI_DIR := core/bmi
 
@@ -919,7 +963,8 @@ TARGET_IF_INC := -I$(WLAN_COMMON_INC)/target_if/core/inc \
 		 -I$(WLAN_COMMON_INC)/target_if/pmo/inc \
 		 -I$(WLAN_COMMON_INC)/target_if/pmo/src \
 		 -I$(WLAN_COMMON_INC)/target_if/p2p/inc \
-		 -I$(WLAN_COMMON_INC)/target_if/regulatory/inc
+		 -I$(WLAN_COMMON_INC)/target_if/regulatory/inc \
+		 -I$(WLAN_COMMON_INC)/target_if/tdls/inc
 
 TARGET_IF_OBJ := $(TARGET_IF_DIR)/core/src/target_if_main.o \
 		$(TARGET_IF_DIR)/init_deinit/src/service_ready_event_handler.o \
@@ -928,12 +973,15 @@ TARGET_IF_OBJ := $(TARGET_IF_DIR)/core/src/target_if_main.o \
 		$(TARGET_IF_DIR)/pmo/src/target_if_pmo_ns.o \
 		$(TARGET_IF_DIR)/pmo/src/target_if_pmo_gtk.o \
 		$(TARGET_IF_DIR)/pmo/src/target_if_pmo_wow.o \
+		$(TARGET_IF_DIR)/pmo/src/target_if_pmo_non_arp_bcast_fltr.o \
 		$(TARGET_IF_DIR)/pmo/src/target_if_pmo_mc_addr_filtering.o \
 		$(TARGET_IF_DIR)/pmo/src/target_if_pmo_static_config.o \
 		$(TARGET_IF_DIR)/pmo/src/target_if_pmo_lphb.o \
 		$(TARGET_IF_DIR)/pmo/src/target_if_pmo_suspend_resume.o \
+		$(TARGET_IF_DIR)/pmo/src/target_if_pmo_non_arp_bcast_fltr.o \
 		$(TARGET_IF_DIR)/p2p/src/target_if_p2p.o \
-		$(TARGET_IF_DIR)/regulatory/src/target_if_reg.o
+		$(TARGET_IF_DIR)/regulatory/src/target_if_reg.o \
+		$(TARGET_IF_DIR)/tdls/src/target_if_tdls.o
 
 ########### GLOBAL_LMAC_IF ##########
 GLOBAL_LMAC_IF_DIR := $(WLAN_COMMON_ROOT)/global_lmac_if
@@ -958,6 +1006,7 @@ WMI_OBJS := $(WMI_OBJ_DIR)/wmi_unified.o \
 	    $(WMI_OBJ_DIR)/wmi_unified_api.o \
 	    $(WMI_OBJ_DIR)/wmi_unified_pmo_api.o \
 	    $(WMI_OBJ_DIR)/wmi_unified_reg_api.o \
+	    $(WMI_OBJ_DIR)/wmi_unified_dfs_api.o \
 	    $(WMI_OBJ_DIR)/wmi_unified_non_tlv.o
 
 ########### FWLOG ###########
@@ -1116,6 +1165,26 @@ WIFI_POS_OBJS := $(WIFI_POS_CORE_DIR)/wifi_pos_api.o \
 		 $(WIFI_POS_TGT_DIR)/target_if_wifi_pos.o
 endif
 
+######################### NAN #########################
+NAN_CORE_DIR := $(WLAN_COMMON_ROOT)/umac/nan/core/src
+NAN_CORE_INC := -I$(WLAN_COMMON_INC)/umac/nan/core/inc
+NAN_UCFG_DIR := $(WLAN_COMMON_ROOT)/umac/nan/dispatcher/src
+NAN_UCFG_INC := -I$(WLAN_COMMON_INC)/umac/nan/dispatcher/inc
+NAN_TGT_DIR  := $(WLAN_COMMON_ROOT)/target_if/nan/src
+NAN_TGT_INC  := -I$(WLAN_COMMON_INC)/target_if/nan/inc
+NAN_OS_IF_DIR  := $(WLAN_COMMON_ROOT)/os_if/linux/nan/src
+NAN_OS_IF_INC  := -I$(WLAN_COMMON_INC)/os_if/linux/nan/inc
+
+ifeq ($(CONFIG_NAN_CONVERGENCE), y)
+WLAN_NAN_OBJS := $(NAN_CORE_DIR)/nan_main.o \
+		 $(NAN_CORE_DIR)/nan_api.o \
+		 $(NAN_CORE_DIR)/nan_utils.o \
+		 $(NAN_UCFG_DIR)/nan_ucfg_api.o \
+		 $(NAN_TGT_DIR)/target_if_nan.o \
+		 $(NAN_OS_IF_DIR)/os_if_nan.o
+endif
+#######################################################
+
 ############## HTC ##########
 HTC_DIR := htc
 HTC_INC := -I$(WLAN_COMMON_INC)/$(HTC_DIR)
@@ -1268,7 +1337,6 @@ WMA_OBJS :=	$(WMA_SRC_DIR)/wma_main.o \
 		$(WMA_SRC_DIR)/wma_data.o \
 		$(WMA_SRC_DIR)/wma_utils.o \
 		$(WMA_SRC_DIR)/wma_features.o \
-		$(WMA_SRC_DIR)/wma_dfs_interface.o \
 		$(WMA_SRC_DIR)/wlan_qct_wma_legacy.o\
 		$(WMA_NDP_OBJS)
 
@@ -1355,12 +1423,19 @@ INCS +=		$(WIFI_POS_TGT_INC)
 INCS +=		$(WIFI_POS_OS_IF_INC)
 ##########################################
 
+################ NAN POS ################
+INCS +=		$(NAN_CORE_INC)
+INCS +=		$(NAN_UCFG_INC)
+INCS +=		$(NAN_TGT_INC)
+INCS +=		$(NAN_OS_IF_INC)
+##########################################
 INCS +=		$(UMAC_OBJMGR_INC)
 INCS +=		$(UMAC_MGMT_TXRX_INC)
 INCS +=		$(PMO_INC)
 INCS +=		$(UMAC_P2P_INC)
 INCS +=		$(UMAC_POLICY_MGR_INC)
 INCS +=		$(TARGET_INC)
+INCS +=		$(UMAC_TDLS_INC)
 INCS +=		$(UMAC_SER_INC)
 INCS +=		$(NLINK_INC) \
 		$(PTT_INC) \
@@ -1414,7 +1489,9 @@ endif
 
 OBJS +=		$(UMAC_OBJMGR_OBJS)
 OBJS +=		$(WIFI_POS_OBJS)
+OBJS +=		$(WLAN_NAN_OBJS)
 OBJS +=		$(UMAC_MGMT_TXRX_OBJS)
+OBJS +=		$(UMAC_TDLS_OBJS)
 OBJS +=		$(PMO_OBJS)
 OBJS +=		$(UMAC_P2P_OBJS)
 OBJS +=		$(UMAC_POLICY_MGR_OBJS)
@@ -1480,7 +1557,8 @@ CDEFINES :=	-DANI_LITTLE_BYTE_ENDIAN \
 		-DWLAN_PMO_ENABLE \
 		-DCONVERGED_P2P_ENABLE \
 		-DWLAN_POLICY_MGR_ENABLE \
-		-DSUPPORT_11AX
+		-DSUPPORT_11AX \
+		-DCONVERGED_TDLS_ENABLE
 
 
 ############ WIFI POS ##############
@@ -1584,6 +1662,7 @@ endif
 ifeq ($(CONFIG_SLUB_DEBUG_ON),y)
 CDEFINES += -DTIMER_MANAGER
 CDEFINES += -DMEMORY_DEBUG
+CDEFINES += -DCONFIG_HALT_KMEMLEAK
 CDEFINES += -DWLAN_SUSPEND_RESUME_TEST
 endif
 
@@ -1875,6 +1954,11 @@ ifeq ($(CONFIG_QCACLD_FEATURE_GREEN_AP),y)
 CDEFINES += -DFEATURE_GREEN_AP
 endif
 
+#Stats & Quota Metering feature
+ifeq ($(CONFIG_QCACLD_FEATURE_METERING),y)
+CDEFINES += -DFEATURE_METERING
+endif
+
 #Enable RX Full re-order OL feature only "LL and NON-MDM9630 platform"
 ifneq ($(CONFIG_ARCH_MDM9630), y)
 ifeq ($(CONFIG_HIF_PCI), 1)
@@ -1993,6 +2077,10 @@ ifeq ($(CONFIG_WLAN_FEATURE_NAN_DATAPATH), y)
 CDEFINES += -DWLAN_FEATURE_NAN_DATAPATH
 endif
 
+ifeq ($(CONFIG_NAN_CONVERGENCE), y)
+CDEFINES += -DWLAN_FEATURE_NAN_CONVERGENCE
+endif
+
 ifeq ($(CONFIG_LITHIUM),y)
 CDEFINES += -DCONFIG_SHADOW_V2
 CDEFINES += -DQCA6290_HEADERS_DEF
@@ -2003,6 +2091,7 @@ CDEFINES += -DQCA_WIFI_QCA8074_VP
 CDEFINES += -DDP_INTR_POLL_BASED
 CDEFINES += -DTX_PER_PDEV_DESC_POOL
 CDEFINES += -DWLAN_RX_HASH
+CDEFINES += -DDP_LFR
 endif
 
 ifeq ($(CONFIG_WLAN_FEATURE_11AX),y)
@@ -2014,6 +2103,12 @@ CDEFINES += -DDP_PRINT_ENABLE=0
 CDEFINES += -DATH_SUPPORT_WRAP=0
 CDEFINES += -DQCA_HOST2FW_RXBUF_RING
 #endof dummy flags
+
+# DFS component
+CDEFINES += -DQCA_MCL_DFS_SUPPORT
+CDEFINES += -DDFS_COMPONENT_ENABLE
+CDEFINES += -DQCA_DFS_USE_POLICY_MANAGER
+CDEFINES += -DQCA_DFS_NOL_PLATFORM_DRV_SUPPORT
 
 ifeq ($(CONFIG_WLAN_DEBUGFS), y)
 CDEFINES += -DWLAN_DEBUGFS

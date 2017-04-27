@@ -77,6 +77,11 @@ int wlan_hdd_cfg80211_sched_scan_stop(struct wiphy *wiphy,
  * Return: 0 for success, non zero for failure
  */
 int wlan_hdd_sched_scan_stop(struct net_device *dev);
+#else
+static inline int wlan_hdd_sched_scan_stop(struct net_device *dev)
+{
+	return 0;
+}
 #endif /* End of FEATURE_WLAN_SCAN_PNO */
 
 int wlan_hdd_cfg80211_vendor_scan(struct wiphy *wiphy,
@@ -99,10 +104,8 @@ int wlan_hdd_vendor_abort_scan(
 	struct wiphy *wiphy, struct wireless_dev *wdev,
 	const void *data, int data_len);
 
-void hdd_cleanup_scan_queue(hdd_context_t *hdd_ctx);
-
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)) || \
-    defined(CFG80211_ABORT_SCAN)
+	defined(CFG80211_ABORT_SCAN)
 void wlan_hdd_cfg80211_abort_scan(struct wiphy *wiphy,
 				  struct wireless_dev *wdev);
 #endif

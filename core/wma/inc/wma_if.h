@@ -456,6 +456,8 @@ typedef struct sLimMlmSetKeysReq {
  * @smpsMode: SMPS mode
  * @dot11_mode: 802.11 mode
  * @he_capable: HE Capability
+ * @cac_duration_ms: cac duration in milliseconds
+ * @dfs_regdomain: dfs region
  */
 typedef struct {
 	tSirMacAddr bssId;
@@ -527,6 +529,8 @@ typedef struct {
 	tDot11fIEvendor_he_cap he_config;
 	tDot11fIEvendor_he_op he_op;
 #endif
+	uint32_t cac_duration_ms;
+	uint32_t dfs_regdomain;
 } tAddBssParams, *tpAddBssParams;
 
 /**
@@ -891,6 +895,8 @@ typedef struct {
  * @isDfsChannel: is DFS channel
  * @vhtCapable: VHT capable
  * @dot11_mode: 802.11 mode
+ * @cac_duration_ms: cac duration in milliseconds
+ * @dfs_regdomain: dfs region
  */
 typedef struct {
 	uint8_t channelNumber;
@@ -924,6 +930,8 @@ typedef struct {
 #ifdef WLAN_FEATURE_11AX
 	bool he_capable;
 #endif
+	uint32_t cac_duration_ms;
+	uint32_t dfs_regdomain;
 } tSwitchChannelParams, *tpSwitchChannelParams;
 
 typedef void (*tpSetLinkStateCallback)(tpAniSirGlobal pMac, void *msgParam,
@@ -1160,6 +1168,7 @@ typedef struct sMaxTxPowerPerBandParams {
  * @tx_aggregation_size: Tx aggregation size
  * @rx_aggregation_size: Rx aggregation size
  * @enable_bcast_probe_rsp: enable broadcast probe response
+ * @fils_max_chan_guard_time: FILS max channel guard time
  */
 struct add_sta_self_params {
 	tSirMacAddr self_mac_addr;
@@ -1173,6 +1182,7 @@ struct add_sta_self_params {
 	uint32_t tx_aggregation_size;
 	uint32_t rx_aggregation_size;
 	bool enable_bcast_probe_rsp;
+	uint8_t fils_max_chan_guard_time;
 };
 
 /**

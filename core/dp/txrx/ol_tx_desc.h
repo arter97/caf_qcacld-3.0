@@ -232,12 +232,15 @@ struct qdf_tso_num_seg_elem_t *ol_tso_num_seg_alloc(
 				struct ol_txrx_pdev_t *pdev);
 void ol_tso_num_seg_free(struct ol_txrx_pdev_t *pdev,
 	 struct qdf_tso_num_seg_elem_t *tso_num_seg);
+void ol_free_remaining_tso_segs(ol_txrx_vdev_handle vdev,
+				struct ol_txrx_msdu_info_t *msdu_info);
 
 #else
 #define ol_tso_alloc_segment(pdev) /*no-op*/
 #define ol_tso_free_segment(pdev, tso_seg) /*no-op*/
 #define ol_tso_num_seg_alloc(pdev) /*no-op*/
 #define ol_tso_num_seg_free(pdev, tso_num_seg) /*no-op*/
+#define ol_free_remaining_tso_segs(vdev, msdu_info) /*no-op*/
 
 #endif
 
@@ -353,7 +356,8 @@ void ol_tx_desc_dup_detect_init(struct ol_txrx_pdev_t *pdev, uint16_t pool_size)
 static inline
 void ol_tx_desc_dup_detect_deinit(struct ol_txrx_pdev_t *pdev)
 {
-	qdf_print("%s: pool_size %d num_free %d\n", __func__,
+	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_DEBUG,
+		  "%s: pool_size %d num_free %d\n", __func__,
 		pdev->tx_desc.pool_size, pdev->tx_desc.num_free);
 	if (pdev->tx_desc.free_list_bitmap)
 		qdf_mem_free(pdev->tx_desc.free_list_bitmap);

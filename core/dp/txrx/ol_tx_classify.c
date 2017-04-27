@@ -589,7 +589,7 @@ ol_tx_classify(
 		 */
 		if (tx_msdu_info->htt.info.peer_id == HTT_INVALID_PEER_ID) {
 			if (peer) {
-				TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
+				ol_txrx_info(
 					   "%s: remove the peer for invalid peer_id %p\n",
 					   __func__, peer);
 				/* remove the peer reference added above */
@@ -612,7 +612,7 @@ ol_tx_classify(
 	if (IEEE80211_IS_MULTICAST(dest_addr) && vdev->opmode !=
 				wlan_op_mode_sta && tx_msdu_info->peer !=
 								NULL) {
-		TXRX_PRINT(TXRX_PRINT_LEVEL_INFO1,
+		ol_txrx_dbg(
 			   "%s: remove the peer reference %p\n",
 			   __func__, peer);
 		/* remove the peer reference added above */
@@ -684,6 +684,8 @@ ol_tx_classify_mgmt(
 			 * frame to vdev queue.
 			 */
 			if (peer) {
+				int rcnt;
+
 				qdf_mem_copy(
 					&local_mac_addr_aligned.raw[0],
 					dest_addr, OL_TXRX_MAC_ADDR_LEN);
@@ -691,13 +693,11 @@ ol_tx_classify_mgmt(
 				if (ol_txrx_peer_find_mac_addr_cmp(
 							mac_addr,
 							&peer->mac_addr) != 0) {
-					qdf_atomic_dec(&peer->ref_cnt);
+					rcnt = ol_txrx_peer_unref_delete(peer);
 					QDF_TRACE(QDF_MODULE_ID_TXRX,
 						 QDF_TRACE_LEVEL_INFO_HIGH,
 						 "%s: peer %p peer->ref_cnt %d",
-						 __func__, peer,
-						 qdf_atomic_read
-							(&peer->ref_cnt));
+						 __func__, peer, rcnt);
 					peer = NULL;
 				}
 			}

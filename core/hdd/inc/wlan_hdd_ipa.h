@@ -98,6 +98,10 @@ void hdd_ipa_uc_stat_query(hdd_context_t *hdd_ctx, uint32_t *ipa_tx_diff,
 	uint32_t *ipa_rx_diff);
 void hdd_ipa_uc_rt_debug_host_dump(hdd_context_t *hdd_ctx);
 void hdd_ipa_uc_stat_request(hdd_adapter_t *adapter, uint8_t reason);
+void hdd_ipa_uc_sharing_stats_request(hdd_adapter_t *adapter,
+				      uint8_t reset_stats);
+void hdd_ipa_uc_set_quota(hdd_adapter_t *adapter, uint8_t set_quota,
+			  uint64_t quota_bytes);
 bool hdd_ipa_is_enabled(hdd_context_t *pHddCtx);
 bool hdd_ipa_uc_is_enabled(hdd_context_t *pHddCtx);
 #ifndef QCA_LL_TX_FLOW_CONTROL_V2
@@ -170,18 +174,15 @@ static inline void hdd_ipa_uc_stat_query(hdd_context_t *hdd_ctx,
 {
 	*ipa_tx_diff = 0;
 	*ipa_rx_diff = 0;
-	return;
 }
 
 static inline void hdd_ipa_uc_stat_request(hdd_adapter_t *adapter,
 	uint8_t reason)
 {
-	return;
 }
 
 static inline void hdd_ipa_uc_rt_debug_host_dump(hdd_context_t *hdd_ctx)
 {
-	return;
 }
 
 static inline bool hdd_ipa_is_enabled(hdd_context_t *pHddCtx)
@@ -196,7 +197,6 @@ static inline bool hdd_ipa_uc_is_enabled(hdd_context_t *pHddCtx)
 
 static inline void hdd_ipa_dump_info(hdd_context_t *hdd_ctx)
 {
-	return;
 }
 
 static inline int hdd_ipa_uc_ssr_reinit(hdd_context_t *hdd_ctx)
@@ -210,7 +210,6 @@ static inline int hdd_ipa_uc_ssr_deinit(void)
 }
 static inline void hdd_ipa_uc_force_pipe_shutdown(hdd_context_t *hdd_ctx)
 {
-	return;
 }
 
 /**
@@ -253,7 +252,7 @@ static inline bool hdd_ipa_is_present(hdd_context_t *hdd_ctx)
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS hdd_ipa_uc_ol_init(hdd_context_t *hdd_ctx)
+static inline QDF_STATUS hdd_ipa_uc_ol_init(hdd_context_t *hdd_ctx)
 {
 	return QDF_STATUS_SUCCESS;
 }

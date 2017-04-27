@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2012, 2014-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2012, 2014-2015, 2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -41,6 +41,7 @@
 #define LOG2    5
 #define LOG3    6
 #define LOG4    7
+#define LOGD    8
 
 #ifdef WLAN_MDM_CODE_REDUCTION_OPT
 #ifdef PE_DEBUG_LOGE
@@ -102,5 +103,23 @@
 
 #define MAC_ADDR_ARRAY(a) (a)[0], (a)[1], (a)[2], (a)[3], (a)[4], (a)[5]
 #define MAC_ADDRESS_STR "%02x:%02x:%02x:%02x:%02x:%02x"
+
+#define pe_log(level, args...) QDF_TRACE(QDF_MODULE_ID_PE, level, ## args)
+#define pe_logfl(level, format, args...) pe_log(level, FL(format), ## args)
+
+#define pe_alert(format, args...) \
+		pe_logfl(QDF_TRACE_LEVEL_FATAL, format, ## args)
+#define pe_err(format, args...) \
+		pe_logfl(QDF_TRACE_LEVEL_ERROR, format, ## args)
+#define pe_warn(format, args...) \
+		pe_logfl(QDF_TRACE_LEVEL_WARN, format, ## args)
+#define pe_info(format, args...) \
+		pe_logfl(QDF_TRACE_LEVEL_INFO, format, ## args)
+#define pe_debug(format, args...) \
+		pe_logfl(QDF_TRACE_LEVEL_DEBUG, format, ## args)
+
+#define PE_ENTER() pe_logfl(QDF_TRACE_LEVEL_DEBUG, "enter")
+#define PE_EXIT() pe_logfl(QDF_TRACE_LEVEL_DEBUG, "exit")
+
 
 #endif

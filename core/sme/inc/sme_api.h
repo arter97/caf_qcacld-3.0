@@ -41,7 +41,6 @@
 #include "qdf_lock.h"
 #include "qdf_types.h"
 #include "sir_api.h"
-#include "cds_reg_service.h"
 #include "p2p_api.h"
 #include "cds_regdomain.h"
 #include "sme_internal.h"
@@ -60,6 +59,23 @@
 #define SME_GLOBAL_CLASSA_STATS   (1 << eCsrGlobalClassAStats)
 #define SME_GLOBAL_CLASSD_STATS   (1 << eCsrGlobalClassDStats)
 #define SME_PER_CHAIN_RSSI_STATS  (1 << csr_per_chain_rssi_stats)
+
+#define sme_log(level, args...) QDF_TRACE(QDF_MODULE_ID_SME, level, ## args)
+#define sme_logfl(level, format, args...) sme_log(level, FL(format), ## args)
+
+#define sme_alert(format, args...) \
+		sme_logfl(QDF_TRACE_LEVEL_FATAL, format, ## args)
+#define sme_err(format, args...) \
+		sme_logfl(QDF_TRACE_LEVEL_ERROR, format, ## args)
+#define sme_warn(format, args...) \
+		sme_logfl(QDF_TRACE_LEVEL_WARN, format, ## args)
+#define sme_info(format, args...) \
+		sme_logfl(QDF_TRACE_LEVEL_INFO, format, ## args)
+#define sme_debug(format, args...) \
+		sme_logfl(QDF_TRACE_LEVEL_DEBUG, format, ## args)
+
+#define SME_ENTER() sme_logfl(QDF_TRACE_LEVEL_DEBUG, "enter")
+#define SME_EXIT() sme_logfl(QDF_TRACE_LEVEL_DEBUG, "exit")
 
 #define SME_SESSION_ID_ANY        50
 
@@ -142,7 +158,7 @@ typedef struct _smeTdlsPeerStateParams {
 #define BW_40_OFFSET_BIT   1
 #define BW_80_OFFSET_BIT   2
 #define BW_160_OFFSET_BIT  3
-typedef struct sme_tdls_chan_switch_params_struct {
+typedef struct sme_tdls_chan_switch_param_struct {
 	uint32_t vdev_id;
 	tSirMacAddr peer_mac_addr;
 	uint16_t tdls_off_ch_bw_offset;/* Target Off Channel Bandwidth offset */
@@ -222,16 +238,6 @@ QDF_STATUS sme_close_session(tHalHandle hHal, uint8_t sessionId,
 		void *pContext);
 QDF_STATUS sme_update_roam_params(tHalHandle hHal, uint8_t session_id,
 		struct roam_ext_params roam_params_src, int update_param);
-#ifdef FEATURE_WLAN_SCAN_PNO
-void sme_update_roam_pno_channel_prediction_config(
-		tHalHandle hal, tCsrConfigParam *csr_config,
-		uint8_t copy_from_to);
-#else
-static inline void sme_update_roam_pno_channel_prediction_config(
-		tHalHandle hal, tCsrConfigParam *csr_config,
-		uint8_t copy_from_to)
-{}
-#endif
 QDF_STATUS sme_update_config(tHalHandle hHal,
 		tpSmeConfigParams pSmeConfigParams);
 
@@ -531,15 +537,6 @@ QDF_STATUS sme_abort_mac_scan(tHalHandle hHal, uint8_t sessionId,
 		uint32_t scan_id, eCsrAbortReason reason);
 QDF_STATUS sme_get_cfg_valid_channels(uint8_t *aValidChannels,
 		uint32_t *len);
-#ifdef FEATURE_WLAN_SCAN_PNO
-QDF_STATUS sme_set_preferred_network_list(tHalHandle hHal,
-		tpSirPNOScanReq pRequest,
-		uint8_t sessionId,
-		preferred_network_found_ind_cb
-		callbackRoutine, void *callbackContext);
-
-QDF_STATUS sme_preferred_network_found_ind(tHalHandle hHal, void *pMsg);
-#endif /* FEATURE_WLAN_SCAN_PNO */
 #ifdef WLAN_FEATURE_PACKET_FILTERING
 QDF_STATUS sme_8023_multicast_list(tHalHandle hHal, uint8_t sessionId,
 		tpSirRcvFltMcAddrList pMulticastAddrs);
@@ -713,12 +710,6 @@ eCsrPhyMode sme_get_phy_mode(tHalHandle hHal);
 QDF_STATUS sme_handoff_request(tHalHandle hHal, uint8_t sessionId,
 			       tCsrHandoffRequest *pHandoffInfo);
 QDF_STATUS sme_is_sta_p2p_client_connected(tHalHandle hHal);
-#ifdef FEATURE_WLAN_LPHB
-QDF_STATUS sme_lphb_config_req(tHalHandle hHal,
-		tSirLPHBReq * lphdReq,
-		void (*pCallbackfn)(void *pHddCtx,
-			tSirLPHBInd * indParam));
-#endif /* FEATURE_WLAN_LPHB */
 QDF_STATUS sme_add_periodic_tx_ptrn(tHalHandle hHal, tSirAddPeriodicTxPtrn
 		*addPeriodicTxPtrnParams);
 QDF_STATUS sme_del_periodic_tx_ptrn(tHalHandle hHal, tSirDelPeriodicTxPtrn
@@ -793,14 +784,14 @@ QDF_STATUS sme_set_auto_shutdown_timer(tHalHandle hHal, uint32_t timer_value);
 #endif
 QDF_STATUS sme_roam_channel_change_req(tHalHandle hHal,
 				       struct qdf_mac_addr bssid,
-				       struct ch_params_s *ch_params,
+				       struct ch_params *ch_params,
 				       tCsrRoamProfile *profile);
 
 QDF_STATUS sme_roam_start_beacon_req(tHalHandle hHal,
 		struct qdf_mac_addr bssid, uint8_t dfsCacWaitStatus);
 QDF_STATUS sme_roam_csa_ie_request(tHalHandle hHal, struct qdf_mac_addr bssid,
 				   uint8_t targetChannel, uint8_t csaIeReqd,
-				   struct ch_params_s *ch_params);
+				   struct ch_params *ch_params);
 
 QDF_STATUS sme_init_thermal_info(tHalHandle hHal,
 				 tSmeThermalParams thermalParam);
@@ -873,9 +864,6 @@ QDF_STATUS sme_set_passpoint_list(tHalHandle hal,
 					struct wifi_passpoint_req *req_msg);
 QDF_STATUS sme_reset_passpoint_list(tHalHandle hal,
 					struct wifi_passpoint_req *req_msg);
-QDF_STATUS
-sme_set_ssid_hotlist(tHalHandle hal,
-		     struct sir_set_ssid_hotlist_request *request);
 
 QDF_STATUS sme_ext_scan_register_callback(tHalHandle hHal,
 		void (*pExtScanIndCb)(void *, const uint16_t, void *));
@@ -897,6 +885,9 @@ QDF_STATUS sme_ll_stats_get_req(tHalHandle hHal,
 QDF_STATUS sme_set_link_layer_stats_ind_cb(tHalHandle hHal,
 		void (*callbackRoutine)(void *callbackCtx,
 				int indType, void *pRsp));
+QDF_STATUS sme_set_link_layer_ext_cb(tHalHandle hal,
+		     void (*ll_stats_ext_cb)(tHddHandle callback_ctx,
+					     tSirLLStatsResults * rsp));
 QDF_STATUS sme_reset_link_layer_stats_ind_cb(tHalHandle hhal);
 #endif /* WLAN_FEATURE_LINK_LAYER_STATS */
 
@@ -1446,7 +1437,29 @@ QDF_STATUS sme_get_beacon_frm(tHalHandle hal, tCsrRoamProfile *profile,
 			    const tSirMacAddr bssid,
 			    uint8_t **frame_buf, uint32_t *frame_len);
 
+/**
+ * sme_congestion_register_callback(): registers congestion callback
+ * @hal: handler for HAL
+ * @congestion_cb: congestion callback
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_congestion_register_callback(tHalHandle hal,
+	void (*congestion_cb)(void *, uint32_t congestion, uint32_t vdev_id));
+
 QDF_STATUS sme_delete_all_tdls_peers(tHalHandle hal, uint8_t session_id);
+
+/**
+ * sme_rso_cmd_status_cb() - Set RSO cmd status callback
+ * @hal: HAL Handle
+ * @cb: HDD Callback to rso comman status read
+ *
+ * This function is used to save HDD RSO Command status callback in MAC
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_rso_cmd_status_cb(tHalHandle hal,
+		void (*cb)(void *, struct rso_cmd_status *));
 
 /**
  * sme_register_set_connection_info_cb() - Register connection
@@ -1465,5 +1478,14 @@ QDF_STATUS sme_register_set_connection_info_cb(tHalHandle hHal,
 				bool (*set_connection_info_cb)(bool),
 				bool (*get_connection_info_cb)(uint8_t *session_id,
 				enum scan_reject_states *reason));
+
+/**
+ * sme_store_pdev() - store pdev
+ * @hal - MAC global handle
+ * @pdev - pdev ptr
+ *
+ * Return: QDF_STATUS
+ */
+void sme_store_pdev(tHalHandle hal, struct wlan_objmgr_pdev *pdev);
 
 #endif /* #if !defined( __SME_API_H ) */

@@ -33,7 +33,7 @@
 #include <wlan_hdd_object_manager.h>
 #include <wlan_osif_priv.h>
 
-#ifdef NAPIER_SCAN
+
 static void hdd_init_pdev_os_priv(hdd_context_t *hdd_ctx,
 	struct pdev_osif_priv *os_priv)
 {
@@ -41,13 +41,20 @@ static void hdd_init_pdev_os_priv(hdd_context_t *hdd_ctx,
 	os_priv->wiphy = hdd_ctx->wiphy;
 	wlan_cfg80211_scan_priv_init(hdd_ctx->hdd_pdev);
 }
-#endif
+
+static void hdd_deinit_pdev_os_priv(hdd_context_t *hdd_ctx)
+{
+	wlan_cfg80211_scan_priv_deinit(hdd_ctx->hdd_pdev);
+}
 
 static void hdd_init_vdev_os_priv(hdd_adapter_t *adapter,
 	struct vdev_osif_priv *os_priv)
 {
 	/* Initialize the vdev OS private structure*/
 	os_priv->wdev = adapter->dev->ieee80211_ptr;
+#ifdef CONVERGED_TDLS_ENABLE
+	wlan_cfg80211_tdls_priv_init(os_priv);
+#endif
 }
 
 static void hdd_init_psoc_qdf_ctx(struct wlan_objmgr_psoc *psoc)
@@ -112,9 +119,11 @@ int hdd_objmgr_create_and_store_pdev(hdd_context_t *hdd_ctx)
 		return -ENOMEM;
 	}
 	hdd_ctx->hdd_pdev = pdev;
-#ifdef NAPIER_SCAN
+	sme_store_pdev(hdd_ctx->hHal, hdd_ctx->hdd_pdev);
 	hdd_init_pdev_os_priv(hdd_ctx, priv);
-#endif
+	wlan_pdev_obj_lock(pdev);
+	wlan_pdev_set_tgt_if_handle(pdev, psoc->tgt_if_handle);
+	wlan_pdev_obj_unlock(pdev);
 	return 0;
 }
 
@@ -123,6 +132,7 @@ int hdd_objmgr_release_and_destroy_pdev(hdd_context_t *hdd_ctx)
 	struct wlan_objmgr_pdev *pdev = hdd_ctx->hdd_pdev;
 	struct pdev_osif_priv *osif_priv;
 
+	hdd_deinit_pdev_os_priv(hdd_ctx);
 	hdd_ctx->hdd_pdev = NULL;
 	if (!pdev)
 		return -EINVAL;
@@ -198,6 +208,9 @@ int hdd_objmgr_destroy_vdev(hdd_adapter_t *adapter)
 
 	osif_priv = wlan_vdev_get_ospriv(vdev);
 	wlan_vdev_reset_ospriv(vdev);
+#ifdef CONVERGED_TDLS_ENABLE
+	wlan_cfg80211_tdls_priv_deinit(osif_priv);
+#endif
 	qdf_mem_free(osif_priv);
 
 	if (hdd_objmgr_remove_peer_object(vdev,
@@ -304,8 +317,35 @@ int hdd_objmgr_remove_peer_object(struct wlan_objmgr_vdev *vdev,
 	return -EINVAL;
 }
 
+int hdd_objmgr_set_peer_mlme_auth_state(struct wlan_objmgr_vdev *vdev,
+					bool is_authenticated)
+{
+	struct wlan_objmgr_peer *peer;
+	QDF_STATUS status;
+
+	wlan_vdev_obj_lock(vdev);
+	peer = wlan_vdev_get_bsspeer(vdev);
+	wlan_vdev_obj_unlock(vdev);
+
+	if (!peer) {
+		hdd_err("peer is null");
+
+		return -EINVAL;
+	}
+	status = wlan_objmgr_peer_try_get_ref(peer, WLAN_TDLS_NB_ID);
+	if (status != QDF_STATUS_SUCCESS)
+		return -EINVAL;
+
+	wlan_peer_obj_lock(peer);
+	wlan_peer_mlme_set_auth_state(peer, is_authenticated);
+	wlan_peer_obj_unlock(peer);
+
+	wlan_objmgr_peer_release_ref(peer, WLAN_TDLS_NB_ID);
+	return 0;
+}
+
 int hdd_objmgr_set_peer_mlme_state(struct wlan_objmgr_vdev *vdev,
-				   enum wlan_peer_state peer_state)
+	enum wlan_peer_state peer_state)
 {
 	struct wlan_objmgr_peer *peer;
 

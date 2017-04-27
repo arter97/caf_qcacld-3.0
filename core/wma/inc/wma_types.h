@@ -276,12 +276,6 @@
 #define WMA_FTM_CMD_RSP        SIR_PTT_MSG_TYPES_END
 #define WMA_CSA_OFFLOAD_EVENT  SIR_CSA_OFFLOAD_EVENT
 
-#ifdef FEATURE_WLAN_SCAN_PNO
-/*Requests sent to lower driver*/
-#define WMA_SET_PNO_REQ             SIR_HAL_SET_PNO_REQ
-
-#endif /* FEATURE_WLAN_SCAN_PNO */
-
 #ifdef FEATURE_WLAN_ESE
 #define WMA_SET_PLM_REQ             SIR_HAL_SET_PLM_REQ
 #endif
@@ -332,9 +326,6 @@
 #define WMA_IBSS_PEER_INACTIVITY_IND SIR_HAL_IBSS_PEER_INACTIVITY_IND
 
 #define WMA_CLI_SET_CMD             SIR_HAL_CLI_SET_CMD
-#ifdef FEATURE_WLAN_SCAN_PNO
-#define WMA_SME_SCAN_CACHE_UPDATED  SIR_HAL_SME_SCAN_CACHE_UPDATED
-#endif
 
 #ifndef REMOVE_PKT_LOG
 #define WMA_PKTLOG_ENABLE_REQ       SIR_HAL_PKTLOG_ENABLE_REQ
@@ -383,9 +374,6 @@
 #endif
 #define WMA_SET_SAP_INTRABSS_DIS          SIR_HAL_SET_SAP_INTRABSS_DIS
 
-/* Message to Indicate Radar Presence on SAP Channel */
-#define WMA_DFS_RADAR_IND           SIR_HAL_DFS_RADAR_IND
-
 /* Message to indicate beacon tx completion after beacon template update
  * beacon offload case
  */
@@ -417,7 +405,6 @@
 #define WMA_SET_EPNO_LIST_REQ               SIR_HAL_SET_EPNO_LIST_REQ
 #define WMA_SET_PASSPOINT_LIST_REQ          SIR_HAL_SET_PASSPOINT_LIST_REQ
 #define WMA_RESET_PASSPOINT_LIST_REQ        SIR_HAL_RESET_PASSPOINT_LIST_REQ
-#define WMA_EXTSCAN_SET_SSID_HOTLIST_REQ    SIR_HAL_EXTSCAN_SET_SSID_HOTLIST_REQ
 
 #endif /* FEATURE_WLAN_EXTSCAN */
 
@@ -641,13 +628,6 @@ typedef void (*wma_txFailIndCallback)(uint8_t *, uint8_t);
 /* generic callback for updating parameters from target to UMAC */
 typedef void (*wma_tgt_cfg_cb)(void *context, void *param);
 
-/*
- * callback for Indicating Radar to HDD and disable Tx Queues
- * to stop accepting data Tx packets from netif as radar is
- * found on the current operating channel
- */
-typedef bool (*wma_dfs_radar_indication_cb)(void *context, void *param);
-
 /**
  * struct wma_cli_set_cmd_t - set command parameters
  * @param_id: parameter id
@@ -729,9 +709,7 @@ QDF_STATUS wma_tx_packet(void *pWMA,
 			 uint16_t channel_freq);
 
 QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc, void *p_cds_context,
-		    wma_tgt_cfg_cb pTgtUpdCB,
-		    wma_dfs_radar_indication_cb radar_ind_cb,
-		    struct cds_config_info *cds_cfg);
+		    wma_tgt_cfg_cb pTgtUpdCB, struct cds_config_info *cds_cfg);
 
 QDF_STATUS wma_register_mgmt_frm_client(void);
 

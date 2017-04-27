@@ -52,7 +52,7 @@
 /* MAX iteration count to wait for Entry point to exit before
  * we proceed with SSR in WD Thread
  */
-#define MAX_SSR_WAIT_ITERATIONS 200
+#define MAX_SSR_WAIT_ITERATIONS 100
 #define MAX_SSR_PROTECT_LOG (16)
 
 static atomic_t ssr_protect_entry_count;
@@ -536,6 +536,7 @@ OL_RX_THREAD_START_FAILURE:
 	cds_free_ol_rx_pkt_freeq(gp_cds_sched_context);
 pkt_freeqalloc_failure:
 #endif
+	gp_cds_sched_context = NULL;
 
 	return QDF_STATUS_E_RESOURCES;
 
@@ -855,12 +856,17 @@ QDF_STATUS cds_sched_close(void *p_cds_context)
 {
 	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO_HIGH,
 		  "%s: invoked", __func__);
+
 	if (gp_cds_sched_context == NULL) {
 		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
 			  "%s: gp_cds_sched_context == NULL", __func__);
 		return QDF_STATUS_E_FAILURE;
 	}
+
 #ifdef QCA_CONFIG_SMP
+	if (!gp_cds_sched_context->ol_rx_thread)
+		return QDF_STATUS_SUCCESS;
+
 	/* Shut down Tlshim Rx thread */
 	set_bit(RX_SHUTDOWN_EVENT, &gp_cds_sched_context->ol_rx_event_flag);
 	set_bit(RX_POST_EVENT, &gp_cds_sched_context->ol_rx_event_flag);
@@ -872,6 +878,7 @@ QDF_STATUS cds_sched_close(void *p_cds_context)
 	unregister_hotcpu_notifier(&cds_cpu_hotplug_notifier);
 	gp_cds_sched_context->cpu_hot_plug_notifier = NULL;
 #endif
+	gp_cds_sched_context = NULL;
 	return QDF_STATUS_SUCCESS;
 } /* cds_sched_close() */
 
@@ -918,8 +925,7 @@ void cds_ssr_protect_init(void)
  * Return:
  *        void
  */
-
-static void cds_print_external_threads(void)
+void cds_print_external_threads(void)
 {
 	int i = 0;
 	unsigned long irq_flags;
@@ -1162,6 +1168,13 @@ bool cds_wait_for_external_threads_completion(const char *caller_func)
 				  "%s: Waiting for %d active entry points to exit",
 				  __func__, r);
 			msleep(SSR_WAIT_SLEEP_TIME);
+			if (count == (MAX_SSR_WAIT_ITERATIONS/2)) {
+				QDF_TRACE(QDF_MODULE_ID_QDF,
+					QDF_TRACE_LEVEL_ERROR,
+					"%s: in middle of waiting for active entry points:",
+					__func__);
+				cds_print_external_threads();
+			}
 		}
 	}
 

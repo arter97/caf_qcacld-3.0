@@ -149,6 +149,9 @@ htt_htc_misc_pkt_list_trim(struct htt_pdev_t *pdev, int level)
 void htt_htc_misc_pkt_list_add(struct htt_pdev_t *pdev, struct htt_htc_pkt *pkt)
 {
 	struct htt_htc_pkt_union *u_pkt = (struct htt_htc_pkt_union *)pkt;
+	int misclist_trim_level = htc_get_tx_queue_depth(pdev->htc_pdev,
+							pkt->htc_pkt.Endpoint)
+				+ HTT_HTC_PKT_MISCLIST_SIZE;
 
 	HTT_TX_MUTEX_ACQUIRE(&pdev->htt_tx_mutex);
 	if (pdev->htt_htc_pkt_misclist) {
@@ -159,7 +162,10 @@ void htt_htc_misc_pkt_list_add(struct htt_pdev_t *pdev, struct htt_htc_pkt *pkt)
 	}
 	HTT_TX_MUTEX_RELEASE(&pdev->htt_tx_mutex);
 
-	htt_htc_misc_pkt_list_trim(pdev, HTT_HTC_PKT_MISCLIST_SIZE);
+	/* only ce pipe size + tx_queue_depth could possibly be in use
+	 * free older packets in the msiclist
+	 */
+	htt_htc_misc_pkt_list_trim(pdev, misclist_trim_level);
 }
 
 void htt_htc_misc_pkt_pool_free(struct htt_pdev_t *pdev)
@@ -354,12 +360,14 @@ htt_pdev_alloc(ol_txrx_pdev_handle txrx_pdev,
 
 	pdev->cfg.is_full_reorder_offload =
 			ol_cfg_is_full_reorder_offload(pdev->ctrl_pdev);
-	qdf_print("is_full_reorder_offloaded? %d\n",
+	QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_INFO,
+		  "is_full_reorder_offloaded? %d",
 		  (int)pdev->cfg.is_full_reorder_offload);
 
 	pdev->cfg.ce_classify_enabled =
 		ol_cfg_is_ce_classify_enabled(ctrl_pdev);
-	qdf_print("ce_classify_enabled %d\n",
+	QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_INFO,
+		  "ce_classify_enabled? %d",
 		  pdev->cfg.ce_classify_enabled);
 
 	if (pdev->cfg.is_high_latency) {
@@ -498,7 +506,8 @@ htt_attach(struct htt_pdev_t *pdev, int desc_pool_size)
 		} else if (frm_type == wlan_frm_fmt_802_3) {
 			pdev->download_len = HTT_TX_HDR_SIZE_ETHERNET;
 		} else {
-			qdf_print("Unexpected frame type spec: %d\n", frm_type);
+			QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_ERROR,
+				  "Unexpected frame type spec: %d", frm_type);
 			HTT_ASSERT0(0);
 		}
 
@@ -630,7 +639,8 @@ int htt_update_endpoint(struct htt_pdev_t *pdev,
 	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
 	if (qdf_unlikely(NULL == hif_ctx)) {
 		QDF_ASSERT(NULL != hif_ctx);
-		qdf_print("%s:%d: assuming non-tx service.",
+		QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_ERROR,
+			  "%s:%d: assuming non-tx service.",
 			  __func__, __LINE__);
 	} else {
 		ul = dl = 0xff;
@@ -638,7 +648,8 @@ int htt_update_endpoint(struct htt_pdev_t *pdev,
 		    hif_map_service_to_pipe(hif_ctx, service_id,
 					    &ul, &dl,
 					    &ul_polled, &dl_polled))
-			qdf_print("%s:%d: assuming non-tx srv.",
+			QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_INFO,
+				  "%s:%d: assuming non-tx srv.",
 				  __func__, __LINE__);
 		else
 			tx_service = (ul != 0xff);
@@ -748,7 +759,8 @@ int htt_ipa_uc_attach(struct htt_pdev_t *pdev)
 		ol_cfg_ipa_uc_tx_max_buf_cnt(pdev->ctrl_pdev),
 		ol_cfg_ipa_uc_tx_partition_base(pdev->ctrl_pdev));
 	if (error) {
-		qdf_print("HTT IPA UC TX attach fail code %d\n", error);
+		QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_ERROR,
+			  "HTT IPA UC TX attach fail code %d", error);
 		HTT_ASSERT0(0);
 		return error;
 	}
@@ -757,7 +769,8 @@ int htt_ipa_uc_attach(struct htt_pdev_t *pdev)
 	error = htt_rx_ipa_uc_attach(
 		pdev, qdf_get_pwr2(pdev->rx_ring.fill_level));
 	if (error) {
-		qdf_print("HTT IPA UC RX attach fail code %d\n", error);
+		QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_ERROR,
+			  "HTT IPA UC RX attach fail code %d", error);
 		htt_tx_ipa_uc_detach(pdev);
 		HTT_ASSERT0(0);
 		return error;
@@ -878,7 +891,8 @@ void htt_mark_first_wakeup_packet(htt_pdev_handle pdev,
 			uint8_t value)
 {
 	if (!pdev) {
-		qdf_print("%s: htt pdev is NULL", __func__);
+		QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_ERROR,
+			  "%s: htt pdev is NULL", __func__);
 		return;
 	}
 

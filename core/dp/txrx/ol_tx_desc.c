@@ -47,7 +47,7 @@ static inline void ol_tx_desc_sanity_checks(struct ol_txrx_pdev_t *pdev,
 					struct ol_tx_desc_t *tx_desc)
 {
 	if (tx_desc->pkt_type != ol_tx_frm_freed) {
-		TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
+		ol_txrx_err(
 				   "%s Potential tx_desc corruption pkt_type:0x%x pdev:0x%p",
 				   __func__, tx_desc->pkt_type, pdev);
 		qdf_assert(0);
@@ -61,7 +61,7 @@ static inline void ol_tx_desc_reset_pkt_type(struct ol_tx_desc_t *tx_desc)
 static inline void ol_tx_desc_compute_delay(struct ol_tx_desc_t *tx_desc)
 {
 	if (tx_desc->entry_timestamp_ticks != 0xffffffff) {
-		TXRX_PRINT(TXRX_PRINT_LEVEL_ERR, "%s Timestamp:0x%x\n",
+		ol_txrx_err("%s Timestamp:0x%x\n",
 				   __func__, tx_desc->entry_timestamp_ticks);
 		qdf_assert(0);
 	}
@@ -104,6 +104,7 @@ ol_tx_desc_vdev_update(struct ol_tx_desc_t *tx_desc,
 		       struct ol_txrx_vdev_t *vdev)
 {
 	tx_desc->vdev = vdev;
+	tx_desc->vdev_id = vdev->vdev_id;
 }
 
 #ifdef CONFIG_PER_VDEV_TX_DESC_POOL
@@ -155,8 +156,6 @@ struct ol_tx_desc_t *ol_tx_desc_alloc(struct ol_txrx_pdev_t *pdev,
 
 	if (!tx_desc)
 		return NULL;
-
-	tx_desc->vdev_id = vdev->vdev_id;
 
 	ol_tx_desc_vdev_update(tx_desc, vdev);
 	ol_tx_desc_count_inc(vdev);
@@ -223,8 +222,6 @@ struct ol_tx_desc_t *ol_tx_desc_alloc(struct ol_txrx_pdev_t *pdev,
 	} else {
 		pdev->pool_stats.pkt_drop_no_pool++;
 	}
-
-	tx_desc->vdev_id = vdev->vdev_id;
 
 	return tx_desc;
 }
@@ -360,10 +357,11 @@ void ol_tx_desc_free(struct ol_txrx_pdev_t *pdev, struct ol_tx_desc_t *tx_desc)
 {
 	qdf_spin_lock_bh(&pdev->tx_mutex);
 
+	ol_tx_desc_dup_detect_reset(pdev, tx_desc);
+
 	if (tx_desc->pkt_type == OL_TX_FRM_TSO)
 		ol_tx_tso_desc_free(pdev, tx_desc);
 
-	ol_tx_desc_dup_detect_reset(pdev, tx_desc);
 	ol_tx_desc_reset_pkt_type(tx_desc);
 	ol_tx_desc_reset_timestamp(tx_desc);
 
@@ -700,8 +698,7 @@ void ol_tx_desc_frame_free_nonstd(struct ol_txrx_pdev_t *pdev,
 			qdf_nbuf_set_next(tx_desc->netbuf, NULL);
 			pdev->tx_data_callback.func(pdev->tx_data_callback.ctxt,
 						    tx_desc->netbuf, had_error);
-			ol_tx_desc_free(pdev, tx_desc);
-			return;
+			goto free_tx_desc;
 		}
 		/* let the code below unmap and free the frame */
 	}
@@ -746,11 +743,19 @@ void ol_tx_desc_frame_free_nonstd(struct ol_txrx_pdev_t *pdev,
 		}
 		/* free the netbuf */
 		qdf_nbuf_free(tx_desc->netbuf);
+	} else if (had_error == htt_tx_status_download_fail) {
+		/* Failed to send to target */
+
+		/* This is to decrement skb->users count for TSO segment */
+		if (tx_desc->pkt_type == OL_TX_FRM_TSO)
+			qdf_nbuf_tx_free(tx_desc->netbuf, had_error);
+		goto free_tx_desc;
 	} else {
-		/* single regular frame */
+		/* single regular frame, called from completion path */
 		qdf_nbuf_set_next(tx_desc->netbuf, NULL);
 		qdf_nbuf_tx_free(tx_desc->netbuf, had_error);
 	}
+free_tx_desc:
 	/* free the tx desc */
 	ol_tx_desc_free(pdev, tx_desc);
 }
@@ -821,8 +826,10 @@ void ol_tso_free_segment(struct ol_txrx_pdev_t *pdev,
 		return;
 	}
 	/*this tso seg is now a part of freelist*/
+	qdf_mem_zero(tso_seg, sizeof(*tso_seg));
 	tso_seg->next = pdev->tso_seg_pool.freelist;
 	tso_seg->on_freelist = 1;
+	tso_seg->cookie = TSO_SEG_MAGIC_COOKIE;
 	pdev->tso_seg_pool.freelist = tso_seg;
 	pdev->tso_seg_pool.num_free++;
 	qdf_spin_unlock_bh(&pdev->tso_seg_pool.tso_mutex);
@@ -870,7 +877,7 @@ void ol_tso_num_seg_free(struct ol_txrx_pdev_t *pdev,
 	qdf_spin_lock_bh(&pdev->tso_num_seg_pool.tso_num_seg_mutex);
 	tso_num_seg->next = pdev->tso_num_seg_pool.freelist;
 	pdev->tso_num_seg_pool.freelist = tso_num_seg;
-	pdev->tso_num_seg_pool.num_free++;
+		pdev->tso_num_seg_pool.num_free++;
 	qdf_spin_unlock_bh(&pdev->tso_num_seg_pool.tso_num_seg_mutex);
 }
 #endif

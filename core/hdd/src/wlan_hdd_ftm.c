@@ -90,7 +90,7 @@ static void wlanqcmbr_mc_process_msg(void *message);
  */
 static uint32_t wlan_ftm_postmsg(uint8_t *cmd_ptr, uint16_t cmd_len)
 {
-	struct scheduler_msg ftmMsg;
+	struct scheduler_msg ftmMsg = {0};
 
 	ENTER();
 
@@ -102,7 +102,6 @@ static uint32_t wlan_ftm_postmsg(uint8_t *cmd_ptr, uint16_t cmd_len)
 	if (QDF_STATUS_SUCCESS != scheduler_post_msg(QDF_MODULE_ID_WMA,
 						      &ftmMsg)) {
 		hdd_err("Failed to post Msg to HAL");
-
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -152,7 +151,7 @@ void hdd_ftm_mc_process_msg(void *message)
 	uint32_t data_len;
 
 	if (!message) {
-		hdd_err("Message is NULL, nothing to process.");
+		hdd_debug("Message is NULL, nothing to process");
 		return;
 	}
 

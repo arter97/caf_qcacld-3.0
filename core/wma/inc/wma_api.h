@@ -130,7 +130,6 @@ int wma_cli_set2_command(int vdev_id, int param_id, int sval1,
 			 int sval2, int vpdev);
 
 QDF_STATUS wma_set_htconfig(uint8_t vdev_id, uint16_t ht_capab, int value);
-QDF_STATUS wma_set_reg_domain(void *clientCtxt, v_REGDOMAIN_t regId);
 
 QDF_STATUS wma_get_wcnss_software_version(void *p_cds_gctx,
 					  uint8_t *pVersion,
@@ -202,7 +201,7 @@ static inline QDF_STATUS wma_send_egap_conf_params(WMA_HANDLE handle,
 QDF_STATUS wma_set_tx_power_scale(uint8_t vdev_id, int value);
 QDF_STATUS wma_set_tx_power_scale_decr_db(uint8_t vdev_id, int value);
 
-#ifdef WLAN_FEATURE_NAN_DATAPATH
+#if defined(WLAN_FEATURE_NAN_DATAPATH) && !defined(WLAN_FEATURE_NAN_CONVERGENCE)
 QDF_STATUS wma_register_ndp_cb(QDF_STATUS (*pe_ndp_event_handler)
 					  (tpAniSirGlobal mac_ctx,
 					  struct scheduler_msg *msg));
@@ -213,7 +212,7 @@ static inline QDF_STATUS wma_register_ndp_cb(QDF_STATUS (*pe_ndp_event_handler)
 {
 	return QDF_STATUS_SUCCESS;
 }
-#endif
+#endif /* WLAN_FEATURE_NAN_DATAPATH && !WLAN_FEATURE_NAN_CONVERGENCE */
 
 bool wma_is_p2p_lo_capable(void);
 QDF_STATUS wma_p2p_lo_start(struct sir_p2p_lo_start *params);
@@ -270,4 +269,31 @@ QDF_STATUS wma_set_sar_limit(WMA_HANDLE handle,
 QDF_STATUS wma_set_qpower_config(uint8_t vdev_id, uint8_t qpower);
 
 bool wma_is_service_enabled(WMI_SERVICE service_type);
+
+#ifdef WLAN_FEATURE_LINK_LAYER_STATS
+/**
+ * wma_tx_failure_cb() - TX failure callback
+ * @ctx: txrx context
+ * @num_msdu: number of msdu with the same status
+ * @tid: TID number
+ * @status: failure status
+ */
+void wma_tx_failure_cb(void *ctx, uint32_t num_msdu,
+		       uint8_t tid, enum htt_tx_status status);
+#else
+static inline void wma_tx_failure_cb(void *ctx, uint32_t num_msdu,
+				     uint8_t tid, enum htt_tx_status status)
+{
+}
+#endif
+
+/**
+ * wma_store_pdev() - store pdev
+ * @wma_ctx:	wma context
+ * @pdev:	pdev context
+ *
+ * Return: void
+ */
+void wma_store_pdev(void *wma_ctx, struct wlan_objmgr_pdev *pdev);
+
 #endif

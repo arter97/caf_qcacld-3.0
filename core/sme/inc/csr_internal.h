@@ -250,17 +250,6 @@ typedef enum {
 
 } eCsrDiagWlanStatusEventReason;
 
-/**
- * enum eCSR_WLAN_DIAG_EVENT_TYPE - enum for DIAG events
- * @eCSR_EVENT_SCAN_COMPLETE - scan complete
- * @eCSR_EVENT_SCAN_RES_FOUND - scan result found
- */
-typedef enum {
-	eCSR_EVENT_TYPE_INVALID = 0,
-	eCSR_EVENT_SCAN_COMPLETE = 64,
-	eCSR_EVENT_SCAN_RES_FOUND = 65,
-} eCSR_WLAN_DIAG_EVENT_TYPE;
-
 #endif /* FEATURE_WLAN_DIAG_SUPPORT */
 
 typedef struct tagCsrChannel {
@@ -323,7 +312,7 @@ typedef struct tagCsrRoamStartBssParams {
 	tSirMacRateSet operationalRateSet;
 	tSirMacRateSet extendedRateSet;
 	uint8_t operationChn;
-	struct ch_params_s ch_params;
+	struct ch_params ch_params;
 	eCsrCfgDot11Mode uCfgDot11Mode;
 	uint8_t privacy;
 	bool fwdWPSPBCProbeReq;
@@ -348,6 +337,8 @@ typedef struct tagCsrRoamStartBssParams {
 	tSirAddIeParams addIeParams;
 	uint8_t sap_dot11mc;
 	uint8_t beacon_tx_rate;
+	uint32_t cac_duration_ms;
+	uint32_t dfs_regdomain;
 } tCsrRoamStartBssParams;
 
 typedef struct tagScanCmd {
@@ -601,13 +592,6 @@ typedef struct tagCsrConfig {
 	uint8_t is_sta_connection_in_5gz_enabled;
 	struct roam_ext_params roam_params;
 	bool sendDeauthBeforeCon;
-#ifdef FEATURE_WLAN_SCAN_PNO
-	bool pno_channel_prediction;
-	uint8_t top_k_num_of_channels;
-	uint8_t stationary_thresh;
-	enum wmi_dwelltime_adaptive_mode pnoscan_adaptive_dwell_mode;
-	uint32_t channel_prediction_full_scan;
-#endif
 	bool early_stop_scan_enable;
 	int8_t early_stop_scan_min_threshold;
 	int8_t early_stop_scan_max_threshold;
@@ -641,6 +625,8 @@ typedef struct tagCsrConfig {
 	bool enable_ul_ofdma;
 	bool enable_ul_mimo;
 #endif
+	bool qcn_ie_support;
+	uint8_t fils_max_chan_guard_time;
 } tCsrConfig;
 
 typedef struct tagCsrChannelPowerInfo {
@@ -674,8 +660,6 @@ typedef struct tagCsrVotes11d {
 
 typedef struct tagCsrScanStruct {
 	tScanProfile scanProfile;
-	tDblLinkList scanResultList;
-	tDblLinkList tempScanResults;
 	bool fScanEnable;
 	bool fFullScanIssued;
 #ifdef WLAN_AP_STA_CONCURRENCY
@@ -972,9 +956,6 @@ typedef struct tagCsrRoamSession {
 #ifdef WLAN_FEATURE_11AX
 	tDot11fIEvendor_he_cap he_config;
 #endif
-#ifdef FEATURE_WLAN_SCAN_PNO
-	bool pnoStarted;
-#endif
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 	csr_roam_offload_synch_params roamOffloadSynchParams;
 	uint8_t psk_pmk[SIR_ROAM_SCAN_PSK_SIZE];
@@ -1165,7 +1146,7 @@ typedef struct tagCsrRoamStruct {
 	(CSR_IS_OPEARTING_DUAL_BAND((pMac)) || \
 		CSR_IS_RADIO_BG_ONLY((pMac)) || CSR_IS_24_BAND_ONLY((pMac)))
 #define CSR_GET_BAND(ch_num) \
-	((CDS_IS_CHANNEL_24GHZ(ch_num)) ? eCSR_BAND_24 : eCSR_BAND_5G)
+	((WLAN_REG_IS_24GHZ_CH(ch_num)) ? eCSR_BAND_24 : eCSR_BAND_5G)
 #define CSR_IS_11D_INFO_FOUND(pMac) \
 	(0 != (pMac)->scan.channelOf11dInfo)
 #define CSR_IS_ROAMING(pSession) \
@@ -1289,12 +1270,6 @@ QDF_STATUS csr_roam_copy_connect_profile(tpAniSirGlobal pMac,
 bool csr_is_set_key_allowed(tpAniSirGlobal pMac, uint32_t sessionId);
 
 void csr_set_opposite_band_channel_info(tpAniSirGlobal pMac);
-#ifdef FEATURE_WLAN_SCAN_PNO
-QDF_STATUS csr_scan_save_preferred_network_found(tpAniSirGlobal pMac,
-		tSirPrefNetworkFoundInd *
-		pPrefNetworkFoundInd);
-#endif
-
 /* Returns whether the current association is a 11r assoc or not */
 bool csr_roam_is11r_assoc(tpAniSirGlobal pMac, uint8_t sessionId);
 
@@ -1335,7 +1310,7 @@ bool csr_roam_is_sta_mode(tpAniSirGlobal pMac, uint32_t sessionId);
 
 /* Post Channel Change Indication */
 QDF_STATUS csr_roam_channel_change_req(tpAniSirGlobal pMac, struct qdf_mac_addr
-				       bssid, struct ch_params_s *ch_params,
+				       bssid, struct ch_params *ch_params,
 				       tCsrRoamProfile *profile);
 
 /* Post Beacon Tx Start Indication */
@@ -1346,7 +1321,7 @@ QDF_STATUS csr_roam_send_chan_sw_ie_request(tpAniSirGlobal pMac,
 					    struct qdf_mac_addr bssid,
 					    uint8_t targetChannel,
 					    uint8_t csaIeReqd,
-					    struct ch_params_s *ch_params);
+					    struct ch_params *ch_params);
 QDF_STATUS csr_roam_modify_add_ies(tpAniSirGlobal pMac, tSirModifyIE *pModifyIE,
 				   eUpdateIEsType updateType);
 QDF_STATUS
@@ -1378,10 +1353,6 @@ bool csr_clear_joinreq_param(tpAniSirGlobal mac_ctx,
 QDF_STATUS csr_issue_stored_joinreq(tpAniSirGlobal mac_ctx,
 		uint32_t *roam_id,
 		uint32_t session_id);
-#ifdef FEATURE_WLAN_DIAG_SUPPORT
-void csr_diag_event_report(tpAniSirGlobal pmac, uint16_t event_type,
-			   uint16_t status, uint16_t reasoncode);
-#endif
 QDF_STATUS csr_get_channels_and_power(tpAniSirGlobal pMac);
 
 /* csr_scan_process_single_bssdescr() - Add a bssdescriptor to scan table

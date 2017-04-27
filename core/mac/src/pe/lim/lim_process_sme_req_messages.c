@@ -134,11 +134,11 @@ static void lim_process_ext_change_channel(tpAniSirGlobal mac_ctx,
 static QDF_STATUS lim_process_set_hw_mode(tpAniSirGlobal mac, uint32_t *msg)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	struct scheduler_msg message;
+	struct scheduler_msg message = {0};
 	struct policy_mgr_hw_mode *req_msg;
 	uint32_t len;
 	struct s_sir_set_hw_mode *buf;
-	struct scheduler_msg resp_msg;
+	struct scheduler_msg resp_msg = {0};
 	struct sir_set_hw_mode_resp *param;
 
 	buf = (struct s_sir_set_hw_mode *) msg;
@@ -205,11 +205,11 @@ static QDF_STATUS lim_process_set_dual_mac_cfg_req(tpAniSirGlobal mac,
 		uint32_t *msg)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	struct scheduler_msg message;
+	struct scheduler_msg message = {0};
 	struct sir_dual_mac_config *req_msg;
 	uint32_t len;
 	struct sir_set_dual_mac_cfg *buf;
-	struct scheduler_msg resp_msg;
+	struct scheduler_msg resp_msg = {0};
 	struct sir_dual_mac_config_resp *param;
 
 	buf = (struct sir_set_dual_mac_cfg *) msg;
@@ -277,10 +277,10 @@ static QDF_STATUS lim_process_set_antenna_mode_req(tpAniSirGlobal mac,
 		uint32_t *msg)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	struct scheduler_msg message;
+	struct scheduler_msg message = {0};
 	struct sir_antenna_mode_param *req_msg;
 	struct sir_set_antenna_mode *buf;
-	struct scheduler_msg resp_msg;
+	struct scheduler_msg resp_msg = {0};
 	struct sir_antenna_mode_resp *param;
 
 	buf = (struct sir_set_antenna_mode *) msg;
@@ -465,7 +465,7 @@ static uint16_t __lim_get_sme_join_req_size_for_alloc(uint8_t *pBuf)
 
 	pBuf += sizeof(uint16_t);
 	len = lim_get_u16(pBuf);
-	return len + sizeof(uint16_t);
+	return len;
 }
 
 /**
@@ -547,7 +547,7 @@ __lim_is_defered_msg_for_radar(tpAniSirGlobal mac_ctx,
 
 static bool __lim_process_sme_sys_ready_ind(tpAniSirGlobal pMac, uint32_t *pMsgBuf)
 {
-	struct scheduler_msg msg;
+	struct scheduler_msg msg = {0};
 	tSirSmeReadyReq *ready_req = (tSirSmeReadyReq *) pMsgBuf;
 
 	msg.type = WMA_SYS_READY_IND;
@@ -1047,7 +1047,10 @@ __lim_handle_sme_start_bss_request(tpAniSirGlobal mac_ctx, uint32_t *msg_buf)
 		mlm_start_req->cbMode = sme_start_bss_req->cbMode;
 		mlm_start_req->beaconPeriod =
 			session->beaconParams.beaconInterval;
-
+		mlm_start_req->cac_duration_ms =
+			sme_start_bss_req->cac_duration_ms;
+		mlm_start_req->dfs_regdomain =
+			sme_start_bss_req->dfs_regdomain;
 		if (LIM_IS_AP_ROLE(session)) {
 			mlm_start_req->dtimPeriod = session->dtimPeriod;
 			mlm_start_req->wps_state = session->wps_state;
@@ -1230,7 +1233,7 @@ static QDF_STATUS lim_send_hal_start_scan_offload_req(tpAniSirGlobal pMac,
 {
 	tSirScanOffloadReq *pScanOffloadReq;
 	uint8_t *p;
-	struct scheduler_msg msg;
+	struct scheduler_msg msg = {0};
 	uint16_t i, len;
 	uint16_t addn_ie_len = 0;
 	tSirRetStatus status, rc = eSIR_SUCCESS;
@@ -1963,7 +1966,7 @@ __lim_process_sme_join_req(tpAniSirGlobal mac_ctx, uint32_t *msg_buf)
 
 		/* Enable the spectrum management if this is a DFS channel */
 		if (session->country_info_present &&
-			lim_isconnected_on_dfs_channel(
+			lim_isconnected_on_dfs_channel(mac_ctx,
 					session->currentOperChannel))
 			session->spectrumMgtEnabled = true;
 
@@ -2312,7 +2315,7 @@ static void __lim_process_sme_reassoc_req(tpAniSirGlobal mac_ctx,
 
 	/* Enable the spectrum management if this is a DFS channel */
 	if (session_entry->country_info_present &&
-		lim_isconnected_on_dfs_channel(
+			lim_isconnected_on_dfs_channel(mac_ctx,
 				session_entry->currentOperChannel))
 		session_entry->spectrumMgtEnabled = true;
 
@@ -2441,7 +2444,7 @@ static void __lim_process_sme_disassoc_req(tpAniSirGlobal pMac, uint32_t *pMsgBu
 
 	psessionEntry->smeSessionId = smesessionId;
 	psessionEntry->transactionId = smetransactionId;
-	lim_log(pMac, LOGW, FL("ho_fail: %d "), smeDisassocReq.process_ho_fail);
+	lim_log(pMac, LOGD, FL("ho_fail: %d "), smeDisassocReq.process_ho_fail);
 	psessionEntry->process_ho_fail = smeDisassocReq.process_ho_fail;
 
 	switch (GET_LIM_SYSTEM_ROLE(psessionEntry)) {
@@ -3992,7 +3995,7 @@ static void
 __lim_process_sme_get_statistics_request(tpAniSirGlobal pMac, uint32_t *pMsgBuf)
 {
 	tpAniGetPEStatsReq pPEStatsReq;
-	struct scheduler_msg msgQ;
+	struct scheduler_msg msgQ = {0};
 
 	pPEStatsReq = (tpAniGetPEStatsReq) pMsgBuf;
 
@@ -4025,7 +4028,7 @@ __lim_process_sme_get_statistics_request(tpAniSirGlobal pMac, uint32_t *pMsgBuf)
 static void
 __lim_process_sme_get_tsm_stats_request(tpAniSirGlobal pMac, uint32_t *pMsgBuf)
 {
-	struct scheduler_msg msgQ;
+	struct scheduler_msg msgQ = {0};
 
 	msgQ.type = WMA_TSM_STATS_REQ;
 	msgQ.reserved = 0;
@@ -4091,7 +4094,7 @@ lim_send_vdev_restart(tpAniSirGlobal pMac,
 		      tpPESession psessionEntry, uint8_t sessionId)
 {
 	tpHalHiddenSsidVdevRestart pHalHiddenSsidVdevRestart = NULL;
-	struct scheduler_msg msgQ;
+	struct scheduler_msg msgQ = {0};
 	tSirRetStatus retCode = eSIR_SUCCESS;
 
 	if (psessionEntry == NULL) {
@@ -4140,7 +4143,7 @@ static void __lim_process_roam_scan_offload_req(tpAniSirGlobal mac_ctx,
 						uint32_t *msg_buf)
 {
 	tpPESession pe_session;
-	struct scheduler_msg wma_msg;
+	struct scheduler_msg wma_msg = {0};
 	tSirRetStatus status;
 	tSirRoamOffloadScanReq *req_buffer;
 	uint16_t local_ie_len;
@@ -4154,6 +4157,7 @@ static void __lim_process_roam_scan_offload_req(tpAniSirGlobal mac_ctx,
 	if (!local_ie_buf) {
 		lim_log(mac_ctx, LOGE,
 			FL("Mem Alloc failed for local_ie_buf"));
+		qdf_mem_free(req_buffer);
 		return;
 	}
 
@@ -4379,7 +4383,7 @@ static void __lim_process_sme_set_ht2040_mode(tpAniSirGlobal pMac,
 	tpSirSetHT2040Mode pSetHT2040Mode;
 	tpPESession psessionEntry;
 	uint8_t sessionId = 0;
-	struct scheduler_msg msg;
+	struct scheduler_msg msg = {0};
 	tUpdateVHTOpMode *pHtOpMode = NULL;
 	uint16_t staId = 0;
 	tpDphHashNode pStaDs = NULL;
@@ -4542,7 +4546,7 @@ lim_send_set_max_tx_power_req(tpAniSirGlobal pMac, int8_t txPower,
 {
 	tpMaxTxPowerParams pMaxTxParams = NULL;
 	tSirRetStatus retCode = eSIR_SUCCESS;
-	struct scheduler_msg msgQ;
+	struct scheduler_msg msgQ = {0};
 
 	if (pSessionEntry == NULL) {
 		lim_log(pMac, LOGE, FL("Inavalid parameters"));
@@ -4890,7 +4894,7 @@ static void lim_set_pdev_ht_ie(tpAniSirGlobal mac_ctx, uint8_t pdev_id,
 		uint8_t nss)
 {
 	struct set_ie_param *ie_params;
-	struct scheduler_msg msg;
+	struct scheduler_msg msg = {0};
 	tSirRetStatus rc = eSIR_SUCCESS;
 	uint8_t *p_ie = NULL;
 	tHtCaps *p_ht_cap;
@@ -4964,7 +4968,7 @@ static void lim_set_pdev_vht_ie(tpAniSirGlobal mac_ctx, uint8_t pdev_id,
 		uint8_t nss)
 {
 	struct set_ie_param *ie_params;
-	struct scheduler_msg msg;
+	struct scheduler_msg msg = {0};
 	tSirRetStatus rc = eSIR_SUCCESS;
 	uint8_t *p_ie = NULL;
 	tSirMacVHTCapabilityInfo *vht_cap;
@@ -5574,7 +5578,9 @@ static void lim_process_sme_channel_change_request(tpAniSirGlobal mac_ctx,
 			session_entry->ch_center_freq_seg0,
 			session_entry->ch_center_freq_seg1,
 			session_entry->ch_width,
-			max_tx_pwr, session_entry->peSessionId);
+			max_tx_pwr, session_entry->peSessionId,
+			ch_change_req->cac_duration_ms,
+			ch_change_req->dfs_regdomain);
 }
 
 /******************************************************************************
@@ -5978,7 +5984,7 @@ static void send_extended_chan_switch_action_frame(tpAniSirGlobal mac_ctx,
 	tpDphHashNode psta;
 
 
-	op_class = cds_reg_dmn_get_opclass_from_channel(
+	op_class = wlan_reg_dmn_get_opclass_from_channel(
 				mac_ctx->scan.countryCodeCurrent,
 				new_channel,
 				ch_bandwidth);

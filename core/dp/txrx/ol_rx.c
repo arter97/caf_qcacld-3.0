@@ -158,8 +158,7 @@ void ol_rx_update_histogram_stats(uint32_t msdu_count, uint8_t frag_ind,
 	struct ol_txrx_pdev_t *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 
 	if (!pdev) {
-		TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
-			"%s pdev is NULL\n", __func__);
+		ol_txrx_err("%s pdev is NULL\n", __func__);
 		return;
 	}
 
@@ -680,13 +679,11 @@ ol_rx_sec_ind_handler(ol_txrx_pdev_handle pdev,
 
 	peer = ol_txrx_peer_find_by_id(pdev, peer_id);
 	if (!peer) {
-		TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
-			   "Couldn't find peer from ID %d - skipping security inits\n",
+		ol_txrx_err("Couldn't find peer from ID %d - skipping security inits\n",
 			   peer_id);
 		return;
 	}
-	TXRX_PRINT(TXRX_PRINT_LEVEL_INFO1,
-		   "sec spec for peer %p (%02x:%02x:%02x:%02x:%02x:%02x): "
+	ol_txrx_dbg("sec spec for peer %p (%02x:%02x:%02x:%02x:%02x:%02x): "
 		   "%s key of type %d\n",
 		   peer,
 		   peer->mac_addr.raw[0], peer->mac_addr.raw[1],
@@ -1099,8 +1096,7 @@ ol_rx_deliver(struct ol_txrx_vdev_t *vdev,
 			htt_rx_msdu_first_msdu_flag(htt_pdev, rx_desc);
 		if (OL_RX_DECAP(vdev, peer, msdu, &info) != A_OK) {
 			discard = 1;
-			TXRX_PRINT(TXRX_PRINT_LEVEL_WARN,
-				   "decap error %p from peer %p "
+			ol_txrx_dbg("decap error %p from peer %p "
 				   "(%02x:%02x:%02x:%02x:%02x:%02x) len %d\n",
 				   msdu, peer,
 				   peer->mac_addr.raw[0], peer->mac_addr.raw[1],
@@ -1277,8 +1273,7 @@ ol_rx_discard(struct ol_txrx_vdev_t *vdev,
 		qdf_nbuf_t msdu = msdu_list;
 
 		msdu_list = qdf_nbuf_next(msdu_list);
-		TXRX_PRINT(TXRX_PRINT_LEVEL_INFO1,
-			   "discard rx %p from partly-deleted peer %p "
+		ol_txrx_dbg("discard rx %p from partly-deleted peer %p "
 			   "(%02x:%02x:%02x:%02x:%02x:%02x)\n",
 			   msdu, peer,
 			   peer->mac_addr.raw[0], peer->mac_addr.raw[1],
@@ -1348,6 +1343,9 @@ ol_rx_in_order_indication_handler(ol_txrx_pdev_handle pdev,
 	htt_pdev_handle htt_pdev = NULL;
 	int status;
 	qdf_nbuf_t head_msdu, tail_msdu = NULL;
+	uint8_t *rx_ind_data;
+	uint32_t *msg_word;
+	uint32_t msdu_count;
 #ifdef WDI_EVENT_ENABLE
 	uint8_t pktlog_bit;
 #endif
@@ -1359,8 +1357,7 @@ ol_rx_in_order_indication_handler(ol_txrx_pdev_handle pdev,
 			peer = ol_txrx_peer_find_by_id(pdev, peer_id);
 		htt_pdev = pdev->htt_pdev;
 	} else {
-		TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
-			   "%s: Invalid pdev passed!\n", __func__);
+		ol_txrx_err("%s: Invalid pdev passed!\n", __func__);
 		qdf_assert_always(pdev);
 		return;
 	}
@@ -1374,6 +1371,11 @@ ol_rx_in_order_indication_handler(ol_txrx_pdev_handle pdev,
 	pktlog_bit = (htt_rx_amsdu_rx_in_order_get_pktlog(rx_ind_msg) == 0x01);
 #endif
 
+	rx_ind_data = qdf_nbuf_data(rx_ind_msg);
+	msg_word = (uint32_t *)rx_ind_data;
+	/* Get the total number of MSDUs */
+	msdu_count = HTT_RX_IN_ORD_PADDR_IND_MSDU_CNT_GET(*(msg_word + 1));
+
 	/*
 	 * Get a linked list of the MSDUs in the rx in order indication.
 	 * This also attaches each rx MSDU descriptor to the
@@ -1381,15 +1383,14 @@ ol_rx_in_order_indication_handler(ol_txrx_pdev_handle pdev,
 	 */
 	status = htt_rx_amsdu_pop(htt_pdev, rx_ind_msg, &head_msdu, &tail_msdu);
 	if (qdf_unlikely(0 == status)) {
-		TXRX_PRINT(TXRX_PRINT_LEVEL_WARN,
-			   "%s: Pop status is 0, returning here\n", __func__);
+		ol_txrx_warn("%s: Pop status is 0, returning here\n", __func__);
 		return;
 	}
 
 	/* Replenish the rx buffer ring first to provide buffers to the target
 	   rather than waiting for the indeterminate time taken by the OS
 	   to consume the rx frames */
-	htt_rx_msdu_buff_replenish(htt_pdev);
+	htt_rx_msdu_buff_in_order_replenish(htt_pdev, msdu_count);
 
 	/* Send the chain of MSDUs to the OS */
 	/* rx_opt_proc takes a NULL-terminated list of msdu netbufs */
@@ -1405,7 +1406,7 @@ ol_rx_in_order_indication_handler(ol_txrx_pdev_handle pdev,
 	if (peer) {
 		vdev = peer->vdev;
 	} else {
-		TXRX_PRINT(TXRX_PRINT_LEVEL_INFO2,
+		ol_txrx_dbg(
 			   "%s: Couldn't find peer from ID 0x%x\n",
 			   __func__, peer_id);
 		while (head_msdu) {
@@ -1449,15 +1450,13 @@ void ol_rx_pkt_dump_call(
 	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 
 	if (!pdev) {
-		TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
-			"%s: pdev is NULL", __func__);
+		ol_txrx_err("%s: pdev is NULL", __func__);
 		return;
 	}
 
 	peer = ol_txrx_peer_find_by_id(pdev, peer_id);
 	if (!peer) {
-		TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
-			"%s: peer with peer id %d is NULL", __func__,
+		ol_txrx_dbg("%s: peer with peer id %d is NULL", __func__,
 			peer_id);
 		return;
 	}

@@ -66,7 +66,6 @@
 #include "csr_api.h"
 #include "ol_fw.h"
 
-#include "dfs.h"
 #include "wma_internal.h"
 #include "cdp_txrx_flow_ctrl_legacy.h"
 #include "cdp_txrx_cmn.h"
@@ -2155,7 +2154,7 @@ int wma_thermal_mgmt_evt_handler(void *handle, uint8_t *event,
 int wma_ibss_peer_info_event_handler(void *handle, uint8_t *data,
 					    uint32_t len)
 {
-	struct scheduler_msg cds_msg;
+	struct scheduler_msg cds_msg = {0};
 	wmi_peer_info *peer_info;
 	void *pdev;
 	tSirIbssPeerInfoParams *pSmeRsp;
@@ -2440,6 +2439,7 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 
 	if (NULL == wma_handle) {
 		WMA_LOGE("wma_handle is NULL");
+		cds_packet_free((void *)tx_frame);
 		return QDF_STATUS_E_FAILURE;
 	}
 	iface = &wma_handle->interfaces[vdev_id];
@@ -2448,6 +2448,7 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 
 	if (!txrx_vdev) {
 		WMA_LOGE("TxRx Vdev Handle is NULL");
+		cds_packet_free((void *)tx_frame);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -2460,12 +2461,14 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 
 	if (frmType >= TXRX_FRM_MAX) {
 		WMA_LOGE("Invalid Frame Type Fail to send Frame");
+		cds_packet_free((void *)tx_frame);
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	pMac = cds_get_context(QDF_MODULE_ID_PE);
 	if (!pMac) {
 		WMA_LOGE("pMac Handle is NULL");
+		cds_packet_free((void *)tx_frame);
 		return QDF_STATUS_E_FAILURE;
 	}
 	/*
@@ -2475,6 +2478,7 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 	if (!((frmType == TXRX_FRM_802_11_MGMT) ||
 	      (frmType == TXRX_FRM_802_11_DATA))) {
 		WMA_LOGE("No Support to send other frames except 802.11 Mgmt/Data");
+		cds_packet_free((void *)tx_frame);
 		return QDF_STATUS_E_FAILURE;
 	}
 #ifdef WLAN_FEATURE_11W
@@ -2592,6 +2596,7 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 
 		if (pdev == NULL) {
 			WMA_LOGE("%s: pdev pointer is not available", __func__);
+			cds_packet_free((void *)tx_frame);
 			return QDF_STATUS_E_FAULT;
 		}
 
@@ -2615,6 +2620,7 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 				} else {
 					WMA_LOGE("%s: Already one Data pending for Ack, reject Tx of data frame",
 						__func__);
+					cds_packet_free((void *)tx_frame);
 					return QDF_STATUS_E_FAILURE;
 				}
 			}
@@ -2624,6 +2630,7 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 			 * so Ack Complete Cb is must
 			 */
 			WMA_LOGE("No Ack Complete Cb. Don't Allow");
+			cds_packet_free((void *)tx_frame);
 			return QDF_STATUS_E_FAILURE;
 		}
 
@@ -2684,6 +2691,7 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 				txrx_vdev);
 	if (ctrl_pdev == NULL) {
 		WMA_LOGE("ol_pdev_handle is NULL\n");
+		cds_packet_free((void *)tx_frame);
 		return QDF_STATUS_E_FAILURE;
 	}
 	is_high_latency = cdp_cfg_is_high_latency(soc, ctrl_pdev);
@@ -2760,7 +2768,7 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 		if ((pFc->type == SIR_MAC_MGMT_FRAME) &&
 		    (pFc->subType != SIR_MAC_MGMT_PROBE_REQ) &&
 		    (pFc->subType != SIR_MAC_MGMT_PROBE_RSP)) {
-			WMA_LOGE("TX MGMT - Type %hu, SubType %hu seq_num[%d]",
+			WMA_LOGD("TX MGMT - Type %hu, SubType %hu seq_num[%d]",
 				 pFc->type, pFc->subType,
 				 ((mHdr->seqControl.seqNumHi << 4) |
 				 mHdr->seqControl.seqNumLo));
@@ -2852,7 +2860,7 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 			 * WMA_TX_FRAME_COMPLETE_TIMEOUT (1 sec)
 			 */
 			/* display scheduler stats */
-			cdp_display_stats(soc, WLAN_SCHEDULER_STATS);
+			return cdp_display_stats(soc, CDP_SCHEDULER_STATS);
 		}
 	}
 
@@ -2921,7 +2929,7 @@ void ol_rx_err(void *pdev, uint8_t vdev_id,
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
 	tpSirSmeMicFailureInd mic_err_ind;
 	struct ether_header *eth_hdr;
-	struct scheduler_msg cds_msg;
+	struct scheduler_msg cds_msg = {0};
 
 	if (NULL == wma) {
 		WMA_LOGE("%s: Failed to get wma", __func__);
@@ -3001,7 +3009,7 @@ void wma_tx_abort(uint8_t vdev_id)
 			 __func__, iface->handle);
 		return;
 	}
-	WMA_LOGI("%s: vdevid %d bssid %pM", __func__, vdev_id, iface->bssid);
+	WMA_LOGD("%s: vdevid %d bssid %pM", __func__, vdev_id, iface->bssid);
 	wma_vdev_set_pause_bit(vdev_id, PAUSE_TYPE_HOST);
 	cdp_fc_vdev_pause(cds_get_context(QDF_MODULE_ID_SOC),
 			iface->handle,
@@ -3071,7 +3079,7 @@ wma_indicate_err(
 	{
 		tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
 		tpSirSmeMicFailureInd mic_err_ind;
-		struct scheduler_msg cds_msg;
+		struct scheduler_msg cds_msg = {0};
 		uint8_t vdev_id;
 
 		if (NULL == wma) {

@@ -35,6 +35,8 @@
 #include "cdp_txrx_tx_delay.h"
 #include "cdp_txrx_misc.h"
 #include <cdp_txrx_handle.h>
+
+#ifndef WLAN_FEATURE_NAN_CONVERGENCE
 /**
  * wma_handle_ndp_initiator_req() - NDP initiator request handler
  * @wma_handle: wma handle
@@ -666,7 +668,7 @@ static int wma_ndp_end_indication_event_handler(void *handle,
 	tp_wma_handle wma_handle = handle;
 	WMI_NDP_END_INDICATION_EVENTID_param_tlvs *event;
 	wmi_ndp_end_indication *ind;
-	struct scheduler_msg pe_msg;
+	struct scheduler_msg pe_msg = {0};
 	struct ndp_end_indication_event *ndp_event_buf;
 	int i, ret, buf_size;
 	struct qdf_mac_addr peer_addr;
@@ -944,6 +946,7 @@ void wma_ndp_wow_event_callback(void *handle, void *event, uint32_t len,
 		break;
 	}
 }
+#endif /* WLAN_FEATURE_NAN_CONVERGENCE */
 
 /**
  * wma_add_bss_ndi_mode() - Process BSS creation request while adding NaN
@@ -1034,6 +1037,7 @@ send_fail_resp:
 	wma_send_msg(wma, WMA_ADD_BSS_RSP, (void *)add_bss, 0);
 }
 
+#ifndef WLAN_FEATURE_NAN_CONVERGENCE
 /**
  * wma_register_ndp_cb() - Register NDP callbacks
  * @pe_ndp_event_handler: PE NDP callback routine pointer
@@ -1057,6 +1061,7 @@ QDF_STATUS wma_register_ndp_cb(QDF_STATUS (*pe_ndp_event_handler)
 	WMA_LOGD("Registered NDP callbacks with WMA successfully");
 	return QDF_STATUS_SUCCESS;
 }
+#endif /* WLAN_FEATURE_NAN_CONVERGENCE */
 
 /**
  * wma_add_sta_ndi_mode() - Process ADD_STA for NaN Data path
@@ -1200,4 +1205,3 @@ send_del_rsp:
 		wma_send_msg(wma, WMA_DELETE_STA_RSP, del_sta, 0);
 	}
 }
-

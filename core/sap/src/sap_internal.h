@@ -166,9 +166,6 @@ typedef struct sSapContext {
 	tCsrRoamProfile csr_roamProfile;
 	uint32_t csr_roamId;
 
-	/* Sap session */
-	bool isSapSessionOpen;
-
 	/* SAP event Callback to hdd */
 	tpWLAN_SAPEventCB pfnSapEventCallback;
 
@@ -215,7 +212,7 @@ typedef struct sSapContext {
 	uint8_t num_of_channel;
 	tSapChannelListInfo SapChnlList;
 	uint16_t ch_width_orig;
-	struct ch_params_s ch_params;
+	struct ch_params ch_params;
 
 	/* session to scan */
 	bool isScanSessionOpen;
@@ -280,6 +277,7 @@ typedef struct sSapContext {
 	wlan_scan_requester req_id;
 	uint8_t sap_acs_pre_start_bss;
 	uint8_t sap_sta_id;
+	bool dfs_cac_offload;
 } *ptSapContext;
 
 /*----------------------------------------------------------------------------
@@ -379,12 +377,8 @@ QDF_STATUS sap_acquire_global_lock(ptSapContext pSapCtx);
 QDF_STATUS sap_release_global_lock(ptSapContext pSapCtx);
 
 #ifdef FEATURE_WLAN_CH_AVOID
-void sap_update_unsafe_channel_list(ptSapContext pSapCtx);
+void sap_update_unsafe_channel_list(tHalHandle hal, ptSapContext pSapCtx);
 #endif /* FEATURE_WLAN_CH_AVOID */
-
-uint8_t
-sap_indicate_radar(ptSapContext sapContext,
-		 tSirSmeDfsEventInd *dfs_event);
 
 QDF_STATUS sap_init_dfs_channel_nol_list(ptSapContext sapContext);
 
@@ -440,6 +434,30 @@ QDF_STATUS sap_close_session(tHalHandle hHal,
 			     ptSapContext sapContext,
 			     csr_roamSessionCloseCallback callback, bool valid);
 /**
+ * sap_set_session_param() - set sap related param to sap context and global var
+ * @hal: pointer to hardware abstraction layer
+ * @sapctx: pointer to sapctx
+ * @session_id: session id for sap
+ *
+ * This API will set appropriate softap parameters to sap context
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sap_set_session_param(tHalHandle hal, ptSapContext sapctx,
+				uint32_t session_id);
+/**
+ * sap_clear_session_param() - clear sap related param from sap context
+ * @hal: pointer to hardware abstraction layer
+ * @sapctx: pointer to sapctx
+ * @session_id: session id for sap
+ *
+ * This API will clear appropriate softap parameters from sap context
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sap_clear_session_param(tHalHandle hal, ptSapContext sapctx,
+				uint32_t session_id);
+/**
  * sap_mark_leaking_ch() - to mark channel leaking in to nol
  * @sap_ctx: pointer to SAP context
  * @ch_width: channel width
@@ -462,6 +480,16 @@ sap_mark_leaking_ch(ptSapContext sap_ctx,
 
 void sap_scan_event_callback(struct wlan_objmgr_vdev *vdev,
 			struct scan_event *event, void *arg);
+
+/**
+ * sap_indicate_radar() - Process radar indication
+ * @sap_ctx: pointer to sap context
+ *
+ * process radar indication.
+ *
+ * Return: channel to which sap wishes to switch.
+ */
+uint8_t sap_indicate_radar(ptSapContext sap_ctx);
 
 #ifdef __cplusplus
 }

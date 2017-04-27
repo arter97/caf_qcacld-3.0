@@ -453,7 +453,7 @@ static bool put_wifi_iface_stats(tpSirWifiIfaceStat pWifiIfaceStat,
 
 	average_tsf_offset =  pWifiIfaceStat->avg_bcn_spread_offset_high;
 	average_tsf_offset =  (average_tsf_offset << 32) |
-		pWifiIfaceStat->avg_bcn_spread_offset_low ;
+		pWifiIfaceStat->avg_bcn_spread_offset_low;
 
 	if (nla_put_u32(vendor_event,
 			QCA_WLAN_VENDOR_ATTR_LL_STATS_TYPE,
@@ -493,7 +493,19 @@ static bool put_wifi_iface_stats(tpSirWifiIfaceStat pWifiIfaceStat,
 			pWifiIfaceStat->rx_leak_window) ||
 	    hdd_wlan_nla_put_u64(vendor_event,
 			QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_AVERAGE_TSF_OFFSET,
-			average_tsf_offset)) {
+			average_tsf_offset) ||
+	    nla_put_u32(vendor_event,
+			QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_RTS_SUCC_CNT,
+			pWifiIfaceStat->rts_succ_cnt) ||
+	    nla_put_u32(vendor_event,
+			QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_RTS_FAIL_CNT,
+			pWifiIfaceStat->rts_fail_cnt) ||
+	    nla_put_u32(vendor_event,
+			QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_PPDU_SUCC_CNT,
+			pWifiIfaceStat->ppdu_succ_cnt) ||
+	    nla_put_u32(vendor_event,
+			QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_PPDU_FAIL_CNT,
+			pWifiIfaceStat->ppdu_fail_cnt)) {
 		hdd_err("QCA_WLAN_VENDOR_ATTR put fail");
 		return false;
 	}
@@ -646,7 +658,7 @@ static void hdd_link_layer_process_peer_stats(hdd_adapter_t *pAdapter,
 	if (0 != status)
 		return;
 
-	hdd_notice("LL_STATS_PEER_ALL : numPeers %u, more data = %u",
+	hdd_debug("LL_STATS_PEER_ALL : numPeers %u, more data = %u",
 		   pWifiPeerStat->numPeers, more_data);
 
 	/*
@@ -685,6 +697,7 @@ static void hdd_link_layer_process_peer_stats(hdd_adapter_t *pAdapter,
 
 	if (pWifiPeerStat->numPeers) {
 		struct nlattr *peerInfo;
+
 		peerInfo = nla_nest_start(vendor_event,
 					  QCA_WLAN_VENDOR_ATTR_LL_STATS_PEER_INFO);
 		if (peerInfo == NULL) {
@@ -724,9 +737,9 @@ static void hdd_link_layer_process_peer_stats(hdd_adapter_t *pAdapter,
 		}
 		nla_nest_end(vendor_event, peerInfo);
 	}
+
 	cfg80211_vendor_cmd_reply(vendor_event);
 	EXIT();
-	return;
 }
 
 /**
@@ -773,7 +786,7 @@ static void hdd_link_layer_process_iface_stats(hdd_adapter_t *pAdapter,
 		return;
 	}
 
-	hdd_notice("WMI_LINK_STATS_IFACE Data");
+	hdd_debug("WMI_LINK_STATS_IFACE Data");
 
 	if (false == hdd_get_interface_info(pAdapter, &pWifiIfaceStat->info)) {
 		hdd_err("hdd_get_interface_info get fail");
@@ -790,7 +803,6 @@ static void hdd_link_layer_process_iface_stats(hdd_adapter_t *pAdapter,
 
 	cfg80211_vendor_cmd_reply(vendor_event);
 	EXIT();
-	return;
 }
 
 /**
@@ -995,10 +1007,10 @@ static void hdd_link_layer_process_radio_stats(hdd_adapter_t *pAdapter,
 	if (0 != status)
 		return;
 
-	hdd_notice("LL_STATS_RADIO: number of radios: %u", num_radio);
+	hdd_debug("LL_STATS_RADIO: number of radios: %u", num_radio);
 
 	for (i = 0; i < num_radio; i++) {
-		hdd_notice("LL_STATS_RADIO"
+		hdd_debug("LL_STATS_RADIO"
 		       " radio: %u onTime: %u txTime: %u rxTime: %u"
 		       " onTimeScan: %u onTimeNbd: %u"
 		       " onTimeGscan: %u onTimeRoamScan: %u"
@@ -1024,8 +1036,8 @@ static void hdd_link_layer_process_radio_stats(hdd_adapter_t *pAdapter,
 
 		pWifiRadioStat++;
 	}
+
 	EXIT();
-	return;
 }
 
 /**
@@ -1061,12 +1073,12 @@ void wlan_hdd_cfg80211_link_layer_stats_callback(void *ctx,
 		return;
 	}
 
-	hdd_notice("Link Layer Indication indType: %d", indType);
+	hdd_debug("Link Layer Indication indType: %d", indType);
 
 	switch (indType) {
 	case SIR_HAL_LL_STATS_RESULTS_RSP:
 	{
-		hdd_notice("LL_STATS RESP paramID = 0x%x, ifaceId = %u, respId= %u , moreResultToFollow = %u, num radio = %u result = %p",
+		hdd_debug("LL_STATS RESP paramID = 0x%x, ifaceId = %u, respId= %u , moreResultToFollow = %u, num radio = %u result = %p",
 			linkLayerStatsResults->paramId,
 			linkLayerStatsResults->ifaceId,
 			linkLayerStatsResults->rspId,
@@ -1141,11 +1153,9 @@ void wlan_hdd_cfg80211_link_layer_stats_callback(void *ctx,
 		break;
 	}
 	default:
-		hdd_err("invalid event type %d", indType);
+		hdd_warn("invalid event type %d", indType);
 		break;
 	}
-
-	return;
 }
 
 void hdd_lost_link_info_cb(void *context,
@@ -1171,7 +1181,7 @@ void hdd_lost_link_info_cb(void *context,
 	}
 
 	adapter->rssi_on_disconnect = lost_link_info->rssi;
-	hdd_info("rssi on disconnect %d", adapter->rssi_on_disconnect);
+	hdd_debug("rssi on disconnect %d", adapter->rssi_on_disconnect);
 }
 
 const struct
@@ -1248,7 +1258,7 @@ __wlan_hdd_cfg80211_ll_stats_set(struct wiphy *wiphy,
 
 	LinkLayerStatsSetReq.staId = pAdapter->sessionId;
 
-	hdd_notice("LL_STATS_SET reqId = %d, staId = %d, mpduSizeThreshold = %d, Statistics Gathering = %d",
+	hdd_debug("LL_STATS_SET reqId = %d, staId = %d, mpduSizeThreshold = %d, Statistics Gathering = %d",
 		LinkLayerStatsSetReq.reqId, LinkLayerStatsSetReq.staId,
 		LinkLayerStatsSetReq.mpduSizeThreshold,
 		LinkLayerStatsSetReq.aggressiveStatisticsGathering);
@@ -1470,7 +1480,7 @@ __wlan_hdd_cfg80211_ll_stats_clear(struct wiphy *wiphy,
 		return -EINVAL;
 
 	if (!pAdapter->isLinkLayerStatsSet) {
-		hdd_alert("isLinkLayerStatsSet : %d",
+		hdd_warn("isLinkLayerStatsSet : %d",
 			  pAdapter->isLinkLayerStatsSet);
 		return -EINVAL;
 	}
@@ -1503,7 +1513,7 @@ __wlan_hdd_cfg80211_ll_stats_clear(struct wiphy *wiphy,
 
 	LinkLayerStatsClearReq.staId = pAdapter->sessionId;
 
-	hdd_notice("LL_STATS_CLEAR reqId = %d, staId = %d, statsClearReqMask = 0x%X, stopReq = %d",
+	hdd_debug("LL_STATS_CLEAR reqId = %d, staId = %d, statsClearReqMask = 0x%X, stopReq = %d",
 		LinkLayerStatsClearReq.reqId,
 		LinkLayerStatsClearReq.staId,
 		LinkLayerStatsClearReq.statsClearReqMask,
@@ -1571,6 +1581,211 @@ int wlan_hdd_cfg80211_ll_stats_clear(struct wiphy *wiphy,
 	cds_ssr_unprotect(__func__);
 
 	return ret;
+}
+
+/**
+ * hdd_populate_per_peer_ps_info() - populate per peer sta's PS info
+ * @wifi_peer_info: peer information
+ * @vendor_event: buffer for vendor event
+ *
+ * Return: 0 success
+ */
+static inline int
+hdd_populate_per_peer_ps_info(tSirWifiPeerInfo *wifi_peer_info,
+			      struct sk_buff *vendor_event)
+{
+	if (!wifi_peer_info) {
+		hdd_err("Invalid pointer to peer info.");
+		return -EINVAL;
+	}
+
+	if (nla_put_u32(vendor_event,
+			QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_PEER_PS_STATE,
+			wifi_peer_info->power_saving) ||
+	    nla_put(vendor_event,
+		    QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_PEER_MAC_ADDRESS,
+		    QDF_MAC_ADDR_SIZE, &wifi_peer_info->peerMacAddress)) {
+		hdd_err("QCA_WLAN_VENDOR_ATTR put fail.");
+		return -EINVAL;
+	}
+	return 0;
+}
+
+/**
+ * hdd_populate_wifi_peer_ps_info() - populate peer sta's power state
+ * @data: stats for peer STA
+ * @vendor_event: buffer for vendor event
+ *
+ * Return: 0 success
+ */
+static int hdd_populate_wifi_peer_ps_info(tSirWifiPeerStat *data,
+					  struct sk_buff *vendor_event)
+{
+	uint32_t peer_num, i;
+	tSirWifiPeerInfo *wifi_peer_info;
+	struct nlattr *peer_info, *peers;
+
+	if (!data) {
+		hdd_err("Invalid pointer to Wifi peer stat.");
+		return -EINVAL;
+	}
+
+	peer_num = data->numPeers;
+	if (peer_num == 0) {
+		hdd_err("Peer number is zero.");
+		return -EINVAL;
+	}
+
+	if (nla_put_u32(vendor_event,
+			QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_PEER_NUM,
+			peer_num)) {
+		hdd_err("QCA_WLAN_VENDOR_ATTR put fail");
+		return -EINVAL;
+	}
+
+	peer_info = nla_nest_start(vendor_event,
+			       QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_PEER_PS_CHG);
+	if (peer_info == NULL) {
+		hdd_err("nla_nest_start failed");
+		return -EINVAL;
+	}
+
+	for (i = 0; i < peer_num; i++) {
+		wifi_peer_info = &data->peerInfo[i];
+		peers = nla_nest_start(vendor_event, i);
+
+		if (peers == NULL) {
+			hdd_err("nla_nest_start failed");
+			return -EINVAL;
+		}
+
+		if (hdd_populate_per_peer_ps_info(wifi_peer_info, vendor_event))
+			return -EINVAL;
+
+		nla_nest_end(vendor_event, peers);
+	}
+	nla_nest_end(vendor_event, peer_info);
+
+	return 0;
+}
+
+/**
+ * hdd_populate_tx_failure_info() - populate TX failure info
+ * @tx_fail: TX failure info
+ * @skb: buffer for vendor event
+ *
+ * Return: 0 Success
+ */
+static inline int
+hdd_populate_tx_failure_info(struct sir_wifi_iface_tx_fail *tx_fail,
+			     struct sk_buff *skb)
+{
+	int status = 0;
+
+	if (tx_fail == NULL || skb == NULL)
+		return -EINVAL;
+
+	if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_TID,
+			tx_fail->tid) ||
+	    nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_NUM_MSDU,
+			tx_fail->msdu_num) ||
+	    nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_TX_STATUS,
+			tx_fail->status)) {
+		hdd_err("QCA_WLAN_VENDOR_ATTR put fail");
+		status = -EINVAL;
+	}
+
+	return status;
+}
+
+/**
+ * wlan_hdd_cfg80211_link_layer_stats_ext_callback() - Callback for LL ext
+ * @ctx: HDD context
+ * @rsp: msg from FW
+ *
+ * This function is an extension of
+ * wlan_hdd_cfg80211_link_layer_stats_callback. It converts
+ * monitoring parameters offloaded to NL data and send the same to the
+ * kernel/upper layers.
+ *
+ * Return: None
+ */
+void wlan_hdd_cfg80211_link_layer_stats_ext_callback(tHddHandle ctx,
+						     tSirLLStatsResults *rsp)
+{
+	hdd_context_t *hdd_ctx;
+	struct sk_buff *skb = NULL;
+	uint32_t param_id, index;
+	hdd_adapter_t *adapter = NULL;
+	tSirLLStatsResults *linkLayer_stats_results;
+	tSirWifiPeerStat *peer_stats;
+	uint8_t *results;
+	int status;
+
+	ENTER();
+
+	if (!ctx) {
+		hdd_err("Invalid HDD context.");
+		return;
+	}
+
+	if (!rsp) {
+		hdd_err("Invalid result.");
+		return;
+	}
+
+	hdd_ctx = (hdd_context_t *)ctx;
+	linkLayer_stats_results = rsp;
+
+	status = wlan_hdd_validate_context(hdd_ctx);
+	if (0 != status)
+		return;
+
+	adapter = hdd_get_adapter_by_vdev(hdd_ctx,
+					  linkLayer_stats_results->ifaceId);
+
+	if (NULL == adapter) {
+		hdd_err("vdev_id %d does not exist with host.",
+			linkLayer_stats_results->ifaceId);
+		return;
+	}
+
+	index = QCA_NL80211_VENDOR_SUBCMD_LL_STATS_EXT_INDEX;
+	skb = cfg80211_vendor_event_alloc(hdd_ctx->wiphy,
+			NULL, LL_STATS_EVENT_BUF_SIZE + NLMSG_HDRLEN,
+			index, GFP_KERNEL);
+	if (!skb) {
+		hdd_err("cfg80211_vendor_event_alloc failed.");
+		return;
+	}
+
+	results = linkLayer_stats_results->results;
+	param_id = linkLayer_stats_results->paramId;
+	hdd_info("LL_STATS RESP paramID = 0x%x, ifaceId = %u, result = %p",
+		 linkLayer_stats_results->paramId,
+		 linkLayer_stats_results->ifaceId,
+		 linkLayer_stats_results->results);
+	if (param_id & WMI_LL_STATS_EXT_PS_CHG) {
+		peer_stats = (tSirWifiPeerStat *)results;
+		status = hdd_populate_wifi_peer_ps_info(peer_stats, skb);
+	} else if (param_id & WMI_LL_STATS_EXT_TX_FAIL) {
+		struct sir_wifi_iface_tx_fail *tx_fail;
+
+		tx_fail = (struct sir_wifi_iface_tx_fail *)results;
+		status = hdd_populate_tx_failure_info(tx_fail, skb);
+	} else if (param_id & WMI_LL_STATS_EXT_MAC_COUNTER) {
+		hdd_info("MAC counters stats");
+		status = -EINVAL;
+	} else {
+		hdd_info("Unknown link layer stats");
+		status = -EINVAL;
+	}
+
+	if (status == 0)
+		cfg80211_vendor_event(skb, GFP_KERNEL);
+	else
+		kfree_skb(skb);
+	EXIT();
 }
 
 #endif /* WLAN_FEATURE_LINK_LAYER_STATS */
@@ -1785,14 +2000,14 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 
 	if ((eConnectionState_Associated != pHddStaCtx->conn_info.connState) ||
 	    (0 == ssidlen)) {
-		hdd_notice("Not associated or Invalid ssidlen, %d",
+		hdd_debug("Not associated or Invalid ssidlen, %d",
 			ssidlen);
 		/*To keep GUI happy */
 		return 0;
 	}
 
 	if (true == pHddStaCtx->hdd_ReassocScenario) {
-		hdd_notice("Roaming is in progress, cannot continue with this request");
+		hdd_debug("Roaming is in progress, cannot continue with this request");
 		/*
 		 * supplicant reports very low rssi to upper layer
 		 * and handover happens to cellular.
@@ -1811,7 +2026,7 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 	wlan_hdd_get_station_stats(pAdapter);
 	sinfo->signal = pAdapter->hdd_stats.summary_stat.rssi;
 	snr = pAdapter->hdd_stats.summary_stat.snr;
-	hdd_info("snr: %d, rssi: %d",
+	hdd_debug("snr: %d, rssi: %d",
 		pAdapter->hdd_stats.summary_stat.snr,
 		pAdapter->hdd_stats.summary_stat.rssi);
 	pHddStaCtx->conn_info.signal = sinfo->signal;
@@ -1846,7 +2061,7 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 			mcs_index = 0;
 	}
 
-	hdd_info("RSSI %d, RLMS %u, rate %d, rssi high %d, rssi mid %d, rssi low %d, rate_flags 0x%x, MCS %d",
+	hdd_debug("RSSI %d, RLMS %u, rate %d, rssi high %d, rssi mid %d, rssi low %d, rate_flags 0x%x, MCS %d",
 		 sinfo->signal, pCfg->reportMaxLinkSpeed, myRate,
 		 (int)pCfg->linkSpeedRssiHigh, (int)pCfg->linkSpeedRssiMid,
 		 (int)pCfg->linkSpeedRssiLow, (int)rate_flags, (int)mcs_index);
@@ -2265,11 +2480,11 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 #endif
 
 	if (rate_flags & eHAL_TX_RATE_LEGACY)
-		hdd_notice("Reporting legacy rate %d pkt cnt tx %d rx %d",
+		hdd_debug("Reporting legacy rate %d pkt cnt tx %d rx %d",
 			sinfo->txrate.legacy, sinfo->tx_packets,
 			sinfo->rx_packets);
 	else
-		hdd_notice("Reporting MCS rate %d flags 0x%x pkt cnt tx %d rx %d",
+		hdd_debug("Reporting MCS rate %d flags 0x%x pkt cnt tx %d rx %d",
 			sinfo->txrate.mcs, sinfo->txrate.flags,
 			sinfo->tx_packets, sinfo->rx_packets);
 
@@ -2283,7 +2498,7 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 				   sinfo->chain_signal_avg[i] != 0)
 			sinfo->signal_avg = sinfo->chain_signal_avg[i];
 
-		hdd_info("RSSI for chain %d, vdev_id %d is %d",
+		hdd_debug("RSSI for chain %d, vdev_id %d is %d",
 			i, pAdapter->sessionId, sinfo->chain_signal_avg[i]);
 
 		if (!rssi_stats_valid && sinfo->chain_signal_avg[i])
@@ -2485,7 +2700,7 @@ static bool wlan_hdd_update_survey_info(struct wiphy *wiphy,
 
 	mutex_lock(&pHddCtx->chan_info_lock);
 
-	for (i = 0; i < IEEE80211_NUM_BANDS && !filled; i++) {
+	for (i = 0; i < NUM_NL80211_BANDS && !filled; i++) {
 		if (wiphy->bands[i] == NULL)
 			continue;
 
@@ -2591,8 +2806,6 @@ inline void hdd_init_ll_stats_ctx(void)
 	spin_lock_init(&ll_stats_context.context_lock);
 	init_completion(&ll_stats_context.response_event);
 	ll_stats_context.request_bitmap = 0;
-
-	return;
 }
 
 /**
@@ -2607,6 +2820,7 @@ void hdd_display_hif_stats(void)
 
 	if (!hif_ctx)
 		return;
+
 	hif_display_stats(hif_ctx);
 }
 

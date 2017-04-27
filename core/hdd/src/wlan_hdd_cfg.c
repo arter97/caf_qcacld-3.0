@@ -77,22 +77,23 @@ cb_notify_set_roam_intra_band(hdd_context_t *pHddCtx, unsigned long notifyId)
 	sme_set_roam_intra_band(pHddCtx->hHal, pHddCtx->config->nRoamIntraBand);
 }
 
-static void cb_notify_set_wes_mode(hdd_context_t *pHddCtx, unsigned long notifyId)
+static void cb_notify_set_wes_mode(hdd_context_t *pHddCtx,
+				   unsigned long notifyId)
 {
-	/* At the point this routine is called, the value in the hdd config
-	 * table has already been updated
-	 */
-	sme_update_wes_mode(pHddCtx->hHal, pHddCtx->config->isWESModeEnabled, 0);
+	sme_update_wes_mode(pHddCtx->hHal,
+			    pHddCtx->config->isWESModeEnabled, 0);
 }
 
 static void
 cb_notify_set_roam_scan_n_probes(hdd_context_t *pHddCtx, unsigned long notifyId)
 {
-	sme_update_roam_scan_n_probes(pHddCtx->hHal, 0, pHddCtx->config->nProbes);
+	sme_update_roam_scan_n_probes(pHddCtx->hHal, 0,
+				      pHddCtx->config->nProbes);
 }
 
 static void
-cb_notify_set_roam_scan_home_away_time(hdd_context_t *pHddCtx, unsigned long notifyId)
+cb_notify_set_roam_scan_home_away_time(hdd_context_t *pHddCtx,
+				       unsigned long notifyId)
 {
 	sme_update_roam_scan_home_away_time(pHddCtx->hHal, 0,
 					    pHddCtx->config->nRoamScanHomeAwayTime,
@@ -103,31 +104,24 @@ static void
 notify_is_fast_roam_ini_feature_enabled(hdd_context_t *pHddCtx,
 					unsigned long notifyId)
 {
-	/* At the point this routine is called, the value in the hdd config
-	 * table has already been updated
-	 */
 	sme_update_is_fast_roam_ini_feature_enabled(pHddCtx->hHal, 0,
 						    pHddCtx->config->
 						    isFastRoamIniFeatureEnabled);
 }
 
 static void
-notify_is_mawc_ini_feature_enabled(hdd_context_t *pHddCtx, unsigned long notifyId)
+notify_is_mawc_ini_feature_enabled(hdd_context_t *pHddCtx,
+				   unsigned long notifyId)
 {
-	/* At the point this routine is called, the value in the hdd config
-	 * table has already been updated
-	 */
 	sme_update_is_mawc_ini_feature_enabled(pHddCtx->hHal,
 					       pHddCtx->config->MAWCEnabled);
 }
 
 #ifdef FEATURE_WLAN_ESE
 static void
-cb_notify_set_ese_feature_enabled(hdd_context_t *pHddCtx, unsigned long notifyId)
+cb_notify_set_ese_feature_enabled(hdd_context_t *pHddCtx,
+				  unsigned long notifyId)
 {
-	/* At the point this routine is called, the value in the hdd config
-	 * table has already been updated
-	 */
 	sme_update_is_ese_feature_enabled(pHddCtx->hHal, 0,
 					  pHddCtx->config->isEseIniFeatureEnabled);
 }
@@ -136,9 +130,6 @@ cb_notify_set_ese_feature_enabled(hdd_context_t *pHddCtx, unsigned long notifyId
 static void
 cb_notify_set_fw_rssi_monitoring(hdd_context_t *pHddCtx, unsigned long notifyId)
 {
-	/* At the point this routine is called, the value in the hdd config
-	 * table has already been updated
-	 */
 	sme_update_config_fw_rssi_monitoring(pHddCtx->hHal,
 					     pHddCtx->config->
 					     fEnableFwRssiMonitoring);
@@ -147,9 +138,6 @@ cb_notify_set_fw_rssi_monitoring(hdd_context_t *pHddCtx, unsigned long notifyId)
 static void cb_notify_set_opportunistic_scan_threshold_diff(hdd_context_t *pHddCtx,
 							    unsigned long notifyId)
 {
-	/* At the point this routine is called, the value in the hdd config
-	 * table has already been updated
-	 */
 	sme_set_roam_opportunistic_scan_threshold_diff(pHddCtx->hHal, 0,
 						       pHddCtx->config->
 						       nOpportunisticThresholdDiff);
@@ -158,9 +146,6 @@ static void cb_notify_set_opportunistic_scan_threshold_diff(hdd_context_t *pHddC
 static void cb_notify_set_roam_rescan_rssi_diff(hdd_context_t *pHddCtx,
 						unsigned long notifyId)
 {
-	/* At the point this routine is called, the value in the hdd config
-	 * table has already been updated
-	 */
 	sme_set_roam_rescan_rssi_diff(pHddCtx->hHal,
 				      0, pHddCtx->config->nRoamRescanRssiDiff);
 }
@@ -169,9 +154,6 @@ static void
 cb_notify_set_neighbor_lookup_rssi_threshold(hdd_context_t *pHddCtx,
 					     unsigned long notifyId)
 {
-	/* At the point this routine is called, the value in the hdd config
-	 * table has already been updated
-	 */
 	sme_set_neighbor_lookup_rssi_threshold(pHddCtx->hHal, 0,
 					       pHddCtx->config->
 					       nNeighborLookupRssiThreshold);
@@ -181,20 +163,14 @@ static void
 cb_notify_set_delay_before_vdev_stop(hdd_context_t *hdd_ctx,
 				     unsigned long notify_id)
 {
-	/*
-	 * At the point this routine is called, the value in the cfg_ini
-	 * table has already been updated
-	 */
 	sme_set_delay_before_vdev_stop(hdd_ctx->hHal, 0,
 				hdd_ctx->config->delay_before_vdev_stop);
 }
 
 static void
-cb_notify_set_neighbor_scan_period(hdd_context_t *pHddCtx, unsigned long notifyId)
+cb_notify_set_neighbor_scan_period(hdd_context_t *pHddCtx,
+				   unsigned long notifyId)
 {
-	/* At the point this routine is called, the value in the hdd config
-	 * table has already been updated
-	 */
 	sme_set_neighbor_scan_period(pHddCtx->hHal, 0,
 				     pHddCtx->config->nNeighborScanPeriod);
 }
@@ -203,9 +179,6 @@ static void
 cb_notify_set_neighbor_results_refresh_period(hdd_context_t *pHddCtx,
 					      unsigned long notifyId)
 {
-	/* At the point this routine is called, the value in the hdd config
-	 * table has already been updated
-	 */
 	sme_set_neighbor_scan_refresh_period(pHddCtx->hHal, 0,
 					     pHddCtx->config->
 					     nNeighborResultsRefreshPeriod);
@@ -215,9 +188,6 @@ static void
 cb_notify_set_empty_scan_refresh_period(hdd_context_t *pHddCtx,
 					unsigned long notifyId)
 {
-	/* At the point this routine is called, the value in the hdd config
-	 * table has already been updated
-	 */
 	sme_update_empty_scan_refresh_period(pHddCtx->hHal, 0,
 					     pHddCtx->config->
 					     nEmptyScanRefreshPeriod);
@@ -227,9 +197,6 @@ static void
 cb_notify_set_neighbor_scan_min_chan_time(hdd_context_t *pHddCtx,
 					  unsigned long notifyId)
 {
-	/* At the point this routine is called, the value in the hdd config
-	 * table has already been updated
-	 */
 	sme_set_neighbor_scan_min_chan_time(pHddCtx->hHal,
 					    pHddCtx->config->
 					    nNeighborScanMinChanTime, 0);
@@ -247,9 +214,6 @@ cb_notify_set_neighbor_scan_max_chan_time(hdd_context_t *pHddCtx,
 static void cb_notify_set_roam_bmiss_first_bcnt(hdd_context_t *pHddCtx,
 						unsigned long notifyId)
 {
-	/* At the point this routine is called, the value in the hdd config
-	 * table has already been updated
-	 */
 	sme_set_roam_bmiss_first_bcnt(pHddCtx->hHal,
 				      0, pHddCtx->config->nRoamBmissFirstBcnt);
 }
@@ -271,9 +235,6 @@ static void cb_notify_set_roam_beacon_rssi_weight(hdd_context_t *pHddCtx,
 static void
 cb_notify_set_dfs_scan_mode(hdd_context_t *pHddCtx, unsigned long notifyId)
 {
-	/* At the point this routine is called, the value in the hdd config
-	 * table has already been updated
-	 */
 	sme_update_dfs_scan_mode(pHddCtx->hHal, 0,
 				 pHddCtx->config->allowDFSChannelRoam);
 }
@@ -338,9 +299,8 @@ cb_notify_set_roam_scan_hi_rssi_scan_params(hdd_context_t *hdd_ctx,
 {
 	int32_t val;
 
-	if (wlan_hdd_validate_context(hdd_ctx)) {
+	if (wlan_hdd_validate_context(hdd_ctx))
 		return;
-	}
 
 	switch (notify_id) {
 	case eCSR_HI_RSSI_SCAN_MAXCOUNT_ID:
@@ -368,7 +328,7 @@ cb_notify_set_roam_scan_hi_rssi_scan_params(hdd_context_t *hdd_ctx,
 }
 
 
-REG_TABLE_ENTRY g_registry_table[] = {
+struct reg_table_entry g_registry_table[] = {
 	REG_VARIABLE(CFG_RTS_THRESHOLD_NAME, WLAN_PARAM_Integer,
 		     struct hdd_config, RTSThreshold,
 		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -903,6 +863,13 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     CFG_DATA_INACTIVITY_TIMEOUT_MIN,
 		     CFG_DATA_INACTIVITY_TIMEOUT_MAX),
 
+	REG_VARIABLE(CFG_WOW_DATA_INACTIVITY_TIMEOUT_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, wow_data_inactivity_timeout,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_WOW_DATA_INACTIVITY_TIMEOUT_DEFAULT,
+		     CFG_WOW_DATA_INACTIVITY_TIMEOUT_MIN,
+		     CFG_WOW_DATA_INACTIVITY_TIMEOUT_MAX),
+
 	REG_VARIABLE(CFG_QOS_WMM_MODE_NAME, WLAN_PARAM_Integer,
 		     struct hdd_config, WmmMode,
 		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -1039,8 +1006,8 @@ REG_TABLE_ENTRY g_registry_table[] = {
 			     CFG_FAST_TRANSITION_ENABLED_NAME_MAX,
 			     cb_notify_set_fast_transition_enabled, 0),
 
-	/* Variable to specify the delta/difference between the RSSI
-	 * of current AP and roamable AP while roaming
+	/* Variable to specify the delta/difference between the
+	 * RSSI of current AP and roamable AP while roaming
 	 */
 	REG_DYNAMIC_VARIABLE(CFG_ROAM_RSSI_DIFF_NAME, WLAN_PARAM_Integer,
 			     struct hdd_config, RoamRssiDiff,
@@ -1323,7 +1290,8 @@ REG_TABLE_ENTRY g_registry_table[] = {
 			     CFG_OPPORTUNISTIC_SCAN_THRESHOLD_DIFF_DEFAULT,
 			     CFG_OPPORTUNISTIC_SCAN_THRESHOLD_DIFF_MIN,
 			     CFG_OPPORTUNISTIC_SCAN_THRESHOLD_DIFF_MAX,
-			     cb_notify_set_opportunistic_scan_threshold_diff, 0),
+			     cb_notify_set_opportunistic_scan_threshold_diff,
+			     0),
 
 	REG_DYNAMIC_VARIABLE(CFG_ROAM_RESCAN_RSSI_DIFF_NAME, WLAN_PARAM_Integer,
 			     struct hdd_config, nRoamRescanRssiDiff,
@@ -1503,6 +1471,13 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     CFG_ENABLE_HOST_ARPOFFLOAD_DEFAULT,
 		     CFG_ENABLE_HOST_ARPOFFLOAD_MIN,
 		     CFG_ENABLE_HOST_ARPOFFLOAD_MAX),
+
+	REG_VARIABLE(CFG_HW_BC_FILTER_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, hw_broadcast_filter,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_HW_FILTER_DEFAULT,
+		     CFG_HW_FILTER_MIN,
+		     CFG_HW_FILTER_MAX),
 
 #ifdef FEATURE_WLAN_RA_FILTERING
 	REG_VARIABLE(CFG_RA_FILTER_ENABLE_NAME, WLAN_PARAM_Integer,
@@ -1764,6 +1739,20 @@ REG_TABLE_ENTRY g_registry_table[] = {
 
 	REG_VARIABLE(CFG_QDF_TRACE_ENABLE_WIFI_POS, WLAN_PARAM_Integer,
 		     struct hdd_config, qdf_trace_enable_wifi_pos,
+		     VAR_FLAGS_OPTIONAL,
+		     CFG_QDF_TRACE_ENABLE_DEFAULT,
+		     CFG_QDF_TRACE_ENABLE_MIN,
+		     CFG_QDF_TRACE_ENABLE_MAX),
+
+	REG_VARIABLE(CFG_QDF_TRACE_ENABLE_NAN, WLAN_PARAM_Integer,
+		     struct hdd_config, qdf_trace_enable_nan,
+		     VAR_FLAGS_OPTIONAL,
+		     CFG_QDF_TRACE_ENABLE_DEFAULT,
+		     CFG_QDF_TRACE_ENABLE_MIN,
+		     CFG_QDF_TRACE_ENABLE_MAX),
+
+	REG_VARIABLE(CFG_QDF_TRACE_ENABLE_REGULATORY, WLAN_PARAM_Integer,
+		     struct hdd_config, qdf_trace_enable_regulatory,
 		     VAR_FLAGS_OPTIONAL,
 		     CFG_QDF_TRACE_ENABLE_DEFAULT,
 		     CFG_QDF_TRACE_ENABLE_MIN,
@@ -3214,13 +3203,13 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		     CFG_WLAN_LOGGING_SUPPORT_DISABLE,
 		     CFG_WLAN_LOGGING_SUPPORT_ENABLE),
 
-	REG_VARIABLE(CFG_WLAN_LOGGING_FE_CONSOLE_SUPPORT_NAME,
+	REG_VARIABLE(CFG_WLAN_LOGGING_CONSOLE_SUPPORT_NAME,
 		     WLAN_PARAM_Integer,
-		     struct hdd_config, wlanLoggingFEToConsole,
+		     struct hdd_config, wlanLoggingToConsole,
 		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-		     CFG_WLAN_LOGGING_FE_CONSOLE_SUPPORT_DEFAULT,
-		     CFG_WLAN_LOGGING_FE_CONSOLE_SUPPORT_DISABLE,
-		     CFG_WLAN_LOGGING_FE_CONSOLE_SUPPORT_ENABLE),
+		     CFG_WLAN_LOGGING_CONSOLE_SUPPORT_DEFAULT,
+		     CFG_WLAN_LOGGING_CONSOLE_SUPPORT_DISABLE,
+		     CFG_WLAN_LOGGING_CONSOLE_SUPPORT_ENABLE),
 
 	REG_VARIABLE(CFG_WLAN_LOGGING_NUM_BUF_NAME, WLAN_PARAM_Integer,
 		     struct hdd_config, wlanLoggingNumBuf,
@@ -4253,12 +4242,20 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		CFG_PER_ROAM_MONITOR_TIME_MIN,
 		CFG_PER_ROAM_MONITOR_TIME_MAX),
 
-	REG_VARIABLE(CFG_ACTIVE_BPF_MODE_NAME, WLAN_PARAM_Integer,
-		struct hdd_config, active_bpf_mode,
+	REG_VARIABLE(CFG_ACTIVE_UC_BPF_MODE_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, active_uc_bpf_mode,
 		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-		CFG_ACTIVE_BPF_MODE_DEFAULT,
-		CFG_ACTIVE_BPF_MODE_MIN,
-		CFG_ACTIVE_BPF_MODE_MAX),
+		CFG_ACTIVE_UC_BPF_MODE_DEFAULT,
+		CFG_ACTIVE_UC_BPF_MODE_MIN,
+		CFG_ACTIVE_UC_BPF_MODE_MAX),
+
+	REG_VARIABLE(CFG_ACTIVE_MC_BC_BPF_MODE_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, active_mc_bc_bpf_mode,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_ACTIVE_MC_BC_BPF_MODE_DEFAULT,
+		CFG_ACTIVE_MC_BC_BPF_MODE_MIN,
+		CFG_ACTIVE_MC_BC_BPF_MODE_MAX),
+
 	REG_VARIABLE(CFG_ENABLE_BCAST_PROBE_RESP_NAME, WLAN_PARAM_Integer,
 		struct hdd_config, enable_bcast_probe_rsp,
 		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -4294,7 +4291,35 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		CFG_ARP_AC_CATEGORY_DEFAULT,
 		CFG_ARP_AC_CATEGORY_MIN,
 		CFG_ARP_AC_CATEGORY_MAX),
+
+	REG_VARIABLE(CFG_ENABLE_ANI_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, ani_enabled,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_ENABLE_ANI_DEFAULT,
+		     CFG_ENABLE_ANI_MIN,
+		     CFG_ENABLE_ANI_MAX),
+
+	REG_VARIABLE(CFG_QCN_IE_SUPPORT_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, qcn_ie_support,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_QCN_IE_SUPPORT_DEFAULT,
+		CFG_QCN_IE_SUPPORT_MIN,
+		CFG_QCN_IE_SUPPORT_MAX),
+
+	REG_VARIABLE(CFG_ENABLE_REG_OFFLOAD_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, reg_offload_enabled,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_ENABLE_REG_OFFLOAD_DEFAULT,
+		     CFG_ENABLE_REG_OFFLOAD_MIN,
+		     CFG_ENABLE_REG_OFFLOAD_MAX),
+	REG_VARIABLE(CFG_FILS_MAX_CHAN_GUARD_TIME_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, fils_max_chan_guard_time,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_FILS_MAX_CHAN_GUARD_TIME_DEFAULT,
+		CFG_FILS_MAX_CHAN_GUARD_TIME_MIN,
+		CFG_FILS_MAX_CHAN_GUARD_TIME_MAX),
 };
+
 
 /**
  * get_next_line() - find and locate the new line pointer
@@ -4311,9 +4336,8 @@ static char *get_next_line(char *str)
 {
 	char c;
 
-	if (str == NULL || *str == '\0') {
+	if (str == NULL || *str == '\0')
 		return NULL;
-	}
 
 	c = *str;
 	while (c != '\n' && c != '\0' && c != 0xd) {
@@ -4325,7 +4349,6 @@ static char *get_next_line(char *str)
 		return NULL;
 
 	*str = '\0';
-
 	return str + 1;
 }
 
@@ -4391,14 +4414,14 @@ static char *i_trim(char *str)
  * Return: QDF_STATUS_SUCCESS if the configuration and buffer size can carry
  *		the content, otherwise QDF_STATUS_E_RESOURCES
  */
-static QDF_STATUS hdd_cfg_get_config(REG_TABLE_ENTRY *reg_table,
+static QDF_STATUS hdd_cfg_get_config(struct reg_table_entry *reg_table,
 				     unsigned long cRegTableEntries,
 				     uint8_t *ini_struct,
 				     hdd_context_t *pHddCtx, char *pBuf,
 				     int buflen)
 {
 	unsigned int idx;
-	REG_TABLE_ENTRY *pRegEntry = reg_table;
+	struct reg_table_entry *pRegEntry = reg_table;
 	uint32_t value;
 	char valueStr[CFG_VALUE_MAX_LEN];
 	char configStr[CFG_ENTRY_MAX_LEN];
@@ -4509,7 +4532,7 @@ static QDF_STATUS find_cfg_item(tCfgIniEntry *iniTable, unsigned long entries,
 	for (i = 0; i < entries; i++) {
 		if (strcmp(iniTable[i].name, name) == 0) {
 			*value = iniTable[i].value;
-			hdd_info("Found %s entry for Name=[%s] Value=[%s] ",
+			hdd_debug("Found %s entry for Name=[%s] Value=[%s] ",
 				  WLAN_INI_FILE, name, *value);
 			return QDF_STATUS_SUCCESS;
 		}
@@ -4597,7 +4620,7 @@ static QDF_STATUS hdd_apply_cfg_ini(hdd_context_t *pHddCtx,
 	uint32_t value;
 	int32_t svalue;
 	void *pStructBase = pHddCtx->config;
-	REG_TABLE_ENTRY *pRegEntry = g_registry_table;
+	struct reg_table_entry *pRegEntry = g_registry_table;
 	unsigned long cRegTableEntries = QDF_ARRAY_SIZE(g_registry_table);
 	uint32_t cbOutString;
 	int i;
@@ -4634,7 +4657,7 @@ static QDF_STATUS hdd_apply_cfg_ini(hdd_context_t *pHddCtx,
 			    && (WLAN_PARAM_Integer == pRegEntry->RegType)) {
 				rv = kstrtou32(value_str, 10, &value);
 				if (rv < 0) {
-					hdd_err("Reg Parameter %s invalid. Enforcing default", pRegEntry->RegName);
+					hdd_warn("Reg Parameter %s invalid. Enforcing default", pRegEntry->RegName);
 					value = pRegEntry->VarDefault;
 				}
 			} else if (match_status == QDF_STATUS_SUCCESS
@@ -4642,7 +4665,7 @@ static QDF_STATUS hdd_apply_cfg_ini(hdd_context_t *pHddCtx,
 				       pRegEntry->RegType)) {
 				rv = kstrtou32(value_str, 16, &value);
 				if (rv < 0) {
-					hdd_err("Reg paramter %s invalid. Enforcing default", pRegEntry->RegName);
+					hdd_warn("Reg paramter %s invalid. Enforcing default", pRegEntry->RegName);
 					value = pRegEntry->VarDefault;
 				}
 			} else {
@@ -4653,13 +4676,13 @@ static QDF_STATUS hdd_apply_cfg_ini(hdd_context_t *pHddCtx,
 			if (match_status == QDF_STATUS_SUCCESS &&
 			    pRegEntry->Flags & VAR_FLAGS_RANGE_CHECK) {
 				if (value > pRegEntry->VarMax) {
-					hdd_err("Reg Parameter %s > allowed Maximum [%u > %lu]. Enforcing Maximum", pRegEntry->RegName,
+					hdd_warn("Reg Parameter %s > allowed Maximum [%u > %lu]. Enforcing Maximum", pRegEntry->RegName,
 					       value, pRegEntry->VarMax);
 					value = pRegEntry->VarMax;
 				}
 
 				if (value < pRegEntry->VarMin) {
-					hdd_err("Reg Parameter %s < allowed Minimum [%u < %lu]. Enforcing Minimum", pRegEntry->RegName,
+					hdd_warn("Reg Parameter %s < allowed Minimum [%u < %lu]. Enforcing Minimum", pRegEntry->RegName,
 					       value, pRegEntry->VarMin);
 					value = pRegEntry->VarMin;
 				}
@@ -4669,14 +4692,14 @@ static QDF_STATUS hdd_apply_cfg_ini(hdd_context_t *pHddCtx,
 				 pRegEntry->Flags &
 					VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT) {
 				if (value > pRegEntry->VarMax) {
-					hdd_err("Reg Parameter %s > allowed Maximum [%u > %lu]. Enforcing Default= %lu", pRegEntry->RegName,
+					hdd_warn("Reg Parameter %s > allowed Maximum [%u > %lu]. Enforcing Default: %lu", pRegEntry->RegName,
 					       value, pRegEntry->VarMax,
 					       pRegEntry->VarDefault);
 					value = pRegEntry->VarDefault;
 				}
 
 				if (value < pRegEntry->VarMin) {
-					hdd_err("Reg Parameter %s < allowed Minimum [%u < %lu]. Enforcing Default= %lu", pRegEntry->RegName,
+					hdd_warn("Reg Parameter %s < allowed Minimum [%u < %lu]. Enforcing Default: %lu", pRegEntry->RegName,
 					       value, pRegEntry->VarMin,
 					       pRegEntry->VarDefault);
 					value = pRegEntry->VarDefault;
@@ -4703,14 +4726,14 @@ static QDF_STATUS hdd_apply_cfg_ini(hdd_context_t *pHddCtx,
 			if (match_status == QDF_STATUS_SUCCESS &&
 			    pRegEntry->Flags & VAR_FLAGS_RANGE_CHECK) {
 				if (svalue > (int32_t) pRegEntry->VarMax) {
-					hdd_err("Reg Parameter %s > allowed Maximum "
+					hdd_warn("Reg Parameter %s > allowed Maximum "
 					       "[%d > %d]. Enforcing Maximum", pRegEntry->RegName,
 					       svalue, (int)pRegEntry->VarMax);
 					svalue = (int32_t) pRegEntry->VarMax;
 				}
 
 				if (svalue < (int32_t) pRegEntry->VarMin) {
-					hdd_err("Reg Parameter %s < allowed Minimum "
+					hdd_warn("Reg Parameter %s < allowed Minimum "
 					       "[%d < %d]. Enforcing Minimum", pRegEntry->RegName,
 					       svalue, (int)pRegEntry->VarMin);
 					svalue = (int32_t) pRegEntry->VarMin;
@@ -4721,8 +4744,8 @@ static QDF_STATUS hdd_apply_cfg_ini(hdd_context_t *pHddCtx,
 				 pRegEntry->Flags &
 					VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT) {
 				if (svalue > (int32_t) pRegEntry->VarMax) {
-					hdd_err("Reg Parameter %s > allowed Maximum "
-					       "[%d > %d]. Enforcing Default= %d", pRegEntry->RegName,
+					hdd_warn("Reg Parameter %s > allowed Maximum "
+					       "[%d > %d]. Enforcing Default: %d", pRegEntry->RegName,
 					       svalue, (int)pRegEntry->VarMax,
 					       (int)pRegEntry->VarDefault);
 					svalue =
@@ -4730,8 +4753,8 @@ static QDF_STATUS hdd_apply_cfg_ini(hdd_context_t *pHddCtx,
 				}
 
 				if (svalue < (int32_t) pRegEntry->VarMin) {
-					hdd_err("Reg Parameter %s < allowed Minimum "
-					       "[%d < %d]. Enforcing Default= %d", pRegEntry->RegName,
+					hdd_warn("Reg Parameter %s < allowed Minimum "
+					       "[%d < %d]. Enforcing Default: %d", pRegEntry->RegName,
 					       svalue, (int)pRegEntry->VarMin,
 					       (int)pRegEntry->VarDefault);
 					svalue = pRegEntry->VarDefault;
@@ -4743,7 +4766,7 @@ static QDF_STATUS hdd_apply_cfg_ini(hdd_context_t *pHddCtx,
 		/* Handle string parameters */
 		else if (WLAN_PARAM_String == pRegEntry->RegType) {
 #ifdef WLAN_CFG_DEBUG
-			hdd_info("RegName = %s, VarOffset %u VarSize %u VarDefault %s",
+			hdd_debug("RegName = %s, VarOffset %u VarSize %u VarDefault %s",
 				  pRegEntry->RegName, pRegEntry->VarOffset,
 				  pRegEntry->VarSize,
 				  (char *)pRegEntry->VarDefault);
@@ -4757,8 +4780,8 @@ static QDF_STATUS hdd_apply_cfg_ini(hdd_context_t *pHddCtx,
 					       pRegEntry->RegName,
 					       WLAN_INI_FILE);
 					cbOutString =
-						util_min(strlen
-								 ((char *)pRegEntry->
+						QDF_MIN(strlen
+							 ((char *)pRegEntry->
 								 VarDefault),
 							 pRegEntry->VarSize - 1);
 					memcpy(pField,
@@ -4775,7 +4798,7 @@ static QDF_STATUS hdd_apply_cfg_ini(hdd_context_t *pHddCtx,
 			} else {
 				/* Failed to read the string parameter from the registry.  Use the default. */
 				cbOutString =
-					util_min(strlen((char *)pRegEntry->VarDefault),
+					QDF_MIN(strlen((char *)pRegEntry->VarDefault),
 						 pRegEntry->VarSize - 1);
 				memcpy(pField, (void *)(pRegEntry->VarDefault),
 				       cbOutString);
@@ -4783,7 +4806,7 @@ static QDF_STATUS hdd_apply_cfg_ini(hdd_context_t *pHddCtx,
 			}
 		} else if (WLAN_PARAM_MacAddr == pRegEntry->RegType) {
 			if (pRegEntry->VarSize != QDF_MAC_ADDR_SIZE) {
-				hdd_err("Invalid VarSize %u for Name=[%s]", pRegEntry->VarSize,
+				hdd_warn("Invalid VarSize %u for Name=[%s]", pRegEntry->VarSize,
 				       pRegEntry->RegName);
 				continue;
 			}
@@ -4805,7 +4828,7 @@ static QDF_STATUS hdd_apply_cfg_ini(hdd_context_t *pHddCtx,
 					       parse_hex_digit(candidate[i * 2 + 1]));
 			}
 		} else {
-			hdd_err("Unknown param type for name[%s] in registry table", pRegEntry->RegName);
+			hdd_warn("Unknown param type for name[%s] in registry table", pRegEntry->RegName);
 		}
 
 		/* did we successfully parse a cfg item for this parameter? */
@@ -4829,13 +4852,13 @@ static QDF_STATUS hdd_apply_cfg_ini(hdd_context_t *pHddCtx,
  * Return: QDF_STATUS_SUCCESS if the command is found and able to execute,
  *		otherwise the appropriate QDF_STATUS will be returned
  */
-static QDF_STATUS hdd_execute_config_command(REG_TABLE_ENTRY *reg_table,
+static QDF_STATUS hdd_execute_config_command(struct reg_table_entry *reg_table,
 					     unsigned long tableSize,
 					     uint8_t *ini_struct,
 					     hdd_context_t *pHddCtx,
 					     char *command)
 {
-	REG_TABLE_ENTRY *pRegEntry;
+	struct reg_table_entry *pRegEntry;
 	char *clone;
 	char *pCmd;
 	void *pField;
@@ -4854,10 +4877,9 @@ static QDF_STATUS hdd_execute_config_command(REG_TABLE_ENTRY *reg_table,
 
 	/* clone the command so that we can manipulate it */
 	clone = kstrdup(command, GFP_ATOMIC);
-	if (NULL == clone) {
-		hdd_err("memory allocation failure, unable to process [%s]", command);
+	if (NULL == clone)
 		return vstatus;
-	}
+
 	/* 'clone' will point to the beginning of the string so it can be freed
 	 * 'pCmd' will be used to walk/parse the command
 	 */
@@ -4872,9 +4894,9 @@ static QDF_STATUS hdd_execute_config_command(REG_TABLE_ENTRY *reg_table,
 	}
 	/* parse the <name> = <value> */
 	name = pCmd;
-	while (('=' != *pCmd) && ('\0' != *pCmd)) {
+	while (('=' != *pCmd) && ('\0' != *pCmd))
 		pCmd++;
-	}
+
 	if ('\0' == *pCmd) {
 		/* did not find '=' */
 		hdd_err("invalid command, no '=':[%s]", command);
@@ -4911,7 +4933,7 @@ static QDF_STATUS hdd_execute_config_command(REG_TABLE_ENTRY *reg_table,
 	pRegEntry = &reg_table[idx];
 	if (!(pRegEntry->Flags & VAR_FLAGS_DYNAMIC_CFG)) {
 		/* does not support dynamic configuration */
-		hdd_err("Global_Registry_Table.%s does not support "
+		hdd_err("Global_Registry_Table. %s does not support "
 		       "dynamic configuration", name);
 		vstatus = QDF_STATUS_E_PERM;
 		goto done;
@@ -4926,12 +4948,12 @@ static QDF_STATUS hdd_execute_config_command(REG_TABLE_ENTRY *reg_table,
 			goto done;
 		if (value < pRegEntry->VarMin) {
 			/* out of range */
-			hdd_err("invalid command, value %u < min value %lu", value, pRegEntry->VarMin);
+			hdd_err("Invalid command, value %u < min value %lu", value, pRegEntry->VarMin);
 			goto done;
 		}
 		if (value > pRegEntry->VarMax) {
 			/* out of range */
-			hdd_err("invalid command, value %u > max value %lu", value, pRegEntry->VarMax);
+			hdd_err("Invalid command, value %u > max value %lu", value, pRegEntry->VarMax);
 			goto done;
 		}
 		memcpy(pField, &value, pRegEntry->VarSize);
@@ -4943,12 +4965,12 @@ static QDF_STATUS hdd_execute_config_command(REG_TABLE_ENTRY *reg_table,
 			goto done;
 		if (value < pRegEntry->VarMin) {
 			/* out of range */
-			hdd_err("invalid command, value %x < min value %lx", value, pRegEntry->VarMin);
+			hdd_err("Invalid command, value %x < min value %lx", value, pRegEntry->VarMin);
 			goto done;
 		}
 		if (value > pRegEntry->VarMax) {
 			/* out of range */
-			hdd_err("invalid command, value %x > max value %lx", value, pRegEntry->VarMax);
+			hdd_err("Invalid command, value %x > max value %lx", value, pRegEntry->VarMax);
 			goto done;
 		}
 		memcpy(pField, &value, pRegEntry->VarSize);
@@ -4960,12 +4982,12 @@ static QDF_STATUS hdd_execute_config_command(REG_TABLE_ENTRY *reg_table,
 			goto done;
 		if (svalue < (int32_t) pRegEntry->VarMin) {
 			/* out of range */
-			hdd_err("invalid command, value %d < min value %d", svalue, (int)pRegEntry->VarMin);
+			hdd_err("Invalid command, value %d < min value %d", svalue, (int)pRegEntry->VarMin);
 			goto done;
 		}
 		if (svalue > (int32_t) pRegEntry->VarMax) {
 			/* out of range */
-			hdd_err("invalid command, value %d > max value %d", svalue, (int)pRegEntry->VarMax);
+			hdd_err("Invalid command, value %d > max value %d", svalue, (int)pRegEntry->VarMax);
 			goto done;
 		}
 		memcpy(pField, &svalue, pRegEntry->VarSize);
@@ -4975,7 +4997,7 @@ static QDF_STATUS hdd_execute_config_command(REG_TABLE_ENTRY *reg_table,
 		len_value_str = strlen(value_str);
 		if (len_value_str > (pRegEntry->VarSize - 1)) {
 			/* too big */
-			hdd_err("invalid command, string [%s] length "
+			hdd_err("Invalid command, string [%s] length "
 			       "%zu exceeds maximum length %u", value_str,
 			       len_value_str, (pRegEntry->VarSize - 1));
 			goto done;
@@ -4988,7 +5010,7 @@ static QDF_STATUS hdd_execute_config_command(REG_TABLE_ENTRY *reg_table,
 		len_value_str = strlen(value_str);
 		if (len_value_str != (QDF_MAC_ADDR_SIZE * 2)) {
 			/* out of range */
-			hdd_err("invalid command, MAC address [%s] length "
+			hdd_err("Invalid command, MAC address [%s] length "
 			       "%zu is not expected length %u", value_str,
 			       len_value_str, (QDF_MAC_ADDR_SIZE * 2));
 			goto done;
@@ -5009,13 +5031,13 @@ static QDF_STATUS hdd_execute_config_command(REG_TABLE_ENTRY *reg_table,
 	vstatus = QDF_STATUS_SUCCESS;
 
 	/* config table has been modified, is there a notifier? */
-	if (NULL != pRegEntry->pfnDynamicnotify) {
+	if (NULL != pRegEntry->pfnDynamicnotify)
 		(pRegEntry->pfnDynamicnotify)(pHddCtx, pRegEntry->notifyId);
-	}
+
 	/* note that this item was explicitly configured */
-	if (idx < MAX_CFG_INI_ITEMS) {
+	if (idx < MAX_CFG_INI_ITEMS)
 		set_bit(idx, (void *)&pHddCtx->config->bExplicitCfg);
-	}
+
 done:
 	kfree(clone);
 	return vstatus;
@@ -5032,13 +5054,12 @@ static void hdd_set_power_save_offload_config(hdd_context_t *pHddCtx)
 	struct hdd_config *pConfig = pHddCtx->config;
 	uint32_t listenInterval = 0;
 
-	if (strcmp(pConfig->PowerUsageControl, "Min") == 0) {
+	if (strcmp(pConfig->PowerUsageControl, "Min") == 0)
 		listenInterval = pConfig->nBmpsMinListenInterval;
-	} else if (strcmp(pConfig->PowerUsageControl, "Max") == 0) {
+	else if (strcmp(pConfig->PowerUsageControl, "Max") == 0)
 		listenInterval = pConfig->nBmpsMaxListenInterval;
-	} else if (strcmp(pConfig->PowerUsageControl, "Mod") == 0) {
+	else if (strcmp(pConfig->PowerUsageControl, "Mod") == 0)
 		listenInterval = pConfig->nBmpsModListenInterval;
-	}
 
 	/*
 	 * Based on Mode Set the LI
@@ -5060,10 +5081,10 @@ static void hdd_set_power_save_offload_config(hdd_context_t *pHddCtx)
 #ifdef FEATURE_RUNTIME_PM
 static void hdd_cfg_print_runtime_pm(hdd_context_t *hdd_ctx)
 {
-	hdd_info("Name = [gRuntimePM] Value = [%u] ",
+	hdd_debug("Name = [gRuntimePM] Value = [%u] ",
 		 hdd_ctx->config->runtime_pm);
 
-	hdd_info("Name = [gRuntimePMDelay] Value = [%u] ",
+	hdd_debug("Name = [gRuntimePMDelay] Value = [%u] ",
 		 hdd_ctx->config->runtime_pm_delay);
 }
 #else
@@ -5080,22 +5101,22 @@ static void hdd_cfg_print_runtime_pm(hdd_context_t *hdd_ctx)
  */
 static void hdd_per_roam_print_ini_config(hdd_context_t *hdd_ctx)
 {
-	hdd_info("Name = [%s] Value = [%u]",
+	hdd_debug("Name = [%s] Value = [%u]",
 		CFG_PER_ROAM_ENABLE_NAME,
 		hdd_ctx->config->is_per_roam_enabled);
-	hdd_info("Name = [%s] Value = [%u]",
+	hdd_debug("Name = [%s] Value = [%u]",
 		CFG_PER_ROAM_CONFIG_HIGH_RATE_TH_NAME,
 		hdd_ctx->config->per_roam_high_rate_threshold);
-	hdd_info("Name = [%s] Value = [%u]",
+	hdd_debug("Name = [%s] Value = [%u]",
 		CFG_PER_ROAM_CONFIG_LOW_RATE_TH_NAME,
 		hdd_ctx->config->per_roam_low_rate_threshold);
-	hdd_info("Name = [%s] Value = [%u]",
+	hdd_debug("Name = [%s] Value = [%u]",
 		CFG_PER_ROAM_CONFIG_RATE_TH_PERCENT_NAME,
 		hdd_ctx->config->per_roam_th_percent);
-	hdd_info("Name = [%s] Value = [%u]",
+	hdd_debug("Name = [%s] Value = [%u]",
 		CFG_PER_ROAM_REST_TIME_NAME,
 		hdd_ctx->config->per_roam_rest_time);
-	hdd_info("Name = [%s] Value = [%u]",
+	hdd_debug("Name = [%s] Value = [%u]",
 		CFG_PER_ROAM_MONITOR_TIME,
 		hdd_ctx->config->per_roam_mon_time);
 
@@ -5288,6 +5309,8 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
 		  pHddCtx->config->mcastBcastFilterSetting);
 	hdd_info("Name = [fhostArpOffload] Value = [%u] ",
 		  pHddCtx->config->fhostArpOffload);
+	hdd_info("Name = [hw_broadcast_filter] Value = [%u]",
+		  pHddCtx->config->hw_broadcast_filter);
 	hdd_info("Name = [ssdp] Value = [%u] ", pHddCtx->config->ssdp);
 	hdd_cfg_print_runtime_pm(pHddCtx);
 #ifdef FEATURE_WLAN_RA_FILTERING
@@ -5771,6 +5794,12 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
 	hdd_info("Name = [%s] Value = [%u]",
 		CFG_CRASH_FW_TIMEOUT_NAME,
 		pHddCtx->config->fw_timeout_crash);
+	hdd_debug("Name = [%s] Value = [%u]",
+		CFG_ACTIVE_UC_BPF_MODE_NAME,
+		pHddCtx->config->active_uc_bpf_mode);
+	hdd_debug("Name = [%s] Value = [%u]",
+		CFG_ACTIVE_MC_BC_BPF_MODE_NAME,
+		pHddCtx->config->active_mc_bc_bpf_mode);
 	hdd_info("Name = [%s] Value = [%d]",
 		CFG_SAP_INTERNAL_RESTART_NAME,
 		pHddCtx->config->sap_internal_restart);
@@ -5807,7 +5836,7 @@ QDF_STATUS hdd_update_mac_config(hdd_context_t *pHddCtx)
 	status = request_firmware(&fw, WLAN_MAC_FILE, pHddCtx->parent_dev);
 
 	if (status) {
-		hdd_warn("request_firmware failed %d", status);
+		hdd_err("request_firmware failed %d", status);
 		qdf_status = QDF_STATUS_E_FAILURE;
 		return qdf_status;
 	}
@@ -5828,7 +5857,7 @@ QDF_STATUS hdd_update_mac_config(hdd_context_t *pHddCtx)
 	}
 	buffer = temp;
 	qdf_mem_copy(buffer, fw->data, fw->size);
-	buffer[fw->size + 1] = 0x0;
+	buffer[fw->size] = 0x0;
 
 	/* data format:
 	 * Intf0MacAddress=00AA00BB00CC
@@ -5865,7 +5894,7 @@ QDF_STATUS hdd_update_mac_config(hdd_context_t *pHddCtx)
 		buffer = line;
 	}
 	if (i <= QDF_MAX_CONCURRENCY_PERSONA) {
-		hdd_notice("%d Mac addresses provided", i);
+		hdd_debug("%d Mac addresses provided", i);
 	} else {
 		hdd_err("invalid number of Mac address provided, nMac = %d", i);
 		qdf_status = QDF_STATUS_E_INVAL;
@@ -5955,7 +5984,7 @@ static void hdd_set_rx_mode_value(hdd_context_t *hdd_ctx)
 {
 	if (hdd_ctx->config->rx_mode & CFG_ENABLE_RX_THREAD &&
 		 hdd_ctx->config->rx_mode & CFG_ENABLE_RPS) {
-		hdd_err("rx_mode wrong configuration. Make it default");
+		hdd_warn("rx_mode wrong configuration. Make it default");
 		hdd_ctx->config->rx_mode = CFG_RX_MODE_DEFAULT;
 	}
 
@@ -6006,12 +6035,12 @@ QDF_STATUS hdd_parse_config_ini(hdd_context_t *pHddCtx)
 		goto config_exit;
 	}
 
-	hdd_notice("qcom_cfg.ini Size %zu", fw->size);
+	hdd_debug("qcom_cfg.ini Size %zu", fw->size);
 
 	buffer = (char *)qdf_mem_malloc(fw->size);
 
 	if (NULL == buffer) {
-		hdd_alert("qdf_mem_malloc failure");
+		hdd_err("qdf_mem_malloc failure");
 		release_firmware(fw);
 		return QDF_STATUS_E_NOMEM;
 	}
@@ -6024,7 +6053,7 @@ QDF_STATUS hdd_parse_config_ini(hdd_context_t *pHddCtx)
 		line = get_next_line(buffer);
 		buffer = i_trim(buffer);
 
-		hdd_notice("%s: item", buffer);
+		hdd_debug("%s: item", buffer);
 
 		if (strlen((char *)buffer) == 0 || *buffer == '#') {
 			buffer = line;
@@ -6082,7 +6111,7 @@ config_exit:
  *
  * Return: the CSR phy mode value
  */
-eCsrPhyMode hdd_cfg_xlate_to_csr_phy_mode(eHddDot11Mode dot11Mode)
+eCsrPhyMode hdd_cfg_xlate_to_csr_phy_mode(enum hdd_dot11_mode dot11Mode)
 {
 	if (cds_is_sub_20_mhz_enabled())
 		return eCSR_DOT11_MODE_abg;
@@ -6131,7 +6160,7 @@ QDF_STATUS hdd_set_idle_ps_config(hdd_context_t *pHddCtx, uint32_t val)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
-	hdd_notice("hdd_set_idle_ps_config: Enter Val %d", val);
+	hdd_debug("hdd_set_idle_ps_config: Enter Val %d", val);
 
 	status = sme_set_idle_powersave_config(pHddCtx->pcds_context,
 			pHddCtx->hHal, val);
@@ -6161,11 +6190,9 @@ static void hdd_set_fine_time_meas_cap(hdd_context_t *hdd_ctx,
 	capability &= CFG_FINE_TIME_MEAS_CAPABILITY_MAX;
 	sme_config->csrConfig.fine_time_meas_cap = capability;
 
-	hdd_notice("fine time meas capability - INI: %04x Enabled: %04x",
+	hdd_debug("fine time meas capability - INI: %04x Enabled: %04x",
 		config->fine_time_meas_cap,
 		sme_config->csrConfig.fine_time_meas_cap);
-
-	return;
 }
 
 /**
@@ -6276,7 +6303,7 @@ QDF_STATUS hdd_hex_string_to_u16_array(char *str,
 	if (str == NULL || int_array == NULL || len == NULL)
 		return QDF_STATUS_E_INVAL;
 
-	hdd_err("str %p intArray %p intArrayMaxLen %d",
+	hdd_debug("str %p intArray %p intArrayMaxLen %d",
 		s, int_array, int_array_max_len);
 
 	*len = 0;
@@ -6373,7 +6400,9 @@ static bool hdd_update_vht_cap_in_cfg(hdd_context_t *hdd_ctx)
 			status = false;
 			hdd_err("Couldn't pass WNI_VHT_SHORT_GI_80MHZ to CFG");
 		}
-		/* Hardware is capable of doing 128K AMPDU in 11AC mode */
+		/* Hardware is capable of doing
+		 * 128K AMPDU in 11AC mode
+		 */
 		if (sme_cfg_set_int(hdd_ctx->hHal,
 			     WNI_CFG_VHT_AMPDU_LEN_EXPONENT,
 			     config->fVhtAmpduLenExponent) ==
@@ -6590,6 +6619,13 @@ bool hdd_update_config_cfg(hdd_context_t *hdd_ctx)
 		hdd_err("Couldn't pass on WNI_CFG_PS_DATA_INACTIVITY_TIMEOUT to CFG");
 	}
 
+	if (sme_cfg_set_int(hdd_ctx->hHal,
+		WNI_CFG_PS_WOW_DATA_INACTIVITY_TIMEOUT,
+		config->wow_data_inactivity_timeout) == QDF_STATUS_E_FAILURE) {
+		status = false;
+		hdd_err("Fail to pass WNI_CFG_PS_WOW_DATA_INACTIVITY_TO CFG");
+	}
+
 	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_ENABLE_LTE_COEX,
 		     config->enableLTECoex) == QDF_STATUS_E_FAILURE) {
 		status = false;
@@ -6621,9 +6657,10 @@ bool hdd_update_config_cfg(hdd_context_t *hdd_ctx)
 	}
 
 	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_MCAST_BCAST_FILTER_SETTING,
-		    config->mcastBcastFilterSetting) == QDF_STATUS_E_FAILURE)
+		    config->mcastBcastFilterSetting) == QDF_STATUS_E_FAILURE) {
 		status = false;
 		hdd_err("Couldn't pass on WNI_CFG_MCAST_BCAST_FILTER_SETTING to CFG");
+	}
 
 	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_SINGLE_TID_RC,
 		    config->bSingleTidRc) == QDF_STATUS_E_FAILURE) {
@@ -6910,35 +6947,6 @@ bool hdd_update_config_cfg(hdd_context_t *hdd_ctx)
 	return status;
 }
 
-#ifdef FEATURE_WLAN_SCAN_PNO
-/**
- * hdd_set_pno_channel_prediction_config() - Set PNO configuration
- * @sme_config:         Config params from SME Context
- * @hdd_ctx:            Config params from HDD Context
- *
- * Copy the PNO Channel prediction feature configuration parameters
- * from HDD context to SME context.
- *
- * Return: None
- */
-void hdd_set_pno_channel_prediction_config(
-		tpSmeConfigParams sme_config, hdd_context_t *hdd_ctx)
-{
-	sme_config->csrConfig.dual_mac_feature_disable =
-		hdd_ctx->config->dual_mac_feature_disable;
-	sme_config->csrConfig.pno_channel_prediction =
-		hdd_ctx->config->pno_channel_prediction;
-	sme_config->csrConfig.top_k_num_of_channels =
-		hdd_ctx->config->top_k_num_of_channels;
-	sme_config->csrConfig.stationary_thresh =
-		hdd_ctx->config->stationary_thresh;
-	sme_config->csrConfig.channel_prediction_full_scan =
-		hdd_ctx->config->channel_prediction_full_scan;
-	sme_config->csrConfig.pnoscan_adaptive_dwell_mode =
-		hdd_ctx->config->pnoscan_adaptive_dwell_mode;
-}
-#endif
-
 /**
  * hdd_update_per_config_to_sme() -initializes the sme config for PER roam
  *
@@ -7033,7 +7041,7 @@ QDF_STATUS hdd_set_sme_config(hdd_context_t *pHddCtx)
 		return QDF_STATUS_E_NOMEM;
 	}
 
-	hdd_info("%s bWmmIsEnabled=%d 802_11e_enabled=%d dot11Mode=%d",
+	hdd_debug("%s bWmmIsEnabled=%d 802_11e_enabled=%d dot11Mode=%d",
 		  __func__, pConfig->WmmMode, pConfig->b80211eIsEnabled,
 		  pConfig->dot11Mode);
 
@@ -7163,9 +7171,8 @@ QDF_STATUS hdd_set_sme_config(hdd_context_t *pHddCtx)
 #ifdef FEATURE_WLAN_ESE
 	smeConfig->csrConfig.isEseIniFeatureEnabled =
 		pConfig->isEseIniFeatureEnabled;
-	if (pConfig->isEseIniFeatureEnabled) {
+	if (pConfig->isEseIniFeatureEnabled)
 		pConfig->isFastTransitionEnabled = true;
-	}
 #endif
 	smeConfig->csrConfig.isFastTransitionEnabled =
 		pConfig->isFastTransitionEnabled;
@@ -7177,7 +7184,9 @@ QDF_STATUS hdd_set_sme_config(hdd_context_t *pHddCtx)
 		pConfig->bFastRoamInConIniFeatureEnabled;
 
 	if (0 == smeConfig->csrConfig.isRoamOffloadScanEnabled) {
-		/* Disable roaming in concurrency if roam scan offload is disabled */
+		/* Disable roaming in concurrency if roam scan
+		 * offload is disabled
+		 */
 		smeConfig->csrConfig.bFastRoamInConIniFeatureEnabled = 0;
 	}
 	smeConfig->csrConfig.neighborRoamConfig.nNeighborLookupRssiThreshold =
@@ -7253,11 +7262,6 @@ QDF_STATUS hdd_set_sme_config(hdd_context_t *pHddCtx)
 	sme_update_enable_ssr((tHalHandle) (pHddCtx->hHal),
 			      pHddCtx->config->enableSSR);
 
-#ifdef FEATURE_WLAN_SCAN_PNO
-	/* Update PNO offoad status */
-	smeConfig->csrConfig.pnoOffload = pHddCtx->config->PnoOffload;
-#endif
-
 	/* Update maximum interfaces information */
 	smeConfig->csrConfig.max_intf_count = pHddCtx->max_intf_count;
 
@@ -7304,7 +7308,6 @@ QDF_STATUS hdd_set_sme_config(hdd_context_t *pHddCtx)
 	/* Update 802.11p config */
 	smeConfig->csrConfig.enable_dot11p =
 		(pHddCtx->config->dot11p_mode != WLAN_HDD_11P_DISABLED);
-	hdd_set_pno_channel_prediction_config(smeConfig, pHddCtx);
 
 	smeConfig->csrConfig.early_stop_scan_enable =
 		pHddCtx->config->early_stop_scan_enable;
@@ -7379,14 +7382,16 @@ QDF_STATUS hdd_set_sme_config(hdd_context_t *pHddCtx)
 			pHddCtx->config->rx_aggregation_size;
 	smeConfig->csrConfig.enable_bcast_probe_rsp =
 			pHddCtx->config->enable_bcast_probe_rsp;
+	smeConfig->csrConfig.qcn_ie_support =
+			pHddCtx->config->qcn_ie_support;
+	smeConfig->csrConfig.fils_max_chan_guard_time =
+			pHddCtx->config->fils_max_chan_guard_time;
 
 	hdd_he_set_sme_config(smeConfig, pConfig);
 
 	status = sme_update_config(pHddCtx->hHal, smeConfig);
-	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		hdd_err("sme_update_config() return failure %d",
-		       status);
-	}
+	if (!QDF_IS_STATUS_SUCCESS(status))
+		hdd_err("sme_update_config() failure: %d", status);
 
 	qdf_mem_free(smeConfig);
 	return status;
@@ -7475,7 +7480,7 @@ QDF_STATUS hdd_update_nss(hdd_context_t *hdd_ctx, uint8_t nss)
 	enable2x2 = (nss == 1) ? 0 : 1;
 
 	if (hdd_config->enable2x2 == enable2x2) {
-		hdd_err("NSS same as requested");
+		hdd_debug("NSS same as requested");
 		return QDF_STATUS_SUCCESS;
 	}
 
@@ -7519,7 +7524,7 @@ QDF_STATUS hdd_update_nss(hdd_context_t *hdd_ctx, uint8_t nss)
 		ht_cap_info->txSTBC = 0;
 	} else {
 		sme_cfg_get_int(hdd_ctx->hHal, WNI_CFG_VHT_TXSTBC, &val32);
-		hdd_notice("STBC %d", val32);
+		hdd_debug("STBC %d", val32);
 		ht_cap_info->txSTBC = val32;
 	}
 	temp = val16;

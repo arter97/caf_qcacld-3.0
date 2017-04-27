@@ -232,7 +232,7 @@
 #define CFG_ADVERTISE_CONCURRENT_OPERATION_MIN     (0)
 #define CFG_ADVERTISE_CONCURRENT_OPERATION_MAX     (1)
 
-typedef enum {
+enum hdd_dot11_mode {
 	eHDD_DOT11_MODE_AUTO = 0,       /* covers all things we support */
 	eHDD_DOT11_MODE_abg,    /* 11a/b/g only, no HT, no proprietary */
 	eHDD_DOT11_MODE_11b,
@@ -246,7 +246,7 @@ typedef enum {
 	eHDD_DOT11_MODE_11a,
 	eHDD_DOT11_MODE_11ax_ONLY,
 	eHDD_DOT11_MODE_11ax,
-} eHddDot11Mode;
+};
 
 /*
  * <ini>
@@ -1324,10 +1324,503 @@ typedef enum {
 #define CFG_RSSI_CATEGORY_GAP_MAX              (100)
 #define CFG_RSSI_CATEGORY_GAP_DEFAULT          (5)
 
-#define CFG_ROAM_PREFER_5GHZ                   "gRoamPrefer5GHz"
+/*
+ * <ini>
+ * gRoamPrefer5GHz - Prefer roaming to 5GHz Bss
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to inform FW to prefer roaming to 5GHz BSS
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ROAM_PREFER_5GHZ                  "gRoamPrefer5GHz"
 #define CFG_ROAM_PREFER_5GHZ_MIN              (0)
 #define CFG_ROAM_PREFER_5GHZ_MAX              (1)
 #define CFG_ROAM_PREFER_5GHZ_DEFAULT          (1)
+
+/*
+ * <ini>
+ * gRoamIntraBand - Prefer roaming within Band
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to inform FW to prefer roaming within band
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ROAM_INTRA_BAND                   "gRoamIntraBand"
+#define CFG_ROAM_INTRA_BAND_MIN               (0)
+#define CFG_ROAM_INTRA_BAND_MAX               (1)
+#define CFG_ROAM_INTRA_BAND_DEFAULT           (0)
+
+/*
+ * <ini>
+ * FastRoamEnabled - Enable fast roaming
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to inform FW to enable fast roaming
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_LFR_FEATURE_ENABLED_NAME                        "FastRoamEnabled"
+#define CFG_LFR_FEATURE_ENABLED_MIN                         (0)
+#define CFG_LFR_FEATURE_ENABLED_MAX                         (1)
+#define CFG_LFR_FEATURE_ENABLED_DEFAULT                     (0)
+
+/*
+ * <ini>
+ * FastTransitionEnabled - Enable fast transition in case of 11r and ese.
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to turn ON/OFF the whole neighbor roam, pre-auth, reassoc.
+ * With this turned OFF 11r will completely not work. For 11r this flag has to
+ * be ON. For ESE fastroam will not work.
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_FAST_TRANSITION_ENABLED_NAME                    "FastTransitionEnabled"
+#define CFG_FAST_TRANSITION_ENABLED_NAME_MIN                (0)
+#define CFG_FAST_TRANSITION_ENABLED_NAME_MAX                (1)
+#define CFG_FAST_TRANSITION_ENABLED_NAME_DEFAULT            (1)
+
+/*
+ * <ini>
+ * RoamRssiDiff - Enable roam based on rssi
+ * @Min: 0
+ * @Max: 30
+ * @Default: 5
+ *
+ * This INI is used to decide whether to Roam or not based on RSSI. AP1 is the
+ * currently associated AP and AP2 is chosen for roaming. The Roaming will
+ * happen only if AP2 has better Signal Quality and it has a RSSI better than
+ * AP2. RoamRssiDiff is the number of units (typically measured in dB) AP2
+ * is better than AP1.
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ROAM_RSSI_DIFF_NAME                             "RoamRssiDiff"
+#define CFG_ROAM_RSSI_DIFF_MIN                              (0)
+#define CFG_ROAM_RSSI_DIFF_MAX                              (30)
+#define CFG_ROAM_RSSI_DIFF_DEFAULT                          (5)
+
+/*
+ * <ini>
+ * gRoamScanNProbes - Sets the number of probes to be sent for firmware roaming
+ * @Min: 1
+ * @Max: 10
+ * @Default: 2
+ *
+ * This INI is used to set the maximum number of probes the firmware can send
+ * for firmware internal roaming cases.
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ROAM_SCAN_N_PROBES                              "gRoamScanNProbes"
+#define CFG_ROAM_SCAN_N_PROBES_MIN                          (1)
+#define CFG_ROAM_SCAN_N_PROBES_MAX                          (10)
+#define CFG_ROAM_SCAN_N_PROBES_DEFAULT                      (2)
+
+/*
+ * <ini>
+ * gRoamScanHomeAwayTime - Sets the Home Away Time to firmware
+ * @Min: 0
+ * @Max: 300
+ * @Default: 0
+ *
+ * Home Away Time should be at least equal to (gNeighborScanChannelMaxTime
+ * + (2*RFS)), where RFS is the RF Switching time(3). It is twice RFS
+ * to consider the time to go off channel and return to the home channel.
+ *
+ * Related: gNeighborScanChannelMaxTime
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ROAM_SCAN_HOME_AWAY_TIME                        "gRoamScanHomeAwayTime"
+#define CFG_ROAM_SCAN_HOME_AWAY_TIME_MIN                    (0)
+#define CFG_ROAM_SCAN_HOME_AWAY_TIME_MAX                    (300)
+#define CFG_ROAM_SCAN_HOME_AWAY_TIME_DEFAULT                (0)
+
+/*
+ * <ini>
+ * OkcEnabled - Enable OKC(Oppurtunistic Key Caching)
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This INI is used to enable OKC feature
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_OKC_FEATURE_ENABLED_NAME                       "OkcEnabled"
+#define CFG_OKC_FEATURE_ENABLED_MIN                        (0)
+#define CFG_OKC_FEATURE_ENABLED_MAX                        (1)
+#define CFG_OKC_FEATURE_ENABLED_DEFAULT                    (1)
+
+/*
+ * <ini>
+ * gRoamScanOffloadEnabled - Enable Roam Scan Offload
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This INI is used to enable Roam Scan Offload in firmware
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ROAM_SCAN_OFFLOAD_ENABLED                       "gRoamScanOffloadEnabled"
+#define CFG_ROAM_SCAN_OFFLOAD_ENABLED_MIN                   (0)
+#define CFG_ROAM_SCAN_OFFLOAD_ENABLED_MAX                   (1)
+#define CFG_ROAM_SCAN_OFFLOAD_ENABLED_DEFAULT               (1)
+
+/*
+ * <ini>
+ * gRoamRescanRssiDiff - Sets RSSI for Scan trigger in firmware
+ * @Min: 0
+ * @Max: 100
+ * @Default: 5
+ *
+ * This INI is the drop in RSSI value that will trigger a precautionary
+ * scan by firmware. Max value is chosen in such a way that this type
+ * of scan can be disabled by user.
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ROAM_RESCAN_RSSI_DIFF_NAME                  "gRoamRescanRssiDiff"
+#define CFG_ROAM_RESCAN_RSSI_DIFF_MIN                   (0)
+#define CFG_ROAM_RESCAN_RSSI_DIFF_MAX                   (100)
+#define CFG_ROAM_RESCAN_RSSI_DIFF_DEFAULT               (5)
+
+/*
+ * <ini>
+ * gEnableFastRoamInConcurrency - Enable LFR roaming on STA during concurrency
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This INI is used to enable Legacy fast roaming(LFR) on STA link during
+ * concurrent sessions.
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_FAST_ROAM_IN_CONCURRENCY          "gEnableFastRoamInConcurrency"
+#define CFG_ENABLE_FAST_ROAM_IN_CONCURRENCY_MIN      (0)
+#define CFG_ENABLE_FAST_ROAM_IN_CONCURRENCY_MAX      (1)
+#define CFG_ENABLE_FAST_ROAM_IN_CONCURRENCY_DEFAULT  (1)
+
+/*
+ * <ini>
+ * gSelect5GHzMargin - Sets RSSI preference for 5GHz over 2.4GHz AP.
+ * @Min: 0
+ * @Max: 60
+ * @Default: 0
+ *
+ * Prefer connecting to 5G AP even if its RSSI is lower by gSelect5GHzMargin
+ * dBm than 2.4G AP. This feature requires the dependent cfg.ini
+ * "gRoamPrefer5GHz" set to 1
+ *
+ * Related: gRoamPrefer5GHz
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_STRICT_5GHZ_PREF_BY_MARGIN                 "gSelect5GHzMargin"
+#define CFG_STRICT_5GHZ_PREF_BY_MARGIN_MIN             (0)
+#define CFG_STRICT_5GHZ_PREF_BY_MARGIN_MAX             (60)
+#define CFG_STRICT_5GHZ_PREF_BY_MARGIN_DEFAULT         (0)
+
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+/*
+ * <ini>
+ * gRoamOffloadEnabled - enable/disable roam offload feature
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This INI is used to enable/disable roam offload feature
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ROAMING_OFFLOAD_NAME                "gRoamOffloadEnabled"
+#define CFG_ROAMING_OFFLOAD_MIN                 (0)
+#define CFG_ROAMING_OFFLOAD_MAX                 (1)
+#define CFG_ROAMING_OFFLOAD_DEFAULT             (1)
+#endif
+
+/*
+ * <ini>
+ * gRoamScanHiRssiMaxCount - Sets 5GHz maximum scan count
+ * @Min: 0
+ * @Max: 10
+ * @Default: 3
+ *
+ * This INI is used to set maximum scan count in 5GHz
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ROAM_SCAN_HI_RSSI_MAXCOUNT_NAME         "gRoamScanHiRssiMaxCount"
+#define CFG_ROAM_SCAN_HI_RSSI_MAXCOUNT_MIN          (0)
+#define CFG_ROAM_SCAN_HI_RSSI_MAXCOUNT_MAX          (10)
+#define CFG_ROAM_SCAN_HI_RSSI_MAXCOUNT_DEFAULT      (3)
+
+/*
+ * <ini>
+ * gRoamScanHiRssiDelta - Sets RSSI Delta for scan trigger
+ * @Min: 0
+ * @Max: 16
+ * @Default: 10
+ *
+ * This INI is used to set change in RSSI at which scan is triggered
+ * in 5GHz.
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ROAM_SCAN_HI_RSSI_DELTA_NAME           "gRoamScanHiRssiDelta"
+#define CFG_ROAM_SCAN_HI_RSSI_DELTA_MIN            (0)
+#define CFG_ROAM_SCAN_HI_RSSI_DELTA_MAX            (16)
+#define CFG_ROAM_SCAN_HI_RSSI_DELTA_DEFAULT        (10)
+
+/*
+ * <ini>
+ * gRoamScanHiRssiDelay - Sets minimum delay between 5GHz scans
+ * @Min: 5000
+ * @Max: 0x7fffffff
+ * @Default: 15000
+ *
+ * This INI is used to set the minimum delay between 5GHz scans.
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ROAM_SCAN_HI_RSSI_DELAY_NAME            "gRoamScanHiRssiDelay"
+#define CFG_ROAM_SCAN_HI_RSSI_DELAY_MIN             (5000)
+#define CFG_ROAM_SCAN_HI_RSSI_DELAY_MAX             (0x7fffffff)
+#define CFG_ROAM_SCAN_HI_RSSI_DELAY_DEFAULT         (15000)
+
+/*
+ * <ini>
+ * gRoamScanHiRssiUpperBound - Sets upper bound after which 5GHz scan
+ * @Min: -66
+ * @Max: 0
+ * @Default: -30
+ *
+ * This INI is used to set the RSSI upper bound above which the 5GHz scan
+ * will not be performed.
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ROAM_SCAN_HI_RSSI_UB_NAME              "gRoamScanHiRssiUpperBound"
+#define CFG_ROAM_SCAN_HI_RSSI_UB_MIN               (-66)
+#define CFG_ROAM_SCAN_HI_RSSI_UB_MAX               (0)
+#define CFG_ROAM_SCAN_HI_RSSI_UB_DEFAULT           (-30)
+
+#ifdef FEATURE_LFR_SUBNET_DETECTION
+/*
+ * <ini>
+ * gLFRSubnetDetectionEnable - Enable LFR3 subnet detection
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * Enable IP subnet detection during legacy fast roming version 3. Legacy fast
+ * roaming could roam across IP subnets without host processors' knowledge.
+ * This feature enables firmware to wake up the host processor if it
+ * successfully determines change in the IP subnet. Change in IP subnet could
+ * potentially cause disruption in IP connnectivity if IP address is not
+ * refreshed.
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_LFR_SUBNET_DETECTION    "gLFRSubnetDetectionEnable"
+#define CFG_ENABLE_LFR_SUBNET_MIN          (0)
+#define CFG_ENABLE_LFR_SUBNET_MAX          (1)
+#define CFG_ENABLE_LFR_SUBNET_DEFAULT      (1)
+#endif /* FEATURE_LFR_SUBNET_DETECTION */
+
+/*
+ * <ini>
+ * groam_dense_rssi_thresh_offset - Sets dense roam RSSI threshold diff
+ * @Min: 0
+ * @Max: 20
+ * @Default: 10
+ *
+ * This INI is used to set offset value from normal RSSI threshold to dense
+ * RSSI threshold Fw will optimize roaming based on new RSSI threshold once
+ * it detects dense enviournment.
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ROAM_DENSE_RSSI_THRE_OFFSET         "groam_dense_rssi_thresh_offset"
+#define CFG_ROAM_DENSE_RSSI_THRE_OFFSET_MIN     (0)
+#define CFG_ROAM_DENSE_RSSI_THRE_OFFSET_MAX     (20)
+#define CFG_ROAM_DENSE_RSSI_THRE_OFFSET_DEFAULT (10)
+
+/*
+ * <ini>
+ * groam_dense_min_aps - Sets minimum number of AP for dense roam
+ * @Min: 1
+ * @Max: 5
+ * @Default: 3
+ *
+ * Minimum number of APs required for dense roam. FW will consider
+ * environment as dense once it detects #APs operating is more than
+ * groam_dense_min_aps.
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ROAM_DENSE_MIN_APS         "groam_dense_min_aps"
+#define CFG_ROAM_DENSE_MIN_APS_MIN     (1)
+#define CFG_ROAM_DENSE_MIN_APS_MAX     (5)
+#define CFG_ROAM_DENSE_MIN_APS_DEFAULT (3)
+
+/*
+ * <ini>
+ * roamscan_adaptive_dwell_mode - Sets dwell time adaptive mode
+ * @Min: 0
+ * @Max: 4
+ * @Default: 0
+ *
+ * This parameter will set the algo used in dwell time optimization during
+ * roam scan. see enum wmi_dwelltime_adaptive_mode.
+ * Acceptable values for this:
+ * 0: Default (Use firmware default mode)
+ * 1: Conservative optimization
+ * 2: Moderate optimization
+ * 3: Aggressive optimization
+ * 4: Static
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ADAPTIVE_ROAMSCAN_DWELL_MODE_NAME    "roamscan_adaptive_dwell_mode"
+#define CFG_ADAPTIVE_ROAMSCAN_DWELL_MODE_MIN     (0)
+#define CFG_ADAPTIVE_ROAMSCAN_DWELL_MODE_MAX     (4)
+#define CFG_ADAPTIVE_ROAMSCAN_DWELL_MODE_DEFAULT (0)
 
 /*
  * Timer waiting for interface up from the upper layer. If
@@ -1338,15 +1831,6 @@ typedef enum {
 #define CFG_INTERFACE_CHANGE_WAIT_MIN     (10)
 #define CFG_INTERFACE_CHANGE_WAIT_MAX     (500000)
 #define CFG_INTERFACE_CHANGE_WAIT_DEFAULT (15000)
-
-/*
- * To enable, set gRoamIntraBand=1 (Roaming within band)
- * To disable, set gRoamIntraBand=0 (Roaming across band)
- */
-#define CFG_ROAM_INTRA_BAND                   "gRoamIntraBand"
-#define CFG_ROAM_INTRA_BAND_MIN               (0)
-#define CFG_ROAM_INTRA_BAND_MAX               (1)
-#define CFG_ROAM_INTRA_BAND_DEFAULT           (0)
 
 /*
  * <ini>
@@ -2487,10 +2971,46 @@ typedef enum {
 #define CFG_FW_MCC_BCAST_PROB_RESP_MAX         (1)
 #define CFG_FW_MCC_BCAST_PROB_RESP_DEFAULT     (0)
 
+/*
+ * <ini>
+ * gDataInactivityTimeout - Data activity timeout for non wow mode.
+ * @Min: 1
+ * @Max: 255
+ * @Default: 200
+ *
+ * This ini is used to set data inactivity timeout in non wow mode.
+ *
+ * Supported Feature: inactivity timeout in non wow mode
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+
 #define CFG_DATA_INACTIVITY_TIMEOUT_NAME       "gDataInactivityTimeout"
 #define CFG_DATA_INACTIVITY_TIMEOUT_MIN        (1)
 #define CFG_DATA_INACTIVITY_TIMEOUT_MAX        (255)
 #define CFG_DATA_INACTIVITY_TIMEOUT_DEFAULT    (200)
+
+/*
+ * <ini>
+ * g_wow_data_inactivity_timeout - Data activity timeout in wow mode.
+ * @Min: 1
+ * @Max: 255
+ * @Default: 50
+ *
+ * This ini is used to set data inactivity timeout in wow mode.
+ *
+ * Supported Feature: inactivity timeout in wow mode
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_WOW_DATA_INACTIVITY_TIMEOUT_NAME     "g_wow_data_inactivity_timeout"
+#define CFG_WOW_DATA_INACTIVITY_TIMEOUT_MIN      (1)
+#define CFG_WOW_DATA_INACTIVITY_TIMEOUT_MAX      (255)
+#define CFG_WOW_DATA_INACTIVITY_TIMEOUT_DEFAULT  (50)
 
 /*
  * <ini>
@@ -3385,65 +3905,16 @@ enum station_keepalive_method {
 #define CFG_ESE_FEATURE_ENABLED_DEFAULT                     (0) /* disabled */
 #endif /* FEATURE_WLAN_ESE */
 
-#define CFG_LFR_FEATURE_ENABLED_NAME                       "FastRoamEnabled"
-#define CFG_LFR_FEATURE_ENABLED_MIN                         (0)
-#define CFG_LFR_FEATURE_ENABLED_MAX                         (1)
-#define CFG_LFR_FEATURE_ENABLED_DEFAULT                     (0) /* disabled */
-
 #define CFG_LFR_MAWC_FEATURE_ENABLED_NAME                   "MAWCEnabled"
 #define CFG_LFR_MAWC_FEATURE_ENABLED_MIN                    (0)
 #define CFG_LFR_MAWC_FEATURE_ENABLED_MAX                    (1)
 #define CFG_LFR_MAWC_FEATURE_ENABLED_DEFAULT                (0) /* disabled */
-
-/* This flag will control fasttransition in case of 11r and ese. */
-/* Basically with this the whole neighbor roam, pre-auth, reassoc */
-/* can be turned ON/OFF. */
-/* With this turned OFF 11r will completely not work. */
-/* For 11r this flag has to be ON. */
-/* For ESE fastroam will not work. */
-#define CFG_FAST_TRANSITION_ENABLED_NAME                    "FastTransitionEnabled"
-#define CFG_FAST_TRANSITION_ENABLED_NAME_MIN                (0)
-#define CFG_FAST_TRANSITION_ENABLED_NAME_MAX                (1)
-#define CFG_FAST_TRANSITION_ENABLED_NAME_DEFAULT            (1) /* Enabled */
-
-/* This parameter is used to decide whether to Roam or not.  AP1 is
- * the currently associated AP and AP2 is chosen for roaming.  The
- * Roaming will happen only if AP2 has better Signal Quality and it
- * has a RSSI better than AP1 in terms of RoamRssiDiff,and
- * RoamRssiDiff is the number of units (typically measured in dB) AP2
- * is better than AP1.  This check is not done if the value is Zero
- */
-#define CFG_ROAM_RSSI_DIFF_NAME                             "RoamRssiDiff"
-#define CFG_ROAM_RSSI_DIFF_MIN                              (0)
-#define CFG_ROAM_RSSI_DIFF_MAX                              (30)
-#define CFG_ROAM_RSSI_DIFF_DEFAULT                          (5)
 
 /*This parameter is used to set Wireless Extended Security Mode.*/
 #define CFG_ENABLE_WES_MODE_NAME                            "gWESModeEnabled"
 #define CFG_ENABLE_WES_MODE_NAME_MIN                        (0)
 #define CFG_ENABLE_WES_MODE_NAME_MAX                        (1)
 #define CFG_ENABLE_WES_MODE_NAME_DEFAULT                    (0)
-
-#define CFG_ROAM_SCAN_N_PROBES                             "gRoamScanNProbes"
-#define CFG_ROAM_SCAN_N_PROBES_MIN                          (1)
-#define CFG_ROAM_SCAN_N_PROBES_MAX                          (10)
-#define CFG_ROAM_SCAN_N_PROBES_DEFAULT                      (2)
-
-#define CFG_ROAM_SCAN_HOME_AWAY_TIME                        "gRoamScanHomeAwayTime"
-#define CFG_ROAM_SCAN_HOME_AWAY_TIME_MIN                    (0) /* 0 for disable */
-#define CFG_ROAM_SCAN_HOME_AWAY_TIME_MAX                    (300)
-#define CFG_ROAM_SCAN_HOME_AWAY_TIME_DEFAULT                (CFG_ROAM_SCAN_HOME_AWAY_TIME_MIN)
-/* disabled by default */
-
-#define CFG_OKC_FEATURE_ENABLED_NAME                       "OkcEnabled"
-#define CFG_OKC_FEATURE_ENABLED_MIN                        (0)
-#define CFG_OKC_FEATURE_ENABLED_MAX                        (1)
-#define CFG_OKC_FEATURE_ENABLED_DEFAULT                    (1)
-
-#define CFG_ROAM_SCAN_OFFLOAD_ENABLED                       "gRoamScanOffloadEnabled"
-#define CFG_ROAM_SCAN_OFFLOAD_ENABLED_MIN                   (0)
-#define CFG_ROAM_SCAN_OFFLOAD_ENABLED_MAX                   (1)
-#define CFG_ROAM_SCAN_OFFLOAD_ENABLED_DEFAULT               (1)
 
 #define CFG_TL_DELAYED_TRGR_FRM_INT_NAME                   "DelayedTriggerFrmInt"
 #define CFG_TL_DELAYED_TRGR_FRM_INT_MIN                     1
@@ -3555,16 +4026,6 @@ enum station_keepalive_method {
 #define CFG_DELAY_BEFORE_VDEV_STOP_MIN               (2)
 #define CFG_DELAY_BEFORE_VDEV_STOP_MAX               (200)
 #define CFG_DELAY_BEFORE_VDEV_STOP_DEFAULT           (20)
-
-/*
- * This parameter is the drop in RSSI value that will trigger a precautionary
- * scan by firmware.
- * MAX value is choose so that this type of scan can be disabled by user.
- */
-#define CFG_ROAM_RESCAN_RSSI_DIFF_NAME                  "gRoamRescanRssiDiff"
-#define CFG_ROAM_RESCAN_RSSI_DIFF_MIN                   (0)
-#define CFG_ROAM_RESCAN_RSSI_DIFF_MAX                   (100)
-#define CFG_ROAM_RESCAN_RSSI_DIFF_DEFAULT               (5)
 
 #define CFG_11R_NEIGHBOR_REQ_MAX_TRIES_NAME           "gMaxNeighborReqTries"
 #define CFG_11R_NEIGHBOR_REQ_MAX_TRIES_MIN            (1)
@@ -3705,6 +4166,25 @@ enum station_keepalive_method {
 
 /*
  * <ini>
+ * g_enable_non_arp_bc_hw_filter - Enable HW broadcast filtering
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini support to dynamically enable/disable Broadast filter
+ * when target goes to wow suspend/resume mode
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_HW_BC_FILTER_NAME     "g_enable_non_arp_bc_hw_filter"
+#define CFG_HW_FILTER_DEFAULT         (0)
+#define CFG_HW_FILTER_MIN             (0)
+#define CFG_HW_FILTER_MAX             (1)
+
+/*
+ * <ini>
  * BandCapability - Preferred band (0: Both,  1: 2.4G only,  2: 5G only)
  * @Min: 0
  * @Max: 2
@@ -3733,6 +4213,50 @@ enum station_keepalive_method {
 #define CFG_ENABLE_BYPASS_11D_DEFAULT              (1)
 
 /*
+ * gEnableDFSChnlScan - enable dfs channel scan.
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to enable/disable dfs channels in scan, enabling this
+ * will enable driver to include dfs channels in its scan list.
+ * Related: NA
+ *
+ * Supported Feature: DFS, Scan
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_DFS_CHNL_SCAN_NAME              "gEnableDFSChnlScan"
+#define CFG_ENABLE_DFS_CHNL_SCAN_MIN               (0)
+#define CFG_ENABLE_DFS_CHNL_SCAN_MAX               (1)
+#define CFG_ENABLE_DFS_CHNL_SCAN_DEFAULT           (1)
+
+/*
+ * <ini>
+ * gEnableDFSPnoChnlScan - enable dfs channels in PNO scan
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to enable/disable dfs channels in PNO scan request,
+ * enabling this ini enables driver to include dfs channels in its
+ * PNO scan request
+ * Related: NA
+ *
+ * Supported Feature: DFS, PNO
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_DFS_PNO_CHNL_SCAN_NAME              "gEnableDFSPnoChnlScan"
+#define CFG_ENABLE_DFS_PNO_CHNL_SCAN_MIN               (0)
+#define CFG_ENABLE_DFS_PNO_CHNL_SCAN_MAX               (1)
+#define CFG_ENABLE_DFS_PNO_CHNL_SCAN_DEFAULT           (1)
+
+/*
  * <ini>
  * gEnableDumpCollect - It will use for collect the dumps
  * @Min: 0
@@ -3755,11 +4279,11 @@ enum station_keepalive_method {
 #define CFG_ENABLE_RAMDUMP_COLLECTION_MAX          (1)
 #define CFG_ENABLE_RAMDUMP_COLLECTION_DEFAULT      (1)
 
-typedef enum {
+enum hdd_link_speed_rpt_type {
 	eHDD_LINK_SPEED_REPORT_ACTUAL = 0,
 	eHDD_LINK_SPEED_REPORT_MAX = 1,
 	eHDD_LINK_SPEED_REPORT_MAX_SCALED = 2,
-} eHddLinkSpeedReportType;
+};
 
 /*
  * <ini>
@@ -4162,26 +4686,115 @@ typedef enum {
 #define CFG_HT_SMPS_CAP_FEATURE_MAX             (3)
 #define CFG_HT_SMPS_CAP_FEATURE_DEFAULT         (3)
 
+/*
+ * <ini>
+ * gDisableDFSChSwitch - Disable channel switch if radar is found
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to disable channel switch if radar is found
+ * on that channel.
+ * Related: NA.
+ *
+ * Supported Feature: DFS
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
 #define CFG_DISABLE_DFS_CH_SWITCH                 "gDisableDFSChSwitch"
 #define CFG_DISABLE_DFS_CH_SWITCH_MIN             (0)
 #define CFG_DISABLE_DFS_CH_SWITCH_MAX             (1)
 #define CFG_DISABLE_DFS_CH_SWITCH_DEFAULT         (0)
 
+/*
+ * <ini>
+ * gEnableDFSMasterCap - Enable DFS master capability
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable/disable the DFS master capability.
+ * Disabling it will cause driver to not advertise the spectrum
+ * management capability
+ * Related: NA.
+ *
+ * Supported Feature: DFS
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_ENABLE_DFS_MASTER_CAPABILITY               "gEnableDFSMasterCap"
 #define CFG_ENABLE_DFS_MASTER_CAPABILITY_MIN           (0)
 #define CFG_ENABLE_DFS_MASTER_CAPABILITY_MAX           (1)
 #define CFG_ENABLE_DFS_MASTER_CAPABILITY_DEFAULT       (0)
 
+/*
+ * <ini>
+ * gSapPreferredChanLocation - Restrict channel switches between ondoor and
+ * outdoor.
+ * @Min: 0
+ * @Max: 2
+ * @Default: 0
+ *
+ * This ini is used for restricting channel switches between Indoor and outdoor
+ * channels after radar detection.
+ * 0- No preferred channel location
+ * 1- Use indoor channels only
+ * 2- Use outdoor channels only
+ * Related: NA.
+ *
+ * Supported Feature: DFS
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_SAP_PREFERRED_CHANNEL_LOCATION          "gSapPreferredChanLocation"
 #define CFG_SAP_PREFERRED_CHANNEL_LOCATION_MIN      (0)
 #define CFG_SAP_PREFERRED_CHANNEL_LOCATION_MAX      (2)
 #define CFG_SAP_PREFERRED_CHANNEL_LOCATION_DEFAULT  (0)
 
+/*
+ * <ini>
+ * gDisableDfsJapanW53 - Block W53 channels in random channel selection
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to block W53 Japan channel in random channel selection
+ * Related: NA.
+ *
+ * Supported Feature: DFS
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_DISABLE_DFS_JAPAN_W53                      "gDisableDfsJapanW53"
 #define CFG_DISABLE_DFS_JAPAN_W53_MIN                  (0)
 #define CFG_DISABLE_DFS_JAPAN_W53_MAX                  (1)
 #define CFG_DISABLE_DFS_JAPAN_W53_DEFAULT              (0)
 
+/*
+ * <ini>
+ * gDisableDfsJapanW53 - Enable dfs phyerror filtering offload in FW
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to to enable dfs phyerror filtering offload to firmware
+ * Enabling it will cause basic phy error to be discarding in firmware.
+ * Related: NA.
+ *
+ * Supported Feature: DFS
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_ENABLE_DFS_PHYERR_FILTEROFFLOAD_NAME       "dfsPhyerrFilterOffload"
 #define CFG_ENABLE_DFS_PHYERR_FILTEROFFLOAD_MIN        (0)
 #define CFG_ENABLE_DFS_PHYERR_FILTEROFFLOAD_MAX        (1)
@@ -4386,7 +4999,7 @@ typedef enum {
  * for valid values of module ids check enum WLAN_MODULE_ID.
  */
 #define CFG_ENABLE_FW_MODULE_LOG_LEVEL    "gFwDebugModuleLoglevel"
-#define CFG_ENABLE_FW_MODULE_LOG_DEFAULT  "2,1,3,1,5,1,9,1,13,1,14,1,18,1,19,1,26,1,28,1,29,1,31,1,36,1,38,1,46,1,47,1,50,1,52,1,53,1,56,1,60,1,61,1"
+#define CFG_ENABLE_FW_MODULE_LOG_DEFAULT  "2,1,3,1,5,1,9,1,13,1,14,1,18,1,19,1,26,1,28,1,29,1,31,1,36,1,38,1,46,1,47,1,50,1,52,1,53,1,56,1,60,1,61,1,4,1"
 
 /*
  * <ini>
@@ -4515,6 +5128,8 @@ typedef enum {
 #define CFG_CDR_TRACE_ENABLE_HDD_SAP_DATA_NAME   "qdf_trace_enable_hdd_sap_data"
 #define CFG_QDF_TRACE_ENABLE_HDD_DATA_NAME       "qdf_trace_enable_hdd_data"
 #define CFG_QDF_TRACE_ENABLE_WIFI_POS     "qdf_trace_enable_wifi_pos"
+#define CFG_QDF_TRACE_ENABLE_NAN          "qdf_trace_enable_nan"
+#define CFG_QDF_TRACE_ENABLE_REGULATORY   "qdf_trace_enable_regulatory"
 
 #define CFG_QDF_TRACE_ENABLE_MIN          (0)
 #define CFG_QDF_TRACE_ENABLE_MAX          (0xff)
@@ -4568,6 +5183,22 @@ typedef enum {
  * Options
  * 0 - Don't Skip DFS Channel in case of P2P Search
  * 1 - Skip DFS Channel in case of P2P Search
+ */
+/*
+ * <ini>
+ * gSkipDfsChannelInP2pSearch - Skip DFS Channel in case of P2P Search
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to to disable(skip) dfs channel in p2p search.
+ * Related: NA.
+ *
+ * Supported Feature: DFS P2P
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
  */
 #define CFG_ENABLE_SKIP_DFS_IN_P2P_SEARCH_NAME       "gSkipDfsChannelInP2pSearch"
 #define CFG_ENABLE_SKIP_DFS_IN_P2P_SEARCH_MIN        (0)
@@ -5758,14 +6389,6 @@ typedef enum {
 #define CFG_MAX_MEDIUM_TIME_STADEFAULT           WNI_CFG_MAX_MEDIUM_TIME_STADEF
 
 /*
- * Enable legacy fast roaming (LFR) on STA link during concurrent sessions
- */
-#define CFG_ENABLE_FAST_ROAM_IN_CONCURRENCY          "gEnableFastRoamInConcurrency"
-#define CFG_ENABLE_FAST_ROAM_IN_CONCURRENCY_MIN      (0)
-#define CFG_ENABLE_FAST_ROAM_IN_CONCURRENCY_MAX      (1)
-#define CFG_ENABLE_FAST_ROAM_IN_CONCURRENCY_DEFAULT  (1)
-
-/*
  * <ini>
  * gEnableIbssHeartBeatOffload - Enable heart beat monitoring offload to FW
  * @Min: 0
@@ -5838,15 +6461,6 @@ typedef enum {
 #define CFG_AMSDU_SUPPORT_IN_AMPDU_MIN                 (0)
 #define CFG_AMSDU_SUPPORT_IN_AMPDU_MAX                 (1)
 #define CFG_AMSDU_SUPPORT_IN_AMPDU_DEFAULT             (0)      /* disabled */
-
-/* Prefer connecting to 5G AP even if its RSSI is lower by
- * gSelect5GHzMargin dBm than 2.4G AP.
- * This feature requires the dependent cfg.ini "gRoamPrefer5GHz" set to 1
- */
-#define CFG_STRICT_5GHZ_PREF_BY_MARGIN                 "gSelect5GHzMargin"
-#define CFG_STRICT_5GHZ_PREF_BY_MARGIN_MIN             (0)
-#define CFG_STRICT_5GHZ_PREF_BY_MARGIN_MAX             (60)
-#define CFG_STRICT_5GHZ_PREF_BY_MARGIN_DEFAULT         (0)      /* set 0 to disable */
 
 /*
  * <ini>
@@ -6736,13 +7350,6 @@ typedef enum {
 #define CFG_REORDER_OFFLOAD_SUPPORT_MAX     (1)
 #define CFG_REORDER_OFFLOAD_SUPPORT_DEFAULT (1)
 
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
-#define CFG_ROAMING_OFFLOAD_NAME                "gRoamOffloadEnabled"
-#define CFG_ROAMING_OFFLOAD_MIN                 (0)
-#define CFG_ROAMING_OFFLOAD_MAX                 (1)
-#define CFG_ROAMING_OFFLOAD_DEFAULT             (1)
-#endif
-
 /* IpaUcTxBufCount should be power of 2 */
 #define CFG_IPA_UC_TX_BUF_COUNT_NAME               "IpaUcTxBufCount"
 #define CFG_IPA_UC_TX_BUF_COUNT_MIN                (0)
@@ -6772,11 +7379,11 @@ typedef enum {
 #define CFG_WLAN_LOGGING_SUPPORT_DISABLE            (0)
 #define CFG_WLAN_LOGGING_SUPPORT_DEFAULT            (1)
 
-/* Enable FATAL and ERROR logs for kmsg console */
-#define CFG_WLAN_LOGGING_FE_CONSOLE_SUPPORT_NAME    "wlanLoggingFEToConsole"
-#define CFG_WLAN_LOGGING_FE_CONSOLE_SUPPORT_ENABLE  (1)
-#define CFG_WLAN_LOGGING_FE_CONSOLE_SUPPORT_DISABLE (0)
-#define CFG_WLAN_LOGGING_FE_CONSOLE_SUPPORT_DEFAULT (1)
+/* Enable forwarding the driver logs to kmsg console */
+#define CFG_WLAN_LOGGING_CONSOLE_SUPPORT_NAME    "wlanLoggingToConsole"
+#define CFG_WLAN_LOGGING_CONSOLE_SUPPORT_ENABLE  (1)
+#define CFG_WLAN_LOGGING_CONSOLE_SUPPORT_DISABLE (0)
+#define CFG_WLAN_LOGGING_CONSOLE_SUPPORT_DEFAULT (1)
 
 /* Number of buffers to be used for WLAN logging */
 #define CFG_WLAN_LOGGING_NUM_BUF_NAME               "wlanLoggingNumBuf"
@@ -7382,31 +7989,6 @@ enum dot11p_mode {
 #define CFG_DUAL_MAC_FEATURE_DISABLE_MAX          (1)
 #define CFG_DUAL_MAC_FEATURE_DISABLE_DEFAULT      (0)
 
-/* Parameters for roaming scans performed at high RSSI */
-
-/* Maximum number of scans after RSSI change */
-#define CFG_ROAM_SCAN_HI_RSSI_MAXCOUNT_NAME         "gRoamScanHiRssiMaxCount"
-#define CFG_ROAM_SCAN_HI_RSSI_MAXCOUNT_MIN          (0)
-#define CFG_ROAM_SCAN_HI_RSSI_MAXCOUNT_MAX          (10)
-#define CFG_ROAM_SCAN_HI_RSSI_MAXCOUNT_DEFAULT      (3)
-
-/* Change in RSSI at which scan is triggered */
-#define CFG_ROAM_SCAN_HI_RSSI_DELTA_NAME           "gRoamScanHiRssiDelta"
-#define CFG_ROAM_SCAN_HI_RSSI_DELTA_MIN            (0)
-#define CFG_ROAM_SCAN_HI_RSSI_DELTA_MAX            (16)
-#define CFG_ROAM_SCAN_HI_RSSI_DELTA_DEFAULT        (10)
-
-/* Delay between consecutive scans in milliseconds */
-#define CFG_ROAM_SCAN_HI_RSSI_DELAY_NAME            "gRoamScanHiRssiDelay"
-#define CFG_ROAM_SCAN_HI_RSSI_DELAY_MIN             (5000)
-#define CFG_ROAM_SCAN_HI_RSSI_DELAY_MAX             (0x7fffffff)
-#define CFG_ROAM_SCAN_HI_RSSI_DELAY_DEFAULT         (15000)
-
-/* Upper bound after which scan will not be performed */
-#define CFG_ROAM_SCAN_HI_RSSI_UB_NAME              "gRoamScanHiRssiUpperBound"
-#define CFG_ROAM_SCAN_HI_RSSI_UB_MIN               (-66)
-#define CFG_ROAM_SCAN_HI_RSSI_UB_MAX               (0)
-#define CFG_ROAM_SCAN_HI_RSSI_UB_DEFAULT           (-30)
 /*
  * gPNOChannelPrediction will allow user to enable/disable the
  * PNO channel prediction feature.
@@ -7442,20 +8024,6 @@ enum dot11p_mode {
 #define CFG_STATIONARY_THRESHOLD_MAX       (100)
 #define CFG_STATIONARY_THRESHOLD_DEFAULT   (10)
 
-#ifdef FEATURE_LFR_SUBNET_DETECTION
-/*
- * Enable IP subnet detection during legacy fast roming version 3.
- * Legacy fast roaming could roam across IP subnets without host
- * processors' knowledge. This feature enables firmware to wake up
- * the host processor if it successfully determines change in the IP subnet.
- * Change in IP subnet could potentially cause disruption in IP connnectivity
- * if IP address is not refreshed.
- */
-#define CFG_ENABLE_LFR_SUBNET_DETECTION    "gLFRSubnetDetectionEnable"
-#define CFG_ENABLE_LFR_SUBNET_MIN          (0)
-#define CFG_ENABLE_LFR_SUBNET_MAX          (1)
-#define CFG_ENABLE_LFR_SUBNET_DEFAULT      (1)
-#endif /* FEATURE_LFR_SUBNET_DETECTION */
 /* Option to report rssi in cfg80211_inform_bss_frame()
  * 0 = use rssi value based on noise floor = -96 dBm
  * 1 = use rssi value based on actual noise floor in hardware
@@ -7481,17 +8049,6 @@ enum dot11p_mode {
 #define CFG_ROAM_DENSE_TRAFFIC_THRESHOLD_MIN     (0)
 #define CFG_ROAM_DENSE_TRAFFIC_THRESHOLD_MAX     (0xffffffff)
 #define CFG_ROAM_DENSE_TRAFFIC_THRESHOLD_DEFAULT (400)
-
-/*
- * Dense Roam RSSI Threshold diff
- * offset value from normal RSSI threshold to dense RSSI threshold
- * Fw will optimize roaming based on new RSSI threshold once it detects
- * dense enviournment.
- */
-#define CFG_ROAM_DENSE_RSSI_THRE_OFFSET         "groam_dense_rssi_thresh_offset"
-#define CFG_ROAM_DENSE_RSSI_THRE_OFFSET_MIN     (0)
-#define CFG_ROAM_DENSE_RSSI_THRE_OFFSET_MAX     (20)
-#define CFG_ROAM_DENSE_RSSI_THRE_OFFSET_DEFAULT (10)
 
 /*
  * <ini>
@@ -7565,17 +8122,6 @@ enum dot11p_mode {
 #define CFG_ENABLE_NAN_NDI_CHANNEL_MAX     (149)
 #define CFG_ENABLE_NAN_NDI_CHANNEL_DEFAULT (6)
 #endif
-
-/*
- * Dense Roam Min APs
- * minimum number of AP required for dense roam
- * FW will consider environment as dense once it detects #APs
- * operating is more than CFG_ROAM_DENSE_MIN_APS.
- */
-#define CFG_ROAM_DENSE_MIN_APS         "groam_dense_min_aps"
-#define CFG_ROAM_DENSE_MIN_APS_MIN     (1)
-#define CFG_ROAM_DENSE_MIN_APS_MAX     (5)
-#define CFG_ROAM_DENSE_MIN_APS_DEFAULT (3)
 
 /*
  * Enable/Disable to initiate BUG report in case of fatal event
@@ -7996,21 +8542,6 @@ enum dot11p_mode {
 #define CFG_ADAPT_DWELL_WIFI_THRESH_MIN        (0)
 #define CFG_ADAPT_DWELL_WIFI_THRESH_MAX        (100)
 #define CFG_ADAPT_DWELL_WIFI_THRESH_DEFAULT    (10)
-
-/*
- * This parameter will set the algo used in dwell time optimization during
- * roam scan. see enum wmi_dwelltime_adaptive_mode.
- * Acceptable values for this:
- * 0: Default (Use firmware default mode)
- * 1: Conservative optimization
- * 2: Moderate optimization
- * 3: Aggressive optimization
- * 4: Static
- */
-#define CFG_ADAPTIVE_ROAMSCAN_DWELL_MODE_NAME    "roamscan_adaptive_dwell_mode"
-#define CFG_ADAPTIVE_ROAMSCAN_DWELL_MODE_MIN     (0)
-#define CFG_ADAPTIVE_ROAMSCAN_DWELL_MODE_MAX     (4)
-#define CFG_ADAPTIVE_ROAMSCAN_DWELL_MODE_DEFAULT (0)
 
 /*
  * This parameter will help to debug ssr reinit failure issues
@@ -9155,27 +9686,51 @@ enum hdd_wext_control {
 
 /*
  * <ini>
- * gActiveBpfMode - Control active BPF mode
+ * gActiveUcBpfMode - Control UC active BPF mode
  * @Min: 0 (disabled)
  * @Max: 2 (adaptive)
  * @Default: 0 (disabled)
  *
- * This config item is used to control BPF in active mode. There are 3 modes:
+ * This config item controls UC BPF in active mode. There are 3 modes:
  *	0) disabled - BPF is disabled in active mode
  *	1) enabled - BPF is enabled for all packets in active mode
  *	2) adaptive - BPF is enabled for packets up to some throughput threshold
  *
- * Related: N/A
+ * Related: gActiveMcBcBpfMode
  *
  * Supported Feature: Active Mode BPF
  *
  * Usage: Internal/External
  * </ini>
  */
-#define CFG_ACTIVE_BPF_MODE_NAME    "gActiveBpfMode"
-#define CFG_ACTIVE_BPF_MODE_MIN     (ACTIVE_BPF_DISABLED)
-#define CFG_ACTIVE_BPF_MODE_MAX     (ACTIVE_BPF_MODE_COUNT - 1)
-#define CFG_ACTIVE_BPF_MODE_DEFAULT (ACTIVE_BPF_DISABLED)
+#define CFG_ACTIVE_UC_BPF_MODE_NAME    "gActiveUcBpfMode"
+#define CFG_ACTIVE_UC_BPF_MODE_MIN     (ACTIVE_BPF_DISABLED)
+#define CFG_ACTIVE_UC_BPF_MODE_MAX     (ACTIVE_BPF_MODE_COUNT - 1)
+#define CFG_ACTIVE_UC_BPF_MODE_DEFAULT (ACTIVE_BPF_DISABLED)
+
+/*
+ * <ini>
+ * gActiveMcBcBpfMode - Control MC/BC active BPF mode
+ * @Min: 0 (disabled)
+ * @Max: 2 (adaptive)
+ * @Default: 0 (disabled)
+ *
+ * This config item controls MC/BC BPF in active mode. There are 3 modes:
+ *	0) disabled - BPF is disabled in active mode
+ *	1) enabled - BPF is enabled for all packets in active mode
+ *	2) adaptive - BPF is enabled for packets up to some throughput threshold
+ *
+ * Related: gActiveUcBpfMode
+ *
+ * Supported Feature: Active Mode BPF
+ *
+ * Usage: Internal/External
+ * </ini>
+ */
+#define CFG_ACTIVE_MC_BC_BPF_MODE_NAME    "gActiveMcBcBpfMode"
+#define CFG_ACTIVE_MC_BC_BPF_MODE_MIN     (ACTIVE_BPF_DISABLED)
+#define CFG_ACTIVE_MC_BC_BPF_MODE_MAX     (ACTIVE_BPF_MODE_COUNT - 1)
+#define CFG_ACTIVE_MC_BC_BPF_MODE_DEFAULT (ACTIVE_BPF_DISABLED)
 
 #ifdef WLAN_FEATURE_11AX
 /* 11AX related INI configuration */
@@ -9267,6 +9822,93 @@ enum l1ss_sleep_allowed {
 #define CFG_L1SS_SLEEP_ALLOWED_DEFAULT (L1SS_SLEEP_ALLOWED_STA_CONNECTED)
 
 /*
+ * <ini>
+ * gEnableANI - Enable Adaptive Noise Immunity
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to enable or disable Adaptive Noise Immunity.
+ *
+ * Related: None
+ *
+ * Supported Feature: ANI
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_ANI_NAME              "gEnableANI"
+#define CFG_ENABLE_ANI_MIN               (0)
+#define CFG_ENABLE_ANI_MAX               (1)
+#define CFG_ENABLE_ANI_DEFAULT           (1)
+
+/*
+ * <ini>
+ * g_qcn_ie_support - QCN IE Support
+ * @Min: 0 (disabled)
+ * @Max: 1 (enabled)
+ * @Default: 0 (disabled)
+ *
+ * This config item is used to support QCN IE in probe/assoc/reassoc request
+ * for STA mode. QCN IE support is not added for SAP mode.
+ *
+ * Related: N/A
+ *
+ * Supported Feature: N/A
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+#define CFG_QCN_IE_SUPPORT_NAME    "g_qcn_ie_support"
+#define CFG_QCN_IE_SUPPORT_MIN      0
+#define CFG_QCN_IE_SUPPORT_MAX      1
+#define CFG_QCN_IE_SUPPORT_DEFAULT  0
+
+/* enable_reg_offload - enable regulatory offload
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to enable or disable reg offload
+ *
+ * Related: None
+ *
+ * Supported Feature: reg offload
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_REG_OFFLOAD_NAME      "enable_reg_offload"
+#define CFG_ENABLE_REG_OFFLOAD_MIN       (0)
+#define CFG_ENABLE_REG_OFFLOAD_MAX       (1)
+#define CFG_ENABLE_REG_OFFLOAD_DEFAULT   (1)
+
+/*
+ * <ini>
+ * g_fils_max_chan_guard_time - Set maximum channel guard time(ms)
+ * @Min: 0
+ * @Max: 10
+ * @Default: 0
+ *
+ * This ini is used to set maximum channel guard time in milli seconds
+ *
+ * Related: None
+ *
+ * Supported Feature: FILS
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_FILS_MAX_CHAN_GUARD_TIME_NAME    "g_fils_max_chan_guard_time"
+#define CFG_FILS_MAX_CHAN_GUARD_TIME_MIN     (0)
+#define CFG_FILS_MAX_CHAN_GUARD_TIME_MAX     (10)
+#define CFG_FILS_MAX_CHAN_GUARD_TIME_DEFAULT (0)
+
+/*
  * Type declarations
  */
 struct hdd_config {
@@ -9289,7 +9931,7 @@ struct hdd_config {
 	uint32_t nBmpsModListenInterval;
 	uint32_t nBmpsMaxListenInterval;
 	uint32_t nBmpsMinListenInterval;
-	eHddDot11Mode dot11Mode;
+	enum hdd_dot11_mode dot11Mode;
 	uint32_t nChannelBondingMode24GHz;
 	uint32_t nChannelBondingMode5GHz;
 	uint32_t MaxRxAmpduFactor;
@@ -9371,9 +10013,9 @@ struct hdd_config {
 	uint32_t       min_rest_time_conc;
 	/* In units of milliseconds */
 	uint32_t       idle_time_conc;
-	uint8_t nNumStaChanCombinedConc;        /* number of channels combined for */
+	uint8_t nNumStaChanCombinedConc;
 	/* STA in each split scan operation */
-	uint8_t nNumP2PChanCombinedConc;        /* number of channels combined for */
+	uint8_t nNumP2PChanCombinedConc;
 	/* P2P in each split scan operation */
 #endif
 
@@ -9389,9 +10031,10 @@ struct hdd_config {
 	bool mcc_rts_cts_prot_enable;
 	bool mcc_bcast_prob_resp_enable;
 	uint8_t nDataInactivityTimeout;
+	uint8_t wow_data_inactivity_timeout;
 
 	/* WMM QoS Configuration */
-	hdd_wmm_user_mode_t WmmMode;
+	enum hdd_wmm_user_mode WmmMode;
 	bool b80211eIsEnabled;
 	uint8_t UapsdMask;      /* what ACs to setup U-APSD for at assoc */
 	uint32_t InfraUapsdVoSrvIntv;
@@ -9448,12 +10091,13 @@ struct hdd_config {
 	/* Wowl pattern */
 	char wowlPattern[1024];
 
-	/* Control for Replay counter. value 1 means single replay
-	 * counter for all TID
+	/* Control for Replay counetr. value 1 means
+	 * single replay counter for all TID
 	 */
 	bool bSingleTidRc;
 	uint8_t mcastBcastFilterSetting;
 	bool fhostArpOffload;
+	bool hw_broadcast_filter;
 	bool ssdp;
 
 #ifdef FEATURE_RUNTIME_PM
@@ -9507,6 +10151,8 @@ struct hdd_config {
 	uint16_t qdf_trace_enable_epping;
 	uint16_t qdf_trace_enable_qdf_devices;
 	uint16_t qdf_trace_enable_wifi_pos;
+	uint16_t qdf_trace_enable_nan;
+	uint16_t qdf_trace_enable_regulatory;
 
 	uint16_t nTeleBcnTransListenInterval;
 	uint16_t nTeleBcnMaxListenInterval;
@@ -9517,7 +10163,7 @@ struct hdd_config {
 	uint8_t enable_dfs_pno_chnl_scan;
 	uint8_t enableDynamicDTIM;
 	uint8_t ShortGI40MhzEnable;
-	eHddLinkSpeedReportType reportMaxLinkSpeed;
+	enum hdd_link_speed_rpt_type reportMaxLinkSpeed;
 	int32_t linkSpeedRssiHigh;
 	int32_t linkSpeedRssiMid;
 	int32_t linkSpeedRssiLow;
@@ -9633,7 +10279,6 @@ struct hdd_config {
 	uint32_t cfgMaxMediumTime;
 	bool enableVhtFor24GHzBand;
 	bool enable_sap_vendor_vht;
-	/* Flag indicating whether legacy fast roam during concurrency is enabled in cfg.ini or not */
 	bool bFastRoamInConIniFeatureEnabled;
 	bool fEnableAdaptRxDrain;
 	bool enableIbssHeartBeatOffload;
@@ -9660,7 +10305,7 @@ struct hdd_config {
 	uint32_t ibssPs1RxChainInAtimEnable;
 
 	bool enable_ip_tcp_udp_checksum_offload;
-	bool enablePowersaveOffload;
+	uint8_t enablePowersaveOffload;
 	bool enablefwprint;
 	uint8_t enable_fw_log;
 	uint8_t fVhtAmpduLenExponent;
@@ -9786,7 +10431,7 @@ struct hdd_config {
 #ifdef WLAN_LOGGING_SOCK_SVC_ENABLE
 	/* WLAN Logging */
 	uint32_t wlanLoggingEnable;
-	uint32_t wlanLoggingFEToConsole;
+	uint32_t wlanLoggingToConsole;
 	uint32_t wlanLoggingNumBuf;
 #endif /* WLAN_LOGGING_SOCK_SVC_ENABLE */
 
@@ -9974,7 +10619,8 @@ struct hdd_config {
 	uint32_t per_roam_th_percent;
 	uint32_t per_roam_rest_time;
 	uint32_t per_roam_mon_time;
-	enum active_bpf_mode active_bpf_mode;
+	enum active_bpf_mode active_uc_bpf_mode;
+	enum active_bpf_mode active_mc_bc_bpf_mode;
 	bool enable_bcast_probe_rsp;
 #ifdef WLAN_FEATURE_11AX
 	bool enable_ul_mimo;
@@ -9982,6 +10628,10 @@ struct hdd_config {
 #endif
 	enum l1ss_sleep_allowed l1ss_sleep_allowed;
 	uint32_t arp_ac_category;
+	bool ani_enabled;
+	bool qcn_ie_support;
+	bool reg_offload_enabled;
+	uint8_t fils_max_chan_guard_time;
 };
 
 #define VAR_OFFSET(_Struct, _Var) (offsetof(_Struct, _Var))
@@ -10014,13 +10664,13 @@ struct hdd_config {
  */
 #define VAR_FLAGS_DYNAMIC_CFG (1 << 3)
 
-typedef enum {
+enum wlan_parameter_type {
 	WLAN_PARAM_Integer,
 	WLAN_PARAM_SignedInteger,
 	WLAN_PARAM_HexInteger,
 	WLAN_PARAM_String,
 	WLAN_PARAM_MacAddr,
-} WLAN_PARAMETER_TYPE;
+};
 
 #define REG_VARIABLE(_Name, _Type,  _Struct, _VarName,		\
 		      _Flags, _Default, _Min, _Max)		\
@@ -10068,10 +10718,9 @@ typedef enum {
 		0						\
 	}
 
-typedef struct tREG_TABLE_ENTRY {
-
+struct reg_table_entry {
 	char *RegName;          /* variable name in the qcom_cfg.ini file */
-	WLAN_PARAMETER_TYPE RegType;    /* variable type in hdd_config struct */
+	enum wlan_parameter_type RegType;    /* variable type in hdd_config struct */
 	unsigned long Flags;    /* Specify optional parms and if RangeCheck is performed */
 	unsigned short VarOffset;       /* offset to field from the base address of the structure */
 	unsigned short VarSize; /* size (in bytes) of the field */
@@ -10082,15 +10731,7 @@ typedef struct tREG_TABLE_ENTRY {
 	void (*pfnDynamicnotify)(hdd_context_t *pHddCtx,
 				 unsigned long notifyId);
 	unsigned long notifyId; /* Dynamic modification identifier */
-} REG_TABLE_ENTRY;
-
-static __inline unsigned long util_min(unsigned long a, unsigned long b)
-{
-	unsigned long r;
-
-	r = ((a < b) ? a : b);
-	return r;
-}
+};
 
 /* Function declarations and documenation */
 QDF_STATUS hdd_parse_config_ini(hdd_context_t *pHddCtx);
@@ -10102,7 +10743,7 @@ bool hdd_update_config_cfg(hdd_context_t *pHddCtx);
 QDF_STATUS hdd_cfg_get_global_config(hdd_context_t *pHddCtx, char *pBuf,
 				     int buflen);
 
-eCsrPhyMode hdd_cfg_xlate_to_csr_phy_mode(eHddDot11Mode dot11Mode);
+eCsrPhyMode hdd_cfg_xlate_to_csr_phy_mode(enum hdd_dot11_mode dot11Mode);
 QDF_STATUS hdd_execute_global_config_command(hdd_context_t *pHddCtx,
 					     char *command);
 
@@ -10110,7 +10751,6 @@ bool hdd_is_okc_mode_enabled(hdd_context_t *pHddCtx);
 QDF_STATUS hdd_set_idle_ps_config(hdd_context_t *pHddCtx, uint32_t val);
 
 void hdd_update_tgt_cfg(void *context, void *param);
-bool hdd_dfs_indicate_radar(void *context, void *param);
 
 QDF_STATUS hdd_string_to_u8_array(char *str, uint8_t *intArray, uint8_t *len,
 				  uint8_t intArrayMaxLen);
@@ -10120,13 +10760,19 @@ QDF_STATUS hdd_hex_string_to_u16_array(char *str, uint16_t *int_array,
 void hdd_cfg_print(hdd_context_t *pHddCtx);
 
 QDF_STATUS hdd_update_nss(hdd_context_t *hdd_ctx, uint8_t nss);
-#ifdef FEATURE_WLAN_SCAN_PNO
-void hdd_set_pno_channel_prediction_config(
-	tpSmeConfigParams sme_config, hdd_context_t *hdd_ctx);
-#else
-static inline void hdd_set_pno_channel_prediction_config(
-	tpSmeConfigParams sme_config, hdd_context_t *hdd_ctx)
-{}
-#endif
+
+/**
+ * hdd_dfs_indicate_radar() - Block tx as radar found on the channel
+ * @hdd_ctxt: HDD context pointer
+ *
+ * This function is invoked in atomic context when a radar
+ * is found on the SAP current operating channel and Data Tx
+ * from netif has to be stopped to honor the DFS regulations.
+ * Actions: Stop the netif Tx queues,Indicate Radar present
+ * in HDD context for future usage.
+ *
+ * Return: true on success, else false
+ */
+bool hdd_dfs_indicate_radar(hdd_context_t *hdd_ctx);
 
 #endif

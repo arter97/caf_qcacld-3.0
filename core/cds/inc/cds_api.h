@@ -42,6 +42,7 @@
 #include <qdf_trace.h>
 #include <qdf_event.h>
 #include <qdf_lock.h>
+#include "reg_services_public_struct.h"
 #include <cds_reg_service.h>
 #include <cds_packet.h>
 #include <cds_sched.h>
@@ -195,6 +196,18 @@ static inline void cds_set_unload_in_progress(uint8_t value)
 		cds_clear_driver_state(CDS_DRIVER_STATE_UNLOADING);
 }
 
+/**
+ * cds_is_driver_loaded() - Is driver loaded
+ *
+ * Return: true if driver is loaded or false otherwise.
+ */
+static inline bool cds_is_driver_loaded(void)
+{
+	enum cds_driver_state state = cds_get_driver_state();
+
+	return __CDS_IS_DRIVER_STATE(state, CDS_DRIVER_STATE_LOADED);
+}
+
 v_CONTEXT_t cds_init(void);
 void cds_deinit(void);
 
@@ -289,4 +302,10 @@ bool cds_is_sub_20_mhz_enabled(void);
 bool cds_is_self_recovery_enabled(void);
 void cds_pkt_stats_to_logger_thread(void *pl_hdr, void *pkt_dump, void *data);
 enum tQDF_GLOBAL_CON_MODE cds_get_conparam(void);
+
+#ifdef WMI_INTERFACE_EVENT_LOGGING
+void cds_print_htc_credit_history(uint32_t count, qdf_abstract_print * print,
+				  void *print_priv);
+#endif
+
 #endif /* if !defined __CDS_API_H */

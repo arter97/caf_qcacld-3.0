@@ -37,7 +37,6 @@
 #include "sch_global.h"
 #include "sys_global.h"
 #include "cfg_global.h"
-#include "utils_global.h"
 #include "sir_api.h"
 
 #include "csr_api.h"
@@ -908,7 +907,6 @@ typedef struct sAniSirGlobal {
 	tAniSirLim lim;
 	tAniSirSch sch;
 	tAniSirSys sys;
-	tAniSirUtils utils;
 
 	/* PAL/HDD handle */
 	tHddHandle hHdd;
@@ -933,9 +931,6 @@ typedef struct sAniSirGlobal {
 	uint8_t isCoalesingInIBSSAllowed;
 
 	bool imps_enabled;
-
-	/* PNO offload */
-	bool pnoOffload;
 
 	csr_readyToSuspendCallback readyToSuspendCallback;
 	void *readyToSuspendContext;
@@ -973,9 +968,11 @@ typedef struct sAniSirGlobal {
 	uint8_t user_configured_nss;
 	bool sta_prefer_80MHz_over_160MHz;
 	struct wlan_objmgr_psoc *psoc;
+	struct wlan_objmgr_pdev *pdev;
 	enum  country_src reg_hint_src;
 	bool snr_monitor_enabled;
 	void (*chan_info_cb)(struct scan_chan_info *chan_info);
+	uint32_t rx_packet_drop_counter;
 } tAniSirGlobal;
 
 typedef enum {

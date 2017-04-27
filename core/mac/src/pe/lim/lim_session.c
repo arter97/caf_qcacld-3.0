@@ -39,7 +39,6 @@
    Include Files
    ------------------------------------------------------------------------*/
 #include "ani_global.h"
-#include "lim_debug.h"
 #include "lim_ft_defs.h"
 #include "lim_ft.h"
 #include "lim_session.h"
@@ -202,7 +201,7 @@ static void pe_reset_protection_callback(void *ptr)
 		pe_session_entry->old_protection_state) &&
 		(false == mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running)) {
 		QDF_TRACE(QDF_MODULE_ID_PE,
-			  QDF_TRACE_LEVEL_ERROR,
+			  QDF_TRACE_LEVEL_DEBUG,
 			  FL("protection changed, update beacon template"));
 		/* update beacon fix params and send update to FW */
 		qdf_mem_zero(&beacon_params, sizeof(tUpdateBeaconParams));
@@ -791,6 +790,7 @@ tpPESession pe_find_session_by_sme_session_id(tpAniSirGlobal mac_ctx,
 					      uint8_t sme_session_id)
 {
 	uint8_t i;
+
 	for (i = 0; i < mac_ctx->lim.maxBssId; i++) {
 		if ((mac_ctx->lim.gpSession[i].valid) &&
 		     (mac_ctx->lim.gpSession[i].smeSessionId ==
@@ -798,9 +798,6 @@ tpPESession pe_find_session_by_sme_session_id(tpAniSirGlobal mac_ctx,
 			return &mac_ctx->lim.gpSession[i];
 		}
 	}
-	lim_log(mac_ctx, LOG4,
-		FL("Session lookup fails for smeSessionID: %d"),
-		sme_session_id);
 	return NULL;
 }
 

@@ -77,16 +77,14 @@ lim_process_beacon_frame(tpAniSirGlobal mac_ctx, uint8_t *rx_pkt_info,
 	 * beacon counter
 	 */
 	mac_hdr = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
-	lim_log(mac_ctx, LOG2,
-		FL("Received Beacon frame with length=%d from "),
+	pe_debug("Received Beacon frame with length: %d from",
 		WMA_GET_RX_MPDU_LEN(rx_pkt_info));
 		lim_print_mac_addr(mac_ctx, mac_hdr->sa, LOG2);
 
 	/* Expect Beacon in any state as Scan is independent of LIM state */
 	bcn_ptr = qdf_mem_malloc(sizeof(*bcn_ptr));
 	if (NULL == bcn_ptr) {
-		lim_log(mac_ctx, LOGE,
-			FL("Unable to allocate memory"));
+		pe_err("Unable to allocate memory");
 		return;
 	}
 	/* Parse received Beacon */
@@ -97,8 +95,7 @@ lim_process_beacon_frame(tpAniSirGlobal mac_ctx, uint8_t *rx_pkt_info,
 		 * Received wrongly formatted/invalid Beacon.
 		 * Ignore it and move on.
 		 */
-		lim_log(mac_ctx, LOGW,
-			FL("Received invalid Beacon in state %X"),
+		pe_warn("Received invalid Beacon in state: %X",
 			session->limMlmState);
 		lim_print_mlm_state(mac_ctx, LOGW,
 			session->limMlmState);
@@ -124,23 +121,11 @@ lim_process_beacon_frame(tpAniSirGlobal mac_ctx, uint8_t *rx_pkt_info,
 		TRACE_CODE_RX_MGMT_TSF, 0, bcn_ptr->timeStamp[0]);)
 	MTRACE(mac_trace(mac_ctx, TRACE_CODE_RX_MGMT_TSF, 0,
 		bcn_ptr->timeStamp[1]);)
-	lim_check_and_add_bss_description(mac_ctx, bcn_ptr,
-				rx_pkt_info, false, true);
 
 	if ((mac_ctx->lim.gLimMlmState ==
 				eLIM_MLM_WT_PROBE_RESP_STATE) ||
 		(mac_ctx->lim.gLimMlmState ==
 				eLIM_MLM_PASSIVE_SCAN_STATE)) {
-		/* If we are scanning for P2P, only accept probe rsp */
-		if ((mac_ctx->lim.gLimHalScanState !=
-		    eLIM_HAL_SCANNING_STATE) ||
-		    (NULL == mac_ctx->lim.gpLimMlmScanReq) ||
-		    !mac_ctx->lim.gpLimMlmScanReq->p2pSearch)
-			lim_check_and_add_bss_description(mac_ctx, bcn_ptr,
-				rx_pkt_info,
-				((mac_ctx->lim.gLimHalScanState ==
-				 eLIM_HAL_SCANNING_STATE) ? true : false),
-				false);
 		/*
 		 * Calling dfsChannelList which will convert DFS channel
 		 * to active channel for x secs if this channel is DFS
@@ -158,8 +143,7 @@ lim_process_beacon_frame(tpAniSirGlobal mac_ctx, uint8_t *rx_pkt_info,
 		session->bcnLen = WMA_GET_RX_PAYLOAD_LEN(rx_pkt_info);
 		session->beacon = qdf_mem_malloc(session->bcnLen);
 		if (NULL == session->beacon) {
-			lim_log(mac_ctx, LOGE,
-				FL("fail to alloc mem to store bcn"));
+			pe_err("fail to alloc mem to store bcn");
 		} else {
 			/*
 			 * Store the Beacon/ProbeRsp. This is sent to
@@ -175,85 +159,3 @@ lim_process_beacon_frame(tpAniSirGlobal mac_ctx, uint8_t *rx_pkt_info,
 	qdf_mem_free(bcn_ptr);
 	return;
 }
-#ifndef NAPIER_SCAN
-/**---------------------------------------------------------------
-   \fn     lim_process_beacon_frame_no_session
-   \brief  This function is called by limProcessMessageQueue()
- \       upon Beacon reception.
- \
-   \param pMac
-   \param *pRxPacketInfo    - A pointer to Rx packet info structure
-   \return None
-   ------------------------------------------------------------------*/
-void
-lim_process_beacon_frame_no_session(tpAniSirGlobal pMac, uint8_t *pRxPacketInfo)
-{
-	tpSirMacMgmtHdr pHdr;
-	tSchBeaconStruct *pBeacon;
-
-	pMac->lim.gLimNumBeaconsRcvd++;
-	pHdr = WMA_GET_RX_MAC_HEADER(pRxPacketInfo);
-
-	lim_log(pMac, LOG2, FL("Received Beacon frame with length=%d from "),
-		WMA_GET_RX_MPDU_LEN(pRxPacketInfo));
-	lim_print_mac_addr(pMac, pHdr->sa, LOG2);
-
-
-	/**
-	 * No session has been established. Expect Beacon only when
-	 * 1. STA is in Scan mode waiting for Beacon/Probe response or
-	 * 2. STA/AP is in Learn mode
-	 */
-	if ((pMac->lim.gLimMlmState == eLIM_MLM_WT_PROBE_RESP_STATE) ||
-	    (pMac->lim.gLimMlmState == eLIM_MLM_PASSIVE_SCAN_STATE) ||
-	    (pMac->lim.gLimMlmState == eLIM_MLM_LEARN_STATE)) {
-		pBeacon = qdf_mem_malloc(sizeof(tSchBeaconStruct));
-		if (NULL == pBeacon) {
-			lim_log(pMac, LOGE,
-				FL
-					("Unable to allocate memory in lim_process_beacon_frame_no_session"));
-			return;
-		}
-
-		if (sir_convert_beacon_frame2_struct
-			    (pMac, (uint8_t *) pRxPacketInfo,
-			    pBeacon) != eSIR_SUCCESS) {
-			/* Received wrongly formatted/invalid Beacon. Ignore and move on. */
-			lim_log(pMac, LOGW,
-				FL
-					("Received invalid Beacon in global MLM state %X"),
-				pMac->lim.gLimMlmState);
-			lim_print_mlm_state(pMac, LOGW, pMac->lim.gLimMlmState);
-			qdf_mem_free(pBeacon);
-			return;
-		}
-
-		if ((pMac->lim.gLimMlmState == eLIM_MLM_WT_PROBE_RESP_STATE) ||
-		    (pMac->lim.gLimMlmState == eLIM_MLM_PASSIVE_SCAN_STATE)) {
-			/*If we are scanning for P2P, only accept probe rsp */
-			if ((pMac->lim.gLimHalScanState !=
-			    eLIM_HAL_SCANNING_STATE) ||
-			    (NULL == pMac->lim.gpLimMlmScanReq) ||
-			    !pMac->lim.gpLimMlmScanReq->p2pSearch)
-				lim_check_and_add_bss_description(pMac, pBeacon,
-					pRxPacketInfo, true, false);
-			/* Calling dfsChannelList which will convert DFS channel
-			 * to Active channel for x secs if this channel is DFS channel */
-			lim_set_dfs_channel_list(pMac, pBeacon->channelNumber,
-						 &pMac->lim.dfschannelList);
-		} else if (pMac->lim.gLimMlmState == eLIM_MLM_LEARN_STATE) {
-		} /* end of eLIM_MLM_LEARN_STATE) */
-		qdf_mem_free(pBeacon);
-	} /* end of (eLIM_MLM_WT_PROBE_RESP_STATE) || (eLIM_MLM_PASSIVE_SCAN_STATE) */
-	else {
-		lim_log(pMac, LOG1, FL("Rcvd Beacon in unexpected MLM state %s (%d)"),
-			lim_mlm_state_str(pMac->lim.gLimMlmState),
-			pMac->lim.gLimMlmState);
-#ifdef WLAN_DEBUG
-		pMac->lim.gLimUnexpBcnCnt++;
-#endif
-	}
-
-	return;
-} /*** end lim_process_beacon_frame_no_session() ***/
-#endif

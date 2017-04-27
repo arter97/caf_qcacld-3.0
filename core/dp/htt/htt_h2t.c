@@ -178,9 +178,10 @@ A_STATUS htt_h2t_frag_desc_bank_cfg_msg(struct htt_pdev_t *pdev)
 
 	/** Bank specific data structure.*/
 #if HTT_PADDR64
-	bank_cfg->bank_base_address[0].lo =
-		pdev->frag_descs.desc_pages.dma_pages->page_p_addr;
-	bank_cfg->bank_base_address[0].hi = 0;
+	bank_cfg->bank_base_address[0].lo = qdf_get_lower_32_bits(
+			pdev->frag_descs.desc_pages.dma_pages->page_p_addr);
+	bank_cfg->bank_base_address[0].hi = qdf_get_upper_32_bits(
+			pdev->frag_descs.desc_pages.dma_pages->page_p_addr);
 #else /* ! HTT_PADDR64 */
 	bank_cfg->bank_base_address[0] =
 		pdev->frag_descs.desc_pages.dma_pages->page_p_addr;
@@ -306,7 +307,8 @@ QDF_STATUS htt_h2t_rx_ring_rfs_cfg_msg_ll(struct htt_pdev_t *pdev)
 	qdf_nbuf_t msg;
 	uint32_t *msg_word;
 
-	qdf_print("Receive flow steering configuration, disable gEnableFlowSteering(=0) in ini if FW doesnot support it\n");
+	QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_INFO,
+		  "Receive flow steering configuration, disable gEnableFlowSteering(=0) in ini if FW doesnot support it\n");
 	pkt = htt_htc_pkt_alloc(pdev);
 	if (!pkt)
 		return QDF_STATUS_E_NOMEM; /* failure */
@@ -341,9 +343,11 @@ QDF_STATUS htt_h2t_rx_ring_rfs_cfg_msg_ll(struct htt_pdev_t *pdev)
 	HTT_H2T_MSG_TYPE_SET(*msg_word, HTT_H2T_MSG_TYPE_RFS_CONFIG);
 	if (ol_cfg_is_flow_steering_enabled(pdev->ctrl_pdev)) {
 		HTT_RX_RFS_CONFIG_SET(*msg_word, 1);
-	    qdf_print("Enable Rx flow steering\n");
+	    QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_INFO,
+		"Enable Rx flow steering\n");
 	} else {
-	    qdf_print("Disable Rx flow steering\n");
+	    QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_INFO,
+	    "Disable Rx flow steering\n");
 	}
 
 	SET_HTC_PACKET_INFO_TX(&pkt->htc_pkt,
@@ -366,7 +370,8 @@ QDF_STATUS htt_h2t_rx_ring_rfs_cfg_msg_ll(struct htt_pdev_t *pdev)
  */
 QDF_STATUS htt_h2t_rx_ring_rfs_cfg_msg_ll(struct htt_pdev_t *pdev)
 {
-	qdf_print("Doesnot support receive flow steering configuration\n");
+	QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_INFO,
+		  "Doesnot support receive flow steering configuration\n");
 	return QDF_STATUS_SUCCESS;
 }
 #endif /* HELIUMPLUS */
@@ -420,10 +425,13 @@ QDF_STATUS htt_h2t_rx_ring_cfg_msg_ll(struct htt_pdev_t *pdev)
 	msg_word++;
 	*msg_word = 0;
 #if HTT_PADDR64
-	HTT_RX_RING_CFG_IDX_SHADOW_REG_PADDR_LO_SET(*msg_word,
-						    pdev->rx_ring.alloc_idx.paddr);
+	HTT_RX_RING_CFG_IDX_SHADOW_REG_PADDR_LO_SET(
+			*msg_word,
+			qdf_get_lower_32_bits(pdev->rx_ring.alloc_idx.paddr));
 	msg_word++;
-	HTT_RX_RING_CFG_IDX_SHADOW_REG_PADDR_HI_SET(*msg_word, 0);
+	HTT_RX_RING_CFG_IDX_SHADOW_REG_PADDR_HI_SET(
+			*msg_word,
+			qdf_get_upper_32_bits(pdev->rx_ring.alloc_idx.paddr));
 #else /* ! HTT_PADDR64 */
 	HTT_RX_RING_CFG_IDX_SHADOW_REG_PADDR_SET(*msg_word,
 						 pdev->rx_ring.alloc_idx.paddr);
@@ -439,7 +447,8 @@ QDF_STATUS htt_h2t_rx_ring_cfg_msg_ll(struct htt_pdev_t *pdev)
 
 		tmp = qdf_get_upper_32_bits(pdev->rx_ring.base_paddr);
 		if (tmp & 0xfffffe0) {
-			qdf_print("%s:%d paddr > 37 bits!. Trimmed.",
+			QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_INFO,
+				  "%s:%d paddr > 37 bits!. Trimmed.",
 				  __func__, __LINE__);
 			tmp &= 0x01f;
 		}
@@ -471,9 +480,11 @@ QDF_STATUS htt_h2t_rx_ring_cfg_msg_ll(struct htt_pdev_t *pdev)
 		enable_hdr = 1;
 		enable_ppdu_start = 1;
 		enable_ppdu_end = 1;
-		qdf_print("Pkt log is enabled\n");
+		QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_INFO,
+			  "%s : %d Pkt log is enabled\n",  __func__, __LINE__);
 	} else {
-		qdf_print("Pkt log is disabled\n");
+		QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_INFO,
+			  "%s : %d Pkt log is disabled\n",  __func__, __LINE__);
 		enable_ctrl_data = 0;
 		enable_mgmt_data = 0;
 		enable_null_data = 0;
@@ -500,7 +511,8 @@ QDF_STATUS htt_h2t_rx_ring_cfg_msg_ll(struct htt_pdev_t *pdev)
 		enable_ppdu_start = 1;
 		enable_ppdu_end   = 1;
 		/* Disable ASPM for monitor mode */
-		qdf_print("Monitor mode is enabled\n");
+		QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_INFO,
+			  "%s : %d Monitor mode is enabled\n",  __func__, __LINE__);
 	}
 
 	HTT_RX_RING_CFG_ENABLED_802_11_HDR_SET(*msg_word, enable_hdr);
@@ -724,7 +736,8 @@ htt_h2t_rx_ring_cfg_msg_hl(struct htt_pdev_t *pdev)
  */
 QDF_STATUS htt_h2t_rx_ring_rfs_cfg_msg_hl(struct htt_pdev_t *pdev)
 {
-	qdf_print("Doesnot support Receive flow steering configuration\n");
+	QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_INFO,
+		  "Doesnot support Receive flow steering configuration\n");
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -746,7 +759,8 @@ htt_h2t_dbg_stats_get(struct htt_pdev_t *pdev,
 	if (stats_type_upload_mask >= 1 << HTT_DBG_NUM_STATS ||
 	    stats_type_reset_mask >= 1 << HTT_DBG_NUM_STATS) {
 		/* FIX THIS - add more details? */
-		qdf_print("%#x %#x stats not supported\n",
+		QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_ERROR,
+			  "%#x %#x stats not supported\n",
 			  stats_type_upload_mask, stats_type_reset_mask);
 		htt_htc_pkt_free(pdev, pkt);
 		return -EINVAL;      /* failure */
@@ -1308,6 +1322,145 @@ int htt_h2t_ipa_uc_get_stats(struct htt_pdev_t *pdev)
 	HTT_WDI_IPA_OP_REQUEST_OP_CODE_SET(*msg_word,
 					   HTT_WDI_IPA_OPCODE_DBG_STATS);
 	HTT_H2T_MSG_TYPE_SET(*msg_word, HTT_H2T_MSG_TYPE_WDI_IPA_OP_REQ);
+
+	SET_HTC_PACKET_INFO_TX(&pkt->htc_pkt,
+			       htt_h2t_send_complete_free_netbuf,
+			       qdf_nbuf_data(msg),
+			       qdf_nbuf_len(msg),
+			       pdev->htc_tx_endpoint,
+			       1); /* tag - not relevant here */
+
+	SET_HTC_PACKET_NET_BUF_CONTEXT(&pkt->htc_pkt, msg);
+	HTT_SEND_HTC_PKT(pdev, pkt);
+	return A_OK;
+}
+
+/**
+ * htt_h2t_ipa_uc_get_share_stats() - WDI UC wifi sharing state request to FW
+ * @pdev: handle to the HTT instance
+ *
+ * Return: A_OK success
+ *         A_NO_MEMORY No memory fail
+ */
+int htt_h2t_ipa_uc_get_share_stats(struct htt_pdev_t *pdev, uint8_t reset_stats)
+{
+	struct htt_htc_pkt *pkt;
+	qdf_nbuf_t msg;
+	uint32_t *msg_word;
+
+	pkt = htt_htc_pkt_alloc(pdev);
+	if (!pkt)
+		return -A_NO_MEMORY;
+
+	/* show that this is not a tx frame download
+	 * (not required, but helpful)
+	 */
+	pkt->msdu_id = HTT_TX_COMPL_INV_MSDU_ID;
+	pkt->pdev_ctxt = NULL;  /* not used during send-done callback */
+
+	/* reserve room for HTC header */
+	msg = qdf_nbuf_alloc(pdev->osdev,
+		HTT_MSG_BUF_SIZE(HTT_WDI_IPA_OP_REQUEST_SZ)+
+		HTT_MSG_BUF_SIZE(HTT_WDI_IPA_OP_REQ_GET_SHARING_STATS_SZ),
+		HTC_HEADER_LEN + HTC_HDR_ALIGNMENT_PADDING, 4, false);
+	if (!msg) {
+		htt_htc_pkt_free(pdev, pkt);
+		return -A_NO_MEMORY;
+	}
+	/* set the length of the message */
+	qdf_nbuf_put_tail(msg, HTT_WDI_IPA_OP_REQUEST_SZ+
+			  HTT_WDI_IPA_OP_REQ_GET_SHARING_STATS_SZ);
+
+	/* fill in the message contents */
+	msg_word = (uint32_t *) qdf_nbuf_data(msg);
+
+	/* rewind beyond alignment pad to get to the HTC header reserved area */
+	qdf_nbuf_push_head(msg, HTC_HDR_ALIGNMENT_PADDING);
+
+	*msg_word = 0;
+	HTT_WDI_IPA_OP_REQUEST_OP_CODE_SET(*msg_word,
+				   HTT_WDI_IPA_OPCODE_GET_SHARING_STATS);
+	HTT_H2T_MSG_TYPE_SET(*msg_word, HTT_H2T_MSG_TYPE_WDI_IPA_OP_REQ);
+
+	msg_word++;
+	*msg_word = 0;
+	HTT_WDI_IPA_OP_REQ_GET_SHARING_STATS_RESET_STATS_SET(*msg_word,
+							     reset_stats);
+
+	SET_HTC_PACKET_INFO_TX(&pkt->htc_pkt,
+			       htt_h2t_send_complete_free_netbuf,
+			       qdf_nbuf_data(msg),
+			       qdf_nbuf_len(msg),
+			       pdev->htc_tx_endpoint,
+			       1); /* tag - not relevant here */
+
+	SET_HTC_PACKET_NET_BUF_CONTEXT(&pkt->htc_pkt, msg);
+	HTT_SEND_HTC_PKT(pdev, pkt);
+	return A_OK;
+}
+
+/**
+ * htt_h2t_ipa_uc_set_quota() - WDI UC state query request to firmware
+ * @pdev: handle to the HTT instance
+ *
+ * Return: A_OK success
+ *         A_NO_MEMORY No memory fail
+ */
+int htt_h2t_ipa_uc_set_quota(struct htt_pdev_t *pdev, uint64_t quota_bytes)
+{
+	struct htt_htc_pkt *pkt;
+	qdf_nbuf_t msg;
+	uint32_t *msg_word;
+
+	pkt = htt_htc_pkt_alloc(pdev);
+	if (!pkt)
+		return -A_NO_MEMORY;
+
+	/* show that this is not a tx frame download
+	 * (not required, but helpful)
+	 */
+	pkt->msdu_id = HTT_TX_COMPL_INV_MSDU_ID;
+	pkt->pdev_ctxt = NULL;  /* not used during send-done callback */
+
+	/* reserve room for HTC header */
+	msg = qdf_nbuf_alloc(pdev->osdev,
+		HTT_MSG_BUF_SIZE(HTT_WDI_IPA_OP_REQUEST_SZ)+
+		HTT_MSG_BUF_SIZE(HTT_WDI_IPA_OP_REQ_SET_QUOTA_SZ),
+		HTC_HEADER_LEN + HTC_HDR_ALIGNMENT_PADDING, 4, false);
+	if (!msg) {
+		htt_htc_pkt_free(pdev, pkt);
+		return -A_NO_MEMORY;
+	}
+	/* set the length of the message */
+	qdf_nbuf_put_tail(msg, HTT_WDI_IPA_OP_REQUEST_SZ+
+			  HTT_WDI_IPA_OP_REQ_SET_QUOTA_SZ);
+
+	/* fill in the message contents */
+	msg_word = (uint32_t *) qdf_nbuf_data(msg);
+
+	/* rewind beyond alignment pad to get to the HTC header reserved area */
+	qdf_nbuf_push_head(msg, HTC_HDR_ALIGNMENT_PADDING);
+
+	*msg_word = 0;
+	HTT_WDI_IPA_OP_REQUEST_OP_CODE_SET(*msg_word,
+					   HTT_WDI_IPA_OPCODE_SET_QUOTA);
+	HTT_H2T_MSG_TYPE_SET(*msg_word, HTT_H2T_MSG_TYPE_WDI_IPA_OP_REQ);
+
+	msg_word++;
+	*msg_word = 0;
+	HTT_WDI_IPA_OP_REQ_SET_QUOTA_SET_QUOTA_SET(*msg_word, quota_bytes > 0);
+
+	msg_word++;
+	*msg_word = 0;
+	HTT_WDI_IPA_OP_REQ_SET_QUOTA_QUOTA_LO_SET(*msg_word,
+			(uint32_t)(quota_bytes &
+				   HTT_WDI_IPA_OP_REQ_SET_QUOTA_QUOTA_LO_M));
+
+	msg_word++;
+	*msg_word = 0;
+	HTT_WDI_IPA_OP_REQ_SET_QUOTA_QUOTA_HI_SET(*msg_word,
+			(uint32_t)(quota_bytes>>32 &
+				   HTT_WDI_IPA_OP_REQ_SET_QUOTA_QUOTA_HI_M));
 
 	SET_HTC_PACKET_INFO_TX(&pkt->htc_pkt,
 			       htt_h2t_send_complete_free_netbuf,

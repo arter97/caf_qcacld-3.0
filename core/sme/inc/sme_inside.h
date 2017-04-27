@@ -115,7 +115,7 @@ typedef struct TdlsLinkEstablishInfo {
 	uint8_t supportedChannelsLen;
 	uint8_t supportedChannels[SIR_MAC_MAX_SUPP_CHANNELS];
 	uint8_t supportedOperClassesLen;
-	uint8_t supportedOperClasses[CDS_MAX_SUPP_OPER_CLASSES];
+	uint8_t supportedOperClasses[REG_MAX_SUPP_OPER_CLASSES];
 } tTdlsLinkEstablishCmdInfo;
 
 typedef struct TdlsAddStaInfo {
@@ -188,7 +188,7 @@ typedef struct tagSmeCmd {
 		struct s_nss_update_cmd nss_update_cmd;
 		struct sir_dual_mac_config set_dual_mac_cmd;
 		struct sir_antenna_mode_param set_antenna_mode_cmd;
-#ifdef WLAN_FEATURE_NAN_DATAPATH
+#if defined(WLAN_FEATURE_NAN_DATAPATH) && !defined(WLAN_FEATURE_NAN_CONVERGENCE)
 		struct ndp_initiator_req initiator_req;
 		struct ndp_responder_req responder_req;
 		struct ndp_end_req *data_end_req;
@@ -247,13 +247,6 @@ QDF_STATUS sme_release_global_lock(tSmeStruct *psSme);
 QDF_STATUS csr_process_add_sta_session_rsp(tpAniSirGlobal pMac, uint8_t *pMsg);
 QDF_STATUS csr_process_del_sta_session_rsp(tpAniSirGlobal pMac, uint8_t *pMsg);
 
-#ifdef FEATURE_WLAN_SCAN_PNO
-QDF_STATUS pmc_set_preferred_network_list(tHalHandle hHal,
-		tpSirPNOScanReq pRequest,
-		uint8_t sessionId,
-		preferred_network_found_ind_cb
-		callbackRoutine, void *callbackContext);
-#endif /* FEATURE_WLAN_SCAN_PNO */
 bool csr_roamGetConcurrencyConnectStatusForBmps(tpAniSirGlobal pMac);
 #ifdef FEATURE_WLAN_TDLS
 QDF_STATUS csr_tdls_send_mgmt_req(tHalHandle hHal, uint8_t sessionId,

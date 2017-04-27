@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -63,7 +63,7 @@ struct index_vht_data_rate_type {
  * @DATA_RATE_11AC_MAX_MCS_9: MCS9 rate
  * @DATA_RATE_11AC_MAX_MCS_NA:i Not applicable
  */
-enum eDataRate11ACMaxMcs{
+enum eDataRate11ACMaxMcs {
 	DATA_RATE_11AC_MAX_MCS_7,
 	DATA_RATE_11AC_MAX_MCS_8,
 	DATA_RATE_11AC_MAX_MCS_9,
@@ -144,7 +144,6 @@ static inline bool hdd_link_layer_stats_supported(void)
 
 static inline void hdd_init_ll_stats_ctx(void)
 {
-	return;
 }
 
 static inline bool hdd_link_layer_stats_supported(void)
@@ -221,5 +220,19 @@ void wlan_hdd_cfg80211_stats_ext_callback(void *ctx,
 
 void wlan_hdd_cfg80211_link_layer_stats_callback(void *ctx,
 						 int indType, void *pRsp);
+/**
+ * wlan_hdd_cfg80211_link_layer_stats_ext_callback() - Callback for LL ext
+ * @ctx: HDD context
+ * @rsp: msg from FW
+ *
+ * This function is an extension of
+ * wlan_hdd_cfg80211_link_layer_stats_callback. It converts
+ * monitoring parameters offloaded to NL data and send the same to the
+ * kernel/upper layers.
+ *
+ * Return: None.
+ */
+void wlan_hdd_cfg80211_link_layer_stats_ext_callback(tHddHandle ctx,
+						     tSirLLStatsResults *rsp);
 #endif /* end #if !defined(WLAN_HDD_STATS_H) */
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2017 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -106,6 +106,7 @@ int hdd_napi_create(void)
 	struct  hif_opaque_softc *hif_ctx;
 	int     rc = 0;
 	hdd_context_t *hdd_ctx;
+	uint8_t feature_flags = 0;
 
 	NAPI_DEBUG("-->");
 
@@ -114,9 +115,15 @@ int hdd_napi_create(void)
 		QDF_ASSERT(NULL != hif_ctx);
 		rc = -EFAULT;
 	} else {
+
+		feature_flags = QCA_NAPI_FEATURE_CPU_CORRECTION |
+				QCA_NAPI_FEATURE_IRQ_BLACKLISTING |
+				QCA_NAPI_FEATURE_CORE_CTL_BOOST;
+
 		rc = hif_napi_create(hif_ctx, hdd_napi_poll,
 				     QCA_NAPI_BUDGET,
-				     QCA_NAPI_DEF_SCALE);
+				     QCA_NAPI_DEF_SCALE,
+				     feature_flags);
 		if (rc < 0) {
 			hdd_err("ERR(%d) creating NAPI instances",
 				rc);
@@ -373,3 +380,66 @@ int hdd_napi_poll(struct napi_struct *napi, int budget)
 {
 	return hif_napi_poll(cds_get_context(QDF_MODULE_ID_HIF), napi, budget);
 }
+
+/**
+ * hdd_display_napi_stats() - print NAPI stats
+ *
+ * Return: == 0: success; !=0: failure
+ */
+int hdd_display_napi_stats(void)
+{
+	int i, j, k, n; /* NAPI, CPU, bucket indices, bucket buf write index*/
+	int max;
+	struct qca_napi_data *napid;
+	struct qca_napi_info *napii;
+	struct qca_napi_stat *napis;
+	/*
+	 * Expecting each NAPI bucket item to need at max 5 numerals + space for
+	 * formatting. For example "10000 " Thus the array needs to have
+	 * (5 + 1) * QCA_NAPI_NUM_BUCKETS bytes of space. Leaving one space at
+	 * the end of the "buf" arrary for end of string char.
+	 */
+	char buf[6 * QCA_NAPI_NUM_BUCKETS + 1] = {'\0'};
+
+	napid = hdd_napi_get_all();
+	if (NULL == napid) {
+		hdd_err("%s unable to retrieve napi structure", __func__);
+		return -EFAULT;
+	}
+	qdf_print("[NAPI %u][BL %d]:  scheds   polls   comps    done t-lim p-lim  corr napi-buckets(%d)",
+		  napid->napi_mode,
+		  hif_napi_cpu_blacklist(napid, BLACKLIST_QUERY),
+		  QCA_NAPI_NUM_BUCKETS);
+
+	for (i = 0; i < CE_COUNT_MAX; i++)
+		if (napid->ce_map & (0x01 << i)) {
+			napii = &(napid->napis[i]);
+			for (j = 0; j < num_possible_cpus(); j++) {
+				napis = &(napii->stats[j]);
+				n = 0;
+				max = sizeof(buf);
+				for (k = 0; k < QCA_NAPI_NUM_BUCKETS; k++) {
+					n += scnprintf(
+						buf + n, max - n,
+						" %d",
+						napis->napi_budget_uses[k]);
+				}
+
+				if (napis->napi_schedules != 0)
+					qdf_print("NAPI[%2d]CPU[%d]: %7d %7d %7d %7d %5d %5d %5d %s",
+						  i, j,
+						  napis->napi_schedules,
+						  napis->napi_polls,
+						  napis->napi_completes,
+						  napis->napi_workdone,
+						  napis->time_limit_reached,
+						  napis->rxpkt_thresh_reached,
+						  napis->cpu_corrected,
+						  buf);
+			}
+		}
+
+	hif_napi_stats(napid);
+	return 0;
+}
+

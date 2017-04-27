@@ -58,6 +58,7 @@
 #include "wma.h"
 #include "pktlog_ac.h"
 #include "wlan_hdd_ipa.h"
+#include "wlan_policy_mgr_api.h"
 
 #include <cdp_txrx_cmn_reg.h>
 #include <cdp_txrx_cfg.h>
@@ -78,6 +79,7 @@ static struct ol_if_ops  dp_ol_if_ops = {
 	.peer_set_default_routing = wma_peer_set_default_routing,
 	.peer_rx_reorder_queue_setup = wma_peer_rx_reorder_queue_setup,
 	.peer_rx_reorder_queue_remove = wma_peer_rx_reorder_queue_remove,
+	.is_hw_dbs_2x2_capable = policy_mgr_is_hw_dbs_2x2_capable
     /* TODO: Add any other control path calls required to OL_IF/WMA layer */
 };
 
@@ -492,8 +494,7 @@ QDF_STATUS cds_open(struct wlan_objmgr_psoc *psoc)
 
 	/*Open the WMA module */
 	qdf_status = wma_open(psoc, gp_cds_context,
-			      hdd_update_tgt_cfg,
-			      hdd_dfs_indicate_radar, cds_cfg);
+			      hdd_update_tgt_cfg, cds_cfg);
 
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		/* Critical Error ...  Cannot proceed further */
@@ -537,12 +538,12 @@ QDF_STATUS cds_open(struct wlan_objmgr_psoc *psoc)
 		gp_cds_context->dp_soc = cdp_soc_attach(LITHIUM_DP,
 			gp_cds_context->pHIFContext, scn,
 			gp_cds_context->htc_ctx, gp_cds_context->qdf_ctx,
-			&dp_ol_if_ops);
+			&dp_ol_if_ops, psoc);
 	else
 		gp_cds_context->dp_soc = cdp_soc_attach(MOB_DRV_LEGACY_DP,
 			gp_cds_context->pHIFContext, scn,
 			gp_cds_context->htc_ctx, gp_cds_context->qdf_ctx,
-			&dp_ol_if_ops);
+			&dp_ol_if_ops, psoc);
 
 	cds_set_ac_specs_params(cds_cfg);
 
@@ -635,7 +636,7 @@ QDF_STATUS cds_pre_enable(v_CONTEXT_t cds_context)
 	void *scn;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 
-	QDF_TRACE(QDF_MODULE_ID_SYS, QDF_TRACE_LEVEL_INFO, "cds prestart");
+	QDF_TRACE(QDF_MODULE_ID_SYS, QDF_TRACE_LEVEL_DEBUG, "cds prestart");
 	if (gp_cds_context != p_cds_context) {
 		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
 			  "%s: Context mismatch", __func__);
@@ -753,9 +754,6 @@ QDF_STATUS cds_enable(struct wlan_objmgr_psoc *psoc, v_CONTEXT_t cds_context)
 	p_cds_contextType p_cds_context = (p_cds_contextType) cds_context;
 	tHalMacStartParameters halStartParams;
 
-	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO,
-		  "%s: Starting Libra SW", __func__);
-
 	/* We support only one instance for now ... */
 	if (gp_cds_context != p_cds_context) {
 		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
@@ -827,8 +825,6 @@ QDF_STATUS cds_enable(struct wlan_objmgr_psoc *psoc, v_CONTEXT_t cds_context)
 		goto err_soc_target_detach;
 	}
 
-	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO,
-		  "TL correctly started");
 	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO,
 		  "%s: CDS Start is successful!!", __func__);
 
@@ -1011,6 +1007,8 @@ QDF_STATUS cds_close(struct wlan_objmgr_psoc *psoc, v_CONTEXT_t cds_context)
 	QDF_STATUS qdf_status;
 	void *ctx;
 
+	dispatcher_psoc_close(psoc);
+
 	qdf_status = wma_wmi_work_close(cds_context);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
@@ -1089,7 +1087,6 @@ QDF_STATUS cds_close(struct wlan_objmgr_psoc *psoc, v_CONTEXT_t cds_context)
 
 	cds_deregister_all_modules();
 
-	dispatcher_psoc_close(psoc);
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -2459,3 +2456,13 @@ enum tQDF_GLOBAL_CON_MODE cds_get_conparam(void)
 
 	return con_mode;
 }
+
+#ifdef WMI_INTERFACE_EVENT_LOGGING
+inline void
+cds_print_htc_credit_history(uint32_t count, qdf_abstract_print *print,
+			     void *print_priv)
+{
+	htc_print_credit_history(gp_cds_context->htc_ctx, count,
+				 print, print_priv);
+}
+#endif
