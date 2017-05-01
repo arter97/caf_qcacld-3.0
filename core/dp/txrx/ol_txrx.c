@@ -1770,7 +1770,8 @@ static void ol_tx_free_descs_inuse(ol_txrx_pdev_handle pdev)
 		 * been given to the target to transmit, for which the
 		 * target has never provided a response.
 		 */
-		if (qdf_atomic_read(&tx_desc->ref_cnt)) {
+		if (qdf_atomic_read(&tx_desc->ref_cnt) &&
+				tx_desc->vdev_id != OL_TXRX_INVALID_VDEV_ID) {
 			TXRX_PRINT(TXRX_PRINT_LEVEL_WARN,
 				   "Warning: freeing tx frame (no compltn)\n");
 			ol_tx_desc_frame_free_nonstd(pdev,
@@ -2026,6 +2027,8 @@ ol_txrx_vdev_attach(ol_txrx_pdev_handle pdev,
 	vdev->tx_fl_hwm = 0;
 	vdev->rx = NULL;
 	vdev->wait_on_peer_id = OL_TXRX_INVALID_LOCAL_PEER_ID;
+	qdf_mem_zero(&vdev->last_peer_mac_addr,
+			sizeof(union ol_txrx_align_mac_addr_t));
 	qdf_spinlock_create(&vdev->flow_control_lock);
 	vdev->osif_flow_control_cb = NULL;
 	vdev->osif_fc_ctx = NULL;
@@ -2379,6 +2382,8 @@ ol_txrx_peer_attach(ol_txrx_vdev_handle vdev, uint8_t *peer_mac_addr)
 	bool wait_on_deletion = false;
 	unsigned long rc;
 	struct ol_txrx_pdev_t *pdev;
+	bool cmp_wait_mac = false;
+	uint8_t zero_mac_addr[QDF_MAC_ADDR_SIZE] = { 0, 0, 0, 0, 0, 0 };
 
 	/* preconditions */
 	TXRX_ASSERT2(vdev);
@@ -2386,6 +2391,10 @@ ol_txrx_peer_attach(ol_txrx_vdev_handle vdev, uint8_t *peer_mac_addr)
 
 	pdev = vdev->pdev;
 	TXRX_ASSERT2(pdev);
+
+	if (qdf_mem_cmp(&zero_mac_addr, &vdev->last_peer_mac_addr,
+				QDF_MAC_ADDR_SIZE))
+		cmp_wait_mac = true;
 
 	qdf_spin_lock_bh(&pdev->peer_ref_mutex);
 	/* check for duplicate exsisting peer */
@@ -2402,14 +2411,41 @@ ol_txrx_peer_attach(ol_txrx_vdev_handle vdev, uint8_t *peer_mac_addr)
 				vdev->wait_on_peer_id = temp_peer->local_id;
 				qdf_event_reset(&vdev->wait_delete_comp);
 				wait_on_deletion = true;
+				break;
 			} else {
 				qdf_spin_unlock_bh(&pdev->peer_ref_mutex);
+				return NULL;
+			}
+		}
+		if (cmp_wait_mac && !ol_txrx_peer_find_mac_addr_cmp(
+					&temp_peer->mac_addr,
+					&vdev->last_peer_mac_addr)) {
+			TXRX_PRINT(TXRX_PRINT_LEVEL_INFO1,
+				"vdev_id %d (%02x:%02x:%02x:%02x:%02x:%02x) old peer exsist.\n",
+				vdev->vdev_id,
+				vdev->last_peer_mac_addr.raw[0],
+				vdev->last_peer_mac_addr.raw[1],
+				vdev->last_peer_mac_addr.raw[2],
+				vdev->last_peer_mac_addr.raw[3],
+				vdev->last_peer_mac_addr.raw[4],
+				vdev->last_peer_mac_addr.raw[5]);
+			if (qdf_atomic_read(&temp_peer->delete_in_progress)) {
+				vdev->wait_on_peer_id = temp_peer->local_id;
+				qdf_event_reset(&vdev->wait_delete_comp);
+				wait_on_deletion = true;
+				break;
+			} else {
+				qdf_spin_unlock_bh(&pdev->peer_ref_mutex);
+				TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
+					"peer not found");
 				return NULL;
 			}
 		}
 	}
 	qdf_spin_unlock_bh(&pdev->peer_ref_mutex);
 
+	qdf_mem_zero(&vdev->last_peer_mac_addr,
+			sizeof(union ol_txrx_align_mac_addr_t));
 	if (wait_on_deletion) {
 		/* wait for peer deletion */
 		rc = qdf_wait_single_event(&vdev->wait_delete_comp,
@@ -3306,11 +3342,12 @@ void peer_unmap_timer_handler(void *data)
 		 peer->mac_addr.raw[0], peer->mac_addr.raw[1],
 		 peer->mac_addr.raw[2], peer->mac_addr.raw[3],
 		 peer->mac_addr.raw[4], peer->mac_addr.raw[5]);
-	wma_peer_debug_dump();
-	if (cds_is_self_recovery_enabled())
-		cds_trigger_recovery(false);
-	else
+	if (!cds_is_driver_recovering()) {
+		wma_peer_debug_dump();
 		QDF_BUG(0);
+	} else {
+		WMA_LOGE("%s: Recovery is in progress, ignore!", __func__);
+	}
 }
 
 
@@ -3369,6 +3406,9 @@ void ol_txrx_peer_detach(ol_txrx_peer_handle peer)
 	 * Create a timer to track unmap events when the sta peer gets deleted.
 	 */
 	if (vdev->opmode == wlan_op_mode_sta) {
+		qdf_mem_copy(&peer->vdev->last_peer_mac_addr,
+			&peer->mac_addr,
+			sizeof(union ol_txrx_align_mac_addr_t));
 		qdf_timer_start(&peer->peer_unmap_timer,
 				OL_TXRX_PEER_UNMAP_TIMEOUT);
 		TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
@@ -4831,8 +4871,9 @@ void ol_rx_data_process(struct ol_txrx_peer_t *peer,
 	if (!data_rx) {
 		if (ol_txrx_enqueue_rx_frames(&peer->bufq_info, rx_buf_list)
 				!= QDF_STATUS_SUCCESS)
-			TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
-				"failed to enqueue rx frm to cached_bufq");
+			QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO_HIGH,
+				  "%s: failed to enqueue rx frm to cached_bufq",
+				  __func__);
 	} else {
 #ifdef QCA_CONFIG_SMP
 		/*

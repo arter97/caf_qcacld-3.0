@@ -1291,7 +1291,7 @@ static void hdd_send_association_event(struct net_device *dev,
 			&pAdapter->prev_fwd_tx_packets,
 			&pAdapter->prev_fwd_rx_packets);
 		spin_unlock_bh(&pHddCtx->bus_bw_lock);
-		hdd_start_bus_bw_compute_timer(pAdapter);
+		hdd_bus_bw_compute_timer_start(pHddCtx);
 #endif
 #endif
 	} else if (eConnectionState_IbssConnected ==    /* IBss Associated */
@@ -1335,7 +1335,7 @@ static void hdd_send_association_event(struct net_device *dev,
 		pAdapter->prev_fwd_tx_packets = 0;
 		pAdapter->prev_fwd_rx_packets = 0;
 		spin_unlock_bh(&pHddCtx->bus_bw_lock);
-		hdd_stop_bus_bw_compute_timer(pAdapter);
+		hdd_bus_bw_compute_timer_try_stop(pHddCtx);
 #endif
 	}
 	cds_dump_concurrency_info();
@@ -3765,6 +3765,14 @@ hdd_roam_tdls_status_update_handler(hdd_adapter_t *pAdapter,
 		curr_peer =
 			wlan_hdd_tdls_find_peer(pAdapter,
 						pRoamInfo->peerMac.bytes);
+
+		if (!curr_peer) {
+			mutex_unlock(&pHddCtx->tdls_lock);
+			hdd_debug("peer doesn't exists");
+			status = QDF_STATUS_SUCCESS;
+			break;
+		}
+
 		wlan_hdd_tdls_indicate_teardown(pAdapter, curr_peer,
 						pRoamInfo->reasonCode);
 		hdd_send_wlan_tdls_teardown_event(eTDLS_TEARDOWN_BSS_DISCONNECT,
