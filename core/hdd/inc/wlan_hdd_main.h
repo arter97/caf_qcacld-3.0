@@ -2219,4 +2219,17 @@ void hdd_start_complete(int ret);
  *
  */
 void hdd_unregister_notifiers(hdd_context_t *hdd_ctx);
+
+/**
+ * hdd_get_rssi_snr_by_bssid() - gets the rssi and snr by bssid from scan cache
+ * @adapter: adapter handle
+ * @bssid: bssid to look for in scan cache
+ * @rssi: rssi value found
+ * @snr: snr value found
+ *
+ * Return: QDF_STATUS
+ */
+int hdd_get_rssi_snr_by_bssid(hdd_adapter_t *adapter, const uint8_t *bssid,
+			      int8_t *rssi, int8_t *snr);
+
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */
