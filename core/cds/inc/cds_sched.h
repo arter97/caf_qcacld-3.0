@@ -266,6 +266,7 @@ typedef struct _cds_context_type {
 	qdf_event_t ProbeEvent;
 
 	uint32_t driver_state;
+	unsigned long fw_state;
 
 	qdf_event_t wmaCompleteEvent;
 
@@ -322,6 +323,7 @@ typedef struct _cds_context_type {
 	 */
 	uint8_t sap_mandatory_channels[QDF_MAX_NUM_CHAN];
 	uint32_t sap_mandatory_channels_len;
+	bool enable_sap_mandatory_chan_list;
 	bool do_hw_mode_change;
 	bool enable_fatal_event;
 	struct cds_config_info *cds_cfg;
