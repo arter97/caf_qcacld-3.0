@@ -160,7 +160,7 @@ int hdd_request_wait_for_response(struct hdd_request *request)
 	QDF_STATUS status;
 
 	status = qdf_wait_for_event_completion(&request->completed,
-				       request->params.timeout_ms);
+					       request->params.timeout_ms);
 
 	return qdf_status_to_os_return(status);
 }
