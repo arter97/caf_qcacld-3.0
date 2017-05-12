@@ -8703,6 +8703,8 @@ int hdd_wlan_startup(struct device *dev)
 	qdf_mc_timer_init(&hdd_ctx->iface_change_timer, QDF_TIMER_TYPE_SW,
 			  hdd_iface_change_callback, (void *)hdd_ctx);
 
+	qdf_nbuf_init_replenish_timer();
+
 	mutex_init(&hdd_ctx->iface_change_lock);
 
 	ret = hdd_init_netlink_services(hdd_ctx);
@@ -8841,6 +8843,7 @@ err_exit_nl_srv:
 	cds_deinit_ini_config();
 err_hdd_free_context:
 	hdd_start_complete(ret);
+	qdf_nbuf_deinit_replenish_timer();
 	qdf_mc_timer_destroy(&hdd_ctx->iface_change_timer);
 	mutex_destroy(&hdd_ctx->iface_change_lock);
 	hdd_context_destroy(hdd_ctx);
