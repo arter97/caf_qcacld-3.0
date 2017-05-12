@@ -3248,7 +3248,7 @@ static void wma_add_bss_ap_mode(tp_wma_handle wma, tpAddBssParams add_bss)
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		WMA_LOGE("wma_get_current_hw_mode failed");
 
-	if ((add_bss->nss == 2) && !hw_mode.dbs_cap) {
+	if (add_bss->nss == 2) {
 		req.preferred_rx_streams = 2;
 		req.preferred_tx_streams = 2;
 	} else {
@@ -3393,7 +3393,7 @@ static void wma_add_bss_ibss_mode(tp_wma_handle wma, tpAddBssParams add_bss)
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		WMA_LOGE("wma_get_current_hw_mode failed");
 
-	if ((add_bss->nss == 2) && !hw_mode.dbs_cap) {
+	if (add_bss->nss == 2) {
 		req.preferred_rx_streams = 2;
 		req.preferred_tx_streams = 2;
 	} else {
@@ -3574,7 +3574,7 @@ static void wma_add_bss_sta_mode(tp_wma_handle wma, tpAddBssParams add_bss)
 			if (!QDF_IS_STATUS_SUCCESS(status))
 				WMA_LOGE("wma_get_current_hw_mode failed");
 
-			if ((add_bss->nss == 2) && !hw_mode.dbs_cap) {
+			if (add_bss->nss == 2) {
 				req.preferred_rx_streams = 2;
 				req.preferred_tx_streams = 2;
 			} else {
