@@ -2623,6 +2623,9 @@ static inline bool wma_crash_on_fw_timeout(bool crash_enabled)
 	if (cds_is_driver_recovering())
 		return false;
 
+	if (cds_is_driver_unloading())
+		return false;
+
 	if (!cds_is_fw_down())
 		return false;
 
@@ -2766,9 +2769,6 @@ struct wma_target_req *wma_fill_hold_req(tp_wma_handle wma,
 {
 	struct wma_target_req *req;
 	QDF_STATUS status;
-
-	if (cds_is_driver_recovering())
-		return NULL;
 
 	req = qdf_mem_malloc(sizeof(*req));
 	if (!req) {
@@ -3075,9 +3075,6 @@ struct wma_target_req *wma_fill_vdev_req(tp_wma_handle wma,
 {
 	struct wma_target_req *req;
 	QDF_STATUS status;
-
-	if (cds_is_driver_recovering())
-		return NULL;
 
 	req = qdf_mem_malloc(sizeof(*req));
 	if (!req) {

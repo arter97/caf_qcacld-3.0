@@ -2896,8 +2896,6 @@ static QDF_STATUS hdd_association_completion_handler(hdd_adapter_t *pAdapter,
 					roamResult, pHddStaCtx))
 		return QDF_STATUS_E_FAILURE;
 
-	hdd_clear_fils_connection_info(pAdapter);
-
 	if (NULL != pRoamInfo && NULL != pRoamInfo->pBssDesc) {
 		cds_force_sap_on_scc(roamResult,
 				pRoamInfo->pBssDesc->channelId);
@@ -4905,6 +4903,9 @@ hdd_sme_roam_callback(void *pContext, tCsrRoamInfo *pRoamInfo, uint32_t roamId,
 	case eCSR_ROAM_RESULT_MGMT_TX_COMPLETE_IND:
 		wlan_hdd_tdls_mgmt_completion_callback(pAdapter,
 						       pRoamInfo->reasonCode);
+		break;
+	case eCSR_ROAM_TDLS_SET_STATE_DISABLE:
+		hdd_tdls_notify_set_state_disable(pRoamInfo->sessionId);
 		break;
 #endif
 #ifdef WLAN_FEATURE_11W
