@@ -302,11 +302,9 @@ lim_check_and_add_bss_description(tpAniSirGlobal mac_ctx,
 
 		if (rx_chan_bd != rx_chan_in_beacon) {
 			/* BCAST Frame, if CH do not match, Drop */
-			if (WMA_IS_RX_BCAST(rx_packet_info) || ((!fProbeRsp) &&
-				 (cds_chan_to_band(rx_chan_in_beacon) !=
-					cds_chan_to_band(rx_chan_bd)))) {
+			if (WMA_IS_RX_BCAST(rx_packet_info)) {
 				lim_log(mac_ctx, LOG3,
-					FL("Beacon dropped. Channel in BD: %d Channel in beacon: %d"),
+					FL("Beacon/Probe Rsp dropped. Channel in BD %d. Channel in beacon %d"),
 					WMA_GET_RX_CH(rx_packet_info),
 					lim_get_channel_from_beacon(mac_ctx,
 						bpr));
