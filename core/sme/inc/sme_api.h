@@ -62,6 +62,23 @@
 #define SME_PER_STA_STATS        32
 #define SME_PER_CHAIN_RSSI_STATS 64
 
+#define sme_log(level, args...) QDF_TRACE(QDF_MODULE_ID_SME, level, ## args)
+#define sme_logfl(level, format, args...) sme_log(level, FL(format), ## args)
+
+#define sme_alert(format, args...) \
+		sme_logfl(QDF_TRACE_LEVEL_FATAL, format, ## args)
+#define sme_err(format, args...) \
+		sme_logfl(QDF_TRACE_LEVEL_ERROR, format, ## args)
+#define sme_warn(format, args...) \
+		sme_logfl(QDF_TRACE_LEVEL_WARN, format, ## args)
+#define sme_info(format, args...) \
+		sme_logfl(QDF_TRACE_LEVEL_INFO, format, ## args)
+#define sme_debug(format, args...) \
+		sme_logfl(QDF_TRACE_LEVEL_DEBUG, format, ## args)
+
+#define SME_ENTER() sme_logfl(QDF_TRACE_LEVEL_DEBUG, "enter")
+#define SME_EXIT() sme_logfl(QDF_TRACE_LEVEL_DEBUG, "exit")
+
 #define SME_SESSION_ID_ANY        50
 
 #define SME_INVALID_COUNTRY_CODE "XX"
