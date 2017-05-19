@@ -2168,6 +2168,43 @@ static void cds_update_conc_list(uint32_t conn_index,
 }
 
 /**
+ * cds_mode_specific_vdev_id() - provides the
+ * vdev id of specific mode
+ * @mode: type of connection
+ *
+ * This function provides the vdev id of specific mode
+ *
+ * Note: This gives the first vdev id of the mode type in a
+ * sta+sta or sap+sap or p2p + p2p case
+ *
+ * Return: vdev id of specific type or CDS_INVALID_VDEV_ID if no vdev
+ *         found for the given mode
+ */
+uint32_t cds_mode_specific_vdev_id(enum cds_con_mode mode)
+{
+	uint32_t conn_index;
+	uint32_t vdev_id = CDS_INVALID_VDEV_ID;
+	cds_context_type *cds_ctx;
+
+	cds_ctx = cds_get_context(QDF_MODULE_ID_QDF);
+	if (!cds_ctx) {
+		cds_err("Invalid CDS Context");
+		return vdev_id;
+	}
+	qdf_mutex_acquire(&cds_ctx->qdf_conc_list_lock);
+	for (conn_index = 0; conn_index < MAX_NUMBER_OF_CONC_CONNECTIONS;
+		 conn_index++) {
+		if ((conc_connection_list[conn_index].mode == mode) &&
+			conc_connection_list[conn_index].in_use) {
+			vdev_id = conc_connection_list[conn_index].vdev_id;
+			break;
+		}
+	}
+	qdf_mutex_release(&cds_ctx->qdf_conc_list_lock);
+	return vdev_id;
+}
+
+/**
  * cds_mode_specific_connection_count() - provides the
  * count of connections of specific mode
  * @mode: type of connection
@@ -9447,6 +9484,7 @@ QDF_STATUS cds_get_valid_chan_weights(struct sir_pcl_chan_weights *weight)
 		 * There is a small window between releasing the above lock
 		 * and acquiring the same in cds_allow_concurrency, below!
 		 */
+		qdf_mutex_release(&cds_ctx->qdf_conc_list_lock);
 		for (i = 0; i < weight->saved_num_chan; i++) {
 			if (cds_allow_concurrency(CDS_STA_MODE,
 						  weight->saved_chan_list[i],
@@ -9455,7 +9493,7 @@ QDF_STATUS cds_get_valid_chan_weights(struct sir_pcl_chan_weights *weight)
 					WEIGHT_OF_NON_PCL_CHANNELS;
 			}
 		}
-
+		qdf_mutex_acquire(&cds_ctx->qdf_conc_list_lock);
 		/* Restore the connection info */
 		cds_restore_deleted_conn_info(&info);
 	}
