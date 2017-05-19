@@ -438,19 +438,8 @@ static int __hdd_netdev_notifier_call(struct notifier_block *nb,
 
 	case NETDEV_GOING_DOWN:
 		if (adapter->scan_info.mScanPending != false) {
-			unsigned long rc;
-
-			INIT_COMPLETION(adapter->scan_info.
-					abortscan_event_var);
-			hdd_abort_mac_scan(adapter->pHddCtx,
-					   adapter->sessionId,
-					   INVALID_SCAN_ID,
-					   eCSR_SCAN_ABORT_DEFAULT);
-			rc = wait_for_completion_timeout(
-				&adapter->scan_info.abortscan_event_var,
-				msecs_to_jiffies(WLAN_WAIT_TIME_ABORTSCAN));
-			if (!rc)
-				hdd_err("Timeout occurred while waiting for abortscan");
+			wlan_abort_scan(hdd_ctx->hdd_pdev, INVAL_PDEV_ID,
+				adapter->sessionId, INVALID_SCAN_ID, true);
 		} else {
 			hdd_debug("Scan is not Pending from user");
 		}
@@ -1391,11 +1380,14 @@ void hdd_update_tgt_cfg(void *context, void *param)
 	struct wma_tgt_cfg *cfg = param;
 	uint8_t temp_band_cap;
 	struct cds_config_info *cds_cfg = cds_get_ini_config();
+	uint8_t antenna_mode;
 
-	/* Reuse same pdev for module stop and start */
+	/* Reuse same pdev for module start/stop or SSR */
 	if ((hdd_get_conparam() == QDF_GLOBAL_FTM_MODE) ||
-		(!cds_is_driver_loading())) {
-		hdd_err("Reuse pdev for module start/stop");
+	    !cds_is_driver_loading()) {
+		hdd_err("Reuse pdev for module start/stop or SSR");
+		/* Restore pdev to MAC/WMA contexts */
+		sme_store_pdev(hdd_ctx->hHal, hdd_ctx->hdd_pdev);
 	} else {
 		ret = hdd_objmgr_create_and_store_pdev(hdd_ctx);
 		if (ret) {
@@ -1493,9 +1485,9 @@ void hdd_update_tgt_cfg(void *context, void *param)
 	hdd_debug("fine_time_meas_cap: 0x%x",
 		hdd_ctx->config->fine_time_meas_cap);
 
-	hdd_ctx->current_antenna_mode =
-		(hdd_ctx->config->enable2x2 == 0x01) ?
-		HDD_ANTENNA_MODE_2X2 : HDD_ANTENNA_MODE_1X1;
+	antenna_mode = (hdd_ctx->config->enable2x2 == 0x01) ?
+			HDD_ANTENNA_MODE_2X2 : HDD_ANTENNA_MODE_1X1;
+	hdd_update_smps_antenna_mode(hdd_ctx, antenna_mode);
 	hdd_debug("Init current antenna mode: %d",
 		 hdd_ctx->current_antenna_mode);
 
@@ -2099,7 +2091,7 @@ ol_cds_free:
 	ol_cds_free();
 
 hif_close:
-	hdd_hif_close(p_cds_context->pHIFContext);
+	hdd_hif_close(hdd_ctx, p_cds_context->pHIFContext);
 power_down:
 	if (!reinit && !unint)
 		pld_power_off(qdf_dev->dev);
@@ -2690,7 +2682,6 @@ static void hdd_runtime_suspend_context_init(hdd_context_t *hdd_ctx)
 {
 	struct hdd_runtime_pm_context *ctx = &hdd_ctx->runtime_context;
 
-	ctx->scan = qdf_runtime_lock_init("scan");
 	ctx->roc = qdf_runtime_lock_init("roc");
 	ctx->dfs = qdf_runtime_lock_init("dfs");
 }
@@ -2705,8 +2696,6 @@ static void hdd_runtime_suspend_context_deinit(hdd_context_t *hdd_ctx)
 {
 	struct hdd_runtime_pm_context *ctx = &hdd_ctx->runtime_context;
 
-	qdf_runtime_lock_deinit(ctx->scan);
-	ctx->scan = NULL;
 	qdf_runtime_lock_deinit(ctx->roc);
 	ctx->roc = NULL;
 	qdf_runtime_lock_deinit(ctx->dfs);
@@ -2957,6 +2946,13 @@ int hdd_vdev_destroy(hdd_adapter_t *adapter)
 		return errno;
 	}
 
+	/*
+	 * In SSR case, there is no need to destroy vdev in firmware since
+	 * it has already asserted. vdev can be released directly.
+	 */
+	if (cds_is_driver_recovering())
+		goto release_vdev;
+
 	/* close sme session (destroy vdev in firmware via legacy API) */
 	INIT_COMPLETION(adapter->session_close_comp_var);
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
@@ -2979,6 +2975,7 @@ int hdd_vdev_destroy(hdd_adapter_t *adapter)
 		return -ETIMEDOUT;
 	}
 
+release_vdev:
 	/* now that sme session is closed, allow physical vdev destroy */
 	errno = hdd_objmgr_release_vdev(adapter);
 	if (errno) {
@@ -4177,6 +4174,9 @@ QDF_STATUS hdd_reset_all_adapters(hdd_context_t *hdd_ctx)
 			wlansap_set_invalid_session(
 				WLAN_HDD_GET_SAP_CTX_PTR(adapter));
 
+		/* Destroy vdev which will be recreated during reinit. */
+		hdd_vdev_destroy(adapter);
+
 		status = hdd_get_next_adapter(hdd_ctx, adapterNode, &pNext);
 		adapterNode = pNext;
 	}
@@ -4900,9 +4900,8 @@ QDF_STATUS hdd_abort_mac_scan_all_adapters(hdd_context_t *hdd_ctx)
 		    (adapter->device_mode == QDF_P2P_DEVICE_MODE) ||
 		    (adapter->device_mode == QDF_SAP_MODE) ||
 		    (adapter->device_mode == QDF_P2P_GO_MODE)) {
-			hdd_abort_mac_scan(hdd_ctx, adapter->sessionId,
-					   INVALID_SCAN_ID,
-					   eCSR_SCAN_ABORT_DEFAULT);
+		    wlan_abort_scan(hdd_ctx->hdd_pdev, INVAL_PDEV_ID,
+				adapter->sessionId, INVALID_SCAN_ID, false);
 		}
 		status = hdd_get_next_adapter(hdd_ctx, adapterNode, &pNext);
 		adapterNode = pNext;
@@ -8964,7 +8963,7 @@ int hdd_wlan_stop_modules(hdd_context_t *hdd_ctx, bool ftm_mode)
 		ret = -EINVAL;
 	}
 
-	hdd_hif_close(hif_ctx);
+	hdd_hif_close(hdd_ctx, hif_ctx);
 
 	ol_cds_free();
 
@@ -11175,7 +11174,13 @@ static int hdd_update_scan_config(hdd_context_t *hdd_ctx)
 	scan_cfg.conc_max_rest_time = cfg->nRestTimeConc;
 	scan_cfg.conc_min_rest_time = cfg->min_rest_time_conc;
 	scan_cfg.conc_idle_time = cfg->idle_time_conc;
-	scan_cfg.scan_cache_aging_time = cfg->scanAgingTimeout;
+	/* convert to ms */
+	scan_cfg.scan_cache_aging_time =
+		cfg->scanAgingTimeout * 1000;
+	scan_cfg.prefer_5ghz = cfg->nRoamPrefer5GHz;
+	scan_cfg.select_5ghz_margin = cfg->nSelect5GHzMargin;
+	scan_cfg.scan_bucket_threshold = cfg->first_scan_bucket_threshold;
+	scan_cfg.rssi_cat_gap = cfg->nRssiCatGap;
 	scan_cfg.scan_dwell_time_mode = cfg->scan_adaptive_dwell_mode;
 	scan_cfg.is_snr_monitoring_enabled = cfg->fEnableSNRMonitoring;
 
@@ -11239,6 +11244,7 @@ static int hdd_update_tdls_config(hdd_context_t *hdd_ctx)
 	tdls_cfg.tdls_del_sta_req = eWNI_SME_TDLS_DEL_STA_REQ;
 	tdls_cfg.tdls_update_peer_state = WMA_UPDATE_TDLS_PEER_STATE;
 	tdls_cfg.tdls_del_all_peers = eWNI_SME_DEL_ALL_TDLS_PEERS;
+	tdls_cfg.tdls_update_dp_vdev_flags = CDP_UPDATE_TDLS_FLAGS;
 	tdls_cfg.tdls_event_cb = wlan_cfg80211_tdls_event_callback;
 	tdls_cfg.tdls_evt_cb_data = psoc;
 	tdls_cfg.tdls_tl_peer_data = hdd_ctx;
@@ -11248,6 +11254,7 @@ static int hdd_update_tdls_config(hdd_context_t *hdd_ctx)
 	tdls_cfg.tdls_wmm_cb_data = psoc;
 	tdls_cfg.tdls_rx_cb = wlan_cfg80211_tdls_rx_callback;
 	tdls_cfg.tdls_rx_cb_data = psoc;
+	tdls_cfg.tdls_dp_vdev_update = hdd_update_dp_vdev_flags;
 
 	status = ucfg_tdls_update_config(psoc, &tdls_cfg);
 	if (status != QDF_STATUS_SUCCESS) {
@@ -11256,6 +11263,8 @@ static int hdd_update_tdls_config(hdd_context_t *hdd_ctx)
 	}
 
 	hdd_ctx->tdls_umac_comp_active = true;
+	/* disable napier specific tdls data path */
+	hdd_ctx->tdls_nap_active = false;
 
 	return 0;
 }
@@ -11263,6 +11272,8 @@ static int hdd_update_tdls_config(hdd_context_t *hdd_ctx)
 static int hdd_update_tdls_config(hdd_context_t *hdd_ctx)
 {
 	hdd_ctx->tdls_umac_comp_active = false;
+	/* disable napier specific tdls data path */
+	hdd_ctx->tdls_nap_active = false;
 	return 0;
 }
 #endif

@@ -112,9 +112,7 @@ static void pe_reset_protection_callback(void *ptr)
 	bool bcn_prms_changed = false;
 
 	if (pe_session_entry->valid == false) {
-		QDF_TRACE(QDF_MODULE_ID_PE,
-			  QDF_TRACE_LEVEL_ERROR,
-			  FL("session already deleted. exiting timer callback"));
+		pe_err("session already deleted. exiting timer callback");
 		return;
 	}
 
@@ -126,9 +124,7 @@ static void pe_reset_protection_callback(void *ptr)
 	 * is not yet up.
 	 */
 	if (!wma_is_vdev_up(pe_session_entry->smeSessionId)) {
-		QDF_TRACE(QDF_MODULE_ID_PE,
-			  QDF_TRACE_LEVEL_ERROR,
-			  FL("session is not up yet. exiting timer callback"));
+		pe_err("session is not up yet. exiting timer callback");
 		return;
 	}
 
@@ -139,9 +135,7 @@ static void pe_reset_protection_callback(void *ptr)
 	       pe_session_entry->gLimOverlapNonGfParams.protectionEnabled << 3 |
 	       pe_session_entry->gLimOlbcParams.protectionEnabled         << 4;
 
-	QDF_TRACE(QDF_MODULE_ID_PE,
-		  QDF_TRACE_LEVEL_INFO,
-		  FL("old protection state: 0x%04X, new protection state: 0x%04X"),
+	pe_debug("old protection state: 0x%04X, new protection state: 0x%04X",
 		  pe_session_entry->old_protection_state,
 		  current_protection_state);
 
@@ -200,9 +194,7 @@ static void pe_reset_protection_callback(void *ptr)
 	if ((current_protection_state !=
 		pe_session_entry->old_protection_state) &&
 		(false == mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running)) {
-		QDF_TRACE(QDF_MODULE_ID_PE,
-			  QDF_TRACE_LEVEL_DEBUG,
-			  FL("protection changed, update beacon template"));
+		pe_debug("protection changed, update beacon template");
 		/* update beacon fix params and send update to FW */
 		qdf_mem_zero(&beacon_params, sizeof(tUpdateBeaconParams));
 		beacon_params.bssIdx = pe_session_entry->bssIdx;
@@ -241,9 +233,7 @@ static void pe_reset_protection_callback(void *ptr)
 				protection_fields_reset_timer,
 				SCH_PROTECTION_RESET_TIME)
 		!= QDF_STATUS_SUCCESS) {
-		QDF_TRACE(QDF_MODULE_ID_PE,
-			QDF_TRACE_LEVEL_ERROR,
-			FL("cannot create or start protectionFieldsResetTimer"));
+		pe_err("cannot create or start protectionFieldsResetTimer");
 	}
 }
 
@@ -267,13 +257,47 @@ tpPESession session, uint8_t session_id)
 			QDF_TIMER_TYPE_SW, lim_pmf_comeback_timer_callback,
 			(void *)&session->pmfComebackTimerInfo);
 	if (!QDF_IS_STATUS_SUCCESS(status))
-		lim_log(mac_ctx, LOGE, FL("cannot init pmf comeback timer."));
+		pe_err("cannot init pmf comeback timer");
 }
 #else
 static inline void
 pe_init_pmf_comeback_timer(tpAniSirGlobal mac_ctx,
 	tpPESession session, uint8_t session_id)
 {
+}
+#endif
+
+/**
+ * lim_get_peer_idxpool_size: get number of peer idx pool size
+ * @num_sta: Max number of STA
+ * @bss_type: BSS type
+ *
+ * The peer index start from 1 and thus index 0 is not used, so
+ * add 1 to the max sta. For STA if TDLS is enabled add 2 as
+ * index 1 is reserved for peer BSS.
+ *
+ * Return: number of peer idx pool size
+ */
+#ifdef FEATURE_WLAN_TDLS
+static inline uint8_t
+lim_get_peer_idxpool_size(uint16_t num_sta, tSirBssType bss_type)
+{
+	/*
+	 * In station role, index 1 is reserved for peer
+	 * corresponding to AP. For TDLS the index should
+	 * start from 2
+	 */
+	if (bss_type == eSIR_INFRASTRUCTURE_MODE)
+		return num_sta + 2;
+	else
+		return num_sta + 1;
+
+}
+#else
+static inline uint8_t
+lim_get_peer_idxpool_size(uint16_t num_sta, tSirBssType bss_type)
+{
+	return num_sta + 1;
 }
 #endif
 
@@ -306,8 +330,7 @@ pe_create_session(tpAniSirGlobal pMac, uint8_t *bssid, uint8_t *sessionId,
 	}
 
 	if (i == pMac->lim.maxBssId) {
-		lim_log(pMac, LOGE,
-			FL("Session can't be created. Reached max sessions"));
+		pe_err("Session can't be created. Reached max sessions");
 		return NULL;
 	}
 
@@ -317,26 +340,28 @@ pe_create_session(tpAniSirGlobal pMac, uint8_t *bssid, uint8_t *sessionId,
 	session_ptr->dph.dphHashTable.pHashTable =
 		qdf_mem_malloc(sizeof(tpDphHashNode) * (numSta + 1));
 	if (NULL == session_ptr->dph.dphHashTable.pHashTable) {
-		lim_log(pMac, LOGE, FL("memory allocate failed!"));
+		pe_err("memory allocate failed!");
 		return NULL;
 	}
 
 	session_ptr->dph.dphHashTable.pDphNodeArray =
 		qdf_mem_malloc(sizeof(tDphHashNode) * (numSta + 1));
 	if (NULL == session_ptr->dph.dphHashTable.pDphNodeArray) {
-		lim_log(pMac, LOGE, FL("memory allocate failed!"));
+		pe_err("memory allocate failed!");
 		qdf_mem_free(session_ptr->dph.dphHashTable.pHashTable);
 		session_ptr->dph.dphHashTable.
 		pHashTable = NULL;
 		return NULL;
 	}
 
+
 	session_ptr->dph.dphHashTable.size = numSta + 1;
 	dph_hash_table_class_init(pMac, &session_ptr->dph.dphHashTable);
 	session_ptr->gpLimPeerIdxpool = qdf_mem_malloc(
-		sizeof(*(session_ptr->gpLimPeerIdxpool)) * (numSta + 1));
+		sizeof(*(session_ptr->gpLimPeerIdxpool)) *
+		lim_get_peer_idxpool_size(numSta, bssType));
 	if (NULL == session_ptr->gpLimPeerIdxpool) {
-		lim_log(pMac, LOGE, FL("memory allocate failed!"));
+		pe_err("memory allocate failed!");
 		qdf_mem_free(session_ptr->dph.dphHashTable.pHashTable);
 		qdf_mem_free(session_ptr->dph.dphHashTable.pDphNodeArray);
 		session_ptr->dph.dphHashTable.pHashTable = NULL;
@@ -377,8 +402,7 @@ pe_create_session(tpAniSirGlobal pMac, uint8_t *bssid, uint8_t *sessionId,
 	session_ptr->fWaitForProbeRsp = 0;
 	session_ptr->fIgnoreCapsChange = 0;
 
-	QDF_TRACE(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
-		FL("Create a new PE session(%d), BSSID: "MAC_ADDRESS_STR" Max No. of STA %d"),
+	pe_debug("Create a new PE session: %d BSSID: "MAC_ADDRESS_STR" Max No of STA: %d",
 		*sessionId, MAC_ADDR_ARRAY(bssid), numSta);
 
 	if (eSIR_INFRA_AP_MODE == bssType || eSIR_IBSS_MODE == bssType) {
@@ -391,7 +415,7 @@ pe_create_session(tpAniSirGlobal pMac, uint8_t *bssid, uint8_t *sessionId,
 		if ((NULL == session_ptr->pSchProbeRspTemplate)
 		    || (NULL == session_ptr->pSchBeaconFrameBegin)
 		    || (NULL == session_ptr->pSchBeaconFrameEnd)) {
-			lim_log(pMac, LOGE, FL("memory allocate failed!"));
+			pe_err("memory allocate failed!");
 			qdf_mem_free(session_ptr->dph.dphHashTable.pHashTable);
 			qdf_mem_free(session_ptr->dph.dphHashTable.pDphNodeArray);
 			qdf_mem_free(session_ptr->gpLimPeerIdxpool);
@@ -427,8 +451,7 @@ pe_create_session(tpAniSirGlobal pMac, uint8_t *bssid, uint8_t *sessionId,
 				SCH_PROTECTION_RESET_TIME);
 		}
 		if (status != QDF_STATUS_SUCCESS)
-			QDF_TRACE(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_ERROR,
-				FL("cannot create or start protectionFieldsResetTimer"));
+			pe_err("cannot create or start protectionFieldsResetTimer");
 	}
 	pe_init_pmf_comeback_timer(pMac, session_ptr, *sessionId);
 
@@ -464,8 +487,8 @@ tpPESession pe_find_session_by_bssid(tpAniSirGlobal pMac, uint8_t *bssid,
 		}
 	}
 
-	lim_log(pMac, LOG4, FL("Session lookup fails for BSSID:"));
-	lim_print_mac_addr(pMac, bssid, LOG4);
+	pe_debug("Session lookup fails for BSSID:");
+	lim_print_mac_addr(pMac, bssid, LOGD);
 	return NULL;
 
 }
@@ -490,7 +513,7 @@ tpPESession pe_find_session_by_bss_idx(tpAniSirGlobal pMac, uint8_t bssIdx)
 			return &pMac->lim.gpSession[i];
 		}
 	}
-	lim_log(pMac, LOG4, FL("Session lookup fails for bssIdx: %d"), bssIdx);
+	pe_debug("Session lookup fails for bssIdx: %d", bssIdx);
 	return NULL;
 }
 
@@ -510,7 +533,7 @@ tpPESession pe_find_session_by_bss_idx(tpAniSirGlobal pMac, uint8_t bssIdx)
 tpPESession pe_find_session_by_session_id(tpAniSirGlobal pMac, uint8_t sessionId)
 {
 	if (sessionId >= pMac->lim.maxBssId) {
-		lim_log(pMac, LOGE, FL("Invalid sessionId: %d \n "), sessionId);
+		pe_err("Invalid sessionId: %d", sessionId);
 		return NULL;
 	}
 	if ((pMac->lim.gpSession[sessionId].valid == true)) {
@@ -555,8 +578,7 @@ pe_find_session_by_sta_id(tpAniSirGlobal mac_ctx,
 		}
 	}
 
-	lim_log(mac_ctx, LOG4,
-		FL("Session lookup fails for StaId: %d"), staid);
+	pe_debug("Session lookup fails for StaId: %d", staid);
 	return NULL;
 }
 
@@ -576,13 +598,11 @@ void pe_delete_session(tpAniSirGlobal mac_ctx, tpPESession session)
 	TX_TIMER *timer_ptr;
 
 	if (!session || (session && !session->valid)) {
-		QDF_TRACE(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
-			  FL("session is not valid"));
+		pe_err("session is not valid");
 		return;
 	}
 
-	QDF_TRACE(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
-		FL("Trying to delete PE session %d Opmode %d BssIdx %d BSSID: "MAC_ADDRESS_STR),
+	pe_debug("Trying to delete PE session: %d Opmode: %d BssIdx: %d BSSID: "MAC_ADDRESS_STR,
 		session->peSessionId, session->operMode,
 		session->bssIdx,
 		MAC_ADDR_ARRAY(session->bssId));
@@ -771,8 +791,8 @@ tpPESession pe_find_session_by_peer_sta(tpAniSirGlobal pMac, uint8_t *sa,
 		}
 	}
 
-	lim_log(pMac, LOG1, FL("Session lookup fails for Peer StaId:"));
-	lim_print_mac_addr(pMac, sa, LOG1);
+	pe_debug("Session lookup fails for Peer StaId:");
+	lim_print_mac_addr(pMac, sa, LOGD);
 	return NULL;
 }
 

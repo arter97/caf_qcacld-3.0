@@ -25,23 +25,20 @@
  * to the Linux Foundation.
  */
 
-/************************************************************************
-   smeTrace.c
-
-   \brief implementation for trace related APIs
-
-   \author Kiran Kumar Reddy CH L V
-
-   ========================================================================*/
+/*
+ * DOC: smeTrace.c
+ *  Implementation for trace related APIs
+ *
+ * Author Kiran Kumar Reddy CH L V
+ */
 #include "ani_global.h"          /* for tpAniSirGlobal */
-#include "sms_debug.h"
 #include "mac_trace.h"
 #include "sme_trace.h"
 #include "sme_internal.h"
 #ifndef SME_TRACE_RECORD
 void sme_trace_init(tpAniSirGlobal pMac)
 {
-	return;
+
 }
 #endif
 #ifdef SME_TRACE_RECORD
@@ -164,7 +161,6 @@ static uint8_t *sme_trace_get_rx_msg_string(uint32_t code)
 		CASE_RETURN_STRING(TRACE_CODE_SME_RX_HDD_PREF_NET_LIST);
 	default:
 		return "UNKNOWN";
-		break;
 	}
 }
 
@@ -204,7 +200,6 @@ static uint8_t *sme_trace_get_command_string(uint32_t command)
 		CASE_RETURN_STRING(eSmeCommandNdpDataEndInitiatorRequest);
 	default:
 		return "UNKNOWN";
-		break;
 	}
 }
 
@@ -245,6 +240,7 @@ static void sme_trace_dump(tpAniSirGlobal mac_ctx, tp_qdf_trace_record record,
 
 void sme_trace_init(tpAniSirGlobal pMac)
 {
-	qdf_trace_register(QDF_MODULE_ID_SME, (tp_qdf_trace_cb) &sme_trace_dump);
+	qdf_trace_register(QDF_MODULE_ID_SME, (tp_qdf_trace_cb)
+				&sme_trace_dump);
 }
 #endif

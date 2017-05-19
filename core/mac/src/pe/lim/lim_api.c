@@ -1031,8 +1031,7 @@ static QDF_STATUS pe_drop_pending_rx_mgmt_frames(tpAniSirGlobal mac_ctx,
 	if (mac_ctx->sys.sys_bbt_pending_mgmt_count >=
 	     MGMT_RX_PACKETS_THRESHOLD) {
 		qdf_spin_unlock(&mac_ctx->sys.bbt_mgmt_lock);
-		lim_log(mac_ctx, LOG1,
-			FL("No.of pending RX management frames reaches to threshold, dropping management frames"));
+		pe_debug("No.of pending RX management frames reaches to threshold, dropping management frames");
 		cds_pkt_return_packet(cds_pkt);
 		cds_pkt = NULL;
 		mac_ctx->rx_packet_drop_counter++;
@@ -1045,8 +1044,7 @@ static QDF_STATUS pe_drop_pending_rx_mgmt_frames(tpAniSirGlobal mac_ctx,
 		    hdr->fc.subType == SIR_MAC_MGMT_PROBE_RSP) {
 			qdf_spin_unlock(&mac_ctx->sys.bbt_mgmt_lock);
 			if (!(mac_ctx->rx_packet_drop_counter % 100))
-				lim_log(mac_ctx, LOG1,
-					FL("No.of pending RX mgmt frames reaches 1/2 thresh, dropping frame subtype: %d rx_packet_drop_counter: %d"),
+				pe_debug("No.of pending RX mgmt frames reaches 1/2 thresh, dropping frame subtype: %d rx_packet_drop_counter: %d",
 					hdr->fc.subType,
 					mac_ctx->rx_packet_drop_counter);
 			mac_ctx->rx_packet_drop_counter++;
@@ -1060,8 +1058,7 @@ static QDF_STATUS pe_drop_pending_rx_mgmt_frames(tpAniSirGlobal mac_ctx,
 	if (mac_ctx->sys.sys_bbt_pending_mgmt_count ==
 	    (MGMT_RX_PACKETS_THRESHOLD / 4)) {
 		if (!(mac_ctx->rx_packet_drop_counter % 100))
-			lim_log(mac_ctx, LOG1,
-				FL("No.of pending RX management frames reaches to 1/4th of threshold, rx_packet_drop_counter: %d"),
+			pe_debug("No.of pending RX management frames reaches to 1/4th of threshold, rx_packet_drop_counter: %d",
 				mac_ctx->rx_packet_drop_counter);
 			mac_ctx->rx_packet_drop_counter++;
 	}
@@ -1104,16 +1101,14 @@ static QDF_STATUS pe_handle_mgmt_frame(struct wlan_objmgr_psoc *psoc,
 
 	pVosPkt = qdf_mem_malloc(sizeof(*pVosPkt));
 	if (!pVosPkt) {
-		lim_log(pMac, LOGP,
-			FL("Failed to allocate rx packet"));
+		pe_err("Failed to allocate rx packet");
 		qdf_nbuf_free(buf);
 		return QDF_STATUS_E_NOMEM;
 	}
 
 	ret = wma_form_rx_packet(buf, mgmt_rx_params, pVosPkt);
 	if (ret) {
-		lim_log(pMac, LOGP,
-			FL("Failed to fill cds packet from event buffer"));
+		pe_err("Failed to fill cds packet from event buffer");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -1189,8 +1184,7 @@ void pe_register_mgmt_rx_frm_callback(tpAniSirGlobal mac_ctx)
 	status = wlan_mgmt_txrx_register_rx_cb(mac_ctx->psoc,
 					 WLAN_UMAC_COMP_MLME, &frm_cb_info, 1);
 	if (status != QDF_STATUS_SUCCESS)
-		lim_log(mac_ctx, LOGP,
-			FL("Registering the PE Handle with MGMT TXRX layer has failed"));
+		pe_err("Registering the PE Handle with MGMT TXRX layer has failed");
 
 	wma_register_mgmt_frm_client();
 }
@@ -1207,8 +1201,7 @@ void pe_deregister_mgmt_rx_frm_callback(tpAniSirGlobal mac_ctx)
 	status = wlan_mgmt_txrx_deregister_rx_cb(mac_ctx->psoc,
 					 WLAN_UMAC_COMP_MLME, &frm_cb_info, 1);
 	if (status != QDF_STATUS_SUCCESS)
-		lim_log(mac_ctx, LOGP,
-			FL("Deregistering the PE Handle with MGMT TXRX layer has failed"));
+		pe_err("Deregistering the PE Handle with MGMT TXRX layer has failed");
 
 	wma_de_register_mgmt_frm_client();
 }
@@ -1333,7 +1326,7 @@ lim_update_overlap_sta_param(tpAniSirGlobal pMac, tSirMacAddr bssId,
 	}
 
 	if (i == LIM_PROT_STA_OVERLAP_CACHE_SIZE) {
-		pe_warn("Overlap cache is full");
+		pe_debug("Overlap cache is full");
 	} else {
 		qdf_mem_copy(pMac->lim.protStaOverlapCache[i].addr,
 			     bssId, sizeof(tSirMacAddr));
@@ -2404,7 +2397,6 @@ QDF_STATUS lim_update_ext_cap_ie(tpAniSirGlobal mac_ctx,
 	uint32_t dot11mode;
 	bool vht_enabled = false;
 	tDot11fIEExtCap default_scan_ext_cap = {0}, driver_ext_cap = {0};
-	uint8_t ext_cap_ie_hdr[EXT_CAP_IE_HDR_LEN] = {0x7f, 0x9};
 	tSirRetStatus status;
 
 	status = lim_strip_extcap_update_struct(mac_ctx, ie_data,
@@ -2414,10 +2406,11 @@ QDF_STATUS lim_update_ext_cap_ie(tpAniSirGlobal mac_ctx,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	/* copy ie prior to ext cap to local buffer */
 	qdf_mem_copy(local_ie_buf, ie_data, (*local_ie_len));
-	qdf_mem_copy(local_ie_buf + (*local_ie_len),
-			ext_cap_ie_hdr, EXT_CAP_IE_HDR_LEN);
-	(*local_ie_len) += EXT_CAP_IE_HDR_LEN;
+
+	/* from here ext cap ie starts, set EID */
+	local_ie_buf[*local_ie_len] = DOT11F_EID_EXTCAP;
 
 	wlan_cfg_get_int(mac_ctx, WNI_CFG_DOT11_MODE, &dot11mode);
 	if (IS_DOT11_MODE_VHT(dot11mode))
@@ -2428,6 +2421,8 @@ QDF_STATUS lim_update_ext_cap_ie(tpAniSirGlobal mac_ctx,
 	if (eSIR_SUCCESS != status) {
 		pe_err("Failed %d to create ext cap IE. Use default value instead",
 				status);
+		local_ie_buf[*local_ie_len + 1] = DOT11F_IE_EXTCAP_MAX_LEN;
+		(*local_ie_len) += EXT_CAP_IE_HDR_LEN;
 		qdf_mem_copy(local_ie_buf + (*local_ie_len),
 				default_scan_ext_cap.bytes,
 				DOT11F_IE_EXTCAP_MAX_LEN);
@@ -2435,22 +2430,12 @@ QDF_STATUS lim_update_ext_cap_ie(tpAniSirGlobal mac_ctx,
 		return QDF_STATUS_SUCCESS;
 	}
 	lim_merge_extcap_struct(&driver_ext_cap, &default_scan_ext_cap, true);
-
+	local_ie_buf[*local_ie_len + 1] = driver_ext_cap.num_bytes;
+	(*local_ie_len) += EXT_CAP_IE_HDR_LEN;
 	qdf_mem_copy(local_ie_buf + (*local_ie_len),
 			driver_ext_cap.bytes, driver_ext_cap.num_bytes);
 	(*local_ie_len) += driver_ext_cap.num_bytes;
 	return QDF_STATUS_SUCCESS;
-}
-
-void lim_log(tpAniSirGlobal pMac, uint32_t loglevel, const char *pString, ...)
-{
-#ifdef WLAN_DEBUG
-	va_list marker;
-
-	va_start(marker, pString);
-	log_debug(pMac, SIR_LIM_MODULE_ID, loglevel, pString, marker);
-	va_end(marker);
-#endif
 }
 
 /**

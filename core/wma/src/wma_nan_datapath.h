@@ -27,6 +27,8 @@
 #ifndef __WMA_NAN_DATAPATH_H
 #define __WMA_NAN_DATAPATH_H
 
+#include <sir_common.h>
+#include <ani_global.h>
 #include "wma.h"
 #include "sir_api.h"
 #include "sme_nan_datapath.h"
@@ -37,8 +39,8 @@ QDF_STATUS wma_handle_ndp_responder_req(tp_wma_handle wma_handle,
 
 void wma_ndp_register_all_event_handlers(tp_wma_handle wma_handle);
 void wma_ndp_unregister_all_event_handlers(tp_wma_handle wma_handle);
-void wma_ndp_wow_event_callback(void *handle, void *event,
-				uint32_t len, uint32_t event_id);
+int wma_ndp_wow_event_callback(void *handle, void *event,
+			       uint32_t len, uint32_t event_id);
 
 QDF_STATUS wma_handle_ndp_initiator_req(tp_wma_handle wma_handle, void *req);
 QDF_STATUS wma_handle_ndp_end_req(tp_wma_handle wma_handle, void *req);
@@ -48,8 +50,11 @@ static inline void wma_ndp_register_all_event_handlers(
 					tp_wma_handle wma_handle) {}
 static inline void wma_ndp_unregister_all_event_handlers(
 					tp_wma_handle wma_handle) {}
-static inline void wma_ndp_wow_event_callback(void *handle, void *event,
-					uint32_t len, uint32_t event_id) {}
+static inline int wma_ndp_wow_event_callback(void *handle, void *event,
+					     uint32_t len, uint32_t event_id)
+{
+	return 0;
+}
 static inline QDF_STATUS wma_handle_ndp_initiator_req(tp_wma_handle wma_handle,
 						      void *req)
 {

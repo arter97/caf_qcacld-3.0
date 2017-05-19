@@ -1031,7 +1031,8 @@ void hdd_abort_mac_scan(hdd_context_t *pHddCtx, uint8_t sessionId,
 #ifndef NAPIER_SCAN
 	sme_abort_mac_scan(pHddCtx->hHal, sessionId, scan_id, reason);
 #else
-	wlan_abort_scan(pHddCtx->hdd_pdev, INVAL_PDEV_ID, sessionId, scan_id);
+	wlan_abort_scan(pHddCtx->hdd_pdev, INVAL_PDEV_ID,
+		sessionId, scan_id, false);
 #endif
 }
 /**
@@ -1279,7 +1280,6 @@ static QDF_STATUS hdd_cfg80211_scan_done_callback(tHalHandle halHandle,
 		hdd_vendor_scan_callback(pAdapter, req, aborted);
 
 allow_suspend:
-	qdf_runtime_pm_allow_suspend(hddctx->runtime_context.scan);
 	qdf_spin_lock(&hddctx->hdd_scan_req_q_lock);
 	size = qdf_list_size(&hddctx->hdd_scan_req_q);
 	if (!size) {
@@ -1539,16 +1539,13 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 		pAdapter->device_mode);
 
 	/*
-	 * IBSS vdev does not have peers on other macs,
-	 * so it does not support scan on other band,
-	 * and IBSS vdev does not need to scan to establish
+	 * IBSS vdev does not need to scan to establish
 	 * IBSS connection. If IBSS vdev need to support scan,
 	 * Firmware need to make the change to add self peer
 	 * per mac for IBSS vdev.
 	 */
-	if (policy_mgr_is_hw_dbs_capable(pHddCtx->hdd_psoc) &&
-	   (QDF_IBSS_MODE == pAdapter->device_mode)) {
-		hdd_err("Scan not supported for IBSS in if HW support DBS");
+	if (QDF_IBSS_MODE == pAdapter->device_mode) {
+		hdd_err("Scan not supported for IBSS");
 		return -EINVAL;
 	}
 
@@ -1898,7 +1895,6 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 	if (request->flags & NL80211_SCAN_FLAG_FLUSH)
 		sme_scan_flush_result(WLAN_HDD_GET_HAL_CTX(pAdapter));
 #endif
-	qdf_runtime_pm_prevent_suspend(pHddCtx->runtime_context.scan);
 	status = sme_scan_request(WLAN_HDD_GET_HAL_CTX(pAdapter),
 				pAdapter->sessionId, &scan_req,
 				&hdd_cfg80211_scan_done_callback, dev);
@@ -1913,8 +1909,6 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 		} else {
 			status = -EIO;
 		}
-
-		qdf_runtime_pm_allow_suspend(pHddCtx->runtime_context.scan);
 		hdd_allow_suspend(WIFI_POWER_EVENT_WAKELOCK_SCAN);
 		goto free_mem;
 	}
@@ -2437,10 +2431,8 @@ static int __wlan_hdd_vendor_abort_scan(
 					  cookie);
 		if (ret != 0)
 			return ret;
-		hdd_abort_mac_scan(hdd_ctx,
-				   HDD_SESSION_ID_INVALID,
-				   scan_id,
-				   eCSR_SCAN_ABORT_DEFAULT);
+		wlan_abort_scan(hdd_ctx->hdd_pdev, INVAL_PDEV_ID,
+				HDD_SESSION_ID_INVALID, scan_id, false);
 	}
 #else
 	wlan_vendor_abort_scan(hdd_ctx->hdd_pdev, data,
@@ -2487,23 +2479,12 @@ int wlan_hdd_scan_abort(hdd_adapter_t *pAdapter)
 {
 	hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
 	hdd_scaninfo_t *pScanInfo = NULL;
-	unsigned long rc;
 
 	pScanInfo = &pAdapter->scan_info;
 
-	if (pScanInfo->mScanPending) {
-		INIT_COMPLETION(pScanInfo->abortscan_event_var);
-		hdd_abort_mac_scan(pHddCtx, pAdapter->sessionId,
-				   INVALID_SCAN_ID, eCSR_SCAN_ABORT_DEFAULT);
-
-		rc = wait_for_completion_timeout(
-			&pScanInfo->abortscan_event_var,
-				msecs_to_jiffies(5000));
-		if (!rc) {
-			hdd_err("Timeout occurred while waiting for abort scan");
-			return -ETIME;
-		}
-	}
+	if (pScanInfo->mScanPending)
+		wlan_abort_scan(pHddCtx->hdd_pdev, INVAL_PDEV_ID,
+				pAdapter->sessionId, INVALID_SCAN_ID, true);
 	return 0;
 }
 

@@ -2762,7 +2762,7 @@ lim_send_tdls_comp_mgmt_rsp(tpAniSirGlobal mac_ctx, uint16_t msg_type,
 	struct scheduler_msg msg = {0};
 	tSirSmeRsp *sme_rsp;
 
-	lim_log(mac_ctx, LOG1, FL("Sending message %s with reasonCode %s"),
+	pe_debug("Sending message %s with reasonCode %s",
 		lim_msg_str(msg_type), lim_result_code_str(result_code));
 
 	sme_rsp = qdf_mem_malloc(sizeof(tSirSmeRsp));
@@ -3292,8 +3292,7 @@ static void lim_check_aid_and_delete_peer(tpAniSirGlobal p_mac,
 			if (NULL == stads)
 				goto skip;
 
-			lim_log(p_mac, LOG1,
-				FL("Deleting "MAC_ADDRESS_STR),
+			pe_debug("Deleting "MAC_ADDRESS_STR,
 				MAC_ADDR_ARRAY(stads->staAddr));
 
 			lim_send_deauth_mgmt_frame(p_mac,
@@ -3319,6 +3318,7 @@ skip:
 	}
 }
 
+#ifndef CONVERGED_TDLS_ENABLE
 /**
  * lim_delete_tdls_peers() - delete tdls peers
  *
@@ -3332,18 +3332,71 @@ skip:
 tSirRetStatus lim_delete_tdls_peers(tpAniSirGlobal mac_ctx,
 				    tpPESession session_entry)
 {
+	cds_msg_t msg;
+	struct sir_tdls_notify_set_state_disable *tdls_state_disable;
+
+	pe_debug("Enter");
+
 	if (NULL == session_entry) {
-		lim_log(mac_ctx, LOGE, FL("NULL session_entry"));
+		pe_err("NULL session_entry");
 		return eSIR_FAILURE;
 	}
 
 	lim_check_aid_and_delete_peer(mac_ctx, session_entry);
 	if (lim_is_roam_synch_in_progress(session_entry))
 		return eSIR_SUCCESS;
-	lim_send_sme_tdls_delete_all_peer_ind(mac_ctx, session_entry);
 
+	if (mac_ctx->lim.sme_msg_callback) {
+		tdls_state_disable = qdf_mem_malloc(
+						sizeof(*tdls_state_disable));
+		if (NULL == tdls_state_disable) {
+			pe_err("memory allocation failed");
+			return eSIR_FAILURE;
+		}
+		tdls_state_disable->session_id = session_entry->smeSessionId;
+		msg.type = eWNI_SME_TDLS_NOTIFY_SET_STATE_DISABLE;
+		msg.bodyptr = tdls_state_disable;
+		msg.bodyval = 0;
+		mac_ctx->lim.sme_msg_callback(mac_ctx, &msg);
+	}
+
+	lim_send_sme_tdls_delete_all_peer_ind(mac_ctx, session_entry);
+	pe_debug("Exit");
 	return eSIR_SUCCESS;
 }
+#else
+/**
+ * lim_delete_tdls_peers() - delete tdls peers
+ *
+ * @mac_ctx - global MAC context
+ * @session_entry - PE session entry
+ *
+ * Delete all the TDLS peer connected before leaving the BSS
+ *
+ * Return: eSIR_SUCCESS on success, error code otherwise
+ */
+tSirRetStatus lim_delete_tdls_peers(tpAniSirGlobal mac_ctx,
+				    tpPESession session_entry)
+{
+	pe_debug("Enter");
+
+	if (NULL == session_entry) {
+		pe_err("NULL session_entry");
+		return eSIR_FAILURE;
+	}
+
+	lim_check_aid_and_delete_peer(mac_ctx, session_entry);
+
+	if (lim_is_roam_synch_in_progress(session_entry))
+		return eSIR_SUCCESS;
+
+	tgt_tdls_peers_deleted_notification(mac_ctx->psoc,
+					    session_entry->smeSessionId);
+
+	pe_debug("Exit");
+	return eSIR_SUCCESS;
+}
+#endif
 
 /**
  * lim_process_sme_del_all_tdls_peers(): process delete tdls peers
@@ -3363,14 +3416,14 @@ tSirRetStatus lim_process_sme_del_all_tdls_peers(tpAniSirGlobal p_mac,
 
 	msg = (struct sir_del_all_tdls_peers *)msg_buf;
 	if (msg == NULL) {
-		lim_log(p_mac, LOGE, FL("NULL msg"));
+		pe_err("NULL msg");
 		return eSIR_FAILURE;
 	}
 
 	session_entry = pe_find_session_by_bssid(p_mac,
 						 msg->bssid.bytes, &session_id);
 	if (NULL == session_entry) {
-		lim_log(p_mac, LOGE, FL("NULL psessionEntry"));
+		pe_err("NULL psessionEntry");
 		return eSIR_FAILURE;
 	}
 

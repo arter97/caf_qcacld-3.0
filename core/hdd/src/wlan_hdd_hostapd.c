@@ -1574,6 +1574,12 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 				pSapEvent->sapevt.
 				sapStationAssocReassocCompleteEvent.
 				chan_info.rate_flags;
+			pHostapdAdapter->aStaInfo[staId].staType =
+				pSapEvent->sapevt.
+				sapStationAssocReassocCompleteEvent.
+				staType;
+			hdd_debug("hdd_hostapd_sap_event_cb, StaID: %d, StaType: %d",
+			      staId, pHostapdAdapter->aStaInfo[staId].staType);
 		}
 
 		if (hdd_ipa_is_enabled(pHddCtx)) {
@@ -1669,9 +1675,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 		pScanInfo = &pHostapdAdapter->scan_info;
 		/* Lets abort scan to ensure smooth authentication for client */
 		if ((pScanInfo != NULL) && pScanInfo->mScanPending) {
-			hdd_abort_mac_scan(pHddCtx, pHostapdAdapter->sessionId,
-					   INVALID_SCAN_ID,
-					   eCSR_SCAN_ABORT_DEFAULT);
+			wlan_abort_scan(pHddCtx->hdd_pdev, INVAL_PDEV_ID,
+				pHostapdAdapter->sessionId, INVALID_SCAN_ID, false);
 		}
 		if (pHostapdAdapter->device_mode == QDF_P2P_GO_MODE) {
 			/* send peer status indication to oem app */
@@ -1692,7 +1697,9 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 			pHostapdAdapter->hdd_vdev,
 			pHostapdAdapter->device_mode,
 			pSapEvent->sapevt.sapStationAssocReassocCompleteEvent.
-				staMac.bytes);
+			staMac.bytes,
+			(pHostapdAdapter->aStaInfo[staId].staType
+							== eSTA_TYPE_P2P_CLI));
 		if (ret)
 			hdd_err("Peer object "MAC_ADDRESS_STR" add fails!",
 					MAC_ADDR_ARRAY(pSapEvent->sapevt.
@@ -7279,14 +7286,23 @@ static int wlan_hdd_setup_driver_overrides(hdd_adapter_t *ap_adapter)
 		if (sap_cfg->SapHw_mode == eCSR_DOT11_MODE_11n)
 			sap_cfg->SapHw_mode = eCSR_DOT11_MODE_11ac;
 
-		if (sap_cfg->channel >= 36)
+		if (sap_cfg->channel >= 36) {
 			sap_cfg->ch_width_orig =
 					hdd_ctx->config->vhtChannelWidth;
-		else
-			sap_cfg->ch_width_orig =
-				hdd_ctx->config->nChannelBondingMode24GHz ?
-				eHT_CHANNEL_WIDTH_40MHZ :
-				eHT_CHANNEL_WIDTH_20MHZ;
+		} else {
+			/*
+			 * Allow 40 Mhz in 2.4 Ghz only if indicated by
+			 * supplicant after OBSS scan and if 2.4 Ghz channel
+			 * bonding is set in INI
+			 */
+			if (sap_cfg->ch_width_orig >= eHT_CHANNEL_WIDTH_40MHZ &&
+			   hdd_ctx->config->nChannelBondingMode24GHz)
+				sap_cfg->ch_width_orig =
+					eHT_CHANNEL_WIDTH_40MHZ;
+			else
+				sap_cfg->ch_width_orig =
+					eHT_CHANNEL_WIDTH_20MHZ;
+		}
 	}
 	sap_cfg->ch_params.ch_width = sap_cfg->ch_width_orig;
 	wlan_reg_set_channel_params(hdd_ctx->hdd_pdev, sap_cfg->channel,
@@ -8025,7 +8041,6 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	tSirUpdateIE updateIE;
 	beacon_data_t *old;
 	int ret;
-	unsigned long rc;
 	hdd_adapter_list_node_t *pAdapterNode = NULL;
 	hdd_adapter_list_node_t *pNext = NULL;
 
@@ -8084,19 +8099,8 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 			if (pScanInfo && pScanInfo->mScanPending) {
 				hdd_debug("Aborting pending scan for device mode:%d",
 				       staAdapter->device_mode);
-				INIT_COMPLETION(pScanInfo->abortscan_event_var);
-				hdd_abort_mac_scan(staAdapter->pHddCtx,
-						   staAdapter->sessionId,
-						   INVALID_SCAN_ID,
-						   eCSR_SCAN_ABORT_DEFAULT);
-				rc = wait_for_completion_timeout(
-					&pScanInfo->abortscan_event_var,
-					msecs_to_jiffies(
-						WLAN_WAIT_TIME_ABORTSCAN));
-				if (!rc) {
-					hdd_err("Timeout occurred while waiting for abortscan");
-					QDF_ASSERT(pScanInfo->mScanPending);
-				}
+				wlan_abort_scan(pHddCtx->hdd_pdev, INVAL_PDEV_ID,
+					staAdapter->sessionId, INVALID_SCAN_ID, true);
 			}
 		}
 

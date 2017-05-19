@@ -1796,7 +1796,8 @@ static void ol_txrx_pdev_pre_detach(struct cdp_pdev *ppdev, int force)
 		 * been given to the target to transmit, for which the
 		 * target has never provided a response.
 		 */
-		if (qdf_atomic_read(&tx_desc->ref_cnt)) {
+		if (qdf_atomic_read(&tx_desc->ref_cnt) &&
+				tx_desc->vdev_id != OL_TXRX_INVALID_VDEV_ID) {
 			ol_txrx_dbg(
 				   "Warning: freeing tx frame (no compltn)\n");
 			ol_tx_desc_frame_free_nonstd(pdev,
@@ -5045,14 +5046,17 @@ ol_txrx_fwd_desc_thresh_check(struct ol_txrx_vdev_t *vdev)
 	bool enough_desc_flag;
 
 	if (!vdev)
-		return true;
+		return false;
 
 	pool = vdev->pool;
 
+	if (!pool)
+		return false;
+
 	qdf_spin_lock_bh(&pool->flow_pool_lock);
 	enough_desc_flag = (pool->avail_desc < (pool->stop_th +
-						OL_TX_NON_FWD_RESERVE))
-			   ? false : true;
+				OL_TX_NON_FWD_RESERVE))
+		? false : true;
 	qdf_spin_unlock_bh(&pool->flow_pool_lock);
 	return enough_desc_flag;
 }

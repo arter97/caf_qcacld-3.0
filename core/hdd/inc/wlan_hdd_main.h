@@ -197,7 +197,7 @@
 #define hdd_notice(format, args...) \
 		hdd_logfl(QDF_TRACE_LEVEL_INFO, format, ## args)
 #define hdd_info(format, args...) \
-		hdd_logfl(QDF_TRACE_LEVEL_INFO_HIGH, format, ## args)
+		hdd_logfl(QDF_TRACE_LEVEL_INFO, format, ## args)
 #define hdd_debug(format, args...) \
 		hdd_logfl(QDF_TRACE_LEVEL_DEBUG, format, ## args)
 
@@ -713,6 +713,9 @@ typedef struct {
 	 */
 	uint8_t ucSTAId;
 
+	/* type of station i.e. p2p client or infrastructure station */
+	eStationType staType;
+
 	/** MAC address of the station */
 	struct qdf_mac_addr macAddrSTA;
 
@@ -866,7 +869,6 @@ struct hdd_chan_change_params {
  * Prevent Runtime PM for scan
  */
 struct hdd_runtime_pm_context {
-	qdf_runtime_lock_t scan;
 	qdf_runtime_lock_t roc;
 	qdf_runtime_lock_t dfs;
 };
@@ -1605,6 +1607,7 @@ struct hdd_context_s {
 	/* tdls source timer to enable/disable TDLS on p2p listen */
 	qdf_mc_timer_t tdls_source_timer;
 	bool tdls_umac_comp_active;
+	bool tdls_nap_active;
 	uint8_t beacon_probe_rsp_cnt_per_scan;
 	uint8_t last_scan_reject_session_id;
 	enum scan_reject_states last_scan_reject_reason;
@@ -1617,12 +1620,14 @@ struct hdd_context_s {
  * struct hdd_vendor_acs_chan_params - vendor acs channel parameters
  * @channel_count: channel count
  * @channel_list: pointer to channel list
+ * @pcl_count: pcl list count
  * @vendor_pcl_list: pointer to pcl list
  * @vendor_weight_list: pointer to pcl weight list
  */
 struct hdd_vendor_acs_chan_params {
 	uint32_t channel_count;
 	uint8_t *channel_list;
+	uint32_t pcl_count;
 	uint8_t *vendor_pcl_list;
 	uint8_t *vendor_weight_list;
 };
@@ -2247,6 +2252,7 @@ bool hdd_set_connection_in_progress(bool value);
  * @ap_adapter: adapter
  * @channel_count: valid channel count
  * @channel_list: valid channel list
+ * @band: frequency band
  *
  * This API returns valid channel list for SAP after removing nol and
  * channel which lies outside of configuration.
@@ -2255,7 +2261,8 @@ bool hdd_set_connection_in_progress(bool value);
  */
 int wlan_hdd_sap_get_valid_channellist(hdd_adapter_t *adapter,
 				       uint32_t *channel_count,
-				       uint8_t *channel_list);
+				       uint8_t *channel_list,
+				       eCsrBand band);
 /**
  * wlan_hdd_init_chan_info() - initialize channel info variables
  * @hdd_ctx: hdd ctx

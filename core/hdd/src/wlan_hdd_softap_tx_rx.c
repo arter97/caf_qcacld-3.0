@@ -47,6 +47,7 @@
 #include <cdp_txrx_flow_ctrl_v2.h>
 #include <cdp_txrx_handle.h>
 #include <wlan_hdd_object_manager.h>
+#include "wlan_p2p_ucfg_api.h"
 #ifdef IPA_OFFLOAD
 #include <wlan_hdd_ipa.h>
 #endif
@@ -759,7 +760,7 @@ QDF_STATUS hdd_softap_rx_packet_cbk(void *context, qdf_nbuf_t rxBuf)
 		/* Remove SKB from internal tracking table before submitting
 		 * it to stack
 		 */
-		qdf_net_buf_debug_release_skb(rxBuf);
+		qdf_net_buf_debug_release_skb(skb);
 		if (hdd_napi_enabled(HDD_NAPI_ANY) &&
 			!pHddCtx->enableRxThread)
 			rxstat = netif_receive_skb(skb);
@@ -1067,6 +1068,7 @@ QDF_STATUS hdd_softap_change_sta_state(hdd_adapter_t *pAdapter,
 	if (QDF_STATUS_SUCCESS == qdf_status) {
 		pAdapter->aStaInfo[ucSTAId].tlSTAState =
 			OL_TXRX_PEER_STATE_AUTH;
+		p2p_peer_authorized(pAdapter->hdd_vdev, pDestMacAddress->bytes);
 	}
 
 	EXIT();

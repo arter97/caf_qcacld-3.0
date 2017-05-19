@@ -82,7 +82,11 @@
 #include "cds_utils.h"
 
 /* Preprocessor definitions and constants */
+#ifdef QCA_WIFI_NAPIER_EMULATION
+#define HDD_SSR_BRING_UP_TIME 3000000
+#else
 #define HDD_SSR_BRING_UP_TIME 30000
+#endif
 #define HDD_WAKE_LOCK_RESUME_DURATION 1000
 
 /* Type declarations */
@@ -1832,23 +1836,9 @@ next_adapter:
 			return -EAGAIN;
 		}
 
-		if (pScanInfo->mScanPending) {
-			INIT_COMPLETION(pScanInfo->abortscan_event_var);
-			hdd_abort_mac_scan(pHddCtx, pAdapter->sessionId,
-					   INVALID_SCAN_ID,
-					   eCSR_SCAN_ABORT_DEFAULT);
-
-			status =
-				wait_for_completion_timeout(&pScanInfo->
-				    abortscan_event_var,
-				    msecs_to_jiffies(WLAN_WAIT_TIME_ABORTSCAN));
-			if (!status) {
-				hdd_err("Timeout occurred while waiting for abort scan");
-				wlan_hdd_inc_suspend_stats(pHddCtx,
-							   SUSPEND_FAIL_SCAN);
-				return -ETIME;
-			}
-		}
+		if (pScanInfo->mScanPending)
+			wlan_abort_scan(pHddCtx->hdd_pdev, INVAL_PDEV_ID,
+				pAdapter->sessionId, INVALID_SCAN_ID, true);
 		status = hdd_get_next_adapter(pHddCtx, pAdapterNode, &pNext);
 		pAdapterNode = pNext;
 	}
@@ -2176,10 +2166,12 @@ int wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
  */
 static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 				  struct wireless_dev *wdev,
-				  int *dbm, hdd_adapter_t *adapter)
+				  int *dbm)
 {
 
 	hdd_context_t *pHddCtx = (hdd_context_t *) wiphy_priv(wiphy);
+	struct net_device *ndev = wdev->netdev;
+	hdd_adapter_t *adapter = WLAN_HDD_GET_PRIV_PTR(ndev);
 	int status;
 
 	ENTER();
@@ -2198,7 +2190,7 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 	/* Validate adapter sessionId */
 	if (wlan_hdd_validate_session_id(adapter->sessionId)) {
 		hdd_err("invalid session id: %d", adapter->sessionId);
-		return -ENOTSUPP;
+		return -EINVAL;
 	}
 
 	mutex_lock(&pHddCtx->iface_change_lock);
@@ -2237,15 +2229,10 @@ int wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 					 struct wireless_dev *wdev,
 					 int *dbm)
 {
-	int ret = -ENOTSUPP;
-	struct net_device *ndev = wdev->netdev;
-	hdd_adapter_t *adapter = WLAN_HDD_GET_PRIV_PTR(ndev);
+	int ret;
 
 	cds_ssr_protect(__func__);
-	if (adapter->sessionId != HDD_SESSION_ID_INVALID)
-		ret = __wlan_hdd_cfg80211_get_txpower(wiphy,
-						wdev,
-						dbm, adapter);
+	ret = __wlan_hdd_cfg80211_get_txpower(wiphy, wdev, dbm);
 	cds_ssr_unprotect(__func__);
 
 	return ret;

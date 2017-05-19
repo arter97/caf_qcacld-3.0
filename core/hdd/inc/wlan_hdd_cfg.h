@@ -5592,29 +5592,6 @@ enum hdd_link_speed_rpt_type {
 
 /*
  * <ini>
- * gEnableRXLDPC - Enables/disables Rx LDPC capability in STA mode
- * @Min: 0
- * @Max: 1
- * @Default: 0
- *
- * This ini is used to set default Rx LDPC capability
- *
- * Related: None
- *
- * Supported Feature: STA
- *
- * Usage: Internal/External
- *
- * </ini>
- */
-
-#define CFG_ENABLE_RX_LDPC                       "gEnableRXLDPC"
-#define CFG_ENABLE_RX_LDPC_MIN                   (0)
-#define CFG_ENABLE_RX_LDPC_MAX                   (1)
-#define CFG_ENABLE_RX_LDPC_DEFAULT               (0)
-
-/*
- * <ini>
  * gMaxHTMCSForTxData - max HT mcs for TX
  * @Min: 0
  * @Max: 383
@@ -6268,16 +6245,54 @@ enum hdd_link_speed_rpt_type {
 #define CFG_ENABLE_LPWR_IMG_TRANSITION_MAX         (1)
 #define CFG_ENABLE_LPWR_IMG_TRANSITION_DEFAULT     (0)
 
-/* Config Param to enable the txLdpc capability
+/*
+ * <ini>
+ * gTxLdpcEnable - Config Param to enable Tx LDPC capability
+ * @Min: 0
+ * @Max: 3
+ * @Default: 3
+ *
+ * This ini is used to enable/disable Tx LDPC capability
  * 0 - disable
  * 1 - HT LDPC enable
  * 2 - VHT LDPC enable
  * 3 - HT & VHT LDPC enable
+ *
+ * Related: STA/SAP/P2P/IBSS/NAN.
+ *
+ * Supported Feature: Concurrency/Standalone
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
  */
 #define CFG_TX_LDPC_ENABLE_FEATURE         "gTxLdpcEnable"
 #define CFG_TX_LDPC_ENABLE_FEATURE_MIN     (0)
 #define CFG_TX_LDPC_ENABLE_FEATURE_MAX     (3)
 #define CFG_TX_LDPC_ENABLE_FEATURE_DEFAULT (3)
+
+/*
+ * <ini>
+ * gEnableRXLDPC - Config Param to enable Rx LDPC capability
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable/disable Rx LDPC capability
+ *
+ * Related: STA/SAP/P2P/IBSS/NAN.
+ *
+ * Supported Feature: Concurrency/Standalone
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+
+#define CFG_ENABLE_RX_LDPC                       "gEnableRXLDPC"
+#define CFG_ENABLE_RX_LDPC_MIN                   (0)
+#define CFG_ENABLE_RX_LDPC_MAX                   (1)
+#define CFG_ENABLE_RX_LDPC_DEFAULT               (0)
 
 /*
  * <ini>
@@ -9642,7 +9657,7 @@ enum hdd_wext_control {
  * g_enable_bcast_probe_rsp - Enable Broadcast probe response.
  * @Min: 0
  * @Max: 1
- * @Default: 0
+ * @Default: 1
  *
  * This ini is used to enable/disable broadcast probe response
  *
@@ -9657,7 +9672,7 @@ enum hdd_wext_control {
 #define CFG_ENABLE_BCAST_PROBE_RESP_NAME    "g_enable_bcast_probe_rsp"
 #define CFG_ENABLE_BCAST_PROBE_RESP_MIN     (0)
 #define CFG_ENABLE_BCAST_PROBE_RESP_MAX     (1)
-#define CFG_ENABLE_BCAST_PROBE_RESP_DEFAULT (0)
+#define CFG_ENABLE_BCAST_PROBE_RESP_DEFAULT (1)
 
 /**
  * arp_ac_category - ARP access category
@@ -9848,7 +9863,7 @@ enum l1ss_sleep_allowed {
  * g_qcn_ie_support - QCN IE Support
  * @Min: 0 (disabled)
  * @Max: 1 (enabled)
- * @Default: 0 (disabled)
+ * @Default: 1 (enabled)
  *
  * This config item is used to support QCN IE in probe/assoc/reassoc request
  * for STA mode. QCN IE support is not added for SAP mode.
@@ -9864,7 +9879,7 @@ enum l1ss_sleep_allowed {
 #define CFG_QCN_IE_SUPPORT_NAME    "g_qcn_ie_support"
 #define CFG_QCN_IE_SUPPORT_MIN      0
 #define CFG_QCN_IE_SUPPORT_MAX      1
-#define CFG_QCN_IE_SUPPORT_DEFAULT  0
+#define CFG_QCN_IE_SUPPORT_DEFAULT  1
 
 /* enable_reg_offload - enable regulatory offload
  * @Min: 0
@@ -9907,6 +9922,85 @@ enum l1ss_sleep_allowed {
 #define CFG_FILS_MAX_CHAN_GUARD_TIME_MIN     (0)
 #define CFG_FILS_MAX_CHAN_GUARD_TIME_MAX     (10)
 #define CFG_FILS_MAX_CHAN_GUARD_TIME_DEFAULT (0)
+
+/*
+ * enum hdd_external_acs_policy - External ACS policy
+ * @HDD_EXTERNAL_ACS_PCL_PREFERRED -Preferable for ACS to select a
+ *	channel with non-zero pcl weight.
+ * @HDD_EXTERNAL_ACS_PCL_MANDATORY -Mandatory for ACS to select a
+ *	channel with non-zero pcl weight.
+ *
+ * enum hdd_external_acs_policy is used to select the ACS policy.
+ *
+ */
+enum hdd_external_acs_policy {
+	HDD_EXTERNAL_ACS_PCL_PREFERRED = 0,
+	HDD_EXTERNAL_ACS_PCL_MANDATORY = 1,
+};
+
+/*
+ * <ini>
+ * external_acs_policy - External ACS policy control
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * Values are per enum hdd_external_acs_policy.
+ *
+ * This ini is used to control the external ACS policy.
+ *
+ * Related: None
+ *
+ * Supported Feature: ACS
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+#define CFG_EXTERNAL_ACS_POLICY         "acs_policy"
+#define CFG_EXTERNAL_ACS_POLICY_MIN     (HDD_EXTERNAL_ACS_PCL_PREFERRED)
+#define CFG_EXTERNAL_ACS_POLICY_MAX     (HDD_EXTERNAL_ACS_PCL_MANDATORY)
+#define CFG_EXTERNAL_ACS_POLICY_DEFAULT (HDD_EXTERNAL_ACS_PCL_PREFERRED)
+
+/*
+ * enum hdd_external_acs_policyl - Preferred freq band for external ACS
+ * @HDD_EXTERNAL_ACS_FREQ_BAND_24GHZ -2.4GHz band
+ * @HDD_EXTERNAL_ACS_FREQ_BAND_5GHZ -5GHz band
+ *
+ * enum hdd_external_acs_freq_band is used to select the freq band for ACS.
+ *
+ */
+enum hdd_external_acs_freq_band {
+	HDD_EXTERNAL_ACS_FREQ_BAND_24GHZ = 0,
+	HDD_EXTERNAL_ACS_FREQ_BAND_5GHZ = 1,
+};
+
+/*
+ * <ini>
+ * external_acs_freq_band - External ACS freq band
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * Values are per enum hdd_external_acs_freq_band.
+ *
+ * This ini is used to select the ACS freq band. Currently
+ * the external ACS module doesn't support channels from
+ * both the bands. Once multiple band support is added in
+ * ICM, this ini can be removed
+ *
+ * Related: None
+ *
+ * Supported Feature: ACS
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+#define CFG_EXTERNAL_ACS_FREQ_BAND          "acs_freq_band"
+#define CFG_EXTERNAL_ACS_FREQ_BAND_MIN      (HDD_EXTERNAL_ACS_FREQ_BAND_24GHZ)
+#define CFG_EXTERNAL_ACS_FREQ_BAND_MAX      (HDD_EXTERNAL_ACS_FREQ_BAND_5GHZ)
+#define CFG_EXTERNAL_ACS_FREQ_BAND_DEFAULT  (HDD_EXTERNAL_ACS_FREQ_BAND_24GHZ)
 
 /*
  * Type declarations
@@ -10235,7 +10329,8 @@ struct hdd_config {
 	bool ignoreDynamicDtimInP2pMode;
 	bool enableRxSTBC;
 	bool enableTxSTBC;
-	bool enableRxLDPC;
+	uint8_t enable_tx_ldpc;
+	uint8_t enable_rx_ldpc;
 	bool enable5gEBT;
 #ifdef FEATURE_WLAN_TDLS
 	bool fEnableTDLSSupport;
@@ -10268,7 +10363,6 @@ struct hdd_config {
 #endif
 	uint32_t enableLpwrImgTransition;
 	uint8_t scanAgingTimeout;
-	bool enableTxLdpc;
 	uint8_t disableLDPCWithTxbfAP;
 	uint8_t enableMCCAdaptiveScheduler;
 	bool sapAllowAllChannel;
@@ -10632,6 +10726,8 @@ struct hdd_config {
 	bool qcn_ie_support;
 	bool reg_offload_enabled;
 	uint8_t fils_max_chan_guard_time;
+	enum hdd_external_acs_policy external_acs_policy;
+	enum hdd_external_acs_freq_band external_acs_freq_band;
 };
 
 #define VAR_OFFSET(_Struct, _Var) (offsetof(_Struct, _Var))

@@ -59,6 +59,7 @@
 #include <cdp_txrx_flow_ctrl_legacy.h>
 #include <cdp_txrx_peer_ops.h>
 #include <cdp_txrx_misc.h>
+#include <cdp_txrx_ctrl.h>
 #include <wlan_logging_sock_svc.h>
 #include <wlan_hdd_object_manager.h>
 #include <cdp_txrx_handle.h>
@@ -1276,7 +1277,8 @@ static void hdd_send_association_event(struct net_device *dev,
 
 		ret = hdd_objmgr_add_peer_object(pAdapter->hdd_vdev,
 						 pAdapter->device_mode,
-						 peerMacAddr.bytes);
+						 peerMacAddr.bytes,
+						 false);
 		if (ret)
 			hdd_err("Peer object "MAC_ADDRESS_STR" add fails!",
 					MAC_ADDR_ARRAY(peerMacAddr.bytes));
@@ -1326,7 +1328,8 @@ static void hdd_send_association_event(struct net_device *dev,
 
 		ret = hdd_objmgr_add_peer_object(pAdapter->hdd_vdev,
 						 QDF_IBSS_MODE,
-						 pCsrRoamInfo->bssid.bytes);
+						 pCsrRoamInfo->bssid.bytes,
+						 false);
 		if (ret)
 			hdd_err("Peer object "MAC_ADDRESS_STR" add fails!",
 				MAC_ADDR_ARRAY(pCsrRoamInfo->bssid.bytes));
@@ -1839,6 +1842,46 @@ QDF_STATUS hdd_change_peer_state(hdd_adapter_t *pAdapter,
 		}
 	}
 	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * hdd_update_dp_vdev_flags() - update datapath vdev flags
+ * @cbk_data: callback data
+ * @sta_id: station id
+ * @vdev_param: vdev parameter
+ * @is_link_up: link state up or down
+ *
+ * Return: QDF status
+ */
+QDF_STATUS hdd_update_dp_vdev_flags(void *cbk_data,
+				    uint8_t sta_id,
+				    uint32_t vdev_param,
+				    bool is_link_up)
+{
+	struct cdp_vdev *data_vdev;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	hdd_context_t *hdd_ctx;
+	struct wlan_objmgr_psoc **psoc;
+
+	if (!cbk_data)
+		return status;
+
+	psoc = cbk_data;
+	hdd_ctx = container_of(psoc, hdd_context_t, hdd_psoc);
+
+	if (!hdd_ctx->tdls_nap_active)
+		return status;
+
+	data_vdev = cdp_peer_get_vdev_by_sta_id(soc, sta_id);
+	if (NULL == data_vdev) {
+		status = QDF_STATUS_E_FAILURE;
+		return status;
+	}
+
+	cdp_txrx_set_vdev_param(soc, data_vdev, vdev_param, is_link_up);
+
+	return status;
 }
 
 /**
@@ -2394,6 +2437,7 @@ static QDF_STATUS hdd_association_completion_handler(hdd_adapter_t *pAdapter,
 	bool hddDisconInProgress = false;
 	unsigned long rc;
 	tSirResultCodes timeout_reason = 0;
+	bool ok;
 
 	if (!pHddCtx) {
 		hdd_err("HDD context is NULL");
@@ -2512,6 +2556,31 @@ static QDF_STATUS hdd_association_completion_handler(hdd_adapter_t *pAdapter,
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
 		wlan_hdd_auto_shutdown_enable(pHddCtx, false);
 #endif
+
+		hdd_debug("check if STA chan ok for DNBS");
+		if (policy_mgr_is_chan_ok_for_dnbs(pHddCtx->hdd_psoc,
+					pHddStaCtx->conn_info.operationChannel,
+					&ok)) {
+			hdd_err("Unable to check DNBS eligibility for chan:%d",
+					pHddStaCtx->conn_info.operationChannel);
+			return QDF_STATUS_E_FAILURE;
+		}
+
+		if (!ok) {
+			hdd_err("Chan:%d not suitable for DNBS",
+				pHddStaCtx->conn_info.operationChannel);
+			wlan_hdd_netif_queue_control(pAdapter,
+				WLAN_NETIF_CARRIER_OFF,
+				WLAN_CONTROL_PATH);
+			if (!hddDisconInProgress) {
+				hdd_err("Disconnecting...");
+				sme_roam_disconnect(
+					WLAN_HDD_GET_HAL_CTX(pAdapter),
+					pAdapter->sessionId,
+					eCSR_DISCONNECT_REASON_UNSPECIFIED);
+			}
+			return QDF_STATUS_E_FAILURE;
+		}
 
 		hdd_debug("check for SAP restart");
 		policy_mgr_check_concurrent_intf_and_restart_sap(
@@ -3882,6 +3951,14 @@ hdd_roam_tdls_status_update_handler(hdd_adapter_t *pAdapter,
 		curr_peer =
 			wlan_hdd_tdls_find_peer(pAdapter,
 						pRoamInfo->peerMac.bytes);
+
+		if (!curr_peer) {
+			mutex_unlock(&pHddCtx->tdls_lock);
+			hdd_debug("peer doesn't exists");
+			status = QDF_STATUS_SUCCESS;
+			break;
+		}
+
 		wlan_hdd_tdls_indicate_teardown(pAdapter, curr_peer,
 						pRoamInfo->reasonCode);
 		hdd_send_wlan_tdls_teardown_event(eTDLS_TEARDOWN_BSS_DISCONNECT,

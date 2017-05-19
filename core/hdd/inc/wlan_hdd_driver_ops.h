@@ -103,11 +103,12 @@ int wlan_hdd_bus_resume_noirq(void);
 
 /**
  * hdd_hif_close() - HIF close helper
+ * @hdd_ctx: HDD context
  * @hif_ctx: HIF context
  *
  * Helper function to close HIF
  */
-void hdd_hif_close(void *hif_ctx);
+void hdd_hif_close(hdd_context_t *hdd_ctx, void *hif_ctx);
 
 /**
  * hdd_hif_open() - HIF open helper
@@ -121,7 +122,7 @@ void hdd_hif_close(void *hif_ctx);
  *
  * Return: 0 on success and errno on failure.
  */
-int hdd_hif_open(struct device *dev, void *bdev, const hif_bus_id *bid,
+int hdd_hif_open(struct device *dev, void *bdev, const struct hif_bus_id *bid,
 		 enum qdf_bus_type bus_type, bool reinit);
 
 #endif /* __WLAN_HDD_DRIVER_OPS_H__ */

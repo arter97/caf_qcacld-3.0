@@ -79,13 +79,6 @@ ifeq ($(KERNEL_BUILD), 0)
 		else
 			CONFIG_FEATURE_PKTLOG := y
 		endif
-		ifeq ($(CONFIG_SLUB_DEBUG_ON),y)
-			CONFIG_FEATURE_DP_TRACE := y
-		else
-			ifeq ($(findstring perf,$(KERNEL_DEFCONFIG)),)
-				CONFIG_FEATURE_DP_TRACE := y
-			endif
-		endif
 	endif
 
 	#Flag to enable Legacy Fast Roaming2(LFR2)
@@ -754,7 +747,6 @@ SYS_OBJS :=	$(SYS_COMMON_SRC_DIR)/wlan_qct_sys.o \
 		$(SYS_LEGACY_SRC_DIR)/system/src/mac_init_api.o \
 		$(SYS_LEGACY_SRC_DIR)/system/src/sys_entry_func.o \
 		$(SYS_LEGACY_SRC_DIR)/utils/src/dot11f.o \
-		$(SYS_LEGACY_SRC_DIR)/utils/src/log_api.o \
 		$(SYS_LEGACY_SRC_DIR)/utils/src/mac_trace.o \
 		$(SYS_LEGACY_SRC_DIR)/utils/src/parser_api.o \
 		$(SYS_LEGACY_SRC_DIR)/utils/src/utils_parser.o
@@ -872,11 +864,11 @@ UMAC_MGMT_TXRX_OBJS := $(UMAC_MGMT_TXRX_DIR)/core/src/wlan_mgmt_txrx_main.o \
 	$(UMAC_MGMT_TXRX_DIR)/dispatcher/src/wlan_mgmt_txrx_tgt_api.o
 
 ########## POWER MANAGEMENT OFFLOADS (PMO) ##########
-PMO_DIR := $(WLAN_COMMON_ROOT)/power_management_offloads
-PMO_INC :=      -I$(WLAN_COMMON_INC)/power_management_offloads/core/inc \
-		-I$(WLAN_COMMON_INC)/power_management_offloads/dispatcher/inc \
-		-I$(WLAN_COMMON_INC)/power_management_offloads/core/src \
-		-I$(WLAN_COMMON_INC)/power_management_offloads/dispatcher/src
+PMO_DIR := $(WLAN_COMMON_ROOT)/pmo
+PMO_INC :=      -I$(WLAN_COMMON_INC)/pmo/core/inc \
+		-I$(WLAN_COMMON_INC)/pmo/dispatcher/inc \
+		-I$(WLAN_COMMON_INC)/pmo/core/src \
+		-I$(WLAN_COMMON_INC)/pmo/dispatcher/src
 
 PMO_OBJS :=     $(PMO_DIR)/core/src/wlan_pmo_main.o \
 		$(PMO_DIR)/core/src/wlan_pmo_arp.o \
@@ -1059,7 +1051,8 @@ DP_OBJS := $(DP_SRC)/dp_main.o \
 		$(DP_SRC)/dp_rx_desc.o \
 		$(DP_SRC)/dp_reo.o \
 		$(DP_SRC)/dp_rx_mon_dest.o \
-		$(DP_SRC)/dp_rx_mon_status.o
+		$(DP_SRC)/dp_rx_mon_status.o \
+		$(DP_SRC)/dp_rx_defrag.o
 endif
 
 ############ CFG ############
@@ -1117,6 +1110,7 @@ REGULATORY_INC := -I$(WLAN_COMMON_INC)/$(REGULATORY_CORE_INC_DIR)
 REGULATORY_INC += -I$(WLAN_COMMON_INC)/$(REG_DISPATCHER_INC_DIR)
 REGULATORY_OBJS := $(REG_CORE_OBJ_DIR)/reg_db.o \
                    $(REG_CORE_OBJ_DIR)/reg_services.o \
+                   $(REG_CORE_OBJ_DIR)/reg_db_parser.o \
                    $(REG_DISPATCHER_OBJ_DIR)/wlan_reg_services_api.o \
                    $(REG_DISPATCHER_OBJ_DIR)/wlan_reg_tgt_api.o \
                    $(REG_DISPATCHER_OBJ_DIR)/wlan_reg_ucfg_api.o
@@ -1616,9 +1610,7 @@ ifeq ($(CONFIG_FEATURE_PKTLOG), y)
 CDEFINES +=     -DFEATURE_PKTLOG
 endif
 
-ifeq ($(CONFIG_FEATURE_DP_TRACE), y)
 CDEFINES +=	-DFEATURE_DP_TRACE
-endif
 
 ifeq ($(CONFIG_WLAN_NAPI), y)
 CDEFINES += -DFEATURE_NAPI
@@ -2025,6 +2017,9 @@ CONFIG_HELIUMPLUS := y
 CONFIG_64BIT_PADDR := y
 CONFIG_FEATURE_TSO := y
 CONFIG_FEATURE_TSO_DEBUG := y
+ifeq ($(CONFIG_ARCH_MSM8998), y)
+CONFIG_ENABLE_DEBUG_ADDRESS_MARKING := y
+endif
 ifeq ($(CONFIG_HELIUMPLUS),y)
 CDEFINES += -DHELIUMPLUS
 CDEFINES += -DAR900B
@@ -2034,6 +2029,9 @@ endif
 endif
 endif
 
+ifeq ($(CONFIG_ENABLE_DEBUG_ADDRESS_MARKING),y)
+CDEFINES += -DENABLE_DEBUG_ADDRESS_MARKING
+endif
 ifeq ($(CONFIG_FEATURE_TSO),y)
 CDEFINES += -DFEATURE_TSO
 endif

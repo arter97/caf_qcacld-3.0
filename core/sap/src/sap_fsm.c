@@ -55,6 +55,7 @@
 #include "cds_reg_service.h"
 #include "qdf_util.h"
 #include "wlan_policy_mgr_api.h"
+#include "cfg_api.h"
 #include <wlan_objmgr_pdev_obj.h>
 #include <wlan_objmgr_vdev_obj.h>
 #include <wlan_utility.h>
@@ -1209,10 +1210,10 @@ static void sap_get_cac_dur_dfs_region(ptSapContext sap_ctx,
 void sap_dfs_set_current_channel(void *ctx)
 {
 	ptSapContext sap_ctx = (ptSapContext) ctx;
-	uint16_t ic_freq = 0;
 	uint32_t ic_flags = 0;
 	uint16_t ic_flagext = 0;
 	uint8_t ic_ieee = sap_ctx->channel;
+	uint16_t ic_freq = utils_dfs_chan_to_freq(sap_ctx->channel);
 	uint8_t vht_seg0 = sap_ctx->csr_roamProfile.ch_params.center_freq_seg0;
 	uint8_t vht_seg1 = sap_ctx->csr_roamProfile.ch_params.center_freq_seg1;
 	struct wlan_objmgr_pdev *pdev;
@@ -1257,7 +1258,10 @@ void sap_dfs_set_current_channel(void *ctx)
 		return;
 	}
 
-	ic_freq = wlan_reg_chan_to_freq(pdev, sap_ctx->channel);
+	QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO,
+		  FL("freq=%d, channel=%d, seg0=%d, seg1=%d, flags=%d"),
+		  ic_freq, ic_ieee, vht_seg0, vht_seg1, ic_flags);
+
 	tgt_dfs_set_current_channel(pdev, ic_freq, ic_flags,
 			ic_flagext, ic_ieee, vht_seg0, vht_seg1);
 }
@@ -2390,6 +2394,13 @@ QDF_STATUS sap_signal_hdd_event(ptSapContext sap_ctx,
 			qdf_mem_copy(&reassoc_complete->ies[len],
 				     csr_roaminfo->paddIE,
 				     csr_roaminfo->addIELen);
+			if (cfg_get_vendor_ie_ptr_from_oui(mac_ctx,
+			    SIR_MAC_P2P_OUI, SIR_MAC_P2P_OUI_SIZE,
+			    csr_roaminfo->paddIE, csr_roaminfo->addIELen)) {
+				reassoc_complete->staType = eSTA_TYPE_P2P_CLI;
+			} else {
+				reassoc_complete->staType = eSTA_TYPE_INFRA;
+			}
 		}
 
 		/* also fill up the channel info from the csr_roamInfo */
