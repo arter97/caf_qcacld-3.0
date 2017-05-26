@@ -5049,17 +5049,17 @@ enum hdd_link_speed_rpt_type {
 #define CFG_ENABLE_EGAP_INACT_TIME_FEATURE         "gEGAPInactTime"
 #define CFG_ENABLE_EGAP_INACT_TIME_FEATURE_MIN     (0)
 #define CFG_ENABLE_EGAP_INACT_TIME_FEATURE_MAX     (300000)
-#define CFG_ENABLE_EGAP_INACT_TIME_FEATURE_DEFAULT (1000)
+#define CFG_ENABLE_EGAP_INACT_TIME_FEATURE_DEFAULT (2000)
 
 #define CFG_ENABLE_EGAP_WAIT_TIME_FEATURE          "gEGAPWaitTime"
 #define CFG_ENABLE_EGAP_WAIT_TIME_FEATURE_MIN      (0)
 #define CFG_ENABLE_EGAP_WAIT_TIME_FEATURE_MAX      (300000)
-#define CFG_ENABLE_EGAP_WAIT_TIME_FEATURE_DEFAULT  (100)
+#define CFG_ENABLE_EGAP_WAIT_TIME_FEATURE_DEFAULT  (150)
 
 #define CFG_ENABLE_EGAP_FLAGS_FEATURE              "gEGAPFeatures"
 #define CFG_ENABLE_EGAP_FLAGS_FEATURE_MIN          (0)
 #define CFG_ENABLE_EGAP_FLAGS_FEATURE_MAX          (15)
-#define CFG_ENABLE_EGAP_FLAGS_FEATURE_DEFAULT      (7)
+#define CFG_ENABLE_EGAP_FLAGS_FEATURE_DEFAULT      (3)
 /* end Enhanced Green AP flags/params */
 
 #endif
@@ -10053,7 +10053,7 @@ enum hw_filter_mode {
  * gHwFilterMode - configure hardware filter for DTIM mode
  * @Min: 0
  * @Max: 3
- * @Default: 0
+ * @Default: 1
  *
  * The hardware filter is only effective in DTIM mode. Use this configuration
  * to blanket drop broadcast/multicast packets at the hardware level, without
@@ -10061,9 +10061,9 @@ enum hw_filter_mode {
  *
  * Takes a bitmap of frame types to drop
  * @E.g.
- *	# disable feature (default)
+ *	# disable feature
  *	gHwFilterMode=0
- *	# drop all broadcast frames, except ARP
+ *	# drop all broadcast frames, except ARP (default)
  *	gHwFilterMode=1
  *	# drop all multicast frames, except ICMPv6
  *	gHwFilterMode=2
@@ -10079,7 +10079,7 @@ enum hw_filter_mode {
 #define CFG_HW_FILTER_MODE_NAME		"gHwFilterMode"
 #define CFG_HW_FILTER_MODE_MIN		(0)
 #define CFG_HW_FILTER_MODE_MAX		(3)
-#define CFG_HW_FILTER_MODE_DEFAULT	(0)
+#define CFG_HW_FILTER_MODE_DEFAULT	(1)
 
 /*
  * <ini>

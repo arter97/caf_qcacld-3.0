@@ -500,6 +500,7 @@ typedef enum {
 	 */
 	eCSR_ROAM_TDLS_STATUS_UPDATE,
 	eCSR_ROAM_RESULT_MGMT_TX_COMPLETE_IND,
+	eCSR_ROAM_TDLS_SET_STATE_DISABLE,
 
 	/* Disaconnect all the clients */
 	eCSR_ROAM_DISCONNECT_ALL_P2P_CLIENTS,
@@ -1699,6 +1700,12 @@ typedef QDF_STATUS (*csr_roamSessionCloseCallback)(void *pContext);
 
 #define CSR_IS_CLOSE_SESSION_COMMAND(pCommand) \
 	((pCommand)->command == eSmeCommandDelStaSession)
+
+#define CSR_IS_AUTH_TYPE_FILS(auth_type) \
+		((eCSR_AUTH_TYPE_FILS_SHA256 == auth_type) || \
+		(eCSR_AUTH_TYPE_FILS_SHA384 == auth_type) || \
+		(eCSR_AUTH_TYPE_FT_FILS_SHA256 == auth_type) || \
+		(eCSR_AUTH_TYPE_FT_FILS_SHA384 == auth_type))
 
 QDF_STATUS csr_set_channels(tHalHandle hHal, tCsrConfigParam *pParam);
 

@@ -4763,6 +4763,7 @@ QDF_STATUS csr_scan_process_single_bssdescr(tpAniSirGlobal mac_ctx,
 	tCsrRoamInfo *roam_info;
 	uint8_t session_id;
 
+	session_id = csr_scan_get_session_id(mac_ctx);
 	sme_debug("CSR: Processing single bssdescr");
 	if (QDF_IS_STATUS_SUCCESS(
 		csr_get_cfg_valid_channels(mac_ctx,
@@ -4782,7 +4783,6 @@ QDF_STATUS csr_scan_process_single_bssdescr(tpAniSirGlobal mac_ctx,
 			qdf_mem_zero(roam_info, sizeof(*roam_info));
 			roam_info->pBssDesc = bssdescr;
 
-			session_id = csr_scan_get_session_id(mac_ctx);
 			if (session_id == CSR_SESSION_ID_INVALID) {
 				if (ies != NULL)
 					qdf_mem_free(ies);
@@ -4801,6 +4801,21 @@ QDF_STATUS csr_scan_process_single_bssdescr(tpAniSirGlobal mac_ctx,
 			(mac_ctx, bssdescr);
 		csr_scan_save_bss_description_to_interim_list
 			(mac_ctx, bssdescr, ies);
+		/*
+		 * If scan is not in progress and interim list
+		 * reach threashold, move scan results from temp
+		 * to main list and age out old results.
+		 */
+		if (csr_ll_is_list_empty(&mac_ctx->sme.smeScanCmdActiveList,
+		   LL_ACCESS_LOCK) &&
+		   csr_ll_count(&mac_ctx->scan.tempScanResults) >=
+				CSR_MAX_BSS_SUPPORT / 10) {
+			csr_remove_from_tmp_list(mac_ctx, eCsrScanOther,
+				session_id);
+			/* Purge the scan results based on Aging */
+			if (mac_ctx->scan.scanResultCfgAgingTime)
+				csr_purge_scan_result_by_age(mac_ctx);
+		}
 		csr_update_scantype(mac_ctx, ies, bssdescr->channelId);
 		/* Free the resource */
 		if (ies != NULL)
@@ -7258,8 +7273,12 @@ void csr_init_occupied_channels_list(tpAniSirGlobal pMac, uint8_t sessionId)
 		/* At this time, pBssDescription->Result.pvIes may be NULL */
 		if (!pIes && !QDF_IS_STATUS_SUCCESS(
 			csr_get_parsed_bss_description_ies(pMac,
-				&pBssDesc->Result.BssDescriptor, &pIes)))
+				&pBssDesc->Result.BssDescriptor, &pIes))) {
+			/* Pick next bss entry before continuing */
+			pEntry = csr_ll_next(&pMac->scan.scanResultList, pEntry,
+				     LL_ACCESS_NOLOCK);
 			continue;
+		}
 		csr_scan_add_to_occupied_channels(pMac, pBssDesc, sessionId,
 				&pMac->scan.occupiedChannels[sessionId], pIes,
 				true);
@@ -7551,5 +7570,6 @@ void csr_scan_active_list_timeout_handle(void *userData)
 
 	csr_save_scan_results(mac_ctx, scan_cmd->u.scanCmd.reason,
 		scan_cmd->sessionId);
+	scan_cmd->u.scanCmd.abort_scan_indication = eCSR_SCAN_ABORT_DEFAULT;
 	csr_release_scan_command(mac_ctx, scan_cmd, eCSR_SCAN_FAILURE);
 }

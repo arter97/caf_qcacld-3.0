@@ -1508,7 +1508,7 @@ static int wlan_hdd_update_scan_ies(hdd_adapter_t *adapter,
 	uint8_t *current_ie;
 	uint8_t elem_id;
 	uint16_t elem_len;
-	bool add_ie;
+	bool add_ie = false;
 
 	if (!scan_info->default_scan_ies_len || !scan_info->default_scan_ies)
 		return 0;
@@ -1699,16 +1699,13 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 		pAdapter->device_mode);
 
 	/*
-	 * IBSS vdev does not have peers on other macs,
-	 * so it does not support scan on other band,
-	 * and IBSS vdev does not need to scan to establish
+	 * IBSS vdev does not need to scan to establish
 	 * IBSS connection. If IBSS vdev need to support scan,
 	 * Firmware need to make the change to add self peer
 	 * per mac for IBSS vdev.
 	 */
-	if (wma_is_hw_dbs_capable() &&
-	   (QDF_IBSS_MODE == pAdapter->device_mode)) {
-		hdd_err("Scan not supported for IBSS in if HW support DBS");
+	if (QDF_IBSS_MODE == pAdapter->device_mode) {
+		hdd_err("Scan not supported for IBSS");
 		return -EINVAL;
 	}
 
@@ -3457,6 +3454,8 @@ void hdd_cleanup_scan_queue(hdd_context_t *hdd_ctx)
 		adapter = hdd_scan_req->adapter;
 		if (WLAN_HDD_ADAPTER_MAGIC != adapter->magic) {
 			hdd_err("HDD adapter magic is invalid");
+		} else if (!req) {
+			hdd_debug("pending scan is wext triggered");
 		} else {
 			if (NL_SCAN == source)
 				hdd_cfg80211_scan_done(adapter, req, aborted);

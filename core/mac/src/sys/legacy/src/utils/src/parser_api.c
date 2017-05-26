@@ -1230,7 +1230,7 @@ populate_dot11f_ext_cap(tpAniSirGlobal pMac,
 #endif
 	p_ext_cap->ext_chan_switch = 1;
 
-	if (pMac->roam.configParam.enable_bcast_probe_rsp)
+	if (psessionEntry && psessionEntry->enable_bcast_probe_rsp)
 		p_ext_cap->fils_capability = 1;
 
 	/* Need to calulate the num_bytes based on bits set */
@@ -2272,6 +2272,18 @@ sir_validate_and_rectify_ies(tpAniSirGlobal mac_ctx,
 }
 
 #ifdef WLAN_FEATURE_FILS_SK
+static void populate_dot11f_fils_rsn(tpAniSirGlobal mac_ctx,
+				     tDot11fIERSNOpaque *p_dot11f,
+				     uint8_t *rsn_ie)
+{
+	pe_debug("FILS RSN IE length %d", rsn_ie[1]);
+	if (rsn_ie[1]) {
+		p_dot11f->present = 1;
+		p_dot11f->num_data = rsn_ie[1];
+		qdf_mem_copy(p_dot11f->data, &rsn_ie[2], rsn_ie[1]);
+	}
+}
+
 void populate_dot11f_fils_params(tpAniSirGlobal mac_ctx,
 		tDot11fAssocRequest *frm,
 		tpPESession pe_session)
@@ -2279,8 +2291,8 @@ void populate_dot11f_fils_params(tpAniSirGlobal mac_ctx,
 	struct pe_fils_session *fils_info = pe_session->fils_info;
 
 	/* Populate RSN IE with FILS AKM */
-	populate_dot11f_rsn_opaque(mac_ctx, (tpSirRSNie) &(fils_info->rsn_ie),
-							   &frm->RSNOpaque);
+	populate_dot11f_fils_rsn(mac_ctx, &frm->RSNOpaque,
+				 fils_info->rsn_ie);
 
 	/* Populate FILS session IE */
 	frm->fils_session.present = true;
@@ -2851,7 +2863,6 @@ sir_convert_assoc_req_frame2_struct(tpAniSirGlobal pMac,
 			lim_log_vht_cap(pMac, &pAssocReq->VHTCaps);
 		}
 	}
-
 	qdf_mem_free(ar);
 	return eSIR_SUCCESS;
 
@@ -2931,6 +2942,27 @@ static void fils_convert_assoc_rsp_frame2_struct(tDot11fAssocResponse *ar,
 		qdf_mem_copy(&pAssocRsp->fils_kde.kde_list,
 				&ar->fils_kde.kde_list,
 				pAssocRsp->fils_kde.num_kde_list);
+	}
+
+	if (ar->fils_hlp_container.present) {
+		pe_debug("FILS HLP container IE present");
+		sir_copy_mac_addr(pAssocRsp->dst_mac.bytes,
+				ar->fils_hlp_container.dest_mac);
+		sir_copy_mac_addr(pAssocRsp->src_mac.bytes,
+				ar->fils_hlp_container.src_mac);
+		pAssocRsp->hlp_data_len = ar->fils_hlp_container.num_hlp_packet;
+		qdf_mem_copy(pAssocRsp->hlp_data,
+				ar->fils_hlp_container.hlp_packet,
+				pAssocRsp->hlp_data_len);
+
+		if (ar->fragment_ie.present) {
+			pe_debug("FILS fragment ie present");
+			qdf_mem_copy(pAssocRsp->hlp_data +
+					pAssocRsp->hlp_data_len,
+					ar->fragment_ie.data,
+					ar->fragment_ie.num_data);
+			pAssocRsp->hlp_data_len += ar->fragment_ie.num_data;
+		}
 	}
 }
 #else

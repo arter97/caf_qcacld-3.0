@@ -1503,6 +1503,20 @@ static inline QDF_STATUS sme_set_udp_resp_offload(struct udp_resp_offload
 QDF_STATUS sme_get_rcpi(tHalHandle hal, struct sme_rcpi_req *rcpi);
 
 /**
+ * sme_get_rssi_snr_by_bssid() - gets the rssi and snr by bssid from scan cache
+ * @hal: handle returned by mac_open
+ * @profile: current connected profile
+ * @bssid: bssid to look for in scan cache
+ * @rssi: rssi value found
+ * @snr: snr value found
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_get_rssi_snr_by_bssid(tHalHandle hal, tCsrRoamProfile *profile,
+				     const uint8_t *bssid, int8_t *rssi,
+				     int8_t *snr);
+
+/**
  * sme_get_beacon_frm() - gets the bss descriptor from scan cache and prepares
  * beacon frame
  * @hal: handle returned by mac_open
@@ -1541,6 +1555,16 @@ void sme_set_5g_band_pref(tHalHandle hal_handle,
  */
 QDF_STATUS sme_set_bt_activity_info_cb(tHalHandle hal,
 				void (*cb)(void *, uint32_t profile_info));
+
+/**
+ * sme_congestion_register_callback(): registers congestion callback
+ * @hal: handler for HAL
+ * @congestion_cb: congestion callback
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_congestion_register_callback(tHalHandle hal,
+	void (*congestion_cb)(void *, uint32_t congestion, uint32_t vdev_id));
 
 /**
  * sme_scan_get_result_for_bssid - gets the scan result from scan cache for the
@@ -1666,5 +1690,16 @@ QDF_STATUS sme_set_reorder_timeout(tHalHandle hal,
 
 QDF_STATUS sme_set_rx_set_blocksize(tHalHandle hal,
 		struct sir_peer_set_rx_blocksize *req);
-
+/**
+ * sme_ipa_uc_stat_request() - set ipa config parameters
+ * @vdev_id: virtual device for the command
+ * @param_id: parameter id
+ * @param_val: parameter value
+ * @req_cat: parameter category
+ *
+ * Return: QDF_STATUS_SUCCESS or non-zero on failure
+ */
+QDF_STATUS sme_ipa_uc_stat_request(tHalHandle hal,
+			uint32_t vdev_id, uint32_t param_id,
+			uint32_t param_val, uint32_t req_cat);
 #endif /* #if !defined( __SME_API_H ) */

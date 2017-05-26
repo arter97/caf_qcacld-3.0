@@ -3432,6 +3432,7 @@ static void hdd_get_rssi_cb(int8_t rssi, uint32_t staId, void *pContext)
 {
 	struct statsContext *pStatsContext;
 	hdd_adapter_t *pAdapter;
+	hdd_station_ctx_t *pHddStaCtx;
 
 	if (NULL == pContext) {
 		hdd_err("Bad param");
@@ -3440,6 +3441,7 @@ static void hdd_get_rssi_cb(int8_t rssi, uint32_t staId, void *pContext)
 
 	pStatsContext = pContext;
 	pAdapter = pStatsContext->pAdapter;
+	pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
 
 	/* there is a race condition that exists between this callback
 	 * function and the caller since the caller could time out
@@ -3464,11 +3466,15 @@ static void hdd_get_rssi_cb(int8_t rssi, uint32_t staId, void *pContext)
 	/* paranoia: invalidate the magic */
 	pStatsContext->magic = 0;
 
-	/* copy over the rssi */
-	pAdapter->rssi = rssi;
+	/* update rssi only if its valid else return previous valid rssi */
+	if (rssi)
+		pAdapter->rssi = rssi;
 
-	if (pAdapter->rssi > 0)
-		pAdapter->rssi = 0;
+	/* for new connection there might be no valid previous RSSI */
+	if (!pAdapter->rssi)
+		hdd_get_rssi_snr_by_bssid(pAdapter,
+			pHddStaCtx->conn_info.bssId.bytes,
+			&pAdapter->rssi, NULL);
 
 	/* notify the caller */
 	complete(&pStatsContext->completion);
@@ -3986,6 +3992,7 @@ void hdd_clear_roam_profile_ie(hdd_adapter_t *pAdapter)
 	pAdapter->wapi_info.nWapiMode = 0;
 #endif
 
+	hdd_clear_fils_connection_info(pAdapter);
 	qdf_zero_macaddr(&pWextState->req_bssId);
 	EXIT();
 }
@@ -8923,6 +8930,8 @@ static int __iw_setnone_getint(struct net_device *dev,
 	{
 		sme_get_config_param(hHal, &smeConfig);
 		*value = (smeConfig.csrConfig.enable2x2 == 0) ? 1 : 2;
+		 if (wma_is_current_hwmode_dbs())
+			 *value = *value-1;
 		hdd_debug("GET_NSS: Current NSS:%d", *value);
 		break;
 	}

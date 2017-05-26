@@ -2533,6 +2533,7 @@ static hdd_adapter_t *hdd_alloc_station_adapter(hdd_context_t *hdd_ctx,
 {
 	struct net_device *pWlanDev = NULL;
 	hdd_adapter_t *adapter = NULL;
+	hdd_station_ctx_t *sta_ctx;
 	/*
 	 * cfg80211 initialization and registration....
 	 */
@@ -2550,7 +2551,10 @@ static hdd_adapter_t *hdd_alloc_station_adapter(hdd_context_t *hdd_ctx,
 		adapter = (hdd_adapter_t *) netdev_priv(pWlanDev);
 
 		qdf_mem_zero(adapter, sizeof(hdd_adapter_t));
-
+		sta_ctx = &adapter->sessionCtx.station;
+		qdf_mem_set(sta_ctx->conn_info.staId,
+			sizeof(sta_ctx->conn_info.staId),
+			HDD_WLAN_INVALID_STA_ID);
 		adapter->dev = pWlanDev;
 		adapter->pHddCtx = hdd_ctx;
 		adapter->magic = WLAN_HDD_ADAPTER_MAGIC;
@@ -2559,6 +2563,7 @@ static hdd_adapter_t *hdd_alloc_station_adapter(hdd_context_t *hdd_ctx,
 		init_completion(&adapter->session_open_comp_var);
 		init_completion(&adapter->session_close_comp_var);
 		init_completion(&adapter->disconnect_comp_var);
+		init_completion(&adapter->roaming_comp_var);
 		init_completion(&adapter->linkup_event_var);
 		init_completion(&adapter->cancel_rem_on_chan_var);
 		init_completion(&adapter->rem_on_chan_ready_event);
@@ -2744,9 +2749,8 @@ QDF_STATUS hdd_init_station_mode(hdd_adapter_t *adapter)
 	if (!rc) {
 		hdd_err("Session is not opened within timeout period code %ld",
 			rc);
-		adapter->sessionId = HDD_SESSION_ID_INVALID;
 		status = QDF_STATUS_E_FAILURE;
-		goto error_sme_open;
+		goto error_register_wext;
 	}
 	if (hdd_ctx->config->enable_rx_ldpc &&
 	    hdd_ctx->config->rx_ldpc_support_for_2g &&
@@ -2832,14 +2836,12 @@ error_wmm_init:
 error_init_txrx:
 	hdd_unregister_wext(pWlanDev);
 error_register_wext:
-	if (test_bit(SME_SESSION_OPENED, &adapter->event_flags)) {
+	if (adapter->sessionId != HDD_SESSION_ID_INVALID) {
 		INIT_COMPLETION(adapter->session_close_comp_var);
 		if (QDF_STATUS_SUCCESS == sme_close_session(hdd_ctx->hHal,
 							    adapter->sessionId,
 							    hdd_sme_close_session_callback,
 							    adapter)) {
-			unsigned long rc;
-
 			/*
 			 * Block on a completion variable.
 			 * Can't wait forever though.
@@ -2849,9 +2851,10 @@ error_register_wext:
 				msecs_to_jiffies
 					(WLAN_WAIT_TIME_SESSIONOPENCLOSE));
 			if (rc <= 0)
-				hdd_err("Session is not opened within timeout period code %ld",
+				hdd_err("Session is not closed within timeout period code %ld",
 				       rc);
 		}
+		adapter->sessionId = HDD_SESSION_ID_INVALID;
 	}
 error_sme_open:
 	return status;
@@ -3453,12 +3456,6 @@ hdd_adapter_t *hdd_open_adapter(hdd_context_t *hdd_ctx, uint8_t session_type,
 	if (QDF_STATUS_SUCCESS == status) {
 		cds_set_concurrency_mode(session_type);
 
-		/* Initialize the WoWL service */
-		if (!hdd_init_wowl(adapter)) {
-			hdd_err("hdd_init_wowl failed");
-			goto err_close_adapter;
-		}
-
 		/* Adapter successfully added. Increment the vdev count */
 		hdd_ctx->current_intf_count++;
 
@@ -3473,8 +3470,6 @@ hdd_adapter_t *hdd_open_adapter(hdd_context_t *hdd_ctx, uint8_t session_type,
 
 	return adapter;
 
-err_close_adapter:
-	hdd_close_adapter(hdd_ctx, adapter, rtnl_held);
 err_free_netdev:
 	wlan_hdd_release_intf_addr(hdd_ctx, adapter->macAddressCurrent.bytes);
 	free_netdev(adapter->dev);
@@ -3737,6 +3732,7 @@ QDF_STATUS hdd_stop_adapter(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 
 		hdd_lro_disable(hdd_ctx, adapter);
 		wlan_hdd_cleanup_remain_on_channel_ctx(adapter);
+		hdd_clear_fils_connection_info(adapter);
 
 #ifdef WLAN_OPEN_SOURCE
 		cancel_work_sync(&adapter->ipv4NotifierWorkQueue);
@@ -4214,6 +4210,64 @@ static inline void hdd_populate_fils_params(struct cfg80211_connect_resp_params
 #endif
 
 /**
+ * hdd_update_hlp_info() - Update HLP packet received in FILS assoc rsp
+ * @dev: net device
+ * @roam_fils_params: Fils join rsp params
+ *
+ * This API is used to send the received HLP packet in Assoc rsp(FILS AKM)
+ * to the network layer.
+ *
+ * Return: None
+ */
+static void hdd_update_hlp_info(struct net_device *dev,
+				struct fils_join_rsp_params *roam_fils_params)
+{
+	struct sk_buff *skb;
+	uint16_t skb_len;
+	struct llc_snap_hdr_t *llc_hdr;
+	QDF_STATUS status;
+	uint8_t *hlp_data = roam_fils_params->hlp_data;
+	uint16_t hlp_data_len = roam_fils_params->hlp_data_len;
+	hdd_adapter_t *padapter = WLAN_HDD_GET_PRIV_PTR(dev);
+
+	/* Calculate skb length */
+	skb_len = (2 * ETH_ALEN) + hlp_data_len;
+	skb = qdf_nbuf_alloc(NULL, skb_len, 0, 4, false);
+	if (skb == NULL) {
+		hdd_err("HLP packet nbuf alloc fails");
+		return;
+	}
+
+	qdf_mem_copy(skb_put(skb, ETH_ALEN), roam_fils_params->dst_mac.bytes,
+				 QDF_MAC_ADDR_SIZE);
+	qdf_mem_copy(skb_put(skb, ETH_ALEN), roam_fils_params->src_mac.bytes,
+				 QDF_MAC_ADDR_SIZE);
+
+	llc_hdr = (struct llc_snap_hdr_t *) hlp_data;
+	if (IS_SNAP(llc_hdr)) {
+		hlp_data += LLC_SNAP_HDR_OFFSET_ETHERTYPE;
+		hlp_data_len += LLC_SNAP_HDR_OFFSET_ETHERTYPE;
+	}
+
+	qdf_mem_copy(skb_put(skb, hlp_data_len), hlp_data, hlp_data_len);
+
+	/*
+	 * This HLP packet is formed from HLP info encapsulated
+	 * in assoc response frame which is AEAD encrypted.
+	 * Hence, this checksum validation can be set unnecessary.
+	 * i.e. network layer need not worry about checksum.
+	 */
+	skb->ip_summed = CHECKSUM_UNNECESSARY;
+
+	status = hdd_rx_packet_cbk(padapter, skb);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Sending HLP packet fails");
+		return;
+	}
+	hdd_debug("send HLP packet to netif successfully");
+}
+
+/**
  * hdd_connect_done() - Wrapper API to call cfg80211_connect_done
  * @dev: network device
  * @bssid: bssid to which we want to associate
@@ -4271,6 +4325,9 @@ static void hdd_connect_done(struct net_device *dev, const u8 *bssid,
 
 	cfg80211_connect_done(dev, &fils_params, gfp);
 
+	if (roam_fils_params && roam_fils_params->hlp_data_len)
+		hdd_update_hlp_info(dev, roam_fils_params);
+
 	/* Clear all the FILS key info */
 	if (roam_fils_params && roam_fils_params->fils_pmk)
 		qdf_mem_free(roam_fils_params->fils_pmk);
@@ -4287,6 +4344,11 @@ static inline void hdd_connect_done(struct net_device *dev, const u8 *bssid,
 				    bool connect_timeout, tSirResultCodes
 				    timeout_reason, struct fils_join_rsp_params
 				    *roam_fils_params)
+{ }
+
+static inline void hdd_update_hlp_info(struct net_device *dev,
+			struct fils_join_rsp_params *roam_fils_params)
+
 { }
 #endif
 #endif
@@ -5223,8 +5285,8 @@ static void hdd_destroy_roc_req_q(hdd_context_t *hdd_ctx)
 				(qdf_list_node_t **) &hdd_roc_req);
 
 		if (QDF_STATUS_SUCCESS != status) {
-			hdd_debug("unable to remove roc element from list in %s",
-					__func__);
+			qdf_spin_unlock(&hdd_ctx->hdd_roc_req_q_lock);
+			hdd_debug("unable to remove roc element from list");
 			QDF_ASSERT(0);
 			return;
 		}
@@ -5292,8 +5354,8 @@ static int hdd_context_deinit(hdd_context_t *hdd_ctx)
  */
 static void hdd_context_destroy(hdd_context_t *hdd_ctx)
 {
-	if (QDF_GLOBAL_FTM_MODE != hdd_get_conparam())
-		hdd_logging_sock_deactivate_svc(hdd_ctx);
+
+	hdd_logging_sock_deactivate_svc(hdd_ctx);
 
 	wlan_hdd_deinit_tx_rx_histogram(hdd_ctx);
 
@@ -5476,9 +5538,6 @@ void __hdd_wlan_exit(void)
 		EXIT();
 		return;
 	}
-
-	/* Check IPA HW Pipe shutdown */
-	hdd_ipa_uc_force_pipe_shutdown(hdd_ctx);
 
 	memdump_deinit();
 	hdd_driver_memdump_deinit();
@@ -7686,7 +7745,7 @@ static int hdd_update_cds_config(hdd_context_t *hdd_ctx)
 				hdd_ctx->config->IpaUcTxBufCount);
 		if (!hdd_ctx->config->IpaUcTxBufCount) {
 			hdd_err("Failed to round down IpaUcTxBufCount");
-			return -EINVAL;
+			goto exit;
 		}
 		hdd_debug("IpaUcTxBufCount rounded down to %d",
 			hdd_ctx->config->IpaUcTxBufCount);
@@ -7702,7 +7761,7 @@ static int hdd_update_cds_config(hdd_context_t *hdd_ctx)
 				hdd_ctx->config->IpaUcRxIndRingCount);
 		if (!hdd_ctx->config->IpaUcRxIndRingCount) {
 			hdd_err("Failed to round down IpaUcRxIndRingCount");
-			return -EINVAL;
+			goto exit;
 		}
 		hdd_debug("IpaUcRxIndRingCount rounded down to %d",
 			hdd_ctx->config->IpaUcRxIndRingCount);
@@ -7738,6 +7797,10 @@ static int hdd_update_cds_config(hdd_context_t *hdd_ctx)
 	hdd_lpass_populate_cds_config(cds_cfg, hdd_ctx);
 	cds_init_ini_config(cds_cfg);
 	return 0;
+
+exit:
+	qdf_mem_free(cds_cfg);
+	return -EINVAL;
 }
 
 /**
@@ -9448,6 +9511,11 @@ int hdd_register_cb(hdd_context_t *hdd_ctx)
 	sme_chain_rssi_register_callback(hdd_ctx->hHal,
 				wlan_hdd_cfg80211_chainrssi_callback);
 
+	status = sme_congestion_register_callback(hdd_ctx->hHal,
+					     hdd_update_cca_info_cb);
+	if (!QDF_IS_STATUS_SUCCESS(status))
+		hdd_err("set congestion callback failed");
+
 	EXIT();
 
 	return ret;
@@ -10339,6 +10407,7 @@ err_out:
  */
 void hdd_deinit(void)
 {
+	hdd_deinit_wowl();
 	cds_deinit();
 
 #ifdef WLAN_LOGGING_SOCK_SVC_ENABLE
@@ -11245,6 +11314,23 @@ hdd_adapter_t *hdd_get_adapter_by_rand_macaddr(hdd_context_t *hdd_ctx,
 	}
 
 	return NULL;
+}
+
+int hdd_get_rssi_snr_by_bssid(hdd_adapter_t *adapter, const uint8_t *bssid,
+			      int8_t *rssi, int8_t *snr)
+{
+	QDF_STATUS status;
+	hdd_wext_state_t *wext_state = WLAN_HDD_GET_WEXT_STATE_PTR(adapter);
+	tCsrRoamProfile *profile = &wext_state->roamProfile;
+
+	status = sme_get_rssi_snr_by_bssid(WLAN_HDD_GET_HAL_CTX(adapter),
+				profile, bssid, rssi, snr);
+	if (QDF_STATUS_SUCCESS != status) {
+		hdd_warn("sme_get_rssi_snr_by_bssid failed");
+		return -EINVAL;
+	}
+
+	return 0;
 }
 
 /* Register the module init/exit functions */

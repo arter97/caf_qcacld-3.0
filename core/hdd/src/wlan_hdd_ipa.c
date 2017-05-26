@@ -706,10 +706,13 @@ static void hdd_ipa_uc_loaded_uc_cb(void *priv_ctxt)
 
 	/* When the same uC OPCODE is already pended, just return */
 	if (uc_op_work->msg)
-		return;
+		goto done;
 
 	uc_op_work->msg = msg;
 	schedule_work(&uc_op_work->work);
+
+done:
+	qdf_mem_free(msg);
 }
 
 /**
@@ -1481,9 +1484,9 @@ static void __hdd_ipa_uc_stat_request(hdd_adapter_t *adapter, uint8_t reason)
 		(false == hdd_ipa->resource_loading)) {
 		hdd_ipa->stat_req_reason = reason;
 		qdf_mutex_release(&hdd_ipa->ipa_lock);
-		wma_cli_set_command(
-			(int)adapter->sessionId,
-			(int)WMA_VDEV_TXRX_GET_IPA_UC_FW_STATS_CMDID,
+		sme_ipa_uc_stat_request(WLAN_HDD_GET_HAL_CTX(adapter),
+			adapter->sessionId,
+			WMA_VDEV_TXRX_GET_IPA_UC_FW_STATS_CMDID,
 			0, VDEV_CMD);
 	} else {
 		qdf_mutex_release(&hdd_ipa->ipa_lock);
@@ -2793,11 +2796,15 @@ QDF_STATUS hdd_ipa_uc_ol_init(hdd_context_t *hdd_ctx)
 		ret = ipa_connect_wdi_pipe(&ipa_ctxt->prod_pipe_in, &pipe_out);
 		if (ret) {
 			HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
-				"ipa_connect_wdi_pipe falied for Rx: ret=%d",
+				"ipa_connect_wdi_pipe failed for Rx: ret=%d",
 				ret);
 			stat = QDF_STATUS_E_FAILURE;
+			ret = ipa_disconnect_wdi_pipe(ipa_ctxt->tx_pipe_handle);
+			if (ret)
+				HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
+					    "disconnect failed for TX: ret=%d",
+					    ret);
 			goto fail_return;
-
 		}
 		ipa_ctxt->rx_ready_doorbell_paddr = pipe_out.uc_door_bell_pa;
 		ipa_ctxt->rx_pipe_handle = pipe_out.clnt_hdl;
@@ -2851,6 +2858,9 @@ int hdd_ipa_uc_ol_deinit(hdd_context_t *hdd_ctx)
 
 	if (!hdd_ipa_uc_is_enabled(hdd_ctx))
 		return ret;
+
+	if (!hdd_ipa->ipa_pipes_down)
+		hdd_ipa_uc_disable_pipes(hdd_ipa);
 
 	if (true == hdd_ipa->uc_loaded) {
 		HDD_IPA_LOG(QDF_TRACE_LEVEL_INFO,
@@ -3119,8 +3129,6 @@ static int __hdd_ipa_uc_ssr_deinit(void)
 	 * IPA submodule during SSR transient state. So deinit basic IPA
 	 * UC host side to be in sync with reloaded FW during SSR
 	 */
-	if (!hdd_ipa->ipa_pipes_down)
-		hdd_ipa_uc_disable_pipes(hdd_ipa);
 
 	qdf_mutex_acquire(&hdd_ipa->ipa_lock);
 	for (idx = 0; idx < WLAN_MAX_STA_COUNT; idx++) {
@@ -6016,7 +6024,8 @@ static QDF_STATUS __hdd_ipa_cleanup(hdd_context_t *hdd_ctx)
 		qdf_spin_unlock_bh(&hdd_ipa->pm_lock);
 
 		pm_tx_cb = (struct hdd_ipa_pm_tx_cb *)skb->cb;
-		ipa_free_skb(pm_tx_cb->ipa_tx_desc);
+		if (pm_tx_cb->ipa_tx_desc)
+			ipa_free_skb(pm_tx_cb->ipa_tx_desc);
 
 		qdf_spin_lock_bh(&hdd_ipa->pm_lock);
 	}

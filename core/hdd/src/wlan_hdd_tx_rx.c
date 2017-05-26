@@ -1080,17 +1080,21 @@ static bool hdd_is_arp_local(struct sk_buff *skb)
 			memcpy(&tip, arp_ptr, 4);
 			hdd_info("ARP packet: local IP: %x dest IP: %x",
 				ifa->ifa_local, tip);
-			if (ifa->ifa_local != tip)
-				return false;
+			if (ifa->ifa_local == tip)
+				return true;
 		}
 	}
 
-	return true;
+	return false;
 }
 
 /**
  * hdd_is_rx_wake_lock_needed() - check if wake lock is needed
  * @skb: pointer to sk_buff
+ *
+ * RX wake lock is needed for:
+ * 1) Unicast data packet OR
+ * 2) Local ARP data packet
  *
  * Return: true if wake lock is needed or false otherwise.
  */
@@ -1198,12 +1202,8 @@ QDF_STATUS hdd_rx_packet_cbk(void *context, qdf_nbuf_t rxBuf)
 	++pAdapter->stats.rx_packets;
 	pAdapter->stats.rx_bytes += skb->len;
 
-	if (is_arp) {
+	if (is_arp)
 		pAdapter->dad |= hdd_is_duplicate_ip_arp(skb);
-		if (pAdapter->dad)
-			QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_ERROR,
-				"%s: Duplicate IP detected", __func__);
-	}
 
 	/* Check & drop replayed mcast packets (for IPV6) */
 	if (pHddCtx->config->multicast_replay_filter &&

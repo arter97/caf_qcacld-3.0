@@ -339,6 +339,10 @@ struct fils_join_rsp_params {
 	uint8_t tk_len;
 	uint8_t gtk_len;
 	uint8_t gtk[MAX_GTK_LEN];
+	struct qdf_mac_addr dst_mac;
+	struct qdf_mac_addr src_mac;
+	uint16_t hlp_data_len;
+	uint8_t hlp_data[FILS_MAX_HLP_DATA_LEN];
 };
 #endif
 
@@ -1267,7 +1271,8 @@ typedef struct sSirSmeJoinReq {
 #endif
 	/* Pls make this as last variable in struct */
 	tSirBssDescription bssDescription;
-
+	bool ignore_assoc_disallowed;
+	bool enable_bcast_probe_rsp;
 } tSirSmeJoinReq, *tpSirSmeJoinReq;
 
 /* / Definition for reponse message to previously issued join request */
@@ -3820,6 +3825,15 @@ typedef struct sSirTdlsEventnotify {
 	uint16_t messageType;
 	uint32_t peer_reason;
 } tSirTdlsEventnotify;
+
+/**
+ * struct sir_sme_tdls_notify_set_state_disable - notify set state disable
+ * @session_id: session id
+ */
+struct sir_tdls_notify_set_state_disable {
+	uint32_t session_id;
+};
+
 #endif /* FEATURE_WLAN_TDLS */
 
 typedef struct sSirActiveModeSetBcnFilterReq {
@@ -7851,6 +7865,26 @@ struct sir_peer_set_rx_blocksize {
 	uint32_t vdev_id;
 	struct qdf_mac_addr peer_macaddr;
 	uint32_t rx_block_ack_win_limit;
+};
+
+/**
+ * struct ani_ipa_stat_req - IPA stats request
+ * @msg_type: Message type
+ * @msg_len: Message Length
+ * @vdev_id: Vdev Id
+ * @param_id: param id
+ * @param_val: param value
+ * @req_type: request type
+ *
+ * IPA stats request message structure
+ */
+struct ani_ipa_stat_req {
+	uint16_t msg_type;
+	uint16_t msg_len;
+	uint16_t vdev_id;
+	uint32_t param_id;
+	uint32_t param_val;
+	uint32_t req_type;
 };
 
 #endif /* __SIR_API_H */

@@ -551,6 +551,30 @@ static void dump_tdls_state_param_setting(tdlsInfo_t *info)
 
 }
 
+void hdd_tdls_notify_set_state_disable(uint32_t session_id)
+{
+	hdd_context_t *hdd_ctx;
+	hdd_adapter_t *adapter;
+
+	ENTER();
+
+	/* Get the HDD context.*/
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (NULL == hdd_ctx)
+		return;
+
+	adapter = hdd_get_adapter_by_sme_session_id(hdd_ctx, session_id);
+	if (NULL == adapter) {
+		hdd_err("adapter not found");
+		return;
+	}
+
+	if (WLAN_HDD_ADAPTER_MAGIC != adapter->magic) {
+		hdd_err("adapter has invalid magic");
+		return;
+	}
+	wlan_hdd_tdls_notify_disconnect(adapter, true);
+}
 
 /**
  * wlan_hdd_tdls_monitor_timers_stop() - stop all monitoring timers
@@ -1730,8 +1754,19 @@ static void wlan_hdd_tdls_set_mode(hdd_context_t *pHddCtx,
 				/* tdls implicit mode is enabled, so
 				 * enable the connection tracker
 				 */
-				pHddCtx->enable_tdls_connection_tracker =
-					true;
+				pHddCtx->enable_tdls_connection_tracker
+					= true;
+
+				if  (tdls_mode == eTDLS_SUPPORT_EXTERNAL_CONTROL
+					&& !pHddCtx->tdls_external_peer_count) {
+					/* Disable connection tracker if tdls
+					 * mode is external and no force peers
+					 * were configured by application.
+					 */
+					pHddCtx->enable_tdls_connection_tracker
+						= false;
+				}
+
 			} else if (eTDLS_SUPPORT_DISABLED == tdls_mode) {
 				set_bit((unsigned long)source,
 					&pHddCtx->tdls_source_bitmap);
@@ -1891,17 +1926,21 @@ int wlan_hdd_tdls_set_params(struct net_device *dev,
  */
 static hdd_adapter_t *wlan_hdd_tdls_get_adapter(hdd_context_t *hdd_ctx)
 {
+	uint32_t vdev_id;
+
 	if (cds_get_connection_count() > 1)
 		return NULL;
-	if (cds_mode_specific_connection_count(QDF_STA_MODE,
-					       NULL) == 1)
-		return hdd_get_adapter(hdd_ctx,
-				       QDF_STA_MODE);
-	if (cds_mode_specific_connection_count(QDF_P2P_CLIENT_MODE,
-					       NULL) == 1)
-		return hdd_get_adapter(hdd_ctx,
-				       QDF_P2P_CLIENT_MODE);
+
+	vdev_id = cds_mode_specific_vdev_id(QDF_STA_MODE);
+	if (CDS_INVALID_VDEV_ID != vdev_id)
+		return hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
+
+	vdev_id = cds_mode_specific_vdev_id(QDF_P2P_CLIENT_MODE);
+	if (CDS_INVALID_VDEV_ID != vdev_id)
+		return hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
+
 	return NULL;
+
 }
 
 /**
@@ -2077,6 +2116,11 @@ void wlan_hdd_tdls_notify_connect(hdd_adapter_t *adapter,
 				  tCsrRoamInfo *csr_roam_info)
 {
 	hdd_info("Check and update TDLS state");
+
+	if (cds_get_connection_count() > 1) {
+		hdd_debug("concurrent sessions exist, TDLS can't be enabled");
+		return;
+	}
 
 	/* Association event */
 	if (adapter->device_mode == QDF_STA_MODE ||
@@ -5701,7 +5745,7 @@ void wlan_hdd_tdls_implicit_send_discovery_request(tdlsCtx_t *hdd_tdls_ctx)
 					   eTDLS_LINK_DISCOVERING,
 					   eTDLS_LINK_SUCCESS);
 
-	hdd_info("Implicit TDLS, Send Discovery request event");
+	hdd_debug("Implicit TDLS, Send Discovery request event");
 	cfg80211_tdls_oper_request(hdd_tdls_ctx->pAdapter->dev,
 				   curr_peer->peerMac,
 				   NL80211_TDLS_DISCOVERY_REQ,
@@ -5714,7 +5758,7 @@ void wlan_hdd_tdls_implicit_send_discovery_request(tdlsCtx_t *hdd_tdls_ctx)
 				hdd_tdls_ctx->threshold_config.tx_period_t -
 				TDLS_DISCOVERY_TIMEOUT_BEFORE_UPDATE);
 
-	hdd_info("discovery count %u timeout %u msec",
+	hdd_debug("discovery count %u timeout %u msec",
 		 hdd_tdls_ctx->discovery_sent_cnt,
 		 hdd_tdls_ctx->threshold_config.tx_period_t -
 		 TDLS_DISCOVERY_TIMEOUT_BEFORE_UPDATE);
@@ -5942,7 +5986,7 @@ static void wlan_hdd_tdls_ct_process_cap_supported(hddTdlsPeer_t *curr_peer,
 						   hdd_context_t *hdd_ctx,
 						   tdlsCtx_t *hdd_tdls_ctx)
 {
-	hdd_info("tx %d, rx %d (thr.pkt %d/idle %d), rssi %d (thr.trig %d/tear %d)",
+	hdd_debug("tx %d, rx %d (thr.pkt %d/idle %d), rssi %d (thr.trig %d/tear %d)",
 		 curr_peer->tx_pkt, curr_peer->rx_pkt,
 		 hdd_tdls_ctx->threshold_config.tx_packet_n,
 		 hdd_tdls_ctx->threshold_config.idle_packet_n,
@@ -5986,7 +6030,7 @@ static void wlan_hdd_tdls_ct_process_cap_unknown(hddTdlsPeer_t *curr_peer,
 		return;
 	}
 
-	hdd_info("threshold_config.tx_packet_n = %d curr_peer->tx_pkt = %d curr_peer->rx_pkt = %d ",
+	hdd_debug("threshold_config.tx_packet_n = %d curr_peer->tx_pkt = %d curr_peer->rx_pkt = %d ",
 		hdd_tdls_ctx->threshold_config.tx_packet_n, curr_peer->tx_pkt,
 		curr_peer->rx_pkt);
 
@@ -5997,10 +6041,10 @@ static void wlan_hdd_tdls_ct_process_cap_unknown(hddTdlsPeer_t *curr_peer,
 		 * is, peer is forced. In that case, continue discovery attempt
 		 * regardless attempt count
 		 */
-		hdd_info("TDLS UNKNOWN pre discover ");
+		hdd_debug("TDLS UNKNOWN pre discover ");
 		if (curr_peer->isForcedPeer || curr_peer->discovery_attempt++ <
 		    hdd_tdls_ctx->threshold_config.discovery_tries_n) {
-			hdd_info("TDLS UNKNOWN discover ");
+			hdd_debug("TDLS UNKNOWN discover ");
 			hdd_tdls_ctx->curr_candidate = curr_peer;
 			wlan_hdd_tdls_implicit_send_discovery_request(hdd_tdls_ctx);
 		} else {
