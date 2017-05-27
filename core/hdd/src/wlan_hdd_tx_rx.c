@@ -397,7 +397,7 @@ static void hdd_get_transmit_sta_id(hdd_adapter_t *adapter,
 	if (*station_id == HDD_WLAN_INVALID_STA_ID) {
 		if (QDF_NBUF_CB_GET_IS_BCAST(skb) ||
 				QDF_NBUF_CB_GET_IS_MCAST(skb)) {
-			hdd_info("Received MC/BC packet for transmission");
+			hdd_debug("Received MC/BC packet for transmission");
 			mcbc_addr = true;
 		}
 	}
