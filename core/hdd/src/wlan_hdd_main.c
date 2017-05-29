@@ -616,6 +616,28 @@ int wlan_hdd_validate_context(hdd_context_t *hdd_ctx)
 }
 
 /**
+ * wlan_hdd_modules_are_enabled() - Check modules status
+ * @hdd_ctx: HDD context pointer
+ *
+ * Check's the driver module's state and returns true if the
+ * modules are enabled returns false if modules are closed.
+ *
+ * Return: True if modules are enabled or false.
+ */
+bool wlan_hdd_modules_are_enabled(hdd_context_t *hdd_ctx)
+{
+	mutex_lock(&hdd_ctx->iface_change_lock);
+	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
+		mutex_unlock(&hdd_ctx->iface_change_lock);
+		hdd_notice("Modules not enabled, Present status: %d",
+			   hdd_ctx->driver_status);
+		return false;
+	}
+	mutex_unlock(&hdd_ctx->iface_change_lock);
+	return true;
+}
+
+/**
  * hdd_set_ibss_power_save_params() - update IBSS Power Save params to WMA.
  * @hdd_adapter_t Hdd adapter.
  *
@@ -2752,17 +2774,33 @@ QDF_STATUS hdd_init_station_mode(hdd_adapter_t *adapter)
 		status = QDF_STATUS_E_FAILURE;
 		goto error_register_wext;
 	}
-	if (hdd_ctx->config->enable_rx_ldpc &&
-	    hdd_ctx->config->rx_ldpc_support_for_2g &&
-	    (QDF_STA_MODE == adapter->device_mode)) {
-		if (!wma_is_current_hwmode_dbs()) {
-		    hdd_notice("send HT/VHT IE per band using nondbs hwmode");
-		    sme_set_vdev_ies_per_band(adapter->sessionId, false);
-		} else {
-		    hdd_notice("send HT/VHT IE per band using dbs hwmode");
-		    sme_set_vdev_ies_per_band(adapter->sessionId, true);
-		}
+
+	/*
+	 * 1) When DBS hwmode is disabled from INI then send HT/VHT IE as per
+	 *    non-dbs hw mode, so that there is no limitation applied for 2G/5G.
+	 * 2) When DBS hw mode is enabled, master Rx LDPC is enabled, 2G RX LDPC
+	 *    support is enabled, and if it is STA connection then send HT/VHT
+	 *    IE as per non-dbs hw mode, so that there is no limitation applied
+	 *    for first connection (initial connections as well as roaming
+	 *    scenario). As soon as second connection comes up policy manager
+	 *    will take care of imposing Rx LDPC limitation of STA connection
+	 *    (for current connection as well as roaming scenario).
+	 * 3) When DBS hw mode is supported but RX LDPC is disabled or 2G RXLPDC
+	 *    support is disabled then send HT/VHT IE as per DBS hw mode, so
+	 *    that STA will not use Rx LDPC for 2G connection.
+	 */
+	if (!wma_is_hw_dbs_capable() ||
+		(((QDF_STA_MODE == adapter->device_mode) &&
+			hdd_ctx->config->enable_rx_ldpc &&
+			hdd_ctx->config->rx_ldpc_support_for_2g) &&
+					!wma_is_current_hwmode_dbs())) {
+		hdd_notice("send HT/VHT IE per band using nondbs hwmode");
+		sme_set_vdev_ies_per_band(adapter->sessionId, false);
+	} else {
+		hdd_notice("send HT/VHT IE per band using dbs hwmode");
+		sme_set_vdev_ies_per_band(adapter->sessionId, true);
 	}
+
 	/* Register wireless extensions */
 	qdf_ret_status = hdd_register_wext(pWlanDev);
 	if (QDF_STATUS_SUCCESS != qdf_ret_status) {
@@ -3335,11 +3373,6 @@ hdd_adapter_t *hdd_open_adapter(hdd_context_t *hdd_ctx, uint8_t session_type,
 
 		adapter->device_mode = session_type;
 
-		if (QDF_NDI_MODE == session_type) {
-			status = hdd_init_nan_data_mode(adapter);
-			if (QDF_STATUS_SUCCESS != status)
-				goto err_free_netdev;
-		}
 
 		/* initialize action frame random mac info */
 		hdd_adapter_init_action_frame_random_mac(adapter);
@@ -3370,8 +3403,15 @@ hdd_adapter_t *hdd_open_adapter(hdd_context_t *hdd_ctx, uint8_t session_type,
 		wlan_hdd_netif_queue_control(adapter,
 					WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 					WLAN_CONTROL_PATH);
-		break;
 
+		/* Initialize NAN Data Interface */
+		if (QDF_NDI_MODE == session_type) {
+			status = hdd_init_nan_data_mode(adapter);
+			if (QDF_STATUS_SUCCESS != status)
+				goto err_free_netdev;
+		}
+
+		break;
 
 	case QDF_P2P_GO_MODE:
 	case QDF_SAP_MODE:
@@ -9297,6 +9337,10 @@ int hdd_wlan_startup(struct device *dev)
 				    set_value, PDEV_CMD);
 	}
 
+	if (hdd_ctx->config->is_force_1x1)
+		wma_cli_set_command(0, (int)WMI_PDEV_PARAM_SET_IOT_PATTERN,
+				1, PDEV_CMD);
+
 	qdf_mc_timer_start(&hdd_ctx->iface_change_timer,
 			   hdd_ctx->config->iface_change_wait_time);
 
@@ -10969,16 +11013,15 @@ static int __con_mode_handler(const char *kmessage, struct kernel_param *kp,
 	enum tQDF_GLOBAL_CON_MODE curr_mode;
 	enum tQDF_ADAPTER_MODE adapter_mode;
 
+	hdd_info("con_mode handler: %s", kmessage);
+
 	ret = wlan_hdd_validate_context(hdd_ctx);
 	if (ret)
 		return ret;
 
 	cds_set_load_in_progress(true);
 
-	hdd_debug("con_mode handler: %s", kmessage);
 	ret = param_set_int(kmessage, kp);
-
-
 
 	if (!(is_con_mode_valid(con_mode))) {
 		hdd_err("invlaid con_mode %d", con_mode);
