@@ -84,6 +84,7 @@
 #include <cdp_txrx_stats.h>
 #include "wlan_hdd_he.h"
 #include "wlan_dfs_tgt_api.h"
+#include <wlan_reg_ucfg_api.h>
 
 #define    IS_UP(_dev) \
 	(((_dev)->flags & (IFF_RUNNING|IFF_UP)) == (IFF_RUNNING|IFF_UP))
@@ -2732,7 +2733,6 @@ static __iw_softap_setparam(struct net_device *dev,
 	struct cdp_vdev *vdev = NULL;
 	struct cdp_pdev *pdev = NULL;
 	void *soc = NULL;
-	struct ol_txrx_stats_req req;
 
 	ENTER_DEV(dev);
 
@@ -2878,11 +2878,14 @@ static __iw_softap_setparam(struct net_device *dev,
 	{
 		ret = cds_get_datapath_handles(&soc, &pdev, &vdev,
 				 pHostapdAdapter->sessionId);
-		if (ret != 0)
+		if (ret != 0) {
+			QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_ERROR,
+				"Invalid Handles");
 			break;
+		}
+
 		hdd_notice("QCSAP_PARAM_SET_TXRX_STATS val %d", set_value);
-		qdf_mem_zero(&req, sizeof(req));
-		ret = cdp_txrx_stats(soc, vdev, &req, set_value);
+		ret = cdp_txrx_stats(soc, vdev, set_value);
 		break;
 	}
 
@@ -6051,6 +6054,9 @@ QDF_STATUS hdd_init_ap_mode(hdd_adapter_t *pAdapter, bool reinit)
 		return status;
 	}
 
+	/* set SME_SESSION_OPENED since sap session started */
+	set_bit(SME_SESSION_OPENED, &pAdapter->event_flags);
+
 	ret = hdd_vdev_ready(pAdapter);
 	if (ret) {
 		hdd_err("failed to raise vdev ready event: %d", ret);
@@ -7502,8 +7508,12 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 		if (pIe) {
 			pConfig->ieee80211d = 1;
 			qdf_mem_copy(pConfig->countryCode, &pIe[2], 3);
-			sme_set_reg_info(hHal, pConfig->countryCode);
-			sme_apply_channel_power_info_to_fw(hHal);
+			status = ucfg_reg_set_country(pHddCtx->hdd_pdev,
+					pConfig->countryCode);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				hdd_err("Failed to set country");
+				pConfig->ieee80211d = 0;
+			}
 		} else {
 			pConfig->countryCode[0] = pHddCtx->reg.alpha2[0];
 			pConfig->countryCode[1] = pHddCtx->reg.alpha2[1];
@@ -8203,8 +8213,8 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 		global_p2p_connection_status = P2P_NOT_ACTIVE;
 	}
 #endif
-	pAdapter->sessionId = HDD_SESSION_ID_INVALID;
 	EXIT();
+
 	return ret;
 }
 

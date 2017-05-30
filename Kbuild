@@ -209,11 +209,9 @@ endif
 
 	# Flag to enable LRO (Large Receive Offload)
 	ifeq ($(CONFIG_INET_LRO), y)
-		ifeq ($(VERSION), 4)
-			CONFIG_WLAN_LRO := y
-		else
-			CONFIG_WLAN_LRO := n
-		endif
+		CONFIG_WLAN_LRO := y
+	else
+		CONFIG_WLAN_LRO := n
 	endif
 endif
 
@@ -1052,7 +1050,8 @@ DP_OBJS := $(DP_SRC)/dp_main.o \
 		$(DP_SRC)/dp_reo.o \
 		$(DP_SRC)/dp_rx_mon_dest.o \
 		$(DP_SRC)/dp_rx_mon_status.o \
-		$(DP_SRC)/dp_rx_defrag.o
+		$(DP_SRC)/dp_rx_defrag.o \
+		$(DP_SRC)/dp_stats.o
 endif
 
 ############ CFG ############
@@ -1367,7 +1366,7 @@ ifeq ($(CONFIG_PLD_USB_CNSS), y)
 PLD_OBJS +=	$(PLD_SRC_DIR)/pld_usb.o
 endif
 
-TARGET_INC :=	-I$(WLAN_ROOT)/../fw-api/hw/qca6290/v1 \
+TARGET_INC :=	-I$(WLAN_ROOT)/../fw-api/hw/qca6290/v2 \
 		-I$(WLAN_ROOT)/../fw-api/fw
 
 LINUX_INC :=	-Iinclude/linux
@@ -2017,7 +2016,7 @@ CONFIG_HELIUMPLUS := y
 CONFIG_64BIT_PADDR := y
 CONFIG_FEATURE_TSO := y
 CONFIG_FEATURE_TSO_DEBUG := y
-ifeq ($(CONFIG_ARCH_MSM8998), y)
+ifneq ($(CONFIG_FORCE_ALLOC_FROM_DMA_ZONE), y)
 CONFIG_ENABLE_DEBUG_ADDRESS_MARKING := y
 endif
 ifeq ($(CONFIG_HELIUMPLUS),y)

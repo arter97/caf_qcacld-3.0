@@ -391,29 +391,6 @@ populate_dot11f_country(tpAniSirGlobal pMac,
 	return eSIR_SUCCESS;
 } /* End populate_dot11f_country. */
 
-#if defined(QCA_WIFI_3_0_EMU) || defined(QCA_WIFI_NAPIER_EMULATION)
-/**
- * populate_dot11f_ds_params() - To populate DS IE params
- * mac_ctx: Pointer to global mac context
- * dot11f_param: pointer to DS params IE
- * channel: channel number
- *
- * This routine will populate DS param in management frame like
- * beacon, probe response, and etc.
- *
- * Return: Overall sucess
- */
-tSirRetStatus
-populate_dot11f_ds_params(tpAniSirGlobal mac_ctx,
-			  tDot11fIEDSParams *dot11f_param, uint8_t channel)
-{
-	/* .11a/11b/g mode PHY => Include the DS Parameter Set IE: */
-	dot11f_param->curr_channel = channel;
-	dot11f_param->present = 1;
-
-	return eSIR_SUCCESS;
-} /* End populate_dot11f_ds_params. */
-#else
 /**
  * populate_dot11f_ds_params() - To populate DS IE params
  * mac_ctx: Pointer to global mac context
@@ -437,7 +414,6 @@ populate_dot11f_ds_params(tpAniSirGlobal mac_ctx,
 
 	return eSIR_SUCCESS;
 }
-#endif
 
 #define SET_AIFSN(aifsn) (((aifsn) < 2) ? 2 : (aifsn))
 
@@ -6010,6 +5986,34 @@ QDF_STATUS populate_dot11f_he_operation(tpAniSirGlobal mac_ctx,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef WLAN_FEATURE_11AX_BSS_COLOR
+/**
+ * populate_dot11f_he_bss_color_change() - pouldate HE BSS color change IE
+ * @mac_ctx: Global MAC context
+ * @session: PE session
+ * @he_bss_color: pointer to HE BSS color change IE
+ *
+ * Populdate the HE BSS color change IE based on the session.
+ */
+QDF_STATUS populate_dot11f_he_bss_color_change(tpAniSirGlobal mac_ctx,
+				tpPESession session,
+				tDot11fIEbss_color_change *he_bss_color)
+{
+	if (!session->bss_color_changing) {
+		he_bss_color->present = 0;
+		return QDF_STATUS_SUCCESS;
+	}
+
+	he_bss_color->present = 1;
+	he_bss_color->countdown = session->he_bss_color_change.countdown;
+	he_bss_color->new_color = session->he_bss_color_change.new_color;
+
+	lim_log_he_bss_color(mac_ctx, he_bss_color);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 #endif
 
 /* parser_api.c ends here. */

@@ -59,6 +59,10 @@
 #define IPADDR_STRING_LENGTH   (16)
 #endif
 
+#define CFG_DBS_SCAN_CLIENTS_MAX           (7)
+#define CFG_DBS_SCAN_PARAM_PER_CLIENT      (3)
+#define CFG_DBS_SCAN_PARAM_LENGTH          (42)
+
 /* Number of items that can be configured */
 #define MAX_CFG_INI_ITEMS   1024
 
@@ -1554,6 +1558,29 @@ enum hdd_dot11_mode {
 #define CFG_ROAM_RESCAN_RSSI_DIFF_MIN                   (0)
 #define CFG_ROAM_RESCAN_RSSI_DIFF_MAX                   (100)
 #define CFG_ROAM_RESCAN_RSSI_DIFF_DEFAULT               (5)
+
+/*
+ * <ini>
+ * gDroppedPktDisconnectTh - Sets dropped packet threshold in firmware
+ * @Min: 0
+ * @Max: 512
+ * @Default: 512
+ *
+ * This INI is the packet drop threshold will trigger disconnect from remote
+ * peer.
+ *
+ * Related: None
+ *
+ * Supported Feature: connection
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_DROPPED_PKT_DISCONNECT_TH_NAME      "gDroppedPktDisconnectTh"
+#define CFG_DROPPED_PKT_DISCONNECT_TH_MIN       (0)
+#define CFG_DROPPED_PKT_DISCONNECT_TH_MAX       (512)
+#define CFG_DROPPED_PKT_DISCONNECT_TH_DEFAULT   (512)
 
 /*
  * <ini>
@@ -5046,17 +5073,17 @@ enum hdd_link_speed_rpt_type {
 #define CFG_ENABLE_EGAP_INACT_TIME_FEATURE         "gEGAPInactTime"
 #define CFG_ENABLE_EGAP_INACT_TIME_FEATURE_MIN     (0)
 #define CFG_ENABLE_EGAP_INACT_TIME_FEATURE_MAX     (300000)
-#define CFG_ENABLE_EGAP_INACT_TIME_FEATURE_DEFAULT (1000)
+#define CFG_ENABLE_EGAP_INACT_TIME_FEATURE_DEFAULT (2000)
 
 #define CFG_ENABLE_EGAP_WAIT_TIME_FEATURE          "gEGAPWaitTime"
 #define CFG_ENABLE_EGAP_WAIT_TIME_FEATURE_MIN      (0)
 #define CFG_ENABLE_EGAP_WAIT_TIME_FEATURE_MAX      (300000)
-#define CFG_ENABLE_EGAP_WAIT_TIME_FEATURE_DEFAULT  (100)
+#define CFG_ENABLE_EGAP_WAIT_TIME_FEATURE_DEFAULT  (150)
 
 #define CFG_ENABLE_EGAP_FLAGS_FEATURE              "gEGAPFeatures"
 #define CFG_ENABLE_EGAP_FLAGS_FEATURE_MIN          (0)
 #define CFG_ENABLE_EGAP_FLAGS_FEATURE_MAX          (15)
-#define CFG_ENABLE_EGAP_FLAGS_FEATURE_DEFAULT      (7)
+#define CFG_ENABLE_EGAP_FLAGS_FEATURE_DEFAULT      (3)
 /* end Enhanced Green AP flags/params */
 
 #endif
@@ -8005,6 +8032,30 @@ enum dot11p_mode {
 #define CFG_DUAL_MAC_FEATURE_DISABLE_DEFAULT      (0)
 
 /*
+ * <ini>
+ * gdbs_scan_selection - DBS Scan Selection.
+ * @Default: 5,2,2,16,2,2
+ *
+ * This ini is used to enable DBS scan selection.
+ * 1st argument is module_id, 2nd argument is number of DBS scan,
+ * 3rd argument is number of non-DBS scan,
+ * and other arguments follows.
+ * 5,2,2,16,2,2 means:
+ * 5 is module id, 2 is num of DBS scan, 2 is num of non-DBS scan.
+ * 16 is module id, 2 is num of DBS scan, 2 is num of non-DBS scan.
+ *
+ * Related: None.
+ *
+ * Supported Feature: DBS Scan
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+#define CFG_DBS_SCAN_SELECTION_NAME          "gdbs_scan_selection"
+#define CFG_DBS_SCAN_SELECTION_DEFAULT       "5,2,2,16,2,2"
+
+/*
  * gPNOChannelPrediction will allow user to enable/disable the
  * PNO channel prediction feature.
  * In current PNO implementation, scan is always done until all configured
@@ -9881,6 +9932,36 @@ enum l1ss_sleep_allowed {
 #define CFG_QCN_IE_SUPPORT_MAX      1
 #define CFG_QCN_IE_SUPPORT_DEFAULT  1
 
+/*
+ * <ini>
+ * gTimerMultiplier - Scale QDF timers by this value
+ * @Min: 1
+ * @Max: 0xFFFFFFFF
+ * @Default: 1 (100 for emulation)
+ *
+ * To assist in debugging emulation setups, scale QDF timers by this factor.
+ *
+ * @E.g.
+ *	# QDF timers expire in real time
+ *	gTimerMultiplier=1
+ *	# QDF timers expire after 100 times real time
+ *	gTimerMultiplier=100
+ *
+ * Related: N/A
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_TIMER_MULTIPLIER_NAME	"gTimerMultiplier"
+#define CFG_TIMER_MULTIPLIER_MIN	(1)
+#define CFG_TIMER_MULTIPLIER_MAX	(0xFFFFFFFF)
+#ifdef QCA_WIFI_NAPIER_EMULATION
+#define CFG_TIMER_MULTIPLIER_DEFAULT	(100)
+#else
+#define CFG_TIMER_MULTIPLIER_DEFAULT	(1)
+#endif
+
 /* enable_reg_offload - enable regulatory offload
  * @Min: 0
  * @Max: 1
@@ -10604,6 +10685,7 @@ struct hdd_config {
 #endif
 	bool ce_classify_enabled;
 	uint32_t dual_mac_feature_disable;
+	uint8_t dbs_scan_selection[CFG_DBS_SCAN_PARAM_LENGTH];
 	bool     tx_chain_mask_cck;
 	uint8_t  tx_chain_mask_1ss;
 	bool smart_chainmask_enabled;
@@ -10725,9 +10807,12 @@ struct hdd_config {
 	bool ani_enabled;
 	bool qcn_ie_support;
 	bool reg_offload_enabled;
+	uint32_t timer_multiplier;
 	uint8_t fils_max_chan_guard_time;
 	enum hdd_external_acs_policy external_acs_policy;
 	enum hdd_external_acs_freq_band external_acs_freq_band;
+	/* threshold of packet drops at which FW initiates disconnect */
+	uint16_t pkt_err_disconn_th;
 };
 
 #define VAR_OFFSET(_Struct, _Var) (offsetof(_Struct, _Var))

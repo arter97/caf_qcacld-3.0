@@ -742,6 +742,12 @@ static void wma_vdev_start_rsp(tp_wma_handle wma,
 	}
 	add_bss->smpsMode = host_map_smps_mode(resp_event->smps_mode);
 send_fail_resp:
+	/* Send vdev stop if vdev start was success */
+	if ((add_bss->status != QDF_STATUS_SUCCESS) &&
+	   !resp_event->status)
+		if (wma_send_vdev_stop_to_fw(wma, resp_event->vdev_id))
+			WMA_LOGE("%s: %d Failed to send vdev stop", __func__, __LINE__);
+
 	WMA_LOGD("%s: Sending add bss rsp to umac(vdev %d status %d)",
 		 __func__, resp_event->vdev_id, add_bss->status);
 	wma_send_msg(wma, WMA_ADD_BSS_RSP, (void *)add_bss, 0);
@@ -1761,6 +1767,15 @@ struct cdp_vdev *wma_vdev_attach(tp_wma_handle wma_handle,
 						     self_sta_req->session_id);
 		}
 	}
+
+	WMA_LOGD("Setting WMI_VDEV_PARAM_DISCONNECT_TH: %d",
+		self_sta_req->pkt_err_disconn_th);
+	ret = wma_vdev_set_param(wma_handle->wmi_handle,
+				self_sta_req->session_id,
+				WMI_VDEV_PARAM_DISCONNECT_TH,
+				self_sta_req->pkt_err_disconn_th);
+	if (ret)
+		WMA_LOGE("Failed to set WMI_VDEV_PARAM_DISCONNECT_TH");
 
 	wma_handle->interfaces[vdev_id].is_vdev_valid = true;
 	ret = wma_vdev_set_param(wma_handle->wmi_handle,
@@ -3617,6 +3632,7 @@ static void wma_add_sta_req_ap_mode(tp_wma_handle wma, tpAddStaParams add_sta)
 	}
 #endif
 
+	iface->rmfEnabled = add_sta->rmfEnabled;
 	if (add_sta->rmfEnabled)
 		wma_set_mgmt_frame_protection(wma);
 

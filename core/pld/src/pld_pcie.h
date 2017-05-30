@@ -72,22 +72,30 @@ int pld_pcie_wlan_enable(struct device *dev, struct pld_wlan_enable_cfg *config,
 int pld_pcie_wlan_disable(struct device *dev, enum pld_driver_mode mode);
 #endif
 
-#if (!defined(CONFIG_PLD_PCIE_CNSS)) || (!defined(QCA_WIFI_3_0_ADRASTEA))
-static inline int pld_pcie_set_fw_log_mode(u8 fw_log_mode)
-{
-	return 0;
-}
-static inline void pld_pcie_intr_notify_q6(void)
-{
-}
-#else
-static inline int pld_pcie_set_fw_log_mode(u8 fw_log_mode)
+#if defined(CONFIG_PLD_PCIE_CNSS) && defined(QCA_WIFI_3_0_ADRASTEA)
+static inline int pld_pcie_set_fw_log_mode(struct device *dev, u8 fw_log_mode)
 {
 	return cnss_set_fw_debug_mode(fw_log_mode);
 }
 static inline void pld_pcie_intr_notify_q6(void)
 {
 	cnss_intr_notify_q6();
+}
+#elif defined(CONFIG_PLD_PCIE_CNSS)
+static inline int pld_pcie_set_fw_log_mode(struct device *dev, u8 fw_log_mode)
+{
+	return cnss_set_fw_log_mode(dev, fw_log_mode);
+}
+static inline void pld_pcie_intr_notify_q6(void)
+{
+}
+#else
+static inline int pld_pcie_set_fw_log_mode(struct device *dev, u8 fw_log_mode)
+{
+	return 0;
+}
+static inline void pld_pcie_intr_notify_q6(void)
+{
 }
 #endif
 
@@ -156,6 +164,18 @@ static inline int pld_pcie_wlan_set_dfs_nol(void *info, u16 info_len)
 	return 0;
 }
 static inline int pld_pcie_wlan_get_dfs_nol(void *info, u16 info_len)
+{
+	return 0;
+}
+static inline int pld_pcie_athdiag_read(struct device *dev, uint32_t offset,
+					uint32_t memtype, uint32_t datalen,
+					uint8_t *output)
+{
+	return 0;
+}
+static inline int pld_pcie_athdiag_write(struct device *dev, uint32_t offset,
+					 uint32_t memtype, uint32_t datalen,
+					 uint8_t *input)
 {
 	return 0;
 }
@@ -279,6 +299,18 @@ static inline int pld_pcie_wlan_set_dfs_nol(void *info, u16 info_len)
 static inline int pld_pcie_wlan_get_dfs_nol(void *info, u16 info_len)
 {
 	return cnss_wlan_get_dfs_nol(info, info_len);
+}
+static inline int pld_pcie_athdiag_read(struct device *dev, uint32_t offset,
+					uint32_t memtype, uint32_t datalen,
+					uint8_t *output)
+{
+	return cnss_athdiag_read(dev, offset, memtype, datalen, output);
+}
+static inline int pld_pcie_athdiag_write(struct device *dev, uint32_t offset,
+					 uint32_t memtype, uint32_t datalen,
+					 uint8_t *input)
+{
+	return cnss_athdiag_write(dev, offset, memtype, datalen, input);
 }
 static inline void *pld_pcie_get_virt_ramdump_mem(unsigned long *size)
 {

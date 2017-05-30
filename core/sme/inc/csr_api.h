@@ -1313,6 +1313,7 @@ typedef struct tagCsrConfigParam {
 #endif
 	bool qcn_ie_support;
 	uint8_t fils_max_chan_guard_time;
+	uint16_t pkt_err_disconn_th;
 } tCsrConfigParam;
 
 /* Tush */
@@ -1665,8 +1666,6 @@ typedef QDF_STATUS (*csr_roamSessionCloseCallback)(void *pContext);
 #endif
 
 QDF_STATUS csr_set_channels(tHalHandle hHal, tCsrConfigParam *pParam);
-
-QDF_STATUS csr_set_reg_info(tHalHandle hHal, uint8_t *apCntryCode);
 
 /* enum to string conversion for debug output */
 const char *get_e_roam_cmd_status_str(eRoamCmdStatus val);

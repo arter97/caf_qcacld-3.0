@@ -613,8 +613,6 @@ int wlan_hdd_validate_context(hdd_context_t *hdd_ctx)
 	}
 
 	if (cds_is_load_or_unload_in_progress()) {
-		hdd_debug("%pS Unloading/Loading in Progress. Ignore!!!: 0x%x",
-			(void *)_RET_IP_, cds_get_driver_state());
 		return -EAGAIN;
 	}
 
@@ -623,6 +621,42 @@ int wlan_hdd_validate_context(hdd_context_t *hdd_ctx)
 		hdd_debug("%pS Start/Stop Modules in progress. Ignore!!!",
 				(void *)_RET_IP_);
 		return -EAGAIN;
+	}
+
+	return 0;
+}
+
+int hdd_validate_adapter(hdd_adapter_t *adapter)
+{
+	if (!adapter) {
+		hdd_err("adapter is null");
+		return -EINVAL;
+	}
+
+	if (adapter->magic != WLAN_HDD_ADAPTER_MAGIC) {
+		hdd_err("bad adapter magic: 0x%x (should be 0x%x)",
+			adapter->magic, WLAN_HDD_ADAPTER_MAGIC);
+		return -EINVAL;
+	}
+
+	if (!adapter->dev) {
+		hdd_err("adapter net_device is null");
+		return -EINVAL;
+	}
+
+	if (!(adapter->dev->flags & IFF_UP)) {
+		hdd_info("adapter net_device is not up");
+		return -EAGAIN;
+	}
+
+	if (adapter->sessionId == HDD_SESSION_ID_INVALID) {
+		hdd_info("adapter session is not open");
+		return -EAGAIN;
+	}
+
+	if (adapter->sessionId >= MAX_NUMBER_OF_ADAPTERS) {
+		hdd_err("bad adapter session Id: %u", adapter->sessionId);
+		return -EINVAL;
 	}
 
 	return 0;
@@ -3130,14 +3164,9 @@ QDF_STATUS hdd_init_station_mode(hdd_adapter_t *adapter)
 	if (status != QDF_STATUS_SUCCESS)
 		goto error_tdls_init;
 
-	status = hdd_lro_enable(hdd_ctx, adapter);
-	if (status != QDF_STATUS_SUCCESS)
-		goto error_lro_enable;
-
+	adapter->dev->features |= NETIF_F_LRO;
 	return QDF_STATUS_SUCCESS;
 
-error_lro_enable:
-	wlan_hdd_tdls_exit(adapter);
 error_tdls_init:
 	clear_bit(WMM_INIT_DONE, &adapter->event_flags);
 	hdd_wmm_adapter_close(adapter);
@@ -3735,12 +3764,6 @@ hdd_adapter_t *hdd_open_adapter(hdd_context_t *hdd_ctx, uint8_t session_type,
 		policy_mgr_set_concurrency_mode(hdd_ctx->hdd_psoc,
 			session_type);
 
-		/* Initialize the WoWL service */
-		if (!hdd_init_wowl(adapter)) {
-			hdd_err("hdd_init_wowl failed");
-			goto err_close_adapter;
-		}
-
 		/* Adapter successfully added. Increment the vdev count */
 		hdd_ctx->current_intf_count++;
 
@@ -3755,8 +3778,6 @@ hdd_adapter_t *hdd_open_adapter(hdd_context_t *hdd_ctx, uint8_t session_type,
 
 	return adapter;
 
-err_close_adapter:
-	hdd_close_adapter(hdd_ctx, adapter, rtnl_held);
 err_free_netdev:
 	wlan_hdd_release_intf_addr(hdd_ctx, adapter->macAddressCurrent.bytes);
 	free_netdev(adapter->dev);
@@ -3964,7 +3985,6 @@ QDF_STATUS hdd_stop_adapter(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 		if (scan_info != NULL && scan_info->mScanPending)
 			wlan_hdd_scan_abort(adapter);
 
-		hdd_lro_disable(hdd_ctx, adapter);
 		wlan_hdd_cleanup_remain_on_channel_ctx(adapter);
 
 #ifdef WLAN_OPEN_SOURCE
@@ -5307,6 +5327,26 @@ static void hdd_context_destroy(hdd_context_t *hdd_ctx)
 }
 
 /**
+ * wlan_destroy_bug_report_lock() - Destroy bug report lock
+ *
+ * This function is used to destroy bug report lock
+ *
+ * Return: None
+ */
+static void wlan_destroy_bug_report_lock(void)
+{
+	p_cds_contextType p_cds_context;
+
+	p_cds_context = cds_get_global_context();
+	if (!p_cds_context) {
+		hdd_err("cds context is NULL");
+		return;
+	}
+
+	qdf_spinlock_destroy(&p_cds_context->bug_report_lock);
+}
+
+/**
  * hdd_wlan_exit() - HDD WLAN exit function
  * @hdd_ctx:	Pointer to the HDD Context
  *
@@ -5391,6 +5431,8 @@ static void hdd_wlan_exit(hdd_context_t *hdd_ctx)
 		hdd_abort_sched_scan_all_adapters(hdd_ctx);
 		hdd_stop_all_adapters(hdd_ctx);
 	}
+
+	wlan_destroy_bug_report_lock();
 
 	/*
 	 * Close the scheduler before calling cds_close to make sure
@@ -5747,14 +5789,9 @@ void hdd_exchange_version_and_caps(hdd_context_t *hdd_ctx)
 QDF_STATUS hdd_set_sme_chan_list(hdd_context_t *hdd_ctx)
 {
 
-	if (hdd_ctx->reg_offload)
-		return sme_init_chan_list(hdd_ctx->hHal,
-					  hdd_ctx->reg.alpha2,
-					  0);
-	else
-		return sme_init_chan_list(hdd_ctx->hHal,
-					  hdd_ctx->reg.alpha2,
-					  hdd_ctx->reg.cc_src);
+	return sme_init_chan_list(hdd_ctx->hHal,
+				  hdd_ctx->reg.alpha2,
+				  hdd_ctx->reg.cc_src);
 }
 
 /**
@@ -7384,6 +7421,10 @@ static hdd_context_t *hdd_context_create(struct device *dev)
 		goto err_free_config;
 	}
 
+	hdd_debug("setting timer multiplier: %u",
+		  hdd_ctx->config->timer_multiplier);
+	qdf_timer_set_multiplier(hdd_ctx->config->timer_multiplier);
+
 	hdd_debug("Setting configuredMcastBcastFilter: %d",
 		   hdd_ctx->config->mcastBcastFilterSetting);
 
@@ -7649,46 +7690,17 @@ err_close_adapters:
 /**
  * hdd_update_country_code - Update country code
  * @hdd_ctx: HDD context
- * @adapter: Primary adapter context
  *
- * Update country code based on module parameter country_code at SME and wait
- * for the settings to take effect.
+ * Update country code based on module parameter country_code
  *
  * Return: 0 on success and errno on failure
  */
-static int hdd_update_country_code(hdd_context_t *hdd_ctx,
-				  hdd_adapter_t *adapter)
+static int hdd_update_country_code(hdd_context_t *hdd_ctx)
 {
-	QDF_STATUS status;
-	int ret = 0;
-	unsigned long rc;
-
-	if (country_code == NULL)
+	if (!country_code)
 		return 0;
 
-	INIT_COMPLETION(adapter->change_country_code);
-
-	status = sme_change_country_code(hdd_ctx->hHal,
-					 wlan_hdd_change_country_code_callback,
-					 country_code, adapter,
-					 hdd_ctx->pcds_context, eSIR_TRUE,
-					 eSIR_TRUE);
-
-
-	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		hdd_err("SME Change Country code from module param fail ret=%d",
-			ret);
-		return -EINVAL;
-	}
-
-	rc = wait_for_completion_timeout(&adapter->change_country_code,
-			 msecs_to_jiffies(WLAN_WAIT_TIME_COUNTRY));
-	if (!rc) {
-		hdd_err("SME while setting country code timed out");
-		ret = -ETIMEDOUT;
-	}
-
-	return ret;
+	return hdd_reg_set_country(hdd_ctx, country_code);
 }
 
 #ifdef QCA_LL_TX_FLOW_CONTROL_V2
@@ -8636,7 +8648,7 @@ static int hdd_features_init(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter)
 
 	ENTER();
 
-	ret = hdd_update_country_code(hdd_ctx, adapter);
+	ret = hdd_update_country_code(hdd_ctx);
 	if (ret) {
 		hdd_err("Failed to update country code: %d", ret);
 		goto out;
@@ -9089,6 +9101,26 @@ static void hdd_register_debug_callback(void)
 	qdf_register_debug_callback(QDF_MODULE_ID_HDD, &hdd_state_info_dump);
 }
 
+/*
+ * wlan_init_bug_report_lock() - Initialize bug report lock
+ *
+ * This function is used to create bug report lock
+ *
+ * Return: None
+ */
+static void wlan_init_bug_report_lock(void)
+{
+	p_cds_contextType p_cds_context;
+
+	p_cds_context = cds_get_global_context();
+	if (!p_cds_context) {
+		hdd_err("cds context is NULL");
+		return;
+	}
+
+	qdf_spinlock_create(&p_cds_context->bug_report_lock);
+}
+
 /**
  * hdd_wlan_startup() - HDD init function
  * @dev:	Pointer to the underlying device
@@ -9137,6 +9169,8 @@ int hdd_wlan_startup(struct device *dev)
 		hdd_err("Failed to start modules: %d", ret);
 		goto err_exit_nl_srv;
 	}
+
+	wlan_init_bug_report_lock();
 
 	wlan_hdd_update_wiphy(hdd_ctx);
 
@@ -10247,6 +10281,7 @@ err_out:
  */
 void hdd_deinit(void)
 {
+	hdd_deinit_wowl();
 	cds_deinit();
 
 #ifdef WLAN_LOGGING_SOCK_SVC_ENABLE

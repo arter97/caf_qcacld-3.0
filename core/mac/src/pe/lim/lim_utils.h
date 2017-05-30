@@ -465,6 +465,9 @@ bool lim_check_vht_op_mode_change(tpAniSirGlobal pMac,
 		tpPESession psessionEntry,
 		uint8_t chanWidth, uint8_t staId,
 		uint8_t *peerMac);
+#ifdef WLAN_FEATURE_11AX_BSS_COLOR
+bool lim_send_he_ie_update(tpAniSirGlobal mac_ctx, tpPESession pe_session);
+#endif
 bool lim_set_nss_change(tpAniSirGlobal pMac, tpPESession psessionEntry,
 		uint8_t rxNss, uint8_t staId, uint8_t *peerMac);
 bool lim_check_membership_user_position(tpAniSirGlobal pMac,
@@ -766,6 +769,20 @@ void lim_copy_join_req_he_cap(tpPESession session,
  * Return: None
  */
 void lim_log_he_op(tpAniSirGlobal mac, tDot11fIEvendor_he_op *he_ops);
+
+#ifdef WLAN_FEATURE_11AX_BSS_COLOR
+/**
+ * lim_log_he_bss_color() - Print HE bss color
+ * @mac: pointer to MAC context
+ * @he_bss_color: pointer to HE bss color
+ *
+ * Print HE bss color IE
+ *
+ * Return: None
+ */
+void lim_log_he_bss_color(tpAniSirGlobal mac,
+			tDot11fIEbss_color_change *he_bss_color);
+#endif
 
 /**
  * lim_log_he_cap() - Print HE capabilities

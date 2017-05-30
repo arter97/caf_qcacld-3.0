@@ -164,9 +164,6 @@ typedef enum {
 	eCsrForcedDisassocSta,
 	eCsrForcedDeauthSta,
 	eCsrPerformPreauth,
-	eCsrLostLink1Abort,
-	eCsrLostLink2Abort,
-	eCsrLostLink3Abort,
 } eCsrRoamReason;
 
 typedef enum {
@@ -627,6 +624,7 @@ typedef struct tagCsrConfig {
 #endif
 	bool qcn_ie_support;
 	uint8_t fils_max_chan_guard_time;
+	uint16_t pkt_err_disconn_th;
 } tCsrConfig;
 
 typedef struct tagCsrChannelPowerInfo {
@@ -1153,8 +1151,6 @@ typedef struct tagCsrRoamStruct {
 	((CSR_IS_LOSTLINK_ROAMING((pSession)->roamingReason)) || \
 		(eCsrDynamicRoaming == (pSession)->roamingReason)  ||	\
 		(eCsrReassocRoaming == (pSession)->roamingReason))
-#define CSR_IS_SET_KEY_COMMAND(pCommand) \
-	(eSmeCommandSetKey == (pCommand)->command)
 #define CSR_IS_ADDTS_WHEN_ACMOFF_SUPPORTED(pMac) \
 	(pMac->roam.configParam.addTSWhenACMIsOff)
 #define CSR_IS_LOSTLINK_ROAMING(reason) \
