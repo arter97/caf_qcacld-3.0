@@ -1997,9 +1997,10 @@ static void lim_csa_ecsa_handler(tpAniSirGlobal mac_ctx, tpPESession session)
 	old_channel = session->currentOperChannel;
 	new_channel = session->gLimChannelSwitch.primaryChannel;
 
-	if (!CDS_IS_SAME_BAND_CHANNELS(old_channel, new_channel) &&
-			(QDF_STA_MODE == session->pePersona)) {
-		pe_debug("Bands are different & Persona is STA");
+	if (mac_ctx->roam.configParam.isRoamOffloadEnabled &&
+	   !CDS_IS_SAME_BAND_CHANNELS(old_channel, new_channel) &&
+	   (QDF_STA_MODE == session->pePersona)) {
+		pe_debug("Roam offload enabled & Bands are different & Persona is STA");
 		is_fw_roaming_allowed = 1;
 	} else {
 		pe_debug("use host driver CSA/ECSA mechanism");
@@ -5562,6 +5563,11 @@ void lim_handle_heart_beat_failure_timeout(tpAniSirGlobal mac_ctx)
 			 (psession_entry->currentBssBeaconCnt == 0))) {
 			pe_debug("for session: %d",
 						psession_entry->peSessionId);
+
+			lim_send_deauth_mgmt_frame(mac_ctx,
+				eSIR_MAC_DISASSOC_DUE_TO_INACTIVITY_REASON,
+				psession_entry->bssId, psession_entry, false);
+
 			/*
 			 * AP did not respond to Probe Request.
 			 * Tear down link with it.
@@ -7263,12 +7269,14 @@ bool lim_check_if_vendor_oui_match(tpAniSirGlobal mac_ctx,
 			       uint8_t *ie, uint8_t ie_len)
 {
 	uint8_t *ptr = ie;
-	uint8_t elem_id = *ie;
+	uint8_t elem_id;
 
 	if (NULL == ie || 0 == ie_len) {
 		pe_err("IE Null or ie len zero %d", ie_len);
 		return false;
 	}
+
+	elem_id = *ie;
 
 	if (elem_id == IE_EID_VENDOR &&
 		!qdf_mem_cmp(&ptr[2], oui, oui_len))
