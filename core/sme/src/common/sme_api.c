@@ -17705,3 +17705,8 @@ QDF_STATUS sme_get_nud_debug_stats(tHalHandle hal,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+int sme_cli_set_command(int vdev_id, int param_id, int sval, int vpdev)
+{
+	return wma_cli_set_command(vdev_id, param_id, sval, vpdev);
+}

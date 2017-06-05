@@ -1540,4 +1540,18 @@ QDF_STATUS sme_rso_cmd_status_cb(tHalHandle hal,
 void sme_set_5g_band_pref(tHalHandle hal_handle,
 			  struct sme_5g_band_pref_params *pref_params);
 
+/**
+ * sme_cli_set_command() - SME wrapper API over WMA "set" command
+ * processor cmd
+ * @vdev_id: virtual device for the command
+ * @param_id: parameter id
+ * @sval: parameter value
+ * @vpdev: parameter category
+ *
+ * Command handler for set operations
+ *
+ * Return: 0 on success, errno on failure
+ */
+int sme_cli_set_command(int vdev_id, int param_id, int sval, int vpdev);
+
 #endif /* #if !defined( __SME_API_H ) */
