@@ -2625,6 +2625,8 @@ QDF_STATUS csr_change_default_config_param(tpAniSirGlobal pMac,
 			pParam->per_roam_config.tx_per_mon_time;
 		pMac->roam.configParam.per_roam_config.rx_per_mon_time =
 			pParam->per_roam_config.rx_per_mon_time;
+		pMac->roam.configParam.per_roam_config.min_candidate_rssi =
+			pParam->per_roam_config.min_candidate_rssi;
 
 		/* update p2p offload status */
 		pMac->pnoOffload = pParam->pnoOffload;
@@ -2862,6 +2864,8 @@ QDF_STATUS csr_get_config_param(tpAniSirGlobal pMac, tCsrConfigParam *pParam)
 			cfg_params->per_roam_config.tx_per_mon_time;
 	pParam->per_roam_config.rx_per_mon_time =
 			cfg_params->per_roam_config.rx_per_mon_time;
+	pParam->per_roam_config.min_candidate_rssi =
+			cfg_params->per_roam_config.min_candidate_rssi;
 
 	pParam->conc_custom_rule1 = cfg_params->conc_custom_rule1;
 	pParam->conc_custom_rule2 = cfg_params->conc_custom_rule2;
@@ -15014,18 +15018,6 @@ QDF_STATUS csr_send_join_req_msg(tpAniSirGlobal pMac, uint32_t sessionId,
 			QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
 				("Failed to get CSN beamformee capability"));
 
-		/*
-		 * Set SU Bformee only if SU Bformee is enabled in INI
-		 * and AP is SU Bformer capable
-		 */
-		if (value && !((IS_BSS_VHT_CAPABLE(pIes->VHTCaps) &&
-		   pIes->VHTCaps.suBeamFormerCap) ||
-		   (IS_BSS_VHT_CAPABLE(
-		   pIes->vendor_vht_ie.VHTCaps)
-		   && pIes->vendor_vht_ie.VHTCaps.
-		   suBeamFormerCap)))
-			value = 0;
-
 		csr_join_req->vht_config.su_beam_formee = value;
 
 		/* Set BF CSN value only if SU Bformee is enabled */
@@ -18465,15 +18457,18 @@ csr_create_per_roam_request(tpAniSirGlobal mac_ctx, uint8_t session_id)
 		mac_ctx->roam.configParam.per_roam_config.tx_rate_thresh_percnt;
 	req_buf->per_config.rx_rate_thresh_percnt =
 		mac_ctx->roam.configParam.per_roam_config.rx_rate_thresh_percnt;
+	req_buf->per_config.min_candidate_rssi =
+		mac_ctx->roam.configParam.per_roam_config.min_candidate_rssi;
 
 	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
-		"PER based roaming configuaration enable: %d vdev: %d high_rate_thresh: %d low_rate_thresh: %d rate_thresh_percnt: %d per_rest_time: %d monitor_time: %d",
+		"PER based roaming configuaration enable: %d vdev: %d high_rate_thresh: %d low_rate_thresh: %d rate_thresh_percnt: %d per_rest_time: %d monitor_time: %d min cand rssi: %d",
 			  req_buf->per_config.enable, session_id,
 			  req_buf->per_config.tx_high_rate_thresh,
 			  req_buf->per_config.tx_low_rate_thresh,
 			  req_buf->per_config.tx_rate_thresh_percnt,
 			  req_buf->per_config.per_rest_time,
-			  req_buf->per_config.tx_per_mon_time);
+			  req_buf->per_config.tx_per_mon_time,
+			  req_buf->per_config.min_candidate_rssi);
 	return req_buf;
 }
 
@@ -18563,12 +18558,14 @@ csr_roam_offload_scan(tpAniSirGlobal mac_ctx, uint8_t session_id,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if ((ROAM_SCAN_OFFLOAD_START == command) &&
-	    (session->pCurRoamProfile &&
-	     session->pCurRoamProfile->do_not_roam)) {
+	if ((ROAM_SCAN_OFFLOAD_START == command &&
+			REASON_CTX_INIT != reason) &&
+			(session->pCurRoamProfile &&
+			 session->pCurRoamProfile->do_not_roam)) {
 		sme_debug("Supplicant disabled driver roaming");
 		return QDF_STATUS_E_FAILURE;
 	}
+
 	if (0 == csr_roam_is_roam_offload_scan_enabled(mac_ctx)) {
 		sme_err("isRoamOffloadScanEnabled not set");
 		return QDF_STATUS_E_FAILURE;
@@ -19191,6 +19188,35 @@ QDF_STATUS csr_queue_sme_command(tpAniSirGlobal pMac, tSmeCmd *pCommand,
 		}
 	}
 	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS csr_roam_update_config(tpAniSirGlobal mac_ctx, uint8_t session_id,
+				  uint16_t capab, uint32_t value)
+{
+	struct update_config *msg;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	tCsrRoamSession *session = CSR_GET_SESSION(mac_ctx, session_id);
+
+	sme_debug("update HT config requested");
+	if (NULL == session) {
+		sme_err("Session does not exist for session id %d", session_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	msg = qdf_mem_malloc(sizeof(*msg));
+	if (NULL == msg) {
+		sme_err("malloc failed");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	msg->messageType = eWNI_SME_UPDATE_CONFIG;
+	msg->sme_session_id = session_id;
+	msg->capab = capab;
+	msg->value = value;
+	msg->length = sizeof(*msg);
+	status = cds_send_mb_message_to_mac(msg);
+
+	return status;
 }
 
 QDF_STATUS csr_roam_update_apwpsie(tpAniSirGlobal pMac, uint32_t sessionId,
@@ -20464,6 +20490,16 @@ static QDF_STATUS csr_process_roam_sync_callback(tpAniSirGlobal mac_ctx,
 		csr_roam_call_callback(mac_ctx, session_id, NULL, 0,
 				eCSR_ROAM_NAPI_OFF, eSIR_SME_SUCCESS);
 		return status;
+	case SIR_ROAMING_INVOKE_FAIL:
+		csr_roam_call_callback(mac_ctx, session_id, NULL, 0,
+				       eCSR_ROAM_ASSOCIATION_FAILURE,
+				       eCSR_ROAM_RESULT_INVOKE_FAILED);
+
+		/* Userspace roam request failed, disconnect with current AP */
+		sme_debug("LFR3: roam invoke from user-space fail, dis cur AP");
+		csr_roam_disconnect(mac_ctx, session_id,
+				    eCSR_DISCONNECT_REASON_DEAUTH);
+		return status;
 	case SIR_ROAM_SYNCH_PROPAGATION:
 		break;
 	case SIR_ROAM_SYNCH_COMPLETE:
@@ -20487,6 +20523,9 @@ static QDF_STATUS csr_process_roam_sync_callback(tpAniSirGlobal mac_ctx,
 		cds_set_connection_in_progress(false);
 		session->roam_synch_in_progress = false;
 		cds_check_concurrent_intf_and_restart_sap(session->pContext);
+		csr_roam_offload_scan(mac_ctx, session_id,
+				ROAM_SCAN_OFFLOAD_START,
+				REASON_CONNECT);
 		return status;
 	default:
 		sme_err("LFR3: callback reason %d", reason);

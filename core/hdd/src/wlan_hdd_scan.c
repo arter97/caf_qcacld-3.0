@@ -521,9 +521,9 @@ static void hdd_update_dbs_scan_ctrl_ext_flag(hdd_context_t *hdd_ctx,
 	/* Resetting the scan_ctrl_flags_ext to 0 */
 	scan_req->scan_ctrl_flags_ext = 0;
 
-	if ((hdd_ctx->config->dual_mac_feature_disable)
-	    || (!wma_is_hw_dbs_capable())) {
-		hdd_info("DBS is disabled or HW is not capable of DBS");
+	if (hdd_ctx->config->dual_mac_feature_disable ==
+				DISABLE_DBS_CXN_AND_SCAN) {
+		hdd_info("DBS is disabled");
 		goto end;
 	}
 
@@ -1743,7 +1743,8 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 			return 0;
 		}
 	}
-	if (!wma_is_hw_dbs_capable()) {
+	if (pHddCtx->config->dual_mac_feature_disable ==
+				DISABLE_DBS_CXN_AND_SCAN) {
 		if (true == pScanInfo->mScanPending) {
 			scan_ebusy_cnt++;
 			if (MAX_PENDING_LOG >
@@ -2074,8 +2075,10 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 	       scan_req.minChnTime, scan_req.maxChnTime,
 	       scan_req.p2pSearch, scan_req.skipDfsChnlInP2pSearch);
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 7, 0))
-	if (request->flags & NL80211_SCAN_FLAG_FLUSH)
+	if (request->flags & NL80211_SCAN_FLAG_FLUSH) {
+		hdd_debug("Kernel scan flush flag enabled");
 		sme_scan_flush_result(WLAN_HDD_GET_HAL_CTX(pAdapter));
+	}
 #endif
 	wlan_hdd_update_scan_rand_attrs((void *)&scan_req, (void *)request,
 					WLAN_HDD_HOST_SCAN);
@@ -3001,7 +3004,6 @@ static int __wlan_hdd_cfg80211_sched_scan_start(struct wiphy *wiphy,
 	 * that the wlan wakelock which was held in the wlan_hdd_cfg80211_scan
 	 * function.
 	 */
-	sme_scan_flush_result(hHal);
 	if (true == pScanInfo->mScanPending) {
 		ret = wlan_hdd_scan_abort(pAdapter);
 		if (ret < 0) {

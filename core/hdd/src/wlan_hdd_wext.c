@@ -7051,7 +7051,7 @@ static int __iw_set_mlme(struct net_device *dev,
 			(WLAN_HDD_GET_WEXT_STATE_PTR(pAdapter))->authKeyMgmt =
 				0;
 
-			hdd_notice("Disabling queues");
+			hdd_debug("Disabling queues");
 			wlan_hdd_netif_queue_control(pAdapter,
 					WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 					WLAN_CONTROL_PATH);
@@ -9460,7 +9460,8 @@ static int __iw_set_three_ints_getnone(struct net_device *dev,
 		break;
 	case WE_SET_DUAL_MAC_SCAN_CONFIG:
 		hdd_debug("Ioctl to set dual mac scan config");
-		if (hdd_ctx->config->dual_mac_feature_disable) {
+		if (hdd_ctx->config->dual_mac_feature_disable ==
+				DISABLE_DBS_CXN_AND_SCAN) {
 			hdd_err("Dual mac feature is disabled from INI");
 			return -EPERM;
 		}
@@ -10259,7 +10260,7 @@ static int iw_get_policy_manager_ut_ops(hdd_context_t *hdd_ctx,
 		uint8_t weight_list[QDF_MAX_NUM_CHAN] = {0};
 		uint32_t pcl_len = 0, i = 0;
 
-		hdd_notice("<iwpriv wlan0 pm_pcl> is called");
+		hdd_debug("<iwpriv wlan0 pm_pcl> is called");
 
 		cds_get_pcl(apps_args[0],
 				pcl, &pcl_len,
@@ -10303,7 +10304,7 @@ static int iw_get_policy_manager_ut_ops(hdd_context_t *hdd_ctx,
 	{
 		enum cds_conc_next_action action;
 
-		hdd_notice("<iwpriv wlan0 pm_query_action> is called");
+		hdd_debug("<iwpriv wlan0 pm_query_action> is called");
 		action = cds_current_connections_update(adapter->sessionId,
 						apps_args[0],
 						SIR_UPDATE_REASON_UT);
@@ -10315,7 +10316,7 @@ static int iw_get_policy_manager_ut_ops(hdd_context_t *hdd_ctx,
 	{
 		bool allow;
 
-		hdd_notice("<iwpriv wlan0 pm_query_allow> is called");
+		hdd_debug("<iwpriv wlan0 pm_query_allow> is called");
 		allow = cds_allow_concurrency(
 				apps_args[0], apps_args[1], apps_args[2]);
 		pr_info("allow %d {0 = don't allow, 1 = allow}", allow);
@@ -12394,7 +12395,8 @@ static int __iw_set_two_ints_getnone(struct net_device *dev,
 		break;
 	case WE_SET_DUAL_MAC_FW_MODE_CONFIG:
 		hdd_debug("Ioctl to set dual fw mode config");
-		if (hdd_ctx->config->dual_mac_feature_disable) {
+		if (hdd_ctx->config->dual_mac_feature_disable ==
+				DISABLE_DBS_CXN_AND_SCAN) {
 			hdd_err("Dual mac feature is disabled from INI");
 			return -EPERM;
 		}
