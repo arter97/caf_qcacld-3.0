@@ -318,6 +318,7 @@ static int wlan_hdd_probe(struct device *dev, void *bdev, const struct hif_bus_i
 {
 	int ret = 0;
 
+	mutex_lock(&hdd_init_deinit_lock);
 	pr_info("%s: %sprobing driver v%s\n", WLAN_MODULE_NAME,
 		reinit ? "re-" : "", QWLAN_VERSIONSTR);
 
@@ -359,6 +360,7 @@ static int wlan_hdd_probe(struct device *dev, void *bdev, const struct hif_bus_i
 
 	cds_clear_fw_state(CDS_FW_STATE_DOWN);
 
+	mutex_unlock(&hdd_init_deinit_lock);
 	return 0;
 
 
@@ -371,7 +373,7 @@ err_hdd_deinit:
 	hdd_remove_pm_qos(dev);
 
 	cds_clear_fw_state(CDS_FW_STATE_DOWN);
-
+	mutex_unlock(&hdd_init_deinit_lock);
 	return ret;
 }
 
@@ -1022,7 +1024,11 @@ static int wlan_hdd_pld_probe(struct device *dev,
 static void wlan_hdd_pld_remove(struct device *dev,
 		     enum pld_bus_type bus_type)
 {
+	ENTER();
+	mutex_lock(&hdd_init_deinit_lock);
 	wlan_hdd_remove(dev);
+	mutex_unlock(&hdd_init_deinit_lock);
+	EXIT();
 }
 
 /**
@@ -1035,7 +1041,11 @@ static void wlan_hdd_pld_remove(struct device *dev,
 static void wlan_hdd_pld_shutdown(struct device *dev,
 		       enum pld_bus_type bus_type)
 {
+	ENTER();
+	mutex_lock(&hdd_init_deinit_lock);
 	wlan_hdd_shutdown();
+	mutex_unlock(&hdd_init_deinit_lock);
+	EXIT();
 }
 
 /**
