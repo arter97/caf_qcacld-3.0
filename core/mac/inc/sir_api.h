@@ -209,6 +209,7 @@ typedef enum {
  * @SIR_ROAMING_START: Firmware started roaming operation
  * @SIR_ROAMING_ABORT: Firmware aborted roaming operation, still connected.
  * @SIR_ROAM_SYNCH_COMPLETE: Roam sync propagation is complete.
+ * @SIR_ROAMING_INVOKE_FAIL: Firmware roaming failed.
  */
 enum sir_roam_op_code {
 	SIR_ROAM_SYNCH_PROPAGATION = 1,
@@ -217,6 +218,7 @@ enum sir_roam_op_code {
 	SIR_ROAMING_ABORT,
 	SIR_ROAM_SYNCH_COMPLETE,
 	SIR_ROAM_SYNCH_NAPI_OFF,
+	SIR_ROAMING_INVOKE_FAIL,
 };
 /**
  * Module ID definitions.
@@ -2636,6 +2638,14 @@ typedef struct sSirUpdateAPWPSIEsReq {
 	uint8_t sessionId;      /* Session ID */
 	tSirAPWPSIEs APWPSIEs;
 } tSirUpdateAPWPSIEsReq, *tpSirUpdateAPWPSIEsReq;
+
+struct update_config {
+	uint16_t messageType;   /* eWNI_SME_UPDATE_CONFIG */
+	uint16_t length;
+	uint8_t sme_session_id;
+	uint16_t capab;
+	uint32_t value;
+};
 
 /*
  * enum sir_update_session_param_type - session param type
@@ -7865,26 +7875,6 @@ struct sir_peer_set_rx_blocksize {
 	uint32_t vdev_id;
 	struct qdf_mac_addr peer_macaddr;
 	uint32_t rx_block_ack_win_limit;
-};
-
-/**
- * struct ani_ipa_stat_req - IPA stats request
- * @msg_type: Message type
- * @msg_len: Message Length
- * @vdev_id: Vdev Id
- * @param_id: param id
- * @param_val: param value
- * @req_type: request type
- *
- * IPA stats request message structure
- */
-struct ani_ipa_stat_req {
-	uint16_t msg_type;
-	uint16_t msg_len;
-	uint16_t vdev_id;
-	uint32_t param_id;
-	uint32_t param_val;
-	uint32_t req_type;
 };
 
 #endif /* __SIR_API_H */

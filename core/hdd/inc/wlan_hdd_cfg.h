@@ -1587,6 +1587,29 @@ enum hdd_dot11_mode {
 
 /*
  * <ini>
+ * gForce1x1Exception - force 1x1 when connecting to certain peer
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This INI when enabled will force 1x1 connection with certain peer.
+ *
+ *
+ * Related: None
+ *
+ * Supported Feature: connection
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_FORCE_1X1_NAME      "gForce1x1Exception"
+#define CFG_FORCE_1X1_MIN       (0)
+#define CFG_FORCE_1X1_MAX       (1)
+#define CFG_FORCE_1X1_DEFAULT   (0)
+
+/*
+ * <ini>
  * gEnableFastRoamInConcurrency - Enable LFR roaming on STA during concurrency
  * @Min: 0
  * @Max: 1
@@ -8167,11 +8190,19 @@ enum dot11p_mode {
  * <ini>
  * gDualMacFeatureDisable - Disable Dual MAC feature.
  * @Min: 0
- * @Max: 1
+ * @Max: 4
  * @Default: 0
  *
  * This ini is used to enable/disable dual MAC feature.
- * 0 - enable DBS  1 - disable DBS
+ * 0 - enable DBS
+ * 1 - disable DBS
+ * 2 - disable DBS for connection but keep DBS for scan
+ * 3 - disable DBS for connection but keep DBS scan with async
+ *			scan policy disabled.
+ * 4 - enable DBS for connection as well as for scan with async
+ *			scan policy disabled.
+ *
+ * Note: INI item value should match 'enum dbs_support'
  *
  * Related: None.
  *
@@ -8183,7 +8214,7 @@ enum dot11p_mode {
  */
 #define CFG_DUAL_MAC_FEATURE_DISABLE               "gDualMacFeatureDisable"
 #define CFG_DUAL_MAC_FEATURE_DISABLE_MIN          (0)
-#define CFG_DUAL_MAC_FEATURE_DISABLE_MAX          (1)
+#define CFG_DUAL_MAC_FEATURE_DISABLE_MAX          (4)
 #define CFG_DUAL_MAC_FEATURE_DISABLE_DEFAULT      (0)
 
 /*
@@ -9428,6 +9459,30 @@ enum dot11p_mode {
 
 /*
  * <ini>
+ * gper_min_rssi_threshold_for_roam -  Minimum roamable AP RSSI for
+ * candidate selection for PER based roam
+ * @Min: 0
+ * @Max: 96
+ * @Default: 83
+ *
+ * Minimum roamable AP RSSI for candidate selection for PER based roam
+ *
+ * Related: gper_roam_enabled, gper_roam_high_rate_th, gper_roam_low_rate_th,
+ *          gper_roam_th_percent, gper_roam_rest_time
+ *
+ * Supported Feature: LFR-3.0
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_PER_ROAM_MIN_CANDIDATE_RSSI           "gper_min_rssi_threshold_for_roam"
+#define CFG_PER_ROAM_MIN_CANDIDATE_RSSI_MIN       (0)
+#define CFG_PER_ROAM_MIN_CANDIDATE_RSSI_MAX       (96)
+#define CFG_PER_ROAM_MIN_CANDIDATE_RSSI_DEFAULT   (83)
+
+/*
+ * <ini>
  * gPowerUsage - Preferred Power Usage
  * @Min: Min
  * @Max: Max
@@ -10185,6 +10240,7 @@ enum hw_filter_mode {
 #define CFG_ENABLE_PACKET_FILTERS_MAX      (63)
 
 /*
+ * <ini>
  * arp_ac_category - ARP access category
  * @Min: 0
  * @Max: 3
@@ -10665,6 +10721,7 @@ enum hw_filter_mode {
 #define CFG_ENABLE_ANI_DEFAULT           (1)
 
 /**
+ * <ini>
  * gSetRTSForSIFSBursting - set rts for sifs bursting
  * @Min: 0
  * @Max: 1
@@ -10700,6 +10757,7 @@ enum hw_filter_mode {
 #define CFG_MAX_MPDUS_IN_AMPDU_DEFAULT          (0)
 
 /*
+ * <ini>
  * gSapMaxMCSForTxData - sap 11n max mcs
  * @Min: 0
  * @Max: 383
@@ -10717,6 +10775,7 @@ enum hw_filter_mode {
 #define CFG_SAP_MAX_MCS_FOR_TX_DATA_DEFAULT         (0)
 
 /*
+ * <ini>
  * g_is_bssid_hint_priority - Set priority for connection with bssid_hint
  * BSSID.
  * @Min: 0
@@ -10738,6 +10797,29 @@ enum hw_filter_mode {
 #define CFG_IS_BSSID_HINT_PRIORITY_DEFAULT (1)
 #define CFG_IS_BSSID_HINT_PRIORITY_MIN     (0)
 #define CFG_IS_BSSID_HINT_PRIORITY_MAX     (1)
+
+/*
+ * <ini>
+ * g_is_fils_enabled - Enable/Disable FILS support in driver
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to enable/disable FILS support in driver
+ * Driver will update config to supplicant based on this config.
+ *
+ * Related: None
+ *
+ * Supported Feature: FILS
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_IS_FILS_ENABLED_NAME    "g_is_fils_enabled"
+#define CFG_IS_FILS_ENABLED_DEFAULT (1)
+#define CFG_IS_FILS_ENABLED_MIN     (0)
+#define CFG_IS_FILS_ENABLED_MAX     (1)
 
 /*
  * <ini>
@@ -11502,6 +11584,7 @@ struct hdd_config {
 	uint32_t per_roam_th_percent;
 	uint32_t per_roam_rest_time;
 	uint32_t per_roam_mon_time;
+	uint32_t min_candidate_rssi;
 	uint32_t max_sched_scan_plan_interval;
 	uint32_t max_sched_scan_plan_iterations;
 	uint8_t enable_phy_reg_retention;
@@ -11553,8 +11636,10 @@ struct hdd_config {
 	uint8_t max_mpdus_inampdu;
 	uint16_t sap_max_mcs_txdata;
 	bool is_bssid_hint_priority;
+	bool is_fils_enabled;
 	uint8_t dfs_beacon_tx_enhanced;
 	uint8_t scan_backoff_multiplier;
+	bool is_force_1x1;
 };
 
 #define VAR_OFFSET(_Struct, _Var) (offsetof(_Struct, _Var))

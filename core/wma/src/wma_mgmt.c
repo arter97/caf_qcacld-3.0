@@ -3181,6 +3181,7 @@ static inline int wma_process_rmf_frame(tp_wma_handle wma_handle,
  * wma_is_pkt_drop_candidate() - check if the mgmt frame should be droppped
  * @wma_handle: wma handle
  * @peer_addr: peer MAC address
+ * @bssid: BSSID Address
  * @subtype: Management frame subtype
  *
  * This function is used to decide if a particular management frame should be
@@ -3189,12 +3190,21 @@ static inline int wma_process_rmf_frame(tp_wma_handle wma_handle,
  * Return: true if the packet should be dropped and false oterwise
  */
 static bool wma_is_pkt_drop_candidate(tp_wma_handle wma_handle,
-				      uint8_t *peer_addr, uint8_t subtype)
+				      uint8_t *peer_addr, uint8_t *bssid,
+				      uint8_t subtype)
 {
 	struct ol_txrx_peer_t *peer = NULL;
 	struct ol_txrx_pdev_t *pdev_ctx;
 	uint8_t peer_id;
 	bool should_drop = false;
+	uint8_t nan_addr[] = {0x50, 0x6F, 0x9A, 0x01, 0x00, 0x00};
+
+	/* Drop the beacons from NAN device */
+	if ((subtype == IEEE80211_FC0_SUBTYPE_BEACON) &&
+		(!qdf_mem_cmp(nan_addr, bssid, NAN_CLUSTER_ID_BYTES))) {
+			should_drop = true;
+			goto end;
+	}
 
 	/*
 	 * Currently this function handles only Disassoc,
@@ -3214,7 +3224,6 @@ static bool wma_is_pkt_drop_candidate(tp_wma_handle wma_handle,
 		should_drop = true;
 		goto end;
 	}
-
 	peer = ol_txrx_find_peer_by_addr_inc_ref(pdev_ctx, peer_addr, &peer_id);
 	if (!peer) {
 		if (SIR_MAC_MGMT_ASSOC_REQ != subtype) {
@@ -3269,6 +3278,7 @@ end:
 	return should_drop;
 }
 
+#define RATE_LIMIT 16
 /**
  * wma_mgmt_rx_process() - process management rx frame.
  * @handle: wma handle
@@ -3291,6 +3301,9 @@ static int wma_mgmt_rx_process(void *handle, uint8_t *data,
 	struct wma_txrx_node *iface = NULL;
 	int status;
 	tp_wma_packetdump_cb packetdump_cb;
+	static uint8_t limit_prints_invalid_len = RATE_LIMIT - 1;
+	static uint8_t limit_prints_load_unload = RATE_LIMIT - 1;
+	static uint8_t limit_prints_recovery = RATE_LIMIT - 1;
 
 	if (!wma_handle) {
 		WMA_LOGE("%s: Failed to get WMA  context", __func__);
@@ -3310,17 +3323,29 @@ static int wma_mgmt_rx_process(void *handle, uint8_t *data,
 	}
 
 	if (hdr->buf_len < sizeof(struct ieee80211_frame)) {
-		WMA_LOGE("Invalid rx mgmt packet");
+		limit_prints_invalid_len++;
+		if (limit_prints_invalid_len == RATE_LIMIT) {
+			WMA_LOGD("Invalid rx mgmt packet");
+			limit_prints_invalid_len = 0;
+		}
 		return -EINVAL;
 	}
 
 	if (cds_is_load_or_unload_in_progress()) {
-		WMA_LOGW(FL("Load/Unload in progress"));
+		limit_prints_load_unload++;
+		if (limit_prints_load_unload == RATE_LIMIT) {
+			WMA_LOGD(FL("Load/Unload in progress"));
+			limit_prints_load_unload = 0;
+		}
 		return -EINVAL;
 	}
 
 	if (cds_is_driver_recovering()) {
-		WMA_LOGW(FL("Recovery in progress"));
+		limit_prints_recovery++;
+		if (limit_prints_recovery == RATE_LIMIT) {
+			WMA_LOGD(FL("Recovery in progress"));
+			limit_prints_recovery = 0;
+		}
 		return -EINVAL;
 	}
 
@@ -3449,8 +3474,19 @@ static int wma_mgmt_rx_process(void *handle, uint8_t *data,
 
 	rx_pkt->pkt_meta.sessionId =
 		(vdev_id == WMA_INVALID_VDEV_ID ? 0 : vdev_id);
-
-	if (wma_is_pkt_drop_candidate(wma_handle, wh->i_addr2, mgt_subtype)) {
+	if (mgt_type == IEEE80211_FC0_TYPE_MGT &&
+	    (mgt_subtype == IEEE80211_FC0_SUBTYPE_BEACON ||
+	     mgt_subtype == IEEE80211_FC0_SUBTYPE_PROBE_RESP)) {
+		if (hdr->buf_len <=
+			(sizeof(struct ieee80211_frame) +
+			offsetof(struct sSirProbeRespBeacon, ssId))) {
+			WMA_LOGD("Dropping frame from "MAC_ADDRESS_STR, MAC_ADDR_ARRAY(wh->i_addr3));
+			cds_pkt_return_packet(rx_pkt);
+			return -EINVAL;
+		}
+	}
+	if (wma_is_pkt_drop_candidate(wma_handle, wh->i_addr2, wh->i_addr3,
+					mgt_subtype)) {
 		cds_pkt_return_packet(rx_pkt);
 		return -EINVAL;
 	}

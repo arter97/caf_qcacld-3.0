@@ -4573,14 +4573,25 @@ static void wma_init_scan_fw_mode_config(tp_wma_handle wma_handle,
 	wma_handle->dual_mac_cfg.cur_scan_config = 0;
 	wma_handle->dual_mac_cfg.cur_fw_mode_config = 0;
 
-	/* If dual mac features are disabled in the INI, we
+	/*
+	 * If dual mac features are disabled in the INI, we
 	 * need not proceed further
 	 */
-	if (mac->dual_mac_feature_disable) {
+	if (mac->dual_mac_feature_disable == DISABLE_DBS_CXN_AND_SCAN) {
 		WMA_LOGE("%s: Disabling dual mac capabilities", __func__);
 		/* All capabilites are initialized to 0. We can return */
 		goto done;
 	}
+
+	WMI_DBS_CONC_SCAN_CFG_ASYNC_DBS_SCAN_SET(
+		wma_handle->dual_mac_cfg.cur_scan_config,
+		WMI_DBS_CONC_SCAN_CFG_ASYNC_DBS_SCAN_GET(scan_config));
+	WMI_DBS_FW_MODE_CFG_DBS_FOR_CXN_SET(
+		wma_handle->dual_mac_cfg.cur_fw_mode_config,
+		WMI_DBS_FW_MODE_CFG_DBS_FOR_CXN_GET(fw_config));
+	WMI_DBS_CONC_SCAN_CFG_SYNC_DBS_SCAN_SET(
+		wma_handle->dual_mac_cfg.cur_scan_config,
+		WMI_DBS_CONC_SCAN_CFG_SYNC_DBS_SCAN_GET(scan_config));
 
 	/* Initialize concurrent_scan_config_bits with default FW value */
 	WMI_DBS_CONC_SCAN_CFG_DBS_SCAN_SET(
@@ -6419,7 +6430,10 @@ void wma_mc_discard_msg(cds_msg_t *msg)
 	case WMA_PROCESS_FW_EVENT:
 		qdf_nbuf_free(((wma_process_fw_event_params *)msg->bodyptr)->
 			      evt_buf);
-	break;
+		break;
+	case WMA_SET_LINK_STATE:
+		qdf_mem_free(((tpLinkStateParams) msg->bodyptr)->callbackArg);
+		break;
 	}
 	if (msg->bodyptr)
 		qdf_mem_free(msg->bodyptr);
@@ -7706,7 +7720,8 @@ QDF_STATUS wma_send_pdev_set_pcl_cmd(tp_wma_handle wma_handle,
 	}
 
 	msg->saved_num_chan = wma_handle->saved_chan.num_channels;
-	status = cds_get_valid_chan_weights((struct sir_pcl_chan_weights *)msg);
+	status = cds_get_valid_chan_weights((struct sir_pcl_chan_weights *)msg,
+					CDS_STA_MODE);
 
 	for (i = 0; i < msg->saved_num_chan; i++) {
 		msg->weighed_valid_list[i] =

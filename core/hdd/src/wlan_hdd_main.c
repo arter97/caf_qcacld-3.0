@@ -616,6 +616,28 @@ int wlan_hdd_validate_context(hdd_context_t *hdd_ctx)
 }
 
 /**
+ * wlan_hdd_modules_are_enabled() - Check modules status
+ * @hdd_ctx: HDD context pointer
+ *
+ * Check's the driver module's state and returns true if the
+ * modules are enabled returns false if modules are closed.
+ *
+ * Return: True if modules are enabled or false.
+ */
+bool wlan_hdd_modules_are_enabled(hdd_context_t *hdd_ctx)
+{
+	mutex_lock(&hdd_ctx->iface_change_lock);
+	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
+		mutex_unlock(&hdd_ctx->iface_change_lock);
+		hdd_notice("Modules not enabled, Present status: %d",
+			   hdd_ctx->driver_status);
+		return false;
+	}
+	mutex_unlock(&hdd_ctx->iface_change_lock);
+	return true;
+}
+
+/**
  * hdd_set_ibss_power_save_params() - update IBSS Power Save params to WMA.
  * @hdd_adapter_t Hdd adapter.
  *
@@ -841,8 +863,11 @@ static void hdd_update_hw_dbs_capable(hdd_context_t *hdd_ctx)
 	struct hdd_config *cfg_ini = hdd_ctx->config;
 	uint8_t hw_dbs_capable = 0;
 
-	if ((!cfg_ini->dual_mac_feature_disable)
-	    && wma_is_hw_dbs_capable())
+	if (wma_is_hw_dbs_capable() &&
+			((cfg_ini->dual_mac_feature_disable ==
+			 ENABLE_DBS_CXN_AND_SCAN) ||
+			(cfg_ini->dual_mac_feature_disable ==
+			 ENABLE_DBS_CXN_AND_ENABLE_SCAN_WITH_ASYNC_SCAN_OFF)))
 		hw_dbs_capable = 1;
 
 	sme_update_hw_dbs_capable(hdd_ctx->hHal, hw_dbs_capable);
@@ -1968,7 +1993,7 @@ static int __hdd_open(struct net_device *dev)
 
 	/* Enable carrier and transmit queues for NDI */
 	if (WLAN_HDD_IS_NDI(adapter)) {
-		hdd_notice("Enabling Tx Queues");
+		hdd_debug("Enabling Tx Queues");
 		wlan_hdd_netif_queue_control(adapter,
 			WLAN_START_ALL_NETIF_QUEUE_N_CARRIER,
 			WLAN_CONTROL_PATH);
@@ -2030,7 +2055,7 @@ static int __hdd_stop(struct net_device *dev)
 	 * Disable TX on the interface, after this hard_start_xmit() will not
 	 * be called on that interface
 	 */
-	hdd_notice("Disabling queues");
+	hdd_debug("Disabling queues");
 	wlan_hdd_netif_queue_control(adapter,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 				     WLAN_CONTROL_PATH);
@@ -2752,17 +2777,33 @@ QDF_STATUS hdd_init_station_mode(hdd_adapter_t *adapter)
 		status = QDF_STATUS_E_FAILURE;
 		goto error_register_wext;
 	}
-	if (hdd_ctx->config->enable_rx_ldpc &&
-	    hdd_ctx->config->rx_ldpc_support_for_2g &&
-	    (QDF_STA_MODE == adapter->device_mode)) {
-		if (!wma_is_current_hwmode_dbs()) {
-		    hdd_notice("send HT/VHT IE per band using nondbs hwmode");
-		    sme_set_vdev_ies_per_band(adapter->sessionId, false);
-		} else {
-		    hdd_notice("send HT/VHT IE per band using dbs hwmode");
-		    sme_set_vdev_ies_per_band(adapter->sessionId, true);
-		}
+
+	/*
+	 * 1) When DBS hwmode is disabled from INI then send HT/VHT IE as per
+	 *    non-dbs hw mode, so that there is no limitation applied for 2G/5G.
+	 * 2) When DBS hw mode is enabled, master Rx LDPC is enabled, 2G RX LDPC
+	 *    support is enabled, and if it is STA connection then send HT/VHT
+	 *    IE as per non-dbs hw mode, so that there is no limitation applied
+	 *    for first connection (initial connections as well as roaming
+	 *    scenario). As soon as second connection comes up policy manager
+	 *    will take care of imposing Rx LDPC limitation of STA connection
+	 *    (for current connection as well as roaming scenario).
+	 * 3) When DBS hw mode is supported but RX LDPC is disabled or 2G RXLPDC
+	 *    support is disabled then send HT/VHT IE as per DBS hw mode, so
+	 *    that STA will not use Rx LDPC for 2G connection.
+	 */
+	if (!wma_is_hw_dbs_capable() ||
+		(((QDF_STA_MODE == adapter->device_mode) &&
+			hdd_ctx->config->enable_rx_ldpc &&
+			hdd_ctx->config->rx_ldpc_support_for_2g) &&
+					!wma_is_current_hwmode_dbs())) {
+		hdd_debug("send HT/VHT IE per band using nondbs hwmode");
+		sme_set_vdev_ies_per_band(adapter->sessionId, false);
+	} else {
+		hdd_debug("send HT/VHT IE per band using dbs hwmode");
+		sme_set_vdev_ies_per_band(adapter->sessionId, true);
 	}
+
 	/* Register wireless extensions */
 	qdf_ret_status = hdd_register_wext(pWlanDev);
 	if (QDF_STATUS_SUCCESS != qdf_ret_status) {
@@ -3335,11 +3376,6 @@ hdd_adapter_t *hdd_open_adapter(hdd_context_t *hdd_ctx, uint8_t session_type,
 
 		adapter->device_mode = session_type;
 
-		if (QDF_NDI_MODE == session_type) {
-			status = hdd_init_nan_data_mode(adapter);
-			if (QDF_STATUS_SUCCESS != status)
-				goto err_free_netdev;
-		}
 
 		/* initialize action frame random mac info */
 		hdd_adapter_init_action_frame_random_mac(adapter);
@@ -3370,8 +3406,15 @@ hdd_adapter_t *hdd_open_adapter(hdd_context_t *hdd_ctx, uint8_t session_type,
 		wlan_hdd_netif_queue_control(adapter,
 					WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 					WLAN_CONTROL_PATH);
-		break;
 
+		/* Initialize NAN Data Interface */
+		if (QDF_NDI_MODE == session_type) {
+			status = hdd_init_nan_data_mode(adapter);
+			if (QDF_STATUS_SUCCESS != status)
+				goto err_free_netdev;
+		}
+
+		break;
 
 	case QDF_P2P_GO_MODE:
 	case QDF_SAP_MODE:
@@ -3668,7 +3711,7 @@ QDF_STATUS hdd_stop_adapter(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 	}
 
 	scan_info = &adapter->scan_info;
-	hdd_notice("Disabling queues");
+	hdd_debug("Disabling queues");
 	wlan_hdd_netif_queue_control(adapter,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 				     WLAN_CONTROL_PATH);
@@ -3909,6 +3952,7 @@ QDF_STATUS hdd_reset_all_adapters(hdd_context_t *hdd_ctx)
 	hdd_adapter_list_node_t *adapterNode = NULL, *pNext = NULL;
 	QDF_STATUS status;
 	hdd_adapter_t *adapter;
+	tdlsCtx_t *tdls_ctx;
 
 	ENTER();
 
@@ -3918,7 +3962,16 @@ QDF_STATUS hdd_reset_all_adapters(hdd_context_t *hdd_ctx)
 
 	while (NULL != adapterNode && QDF_STATUS_SUCCESS == status) {
 		adapter = adapterNode->pAdapter;
-		hdd_notice("Disabling queues");
+
+		if ((adapter->device_mode == QDF_STA_MODE) ||
+			(adapter->device_mode == QDF_P2P_CLIENT_MODE)) {
+			/* Stop tdls timers */
+			tdls_ctx = WLAN_HDD_GET_TDLS_CTX_PTR(adapter);
+			if (tdls_ctx)
+				wlan_hdd_tdls_timers_stop(tdls_ctx);
+		}
+
+		hdd_debug("Disabling queues");
 		if (hdd_ctx->config->sap_internal_restart &&
 		    adapter->device_mode == QDF_SAP_MODE) {
 			wlan_hdd_netif_queue_control(adapter,
@@ -7075,6 +7128,42 @@ static QDF_STATUS wlan_hdd_disable_all_dual_mac_features(hdd_context_t *hdd_ctx)
 	return QDF_STATUS_SUCCESS;
 }
 
+static QDF_STATUS
+wlan_hdd_update_dbs_scan_and_fw_mode_config(hdd_context_t *hdd_ctx)
+{
+	struct sir_dual_mac_config cfg = {0};
+	QDF_STATUS status;
+
+	if (!hdd_ctx) {
+		hdd_err("HDD context is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	cfg.scan_config = 0;
+	cfg.fw_mode_config = 0;
+	cfg.set_dual_mac_cb = cds_soc_set_dual_mac_cfg_cb;
+	status = wma_get_updated_scan_and_fw_mode_config(&cfg.scan_config,
+			&cfg.fw_mode_config,
+			hdd_ctx->config->dual_mac_feature_disable);
+
+	if (status != QDF_STATUS_SUCCESS) {
+		hdd_err("wma_get_updated_scan_and_fw_mode_config failed %d",
+			status);
+		return status;
+	}
+
+	hdd_debug("send scan_cfg: 0x%x fw_mode_cfg: 0x%x to fw",
+		  cfg.scan_config, cfg.fw_mode_config);
+
+	status = sme_soc_set_dual_mac_config(hdd_ctx->hHal, cfg);
+	if (status != QDF_STATUS_SUCCESS) {
+		hdd_err("sme_soc_set_dual_mac_config failed %d", status);
+		return status;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 /**
  * hdd_override_ini_config - Override INI config
  * @hdd_ctx: HDD context
@@ -8509,8 +8598,8 @@ int hdd_dbs_scan_selection_init(hdd_context_t *hdd_ctx)
 				* CFG_DBS_SCAN_CLIENTS_MAX];
 
 	/* check if DBS is enabled or supported */
-	if ((hdd_ctx->config->dual_mac_feature_disable)
-	    || (!wma_is_hw_dbs_capable()))
+	if (hdd_ctx->config->dual_mac_feature_disable ==
+				DISABLE_DBS_CXN_AND_SCAN)
 		return -EINVAL;
 
 	hdd_string_to_u8_array(hdd_ctx->config->dbs_scan_selection,
@@ -8587,6 +8676,31 @@ static int hdd_set_auto_shutdown_cb(hdd_context_t *hdd_ctx)
 }
 #endif
 
+static QDF_STATUS hdd_set_dbs_scan_and_fw_mode_cfg(hdd_context_t *hdd_ctx)
+{
+
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	switch (hdd_ctx->config->dual_mac_feature_disable) {
+	case DISABLE_DBS_CXN_AND_SCAN:
+		status = wlan_hdd_disable_all_dual_mac_features(hdd_ctx);
+		if (status != QDF_STATUS_SUCCESS)
+			hdd_err("Failed to disable dual mac features");
+		break;
+	case DISABLE_DBS_CXN_AND_ENABLE_DBS_SCAN:
+	case DISABLE_DBS_CXN_AND_ENABLE_DBS_SCAN_WITH_ASYNC_SCAN_OFF:
+	case ENABLE_DBS_CXN_AND_ENABLE_SCAN_WITH_ASYNC_SCAN_OFF:
+		status = wlan_hdd_update_dbs_scan_and_fw_mode_config(hdd_ctx);
+		if (status != QDF_STATUS_SUCCESS)
+			hdd_err("Failed to set dbs scan and fw mode config");
+		break;
+	default:
+		break;
+	}
+
+	return status;
+
+}
 /**
  * hdd_features_init() - Init features
  * @hdd_ctx:	HDD context
@@ -8657,13 +8771,10 @@ static int hdd_features_init(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter)
 		hdd_err("Failed to register HDD callbacks!");
 		goto deregister_frames;
 	}
-
-	if (hdd_ctx->config->dual_mac_feature_disable) {
-		status = wlan_hdd_disable_all_dual_mac_features(hdd_ctx);
-		if (status != QDF_STATUS_SUCCESS) {
-			hdd_err("Failed to disable dual mac features");
-			goto deregister_cb;
-		}
+	status = hdd_set_dbs_scan_and_fw_mode_cfg(hdd_ctx);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		hdd_err("Failed to set dbs scan and fw mode cfg");
+		goto deregister_cb;
 	}
 	if (hdd_ctx->config->goptimize_chan_avoid_event) {
 		status = sme_enable_disable_chanavoidind_event(
@@ -9297,6 +9408,10 @@ int hdd_wlan_startup(struct device *dev)
 				    set_value, PDEV_CMD);
 	}
 
+	if (hdd_ctx->config->is_force_1x1)
+		wma_cli_set_command(0, (int)WMI_PDEV_PARAM_SET_IOT_PATTERN,
+				1, PDEV_CMD);
+
 	qdf_mc_timer_start(&hdd_ctx->iface_change_timer,
 			   hdd_ctx->config->iface_change_wait_time);
 
@@ -9403,15 +9518,15 @@ static void hdd_get_nud_stats_cb(void *data, struct rsp_stats *rsp)
 		return;
 	}
 
-	hdd_notice("rsp->arp_req_enqueue :%x", rsp->arp_req_enqueue);
-	hdd_notice("rsp->arp_req_tx_success :%x", rsp->arp_req_tx_success);
-	hdd_notice("rsp->arp_req_tx_failure :%x", rsp->arp_req_tx_failure);
-	hdd_notice("rsp->arp_rsp_recvd :%x", rsp->arp_rsp_recvd);
-	hdd_notice("rsp->out_of_order_arp_rsp_drop_cnt :%x",
+	hdd_debug("rsp->arp_req_enqueue :%x", rsp->arp_req_enqueue);
+	hdd_debug("rsp->arp_req_tx_success :%x", rsp->arp_req_tx_success);
+	hdd_debug("rsp->arp_req_tx_failure :%x", rsp->arp_req_tx_failure);
+	hdd_debug("rsp->arp_rsp_recvd :%x", rsp->arp_rsp_recvd);
+	hdd_debug("rsp->out_of_order_arp_rsp_drop_cnt :%x",
 		   rsp->out_of_order_arp_rsp_drop_cnt);
-	hdd_notice("rsp->dad_detected :%x", rsp->dad_detected);
-	hdd_notice("rsp->connect_status :%x", rsp->connect_status);
-	hdd_notice("rsp->ba_session_establishment_status :%x",
+	hdd_debug("rsp->dad_detected :%x", rsp->dad_detected);
+	hdd_debug("rsp->connect_status :%x", rsp->connect_status);
+	hdd_debug("rsp->ba_session_establishment_status :%x",
 		   rsp->ba_session_establishment_status);
 
 	adapter->hdd_stats.hdd_arp_stats.rx_fw_cnt = rsp->arp_rsp_recvd;
@@ -10969,16 +11084,15 @@ static int __con_mode_handler(const char *kmessage, struct kernel_param *kp,
 	enum tQDF_GLOBAL_CON_MODE curr_mode;
 	enum tQDF_ADAPTER_MODE adapter_mode;
 
+	hdd_info("con_mode handler: %s", kmessage);
+
 	ret = wlan_hdd_validate_context(hdd_ctx);
 	if (ret)
 		return ret;
 
 	cds_set_load_in_progress(true);
 
-	hdd_debug("con_mode handler: %s", kmessage);
 	ret = param_set_int(kmessage, kp);
-
-
 
 	if (!(is_con_mode_valid(con_mode))) {
 		hdd_err("invlaid con_mode %d", con_mode);

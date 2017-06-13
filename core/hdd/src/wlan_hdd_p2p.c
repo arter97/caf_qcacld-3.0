@@ -590,7 +590,7 @@ static int32_t hdd_delete_action_frame_cookie(hdd_adapter_t *adapter,
 	struct action_frame_cookie *action_cookie = NULL;
 	uint32_t freq = 0;
 
-	hdd_info("Delete cookie = %llu", cookie);
+	hdd_debug("Delete cookie = %llu", cookie);
 
 	spin_lock(&adapter->random_mac_lock);
 	for (i = 0; i < MAX_RANDOM_MAC_ADDRS; i++) {
@@ -1658,7 +1658,7 @@ __wlan_hdd_cfg80211_cancel_remain_on_channel(struct wiphy *wiphy,
 	pRemainChanCtx = cfgState->remain_on_chan_ctx;
 
 	if (pRemainChanCtx) {
-		hdd_notice("action_cookie = %08llx, roc cookie = %08llx, cookie = %08llx",
+		hdd_debug("action_cookie = %08llx, roc cookie = %08llx, cookie = %08llx",
 				cfgState->action_cookie, pRemainChanCtx->cookie,
 				cookie);
 
@@ -1683,6 +1683,8 @@ __wlan_hdd_cfg80211_cancel_remain_on_channel(struct wiphy *wiphy,
 						OFF_CHANNEL_ACTION_TX;
 					pRemainChanCtx->cookie =
 						cfgState->action_cookie;
+					mutex_unlock(&cfgState->
+						remain_on_chan_ctx_lock);
 					return 0;
 				}
 			}
