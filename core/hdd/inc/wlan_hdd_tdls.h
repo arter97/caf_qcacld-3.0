@@ -755,6 +755,21 @@ void wlan_hdd_tdls_notify_connect(hdd_adapter_t *adapter,
  * Return: None
  */
 void wlan_hdd_tdls_notify_disconnect(hdd_adapter_t *adapter, bool lfr_roam);
+
+/**
+ * wlan_hdd_check_conc_and_update_tdls_state - Check concurrency and update
+ *     FW TDLS state if needed
+ * @hdd_ctx: hdd context
+ * @disable_tdls: disable TDLS in FW TDLS state
+ *
+ * This routine is called to teardown TDLS links, and enable/disable TDLS mode
+ * in FW tdls state if concurrency is detected.
+ *
+ * Return: None
+ */
+void wlan_hdd_check_conc_and_update_tdls_state(hdd_context_t *hdd_ctx,
+					       bool disable_tdls);
+
 void wlan_hdd_change_tdls_mode(void *hdd_ctx);
 
 /**
@@ -786,6 +801,25 @@ int wlan_hdd_cfg80211_configure_tdls_mode(struct wiphy *wiphy,
 					struct wireless_dev *wdev,
 					const void *data,
 					int data_len);
+
+/**
+ * hdd_tdls_notify_set_state_disable() - callback from pe to update tdls state
+ * @session_id: session_id
+ *
+ * This function is called part of STA disconnect and we need to
+ * update the TDLS state before vdev is stopped
+ *
+ * Return: none
+ */
+void hdd_tdls_notify_set_state_disable(uint32_t session_id);
+
+/**
+ * hdd_tdls_timers_stop() - stop all the tdls timers
+ * @adapter: hdd adapter
+ *
+ * Return: none
+ */
+void hdd_tdls_timers_stop(hdd_adapter_t *adapter);
 
 #else
 static inline void hdd_update_tdls_ct_and_teardown_links(hdd_context_t *hdd_ctx)
@@ -829,6 +863,12 @@ static inline void wlan_hdd_tdls_notify_disconnect(hdd_adapter_t *adapter,
 {
 }
 
+static inline void
+wlan_hdd_check_conc_and_update_tdls_state(hdd_context_t *hdd_ctx,
+					  bool disable_tdls)
+{
+}
+
 static inline int wlan_hdd_cfg80211_configure_tdls_mode(struct wiphy *wiphy,
 					struct wireless_dev *wdev,
 					const void *data,
@@ -843,6 +883,12 @@ static inline void wlan_hdd_change_tdls_mode(void *hdd_ctx)
 static inline void
 hdd_tdls_notify_p2p_roc(hdd_context_t *hdd_ctx,
 			enum tdls_concerned_external_events event)
+{
+}
+static inline void hdd_tdls_notify_set_state_disable(uint32_t session_id)
+{
+}
+static inline void hdd_tdls_timers_stop(hdd_adapter_t *adapter)
 {
 }
 #endif /* End of FEATURE_WLAN_TDLS */

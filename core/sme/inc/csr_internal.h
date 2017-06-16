@@ -649,6 +649,7 @@ typedef struct tagCsrConfig {
 	uint8_t fils_max_chan_guard_time;
 	uint16_t pkt_err_disconn_th;
 	bool is_bssid_hint_priority;
+	bool is_force_1x1;
 } tCsrConfig;
 
 typedef struct tagCsrChannelPowerInfo {
@@ -1412,4 +1413,8 @@ void csr_neighbor_roam_process_scan_results(tpAniSirGlobal mac_ctx,
 void csr_neighbor_roam_trigger_handoff(tpAniSirGlobal mac_ctx,
 					uint8_t session_id);
 bool csr_is_ndi_started(tpAniSirGlobal mac_ctx, uint32_t session_id);
+
+QDF_STATUS csr_roam_update_config(tpAniSirGlobal mac_ctx, uint8_t session_id,
+				  uint16_t capab, uint32_t value);
+
 #endif
