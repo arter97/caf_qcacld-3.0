@@ -865,6 +865,7 @@ static uint8_t *sap_hdd_event_to_string(eSapHddEvent event)
 	CASE_RETURN_STRING(eSAP_MAX_ASSOC_EXCEEDED);
 	CASE_RETURN_STRING(eSAP_CHANNEL_CHANGE_EVENT);
 	CASE_RETURN_STRING(eSAP_DFS_CAC_START);
+	CASE_RETURN_STRING(eSAP_DFS_CAC_INTERRUPTED);
 	CASE_RETURN_STRING(eSAP_DFS_CAC_END);
 	CASE_RETURN_STRING(eSAP_DFS_PRE_CAC_END);
 	CASE_RETURN_STRING(eSAP_DFS_RADAR_DETECT);
@@ -876,6 +877,8 @@ static uint8_t *sap_hdd_event_to_string(eSapHddEvent event)
 	CASE_RETURN_STRING(eSAP_ACS_SCAN_SUCCESS_EVENT);
 #endif
 	CASE_RETURN_STRING(eSAP_ACS_CHANNEL_SELECTED);
+	CASE_RETURN_STRING(eSAP_ECSA_CHANGE_CHAN_IND);
+	CASE_RETURN_STRING(eSAP_UPDATE_SCAN_RESULT);
 	default:
 		return "eSAP_HDD_EVENT_UNKNOWN";
 	}
@@ -3261,11 +3264,11 @@ QDF_STATUS sap_close_session(tHalHandle hHal,
 
 	if (false == valid) {
 		qdf_status = sme_close_session(hHal,
-					       sapContext->sessionId,
+					       sapContext->sessionId, true,
 					       callback, NULL);
 	} else {
 		qdf_status = sme_close_session(hHal,
-					       sapContext->sessionId,
+					       sapContext->sessionId, true,
 					       callback, sapContext);
 	}
 
@@ -4301,8 +4304,14 @@ sapconvert_to_csr_profile(tsap_Config_t *pconfig_params, eCsrRoamBssType bssType
 	profile->pWPAReqIE = NULL;
 	profile->nWPAReqIELength = 0;
 
+	if (profile->pRSNReqIE) {
+		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_DEBUG,
+			  FL("pRSNReqIE already allocated."));
+		qdf_mem_free(profile->pRSNReqIE);
+		profile->pRSNReqIE = NULL;
+	}
+
 	/* set the RSN/WPA IE */
-	profile->pRSNReqIE = NULL;
 	profile->nRSNReqIELength = pconfig_params->RSNWPAReqIELength;
 	if (pconfig_params->RSNWPAReqIELength) {
 		profile->pRSNReqIE =
