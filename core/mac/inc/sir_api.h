@@ -1200,8 +1200,14 @@ typedef struct sSirSmeJoinReq {
 	tAniBool spectrumMgtIndicator;
 	tSirMacPowerCapInfo powerCap;
 	tSirSupChnl supportedChannels;
+	bool enable_bcast_probe_rsp;
 	tSirBssDescription bssDescription;
-
+	/*
+	 * WARNING - Keep bssDescription as last element
+	 * in the struct tSirSmeJoinReq as it has ieFields
+	 * following which is corrupted if any other variables
+	 * are added here
+	 */
 } tSirSmeJoinReq, *tpSirSmeJoinReq;
 
 /* / Definition for reponse message to previously issued join request */
