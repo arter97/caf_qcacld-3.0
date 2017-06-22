@@ -1755,7 +1755,7 @@ static void wlan_hdd_tdls_set_mode(hdd_context_t *pHddCtx,
 		status = hdd_get_next_adapter(pHddCtx, pAdapterNode, &pNext);
 		pAdapterNode = pNext;
 	}
-	if (!bUpdateLast)
+	if (!bUpdateLast && (pHddCtx->tdls_mode > eTDLS_SUPPORT_DISABLED))
 		pHddCtx->tdls_mode_last = pHddCtx->tdls_mode;
 
 	pHddCtx->tdls_mode = tdls_mode;
@@ -2086,7 +2086,34 @@ done:
 void wlan_hdd_tdls_notify_connect(hdd_adapter_t *adapter,
 				  tCsrRoamInfo *csr_roam_info)
 {
+	hdd_context_t *hdd_ctx;
 	hdd_info("Check and update TDLS state");
+
+
+	if (cds_mode_specific_connection_count(CDS_SAP_MODE, NULL) >= 1) {
+		hdd_debug("SAP sessions exist, TDLS can't be enabled");
+		return;
+	}
+
+	if (cds_mode_specific_connection_count(CDS_P2P_GO_MODE, NULL) >= 1) {
+		hdd_debug("P2P GO sessions exist, TDLS can't be enabled");
+		return;
+	}
+
+	if (cds_get_connection_count() > 1) {
+		hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+		mutex_lock(&hdd_ctx->tdls_lock);
+		/* If TDLS state already enabled in the firmware then host
+		 * needs to disable it, when the concurrent session comes
+		 * into the system
+		 */
+		if (hdd_ctx->set_state_info.set_state_cnt == 0) {
+			mutex_unlock(&hdd_ctx->tdls_lock);
+			hdd_debug("concurrency exist, TDLS can't be enabled");
+			return;
+		}
+		mutex_unlock(&hdd_ctx->tdls_lock);
+	}
 
 	/* Association event */
 	if (adapter->device_mode == QDF_STA_MODE ||
