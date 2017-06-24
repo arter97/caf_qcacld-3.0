@@ -1655,6 +1655,7 @@ lim_send_assoc_req_mgmt_frame(tpAniSirGlobal mac_ctx,
 	/* check this early to avoid unncessary operation */
 	if (NULL == pe_session->pLimJoinReq) {
 		pe_err("pe_session->pLimJoinReq is NULL");
+		qdf_mem_free(mlm_assoc_req);
 		return;
 	}
 	add_ie_len = pe_session->pLimJoinReq->addIEAssoc.length;
@@ -1663,6 +1664,7 @@ lim_send_assoc_req_mgmt_frame(tpAniSirGlobal mac_ctx,
 	frm = qdf_mem_malloc(sizeof(tDot11fAssocRequest));
 	if (NULL == frm) {
 		pe_err("Unable to allocate memory");
+		qdf_mem_free(mlm_assoc_req);
 		return;
 	}
 	qdf_mem_set((uint8_t *) frm, sizeof(tDot11fAssocRequest), 0);
@@ -1967,8 +1969,7 @@ lim_send_assoc_req_mgmt_frame(tpAniSirGlobal mac_ctx,
 		lim_post_sme_message(mac_ctx, LIM_MLM_ASSOC_CNF,
 			(uint32_t *) &assoc_cnf);
 
-		qdf_mem_free(frm);
-		return;
+		goto end;
 	}
 	/* Paranoia: */
 	qdf_mem_set(frame, bytes, 0);
@@ -1983,8 +1984,7 @@ lim_send_assoc_req_mgmt_frame(tpAniSirGlobal mac_ctx,
 	if (DOT11F_FAILED(status)) {
 		pe_err("Assoc request pack failure (0x%08x)", status);
 		cds_packet_free((void *)packet);
-		qdf_mem_free(frm);
-		return;
+		goto end;
 	} else if (DOT11F_WARNED(status)) {
 		pe_warn("Assoc request pack warning (0x%08x)", status);
 	}
@@ -2005,8 +2005,7 @@ lim_send_assoc_req_mgmt_frame(tpAniSirGlobal mac_ctx,
 					pe_session, assoc_ack_status,
 					eSIR_FAILURE);
 			cds_packet_free((void *)packet);
-			qdf_mem_free(frm);
-			return;
+			goto end;
 		}
 	}
 
@@ -2058,10 +2057,10 @@ lim_send_assoc_req_mgmt_frame(tpAniSirGlobal mac_ctx,
 		lim_diag_event_report(mac_ctx, WLAN_PE_DIAG_ASSOC_ACK_EVENT,
 				pe_session, assoc_ack_status, eSIR_FAILURE);
 		/* Pkt will be freed up by the callback */
-		qdf_mem_free(frm);
-		return;
+		goto end;
 	}
 
+end:
 	/* Free up buffer allocated for mlm_assoc_req */
 	qdf_mem_free(mlm_assoc_req);
 	mlm_assoc_req = NULL;
