@@ -394,29 +394,6 @@ populate_dot11f_country(tpAniSirGlobal pMac,
 	return eSIR_SUCCESS;
 } /* End populate_dot11f_country. */
 
-#ifdef QCA_WIFI_3_0_EMU
-/**
- * populate_dot11f_ds_params() - To populate DS IE params
- * mac_ctx: Pointer to global mac context
- * dot11f_param: pointer to DS params IE
- * channel: channel number
- *
- * This routine will populate DS param in management frame like
- * beacon, probe response, and etc.
- *
- * Return: Overall sucess
- */
-tSirRetStatus
-populate_dot11f_ds_params(tpAniSirGlobal mac_ctx,
-			  tDot11fIEDSParams *dot11f_param, uint8_t channel)
-{
-	/* .11a/11b/g mode PHY => Include the DS Parameter Set IE: */
-	dot11f_param->curr_channel = channel;
-	dot11f_param->present = 1;
-
-	return eSIR_SUCCESS;
-} /* End populate_dot11f_ds_params. */
-#else
 /**
  * populate_dot11f_ds_params() - To populate DS IE params
  * mac_ctx: Pointer to global mac context
@@ -440,7 +417,6 @@ populate_dot11f_ds_params(tpAniSirGlobal mac_ctx,
 
 	return eSIR_SUCCESS;
 }
-#endif
 
 #define SET_AIFSN(aifsn) (((aifsn) < 2) ? 2 : (aifsn))
 
@@ -2376,6 +2352,27 @@ sir_convert_fils_data_to_probersp_struct(tpSirProbeRespBeacon probe_resp,
 }
 #endif
 
+void sir_copy_caps_info(tpAniSirGlobal mac_ctx, tDot11fFfCapabilities caps,
+					    tpSirProbeRespBeacon pProbeResp)
+{
+	pProbeResp->capabilityInfo.ess = caps.ess;
+	pProbeResp->capabilityInfo.ibss = caps.ibss;
+	pProbeResp->capabilityInfo.cfPollable = caps.cfPollable;
+	pProbeResp->capabilityInfo.cfPollReq = caps.cfPollReq;
+	pProbeResp->capabilityInfo.privacy = caps.privacy;
+	pProbeResp->capabilityInfo.shortPreamble = caps.shortPreamble;
+	pProbeResp->capabilityInfo.pbcc = caps.pbcc;
+	pProbeResp->capabilityInfo.channelAgility = caps.channelAgility;
+	pProbeResp->capabilityInfo.spectrumMgt = caps.spectrumMgt;
+	pProbeResp->capabilityInfo.qos = caps.qos;
+	pProbeResp->capabilityInfo.shortSlotTime = caps.shortSlotTime;
+	pProbeResp->capabilityInfo.apsd = caps.apsd;
+	pProbeResp->capabilityInfo.rrm = caps.rrm;
+	pProbeResp->capabilityInfo.dsssOfdm = caps.dsssOfdm;
+	pProbeResp->capabilityInfo.delayedBA = caps.delayedBA;
+	pProbeResp->capabilityInfo.immediateBA = caps.immediateBA;
+}
+
 tSirRetStatus sir_convert_probe_frame2_struct(tpAniSirGlobal pMac,
 					      uint8_t *pFrame,
 					      uint32_t nFrame,
@@ -2417,26 +2414,7 @@ tSirRetStatus sir_convert_probe_frame2_struct(tpAniSirGlobal pMac,
 	/* Beacon Interval */
 	pProbeResp->beaconInterval = pr->BeaconInterval.interval;
 
-	/* Capabilities */
-	pProbeResp->capabilityInfo.ess = pr->Capabilities.ess;
-	pProbeResp->capabilityInfo.ibss = pr->Capabilities.ibss;
-	pProbeResp->capabilityInfo.cfPollable = pr->Capabilities.cfPollable;
-	pProbeResp->capabilityInfo.cfPollReq = pr->Capabilities.cfPollReq;
-	pProbeResp->capabilityInfo.privacy = pr->Capabilities.privacy;
-	pProbeResp->capabilityInfo.shortPreamble =
-		pr->Capabilities.shortPreamble;
-	pProbeResp->capabilityInfo.pbcc = pr->Capabilities.pbcc;
-	pProbeResp->capabilityInfo.channelAgility =
-		pr->Capabilities.channelAgility;
-	pProbeResp->capabilityInfo.spectrumMgt = pr->Capabilities.spectrumMgt;
-	pProbeResp->capabilityInfo.qos = pr->Capabilities.qos;
-	pProbeResp->capabilityInfo.shortSlotTime =
-		pr->Capabilities.shortSlotTime;
-	pProbeResp->capabilityInfo.apsd = pr->Capabilities.apsd;
-	pProbeResp->capabilityInfo.rrm = pr->Capabilities.rrm;
-	pProbeResp->capabilityInfo.dsssOfdm = pr->Capabilities.dsssOfdm;
-	pProbeResp->capabilityInfo.delayedBA = pr->Capabilities.delayedBA;
-	pProbeResp->capabilityInfo.immediateBA = pr->Capabilities.immediateBA;
+	sir_copy_caps_info(pMac, pr->Capabilities, pProbeResp);
 
 	if (!pr->SSID.present) {
 		pe_warn("Mandatory IE SSID not present!");

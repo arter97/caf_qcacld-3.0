@@ -178,6 +178,8 @@ static int enable_dfs_chan_scan = -1;
  */
 DEFINE_SPINLOCK(hdd_context_lock);
 
+DEFINE_MUTEX(hdd_init_deinit_lock);
+
 #define WLAN_NLINK_CESIUM 30
 
 static qdf_wake_lock_t wlan_wake_lock;
@@ -1959,15 +1961,25 @@ static int __hdd_open(struct net_device *dev)
 	MTRACE(qdf_trace(QDF_MODULE_ID_HDD, TRACE_CODE_HDD_OPEN_REQUEST,
 		adapter->sessionId, adapter->device_mode));
 
-	ret = wlan_hdd_validate_context(hdd_ctx);
-	if (ret)
-		return ret;
+	mutex_lock(&hdd_init_deinit_lock);
+
+	/*
+	 * This scenario can be hit in cases where in the wlan driver after
+	 * registering the netdevices and there is a failure in driver
+	 * initialization. So return error gracefully because the netdevices
+	 * will be de-registered as part of the load failure.
+	 */
+	if (!cds_is_driver_loaded()) {
+		hdd_err("Failed to start the wlan driver!!");
+		ret = -EIO;
+		goto err_hdd_hdd_init_deinit_lock;
+	}
 
 
 	ret = hdd_wlan_start_modules(hdd_ctx, adapter, false);
 	if (ret) {
 		hdd_err("Failed to start WLAN modules return");
-		return -ret;
+		goto err_hdd_hdd_init_deinit_lock;
 	}
 
 
@@ -1976,7 +1988,7 @@ static int __hdd_open(struct net_device *dev)
 		if (ret) {
 			hdd_err("Failed to start adapter :%d",
 				adapter->device_mode);
-			return ret;
+			goto err_hdd_hdd_init_deinit_lock;
 		}
 	}
 
@@ -1999,6 +2011,8 @@ static int __hdd_open(struct net_device *dev)
 			WLAN_CONTROL_PATH);
 	}
 
+err_hdd_hdd_init_deinit_lock:
+	mutex_unlock(&hdd_init_deinit_lock);
 	return ret;
 }
 
@@ -3868,9 +3882,9 @@ QDF_STATUS hdd_stop_adapter(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 			}
 			/* Reset WNI_CFG_PROBE_RSP Flags */
 			wlan_hdd_reset_prob_rspies(adapter);
-			qdf_mem_free(adapter->sessionCtx.ap.beacon);
-			adapter->sessionCtx.ap.beacon = NULL;
 		}
+		qdf_mem_free(adapter->sessionCtx.ap.beacon);
+		adapter->sessionCtx.ap.beacon = NULL;
 		if (true == bCloseSession)
 			hdd_wait_for_sme_close_sesion(hdd_ctx, adapter);
 
@@ -6975,6 +6989,9 @@ void hdd_ch_avoid_cb(void *hdd_context, void *indi_param)
 
 		return;
 	}
+
+	cds_save_wlan_unsafe_channels(hdd_ctxt->unsafe_channel_list,
+			hdd_ctxt->unsafe_channel_count);
 
 	for (channel_loop = 0;
 	     channel_loop < hdd_ctxt->unsafe_channel_count; channel_loop++) {
@@ -10405,6 +10422,10 @@ void wlan_hdd_start_sap(hdd_adapter_t *ap_adapter, bool reinit)
 
 end:
 	mutex_unlock(&hdd_ctx->sap_lock);
+	/* SAP context and beacon cleanup will happen during driver unload
+	 * in hdd_stop_adapter
+	 */
+	hdd_err("SAP restart after SSR failed! Reload WLAN and try SAP again");
 }
 
 /**
