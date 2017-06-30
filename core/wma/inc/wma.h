@@ -1461,6 +1461,7 @@ struct peer_debug_info {
  * @wmi_cmd_rsp_runtime_lock: wmi command response bus lock
  * @saved_chan: saved channel list sent as part of WMI_SCAN_CHAN_LIST_CMDID
  * @fw_mem_dump_enabled: Fw memory dump support
+ * @ito_repeat_count: Indicates ito repeated count
  */
 typedef struct {
 	void *wmi_handle;
@@ -1654,6 +1655,7 @@ typedef struct {
 	bool fw_mem_dump_enabled;
 	tSirAddonPsReq ps_setting;
 	struct peer_debug_info *peer_dbg;
+	uint8_t  ito_repeat_count;
 } t_wma_handle, *tp_wma_handle;
 
 /**

@@ -4413,6 +4413,7 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		CFG_ARP_AC_CATEGORY_MIN,
 		CFG_ARP_AC_CATEGORY_MAX),
 
+
 	REG_VARIABLE(CFG_11B_NUM_TX_CHAIN_NAME, WLAN_PARAM_Integer,
 		struct hdd_config, num_11b_tx_chains,
 		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -4426,6 +4427,13 @@ REG_TABLE_ENTRY g_registry_table[] = {
 		CFG_11AG_NUM_TX_CHAIN_DEFAULT,
 		CFG_11AG_NUM_TX_CHAIN_MIN,
 		CFG_11AG_NUM_TX_CHAIN_MAX),
+
+	REG_VARIABLE(CFG_ITO_REPEAT_COUNT_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, ito_repeat_count,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_ITO_REPEAT_COUNT_DEFAULT,
+		CFG_ITO_REPEAT_COUNT_MIN,
+		CFG_ITO_REPEAT_COUNT_MAX),
 };
 
 /**
@@ -5928,6 +5936,9 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
 	hdd_debug("Name = [%s] value = [%u]",
 		 CFG_11AG_NUM_TX_CHAIN_NAME,
 		 pHddCtx->config->num_11ag_tx_chains);
+	 hdd_debug("Name = [%s] value = [%u]",
+		CFG_ITO_REPEAT_COUNT_NAME,
+		pHddCtx->config->ito_repeat_count);
 }
 
 
