@@ -2830,6 +2830,9 @@ QDF_STATUS hdd_init_station_mode(hdd_adapter_t *adapter)
 	hdd_debug("Set HDD connState to eConnectionState_NotConnected");
 	pHddStaCtx->conn_info.connState = eConnectionState_NotConnected;
 
+	qdf_mem_set(pHddStaCtx->conn_info.staId,
+		sizeof(pHddStaCtx->conn_info.staId), HDD_WLAN_INVALID_STA_ID);
+
 	/* set fast roaming capability in sme session */
 	status = sme_config_fast_roaming(hdd_ctx->hHal, adapter->sessionId,
 					 adapter->fast_roaming_allowed);
@@ -5950,6 +5953,8 @@ static int hdd_wiphy_init(hdd_context_t *hdd_ctx)
 		hdd_err("wiphy registration failed");
 		return ret_val;
 	}
+
+	pld_increment_driver_load_cnt(hdd_ctx->parent_dev);
 
 	hdd_program_country_code(hdd_ctx);
 
