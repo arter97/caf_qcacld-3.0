@@ -4628,6 +4628,14 @@ struct reg_table_entry g_registry_table[] = {
 		CFG_TX_ORPHAN_ENABLE_DEFAULT,
 		CFG_TX_ORPHAN_ENABLE_MIN,
 		CFG_TX_ORPHAN_ENABLE_MAX),
+
+	REG_VARIABLE(CFG_ITO_REPEAT_COUNT_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, ito_repeat_count,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_ITO_REPEAT_COUNT_DEFAULT,
+		CFG_ITO_REPEAT_COUNT_MIN,
+		CFG_ITO_REPEAT_COUNT_MAX),
+
 };
 
 /**
@@ -6190,6 +6198,9 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
 		pHddCtx->config->scan_backoff_multiplier);
 	hdd_info("Name = [gEnableConnectedScan] Value = %u",
 		pHddCtx->config->enable_connected_scan);
+	hdd_debug("Name = [%s] value = [%u]",
+		CFG_ITO_REPEAT_COUNT_NAME,
+		pHddCtx->config->ito_repeat_count);
 }
 
 /**

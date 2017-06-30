@@ -2594,6 +2594,8 @@ QDF_STATUS wma_open(void *cds_context,
 			wma_action_frame_filter_mac_event_handler,
 			WMA_RX_SERIALIZER_CTX);
 
+	wma_handle->ito_repeat_count = cds_cfg->ito_repeat_count;
+
 	wma_handle->auto_power_save_enabled =
 		cds_cfg->auto_power_save_fail_mode;
 	/* Register PWR_SAVE_FAIL event only in case of recovery(1) */

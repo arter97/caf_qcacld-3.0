@@ -10379,6 +10379,24 @@ enum hw_filter_mode {
 #define CFG_PRB_REQ_IE_BIT_MAP1_MIN     (0x00000000)
 #define CFG_PRB_REQ_IE_BIT_MAP1_MAX     (0xFFFFFFFF)
 #define CFG_PRB_REQ_IE_BIT_MAP1_DEFAULT (0x00000000)
+/*
+ * gItoRepeatCount - sets ito repeated count
+ * @Min: 0
+ * @Max: 5
+ * @Default: 0
+ *
+ * This ini sets the ito count in FW
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+
+#define CFG_ITO_REPEAT_COUNT_NAME "gItoRepeatCount"
+#define CFG_ITO_REPEAT_COUNT_MIN        (0)
+#define CFG_ITO_REPEAT_COUNT_MAX        (5)
+#define CFG_ITO_REPEAT_COUNT_DEFAULT    (0)
+
 
 /*
  * <ini>
@@ -11687,6 +11705,7 @@ struct hdd_config {
 	uint8_t dfs_beacon_tx_enhanced;
 	uint8_t scan_backoff_multiplier;
 	bool is_force_1x1;
+	uint8_t ito_repeat_count;
 };
 
 #define VAR_OFFSET(_Struct, _Var) (offsetof(_Struct, _Var))
