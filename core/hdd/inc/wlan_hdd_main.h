@@ -1461,6 +1461,16 @@ struct hdd_nud_stats_context {
 	struct completion response_event;
 };
 
+/**
+ * struct sta_ap_intf_check_work_ctx - sta_ap_intf_check_work
+ * related info
+ * @adapter: adaptor of the interface to which SAP to do SCC
+ *         with
+ */
+struct sta_ap_intf_check_work_ctx {
+	hdd_adapter_t *adapter;
+};
+
 /** Adapter structure definition */
 struct hdd_context_s {
 	/** Global CDS context  */
@@ -1522,6 +1532,9 @@ struct hdd_context_s {
 
 	uint8_t no_of_open_sessions[QDF_MAX_NO_OF_MODE];
 	uint8_t no_of_active_sessions[QDF_MAX_NO_OF_MODE];
+
+	/* Check if dbs scan duty cycle is enabled */
+	bool is_dbs_scan_duty_cycle_enabled;
 
 	/** P2P Device MAC Address for the adapter  */
 	struct qdf_mac_addr p2pDeviceAddress;
@@ -1736,6 +1749,7 @@ struct hdd_context_s {
 	/* tdls source timer to enable/disable TDLS on p2p listen */
 	qdf_mc_timer_t tdls_source_timer;
 	qdf_atomic_t disable_lro_in_concurrency;
+	qdf_atomic_t disable_lro_in_low_tput;
 	bool fw_mem_dump_enabled;
 	uint8_t last_scan_reject_session_id;
 	scan_reject_states last_scan_reject_reason;
@@ -1755,6 +1769,7 @@ struct hdd_context_s {
 	struct vdev_spectral_configure_params ss_config;
 	int sscan_pid;
 #endif
+	struct sta_ap_intf_check_work_ctx *sta_ap_intf_check_work_info;
 };
 
 int hdd_validate_channel_and_bandwidth(hdd_adapter_t *adapter,
