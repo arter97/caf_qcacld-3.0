@@ -261,6 +261,18 @@ void lim_prepare_for11h_channel_switch(tpAniSirGlobal pMac,
 void lim_switch_channel_cback(tpAniSirGlobal pMac, QDF_STATUS status,
 		uint32_t *data, tpPESession psessionEntry);
 
+/**
+ * lim_get_session_by_macaddr() - api to find session based on MAC
+ * @mac_ctx: Pointer to global mac structure.
+ * @self_mac: MAC address.
+ *
+ * This function is used to get session for given MAC address.
+ *
+ * Return: session pointer if exists, NULL otherwise.
+ */
+tCsrRoamSession *lim_get_session_by_macaddr(tpAniSirGlobal mac_ctx,
+		tSirMacAddr self_mac);
+
 static inline tSirRFBand lim_get_rf_band(uint8_t channel)
 {
 	if ((channel >= SIR_11A_CHANNEL_BEGIN) &&
@@ -740,6 +752,15 @@ void lim_add_self_he_cap(tpAddStaParams add_sta_params, tpPESession session);
 void lim_add_bss_he_cap(tpAddBssParams add_bss, tpSirAssocRsp assoc_rsp);
 
 /**
+ * lim_add_bss_he_cfg() - Set HE config to BSS params
+ * @add_bss: pointer to add bss params
+ * @session: Pointer to Session entry struct
+ *
+ * Return: None
+ */
+void lim_add_bss_he_cfg(tpAddBssParams add_bss, tpPESession session);
+
+/**
  * lim_copy_bss_he_cap() - Copy HE capability into PE session from start bss
  * @session: pointer to PE session
  * @sme_start_bss_req: pointer to start BSS request
@@ -944,6 +965,11 @@ static inline void lim_add_bss_he_cap(tpAddBssParams add_bss,
 				      tpSirAssocRsp assoc_rsp)
 {
 	return;
+}
+
+static inline void lim_add_bss_he_cfg(tpAddBssParams add_bss,
+					 tpPESession session)
+{
 }
 
 static inline void lim_intersect_ap_he_caps(tpPESession session,

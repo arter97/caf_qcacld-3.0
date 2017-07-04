@@ -181,6 +181,17 @@ QDF_STATUS wma_add_beacon_filter(WMA_HANDLE wma,
 				struct beacon_filter_param *filter_params);
 QDF_STATUS wma_send_adapt_dwelltime_params(WMA_HANDLE handle,
 			struct adaptive_dwelltime_params *dwelltime_params);
+
+/**
+ * wma_send_dbs_scan_selection_params() - send DBS scan selection configuration
+ * params to firmware
+ * @handle: wma handler
+ * @dbs_scan_params: pointer to wmi_dbs_scan_sel_params
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF failure reason code for failure
+ */
+QDF_STATUS wma_send_dbs_scan_selection_params(WMA_HANDLE handle,
+			struct wmi_dbs_scan_sel_params *dbs_scan_params);
 #ifdef FEATURE_GREEN_AP
 void wma_setup_egap_support(struct wma_tgt_cfg *tgt_cfg, WMA_HANDLE handle);
 void wma_register_egap_event_handle(WMA_HANDLE handle);
@@ -212,6 +223,7 @@ static inline QDF_STATUS wma_register_ndp_cb(QDF_STATUS (*pe_ndp_event_handler)
 }
 #endif /* WLAN_FEATURE_NAN_DATAPATH && !WLAN_FEATURE_NAN_CONVERGENCE */
 
+bool wma_is_csa_offload_enabled(void);
 bool wma_is_p2p_lo_capable(void);
 QDF_STATUS wma_p2p_lo_start(struct sir_p2p_lo_start *params);
 QDF_STATUS wma_p2p_lo_stop(u_int32_t vdev_id);
@@ -294,4 +306,11 @@ static inline void wma_tx_failure_cb(void *ctx, uint32_t num_msdu,
  */
 void wma_store_pdev(void *wma_ctx, struct wlan_objmgr_pdev *pdev);
 
+/**
+ * wmi_to_sir_peer_type() - convert peer type from WMI to SIR enum
+ * @type: enum wmi_peer_type
+ *
+ * Return: tSirWifiPeerType
+ */
+tSirWifiPeerType wmi_to_sir_peer_type(enum wmi_peer_type type);
 #endif

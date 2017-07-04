@@ -237,10 +237,16 @@ typedef struct tagCsrChannelInfo {
 	uint8_t *ChannelList;   /* it will be an array of channels */
 } tCsrChannelInfo, *tpCsrChannelInfo;
 
+typedef enum {
+	eHIDDEN_SSID_NOT_IN_USE,
+	eHIDDEN_SSID_ZERO_LEN,
+	eHIDDEN_SSID_ZERO_CONTENTS
+} tHiddenssId;
+
 typedef struct tagCsrSSIDInfo {
 	tSirMacSSid SSID;
 	bool handoffPermitted;
-	bool ssidHidden;
+	tHiddenssId ssidHidden;
 } tCsrSSIDInfo;
 
 typedef struct tagCsrSSIDs {
@@ -627,6 +633,7 @@ typedef enum {
 	eCSR_ROAM_RESULT_CAC_END_IND,
 	/* If Scan for SSID failed to found proper BSS */
 	eCSR_ROAM_RESULT_SCAN_FOR_SSID_FAILURE,
+	eCSR_ROAM_RESULT_INVOKE_FAILED,
 } eCsrRoamResult;
 
 /*----------------------------------------------------------------------------
@@ -1155,10 +1162,6 @@ typedef struct tagCsrConfigParam {
 	uint32_t nActiveMinChnTimeConc;     /* in units of milliseconds */
 	uint32_t nActiveMaxChnTimeConc;     /* in units of milliseconds */
 	uint32_t nRestTimeConc;             /* in units of milliseconds */
-	/* num of channels combined for STA in each split scan operation */
-	uint8_t nNumStaChanCombinedConc;
-	/* number of channels combined for P2P in each split scan operation */
-	uint8_t nNumP2PChanCombinedConc;
 #endif
 	/*In units of milliseconds*/
 	uint32_t       min_rest_time_conc;
@@ -1314,6 +1317,7 @@ typedef struct tagCsrConfigParam {
 	bool qcn_ie_support;
 	uint8_t fils_max_chan_guard_time;
 	uint16_t pkt_err_disconn_th;
+	bool is_force_1x1;
 } tCsrConfigParam;
 
 /* Tush */

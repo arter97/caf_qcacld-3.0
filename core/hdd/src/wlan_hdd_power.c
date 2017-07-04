@@ -72,6 +72,7 @@
 #include <wma_types.h>
 #include <ol_txrx_osif_api.h>
 #include "hif.h"
+#include "hif_unit_test_suspend.h"
 #include "sme_power_save_api.h"
 #include "wlan_policy_mgr_api.h"
 #include "cdp_txrx_flow_ctrl_v2.h"
@@ -87,7 +88,6 @@
 #else
 #define HDD_SSR_BRING_UP_TIME 30000
 #endif
-#define HDD_WAKE_LOCK_RESUME_DURATION 1000
 
 /* Type declarations */
 
@@ -223,6 +223,14 @@ static int __wlan_hdd_ipv6_changed(struct notifier_block *nb,
 		errno = wlan_hdd_validate_context(hdd_ctx);
 		if (errno)
 			goto exit;
+
+		/* Ignore if the interface is down */
+		if (!(ndev->flags & IFF_UP)) {
+			hdd_err("Rcvd change addr request on %s(flags 0x%X)",
+				ndev->name, ndev->flags);
+			hdd_err("NETDEV Interface is down, ignoring...");
+			goto exit;
+		}
 
 		hdd_debug("invoking sme_dhcp_done_ind");
 		sme_dhcp_done_ind(hdd_ctx->hHal, adapter->sessionId);
@@ -499,6 +507,32 @@ void hdd_ipv6_notifier_work_queue(struct work_struct *work)
 	cds_ssr_unprotect(__func__);
 }
 
+static void hdd_enable_hw_filter(hdd_adapter_t *adapter)
+{
+	QDF_STATUS status;
+
+	ENTER();
+
+	status = pmo_ucfg_enable_hw_filter_in_fwr(adapter->hdd_vdev);
+	if (status != QDF_STATUS_SUCCESS)
+		hdd_info("Failed to enable hardware filter");
+
+	EXIT();
+}
+
+static void hdd_disable_hw_filter(hdd_adapter_t *adapter)
+{
+	QDF_STATUS status;
+
+	ENTER();
+
+	status = pmo_ucfg_disable_hw_filter_in_fwr(adapter->hdd_vdev);
+	if (status != QDF_STATUS_SUCCESS)
+		hdd_info("Failed to disable hardware filter");
+
+	EXIT();
+}
+
 void hdd_enable_host_offloads(hdd_adapter_t *adapter,
 	enum pmo_offload_trigger trigger)
 {
@@ -520,7 +554,7 @@ void hdd_enable_host_offloads(hdd_adapter_t *adapter,
 	hdd_enable_arp_offload(adapter, trigger);
 	hdd_enable_ns_offload(adapter, trigger);
 	hdd_enable_mc_addr_filtering(adapter, trigger);
-	hdd_enable_non_arp_hw_broadcast_filter(adapter);
+	hdd_enable_hw_filter(adapter);
 out:
 	EXIT();
 
@@ -547,7 +581,7 @@ void hdd_disable_host_offloads(hdd_adapter_t *adapter,
 	hdd_disable_arp_offload(adapter, trigger);
 	hdd_disable_ns_offload(adapter, trigger);
 	hdd_disable_mc_addr_filtering(adapter, trigger);
-	hdd_disable_non_arp_hw_broadcast_filter(adapter);
+	hdd_disable_hw_filter(adapter);
 out:
 	EXIT();
 
@@ -772,6 +806,13 @@ static int __wlan_hdd_ipv4_changed(struct notifier_block *nb,
 		if (errno)
 			goto exit;
 
+		/* Ignore if the interface is down */
+		if (!(ndev->flags & IFF_UP)) {
+			hdd_err("Rcvd change addr request on %s(flags 0x%X)",
+				ndev->name, ndev->flags);
+			hdd_err("NETDEV Interface is down, ignoring...");
+			goto exit;
+		}
 		hdd_debug("invoking sme_dhcp_done_ind");
 		sme_dhcp_done_ind(hdd_ctx->hHal, adapter->sessionId);
 
@@ -911,35 +952,6 @@ void hdd_disable_arp_offload(hdd_adapter_t *adapter,
 	else
 		hdd_info("fail to disable arp offload");
 out:
-	EXIT();
-}
-
-void hdd_enable_non_arp_hw_broadcast_filter(hdd_adapter_t *adapter)
-{
-	QDF_STATUS status;
-
-	ENTER();
-
-	status = pmo_ucfg_enable_non_arp_bcast_filter_in_fwr(
-							adapter->hdd_vdev);
-
-	if (status != QDF_STATUS_SUCCESS)
-		hdd_info("Failed to enable broadcast filter");
-
-	EXIT();
-}
-
-void hdd_disable_non_arp_hw_broadcast_filter(hdd_adapter_t *adapter)
-{
-	QDF_STATUS status;
-
-	ENTER();
-
-	status = pmo_ucfg_disable_non_arp_bcast_filter_in_fwr(
-							adapter->hdd_vdev);
-	if (status != QDF_STATUS_SUCCESS)
-		hdd_info("Failed to disable broadcast filter");
-
 	EXIT();
 }
 
@@ -1360,7 +1372,10 @@ QDF_STATUS hdd_wlan_shutdown(void)
 
 	hdd_lpass_notify_stop(pHddCtx);
 
+	wlan_objmgr_print_ref_all_objects_per_psoc(pHddCtx->hdd_psoc);
+
 	hdd_info("WLAN driver shutdown complete");
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -1460,10 +1475,14 @@ QDF_STATUS hdd_wlan_re_init(void)
 	pHddCtx->last_scan_reject_timestamp = 0;
 
 	hdd_set_roaming_in_progress(false);
+	complete(&pAdapter->roaming_comp_var);
 	pHddCtx->btCoexModeSet = false;
 
 	/* Allow the phone to go to sleep */
 	hdd_allow_suspend(WIFI_POWER_EVENT_WAKELOCK_DRIVER_REINIT);
+	/* set chip power save failure detected callback */
+	sme_set_chip_pwr_save_fail_cb(pHddCtx->hHal,
+				      hdd_chip_pwr_save_fail_detected_cb);
 
 	ret = hdd_register_cb(pHddCtx);
 	if (ret) {
@@ -1513,19 +1532,12 @@ success:
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * wlan_hdd_set_powersave() - Set powersave mode
- * @adapter: adapter upon which the request was received
- * @allow_power_save: is wlan allowed to go into power save mode
- * @timeout: timeout period in ms
- *
- * Return: 0 on success, non-zero on any error
- */
-static int wlan_hdd_set_powersave(hdd_adapter_t *adapter,
+int wlan_hdd_set_powersave(hdd_adapter_t *adapter,
 	bool allow_power_save, uint32_t timeout)
 {
 	tHalHandle hal;
 	hdd_context_t *hdd_ctx;
+	bool force_trigger = false;
 
 	if (NULL == adapter) {
 		hdd_err("Adapter NULL");
@@ -1540,6 +1552,15 @@ static int wlan_hdd_set_powersave(hdd_adapter_t *adapter,
 
 	hdd_debug("Allow power save: %d", allow_power_save);
 	hal = WLAN_HDD_GET_HAL_CTX(adapter);
+
+	if ((QDF_STA_MODE == adapter->device_mode) &&
+	    !adapter->sessionCtx.station.ap_supports_immediate_power_save) {
+		/* override user's requested flag */
+		force_trigger = allow_power_save;
+		allow_power_save = false;
+		timeout = AUTO_PS_ENTRY_USER_TIMER_DEFAULT_VALUE;
+		hdd_debug("Defer power-save for few seconds...");
+	}
 
 	if (allow_power_save) {
 		if (QDF_STA_MODE == adapter->device_mode ||
@@ -1573,7 +1594,7 @@ static int wlan_hdd_set_powersave(hdd_adapter_t *adapter,
 			adapter->sessionId);
 		sme_ps_enable_disable(hal, adapter->sessionId, SME_PS_DISABLE);
 		sme_ps_enable_auto_ps_timer(WLAN_HDD_GET_HAL_CTX(adapter),
-			adapter->sessionId, timeout);
+			adapter->sessionId, timeout, force_trigger);
 	}
 
 	return 0;
@@ -1696,7 +1717,7 @@ static int __wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 				 * process the connect request to AP
 				 */
 				hdd_prevent_suspend_timeout(
-					HDD_WAKE_LOCK_RESUME_DURATION,
+					HDD_WAKELOCK_TIMEOUT_RESUME,
 					WIFI_POWER_EVENT_WAKELOCK_RESUME_WLAN);
 				cfg80211_sched_scan_results(pHddCtx->wiphy);
 			}
@@ -1984,7 +2005,8 @@ static void hdd_start_dhcp_ind(hdd_adapter_t *adapter)
 
 	hdd_debug("DHCP start indicated through power save");
 	qdf_runtime_pm_prevent_suspend(adapter->connect_rpm_ctx.connect);
-	hdd_prevent_suspend_timeout(1000, WIFI_POWER_EVENT_WAKELOCK_DHCP);
+	hdd_prevent_suspend_timeout(HDD_WAKELOCK_TIMEOUT_CONNECT,
+				    WIFI_POWER_EVENT_WAKELOCK_DHCP);
 	sme_dhcp_start_ind(hdd_ctx->hHal, adapter->device_mode,
 			   adapter->macAddressCurrent.bytes,
 			   adapter->sessionId);
@@ -2189,6 +2211,7 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 	struct net_device *ndev = wdev->netdev;
 	hdd_adapter_t *adapter = WLAN_HDD_GET_PRIV_PTR(ndev);
 	int status;
+	hdd_station_ctx_t *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 
 	ENTER();
 
@@ -2218,6 +2241,13 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 		return 0;
 	}
 	mutex_unlock(&pHddCtx->iface_change_lock);
+
+	if (sta_ctx->conn_info.connState != eConnectionState_Associated) {
+		hdd_debug("Not associated");
+		/*To keep GUI happy */
+		*dbm = 0;
+		return 0;
+	}
 
 	MTRACE(qdf_trace(QDF_MODULE_ID_HDD,
 			 TRACE_CODE_HDD_CFG80211_GET_TXPOWER,
@@ -2318,7 +2348,7 @@ static void __hdd_wlan_fake_apps_resume(struct wiphy *wiphy,
 	struct hif_opaque_softc *hif_ctx;
 	qdf_device_t qdf_dev;
 
-	hdd_debug("Unit-test resume WLAN");
+	hdd_info("Unit-test resume WLAN");
 
 	qdf_dev = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
 	if (!qdf_dev) {
@@ -2334,7 +2364,7 @@ static void __hdd_wlan_fake_apps_resume(struct wiphy *wiphy,
 	}
 
 	if (!test_and_clear_bit(HDD_FA_SUSPENDED_BIT, &fake_apps_state)) {
-		hdd_debug("Not unit-test suspended; Nothing to do");
+		hdd_alert("Not unit-test suspended; Nothing to do");
 		return;
 	}
 
@@ -2355,21 +2385,20 @@ static void __hdd_wlan_fake_apps_resume(struct wiphy *wiphy,
 
 	dev->watchdog_timeo = HDD_TX_TIMEOUT;
 
-	hdd_debug("Unit-test resume succeeded");
+	hdd_alert("Unit-test resume succeeded");
 }
 
 /**
  * hdd_wlan_fake_apps_resume_irq_callback() - Irq callback function for resuming
  *	from unit-test initiated suspend from irq wakeup signal
- * @val: interrupt val
  *
  * Resume wlan after getting very 1st CE interrupt from target
  *
  * Return: none
  */
-static void hdd_wlan_fake_apps_resume_irq_callback(uint32_t val)
+static void hdd_wlan_fake_apps_resume_irq_callback(void)
 {
-	hdd_debug("Trigger unit-test resume WLAN; val: 0x%x", val);
+	hdd_info("Trigger unit-test resume WLAN");
 
 	QDF_BUG(g_wiphy);
 	QDF_BUG(g_dev);
@@ -2391,7 +2420,7 @@ int hdd_wlan_fake_apps_suspend(struct wiphy *wiphy, struct net_device *dev,
 		.resume_trigger = resume_setting
 	};
 
-	hdd_debug("Unit-test suspend WLAN");
+	hdd_info("Unit-test suspend WLAN");
 
 	if (pause_setting < WOW_INTERFACE_PAUSE_DEFAULT ||
 	    pause_setting >= WOW_INTERFACE_PAUSE_COUNT) {
@@ -2420,7 +2449,7 @@ int hdd_wlan_fake_apps_suspend(struct wiphy *wiphy, struct net_device *dev,
 	}
 
 	if (test_and_set_bit(HDD_FA_SUSPENDED_BIT, &fake_apps_state)) {
-		hdd_debug("Already unit-test suspended; Nothing to do");
+		hdd_alert("Already unit-test suspended; Nothing to do");
 		return 0;
 	}
 
@@ -2449,7 +2478,7 @@ int hdd_wlan_fake_apps_suspend(struct wiphy *wiphy, struct net_device *dev,
 	g_wiphy = wiphy;
 	g_dev = dev;
 	g_resume_trigger = resume_setting;
-	hif_fake_apps_suspend(hif_ctx, hdd_wlan_fake_apps_resume_irq_callback);
+	hif_ut_apps_suspend(hif_ctx, hdd_wlan_fake_apps_resume_irq_callback);
 
 	/* re-enable wake irq */
 	errno = hif_apps_wake_irq_enable(hif_ctx);
@@ -2462,12 +2491,12 @@ int hdd_wlan_fake_apps_suspend(struct wiphy *wiphy, struct net_device *dev,
 	 */
 	dev->watchdog_timeo = INT_MAX;
 
-	hdd_debug("Unit-test suspend succeeded");
+	hdd_alert("Unit-test suspend succeeded");
 
 	return 0;
 
 fake_apps_resume:
-	hif_fake_apps_resume(hif_ctx);
+	hif_ut_apps_resume(hif_ctx);
 
 enable_irqs:
 	QDF_BUG(!hif_apps_irqs_enable(hif_ctx));
@@ -2497,7 +2526,7 @@ int hdd_wlan_fake_apps_resume(struct wiphy *wiphy, struct net_device *dev)
 		return -EINVAL;
 	}
 
-	hif_fake_apps_resume(hif_ctx);
+	hif_ut_apps_resume(hif_ctx);
 	__hdd_wlan_fake_apps_resume(wiphy, dev);
 
 	return 0;

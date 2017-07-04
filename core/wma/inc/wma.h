@@ -64,6 +64,7 @@
 #define WMA_WAKE_LOCK_TIMEOUT              1000
 #define WMA_RESUME_TIMEOUT                 25000
 #define MAX_MEM_CHUNKS                     32
+#define NAN_CLUSTER_ID_BYTES               4
 
 #define WMA_CRASH_INJECT_TIMEOUT           5000
 
@@ -89,6 +90,8 @@
 #define WMA_MAX_SUPPORTED_BSS     5
 
 #define FRAGMENT_SIZE 3072
+
+#define MAX_PRINT_FAILURE_CNT 50
 
 #define WMA_INVALID_VDEV_ID                             0xFF
 #define MAX_MEM_CHUNKS                                  32
@@ -262,11 +265,19 @@ enum ds_mode {
 #define WMA_DELETE_STA_TIMEOUT (6000) /* 6 seconds */
 
 #define WMA_DEL_P2P_SELF_STA_RSP_START 0x03
-
+#define WMA_SET_LINK_PEER_RSP 0x04
+#define WMA_DELETE_PEER_RSP 0x05
 #define WMA_VDEV_START_REQUEST_TIMEOUT (6000)   /* 6 seconds */
 #define WMA_VDEV_STOP_REQUEST_TIMEOUT  (6000)   /* 6 seconds */
+#define WMA_VDEV_HW_MODE_REQUEST_TIMEOUT (5000) /* 5 seconds */
 
-#define WMA_TGT_INVALID_SNR 0x127
+/*
+ * The firmware value has been changed recently to 0x127
+ * But, to maintain backward compatibility, the old
+ * value is also preserved.
+ */
+#define WMA_TGT_INVALID_SNR_OLD (-1)
+#define WMA_TGT_INVALID_SNR_NEW 0x127
 
 #define WMA_TX_Q_RECHECK_TIMER_WAIT      2      /* 2 ms */
 #define WMA_TX_Q_RECHECK_TIMER_MAX_WAIT  20     /* 20 ms */
@@ -1006,6 +1017,7 @@ typedef struct {
  * @ns_offload_req: cached ns offload request
  * @wow_stats: stat counters for WoW related events
  * It stores parameters per vdev in wma.
+ * @in_bmps : Whether bmps for this interface has been enabled
  */
 struct wma_txrx_node {
 	uint8_t addr[IEEE80211_ADDR_LEN];
@@ -1083,6 +1095,7 @@ struct wma_txrx_node {
 	bool he_capable;
 	uint32_t he_ops;
 #endif
+	bool in_bmps;
 };
 
 #if defined(QCA_WIFI_FTM)
@@ -1506,10 +1519,12 @@ typedef struct {
 	tp_wma_packetdump_cb wma_mgmt_tx_packetdump_cb;
 	tp_wma_packetdump_cb wma_mgmt_rx_packetdump_cb;
 	tSirLLStatsResults *link_stats_results;
-
+	uint64_t tx_fail_cnt;
 #ifdef WLAN_FEATURE_11AX
 	struct he_capability he_cap;
 #endif
+	bool tx_bfee_8ss_enabled;
+	bool in_imps;
 } t_wma_handle, *tp_wma_handle;
 
 /**
@@ -2292,7 +2307,7 @@ void wma_vdev_update_pause_bitmap(uint8_t vdev_id, uint16_t value)
 	tp_wma_handle wma = (tp_wma_handle)cds_get_context(QDF_MODULE_ID_WMA);
 	struct wma_txrx_node *iface;
 
-	if (vdev_id > wma->max_bssid) {
+	if (vdev_id >= wma->max_bssid) {
 		WMA_LOGE("%s: Invalid vdev_id: %d", __func__, vdev_id);
 		return;
 	}
@@ -2337,6 +2352,32 @@ uint16_t wma_vdev_get_pause_bitmap(uint8_t vdev_id)
 	}
 
 	return iface->pause_bitmap;
+}
+
+/**
+ * wma_vdev_is_device_in_low_pwr_mode - is device in power save mode
+ * @vdev_id: the Id of the vdev to configure
+ *
+ * Return: true if device is in low power mode else false
+ */
+static inline bool wma_vdev_is_device_in_low_pwr_mode(uint8_t vdev_id)
+{
+	tp_wma_handle wma = (tp_wma_handle)cds_get_context(QDF_MODULE_ID_WMA);
+	struct wma_txrx_node *iface;
+
+	if (!wma) {
+		WMA_LOGE("%s: WMA context is invald!", __func__);
+		return 0;
+	}
+
+	iface = &wma->interfaces[vdev_id];
+	if (!iface || !iface->handle) {
+		WMA_LOGE("%s: Failed to get iface handle: %p",
+			 __func__, iface->handle);
+		return 0;
+	}
+
+	return iface->in_bmps || wma->in_imps;
 }
 
 /**
@@ -2394,6 +2435,18 @@ void wma_vdev_clear_pause_bit(uint8_t vdev_id, wmi_tx_pause_type bit_pos)
 
 	iface->pause_bitmap &= ~(1 << bit_pos);
 }
+
+/**
+ * wma_process_roaming_config() - process roam request
+ * @wma_handle: wma handle
+ * @roam_req: roam request parameters
+ *
+ * Main routine to handle ROAM commands coming from CSR module.
+ *
+ * Return: QDF status
+ */
+QDF_STATUS wma_process_roaming_config(tp_wma_handle wma_handle,
+				     tSirRoamOffloadScanReq *roam_req);
 
 #ifdef WMI_INTERFACE_EVENT_LOGGING
 static inline void wma_print_wmi_cmd_log(uint32_t count,
@@ -2472,4 +2525,44 @@ static inline void wma_print_wmi_mgmt_event_log(uint32_t count,
 }
 #endif /* WMI_INTERFACE_EVENT_LOGGING */
 
+/**
+ * wma_ipa_uc_stat_request() - set ipa config parameters
+ * @privcmd: private command
+ *
+ * Return: None
+ */
+void wma_ipa_uc_stat_request(wma_cli_set_cmd_t *privcmd);
+
+/**
+ * wma_set_rx_reorder_timeout_val() - set rx recorder timeout value
+ * @wma_handle: pointer to wma handle
+ * @reorder_timeout: rx reorder timeout value
+ *
+ * Return: VOS_STATUS_SUCCESS for success or error code.
+ */
+QDF_STATUS wma_set_rx_reorder_timeout_val(tp_wma_handle wma_handle,
+	struct sir_set_rx_reorder_timeout_val *reorder_timeout);
+
+/**
+ * wma_set_rx_blocksize() - set rx blocksize
+ * @wma_handle: pointer to wma handle
+ * @peer_rx_blocksize: rx blocksize for peer mac
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code.
+ */
+QDF_STATUS wma_set_rx_blocksize(tp_wma_handle wma_handle,
+	struct sir_peer_set_rx_blocksize *peer_rx_blocksize);
+
+/*
+ * wma_chip_power_save_failure_detected_handler() - chip pwr save fail detected
+ * event handler
+ * @handle: wma handle
+ * @cmd_param_info: event handler data
+ * @len: length of @cmd_param_info
+ *
+ * Return: QDF_STATUS_SUCCESS on success; error code otherwise
+ */
+int wma_chip_power_save_failure_detected_handler(void *handle,
+						 uint8_t *cmd_param_info,
+						 uint32_t len);
 #endif

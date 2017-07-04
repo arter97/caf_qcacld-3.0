@@ -2662,7 +2662,6 @@ void lim_switch_primary_secondary_channel(tpAniSirGlobal pMac,
 					uint8_t ch_center_freq_seg1,
 					enum phy_ch_width ch_width)
 {
-	uint8_t subband = 0;
 
 	/* Assign the callback to resume TX once channel is changed. */
 	psessionEntry->currentReqChannel = newChannel;
@@ -2686,7 +2685,8 @@ void lim_switch_primary_secondary_channel(tpAniSirGlobal pMac,
 	if (psessionEntry->htSecondaryChannelOffset !=
 			psessionEntry->gLimChannelSwitch.sec_ch_offset) {
 		pe_warn("switch old sec chnl: %d --> new sec chnl: %d",
-			psessionEntry->htSecondaryChannelOffset, subband);
+			psessionEntry->htSecondaryChannelOffset,
+			psessionEntry->gLimChannelSwitch.sec_ch_offset);
 		psessionEntry->htSecondaryChannelOffset =
 			psessionEntry->gLimChannelSwitch.sec_ch_offset;
 		if (psessionEntry->htSecondaryChannelOffset ==
@@ -4328,6 +4328,11 @@ void lim_update_sta_run_time_ht_switch_chnl_params(tpAniSirGlobal pMac,
 		return;
 	}
 
+	if (!pHTInfo->primaryChannel) {
+		pe_debug("Ignore as primary channel is 0 in HT info");
+		return;
+	}
+
 	if (psessionEntry->htSecondaryChannelOffset !=
 	    (uint8_t) pHTInfo->secondaryChannelOffset
 	    || psessionEntry->htRecommendedTxWidthSet !=
@@ -5469,6 +5474,11 @@ void lim_handle_heart_beat_failure_timeout(tpAniSirGlobal mac_ctx)
 			 (psession_entry->currentBssBeaconCnt == 0))) {
 			pe_debug("for session: %d",
 						psession_entry->peSessionId);
+
+			lim_send_deauth_mgmt_frame(mac_ctx,
+				eSIR_MAC_DISASSOC_DUE_TO_INACTIVITY_REASON,
+				psession_entry->bssId, psession_entry, false);
+
 			/*
 			 * AP did not respond to Probe Request.
 			 * Tear down link with it.
@@ -6607,6 +6617,7 @@ void lim_update_extcap_struct(tpAniSirGlobal mac_ctx,
 	uint8_t *buf, tDot11fIEExtCap *dst)
 {
 	uint8_t out[DOT11F_IE_EXTCAP_MAX_LEN];
+	uint32_t status;
 
 	if (NULL == buf) {
 		pe_err("Invalid Buffer Address");
@@ -6627,9 +6638,10 @@ void lim_update_extcap_struct(tpAniSirGlobal mac_ctx,
 	qdf_mem_set((uint8_t *)&out[0], DOT11F_IE_EXTCAP_MAX_LEN, 0);
 	qdf_mem_copy(&out[0], &buf[2], buf[1]);
 
-	if (DOT11F_PARSE_SUCCESS != dot11f_unpack_ie_ext_cap(mac_ctx, &out[0],
-							buf[1], dst, false))
-		pe_err("dot11f_unpack Parse Error");
+	status = dot11f_unpack_ie_ext_cap(mac_ctx, &out[0],
+					buf[1], dst, false);
+	if (DOT11F_PARSE_SUCCESS != status)
+		pe_err("dot11f_unpack Parse Error %d", status);
 }
 
 /**
@@ -7231,6 +7243,11 @@ void lim_add_bss_he_cap(tpAddBssParams add_bss, tpSirAssocRsp assoc_rsp)
 			     he_op, sizeof(*he_op));
 }
 
+void lim_add_bss_he_cfg(tpAddBssParams add_bss, tpPESession session)
+{
+	add_bss->he_sta_obsspd = session->he_sta_obsspd;
+}
+
 void lim_update_stads_he_caps(tpDphHashNode sta_ds, tpSirAssocRsp assoc_rsp,
 			      tpPESession session_entry)
 {
@@ -7765,4 +7782,35 @@ void lim_decrement_pending_mgmt_count(tpAniSirGlobal mac_ctx)
 	}
 	mac_ctx->sys.sys_bbt_pending_mgmt_count--;
 	qdf_spin_unlock(&mac_ctx->sys.bbt_mgmt_lock);
+}
+
+tCsrRoamSession *lim_get_session_by_macaddr(tpAniSirGlobal mac_ctx,
+		tSirMacAddr self_mac)
+{
+	int i = 0;
+	tCsrRoamSession *session;
+
+	if (!mac_ctx || !self_mac) {
+		QDF_TRACE(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_ERROR,
+			  FL("Invalid arguments"));
+		return NULL;
+	}
+
+	for (i = 0; i < mac_ctx->sme.max_intf_count; i++) {
+		session = CSR_GET_SESSION(mac_ctx, i);
+		if (!session)
+			continue;
+		else if (!qdf_mem_cmp(&session->selfMacAddr,
+			 self_mac, sizeof(tSirMacAddr))) {
+
+			QDF_TRACE(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_INFO,
+				  FL("session %d exists with mac address "
+				  MAC_ADDRESS_STR), session->sessionId,
+				  MAC_ADDR_ARRAY(self_mac));
+
+			return session;
+		}
+	}
+
+	return NULL;
 }

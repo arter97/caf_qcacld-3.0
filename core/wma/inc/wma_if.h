@@ -530,6 +530,7 @@ typedef struct {
 	bool he_capable;
 	tDot11fIEvendor_he_cap he_config;
 	tDot11fIEvendor_he_op he_op;
+	uint32_t he_sta_obsspd;
 #endif
 	uint32_t cac_duration_ms;
 	uint32_t dfs_regdomain;
@@ -1394,6 +1395,7 @@ typedef struct sTdlsLinkEstablishParams {
 typedef struct tHalHiddenSsidVdevRestart {
 	uint8_t ssidHidden;
 	uint8_t sessionId;
+	uint16_t pe_session_id;
 } tHalHiddenSsidVdevRestart, *tpHalHiddenSsidVdevRestart;
 
 

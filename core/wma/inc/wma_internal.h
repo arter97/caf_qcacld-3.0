@@ -263,9 +263,6 @@ QDF_STATUS wma_roam_scan_bmiss_cnt(tp_wma_handle wma_handle,
 QDF_STATUS wma_roam_scan_offload_command(tp_wma_handle wma_handle,
 					 uint32_t command, uint32_t vdev_id);
 
-QDF_STATUS wma_process_roaming_config(tp_wma_handle wma_handle,
-				     tSirRoamOffloadScanReq *roam_req);
-
 QDF_STATUS wma_roam_preauth_chan_set(tp_wma_handle wma_handle,
 				     tpSwitchChannelParams params,
 				     uint8_t vdev_id);
@@ -426,7 +423,7 @@ struct cdp_vdev *wma_find_vdev_by_addr(tp_wma_handle wma, uint8_t *addr,
 static inline
 struct cdp_vdev *wma_find_vdev_by_id(tp_wma_handle wma, uint8_t vdev_id)
 {
-	if (vdev_id > wma->max_bssid)
+	if (vdev_id >= wma->max_bssid)
 		return NULL;
 
 	return wma->interfaces[vdev_id].handle;
@@ -949,14 +946,6 @@ void wma_aggr_qos_req(tp_wma_handle wma,
 
 void wma_add_ts_req(tp_wma_handle wma, tAddTsParams *msg);
 
-int wma_process_receive_filter_set_filter_req(tp_wma_handle wma_handle,
-						     tSirRcvPktFilterCfgType *
-						     rcv_filter_param);
-
-int wma_process_receive_filter_clear_filter_req(tp_wma_handle wma_handle,
-						       tSirRcvFltPktClearParam *
-						       rcv_clear_param);
-
 #ifdef FEATURE_WLAN_ESE
 QDF_STATUS wma_process_tsm_stats_req(tp_wma_handle wma_handler,
 				     void *pTsmStatsMsg);
@@ -1222,5 +1211,19 @@ wma_send_vdev_start_to_fw(t_wma_handle *wma, struct vdev_start_params *params);
  * Return: QDF_STATUS
  */
 QDF_STATUS wma_send_vdev_stop_to_fw(t_wma_handle *wma, uint8_t vdev_id);
+
+/*
+ * wma_rx_aggr_failure_event_handler - event handler to handle rx aggr failure
+ * @handle: the wma handle
+ * @event_buf: buffer with event
+ * @len: buffer length
+ *
+ * This function receives rx aggregation failure event and then pass to upper
+ * layer
+ *
+ * Return: 0 on success
+ */
+int wma_rx_aggr_failure_event_handler(void *handle, u_int8_t *event_buf,
+							u_int32_t len);
 
 #endif

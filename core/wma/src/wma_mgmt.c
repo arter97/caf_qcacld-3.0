@@ -584,6 +584,49 @@ static inline void wma_get_link_probe_timeout(struct sAniSirGlobal *mac,
 }
 
 /**
+ * wma_verify_rate_code() - verify if rate code is valid.
+ * @rate_code:     rate code
+ *
+ * Return: verify result
+ */
+static bool wma_verify_rate_code(u_int32_t rate_code)
+{
+	uint8_t preamble, nss, rate;
+	bool valid = true;
+
+	preamble = (rate_code & 0xc0) >> 6;
+	nss = (rate_code & 0x30) >> 4;
+	rate = rate_code & 0xf;
+
+	switch (preamble) {
+	case WMI_RATE_PREAMBLE_CCK:
+		if (nss != 0 || rate > 3)
+			valid = false;
+		break;
+	case WMI_RATE_PREAMBLE_OFDM:
+		if (nss != 0 || rate > 7)
+			valid = false;
+		break;
+	case WMI_RATE_PREAMBLE_HT:
+		if (nss > 1 || rate > 7)
+			valid = false;
+		break;
+	case WMI_RATE_PREAMBLE_VHT:
+		if (nss > 1 || rate > 9)
+			valid = false;
+		break;
+	default:
+		break;
+	}
+	return valid;
+}
+
+#define TX_MGMT_RATE_2G_ENABLE_OFFSET 30
+#define TX_MGMT_RATE_5G_ENABLE_OFFSET 31
+#define TX_MGMT_RATE_2G_OFFSET 0
+#define TX_MGMT_RATE_5G_OFFSET 12
+
+/**
  * wma_set_mgmt_rate() - set vdev mgmt rate.
  * @wma:     wma handle
  * @vdev_id: vdev id
@@ -594,6 +637,7 @@ void wma_set_vdev_mgmt_rate(tp_wma_handle wma, uint8_t vdev_id)
 {
 	uint32_t cfg_val;
 	int ret;
+	uint32_t per_band_mgmt_tx_rate = 0;
 	struct sAniSirGlobal *mac = cds_get_context(QDF_MODULE_ID_PE);
 
 	if (NULL == mac) {
@@ -603,7 +647,8 @@ void wma_set_vdev_mgmt_rate(tp_wma_handle wma, uint8_t vdev_id)
 
 	if (wlan_cfg_get_int(mac, WNI_CFG_RATE_FOR_TX_MGMT,
 			     &cfg_val) == eSIR_SUCCESS) {
-		if (cfg_val == WNI_CFG_RATE_FOR_TX_MGMT_STADEF) {
+		if ((cfg_val == WNI_CFG_RATE_FOR_TX_MGMT_STADEF) ||
+		    !wma_verify_rate_code(cfg_val)) {
 			WMA_LOGD("default WNI_CFG_RATE_FOR_TX_MGMT, ignore");
 		} else {
 			ret = wma_vdev_set_param(
@@ -619,6 +664,47 @@ void wma_set_vdev_mgmt_rate(tp_wma_handle wma, uint8_t vdev_id)
 	} else {
 		WMA_LOGE("Failed to get value of WNI_CFG_RATE_FOR_TX_MGMT");
 	}
+
+	if (wlan_cfg_get_int(mac, WNI_CFG_RATE_FOR_TX_MGMT_2G,
+			     &cfg_val) == eSIR_SUCCESS) {
+		if ((cfg_val == WNI_CFG_RATE_FOR_TX_MGMT_2G_STADEF) ||
+		    !wma_verify_rate_code(cfg_val)) {
+			per_band_mgmt_tx_rate &=
+			    ~(1 << TX_MGMT_RATE_2G_ENABLE_OFFSET);
+		} else {
+			per_band_mgmt_tx_rate |=
+			    (1 << TX_MGMT_RATE_2G_ENABLE_OFFSET);
+			per_band_mgmt_tx_rate |=
+			    ((cfg_val & 0x7FF) << TX_MGMT_RATE_2G_OFFSET);
+		}
+	} else {
+		WMA_LOGE("Failed to get value of WNI_CFG_RATE_FOR_TX_MGMT_2G");
+	}
+
+	if (wlan_cfg_get_int(mac, WNI_CFG_RATE_FOR_TX_MGMT_5G,
+			     &cfg_val) == eSIR_SUCCESS) {
+		if ((cfg_val == WNI_CFG_RATE_FOR_TX_MGMT_5G_STADEF) ||
+		    !wma_verify_rate_code(cfg_val)) {
+			per_band_mgmt_tx_rate &=
+			    ~(1 << TX_MGMT_RATE_5G_ENABLE_OFFSET);
+		} else {
+			per_band_mgmt_tx_rate |=
+			    (1 << TX_MGMT_RATE_5G_ENABLE_OFFSET);
+			per_band_mgmt_tx_rate |=
+			    ((cfg_val & 0x7FF) << TX_MGMT_RATE_5G_OFFSET);
+		}
+	} else {
+		WMA_LOGE("Failed to get value of WNI_CFG_RATE_FOR_TX_MGMT_5G");
+	}
+
+	ret = wma_vdev_set_param(
+		wma->wmi_handle,
+		vdev_id,
+		WMI_VDEV_PARAM_PER_BAND_MGMT_TX_RATE,
+		per_band_mgmt_tx_rate);
+	if (ret)
+		WMA_LOGE("Failed to set WMI_VDEV_PARAM_PER_BAND_MGMT_TX_RATE");
+
 }
 
 /**
@@ -2253,7 +2339,7 @@ static QDF_STATUS wma_unified_bcn_tmpl_send(tp_wma_handle wma,
 				     const tpSendbeaconParams bcn_info,
 				     uint8_t bytes_to_strip)
 {
-	struct beacon_params params = {0};
+	struct beacon_tmpl_params params = {0};
 	uint32_t tmpl_len, tmpl_len_aligned;
 	uint8_t *frm;
 	QDF_STATUS ret;
@@ -2301,7 +2387,7 @@ static QDF_STATUS wma_unified_bcn_tmpl_send(tp_wma_handle wma,
 	params.frm = frm;
 	params.tmpl_len_aligned = tmpl_len_aligned;
 
-	ret = wmi_unified_beacon_send_cmd(wma->wmi_handle,
+	ret = wmi_unified_beacon_tmpl_send_cmd(wma->wmi_handle,
 				 &params);
 	if (QDF_IS_STATUS_ERROR(ret))
 		WMA_LOGE("%s: Failed to send bcn tmpl: %d", __func__, ret);
@@ -3197,7 +3283,6 @@ int wma_process_rmf_frame(tp_wma_handle wma_handle,
 		rx_pkt->pkt_meta.mpdu_data_ptr =
 		rx_pkt->pkt_meta.mpdu_hdr_ptr +
 		rx_pkt->pkt_meta.mpdu_hdr_len;
-		rx_pkt->pkt_meta.tsf_delta = rx_pkt->pkt_meta.tsf_delta;
 		rx_pkt->pkt_buf = wbuf;
 		WMA_LOGD(FL("BSSID: "MAC_ADDRESS_STR" tsf_delta: %u"),
 		    MAC_ADDR_ARRAY(wh->i_addr3), rx_pkt->pkt_meta.tsf_delta);
@@ -3232,6 +3317,7 @@ static inline int wma_process_rmf_frame(tp_wma_handle wma_handle,
  * wma_is_pkt_drop_candidate() - check if the mgmt frame should be droppped
  * @wma_handle: wma handle
  * @peer_addr: peer MAC address
+ * @bssid: BSSID Address
  * @subtype: Management frame subtype
  *
  * This function is used to decide if a particular management frame should be
@@ -3240,7 +3326,8 @@ static inline int wma_process_rmf_frame(tp_wma_handle wma_handle,
  * Return: true if the packet should be dropped and false oterwise
  */
 static bool wma_is_pkt_drop_candidate(tp_wma_handle wma_handle,
-				      uint8_t *peer_addr, uint8_t subtype)
+				      uint8_t *peer_addr, uint8_t *bssid,
+				      uint8_t subtype)
 {
 	void *peer;
 	struct cdp_pdev *pdev_ctx;
@@ -3248,6 +3335,14 @@ static bool wma_is_pkt_drop_candidate(tp_wma_handle wma_handle,
 	bool should_drop = false;
 	qdf_time_t *ptr;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	uint8_t nan_addr[] = {0x50, 0x6F, 0x9A, 0x01, 0x00, 0x00};
+
+	/* Drop the beacons from NAN device */
+	if ((subtype == IEEE80211_FC0_SUBTYPE_BEACON) &&
+		(!qdf_mem_cmp(nan_addr, bssid, NAN_CLUSTER_ID_BYTES))) {
+			should_drop = true;
+			goto end;
+	}
 
 	/*
 	 * Currently this function handles only Disassoc,
@@ -3337,6 +3432,8 @@ end:
 	return should_drop;
 }
 
+#define RATE_LIMIT 16
+
 int wma_form_rx_packet(qdf_nbuf_t buf,
 			struct mgmt_rx_event_params *mgmt_rx_params,
 			cds_pkt_t *rx_pkt)
@@ -3349,6 +3446,9 @@ int wma_form_rx_packet(qdf_nbuf_t buf,
 	tp_wma_handle wma_handle = (tp_wma_handle)
 				cds_get_context(QDF_MODULE_ID_WMA);
 	tp_wma_packetdump_cb packetdump_cb;
+	static uint8_t limit_prints_invalid_len = RATE_LIMIT - 1;
+	static uint8_t limit_prints_load_unload = RATE_LIMIT - 1;
+	static uint8_t limit_prints_recovery = RATE_LIMIT - 1;
 
 	if (!wma_handle) {
 		WMA_LOGE(FL("wma handle is NULL"));
@@ -3358,21 +3458,33 @@ int wma_form_rx_packet(qdf_nbuf_t buf,
 	}
 
 	if (!mgmt_rx_params) {
-		WMA_LOGE(FL("mgmt rx params is NULL"));
+		limit_prints_invalid_len++;
+		if (limit_prints_invalid_len == RATE_LIMIT) {
+			WMA_LOGD(FL("mgmt rx params is NULL"));
+			limit_prints_invalid_len = 0;
+		}
 		qdf_nbuf_free(buf);
 		qdf_mem_free(rx_pkt);
 		return -EINVAL;
 	}
 
 	if (cds_is_load_or_unload_in_progress()) {
-		WMA_LOGW(FL("Load/Unload in progress"));
+		limit_prints_load_unload++;
+		if (limit_prints_load_unload == RATE_LIMIT) {
+			WMA_LOGD(FL("Load/Unload in progress"));
+			limit_prints_load_unload = 0;
+		}
 		qdf_nbuf_free(buf);
 		qdf_mem_free(rx_pkt);
 		return -EINVAL;
 	}
 
 	if (cds_is_driver_recovering()) {
-		WMA_LOGW(FL("Recovery in progress"));
+		limit_prints_recovery++;
+		if (limit_prints_recovery == RATE_LIMIT) {
+			WMA_LOGD(FL("Recovery in progress"));
+			limit_prints_recovery = 0;
+		}
 		qdf_nbuf_free(buf);
 		qdf_mem_free(rx_pkt);
 		return -EINVAL;
@@ -3455,7 +3567,21 @@ int wma_form_rx_packet(qdf_nbuf_t buf,
 	rx_pkt->pkt_meta.sessionId =
 		(vdev_id == WMA_INVALID_VDEV_ID ? 0 : vdev_id);
 
-	if (wma_is_pkt_drop_candidate(wma_handle, wh->i_addr2, mgt_subtype)) {
+	if (mgt_type == IEEE80211_FC0_TYPE_MGT &&
+	    (mgt_subtype == IEEE80211_FC0_SUBTYPE_BEACON ||
+	     mgt_subtype == IEEE80211_FC0_SUBTYPE_PROBE_RESP)) {
+		if (mgmt_rx_params->buf_len <=
+			(sizeof(struct ieee80211_frame) +
+			offsetof(struct wlan_bcn_frame, ie))) {
+			WMA_LOGD("Dropping frame from "MAC_ADDRESS_STR,
+				 MAC_ADDR_ARRAY(wh->i_addr3));
+			cds_pkt_return_packet(rx_pkt);
+			return -EINVAL;
+		}
+	}
+
+	if (wma_is_pkt_drop_candidate(wma_handle, wh->i_addr2, wh->i_addr3,
+					mgt_subtype)) {
 		cds_pkt_return_packet(rx_pkt);
 		return -EINVAL;
 	}

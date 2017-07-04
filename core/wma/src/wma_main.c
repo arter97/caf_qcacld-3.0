@@ -78,6 +78,7 @@
 #include "cdp_txrx_flow_ctrl_v2.h"
 #include "cdp_txrx_ipa.h"
 #include "cdp_txrx_misc.h"
+#include "wma_fips_api.h"
 #include "wma_nan_datapath.h"
 #include "wlan_lmac_if_def.h"
 #include "wlan_lmac_if_api.h"
@@ -91,6 +92,8 @@
 #include "wlan_reg_services_api.h"
 #include <cdp_txrx_handle.h>
 #include <wlan_pmo_ucfg_api.h>
+#include "wifi_pos_api.h"
+#include "hif_main.h"
 
 #define WMA_LOG_COMPLETION_TIMER 10000 /* 10 seconds */
 #define WMI_TLV_HEADROOM 128
@@ -1701,7 +1704,6 @@ static void wma_cleanup_vdev_resp_queue(tp_wma_handle wma)
 {
 	struct wma_target_req *req_msg = NULL;
 	qdf_list_node_t *node1 = NULL;
-	QDF_STATUS status;
 
 	qdf_spin_lock_bh(&wma->vdev_respq_lock);
 	if (!qdf_list_size(&wma->vdev_resp_queue)) {
@@ -1710,21 +1712,46 @@ static void wma_cleanup_vdev_resp_queue(tp_wma_handle wma)
 		return;
 	}
 
-	while (qdf_list_peek_front(&wma->vdev_resp_queue, &node1) !=
+	while (qdf_list_peek_front(&wma->vdev_resp_queue, &node1) ==
 				   QDF_STATUS_SUCCESS) {
 		req_msg = qdf_container_of(node1, struct wma_target_req, node);
-		status = qdf_list_remove_node(&wma->vdev_resp_queue, node1);
 		qdf_spin_unlock_bh(&wma->vdev_respq_lock);
-		if (status != QDF_STATUS_SUCCESS) {
-			WMA_LOGE(FL("Failed to remove req vdev_id %d type %d"),
-				 req_msg->vdev_id, req_msg->type);
-			return;
-		}
-		qdf_mc_timer_destroy(&req_msg->event_timeout);
-		qdf_mem_free(req_msg);
+		qdf_mc_timer_stop(&req_msg->event_timeout);
+		wma_vdev_resp_timer(req_msg);
 		qdf_spin_lock_bh(&wma->vdev_respq_lock);
 	}
 	qdf_spin_unlock_bh(&wma->vdev_respq_lock);
+}
+
+/**
+ * wma_cleanup_hold_req() - cleanup hold request queue
+ * @wma: wma handle
+ *
+ * Return: none
+ */
+static void wma_cleanup_hold_req(tp_wma_handle wma)
+{
+	struct wma_target_req *req_msg = NULL;
+	qdf_list_node_t *node1 = NULL;
+
+	qdf_spin_lock_bh(&wma->wma_hold_req_q_lock);
+	if (!qdf_list_size(&wma->wma_hold_req_queue)) {
+		qdf_spin_unlock_bh(&wma->wma_hold_req_q_lock);
+		WMA_LOGD(FL("request queue is empty"));
+		return;
+	}
+
+	while (QDF_STATUS_SUCCESS ==
+			qdf_list_peek_front(&wma->wma_hold_req_queue, &node1)) {
+		req_msg = qdf_container_of(node1, struct wma_target_req, node);
+		qdf_spin_unlock_bh(&wma->wma_hold_req_q_lock);
+		/* Cleanup timeout handler */
+		qdf_mc_timer_stop(&req_msg->event_timeout);
+		qdf_mc_timer_destroy(&req_msg->event_timeout);
+		wma_hold_req_timer(req_msg);
+		qdf_spin_lock_bh(&wma->wma_hold_req_q_lock);
+	}
+	qdf_spin_unlock_bh(&wma->wma_hold_req_q_lock);
 }
 
 /**
@@ -1745,6 +1772,7 @@ static void wma_shutdown_notifier_cb(void *priv)
 
 	qdf_event_set(&wma_handle->wma_resume_event);
 	wma_cleanup_vdev_resp_queue(wma_handle);
+	wma_cleanup_hold_req(wma_handle);
 	pmo_ucfg_psoc_wakeup_host_event_received(wma_handle->psoc);
 }
 
@@ -2078,6 +2106,7 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc, void *cds_context,
 	QDF_STATUS qdf_status;
 	struct wmi_rx_ops ops;
 	struct policy_mgr_wma_cbacks wma_cbacks;
+	struct target_psoc_info *tgt_psoc_info;
 
 	bool use_cookie = false;
 
@@ -2108,6 +2137,12 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc, void *cds_context,
 
 	qdf_mem_zero(wma_handle, sizeof(t_wma_handle));
 
+	tgt_psoc_info = qdf_mem_malloc(sizeof(*tgt_psoc_info));
+	if (!tgt_psoc_info) {
+		WMA_LOGE("%s: failed to allocate mem for tgt info", __func__);
+		return QDF_STATUS_E_NOMEM;
+	}
+
 	if (cds_get_conparam() != QDF_GLOBAL_FTM_MODE) {
 #ifdef FEATURE_WLAN_EXTSCAN
 		qdf_wake_lock_create(&wma_handle->extscan_wake_lock,
@@ -2119,6 +2154,7 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc, void *cds_context,
 	qdf_status = wlan_objmgr_psoc_try_get_ref(psoc, WLAN_LEGACY_WMA_ID);
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {
 		WMA_LOGE("%s: PSOC get_ref fails", __func__);
+		qdf_mem_free(tgt_psoc_info);
 		return qdf_status;
 	}
 	wma_handle->psoc = psoc;
@@ -2143,9 +2179,11 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc, void *cds_context,
 
 	WMA_LOGA("WMA --> wmi_unified_attach - success");
 
-	/* set the wmi handle (as tgt_if_handle) in psoc */
+	/* store the wmi handle in tgt_if_handle */
+	tgt_psoc_info->wmi_handle = wmi_handle;
+
 	wlan_psoc_obj_lock(psoc);
-	wlan_psoc_set_tgt_if_handle(psoc, wmi_handle);
+	wlan_psoc_set_tgt_if_handle(psoc, tgt_psoc_info);
 	wlan_psoc_obj_unlock(psoc);
 
 	wmi_unified_register_event_handler(wmi_handle,
@@ -2513,6 +2551,18 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc, void *cds_context,
 				WMI_DEBUG_MESG_FLUSH_COMPLETE_EVENTID,
 				wma_flush_complete_evt_handler,
 				WMA_RX_WORK_CTX);
+	wmi_unified_register_event_handler(wma_handle->wmi_handle,
+				WMI_REPORT_RX_AGGR_FAILURE_EVENTID,
+				wma_rx_aggr_failure_event_handler,
+				WMA_RX_SERIALIZER_CTX);
+
+	/* Register PWR_SAVE_FAIL event only in case of recovery(1) */
+	if (cds_cfg->auto_power_save_fail_mode) {
+		wmi_unified_register_event_handler(wma_handle->wmi_handle,
+			WMI_PDEV_CHIP_POWER_SAVE_FAILURE_DETECTED_EVENTID,
+			wma_chip_power_save_failure_detected_handler,
+			WMA_RX_WORK_CTX);
+	}
 
 	wma_ndp_register_all_event_handlers(wma_handle);
 
@@ -2522,6 +2572,8 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc, void *cds_context,
 		wma_vdev_update_pause_bitmap);
 	pmo_register_get_pause_bitmap(wma_handle->psoc,
 		wma_vdev_get_pause_bitmap);
+	pmo_register_is_device_in_low_pwr_mode(wma_handle->psoc,
+		wma_vdev_is_device_in_low_pwr_mode);
 	wma_cbacks.wma_get_connection_info = wma_get_connection_info;
 	wma_cbacks.wma_is_service_enabled = wma_is_service_enabled;
 	qdf_status = policy_mgr_register_wma_cb(wma_handle->psoc, &wma_cbacks);
@@ -2548,7 +2600,7 @@ err_scn_context:
 	OS_FREE(wmi_handle);
 
 err_wma_handle:
-
+	qdf_mem_free(tgt_psoc_info);
 	if (cds_get_conparam() != QDF_GLOBAL_FTM_MODE) {
 #ifdef FEATURE_WLAN_EXTSCAN
 		qdf_wake_lock_destroy(&wma_handle->extscan_wake_lock);
@@ -2591,6 +2643,10 @@ QDF_STATUS wma_pre_start(void *cds_ctx)
 						 wma_handle->htc_handle);
 	if (A_OK != status) {
 		WMA_LOGE("%s: wmi_unified_connect_htc_service", __func__);
+
+		if (!cds_is_fw_down())
+			QDF_BUG(0);
+
 		qdf_status = QDF_STATUS_E_FAULT;
 		goto end;
 	}
@@ -2717,7 +2773,7 @@ static int wma_pdev_set_hw_mode_resp_evt_handler(void *handle,
 		 */
 		return QDF_STATUS_E_NULL_VALUE;
 	}
-
+	wma_release_wmi_resp_wakelock(wma);
 	hw_mode_resp = qdf_mem_malloc(sizeof(*hw_mode_resp));
 	if (!hw_mode_resp) {
 		WMA_LOGE("%s: Memory allocation failed", __func__);
@@ -3007,7 +3063,6 @@ QDF_STATUS wma_start(void *cds_ctx)
 
 	WMA_LOGD("%s: Enter", __func__);
 
-	WMA_LOGD("%s: Enter", __func__);
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
 	/* validate the wma_handle */
 	if (NULL == wma_handle) {
@@ -3164,6 +3219,13 @@ QDF_STATUS wma_start(void *cds_ctx)
 		goto end;
 	}
 
+	status = wma_fips_register_event_handlers(wma_handle);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		WMA_LOGE("Failed to register FIPS event handler");
+		qdf_status = QDF_STATUS_E_FAILURE;
+		goto end;
+	}
+
 	/* Initialize the get temperature event handler */
 	status = wmi_unified_register_event_handler(wma_handle->wmi_handle,
 					WMI_PDEV_TEMPERATURE_EVENTID,
@@ -3298,41 +3360,6 @@ QDF_STATUS wma_stop(void *cds_ctx, uint8_t reason)
 end:
 	WMA_LOGD("%s: Exit", __func__);
 	return qdf_status;
-}
-
-/**
- * wma_cleanup_hold_req() - cleanup hold request queue
- * @wma: wma handle
- *
- * Return: none
- */
-static void wma_cleanup_hold_req(tp_wma_handle wma)
-{
-	struct wma_target_req *req_msg = NULL;
-	qdf_list_node_t *node1 = NULL;
-	QDF_STATUS status;
-
-	qdf_spin_lock_bh(&wma->wma_hold_req_q_lock);
-	if (!qdf_list_size(&wma->wma_hold_req_queue)) {
-		qdf_spin_unlock_bh(&wma->wma_hold_req_q_lock);
-		WMA_LOGD(FL("request queue is empty"));
-		return;
-	}
-
-	while (QDF_STATUS_SUCCESS !=
-			qdf_list_peek_front(&wma->wma_hold_req_queue, &node1)) {
-		req_msg = qdf_container_of(node1, struct wma_target_req, node);
-		status = qdf_list_remove_node(&wma->wma_hold_req_queue, node1);
-		if (QDF_STATUS_SUCCESS != status) {
-			qdf_spin_unlock_bh(&wma->wma_hold_req_q_lock);
-			WMA_LOGE(FL("Failed to remove request for vdev_id %d type %d"),
-				 req_msg->vdev_id, req_msg->type);
-			return;
-		}
-		qdf_mc_timer_destroy(&req_msg->event_timeout);
-		qdf_mem_free(req_msg);
-	}
-	qdf_spin_unlock_bh(&wma->wma_hold_req_q_lock);
 }
 
 /**
@@ -3508,6 +3535,7 @@ QDF_STATUS wma_close(void *cds_ctx)
 	tp_wma_handle wma_handle;
 	uint32_t idx;
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
+	struct target_psoc_info *tgt_psoc_info;
 
 	WMA_LOGD("%s: Enter", __func__);
 
@@ -3594,16 +3622,24 @@ QDF_STATUS wma_close(void *cds_ctx)
 				WLAN_LEGACY_WMA_ID);
 		wma_handle->pdev = NULL;
 	}
-	wlan_objmgr_psoc_release_ref(wma_handle->psoc, WLAN_LEGACY_WMA_ID);
-	wma_handle->psoc = NULL;
-	target_if_close();
-	wma_target_if_close(wma_handle);
+
+	tgt_psoc_info = wlan_psoc_get_tgt_if_handle(wma_handle->psoc);
+	if (tgt_psoc_info) {
+		qdf_mem_free(tgt_psoc_info);
+		wlan_psoc_set_tgt_if_handle(wma_handle->psoc, NULL);
+	}
 
 	pmo_unregister_pause_bitmap_notifier(wma_handle->psoc,
 		wma_vdev_update_pause_bitmap);
 	pmo_unregister_get_pause_bitmap(wma_handle->psoc,
 		wma_vdev_get_pause_bitmap);
+	pmo_unregister_is_device_in_low_pwr_mode(wma_handle->psoc,
+		wma_vdev_is_device_in_low_pwr_mode);
 
+	wlan_objmgr_psoc_release_ref(wma_handle->psoc, WLAN_LEGACY_WMA_ID);
+	wma_handle->psoc = NULL;
+	target_if_close();
+	wma_target_if_close(wma_handle);
 
 	WMA_LOGD("%s: Exit", __func__);
 	return QDF_STATUS_SUCCESS;
@@ -4313,7 +4349,7 @@ static void wma_update_hdd_cfg(tp_wma_handle wma_handle)
 	tgt_cfg.wmi_max_len = wmi_get_max_msg_len(wma_handle->wmi_handle)
 			      - WMI_TLV_HEADROOM;
 	wma_setup_egap_support(&tgt_cfg, wma_handle);
-
+	tgt_cfg.tx_bfee_8ss_enabled = wma_handle->tx_bfee_8ss_enabled;
 	wma_update_hdd_cfg_ndp(wma_handle, &tgt_cfg);
 	wma_handle->tgt_cfg_update_cb(hdd_ctx, &tgt_cfg);
 }
@@ -4701,6 +4737,9 @@ int wma_rx_service_ready_event(void *handle, uint8_t *cmd_param_info,
 	else
 		wma_handle->wlan_resource_config.use_pdev_id = false;
 
+	wma_handle->wlan_resource_config.max_num_dbs_scan_duty_cycle =
+		CDS_DBS_SCAN_CLIENTS_MAX;
+
 	/* register the Enhanced Green AP event handler */
 	wma_register_egap_event_handle(wma_handle);
 
@@ -4785,6 +4824,12 @@ int wma_rx_service_ready_event(void *handle, uint8_t *cmd_param_info,
 		WMA_LOGD("%s: WMA waiting for WMI_SERVICE_READY_EXT_EVENTID",
 				__func__);
 	}
+
+	if (WMI_SERVICE_IS_ENABLED(wma_handle->wmi_service_bitmap,
+				   WMI_SERVICE_8SS_TX_BFEE))
+		wma_handle->tx_bfee_8ss_enabled = true;
+	else
+		wma_handle->tx_bfee_8ss_enabled = false;
 
 	return 0;
 }
@@ -5244,6 +5289,15 @@ static QDF_STATUS wma_update_hw_mode_list(t_wma_handle *wma_handle)
 	return QDF_STATUS_SUCCESS;
 }
 
+static void wma_init_wifi_pos_dma_rings(t_wma_handle *wma_handle,
+					uint8_t num_mac, void *buf)
+{
+	struct hif_softc *hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
+	void *hal_soc = hif_get_hal_handle(hif_ctx);
+
+	wifi_pos_init_cir_cfr_rings(wma_handle->psoc, hal_soc, num_mac, buf);
+}
+
 /**
  * wma_populate_soc_caps() - populate entire SOC's capabilities
  * @wma_handle: pointer to wma global structure
@@ -5379,6 +5433,11 @@ static void wma_populate_soc_caps(t_wma_handle *wma_handle,
 			param_buf->hal_reg_caps,
 			phy_caps->num_phy_for_hal_reg_cap.num_phy *
 				sizeof(WMI_HAL_REG_CAPABILITIES_EXT));
+
+	wma_init_wifi_pos_dma_rings(wma_handle,
+				    param_buf->num_oem_dma_ring_caps,
+				    param_buf->oem_dma_ring_caps);
+
 	wma_print_populate_soc_caps(wma_handle);
 }
 
@@ -6252,6 +6311,108 @@ static QDF_STATUS wma_process_power_debug_stats_req(tp_wma_handle wma_handle)
 }
 #endif
 
+QDF_STATUS wma_set_rx_reorder_timeout_val(tp_wma_handle wma_handle,
+	struct sir_set_rx_reorder_timeout_val *reorder_timeout)
+{
+	wmi_pdev_set_reorder_timeout_val_cmd_fixed_param *cmd;
+	uint32_t len;
+	wmi_buf_t buf;
+	int ret;
+
+	if (!reorder_timeout) {
+		WMA_LOGE(FL("invalid pointer"));
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!wma_handle) {
+		WMA_LOGE(FL("WMA context is invald!"));
+		return QDF_STATUS_E_INVAL;
+	}
+	len = sizeof(*cmd);
+	buf = wmi_buf_alloc(wma_handle->wmi_handle, len);
+
+	if (!buf) {
+		WMA_LOGE(FL("Failed allocate wmi buffer"));
+		return QDF_STATUS_E_NOMEM;
+	}
+	cmd = (wmi_pdev_set_reorder_timeout_val_cmd_fixed_param *)
+		wmi_buf_data(buf);
+
+	WMITLV_SET_HDR(&cmd->tlv_header,
+	WMITLV_TAG_STRUC_wmi_pdev_set_reorder_timeout_val_cmd_fixed_param,
+	WMITLV_GET_STRUCT_TLVLEN(wmi_pdev_set_reorder_timeout_val_cmd_fixed_param));
+
+	memcpy(cmd->rx_timeout_pri, reorder_timeout->rx_timeout_pri,
+		sizeof(reorder_timeout->rx_timeout_pri));
+
+	WMA_LOGD("rx aggr record timeout: VO: %d, VI: %d, BE: %d, BK: %d",
+		cmd->rx_timeout_pri[0], cmd->rx_timeout_pri[1],
+		cmd->rx_timeout_pri[2], cmd->rx_timeout_pri[3]);
+
+	ret = wmi_unified_cmd_send(wma_handle->wmi_handle, buf, len,
+			WMI_PDEV_SET_REORDER_TIMEOUT_VAL_CMDID);
+	if (ret) {
+		WMA_LOGE(FL("Failed to send aggregation timeout"));
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wma_set_rx_blocksize(tp_wma_handle wma_handle,
+	struct sir_peer_set_rx_blocksize *peer_rx_blocksize)
+{
+	wmi_peer_set_rx_blocksize_cmd_fixed_param *cmd;
+	int32_t len;
+	wmi_buf_t buf;
+	u_int8_t *buf_ptr;
+	int ret;
+
+	if (!peer_rx_blocksize) {
+		WMA_LOGE(FL("invalid pointer"));
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!wma_handle) {
+		WMA_LOGE(FL(" WMA context is invald!"));
+		return QDF_STATUS_E_INVAL;
+	}
+
+	len = sizeof(*cmd);
+	buf = wmi_buf_alloc(wma_handle->wmi_handle, len);
+
+	if (!buf) {
+		WMA_LOGE(FL("Failed allocate wmi buffer"));
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	buf_ptr = (u_int8_t *) wmi_buf_data(buf);
+	cmd = (wmi_peer_set_rx_blocksize_cmd_fixed_param *) buf_ptr;
+
+	WMITLV_SET_HDR(&cmd->tlv_header,
+	WMITLV_TAG_STRUC_wmi_peer_set_rx_blocksize_cmd_fixed_param,
+	WMITLV_GET_STRUCT_TLVLEN(wmi_peer_set_rx_blocksize_cmd_fixed_param));
+
+	cmd->vdev_id = peer_rx_blocksize->vdev_id;
+	cmd->rx_block_ack_win_limit =
+		peer_rx_blocksize->rx_block_ack_win_limit;
+	WMI_CHAR_ARRAY_TO_MAC_ADDR(peer_rx_blocksize->peer_macaddr.bytes,
+		&cmd->peer_macaddr);
+
+	WMA_LOGD("rx aggr blocksize: %d", cmd->rx_block_ack_win_limit);
+
+	ret = wmi_unified_cmd_send(wma_handle->wmi_handle, buf, len,
+			WMI_PEER_SET_RX_BLOCKSIZE_CMDID);
+	if (ret) {
+		WMA_LOGE(FL("Failed to send aggregation size command"));
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 /**
  * wma_mc_process_msg() - process wma messages and call appropriate function.
  * @cds_context: cds context
@@ -6501,18 +6662,6 @@ QDF_STATUS wma_mc_process_msg(void *cds_context, struct scheduler_msg *msg)
 		wma_aggr_qos_req(wma_handle, (tAggrAddTsParams *) msg->bodyptr);
 		break;
 
-	case WMA_RECEIVE_FILTER_SET_FILTER_REQ:
-		wma_process_receive_filter_set_filter_req(wma_handle,
-				(tSirRcvPktFilterCfgType *) msg->bodyptr);
-		qdf_mem_free(msg->bodyptr);
-		break;
-
-	case WMA_RECEIVE_FILTER_CLEAR_FILTER_REQ:
-		wma_process_receive_filter_clear_filter_req(wma_handle,
-				(tSirRcvFltPktClearParam *) msg->bodyptr);
-		qdf_mem_free(msg->bodyptr);
-		break;
-
 	case WMA_WOW_ADD_PTRN:
 		wma_wow_add_pattern(wma_handle,
 				    (struct wow_add_pattern *) msg->bodyptr);
@@ -6668,7 +6817,6 @@ QDF_STATUS wma_mc_process_msg(void *cds_context, struct scheduler_msg *msg)
 	case WMA_HIDDEN_SSID_VDEV_RESTART:
 		wma_hidden_ssid_vdev_restart(wma_handle,
 				(tHalHiddenSsidVdevRestart *) msg->bodyptr);
-		qdf_mem_free(msg->bodyptr);
 		break;
 #ifdef WLAN_FEATURE_EXTWOW_SUPPORT
 	case WMA_WLAN_EXT_WOW:
@@ -7041,6 +7189,11 @@ QDF_STATUS wma_mc_process_msg(void *cds_context, struct scheduler_msg *msg)
 			(struct wow_pulse_mode *)msg->bodyptr);
 		qdf_mem_free(msg->bodyptr);
 		break;
+	case WMA_SET_DBS_SCAN_SEL_CONF_PARAMS:
+		wma_send_dbs_scan_selection_params(wma_handle,
+			(struct wmi_dbs_scan_sel_params *)msg->bodyptr);
+		qdf_mem_free(msg->bodyptr);
+		break;
 	default:
 		WMA_LOGE("Unhandled WMA message of type %d", msg->type);
 		if (msg->bodyptr)
@@ -7203,9 +7356,13 @@ QDF_STATUS wma_send_pdev_set_hw_mode_cmd(tp_wma_handle wma_handle,
 		goto fail;
 	}
 
+	wma_acquire_wmi_resp_wakelock(wma_handle,
+				WMA_VDEV_HW_MODE_REQUEST_TIMEOUT);
 	if (wmi_unified_soc_set_hw_mode_cmd(wma_handle->wmi_handle,
-				msg->hw_mode_index))
+				msg->hw_mode_index)) {
+		wma_release_wmi_resp_wakelock(wma_handle);
 		goto fail;
+	}
 
 	return QDF_STATUS_SUCCESS;
 fail:
@@ -7467,3 +7624,15 @@ int wma_peer_rx_reorder_queue_remove(void *scn_handle,
 }
 
 
+void wma_ipa_uc_stat_request(wma_cli_set_cmd_t *privcmd)
+{
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+
+	if (!wma) {
+		WMA_LOGE("%s: Failed to get wma", __func__);
+		return;
+	}
+
+	if (wma_set_priv_cfg(wma, privcmd))
+		WMA_LOGE("Failed to set wma priv congiuration");
+}

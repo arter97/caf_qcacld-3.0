@@ -52,7 +52,8 @@
 #include <htt_types.h>
 #include <ol_if_athvar.h>
 #include <enet.h>               /* ethernet + SNAP/LLC header defs and
-				   ethertype values */
+				 * ethertype values
+				 */
 #include <ip_prot.h>            /* IP protocol values */
 #include <ipv4.h>               /* IPv4 header defs */
 #include <ipv6_defs.h>          /* IPv6 header defs */
@@ -62,6 +63,68 @@
 #include "pktlog_ac_fmt.h"
 #include <cdp_txrx_handle.h>
 #include <pld_common.h>
+
+
+#define OL_RX_INDICATION_MAX_RECORDS 2048
+
+/**
+ * enum ol_rx_ind_record_type - OL rx indication events
+ * @OL_RX_INDICATION_POP_START: event recorded before netbuf pop
+ * @OL_RX_INDICATION_POP_END: event recorded after netbuf pop
+ * @OL_RX_INDICATION_BUF_REPLENISH: event recorded after buffer replenishment
+ */
+enum ol_rx_ind_record_type {
+	OL_RX_INDICATION_POP_START,
+	OL_RX_INDICATION_POP_END,
+	OL_RX_INDICATION_BUF_REPLENISH,
+};
+
+/**
+ * struct ol_rx_ind_record - structure for detailing ol txrx rx ind. event
+ * @value: info corresponding to rx indication event
+ * @type: what the event was
+ * @time: when it happened
+ */
+struct ol_rx_ind_record {
+	uint16_t value;
+	enum ol_rx_ind_record_type type;
+	uint64_t time;
+};
+
+#ifdef OL_RX_INDICATION_RECORD
+static uint32_t ol_rx_ind_record_index;
+static struct ol_rx_ind_record
+	      ol_rx_indication_record_history[OL_RX_INDICATION_MAX_RECORDS];
+
+/**
+ * ol_rx_ind_record_event() - record ol rx indication events
+ * @value: contains rx ind. event related info
+ * @type: ol rx indication message type
+ *
+ * This API record the ol rx indiation event in a rx indication
+ * record buffer.
+ *
+ * Return: None
+ */
+static void ol_rx_ind_record_event(uint32_t value,
+				    enum ol_rx_ind_record_type type)
+{
+	ol_rx_indication_record_history[ol_rx_ind_record_index].value = value;
+	ol_rx_indication_record_history[ol_rx_ind_record_index].type = type;
+	ol_rx_indication_record_history[ol_rx_ind_record_index].time =
+							qdf_get_log_timestamp();
+
+	ol_rx_ind_record_index++;
+	if (ol_rx_ind_record_index >= OL_RX_INDICATION_MAX_RECORDS)
+		ol_rx_ind_record_index = 0;
+}
+#else
+static inline
+void ol_rx_ind_record_event(uint32_t value, enum ol_rx_ind_record_type type)
+{
+}
+
+#endif /* OL_RX_INDICATION_RECORD */
 
 void ol_rx_data_process(struct ol_txrx_peer_t *peer,
 			qdf_nbuf_t rx_buf_list);
@@ -250,6 +313,7 @@ static void
 ol_rx_ind_rssi_update(struct ol_txrx_peer_t *peer, qdf_nbuf_t rx_ind_msg)
 {
 	struct ol_txrx_pdev_t *pdev = peer->vdev->pdev;
+
 	peer->rssi_dbm = ol_rx_rssi_avg(pdev, peer->rssi_dbm,
 					htt_rx_ind_rssi_dbm(pdev->htt_pdev,
 							    rx_ind_msg));
@@ -259,6 +323,7 @@ static void
 ol_rx_mpdu_rssi_update(struct ol_txrx_peer_t *peer, void *rx_mpdu_desc)
 {
 	struct ol_txrx_pdev_t *pdev = peer->vdev->pdev;
+
 	if (!peer)
 		return;
 	peer->rssi_dbm = ol_rx_rssi_avg(pdev, peer->rssi_dbm,
@@ -278,6 +343,7 @@ static void discard_msdus(htt_pdev_handle htt_pdev,
 {
 	while (1) {
 		qdf_nbuf_t next;
+
 		next = qdf_nbuf_next(
 			head_msdu);
 		htt_rx_desc_frame_free
@@ -289,7 +355,6 @@ static void discard_msdus(htt_pdev_handle htt_pdev,
 		}
 		head_msdu = next;
 	}
-	return;
 }
 
 static void chain_msdus(htt_pdev_handle htt_pdev,
@@ -298,6 +363,7 @@ static void chain_msdus(htt_pdev_handle htt_pdev,
 {
 	while (1) {
 		qdf_nbuf_t next;
+
 		next = qdf_nbuf_next(head_msdu);
 		htt_rx_desc_frame_free(
 			htt_pdev,
@@ -306,7 +372,6 @@ static void chain_msdus(htt_pdev_handle htt_pdev,
 			break;
 		head_msdu = next;
 	}
-	return;
 }
 
 static void process_reorder(ol_txrx_pdev_handle pdev,
@@ -322,6 +387,7 @@ static void process_reorder(ol_txrx_pdev_handle pdev,
 	htt_pdev_handle htt_pdev = pdev->htt_pdev;
 	enum htt_rx_status mpdu_status;
 	int reorder_idx;
+
 	reorder_idx = htt_rx_mpdu_desc_reorder_idx(htt_pdev, rx_mpdu_desc);
 	OL_RX_REORDER_TRACE_ADD(pdev, tid,
 				reorder_idx,
@@ -385,7 +451,6 @@ static void process_reorder(ol_txrx_pdev_handle pdev,
 				rx_mpdu_desc);
 		}
 	}
-	return;
 } /* process_reorder */
 
 void
@@ -394,7 +459,7 @@ ol_rx_indication_handler(ol_txrx_pdev_handle pdev,
 			 uint16_t peer_id, uint8_t tid, int num_mpdu_ranges)
 {
 	int mpdu_range, i;
-	unsigned seq_num_start = 0, seq_num_end = 0;
+	unsigned int seq_num_start = 0, seq_num_end = 0;
 	bool rx_ind_release = false;
 	struct ol_txrx_vdev_t *vdev = NULL;
 	struct ol_txrx_peer_t *peer;
@@ -404,6 +469,7 @@ ol_rx_indication_handler(ol_txrx_pdev_handle pdev,
 	uint16_t chan2;
 	uint8_t phymode;
 	bool ret;
+	uint32_t msdu_count = 0;
 
 	htt_pdev = pdev->htt_pdev;
 	peer = ol_txrx_peer_find_by_id(pdev, peer_id);
@@ -462,10 +528,12 @@ ol_rx_indication_handler(ol_txrx_pdev_handle pdev,
 	}
 
 	if (htt_rx_ind_release(pdev->htt_pdev, rx_ind_msg)) {
-		/* the ind info of release is saved here and do release at the
+		/*
+		 * The ind info of release is saved here and do release at the
 		 * end. This is for the reason of in HL case, the qdf_nbuf_t
 		 * for msg and payload are the same buf. And the buf will be
-		 * changed during processing */
+		 * changed during processing
+		 */
 		rx_ind_release = true;
 		htt_rx_ind_release_seq_num_range(pdev->htt_pdev, rx_ind_msg,
 						 &seq_num_start, &seq_num_end);
@@ -523,7 +591,8 @@ ol_rx_indication_handler(ol_txrx_pdev_handle pdev,
 					htt_rx_amsdu_pop(htt_pdev,
 							 rx_ind_msg,
 							 &head_msdu,
-							 &tail_msdu);
+							 &tail_msdu,
+							 &msdu_count);
 #ifdef HTT_RX_RESTORE
 				if (htt_pdev->rx_ring.rx_reset) {
 					ol_rx_trigger_restore(htt_pdev,
@@ -581,7 +650,7 @@ ol_rx_indication_handler(ol_txrx_pdev_handle pdev,
 			for (i = 0; i < num_mpdus; i++) {
 				/* pull the MPDU's MSDUs off the buffer queue */
 				htt_rx_amsdu_pop(htt_pdev, rx_ind_msg, &msdu,
-						 &tail_msdu);
+						 &tail_msdu, &msdu_count);
 #ifdef HTT_RX_RESTORE
 				if (htt_pdev->rx_ring.rx_reset) {
 					ol_rx_trigger_restore(htt_pdev, msdu,
@@ -601,6 +670,7 @@ ol_rx_indication_handler(ol_txrx_pdev_handle pdev,
 				    vdev != NULL && peer != NULL) {
 					union htt_rx_pn_t pn;
 					uint8_t key_id;
+
 					htt_rx_mpdu_desc_pn(
 						pdev->htt_pdev,
 						htt_rx_msdu_desc_retrieve(
@@ -637,6 +707,7 @@ ol_rx_indication_handler(ol_txrx_pdev_handle pdev,
 				while (1) {
 					/* Free the nbuf */
 					qdf_nbuf_t next;
+
 					next = qdf_nbuf_next(msdu);
 					htt_rx_desc_frame_free(htt_pdev, msdu);
 					if (msdu == tail_msdu)
@@ -679,21 +750,24 @@ ol_rx_sec_ind_handler(ol_txrx_pdev_handle pdev,
 
 	peer = ol_txrx_peer_find_by_id(pdev, peer_id);
 	if (!peer) {
-		ol_txrx_err("Couldn't find peer from ID %d - skipping security inits\n",
-			   peer_id);
+		ol_txrx_err(
+			"Couldn't find peer from ID %d - skipping security inits\n",
+			peer_id);
 		return;
 	}
-	ol_txrx_dbg("sec spec for peer %p (%02x:%02x:%02x:%02x:%02x:%02x): "
-		   "%s key of type %d\n",
-		   peer,
-		   peer->mac_addr.raw[0], peer->mac_addr.raw[1],
-		   peer->mac_addr.raw[2], peer->mac_addr.raw[3],
-		   peer->mac_addr.raw[4], peer->mac_addr.raw[5],
-		   is_unicast ? "ucast" : "mcast", sec_type);
+	ol_txrx_dbg(
+		"sec spec for peer %p (%02x:%02x:%02x:%02x:%02x:%02x): %s key of type %d\n",
+		peer,
+		peer->mac_addr.raw[0], peer->mac_addr.raw[1],
+		peer->mac_addr.raw[2], peer->mac_addr.raw[3],
+		peer->mac_addr.raw[4], peer->mac_addr.raw[5],
+		is_unicast ? "ucast" : "mcast", sec_type);
 	sec_index = is_unicast ? txrx_sec_ucast : txrx_sec_mcast;
 	peer->security[sec_index].sec_type = sec_type;
-	/* michael key only valid for TKIP
-	   but for simplicity, copy it anyway */
+	/*
+	 * michael key only valid for TKIP
+	 * but for simplicity, copy it anyway
+	 */
 	qdf_mem_copy(&peer->security[sec_index].michael_key[0],
 		     michael_key,
 		     sizeof(peer->security[sec_index].michael_key));
@@ -808,7 +882,7 @@ void ol_rx_notify(struct cdp_cfg *cfg_pdev,
 static void
 ol_rx_inspect(struct ol_txrx_vdev_t *vdev,
 	      struct ol_txrx_peer_t *peer,
-	      unsigned tid, qdf_nbuf_t msdu, void *rx_desc)
+	      unsigned int tid, qdf_nbuf_t msdu, void *rx_desc)
 {
 	ol_txrx_pdev_handle pdev = vdev->pdev;
 	uint8_t *data, *l3_hdr;
@@ -858,6 +932,7 @@ ol_rx_offload_deliver_ind_handler(ol_txrx_pdev_handle pdev,
 				buf = head_buf;
 				while (1) {
 					qdf_nbuf_t next;
+
 					next = qdf_nbuf_next(buf);
 					htt_rx_desc_frame_free(htt_pdev, buf);
 					if (buf == tail_buf)
@@ -978,8 +1053,10 @@ ol_rx_filter(struct ol_txrx_vdev_t *vdev,
 	is_encrypted = htt_rx_mpdu_is_encrypted(htt_pdev, rx_desc);
 #ifdef ATH_SUPPORT_WAPI
 	if ((true == is_encrypted) && (ETHERTYPE_WAI == ether_type)) {
-		/* We expect the WAI frames to be always unencrypted when
-		   the UMAC gets it.*/
+		/*
+		 * We expect the WAI frames to be always unencrypted when
+		 * the UMAC gets it
+		 */
 		return FILTER_STATUS_REJECT;
 	}
 #endif /* ATH_SUPPORT_WAPI */
@@ -1060,7 +1137,8 @@ ol_rx_filter(struct ol_txrx_vdev_t *vdev,
 
 void
 ol_rx_deliver(struct ol_txrx_vdev_t *vdev,
-	      struct ol_txrx_peer_t *peer, unsigned tid, qdf_nbuf_t msdu_list)
+	      struct ol_txrx_peer_t *peer, unsigned int tid,
+	      qdf_nbuf_t msdu_list)
 {
 	ol_txrx_pdev_handle pdev = vdev->pdev;
 	htt_pdev_handle htt_pdev = pdev->htt_pdev;
@@ -1070,6 +1148,7 @@ ol_rx_deliver(struct ol_txrx_vdev_t *vdev,
 	bool filter = false;
 #ifdef QCA_SUPPORT_SW_TXRX_ENCAP
 	struct ol_rx_decap_info_t info;
+
 	qdf_mem_set(&info, sizeof(info), 0);
 #endif
 
@@ -1096,13 +1175,13 @@ ol_rx_deliver(struct ol_txrx_vdev_t *vdev,
 			htt_rx_msdu_first_msdu_flag(htt_pdev, rx_desc);
 		if (OL_RX_DECAP(vdev, peer, msdu, &info) != A_OK) {
 			discard = 1;
-			ol_txrx_dbg("decap error %p from peer %p "
-				   "(%02x:%02x:%02x:%02x:%02x:%02x) len %d\n",
-				   msdu, peer,
-				   peer->mac_addr.raw[0], peer->mac_addr.raw[1],
-				   peer->mac_addr.raw[2], peer->mac_addr.raw[3],
-				   peer->mac_addr.raw[4], peer->mac_addr.raw[5],
-				   qdf_nbuf_len(msdu));
+			ol_txrx_dbg(
+				"decap error %p from peer %p (%02x:%02x:%02x:%02x:%02x:%02x) len %d\n",
+				msdu, peer,
+				peer->mac_addr.raw[0], peer->mac_addr.raw[1],
+				peer->mac_addr.raw[2], peer->mac_addr.raw[3],
+				peer->mac_addr.raw[4], peer->mac_addr.raw[5],
+				qdf_nbuf_len(msdu));
 			goto DONE;
 		}
 #endif
@@ -1129,9 +1208,11 @@ DONE:
 					  ol_txrx_frm_dump_contents,
 					  0 /* don't print contents */);
 			qdf_nbuf_free(msdu);
-			/* If discarding packet is last packet of the delivery
-			   list, NULL terminator should be added
-			   for delivery list. */
+			/*
+			 * If discarding packet is last packet of the delivery
+			 * list, NULL terminator should be added
+			 * for delivery list.
+			 */
 			if (next == NULL && deliver_list_head) {
 				/* add NULL terminator */
 				qdf_nbuf_set_next(deliver_list_tail, NULL);
@@ -1145,6 +1226,7 @@ DONE:
 				int i;
 				struct ol_txrx_ocb_chan_info *chan_info = 0;
 				int packet_freq = peer->last_pkt_center_freq;
+
 				for (i = 0; i < vdev->ocb_channel_count; i++) {
 					if (vdev->ocb_channel_info[i].
 						chan_freq == packet_freq) {
@@ -1173,42 +1255,34 @@ DONE:
 					qdf_mem_copy(rx_header.rssi,
 							peer->last_pkt_rssi,
 							sizeof(rx_header.rssi));
-					if (peer->last_pkt_legacy_rate_sel ==
-					    0) {
-						switch (peer->
-							last_pkt_legacy_rate) {
-						case 0x8:
-							rx_header.datarate = 6;
-							break;
-						case 0x9:
-							rx_header.datarate = 4;
-							break;
-						case 0xA:
-							rx_header.datarate = 2;
-							break;
-						case 0xB:
-							rx_header.datarate = 0;
-							break;
-						case 0xC:
-							rx_header.datarate = 7;
-							break;
-						case 0xD:
-							rx_header.datarate = 5;
-							break;
-						case 0xE:
-							rx_header.datarate = 3;
-							break;
-						case 0xF:
-							rx_header.datarate = 1;
-							break;
-						default:
-							rx_header.datarate =
-								0xFF;
-							break;
-						}
-					} else {
+					if (peer->last_pkt_legacy_rate_sel)
 						rx_header.datarate = 0xFF;
-					}
+					else if (peer->last_pkt_legacy_rate ==
+						 0x8)
+						rx_header.datarate = 6;
+					else if (peer->last_pkt_legacy_rate ==
+						 0x9)
+						rx_header.datarate = 4;
+					else if (peer->last_pkt_legacy_rate ==
+						 0xA)
+						rx_header.datarate = 2;
+					else if (peer->last_pkt_legacy_rate ==
+						 0xB)
+						rx_header.datarate = 0;
+					else if (peer->last_pkt_legacy_rate ==
+						 0xC)
+						rx_header.datarate = 7;
+					else if (peer->last_pkt_legacy_rate ==
+						 0xD)
+						rx_header.datarate = 5;
+					else if (peer->last_pkt_legacy_rate ==
+						 0xE)
+						rx_header.datarate = 3;
+					else if (peer->last_pkt_legacy_rate ==
+						 0xF)
+						rx_header.datarate = 1;
+					else
+						rx_header.datarate = 0xFF;
 
 					rx_header.timestamp_microsec = peer->
 						last_pkt_timestamp_microsec;
@@ -1222,10 +1296,12 @@ DONE:
 					qdf_mem_copy(qdf_nbuf_data(msdu),
 						&rx_header, sizeof(rx_header));
 
-					/* Construct the ethernet header with
-					   type 0x8152 and push that to the
-					   front of the packet to indicate the
-					   RX stats header. */
+					/*
+					 * Construct the ethernet header with
+					 * type 0x8152 and push that to the
+					 * front of the packet to indicate the
+					 * RX stats header.
+					 */
 					eth_header.ether_type = QDF_SWAP_U16(
 						ETHERTYPE_OCB_RX);
 					qdf_nbuf_push_head(msdu,
@@ -1264,7 +1340,8 @@ DONE:
 
 void
 ol_rx_discard(struct ol_txrx_vdev_t *vdev,
-	      struct ol_txrx_peer_t *peer, unsigned tid, qdf_nbuf_t msdu_list)
+	      struct ol_txrx_peer_t *peer, unsigned int tid,
+	      qdf_nbuf_t msdu_list)
 {
 	ol_txrx_pdev_handle pdev = vdev->pdev;
 	htt_pdev_handle htt_pdev = pdev->htt_pdev;
@@ -1273,12 +1350,12 @@ ol_rx_discard(struct ol_txrx_vdev_t *vdev,
 		qdf_nbuf_t msdu = msdu_list;
 
 		msdu_list = qdf_nbuf_next(msdu_list);
-		ol_txrx_dbg("discard rx %p from partly-deleted peer %p "
-			   "(%02x:%02x:%02x:%02x:%02x:%02x)\n",
-			   msdu, peer,
-			   peer->mac_addr.raw[0], peer->mac_addr.raw[1],
-			   peer->mac_addr.raw[2], peer->mac_addr.raw[3],
-			   peer->mac_addr.raw[4], peer->mac_addr.raw[5]);
+		ol_txrx_dbg(
+			"discard rx %p from partly-deleted peer %p (%02x:%02x:%02x:%02x:%02x:%02x)\n",
+			msdu, peer,
+			peer->mac_addr.raw[0], peer->mac_addr.raw[1],
+			peer->mac_addr.raw[2], peer->mac_addr.raw[3],
+			peer->mac_addr.raw[4], peer->mac_addr.raw[5]);
 		htt_rx_desc_frame_free(htt_pdev, msdu);
 	}
 }
@@ -1286,6 +1363,7 @@ ol_rx_discard(struct ol_txrx_vdev_t *vdev,
 void ol_rx_peer_init(struct ol_txrx_pdev_t *pdev, struct ol_txrx_peer_t *peer)
 {
 	uint8_t tid;
+
 	for (tid = 0; tid < OL_TXRX_NUM_EXT_TIDS; tid++) {
 		ol_rx_reorder_init(&peer->tids_rx_reorder[tid], tid);
 
@@ -1342,13 +1420,14 @@ ol_rx_in_order_indication_handler(ol_txrx_pdev_handle pdev,
 	struct ol_txrx_peer_t *peer = NULL;
 	htt_pdev_handle htt_pdev = NULL;
 	int status;
-	qdf_nbuf_t head_msdu, tail_msdu = NULL;
+	qdf_nbuf_t head_msdu = NULL, tail_msdu = NULL;
 	uint8_t *rx_ind_data;
 	uint32_t *msg_word;
 	uint32_t msdu_count;
 #ifdef WDI_EVENT_ENABLE
 	uint8_t pktlog_bit;
 #endif
+	uint32_t filled = 0;
 
 	if (pdev) {
 		if (qdf_unlikely(QDF_GLOBAL_MONITOR_MODE == cds_get_conparam()))
@@ -1376,21 +1455,35 @@ ol_rx_in_order_indication_handler(ol_txrx_pdev_handle pdev,
 	/* Get the total number of MSDUs */
 	msdu_count = HTT_RX_IN_ORD_PADDR_IND_MSDU_CNT_GET(*(msg_word + 1));
 
+	ol_rx_ind_record_event(msdu_count, OL_RX_INDICATION_POP_START);
+
 	/*
 	 * Get a linked list of the MSDUs in the rx in order indication.
 	 * This also attaches each rx MSDU descriptor to the
 	 * corresponding rx MSDU network buffer.
 	 */
-	status = htt_rx_amsdu_pop(htt_pdev, rx_ind_msg, &head_msdu, &tail_msdu);
+	status = htt_rx_amsdu_pop(htt_pdev, rx_ind_msg, &head_msdu,
+				  &tail_msdu, &msdu_count);
+	ol_rx_ind_record_event(status, OL_RX_INDICATION_POP_END);
+
 	if (qdf_unlikely(0 == status)) {
-		ol_txrx_warn("%s: Pop status is 0, returning here\n", __func__);
+		ol_txrx_warn("%s: Pop status is 0, returning here", __func__);
 		return;
 	}
 
-	/* Replenish the rx buffer ring first to provide buffers to the target
-	   rather than waiting for the indeterminate time taken by the OS
-	   to consume the rx frames */
-	htt_rx_msdu_buff_in_order_replenish(htt_pdev, msdu_count);
+	/*
+	 * Replenish the rx buffer ring first to provide buffers to the target
+	 * rather than waiting for the indeterminate time taken by the OS
+	 * to consume the rx frames
+	 */
+	filled = htt_rx_msdu_buff_in_order_replenish(htt_pdev, msdu_count);
+	ol_rx_ind_record_event(filled, OL_RX_INDICATION_BUF_REPLENISH);
+
+	if (!head_msdu) {
+		ol_txrx_warn("%s: No packet to send to HDD",
+			     __func__);
+		return;
+	}
 
 	/* Send the chain of MSDUs to the OS */
 	/* rx_opt_proc takes a NULL-terminated list of msdu netbufs */
@@ -1401,8 +1494,10 @@ ol_rx_in_order_indication_handler(ol_txrx_pdev_handle pdev,
 	ol_rx_send_pktlog_event(pdev, peer, head_msdu, pktlog_bit);
 #endif
 
-	/* if this is an offload indication, peer id is carried in the
-	   rx buffer */
+	/*
+	 * if this is an offload indication, peer id is carried in the
+	 * rx buffer
+	 */
 	if (peer) {
 		vdev = peer->vdev;
 	} else {
@@ -1411,6 +1506,7 @@ ol_rx_in_order_indication_handler(ol_txrx_pdev_handle pdev,
 			   __func__, peer_id);
 		while (head_msdu) {
 			qdf_nbuf_t msdu = head_msdu;
+
 			head_msdu = qdf_nbuf_next(head_msdu);
 			TXRX_STATS_MSDU_INCR(pdev,
 				 rx.dropped_peer_invalid, msdu);
@@ -1470,7 +1566,7 @@ void ol_rx_pkt_dump_call(
 void
 ol_rx_in_order_deliver(struct ol_txrx_vdev_t *vdev,
 		       struct ol_txrx_peer_t *peer,
-		       unsigned tid, qdf_nbuf_t msdu_list)
+		       unsigned int tid, qdf_nbuf_t msdu_list)
 {
 	qdf_nbuf_t msdu;
 
@@ -1487,6 +1583,7 @@ ol_rx_in_order_deliver(struct ol_txrx_vdev_t *vdev,
 
 		DPTRACE(qdf_dp_trace(msdu,
 			QDF_DP_TRACE_RX_TXRX_PACKET_PTR_RECORD,
+			QDF_TRACE_DEFAULT_PDEV_ID,
 			qdf_nbuf_data_addr(msdu),
 			sizeof(qdf_nbuf_data(msdu)), QDF_RX));
 
@@ -1513,7 +1610,8 @@ void ol_rx_log_packet(htt_pdev_handle htt_pdev,
 
 	peer = ol_txrx_peer_find_by_id(htt_pdev->txrx_pdev, peer_id);
 	if (peer)
-		qdf_dp_trace_log_pkt(peer->vdev->vdev_id, msdu, QDF_RX);
+		qdf_dp_trace_log_pkt(peer->vdev->vdev_id, msdu, QDF_RX,
+				QDF_TRACE_DEFAULT_PDEV_ID);
 }
 
 void
@@ -1540,9 +1638,11 @@ ol_rx_offload_paddr_deliver_ind_handler(htt_pdev_handle htt_pdev,
 			QDF_NBUF_CB_TX_PACKET_TRACK(head_buf) =
 						QDF_NBUF_TX_PKT_DATA_TRACK;
 			qdf_dp_trace_log_pkt(peer->vdev->vdev_id,
-				head_buf, QDF_RX);
+				head_buf, QDF_RX,
+				QDF_TRACE_DEFAULT_PDEV_ID);
 			DPTRACE(qdf_dp_trace(head_buf,
 				QDF_DP_TRACE_RX_OFFLOAD_HTT_PACKET_PTR_RECORD,
+				QDF_TRACE_DEFAULT_PDEV_ID,
 				qdf_nbuf_data_addr(head_buf),
 				sizeof(qdf_nbuf_data(head_buf)), QDF_RX));
 			ol_rx_data_process(peer, head_buf);
@@ -1550,6 +1650,7 @@ ol_rx_offload_paddr_deliver_ind_handler(htt_pdev_handle htt_pdev,
 			buf = head_buf;
 			while (1) {
 				qdf_nbuf_t next;
+
 				next = qdf_nbuf_next(buf);
 				htt_rx_desc_frame_free(htt_pdev, buf);
 				if (buf == tail_buf)
@@ -1590,107 +1691,105 @@ void ol_ath_add_vow_extstats(htt_pdev_handle pdev, qdf_nbuf_t msdu)
 	 */
 	struct ol_ath_softc_net80211 *scn =
 		(struct ol_ath_softc_net80211 *)pdev->ctrl_pdev;
+	uint8_t *data, *l3_hdr, *bp;
+	uint16_t ethertype;
+	int offset;
+	struct vow_extstats vowstats;
 
-	if (scn->vow_extstats == 0) {
+	if (scn->vow_extstats == 0)
 		return;
-	} else {
-		uint8_t *data, *l3_hdr, *bp;
-		uint16_t ethertype;
-		int offset;
-		struct vow_extstats vowstats;
 
-		data = qdf_nbuf_data(msdu);
+	data = qdf_nbuf_data(msdu);
 
-		offset = ETHERNET_ADDR_LEN * 2;
-		l3_hdr = data + ETHERNET_HDR_LEN;
-		ethertype = (data[offset] << 8) | data[offset + 1];
-		if (ethertype == ETHERTYPE_IPV4) {
-			offset = IPV4_HDR_OFFSET_PROTOCOL;
-			if ((l3_hdr[offset] == IP_PROTOCOL_UDP) &&
-			    (l3_hdr[0] == IP_VER4_N_NO_EXTRA_HEADERS)) {
-				bp = data + EXT_HDR_OFFSET;
+	offset = ETHERNET_ADDR_LEN * 2;
+	l3_hdr = data + ETHERNET_HDR_LEN;
+	ethertype = (data[offset] << 8) | data[offset + 1];
+	if (ethertype == ETHERTYPE_IPV4) {
+		offset = IPV4_HDR_OFFSET_PROTOCOL;
+		if ((l3_hdr[offset] == IP_PROTOCOL_UDP) &&
+				(l3_hdr[0] == IP_VER4_N_NO_EXTRA_HEADERS)) {
+			bp = data + EXT_HDR_OFFSET;
 
-				if ((data[RTP_HDR_OFFSET] == UDP_PDU_RTP_EXT) &&
-				    (bp[0] == 0x12) &&
-				    (bp[1] == 0x34) &&
-				    (bp[2] == 0x00) && (bp[3] == 0x08)) {
-					/*
-					 * Clear UDP checksum so we do not have
-					 * to recalculate it
-					 * after filling in status fields.
-					 */
-					data[UDP_CKSUM_OFFSET] = 0;
-					data[(UDP_CKSUM_OFFSET + 1)] = 0;
+			if ((data[RTP_HDR_OFFSET] == UDP_PDU_RTP_EXT) &&
+					(bp[0] == 0x12) &&
+					(bp[1] == 0x34) &&
+					(bp[2] == 0x00) && (bp[3] == 0x08)) {
+				/*
+				 * Clear UDP checksum so we do not have
+				 * to recalculate it
+				 * after filling in status fields.
+				 */
+				data[UDP_CKSUM_OFFSET] = 0;
+				data[(UDP_CKSUM_OFFSET + 1)] = 0;
 
-					bp += IPERF3_DATA_OFFSET;
+				bp += IPERF3_DATA_OFFSET;
 
-					htt_rx_get_vowext_stats(msdu,
-								&vowstats);
+				htt_rx_get_vowext_stats(msdu,
+						&vowstats);
 
-					/* control channel RSSI */
-					*bp++ = vowstats.rx_rssi_ctl0;
-					*bp++ = vowstats.rx_rssi_ctl1;
-					*bp++ = vowstats.rx_rssi_ctl2;
+				/* control channel RSSI */
+				*bp++ = vowstats.rx_rssi_ctl0;
+				*bp++ = vowstats.rx_rssi_ctl1;
+				*bp++ = vowstats.rx_rssi_ctl2;
 
-					/* rx rate info */
-					*bp++ = vowstats.rx_bw;
-					*bp++ = vowstats.rx_sgi;
-					*bp++ = vowstats.rx_nss;
+				/* rx rate info */
+				*bp++ = vowstats.rx_bw;
+				*bp++ = vowstats.rx_sgi;
+				*bp++ = vowstats.rx_nss;
 
-					*bp++ = vowstats.rx_rssi_comb;
-					/* rsflags */
-					*bp++ = vowstats.rx_rs_flags;
+				*bp++ = vowstats.rx_rssi_comb;
+				/* rsflags */
+				*bp++ = vowstats.rx_rs_flags;
 
-					/* Time stamp Lo */
-					*bp++ = (uint8_t)
-						((vowstats.
-						  rx_macTs & 0x0000ff00) >> 8);
-					*bp++ = (uint8_t)
-						(vowstats.rx_macTs & 0x0000ff);
-					/* rx phy errors */
-					*bp++ = (uint8_t)
-						((scn->chan_stats.
-						  phy_err_cnt >> 8) & 0xff);
-					*bp++ =
-						(uint8_t) (scn->chan_stats.
-							   phy_err_cnt & 0xff);
-					/* rx clear count */
-					*bp++ = (uint8_t)
-						((scn->mib_cycle_cnts.
-						  rx_clear_count >> 24) & 0xff);
-					*bp++ = (uint8_t)
-						((scn->mib_cycle_cnts.
-						  rx_clear_count >> 16) & 0xff);
-					*bp++ = (uint8_t)
-						((scn->mib_cycle_cnts.
-						  rx_clear_count >> 8) & 0xff);
-					*bp++ = (uint8_t)
-						(scn->mib_cycle_cnts.
-						 rx_clear_count & 0xff);
-					/* rx cycle count */
-					*bp++ = (uint8_t)
-						((scn->mib_cycle_cnts.
-						  cycle_count >> 24) & 0xff);
-					*bp++ = (uint8_t)
-						((scn->mib_cycle_cnts.
-						  cycle_count >> 16) & 0xff);
-					*bp++ = (uint8_t)
-						((scn->mib_cycle_cnts.
-						  cycle_count >> 8) & 0xff);
-					*bp++ = (uint8_t)
-						(scn->mib_cycle_cnts.
-						 cycle_count & 0xff);
+				/* Time stamp Lo */
+				*bp++ = (uint8_t)
+					((vowstats.
+					  rx_macTs & 0x0000ff00) >> 8);
+				*bp++ = (uint8_t)
+					(vowstats.rx_macTs & 0x0000ff);
+				/* rx phy errors */
+				*bp++ = (uint8_t)
+					((scn->chan_stats.
+					  phy_err_cnt >> 8) & 0xff);
+				*bp++ =
+					(uint8_t) (scn->chan_stats.
+							phy_err_cnt & 0xff);
+				/* rx clear count */
+				*bp++ = (uint8_t)
+					((scn->mib_cycle_cnts.
+					  rx_clear_count >> 24) & 0xff);
+				*bp++ = (uint8_t)
+					((scn->mib_cycle_cnts.
+					  rx_clear_count >> 16) & 0xff);
+				*bp++ = (uint8_t)
+					((scn->mib_cycle_cnts.
+					  rx_clear_count >> 8) & 0xff);
+				*bp++ = (uint8_t)
+					(scn->mib_cycle_cnts.
+					 rx_clear_count & 0xff);
+				/* rx cycle count */
+				*bp++ = (uint8_t)
+					((scn->mib_cycle_cnts.
+					  cycle_count >> 24) & 0xff);
+				*bp++ = (uint8_t)
+					((scn->mib_cycle_cnts.
+					  cycle_count >> 16) & 0xff);
+				*bp++ = (uint8_t)
+					((scn->mib_cycle_cnts.
+					  cycle_count >> 8) & 0xff);
+				*bp++ = (uint8_t)
+					(scn->mib_cycle_cnts.
+					 cycle_count & 0xff);
 
-					*bp++ = vowstats.rx_ratecode;
-					*bp++ = vowstats.rx_moreaggr;
+				*bp++ = vowstats.rx_ratecode;
+				*bp++ = vowstats.rx_moreaggr;
 
-					/* sequence number */
-					*bp++ = (uint8_t)
-						((vowstats.rx_seqno >> 8) &
-						 0xff);
-					*bp++ = (uint8_t)
-						(vowstats.rx_seqno & 0xff);
-				}
+				/* sequence number */
+				*bp++ = (uint8_t)
+					((vowstats.rx_seqno >> 8) &
+					 0xff);
+				*bp++ = (uint8_t)
+					(vowstats.rx_seqno & 0xff);
 			}
 		}
 	}

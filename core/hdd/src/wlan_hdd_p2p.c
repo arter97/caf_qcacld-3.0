@@ -1253,7 +1253,7 @@ __wlan_hdd_cfg80211_cancel_remain_on_channel(struct wiphy *wiphy,
 	pRemainChanCtx = cfgState->remain_on_chan_ctx;
 
 	if (pRemainChanCtx) {
-		hdd_notice("action_cookie = %08llx, roc cookie = %08llx, cookie = %08llx",
+		hdd_debug("action_cookie = %08llx, roc cookie = %08llx, cookie = %08llx",
 				cfgState->action_cookie, pRemainChanCtx->cookie,
 				cookie);
 
@@ -1278,6 +1278,8 @@ __wlan_hdd_cfg80211_cancel_remain_on_channel(struct wiphy *wiphy,
 						OFF_CHANNEL_ACTION_TX;
 					pRemainChanCtx->cookie =
 						cfgState->action_cookie;
+					mutex_unlock(&cfgState->
+						remain_on_chan_ctx_lock);
 					return 0;
 				}
 			}
@@ -2582,7 +2584,10 @@ void __hdd_indicate_mgmt_frame(hdd_adapter_t *pAdapter,
 	subType = WLAN_HDD_GET_SUBTYPE_FRM_FC(pbFrames[0]);
 
 	/* Get pAdapter from Destination mac address of the frame */
-	if ((type == SIR_MAC_MGMT_FRAME) && (subType != SIR_MAC_MGMT_PROBE_REQ)) {
+	if ((type == SIR_MAC_MGMT_FRAME) &&
+	    (subType != SIR_MAC_MGMT_PROBE_REQ) &&
+	    !qdf_is_macaddr_broadcast(
+	     (struct qdf_mac_addr *)&pbFrames[WLAN_HDD_80211_FRM_DA_OFFSET])) {
 		pAdapter =
 			hdd_get_adapter_by_macaddr(pHddCtx,
 						   &pbFrames

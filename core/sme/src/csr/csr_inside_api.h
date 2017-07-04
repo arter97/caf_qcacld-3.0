@@ -58,8 +58,6 @@ extern void wlan_objmgr_vdev_release_ref(struct wlan_objmgr_vdev *vdev,
 #define CSR_MIN_REST_TIME_CONC              50
 #define CSR_IDLE_TIME_CONC                  25
 
-#define CSR_NUM_STA_CHAN_COMBINED_CONC      3
-#define CSR_NUM_P2P_CHAN_COMBINED_CONC      1
 #endif
 
 #define CSR_MAX_NUM_SUPPORTED_CHANNELS 55
@@ -156,14 +154,17 @@ typedef struct tagCsrScanResult {
 	int32_t AgingCount;     /* This BSS is removed when it reaches 0 or less */
 	uint32_t preferValue;   /* The bigger the number, the better the BSS. This value override capValue */
 	uint32_t capValue;      /* The biggger the better. This value is in use only if we have equal preferValue */
-	/* This member must be the last in the structure because the end of tSirBssDescription (inside) is an */
-	/*    array with nonknown size at this time */
-
 	eCsrEncryptionType ucEncryptionType;    /* Preferred Encryption type that matched with profile. */
 	eCsrEncryptionType mcEncryptionType;
 	eCsrAuthType authType;  /* Preferred auth type that matched with the profile. */
 
 	tCsrScanResultInfo Result;
+	/*
+	 * WARNING - Do not add any element here
+	 * This member Result must be the last in the structure because the end
+	 * of tSirBssDescription (inside) is an array with nonknown size at
+	 * this time.
+	 */
 } tCsrScanResult;
 
 typedef struct {
@@ -776,7 +777,7 @@ QDF_STATUS csr_roam_set_psk_pmk(tpAniSirGlobal pMac, uint32_t sessionId,
 QDF_STATUS csr_roam_set_key_mgmt_offload(tpAniSirGlobal mac_ctx,
 					 uint32_t session_id,
 					 bool roam_key_mgmt_offload_enabled,
-					 bool okc_enabled);
+					 struct pmkid_mode_bits *pmkid_modes);
 #endif
 /* ---------------------------------------------------------------------------
     \fn csr_roam_get_wpa_rsn_req_ie

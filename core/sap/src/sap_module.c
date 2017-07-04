@@ -392,11 +392,10 @@ QDF_STATUS wlansap_start(void *pCtx, enum tQDF_ADAPTER_MODE mode,
 			__func__, qdf_ret_status);
 		return QDF_STATUS_E_FAILURE;
 	}
-#ifdef NAPIER_SCAN
 	/* Register with scan component */
 	pSapCtx->req_id = ucfg_scan_register_requester(pmac->psoc, "SAP",
 					sap_scan_event_callback, pSapCtx);
-#endif
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -445,9 +444,7 @@ QDF_STATUS wlansap_stop(void *pCtx)
 			  FL("sap session can't be closed"));
 		return QDF_STATUS_E_FAULT;
 	}
-#ifdef NAPIER_SCAN
 	ucfg_scan_unregister_requester(pmac->psoc, pSapCtx->req_id);
-#endif
 	sap_free_roam_profile(&pSapCtx->csr_roamProfile);
 
 	if (!QDF_IS_STATUS_SUCCESS(qdf_mutex_destroy(&pSapCtx->SapGlobalLock))) {
@@ -885,6 +882,7 @@ QDF_STATUS wlansap_start_bss(void *pCtx,     /* pwextCtx */
 	pSapCtx->enableOverLapCh = pConfig->enOverLapCh;
 	pSapCtx->acs_cfg = &pConfig->acs_cfg;
 	pSapCtx->dfs_cac_offload = pConfig->dfs_cac_offload;
+	pSapCtx->isCacEndNotified = false;
 	/* Set the BSSID to your "self MAC Addr" read the mac address
 		from Configuation ITEM received from HDD */
 	pSapCtx->csr_roamProfile.BSSIDs.numOfBSSIDs = 1;
@@ -905,14 +903,16 @@ QDF_STATUS wlansap_start_bss(void *pCtx,     /* pwextCtx */
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_HIGH,
 			  "%s: Invalid MAC context from p_cds_gctx",
 			  __func__);
-		return QDF_STATUS_E_FAULT;
+		qdf_status = QDF_STATUS_E_FAULT;
+		goto fail;
 	}
 	pmac = PMAC_STRUCT(hHal);
 	if (NULL == pmac) {
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_HIGH,
 			  "%s: Invalid MAC context from p_cds_gctx",
 			  __func__);
-		return QDF_STATUS_E_FAULT;
+		qdf_status = QDF_STATUS_E_FAULT;
+		goto fail;
 	}
 	/* If concurrent session is running that is already associated
 	 * then we just follow that sessions country info (whether
@@ -959,6 +959,9 @@ QDF_STATUS wlansap_start_bss(void *pCtx,     /* pwextCtx */
 
 	/* Handle event */
 	qdf_status = sap_fsm(pSapCtx, &sapEvent);
+fail:
+	if (QDF_IS_STATUS_ERROR(qdf_status))
+		sap_free_roam_profile(&pSapCtx->csr_roamProfile);
 
 	return qdf_status;
 } /* wlansap_start_bss */

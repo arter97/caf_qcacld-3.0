@@ -509,10 +509,6 @@ typedef struct tagCsrConfig {
 	/* In units of milliseconds */
 	uint32_t  idle_time_conc;
 
-	/* number of channels combined for Sta in each split scan operation */
-	uint8_t nNumStaChanCombinedConc;
-	/* number of channels combined for P2P in each split scan operation */
-	uint8_t nNumP2PChanCombinedConc;
 #endif
 	/*
 	 * in dBm, the max TX power. The actual TX power is the lesser of this
@@ -625,6 +621,7 @@ typedef struct tagCsrConfig {
 	bool qcn_ie_support;
 	uint8_t fils_max_chan_guard_time;
 	uint16_t pkt_err_disconn_th;
+	bool is_force_1x1;
 } tCsrConfig;
 
 typedef struct tagCsrChannelPowerInfo {
@@ -660,9 +657,6 @@ typedef struct tagCsrScanStruct {
 	tScanProfile scanProfile;
 	bool fScanEnable;
 	bool fFullScanIssued;
-#ifdef WLAN_AP_STA_CONCURRENCY
-	qdf_mc_timer_t hTimerStaApConcTimer;
-#endif
 	qdf_mc_timer_t hTimerIdleScan;
 	/*
 	 * changes on every scan, it is used as a flag for whether 11d info is
@@ -953,6 +947,7 @@ typedef struct tagCsrRoamSession {
 	struct sir_vht_config vht_config;
 #ifdef WLAN_FEATURE_11AX
 	tDot11fIEvendor_he_cap he_config;
+	uint32_t he_sta_obsspd;
 #endif
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 	csr_roam_offload_synch_params roamOffloadSynchParams;
@@ -960,7 +955,7 @@ typedef struct tagCsrRoamSession {
 	size_t pmk_len;
 	uint8_t RoamKeyMgmtOffloadEnabled;
 	roam_offload_synch_ind *roam_synch_data;
-	bool okc_enabled;
+	struct pmkid_mode_bits pmkid_modes;
 #endif
 	tftSMEContext ftSmeContext;
 	/* This count represents the number of bssid's we try to join. */
@@ -1452,4 +1447,8 @@ void csr_neighbor_roam_process_scan_results(tpAniSirGlobal mac_ctx,
 void csr_neighbor_roam_trigger_handoff(tpAniSirGlobal mac_ctx,
 					uint8_t session_id);
 bool csr_is_ndi_started(tpAniSirGlobal mac_ctx, uint32_t session_id);
+
+QDF_STATUS csr_roam_update_config(tpAniSirGlobal mac_ctx, uint8_t session_id,
+				  uint16_t capab, uint32_t value);
+
 #endif

@@ -262,7 +262,6 @@ static void lim_process_set_default_scan_ie_request(tpAniSirGlobal mac_ctx,
 	uint16_t local_ie_len;
 	struct scheduler_msg msg_q = {0};
 	tSirRetStatus ret_code;
-	QDF_STATUS qdf_status;
 
 	if (!msg_buf) {
 		pe_err("msg_buf is NULL");
@@ -283,13 +282,6 @@ static void lim_process_set_default_scan_ie_request(tpAniSirGlobal mac_ctx,
 			local_ie_buf, &local_ie_len)) {
 		pe_err("Update ext cap IEs fails");
 		goto scan_ie_send_fail;
-	}
-
-	if (mac_ctx->roam.configParam.qcn_ie_support) {
-		qdf_status = lim_add_qcn_ie(mac_ctx, local_ie_buf,
-							&local_ie_len);
-		if (QDF_IS_STATUS_ERROR(qdf_status))
-			goto scan_ie_send_fail;
 	}
 
 	wma_ie_params = qdf_mem_malloc(sizeof(*wma_ie_params) + local_ie_len);
@@ -966,8 +958,8 @@ lim_handle80211_frames(tpAniSirGlobal pMac, struct scheduler_msg *limMsg,
 			psessionEntry = pe_find_session_by_peer_sta(pMac,
 						pHdr->sa, &sessionId);
 			if (psessionEntry == NULL) {
-				pe_debug("SessionId does not exist for Bssid");
-				lim_print_mac_addr(pMac, pHdr->sa, LOG3);
+				pe_debug("session does not exist for bssId");
+				lim_print_mac_addr(pMac, pHdr->sa, LOGD);
 				goto end;
 			} else {
 				pe_debug("SessionId:%d exists for given Bssid",
@@ -1402,6 +1394,7 @@ static void lim_process_messages(tpAniSirGlobal mac_ctx,
 	case eWNI_SME_SET_DUAL_MAC_CFG_REQ:
 	case eWNI_SME_SET_ANTENNA_MODE_REQ:
 	case eWNI_SME_UPDATE_ACCESS_POLICY_VENDOR_IE:
+	case eWNI_SME_UPDATE_CONFIG:
 		/* These messages are from HDD. Need to respond to HDD */
 		lim_process_normal_hdd_msg(mac_ctx, msg, true);
 		break;
@@ -1680,6 +1673,7 @@ static void lim_process_messages(tpAniSirGlobal mac_ctx,
 	case SIR_HAL_TDLS_SHOULD_DISCOVER:
 	case SIR_HAL_TDLS_SHOULD_TEARDOWN:
 	case SIR_HAL_TDLS_PEER_DISCONNECTED:
+	case SIR_HAL_TDLS_CONNECTION_TRACKER_NOTIFICATION:
 		QDF_TRACE(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_INFO,
 			("%s received tdls event: 0x%x"), __func__, msg->type);
 		lim_send_sme_tdls_event_notify(mac_ctx, msg->type,
@@ -1688,6 +1682,9 @@ static void lim_process_messages(tpAniSirGlobal mac_ctx,
 #endif
 	case WMA_ADD_BSS_RSP:
 		lim_process_mlm_add_bss_rsp(mac_ctx, msg);
+		break;
+	case WMA_HIDDEN_SSID_RESTART_RSP:
+		lim_process_mlm_update_hidden_ssid_rsp(mac_ctx, msg);
 		break;
 	case WMA_ADD_STA_RSP:
 		lim_process_add_sta_rsp(mac_ctx, msg);
@@ -1927,7 +1924,7 @@ static void lim_process_messages(tpAniSirGlobal mac_ctx,
 	default:
 		qdf_mem_free((void *)msg->bodyptr);
 		msg->bodyptr = NULL;
-		pe_err("Discarding unexpected message received %X",
+		pe_debug("Discarding unexpected message received %X",
 			msg->type);
 		lim_print_msg_name(mac_ctx, LOGE, msg->type);
 		break;

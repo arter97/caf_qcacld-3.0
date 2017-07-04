@@ -48,6 +48,8 @@
 #include "mac_trace.h"
 #endif
 
+static tAniSirGlobal global_mac_context;
+
 extern tSirRetStatus halDoCfgInit(tpAniSirGlobal pMac);
 extern tSirRetStatus halProcessStartEvent(tpAniSirGlobal pMac);
 
@@ -103,24 +105,12 @@ tSirRetStatus mac_stop(tHalHandle hHal, tHalStopType stopType)
 tSirRetStatus mac_open(struct wlan_objmgr_psoc *psoc, tHalHandle *pHalHandle,
 			tHddHandle hHdd, struct cds_config_info *cds_cfg)
 {
-	tpAniSirGlobal p_mac = NULL;
+	tpAniSirGlobal p_mac = &global_mac_context;
 	tSirRetStatus status = eSIR_SUCCESS;
 	QDF_STATUS qdf_status;
 
 	if (pHalHandle == NULL)
 		return eSIR_FAILURE;
-
-	/*
-	 * Make sure this adapter is not already opened. (Compare pAdapter pointer in already
-	 * allocated p_mac structures.)
-	 * If it is opened just return pointer to previously allocated p_mac pointer.
-	 * Or should this result in error?
-	 */
-
-	/* Allocate p_mac */
-	p_mac = qdf_mem_malloc(sizeof(tAniSirGlobal));
-	if (NULL == p_mac)
-		return eSIR_MEM_ALLOC_FAILED;
 
 	/*
 	 * Set various global fields of p_mac here
@@ -140,10 +130,8 @@ tSirRetStatus mac_open(struct wlan_objmgr_psoc *psoc, tHalHandle *pHalHandle,
 
 	{
 		/* Call routine to initialize CFG data structures */
-		if (eSIR_SUCCESS != cfg_init(p_mac)) {
-			qdf_mem_free(p_mac);
+		if (eSIR_SUCCESS != cfg_init(p_mac))
 			return eSIR_FAILURE;
-		}
 
 		sys_init_globals(p_mac);
 	}
@@ -155,7 +143,7 @@ tSirRetStatus mac_open(struct wlan_objmgr_psoc *psoc, tHalHandle *pHalHandle,
 	status =  pe_open(p_mac, cds_cfg);
 	if (eSIR_SUCCESS != status) {
 		pe_err("pe_open() failure");
-		qdf_mem_free(p_mac);
+		cfg_de_init(p_mac);
 	}
 
 	return status;
@@ -188,8 +176,6 @@ tSirRetStatus mac_close(tHalHandle hHal)
 	}
 	wlan_objmgr_psoc_release_ref(pMac->psoc, WLAN_LEGACY_MAC_ID);
 	pMac->psoc = NULL;
-	/* Finally, de-allocate the global MAC datastructure: */
-	qdf_mem_free(pMac);
 
 	return eSIR_SUCCESS;
 }

@@ -64,6 +64,7 @@
 #include <wlan_hdd_object_manager.h>
 #include <cdp_txrx_handle.h>
 #include "wlan_pmo_ucfg_api.h"
+#include "wlan_hdd_tsf.h"
 
 /* These are needed to recognize WPA and RSN suite types */
 #define HDD_WPA_OUI_SIZE 4
@@ -181,6 +182,10 @@ void hdd_conn_set_connection_state(hdd_adapter_t *pAdapter,
 	hdd_debug("%pS Changed connectionState Changed from oldState:%d to State:%d",
 		(void *)_RET_IP_, pHddStaCtx->conn_info.connState,
 		connState);
+
+	hdd_tsf_notify_wlan_state_change(pAdapter,
+					 pHddStaCtx->conn_info.connState,
+					 connState);
 	pHddStaCtx->conn_info.connState = connState;
 
 	/* Check is pending ROC request or not when connection state changed */
@@ -1591,6 +1596,7 @@ static QDF_STATUS hdd_dis_connect_handler(hdd_adapter_t *pAdapter,
 
 	DPTRACE(qdf_dp_trace_mgmt_pkt(QDF_DP_TRACE_MGMT_PACKET_RECORD,
 				pAdapter->sessionId,
+				QDF_TRACE_DEFAULT_PDEV_ID,
 				QDF_PROTO_TYPE_MGMT, QDF_PROTO_MGMT_DISASSOC));
 
 	/* HDD has initiated disconnect, do not send disconnect indication
@@ -1692,7 +1698,8 @@ static QDF_STATUS hdd_dis_connect_handler(hdd_adapter_t *pAdapter,
 		pHddCtx->sta_to_adapter[sta_id] = NULL;
 		/* Clear all the peer sta register with TL. */
 		for (i = 0; i < MAX_PEERS; i++) {
-			if (0 == pHddStaCtx->conn_info.staId[i])
+			if (HDD_WLAN_INVALID_STA_ID ==
+				pHddStaCtx->conn_info.staId[i])
 				continue;
 			sta_id = pHddStaCtx->conn_info.staId[i];
 			hdd_debug("Deregister StaID %d", sta_id);
@@ -1716,7 +1723,8 @@ static QDF_STATUS hdd_dis_connect_handler(hdd_adapter_t *pAdapter,
 		hdd_debug("roamResult: %d", roamResult);
 
 		/* clear scan cache for Link Lost */
-		if (pRoamInfo && !pRoamInfo->reasonCode &&
+		if (eCSR_ROAM_RESULT_DEAUTH_IND == roamResult ||
+		    eCSR_ROAM_RESULT_DISASSOC_IND == roamResult ||
 		    eCSR_ROAM_LOSTLINK == roamStatus) {
 			wlan_hdd_cfg80211_update_bss_list(pAdapter,
 				pHddStaCtx->conn_info.bssId.bytes);
@@ -1929,7 +1937,7 @@ QDF_STATUS hdd_roam_register_sta(hdd_adapter_t *pAdapter,
 		staDesc.is_qos_enabled = 0;
 
 #ifdef FEATURE_WLAN_WAPI
-	hdd_notice("WAPI STA Registered: %d",
+	hdd_debug("WAPI STA Registered: %d",
 		   pAdapter->wapi_info.fIsWapiSta);
 	if (pAdapter->wapi_info.fIsWapiSta)
 		staDesc.is_wapi_supported = 1;
@@ -2030,11 +2038,6 @@ static void hdd_send_re_assoc_event(struct net_device *dev,
 	hdd_context_t *hdd_ctx = WLAN_HDD_GET_CTX(pAdapter);
 
 	qdf_mem_zero(&roam_profile, sizeof(roam_profile));
-
-	if (pAdapter->defer_disconnect) {
-		hdd_debug("Do not send roam event as discon will be processed");
-		goto done;
-	}
 
 	if (!rspRsnIe) {
 		hdd_err("Unable to allocate RSN IE");
@@ -2236,7 +2239,7 @@ static int hdd_change_sta_state_authenticated(hdd_adapter_t *adapter,
 		sme_ps_enable_auto_ps_timer(
 			WLAN_HDD_GET_HAL_CTX(adapter),
 			adapter->sessionId,
-			timeout);
+			timeout, false);
 	}
 
 	return qdf_status_to_os_return(status);
@@ -2441,7 +2444,7 @@ static QDF_STATUS hdd_association_completion_handler(hdd_adapter_t *pAdapter,
 	hdd_station_ctx_t *pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
 	QDF_STATUS qdf_status = QDF_STATUS_E_FAILURE;
 	uint8_t reqRsnIe[DOT11F_IE_RSN_MAX_LEN];
-	uint32_t reqRsnLength = DOT11F_IE_RSN_MAX_LEN;
+	uint32_t reqRsnLength = DOT11F_IE_RSN_MAX_LEN, ie_len;
 	int ft_carrier_on = false;
 	bool hddDisconInProgress = false;
 	unsigned long rc;
@@ -2497,6 +2500,19 @@ static QDF_STATUS hdd_association_completion_handler(hdd_adapter_t *pAdapter,
 			pAdapter->wapi_info.fIsWapiSta = 0;
 		}
 #endif /* FEATURE_WLAN_WAPI */
+		hdd_debug("bss_descr[%d] devicemode[%d]", !!pRoamInfo->pBssDesc,
+				pAdapter->device_mode);
+		if ((QDF_STA_MODE == pAdapter->device_mode) &&
+						pRoamInfo->pBssDesc) {
+			ie_len = GET_IE_LEN_IN_BSS(pRoamInfo->pBssDesc->length);
+			pHddStaCtx->ap_supports_immediate_power_save =
+				wlan_hdd_is_ap_supports_immediate_power_save(
+				     (uint8_t *) pRoamInfo->pBssDesc->ieFields,
+				     ie_len);
+			hdd_debug("ap_supports_immediate_power_save flag [%d]",
+				  pHddStaCtx->ap_supports_immediate_power_save);
+		}
+
 		/* Indicate 'connect' status to user space */
 		hdd_send_association_event(dev, pRoamInfo);
 
@@ -2597,6 +2613,7 @@ static QDF_STATUS hdd_association_completion_handler(hdd_adapter_t *pAdapter,
 
 		DPTRACE(qdf_dp_trace_mgmt_pkt(QDF_DP_TRACE_MGMT_PACKET_RECORD,
 			pAdapter->sessionId,
+			QDF_TRACE_DEFAULT_PDEV_ID,
 			QDF_PROTO_TYPE_MGMT, QDF_PROTO_MGMT_ASSOC));
 
 		/*
@@ -2701,7 +2718,8 @@ static QDF_STATUS hdd_association_completion_handler(hdd_adapter_t *pAdapter,
 				}
 
 				if (ft_carrier_on) {
-					if (!hddDisconInProgress) {
+					if (!hddDisconInProgress &&
+						pRoamInfo->pBssDesc) {
 						struct cfg80211_bss *roam_bss;
 
 						/*
@@ -2741,31 +2759,30 @@ static QDF_STATUS hdd_association_completion_handler(hdd_adapter_t *pAdapter,
 							QDF_TRACE_LEVEL_DEBUG,
 							pFTAssocReq,
 							assocReqlen);
-						if (!pAdapter->defer_disconnect) {
-							roam_bss = hdd_cfg80211_get_bss(
-								pAdapter->wdev.wiphy,
-								chan,
-								pRoamInfo->bssid.bytes,
-								pRoamInfo->u.
-								pConnectedProfile->SSID.ssId,
-								pRoamInfo->u.
-								pConnectedProfile->SSID.length);
-							cfg80211_roamed_bss(dev,
-								roam_bss,
-								pFTAssocReq,
-								assocReqlen,
-								pFTAssocRsp,
-								assocRsplen,
-								GFP_KERNEL);
-							wlan_hdd_send_roam_auth_event(
-								pAdapter,
-								pRoamInfo->bssid.bytes,
-								pFTAssocReq,
-								assocReqlen,
-								pFTAssocRsp,
-								assocRsplen,
-								pRoamInfo);
-						}
+						roam_bss =
+							hdd_cfg80211_get_bss(
+							pAdapter->wdev.wiphy,
+							chan,
+							pRoamInfo->bssid.bytes,
+							pRoamInfo->u.
+							pConnectedProfile->SSID.ssId,
+							pRoamInfo->u.
+							pConnectedProfile->SSID.length);
+						cfg80211_roamed_bss(dev,
+							roam_bss,
+							pFTAssocReq,
+							assocReqlen,
+							pFTAssocRsp,
+							assocRsplen,
+							GFP_KERNEL);
+						wlan_hdd_send_roam_auth_event(
+							pAdapter,
+							pRoamInfo->bssid.bytes,
+							pFTAssocReq,
+							assocReqlen,
+							pFTAssocRsp,
+							assocRsplen,
+							pRoamInfo);
 					}
 					if (sme_get_ftptk_state
 						    (WLAN_HDD_GET_HAL_CTX(pAdapter),
@@ -3317,7 +3334,8 @@ static bool roam_remove_ibss_station(hdd_adapter_t *pAdapter, uint8_t staId)
 
 			empty_slots++;
 		} else {
-			if (pHddStaCtx->conn_info.staId[idx] != 0) {
+			if (pHddStaCtx->conn_info.staId[idx] !=
+					HDD_WLAN_INVALID_STA_ID) {
 				valid_idx = idx;
 			} else {
 				/* Found an empty slot */
@@ -3335,7 +3353,8 @@ static bool roam_remove_ibss_station(hdd_adapter_t *pAdapter, uint8_t staId)
 	/* Find next active staId, to have a valid sta trigger for TL. */
 	if (fSuccess == true) {
 		if (del_idx == 0) {
-			if (pHddStaCtx->conn_info.staId[valid_idx] != 0) {
+			if (pHddStaCtx->conn_info.staId[valid_idx] !=
+					HDD_WLAN_INVALID_STA_ID) {
 				pHddStaCtx->conn_info.staId[0] =
 					pHddStaCtx->conn_info.staId[valid_idx];
 				qdf_copy_macaddr(&pHddStaCtx->conn_info.
@@ -4904,8 +4923,11 @@ hdd_sme_roam_callback(void *pContext, tCsrRoamInfo *pRoamInfo, uint32_t roamId,
 		hdd_debug("After Roam Synch Comp: NAPI Serialize OFF");
 		hdd_napi_serialize(0);
 		hdd_set_roaming_in_progress(false);
-		if (pAdapter->defer_disconnect)
-			hdd_process_defer_disconnect(pAdapter);
+		if (roamResult == eCSR_ROAM_RESULT_FAILURE)
+			pAdapter->roam_ho_fail = true;
+		else
+			pAdapter->roam_ho_fail = false;
+		complete(&pAdapter->roaming_comp_var);
 		break;
 	case eCSR_ROAM_SHOULD_ROAM:
 		/* notify apps that we can't pass traffic anymore */
@@ -4934,7 +4956,8 @@ hdd_sme_roam_callback(void *pContext, tCsrRoamInfo *pRoamInfo, uint32_t roamId,
 		hdd_napi_serialize(0);
 		hdd_set_connection_in_progress(false);
 		hdd_set_roaming_in_progress(false);
-		pAdapter->defer_disconnect = 0;
+		pAdapter->roam_ho_fail = false;
+		complete(&pAdapter->roaming_comp_var);
 
 		/* Call to clear any MC Addr List filter applied after
 		 * successful connection.
@@ -5171,11 +5194,8 @@ hdd_sme_roam_callback(void *pContext, tCsrRoamInfo *pRoamInfo, uint32_t roamId,
 				WLAN_CONTROL_PATH);
 		hdd_set_connection_in_progress(false);
 		hdd_set_roaming_in_progress(false);
-		/*
-		 * If disconnect operation is in deferred state, do it now.
-		 */
-		if (pAdapter->defer_disconnect)
-			hdd_process_defer_disconnect(pAdapter);
+		pAdapter->roam_ho_fail = false;
+		complete(&pAdapter->roaming_comp_var);
 		break;
 
 	default:

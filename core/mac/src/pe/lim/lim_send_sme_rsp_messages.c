@@ -265,6 +265,10 @@ static void lim_handle_join_rsp_status(tpAniSirGlobal mac_ctx,
 	tpPESession session_entry, tSirResultCodes result_code,
 	tpSirSmeJoinRsp sme_join_rsp)
 {
+	uint16_t bss_ie_len;
+	void *bss_ies;
+	bool is_vendor_ap_1_present;
+
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 	tSirSmeHTProfile *ht_profile;
 #endif
@@ -361,6 +365,24 @@ static void lim_handle_join_rsp_status(tpAniSirGlobal mac_ctx,
 			ht_profile->apChanWidth = session_entry->ch_width;
 		}
 #endif
+		bss_ie_len = lim_get_ielen_from_bss_description(
+				&session_entry->pLimJoinReq->bssDescription);
+		bss_ies = &session_entry->pLimJoinReq->bssDescription.ieFields;
+		is_vendor_ap_1_present = (cfg_get_vendor_ie_ptr_from_oui(mac_ctx,
+			SIR_MAC_VENDOR_AP_1_OUI, SIR_MAC_VENDOR_AP_1_OUI_LEN,
+			bss_ies, bss_ie_len) != NULL);
+
+		if (mac_ctx->roam.configParam.is_force_1x1 &&
+			is_vendor_ap_1_present && (session_entry->nss == 2) &&
+			(mac_ctx->lteCoexAntShare == 0 ||
+				IS_5G_CH(session_entry->currentOperChannel))) {
+			/* SET vdev param */
+			pe_debug("sending SMPS intolrent vdev_param");
+			wma_cli_set_command(session_entry->smeSessionId,
+					   (int)WMI_VDEV_PARAM_SMPS_INTOLERANT,
+					    1, VDEV_CMD);
+
+		}
 	} else {
 		if (session_entry->beacon != NULL) {
 			qdf_mem_free(session_entry->beacon);
@@ -2166,7 +2188,16 @@ void lim_handle_csa_offload_msg(tpAniSirGlobal mac_ctx,
 			lim_process_csa_wbw_ie(mac_ctx, csa_params,
 					chnl_switch_info, session_entry);
 			lim_ch_switch->sec_ch_offset =
-				csa_params->sec_chan_offset;
+				PHY_SINGLE_CHANNEL_CENTERED;
+			if (chnl_switch_info->newChanWidth) {
+				if (csa_params->channel <
+				  csa_params->new_ch_freq_seg1)
+					lim_ch_switch->sec_ch_offset =
+						PHY_DOUBLE_CHANNEL_LOW_PRIMARY;
+				else
+					lim_ch_switch->sec_ch_offset =
+						PHY_DOUBLE_CHANNEL_HIGH_PRIMARY;
+			}
 		} else if (csa_params->ies_present_flag
 				& lim_xcsa_ie_present) {
 			chan_space =

@@ -40,6 +40,7 @@
 #include <wlan_hdd_request_manager.h>
 #include <wlan_hdd_wowl.h>
 #include <cds_sched.h>
+#include <wlan_hdd_debugfs_llstat.h>
 
 #define MAX_USER_COMMAND_SIZE_WOWL_ENABLE 8
 #define MAX_USER_COMMAND_SIZE_WOWL_PATTERN 512
@@ -84,6 +85,8 @@ static ssize_t __wcnss_wowenable_write(struct file *file,
 	if (0 != ret)
 		return ret;
 
+	if (!wlan_hdd_validate_modules_state(hdd_ctx))
+		return -EINVAL;
 
 	if (!sme_is_feature_supported_by_fw(WOW)) {
 		hdd_err("Wake-on-Wireless feature is not supported in firmware!");
@@ -201,6 +204,9 @@ static ssize_t __wcnss_wowpattern_write(struct file *file,
 	ret = wlan_hdd_validate_context(hdd_ctx);
 	if (0 != ret)
 		return ret;
+
+	if (!wlan_hdd_validate_modules_state(hdd_ctx))
+		return -EINVAL;
 
 	if (!sme_is_feature_supported_by_fw(WOW)) {
 		hdd_err("Wake-on-Wireless feature is not supported in firmware!");
@@ -322,6 +328,9 @@ static ssize_t __wcnss_patterngen_write(struct file *file,
 	ret = wlan_hdd_validate_context(pHddCtx);
 	if (0 != ret)
 		return ret;
+
+	if (!wlan_hdd_validate_modules_state(pHddCtx))
+		return -EINVAL;
 
 	if (!sme_is_feature_supported_by_fw(WLAN_PERIODIC_TX_PTRN)) {
 		hdd_err("Periodic Tx Pattern Offload feature is not supported in firmware!");
@@ -593,6 +602,9 @@ static ssize_t __wlan_hdd_read_power_debugfs(struct file *file,
 	if (0 != ret_cnt)
 		return ret_cnt;
 
+	if (!wlan_hdd_validate_modules_state(hdd_ctx))
+		return -EINVAL;
+
 	request = hdd_request_alloc(&params);
 	if (!request) {
 		hdd_err("Request allocation failure");
@@ -854,6 +866,9 @@ QDF_STATUS hdd_debugfs_init(hdd_adapter_t *adapter)
 		return QDF_STATUS_E_FAILURE;
 
 	if (QDF_STATUS_SUCCESS != wlan_hdd_create_power_stats_file(adapter))
+		return QDF_STATUS_E_FAILURE;
+
+	if (0 != wlan_hdd_create_ll_stats_file(adapter))
 		return QDF_STATUS_E_FAILURE;
 
 	return QDF_STATUS_SUCCESS;

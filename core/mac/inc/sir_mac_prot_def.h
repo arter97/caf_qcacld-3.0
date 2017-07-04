@@ -427,7 +427,7 @@
 #define SIR_MAC_ANI_WORKAROUND_EID_MIN     0
 #define SIR_MAC_ANI_WORKAROUND_EID_MAX     255
 
-#define SIR_MAC_MAX_ADD_IE_LENGTH       500
+#define SIR_MAC_MAX_ADD_IE_LENGTH       2048
 
 /* / Maximum length of each IE */
 #define SIR_MAC_MAX_IE_LENGTH       255
@@ -617,6 +617,8 @@
 #define BA_INITIATOR       2
 #define BA_BOTH_DIRECTIONS 3
 
+#define SIR_MAC_VENDOR_AP_1_OUI             "\x00\x0C\x43"
+#define SIR_MAC_VENDOR_AP_1_OUI_LEN         3
 /* / Status Code (present in Management response frames) enum */
 
 typedef enum eSirMacStatusCodes {
@@ -974,6 +976,15 @@ typedef struct sSirMacRateSet {
 	uint8_t numRates;
 	uint8_t rate[SIR_MAC_RATESET_EID_MAX];
 } qdf_packed tSirMacRateSet;
+
+/** struct merged_mac_rate_set - merged mac rate set
+ * @num_rates: num of rates
+ * @rate: rate list
+ */
+struct merged_mac_rate_set {
+	uint8_t num_rates;
+	uint8_t rate[2 * SIR_MAC_RATESET_EID_MAX];
+};
 
 typedef struct sSirMacSSid {
 	uint8_t length;

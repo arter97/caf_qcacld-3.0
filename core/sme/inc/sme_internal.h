@@ -242,12 +242,16 @@ typedef struct tagSmeStruct {
 	void *encrypt_decrypt_context;
 	void (*lost_link_info_cb)(void *context,
 			struct sir_lost_link_info *lost_link_info);
+
 	bool (*set_connection_info_cb)(bool);
 	bool (*get_connection_info_cb)(uint8_t *session_id,
 			enum scan_reject_states *reason);
 	void (*rso_cmd_status_cb)(void *hdd_context,
 			struct rso_cmd_status *rso_status);
 	void (*congestion_cb)(void *, uint32_t congestion, uint32_t vdev_id);
+	void (*stats_ext2_cb)(void *, struct sir_sme_rx_aggr_hole_ind *);
+	void (*chip_power_save_fail_cb)(void *,
+			struct chip_pwr_save_fail_detected_params *);
 } tSmeStruct, *tpSmeStruct;
 
 #endif /* #if !defined( __SMEINTERNAL_H ) */

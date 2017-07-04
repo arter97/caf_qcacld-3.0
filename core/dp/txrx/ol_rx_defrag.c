@@ -279,7 +279,6 @@ ol_rx_frag_restructure(
 		int rx_desc_len)
 {
 	/* no op */
-	return;
 }
 
 static inline
@@ -332,6 +331,7 @@ ol_rx_frag_indication_handler(ol_txrx_pdev_handle pdev,
 	qdf_nbuf_t head_msdu, tail_msdu;
 	void *rx_mpdu_desc;
 	uint8_t pktlog_bit;
+	uint32_t msdu_count = 0;
 
 	htt_pdev = pdev->htt_pdev;
 	peer = ol_txrx_peer_find_by_id(pdev, peer_id);
@@ -352,7 +352,7 @@ ol_rx_frag_indication_handler(ol_txrx_pdev_handle pdev,
 		(htt_rx_amsdu_rx_in_order_get_pktlog(rx_frag_ind_msg) == 0x01);
 	if (peer) {
 		htt_rx_frag_pop(htt_pdev, rx_frag_ind_msg, &head_msdu,
-				&tail_msdu);
+				&tail_msdu, &msdu_count);
 		qdf_assert(head_msdu == tail_msdu);
 		if (ol_cfg_is_full_reorder_offload(pdev->ctrl_pdev)) {
 			rx_mpdu_desc =
@@ -370,7 +370,7 @@ ol_rx_frag_indication_handler(ol_txrx_pdev_handle pdev,
 	} else {
 		/* invalid frame - discard it */
 		htt_rx_frag_pop(htt_pdev, rx_frag_ind_msg, &head_msdu,
-				&tail_msdu);
+				&tail_msdu, &msdu_count);
 		if (ol_cfg_is_full_reorder_offload(pdev->ctrl_pdev))
 			htt_rx_msdu_desc_retrieve(htt_pdev, head_msdu);
 		else
@@ -388,7 +388,8 @@ ol_rx_frag_indication_handler(ol_txrx_pdev_handle pdev,
  */
 void
 ol_rx_reorder_flush_frag(htt_pdev_handle htt_pdev,
-			 struct ol_txrx_peer_t *peer, unsigned tid, int seq_num)
+			 struct ol_txrx_peer_t *peer,
+			 unsigned int tid, int seq_num)
 {
 	struct ol_rx_reorder_array_elem_t *rx_reorder_array_elem;
 	int seq;
@@ -408,7 +409,7 @@ ol_rx_reorder_flush_frag(htt_pdev_handle htt_pdev,
 void
 ol_rx_reorder_store_frag(ol_txrx_pdev_handle pdev,
 			 struct ol_txrx_peer_t *peer,
-			 unsigned tid, uint16_t seq_num, qdf_nbuf_t frag)
+			 unsigned int tid, uint16_t seq_num, qdf_nbuf_t frag)
 {
 	struct ieee80211_frame *fmac_hdr, *mac_hdr;
 	uint8_t fragno, more_frag, all_frag_present = 0;
@@ -532,10 +533,10 @@ ol_rx_fraglist_insert(htt_pdev_handle htt_pdev,
 			htt_rx_desc_frame_free(htt_pdev, frag);
 			*all_frag_present = 0;
 			return;
-		} else {
-			qdf_nbuf_set_next(prev, frag);
-			qdf_nbuf_set_next(frag, cur);
 		}
+
+		qdf_nbuf_set_next(prev, frag);
+		qdf_nbuf_set_next(frag, cur);
 	}
 	next = qdf_nbuf_next(*head_addr);
 	lmac_hdr = (struct ieee80211_frame *)ol_rx_frag_get_mac_hdr(htt_pdev,
@@ -567,7 +568,7 @@ ol_rx_fraglist_insert(htt_pdev_handle htt_pdev,
 /*
  * add tid to pending fragment wait list
  */
-void ol_rx_defrag_waitlist_add(struct ol_txrx_peer_t *peer, unsigned tid)
+void ol_rx_defrag_waitlist_add(struct ol_txrx_peer_t *peer, unsigned int tid)
 {
 	struct ol_txrx_pdev_t *pdev = peer->vdev->pdev;
 	struct ol_rx_reorder_t *rx_reorder = &peer->tids_rx_reorder[tid];
@@ -579,7 +580,7 @@ void ol_rx_defrag_waitlist_add(struct ol_txrx_peer_t *peer, unsigned tid)
 /*
  * remove tid from pending fragment wait list
  */
-void ol_rx_defrag_waitlist_remove(struct ol_txrx_peer_t *peer, unsigned tid)
+void ol_rx_defrag_waitlist_remove(struct ol_txrx_peer_t *peer, unsigned int tid)
 {
 	struct ol_txrx_pdev_t *pdev = peer->vdev->pdev;
 	struct ol_rx_reorder_t *rx_reorder = &peer->tids_rx_reorder[tid];
@@ -615,7 +616,7 @@ void ol_rx_defrag_waitlist_flush(struct ol_txrx_pdev_t *pdev)
 			   defrag_waitlist_elem, tmp) {
 		struct ol_txrx_peer_t *peer;
 		struct ol_rx_reorder_t *rx_reorder_base;
-		unsigned tid;
+		unsigned int tid;
 
 		if (rx_reorder->defrag_timeout_ms > now_ms)
 			break;
@@ -638,7 +639,8 @@ void ol_rx_defrag_waitlist_flush(struct ol_txrx_pdev_t *pdev)
  */
 void
 ol_rx_defrag(ol_txrx_pdev_handle pdev,
-	     struct ol_txrx_peer_t *peer, unsigned tid, qdf_nbuf_t frag_list)
+	     struct ol_txrx_peer_t *peer, unsigned int tid,
+	     qdf_nbuf_t frag_list)
 {
 	struct ol_txrx_vdev_t *vdev = NULL;
 	qdf_nbuf_t tmp_next, msdu, prev = NULL, cur = frag_list;
@@ -647,8 +649,8 @@ ol_rx_defrag(ol_txrx_pdev_handle pdev,
 	void *rx_desc;
 	struct ieee80211_frame *wh;
 	uint8_t key[DEFRAG_IEEE80211_KEY_LEN];
-
 	htt_pdev_handle htt_pdev = pdev->htt_pdev;
+
 	vdev = peer->vdev;
 
 	/* bypass defrag for safe mode */
@@ -1143,7 +1145,6 @@ ol_rx_defrag_decap_recombine(htt_pdev_handle htt_pdev,
 	qdf_nbuf_set_next(rx_nbuf, NULL);
 	while (msdu) {
 		htt_rx_msdu_desc_free(htt_pdev, msdu);
-		qdf_net_buf_debug_release_skb(msdu);
 		tmp = qdf_nbuf_next(msdu);
 		qdf_nbuf_set_next(msdu, NULL);
 		ol_rx_frag_pull_hdr(htt_pdev, msdu, hdrsize);

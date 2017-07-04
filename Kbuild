@@ -58,26 +58,9 @@ ifeq ($(KERNEL_BUILD), 0)
 	CONFIG_MOBILE_ROUTER := y
 	endif
 
-	# As per target team, build is done as follows:
-	# Defconfig : build with default flags
-	# Slub      : defconfig  + CONFIG_SLUB_DEBUG=y +
-	#	      CONFIG_SLUB_DEBUG_ON=y + CONFIG_PAGE_POISONING=y
-	# Perf      : Using appropriate msmXXXX-perf_defconfig
-	#
-	# Shipment builds (user variants) should not have any debug feature
-	# enabled. This is identified using 'TARGET_BUILD_VARIANT'. Slub builds
-	# are identified using the CONFIG_SLUB_DEBUG_ON configuration. Since
-	# there is no other way to identify defconfig builds, QCOMs internal
-	# representation of perf builds (identified using the string 'perf'),
-	# is used to identify if the build is a slub or defconfig one. This
-	# way no critical debug feature will be enabled for perf and shipment
-	# builds. Other OEMs are also protected using the TARGET_BUILD_VARIANT
-	# config.
-	ifneq ($(TARGET_BUILD_VARIANT),user)
-		ifeq ($(CONFIG_LITHIUM), y)
-			CONFIG_FEATURE_PKTLOG := n
-		else
-			CONFIG_FEATURE_PKTLOG := y
+	ifeq ($(CONFIG_ARCH_MSM8917), y)
+		ifeq ($(CONFIG_ROME_IF), sdio)
+			CONFIG_WLAN_SYNC_TSF_PLUS := y
 		endif
 	endif
 
@@ -85,11 +68,6 @@ ifeq ($(KERNEL_BUILD), 0)
 	CONFIG_QCACLD_WLAN_LFR2 := y
 	#Flag to enable Legacy Fast Roaming3(LFR3)
 	CONFIG_QCACLD_WLAN_LFR3 := y
-
-	#Enable Power debugfs feature only if debug_fs is enabled
-	ifeq ($(CONFIG_DEBUG_FS), y)
-	CONFIG_WLAN_POWER_DEBUGFS := y
-	endif
 
 	# JB kernel has CPU enablement patches, so enable
 	ifeq ($(CONFIG_ROME_IF),pci)
@@ -189,6 +167,9 @@ ifneq ($(CONFIG_ROME_IF),sdio)
 	#Flag to enable DISA
 	CONFIG_WLAN_FEATURE_DISA := y
 
+	#Flag to enable FIPS
+	CONFIG_WLAN_FEATURE_FIPS := y
+
 	#Flag to enable Fast Path feature
 	CONFIG_WLAN_FASTPATH := y
 
@@ -225,12 +206,38 @@ endif
 	# Flag to enable MCC to SCC switch feature
 	CONFIG_MCC_TO_SCC_SWITCH := y
 
-ifeq ($(CONFIG_DEBUG_FS), y)
-	# Flag to enable debugfs. Depends on CONFIG_DEBUG_FS in kernel
-	# configuration.
-	CONFIG_WLAN_DEBUGFS := y
 endif
 
+# As per target team, build is done as follows:
+# Defconfig : build with default flags
+# Slub      : defconfig  + CONFIG_SLUB_DEBUG=y +
+#	      CONFIG_SLUB_DEBUG_ON=y + CONFIG_PAGE_POISONING=y
+# Perf      : Using appropriate msmXXXX-perf_defconfig
+#
+# Shipment builds (user variants) should not have any debug feature
+# enabled. This is identified using 'TARGET_BUILD_VARIANT'. Slub builds
+# are identified using the CONFIG_SLUB_DEBUG_ON configuration. Since
+# there is no other way to identify defconfig builds, QCOMs internal
+# representation of perf builds (identified using the string 'perf'),
+# is used to identify if the build is a slub or defconfig one. This
+# way no critical debug feature will be enabled for perf and shipment
+# builds. Other OEMs are also protected using the TARGET_BUILD_VARIANT
+# config.
+ifneq ($(TARGET_BUILD_VARIANT),user)
+	ifeq ($(CONFIG_LITHIUM), y)
+		CONFIG_FEATURE_PKTLOG := n
+	else
+		CONFIG_FEATURE_PKTLOG := y
+	endif
+endif
+
+#Enable WLAN/Power debugfs feature only if debug_fs is enabled
+ifeq ($(CONFIG_DEBUG_FS), y)
+       # Flag to enable debugfs. Depends on CONFIG_DEBUG_FS in kernel
+       # configuration.
+       CONFIG_WLAN_DEBUGFS := y
+
+       CONFIG_WLAN_POWER_DEBUGFS := y
 endif
 
 # If not set, assume, Common driver is with in the build tree
@@ -374,6 +381,11 @@ HAVE_CFG80211 := 0
 endif
 endif
 
+# enable unit-test suspend for SLUB debug builds
+ifeq ($(CONFIG_SLUB_DEBUG_ON), y)
+	CONFIG_FEATURE_UNIT_TEST_SUSPEND := 1
+endif
+
 ############ UAPI ############
 UAPI_DIR :=	uapi
 UAPI_INC :=	-I$(WLAN_ROOT)/$(UAPI_DIR)/linux
@@ -412,10 +424,15 @@ HDD_OBJS := 	$(HDD_SRC_DIR)/wlan_hdd_assoc.o \
 
 ifeq ($(CONFIG_WLAN_DEBUGFS), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_debugfs.o
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_debugfs_llstat.o
 endif
 
 ifeq ($(CONFIG_WLAN_FEATURE_DSRC), y)
 HDD_OBJS+=	$(HDD_SRC_DIR)/wlan_hdd_ocb.o
+endif
+
+ifeq ($(CONFIG_WLAN_FEATURE_FIPS), y)
+HDD_OBJS+=	$(HDD_SRC_DIR)/wlan_hdd_fips.o
 endif
 
 ifeq ($(CONFIG_WLAN_FEATURE_LPSS),y)
@@ -451,6 +468,10 @@ endif
 
 ifeq ($(CONFIG_QCOM_TDLS),y)
 HDD_OBJS +=	$(HDD_SRC_DIR)/wlan_hdd_tdls.o
+endif
+
+ifeq ($(CONFIG_WLAN_SYNC_TSF_PLUS), y)
+CONFIG_WLAN_SYNC_TSF := y
 endif
 
 ifeq ($(CONFIG_WLAN_SYNC_TSF),y)
@@ -877,7 +898,8 @@ PMO_OBJS :=     $(PMO_DIR)/core/src/wlan_pmo_main.o \
 		$(PMO_DIR)/core/src/wlan_pmo_wow.o \
 		$(PMO_DIR)/core/src/wlan_pmo_lphb.o \
 		$(PMO_DIR)/core/src/wlan_pmo_suspend_resume.o \
-		$(PMO_DIR)/core/src/wlan_pmo_hw_bcast_fltr.o \
+		$(PMO_DIR)/core/src/wlan_pmo_hw_filter.o \
+		$(PMO_DIR)/core/src/wlan_pmo_pkt_filter.o \
 		$(PMO_DIR)/dispatcher/src/wlan_pmo_obj_mgmt_api.o \
 		$(PMO_DIR)/dispatcher/src/wlan_pmo_ucfg_api.o \
 		$(PMO_DIR)/dispatcher/src/wlan_pmo_tgt_arp.o \
@@ -888,7 +910,8 @@ PMO_OBJS :=     $(PMO_DIR)/core/src/wlan_pmo_main.o \
 		$(PMO_DIR)/dispatcher/src/wlan_pmo_tgt_mc_addr_filtering.o \
 		$(PMO_DIR)/dispatcher/src/wlan_pmo_tgt_lphb.o \
 		$(PMO_DIR)/dispatcher/src/wlan_pmo_tgt_suspend_resume.o \
-		$(PMO_DIR)/dispatcher/src/wlan_pmo_tgt_non_arp_bcast_fltr.o
+		$(PMO_DIR)/dispatcher/src/wlan_pmo_tgt_hw_filter.o \
+		$(PMO_DIR)/dispatcher/src/wlan_pmo_tgt_pkt_filter.o
 
 ############## UMAC P2P ###########
 P2P_DIR := umac/p2p
@@ -963,12 +986,12 @@ TARGET_IF_OBJ := $(TARGET_IF_DIR)/core/src/target_if_main.o \
 		$(TARGET_IF_DIR)/pmo/src/target_if_pmo_ns.o \
 		$(TARGET_IF_DIR)/pmo/src/target_if_pmo_gtk.o \
 		$(TARGET_IF_DIR)/pmo/src/target_if_pmo_wow.o \
-		$(TARGET_IF_DIR)/pmo/src/target_if_pmo_non_arp_bcast_fltr.o \
+		$(TARGET_IF_DIR)/pmo/src/target_if_pmo_hw_filter.o \
 		$(TARGET_IF_DIR)/pmo/src/target_if_pmo_mc_addr_filtering.o \
 		$(TARGET_IF_DIR)/pmo/src/target_if_pmo_static_config.o \
 		$(TARGET_IF_DIR)/pmo/src/target_if_pmo_lphb.o \
 		$(TARGET_IF_DIR)/pmo/src/target_if_pmo_suspend_resume.o \
-		$(TARGET_IF_DIR)/pmo/src/target_if_pmo_non_arp_bcast_fltr.o \
+		$(TARGET_IF_DIR)/pmo/src/target_if_pmo_pkt_filter.o \
 		$(TARGET_IF_DIR)/p2p/src/target_if_p2p.o \
 		$(TARGET_IF_DIR)/regulatory/src/target_if_reg.o \
 		$(TARGET_IF_DIR)/tdls/src/target_if_tdls.o
@@ -1263,6 +1286,10 @@ ifeq ($(CONFIG_WLAN_NAPI), y)
 HIF_OBJS += $(WLAN_COMMON_ROOT)/$(HIF_DIR)/src/hif_napi.o
 endif
 
+ifeq ($(CONFIG_FEATURE_UNIT_TEST_SUSPEND), 1)
+	HIF_OBJS += $(WLAN_COMMON_ROOT)/$(HIF_DIR)/src/hif_unit_test_suspend.o
+endif
+
 HIF_PCIE_OBJS := $(WLAN_COMMON_ROOT)/$(HIF_PCIE_DIR)/if_pci.o
 HIF_SNOC_OBJS := $(WLAN_COMMON_ROOT)/$(HIF_SNOC_DIR)/if_snoc.o
 HIF_SDIO_OBJS += $(WLAN_COMMON_ROOT)/$(HIF_SDIO_DIR)/if_sdio.o
@@ -1335,6 +1362,9 @@ WMA_OBJS :=	$(WMA_SRC_DIR)/wma_main.o \
 
 ifeq ($(CONFIG_WLAN_FEATURE_DSRC), y)
 WMA_OBJS+=	$(WMA_SRC_DIR)/wma_ocb.o
+endif
+ifeq ($(CONFIG_WLAN_FEATURE_FIPS), y)
+WMA_OBJS+=	$(WMA_SRC_DIR)/wma_fips_api.o
 endif
 ifeq ($(CONFIG_MPC_UT_FRAMEWORK),y)
 WMA_OBJS +=	$(WMA_SRC_DIR)/wma_utils_ut.o
@@ -1609,7 +1639,7 @@ ifeq ($(CONFIG_FEATURE_PKTLOG), y)
 CDEFINES +=     -DFEATURE_PKTLOG
 endif
 
-CDEFINES +=	-DFEATURE_DP_TRACE
+CDEFINES +=	-DCONFIG_DP_TRACE
 
 ifeq ($(CONFIG_WLAN_NAPI), y)
 CDEFINES += -DFEATURE_NAPI
@@ -1650,11 +1680,14 @@ CDEFINES +=	-DWLAN_DEBUG \
 		-DPE_DEBUG_LOGE
 endif
 
+ifeq ($(CONFIG_FEATURE_UNIT_TEST_SUSPEND), 1)
+	CDEFINES += -DWLAN_SUSPEND_RESUME_TEST
+endif
+
 ifeq ($(CONFIG_SLUB_DEBUG_ON),y)
 CDEFINES += -DTIMER_MANAGER
 CDEFINES += -DMEMORY_DEBUG
 CDEFINES += -DCONFIG_HALT_KMEMLEAK
-CDEFINES += -DWLAN_SUSPEND_RESUME_TEST
 endif
 
 ifeq ($(HAVE_CFG80211),1)
@@ -1906,6 +1939,11 @@ ifneq (y,$(filter y,$(CONFIG_CNSS_EOS) $(CONFIG_ICNSS)))
 CDEFINES += -DWLAN_ENABLE_CHNL_MATRIX_RESTRICTION
 endif
 
+#Enable ICMP packet disable powersave feature
+ifeq ($(CONFIG_ICMP_DISABLE_PS),y)
+CDEFINES += -DWLAN_ICMP_DISABLE_PS
+endif
+
 #Enable OBSS feature
 CDEFINES += -DQCA_HT_2040_COEX
 
@@ -1995,6 +2033,10 @@ ifeq ($(CONFIG_WLAN_SYNC_TSF), y)
 CDEFINES += -DWLAN_FEATURE_TSF
 endif
 
+ifeq ($(CONFIG_WLAN_SYNC_TSF_PLUS), y)
+CDEFINES += -DWLAN_FEATURE_TSF_PLUS
+endif
+
 # Enable full rx re-order offload for adrastea
 ifeq (y, $(filter y, $(CONFIG_CNSS_ADRASTEA) $(CONFIG_ICNSS)))
 CDEFINES += -DWLAN_FEATURE_RX_FULL_REORDER_OL
@@ -2025,6 +2067,11 @@ CDEFINES += -DAR900B
 ifeq ($(CONFIG_64BIT_PADDR),y)
 CDEFINES += -DHTT_PADDR64
 endif
+
+ifeq ($(CONFIG_SLUB_DEBUG_ON),y)
+CDEFINES += -DOL_RX_INDICATION_RECORD
+endif
+
 endif
 endif
 
@@ -2062,6 +2109,10 @@ ifeq ($(CONFIG_WLAN_FEATURE_DISA),y)
 CDEFINES += -DWLAN_FEATURE_DISA
 endif
 
+ifeq ($(CONFIG_WLAN_FEATURE_FIPS),y)
+CDEFINES += -DWLAN_FEATURE_FIPS
+endif
+
 ifeq ($(CONFIG_LFR_SUBNET_DETECTION), y)
 CDEFINES += -DFEATURE_LFR_SUBNET_DETECTION
 endif
@@ -2088,6 +2139,9 @@ CDEFINES += -DQCA_WIFI_QCA8074_VP
 CDEFINES += -DDP_INTR_POLL_BASED
 CDEFINES += -DTX_PER_PDEV_DESC_POOL
 CDEFINES += -DWLAN_RX_HASH
+CDEFINES += -DCONFIG_DP_TRACE
+CDEFINES += -DFEATURE_TSO
+CDEFINES += -DTSO_DEBUG_LOG_ENABLE
 CDEFINES += -DDP_LFR
 endif
 
@@ -2150,3 +2204,6 @@ endif
 # Module information used by KBuild framework
 obj-$(CONFIG_QCA_CLD_WLAN) += $(MODNAME).o
 $(MODNAME)-y := $(OBJS)
+
+# inject some build related information
+CDEFINES += -DBUILD_TIMESTAMP=\"$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')\"

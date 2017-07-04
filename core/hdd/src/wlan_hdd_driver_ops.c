@@ -233,6 +233,9 @@ int hdd_hif_open(struct device *dev, void *bdev, const struct hif_bus_id *bid,
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("hif_enable failed status: %d, reinit: %d",
 			status, reinit);
+		if (!cds_is_fw_down())
+			QDF_BUG(0);
+
 		ret = qdf_status_to_os_return(status);
 		goto err_hif_close;
 	} else {
@@ -365,6 +368,8 @@ static int wlan_hdd_probe(struct device *dev, void *bdev,
 	hdd_allow_suspend(WIFI_POWER_EVENT_WAKELOCK_DRIVER_INIT);
 	hdd_remove_pm_qos(dev);
 
+	cds_set_fw_down(false);
+
 	return 0;
 
 
@@ -375,6 +380,9 @@ err_hdd_deinit:
 		cds_set_load_in_progress(false);
 	hdd_allow_suspend(WIFI_POWER_EVENT_WAKELOCK_DRIVER_INIT);
 	hdd_remove_pm_qos(dev);
+
+	cds_set_fw_down(false);
+
 	return ret;
 }
 
@@ -411,6 +419,8 @@ static void wlan_hdd_remove(struct device *dev)
 	} else {
 		__hdd_wlan_exit();
 	}
+
+	cds_set_unload_in_progress(false);
 
 	pr_info("%s: Driver De-initialized\n", WLAN_MODULE_NAME);
 }
@@ -597,7 +607,8 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params)
 	QDF_STATUS status;
 	hdd_context_t *hdd_ctx;
 	void *hif_ctx;
-	void *soc;
+	void *dp_soc;
+	void *dp_pdev;
 	struct pmo_wow_enable_params pmo_params;
 
 	hdd_debug("starting bus suspend");
@@ -626,8 +637,9 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params)
 		return err;
 	}
 
-	soc = cds_get_context(QDF_MODULE_ID_SOC);
-	err = qdf_status_to_os_return(cdp_bus_suspend(soc));
+	dp_soc = cds_get_context(QDF_MODULE_ID_SOC);
+	dp_pdev = cds_get_context(QDF_MODULE_ID_TXRX);
+	err = qdf_status_to_os_return(cdp_bus_suspend(dp_soc, dp_pdev));
 	if (err) {
 		hdd_err("Failed cdp bus suspend: %d", err);
 		return err;
@@ -657,7 +669,7 @@ resume_pmo:
 	QDF_BUG(QDF_IS_STATUS_SUCCESS(status));
 
 resume_cdp:
-	status = cdp_bus_resume(soc);
+	status = cdp_bus_resume(dp_soc, dp_pdev);
 	QDF_BUG(QDF_IS_STATUS_SUCCESS(status));
 
 	/* return suspend related error code */
@@ -782,6 +794,8 @@ static int __wlan_hdd_bus_resume(void)
 	void *hif_ctx;
 	int status;
 	QDF_STATUS qdf_status;
+	void *dp_soc;
+	void *dp_pdev;
 
 	if (cds_is_driver_recovering())
 		return 0;
@@ -819,7 +833,9 @@ static int __wlan_hdd_bus_resume(void)
 		goto out;
 	}
 
-	qdf_status = cdp_bus_resume(cds_get_context(QDF_MODULE_ID_SOC));
+	dp_soc = cds_get_context(QDF_MODULE_ID_SOC);
+	dp_pdev = cds_get_context(QDF_MODULE_ID_TXRX);
+	qdf_status = cdp_bus_resume(dp_soc, dp_pdev);
 	status = qdf_status_to_os_return(qdf_status);
 	if (status) {
 		hdd_err("Failed cdp bus resume");
@@ -1276,6 +1292,8 @@ static void wlan_hdd_pld_uevent(struct device *dev,
 {
 	if (uevent->uevent == PLD_RECOVERY)
 		cds_set_recovery_in_progress(true);
+	else if (uevent->uevent == PLD_FW_DOWN)
+		cds_set_fw_state(CDS_FW_STATE_DOWN);
 }
 
 #ifdef FEATURE_RUNTIME_PM

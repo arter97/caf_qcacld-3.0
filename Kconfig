@@ -128,8 +128,16 @@ config WLAN_FEATURE_DISA
 	bool "Enable DISA certification feature"
 	default n
 
+config WLAN_FEATURE_FIPS
+	bool "Enable FIPS certification feature"
+	default n
+
 config WLAN_FEATURE_11AX
 	bool "Enable 11AX(High Efficiency) feature"
+	default n
+
+config ICMP_DISABLE_PS
+	bool "Enable ICMP packet disable powersave feature"
 	default n
 
 endif # QCA_CLD_WLAN

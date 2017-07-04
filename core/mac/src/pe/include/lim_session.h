@@ -507,12 +507,15 @@ typedef struct sPESession       /* Added to Support BT-AMP */
 	bool he_capable;
 	tDot11fIEvendor_he_cap he_config;
 	tDot11fIEvendor_he_op he_op;
+	uint32_t he_sta_obsspd;
 #ifdef WLAN_FEATURE_11AX_BSS_COLOR
 	tDot11fIEbss_color_change he_bss_color_change;
 	struct bss_color_info bss_color_info[MAX_BSS_COLOR_VALUE];
 	uint8_t bss_color_changing;
 #endif
 #endif
+	bool enable_bcast_probe_rsp;
+	uint8_t ht_client_cnt;
 } tPESession, *tpPESession;
 
 /*-------------------------------------------------------------------------

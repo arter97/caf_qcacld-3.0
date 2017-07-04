@@ -108,6 +108,7 @@ void htt_htc_pkt_free(struct htt_pdev_t *pdev, struct htt_htc_pkt *pkt)
 void htt_htc_pkt_pool_free(struct htt_pdev_t *pdev)
 {
 	struct htt_htc_pkt_union *pkt, *next;
+
 	pkt = pdev->htt_htc_pkt_freelist;
 	while (pkt) {
 		next = pkt->u.next;
@@ -132,7 +133,8 @@ htt_htc_misc_pkt_list_trim(struct htt_pdev_t *pdev, int level)
 		next = pkt->u.next;
 		/* trim the out grown list*/
 		if (++i > level) {
-			netbuf = (qdf_nbuf_t)(pkt->u.pkt.htc_pkt.pNetBufContext);
+			netbuf =
+				(qdf_nbuf_t)(pkt->u.pkt.htc_pkt.pNetBufContext);
 			qdf_nbuf_unmap(pdev->osdev, netbuf, QDF_DMA_TO_DEVICE);
 			qdf_nbuf_free(netbuf);
 			qdf_mem_free(pkt);
@@ -172,6 +174,7 @@ void htt_htc_misc_pkt_pool_free(struct htt_pdev_t *pdev)
 {
 	struct htt_htc_pkt_union *pkt, *next;
 	qdf_nbuf_t netbuf;
+
 	pkt = pdev->htt_htc_pkt_misclist;
 
 	while (pkt) {
@@ -257,7 +260,6 @@ htt_htc_tx_htt2_service_start(struct htt_pdev_t *pdev,
 			      struct htc_service_connect_req *connect_req,
 			      struct htc_service_connect_resp *connect_resp)
 {
-	return;
 }
 #endif
 
@@ -316,6 +318,38 @@ void htt_dump_bundle_stats(htt_pdev_handle pdev)
 void htt_clear_bundle_stats(htt_pdev_handle pdev)
 {
 	htc_clear_bundle_stats(pdev->htc_pdev);
+}
+#endif
+
+#if defined(QCA_WIFI_3_0_ADRASTEA)
+/**
+ * htt_htc_attach_all() - Connect to HTC service for HTT
+ * @pdev: pdev ptr
+ *
+ * Return: 0 for success or error code.
+ */
+static int
+htt_htc_attach_all(struct htt_pdev_t *pdev)
+{
+	if (htt_htc_attach(pdev, HTT_DATA_MSG_SVC))
+		return -EIO;
+	if (htt_htc_attach(pdev, HTT_DATA2_MSG_SVC))
+		return -EIO;
+	if (htt_htc_attach(pdev, HTT_DATA3_MSG_SVC))
+		return -EIO;
+	return 0;
+}
+#else
+/**
+ * htt_htc_attach_all() - Connect to HTC service for HTT
+ * @pdev: pdev ptr
+ *
+ * Return: 0 for success or error code.
+ */
+static int
+htt_htc_attach_all(struct htt_pdev_t *pdev)
+{
+	return htt_htc_attach(pdev, HTT_DATA_MSG_SVC);
 }
 #endif
 
@@ -390,23 +424,15 @@ htt_pdev_alloc(ol_txrx_pdev_handle txrx_pdev,
 	 * since htt_rx_attach involves sending a rx ring configure
 	 * message to the target.
 	 */
-	if (htt_htc_attach(pdev, HTT_DATA_MSG_SVC))
-		goto fail2;
-	if (htt_htc_attach(pdev, HTT_DATA2_MSG_SVC))
-		;
-	/* TODO: enable the following line once FW is ready */
-	/* goto fail2; */
-	if (htt_htc_attach(pdev, HTT_DATA3_MSG_SVC))
-		;
-	/* TODO: enable the following line once FW is ready */
-	/* goto fail2; */
+	if (htt_htc_attach_all(pdev))
+		goto htt_htc_attach_fail;
 	if (hif_ce_fastpath_cb_register(osc, htt_t2h_msg_handler_fast, pdev))
 		qdf_print("failed to register fastpath callback\n");
 
 success:
 	return pdev;
 
-fail2:
+htt_htc_attach_fail:
 	qdf_mem_free(pdev);
 
 fail1:
@@ -441,6 +467,7 @@ htt_attach(struct htt_pdev_t *pdev, int desc_pool_size)
 	/* pre-allocate some HTC_PACKET objects */
 	for (i = 0; i < HTT_HTC_PKT_POOL_INIT_SIZE; i++) {
 		struct htt_htc_pkt_union *pkt;
+
 		pkt = qdf_mem_malloc(sizeof(*pkt));
 		if (!pkt)
 			break;
@@ -702,8 +729,12 @@ int htt_htc_attach(struct htt_pdev_t *pdev, uint16_t service_id)
 
 	status = htc_connect_service(pdev->htc_pdev, &connect, &response);
 
-	if (status != A_OK)
+	if (status != A_OK) {
+		if (!cds_is_fw_down())
+			QDF_BUG(0);
+
 		return -EIO;       /* failure */
+	}
 
 	htt_update_endpoint(pdev, service_id, response.Endpoint);
 

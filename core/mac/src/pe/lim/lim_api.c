@@ -618,7 +618,8 @@ void lim_cleanup(tpAniSirGlobal pMac)
 	qdf_mutex_release(&pMac->lim.lim_frame_register_lock);
 	qdf_list_destroy(&pMac->lim.gLimMgmtFrameRegistratinQueue);
 	qdf_mutex_destroy(&pMac->lim.lim_frame_register_lock);
-
+	qdf_mem_free(pMac->lim.gpLimRemainOnChanReq);
+	pMac->lim.gpLimRemainOnChanReq = NULL;
 	lim_cleanup_mlm(pMac);
 
 	/* free up preAuth table */
@@ -1829,6 +1830,30 @@ void lim_fill_join_rsp_ht_caps(tpPESession session, tpSirSmeJoinRsp join_rsp)
 #endif
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
+/**
+ * sir_parse_bcn_fixed_fields() - Parse fixed fields in Beacon IE's
+ *
+ * @mac_ctx: MAC Context
+ * @beacon_struct: Beacon/Probe Response structure
+ * @buf: Fixed Fields buffer
+ */
+static void sir_parse_bcn_fixed_fields(tpAniSirGlobal mac_ctx,
+					tpSirProbeRespBeacon beacon_struct,
+					uint8_t *buf)
+{
+	tDot11fFfCapabilities dst;
+	beacon_struct->timeStamp[0] = lim_get_u32(buf);
+	beacon_struct->timeStamp[1] = lim_get_u32(buf + 4);
+	buf += 8;
+
+	beacon_struct->beaconInterval = lim_get_u16(buf);
+	buf += 2;
+
+	dot11f_unpack_ff_capabilities(mac_ctx, buf, &dst);
+
+	sir_copy_caps_info(mac_ctx, dst, beacon_struct);
+}
+
 static QDF_STATUS
 lim_roam_fill_bss_descr(tpAniSirGlobal pMac,
 			roam_offload_synch_ind *roam_offload_synch_ind_ptr,
@@ -1884,6 +1909,15 @@ lim_roam_fill_bss_descr(tpAniSirGlobal pMac,
 			return QDF_STATUS_E_FAILURE;
 		}
 	}
+
+	/*
+	 * For probe response, unpack core parses beacon interval, capabilities,
+	 * timestamp. For beacon IEs, these fields are not parsed.
+	 */
+	if (roam_offload_synch_ind_ptr->isBeacon)
+		sir_parse_bcn_fixed_fields(pMac, parsed_frm_ptr,
+			&bcn_proberesp_ptr[SIR_MAC_HDR_LEN_3A]);
+
 	/* 24 byte MAC header and 12 byte to ssid IE */
 	if (roam_offload_synch_ind_ptr->beaconProbeRespLength >
 		(SIR_MAC_HDR_LEN_3A + SIR_MAC_B_PR_SSID_OFFSET)) {
@@ -1998,7 +2032,6 @@ QDF_STATUS pe_roam_synch_callback(tpAniSirGlobal mac_ctx,
 	tpDphHashNode curr_sta_ds;
 	uint16_t aid;
 	tpAddBssParams add_bss_params;
-	uint8_t local_nss;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	uint16_t join_rsp_len;
 
@@ -2055,6 +2088,14 @@ QDF_STATUS pe_roam_synch_callback(tpAniSirGlobal mac_ctx,
 	ft_session_ptr->csaOffloadEnable = session_ptr->csaOffloadEnable;
 
 	lim_fill_ft_session(mac_ctx, bss_desc, ft_session_ptr, session_ptr);
+
+	if (IS_5G_CH(ft_session_ptr->currentOperChannel))
+		ft_session_ptr->vdev_nss = mac_ctx->vdev_type_nss_5g.sta;
+	else
+		ft_session_ptr->vdev_nss = mac_ctx->vdev_type_nss_2g.sta;
+
+	ft_session_ptr->nss = ft_session_ptr->vdev_nss;
+
 	lim_ft_prepare_add_bss_req(mac_ctx, false, ft_session_ptr, bss_desc);
 	roam_sync_ind_ptr->add_bss_params =
 		(tpAddBssParams) ft_session_ptr->ftPEContext.pAddBssReq;
@@ -2067,14 +2108,12 @@ QDF_STATUS pe_roam_synch_callback(tpAniSirGlobal mac_ctx,
 		ft_session_ptr->bRoamSynchInProgress = false;
 		return status;
 	}
-	local_nss = curr_sta_ds->nss;
 	session_ptr->limSmeState = eLIM_SME_IDLE_STATE;
 	lim_cleanup_rx_path(mac_ctx, curr_sta_ds, session_ptr);
 	lim_delete_dph_hash_entry(mac_ctx, curr_sta_ds->staAddr,
 			aid, session_ptr);
 	pe_delete_session(mac_ctx, session_ptr);
 	session_ptr = NULL;
-	ft_session_ptr->nss = local_nss;
 	curr_sta_ds = dph_add_hash_entry(mac_ctx,
 			roam_sync_ind_ptr->bssid.bytes, DPH_STA_HASH_INDEX_PEER,
 			&ft_session_ptr->dph.dphHashTable);
@@ -2119,7 +2158,8 @@ QDF_STATUS pe_roam_synch_callback(tpAniSirGlobal mac_ctx,
 	roam_sync_ind_ptr->aid = ft_session_ptr->limAID;
 	curr_sta_ds->mlmStaContext.mlmState =
 		eLIM_MLM_LINK_ESTABLISHED_STATE;
-	curr_sta_ds->nss = local_nss;
+	curr_sta_ds->nss = ft_session_ptr->nss;
+	roam_sync_ind_ptr->nss = ft_session_ptr->nss;
 	ft_session_ptr->limMlmState = eLIM_MLM_LINK_ESTABLISHED_STATE;
 	lim_init_tdls_data(mac_ctx, ft_session_ptr);
 	join_rsp_len = ft_session_ptr->RICDataLen +
@@ -2436,41 +2476,5 @@ QDF_STATUS lim_update_ext_cap_ie(tpAniSirGlobal mac_ctx,
 	qdf_mem_copy(local_ie_buf + (*local_ie_len),
 			driver_ext_cap.bytes, driver_ext_cap.num_bytes);
 	(*local_ie_len) += driver_ext_cap.num_bytes;
-	return QDF_STATUS_SUCCESS;
-}
-
-/**
- * lim_add_qcn_ie() - Add QCN IE to a given IE buffer
- *
- * @mac_ctx: Pointer to Global MAC structure
- * @ie_data: IE buffer
- * @ie_len: length of the @ie_data
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS lim_add_qcn_ie(tpAniSirGlobal mac_ctx, uint8_t *ie_data,
-							uint16_t *ie_len)
-{
-	tDot11fIEQCN_IE qcn_ie;
-	uint8_t qcn_ie_hdr[QCN_IE_HDR_LEN]
-		= {IE_EID_VENDOR, DOT11F_IE_QCN_IE_MAX_LEN,
-			0x8C, 0xFD, 0xF0, 0x1};
-
-	if (((*ie_len) + DOT11F_IE_QCN_IE_MAX_LEN) > MAX_DEFAULT_SCAN_IE_LEN) {
-		pe_err("IE buffer not enough for QCN IE");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	/* Add QCN IE header */
-	qdf_mem_copy(ie_data + (*ie_len), qcn_ie_hdr, QCN_IE_HDR_LEN);
-	(*ie_len) += QCN_IE_HDR_LEN;
-
-	/* Retrieve Version sub-attribute data */
-	populate_dot11f_qcn_ie(&qcn_ie);
-
-	/* Add QCN IE data[version sub attribute] */
-	qdf_mem_copy(ie_data + (*ie_len), qcn_ie.version,
-			(QCN_IE_VERSION_SUBATTR_LEN));
-	(*ie_len) += (QCN_IE_VERSION_SUBATTR_LEN);
 	return QDF_STATUS_SUCCESS;
 }

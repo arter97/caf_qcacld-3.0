@@ -1164,11 +1164,11 @@ void wma_set_linkstate(tp_wma_handle wma, tpLinkStateParams params)
 {
 	struct cdp_pdev *pdev;
 	struct cdp_vdev *vdev;
-	void *peer;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
-	uint8_t vdev_id, peer_id;
+	uint8_t vdev_id;
 	bool roam_synch_in_progress = false;
 	QDF_STATUS status;
+	struct wma_target_req *msg;
 
 	params->status = true;
 	WMA_LOGD("%s: state %d selfmac %pM", __func__,
@@ -1215,18 +1215,28 @@ void wma_set_linkstate(tp_wma_handle wma, tpLinkStateParams params)
 		cdp_fc_vdev_pause(soc,
 			wma->interfaces[vdev_id].handle,
 			OL_TXQ_PAUSE_REASON_VDEV_STOP);
+		msg = wma_fill_vdev_req(wma, vdev_id,
+				WMA_SET_LINK_STATE,
+				WMA_TARGET_REQ_TYPE_VDEV_STOP, params,
+				WMA_VDEV_STOP_REQUEST_TIMEOUT);
+		if (!msg) {
+			WMA_LOGP(FL("Failed to fill vdev request for vdev_id %d"),
+				 vdev_id);
+			status = QDF_STATUS_E_NOMEM;
+		}
 		wma_vdev_set_pause_bit(vdev_id, PAUSE_TYPE_HOST);
 		if (wma_send_vdev_stop_to_fw(wma, vdev_id)) {
 			WMA_LOGP("%s: %d Failed to send vdev stop",
 				 __func__, __LINE__);
-		}
-		peer = cdp_peer_find_by_addr(soc, pdev,
-				params->bssid, &peer_id);
-		if (peer) {
-			WMA_LOGP("%s: Deleting peer %pM vdev id %d",
-				 __func__, params->bssid, vdev_id);
-			wma_remove_peer(wma, params->bssid, vdev_id, peer,
-					roam_synch_in_progress);
+		} else {
+			WMA_LOGP("%s: %d vdev stop sent vdev %d",
+				 __func__, __LINE__, vdev_id);
+			/*
+			 * Remove peer, Vdev down and sending set link
+			 * response will be handled in vdev stop response
+			 * handler
+			 */
+			return;
 		}
 	}
 out:
@@ -2754,7 +2764,7 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 			chanfreq = wma_handle->interfaces[vdev_id].mhz;
 		else
 			chanfreq = channel_freq;
-		WMA_LOGI("%s: Probe response frame on channel %d vdev:%d",
+		WMA_LOGD("%s: Probe response frame on channel %d vdev:%d",
 			__func__, chanfreq, vdev_id);
 		if (wma_is_vdev_in_ap_mode(wma_handle, vdev_id) && !chanfreq)
 			WMA_LOGE("%s: AP oper chan is zero", __func__);
@@ -2826,7 +2836,11 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 			tx_frm_download_comp_cb(wma_handle->mac_context,
 						tx_frame,
 						WMA_TX_FRAME_BUFFER_FREE);
-		WMA_LOGP("%s: Failed to send Mgmt Frame", __func__);
+		if (!(wma_handle->tx_fail_cnt % MAX_PRINT_FAILURE_CNT))
+			WMA_LOGE("%s: Failed to send Mgmt Frame", __func__);
+		else
+			WMA_LOGD("%s: Failed to send Mgmt Frame", __func__);
+		wma_handle->tx_fail_cnt++;
 		goto error;
 	}
 

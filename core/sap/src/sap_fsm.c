@@ -856,6 +856,7 @@ static uint8_t *sap_hdd_event_to_string(eSapHddEvent event)
 	CASE_RETURN_STRING(eSAP_MAX_ASSOC_EXCEEDED);
 	CASE_RETURN_STRING(eSAP_CHANNEL_CHANGE_EVENT);
 	CASE_RETURN_STRING(eSAP_DFS_CAC_START);
+	CASE_RETURN_STRING(eSAP_DFS_CAC_INTERRUPTED);
 	CASE_RETURN_STRING(eSAP_DFS_CAC_END);
 	CASE_RETURN_STRING(eSAP_DFS_PRE_CAC_END);
 	CASE_RETURN_STRING(eSAP_DFS_RADAR_DETECT);
@@ -867,6 +868,7 @@ static uint8_t *sap_hdd_event_to_string(eSapHddEvent event)
 	CASE_RETURN_STRING(eSAP_ACS_SCAN_SUCCESS_EVENT);
 #endif
 	CASE_RETURN_STRING(eSAP_ACS_CHANNEL_SELECTED);
+	CASE_RETURN_STRING(eSAP_ECSA_CHANGE_CHAN_IND);
 	default:
 		return "eSAP_HDD_EVENT_UNKNOWN";
 	}
@@ -1160,6 +1162,67 @@ static bool sap_is_channel_bonding_etsi_weather_channel(ptSapContext sap_ctx)
 }
 
 /**
+ * sap_ch_params_to_bonding_channels() - get bonding channels from channel param
+ * @ch_params: channel params ( bw, pri and sec channel info)
+ * @channels: bonded channel list
+ *
+ * Return: Number of sub channels
+ */
+static uint8_t sap_ch_params_to_bonding_channels(
+		struct ch_params *ch_params,
+		uint8_t *channels)
+{
+	uint8_t center_chan = ch_params->center_freq_seg0;
+	uint8_t nchannels = 0;
+
+	switch (ch_params->ch_width) {
+	case CH_WIDTH_160MHZ:
+		nchannels = 8;
+		center_chan = ch_params->center_freq_seg1;
+		channels[0] = center_chan - 14;
+		channels[1] = center_chan - 10;
+		channels[2] = center_chan - 6;
+		channels[3] = center_chan - 2;
+		channels[4] = center_chan + 2;
+		channels[5] = center_chan + 6;
+		channels[6] = center_chan + 10;
+		channels[7] = center_chan + 14;
+		break;
+	case CH_WIDTH_80P80MHZ:
+		nchannels = 8;
+		channels[0] = center_chan - 6;
+		channels[1] = center_chan - 2;
+		channels[2] = center_chan + 2;
+		channels[3] = center_chan + 6;
+
+		center_chan = ch_params->center_freq_seg1;
+		channels[4] = center_chan - 6;
+		channels[5] = center_chan - 2;
+		channels[6] = center_chan + 2;
+		channels[7] = center_chan + 6;
+		break;
+	case CH_WIDTH_80MHZ:
+		nchannels = 4;
+		channels[0] = center_chan - 6;
+		channels[1] = center_chan - 2;
+		channels[2] = center_chan + 2;
+		channels[3] = center_chan + 6;
+		break;
+	case CH_WIDTH_40MHZ:
+		nchannels = 2;
+		channels[0] = center_chan - 2;
+		channels[1] = center_chan + 2;
+		break;
+	default:
+		nchannels = 1;
+		channels[0] = center_chan;
+		break;
+	}
+
+	return nchannels;
+}
+
+/**
  * sap_get_cac_dur_dfs_region() - get cac duration and dfs region.
  * @sap_ctxt: sap context
  * @cac_duration_ms: pointer to cac duration
@@ -1173,6 +1236,10 @@ static void sap_get_cac_dur_dfs_region(ptSapContext sap_ctx,
 		uint32_t *cac_duration_ms,
 		uint32_t *dfs_region)
 {
+	int i;
+	uint8_t channels[MAX_BONDED_CHANNELS];
+	uint8_t num_channels;
+	struct ch_params *ch_params = &sap_ctx->ch_params;
 	tHalHandle hal = NULL;
 	tpAniSirGlobal mac = NULL;
 
@@ -1190,21 +1257,45 @@ static void sap_get_cac_dur_dfs_region(ptSapContext sap_ctx,
 	}
 
 	mac = PMAC_STRUCT(hal);
+	wlan_reg_get_dfs_region(mac->psoc, dfs_region);
 	if (mac->sap.SapDfsInfo.ignore_cac) {
 		*cac_duration_ms = 0;
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_DEBUG,
 			  "%s: ignore_cac is set", __func__);
 		return;
 	}
+	*cac_duration_ms = DEFAULT_CAC_TIMEOUT;
 
-	wlan_reg_get_dfs_region(mac->psoc, dfs_region);
+	QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO,
+		  FL("sapdfs: dfs_region=%d, chwidth=%d, seg0=%d, seg1=%d"),
+		  *dfs_region, ch_params->ch_width,
+		  ch_params->center_freq_seg0, ch_params->center_freq_seg1);
 
-	if ((*dfs_region == DFS_ETSI_REG) &&
-	    ((IS_ETSI_WEATHER_CH(sap_ctx->channel)) ||
-	    (sap_is_channel_bonding_etsi_weather_channel(sap_ctx))))
+	if (*dfs_region != DFS_ETSI_REG) {
+		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO,
+			  FL("sapdfs: defult cac duration"));
+		return;
+	}
+
+	if (sap_is_channel_bonding_etsi_weather_channel(sap_ctx)) {
 		*cac_duration_ms = ETSI_WEATHER_CH_CAC_TIMEOUT;
-	else
-		*cac_duration_ms = DEFAULT_CAC_TIMEOUT;
+		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO,
+			  FL("sapdfs: bonding_etsi_weather_channel"));
+		return;
+	}
+
+	qdf_mem_zero(channels, sizeof(channels));
+	num_channels = sap_ch_params_to_bonding_channels(ch_params, channels);
+	for (i = 0; i < num_channels; i++) {
+		if (IS_ETSI_WEATHER_CH(channels[i])) {
+			*cac_duration_ms = ETSI_WEATHER_CH_CAC_TIMEOUT;
+			QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO,
+				  FL("sapdfs: ch=%d is etsi weather channel"),
+				  channels[i]);
+			return;
+		}
+	}
+
 }
 
 void sap_dfs_set_current_channel(void *ctx)
@@ -1571,13 +1662,9 @@ QDF_STATUS sap_goto_channel_sel(ptSapContext sap_context,
 	/* To be initialised if scan is required */
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
 	tpAniSirGlobal mac_ctx;
-#ifdef NAPIER_SCAN
 	struct scan_start_request *req;
 	struct wlan_objmgr_vdev *vdev;
 	uint8_t i;
-#else
-	tCsrScanRequest scan_request;
-#endif
 
 #ifdef SOFTAP_CHANNEL_RANGE
 	uint8_t *channel_list = NULL;
@@ -1694,19 +1781,7 @@ QDF_STATUS sap_goto_channel_sel(ptSapContext sap_context,
 		if (sap_context->acs_cfg->skip_scan_status !=
 						eSAP_SKIP_ACS_SCAN) {
 #endif
-#ifndef NAPIER_SCAN
-		qdf_mem_zero(&scan_request, sizeof(scan_request));
-		/*
-		 * Set scanType to Active scan. FW takes care of using passive
-		 * scan for DFS and active for non DFS channels.
-		 */
-		scan_request.scanType = eSIR_ACTIVE_SCAN;
-		/* Set min and max channel time to zero */
-		scan_request.minChnTime = 0;
-		scan_request.maxChnTime = 0;
-		/* Set BSSType to default type */
-		scan_request.BSSType = eCSR_BSS_TYPE_ANY;
-#else
+
 		req = qdf_mem_malloc(sizeof(*req));
 		if (!req) {
 			QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_HIGH,
@@ -1722,27 +1797,16 @@ QDF_STATUS sap_goto_channel_sel(ptSapContext sap_context,
 		req->scan_req.scan_id = ucfg_scan_get_scan_id(mac_ctx->psoc);
 		req->scan_req.vdev_id = wlan_vdev_get_id(vdev);
 		req->scan_req.scan_req_id = sap_context->req_id;
-#endif
 		sap_get_channel_list(sap_context, &channel_list,
 				  &num_of_channels);
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
 		if (num_of_channels != 0) {
 #endif
 
-#ifndef NAPIER_SCAN
-		/*Scan the channels in the list */
-		scan_request.ChannelInfo.numOfChannels =
-			num_of_channels;
-		scan_request.ChannelInfo.ChannelList =
-			channel_list;
-		scan_request.requestType =
-			eCSR_SCAN_SOFTAP_CHANNEL_RANGE;
-#else
 		req->scan_req.num_chan = num_of_channels;
 		for (i = 0; i < num_of_channels; i++)
 			req->scan_req.chan_list[i] =
 				wlan_chan_to_freq(channel_list[i]);
-#endif
 		sap_context->channelList = channel_list;
 		sap_context->num_of_channel = num_of_channels;
 		/* Set requestType to Full scan */
@@ -1755,36 +1819,9 @@ QDF_STATUS sap_goto_channel_sel(ptSapContext sap_context,
 #endif
 			sme_scan_flush_result(h_hal);
 		sap_context->sap_acs_pre_start_bss = sap_do_acs_pre_start_bss;
-#ifndef NAPIER_SCAN
-		if (true == sap_do_acs_pre_start_bss) {
-			/*
-			 * when ID == 0 11D scan/active scan with callback,
-			 * min-maxChntime set in csrScanRequest()?
-			 * csrScanCompleteCallback callback
-			 * pContext scan_request_id filled up
-			 */
-			qdf_ret_status = sme_scan_request(h_hal,
-				sap_context->sessionId,
-				&scan_request,
-				&wlansap_pre_start_bss_acs_scan_callback,
-				sap_context);
-		} else {
-			/*
-			 * when ID == 0 11D scan/active scan with callback,
-			 * min-maxChntime set in csrScanRequest()?
-			 * csrScanCompleteCallback callback,
-			 * pContext scan_request_id filled up
-			 */
-			qdf_ret_status = sme_scan_request(h_hal,
-				sap_context->sessionId,
-				&scan_request,
-				&wlansap_scan_callback,
-				sap_context);
-		}
-#else
 		qdf_ret_status = ucfg_scan_start(req);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
-#endif
+
 		if (QDF_STATUS_SUCCESS != qdf_ret_status) {
 			QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
 				  FL("sme_scan_request  fail %d!!!"),
@@ -1822,11 +1859,7 @@ QDF_STATUS sap_goto_channel_sel(ptSapContext sap_context,
 		} else {
 			QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_HIGH,
 				 FL("return sme_ScanReq, scanID=%d, Ch=%d"),
-#ifndef NAPIER_SCAN
-				 scan_request.scan_id,
-#else
 				req->scan_req.scan_id,
-#endif
 				 sap_context->channel);
 		}
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
@@ -1838,8 +1871,14 @@ QDF_STATUS sap_goto_channel_sel(ptSapContext sap_context,
 	if (sap_context->acs_cfg->skip_scan_status == eSAP_SKIP_ACS_SCAN) {
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
 			  FL("## %s SKIPPED ACS SCAN"), __func__);
-		wlansap_scan_callback(h_hal, sap_context,
-			sap_context->sessionId, 0, eCSR_SCAN_SUCCESS);
+
+		if (true == sap_do_acs_pre_start_bss)
+			wlansap_pre_start_bss_acs_scan_callback(h_hal,
+				sap_context, sap_context->sessionId, 0,
+				eCSR_SCAN_SUCCESS);
+		else
+			wlansap_scan_callback(h_hal, sap_context,
+				sap_context->sessionId, 0, eCSR_SCAN_SUCCESS);
 	}
 #endif
 	} else {
@@ -4330,12 +4369,6 @@ int sap_start_dfs_cac_timer(ptSapContext sap_ctx)
 	sap_get_cac_dur_dfs_region(sap_ctx, &cac_dur, &dfs_region);
 	if (0 == cac_dur)
 		return 0;
-
-	if ((dfs_region == DFS_ETSI_REG) &&
-	    ((IS_ETSI_WEATHER_CH(sap_ctx->channel)) ||
-	     (sap_is_channel_bonding_etsi_weather_channel(sap_ctx)))) {
-		cac_dur = ETSI_WEATHER_CH_CAC_TIMEOUT;
-	}
 
 #ifdef QCA_WIFI_NAPIER_EMULATION
 	cac_dur = cac_dur / 100;

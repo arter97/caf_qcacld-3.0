@@ -219,9 +219,10 @@ static inline struct sk_buff *hdd_skb_orphan(hdd_adapter_t *pAdapter,
 		struct sk_buff *skb) {
 
 	struct sk_buff *nskb;
-	nskb = skb_unshare(skb, GFP_ATOMIC);
+	hdd_context_t *hdd_ctx = pAdapter->pHddCtx;
 
-	if (nskb == skb) {
+	nskb = skb_unshare(skb, GFP_ATOMIC);
+	if (unlikely(hdd_ctx->config->tx_orphan_enable) && (nskb == skb)) {
 		/*
 		 * For UDP packets we want to orphan the packet to allow the app
 		 * to send more packets. The flow would ultimately be controlled
@@ -401,18 +402,22 @@ static int __hdd_softap_hard_start_xmit(struct sk_buff *skb,
 		++pAdapter->stats.tx_packets;
 
 	hdd_event_eapol_log(skb, QDF_TX);
-	qdf_dp_trace_log_pkt(pAdapter->sessionId, skb, QDF_TX);
+	qdf_dp_trace_log_pkt(pAdapter->sessionId, skb, QDF_TX,
+			QDF_TRACE_DEFAULT_PDEV_ID);
 	QDF_NBUF_CB_TX_PACKET_TRACK(skb) = QDF_NBUF_TX_PKT_DATA_TRACK;
 	QDF_NBUF_UPDATE_TX_PKT_COUNT(skb, QDF_NBUF_TX_PKT_HDD);
 
 	qdf_dp_trace_set_track(skb, QDF_TX);
 	DPTRACE(qdf_dp_trace(skb, QDF_DP_TRACE_HDD_TX_PACKET_PTR_RECORD,
-			qdf_nbuf_data_addr(skb), sizeof(qdf_nbuf_data(skb)),
+			QDF_TRACE_DEFAULT_PDEV_ID, qdf_nbuf_data_addr(skb),
+			sizeof(qdf_nbuf_data(skb)),
 			QDF_TX));
 	DPTRACE(qdf_dp_trace(skb, QDF_DP_TRACE_HDD_TX_PACKET_RECORD,
-			(uint8_t *)skb->data, qdf_nbuf_len(skb), QDF_TX));
+			QDF_TRACE_DEFAULT_PDEV_ID, (uint8_t *)skb->data,
+			qdf_nbuf_len(skb), QDF_TX));
 	if (qdf_nbuf_len(skb) > QDF_DP_TRACE_RECORD_SIZE)
 		DPTRACE(qdf_dp_trace(skb, QDF_DP_TRACE_HDD_TX_PACKET_RECORD,
+			QDF_TRACE_DEFAULT_PDEV_ID,
 			(uint8_t *)&skb->data[QDF_DP_TRACE_RECORD_SIZE],
 			(qdf_nbuf_len(skb)-QDF_DP_TRACE_RECORD_SIZE), QDF_TX));
 
@@ -433,9 +438,11 @@ drop_pkt_and_release_skb:
 drop_pkt:
 
 	DPTRACE(qdf_dp_trace(skb, QDF_DP_TRACE_DROP_PACKET_RECORD,
-			(uint8_t *)skb->data, qdf_nbuf_len(skb), QDF_TX));
+			QDF_TRACE_DEFAULT_PDEV_ID, (uint8_t *)skb->data,
+			qdf_nbuf_len(skb), QDF_TX));
 	if (qdf_nbuf_len(skb) > QDF_DP_TRACE_RECORD_SIZE)
 		DPTRACE(qdf_dp_trace(skb, QDF_DP_TRACE_DROP_PACKET_RECORD,
+			QDF_TRACE_DEFAULT_PDEV_ID,
 			(uint8_t *)&skb->data[QDF_DP_TRACE_RECORD_SIZE],
 			(qdf_nbuf_len(skb)-QDF_DP_TRACE_RECORD_SIZE), QDF_TX));
 	kfree_skb(skb);
@@ -510,7 +517,8 @@ static void __hdd_softap_tx_timeout(struct net_device *dev)
 	int i;
 
 	DPTRACE(qdf_dp_trace(NULL, QDF_DP_TRACE_HDD_SOFTAP_TX_TIMEOUT,
-				NULL, 0, QDF_TX));
+			QDF_TRACE_DEFAULT_PDEV_ID,
+			NULL, 0, QDF_TX));
 	/* Getting here implies we disabled the TX queues for too
 	 * long. Queues are disabled either because of disassociation
 	 * or low resource scenarios. In case of disassociation it is
@@ -732,13 +740,17 @@ QDF_STATUS hdd_softap_rx_packet_cbk(void *context, qdf_nbuf_t rxBuf)
 		hdd_event_eapol_log(skb, QDF_RX);
 		DPTRACE(qdf_dp_trace(skb,
 			QDF_DP_TRACE_RX_HDD_PACKET_PTR_RECORD,
+			QDF_TRACE_DEFAULT_PDEV_ID,
 			qdf_nbuf_data_addr(skb),
 			sizeof(qdf_nbuf_data(skb)), QDF_RX));
 		DPTRACE(qdf_dp_trace(skb, QDF_DP_TRACE_HDD_RX_PACKET_RECORD,
-			(uint8_t *)skb->data, qdf_nbuf_len(skb), QDF_RX));
+				QDF_TRACE_DEFAULT_PDEV_ID,
+				(uint8_t *)skb->data, qdf_nbuf_len(skb),
+				QDF_RX));
 		if (qdf_nbuf_len(skb) > QDF_DP_TRACE_RECORD_SIZE)
 			DPTRACE(qdf_dp_trace(skb,
 				QDF_DP_TRACE_HDD_RX_PACKET_RECORD,
+				QDF_TRACE_DEFAULT_PDEV_ID,
 				(uint8_t *)&skb->data[QDF_DP_TRACE_RECORD_SIZE],
 				(qdf_nbuf_len(skb)-QDF_DP_TRACE_RECORD_SIZE),
 				QDF_RX));

@@ -366,8 +366,14 @@ QDF_STATUS wma_get_buf_start_scan_cmd(tp_wma_handle wma_handle,
 			}
 			if (wma_is_sta_active(wma_handle) ||
 			    wma_is_p2p_cli_active(wma_handle)) {
-				/* Typical background scan. Disable burst scan for now. */
-				cmd->burst_duration = 0;
+				if (scan_req->burst_scan_duration)
+					cmd->burst_duration =
+						scan_req->burst_scan_duration;
+				else
+					/* Typical background scan.
+					 * Disable burst scan for now.
+					 */
+					cmd->burst_duration = 0;
 				break;
 			}
 		} while (0);
@@ -527,7 +533,7 @@ QDF_STATUS wma_start_scan(tp_wma_handle wma_handle,
 	struct scan_req_params cmd = {0};
 	tSirScanOffloadEvent *scan_event;
 
-	if (scan_req->sessionId > wma_handle->max_bssid) {
+	if (scan_req->sessionId >= wma_handle->max_bssid) {
 		WMA_LOGE("%s: Invalid vdev_id %d, msg_type : 0x%x", __func__,
 			 scan_req->sessionId, msg_type);
 		goto error1;
@@ -803,7 +809,8 @@ QDF_STATUS wma_roam_scan_offload_mode(tp_wma_handle wma_handle,
 				roam_req->RoamKeyMgmtOffloadEnabled;
 		wma_roam_scan_fill_self_caps(wma_handle,
 			&params->roam_offload_params, roam_req);
-		params->okc_enabled = roam_req->okc_enabled;
+		params->fw_okc = roam_req->pmkid_modes.fw_okc;
+		params->fw_pmksa_cache = roam_req->pmkid_modes.fw_pmksa_cache;
 #endif
 		params->is_ese_assoc = roam_req->IsESEAssoc;
 		params->mdid.mdie_present = roam_req->MDID.mdiePresent;
@@ -1844,13 +1851,18 @@ QDF_STATUS wma_process_roaming_config(tp_wma_handle wma_handle,
 	case ROAM_SCAN_OFFLOAD_STOP:
 		wma_handle->suitable_ap_hb_failure = false;
 		if (wma_handle->roam_offload_enabled) {
+			uint32_t mode;
 
 			wma_roam_scan_fill_scan_params(wma_handle, pMac,
 						       NULL, &scan_params);
+
+			if (roam_req->reason == REASON_ROAM_STOP_ALL)
+				mode = WMI_ROAM_SCAN_MODE_NONE;
+			else
+				mode = WMI_ROAM_SCAN_MODE_NONE |
+					WMI_ROAM_SCAN_MODE_ROAMOFFLOAD;
 			qdf_status = wma_roam_scan_offload_mode(wma_handle,
-						&scan_params, NULL,
-						WMI_ROAM_SCAN_MODE_NONE |
-						WMI_ROAM_SCAN_MODE_ROAMOFFLOAD,
+						&scan_params, NULL, mode,
 						roam_req->sessionId);
 		}
 		/*
@@ -2231,6 +2243,8 @@ static void wma_roam_update_vdev(tp_wma_handle wma,
 	tAddStaParams *add_sta_params;
 	uint8_t vdev_id;
 
+	vdev_id = roam_synch_ind_ptr->roamedVdevId;
+	wma->interfaces[vdev_id].nss = roam_synch_ind_ptr->nss;
 	del_bss_params = qdf_mem_malloc(sizeof(*del_bss_params));
 	del_sta_params = qdf_mem_malloc(sizeof(*del_sta_params));
 	set_link_params = qdf_mem_malloc(sizeof(*set_link_params));
@@ -2240,7 +2254,6 @@ static void wma_roam_update_vdev(tp_wma_handle wma,
 		WMA_LOGE("%s: failed to allocate memory", __func__);
 		return;
 	}
-	vdev_id = roam_synch_ind_ptr->roamedVdevId;
 	qdf_mem_zero(del_bss_params, sizeof(*del_bss_params));
 	qdf_mem_zero(del_sta_params, sizeof(*del_sta_params));
 	qdf_mem_zero(set_link_params, sizeof(*set_link_params));
@@ -2319,7 +2332,8 @@ int wma_roam_synch_event_handler(void *handle, uint8_t *event,
 	}
 
 	DPTRACE(qdf_dp_trace_record_event(QDF_DP_TRACE_EVENT_RECORD,
-		synch_event->vdev_id, QDF_PROTO_TYPE_EVENT, QDF_ROAM_SYNCH));
+		synch_event->vdev_id, QDF_TRACE_DEFAULT_PDEV_ID,
+		QDF_PROTO_TYPE_EVENT, QDF_ROAM_SYNCH));
 
 	if (wma_is_roam_synch_in_progress(wma, synch_event->vdev_id)) {
 		WMA_LOGE("%s: Ignoring RSI since one is already in progress",
@@ -2372,6 +2386,7 @@ int wma_roam_synch_event_handler(void *handle, uint8_t *event,
 		status = -EBUSY;
 		goto cleanup_label;
 	}
+
 	wma_roam_update_vdev(wma, roam_synch_ind_ptr);
 	wma->csr_roam_synch_cb((tpAniSirGlobal)wma->mac_context,
 		roam_synch_ind_ptr, bss_desc_ptr, SIR_ROAM_SYNCH_PROPAGATION);
@@ -2759,7 +2774,8 @@ void wma_process_roam_synch_complete(WMA_HANDLE handle, uint8_t vdev_id)
 	}
 
 	DPTRACE(qdf_dp_trace_record_event(QDF_DP_TRACE_EVENT_RECORD,
-		vdev_id, QDF_PROTO_TYPE_EVENT, QDF_ROAM_COMPLETE));
+		vdev_id, QDF_TRACE_DEFAULT_PDEV_ID,
+		QDF_PROTO_TYPE_EVENT, QDF_ROAM_COMPLETE));
 
 	WMA_LOGE("LFR3: Posting WMA_ROAM_OFFLOAD_SYNCH_CNF");
 }
@@ -5371,7 +5387,8 @@ int wma_roam_event_callback(WMA_HANDLE handle, uint8_t *event_buf,
 		 wmi_event->vdev_id, wmi_event->rssi);
 
 	DPTRACE(qdf_dp_trace_record_event(QDF_DP_TRACE_EVENT_RECORD,
-		wmi_event->vdev_id, QDF_PROTO_TYPE_EVENT, QDF_ROAM_EVENTID));
+		wmi_event->vdev_id, QDF_TRACE_DEFAULT_PDEV_ID,
+		QDF_PROTO_TYPE_EVENT, QDF_ROAM_EVENTID));
 
 	switch (wmi_event->reason) {
 	case WMI_ROAM_REASON_BMISS:
@@ -5419,6 +5436,18 @@ int wma_roam_event_callback(WMA_HANDLE handle, uint8_t *event_buf,
 		break;
 	case WMI_ROAM_REASON_RSO_STATUS:
 		wma_rso_cmd_status_event_handler(wmi_event);
+		break;
+	case WMI_ROAM_REASON_INVOKE_ROAM_FAIL:
+		roam_synch_data = qdf_mem_malloc(sizeof(*roam_synch_data));
+		if (!roam_synch_data) {
+			WMA_LOGE("Memory unavailable for roam synch data");
+			return -ENOMEM;
+		}
+		roam_synch_data->roamedVdevId = wmi_event->vdev_id;
+		wma_handle->csr_roam_synch_cb(
+				(tpAniSirGlobal)wma_handle->mac_context,
+				roam_synch_data, NULL, SIR_ROAMING_INVOKE_FAIL);
+		qdf_mem_free(roam_synch_data);
 		break;
 	default:
 		WMA_LOGD("%s:Unhandled Roam Event %x for vdevid %x", __func__,

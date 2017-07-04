@@ -210,8 +210,13 @@ typedef struct sLimMlmStartCnf {
 typedef struct sLimMlmScanCnf {
 	tSirResultCodes resultCode;
 	uint16_t scanResultLength;
-	tSirBssDescription bssDescription[1];
 	uint8_t sessionId;
+	tSirBssDescription bssDescription[1];
+	/*
+	 * WARNING: Pls make bssDescription as last variable in struct
+	 * tLimMlmScanCnf as it has ieFields followed after this bss
+	 * description. Adding a variable after this corrupts the ieFields
+	 */
 } tLimMlmScanCnf, *tpLimMlmScanCnf;
 
 typedef struct sLimScanResult {
@@ -497,6 +502,9 @@ void lim_send_disassoc_mgmt_frame(tpAniSirGlobal, uint16_t, tSirMacAddr,
 				  tpPESession, bool waitForAck);
 void lim_send_deauth_mgmt_frame(tpAniSirGlobal, uint16_t, tSirMacAddr, tpPESession,
 				bool waitForAck);
+
+void lim_process_mlm_update_hidden_ssid_rsp(tpAniSirGlobal mac_ctx,
+		struct scheduler_msg *msg);
 
 tSirResultCodes lim_mlm_add_bss(tpAniSirGlobal, tLimMlmStartReq *,
 				tpPESession psessionEntry);

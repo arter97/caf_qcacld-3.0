@@ -197,6 +197,7 @@ typedef enum {
  * @SIR_ROAMING_START: Firmware started roaming operation
  * @SIR_ROAMING_ABORT: Firmware aborted roaming operation, still connected.
  * @SIR_ROAM_SYNCH_COMPLETE: Roam sync propagation is complete.
+ * @SIR_ROAMING_INVOKE_FAIL: Firmware roaming failed.
  */
 enum sir_roam_op_code {
 	SIR_ROAM_SYNCH_PROPAGATION = 1,
@@ -205,6 +206,7 @@ enum sir_roam_op_code {
 	SIR_ROAMING_ABORT,
 	SIR_ROAM_SYNCH_COMPLETE,
 	SIR_ROAM_SYNCH_NAPI_OFF,
+	SIR_ROAMING_INVOKE_FAIL,
 };
 /**
  * Module ID definitions.
@@ -1195,8 +1197,13 @@ typedef struct sSirSmeJoinReq {
 	tAniBool spectrumMgtIndicator;
 	tSirMacPowerCapInfo powerCap;
 	tSirSupChnl supportedChannels;
+	bool enable_bcast_probe_rsp;
 	tSirBssDescription bssDescription;
-
+	/*
+	 * WARNING: Pls make bssDescription as last variable in struct
+	 * tSirSmeJoinReq as it has ieFields followed after this bss
+	 * description. Adding a variable after this corrupts the ieFields
+	 */
 } tSirSmeJoinReq, *tpSirSmeJoinReq;
 
 /* / Definition for reponse message to previously issued join request */
@@ -2554,6 +2561,14 @@ typedef struct sSirUpdateAPWPSIEsReq {
 	tSirAPWPSIEs APWPSIEs;
 } tSirUpdateAPWPSIEsReq, *tpSirUpdateAPWPSIEsReq;
 
+struct update_config {
+	uint16_t messageType;   /* eWNI_SME_UPDATE_CONFIG */
+	uint16_t length;
+	uint8_t sme_session_id;
+	uint16_t capab;
+	uint32_t value;
+};
+
 /*
  * enum sir_update_session_param_type - session param type
  * @SIR_PARAM_SSID_HIDDEN: ssidHidden parameter
@@ -2956,6 +2971,18 @@ struct roam_ext_params {
 	int traffic_threshold;
 };
 
+/**
+ * struct pmkid_mode_bits - Bit flags for PMKID usage in RSN IE
+ * @fw_okc: Opportunistic key caching enable in firmware
+ * @fw_pmksa_cache: PMKSA caching enable in firmware, remember previously
+ *                  visited BSSID/PMK pairs
+ */
+struct pmkid_mode_bits {
+	uint32_t fw_okc:1;
+	uint32_t fw_pmksa_cache:1;
+	uint32_t unused:30;
+};
+
 typedef struct sSirRoamOffloadScanReq {
 	uint16_t message_type;
 	uint16_t length;
@@ -3000,7 +3027,7 @@ typedef struct sSirRoamOffloadScanReq {
 	uint8_t R0KH_ID[SIR_ROAM_R0KH_ID_MAX_LEN];
 	uint32_t R0KH_ID_Length;
 	uint8_t RoamKeyMgmtOffloadEnabled;
-	bool okc_enabled;
+	struct pmkid_mode_bits pmkid_modes;
 #endif
 	struct roam_ext_params roam_params;
 	uint8_t  middle_of_roaming;
@@ -3030,60 +3057,6 @@ typedef struct sSirRoamOffloadScanRsp {
 #define    SIR_MAX_NUM_MULTICAST_ADDRESS    240
 #define    SIR_MAX_NUM_FILTERS               20
 #define    SIR_MAX_NUM_TESTS_PER_FILTER      10
-
-/* */
-/* Receive Filter Parameters */
-/* */
-typedef enum {
-	SIR_RCV_FILTER_TYPE_INVALID,
-	SIR_RCV_FILTER_TYPE_FILTER_PKT,
-	SIR_RCV_FILTER_TYPE_BUFFER_PKT,
-	SIR_RCV_FILTER_TYPE_MAX_ENUM_SIZE
-} eSirReceivePacketFilterType;
-
-typedef enum {
-	SIR_FILTER_HDR_TYPE_INVALID,
-	SIR_FILTER_HDR_TYPE_MAC,
-	SIR_FILTER_HDR_TYPE_ARP,
-	SIR_FILTER_HDR_TYPE_IPV4,
-	SIR_FILTER_HDR_TYPE_IPV6,
-	SIR_FILTER_HDR_TYPE_UDP,
-	SIR_FILTER_HDR_TYPE_MAX
-} eSirRcvPktFltProtocolType;
-
-typedef enum {
-	SIR_FILTER_CMP_TYPE_INVALID,
-	SIR_FILTER_CMP_TYPE_EQUAL,
-	SIR_FILTER_CMP_TYPE_MASK_EQUAL,
-	SIR_FILTER_CMP_TYPE_NOT_EQUAL,
-	SIR_FILTER_CMP_TYPE_MASK_NOT_EQUAL,
-	SIR_FILTER_CMP_TYPE_MAX
-} eSirRcvPktFltCmpFlagType;
-
-typedef struct sSirRcvPktFilterFieldParams {
-	eSirRcvPktFltProtocolType protocolLayer;
-	eSirRcvPktFltCmpFlagType cmpFlag;
-	/* Length of the data to compare */
-	uint16_t dataLength;
-	/* from start of the respective frame header */
-	uint8_t dataOffset;
-	/* Reserved field */
-	uint8_t reserved;
-	/* Data to compare */
-	uint8_t compareData[SIR_MAX_FILTER_TEST_DATA_LEN];
-	/* Mask to be applied on the received packet data before compare */
-	uint8_t dataMask[SIR_MAX_FILTER_TEST_DATA_LEN];
-} tSirRcvPktFilterFieldParams, *tpSirRcvPktFilterFieldParams;
-
-typedef struct sSirRcvPktFilterCfg {
-	uint8_t filterId;
-	eSirReceivePacketFilterType filterType;
-	uint32_t numFieldParams;
-	uint32_t coalesceTime;
-	struct qdf_mac_addr self_macaddr;
-	struct qdf_mac_addr bssid;      /* Bssid of the connected AP */
-	tSirRcvPktFilterFieldParams paramsData[SIR_MAX_NUM_TESTS_PER_FILTER];
-} tSirRcvPktFilterCfgType, *tpSirRcvPktFilterCfgType;
 
 /* */
 /* Filter Packet Match Count Parameters */
@@ -3546,6 +3519,7 @@ typedef struct sSirScanOffloadReq {
 	enum wmi_dwelltime_adaptive_mode scan_adaptive_dwell_mode;
 	uint16_t uIEFieldLen;
 	uint16_t uIEFieldOffset;
+	uint32_t burst_scan_duration;
 	tSirChannelList channelList;
 	/*-----------------------------
 	  sSirScanOffloadReq....
@@ -3993,6 +3967,7 @@ typedef struct sSirSmeRoamOffloadSynchInd {
 	tpSirSmeJoinRsp join_rsp;
 	uint16_t aid;
 	struct sir_hw_mode_trans_ind hw_mode_trans_ind;
+	uint8_t nss;
 } roam_offload_synch_ind;
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
@@ -4869,6 +4844,9 @@ typedef struct {
 	/* tx time (in milliseconds) per TPC level (0.5 dBm) */
 	uint32_t tx_time_per_tpc[MAX_TPC_LEVELS];
 
+	uint32_t on_time_host_scan;
+	uint32_t on_time_lpi_scan;
+
 	/* channel statistics tSirWifiChannelStats */
 	tSirWifiChannelStats *channels;
 } tSirWifiRadioStat, *tpSirWifiRadioStat;
@@ -4928,6 +4906,22 @@ typedef struct {
 	/* per rate statistics, number of entries  = num_rate */
 	tSirWifiRateStat rateStats[0];
 } tSirWifiPeerInfo, *tpSirWifiPeerInfo;
+
+/**
+ * struct wifi_iface_offload_stat - Wifi Iface offload statistics
+ * @type: type of offload stats (enum wmi_offload_stats_type)
+ * @rx_count: Number of (MSDUs) frames Received
+ * @drp_count: Number of frames Dropped
+ * @fwd_count:
+ *  Number of frames for which FW Responded (Valid for ARP and NS only).(or)
+ *  Number of frames forwarded to Host (Valid for stats type except ARP and NS).
+ */
+struct wifi_iface_offload_stat {
+	wmi_offload_stats_type type;
+	uint32_t rx_count;
+	uint32_t drp_count;
+	uint32_t fwd_count;
+};
 
 /* per access category statistics */
 typedef struct {
@@ -5027,8 +5021,23 @@ typedef struct {
 	uint32_t rts_fail_cnt;
 	uint32_t ppdu_succ_cnt;
 	uint32_t ppdu_fail_cnt;
+
+	uint32_t tx_rts_succ_cnt;
+	uint32_t tx_rts_fail_cnt;
+	uint32_t tx_ppdu_succ_cnt;
+	uint32_t tx_ppdu_fail_cnt;
+	uint32_t connected_duration;
+	uint32_t disconnected_duration;
+	uint32_t rtt_ranging_duration;
+	uint32_t rtt_responder_duration;
+	uint32_t num_probes_tx;
+	uint32_t num_beacon_miss;
+
 	/* per ac data packet statistics */
 	tSirWifiWmmAcStat AccessclassStats[WIFI_AC_MAX];
+
+	uint32_t num_offload_stats;
+	struct wifi_iface_offload_stat offload_stat[WMI_OFFLOAD_STATS_TYPE_MAX];
 } tSirWifiIfaceStat, *tpSirWifiIfaceStat;
 
 /* Peer statistics - corresponding to 3rd most LSB in
@@ -5676,6 +5685,17 @@ struct rssi_breach_event {
 	struct qdf_mac_addr  curr_bssid;
 };
 
+/**
+ * struct chip_pwr_save_fail_detected_params - chip power save failure detected
+ * event params
+ * @failure_reason_code:failure reason code
+ * @wake_lock_bitmap:bitmap for modules voting against sleep for long duration.
+ */
+struct chip_pwr_save_fail_detected_params {
+	uint32_t     failure_reason_code;
+	uint32_t     wake_lock_bitmap[4];
+};
+
 #define MAX_NUM_FW_SEGMENTS 4
 
 /**
@@ -5735,7 +5755,7 @@ struct fw_dump_rsp {
 #define DEFAULT_SCAN_IE_ID 256
 
  /* MAX_DEFAULT_SCAN_IE_LEN - Maxmimum length of Default Scan IE's */
-#define MAX_DEFAULT_SCAN_IE_LEN 1024
+#define MAX_DEFAULT_SCAN_IE_LEN 2048
 
  /* Extended Capabilities IE header(IE Id + IE Length) length */
 #define EXT_CAP_IE_HDR_LEN 2
@@ -6356,6 +6376,7 @@ struct sir_bpf_get_offload {
  * @wow_pno_complete_wake_up_count: pno complete wakeup count
  * @wow_pno_match_wake_up_count: pno match wakeup count
  * @wow_oem_response_wake_up_count: oem response wakeup count
+ * @pwr_save_fail_detected: pwr save fail detected wakeup count
  */
 struct sir_wake_lock_stats {
 	uint32_t wow_unspecified_wake_up_count;
@@ -6374,6 +6395,7 @@ struct sir_wake_lock_stats {
 	uint32_t wow_pno_complete_wake_up_count;
 	uint32_t wow_pno_match_wake_up_count;
 	uint32_t wow_oem_response_wake_up_count;
+	uint32_t pwr_save_fail_detected;
 };
 
 /**
@@ -6410,6 +6432,7 @@ struct sir_vdev_wow_stats {
 	uint32_t pno_complete;
 	uint32_t pno_match;
 	uint32_t oem_response;
+	uint32_t pwr_save_fail_detected;
 };
 
 /**
@@ -7225,5 +7248,39 @@ enum scan_reject_states {
 	REASSOC_IN_PROGRESS,
 	EAPOL_IN_PROGRESS,
 	SAP_EAPOL_IN_PROGRESS,
+};
+
+/**
+ * sir_sme_rx_aggr_hole_ind - sme rx aggr hole indication
+ * @hole_cnt: num of holes detected
+ * @hole_info_array: hole info
+ */
+struct sir_sme_rx_aggr_hole_ind {
+	uint32_t hole_cnt;
+	uint32_t hole_info_array[];
+};
+
+/**
+ * struct sir_set_rx_reorder_timeout_val - rx reorder timeout
+ * @rx_timeout_pri: reorder timeout for AC
+ *                  rx_timeout_pri[0] : AC_VO
+ *                  rx_timeout_pri[1] : AC_VI
+ *                  rx_timeout_pri[2] : AC_BE
+ *                  rx_timeout_pri[3] : AC_BK
+ */
+struct sir_set_rx_reorder_timeout_val {
+	uint32_t rx_timeout_pri[4];
+};
+
+/**
+ * struct sir_peer_set_rx_blocksize - set rx blocksize
+ * @vdev_id: vdev id
+ * @peer_macaddr: peer mac address
+ * @rx_block_ack_win_limit: windows size limitation
+ */
+struct sir_peer_set_rx_blocksize {
+	uint32_t vdev_id;
+	struct qdf_mac_addr peer_macaddr;
+	uint32_t rx_block_ack_win_limit;
 };
 #endif /* __SIR_API_H */

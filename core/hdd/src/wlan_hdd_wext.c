@@ -82,6 +82,7 @@
 #include "sme_power_save_api.h"
 #include "wlan_policy_mgr_api.h"
 #include "wlan_hdd_conc_ut.h"
+#include "wlan_hdd_fips.h"
 #include "wlan_hdd_tsf.h"
 #include "wlan_hdd_ocb.h"
 #include "wlan_hdd_napi.h"
@@ -2534,6 +2535,28 @@ static const struct ccp_freq_chan_map freq_chan_map[] = {
 #define MAX_VAR_ARGS         9
 #endif
 
+/*
+ * <ioctl>
+ * fips_test - Perform a FIPS test
+ *
+ * @INPUT: Binary representation of the following packed structure
+ *
+ * @OUTPUT: Binary representation of the following packed structure
+ *
+ * This IOCTL is used to perform FIPS certification testing
+ *
+ * @E.g: iwpriv wlan0 fips_test <test vector>
+ *
+ * iwpriv wlan0 fips_test <tbd>
+ *
+ * Supported Feature: FIPS
+ *
+ * Usage: Internal
+ *
+ * </ioctl>
+ */
+#define WLAN_PRIV_FIPS_TEST (SIOCIWFIRSTPRIV +  8)
+
 /* Private ioctls (with no sub-ioctls) */
 /* note that they must be odd so that they have "get" semantics */
 /*
@@ -2627,7 +2650,6 @@ static const struct ccp_freq_chan_map freq_chan_map[] = {
  */
 #define WLAN_PRIV_GET_TSPEC (SIOCIWFIRSTPRIV + 13)
 
-/* (SIOCIWFIRSTPRIV + 8)  is currently unused */
 /* (SIOCIWFIRSTPRIV + 10) is currently unused */
 /* (SIOCIWFIRSTPRIV + 12) is currently unused */
 /* (SIOCIWFIRSTPRIV + 14) is currently unused */
@@ -3270,8 +3292,9 @@ hdd_wlan_get_ibss_mac_addr_from_staid(hdd_adapter_t *pAdapter,
 	hdd_station_ctx_t *pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
 
 	for (idx = 0; idx < MAX_PEERS; idx++) {
-		if (0 != pHddStaCtx->conn_info.staId[idx] &&
-		    staIdx == pHddStaCtx->conn_info.staId[idx]) {
+		if (HDD_WLAN_INVALID_STA_ID !=
+				pHddStaCtx->conn_info.staId[idx] &&
+				staIdx == pHddStaCtx->conn_info.staId[idx]) {
 			return &pHddStaCtx->conn_info.peerMacAddress[idx];
 		}
 	}
@@ -3978,7 +4001,7 @@ uint8_t *wlan_hdd_get_vendor_oui_ie_ptr(uint8_t *oui, uint8_t oui_size,
 				eid, elem_len, left);
 			return NULL;
 		}
-		if (elem_id == eid) {
+		if ((elem_id == eid) && (elem_len >= oui_size)) {
 			if (memcmp(&ptr[2], oui, oui_size) == 0)
 				return ptr;
 		}
@@ -10130,7 +10153,8 @@ static int __iw_get_char_setnone(struct net_device *dev,
 		int length = 0, buf = 0;
 
 		for (idx = 0; idx < MAX_PEERS; idx++) {
-			if (0 != pHddStaCtx->conn_info.staId[idx]) {
+			if (HDD_WLAN_INVALID_STA_ID !=
+					pHddStaCtx->conn_info.staId[idx]) {
 				buf = snprintf
 					      ((extra + length),
 					      WE_MAX_STR_LEN - length,
@@ -11607,9 +11631,10 @@ static int wlan_hdd_set_filter(hdd_context_t *hdd_ctx,
 				struct pkt_filter_cfg *request,
 				uint8_t sessionId)
 {
-	tSirRcvPktFilterCfgType packetFilterSetReq = {0};
-	tSirRcvFltPktClearParam packetFilterClrReq = {0};
+	struct pmo_rcv_pkt_fltr_cfg *pmo_set_pkt_fltr_req = NULL;
+	struct pmo_rcv_pkt_fltr_clear_param *pmo_clr_pkt_fltr_param = NULL;
 	int i = 0;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	if (hdd_ctx->config->disablePacketFilter) {
 		hdd_warn("Packet filtering disabled in ini");
@@ -11625,25 +11650,33 @@ static int wlan_hdd_set_filter(hdd_context_t *hdd_ctx,
 		hdd_debug("Set Packet Filter Request for Id: %d",
 			request->filter_id);
 
-		packetFilterSetReq.filterId = request->filter_id;
+		pmo_set_pkt_fltr_req =
+			qdf_mem_malloc(sizeof(*pmo_set_pkt_fltr_req));
+		if (!pmo_set_pkt_fltr_req) {
+			pmo_err("unable to allocate pmo_set_pkt_fltr_req");
+			return QDF_STATUS_E_NOMEM;
+		}
+
+		pmo_set_pkt_fltr_req->filter_id = request->filter_id;
 		if (request->num_params >= HDD_MAX_CMP_PER_PACKET_FILTER) {
 			hdd_err("Number of Params exceed Max limit %d",
 				request->num_params);
-			return -EINVAL;
+			status = QDF_STATUS_E_INVAL;
+			goto out;
 		}
-		packetFilterSetReq.numFieldParams = request->num_params;
-		packetFilterSetReq.coalesceTime = 0;
-		packetFilterSetReq.filterType = HDD_RCV_FILTER_SET;
+		pmo_set_pkt_fltr_req->num_params = request->num_params;
+		pmo_set_pkt_fltr_req->coalesce_time = 0;
+		pmo_set_pkt_fltr_req->filter_type = HDD_RCV_FILTER_SET;
 		for (i = 0; i < request->num_params; i++) {
-			packetFilterSetReq.paramsData[i].protocolLayer =
+			pmo_set_pkt_fltr_req->params_data[i].protocol_layer =
 				request->params_data[i].protocol_layer;
-			packetFilterSetReq.paramsData[i].cmpFlag =
+			pmo_set_pkt_fltr_req->params_data[i].compare_flag =
 				request->params_data[i].compare_flag;
-			packetFilterSetReq.paramsData[i].dataOffset =
+			pmo_set_pkt_fltr_req->params_data[i].data_offset =
 				request->params_data[i].data_offset;
-			packetFilterSetReq.paramsData[i].dataLength =
+			pmo_set_pkt_fltr_req->params_data[i].data_length =
 				request->params_data[i].data_length;
-			packetFilterSetReq.paramsData[i].reserved = 0;
+			pmo_set_pkt_fltr_req->params_data[i].reserved = 0;
 
 			if (request->params_data[i].data_offset >
 			    SIR_MAX_FILTER_TEST_DATA_OFFSET) {
@@ -11651,36 +11684,41 @@ static int wlan_hdd_set_filter(hdd_context_t *hdd_ctx,
 					request->params_data[i].data_offset,
 					i,
 					SIR_MAX_FILTER_TEST_DATA_OFFSET);
-				return -EINVAL;
+				status = QDF_STATUS_E_INVAL;
+				goto out;
 			}
 
 			if (request->params_data[i].data_length >
 				SIR_MAX_FILTER_TEST_DATA_LEN) {
 				hdd_err("Error invalid data length %d",
 					request->params_data[i].data_length);
-				return -EINVAL;
+				status = QDF_STATUS_E_INVAL;
+				goto out;
 			}
 
 			hdd_debug("Proto %d Comp Flag %d Filter Type %d",
 				request->params_data[i].protocol_layer,
 				request->params_data[i].compare_flag,
-				packetFilterSetReq.filterType);
+				pmo_set_pkt_fltr_req->filter_type);
 
 			hdd_debug("Data Offset %d Data Len %d",
 				request->params_data[i].data_offset,
 				request->params_data[i].data_length);
 
-			if (sizeof(packetFilterSetReq.paramsData[i].compareData)
+			if (sizeof(
+			    pmo_set_pkt_fltr_req->params_data[i].compare_data)
 				< (request->params_data[i].data_length)) {
 				hdd_err("Error invalid data length %d",
 					request->params_data[i].data_length);
-				return -EINVAL;
+				status = QDF_STATUS_E_INVAL;
+				goto out;
 			}
 
-			memcpy(&packetFilterSetReq.paramsData[i].compareData,
+			memcpy(
+			    &pmo_set_pkt_fltr_req->params_data[i].compare_data,
 			       request->params_data[i].compare_data,
 			       request->params_data[i].data_length);
-			memcpy(&packetFilterSetReq.paramsData[i].dataMask,
+			memcpy(&pmo_set_pkt_fltr_req->params_data[i].data_mask,
 			       request->params_data[i].data_mask,
 			       request->params_data[i].data_length);
 
@@ -11702,26 +11740,35 @@ static int wlan_hdd_set_filter(hdd_context_t *hdd_ctx,
 		}
 
 		if (QDF_STATUS_SUCCESS !=
-			sme_receive_filter_set_filter(hdd_ctx->hHal,
-				&packetFilterSetReq,
+			pmo_ucfg_set_pkt_filter(hdd_ctx->hdd_psoc,
+				pmo_set_pkt_fltr_req,
 				sessionId)) {
 			hdd_err("Failure to execute Set Filter");
-			return -EINVAL;
+			status = QDF_STATUS_E_INVAL;
+			goto out;
 		}
 
 		break;
 
 	case HDD_RCV_FILTER_CLEAR:
-
 		hdd_debug("Clear Packet Filter Request for Id: %d",
 			request->filter_id);
-		packetFilterClrReq.filterId = request->filter_id;
+
+		pmo_clr_pkt_fltr_param = qdf_mem_malloc(
+					sizeof(*pmo_clr_pkt_fltr_param));
+		if (!pmo_clr_pkt_fltr_param) {
+			hdd_err("unable to allocate pmo_clr_pkt_fltr_param");
+			return QDF_STATUS_E_NOMEM;
+		}
+
+		pmo_clr_pkt_fltr_param->filter_id = request->filter_id;
 		if (QDF_STATUS_SUCCESS !=
-		    sme_receive_filter_clear_filter(hdd_ctx->hHal,
-						    &packetFilterClrReq,
-						    sessionId)) {
+			pmo_ucfg_clear_pkt_filter(hdd_ctx->hdd_psoc,
+			    pmo_clr_pkt_fltr_param,
+			    sessionId)) {
 			hdd_err("Failure to execute Clear Filter");
-			return -EINVAL;
+			status = QDF_STATUS_E_INVAL;
+			goto out;
 		}
 		break;
 
@@ -11730,7 +11777,14 @@ static int wlan_hdd_set_filter(hdd_context_t *hdd_ctx,
 		       request->filter_action);
 		return -EINVAL;
 	}
-	return 0;
+
+out:
+	if (pmo_set_pkt_fltr_req)
+		qdf_mem_free(pmo_set_pkt_fltr_req);
+	if (pmo_clr_pkt_fltr_param)
+		qdf_mem_free(pmo_clr_pkt_fltr_param);
+
+	return status;
 }
 
 /**
@@ -11777,6 +11831,11 @@ static int __iw_set_packet_filter_params(struct net_device *dev,
 		hdd_err("invalid priv data %p or invalid priv data length %d",
 			priv_data.pointer, priv_data.length);
 		return -EINVAL;
+	}
+
+	if (!hdd_conn_is_connected(WLAN_HDD_GET_STATION_CTX_PTR(adapter))) {
+		hdd_err("Packet filter not supported in disconnected state");
+		return -ENOTSUPP;
 	}
 
 	/* copy data using copy_from_user */
@@ -12659,7 +12718,8 @@ static int __iw_set_two_ints_getnone(struct net_device *dev,
 		hdd_debug("WE_DUMP_DP_TRACE_LEVEL: %d %d",
 		       value[1], value[2]);
 		if (value[1] == DUMP_DP_TRACE)
-			qdf_dp_trace_dump_all(value[2]);
+			qdf_dp_trace_dump_all(value[2],
+					QDF_TRACE_DEFAULT_PDEV_ID);
 		else if (value[1] == ENABLE_DP_TRACE_LIVE_MODE)
 			qdf_dp_trace_enable_live_mode();
 		else if (value[1] == CLEAR_DP_TRACE_BUFFER)
@@ -12734,13 +12794,8 @@ static const iw_handler we_handler[] = {
 	(iw_handler) iw_get_ap_address, /* SIOCGIWAP */
 	(iw_handler) iw_set_mlme,       /* SIOCSIWMLME */
 	(iw_handler) NULL,      /* SIOCGIWAPLIST */
-#ifndef NAPIER_SCAN
-	(iw_handler) iw_set_scan,       /* SIOCSIWSCAN */
-	(iw_handler) iw_get_scan,       /* SIOCGIWSCAN */
-#else
 	(iw_handler) NULL,       /* SIOCSIWSCAN */
 	(iw_handler) NULL,       /* SIOCGIWSCAN */
-#endif
 	(iw_handler) iw_set_essid,      /* SIOCSIWESSID */
 	(iw_handler) iw_get_essid,      /* SIOCGIWESSID */
 	(iw_handler) iw_set_nick,       /* SIOCSIWNICKN */
@@ -12785,6 +12840,7 @@ static const iw_handler we_private[] = {
 		iw_hdd_set_var_ints_getnone,
 	[WLAN_PRIV_SET_NONE_GET_THREE_INT - SIOCIWFIRSTPRIV] =
 							iw_setnone_get_threeint,
+	[WLAN_PRIV_FIPS_TEST - SIOCIWFIRSTPRIV] = hdd_fips_test,
 	[WLAN_PRIV_ADD_TSPEC - SIOCIWFIRSTPRIV] = iw_add_tspec,
 	[WLAN_PRIV_DEL_TSPEC - SIOCIWFIRSTPRIV] = iw_del_tspec,
 	[WLAN_PRIV_GET_TSPEC - SIOCIWFIRSTPRIV] = iw_get_tspec,
@@ -13809,6 +13865,12 @@ static const struct iw_priv_args we_private_args[] = {
 	 "gpio_control"},
 #endif
 	/* handlers for main ioctl */
+	{WLAN_PRIV_FIPS_TEST,
+	 IW_PRIV_TYPE_BYTE | WE_MAX_STR_LEN,
+	 IW_PRIV_TYPE_BYTE | WE_MAX_STR_LEN,
+	 "fips_test"},
+
+	/* handlers for main ioctl */
 	{WLAN_PRIV_ADD_TSPEC,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | HDD_WLAN_WMM_PARAM_COUNT,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
@@ -13967,6 +14029,11 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 "enable_range_ext"}
 	,
+
+	{WLAN_PRIV_SET_FTIES,
+	 IW_PRIV_TYPE_CHAR | MAX_FTIE_SIZE,
+	 0,
+	 "set_ft_ies"},
 };
 
 const struct iw_handler_def we_handler_def = {

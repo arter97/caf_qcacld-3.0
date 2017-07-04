@@ -1126,6 +1126,24 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 
 		pHostapdState->qdf_status =
 			pSapEvent->sapevt.sapStartBssCompleteEvent.status;
+
+		qdf_atomic_set(&pHddCtx->dfs_radar_found, 0);
+		wlansap_get_dfs_ignore_cac(pHddCtx->hHal, &ignoreCAC);
+
+		/* DFS requirement: DO NOT transmit during CAC. */
+		if ((CHANNEL_STATE_DFS !=
+			wlan_reg_get_channel_state(pHddCtx->hdd_pdev,
+				pHddApCtx->operatingChannel))
+			|| ignoreCAC
+			|| pHddCtx->dev_dfs_cac_status == DFS_CAC_ALREADY_DONE)
+			pHddApCtx->dfs_cac_block_tx = false;
+		else
+			pHddApCtx->dfs_cac_block_tx = true;
+
+		hdd_debug("The value of dfs_cac_block_tx[%d] for ApCtx[%p]:%d",
+				pHddApCtx->dfs_cac_block_tx, pHddApCtx,
+				pHostapdAdapter->sessionId);
+
 		if (pHostapdState->qdf_status) {
 			hdd_err("startbss event failed!!");
 			/*
@@ -1242,24 +1260,6 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 					hdd_err("set_key failed idx: %d", i);
 			}
 		}
-
-		qdf_atomic_set(&pHddCtx->dfs_radar_found, 0);
-
-		wlansap_get_dfs_ignore_cac(pHddCtx->hHal, &ignoreCAC);
-
-		/* DFS requirement: DO NOT transmit during CAC. */
-		if ((CHANNEL_STATE_DFS !=
-			wlan_reg_get_channel_state(pHddCtx->hdd_pdev,
-				pHddApCtx->operatingChannel))
-			|| ignoreCAC
-			|| pHddCtx->dev_dfs_cac_status == DFS_CAC_ALREADY_DONE)
-			pHddApCtx->dfs_cac_block_tx = false;
-		else
-			pHddApCtx->dfs_cac_block_tx = true;
-
-		hdd_debug("The value of dfs_cac_block_tx[%d] for ApCtx[%p]:%d",
-				pHddApCtx->dfs_cac_block_tx, pHddApCtx,
-				pHostapdAdapter->sessionId);
 
 		if ((CHANNEL_STATE_DFS == wlan_reg_get_channel_state(
 						pHddCtx->hdd_pdev,
@@ -1599,6 +1599,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 
 		DPTRACE(qdf_dp_trace_mgmt_pkt(QDF_DP_TRACE_MGMT_PACKET_RECORD,
 			pHostapdAdapter->sessionId,
+			QDF_TRACE_DEFAULT_PDEV_ID,
 			QDF_PROTO_TYPE_MGMT, QDF_PROTO_MGMT_ASSOC));
 
 #ifdef MSM_PLATFORM
@@ -1753,6 +1754,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 #endif
 		DPTRACE(qdf_dp_trace_mgmt_pkt(QDF_DP_TRACE_MGMT_PACKET_RECORD,
 			pHostapdAdapter->sessionId,
+			QDF_TRACE_DEFAULT_PDEV_ID,
 			QDF_PROTO_TYPE_MGMT, QDF_PROTO_MGMT_DISASSOC));
 
 		hdd_softap_deregister_sta(pHostapdAdapter, staId);
@@ -2136,9 +2138,6 @@ stopbss:
 		we_custom_event_generic = we_custom_event;
 		wireless_send_event(dev, we_event, &wrqu,
 				    (char *)we_custom_event_generic);
-		policy_mgr_decr_session_set_pcl(pHddCtx->hdd_psoc,
-					 pHostapdAdapter->device_mode,
-					 pHostapdAdapter->sessionId);
 
 		/* once the event is set, structure dev/pHostapdAdapter should
 		 * not be touched since they are now subject to being deleted
@@ -2390,7 +2389,7 @@ void sap_restart_chan_switch_cb (struct wlan_objmgr_psoc *psoc,
 QDF_STATUS wlan_hdd_get_channel_for_sap_restart(
 				struct wlan_objmgr_psoc *psoc,
 				uint8_t vdev_id, uint8_t *channel,
-				uint8_t *sec_ch, bool restart_sap)
+				uint8_t *sec_ch)
 {
 	tHalHandle *hal_handle;
 	hdd_ap_ctx_t *hdd_ap_ctx;
@@ -2440,13 +2439,10 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(
 	*channel = hdd_ap_ctx->sapConfig.channel;
 	*sec_ch = hdd_ap_ctx->sapConfig.sec_ch;
 
-	if (restart_sap) {
-		hdd_info("Restart SAP as a part of channel switch");
-		sap_restart_chan_switch_cb(psoc, vdev_id,
-			hdd_ap_ctx->sapConfig.channel,
-			hdd_ap_ctx->sapConfig.ch_params.ch_width);
-
-	}
+	hdd_info("SAP channel change with CSA/ECSA");
+	sap_restart_chan_switch_cb(psoc, vdev_id,
+		hdd_ap_ctx->sapConfig.channel,
+		hdd_ap_ctx->sapConfig.ch_params.ch_width);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2603,7 +2599,8 @@ static int __iw_softap_set_two_ints_getnone(struct net_device *dev,
 		hdd_debug("WE_DUMP_DP_TRACE: %d %d",
 		       value[1], value[2]);
 		if (value[1] == DUMP_DP_TRACE)
-			qdf_dp_trace_dump_all(value[2]);
+			qdf_dp_trace_dump_all(value[2],
+				QDF_TRACE_DEFAULT_PDEV_ID);
 		else if (value[1] == ENABLE_DP_TRACE_LIVE_MODE)
 			qdf_dp_trace_enable_live_mode();
 		else if (value[1] == CLEAR_DP_TRACE_BUFFER)
@@ -3381,6 +3378,18 @@ static __iw_softap_setparam(struct net_device *dev,
 		ret = wma_cli_set_command(pHostapdAdapter->sessionId,
 					  WMI_VDEV_PARAM_HE_RANGE_EXT,
 					  set_value, VDEV_CMD);
+		break;
+	case QCSAP_SET_DEFAULT_AMPDU:
+		hdd_notice("QCSAP_SET_DEFAULT_AMPDU val %d", set_value);
+		ret = wma_cli_set_command((int)pHostapdAdapter->sessionId,
+				(int)WMI_PDEV_PARAM_MAX_MPDUS_IN_AMPDU,
+				set_value, PDEV_CMD);
+		break;
+	case QCSAP_ENABLE_RTS_BURSTING:
+		hdd_notice("QCSAP_ENABLE_RTS_BURSTING val %d", set_value);
+		ret = wma_cli_set_command((int)pHostapdAdapter->sessionId,
+				(int)WMI_PDEV_PARAM_ENABLE_RTS_SIFS_BURSTING,
+				set_value, PDEV_CMD);
 		break;
 	default:
 		hdd_err("Invalid setparam command %d value %d",
@@ -5897,6 +5906,16 @@ static const struct iw_priv_args hostapd_private_args[] = {
 		0, "enable_range_ext"
 	}
 	,
+	{	QCSAP_SET_DEFAULT_AMPDU,
+		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+		0, "def_ampdu"
+	}
+	,
+	{	QCSAP_ENABLE_RTS_BURSTING,
+		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+		0, "rts_bursting"
+	}
+	,
 };
 
 static const iw_handler hostapd_private[] = {
@@ -6669,7 +6688,7 @@ static void wlan_hdd_add_hostapd_conf_vsie(hdd_adapter_t *pHostapdAdapter,
 		elem_id = ptr[0];
 		elem_len = ptr[1];
 		left -= 2;
-		if (elem_len > left) {
+		if (elem_len > left || elem_len < WPS_OUI_TYPE_SIZE) {
 			hdd_err("**Invalid IEs eid: %d elem_len: %d left: %d**",
 				elem_id, elem_len, left);
 			return;
@@ -6992,8 +7011,8 @@ int wlan_hdd_cfg80211_update_apies(hdd_adapter_t *adapter)
 	proberesp_ies = qdf_mem_malloc(beacon->proberesp_ies_len +
 				      MAX_GENIE_LEN);
 	if (proberesp_ies == NULL) {
-		hdd_err("mem alloc failed for probe resp ies %d",
-			proberesp_ies_len);
+		hdd_err("mem alloc failed for probe resp ies, size: %d",
+			beacon->proberesp_ies_len + MAX_GENIE_LEN);
 		ret = -EINVAL;
 		goto done;
 	}
@@ -8032,6 +8051,32 @@ error:
 	return ret;
 }
 
+static int hdd_destroy_acs_timer(hdd_adapter_t *adapter)
+{
+	QDF_STATUS qdf_status = QDF_STATUS_E_FAILURE;
+
+	if (!adapter->sessionCtx.ap.vendor_acs_timer_initialized)
+		return 0;
+
+	adapter->sessionCtx.ap.vendor_acs_timer_initialized = false;
+
+	if (QDF_TIMER_STATE_RUNNING ==
+			adapter->sessionCtx.ap.vendor_acs_timer.state) {
+		qdf_status =
+			qdf_mc_timer_stop(&adapter->sessionCtx.ap.
+					vendor_acs_timer);
+		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
+			hdd_err("Failed to stop ACS timer");
+	}
+
+	if (adapter->sessionCtx.ap.vendor_acs_timer.user_data)
+		qdf_mem_free(adapter->sessionCtx.ap.vendor_acs_timer.user_data);
+
+	qdf_mc_timer_destroy(&adapter->sessionCtx.ap.vendor_acs_timer);
+
+	return 0;
+}
+
 /**
  * __wlan_hdd_cfg80211_stop_ap() - stop soft ap
  * @wiphy: Pointer to wiphy structure
@@ -8205,7 +8250,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	}
 	/* Reset WNI_CFG_PROBE_RSP Flags */
 	wlan_hdd_reset_prob_rspies(pAdapter);
-
+	hdd_destroy_acs_timer(pAdapter);
 #ifdef WLAN_FEATURE_P2P_DEBUG
 	if ((pAdapter->device_mode == QDF_P2P_GO_MODE) &&
 	    (global_p2p_connection_status == P2P_GO_COMPLETED_STATE)) {
@@ -8429,6 +8474,8 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	    ) {
 		beacon_data_t *old, *new;
 		enum nl80211_channel_type channel_type;
+		tsap_Config_t *sap_config =
+			&((WLAN_HDD_GET_AP_CTX_PTR(pAdapter))->sapConfig);
 
 		old = pAdapter->sessionCtx.ap.beacon;
 
@@ -8478,7 +8525,15 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 				&params->beacon,
 				params->ssid, params->ssid_len,
 				params->hidden_ssid, true, false);
-
+		/*
+		 * If Do_Not_Break_Stream enabled send avoid channel list
+		 * to application.
+		 */
+		if (policy_mgr_is_dnsc_set(pAdapter->hdd_vdev) &&
+		    sap_config->channel) {
+			wlan_hdd_send_avoid_freq_for_dnbs(pHddCtx,
+							  sap_config->channel);
+		}
 		if (pHddCtx->config->sap_max_inactivity_override) {
 			sta_inactivity_timer = qdf_mem_malloc(
 					sizeof(*sta_inactivity_timer));

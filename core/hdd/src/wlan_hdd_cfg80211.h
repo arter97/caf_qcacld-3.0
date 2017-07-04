@@ -81,6 +81,9 @@
 #define WMM_OUI_TYPE   "\x00\x50\xf2\x02\x01"
 #define WMM_OUI_TYPE_SIZE  5
 
+#define VENDOR1_AP_OUI_TYPE "\x00\xE0\x4C"
+#define VENDOR1_AP_OUI_TYPE_SIZE 3
+
 #define WLAN_BSS_MEMBERSHIP_SELECTOR_VHT_PHY 126
 #define WLAN_BSS_MEMBERSHIP_SELECTOR_HT_PHY 127
 #define BASIC_RATE_MASK   0x80
@@ -113,6 +116,8 @@ static inline void wlan_hdd_clear_link_layer_stats(hdd_adapter_t *adapter) {}
 #if defined(CFG80211_DEL_STA_V2) || (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0)) || defined(WITH_BACKPORTS)
 #define USE_CFG80211_DEL_STA_V2
 #endif
+
+#define OL_TXRX_INVALID_TDLS_PEER_ID 0xff
 
 /**
  * enum eDFS_CAC_STATUS: CAC status
@@ -167,7 +172,6 @@ typedef enum {
 #define WIFI_TDLS_EXTERNAL_CONTROL_SUPPORT	BIT(1)
 #define WIIF_TDLS_OFFCHANNEL_SUPPORT		BIT(2)
 
-#if defined(FEATURE_WLAN_CH_AVOID) || defined(FEATURE_WLAN_FORCE_SAP_SCC)
 #define HDD_MAX_AVOID_FREQ_RANGES   4
 /**
  * typedef struct sHddAvoidFreqRange - avoid frequency range
@@ -190,7 +194,6 @@ typedef struct sHddAvoidFreqList {
 	u32 avoidFreqRangeCount;
 	tHddAvoidFreqRange avoidFreqRange[HDD_MAX_AVOID_FREQ_RANGES];
 } tHddAvoidFreqList;
-#endif /* FEATURE_WLAN_CH_AVOID || FEATURE_WLAN_FORCE_SAP_SCC */
 
 #define CFG_NON_AGG_RETRY_MAX                  (31)
 #define CFG_AGG_RETRY_MAX                      (31)
@@ -267,7 +270,19 @@ void hdd_select_cbmode(hdd_adapter_t *pAdapter, uint8_t operationChannel,
 
 uint8_t *wlan_hdd_cfg80211_get_ie_ptr(const uint8_t *ies_ptr, int length,
 				      uint8_t eid);
-
+/**
+ * wlan_hdd_is_ap_supports_immediate_power_save() - to find certain vendor APs
+ *				which do not support immediate power-save.
+ * @ies: beacon IE of the AP which STA is connecting/connected to
+ * @length: beacon IE length only
+ *
+ * This API takes the IE of connected/connecting AP and determines that
+ * whether it has specific vendor OUI. If it finds then it will return false to
+ * notify that AP doesn't support immediate power-save.
+ *
+ * Return: true or false based on findings
+ */
+bool wlan_hdd_is_ap_supports_immediate_power_save(uint8_t *ies, int length);
 void wlan_hdd_del_station(hdd_adapter_t *adapter);
 
 #if defined(USE_CFG80211_DEL_STA_V2)
@@ -291,10 +306,10 @@ int wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 void wlan_hdd_testmode_rx_event(void *buf, size_t buf_len);
 #endif
 
-#if defined(FEATURE_WLAN_CH_AVOID) || defined(FEATURE_WLAN_FORCE_SAP_SCC)
 int wlan_hdd_send_avoid_freq_event(hdd_context_t *pHddCtx,
 				tHddAvoidFreqList * pAvoidFreqList);
-#endif /* FEATURE_WLAN_CH_AVOID || FEATURE_WLAN_FORCE_SAP_SCC */
+
+int wlan_hdd_send_avoid_freq_for_dnbs(hdd_context_t *pHddCtx, uint8_t op_chan);
 
 #ifdef FEATURE_WLAN_EXTSCAN
 void wlan_hdd_cfg80211_extscan_callback(void *ctx,
@@ -499,4 +514,28 @@ int wlan_cfg80211_tdls_mgmt(struct wlan_objmgr_pdev *pdev,
  */
 void hdd_update_cca_info_cb(void *context, uint32_t congestion,
 			uint32_t vdev_id);
+
+/**
+ * wlan_hdd_get_adjacent_chan(): Gets next/previous channel
+ * to the channel passed.
+ * @chan: Channel
+ * @upper: If "true" then next channel is returned or else
+ * previous channel is returned.
+ *
+ * This function returns the next/previous adjacent-channel to
+ * the channel passed. If "upper = true" then next channel is
+ * returned else previous is returned.
+ */
+int wlan_hdd_get_adjacent_chan(uint8_t chan, bool upper);
+
+/**
+ * wlan_hdd_merge_avoid_freqs(): Merge two tHddAvoidFreqList
+ * @destFreqList: Destination list in which merged frequency
+ * list will be available.
+ * @srcFreqList: Source frequency list.
+ *
+ * Merges two avoid_frequency lists
+ */
+int wlan_hdd_merge_avoid_freqs(tHddAvoidFreqList *destFreqList,
+		tHddAvoidFreqList *srcFreqList);
 #endif

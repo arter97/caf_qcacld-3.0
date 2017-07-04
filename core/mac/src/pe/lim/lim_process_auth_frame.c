@@ -428,6 +428,22 @@ static void lim_process_auth_frame_type1(tpAniSirGlobal mac_ctx,
 	if (lim_is_auth_algo_supported(mac_ctx,
 			(tAniAuthType) rx_auth_frm_body->authAlgoNumber,
 			pe_session)) {
+
+		if (lim_get_session_by_macaddr(mac_ctx, mac_hdr->sa)) {
+
+			auth_frame->authAlgoNumber =
+				rx_auth_frm_body->authAlgoNumber;
+			auth_frame->authTransactionSeqNumber =
+				rx_auth_frm_body->authTransactionSeqNumber + 1;
+			auth_frame->authStatusCode =
+				eSIR_MAC_WME_INVALID_PARAMS_STATUS;
+
+			lim_send_auth_mgmt_frame(mac_ctx, auth_frame,
+				mac_hdr->sa, LIM_NO_WEP_IN_FC,
+				pe_session, false);
+			return;
+		}
+
 		switch (rx_auth_frm_body->authAlgoNumber) {
 		case eSIR_OPEN_SYSTEM:
 			lim_process_auth_open_system_algo(mac_ctx, mac_hdr,
@@ -1383,7 +1399,7 @@ tSirRetStatus lim_process_auth_frame_no_session(tpAniSirGlobal pMac, uint8_t *pB
 	}
 
 	if (psessionEntry == NULL) {
-		pe_err("Error: Unable to find session id while in pre-auth phase for FT");
+		pe_debug("cannot find session id in FT pre-auth phase");
 		return eSIR_FAILURE;
 	}
 

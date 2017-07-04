@@ -79,6 +79,9 @@
 
 #define CONV_MS_TO_US 1024      /* conversion factor from ms to us */
 
+#define BEACON_INTERVAL_THRESHOLD 50  /* in msecs */
+#define STA_BURST_SCAN_DURATION 120   /* in msecs */
+
 /* SME REQ processing function templates */
 static bool __lim_process_sme_sys_ready_ind(tpAniSirGlobal, uint32_t *);
 static bool __lim_process_sme_start_bss_req(tpAniSirGlobal,
@@ -1279,6 +1282,20 @@ static QDF_STATUS lim_send_hal_start_scan_offload_req(tpAniSirGlobal pMac,
 	pScanOffloadReq->scan_adaptive_dwell_mode =
 			pScanReq->scan_adaptive_dwell_mode;
 
+	for (i = 0; i < pMac->lim.maxBssId; i++) {
+		tpPESession session_entry =
+				pe_find_session_by_sme_session_id(pMac, i);
+		if (session_entry &&
+			(eLIM_MLM_LINK_ESTABLISHED_STATE ==
+				session_entry->limMlmState) &&
+			(session_entry->beaconParams.beaconInterval
+				< BEACON_INTERVAL_THRESHOLD)) {
+			pScanOffloadReq->burst_scan_duration =
+						STA_BURST_SCAN_DURATION;
+			break;
+		}
+	}
+
 	/* for normal scan, the value for p2pScanType should be 0
 	   always */
 	if (pScanReq->p2pSearch)
@@ -1617,6 +1634,9 @@ __lim_process_sme_join_req(tpAniSirGlobal mac_ctx, uint32_t *msg_buf)
 		session->limWmeEnabled = sme_join_req->isWMEenabled;
 		session->limQosEnabled = sme_join_req->isQosEnabled;
 		session->wps_registration = sme_join_req->wps_registration;
+
+		session->enable_bcast_probe_rsp =
+				sme_join_req->enable_bcast_probe_rsp;
 
 		/* Store vendor specfic IE for CISCO AP */
 		ie_len = (bss_desc->length + sizeof(bss_desc->length) -
@@ -3918,6 +3938,48 @@ end:
 	return;
 }
 
+static void lim_process_sme_update_config(tpAniSirGlobal mac_ctx,
+					  struct update_config *msg)
+{
+	tpPESession pe_session;
+
+	pe_debug("received eWNI_SME_UPDATE_HT_CONFIG message");
+	if (msg == NULL) {
+		pe_err("Buffer is Pointing to NULL");
+		return;
+	}
+
+	pe_session = pe_find_session_by_sme_session_id(mac_ctx,
+						       msg->sme_session_id);
+	if (pe_session == NULL) {
+		pe_warn("Session does not exist for given BSSID");
+		return;
+	}
+
+	switch (msg->capab) {
+	case WNI_CFG_HT_CAP_INFO_ADVANCE_CODING:
+		pe_session->htConfig.ht_rx_ldpc = msg->value;
+		break;
+	case WNI_CFG_HT_CAP_INFO_TX_STBC:
+		pe_session->htConfig.ht_tx_stbc = msg->value;
+		break;
+	case WNI_CFG_HT_CAP_INFO_RX_STBC:
+		pe_session->htConfig.ht_rx_stbc = msg->value;
+		break;
+	case WNI_CFG_HT_CAP_INFO_SHORT_GI_20MHZ:
+		pe_session->htConfig.ht_sgi20 = msg->value;
+		break;
+	case WNI_CFG_HT_CAP_INFO_SHORT_GI_40MHZ:
+		pe_session->htConfig.ht_sgi40 = msg->value;
+		break;
+	}
+
+	if (LIM_IS_AP_ROLE(pe_session)) {
+		sch_set_fixed_beacon_fields(mac_ctx, pe_session);
+		lim_send_beacon_ind(mac_ctx, pe_session);
+	}
+}
+
 void
 lim_send_vdev_restart(tpAniSirGlobal pMac,
 		      tpPESession psessionEntry, uint8_t sessionId)
@@ -3940,6 +4002,7 @@ lim_send_vdev_restart(tpAniSirGlobal pMac,
 
 	pHalHiddenSsidVdevRestart->ssidHidden = psessionEntry->ssidHidden;
 	pHalHiddenSsidVdevRestart->sessionId = sessionId;
+	pHalHiddenSsidVdevRestart->pe_session_id = psessionEntry->peSessionId;
 
 	msgQ.type = WMA_HIDDEN_SSID_VDEV_RESTART;
 	msgQ.bodyptr = pHalHiddenSsidVdevRestart;
@@ -4016,22 +4079,18 @@ static void __lim_process_roam_scan_offload_req(tpAniSirGlobal mac_ctx,
 static void lim_handle_update_ssid_hidden(tpAniSirGlobal mac_ctx,
 				tpPESession session, uint8_t ssid_hidden)
 {
-	pe_debug("received HIDE_SSID message old HIDE_SSID: %d new HIDE_SSID: %d",
+	pe_debug("rcvd HIDE_SSID message old HIDE_SSID: %d new HIDE_SSID: %d",
 			session->ssidHidden, ssid_hidden);
 
-	if (ssid_hidden != session->ssidHidden)
+	if (ssid_hidden != session->ssidHidden) {
 		session->ssidHidden = ssid_hidden;
-	else {
-		pe_debug("Same config already present!");
+	} else {
+		pe_debug("Dont process HIDE_SSID msg with existing setting");
 		return;
 	}
 
 	/* Send vdev restart */
 	lim_send_vdev_restart(mac_ctx, session, session->smeSessionId);
-
-	/* Update beacon */
-	sch_set_fixed_beacon_fields(mac_ctx, session);
-	lim_send_beacon_ind(mac_ctx, session);
 
 	return;
 }
@@ -5185,6 +5244,10 @@ bool lim_process_sme_req_messages(tpAniSirGlobal pMac,
 	case eWNI_SME_UPDATE_ACCESS_POLICY_VENDOR_IE:
 		lim_process_sme_update_access_policy_vendor_ie(pMac, pMsgBuf);
 		break;
+	case eWNI_SME_UPDATE_CONFIG:
+		lim_process_sme_update_config(pMac,
+					(struct update_config *)pMsgBuf);
+		break;
 	default:
 		qdf_mem_free((void *)pMsg->bodyptr);
 		pMsg->bodyptr = NULL;
@@ -6008,6 +6071,14 @@ static void lim_process_nss_update_request(tpAniSirGlobal mac_ctx,
 	/* populate nss field in the beacon */
 	session_entry->gLimOperatingMode.present = 1;
 	session_entry->gLimOperatingMode.rxNSS = nss_update_req_ptr->new_nss;
+	session_entry->gLimOperatingMode.chanWidth = session_entry->ch_width;
+
+	if ((nss_update_req_ptr->new_nss == NSS_1x1_MODE) &&
+			(session_entry->ch_width > CH_WIDTH_80MHZ))
+		session_entry->gLimOperatingMode.chanWidth = CH_WIDTH_80MHZ;
+
+	pe_debug("ch width %hu", session_entry->gLimOperatingMode.chanWidth);
+
 	/* Send nss update request from here */
 	if (sch_set_fixed_beacon_fields(mac_ctx, session_entry) !=
 			eSIR_SUCCESS) {

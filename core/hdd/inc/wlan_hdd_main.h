@@ -61,7 +61,11 @@
 #include "cdp_txrx_flow_ctrl_legacy.h"
 #include <cdp_txrx_peer_ops.h>
 #include "wlan_hdd_nan_datapath.h"
+#if defined(CONFIG_HL_SUPPORT)
+#include "wlan_tgt_def_config_hl.h"
+#else
 #include "wlan_tgt_def_config.h"
+#endif
 #include <wlan_objmgr_cmn.h>
 #include <wlan_objmgr_global_obj.h>
 #include <wlan_objmgr_psoc_obj.h>
@@ -129,6 +133,7 @@
 #else
 #define WLAN_WAIT_TIME_DISCONNECT  5000
 #endif
+#define WLAN_WAIT_TIME_STOP_ROAM  4000
 #define WLAN_WAIT_TIME_STATS       800
 #define WLAN_WAIT_TIME_POWER       800
 #define WLAN_WAIT_TIME_COUNTRY     1000
@@ -181,7 +186,9 @@
 /** Mac Address string **/
 #define MAC_ADDRESS_STR "%02x:%02x:%02x:%02x:%02x:%02x"
 #define MAC_ADDRESS_STR_LEN 18  /* Including null terminator */
-#define MAX_GENIE_LEN 512
+/* Max and min IEs length in bytes */
+#define MAX_GENIE_LEN (512)
+#define MIN_GENIE_LEN (2)
 
 #define WLAN_CHIP_VERSION   "WCNSS"
 
@@ -673,6 +680,7 @@ struct hdd_station_ctx {
 #if defined(WLAN_FEATURE_NAN_DATAPATH) && !defined(WLAN_FEATURE_NAN_CONVERGENCE)
 	struct nan_datapath_ctx ndp_ctx;
 #endif
+	bool ap_supports_immediate_power_save;
 };
 
 #define BSS_STOP    0
@@ -806,7 +814,7 @@ typedef struct hdd_scaninfo_s {
 	tSirAddie scanAddIE;
 
 	uint8_t *default_scan_ies;
-	uint8_t default_scan_ies_len;
+	uint16_t default_scan_ies_len;
 	/* Scan mode */
 	tSirScanType scan_mode;
 
@@ -970,6 +978,8 @@ struct hdd_adapter_s {
 	/** completion variable for disconnect callback */
 	struct completion disconnect_comp_var;
 
+	struct completion roaming_comp_var;
+
 	/** Completion of change country code */
 	struct completion change_country_code;
 
@@ -1041,11 +1051,20 @@ struct hdd_adapter_s {
 
 #ifdef WLAN_FEATURE_TSF
 	/* tsf value received from firmware */
-	uint32_t tsf_low;
-	uint32_t tsf_high;
-	/* TSF capture state */
-	enum hdd_tsf_capture_state tsf_state;
+	uint64_t cur_target_time;
 	uint64_t tsf_sync_soc_timer;
+#ifdef WLAN_FEATURE_TSF_PLUS
+	/* spin lock for read/write timestamps */
+	qdf_spinlock_t host_target_sync_lock;
+	qdf_mc_timer_t host_target_sync_timer;
+	uint64_t cur_host_time;
+	uint64_t last_host_time;
+	uint64_t last_target_time;
+	/* to store the count of continuous invalid tstamp-pair */
+	int continuous_error_count;
+	/* to indicate whether tsf_sync has been initialized */
+	qdf_atomic_t tsf_sync_ready_flag;
+#endif /* WLAN_FEATURE_TSF_PLUS */
 #endif
 
 	hdd_cfg80211_state_t cfg80211State;
@@ -1136,27 +1155,18 @@ struct hdd_adapter_s {
 
 	bool fast_roaming_allowed;
 	/*
-	 * defer disconnect is used as a flag by roaming to check
-	 * if any disconnect has been deferred because of roaming
-	 * and handle it. It stores the source of the disconnect.
-	 * Based on the source, it will appropriately handle the
-	 * disconnect.
+	 * Indicate if HO fails during disconnect so that
+	 * disconnect is not initiated by HDD as its already
+	 * initiated by CSR
 	 */
-	uint8_t defer_disconnect;
-	/*
-	 * cfg80211 issues a reason for disconnect. Store this reason if the
-	 * disconnect is being deferred.
-	 */
-	uint8_t cfg80211_disconnect_reason;
+	bool roam_ho_fail;
 	struct lfr_firmware_status lfr_fw_status;
+	/*
+	 * Store the restrict_offchannel count
+	 * to cater to multiple application.
+	 */
+	u8 restrict_offchannel_cnt;
 };
-
-/*
- * Below two definitions are useful to distinguish the
- * source of the disconnect when a disconnect is deferred
- */
-#define DEFER_DISCONNECT_TRY_DISCONNECT      1
-#define DEFER_DISCONNECT_CFG80211_DISCONNECT 2
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(pAdapter) (&(pAdapter)->sessionCtx.station)
 #define WLAN_HDD_GET_AP_CTX_PTR(pAdapter) (&(pAdapter)->sessionCtx.ap)
@@ -1613,6 +1623,20 @@ struct hdd_context_s {
 	unsigned long last_scan_reject_timestamp;
 	bool dfs_cac_offload;
 	bool reg_offload;
+#ifdef FEATURE_WLAN_CH_AVOID
+	tHddAvoidFreqList coex_avoid_freq_list;
+	tHddAvoidFreqList dnbs_avoid_freq_list;
+	/* Lock to control access to dnbs and coex avoid freq list */
+	struct mutex avoid_freq_lock;
+#endif
+#ifdef WLAN_FEATURE_TSF
+	/* indicate whether tsf has been initialized */
+	qdf_atomic_t tsf_ready_flag;
+	/* indicate whether it's now capturing tsf(updating tstamp-pair) */
+	qdf_atomic_t cap_tsf_flag;
+	/* the context that is capturing tsf */
+	hdd_adapter_t *cap_tsf_context;
+#endif
 };
 
 /**
@@ -1643,6 +1667,7 @@ struct hdd_external_acs_timer_context {
 
 /**
  * struct hdd_vendor_chan_info - vendor channel info
+ * @band: channel operating band
  * @pri_ch: primary channel
  * @ht_sec_ch: secondary channel
  * @vht_seg0_center_ch: segment0 for vht
@@ -1650,6 +1675,7 @@ struct hdd_external_acs_timer_context {
  * @chan_width: channel width
  */
 struct hdd_vendor_chan_info {
+	uint8_t band;
 	uint8_t pri_ch;
 	uint8_t ht_sec_ch;
 	uint8_t vht_seg0_center_ch;
@@ -1780,6 +1806,7 @@ int hdd_validate_adapter(hdd_adapter_t *adapter);
 
 bool hdd_is_valid_mac_address(const uint8_t *pMacAddr);
 QDF_STATUS hdd_issta_p2p_clientconnected(hdd_context_t *pHddCtx);
+bool wlan_hdd_validate_modules_state(hdd_context_t *hdd_ctx);
 
 struct qdf_mac_addr *
 hdd_wlan_get_ibss_mac_addr_from_staid(hdd_adapter_t *pAdapter,
@@ -2408,6 +2435,17 @@ hdd_adapter_t *wlan_hdd_get_adapter_from_vdev(struct wlan_objmgr_psoc
 void hdd_unregister_notifiers(hdd_context_t *hdd_ctx);
 
 /**
+ * hdd_dbs_scan_selection_init() - initialization for DBS scan selection config
+ * @hdd_ctx: HDD context
+ *
+ * This function sends the DBS scan selection config configuration to the
+ * firmware via WMA
+ *
+ * Return: 0 - success, < 0 - failure
+ */
+int hdd_dbs_scan_selection_init(hdd_context_t *hdd_ctx);
+
+/**
  * hdd_start_complete()- complete the start event
  * @ret: return value for complete event.
  *
@@ -2418,4 +2456,23 @@ void hdd_unregister_notifiers(hdd_context_t *hdd_ctx);
  */
 
 void hdd_start_complete(int ret);
+
+/**
+ * hdd_chip_pwr_save_fail_detected_cb() - chip power save failure detected
+ * callback
+ * @hddctx: HDD context
+ * @data: chip power save failure detected data
+ *
+ * This function reads the chip power save failure detected data and fill in
+ * the skb with NL attributes and send up the NL event.
+ * This callback execute in atomic context and must not invoke any
+ * blocking calls.
+ *
+ * Return: none
+ */
+
+void hdd_chip_pwr_save_fail_detected_cb(void *hddctx,
+				struct chip_pwr_save_fail_detected_params
+				*data);
+
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

@@ -45,6 +45,7 @@
 #include "cds_regdomain.h"
 #include "sme_internal.h"
 #include "wma_tgt_cfg.h"
+#include "wma_fips_public_structs.h"
 
 #include "sme_rrm_internal.h"
 #include "sir_types.h"
@@ -537,12 +538,6 @@ QDF_STATUS sme_get_cfg_valid_channels(uint8_t *aValidChannels,
 #ifdef WLAN_FEATURE_PACKET_FILTERING
 QDF_STATUS sme_8023_multicast_list(tHalHandle hHal, uint8_t sessionId,
 		tpSirRcvFltMcAddrList pMulticastAddrs);
-QDF_STATUS sme_receive_filter_set_filter(tHalHandle hHal,
-		tpSirRcvPktFilterCfgType pRcvPktFilterCfg,
-		uint8_t sessionId);
-QDF_STATUS sme_receive_filter_clear_filter(tHalHandle hHal,
-		tpSirRcvFltPktClearParam pRcvFltPktClearParam,
-		uint8_t sessionId);
 #endif /* WLAN_FEATURE_PACKET_FILTERING */
 bool sme_is_channel_valid(tHalHandle hHal, uint8_t channel);
 QDF_STATUS sme_set_freq_band(tHalHandle hHal, uint8_t sessionId,
@@ -711,8 +706,6 @@ QDF_STATUS sme_add_periodic_tx_ptrn(tHalHandle hHal, tSirAddPeriodicTxPtrn
 		*addPeriodicTxPtrnParams);
 QDF_STATUS sme_del_periodic_tx_ptrn(tHalHandle hHal, tSirDelPeriodicTxPtrn
 		*delPeriodicTxPtrnParams);
-void sme_enable_disable_split_scan(tHalHandle hHal, uint8_t nNumStaChan,
-		uint8_t nNumP2PChan);
 QDF_STATUS sme_send_rate_update_ind(tHalHandle hHal,
 		tSirRateUpdateInd *rateUpdateParams);
 QDF_STATUS sme_roam_del_pmkid_from_cache(tHalHandle hHal, uint8_t sessionId,
@@ -819,6 +812,19 @@ typedef struct sStatsExtRequestReq {
 typedef void (*StatsExtCallback)(void *, tStatsExtEvent *);
 void sme_stats_ext_register_callback(tHalHandle hHal,
 		StatsExtCallback callback);
+/**
+ * sme_register_stats_ext2_callback() - Register stats ext2 register
+ * @hal_handle: hal handle for getting global mac struct
+ * @stats_ext2_cb: callback to be registered
+ *
+ * This function will register a callback for frame aggregation failure
+ * indications processing.
+ *
+ * Return: void
+ */
+void sme_stats_ext2_register_callback(tHalHandle hal_handle,
+	void (*stats_ext2_cb)(void *, struct sir_sme_rx_aggr_hole_ind *));
+
 void sme_stats_ext_deregister_callback(tHalHandle hhal);
 QDF_STATUS sme_stats_ext_request(uint8_t session_id,
 		tpStatsExtRequestReq input);
@@ -903,7 +909,7 @@ QDF_STATUS sme_update_roam_offload_enabled(tHalHandle hHal,
 QDF_STATUS sme_update_roam_key_mgmt_offload_enabled(tHalHandle hal_ctx,
 		uint8_t session_id,
 		bool key_mgmt_offload_enabled,
-		bool okc_enabled);
+		struct pmkid_mode_bits *pmkid_modes);
 #endif
 #ifdef WLAN_FEATURE_NAN
 QDF_STATUS sme_nan_event(tHalHandle hHal, void *pMsg);
@@ -1317,6 +1323,28 @@ QDF_STATUS sme_encrypt_decrypt_msg(tHalHandle hal,
 		void *context);
 #endif
 
+#ifdef WLAN_FEATURE_FIPS
+/**
+ * sme_fips_request() - Perform a FIPS certification operation
+ * @hal: Hal handle for the object being certified
+ * @param: The FIPS certification parameters
+ * @callback: Callback function to invoke with the results
+ * @context: Opaque context to pass back to caller in the callback
+ *
+ * Return: QDF_STATUS_SUCCESS if the request is successfully sent
+ * to firmware for processing, otherwise an error status.
+ */
+QDF_STATUS sme_fips_request(tHalHandle hal, struct fips_params *param,
+			    wma_fips_cb callback, void *context);
+#else
+static inline
+QDF_STATUS sme_fips_request(tHalHandle hal, struct fips_params *param,
+			    wma_fips_cb callback, void *context)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif /* WLAN_FEATURE_FIPS */
+
 /**
  * sme_set_cts2self_for_p2p_go() - sme function to set ini parms to FW.
  * @hal:                    reference to the HAL
@@ -1429,12 +1457,14 @@ void sme_set_chan_info_callback(tHalHandle hal_handle,
  * @bssid: bssid to look for in scan cache
  * @frame_buf: frame buffer to populate
  * @frame_len: length of constructed frame
+ * @channel: Pointer to channel info to be filled
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS sme_get_beacon_frm(tHalHandle hal, tCsrRoamProfile *profile,
 			    const tSirMacAddr bssid,
-			    uint8_t **frame_buf, uint32_t *frame_len);
+			    uint8_t **frame_buf, uint32_t *frame_len,
+			    int *channel);
 /**
  * sme_fast_reassoc() - invokes FAST REASSOC command
  * @hal: handle returned by mac_open
@@ -1492,6 +1522,18 @@ QDF_STATUS sme_register_set_connection_info_cb(tHalHandle hHal,
 				enum scan_reject_states *reason));
 
 /**
+ * sme_set_dbs_scan_selection_config() - Update DBS scan selection
+ * configuration
+ * @hal: The handle returned by macOpen
+ * @params: wmi_dbs_scan_sel_params config
+ *
+ * Return: QDF_STATUS if DBS scan selection update
+ * configuration success else failure status
+ */
+QDF_STATUS sme_set_dbs_scan_selection_config(tHalHandle hal,
+		struct wmi_dbs_scan_sel_params *params);
+
+/**
  * sme_store_pdev() - store pdev
  * @hal - MAC global handle
  * @pdev - pdev ptr
@@ -1499,5 +1541,54 @@ QDF_STATUS sme_register_set_connection_info_cb(tHalHandle hHal,
  * Return: QDF_STATUS
  */
 void sme_store_pdev(tHalHandle hal, struct wlan_objmgr_pdev *pdev);
+
+/**
+ * sme_ipa_uc_stat_request() - set ipa config parameters
+ * @vdev_id: virtual device for the command
+ * @param_id: parameter id
+ * @param_val: parameter value
+ * @req_cat: parameter category
+ *
+ * Return: QDF_STATUS_SUCCESS or non-zero on failure
+ */
+QDF_STATUS sme_ipa_uc_stat_request(tHalHandle hal,
+			uint32_t vdev_id, uint32_t param_id,
+			uint32_t param_val, uint32_t req_cat);
+
+/**
+ * sme_set_reorder_timeout() - set reorder timeout value
+ * including Voice,Video,Besteffort,Background parameters
+ * @hal: hal handle for getting global mac struct
+ * @reg: struct sir_set_rx_reorder_timeout_val
+ *
+ * Return: QDF_STATUS_SUCCESS or non-zero on failure.
+ */
+QDF_STATUS sme_set_reorder_timeout(tHalHandle hal,
+		struct sir_set_rx_reorder_timeout_val *req);
+
+/**
+ * sme_set_rx_set_blocksize() - set blocksize value
+ * including mac_addr and win_limit parameters
+ * @hal: hal handle for getting global mac struct
+ * @reg: struct sir_peer_set_rx_blocksize
+ *
+ * Return: QDF_STATUS_SUCCESS or non-zero on failure.
+ */
+
+QDF_STATUS sme_set_rx_set_blocksize(tHalHandle hal,
+		struct sir_peer_set_rx_blocksize *req);
+
+/*
+ * sme_set_chip_pwr_save_fail_cb() - set chip power save failure callback
+ * @hal: global hal handle
+ * @cb: callback function pointer
+ *
+ * This function stores the chip power save failure callback function.
+ *
+ * Return: QDF_STATUS enumeration.
+ */
+
+QDF_STATUS sme_set_chip_pwr_save_fail_cb(tHalHandle hal, void (*cb)(void *,
+				 struct chip_pwr_save_fail_detected_params *));
 
 #endif /* #if !defined( __SME_API_H ) */
