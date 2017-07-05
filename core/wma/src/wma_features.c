@@ -99,7 +99,8 @@
 				(1 << WOW_ASSOC_REQ_EVENT) |\
 				(1 << WOW_DEAUTH_RECVD_EVENT) |\
 				(1 << WOW_DISASSOC_RECVD_EVENT) |\
-				(1 << WOW_HTT_EVENT))\
+				(1 << WOW_HTT_EVENT) |\
+				(1 << WOW_CLIENT_KICKOUT_EVENT))
 
 /**
  * WMA_SET_VDEV_IE_SOURCE_HOST - Flag to identify the source of VDEV SET IE
