@@ -1378,53 +1378,11 @@ qdf_nbuf_t dp_tx_send(void *vap_dev, qdf_nbuf_t nbuf)
 	struct dp_tx_msdu_info_s msdu_info;
 	struct dp_tx_seg_info_s seg_info;
 	struct dp_vdev *vdev = (struct dp_vdev *) vap_dev;
-	struct dp_soc *soc = vdev->pdev->soc;
 	uint16_t peer_id = HTT_INVALID_PEER;
-	uint8_t count;
-	uint8_t found = 0;
-	uint8_t oldest_mec_entry_idx = 0;
-	uint64_t oldest_mec_ts = 0;
-	struct mect_entry *mect_entry;
-
 	qdf_mem_set(&msdu_info, sizeof(msdu_info), 0x0);
 	qdf_mem_set(&seg_info, sizeof(seg_info), 0x0);
 
-	if (qdf_nbuf_get_ftype(nbuf) == CB_FTYPE_INTRABSS_FWD)
-		goto out;
-
 	eh = (struct ether_header *)qdf_nbuf_data(nbuf);
-	if (DP_FRAME_IS_MULTICAST((eh)->ether_dhost)) {
-		for (count = 0; count < soc->mect_cnt; count++) {
-			mect_entry = &soc->mect_table[count];
-			if (!memcmp(mect_entry->mac_addr, eh->ether_shost,
-					DP_MAC_ADDR_LEN)) {
-				found = 1;
-				break;
-			}
-
-			if (!oldest_mec_ts) {
-				oldest_mec_entry_idx = count;
-				oldest_mec_ts = mect_entry->ts;
-			} else if (mect_entry->ts < oldest_mec_ts) {
-				oldest_mec_entry_idx = count;
-				oldest_mec_ts = mect_entry->ts;
-			}
-		}
-
-		if (!found) {
-			if (count >= DP_MAX_MECT_ENTRIES)
-				count = oldest_mec_entry_idx;
-			else
-				soc->mect_cnt++;
-
-			mect_entry = &soc->mect_table[count];
-			mect_entry->ts = jiffies_64;
-			memcpy(mect_entry->mac_addr, eh->ether_shost,
-				DP_MAC_ADDR_LEN);
-		}
-	}
-
-out:
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
 			"%s , skb %0x:%0x:%0x:%0x:%0x:%0x\n",
 			__func__, nbuf->data[0], nbuf->data[1], nbuf->data[2],
@@ -1720,6 +1678,55 @@ static inline void dp_tx_comp_free_buf(struct dp_soc *soc,
 	}
 }
 
+/** 
+ * dp_tx_mec_handler() - Tx  MEC Notify Handler
+ * @tx_desc: software descriptor head pointer
+ * @status : Tx completion status from HTT descriptor
+ *
+ * Handles MEC notify event sent from fw to Host
+ *
+ * Return: none
+ */
+static void dp_tx_mec_handler(struct dp_tx_desc_s *tx_desc, uint8_t *status)
+{
+
+	struct dp_soc *soc;
+	struct dp_pdev *pdev = tx_desc->pdev;
+	struct dp_vdev *vdev = tx_desc->vdev;
+	uint32_t flags = IEEE80211_NODE_F_WDS_HM;
+	struct dp_peer *peer;
+	uint8_t mac_addr[6], i;
+	uint16_t sa_idx;
+	uint32_t *htt_status_word = (uint32_t *)status;
+
+	sa_idx = HTT_TX_WBM_COMPLETION_V2_SA_AST_INDEX_GET(htt_status_word[2]);
+
+	/* Add an entry only if sa_idx is 0xffff */
+	if (sa_idx != 0xffff)
+		return;
+
+	qdf_assert(pdev);
+	qdf_assert(vdev);
+
+	soc = pdev->soc;
+	for (i = 0; i < 6; i++)
+		mac_addr[5 - i] = status[4+i];
+
+	peer = TAILQ_FIRST(&vdev->peer_list);
+
+	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
+			"%s Tx MEC Handler\n",
+			__func__);
+
+	if (!dp_peer_add_ast(soc, peer, mac_addr, 2)) {
+		soc->cdp_soc.ol_ops->peer_add_wds_entry(
+				vdev->pdev->osif_pdev,
+				mac_addr,
+				vdev->mac_addr.raw,
+				flags);
+	}
+}
+
 /**
  * dp_tx_process_htt_completion() - Tx HTT Completion Indication Handler
  * @tx_desc: software descriptor head pointer
@@ -1761,6 +1768,11 @@ void dp_tx_process_htt_completion(struct dp_tx_desc_s *tx_desc, uint8_t *status)
 	case HTT_TX_FW2WBM_TX_STATUS_INSPECT:
 	{
 		dp_tx_inspect_handler(tx_desc, status);
+		break;
+	}
+	case HTT_TX_FW2WBM_TX_STATUS_MEC_NOTIFY:
+	{
+		dp_tx_mec_handler(tx_desc, status);
 		break;
 	}
 	default:

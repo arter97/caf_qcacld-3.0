@@ -87,7 +87,6 @@
 #define MAX_TX_HW_QUEUES 3
 
 #define DP_MAX_INTERRUPT_CONTEXTS 8
-#define DP_MAX_MECT_ENTRIES 64
 
 #ifndef REMOVE_PKT_LOG
 enum rx_pktlog_mode {
@@ -474,15 +473,10 @@ struct dp_ast_entry {
 	bool next_hop;
 	bool is_active;
 	bool is_static;
+	bool is_mec;
+	bool is_bss;
 	TAILQ_ENTRY(dp_ast_entry) ase_list_elem;
 	TAILQ_ENTRY(dp_ast_entry) hash_list_elem;
-};
-
-struct mect_entry {
-	uint8_t idx;
-	uint8_t valid;
-	uint8_t mac_addr[6];
-	uint64_t ts;
 };
 
 /* SOC level structure for data path */
@@ -688,8 +682,6 @@ struct dp_soc {
 #endif
 	qdf_list_t reo_desc_freelist;
 	qdf_spinlock_t reo_desc_freelist_lock;
-	struct mect_entry mect_table[DP_MAX_MECT_ENTRIES];
-	uint8_t mect_cnt;
 
 	/* Obj Mgr SoC */
 	struct wlan_objmgr_psoc *psoc;
