@@ -1560,7 +1560,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 		hdd_debug("MIC MAC " MAC_ADDRESS_STR,
 		       MAC_ADDR_ARRAY(msg.src_addr.sa_data));
 		if (pSapEvent->sapevt.sapStationMICFailureEvent.
-		    multicast == eSAP_TRUE)
+		    multicast == true)
 			msg.flags = IW_MICFAILURE_GROUP;
 		else
 			msg.flags = IW_MICFAILURE_PAIRWISE;
@@ -1577,7 +1577,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 					     ((pSapEvent->sapevt.
 					       sapStationMICFailureEvent.
 					       multicast ==
-					       eSAP_TRUE) ?
+					       true) ?
 					      NL80211_KEYTYPE_GROUP :
 					      NL80211_KEYTYPE_PAIRWISE),
 					     pSapEvent->sapevt.
@@ -2193,8 +2193,6 @@ stopbss:
 		we_custom_event_generic = we_custom_event;
 		wireless_send_event(dev, we_event, &wrqu,
 				    (char *)we_custom_event_generic);
-		cds_decr_session_set_pcl(pHostapdAdapter->device_mode,
-					 pHostapdAdapter->sessionId);
 
 		/* once the event is set, structure dev/pHostapdAdapter should
 		 * not be touched since they are now subject to being deleted
@@ -2378,7 +2376,7 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_channel,
 	status = wlansap_set_channel_change_with_csa(
 		WLAN_HDD_GET_SAP_CTX_PTR(pHostapdAdapter),
 		(uint32_t)target_channel,
-		target_bw);
+		target_bw, true);
 
 	if (QDF_STATUS_SUCCESS != status) {
 		hdd_err("SAP set channel failed for channel: %d, bw: %d",
@@ -2577,6 +2575,8 @@ static int __iw_softap_set_two_ints_getnone(struct net_device *dev,
 			qdf_dp_trace_enable_live_mode();
 		else if (value[1] == CLEAR_DP_TRACE_BUFFER)
 			qdf_dp_trace_clear_buffer();
+		else if (value[1] == DISABLE_DP_TRACE_LIVE_MODE)
+			qdf_dp_trace_disable_live_mode();
 		break;
 	case QCSAP_ENABLE_FW_PROFILE:
 		hdd_debug("QCSAP_ENABLE_FW_PROFILE: %d %d",
@@ -6535,7 +6535,7 @@ static void wlan_hdd_add_hostapd_conf_vsie(hdd_adapter_t *pHostapdAdapter,
 		elem_id = ptr[0];
 		elem_len = ptr[1];
 		left -= 2;
-		if (elem_len > left) {
+		if (elem_len > left || elem_len < WPS_OUI_TYPE_SIZE) {
 			hdd_err("**Invalid IEs eid: %d elem_len: %d left: %d**",
 				elem_id, elem_len, left);
 			return;
@@ -6858,8 +6858,8 @@ int wlan_hdd_cfg80211_update_apies(hdd_adapter_t *adapter)
 	proberesp_ies = qdf_mem_malloc(beacon->proberesp_ies_len +
 				      MAX_GENIE_LEN);
 	if (proberesp_ies == NULL) {
-		hdd_err("mem alloc failed for probe resp ies %d",
-			proberesp_ies_len);
+		hdd_err("mem alloc failed for probe resp ies, size: %d",
+			beacon->proberesp_ies_len + MAX_GENIE_LEN);
 		ret = -EINVAL;
 		goto done;
 	}
@@ -7368,29 +7368,33 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 	bool MFPRequired = false;
 	uint16_t prev_rsn_length = 0;
 	enum dfs_mode mode;
+	bool disable_fw_tdls_state = false;
 
 	ENTER();
 
-	if (!update_beacon && (cds_is_connection_in_progress(NULL, NULL) ||
-		pHddCtx->btCoexModeSet)) {
-		hdd_err("Can't start BSS: connection ot btcoex(%d) is in progress",
-			pHddCtx->btCoexModeSet);
+	if (!update_beacon && cds_is_connection_in_progress(NULL, NULL)) {
+		hdd_err("Can't start BSS: connection is in progress");
 		return -EINVAL;
 	}
 
-	wlan_hdd_tdls_disable_offchan_and_teardown_links(pHddCtx);
+	disable_fw_tdls_state = true;
+	wlan_hdd_check_conc_and_update_tdls_state(pHddCtx,
+						  disable_fw_tdls_state);
+
 	if (cds_is_hw_mode_change_in_progress()) {
 		status = qdf_wait_for_connection_update();
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			hdd_err("qdf wait for event failed!!");
-			return -EINVAL;
+			ret = -EINVAL;
+			goto ret_status;
 		}
 	}
 
 	sme_config = qdf_mem_malloc(sizeof(tSmeConfigParams));
 	if (!sme_config) {
 		hdd_err("failed to allocate memory");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto ret_status;
 	}
 
 	iniConfig = pHddCtx->config;
@@ -7971,6 +7975,10 @@ error:
 			acs_cfg.ch_list);
 		pHostapdAdapter->sessionCtx.ap.sapConfig.acs_cfg.ch_list = NULL;
 	}
+
+ret_status:
+	if (disable_fw_tdls_state)
+		wlan_hdd_check_conc_and_update_tdls_state(pHddCtx, false);
 	return ret;
 }
 
@@ -8176,6 +8184,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	}
 #endif
 	pAdapter->sessionId = HDD_SESSION_ID_INVALID;
+	wlan_hdd_check_conc_and_update_tdls_state(pHddCtx, false);
 	EXIT();
 	return ret;
 }
@@ -8283,11 +8292,6 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	hdd_debug("pAdapter = %p, Device mode %s(%d) sub20 %d",
 		pAdapter, hdd_device_mode_to_string(pAdapter->device_mode),
 		pAdapter->device_mode, cds_is_sub_20_mhz_enabled());
-
-	if (pHddCtx->btCoexModeSet) {
-		hdd_debug("BTCoex Mode operation in progress");
-		return -EBUSY;
-	}
 
 	if (cds_is_connection_in_progress(NULL, NULL)) {
 		hdd_err("Can't start BSS: connection is in progress");

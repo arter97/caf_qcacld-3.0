@@ -2352,6 +2352,27 @@ sir_convert_fils_data_to_probersp_struct(tpSirProbeRespBeacon probe_resp,
 }
 #endif
 
+void sir_copy_caps_info(tpAniSirGlobal mac_ctx, tDot11fFfCapabilities caps,
+					    tpSirProbeRespBeacon pProbeResp)
+{
+	pProbeResp->capabilityInfo.ess = caps.ess;
+	pProbeResp->capabilityInfo.ibss = caps.ibss;
+	pProbeResp->capabilityInfo.cfPollable = caps.cfPollable;
+	pProbeResp->capabilityInfo.cfPollReq = caps.cfPollReq;
+	pProbeResp->capabilityInfo.privacy = caps.privacy;
+	pProbeResp->capabilityInfo.shortPreamble = caps.shortPreamble;
+	pProbeResp->capabilityInfo.pbcc = caps.pbcc;
+	pProbeResp->capabilityInfo.channelAgility = caps.channelAgility;
+	pProbeResp->capabilityInfo.spectrumMgt = caps.spectrumMgt;
+	pProbeResp->capabilityInfo.qos = caps.qos;
+	pProbeResp->capabilityInfo.shortSlotTime = caps.shortSlotTime;
+	pProbeResp->capabilityInfo.apsd = caps.apsd;
+	pProbeResp->capabilityInfo.rrm = caps.rrm;
+	pProbeResp->capabilityInfo.dsssOfdm = caps.dsssOfdm;
+	pProbeResp->capabilityInfo.delayedBA = caps.delayedBA;
+	pProbeResp->capabilityInfo.immediateBA = caps.immediateBA;
+}
+
 tSirRetStatus sir_convert_probe_frame2_struct(tpAniSirGlobal pMac,
 					      uint8_t *pFrame,
 					      uint32_t nFrame,
@@ -2393,26 +2414,7 @@ tSirRetStatus sir_convert_probe_frame2_struct(tpAniSirGlobal pMac,
 	/* Beacon Interval */
 	pProbeResp->beaconInterval = pr->BeaconInterval.interval;
 
-	/* Capabilities */
-	pProbeResp->capabilityInfo.ess = pr->Capabilities.ess;
-	pProbeResp->capabilityInfo.ibss = pr->Capabilities.ibss;
-	pProbeResp->capabilityInfo.cfPollable = pr->Capabilities.cfPollable;
-	pProbeResp->capabilityInfo.cfPollReq = pr->Capabilities.cfPollReq;
-	pProbeResp->capabilityInfo.privacy = pr->Capabilities.privacy;
-	pProbeResp->capabilityInfo.shortPreamble =
-		pr->Capabilities.shortPreamble;
-	pProbeResp->capabilityInfo.pbcc = pr->Capabilities.pbcc;
-	pProbeResp->capabilityInfo.channelAgility =
-		pr->Capabilities.channelAgility;
-	pProbeResp->capabilityInfo.spectrumMgt = pr->Capabilities.spectrumMgt;
-	pProbeResp->capabilityInfo.qos = pr->Capabilities.qos;
-	pProbeResp->capabilityInfo.shortSlotTime =
-		pr->Capabilities.shortSlotTime;
-	pProbeResp->capabilityInfo.apsd = pr->Capabilities.apsd;
-	pProbeResp->capabilityInfo.rrm = pr->Capabilities.rrm;
-	pProbeResp->capabilityInfo.dsssOfdm = pr->Capabilities.dsssOfdm;
-	pProbeResp->capabilityInfo.delayedBA = pr->Capabilities.delayedBA;
-	pProbeResp->capabilityInfo.immediateBA = pr->Capabilities.immediateBA;
+	sir_copy_caps_info(pMac, pr->Capabilities, pProbeResp);
 
 	if (!pr->SSID.present) {
 		pe_warn("Mandatory IE SSID not present!");
@@ -2619,14 +2621,14 @@ tSirRetStatus sir_convert_probe_frame2_struct(tpAniSirGlobal pMac,
 	}
 	if (pr->MBO_IE.present) {
 		pProbeResp->MBO_IE_present = true;
-		pProbeResp->MBO_capability = pr->MBO_IE.mbo_cap[2];
+		if (pr->MBO_IE.cellular_data_cap.present)
+			pProbeResp->MBO_capability =
+				pr->MBO_IE.cellular_data_cap.cellular_connectivity;
 
-		if (pr->MBO_IE.num_assoc_disallowed &&
-			(pr->MBO_IE.assoc_disallowed[0] ==
-				 MBO_IE_ASSOC_DISALLOWED_SUBATTR_ID)) {
+		if (pr->MBO_IE.assoc_disallowed.present) {
 			pProbeResp->assoc_disallowed = true;
 			pProbeResp->assoc_disallowed_reason =
-				pr->MBO_IE.assoc_disallowed[2];
+				pr->MBO_IE.assoc_disallowed.reason_code;
 		}
 	}
 
@@ -3910,14 +3912,14 @@ sir_parse_beacon_ie(tpAniSirGlobal pMac,
 
 	if (pBies->MBO_IE.present) {
 		pBeaconStruct->MBO_IE_present = true;
-		pBeaconStruct->MBO_capability = pBies->MBO_IE.mbo_cap[2];
+		if (pBies->MBO_IE.cellular_data_cap.present)
+			pBeaconStruct->MBO_capability =
+				pBies->MBO_IE.cellular_data_cap.cellular_connectivity;
 
-		if (pBies->MBO_IE.num_assoc_disallowed &&
-			(pBies->MBO_IE.assoc_disallowed[0] ==
-				 MBO_IE_ASSOC_DISALLOWED_SUBATTR_ID)) {
+		if (pBies->MBO_IE.assoc_disallowed.present) {
 			pBeaconStruct->assoc_disallowed = true;
 			pBeaconStruct->assoc_disallowed_reason =
-				pBies->MBO_IE.assoc_disallowed[2];
+				pBies->MBO_IE.assoc_disallowed.reason_code;
 		}
 	}
 
@@ -4299,14 +4301,14 @@ sir_convert_beacon_frame2_struct(tpAniSirGlobal pMac,
 	}
 	if (pBeacon->MBO_IE.present) {
 		pBeaconStruct->MBO_IE_present = true;
-		pBeaconStruct->MBO_capability = pBeacon->MBO_IE.mbo_cap[2];
+		if (pBeacon->MBO_IE.cellular_data_cap.present)
+			pBeaconStruct->MBO_capability =
+				pBeacon->MBO_IE.cellular_data_cap.cellular_connectivity;
 
-		if (pBeacon->MBO_IE.num_assoc_disallowed &&
-			(pBeacon->MBO_IE.assoc_disallowed[0] ==
-				 MBO_IE_ASSOC_DISALLOWED_SUBATTR_ID)) {
+		if (pBeacon->MBO_IE.assoc_disallowed.present) {
 			pBeaconStruct->assoc_disallowed = true;
 			pBeaconStruct->assoc_disallowed_reason =
-				pBeacon->MBO_IE.assoc_disallowed[2];
+				pBeacon->MBO_IE.assoc_disallowed.reason_code;
 		}
 	}
 

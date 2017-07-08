@@ -116,7 +116,7 @@ bool wma_is_vdev_in_ap_mode(tp_wma_handle wma, uint8_t vdev_id)
 {
 	struct wma_txrx_node *intf = wma->interfaces;
 
-	if (vdev_id > wma->max_bssid) {
+	if (vdev_id >= wma->max_bssid) {
 		WMA_LOGE("%s: Invalid vdev_id %hu", __func__, vdev_id);
 		QDF_ASSERT(0);
 		return false;
@@ -145,7 +145,7 @@ bool wma_is_vdev_in_ibss_mode(tp_wma_handle wma, uint8_t vdev_id)
 {
 	struct wma_txrx_node *intf = wma->interfaces;
 
-	if (vdev_id > wma->max_bssid) {
+	if (vdev_id >= wma->max_bssid) {
 		WMA_LOGE("%s: Invalid vdev_id %hu", __func__, vdev_id);
 		QDF_ASSERT(0);
 		return false;
@@ -968,7 +968,7 @@ int wma_vdev_start_resp_handler(void *handle, uint8_t *cmd_param_info,
 		return -EINVAL;
 	}
 
-	if ((resp_event->vdev_id <= wma->max_bssid) &&
+	if ((resp_event->vdev_id < wma->max_bssid) &&
 	    (qdf_atomic_read(
 	    &wma->interfaces[resp_event->vdev_id].vdev_restart_params.hidden_ssid_restart_in_progress))
 	    && (wma_is_vdev_in_ap_mode(wma, resp_event->vdev_id) == true)) {
@@ -1235,6 +1235,42 @@ peer_detach:
 }
 
 /**
+ * wma_find_duplicate_peer_on_other_vdev() - Find if same peer exist
+ * on other vdevs
+ * @wma: wma handle
+ * @pdev: txrx pdev ptr
+ * @vdev_id: vdev id of vdev on which the peer
+ *           needs to be added
+ * @peer_mac: peer mac addr which needs to be added
+ *
+ * Check if peer with same MAC is present on vdev other then
+ * the provided vdev_id
+ *
+ * Return: true if same peer is present on vdev other then vdev_id
+ * else return false
+ */
+static bool wma_find_duplicate_peer_on_other_vdev(tp_wma_handle wma,
+	ol_txrx_pdev_handle pdev, uint8_t vdev_id, uint8_t *peer_mac)
+{
+	int i;
+	uint8_t peer_id;
+
+	for (i = 0; i < wma->max_bssid; i++) {
+		/* Need to check vdevs other than the vdev_id */
+		if (vdev_id == i ||
+		   !wma->interfaces[i].handle)
+			continue;
+		if (ol_txrx_find_peer_by_addr_and_vdev(pdev,
+			wma->interfaces[i].handle, peer_mac, &peer_id)) {
+			WMA_LOGE("%s :Duplicate peer %pM (peer id %d) already exist on vdev %d",
+				__func__, peer_mac, peer_id, i);
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
  * wma_create_peer() - send peer create command to fw
  * @wma: wma handle
  * @pdev: txrx pdev ptr
@@ -1256,12 +1292,22 @@ QDF_STATUS wma_create_peer(tp_wma_handle wma, ol_txrx_pdev_handle pdev,
 	struct peer_create_params param = {0};
 	uint8_t *mac_addr_raw;
 
+
 	if (++wma->interfaces[vdev_id].peer_count >
 	    wma->wlan_resource_config.num_peers) {
 		WMA_LOGE("%s, the peer count exceeds the limit %d", __func__,
 			 wma->interfaces[vdev_id].peer_count - 1);
 		goto err;
 	}
+
+	/*
+	 * Check if peer with same MAC exist on other Vdev, If so avoid
+	 * adding this peer, as it will cause FW to crash.
+	 */
+	if (wma_find_duplicate_peer_on_other_vdev(wma, pdev,
+	   vdev_id, peer_addr))
+		goto err;
+
 	peer = ol_txrx_peer_attach(vdev, peer_addr);
 	if (!peer) {
 		WMA_LOGE("%s : Unable to attach peer %pM", __func__, peer_addr);
@@ -1337,7 +1383,7 @@ static void wma_delete_all_ibss_peers(tp_wma_handle wma, A_UINT32 vdev_id)
 {
 	ol_txrx_vdev_handle vdev;
 
-	if (!wma || vdev_id > wma->max_bssid)
+	if (!wma || vdev_id >= wma->max_bssid)
 		return;
 
 	vdev = wma->interfaces[vdev_id].handle;
@@ -1383,7 +1429,7 @@ static void wma_delete_all_ap_remote_peers(tp_wma_handle wma, A_UINT32 vdev_id)
 {
 	ol_txrx_vdev_handle vdev;
 
-	if (!wma || vdev_id > wma->max_bssid)
+	if (!wma || vdev_id >= wma->max_bssid)
 		return;
 
 	vdev = wma->interfaces[vdev_id].handle;
@@ -1686,7 +1732,7 @@ int wma_vdev_stop_resp_handler(void *handle, uint8_t *cmd_param_info,
 		return -EINVAL;
 	}
 
-	if ((resp_event->vdev_id <= wma->max_bssid) &&
+	if ((resp_event->vdev_id < wma->max_bssid) &&
 	    (qdf_atomic_read
 		     (&wma->interfaces[resp_event->vdev_id].vdev_restart_params.
 		     hidden_ssid_restart_in_progress))
@@ -1725,7 +1771,7 @@ int wma_vdev_stop_resp_handler(void *handle, uint8_t *cmd_param_info,
 		tpDeleteBssParams params =
 			(tpDeleteBssParams) req_msg->user_data;
 
-		if (resp_event->vdev_id > wma->max_bssid) {
+		if (resp_event->vdev_id >= wma->max_bssid) {
 			WMA_LOGE("%s: Invalid vdev_id %d", __func__,
 				 resp_event->vdev_id);
 			wma_cleanup_target_req_param(req_msg);
@@ -2907,7 +2953,7 @@ void wma_vdev_resp_timer(void *data)
 		struct beacon_info *bcn;
 		struct wma_txrx_node *iface;
 
-		if (tgt_req->vdev_id > wma->max_bssid) {
+		if (tgt_req->vdev_id >= wma->max_bssid) {
 			WMA_LOGE("%s: Invalid vdev_id %d", __func__,
 				 tgt_req->vdev_id);
 			wma_cleanup_target_req_param(tgt_req);
@@ -3748,10 +3794,11 @@ static void wma_add_bss_sta_mode(tp_wma_handle wma, tpAddBssParams add_bss)
 
 	}
 send_bss_resp:
-	ol_txrx_find_peer_by_addr(pdev, add_bss->bssId,
-				  &add_bss->staContext.staIdx);
-	add_bss->status = (add_bss->staContext.staIdx < 0) ?
-			  QDF_STATUS_E_FAILURE : QDF_STATUS_SUCCESS;
+	if (NULL == ol_txrx_find_peer_by_addr(pdev, add_bss->bssId,
+				  &add_bss->staContext.staIdx))
+		add_bss->status = QDF_STATUS_E_FAILURE;
+	else
+		add_bss->status = QDF_STATUS_SUCCESS;
 	add_bss->bssIdx = add_bss->staContext.smesessionId;
 	qdf_mem_copy(add_bss->staContext.staMac, add_bss->bssId,
 		     sizeof(add_bss->staContext.staMac));
@@ -4107,6 +4154,12 @@ static void wma_add_tdls_sta(tp_wma_handle wma, tpAddStaParams add_sta)
 	if (!vdev) {
 		WMA_LOGE("%s: Failed to find vdev", __func__);
 		add_sta->status = QDF_STATUS_E_FAILURE;
+		goto send_rsp;
+	}
+
+	if (wma_is_roam_synch_in_progress(wma, add_sta->smesessionId)) {
+		WMA_LOGE("%s: roaming in progress, reject add sta!", __func__);
+		add_sta->status = QDF_STATUS_E_PERM;
 		goto send_rsp;
 	}
 
@@ -4548,6 +4601,12 @@ static void wma_del_tdls_sta(tp_wma_handle wma, tpDeleteStaParams del_sta)
 		WMA_LOGE("%s: Failed to allocate memory for peerStateParams for: %pM",
 			__func__, del_sta->staMac);
 		del_sta->status = QDF_STATUS_E_NOMEM;
+		goto send_del_rsp;
+	}
+
+	if (wma_is_roam_synch_in_progress(wma, del_sta->smesessionId)) {
+		WMA_LOGE("%s: roaming in progress, reject del sta!", __func__);
+		del_sta->status = QDF_STATUS_E_PERM;
 		goto send_del_rsp;
 	}
 

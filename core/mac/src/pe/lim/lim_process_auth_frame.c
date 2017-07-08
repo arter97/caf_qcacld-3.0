@@ -282,7 +282,7 @@ static void lim_process_auth_frame_type1(tpAniSirGlobal mac_ctx,
 	if (sta_ds_ptr) {
 		tLimMlmDisassocReq *pMlmDisassocReq = NULL;
 		tLimMlmDeauthReq *pMlmDeauthReq = NULL;
-		tAniBool isConnected = eSIR_TRUE;
+		bool isConnected = true;
 
 		pMlmDisassocReq =
 			mac_ctx->lim.limDisassocDeauthCnfReq.pMlmDisassocReq;
@@ -295,7 +295,7 @@ static void lim_process_auth_frame_type1(tpAniSirGlobal mac_ctx,
 				MAC_ADDR_ARRAY(
 					pMlmDisassocReq->peer_macaddr.bytes));
 			lim_process_disassoc_ack_timeout(mac_ctx);
-			isConnected = eSIR_FALSE;
+			isConnected = false;
 		}
 		pMlmDeauthReq =
 			mac_ctx->lim.limDisassocDeauthCnfReq.pMlmDeauthReq;
@@ -308,7 +308,7 @@ static void lim_process_auth_frame_type1(tpAniSirGlobal mac_ctx,
 				MAC_ADDR_ARRAY(
 					pMlmDeauthReq->peer_macaddr.bytes));
 			lim_process_deauth_ack_timeout(mac_ctx);
-			isConnected = eSIR_FALSE;
+			isConnected = false;
 		}
 
 		/*
@@ -515,7 +515,7 @@ static void lim_process_auth_frame_type2(tpAniSirGlobal mac_ctx,
 	uint32_t val, key_length = 8;
 	uint8_t defaultkey[SIR_MAC_KEY_LENGTH];
 	struct tLimPreAuthNode *auth_node;
-	uint8_t encr_auth_frame[LIM_ENCR_AUTH_BODY_LEN];
+	uint8_t *encr_auth_frame;
 
 	/* AuthFrame 2 */
 	if (pe_session->limMlmState != eLIM_MLM_WT_AUTH_FRAME2_STATE) {
@@ -732,6 +732,11 @@ static void lim_process_auth_frame_type2(tpAniSirGlobal mac_ctx,
 			(tpSirMacAuthFrameBody)plainbody)->challengeText,
 			rx_auth_frm_body->challengeText,
 			SIR_MAC_AUTH_CHALLENGE_LENGTH);
+		encr_auth_frame = qdf_mem_malloc(LIM_ENCR_AUTH_BODY_LEN);
+		if (!encr_auth_frame) {
+			pe_err("failed to allocate memory");
+			return;
+		}
 		lim_encrypt_auth_frame(mac_ctx, key_id,
 				defaultkey, plainbody,
 				encr_auth_frame, key_length);
@@ -743,7 +748,7 @@ static void lim_process_auth_frame_type2(tpAniSirGlobal mac_ctx,
 				(tpSirMacAuthFrameBody)encr_auth_frame,
 				mac_hdr->sa, LIM_WEP_IN_FC,
 				pe_session);
-
+		qdf_mem_free(encr_auth_frame);
 		return;
 	}
 }
@@ -1429,7 +1434,7 @@ tSirRetStatus lim_process_auth_frame_no_session(tpAniSirGlobal pMac, uint8_t *pB
 	}
 
 	if (psessionEntry == NULL) {
-		pe_err("Error: Unable to find session id while in pre-auth phase for FT");
+		pe_debug("cannot find session id in FT pre-auth phase");
 		return eSIR_FAILURE;
 	}
 

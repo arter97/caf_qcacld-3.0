@@ -728,7 +728,7 @@ static inline void cds_check_and_restart_sap_with_non_dfs_acs(void)
 #endif /* FEATURE_WLAN_STA_AP_MODE_DFS_DISABLE */
 void cds_incr_active_session(enum tQDF_ADAPTER_MODE mode,
 				uint8_t sessionId);
-void cds_decr_active_session(enum tQDF_ADAPTER_MODE mode,
+QDF_STATUS cds_decr_active_session(enum tQDF_ADAPTER_MODE mode,
 				uint8_t sessionId);
 void cds_decr_session_set_pcl(enum tQDF_ADAPTER_MODE mode,
 		uint8_t session_id);
@@ -888,6 +888,19 @@ void cds_dump_connection_status_info(void);
 uint32_t cds_mode_specific_vdev_id(enum cds_con_mode mode);
 uint32_t cds_mode_specific_connection_count(enum cds_con_mode mode,
 						uint32_t *list);
+/**
+ * cds_check_conn_with_mode_and_vdev_id() - checks if any active
+ * session with specific mode and vdev_id
+ * @mode: type of connection
+ * @vdev_id: vdev_id of the connection
+ *
+ * This function checks if any active session with specific mode and vdev_id
+ * is present
+ *
+ * Return: QDF STATUS with success if active session is found, else failure
+ */
+QDF_STATUS cds_check_conn_with_mode_and_vdev_id(enum cds_con_mode mode,
+						uint32_t vdev_id);
 void cds_hw_mode_transition_cb(uint32_t old_hw_mode_index,
 			uint32_t new_hw_mode_index,
 			uint32_t num_vdev_mac_entries,
@@ -900,4 +913,67 @@ void cds_remove_sap_mandatory_chan(uint8_t chan);
 bool cds_is_sap_mandatory_chan_list_enabled(void);
 void cds_init_sap_mandatory_2g_chan(void);
 uint32_t cds_get_sap_mandatory_chan_list_len(void);
+/**
+ * cds_save_wlan_unsafe_channels() - saves the
+ * LTE channel avoidance list in cds
+ * @unsafe_channel_list: LTE channel avoidance list
+ * @unsafe_channel_count: LTE channel avoidance list count
+ *
+ * This function saves the LTE unsafe channels in cds context
+ *
+ * Return: None
+ */
+void cds_save_wlan_unsafe_channels(uint16_t *unsafe_channel_list,
+		uint16_t unsafe_channel_count);
+/**
+ * cds_is_force_scc() - checks if SCC needs to be mandated
+ *
+ * This function checks if SCC needs to be mandated or not
+ *
+ * Return: True if SCC to be mandated, false otherwise
+ */
+bool cds_is_force_scc(void);
+/**
+ * cds_valid_sap_conc_channel_check() - checks & updates the channel
+ * SAP to come up on in case of STA+SAP concurrency
+ * @con_ch: pointer to the channel on which sap will come up
+ * @sap_ch: initial channel for SAP
+ *
+ * This function checks & updates the channel SAP to come up on in
+ * case of STA+SAP concurrency
+ * Return: Success if SAP can come up on a channel
+ */
+QDF_STATUS cds_valid_sap_conc_channel_check(uint8_t *con_ch, uint8_t sap_ch);
+/**
+ * cds_is_safe_channel() - checks if the channel is
+ * LTE safe
+ * @channel: channel on which a beaconing entity might come up
+ *
+ * This function checks if the channel is LTE safe
+ *
+ * Return: Success if the channel is LTE safe
+ */
+bool cds_is_safe_channel(uint8_t channel);
+/**
+ * cds_disallow_mcc() - Check for mcc
+ *
+ * @channel: channel on which new connection is coming up
+ *
+ * When a new connection is about to come up check if current
+ * concurrency combination including the new connection is
+ * causing MCC
+ *
+ * Return: True if it is causing MCC
+ */
+bool cds_disallow_mcc(uint8_t channel);
+/**
+ * cds_get_alternate_channel_for_sap() - checks if any alternate channel can
+ * be obtained from PCL if current channel can't be allowed
+ *
+ * This function checks if any alternate channel can be obtained
+ * from PCL or other means if current channel for SAP can't be allowed
+ *
+ * Return: New channel
+ */
+uint8_t cds_get_alternate_channel_for_sap(void);
 #endif /* __CDS_CONCURRENCY_H */

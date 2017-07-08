@@ -61,23 +61,10 @@ ifeq ($(KERNEL_BUILD), 0)
 	CONFIG_WLAN_DISABLE_EXPORT_SYMBOL := y
 	endif
 
-	# As per target team, build is done as follows:
-	# Defconfig : build with default flags
-	# Slub      : defconfig  + CONFIG_SLUB_DEBUG=y +
-	#	      CONFIG_SLUB_DEBUG_ON=y + CONFIG_PAGE_POISONING=y
-	# Perf      : Using appropriate msmXXXX-perf_defconfig
-	#
-	# Shipment builds (user variants) should not have any debug feature
-	# enabled. This is identified using 'TARGET_BUILD_VARIANT'. Slub builds
-	# are identified using the CONFIG_SLUB_DEBUG_ON configuration. Since
-	# there is no other way to identify defconfig builds, QCOMs internal
-	# representation of perf builds (identified using the string 'perf'),
-	# is used to identify if the build is a slub or defconfig one. This
-	# way no critical debug feature will be enabled for perf and shipment
-	# builds. Other OEMs are also protected using the TARGET_BUILD_VARIANT
-	# config.
-	ifneq ($(TARGET_BUILD_VARIANT),user)
-		CONFIG_FEATURE_PKTLOG := y
+	ifeq ($(CONFIG_ARCH_MSM8917), y)
+		ifeq ($(CONFIG_ROME_IF), sdio)
+			CONFIG_WLAN_SYNC_TSF_PLUS := y
+		endif
 	endif
 
 	#Flag to enable Legacy Fast Roaming2(LFR2)
@@ -123,8 +110,11 @@ ifeq ($(KERNEL_BUILD), 0)
 	#Flag to enable Fast Transition (11r) feature
 	CONFIG_QCOM_VOWIFI_11R := y
 
+	ifneq ($(CONFIG_ARCH_SDX20), y)
 	#Flag to enable FILS Feature (11ai)
 	CONFIG_WLAN_FEATURE_FILS := y
+	endif
+
 	ifneq ($(CONFIG_QCA_CLD_WLAN),)
 		ifeq (y,$(findstring y,$(CONFIG_CNSS) $(CONFIG_ICNSS)))
 		#Flag to enable Protected Managment Frames (11w) feature
@@ -224,6 +214,27 @@ endif
 	CONFIG_MCC_TO_SCC_SWITCH := y
 
 endif
+
+
+# As per target team, build is done as follows:
+# Defconfig : build with default flags
+# Slub      : defconfig  + CONFIG_SLUB_DEBUG=y +
+#	      CONFIG_SLUB_DEBUG_ON=y + CONFIG_PAGE_POISONING=y
+# Perf      : Using appropriate msmXXXX-perf_defconfig
+#
+# Shipment builds (user variants) should not have any debug feature
+# enabled. This is identified using 'TARGET_BUILD_VARIANT'. Slub builds
+# are identified using the CONFIG_SLUB_DEBUG_ON configuration. Since
+# there is no other way to identify defconfig builds, QCOMs internal
+# representation of perf builds (identified using the string 'perf'),
+# is used to identify if the build is a slub or defconfig one. This
+# way no critical debug feature will be enabled for perf and shipment
+# builds. Other OEMs are also protected using the TARGET_BUILD_VARIANT
+# config.
+ifneq ($(TARGET_BUILD_VARIANT),user)
+	CONFIG_FEATURE_PKTLOG := y
+endif
+
 
 #Enable WLAN/Power debugfs feature only if debug_fs is enabled
 ifeq ($(CONFIG_DEBUG_FS), y)
@@ -357,6 +368,10 @@ ifeq ($(CONFIG_IPA), y)
 CONFIG_IPA_OFFLOAD := 1
 CONFIG_NUM_IPA_IFACE := 3
 endif
+ifeq ($(CONFIG_IPA3), y)
+CONFIG_IPA_OFFLOAD := 1
+CONFIG_NUM_IPA_IFACE := 2
+endif
 
 #Enable Signed firmware support for split binary format
 CONFIG_QCA_SIGNED_SPLIT_BINARY_SUPPORT := 0
@@ -460,6 +475,10 @@ endif
 
 ifeq ($(CONFIG_QCOM_TDLS),y)
 HDD_OBJS +=	$(HDD_SRC_DIR)/wlan_hdd_tdls.o
+endif
+
+ifeq ($(CONFIG_WLAN_SYNC_TSF_PLUS), y)
+CONFIG_WLAN_SYNC_TSF := y
 endif
 
 ifeq ($(CONFIG_WLAN_SYNC_TSF),y)
@@ -1602,6 +1621,10 @@ ifeq ($(CONFIG_WLAN_SYNC_TSF), y)
 CDEFINES += -DWLAN_FEATURE_TSF
 endif
 
+ifeq ($(CONFIG_WLAN_SYNC_TSF_PLUS), y)
+CDEFINES += -DWLAN_FEATURE_TSF_PLUS
+endif
+
 # Enable full rx re-order offload for adrastea
 ifeq (y, $(filter y, $(CONFIG_CNSS_ADRASTEA) $(CONFIG_ICNSS)))
 CDEFINES += -DWLAN_FEATURE_RX_FULL_REORDER_OL
@@ -1635,6 +1658,7 @@ endif
 
 ifeq ($(CONFIG_SLUB_DEBUG_ON),y)
 CDEFINES += -DOL_RX_INDICATION_RECORD
+CDEFINES += -DTSOSEG_DEBUG
 endif
 
 endif
@@ -1735,3 +1759,6 @@ endif
 # Module information used by KBuild framework
 obj-$(CONFIG_QCA_CLD_WLAN) += $(MODNAME).o
 $(MODNAME)-y := $(OBJS)
+
+# inject some build related information
+CDEFINES += -DBUILD_TIMESTAMP=\"$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')\"

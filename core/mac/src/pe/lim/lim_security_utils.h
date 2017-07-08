@@ -39,14 +39,11 @@
 #define __LIM_SECURITY_UTILS_H
 #include "sir_mac_prot_def.h"      /* for tSirMacAuthFrameBody */
 
-#define LIM_ENCR_AUTH_BODY_LEN  (sizeof(tSirMacAuthFrameBody) -	\
-				 sizeof(tSirMacRsnInfo) - \
-				 2 * sizeof(uint8_t) - \
-				 SIR_FILS_SESSION_LENGTH - \
-				 SIR_FILS_WRAPPED_DATA_MAX_SIZE - \
-				 SIR_FILS_NONCE_LENGTH + \
+#define LIM_ENCR_AUTH_BODY_LEN  (SIR_MAC_AUTH_FRAME_INFO_LEN + \
+				 SIR_MAC_AUTH_CHALLENGE_BODY_LEN + \
 				 SIR_MAC_WEP_IV_LENGTH + \
 				 SIR_MAC_WEP_ICV_LENGTH)
+
 struct tLimPreAuthNode;
 
 uint8_t lim_is_auth_algo_supported(tpAniSirGlobal, tAniAuthType, tpPESession);

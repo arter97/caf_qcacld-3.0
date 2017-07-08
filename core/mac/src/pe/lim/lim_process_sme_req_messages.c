@@ -169,7 +169,7 @@ static QDF_STATUS lim_process_set_hw_mode(tpAniSirGlobal mac, uint32_t *msg)
 	cds_message.type    = SIR_HAL_PDEV_SET_HW_MODE;
 
 	pe_debug("Posting SIR_HAL_SOC_SET_HW_MOD to WMA");
-	status = cds_mq_post_message(CDS_MQ_ID_WMA, &cds_message);
+	status = cds_mq_post_message(QDF_MODULE_ID_WMA, &cds_message);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		pe_err("cds_mq_post_message failed!(err=%d)",
 			status);
@@ -240,7 +240,7 @@ static QDF_STATUS lim_process_set_dual_mac_cfg_req(tpAniSirGlobal mac,
 
 	pe_debug("Post SIR_HAL_PDEV_DUAL_MAC_CFG_REQ to WMA: %x %x",
 		req_msg->scan_config, req_msg->fw_mode_config);
-	status = cds_mq_post_message(CDS_MQ_ID_WMA, &cds_message);
+	status = cds_mq_post_message(QDF_MODULE_ID_WMA, &cds_message);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		pe_err("cds_mq_post_message failed!(err=%d)",
 				status);
@@ -304,7 +304,7 @@ static QDF_STATUS lim_process_set_antenna_mode_req(tpAniSirGlobal mac,
 	pe_debug("Post SIR_HAL_SOC_ANTENNA_MODE_REQ to WMA: %d %d",
 		req_msg->num_rx_chains,
 		req_msg->num_tx_chains);
-	status = cds_mq_post_message(CDS_MQ_ID_WMA, &cds_message);
+	status = cds_mq_post_message(QDF_MODULE_ID_WMA, &cds_message);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		pe_err("cds_mq_post_message failed!(err=%d)",
 				status);
@@ -2746,23 +2746,23 @@ static void __lim_process_sme_deauth_req(tpAniSirGlobal mac_ctx,
 				ret_code = eSIR_SME_STA_NOT_AUTHENTICATED;
 				deauth_trigger = eLIM_HOST_DEAUTH;
 
-			/*
-			 * here we received deauth request from AP so sme state
-			 * is eLIM_SME_WT_DEAUTH_STATE.if we have ISSUED
-			 * delSta then mlm state should be
-			 * eLIM_MLM_WT_DEL_STA_RSP_STATE and ifwe got delBSS
-			 * rsp then mlm state should be eLIM_MLM_IDLE_STATE
-			 * so the below condition captures the state where
-			 * delSta not done and firmware still in
-			 * connected state.
-			 */
-			if (session_entry->limSmeState ==
+				/*
+				 * here we received deauth request from AP so
+				 * sme state is eLIM_SME_WT_DEAUTH_STATE.if we
+				 * have ISSUED delSta then mlm state should be
+				 * eLIM_MLM_WT_DEL_STA_RSP_STATE and ifwe got
+				 * delBSS rsp then mlm state should be
+				 * eLIM_MLM_IDLE_STATE so the below condition
+				 * captures the state where delSta not done
+				 * and firmware still in connected state.
+				 */
+				if (session_entry->limSmeState ==
 					eLIM_SME_WT_DEAUTH_STATE &&
 					session_entry->limMlmState !=
 					eLIM_MLM_IDLE_STATE &&
 					session_entry->limMlmState !=
 					eLIM_MLM_WT_DEL_STA_RSP_STATE)
-				ret_code = eSIR_SME_DEAUTH_STATUS;
+					ret_code = eSIR_SME_DEAUTH_STATUS;
 				goto send_deauth;
 			}
 			return;
@@ -3520,7 +3520,7 @@ void __lim_process_sme_assoc_cnf_new(tpAniSirGlobal mac_ctx, uint32_t msg_type,
 				       sta_ds->mlmStaContext.subType,
 				       true, sta_ds->mlmStaContext.authType,
 				       sta_ds->assocId, true,
-				       eSIR_MAC_UNSPEC_FAILURE_STATUS,
+				       eSIR_SME_UNEXPECTED_REQ_RESULT_CODE,
 				       session_entry);
 	}
 end:
@@ -3950,6 +3950,48 @@ __lim_process_sme_update_apwpsi_es(tpAniSirGlobal pMac, uint32_t *pMsgBuf)
 end:
 	qdf_mem_free(pUpdateAPWPSIEsReq);
 	return;
+}
+
+static void lim_process_sme_update_config(tpAniSirGlobal mac_ctx,
+					  struct update_config *msg)
+{
+	tpPESession pe_session;
+
+	pe_debug("received eWNI_SME_UPDATE_HT_CONFIG message");
+	if (msg == NULL) {
+		pe_err("Buffer is Pointing to NULL");
+		return;
+	}
+
+	pe_session = pe_find_session_by_sme_session_id(mac_ctx,
+						       msg->sme_session_id);
+	if (pe_session == NULL) {
+		pe_warn("Session does not exist for given BSSID");
+		return;
+	}
+
+	switch (msg->capab) {
+	case WNI_CFG_HT_CAP_INFO_ADVANCE_CODING:
+		pe_session->htConfig.ht_rx_ldpc = msg->value;
+		break;
+	case WNI_CFG_HT_CAP_INFO_TX_STBC:
+		pe_session->htConfig.ht_tx_stbc = msg->value;
+		break;
+	case WNI_CFG_HT_CAP_INFO_RX_STBC:
+		pe_session->htConfig.ht_rx_stbc = msg->value;
+		break;
+	case WNI_CFG_HT_CAP_INFO_SHORT_GI_20MHZ:
+		pe_session->htConfig.ht_sgi20 = msg->value;
+		break;
+	case WNI_CFG_HT_CAP_INFO_SHORT_GI_40MHZ:
+		pe_session->htConfig.ht_sgi40 = msg->value;
+		break;
+	}
+
+	if (LIM_IS_AP_ROLE(pe_session)) {
+		sch_set_fixed_beacon_fields(mac_ctx, pe_session);
+		lim_send_beacon_ind(mac_ctx, pe_session);
+	}
 }
 
 void
@@ -5248,6 +5290,10 @@ bool lim_process_sme_req_messages(tpAniSirGlobal pMac, tpSirMsgQ pMsg)
 		break;
 	case eWNI_SME_UPDATE_ACCESS_POLICY_VENDOR_IE:
 		lim_process_sme_update_access_policy_vendor_ie(pMac, pMsgBuf);
+		break;
+	case eWNI_SME_UPDATE_CONFIG:
+		lim_process_sme_update_config(pMac,
+					(struct update_config *)pMsgBuf);
 		break;
 	default:
 		qdf_mem_free((void *)pMsg->bodyptr);

@@ -40,6 +40,7 @@
 #include "cfg_api.h"
 #include "qdf_status.h"
 #include "cds_sched.h"
+#include "cds_config.h"
 #include "sir_mac_prot_def.h"
 #include "wma_types.h"
 #include "ol_txrx_types.h"
@@ -48,7 +49,6 @@
 #include "lim_types.h"
 #include "wmi_unified_api.h"
 #include "cdp_txrx_cmn.h"
-#include "ol_defines.h"
 #include "dbglog.h"
 #include "wma_spectral.h"
 
@@ -269,6 +269,7 @@ enum ds_mode {
 #define WMA_DELETE_PEER_RSP 0x05
 #define WMA_VDEV_START_REQUEST_TIMEOUT (6000)   /* 6 seconds */
 #define WMA_VDEV_STOP_REQUEST_TIMEOUT  (6000)   /* 6 seconds */
+#define WMA_VDEV_HW_MODE_REQUEST_TIMEOUT (5000) /* 5 seconds */
 
 #define WMA_TGT_INVALID_SNR (0)
 
@@ -333,6 +334,8 @@ enum ds_mode {
 #define WMA_ROAM_HO_WAKE_LOCK_DURATION          (500)          /* in msec */
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
 #define WMA_AUTO_SHUTDOWN_WAKE_LOCK_DURATION    (5 * 1000)     /* in msec */
+#else
+#define WMA_AUTO_SHUTDOWN_WAKE_LOCK_DURATION    0              /* in msec */
 #endif
 #define WMA_BMISS_EVENT_WAKE_LOCK_DURATION      (4 * 1000)     /* in msec */
 #define WMA_FW_RSP_EVENT_WAKE_LOCK_DURATION     (3 * 1000)     /* in msec */
@@ -533,18 +536,6 @@ typedef void (*encrypt_decrypt_cb)(struct sir_encrypt_decrypt_rsp_params
 
 typedef void (*tp_wma_packetdump_cb)(qdf_nbuf_t netbuf,
 			uint8_t status, uint8_t vdev_id, uint8_t type);
-
-/**
- * enum t_wma_drv_type - wma driver type
- * @WMA_DRIVER_TYPE_PRODUCTION: production driver type
- * @WMA_DRIVER_TYPE_MFG: manufacture driver type
- * @WMA_DRIVER_TYPE_INVALID: invalid driver type
- */
-typedef enum {
-	WMA_DRIVER_TYPE_PRODUCTION = 0,
-	WMA_DRIVER_TYPE_MFG = 1,
-	WMA_DRIVER_TYPE_INVALID = 0x7FFFFFFF
-} t_wma_drv_type;
 
 #ifdef FEATURE_WLAN_TDLS
 /**
@@ -1021,6 +1012,7 @@ typedef struct {
  * @plink_status_req: link status request
  * @psnr_req: snr request
  * @delay_before_vdev_stop: delay
+ * @override_li: dynamically user configured listen interval
  * @tx_streams: number of tx streams can be used by the vdev
  * @rx_streams: number of rx streams can be used by the vdev
  * @chain_mask: chain mask can be used by the vdev
@@ -1096,6 +1088,7 @@ struct wma_txrx_node {
 #endif
 	uint32_t alt_modulated_dtim;
 	bool alt_modulated_dtim_enabled;
+	uint32_t override_li;
 	uint32_t tx_streams;
 	uint32_t rx_streams;
 	uint32_t chain_mask;
@@ -1411,6 +1404,13 @@ struct peer_debug_info {
  * @pno_wake_lock: PNO wake lock
  * @extscan_wake_lock: extscan wake lock
  * @wow_wake_lock: wow wake lock
+ * @wow_auth_req_wl: wow wake lock for auth req
+ * @wow_assoc_req_wl: wow wake lock for assoc req
+ * @wow_deauth_rec_wl: wow wake lock for deauth req
+ * @wow_disassoc_rec_wl: wow wake lock for disassoc req
+ * @wow_ap_assoc_lost_wl: wow wake lock for assoc lost req
+ * @wow_auto_shutdown_wl: wow wake lock for shutdown req
+ * @roam_ho_wl: wake lock for roam handoff req
  * @wow_nack: wow negative ack flag
  * @ap_client_cnt: ap client count
  * @is_wow_bus_suspended: is wow bus suspended flag
@@ -1489,7 +1489,7 @@ typedef struct {
 	qdf_event_t recovery_event;
 	uint16_t max_station;
 	uint16_t max_bssid;
-	t_wma_drv_type driver_type;
+	enum driver_type driver_type;
 	uint8_t myaddr[IEEE80211_ADDR_LEN];
 	uint8_t hwaddr[IEEE80211_ADDR_LEN];
 	wmi_abi_version target_abi_vers;
@@ -1557,6 +1557,9 @@ typedef struct {
 	uint8_t powersave_mode;
 	bool ptrn_match_enable_all_vdev;
 	void *pGetRssiReq;
+	bool get_one_peer_info;
+	bool get_sta_peer_info;
+	struct qdf_mac_addr peer_macaddr;
 	t_thermal_mgmt thermal_mgmt_info;
 	bool roam_offload_enabled;
 	/* Here ol_ini_info is used to store ini
@@ -1579,6 +1582,13 @@ typedef struct {
 	qdf_wake_lock_t extscan_wake_lock;
 #endif
 	qdf_wake_lock_t wow_wake_lock;
+	qdf_wake_lock_t wow_auth_req_wl;
+	qdf_wake_lock_t wow_assoc_req_wl;
+	qdf_wake_lock_t wow_deauth_rec_wl;
+	qdf_wake_lock_t wow_disassoc_rec_wl;
+	qdf_wake_lock_t wow_ap_assoc_lost_wl;
+	qdf_wake_lock_t wow_auto_shutdown_wl;
+	qdf_wake_lock_t roam_ho_wl;
 	int wow_nack;
 	bool wow_initial_wake_up;
 	qdf_atomic_t is_wow_bus_suspended;
@@ -1670,6 +1680,7 @@ typedef struct {
 	bool rcpi_enabled;
 	tSirLLStatsResults *link_stats_results;
 	bool fw_mem_dump_enabled;
+	bool tx_bfee_8ss_enabled;
 	tSirAddonPsReq ps_setting;
 	struct peer_debug_info *peer_dbg;
 	bool auto_power_save_enabled;
@@ -1707,7 +1718,7 @@ struct wma_target_cap {
 typedef struct {
 	void *pConfigBuffer;
 	uint16_t usConfigBufferLen;
-	t_wma_drv_type driver_type;
+	enum driver_type driver_type;
 	void *pUserData;
 	void *pIndUserData;
 } t_wma_start_req;
@@ -1739,8 +1750,8 @@ typedef struct qdf_packed sHalMacStartParameter {
 
 extern void cds_wma_complete_cback(void *p_cds_context);
 extern void wma_send_regdomain_info_to_fw(uint32_t reg_dmn, uint16_t regdmn2G,
-					  uint16_t regdmn5G, int8_t ctl2G,
-					  int8_t ctl5G);
+					  uint16_t regdmn5G, uint8_t ctl2G,
+					  uint8_t ctl5G);
 /**
  * enum frame_index - Frame index
  * @GENERIC_NODOWNLD_NOACK_COMP_INDEX: Frame index for no download comp no ack
@@ -2231,6 +2242,7 @@ typedef struct wma_unit_test_cmd {
  * @channel: channel
  * @frame_len: frame length, includs mac header, fixed params and ies
  * @frame_buf: buffer contaning probe response or beacon
+ * @is_same_bssid: flag to indicate if roaming is requested for same bssid
  */
 struct wma_roam_invoke_cmd {
 	uint32_t vdev_id;
@@ -2238,6 +2250,7 @@ struct wma_roam_invoke_cmd {
 	uint32_t channel;
 	uint32_t frame_len;
 	uint8_t *frame_buf;
+	uint8_t is_same_bssid;
 };
 
 /**
@@ -2604,4 +2617,16 @@ static inline void wma_print_wmi_mgmt_event_log(uint32_t count,
  */
 void wma_ipa_uc_stat_request(wma_cli_set_cmd_t *privcmd);
 
+/*
+ * wma_chan_info_event_handler() - chan info event handler
+ * @handle: wma handle
+ * @event_buf: event handler data
+ * @len: length of event_buf
+ *
+ * this function will handle the WMI_CHAN_INFO_EVENTID
+ *
+ * Return: int
+ */
+int wma_chan_info_event_handler(void *handle, u_int8_t *event_buf,
+						u_int32_t len);
 #endif

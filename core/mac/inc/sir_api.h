@@ -209,6 +209,7 @@ typedef enum {
  * @SIR_ROAMING_START: Firmware started roaming operation
  * @SIR_ROAMING_ABORT: Firmware aborted roaming operation, still connected.
  * @SIR_ROAM_SYNCH_COMPLETE: Roam sync propagation is complete.
+ * @SIR_ROAMING_INVOKE_FAIL: Firmware roaming failed.
  */
 enum sir_roam_op_code {
 	SIR_ROAM_SYNCH_PROPAGATION = 1,
@@ -217,6 +218,7 @@ enum sir_roam_op_code {
 	SIR_ROAMING_ABORT,
 	SIR_ROAM_SYNCH_COMPLETE,
 	SIR_ROAM_SYNCH_NAPI_OFF,
+	SIR_ROAMING_INVOKE_FAIL,
 };
 /**
  * Module ID definitions.
@@ -1238,15 +1240,15 @@ typedef struct sSirSmeJoinReq {
 	tAniEdType MgmtEncryptionType;
 #endif
 
-	tAniBool is11Rconnection;
+	bool is11Rconnection;
 #ifdef FEATURE_WLAN_ESE
-	tAniBool isESEFeatureIniEnabled;
-	tAniBool isESEconnection;
+	bool isESEFeatureIniEnabled;
+	bool isESEconnection;
 	tESETspecInfo eseTspecInfo;
 #endif
 
-	tAniBool isFastTransitionEnabled;
-	tAniBool isFastRoamIniFeatureEnabled;
+	bool isFastTransitionEnabled;
+	bool isFastRoamIniFeatureEnabled;
 
 	uint8_t txLdpcIniFeatureEnabled;
 	tSirHTConfig htConfig;
@@ -1259,20 +1261,24 @@ typedef struct sSirSmeJoinReq {
 	bool send_smps_action;
 
 	uint8_t max_amsdu_num;
-	tAniBool isWMEenabled;
-	tAniBool isQosEnabled;
-	tAniBool isOSENConnection;
+	bool isWMEenabled;
+	bool isQosEnabled;
+	bool isOSENConnection;
 	struct rrm_config_param rrm_config;
-	tAniBool spectrumMgtIndicator;
+	bool spectrumMgtIndicator;
 	tSirMacPowerCapInfo powerCap;
 	tSirSupChnl supportedChannels;
 #ifdef WLAN_FEATURE_FILS_SK
 	struct cds_fils_connection_info fils_con_info;
 #endif
-	/* Pls make this as last variable in struct */
-	tSirBssDescription bssDescription;
 	bool ignore_assoc_disallowed;
 	bool enable_bcast_probe_rsp;
+	tSirBssDescription bssDescription;
+	/*
+	 * WARNING: Pls make bssDescription as last variable in struct
+	 * tSirSmeJoinReq as it has ieFields followed after this bss
+	 * description. Adding a variable after this corrupts the ieFields
+	 */
 } tSirSmeJoinReq, *tpSirSmeJoinReq;
 
 /* / Definition for reponse message to previously issued join request */
@@ -1361,6 +1367,12 @@ typedef struct sSirSmeChanInfo {
 	enum phy_ch_width ch_width;
 } tSirSmeChanInfo, *tpSirSmeChanInfo;
 
+enum sir_sme_phy_mode {
+	SIR_SME_PHY_MODE_LEGACY = 0,
+	SIR_SME_PHY_MODE_HT = 1,
+	SIR_SME_PHY_MODE_VHT = 2
+};
+
 /* / Definition for Association indication from peer */
 /* / MAC ---> */
 typedef struct sSirSmeAssocInd {
@@ -1384,11 +1396,11 @@ typedef struct sSirSmeAssocInd {
 
 	/* powerCap & supportedChannels are present only when */
 	/* spectrumMgtIndicator flag is set */
-	tAniBool spectrumMgtIndicator;
+	bool spectrumMgtIndicator;
 	tSirMacPowerCapInfo powerCap;
 	tSirSupChnl supportedChannels;
-	tAniBool wmmEnabledSta; /* if present - STA is WMM enabled */
-	tAniBool reassocReq;
+	bool wmmEnabledSta; /* if present - STA is WMM enabled */
+	bool reassocReq;
 	/* Required for indicating the frames to upper layer */
 	uint32_t beaconLength;
 	uint8_t *beaconPtr;
@@ -1399,7 +1411,18 @@ typedef struct sSirSmeAssocInd {
 	uint8_t timingMeasCap;
 	tSirSmeChanInfo chan_info;
 	/* Extended CSA capability of station */
-	uint8_t              ecsa_capable;
+	uint8_t ecsa_capable;
+	bool ampdu;
+	bool sgi_enable;
+	bool tx_stbc;
+	bool rx_stbc;
+	tSirMacHTChannelWidth ch_width;
+	enum sir_sme_phy_mode mode;
+	uint8_t max_supp_idx;
+	uint8_t max_ext_idx;
+	uint8_t max_mcs_idx;
+	uint8_t rx_mcs_map;
+	uint8_t tx_mcs_map;
 } tSirSmeAssocInd, *tpSirSmeAssocInd;
 
 /* / Definition for Association confirm */
@@ -1639,7 +1662,7 @@ typedef struct sSirSmeDisassocRsp {
 	struct qdf_mac_addr peer_macaddr;
 	tAniStaStatStruct perStaStats;  /* STA stats */
 	uint16_t staId;
-} qdf_packed tSirSmeDisassocRsp, *tpSirSmeDisassocRsp;
+} tSirSmeDisassocRsp, *tpSirSmeDisassocRsp;
 
 /* / Definition for Disassociation indication from peer */
 typedef struct sSirSmeDisassocInd {
@@ -1973,8 +1996,8 @@ typedef struct sAniChangeCountryCodeReq {
 	uint16_t msgType;       /* message type is same as the request type */
 	uint16_t msgLen;        /* length of the entire request */
 	uint8_t countryCode[WNI_CFG_COUNTRY_CODE_LEN]; /* 3 char country code */
-	tAniBool countryFromUserSpace;
-	tAniBool sendRegHint;   /* true if we want to send hint to NL80211 */
+	bool countryFromUserSpace;
+	bool sendRegHint;   /* true if we want to send hint to NL80211 */
 	void *changeCCCallback;
 	void *pDevContext;      /* device context */
 	void *p_cds_context;    /* cds context */
@@ -2637,6 +2660,14 @@ typedef struct sSirUpdateAPWPSIEsReq {
 	tSirAPWPSIEs APWPSIEs;
 } tSirUpdateAPWPSIEsReq, *tpSirUpdateAPWPSIEsReq;
 
+struct update_config {
+	uint16_t messageType;   /* eWNI_SME_UPDATE_CONFIG */
+	uint16_t length;
+	uint8_t sme_session_id;
+	uint16_t capab;
+	uint32_t value;
+};
+
 /*
  * enum sir_update_session_param_type - session param type
  * @SIR_PARAM_SSID_HIDDEN: ssidHidden parameter
@@ -3255,6 +3286,20 @@ struct pmkid_mode_bits {
 	uint32_t unused:30;
 };
 
+/**
+ * struct lca_disallow_config_params - LCA[Last Connected AP]
+ *                                     disallow config params
+ * @disallow_duration: LCA AP disallowed duration
+ * @rssi_channel_penalization: RSSI channel Penalization
+ * @num_disallowed_aps: Maximum number of AP's in LCA list
+ *
+ */
+struct lca_disallow_config_params{
+    uint32_t disallow_duration;
+    uint32_t rssi_channel_penalization;
+    uint32_t num_disallowed_aps;
+};
+
 typedef struct sSirRoamOffloadScanReq {
 	uint16_t message_type;
 	uint16_t length;
@@ -3312,6 +3357,7 @@ typedef struct sSirRoamOffloadScanReq {
 	int8_t early_stop_scan_max_threshold;
 	enum wmi_dwelltime_adaptive_mode roamscan_adaptive_dwell_mode;
 	tSirAddie assoc_ie;
+	struct lca_disallow_config_params lca_config_params;
 } tSirRoamOffloadScanReq, *tpSirRoamOffloadScanReq;
 
 typedef struct sSirRoamOffloadScanRsp {
@@ -4118,6 +4164,105 @@ typedef struct sSirLinkSpeedInfo {
 	uint32_t estLinkSpeed;  /* Linkspeed from firmware */
 } tSirLinkSpeedInfo, *tpSirLinkSpeedInfo;
 
+/**
+ * struct sir_peer_info_req - peer info request struct
+ * @peer_macaddr: MAC address
+ * @sessionid: vdev id
+ *
+ * peer info request message's struct
+ */
+struct sir_peer_info_req {
+	struct qdf_mac_addr peer_macaddr;
+	uint8_t sessionid;
+};
+
+/**
+ * struct sir_peer_info - peer information struct
+ * @peer_macaddr: MAC address
+ * @rssi: rssi
+ * @tx_rate: last tx rate
+ * @rx_rate: last rx rate
+ *
+ * a station's information
+ */
+struct sir_peer_info {
+	struct qdf_mac_addr peer_macaddr;
+	int8_t rssi;
+	uint32_t tx_rate;
+	uint32_t rx_rate;
+};
+
+/**
+ * struct sir_peer_info_resp - all peers information struct
+ * @count: peer's number
+ * @info: peer information
+ *
+ * all station's information
+ */
+struct sir_peer_info_resp {
+	uint8_t count;
+	struct sir_peer_info info[0];
+};
+
+/**
+ * struct sir_peer_info_ext_req - peer info request struct
+ * @peer_macaddr: MAC address
+ * @sessionid: vdev id
+ * @reset_after_request: fw reset statistics after query
+ *
+ * peer info request message's struct
+ */
+struct sir_peer_info_ext_req {
+	struct qdf_mac_addr peer_macaddr;
+	uint8_t sessionid;
+	uint8_t reset_after_request;
+};
+
+/**
+ * struct sir_peer_info_ext - peer info information struct
+ *                            (refer to station_info struct in Kernel)
+ * @peer_macaddr: MAC address
+ * @tx_packets: packets transmitted to this station
+ * @tx_bytes: bytes transmitted to this station
+ * @rx_packets: packets received from this station
+ * @rx_bytes: bytes received from this station
+ * @rx_retries: cumulative retry counts
+ * @tx_failed: number of failed transmissions
+ * @rssi: The signal strength
+ * @tx_rate: last used tx bitrate (kbps)
+ * @tx_rate_code: last tx rate code (last_tx_rate_code of wmi_peer_stats_info)
+ * @rx_rate: last used rx bitrate (kbps)
+ * @rx_rate_code: last rx rate code (last_rx_rate_code of wmi_peer_stats_info)
+ *
+ * a station's information
+ */
+struct sir_peer_info_ext {
+	struct qdf_mac_addr peer_macaddr;
+	uint32_t tx_packets;
+	uint64_t tx_bytes;
+	uint32_t rx_packets;
+	uint64_t rx_bytes;
+	uint32_t tx_retries;
+	uint32_t tx_failed;
+	int32_t rssi;
+	uint32_t tx_rate;
+	uint32_t tx_rate_code;
+	uint32_t rx_rate;
+	uint32_t rx_rate_code;
+};
+
+/**
+ * struct sir_peer_info_ext_resp - all peers' information struct
+ * @count: peer's number
+ * @info: peer information
+ *
+ * all station's information
+ */
+struct sir_peer_info_ext_resp {
+	uint8_t count;
+	struct sir_peer_info_ext info[0];
+};
+
 typedef struct sSirAddPeriodicTxPtrn {
 	/* MAC Address for the adapter */
 	struct qdf_mac_addr mac_address;
@@ -4470,6 +4615,7 @@ typedef struct sSirSmeRoamOffloadSynchInd {
 	tpSirSmeJoinRsp join_rsp;
 	uint16_t aid;
 	struct sir_hw_mode_trans_ind hw_mode_trans_ind;
+	uint8_t nss;
 } roam_offload_synch_ind;
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
@@ -5628,6 +5774,9 @@ struct sir_wifi_chan_cca_stats {
  * @peer_id: peer ID
  * @per_ant_snr: per antenna SNR
  * @nf: peer background noise
+ * @per_ant_rx_mpdus: MPDUs received per antenna
+ * @per_ant_tx_mpdus: MPDUs transferred per antenna
+ * @num_chain: valid chain count
  */
 struct sir_wifi_peer_signal_stats {
 	uint32_t vdev_id;
@@ -5638,6 +5787,10 @@ struct sir_wifi_peer_signal_stats {
 
 	/* Background noise */
 	int32_t nf[WIFI_MAX_CHAINS];
+
+	int32_t per_ant_rx_mpdus[WIFI_MAX_CHAINS];
+	int32_t per_ant_tx_mpdus[WIFI_MAX_CHAINS];
+	int32_t num_chain;
 };
 
 #define WIFI_VDEV_NUM     4
@@ -7868,4 +8021,23 @@ struct sir_peer_set_rx_blocksize {
 	uint32_t rx_block_ack_win_limit;
 };
 
+/*
+ * struct scan_chan_info - channel info
+ * @freq: radio frequence
+ * @cmd flag: cmd flag
+ * @noise_floor: noise floor
+ * @cycle_count: cycle count
+ * @rx_clear_count: rx clear count
+ * @tx_frame_count: TX frame count
+ * @clock_freq: clock frequency MHZ
+ */
+struct scan_chan_info {
+	uint32_t freq;
+	uint32_t cmd_flag;
+	uint32_t noise_floor;
+	uint32_t cycle_count;
+	uint32_t rx_clear_count;
+	uint32_t tx_frame_count;
+	uint32_t clock_freq;
+};
 #endif /* __SIR_API_H */
