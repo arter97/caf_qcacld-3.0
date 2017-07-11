@@ -1850,6 +1850,8 @@ int hdd_wlan_start_modules(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 			goto hif_close;
 		}
 
+		hdd_green_ap_init(hdd_ctx);
+
 		ret = hdd_update_config(hdd_ctx);
 		if (ret) {
 			hdd_err("Failed to update configuration :%d", ret);
@@ -9321,8 +9323,6 @@ int hdd_wlan_startup(struct device *dev)
 	ret = hdd_init_netlink_services(hdd_ctx);
 	if (ret)
 		goto err_hdd_free_context;
-
-	hdd_green_ap_init(hdd_ctx);
 
 	hdd_init_spectral_scan(hdd_ctx);
 
