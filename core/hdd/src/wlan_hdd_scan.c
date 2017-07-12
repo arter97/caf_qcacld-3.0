@@ -80,6 +80,13 @@ typedef struct hdd_scan_info {
 	char *end;
 } hdd_scan_info_t, *hdd_scan_info_tp;
 
+static const
+struct nla_policy scan_policy[QCA_WLAN_VENDOR_ATTR_SCAN_MAX + 1] = {
+	[QCA_WLAN_VENDOR_ATTR_SCAN_FLAGS] = {.type = NLA_U32},
+	[QCA_WLAN_VENDOR_ATTR_SCAN_TX_NO_CCK_RATE] = {.type = NLA_FLAG},
+	[QCA_WLAN_VENDOR_ATTR_SCAN_COOKIE] = {.type = NLA_U64},
+};
+
 /**
  * hdd_translate_abg_rate_to_mbps_rate() - translate abg rate to Mbps rate
  * @pFcRate: Rate pointer
@@ -520,6 +527,12 @@ static void hdd_update_dbs_scan_ctrl_ext_flag(hdd_context_t *hdd_ctx,
 
 	/* Resetting the scan_ctrl_flags_ext to 0 */
 	scan_req->scan_ctrl_flags_ext = 0;
+
+	if (!(hdd_ctx->is_dbs_scan_duty_cycle_enabled)) {
+		scan_dbs_policy = HDD_SCAN_DBS_POLICY_IGNORE_DUTY;
+		hdd_info("DBS scan duty cycle is disabled");
+		goto end;
+	}
 
 	if (hdd_ctx->config->dual_mac_feature_disable ==
 				DISABLE_DBS_CXN_AND_SCAN) {
@@ -1434,21 +1447,21 @@ static bool wlan_hdd_sap_skip_scan_check(hdd_context_t *hdd_ctx,
 }
 #endif
 
-/**
- * wlan_hdd_cfg80211_scan_block_cb() - scan block work handler
- * @work: Pointer to work
- *
- * Return: none
- */
-static void wlan_hdd_cfg80211_scan_block_cb(struct work_struct *work)
+static void __wlan_hdd_cfg80211_scan_block_cb(struct work_struct *work)
 {
 	hdd_adapter_t *adapter = container_of(work,
 					      hdd_adapter_t, scan_block_work);
 	struct cfg80211_scan_request *request;
+	hdd_context_t *hdd_ctx;
+
 	if (WLAN_HDD_ADAPTER_MAGIC != adapter->magic) {
 		hdd_err("HDD adapter context is invalid");
 		return;
 	}
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	if (0 != wlan_hdd_validate_context(hdd_ctx))
+		return;
 
 	request = adapter->request;
 	if (request) {
@@ -1462,6 +1475,19 @@ static void wlan_hdd_cfg80211_scan_block_cb(struct work_struct *work)
 			hdd_vendor_scan_callback(adapter, request, true);
 		adapter->request = NULL;
 	}
+}
+
+/**
+ * wlan_hdd_cfg80211_scan_block_cb() - scan block work handler
+ * @work: Pointer to work
+ *
+ * Return: none
+ */
+static void wlan_hdd_cfg80211_scan_block_cb(struct work_struct *work)
+{
+	cds_ssr_protect(__func__);
+	__wlan_hdd_cfg80211_scan_block_cb(work);
+	cds_ssr_unprotect(__func__);
 }
 
 /**
@@ -2407,7 +2433,7 @@ static int __wlan_hdd_cfg80211_vendor_scan(struct wiphy *wiphy,
 		return ret;
 
 	if (nla_parse(tb, QCA_WLAN_VENDOR_ATTR_SCAN_MAX, data,
-		data_len, NULL)) {
+		      data_len, scan_policy)) {
 		hdd_err("Invalid ATTR");
 		return -EINVAL;
 	}
@@ -2460,8 +2486,13 @@ static int __wlan_hdd_cfg80211_vendor_scan(struct wiphy *wiphy,
 	count = 0;
 	if (tb[QCA_WLAN_VENDOR_ATTR_SCAN_FREQUENCIES]) {
 		nla_for_each_nested(attr,
-				tb[QCA_WLAN_VENDOR_ATTR_SCAN_FREQUENCIES],
-				tmp) {
+				    tb[QCA_WLAN_VENDOR_ATTR_SCAN_FREQUENCIES],
+				    tmp) {
+			if (nla_len(attr) != sizeof(uint32_t)) {
+				hdd_err("len is not correct for frequency %d",
+					count);
+				goto error;
+			}
 			chan = __ieee80211_get_channel(wiphy,
 							nla_get_u32(attr));
 			if (!chan)
@@ -2689,7 +2720,7 @@ static int __wlan_hdd_vendor_abort_scan(
 
 	ret = -EINVAL;
 	if (nla_parse(tb, QCA_WLAN_VENDOR_ATTR_SCAN_MAX, data,
-	    data_len, NULL)) {
+		      data_len, scan_policy)) {
 		hdd_err("Invalid ATTR");
 		return ret;
 	}

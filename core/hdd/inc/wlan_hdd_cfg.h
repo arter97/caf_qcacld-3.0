@@ -8243,9 +8243,11 @@ enum dot11p_mode {
 /*
  * <ini>
  * gdbs_scan_selection - DBS Scan Selection.
- * @Default: 5,2,2,16,2,2
+ * @Default: ""
  *
  * This ini is used to enable DBS scan selection.
+ * Example
+ : @Value: "5,2,2,16,2,2"
  * 1st argument is module_id, 2nd argument is number of DBS scan,
  * 3rd argument is number of non-DBS scan,
  * and other arguments follows.
@@ -8262,7 +8264,7 @@ enum dot11p_mode {
  * </ini>
  */
 #define CFG_DBS_SCAN_SELECTION_NAME          "gdbs_scan_selection"
-#define CFG_DBS_SCAN_SELECTION_DEFAULT       "5,2,2,16,2,2"
+#define CFG_DBS_SCAN_SELECTION_DEFAULT       ""
 
 /*
  * gPNOChannelPrediction will allow user to enable/disable the
@@ -10895,6 +10897,26 @@ enum hw_filter_mode {
 #define CFG_SCAN_BACKOFF_MULTIPLIER_MAX		(255)
 #define CFG_SCAN_BACKOFF_MULTIPLIER_DEFAULT	(0)
 
+/*
+ * <ini>
+ * gEnableTxOrphan- Enable/Disable orphaning of Tx packets
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable/disable orphaning of Tx packets.
+ *
+ * Related: None
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_TX_ORPHAN_ENABLE_NAME    "gEnableTxOrphan"
+#define CFG_TX_ORPHAN_ENABLE_DEFAULT (0)
+#define CFG_TX_ORPHAN_ENABLE_MIN     (0)
+#define CFG_TX_ORPHAN_ENABLE_MAX     (1)
+
 /*---------------------------------------------------------------------------
    Type declarations
    -------------------------------------------------------------------------*/
@@ -11661,6 +11683,7 @@ struct hdd_config {
 	uint16_t sap_max_mcs_txdata;
 	bool is_bssid_hint_priority;
 	bool is_fils_enabled;
+	bool tx_orphan_enable;
 	uint8_t dfs_beacon_tx_enhanced;
 	uint8_t scan_backoff_multiplier;
 	bool is_force_1x1;
