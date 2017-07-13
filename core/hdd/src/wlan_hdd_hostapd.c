@@ -7369,10 +7369,8 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 
 	ENTER();
 
-	if (!update_beacon && (cds_is_connection_in_progress(NULL, NULL) ||
-		pHddCtx->btCoexModeSet)) {
-		hdd_err("Can't start BSS: connection ot btcoex(%d) is in progress",
-			pHddCtx->btCoexModeSet);
+	if (!update_beacon && cds_is_connection_in_progress(NULL, NULL)) {
+		hdd_err("Can't start BSS: connection is in progress");
 		return -EINVAL;
 	}
 
@@ -8291,11 +8289,6 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	hdd_debug("pAdapter = %p, Device mode %s(%d) sub20 %d",
 		pAdapter, hdd_device_mode_to_string(pAdapter->device_mode),
 		pAdapter->device_mode, cds_is_sub_20_mhz_enabled());
-
-	if (pHddCtx->btCoexModeSet) {
-		hdd_debug("BTCoex Mode operation in progress");
-		return -EBUSY;
-	}
 
 	if (cds_is_connection_in_progress(NULL, NULL)) {
 		hdd_err("Can't start BSS: connection is in progress");
