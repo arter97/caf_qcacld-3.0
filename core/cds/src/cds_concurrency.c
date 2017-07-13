@@ -9494,11 +9494,14 @@ QDF_STATUS cds_get_sap_mandatory_channel(uint32_t *chan)
 		return status;
 	}
 
-	/* No existing SAP connection and hence a new SAP connection might be
-	 * coming up.
+	/*
+	 * Get inside below loop if no existing SAP connection and hence a new
+	 * SAP connection might be coming up. pcl.pcl_len can be 0 if no common
+	 * channel between PCL & mandatory channel list as well
 	 */
-	if (!pcl.pcl_len) {
-		cds_info("cds_get_pcl_for_existing_conn returned no pcl");
+	if (!pcl.pcl_len &&
+		!cds_mode_specific_connection_count(CDS_SAP_MODE, NULL)) {
+		cds_debug("cds_get_pcl_for_existing_conn returned no pcl");
 		status = cds_get_pcl(CDS_SAP_MODE,
 				pcl.pcl_list, &pcl.pcl_len,
 				pcl.weight_list,
@@ -9515,6 +9518,11 @@ QDF_STATUS cds_get_sap_mandatory_channel(uint32_t *chan)
 	if (QDF_IS_STATUS_ERROR(status)) {
 		cds_err("Unable to modify SAP PCL");
 		return status;
+	}
+
+	if (!pcl.pcl_len) {
+		cds_err("No common channel between mandatory list & PCL");
+		return QDF_STATUS_E_FAILURE;
 	}
 
 	*chan = pcl.pcl_list[0];
