@@ -1855,8 +1855,6 @@ int hdd_wlan_start_modules(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 			goto hif_close;
 		}
 
-		hdd_green_ap_init(hdd_ctx);
-
 		ret = hdd_update_config(hdd_ctx);
 		if (ret) {
 			hdd_err("Failed to update configuration :%d", ret);
@@ -8988,6 +8986,9 @@ int hdd_configure_cds(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter)
 	cds_get_dfs_region(&dfs_reg);
 	cds_set_wma_dfs_region(dfs_reg);
 
+	if (hdd_enable_egap(hdd_ctx))
+		hdd_debug("enhance green ap is not enabled");
+
 	return 0;
 
 hdd_features_deinit:
@@ -9329,6 +9330,8 @@ int hdd_wlan_startup(struct device *dev)
 	if (ret)
 		goto err_hdd_free_context;
 
+	hdd_green_ap_init(hdd_ctx);
+
 	hdd_init_spectral_scan(hdd_ctx);
 
 	ret = hdd_wlan_start_modules(hdd_ctx, NULL, false);
@@ -9427,9 +9430,6 @@ int hdd_wlan_startup(struct device *dev)
 	hdd_runtime_suspend_context_init(hdd_ctx);
 	memdump_init();
 	hdd_driver_memdump_init();
-
-	if (hdd_enable_egap(hdd_ctx))
-		hdd_debug("enhance green ap is not enabled");
 
 	if (hdd_ctx->config->fIsImpsEnabled)
 		hdd_set_idle_ps_config(hdd_ctx, true);
