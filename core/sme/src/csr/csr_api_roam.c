@@ -13819,12 +13819,17 @@ static void csr_update_pmk_cache(tCsrRoamSession *pSession,
 	/* Increment the CSR local cache index */
 	if (cache_idx < (CSR_MAX_PMKID_ALLOWED - 1))
 		pSession->curr_cache_idx++;
-	else
+	else {
+		sme_debug("max value reached, setting current index as 0");
 		pSession->curr_cache_idx = 0;
+	}
 
 	pSession->NumPmkidCache++;
-	if (pSession->NumPmkidCache > CSR_MAX_PMKID_ALLOWED)
+	if (pSession->NumPmkidCache > CSR_MAX_PMKID_ALLOWED) {
+		sme_debug("setting num pmkid cache to %d",
+			CSR_MAX_PMKID_ALLOWED);
 		pSession->NumPmkidCache = CSR_MAX_PMKID_ALLOWED;
+	}
 }
 
 QDF_STATUS
@@ -13959,6 +13964,9 @@ QDF_STATUS csr_roam_del_pmkid_from_cache(tpAniSirGlobal pMac,
 
 	/* Decrement the count since an entry has been deleted */
 	pSession->NumPmkidCache--;
+	sme_debug("PMKID at index=%d deleted, current index=%d cache count=%d",
+		Index, pSession->curr_cache_idx, pSession->NumPmkidCache);
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -20104,13 +20112,6 @@ void csr_process_set_hw_mode(tpAniSirGlobal mac, tSmeCmd *command)
 	tSirMsgQ msg;
 	struct sir_set_hw_mode_resp *param;
 	enum cds_hw_mode_change cds_hw_mode;
-	hdd_context_t *hdd_ctx;
-
-	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	if (!hdd_ctx) {
-		cds_err("HDD context is NULL");
-		goto fail;
-	}
 
 	/* Setting HW mode is for the entire system.
 	 * So, no need to check session
@@ -20146,11 +20147,8 @@ void csr_process_set_hw_mode(tpAniSirGlobal mac, tSmeCmd *command)
 
 	if ((SIR_UPDATE_REASON_OPPORTUNISTIC ==
 	     command->u.set_hw_mode_cmd.reason) &&
-	    (hdd_ctx->btCoexModeSet ||
-		(cds_is_connection_in_progress(NULL, NULL)))) {
-		sme_err(
-		"Set HW mode refused: conn or btcoex(%d) is in progress",
-			hdd_ctx->btCoexModeSet);
+	    (true == cds_is_connection_in_progress(NULL, NULL))) {
+		sme_err("Set HW mode refused: conn in progress");
 		cds_restart_opportunistic_timer(false);
 		goto fail;
 	}
