@@ -310,7 +310,7 @@ typedef struct tagCsrScanRequest {
 	bool ie_whitelist;
 	uint32_t probe_req_ie_bitmap[PROBE_REQ_BITMAP_LEN];
 	uint32_t num_vendor_oui;
-	struct vendor_oui *voui;
+	uint32_t *voui;
 } tCsrScanRequest;
 
 typedef struct tagCsrScanResultInfo {
@@ -1348,6 +1348,8 @@ typedef struct tagCsrConfigParam {
 	uint32_t disallow_duration;
 	uint32_t rssi_channel_penalization;
 	uint32_t num_disallowed_aps;
+	uint32_t scan_probe_repeat_time;
+	uint32_t scan_num_probes;
 } tCsrConfigParam;
 
 /* Tush */
@@ -1789,4 +1791,21 @@ static inline void csr_roam_fill_tdls_info(tpAniSirGlobal mac_ctx, tCsrRoamInfo 
 #endif
 void csr_packetdump_timer_stop(void);
 
+/**
+ * csr_get_channel_status() - get chan info via channel number
+ * @p_mac: Pointer to Global MAC structure
+ * @channel_id: channel id
+ *
+ * Return: chan status info
+ */
+struct lim_channel_status *csr_get_channel_status(void *p_mac,
+						  uint32_t channel_id);
+
+/**
+ * csr_clear_channel_status() - clear chan info
+ * @p_mac: Pointer to Global MAC structure
+ *
+ * Return: none
+ */
+void csr_clear_channel_status(void *p_mac);
 #endif

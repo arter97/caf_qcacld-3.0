@@ -41,6 +41,10 @@ ifeq ($(KERNEL_BUILD), 0)
 	# These are configurable via Kconfig for kernel-based builds
 	# Need to explicitly configure for Android-based builds
 
+	ifneq ($(DEVELOPER_DISABLE_BUILD_TIMESTAMP),y)
+	CONFIG_BUILD_TIMESTAMP := y
+	endif
+
 	ifeq ($(CONFIG_ARCH_MDM9630), y)
 	CONFIG_MOBILE_ROUTER := y
 	endif
@@ -1506,6 +1510,14 @@ ifeq ($(CONFIG_ARCH_MSM8996), y)
 CDEFINES += -DCHANNEL_HOPPING_ALL_BANDS
 endif
 
+ifeq ($(CONFIG_ARCH_MSM8909), y)
+CDEFINES += -DACS_FW_REPORT_PARAM
+endif
+
+ifeq ($(CONFIG_ARCH_MSM8996), y)
+CDEFINES += -DACS_FW_REPORT_PARAM
+endif
+
 #Enable GTK Offload
 ifeq ($(CONFIG_GTK_OFFLOAD), 1)
 CDEFINES += -DWLAN_FEATURE_GTK_OFFLOAD
@@ -1722,6 +1734,13 @@ ifeq ($(CONFIG_WLAN_SPECTRAL_SCAN), y)
 CDEFINES += -DFEATURE_SPECTRAL_SCAN
 endif
 
+#Flag to enable/disable WLAN D0-WOW
+ifeq ($(CONFIG_PCI_MSM), y)
+ifeq ($(CONFIG_ROME_IF),pci)
+CDEFINES += -DFEATURE_WLAN_D0WOW
+endif
+endif
+
 KBUILD_CPPFLAGS += $(CDEFINES)
 
 # Currently, for versions of gcc which support it, the kernel Makefile
@@ -1756,9 +1775,11 @@ ifdef WLAN_HDD_ADAPTER_MAGIC
 CDEFINES += -DWLAN_HDD_ADAPTER_MAGIC=$(WLAN_HDD_ADAPTER_MAGIC)
 endif
 
+# inject some build related information
+ifeq ($(CONFIG_BUILD_TIMESTAMP), y)
+CDEFINES += -DBUILD_TIMESTAMP=\"$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')\"
+endif
+
 # Module information used by KBuild framework
 obj-$(CONFIG_QCA_CLD_WLAN) += $(MODNAME).o
 $(MODNAME)-y := $(OBJS)
-
-# inject some build related information
-CDEFINES += -DBUILD_TIMESTAMP=\"$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')\"

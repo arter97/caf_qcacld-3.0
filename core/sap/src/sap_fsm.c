@@ -2343,6 +2343,9 @@ QDF_STATUS sap_goto_channel_sel(ptSapContext sap_context,
 		/* Set BSSType to default type */
 		scan_request.BSSType = eCSR_BSS_TYPE_ANY;
 
+		if (ACS_FW_REPORT_PARAM_CONFIGURED)
+			scan_request.BSSType = eCSR_BSS_TYPE_INFRA_AP;
+
 #ifndef SOFTAP_CHANNEL_RANGE
 		/*Scan all the channels */
 		scan_request.ChannelInfo.num_of_channels = 0;
@@ -2454,8 +2457,14 @@ QDF_STATUS sap_goto_channel_sel(ptSapContext sap_context,
 	if (sap_context->acs_cfg->skip_scan_status == eSAP_SKIP_ACS_SCAN) {
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
 			  FL("## %s SKIPPED ACS SCAN"), __func__);
-		wlansap_scan_callback(h_hal, sap_context,
-			sap_context->sessionId, 0, eCSR_SCAN_SUCCESS);
+
+		if (true == sap_do_acs_pre_start_bss)
+			wlansap_pre_start_bss_acs_scan_callback(h_hal,
+				sap_context, sap_context->sessionId, 0,
+				eCSR_SCAN_SUCCESS);
+		else
+			wlansap_scan_callback(h_hal, sap_context,
+				sap_context->sessionId, 0, eCSR_SCAN_SUCCESS);
 	}
 #endif
 	} else {
@@ -3114,8 +3123,7 @@ QDF_STATUS sap_signal_hdd_event(ptSapContext sap_ctx,
 
 		acs_selected = &sap_ap_event.sapevt.sap_ch_selected;
 		acs_selected->pri_ch = sap_ctx->acs_cfg->pri_ch;
-		acs_selected->ht_sec_ch =
-			sap_ctx->csr_roamProfile.ch_params.sec_ch_offset;
+		acs_selected->ht_sec_ch = sap_ctx->acs_cfg->ht_sec_ch;
 		acs_selected->ch_width =
 			sap_ctx->csr_roamProfile.ch_params.ch_width;
 		acs_selected->vht_seg0_center_ch =

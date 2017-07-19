@@ -608,7 +608,7 @@ tSmeCmd *sme_get_command_buffer(tpAniSirGlobal pMac)
 				false,
 				pMac->sme.enableSelfRecovery ? true : false);
 		else if (pMac->sme.enableSelfRecovery)
-			cds_trigger_recovery(false);
+			cds_trigger_recovery();
 		else
 			QDF_BUG(0);
 	}
@@ -4990,11 +4990,13 @@ QDF_STATUS sme_wow_delete_pattern(tHalHandle hal,
 	sme_debug("Sending WMA_WOWL_DEL_BCAST_PTRN");
 
 	ret_code = wma_post_ctrl_msg(pMac, &msg_q);
-	if (eSIR_SUCCESS != ret_code)
+	if (eSIR_SUCCESS != ret_code) {
 		sme_err("Posting WMA_WOWL_DEL_BCAST_PTRN failed, reason: %X",
 			ret_code);
+		return QDF_STATUS_E_FAILURE;
+	}
 
-	return ret_code;
+	return QDF_STATUS_SUCCESS;
 }
 
 /**
@@ -5115,7 +5117,6 @@ QDF_STATUS sme_roam_set_key(tHalHandle hal,  uint8_t session_id,
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal);
 	uint32_t roam_id;
-	uint32_t i;
 	tCsrRoamSession *session = NULL;
 	struct ps_global_info *ps_global_info = &mac_ctx->sme.ps_global_info;
 
@@ -5138,8 +5139,6 @@ QDF_STATUS sme_roam_set_key(tHalHandle hal,  uint8_t session_id,
 		*ptr_roam_id = roam_id;
 
 	sme_debug("keyLength: %d", set_key->keyLength);
-	for (i = 0; i < set_key->keyLength; i++)
-		sme_debug("%02x", set_key->Key[i]);
 
 	sme_debug("Session_id: %d roam_id: %d", session_id, roam_id);
 	session = CSR_GET_SESSION(mac_ctx, session_id);
@@ -11956,7 +11955,7 @@ void active_list_cmd_timeout_handle(void *userData)
 
 	if (mac_ctx->sme.enableSelfRecovery) {
 		sme_save_active_cmd_stats(hal);
-		cds_trigger_recovery(false);
+		cds_trigger_recovery();
 	} else {
 		if (!mac_ctx->roam.configParam.enable_fatal_event &&
 		   !(cds_is_load_or_unload_in_progress() ||
@@ -12767,8 +12766,6 @@ static QDF_STATUS sme_process_channel_change_resp(tpAniSirGlobal pMac,
 		proam_info.channelChangeRespEvent->sessionId = SessionId;
 		proam_info.channelChangeRespEvent->newChannelNumber =
 			pChnlParams->channelNumber;
-		proam_info.channelChangeRespEvent->secondaryChannelOffset =
-			pChnlParams->ch_width;
 
 		if (pChnlParams->status == QDF_STATUS_SUCCESS) {
 			QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
@@ -15125,7 +15122,7 @@ QDF_STATUS sme_enable_uapsd_for_ac(void *cds_ctx, uint8_t sta_id,
 				   sme_ac_enum_type ac, uint8_t tid,
 				   uint8_t pri, uint32_t srvc_int,
 				   uint32_t sus_int,
-				   sme_tspec_dir_type dir,
+				   sme_qos_wmm_dir_type dir,
 				   uint8_t psb, uint32_t sessionId,
 				   uint32_t delay_interval)
 {

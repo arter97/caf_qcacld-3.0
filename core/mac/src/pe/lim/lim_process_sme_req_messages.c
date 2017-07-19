@@ -543,7 +543,7 @@ static bool __lim_process_sme_sys_ready_ind(tpAniSirGlobal pMac, uint32_t *pMsgB
 	msg.bodyptr = pMsgBuf;
 	msg.bodyval = 0;
 
-	if (ANI_DRIVER_TYPE(pMac) != eDRIVER_TYPE_MFG) {
+	if (ANI_DRIVER_TYPE(pMac) != QDF_DRIVER_TYPE_MFG) {
 		ready_req->pe_roam_synch_cb = pe_roam_synch_callback;
 		pe_register_callbacks_with_wma(pMac, ready_req);
 		pMac->lim.add_bssdescr_callback = ready_req->add_bssdescr_cb;
@@ -1261,6 +1261,9 @@ static QDF_STATUS lim_send_hal_start_scan_offload_req(tpAniSirGlobal pMac,
 	pScanOffloadReq->scanType = pScanReq->scanType;
 	pScanOffloadReq->minChannelTime = pScanReq->minChannelTime;
 	pScanOffloadReq->maxChannelTime = pScanReq->maxChannelTime;
+	pScanOffloadReq->scan_num_probes = pScanReq->scan_num_probes;
+	pScanOffloadReq->scan_probe_repeat_time =
+		pScanReq->scan_probe_repeat_time;
 	pScanOffloadReq->restTime = pScanReq->restTime;
 	pScanOffloadReq->min_rest_time = pScanReq->min_rest_time;
 	pScanOffloadReq->idle_time = pScanReq->idle_time;

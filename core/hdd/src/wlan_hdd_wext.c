@@ -3442,6 +3442,12 @@ static void hdd_get_rssi_cb(int8_t rssi, uint32_t staId, void *pContext)
 
 	pStatsContext = pContext;
 	pAdapter = pStatsContext->pAdapter;
+
+	if (!pAdapter) {
+		hdd_err("Invalid pAdapter");
+		return;
+	}
+
 	pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
 
 	/* update rssi only if its valid else return previous valid rssi */
@@ -3466,14 +3472,13 @@ static void hdd_get_rssi_cb(int8_t rssi, uint32_t staId, void *pContext)
 	 */
 	spin_lock(&hdd_context_lock);
 
-	if ((NULL == pAdapter) ||
-	    (RSSI_CONTEXT_MAGIC != pStatsContext->magic)) {
+	if (RSSI_CONTEXT_MAGIC != pStatsContext->magic) {
 		/* the caller presumably timed out so there is nothing
 		 * we can do
 		 */
 		spin_unlock(&hdd_context_lock);
-		hdd_warn("Invalid context, pAdapter [%p] magic [%08x]",
-			 pAdapter, pStatsContext->magic);
+		hdd_warn("Invalid context, magic [%08x]",
+				pStatsContext->magic);
 		return;
 	}
 
@@ -7381,10 +7386,10 @@ int wlan_hdd_update_phymode(struct net_device *net, tHalHandle hal,
 			return -EIO;
 		}
 		if (phddctx->config->nChannelBondingMode5GHz)
-			phddctx->wiphy->bands[NL80211_BAND_5GHZ]->ht_cap.cap
+			phddctx->wiphy->bands[HDD_NL80211_BAND_5GHZ]->ht_cap.cap
 				|= IEEE80211_HT_CAP_SUP_WIDTH_20_40;
 		else
-			phddctx->wiphy->bands[NL80211_BAND_5GHZ]->ht_cap.cap
+			phddctx->wiphy->bands[HDD_NL80211_BAND_5GHZ]->ht_cap.cap
 				&= ~IEEE80211_HT_CAP_SUP_WIDTH_20_40;
 
 		hdd_debug("New_Phymode= %d ch_bonding=%d band=%d VHT_ch_width=%u",
@@ -8642,8 +8647,7 @@ static int __iw_setint_getnone(struct net_device *dev,
 			return -EINVAL;
 		}
 
-		/* hdd_ctx, hdd_ctx->config are already checked for null */
-		hdd_ctx->config->conc_system_pref = set_value;
+		cds_set_cur_conc_system_pref(set_value);
 		break;
 	}
 	default:
@@ -10255,7 +10259,7 @@ static int iw_get_policy_manager_ut_ops(hdd_context_t *hdd_ctx,
 		if (apps_args[1] >= CDS_THROUGHPUT &&
 			apps_args[1] <= CDS_LATENCY) {
 			pr_info("setting system pref to [%d]\n", apps_args[1]);
-			hdd_ctx->config->conc_system_pref = apps_args[1];
+			cds_set_cur_conc_system_pref(apps_args[1]);
 		}
 	}
 	break;
@@ -10308,13 +10312,13 @@ static int iw_get_policy_manager_ut_ops(hdd_context_t *hdd_ctx,
 
 	case WE_POLICY_MANAGER_QUERY_ACTION_CMD:
 	{
-		enum cds_conc_next_action action;
+		QDF_STATUS status;
 
 		hdd_debug("<iwpriv wlan0 pm_query_action> is called");
-		action = cds_current_connections_update(adapter->sessionId,
+		status = cds_current_connections_update(adapter->sessionId,
 						apps_args[0],
 						SIR_UPDATE_REASON_UT);
-		pr_info("next action is %d {HDD_NOP = 0, HDD_DBS, HDD_DBS_DOWNGRADE, HDD_MCC, HDD_MCC_UPGRADE}", action);
+		pr_info("status is %d {HDD_NOP = 0, HDD_DBS, HDD_DBS_DOWNGRADE, HDD_MCC, HDD_MCC_UPGRADE}", status);
 	}
 	break;
 
@@ -11362,7 +11366,7 @@ int wlan_hdd_set_filter(hdd_context_t *hdd_ctx,
 		}
 		packetFilterSetReq.numFieldParams = request->num_params;
 		packetFilterSetReq.coalesceTime = 0;
-		packetFilterSetReq.filterType = HDD_RCV_FILTER_SET;
+		packetFilterSetReq.filterType = SIR_RCV_FILTER_TYPE_FILTER_PKT;
 		for (i = 0; i < request->num_params; i++) {
 			packetFilterSetReq.paramsData[i].protocolLayer =
 				request->params_data[i].protocol_layer;

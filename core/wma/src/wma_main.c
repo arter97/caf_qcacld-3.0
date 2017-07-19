@@ -1836,7 +1836,7 @@ static void wma_cleanup_vdev_resp_queue(tp_wma_handle wma)
 		return;
 	}
 
-	while (qdf_list_peek_front(&wma->vdev_resp_queue, &node1) ==
+	while (qdf_list_remove_front(&wma->vdev_resp_queue, &node1) ==
 				   QDF_STATUS_SUCCESS) {
 		req_msg = qdf_container_of(node1, struct wma_target_req, node);
 		qdf_spin_unlock_bh(&wma->vdev_respq_lock);
@@ -1866,7 +1866,7 @@ static void wma_cleanup_hold_req(tp_wma_handle wma)
 	}
 
 	while (QDF_STATUS_SUCCESS ==
-			qdf_list_peek_front(&wma->wma_hold_req_queue, &node1)) {
+		qdf_list_remove_front(&wma->wma_hold_req_queue, &node1)) {
 		req_msg = qdf_container_of(node1, struct wma_target_req, node);
 		qdf_spin_unlock_bh(&wma->wma_hold_req_q_lock);
 		/* Cleanup timeout handler */
@@ -2468,7 +2468,6 @@ QDF_STATUS wma_open(void *cds_context,
 	qdf_spinlock_create(&wma_handle->wma_hold_req_q_lock);
 	qdf_atomic_init(&wma_handle->is_wow_bus_suspended);
 	qdf_atomic_init(&wma_handle->scan_id_counter);
-	qdf_atomic_init(&wma_handle->num_pending_scans);
 
 	/* Register vdev start response event handler */
 	wmi_unified_register_event_handler(wma_handle->wmi_handle,
@@ -2685,6 +2684,8 @@ QDF_STATUS wma_open(void *cds_context,
 			WMI_VDEV_ADD_MAC_ADDR_TO_RX_FILTER_STATUS_EVENTID,
 			wma_action_frame_filter_mac_event_handler,
 			WMA_RX_SERIALIZER_CTX);
+
+	wma_handle->ito_repeat_count = cds_cfg->ito_repeat_count;
 
 	wma_handle->auto_power_save_enabled =
 		cds_cfg->auto_power_save_fail_mode;
@@ -3249,6 +3250,22 @@ QDF_STATUS wma_start(void *cds_ctx)
 			 __func__);
 		qdf_status = QDF_STATUS_E_FAILURE;
 		goto end;
+	}
+
+	if (!WMI_SERVICE_IS_ENABLED(wma_handle->wmi_service_bitmap,
+				WMI_SERVICE_UNIFIED_WOW_CAPABILITY)) {
+
+		status = wmi_unified_register_event_handler(
+					wma_handle->wmi_handle,
+					WMI_D0_WOW_DISABLE_ACK_EVENTID,
+					wma_d0_wow_disable_ack_event,
+					WMA_RX_TASKLET_CTX);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			WMA_LOGE("%s: Failed to register D0-WOW disable event handler!",
+				__func__);
+			qdf_status = QDF_STATUS_E_FAILURE;
+			goto end;
+		}
 	}
 
 	status = wmi_unified_register_event_handler(wma_handle->wmi_handle,
@@ -5231,6 +5248,11 @@ bool wma_is_rx_ldpc_supported_for_channel(uint32_t channel,
 	enum cds_band_type band;
 	bool status;
 
+	if (!wma_handle) {
+		WMA_LOGE("Wma handle is null");
+		return false;
+	}
+
 	if (!CDS_IS_CHANNEL_24GHZ(channel))
 		band = CDS_BAND_5GHZ;
 	else
@@ -6862,6 +6884,37 @@ static QDF_STATUS wma_set_rx_blocksize(tp_wma_handle wma_handle,
 	return QDF_STATUS_SUCCESS;
 }
 
+
+/**
+ * wma_process_set_limit_off_chan() - set limit off chanel parameters
+ * @wma_handle: pointer to wma handle
+ * @param: pointer to sir_limit_off_chan
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code.
+ */
+static QDF_STATUS wma_process_limit_off_chan(tp_wma_handle wma_handle,
+	struct sir_limit_off_chan *param)
+{
+
+	int32_t err;
+	struct wmi_limit_off_chan_param limit_off_chan_param;
+
+	limit_off_chan_param.vdev_id = param->vdev_id;
+	limit_off_chan_param.status = param->is_tos_active;
+	limit_off_chan_param.max_offchan_time = param->max_off_chan_time;
+	limit_off_chan_param.rest_time = param->rest_time;
+	limit_off_chan_param.skip_dfs_chans = param->skip_dfs_chans;
+
+	err = wmi_unified_send_limit_off_chan_cmd(wma_handle->wmi_handle,
+			&limit_off_chan_param);
+	if (err) {
+		WMA_LOGE("\n failed to set limit off chan cmd");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 /**
  * wma_mc_process_msg() - process wma messages and call appropriate function.
  * @cds_context: cds context
@@ -7763,6 +7816,11 @@ QDF_STATUS wma_mc_process_msg(void *cds_context, cds_msg_t *msg)
 		break;
 	case SIR_HAL_SET_RX_BLOCKSIZE_CMDID:
 		wma_set_rx_blocksize(wma_handle, msg->bodyptr);
+		qdf_mem_free(msg->bodyptr);
+		break;
+
+	case WMA_SET_LIMIT_OFF_CHAN:
+		wma_process_limit_off_chan(wma_handle, msg->bodyptr);
 		qdf_mem_free(msg->bodyptr);
 		break;
 

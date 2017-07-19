@@ -205,6 +205,13 @@ static const struct wiphy_wowlan_support wowlan_support_reg_init = {
 };
 #endif
 
+int limit_off_chan_tbl[HDD_MAX_AC][HDD_MAX_OFF_CHAN_ENTRIES] = {
+	{ HDD_AC_BK_BIT, HDD_MAX_OFF_CHAN_TIME_FOR_BK },
+	{ HDD_AC_BE_BIT, HDD_MAX_OFF_CHAN_TIME_FOR_BE },
+	{ HDD_AC_VI_BIT, HDD_MAX_OFF_CHAN_TIME_FOR_VI },
+	{ HDD_AC_VO_BIT, HDD_MAX_OFF_CHAN_TIME_FOR_VO },
+};
+
 /* internal function declaration */
 struct notifier_block hdd_netdev_notifier;
 
@@ -271,6 +278,10 @@ void wlan_hdd_txrx_pause_cb(uint8_t vdev_id,
  * post processing
  */
 uint8_t g_wlan_driver_version[] = QWLAN_VERSIONSTR;
+
+#ifndef BUILD_TIMESTAMP
+#define BUILD_TIMESTAMP ""
+#endif
 uint8_t g_wlan_driver_timestamp[] = BUILD_TIMESTAMP;
 
 /**
@@ -1007,7 +1018,7 @@ static void hdd_update_tgt_vht_cap(hdd_context_t *hdd_ctx,
 	struct hdd_config *pconfig = hdd_ctx->config;
 	struct wiphy *wiphy = hdd_ctx->wiphy;
 	struct ieee80211_supported_band *band_5g =
-		wiphy->bands[NL80211_BAND_5GHZ];
+		wiphy->bands[HDD_NL80211_BAND_5GHZ];
 	uint32_t temp = 0;
 	uint32_t ch_width = eHT_CHANNEL_WIDTH_80MHZ;
 	uint32_t hw_rx_ldpc_enabled;
@@ -4004,6 +4015,11 @@ QDF_STATUS hdd_stop_all_adapters(hdd_context_t *hdd_ctx)
 	ENTER();
 
 	cds_flush_work(&hdd_ctx->sap_pre_cac_work);
+	if (hdd_ctx->sta_ap_intf_check_work_info) {
+		cds_flush_work(&hdd_ctx->sta_ap_intf_check_work);
+		qdf_mem_free(hdd_ctx->sta_ap_intf_check_work_info);
+		hdd_ctx->sta_ap_intf_check_work_info = NULL;
+	}
 
 	status = hdd_get_front_adapter(hdd_ctx, &adapterNode);
 
@@ -4028,6 +4044,11 @@ QDF_STATUS hdd_reset_all_adapters(hdd_context_t *hdd_ctx)
 	ENTER();
 
 	cds_flush_work(&hdd_ctx->sap_pre_cac_work);
+	if (hdd_ctx->sta_ap_intf_check_work_info) {
+		cds_flush_work(&hdd_ctx->sta_ap_intf_check_work);
+		qdf_mem_free(hdd_ctx->sta_ap_intf_check_work_info);
+		hdd_ctx->sta_ap_intf_check_work_info = NULL;
+	}
 
 	status = hdd_get_front_adapter(hdd_ctx, &adapterNode);
 
@@ -4625,6 +4646,8 @@ QDF_STATUS hdd_start_all_adapters(hdd_context_t *hdd_ctx)
 
 		hdd_wmm_init(adapter);
 
+		adapter->scan_info.mScanPending = false;
+
 		switch (adapter->device_mode) {
 		case QDF_STA_MODE:
 		case QDF_P2P_CLIENT_MODE:
@@ -4636,7 +4659,6 @@ QDF_STATUS hdd_start_all_adapters(hdd_context_t *hdd_ctx)
 			hdd_init_station_mode(adapter);
 			/* Open the gates for HDD to receive Wext commands */
 			adapter->isLinkUpSvcNeeded = false;
-			adapter->scan_info.mScanPending = false;
 
 			/* Indicate disconnect event to supplicant
 			 * if associated previously
@@ -6748,10 +6770,13 @@ static uint8_t hdd_get_safe_channel_from_pcl_and_acs_range(
 		return INVALID_CHANNEL_ID;
 	}
 
-	if (!pcl.pcl_len) {
-		hdd_err("pcl length is zero. this is not expected");
-		return INVALID_CHANNEL_ID;
-	}
+	/*
+	 * In some scenarios, like hw dbs disabled, sap+sap case, if operating
+	 * channel is unsafe channel, the pcl may be empty, instead of return,
+	 * try to choose a safe channel from acs range.
+	 */
+	if (!pcl.pcl_len)
+		hdd_debug("pcl length is zero!");
 
 	hdd_debug("start:%d end:%d",
 		adapter->sessionCtx.ap.sapConfig.acs_cfg.start_ch,
@@ -7402,6 +7427,37 @@ list_destroy:
 }
 
 /**
+ * ie_whitelist_attrs_init() - initialize ie whitelisting attributes
+ * @hdd_ctx: pointer to hdd context
+ *
+ * Return: status of initialization
+ *         0 - success
+ *         negative value - failure
+ */
+static int ie_whitelist_attrs_init(hdd_context_t *hdd_ctx)
+{
+	int ret;
+
+	if (!hdd_ctx->config->probe_req_ie_whitelist)
+		return 0;
+
+	if (!hdd_validate_prb_req_ie_bitmap(hdd_ctx)) {
+		hdd_err("invalid ie bitmap and ouis: disable ie whitelisting");
+		hdd_ctx->config->probe_req_ie_whitelist = false;
+		return -EINVAL;
+	}
+
+	/* parse ini string probe req oui */
+	ret = hdd_parse_probe_req_ouis(hdd_ctx);
+	if (ret) {
+		hdd_err("parsing error: disable ie whitelisting");
+		hdd_ctx->config->probe_req_ie_whitelist = false;
+	}
+
+	return ret;
+}
+
+/**
  * hdd_context_create() - Allocate and inialize HDD context.
  * @dev:	Device Pointer to the underlying device
  *
@@ -7453,20 +7509,7 @@ static hdd_context_t *hdd_context_create(struct device *dev)
 		goto err_free_config;
 	}
 
-	if (hdd_ctx->config->probe_req_ie_whitelist) {
-		if (hdd_validate_prb_req_ie_bitmap(hdd_ctx)) {
-			/* parse ini string probe req oui */
-			if (hdd_parse_probe_req_ouis(hdd_ctx)) {
-				hdd_err("Error parsing probe req ouis");
-				hdd_err("disable probe req ie whitelisting");
-				hdd_ctx->config->probe_req_ie_whitelist = false;
-			}
-		} else {
-			hdd_err("invalid probe req ie bitmap and ouis");
-			hdd_err("disable probe req ie whitelisting");
-			hdd_ctx->config->probe_req_ie_whitelist = false;
-		}
-	}
+	ie_whitelist_attrs_init(hdd_ctx);
 
 	if (hdd_ctx->config->fhostNSOffload)
 		hdd_ctx->ns_offload_enable = true;
@@ -7842,7 +7885,7 @@ static int hdd_update_cds_config(hdd_context_t *hdd_ctx)
 		return -ENOMEM;
 	}
 
-	cds_cfg->driver_type = DRIVER_TYPE_PRODUCTION;
+	cds_cfg->driver_type = QDF_DRIVER_TYPE_PRODUCTION;
 	if (!hdd_ctx->config->nMaxPsPoll ||
 			!hdd_ctx->config->enablePowersaveOffload) {
 		cds_cfg->powersave_offload_enabled =
@@ -7958,6 +8001,8 @@ static int hdd_update_cds_config(hdd_context_t *hdd_ctx)
 	cds_cfg->active_mc_bc_bpf_mode = hdd_ctx->config->active_mc_bc_bpf_mode;
 	cds_cfg->auto_power_save_fail_mode =
 		hdd_ctx->config->auto_pwr_save_fail_mode;
+
+	cds_cfg->ito_repeat_count = hdd_ctx->config->ito_repeat_count;
 
 	hdd_ra_populate_cds_config(cds_cfg, hdd_ctx);
 	hdd_txrx_populate_cds_config(cds_cfg, hdd_ctx);
@@ -8270,7 +8315,7 @@ static uint8_t *hdd_get_platform_wlan_mac_buff(struct device *dev,
  *
  * Return: None
  */
-static void hdd_populate_random_mac_addr(hdd_context_t *hdd_ctx, uint32_t num)
+void hdd_populate_random_mac_addr(hdd_context_t *hdd_ctx, uint32_t num)
 {
 	uint32_t start_idx = QDF_MAX_CONCURRENCY_PERSONA - num;
 	uint32_t iter;
@@ -8553,6 +8598,7 @@ static int hdd_pre_enable_configure(hdd_context_t *hdd_ctx)
 	cds_enable_disable_sap_mandatory_chan_list(
 			hdd_ctx->config->enable_sap_mandatory_chan_list);
 
+	cds_set_cur_conc_system_pref(hdd_ctx->config->conc_system_pref);
 out:
 	return ret;
 }
@@ -10802,7 +10848,7 @@ static int __hdd_module_init(void)
 	pr_err("%s: Loading driver v%s (%s)%s\n",
 	       WLAN_MODULE_NAME,
 	       QWLAN_VERSIONSTR,
-	       BUILD_TIMESTAMP,
+	       g_wlan_driver_timestamp,
 	       TIMER_MANAGER_STR MEMORY_DEBUG_STR);
 
 	ret = wlan_hdd_state_ctrl_param_create();
@@ -11583,6 +11629,107 @@ int hdd_get_rssi_snr_by_bssid(hdd_adapter_t *adapter, const uint8_t *bssid,
 	}
 
 	return 0;
+}
+
+/**
+ * hdd_send_limit_off_chan_cmd() - send limit off-channel command parameters
+ * @param - pointer to sir_limit_off_chan
+ *
+ * Return: 0 on success and non zero value on failure
+ */
+static int hdd_send_limit_off_chan_cmd(struct sir_limit_off_chan *param)
+{
+	cds_msg_t msg = {0};
+	QDF_STATUS status;
+
+	msg.type = SIR_HAL_SET_LIMIT_OFF_CHAN;
+	msg.reserved = 0;
+	msg.bodyptr = param;
+
+	status = cds_mq_post_message(QDF_MODULE_ID_WMA, &msg);
+	if (status != QDF_STATUS_SUCCESS) {
+		hdd_err("Not able to post limit off chan param message to WMA");
+		return -EIO;
+	}
+	return 0;
+}
+
+/**
+ * hdd_set_limit_off_chan_for_tos() - set limit off-channel command parameters
+ * @adapter - HDD adapter
+ * @tos - type of service
+ * @status - status of the traffic
+ *
+ * Return: 0 on success and non zero value on failure
+ */
+
+int hdd_set_limit_off_chan_for_tos(hdd_adapter_t *adapter, enum tos tos,
+		bool is_tos_active)
+{
+	int ac_bit;
+	struct sir_limit_off_chan *cmd;
+	hdd_context_t *hdd_ctx;
+	int ret;
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	ret = wlan_hdd_validate_context(hdd_ctx);
+
+	if (ret < 0) {
+		hdd_err("failed to set limit off chan params");
+		return ret;
+	}
+
+	cmd = qdf_mem_malloc(sizeof(struct sir_limit_off_chan));
+	if (!cmd) {
+		hdd_err("qdf_mem_malloc failed for limit off channel");
+		return -ENOMEM;
+	}
+
+	ac_bit = limit_off_chan_tbl[tos][HDD_AC_BIT_INDX];
+
+	if (is_tos_active)
+		hdd_ctx->active_ac |= ac_bit;
+	else
+		hdd_ctx->active_ac &= ~ac_bit;
+
+	if (hdd_ctx->active_ac) {
+		if (hdd_ctx->active_ac & HDD_AC_VO_BIT) {
+			cmd->max_off_chan_time =
+				limit_off_chan_tbl[TOS_VO][HDD_DWELL_TIME_INDX];
+			cds_set_cur_conc_system_pref(CDS_LATENCY);
+		} else if (hdd_ctx->active_ac & HDD_AC_VI_BIT) {
+			cmd->max_off_chan_time =
+				limit_off_chan_tbl[TOS_VI][HDD_DWELL_TIME_INDX];
+			cds_set_cur_conc_system_pref(CDS_LATENCY);
+		} else {
+			/*ignore this command if only BE/BK is active */
+			is_tos_active = false;
+			cds_set_cur_conc_system_pref(
+					hdd_ctx->config->conc_system_pref);
+		}
+	} else {
+		/* No active tos */
+		cds_set_cur_conc_system_pref(hdd_ctx->config->conc_system_pref);
+	}
+
+	cmd = qdf_mem_malloc(sizeof(struct sir_limit_off_chan));
+	if (!cmd) {
+		hdd_err("qdf_mem_malloc failed for limit off channel");
+		return -ENOMEM;
+	}
+
+	qdf_mem_zero(cmd, sizeof(struct sir_limit_off_chan));
+
+	cmd->vdev_id = adapter->sessionId;
+	cmd->is_tos_active = is_tos_active;
+	cmd->rest_time = hdd_ctx->config->nRestTimeConc;
+	cmd->skip_dfs_chans = true;
+
+	ret = hdd_send_limit_off_chan_cmd(cmd);
+	if (ret)
+		qdf_mem_free(cmd);
+
+	return ret;
 }
 
 /* Register the module init/exit functions */
