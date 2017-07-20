@@ -309,7 +309,7 @@ struct cdp_ctrl_ops {
 	 * @return none
 	 */
 	void
-		(*txrx_peer_authorize)(void *peer,
+		(*txrx_peer_authorize)(struct cdp_peer *peer,
 				u_int32_t authorize);
 
 	bool
@@ -378,7 +378,7 @@ struct cdp_ctrl_ops {
 	void (*txrx_set_vdev_param)(struct cdp_vdev *vdev,
 			enum cdp_vdev_param_type param, uint32_t val);
 
-	void (*txrx_peer_set_nawds)(void *peer, uint8_t value);
+	void (*txrx_peer_set_nawds)(struct cdp_peer *peer, uint8_t value);
 	/**
 	 * @brief Set the reo dest ring num of the radio
 	 * @details
@@ -409,6 +409,7 @@ struct cdp_ctrl_ops {
 
 	int (*txrx_wdi_event_unsub)(struct cdp_pdev *pdev, void *event_cb_sub,
 			uint32_t event);
+	int (*txrx_get_sec_type)(struct cdp_peer *peer, uint8_t sec_idx);
 };
 
 struct cdp_me_ops {
@@ -725,10 +726,10 @@ struct cdp_cfg_ops {
  * @dump_flow_pool_info:
  */
 struct cdp_flowctl_ops {
-	QDF_STATUS (*register_pause_cb)(ol_tx_pause_callback_fp);
-
+	QDF_STATUS (*register_pause_cb)(struct cdp_soc_t *soc,
+					tx_pause_callback);
 	void (*set_desc_global_pool_size)(uint32_t num_msdu_desc);
-	void (*dump_flow_pool_info)(void);
+	void (*dump_flow_pool_info)(void *);
 };
 
 /**

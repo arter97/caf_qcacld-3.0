@@ -49,8 +49,6 @@
 #define WMI_UNIFIED_MAX_EVENT 0x100
 #define WMI_MAX_CMDS 1024
 
-typedef qdf_nbuf_t wmi_buf_t;
-
 #ifdef WMI_INTERFACE_EVENT_LOGGING
 
 #define WMI_EVENT_DEBUG_MAX_ENTRY (1024)
@@ -1351,6 +1349,8 @@ QDF_STATUS (*send_set_country_cmd)(wmi_unified_t wmi_handle,
 uint32_t (*convert_pdev_id_host_to_target)(uint32_t pdev_id);
 uint32_t (*convert_pdev_id_target_to_host)(uint32_t pdev_id);
 
+QDF_STATUS (*send_user_country_code_cmd)(wmi_unified_t wmi_handle,
+		uint8_t pdev_id, struct cc_regdmn_s *rd);
 };
 
 struct target_abi_version {

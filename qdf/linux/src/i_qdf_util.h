@@ -56,7 +56,7 @@
 #endif
 
 #include <qdf_types.h>
-#include <asm/io.h>
+#include <linux/io.h>
 #include <asm/byteorder.h>
 
 #ifdef QCA_PARTNER_PLATFORM
@@ -249,6 +249,12 @@ static inline bool __qdf_is_macaddr_equal(struct qdf_mac_addr *mac_addr1,
 	}     \
 } while (0)
 
+/**
+ * @brief Compile time Assert
+ */
+#define QDF_COMPILE_TIME_ASSERT(assertion_name, predicate) \
+    typedef char assertion_name[(predicate) ? 1 : -1]
+
 #define __qdf_container_of(ptr, type, member) container_of(ptr, type, member)
 
 #define __qdf_ntohs                      ntohs
@@ -320,6 +326,7 @@ static inline uint64_t
 __qdf_get_totalramsize(void)
 {
 	struct sysinfo meminfo;
+
 	si_meminfo(&meminfo);
 	return MEMINFO_KB(meminfo.totalram);
 }

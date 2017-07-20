@@ -201,7 +201,9 @@ static inline void wlan_crypto_put_be64(u8 *a, u64 val)
 	do {frm[0] = (v) & 0xff; frm[1] = (v) >> 8; frm += 2; } while (0)
 
 #define	WLAN_CRYPTO_ADDSELECTOR(frm, sel) \
-	do {qdf_mem_copy(frm, (uint8_t *)sel, OUI_SIZE); \
+	do { \
+		uint32_t value = sel;\
+		qdf_mem_copy(frm, (uint8_t *)&value, OUI_SIZE); \
 	frm += OUI_SIZE; } while (0)
 
 #define WLAN_CRYPTO_SELECTOR(a, b, c, d) \
@@ -211,6 +213,9 @@ static inline void wlan_crypto_put_be64(u8 *a, u64 val)
 		(uint32_t) (d))
 
 #define WPA_TYPE_OUI     WLAN_CRYPTO_SELECTOR(0x00, 0x50, 0xf2, 1)
+
+#define WLAN_CRYPTO_WAPI_IE_LEN      20
+#define WLAN_CRYPTO_WAPI_SMS4_CIPHER 0x01
 
 #define WPA_AUTH_KEY_MGMT_NONE \
 				WLAN_CRYPTO_SELECTOR(0x00, 0x50, 0xf2, 0)
@@ -312,7 +317,7 @@ static inline void wlan_crypto_put_be64(u8 *a, u64 val)
 #define UCIPHER_IS_GCMP256(_param) \
 		HAS_UCAST_CIPHER((_param), WLAN_CRYPTO_CIPHER_AES_GCM_256)
 #define UCIPHER_IS_SMS4(_param)    \
-		HAS_UCAST_CIPHER((_param), WLAN_CRYPTO_CIPHER_WAPI)
+		HAS_UCAST_CIPHER((_param), WLAN_CRYPTO_CIPHER_WAPI_SMS4)
 
 #define RESET_MCAST_CIPHERS(_param)   ((_param)->mcastcipherset = 0)
 #define SET_MCAST_CIPHER(_param, _c)  ((_param)->mcastcipherset |= (1<<(_c)))
@@ -336,7 +341,7 @@ static inline void wlan_crypto_put_be64(u8 *a, u64 val)
 #define MCIPHER_IS_GCMP256(_param) \
 		HAS_MCAST_CIPHER((_param), WLAN_CRYPTO_CIPHER_AES_GCM_256)
 #define MCIPHER_IS_SMS4(_param)    \
-		HAS_MCAST_CIPHER((_param), WLAN_CRYPTO_CIPHER_WAPI)
+		HAS_MCAST_CIPHER((_param), WLAN_CRYPTO_CIPHER_WAPI_SMS4)
 
 #define RESET_MGMT_CIPHERS(_param)   ((_param)->mgmtcipherset = 0)
 #define SET_MGMT_CIPHER(_param, _c)  ((_param)->mgmtcipherset |= (1<<(_c)))
@@ -419,9 +424,33 @@ struct wlan_crypto_cipher {
 				qdf_nbuf_t, uint8_t,  uint8_t);
 };
 
-/*
-* Return the size of the 802.11 header for a management or data frame.
-*/
+
+/**
+ * wlan_crypto_is_data_protected - check is frame is protected or not
+ *
+ * @data: frame
+ * This function check is frame is protected or not
+ *
+ * Return: TRUE/FALSE
+ */
+static inline bool wlan_crypto_is_data_protected(const void *data)
+{
+	const struct ieee80211_hdr *hdr = (const struct ieee80211_hdr *)data;
+
+	if (hdr->frame_control & WLAN_FC_ISWEP)
+		return true;
+	else
+		return false;
+}
+
+/**
+ * ieee80211_hdrsize - calculate frame header size
+ *
+ * @data: frame
+ * This function calculate frame header size
+ *
+ * Return: header size of the frame
+ */
 static inline int ieee80211_hdrsize(const void *data)
 {
 	const struct ieee80211_hdr *hdr = (const struct ieee80211_hdr *)data;
@@ -442,6 +471,14 @@ static inline int ieee80211_hdrsize(const void *data)
 	return size;
 }
 
+/**
+ * wlan_get_tid - get tid of the frame
+ *
+ * @data: frame
+ * This function get tid of the frame
+ *
+ * Return: tid of the frame
+ */
 static inline int wlan_get_tid(const void *data)
 {
 	const struct ieee80211_hdr *hdr = (const struct ieee80211_hdr *)data;

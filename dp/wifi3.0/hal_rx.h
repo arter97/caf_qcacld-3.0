@@ -813,6 +813,31 @@ hal_rx_msdu_end_l3_hdr_padding_get(uint8_t *buf)
 	return l3_header_padding;
 }
 
+#define HAL_RX_MSDU_END_SA_IDX_GET(_rx_msdu_end)	\
+	(_HAL_MS((*_OFFSET_TO_WORD_PTR(_rx_msdu_end,	\
+		RX_MSDU_END_13_SA_IDX_OFFSET)),	\
+		RX_MSDU_END_13_SA_IDX_MASK,		\
+		RX_MSDU_END_13_SA_IDX_LSB))
+
+ /**
+ * hal_rx_msdu_end_sa_idx_get(): API to get the
+ * sa_idx from rx_msdu_end TLV
+ *
+ * @ buf: pointer to the start of RX PKT TLV headers
+ * Return: sa_idx (SA AST index)
+ */
+static inline uint16_t
+hal_rx_msdu_end_sa_idx_get(uint8_t *buf)
+{
+	struct rx_pkt_tlvs *pkt_tlvs = (struct rx_pkt_tlvs *)buf;
+	struct rx_msdu_end *msdu_end = &pkt_tlvs->msdu_end_tlv.rx_msdu_end;
+	uint8_t sa_idx;
+
+	sa_idx = HAL_RX_MSDU_END_SA_IDX_GET(msdu_end);
+
+	return sa_idx;
+}
+
 #define HAL_RX_MSDU_END_SA_IS_VALID_GET(_rx_msdu_end)	\
 	(_HAL_MS((*_OFFSET_TO_WORD_PTR(_rx_msdu_end,	\
 		RX_MSDU_END_5_SA_IS_VALID_OFFSET)),	\
@@ -1633,6 +1658,10 @@ struct hal_buf_info {
 	uint32_t sw_cookie;
 };
 
+/* This special cookie value will be used to indicate FW allocated buffers
+ * received through RXDMA2SW ring for RXDMA WARs */
+#define HAL_RX_COOKIE_SPECIAL 0x1fffff
+
 /**
  * hal_rx_msdu_link_desc_get(): API to get the MSDU information
  * from the MSDU link descriptor
@@ -1647,15 +1676,15 @@ struct hal_buf_info {
  * Return: void
  */
 static inline void hal_rx_msdu_list_get(void *msdu_link_desc,
-			struct hal_rx_msdu_list *msdu_list, uint8_t num_msdus)
+		struct hal_rx_msdu_list *msdu_list, uint16_t *num_msdus)
 {
 	struct rx_msdu_details *msdu_details;
 	struct rx_msdu_desc_info *msdu_desc_info;
 	struct rx_msdu_link *msdu_link = (struct rx_msdu_link *)msdu_link_desc;
 	int i;
 
-	if (num_msdus > HAL_RX_NUM_MSDU_DESC)
-		num_msdus = HAL_RX_NUM_MSDU_DESC;
+	if (*num_msdus > HAL_RX_NUM_MSDU_DESC)
+		*num_msdus = HAL_RX_NUM_MSDU_DESC;
 
 	msdu_details = HAL_RX_LINK_DESC_MSDU0_PTR(msdu_link);
 
@@ -1663,7 +1692,14 @@ static inline void hal_rx_msdu_list_get(void *msdu_link_desc,
 		"[%s][%d] msdu_link=%p msdu_details=%p\n",
 		__func__, __LINE__, msdu_link, msdu_details);
 
-	for (i = 0; i < num_msdus; i++) {
+	for (i = 0; i < *num_msdus; i++) {
+		/* num_msdus received in mpdu descriptor may be incorrect
+		 * sometimes due to HW issue. Check msdu buffer address also */
+		if (HAL_RX_BUFFER_ADDR_31_0_GET(
+			&msdu_details[i].buffer_addr_info_details) == 0) {
+			*num_msdus = i;
+			break;
+		}
 		msdu_desc_info = HAL_RX_MSDU_DESC_INFO_GET(&msdu_details[i]);
 		msdu_list->msdu_info[i].msdu_flags =
 			 HAL_RX_MSDU_FLAGS_GET(msdu_desc_info);
@@ -1788,6 +1824,7 @@ enum hal_reo_error_code {
  * @ HAL_RXDMA_ERR_DA_TIMEOUT    : Destination Address  search timeout
  * @ HAL_RXDMA_ERR_FLOW_TIMEOUT  : Flow Search Timeout
  * @ HAL_RXDMA_ERR_FLUSH_REQUEST : RxDMA FIFO Flush request
+ * @ HAL_RXDMA_ERR_WAR           : RxDMA WAR dummy errors
  */
 enum hal_rxdma_error_code {
 	HAL_RXDMA_ERR_OVERFLOW = 0,
@@ -1795,7 +1832,7 @@ enum hal_rxdma_error_code {
 	HAL_RXDMA_ERR_FCS,
 	HAL_RXDMA_ERR_DECRYPT,
 	HAL_RXDMA_ERR_TKIP_MIC,
-	HAL_RXDMA_ERR_UNECRYPTED,
+	HAL_RXDMA_ERR_UNENCRYPTED,
 	HAL_RXDMA_ERR_MSDU_LEN,
 	HAL_RXDMA_ERR_MSDU_LIMIT,
 	HAL_RXDMA_ERR_WIFI_PARSE,
@@ -1803,7 +1840,8 @@ enum hal_rxdma_error_code {
 	HAL_RXDMA_ERR_SA_TIMEOUT,
 	HAL_RXDMA_ERR_DA_TIMEOUT,
 	HAL_RXDMA_ERR_FLOW_TIMEOUT,
-	HAL_RXDMA_ERR_FLUSH_REQUEST
+	HAL_RXDMA_ERR_FLUSH_REQUEST,
+	HAL_RXDMA_ERR_WAR = 31
 };
 
 /**

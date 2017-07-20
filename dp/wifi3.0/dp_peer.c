@@ -124,6 +124,9 @@ static int dp_peer_find_add_id_to_obj(
 #define DP_PEER_HASH_LOAD_MULT  2
 #define DP_PEER_HASH_LOAD_SHIFT 0
 
+#define DP_AST_HASH_LOAD_MULT  2
+#define DP_AST_HASH_LOAD_SHIFT 0
+
 static int dp_peer_find_hash_attach(struct dp_soc *soc)
 {
 	int i, hash_elems, log2;
@@ -185,6 +188,300 @@ void dp_peer_find_hash_add(struct dp_soc *soc, struct dp_peer *peer)
 	TAILQ_INSERT_TAIL(&soc->peer_hash.bins[index], peer, hash_list_elem);
 	qdf_spin_unlock_bh(&soc->peer_ref_mutex);
 }
+
+#ifdef FEATURE_WDS
+/*
+ * dp_peer_ast_hash_attach() - Allocate and initialize AST Hash Table
+ * @soc: SoC handle
+ *
+ * Return: None
+ */
+static int dp_peer_ast_hash_attach(struct dp_soc *soc)
+{
+	int i, hash_elems, log2;
+
+	hash_elems = ((WLAN_UMAC_PSOC_MAX_PEERS * DP_AST_HASH_LOAD_MULT) >>
+		DP_AST_HASH_LOAD_SHIFT);
+
+	log2 = dp_log2_ceil(hash_elems);
+	hash_elems = 1 << log2;
+
+	soc->ast_hash.mask = hash_elems - 1;
+	soc->ast_hash.idx_bits = log2;
+
+	/* allocate an array of TAILQ peer object lists */
+	soc->ast_hash.bins = qdf_mem_malloc(
+		hash_elems * sizeof(TAILQ_HEAD(anonymous_tail_q,
+				dp_ast_entry)));
+
+	if (!soc->ast_hash.bins)
+		return QDF_STATUS_E_NOMEM;
+
+	for (i = 0; i < hash_elems; i++)
+		TAILQ_INIT(&soc->ast_hash.bins[i]);
+
+	return 0;
+}
+
+/*
+ * dp_peer_ast_hash_detach() - Free AST Hash table
+ * @soc: SoC handle
+ *
+ * Return: None
+ */
+static void dp_peer_ast_hash_detach(struct dp_soc *soc)
+{
+	qdf_mem_free(soc->ast_hash.bins);
+}
+
+/*
+ * dp_peer_ast_hash_index() - Compute the AST hash from MAC address
+ * @soc: SoC handle
+ *
+ * Return: AST hash
+ */
+static inline uint32_t dp_peer_ast_hash_index(struct dp_soc *soc,
+	union dp_align_mac_addr *mac_addr)
+{
+	uint32_t index;
+
+	index =
+		mac_addr->align2.bytes_ab ^
+		mac_addr->align2.bytes_cd ^
+		mac_addr->align2.bytes_ef;
+	index ^= index >> soc->ast_hash.idx_bits;
+	index &= soc->ast_hash.mask;
+	return index;
+}
+
+/*
+ * dp_peer_ast_hash_add() - Add AST entry into hash table
+ * @soc: SoC handle
+ *
+ * This function adds the AST entry into SoC AST hash table
+ * It assumes caller has taken the ast lock to protect the access to this table
+ *
+ * Return: None
+ */
+static inline void dp_peer_ast_hash_add(struct dp_soc *soc,
+		struct dp_ast_entry *ase)
+{
+	uint32_t index;
+
+	index = dp_peer_ast_hash_index(soc, &ase->mac_addr);
+	TAILQ_INSERT_TAIL(&soc->ast_hash.bins[index], ase, hash_list_elem);
+}
+
+/*
+ * dp_peer_ast_hash_remove() - Look up and remove AST entry from hash table
+ * @soc: SoC handle
+ *
+ * This function removes the AST entry from soc AST hash table
+ * It assumes caller has taken the ast lock to protect the access to this table
+ *
+ * Return: None
+ */
+static inline void dp_peer_ast_hash_remove(struct dp_soc *soc,
+		struct dp_ast_entry *ase)
+{
+	unsigned index;
+	struct dp_ast_entry *tmpase;
+	int found = 0;
+
+	index = dp_peer_ast_hash_index(soc, &ase->mac_addr);
+	/* Check if tail is not empty before delete*/
+	QDF_ASSERT(!TAILQ_EMPTY(&soc->ast_hash.bins[index]));
+
+	TAILQ_FOREACH(tmpase, &soc->ast_hash.bins[index], hash_list_elem) {
+		if (tmpase == ase) {
+			found = 1;
+			break;
+		}
+	}
+
+	QDF_ASSERT(found);
+	TAILQ_REMOVE(&soc->ast_hash.bins[index], ase, hash_list_elem);
+}
+
+/*
+ * dp_peer_ast_hash_find() - Find AST entry by MAC address
+ * @soc: SoC handle
+ *
+ * It assumes caller has taken the ast lock to protect the access to
+ * AST hash table
+ *
+ * Return: AST entry
+ */
+struct dp_ast_entry *dp_peer_ast_hash_find(struct dp_soc *soc,
+	uint8_t *ast_mac_addr, int mac_addr_is_aligned)
+{
+	union dp_align_mac_addr local_mac_addr_aligned, *mac_addr;
+	unsigned index;
+	struct dp_ast_entry *ase;
+
+	if (mac_addr_is_aligned) {
+		mac_addr = (union dp_align_mac_addr *) ast_mac_addr;
+	} else {
+		qdf_mem_copy(
+			&local_mac_addr_aligned.raw[0],
+			ast_mac_addr, DP_MAC_ADDR_LEN);
+		mac_addr = &local_mac_addr_aligned;
+	}
+
+	index = dp_peer_ast_hash_index(soc, mac_addr);
+	TAILQ_FOREACH(ase, &soc->ast_hash.bins[index], hash_list_elem) {
+		if (dp_peer_find_mac_addr_cmp(mac_addr, &ase->mac_addr) == 0) {
+			return ase;
+		}
+	}
+
+	return NULL;
+}
+
+/*
+ * dp_peer_map_ast() - Map the ast entry with HW AST Index
+ * @soc: SoC handle
+ * @peer: peer to which ast node belongs
+ * @mac_addr: MAC address of ast node
+ * @hw_peer_id: HW AST Index returned by target in peer map event
+ * @vdev_id: vdev id for VAP to which the peer belongs to
+ *
+ * Return: None
+ */
+static inline void dp_peer_map_ast(struct dp_soc *soc,
+	struct dp_peer *peer, uint8_t *mac_addr, uint16_t hw_peer_id,
+	uint8_t vdev_id)
+{
+	struct dp_ast_entry *ast_entry;
+
+	if (!peer) {
+		return;
+	}
+
+	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
+		"%s: peer %p ID %d vid %d mac %02x:%02x:%02x:%02x:%02x:%02x\n",
+		__func__, peer, hw_peer_id, vdev_id, mac_addr[0],
+		mac_addr[1], mac_addr[2], mac_addr[3],
+		mac_addr[4], mac_addr[5]);
+
+	qdf_spin_lock_bh(&soc->ast_lock);
+	TAILQ_FOREACH(ast_entry, &peer->ast_entry_list, ase_list_elem) {
+		if (!(qdf_mem_cmp(mac_addr, ast_entry->mac_addr.raw,
+				DP_MAC_ADDR_LEN))) {
+			qdf_spin_unlock_bh(&soc->ast_lock);
+			ast_entry->ast_idx = hw_peer_id;
+			soc->ast_table[hw_peer_id] = ast_entry;
+			ast_entry->is_active = TRUE;
+			return;
+		}
+	}
+	qdf_spin_unlock_bh(&soc->ast_lock);
+
+	if (soc->cdp_soc.ol_ops->peer_map_event) {
+		soc->cdp_soc.ol_ops->peer_map_event(soc->osif_soc,
+				peer->peer_ids[0], hw_peer_id, vdev_id,
+				mac_addr);
+	}
+
+	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
+			"AST entry not found\n");
+	return;
+}
+
+/*
+ * dp_peer_add_ast() - Allocate and add AST entry into peer list
+ * @soc: SoC handle
+ * @peer: peer to which ast node belongs
+ * @mac_addr: MAC address of ast node
+ * @is_self: Is this base AST entry with peer mac address
+ *
+ * This API is used by WDS source port learning funtion to
+ * add a new AST entry into peer AST list
+ *
+ * Return: 0 if new entry is allocated,
+ *         1 if entry already exists or if allocation has failed
+ */
+int dp_peer_add_ast(struct dp_soc *soc, struct dp_peer *peer,
+		uint8_t *mac_addr, bool is_self)
+{
+	struct dp_ast_entry *ast_entry;
+
+	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
+		"%s: peer %p mac %02x:%02x:%02x:%02x:%02x:%02x\n",
+		__func__, peer, mac_addr[0], mac_addr[1], mac_addr[2],
+		mac_addr[3], mac_addr[4], mac_addr[5]);
+
+	qdf_spin_lock_bh(&soc->ast_lock);
+
+	/* If AST entry already exists , just return from here */
+	if (dp_peer_ast_hash_find(soc, mac_addr, 0)) {
+		qdf_spin_unlock_bh(&soc->ast_lock);
+		return 1;
+	}
+
+	ast_entry = (struct dp_ast_entry *)
+			qdf_mem_malloc(sizeof(struct dp_ast_entry));
+
+	if (!ast_entry) {
+		qdf_spin_unlock_bh(&soc->ast_lock);
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
+			FL("fail to allocate ast_entry"));
+		QDF_ASSERT(0);
+		return 1;
+	}
+
+	qdf_mem_copy(&ast_entry->mac_addr.raw[0], mac_addr, DP_MAC_ADDR_LEN);
+	ast_entry->peer = peer;
+
+	if (is_self) {
+		peer->self_ast_entry = ast_entry;
+		ast_entry->is_static = TRUE;
+	} else {
+		ast_entry->next_hop = 1;
+		ast_entry->is_static = FALSE;
+	}
+
+	ast_entry->is_active = TRUE;
+	TAILQ_INSERT_TAIL(&peer->ast_entry_list, ast_entry, ase_list_elem);
+	dp_peer_ast_hash_add(soc, ast_entry);
+	qdf_spin_unlock_bh(&soc->ast_lock);
+	return 0;
+}
+
+/*
+ * dp_peer_del_ast() - Delete and free AST entry
+ * @soc: SoC handle
+ * @ast_entry: AST entry of the node
+ *
+ * This function removes the AST entry from peer and soc tables
+ * It assumes caller has taken the ast lock to protect the access to these
+ * tables
+ *
+ * Return: None
+ */
+void dp_peer_del_ast(struct dp_soc *soc,
+		struct dp_ast_entry *ast_entry)
+{
+	struct dp_peer *peer = ast_entry->peer;
+	soc->ast_table[ast_entry->ast_idx] = NULL;
+	TAILQ_REMOVE(&peer->ast_entry_list, ast_entry, ase_list_elem);
+	dp_peer_ast_hash_remove(soc, ast_entry);
+	qdf_mem_free(ast_entry);
+}
+#else
+static int dp_peer_ast_hash_attach(struct dp_soc *soc)
+{
+	return 0;
+}
+static void dp_peer_ast_hash_detach(struct dp_soc *soc)
+{
+}
+static inline void dp_peer_map_ast(struct dp_soc *soc, struct dp_peer *peer,
+		uint8_t *mac_addr, uint16_t hw_peer_id, uint8_t vdev_id)
+{
+}
+
+#endif
 
 #if ATH_SUPPORT_WRAP
 static struct dp_peer *dp_peer_find_hash_find(struct dp_soc *soc,
@@ -315,6 +612,12 @@ int dp_peer_find_attach(struct dp_soc *soc)
 		dp_peer_find_map_detach(soc);
 		return 1;
 	}
+
+	if (dp_peer_ast_hash_attach(soc)) {
+		dp_peer_find_hash_detach(soc);
+		dp_peer_find_map_detach(soc);
+		return 1;
+	}
 	return 0; /* success */
 }
 
@@ -346,7 +649,21 @@ static void dp_rx_tid_stats_cb(struct dp_soc *soc, void *cb_ctxt,
 		"rx_bitmap_159_128  : %08x\n"
 		"rx_bitmap_191_160  : %08x\n"
 		"rx_bitmap_223_192  : %08x\n"
-		"rx_bitmap_255_224  : %08x\n"
+		"rx_bitmap_255_224  : %08x\n",
+		rx_tid->tid,
+		queue_status->ssn, queue_status->curr_idx,
+		queue_status->pn_31_0, queue_status->pn_63_32,
+		queue_status->pn_95_64, queue_status->pn_127_96,
+		queue_status->last_rx_enq_tstamp,
+		queue_status->last_rx_deq_tstamp,
+		queue_status->rx_bitmap_31_0, queue_status->rx_bitmap_63_32,
+		queue_status->rx_bitmap_95_64, queue_status->rx_bitmap_127_96,
+		queue_status->rx_bitmap_159_128,
+		queue_status->rx_bitmap_191_160,
+		queue_status->rx_bitmap_223_192,
+		queue_status->rx_bitmap_255_224);
+
+	DP_TRACE_STATS(FATAL,
 		"curr_mpdu_cnt      : %d\n"
 		"curr_msdu_cnt      : %d\n"
 		"fwd_timeout_cnt    : %d\n"
@@ -360,18 +677,6 @@ static void dp_rx_tid_stats_cb(struct dp_soc *soc, void *cb_ctxt,
 		"late_recv_mpdu_cnt : %d\n"
 		"win_jump_2k 	    : %d\n"
 		"hole_cnt 	    : %d\n",
-		rx_tid->tid,
-		queue_status->ssn, queue_status->curr_idx,
-		queue_status->pn_31_0, queue_status->pn_63_32,
-		queue_status->pn_95_64, queue_status->pn_127_96,
-		queue_status->last_rx_enq_tstamp,
-		queue_status->last_rx_deq_tstamp,
-		queue_status->rx_bitmap_31_0, queue_status->rx_bitmap_63_32,
-		queue_status->rx_bitmap_95_64, queue_status->rx_bitmap_127_96,
-		queue_status->rx_bitmap_159_128,
-		queue_status->rx_bitmap_191_160,
-		queue_status->rx_bitmap_223_192,
-		queue_status->rx_bitmap_255_224,
 		queue_status->curr_mpdu_cnt, queue_status->curr_msdu_cnt,
 		queue_status->fwd_timeout_cnt, queue_status->fwd_bar_cnt,
 		queue_status->dup_cnt, queue_status->frms_in_order_cnt,
@@ -381,7 +686,7 @@ static void dp_rx_tid_stats_cb(struct dp_soc *soc, void *cb_ctxt,
 		queue_status->hole_cnt);
 }
 
-static inline void dp_peer_find_add_id(struct dp_soc *soc,
+static inline struct dp_peer *dp_peer_find_add_id(struct dp_soc *soc,
 	uint8_t *peer_mac_addr, uint16_t peer_id, uint16_t hw_peer_id,
 	uint8_t vdev_id)
 {
@@ -409,55 +714,16 @@ static inline void dp_peer_find_add_id(struct dp_soc *soc,
 			  "%s: ref_cnt: %d", __func__,
 			   qdf_atomic_read(&peer->ref_cnt));
 		soc->peer_id_to_obj_map[peer_id] = peer;
-		peer->self_ast_entry.ast_idx = hw_peer_id;
-		soc->ast_table[hw_peer_id] = &peer->self_ast_entry;
 
 		if (dp_peer_find_add_id_to_obj(peer, peer_id)) {
 			/* TBDXXX: assert for now */
 			QDF_ASSERT(0);
 		}
 
-		return;
-	}
-}
-
-static inline void dp_peer_add_ast(struct dp_soc *soc,
-	struct dp_peer *peer, uint8_t *peer_mac_addr, uint16_t hw_peer_id,
-	uint8_t vdev_id)
-{
-	struct dp_ast_entry *ast_entry;
-
-	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-		"%s: peer %p ID %d vid %d mac %02x:%02x:%02x:%02x:%02x:%02x\n",
-		__func__, peer, hw_peer_id, vdev_id, peer_mac_addr[0],
-		peer_mac_addr[1], peer_mac_addr[2], peer_mac_addr[3],
-		peer_mac_addr[4], peer_mac_addr[5]);
-
-	TAILQ_FOREACH(ast_entry, &peer->ast_entry_list, ast_entry_elem) {
-		if (!(qdf_mem_cmp(peer_mac_addr, ast_entry->mac_addr,
-				DP_MAC_ADDR_LEN))) {
-			soc->ast_table[ast_entry->ast_idx] = NULL;
-			ast_entry->ast_idx = hw_peer_id;
-			soc->ast_table[hw_peer_id] = ast_entry;
-			return;
-		}
+		return peer;
 	}
 
-	ast_entry = (struct dp_ast_entry *)
-			qdf_mem_malloc(sizeof(struct dp_ast_entry));
-
-	if (!ast_entry) {
-		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			FL("fail to allocate ast_entry for: %d"), hw_peer_id);
-		QDF_ASSERT(0);
-	}
-
-	qdf_mem_copy(&ast_entry->mac_addr, peer_mac_addr, DP_MAC_ADDR_LEN);
-	ast_entry->peer = peer;
-	ast_entry->next_hop = 1;
-	TAILQ_INSERT_TAIL(&peer->ast_entry_list, ast_entry, ast_entry_elem);
-	soc->ast_table[hw_peer_id] = ast_entry;
-	return;
+	return NULL;
 }
 
 /**
@@ -481,7 +747,6 @@ dp_rx_peer_map_handler(void *soc_handle, uint16_t peer_id, uint16_t hw_peer_id,
 	struct dp_soc *soc = (struct dp_soc *)soc_handle;
 	struct dp_peer *peer = NULL;
 
-
 	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO_HIGH,
 		"peer_map_event (soc:%p): peer_id %di, hw_peer_id %d, peer_mac "
 		"%02x:%02x:%02x:%02x:%02x:%02x, vdev_id %d\n", soc, peer_id,
@@ -504,18 +769,12 @@ dp_rx_peer_map_handler(void *soc_handle, uint16_t peer_id, uint16_t hw_peer_id,
 	 * in this case just add the ast entry to the existing
 	 * peer ast_list.
 	 */
-	if (!peer) {
-		dp_peer_find_add_id(soc, peer_mac_addr, peer_id,
-				hw_peer_id, vdev_id);
-		if (soc->cdp_soc.ol_ops->peer_map_event) {
-			soc->cdp_soc.ol_ops->peer_map_event(soc->osif_soc,
-					peer_id, hw_peer_id, vdev_id, peer_mac_addr);
-		}
+	if (!peer)
+		peer = dp_peer_find_add_id(soc, peer_mac_addr, peer_id,
+					hw_peer_id, vdev_id);
 
-	} else {
-		dp_peer_add_ast(soc, peer, peer_mac_addr,
-				hw_peer_id, vdev_id);
-	}
+	dp_peer_map_ast(soc, peer, peer_mac_addr,
+			hw_peer_id, vdev_id);
 }
 
 void
@@ -563,6 +822,7 @@ dp_peer_find_detach(struct dp_soc *soc)
 {
 	dp_peer_find_map_detach(soc);
 	dp_peer_find_hash_detach(soc);
+	dp_peer_ast_hash_detach(soc);
 }
 
 static void dp_rx_tid_update_cb(struct dp_soc *soc, void *cb_ctxt,
@@ -1719,6 +1979,17 @@ int dp_peer_rxtid_stats(struct dp_peer *peer)
 				(uint64_t)(rx_tid->hw_qdesc_paddr) >> 32;
 			dp_reo_send_cmd(soc, CMD_GET_QUEUE_STATS, &params,
 				dp_rx_tid_stats_cb, rx_tid);
+
+			/* Flush REO descriptor from HW cache to update stats
+			 * in descriptor memory. This is to help debugging */
+			qdf_mem_zero(&params, sizeof(params));
+			params.std.need_status = 0;
+			params.std.addr_lo =
+				rx_tid->hw_qdesc_paddr & 0xffffffff;
+			params.std.addr_hi =
+				(uint64_t)(rx_tid->hw_qdesc_paddr) >> 32;
+			dp_reo_send_cmd(soc, CMD_FLUSH_CACHE, &params, NULL,
+				NULL);
 		}
 	}
 	return 0;

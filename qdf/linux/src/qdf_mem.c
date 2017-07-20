@@ -107,10 +107,12 @@ static struct dentry *qdf_mem_debugfs_root;
  * struct __qdf_mem_stat - qdf memory statistics
  * @kmalloc:	total kmalloc allocations
  * @dma:	total dma allocations
+ * @skb:	total skb allocations
  */
 static struct __qdf_mem_stat {
 	qdf_atomic_t kmalloc;
 	qdf_atomic_t dma;
+	qdf_atomic_t skb;
 } qdf_mem_stat;
 
 static inline void qdf_mem_kmalloc_inc(qdf_size_t size)
@@ -123,6 +125,11 @@ static inline void qdf_mem_dma_inc(qdf_size_t size)
 	qdf_atomic_add(size, &qdf_mem_stat.dma);
 }
 
+void qdf_mem_skb_inc(qdf_size_t size)
+{
+	qdf_atomic_add(size, &qdf_mem_stat.skb);
+}
+
 static inline void qdf_mem_kmalloc_dec(qdf_size_t size)
 {
 	qdf_atomic_sub(size, &qdf_mem_stat.kmalloc);
@@ -131,6 +138,11 @@ static inline void qdf_mem_kmalloc_dec(qdf_size_t size)
 static inline void qdf_mem_dma_dec(qdf_size_t size)
 {
 	qdf_atomic_sub(size, &qdf_mem_stat.dma);
+}
+
+void qdf_mem_skb_dec(qdf_size_t size)
+{
+	qdf_atomic_sub(size, &qdf_mem_stat.skb);
 }
 
 #ifdef MEMORY_DEBUG
@@ -493,6 +505,11 @@ static QDF_STATUS qdf_mem_debugfs_init(void)
 				qdf_mem_debugfs_root,
 				&qdf_mem_stat.dma);
 
+	debugfs_create_atomic_t("skb",
+				S_IRUSR,
+				qdf_mem_debugfs_root,
+				&qdf_mem_stat.skb);
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -838,6 +855,7 @@ static void qdf_handle_leaked_memory(qdf_list_node_t *node)
 static void qdf_mem_debug_clean(void)
 {
 	uint32_t list_size;
+
 	list_size = qdf_list_size(&qdf_mem_list);
 	if (list_size) {
 		qdf_list_node_t *node;
@@ -861,7 +879,8 @@ static void qdf_mem_debug_clean(void)
 			if (QDF_STATUS_SUCCESS == qdf_status) {
 				mem_struct = (struct s_qdf_mem_struct *)node;
 				/* Take care to log only once multiple memory
-				   leaks from the same place */
+				 * leaks from the same place
+				 */
 				if (strcmp(prev_mleak_file,
 					mem_struct->file_name)
 				    || (prev_mleak_line_num !=

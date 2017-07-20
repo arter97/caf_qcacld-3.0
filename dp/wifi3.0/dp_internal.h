@@ -316,14 +316,14 @@ static inline int dp_wdi_event_unsub(struct cdp_pdev *txrx_pdev_handle,
 	void *event_cb_sub_handle,
 	uint32_t event)
 {
-	return -EPERM;
+	return 0;
 }
 
 static inline int dp_wdi_event_sub(struct cdp_pdev *txrx_pdev_handle,
 	void *event_cb_sub_handle,
 	uint32_t event)
 {
-	return -EPERM;
+	return 0;
 }
 
 static inline void dp_wdi_event_handler(enum WDI_EVENT event, void *soc,
@@ -334,18 +334,23 @@ static inline void dp_wdi_event_handler(enum WDI_EVENT event, void *soc,
 
 static inline int dp_wdi_event_attach(struct dp_pdev *txrx_pdev)
 {
-	return -EPERM;
+	return 0;
 }
 
 static inline int dp_wdi_event_detach(struct dp_pdev *txrx_pdev)
 {
-	return -EPERM;
+	return 0;
 }
 
 static inline int dp_set_pktlog_wifi3(struct dp_pdev *pdev, uint32_t event,
 	bool enable)
 {
-	return -EPERM;
+	return 0;
 }
 #endif /* CONFIG_WIN */
+#ifdef QCA_LL_TX_FLOW_CONTROL_V2
+void dp_tx_dump_flow_pool_info(void *soc);
+int dp_tx_delete_flow_pool(struct dp_soc *soc, struct dp_tx_desc_pool_s *pool,
+	bool force);
+#endif /* QCA_LL_TX_FLOW_CONTROL_V2 */
 #endif /* #ifndef _DP_INTERNAL_H_ */

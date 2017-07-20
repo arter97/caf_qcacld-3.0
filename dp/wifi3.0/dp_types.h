@@ -100,9 +100,18 @@ enum rx_pktlog_mode {
 struct dp_soc_cmn;
 struct dp_pdev;
 struct dp_vdev;
-union dp_tx_desc_list_elem_t;
+struct dp_tx_desc_s;
 struct dp_soc;
 union dp_rx_desc_list_elem_t;
+
+#define DP_PDEV_ITERATE_VDEV_LIST(_pdev, _vdev) \
+	TAILQ_FOREACH((_vdev), &(_pdev)->vdev_list, vdev_list_elem)
+
+#define DP_VDEV_ITERATE_PEER_LIST(_vdev, _peer) \
+	TAILQ_FOREACH((_peer), &(_vdev)->peer_list, peer_list_elem)
+
+#define DP_PEER_ITERATE_ASE_LIST(_peer, _ase) \
+	TAILQ_FOREACH((_ase), &peer->ast_entry_list, ase_list_elem)
 
 #define DP_MUTEX_TYPE qdf_spinlock_t
 
@@ -222,6 +231,7 @@ struct dp_tx_ext_desc_pool_s {
  * @pkt_offset: Offset from which the actual packet data starts
  * @me_buffer: Pointer to ME buffer - store this so that it can be freed on
  *		Tx completion of ME packet
+ * @pool: handle to flow_pool this descriptor belongs to.
  */
 struct dp_tx_desc_s {
 	struct dp_tx_desc_s *next;
@@ -239,6 +249,22 @@ struct dp_tx_desc_s {
 	void *me_buffer;
 	void *tso_desc;
 	void *tso_num_desc;
+};
+
+/**
+ * enum flow_pool_status - flow pool status
+ * @FLOW_POOL_ACTIVE_UNPAUSED : pool is active (can take/put descriptors)
+ *				and network queues are unpaused
+ * @FLOW_POOL_ACTIVE_PAUSED: pool is active (can take/put descriptors)
+ *			   and network queues are paused
+ * @FLOW_POOL_INVALID: pool is invalid (put descriptor)
+ * @FLOW_POOL_INACTIVE: pool is inactive (pool is free)
+ */
+enum flow_pool_status {
+	FLOW_POOL_ACTIVE_UNPAUSED = 0,
+	FLOW_POOL_ACTIVE_PAUSED = 1,
+	FLOW_POOL_INVALID = 2,
+	FLOW_POOL_INACTIVE = 3,
 };
 
 /**
@@ -274,23 +300,51 @@ struct dp_tx_tso_num_seg_pool_s {
 /**
  * struct dp_tx_desc_pool_s - Tx Descriptor pool information
  * @elem_size: Size of each descriptor in the pool
- * @elem_count: Total number of descriptors in the pool
- * @num_allocated: Number of used descriptors
+ * @pool_size: Total number of descriptors in the pool
  * @num_free: Number of free descriptors
+ * @num_allocated: Number of used descriptors
  * @freelist: Chain of free descriptors
  * @desc_pages: multiple page allocation information for actual descriptors
+ * @num_invalid_bin: Deleted pool with pending Tx completions.
+ * @flow_pool_array_lock: Lock when operating on flow_pool_array.
+ * @flow_pool_array: List of allocated flow pools
  * @lock- Lock for descriptor allocation/free from/to the pool
  */
 struct dp_tx_desc_pool_s {
 	uint16_t elem_size;
-	uint16_t elem_count;
 	uint32_t num_allocated;
-	uint32_t num_free;
 	struct dp_tx_desc_s *freelist;
 	struct qdf_mem_multi_page_t desc_pages;
+#ifdef QCA_LL_TX_FLOW_CONTROL_V2
+	uint16_t pool_size;
+	uint8_t flow_pool_id;
+	uint8_t num_invalid_bin;
+	uint16_t avail_desc;
+	enum flow_pool_status status;
+	enum htt_flow_type flow_type;
+	uint16_t stop_th;
+	uint16_t start_th;
+	uint16_t pkt_drop_no_desc;
+	qdf_spinlock_t flow_pool_lock;
+	void *pool_owner_ctx;
+#else
+	uint16_t elem_count;
+	uint32_t num_free;
 	qdf_spinlock_t lock;
+#endif
 };
 
+/**
+ * struct dp_txrx_pool_stats - flow pool related statistics
+ * @pool_map_count: flow pool map received
+ * @pool_unmap_count: flow pool unmap received
+ * @pkt_drop_no_pool: packets dropped due to unavailablity of pool
+ */
+struct dp_txrx_pool_stats {
+	uint16_t pool_map_count;
+	uint16_t pool_unmap_count;
+	uint16_t pkt_drop_no_pool;
+};
 
 struct dp_srng {
 	void *hal_srng;
@@ -380,12 +434,48 @@ struct reo_desc_list_node {
 	struct dp_rx_tid rx_tid;
 };
 
+#define DP_MAC_ADDR_LEN 6
+union dp_align_mac_addr {
+	uint8_t raw[DP_MAC_ADDR_LEN];
+	struct {
+		uint16_t bytes_ab;
+		uint16_t bytes_cd;
+		uint16_t bytes_ef;
+	} align2;
+	struct {
+		uint32_t bytes_abcd;
+		uint16_t bytes_ef;
+	} align4;
+	struct {
+		uint16_t bytes_ab;
+		uint32_t bytes_cdef;
+	} align4_2;
+};
+
+/*
+ * dp_ast_entry
+ *
+ * @ast_idx: Hardware AST Index
+ * @mac_addr:  MAC Address for this AST entry
+ * @peer: Next Hop peer (for non-WDS nodes, this will be point to
+ *        associated peer with this MAC address)
+ * @next_hop: Set to 1 if this is for a WDS node
+ * @is_active: flag to indicate active data traffic on this node
+ *             (used for aging out/expiry)
+ * @is_static: flag to indicate static entry (should not be expired)
+ * @ase_list_elem: node in peer AST list
+ * @hash_list_elem: node in soc AST hash list (mac address used as hash)
+ */
 struct dp_ast_entry {
 	uint16_t ast_idx;
-	uint8_t mac_addr[DP_MAC_ADDR_LEN];
-	uint8_t next_hop;
+	/* MAC address */
+	union dp_align_mac_addr mac_addr;
 	struct dp_peer *peer;
-	TAILQ_ENTRY(dp_ast_entry) ast_entry_elem;
+	bool next_hop;
+	bool is_active;
+	bool is_static;
+	TAILQ_ENTRY(dp_ast_entry) ase_list_elem;
+	TAILQ_ENTRY(dp_ast_entry) hash_list_elem;
 };
 
 struct mect_entry {
@@ -442,6 +532,11 @@ struct dp_soc {
 	void *wbm_idle_scatter_buf_base_vaddr[MAX_IDLE_SCATTER_BUFS];
 	uint32_t wbm_idle_scatter_buf_size;
 
+#ifdef QCA_LL_TX_FLOW_CONTROL_V2
+	qdf_spinlock_t flow_pool_array_lock;
+	tx_pause_callback pause_cb;
+	struct dp_txrx_pool_stats pool_stats;
+#endif /* !QCA_LL_TX_FLOW_CONTROL_V2 */
 	/* Tx SW descriptor pool */
 	struct dp_tx_desc_pool_s tx_desc[MAX_TXDESC_POOLS];
 
@@ -617,6 +712,14 @@ struct dp_soc {
 	bool process_tx_status;
 
 	struct dp_ast_entry *ast_table[WLAN_UMAC_PSOC_MAX_PEERS];
+	struct {
+		unsigned mask;
+		unsigned idx_bits;
+		TAILQ_HEAD(, dp_ast_entry) * bins;
+	} ast_hash;
+
+	qdf_spinlock_t ast_lock;
+	qdf_timer_t wds_aging_timer;
 
 #ifdef DP_INTR_POLL_BASED
 	/*interrupt timer*/
@@ -652,6 +755,8 @@ struct dp_soc {
 	qdf_nbuf_queue_t htt_stats_msg;
 	/* T2H Ext stats message length */
 	uint32_t htt_msg_len;
+	/* work queue to process htt stats */
+	qdf_work_t htt_stats_work;
 };
 #define MAX_RX_MAC_RINGS 2
 /* Same as NAC_MAX_CLENT */
@@ -665,19 +770,6 @@ enum dp_nac_param_cmd {
 	DP_NAC_PARAM_DEL,
 	/* IEEE80211_NAC_PARAM_LIST */
 	DP_NAC_PARAM_LIST,
-};
-#define DP_MAC_ADDR_LEN 6
-union dp_align_mac_addr {
-	uint8_t raw[DP_MAC_ADDR_LEN];
-	struct {
-		uint16_t bytes_ab;
-		uint16_t bytes_cd;
-		uint16_t bytes_ef;
-	} align2;
-	struct {
-		uint32_t bytes_abcd;
-		uint16_t bytes_ef;
-	} align4;
 };
 
 /**
@@ -918,6 +1010,9 @@ struct dp_vdev {
 	/* WDS enabled */
 	bool wds_enabled;
 
+	/* WDS Aging timer period */
+	uint32_t wds_aging_timer_val;
+
 	/* NAWDS enabled */
 	bool nawds_enabled;
 
@@ -953,6 +1048,9 @@ struct dp_vdev {
 
 	/* Address search flags to be configured in HAL descriptor */
 	uint8_t hal_desc_addr_search_flags;
+#ifdef QCA_LL_TX_FLOW_CONTROL_V2
+	struct dp_tx_desc_pool_s *pool;
+#endif
 };
 
 
@@ -966,7 +1064,7 @@ struct dp_peer {
 	/* VDEV to which this peer is associated */
 	struct dp_vdev *vdev;
 
-	struct dp_ast_entry self_ast_entry;
+	struct dp_ast_entry *self_ast_entry;
 
 	qdf_atomic_t ref_cnt;
 

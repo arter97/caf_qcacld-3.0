@@ -98,6 +98,27 @@ target_if_regulatory_get_rx_ops(struct wlan_objmgr_psoc *psoc)
 	return &psoc->soc_cb.rx_ops.reg_rx_ops;
 }
 
+QDF_STATUS target_if_reg_set_offloaded_info(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_lmac_if_reg_rx_ops *reg_rx_ops;
+
+	reg_rx_ops = target_if_regulatory_get_rx_ops(psoc);
+	if (!reg_rx_ops) {
+		target_if_err("reg_rx_ops is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (reg_rx_ops->reg_set_regdb_offloaded)
+		reg_rx_ops->reg_set_regdb_offloaded(psoc,
+				tgt_if_regulatory_is_regdb_offloaded(psoc));
+
+	if (reg_rx_ops->reg_set_11d_offloaded)
+		reg_rx_ops->reg_set_11d_offloaded(psoc,
+				tgt_if_regulatory_is_11d_offloaded(psoc));
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static int tgt_reg_chan_list_update_handler(ol_scn_t handle,
 					    uint8_t *event_buf,
 					    uint32_t len)
@@ -230,6 +251,20 @@ static QDF_STATUS tgt_if_regulatory_set_country_code(
 
 }
 
+static QDF_STATUS tgt_if_regulatory_set_user_country_code(
+	struct wlan_objmgr_psoc *psoc, uint8_t pdev_id, struct cc_regdmn_s *rd)
+{
+	wmi_unified_t wmi_handle = GET_WMI_HDL_FROM_PSOC(psoc);
+
+	if (wmi_unified_set_user_country_code_cmd_send(wmi_handle, pdev_id,
+				rd) != QDF_STATUS_SUCCESS) {
+		target_if_err("Set user country code failed");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static QDF_STATUS tgt_if_regulatory_register_11d_new_cc_handler(
 	struct wlan_objmgr_psoc *psoc, void *arg)
 {
@@ -295,12 +330,11 @@ QDF_STATUS target_if_register_regulatory_tx_ops(struct wlan_lmac_if_tx_ops
 
 	reg_ops->stop_11d_scan = tgt_if_regulatory_stop_11d_scan;
 
-	reg_ops->is_11d_offloaded = tgt_if_regulatory_is_11d_offloaded;
-
-	reg_ops->is_regdb_offloaded = tgt_if_regulatory_is_regdb_offloaded;
-
 	reg_ops->is_there_serv_ready_extn =
 		tgt_if_regulatory_is_there_serv_ready_extn;
+
+	reg_ops->set_user_country_code =
+		tgt_if_regulatory_set_user_country_code;
 
 	return QDF_STATUS_SUCCESS;
 }

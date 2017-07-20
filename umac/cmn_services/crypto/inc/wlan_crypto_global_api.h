@@ -201,6 +201,17 @@ QDF_STATUS wlan_crypto_demic(struct wlan_objmgr_vdev *vdev,
 					uint8_t tid);
 
 /**
+ * wlan_crypto_vdev_is_pmf_enabled - called to check is pmf enabled in vdev
+ *
+ * @vdev: vdev
+ *
+ * This function gets called to check is pmf enabled or not in vdev.
+ *
+ * Return: true or false
+ */
+bool wlan_crypto_vdev_is_pmf_enabled(struct wlan_objmgr_vdev *vdev);
+
+/**
  * wlan_crypto_is_pmf_enabled - called by mgmt txrx to check is pmf enabled
  *
  * @vdev: vdev
@@ -295,6 +306,33 @@ uint8_t *wlan_crypto_build_rsnie(struct wlan_crypto_params *,
 					uint8_t *iebuf);
 
 /**
+ * wlan_crypto_wapiie_check - called by mlme to check the wapiie
+ *
+ *
+ * @crypto params: crypto params
+ * @iebuf: ie buffer
+ *
+ * This function gets called by mlme to check the contents of wapi is
+ * matching with given crypto params
+ *
+ * Return: QDF_STATUS_SUCCESS - in case of success
+ */
+QDF_STATUS wlan_crypto_wapiie_check(struct wlan_crypto_params *crypto_params,
+					uint8_t *frm);
+
+/**
+ * wlan_crypto_build_wapiie - called by mlme to build wapi ie
+ *
+ * @vdev: vdev
+ * @iebuf: ie buffer
+ *
+ * This function gets called by mlme to build wapi ie from given vdev
+ *
+ * Return: end of buffer
+ */
+uint8_t *wlan_crypto_build_wapiie(struct wlan_objmgr_vdev *vdev,
+					uint8_t *iebuf);
+/**
  * wlan_crypto_rsn_info - check is given params matching with vdev params.
  *
  * @vdev: vdev
@@ -378,4 +416,29 @@ QDF_STATUS wlan_crypto_register_crypto_rx_ops(
  */
 struct wlan_lmac_if_crypto_rx_ops *wlan_crypto_get_crypto_rx_ops(
 			struct wlan_objmgr_psoc *psoc);
+/**
+ * wlan_crypto_vdev_has_auth_mode - check authmode for vdev
+ *
+ * @vdev: vdev
+ * @authvalue: authvalue to be checked
+ *
+ * This function check is authvalue passed is set in vdev or not
+ *
+ * Return: true or false
+ */
+bool wlan_crypto_vdev_has_auth_mode(struct wlan_objmgr_vdev *vdev,
+					wlan_crypto_auth_mode authmode);
+
+/**
+ * wlan_crypto_peer_has_auth_mode - check authmode for peer
+ *
+ * @peer: peer
+ * @authvalue: authvalue to be checked
+ *
+ * This function check is authvalue passed is set in peer or not
+ *
+ * Return: true or false
+ */
+bool wlan_crypto_peer_has_auth_mode(struct wlan_objmgr_peer *peer,
+					wlan_crypto_auth_mode authvalue);
 #endif /* end of _WLAN_CRYPTO_GLOBAL_API_H_ */

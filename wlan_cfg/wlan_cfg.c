@@ -36,6 +36,8 @@
 #define WLAN_CFG_PER_PDEV_RX_RING 0
 #define NUM_RXDMA_RINGS_PER_PDEV 2
 #define WLAN_LRO_ENABLE 1
+#define WLAN_CFG_TX_RING_SIZE 512
+#define WLAN_CFG_TX_COMP_RING_SIZE 1024
 
 /* Tx Descriptor and Tx Extension Descriptor pool sizes */
 #define WLAN_CFG_NUM_TX_DESC  1024
@@ -71,6 +73,17 @@
 #define WLAN_CFG_INT_TIMER_THRESHOLD_TX 1000
 #define WLAN_CFG_INT_TIMER_THRESHOLD_RX 500
 #define WLAN_CFG_INT_TIMER_THRESHOLD_OTHER 8
+
+#define WLAN_CFG_TX_RING_SIZE 512
+
+/* Size the completion ring using following 2 parameters
+ *  - NAPI schedule latency (assuming 1 netdev competing for CPU) = 20 ms (2 jiffies)
+ *  - Worst case PPS requirement = 400K PPS
+ *
+ * Ring size = 20 * 400 = 8000
+ * 8192 is nearest power of 2
+ */
+#define WLAN_CFG_TX_COMP_RING_SIZE (8 << 10)
 #endif
 
 #define WLAN_CFG_INT_NUM_CONTEXTS 4
@@ -80,13 +93,25 @@
 #define RXDMA_MONITOR_DEST_RING_SIZE 2048
 #define RXDMA_MONITOR_STATUS_RING_SIZE 2048
 
+#ifdef QCA_LL_TX_FLOW_CONTROL_V2
+
+/* Per vdev pools */
+#define WLAN_CFG_NUM_TX_DESC_POOL	3
+#define WLAN_CFG_NUM_TXEXT_DESC_POOL	3
+
+#else /* QCA_LL_TX_FLOW_CONTROL_V2 */
+
 #ifdef TX_PER_PDEV_DESC_POOL
-#define WLAN_CFG_NUM_TX_DESC_POOL 	MAX_PDEV_CNT
+#define WLAN_CFG_NUM_TX_DESC_POOL	MAX_PDEV_CNT
 #define WLAN_CFG_NUM_TXEXT_DESC_POOL	MAX_PDEV_CNT
-#else
+
+#else /* TX_PER_PDEV_DESC_POOL */
+
 #define WLAN_CFG_NUM_TX_DESC_POOL 3
 #define WLAN_CFG_NUM_TXEXT_DESC_POOL 3
+
 #endif /* TX_PER_PDEV_DESC_POOL */
+#endif /* QCA_LL_TX_FLOW_CONTROL_V2 */
 
 #define WLAN_CFG_TX_RING_MASK_0 0x1
 #define WLAN_CFG_TX_RING_MASK_1 0x2
@@ -232,6 +257,8 @@ struct wlan_cfg_dp_soc_ctxt {
 	int int_timer_threshold_rx;
 	int int_batch_threshold_other;
 	int int_timer_threshold_other;
+	int tx_ring_size;
+	int tx_comp_ring_size;
 	int int_tx_ring_mask[WLAN_CFG_INT_NUM_CONTEXTS];
 	int int_rx_ring_mask[WLAN_CFG_INT_NUM_CONTEXTS];
 	int int_rx_mon_ring_mask[WLAN_CFG_INT_NUM_CONTEXTS];
@@ -245,6 +272,10 @@ struct wlan_cfg_dp_soc_ctxt {
 	int nss_cfg;
 	int hw_macid[MAX_PDEV_CNT];
 	int base_hw_macid;
+#ifdef QCA_LL_TX_FLOW_CONTROL_V2
+	int tx_flow_stop_queue_th;
+	int tx_flow_start_queue_offset;
+#endif
 };
 
 /**
@@ -285,12 +316,15 @@ struct wlan_cfg_dp_soc_ctxt *wlan_cfg_soc_attach()
 	wlan_cfg_ctx->num_tcl_data_rings = WLAN_CFG_NUM_TCL_DATA_RINGS;
 	wlan_cfg_ctx->per_pdev_rx_ring = WLAN_CFG_PER_PDEV_RX_RING;
 	wlan_cfg_ctx->num_reo_dest_rings = WLAN_CFG_NUM_REO_DEST_RING;
-	wlan_cfg_ctx->num_tx_desc_pool = WLAN_CFG_NUM_TX_DESC_POOL;
+	wlan_cfg_ctx->num_tx_desc_pool = MAX_TXDESC_POOLS;
 	wlan_cfg_ctx->num_tx_ext_desc_pool = WLAN_CFG_NUM_TXEXT_DESC_POOL;
 	wlan_cfg_ctx->num_tx_desc = WLAN_CFG_NUM_TX_DESC;
 	wlan_cfg_ctx->num_tx_ext_desc = WLAN_CFG_NUM_TX_EXT_DESC;
 	wlan_cfg_ctx->htt_packet_type = WLAN_CFG_HTT_PKT_TYPE;
 	wlan_cfg_ctx->max_peer_id = WLAN_CFG_MAX_PEER_ID;
+
+	wlan_cfg_ctx->tx_ring_size = WLAN_CFG_TX_RING_SIZE;
+	wlan_cfg_ctx->tx_comp_ring_size = WLAN_CFG_TX_COMP_RING_SIZE;
 
 	wlan_cfg_ctx->int_batch_threshold_tx = WLAN_CFG_INT_BATCH_THRESHOLD_TX;
 	wlan_cfg_ctx->int_timer_threshold_tx =  WLAN_CFG_INT_TIMER_THRESHOLD_TX;
@@ -509,6 +543,16 @@ int wlan_cfg_num_tcl_data_rings(struct wlan_cfg_dp_soc_ctxt *cfg)
 	return cfg->num_tcl_data_rings;
 }
 
+int wlan_cfg_tx_ring_size(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return cfg->tx_ring_size;
+}
+
+int wlan_cfg_tx_comp_ring_size(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return cfg->tx_comp_ring_size;
+}
+
 int wlan_cfg_per_pdev_rx_ring(struct wlan_cfg_dp_soc_ctxt *cfg)
 {
 	return cfg->per_pdev_rx_ring;
@@ -634,3 +678,37 @@ int wlan_cfg_get_int_timer_threshold_other(struct wlan_cfg_dp_soc_ctxt *cfg)
 {
 	return cfg->int_timer_threshold_other;
 }
+#ifdef QCA_LL_TX_FLOW_CONTROL_V2
+/**
+ * wlan_cfg_get_tx_flow_stop_queue_th() - Get flow control stop threshold
+ * @cfg: config context
+ *
+ * Return: stop threshold
+ */
+int wlan_cfg_get_tx_flow_stop_queue_th(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+#ifdef QCA_WIFI_NAPIER_EMULATION
+	/* TODO remove this hack when INI hookup is ready */
+	return 15;
+#else
+	return cfg->tx_flow_stop_queue_th;
+#endif
+}
+
+/**
+ * wlan_cfg_get_tx_flow_start_queue_offset() - Get flow control start offset
+ *					for TX to resume
+ * @cfg: config context
+ *
+ * Return: stop threshold
+ */
+int wlan_cfg_get_tx_flow_start_queue_offset(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+#ifdef QCA_WIFI_NAPIER_EMULATION
+	/* TODO remove this hack when INI hookup is ready */
+	return 10;
+#else
+	return cfg->tx_flow_start_queue_offset;
+#endif
+}
+#endif /* QCA_LL_TX_FLOW_CONTROL_V2 */
