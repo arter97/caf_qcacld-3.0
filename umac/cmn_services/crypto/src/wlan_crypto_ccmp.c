@@ -59,8 +59,13 @@ static QDF_STATUS ccmp_encap(struct wlan_crypto_key *key,
 		ivp = (uint8_t *)qdf_nbuf_data(wbuf);
 	} else {
 		ivp = (uint8_t *)qdf_nbuf_push_head(wbuf,
-							cipher_table->header);
-		qdf_mem_move(ivp, ivp + cipher_table->header, hdrlen);
+						cipher_table->header + cipher_table->miclen);
+		qdf_mem_move(ivp, ivp + cipher_table->header + cipher_table->miclen, hdrlen);
+
+		qdf_mem_move(ivp + hdrlen + cipher_table->header,
+				ivp + hdrlen + cipher_table->header + cipher_table->miclen ,
+				(qdf_nbuf_len(wbuf)- hdrlen - cipher_table->header - cipher_table->miclen));
+
 		ivp = (uint8_t *) qdf_nbuf_data(wbuf);
 	}
 
