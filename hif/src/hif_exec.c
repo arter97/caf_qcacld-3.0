@@ -20,6 +20,7 @@
 #include <ce_main.h>
 #include <hif_irq_affinity.h>
 
+static struct hif_exec_context *hif_exec_tasklet_create(void);
 
 static void hif_exec_tasklet_schedule(struct hif_exec_context *ctx)
 {
