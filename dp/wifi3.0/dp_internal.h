@@ -276,6 +276,7 @@ extern QDF_STATUS dp_reo_send_cmd(struct dp_soc *soc,
 	enum hal_reo_cmd_type type, struct hal_reo_cmd_params *params,
 	void (*callback_fn), void *data);
 
+extern void dp_reo_cmdlist_destroy(struct dp_soc *soc);
 extern void dp_reo_status_ring_handler(struct dp_soc *soc);
 void dp_aggregate_vdev_stats(struct dp_vdev *vdev);
 uint16_t dp_tx_me_send_convert_ucast(struct cdp_vdev *vdev_handle,
@@ -295,6 +296,9 @@ void dp_set_pn_check_wifi3(struct cdp_vdev *vdev_handle,
 	 uint32_t *rx_pn);
 
 #if defined(CONFIG_WIN) && WDI_EVENT_ENABLE
+QDF_STATUS dp_h2t_cfg_stats_msg_send(struct dp_pdev *pdev,
+		                uint32_t stats_type_upload_mask);
+
 int dp_wdi_event_unsub(struct cdp_pdev *txrx_pdev_handle,
 	void *event_cb_sub_handle,
 	uint32_t event);
@@ -344,6 +348,11 @@ static inline int dp_wdi_event_detach(struct dp_pdev *txrx_pdev)
 
 static inline int dp_set_pktlog_wifi3(struct dp_pdev *pdev, uint32_t event,
 	bool enable)
+{
+	return 0;
+}
+static inline QDF_STATUS dp_h2t_cfg_stats_msg_send(struct dp_pdev *pdev,
+		uint32_t stats_type_upload_mask)
 {
 	return 0;
 }
