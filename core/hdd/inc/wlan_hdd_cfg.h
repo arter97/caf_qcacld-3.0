@@ -11046,6 +11046,24 @@ enum hw_filter_mode {
 #define CFG_DTIM_1CHRX_ENABLE_MAX       (1)
 #define CFG_DTIM_1CHRX_ENABLE_DEFAULT   (1)
 
+/*
+ * <ini>
+ * gEnableLPRx - Enable/Disable LPRx
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini Enables or disables the LPRx in FW
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_LPRx_NAME       "gEnableLPRx"
+#define CFG_LPRx_MIN         (0)
+#define CFG_LPRx_MAX         (1)
+#define CFG_LPRx_DEFAULT     (1)
+
 /*---------------------------------------------------------------------------
    Type declarations
    -------------------------------------------------------------------------*/
@@ -11822,6 +11840,7 @@ struct hdd_config {
 	uint8_t upper_brssi_thresh;
 	uint8_t lower_brssi_thresh;
 	bool enable_dtim_1chrx;
+	bool enable_lprx;
 };
 
 #define VAR_OFFSET(_Struct, _Var) (offsetof(_Struct, _Var))
