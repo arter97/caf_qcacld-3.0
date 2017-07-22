@@ -757,6 +757,20 @@ struct reg_table_entry g_registry_table[] = {
 		     CFG_ACTIVE_MIN_CHANNEL_TIME_MIN,
 		     CFG_ACTIVE_MIN_CHANNEL_TIME_MAX),
 
+	REG_VARIABLE(CFG_SCAN_NUM_PROBES_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, scan_num_probes,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_SCAN_NUM_PROBES_DEFAULT,
+		     CFG_SCAN_NUM_PROBES_MIN,
+		     CFG_SCAN_NUM_PROBES_MAX),
+
+	REG_VARIABLE(CFG_SCAN_PROBE_REPEAT_TIME_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, scan_probe_repeat_time,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_SCAN_PROBE_REPEAT_TIME_DEFAULT,
+		     CFG_SCAN_PROBE_REPEAT_TIME_MIN,
+		     CFG_SCAN_PROBE_REPEAT_TIME_MAX),
+
 	REG_VARIABLE(CFG_RETRY_LIMIT_ZERO_NAME, WLAN_PARAM_Integer,
 		     struct hdd_config, retryLimitZero,
 		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -4628,6 +4642,14 @@ struct reg_table_entry g_registry_table[] = {
 		CFG_TX_ORPHAN_ENABLE_DEFAULT,
 		CFG_TX_ORPHAN_ENABLE_MIN,
 		CFG_TX_ORPHAN_ENABLE_MAX),
+
+	REG_VARIABLE(CFG_ITO_REPEAT_COUNT_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, ito_repeat_count,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_ITO_REPEAT_COUNT_DEFAULT,
+		CFG_ITO_REPEAT_COUNT_MIN,
+		CFG_ITO_REPEAT_COUNT_MAX),
+
 };
 
 /**
@@ -6190,6 +6212,9 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
 		pHddCtx->config->scan_backoff_multiplier);
 	hdd_info("Name = [gEnableConnectedScan] Value = %u",
 		pHddCtx->config->enable_connected_scan);
+	hdd_debug("Name = [%s] value = [%u]",
+		CFG_ITO_REPEAT_COUNT_NAME,
+		pHddCtx->config->ito_repeat_count);
 }
 
 /**
@@ -7478,6 +7503,9 @@ QDF_STATUS hdd_set_sme_config(hdd_context_t *pHddCtx)
 	smeConfig->csrConfig.nActiveMinChnTime = pConfig->nActiveMinChnTime;
 	smeConfig->csrConfig.nPassiveMaxChnTime = pConfig->nPassiveMaxChnTime;
 	smeConfig->csrConfig.nPassiveMinChnTime = pConfig->nPassiveMinChnTime;
+	smeConfig->csrConfig.scan_probe_repeat_time =
+		pConfig->scan_probe_repeat_time;
+	smeConfig->csrConfig.scan_num_probes = pConfig->scan_num_probes;
 #ifdef WLAN_AP_STA_CONCURRENCY
 	smeConfig->csrConfig.nActiveMaxChnTimeConc =
 		pConfig->nActiveMaxChnTimeConc;

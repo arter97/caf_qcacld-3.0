@@ -650,6 +650,8 @@ typedef struct tagCsrConfig {
 	uint16_t pkt_err_disconn_th;
 	bool is_bssid_hint_priority;
 	bool is_force_1x1;
+	uint32_t scan_probe_repeat_time;
+	uint32_t scan_num_probes;
 } tCsrConfig;
 
 typedef struct tagCsrChannelPowerInfo {
