@@ -7579,19 +7579,17 @@ static void __cds_check_sta_ap_concurrent_ch_intf(void *data)
 	 * supported, return from here if DBS is not supported.
 	 * Need to take care of 3 port cases with 2 STA iface in future.
 	 */
-	qdf_mutex_acquire(&cds_ctx->qdf_conc_list_lock);
 	intf_ch = wlansap_check_cc_intf(hdd_ap_ctx->sapContext);
+
 	cds_debug("intf_ch:%d", intf_ch);
 	if (QDF_IS_STATUS_ERROR(
 		cds_valid_sap_conc_channel_check(&intf_ch,
 			cds_mode_specific_get_channel(CDS_SAP_MODE)))) {
-			qdf_mutex_release(&cds_ctx->qdf_conc_list_lock);
 			cds_debug("can't move sap to %d",
 				hdd_sta_ctx->conn_info.operationChannel);
 			goto end;
 	}
 	if (intf_ch == 0) {
-		qdf_mutex_release(&cds_ctx->qdf_conc_list_lock);
 		cds_debug("No need for sap channel change");
 		goto end;
 	}
@@ -7619,7 +7617,6 @@ static void __cds_check_sta_ap_concurrent_ch_intf(void *data)
 	} else {
 		cds_restart_sap(ap_adapter);
 	}
-	qdf_mutex_release(&cds_ctx->qdf_conc_list_lock);
 
 end:
 	if (work_info) {
