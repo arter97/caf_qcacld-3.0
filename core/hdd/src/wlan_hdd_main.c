@@ -10414,6 +10414,7 @@ static void hdd_cleanup_present_mode(hdd_context_t *hdd_ctx,
 	case QDF_GLOBAL_MONITOR_MODE:
 	case QDF_GLOBAL_FTM_MODE:
 		if (driver_status != DRIVER_MODULES_CLOSED) {
+			hdd_cleanup_scan_queue(hdd_ctx);
 			hdd_abort_mac_scan_all_adapters(hdd_ctx);
 			hdd_stop_all_adapters(hdd_ctx);
 		}
