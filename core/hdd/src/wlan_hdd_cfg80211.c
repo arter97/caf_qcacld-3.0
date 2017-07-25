@@ -4188,6 +4188,8 @@ wlan_hdd_wifi_config_policy[QCA_WLAN_VENDOR_ATTR_CONFIG_MAX + 1] = {
 		.type = NLA_UNSPEC,
 		.len = QDF_MAC_ADDR_SIZE},
 	[RX_BLOCKSIZE_WINLIMIT] = {.type = NLA_U32},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_TOTAL_BEACON_MISS_COUNT] = {
+			.type = NLA_U8},
 };
 
 /**
@@ -4327,6 +4329,7 @@ __wlan_hdd_cfg80211_wifi_configuration_set(struct wiphy *wiphy,
 	uint32_t abs_delay;
 	int param_id;
 	uint32_t tx_fail_count;
+	uint8_t bmiss_bcnt;
 
 	ENTER_DEV(dev);
 
@@ -4748,6 +4751,39 @@ __wlan_hdd_cfg80211_wifi_configuration_set(struct wiphy *wiphy,
 			hdd_err(FL("window size val is not in range"));
 			ret_val = -EINVAL;
 		}
+	}
+
+	if (tb[QCA_WLAN_VENDOR_ATTR_CONFIG_TOTAL_BEACON_MISS_COUNT]) {
+		bmiss_bcnt = nla_get_u8(
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_TOTAL_BEACON_MISS_COUNT]);
+		if (hdd_ctx->config->nRoamBmissFirstBcnt < bmiss_bcnt) {
+			hdd_ctx->config->nRoamBmissFinalBcnt = bmiss_bcnt
+				- hdd_ctx->config->nRoamBmissFirstBcnt;
+			hdd_debug("Bmiss first cnt(%d), Bmiss final cnt(%d)",
+				hdd_ctx->config->nRoamBmissFirstBcnt,
+				hdd_ctx->config->nRoamBmissFinalBcnt);
+			ret_val = sme_set_roam_bmiss_final_bcnt(hdd_ctx->hHal,
+				0, hdd_ctx->config->nRoamBmissFinalBcnt);
+
+			if (ret_val) {
+				hdd_err("Failed to set bmiss final Bcnt");
+				return ret_val;
+			}
+
+			ret_val = sme_set_bmiss_bcnt(adapter->sessionId,
+				hdd_ctx->config->nRoamBmissFirstBcnt,
+				hdd_ctx->config->nRoamBmissFinalBcnt);
+			if (ret_val) {
+				hdd_err("Failed to set bmiss Bcnt");
+				return ret_val;
+			}
+		} else {
+			hdd_err("Bcnt(%d) needs to exceed BmissFirstBcnt(%d)",
+				bmiss_bcnt,
+				hdd_ctx->config->nRoamBmissFirstBcnt);
+			return -EINVAL;
+		}
+
 	}
 
 	return ret_val;
