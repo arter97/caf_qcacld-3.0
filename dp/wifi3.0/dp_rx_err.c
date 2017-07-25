@@ -274,6 +274,9 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc, struct dp_rx_desc *rx_desc,
 	uint16_t peer_id = 0xFFFF;
 	struct dp_peer *peer = NULL;
 	uint32_t sgi, rate_mcs, tid;
+	struct dp_ast_entry *ase;
+	uint16_t sa_idx;
+	uint8_t *data = NULL;
 
 	rx_bufs_used++;
 
@@ -353,24 +356,22 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc, struct dp_rx_desc *rx_desc,
 	 * This is a Multicast echo check, drop the pkt if we meet
 	 * the Multicast Echo Check condition
 	 */
+	data = qdf_nbuf_data(nbuf);
 	if (hal_rx_msdu_end_sa_is_valid_get(rx_desc->rx_buf_start)) {
-		struct dp_ast_entry *ase;
-		uint16_t sa_idx;
-		uint8_t *nbuf_data = NULL;
-
-		nbuf_data = qdf_nbuf_data(nbuf);
 		sa_idx= hal_rx_msdu_end_sa_idx_get(rx_desc->rx_buf_start);
 		ase = soc->ast_table[sa_idx];
-		if (ase) {
-			if (ase->is_mec || (ase->peer->vdev != vdev)) {
-				QDF_TRACE(QDF_MODULE_ID_DP,
-					QDF_TRACE_LEVEL_INFO,
-					"received pkt with same src mac %pM",
-					&nbuf_data[DP_MAC_ADDR_LEN]);
+	} else
+		ase = dp_peer_ast_hash_find(soc, &data[DP_MAC_ADDR_LEN], 0);
 
-				qdf_nbuf_free(nbuf);
-				goto fail;
-			}
+	if (ase) {
+		if (ase->is_mec || (ase->peer->vdev != vdev)) {
+			QDF_TRACE(QDF_MODULE_ID_DP,
+				QDF_TRACE_LEVEL_INFO,
+				"received pkt with same src mac %pM",
+				&data[DP_MAC_ADDR_LEN]);
+
+			qdf_nbuf_free(nbuf);
+			goto fail;
 		}
 	}
 

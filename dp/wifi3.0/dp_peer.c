@@ -413,8 +413,14 @@ int dp_peer_add_ast(struct dp_soc *soc, struct dp_peer *peer,
 
 	qdf_spin_lock_bh(&soc->ast_lock);
 
-	/* If AST entry already exists , just return from here */
-	if (dp_peer_ast_hash_find(soc, mac_addr, 0)) {
+	/* If AST entry already exists, update the active bit
+	 * for that ast and just return from here
+	 */
+	ast_entry = dp_peer_ast_hash_find(soc, mac_addr, 0);
+	if (ast_entry) {
+		if (ast_entry->is_mec)
+			ast_entry->is_active = TRUE;
+
 		qdf_spin_unlock_bh(&soc->ast_lock);
 		return 1;
 	}
