@@ -176,15 +176,16 @@ next:
  */
 void dp_reo_cmdlist_destroy(struct dp_soc *soc)
 {
-	struct dp_reo_cmd_info *reo_cmd = NULL;
+	struct dp_reo_cmd_info *reo_cmd, *tmp_reo_cmd;
 	union hal_reo_status reo_status;
 
+	reo_cmd = tmp_reo_cmd = NULL;
 	reo_status.queue_status.header.status =
 			HAL_REO_CMD_FAILED;
 
 	qdf_spin_lock_bh(&soc->rx.reo_cmd_lock);
-	TAILQ_FOREACH(reo_cmd, &soc->rx.reo_cmd_list,
-		      reo_cmd_list_elem) {
+	TAILQ_FOREACH_SAFE(reo_cmd, &soc->rx.reo_cmd_list,
+			   reo_cmd_list_elem, tmp_reo_cmd) {
 		TAILQ_REMOVE(&soc->rx.reo_cmd_list, reo_cmd,
 		       reo_cmd_list_elem);
 		if (reo_cmd) {
