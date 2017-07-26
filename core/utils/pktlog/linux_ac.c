@@ -574,8 +574,8 @@ static int __pktlog_open(struct inode *i, struct file *f)
 		return -EBUSY;
 	}
 
-	if (cds_is_load_or_unload_in_progress() || cds_is_driver_recovering()) {
-		pr_info("%s: Load/Unload or recovery is in progress", __func__);
+	if (cds_is_module_state_transitioning()) {
+		pr_info("%s: module transition in progress", __func__);
 		return -EAGAIN;
 	}
 
@@ -640,8 +640,8 @@ static int __pktlog_release(struct inode *i, struct file *f)
 	if (!pl_info)
 		return -EINVAL;
 
-	if (cds_is_load_or_unload_in_progress() || cds_is_driver_recovering()) {
-		pr_info("%s: Load/Unload or recovery is in progress", __func__);
+	if (cds_is_module_state_transitioning()) {
+		pr_info("%s: module transition in progress", __func__);
 		return -EAGAIN;
 	}
 
@@ -861,8 +861,8 @@ __pktlog_read(struct file *file, char *buf, size_t nbytes, loff_t *ppos)
 	struct ath_pktlog_info *pl_info;
 	struct ath_pktlog_buf *log_buf;
 
-	if (cds_is_load_or_unload_in_progress() || cds_is_driver_recovering()) {
-		pr_info("%s: Load/Unload or recovery is in progress", __func__);
+	if (cds_is_module_state_transitioning()) {
+		pr_info("%s: module transition in progress", __func__);
 		return -EAGAIN;
 	}
 
@@ -1070,8 +1070,8 @@ static int __pktlog_mmap(struct file *file, struct vm_area_struct *vma)
 		return -ENOMEM;
 	}
 
-	if (cds_is_load_or_unload_in_progress() || cds_is_driver_recovering()) {
-		pr_info("%s: Load/Unload or recovery is in progress", __func__);
+	if (cds_is_module_state_transitioning()) {
+		pr_info("%s: module transition in progress", __func__);
 		return -EAGAIN;
 	}
 
