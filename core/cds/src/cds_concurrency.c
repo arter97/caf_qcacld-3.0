@@ -4068,7 +4068,7 @@ QDF_STATUS cds_get_pcl_for_existing_conn(enum cds_con_mode mode,
 		qdf_mutex_release(&cds_ctx->qdf_conc_list_lock);
 		/* Get the PCL */
 		status = cds_get_pcl(mode, pcl_ch, len, pcl_weight, weight_len);
-		cds_info("Get PCL to FW for mode:%d", mode);
+		cds_debug("Get PCL to FW for mode:%d", mode);
 		/* Restore the connection info */
 		qdf_mutex_acquire(&cds_ctx->qdf_conc_list_lock);
 		cds_restore_deleted_conn_info(&info);
@@ -8358,7 +8358,7 @@ QDF_STATUS cds_decr_connection_count_utfw(uint32_t del_all,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	sme_cbacks.sme_get_valid_channels = sme_get_cfg_valid_channels;
+	sme_cbacks.sme_get_valid_channels = sme_cfg_get_str;
 	sme_cbacks.sme_get_nss_for_vdev = sme_get_vdev_type_nss;
 	if (del_all) {
 		status = cds_init_policy_mgr(&sme_cbacks);
@@ -9066,7 +9066,7 @@ QDF_STATUS cds_get_valid_chans(uint8_t *chan_list, uint32_t *list_len)
 
 	*list_len = QDF_MAX_NUM_CHAN;
 	status = cds_ctx->sme_get_valid_channels(hdd_ctx->hHal,
-					chan_list, list_len);
+			WNI_CFG_VALID_CHANNEL_LIST, chan_list, list_len);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		cds_err("Error in getting valid channels");
 		*list_len = 0;
@@ -9680,6 +9680,7 @@ QDF_STATUS cds_get_valid_chan_weights(struct sir_pcl_chan_weights *weight,
 		 * and acquiring the same in cds_allow_concurrency, below!
 		 */
 		qdf_mutex_release(&cds_ctx->qdf_conc_list_lock);
+
 		for (i = 0; i < weight->saved_num_chan; i++) {
 			if (cds_allow_concurrency(CDS_STA_MODE,
 						  weight->saved_chan_list[i],
