@@ -1600,7 +1600,7 @@ typedef enum {
 #define CFG_FORCE_1X1_NAME      "gForce1x1Exception"
 #define CFG_FORCE_1X1_MIN       (0)
 #define CFG_FORCE_1X1_MAX       (1)
-#define CFG_FORCE_1X1_DEFAULT   (0)
+#define CFG_FORCE_1X1_DEFAULT   (1)
 
 /*
  * <ini>
