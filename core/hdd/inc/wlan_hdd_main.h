@@ -1779,7 +1779,7 @@ struct hdd_context_s {
 	bool rcpi_enabled;
 	bool imps_enabled;
 	int user_configured_pkt_filter_rules;
-
+	uint8_t curr_band;
 	uint32_t no_of_probe_req_ouis;
 	struct vendor_oui *probe_req_voui;
 	struct hdd_nud_stats_context nud_stats_context;
