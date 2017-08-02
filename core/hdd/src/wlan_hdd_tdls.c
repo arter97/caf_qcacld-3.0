@@ -1029,7 +1029,7 @@ hddTdlsPeer_t *wlan_hdd_tdls_get_peer(hdd_adapter_t *pAdapter, const u8 *mac)
  * Return: 0 if successful or negative errno otherwise
  */
 int wlan_hdd_tdls_set_cap(hdd_adapter_t *pAdapter, const uint8_t *mac,
-			  tTDLSCapType cap)
+			  enum tdls_cap_type cap)
 {
 	hddTdlsPeer_t *curr_peer;
 	hdd_context_t *hdd_ctx;
@@ -1065,8 +1065,8 @@ ret_status:
  * Return: Void
  */
 void wlan_hdd_tdls_set_peer_link_status(hddTdlsPeer_t *curr_peer,
-					tTDLSLinkStatus status,
-					tTDLSLinkReason reason)
+					enum tdls_link_status status,
+					enum tdls_link_reason reason)
 {
 	uint32_t state = 0;
 	int32_t res = 0;
@@ -1127,8 +1127,8 @@ void wlan_hdd_tdls_set_peer_link_status(hddTdlsPeer_t *curr_peer,
  */
 void wlan_hdd_tdls_set_link_status(hdd_adapter_t *pAdapter,
 				   const uint8_t *mac,
-				   tTDLSLinkStatus linkStatus,
-				   tTDLSLinkReason reason)
+				   enum tdls_link_status linkStatus,
+				   enum tdls_link_reason reason)
 {
 	uint32_t state = 0;
 	int32_t res = 0;
@@ -1647,7 +1647,7 @@ static void wlan_hdd_tdls_implicit_enable(tdlsCtx_t *pHddTdlsCtx)
  * Return: Void
  */
 static void wlan_hdd_tdls_set_mode(hdd_context_t *pHddCtx,
-				   eTDLSSupportMode tdls_mode,
+				   enum tdls_support_mode tdls_mode,
 				   bool bUpdateLast,
 				   enum tdls_disable_source source)
 {
@@ -1777,7 +1777,7 @@ int wlan_hdd_tdls_set_params(struct net_device *dev,
 	hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
 	tdlsCtx_t *pHddTdlsCtx;
-	eTDLSSupportMode req_tdls_mode;
+	enum tdls_support_mode req_tdls_mode;
 	tdlsInfo_t *tdlsParams;
 	QDF_STATUS qdf_ret_status = QDF_STATUS_E_FAILURE;
 
@@ -3414,7 +3414,7 @@ __wlan_hdd_cfg80211_configure_tdls_mode(struct wiphy *wiphy,
 	hdd_adapter_t *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_MAX + 1];
 	int ret;
-	eTDLSSupportMode tdls_mode;
+	enum tdls_support_mode tdls_mode;
 	uint32_t trigger_mode;
 	tdlsCtx_t *hdd_tdls_ctx;
 
@@ -3854,7 +3854,7 @@ int wlan_hdd_tdls_add_station(struct wiphy *wiphy,
 	hdd_context_t *pHddCtx = wiphy_priv(wiphy);
 	QDF_STATUS status;
 	hddTdlsPeer_t *pTdlsPeer;
-	tTDLSLinkStatus link_status;
+	enum tdls_link_status link_status;
 	uint16_t numCurrTdlsPeers;
 	unsigned long rc;
 	int ret;
@@ -4729,7 +4729,7 @@ static int __wlan_hdd_cfg80211_tdls_oper(struct wiphy *wiphy,
 	tSmeTdlsPeerStateParams smeTdlsPeerStateParams;
 	QDF_STATUS qdf_ret_status = QDF_STATUS_E_FAILURE;
 	hddTdlsPeer_t *pTdlsPeer;
-	tTDLSLinkStatus peer_status = eTDLS_LINK_IDLE;
+	enum tdls_link_status peer_status = eTDLS_LINK_IDLE;
 	uint16_t peer_staid;
 	uint8_t peer_offchannelsupp;
 
@@ -6315,7 +6315,7 @@ void wlan_hdd_change_tdls_mode(void *data)
 void hdd_tdls_notify_p2p_roc(hdd_context_t *hdd_ctx,
 				enum tdls_concerned_external_events event)
 {
-	eTDLSSupportMode tdls_mode;
+	enum tdls_support_mode tdls_mode;
 
 	qdf_mc_timer_stop(&hdd_ctx->tdls_source_timer);
 
@@ -6332,3 +6332,52 @@ void hdd_tdls_notify_p2p_roc(hdd_context_t *hdd_ctx,
 	return;
 }
 
+void hdd_tdls_notify_hw_mode_change(bool is_dbs_hw_mode)
+{
+	hdd_context_t *hdd_ctx;
+	v_CONTEXT_t g_context;
+	enum tdls_support_mode tdls_mode;
+
+	g_context = cds_get_global_context();
+
+	if (!g_context)
+		return;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	if (!hdd_ctx)
+		return;
+
+	if (is_dbs_hw_mode) {
+		hdd_debug("hw mode is DBS");
+		wlan_hdd_tdls_set_mode(hdd_ctx,
+				       eTDLS_SUPPORT_DISABLED,
+				       false,
+				       HDD_SET_TDLS_MODE_SOURCE_POLICY_MGR);
+		return;
+	}
+
+	/* if tdls was enabled before dbs, re-enable tdls mode */
+	if (hdd_ctx->tdls_mode_last > eTDLS_SUPPORT_DISABLED) {
+		tdls_mode = hdd_ctx->tdls_mode_last;
+		goto revert_tdls_mode;
+	}
+
+	/* TDLS previous mode is modified by other source, so
+	 * assign the default configured mode to TDLS
+	 */
+	if (false == hdd_ctx->config->fEnableTDLSImplicitTrigger)
+		tdls_mode = eTDLS_SUPPORT_EXPLICIT_TRIGGER_ONLY;
+	else if (true == hdd_ctx->config->fTDLSExternalControl)
+		tdls_mode = eTDLS_SUPPORT_EXTERNAL_CONTROL;
+	else
+		tdls_mode = eTDLS_SUPPORT_ENABLED;
+
+revert_tdls_mode:
+	hdd_debug("hw mode is non DBS, so revert to last tdls mode %d",
+					tdls_mode);
+	wlan_hdd_tdls_set_mode(hdd_ctx,
+			       tdls_mode,
+			       false,
+			       HDD_SET_TDLS_MODE_SOURCE_POLICY_MGR);
+}
