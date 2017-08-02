@@ -357,6 +357,8 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc, struct dp_rx_desc *rx_desc,
 	 * the Multicast Echo Check condition
 	 */
 	data = qdf_nbuf_data(nbuf);
+
+	qdf_spin_lock_bh(&soc->ast_lock);
 	if (hal_rx_msdu_end_sa_is_valid_get(rx_desc->rx_buf_start)) {
 		sa_idx= hal_rx_msdu_end_sa_idx_get(rx_desc->rx_buf_start);
 		ase = soc->ast_table[sa_idx];
@@ -364,7 +366,9 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc, struct dp_rx_desc *rx_desc,
 		ase = dp_peer_ast_hash_find(soc, &data[DP_MAC_ADDR_LEN], 0);
 
 	if (ase) {
-		if (ase->is_mec || (ase->peer->vdev != vdev)) {
+		if ((ase->type == CDP_TXRX_AST_TYPE_MEC) ||
+				(ase->peer != peer)) {
+			qdf_spin_unlock_bh(&soc->ast_lock);
 			QDF_TRACE(QDF_MODULE_ID_DP,
 				QDF_TRACE_LEVEL_INFO,
 				"received pkt with same src mac %pM",
@@ -374,6 +378,7 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc, struct dp_rx_desc *rx_desc,
 			goto fail;
 		}
 	}
+	qdf_spin_unlock_bh(&soc->ast_lock);
 
 	/* WDS Source Port Learning */
 	if (qdf_likely(vdev->rx_decap_type == htt_cmn_pkt_type_ethernet))
