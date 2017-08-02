@@ -166,31 +166,31 @@ hdd_conn_set_authenticated(hdd_adapter_t *pAdapter, uint8_t authState)
 
 /**
  * hdd_conn_set_connection_state() - set connection state
- * @pAdapter: pointer to the adapter
- * @connState: connection state
+ * @adapter: pointer to the adapter
+ * @conn_state: connection state
  *
  * This function updates the global HDD station context connection state.
  *
  * Return: none
  */
-void hdd_conn_set_connection_state(hdd_adapter_t *pAdapter,
-				   eConnectionState connState)
+void hdd_conn_set_connection_state(hdd_adapter_t *adapter,
+				   eConnectionState conn_state)
 {
-	hdd_station_ctx_t *pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
-	hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
+	hdd_station_ctx_t *hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_context_t *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
 	/* save the new connection state */
-	hdd_debug("%pS Changed connectionState Changed from oldState:%d to State:%d",
-		(void *)_RET_IP_, pHddStaCtx->conn_info.connState,
-		connState);
+	hdd_debug("%pS Changed conn state from old:%d to new:%d for dev %s",
+		(void *)_RET_IP_, hdd_sta_ctx->conn_info.connState,
+		conn_state, adapter->dev->name);
 
-	hdd_tsf_notify_wlan_state_change(pAdapter,
-					 pHddStaCtx->conn_info.connState,
-					 connState);
-	pHddStaCtx->conn_info.connState = connState;
+	hdd_tsf_notify_wlan_state_change(adapter,
+					 hdd_sta_ctx->conn_info.connState,
+					 conn_state);
+	hdd_sta_ctx->conn_info.connState = conn_state;
 
-	/* Check is pending ROC request or not when connection state changed */
-	schedule_delayed_work(&pHddCtx->roc_req_work, 0);
+	if (conn_state != eConnectionState_NdiConnected)
+		schedule_delayed_work(&hdd_ctx->roc_req_work, 0);
 }
 
 /**
@@ -1995,8 +1995,11 @@ static void hdd_send_re_assoc_event(struct net_device *dev,
 	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
 			   buf_ssid_ie, ssid_ie_len);
 	final_req_ie = qdf_mem_malloc(IW_GENERIC_IE_MAX);
-	if (final_req_ie == NULL)
+	if (final_req_ie == NULL) {
+		if (bss)
+			cfg80211_put_bss(pAdapter->wdev.wiphy, bss);
 		goto done;
+	}
 	buf_ptr = final_req_ie;
 	qdf_mem_copy(buf_ptr, buf_ssid_ie, ssid_ie_len);
 	buf_ptr += ssid_ie_len;
@@ -2087,7 +2090,7 @@ static int hdd_change_sta_state_authenticated(hdd_adapter_t *adapter,
 		sme_ps_enable_auto_ps_timer(
 			WLAN_HDD_GET_HAL_CTX(adapter),
 			adapter->sessionId,
-			timeout, false);
+			timeout);
 	}
 
 	return ret;
@@ -2252,7 +2255,13 @@ void hdd_perform_roam_set_key_complete(hdd_adapter_t *pAdapter)
 #if defined(WLAN_FEATURE_FILS_SK) && defined(CFG80211_FILS_SK_OFFLOAD_SUPPORT)
 void hdd_clear_fils_connection_info(hdd_adapter_t *adapter)
 {
-	hdd_wext_state_t *wext_state = WLAN_HDD_GET_WEXT_STATE_PTR(adapter);
+	hdd_wext_state_t *wext_state;
+
+	if ((adapter->device_mode == QDF_SAP_MODE) ||
+	    (adapter->device_mode == QDF_P2P_GO_MODE))
+		return;
+
+	wext_state = WLAN_HDD_GET_WEXT_STATE_PTR(adapter);
 
 	if (wext_state->roamProfile.fils_con_info) {
 		qdf_mem_free(wext_state->roamProfile.fils_con_info);
@@ -2307,7 +2316,9 @@ static QDF_STATUS hdd_association_completion_handler(hdd_adapter_t *pAdapter,
 	    pHddStaCtx->conn_info.connState)) &&
 	    ((eCSR_ROAM_RESULT_ASSOCIATED == roamResult) ||
 	    (eCSR_ROAM_ASSOCIATION_FAILURE == roamStatus))) {
-		hdd_info("Disconnect from HDD in progress");
+		hdd_info("hddDisconInProgress state=%d, result=%d, status=%d",
+				pHddStaCtx->conn_info.connState,
+				roamResult, roamStatus);
 		hddDisconInProgress = true;
 	}
 
@@ -3167,8 +3178,8 @@ static bool roam_remove_ibss_station(hdd_adapter_t *pAdapter, uint8_t staId)
 
 	if (MAX_PEERS == empty_slots) {
 		/* Last peer departed, set the IBSS state appropriately */
-		pHddStaCtx->conn_info.connState =
-			eConnectionState_IbssDisconnected;
+		hdd_conn_set_connection_state(pAdapter,
+				eConnectionState_IbssDisconnected);
 		hdd_debug("Last IBSS Peer Departed!!!");
 	}
 	/* Find next active staId, to have a valid sta trigger for TL. */
@@ -4642,7 +4653,8 @@ static void hdd_roam_channel_switch_handler(hdd_adapter_t *adapter,
 	else
 		cfg80211_put_bss(wiphy, bss);
 
-	status = hdd_chan_change_notify(adapter, adapter->dev, chan_change);
+	status = hdd_chan_change_notify(adapter, adapter->dev, chan_change,
+			roam_info->mode == SIR_SME_PHY_MODE_LEGACY);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("channel change notification failed");
 

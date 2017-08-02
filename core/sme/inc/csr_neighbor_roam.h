@@ -54,6 +54,7 @@ typedef enum {
 typedef struct sCsrNeighborRoamCfgParams {
 	uint8_t maxNeighborRetries;
 	uint32_t neighborScanPeriod;
+	uint32_t neighbor_scan_min_period;
 	tCsrChannelInfo channelInfo;
 	uint8_t neighborLookupThreshold;
 	uint8_t neighborReassocThreshold;
@@ -170,6 +171,7 @@ typedef struct sCsrNeighborRoamControlInfo {
 	uint8_t currentRoamBmissFinalBcnt;
 	uint8_t currentRoamBeaconRssiWeight;
 	uint8_t last_sent_cmd;
+	bool b_roam_scan_offload_started;
 } tCsrNeighborRoamControlInfo, *tpCsrNeighborRoamControlInfo;
 
 /* All the necessary Function declarations are here */

@@ -268,7 +268,7 @@ QDF_STATUS sme_close_session(tHalHandle hHal, uint8_t sessionId,
 		csr_roamSessionCloseCallback callback,
 		void *pContext);
 QDF_STATUS sme_update_roam_params(tHalHandle hHal, uint8_t session_id,
-		struct roam_ext_params roam_params_src, int update_param);
+		struct roam_ext_params *roam_params_src, int update_param);
 #ifdef FEATURE_WLAN_SCAN_PNO
 void sme_update_roam_pno_channel_prediction_config(
 		tHalHandle hal, tCsrConfigParam *csr_config,
@@ -710,6 +710,8 @@ uint16_t sme_get_neighbor_scan_max_chan_time(tHalHandle hHal,
 QDF_STATUS sme_set_neighbor_scan_period(tHalHandle hHal, uint8_t sessionId,
 		const uint16_t nNeighborScanPeriod);
 uint16_t sme_get_neighbor_scan_period(tHalHandle hHal, uint8_t sessionId);
+QDF_STATUS sme_set_neighbor_scan_min_period(tHalHandle h_hal,
+		uint8_t session_id, const uint16_t neighbor_scan_min_period);
 QDF_STATUS sme_set_roam_bmiss_first_bcnt(tHalHandle hHal,
 		uint8_t sessionId, const uint8_t nRoamBmissFirstBcnt);
 uint8_t sme_get_roam_bmiss_first_bcnt(tHalHandle hHal);
@@ -1415,6 +1417,7 @@ QDF_STATUS sme_encrypt_decrypt_msg(tHalHandle hal,
 QDF_STATUS sme_set_cts2self_for_p2p_go(tHalHandle hal);
 void sme_set_prefer_80MHz_over_160MHz(tHalHandle hal,
 		bool sta_prefer_80MHz_over_160MHz);
+void sme_set_allow_adj_ch_bcn(tHalHandle hal, bool allow_adj_ch_bcn);
 QDF_STATUS sme_update_tx_fail_cnt_threshold(tHalHandle hal_handle,
 		uint8_t session_id, uint32_t tx_fail_count);
 QDF_STATUS sme_update_short_retry_limit_threshold(tHalHandle hal_handle,
@@ -1724,6 +1727,17 @@ QDF_STATUS sme_ipa_uc_stat_request(tHalHandle hal,
 			uint32_t param_val, uint32_t req_cat);
 
 /**
+ * sme_set_smps_cfg() - set SMPS config params
+ * @vdev_id: virtual device for the command
+ * @param_id: parameter id
+ * @param_val: parameter value
+ *
+ * Return: QDF_STATUS_SUCCESS or non-zero on failure
+ */
+
+QDF_STATUS sme_set_smps_cfg(uint32_t vdev_id, uint32_t param_id,
+				uint32_t param_val);
+/**
  * sme_get_peer_info() - sme api to get peer info
  * @hal: hal handle for getting global mac struct
  * @req: peer info request struct send to wma
@@ -1782,4 +1796,27 @@ int sme_cli_set_command(int vdev_id, int param_id, int sval, int vpdev);
  */
 void sme_set_chan_info_callback(tHalHandle hal_handle,
 			void (*callback)(struct scan_chan_info *chan_info));
+
+/**
+ * sme_send_limit_off_chan_cmd() - send limit off-channel command parameters
+ * @hal: hal handle for getting global mac struct
+ * @param:  pointer to sir_limit_off_chan
+ *
+ * Return: 0 on success and non zero value on failure
+ */
+
+QDF_STATUS sme_send_limit_off_chan_cmd(tHalHandle hal,
+		struct sir_limit_off_chan *param);
+
+/**
+ * sme_set_bmiss_bcnt() - set bmiss config parameters
+ * @vdev_id: virtual device for the command
+ * @first_cnt: bmiss first value
+ * @final_cnt: bmiss final value
+ *
+ * Return: QDF_STATUS_SUCCESS or non-zero on failure
+ */
+QDF_STATUS sme_set_bmiss_bcnt(uint32_t vdev_id, uint32_t first_cnt,
+		uint32_t final_cnt);
+
 #endif /* #if !defined( __SME_API_H ) */

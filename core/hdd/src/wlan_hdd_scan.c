@@ -606,6 +606,7 @@ static void hdd_update_dbs_scan_ctrl_ext_flag(hdd_context_t *hdd_ctx,
 {
 	uint32_t num_chan;
 	uint32_t scan_dbs_policy = HDD_SCAN_DBS_POLICY_FORCE_NONDBS;
+	uint32_t conn_cnt;
 
 	/* Resetting the scan_ctrl_flags_ext to 0 */
 	scan_req->scan_ctrl_flags_ext = 0;
@@ -619,6 +620,13 @@ static void hdd_update_dbs_scan_ctrl_ext_flag(hdd_context_t *hdd_ctx,
 	if (hdd_ctx->config->dual_mac_feature_disable ==
 				DISABLE_DBS_CXN_AND_SCAN) {
 		hdd_debug("DBS is disabled");
+		goto end;
+	}
+
+	conn_cnt = cds_get_connection_count();
+	if (conn_cnt > 0) {
+		hdd_debug("%d active connections, go for DBS scan", conn_cnt);
+		scan_dbs_policy = HDD_SCAN_DBS_POLICY_DEFAULT;
 		goto end;
 	}
 
@@ -707,6 +715,40 @@ static bool wlan_hdd_is_scan_pending(hdd_adapter_t *adapter)
 }
 
 /**
+ * hdd_scan_inactivity_timer_handler() - Function invoked when hdd inactivity
+ * timer expires
+ * @scan_req: void pointer to scan request
+ *
+ * This function is invoked when the scan request enqueued by hdd expires the
+ * given timeout, it shall BUG_ON to provide further details for debugging.
+ *
+ * Return: void
+ */
+static void hdd_scan_inactivity_timer_handler(void *scan_req)
+{
+	struct hdd_scan_req *hdd_scan_req = scan_req;
+
+	hdd_debug("scan_id %d, enqueue timestamp %u, flags 0x%X",
+		hdd_scan_req->scan_id, hdd_scan_req->timestamp,
+		hdd_scan_req->scan_req_flags);
+
+	if (cds_is_load_or_unload_in_progress())
+		hdd_err("%s: Module (un)loading; Ignore hdd scan req timeout",
+			 __func__);
+	else if (cds_is_driver_recovering())
+		hdd_err("%s: Module recovering; Ignore hdd scan req timeout",
+			 __func__);
+	else if (cds_is_driver_in_bad_state())
+		hdd_err("%s: Module in bad state; Ignore hdd scan req timeout",
+			 __func__);
+	else if (cds_is_self_recovery_enabled())
+		cds_trigger_recovery();
+	else
+		QDF_BUG(0);
+
+}
+
+/**
  * wlan_hdd_scan_request_enqueue() - enqueue Scan Request
  * @adapter: Pointer to the adapter
  * @scan_req: Pointer to the scan request
@@ -737,6 +779,7 @@ static int wlan_hdd_scan_request_enqueue(hdd_adapter_t *adapter,
 	hdd_scan_req->source = source;
 	hdd_scan_req->scan_id = scan_id;
 	hdd_scan_req->timestamp = timestamp;
+	hdd_scan_req->scan_req_flags = scan_req->flags;
 
 	qdf_spin_lock(&hdd_ctx->hdd_scan_req_q_lock);
 	status = qdf_list_insert_back(&hdd_ctx->hdd_scan_req_q,
@@ -748,6 +791,13 @@ static int wlan_hdd_scan_request_enqueue(hdd_adapter_t *adapter,
 		qdf_mem_free(hdd_scan_req);
 		return -EINVAL;
 	}
+
+	qdf_timer_init(NULL, &hdd_scan_req->hdd_scan_inactivity_timer,
+		hdd_scan_inactivity_timer_handler, hdd_scan_req,
+		QDF_TIMER_TYPE_SW);
+	qdf_timer_start(&hdd_scan_req->hdd_scan_inactivity_timer,
+		HDD_SCAN_INACTIVITY_TIMEOUT);
+
 	EXIT();
 	return 0;
 }
@@ -796,6 +846,12 @@ static QDF_STATUS wlan_hdd_scan_request_dequeue(hdd_context_t *hdd_ctx,
 			status = qdf_list_remove_node(&hdd_ctx->hdd_scan_req_q,
 					pNode);
 			if (status == QDF_STATUS_SUCCESS) {
+				qdf_timer_stop(&hdd_scan_req->
+					hdd_scan_inactivity_timer);
+				qdf_timer_free(&hdd_scan_req->
+					hdd_scan_inactivity_timer);
+				hdd_debug("Stopping HDD Scan inactivity timer");
+
 				*req = hdd_scan_req->scan_request;
 				*source = hdd_scan_req->source;
 				*timestamp = hdd_scan_req->timestamp;
@@ -1958,16 +2014,21 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 			pHddCtx->last_scan_reject_session_id = curr_session_id;
 			pHddCtx->last_scan_reject_reason = curr_reason;
 			pHddCtx->last_scan_reject_timestamp =
-				jiffies_to_msecs(jiffies);
+				jiffies_to_msecs(jiffies) +
+				SCAN_REJECT_THRESHOLD_TIME;
+			pHddCtx->scan_reject_cnt = 0;
 		} else {
-			hdd_debug("curr_session id %d curr_reason %d time delta %lu",
-				curr_session_id, curr_reason,
-				(jiffies_to_msecs(jiffies) -
-				 pHddCtx->last_scan_reject_timestamp));
-			if ((jiffies_to_msecs(jiffies) -
-			    pHddCtx->last_scan_reject_timestamp) >=
-			    SCAN_REJECT_THRESHOLD_TIME) {
+			pHddCtx->scan_reject_cnt++;
+			hdd_debug("curr_session id %d curr_reason %d count %d threshold time has elapsed? %d",
+				curr_session_id, curr_reason, pHddCtx->scan_reject_cnt,
+				qdf_system_time_after(jiffies_to_msecs(jiffies),
+				pHddCtx->last_scan_reject_timestamp));
+			if ((pHddCtx->scan_reject_cnt >=
+			   SCAN_REJECT_THRESHOLD) &&
+			   qdf_system_time_after(jiffies_to_msecs(jiffies),
+			   pHddCtx->last_scan_reject_timestamp)) {
 				pHddCtx->last_scan_reject_timestamp = 0;
+				pHddCtx->scan_reject_cnt = 0;
 				if (pHddCtx->config->enable_fatal_event) {
 					cds_flush_logs(WLAN_LOG_TYPE_FATAL,
 					   WLAN_LOG_INDICATOR_HOST_DRIVER,
@@ -1989,6 +2050,7 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 	pHddCtx->last_scan_reject_timestamp = 0;
 	pHddCtx->last_scan_reject_session_id = 0xFF;
 	pHddCtx->last_scan_reject_reason = 0;
+	pHddCtx->scan_reject_cnt = 0;
 
 	/* Check whether SAP scan can be skipped or not */
 	if (pAdapter->device_mode == QDF_SAP_MODE &&
@@ -3312,6 +3374,21 @@ static int __wlan_hdd_cfg80211_sched_scan_start(struct wiphy *wiphy,
 	hdd_config_sched_scan_plan(pPnoRequest, request, pHddCtx);
 	pPnoRequest->scan_backoff_multiplier =
 		pHddCtx->config->scan_backoff_multiplier;
+	pPnoRequest->mawc_params.mawc_nlo_enabled =
+		pHddCtx->config->mawc_nlo_enabled &&
+		pHddCtx->config->MAWCEnabled;
+	pPnoRequest->mawc_params.exp_backoff_ratio =
+		pHddCtx->config->mawc_nlo_exp_backoff_ratio;
+	pPnoRequest->mawc_params.init_scan_interval =
+		pHddCtx->config->mawc_nlo_init_scan_interval;
+	pPnoRequest->mawc_params.max_scan_interval =
+		pHddCtx->config->mawc_nlo_max_scan_interval;
+	hdd_debug("MAWC NLO global:%d, en:%d, exp:%d, init:%d, max:%d",
+			pHddCtx->config->MAWCEnabled,
+			pHddCtx->config->mawc_nlo_enabled,
+			pPnoRequest->mawc_params.exp_backoff_ratio,
+			pPnoRequest->mawc_params.init_scan_interval,
+			pPnoRequest->mawc_params.max_scan_interval);
 	pPnoRequest->delay_start_time =
 		hdd_config_sched_scan_start_delay(request);
 	wlan_hdd_sched_scan_update_relative_rssi(pPnoRequest, request);
@@ -3598,6 +3675,11 @@ void hdd_cleanup_scan_queue(hdd_context_t *hdd_ctx)
 		req = hdd_scan_req->scan_request;
 		source = hdd_scan_req->source;
 		adapter = hdd_scan_req->adapter;
+
+		qdf_timer_stop(&hdd_scan_req->hdd_scan_inactivity_timer);
+		qdf_timer_free(&hdd_scan_req->hdd_scan_inactivity_timer);
+		hdd_debug("Stopping HDD Scan inactivity timer");
+
 		if (WLAN_HDD_ADAPTER_MAGIC != adapter->magic) {
 			hdd_err("HDD adapter magic is invalid");
 		} else if (!req) {

@@ -7622,19 +7622,17 @@ static void __cds_check_sta_ap_concurrent_ch_intf(void *data)
 	 * supported, return from here if DBS is not supported.
 	 * Need to take care of 3 port cases with 2 STA iface in future.
 	 */
-	qdf_mutex_acquire(&cds_ctx->qdf_conc_list_lock);
 	intf_ch = wlansap_check_cc_intf(hdd_ap_ctx->sapContext);
+
 	cds_debug("intf_ch:%d", intf_ch);
 	if (QDF_IS_STATUS_ERROR(
 		cds_valid_sap_conc_channel_check(&intf_ch,
 			cds_mode_specific_get_channel(CDS_SAP_MODE)))) {
-			qdf_mutex_release(&cds_ctx->qdf_conc_list_lock);
 			cds_debug("can't move sap to %d",
 				hdd_sta_ctx->conn_info.operationChannel);
 			goto end;
 	}
 	if (intf_ch == 0) {
-		qdf_mutex_release(&cds_ctx->qdf_conc_list_lock);
 		cds_debug("No need for sap channel change");
 		goto end;
 	}
@@ -7659,11 +7657,7 @@ static void __cds_check_sta_ap_concurrent_ch_intf(void *data)
 		cds_ctx->sap_restart_chan_switch_cb(ap_adapter,
 				hdd_ap_ctx->sapConfig.channel,
 				hdd_ap_ctx->sapConfig.ch_params.ch_width);
-		qdf_mutex_release(&cds_ctx->qdf_conc_list_lock);
 	} else {
-		/* release mutex to avoid dead lock*/
-		qdf_mutex_release(&cds_ctx->qdf_conc_list_lock);
-
 		cds_restart_sap(ap_adapter);
 	}
 end:
@@ -9587,10 +9581,13 @@ QDF_STATUS cds_get_sap_mandatory_channel(uint32_t *chan)
 		return status;
 	}
 
-	/* No existing SAP connection and hence a new SAP connection might be
-	 * coming up.
+	/*
+	 * Get inside below loop if no existing SAP connection and hence a new
+	 * SAP connection might be coming up. pcl.pcl_len can be 0 if no common
+	 * channel between PCL & mandatory channel list as well
 	 */
-	if (!pcl.pcl_len) {
+	if (!pcl.pcl_len &&
+		!cds_mode_specific_connection_count(CDS_SAP_MODE, NULL)) {
 		cds_debug("cds_get_pcl_for_existing_conn returned no pcl");
 		status = cds_get_pcl(CDS_SAP_MODE,
 				pcl.pcl_list, &pcl.pcl_len,
@@ -9608,6 +9605,11 @@ QDF_STATUS cds_get_sap_mandatory_channel(uint32_t *chan)
 	if (QDF_IS_STATUS_ERROR(status)) {
 		cds_err("Unable to modify SAP PCL");
 		return status;
+	}
+
+	if (!pcl.pcl_len) {
+		cds_err("No common channel between mandatory list & PCL");
+		return QDF_STATUS_E_FAILURE;
 	}
 
 	*chan = pcl.pcl_list[0];
@@ -9662,6 +9664,7 @@ QDF_STATUS cds_valid_sap_conc_channel_check(uint8_t *con_ch, uint8_t sap_ch)
 			if (wma_is_hw_dbs_capable()) {
 				temp_channel =
 					cds_get_alternate_channel_for_sap();
+				cds_debug("temp_channel is %d", temp_channel);
 				if (temp_channel) {
 					channel = temp_channel;
 				} else {
@@ -9669,6 +9672,11 @@ QDF_STATUS cds_valid_sap_conc_channel_check(uint8_t *con_ch, uint8_t sap_ch)
 						channel = CDS_24_GHZ_CHANNEL_6;
 					else
 						channel = CDS_5_GHZ_CHANNEL_36;
+				}
+				if (!cds_is_safe_channel(channel)) {
+					cds_warn("Can't have concurrency on %d as it is not safe",
+						channel);
+					return QDF_STATUS_E_FAILURE;
 				}
 			} else {
 				cds_warn("Can't have concurrency on %d",
