@@ -2601,6 +2601,12 @@ static void cds_pdev_set_hw_mode_cb(uint32_t status,
 			vdev_mac_map,
 			hw_mode);
 
+	/* notify TDLS of HW mode */
+	if (wma_is_current_hwmode_dbs())
+		hdd_tdls_notify_hw_mode_change(true);
+	else
+		hdd_tdls_notify_hw_mode_change(false);
+
 	ret = qdf_set_connection_update();
 	if (!QDF_IS_STATUS_SUCCESS(ret))
 		cds_err("ERROR: set connection_update_done event failed");
@@ -9536,10 +9542,13 @@ QDF_STATUS cds_get_sap_mandatory_channel(uint32_t *chan)
 		return status;
 	}
 
-	/* No existing SAP connection and hence a new SAP connection might be
-	 * coming up.
+	/*
+	 * Get inside below loop if no existing SAP connection and hence a new
+	 * SAP connection might be coming up. pcl.pcl_len can be 0 if no common
+	 * channel between PCL & mandatory channel list as well
 	 */
-	if (!pcl.pcl_len) {
+	if (!pcl.pcl_len &&
+		!cds_mode_specific_connection_count(CDS_SAP_MODE, NULL)) {
 		cds_debug("cds_get_pcl_for_existing_conn returned no pcl");
 		status = cds_get_pcl(CDS_SAP_MODE,
 				pcl.pcl_list, &pcl.pcl_len,
@@ -9557,6 +9566,11 @@ QDF_STATUS cds_get_sap_mandatory_channel(uint32_t *chan)
 	if (QDF_IS_STATUS_ERROR(status)) {
 		cds_err("Unable to modify SAP PCL");
 		return status;
+	}
+
+	if (!pcl.pcl_len) {
+		cds_err("No common channel between mandatory list & PCL");
+		return QDF_STATUS_E_FAILURE;
 	}
 
 	*chan = pcl.pcl_list[0];
@@ -9611,6 +9625,7 @@ QDF_STATUS cds_valid_sap_conc_channel_check(uint8_t *con_ch, uint8_t sap_ch)
 			if (wma_is_hw_dbs_capable()) {
 				temp_channel =
 					cds_get_alternate_channel_for_sap();
+				cds_debug("temp_channel is %d", temp_channel);
 				if (temp_channel) {
 					channel = temp_channel;
 				} else {
@@ -9618,6 +9633,11 @@ QDF_STATUS cds_valid_sap_conc_channel_check(uint8_t *con_ch, uint8_t sap_ch)
 						channel = CDS_24_GHZ_CHANNEL_6;
 					else
 						channel = CDS_5_GHZ_CHANNEL_36;
+				}
+				if (!cds_is_safe_channel(channel)) {
+					cds_warn("Can't have concurrency on %d as it is not safe",
+						channel);
+					return QDF_STATUS_E_FAILURE;
 				}
 			} else {
 				cds_warn("Can't have concurrency on %d",

@@ -1721,7 +1721,12 @@ int hdd_start_adapter(hdd_adapter_t *adapter)
 	 * Action frame registered in one adapter which will
 	 * applicable to all interfaces
 	 */
-	wlan_hdd_cfg80211_register_frames(adapter);
+	ret = wlan_hdd_cfg80211_register_frames(adapter);
+
+	if (ret < 0) {
+		hdd_err("Failed to register frames - ret %d", ret);
+		goto err_start_adapter;
+	}
 exit:
 	EXIT();
 	return 0;
@@ -4582,6 +4587,8 @@ QDF_STATUS hdd_start_all_adapters(hdd_context_t *hdd_ctx)
 
 		hdd_wmm_init(adapter);
 
+		adapter->scan_info.mScanPending = false;
+
 		switch (adapter->device_mode) {
 		case QDF_STA_MODE:
 		case QDF_P2P_CLIENT_MODE:
@@ -4593,7 +4600,6 @@ QDF_STATUS hdd_start_all_adapters(hdd_context_t *hdd_ctx)
 			hdd_init_station_mode(adapter);
 			/* Open the gates for HDD to receive Wext commands */
 			adapter->isLinkUpSvcNeeded = false;
-			adapter->scan_info.mScanPending = false;
 
 			/* Indicate disconnect event to supplicant
 			 * if associated previously
@@ -6698,10 +6704,13 @@ static uint8_t hdd_get_safe_channel_from_pcl_and_acs_range(
 		return INVALID_CHANNEL_ID;
 	}
 
-	if (!pcl.pcl_len) {
-		hdd_err("pcl length is zero. this is not expected");
-		return INVALID_CHANNEL_ID;
-	}
+	/*
+	 * In some scenarios, like hw dbs disabled, sap+sap case, if operating
+	 * channel is unsafe channel, the pcl may be empty, instead of return,
+	 * try to choose a safe channel from acs range.
+	 */
+	if (!pcl.pcl_len)
+		hdd_debug("pcl length is zero!");
 
 	hdd_debug("start:%d end:%d",
 		adapter->sessionCtx.ap.sapConfig.acs_cfg.start_ch,
@@ -7918,6 +7927,8 @@ static int hdd_update_cds_config(hdd_context_t *hdd_ctx)
 	cds_cfg->auto_power_save_fail_mode =
 		hdd_ctx->config->auto_pwr_save_fail_mode;
 
+	cds_cfg->ito_repeat_count = hdd_ctx->config->ito_repeat_count;
+
 	hdd_ra_populate_cds_config(cds_cfg, hdd_ctx);
 	hdd_txrx_populate_cds_config(cds_cfg, hdd_ctx);
 	hdd_nan_populate_cds_config(cds_cfg, hdd_ctx);
@@ -8975,6 +8986,9 @@ int hdd_configure_cds(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter)
 	cds_get_dfs_region(&dfs_reg);
 	cds_set_wma_dfs_region(dfs_reg);
 
+	if (hdd_enable_egap(hdd_ctx))
+		hdd_debug("enhance green ap is not enabled");
+
 	return 0;
 
 hdd_features_deinit:
@@ -9416,9 +9430,6 @@ int hdd_wlan_startup(struct device *dev)
 	hdd_runtime_suspend_context_init(hdd_ctx);
 	memdump_init();
 	hdd_driver_memdump_init();
-
-	if (hdd_enable_egap(hdd_ctx))
-		hdd_debug("enhance green ap is not enabled");
 
 	if (hdd_ctx->config->fIsImpsEnabled)
 		hdd_set_idle_ps_config(hdd_ctx, true);

@@ -2386,7 +2386,6 @@ QDF_STATUS wma_open(void *cds_context,
 	qdf_spinlock_create(&wma_handle->wma_hold_req_q_lock);
 	qdf_atomic_init(&wma_handle->is_wow_bus_suspended);
 	qdf_atomic_init(&wma_handle->scan_id_counter);
-	qdf_atomic_init(&wma_handle->num_pending_scans);
 
 	/* Register vdev start response event handler */
 	wmi_unified_register_event_handler(wma_handle->wmi_handle,
@@ -2593,6 +2592,8 @@ QDF_STATUS wma_open(void *cds_context,
 			WMI_VDEV_ADD_MAC_ADDR_TO_RX_FILTER_STATUS_EVENTID,
 			wma_action_frame_filter_mac_event_handler,
 			WMA_RX_SERIALIZER_CTX);
+
+	wma_handle->ito_repeat_count = cds_cfg->ito_repeat_count;
 
 	wma_handle->auto_power_save_enabled =
 		cds_cfg->auto_power_save_fail_mode;
