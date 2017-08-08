@@ -1865,9 +1865,12 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 
 		if (eHDD_LINK_SPEED_REPORT_ACTUAL == pCfg->reportMaxLinkSpeed) {
 			/* Get current rate flags if report actual */
-			rate_flags =
-				pAdapter->hdd_stats.ClassA_stat.
-				promiscuous_rx_frag_cnt;
+			/* WMA fails to find mcs_index for legacy tx rates */
+			if (mcs_index == INVALID_MCS_IDX && myRate)
+				rate_flags = eHAL_TX_RATE_LEGACY;
+			else
+				rate_flags =
+				pAdapter->hdd_stats.ClassA_stat.promiscuous_rx_frag_cnt;
 		}
 
 		if (mcs_index == INVALID_MCS_IDX)
