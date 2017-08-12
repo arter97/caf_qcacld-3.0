@@ -3409,11 +3409,6 @@ QDF_STATUS wma_pno_start(tp_wma_handle wma, tpSirPNOScanReq pno)
 	mawc_params->exp_backoff_ratio = pno->mawc_params.exp_backoff_ratio;
 	mawc_params->init_scan_interval = pno->mawc_params.init_scan_interval;
 	mawc_params->max_scan_interval = pno->mawc_params.max_scan_interval;
-	status = wmi_unified_nlo_mawc_cmd(wma->wmi_handle, mawc_params);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		WMA_LOGD("Failed to send NLO MAWC cmd for vdev %d",
-			 pno->sessionId);
-	}
 
 exit_pno_start:
 	if (channel_list)
