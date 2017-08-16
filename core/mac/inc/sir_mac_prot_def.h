@@ -554,14 +554,16 @@
 #define SIR_MAC_MAX_NUMBER_OF_RATES          12
 #define SIR_MAC_MAX_NUM_OF_DEFAULT_KEYS      4
 #define SIR_MAC_KEY_LENGTH                   13 /* WEP Maximum key length size */
-#define SIR_MAC_AUTH_CHALLENGE_LENGTH        128
+#define SIR_MAC_AUTH_CHALLENGE_LENGTH        253
 #define SIR_MAC_WEP_IV_LENGTH                4
 #define SIR_MAC_WEP_ICV_LENGTH               4
+#define SIR_MAC_CHALLENGE_ID_LEN             2
 
 /* 2 bytes each for auth algo number, transaction number and status code */
 #define SIR_MAC_AUTH_FRAME_INFO_LEN          6
 /* 2 bytes for ID and length + SIR_MAC_AUTH_CHALLENGE_LENGTH */
-#define SIR_MAC_AUTH_CHALLENGE_BODY_LEN    (2 + SIR_MAC_AUTH_CHALLENGE_LENGTH)
+#define SIR_MAC_AUTH_CHALLENGE_BODY_LEN    (SIR_MAC_CHALLENGE_ID_LEN + \
+					    SIR_MAC_AUTH_CHALLENGE_LENGTH)
 
 /* / MAX key length when ULA is used */
 #define SIR_MAC_MAX_KEY_LENGTH               32
@@ -666,7 +668,11 @@ typedef enum eSirMacStatusCodes {
 	eSIR_MAC_QOS_UNSPECIFIED_FAILURE_STATUS = 32,   /* Unspecified, QoS-related failure */
 	eSIR_MAC_QAP_NO_BANDWIDTH_STATUS = 33,  /* Association denied because QoS AP has insufficient bandwidth to handle another */
 	/* QoS STA */
-	eSIR_MAC_XS_FRAME_LOSS_STATUS = 34,     /* Association denied due to excessive frame loss rates and/or poor conditions on cur- */
+	/*
+	 * Association denied due to excessive frame loss rates
+	 * and/or poor conditions/RSSI on cur channel
+	 */
+	eSIR_MAC_XS_FRAME_LOSS_POOR_CHANNEL_RSSI_STATUS = 34,
 	/* rent operating channel */
 	eSIR_MAC_STA_QOS_NOT_SUPPORTED_STATUS = 35,     /* Association (with QoS BSS) denied because the requesting STA does not support the */
 	/* QoS facility */

@@ -1907,6 +1907,15 @@ lim_roam_fill_bss_descr(tpAniSirGlobal pMac,
 	bss_desc_ptr->timeStamp[1]   = parsed_frm_ptr->timeStamp[1];
 	qdf_mem_copy(&bss_desc_ptr->capabilityInfo,
 	&bcn_proberesp_ptr[SIR_MAC_HDR_LEN_3A + SIR_MAC_B_PR_CAPAB_OFFSET], 2);
+
+	if (qdf_is_macaddr_zero((struct qdf_mac_addr *)mac_hdr->bssId)) {
+		pe_debug("bssid is 0 in beacon/probe update it with bssId %pM in sync ind",
+			roam_offload_synch_ind_ptr->bssid.bytes);
+		qdf_mem_copy(mac_hdr->bssId,
+			roam_offload_synch_ind_ptr->bssid.bytes,
+			sizeof(tSirMacAddr));
+	}
+
 	qdf_mem_copy((uint8_t *) &bss_desc_ptr->bssId,
 			(uint8_t *) mac_hdr->bssId,
 			sizeof(tSirMacAddr));
@@ -1918,7 +1927,7 @@ lim_roam_fill_bss_descr(tpAniSirGlobal pMac,
 				(uint8_t *)parsed_frm_ptr->mdie,
 				SIR_MDIE_SIZE);
 	}
-	pe_debug("LFR3: %s:BssDescr Info:", __func__);
+	pe_debug("LFR3: BssDescr Info:");
 	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
 			bss_desc_ptr->bssId, sizeof(tSirMacAddr));
 	pe_debug("chan: %d rssi: %d", bss_desc_ptr->channelId,
@@ -2009,8 +2018,7 @@ QDF_STATUS pe_roam_synch_callback(tpAniSirGlobal mac_ctx,
 	sir_copy_mac_addr(session_ptr->limReAssocbssId, bss_desc->bssId);
 	ft_session_ptr->csaOffloadEnable = session_ptr->csaOffloadEnable;
 
-	lim_fill_ft_session(mac_ctx, bss_desc, ft_session_ptr, session_ptr);
-
+	/* Assign default configured nss value in the new session */
 	if (IS_5G_CH(ft_session_ptr->currentOperChannel))
 		ft_session_ptr->vdev_nss = mac_ctx->vdev_type_nss_5g.sta;
 	else
@@ -2018,6 +2026,10 @@ QDF_STATUS pe_roam_synch_callback(tpAniSirGlobal mac_ctx,
 
 	ft_session_ptr->nss = ft_session_ptr->vdev_nss;
 
+	/* Next routine will update nss and vdev_nss with AP's capabilities */
+	lim_fill_ft_session(mac_ctx, bss_desc, ft_session_ptr, session_ptr);
+
+	/* Next routine may update nss based on dot11Mode */
 	lim_ft_prepare_add_bss_req(mac_ctx, false, ft_session_ptr, bss_desc);
 	roam_sync_ind_ptr->add_bss_params =
 		(tpAddBssParams) ft_session_ptr->ftPEContext.pAddBssReq;

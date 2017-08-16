@@ -885,7 +885,6 @@ uint16_t csr_check_concurrent_channel_overlap(tpAniSirGlobal mac_ctx,
 			    cds_get_sap_mandatory_channel((uint32_t *)&intf_ch);
 			if (QDF_IS_STATUS_ERROR(status)) {
 				sme_err("no mandatory channel");
-				intf_ch = sap_ch;
 			}
 		}
 	} else if ((intf_ch == sap_ch) && (cc_switch_mode ==
@@ -896,7 +895,6 @@ uint16_t csr_check_concurrent_channel_overlap(tpAniSirGlobal mac_ctx,
 						(uint32_t *)&intf_ch);
 			if (QDF_IS_STATUS_ERROR(status)) {
 				sme_err("no mandatory channel");
-				intf_ch = sap_ch;
 			}
 		}
 	}
@@ -3044,7 +3042,7 @@ csr_is_pmf_capabilities_in_rsn_match(tHalHandle hHal,
 	if (pRSNIe && pFilterMFPEnabled && pFilterMFPCapable
 	    && pFilterMFPRequired) {
 		/* Extracting MFPCapable bit from RSN Ie */
-		apProfileMFPCapable = (pRSNIe->RSN_Cap[0] >> 7) & 0x1;
+		apProfileMFPCapable = csr_is_mfpc_capable(pRSNIe);
 		apProfileMFPRequired = (pRSNIe->RSN_Cap[0] >> 6) & 0x1;
 
 		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
@@ -6019,6 +6017,7 @@ const char *sme_request_type_to_string(const uint8_t request_type)
 	CASE_RETURN_STRING(eCSR_SCAN_P2P_DISCOVERY);
 	CASE_RETURN_STRING(eCSR_SCAN_SOFTAP_CHANNEL_RANGE);
 	CASE_RETURN_STRING(eCSR_SCAN_P2P_FIND_PEER);
+	CASE_RETURN_STRING(eCSR_SCAN_RRM);
 	default:
 		return "Unknown Scan Request Type";
 	}

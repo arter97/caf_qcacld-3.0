@@ -96,7 +96,8 @@ enum cds_fw_state {
  * @sme_get_nss_for_vdev: gets the nss allowed for the vdev type
  */
 struct cds_sme_cbacks {
-	QDF_STATUS (*sme_get_valid_channels)(void*, uint8_t *, uint32_t *);
+	QDF_STATUS (*sme_get_valid_channels)(void*, uint16_t,
+		uint8_t *, uint32_t *);
 	void (*sme_get_nss_for_vdev)(void*, enum tQDF_ADAPTER_MODE,
 		uint8_t *, uint8_t *);
 };
@@ -436,4 +437,28 @@ void cds_print_htc_credit_history(uint32_t count, qdf_abstract_print * print,
 				  void *print_priv);
 #endif
 
+/**
+ * cds_smmu_mem_map_setup() - Check SMMU S1 stage enable
+ *                            status and setup wlan driver
+ * @osdev: Parent device instance
+ *
+ * This API checks if SMMU S1 translation is enabled in
+ * platform driver or not and sets it accordingly in driver.
+ *
+ * Return: none
+ */
+void cds_smmu_mem_map_setup(qdf_device_t osdev);
+
+/**
+ * cds_smmu_map_unmap() - Map / Unmap DMA buffer to IPA UC
+ * @map: Map / unmap operation
+ * @num_buf: Number of buffers in array
+ * @buf_arr: Buffer array of DMA mem mapping info
+ *
+ * This API maps/unmaps WLAN-IPA buffers if SMMU S1 translation
+ * is enabled.
+ *
+ * Return: Status of map operation
+ */
+int cds_smmu_map_unmap(bool map, uint32_t num_buf, qdf_mem_info_t *buf_arr);
 #endif /* if !defined __CDS_API_H */

@@ -452,6 +452,7 @@ typedef struct tagCsr11rConfig {
 
 typedef struct tagCsrNeighborRoamConfig {
 	uint32_t nNeighborScanTimerPeriod;
+	uint32_t neighbor_scan_min_timer_period;
 	uint8_t nNeighborLookupRssiThreshold;
 	uint16_t nNeighborScanMinChanTime;
 	uint16_t nNeighborScanMaxChanTime;
@@ -488,6 +489,7 @@ typedef struct tagCsrConfig {
 	bool Is11eSupportEnabled;
 	bool Is11dSupportEnabled;
 	bool Is11dSupportEnabledOriginal;
+	bool enable_11d_in_world_mode;
 	bool Is11hSupportEnabled;
 	bool shortSlotTime;
 	bool ProprietaryRatesEnabled;
@@ -545,7 +547,7 @@ typedef struct tagCsrConfig {
 	bool ssidHidden;
 	tCsr11rConfig csr11rConfig;
 	uint8_t isFastRoamIniFeatureEnabled;
-	uint8_t MAWCEnabled;
+	struct mawc_params csr_mawc_config;
 	uint8_t isRoamOffloadScanEnabled;
 	bool bFastRoamInConIniFeatureEnabled;
 #ifdef FEATURE_WLAN_ESE
@@ -1035,6 +1037,7 @@ typedef struct tagCsrRoamStruct {
 	uint8_t *pReassocResp;          /* reassociation response from new AP */
 	uint16_t reassocRespLen;        /* length of reassociation response */
 	qdf_mc_timer_t packetdump_timer;
+	qdf_list_t rssi_disallow_bssid;
 } tCsrRoamStruct;
 
 #define GET_NEXT_ROAM_ID(pRoamStruct)  (((pRoamStruct)->nextRoamId + 1 == 0) ? \
