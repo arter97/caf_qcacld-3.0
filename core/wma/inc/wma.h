@@ -1108,6 +1108,8 @@ struct wma_txrx_node {
 	struct sir_vdev_wow_stats wow_stats;
 	struct sme_rcpi_req *rcpi_req;
 	bool in_bmps;
+	struct beacon_filter_param beacon_filter;
+	bool beacon_filter_enabled;
 };
 
 #if defined(QCA_WIFI_FTM)
