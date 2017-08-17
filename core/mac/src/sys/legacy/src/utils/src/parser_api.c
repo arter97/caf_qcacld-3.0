@@ -729,20 +729,9 @@ populate_dot11f_ht_caps(tpAniSirGlobal pMac,
 		    pDot11f->supportedMCSSet, nCfgLen,
 		    SIZE_OF_SUPPORTED_MCS_SET);
 
-	if (psessionEntry) {
-		if (pMac->lteCoexAntShare
-		    && (IS_24G_CH(psessionEntry->currentOperChannel))) {
-			if (!(IS_2X2_CHAIN(psessionEntry->chainMask))) {
-				pDot11f->supportedMCSSet[1] = 0;
-				if (LIM_IS_STA_ROLE(psessionEntry)) {
-					pDot11f->mimoPowerSave =
-						psessionEntry->smpsMode;
-				}
-			}
-		}
+	if (psessionEntry)
 		if (psessionEntry->nss == NSS_1x1_MODE)
 			pDot11f->supportedMCSSet[1] = 0;
-	}
 
 	/* If STA mode, session supported NSS > 1 and
 	 * SMPS enabled publish HT SMPS IE
@@ -1109,13 +1098,6 @@ populate_dot11f_vht_caps(tpAniSirGlobal pMac,
 
 	pDot11f->reserved3 = 0;
 	if (psessionEntry) {
-		if (pMac->lteCoexAntShare
-		    && (IS_24G_CH(psessionEntry->currentOperChannel))) {
-			if (!(IS_2X2_CHAIN(psessionEntry->chainMask))) {
-				pDot11f->txMCSMap |= DISABLE_NSS2_MCS;
-				pDot11f->rxMCSMap |= DISABLE_NSS2_MCS;
-			}
-		}
 		if (psessionEntry->nss == NSS_1x1_MODE) {
 			pDot11f->txMCSMap |= DISABLE_NSS2_MCS;
 			pDot11f->rxMCSMap |= DISABLE_NSS2_MCS;
