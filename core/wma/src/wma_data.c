@@ -1239,6 +1239,8 @@ void wma_set_linkstate(tp_wma_handle wma, tpLinkStateParams params)
 		if (wma_send_vdev_stop_to_fw(wma, vdev_id)) {
 			WMA_LOGP("%s: %d Failed to send vdev stop vdev %d",
 				 __func__, __LINE__, vdev_id);
+			wma_remove_vdev_req(wma, vdev_id,
+					WMA_TARGET_REQ_TYPE_VDEV_STOP);
 			params->status = false;
 		} else {
 			WMA_LOGP("%s: %d vdev stop sent vdev %d",
@@ -2926,8 +2928,10 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 			status = wmi_mgmt_unified_cmd_send(
 					wma_handle->wmi_handle,
 					&mgmt_param);
-			if (status)
+			if (status) {
+				wmi_desc->nbuf = NULL;
 				wmi_desc_put(wma_handle, wmi_desc);
+			}
 		}
 	} else {
 		/* Hand over the Tx Mgmt frame to TxRx */

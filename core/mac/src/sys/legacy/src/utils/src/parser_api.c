@@ -611,6 +611,7 @@ populate_dot11f_ht_caps(tpAniSirGlobal pMac,
 	uint8_t nCfgValue8;
 	tSirRetStatus nSirStatus;
 	tSirMacHTParametersInfo *pHTParametersInfo;
+	uint8_t disable_high_ht_mcs_2x2 = 0;
 	union {
 		uint16_t nCfgValue16;
 		tSirMacHTCapabilityInfo htCapInfo;
@@ -679,6 +680,11 @@ populate_dot11f_ht_caps(tpAniSirGlobal pMac,
 		    SIZE_OF_SUPPORTED_MCS_SET);
 
 	if (psessionEntry) {
+		disable_high_ht_mcs_2x2 =
+				pMac->roam.configParam.disable_high_ht_mcs_2x2;
+		pe_debug("disable HT high MCS INI param[%d]",
+			 disable_high_ht_mcs_2x2);
+
 		if (pMac->lteCoexAntShare
 		    && (IS_24G_CH(psessionEntry->currentOperChannel))) {
 			if (!(IS_2X2_CHAIN(psessionEntry->chainMask))) {
@@ -689,8 +695,17 @@ populate_dot11f_ht_caps(tpAniSirGlobal pMac,
 				}
 			}
 		}
-		if (psessionEntry->nss == NSS_1x1_MODE)
+		if (psessionEntry->nss == NSS_1x1_MODE) {
 			pDot11f->supportedMCSSet[1] = 0;
+		} else if (IS_24G_CH(psessionEntry->currentOperChannel) &&
+			   disable_high_ht_mcs_2x2 &&
+			   (psessionEntry->pePersona == QDF_STA_MODE)) {
+				pe_debug("Disabling high HT MCS [%d]",
+					 disable_high_ht_mcs_2x2);
+				pDot11f->supportedMCSSet[1] =
+					(pDot11f->supportedMCSSet[1] >>
+						disable_high_ht_mcs_2x2);
+		}
 	}
 
 	/* If STA mode, session supported NSS > 1 and
@@ -2587,10 +2602,6 @@ tSirRetStatus sir_convert_probe_frame2_struct(tpAniSirGlobal pMac,
 	pProbeResp->Vendor3IEPresent = pr->Vendor3IE.present;
 
 	pProbeResp->vendor_vht_ie.present = pr->vendor_vht_ie.present;
-	if (pr->vendor_vht_ie.present) {
-		pProbeResp->vendor_vht_ie.type = pr->vendor_vht_ie.type;
-		pProbeResp->vendor_vht_ie.sub_type = pr->vendor_vht_ie.sub_type;
-	}
 	if (pr->vendor_vht_ie.VHTCaps.present) {
 		qdf_mem_copy(&pProbeResp->vendor_vht_ie.VHTCaps,
 				&pr->vendor_vht_ie.VHTCaps,
@@ -2822,9 +2833,6 @@ sir_convert_assoc_req_frame2_struct(tpAniSirGlobal pMac,
 
 	pAssocReq->vendor_vht_ie.present = ar->vendor_vht_ie.present;
 	if (ar->vendor_vht_ie.present) {
-		pAssocReq->vendor_vht_ie.type = ar->vendor_vht_ie.type;
-		pAssocReq->vendor_vht_ie.sub_type = ar->vendor_vht_ie.sub_type;
-
 		if (ar->vendor_vht_ie.VHTCaps.present) {
 			qdf_mem_copy(&pAssocReq->vendor_vht_ie.VHTCaps,
 				     &ar->vendor_vht_ie.VHTCaps,
@@ -3132,10 +3140,6 @@ sir_convert_assoc_resp_frame2_struct(tpAniSirGlobal pMac,
 	}
 
 	pAssocRsp->vendor_vht_ie.present = ar->vendor_vht_ie.present;
-	if (ar->vendor_vht_ie.present) {
-		pAssocRsp->vendor_vht_ie.type = ar->vendor_vht_ie.type;
-		pAssocRsp->vendor_vht_ie.sub_type = ar->vendor_vht_ie.sub_type;
-	}
 	if (ar->OBSSScanParameters.present) {
 		qdf_mem_copy(&pAssocRsp->obss_scanparams,
 				&ar->OBSSScanParameters,
@@ -3859,11 +3863,6 @@ sir_parse_beacon_ie(tpAniSirGlobal pMac,
 	pBeaconStruct->Vendor1IEPresent = pBies->Vendor1IE.present;
 	pBeaconStruct->Vendor3IEPresent = pBies->Vendor3IE.present;
 	pBeaconStruct->vendor_vht_ie.present = pBies->vendor_vht_ie.present;
-	if (pBies->vendor_vht_ie.present) {
-		pBeaconStruct->vendor_vht_ie.type = pBies->vendor_vht_ie.type;
-		pBeaconStruct->vendor_vht_ie.sub_type =
-						pBies->vendor_vht_ie.sub_type;
-	}
 
 	if (pBies->vendor_vht_ie.VHTCaps.present) {
 		pBeaconStruct->vendor_vht_ie.VHTCaps.present = 1;
@@ -4236,11 +4235,6 @@ sir_convert_beacon_frame2_struct(tpAniSirGlobal pMac,
 	pBeaconStruct->Vendor3IEPresent = pBeacon->Vendor3IE.present;
 
 	pBeaconStruct->vendor_vht_ie.present = pBeacon->vendor_vht_ie.present;
-	if (pBeacon->vendor_vht_ie.present) {
-		pBeaconStruct->vendor_vht_ie.type = pBeacon->vendor_vht_ie.type;
-		pBeaconStruct->vendor_vht_ie.sub_type =
-			pBeacon->vendor_vht_ie.sub_type;
-	}
 	if (pBeacon->vendor_vht_ie.present)
 		pe_debug("Vendor Specific VHT caps present in Beacon Frame!");
 

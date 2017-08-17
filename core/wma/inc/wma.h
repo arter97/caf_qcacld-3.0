@@ -1113,6 +1113,8 @@ struct wma_txrx_node {
 	struct sme_rcpi_req *rcpi_req;
 	struct action_frame_random_filter *action_frame_filter;
 	bool in_bmps;
+	struct beacon_filter_param beacon_filter;
+	bool beacon_filter_enabled;
 };
 
 #if defined(QCA_WIFI_FTM)
@@ -2604,5 +2606,27 @@ static inline void wma_print_wmi_mgmt_event_log(uint32_t count,
  * Return: None
  */
 void wma_ipa_uc_stat_request(wma_cli_set_cmd_t *privcmd);
+
+/**
+ * wma_configure_smps_params() - Configures the smps parameters to set
+ * @vdev_id: Virtual device for the command
+ * @param_id: SMPS parameter ID
+ * @param_val: Value to be set for the parameter
+ * Return: QDF_STATUS_SUCCESS or non-zero on failure
+ */
+QDF_STATUS wma_configure_smps_params(uint32_t vdev_id, uint32_t param_id,
+							uint32_t param_val);
+
+
+/**
+ * wma_config_bmiss_bcnt_params() - set bmiss config parameters
+ * @vdev_id: virtual device for the command
+ * @first_cnt: bmiss first value
+ * @final_cnt: bmiss final value
+ *
+ * Return: QDF_STATUS_SUCCESS or non-zero on failure
+ */
+QDF_STATUS wma_config_bmiss_bcnt_params(uint32_t vdev_id, uint32_t first_cnt,
+		uint32_t final_cnt);
 
 #endif

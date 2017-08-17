@@ -1397,6 +1397,7 @@ QDF_STATUS sme_encrypt_decrypt_msg(tHalHandle hal,
 QDF_STATUS sme_set_cts2self_for_p2p_go(tHalHandle hal);
 void sme_set_prefer_80MHz_over_160MHz(tHalHandle hal,
 		bool sta_prefer_80MHz_over_160MHz);
+void sme_set_allow_adj_ch_bcn(tHalHandle hal, bool allow_adj_ch_bcn);
 QDF_STATUS sme_update_tx_fail_cnt_threshold(tHalHandle hal_handle,
 		uint8_t session_id, uint32_t tx_fail_count);
 QDF_STATUS sme_update_short_retry_limit_threshold(tHalHandle hal_handle,
@@ -1702,4 +1703,28 @@ QDF_STATUS sme_set_rx_set_blocksize(tHalHandle hal,
 QDF_STATUS sme_ipa_uc_stat_request(tHalHandle hal,
 			uint32_t vdev_id, uint32_t param_id,
 			uint32_t param_val, uint32_t req_cat);
+
+/**
+ * sme_set_smps_cfg() - set SMPS config params
+ * @vdev_id: virtual device for the command
+ * @param_id: parameter id
+ * @param_val: parameter value
+ *
+ * Return: QDF_STATUS_SUCCESS or non-zero on failure
+ */
+
+QDF_STATUS sme_set_smps_cfg(uint32_t vdev_id, uint32_t param_id,
+				uint32_t param_val);
+
+/**
+ * sme_set_bmiss_bcnt() - set bmiss config parameters
+ * @vdev_id: virtual device for the command
+ * @first_cnt: bmiss first value
+ * @final_cnt: bmiss final value
+ *
+ * Return: QDF_STATUS_SUCCESS or non-zero on failure
+ */
+QDF_STATUS sme_set_bmiss_bcnt(uint32_t vdev_id, uint32_t first_cnt,
+		uint32_t final_cnt);
+
 #endif /* #if !defined( __SME_API_H ) */

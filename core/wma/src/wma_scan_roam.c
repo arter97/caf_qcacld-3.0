@@ -96,6 +96,12 @@ enum extscan_report_events_type {
 };
 
 #define WMA_EXTSCAN_CYCLE_WAKE_LOCK_DURATION (5 * 1000) /* in msec */
+
+/*
+ * Maximum number of entires that could be present in the
+ * WMI_EXTSCAN_HOTLIST_MATCH_EVENT buffer from the firmware
+ */
+#define WMA_EXTSCAN_MAX_HOTLIST_ENTRIES 10
 #endif
 
 /**
@@ -1568,7 +1574,7 @@ static QDF_STATUS wma_roam_scan_filter(tp_wma_handle wma_handle,
 {
 	int i;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	uint32_t len = 0, num_bssid_black_list = 0, num_ssid_white_list = 0,
+	uint32_t num_bssid_black_list = 0, num_ssid_white_list = 0,
 	   num_bssid_preferred_list = 0;
 	uint32_t op_bitmap = 0;
 	struct roam_ext_params *roam_params;
@@ -1587,23 +1593,16 @@ static QDF_STATUS wma_roam_scan_filter(tp_wma_handle wma_handle,
 			op_bitmap |= 0x1;
 			num_bssid_black_list =
 				roam_params->num_bssid_avoid_list;
-			len = num_bssid_black_list * sizeof(wmi_mac_addr);
-			len += WMI_TLV_HDR_SIZE;
 			break;
 		case REASON_ROAM_SET_SSID_ALLOWED:
 			op_bitmap |= 0x2;
 			num_ssid_white_list =
 				roam_params->num_ssid_allowed_list;
-			len = num_ssid_white_list * sizeof(wmi_ssid);
-			len += WMI_TLV_HDR_SIZE;
 			break;
 		case REASON_ROAM_SET_FAVORED_BSSID:
 			op_bitmap |= 0x4;
 			num_bssid_preferred_list =
 				roam_params->num_bssid_favored;
-			len = num_bssid_preferred_list * sizeof(wmi_mac_addr);
-			len += WMI_TLV_HDR_SIZE;
-			len += num_bssid_preferred_list * sizeof(A_UINT32);
 			break;
 		default:
 			WMA_LOGD("%s : Roam Filter need not be sent", __func__);
@@ -1617,11 +1616,7 @@ static QDF_STATUS wma_roam_scan_filter(tp_wma_handle wma_handle,
 		 */
 		op_bitmap = 0x2 | 0x4;
 		num_ssid_white_list = roam_params->num_ssid_allowed_list;
-		len = num_ssid_white_list * sizeof(wmi_ssid);
 		num_bssid_preferred_list = roam_params->num_bssid_favored;
-		len += num_bssid_preferred_list * sizeof(wmi_mac_addr);
-		len += num_bssid_preferred_list * sizeof(A_UINT32);
-		len += (2 * WMI_TLV_HDR_SIZE);
 	}
 
 	/* fill in fixed values */
@@ -1630,7 +1625,6 @@ static QDF_STATUS wma_roam_scan_filter(tp_wma_handle wma_handle,
 	params->num_bssid_black_list = num_bssid_black_list;
 	params->num_ssid_white_list = num_ssid_white_list;
 	params->num_bssid_preferred_list = num_bssid_preferred_list;
-	params->len = len;
 	qdf_mem_copy(params->bssid_avoid_list, roam_params->bssid_avoid_list,
 			MAX_BSSID_AVOID_LIST * sizeof(struct qdf_mac_addr));
 
@@ -3049,6 +3043,11 @@ void wma_set_channel(tp_wma_handle wma, tpSwitchChannelParams params)
 		(params->restart_on_chan_switch == true))
 		wma->interfaces[req.vdev_id].is_channel_switch = true;
 
+	if (params->restart_on_chan_switch == true &&
+			wma->interfaces[req.vdev_id].beacon_filter_enabled)
+		wma_remove_beacon_filter(wma,
+				&wma->interfaces[req.vdev_id].beacon_filter);
+
 	if ((wma_is_vdev_in_ap_mode(wma, req.vdev_id) == true) &&
 		(params->reduced_beacon_interval)) {
 		/* Reduce the beacon interval just before the channel switch.
@@ -4147,7 +4146,8 @@ int wma_extscan_hotlist_match_event_handler(void *handle,
 	struct extscan_hotlist_match *dest_hotlist;
 	tSirWifiScanResult *dest_ap;
 	wmi_extscan_wlan_descriptor *src_hotlist;
-	int numap, j, ap_found = 0;
+	uint32_t numap;
+	int j, ap_found = 0;
 	tpAniSirGlobal pMac = cds_get_context(QDF_MODULE_ID_PE);
 
 	if (!pMac) {
@@ -4171,6 +4171,11 @@ int wma_extscan_hotlist_match_event_handler(void *handle,
 	if (!src_hotlist || !numap) {
 		WMA_LOGE("%s: Hotlist AP's list invalid", __func__);
 		return -EINVAL;
+	}
+	if (numap > WMA_EXTSCAN_MAX_HOTLIST_ENTRIES) {
+		WMA_LOGE("%s: Total Entries %u greater than max",
+			__func__, numap);
+		numap = WMA_EXTSCAN_MAX_HOTLIST_ENTRIES;
 	}
 	dest_hotlist = qdf_mem_malloc(sizeof(*dest_hotlist) +
 				      sizeof(*dest_ap) * numap);
