@@ -1274,7 +1274,7 @@ hdd_suspend_wlan(void (*callback)(void *callbackContext, bool suspended),
 		pAdapter = pAdapterNode->pAdapter;
 
 		/* stop all TX queues before suspend */
-		hdd_debug("Disabling queues");
+		hdd_info("Disabling queues");
 		wlan_hdd_netif_queue_control(pAdapter,
 					     WLAN_STOP_ALL_NETIF_QUEUE,
 					     WLAN_CONTROL_PATH);
@@ -1440,7 +1440,6 @@ QDF_STATUS hdd_wlan_shutdown(void)
 	wlan_deregister_txrx_packetdump();
 
 	hdd_cleanup_scan_queue(pHddCtx);
-	hdd_ipa_uc_ssr_deinit();
 	hdd_reset_all_adapters(pHddCtx);
 
 	/* Flush cached rx frame queue */
@@ -1468,6 +1467,7 @@ QDF_STATUS hdd_wlan_shutdown(void)
 		hdd_err("Failed to close CDS Scheduler");
 		QDF_ASSERT(false);
 	}
+	hdd_ipa_uc_ssr_deinit();
 
 	qdf_mc_timer_stop(&pHddCtx->tdls_source_timer);
 
@@ -1575,6 +1575,7 @@ QDF_STATUS hdd_wlan_re_init(void)
 	pHddCtx->last_scan_reject_session_id = 0xFF;
 	pHddCtx->last_scan_reject_reason = 0;
 	pHddCtx->last_scan_reject_timestamp = 0;
+	pHddCtx->scan_reject_cnt = 0;
 
 	hdd_set_roaming_in_progress(false);
 	complete(&pAdapter->roaming_comp_var);
@@ -1617,7 +1618,6 @@ int wlan_hdd_set_powersave(hdd_adapter_t *adapter,
 {
 	tHalHandle hal;
 	hdd_context_t *hdd_ctx;
-	bool force_trigger = false;
 
 	if (NULL == adapter) {
 		hdd_err("Adapter NULL");
@@ -1633,13 +1633,18 @@ int wlan_hdd_set_powersave(hdd_adapter_t *adapter,
 	hdd_debug("Allow power save: %d", allow_power_save);
 	hal = WLAN_HDD_GET_HAL_CTX(adapter);
 
-	if ((QDF_STA_MODE == adapter->device_mode) &&
+	/*
+	 * This is a workaround for defective AP's that send a disassoc
+	 * immediately after WPS connection completes. Defer powersave by a
+	 * small amount if the affected AP is detected.
+	 */
+	if (allow_power_save &&
+	    adapter->device_mode == QDF_STA_MODE &&
 	    !adapter->sessionCtx.station.ap_supports_immediate_power_save) {
 		/* override user's requested flag */
-		force_trigger = allow_power_save;
 		allow_power_save = false;
-		timeout = AUTO_PS_ENTRY_USER_TIMER_DEFAULT_VALUE;
-		hdd_debug("Defer power-save for few seconds...");
+		timeout = AUTO_PS_DEFER_TIMEOUT_MS;
+		hdd_debug("Defer power-save due to AP spec non-conformance");
 	}
 
 	if (allow_power_save) {
@@ -1674,7 +1679,7 @@ int wlan_hdd_set_powersave(hdd_adapter_t *adapter,
 			adapter->sessionId);
 		sme_ps_enable_disable(hal, adapter->sessionId, SME_PS_DISABLE);
 		sme_ps_enable_auto_ps_timer(WLAN_HDD_GET_HAL_CTX(adapter),
-			adapter->sessionId, timeout, force_trigger);
+			adapter->sessionId, timeout);
 	}
 
 	return 0;
@@ -1953,25 +1958,24 @@ next_adapter:
 			return -EAGAIN;
 		}
 
-		if (pScanInfo->mScanPending) {
-			INIT_COMPLETION(pScanInfo->abortscan_event_var);
-			hdd_abort_mac_scan(pHddCtx, pAdapter->sessionId,
-					   INVALID_SCAN_ID,
-					   eCSR_SCAN_ABORT_DEFAULT);
+		hdd_abort_mac_scan(pHddCtx, pAdapter->sessionId,
+				   INVALID_SCAN_ID, eCSR_SCAN_ABORT_DEFAULT);
 
-			status =
-				wait_for_completion_timeout(&pScanInfo->
-				    abortscan_event_var,
-				    msecs_to_jiffies(WLAN_WAIT_TIME_ABORTSCAN));
-			if (!status) {
-				hdd_err("Timeout occurred while waiting for abort scan");
-				wlan_hdd_inc_suspend_stats(pHddCtx,
-							   SUSPEND_FAIL_SCAN);
-				return -ETIME;
-			}
-		}
+		/* for suspend case, don't wait for scan cancel completion */
+
 		status = hdd_get_next_adapter(pHddCtx, pAdapterNode, &pNext);
 		pAdapterNode = pNext;
+	}
+
+	/* flush any pending powersave timers */
+	status = hdd_get_front_adapter(pHddCtx, &pAdapterNode);
+	while (pAdapterNode && QDF_IS_STATUS_SUCCESS(status)) {
+		pAdapter = pAdapterNode->pAdapter;
+
+		sme_ps_timer_flush_sync(pHddCtx->hHal, pAdapter->sessionId);
+
+		status = hdd_get_next_adapter(pHddCtx, pAdapterNode,
+					      &pAdapterNode);
 	}
 
 	/*

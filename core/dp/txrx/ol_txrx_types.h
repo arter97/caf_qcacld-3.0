@@ -261,6 +261,23 @@ enum {
 	OL_TX_SCHED_WRR_ADV_NUM_CATEGORIES /* must be last */
 };
 
+A_COMPILE_TIME_ASSERT(ol_tx_sched_htt_ac_values,
+	/* check that regular WMM AC enum values match */
+	((int)OL_TX_SCHED_WRR_ADV_CAT_VO == (int)HTT_AC_WMM_VO) &&
+	((int)OL_TX_SCHED_WRR_ADV_CAT_VI == (int)HTT_AC_WMM_VI) &&
+	((int)OL_TX_SCHED_WRR_ADV_CAT_BK == (int)HTT_AC_WMM_BK) &&
+	((int)OL_TX_SCHED_WRR_ADV_CAT_BE == (int)HTT_AC_WMM_BE) &&
+
+	/* check that extension AC enum values match */
+	((int)OL_TX_SCHED_WRR_ADV_CAT_NON_QOS_DATA
+		== (int)HTT_AC_EXT_NON_QOS) &&
+	((int)OL_TX_SCHED_WRR_ADV_CAT_UCAST_MGMT
+		== (int)HTT_AC_EXT_UCAST_MGMT) &&
+	((int)OL_TX_SCHED_WRR_ADV_CAT_MCAST_DATA
+		== (int)HTT_AC_EXT_MCAST_DATA) &&
+	((int)OL_TX_SCHED_WRR_ADV_CAT_MCAST_MGMT
+		== (int)HTT_AC_EXT_MCAST_MGMT));
+
 struct ol_tx_reorder_cat_timeout_t {
 	TAILQ_HEAD(, ol_rx_reorder_timeout_list_elem_t) virtual_timer_list;
 	qdf_timer_t timer;
@@ -413,6 +430,14 @@ enum throttle_phase {
 
 #define THROTTLE_TX_THRESHOLD (100)
 
+/*
+ * Threshold to stop priority queue in percentage. When no
+ * of available descriptors falls below TX_STOP_PRIORITY_TH,
+ * priority queue will be paused.
+ */
+#define TX_STOP_PRIORITY_TH   (80)
+
+
 typedef void (*ipa_uc_op_cb_type)(uint8_t *op_msg, void *osif_ctxt);
 
 struct ol_tx_queue_group_t {
@@ -479,6 +504,7 @@ struct ol_txrx_pool_stats {
  * @freelist: tx descriptor freelist
  * @pkt_drop_no_desc: drop due to no descriptors
  * @ref_cnt: pool's ref count
+ * @stop_priority_th: Threshold to stop priority queue
  */
 struct ol_tx_flow_pool_t {
 	TAILQ_ENTRY(ol_tx_flow_pool_t) flow_pool_list_elem;
@@ -495,6 +521,7 @@ struct ol_tx_flow_pool_t {
 	union ol_tx_desc_list_elem_t *freelist;
 	uint16_t pkt_drop_no_desc;
 	qdf_atomic_t ref_cnt;
+	uint16_t stop_priority_th;
 };
 
 #endif
@@ -984,7 +1011,6 @@ struct ol_txrx_pdev_t {
 		void (*lro_flush_cb)(void *);
 	} lro_info;
 	struct ol_txrx_peer_t *self_peer;
-	qdf_work_t peer_unmap_timer_work;
 };
 
 struct ol_txrx_ocb_chan_info {

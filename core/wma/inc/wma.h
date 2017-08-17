@@ -1027,6 +1027,8 @@ typedef struct {
  * @rcpi_req: rcpi request
  * It stores parameters per vdev in wma.
  * @in_bmps : Whether bmps for this interface has been enabled
+ * @vdev_start_wakelock: wakelock to protect vdev start op with firmware
+ * @vdev_stop_wakelock: wakelock to protect vdev stop op with firmware
  */
 struct wma_txrx_node {
 	uint8_t addr[IEEE80211_ADDR_LEN];
@@ -1109,6 +1111,10 @@ struct wma_txrx_node {
 	struct sme_rcpi_req *rcpi_req;
 	struct action_frame_random_filter *action_frame_filter;
 	bool in_bmps;
+	struct beacon_filter_param beacon_filter;
+	bool beacon_filter_enabled;
+	qdf_wake_lock_t vdev_start_wakelock;
+	qdf_wake_lock_t vdev_stop_wakelock;
 };
 
 #if defined(QCA_WIFI_FTM)
@@ -1628,7 +1634,6 @@ typedef struct {
 	uint32_t new_hw_mode_index;
 	struct extended_caps phy_caps;
 	qdf_atomic_t scan_id_counter;
-	qdf_atomic_t num_pending_scans;
 	wma_peer_authorized_fp peer_authorized_cb;
 	uint32_t wow_unspecified_wake_count;
 
@@ -1695,6 +1700,9 @@ typedef struct {
 	struct vdev_spectral_configure_params ss_configs;
 #endif
 	uint8_t  ito_repeat_count;
+#ifdef FEATURE_WLAN_D0WOW
+	atomic_t in_d0wow;
+#endif
 } t_wma_handle, *tp_wma_handle;
 
 /**
@@ -2622,6 +2630,16 @@ static inline void wma_print_wmi_mgmt_event_log(uint32_t count,
  */
 void wma_ipa_uc_stat_request(wma_cli_set_cmd_t *privcmd);
 
+/**
+ * wma_configure_smps_params() - Configures the smps parameters to set
+ * @vdev_id: Virtual device for the command
+ * @param_id: SMPS parameter ID
+ * @param_val: Value to be set for the parameter
+ * Return: QDF_STATUS_SUCCESS or non-zero on failure
+ */
+QDF_STATUS wma_configure_smps_params(uint32_t vdev_id, uint32_t param_id,
+							uint32_t param_val);
+
 /*
  * wma_chan_info_event_handler() - chan info event handler
  * @handle: wma handle
@@ -2634,4 +2652,16 @@ void wma_ipa_uc_stat_request(wma_cli_set_cmd_t *privcmd);
  */
 int wma_chan_info_event_handler(void *handle, u_int8_t *event_buf,
 						u_int32_t len);
+
+/**
+ * wma_config_bmiss_bcnt_params() - set bmiss config parameters
+ * @vdev_id: virtual device for the command
+ * @first_cnt: bmiss first value
+ * @final_cnt: bmiss final value
+ *
+ * Return: QDF_STATUS_SUCCESS or non-zero on failure
+ */
+QDF_STATUS wma_config_bmiss_bcnt_params(uint32_t vdev_id, uint32_t first_cnt,
+		uint32_t final_cnt);
+
 #endif

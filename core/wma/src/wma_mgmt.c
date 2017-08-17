@@ -2606,9 +2606,8 @@ void wma_send_beacon(tp_wma_handle wma, tpSendbeaconParams bcn_info)
 		if (!wma->interfaces[vdev_id].vdev_up) {
 			param.vdev_id = vdev_id;
 			param.assoc_id = 0;
-			status = wmi_unified_vdev_up_send(wma->wmi_handle,
-					bcn_info->bssId,
-					&param);
+			status = wma_send_vdev_up_to_fw(wma, &param,
+							bcn_info->bssId);
 			if (QDF_IS_STATUS_ERROR(status)) {
 				WMA_LOGE(FL("failed to send vdev up"));
 				cds_set_do_hw_mode_change_flag(false);
@@ -3548,6 +3547,11 @@ static int wma_mgmt_rx_process(void *handle, uint8_t *data,
 	/* If it is a beacon/probe response, save it for future use */
 	mgt_type = (wh)->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
 	mgt_subtype = (wh)->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
+
+	if (wma_read_d0wow_flag(wma_handle)) {
+		WMA_LOGE("%s: Frame subtype is 0x%x", __func__, mgt_subtype);
+		wma_set_d0wow_flag(wma_handle, false);
+	}
 
 	if (mgt_type == IEEE80211_FC0_TYPE_MGT &&
 	    (mgt_subtype == IEEE80211_FC0_SUBTYPE_DISASSOC ||

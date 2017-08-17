@@ -197,13 +197,25 @@ struct ol_tx_desc_t *ol_tx_desc_alloc(struct ol_txrx_pdev_t *pdev,
 		if (pool->avail_desc) {
 			tx_desc = ol_tx_get_desc_flow_pool(pool);
 			ol_tx_desc_dup_detect_set(pdev, tx_desc);
-			if (qdf_unlikely(pool->avail_desc < pool->stop_th)) {
+			if (qdf_unlikely(pool->avail_desc < pool->stop_th)
+				&& (pool->status != FLOW_POOL_ACTIVE_PAUSED)) {
 				pool->status = FLOW_POOL_ACTIVE_PAUSED;
 				qdf_spin_unlock_bh(&pool->flow_pool_lock);
 				/* pause network queues */
 				pdev->pause_cb(vdev->vdev_id,
 					       WLAN_STOP_ALL_NETIF_QUEUE,
 					       WLAN_DATA_FLOW_CONTROL);
+				/* unpause priority queue */
+				pdev->pause_cb(vdev->vdev_id,
+					       WLAN_NETIF_PRIORITY_QUEUE_ON,
+					       WLAN_DATA_FLOW_CONTROL_PRIORITY);
+			} else if (qdf_unlikely(pool->avail_desc <
+						pool->stop_priority_th)) {
+				qdf_spin_unlock_bh(&pool->flow_pool_lock);
+				/* pause priority queue */
+				pdev->pause_cb(vdev->vdev_id,
+					       WLAN_NETIF_PRIORITY_QUEUE_OFF,
+					       WLAN_DATA_FLOW_CONTROL_PRIORITY);
 			} else {
 				qdf_spin_unlock_bh(&pool->flow_pool_lock);
 			}
@@ -287,6 +299,13 @@ ol_tx_desc_alloc_hl(struct ol_txrx_pdev_t *pdev,
 static inline void
 ol_tx_desc_vdev_rm(struct ol_tx_desc_t *tx_desc)
 {
+	/*
+	 * In module exit context, vdev handle could be destroyed but still
+	 * we need to free pending completion tx_desc.
+	 */
+	if (!tx_desc || !tx_desc->vdev)
+		return;
+
 	qdf_atomic_dec(&tx_desc->vdev->tx_desc_count);
 	tx_desc->vdev = NULL;
 }
@@ -403,6 +422,8 @@ static void ol_tx_desc_free_common(struct ol_txrx_pdev_t *pdev,
 
 	ol_tx_desc_reset_pkt_type(tx_desc);
 	ol_tx_desc_reset_timestamp(tx_desc);
+	/* clear the ref cnt */
+	qdf_atomic_init(&tx_desc->ref_cnt);
 	tx_desc->vdev_id = OL_TXRX_INVALID_VDEV_ID;
 }
 
@@ -445,6 +466,10 @@ void ol_tx_desc_free(struct ol_txrx_pdev_t *pdev, struct ol_tx_desc_t *tx_desc)
 	switch (pool->status) {
 	case FLOW_POOL_ACTIVE_PAUSED:
 		if (pool->avail_desc > pool->start_th) {
+			/* unpause priority queue */
+			pdev->pause_cb(pool->member_flow_id,
+				       WLAN_NETIF_PRIORITY_QUEUE_ON,
+				       WLAN_DATA_FLOW_CONTROL_PRIORITY);
 			pdev->pause_cb(pool->member_flow_id,
 				       WLAN_WAKE_ALL_NETIF_QUEUE,
 				       WLAN_DATA_FLOW_CONTROL);
@@ -822,6 +847,9 @@ ol_tso_seg_dbg_sanitize(struct qdf_tso_seg_elem_t *tsoseg)
 
 	if (tsoseg != NULL) {
 		txdesc = tsoseg->dbg.txdesc;
+		/* Don't validate if TX desc is NULL*/
+		if (!txdesc)
+			return 0;
 		if (txdesc->tso_desc != tsoseg)
 			qdf_tso_seg_dbg_bug("Owner sanity failed");
 		else
@@ -904,6 +932,7 @@ void ol_tso_free_segment(struct ol_txrx_pdev_t *pdev,
 	}
 	/* sanitize before free */
 	ol_tso_seg_dbg_sanitize(tso_seg);
+	qdf_tso_seg_dbg_setowner(tso_seg, NULL);
 	/*this tso seg is now a part of freelist*/
 	/* retain segment history, if debug is enabled */
 	qdf_tso_seg_dbg_zero(tso_seg);

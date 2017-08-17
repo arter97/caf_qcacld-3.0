@@ -186,11 +186,12 @@ void wma_handle_initial_wake_up(void);
 int wma_bus_resume(void);
 QDF_STATUS wma_resume_target(WMA_HANDLE handle);
 QDF_STATUS wma_disable_wow_in_fw(WMA_HANDLE handle);
+void wma_set_d0wow_flag(WMA_HANDLE handle, bool flag);
+bool wma_read_d0wow_flag(WMA_HANDLE handle);
 QDF_STATUS wma_disable_d0wow_in_fw(WMA_HANDLE handle);
+QDF_STATUS wma_enable_d0wow_in_fw(WMA_HANDLE handle);
 bool wma_is_wow_mode_selected(WMA_HANDLE handle);
 QDF_STATUS wma_enable_wow_in_fw(WMA_HANDLE handle, uint32_t wow_flags);
-QDF_STATUS wma_enable_d0wow_in_fw(WMA_HANDLE handle, uint32_t wow_flags);
-bool wma_check_scan_in_progress(WMA_HANDLE handle);
 void wma_set_peer_authorized_cb(void *wma_ctx, wma_peer_authorized_fp auth_cb);
 QDF_STATUS wma_set_peer_param(void *wma_ctx, uint8_t *peer_addr,
 		  uint32_t param_id,
@@ -266,6 +267,7 @@ QDF_STATUS wma_get_caps_for_phyidx_hwmode(struct wma_caps_per_phy *caps_per_phy,
 		enum hw_mode_dbs_capab hw_mode, enum cds_band_type band);
 bool wma_is_rx_ldpc_supported_for_channel(uint32_t channel,
 				enum hw_mode_dbs_capab hw_mode);
+int wma_unified_radio_tx_mem_free(void *handle);
 
 #define LRO_IPV4_SEED_ARR_SZ 5
 #define LRO_IPV6_SEED_ARR_SZ 11

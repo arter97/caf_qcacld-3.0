@@ -129,12 +129,17 @@ typedef uint8_t tSirVersionString[SIR_VERSION_STRING_LEN];
 
 #define MAX_LEN_UDP_RESP_OFFLOAD 128
 
+#define MAX_RSSI_AVOID_BSSID_LIST    10
+
 /* Maximum number of realms present in fils indication element */
 #define SIR_MAX_REALM_COUNT 7
 /* Realm length */
 #define SIR_REALM_LEN 2
 /* Cache ID length */
 #define CACHE_ID_LEN 2
+
+/* Maximum peer station number query one time */
+#define MAX_PEER_STA 12
 
 /**
  * enum sir_conn_update_reason: Reason for conc connection update
@@ -794,6 +799,7 @@ typedef struct sSirBssDescription {
 	uint8_t QBSSLoad_present;
 	uint8_t qbss_chan_load;
 	uint16_t QBSSLoad_avail;
+	uint16_t qbss_stacount;
 	/* To achieve 8-byte alignment with ESE enabled */
 	uint32_t reservedPadding5;
 	/* whether it is from a probe rsp */
@@ -812,6 +818,8 @@ typedef struct sSirBssDescription {
 #ifdef WLAN_FEATURE_FILS_SK
 	struct fils_ind_elements fils_info_element;
 #endif
+	uint8_t air_time_fraction;
+	uint8_t nss;
 	/* Please keep the structure 4 bytes aligned above the ieFields */
 	uint32_t ieFields[1];
 
@@ -903,6 +911,8 @@ typedef struct sSirSmeScanReq {
 	 * WNI_CFG_PASSIVE_MAXIMUM_CHANNEL_TIME) is used.
 	 */
 	uint32_t maxChannelTime;
+	uint32_t scan_probe_repeat_time;
+	uint32_t scan_num_probes;
 	enum wmi_dwelltime_adaptive_mode scan_adaptive_dwell_mode;
 	/**
 	 * returnAfterFirstMatch can take following values:
@@ -3081,6 +3091,19 @@ struct connected_pno_band_rssi_pref {
 };
 
 /**
+ * struct sir_nlo_mawc_params - MAWC based NLO configuration
+ * @mawc_nlo_enabled: enable/disable MAWC based NLO
+ * @exp_backoff_ratio: MAWC based NLO exponential backoff ratio
+ * @init_scan_interval: MAWC based NLO initial scan interval
+ * @max_scan_interval: MAWC based NLO maximum scan interval
+ */
+struct sir_nlo_mawc_params {
+	bool mawc_nlo_enabled;
+	uint32_t exp_backoff_ratio;
+	uint32_t init_scan_interval;
+	uint32_t max_scan_interval;
+};
+/**
  * struct sSirPNOScanReq - PNO Scan request structure
  * @enable: flag to enable or disable
  * @modePNO: PNO Mode
@@ -3114,6 +3137,7 @@ typedef struct sSirPNOScanReq {
 	uint32_t delay_start_time;
 	uint8_t fast_scan_max_cycles;
 	uint32_t scan_backoff_multiplier;
+	struct sir_nlo_mawc_params mawc_params;
 	uint32_t        active_min_time;
 	uint32_t        active_max_time;
 	uint32_t        passive_min_time;
@@ -3169,8 +3193,7 @@ typedef struct {
  */
 struct candidate_chan_info {
 	uint8_t    channel_num;
-	uint8_t    other_ap_count;
-	int8_t     max_rssi_on_channel;
+	uint8_t    ap_count;
 };
 
 /*
@@ -3295,6 +3318,8 @@ typedef enum {
  *                              current AP to avoid ping pong effects
  * @good_rssi_roam:             Lazy Roam
  * @is_5g_pref_enabled:         5GHz BSSID preference feature enable/disable.
+ * @bg_scan_bad_rssi_thresh:    Bad RSSI threshold to perform bg scan.
+ * @bg_scan_client_bitmap:      Bitmap to identify the client scans to snoop.
  *
  * This structure holds all the key parameters related to
  * initial connection and also roaming connections.
@@ -3323,6 +3348,10 @@ struct roam_ext_params {
 	int dense_min_aps_cnt;
 	int initial_dense_status;
 	int traffic_threshold;
+	uint8_t num_rssi_rejection_ap;
+	struct rssi_disallow_bssid rssi_rejection_ap[MAX_RSSI_AVOID_BSSID_LIST];
+	int8_t bg_scan_bad_rssi_thresh;
+	uint32_t bg_scan_client_bitmap;
 };
 
 /**
@@ -3351,11 +3380,29 @@ struct lca_disallow_config_params{
     uint32_t num_disallowed_aps;
 };
 
+/**
+ * struct mawc_params - Motion Aided Wireless Connectivity configuration
+ * @MAWCEnabled: Global configuration for MAWC (Roaming/PNO/ExtScan)
+ * @mawc_roam_enabled: MAWC roaming enable/disable
+ * @mawc_roam_traffic_threshold: Traffic threshold in kBps for MAWC roaming
+ * @mawc_roam_ap_rssi_threshold: AP RSSI threshold for MAWC roaming
+ * @mawc_roam_rssi_high_adjust: High Adjustment value for suppressing scan
+ * @mawc_roam_rssi_low_adjust: Low Adjustment value for suppressing scan
+ */
+struct mawc_params {
+	bool mawc_enabled;
+	bool mawc_roam_enabled;
+	uint32_t mawc_roam_traffic_threshold;
+	int8_t mawc_roam_ap_rssi_threshold;
+	uint8_t mawc_roam_rssi_high_adjust;
+	uint8_t mawc_roam_rssi_low_adjust;
+};
+
 typedef struct sSirRoamOffloadScanReq {
 	uint16_t message_type;
 	uint16_t length;
 	bool RoamScanOffloadEnabled;
-	bool MAWCEnabled;
+	struct mawc_params mawc_roam_params;
 	int8_t LookupThreshold;
 	uint8_t delay_before_vdev_stop;
 	uint8_t OpportunisticScanThresholdDiff;
@@ -3365,6 +3412,7 @@ typedef struct sSirRoamOffloadScanReq {
 	uint8_t Command;
 	uint8_t reason;
 	uint16_t NeighborScanTimerPeriod;
+	uint16_t neighbor_scan_min_timer_period;
 	uint16_t NeighborRoamScanRefreshPeriod;
 	uint16_t NeighborScanChannelMinTime;
 	uint16_t NeighborScanChannelMaxTime;
@@ -4015,6 +4063,8 @@ typedef struct sSirScanOffloadReq {
 	tSirScanType scanType;
 	uint32_t minChannelTime;
 	uint32_t maxChannelTime;
+	uint32_t scan_probe_repeat_time;
+	uint32_t scan_num_probes;
 	uint32_t scan_id;
 	uint32_t scan_requestor_id;
 	/* in units of milliseconds, ignored when not connected */
@@ -4314,6 +4364,17 @@ struct sir_peer_info_ext_resp {
 	struct sir_peer_info_ext info[0];
 };
 
+/**
+ * @sta_num: number of peer station which has valid info
+ * @info: peer information
+ *
+ * all SAP peer station's information saved in adapter
+ */
+struct sir_peer_sta_info {
+	uint8_t sta_num;
+	struct sir_peer_info info[MAX_PEER_STA];
+};
+
 typedef struct sSirAddPeriodicTxPtrn {
 	/* MAC Address for the adapter */
 	struct qdf_mac_addr mac_address;
@@ -4474,7 +4535,6 @@ typedef struct sSirChanChangeResponse {
 	uint8_t sessionId;
 	uint8_t newChannelNumber;
 	uint8_t channelChangeStatus;
-	ePhyChanBondState secondaryChannelOffset;
 } tSirChanChangeResponse, *tpSirChanChangeResponse;
 
 typedef struct sSirStartBeaconIndication {
@@ -8070,6 +8130,23 @@ struct sir_peer_set_rx_blocksize {
 	uint32_t vdev_id;
 	struct qdf_mac_addr peer_macaddr;
 	uint32_t rx_block_ack_win_limit;
+};
+
+/**
+ * struct sir_rssi_disallow_lst - Structure holding Rssi based avoid candidate
+ * list
+ * @node: Node pointer
+ * @bssid: BSSID of the AP
+ * @retry_delay: Retry delay received during last rejection in ms
+ * @ expected_rssi: RSSI at which STA can initate
+ * @time_during_rejection: Timestamp during last rejection in millisec
+ */
+struct sir_rssi_disallow_lst {
+	qdf_list_node_t node;
+	struct qdf_mac_addr bssid;
+	uint32_t retry_delay;
+	int8_t expected_rssi;
+	qdf_time_t time_during_rejection;
 };
 
 /*

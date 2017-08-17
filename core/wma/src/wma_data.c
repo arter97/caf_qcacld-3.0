@@ -920,27 +920,21 @@ free_nbuf:
 }
 
 /**
- * wma_update_txrx_chainmask() - update txrx chainmask
- * @num_rf_chains: number rf chains
+ * wma_check_txrx_chainmask() - check txrx chainmask
+ * @num_rf_chains: number of rf chains
  * @cmd_value: command value
  *
- * Return: none
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
-void wma_update_txrx_chainmask(int num_rf_chains, int *cmd_value)
+QDF_STATUS wma_check_txrx_chainmask(int num_rf_chains, int cmd_value)
 {
-	if (*cmd_value > WMA_MAX_RF_CHAINS(num_rf_chains)) {
-		WMA_LOGE("%s: Chainmask value exceeds the maximum supported range setting it to maximum value.",
-			__func__);
-		WMA_LOGE("%s: Requested value %d Updated value %d",
-			__func__, *cmd_value, WMA_MAX_RF_CHAINS(num_rf_chains));
-		*cmd_value = WMA_MAX_RF_CHAINS(num_rf_chains);
-	} else if (*cmd_value < WMA_MIN_RF_CHAINS) {
-		WMA_LOGE("%s: Chainmask value is less than the minimum supported range setting it to minimum value.",
-			__func__);
-		WMA_LOGE("%s: Requested value %d Updated value %d",
-			__func__, *cmd_value, WMA_MIN_RF_CHAINS);
-		*cmd_value = WMA_MIN_RF_CHAINS;
+	if ((cmd_value > WMA_MAX_RF_CHAINS(num_rf_chains)) ||
+	    (cmd_value < WMA_MIN_RF_CHAINS)) {
+		WMA_LOGE("%s: Requested value %d over the range",
+			__func__, cmd_value);
+		return QDF_STATUS_E_INVAL;
 	}
+	return QDF_STATUS_SUCCESS;
 }
 
 /**
@@ -1239,6 +1233,8 @@ void wma_set_linkstate(tp_wma_handle wma, tpLinkStateParams params)
 		if (wma_send_vdev_stop_to_fw(wma, vdev_id)) {
 			WMA_LOGP("%s: %d Failed to send vdev stop vdev %d",
 				 __func__, __LINE__, vdev_id);
+			wma_remove_vdev_req(wma, vdev_id,
+					WMA_TARGET_REQ_TYPE_VDEV_STOP);
 			params->status = false;
 		} else {
 			WMA_LOGP("%s: %d vdev stop sent vdev %d",
@@ -2926,8 +2922,10 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 			status = wmi_mgmt_unified_cmd_send(
 					wma_handle->wmi_handle,
 					&mgmt_param);
-			if (status)
+			if (status) {
+				wmi_desc->nbuf = NULL;
 				wmi_desc_put(wma_handle, wmi_desc);
+			}
 		}
 	} else {
 		/* Hand over the Tx Mgmt frame to TxRx */

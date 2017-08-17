@@ -41,6 +41,10 @@ ifeq ($(KERNEL_BUILD), 0)
 	# These are configurable via Kconfig for kernel-based builds
 	# Need to explicitly configure for Android-based builds
 
+	ifneq ($(DEVELOPER_DISABLE_BUILD_TIMESTAMP),y)
+	CONFIG_BUILD_TIMESTAMP := y
+	endif
+
 	ifeq ($(CONFIG_ARCH_MDM9630), y)
 	CONFIG_MOBILE_ROUTER := y
 	endif
@@ -90,16 +94,13 @@ ifeq ($(KERNEL_BUILD), 0)
 	CONFIG_QCOM_TDLS := y
 	endif
 
-	ifeq ($(CONFIG_MOBILE_ROUTER), y)
 	CONFIG_QCACLD_FEATURE_GREEN_AP := y
-	endif
+
 	ifeq ($(CONFIG_ARCH_MSM8998), y)
-	CONFIG_QCACLD_FEATURE_GREEN_AP := y
 	CONFIG_QCACLD_FEATURE_METERING := y
 	endif
 
 	ifeq ($(CONFIG_ARCH_SDM660), y)
-	CONFIG_QCACLD_FEATURE_GREEN_AP := y
 	CONFIG_QCACLD_FEATURE_METERING := y
 	endif
 
@@ -1176,7 +1177,8 @@ CDEFINES :=	-DANI_LITTLE_BYTE_ENDIAN \
 		-DWLAN_FEATURE_MBSSID \
 		-DCONFIG_160MHZ_SUPPORT \
 		-DCONFIG_MCL \
-		-DWMI_CMD_STRINGS
+		-DWMI_CMD_STRINGS \
+		-DCONFIG_HDD_INIT_WITH_RTNL_LOCK
 
 ifneq ($(CONFIG_HIF_USB), 1)
 CDEFINES += -DWLAN_LOGGING_SOCK_SVC_ENABLE
@@ -1216,7 +1218,9 @@ ifeq ($(CONFIG_FEATURE_PKTLOG), y)
 CDEFINES +=     -DFEATURE_PKTLOG
 endif
 
+ifneq ($(CONFIG_ARCH_SDX20), y)
 CDEFINES +=	-DFEATURE_DP_TRACE
+endif
 
 ifeq ($(CONFIG_WLAN_NAPI), y)
 CDEFINES += -DFEATURE_NAPI
@@ -1730,6 +1734,18 @@ ifeq ($(CONFIG_WLAN_SPECTRAL_SCAN), y)
 CDEFINES += -DFEATURE_SPECTRAL_SCAN
 endif
 
+#Flag to enable/disable WLAN D0-WOW
+ifeq ($(CONFIG_PCI_MSM), y)
+ifeq ($(CONFIG_ROME_IF),pci)
+CDEFINES += -DFEATURE_WLAN_D0WOW
+endif
+endif
+
+#Flag to enable SMMU S1 support
+ifeq ($(CONFIG_ARCH_SDM845), y)
+CDEFINES += -DENABLE_SMMU_S1_TRANSLATION
+endif
+
 KBUILD_CPPFLAGS += $(CDEFINES)
 
 # Currently, for versions of gcc which support it, the kernel Makefile
@@ -1764,9 +1780,11 @@ ifdef WLAN_HDD_ADAPTER_MAGIC
 CDEFINES += -DWLAN_HDD_ADAPTER_MAGIC=$(WLAN_HDD_ADAPTER_MAGIC)
 endif
 
+# inject some build related information
+ifeq ($(CONFIG_BUILD_TIMESTAMP), y)
+CDEFINES += -DBUILD_TIMESTAMP=\"$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')\"
+endif
+
 # Module information used by KBuild framework
 obj-$(CONFIG_QCA_CLD_WLAN) += $(MODNAME).o
 $(MODNAME)-y := $(OBJS)
-
-# inject some build related information
-CDEFINES += -DBUILD_TIMESTAMP=\"$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')\"
