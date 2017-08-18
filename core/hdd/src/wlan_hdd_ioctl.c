@@ -316,7 +316,7 @@ static int hdd_parse_setrmcenable_command(uint8_t *pValue,
 		return 0;
 	}
 
-	sscanf(inPtr, "%32s ", buf);
+	sscanf(inPtr, "%31s ", buf);
 	v = kstrtos32(buf, 10, &tempInt);
 	if (v < 0) {
 		return -EINVAL;
@@ -356,7 +356,7 @@ static int hdd_parse_setrmcactionperiod_command(uint8_t *pValue,
 		return 0;
 	}
 
-	sscanf(inPtr, "%32s ", buf);
+	sscanf(inPtr, "%31s ", buf);
 	v = kstrtos32(buf, 10, &tempInt);
 	if (v < 0) {
 		return -EINVAL;
