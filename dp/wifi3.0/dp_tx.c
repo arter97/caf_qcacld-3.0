@@ -1678,7 +1678,7 @@ static inline void dp_tx_comp_free_buf(struct dp_soc *soc,
 	}
 }
 
-/** 
+/**
  * dp_tx_mec_handler() - Tx  MEC Notify Handler
  * @tx_desc: software descriptor head pointer
  * @status : Tx completion status from HTT descriptor
@@ -1687,12 +1687,10 @@ static inline void dp_tx_comp_free_buf(struct dp_soc *soc,
  *
  * Return: none
  */
-static void dp_tx_mec_handler(struct dp_tx_desc_s *tx_desc, uint8_t *status)
+#ifdef FEATURE_WDS
+void dp_tx_mec_handler(struct dp_vdev *vdev, uint8_t *status)
 {
-
 	struct dp_soc *soc;
-	struct dp_pdev *pdev = tx_desc->pdev;
-	struct dp_vdev *vdev = tx_desc->vdev;
 	uint32_t flags = IEEE80211_NODE_F_WDS_HM;
 	struct dp_peer *peer;
 	uint8_t mac_addr[6], i;
@@ -1705,10 +1703,7 @@ static void dp_tx_mec_handler(struct dp_tx_desc_s *tx_desc, uint8_t *status)
 	if (sa_idx != 0xffff)
 		return;
 
-	qdf_assert(pdev);
-	qdf_assert(vdev);
-
-	soc = pdev->soc;
+	soc = vdev->pdev->soc;
 	for (i = 0; i < 6; i++)
 		mac_addr[5 - i] = status[4+i];
 
@@ -1726,6 +1721,11 @@ static void dp_tx_mec_handler(struct dp_tx_desc_s *tx_desc, uint8_t *status)
 				flags);
 	}
 }
+#else
+static void dp_tx_mec_handler(struct dp_vdev *vdev, uint8_t *status) {
+	return;
+}
+#endif
 
 /**
  * dp_tx_process_htt_completion() - Tx HTT Completion Indication Handler
@@ -1743,10 +1743,13 @@ void dp_tx_process_htt_completion(struct dp_tx_desc_s *tx_desc, uint8_t *status)
 	struct dp_pdev *pdev;
 	struct dp_soc *soc;
 	uint32_t *htt_status_word = (uint32_t *) status;
+	struct dp_vdev *vdev;
 
 	qdf_assert(tx_desc->pdev);
+	qdf_assert(tx_desc->vdev);
 
 	pdev = tx_desc->pdev;
+	vdev = tx_desc->vdev;
 	soc = pdev->soc;
 
 	tx_status = HTT_TX_WBM_COMPLETION_V2_TX_STATUS_GET(htt_status_word[0]);
@@ -1772,7 +1775,7 @@ void dp_tx_process_htt_completion(struct dp_tx_desc_s *tx_desc, uint8_t *status)
 	}
 	case HTT_TX_FW2WBM_TX_STATUS_MEC_NOTIFY:
 	{
-		dp_tx_mec_handler(tx_desc, status);
+		dp_tx_mec_handler(vdev, status);
 		break;
 	}
 	default:
