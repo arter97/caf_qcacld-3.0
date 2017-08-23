@@ -1680,7 +1680,7 @@ static inline void dp_tx_comp_free_buf(struct dp_soc *soc,
 
 /**
  * dp_tx_mec_handler() - Tx  MEC Notify Handler
- * @tx_desc: software descriptor head pointer
+ * @vdev: pointer to dp dev handler
  * @status : Tx completion status from HTT descriptor
  *
  * Handles MEC notify event sent from fw to Host
@@ -1693,25 +1693,26 @@ void dp_tx_mec_handler(struct dp_vdev *vdev, uint8_t *status)
 	struct dp_soc *soc;
 	uint32_t flags = IEEE80211_NODE_F_WDS_HM;
 	struct dp_peer *peer;
-	uint8_t mac_addr[6], i;
-	uint16_t sa_idx;
-	uint32_t *htt_status_word = (uint32_t *)status;
-
-	sa_idx = HTT_TX_WBM_COMPLETION_V2_SA_AST_INDEX_GET(htt_status_word[2]);
-
-	/* Add an entry only if sa_idx is 0xffff */
-	if (sa_idx != 0xffff)
-		return;
+	uint8_t mac_addr[DP_MAC_ADDR_LEN], i;
 
 	soc = vdev->pdev->soc;
-	for (i = 0; i < 6; i++)
-		mac_addr[5 - i] = status[4+i];
-
+	qdf_spin_lock_bh(&soc->peer_ref_mutex);
 	peer = TAILQ_FIRST(&vdev->peer_list);
+	qdf_spin_unlock_bh(&soc->peer_ref_mutex);
+
+	if (!peer) {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
+				FL("peer is NULL"));
+		return;
+	}
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
 			"%s Tx MEC Handler\n",
 			__func__);
+
+	for (i = 0; i < DP_MAC_ADDR_LEN; i++)
+		mac_addr[(DP_MAC_ADDR_LEN - 1) - i] =
+					status[(DP_MAC_ADDR_LEN - 2) + i];
 
 	if (!dp_peer_add_ast(soc, peer, mac_addr, 2)) {
 		soc->cdp_soc.ol_ops->peer_add_wds_entry(
@@ -1722,8 +1723,8 @@ void dp_tx_mec_handler(struct dp_vdev *vdev, uint8_t *status)
 	}
 }
 #else
-static void dp_tx_mec_handler(struct dp_vdev *vdev, uint8_t *status) {
-	return;
+static void dp_tx_mec_handler(struct dp_vdev *vdev, uint8_t *status)
+{
 }
 #endif
 
@@ -1741,9 +1742,9 @@ void dp_tx_process_htt_completion(struct dp_tx_desc_s *tx_desc, uint8_t *status)
 {
 	uint8_t tx_status;
 	struct dp_pdev *pdev;
+	struct dp_vdev *vdev;
 	struct dp_soc *soc;
 	uint32_t *htt_status_word = (uint32_t *) status;
-	struct dp_vdev *vdev;
 
 	qdf_assert(tx_desc->pdev);
 	qdf_assert(tx_desc->vdev);
