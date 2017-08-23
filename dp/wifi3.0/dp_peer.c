@@ -369,7 +369,6 @@ static inline void dp_peer_map_ast(struct dp_soc *soc,
 	TAILQ_FOREACH(ast_entry, &peer->ast_entry_list, ase_list_elem) {
 		if (!(qdf_mem_cmp(mac_addr, ast_entry->mac_addr.raw,
 				DP_MAC_ADDR_LEN))) {
-			qdf_spin_unlock_bh(&soc->ast_lock);
 			ast_entry->ast_idx = hw_peer_id;
 			soc->ast_table[hw_peer_id] = ast_entry;
 			ast_entry->is_active = TRUE;
