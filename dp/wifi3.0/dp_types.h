@@ -479,6 +479,21 @@ struct dp_ast_entry {
 	TAILQ_ENTRY(dp_ast_entry) hash_list_elem;
 };
 
+/* SOC level htt stats */
+struct htt_t2h_stats {
+	/* lock to protect htt_stats_msg update */
+	qdf_spinlock_t lock;
+
+	/* work queue to process htt stats */
+	qdf_work_t work;
+
+	/* T2H Ext stats message queue */
+	qdf_nbuf_queue_t msg;
+
+	/* number of completed stats in htt_stats_msg */
+	uint32_t num_stats;
+};
+
 /* SOC level structure for data path */
 struct dp_soc {
 	/* Common base structure - Should be the first member */
@@ -704,12 +719,44 @@ struct dp_soc {
 	u_int16_t pdev_bs_inact_interval;
 	/* Inactivity timer */
 #endif /* QCA_SUPPORT_SON */
-	/* T2H Ext stats message queue */
-	qdf_nbuf_queue_t htt_stats_msg;
-	/* T2H Ext stats message length */
-	uint32_t htt_msg_len;
-	/* work queue to process htt stats */
-	qdf_work_t htt_stats_work;
+
+	/* htt stats */
+	struct htt_t2h_stats htt_stats;
+
+#ifdef IPA_OFFLOAD
+	/* IPA uC datapath offload Wlan Tx resources */
+	struct {
+		/* Resource info to be passed to IPA */
+		qdf_dma_addr_t ipa_tcl_ring_base_paddr;
+		void *ipa_tcl_ring_base_vaddr;
+		uint32_t ipa_tcl_ring_size;
+		qdf_dma_addr_t ipa_tcl_hp_paddr;
+		uint32_t alloc_tx_buf_cnt;
+
+		qdf_dma_addr_t ipa_wbm_ring_base_paddr;
+		void *ipa_wbm_ring_base_vaddr;
+		uint32_t ipa_wbm_ring_size;
+		qdf_dma_addr_t ipa_wbm_tp_paddr;
+
+		/* TX buffers populated into the WBM ring */
+		void **tx_buf_pool_vaddr;
+	} ipa_uc_tx_rsc;
+
+	/* IPA uC datapath offload Wlan Rx resources */
+	struct {
+		/* Resource info to be passed to IPA */
+		qdf_dma_addr_t ipa_reo_ring_base_paddr;
+		void *ipa_reo_ring_base_vaddr;
+		uint32_t ipa_reo_ring_size;
+		qdf_dma_addr_t ipa_reo_tp_paddr;
+
+		/* Resource info to be passed to firmware and IPA */
+		qdf_dma_addr_t ipa_rx_refill_buf_ring_base_paddr;
+		void *ipa_rx_refill_buf_ring_base_vaddr;
+		uint32_t ipa_rx_refill_buf_ring_size;
+		qdf_dma_addr_t ipa_rx_refill_buf_hp_paddr;
+	} ipa_uc_rx_rsc;
+#endif
 };
 #define MAX_RX_MAC_RINGS 2
 /* Same as NAC_MAX_CLENT */
