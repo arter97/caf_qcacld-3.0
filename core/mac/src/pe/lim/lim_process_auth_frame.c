@@ -1200,7 +1200,8 @@ lim_process_auth_frame(tpAniSirGlobal mac_ctx, uint8_t *rx_pkt_info,
 			goto free;
 		}
 
-		if (frame_len < LIM_ENCR_AUTH_BODY_LEN_SAP) {
+		if ((frame_len < LIM_ENCR_AUTH_BODY_LEN_SAP) ||
+		    (frame_len > LIM_ENCR_AUTH_BODY_LEN)) {
 			/* Log error */
 			lim_log(mac_ctx, LOGE,
 				FL("Not enough size [%d] to decry rx Auth frm"),
