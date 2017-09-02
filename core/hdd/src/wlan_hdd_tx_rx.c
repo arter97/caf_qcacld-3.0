@@ -164,6 +164,18 @@ static inline struct sk_buff *hdd_skb_orphan(hdd_adapter_t *pAdapter,
 	return skb;
 }
 
+bool hdd_tx_flow_control_is_pause(void *adapter_context)
+{
+	hdd_adapter_t *pAdapter = (hdd_adapter_t *) adapter_context;
+
+	if ((NULL == pAdapter) || (WLAN_HDD_ADAPTER_MAGIC != pAdapter->magic)) {
+		/* INVALID ARG */
+		hdd_err("invalid adapter %p", pAdapter);
+		return false;
+	}
+
+	return pAdapter->pause_map & (1 << WLAN_DATA_FLOW_CONTROL);
+}
 /**
  * hdd_tx_resume_cb() - Resume OS TX Q.
  * @adapter_context: pointer to vdev apdapter
@@ -200,17 +212,10 @@ void hdd_tx_resume_cb(void *adapter_context, bool tx_resume)
 	hdd_tx_resume_false(pAdapter, tx_resume);
 }
 
-/**
- * hdd_register_tx_flow_control() - Register TX Flow control
- * @adapter: adapter handle
- * @timer_callback: timer callback
- * @flow_control_fp: txrx flow control
- *
- * Return: none
- */
 void hdd_register_tx_flow_control(hdd_adapter_t *adapter,
 		qdf_mc_timer_callback_t timer_callback,
-		ol_txrx_tx_flow_control_fp flow_control_fp)
+		ol_txrx_tx_flow_control_fp flow_control_fp,
+		ol_txrx_tx_flow_control_is_pause_fp flow_control_is_pause_fp)
 {
 	if (adapter->tx_flow_timer_initialized == false) {
 		qdf_mc_timer_init(&adapter->tx_flow_control_timer,
@@ -221,7 +226,8 @@ void hdd_register_tx_flow_control(hdd_adapter_t *adapter,
 	}
 	ol_txrx_register_tx_flow_control(adapter->sessionId,
 					flow_control_fp,
-					adapter);
+					adapter,
+					flow_control_is_pause_fp);
 }
 
 /**
@@ -852,7 +858,7 @@ static void __hdd_tx_timeout(struct net_device *dev)
 			   i, netif_tx_queue_stopped(txq), txq->trans_start);
 	}
 
-	QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_INFO,
+	QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_DEBUG,
 		  "carrier state: %d", netif_carrier_ok(dev));
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	wlan_hdd_display_netif_queue_history(hdd_ctx);
@@ -1278,7 +1284,8 @@ QDF_STATUS hdd_rx_packet_cbk(void *context, qdf_nbuf_t rxBuf)
 	}
 
 	/* hold configurable wakelock for unicast traffic */
-	if (pHddCtx->config->rx_wakelock_timeout)
+	if (pHddCtx->config->rx_wakelock_timeout &&
+	    pHddStaCtx->conn_info.uIsAuthenticated)
 		wake_lock = hdd_is_rx_wake_lock_needed(skb);
 
 	if (wake_lock) {
@@ -1640,10 +1647,6 @@ int hdd_set_mon_rx_cb(struct net_device *dev)
 	QDF_STATUS qdf_status;
 	struct ol_txrx_desc_type sta_desc = {0};
 	struct ol_txrx_ops txrx_ops;
-
-	ret = wlan_hdd_validate_context(hdd_ctx);
-	if (0 != ret)
-		return ret;
 
 	qdf_mem_zero(&txrx_ops, sizeof(txrx_ops));
 	txrx_ops.rx.rx = hdd_mon_rx_packet_cbk;

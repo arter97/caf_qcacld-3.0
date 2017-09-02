@@ -1932,6 +1932,33 @@ static inline void hdd_send_roamed_ind(struct net_device *dev,
 }
 #endif
 
+#if defined(WLAN_FEATURE_ROAM_OFFLOAD)
+void hdd_save_gtk_params(hdd_adapter_t *adapter,
+			 tCsrRoamInfo *csr_roam_info, bool is_reassoc)
+{
+	uint8_t *kek;
+	uint32_t kek_len;
+
+	if (is_reassoc) {
+		kek = csr_roam_info->kek;
+		kek_len = csr_roam_info->kek_len;
+	} else {
+		/*
+		 * This should come for FILS case only.
+		 * Caller should make sure fils_join_rsp is
+		 * not NULL, if there is need to use else where.
+		 */
+		kek = csr_roam_info->fils_join_rsp->kek;
+		kek_len = csr_roam_info->fils_join_rsp->kek_len;
+	}
+
+	wlan_hdd_save_gtk_offload_params(adapter, NULL, kek, kek_len,
+					 csr_roam_info->replay_ctr,
+					 true, GTK_OFFLOAD_ENABLE);
+
+	hdd_debug("Kek len %d", kek_len);
+}
+#endif
 /**
  * hdd_send_re_assoc_event() - send reassoc event
  * @dev: pointer to net device
@@ -2057,6 +2084,8 @@ static void hdd_send_re_assoc_event(struct net_device *dev,
 		(u8 *)pCsrRoamInfo->pbFrames + pCsrRoamInfo->nBeaconLength,
 		pCsrRoamInfo->nAssocReqLength);
 
+	hdd_save_gtk_params(pAdapter, pCsrRoamInfo, true);
+
 	hdd_debug("ReAssoc Req IE dump");
 	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
 		assoc_req_ies, pCsrRoamInfo->nAssocReqLength);
@@ -2065,6 +2094,9 @@ static void hdd_send_re_assoc_event(struct net_device *dev,
 			assoc_req_ies, pCsrRoamInfo->nAssocReqLength,
 			rspRsnIe, rspRsnLength,
 			pCsrRoamInfo);
+
+	hdd_update_hlp_info(dev, pCsrRoamInfo);
+
 done:
 	sme_roam_free_connect_profile(&roam_profile);
 	if (final_req_ie)
@@ -2291,7 +2323,9 @@ void hdd_perform_roam_set_key_complete(hdd_adapter_t *pAdapter)
 	pHddStaCtx->roam_info.deferKeyComplete = false;
 }
 
-#if defined(WLAN_FEATURE_FILS_SK) && defined(CFG80211_FILS_SK_OFFLOAD_SUPPORT)
+#if defined(WLAN_FEATURE_FILS_SK) && \
+	(defined(CFG80211_FILS_SK_OFFLOAD_SUPPORT) || \
+		 (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)))
 void hdd_clear_fils_connection_info(hdd_adapter_t *adapter)
 {
 	hdd_wext_state_t *wext_state;
@@ -2305,6 +2339,12 @@ void hdd_clear_fils_connection_info(hdd_adapter_t *adapter)
 	if (wext_state->roamProfile.fils_con_info) {
 		qdf_mem_free(wext_state->roamProfile.fils_con_info);
 		wext_state->roamProfile.fils_con_info = NULL;
+	}
+
+	if (wext_state->roamProfile.hlp_ie) {
+		qdf_mem_free(wext_state->roamProfile.hlp_ie);
+		wext_state->roamProfile.hlp_ie = NULL;
+		wext_state->roamProfile.hlp_ie_len = 0;
 	}
 }
 #endif
