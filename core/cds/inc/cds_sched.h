@@ -270,6 +270,7 @@ typedef struct _cds_context_type {
 	uint32_t driver_state;
 
 	qdf_event_t wmaCompleteEvent;
+	unsigned long fw_state;
 
 	/* WMA Context */
 	void *pWMAContext;
