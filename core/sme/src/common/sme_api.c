@@ -608,7 +608,7 @@ tSmeCmd *sme_get_command_buffer(tpAniSirGlobal pMac)
 				false,
 				pMac->sme.enableSelfRecovery ? true : false);
 		else if (pMac->sme.enableSelfRecovery)
-			cds_trigger_recovery();
+			cds_trigger_recovery(CDS_GET_MSG_BUFF_FAILURE);
 		else
 			QDF_BUG(0);
 	}
@@ -12154,7 +12154,7 @@ void active_list_cmd_timeout_handle(void *userData)
 
 	if (mac_ctx->sme.enableSelfRecovery) {
 		sme_save_active_cmd_stats(hal);
-		cds_trigger_recovery();
+		cds_trigger_recovery(CDS_ACTIVE_LIST_TIMEOUT);
 	} else {
 		if (!mac_ctx->roam.configParam.enable_fatal_event &&
 		   !(cds_is_load_or_unload_in_progress() ||
@@ -17996,8 +17996,11 @@ QDF_STATUS sme_set_del_pmkid_cache(tHalHandle hal, uint8_t session_id,
 				   tPmkidCacheInfo *pmk_cache_info,
 				   bool is_add)
 {
-	wmi_pmk_cache *pmk_cache;
+	wmi_pmk_cache *pmk_cache = NULL;
 	cds_msg_t msg;
+
+	if (!pmk_cache_info)
+		goto send_flush_cmd;
 
 	pmk_cache = qdf_mem_malloc(sizeof(*pmk_cache));
 	if (!pmk_cache) {
@@ -18032,13 +18035,17 @@ QDF_STATUS sme_set_del_pmkid_cache(tHalHandle hal, uint8_t session_id,
 	qdf_mem_copy(pmk_cache->pmk, pmk_cache_info->pmk,
 		     pmk_cache->pmk_len);
 
+send_flush_cmd:
 	msg.type = SIR_HAL_SET_DEL_PMKID_CACHE;
 	msg.reserved = session_id;
 	msg.bodyptr = pmk_cache;
 	if (QDF_STATUS_SUCCESS !=
 	    cds_mq_post_message(QDF_MODULE_ID_WMA, &msg)) {
 		sme_err("Not able to post message to WDA");
-		qdf_mem_free(pmk_cache);
+
+		if (pmk_cache)
+			qdf_mem_free(pmk_cache);
+
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -18054,7 +18061,8 @@ QDF_STATUS sme_set_del_pmkid_cache(tHalHandle hal, uint8_t session_id,
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS sme_delete_all_tdls_peers(tHalHandle hal, uint8_t session_id)
+QDF_STATUS sme_delete_all_tdls_peers(tHalHandle hal, uint8_t session_id,
+		bool disable_tdls_state)
 {
 	struct sir_del_all_tdls_peers *msg;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
@@ -18074,6 +18082,8 @@ QDF_STATUS sme_delete_all_tdls_peers(tHalHandle hal, uint8_t session_id)
 
 	qdf_mem_copy(msg->bssid.bytes, session->connectedProfile.bssid.bytes,
 		     sizeof(struct qdf_mac_addr));
+
+	msg->disable_tdls_state = disable_tdls_state;
 
 	status = cds_send_mb_message_to_mac(msg);
 

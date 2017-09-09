@@ -82,8 +82,8 @@
 #include "wlan_hdd_tdls.h"
 #ifdef FEATURE_WLAN_CH_AVOID
 #include "cds_regdomain.h"
-#include "cdp_txrx_flow_ctrl_v2.h"
 #endif /* FEATURE_WLAN_CH_AVOID */
+#include "cdp_txrx_flow_ctrl_v2.h"
 #include "pld_common.h"
 #include "wlan_hdd_ocb.h"
 #include "wlan_hdd_nan.h"
@@ -91,6 +91,7 @@
 #include "wlan_hdd_driver_ops.h"
 #include "epping_main.h"
 #include "wlan_hdd_memdump.h"
+#include "wlan_hdd_data_stall_detection.h"
 
 #include <wlan_hdd_ipa.h>
 #include "hif.h"
@@ -382,6 +383,40 @@ int hdd_validate_channel_and_bandwidth(hdd_adapter_t *adapter,
 	return 0;
 }
 
+/**
+ * hdd_wait_for_recovery_completion() - Wait for cds recovery completion
+ *
+ * Block the unloading of the driver (or) interface up until the
+ * cds recovery is completed
+ *
+ * Return: true for recovery completion else false
+ */
+static bool hdd_wait_for_recovery_completion(void)
+{
+	int retry = 0;
+
+	/* Wait for recovery to complete */
+	while (cds_is_driver_recovering()) {
+		if (retry == HDD_MOD_EXIT_SSR_MAX_RETRIES/2)
+			hdd_err("Recovery in progress; wait here!!!");
+		msleep(1000);
+		if (retry++ == HDD_MOD_EXIT_SSR_MAX_RETRIES) {
+			hdd_err("SSR never completed, error");
+			/*
+			 * Trigger the bug_on in the internal builds, in the
+			 * customer builds self-recovery will be enabled
+			 * in those cases just return error.
+			 */
+			if (cds_is_self_recovery_enabled())
+				return false;
+			QDF_BUG(0);
+		}
+	}
+
+	hdd_info("Recovery completed successfully!");
+	return true;
+}
+
 static int __hdd_netdev_notifier_call(struct notifier_block *nb,
 				    unsigned long state, void *data)
 {
@@ -649,9 +684,8 @@ int wlan_hdd_validate_context(hdd_context_t *hdd_ctx)
 		return -EAGAIN;
 	}
 
-	if (cds_is_load_or_unload_in_progress()) {
+	if (cds_is_load_or_unload_in_progress())
 		return -EAGAIN;
-	}
 
 	if (hdd_ctx->start_modules_in_progress ||
 	    hdd_ctx->stop_modules_in_progress) {
@@ -1964,8 +1998,6 @@ static void hdd_update_hw_sw_info(hdd_context_t *hdd_ctx)
 
 	/* Get the wlan hw/fw version */
 	hdd_wlan_get_version(hdd_ctx, NULL, NULL);
-
-	return;
 }
 
 /**
@@ -2173,6 +2205,10 @@ static int __hdd_open(struct net_device *dev)
 		return -EBUSY;
 	}
 
+	if (!hdd_wait_for_recovery_completion()) {
+		hdd_err("Recovery failed");
+		return -EIO;
+	}
 	mutex_lock(&hdd_init_deinit_lock);
 
 	/*
@@ -3117,16 +3153,16 @@ QDF_STATUS hdd_init_station_mode(hdd_adapter_t *adapter)
 		goto error_tdls_init;
 
 	status = hdd_lro_enable(hdd_ctx, adapter);
-	if (status != QDF_STATUS_SUCCESS)
-		goto error_lro_enable;
+	if (status)
+		/* Err code from errno.h */
+		hdd_err("LRO is disabled either because of kernel doesnot support or disabled in INI or via vendor commandi. err code %d",
+		status);
 
 	/* rcpi info initialization */
 	qdf_mem_zero(&adapter->rcpi, sizeof(adapter->rcpi));
 
 	return QDF_STATUS_SUCCESS;
 
-error_lro_enable:
-	wlan_hdd_tdls_exit(adapter);
 error_tdls_init:
 	clear_bit(WMM_INIT_DONE, &adapter->event_flags);
 	hdd_wmm_adapter_close(adapter);
@@ -4665,8 +4701,8 @@ static void hdd_connect_done(struct net_device *dev, const u8 *bssid,
 			     struct cfg80211_bss *bss, tCsrRoamInfo *roam_info,
 			     const u8 *req_ie, size_t req_ie_len,
 			     const u8 *resp_ie, size_t resp_ie_len, u16 status,
-			     gfp_t gfp, bool connect_timeout, tSirResultCodes
-			     timeout_reason)
+			     gfp_t gfp, bool connect_timeout,
+			     tSirResultCodes timeout_reason)
 {
 	struct cfg80211_connect_resp_params fils_params;
 	hdd_adapter_t *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
@@ -4718,8 +4754,8 @@ static inline void hdd_connect_done(struct net_device *dev, const u8 *bssid,
 				    *roam_info, const u8 *req_ie,
 				    size_t req_ie_len, const u8 *resp_ie,
 				    size_t resp_ie_len, u16 status, gfp_t gfp,
-				    bool connect_timeout, tSirResultCodes
-				    timeout_reason)
+				    bool connect_timeout,
+				    tSirResultCodes timeout_reason)
 { }
 #endif
 #endif
@@ -6293,9 +6329,9 @@ static void hdd_pld_request_bus_bandwidth(hdd_context_t *hdd_ctx,
 	hdd_ctx->prev_rx = rx_packets;
 
 	if (temp_rx < hdd_ctx->config->busBandwidthLowThreshold)
-		hdd_disable_lro_for_low_tput(hdd_ctx, true);
+		hdd_disable_rx_ol_for_low_tput(hdd_ctx, true);
 	else
-		hdd_disable_lro_for_low_tput(hdd_ctx, false);
+		hdd_disable_rx_ol_for_low_tput(hdd_ctx, false);
 
 	if (temp_rx > hdd_ctx->config->tcpDelackThresholdHigh) {
 		if ((hdd_ctx->cur_rx_level != WLAN_SVC_TP_HIGH) &&
@@ -6383,6 +6419,9 @@ static void hdd_bus_bw_work_handler(struct work_struct *work)
 	if (wlan_hdd_validate_context(hdd_ctx))
 		return;
 
+	if (hdd_ctx->isWiphySuspended)
+		goto restart_timer;
+
 	for (status = hdd_get_front_adapter(hdd_ctx, &adapterNode);
 	     NULL != adapterNode && QDF_STATUS_SUCCESS == status;
 	     status =
@@ -6465,6 +6504,7 @@ static void hdd_bus_bw_work_handler(struct work_struct *work)
 	hdd_ipa_set_perf_level(hdd_ctx, tx_packets, rx_packets);
 	hdd_ipa_uc_stat_request(adapter, 2);
 
+restart_timer:
 	/* ensure periodic timer should still be running before restarting it */
 	qdf_spinlock_acquire(&hdd_ctx->bus_bw_timer_lock);
 	if (hdd_ctx->bus_bw_timer_running)
@@ -7794,7 +7834,6 @@ static hdd_context_t *hdd_context_create(struct device *dev)
 
 	cds_set_multicast_logging(hdd_ctx->config->multicast_host_fw_msgs);
 
-	wlan_hdd_init_chan_info(hdd_ctx);
 	ret = wlan_hdd_init_tx_rx_histogram(hdd_ctx);
 	if (ret)
 		goto err_deinit_hdd_context;
@@ -9110,7 +9149,7 @@ static int hdd_features_init(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter)
 	if (hdd_ctx->config->enable_go_cts2self_for_sta)
 		sme_set_cts2self_for_p2p_go(hdd_ctx->hHal);
 
-	if (hdd_lro_init(hdd_ctx))
+	if (hdd_rx_ol_init(hdd_ctx))
 		hdd_warn("Unable to initialize LRO in fw");
 
 	if (hdd_adaptive_dwelltime_init(hdd_ctx))
@@ -9299,10 +9338,10 @@ int hdd_configure_cds(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter)
 		goto hdd_features_deinit;
 	}
 
-	if (hdd_ctx->config->lro_enable) {
-		dp_cbacks.hdd_en_lro_in_cc_cb = hdd_enable_lro_in_concurrency;
+	if (hdd_ctx->ol_enable) {
+		dp_cbacks.hdd_en_lro_in_cc_cb = hdd_enable_rx_ol_in_concurrency;
 		dp_cbacks.hdd_disble_lro_in_cc_cb =
-						hdd_disable_lro_in_concurrency;
+					hdd_disable_rx_ol_in_concurrency;
 	}
 
 	dp_cbacks.hdd_set_rx_mode_rps_cb = hdd_set_rx_mode_rps;
@@ -9741,6 +9780,8 @@ int hdd_wlan_startup(struct device *dev)
 		goto err_stop_modules;
 	}
 
+	wlan_hdd_init_chan_info(hdd_ctx);
+
 	ret = hdd_wiphy_init(hdd_ctx);
 	if (ret) {
 		hdd_err("Failed to initialize wiphy: %d", ret);
@@ -10069,6 +10110,12 @@ int hdd_register_cb(hdd_context_t *hdd_ctx)
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		hdd_err("set lost link info callback failed");
 
+	ret = hdd_register_data_stall_detect_cb();
+	if (ret) {
+		hdd_err("Register data stall detect detect callback failed.");
+		return ret;
+	}
+
 	wlan_hdd_dcc_register_for_dcc_stats_event(hdd_ctx);
 
 	status = sme_set_bt_activity_info_cb(hdd_ctx->hHal,
@@ -10100,6 +10147,7 @@ int hdd_register_cb(hdd_context_t *hdd_ctx)
 void hdd_deregister_cb(hdd_context_t *hdd_ctx)
 {
 	QDF_STATUS status;
+	int ret;
 
 	ENTER();
 
@@ -10132,6 +10180,10 @@ void hdd_deregister_cb(hdd_context_t *hdd_ctx)
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		hdd_err("Failed to de-register the fw mem dump callback: %d",
 			status);
+
+	ret = hdd_deregister_data_stall_detect_cb();
+	if (ret)
+		hdd_err("Failed to de-register data stall detect event callback");
 
 	sme_deregister_oem_data_rsp_callback(hdd_ctx->hHal);
 	sme_deregister11d_scan_done_callback(hdd_ctx->hHal);
@@ -11193,27 +11245,6 @@ err_dev_state:
 	return ret;
 }
 
-/**
- * hdd_wait_for_recovery_completion() - Wait for cds recovery completion
- *
- * Block the unloading of the driver until the cds recovery is completed
- *
- * Return: None
- */
-static void hdd_wait_for_recovery_completion(void)
-{
-	int retry = 0;
-
-	/* Wait for recovery to complete */
-	while (cds_is_driver_recovering()) {
-		hdd_err("Recovery in progress; wait here!!!");
-		msleep(1000);
-		if (retry++ == HDD_MOD_EXIT_SSR_MAX_RETRIES) {
-			hdd_err("SSR never completed, error");
-			QDF_BUG(0);
-		}
-	}
-}
 
 /**
  * __hdd_module_exit - Module exit helper
@@ -12027,6 +12058,15 @@ int hdd_set_limit_off_chan_for_tos(hdd_adapter_t *adapter, enum tos tos,
 		qdf_mem_free(cmd);
 
 	return ret;
+}
+
+void hdd_pld_ipa_uc_shutdown_pipes(void)
+{
+	hdd_context_t *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx)
+		return;
+
+	hdd_ipa_uc_force_pipe_shutdown(hdd_ctx);
 }
 
 /* Register the module init/exit functions */

@@ -1662,6 +1662,26 @@ static void init_config_param(tpAniSirGlobal pMac)
 		MAWC_ROAM_RSSI_HIGH_ADJUST_DEFAULT;
 	pMac->roam.configParam.csr_mawc_config.mawc_roam_rssi_low_adjust =
 		MAWC_ROAM_RSSI_LOW_ADJUST_DEFAULT;
+
+	pMac->roam.configParam.best_candidate_weight_config.
+		rssi_weightage = RSSI_WEIGHTAGE;
+	pMac->roam.configParam.best_candidate_weight_config.
+		ht_caps_weightage = HT_CAPABILITY_WEIGHTAGE;
+	pMac->roam.configParam.best_candidate_weight_config.
+		vht_caps_weightage = VHT_CAP_WEIGHTAGE;
+	pMac->roam.configParam.best_candidate_weight_config.
+		chan_width_weightage = CHAN_WIDTH_WEIGHTAGE;
+	pMac->roam.configParam.best_candidate_weight_config.
+		chan_band_weightage = CHAN_BAND_WEIGHTAGE;
+	pMac->roam.configParam.best_candidate_weight_config.
+		nss_weightage = NSS_WEIGHTAGE;
+	pMac->roam.configParam.best_candidate_weight_config.
+		beamforming_cap_weightage = BEAMFORMING_CAP_WEIGHTAGE;
+	pMac->roam.configParam.best_candidate_weight_config.
+		pcl_weightage = PCL_WEIGHT;
+	pMac->roam.configParam.best_candidate_weight_config.
+		channel_congestion_weightage = CHANNEL_CONGESTION_WEIGHTAGE;
+
 }
 
 eCsrBand csr_get_current_band(tHalHandle hHal)
@@ -2811,6 +2831,10 @@ QDF_STATUS csr_change_default_config_param(tpAniSirGlobal pMac,
 		pMac->roam.configParam.num_disallowed_aps =
 			pParam->num_disallowed_aps;
 
+		qdf_mem_copy(&pMac->roam.configParam.
+			best_candidate_weight_config,
+			&pParam->best_candidate_weight_config,
+			sizeof(struct csr_best_candidate_weight_config));
 	}
 	return status;
 }
@@ -3072,6 +3096,9 @@ QDF_STATUS csr_get_config_param(tpAniSirGlobal pMac, tCsrConfigParam *pParam)
 	qdf_mem_copy(&pParam->csr_mawc_config,
 		&pMac->roam.configParam.csr_mawc_config,
 		sizeof(pParam->csr_mawc_config));
+	qdf_mem_copy(&pParam->best_candidate_weight_config,
+		&pMac->roam.configParam.best_candidate_weight_config,
+		sizeof(struct best_candidate_wt_cfg_param));
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -4284,14 +4311,19 @@ QDF_STATUS csr_roam_prepare_bss_config(tpAniSirGlobal pMac,
 	 * Join timeout: if we find a BeaconInterval in the BssDescription,
 	 * then set the Join Timeout to be 10 x the BeaconInterval.
 	 */
-	if (pBssDesc->beaconInterval)
+	if (pBssDesc->beaconInterval) {
 		/* Make sure it is bigger than the minimal */
 		pBssConfig->uJoinTimeOut =
 			QDF_MAX(10 * pBssDesc->beaconInterval,
 				CSR_JOIN_FAILURE_TIMEOUT_MIN);
-	else
+		/* make sure it is less than max allowed */
+		pBssConfig->uJoinTimeOut =
+			QDF_MIN(pBssConfig->uJoinTimeOut,
+				WNI_CFG_JOIN_FAILURE_TIMEOUT_STAMAX);
+	} else {
 		pBssConfig->uJoinTimeOut =
 			CSR_JOIN_FAILURE_TIMEOUT_DEFAULT;
+	}
 	/* validate CB */
 	if ((pBssConfig->uCfgDot11Mode == eCSR_CFG_DOT11_MODE_11N)
 	    || (pBssConfig->uCfgDot11Mode == eCSR_CFG_DOT11_MODE_11AC)
@@ -7110,6 +7142,7 @@ static void csr_roam_process_join_res(tpAniSirGlobal mac_ctx,
 	}
 	session = CSR_GET_SESSION(mac_ctx, session_id);
 
+	qdf_mem_set(&roam_info, sizeof(roam_info), 0);
 	conn_profile = &session->connectedProfile;
 	if (eCsrReassocSuccess == res) {
 		roam_info.reassoc = true;
@@ -7119,7 +7152,6 @@ static void csr_roam_process_join_res(tpAniSirGlobal mac_ctx,
 		ind_qos = SME_QOS_CSR_ASSOC_COMPLETE;
 	}
 	sme_debug("receives association indication");
-	qdf_mem_set(&roam_info, sizeof(roam_info), 0);
 	/* always free the memory here */
 	if (session->pWpaRsnRspIE) {
 		session->nWpaRsnRspIeLength = 0;
@@ -18980,17 +19012,19 @@ QDF_STATUS csr_update_fils_config(tpAniSirGlobal mac, uint8_t session_id,
  * @str: Source string
  * @dst: Destination string
  * @c: Character before which all characters need to be copied
+ * @max_dst_len: Maximum length destination can accomodate.
  *
  * Return: length of the copied string, if success. zero otherwise.
  */
-static uint32_t copy_all_before_char(char *str, char *dst, char c)
+static uint32_t copy_all_before_char(char *str, char *dst,
+		char c, uint16_t max_dst_len)
 {
 	uint32_t len = 0;
 
 	if (!str)
 		return len;
 
-	while (*str != '\0' && *str != c) {
+	while (*str != '\0' && *str != c && (len < max_dst_len)) {
 		*dst++ = *str++;
 		len++;
 	}
@@ -19029,7 +19063,8 @@ static void csr_update_fils_params_rso(tpAniSirGlobal mac,
 	req_buffer->is_fils_connection = true;
 	roam_fils_params->username_length =
 			copy_all_before_char(fils_info->keyname_nai,
-				roam_fils_params->username, '@');
+				roam_fils_params->username, '@',
+				WMI_FILS_MAX_USERNAME_LENGTH);
 
 	roam_fils_params->next_erp_seq_num =
 			(fils_info->sequence_number + 1);

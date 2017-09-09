@@ -61,6 +61,44 @@ QDF_STATUS hdd_init_tx_rx(hdd_adapter_t *pAdapter);
 QDF_STATUS hdd_deinit_tx_rx(hdd_adapter_t *pAdapter);
 QDF_STATUS hdd_rx_packet_cbk(void *context, qdf_nbuf_t rxBuf);
 
+/**
+ * hdd_rx_ol_init() - Initialize Rx mode(LRO or GRO) method
+ * @hdd_ctx: pointer to HDD Station Context
+ *
+ * Return: 0 on success and non zero on failure.
+ */
+int hdd_rx_ol_init(hdd_context_t *hdd_ctx);
+
+/**
+ * hdd_enable_rx_ol_in_concurrency() - Enable Rx offload
+ * @hdd_ctx: hdd context
+ *
+ * Enable Rx offload if for inactive concurrency is not active
+ *
+ * Return: none
+ */
+void hdd_enable_rx_ol_in_concurrency(hdd_context_t *hdd_ctx);
+
+/**
+ * hdd_disable_rx_ol_in_concurrency() - Disable Rx offload due to concurrency
+ * @hdd_ctx: hdd context
+ *
+ * Return: none
+ */
+void hdd_disable_rx_ol_in_concurrency(hdd_context_t *hdd_ctx);
+
+/**
+ * hdd_disable_rx_ol_for_low_tput() - Disable Rx offload in low TPUT scenario
+ * @hdd_ctx: hdd context
+ * @disable: 1 disable, 0 enable
+ *
+ * Return: none
+ */
+void hdd_disable_rx_ol_for_low_tput(hdd_context_t *hdd_ctx, bool disable);
+
+#define CFG_LRO_ENABLED		1
+#define CFG_GRO_ENABLED		2
+
 #ifdef IPA_OFFLOAD
 QDF_STATUS hdd_rx_mul_packet_cbk(void *cds_context,
 				 qdf_nbuf_t rx_buf_list, uint8_t staId);
@@ -170,5 +208,17 @@ static inline void netif_trans_update(struct net_device *dev)
 	"%s: Transmission timeout occurred jiffies %lu", \
 	__func__, jiffies)
 #endif
+
+static inline void
+hdd_skb_fill_gso_size (struct net_device *dev,
+					struct sk_buff *skb) {
+	if (skb_cloned(skb) && skb_is_nonlinear(skb) &&
+		skb_shinfo(skb)->gso_size == 0 &&
+		ip_hdr(skb)->protocol == IPPROTO_TCP) {
+		skb_shinfo(skb)->gso_size = dev->mtu -
+			((skb_transport_header(skb) - skb_network_header(skb))
+				+ tcp_hdrlen(skb));
+	}
+}
 
 #endif /* end #if !defined(WLAN_HDD_TX_RX_H) */
