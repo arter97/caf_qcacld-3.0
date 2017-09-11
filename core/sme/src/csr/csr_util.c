@@ -2511,9 +2511,12 @@ static bool csr_match_wpaoui_index(tpAniSirGlobal pMac,
 				   uint8_t cAllCyphers, uint8_t ouiIndex,
 				   uint8_t Oui[])
 {
-	return csr_is_oui_match
-		(pMac, AllCyphers, cAllCyphers, csr_wpa_oui[ouiIndex], Oui);
-
+	if (ouiIndex < QDF_ARRAY_SIZE(csr_wpa_oui))
+		return csr_is_oui_match
+			(pMac, AllCyphers, cAllCyphers,
+			 csr_wpa_oui[ouiIndex], Oui);
+	else
+		return false;
 }
 
 #ifdef FEATURE_WLAN_WAPI
@@ -3792,6 +3795,7 @@ static bool csr_get_wpa_cyphers(tpAniSirGlobal mac_ctx, tCsrAuthList *auth_type,
 	uint8_t authentication[CSR_WPA_OUI_SIZE];
 	uint8_t mccipher_arr[1][CSR_WPA_OUI_SIZE];
 	uint8_t i;
+	uint8_t index;
 	eCsrAuthType neg_authtype = eCSR_AUTH_TYPE_UNKNOWN;
 
 	if (!wpa_ie->present)
@@ -3801,20 +3805,38 @@ static bool csr_get_wpa_cyphers(tpAniSirGlobal mac_ctx, tCsrAuthList *auth_type,
 	c_ucast_cipher = (uint8_t) (wpa_ie->unicast_cipher_count);
 	c_auth_suites = (uint8_t) (wpa_ie->auth_suite_count);
 
+	/*
+	 * csr_match_wpaoui_index will provide the index of the
+	 * array csr_wpa_oui to be read and determine if it is
+	 * accepatable cipher or not. Below check ensures that
+	 * the index will not be out of range of the array size.
+	 */
+	index = csr_get_oui_index_from_cipher(encr_type);
+	if (!(index < (sizeof(csr_wpa_oui)/CSR_WPA_OUI_SIZE))) {
+		sme_debug("Unacceptable index: %d", index);
+		goto end;
+	}
+
+	sme_debug("kw_dbg: index: %d", index);
 	/* Check - Is requested unicast Cipher supported by the BSS. */
 	acceptable_cipher = csr_match_wpaoui_index(mac_ctx,
 				wpa_ie->unicast_ciphers, c_ucast_cipher,
-				csr_get_oui_index_from_cipher(encr_type),
-				unicast);
+				index, unicast);
 	if (!acceptable_cipher)
 		goto end;
 	/* unicast is supported. Pick the first matching Group cipher, if any */
 	for (i = 0; i < mc_encryption->numEntries; i++) {
+		index = csr_get_oui_index_from_cipher(
+				mc_encryption->encryptionType[i]);
+		sme_debug("kw_dbg: index: %d", index);
+		if (!(index < (sizeof(csr_wpa_oui)/CSR_WPA_OUI_SIZE))) {
+			sme_debug("Unacceptable MC index: %d", index);
+			acceptable_cipher = false;
+			continue;
+		}
 		acceptable_cipher = csr_match_wpaoui_index(mac_ctx,
 					mccipher_arr, c_mcast_cipher,
-					csr_get_oui_index_from_cipher(
-					    mc_encryption->encryptionType[i]),
-					multicast);
+					index, multicast);
 		if (acceptable_cipher)
 			break;
 	}
@@ -4222,6 +4244,7 @@ static bool csr_validate_wep(tpAniSirGlobal mac_ctx,
 	bool match = false;
 	eCsrAuthType negotiated_auth = eCSR_AUTH_TYPE_OPEN_SYSTEM;
 	eCsrEncryptionType negotiated_mccipher = eCSR_ENCRYPT_TYPE_UNKNOWN;
+	uint8_t oui_index;
 
 	/* If privacy bit is not set, consider no match */
 	if (!csr_is_privacy(bss_descr))
@@ -4287,10 +4310,11 @@ static bool csr_validate_wep(tpAniSirGlobal mac_ctx,
 
 	/* else we can use the encryption type directly */
 	if (ie_ptr->WPA.present) {
-		match = (!qdf_mem_cmp(ie_ptr->WPA.multicast_cipher,
-				csr_wpa_oui[csr_get_oui_index_from_cipher(
-					uc_encry_type)],
-				CSR_WPA_OUI_SIZE));
+		oui_index = csr_get_oui_index_from_cipher(uc_encry_type);
+		if (oui_index < QDF_ARRAY_SIZE(csr_wpa_oui))
+			match = (!qdf_mem_cmp(ie_ptr->WPA.multicast_cipher,
+					csr_wpa_oui[oui_index],
+					CSR_WPA_OUI_SIZE));
 		if (match)
 			goto end;
 	}
@@ -5544,6 +5568,12 @@ static inline void csr_free_fils_profile_info(tCsrRoamProfile *profile)
 	if (profile->fils_con_info) {
 		qdf_mem_free(profile->fils_con_info);
 		profile->fils_con_info = NULL;
+	}
+
+	if (profile->hlp_ie) {
+		qdf_mem_free(profile->hlp_ie);
+		profile->hlp_ie = NULL;
+		profile->hlp_ie_len = 0;
 	}
 }
 #else

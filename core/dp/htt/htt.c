@@ -452,6 +452,10 @@ htt_attach(struct htt_pdev_t *pdev, int desc_pool_size)
 	int i;
 	int ret = 0;
 
+	pdev->is_ipa_uc_enabled = false;
+	if (ol_cfg_ipa_uc_offload_enabled(pdev->ctrl_pdev))
+		pdev->is_ipa_uc_enabled = true;
+
 	ret = htt_tx_attach(pdev, desc_pool_size);
 	if (ret)
 		goto fail1;
@@ -597,14 +601,23 @@ QDF_STATUS htt_attach_target(htt_pdev_handle pdev)
 	QDF_STATUS status;
 
 	status = htt_h2t_ver_req_msg(pdev);
-	if (status != QDF_STATUS_SUCCESS)
+	if (status != QDF_STATUS_SUCCESS) {
+		QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_ERROR,
+			  "%s:%d: could not send h2t_ver_req msg",
+			  __func__, __LINE__);
 		return status;
-
+	}
 #if defined(HELIUMPLUS)
 	/*
 	 * Send the frag_desc info to target.
 	 */
-	htt_h2t_frag_desc_bank_cfg_msg(pdev);
+	status = htt_h2t_frag_desc_bank_cfg_msg(pdev);
+	if (status != QDF_STATUS_SUCCESS) {
+		QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_ERROR,
+			  "%s:%d: could not send h2t_frag_desc_bank_cfg msg",
+			  __func__, __LINE__);
+		return status;
+	}
 #endif /* defined(HELIUMPLUS) */
 
 
@@ -618,8 +631,28 @@ QDF_STATUS htt_attach_target(htt_pdev_handle pdev)
 	 */
 
 	status = htt_h2t_rx_ring_rfs_cfg_msg(pdev);
+	if (status != QDF_STATUS_SUCCESS) {
+		QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_ERROR,
+			  "%s:%d: could not send h2t_rx_ring_rfs_cfg msg",
+			  __func__, __LINE__);
+		return status;
+	}
+
 	status = htt_h2t_rx_ring_cfg_msg(pdev);
+	if (status != QDF_STATUS_SUCCESS) {
+		QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_ERROR,
+			  "%s:%d: could not send h2t_rx_ring_cfg msg",
+			  __func__, __LINE__);
+		return status;
+	}
+
 	status = HTT_IPA_CONFIG(pdev, status);
+	if (status != QDF_STATUS_SUCCESS) {
+		QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_ERROR,
+			  "%s:%d: could not send h2t_ipa_uc_rsc_cfg msg",
+			  __func__, __LINE__);
+		return status;
+	}
 
 	return status;
 }
@@ -729,10 +762,14 @@ int htt_htc_attach(struct htt_pdev_t *pdev, uint16_t service_id)
 	status = htc_connect_service(pdev->htc_pdev, &connect, &response);
 
 	if (status != QDF_STATUS_SUCCESS) {
-		if (!cds_is_fw_down())
-			QDF_BUG(0);
+		if (cds_is_fw_down())
+			return -EIO;
 
-		return -EIO;       /* failure */
+		if (status == QDF_STATUS_E_NOMEM ||
+		    cds_is_self_recovery_enabled())
+			return qdf_status_to_os_return(status);
+
+		QDF_BUG(0);
 	}
 
 	htt_update_endpoint(pdev, service_id, response.Endpoint);
@@ -782,7 +819,6 @@ int htt_ipa_uc_attach(struct htt_pdev_t *pdev)
 {
 	int error;
 
-	pdev->uc_map_reqd = 0;
 	/* TX resource attach */
 	error = htt_tx_ipa_uc_attach(
 		pdev,

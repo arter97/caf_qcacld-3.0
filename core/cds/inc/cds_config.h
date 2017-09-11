@@ -56,6 +56,32 @@ enum active_bpf_mode {
 };
 
 /**
+ * enum cds_hang_reason - host hang/ssr reason
+ * @CDS_REASON_UNSPECIFIED: Unspecified reason
+ * @CDS_RX_HASH_NO_ENTRY_FOUND: No Map for the MAC entry for the received frame
+ * @CDS_PEER_DELETION_TIMEDOUT: peer deletion timeout happened
+ * @CDS_PEER_UNMAP_TIMEDOUT: peer unmap timeout
+ * @CDS_SCAN_REQ_EXPIRED: Scan request timed out
+ * @CDS_SCAN_ATTEMPT_FAILURES: Consecutive Scan attempt failures
+ * @CDS_GET_MSG_BUFF_FAILURE: Unable to get the message buffer
+ * @CDS_ACTIVE_LIST_TIMEOUT: Current command processing is timedout
+ * @CDS_SUSPEND_TIMEOUT: Timeout for an ACK from FW for suspend request
+ * @CDS_RESUME_TIMEOUT: Timeout for an ACK from FW for resume request
+ */
+enum cds_hang_reason {
+	CDS_REASON_UNSPECIFIED = 0,
+	CDS_RX_HASH_NO_ENTRY_FOUND = 1,
+	CDS_PEER_DELETION_TIMEDOUT = 2,
+	CDS_PEER_UNMAP_TIMEDOUT = 3,
+	CDS_SCAN_REQ_EXPIRED = 4,
+	CDS_SCAN_ATTEMPT_FAILURES = 5,
+	CDS_GET_MSG_BUFF_FAILURE = 6,
+	CDS_ACTIVE_LIST_TIMEOUT = 7,
+	CDS_SUSPEND_TIMEOUT = 8,
+	CDS_RESUME_TIMEOUT = 9,
+};
+
+/**
  * struct cds_config_info - Place Holder for cds configuration
  * @max_station: Max station supported
  * @max_bssid: Max Bssid Supported
@@ -172,9 +198,11 @@ struct cds_config_info {
 
 #ifdef WLAN_FEATURE_FILS_SK
 #define MAX_PMK_LEN 48
+#define MAX_PMKID_LEN 16
 #define FILS_MAX_KEYNAME_NAI_LENGTH 255
 #define FILS_MAX_REALM_LEN 255
 #define FILS_MAX_RRK_LENGTH 64
+#define FILS_MAX_RIK_LENGTH FILS_MAX_RRK_LENGTH
 
 struct cds_fils_connection_info {
 	bool is_fils_connection;

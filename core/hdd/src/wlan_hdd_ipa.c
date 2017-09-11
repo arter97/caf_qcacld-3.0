@@ -458,6 +458,7 @@ struct hdd_ipa_priv {
 	qdf_spinlock_t q_lock;
 
 	struct list_head pend_desc_head;
+	uint16_t tx_desc_size;
 	struct hdd_ipa_tx_desc *tx_desc_list;
 	struct list_head free_tx_desc_head;
 
@@ -550,13 +551,9 @@ struct hdd_ipa_priv {
 	(((_hdd_ctx)->config->IpaConfig & (_mask)) == (_mask))
 
 #define HDD_IPA_INCREASE_INTERNAL_DROP_COUNT(hdd_ipa) \
-			do { \
-				hdd_ipa->ipa_rx_internel_drop_count++; \
-			} while (0)
+				hdd_ipa->ipa_rx_internel_drop_count++;
 #define HDD_IPA_INCREASE_NET_SEND_COUNT(hdd_ipa) \
-			do { \
-				hdd_ipa->ipa_rx_net_send_count++; \
-			} while (0)
+				hdd_ipa->ipa_rx_net_send_count++;
 #define HDD_BW_GET_DIFF(_x, _y) (unsigned long)((ULONG_MAX - (_y)) + (_x) + 1)
 
 #if defined(QCA_WIFI_3_0) && defined(CONFIG_IPA3)
@@ -1804,6 +1801,13 @@ static int hdd_ipa_uc_handle_first_con(struct hdd_ipa_priv *hdd_ipa)
 			/* RM PROD request sync return
 			 * enable pipe immediately
 			 */
+			if (!hdd_ipa->ipa_pipes_down) {
+				HDD_IPA_LOG(QDF_TRACE_LEVEL_DEBUG,
+					"%s: IPA WDI Pipe already activated",
+					__func__);
+				return 0;
+			}
+
 			if (hdd_ipa_uc_enable_pipes(hdd_ipa)) {
 				HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
 					"%s: IPA WDI Pipe activation failed",
@@ -1811,6 +1815,10 @@ static int hdd_ipa_uc_handle_first_con(struct hdd_ipa_priv *hdd_ipa)
 				hdd_ipa->resource_loading = false;
 				return -EBUSY;
 			}
+		} else {
+			HDD_IPA_LOG(QDF_TRACE_LEVEL_INFO,
+				    "%s: IPA WDI Pipe activation deferred",
+					__func__);
 		}
 	} else {
 		/* RM Disabled
@@ -2097,6 +2105,13 @@ static void hdd_ipa_uc_op_cb(struct op_msg_type *op_msg, void *usr_ctxt)
 	if (HDD_IPA_UC_OPCODE_MAX <= msg->op_code) {
 		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
 			    "%s, INVALID OPCODE %d", __func__, msg->op_code);
+		qdf_mem_free(op_msg);
+		return;
+	}
+
+	if (!osdev) {
+		HDD_IPA_LOG(QDF_TRACE_LEVEL_FATAL,
+			    "%s: qdf dev context is NULL", __func__);
 		qdf_mem_free(op_msg);
 		return;
 	}
@@ -2720,6 +2735,14 @@ QDF_STATUS hdd_ipa_uc_ol_init(hdd_context_t *hdd_ctx)
 		return stat;
 
 	ENTER();
+
+	if (!osdev) {
+		HDD_IPA_LOG(QDF_TRACE_LEVEL_FATAL,
+			    "%s: qdf dev context is NULL", __func__);
+		stat = QDF_STATUS_E_INVAL;
+		goto fail_return;
+	}
+
 	/* Do only IPA Pipe specific configuration here. All one time
 	 * initialization wrt IPA UC shall in hdd_ipa_init and those need
 	 * to be reinit at SSR shall in be SSR deinit / reinit functions.
@@ -2974,6 +2997,14 @@ QDF_STATUS hdd_ipa_uc_ol_init(hdd_context_t *hdd_ctx)
 		return stat;
 
 	ENTER();
+
+	if (!osdev) {
+		HDD_IPA_LOG(QDF_TRACE_LEVEL_FATAL,
+			    "%s: qdf dev context is NULL", __func__);
+		stat = QDF_STATUS_E_INVAL;
+		goto fail_return;
+	}
+
 	/* Do only IPA Pipe specific configuration here. All one time
 	 * initialization wrt IPA UC shall in hdd_ipa_init and those need
 	 * to be reinit at SSR shall in be SSR deinit / reinit functions.
@@ -4615,7 +4646,11 @@ static void hdd_ipa_pm_flush(struct work_struct *work)
 		if (pm_tx_cb->exception) {
 			HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
 				"FLUSH EXCEPTION");
-			hdd_softap_hard_start_xmit(skb, pm_tx_cb->adapter->dev);
+			if (pm_tx_cb->adapter->dev)
+				hdd_softap_hard_start_xmit(skb,
+					  pm_tx_cb->adapter->dev);
+			else
+				ipa_free_skb(pm_tx_cb->ipa_tx_desc);
 		} else {
 			hdd_ipa_send_pkt_to_tl(pm_tx_cb->iface_context,
 				       pm_tx_cb->ipa_tx_desc);
@@ -4846,14 +4881,23 @@ int hdd_ipa_resume(hdd_context_t *hdd_ctx)
 static int hdd_ipa_alloc_tx_desc_list(struct hdd_ipa_priv *hdd_ipa)
 {
 	int i;
-	uint32_t max_desc_cnt;
 	struct hdd_ipa_tx_desc *tmp_desc;
+	struct ol_txrx_pdev_t *pdev;
 
-	max_desc_cnt = hdd_ipa->hdd_ctx->config->IpaUcTxBufCount;
+	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
+	if (!pdev) {
+		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR, "pdev is NULL");
+		return -ENODEV;
+	}
+
+	hdd_ipa->tx_desc_size = QDF_MIN(
+			hdd_ipa->hdd_ctx->config->IpaMccTxDescSize,
+			pdev->tx_desc.pool_size);
 
 	INIT_LIST_HEAD(&hdd_ipa->free_tx_desc_head);
 
-	tmp_desc = qdf_mem_malloc(sizeof(struct hdd_ipa_tx_desc)*max_desc_cnt);
+	tmp_desc = qdf_mem_malloc(sizeof(struct hdd_ipa_tx_desc) *
+			hdd_ipa->tx_desc_size);
 
 	if (!tmp_desc) {
 		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
@@ -4864,7 +4908,7 @@ static int hdd_ipa_alloc_tx_desc_list(struct hdd_ipa_priv *hdd_ipa)
 	hdd_ipa->tx_desc_list = tmp_desc;
 
 	qdf_spin_lock_bh(&hdd_ipa->q_lock);
-	for (i = 0; i < max_desc_cnt; i++) {
+	for (i = 0; i < hdd_ipa->tx_desc_size; i++) {
 		tmp_desc->id = i;
 		tmp_desc->ipa_tx_desc_ptr = NULL;
 		list_add_tail(&tmp_desc->link,
@@ -4980,7 +5024,7 @@ static int hdd_ipa_setup_sys_pipe(struct hdd_ipa_priv *hdd_ipa)
 		hdd_ipa->sys_pipe[HDD_IPA_RX_PIPE].conn_hdl_valid = 1;
 	}
 
-       /* Allocate free Tx desc list */
+	/* Allocate free Tx desc list */
 	ret = hdd_ipa_alloc_tx_desc_list(hdd_ipa);
 	if (ret)
 		goto setup_sys_pipe_fail;
@@ -5007,7 +5051,6 @@ setup_sys_pipe_fail:
 static void hdd_ipa_teardown_sys_pipe(struct hdd_ipa_priv *hdd_ipa)
 {
 	int ret = 0, i;
-	uint32_t max_desc_cnt;
 	struct hdd_ipa_tx_desc *tmp_desc;
 	struct ipa_rx_data *ipa_tx_desc;
 
@@ -5025,10 +5068,8 @@ static void hdd_ipa_teardown_sys_pipe(struct hdd_ipa_priv *hdd_ipa)
 	}
 
 	if (hdd_ipa->tx_desc_list) {
-		max_desc_cnt = hdd_ipa->hdd_ctx->config->IpaUcTxBufCount;
-
 		qdf_spin_lock_bh(&hdd_ipa->q_lock);
-		for (i = 0; i < max_desc_cnt; i++) {
+		for (i = 0; i < hdd_ipa->tx_desc_size; i++) {
 			tmp_desc = hdd_ipa->tx_desc_list + i;
 			ipa_tx_desc = tmp_desc->ipa_tx_desc_ptr;
 			if (ipa_tx_desc)
@@ -5757,12 +5798,11 @@ static int __hdd_ipa_wlan_evt(hdd_adapter_t *adapter, uint8_t sta_id,
 				qdf_mutex_release(&hdd_ipa->ipa_lock);
 			}
 			return 0;
-		} else {
-			HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
-				    "IPA resource %s completed",
-				    hdd_ipa->resource_loading ?
-				    "load" : "unload");
 		}
+		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
+			    "IPA resource %s completed",
+			    hdd_ipa->resource_loading ?
+			    "load" : "unload");
 	}
 
 	hdd_ipa->stats.event[type]++;
@@ -6040,14 +6080,16 @@ static int __hdd_ipa_wlan_evt(hdd_adapter_t *adapter, uint8_t sta_id,
 				hdd_ipa_uc_handle_last_discon(hdd_ipa);
 			}
 
-			qdf_mutex_release(&hdd_ipa->event_lock);
-
 			if (hdd_ipa_uc_sta_is_enabled(hdd_ipa->hdd_ctx) &&
-			    hdd_ipa->sta_connected)
+			    hdd_ipa->sta_connected) {
+				qdf_mutex_release(&hdd_ipa->event_lock);
 				hdd_ipa_uc_offload_enable_disable(
 					hdd_get_adapter(hdd_ipa->hdd_ctx,
 							QDF_STA_MODE),
 					SIR_STA_RX_DATA_OFFLOAD, false);
+			} else {
+				qdf_mutex_release(&hdd_ipa->event_lock);
+			}
 		} else {
 			qdf_mutex_release(&hdd_ipa->event_lock);
 		}
@@ -6349,32 +6391,16 @@ static void hdd_ipa_cleanup_pending_event(struct hdd_ipa_priv *hdd_ipa)
 }
 
 /**
- * __hdd_ipa_cleanup - IPA cleanup function
+ * __hdd_ipa_flush - flush IPA exception path SKB's
  * @hdd_ctx: HDD global context
  *
- * Return: QDF_STATUS enumeration
+ * Return: none
  */
-static QDF_STATUS __hdd_ipa_cleanup(hdd_context_t *hdd_ctx)
+static void __hdd_ipa_flush(hdd_context_t *hdd_ctx)
 {
 	struct hdd_ipa_priv *hdd_ipa = hdd_ctx->hdd_ipa;
-	int i;
-	struct hdd_ipa_iface_context *iface_context = NULL;
 	qdf_nbuf_t skb;
 	struct hdd_ipa_pm_tx_cb *pm_tx_cb = NULL;
-
-	if (!hdd_ipa_is_enabled(hdd_ctx))
-		return QDF_STATUS_SUCCESS;
-
-	if (!hdd_ipa_uc_is_enabled(hdd_ctx)) {
-		unregister_inetaddr_notifier(&hdd_ipa->ipv4_notifier);
-		hdd_ipa_teardown_sys_pipe(hdd_ipa);
-	}
-
-	/* Teardown IPA sys_pipe for MCC */
-	if (hdd_ipa_uc_sta_is_enabled(hdd_ipa->hdd_ctx))
-		hdd_ipa_teardown_sys_pipe(hdd_ipa);
-
-	hdd_ipa_destroy_rm_resource(hdd_ipa);
 
 	cancel_work_sync(&hdd_ipa->pm_work);
 	qdf_spin_lock_bh(&hdd_ipa->pm_lock);
@@ -6390,6 +6416,37 @@ static QDF_STATUS __hdd_ipa_cleanup(hdd_context_t *hdd_ctx)
 		qdf_spin_lock_bh(&hdd_ipa->pm_lock);
 	}
 	qdf_spin_unlock_bh(&hdd_ipa->pm_lock);
+
+}
+
+/**
+ * __hdd_ipa_cleanup - IPA cleanup function
+ * @hdd_ctx: HDD global context
+ *
+ * Return: QDF_STATUS enumeration
+ */
+static QDF_STATUS __hdd_ipa_cleanup(hdd_context_t *hdd_ctx)
+{
+	struct hdd_ipa_priv *hdd_ipa = hdd_ctx->hdd_ipa;
+	int i;
+	struct hdd_ipa_iface_context *iface_context = NULL;
+
+	if (!hdd_ipa_is_enabled(hdd_ctx))
+		return QDF_STATUS_SUCCESS;
+
+	if (!hdd_ipa_uc_is_enabled(hdd_ctx)) {
+		unregister_inetaddr_notifier(&hdd_ipa->ipv4_notifier);
+		hdd_ipa_teardown_sys_pipe(hdd_ipa);
+	}
+
+	/* Teardown IPA sys_pipe for MCC */
+	if (hdd_ipa_uc_sta_is_enabled(hdd_ipa->hdd_ctx))
+		hdd_ipa_teardown_sys_pipe(hdd_ipa);
+
+	hdd_ipa_destroy_rm_resource(hdd_ipa);
+
+
+	__hdd_ipa_flush(hdd_ctx);
 
 	qdf_spinlock_destroy(&hdd_ipa->pm_lock);
 	qdf_spinlock_destroy(&hdd_ipa->q_lock);
@@ -6419,6 +6476,19 @@ static QDF_STATUS __hdd_ipa_cleanup(hdd_context_t *hdd_ctx)
 	hdd_ctx->hdd_ipa = NULL;
 
 	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * hdd_ipa_cleanup - SSR wrapper for __hdd_ipa_flush
+ * @hdd_ctx: HDD global context
+ *
+ * Return: None
+ */
+void hdd_ipa_flush(hdd_context_t *hdd_ctx)
+{
+	cds_ssr_protect(__func__);
+	__hdd_ipa_flush(hdd_ctx);
+	cds_ssr_unprotect(__func__);
 }
 
 /**

@@ -610,7 +610,11 @@ out:
 		qdf_mem_free(iface->addBssStaContext);
 	if (iface->staKeyParams)
 		qdf_mem_free(iface->staKeyParams);
+
+	wma_vdev_deinit(iface);
 	qdf_mem_zero(iface, sizeof(*iface));
+	wma_vdev_init(iface);
+
 	del_sta_self_req_param->status = status;
 	if (generate_rsp)
 		wma_send_del_sta_self_resp(del_sta_self_req_param);
@@ -786,7 +790,7 @@ send_fail_resp:
 
 	WMA_LOGD("%s: Sending add bss rsp to umac(vdev %d status %d)",
 		 __func__, resp_event->vdev_id, add_bss->status);
-	wma_send_msg(wma, WMA_ADD_BSS_RSP, (void *)add_bss, 0);
+	wma_send_msg_high_priority(wma, WMA_ADD_BSS_RSP, (void *)add_bss, 0);
 }
 
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE
@@ -1084,7 +1088,8 @@ int wma_vdev_start_resp_handler(void *handle, uint8_t *cmd_param_info,
 			}
 		}
 
-		wma_send_msg(wma, WMA_SWITCH_CHANNEL_RSP, (void *)params, 0);
+		wma_send_msg_high_priority(wma,
+			WMA_SWITCH_CHANNEL_RSP, (void *)params, 0);
 	} else if (req_msg->msg_type == WMA_ADD_BSS_REQ) {
 		tpAddBssParams bssParams = (tpAddBssParams) req_msg->user_data;
 
@@ -1704,8 +1709,8 @@ wma_send_del_bss_response(tp_wma_handle wma, struct wma_target_req *req,
 			 __func__, vdev_id);
 	} else {
 		params->status = QDF_STATUS_SUCCESS;
-		wma_send_msg(wma, WMA_DELETE_BSS_RSP, (void *)params,
-			 0);
+		wma_send_msg_high_priority(wma,
+			WMA_DELETE_BSS_RSP, (void *)params, 0);
 	}
 
 	if (iface->del_staself_req != NULL) {
@@ -2172,6 +2177,24 @@ ol_txrx_vdev_handle wma_vdev_attach(tp_wma_handle wma_handle,
 				self_sta_req->fils_max_chan_guard_time);
 		if (QDF_IS_STATUS_ERROR(ret))
 			WMA_LOGE("Failed to set WMI_VDEV_PARAM_FILS_MAX_CHANNEL_GUARD_TIME");
+
+		/* Pass down the Probe Request tx delay(in ms) to FW */
+		ret = wma_vdev_set_param(
+				wma_handle->wmi_handle,
+				self_sta_req->session_id,
+				WMI_VDEV_PARAM_PROBE_DELAY,
+				PROBE_REQ_TX_DELAY);
+		if (QDF_IS_STATUS_ERROR(ret))
+			WMA_LOGE("Failed to set WMI_VDEV_PARAM_PROBE_DELAY");
+
+		/* Pass down the probe request tx time gap(in ms) to FW */
+		ret = wma_vdev_set_param(
+				wma_handle->wmi_handle,
+				self_sta_req->session_id,
+				WMI_VDEV_PARAM_REPEAT_PROBE_TIME,
+				PROBE_REQ_TX_TIME_GAP);
+		if (QDF_IS_STATUS_ERROR(ret))
+			WMA_LOGE("Failed to set WMI_VDEV_PARAM_REPEAT_PROBE_TIME");
 	}
 
 	/* Initialize BMISS parameters */
@@ -2534,7 +2557,8 @@ int wma_peer_assoc_conf_handler(void *handle, uint8_t *cmd_param_info,
 			 params->staType, params->smesessionId,
 			 params->assocId, params->bssId, params->staIdx,
 			 params->status);
-		wma_send_msg(wma, WMA_ADD_STA_RSP, (void *)params, 0);
+		wma_send_msg_high_priority(wma,
+			WMA_ADD_STA_RSP, (void *)params, 0);
 	} else if (req_msg->msg_type == WMA_ADD_BSS_REQ) {
 		tpAddBssParams  params = (tpAddBssParams) req_msg->user_data;
 
@@ -2551,7 +2575,8 @@ int wma_peer_assoc_conf_handler(void *handle, uint8_t *cmd_param_info,
 			params->operMode,
 			params->updateBss, params->nwType, params->bssId,
 			params->staContext.staIdx, params->status);
-		wma_send_msg(wma, WMA_ADD_BSS_RSP, (void *)params, 0);
+		wma_send_msg_high_priority(wma,
+			WMA_ADD_BSS_RSP, (void *)params, 0);
 	} else {
 		WMA_LOGE(FL("Unhandled request message type: %d"),
 		req_msg->msg_type);
@@ -2668,7 +2693,7 @@ int wma_peer_delete_handler(void *handle, uint8_t *cmd_param_info,
 		del_sta = req_msg->user_data;
 		if (del_sta->respReqd) {
 			WMA_LOGD(FL("Sending peer del rsp to umac"));
-			wma_send_msg(wma, WMA_DELETE_STA_RSP,
+			wma_send_msg_high_priority(wma, WMA_DELETE_STA_RSP,
 				(void *)del_sta, QDF_STATUS_SUCCESS);
 		} else {
 			qdf_mem_free(del_sta);
@@ -2755,7 +2780,8 @@ void wma_hold_req_timer(void *data)
 		if (wma_crash_on_fw_timeout(wma->fw_timeout_crash) == true)
 			QDF_BUG(0);
 		else
-			wma_send_msg(wma, WMA_ADD_STA_RSP, (void *)params, 0);
+			wma_send_msg_high_priority(wma,
+				WMA_ADD_STA_RSP, (void *)params, 0);
 	} else if (tgt_req->msg_type == WMA_ADD_BSS_REQ) {
 		tpAddBssParams  params = (tpAddBssParams) tgt_req->user_data;
 
@@ -2766,7 +2792,8 @@ void wma_hold_req_timer(void *data)
 		if (wma_crash_on_fw_timeout(wma->fw_timeout_crash) == true)
 			QDF_BUG(0);
 		else
-			wma_send_msg(wma, WMA_ADD_BSS_RSP, (void *)params, 0);
+			wma_send_msg_high_priority(wma,
+				WMA_ADD_BSS_RSP, (void *)params, 0);
 	} else if ((tgt_req->msg_type == WMA_DELETE_STA_REQ) &&
 		(tgt_req->type == WMA_DELETE_STA_RSP_START)) {
 		tpDeleteStaParams params =
@@ -2784,7 +2811,7 @@ void wma_hold_req_timer(void *data)
 			 * Send response in production builds.
 			 */
 			QDF_ASSERT(0);
-			wma_send_msg(wma, WMA_DELETE_STA_RSP,
+			wma_send_msg_high_priority(wma, WMA_DELETE_STA_RSP,
 				    (void *)params, 0);
 		}
 	} else if ((tgt_req->msg_type == WMA_DELETE_STA_REQ) &&
@@ -2824,12 +2851,14 @@ void wma_hold_req_timer(void *data)
 		if (wma_crash_on_fw_timeout(wma->fw_timeout_crash) == true)
 			QDF_BUG(0);
 		else
-			wma_send_msg(wma, WMA_DELETE_BSS_RSP, params, 0);
+			wma_send_msg_high_priority(wma,
+				WMA_DELETE_BSS_RSP, params, 0);
 	} else {
 		WMA_LOGE(FL("Unhandled timeout for msg_type:%d and type:%d"),
 				tgt_req->msg_type, tgt_req->type);
 		QDF_BUG(0);
 	}
+	qdf_mc_timer_destroy(&tgt_req->event_timeout);
 	qdf_mem_free(tgt_req);
 }
 
@@ -2919,13 +2948,7 @@ void wma_vdev_resp_timer(void *data)
 	uint8_t peer_id;
 	struct wma_target_req *msg;
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE
-	tpAniSirGlobal mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
-
-	if (NULL == mac_ctx) {
-		WMA_LOGE("%s: Failed to get mac_ctx", __func__);
-		wma_cleanup_target_req_param(tgt_req);
-		goto free_tgt_req;
-	}
+	tpAniSirGlobal mac_ctx;
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
 
 	wma = cds_get_context(QDF_MODULE_ID_WMA);
@@ -2955,6 +2978,15 @@ void wma_vdev_resp_timer(void *data)
 		goto free_tgt_req;
 	}
 
+#ifdef FEATURE_AP_MCC_CH_AVOIDANCE
+	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	if (!mac_ctx) {
+		WMA_LOGE("%s: Failed to get mac_ctx", __func__);
+		wma_cleanup_target_req_param(tgt_req);
+		goto free_tgt_req;
+	}
+#endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
+
 	if (tgt_req->msg_type == WMA_CHNL_SWITCH_REQ) {
 		tpSwitchChannelParams params =
 			(tpSwitchChannelParams) tgt_req->user_data;
@@ -2968,7 +3000,7 @@ void wma_vdev_resp_timer(void *data)
 		if (wma_crash_on_fw_timeout(wma->fw_timeout_crash) == true)
 			QDF_BUG(0);
 		else
-			wma_send_msg(wma, WMA_SWITCH_CHANNEL_RSP,
+			wma_send_msg_high_priority(wma, WMA_SWITCH_CHANNEL_RSP,
 				    (void *)params, 0);
 		if (wma->interfaces[tgt_req->vdev_id].is_channel_switch) {
 			wma->interfaces[tgt_req->vdev_id].is_channel_switch =
@@ -3054,7 +3086,7 @@ void wma_vdev_resp_timer(void *data)
 		}
 		params->status = QDF_STATUS_E_TIMEOUT;
 		WMA_LOGA("%s: WMA_DELETE_BSS_REQ timedout", __func__);
-		wma_send_msg(wma, WMA_DELETE_BSS_RSP,
+		wma_send_msg_high_priority(wma, WMA_DELETE_BSS_RSP,
 				    (void *)params, 0);
 		if (iface->del_staself_req) {
 			WMA_LOGA("scheduling defered deletion(vdev id %x)",
@@ -3083,7 +3115,10 @@ void wma_vdev_resp_timer(void *data)
 			qdf_mem_free(iface->addBssStaContext);
 		if (iface->staKeyParams)
 			qdf_mem_free(iface->staKeyParams);
+
+		wma_vdev_deinit(iface);
 		qdf_mem_zero(iface, sizeof(*iface));
+		wma_vdev_init(iface);
 	} else if (tgt_req->msg_type == WMA_ADD_BSS_REQ) {
 		tpAddBssParams params = (tpAddBssParams) tgt_req->user_data;
 
@@ -3093,7 +3128,8 @@ void wma_vdev_resp_timer(void *data)
 		if (wma_crash_on_fw_timeout(wma->fw_timeout_crash) == true) {
 			QDF_BUG(0);
 		} else {
-			wma_send_msg(wma, WMA_ADD_BSS_RSP, (void *)params, 0);
+			wma_send_msg_high_priority(wma,
+				WMA_ADD_BSS_RSP, (void *)params, 0);
 			QDF_ASSERT(0);
 		}
 		goto free_tgt_req;
@@ -3421,7 +3457,7 @@ peer_cleanup:
 	wma_remove_peer(wma, add_bss->bssId, vdev_id, peer, false);
 send_fail_resp:
 	add_bss->status = QDF_STATUS_E_FAILURE;
-	wma_send_msg(wma, WMA_ADD_BSS_RSP, (void *)add_bss, 0);
+	wma_send_msg_high_priority(wma, WMA_ADD_BSS_RSP, (void *)add_bss, 0);
 }
 
 #ifdef QCA_IBSS_SUPPORT
@@ -3574,7 +3610,7 @@ peer_cleanup:
 		wma_remove_peer(wma, add_bss->bssId, vdev_id, peer, false);
 send_fail_resp:
 	add_bss->status = QDF_STATUS_E_FAILURE;
-	wma_send_msg(wma, WMA_ADD_BSS_RSP, (void *)add_bss, 0);
+	wma_send_msg_high_priority(wma, WMA_ADD_BSS_RSP, (void *)add_bss, 0);
 }
 #endif /* QCA_IBSS_SUPPORT */
 
@@ -3852,7 +3888,7 @@ send_final_rsp:
 		 __func__, add_bss->operMode,
 		 add_bss->updateBss, add_bss->nwType, add_bss->bssId,
 		 add_bss->staContext.staIdx, add_bss->status);
-	wma_send_msg(wma, WMA_ADD_BSS_RSP, (void *)add_bss, 0);
+	wma_send_msg_high_priority(wma, WMA_ADD_BSS_RSP, (void *)add_bss, 0);
 	return;
 
 peer_cleanup:
@@ -3861,7 +3897,8 @@ peer_cleanup:
 send_fail_resp:
 	add_bss->status = QDF_STATUS_E_FAILURE;
 	if (!wma_is_roam_synch_in_progress(wma, vdev_id))
-		wma_send_msg(wma, WMA_ADD_BSS_RSP, (void *)add_bss, 0);
+		wma_send_msg_high_priority(wma,
+			WMA_ADD_BSS_RSP, (void *)add_bss, 0);
 }
 
 /**
@@ -4137,7 +4174,7 @@ send_rsp:
 		 add_sta->staType, add_sta->smesessionId,
 		 add_sta->assocId, add_sta->bssId, add_sta->staIdx,
 		 add_sta->status);
-	wma_send_msg(wma, WMA_ADD_STA_RSP, (void *)add_sta, 0);
+	wma_send_msg_high_priority(wma, WMA_ADD_STA_RSP, (void *)add_sta, 0);
 }
 
 #ifdef FEATURE_WLAN_TDLS
@@ -4297,7 +4334,7 @@ send_rsp:
 		 add_sta->staType, add_sta->smesessionId,
 		 add_sta->assocId, add_sta->bssId, add_sta->staIdx,
 		 add_sta->status);
-	wma_send_msg(wma, WMA_ADD_STA_RSP, (void *)add_sta, 0);
+	wma_send_msg_high_priority(wma, WMA_ADD_STA_RSP, (void *)add_sta, 0);
 }
 #endif
 
@@ -4531,7 +4568,8 @@ out:
 		 params->status);
 	/* Don't send a response during roam sync operation */
 	if (!wma_is_roam_synch_in_progress(wma, params->smesessionId))
-		wma_send_msg(wma, WMA_ADD_STA_RSP, (void *)params, 0);
+		wma_send_msg_high_priority(wma,
+			WMA_ADD_STA_RSP, (void *)params, 0);
 }
 
 /**
@@ -4595,7 +4633,8 @@ send_del_rsp:
 	if (del_sta->respReqd) {
 		WMA_LOGD("%s: Sending del rsp to umac (status: %d)",
 			 __func__, del_sta->status);
-		wma_send_msg(wma, WMA_DELETE_STA_RSP, (void *)del_sta, 0);
+		wma_send_msg_high_priority(wma,
+			WMA_DELETE_STA_RSP, (void *)del_sta, 0);
 	}
 }
 
@@ -4674,7 +4713,8 @@ send_del_rsp:
 	if (del_sta->respReqd) {
 		WMA_LOGD("%s: Sending del rsp to umac (status: %d)",
 			 __func__, del_sta->status);
-		wma_send_msg(wma, WMA_DELETE_STA_RSP, (void *)del_sta, 0);
+		wma_send_msg_high_priority(wma,
+			WMA_DELETE_STA_RSP, (void *)del_sta, 0);
 	}
 }
 #endif
@@ -4706,7 +4746,8 @@ static void wma_delete_sta_req_sta_mode(tp_wma_handle wma,
 	if (params->respReqd) {
 		WMA_LOGD("%s: vdev_id %d status %d", __func__,
 			 params->smesessionId, status);
-		wma_send_msg(wma, WMA_DELETE_STA_RSP, (void *)params, 0);
+		wma_send_msg_high_priority(wma,
+			WMA_DELETE_STA_RSP, (void *)params, 0);
 	}
 }
 
@@ -4931,9 +4972,48 @@ void wma_delete_bss_ho_fail(tp_wma_handle wma, tpDeleteBssParams params)
 		 iface->peer_count);
 fail_del_bss_ho_fail:
 	params->status = status;
-	wma_send_msg(wma, WMA_DELETE_BSS_HO_FAIL_RSP, (void *)params, 0);
+	wma_send_msg_high_priority(wma,
+		WMA_DELETE_BSS_HO_FAIL_RSP, (void *)params, 0);
 }
 
+#ifdef WLAN_FEATURE_HOST_ROAM
+/**
+ * wma_wait_tx_complete() - Wait till tx packets are drained
+ * @wma: wma handle
+ * @session_id: vdev id
+ *
+ * Return: none
+ */
+static void wma_wait_tx_complete(tp_wma_handle wma,
+				uint32_t session_id)
+{
+	ol_txrx_pdev_handle pdev;
+	uint8_t max_wait_iterations = 0;
+
+	if (!wma->interfaces[session_id].is_vdev_valid) {
+		WMA_LOGE("%s: Vdev is not valid: %d",
+			 __func__, session_id);
+		return;
+	}
+
+	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
+	max_wait_iterations =
+		wma->interfaces[session_id].delay_before_vdev_stop /
+		WMA_TX_Q_RECHECK_TIMER_WAIT;
+
+	while (ol_txrx_get_tx_pending(pdev) && max_wait_iterations) {
+		WMA_LOGW(FL("Waiting for outstanding packet to drain."));
+		qdf_wait_single_event(&wma->tx_queue_empty_event,
+				      WMA_TX_Q_RECHECK_TIMER_WAIT);
+		max_wait_iterations--;
+	}
+}
+#else
+static void wma_wait_tx_complete(tp_wma_handle wma)
+{
+
+}
+#endif
 /**
  * wma_delete_bss() - process delete bss request from upper layer
  * @wma: wma handle
@@ -4948,7 +5028,6 @@ void wma_delete_bss(tp_wma_handle wma, tpDeleteBssParams params)
 	struct wma_target_req *msg;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint8_t peer_id;
-	uint8_t max_wait_iterations = 0;
 	ol_txrx_vdev_handle txrx_vdev = NULL;
 	bool roam_synch_in_progress = false;
 	struct wma_txrx_node *iface;
@@ -5045,17 +5124,7 @@ void wma_delete_bss(tp_wma_handle wma, tpDeleteBssParams params)
 	WMA_LOGW(FL("Outstanding msdu packets: %d"),
 		 ol_txrx_get_tx_pending(pdev));
 
-	max_wait_iterations =
-		wma->interfaces[params->smesessionId].delay_before_vdev_stop /
-		WMA_TX_Q_RECHECK_TIMER_WAIT;
-
-	while (ol_txrx_get_tx_pending(pdev) && max_wait_iterations) {
-		WMA_LOGW(FL("Waiting for outstanding packet to drain."));
-		qdf_wait_single_event(&wma->tx_queue_empty_event,
-				      WMA_TX_Q_RECHECK_TIMER_MAX_WAIT);
-		max_wait_iterations--;
-	}
-
+	wma_wait_tx_complete(wma, params->smesessionId);
 	if (ol_txrx_get_tx_pending(pdev)) {
 		WMA_LOGW(FL("Outstanding msdu packets before VDEV_STOP : %d"),
 			 ol_txrx_get_tx_pending(pdev));
@@ -5085,7 +5154,7 @@ detach_peer:
 
 out:
 	params->status = status;
-	wma_send_msg(wma, WMA_DELETE_BSS_RSP, (void *)params, 0);
+	wma_send_msg_high_priority(wma, WMA_DELETE_BSS_RSP, (void *)params, 0);
 }
 
 /**

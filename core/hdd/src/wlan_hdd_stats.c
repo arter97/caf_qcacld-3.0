@@ -4125,15 +4125,19 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 	myRate = pAdapter->hdd_stats.ClassA_stat.tx_rate * 5;
 	if (!(rate_flags & eHAL_TX_RATE_LEGACY)) {
 		nss = pAdapter->hdd_stats.ClassA_stat.nss;
-		if (wma_is_current_hwmode_dbs()) {
-			hdd_debug("Hw mode is DBS, Reduce nss to 1");
+		if ((nss > 1) && (wma_is_current_hwmode_dbs())) {
+			hdd_debug("Hw mode is DBS, Reduce nss(%d) by 1", nss);
 			nss--;
 		}
 
 		if (eHDD_LINK_SPEED_REPORT_ACTUAL == pCfg->reportMaxLinkSpeed) {
 			/* Get current rate flags if report actual */
-			rate_flags =
-				pAdapter->hdd_stats.ClassA_stat.mcs_rate_flags;
+			/* WMA fails to find mcs_index for legacy tx rates */
+			if (mcs_index == INVALID_MCS_IDX && myRate)
+				rate_flags = eHAL_TX_RATE_LEGACY;
+			else
+				rate_flags =
+				 pAdapter->hdd_stats.ClassA_stat.mcs_rate_flags;
 		}
 
 		if (mcs_index == INVALID_MCS_IDX)
@@ -4735,6 +4739,7 @@ static int __wlan_hdd_cfg80211_dump_survey(struct wiphy *wiphy,
 
 	for (i = 0; i < NUM_NL80211_BANDS && !filled; i++) {
 		struct ieee80211_supported_band *band = wiphy->bands[i];
+
 		if (NULL == wiphy->bands[i])
 			continue;
 		for (j = 0; j < wiphy->bands[i]->n_channels && !filled; j++) {

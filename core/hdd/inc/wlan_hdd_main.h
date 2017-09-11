@@ -89,6 +89,9 @@
 #else
 #define HDD_TX_TIMEOUT          msecs_to_jiffies(5000)
 #endif
+
+#define HDD_TX_STALL_THRESHOLD 4
+
 /** Hdd Default MTU */
 #define HDD_DEFAULT_MTU         (1500)
 
@@ -180,27 +183,27 @@
 
 #define WLAN_CHIP_VERSION   "WCNSS"
 
-#define hdd_log_rate_limited(rate, level, args...) \
+#define hdd_log_ratelimited(rate, level, args...) \
 		QDF_TRACE_RATE_LIMITED(rate, QDF_MODULE_ID_HDD, level, ## args)
-#define hdd_log_rate_limited_fl(rate, level, format, args...) \
-		hdd_log_rate_limited(rate, level, FL(format), ## args)
-#define hdd_alert_rate_limited(rate, format, args...) \
-		hdd_log_rate_limited_fl(rate, QDF_TRACE_LEVEL_FATAL,\
+#define hdd_log_ratelimited_fl(rate, level, format, args...) \
+		hdd_log_ratelimited(rate, level, FL(format), ## args)
+#define hdd_alert_ratelimited(rate, format, args...) \
+		hdd_log_ratelimited_fl(rate, QDF_TRACE_LEVEL_FATAL,\
 			format, ## args)
-#define hdd_err_rate_limited(rate, format, args...) \
-		hdd_log_rate_limited_fl(rate, QDF_TRACE_LEVEL_ERROR,\
+#define hdd_err_ratelimited(rate, format, args...) \
+		hdd_log_ratelimited_fl(rate, QDF_TRACE_LEVEL_ERROR,\
 			format, ## args)
-#define hdd_warn_rate_limited(rate, format, args...) \
-		hdd_log_rate_limited_fl(rate, QDF_TRACE_LEVEL_WARN,\
+#define hdd_warn_ratelimited(rate, format, args...) \
+		hdd_log_ratelimited_fl(rate, QDF_TRACE_LEVEL_WARN,\
 			format, ## args)
-#define hdd_notice_rate_limited(rate, format, args...) \
-		hdd_log_rate_limited_fl(rate, QDF_TRACE_LEVEL_INFO,\
+#define hdd_notice_ratelimited(rate, format, args...) \
+		hdd_log_ratelimited_fl(rate, QDF_TRACE_LEVEL_INFO,\
 			format, ## args)
-#define hdd_info_rate_limited(rate, format, args...) \
-		hdd_log_rate_limited_fl(rate, QDF_TRACE_LEVEL_INFO,\
+#define hdd_info_ratelimited(rate, format, args...) \
+		hdd_log_ratelimited_fl(rate, QDF_TRACE_LEVEL_INFO,\
 			format, ## args)
-#define hdd_debug_rate_limited(rate, format, args...) \
-		hdd_log_rate_limited_fl(rate, QDF_TRACE_LEVEL_DEBUG,\
+#define hdd_debug_ratelimited(rate, format, args...) \
+		hdd_log_ratelimited_fl(rate, QDF_TRACE_LEVEL_DEBUG,\
 			format, ## args)
 
 #define hdd_log(level, args...) QDF_TRACE(QDF_MODULE_ID_HDD, level, ## args)
@@ -470,6 +473,11 @@ typedef struct hdd_tx_rx_stats_s {
 	__u32    txflow_pause_cnt;
 	__u32    txflow_unpause_cnt;
 	__u32    txflow_timer_cnt;
+
+	/*tx timeout stats*/
+	__u32 tx_timeout_cnt;
+	__u32 cont_txtimeout_cnt;
+	u64 jiffies_last_txtimeout;
 } hdd_tx_rx_stats_t;
 
 #ifdef WLAN_FEATURE_11W
@@ -1394,6 +1402,8 @@ struct hdd_adapter_s {
 	/* random address management for management action frames */
 	spinlock_t random_mac_lock;
 	struct action_frame_random_mac random_mac[MAX_RANDOM_MAC_ADDRS];
+	uint32_t mon_chan;
+	uint32_t mon_bandwidth;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(pAdapter) (&(pAdapter)->sessionCtx.station)
@@ -1747,7 +1757,6 @@ struct hdd_context_s {
 	uint16_t max_num_tdls_sta;
 	/* TDLS peer connected count */
 	uint16_t connected_peer_count;
-	tdls_scan_context_t tdls_scan_ctxt;
 	/* Lock to avoid race condition during TDLS operations */
 	qdf_spinlock_t tdls_ct_spinlock;
 	/*linear mac address table for counting the packets*/
@@ -1921,6 +1930,7 @@ struct hdd_context_s {
 	qdf_work_t sap_pre_cac_work;
 	bool hbw_requested;
 	uint32_t last_nil_scan_bug_report_timestamp;
+	uint32_t ol_enable;
 #ifdef WLAN_FEATURE_NAN_DATAPATH
 	bool nan_datapath_enabled;
 #endif
@@ -1947,6 +1957,8 @@ struct hdd_context_s {
 	unsigned long tdls_source_bitmap;
 	/* tdls source timer to enable/disable TDLS on p2p listen */
 	qdf_mc_timer_t tdls_source_timer;
+	QDF_STATUS (*receive_offload_cb)(hdd_adapter_t *,
+					struct sk_buff *);
 	qdf_atomic_t disable_lro_in_concurrency;
 	qdf_atomic_t disable_lro_in_low_tput;
 	qdf_atomic_t vendor_disable_lro_flag;
@@ -2070,6 +2082,17 @@ QDF_STATUS hdd_set_ibss_power_save_params(hdd_adapter_t *pAdapter);
 QDF_STATUS wlan_hdd_restart_driver(hdd_context_t *pHddCtx);
 void hdd_exchange_version_and_caps(hdd_context_t *pHddCtx);
 int wlan_hdd_validate_context(hdd_context_t *pHddCtx);
+
+/**
+ * hdd_validate_adapter() - Validate the given adapter
+ * @adapter: the adapter to validate
+ *
+ * This function validates the given adapter, and ensures that it is open.
+ *
+ * Return: Errno
+ */
+int hdd_validate_adapter(hdd_adapter_t *adapter);
+
 /**
  * wlan_hdd_validate_context_in_loading() - check the HDD context in loading
  * @hdd_ctx:	HDD context pointer
@@ -2147,17 +2170,14 @@ void hdd_bus_bandwidth_destroy(hdd_context_t *hdd_ctx);
 
 void hdd_bus_bw_compute_timer_start(hdd_context_t *hdd_ctx)
 {
-	return;
 }
 
 void hdd_bus_bw_compute_timer_try_start(hdd_context_t *hdd_ctx)
 {
-	return;
 }
 
 void hdd_bus_bw_compute_timer_stop(hdd_context_t *hdd_ctx)
 {
-	return;
 }
 
 void hdd_bus_bw_compute_timer_try_stop(hdd_context_t *hdd_ctx)
@@ -2642,7 +2662,9 @@ void hdd_chip_pwr_save_fail_detected_cb(void *hdd_ctx,
 				struct chip_pwr_save_fail_detected_params
 				*data);
 
-#if defined(WLAN_FEATURE_FILS_SK) && defined(CFG80211_FILS_SK_OFFLOAD_SUPPORT)
+#if defined(WLAN_FEATURE_FILS_SK) && \
+	(defined(CFG80211_FILS_SK_OFFLOAD_SUPPORT) || \
+		 (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)))
 /**
  * hdd_clear_fils_connection_info: API to clear fils info from roam profile and
  * free allocated memory
@@ -2689,4 +2711,28 @@ void hdd_dp_trace_init(struct hdd_config *config);
 int hdd_set_limit_off_chan_for_tos(hdd_adapter_t *adapter, enum tos tos,
 		bool is_tos_active);
 
+#if defined(WLAN_FEATURE_FILS_SK)
+/**
+ * hdd_update_hlp_info() - Update HLP packet received in FILS (re)assoc rsp
+ * @dev: net device
+ * @roam_fils_params: Fils join rsp params
+ *
+ * This API is used to send the received HLP packet in Assoc rsp(FILS AKM)
+ * to the network layer.
+ *
+ * Return: None
+ */
+void hdd_update_hlp_info(struct net_device *dev, tCsrRoamInfo *roam_info);
+#else
+static inline void hdd_update_hlp_info(struct net_device *dev,
+				       tCsrRoamInfo *roam_info)
+{}
+#endif
+
+/**
+ * hdd_pld_ipa_uc_shutdown_pipes() - Disconnect IPA WDI pipes during PDR
+ *
+ * Return: None
+ */
+void hdd_pld_ipa_uc_shutdown_pipes(void);
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

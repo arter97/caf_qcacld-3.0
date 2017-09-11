@@ -577,6 +577,75 @@ static void lim_deactivate_del_sta(tpAniSirGlobal mac_ctx, uint32_t bss_entry,
 }
 #endif
 
+void lim_deactivate_timers(tpAniSirGlobal mac_ctx)
+{
+	uint32_t n;
+	tLimTimers *lim_timer = &mac_ctx->lim.limTimers;
+
+	lim_deactivate_timers_host_roam(mac_ctx);
+
+	/* Deactivate Periodic Probe channel timers. */
+	tx_timer_deactivate(&lim_timer->gLimPeriodicProbeReqTimer);
+
+	/* Deactivate channel switch timer. */
+	tx_timer_deactivate(&lim_timer->gLimChannelSwitchTimer);
+
+	/* Deactivate addts response timer. */
+	tx_timer_deactivate(&lim_timer->gLimAddtsRspTimer);
+
+	/* Deactivate Join failure timer. */
+	tx_timer_deactivate(&lim_timer->gLimJoinFailureTimer);
+
+	/* Deactivate Periodic Join Probe Request timer. */
+	tx_timer_deactivate(&lim_timer->gLimPeriodicJoinProbeReqTimer);
+
+	/* Deactivate Auth Retry timer. */
+	tx_timer_deactivate
+			(&lim_timer->g_lim_periodic_auth_retry_timer);
+
+	/* Deactivate Association failure timer. */
+	tx_timer_deactivate(&lim_timer->gLimAssocFailureTimer);
+
+	/* Deactivate Open system auth timer. */
+	tx_timer_deactivate(&lim_timer->open_sys_auth_timer);
+
+	/* Deactivate Authentication failure timer. */
+	tx_timer_deactivate(&lim_timer->gLimAuthFailureTimer);
+
+	/* Deactivate wait-for-probe-after-Heartbeat timer. */
+	tx_timer_deactivate(&lim_timer->gLimProbeAfterHBTimer);
+
+	/* Deactivate and delete Quiet timer. */
+	tx_timer_deactivate(&lim_timer->gLimQuietTimer);
+
+	/* Deactivate Quiet BSS timer. */
+	tx_timer_deactivate(&lim_timer->gLimQuietBssTimer);
+
+	/* Deactivate cnf wait timer */
+	for (n = 0; n < (mac_ctx->lim.maxStation + 1); n++)
+		tx_timer_deactivate(&lim_timer->gpLimCnfWaitTimer[n]);
+
+	/* Deactivate any Authentication response timers */
+	lim_delete_pre_auth_list(mac_ctx);
+
+	tx_timer_deactivate(&lim_timer->gLimUpdateOlbcCacheTimer);
+	tx_timer_deactivate(&lim_timer->gLimPreAuthClnupTimer);
+
+	/* Deactivate remain on channel timer */
+	tx_timer_deactivate(&lim_timer->gLimRemainOnChannelTimer);
+
+	tx_timer_deactivate(&lim_timer->gLimDisassocAckTimer);
+
+	tx_timer_deactivate(&lim_timer->gLimDeauthAckTimer);
+
+	tx_timer_deactivate(&lim_timer->
+			gLimP2pSingleShotNoaInsertTimer);
+
+	tx_timer_deactivate(&lim_timer->
+			gLimActiveToPassiveChannelTimer);
+}
+
+
 /**
  * lim_cleanup_mlm() - This function is called to cleanup
  * @mac_ctx: Pointer to Global MAC structure
@@ -600,91 +669,70 @@ void lim_cleanup_mlm(tpAniSirGlobal mac_ctx)
 	if (mac_ctx->lim.gLimTimersCreated == 1) {
 		lim_timer = &mac_ctx->lim.limTimers;
 
+		lim_deactivate_timers(mac_ctx);
+
 		lim_delete_timers_host_roam(mac_ctx);
-		/* Deactivate and delete Periodic Probe channel timers. */
-		tx_timer_deactivate(&lim_timer->gLimPeriodicProbeReqTimer);
+		/* Delete Periodic Probe channel timers. */
 		tx_timer_delete(&lim_timer->gLimPeriodicProbeReqTimer);
 
-		/* Deactivate and delete channel switch timer. */
-		tx_timer_deactivate(&lim_timer->gLimChannelSwitchTimer);
+		/* Delete channel switch timer. */
 		tx_timer_delete(&lim_timer->gLimChannelSwitchTimer);
 
-		/* Deactivate and delete addts response timer. */
-		tx_timer_deactivate(&lim_timer->gLimAddtsRspTimer);
+		/* Delete addts response timer. */
 		tx_timer_delete(&lim_timer->gLimAddtsRspTimer);
 
-		/* Deactivate and delete Join failure timer. */
-		tx_timer_deactivate(&lim_timer->gLimJoinFailureTimer);
+		/* Delete Join failure timer. */
 		tx_timer_delete(&lim_timer->gLimJoinFailureTimer);
 
-		/* Deactivate and delete Periodic Join Probe Request timer. */
-		tx_timer_deactivate(&lim_timer->gLimPeriodicJoinProbeReqTimer);
+		/* Delete Periodic Join Probe Request timer. */
 		tx_timer_delete(&lim_timer->gLimPeriodicJoinProbeReqTimer);
 
-		/* Deactivate and delete Auth Retry timer. */
-		tx_timer_deactivate
-				(&lim_timer->g_lim_periodic_auth_retry_timer);
+		/* Delete Auth Retry timer. */
 		tx_timer_delete(&lim_timer->g_lim_periodic_auth_retry_timer);
 
-		/* Deactivate and delete Association failure timer. */
-		tx_timer_deactivate(&lim_timer->gLimAssocFailureTimer);
+		/* Delete Association failure timer. */
 		tx_timer_delete(&lim_timer->gLimAssocFailureTimer);
 
-		/* Deactivate and delete Authentication failure timer. */
-		tx_timer_deactivate(&lim_timer->gLimAuthFailureTimer);
+		/* Delete Open system auth timer. */
+		tx_timer_delete(&lim_timer->open_sys_auth_timer);
+
+		/* Delete Authentication failure timer. */
 		tx_timer_delete(&lim_timer->gLimAuthFailureTimer);
 
-		/* Deactivate and delete wait-for-probe-after-Heartbeat timer. */
-		tx_timer_deactivate(&lim_timer->gLimProbeAfterHBTimer);
+		/* Delete wait-for-probe-after-Heartbeat timer. */
 		tx_timer_delete(&lim_timer->gLimProbeAfterHBTimer);
 
-		/* Deactivate and delete Quiet timer. */
-		tx_timer_deactivate(&lim_timer->gLimQuietTimer);
+		/* Delete Quiet timer. */
 		tx_timer_delete(&lim_timer->gLimQuietTimer);
 
-		/* Deactivate and delete Quiet BSS timer. */
-		tx_timer_deactivate(&lim_timer->gLimQuietBssTimer);
+		/* Delete Quiet BSS timer. */
 		tx_timer_delete(&lim_timer->gLimQuietBssTimer);
 
-		/* Deactivate and delete cnf wait timer */
+		/* Delete cnf wait timer */
 		for (n = 0; n < (mac_ctx->lim.maxStation + 1); n++) {
-			tx_timer_deactivate(&lim_timer->gpLimCnfWaitTimer[n]);
 			tx_timer_delete(&lim_timer->gpLimCnfWaitTimer[n]);
 		}
 
 		pAuthNode = mac_ctx->lim.gLimPreAuthTimerTable.pTable;
-
-		/* Deactivate any Authentication response timers */
-		lim_delete_pre_auth_list(mac_ctx);
 
 		/* Delete any Auth rsp timers, which might have been started */
 		for (n = 0; n < mac_ctx->lim.gLimPreAuthTimerTable.numEntry;
 				n++)
 			tx_timer_delete(&pAuthNode[n]->timer);
 
-		tx_timer_deactivate(&lim_timer->gLimUpdateOlbcCacheTimer);
 		tx_timer_delete(&lim_timer->gLimUpdateOlbcCacheTimer);
-		tx_timer_deactivate(&lim_timer->gLimPreAuthClnupTimer);
 		tx_timer_delete(&lim_timer->gLimPreAuthClnupTimer);
 
-		/* Deactivate and delete remain on channel timer */
-		tx_timer_deactivate(&lim_timer->gLimRemainOnChannelTimer);
+		/* Delete remain on channel timer */
 		tx_timer_delete(&lim_timer->gLimRemainOnChannelTimer);
 
-
-		tx_timer_deactivate(&lim_timer->gLimDisassocAckTimer);
 		tx_timer_delete(&lim_timer->gLimDisassocAckTimer);
 
-		tx_timer_deactivate(&lim_timer->gLimDeauthAckTimer);
 		tx_timer_delete(&lim_timer->gLimDeauthAckTimer);
 
-		tx_timer_deactivate(&lim_timer->
-				gLimP2pSingleShotNoaInsertTimer);
 		tx_timer_delete(&lim_timer->
 				gLimP2pSingleShotNoaInsertTimer);
 
-		tx_timer_deactivate(&lim_timer->
-				gLimActiveToPassiveChannelTimer);
 		tx_timer_delete(&lim_timer->
 				gLimActiveToPassiveChannelTimer);
 
@@ -4364,6 +4412,12 @@ void lim_update_sta_run_time_ht_switch_chnl_params(tpAniSirGlobal pMac,
 		    (pMac, eHT_SUPPORTED_CHANNEL_WIDTH_SET, psessionEntry))
 		return;
 
+	if (CDS_IS_CHANNEL_24GHZ(psessionEntry->currentOperChannel) &&
+		psessionEntry->force_24ghz_in_ht20) {
+		pe_debug("force_24ghz_in_ht20 is set and channel is 2.4 Ghz");
+		return;
+	}
+
 	if (psessionEntry->ftPEContext.ftPreAuthSession) {
 		pe_err("FT PREAUTH channel change is in progress");
 		return;
@@ -7421,4 +7475,65 @@ bool lim_check_if_vendor_oui_match(tpAniSirGlobal mac_ctx,
 		return true;
 	else
 		return false;
+}
+
+enum rateid lim_get_min_session_txrate(tpPESession session)
+{
+	enum rateid rid = RATEID_DEFAULT;
+	uint8_t min_rate = SIR_MAC_RATE_54, curr_rate, i;
+	tSirMacRateSet *rateset = &session->rateSet;
+
+	if (!session)
+		return rid;
+
+	for (i = 0; i < rateset->numRates; i++) {
+		/* Ignore MSB - set to indicate basic rate */
+		curr_rate = rateset->rate[i] & 0x7F;
+		min_rate =  (curr_rate < min_rate) ? curr_rate : min_rate;
+	}
+	pe_debug("supported min_rate: %0x(%d)", min_rate, min_rate);
+
+	switch (min_rate) {
+	case SIR_MAC_RATE_1:
+		rid = RATEID_1MBPS;
+		break;
+	case SIR_MAC_RATE_2:
+		rid = RATEID_2MBPS;
+		break;
+	case SIR_MAC_RATE_5_5:
+		rid = RATEID_5_5MBPS;
+		break;
+	case SIR_MAC_RATE_11:
+		rid = RATEID_11MBPS;
+		break;
+	case SIR_MAC_RATE_6:
+		rid = RATEID_6MBPS;
+		break;
+	case SIR_MAC_RATE_9:
+		rid = RATEID_9MBPS;
+		break;
+	case SIR_MAC_RATE_12:
+		rid = RATEID_12MBPS;
+		break;
+	case SIR_MAC_RATE_18:
+		rid = RATEID_18MBPS;
+		break;
+	case SIR_MAC_RATE_24:
+		rid = RATEID_24MBPS;
+		break;
+	case SIR_MAC_RATE_36:
+		rid = RATEID_36MBPS;
+		break;
+	case SIR_MAC_RATE_48:
+		rid = RATEID_48MBPS;
+		break;
+	case SIR_MAC_RATE_54:
+		rid = RATEID_54MBPS;
+		break;
+	default:
+		rid = RATEID_DEFAULT;
+		break;
+	}
+
+	return rid;
 }

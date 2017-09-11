@@ -200,7 +200,10 @@ typedef enum {
 #define SIR_BTK_KEY_LEN 32
 #define SIR_KCK_KEY_LEN 16
 #define SIR_KEK_KEY_LEN 16
+#define SIR_KEK_KEY_LEN_FILS 64
 #define SIR_REPLAY_CTR_LEN 8
+#define SIR_PMK_LEN  48
+#define SIR_PMKID_LEN 16
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 #define SIR_UAPSD_BITOFFSET_ACVO     0
 #define SIR_UAPSD_BITOFFSET_ACVI     1
@@ -1291,6 +1294,7 @@ typedef struct sSirSmeJoinReq {
 #endif
 	bool ignore_assoc_disallowed;
 	bool enable_bcast_probe_rsp;
+	bool force_24ghz_in_ht20;
 	tSirBssDescription bssDescription;
 	/*
 	 * WARNING: Pls make bssDescription as last variable in struct
@@ -3185,17 +3189,6 @@ typedef struct {
 #endif /* FEATURE_WLAN_SCAN_PNO */
 
 
-/**
- * struct candidate_chan_info - channel information for candidate
- * @channel_num: channel number.
- * @other_ap_count: other ap count on candidate channel.
- * @max_rssi_on_channel: Max best  rssi on candiate channel
- */
-struct candidate_chan_info {
-	uint8_t    channel_num;
-	uint8_t    ap_count;
-};
-
 /*
  * ALLOWED_ACTION_FRAMES_BITMAP
  *
@@ -3247,6 +3240,30 @@ struct candidate_chan_info {
 
 #define ALLOWED_ACTION_FRAME_MAP_WORDS (SIR_MAC_ACTION_MAX / 32)
 
+#ifndef ANI_SUPPORT_11H
+/*
+ * DROP_SPEC_MGMT_ACTION_FRAME_BITMAP
+ *
+ * Bitmask is based on the below. The frames with 1's
+ * set to their corresponding bit can be dropped in FW.
+ *
+ * ----------------------------------+-----+------+
+ *         Type                      | Bit | Drop |
+ * ----------------------------------+-----+------+
+ * SIR_MAC_ACTION_MEASURE_REQUEST_ID    0     1
+ * SIR_MAC_ACTION_TPC_REQUEST_ID        1     1
+ * ----------------------------------+-----+------+
+ */
+#define DROP_SPEC_MGMT_ACTION_FRAME_BITMAP \
+		((1 << SIR_MAC_ACTION_MEASURE_REQUEST_ID) |\
+		 (1 << SIR_MAC_ACTION_TPC_REQUEST_ID))
+#else
+/*
+ * If 11H support is defined, dont drop the above action category of
+ * spectrum mgmt action frames as host driver is processing them.
+ */
+#define DROP_SPEC_MGMT_ACTION_FRAME_BITMAP 0
+#endif /* ANI_SUPPORT_11H */
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 typedef struct {
@@ -3404,6 +3421,7 @@ typedef struct sSirRoamOffloadScanReq {
 	bool RoamScanOffloadEnabled;
 	struct mawc_params mawc_roam_params;
 	int8_t LookupThreshold;
+	int8_t rssi_thresh_offset_5g;
 	uint8_t delay_before_vdev_stop;
 	uint8_t OpportunisticScanThresholdDiff;
 	uint8_t RoamRescanRssiDiff;
@@ -3457,6 +3475,10 @@ typedef struct sSirRoamOffloadScanReq {
 	enum wmi_dwelltime_adaptive_mode roamscan_adaptive_dwell_mode;
 	tSirAddie assoc_ie;
 	struct lca_disallow_config_params lca_config_params;
+#ifdef WLAN_FEATURE_FILS_SK
+	bool is_fils_connection;
+	struct roam_fils_params roam_fils_params;
+#endif
 } tSirRoamOffloadScanReq, *tpSirRoamOffloadScanReq;
 
 typedef struct sSirRoamOffloadScanRsp {
@@ -3584,9 +3606,10 @@ typedef struct {
 * WMA_GTK_OFFLOAD_REQ
 *--------------------------------------------------------------------------*/
 typedef struct {
-	uint32_t ulFlags;       /* optional flags */
-	uint8_t aKCK[16];       /* Key confirmation key */
-	uint8_t aKEK[16];       /* key encryption key */
+	uint32_t ulFlags;                    /* optional flags */
+	uint8_t aKCK[SIR_KCK_KEY_LEN];       /* Key confirmation key */
+	uint8_t aKEK[SIR_KEK_KEY_LEN_FILS];       /* key encryption key */
+	uint32_t kek_len;
 	uint64_t ullKeyReplayCounter;   /* replay counter */
 	struct qdf_mac_addr bssid;
 } tSirGtkOffloadParams, *tpSirGtkOffloadParams;
@@ -4720,13 +4743,23 @@ typedef struct sSirSmeRoamOffloadSynchInd {
 	uint8_t roamReason;
 	uint32_t chan_freq;
 	uint8_t kck[SIR_KCK_KEY_LEN];
-	uint8_t kek[SIR_KEK_KEY_LEN];
+	uint32_t kek_len;
+	uint8_t kek[SIR_KEK_KEY_LEN_FILS];
+	uint32_t   pmk_len;
+	uint8_t    pmk[SIR_PMK_LEN];
+	uint8_t    pmkid[SIR_PMKID_LEN];
+	bool update_erp_next_seq_num;
+	uint16_t next_erp_seq_num;
 	uint8_t replay_ctr[SIR_REPLAY_CTR_LEN];
 	void *add_bss_params;
 	tpSirSmeJoinRsp join_rsp;
 	uint16_t aid;
 	struct sir_hw_mode_trans_ind hw_mode_trans_ind;
 	uint8_t nss;
+	struct qdf_mac_addr dst_mac;
+	struct qdf_mac_addr src_mac;
+	uint16_t hlp_data_len;
+	uint8_t hlp_data[FILS_MAX_HLP_DATA_LEN];
 } roam_offload_synch_ind;
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
@@ -7966,6 +7999,7 @@ struct sir_del_all_tdls_peers {
 	uint16_t msg_type;
 	uint16_t msg_len;
 	struct qdf_mac_addr bssid;
+	bool disable_tdls_state;
 };
 
 /**

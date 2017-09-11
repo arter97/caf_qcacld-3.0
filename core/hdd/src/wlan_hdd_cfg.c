@@ -479,6 +479,13 @@ struct reg_table_entry g_registry_table[] = {
 		     CFG_CHANNEL_BONDING_MODE_MIN,
 		     CFG_CHANNEL_BONDING_MODE_MAX),
 
+	REG_VARIABLE(CFG_OVERRIDE_HT40_20_24GHZ_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, override_ht20_40_24g,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_OVERRIDE_HT40_20_24GHZ_DEFAULT,
+		     CFG_OVERRIDE_HT40_20_24GHZ_MIN,
+		     CFG_OVERRIDE_HT40_20_24GHZ_MAX),
+
 	REG_VARIABLE(CFG_CHANNEL_BONDING_MODE_5GHZ_NAME, WLAN_PARAM_Integer,
 		     struct hdd_config, nChannelBondingMode5GHz,
 		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK,
@@ -1441,6 +1448,14 @@ struct reg_table_entry g_registry_table[] = {
 			     CFG_NEIGHBOR_LOOKUP_RSSI_THRESHOLD_MAX,
 			     cb_notify_set_neighbor_lookup_rssi_threshold, 0),
 
+	REG_VARIABLE(CFG_5G_RSSI_THRESHOLD_OFFSET_NAME,
+		     WLAN_PARAM_SignedInteger, struct hdd_config,
+		     rssi_thresh_offset_5g,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_5G_RSSI_THRESHOLD_OFFSET_DEFAULT,
+		     CFG_5G_RSSI_THRESHOLD_OFFSET_MIN,
+		     CFG_5G_RSSI_THRESHOLD_OFFSET_MAX),
+
 	REG_DYNAMIC_VARIABLE(CFG_OPPORTUNISTIC_SCAN_THRESHOLD_DIFF_NAME,
 			     WLAN_PARAM_Integer,
 			     struct hdd_config, nOpportunisticThresholdDiff,
@@ -2138,6 +2153,13 @@ struct reg_table_entry g_registry_table[] = {
 		     CFG_VHT_ENABLE_2x2_CAP_FEATURE_MIN,
 		     CFG_VHT_ENABLE_2x2_CAP_FEATURE_MAX),
 
+	REG_VARIABLE(CFG_DISABLE_HIGH_HT_RX_MCS_2x2, WLAN_PARAM_Integer,
+		     struct hdd_config, disable_high_ht_mcs_2x2,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_DISABLE_HIGH_HT_RX_MCS_2x2_DEFAULT,
+		     CFG_DISABLE_HIGH_HT_RX_MCS_2x2_MIN,
+		     CFG_DISABLE_HIGH_HT_RX_MCS_2x2_MAX),
+
 	REG_VARIABLE(CFG_VDEV_TYPE_NSS_2G, WLAN_PARAM_Integer,
 		     struct hdd_config, vdev_type_nss_2g,
 		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -2786,6 +2808,13 @@ struct reg_table_entry g_registry_table[] = {
 		     CFG_IPA_LOW_BANDWIDTH_MBPS_DEFAULT,
 		     CFG_IPA_LOW_BANDWIDTH_MBPS_MIN,
 		     CFG_IPA_LOW_BANDWIDTH_MBPS_MAX),
+
+	REG_VARIABLE(CFG_IPA_MCC_TX_DESC_SIZE, WLAN_PARAM_Integer,
+		     struct hdd_config, IpaMccTxDescSize,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_IPA_MCC_TX_DESC_SIZE_DEFAULT,
+		     CFG_IPA_MCC_TX_DESC_SIZE_MIN,
+		     CFG_IPA_MCC_TX_DESC_SIZE_MAX),
 #endif
 
 	REG_VARIABLE(CFG_VHT_AMPDU_LEN_EXPONENT_NAME, WLAN_PARAM_Integer,
@@ -3653,6 +3682,13 @@ struct reg_table_entry g_registry_table[] = {
 		     CFG_LRO_ENABLED_DEFAULT,
 		     CFG_LRO_ENABLED_MIN,
 		     CFG_LRO_ENABLED_MAX),
+
+	REG_VARIABLE(CFG_GRO_ENABLED_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, gro_enable,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_GRO_ENABLED_DEFAULT,
+		     CFG_GRO_ENABLED_MIN,
+		     CFG_GRO_ENABLED_MAX),
 
 	REG_VARIABLE(CFG_BPF_PACKET_FILTER_OFFLOAD, WLAN_PARAM_Integer,
 		     struct hdd_config, bpf_packet_filter_enable,
@@ -4911,6 +4947,70 @@ struct reg_table_entry g_registry_table[] = {
 		     CFG_ENABLE_11D_IN_WORLD_MODE_DEFAULT,
 		     CFG_ENABLE_11D_IN_WORLD_MODE_MIN,
 		     CFG_ENABLE_11D_IN_WORLD_MODE_MAX),
+
+	REG_VARIABLE(CFG_RSSI_WEIGHTAGE_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, rssi_weightage,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_RSSI_WEIGHTAGE_DEFAULT,
+		CFG_RSSI_WEIGHTAGE_MIN,
+		CFG_RSSI_WEIGHTAGE_MAX),
+
+	REG_VARIABLE(CFG_HT_CAPABILITY_WEIGHTAGE_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, ht_caps_weightage,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_HT_CAPABILITY_WEIGHTAGE_DEFAULT,
+		CFG_HT_CAPABILITY_WEIGHTAGE_MIN,
+		CFG_HT_CAPABILITY_WEIGHTAGE_MAX),
+
+	REG_VARIABLE(CFG_VHT_CAPABILITY_WEIGHTAGE_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, vht_caps_weightage,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_VHT_CAPABILITY_WEIGHTAGE_DEFAULT,
+		CFG_VHT_CAPABILITY_WEIGHTAGE_MIN,
+		CFG_VHT_CAPABILITY_WEIGHTAGE_MAX),
+
+	REG_VARIABLE(CFG_CHAN_WIDTH_WEIGHTAGE_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, chan_width_weightage,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_CHAN_WIDTH_WEIGHTAGE_DEFAULT,
+		CFG_CHAN_WIDTH_WEIGHTAGE_MIN,
+		CFG_CHAN_WIDTH_WEIGHTAGE_MAX),
+
+	REG_VARIABLE(CFG_CHAN_BAND_WEIGHTAGE_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, chan_band_weightage,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_CHAN_BAND_WEIGHTAGE_DEFAULT,
+		CFG_CHAN_BAND_WEIGHTAGE_MIN,
+		CFG_CHAN_BAND_WEIGHTAGE_MAX),
+
+	REG_VARIABLE(CFG_NSS_WEIGHTAGE_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, nss_weightage,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_NSS_WEIGHTAGE_DEFAULT,
+		CFG_NSS_WEIGHTAGE_MIN,
+		CFG_NSS_WEIGHTAGE_MAX),
+
+	REG_VARIABLE(CFG_BEAMFORMING_CAP_WEIGHTAGE_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, beamforming_cap_weightage,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_BEAMFORMING_CAP_WEIGHTAGE_DEFAULT,
+		CFG_BEAMFORMING_CAP_WEIGHTAGE_MIN,
+		CFG_BEAMFORMING_CAP_WEIGHTAGE_MAX),
+
+	REG_VARIABLE(CFG_PCL_WEIGHT_WEIGHTAGE_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, pcl_weightage,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_PCL_WEIGHT_DEFAULT,
+		CFG_PCL_WEIGHT_MIN,
+		CFG_PCL_WEIGHT_MAX),
+
+	REG_VARIABLE(CFG_CHANNEL_CONGESTION_WEIGHTAGE_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, channel_congestion_weightage,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_CHANNEL_CONGESTION_WEIGHTAGE_DEFAULT,
+		CFG_CHANNEL_CONGESTION_WEIGHTAGE_MIN,
+		CFG_CHANNEL_CONGESTION_WEIGHTAGE_MAX),
+
 };
 
 /**
@@ -5850,6 +5950,9 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
 				pHddCtx->config->sap_p2p_11ac_override);
 	hdd_debug("Name = [ChannelBondingMode] Value = [%u]",
 		  pHddCtx->config->nChannelBondingMode24GHz);
+	hdd_debug("Name = [%s] Value = [%u] ",
+		  CFG_OVERRIDE_HT40_20_24GHZ_NAME,
+		  pHddCtx->config->override_ht20_40_24g);
 	hdd_debug("Name = [ChannelBondingMode] Value = [%u]",
 		  pHddCtx->config->nChannelBondingMode5GHz);
 	hdd_debug("Name = [dot11Mode] Value = [%u]",
@@ -5985,6 +6088,9 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
 
 	hdd_debug("Name = [nNeighborLookupRssiThreshold] Value = [%u] ",
 		  pHddCtx->config->nNeighborLookupRssiThreshold);
+	hdd_debug("Name = [%s] Value = [%d] ",
+		  CFG_5G_RSSI_THRESHOLD_OFFSET_NAME,
+		  pHddCtx->config->rssi_thresh_offset_5g);
 	hdd_debug("Name = [delay_before_vdev_stop] Value = [%u] ",
 		  pHddCtx->config->delay_before_vdev_stop);
 	hdd_debug("Name = [nOpportunisticThresholdDiff] Value = [%u] ",
@@ -6127,6 +6233,8 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
 		  pHddCtx->config->IpaMediumBandwidthMbps);
 	hdd_debug("Name = [IpaLowBandwidthMbps] Value = [%u] ",
 		  pHddCtx->config->IpaLowBandwidthMbps);
+	hdd_debug("Name = [IpaMccTxDescSize] Value = [%u] ",
+		  pHddCtx->config->IpaMccTxDescSize);
 #endif
 	hdd_debug("Name = [gEnableOverLapCh] Value = [%u] ",
 		  pHddCtx->config->gEnableOverLapCh);
@@ -6567,6 +6675,36 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
 	hdd_debug("Name = [%s] value = [%u]",
 		CFG_DTIM_1CHRX_ENABLE_NAME,
 		pHddCtx->config->enable_dtim_1chrx);
+	hdd_debug("Name = [%s] value = [%u]",
+		CFG_RSSI_WEIGHTAGE_NAME,
+		pHddCtx->config->rssi_weightage);
+	hdd_debug("Name = [%s] value = [%u]",
+		CFG_HT_CAPABILITY_WEIGHTAGE_NAME,
+		pHddCtx->config->ht_caps_weightage);
+	hdd_debug("Name = [%s] value = [%u]",
+		CFG_VHT_CAPABILITY_WEIGHTAGE_NAME,
+		pHddCtx->config->vht_caps_weightage);
+	hdd_debug("Name = [%s] value = [%u]",
+		CFG_CHAN_WIDTH_WEIGHTAGE_NAME,
+		pHddCtx->config->chan_width_weightage);
+	hdd_debug("Name = [%s] value = [%u]",
+		CFG_CHAN_BAND_WEIGHTAGE_NAME,
+		pHddCtx->config->chan_band_weightage);
+	hdd_debug("Name = [%s] value = [%u]",
+		CFG_NSS_WEIGHTAGE_NAME,
+		pHddCtx->config->nss_weightage);
+	hdd_debug("Name = [%s] value = [%u]",
+		CFG_BEAMFORMING_CAP_WEIGHTAGE_NAME,
+		pHddCtx->config->beamforming_cap_weightage);
+	hdd_debug("Name = [%s] value = [%u]",
+		CFG_PCL_WEIGHT_WEIGHTAGE_NAME,
+		pHddCtx->config->pcl_weightage);
+	hdd_debug("Name = [%s] value = [%u]",
+		CFG_CHANNEL_CONGESTION_WEIGHTAGE_NAME,
+		pHddCtx->config->channel_congestion_weightage);
+	hdd_debug("Name = [%s] value = [%u]",
+		CFG_DOT11P_MODE_NAME,
+		pHddCtx->config->dot11p_mode);
 }
 
 /**
@@ -8013,6 +8151,8 @@ QDF_STATUS hdd_set_sme_config(hdd_context_t *pHddCtx)
 	}
 	smeConfig->csrConfig.neighborRoamConfig.nNeighborLookupRssiThreshold =
 		pConfig->nNeighborLookupRssiThreshold;
+	smeConfig->csrConfig.neighborRoamConfig.rssi_thresh_offset_5g =
+		pConfig->rssi_thresh_offset_5g;
 	smeConfig->csrConfig.neighborRoamConfig.delay_before_vdev_stop =
 		pConfig->delay_before_vdev_stop;
 	smeConfig->csrConfig.neighborRoamConfig.nOpportunisticThresholdDiff =
@@ -8071,6 +8211,8 @@ QDF_STATUS hdd_set_sme_config(hdd_context_t *pHddCtx)
 
 	smeConfig->csrConfig.enable_tx_ldpc = pConfig->enable_tx_ldpc;
 	smeConfig->csrConfig.enable_rx_ldpc = pConfig->enable_rx_ldpc;
+	smeConfig->csrConfig.disable_high_ht_mcs_2x2 =
+					pConfig->disable_high_ht_mcs_2x2;
 	smeConfig->csrConfig.rx_ldpc_support_for_2g =
 					pConfig->rx_ldpc_support_for_2g;
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
@@ -8239,6 +8381,27 @@ QDF_STATUS hdd_set_sme_config(hdd_context_t *pHddCtx)
 			pHddCtx->config->num_11b_tx_chains;
 	smeConfig->csrConfig.num_11ag_tx_chains =
 			pHddCtx->config->num_11ag_tx_chains;
+
+	smeConfig->csrConfig.best_candidate_weight_config.rssi_weightage =
+		pHddCtx->config->rssi_weightage;
+	smeConfig->csrConfig.best_candidate_weight_config.ht_caps_weightage =
+		pHddCtx->config->ht_caps_weightage;
+	smeConfig->csrConfig.best_candidate_weight_config.vht_caps_weightage =
+		pHddCtx->config->vht_caps_weightage;
+	smeConfig->csrConfig.best_candidate_weight_config.chan_width_weightage =
+		pHddCtx->config->chan_width_weightage;
+	smeConfig->csrConfig.best_candidate_weight_config.chan_band_weightage =
+		pHddCtx->config->chan_band_weightage;
+	smeConfig->csrConfig.best_candidate_weight_config.nss_weightage =
+		pHddCtx->config->nss_weightage;
+	smeConfig->csrConfig.best_candidate_weight_config.
+		beamforming_cap_weightage =
+		pHddCtx->config->beamforming_cap_weightage;
+	smeConfig->csrConfig.best_candidate_weight_config.pcl_weightage =
+		pHddCtx->config->pcl_weightage;
+	smeConfig->csrConfig.best_candidate_weight_config.
+		channel_congestion_weightage =
+		pHddCtx->config->channel_congestion_weightage;
 
 	status = sme_update_config(pHddCtx->hHal, smeConfig);
 	if (!QDF_IS_STATUS_SUCCESS(status))
