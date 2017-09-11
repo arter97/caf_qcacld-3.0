@@ -12251,10 +12251,17 @@ static int __wlan_hdd_change_station(struct wiphy *wiphy,
 			StaParams.supported_oper_classes_len =
 				params->supported_oper_classes_len;
 
+			if (params->ext_capab_len >
+			    sizeof(StaParams.extn_capability)) {
+				hdd_debug("received extn capabilities:%d, resetting it to max supported",
+					  params->ext_capab_len);
+				params->ext_capab_len =
+					sizeof(StaParams.extn_capability);
+			}
 			if (0 != params->ext_capab_len)
 				qdf_mem_copy(StaParams.extn_capability,
 					     params->ext_capab,
-					     sizeof(StaParams.extn_capability));
+					     params->ext_capab_len);
 
 			if (NULL != params->ht_capa) {
 				StaParams.htcap_present = 1;
@@ -16297,6 +16304,13 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 						pAdapter->aStaInfo[i].
 							macAddrSTA.bytes,
 						QDF_MAC_ADDR_SIZE);
+					if (hdd_ipa_uc_is_enabled(pHddCtx)) {
+						hdd_ipa_wlan_evt(pAdapter,
+						    pAdapter->aStaInfo[i].
+						    ucSTAId,
+						    HDD_IPA_CLIENT_DISCONNECT,
+						    mac);
+					}
 					hdd_debug("Delete STA with MAC::"
 						  MAC_ADDRESS_STR,
 					       MAC_ADDR_ARRAY(mac));
@@ -16335,6 +16349,11 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 					  MAC_ADDRESS_STR,
 				       MAC_ADDR_ARRAY(mac));
 				return -ENOENT;
+			}
+
+			if (hdd_ipa_uc_is_enabled(pHddCtx)) {
+				hdd_ipa_wlan_evt(pAdapter, staId,
+					HDD_IPA_CLIENT_DISCONNECT, mac);
 			}
 
 			if (pAdapter->aStaInfo[staId].isDeauthInProgress ==

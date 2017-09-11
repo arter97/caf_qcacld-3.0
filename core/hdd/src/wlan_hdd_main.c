@@ -2004,6 +2004,12 @@ static int __hdd_open(struct net_device *dev)
 	MTRACE(qdf_trace(QDF_MODULE_ID_HDD, TRACE_CODE_HDD_OPEN_REQUEST,
 		adapter->sessionId, adapter->device_mode));
 
+	/* Nothing to be done if device is unloading */
+	if (cds_is_driver_unloading()) {
+		hdd_err("Driver is unloading can not open the hdd");
+		return -EBUSY;
+	}
+
 	mutex_lock(&hdd_init_deinit_lock);
 
 	/*
@@ -6212,6 +6218,11 @@ static void hdd_bus_bw_work_handler(struct work_struct *work)
 	hdd_ipa_uc_stat_query(hdd_ctx, &ipa_tx_packets, &ipa_rx_packets);
 	tx_packets += (uint64_t)ipa_tx_packets;
 	rx_packets += (uint64_t)ipa_rx_packets;
+
+	if (adapter) {
+		adapter->stats.tx_packets += ipa_tx_packets;
+		adapter->stats.rx_packets += ipa_rx_packets;
+	}
 
 	if (!connected) {
 		hdd_err("bus bandwidth timer running in disconnected state");
@@ -11159,14 +11170,14 @@ static int __con_mode_handler(const char *kmessage, struct kernel_param *kp,
 		goto reset_flags;
 	}
 
-	/* Cleanup present mode before switching to new mode */
-	hdd_cleanup_present_mode(hdd_ctx, curr_mode);
-
 	ret = hdd_wlan_stop_modules(hdd_ctx, true);
 	if (ret) {
 		hdd_err("Stop wlan modules failed");
 		goto reset_flags;
 	}
+
+	/* Cleanup present mode before switching to new mode */
+	hdd_cleanup_present_mode(hdd_ctx, curr_mode);
 
 	hdd_set_conparam(con_mode);
 

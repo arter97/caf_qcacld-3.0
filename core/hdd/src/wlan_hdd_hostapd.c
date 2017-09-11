@@ -1796,8 +1796,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 			return QDF_STATUS_E_FAILURE;
 		}
 #ifdef IPA_OFFLOAD
-		if (!cds_is_driver_recovering() &&
-		    hdd_ipa_is_enabled(pHddCtx)) {
+		if (hdd_ipa_is_enabled(pHddCtx)) {
 			status = hdd_ipa_wlan_evt(pHostapdAdapter, staId,
 					HDD_IPA_CLIENT_DISCONNECT,
 					pSapEvent->sapevt.
@@ -6535,12 +6534,13 @@ static void wlan_hdd_add_hostapd_conf_vsie(hdd_adapter_t *pHostapdAdapter,
 		elem_id = ptr[0];
 		elem_len = ptr[1];
 		left -= 2;
-		if (elem_len > left || elem_len < WPS_OUI_TYPE_SIZE) {
+		if (elem_len > left) {
 			hdd_err("**Invalid IEs eid: %d elem_len: %d left: %d**",
 				elem_id, elem_len, left);
 			return;
 		}
-		if (IE_EID_VENDOR == elem_id) {
+		if (IE_EID_VENDOR == elem_id &&
+				(elem_len >= WPS_OUI_TYPE_SIZE)) {
 			/* skipping the VSIE's which we don't want to include or
 			 * it will be included by existing code
 			 */
