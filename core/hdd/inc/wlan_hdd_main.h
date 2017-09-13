@@ -1397,6 +1397,16 @@ struct hdd_nud_stats_context {
 	struct completion response_event;
 };
 
+/**
+ * struct sta_ap_intf_check_work_ctx - sta_ap_intf_check_work
+ * related info
+ * @adapter: adaptor of the interface to which SAP to do SCC
+ *         with
+ */
+struct sta_ap_intf_check_work_ctx {
+	hdd_adapter_t *adapter;
+};
+
 /** Adapter structure definition */
 struct hdd_context_s {
 	/** Global CDS context  */
@@ -1680,6 +1690,7 @@ struct hdd_context_s {
 	int user_configured_pkt_filter_rules;
 	struct hdd_nud_stats_context nud_stats_context;
 	uint32_t track_arp_ip;
+	struct sta_ap_intf_check_work_ctx *sta_ap_intf_check_work_info;
 };
 
 /*---------------------------------------------------------------------------

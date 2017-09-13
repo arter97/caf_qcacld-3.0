@@ -3924,6 +3924,11 @@ QDF_STATUS hdd_stop_all_adapters(hdd_context_t *hdd_ctx)
 	ENTER();
 
 	cds_flush_work(&hdd_ctx->sap_pre_cac_work);
+	if (hdd_ctx->sta_ap_intf_check_work_info) {
+		cds_flush_work(&hdd_ctx->sta_ap_intf_check_work);
+		qdf_mem_free(hdd_ctx->sta_ap_intf_check_work_info);
+		hdd_ctx->sta_ap_intf_check_work_info = NULL;
+	}
 
 	status = hdd_get_front_adapter(hdd_ctx, &adapterNode);
 
@@ -3948,6 +3953,11 @@ QDF_STATUS hdd_reset_all_adapters(hdd_context_t *hdd_ctx)
 	ENTER();
 
 	cds_flush_work(&hdd_ctx->sap_pre_cac_work);
+	if (hdd_ctx->sta_ap_intf_check_work_info) {
+		cds_flush_work(&hdd_ctx->sta_ap_intf_check_work);
+		qdf_mem_free(hdd_ctx->sta_ap_intf_check_work_info);
+		hdd_ctx->sta_ap_intf_check_work_info = NULL;
+	}
 
 	status = hdd_get_front_adapter(hdd_ctx, &adapterNode);
 
@@ -6654,6 +6664,9 @@ void hdd_ch_avoid_cb(void *hdd_context, void *indi_param)
 		return;
 	}
 
+	cds_save_wlan_unsafe_channels(hdd_ctxt->unsafe_channel_list,
+			hdd_ctxt->unsafe_channel_count);
+
 	for (channel_loop = 0;
 	     channel_loop < hdd_ctxt->unsafe_channel_count; channel_loop++) {
 		hdd_notice("channel %d is not safe ",
@@ -8064,6 +8077,10 @@ static int hdd_pre_enable_configure(hdd_context_t *hdd_ctx)
 
 	hdd_init_channel_avoidance(hdd_ctx);
 
+	/* update enable sap mandatory chan list */
+	cds_enable_disable_sap_mandatory_chan_list(
+			hdd_ctx->config->enable_sap_mandatory_chan_list);
+
 out:
 	return ret;
 }
@@ -8384,7 +8401,7 @@ int hdd_configure_cds(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter)
 	if (ret)
 		goto cds_disable;
 
-	sme_cbacks.sme_get_valid_channels = sme_get_cfg_valid_channels;
+	sme_cbacks.sme_get_valid_channels = sme_cfg_get_str;
 	sme_cbacks.sme_get_nss_for_vdev = sme_get_vdev_type_nss;
 	status = cds_init_policy_mgr(&sme_cbacks);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
@@ -8415,7 +8432,6 @@ hdd_features_deinit:
 	wlan_hdd_cfg80211_deregister_frames(adapter);
 cds_disable:
 	cds_disable(hdd_ctx->pcds_context);
-
 out:
 	return -EINVAL;
 }

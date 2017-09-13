@@ -1255,8 +1255,8 @@ int wlan_hdd_sap_cfg_dfs_override(hdd_adapter_t *adapter)
  * Return: None
  */
 
-static void wlan_hdd_set_acs_ch_range(tsap_Config_t *sap_cfg, bool ht_enabled,
-							bool vht_enabled)
+static void wlan_hdd_set_acs_ch_range(tsap_Config_t *sap_cfg,
+			bool ht_enabled, bool vht_enabled)
 {
 	int i;
 	if (sap_cfg->acs_cfg.hw_mode == QCA_ACS_MODE_IEEE80211B) {
@@ -1403,7 +1403,6 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_ACS_MAX + 1];
 	bool ht_enabled, ht40_enabled, vht_enabled;
 	uint8_t ch_width;
-	uint8_t weight_list[QDF_MAX_NUM_CHAN];
 
 	/* ***Note*** Donot set SME config related to ACS operation here because
 	 * ACS operation is not synchronouse and ACS for Second AP may come when
@@ -1548,9 +1547,10 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 
 	/* consult policy manager to get PCL */
 	status = cds_get_pcl(CDS_SAP_MODE,
-				sap_config->acs_cfg.pcl_channels,
-				&sap_config->acs_cfg.pcl_ch_count,
-				weight_list, QDF_ARRAY_SIZE(weight_list));
+			sap_config->acs_cfg.pcl_channels,
+			&sap_config->acs_cfg.pcl_ch_count,
+			sap_config->acs_cfg.weight_list,
+			QDF_ARRAY_SIZE(sap_config->acs_cfg.weight_list));
 	if (QDF_STATUS_SUCCESS != status)
 		hdd_err("Get PCL failed");
 
@@ -1568,7 +1568,8 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 			sap_config->acs_cfg.ch_width = eHT_CHANNEL_WIDTH_40MHZ;
 	}
 
-	wlan_hdd_set_acs_ch_range(sap_config, ht_enabled, vht_enabled);
+	wlan_hdd_set_acs_ch_range(sap_config,
+			ht_enabled, vht_enabled);
 
 	hdd_notice("ACS Config for wlan%d: HW_MODE: %d ACS_BW: %d HT: %d VHT: %d START_CH: %d END_CH: %d",
 		adapter->dev->ifindex, sap_config->acs_cfg.hw_mode,
@@ -12304,12 +12305,13 @@ static bool wlan_hdd_handle_sap_sta_dfs_conc(hdd_adapter_t *adapter,
 	}
 
 	/*
-	 * If channel is 0 or DFS then better to call pcl and find out the
-	 * best channel. If channel is non-dfs 5 GHz then better move SAP
-	 * to STA's channel to make scc, so we have room for 3port MCC
-	 * scenario.
+	 * If channel is 0 or DFS or LTE unsafe then better to call pcl and
+	 * find out the best channel. If channel is non-dfs 5 GHz then
+	 * better move SAP to STA's channel to make scc, so we have room
+	 * for 3port MCC scenario.
 	 */
-	if ((0 == channel) || CDS_IS_DFS_CH(channel))
+	if ((0 == channel) || CDS_IS_DFS_CH(channel) ||
+		!cds_is_safe_channel(channel))
 		channel = cds_get_nondfs_preferred_channel(CDS_SAP_MODE,
 								true);
 
@@ -12317,7 +12319,7 @@ static bool wlan_hdd_handle_sap_sta_dfs_conc(hdd_adapter_t *adapter,
 	qdf_event_reset(&hostapd_state->qdf_event);
 	status = wlansap_set_channel_change_with_csa(
 			WLAN_HDD_GET_SAP_CTX_PTR(ap_adapter), channel,
-			hdd_ap_ctx->sapConfig.ch_width_orig);
+			hdd_ap_ctx->sapConfig.ch_width_orig, false);
 
 	if (QDF_STATUS_SUCCESS != status) {
 		hdd_err("Set channel with CSA IE failed, can't allow STA");

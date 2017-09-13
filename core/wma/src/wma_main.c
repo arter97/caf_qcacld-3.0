@@ -3403,6 +3403,19 @@ QDF_STATUS wma_wmi_service_close(void *cds_ctx)
 			qdf_mem_free(wma_handle->interfaces[i].stats_rsp);
 			wma_handle->interfaces[i].stats_rsp = NULL;
 		}
+
+		if (wma_handle->interfaces[i].psnr_req) {
+			qdf_mem_free(wma_handle->
+				     interfaces[i].psnr_req);
+			wma_handle->interfaces[i].psnr_req = NULL;
+		}
+
+		if (wma_handle->interfaces[i].rcpi_req) {
+			qdf_mem_free(wma_handle->
+				     interfaces[i].rcpi_req);
+			wma_handle->interfaces[i].rcpi_req = NULL;
+		}
+
 	}
 
 	qdf_mem_free(wma_handle->interfaces);
@@ -7312,7 +7325,8 @@ QDF_STATUS wma_send_pdev_set_pcl_cmd(tp_wma_handle wma_handle,
 	}
 
 	msg->saved_num_chan = wma_handle->saved_chan.num_channels;
-	status = cds_get_valid_chan_weights((struct sir_pcl_chan_weights *)msg);
+	status = cds_get_valid_chan_weights((struct sir_pcl_chan_weights *)msg,
+					CDS_STA_MODE);
 
 	for (i = 0; i < msg->saved_num_chan; i++) {
 		msg->weighed_valid_list[i] =
