@@ -63,6 +63,8 @@ static const struct nla_policy wlan_hdd_extscan_config_policy
 				.type = NLA_U32},
 	[QCA_WLAN_VENDOR_ATTR_EXTSCAN_GET_VALID_CHANNELS_CONFIG_PARAM_WIFI_BAND] = {
 				.type = NLA_U32},
+	[QCA_WLAN_VENDOR_ATTR_EXTSCAN_GET_VALID_CHANNELS_CONFIG_PARAM_MAX_CHANNELS] = {
+				.type = NLA_U32 },
 	[QCA_WLAN_VENDOR_ATTR_EXTSCAN_CHANNEL_SPEC_CHANNEL] = {.type = NLA_U32},
 	[QCA_WLAN_VENDOR_ATTR_EXTSCAN_CHANNEL_SPEC_DWELL_TIME] = {
 				.type = NLA_U32},
@@ -175,6 +177,9 @@ wlan_hdd_pno_config_policy[QCA_WLAN_VENDOR_ATTR_PNO_MAX + 1] = {
 		.type = NLA_U32
 	},
 	[QCA_WLAN_VENDOR_ATTR_EPNO_BAND5GHZ_BONUS] = {
+		.type = NLA_U32
+	},
+	[QCA_WLAN_VENDOR_ATTR_PNO_CONFIG_REQUEST_ID] = {
 		.type = NLA_U32
 	},
 };
@@ -1665,14 +1670,14 @@ static int __wlan_hdd_cfg80211_extscan_get_capabilities(struct wiphy *wiphy,
 	}
 
 	/* Parse and fetch request Id */
-	if (!tb[QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_REQUEST_ID]) {
+	if (!tb[QCA_WLAN_VENDOR_ATTR_PNO_CONFIG_REQUEST_ID]) {
 		hdd_err("attr request id failed");
 		goto fail;
 	}
 
 	pReqMsg->requestId =
 		nla_get_u32(tb
-		 [QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_REQUEST_ID]);
+		 [QCA_WLAN_VENDOR_ATTR_PNO_CONFIG_REQUEST_ID]);
 	pReqMsg->sessionId = pAdapter->sessionId;
 	hdd_debug("Req Id %d Session Id %d",
 		pReqMsg->requestId, pReqMsg->sessionId);

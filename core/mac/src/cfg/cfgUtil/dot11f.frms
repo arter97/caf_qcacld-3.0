@@ -2999,10 +2999,8 @@ MULTIIE P2PDisAssoc ( EID_VENDOR_SPECIFIC ) OUI( 0x50, 0x6F, 0x9A, 0x09 )
    MANDATORYTLV MinorReasonCode;
 }
 
-IE vendor_vht_ie (EID_VENDOR_SPECIFIC) OUI (0x00, 0x90, 0x4c)
+IE vendor_vht_ie (EID_VENDOR_SPECIFIC) OUI (0x00, 0x90, 0x4c, 0x04, 0x08)
 {
-   type, 1;
-   sub_type, 1;
    OPTIE IE VHTCaps;
    OPTIE IE VHTOperation;
 }

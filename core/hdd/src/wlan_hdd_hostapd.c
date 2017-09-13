@@ -1796,8 +1796,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 			return QDF_STATUS_E_FAILURE;
 		}
 #ifdef IPA_OFFLOAD
-		if (!cds_is_driver_recovering() &&
-		    hdd_ipa_is_enabled(pHddCtx)) {
+		if (hdd_ipa_is_enabled(pHddCtx)) {
 			status = hdd_ipa_wlan_evt(pHostapdAdapter, staId,
 					HDD_IPA_CLIENT_DISCONNECT,
 					pSapEvent->sapevt.
@@ -1858,6 +1857,11 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 		wlan_hdd_auto_shutdown_enable(pHddCtx, true);
 #endif
 
+		cds_host_diag_log_work(&pHddCtx->sap_wake_lock,
+				       HDD_SAP_WAKE_LOCK_DURATION,
+				       WIFI_POWER_EVENT_WAKELOCK_SAP);
+		qdf_wake_lock_timeout_acquire(&pHddCtx->sap_wake_lock,
+			 HDD_SAP_CLIENT_DISCONNECT_WAKE_LOCK_DURATION);
 		cfg80211_del_sta(dev,
 				 (const u8 *)&pSapEvent->sapevt.
 				 sapStationDisassocCompleteEvent.staMac.
@@ -2190,8 +2194,6 @@ stopbss:
 		we_custom_event_generic = we_custom_event;
 		wireless_send_event(dev, we_event, &wrqu,
 				    (char *)we_custom_event_generic);
-		cds_decr_session_set_pcl(pHostapdAdapter->device_mode,
-					 pHostapdAdapter->sessionId);
 
 		/* once the event is set, structure dev/pHostapdAdapter should
 		 * not be touched since they are now subject to being deleted
@@ -6532,12 +6534,13 @@ static void wlan_hdd_add_hostapd_conf_vsie(hdd_adapter_t *pHostapdAdapter,
 		elem_id = ptr[0];
 		elem_len = ptr[1];
 		left -= 2;
-		if (elem_len > left || elem_len < WPS_OUI_TYPE_SIZE) {
+		if (elem_len > left) {
 			hdd_err("**Invalid IEs eid: %d elem_len: %d left: %d**",
 				elem_id, elem_len, left);
 			return;
 		}
-		if (IE_EID_VENDOR == elem_id) {
+		if (IE_EID_VENDOR == elem_id &&
+				(elem_len >= WPS_OUI_TYPE_SIZE)) {
 			/* skipping the VSIE's which we don't want to include or
 			 * it will be included by existing code
 			 */
