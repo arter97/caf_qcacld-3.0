@@ -1565,4 +1565,14 @@ int sme_cli_set_command(int vdev_id, int param_id, int sval, int vpdev);
 QDF_STATUS sme_process_msg_callback(tHalHandle hal, cds_msg_t *msg);
 
 QDF_STATUS sme_delete_all_tdls_peers(tHalHandle hal, uint8_t session_id);
+
+/**
+ * sme_set_vc_mode_config() - Set voltage corner config to FW.
+ * @bitmap:	Bitmap that refers to voltage corner config with
+ * different phymode and bw configuration
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_set_vc_mode_config(uint32_t vc_bitmap);
+
 #endif /* #if !defined( __SME_API_H ) */
