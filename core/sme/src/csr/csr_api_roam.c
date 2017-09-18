@@ -789,6 +789,71 @@ scan_list_sort_error:
 	qdf_mem_free(chan_list_non_greedy);
 }
 
+#ifdef WLAN_ENABLE_SOCIAL_CHANNELS_5G_ONLY
+static void csr_add_len_of_social_channels(tpAniSirGlobal mac,
+		uint8_t *num_chan)
+{
+	uint8_t i;
+	uint8_t no_chan = *num_chan;
+
+	sme_debug("add len of social channels, before adding - num_chan:%hu",
+			*num_chan);
+	if (CSR_IS_5G_BAND_ONLY(mac)) {
+		for (i = 0; i < MAX_SOCIAL_CHANNELS; i++) {
+			if (cds_get_channel_state(social_channel[i])
+					== CHANNEL_STATE_ENABLE)
+				no_chan++;
+		}
+	}
+	*num_chan = no_chan;
+	sme_debug("after adding - num_chan:%hu", *num_chan);
+}
+
+static void csr_add_social_channels(tpAniSirGlobal mac,
+		tSirUpdateChanList *chan_list, tCsrScanStruct *pScan,
+		uint8_t *num_chan)
+{
+	uint8_t i;
+	uint8_t no_chan = *num_chan;
+
+	sme_debug("add social channels chan_list %pK, num_chan %hu", chan_list,
+			*num_chan);
+	if (CSR_IS_5G_BAND_ONLY(mac)) {
+		for (i = 0; i < MAX_SOCIAL_CHANNELS; i++) {
+			if (cds_get_channel_state(social_channel[i])
+					!= CHANNEL_STATE_ENABLE)
+				continue;
+			chan_list->chanParam[no_chan].chanId =
+				social_channel[i];
+			chan_list->chanParam[no_chan].pwr =
+				csr_find_channel_pwr(pScan->defaultPowerTable,
+						social_channel[i]);
+			chan_list->chanParam[no_chan].dfsSet = false;
+			if (cds_is_5_mhz_enabled())
+				chan_list->chanParam[no_chan].quarter_rate
+					= 1;
+			else if (cds_is_10_mhz_enabled())
+				chan_list->chanParam[no_chan].half_rate = 1;
+			no_chan++;
+		}
+		sme_debug("after adding -num_chan %hu", no_chan);
+	}
+	*num_chan = no_chan;
+}
+#else
+static void csr_add_len_of_social_channels(tpAniSirGlobal mac,
+		uint8_t *num_chan)
+{
+	sme_debug("skip adding len of social channels");
+}
+static void csr_add_social_channels(tpAniSirGlobal mac,
+		tSirUpdateChanList *chan_list, tCsrScanStruct *pScan,
+		uint8_t *num_chan)
+{
+	sme_debug("skip social channels");
+}
+#endif
+
 QDF_STATUS csr_update_channel_list(tpAniSirGlobal pMac)
 {
 	tSirUpdateChanList *pChanList;
@@ -1455,7 +1520,7 @@ void csr_abort_command(tpAniSirGlobal pMac, tSmeCmd *pCommand, bool fStopping)
 			/* We need to inform the requester before dropping
 			 * the scan command
 			 */
-			sme_debug("Drop scan reason %d callback %p",
+			sme_debug("Drop scan reason %d callback %pK",
 				pCommand->u.scanCmd.reason,
 				pCommand->u.scanCmd.callback);
 			if (NULL != pCommand->u.scanCmd.callback) {
