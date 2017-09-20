@@ -55,7 +55,7 @@ typedef struct tagComebackTimerInfo {
 	tpAniSirGlobal pMac;
 	uint8_t sessionID;
 	tLimMlmStates limPrevMlmState;  /* Previous MLM State */
-	tLimSmeStates limMlmState;      /* MLM State */
+	tLimMlmStates limMlmState;      /* MLM State */
 } tComebackTimerInfo;
 #endif /* WLAN_FEATURE_11W */
 /*--------------------------------------------------------------------------
@@ -292,14 +292,14 @@ typedef struct sPESession       /* Added to Support BT-AMP */
 	int8_t maxTxPower;   /* MIN (Regulatory and local power constraint) */
 	enum tQDF_ADAPTER_MODE pePersona;
 	int8_t txMgmtPower;
-	tAniBool is11Rconnection;
+	bool is11Rconnection;
 
 #ifdef FEATURE_WLAN_ESE
-	tAniBool isESEconnection;
+	bool isESEconnection;
 	tEsePEContext eseContext;
 #endif
-	tAniBool isFastTransitionEnabled;
-	tAniBool isFastRoamIniFeatureEnabled;
+	bool isFastTransitionEnabled;
+	bool isFastRoamIniFeatureEnabled;
 	tSirNoAParam p2pNoA;
 	tSirP2PNoaAttr p2pGoPsUpdate;
 	uint32_t defaultAuthFailureTimeout;
@@ -374,7 +374,7 @@ typedef struct sPESession       /* Added to Support BT-AMP */
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_LIM
 	int8_t rssi;
 #endif
-	uint8_t isAmsduSupportInAMPDU;
+	uint8_t max_amsdu_num;
 	uint8_t isCoalesingInIBSSAllowed;
 
 	tSirHTConfig htConfig;
@@ -503,6 +503,8 @@ typedef struct sPESession       /* Added to Support BT-AMP */
 	bool ignore_assoc_disallowed;
 	bool send_p2p_conf_frame;
 	bool process_ho_fail;
+	/* Number of STAs that do not support ECSA capability */
+	uint8_t lim_non_ecsa_cap_num;
 #ifdef WLAN_FEATURE_11AX
 	bool he_capable;
 	tDot11fIEvendor_he_cap he_config;
@@ -516,6 +518,11 @@ typedef struct sPESession       /* Added to Support BT-AMP */
 #endif
 	bool enable_bcast_probe_rsp;
 	uint8_t ht_client_cnt;
+	bool force_24ghz_in_ht20;
+	bool ch_switch_in_progress;
+#ifdef WLAN_FEATURE_FILS_SK
+	struct pe_fils_session *fils_info;
+#endif
 } tPESession, *tpPESession;
 
 /*-------------------------------------------------------------------------
@@ -640,4 +647,13 @@ void pe_delete_session(tpAniSirGlobal pMac, tpPESession psessionEntry);
 tpPESession pe_find_session_by_sme_session_id(tpAniSirGlobal mac_ctx,
 					      uint8_t sme_session_id);
 uint8_t pe_get_active_session_count(tpAniSirGlobal mac_ctx);
+#ifdef WLAN_FEATURE_FILS_SK
+/**
+ * pe_delete_fils_info: API to delete fils session info
+ * @session: pe session
+ *
+ * Return: void
+ */
+void pe_delete_fils_info(tpPESession session);
+#endif
 #endif /* #if !defined( __LIM_SESSION_H ) */

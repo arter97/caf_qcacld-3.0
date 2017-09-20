@@ -146,9 +146,10 @@ static const char *pcl_type_to_string(uint8_t idx)
 	}
 }
 
-void clean_report(hdd_context_t *hdd_ctx)
+void clean_report(struct hdd_context *hdd_ctx)
 {
 	uint32_t idx = 0;
+
 	while (idx < NUMBER_OF_SCENARIO) {
 		qdf_mem_zero(&report[idx], sizeof(struct report_t));
 		idx++;
@@ -156,9 +157,10 @@ void clean_report(hdd_context_t *hdd_ctx)
 	report_idx = 0;
 }
 
-void print_report(hdd_context_t *hdd_ctx)
+void print_report(struct hdd_context *hdd_ctx)
 {
 	uint32_t idx = 0;
+
 	pr_info("+----------Report start -----------+\n");
 	while (idx < report_idx) {
 		pr_info("Idx:[%d]\nTitle:%s\nResult:[%s]\n\t1st_person[%s]\n\t2nd_persona[%s]\n\t3rd_persona[%s]\n\tDBS[%s]\n\tsystem_config[%s]\n\treason[%s]\n\tpcl[%s]\n",
@@ -173,7 +175,7 @@ void print_report(hdd_context_t *hdd_ctx)
 	pr_info("+----------Report end -----------+\n");
 }
 
-void fill_report(hdd_context_t *hdd_ctx, char *title,
+void fill_report(struct hdd_context *hdd_ctx, char *title,
 	uint32_t first_persona, uint32_t second_persona, uint32_t third_persona,
 	uint32_t chnl_1st_conn, uint32_t chnl_2nd_conn, uint32_t chnl_3rd_conn,
 	bool status, enum policy_mgr_pcl_type pcl_type, char *reason,
@@ -246,7 +248,7 @@ void fill_report(hdd_context_t *hdd_ctx, char *title,
 	report_idx++;
 }
 
-static bool wlan_hdd_validate_pcl(hdd_context_t *hdd_ctx,
+static bool wlan_hdd_validate_pcl(struct hdd_context *hdd_ctx,
 	enum policy_mgr_pcl_type pcl_type, uint8_t *pcl, uint32_t pcl_len,
 	uint8_t first_connection_chnl, uint8_t second_connection_chnl,
 	char *reason, uint32_t reason_length)
@@ -621,7 +623,7 @@ static void wlan_hdd_map_subtypes_hdd_wma(enum policy_mgr_con_mode *dst,
 		*dst = *src;
 }
 
-void wlan_hdd_one_connection_scenario(hdd_context_t *hdd_ctx)
+void wlan_hdd_one_connection_scenario(struct hdd_context *hdd_ctx)
 {
 	enum policy_mgr_con_mode sub_type;
 	enum policy_mgr_conc_priority_mode system_pref =
@@ -635,7 +637,7 @@ void wlan_hdd_one_connection_scenario(hdd_context_t *hdd_ctx)
 	QDF_STATUS ret;
 	struct policy_mgr_sme_cbacks sme_cbacks;
 
-	sme_cbacks.sme_get_valid_channels = sme_get_cfg_valid_channels;
+	sme_cbacks.sme_get_valid_channels = sme_get_valid_channels;
 	sme_cbacks.sme_get_nss_for_vdev = sme_get_vdev_type_nss;
 	/* flush the entire table first */
 	ret = policy_mgr_psoc_enable(hdd_ctx->hdd_psoc);
@@ -672,7 +674,7 @@ void wlan_hdd_one_connection_scenario(hdd_context_t *hdd_ctx)
 	}
 }
 
-void wlan_hdd_two_connections_scenario(hdd_context_t *hdd_ctx,
+void wlan_hdd_two_connections_scenario(struct hdd_context *hdd_ctx,
 		uint8_t first_chnl, enum policy_mgr_chain_mode first_chain_mask)
 {
 	uint8_t vdevid = 0, tx_stream = 2, rx_stream = 2;
@@ -695,7 +697,7 @@ void wlan_hdd_two_connections_scenario(hdd_context_t *hdd_ctx,
 		sub_type < PM_MAX_NUM_OF_MODE; sub_type++) {
 		type = wlan_hdd_valid_type_of_persona(sub_type);
 
-		sme_cbacks.sme_get_valid_channels = sme_get_cfg_valid_channels;
+		sme_cbacks.sme_get_valid_channels = sme_get_valid_channels;
 		sme_cbacks.sme_get_nss_for_vdev = sme_get_vdev_type_nss;
 		/* flush the entire table first */
 		ret = policy_mgr_psoc_enable(hdd_ctx->hdd_psoc);
@@ -732,7 +734,8 @@ void wlan_hdd_two_connections_scenario(hdd_context_t *hdd_ctx,
 			pcl_len = 0;
 			pcl_type = policy_mgr_get_pcl_from_second_conn_table(
 				second_index, next_sub_type, system_pref,
-				policy_mgr_is_hw_dbs_capable(hdd_ctx->hdd_psoc));
+				policy_mgr_is_hw_dbs_capable(
+					hdd_ctx->hdd_psoc));
 			/* check PCL for second connection is correct or no */
 			policy_mgr_get_pcl(hdd_ctx->hdd_psoc,
 				next_sub_type, pcl, &pcl_len,
@@ -753,7 +756,7 @@ void wlan_hdd_two_connections_scenario(hdd_context_t *hdd_ctx,
 	}
 }
 
-void wlan_hdd_three_connections_scenario(hdd_context_t *hdd_ctx,
+void wlan_hdd_three_connections_scenario(struct hdd_context *hdd_ctx,
 		uint8_t first_chnl, uint8_t second_chnl,
 		enum policy_mgr_chain_mode chain_mask, uint8_t use_same_mac)
 {
@@ -800,7 +803,7 @@ void wlan_hdd_three_connections_scenario(hdd_context_t *hdd_ctx,
 
 		type_1 = wlan_hdd_valid_type_of_persona(sub_type_1);
 
-		sme_cbacks.sme_get_valid_channels = sme_get_cfg_valid_channels;
+		sme_cbacks.sme_get_valid_channels = sme_get_valid_channels;
 		sme_cbacks.sme_get_nss_for_vdev = sme_get_vdev_type_nss;
 		/* flush the entire table first */
 		ret = policy_mgr_psoc_enable(hdd_ctx->hdd_psoc);

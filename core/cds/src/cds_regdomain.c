@@ -98,6 +98,7 @@ static const struct reg_dmn_pair g_reg_dmn_pairs[] = {
 	{APL4_WORLD, APL4, WORLD, CTRY_DEFAULT},
 	{APL2_WORLD, APL2, WORLD, CTRY_DEFAULT},
 	{APL2_FCCA, APL2, FCCA, CTRY_DEFAULT},
+	{APL2_ETSIC, APL2, ETSIC, CTRY_DEFAULT},
 	{APL1_WORLD, APL1, WORLD, CTRY_DEFAULT},
 	{APL1_ETSIC, APL1, ETSIC, CTRY_DEFAULT},
 	{APL6_WORLD, APL6, WORLD, CTRY_DEFAULT},
@@ -378,6 +379,63 @@ struct reg_dmn_tables g_reg_dmn_tbl = {
 	QDF_ARRAY_SIZE(g_reg_dmns),
 };
 
+/*
+ *  ETSI is updating EN 301 893, which specifies 5 GHz channel access
+ *  in Europe
+ */
+static const char etsi_europe_country[][2] = {
+	{'A', 'T'},
+	{'B', 'E'},
+	{'B', 'G'},
+	{'C', 'Z'},
+	{'D', 'K'},
+	{'E', 'E'},
+	{'F', 'R'},
+
+	{'D', 'E'},
+	{'I', 'S'},
+	{'I', 'E'},
+	{'I', 'T'},
+	{'E', 'L'},
+	{'E', 'S'},
+	{'C', 'Y'},
+
+	{'L', 'V'},
+	{'L', 'I'},
+	{'L', 'T'},
+	{'L', 'U'},
+	{'H', 'U'},
+	{'M', 'T'},
+	{'N', 'L'},
+
+	{'N', 'O'},
+	{'P', 'L'},
+	{'P', 'T'},
+	{'R', 'O'},
+	{'S', 'I'},
+	{'S', 'K'},
+	{'T', 'R'},
+
+	{'F', 'I'},
+	{'S', 'E'},
+	{'C', 'H'},
+	{'U', 'K'},
+	{'H', 'R'},
+};
+
+bool cds_is_etsi_europe_country(uint8_t *country)
+{
+	int32_t i;
+
+	for (i = 0; i < QDF_ARRAY_SIZE(etsi_europe_country); i++) {
+		if (country[0] == etsi_europe_country[i][0] &&
+		    country[1] == etsi_europe_country[i][1])
+			return true;
+	}
+
+	return false;
+}
+
 /**
  * get_bdf_reg_dmn() - get regulatory domain from BDF
  * @reg_dmn: BDF regulatory domain
@@ -621,7 +679,7 @@ void cds_fill_and_send_ctl_to_fw(struct regulatory *reg)
 {
 	const struct reg_dmn *reg_dmn_2g = NULL;
 	const struct reg_dmn *reg_dmn_5g = NULL;
-	int8_t ctl_2g, ctl_5g;
+	uint8_t ctl_2g, ctl_5g;
 	const struct reg_dmn_pair *regpair;
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
 

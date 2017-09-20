@@ -45,7 +45,7 @@ void hdd_rx_monitor_callback(ol_osif_vdev_handle context,
 				qdf_nbuf_t rxbuf,
 				void *rx_status)
 {
-	hdd_adapter_t *adapter;
+	struct hdd_adapter *adapter;
 	int rxstat;
 	struct sk_buff *skb;
 	struct sk_buff *skb_next;
@@ -54,7 +54,7 @@ void hdd_rx_monitor_callback(ol_osif_vdev_handle context,
 	qdf_assert(context);
 	qdf_assert(rxbuf);
 
-	adapter = (hdd_adapter_t *)context;
+	adapter = (struct hdd_adapter *)context;
 	if (WLAN_HDD_ADAPTER_MAGIC != adapter->magic) {
 		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_ERROR,
 			"invalid adapter %p", adapter);
@@ -101,8 +101,6 @@ void hdd_rx_monitor_callback(ol_osif_vdev_handle context,
 		skb = skb_next;
 	}
 
-	adapter->dev->last_rx = jiffies;
-
 	return;
 }
 
@@ -117,4 +115,27 @@ void hdd_monitor_set_rx_monitor_cb(struct ol_txrx_ops *txrx,
 				ol_txrx_rx_mon_fp rx_monitor_cb)
 {
 	txrx->rx.mon = rx_monitor_cb;
+}
+
+/**
+ * hdd_enable_monitor_mode() - Enable monitor mode
+ * @dev: Pointer to the net_device structure
+ *
+ * This function invokes cdp interface API to enable
+ * monitor mode configuration on the hardware. In this
+ * case sends HTT messages to FW to setup hardware rings
+ *
+ * Return: 0 for success; non-zero for failure
+ */
+int hdd_enable_monitor_mode(struct net_device *dev)
+{
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	void *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+
+	ENTER_DEV(dev);
+
+	return cdp_set_monitor_mode(soc,
+			(struct cdp_vdev *)cdp_get_vdev_from_vdev_id(soc,
+			(struct cdp_pdev *)pdev, adapter->sessionId), false);
 }

@@ -180,6 +180,9 @@ wlan_hdd_pno_config_policy[QCA_WLAN_VENDOR_ATTR_PNO_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_EPNO_BAND5GHZ_BONUS] = {
 		.type = NLA_U32
 	},
+	[QCA_WLAN_VENDOR_ATTR_PNO_CONFIG_REQUEST_ID] = {
+		.type = NLA_U32
+	},
 };
 
 static const struct nla_policy
@@ -202,7 +205,7 @@ wlan_hdd_cfg80211_extscan_get_capabilities_rsp(void *ctx,
 	struct ext_scan_capabilities_response *data)
 {
 	struct hdd_ext_scan_context *context;
-	hdd_context_t *hdd_ctx  = ctx;
+	struct hdd_context *hdd_ctx  = ctx;
 
 	ENTER();
 
@@ -325,7 +328,7 @@ static void
 wlan_hdd_cfg80211_extscan_cached_results_ind(void *ctx,
 				struct extscan_cached_scan_results *data)
 {
-	hdd_context_t *pHddCtx = ctx;
+	struct hdd_context *hdd_ctx = ctx;
 	struct sk_buff *skb = NULL;
 	struct hdd_ext_scan_context *context;
 	struct extscan_cached_scan_result *result;
@@ -335,7 +338,7 @@ wlan_hdd_cfg80211_extscan_cached_results_ind(void *ctx,
 
 	/* ENTER() intentionally not used in a frequently invoked API */
 
-	if (wlan_hdd_validate_context(pHddCtx))
+	if (wlan_hdd_validate_context(hdd_ctx))
 		return;
 	if (!data) {
 		hdd_err("data is null");
@@ -401,7 +404,7 @@ wlan_hdd_cfg80211_extscan_cached_results_ind(void *ctx,
 		}
 	}
 
-	skb = cfg80211_vendor_cmd_alloc_reply_skb(pHddCtx->wiphy, nl_buf_len);
+	skb = cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy, nl_buf_len);
 
 	if (!skb) {
 		hdd_err("cfg80211_vendor_cmd_alloc_reply_skb failed");
@@ -425,7 +428,7 @@ wlan_hdd_cfg80211_extscan_cached_results_ind(void *ctx,
 			 * to derive the time since boot when the
 			 * BSSID was cached.
 			 */
-			ap->ts += pHddCtx->ext_scan_start_since_boot;
+			ap->ts += hdd_ctx->ext_scan_start_since_boot;
 			hdd_debug("Timestamp %llu "
 				"Ssid: %s "
 				"Bssid (" MAC_ADDRESS_STR ") "
@@ -555,14 +558,14 @@ static void
 wlan_hdd_cfg80211_extscan_hotlist_match_ind(void *ctx,
 					    struct extscan_hotlist_match *data)
 {
-	hdd_context_t *pHddCtx = ctx;
+	struct hdd_context *hdd_ctx = ctx;
 	struct sk_buff *skb = NULL;
 	uint32_t i, index;
 	int flags = cds_get_gfp_flags();
 
 	ENTER();
 
-	if (wlan_hdd_validate_context(pHddCtx))
+	if (wlan_hdd_validate_context(hdd_ctx))
 		return;
 	if (!data) {
 		hdd_err("data is null");
@@ -575,7 +578,7 @@ wlan_hdd_cfg80211_extscan_hotlist_match_ind(void *ctx,
 		index = QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_HOTLIST_AP_LOST_INDEX;
 
 	skb = cfg80211_vendor_event_alloc(
-		  pHddCtx->wiphy,
+		  hdd_ctx->wiphy,
 		  NULL,
 		  EXTSCAN_EVENT_BUF_SIZE + NLMSG_HDRLEN,
 		  index, flags);
@@ -691,7 +694,7 @@ wlan_hdd_cfg80211_extscan_signif_wifi_change_results_ind(
 			void *ctx,
 			tpSirWifiSignificantChangeEvent pData)
 {
-	hdd_context_t *pHddCtx = (hdd_context_t *) ctx;
+	struct hdd_context *hdd_ctx = (struct hdd_context *) ctx;
 	struct sk_buff *skb = NULL;
 	tSirWifiSignificantChange *ap_info;
 	int32_t *rssi;
@@ -700,7 +703,7 @@ wlan_hdd_cfg80211_extscan_signif_wifi_change_results_ind(
 
 	ENTER();
 
-	if (wlan_hdd_validate_context(pHddCtx))
+	if (wlan_hdd_validate_context(hdd_ctx))
 		return;
 	if (!pData) {
 		hdd_err("pData is null");
@@ -708,7 +711,7 @@ wlan_hdd_cfg80211_extscan_signif_wifi_change_results_ind(
 	}
 
 	skb = cfg80211_vendor_event_alloc(
-		pHddCtx->wiphy,
+		hdd_ctx->wiphy,
 		NULL,
 		EXTSCAN_EVENT_BUF_SIZE + NLMSG_HDRLEN,
 		QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_SIGNIFICANT_CHANGE_INDEX,
@@ -814,7 +817,7 @@ wlan_hdd_cfg80211_extscan_full_scan_result_event(void *ctx,
 						 tpSirWifiFullScanResultEvent
 						 pData)
 {
-	hdd_context_t *pHddCtx = (hdd_context_t *) ctx;
+	struct hdd_context *hdd_ctx = (struct hdd_context *) ctx;
 	struct sk_buff *skb = NULL;
 	struct timespec ts;
 	struct hdd_ext_scan_context *context;
@@ -823,7 +826,7 @@ wlan_hdd_cfg80211_extscan_full_scan_result_event(void *ctx,
 
 	/* ENTER() intentionally not used in a frequently invoked API */
 
-	if (wlan_hdd_validate_context(pHddCtx))
+	if (wlan_hdd_validate_context(hdd_ctx))
 		return;
 	if (!pData) {
 		hdd_err("pData is null");
@@ -835,7 +838,7 @@ wlan_hdd_cfg80211_extscan_full_scan_result_event(void *ctx,
 		return;
 	}
 	skb = cfg80211_vendor_event_alloc(
-		  pHddCtx->wiphy,
+		  hdd_ctx->wiphy,
 		  NULL,
 		  EXTSCAN_EVENT_BUF_SIZE + NLMSG_HDRLEN,
 		  QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_FULL_SCAN_RESULT_INDEX,
@@ -957,13 +960,13 @@ wlan_hdd_cfg80211_extscan_scan_res_available_event(
 			void *ctx,
 			tpSirExtScanResultsAvailableIndParams pData)
 {
-	hdd_context_t *pHddCtx = (hdd_context_t *) ctx;
+	struct hdd_context *hdd_ctx = (struct hdd_context *) ctx;
 	struct sk_buff *skb = NULL;
 	int flags = cds_get_gfp_flags();
 
 	ENTER();
 
-	if (wlan_hdd_validate_context(pHddCtx))
+	if (wlan_hdd_validate_context(hdd_ctx))
 		return;
 	if (!pData) {
 		hdd_err("pData is null");
@@ -971,7 +974,7 @@ wlan_hdd_cfg80211_extscan_scan_res_available_event(
 	}
 
 	skb = cfg80211_vendor_event_alloc(
-		 pHddCtx->wiphy,
+		 hdd_ctx->wiphy,
 		 NULL,
 		 EXTSCAN_EVENT_BUF_SIZE + NLMSG_HDRLEN,
 		 QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_SCAN_RESULTS_AVAILABLE_INDEX,
@@ -1017,14 +1020,14 @@ wlan_hdd_cfg80211_extscan_scan_progress_event(void *ctx,
 					      tpSirExtScanOnScanEventIndParams
 					      pData)
 {
-	hdd_context_t *pHddCtx = (hdd_context_t *) ctx;
+	struct hdd_context *hdd_ctx = (struct hdd_context *) ctx;
 	struct sk_buff *skb = NULL;
 	int flags = cds_get_gfp_flags();
 	struct hdd_ext_scan_context *context;
 
 	/* ENTER() intentionally not used in a frequently invoked API */
 
-	if (wlan_hdd_validate_context(pHddCtx))
+	if (wlan_hdd_validate_context(hdd_ctx))
 		return;
 	if (!pData) {
 		hdd_err("pData is null");
@@ -1032,7 +1035,7 @@ wlan_hdd_cfg80211_extscan_scan_progress_event(void *ctx,
 	}
 
 	skb = cfg80211_vendor_event_alloc(
-			pHddCtx->wiphy,
+			hdd_ctx->wiphy,
 			NULL,
 			EXTSCAN_EVENT_BUF_SIZE + NLMSG_HDRLEN,
 			QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_SCAN_EVENT_INDEX,
@@ -1094,14 +1097,14 @@ static void
 wlan_hdd_cfg80211_extscan_epno_match_found(void *ctx,
 					struct pno_match_found *data)
 {
-	hdd_context_t *pHddCtx  = (hdd_context_t *)ctx;
+	struct hdd_context *hdd_ctx  = (struct hdd_context *)ctx;
 	struct sk_buff *skb     = NULL;
 	uint32_t len, i;
 	int flags = cds_get_gfp_flags();
 
 	ENTER();
 
-	if (wlan_hdd_validate_context(pHddCtx))
+	if (wlan_hdd_validate_context(hdd_ctx))
 		return;
 	if (!data) {
 		hdd_err("data is null");
@@ -1122,7 +1125,7 @@ wlan_hdd_cfg80211_extscan_epno_match_found(void *ctx,
 		return;
 	}
 
-	skb = cfg80211_vendor_event_alloc(pHddCtx->wiphy,
+	skb = cfg80211_vendor_event_alloc(hdd_ctx->wiphy,
 		  NULL,
 		  EXTSCAN_EVENT_BUF_SIZE + NLMSG_HDRLEN,
 		QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_PNO_NETWORK_FOUND_INDEX,
@@ -1208,7 +1211,7 @@ static void
 wlan_hdd_cfg80211_passpoint_match_found(void *ctx,
 					struct wifi_passpoint_match *data)
 {
-	hdd_context_t *pHddCtx  = ctx;
+	struct hdd_context *hdd_ctx  = ctx;
 	struct sk_buff *skb     = NULL;
 	uint32_t len, i, num_matches = 1, more_data = 0;
 	struct nlattr *nla_aps, *nla_bss;
@@ -1216,7 +1219,7 @@ wlan_hdd_cfg80211_passpoint_match_found(void *ctx,
 
 	ENTER();
 
-	if (wlan_hdd_validate_context(pHddCtx))
+	if (wlan_hdd_validate_context(hdd_ctx))
 		return;
 	if (!data) {
 		hdd_err("data is null");
@@ -1229,7 +1232,7 @@ wlan_hdd_cfg80211_passpoint_match_found(void *ctx,
 		return;
 	}
 
-	skb = cfg80211_vendor_event_alloc(pHddCtx->wiphy,
+	skb = cfg80211_vendor_event_alloc(hdd_ctx->wiphy,
 		  NULL,
 		  EXTSCAN_EVENT_BUF_SIZE + NLMSG_HDRLEN,
 		  QCA_NL80211_VENDOR_SUBCMD_EXTSCAN_PNO_PASSPOINT_NETWORK_FOUND_INDEX,
@@ -1340,7 +1343,7 @@ wlan_hdd_cfg80211_extscan_generic_rsp
 	(void *ctx,
 	 struct sir_extscan_generic_response *response)
 {
-	hdd_context_t *hdd_ctx = ctx;
+	struct hdd_context *hdd_ctx = ctx;
 	struct hdd_ext_scan_context *context;
 
 	ENTER();
@@ -1374,11 +1377,11 @@ wlan_hdd_cfg80211_extscan_generic_rsp
 void wlan_hdd_cfg80211_extscan_callback(void *ctx, const uint16_t evType,
 					void *pMsg)
 {
-	hdd_context_t *pHddCtx = (hdd_context_t *) ctx;
+	struct hdd_context *hdd_ctx = (struct hdd_context *) ctx;
 
 	/* ENTER() intentionally not used in a frequently invoked API */
 
-	if (wlan_hdd_validate_context(pHddCtx))
+	if (wlan_hdd_validate_context(hdd_ctx))
 		return;
 
 	hdd_debug("Rcvd Event %d", evType);
@@ -1491,7 +1494,7 @@ void wlan_hdd_cfg80211_extscan_callback(void *ctx, const uint16_t evType,
  *
  * Return: 0 for success, non-zero for failure
  */
-static int wlan_hdd_send_ext_scan_capability(hdd_context_t *hdd_ctx)
+static int wlan_hdd_send_ext_scan_capability(struct hdd_context *hdd_ctx)
 {
 	int ret;
 	struct sk_buff *skb;
@@ -1629,8 +1632,8 @@ static int __wlan_hdd_cfg80211_extscan_get_capabilities(struct wiphy *wiphy,
 	struct hdd_ext_scan_context *context;
 	tpSirGetExtScanCapabilitiesReqParams pReqMsg = NULL;
 	struct net_device *dev = wdev->netdev;
-	hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
-	hdd_context_t *pHddCtx = wiphy_priv(wiphy);
+	struct hdd_adapter *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX +
 			  1];
 	QDF_STATUS status;
@@ -1642,21 +1645,22 @@ static int __wlan_hdd_cfg80211_extscan_get_capabilities(struct wiphy *wiphy,
 		return -EPERM;
 	}
 
-	ret = wlan_hdd_validate_context(pHddCtx);
+	ret = wlan_hdd_validate_context(hdd_ctx);
 	if (0 != ret)
 		return -EINVAL;
 
-	if (pHddCtx->driver_status == DRIVER_MODULES_CLOSED) {
+	if (hdd_ctx->driver_status == DRIVER_MODULES_CLOSED) {
 		hdd_err("Driver Modules are closed");
 		return -EINVAL;
 	}
 
-	if (!pHddCtx->config->extscan_enabled) {
+	if (!hdd_ctx->config->extscan_enabled) {
 		hdd_err("extscan not supported");
 		return -ENOTSUPP;
 	}
-	if (nla_parse(tb, QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX,
-		      data, data_len, wlan_hdd_extscan_config_policy)) {
+	if (hdd_nla_parse(tb,
+			  QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX,
+			  data, data_len, wlan_hdd_extscan_config_policy)) {
 		hdd_err("Invalid ATTR");
 		return -EINVAL;
 	}
@@ -1686,7 +1690,7 @@ static int __wlan_hdd_cfg80211_extscan_get_capabilities(struct wiphy *wiphy,
 	INIT_COMPLETION(context->response_event);
 	spin_unlock(&context->context_lock);
 
-	status = sme_ext_scan_get_capabilities(pHddCtx->hHal, pReqMsg);
+	status = sme_ext_scan_get_capabilities(hdd_ctx->hHal, pReqMsg);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("sme_ext_scan_get_capabilities failed(err=%d)",
 			status);
@@ -1700,7 +1704,7 @@ static int __wlan_hdd_cfg80211_extscan_get_capabilities(struct wiphy *wiphy,
 		return -ETIMEDOUT;
 	}
 
-	ret = wlan_hdd_send_ext_scan_capability(pHddCtx);
+	ret = wlan_hdd_send_ext_scan_capability(hdd_ctx);
 	if (ret)
 		hdd_err("Failed to send ext scan capability to user space");
 	EXIT();
@@ -1769,8 +1773,8 @@ static int __wlan_hdd_cfg80211_extscan_get_cached_results(struct wiphy *wiphy,
 {
 	tpSirExtScanGetCachedResultsReqParams pReqMsg = NULL;
 	struct net_device *dev = wdev->netdev;
-	hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
-	hdd_context_t *pHddCtx = wiphy_priv(wiphy);
+	struct hdd_adapter *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX +
 			  1];
 	struct hdd_ext_scan_context *context;
@@ -1785,16 +1789,16 @@ static int __wlan_hdd_cfg80211_extscan_get_cached_results(struct wiphy *wiphy,
 		return -EPERM;
 	}
 
-	retval = wlan_hdd_validate_context(pHddCtx);
+	retval = wlan_hdd_validate_context(hdd_ctx);
 	if (0 != retval)
 		return -EINVAL;
 
-	if (!pHddCtx->config->extscan_enabled) {
+	if (!hdd_ctx->config->extscan_enabled) {
 		hdd_err("extscan not supported");
 		return -ENOTSUPP;
 	}
-	if (nla_parse(tb, PARAM_MAX, data, data_len,
-		wlan_hdd_extscan_config_policy)) {
+	if (hdd_nla_parse(tb, PARAM_MAX, data, data_len,
+			  wlan_hdd_extscan_config_policy)) {
 		hdd_err("Invalid ATTR");
 		return -EINVAL;
 	}
@@ -1830,7 +1834,7 @@ static int __wlan_hdd_cfg80211_extscan_get_cached_results(struct wiphy *wiphy,
 	INIT_COMPLETION(context->response_event);
 	spin_unlock(&context->context_lock);
 
-	status = sme_get_cached_results(pHddCtx->hHal, pReqMsg);
+	status = sme_get_cached_results(hdd_ctx->hHal, pReqMsg);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("sme_get_cached_results failed(err=%d)", status);
 		goto fail;
@@ -1913,8 +1917,8 @@ __wlan_hdd_cfg80211_extscan_set_bssid_hotlist(struct wiphy *wiphy,
 {
 	tpSirExtScanSetBssidHotListReqParams pReqMsg = NULL;
 	struct net_device *dev = wdev->netdev;
-	hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
-	hdd_context_t *pHddCtx = wiphy_priv(wiphy);
+	struct hdd_adapter *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX +
 			  1];
 	struct nlattr *tb2[QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX
@@ -1934,16 +1938,17 @@ __wlan_hdd_cfg80211_extscan_set_bssid_hotlist(struct wiphy *wiphy,
 		return -EPERM;
 	}
 
-	retval = wlan_hdd_validate_context(pHddCtx);
+	retval = wlan_hdd_validate_context(hdd_ctx);
 	if (0 != retval)
 		return -EINVAL;
 
-	if (!pHddCtx->config->extscan_enabled) {
+	if (!hdd_ctx->config->extscan_enabled) {
 		hdd_err("extscan not supported");
 		return -ENOTSUPP;
 	}
-	if (nla_parse(tb, QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX,
-		      data, data_len, wlan_hdd_extscan_config_policy)) {
+	if (hdd_nla_parse(tb,
+			  QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX,
+			  data, data_len, wlan_hdd_extscan_config_policy)) {
 		hdd_err("Invalid ATTR");
 		return -EINVAL;
 	}
@@ -2006,11 +2011,11 @@ __wlan_hdd_cfg80211_extscan_set_bssid_hotlist(struct wiphy *wiphy,
 			break;
 		}
 
-		if (nla_parse
-		    (tb2, QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX,
-		    nla_data(apTh), nla_len(apTh),
-		    wlan_hdd_extscan_config_policy)) {
-			hdd_err("nla_parse failed");
+		if (hdd_nla_parse(tb2,
+			   QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX,
+			   nla_data(apTh), nla_len(apTh),
+			   wlan_hdd_extscan_config_policy)) {
+			hdd_err("hdd_nla_parse failed");
 			goto fail;
 		}
 
@@ -2063,7 +2068,7 @@ __wlan_hdd_cfg80211_extscan_set_bssid_hotlist(struct wiphy *wiphy,
 	context->request_id = request_id = pReqMsg->requestId;
 	spin_unlock(&context->context_lock);
 
-	status = sme_set_bss_hotlist(pHddCtx->hHal, pReqMsg);
+	status = sme_set_bss_hotlist(hdd_ctx->hHal, pReqMsg);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("sme_set_bss_hotlist failed(err=%d)", status);
 		goto fail;
@@ -2134,8 +2139,8 @@ __wlan_hdd_cfg80211_extscan_set_significant_change(struct wiphy *wiphy,
 {
 	tpSirExtScanSetSigChangeReqParams pReqMsg = NULL;
 	struct net_device *dev = wdev->netdev;
-	hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
-	hdd_context_t *pHddCtx = wiphy_priv(wiphy);
+	struct hdd_adapter *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX +
 			  1];
 	struct nlattr *tb2[QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX
@@ -2155,12 +2160,13 @@ __wlan_hdd_cfg80211_extscan_set_significant_change(struct wiphy *wiphy,
 		return -EPERM;
 	}
 
-	retval = wlan_hdd_validate_context(pHddCtx);
+	retval = wlan_hdd_validate_context(hdd_ctx);
 	if (0 != retval)
 		return -EINVAL;
 
-	if (nla_parse(tb, QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX,
-		      data, data_len, wlan_hdd_extscan_config_policy)) {
+	if (hdd_nla_parse(tb,
+			  QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX,
+			  data, data_len, wlan_hdd_extscan_config_policy)) {
 		hdd_err("Invalid ATTR");
 		return -EINVAL;
 	}
@@ -2248,11 +2254,11 @@ __wlan_hdd_cfg80211_extscan_set_significant_change(struct wiphy *wiphy,
 			break;
 		}
 
-		if (nla_parse
-		    (tb2, QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX,
-		    nla_data(apTh), nla_len(apTh),
-		    wlan_hdd_extscan_config_policy)) {
-			hdd_err("nla_parse failed");
+		if (hdd_nla_parse(tb2,
+			   QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX,
+			   nla_data(apTh), nla_len(apTh),
+			   wlan_hdd_extscan_config_policy)) {
+			hdd_err("hdd_nla_parse failed");
 			goto fail;
 		}
 
@@ -2304,7 +2310,7 @@ __wlan_hdd_cfg80211_extscan_set_significant_change(struct wiphy *wiphy,
 	context->request_id = request_id = pReqMsg->requestId;
 	spin_unlock(&context->context_lock);
 
-	status = sme_set_significant_change(pHddCtx->hHal, pReqMsg);
+	status = sme_set_significant_change(hdd_ctx->hHal, pReqMsg);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("sme_set_significant_change failed(err=%d)", status);
 		qdf_mem_free(pReqMsg);
@@ -2366,7 +2372,7 @@ int wlan_hdd_cfg80211_extscan_set_significant_change(struct wiphy *wiphy,
  *
  * Return: none
  */
-static void hdd_remove_dsrc_channels(hdd_context_t *hdd_ctx,
+static void hdd_remove_dsrc_channels(struct hdd_context *hdd_ctx,
 				     struct wiphy *wiphy, uint32_t *chan_list,
 				     uint8_t *num_channels)
 {
@@ -2399,7 +2405,7 @@ static void hdd_remove_passive_channels(struct wiphy *wiphy,
 	int i, j, k;
 
 	for (i = 0; i < *num_channels; i++)
-		for (j = 0; j < NUM_NL80211_BANDS; j++) {
+		for (j = 0; j < HDD_NUM_NL80211_BANDS; j++) {
 			if (wiphy->bands[j] == NULL)
 				continue;
 			for (k = 0; k < wiphy->bands[j]->n_channels; k++) {
@@ -2432,9 +2438,9 @@ __wlan_hdd_cfg80211_extscan_get_valid_channels(struct wiphy *wiphy,
 						 *wdev, const void *data,
 						 int data_len)
 {
-	hdd_context_t *pHddCtx = wiphy_priv(wiphy);
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	struct net_device *dev = wdev->netdev;
-	hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_adapter *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	uint32_t chan_list[WNI_CFG_VALID_CHANNEL_LIST_LEN] = {0};
 	uint8_t num_channels  = 0, i, buf[256] = {0};
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX +
@@ -2452,16 +2458,17 @@ __wlan_hdd_cfg80211_extscan_get_valid_channels(struct wiphy *wiphy,
 		return -EPERM;
 	}
 
-	ret = wlan_hdd_validate_context(pHddCtx);
+	ret = wlan_hdd_validate_context(hdd_ctx);
 	if (0 != ret)
 		return -EINVAL;
 
-	if (!pHddCtx->config->extscan_enabled) {
+	if (!hdd_ctx->config->extscan_enabled) {
 		hdd_err("extscan not supported");
 		return -ENOTSUPP;
 	}
-	if (nla_parse(tb, QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX,
-		      data, data_len, wlan_hdd_extscan_config_policy)) {
+	if (hdd_nla_parse(tb,
+			  QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX,
+			  data, data_len, wlan_hdd_extscan_config_policy)) {
 		hdd_err("Invalid ATTR");
 		return -EINVAL;
 	}
@@ -2502,7 +2509,7 @@ __wlan_hdd_cfg80211_extscan_get_valid_channels(struct wiphy *wiphy,
 
 	hdd_debug("Req Id: %u Wifi band: %d Max channels: %d", requestId,
 		    wifiBand, maxChannels);
-	status = sme_get_valid_channels_by_band((tHalHandle) (pHddCtx->hHal),
+	status = sme_get_valid_channels_by_band((tHalHandle) (hdd_ctx->hHal),
 						wifiBand, chan_list,
 						&num_channels);
 	if (QDF_STATUS_SUCCESS != status) {
@@ -2513,7 +2520,7 @@ __wlan_hdd_cfg80211_extscan_get_valid_channels(struct wiphy *wiphy,
 
 	num_channels = QDF_MIN(num_channels, maxChannels);
 
-	hdd_remove_dsrc_channels(pHddCtx, wiphy, chan_list, &num_channels);
+	hdd_remove_dsrc_channels(hdd_ctx, wiphy, chan_list, &num_channels);
 	if ((QDF_SAP_MODE == pAdapter->device_mode) ||
 	    !strncmp(hdd_get_fwpath(), "ap", 2))
 		hdd_remove_passive_channels(wiphy, chan_list,
@@ -2661,7 +2668,7 @@ static bool hdd_extscan_channel_max_reached(tSirWifiScanCmdReqParams *req,
  * Return: 0 on success; error number otherwise
  */
 static int hdd_extscan_start_fill_bucket_channel_spec(
-			hdd_context_t *hdd_ctx,
+			struct hdd_context *hdd_ctx,
 			tpSirWifiScanCmdReqParams req_msg,
 			struct nlattr **tb)
 {
@@ -2706,11 +2713,11 @@ static int hdd_extscan_start_fill_bucket_channel_spec(
 			break;
 		}
 
-		if (nla_parse(bucket,
-			      QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX,
-			      nla_data(buckets), nla_len(buckets),
-			      wlan_hdd_extscan_config_policy)) {
-			hdd_err("nla_parse failed");
+		if (hdd_nla_parse(bucket,
+			   QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX,
+			   nla_data(buckets), nla_len(buckets),
+			   wlan_hdd_extscan_config_policy)) {
+			hdd_err("hdd_nla_parse failed");
 			return -EINVAL;
 		}
 
@@ -2930,11 +2937,11 @@ static int hdd_extscan_start_fill_bucket_channel_spec(
 							    total_channels))
 				break;
 
-			if (nla_parse(channel,
-				QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX,
-				nla_data(channels), nla_len(channels),
-				wlan_hdd_extscan_config_policy)) {
-				hdd_err("nla_parse failed");
+			if (hdd_nla_parse(channel,
+			   QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX,
+			   nla_data(channels), nla_len(channels),
+			   wlan_hdd_extscan_config_policy)) {
+				hdd_err("hdd_nla_parse failed");
 				return -EINVAL;
 			}
 
@@ -3121,8 +3128,8 @@ __wlan_hdd_cfg80211_extscan_start(struct wiphy *wiphy,
 {
 	tpSirWifiScanCmdReqParams pReqMsg       = NULL;
 	struct net_device *dev                  = wdev->netdev;
-	hdd_adapter_t *pAdapter                 = WLAN_HDD_GET_PRIV_PTR(dev);
-	hdd_context_t *pHddCtx                  = wiphy_priv(wiphy);
+	struct hdd_adapter *pAdapter                 = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx             = wiphy_priv(wiphy);
 	struct nlattr *tb[PARAM_MAX + 1];
 	struct hdd_ext_scan_context *context;
 	uint32_t request_id, num_buckets;
@@ -3137,16 +3144,16 @@ __wlan_hdd_cfg80211_extscan_start(struct wiphy *wiphy,
 		return -EPERM;
 	}
 
-	retval = wlan_hdd_validate_context(pHddCtx);
+	retval = wlan_hdd_validate_context(hdd_ctx);
 	if (0 != retval)
 		return -EINVAL;
 
-	if (!pHddCtx->config->extscan_enabled) {
+	if (!hdd_ctx->config->extscan_enabled) {
 		hdd_err("extscan not supported");
 		return -ENOTSUPP;
 	}
-	if (nla_parse(tb, PARAM_MAX, data, data_len,
-		wlan_hdd_extscan_config_policy)) {
+	if (hdd_nla_parse(tb, PARAM_MAX, data, data_len,
+			  wlan_hdd_extscan_config_policy)) {
 		hdd_err("Invalid ATTR");
 		return -EINVAL;
 	}
@@ -3222,7 +3229,7 @@ __wlan_hdd_cfg80211_extscan_start(struct wiphy *wiphy,
 				nla_get_u32(tb[PARAM_CONFIG_FLAGS]));
 
 	pReqMsg->extscan_adaptive_dwell_mode =
-		pHddCtx->config->extscan_adaptive_dwell_mode;
+		hdd_ctx->config->extscan_adaptive_dwell_mode;
 
 	hdd_debug("Configuration flags: %u",
 				pReqMsg->configuration_flags);
@@ -3232,7 +3239,7 @@ __wlan_hdd_cfg80211_extscan_start(struct wiphy *wiphy,
 		goto fail;
 	}
 
-	if (hdd_extscan_start_fill_bucket_channel_spec(pHddCtx, pReqMsg, tb))
+	if (hdd_extscan_start_fill_bucket_channel_spec(hdd_ctx, pReqMsg, tb))
 		goto fail;
 
 	context = &ext_scan_context;
@@ -3242,15 +3249,15 @@ __wlan_hdd_cfg80211_extscan_start(struct wiphy *wiphy,
 	context->buckets_scanned = 0;
 	spin_unlock(&context->context_lock);
 
-	status = sme_ext_scan_start(pHddCtx->hHal, pReqMsg);
+	status = sme_ext_scan_start(hdd_ctx->hHal, pReqMsg);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("sme_ext_scan_start failed(err=%d)", status);
 		goto fail;
 	}
 
-	pHddCtx->ext_scan_start_since_boot = qdf_get_monotonic_boottime();
+	hdd_ctx->ext_scan_start_since_boot = qdf_get_monotonic_boottime();
 	hdd_debug("Timestamp since boot: %llu",
-			pHddCtx->ext_scan_start_since_boot);
+			hdd_ctx->ext_scan_start_since_boot);
 
 	/* request was sent -- wait for the response */
 	rc = wait_for_completion_timeout(&context->response_event,
@@ -3335,8 +3342,8 @@ __wlan_hdd_cfg80211_extscan_stop(struct wiphy *wiphy,
 {
 	tpSirExtScanStopReqParams pReqMsg = NULL;
 	struct net_device *dev = wdev->netdev;
-	hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
-	hdd_context_t *pHddCtx = wiphy_priv(wiphy);
+	struct hdd_adapter *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	struct nlattr *tb[PARAM_MAX + 1];
 	struct hdd_ext_scan_context *context;
 	QDF_STATUS status;
@@ -3351,16 +3358,16 @@ __wlan_hdd_cfg80211_extscan_stop(struct wiphy *wiphy,
 		return -EPERM;
 	}
 
-	retval = wlan_hdd_validate_context(pHddCtx);
+	retval = wlan_hdd_validate_context(hdd_ctx);
 	if (0 != retval)
 		return -EINVAL;
 
-	if (!pHddCtx->config->extscan_enabled) {
+	if (!hdd_ctx->config->extscan_enabled) {
 		hdd_err("extscan not supported");
 		return -ENOTSUPP;
 	}
-	if (nla_parse(tb, PARAM_MAX, data, data_len,
-			wlan_hdd_extscan_config_policy)) {
+	if (hdd_nla_parse(tb, PARAM_MAX, data, data_len,
+			  wlan_hdd_extscan_config_policy)) {
 		hdd_err("Invalid ATTR");
 		return -EINVAL;
 	}
@@ -3388,7 +3395,7 @@ __wlan_hdd_cfg80211_extscan_stop(struct wiphy *wiphy,
 	context->request_id = request_id = pReqMsg->requestId;
 	spin_unlock(&context->context_lock);
 
-	status = sme_ext_scan_stop(pHddCtx->hHal, pReqMsg);
+	status = sme_ext_scan_stop(hdd_ctx->hHal, pReqMsg);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("sme_ext_scan_stop failed(err=%d)", status);
 		goto fail;
@@ -3464,8 +3471,8 @@ __wlan_hdd_cfg80211_extscan_reset_bssid_hotlist(struct wiphy *wiphy,
 {
 	tpSirExtScanResetBssidHotlistReqParams pReqMsg = NULL;
 	struct net_device *dev = wdev->netdev;
-	hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
-	hdd_context_t *pHddCtx = wiphy_priv(wiphy);
+	struct hdd_adapter *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX +
 			  1];
 	struct hdd_ext_scan_context *context;
@@ -3481,16 +3488,17 @@ __wlan_hdd_cfg80211_extscan_reset_bssid_hotlist(struct wiphy *wiphy,
 		return -EPERM;
 	}
 
-	retval = wlan_hdd_validate_context(pHddCtx);
+	retval = wlan_hdd_validate_context(hdd_ctx);
 	if (0 != retval)
 		return -EINVAL;
 
-	if (!pHddCtx->config->extscan_enabled) {
+	if (!hdd_ctx->config->extscan_enabled) {
 		hdd_err("extscan not supported");
 		return -ENOTSUPP;
 	}
-	if (nla_parse(tb, QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX,
-		      data, data_len, wlan_hdd_extscan_config_policy)) {
+	if (hdd_nla_parse(tb,
+			  QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX,
+			  data, data_len, wlan_hdd_extscan_config_policy)) {
 		hdd_err("Invalid ATTR");
 		return -EINVAL;
 	}
@@ -3520,7 +3528,7 @@ __wlan_hdd_cfg80211_extscan_reset_bssid_hotlist(struct wiphy *wiphy,
 	context->request_id = request_id = pReqMsg->requestId;
 	spin_unlock(&context->context_lock);
 
-	status = sme_reset_bss_hotlist(pHddCtx->hHal, pReqMsg);
+	status = sme_reset_bss_hotlist(hdd_ctx->hHal, pReqMsg);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("sme_reset_bss_hotlist failed(err=%d)", status);
 		goto fail;
@@ -3592,8 +3600,8 @@ __wlan_hdd_cfg80211_extscan_reset_significant_change(struct wiphy
 {
 	tpSirExtScanResetSignificantChangeReqParams pReqMsg = NULL;
 	struct net_device *dev = wdev->netdev;
-	hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
-	hdd_context_t *pHddCtx = wiphy_priv(wiphy);
+	struct hdd_adapter *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX +
 			  1];
 	struct hdd_ext_scan_context *context;
@@ -3609,16 +3617,18 @@ __wlan_hdd_cfg80211_extscan_reset_significant_change(struct wiphy
 		return -EPERM;
 	}
 
-	retval = wlan_hdd_validate_context(pHddCtx);
+	retval = wlan_hdd_validate_context(hdd_ctx);
 	if (0 != retval)
 		return -EINVAL;
 
-	if (!pHddCtx->config->extscan_enabled) {
+	if (!hdd_ctx->config->extscan_enabled) {
 		hdd_err("extscan not supported");
 		return -ENOTSUPP;
 	}
-	if (nla_parse(tb, QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX,
-		      data, data_len, wlan_hdd_extscan_config_policy)) {
+
+	if (hdd_nla_parse(tb,
+			  QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX,
+			  data, data_len, wlan_hdd_extscan_config_policy)) {
 		hdd_err("Invalid ATTR");
 		return -EINVAL;
 	}
@@ -3648,7 +3658,7 @@ __wlan_hdd_cfg80211_extscan_reset_significant_change(struct wiphy
 	context->request_id = request_id = pReqMsg->requestId;
 	spin_unlock(&context->context_lock);
 
-	status = sme_reset_significant_change(pHddCtx->hHal, pReqMsg);
+	status = sme_reset_significant_change(hdd_ctx->hHal, pReqMsg);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("sme_reset_significant_change failed(err=%d)",
 			status);
@@ -3716,7 +3726,7 @@ int wlan_hdd_cfg80211_extscan_reset_significant_change(struct wiphy *wiphy,
  * Return: 0 on success, error number otherwise
  */
 static int hdd_extscan_epno_fill_network_list(
-			hdd_context_t *hddctx,
+			struct hdd_context *hddctx,
 			struct wifi_epno_params *req_msg,
 			struct nlattr **tb)
 {
@@ -3728,6 +3738,11 @@ static int hdd_extscan_epno_fill_network_list(
 
 	expected_networks = req_msg->num_networks;
 	index = 0;
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_PNO_SET_LIST_PARAM_EPNO_NETWORKS_LIST]) {
+		hdd_err("attr networks list failed");
+		return -EINVAL;
+	}
 	nla_for_each_nested(networks,
 			    tb[QCA_WLAN_VENDOR_ATTR_PNO_SET_LIST_PARAM_EPNO_NETWORKS_LIST],
 			    rem1) {
@@ -3737,10 +3752,10 @@ static int hdd_extscan_epno_fill_network_list(
 			break;
 		}
 
-		if (nla_parse(network, QCA_WLAN_VENDOR_ATTR_PNO_MAX,
-			      nla_data(networks), nla_len(networks),
-			      wlan_hdd_pno_config_policy)) {
-			hdd_err("nla_parse failed");
+		if (hdd_nla_parse(network, QCA_WLAN_VENDOR_ATTR_PNO_MAX,
+				  nla_data(networks), nla_len(networks),
+				  wlan_hdd_pno_config_policy)) {
+			hdd_err("hdd_nla_parse failed");
 			return -EINVAL;
 		}
 
@@ -3752,7 +3767,7 @@ static int hdd_extscan_epno_fill_network_list(
 		ssid_len = nla_len(
 			network[QCA_WLAN_VENDOR_ATTR_PNO_SET_LIST_PARAM_EPNO_NETWORK_SSID]);
 
-		/* nla_parse will detect overflow but not underflow */
+		/* hdd_nla_parse will detect overflow but not underflow */
 		if (0 == ssid_len) {
 			hdd_err("zero ssid length");
 			return -EINVAL;
@@ -3814,8 +3829,8 @@ static int __wlan_hdd_cfg80211_set_epno_list(struct wiphy *wiphy,
 {
 	struct wifi_epno_params *req_msg = NULL;
 	struct net_device *dev           = wdev->netdev;
-	hdd_adapter_t *adapter           = WLAN_HDD_GET_PRIV_PTR(dev);
-	hdd_context_t *hdd_ctx           = wiphy_priv(wiphy);
+	struct hdd_adapter *adapter           = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx      = wiphy_priv(wiphy);
 	struct nlattr *tb[
 		QCA_WLAN_VENDOR_ATTR_PNO_MAX + 1];
 	QDF_STATUS status;
@@ -3832,14 +3847,14 @@ static int __wlan_hdd_cfg80211_set_epno_list(struct wiphy *wiphy,
 		hdd_err("extscan not supported");
 		return -ENOTSUPP;
 	}
+
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
 		hdd_err("Command not allowed in FTM mode");
 		return -EPERM;
 	}
 
-	if (nla_parse(tb, QCA_WLAN_VENDOR_ATTR_PNO_MAX,
-		      data, data_len,
-		      wlan_hdd_pno_config_policy)) {
+	if (hdd_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_PNO_MAX,
+			  data, data_len, wlan_hdd_pno_config_policy)) {
 		hdd_err("Invalid ATTR");
 		return -EINVAL;
 	}
@@ -3875,12 +3890,12 @@ static int __wlan_hdd_cfg80211_set_epno_list(struct wiphy *wiphy,
 	req_msg->num_networks = num_networks;
 
 	/* Parse and fetch request Id */
-	if (!tb[QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_REQUEST_ID]) {
+	if (!tb[QCA_WLAN_VENDOR_ATTR_PNO_CONFIG_REQUEST_ID]) {
 		hdd_err("attr request id failed");
 		goto fail;
 	}
 	req_msg->request_id = nla_get_u32(
-	    tb[QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_REQUEST_ID]);
+	    tb[QCA_WLAN_VENDOR_ATTR_PNO_CONFIG_REQUEST_ID]);
 	hdd_debug("Req Id %u", req_msg->request_id);
 
 	req_msg->session_id = adapter->sessionId;
@@ -4015,7 +4030,7 @@ int wlan_hdd_cfg80211_set_epno_list(struct wiphy *wiphy,
  * Return: 0 on success, error number otherwise
  */
 static int hdd_extscan_passpoint_fill_network_list(
-			hdd_context_t *hddctx,
+			struct hdd_context *hddctx,
 			struct wifi_passpoint_req *req_msg,
 			struct nlattr **tb)
 {
@@ -4027,6 +4042,11 @@ static int hdd_extscan_passpoint_fill_network_list(
 
 	expected_networks = req_msg->num_networks;
 	index = 0;
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_PNO_PASSPOINT_LIST_PARAM_NETWORK_ARRAY]) {
+		hdd_err("attr network array failed");
+		return -EINVAL;
+	}
 	nla_for_each_nested(networks,
 		tb[QCA_WLAN_VENDOR_ATTR_PNO_PASSPOINT_LIST_PARAM_NETWORK_ARRAY],
 		rem1) {
@@ -4036,11 +4056,10 @@ static int hdd_extscan_passpoint_fill_network_list(
 			break;
 		}
 
-		if (nla_parse(network,
-			      QCA_WLAN_VENDOR_ATTR_PNO_MAX,
-			      nla_data(networks), nla_len(networks),
-			      wlan_hdd_pno_config_policy)) {
-			hdd_err("nla_parse failed");
+		if (hdd_nla_parse(network, QCA_WLAN_VENDOR_ATTR_PNO_MAX,
+				  nla_data(networks), nla_len(networks),
+				  wlan_hdd_pno_config_policy)) {
+			hdd_err("hdd_nla_parse failed");
 			return -EINVAL;
 		}
 
@@ -4118,8 +4137,8 @@ static int __wlan_hdd_cfg80211_set_passpoint_list(struct wiphy *wiphy,
 {
 	struct wifi_passpoint_req *req_msg = NULL;
 	struct net_device *dev             = wdev->netdev;
-	hdd_adapter_t *adapter             = WLAN_HDD_GET_PRIV_PTR(dev);
-	hdd_context_t *hdd_ctx             = wiphy_priv(wiphy);
+	struct hdd_adapter *adapter             = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx        = wiphy_priv(wiphy);
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_PNO_MAX + 1];
 	QDF_STATUS status;
 	uint32_t num_networks = 0;
@@ -4136,8 +4155,8 @@ static int __wlan_hdd_cfg80211_set_passpoint_list(struct wiphy *wiphy,
 		return -EPERM;
 	}
 
-	if (nla_parse(tb, QCA_WLAN_VENDOR_ATTR_PNO_MAX, data, data_len,
-		      wlan_hdd_pno_config_policy)) {
+	if (hdd_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_PNO_MAX, data, data_len,
+			  wlan_hdd_pno_config_policy)) {
 		hdd_err("Invalid ATTR");
 		return -EINVAL;
 	}
@@ -4240,8 +4259,8 @@ static int __wlan_hdd_cfg80211_reset_passpoint_list(struct wiphy *wiphy,
 {
 	struct wifi_passpoint_req *req_msg = NULL;
 	struct net_device *dev             = wdev->netdev;
-	hdd_adapter_t *adapter             = WLAN_HDD_GET_PRIV_PTR(dev);
-	hdd_context_t *hdd_ctx             = wiphy_priv(wiphy);
+	struct hdd_adapter *adapter             = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx        = wiphy_priv(wiphy);
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_PNO_MAX + 1];
 	QDF_STATUS status;
 	int ret;
@@ -4257,8 +4276,8 @@ static int __wlan_hdd_cfg80211_reset_passpoint_list(struct wiphy *wiphy,
 		return -EPERM;
 	}
 
-	if (nla_parse(tb, QCA_WLAN_VENDOR_ATTR_PNO_MAX, data, data_len,
-		wlan_hdd_extscan_config_policy)) {
+	if (hdd_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_PNO_MAX, data, data_len,
+			  wlan_hdd_extscan_config_policy)) {
 		hdd_err("Invalid ATTR");
 		return -EINVAL;
 	}
@@ -4329,12 +4348,12 @@ int wlan_hdd_cfg80211_reset_passpoint_list(struct wiphy *wiphy,
  * Return: none
  */
 #ifdef WLAN_FEATURE_EXTWOW_SUPPORT
-static inline void wlan_hdd_init_completion_extwow(hdd_context_t *pHddCtx)
+static inline void wlan_hdd_init_completion_extwow(struct hdd_context *hdd_ctx)
 {
-	init_completion(&pHddCtx->ready_to_extwow);
+	init_completion(&hdd_ctx->ready_to_extwow);
 }
 #else
-static inline void wlan_hdd_init_completion_extwow(hdd_context_t *pHddCtx)
+static inline void wlan_hdd_init_completion_extwow(struct hdd_context *hdd_ctx)
 {
 }
 #endif
@@ -4345,7 +4364,7 @@ static inline void wlan_hdd_init_completion_extwow(hdd_context_t *pHddCtx)
  *
  * Return: none
  */
-void wlan_hdd_cfg80211_extscan_init(hdd_context_t *hdd_ctx)
+void wlan_hdd_cfg80211_extscan_init(struct hdd_context *hdd_ctx)
 {
 	wlan_hdd_init_completion_extwow(hdd_ctx);
 	init_completion(&ext_scan_context.response_event);

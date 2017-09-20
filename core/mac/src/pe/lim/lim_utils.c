@@ -59,6 +59,7 @@
 #include "nan_datapath.h"
 #include "wma.h"
 #include "wlan_reg_services_api.h"
+#include "wlan_policy_mgr_api.h"
 #ifdef WLAN_FEATURE_11AX_BSS_COLOR
 #include "wma_he.h"
 #endif
@@ -235,8 +236,6 @@ char *lim_sme_state_str(tLimSmeStates state)
 		return "eLIM_SME_WT_ASSOC_STATE";
 	case eLIM_SME_WT_REASSOC_STATE:
 		return "eLIM_SME_WT_REASSOC_STATE";
-	case eLIM_SME_WT_REASSOC_LINK_FAIL_STATE:
-		return "eLIM_SME_WT_REASSOC_LINK_FAIL_STATE";
 	case eLIM_SME_JOIN_FAILURE_STATE:
 		return "eLIM_SME_JOIN_FAILURE_STATE";
 	case eLIM_SME_ASSOCIATED_STATE:
@@ -448,8 +447,8 @@ char *lim_result_code_str(tSirResultCodes resultCode)
 	switch (resultCode) {
 	case eSIR_SME_SUCCESS:
 		return "eSIR_SME_SUCCESS";
-	case eSIR_LOGP_EXCEPTION:
-		return "eSIR_LOGP_EXCEPTION";
+	case eSIR_LOGE_EXCEPTION:
+		return "eSIR_LOGE_EXCEPTION";
 	case eSIR_SME_INVALID_PARAMETERS:
 		return "eSIR_SME_INVALID_PARAMETERS";
 	case eSIR_SME_UNEXPECTED_REQ_RESULT_CODE:
@@ -583,6 +582,76 @@ static void lim_deactivate_del_sta(tpAniSirGlobal mac_ctx, uint32_t bss_entry,
 }
 #endif
 
+void lim_deactivate_timers(tpAniSirGlobal mac_ctx)
+{
+	uint32_t n;
+	tLimTimers *lim_timer = &mac_ctx->lim.limTimers;
+
+	lim_deactivate_timers_host_roam(mac_ctx);
+
+	/* Deactivate Periodic Probe channel timers. */
+	tx_timer_deactivate(&lim_timer->gLimPeriodicProbeReqTimer);
+
+	/* Deactivate channel switch timer. */
+	tx_timer_deactivate(&lim_timer->gLimChannelSwitchTimer);
+
+	/* Deactivate addts response timer. */
+	tx_timer_deactivate(&lim_timer->gLimAddtsRspTimer);
+
+	/* Deactivate Join failure timer. */
+	tx_timer_deactivate(&lim_timer->gLimJoinFailureTimer);
+
+	/* Deactivate Periodic Join Probe Request timer. */
+	tx_timer_deactivate(&lim_timer->gLimPeriodicJoinProbeReqTimer);
+
+	/* Deactivate Auth Retry timer. */
+	tx_timer_deactivate
+			(&lim_timer->g_lim_periodic_auth_retry_timer);
+
+	/* Deactivate Association failure timer. */
+	tx_timer_deactivate(&lim_timer->gLimAssocFailureTimer);
+
+	/* Deactivate Open system auth timer. */
+	tx_timer_deactivate(&lim_timer->open_sys_auth_timer);
+
+	/* Deactivate Authentication failure timer. */
+	tx_timer_deactivate(&lim_timer->gLimAuthFailureTimer);
+
+	/* Deactivate wait-for-probe-after-Heartbeat timer. */
+	tx_timer_deactivate(&lim_timer->gLimProbeAfterHBTimer);
+
+	/* Deactivate and delete Quiet timer. */
+	tx_timer_deactivate(&lim_timer->gLimQuietTimer);
+
+	/* Deactivate Quiet BSS timer. */
+	tx_timer_deactivate(&lim_timer->gLimQuietBssTimer);
+
+	/* Deactivate cnf wait timer */
+	for (n = 0; n < (mac_ctx->lim.maxStation + 1); n++) {
+		tx_timer_deactivate(&lim_timer->gpLimCnfWaitTimer[n]);
+	}
+
+	/* Deactivate any Authentication response timers */
+	lim_delete_pre_auth_list(mac_ctx);
+
+	tx_timer_deactivate(&lim_timer->gLimUpdateOlbcCacheTimer);
+	tx_timer_deactivate(&lim_timer->gLimPreAuthClnupTimer);
+
+	/* Deactivate remain on channel timer */
+	tx_timer_deactivate(&lim_timer->gLimRemainOnChannelTimer);
+
+	tx_timer_deactivate(&lim_timer->gLimDisassocAckTimer);
+
+	tx_timer_deactivate(&lim_timer->gLimDeauthAckTimer);
+
+	tx_timer_deactivate(&lim_timer->
+			gLimP2pSingleShotNoaInsertTimer);
+
+	tx_timer_deactivate(&lim_timer->
+			gLimActiveToPassiveChannelTimer);
+}
+
+
 /**
  * lim_cleanup_mlm() - This function is called to cleanup
  * @mac_ctx: Pointer to Global MAC structure
@@ -606,91 +675,70 @@ void lim_cleanup_mlm(tpAniSirGlobal mac_ctx)
 	if (mac_ctx->lim.gLimTimersCreated == 1) {
 		lim_timer = &mac_ctx->lim.limTimers;
 
+		lim_deactivate_timers(mac_ctx);
+
 		lim_delete_timers_host_roam(mac_ctx);
-		/* Deactivate and delete Periodic Probe channel timers. */
-		tx_timer_deactivate(&lim_timer->gLimPeriodicProbeReqTimer);
+		/* Delete Periodic Probe channel timers. */
 		tx_timer_delete(&lim_timer->gLimPeriodicProbeReqTimer);
 
-		/* Deactivate and delete channel switch timer. */
-		tx_timer_deactivate(&lim_timer->gLimChannelSwitchTimer);
+		/* Delete channel switch timer. */
 		tx_timer_delete(&lim_timer->gLimChannelSwitchTimer);
 
-		/* Deactivate and delete addts response timer. */
-		tx_timer_deactivate(&lim_timer->gLimAddtsRspTimer);
+		/* Delete addts response timer. */
 		tx_timer_delete(&lim_timer->gLimAddtsRspTimer);
 
-		/* Deactivate and delete Join failure timer. */
-		tx_timer_deactivate(&lim_timer->gLimJoinFailureTimer);
+		/* Delete Join failure timer. */
 		tx_timer_delete(&lim_timer->gLimJoinFailureTimer);
 
-		/* Deactivate and delete Periodic Join Probe Request timer. */
-		tx_timer_deactivate(&lim_timer->gLimPeriodicJoinProbeReqTimer);
+		/* Delete Periodic Join Probe Request timer. */
 		tx_timer_delete(&lim_timer->gLimPeriodicJoinProbeReqTimer);
 
-		/* Deactivate and delete Auth Retry timer. */
-		tx_timer_deactivate
-				(&lim_timer->g_lim_periodic_auth_retry_timer);
+		/* Delete Auth Retry timer. */
 		tx_timer_delete(&lim_timer->g_lim_periodic_auth_retry_timer);
 
-		/* Deactivate and delete Association failure timer. */
-		tx_timer_deactivate(&lim_timer->gLimAssocFailureTimer);
+		/* Delete Association failure timer. */
 		tx_timer_delete(&lim_timer->gLimAssocFailureTimer);
 
-		/* Deactivate and delete Authentication failure timer. */
-		tx_timer_deactivate(&lim_timer->gLimAuthFailureTimer);
+		/* Delete Open system auth timer. */
+		tx_timer_delete(&lim_timer->open_sys_auth_timer);
+
+		/* Delete Authentication failure timer. */
 		tx_timer_delete(&lim_timer->gLimAuthFailureTimer);
 
-		/* Deactivate and delete wait-for-probe-after-Heartbeat timer. */
-		tx_timer_deactivate(&lim_timer->gLimProbeAfterHBTimer);
+		/* Delete wait-for-probe-after-Heartbeat timer. */
 		tx_timer_delete(&lim_timer->gLimProbeAfterHBTimer);
 
-		/* Deactivate and delete Quiet timer. */
-		tx_timer_deactivate(&lim_timer->gLimQuietTimer);
+		/* Delete Quiet timer. */
 		tx_timer_delete(&lim_timer->gLimQuietTimer);
 
-		/* Deactivate and delete Quiet BSS timer. */
-		tx_timer_deactivate(&lim_timer->gLimQuietBssTimer);
+		/* Delete Quiet BSS timer. */
 		tx_timer_delete(&lim_timer->gLimQuietBssTimer);
 
-		/* Deactivate and delete cnf wait timer */
+		/* Delete cnf wait timer */
 		for (n = 0; n < (mac_ctx->lim.maxStation + 1); n++) {
-			tx_timer_deactivate(&lim_timer->gpLimCnfWaitTimer[n]);
 			tx_timer_delete(&lim_timer->gpLimCnfWaitTimer[n]);
 		}
 
 		pAuthNode = mac_ctx->lim.gLimPreAuthTimerTable.pTable;
-
-		/* Deactivate any Authentication response timers */
-		lim_delete_pre_auth_list(mac_ctx);
 
 		/* Delete any Auth rsp timers, which might have been started */
 		for (n = 0; n < mac_ctx->lim.gLimPreAuthTimerTable.numEntry;
 				n++)
 			tx_timer_delete(&pAuthNode[n]->timer);
 
-		tx_timer_deactivate(&lim_timer->gLimUpdateOlbcCacheTimer);
 		tx_timer_delete(&lim_timer->gLimUpdateOlbcCacheTimer);
-		tx_timer_deactivate(&lim_timer->gLimPreAuthClnupTimer);
 		tx_timer_delete(&lim_timer->gLimPreAuthClnupTimer);
 
-		/* Deactivate and delete remain on channel timer */
-		tx_timer_deactivate(&lim_timer->gLimRemainOnChannelTimer);
+		/* Delete remain on channel timer */
 		tx_timer_delete(&lim_timer->gLimRemainOnChannelTimer);
 
-
-		tx_timer_deactivate(&lim_timer->gLimDisassocAckTimer);
 		tx_timer_delete(&lim_timer->gLimDisassocAckTimer);
 
-		tx_timer_deactivate(&lim_timer->gLimDeauthAckTimer);
 		tx_timer_delete(&lim_timer->gLimDeauthAckTimer);
 
-		tx_timer_deactivate(&lim_timer->
-				gLimP2pSingleShotNoaInsertTimer);
 		tx_timer_delete(&lim_timer->
 				gLimP2pSingleShotNoaInsertTimer);
 
-		tx_timer_deactivate(&lim_timer->
-				gLimActiveToPassiveChannelTimer);
 		tx_timer_delete(&lim_timer->
 				gLimActiveToPassiveChannelTimer);
 
@@ -1401,7 +1449,7 @@ lim_update_short_preamble(tpAniSirGlobal mac_ctx, tSirMacAddr peer_mac_addr,
 
 	pe_debug("Short Preamble is not enabled in Assoc Req from");
 
-	lim_print_mac_addr(mac_ctx, peer_mac_addr, LOG1);
+	lim_print_mac_addr(mac_ctx, peer_mac_addr, LOGD);
 
 	for (i = 0; i < LIM_PROT_STA_CACHE_SIZE; i++) {
 		if (LIM_IS_AP_ROLE(psession_entry) &&
@@ -2856,6 +2904,10 @@ uint8_t lim_get_ht_capability(tpAniSirGlobal pMac,
 		retVal = (uint8_t) macHTCapabilityInfo.maximalAMSDUsize;
 		break;
 
+	case eHT_MAX_AMSDU_NUM:
+		retVal = (uint8_t) psessionEntry->max_amsdu_num;
+		break;
+
 	case eHT_RX_STBC:
 		retVal = (uint8_t) psessionEntry->htConfig.ht_rx_stbc;
 		break;
@@ -3057,7 +3109,7 @@ lim_disable_11a_protection(tpAniSirGlobal mac_ctx,
 
 	/* for station role */
 	if (!LIM_IS_AP_ROLE(pe_session)) {
-		pe_warn("===> Protection from 11A Disabled");
+		pe_debug("===> Protection from 11A Disabled");
 		bcn_prms->llaCoexist = false;
 		pe_session->beaconParams.llaCoexist = false;
 		bcn_prms->paramChangeBitmap |= PARAM_llACOEXIST_CHANGED;
@@ -3835,26 +3887,27 @@ static void lim_handle_ht20coexist_ht20protection(tpAniSirGlobal mac_ctx,
 			 */
 			(eSIR_HT_OP_MODE_OVERLAP_LEGACY ==
 				session_entry->htOperMode)) {
-				if (session_entry->gLimHt20Params.
-					protectionEnabled) {
+			if (session_entry->gLimHt20Params.
+				protectionEnabled) {
 				if (eHT_CHANNEL_WIDTH_20MHZ ==
-				session_entry->htSupportedChannelWidthSet)
+					session_entry->
+					htSupportedChannelWidthSet)
 					session_entry->htOperMode =
 						eSIR_HT_OP_MODE_PURE;
 				else
 					session_entry->htOperMode =
 					eSIR_HT_OP_MODE_NO_LEGACY_20MHZ_HT;
 
-					lim_enable_ht_rifs_protection(mac_ctx,
+				lim_enable_ht_rifs_protection(mac_ctx,
 						false, overlap, beaconparams,
 						session_entry);
-					lim_enable_ht_obss_protection(mac_ctx,
+				lim_enable_ht_obss_protection(mac_ctx,
 						false, overlap, beaconparams,
 						session_entry);
-				} else {
-					session_entry->htOperMode =
-						eSIR_HT_OP_MODE_PURE;
-				}
+			} else {
+				session_entry->htOperMode =
+					eSIR_HT_OP_MODE_PURE;
+			}
 		}
 	} else if (LIM_IS_AP_ROLE(session_entry) && !overlap) {
 		/* Disable protection from 11G stations. */
@@ -4309,6 +4362,12 @@ void lim_update_sta_run_time_ht_switch_chnl_params(tpAniSirGlobal pMac,
 		    (pMac, eHT_SUPPORTED_CHANNEL_WIDTH_SET, psessionEntry))
 		return;
 
+	if (WLAN_REG_IS_24GHZ_CH(psessionEntry->currentOperChannel) &&
+		psessionEntry->force_24ghz_in_ht20) {
+		pe_debug("force_24ghz_in_ht20 is set and channel is 2.4 Ghz");
+		return;
+	}
+
 	if (psessionEntry->ftPEContext.ftPreAuthSession) {
 		pe_err("FT PREAUTH channel change is in progress");
 		return;
@@ -4325,6 +4384,11 @@ void lim_update_sta_run_time_ht_switch_chnl_params(tpAniSirGlobal pMac,
 	 */
 	if (pMac->lim.gpLimRemainOnChanReq) {
 		pe_debug("RoC is in progress");
+		return;
+	}
+
+	if (psessionEntry->ch_switch_in_progress == true) {
+		pe_debug("ch switch is in progress, ignore HT IE BW update");
 		return;
 	}
 
@@ -4908,6 +4972,60 @@ void lim_resset_scan_channel_info(tpAniSirGlobal pMac)
 	qdf_mem_set(&pMac->lim.scanChnInfo, sizeof(tLimScanChnInfo), 0);
 }
 
+void lim_add_channel_status_info(tpAniSirGlobal p_mac,
+				 struct lim_channel_status *channel_stat,
+				 uint8_t channel_id)
+{
+	uint8_t i;
+	bool found = false;
+	struct lim_scan_channel_status *channel_info =
+		&p_mac->lim.scan_channel_status;
+	struct lim_channel_status *channel_status_list =
+		channel_info->channel_status_list;
+	uint8_t total_channel = channel_info->total_channel;
+
+	if (!p_mac->sap.acs_with_more_param)
+		return;
+
+	for (i = 0; i < total_channel; i++) {
+		if (channel_status_list[i].channel_id == channel_id) {
+			if (channel_stat->cmd_flags ==
+			    WMI_CHAN_InFO_END_RESP &&
+			    channel_status_list[i].cmd_flags ==
+			    WMI_CHAN_InFO_START_RESP) {
+				/* adjust to delta value for counts */
+				channel_stat->rx_clear_count -=
+				    channel_status_list[i].rx_clear_count;
+				channel_stat->cycle_count -=
+				    channel_status_list[i].cycle_count;
+				channel_stat->rx_frame_count -=
+				    channel_status_list[i].rx_frame_count;
+				channel_stat->tx_frame_count -=
+				    channel_status_list[i].tx_frame_count;
+				channel_stat->bss_rx_cycle_count -=
+				    channel_status_list[i].bss_rx_cycle_count;
+			}
+			qdf_mem_copy(&channel_status_list[i], channel_stat,
+				     sizeof(*channel_status_list));
+			found = true;
+			break;
+		}
+	}
+
+	if (!found) {
+		if (total_channel < SIR_MAX_SUPPORTED_CHANNEL_LIST) {
+			qdf_mem_copy(&channel_status_list[total_channel++],
+				     channel_stat,
+				     sizeof(*channel_status_list));
+			channel_info->total_channel = total_channel;
+		} else {
+			pe_warn("Chan cnt exceed, channel_id=%d", channel_id);
+		}
+	}
+
+	return;
+}
+
 /**
  * @function :  lim_is_channel_valid_for_channel_switch()
  *
@@ -4925,27 +5043,38 @@ void lim_resset_scan_channel_info(tpAniSirGlobal pMac)
  * @param  channel - New channel to which we are expected to move
  * @return None
  */
-tAniBool lim_is_channel_valid_for_channel_switch(tpAniSirGlobal pMac, uint8_t channel)
+bool lim_is_channel_valid_for_channel_switch(tpAniSirGlobal pMac, uint8_t channel)
 {
 	uint8_t index;
 	uint32_t validChannelListLen = WNI_CFG_VALID_CHANNEL_LIST_LEN;
 	tSirMacChanNum validChannelList[WNI_CFG_VALID_CHANNEL_LIST_LEN];
+	bool ok;
+
+	if (policy_mgr_is_chan_ok_for_dnbs(pMac->psoc, channel, &ok)) {
+		pe_err("policy_mgr_is_chan_ok_for_dnbs() returned error");
+		return false;
+	}
+
+	if (!ok) {
+		pe_debug("channel not ok for DNBS");
+		return false;
+	}
 
 	if (wlan_cfg_get_str(pMac, WNI_CFG_VALID_CHANNEL_LIST,
 			     (uint8_t *) validChannelList,
 			     (uint32_t *) &validChannelListLen) !=
 			eSIR_SUCCESS) {
 		pe_err("could not retrieve valid channel list");
-		return eSIR_FALSE;
+		return false;
 	}
 
 	for (index = 0; index < validChannelListLen; index++) {
 		if (validChannelList[index] == channel)
-			return eSIR_TRUE;
+			return true;
 	}
 
 	/* channel does not belong to list of valid channels */
-	return eSIR_FALSE;
+	return false;
 }
 
 /**------------------------------------------------------
@@ -6506,7 +6635,7 @@ tSirRetStatus lim_strip_ie(tpAniSirGlobal mac_ctx,
 	uint16_t elem_len;
 
 	if (NULL == addn_ie) {
-		pe_err("NULL addn_ie pointer");
+		pe_debug("NULL addn_ie pointer");
 		return eSIR_IGNORE_IE;
 	}
 
@@ -6630,7 +6759,7 @@ void lim_update_extcap_struct(tpAniSirGlobal mac_ctx,
 	}
 
 	if (DOT11F_EID_EXTCAP != buf[0] || buf[1] > DOT11F_IE_EXTCAP_MAX_LEN) {
-		pe_warn("Invalid IEs eid: %d elem_len: %d",
+		pe_debug_rate_limited(30, "Invalid IEs eid: %d elem_len: %d",
 				buf[0], buf[1]);
 		return;
 	}
@@ -6670,7 +6799,7 @@ tSirRetStatus lim_strip_extcap_update_struct(tpAniSirGlobal mac_ctx,
 			      NULL, 0, extracted_buff,
 			      DOT11F_IE_EXTCAP_MAX_LEN);
 	if (eSIR_SUCCESS != status) {
-		pe_err("Failed to strip extcap IE status: %d", status);
+		pe_debug("Failed to strip extcap IE status: %d", status);
 		return status;
 	}
 
@@ -7773,6 +7902,113 @@ error:
 }
 #endif
 
+/**
+ * lim_assoc_rej_get_remaining_delta() - Get remaining time delta for
+ * the rssi based disallowed list entry
+ * @node: rssi based disallowed list entry
+ *
+ * Return: remaining delta, can be -ve if time has already expired.
+ */
+static inline int
+lim_assoc_rej_get_remaining_delta(struct sir_rssi_disallow_lst *node)
+{
+	qdf_time_t cur_time;
+	uint32_t time_diff;
+
+	cur_time = qdf_do_div(qdf_get_monotonic_boottime(),
+				QDF_MC_TIMER_TO_MS_UNIT);
+	time_diff = cur_time - node->time_during_rejection;
+
+	return node->retry_delay - time_diff;
+}
+
+/**
+ * lim_assoc_rej_rem_entry_with_lowest_delta() - Remove the entry
+ * with lowest time delta
+ * @list: rssi based rejected BSSID list
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+lim_assoc_rej_rem_entry_with_lowest_delta(qdf_list_t *list)
+{
+	struct sir_rssi_disallow_lst *oldest_node = NULL;
+	struct sir_rssi_disallow_lst *cur_node;
+	qdf_list_node_t *cur_list = NULL;
+	qdf_list_node_t *next_list = NULL;
+
+	qdf_list_peek_front(list, &cur_list);
+	while (cur_list) {
+		cur_node = qdf_container_of(cur_list,
+			struct sir_rssi_disallow_lst, node);
+		if (!oldest_node ||
+		   (lim_assoc_rej_get_remaining_delta(oldest_node) >
+		    lim_assoc_rej_get_remaining_delta(cur_node)))
+			oldest_node = cur_node;
+
+		qdf_list_peek_next(list, cur_list, &next_list);
+		cur_list = next_list;
+		next_list = NULL;
+	}
+
+	if (oldest_node) {
+		pe_debug("remove node %pM with lowest delta %d",
+			oldest_node->bssid.bytes,
+			lim_assoc_rej_get_remaining_delta(oldest_node));
+		qdf_list_remove_node(list, &oldest_node->node);
+		qdf_mem_free(oldest_node);
+		return QDF_STATUS_SUCCESS;
+	}
+
+	return QDF_STATUS_E_INVAL;
+}
+
+void lim_assoc_rej_add_to_rssi_based_reject_list(tpAniSirGlobal mac_ctx,
+	tDot11fTLVrssi_assoc_rej  *rssi_assoc_rej,
+	tSirMacAddr bssid, int8_t rssi)
+{
+	struct sir_rssi_disallow_lst *entry;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	entry = qdf_mem_malloc(sizeof(*entry));
+	if (!entry) {
+		pe_err("malloc failed for bssid entry");
+		return;
+	}
+
+	pe_debug("%pM: assoc resp rssi %d, delta rssi %d retry delay %d sec and list size %d",
+		bssid, rssi, rssi_assoc_rej->delta_rssi,
+		rssi_assoc_rej->retry_delay,
+		qdf_list_size(&mac_ctx->roam.rssi_disallow_bssid));
+
+	qdf_mem_copy(entry->bssid.bytes,
+		bssid, QDF_MAC_ADDR_SIZE);
+	entry->retry_delay = rssi_assoc_rej->retry_delay *
+		QDF_MC_TIMER_TO_MS_UNIT;
+	entry->expected_rssi = rssi + rssi_assoc_rej->delta_rssi;
+	entry->time_during_rejection =
+		qdf_do_div(qdf_get_monotonic_boottime(),
+		QDF_MC_TIMER_TO_MS_UNIT);
+
+	if (qdf_list_size(&mac_ctx->roam.rssi_disallow_bssid) >=
+		MAX_RSSI_AVOID_BSSID_LIST) {
+		status = lim_assoc_rej_rem_entry_with_lowest_delta(
+					&mac_ctx->roam.rssi_disallow_bssid);
+		if (QDF_IS_STATUS_ERROR(status))
+			pe_err("Failed to remove entry with lowest delta");
+	}
+
+	if (QDF_IS_STATUS_SUCCESS(status))
+		status = qdf_list_insert_back(
+				&mac_ctx->roam.rssi_disallow_bssid,
+				&entry->node);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("Failed to enqueue bssid entry");
+		qdf_mem_free(entry);
+	}
+}
+
 void lim_decrement_pending_mgmt_count(tpAniSirGlobal mac_ctx)
 {
 	qdf_spin_lock(&mac_ctx->sys.bbt_mgmt_lock);
@@ -7784,11 +8020,11 @@ void lim_decrement_pending_mgmt_count(tpAniSirGlobal mac_ctx)
 	qdf_spin_unlock(&mac_ctx->sys.bbt_mgmt_lock);
 }
 
-tCsrRoamSession *lim_get_session_by_macaddr(tpAniSirGlobal mac_ctx,
+struct csr_roam_session *lim_get_session_by_macaddr(tpAniSirGlobal mac_ctx,
 		tSirMacAddr self_mac)
 {
 	int i = 0;
-	tCsrRoamSession *session;
+	struct csr_roam_session *session;
 
 	if (!mac_ctx || !self_mac) {
 		QDF_TRACE(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_ERROR,
@@ -7813,4 +8049,25 @@ tCsrRoamSession *lim_get_session_by_macaddr(tpAniSirGlobal mac_ctx,
 	}
 
 	return NULL;
+}
+
+bool lim_check_if_vendor_oui_match(tpAniSirGlobal mac_ctx,
+					uint8_t *oui, uint8_t oui_len,
+			       uint8_t *ie, uint8_t ie_len)
+{
+	uint8_t *ptr = ie;
+	uint8_t elem_id;
+
+	if (NULL == ie || 0 == ie_len) {
+		pe_err("IE Null or ie len zero %d", ie_len);
+		return false;
+	}
+
+	elem_id = *ie;
+
+	if (elem_id == IE_EID_VENDOR &&
+		!qdf_mem_cmp(&ptr[2], oui, oui_len))
+		return true;
+	else
+		return false;
 }

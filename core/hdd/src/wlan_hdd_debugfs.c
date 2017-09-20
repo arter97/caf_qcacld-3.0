@@ -63,8 +63,8 @@ static ssize_t __wcnss_wowenable_write(struct file *file,
 				     const char __user *buf, size_t count,
 				     loff_t *ppos)
 {
-	hdd_adapter_t *pAdapter;
-	hdd_context_t *hdd_ctx;
+	struct hdd_adapter *pAdapter;
+	struct hdd_context *hdd_ctx;
 	char cmd[MAX_USER_COMMAND_SIZE_WOWL_ENABLE + 1];
 	char *sptr, *token;
 	uint8_t wow_enable = 0;
@@ -74,7 +74,7 @@ static ssize_t __wcnss_wowenable_write(struct file *file,
 
 	ENTER();
 
-	pAdapter = (hdd_adapter_t *)file->private_data;
+	pAdapter = (struct hdd_adapter *)file->private_data;
 	if ((NULL == pAdapter) || (WLAN_HDD_ADAPTER_MAGIC != pAdapter->magic)) {
 		hdd_err("Invalid adapter or adapter has invalid magic");
 		return -EINVAL;
@@ -183,8 +183,8 @@ static ssize_t __wcnss_wowpattern_write(struct file *file,
 				      const char __user *buf, size_t count,
 				      loff_t *ppos)
 {
-	hdd_adapter_t *pAdapter = (hdd_adapter_t *) file->private_data;
-	hdd_context_t *hdd_ctx;
+	struct hdd_adapter *pAdapter = (struct hdd_adapter *) file->private_data;
+	struct hdd_context *hdd_ctx;
 	char cmd[MAX_USER_COMMAND_SIZE_WOWL_PATTERN + 1];
 	char *sptr, *token;
 	uint8_t pattern_idx = 0;
@@ -302,8 +302,8 @@ static ssize_t __wcnss_patterngen_write(struct file *file,
 				      const char __user *buf, size_t count,
 				      loff_t *ppos)
 {
-	hdd_adapter_t *pAdapter;
-	hdd_context_t *pHddCtx;
+	struct hdd_adapter *pAdapter;
+	struct hdd_context *hdd_ctx;
 	tSirAddPeriodicTxPtrn *addPeriodicTxPtrnParams;
 	tSirDelPeriodicTxPtrn *delPeriodicTxPtrnParams;
 
@@ -318,18 +318,18 @@ static ssize_t __wcnss_patterngen_write(struct file *file,
 
 	ENTER();
 
-	pAdapter = (hdd_adapter_t *)file->private_data;
+	pAdapter = (struct hdd_adapter *)file->private_data;
 	if ((NULL == pAdapter) || (WLAN_HDD_ADAPTER_MAGIC != pAdapter->magic)) {
 		hdd_err("Invalid adapter or adapter has invalid magic");
 		return -EINVAL;
 	}
 
-	pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
-	ret = wlan_hdd_validate_context(pHddCtx);
+	hdd_ctx = WLAN_HDD_GET_CTX(pAdapter);
+	ret = wlan_hdd_validate_context(hdd_ctx);
 	if (0 != ret)
 		return ret;
 
-	if (!wlan_hdd_validate_modules_state(pHddCtx))
+	if (!wlan_hdd_validate_modules_state(hdd_ctx))
 		return -EINVAL;
 
 	if (!sme_is_feature_supported_by_fw(WLAN_PERIODIC_TX_PTRN)) {
@@ -395,7 +395,7 @@ static ssize_t __wcnss_patterngen_write(struct file *file,
 				 &pAdapter->macAddressCurrent);
 
 		/* Delete pattern */
-		status = sme_del_periodic_tx_ptrn(pHddCtx->hHal,
+		status = sme_del_periodic_tx_ptrn(hdd_ctx->hHal,
 						  delPeriodicTxPtrnParams);
 		if (QDF_STATUS_SUCCESS != status) {
 			hdd_err("sme_del_periodic_tx_ptrn() failed!");
@@ -416,8 +416,8 @@ static ssize_t __wcnss_patterngen_write(struct file *file,
 	hdd_debug("device mode %d", pAdapter->device_mode);
 	if ((QDF_STA_MODE == pAdapter->device_mode) &&
 	    (!hdd_conn_is_connected(WLAN_HDD_GET_STATION_CTX_PTR(pAdapter)))) {
-			hdd_err("Not in Connected state!");
-			goto failure;
+		hdd_err("Not in Connected state!");
+		goto failure;
 	}
 
 	/* Get pattern */
@@ -467,7 +467,7 @@ static ssize_t __wcnss_patterngen_write(struct file *file,
 	}
 
 	/* Add pattern */
-	status = sme_add_periodic_tx_ptrn(pHddCtx->hHal,
+	status = sme_add_periodic_tx_ptrn(hdd_ctx->hHal,
 					  addPeriodicTxPtrnParams);
 	if (QDF_STATUS_SUCCESS != status) {
 		hdd_err("sme_add_periodic_tx_ptrn() failed!");
@@ -573,8 +573,8 @@ static ssize_t __wlan_hdd_read_power_debugfs(struct file *file,
 		char __user *buf,
 		size_t count, loff_t *pos)
 {
-	hdd_adapter_t *adapter;
-	hdd_context_t *hdd_ctx;
+	struct hdd_adapter *adapter;
+	struct hdd_context *hdd_ctx;
 	QDF_STATUS status;
 	struct power_stats_response *chip_power_stats;
 	ssize_t ret_cnt = 0;
@@ -591,7 +591,7 @@ static ssize_t __wlan_hdd_read_power_debugfs(struct file *file,
 	};
 
 	ENTER();
-	adapter = (hdd_adapter_t *)file->private_data;
+	adapter = (struct hdd_adapter *)file->private_data;
 	if ((!adapter) || (WLAN_HDD_ADAPTER_MAGIC != adapter->magic)) {
 		hdd_err("Invalid adapter or adapter has invalid magic");
 		return -EINVAL;
@@ -737,8 +737,8 @@ static int wlan_hdd_open_power_debugfs(struct inode *inode, struct file *file)
  */
 static int __wcnss_debugfs_open(struct inode *inode, struct file *file)
 {
-	hdd_adapter_t *adapter;
-	hdd_context_t *hdd_ctx;
+	struct hdd_adapter *adapter;
+	struct hdd_context *hdd_ctx;
 	int ret;
 
 	ENTER();
@@ -746,7 +746,7 @@ static int __wcnss_debugfs_open(struct inode *inode, struct file *file)
 	if (inode->i_private)
 		file->private_data = inode->i_private;
 
-	adapter = (hdd_adapter_t *)file->private_data;
+	adapter = (struct hdd_adapter *)file->private_data;
 	if ((NULL == adapter) || (WLAN_HDD_ADAPTER_MAGIC != adapter->magic)) {
 		hdd_err("Invalid adapter or adapter has invalid magic");
 		return -EINVAL;
@@ -813,9 +813,9 @@ static const struct file_operations fops_powerdebugs = {
  *
  * Return: QDF_STATUS
  */
-static QDF_STATUS wlan_hdd_create_power_stats_file(hdd_adapter_t *adapter)
+static QDF_STATUS wlan_hdd_create_power_stats_file(struct hdd_adapter *adapter)
 {
-	if (!debugfs_create_file("power_stats", S_IRUSR | S_IRGRP | S_IROTH,
+	if (!debugfs_create_file("power_stats", 00400 | 00040 | 00004,
 				adapter->debugfs_phy, adapter,
 				&fops_powerdebugs))
 		return QDF_STATUS_E_FAILURE;
@@ -824,7 +824,7 @@ static QDF_STATUS wlan_hdd_create_power_stats_file(hdd_adapter_t *adapter)
 }
 
 #else
-static QDF_STATUS wlan_hdd_create_power_stats_file(hdd_adapter_t *adapter)
+static QDF_STATUS wlan_hdd_create_power_stats_file(struct hdd_adapter *adapter)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -842,7 +842,7 @@ static QDF_STATUS wlan_hdd_create_power_stats_file(hdd_adapter_t *adapter)
  * Return: QDF_STATUS_SUCCESS if all files registered,
  *	   QDF_STATUS_E_FAILURE on failure
  */
-QDF_STATUS hdd_debugfs_init(hdd_adapter_t *adapter)
+QDF_STATUS hdd_debugfs_init(struct hdd_adapter *adapter)
 {
 	struct net_device *dev = adapter->dev;
 	adapter->debugfs_phy = debugfs_create_dir(dev->name, 0);
@@ -850,17 +850,17 @@ QDF_STATUS hdd_debugfs_init(hdd_adapter_t *adapter)
 	if (NULL == adapter->debugfs_phy)
 		return QDF_STATUS_E_FAILURE;
 
-	if (NULL == debugfs_create_file("wow_enable", S_IRUSR | S_IWUSR,
+	if (NULL == debugfs_create_file("wow_enable", 00400 | 00200,
 					adapter->debugfs_phy, adapter,
 					&fops_wowenable))
 		return QDF_STATUS_E_FAILURE;
 
-	if (NULL == debugfs_create_file("wow_pattern", S_IRUSR | S_IWUSR,
+	if (NULL == debugfs_create_file("wow_pattern", 00400 | 00200,
 					adapter->debugfs_phy, adapter,
 					&fops_wowpattern))
 		return QDF_STATUS_E_FAILURE;
 
-	if (NULL == debugfs_create_file("pattern_gen", S_IRUSR | S_IWUSR,
+	if (NULL == debugfs_create_file("pattern_gen", 00400 | 00200,
 					adapter->debugfs_phy, adapter,
 					&fops_patterngen))
 		return QDF_STATUS_E_FAILURE;
@@ -882,13 +882,8 @@ QDF_STATUS hdd_debugfs_init(hdd_adapter_t *adapter)
  *
  * Return: None
  */
-void hdd_debugfs_exit(hdd_adapter_t *adapter)
+void hdd_debugfs_exit(struct hdd_adapter *adapter)
 {
-	struct net_device *dev = adapter->dev;
-
-	if (adapter->debugfs_phy)
-		debugfs_remove_recursive(adapter->debugfs_phy);
-	else
-		hdd_debug("Interface %s has no debugfs entry", dev->name);
+	debugfs_remove_recursive(adapter->debugfs_phy);
 }
 #endif /* #ifdef WLAN_OPEN_SOURCE */

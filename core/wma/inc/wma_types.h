@@ -322,6 +322,7 @@
 #define WMA_STOP_SCAN_OFFLOAD_REQ  SIR_HAL_STOP_SCAN_OFFLOAD_REQ
 #define WMA_UPDATE_CHAN_LIST_REQ    SIR_HAL_UPDATE_CHAN_LIST_REQ
 #define WMA_RX_SCAN_EVENT           SIR_HAL_RX_SCAN_EVENT
+#define WMA_RX_CHN_STATUS_EVENT     SIR_HAL_RX_CHN_STATUS_EVENT
 #define WMA_IBSS_PEER_INACTIVITY_IND SIR_HAL_IBSS_PEER_INACTIVITY_IND
 
 #define WMA_CLI_SET_CMD             SIR_HAL_CLI_SET_CMD
@@ -379,6 +380,9 @@
 #define WMA_DFS_BEACON_TX_SUCCESS_IND   SIR_HAL_BEACON_TX_SUCCESS_IND
 #define WMA_DISASSOC_TX_COMP       SIR_HAL_DISASSOC_TX_COMP
 #define WMA_DEAUTH_TX_COMP         SIR_HAL_DEAUTH_TX_COMP
+
+#define WMA_GET_PEER_INFO          SIR_HAL_GET_PEER_INFO
+#define WMA_GET_PEER_INFO_EXT      SIR_HAL_GET_PEER_INFO_EXT
 
 #define WMA_MODEM_POWER_STATE_IND SIR_HAL_MODEM_POWER_STATE_IND
 
@@ -709,14 +713,30 @@ QDF_STATUS wma_tx_packet(void *pWMA,
 			 uint8_t txFlag, uint8_t sessionId, bool tdlsflag,
 			 uint16_t channel_freq);
 
-QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc, void *p_cds_context,
+QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 		    wma_tgt_cfg_cb pTgtUpdCB, struct cds_config_info *cds_cfg);
+
+/**
+ * wma_vdev_init() - initialize a wma vdev
+ * @vdev: the vdev to initialize
+ *
+ * Return: None
+ */
+void wma_vdev_init(struct wma_txrx_node *vdev);
+
+/**
+ * wma_vdev_deinit() - de-initialize a wma vdev
+ * @vdev: the vdev to de-initialize
+ *
+ * Return: None
+ */
+void wma_vdev_deinit(struct wma_txrx_node *vdev);
 
 QDF_STATUS wma_register_mgmt_frm_client(void);
 
 QDF_STATUS wma_de_register_mgmt_frm_client(void);
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
-QDF_STATUS wma_register_roaming_callbacks(void *cds_ctx,
+QDF_STATUS wma_register_roaming_callbacks(
 		QDF_STATUS (*csr_roam_synch_cb)(tpAniSirGlobal mac,
 			roam_offload_synch_ind *roam_synch_data,
 			tpSirBssDescription  bss_desc_ptr,
@@ -725,7 +745,7 @@ QDF_STATUS wma_register_roaming_callbacks(void *cds_ctx,
 			roam_offload_synch_ind *roam_synch_data,
 			tpSirBssDescription  bss_desc_ptr));
 #else
-static inline QDF_STATUS wma_register_roaming_callbacks(void *cds_ctx,
+static inline QDF_STATUS wma_register_roaming_callbacks(
 		QDF_STATUS (*csr_roam_synch_cb)(tpAniSirGlobal mac,
 			roam_offload_synch_ind *roam_synch_data,
 			tpSirBssDescription  bss_desc_ptr,

@@ -308,6 +308,27 @@ uint8_t lim_check_mcs_set(tpAniSirGlobal pMac, uint8_t *supportedMCSSet)
 #define SECURITY_SUITE_TYPE_TKIP 0x2
 #define SECURITY_SUITE_TYPE_CCMP 0x4
 #define SECURITY_SUITE_TYPE_WEP104 0x4
+#define SECURITY_SUITE_TYPE_GCMP 0x8
+#define SECURITY_SUITE_TYPE_GCMP_256 0x9
+
+/**
+ * is_non_rsn_cipher()- API to check whether cipher suit is rsn or not
+ * @cipher_suite: cipher suit
+ *
+ * Return: True in case non ht cipher else false
+ */
+static inline bool is_non_rsn_cipher(uint8_t cipher_suite)
+{
+	uint8_t cipher_mask;
+
+	cipher_mask = cipher_suite & SECURITY_SUITE_TYPE_MASK;
+	if ((cipher_mask == SECURITY_SUITE_TYPE_CCMP) ||
+	    (cipher_mask == SECURITY_SUITE_TYPE_GCMP) ||
+	    (cipher_mask == SECURITY_SUITE_TYPE_GCMP_256))
+		return false;
+
+	return true;
+}
 
 /**
  * lim_check_rx_rsn_ie_match()- validate received rsn ie with supported cipher
@@ -366,20 +387,14 @@ lim_check_rx_rsn_ie_match(tpAniSirGlobal mac_ctx, tDot11fIERSN rx_rsn_ie,
 			}
 		}
 
-		if ((sta_is_ht)
+		if (sta_is_ht)
 #ifdef ANI_LITTLE_BYTE_ENDIAN
-			&&
-			((rx_rsn_ie.pwise_cipher_suites[i][3] &
-				 SECURITY_SUITE_TYPE_MASK) ==
-					SECURITY_SUITE_TYPE_CCMP))
+			only_non_ht_cipher = is_non_rsn_cipher(
+				rx_rsn_ie.pwise_cipher_suites[i][3]);
 #else
-			&&
-			((rx_rsn_ie.pwise_cipher_suites[i][0] &
-				 SECURITY_SUITE_TYPE_MASK) ==
-					SECURITY_SUITE_TYPE_CCMP))
+			only_non_ht_cipher = is_non_rsn_cipher(
+				rx_rsn_ie.pwise_cipher_suites[i][0]);
 #endif
-			only_non_ht_cipher = 0;
-
 	}
 
 	if ((!match) || ((sta_is_ht) && only_non_ht_cipher)) {
@@ -752,16 +767,15 @@ lim_send_del_sta_cnf(tpAniSirGlobal pMac, struct qdf_mac_addr sta_dsaddr,
 				mlmStaContext.protStatusCode,
 				psessionEntry->peSessionId);
 
-			if (mlmStaContext.resultCode != eSIR_SME_SUCCESS) {
-				pe_delete_session(pMac, psessionEntry);
-				psessionEntry = NULL;
-			}
-
 			lim_send_sme_join_reassoc_rsp(pMac, eWNI_SME_REASSOC_RSP,
 						      mlmStaContext.resultCode,
 						      mlmStaContext.protStatusCode,
 						      psessionEntry, smesessionId,
 						      smetransactionId);
+			if (mlmStaContext.resultCode != eSIR_SME_SUCCESS) {
+				pe_delete_session(pMac, psessionEntry);
+				psessionEntry = NULL;
+			}
 		} else {
 			qdf_mem_free(psessionEntry->pLimJoinReq);
 			psessionEntry->pLimJoinReq = NULL;
@@ -773,16 +787,16 @@ lim_send_del_sta_cnf(tpAniSirGlobal pMac, struct qdf_mac_addr sta_dsaddr,
 				mlmStaContext.protStatusCode,
 				psessionEntry->peSessionId);
 
-			if (mlmStaContext.resultCode != eSIR_SME_SUCCESS) {
-				pe_delete_session(pMac, psessionEntry);
-				psessionEntry = NULL;
-			}
-
 			lim_send_sme_join_reassoc_rsp(pMac, eWNI_SME_JOIN_RSP,
 						      mlmStaContext.resultCode,
 						      mlmStaContext.protStatusCode,
 						      psessionEntry, smesessionId,
 						      smetransactionId);
+
+			if (mlmStaContext.resultCode != eSIR_SME_SUCCESS) {
+				pe_delete_session(pMac, psessionEntry);
+				psessionEntry = NULL;
+			}
 		}
 
 	} else if (mlmStaContext.cleanupTrigger == eLIM_DUPLICATE_ENTRY) {
@@ -1388,18 +1402,8 @@ tSirRetStatus lim_populate_vht_mcs_set(tpAniSirGlobal mac_ctx,
 		QDF_MIN(rates->vhtRxHighestDataRate,
 			peer_vht_caps->rxHighSupDataRate);
 
-	if (session_entry && session_entry->nss == NSS_2x2_MODE) {
-		if (mac_ctx->lteCoexAntShare &&
-			IS_24G_CH(session_entry->currentOperChannel)) {
-			if (IS_2X2_CHAIN(session_entry->chainMask))
-				mcs_map_mask2x2 = MCSMAPMASK2x2;
-			else
-				pe_err("2x2 not enabled %d",
-					session_entry->chainMask);
-		} else {
-			mcs_map_mask2x2 = MCSMAPMASK2x2;
-		}
-	}
+	if (session_entry && session_entry->nss == NSS_2x2_MODE)
+		mcs_map_mask2x2 = MCSMAPMASK2x2;
 
 	if ((peer_vht_caps->txMCSMap & mcs_map_mask) <
 	    (rates->vhtRxMCSMap & mcs_map_mask)) {
@@ -1766,7 +1770,7 @@ lim_populate_peer_rate_set(tpAniSirGlobal pMac,
 	lim_populate_he_mcs_set(pMac, pRates, he_caps,
 			psessionEntry, psessionEntry->nss);
 
-	if (IS_DOT11_MODE_HE(psessionEntry->dot11mode)) {
+	if (IS_DOT11_MODE_HE(psessionEntry->dot11mode) && he_caps) {
 		psessionEntry->nss = he_caps->nss_supported;
 	} else if (IS_DOT11_MODE_VHT(psessionEntry->dot11mode)) {
 		if ((pRates->vhtRxMCSMap & MCSMAPMASK2x2) == MCSMAPMASK2x2)
@@ -1774,6 +1778,7 @@ lim_populate_peer_rate_set(tpAniSirGlobal pMac,
 	} else if (pRates->supportedMCSSet[1] == 0) {
 		psessionEntry->nss = NSS_1x1_MODE;
 	}
+	pe_debug("nss: %d", psessionEntry->nss);
 
 	return eSIR_SUCCESS;
 } /*** lim_populate_peer_rate_set() ***/
@@ -2171,14 +2176,31 @@ lim_add_sta(tpAniSirGlobal mac_ctx,
 
 	add_sta_params->status = QDF_STATUS_SUCCESS;
 	add_sta_params->respReqd = 1;
-	/* Update HT Capability */
 
+	/* Update VHT/HT Capability */
 	if (LIM_IS_AP_ROLE(session_entry) ||
 	    LIM_IS_IBSS_ROLE(session_entry)) {
 		add_sta_params->htCapable = sta_ds->mlmStaContext.htCapability;
 		add_sta_params->vhtCapable =
 			 sta_ds->mlmStaContext.vhtCapability;
 	}
+#ifdef FEATURE_WLAN_TDLS
+	/* SystemRole shouldn't be matter if staType is TDLS peer */
+	else if (STA_ENTRY_TDLS_PEER == sta_ds->staType) {
+		add_sta_params->htCapable = sta_ds->mlmStaContext.htCapability;
+		add_sta_params->vhtCapable =
+			 sta_ds->mlmStaContext.vhtCapability;
+	}
+#endif
+	else {
+		add_sta_params->htCapable = session_entry->htCapability;
+		add_sta_params->vhtCapable = session_entry->vhtCapability;
+	}
+
+	pe_debug("StaIdx: %d updateSta: %d htcapable: %d vhtCapable: %d",
+		add_sta_params->staIdx, add_sta_params->updateSta,
+		add_sta_params->htCapable, add_sta_params->vhtCapable);
+
 	/*
 	 * 2G-AS platform: SAP associates with HT (11n)clients as 2x1 in 2G and
 	 * 2X2 in 5G
@@ -2202,25 +2224,8 @@ lim_add_sta(tpAniSirGlobal mac_ctx,
 		}
 	}
 
-#ifdef FEATURE_WLAN_TDLS
-	/* SystemRole shouldn't be matter if staType is TDLS peer */
-	else if (STA_ENTRY_TDLS_PEER == sta_ds->staType) {
-		add_sta_params->htCapable = sta_ds->mlmStaContext.htCapability;
-		add_sta_params->vhtCapable =
-			 sta_ds->mlmStaContext.vhtCapability;
-	}
-#endif
-	else {
-		add_sta_params->htCapable = session_entry->htCapability;
-		add_sta_params->vhtCapable = session_entry->vhtCapability;
-	}
-
 	lim_update_sta_he_capable(mac_ctx, add_sta_params, sta_ds,
 				  session_entry);
-
-	pe_debug("StaIdx: %d updateSta: %d htcapable: %d vhtCapable: %d",
-		add_sta_params->staIdx, add_sta_params->updateSta,
-		add_sta_params->htCapable, add_sta_params->vhtCapable);
 
 	add_sta_params->greenFieldCapable = sta_ds->htGreenfield;
 	add_sta_params->maxAmpduDensity = sta_ds->htAMpduDensity;
@@ -2767,6 +2772,9 @@ lim_add_sta_self(tpAniSirGlobal pMac, uint16_t staIdx, uint8_t updateSta,
 			pAddStaParams->maxAmsduSize =
 				lim_get_ht_capability(pMac, eHT_MAX_AMSDU_LENGTH,
 						      psessionEntry);
+			pAddStaParams->max_amsdu_num =
+				lim_get_ht_capability(pMac, eHT_MAX_AMSDU_NUM,
+						      psessionEntry);
 			pAddStaParams->fDsssCckMode40Mhz =
 				lim_get_ht_capability(pMac, eHT_DSSS_CCK_MODE_40MHZ,
 						      psessionEntry);
@@ -3026,6 +3034,17 @@ lim_delete_dph_hash_entry(tpAniSirGlobal mac_ctx, tSirMacAddr sta_addr,
 				WNI_CFG_FORCE_POLICY_PROTECTION_DISABLE)
 				lim_decide_ap_protection_on_delete(mac_ctx,
 					sta_ds, &beacon_params, session_entry);
+		}
+
+		if (sta_ds->non_ecsa_capable) {
+			if (session_entry->lim_non_ecsa_cap_num == 0) {
+				pe_debug("NonECSA sta 0, id %d is ecsa",
+					 sta_id);
+			} else {
+				session_entry->lim_non_ecsa_cap_num--;
+				pe_debug("reducing the non ECSA num to %d",
+					 session_entry->lim_non_ecsa_cap_num);
+			}
 		}
 
 		if (LIM_IS_IBSS_ROLE(session_entry))
@@ -3512,6 +3531,7 @@ tSirRetStatus lim_sta_send_add_bss(tpAniSirGlobal pMac, tpSirAssocRsp pAssocRsp,
 	tDot11fIEVHTCaps *vht_caps = NULL;
 	tDot11fIEVHTOperation *vht_oper = NULL;
 	tAddStaParams *sta_context;
+	uint32_t listen_interval = WNI_CFG_LISTEN_INTERVAL_STADEF;
 
 	/* Package SIR_HAL_ADD_BSS_REQ message parameters */
 	pAddBssParams = qdf_mem_malloc(sizeof(tAddBssParams));
@@ -3694,8 +3714,10 @@ tSirRetStatus lim_sta_send_add_bss(tpAniSirGlobal pMac, tpSirAssocRsp pAssocRsp,
 
 	qdf_mem_copy(pAddBssParams->staContext.bssId,
 			bssDescription->bssId, sizeof(tSirMacAddr));
-	pAddBssParams->staContext.listenInterval =
-		bssDescription->beaconInterval;
+	if (wlan_cfg_get_int(pMac, WNI_CFG_LISTEN_INTERVAL, &listen_interval) !=
+				eSIR_SUCCESS)
+		pe_err("Couldn't get LISTEN_INTERVAL");
+	pAddBssParams->staContext.listenInterval = listen_interval;
 
 	/* Fill Assoc id from the dph table */
 	pStaDs = dph_lookup_hash_entry(pMac, pAddBssParams->staContext.bssId,
@@ -4030,6 +4052,7 @@ tSirRetStatus lim_sta_send_add_bss_pre_assoc(tpAniSirGlobal pMac, uint8_t update
 	uint8_t chanWidthSupp = 0;
 	tDot11fIEVHTOperation *vht_oper = NULL;
 	tDot11fIEVHTCaps *vht_caps = NULL;
+	uint32_t listen_interval = WNI_CFG_LISTEN_INTERVAL_STADEF;
 
 	tpSirBssDescription bssDescription =
 		&psessionEntry->pLimJoinReq->bssDescription;
@@ -4238,9 +4261,10 @@ tSirRetStatus lim_sta_send_add_bss_pre_assoc(tpAniSirGlobal pMac, uint8_t update
 
 	qdf_mem_copy(pAddBssParams->staContext.bssId,
 			bssDescription->bssId, sizeof(tSirMacAddr));
-	pAddBssParams->staContext.listenInterval =
-		bssDescription->beaconInterval;
-
+	if (wlan_cfg_get_int(pMac, WNI_CFG_LISTEN_INTERVAL, &listen_interval) !=
+				eSIR_SUCCESS)
+		pe_err("Couldn't get LISTEN_INTERVAL");
+	pAddBssParams->staContext.listenInterval = listen_interval;
 	pAddBssParams->staContext.assocId = 0;
 	pAddBssParams->staContext.uAPSD = 0;
 	pAddBssParams->staContext.maxSPLen = 0;

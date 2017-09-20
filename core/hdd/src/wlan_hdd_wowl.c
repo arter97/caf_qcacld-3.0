@@ -67,7 +67,7 @@ static void hdd_wowl_wake_indication_callback(void *pContext,
 		tpSirWakeReasonInd wake_reason_ind)
 {
 	hdd_info("Wake Reason %d", wake_reason_ind->ulReason);
-	hdd_exit_wowl((hdd_adapter_t *) pContext);
+	hdd_exit_wowl((struct hdd_adapter *) pContext);
 }
 #endif
 
@@ -101,7 +101,7 @@ static void dump_hdd_wowl_ptrn(struct wow_add_pattern *ptrn)
  *
  * Return: false if any errors encountered, true otherwise
  */
-bool hdd_add_wowl_ptrn(hdd_adapter_t *pAdapter, const char *ptrn)
+bool hdd_add_wowl_ptrn(struct hdd_adapter *pAdapter, const char *ptrn)
 {
 	struct wow_add_pattern localPattern;
 	int i, first_empty_slot, len, offset;
@@ -109,7 +109,7 @@ bool hdd_add_wowl_ptrn(hdd_adapter_t *pAdapter, const char *ptrn)
 	const char *temp;
 	tHalHandle hHal = WLAN_HDD_GET_HAL_CTX(pAdapter);
 	uint8_t sessionId = pAdapter->sessionId;
-	hdd_context_t *pHddCtx = pAdapter->pHddCtx;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(pAdapter);
 
 	len = find_ptrn_len(ptrn);
 
@@ -119,7 +119,7 @@ bool hdd_add_wowl_ptrn(hdd_adapter_t *pAdapter, const char *ptrn)
 	 */
 	while (len >= 11) {
 		/* Detect duplicate pattern */
-		for (i = 0; i < pHddCtx->config->maxWoWFilters; i++) {
+		for (i = 0; i < hdd_ctx->config->maxWoWFilters; i++) {
 			if (g_hdd_wowl_ptrns[i] == NULL)
 				continue;
 
@@ -136,7 +136,7 @@ bool hdd_add_wowl_ptrn(hdd_adapter_t *pAdapter, const char *ptrn)
 		first_empty_slot = -1;
 
 		/* Find an empty slot to store the pattern */
-		for (i = 0; i < pHddCtx->config->maxWoWFilters; i++) {
+		for (i = 0; i < hdd_ctx->config->maxWoWFilters; i++) {
 			if (g_hdd_wowl_ptrns[i] == NULL) {
 				first_empty_slot = i;
 				break;
@@ -261,7 +261,7 @@ next_ptrn:
  *
  * Return: false if any errors encountered, true otherwise
  */
-bool hdd_del_wowl_ptrn(hdd_adapter_t *pAdapter, const char *ptrn)
+bool hdd_del_wowl_ptrn(struct hdd_adapter *pAdapter, const char *ptrn)
 {
 	struct wow_delete_pattern delPattern;
 	unsigned char id;
@@ -269,11 +269,11 @@ bool hdd_del_wowl_ptrn(hdd_adapter_t *pAdapter, const char *ptrn)
 	bool patternFound = false;
 	QDF_STATUS qdf_ret_status;
 	uint8_t sessionId = pAdapter->sessionId;
-	hdd_context_t *pHddCtx = pAdapter->pHddCtx;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(pAdapter);
 
 	/* Detect pattern */
 	for (id = 0;
-	     id < pHddCtx->config->maxWoWFilters
+	     id < hdd_ctx->config->maxWoWFilters
 	     && g_hdd_wowl_ptrns[id] != NULL; id++) {
 		if (!strcmp(ptrn, g_hdd_wowl_ptrns[id])) {
 			patternFound = true;
@@ -312,7 +312,7 @@ bool hdd_del_wowl_ptrn(hdd_adapter_t *pAdapter, const char *ptrn)
  *
  * Return: false if any errors encountered, true otherwise
  */
-bool hdd_add_wowl_ptrn_debugfs(hdd_adapter_t *pAdapter, uint8_t pattern_idx,
+bool hdd_add_wowl_ptrn_debugfs(struct hdd_adapter *pAdapter, uint8_t pattern_idx,
 			       uint8_t pattern_offset, char *pattern_buf,
 			       char *pattern_mask)
 {
@@ -425,7 +425,7 @@ bool hdd_add_wowl_ptrn_debugfs(hdd_adapter_t *pAdapter, uint8_t pattern_idx,
  *
  * Return: false if any errors encountered, true otherwise
  */
-bool hdd_del_wowl_ptrn_debugfs(hdd_adapter_t *pAdapter, uint8_t pattern_idx)
+bool hdd_del_wowl_ptrn_debugfs(struct hdd_adapter *pAdapter, uint8_t pattern_idx)
 {
 	struct wow_delete_pattern delPattern;
 	tHalHandle hHal = WLAN_HDD_GET_HAL_CTX(pAdapter);
@@ -473,7 +473,7 @@ bool hdd_del_wowl_ptrn_debugfs(hdd_adapter_t *pAdapter, uint8_t pattern_idx)
  *
  * Return: false if any errors encountered, true otherwise
  */
-bool hdd_enter_wowl(hdd_adapter_t *pAdapter, bool enable_mp, bool enable_pbm)
+bool hdd_enter_wowl(struct hdd_adapter *pAdapter, bool enable_mp, bool enable_pbm)
 {
 	tSirSmeWowlEnterParams wowParams;
 	QDF_STATUS qdf_ret_status;
@@ -521,7 +521,7 @@ bool hdd_enter_wowl(hdd_adapter_t *pAdapter, bool enable_mp, bool enable_pbm)
  *
  * Return: false if any errors encountered, true otherwise
  */
-bool hdd_exit_wowl(hdd_adapter_t *pAdapter)
+bool hdd_exit_wowl(struct hdd_adapter *pAdapter)
 {
 	tSirSmeWowlExitParams wowParams;
 	tHalHandle hHal = WLAN_HDD_GET_HAL_CTX(pAdapter);

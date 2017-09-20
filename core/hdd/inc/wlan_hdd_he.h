@@ -26,9 +26,9 @@
 #if !defined(WLAN_HDD_HE_H)
 #define WLAN_HDD_HE_H
 
-struct hdd_context_s;
+struct hdd_context;
 struct wma_tgt_cfg;
-struct beacon_data_s;
+struct hdd_beacon_data;
 struct sap_Config;
 
 #ifdef WLAN_FEATURE_11AX
@@ -77,7 +77,7 @@ enum qca_wlan_vendor_attr_get_he_capabilities {
  *
  * Return: None
  */
-void hdd_update_tgt_he_cap(struct hdd_context_s *hdd_ctx,
+void hdd_update_tgt_he_cap(struct hdd_context *hdd_ctx,
 			   struct wma_tgt_cfg *cfg);
 
 /**
@@ -90,7 +90,7 @@ void hdd_update_tgt_he_cap(struct hdd_context_s *hdd_ctx,
  *
  * Return: None
  */
-void wlan_hdd_check_11ax_support(struct beacon_data_s *beacon,
+void wlan_hdd_check_11ax_support(struct hdd_beacon_data *beacon,
 				 struct sap_Config *config);
 
 /**
@@ -99,7 +99,7 @@ void wlan_hdd_check_11ax_support(struct beacon_data_s *beacon,
  *
  * Return: None
  */
-void hdd_he_print_ini_config(hdd_context_t *hdd_ctx);
+void hdd_he_print_ini_config(struct hdd_context *hdd_ctx);
 
 /**
  * hdd_update_he_cap_in_cfg() - update HE cap in global CFG
@@ -110,7 +110,7 @@ void hdd_he_print_ini_config(hdd_context_t *hdd_ctx);
  *
  * Return: 0 on success and errno on failure
  */
-int hdd_update_he_cap_in_cfg(hdd_context_t *hdd_ctx);
+int hdd_update_he_cap_in_cfg(struct hdd_context *hdd_ctx);
 
 /**
  * hdd_he_set_sme_config() - set HE related SME config param
@@ -144,21 +144,21 @@ int wlan_hdd_cfg80211_get_he_cap(struct wiphy *wiphy,
 },
 
 #else
-static inline void hdd_update_tgt_he_cap(struct hdd_context_s *hdd_ctx,
+static inline void hdd_update_tgt_he_cap(struct hdd_context *hdd_ctx,
 					 struct wma_tgt_cfg *cfg)
 {
 }
 
-static inline void wlan_hdd_check_11ax_support(struct beacon_data_s *beacon,
+static inline void wlan_hdd_check_11ax_support(struct hdd_beacon_data *beacon,
 					       struct sap_Config *config)
 {
 }
 
-static inline void hdd_he_print_ini_config(hdd_context_t *hdd_ctx)
+static inline void hdd_he_print_ini_config(struct hdd_context *hdd_ctx)
 {
 }
 
-static inline int hdd_update_he_cap_in_cfg(hdd_context_t *hdd_ctx)
+static inline int hdd_update_he_cap_in_cfg(struct hdd_context *hdd_ctx)
 {
 	return 0;
 }

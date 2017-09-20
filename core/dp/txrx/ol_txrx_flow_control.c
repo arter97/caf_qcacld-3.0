@@ -128,8 +128,10 @@ void ol_tx_deregister_flow_control(struct ol_txrx_pdev_t *pdev)
 			break;
 		qdf_spin_unlock_bh(&pdev->tx_desc.flow_pool_list_lock);
 		ol_txrx_info("flow pool list is not empty %d!!!\n", i++);
+
 		if (i == 1)
-			ol_tx_dump_flow_pool_info();
+			ol_tx_dump_flow_pool_info((void *)pdev);
+
 		ol_tx_dec_pool_ref(pool, true);
 		qdf_spin_lock_bh(&pdev->tx_desc.flow_pool_list_lock);
 	}
@@ -274,28 +276,27 @@ QDF_STATUS ol_tx_dec_pool_ref(struct ol_tx_flow_pool_t *pool, bool force)
  *
  * Return: none
  */
-void ol_tx_dump_flow_pool_info(void)
+void ol_tx_dump_flow_pool_info(void *ctx)
 {
-	struct ol_txrx_pdev_t *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
+	struct ol_txrx_pdev_t *pdev = ctx;
 	struct ol_tx_flow_pool_t *pool = NULL, *pool_prev = NULL;
 	struct ol_tx_flow_pool_t tmp_pool;
 
-
-	ol_txrx_info("Global Pool");
+	ol_txrx_dbg("Global Pool");
 	if (!pdev) {
 		ol_txrx_err("ERROR: pdev NULL");
 		QDF_ASSERT(0); /* traceback */
 		return;
 	}
-	ol_txrx_info("Total %d :: Available %d",
+	ol_txrx_dbg("Total %d :: Available %d",
 		pdev->tx_desc.pool_size, pdev->tx_desc.num_free);
-	ol_txrx_info("Invalid flow_pool %d",
+	ol_txrx_dbg("Invalid flow_pool %d",
 		pdev->tx_desc.num_invalid_bin);
-	ol_txrx_info("No of pool map received %d",
+	ol_txrx_dbg("No of pool map received %d",
 		pdev->pool_stats.pool_map_count);
-	ol_txrx_info("No of pool unmap received %d",
+	ol_txrx_dbg("No of pool unmap received %d",
 		pdev->pool_stats.pool_unmap_count);
-	ol_txrx_info(
+	ol_txrx_dbg(
 		"Pkt dropped due to unavailablity of pool %d",
 		pdev->pool_stats.pkt_drop_no_pool);
 
@@ -316,21 +317,21 @@ void ol_tx_dump_flow_pool_info(void)
 		if (pool_prev)
 			ol_tx_dec_pool_ref(pool_prev, false);
 
-		ol_txrx_info("\n");
-		ol_txrx_info(
+		ol_txrx_dbg("\n");
+		ol_txrx_dbg(
 			"Flow_pool_id %d :: status %d",
 			tmp_pool.flow_pool_id, tmp_pool.status);
-		ol_txrx_info(
+		ol_txrx_dbg(
 			"Total %d :: Available %d :: Deficient %d",
 			tmp_pool.flow_pool_size, tmp_pool.avail_desc,
 			tmp_pool.deficient_desc);
-		ol_txrx_info(
+		ol_txrx_dbg(
 			"Start threshold %d :: Stop threshold %d",
 			 tmp_pool.start_th, tmp_pool.stop_th);
-		ol_txrx_info(
+		ol_txrx_dbg(
 			"Member flow_id  %d :: flow_type %d",
 			tmp_pool.member_flow_id, tmp_pool.flow_type);
-		ol_txrx_info(
+		ol_txrx_dbg(
 			"Pkt dropped due to unavailablity of descriptors %d",
 			tmp_pool.pkt_drop_no_desc);
 

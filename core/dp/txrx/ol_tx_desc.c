@@ -144,19 +144,18 @@ struct ol_tx_desc_t *ol_tx_desc_alloc(struct ol_txrx_pdev_t *pdev,
 	qdf_spin_lock_bh(&pdev->tx_mutex);
 	if (pdev->tx_desc.freelist) {
 		tx_desc = ol_tx_get_desc_global_pool(pdev);
+		if (!tx_desc) {
+			qdf_spin_unlock_bh(&pdev->tx_mutex);
+			return NULL;
+		}
 		ol_tx_desc_dup_detect_set(pdev, tx_desc);
 		ol_tx_desc_sanity_checks(pdev, tx_desc);
 		ol_tx_desc_compute_delay(tx_desc);
+		ol_tx_desc_vdev_update(tx_desc, vdev);
+		ol_tx_desc_count_inc(vdev);
+		qdf_atomic_inc(&tx_desc->ref_cnt);
 	}
 	qdf_spin_unlock_bh(&pdev->tx_mutex);
-
-	if (!tx_desc)
-		return NULL;
-
-	ol_tx_desc_vdev_update(tx_desc, vdev);
-	ol_tx_desc_count_inc(vdev);
-	qdf_atomic_inc(&tx_desc->ref_cnt);
-
 	return tx_desc;
 }
 
@@ -287,6 +286,13 @@ ol_tx_desc_alloc_hl(struct ol_txrx_pdev_t *pdev,
 static inline void
 ol_tx_desc_vdev_rm(struct ol_tx_desc_t *tx_desc)
 {
+	/*
+	 * In module exit context, vdev handle could be destroyed but still
+	 * we need to free pending completion tx_desc.
+	 */
+	if (!tx_desc || !tx_desc->vdev)
+		return;
+
 	qdf_atomic_dec(&tx_desc->vdev->tx_desc_count);
 	tx_desc->vdev = NULL;
 }
@@ -767,6 +773,9 @@ ol_tso_seg_dbg_sanitize(struct qdf_tso_seg_elem_t *tsoseg)
 
 	if (tsoseg != NULL) {
 		txdesc = tsoseg->dbg.txdesc;
+		/* Don't validate if TX desc is NULL*/
+		if (!txdesc)
+			return 0;
 		if (txdesc->tso_desc != tsoseg)
 			qdf_tso_seg_dbg_bug("Owner sanity failed");
 		else
@@ -849,6 +858,7 @@ void ol_tso_free_segment(struct ol_txrx_pdev_t *pdev,
 	}
 	/* sanitize before free */
 	ol_tso_seg_dbg_sanitize(tso_seg);
+	qdf_tso_seg_dbg_setowner(tso_seg, NULL);
 	/*this tso seg is now a part of freelist*/
 	/* retain segment history, if debug is enabled */
 	qdf_tso_seg_dbg_zero(tso_seg);

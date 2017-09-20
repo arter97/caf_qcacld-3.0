@@ -40,6 +40,8 @@
 #include <wlan_cfg80211_tdls.h>
 #endif
 
+struct hdd_context;
+
 /* value for initial part of frames and number of bytes to be compared */
 #define GAS_INITIAL_REQ "\x04\x0a"
 #define GAS_INITIAL_REQ_SIZE 2
@@ -89,24 +91,49 @@
 #define BASIC_RATE_MASK   0x80
 #define RATE_MASK         0x7f
 
+#ifndef NL80211_AUTHTYPE_FILS_SK
+#define NL80211_AUTHTYPE_FILS_SK 5
+#endif
+#ifndef NL80211_AUTHTYPE_FILS_SK_PFS
+#define NL80211_AUTHTYPE_FILS_SK_PFS 6
+#endif
+#ifndef NL80211_AUTHTYPE_FILS_PK
+#define NL80211_AUTHTYPE_FILS_PK 7
+#endif
+#ifndef WLAN_AKM_SUITE_FILS_SHA256
+#define WLAN_AKM_SUITE_FILS_SHA256 0x000FAC0E
+#endif
+#ifndef WLAN_AKM_SUITE_FILS_SHA384
+#define WLAN_AKM_SUITE_FILS_SHA384 0x000FAC0F
+#endif
+#ifndef WLAN_AKM_SUITE_FT_FILS_SHA256
+#define WLAN_AKM_SUITE_FT_FILS_SHA256 0x000FAC10
+#endif
+#ifndef WLAN_AKM_SUITE_FT_FILS_SHA384
+#define WLAN_AKM_SUITE_FT_FILS_SHA384 0x000FAC11
+#endif
+
 #ifdef FEATURE_WLAN_TDLS
 #define WLAN_IS_TDLS_SETUP_ACTION(action) \
 	((SIR_MAC_TDLS_SETUP_REQ <= action) && \
 	(SIR_MAC_TDLS_SETUP_CNF >= action))
-#if !defined (TDLS_MGMT_VERSION2)
+#if !defined(TDLS_MGMT_VERSION2)
 #define TDLS_MGMT_VERSION2 0
 #endif
 
 #endif
 
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS
-void wlan_hdd_clear_link_layer_stats(hdd_adapter_t *adapter);
+void wlan_hdd_clear_link_layer_stats(struct hdd_adapter *adapter);
 #else
-static inline void wlan_hdd_clear_link_layer_stats(hdd_adapter_t *adapter) {}
+static inline void wlan_hdd_clear_link_layer_stats(struct hdd_adapter *adapter) {}
 #endif
 
 #define MAX_CHANNEL (NUM_24GHZ_CHANNELS + NUM_5GHZ_CHANNELS)
 #define MAX_SCAN_SSID 10
+
+#define IS_CHANNEL_VALID(channel) ((channel >= 0 && channel < 15) \
+			|| (channel >= 36 && channel <= 184))
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 12, 0)) \
 	|| defined(BACKPORTED_CHANNEL_SWITCH_PRESENT)
@@ -166,6 +193,12 @@ typedef enum {
 #define WIFI_FEATURE_MKEEP_ALIVE        0x100000  /* WiFi mkeep_alive */
 #define WIFI_FEATURE_CONFIG_NDO         0x200000  /* ND offload configure */
 #define WIFI_FEATURE_TX_TRANSMIT_POWER  0x400000  /* Tx transmit power levels */
+#define WIFI_FEATURE_CONTROL_ROAMING    0x800000  /* Enable/Disable roaming */
+#define WIFI_FEATURE_IE_WHITELIST       0x1000000 /* Support Probe IE white listing */
+#define WIFI_FEATURE_SCAN_RAND          0x2000000 /* Support MAC & Probe Sequence Number randomization */
+
+/* Support Tx Power Limit setting */
+#define WIFI_FEATURE_SET_TX_POWER_LIMIT 0x4000000
 
 /* Add more features here */
 #define WIFI_TDLS_SUPPORT			BIT(0)
@@ -203,33 +236,33 @@ typedef struct sHddAvoidFreqList {
 #define CFG_PROPAGATION_DELAY_BASE             (64)
 #define CFG_AGG_RETRY_MIN                      (5)
 
-struct cfg80211_bss *wlan_hdd_cfg80211_update_bss_db(hdd_adapter_t *pAdapter,
+struct cfg80211_bss *wlan_hdd_cfg80211_update_bss_db(struct hdd_adapter *pAdapter,
 						tCsrRoamInfo *pRoamInfo);
 
-int wlan_hdd_cfg80211_pmksa_candidate_notify(hdd_adapter_t *pAdapter,
+int wlan_hdd_cfg80211_pmksa_candidate_notify(struct hdd_adapter *pAdapter,
 					tCsrRoamInfo *pRoamInfo,
 					int index, bool preauth);
 
 #ifdef FEATURE_WLAN_LFR_METRICS
-QDF_STATUS wlan_hdd_cfg80211_roam_metrics_preauth(hdd_adapter_t *pAdapter,
+QDF_STATUS wlan_hdd_cfg80211_roam_metrics_preauth(struct hdd_adapter *pAdapter,
 						tCsrRoamInfo *pRoamInfo);
 
-QDF_STATUS wlan_hdd_cfg80211_roam_metrics_preauth_status(hdd_adapter_t *
+QDF_STATUS wlan_hdd_cfg80211_roam_metrics_preauth_status(struct hdd_adapter *
 							 pAdapter,
 							 tCsrRoamInfo *
 							 pRoamInfo,
 							 bool preauth_status);
 
-QDF_STATUS wlan_hdd_cfg80211_roam_metrics_handover(hdd_adapter_t *pAdapter,
+QDF_STATUS wlan_hdd_cfg80211_roam_metrics_handover(struct hdd_adapter *pAdapter,
 						   tCsrRoamInfo *pRoamInfo);
 #endif
 
 #ifdef FEATURE_WLAN_WAPI
-void wlan_hdd_cfg80211_set_key_wapi(hdd_adapter_t *pAdapter, uint8_t key_index,
+void wlan_hdd_cfg80211_set_key_wapi(struct hdd_adapter *pAdapter, uint8_t key_index,
 				    const uint8_t *mac_addr, const uint8_t *key,
 				    int key_Len);
 #endif
-hdd_context_t *hdd_cfg80211_wiphy_alloc(int priv_size);
+struct hdd_context *hdd_cfg80211_wiphy_alloc(int priv_size);
 
 int wlan_hdd_cfg80211_tdls_scan(struct wiphy *wiphy,
 				struct cfg80211_scan_request *request,
@@ -243,21 +276,32 @@ int wlan_hdd_cfg80211_init(struct device *dev,
 
 void wlan_hdd_cfg80211_deinit(struct wiphy *wiphy);
 
-void wlan_hdd_update_wiphy(hdd_context_t *hdd_ctx);
+void wlan_hdd_update_wiphy(struct hdd_context *hdd_ctx);
 
 void wlan_hdd_update_11n_mode(struct hdd_config *cfg);
 
 int wlan_hdd_cfg80211_register(struct wiphy *wiphy);
-void wlan_hdd_cfg80211_register_frames(hdd_adapter_t *pAdapter);
 
-void wlan_hdd_cfg80211_deregister_frames(hdd_adapter_t *pAdapter);
+/**
+ * wlan_hdd_cfg80211_register_frames() - register frame types and callbacks
+ * with the PE.
+ * @pAdapter: pointer to adapter
+ *
+ * This function is used by HDD to register frame types which are interested
+ * by supplicant, callbacks for rx frame indication and ack.
+ *
+ * Return: 0 on success and non zero value on failure
+ */
+int wlan_hdd_cfg80211_register_frames(struct hdd_adapter *pAdapter);
+
+void wlan_hdd_cfg80211_deregister_frames(struct hdd_adapter *pAdapter);
 
 void hdd_reg_notifier(struct wiphy *wiphy,
 				 struct regulatory_request *request);
 
-extern void hdd_conn_set_connection_state(hdd_adapter_t *pAdapter,
+extern void hdd_conn_set_connection_state(struct hdd_adapter *pAdapter,
 					  eConnectionState connState);
-QDF_STATUS wlan_hdd_validate_operation_channel(hdd_adapter_t *pAdapter,
+QDF_STATUS wlan_hdd_validate_operation_channel(struct hdd_adapter *pAdapter,
 					       int channel);
 #ifdef FEATURE_WLAN_TDLS
 int wlan_hdd_cfg80211_send_tdls_discover_req(struct wiphy *wiphy,
@@ -265,7 +309,7 @@ int wlan_hdd_cfg80211_send_tdls_discover_req(struct wiphy *wiphy,
 #endif
 
 void *wlan_hdd_change_country_code_cb(void *pAdapter);
-void hdd_select_cbmode(hdd_adapter_t *pAdapter, uint8_t operationChannel,
+void hdd_select_cbmode(struct hdd_adapter *pAdapter, uint8_t operationChannel,
 		       struct ch_params *ch_params);
 
 uint8_t *wlan_hdd_cfg80211_get_ie_ptr(const uint8_t *ies_ptr, int length,
@@ -283,7 +327,7 @@ uint8_t *wlan_hdd_cfg80211_get_ie_ptr(const uint8_t *ies_ptr, int length,
  * Return: true or false based on findings
  */
 bool wlan_hdd_is_ap_supports_immediate_power_save(uint8_t *ies, int length);
-void wlan_hdd_del_station(hdd_adapter_t *adapter);
+void wlan_hdd_del_station(struct hdd_adapter *adapter);
 
 #if defined(USE_CFG80211_DEL_STA_V2)
 int wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
@@ -306,10 +350,10 @@ int wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 void wlan_hdd_testmode_rx_event(void *buf, size_t buf_len);
 #endif
 
-int wlan_hdd_send_avoid_freq_event(hdd_context_t *pHddCtx,
-				tHddAvoidFreqList * pAvoidFreqList);
+int wlan_hdd_send_avoid_freq_event(struct hdd_context *hdd_ctx,
+				   struct ch_avoid_ind_type *avoid_freq_list);
 
-int wlan_hdd_send_avoid_freq_for_dnbs(hdd_context_t *pHddCtx, uint8_t op_chan);
+int wlan_hdd_send_avoid_freq_for_dnbs(struct hdd_context *hdd_ctx, uint8_t op_chan);
 
 #ifdef FEATURE_WLAN_EXTSCAN
 void wlan_hdd_cfg80211_extscan_callback(void *ctx,
@@ -331,22 +375,22 @@ void wlan_hdd_rso_cmd_status_cb(void *ctx, struct rso_cmd_status *rso_status);
 void hdd_rssi_threshold_breached(void *hddctx,
 				 struct rssi_breach_event *data);
 
-struct cfg80211_bss *wlan_hdd_cfg80211_update_bss_list(hdd_adapter_t *pAdapter,
+struct cfg80211_bss *wlan_hdd_cfg80211_update_bss_list(struct hdd_adapter *pAdapter,
 						tSirMacAddr bssid);
 
 int wlan_hdd_cfg80211_update_bss(struct wiphy *wiphy,
-						hdd_adapter_t *pAdapter,
+						struct hdd_adapter *pAdapter,
 						uint32_t scan_timestamp);
 
-void wlan_hdd_cfg80211_acs_ch_select_evt(hdd_adapter_t *adapter);
+void wlan_hdd_cfg80211_acs_ch_select_evt(struct hdd_adapter *adapter);
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
-int wlan_hdd_send_roam_auth_event(hdd_adapter_t *adapter, uint8_t *bssid,
+int wlan_hdd_send_roam_auth_event(struct hdd_adapter *adapter, uint8_t *bssid,
 		uint8_t *req_rsn_ie, uint32_t req_rsn_length, uint8_t
 		*rsp_rsn_ie, uint32_t rsp_rsn_length, tCsrRoamInfo
 		*roam_info_ptr);
 #else
-static inline int wlan_hdd_send_roam_auth_event(hdd_adapter_t *adapter,
+static inline int wlan_hdd_send_roam_auth_event(struct hdd_adapter *adapter,
 		uint8_t *bssid, uint8_t *req_rsn_ie, uint32_t req_rsn_length,
 		uint8_t *rsp_rsn_ie, uint32_t rsp_rsn_length, tCsrRoamInfo
 		*roam_info_ptr)
@@ -355,17 +399,17 @@ static inline int wlan_hdd_send_roam_auth_event(hdd_adapter_t *adapter,
 }
 #endif
 
-int wlan_hdd_cfg80211_update_apies(hdd_adapter_t *adapter);
+int wlan_hdd_cfg80211_update_apies(struct hdd_adapter *adapter);
 int wlan_hdd_request_pre_cac(uint8_t channel);
-int wlan_hdd_sap_cfg_dfs_override(hdd_adapter_t *adapter);
+int wlan_hdd_sap_cfg_dfs_override(struct hdd_adapter *adapter);
 
 enum policy_mgr_con_mode wlan_hdd_convert_nl_iftype_to_hdd_type(
 					enum nl80211_iftype type);
 
-int wlan_hdd_enable_dfs_chan_scan(hdd_context_t *hdd_ctx,
+int wlan_hdd_enable_dfs_chan_scan(struct hdd_context *hdd_ctx,
 				  bool enable_dfs_channels);
 
-int wlan_hdd_cfg80211_update_band(hdd_context_t *hdd_ctx, struct wiphy *wiphy,
+int wlan_hdd_cfg80211_update_band(struct hdd_context *hdd_ctx, struct wiphy *wiphy,
 				  eCsrBand eBand);
 
 /**
@@ -376,7 +420,7 @@ int wlan_hdd_cfg80211_update_band(hdd_context_t *hdd_ctx, struct wiphy *wiphy,
  *
  * Return: 0 for success, non-zero for failure
  */
-int wlan_hdd_try_disconnect(hdd_adapter_t *pAdapter);
+int wlan_hdd_try_disconnect(struct hdd_adapter *pAdapter);
 
 #if defined(CFG80211_DISCONNECTED_V2) || \
 (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 2, 0))
@@ -396,16 +440,33 @@ static inline void wlan_hdd_cfg80211_indicate_disconnect(struct net_device *dev,
 				GFP_KERNEL);
 }
 #endif
-struct cfg80211_bss *wlan_hdd_cfg80211_inform_bss_frame(hdd_adapter_t *pAdapter,
+struct cfg80211_bss *wlan_hdd_cfg80211_inform_bss_frame(struct hdd_adapter *pAdapter,
 						tSirBssDescription *bss_desc);
 
-/*
- * As of 4.7, ieee80211_band is removed; add shims so we can reference
- * nl80211_band instead
+/**
+ * hdd_rate_info_bw: an HDD internal rate bandwidth representation
+ * @HDD_RATE_BW_5: 5MHz
+ * @HDD_RATE_BW_10: 10MHz
+ * @HDD_RATE_BW_20: 20MHz
+ * @HDD_RATE_BW_40: 40MHz
+ * @HDD_RATE_BW_80: 80MHz
+ * @HDD_RATE_BW_160: 160 MHz
  */
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0))
-#define NUM_NL80211_BANDS ((enum nl80211_band)IEEE80211_NUM_BANDS)
-#endif
+enum hdd_rate_info_bw {
+	HDD_RATE_BW_5,
+	HDD_RATE_BW_10,
+	HDD_RATE_BW_20,
+	HDD_RATE_BW_40,
+	HDD_RATE_BW_80,
+	HDD_RATE_BW_160,
+};
+
+/**
+ * hdd_set_rate_bw(): Set the bandwidth for the given rate_info
+ * @info: The rate info for which the bandwidth should be set
+ * @hdd_bw: HDD representation of a rate info bandwidth
+ */
+void hdd_set_rate_bw(struct rate_info *info, enum hdd_rate_info_bw hdd_bw);
 
 /**
  * hdd_lost_link_info_cb() - callback function to get lost link information
@@ -423,7 +484,7 @@ void hdd_lost_link_info_cb(void *context,
  *
  * Return : Corresponding band for SAP operating channel
  */
-uint8_t hdd_get_sap_operating_band(hdd_context_t *hdd_ctx);
+uint8_t hdd_get_sap_operating_band(struct hdd_context *hdd_ctx);
 
 /**
  * wlan_hdd_try_disconnect() - try disconnnect from previous connection
@@ -433,20 +494,7 @@ uint8_t hdd_get_sap_operating_band(hdd_context_t *hdd_ctx);
  *
  * Return: 0 for success, non-zero for failure
  */
-int wlan_hdd_try_disconnect(hdd_adapter_t *adapter);
-
-/**
- * hdd_process_defer_disconnect() - Handle the deferred disconnect
- * @adapter: HDD Adapter
- *
- * If roaming is in progress and there is a request to
- * disconnect the session, then it is deferred. Once
- * roaming is complete/aborted, then this routine is
- * used to resume the disconnect that was deferred
- *
- * Return: None
- */
-void hdd_process_defer_disconnect(hdd_adapter_t *adapter);
+int wlan_hdd_try_disconnect(struct hdd_adapter *adapter);
 
 #ifndef CONVERGED_TDLS_ENABLE
 static inline void
@@ -536,6 +584,16 @@ int wlan_hdd_get_adjacent_chan(uint8_t chan, bool upper);
  *
  * Merges two avoid_frequency lists
  */
-int wlan_hdd_merge_avoid_freqs(tHddAvoidFreqList *destFreqList,
-		tHddAvoidFreqList *srcFreqList);
+int wlan_hdd_merge_avoid_freqs(struct ch_avoid_ind_type *destFreqList,
+		struct ch_avoid_ind_type *srcFreqList);
+
+
+/**
+ * hdd_bt_activity_cb() - callback function to receive bt activity
+ * @context: HDD context
+ * @bt_activity: specifies the kind of bt activity
+ *
+ * Return: none
+ */
+void hdd_bt_activity_cb(void *context, uint32_t bt_activity);
 #endif

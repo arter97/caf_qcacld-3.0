@@ -151,6 +151,50 @@ static uint8_t *htt_t2h_mac_addr_deswizzle(uint8_t *tgt_mac_addr,
 #endif
 }
 
+/**
+ * htt_ipa_op_response() - invoke an event handler from FW
+ * @pdev: Handle (pointer) to HTT pdev.
+ * @msg_word: htt msg
+ *
+ * Return: None
+ */
+#ifdef IPA_OFFLOAD
+static void htt_ipa_op_response(struct htt_pdev_t *pdev, uint32_t *msg_word)
+{
+	uint8_t op_code;
+	uint16_t len;
+	uint8_t *op_msg_buffer;
+	uint8_t *msg_start_ptr;
+
+	htc_pm_runtime_put(pdev->htc_pdev);
+	msg_start_ptr = (uint8_t *) msg_word;
+	op_code =
+		HTT_WDI_IPA_OP_RESPONSE_OP_CODE_GET(*msg_word);
+	msg_word++;
+	len = HTT_WDI_IPA_OP_RESPONSE_RSP_LEN_GET(*msg_word);
+
+	op_msg_buffer =
+		qdf_mem_malloc(sizeof
+				(struct htt_wdi_ipa_op_response_t) +
+				len);
+	if (!op_msg_buffer) {
+		qdf_print("OPCODE messsage buffer alloc fail");
+		return;
+	}
+	qdf_mem_copy(op_msg_buffer,
+			msg_start_ptr,
+			sizeof(struct htt_wdi_ipa_op_response_t) +
+			len);
+	cdp_ipa_op_response(cds_get_context(QDF_MODULE_ID_SOC),
+			(struct cdp_pdev *)pdev->txrx_pdev,
+			op_msg_buffer);
+}
+#else
+static void htt_ipa_op_response(struct htt_pdev_t *pdev, uint32_t *msg_word)
+{
+}
+#endif
+
 /* Target to host Msg/event  handler  for low priority messages*/
 static void htt_t2h_lp_msg_handler(void *context, qdf_nbuf_t htt_t2h_msg,
 				   bool free_msg_buf)
@@ -354,10 +398,12 @@ static void htt_t2h_lp_msg_handler(void *context, qdf_nbuf_t htt_t2h_msg,
 
 		if (pdev->cfg.is_high_latency) {
 			if (!pdev->cfg.default_tx_comp_req) {
+				HTT_TX_MUTEX_ACQUIRE(&pdev->credit_mutex);
 				qdf_atomic_add(credit_delta,
 					       &pdev->htt_tx_credit.
 								target_delta);
 				credit_delta = htt_tx_credit_update(pdev);
+				HTT_TX_MUTEX_RELEASE(&pdev->credit_mutex);
 			}
 			if (credit_delta)
 				ol_tx_target_credit_update(
@@ -413,9 +459,11 @@ static void htt_t2h_lp_msg_handler(void *context, qdf_nbuf_t htt_t2h_msg,
 
 		if (pdev->cfg.is_high_latency &&
 		    !pdev->cfg.default_tx_comp_req) {
+			HTT_TX_MUTEX_ACQUIRE(&pdev->credit_mutex);
 			qdf_atomic_add(htt_credit_delta,
 				       &pdev->htt_tx_credit.target_delta);
 			htt_credit_delta = htt_tx_credit_update(pdev);
+			HTT_TX_MUTEX_RELEASE(&pdev->credit_mutex);
 		}
 
 		htt_tx_group_credit_process(pdev, msg_word);
@@ -426,33 +474,7 @@ static void htt_t2h_lp_msg_handler(void *context, qdf_nbuf_t htt_t2h_msg,
 
 	case HTT_T2H_MSG_TYPE_WDI_IPA_OP_RESPONSE:
 	{
-		uint8_t op_code;
-		uint16_t len;
-		uint8_t *op_msg_buffer;
-		uint8_t *msg_start_ptr;
-
-		htc_pm_runtime_put(pdev->htc_pdev);
-		msg_start_ptr = (uint8_t *) msg_word;
-		op_code =
-			HTT_WDI_IPA_OP_RESPONSE_OP_CODE_GET(*msg_word);
-		msg_word++;
-		len = HTT_WDI_IPA_OP_RESPONSE_RSP_LEN_GET(*msg_word);
-
-		op_msg_buffer =
-			qdf_mem_malloc(sizeof
-				       (struct htt_wdi_ipa_op_response_t) +
-				       len);
-		if (!op_msg_buffer) {
-			qdf_print("OPCODE messsage buffer alloc fail");
-			break;
-		}
-		qdf_mem_copy(op_msg_buffer,
-			     msg_start_ptr,
-			     sizeof(struct htt_wdi_ipa_op_response_t) +
-			     len);
-		cdp_ipa_op_response(cds_get_context(QDF_MODULE_ID_SOC),
-				(struct cdp_pdev *)pdev->txrx_pdev,
-				op_msg_buffer);
+		htt_ipa_op_response(pdev, msg_word);
 		break;
 	}
 
@@ -561,8 +583,8 @@ void htt_t2h_msg_handler(void *context, HTC_PACKET *pkt)
 	enum htt_t2h_msg_type msg_type;
 
 	/* check for successful message reception */
-	if (pkt->Status != A_OK) {
-		if (pkt->Status != A_ECANCELED)
+	if (pkt->Status != QDF_STATUS_SUCCESS) {
+		if (pkt->Status != QDF_STATUS_E_CANCELED)
 			pdev->stats.htc_err_cnt++;
 		qdf_nbuf_free(htt_t2h_msg);
 		return;
@@ -664,10 +686,12 @@ void htt_t2h_msg_handler(void *context, HTC_PACKET *pkt)
 			if (!pdev->cfg.default_tx_comp_req) {
 				int credit_delta;
 
+				HTT_TX_MUTEX_ACQUIRE(&pdev->credit_mutex);
 				qdf_atomic_add(num_msdus,
 					       &pdev->htt_tx_credit.
 								target_delta);
 				credit_delta = htt_tx_credit_update(pdev);
+				HTT_TX_MUTEX_RELEASE(&pdev->credit_mutex);
 
 				if (credit_delta) {
 					ol_tx_target_credit_update(
@@ -681,7 +705,7 @@ void htt_t2h_msg_handler(void *context, HTC_PACKET *pkt)
 		}
 
 		ol_tx_completion_handler(pdev->txrx_pdev, num_msdus,
-					 status, msg_word + 1);
+					 status, msg_word);
 		HTT_TX_SCHED(pdev);
 		break;
 	}
@@ -905,7 +929,7 @@ void htt_t2h_msg_handler_fast(void *context, qdf_nbuf_t *cmpl_msdus,
 				}
 			}
 			ol_tx_completion_handler(pdev->txrx_pdev, num_msdus,
-						 status, msg_word + 1);
+						 status, msg_word);
 
 			break;
 		}

@@ -46,7 +46,7 @@ QDF_STATUS p2p_process_remain_on_channel_cmd(tpAniSirGlobal pMac,
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	tSirRemainOnChnReq *pMsg;
 	uint32_t len;
-	tCsrRoamSession *pSession =
+	struct csr_roam_session *pSession =
 		CSR_GET_SESSION(pMac, p2pRemainonChn->sessionId);
 
 	if (!pSession) {
@@ -117,9 +117,12 @@ QDF_STATUS sme_remain_on_chn_rsp(tpAniSirGlobal pMac, uint8_t *pMsg)
 		return status;
 
 	callback = pCommand->u.remainChlCmd.callback;
-	if (callback)
+	if (callback && rsp) {
+		if (rsp->status != eSIR_SME_SUCCESS)
+			status = QDF_STATUS_E_FAILURE;
 		callback(pMac, pCommand->u.remainChlCmd.callbackCtx,
-			rsp->status, rsp->scan_id);
+				status, rsp->scan_id);
+	}
 
 	fFound = csr_scan_active_ll_remove_entry(pMac, pEntry,
 				     LL_ACCESS_LOCK);

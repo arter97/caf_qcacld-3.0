@@ -913,27 +913,21 @@ free_nbuf:
 }
 
 /**
- * wma_update_txrx_chainmask() - update txrx chainmask
- * @num_rf_chains: number rf chains
+ * wma_check_txrx_chainmask() - check txrx chainmask
+ * @num_rf_chains: number of rf chains
  * @cmd_value: command value
  *
- * Return: none
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
-void wma_update_txrx_chainmask(int num_rf_chains, int *cmd_value)
+QDF_STATUS wma_check_txrx_chainmask(int num_rf_chains, int cmd_value)
 {
-	if (*cmd_value > WMA_MAX_RF_CHAINS(num_rf_chains)) {
-		WMA_LOGE("%s: Chainmask value exceeds the maximum supported range setting it to maximum value.",
-			__func__);
-		WMA_LOGE("%s: Requested value %d Updated value %d",
-			__func__, *cmd_value, WMA_MAX_RF_CHAINS(num_rf_chains));
-		*cmd_value = WMA_MAX_RF_CHAINS(num_rf_chains);
-	} else if (*cmd_value < WMA_MIN_RF_CHAINS) {
-		WMA_LOGE("%s: Chainmask value is less than the minimum supported range setting it to minimum value.",
-			__func__);
-		WMA_LOGE("%s: Requested value %d Updated value %d",
-			__func__, *cmd_value, WMA_MIN_RF_CHAINS);
-		*cmd_value = WMA_MIN_RF_CHAINS;
+	if ((cmd_value > WMA_MAX_RF_CHAINS(num_rf_chains)) ||
+	    (cmd_value < WMA_MIN_RF_CHAINS)) {
+		WMA_LOGE("%s: Requested value %d over the range",
+			__func__, cmd_value);
+		return QDF_STATUS_E_INVAL;
 	}
+	return QDF_STATUS_SUCCESS;
 }
 
 /**
@@ -968,7 +962,7 @@ int wma_peer_state_change_event_handler(void *handle,
 	event = param_buf->fixed_param;
 	vdev = wma_find_vdev_by_id(wma_handle, event->vdev_id);
 	if (NULL == vdev) {
-		WMA_LOGP("%s: Couldn't find vdev for vdev_id: %d",
+		WMA_LOGD("%s: Couldn't find vdev for vdev_id: %d",
 			 __func__, event->vdev_id);
 		return -EINVAL;
 	}
@@ -1177,6 +1171,7 @@ void wma_set_linkstate(tp_wma_handle wma, tpLinkStateParams params)
 	    (params->state != eSIR_LINK_DOWN_STATE)) {
 		WMA_LOGD("%s: unsupported link state %d",
 			 __func__, params->state);
+		params->status = false;
 		goto out;
 	}
 
@@ -1184,6 +1179,7 @@ void wma_set_linkstate(tp_wma_handle wma, tpLinkStateParams params)
 
 	if (NULL == pdev) {
 		WMA_LOGE("%s: Unable to get TXRX context", __func__);
+		params->status = false;
 		goto out;
 	}
 
@@ -1191,11 +1187,13 @@ void wma_set_linkstate(tp_wma_handle wma, tpLinkStateParams params)
 	if (!vdev) {
 		WMA_LOGP("%s: vdev not found for addr: %pM",
 			 __func__, params->selfMacAddr);
+		params->status = false;
 		goto out;
 	}
 
 	if (wma_is_vdev_in_ap_mode(wma, vdev_id)) {
 		WMA_LOGD("%s: Ignoring set link req in ap mode", __func__);
+		params->status = false;
 		goto out;
 	}
 
@@ -1205,8 +1203,10 @@ void wma_set_linkstate(tp_wma_handle wma, tpLinkStateParams params)
 		status = wma_create_peer(wma, pdev, vdev, params->bssid,
 				WMI_PEER_TYPE_DEFAULT, vdev_id,
 				roam_synch_in_progress);
-		if (status != QDF_STATUS_SUCCESS)
+		if (status != QDF_STATUS_SUCCESS) {
 			WMA_LOGE("%s: Unable to create peer", __func__);
+			params->status = false;
+		}
 		if (roam_synch_in_progress)
 			return;
 	} else {
@@ -1222,12 +1222,16 @@ void wma_set_linkstate(tp_wma_handle wma, tpLinkStateParams params)
 		if (!msg) {
 			WMA_LOGP(FL("Failed to fill vdev request for vdev_id %d"),
 				 vdev_id);
+			params->status = false;
 			status = QDF_STATUS_E_NOMEM;
 		}
 		wma_vdev_set_pause_bit(vdev_id, PAUSE_TYPE_HOST);
 		if (wma_send_vdev_stop_to_fw(wma, vdev_id)) {
 			WMA_LOGP("%s: %d Failed to send vdev stop",
 				 __func__, __LINE__);
+			params->status = false;
+			wma_remove_vdev_req(wma, vdev_id,
+				WMA_TARGET_REQ_TYPE_VDEV_STOP);
 		} else {
 			WMA_LOGP("%s: %d vdev stop sent vdev %d",
 				 __func__, __LINE__, vdev_id);

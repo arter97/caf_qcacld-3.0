@@ -94,21 +94,19 @@ struct wma_caps_per_phy {
 typedef void (*wma_peer_authorized_fp) (uint32_t vdev_id);
 
 
-QDF_STATUS wma_pre_start(void *cds_context);
-
-QDF_STATUS wma_mc_process_msg(void *cds_context, struct scheduler_msg *msg);
+QDF_STATUS wma_pre_start(void);
 
 QDF_STATUS wma_mc_process_handler(struct scheduler_msg *msg);
 
-QDF_STATUS wma_start(void *cds_context);
+QDF_STATUS wma_start(void);
 
-QDF_STATUS wma_stop(void *cds_context, uint8_t reason);
+QDF_STATUS wma_stop(uint8_t reason);
 
-QDF_STATUS wma_close(void *cds_context);
+QDF_STATUS wma_close(void);
 
-QDF_STATUS wma_wmi_service_close(void *cds_context);
+QDF_STATUS wma_wmi_service_close(void);
 
-QDF_STATUS wma_wmi_work_close(void *cds_context);
+QDF_STATUS wma_wmi_work_close(void);
 
 int wma_rx_ready_event(void *handle, uint8_t *ev, uint32_t len);
 
@@ -116,9 +114,9 @@ int  wma_rx_service_ready_event(void *handle, uint8_t *ev, uint32_t len);
 
 int wma_rx_service_ready_ext_event(void *handle, uint8_t *ev, uint32_t len);
 
-void wma_setneedshutdown(void *cds_context);
+void wma_setneedshutdown(void);
 
-bool wma_needshutdown(void *cds_context);
+bool wma_needshutdown(void);
 
 QDF_STATUS wma_wait_for_ready_event(WMA_HANDLE handle);
 
@@ -131,11 +129,16 @@ int wma_cli_set2_command(int vdev_id, int param_id, int sval1,
 
 QDF_STATUS wma_set_htconfig(uint8_t vdev_id, uint16_t ht_capab, int value);
 
-QDF_STATUS wma_get_wcnss_software_version(void *p_cds_gctx,
-					  uint8_t *pVersion,
-					  uint32_t versionBufferSize);
+/**
+ * wma_get_wcnss_software_version() - get wcnss software version
+ * @version: version pointer
+ * @version_buffer_size: buffer size
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS wma_get_wcnss_software_version(uint8_t *version,
+					  uint32_t version_buffer_size);
 
-bool wma_check_scan_in_progress(WMA_HANDLE handle);
 void wma_set_peer_authorized_cb(void *wma_ctx, wma_peer_authorized_fp auth_cb);
 QDF_STATUS wma_set_peer_param(void *wma_ctx, uint8_t *peer_addr,
 		  uint32_t param_id,
@@ -169,6 +172,7 @@ void wma_set_dbs_capability_ut(uint32_t dbs);
 QDF_STATUS wma_get_caps_for_phyidx_hwmode(struct wma_caps_per_phy *caps_per_phy,
 		enum hw_mode_dbs_capab hw_mode, enum cds_band_type band);
 bool wma_is_rx_ldpc_supported_for_channel(uint32_t channel);
+int wma_unified_radio_tx_mem_free(void *handle);
 
 #if defined(FEATURE_LRO)
 int wma_lro_init(struct cdp_lro_hash_config *lro_config);
@@ -225,6 +229,7 @@ static inline QDF_STATUS wma_register_ndp_cb(QDF_STATUS (*pe_ndp_event_handler)
 
 bool wma_is_csa_offload_enabled(void);
 bool wma_is_p2p_lo_capable(void);
+bool wma_capability_enhanced_mcast_filter(void);
 QDF_STATUS wma_p2p_lo_start(struct sir_p2p_lo_start *params);
 QDF_STATUS wma_p2p_lo_stop(u_int32_t vdev_id);
 QDF_STATUS wma_get_wakelock_stats(struct sir_wake_lock_stats *wake_lock_stats);

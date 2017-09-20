@@ -30,7 +30,7 @@
  *
  * WLAN HDD NAPI interface implementation
  */
-#include <smp.h> /* get_cpu */
+#include <linux/smp.h> /* get_cpu */
 
 #include "wlan_hdd_napi.h"
 #include "cds_api.h"       /* cds_get_context */
@@ -105,7 +105,7 @@ int hdd_napi_create(void)
 {
 	struct  hif_opaque_softc *hif_ctx;
 	int     rc = 0;
-	hdd_context_t *hdd_ctx;
+	struct hdd_context *hdd_ctx;
 	uint8_t feature_flags = 0;
 
 	NAPI_DEBUG("-->");
@@ -182,6 +182,14 @@ int hdd_napi_destroy(int force)
 							i,
 							NAPI_PIPE2ID(i), force);
 				}
+	} else {
+		struct hif_opaque_softc *hif_ctx;
+		hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
+
+		if (unlikely(NULL == hif_ctx))
+			QDF_ASSERT(NULL != hif_ctx);
+		else
+			rc = hif_napi_cpu_deinit(hif_ctx);
 	}
 
 	/* if all instances are removed, it is likely that hif_context has been
@@ -275,7 +283,7 @@ int hdd_napi_event(enum qca_napi_event event, void *data)
  *         !0: error, or action error code
  */
 static int napi_tput_policy_delay;
-int hdd_napi_apply_throughput_policy(struct hdd_context_s *hddctx,
+int hdd_napi_apply_throughput_policy(struct hdd_context *hddctx,
 				     uint64_t              tx_packets,
 				     uint64_t              rx_packets)
 {
@@ -345,7 +353,7 @@ int hdd_napi_apply_throughput_policy(struct hdd_context_s *hddctx,
 int hdd_napi_serialize(int is_on)
 {
 	int rc;
-	hdd_context_t *hdd_ctx;
+	struct hdd_context *hdd_ctx;
 #define POLICY_DELAY_FACTOR (1)
 	rc = hif_napi_serialize(cds_get_context(QDF_MODULE_ID_HIF), is_on);
 	if ((rc == 0) && (is_on == 0)) {

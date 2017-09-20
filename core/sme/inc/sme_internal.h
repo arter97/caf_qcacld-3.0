@@ -160,6 +160,16 @@ typedef void (*sme_encrypt_decrypt_callback)(
 			void *context,
 			struct sir_encrypt_decrypt_rsp_params *response);
 
+/**
+ * typedef get_chain_rssi_callback - get chain rssi callback
+ * @context: Opaque context that the client can use to associate the
+ *    callback with the request
+ * @data: chain rssi result reported by firmware
+ */
+struct chain_rssi_result;
+typedef void (*get_chain_rssi_callback)(void *context,
+					struct chain_rssi_result *data);
+
 typedef struct tagSmeStruct {
 	eSmeState state;
 	qdf_mutex_t lkSmeGlobalLock;
@@ -172,9 +182,6 @@ typedef struct tagSmeStruct {
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_CSR
 	host_event_wlan_status_payload_type eventPayload;
 #endif
-#ifdef FEATURE_WLAN_CH_AVOID
-	void (*pChAvoidNotificationCb)(void *hdd_context, void *indi_param);
-#endif /* FEATURE_WLAN_CH_AVOID */
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS
 	void (*pLinkLayerStatsIndCallback)(void *callbackContext,
 			int indType, void *pRsp);
@@ -197,6 +204,14 @@ typedef struct tagSmeStruct {
 	void (*pLinkSpeedIndCb)(tSirLinkSpeedInfo *indParam,
 			void *pDevContext);
 	void *pLinkSpeedCbContext;
+	/* get peer info callback */
+	void (*pget_peer_info_ind_cb)(struct sir_peer_info_resp *param,
+		void *pcontext);
+	void *pget_peer_info_cb_context;
+	/* get extended peer info callback */
+	void (*pget_peer_info_ext_ind_cb)(struct sir_peer_info_ext_resp *param,
+		void *pcontext);
+	void *pget_peer_info_ext_cb_context;
 #ifdef FEATURE_WLAN_EXTSCAN
 	void (*pExtScanIndCb)(void *, const uint16_t, void *);
 #endif /* FEATURE_WLAN_EXTSCAN */
@@ -252,6 +267,9 @@ typedef struct tagSmeStruct {
 	void (*stats_ext2_cb)(void *, struct sir_sme_rx_aggr_hole_ind *);
 	void (*chip_power_save_fail_cb)(void *,
 			struct chip_pwr_save_fail_detected_params *);
+	void (*bt_activity_info_cb)(void *context, uint32_t bt_activity);
+	get_chain_rssi_callback get_chain_rssi_cb;
+	void *get_chain_rssi_context;
 } tSmeStruct, *tpSmeStruct;
 
 #endif /* #if !defined( __SMEINTERNAL_H ) */

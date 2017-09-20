@@ -70,10 +70,12 @@ int ce_send_fast(struct CE_handle *copyeng, qdf_nbuf_t msdu,
  * succeeds, that guarantees that the target has room to accept
  * the new tx frame.
  */
-static inline qdf_nbuf_t ol_tx_prepare_ll(struct ol_tx_desc_t *tx_desc,
-			ol_txrx_vdev_handle vdev, qdf_nbuf_t msdu,
-			struct ol_txrx_msdu_info_t *msdu_info)
+static struct ol_tx_desc_t *
+ol_tx_prepare_ll(ol_txrx_vdev_handle vdev,
+		 qdf_nbuf_t msdu,
+		 struct ol_txrx_msdu_info_t *msdu_info)
 {
+	struct ol_tx_desc_t *tx_desc;
 	struct ol_txrx_pdev_t *pdev = vdev->pdev;
 
 	(msdu_info)->htt.info.frame_type = pdev->htt_pkt_type;
@@ -88,10 +90,10 @@ static inline qdf_nbuf_t ol_tx_prepare_ll(struct ol_tx_desc_t *tx_desc,
 					vdev, msdu_info, true);
 		TXRX_STATS_MSDU_LIST_INCR(
 				pdev, tx.dropped.host_reject, msdu);
-		return msdu; /* the list of unaccepted MSDUs */
+		return NULL;
 	}
 
-	return NULL;
+	return tx_desc;
 }
 
 #if defined(FEATURE_TSO)
@@ -284,8 +286,7 @@ qdf_nbuf_t ol_tx_data(void *data_vdev, qdf_nbuf_t skb)
 }
 
 #ifdef IPA_OFFLOAD
-qdf_nbuf_t ol_tx_send_ipa_data_frame(struct cdp_vdev *vdev,
-			qdf_nbuf_t skb)
+qdf_nbuf_t ol_tx_send_ipa_data_frame(struct cdp_vdev *vdev, qdf_nbuf_t skb)
 {
 	struct ol_txrx_pdev_t *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 	qdf_nbuf_t ret;
@@ -421,7 +422,8 @@ qdf_nbuf_t ol_tx_ll(ol_txrx_vdev_handle vdev, qdf_nbuf_t msdu_list)
 
 			segments--;
 
-			if (ol_tx_prepare_ll(tx_desc, vdev, msdu, &msdu_info))
+			tx_desc = ol_tx_prepare_ll(vdev, msdu, &msdu_info);
+			if (!tx_desc)
 				return msdu;
 
 			/*
@@ -484,7 +486,8 @@ qdf_nbuf_t ol_tx_ll(ol_txrx_vdev_handle vdev, qdf_nbuf_t msdu_list)
 
 		msdu_info.htt.info.ext_tid = qdf_nbuf_get_tid(msdu);
 		msdu_info.peer = NULL;
-		if (ol_tx_prepare_ll(tx_desc, vdev, msdu, &msdu_info))
+		tx_desc = ol_tx_prepare_ll(vdev, msdu, &msdu_info);
+		if (!tx_desc)
 			return msdu;
 
 		TXRX_STATS_MSDU_INCR(vdev->pdev, tx.from_stack, msdu);
@@ -1026,9 +1029,11 @@ static void ol_tx_vdev_ll_pause_queue_send_base(struct ol_txrx_vdev_t *vdev)
 	}
 	if (vdev->ll_pause.txq.depth) {
 		qdf_timer_stop(&vdev->ll_pause.timer);
-		qdf_timer_start(&vdev->ll_pause.timer,
+		if (!qdf_atomic_read(&vdev->delete.detaching)) {
+			qdf_timer_start(&vdev->ll_pause.timer,
 					OL_TX_VDEV_PAUSE_QUEUE_SEND_PERIOD_MS);
-		vdev->ll_pause.is_q_timer_on = true;
+			vdev->ll_pause.is_q_timer_on = true;
+		}
 		if (vdev->ll_pause.txq.depth >= vdev->ll_pause.max_q_depth)
 			vdev->ll_pause.q_overflow_cnt++;
 	}
@@ -1069,9 +1074,11 @@ ol_tx_vdev_pause_queue_append(struct ol_txrx_vdev_t *vdev,
 
 	if (start_timer) {
 		qdf_timer_stop(&vdev->ll_pause.timer);
-		qdf_timer_start(&vdev->ll_pause.timer,
+		if (!qdf_atomic_read(&vdev->delete.detaching)) {
+			qdf_timer_start(&vdev->ll_pause.timer,
 					OL_TX_VDEV_PAUSE_QUEUE_SEND_PERIOD_MS);
-		vdev->ll_pause.is_q_timer_on = true;
+			vdev->ll_pause.is_q_timer_on = true;
+		}
 	}
 	qdf_spin_unlock_bh(&vdev->ll_pause.mutex);
 
@@ -1243,7 +1250,8 @@ void ol_tx_vdev_ll_pause_queue_send(void *context)
 	struct ol_txrx_vdev_t *vdev = (struct ol_txrx_vdev_t *)context;
 	struct ol_txrx_pdev_t *pdev = vdev->pdev;
 
-	if (pdev->tx_throttle.current_throttle_level != THROTTLE_LEVEL_0 &&
+	if (pdev &&
+	    pdev->tx_throttle.current_throttle_level != THROTTLE_LEVEL_0 &&
 	    pdev->tx_throttle.current_throttle_phase == THROTTLE_PHASE_OFF)
 		return;
 	ol_tx_vdev_ll_pause_queue_send_base(vdev);
@@ -1296,7 +1304,8 @@ ol_tx_non_std_ll(struct ol_txrx_vdev_t *vdev,
 		msdu_info.peer = NULL;
 		msdu_info.tso_info.is_tso = 0;
 
-		if (ol_tx_prepare_ll(tx_desc, vdev, msdu, &msdu_info))
+		tx_desc = ol_tx_prepare_ll(vdev, msdu, &msdu_info);
+		if (!tx_desc)
 			return msdu;
 
 		/*
@@ -1524,7 +1533,7 @@ int ol_txrx_mgmt_send_frame(
 					     1 /* error */);
 		if (tx_msdu_info->peer) {
 			/* remove the peer reference added above */
-			ol_txrx_peer_unref_delete(tx_msdu_info->peer);
+			OL_TXRX_PEER_UNREF_DELETE(tx_msdu_info->peer);
 		}
 		return 1; /* can't accept the tx mgmt frame */
 	}
@@ -1549,7 +1558,7 @@ int ol_txrx_mgmt_send_frame(
 	ol_tx_enqueue(vdev->pdev, txq, tx_desc, tx_msdu_info);
 	if (tx_msdu_info->peer) {
 		/* remove the peer reference added above */
-		ol_txrx_peer_unref_delete(tx_msdu_info->peer);
+		OL_TXRX_PEER_UNREF_DELETE(tx_msdu_info->peer);
 	}
 	ol_tx_sched(vdev->pdev);
 
@@ -1739,7 +1748,7 @@ ol_tx_hl_base(
 				if (tx_msdu_info.peer) {
 					/* remove the peer reference
 					 * added above */
-					ol_txrx_peer_unref_delete(
+					OL_TXRX_PEER_UNREF_DELETE(
 							tx_msdu_info.peer);
 				}
 				goto MSDU_LOOP_BOTTOM;
@@ -1757,7 +1766,7 @@ ol_tx_hl_base(
 					ol_tx_desc_frame_free_nonstd(pdev,
 								     tx_desc,
 								     1);
-					ol_txrx_peer_unref_delete(
+					OL_TXRX_PEER_UNREF_DELETE(
 							tx_msdu_info.peer);
 					msdu = next;
 					continue;
@@ -1773,7 +1782,7 @@ ol_tx_hl_base(
 						ol_tx_desc_frame_free_nonstd(
 								pdev,
 								tx_desc, 1);
-						ol_txrx_peer_unref_delete(
+						OL_TXRX_PEER_UNREF_DELETE(
 							tx_msdu_info.peer);
 						msdu = next;
 						continue;
@@ -1822,7 +1831,7 @@ ol_tx_hl_base(
 				OL_TX_PEER_STATS_UPDATE(tx_msdu_info.peer,
 							msdu);
 				/* remove the peer reference added above */
-				ol_txrx_peer_unref_delete(tx_msdu_info.peer);
+				OL_TXRX_PEER_UNREF_DELETE(tx_msdu_info.peer);
 			}
 MSDU_LOOP_BOTTOM:
 			msdu = next;
@@ -2022,7 +2031,8 @@ qdf_nbuf_t ol_tx_reinject(struct ol_txrx_vdev_t *vdev,
 	msdu_info.htt.action.tx_comp_req = 0;
 	msdu_info.tso_info.is_tso = 0;
 
-	if (ol_tx_prepare_ll(tx_desc, vdev, msdu, &msdu_info))
+	tx_desc = ol_tx_prepare_ll(vdev, msdu, &msdu_info);
+	if (!tx_desc)
 		return msdu;
 
 	HTT_TX_DESC_POSTPONED_SET(*((uint32_t *) (tx_desc->htt_tx_desc)), true);

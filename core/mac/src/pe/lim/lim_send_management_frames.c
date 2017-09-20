@@ -59,10 +59,12 @@
 #include "cds_utils.h"
 #include "sme_trace.h"
 #include "rrm_api.h"
+#include "qdf_crypto.h"
 
 #include "wma_types.h"
 #include <cdp_txrx_cmn.h>
 #include <cdp_txrx_peer_ops.h>
+#include "lim_process_fils.h"
 
 /**
  *
@@ -565,7 +567,7 @@ lim_send_probe_rsp_mgmt_frame(tpAniSirGlobal mac_ctx,
 	bool extracted_ext_cap_flag = false;
 
 	/* We don't answer requests in this case*/
-	if (ANI_DRIVER_TYPE(mac_ctx) == eDRIVER_TYPE_MFG)
+	if (ANI_DRIVER_TYPE(mac_ctx) == QDF_DRIVER_TYPE_MFG)
 		return;
 
 	if (NULL == pe_session)
@@ -1296,6 +1298,9 @@ lim_send_assoc_rsp_mgmt_frame(tpAniSirGlobal mac_ctx,
 						* retry_int);
 		}
 #endif
+
+		if (LIM_IS_AP_ROLE(pe_session)  && sta->non_ecsa_capable)
+			pe_session->lim_non_ecsa_cap_num++;
 	}
 
 	qdf_mem_set((uint8_t *) &beacon_params, sizeof(beacon_params), 0);
@@ -1418,7 +1423,7 @@ lim_send_assoc_rsp_mgmt_frame(tpAniSirGlobal mac_ctx,
 		pe_debug("*** Sending ReAssoc Resp status %d aid %d to",
 			status_code, aid);
 
-	lim_print_mac_addr(mac_ctx, mac_hdr->da, LOG1);
+	lim_print_mac_addr(mac_ctx, mac_hdr->da, LOGD);
 
 	if (addn_ie_len && addn_ie_len <= WNI_CFG_ASSOC_RSP_ADDNIE_DATA_LEN)
 		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
@@ -1594,6 +1599,41 @@ lim_send_delts_req_action_frame(tpAniSirGlobal pMac,
 } /* End lim_send_delts_req_action_frame. */
 
 /**
+ * lim_assoc_tx_complete_cnf()- Confirmation for assoc sent over the air
+ * @context: pointer to global mac
+ * @buf: buffer
+ * @tx_complete : Sent status
+ * @params; tx completion params
+ *
+ * Return: This returns QDF_STATUS
+ */
+
+static QDF_STATUS lim_assoc_tx_complete_cnf(void *context,
+					   qdf_nbuf_t buf,
+					   uint32_t tx_complete,
+					   void *params)
+{
+	uint16_t assoc_ack_status;
+	uint16_t reason_code;
+	tpAniSirGlobal mac_ctx = (tpAniSirGlobal)context;
+
+	pe_debug("tx_complete= %d", tx_complete);
+	if (tx_complete) {
+		assoc_ack_status = ACKED;
+		reason_code = eSIR_SUCCESS;
+	} else {
+		assoc_ack_status = NOT_ACKED;
+		reason_code = eSIR_FAILURE;
+	}
+	if (buf)
+		qdf_nbuf_free(buf);
+
+	lim_diag_event_report(mac_ctx, WLAN_PE_DIAG_ASSOC_ACK_EVENT,
+			NULL, assoc_ack_status, reason_code);
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * lim_send_assoc_req_mgmt_frame() - Send association request
  * @mac_ctx: Handle to MAC context
  * @mlm_assoc_req: Association request information
@@ -1633,9 +1673,11 @@ lim_send_assoc_req_mgmt_frame(tpAniSirGlobal mac_ctx,
 	tDot11fIEExtCap bcn_ext_cap;
 	uint8_t *bcn_ie = NULL;
 	uint32_t bcn_ie_len = 0;
+	uint32_t aes_block_size_len = 0;
 
 	if (NULL == pe_session) {
 		pe_err("pe_session is NULL");
+		qdf_mem_free(mlm_assoc_req);
 		return;
 	}
 
@@ -1644,6 +1686,7 @@ lim_send_assoc_req_mgmt_frame(tpAniSirGlobal mac_ctx,
 	/* check this early to avoid unncessary operation */
 	if (NULL == pe_session->pLimJoinReq) {
 		pe_err("pe_session->pLimJoinReq is NULL");
+		qdf_mem_free(mlm_assoc_req);
 		return;
 	}
 	add_ie_len = pe_session->pLimJoinReq->addIEAssoc.length;
@@ -1652,6 +1695,7 @@ lim_send_assoc_req_mgmt_frame(tpAniSirGlobal mac_ctx,
 	frm = qdf_mem_malloc(sizeof(tDot11fAssocRequest));
 	if (NULL == frm) {
 		pe_err("Unable to allocate memory");
+		qdf_mem_free(mlm_assoc_req);
 		return;
 	}
 	qdf_mem_set((uint8_t *) frm, sizeof(tDot11fAssocRequest), 0);
@@ -1713,7 +1757,7 @@ lim_send_assoc_req_mgmt_frame(tpAniSirGlobal mac_ctx,
 		      LIM_BSS_CAPS_GET(WSM, pe_session->limCurrentBssQosCaps);
 
 	if (pe_session->lim11hEnable &&
-	    pe_session->pLimJoinReq->spectrumMgtIndicator == eSIR_TRUE) {
+	    pe_session->pLimJoinReq->spectrumMgtIndicator == true) {
 		power_caps = true;
 
 		populate_dot11f_power_caps(mac_ctx, &frm->PowerCaps,
@@ -1914,6 +1958,20 @@ lim_send_assoc_req_mgmt_frame(tpAniSirGlobal mac_ctx,
 			add_ie, &add_ie_len, &frm->SuppOperatingClasses))
 		pe_debug("Unable to Stripoff supp op classes IE from Assoc Req");
 
+	if (lim_is_fils_connection(pe_session)) {
+		populate_dot11f_fils_params(mac_ctx, frm, pe_session);
+		aes_block_size_len = AES_BLOCK_SIZE;
+	}
+
+	/*
+	 * Do unpack to populate the add_ie buffer to frm structure
+	 * before packing the frm structure. In this way, the IE ordering
+	 * which the latest 802.11 spec mandates is maintained.
+	 */
+	if (add_ie_len)
+		dot11f_unpack_assoc_request(mac_ctx, add_ie,
+					    add_ie_len, frm, true);
+
 	status = dot11f_get_packed_assoc_request_size(mac_ctx, frm, &payload);
 	if (DOT11F_FAILED(status)) {
 		pe_err("Association Request packet size failure(0x%08x)",
@@ -1925,7 +1983,8 @@ lim_send_assoc_req_mgmt_frame(tpAniSirGlobal mac_ctx,
 			status);
 	}
 
-	bytes = payload + sizeof(tSirMacMgmtHdr) + add_ie_len;
+	bytes = payload + sizeof(tSirMacMgmtHdr) +
+			aes_block_size_len;
 
 	qdf_status = cds_packet_alloc((uint16_t) bytes, (void **)&frame,
 				(void **)&packet);
@@ -1947,8 +2006,7 @@ lim_send_assoc_req_mgmt_frame(tpAniSirGlobal mac_ctx,
 		lim_post_sme_message(mac_ctx, LIM_MLM_ASSOC_CNF,
 			(uint32_t *) &assoc_cnf);
 
-		qdf_mem_free(frm);
-		return;
+		goto end;
 	}
 	/* Paranoia: */
 	qdf_mem_set(frame, bytes, 0);
@@ -1963,23 +2021,25 @@ lim_send_assoc_req_mgmt_frame(tpAniSirGlobal mac_ctx,
 	if (DOT11F_FAILED(status)) {
 		pe_err("Assoc request pack failure (0x%08x)", status);
 		cds_packet_free((void *)packet);
-		qdf_mem_free(frm);
-		return;
+		goto end;
 	} else if (DOT11F_WARNED(status)) {
 		pe_warn("Assoc request pack warning (0x%08x)", status);
 	}
 
-	pe_debug("Sending Association Request length %d to ", bytes);
 	if (pe_session->assocReq != NULL) {
 		qdf_mem_free(pe_session->assocReq);
 		pe_session->assocReq = NULL;
 		pe_session->assocReqLen = 0;
 	}
 
-	if (add_ie_len) {
-		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
-			     add_ie, add_ie_len);
-		payload += add_ie_len;
+	if (lim_is_fils_connection(pe_session)) {
+		qdf_status = aead_encrypt_assoc_req(mac_ctx, pe_session,
+						    frame, &payload);
+		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
+			cds_packet_free((void *)packet);
+			qdf_mem_free(frm);
+			return;
+		}
 	}
 
 	pe_session->assocReq = qdf_mem_malloc(payload);
@@ -2012,21 +2072,25 @@ lim_send_assoc_req_mgmt_frame(tpAniSirGlobal mac_ctx,
 	mac_hdr = (tpSirMacMgmtHdr) frame;
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_MGMT,
 			 pe_session->peSessionId, mac_hdr->fc.subType));
+
+	pe_debug("Sending Association Request length %d to ", bytes);
 	qdf_status =
-		wma_tx_frame(mac_ctx, packet,
+		wma_tx_frameWithTxComplete(mac_ctx, packet,
 			   (uint16_t) (sizeof(tSirMacMgmtHdr) + payload),
 			   TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS, 7,
-			   lim_tx_complete, frame, tx_flag, sme_sessionid, 0);
+			   lim_tx_complete, frame, lim_assoc_tx_complete_cnf,
+			   tx_flag, sme_sessionid, false, 0);
 	MTRACE(qdf_trace
 		       (QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 		       pe_session->peSessionId, qdf_status));
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		pe_err("Failed to send Association Request (%X)!",
 			qdf_status);
+		lim_diag_event_report(mac_ctx, WLAN_PE_DIAG_ASSOC_ACK_EVENT,
+				pe_session, SENT_FAIL, eSIR_FAILURE);
 		/* Pkt will be freed up by the callback */
-		qdf_mem_free(frm);
-		return;
 	}
+end:
 	/* Free up buffer allocated for mlm_assoc_req */
 	qdf_mem_free(mlm_assoc_req);
 	mlm_assoc_req = NULL;
@@ -2050,18 +2114,27 @@ static QDF_STATUS lim_auth_tx_complete_cnf(void *context,
 					   void *params)
 {
 	tpAniSirGlobal mac_ctx = (tpAniSirGlobal)context;
+	uint16_t auth_ack_status;
+	uint16_t reason_code;
 
 	pe_debug("tx_complete= %d", tx_complete);
 	if (tx_complete) {
 		mac_ctx->auth_ack_status = LIM_AUTH_ACK_RCD_SUCCESS;
+		auth_ack_status = ACKED;
+		reason_code = eSIR_SUCCESS;
 		/* 'Change' timer for future activations */
 		lim_deactivate_and_change_timer(mac_ctx, eLIM_AUTH_RETRY_TIMER);
 	} else {
 		mac_ctx->auth_ack_status = LIM_AUTH_ACK_RCD_FAILURE;
+		auth_ack_status = NOT_ACKED;
+		reason_code = eSIR_FAILURE;
 	}
 
 	if (buf)
 		qdf_nbuf_free(buf);
+
+	lim_diag_event_report(mac_ctx, WLAN_PE_DIAG_AUTH_ACK_EVENT,
+				NULL, auth_ack_status, reason_code);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2080,13 +2153,12 @@ static QDF_STATUS lim_auth_tx_complete_cnf(void *context,
  *
  * Return: void
  */
-
 void
 lim_send_auth_mgmt_frame(tpAniSirGlobal mac_ctx,
 			 tpSirMacAuthFrameBody auth_frame,
 			 tSirMacAddr peer_addr,
-			 uint8_t wep_bit,
-			 tpPESession session, bool wait_for_ack)
+			 uint8_t wep_challenge_len,
+			 tpPESession session)
 {
 	uint8_t *frame, *body;
 	uint32_t frame_len = 0, body_len = 0;
@@ -2096,6 +2168,7 @@ lim_send_auth_mgmt_frame(tpAniSirGlobal mac_ctx,
 	uint8_t tx_flag = 0;
 	uint8_t sme_sessionid = 0;
 	uint16_t ft_ies_length = 0;
+	bool challenge_req = false;
 
 	if (NULL == session) {
 		pe_err("Error: psession Entry is NULL");
@@ -2104,7 +2177,7 @@ lim_send_auth_mgmt_frame(tpAniSirGlobal mac_ctx,
 
 	sme_sessionid = session->smeSessionId;
 
-	if (wep_bit == LIM_WEP_IN_FC) {
+	if (wep_challenge_len) {
 		/*
 		 * Auth frame3 to be sent with encrypted framebody
 		 *
@@ -2117,18 +2190,17 @@ lim_send_auth_mgmt_frame(tpAniSirGlobal mac_ctx,
 		pe_debug("Sending encrypted auth frame to " MAC_ADDRESS_STR,
 				MAC_ADDR_ARRAY(peer_addr));
 
-		frame_len = sizeof(tSirMacMgmtHdr) + LIM_ENCR_AUTH_BODY_LEN;
-		body_len = LIM_ENCR_AUTH_BODY_LEN;
+		body_len = wep_challenge_len + LIM_ENCR_AUTH_INFO_LEN;
+		frame_len = sizeof(tSirMacMgmtHdr) + body_len;
 
 		goto alloc_packet;
 	}
 
-	pe_info("Sending Auth seq# %d status %d (%d) wait_for_ack %d to "
+	pe_info("Sending Auth seq# %d status %d (%d) to "
 		MAC_ADDRESS_STR,
 		auth_frame->authTransactionSeqNumber,
 		auth_frame->authStatusCode,
 		(auth_frame->authStatusCode == eSIR_MAC_SUCCESS_STATUS),
-		wait_for_ack,
 		MAC_ADDR_ARRAY(peer_addr));
 
 	switch (auth_frame->authTransactionSeqNumber) {
@@ -2140,10 +2212,11 @@ lim_send_auth_mgmt_frame(tpAniSirGlobal mac_ctx,
 		 * and status code.
 		 */
 
-		frame_len = sizeof(tSirMacMgmtHdr) +
-			   SIR_MAC_AUTH_CHALLENGE_OFFSET;
-		body_len = SIR_MAC_AUTH_CHALLENGE_OFFSET;
+		body_len = SIR_MAC_AUTH_FRAME_INFO_LEN;
+		frame_len = sizeof(tSirMacMgmtHdr) + body_len;
 
+		frame_len += lim_create_fils_auth_data(mac_ctx,
+						auth_frame, session);
 		if (auth_frame->authAlgoNumber == eSIR_FT_AUTH) {
 			if (NULL != session->ftPEContext.pFTPreAuthReq &&
 			    0 != session->ftPEContext.pFTPreAuthReq->
@@ -2172,9 +2245,8 @@ lim_send_auth_mgmt_frame(tpAniSirGlobal mac_ctx,
 			 * transaction number and status code.
 			 */
 
-			frame_len = sizeof(tSirMacMgmtHdr) +
-				   SIR_MAC_AUTH_CHALLENGE_OFFSET;
-			body_len = SIR_MAC_AUTH_CHALLENGE_OFFSET;
+			body_len = SIR_MAC_AUTH_FRAME_INFO_LEN;
+			frame_len = sizeof(tSirMacMgmtHdr) + body_len;
 		} else {
 			/*
 			 * Shared Key algorithm with challenge text
@@ -2187,9 +2259,10 @@ lim_send_auth_mgmt_frame(tpAniSirGlobal mac_ctx,
 			 * for challenge text.
 			 */
 
-			frame_len = sizeof(tSirMacMgmtHdr) +
-				   sizeof(tSirMacAuthFrame);
-			body_len = sizeof(tSirMacAuthFrameBody);
+			challenge_req = true;
+			body_len = SIR_MAC_AUTH_FRAME_INFO_LEN +
+					SIR_MAC_AUTH_CHALLENGE_BODY_LEN;
+			frame_len = sizeof(tSirMacMgmtHdr) + body_len;
 		}
 		break;
 
@@ -2203,9 +2276,8 @@ lim_send_auth_mgmt_frame(tpAniSirGlobal mac_ctx,
 		 * status code.
 		 */
 
-		frame_len = sizeof(tSirMacMgmtHdr) +
-			   SIR_MAC_AUTH_CHALLENGE_OFFSET;
-		body_len = SIR_MAC_AUTH_CHALLENGE_OFFSET;
+		body_len = SIR_MAC_AUTH_FRAME_INFO_LEN;
+		frame_len = sizeof(tSirMacMgmtHdr) + body_len;
 		break;
 
 	case SIR_MAC_AUTH_FRAME_4:
@@ -2216,9 +2288,8 @@ lim_send_auth_mgmt_frame(tpAniSirGlobal mac_ctx,
 		 * status code.
 		 */
 
-		frame_len = sizeof(tSirMacMgmtHdr) +
-			   SIR_MAC_AUTH_CHALLENGE_OFFSET;
-		body_len = SIR_MAC_AUTH_CHALLENGE_OFFSET;
+		body_len = SIR_MAC_AUTH_FRAME_INFO_LEN;
+		frame_len = sizeof(tSirMacMgmtHdr) + body_len;
 
 		break;
 	default:
@@ -2241,7 +2312,10 @@ alloc_packet:
 	lim_populate_mac_header(mac_ctx, frame, SIR_MAC_MGMT_FRAME,
 		SIR_MAC_MGMT_AUTH, peer_addr, session->selfMacAddr);
 	mac_hdr = (tpSirMacMgmtHdr) frame;
-	mac_hdr->fc.wep = wep_bit;
+	if (wep_challenge_len)
+		mac_hdr->fc.wep = LIM_WEP_IN_FC;
+	else
+		mac_hdr->fc.wep = LIM_NO_WEP_IN_FC;
 
 	/* Prepare BSSId */
 	if (LIM_IS_AP_ROLE(session))
@@ -2252,7 +2326,7 @@ alloc_packet:
 	/* Prepare Authentication frame body */
 	body = frame + sizeof(tSirMacMgmtHdr);
 
-	if (wep_bit == LIM_WEP_IN_FC) {
+	if (wep_challenge_len) {
 		qdf_mem_copy(body, (uint8_t *) auth_frame, body_len);
 
 		pe_debug("Sending Auth seq# 3 to " MAC_ADDRESS_STR,
@@ -2274,11 +2348,29 @@ alloc_packet:
 			sir_swap_u16if_needed(auth_frame->authStatusCode);
 		body += sizeof(uint16_t);
 		body_len -= sizeof(uint16_t);
-		if (body_len <= (sizeof(auth_frame->type) +
-				sizeof(auth_frame->length) +
-				sizeof(auth_frame->challengeText)))
-			qdf_mem_copy(body, (uint8_t *) &auth_frame->type,
-				     body_len);
+
+		if (challenge_req) {
+			if (body_len < SIR_MAC_AUTH_CHALLENGE_BODY_LEN) {
+				qdf_mem_copy(body, (uint8_t *)&auth_frame->type,
+					     body_len);
+				pe_err("Incomplete challenge info: length: %d, expected: %d",
+				       body_len,
+				       SIR_MAC_AUTH_CHALLENGE_BODY_LEN);
+				body += body_len;
+				body_len = 0;
+			} else {
+				/* copy challenge IE id, len, challenge text */
+				*body = auth_frame->type;
+				body++;
+				*body = auth_frame->length;
+				body++;
+				qdf_mem_copy(body, auth_frame->challengeText,
+					     SIR_MAC_AUTH_CHALLENGE_LENGTH);
+				body += SIR_MAC_AUTH_CHALLENGE_LENGTH;
+
+				body_len -= SIR_MAC_AUTH_CHALLENGE_BODY_LEN;
+			}
+		}
 
 		if ((auth_frame->authAlgoNumber == eSIR_FT_AUTH) &&
 		    (auth_frame->authTransactionSeqNumber ==
@@ -2307,6 +2399,11 @@ alloc_packet:
 						pbssDescription->mdie[0],
 					SIR_MDIE_SIZE);
 			}
+		} else if (auth_frame->authAlgoNumber ==
+				eSIR_FILS_SK_WITHOUT_PFS) {
+			/* TODO MDIE */
+			pe_debug("appending fils Auth data");
+			lim_add_fils_data_to_auth_frame(session, body);
 		}
 
 		pe_debug("*** Sending Auth seq# %d status %d (%d) to "
@@ -2338,33 +2435,22 @@ alloc_packet:
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_MGMT,
 			 session->peSessionId, mac_hdr->fc.subType));
 
-	if (wait_for_ack) {
-		mac_ctx->auth_ack_status = LIM_AUTH_ACK_NOT_RCD;
-		qdf_status = wma_tx_frameWithTxComplete(mac_ctx, packet,
-					 (uint16_t)frame_len,
-					 TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS,
-					 7, lim_tx_complete, frame,
-					 lim_auth_tx_complete_cnf,
-					 tx_flag, sme_sessionid, false, 0);
-		MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
-			session->peSessionId, qdf_status));
-		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
-			pe_err("*** Could not send Auth frame, retCode=%X ***",
-				qdf_status);
-			mac_ctx->auth_ack_status = LIM_AUTH_ACK_RCD_FAILURE;
-		/* Pkt will be freed up by the callback */
-		}
-	} else {
-		/* Queue Authentication frame in high priority WQ */
-		qdf_status = wma_tx_frame(mac_ctx, packet, (uint16_t) frame_len,
-					TXRX_FRM_802_11_MGMT,
-					ANI_TXDIR_TODS, 7, lim_tx_complete,
-					frame, tx_flag, sme_sessionid, 0);
-		MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
-				 session->peSessionId, qdf_status));
-		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
-			pe_err("*** Could not send Auth frame, retCode=%X ***",
-				qdf_status);
+	mac_ctx->auth_ack_status = LIM_AUTH_ACK_NOT_RCD;
+	qdf_status = wma_tx_frameWithTxComplete(mac_ctx, packet,
+				 (uint16_t)frame_len,
+				 TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS,
+				 7, lim_tx_complete, frame,
+				 lim_auth_tx_complete_cnf,
+				 tx_flag, sme_sessionid, false, 0);
+	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
+		session->peSessionId, qdf_status));
+	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
+		pe_err("*** Could not send Auth frame, retCode=%X ***",
+			qdf_status);
+		mac_ctx->auth_ack_status = LIM_AUTH_ACK_RCD_FAILURE;
+		lim_diag_event_report(mac_ctx, WLAN_PE_DIAG_AUTH_ACK_EVENT,
+				session, SENT_FAIL, eSIR_FAILURE);
+	/* Pkt will be freed up by the callback */
 	}
 	return;
 }
@@ -2507,33 +2593,14 @@ QDF_STATUS lim_send_disassoc_cnf(tpAniSirGlobal mac_ctx)
 			pe_err("cleanup_rx_path error");
 			goto end;
 		}
-		if (LIM_IS_STA_ROLE(pe_session) && (
-#ifdef FEATURE_WLAN_ESE
-			    (pe_session->isESEconnection) ||
-#endif
-			    (pe_session->isFastRoamIniFeatureEnabled) ||
-			    (pe_session->is11Rconnection)) &&
-			    (disassoc_req->reasonCode !=
+		if (LIM_IS_STA_ROLE(pe_session) &&
+			(disassoc_req->reasonCode !=
 				eSIR_MAC_DISASSOC_DUE_TO_FTHANDOFF_REASON)) {
 			pe_debug("FT Preauth Session (%p %d) Clean up",
 					pe_session, pe_session->peSessionId);
 
 			/* Delete FT session if there exists one */
 			lim_ft_cleanup_pre_auth_info(mac_ctx, pe_session);
-		} else {
-			pe_debug("FT Preauth Session %d Clean up"
-#ifdef FEATURE_WLAN_ESE
-				" isESE %d"
-#endif
-				" isLFR %d"
-				" is11r %d reason %d",
-				GET_LIM_SYSTEM_ROLE(pe_session),
-#ifdef FEATURE_WLAN_ESE
-				pe_session->isESEconnection,
-#endif
-				pe_session->isFastRoamIniFeatureEnabled,
-				pe_session->is11Rconnection,
-				disassoc_req->reasonCode);
 		}
 		/* Free up buffer allocated for mlmDisassocReq */
 		qdf_mem_free(disassoc_req);

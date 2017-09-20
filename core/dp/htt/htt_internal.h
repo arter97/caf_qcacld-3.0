@@ -523,10 +523,10 @@ static inline void htt_t2h_msg_handler_fast(void *htt_pdev,
 
 void htt_h2t_send_complete(void *context, HTC_PACKET *pkt);
 
-A_STATUS htt_h2t_ver_req_msg(struct htt_pdev_t *pdev);
+QDF_STATUS htt_h2t_ver_req_msg(struct htt_pdev_t *pdev);
 
 #if defined(HELIUMPLUS)
-A_STATUS
+QDF_STATUS
 htt_h2t_frag_desc_bank_cfg_msg(struct htt_pdev_t *pdev);
 #endif /* defined(HELIUMPLUS) */
 
@@ -684,6 +684,12 @@ void htt_rx_dbg_rxbuf_init(struct htt_pdev_t *pdev)
 	pdev->refill_retry_timer_doubles = 0;
 }
 
+/**
+ * htt_display_rx_buf_debug() - display debug rx buff list and some counters
+ * @pdev: pdev handle
+ *
+ * Return: Success
+ */
 static inline int htt_display_rx_buf_debug(struct htt_pdev_t *pdev)
 {
 	int i;
@@ -855,6 +861,11 @@ static inline
 void htt_rx_dbg_rxbuf_init(struct htt_pdev_t *pdev)
 {
 }
+static inline int htt_display_rx_buf_debug(struct htt_pdev_t *pdev)
+{
+	return 0;
+}
+
 static inline
 void htt_rx_dbg_rxbuf_set(struct htt_pdev_t *pdev,
 				uint32_t paddr,

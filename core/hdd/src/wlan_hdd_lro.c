@@ -46,7 +46,7 @@
 	(LRO_DESC | LRO_ELIGIBILITY_CHECKED | LRO_TCP_ACK_NUM | \
 	 LRO_TCP_DATA_CSUM | LRO_TCP_SEQ_NUM | LRO_TCP_WIN)
 
-#if defined(QCA_WIFI_NAPIER_EMULATION)
+#if defined(QCA_WIFI_QCA6290)
 /**
  * hdd_lro_init() - initialization for LRO
  * @hdd_ctx: HDD context
@@ -58,7 +58,7 @@
  *
  * Return: 0 - success, < 0 - failure
  */
-int hdd_lro_init(hdd_context_t *hdd_ctx)
+int hdd_lro_init(struct hdd_context *hdd_ctx)
 {
 	return 0;
 }
@@ -79,7 +79,7 @@ static qdf_lro_ctx_t wlan_hdd_get_lro_ctx(struct sk_buff *skb)
  *
  * Return: 0 - success, < 0 - failure
  */
-int hdd_lro_init(hdd_context_t *hdd_ctx)
+int hdd_lro_init(struct hdd_context *hdd_ctx)
 {
 	struct cdp_lro_hash_config lro_config;
 
@@ -135,14 +135,15 @@ static qdf_lro_ctx_t wlan_hdd_get_lro_ctx(struct sk_buff *skb)
  * Return: HDD_LRO_RX - frame delivered to LRO manager
  * HDD_LRO_NO_RX - frame not delivered
  */
-enum hdd_lro_rx_status hdd_lro_rx(hdd_context_t *hdd_ctx,
-	 hdd_adapter_t *adapter, struct sk_buff *skb)
+enum hdd_lro_rx_status hdd_lro_rx(struct hdd_context *hdd_ctx,
+	 struct hdd_adapter *adapter, struct sk_buff *skb)
 {
 	qdf_lro_ctx_t ctx;
 	enum hdd_lro_rx_status status = HDD_LRO_NO_RX;
 
 	if ((adapter->dev->features & NETIF_F_LRO) &&
-		 QDF_NBUF_CB_RX_TCP_PROTO(skb)) {
+		 QDF_NBUF_CB_RX_TCP_PROTO(skb) &&
+		 !QDF_NBUF_CB_RX_PEER_CACHED_FRM(skb)) {
 		struct qdf_lro_info info;
 		struct net_lro_desc *lro_desc = NULL;
 		struct hif_opaque_softc *hif_hdl =
@@ -154,10 +155,6 @@ enum hdd_lro_rx_status hdd_lro_rx(hdd_context_t *hdd_ctx,
 		}
 
 		ctx = wlan_hdd_get_lro_ctx(skb);
-
-		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_ERROR,
-			 "%s %d: ctx %p\n", __func__, __LINE__, ctx);
-
 		if (ctx == NULL) {
 			hdd_err("LRO mgr is NULL, vdev could be going down");
 			return status;
@@ -199,7 +196,7 @@ enum hdd_lro_rx_status hdd_lro_rx(hdd_context_t *hdd_ctx,
  *
  * Return: none
  */
-void hdd_lro_display_stats(hdd_context_t *hdd_ctx)
+void hdd_lro_display_stats(struct hdd_context *hdd_ctx)
 {
 	hdd_debug("LRO stats is broken, will fix it");
 }

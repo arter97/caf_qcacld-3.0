@@ -112,7 +112,7 @@ static void hdd_encrypt_decrypt_msg_cb(void *cookie,
  *
  * Return: none
  */
-static int hdd_post_encrypt_decrypt_msg_rsp(hdd_context_t *hdd_ctx,
+static int hdd_post_encrypt_decrypt_msg_rsp(struct hdd_context *hdd_ctx,
 	struct sir_encrypt_decrypt_rsp_params *encrypt_decrypt_rsp_params)
 {
 	struct sk_buff *skb;
@@ -168,7 +168,7 @@ encrypt_decrypt_policy[QCA_WLAN_VENDOR_ATTR_ENCRYPTION_TEST_MAX + 1] = {
  */
 static int hdd_fill_encrypt_decrypt_params(struct encrypt_decrypt_req_params
 						*encrypt_decrypt_params,
-						hdd_adapter_t *adapter,
+						struct hdd_adapter *adapter,
 						const void *data,
 						int data_len)
 {
@@ -177,7 +177,7 @@ static int hdd_fill_encrypt_decrypt_params(struct encrypt_decrypt_req_params
 	uint8_t *tmp;
 	uint8_t fc[2];
 
-	if (nla_parse(tb, QCA_WLAN_VENDOR_ATTR_ENCRYPTION_TEST_MAX,
+	if (hdd_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_ENCRYPTION_TEST_MAX,
 		      data, data_len, encrypt_decrypt_policy)) {
 		hdd_err("Invalid ATTR");
 		return -EINVAL;
@@ -352,8 +352,8 @@ static void hdd_encrypt_decrypt_context_dealloc(void *priv)
  *
  Return: 0 on success, negative errno on failure
  */
-static int hdd_encrypt_decrypt_msg(hdd_adapter_t *adapter,
-				   hdd_context_t *hdd_ctx,
+static int hdd_encrypt_decrypt_msg(struct hdd_adapter *adapter,
+				   struct hdd_context *hdd_ctx,
 				   const void *data,
 				   int data_len)
 {
@@ -430,9 +430,9 @@ static int __wlan_hdd_cfg80211_encrypt_decrypt_msg(struct wiphy *wiphy,
 						const void *data,
 						int data_len)
 {
-	hdd_context_t *hdd_ctx = wiphy_priv(wiphy);
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	struct net_device *dev = wdev->netdev;
-	hdd_adapter_t *adapter = NULL;
+	struct hdd_adapter *adapter = NULL;
 	int ret;
 
 	ENTER_DEV(dev);

@@ -51,7 +51,7 @@
 #include <net/cnss_nl.h>
 #endif
 
-static struct hdd_context_s *p_hdd_ctx;
+static struct hdd_context *p_hdd_ctx;
 
 /**
  * populate_oem_data_cap() - populate oem capabilities
@@ -60,14 +60,14 @@ static struct hdd_context_s *p_hdd_ctx;
  *
  * Return: error code
  */
-static int populate_oem_data_cap(hdd_adapter_t *adapter,
+static int populate_oem_data_cap(struct hdd_adapter *adapter,
 				 struct oem_data_cap *data_cap)
 {
 	QDF_STATUS status;
 	struct hdd_config *config;
 	uint32_t num_chan;
 	uint8_t *chan_list;
-	hdd_context_t *hdd_ctx = adapter->pHddCtx;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
 	config = hdd_ctx->config;
 	if (!config) {
@@ -143,8 +143,8 @@ int iw_get_oem_data_cap(struct net_device *dev,
 	int status;
 	struct oem_data_cap oemDataCap = { {0} };
 	struct oem_data_cap *pHddOemDataCap;
-	hdd_adapter_t *pAdapter = (netdev_priv(dev));
-	hdd_context_t *pHddContext;
+	struct hdd_adapter *pAdapter = (netdev_priv(dev));
+	struct hdd_context *pHddContext;
 	int ret;
 
 	ENTER();
@@ -185,7 +185,7 @@ static void send_oem_reg_rsp_nlink_msg(void)
 	uint8_t *vdevId;
 	hdd_adapter_list_node_t *pAdapterNode = NULL;
 	hdd_adapter_list_node_t *pNext = NULL;
-	hdd_adapter_t *pAdapter = NULL;
+	struct hdd_adapter *pAdapter = NULL;
 	QDF_STATUS status = 0;
 
 	/* OEM msg is always to a specific process & cannot be a broadcast */
@@ -353,7 +353,7 @@ void hdd_send_oem_data_rsp_msg(struct oem_data_rsp *oem_data_rsp)
  */
 static QDF_STATUS oem_process_data_req_msg(int oem_data_len, char *oem_data)
 {
-	hdd_adapter_t *adapter = NULL;
+	struct hdd_adapter *adapter = NULL;
 	struct oem_data_req oem_data_req;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
@@ -401,7 +401,7 @@ static QDF_STATUS oem_process_data_req_msg(int oem_data_len, char *oem_data)
  *
  * Return: void
  */
-void hdd_update_channel_bw_info(hdd_context_t *hdd_ctx,
+void hdd_update_channel_bw_info(struct hdd_context *hdd_ctx,
 				uint16_t chan, void *chan_info)
 {
 	struct ch_params ch_params = {0};
@@ -624,7 +624,7 @@ static int oem_process_get_cap_req_msg(void)
 	struct oem_get_capability_rsp *cap_rsp;
 	struct oem_data_cap data_cap = { {0} };
 	struct sme_oem_capability oem_cap;
-	hdd_adapter_t *adapter;
+	struct hdd_adapter *adapter;
 	struct sk_buff *skb;
 	struct nlmsghdr *nlh;
 	tAniMsgHdr *ani_hdr;
@@ -790,7 +790,7 @@ void hdd_send_peer_status_ind_to_oem_app(struct qdf_mac_addr *peerMac,
  *
  * Return: 0 if success, error code otherwise
  */
-static int oem_app_reg_req_handler(struct hdd_context_s *hdd_ctx,
+static int oem_app_reg_req_handler(struct hdd_context *hdd_ctx,
 					tAniMsgHdr *msg_hdr, int pid)
 {
 	char *sign_str = NULL;
@@ -825,7 +825,7 @@ static int oem_app_reg_req_handler(struct hdd_context_s *hdd_ctx,
  *
  * Return: 0 if success, error code otherwise
  */
-static int oem_data_req_handler(struct hdd_context_s *hdd_ctx,
+static int oem_data_req_handler(struct hdd_context *hdd_ctx,
 				tAniMsgHdr *msg_hdr, int pid)
 {
 	hdd_debug("Received Oem Data Request length: %d from pid: %d",
@@ -862,7 +862,7 @@ static int oem_data_req_handler(struct hdd_context_s *hdd_ctx,
  *
  * Return: 0 if success, error code otherwise
  */
-static int oem_chan_info_req_handler(struct hdd_context_s *hdd_ctx,
+static int oem_chan_info_req_handler(struct hdd_context *hdd_ctx,
 					tAniMsgHdr *msg_hdr, int pid)
 {
 	hdd_debug("Received channel info request, num channel(%d) from pid: %d",
@@ -899,7 +899,7 @@ static int oem_chan_info_req_handler(struct hdd_context_s *hdd_ctx,
  *
  * Return: 0 if success, error code otherwise
  */
-static int oem_set_cap_req_handler(struct hdd_context_s *hdd_ctx,
+static int oem_set_cap_req_handler(struct hdd_context *hdd_ctx,
 					tAniMsgHdr *msg_hdr, int pid)
 {
 	hdd_info("Received set oem cap req of length:%d from pid: %d",
@@ -936,7 +936,7 @@ static int oem_set_cap_req_handler(struct hdd_context_s *hdd_ctx,
  *
  * Return: 0 if success, error code otherwise
  */
-static int oem_get_cap_req_handler(struct hdd_context_s *hdd_ctx,
+static int oem_get_cap_req_handler(struct hdd_context *hdd_ctx,
 					tAniMsgHdr *msg_hdr, int pid)
 {
 	hdd_info("Rcvd get oem capability req - length:%d from pid: %d",
@@ -1025,7 +1025,7 @@ static void oem_cmd_handler(const void *data, int data_len, void *ctx, int pid)
 	 * audit note: it is ok to pass a NULL policy here since only
 	 * one attribute is parsed and it is explicitly validated
 	 */
-	if (nla_parse(tb, CLD80211_ATTR_MAX, data, data_len, NULL)) {
+	if (hdd_nla_parse(tb, CLD80211_ATTR_MAX, data, data_len, NULL)) {
 		hdd_err("Invalid ATTR");
 		return;
 	}
@@ -1062,7 +1062,7 @@ static void oem_cmd_handler(const void *data, int data_len, void *ctx, int pid)
  *
  * Return: 0
  */
-int oem_activate_service(struct hdd_context_s *hdd_ctx)
+int oem_activate_service(struct hdd_context *hdd_ctx)
 {
 	p_hdd_ctx = hdd_ctx;
 	register_cld_cmd_cb(WLAN_NL_MSG_OEM, oem_cmd_handler, NULL);
@@ -1144,7 +1144,7 @@ static int __oem_msg_callback(struct sk_buff *skb)
  * Return: zero on success
  *         On error, error number will be returned.
  */
-int oem_activate_service(struct hdd_context_s *hdd_ctx)
+int oem_activate_service(struct hdd_context *hdd_ctx)
 {
 	p_hdd_ctx = hdd_ctx;
 

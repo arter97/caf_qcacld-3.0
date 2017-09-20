@@ -169,8 +169,8 @@ static int __hdd_fips_test(struct net_device *dev,
 			  struct iw_request_info *info,
 			  union iwreq_data *wrqu, char *extra)
 {
-	hdd_adapter_t *adapter;
-	hdd_context_t *hdd_ctx;
+	struct hdd_adapter *adapter;
+	struct hdd_context *hdd_ctx;
 	struct iw_fips_test_request *user_request;
 	struct iw_fips_test_response *user_response;
 	uint32_t request_len;

@@ -91,7 +91,7 @@ enum hdd_wmm_linuxac {
 	HDD_LINUX_AC_HI_PRIO = 4,
 };
 
-void wlan_hdd_process_peer_unauthorised_pause(hdd_adapter_t *adapter)
+void wlan_hdd_process_peer_unauthorised_pause(struct hdd_adapter *adapter)
 {
 	/* Enable HI_PRIO queue */
 	netif_stop_subqueue(adapter->dev, HDD_LINUX_AC_VO);
@@ -109,9 +109,8 @@ enum hdd_wmm_linuxac {
 	HDD_LINUX_AC_BK = 3
 };
 
-void wlan_hdd_process_peer_unauthorised_pause(hdd_adapter_t *adapter)
+void wlan_hdd_process_peer_unauthorised_pause(struct hdd_adapter *adapter)
 {
-	return;
 }
 #endif
 
@@ -138,14 +137,14 @@ const uint8_t hdd_linux_up_to_ac_map[HDD_WMM_UP_TO_AC_MAP_SIZE] = {
  */
 static void hdd_wmm_enable_tl_uapsd(struct hdd_wmm_qos_context *pQosContext)
 {
-	hdd_adapter_t *pAdapter = pQosContext->pAdapter;
+	struct hdd_adapter *pAdapter = pQosContext->pAdapter;
 	sme_ac_enum_type acType = pQosContext->acType;
 	struct hdd_wmm_ac_status *pAc = &pAdapter->hddWmmStatus.wmmAcStatus[acType];
-	hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(pAdapter);
 	QDF_STATUS status;
 	uint32_t service_interval;
 	uint32_t suspension_interval;
-	sme_QosWmmDirType direction;
+	enum sme_qos_wmm_dir_type direction;
 	bool psb;
 
 	/* The TSPEC must be valid */
@@ -161,7 +160,7 @@ static void hdd_wmm_enable_tl_uapsd(struct hdd_wmm_qos_context *pQosContext)
 	} else {
 		/* no service interval is present in the TSPEC */
 		/* this is OK, there just won't be U-APSD */
-		hdd_notice("No service interval supplied");
+		hdd_debug("No service interval supplied");
 		service_interval = 0;
 	}
 
@@ -176,7 +175,7 @@ static void hdd_wmm_enable_tl_uapsd(struct hdd_wmm_qos_context *pQosContext)
 	    (pAc->wmmAcUapsdSuspensionInterval == suspension_interval) &&
 	    (pAc->wmmAcUapsdDirection == direction) &&
 	    (pAc->wmmAcIsUapsdEnabled == psb)) {
-		hdd_notice("No change in U-APSD parameters");
+		hdd_debug("No change in U-APSD parameters");
 		return;
 	}
 	/* everything is in place to notify TL */
@@ -188,7 +187,7 @@ static void hdd_wmm_enable_tl_uapsd(struct hdd_wmm_qos_context *pQosContext)
 					   pAc->wmmAcTspecInfo.ts_info.up,
 					   service_interval, suspension_interval,
 					   direction, psb, pAdapter->sessionId,
-					   pHddCtx->config->DelayedTriggerFrmInt);
+					   hdd_ctx->config->DelayedTriggerFrmInt);
 
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("Failed to enable U-APSD for AC=%d", acType);
@@ -201,7 +200,7 @@ static void hdd_wmm_enable_tl_uapsd(struct hdd_wmm_qos_context *pQosContext)
 	pAc->wmmAcUapsdDirection = direction;
 	pAc->wmmAcIsUapsdEnabled = psb;
 
-	hdd_notice("Enabled UAPSD in TL srv_int=%d susp_int=%d dir=%d AC=%d",
+	hdd_debug("Enabled UAPSD in TL srv_int=%d susp_int=%d dir=%d AC=%d",
 		   service_interval, suspension_interval, direction, acType);
 
 }
@@ -216,7 +215,7 @@ static void hdd_wmm_enable_tl_uapsd(struct hdd_wmm_qos_context *pQosContext)
  */
 static void hdd_wmm_disable_tl_uapsd(struct hdd_wmm_qos_context *pQosContext)
 {
-	hdd_adapter_t *pAdapter = pQosContext->pAdapter;
+	struct hdd_adapter *pAdapter = pQosContext->pAdapter;
 	sme_ac_enum_type acType = pQosContext->acType;
 	struct hdd_wmm_ac_status *pAc = &pAdapter->hddWmmStatus.wmmAcStatus[acType];
 	QDF_STATUS status;
@@ -235,7 +234,7 @@ static void hdd_wmm_disable_tl_uapsd(struct hdd_wmm_qos_context *pQosContext)
 		} else {
 			/* TL no longer has valid UAPSD info */
 			pAc->wmmAcUapsdInfoValid = false;
-			hdd_notice("Disabled UAPSD in TL for AC=%d", acType);
+			hdd_debug("Disabled UAPSD in TL for AC=%d", acType);
 		}
 	}
 }
@@ -251,9 +250,9 @@ static void hdd_wmm_disable_tl_uapsd(struct hdd_wmm_qos_context *pQosContext)
  */
 static void hdd_wmm_free_context(struct hdd_wmm_qos_context *pQosContext)
 {
-	hdd_adapter_t *pAdapter;
+	struct hdd_adapter *pAdapter;
 
-	hdd_info("Entered, context %p", pQosContext);
+	hdd_debug("Entered, context %p", pQosContext);
 
 	if (unlikely((NULL == pQosContext) ||
 		     (HDD_WMM_CTX_MAGIC != pQosContext->magic))) {
@@ -292,11 +291,11 @@ static void hdd_wmm_free_context(struct hdd_wmm_qos_context *pQosContext)
 #define MAX_NOTIFY_LEN 50
 static void hdd_wmm_notify_app(struct hdd_wmm_qos_context *pQosContext)
 {
-	hdd_adapter_t *pAdapter;
+	struct hdd_adapter *pAdapter;
 	union iwreq_data wrqu;
 	char buf[MAX_NOTIFY_LEN + 1];
 
-	hdd_info("Entered, context %p", pQosContext);
+	hdd_debug("Entered, context %p", pQosContext);
 
 	if (unlikely((NULL == pQosContext) ||
 		     (HDD_WMM_CTX_MAGIC != pQosContext->magic))) {
@@ -319,7 +318,7 @@ static void hdd_wmm_notify_app(struct hdd_wmm_qos_context *pQosContext)
 	pAdapter = pQosContext->pAdapter;
 
 	/* send the event */
-	hdd_notice("Sending [%s]", buf);
+	hdd_debug("Sending [%s]", buf);
 	wireless_send_event(pAdapter->dev, IWEVCUSTOM, &wrqu, buf);
 }
 
@@ -341,7 +340,7 @@ static void hdd_wmm_notify_app(struct hdd_wmm_qos_context *pQosContext)
 static void hdd_wmm_inactivity_timer_cb(void *user_data)
 {
 	struct hdd_wmm_qos_context *pQosContext = user_data;
-	hdd_adapter_t *pAdapter;
+	struct hdd_adapter *pAdapter;
 	struct hdd_wmm_ac_status *pAc;
 	hdd_wlan_wmm_status_e status;
 	QDF_STATUS qdf_status;
@@ -386,8 +385,6 @@ static void hdd_wmm_inactivity_timer_cb(void *user_data)
 				   QDF_TIMER_STATE_STOPPED);
 		}
 	}
-
-	return;
 }
 
 /**
@@ -408,7 +405,7 @@ hdd_wmm_enable_inactivity_timer(struct hdd_wmm_qos_context *pQosContext,
 				uint32_t inactivityTime)
 {
 	QDF_STATUS qdf_status = QDF_STATUS_E_FAILURE;
-	hdd_adapter_t *pAdapter = pQosContext->pAdapter;
+	struct hdd_adapter *pAdapter = pQosContext->pAdapter;
 	sme_ac_enum_type acType = pQosContext->acType;
 	struct hdd_wmm_ac_status *pAc;
 
@@ -431,9 +428,9 @@ hdd_wmm_enable_inactivity_timer(struct hdd_wmm_qos_context *pQosContext,
 		hdd_err("Starting inactivity timer failed on AC %d",
 			  acType);
 		qdf_status = qdf_mc_timer_destroy(&pAc->wmmInactivityTimer);
-		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
+		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
 			hdd_err("Failed to destroy inactivity timer");
-		}
+
 		return qdf_status;
 	}
 	pAc->wmmInactivityTime = inactivityTime;
@@ -459,7 +456,7 @@ hdd_wmm_enable_inactivity_timer(struct hdd_wmm_qos_context *pQosContext,
 static QDF_STATUS
 hdd_wmm_disable_inactivity_timer(struct hdd_wmm_qos_context *pQosContext)
 {
-	hdd_adapter_t *pAdapter = pQosContext->pAdapter;
+	struct hdd_adapter *pAdapter = pQosContext->pAdapter;
 	sme_ac_enum_type acType = pQosContext->acType;
 	struct hdd_wmm_ac_status *pAc = &pAdapter->hddWmmStatus.wmmAcStatus[acType];
 	QDF_STATUS qdf_status = QDF_STATUS_E_FAILURE;
@@ -501,17 +498,17 @@ hdd_wmm_disable_inactivity_timer(struct hdd_wmm_qos_context *pQosContext)
  * Return: QDF_STATUS enumeration
  */
 static QDF_STATUS hdd_wmm_sme_callback(tHalHandle hHal,
-				       void *hddCtx,
-				       sme_QosWmmTspecInfo *pCurrentQosInfo,
-				       sme_QosStatusType smeStatus,
-				       uint32_t qosFlowId)
+			void *hddCtx,
+			struct sme_qos_wmmtspecinfo *pCurrentQosInfo,
+			enum sme_qos_statustype smeStatus,
+			uint32_t qosFlowId)
 {
 	struct hdd_wmm_qos_context *pQosContext = hddCtx;
-	hdd_adapter_t *pAdapter;
+	struct hdd_adapter *pAdapter;
 	sme_ac_enum_type acType;
 	struct hdd_wmm_ac_status *pAc;
 
-	hdd_info("Entered, context %p", pQosContext);
+	hdd_debug("Entered, context %p", pQosContext);
 
 	if (unlikely((NULL == pQosContext) ||
 		     (HDD_WMM_CTX_MAGIC != pQosContext->magic))) {
@@ -523,7 +520,7 @@ static QDF_STATUS hdd_wmm_sme_callback(tHalHandle hHal,
 	acType = pQosContext->acType;
 	pAc = &pAdapter->hddWmmStatus.wmmAcStatus[acType];
 
-	hdd_info("status %d flowid %d info %p",
+	hdd_debug("status %d flowid %d info %p",
 		 smeStatus, qosFlowId, pCurrentQosInfo);
 
 	switch (smeStatus) {
@@ -546,7 +543,7 @@ static QDF_STATUS hdd_wmm_sme_callback(tHalHandle hHal,
 
 		if (HDD_WMM_HANDLE_IMPLICIT != pQosContext->handle) {
 
-			hdd_notice("Explicit Qos, notifying user space");
+			hdd_debug("Explicit Qos, notifying user space");
 
 			/* this was triggered by an application */
 			pQosContext->lastStatus =
@@ -557,7 +554,7 @@ static QDF_STATUS hdd_wmm_sme_callback(tHalHandle hHal,
 #ifdef FEATURE_WLAN_ESE
 		/* Check if the inactivity interval is specified */
 		if (pCurrentQosInfo && pCurrentQosInfo->inactivity_interval) {
-			hdd_notice("Inactivity timer value = %d for AC=%d",
+			hdd_debug("Inactivity timer value = %d for AC=%d",
 				  pCurrentQosInfo->inactivity_interval, acType);
 			hdd_wmm_enable_inactivity_timer(pQosContext,
 							pCurrentQosInfo->
@@ -571,7 +568,7 @@ static QDF_STATUS hdd_wmm_sme_callback(tHalHandle hHal,
 		break;
 
 	case SME_QOS_STATUS_SETUP_SUCCESS_APSD_SET_ALREADY:
-		hdd_notice("Setup is complete (U-APSD set previously)");
+		hdd_debug("Setup is complete (U-APSD set previously)");
 
 		pAc->wmmAcAccessAllowed = true;
 		pAc->wmmAcAccessGranted = true;
@@ -579,7 +576,7 @@ static QDF_STATUS hdd_wmm_sme_callback(tHalHandle hHal,
 
 		if (HDD_WMM_HANDLE_IMPLICIT != pQosContext->handle) {
 
-			hdd_notice("Explicit Qos, notifying user space");
+			hdd_debug("Explicit Qos, notifying user space");
 
 			/* this was triggered by an application */
 			pQosContext->lastStatus =
@@ -598,7 +595,7 @@ static QDF_STATUS hdd_wmm_sme_callback(tHalHandle hHal,
 		pAc->wmmAcAccessAllowed = false;
 		if (HDD_WMM_HANDLE_IMPLICIT != pQosContext->handle) {
 
-			hdd_notice("Explicit Qos, notifying user space");
+			hdd_debug("Explicit Qos, notifying user space");
 
 			/* this was triggered by an application */
 			pQosContext->lastStatus =
@@ -635,7 +632,7 @@ static QDF_STATUS hdd_wmm_sme_callback(tHalHandle hHal,
 			pAc->wmmAcAccessAllowed = true;
 
 		} else {
-			hdd_notice("Explicit Qos, notifying user space");
+			hdd_debug("Explicit Qos, notifying user space");
 
 			/* this was triggered by an application */
 			pQosContext->lastStatus =
@@ -657,12 +654,12 @@ static QDF_STATUS hdd_wmm_sme_callback(tHalHandle hHal,
 		break;
 
 	case SME_QOS_STATUS_SETUP_REQ_PENDING_RSP:
-		hdd_notice("Setup pending");
+		hdd_debug("Setup pending");
 		/* not a callback status -- ignore if we get it */
 		break;
 
 	case SME_QOS_STATUS_SETUP_MODIFIED_IND:
-		hdd_notice("Setup modified");
+		hdd_debug("Setup modified");
 		if (pCurrentQosInfo) {
 			/* update the TSPEC */
 			pAc->wmmAcTspecValid = true;
@@ -670,7 +667,7 @@ static QDF_STATUS hdd_wmm_sme_callback(tHalHandle hHal,
 			       pCurrentQosInfo, sizeof(pAc->wmmAcTspecInfo));
 
 			if (HDD_WMM_HANDLE_IMPLICIT != pQosContext->handle) {
-				hdd_notice("Explicit Qos, notifying user space");
+				hdd_debug("Explicit Qos, notifying user space");
 
 				/* this was triggered by an application */
 				pQosContext->lastStatus =
@@ -693,7 +690,7 @@ static QDF_STATUS hdd_wmm_sme_callback(tHalHandle hHal,
 			pAc->wmmAcAccessAllowed = true;
 
 		} else {
-			hdd_notice("Explicit Qos, notifying user space");
+			hdd_debug("Explicit Qos, notifying user space");
 
 			/* this was triggered by an application */
 			pQosContext->lastStatus =
@@ -739,10 +736,10 @@ static QDF_STATUS hdd_wmm_sme_callback(tHalHandle hHal,
 		break;
 
 	case SME_QOS_STATUS_RELEASE_SUCCESS_RSP:
-		hdd_notice("Release is complete");
+		hdd_debug("Release is complete");
 
 		if (pCurrentQosInfo) {
-			hdd_notice("flows still active");
+			hdd_debug("flows still active");
 
 			/* there is still at least one flow active for
 			 * this AC so update the AC state
@@ -753,7 +750,7 @@ static QDF_STATUS hdd_wmm_sme_callback(tHalHandle hHal,
 			/* need to tell TL to update its UAPSD handling */
 			hdd_wmm_enable_tl_uapsd(pQosContext);
 		} else {
-			hdd_notice("last flow");
+			hdd_debug("last flow");
 
 			/* this is the last flow active for this AC so
 			 * update the AC state
@@ -768,7 +765,7 @@ static QDF_STATUS hdd_wmm_sme_callback(tHalHandle hHal,
 		}
 
 		if (HDD_WMM_HANDLE_IMPLICIT != pQosContext->handle) {
-			hdd_notice("Explicit Qos, notifying user space");
+			hdd_debug("Explicit Qos, notifying user space");
 
 			/* this was triggered by an application */
 			pQosContext->lastStatus =
@@ -780,13 +777,13 @@ static QDF_STATUS hdd_wmm_sme_callback(tHalHandle hHal,
 		break;
 
 	case SME_QOS_STATUS_RELEASE_FAILURE_RSP:
-		hdd_notice("Release failure");
+		hdd_debug("Release failure");
 
 		/* we don't need to update our state or TL since
 		 * nothing has changed
 		 */
 		if (HDD_WMM_HANDLE_IMPLICIT != pQosContext->handle) {
-			hdd_notice("Explicit Qos, notifying user space");
+			hdd_debug("Explicit Qos, notifying user space");
 
 			/* this was triggered by an application */
 			pQosContext->lastStatus =
@@ -797,7 +794,7 @@ static QDF_STATUS hdd_wmm_sme_callback(tHalHandle hHal,
 		break;
 
 	case SME_QOS_STATUS_RELEASE_QOS_LOST_IND:
-		hdd_notice("QOS Lost indication received");
+		hdd_debug("QOS Lost indication received");
 
 		/* current TSPEC is no longer valid */
 		pAc->wmmAcTspecValid = false;
@@ -812,7 +809,7 @@ static QDF_STATUS hdd_wmm_sme_callback(tHalHandle hHal,
 			pAc->wmmAcAccessGranted = false;
 			pAc->wmmAcAccessFailed = false;
 		} else {
-			hdd_info("Explicit Qos, notifying user space");
+			hdd_debug("Explicit Qos, notifying user space");
 
 			/* this was triggered by an application */
 			pQosContext->lastStatus = HDD_WLAN_WMM_STATUS_LOST;
@@ -970,7 +967,7 @@ static QDF_STATUS hdd_wmm_sme_callback(tHalHandle hHal,
 		pAc->wmmAcAccessAllowed = true;
 	}
 
-	hdd_notice("complete, access for TL AC %d is%sallowed",
+	hdd_debug("complete, access for TL AC %d is%sallowed",
 		   acType, pAc->wmmAcAccessAllowed ? " " : " not ");
 
 	return QDF_STATUS_SUCCESS;
@@ -985,7 +982,7 @@ static QDF_STATUS hdd_wmm_sme_callback(tHalHandle hHal,
  *
  * Return: Zero on success, appropriate error on failure.
  */
-int hdd_wmmps_helper(hdd_adapter_t *pAdapter, uint8_t *ptr)
+int hdd_wmmps_helper(struct hdd_adapter *pAdapter, uint8_t *ptr)
 {
 	if (NULL == pAdapter) {
 		hdd_err("pAdapter is NULL");
@@ -1013,16 +1010,16 @@ static void __hdd_wmm_do_implicit_qos(struct work_struct *work)
 {
 	struct hdd_wmm_qos_context *pQosContext =
 		container_of(work, struct hdd_wmm_qos_context, wmmAcSetupImplicitQos);
-	hdd_adapter_t *pAdapter;
+	struct hdd_adapter *pAdapter;
 	sme_ac_enum_type acType;
 	struct hdd_wmm_ac_status *pAc;
 #ifndef WLAN_MDM_CODE_REDUCTION_OPT
-	sme_QosStatusType smeStatus;
+	enum sme_qos_statustype smeStatus;
 #endif
-	sme_QosWmmTspecInfo qosInfo;
-	hdd_context_t *hdd_ctx;
+	struct sme_qos_wmmtspecinfo qosInfo;
+	struct hdd_context *hdd_ctx;
 
-	hdd_info("Entered, context %p", pQosContext);
+	hdd_debug("Entered, context %p", pQosContext);
 
 	if (unlikely(HDD_WMM_CTX_MAGIC != pQosContext->magic)) {
 		hdd_err("Invalid QoS Context");
@@ -1204,7 +1201,7 @@ static void __hdd_wmm_do_implicit_qos(struct work_struct *work)
 				      qosInfo.ts_info.up,
 				      &pQosContext->qosFlowId);
 
-	hdd_notice("sme_qos_setup_req returned %d flowid %d",
+	hdd_debug("sme_qos_setup_req returned %d flowid %d",
 		   smeStatus, pQosContext->qosFlowId);
 
 	/* need to check the return values and act appropriately */
@@ -1275,19 +1272,18 @@ static void hdd_wmm_do_implicit_qos(struct work_struct *work)
  *
  * Return: QDF_STATUS enumeration
  */
-QDF_STATUS hdd_wmm_init(hdd_adapter_t *pAdapter)
+QDF_STATUS hdd_wmm_init(struct hdd_adapter *pAdapter)
 {
-	sme_QosWmmUpType *hddWmmDscpToUpMap = pAdapter->hddWmmDscpToUpMap;
+	enum sme_qos_wmmuptype *hddWmmDscpToUpMap = pAdapter->hddWmmDscpToUpMap;
 	uint8_t dscp;
 
-	hdd_debug("Entered");
+	ENTER();
 
 	/* DSCP to User Priority Lookup Table
 	 * By default use the 3 Precedence bits of DSCP as the User Priority
 	 */
-	for (dscp = 0; dscp <= WLAN_HDD_MAX_DSCP; dscp++) {
+	for (dscp = 0; dscp <= WLAN_HDD_MAX_DSCP; dscp++)
 		hddWmmDscpToUpMap[dscp] = dscp >> 3;
-	}
 
 	/* Special case for Expedited Forwarding (DSCP 46) */
 	hddWmmDscpToUpMap[46] = SME_QOS_WMM_UP_VO;
@@ -1305,12 +1301,12 @@ QDF_STATUS hdd_wmm_init(hdd_adapter_t *pAdapter)
  *
  * Return: QDF_STATUS enumeration
  */
-QDF_STATUS hdd_wmm_adapter_init(hdd_adapter_t *pAdapter)
+QDF_STATUS hdd_wmm_adapter_init(struct hdd_adapter *pAdapter)
 {
 	struct hdd_wmm_ac_status *pAcStatus;
 	sme_ac_enum_type acType;
 
-	hdd_info("Entered");
+	ENTER();
 
 	pAdapter->hddWmmStatus.wmmQap = false;
 	INIT_LIST_HEAD(&pAdapter->hddWmmStatus.wmmContextList);
@@ -1343,12 +1339,12 @@ QDF_STATUS hdd_wmm_adapter_init(hdd_adapter_t *pAdapter)
  *
  * Return: QDF_STATUS enumeration
  */
-QDF_STATUS hdd_wmm_adapter_clear(hdd_adapter_t *pAdapter)
+QDF_STATUS hdd_wmm_adapter_clear(struct hdd_adapter *pAdapter)
 {
 	struct hdd_wmm_ac_status *pAcStatus;
 	sme_ac_enum_type acType;
 
-	hdd_info("Entered");
+	ENTER();
 	for (acType = 0; acType < WLAN_MAX_AC; acType++) {
 		pAcStatus = &pAdapter->hddWmmStatus.wmmAcStatus[acType];
 		pAcStatus->wmmAcAccessRequired = false;
@@ -1372,11 +1368,11 @@ QDF_STATUS hdd_wmm_adapter_clear(hdd_adapter_t *pAdapter)
  *
  * Return: QDF_STATUS enumeration
  */
-QDF_STATUS hdd_wmm_adapter_close(hdd_adapter_t *pAdapter)
+QDF_STATUS hdd_wmm_adapter_close(struct hdd_adapter *pAdapter)
 {
 	struct hdd_wmm_qos_context *pQosContext;
 
-	hdd_info("Entered");
+	ENTER();
 
 	/* free any context records that we still have linked */
 	while (!list_empty(&pAdapter->hddWmmStatus.wmmContextList)) {
@@ -1408,9 +1404,9 @@ QDF_STATUS hdd_wmm_adapter_close(hdd_adapter_t *pAdapter)
  * Return: None
  */
 static
-void hdd_wmm_classify_pkt(hdd_adapter_t *adapter,
+void hdd_wmm_classify_pkt(struct hdd_adapter *adapter,
 			  struct sk_buff *skb,
-			  sme_QosWmmUpType *user_pri,
+			  enum sme_qos_wmmuptype *user_pri,
 			  bool *is_eapol)
 {
 	unsigned char dscp;
@@ -1425,14 +1421,14 @@ void hdd_wmm_classify_pkt(hdd_adapter_t *adapter,
 	 */
 
 #ifdef HDD_WMM_DEBUG
-	hdd_info("Entered");
+	ENTER();
 #endif /* HDD_WMM_DEBUG */
 
 	pkt = skb->data;
 	eth_hdr = (union generic_ethhdr *)pkt;
 
 #ifdef HDD_WMM_DEBUG
-	hdd_info("proto is 0x%04x", skb->protocol);
+	hdd_debug("proto is 0x%04x", skb->protocol);
 #endif /* HDD_WMM_DEBUG */
 
 	if (eth_hdr->eth_II.h_proto == htons(ETH_P_IP)) {
@@ -1440,14 +1436,14 @@ void hdd_wmm_classify_pkt(hdd_adapter_t *adapter,
 		ip_hdr = (struct iphdr *)&pkt[sizeof(eth_hdr->eth_II)];
 		tos = ip_hdr->tos;
 #ifdef HDD_WMM_DEBUG
-		hdd_info("Ethernet II IP Packet, tos is %d", tos);
+		hdd_debug("Ethernet II IP Packet, tos is %d", tos);
 #endif /* HDD_WMM_DEBUG */
 
 	} else if (eth_hdr->eth_II.h_proto == htons(ETH_P_IPV6)) {
 		ipv6hdr = ipv6_hdr(skb);
 		tos = ntohs(*(const __be16 *)ipv6hdr) >> 4;
 #ifdef HDD_WMM_DEBUG
-		hdd_info("Ethernet II IPv6 Packet, tos is %d", tos);
+		hdd_debug("Ethernet II IPv6 Packet, tos is %d", tos);
 #endif /* HDD_WMM_DEBUG */
 	} else if ((ntohs(eth_hdr->eth_II.h_proto) < WLAN_MIN_PROTO) &&
 		  (eth_hdr->eth_8023.h_snap.dsap == WLAN_SNAP_DSAP) &&
@@ -1458,7 +1454,7 @@ void hdd_wmm_classify_pkt(hdd_adapter_t *adapter,
 		ip_hdr = (struct iphdr *)&pkt[sizeof(eth_hdr->eth_8023)];
 		tos = ip_hdr->tos;
 #ifdef HDD_WMM_DEBUG
-		hdd_info("802.3 LLC/SNAP IP Packet, tos is %d", tos);
+		hdd_debug("802.3 LLC/SNAP IP Packet, tos is %d", tos);
 #endif /* HDD_WMM_DEBUG */
 	} else if (eth_hdr->eth_II.h_proto == htons(ETH_P_8021Q)) {
 		/* VLAN tagged */
@@ -1471,7 +1467,7 @@ void hdd_wmm_classify_pkt(hdd_adapter_t *adapter,
 				&pkt[sizeof(eth_hdr->eth_IIv)];
 			tos = ip_hdr->tos;
 #ifdef HDD_WMM_DEBUG
-			hdd_info("Ethernet II VLAN tagged IP Packet, tos is %d",
+			hdd_debug("Ether II VLAN tagged IP Packet, tos is %d",
 				 tos);
 #endif /* HDD_WMM_DEBUG */
 		} else
@@ -1491,7 +1487,7 @@ void hdd_wmm_classify_pkt(hdd_adapter_t *adapter,
 				&pkt[sizeof(eth_hdr->eth_8023v)];
 			tos = ip_hdr->tos;
 #ifdef HDD_WMM_DEBUG
-			hdd_info("802.3 LLC/SNAP VLAN tagged IP Packet, tos is %d",
+			hdd_debug("802.3 LLC/SNAP VLAN tagged IP Packet, tos is %d",
 				 tos);
 #endif /* HDD_WMM_DEBUG */
 		} else {
@@ -1519,10 +1515,8 @@ void hdd_wmm_classify_pkt(hdd_adapter_t *adapter,
 	*user_pri = adapter->hddWmmDscpToUpMap[dscp];
 
 #ifdef HDD_WMM_DEBUG
-	hdd_notice("tos is %d, dscp is %d, up is %d", tos, dscp, *user_pri);
+	hdd_debug("tos is %d, dscp is %d, up is %d", tos, dscp, *user_pri);
 #endif /* HDD_WMM_DEBUG */
-
-	return;
 }
 
 /**
@@ -1581,12 +1575,13 @@ uint16_t hdd_hostapd_select_queue(struct net_device *dev, struct sk_buff *skb
 
 )
 {
-	sme_QosWmmUpType up = SME_QOS_WMM_UP_BE;
+	enum sme_qos_wmmuptype up = SME_QOS_WMM_UP_BE;
 	uint16_t queueIndex;
-	hdd_adapter_t *adapter = (hdd_adapter_t *) netdev_priv(dev);
-	hdd_context_t *hddctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_adapter *adapter = (struct hdd_adapter *) netdev_priv(dev);
+	struct hdd_context *hddctx = WLAN_HDD_GET_CTX(adapter);
 	bool is_eapol = false;
 	int status = 0;
+
 	status = wlan_hdd_validate_context(hddctx);
 
 	if (status != 0) {
@@ -1613,11 +1608,11 @@ uint16_t hdd_hostapd_select_queue(struct net_device *dev, struct sk_buff *skb
  */
 uint16_t hdd_wmm_select_queue(struct net_device *dev, struct sk_buff *skb)
 {
-	sme_QosWmmUpType up = SME_QOS_WMM_UP_BE;
+	enum sme_qos_wmmuptype up = SME_QOS_WMM_UP_BE;
 	uint16_t queueIndex;
-	hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_adapter *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	bool is_eapol = false;
-	hdd_context_t *hdd_ctx = WLAN_HDD_GET_CTX(pAdapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(pAdapter);
 	int status;
 
 	status = wlan_hdd_validate_context(hdd_ctx);
@@ -1644,7 +1639,7 @@ uint16_t hdd_wmm_select_queue(struct net_device *dev, struct sk_buff *skb)
  *
  * Return: void
  */
-void hdd_wmm_acquire_access_required(hdd_adapter_t *pAdapter,
+void hdd_wmm_acquire_access_required(struct hdd_adapter *pAdapter,
 				     sme_ac_enum_type acType)
 {
 	/* Each bit in the LSB nibble indicates 1 AC.
@@ -1685,7 +1680,7 @@ void hdd_wmm_acquire_access_required(hdd_adapter_t *pAdapter,
  *
  * Return: QDF_STATUS enumeration
  */
-QDF_STATUS hdd_wmm_acquire_access(hdd_adapter_t *pAdapter,
+QDF_STATUS hdd_wmm_acquire_access(struct hdd_adapter *pAdapter,
 				  sme_ac_enum_type acType, bool *pGranted)
 {
 	struct hdd_wmm_qos_context *pQosContext;
@@ -1798,18 +1793,18 @@ QDF_STATUS hdd_wmm_acquire_access(hdd_adapter_t *pAdapter,
  *
  * Return: QDF_STATUS enumeration
  */
-QDF_STATUS hdd_wmm_assoc(hdd_adapter_t *pAdapter,
+QDF_STATUS hdd_wmm_assoc(struct hdd_adapter *pAdapter,
 			 tCsrRoamInfo *pRoamInfo, eCsrRoamBssType eBssType)
 {
 	uint8_t uapsdMask;
 	QDF_STATUS status;
-	hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(pAdapter);
 
 	/* when we associate we need to notify TL if it needs to
 	 * enable UAPSD for any access categories
 	 */
 
-	hdd_debug("Entered");
+	ENTER();
 
 	if (pRoamInfo->fReassocReq) {
 		/* when we reassociate we should continue to use
@@ -1838,11 +1833,11 @@ QDF_STATUS hdd_wmm_assoc(hdd_adapter_t *pAdapter,
 						   (WLAN_HDD_GET_STATION_CTX_PTR
 							    (pAdapter))->conn_info.staId[0],
 						   SME_AC_VO, 7, 7,
-						   pHddCtx->config->InfraUapsdVoSrvIntv,
-						   pHddCtx->config->InfraUapsdVoSuspIntv,
-						   SME_BI_DIR, 1,
+						   hdd_ctx->config->InfraUapsdVoSrvIntv,
+						   hdd_ctx->config->InfraUapsdVoSuspIntv,
+						   SME_QOS_WMM_TS_DIR_BOTH, 1,
 						   pAdapter->sessionId,
-						   pHddCtx->config->DelayedTriggerFrmInt);
+						   hdd_ctx->config->DelayedTriggerFrmInt);
 
 		QDF_ASSERT(QDF_IS_STATUS_SUCCESS(status));
 	}
@@ -1854,11 +1849,11 @@ QDF_STATUS hdd_wmm_assoc(hdd_adapter_t *pAdapter,
 						   (WLAN_HDD_GET_STATION_CTX_PTR
 							    (pAdapter))->conn_info.staId[0],
 						   SME_AC_VI, 5, 5,
-						   pHddCtx->config->InfraUapsdViSrvIntv,
-						   pHddCtx->config->InfraUapsdViSuspIntv,
-						   SME_BI_DIR, 1,
+						   hdd_ctx->config->InfraUapsdViSrvIntv,
+						   hdd_ctx->config->InfraUapsdViSuspIntv,
+						   SME_QOS_WMM_TS_DIR_BOTH, 1,
 						   pAdapter->sessionId,
-						   pHddCtx->config->DelayedTriggerFrmInt);
+						   hdd_ctx->config->DelayedTriggerFrmInt);
 
 		QDF_ASSERT(QDF_IS_STATUS_SUCCESS(status));
 	}
@@ -1870,11 +1865,11 @@ QDF_STATUS hdd_wmm_assoc(hdd_adapter_t *pAdapter,
 						   (WLAN_HDD_GET_STATION_CTX_PTR
 							    (pAdapter))->conn_info.staId[0],
 						   SME_AC_BK, 2, 2,
-						   pHddCtx->config->InfraUapsdBkSrvIntv,
-						   pHddCtx->config->InfraUapsdBkSuspIntv,
-						   SME_BI_DIR, 1,
+						   hdd_ctx->config->InfraUapsdBkSrvIntv,
+						   hdd_ctx->config->InfraUapsdBkSuspIntv,
+						   SME_QOS_WMM_TS_DIR_BOTH, 1,
 						   pAdapter->sessionId,
-						   pHddCtx->config->DelayedTriggerFrmInt);
+						   hdd_ctx->config->DelayedTriggerFrmInt);
 
 		QDF_ASSERT(QDF_IS_STATUS_SUCCESS(status));
 	}
@@ -1886,24 +1881,23 @@ QDF_STATUS hdd_wmm_assoc(hdd_adapter_t *pAdapter,
 						   (WLAN_HDD_GET_STATION_CTX_PTR
 							    (pAdapter))->conn_info.staId[0],
 						   SME_AC_BE, 3, 3,
-						   pHddCtx->config->InfraUapsdBeSrvIntv,
-						   pHddCtx->config->InfraUapsdBeSuspIntv,
-						   SME_BI_DIR, 1,
+						   hdd_ctx->config->InfraUapsdBeSrvIntv,
+						   hdd_ctx->config->InfraUapsdBeSuspIntv,
+						   SME_QOS_WMM_TS_DIR_BOTH, 1,
 						   pAdapter->sessionId,
-						   pHddCtx->config->DelayedTriggerFrmInt);
+						   hdd_ctx->config->DelayedTriggerFrmInt);
 
 		QDF_ASSERT(QDF_IS_STATUS_SUCCESS(status));
 	}
 
-	status = sme_update_dsc_pto_up_mapping(pHddCtx->hHal,
+	status = sme_update_dsc_pto_up_mapping(hdd_ctx->hHal,
 					       pAdapter->hddWmmDscpToUpMap,
 					       pAdapter->sessionId);
 
-	if (!QDF_IS_STATUS_SUCCESS(status)) {
+	if (!QDF_IS_STATUS_SUCCESS(status))
 		hdd_wmm_init(pAdapter);
-	}
 
-	hdd_debug("Exiting");
+	EXIT();
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1925,7 +1919,7 @@ static const uint8_t acm_mask_bit[WLAN_MAX_AC] = {
  *
  * Return: QDF_STATUS enumeration
  */
-QDF_STATUS hdd_wmm_connect(hdd_adapter_t *pAdapter,
+QDF_STATUS hdd_wmm_connect(struct hdd_adapter *pAdapter,
 			   tCsrRoamInfo *pRoamInfo, eCsrRoamBssType eBssType)
 {
 	int ac;
@@ -1933,7 +1927,7 @@ QDF_STATUS hdd_wmm_connect(hdd_adapter_t *pAdapter,
 	bool qosConnection;
 	uint8_t acmMask;
 
-	hdd_debug("Entered");
+	ENTER();
 
 	if ((eCSR_BSS_TYPE_INFRASTRUCTURE == eBssType) &&
 	    pRoamInfo && pRoamInfo->u.pConnectedProfile) {
@@ -1993,7 +1987,7 @@ QDF_STATUS hdd_wmm_connect(hdd_adapter_t *pAdapter,
 
 	}
 
-	hdd_debug("Exiting");
+	EXIT();
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2007,7 +2001,7 @@ QDF_STATUS hdd_wmm_connect(hdd_adapter_t *pAdapter,
  *
  * Return: QDF_STATUS enumeration
  */
-QDF_STATUS hdd_wmm_get_uapsd_mask(hdd_adapter_t *pAdapter,
+QDF_STATUS hdd_wmm_get_uapsd_mask(struct hdd_adapter *pAdapter,
 				  uint8_t *pUapsdMask)
 {
 	uint8_t uapsdMask;
@@ -2055,7 +2049,7 @@ QDF_STATUS hdd_wmm_get_uapsd_mask(hdd_adapter_t *pAdapter,
  *
  * Return: true if WMM is enabled, false if WMM is not enabled
  */
-bool hdd_wmm_is_active(hdd_adapter_t *pAdapter)
+bool hdd_wmm_is_active(struct hdd_adapter *pAdapter)
 {
 	if ((!pAdapter->hddWmmStatus.wmmQosConnection) ||
 	    (!pAdapter->hddWmmStatus.wmmQap)) {
@@ -2067,11 +2061,11 @@ bool hdd_wmm_is_active(hdd_adapter_t *pAdapter)
 
 bool hdd_wmm_is_acm_allowed(struct wlan_objmgr_vdev **vdev)
 {
-	hdd_adapter_t *adapter;
+	struct hdd_adapter *adapter;
 	struct hdd_wmm_ac_status *wmm_ac_status;
 
 
-	adapter = container_of(vdev, hdd_adapter_t, hdd_vdev);
+	adapter = container_of(vdev, struct hdd_adapter, hdd_vdev);
 	if (NULL == adapter) {
 		hdd_err("failed, hdd adapter is NULL");
 		return false;
@@ -2094,18 +2088,18 @@ bool hdd_wmm_is_acm_allowed(struct wlan_objmgr_vdev **vdev)
  *
  * Return: HDD_WLAN_WMM_STATUS_*
  */
-hdd_wlan_wmm_status_e hdd_wmm_addts(hdd_adapter_t *pAdapter,
+hdd_wlan_wmm_status_e hdd_wmm_addts(struct hdd_adapter *pAdapter,
 				    uint32_t handle,
-				    sme_QosWmmTspecInfo *pTspec)
+				    struct sme_qos_wmmtspecinfo *pTspec)
 {
 	struct hdd_wmm_qos_context *pQosContext;
 	hdd_wlan_wmm_status_e status = HDD_WLAN_WMM_STATUS_SETUP_SUCCESS;
 #ifndef WLAN_MDM_CODE_REDUCTION_OPT
-	sme_QosStatusType smeStatus;
+	enum sme_qos_statustype smeStatus;
 #endif
 	bool found = false;
 
-	hdd_info("Entered with handle 0x%x", handle);
+	hdd_debug("Entered with handle 0x%x", handle);
 
 	/* see if a context already exists with the given handle */
 	mutex_lock(&pAdapter->hddWmmStatus.wmmLock);
@@ -2190,7 +2184,7 @@ hdd_wlan_wmm_status_e hdd_wmm_addts(hdd_adapter_t *pAdapter,
 	pQosContext->magic = HDD_WMM_CTX_MAGIC;
 	pQosContext->is_inactivity_timer_running = false;
 
-	hdd_notice("Setting up QoS, context %p", pQosContext);
+	hdd_debug("Setting up QoS, context %p", pQosContext);
 
 	mutex_lock(&pAdapter->hddWmmStatus.wmmLock);
 	list_add(&pQosContext->node, &pAdapter->hddWmmStatus.wmmContextList);
@@ -2205,7 +2199,7 @@ hdd_wlan_wmm_status_e hdd_wmm_addts(hdd_adapter_t *pAdapter,
 				      pTspec->ts_info.up,
 				      &pQosContext->qosFlowId);
 
-	hdd_notice("sme_qos_setup_req returned %d flowid %d",
+	hdd_debug("sme_qos_setup_req returned %d flowid %d",
 		   smeStatus, pQosContext->qosFlowId);
 
 	/* need to check the return value and act appropriately */
@@ -2265,7 +2259,7 @@ hdd_wlan_wmm_status_e hdd_wmm_addts(hdd_adapter_t *pAdapter,
  *
  * Return: HDD_WLAN_WMM_STATUS_*
  */
-hdd_wlan_wmm_status_e hdd_wmm_delts(hdd_adapter_t *pAdapter, uint32_t handle)
+hdd_wlan_wmm_status_e hdd_wmm_delts(struct hdd_adapter *pAdapter, uint32_t handle)
 {
 	struct hdd_wmm_qos_context *pQosContext;
 	bool found = false;
@@ -2273,10 +2267,10 @@ hdd_wlan_wmm_status_e hdd_wmm_delts(hdd_adapter_t *pAdapter, uint32_t handle)
 	uint32_t qosFlowId = 0;
 	hdd_wlan_wmm_status_e status = HDD_WLAN_WMM_STATUS_SETUP_SUCCESS;
 #ifndef WLAN_MDM_CODE_REDUCTION_OPT
-	sme_QosStatusType smeStatus;
+	enum sme_qos_statustype smeStatus;
 #endif
 
-	hdd_info("Entered with handle 0x%x", handle);
+	hdd_debug("Entered with handle 0x%x", handle);
 
 	/* locate the context with the given handle */
 	mutex_lock(&pAdapter->hddWmmStatus.wmmLock);
@@ -2375,12 +2369,12 @@ hdd_wlan_wmm_status_e hdd_wmm_delts(hdd_adapter_t *pAdapter, uint32_t handle)
  *
  * Return: HDD_WLAN_WMM_STATUS_*
  */
-hdd_wlan_wmm_status_e hdd_wmm_checkts(hdd_adapter_t *pAdapter, uint32_t handle)
+hdd_wlan_wmm_status_e hdd_wmm_checkts(struct hdd_adapter *pAdapter, uint32_t handle)
 {
 	struct hdd_wmm_qos_context *pQosContext;
 	hdd_wlan_wmm_status_e status = HDD_WLAN_WMM_STATUS_LOST;
 
-	hdd_info("Entered with handle 0x%x", handle);
+	hdd_debug("Entered with handle 0x%x", handle);
 
 	/* locate the context with the given handle */
 	mutex_lock(&pAdapter->hddWmmStatus.wmmLock);

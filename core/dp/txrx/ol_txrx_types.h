@@ -48,7 +48,7 @@
 #include "ol_htt_tx_api.h"
 #include "ol_htt_rx_api.h"
 #include "ol_txrx_ctrl_api.h" /* WLAN_MAX_STA_COUNT */
-#include "ol_txrx_osif_api.h" /* ol_rx_callback_fp */
+#include "ol_txrx_osif_api.h" /* ol_rx_callback */
 #include "cdp_txrx_flow_ctrl_v2.h"
 #include "cdp_txrx_peer_ops.h"
 
@@ -148,6 +148,7 @@ enum tx_peer_level {
 	TXRX_IEEE11_A_G,
 	TXRX_IEEE11_N,
 	TXRX_IEEE11_AC,
+	TXRX_IEEE11_AX,
 	TXRX_IEEE11_MAX,
 };
 
@@ -406,7 +407,7 @@ enum throttle_phase {
 
 #define THROTTLE_TX_THRESHOLD (100)
 
-typedef void (*ipa_uc_op_cb_type)(uint8_t *op_msg, void *osif_ctxt);
+typedef void (*ipa_uc_op_cb_type)(uint8_t *op_msg, void *usr_ctxt);
 
 struct ol_tx_queue_group_t {
 	qdf_atomic_t credit;
@@ -676,6 +677,10 @@ struct ol_txrx_pdev_t {
 	tp_ol_packetdump_cb ol_tx_packetdump_cb;
 	tp_ol_packetdump_cb ol_rx_packetdump_cb;
 
+#ifdef WLAN_FEATURE_TSF_PLUS
+	tp_ol_timestamp_cb ol_tx_timestamp_cb;
+#endif
+
 	struct {
 		uint16_t pool_size;
 		uint16_t num_free;
@@ -914,11 +919,6 @@ struct ol_txrx_pdev_t {
 		bool is_paused;
 	} tx_throttle;
 
-#ifdef IPA_OFFLOAD
-	ipa_uc_op_cb_type ipa_uc_op_cb;
-	void *osif_dev;
-#endif /* IPA_UC_OFFLOAD */
-
 #if defined(FEATURE_TSO)
 	struct {
 		uint16_t pool_size;
@@ -967,13 +967,20 @@ struct ol_txrx_pdev_t {
 	int tid_to_ac[OL_TX_NUM_TIDS + OL_TX_VDEV_NUM_QUEUES];
 	uint8_t ocb_peer_valid;
 	struct ol_txrx_peer_t *ocb_peer;
-	ol_tx_pause_callback_fp pause_cb;
+	tx_pause_callback pause_cb;
 
 	struct {
 		void (*lro_flush_cb)(void *);
 		qdf_atomic_t lro_dev_cnt;
 	} lro_info;
 	struct ol_txrx_peer_t *self_peer;
+	qdf_work_t peer_unmap_timer_work;
+
+#ifdef IPA_OFFLOAD
+	ipa_uc_op_cb_type ipa_uc_op_cb;
+	void *usr_ctxt;
+	struct ol_txrx_ipa_resources ipa_resource;
+#endif /* IPA_UC_OFFLOAD */
 };
 
 struct ol_txrx_vdev_t {
@@ -1010,6 +1017,7 @@ struct ol_txrx_vdev_t {
 		 */
 		ol_txrx_vdev_delete_cb callback;
 		void *context;
+		atomic_t detaching;
 	} delete;
 
 	/* safe mode control to bypass the encrypt and decipher process */
@@ -1054,6 +1062,7 @@ struct ol_txrx_vdev_t {
 	uint16_t tx_fl_hwm;
 	qdf_spinlock_t flow_control_lock;
 	ol_txrx_tx_flow_control_fp osif_flow_control_cb;
+	ol_txrx_tx_flow_control_is_pause_fp osif_flow_control_is_pause;
 	void *osif_fc_ctx;
 
 #if defined(CONFIG_HL_SUPPORT) && defined(FEATURE_WLAN_TDLS)
@@ -1135,8 +1144,29 @@ typedef A_STATUS (*ol_tx_filter_func)(struct ol_txrx_msdu_info_t *
 #define OL_TXRX_PEER_SECURITY_UNICAST    1
 #define OL_TXRX_PEER_SECURITY_MAX        2
 
+
 /* Allow 6000 ms to receive peer unmap events after peer is deleted */
 #define OL_TXRX_PEER_UNMAP_TIMEOUT (6000)
+
+struct ol_txrx_cached_bufq_t {
+	/* cached_bufq is used to enqueue the pending RX frames from a peer
+	 * before the peer is registered for data service. The list will be
+	 * flushed to HDD once that station is registered.
+	 */
+	struct list_head cached_bufq;
+	/* mutual exclusion lock to access the cached_bufq queue */
+	qdf_spinlock_t bufq_lock;
+	/* # entries in queue after which  subsequent adds will be dropped */
+	uint32_t thresh;
+	/* # entries in present in cached_bufq */
+	uint32_t curr;
+	/* # max num of entries in the queue if bufq thresh was not in place */
+	uint32_t high_water_mark;
+	/* # max num of entries in the queue if we did not drop packets */
+	uint32_t qdepth_no_thresh;
+	/* # of packes (beyond threshold) dropped from cached_bufq */
+	uint32_t dropped;
+};
 
 struct ol_txrx_peer_t {
 	struct ol_txrx_vdev_t *vdev;
@@ -1156,8 +1186,9 @@ struct ol_txrx_peer_t {
 	 */
 	enum ol_txrx_peer_state state;
 	qdf_spinlock_t peer_info_lock;
-	qdf_spinlock_t bufq_lock;
-	struct list_head cached_bufq;
+
+	/* Wrapper around the cached_bufq list */
+	struct ol_txrx_cached_bufq_t bufq_info;
 
 	ol_tx_filter_func tx_filter;
 

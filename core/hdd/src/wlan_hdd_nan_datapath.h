@@ -26,10 +26,10 @@
 #ifndef __WLAN_HDD_NAN_DATAPATH_H
 #define __WLAN_HDD_NAN_DATAPATH_H
 
-struct hdd_context_s;
+struct hdd_context;
 struct hdd_tgt_cfg;
 struct hdd_config;
-struct hdd_adapter_s;
+struct hdd_adapter;
 struct wireless_dev;
 
 /* NAN Social channels */
@@ -209,25 +209,25 @@ struct nan_datapath_ctx {
 #endif
 
 #ifdef WLAN_FEATURE_NAN_DATAPATH
-void hdd_ndp_print_ini_config(struct hdd_context_s *hdd_ctx);
-void hdd_nan_datapath_target_config(struct hdd_context_s *hdd_ctx,
+void hdd_ndp_print_ini_config(struct hdd_context *hdd_ctx);
+void hdd_nan_datapath_target_config(struct hdd_context *hdd_ctx,
 						struct wma_tgt_cfg *cfg);
-void hdd_ndp_event_handler(struct hdd_adapter_s *adapter,
+void hdd_ndp_event_handler(struct hdd_adapter *adapter,
 	tCsrRoamInfo *roam_info, uint32_t roam_id, eRoamCmdStatus roam_status,
 	eCsrRoamResult roam_result);
 int wlan_hdd_cfg80211_process_ndp_cmd(struct wiphy *wiphy,
 	struct wireless_dev *wdev, const void *data, int data_len);
-int hdd_init_nan_data_mode(struct hdd_adapter_s *adapter);
-void hdd_ndp_session_end_handler(hdd_adapter_t *adapter);
+int hdd_init_nan_data_mode(struct hdd_adapter *adapter);
+void hdd_ndp_session_end_handler(struct hdd_adapter *adapter);
 #else
-static inline void hdd_ndp_print_ini_config(struct hdd_context_s *hdd_ctx)
+static inline void hdd_ndp_print_ini_config(struct hdd_context *hdd_ctx)
 {
 }
-static inline void hdd_nan_datapath_target_config(struct hdd_context_s *hdd_ctx,
+static inline void hdd_nan_datapath_target_config(struct hdd_context *hdd_ctx,
 						struct wma_tgt_cfg *cfg)
 {
 }
-static inline void hdd_ndp_event_handler(struct hdd_adapter_s *adapter,
+static inline void hdd_ndp_event_handler(struct hdd_adapter *adapter,
 	tCsrRoamInfo *roam_info, uint32_t roam_id, eRoamCmdStatus roam_status,
 	eCsrRoamResult roam_result)
 {
@@ -237,11 +237,11 @@ static inline int wlan_hdd_cfg80211_process_ndp_cmd(struct wiphy *wiphy,
 {
 	return 0;
 }
-static inline int hdd_init_nan_data_mode(struct hdd_adapter_s *adapter)
+static inline int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 {
 	return 0;
 }
-static inline void hdd_ndp_session_end_handler(hdd_adapter_t *adapter)
+static inline void hdd_ndp_session_end_handler(struct hdd_adapter *adapter)
 {
 }
 #endif /* WLAN_FEATURE_NAN_DATAPATH */

@@ -28,6 +28,8 @@
 #if !defined WLAN_HDD_TSF_H
 #define WLAN_HDD_TSF_H
 
+struct hdd_context;
+
 /**
  * enum hdd_tsf_get_state - status of get tsf action
  * @TSF_RETURN:                   get tsf
@@ -68,7 +70,7 @@ enum hdd_tsf_capture_state {
 /**
  * wlan_hdd_tsf_init() - set gpio and callbacks for
  *     capturing tsf and init tsf_plus
- * @hdd_ctx: pointer to the hdd_context_t
+ * @hdd_ctx: pointer to the struct hdd_context
  *
  * This function set the callback to sme module, the callback will be
  * called when a tsf event is reported by firmware; set gpio number
@@ -77,17 +79,17 @@ enum hdd_tsf_capture_state {
  *
  * Return: nothing
  */
-void wlan_hdd_tsf_init(struct hdd_context_s *hdd_ctx);
+void wlan_hdd_tsf_init(struct hdd_context *hdd_ctx);
 
 /**
  * wlan_hdd_tsf_deinit() - reset callbacks for capturing tsf, deinit tsf_plus
- * @hdd_ctx: pointer to the hdd_context_t
+ * @hdd_ctx: pointer to the struct hdd_context
  *
  * This function reset the callback to sme module, and deinit tsf_plus
  *
  * Return: nothing
  */
-void wlan_hdd_tsf_deinit(hdd_context_t *hdd_ctx);
+void wlan_hdd_tsf_deinit(struct hdd_context *hdd_ctx);
 
 /**
  * hdd_capture_tsf() - capture tsf
@@ -99,7 +101,7 @@ void wlan_hdd_tsf_deinit(hdd_context_t *hdd_ctx);
  *
  * Return: 0 for success or non-zero negative failure code
  */
-int hdd_capture_tsf(struct hdd_adapter_s *adapter, uint32_t *buf, int len);
+int hdd_capture_tsf(struct hdd_adapter *adapter, uint32_t *buf, int len);
 
 /**
  * hdd_indicate_tsf() - return tsf to uplayer
@@ -112,7 +114,7 @@ int hdd_capture_tsf(struct hdd_adapter_s *adapter, uint32_t *buf, int len);
  *
  * Return: Describe the execute result of this routine
  */
-int hdd_indicate_tsf(struct hdd_adapter_s *adapter, uint32_t *buf, int len);
+int hdd_indicate_tsf(struct hdd_adapter *adapter, uint32_t *buf, int len);
 
 /**
  * wlan_hdd_cfg80211_handle_tsf_cmd(): Setup TSF operations
@@ -132,22 +134,22 @@ int wlan_hdd_cfg80211_handle_tsf_cmd(struct wiphy *wiphy,
 
 int hdd_get_tsf_cb(void *pcb_cxt, struct stsf *ptsf);
 #else
-static inline void wlan_hdd_tsf_init(struct hdd_context_s *hdd_ctx)
+static inline void wlan_hdd_tsf_init(struct hdd_context *hdd_ctx)
 {
 }
 
-static inline void wlan_hdd_tsf_deinit(hdd_context_t *hdd_ctx)
+static inline void wlan_hdd_tsf_deinit(struct hdd_context *hdd_ctx)
 {
 }
 
-static inline int hdd_indicate_tsf(struct hdd_adapter_s *adapter, uint32_t *buf,
+static inline int hdd_indicate_tsf(struct hdd_adapter *adapter, uint32_t *buf,
 				int len)
 {
 	return -ENOTSUPP;
 }
 
 static inline int
-hdd_capture_tsf(struct hdd_adapter_s *adapter, uint32_t *buf, int len)
+hdd_capture_tsf(struct hdd_adapter *adapter, uint32_t *buf, int len)
 {
 	return -ENOTSUPP;
 }
@@ -176,7 +178,7 @@ static inline int hdd_get_tsf_cb(void *pcb_cxt, struct stsf *ptsf)
  *
  * Return: Describe the execute result of this routine
  */
-int hdd_start_tsf_sync(hdd_adapter_t *adapter);
+int hdd_start_tsf_sync(struct hdd_adapter *adapter);
 
 /**
  * hdd_stop_tsf_sync() - stop tsf sync
@@ -186,7 +188,7 @@ int hdd_start_tsf_sync(hdd_adapter_t *adapter);
  *
  * Return: Describe the execute result of this routine
  */
-int hdd_stop_tsf_sync(hdd_adapter_t *adapter);
+int hdd_stop_tsf_sync(struct hdd_adapter *adapter);
 
 /**
  * hdd_tsf_notify_wlan_state_change() -
@@ -199,7 +201,7 @@ int hdd_stop_tsf_sync(hdd_adapter_t *adapter);
  *
  * Return: nothing
  */
-void hdd_tsf_notify_wlan_state_change(hdd_adapter_t *adapter,
+void hdd_tsf_notify_wlan_state_change(struct hdd_adapter *adapter,
 				      eConnectionState old_state,
 				      eConnectionState new_state);
 
@@ -229,18 +231,18 @@ int hdd_tx_timestamp(qdf_nbuf_t netbuf, uint64_t target_time);
  */
 int hdd_rx_timestamp(qdf_nbuf_t netbuf, uint64_t target_time);
 #else
-static inline int hdd_start_tsf_sync(hdd_adapter_t *adapter)
+static inline int hdd_start_tsf_sync(struct hdd_adapter *adapter)
 {
 	return -ENOTSUPP;
 }
 
-static inline int hdd_stop_tsf_sync(hdd_adapter_t *adapter)
+static inline int hdd_stop_tsf_sync(struct hdd_adapter *adapter)
 {
 	return -ENOTSUPP;
 }
 
 static inline
-void hdd_tsf_notify_wlan_state_change(hdd_adapter_t *adapter,
+void hdd_tsf_notify_wlan_state_change(struct hdd_adapter *adapter,
 				      eConnectionState old_state,
 				      eConnectionState new_state)
 

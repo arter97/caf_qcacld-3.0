@@ -64,6 +64,7 @@
  * CDS_DRIVER_STATE_LOADING: Driver probe is in progress.
  * CDS_DRIVER_STATE_UNLOADING: Driver remove is in progress.
  * CDS_DRIVER_STATE_RECOVERING: Recovery in progress.
+ * CDS_DRIVER_STATE_BAD: Driver in bad state.
  */
 enum cds_driver_state {
 	CDS_DRIVER_STATE_UNINITIALIZED	= 0,
@@ -71,6 +72,7 @@ enum cds_driver_state {
 	CDS_DRIVER_STATE_LOADING	= BIT(1),
 	CDS_DRIVER_STATE_UNLOADING	= BIT(2),
 	CDS_DRIVER_STATE_RECOVERING	= BIT(3),
+	CDS_DRIVER_STATE_BAD		= BIT(4)
 };
 
 #define __CDS_IS_DRIVER_STATE(_state, _mask) (((_state) & (_mask)) == (_mask))
@@ -172,6 +174,18 @@ static inline bool cds_is_driver_recovering(void)
 }
 
 /**
+ * cds_is_driver_in_bad_state() - is driver in bad state
+ *
+ * Return: true if driver is in bad state and false otherwise.
+ */
+static inline bool cds_is_driver_in_bad_state(void)
+{
+	enum cds_driver_state state = cds_get_driver_state();
+
+	return __CDS_IS_DRIVER_STATE(state, CDS_DRIVER_STATE_BAD);
+}
+
+/**
  * cds_is_load_or_unload_in_progress() - Is driver load OR unload in progress
  *
  * Return: true if driver is loading OR unloading and false otherwise.
@@ -222,6 +236,20 @@ static inline void cds_set_recovery_in_progress(uint8_t value)
 		cds_set_driver_state(CDS_DRIVER_STATE_RECOVERING);
 	else
 		cds_clear_driver_state(CDS_DRIVER_STATE_RECOVERING);
+}
+
+/**
+ * cds_set_driver_in_bad_state() - Set driver state
+ * @value: value to set
+ *
+ * Return: none
+ */
+static inline void cds_set_driver_in_bad_state(uint8_t value)
+{
+	if (value)
+		cds_set_driver_state(CDS_DRIVER_STATE_BAD);
+	else
+		cds_clear_driver_state(CDS_DRIVER_STATE_BAD);
 }
 
 /**
@@ -281,17 +309,17 @@ static inline bool cds_is_driver_loaded(void)
 v_CONTEXT_t cds_init(void);
 void cds_deinit(void);
 
-QDF_STATUS cds_pre_enable(v_CONTEXT_t cds_context);
+QDF_STATUS cds_pre_enable(void);
 
 QDF_STATUS cds_open(struct wlan_objmgr_psoc *psoc);
 
-QDF_STATUS cds_enable(struct wlan_objmgr_psoc *psoc, v_CONTEXT_t cds_context);
+QDF_STATUS cds_enable(struct wlan_objmgr_psoc *psoc);
 
-QDF_STATUS cds_disable(struct wlan_objmgr_psoc *psoc, v_CONTEXT_t cds_context);
+QDF_STATUS cds_disable(struct wlan_objmgr_psoc *psoc);
 
 QDF_STATUS cds_post_disable(void);
 
-QDF_STATUS cds_close(struct wlan_objmgr_psoc *psoc, v_CONTEXT_t cds_context);
+QDF_STATUS cds_close(struct wlan_objmgr_psoc *psoc);
 
 void *cds_get_context(QDF_MODULE_ID moduleId);
 
@@ -299,11 +327,10 @@ uint8_t cds_get_datapath_handles(void **soc, struct cdp_pdev **pdev,
 			 struct cdp_vdev **vdev, uint8_t sessionId);
 v_CONTEXT_t cds_get_global_context(void);
 
-QDF_STATUS cds_alloc_context(void *p_cds_context, QDF_MODULE_ID moduleID,
-			     void **ppModuleContext, uint32_t size);
+QDF_STATUS cds_alloc_context(QDF_MODULE_ID moduleID, void **ppModuleContext,
+			     uint32_t size);
 
-QDF_STATUS cds_free_context(void *p_cds_context, QDF_MODULE_ID moduleID,
-			    void *pModuleContext);
+QDF_STATUS cds_free_context(QDF_MODULE_ID moduleID, void *pModuleContext);
 
 QDF_STATUS cds_set_context(QDF_MODULE_ID module_id, void *context);
 
@@ -317,7 +344,7 @@ bool cds_is_packet_log_enabled(void);
 
 uint64_t cds_get_monotonic_boottime(void);
 
-void cds_trigger_recovery(bool);
+void cds_trigger_recovery(void);
 
 void cds_set_wakelock_logging(bool value);
 bool cds_is_wakelock_enabled(void);
@@ -376,5 +403,22 @@ enum tQDF_GLOBAL_CON_MODE cds_get_conparam(void);
 void cds_print_htc_credit_history(uint32_t count, qdf_abstract_print * print,
 				  void *print_priv);
 #endif
+
+/**
+ * cds_is_group_addr() - checks whether addr is multi cast
+ * @mac_addr: address to be checked for multicast
+ *
+ * Check if the input mac addr is multicast addr
+ *
+ * Return: true if multicast addr else false
+ */
+static inline
+bool cds_is_group_addr(uint8_t *mac_addr)
+{
+	if (mac_addr[0] & 0x01)
+		return true;
+	else
+		return false;
+}
 
 #endif /* if !defined __CDS_API_H */

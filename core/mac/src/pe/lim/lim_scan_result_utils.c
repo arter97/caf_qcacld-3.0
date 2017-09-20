@@ -44,7 +44,6 @@
 #include "rrm_api.h"
 #include "cds_utils.h"
 
-
 /**
  * lim_collect_bss_description()
  *
@@ -115,7 +114,7 @@ lim_collect_bss_description(tpAniSirGlobal pMac,
 		     (uint8_t *) pHdr->bssId, sizeof(tSirMacAddr));
 
 	/* Copy Timestamp, Beacon Interval and Capability Info */
-	pBssDescr->scansystimensec = qdf_get_monotonic_boottime_ns();
+	pBssDescr->scansystimensec = qdf_get_bootbased_boottime_ns();
 
 	pBssDescr->timeStamp[0] = pBPR->timeStamp[0];
 	pBssDescr->timeStamp[1] = pBPR->timeStamp[1];

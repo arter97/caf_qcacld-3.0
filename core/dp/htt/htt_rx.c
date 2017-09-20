@@ -541,6 +541,12 @@ moretofill:
 	}
 
 fail:
+	/*
+	 * Make sure alloc index write is reflected correctly before FW polls
+	 * remote ring write index as compiler can reorder the instructions
+	 * based on optimizations.
+	 */
+	qdf_mb();
 	*(pdev->rx_ring.alloc_idx.vaddr) = idx;
 	htt_rx_dbg_rxbuf_indupd(pdev, idx);
 
@@ -699,7 +705,7 @@ void htt_rx_detach(struct htt_pdev_t *pdev)
 							   memctx));
 
 	qdf_mem_free_consistent(pdev->osdev, pdev->osdev->dev,
-				   pdev->rx_ring.size * sizeof(qdf_dma_addr_t),
+				   pdev->rx_ring.size * sizeof(target_paddr_t),
 				   pdev->rx_ring.buf.paddrs_ring,
 				   pdev->rx_ring.base_paddr,
 				   qdf_get_dma_mem_context((&pdev->rx_ring.buf),
@@ -998,20 +1004,20 @@ htt_set_checksum_result_ll(htt_pdev_handle pdev, qdf_nbuf_t msdu,
 		{
 			/* non-fragmented IP packet */
 			/* non TCP/UDP packet */
-			{QDF_NBUF_RX_CKSUM_NONE, QDF_NBUF_RX_CKSUM_NONE},
+			{QDF_NBUF_RX_CKSUM_ZERO, QDF_NBUF_RX_CKSUM_ZERO},
 			/* TCP packet */
 			{QDF_NBUF_RX_CKSUM_TCP, QDF_NBUF_RX_CKSUM_TCPIPV6},
 			/* UDP packet */
 			{QDF_NBUF_RX_CKSUM_UDP, QDF_NBUF_RX_CKSUM_UDPIPV6},
 			/* invalid packet type */
-			{QDF_NBUF_RX_CKSUM_NONE, QDF_NBUF_RX_CKSUM_NONE},
+			{QDF_NBUF_RX_CKSUM_ZERO, QDF_NBUF_RX_CKSUM_ZERO},
 		},
 		{
 			/* fragmented IP packet */
-			{QDF_NBUF_RX_CKSUM_NONE, QDF_NBUF_RX_CKSUM_NONE},
-			{QDF_NBUF_RX_CKSUM_NONE, QDF_NBUF_RX_CKSUM_NONE},
-			{QDF_NBUF_RX_CKSUM_NONE, QDF_NBUF_RX_CKSUM_NONE},
-			{QDF_NBUF_RX_CKSUM_NONE, QDF_NBUF_RX_CKSUM_NONE},
+			{QDF_NBUF_RX_CKSUM_ZERO, QDF_NBUF_RX_CKSUM_ZERO},
+			{QDF_NBUF_RX_CKSUM_ZERO, QDF_NBUF_RX_CKSUM_ZERO},
+			{QDF_NBUF_RX_CKSUM_ZERO, QDF_NBUF_RX_CKSUM_ZERO},
+			{QDF_NBUF_RX_CKSUM_ZERO, QDF_NBUF_RX_CKSUM_ZERO},
 		}
 	};
 
@@ -1495,6 +1501,12 @@ htt_rx_offload_msdu_pop_ll(htt_pdev_handle pdev,
 	uint32_t *msdu_hdr, msdu_len;
 
 	*head_buf = *tail_buf = buf = htt_rx_netbuf_pop(pdev);
+
+	if (qdf_unlikely(NULL == buf)) {
+		qdf_print("%s: netbuf pop failed!\n", __func__);
+		return 1;
+	}
+
 	/* Fake read mpdu_desc to keep desc ptr in sync */
 	htt_rx_mpdu_desc_list_next(pdev, NULL);
 	qdf_nbuf_set_pktlen(buf, HTT_RX_BUF_SIZE);
@@ -1542,7 +1554,7 @@ htt_rx_offload_paddr_msdu_pop_ll(htt_pdev_handle pdev,
 
 	if (qdf_unlikely(NULL == buf)) {
 		qdf_print("%s: netbuf pop failed!\n", __func__);
-		return 0;
+		return 1;
 	}
 	qdf_nbuf_set_pktlen(buf, HTT_RX_BUF_SIZE);
 #ifdef DEBUG_DMA_DONE
@@ -2108,6 +2120,11 @@ uint32_t htt_rx_amsdu_rx_in_order_get_pktlog(qdf_nbuf_t rx_ind_msg)
 }
 
 /* Return values: 1 - success, 0 - failure */
+#define RX_DESC_DISCARD_IS_SET ((*((u_int8_t *) &rx_desc->fw_desc.u.val)) & \
+							FW_RX_DESC_DISCARD_M)
+#define RX_DESC_MIC_ERR_IS_SET ((*((u_int8_t *) &rx_desc->fw_desc.u.val)) & \
+							FW_RX_DESC_ANY_ERR_M)
+
 static int
 htt_rx_amsdu_rx_in_order_pop_ll(htt_pdev_handle pdev,
 				qdf_nbuf_t rx_ind_msg,
@@ -2188,7 +2205,6 @@ htt_rx_amsdu_rx_in_order_pop_ll(htt_pdev_handle pdev,
 		qdf_dp_trace_set_track(msdu, QDF_RX);
 		QDF_NBUF_CB_TX_PACKET_TRACK(msdu) = QDF_NBUF_TX_PKT_DATA_TRACK;
 		QDF_NBUF_CB_RX_CTX_ID(msdu) = rx_ctx_id;
-		ol_rx_log_packet(pdev, peer_id, msdu);
 		DPTRACE(qdf_dp_trace(msdu,
 			QDF_DP_TRACE_RX_HTT_PACKET_PTR_RECORD,
 			QDF_TRACE_DEFAULT_PDEV_ID,
@@ -2217,15 +2233,16 @@ htt_rx_amsdu_rx_in_order_pop_ll(htt_pdev_handle pdev,
 
 		/* calling callback function for packet logging */
 		if (pdev->rx_pkt_dump_cb) {
-			if (qdf_unlikely((*((u_int8_t *)
-				   &rx_desc->fw_desc.u.val)) &
-				   FW_RX_DESC_ANY_ERR_M))
+			if (qdf_unlikely(RX_DESC_MIC_ERR_IS_SET &&
+						!RX_DESC_DISCARD_IS_SET))
 				status = RX_PKT_FATE_FW_DROP_INVALID;
 			pdev->rx_pkt_dump_cb(msdu, peer_id, status);
 		}
-
-		if (qdf_unlikely((*((u_int8_t *) &rx_desc->fw_desc.u.val)) &
-				    FW_RX_DESC_ANY_ERR_M)) {
+		/* if discard flag is set (SA is self MAC), then
+		 * don't check mic failure.
+		 */
+		if (qdf_unlikely(RX_DESC_MIC_ERR_IS_SET &&
+					!RX_DESC_DISCARD_IS_SET)) {
 			uint8_t tid =
 				HTT_RX_IN_ORD_PADDR_IND_EXT_TID_GET(
 					*(u_int32_t *)rx_ind_data);
@@ -3214,6 +3231,11 @@ qdf_nbuf_t htt_rx_hash_list_lookup(struct htt_pdev_t *pdev,
 
 	qdf_spin_lock_bh(&(pdev->rx_ring.rx_hash_lock));
 
+	if (!pdev->rx_ring.hash_table) {
+		qdf_spin_unlock_bh(&(pdev->rx_ring.rx_hash_lock));
+		return NULL;
+	}
+
 	i = RX_HASH_FUNCTION(paddr);
 
 	HTT_LIST_ITER_FWD(list_iter, &pdev->rx_ring.hash_table[i]->listhead) {
@@ -3226,6 +3248,10 @@ qdf_nbuf_t htt_rx_hash_list_lookup(struct htt_pdev_t *pdev,
 		if (hash_entry->paddr == paddr) {
 			/* Found the entry corresponding to paddr */
 			netbuf = hash_entry->netbuf;
+			/* set netbuf to NULL to trace if freed entry
+			 * is getting unmapped in hash deinit.
+			 */
+			hash_entry->netbuf = NULL;
 			htt_list_remove(&hash_entry->listnode);
 			HTT_RX_HASH_COUNT_DECR(pdev->rx_ring.hash_table[i]);
 			/*

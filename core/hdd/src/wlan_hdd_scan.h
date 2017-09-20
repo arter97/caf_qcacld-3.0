@@ -30,6 +30,7 @@
 #define WLAN_HDD_SCAN_H
 
 #include "wlan_hdd_main.h"
+#include "csr_inside_api.h"
 #include <wlan_cfg80211_scan.h>
 
 #define MAX_PENDING_LOG 5
@@ -37,8 +38,13 @@
 /* (30 Mins) */
 #define MIN_TIME_REQUIRED_FOR_NEXT_BUG_REPORT (30 * 60 * 1000)
 
-int hdd_scan_context_init(hdd_context_t *hdd_ctx);
-void hdd_scan_context_destroy(hdd_context_t *hdd_ctx);
+/* HDD Scan inactivity timeout set to 10 seconds
+ * more than the CSR CMD Timeout */
+#define HDD_SCAN_INACTIVITY_TIMEOUT \
+	(CSR_ACTIVE_SCAN_LIST_CMD_TIMEOUT + (10*1000))
+
+int hdd_scan_context_init(struct hdd_context *hdd_ctx);
+void hdd_scan_context_destroy(struct hdd_context *hdd_ctx);
 
 int wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 			   struct cfg80211_scan_request *request);
@@ -49,6 +55,7 @@ int wlan_hdd_cfg80211_sched_scan_start(struct wiphy *wiphy,
 				       struct cfg80211_sched_scan_request
 				       *request);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
 /**
  * wlan_hdd_cfg80211_sched_scan_stop() - stop cfg80211 scheduled (PNO) scan
  * @wiphy: Pointer to wiphy
@@ -63,6 +70,12 @@ int wlan_hdd_cfg80211_sched_scan_start(struct wiphy *wiphy,
  */
 int wlan_hdd_cfg80211_sched_scan_stop(struct wiphy *wiphy,
 				      struct net_device *dev);
+#else
+int wlan_hdd_cfg80211_sched_scan_stop(struct wiphy *wiphy,
+				      struct net_device *dev,
+				      uint64_t reqid);
+
+#endif /* KERNEL_VERSION(4, 12, 0) */
 
 /**
  * wlan_hdd_sched_scan_stop() - stop scheduled (PNO) scans

@@ -1257,7 +1257,7 @@ static void sap_get_cac_dur_dfs_region(ptSapContext sap_ctx,
 	}
 
 	mac = PMAC_STRUCT(hal);
-	wlan_reg_get_dfs_region(mac->psoc, dfs_region);
+	wlan_reg_get_dfs_region(mac->pdev, dfs_region);
 	if (mac->sap.SapDfsInfo.ignore_cac) {
 		*cac_duration_ms = 0;
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_DEBUG,
@@ -1265,17 +1265,6 @@ static void sap_get_cac_dur_dfs_region(ptSapContext sap_ctx,
 		return;
 	}
 	*cac_duration_ms = DEFAULT_CAC_TIMEOUT;
-
-	QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO,
-		  FL("sapdfs: dfs_region=%d, chwidth=%d, seg0=%d, seg1=%d"),
-		  *dfs_region, ch_params->ch_width,
-		  ch_params->center_freq_seg0, ch_params->center_freq_seg1);
-
-	if (*dfs_region != DFS_ETSI_REG) {
-		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO,
-			  FL("sapdfs: defult cac duration"));
-		return;
-	}
 
 	if (sap_is_channel_bonding_etsi_weather_channel(sap_ctx)) {
 		*cac_duration_ms = ETSI_WEATHER_CH_CAC_TIMEOUT;
@@ -1468,85 +1457,6 @@ bool sap_check_in_avoid_ch_list(ptSapContext sap_ctx, uint8_t channel)
 }
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
 
-/*
- * This Function is to get bonding channels from primary channel.
- *
- */
-static uint8_t sap_get_bonding_channels(ptSapContext sapContext,
-					uint8_t channel,
-					uint8_t *channels, uint8_t size,
-					ePhyChanBondState chanBondState)
-{
-	tHalHandle hHal = CDS_GET_HAL_CB(sapContext->p_cds_gctx);
-	tpAniSirGlobal pMac;
-	uint8_t numChannel;
-
-	if (channels == NULL)
-		return 0;
-
-	if (size < MAX_BONDED_CHANNELS)
-		return 0;
-
-	if (NULL != hHal) {
-		pMac = PMAC_STRUCT(hHal);
-	} else
-		return 0;
-
-	QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_DEBUG,
-		  FL("cbmode: %d, channel: %d"), chanBondState, channel);
-
-	switch (chanBondState) {
-	case PHY_SINGLE_CHANNEL_CENTERED:
-		numChannel = 1;
-		channels[0] = channel;
-		break;
-	case PHY_DOUBLE_CHANNEL_HIGH_PRIMARY:
-		numChannel = 2;
-		channels[0] = channel - 4;
-		channels[1] = channel;
-		break;
-	case PHY_DOUBLE_CHANNEL_LOW_PRIMARY:
-		numChannel = 2;
-		channels[0] = channel;
-		channels[1] = channel + 4;
-		break;
-	case PHY_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_LOW:
-		numChannel = 4;
-		channels[0] = channel;
-		channels[1] = channel + 4;
-		channels[2] = channel + 8;
-		channels[3] = channel + 12;
-		break;
-	case PHY_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_LOW:
-		numChannel = 4;
-		channels[0] = channel - 4;
-		channels[1] = channel;
-		channels[2] = channel + 4;
-		channels[3] = channel + 8;
-		break;
-	case PHY_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_HIGH:
-		numChannel = 4;
-		channels[0] = channel - 8;
-		channels[1] = channel - 4;
-		channels[2] = channel;
-		channels[3] = channel + 4;
-		break;
-	case PHY_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_HIGH:
-		numChannel = 4;
-		channels[0] = channel - 12;
-		channels[1] = channel - 8;
-		channels[2] = channel - 4;
-		channels[3] = channel;
-		break;
-	default:
-		numChannel = 1;
-		channels[0] = channel;
-		break;
-	}
-
-	return numChannel;
-}
-
 /**
  * sap_dfs_is_channel_in_nol_list() - given bonded channel is available
  * @sap_context: Handle to SAP context.
@@ -1591,8 +1501,8 @@ sap_dfs_is_channel_in_nol_list(ptSapContext sap_context,
 	}
 
 	/* get the bonded channels */
-	num_channels = sap_get_bonding_channels(sap_context, channel_number,
-			channels, MAX_BONDED_CHANNELS, chan_bondState);
+	num_channels = sap_ch_params_to_bonding_channels(
+					&sap_context->ch_params, channels);
 
 	pdev = mac_ctx->pdev;
 	if (!pdev) {
@@ -1758,6 +1668,15 @@ QDF_STATUS sap_goto_channel_sel(ptSapContext sap_context,
 					sap_context->channel,
 					sap_context->csr_roamProfile.phyMode,
 					sap_context->cc_switch_mode);
+			if (QDF_IS_STATUS_ERROR(
+				policy_mgr_valid_sap_conc_channel_check(
+					mac_ctx->psoc, &con_ch,
+					sap_context->channel)))	{
+				QDF_TRACE(QDF_MODULE_ID_SAP,
+					QDF_TRACE_LEVEL_WARN,
+					FL("SAP can't start (no MCC)"));
+				return QDF_STATUS_E_ABORTED;
+			}
 			if (con_ch && !wlan_reg_is_dfs_ch(mac_ctx->pdev,
 						con_ch)) {
 				QDF_TRACE(QDF_MODULE_ID_SAP,
@@ -2333,6 +2252,7 @@ QDF_STATUS sap_signal_hdd_event(ptSapContext sap_ctx,
 		assoc_ind->assocReqLength = csr_roaminfo->assocReqLength;
 		assoc_ind->assocReqPtr = csr_roaminfo->assocReqPtr;
 		assoc_ind->fWmmEnabled = csr_roaminfo->wmmEnabledSta;
+		assoc_ind->ecsa_capable = csr_roaminfo->ecsa_capable;
 		if (csr_roaminfo->u.pConnectedProfile != NULL) {
 			assoc_ind->negotiatedAuthType =
 				csr_roaminfo->u.pConnectedProfile->AuthType;
@@ -2462,6 +2382,18 @@ QDF_STATUS sap_signal_hdd_event(ptSapContext sap_ctx,
 		reassoc_complete->wmmEnabled = csr_roaminfo->wmmEnabledSta;
 		reassoc_complete->status = (eSapStatus) context;
 		reassoc_complete->timingMeasCap = csr_roaminfo->timingMeasCap;
+		reassoc_complete->ampdu = csr_roaminfo->ampdu;
+		reassoc_complete->sgi_enable = csr_roaminfo->sgi_enable;
+		reassoc_complete->tx_stbc = csr_roaminfo->tx_stbc;
+		reassoc_complete->rx_stbc = csr_roaminfo->rx_stbc;
+		reassoc_complete->ch_width = csr_roaminfo->ch_width;
+		reassoc_complete->mode = csr_roaminfo->mode;
+		reassoc_complete->max_supp_idx = csr_roaminfo->max_supp_idx;
+		reassoc_complete->max_ext_idx = csr_roaminfo->max_ext_idx;
+		reassoc_complete->max_mcs_idx = csr_roaminfo->max_mcs_idx;
+		reassoc_complete->rx_mcs_map = csr_roaminfo->rx_mcs_map;
+		reassoc_complete->tx_mcs_map = csr_roaminfo->tx_mcs_map;
+		reassoc_complete->ecsa_capable = csr_roaminfo->ecsa_capable;
 		break;
 
 	case eSAP_STA_DISASSOC_EVENT:
@@ -2600,8 +2532,7 @@ QDF_STATUS sap_signal_hdd_event(ptSapContext sap_ctx,
 
 		acs_selected = &sap_ap_event.sapevt.sap_ch_selected;
 		acs_selected->pri_ch = sap_ctx->acs_cfg->pri_ch;
-		acs_selected->ht_sec_ch =
-			sap_ctx->csr_roamProfile.ch_params.sec_ch_offset;
+		acs_selected->ht_sec_ch = sap_ctx->acs_cfg->ht_sec_ch;
 		acs_selected->ch_width =
 			sap_ctx->csr_roamProfile.ch_params.ch_width;
 		acs_selected->vht_seg0_center_ch =
@@ -3709,8 +3640,6 @@ sapconvert_to_csr_profile(tsap_Config_t *pconfig_params, eCsrRoamBssType bssType
 			     pconfig_params->RSNWPAReqIELength);
 		profile->nRSNReqIELength = pconfig_params->RSNWPAReqIELength;
 	}
-	/* Turn off CB mode */
-	profile->CBMode = eCSR_CB_OFF;
 
 	/* set the phyMode to accept anything */
 	/* Best means everything because it covers all the things we support */
@@ -3838,7 +3767,7 @@ void sap_sort_mac_list(struct qdf_mac_addr *macList, uint8_t size)
 	}
 }
 
-eSapBool
+bool
 sap_search_mac_list(struct qdf_mac_addr *macList,
 		    uint8_t num_mac, uint8_t *peerMac,
 		    uint8_t *index)
@@ -3850,7 +3779,7 @@ sap_search_mac_list(struct qdf_mac_addr *macList,
 	if ((NULL == macList) || (num_mac > MAX_ACL_MAC_ADDRESS)) {
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_HIGH,
 		    FL("either buffer is NULL or size = %d is more."), num_mac);
-		return eSAP_FALSE;
+		return false;
 	}
 
 	while (nStart <= nEnd) {
@@ -3870,7 +3799,7 @@ sap_search_mac_list(struct qdf_mac_addr *macList,
 					  QDF_TRACE_LEVEL_INFO_HIGH, "index %d",
 					  *index);
 			}
-			return eSAP_TRUE;
+			return true;
 		}
 		if (nRes < 0)
 			nStart = nMiddle + 1;
@@ -3880,7 +3809,7 @@ sap_search_mac_list(struct qdf_mac_addr *macList,
 
 	QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_HIGH,
 		  "search not succ");
-	return eSAP_FALSE;
+	return false;
 }
 
 void sap_add_mac_to_acl(struct qdf_mac_addr *macList,
@@ -4102,17 +4031,17 @@ static QDF_STATUS sap_get_channel_list(ptSapContext sap_ctx,
 		 * - DFS scan enabled and chan not in CHANNEL_STATE_DISABLE
 		 * - DFS scan disable but chan in CHANNEL_STATE_ENABLE
 		 */
-		if (!(((eSAP_TRUE == mac_ctx->scan.fEnableDFSChnlScan) &&
+		if (!(((true == mac_ctx->scan.fEnableDFSChnlScan) &&
 		      wlan_reg_get_channel_state(mac_ctx->pdev, loop_count)) ||
-		    ((eSAP_FALSE == mac_ctx->scan.fEnableDFSChnlScan) &&
+		    ((false == mac_ctx->scan.fEnableDFSChnlScan) &&
 		     (CHANNEL_STATE_ENABLE ==
 		      wlan_reg_get_channel_state(mac_ctx->pdev, loop_count)))))
 			continue;
 
 #ifdef FEATURE_WLAN_CH_AVOID
 		for (i = 0; i < NUM_CHANNELS; i++) {
-			if ((safe_channels[i].channelNumber ==
-			     WLAN_REG_CH_NUM(loop_count))) {
+			if (safe_channels[i].channelNumber ==
+			     WLAN_REG_CH_NUM(loop_count)) {
 				/* Check if channel is safe */
 				if (true == safe_channels[i].isSafe) {
 #endif
@@ -4213,7 +4142,7 @@ uint8_t sap_indicate_radar(ptSapContext sap_ctx)
 	 * if the radar is found in the STARTED state
 	 */
 	if (eSAP_STARTED == sap_ctx->sapsMachine)
-		mac->sap.SapDfsInfo.csaIERequired = eSAP_TRUE;
+		mac->sap.SapDfsInfo.csaIERequired = true;
 
 	if (sap_ctx->csr_roamProfile.disableDFSChSwitch)
 		return sap_ctx->channel;

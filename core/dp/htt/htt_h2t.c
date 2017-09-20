@@ -64,7 +64,7 @@
 #ifdef ATH_11AC_TXCOMPACT
 #define HTT_SEND_HTC_PKT(pdev, pkt)                              \
 do {                                                             \
-	if (htc_send_pkt(pdev->htc_pdev, &pkt->htc_pkt) == A_OK) \
+	if (htc_send_pkt(pdev->htc_pdev, &pkt->htc_pkt) == QDF_STATUS_SUCCESS) \
 		htt_htc_misc_pkt_list_add(pdev, pkt);            \
 } while (0)
 #else
@@ -74,7 +74,7 @@ do {                                                             \
 
 
 static void
-htt_h2t_send_complete_free_netbuf(void *pdev, A_STATUS status,
+htt_h2t_send_complete_free_netbuf(void *pdev, QDF_STATUS status,
 				  qdf_nbuf_t netbuf, uint16_t msdu_id)
 {
 	qdf_nbuf_free(netbuf);
@@ -82,7 +82,7 @@ htt_h2t_send_complete_free_netbuf(void *pdev, A_STATUS status,
 
 void htt_h2t_send_complete(void *context, HTC_PACKET *htc_pkt)
 {
-	void (*send_complete_part2)(void *pdev, A_STATUS status,
+	void (*send_complete_part2)(void *pdev, QDF_STATUS status,
 				    qdf_nbuf_t msdu, uint16_t msdu_id);
 	struct htt_pdev_t *pdev = (struct htt_pdev_t *)context;
 	struct htt_htc_pkt *htt_pkt;
@@ -102,8 +102,10 @@ void htt_h2t_send_complete(void *context, HTC_PACKET *htc_pkt)
 	if (pdev->cfg.is_high_latency && !pdev->cfg.default_tx_comp_req) {
 		int32_t credit_delta;
 
+		HTT_TX_MUTEX_ACQUIRE(&pdev->credit_mutex);
 		qdf_atomic_add(1, &pdev->htt_tx_credit.bus_delta);
 		credit_delta = htt_tx_credit_update(pdev);
+		HTT_TX_MUTEX_RELEASE(&pdev->credit_mutex);
 
 		if (credit_delta)
 			ol_tx_credit_completion_handler(pdev->txrx_pdev,
@@ -121,9 +123,9 @@ enum htc_send_full_action htt_h2t_full(void *context, HTC_PACKET *pkt)
 }
 
 #if defined(HELIUMPLUS)
-A_STATUS htt_h2t_frag_desc_bank_cfg_msg(struct htt_pdev_t *pdev)
+QDF_STATUS htt_h2t_frag_desc_bank_cfg_msg(struct htt_pdev_t *pdev)
 {
-	A_STATUS rc = A_OK;
+	QDF_STATUS rc = QDF_STATUS_SUCCESS;
 
 	struct htt_htc_pkt *pkt;
 	qdf_nbuf_t msg;
@@ -132,7 +134,7 @@ A_STATUS htt_h2t_frag_desc_bank_cfg_msg(struct htt_pdev_t *pdev)
 
 	pkt = htt_htc_pkt_alloc(pdev);
 	if (!pkt)
-		return A_ERROR; /* failure */
+		return QDF_STATUS_E_FAILURE; /* failure */
 
 	/* show that this is not a tx frame download
 	 * (not required, but helpful)
@@ -147,7 +149,7 @@ A_STATUS htt_h2t_frag_desc_bank_cfg_msg(struct htt_pdev_t *pdev)
 		HTC_HEADER_LEN + HTC_HDR_ALIGNMENT_PADDING, 4, true);
 	if (!msg) {
 		htt_htc_pkt_free(pdev, pkt);
-		return A_ERROR; /* failure */
+		return QDF_STATUS_E_FAILURE; /* failure */
 	}
 
 	/*
@@ -205,7 +207,7 @@ A_STATUS htt_h2t_frag_desc_bank_cfg_msg(struct htt_pdev_t *pdev)
 
 	rc = htc_send_pkt(pdev->htc_pdev, &pkt->htc_pkt);
 #ifdef ATH_11AC_TXCOMPACT
-	if (rc == A_OK)
+	if (rc == QDF_STATUS_SUCCESS)
 		htt_htc_misc_pkt_list_add(pdev, pkt);
 #endif
 
@@ -214,7 +216,7 @@ A_STATUS htt_h2t_frag_desc_bank_cfg_msg(struct htt_pdev_t *pdev)
 
 #endif /* defined(HELIUMPLUS) */
 
-A_STATUS htt_h2t_ver_req_msg(struct htt_pdev_t *pdev)
+QDF_STATUS htt_h2t_ver_req_msg(struct htt_pdev_t *pdev)
 {
 	struct htt_htc_pkt *pkt;
 	qdf_nbuf_t msg;
@@ -224,7 +226,7 @@ A_STATUS htt_h2t_ver_req_msg(struct htt_pdev_t *pdev)
 
 	pkt = htt_htc_pkt_alloc(pdev);
 	if (!pkt)
-		return A_ERROR; /* failure */
+		return QDF_STATUS_E_FAILURE; /* failure */
 
 	max_tx_group = ol_tx_get_max_tx_groups_supported(pdev->txrx_pdev);
 
@@ -246,7 +248,7 @@ A_STATUS htt_h2t_ver_req_msg(struct htt_pdev_t *pdev)
 			     true);
 	if (!msg) {
 		htt_htc_pkt_free(pdev, pkt);
-		return A_ERROR; /* failure */
+		return QDF_STATUS_E_FAILURE; /* failure */
 	}
 
 	/*
@@ -291,7 +293,7 @@ A_STATUS htt_h2t_ver_req_msg(struct htt_pdev_t *pdev)
 	    (!pdev->cfg.default_tx_comp_req))
 		ol_tx_target_credit_update(pdev->txrx_pdev, -1);
 
-	return A_OK;
+	return QDF_STATUS_SUCCESS;
 }
 
 #if defined(HELIUMPLUS)
@@ -388,7 +390,7 @@ QDF_STATUS htt_h2t_rx_ring_cfg_msg_ll(struct htt_pdev_t *pdev)
 
 	pkt = htt_htc_pkt_alloc(pdev);
 	if (!pkt)
-		return A_ERROR; /* failure */
+		return QDF_STATUS_E_FAILURE; /* failure */
 
 	/*
 	 * show that this is not a tx frame download
@@ -404,7 +406,7 @@ QDF_STATUS htt_h2t_rx_ring_cfg_msg_ll(struct htt_pdev_t *pdev)
 			     true);
 	if (!msg) {
 		htt_htc_pkt_free(pdev, pkt);
-		return A_ERROR; /* failure */
+		return QDF_STATUS_E_FAILURE; /* failure */
 	}
 	/*
 	 * Set the length of the message.
@@ -585,7 +587,7 @@ QDF_STATUS htt_h2t_rx_ring_cfg_msg_ll(struct htt_pdev_t *pdev)
 
 	SET_HTC_PACKET_NET_BUF_CONTEXT(&pkt->htc_pkt, msg);
 	HTT_SEND_HTC_PKT(pdev, pkt);
-	return A_OK;
+	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS
@@ -719,7 +721,7 @@ htt_h2t_rx_ring_cfg_msg_hl(struct htt_pdev_t *pdev)
 	SET_HTC_PACKET_NET_BUF_CONTEXT(&pkt->htc_pkt, msg);
 
 #ifdef ATH_11AC_TXCOMPACT
-	if (htc_send_pkt(pdev->htc_pdev, &pkt->htc_pkt) == A_OK)
+	if (htc_send_pkt(pdev->htc_pdev, &pkt->htc_pkt) == QDF_STATUS_SUCCESS)
 		htt_htc_misc_pkt_list_add(pdev, pkt);
 #else
 	htc_send_pkt(pdev->htc_pdev, &pkt->htc_pkt);
@@ -830,7 +832,7 @@ htt_h2t_dbg_stats_get(struct htt_pdev_t *pdev,
 	SET_HTC_PACKET_NET_BUF_CONTEXT(&pkt->htc_pkt, msg);
 
 #ifdef ATH_11AC_TXCOMPACT
-	if (htc_send_pkt(pdev->htc_pdev, &pkt->htc_pkt) == A_OK)
+	if (htc_send_pkt(pdev->htc_pdev, &pkt->htc_pkt) == QDF_STATUS_SUCCESS)
 		htt_htc_misc_pkt_list_add(pdev, pkt);
 #else
 	htc_send_pkt(pdev->htc_pdev, &pkt->htc_pkt);
@@ -955,7 +957,7 @@ htt_h2t_aggr_cfg_msg(struct htt_pdev_t *pdev,
 	SET_HTC_PACKET_NET_BUF_CONTEXT(&pkt->htc_pkt, msg);
 
 #ifdef ATH_11AC_TXCOMPACT
-	if (htc_send_pkt(pdev->htc_pdev, &pkt->htc_pkt) == A_OK)
+	if (htc_send_pkt(pdev->htc_pdev, &pkt->htc_pkt) == QDF_STATUS_SUCCESS)
 		htt_htc_misc_pkt_list_add(pdev, pkt);
 #else
 	htc_send_pkt(pdev->htc_pdev, &pkt->htc_pkt);

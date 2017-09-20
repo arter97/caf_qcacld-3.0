@@ -381,7 +381,7 @@ static void process_reorder(ol_txrx_pdev_handle pdev,
 			    qdf_nbuf_t head_msdu,
 			    qdf_nbuf_t tail_msdu,
 			    int num_mpdu_ranges,
-			    int num_pdus,
+			    int num_mpdus,
 			    bool rx_ind_release)
 {
 	htt_pdev_handle htt_pdev = pdev->htt_pdev;
@@ -598,6 +598,8 @@ ol_rx_indication_handler(ol_txrx_pdev_handle pdev,
 					ol_rx_trigger_restore(htt_pdev,
 							      head_msdu,
 							      tail_msdu);
+					OL_RX_REORDER_TIMEOUT_MUTEX_UNLOCK(
+									pdev);
 					return;
 				}
 #endif
@@ -655,6 +657,8 @@ ol_rx_indication_handler(ol_txrx_pdev_handle pdev,
 				if (htt_pdev->rx_ring.rx_reset) {
 					ol_rx_trigger_restore(htt_pdev, msdu,
 							      tail_msdu);
+					OL_RX_REORDER_TIMEOUT_MUTEX_UNLOCK(
+									pdev);
 					return;
 				}
 #endif
@@ -1135,6 +1139,25 @@ ol_rx_filter(struct ol_txrx_vdev_t *vdev,
 	return FILTER_STATUS_REJECT;
 }
 
+#ifdef WLAN_FEATURE_TSF_PLUS
+static inline void ol_rx_timestamp(void *rx_desc, qdf_nbuf_t msdu)
+{
+	struct htt_rx_ppdu_desc_t *rx_ppdu_desc;
+
+	if (!rx_desc || !msdu)
+		return;
+
+	rx_ppdu_desc = (struct htt_rx_ppdu_desc_t *)((uint8_t *)(rx_desc) -
+			HTT_RX_IND_HL_BYTES + HTT_RX_IND_HDR_PREFIX_BYTES);
+	msdu->tstamp = ns_to_ktime((u_int64_t)rx_ppdu_desc->tsf32 *
+			NSEC_PER_USEC);
+}
+#else
+static inline void ol_rx_timestamp(void *rx_desc, qdf_nbuf_t msdu)
+{
+}
+#endif
+
 void
 ol_rx_deliver(struct ol_txrx_vdev_t *vdev,
 	      struct ol_txrx_peer_t *peer, unsigned int tid,
@@ -1315,6 +1338,8 @@ DONE:
 			OL_RX_ERR_STATISTICS_1(pdev, vdev, peer, rx_desc,
 					       OL_RX_ERR_NONE);
 			TXRX_STATS_MSDU_INCR(vdev->pdev, rx.delivered, msdu);
+
+			ol_rx_timestamp(rx_desc, msdu);
 			OL_TXRX_LIST_APPEND(deliver_list_head,
 					    deliver_list_tail, msdu);
 		}
@@ -1537,12 +1562,10 @@ void ol_rx_pkt_dump_call(
 	uint8_t peer_id,
 	uint8_t status)
 {
-	v_CONTEXT_t vos_context;
 	ol_txrx_pdev_handle pdev;
 	struct ol_txrx_peer_t *peer = NULL;
 	tp_ol_packetdump_cb packetdump_cb;
 
-	vos_context = cds_get_global_context();
 	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 
 	if (!pdev) {
@@ -1603,17 +1626,6 @@ ol_rx_in_order_deliver(struct ol_txrx_vdev_t *vdev,
 	ol_rx_data_process(peer, msdu_list);
 }
 
-void ol_rx_log_packet(htt_pdev_handle htt_pdev,
-		uint8_t peer_id, qdf_nbuf_t msdu)
-{
-	struct ol_txrx_peer_t *peer;
-
-	peer = ol_txrx_peer_find_by_id(htt_pdev->txrx_pdev, peer_id);
-	if (peer)
-		qdf_dp_trace_log_pkt(peer->vdev->vdev_id, msdu, QDF_RX,
-				QDF_TRACE_DEFAULT_PDEV_ID);
-}
-
 void
 ol_rx_offload_paddr_deliver_ind_handler(htt_pdev_handle htt_pdev,
 					uint32_t msdu_count,
@@ -1626,10 +1638,18 @@ ol_rx_offload_paddr_deliver_ind_handler(htt_pdev_handle htt_pdev,
 	int msdu_iter = 0;
 
 	while (msdu_count) {
-		htt_rx_offload_paddr_msdu_pop_ll(htt_pdev, msg_word, msdu_iter,
+		if (htt_rx_offload_paddr_msdu_pop_ll(
+						htt_pdev, msg_word, msdu_iter,
 						 &vdev_id, &peer_id, &tid,
 						 &fw_desc, &head_buf,
-						 &tail_buf);
+						 &tail_buf)) {
+			msdu_iter++;
+			msdu_count--;
+			QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO,
+				  "skip msg_word %p, msdu #%d, continue next",
+				  msg_word, msdu_iter);
+			continue;
+		}
 
 		peer = ol_txrx_peer_find_by_id(htt_pdev->txrx_pdev, peer_id);
 		if (peer) {

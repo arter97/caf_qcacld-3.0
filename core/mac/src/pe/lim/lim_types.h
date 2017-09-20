@@ -253,12 +253,12 @@ typedef struct sLimMlmAssocInd {
 	tSirWAPIie wapiIE;
 	tSirAddie addIE;        /* additional IE received from the peer, which possibly includes WSC IE and/or P2P IE. */
 	tSirMacCapabilityInfo capabilityInfo;
-	tAniBool spectrumMgtIndicator;
+	bool spectrumMgtIndicator;
 	tSirMacPowerCapInfo powerCap;
 	tSirSupChnl supportedChannels;
 	uint8_t sessionId;
 
-	tAniBool WmmStaInfoPresent;
+	bool WmmStaInfoPresent;
 
 	/* Required for indicating the frames to upper layer */
 	uint32_t beaconLength;
@@ -266,6 +266,18 @@ typedef struct sLimMlmAssocInd {
 	uint32_t assocReqLength;
 	uint8_t *assocReqPtr;
 	tSirSmeChanInfo chan_info;
+	bool ampdu;
+	bool sgi_enable;
+	bool tx_stbc;
+	bool rx_stbc;
+	tSirMacHTChannelWidth ch_width;
+	enum sir_sme_phy_mode mode;
+	uint8_t max_supp_idx;
+	uint8_t max_ext_idx;
+	uint8_t max_mcs_idx;
+	uint8_t rx_mcs_map;
+	uint8_t tx_mcs_map;
+	uint8_t ecsa_capable;
 } tLimMlmAssocInd, *tpLimMlmAssocInd;
 
 typedef struct sLimMlmReassocReq {
@@ -292,17 +304,18 @@ typedef struct sLimMlmReassocInd {
 	tSirWAPIie wapiIE;
 	tSirAddie addIE;        /* additional IE received from the peer, which can be WSC IE and/or P2P IE. */
 	tSirMacCapabilityInfo capabilityInfo;
-	tAniBool spectrumMgtIndicator;
+	bool spectrumMgtIndicator;
 	tSirMacPowerCapInfo powerCap;
 	tSirSupChnl supportedChannels;
 
-	tAniBool WmmStaInfoPresent;
+	bool WmmStaInfoPresent;
 
 	/* Required for indicating the frames to upper layer */
 	uint32_t beaconLength;
 	uint8_t *beaconPtr;
 	uint32_t assocReqLength;
 	uint8_t *assocReqPtr;
+	uint8_t ecsa_capable;
 } tLimMlmReassocInd, *tpLimMlmReassocInd;
 
 typedef struct sLimMlmAuthCnf {
@@ -468,7 +481,7 @@ tSirRetStatus lim_send_probe_req_mgmt_frame(tpAniSirGlobal, tSirMacSSid *,
 void lim_send_probe_rsp_mgmt_frame(tpAniSirGlobal, tSirMacAddr, tpAniSSID, short,
 				   uint8_t, tpPESession, uint8_t);
 void lim_send_auth_mgmt_frame(tpAniSirGlobal, tSirMacAuthFrameBody *, tSirMacAddr,
-			      uint8_t, tpPESession, bool wait_for_ack);
+			      uint8_t, tpPESession);
 void lim_send_assoc_req_mgmt_frame(tpAniSirGlobal, tLimMlmAssocReq *, tpPESession);
 #ifdef WLAN_FEATURE_HOST_ROAM
 void lim_send_reassoc_req_with_ft_ies_mgmt_frame(tpAniSirGlobal pMac,
@@ -914,8 +927,29 @@ int lim_process_remain_on_chnl_req(tpAniSirGlobal pMac, uint32_t *pMsg);
 void lim_remain_on_chn_rsp(tpAniSirGlobal pMac, QDF_STATUS status, uint32_t *data);
 void lim_send_sme_disassoc_deauth_ntf(tpAniSirGlobal mac_ctx,
 				QDF_STATUS status, uint32_t *ctx);
+
+#ifdef FEATURE_WLAN_TDLS
 tSirRetStatus lim_process_sme_del_all_tdls_peers(tpAniSirGlobal p_mac,
 						 uint32_t *msg_buf);
+#else
+static inline
+tSirRetStatus lim_process_sme_del_all_tdls_peers(tpAniSirGlobal p_mac,
+						 uint32_t *msg_buf)
+{
+	return eSIR_SUCCESS;
+}
+#endif
+
+/**
+ * lim_process_rx_channel_status_event() - processes
+ * event WDA_RX_CHN_STATUS_EVENT
+ * @mac_ctx Pointer to Global MAC structure
+ * @buf: Received message info
+ *
+ * Return: None
+ */
+void lim_process_rx_channel_status_event(tpAniSirGlobal mac_ctx, void *buf);
+
 /* / Bit value data structure */
 typedef enum sHalBitVal         /* For Bit operations */
 {

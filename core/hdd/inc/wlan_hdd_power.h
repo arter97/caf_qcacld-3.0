@@ -157,7 +157,7 @@ QDF_STATUS hdd_wlan_re_init(void);
  *
  * Return: None
  */
-void hdd_enable_arp_offload(hdd_adapter_t *adapter,
+void hdd_enable_arp_offload(struct hdd_adapter *adapter,
 		enum pmo_offload_trigger trigger);
 
 /**
@@ -167,7 +167,7 @@ void hdd_enable_arp_offload(hdd_adapter_t *adapter,
  *
  * Return: None
  */
-void hdd_disable_arp_offload(hdd_adapter_t *adapter,
+void hdd_disable_arp_offload(struct hdd_adapter *adapter,
 		enum pmo_offload_trigger trigger);
 
 /**
@@ -179,7 +179,7 @@ void hdd_disable_arp_offload(hdd_adapter_t *adapter,
  *
  * Return: nothing
  */
-void hdd_enable_host_offloads(hdd_adapter_t *adapter,
+void hdd_enable_host_offloads(struct hdd_adapter *adapter,
 	enum pmo_offload_trigger trigger);
 
 /**
@@ -191,7 +191,7 @@ void hdd_enable_host_offloads(hdd_adapter_t *adapter,
  *
  * Return: nothing
  */
-void hdd_disable_host_offloads(hdd_adapter_t *adapter,
+void hdd_disable_host_offloads(struct hdd_adapter *adapter,
 	enum pmo_offload_trigger trigger);
 
 /**
@@ -201,7 +201,7 @@ void hdd_disable_host_offloads(hdd_adapter_t *adapter,
  *
  * Return: nothing
  */
-void hdd_enable_mc_addr_filtering(hdd_adapter_t *adapter,
+void hdd_enable_mc_addr_filtering(struct hdd_adapter *adapter,
 	enum pmo_offload_trigger trigger);
 
 /**
@@ -211,7 +211,7 @@ void hdd_enable_mc_addr_filtering(hdd_adapter_t *adapter,
  *
  * Return: nothing
  */
-void hdd_disable_mc_addr_filtering(hdd_adapter_t *adapter,
+void hdd_disable_mc_addr_filtering(struct hdd_adapter *adapter,
 	enum pmo_offload_trigger trigger);
 
 /**
@@ -229,11 +229,11 @@ int hdd_cache_mc_addr_list(struct pmo_mc_addr_list_params *mc_list_config);
  *
  * Return: nothing
  */
-void hdd_disable_and_flush_mc_addr_list(hdd_adapter_t *adapter,
+void hdd_disable_and_flush_mc_addr_list(struct hdd_adapter *adapter,
 	enum pmo_offload_trigger trigger);
 
 /**
- * wlan_hdd_cfg80211_update_replay_counter_callback() - replay counter callback
+ * wlan_hdd_cfg80211_update_replay_counter_cb() - replay counter callback
  * @cb_ctx: Callback context as void* as PMO do not about HDD adapter type
  * @gtk_rsp_param: Pointer to gtk offload response parameter
  *
@@ -241,7 +241,7 @@ void hdd_disable_and_flush_mc_addr_list(hdd_adapter_t *adapter,
  *
  * Return: none
  */
-void wlan_hdd_cfg80211_update_replay_counter_callback(
+void wlan_hdd_cfg80211_update_replay_counter_cb(
 	void *cb_ctx,
 	struct pmo_gtk_rsp_params *gtk_rsp_param);
 
@@ -259,7 +259,7 @@ void hdd_ipv4_notifier_work_queue(struct work_struct *work);
  *
  * Return: nothing
  */
-void hdd_enable_ns_offload(hdd_adapter_t *adapter,
+void hdd_enable_ns_offload(struct hdd_adapter *adapter,
 	enum pmo_offload_trigger trigger);
 
 /**
@@ -268,7 +268,7 @@ void hdd_enable_ns_offload(hdd_adapter_t *adapter,
  *
  * Return: nothing
  */
-void hdd_disable_ns_offload(hdd_adapter_t *adapter,
+void hdd_disable_ns_offload(struct hdd_adapter *adapter,
 	enum pmo_offload_trigger trigger);
 
 void hdd_ipv6_notifier_work_queue(struct work_struct *work);
@@ -292,7 +292,7 @@ int wlan_hdd_ipv4_changed(struct notifier_block *nb,
 int wlan_hdd_ipv6_changed(struct notifier_block *nb,
 				unsigned long data, void *arg);
 
-int hdd_set_qpower_config(hdd_context_t *hddctx, hdd_adapter_t *adapter,
+int hdd_set_qpower_config(struct hdd_context *hddctx, struct hdd_adapter *adapter,
 			  uint8_t qpower);
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
@@ -310,7 +310,7 @@ void hdd_wlan_suspend_resume_event(uint8_t state) {}
  *
  * Return: 0 on success, non-zero on any error
  */
-int wlan_hdd_set_powersave(hdd_adapter_t *adapter,
+int wlan_hdd_set_powersave(struct hdd_adapter *adapter,
 			   bool allow_power_save, uint32_t timeout);
 
 /**
@@ -325,7 +325,7 @@ int wlan_hdd_set_powersave(hdd_adapter_t *adapter,
  *
  * Return: none
  */
-void wlan_hdd_inc_suspend_stats(hdd_context_t *hdd_ctx,
+void wlan_hdd_inc_suspend_stats(struct hdd_context *hdd_ctx,
 				enum suspend_fail_reason reason);
 
 /*

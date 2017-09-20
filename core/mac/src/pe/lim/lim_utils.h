@@ -104,6 +104,18 @@ void lim_print_sme_state(tpAniSirGlobal pMac, uint16_t logLevel,
 		tLimSmeStates state);
 void lim_print_msg_name(tpAniSirGlobal pMac, uint16_t logLevel, uint32_t msgType);
 
+/**
+ * lim_send_open_system_auth() - api to send open system auth frame
+ * @ctx: Pointer to global mac structure
+ * @session_id: session id
+ *
+ * This function is used to send open system auth when
+ * shared auth fails with reason-algo not supported
+ *
+ * Return: None
+ */
+void lim_send_open_system_auth(void *ctx, uint32_t param);
+
 extern tSirRetStatus lim_send_set_max_tx_power_req(tpAniSirGlobal pMac,
 		int8_t txPower,
 		tpPESession pSessionEntry);
@@ -131,6 +143,15 @@ void lim_update_short_preamble(tpAniSirGlobal pMac, tSirMacAddr peerMacAddr,
 void lim_update_short_slot_time(tpAniSirGlobal pMac, tSirMacAddr peerMacAddr,
 		tpUpdateBeaconParams pBeaconParams,
 		tpPESession psessionEntry);
+/*
+ * lim_deactivate_timers() - Function to deactivate lim timers
+ * @mac_ctx: Pointer to global mac structure
+ *
+ *	This function is used to deactivate lim timers
+ *
+ * Return: None
+ */
+void lim_deactivate_timers(tpAniSirGlobal mac_ctx);
 
 /*
  * The below 'product' check tobe removed if 'Association' is
@@ -247,7 +268,7 @@ void lim_update_sta_run_time_ht_info(struct sAniSirGlobal *pMac,
 void lim_cancel_dot11h_channel_switch(tpAniSirGlobal pMac,
 		tpPESession psessionEntry);
 void lim_cancel_dot11h_quiet(tpAniSirGlobal pMac, tpPESession psessionEntry);
-tAniBool lim_is_channel_valid_for_channel_switch(tpAniSirGlobal pMac,
+bool lim_is_channel_valid_for_channel_switch(tpAniSirGlobal pMac,
 		uint8_t channel);
 void lim_frame_transmission_control(tpAniSirGlobal pMac, tLimQuietTxMode type,
 		tLimControlTx mode);
@@ -270,7 +291,7 @@ void lim_switch_channel_cback(tpAniSirGlobal pMac, QDF_STATUS status,
  *
  * Return: session pointer if exists, NULL otherwise.
  */
-tCsrRoamSession *lim_get_session_by_macaddr(tpAniSirGlobal mac_ctx,
+struct csr_roam_session *lim_get_session_by_macaddr(tpAniSirGlobal mac_ctx,
 		tSirMacAddr self_mac);
 
 static inline tSirRFBand lim_get_rf_band(uint8_t channel)
@@ -416,6 +437,19 @@ tSirRetStatus lim_post_sm_state_update(tpAniSirGlobal pMac,
 void lim_delete_sta_context(tpAniSirGlobal pMac, struct scheduler_msg *limMsg);
 void lim_delete_dialogue_token_list(tpAniSirGlobal pMac);
 void lim_resset_scan_channel_info(tpAniSirGlobal pMac);
+
+/**
+ * lim_add_channel_status_info() - store
+ * chan status info into Global MAC structure
+ * @p_mac: Pointer to Global MAC structure
+ * @channel_stat: Pointer to chan status info reported by firmware
+ * @channel_id: current channel id
+ *
+ * Return: None
+ */
+void lim_add_channel_status_info(tpAniSirGlobal p_mac,
+				 struct lim_channel_status *channel_stat,
+				 uint8_t channel_id);
 uint8_t lim_get_channel_from_beacon(tpAniSirGlobal pMac,
 		tpSchBeaconStruct pBeacon);
 tSirNwType lim_get_nw_type(tpAniSirGlobal pMac, uint8_t channelNum,
@@ -487,7 +521,21 @@ bool lim_check_membership_user_position(tpAniSirGlobal pMac,
 		uint32_t membership, uint32_t userPosition,
 		uint8_t staId);
 
-#ifdef FEATURE_WLAN_DIAG_SUPPORT
+/**
+ * enum ack_status - Indicate TX status of ASSOC/AUTH
+ * @ACKED : Ack is received.
+ * @NOT_ACKED : No Ack received.
+ * @SENT_FAIL : Failure while sending.
+ *
+ * Indicate if driver is waiting for ACK status of assoc/auth or ACK received
+ * for ASSOC/AUTH OR NO ACK is received for the assoc/auth sent or assoc/auth
+ * sent failed.
+ */
+enum assoc_ack_status {
+	ACKED,
+	NOT_ACKED,
+	SENT_FAIL,
+};
 
 typedef enum {
 	WLAN_PE_DIAG_SCAN_REQ_EVENT = 0,
@@ -568,11 +616,18 @@ typedef enum {
 	WLAN_PE_DIAG_AUTH_TIMEOUT,
 	WLAN_PE_DIAG_DEAUTH_FRAME_EVENT,
 	WLAN_PE_DIAG_DISASSOC_FRAME_EVENT,
+	WLAN_PE_DIAG_AUTH_ACK_EVENT,
+	WLAN_PE_DIAG_ASSOC_ACK_EVENT,
 } WLAN_PE_DIAG_EVENT_TYPE;
 
+#ifdef FEATURE_WLAN_DIAG_SUPPORT
 void lim_diag_event_report(tpAniSirGlobal pMac, uint16_t eventType,
 		tpPESession pSessionEntry, uint16_t status,
 		uint16_t reasonCode);
+#else
+static inline void lim_diag_event_report(tpAniSirGlobal pMac, uint16_t
+		eventType, tpPESession pSessionEntry, uint16_t status,
+		uint16_t reasonCode) {}
 #endif /* FEATURE_WLAN_DIAG_SUPPORT */
 
 void pe_set_resume_channel(tpAniSirGlobal pMac, uint16_t channel,
@@ -654,7 +709,25 @@ void lim_update_obss_scanparams(tpPESession session,
 void lim_init_obss_params(tpAniSirGlobal mac_ctx, tpPESession session);
 #ifdef WLAN_FEATURE_HOST_ROAM
 uint32_t lim_create_timers_host_roam(tpAniSirGlobal mac_ctx);
+/**
+ * lim_delete_timers_host_roam() - Delete timers used in host based roaming
+ * @mac_ctx: Global MAC context
+ *
+ * Delete reassoc and preauth timers
+ *
+ * Return: none
+ */
 void lim_delete_timers_host_roam(tpAniSirGlobal mac_ctx);
+/**
+ * lim_deactivate_timers_host_roam() - deactivate timers used in host based
+ * roaming
+ * @mac_ctx: Global MAC context
+ *
+ * Delete reassoc and preauth timers
+ *
+ * Return: none
+ */
+void lim_deactivate_timers_host_roam(tpAniSirGlobal mac_ctx);
 void lim_deactivate_and_change_timer_host_roam(tpAniSirGlobal mac_ctx,
 		uint32_t timer_id);
 #else
@@ -664,6 +737,7 @@ static inline uint32_t lim_create_timers_host_roam(tpAniSirGlobal mac_ctx)
 }
 static inline void lim_delete_timers_host_roam(tpAniSirGlobal mac_ctx)
 {}
+static inline void lim_deactivate_timers_host_roam(tpAniSirGlobal mac_ctx) {}
 static inline void lim_deactivate_and_change_timer_host_roam(
 		tpAniSirGlobal mac_ctx, uint32_t timer_id)
 {}
@@ -1079,6 +1153,24 @@ static inline QDF_STATUS lim_populate_he_mcs_set(tpAniSirGlobal mac_ctx,
 #endif
 
 /**
+ * lim_assoc_rej_add_to_rssi_based_reject_list() - Add BSSID to the rssi based
+ * rejection list
+ * @mac_ctx: mac ctx
+ * @rssi_assoc_rej: rssi assoc reject attribute
+ * @bssid : BSSID of the AP
+ * @rssi : RSSI of the assoc resp
+ *
+ * Add BSSID to the rssi based rejection list. Also if number
+ * of entries is greater than MAX_RSSI_AVOID_BSSID_LIST
+ * remove the entry with lowest time delta
+ *
+ * Return: void
+ */
+void lim_assoc_rej_add_to_rssi_based_reject_list(tpAniSirGlobal mac_ctx,
+	tDot11fTLVrssi_assoc_rej  *rssi_assoc_rej,
+	tSirMacAddr bssid, int8_t rssi);
+
+/**
  * lim_decrement_pending_mgmt_count: Decrement mgmt frame count
  * @mac_ctx: Pointer to global MAC structure
  *
@@ -1088,4 +1180,19 @@ static inline QDF_STATUS lim_populate_he_mcs_set(tpAniSirGlobal mac_ctx,
  * Return: None
  */
 void lim_decrement_pending_mgmt_count(tpAniSirGlobal mac_ctx);
+
+/**
+ * lim_check_if_vendor_oui_match() - Check if the given OUI match in IE buffer
+ * @mac_ctx: MAC context
+ * @ie: IE buffer
+ * @ie_len: length of @ie
+ *
+ * This API is used to check if given vendor OUI
+ * matches in given IE buffer
+ *
+ * Return: True, if mataches. False otherwise
+ */
+bool lim_check_if_vendor_oui_match(tpAniSirGlobal mac_ctx,
+					uint8_t *oui, uint8_t oui_len,
+			       uint8_t *ie, uint8_t ie_len);
 #endif /* __LIM_UTILS_H */

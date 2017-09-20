@@ -47,6 +47,7 @@
 #endif
 #include "wma_if.h"
 #include "wlan_reg_services_api.h"
+#include "lim_process_fils.h"
 
 static void lim_process_mlm_start_req(tpAniSirGlobal, uint32_t *);
 static void lim_process_mlm_join_req(tpAniSirGlobal, uint32_t *);
@@ -409,6 +410,9 @@ static void mlm_add_sta(tpAniSirGlobal mac_ctx, tpAddStaParams sta_param,
 		sta_param->maxAmsduSize =
 			lim_get_ht_capability(mac_ctx, eHT_MAX_AMSDU_LENGTH,
 					      session_entry);
+		sta_param->max_amsdu_num =
+			lim_get_ht_capability(mac_ctx, eHT_MAX_AMSDU_NUM,
+					      session_entry);
 		sta_param->fDsssCckMode40Mhz =
 			lim_get_ht_capability(mac_ctx, eHT_DSSS_CCK_MODE_40MHZ,
 					      session_entry);
@@ -486,7 +490,7 @@ lim_mlm_add_bss(tpAniSirGlobal mac_ctx,
 	if (NULL == addbss_param) {
 		pe_err("Unable to allocate memory during ADD_BSS");
 		/* Respond to SME with LIM_MLM_START_CNF */
-		return eSIR_MEM_ALLOC_FAILED;
+		return eSIR_SME_RESOURCES_UNAVAILABLE;
 	}
 
 	/* Fill in tAddBssParams members */
@@ -1117,7 +1121,7 @@ static void lim_process_mlm_auth_req(tpAniSirGlobal mac_ctx, uint32_t *msg)
 	mac_ctx->auth_ack_status = LIM_AUTH_ACK_NOT_RCD;
 	lim_send_auth_mgmt_frame(mac_ctx,
 		&auth_frame_body, mac_ctx->lim.gpLimMlmAuthReq->peerMacAddr,
-		LIM_NO_WEP_IN_FC, session, true);
+		LIM_NO_WEP_IN_FC, session);
 
 	/* assign appropriate session_id to the timer object */
 	mac_ctx->lim.limTimers.gLimAuthFailureTimer.sessionId = session_id;
@@ -1986,6 +1990,8 @@ lim_process_mlm_set_keys_req(tpAniSirGlobal mac_ctx, uint32_t *msg_buf)
 		 */
 		switch (mlm_set_keys_req->edType) {
 		case eSIR_ED_CCMP:
+		case eSIR_ED_GCMP:
+		case eSIR_ED_GCMP_256:
 #ifdef WLAN_FEATURE_11W
 		case eSIR_ED_AES_128_CMAC:
 #endif
@@ -2291,10 +2297,11 @@ static void lim_process_auth_retry_timer(tpAniSirGlobal mac_ctx)
 			auth_frame.authStatusCode = 0;
 			pe_warn("Retry Auth");
 			mac_ctx->auth_ack_status = LIM_AUTH_ACK_NOT_RCD;
+			lim_increase_fils_sequence_number(session_entry);
 			lim_send_auth_mgmt_frame(mac_ctx,
 				&auth_frame,
 				mac_ctx->lim.gpLimMlmAuthReq->peerMacAddr,
-				LIM_NO_WEP_IN_FC, session_entry, true);
+				LIM_NO_WEP_IN_FC, session_entry);
 		}
 
 		lim_deactivate_and_change_timer(mac_ctx, eLIM_AUTH_RETRY_TIMER);

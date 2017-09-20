@@ -173,9 +173,6 @@ enum eWniMsgTypes {
 	eWNI_SME_TSM_IE_IND,
 
 	eWNI_SME_READY_TO_SUSPEND_IND,
-#ifdef FEATURE_WLAN_CH_AVOID
-	eWNI_SME_CH_AVOID_IND,
-#endif /* FEATURE_WLAN_CH_AVOID */
 	/* DFS EVENTS */
 	eWNI_SME_DFS_RADAR_FOUND,       /* RADAR found indication from DFS */
 	eWNI_SME_CHANNEL_CHANGE_REQ,    /* Channel Change Request from SAP */
@@ -185,6 +182,8 @@ enum eWniMsgTypes {
 	eWNI_SME_DFS_CSAIE_TX_COMPLETE_IND,     /* To indicate completion of CSA IE */
 	/* update in beacons/probe rsp */
 	eWNI_SME_STATS_EXT_EVENT,
+	eWNI_SME_GET_PEER_INFO_IND,
+	eWNI_SME_GET_PEER_INFO_EXT_IND,
 	eWNI_SME_CSA_OFFLOAD_EVENT,
 	eWNI_SME_UPDATE_ADDITIONAL_IES, /* indicates Additional IE from hdd to PE */
 	eWNI_SME_MODIFY_ADDITIONAL_IES, /* To indicate IE modify from hdd to PE */
@@ -259,6 +258,7 @@ enum eWniMsgTypes {
 	eWMI_SME_LL_STATS_IND,
 	eWNI_SME_DFS_CAC_COMPLETE,
 	eWNI_SME_UPDATE_CONFIG,
+	eWNI_SME_BT_ACTIVITY_INFO_IND,
 	eWNI_SME_MSG_TYPES_END
 };
 

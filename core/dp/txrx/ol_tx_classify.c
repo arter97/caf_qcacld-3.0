@@ -357,7 +357,7 @@ struct ol_txrx_peer_t *ol_tx_tdls_peer_find(struct ol_txrx_pdev_t *pdev,
 			peer = NULL;
 		} else {
 			if (peer)
-				qdf_atomic_inc(&peer->ref_cnt);
+				OL_TXRX_PEER_INC_REF_CNT(peer);
 		}
 	}
 	if (!peer)
@@ -397,6 +397,12 @@ ol_tx_classify(
 
 	TX_SCHED_DEBUG_PRINT("Enter %s\n", __func__);
 	dest_addr = ol_tx_dest_addr_find(pdev, tx_nbuf);
+	if (unlikely(NULL == dest_addr)) {
+		QDF_TRACE(QDF_MODULE_ID_TXRX,
+				QDF_TRACE_LEVEL_ERROR,
+				"Error: dest_addr is NULL.\n");
+		return NULL; /*error*/
+	}
 	if ((IEEE80211_IS_MULTICAST(dest_addr)) ||
 	    (vdev->opmode == wlan_op_mode_ocb)) {
 		txq = &vdev->txqs[OL_TX_VDEV_MCAST_BCAST];
@@ -458,7 +464,7 @@ ol_tx_classify(
 			 * classify_extension function can check whether to
 			 * encrypt multicast / broadcast frames.
 			 */
-			peer = ol_txrx_peer_find_hash_find(pdev,
+			peer = ol_txrx_peer_find_hash_find_inc_ref(pdev,
 							vdev->mac_addr.raw,
 							0, 1);
 			if (!peer) {
@@ -517,8 +523,9 @@ ol_tx_classify(
 			 */
 			peer = ol_tx_tdls_peer_find(pdev, vdev, &peer_id);
 		} else {
-			peer = ol_txrx_peer_find_hash_find(pdev, dest_addr,
-									0, 1);
+			peer = ol_txrx_peer_find_hash_find_inc_ref(pdev,
+								dest_addr,
+								0, 1);
 		}
 		tx_msdu_info->htt.info.is_unicast = true;
 		if (!peer) {
@@ -576,7 +583,7 @@ ol_tx_classify(
 					   "%s: remove the peer for invalid peer_id %p\n",
 					   __func__, peer);
 				/* remove the peer reference added above */
-				ol_txrx_peer_unref_delete(peer);
+				OL_TXRX_PEER_UNREF_DELETE(peer);
 				tx_msdu_info->peer = NULL;
 			}
 			return NULL;
@@ -599,7 +606,7 @@ ol_tx_classify(
 			   "%s: remove the peer reference %p\n",
 			   __func__, peer);
 		/* remove the peer reference added above */
-		ol_txrx_peer_unref_delete(tx_msdu_info->peer);
+		OL_TXRX_PEER_UNREF_DELETE(tx_msdu_info->peer);
 		/* Making peer NULL in case if multicast non STA mode */
 		tx_msdu_info->peer = NULL;
 	}
@@ -629,6 +636,12 @@ ol_tx_classify_mgmt(
 
 	TX_SCHED_DEBUG_PRINT("Enter %s\n", __func__);
 	dest_addr = ol_tx_dest_addr_find(pdev, tx_nbuf);
+	if (unlikely(NULL == dest_addr)) {
+		QDF_TRACE(QDF_MODULE_ID_TXRX,
+				QDF_TRACE_LEVEL_ERROR,
+				"Error: dest_addr is NULL.\n");
+		return NULL; /*error*/
+	}
 	if (IEEE80211_IS_MULTICAST(dest_addr)) {
 		/*
 		 * AP:  beacons are broadcast,
@@ -676,18 +689,15 @@ ol_tx_classify_mgmt(
 				if (ol_txrx_peer_find_mac_addr_cmp(
 							mac_addr,
 							&peer->mac_addr) != 0) {
-					rcnt = ol_txrx_peer_unref_delete(peer);
-					QDF_TRACE(QDF_MODULE_ID_TXRX,
-						 QDF_TRACE_LEVEL_INFO_HIGH,
-						 "%s: peer %p peer->ref_cnt %d",
-						 __func__, peer, rcnt);
+					rcnt = OL_TXRX_PEER_UNREF_DELETE(peer);
 					peer = NULL;
 				}
 			}
 		} else {
 			/* find the peer and increment its reference count */
-			peer = ol_txrx_peer_find_hash_find(pdev, dest_addr,
-							   0, 1);
+			peer = ol_txrx_peer_find_hash_find_inc_ref(pdev,
+								dest_addr,
+								0, 1);
 		}
 		tx_msdu_info->peer = peer;
 		if (!peer) {

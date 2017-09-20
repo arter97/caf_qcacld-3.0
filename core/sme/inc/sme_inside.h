@@ -75,7 +75,7 @@ typedef struct sGenericPmcCmd {
 } tGenericPmcCmd;
 
 typedef struct sGenericQosCmd {
-	sme_QosWmmTspecInfo tspecInfo;
+	struct sme_qos_wmmtspecinfo tspecInfo;
 	sme_QosEdcaAcType ac;
 	uint8_t tspec_mask;
 } tGenericQosCmd;
@@ -171,15 +171,15 @@ typedef struct tagSmeCmd {
 	eSmeCommandType command;
 	uint32_t sessionId;
 	union {
-		tScanCmd scanCmd;
-		tRoamCmd roamCmd;
-		tWmStatusChangeCmd wmStatusChangeCmd;
+		struct scan_cmd scanCmd;
+		struct roam_cmd roamCmd;
+		struct wmstatus_changecmd wmStatusChangeCmd;
 		tGenericPmcCmd pmcCmd;
 		tGenericQosCmd qosCmd;
 		tRemainChlCmd remainChlCmd;
 		tNoACmd NoACmd;
-		tAddStaForSessionCmd addStaSessionCmd;
-		tDelStaForSessionCmd delStaSessionCmd;
+		struct addstafor_sessioncmd addStaSessionCmd;
+		struct delstafor_sessionCmd delStaSessionCmd;
 #ifdef FEATURE_WLAN_TDLS
 		tTdlsCmd tdlsCmd;
 #endif
@@ -232,11 +232,10 @@ void csr_roam_process_wm_status_change_command(tpAniSirGlobal pMac,
 void csr_reinit_roam_cmd(tpAniSirGlobal pMac, tSmeCmd *pCommand);
 void csr_reinit_wm_status_change_cmd(tpAniSirGlobal pMac, tSmeCmd *pCommand);
 QDF_STATUS csr_roam_send_set_key_cmd(tpAniSirGlobal mac_ctx,
-		uint32_t session_id, tSetKeyCmd *set_key_cmd);
+		uint32_t session_id, struct setkey_cmd *set_key_cmd);
 void csr_cancel_command(tpAniSirGlobal mac_ctx, tSmeCmd *sme_cmd);
 
 QDF_STATUS csr_is_valid_channel(tpAniSirGlobal pMac, uint8_t chnNum);
-bool csr_roam_is_valid40_mhz_channel(tpAniSirGlobal pmac, uint8_t channel);
 
 QDF_STATUS sme_acquire_global_lock(tSmeStruct *psSme);
 QDF_STATUS sme_release_global_lock(tSmeStruct *psSme);
@@ -285,8 +284,4 @@ void csr_process_set_dual_mac_config(tpAniSirGlobal mac, tSmeCmd *command);
 void csr_process_set_antenna_mode(tpAniSirGlobal mac, tSmeCmd *command);
 void csr_process_set_hw_mode(tpAniSirGlobal mac, tSmeCmd *command);
 void csr_process_nss_update_req(tpAniSirGlobal mac, tSmeCmd *command);
-
-QDF_STATUS sme_check_ch_in_band(tpAniSirGlobal mac_ctx, uint8_t start_ch,
-				uint8_t ch_cnt);
-
 #endif /* #if !defined( __SMEINSIDE_H ) */

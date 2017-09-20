@@ -39,9 +39,16 @@
  * only for forwarding path.
  */
 #define OL_TX_NON_FWD_RESERVE	100
+#define OL_TXRX_PEER_UNREF_DELETE(peer) \
+	ol_txrx_peer_unref_delete(peer, __func__, __LINE__);
 
-int ol_txrx_peer_unref_delete(struct ol_txrx_peer_t *peer);
+int ol_txrx_peer_unref_delete(ol_txrx_peer_handle peer,
+					      const char *fname,
+					      int line);
 
+ol_txrx_peer_handle ol_txrx_find_peer_by_addr_inc_ref(ol_txrx_pdev_handle pdev,
+						uint8_t *peer_addr,
+						uint8_t *peer_id);
 /**
  * ol_tx_desc_pool_size_hl() - allocate tx descriptor pool size for HL systems
  * @ctrl_pdev: the control pdev handle
@@ -123,6 +130,7 @@ void *ol_txrx_find_peer_by_addr(struct cdp_pdev *pdev,
 				uint8_t *peer_id);
 
 void htt_pkt_log_init(struct cdp_pdev *pdev_handle, void *scn);
+void peer_unmap_timer_work_function(void *);
 void peer_unmap_timer_handler(void *data);
 
 #endif /* _OL_TXRX__H_ */

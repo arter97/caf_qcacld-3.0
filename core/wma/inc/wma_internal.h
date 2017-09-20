@@ -62,7 +62,7 @@
  * similar to the mentioned the WMA
  */
 #define WMA_TGT_NOISE_FLOOR_DBM (-96)
-#define WMA_TGT_RSSI_INVALID      96
+#define WMA_TGT_MAX_SNR         (WMA_TGT_NOISE_FLOOR_DBM * (-1))
 
 /*
  * Make sure that link monitor and keep alive
@@ -152,8 +152,42 @@ int
 wmi_unified_pdev_set_param(wmi_unified_t wmi_handle, WMI_PDEV_PARAM param_id,
 			   uint32_t param_value);
 
+/**
+ * wma_send_msg_by_priority() - Send wma message to PE with priority.
+ * @wma_handle: wma handle
+ * @msg_type: message type
+ * @body_ptr: message body ptr
+ * @body_val: message body value
+ * @is_high_priority: if msg is high priority
+ *
+ * Return: none
+ */
+void wma_send_msg_by_priority(tp_wma_handle wma_handle, uint16_t msg_type,
+		void *body_ptr, uint32_t body_val, bool is_high_priority);
+
+/**
+ * wma_send_msg() - Send wma message to PE.
+ * @wma_handle: wma handle
+ * @msg_type: message type
+ * @body_ptr: message body ptr
+ * @body_val: message body value
+ *
+ * Return: none
+ */
 void wma_send_msg(tp_wma_handle wma_handle, uint16_t msg_type,
 			 void *body_ptr, uint32_t body_val);
+
+/**
+ * wma_send_msg_high_priority() - Send wma message to PE with high priority.
+ * @wma_handle: wma handle
+ * @msg_type: message type
+ * @body_ptr: message body ptr
+ * @body_val: message body value
+ *
+ * Return: none
+ */
+void wma_send_msg_high_priority(tp_wma_handle wma_handle, uint16_t msg_type,
+			void *body_ptr, uint32_t body_val);
 
 void wma_data_tx_ack_comp_hdlr(void *wma_context,
 				      qdf_nbuf_t netbuf, int32_t status);
@@ -216,6 +250,19 @@ QDF_STATUS wma_roam_scan_offload_mode(tp_wma_handle wma_handle,
 				      scan_cmd_fp,
 				      tSirRoamOffloadScanReq *roam_req,
 				      uint32_t mode, uint32_t vdev_id);
+
+/**
+ * wma_roam_scan_mawc_params() - send roam scan mode request to fw
+ * @wma_handle: wma handle
+ * @roam_req: roam request param
+ *
+ * Fill the MAWC roaming parameters and send
+ * WMI_ROAM_CONFIGURE_MAWC_CMDID TLV to firmware.
+ *
+ * Return: QDF status
+ */
+QDF_STATUS wma_roam_scan_mawc_params(tp_wma_handle wma_handle,
+		tSirRoamOffloadScanReq *roam_req);
 
 QDF_STATUS wma_roam_scan_offload_rssi_thresh(tp_wma_handle wma_handle,
 					     tSirRoamOffloadScanReq *roam_req);
@@ -662,7 +709,7 @@ QDF_STATUS wma_set_ap_peer_uapsd(tp_wma_handle wma, uint32_t vdev_id,
 				     uint8_t max_sp);
 
 void wma_update_edca_params_for_ac(tSirMacEdcaParamRecord *edca_param,
-					  wmi_wmm_vparams *wmm_param, int ac);
+					  struct wmi_host_wme_vparams *wmm_param, int ac);
 
 void wma_set_tx_power(WMA_HANDLE handle,
 			     tMaxTxPowerParams *tx_pwr_params);
@@ -721,7 +768,14 @@ void wma_set_bss_rate_flags(struct wma_txrx_node *iface,
 
 int32_t wmi_unified_send_txbf(tp_wma_handle wma, tpAddStaParams params);
 
-void wma_update_txrx_chainmask(int num_rf_chains, int *cmd_value);
+/**
+ * wma_check_txrx_chainmask() - check txrx chainmask
+ * @num_rf_chains: number of rf chains
+ * @cmd_value: command value
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS wma_check_txrx_chainmask(int num_rf_chains, int cmd_value);
 
 int wma_peer_state_change_event_handler(void *handle,
 					       uint8_t *event_buff,
@@ -889,6 +943,34 @@ void wma_process_link_status_req(tp_wma_handle wma,
 QDF_STATUS wma_process_dhcp_ind(tp_wma_handle wma_handle,
 				tAniDHCPInd *ta_dhcp_ind);
 
+QDF_STATUS wma_get_peer_info(WMA_HANDLE handle,
+				struct sir_peer_info_req *peer_info_req);
+
+/**
+ * wma_get_peer_info_ext() - get peer info
+ * @handle: wma interface
+ * @peer_info_req: get peer info request information
+ *
+ * This function will send WMI_REQUEST_PEER_STATS_INFO_CMDID to FW
+ *
+ * Return: 0 on success, otherwise error value
+ */
+QDF_STATUS wma_get_peer_info_ext(WMA_HANDLE handle,
+				struct sir_peer_info_ext_req *peer_info_req);
+
+/**
+ * wma_peer_info_event_handler() - Handler for WMI_PEER_STATS_INFO_EVENTID
+ * @handle: WMA global handle
+ * @cmd_param_info: Command event data
+ * @len: Length of cmd_param_info
+ *
+ * This function will handle WMI_PEER_STATS_INFO_EVENTID
+ *
+ * Return: 0 on success, error code otherwise
+ */
+int wma_peer_info_event_handler(void *handle, u_int8_t *cmd_param_info,
+				   u_int32_t len);
+
 int wma_profile_data_report_event_handler(void *handle, uint8_t *event_buf,
 				       uint32_t len);
 
@@ -1050,15 +1132,10 @@ QDF_STATUS wma_set_led_flashing(tp_wma_handle wma_handle,
 				tSirLedFlashingReq *flashing);
 #endif
 
-#ifdef FEATURE_WLAN_CH_AVOID
-int wma_channel_avoid_evt_handler(void *handle, uint8_t *event,
-					 uint32_t len);
 
 QDF_STATUS wma_process_ch_avoid_update_req(tp_wma_handle wma_handle,
 					   tSirChAvoidUpdateReq *
 					   ch_avoid_update_req);
-#endif
-
 
 #ifdef FEATURE_WLAN_TDLS
 
@@ -1165,32 +1242,34 @@ static inline void wma_sta_kickout_event(uint32_t kickout_reason,
 #endif /* FEATURE_WLAN_DIAG_SUPPORT */
 
 /**
- * wma_acquire_wmi_resp_wakelock() - acquire the WMI response wakelock
- * @wma: the WMA handle containing the wakelock to acquire
+ * wma_acquire_wakelock() - acquire the given wakelock
+ * @wl: the wakelock to acquire
  * @msec: the wakelock duration in milliseconds
  *
- * Return: void
+ * This also acquires the wma runtime pm lock.
+ *
+ * Return: None
  */
-void wma_acquire_wmi_resp_wakelock(t_wma_handle *wma, uint32_t msec);
+void wma_acquire_wakelock(qdf_wake_lock_t *wl, uint32_t msec);
 
 /**
- * wma_release_wmi_resp_wakelock() - release the WMI response wakelock
- * @wma: the WMA handle containing the wakelock to release
+ * wma_release_wakelock() - release the given wakelock
+ * @wl: the wakelock to release
  *
- * Return: void
+ * This also releases the wma runtime pm lock.
+ *
+ * Return: None
  */
-void wma_release_wmi_resp_wakelock(t_wma_handle *wma);
+void wma_release_wakelock(qdf_wake_lock_t *wl);
 
 /**
  * wma_send_vdev_start_to_fw() - send the vdev start command to firmware
- * @wma: the WMA handle containing a reference to the wmi_handle to use
- * @params: the VDEV_START params to send to firmware
+ * @wma: a reference to the global WMA handle
+ * @params: the vdev start params to send to firmware
  *
- * This is a helper function that acquires the WMI response wakelock before
- * sending down the VDEV_START command to firmware. This wakelock is
- * automatically released on failure. Consumers should call
- * wma_release_wmi_resp_wakelock() upon receipt of the VDEV_START response from
- * firmware, to avoid power penalties.
+ * Consumers should call wma_release_wakelock() upon receipt of the vdev start
+ * response from firmware to avoid power penalties. Alternatively, calling the
+ * matching vdev_up or vdev_down APIs will also release this lock.
  *
  * Return: QDF_STATUS
  */
@@ -1199,18 +1278,40 @@ wma_send_vdev_start_to_fw(t_wma_handle *wma, struct vdev_start_params *params);
 
 /**
  * wma_send_vdev_stop_to_fw() - send the vdev stop command to firmware
- * @wma: the WMA handle containing a reference to the wmi_handle to use
- * @vdev_id: the VDEV Id of the VDEV to stop
+ * @wma: a reference to the global WMA handle
+ * @vdev_id: the Id of the vdev to stop
  *
- * This is a helper function that acquires the WMI response wakelock before
- * sending down the VDEV_STOP command to firmware. This wakelock is
- * automatically released on failure. Consumers should call
- * wma_release_wmi_resp_wakelock() upon receipt of the VDEV_STOP response from
- * firmware, to avoid power penalties.
+ * Consumers should call wma_release_wakelock() upon receipt of the vdev stop
+ * response from firmware to avoid power penalties.
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS wma_send_vdev_stop_to_fw(t_wma_handle *wma, uint8_t vdev_id);
+
+/**
+ * wma_send_vdev_up_to_fw() - send the vdev up command to firmware
+ * @wma: a reference to the global WMA handle
+ * @params: the vdev up params to send to firmware
+ * @bssid: the BssId to send to firmware
+ *
+ * This also releases the vdev start wakelock.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wma_send_vdev_up_to_fw(t_wma_handle *wma,
+				  struct vdev_up_params *params,
+				  uint8_t bssid[IEEE80211_ADDR_LEN]);
+
+/**
+ * wma_send_vdev_down_to_fw() - send the vdev down command to firmware
+ * @wma: a reference to the global WMA handle
+ * @vdev_id: the Id of the vdev to down
+ *
+ * This also releases the vdev start wakelock.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wma_send_vdev_down_to_fw(t_wma_handle *wma, uint8_t vdev_id);
 
 /*
  * wma_rx_aggr_failure_event_handler - event handler to handle rx aggr failure
@@ -1225,5 +1326,33 @@ QDF_STATUS wma_send_vdev_stop_to_fw(t_wma_handle *wma, uint8_t vdev_id);
  */
 int wma_rx_aggr_failure_event_handler(void *handle, u_int8_t *event_buf,
 							u_int32_t len);
+
+/**
+ * wma_wlan_bt_activity_evt_handler - event handler to handle bt activity
+ * @handle: the WMA handle
+ * @event: buffer with the event parameters
+ * @len: length of the buffer
+ *
+ * This function receives BT activity event from firmware and passes the event
+ * information to upper layers
+ *
+ * Return: 0 on success
+ */
+int wma_wlan_bt_activity_evt_handler(void *handle, uint8_t *event,
+				     uint32_t len);
+
+/**
+ * wma_peer_ant_info_evt_handler - event handler to handle antenna info
+ * @handle: the wma handle
+ * @event: buffer with event
+ * @len: buffer length
+ *
+ * This function receives antenna info from firmware and passes the event
+ * to upper layer
+ *
+ * Return: 0 on success
+ */
+int wma_peer_ant_info_evt_handler(void *handle, u_int8_t *event,
+	u_int32_t len);
 
 #endif

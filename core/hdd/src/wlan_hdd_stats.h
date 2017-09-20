@@ -57,13 +57,13 @@ struct index_vht_data_rate_type {
 };
 
 /**
- * enum - eDataRate11ACMaxMcs
+ * enum - data_rate_11ac_max_mcs
  * @DATA_RATE_11AC_MAX_MCS_7: MCS7 rate
  * @DATA_RATE_11AC_MAX_MCS_8: MCS8 rate
  * @DATA_RATE_11AC_MAX_MCS_9: MCS9 rate
  * @DATA_RATE_11AC_MAX_MCS_NA:i Not applicable
  */
-enum eDataRate11ACMaxMcs {
+enum data_rate_11ac_max_mcs {
 	DATA_RATE_11AC_MAX_MCS_7,
 	DATA_RATE_11AC_MAX_MCS_8,
 	DATA_RATE_11AC_MAX_MCS_9,
@@ -175,7 +175,7 @@ int wlan_hdd_cfg80211_ll_stats_ext_set_param(struct wiphy *wiphy,
  *
  * Return: bool
  */
-bool hdd_get_interface_info(hdd_adapter_t *adapter,
+bool hdd_get_interface_info(struct hdd_adapter *adapter,
 			    tpSirWifiInterfaceInfo info);
 
 /**
@@ -186,7 +186,7 @@ bool hdd_get_interface_info(hdd_adapter_t *adapter,
  *
  * Return: 0 on success and error code otherwise
  */
-int wlan_hdd_ll_stats_get(hdd_adapter_t *adapter, uint32_t req_id,
+int wlan_hdd_ll_stats_get(struct hdd_adapter *adapter, uint32_t req_id,
 			  uint32_t req_mask);
 
 #else
@@ -226,8 +226,6 @@ int wlan_hdd_cfg80211_stats_ext_request(struct wiphy *wiphy,
 					const void *data,
 					int data_len);
 
-#else
-static inline void wlan_hdd_cfg80211_stats_ext_init(hdd_context_t *pHddCtx) {}
 #endif /* End of WLAN_FEATURE_STATS_EXT */
 
 /**

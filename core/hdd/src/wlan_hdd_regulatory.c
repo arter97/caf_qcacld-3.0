@@ -38,6 +38,7 @@
 #include "wlan_hdd_regulatory.h"
 #include <wlan_reg_ucfg_api.h>
 #include "cds_regdomain.h"
+#include "pld_common.h"
 
 #define REG_RULE_2412_2462    REG_RULE(2412-10, 2462+10, 40, 0, 20, 0)
 
@@ -181,7 +182,7 @@ static bool hdd_is_world_regdomain(uint32_t reg_domain)
  *
  * Return: void
  */
-static void hdd_update_regulatory_info(hdd_context_t *hdd_ctx)
+static void hdd_update_regulatory_info(struct hdd_context *hdd_ctx)
 {
 	uint32_t country_code;
 
@@ -208,16 +209,19 @@ void hdd_reset_global_reg_params(void)
 	init_by_reg_core = false;
 }
 
-static void reg_program_config_vars(hdd_context_t *hdd_ctx,
+static void reg_program_config_vars(struct hdd_context *hdd_ctx,
 				    struct reg_config_vars *config_vars)
 {
 	config_vars->enable_11d_support = hdd_ctx->config->Is11dSupportEnabled;
+	config_vars->scan_11d_interval = hdd_ctx->config->scan_11d_interval;
 	config_vars->userspace_ctry_priority =
 		hdd_ctx->config->fSupplicantCountryCodeHasPriority;
 	config_vars->dfs_enabled = hdd_ctx->config->enableDFSChnlScan;
 	config_vars->indoor_chan_enabled =
 		hdd_ctx->config->indoor_channel_support;
 	config_vars->band_capability = hdd_ctx->config->nBandCapability;
+	config_vars->restart_beaconing = hdd_ctx->config->
+		restart_beaconing_on_chan_avoid_event;
 }
 
 
@@ -230,7 +234,7 @@ static void reg_program_config_vars(hdd_context_t *hdd_ctx,
  * Return: void
  */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0)) || defined(WITH_BACKPORTS)
-static void hdd_regulatory_wiphy_init(hdd_context_t *hdd_ctx,
+static void hdd_regulatory_wiphy_init(struct hdd_context *hdd_ctx,
 				     struct regulatory *reg,
 				     struct wiphy *wiphy)
 {
@@ -259,9 +263,9 @@ static void hdd_regulatory_wiphy_init(hdd_context_t *hdd_ctx,
 	 * disable 2.4 Ghz channels that dont have 20 mhz bw
 	 */
 	for (chan_num = 0;
-	     chan_num < wiphy->bands[NL80211_BAND_2GHZ]->n_channels;
+	     chan_num < wiphy->bands[HDD_NL80211_BAND_2GHZ]->n_channels;
 	     chan_num++) {
-		chan = &(wiphy->bands[NL80211_BAND_2GHZ]->channels[chan_num]);
+		chan = &(wiphy->bands[HDD_NL80211_BAND_2GHZ]->channels[chan_num]);
 		if (chan->flags & IEEE80211_CHAN_NO_20MHZ)
 			chan->flags |= IEEE80211_CHAN_DISABLED;
 	}
@@ -275,7 +279,7 @@ static void hdd_regulatory_wiphy_init(hdd_context_t *hdd_ctx,
 
 }
 #else
-static void hdd_regulatory_wiphy_init(hdd_context_t *hdd_ctx,
+static void hdd_regulatory_wiphy_init(struct hdd_context *hdd_ctx,
 				     struct regulatory *reg,
 				     struct wiphy *wiphy)
 {
@@ -376,7 +380,7 @@ static void hdd_modify_wiphy(struct wiphy  *wiphy,
  *
  * Return: void
  */
-static void hdd_process_regulatory_data(hdd_context_t *hdd_ctx,
+static void hdd_process_regulatory_data(struct hdd_context *hdd_ctx,
 					struct wiphy *wiphy,
 					bool reset)
 {
@@ -387,9 +391,9 @@ static void hdd_process_regulatory_data(hdd_context_t *hdd_ctx,
 	struct regulatory_channel *cds_chan;
 	uint8_t band_capability;
 
-	band_capability = hdd_ctx->config->nBandCapability;
+	band_capability = hdd_ctx->curr_band;
 
-	for (band_num = 0; band_num < NUM_NL80211_BANDS; band_num++) {
+	for (band_num = 0; band_num < HDD_NUM_NL80211_BANDS; band_num++) {
 
 		if (wiphy->bands[band_num] == NULL)
 			continue;
@@ -486,14 +490,14 @@ static void hdd_process_regulatory_data(hdd_context_t *hdd_ctx,
  * Return: void
  */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0)) || defined(WITH_BACKPORTS)
-static void hdd_set_dfs_region(hdd_context_t *hdd_ctx,
+static void hdd_set_dfs_region(struct hdd_context *hdd_ctx,
 			       enum dfs_reg dfs_reg)
 {
-	wlan_reg_set_dfs_region(hdd_ctx->hdd_psoc, dfs_reg);
+	wlan_reg_set_dfs_region(hdd_ctx->hdd_pdev, dfs_reg);
 }
 #else
-static void hdd_set_dfs_region(hdd_context_t *hdd_ctx,
-				     enum dfs_region dfs_reg)
+static void hdd_set_dfs_region(struct hdd_context *hdd_ctx,
+			       enum dfs_region dfs_reg)
 {
 
 	/* remap the ctl code to dfs region code */
@@ -523,7 +527,7 @@ static void hdd_set_dfs_region(hdd_context_t *hdd_ctx,
  *
  * Return: int
  */
-static int hdd_regulatory_init_no_offload(hdd_context_t *hdd_ctx,
+static int hdd_regulatory_init_no_offload(struct hdd_context *hdd_ctx,
 					  struct wiphy *wiphy)
 {
 	int ret_val;
@@ -550,7 +554,7 @@ static int hdd_regulatory_init_no_offload(hdd_context_t *hdd_ctx,
 	cds_fill_and_send_ctl_to_fw(reg_info);
 
 	hdd_set_dfs_region(hdd_ctx, DFS_FCC_REG);
-	wlan_reg_get_dfs_region(hdd_ctx->hdd_psoc, &dfs_reg);
+	wlan_reg_get_dfs_region(hdd_ctx->hdd_pdev, &dfs_reg);
 
 	reg_program_config_vars(hdd_ctx, &config_vars);
 	ucfg_reg_set_config_vars(hdd_ctx->hdd_psoc, config_vars);
@@ -568,7 +572,7 @@ static int hdd_regulatory_init_no_offload(hdd_context_t *hdd_ctx,
  *
  * Return: void
  */
-void hdd_program_country_code(hdd_context_t *hdd_ctx)
+void hdd_program_country_code(struct hdd_context *hdd_ctx)
 {
 	struct wiphy *wiphy = hdd_ctx->wiphy;
 	uint8_t *country_alpha2 = hdd_ctx->reg.alpha2;
@@ -581,7 +585,7 @@ void hdd_program_country_code(hdd_context_t *hdd_ctx)
 	}
 }
 
-int hdd_reg_set_country(hdd_context_t *hdd_ctx, char *country_code)
+int hdd_reg_set_country(struct hdd_context *hdd_ctx, char *country_code)
 {
 	int err;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
@@ -636,7 +640,7 @@ static void hdd_restore_custom_reg_settings(struct wiphy *wiphy,
 	    (country_alpha2[1] == '0') &&
 	    (wiphy->flags & WIPHY_FLAG_CUSTOM_REGULATORY)) {
 
-		for (band = 0; band < NUM_NL80211_BANDS; band++) {
+		for (band = 0; band < HDD_NUM_NL80211_BANDS; band++) {
 			sband = wiphy->bands[band];
 			if (!sband)
 				continue;
@@ -680,7 +684,7 @@ static void hdd_restore_reg_flags(struct wiphy *wiphy, uint32_t flags)
 void hdd_reg_notifier(struct wiphy *wiphy,
 		      struct regulatory_request *request)
 {
-	hdd_context_t *hdd_ctx = wiphy_priv(wiphy);
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	bool reset = false;
 	enum dfs_reg dfs_reg;
 	struct reg_config_vars config_vars;
@@ -696,7 +700,8 @@ void hdd_reg_notifier(struct wiphy *wiphy,
 		return;
 	}
 
-	if (cds_is_driver_unloading() || cds_is_driver_recovering()) {
+	if (cds_is_driver_unloading() || cds_is_driver_recovering() ||
+	    cds_is_driver_in_bad_state()) {
 		hdd_err("%s: unloading or ssr in progress, ignore",
 			__func__);
 		return;
@@ -714,11 +719,11 @@ void hdd_reg_notifier(struct wiphy *wiphy,
 
 	if (('K' == request->alpha2[0]) &&
 	    ('R' == request->alpha2[1]))
-		request->dfs_region = DFS_KR_REG;
+		request->dfs_region = (enum nl80211_dfs_regions) DFS_KR_REG;
 
 	if (('C' == request->alpha2[0]) &&
 	    ('N' == request->alpha2[1]))
-		request->dfs_region = DFS_CN_REG;
+		request->dfs_region = (enum nl80211_dfs_regions) DFS_CN_REG;
 
 	/* first check if this callback is in response to the driver callback */
 
@@ -773,7 +778,7 @@ void hdd_reg_notifier(struct wiphy *wiphy,
 		cds_fill_and_send_ctl_to_fw(&hdd_ctx->reg);
 
 		hdd_set_dfs_region(hdd_ctx, request->dfs_region);
-		wlan_reg_get_dfs_region(hdd_ctx->hdd_psoc, &dfs_reg);
+		wlan_reg_get_dfs_region(hdd_ctx->hdd_pdev, &dfs_reg);
 
 		reg_program_config_vars(hdd_ctx, &config_vars);
 		ucfg_reg_set_config_vars(hdd_ctx->hdd_psoc, config_vars);
@@ -844,15 +849,106 @@ static void fill_wiphy_band_channels(struct wiphy *wiphy,
 	}
 }
 
+/**
+ * hdd_ch_avoid_ind() - Avoid notified channels from FW handler
+ * @adapter:	HDD adapter pointer
+ * @indParam:	Channel avoid notification parameter
+ *
+ * Avoid channel notification from FW handler.
+ * FW will send un-safe channel list to avoid over wrapping.
+ * hostapd should not use notified channel
+ *
+ * Return: None
+ */
+void hdd_ch_avoid_ind(struct hdd_context *hdd_ctxt,
+		struct unsafe_ch_list *unsafe_chan_list,
+		struct ch_avoid_ind_type *avoid_freq_list)
+{
+	uint16_t *local_unsafe_list;
+	uint16_t local_unsafe_list_count;
+
+	/* Basic sanity */
+	if (!hdd_ctxt) {
+		hdd_err("Invalid arguments");
+		return;
+	}
+
+	mutex_lock(&hdd_ctxt->avoid_freq_lock);
+	qdf_mem_copy(&hdd_ctxt->coex_avoid_freq_list, avoid_freq_list,
+			sizeof(struct ch_avoid_ind_type));
+	mutex_unlock(&hdd_ctxt->avoid_freq_lock);
+
+	if (hdd_clone_local_unsafe_chan(hdd_ctxt,
+					&local_unsafe_list,
+					&local_unsafe_list_count) != 0) {
+		hdd_err("failed to clone cur unsafe chan list");
+		return;
+	}
+
+	/* clear existing unsafe channel cache */
+	hdd_ctxt->unsafe_channel_count = 0;
+	qdf_mem_zero(hdd_ctxt->unsafe_channel_list,
+					sizeof(hdd_ctxt->unsafe_channel_list));
+
+	hdd_ctxt->unsafe_channel_count = unsafe_chan_list->ch_cnt;
+
+	qdf_mem_copy(hdd_ctxt->unsafe_channel_list, unsafe_chan_list->ch_list,
+					sizeof(hdd_ctxt->unsafe_channel_list));
+	hdd_debug("number of unsafe channels is %d ",
+	       hdd_ctxt->unsafe_channel_count);
+
+	if (pld_set_wlan_unsafe_channel(hdd_ctxt->parent_dev,
+					hdd_ctxt->unsafe_channel_list,
+				hdd_ctxt->unsafe_channel_count)) {
+		hdd_err("Failed to set unsafe channel");
+
+		/* clear existing unsafe channel cache */
+		hdd_ctxt->unsafe_channel_count = 0;
+		qdf_mem_zero(hdd_ctxt->unsafe_channel_list,
+			sizeof(hdd_ctxt->unsafe_channel_list));
+		qdf_mem_free(local_unsafe_list);
+		return;
+	}
+
+	mutex_lock(&hdd_ctxt->avoid_freq_lock);
+	if (hdd_ctxt->dnbs_avoid_freq_list.ch_avoid_range_cnt)
+		if (wlan_hdd_merge_avoid_freqs(avoid_freq_list,
+					&hdd_ctxt->dnbs_avoid_freq_list)) {
+			mutex_unlock(&hdd_ctxt->avoid_freq_lock);
+			hdd_debug("unable to merge avoid freqs");
+			qdf_mem_free(local_unsafe_list);
+			return;
+	}
+	mutex_unlock(&hdd_ctxt->avoid_freq_lock);
+	/*
+	 * first update the unsafe channel list to the platform driver and
+	 * send the avoid freq event to the application
+	 */
+	wlan_hdd_send_avoid_freq_event(hdd_ctxt, avoid_freq_list);
+
+	if (!hdd_ctxt->unsafe_channel_count) {
+		hdd_debug("no unsafe channels - not restarting SAP");
+		qdf_mem_free(local_unsafe_list);
+		return;
+	}
+	if (hdd_local_unsafe_channel_updated(hdd_ctxt,
+					    local_unsafe_list,
+					    local_unsafe_list_count))
+		hdd_unsafe_channel_restart_sap(hdd_ctxt);
+	qdf_mem_free(local_unsafe_list);
+
+}
+
 
 static void hdd_regulatory_dyn_cbk(struct wlan_objmgr_psoc *psoc,
 				   struct wlan_objmgr_pdev *pdev,
 				   struct regulatory_channel *chan_list,
+				   struct avoid_freq_ind_data *avoid_freq_ind,
 				   void *arg)
 {
 	struct wiphy *wiphy;
 	struct pdev_osif_priv *pdev_priv;
-	hdd_context_t *hdd_ctx;
+	struct hdd_context *hdd_ctx;
 	enum country_src cc_src;
 	uint8_t alpha2[REG_ALPHA2_LEN + 1];
 
@@ -871,6 +967,10 @@ static void hdd_regulatory_dyn_cbk(struct wlan_objmgr_psoc *psoc,
 
 	sme_generic_change_country_code(hdd_ctx->hHal,
 					hdd_ctx->reg.alpha2);
+
+	if (avoid_freq_ind)
+		hdd_ch_avoid_ind(hdd_ctx, &avoid_freq_ind->chan_list,
+				&avoid_freq_ind->freq_list);
 }
 
 /**
@@ -880,7 +980,7 @@ static void hdd_regulatory_dyn_cbk(struct wlan_objmgr_psoc *psoc,
  *
  * Return: int
  */
-static int hdd_regulatory_init_offload(hdd_context_t *hdd_ctx,
+static int hdd_regulatory_init_offload(struct hdd_context *hdd_ctx,
 				       struct wiphy *wiphy)
 {
 	struct reg_config_vars config_vars;
@@ -906,7 +1006,7 @@ static int hdd_regulatory_init_offload(hdd_context_t *hdd_ctx,
 }
 
 
-int hdd_regulatory_init(hdd_context_t *hdd_ctx, struct wiphy *wiphy)
+int hdd_regulatory_init(struct hdd_context *hdd_ctx, struct wiphy *wiphy)
 {
 	bool offload_enabled;
 
@@ -929,7 +1029,7 @@ int hdd_regulatory_init(hdd_context_t *hdd_ctx, struct wiphy *wiphy)
 }
 
 #elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))
-int hdd_regulatory_init(hdd_context_t *hdd_ctx, struct wiphy *wiphy)
+int hdd_regulatory_init(struct hdd_context *hdd_ctx, struct wiphy *wiphy)
 {
 	hdd_ctx->reg_offload = false;
 	wiphy->reg_notifier = hdd_reg_notifier;
@@ -941,7 +1041,7 @@ int hdd_regulatory_init(hdd_context_t *hdd_ctx, struct wiphy *wiphy)
 }
 
 #else
-int hdd_regulatory_init(hdd_context_t *hdd_ctx, struct wiphy *wiphy)
+int hdd_regulatory_init(struct hdd_context *hdd_ctx, struct wiphy *wiphy)
 {
 	hdd_ctx->reg_offload = false;
 	wiphy->reg_notifier = hdd_reg_notifier;

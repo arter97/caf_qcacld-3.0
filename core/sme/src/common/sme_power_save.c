@@ -33,7 +33,8 @@
 #include "sme_trace.h"
 #include "qdf_mem.h"
 #include "qdf_types.h"
-#include "wma_types.h"
+#include "wma.h"
+#include "wma_internal.h"
 #include "wmm_apsd.h"
 #include "cfg_api.h"
 #include "csr_inside_api.h"
@@ -175,7 +176,7 @@ static QDF_STATUS sme_ps_enable_ps_req_params(tpAniSirGlobal mac_ctx,
 	status = sme_post_ps_msg_to_wma(WMA_ENTER_PS_REQ, enable_ps_req_params);
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		return QDF_STATUS_E_FAILURE;
-	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_INFO,
+	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
 		FL("Message WMA_ENTER_PS_REQ Successfully sent to WMA"));
 	ps_param->ps_state = ps_state;
 	return QDF_STATUS_SUCCESS;
@@ -206,7 +207,7 @@ static QDF_STATUS sme_ps_disable_ps_req_params(tpAniSirGlobal mac_ctx,
 	status = sme_post_ps_msg_to_wma(WMA_EXIT_PS_REQ, disable_ps_req_params);
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		return QDF_STATUS_E_FAILURE;
-	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_INFO,
+	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
 			FL("Message WMA_EXIT_PS_REQ Successfully sent to WMA"));
 	sme_set_ps_state(mac_ctx, session_id, FULL_POWER_MODE);
 	return QDF_STATUS_SUCCESS;
@@ -244,7 +245,7 @@ static QDF_STATUS sme_ps_enable_uapsd_req_params(tpAniSirGlobal mac_ctx,
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		return QDF_STATUS_E_FAILURE;
 
-	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_INFO,
+	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
 		    FL("Msg WMA_ENABLE_UAPSD_REQ Successfully sent to WMA"));
 	sme_set_ps_state(mac_ctx, session_id, ps_state);
 	return QDF_STATUS_SUCCESS;
@@ -282,7 +283,7 @@ static QDF_STATUS sme_ps_disable_uapsd_req_params(tpAniSirGlobal mac_ctx,
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		return QDF_STATUS_E_FAILURE;
 
-	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_INFO,
+	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
 		FL("Message WMA_DISABLE_UAPSD_REQ Successfully sent to WMA"));
 	sme_set_ps_state(mac_ctx, session_id, LEGACY_POWER_SAVE_MODE);
 	return QDF_STATUS_SUCCESS;
@@ -382,7 +383,7 @@ static QDF_STATUS sme_ps_enter_wowl_req_params(tpAniSirGlobal mac_ctx,
 
 	if (QDF_STATUS_SUCCESS == sme_post_ps_msg_to_wma(WMA_WOWL_ENTER_REQ,
 							hal_wowl_params)){
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_INFO,
+		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
 			FL("Msg WMA_WOWL_ENTER_REQ Successfully sent to WMA"));
 		return QDF_STATUS_SUCCESS;
 	} else {
@@ -416,7 +417,7 @@ static QDF_STATUS sme_ps_exit_wowl_req_params(tpAniSirGlobal mac_ctx,
 
 	if (QDF_STATUS_SUCCESS == sme_post_ps_msg_to_wma(WMA_WOWL_EXIT_REQ,
 							hal_wowl_msg)){
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_INFO,
+		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
 			FL("Msg WMA_WOWL_EXIT_REQ Successfully sent to WMA"));
 		return QDF_STATUS_SUCCESS;
 	} else {
@@ -440,9 +441,9 @@ QDF_STATUS sme_ps_process_command(tpAniSirGlobal mac_ctx, uint32_t session_id,
 
 	if (!CSR_IS_SESSION_VALID(mac_ctx, session_id)) {
 		sme_err("Invalid Session_id: %d", session_id);
-		return eSIR_FAILURE;
+		return QDF_STATUS_E_INVAL;
 	}
-	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_INFO,
+	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
 			FL("Power Save command %d"), command);
 	switch (command) {
 	case SME_PS_ENABLE:
@@ -526,6 +527,63 @@ QDF_STATUS sme_ps_enable_disable(tHalHandle hal_ctx, uint32_t session_id,
 		return status;
 	status = sme_ps_process_command(mac_ctx, session_id, command);
 	return status;
+}
+
+QDF_STATUS sme_ps_timer_flush_sync(tHalHandle hal, uint8_t session_id)
+{
+	QDF_STATUS status;
+	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal);
+	struct ps_params *ps_parm;
+	enum ps_state ps_state;
+	QDF_TIMER_STATE tstate;
+	struct sEnablePsParams *req;
+	t_wma_handle *wma;
+
+	status = sme_enable_sta_ps_check(mac_ctx, session_id);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		sme_debug("Power save not allowed for vdev id %d", session_id);
+		return QDF_STATUS_SUCCESS;
+	}
+
+	ps_parm = &mac_ctx->sme.ps_global_info.ps_params[session_id];
+	tstate = qdf_mc_timer_get_current_state(&ps_parm->auto_ps_enable_timer);
+	if (tstate != QDF_TIMER_STATE_RUNNING)
+		return QDF_STATUS_SUCCESS;
+
+	sme_debug("flushing powersave enable for vdev %u", session_id);
+
+	qdf_mc_timer_stop(&ps_parm->auto_ps_enable_timer);
+
+	wma = cds_get_context(QDF_MODULE_ID_WMA);
+	if (!wma) {
+		sme_err("wma is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	req = qdf_mem_malloc(sizeof(*req));
+	if (!req) {
+		sme_err("out of memory");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	if (ps_parm->uapsd_per_ac_bit_mask) {
+		req->psSetting = eSIR_ADDON_ENABLE_UAPSD;
+		sme_ps_fill_uapsd_req_params(mac_ctx, &req->uapsdParams,
+					     session_id, &ps_state);
+		ps_state = UAPSD_MODE;
+		req->uapsdParams.enable_ps = true;
+	} else {
+		req->psSetting = eSIR_ADDON_NOTHING;
+		ps_state = LEGACY_POWER_SAVE_MODE;
+	}
+	req->sessionid = session_id;
+
+	wma_enable_sta_ps_mode(wma, req);
+	qdf_mem_free(req);
+
+	ps_parm->ps_state = ps_state;
+
+	return QDF_STATUS_SUCCESS;
 }
 
 /**
@@ -695,9 +753,9 @@ QDF_STATUS sme_set_ps_host_offload(tHalHandle hal_ctx,
 	tpSirHostOffloadReq request_buf;
 	struct scheduler_msg msg = {0};
 	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal_ctx);
-	tCsrRoamSession *session = CSR_GET_SESSION(mac_ctx, session_id);
+	struct csr_roam_session *session = CSR_GET_SESSION(mac_ctx, session_id);
 
-	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_INFO,
+	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
 			"%s: IP address = %d.%d.%d.%d", __func__,
 			request->params.hostIpv4Addr[0],
 			request->params.hostIpv4Addr[1],
@@ -754,7 +812,7 @@ QDF_STATUS sme_set_ps_ns_offload(tHalHandle hal_ctx,
 	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal_ctx);
 	tpSirHostOffloadReq request_buf;
 	struct scheduler_msg msg = {0};
-	tCsrRoamSession *session = CSR_GET_SESSION(mac_ctx, session_id);
+	struct csr_roam_session *session = CSR_GET_SESSION(mac_ctx, session_id);
 
 	if (NULL == session) {
 		sme_err("Session not found");
@@ -821,20 +879,19 @@ tSirRetStatus sme_post_pe_message(tpAniSirGlobal mac_ctx,
 }
 
 QDF_STATUS sme_ps_enable_auto_ps_timer(tHalHandle hal_ctx,
-	uint32_t session_id, uint32_t timeout, bool force_trigger)
+	uint32_t session_id, uint32_t timeout)
 {
 	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal_ctx);
 	struct ps_global_info *ps_global_info = &mac_ctx->sme.ps_global_info;
 	struct ps_params *ps_param = &ps_global_info->ps_params[session_id];
 	QDF_STATUS qdf_status;
 
-	if (!ps_global_info->auto_bmps_timer_val && !force_trigger) {
-		sme_debug("auto_ps_timer is disabled in INI, force_trigger-%d",
-			  force_trigger);
+	if (!timeout) {
+		sme_debug("auto_ps_timer called with timeout 0; ignore");
 		return QDF_STATUS_SUCCESS;
 	}
 
-	sme_err("Start auto_ps_timer for %d ms", timeout);
+	sme_info("Start auto_ps_timer for %d ms", timeout);
 
 	qdf_status = qdf_mc_timer_start(&ps_param->auto_ps_enable_timer,
 		timeout);
@@ -862,7 +919,7 @@ QDF_STATUS sme_ps_disable_auto_ps_timer(tHalHandle hal_ctx,
 	if (QDF_TIMER_STATE_RUNNING ==
 			qdf_mc_timer_get_current_state(
 				&ps_param->auto_ps_enable_timer)) {
-		sme_err("Stop auto_ps_enable_timer Timer for session ID: %d",
+		sme_info("Stop auto_ps_enable_timer Timer for session ID: %d",
 				session_id);
 		qdf_mc_timer_stop(&ps_param->auto_ps_enable_timer);
 	}
@@ -908,19 +965,21 @@ QDF_STATUS sme_ps_open_per_session(tHalHandle hal_ctx, uint32_t session_id)
 
 void sme_auto_ps_entry_timer_expired(void *data)
 {
-	struct ps_params *ps_params =   (struct ps_params *)data;
+	struct ps_params *ps_params = (struct ps_params *)data;
 	tpAniSirGlobal mac_ctx = (tpAniSirGlobal)ps_params->mac_ctx;
 	uint32_t session_id = ps_params->session_id;
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	QDF_STATUS status;
+
+	sme_debug("auto_ps_timer expired, enabling powersave");
 
 	status = sme_enable_sta_ps_check(mac_ctx, session_id);
 	if (QDF_STATUS_SUCCESS == status)
 		sme_ps_enable_disable((tHalHandle)mac_ctx, session_id,
 				SME_PS_ENABLE);
 	else {
-		status =
-			qdf_mc_timer_start(&ps_params->auto_ps_enable_timer,
-					AUTO_PS_ENTRY_TIMER_DEFAULT_VALUE);
+		sme_debug("failed to enable powersave, restarting timer");
+		status = qdf_mc_timer_start(&ps_params->auto_ps_enable_timer,
+					    AUTO_PS_ENTRY_TIMER_DEFAULT_VALUE);
 		if (!QDF_IS_STATUS_SUCCESS(status)
 				&& (QDF_STATUS_E_ALREADY != status))
 			sme_err("Cannot start traffic timer");

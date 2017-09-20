@@ -228,6 +228,8 @@ typedef struct _cds_context_type {
 	struct cds_config_info *cds_cfg;
 
 	struct ol_tx_sched_wrr_ac_specs_t ac_specs[TX_WMM_AC_NUM];
+	qdf_work_t cds_recovery_work;
+	qdf_workqueue_t *cds_recovery_wq;
 } cds_context_type, *p_cds_contextType;
 
 /*---------------------------------------------------------------------------
@@ -422,8 +424,6 @@ QDF_STATUS cds_sched_open(void *p_cds_context,
 
      - The Tx thread is closed
 
-   \param  p_cds_context - pointer to the global QDF Context
-
    \return QDF_STATUS_SUCCESS - Scheduler was successfully initialized and
    is ready to be used.
 
@@ -435,7 +435,7 @@ QDF_STATUS cds_sched_open(void *p_cds_context,
    \sa cds_sched_close()
 
    ---------------------------------------------------------------------------*/
-QDF_STATUS cds_sched_close(void *p_cds_context);
+QDF_STATUS cds_sched_close(void);
 
 p_cds_sched_context get_cds_sched_ctxt(void);
 

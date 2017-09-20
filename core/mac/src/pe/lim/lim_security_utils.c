@@ -487,6 +487,29 @@ lim_restore_from_auth_state(tpAniSirGlobal pMac, tSirResultCodes resultCode,
 	lim_post_sme_message(pMac, LIM_MLM_AUTH_CNF, (uint32_t *) &mlmAuthCnf);
 } /*** end lim_restore_from_auth_state() ***/
 
+#ifdef WLAN_FEATURE_FILS_SK
+/*
+ * lim_get_fils_auth_data_len: This API will return
+ * extra auth data len in case of fils session
+ *
+ * Return: fils data len in auth packet
+ */
+static int lim_get_fils_auth_data_len(void)
+{
+	int len = sizeof(tSirMacRsnInfo) +
+			sizeof(uint8_t) + /* assoc_delay_info */
+			SIR_FILS_SESSION_LENGTH +
+			sizeof(uint8_t) + /* wrapped_data_len */
+			SIR_FILS_WRAPPED_DATA_MAX_SIZE + SIR_FILS_NONCE_LENGTH;
+	return len;
+}
+#else
+static inline int lim_get_fils_auth_data_len(void)
+{
+	return 0;
+}
+#endif
+
 /**
  * lim_encrypt_auth_frame()
  *
@@ -517,22 +540,24 @@ lim_encrypt_auth_frame(tpAniSirGlobal pMac, uint8_t keyId, uint8_t *pKey,
 		       uint32_t keyLength)
 {
 	uint8_t seed[LIM_SEED_LENGTH], icv[SIR_MAC_WEP_ICV_LENGTH];
+	uint16_t frame_len;
 
+	frame_len = sizeof(tSirMacAuthFrameBody) - lim_get_fils_auth_data_len();
 	keyLength += 3;
 
 	/* Bytes 3-7 of seed is key */
 	qdf_mem_copy((uint8_t *) &seed[3], pKey, keyLength - 3);
 
 	/* Compute CRC-32 and place them in last 4 bytes of plain text */
-	lim_compute_crc32(icv, pPlainText, sizeof(tSirMacAuthFrameBody));
+	lim_compute_crc32(icv, pPlainText, frame_len);
 
-	qdf_mem_copy(pPlainText + sizeof(tSirMacAuthFrameBody),
+	qdf_mem_copy(pPlainText + frame_len,
 		     icv, SIR_MAC_WEP_ICV_LENGTH);
 
 	/* Run RC4 on plain text with the seed */
 	lim_rc4(pEncrBody + SIR_MAC_WEP_IV_LENGTH,
 		(uint8_t *) pPlainText, seed, keyLength,
-		LIM_ENCR_AUTH_BODY_LEN - SIR_MAC_WEP_IV_LENGTH);
+		frame_len + SIR_MAC_WEP_ICV_LENGTH);
 
 	/* Prepare IV */
 	pEncrBody[0] = seed[0];
@@ -562,7 +587,7 @@ lim_encrypt_auth_frame(tpAniSirGlobal pMac, uint8_t keyId, uint8_t *pKey,
  * @return None
  */
 
-void lim_compute_crc32(uint8_t *pDest, uint8_t *pSrc, uint8_t len)
+void lim_compute_crc32(uint8_t *pDest, uint8_t *pSrc, uint16_t len)
 {
 	uint32_t crc;
 	int i;
@@ -645,7 +670,7 @@ lim_rc4(uint8_t *pDest, uint8_t *pSrc, uint8_t *seed, uint32_t keyLength,
 	{
 		uint8_t i = ctx.i;
 		uint8_t j = ctx.j;
-		uint8_t len = (uint8_t) frameLen;
+		uint16_t len = frameLen;
 
 		while (len-- > 0) {
 			uint8_t temp1, temp2;
@@ -717,7 +742,7 @@ lim_decrypt_auth_frame(tpAniSirGlobal pMac, uint8_t *pKey, uint8_t *pEncrBody,
 	/* Compute CRC-32 and place them in last 4 bytes of encrypted body */
 	lim_compute_crc32(icv,
 			  (uint8_t *) pPlainBody,
-			  (uint8_t) (frameLen - SIR_MAC_WEP_ICV_LENGTH));
+			  (frameLen - SIR_MAC_WEP_ICV_LENGTH));
 
 	/* Compare RX_ICV with computed ICV */
 	for (i = 0; i < SIR_MAC_WEP_ICV_LENGTH; i++) {
@@ -992,6 +1017,8 @@ void lim_send_set_sta_key_req(tpAniSirGlobal pMac,
 		break;
 	case eSIR_ED_TKIP:
 	case eSIR_ED_CCMP:
+	case eSIR_ED_GCMP:
+	case eSIR_ED_GCMP_256:
 #ifdef FEATURE_WLAN_WAPI
 	case eSIR_ED_WPI:
 #endif

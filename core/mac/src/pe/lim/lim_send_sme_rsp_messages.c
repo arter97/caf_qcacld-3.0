@@ -64,6 +64,7 @@
 #ifdef CONVERGED_TDLS_ENABLE
 #include "wlan_tdls_tgt_api.h"
 #endif
+#include "lim_process_fils.h"
 
 static void lim_handle_join_rsp_status(tpAniSirGlobal mac_ctx,
 	tpPESession session_entry, tSirResultCodes result_code,
@@ -268,6 +269,7 @@ static void lim_handle_join_rsp_status(tpAniSirGlobal mac_ctx,
 	uint16_t bss_ie_len;
 	void *bss_ies;
 	bool is_vendor_ap_1_present;
+	tpSirSmeJoinReq join_reassoc_req = NULL;
 
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 	tSirSmeHTProfile *ht_profile;
@@ -365,9 +367,24 @@ static void lim_handle_join_rsp_status(tpAniSirGlobal mac_ctx,
 			ht_profile->apChanWidth = session_entry->ch_width;
 		}
 #endif
+		pe_debug("pLimJoinReq:%p, pLimReAssocReq:%p",
+			session_entry->pLimJoinReq,
+			session_entry->pLimReAssocReq);
+
+		if (session_entry->pLimJoinReq)
+			join_reassoc_req = session_entry->pLimJoinReq;
+
+		if (session_entry->pLimReAssocReq)
+			join_reassoc_req = session_entry->pLimReAssocReq;
+
+		if (!join_reassoc_req) {
+			pe_err("both  pLimJoinReq and pLimReAssocReq NULL");
+			return;
+		}
+
 		bss_ie_len = lim_get_ielen_from_bss_description(
-				&session_entry->pLimJoinReq->bssDescription);
-		bss_ies = &session_entry->pLimJoinReq->bssDescription.ieFields;
+				&join_reassoc_req->bssDescription);
+		bss_ies = &join_reassoc_req->bssDescription.ieFields;
 		is_vendor_ap_1_present = (cfg_get_vendor_ie_ptr_from_oui(mac_ctx,
 			SIR_MAC_VENDOR_AP_1_OUI, SIR_MAC_VENDOR_AP_1_OUI_LEN,
 			bss_ies, bss_ie_len) != NULL);
@@ -437,6 +454,18 @@ static void lim_add_bss_info(tpDphHashNode sta_ds, tpSirSmeJoinRsp sme_join_rsp)
 		sme_join_rsp->vht_operation = parsed_ies->vht_operation;
 }
 
+#ifdef WLAN_FEATURE_FILS_SK
+static void lim_update_fils_seq_num(tpSirSmeJoinRsp sme_join_rsp,
+				    tpPESession session_entry)
+{
+	sme_join_rsp->fils_seq_num =
+		session_entry->fils_info->sequence_number;
+}
+#else
+static inline void lim_update_fils_seq_num(tpSirSmeJoinRsp sme_join_rsp,
+					   tpPESession session_entry)
+{}
+#endif
 /**
  * lim_send_sme_join_reassoc_rsp() - Send Response to Upper Layers
  * @mac_ctx:            Pointer to Global MAC structure
@@ -500,6 +529,13 @@ lim_send_sme_join_reassoc_rsp(tpAniSirGlobal mac_ctx, uint16_t msg_type,
 			pe_err("MemAlloc fail - JOIN/REASSOC_RSP");
 			return;
 		}
+
+		if (lim_is_fils_connection(session_entry)) {
+			sme_join_rsp->is_fils_connection = true;
+			lim_update_fils_seq_num(sme_join_rsp,
+						session_entry);
+		}
+
 		if (result_code == eSIR_SME_SUCCESS) {
 			sta_ds = dph_get_hash_entry(mac_ctx,
 				DPH_STA_HASH_INDEX_PEER,
@@ -525,8 +561,13 @@ lim_send_sme_join_reassoc_rsp(tpAniSirGlobal mac_ctx, uint16_t msg_type,
 				sme_join_rsp->max_rate_flags =
 					lim_get_max_rate_flags(mac_ctx, sta_ds);
 				lim_add_bss_info(sta_ds, sme_join_rsp);
+
+				/* Copy FILS params only for Successful join */
+				populate_fils_connect_params(mac_ctx,
+						session_entry, sme_join_rsp);
 			}
 		}
+
 		sme_join_rsp->beaconLength = 0;
 		sme_join_rsp->assocReqLength = 0;
 		sme_join_rsp->assocRspLength = 0;
@@ -2298,6 +2339,12 @@ void lim_handle_csa_offload_msg(tpAniSirGlobal mac_ctx,
 	}
 	pe_debug("new ch width: %d space: %d",
 			session_entry->gLimChannelSwitch.ch_width, chan_space);
+	if ((session_entry->currentOperChannel == csa_params->channel) &&
+		(session_entry->ch_width ==
+		 session_entry->gLimChannelSwitch.ch_width)) {
+		pe_debug("Ignore CSA, no change in ch and bw");
+		goto err;
+	}
 
 	lim_prepare_for11h_channel_switch(mac_ctx, session_entry);
 	csa_offload_ind = qdf_mem_malloc(sizeof(tSmeCsaOffloadInd));

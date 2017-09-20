@@ -1705,6 +1705,11 @@ static QDF_STATUS wma_setup_install_key_cmd(tp_wma_handle wma_handle,
 		params.key_cipher = WMI_CIPHER_AES_CMAC;
 		break;
 #endif /* WLAN_FEATURE_11W */
+	/* Firmware uses length to detect GCMP 128/256*/
+	case eSIR_ED_GCMP:
+	case eSIR_ED_GCMP_256:
+		params.key_cipher = WMI_CIPHER_AES_GCM;
+		break;
 	default:
 		/* TODO: MFP ? */
 		WMA_LOGE("%s:Invalid encryption type:%d", __func__,
@@ -1839,6 +1844,11 @@ void wma_set_bsskey(tp_wma_handle wma_handle, tpSetBssKeyParams key_info)
 	     key_info->encType == eSIR_ED_WEP104)) {
 		wma_read_cfg_wepkey(wma_handle, key_info->key,
 				    &def_key_idx, &key_info->numKeys);
+	} else if ((key_info->encType == eSIR_ED_WEP40) ||
+		   (key_info->encType == eSIR_ED_WEP104)) {
+		struct wma_txrx_node *intf =
+			&wma_handle->interfaces[key_info->smesessionId];
+		key_params.def_key_idx = intf->wep_default_key_idx;
 	}
 
 	for (i = 0; i < key_info->numKeys; i++) {
@@ -1887,7 +1897,8 @@ void wma_set_bsskey(tp_wma_handle wma_handle, tpSetBssKeyParams key_info)
 	key_info->status = QDF_STATUS_SUCCESS;
 
 out:
-	wma_send_msg(wma_handle, WMA_SET_BSSKEY_RSP, (void *)key_info, 0);
+	wma_send_msg_high_priority(wma_handle, WMA_SET_BSSKEY_RSP,
+				   (void *)key_info, 0);
 }
 
 #ifdef QCA_IBSS_SUPPORT
@@ -2209,8 +2220,8 @@ void wma_set_stakey(tp_wma_handle wma_handle, tpSetStaKeyParams key_info)
 	key_info->status = QDF_STATUS_SUCCESS;
 out:
 	if (key_info->sendRsp)
-		wma_send_msg(wma_handle, WMA_SET_STAKEY_RSP, (void *)key_info,
-			     0);
+		wma_send_msg_high_priority(wma_handle, WMA_SET_STAKEY_RSP,
+					   (void *)key_info, 0);
 }
 
 /**
@@ -2226,7 +2237,7 @@ QDF_STATUS wma_process_update_edca_param_req(WMA_HANDLE handle,
 					     tEdcaParams *edca_params)
 {
 	tp_wma_handle wma_handle = (tp_wma_handle) handle;
-	wmi_wmm_vparams wmm_param[WME_NUM_AC];
+	struct wmi_host_wme_vparams wmm_param[WME_NUM_AC];
 	tSirMacEdcaParamRecord *edca_record;
 	int ac;
 	struct cdp_pdev *pdev;
@@ -2667,9 +2678,8 @@ void wma_send_beacon(tp_wma_handle wma, tpSendbeaconParams bcn_info)
 		if (!wma_is_vdev_up(vdev_id)) {
 			param.vdev_id = vdev_id;
 			param.assoc_id = 0;
-			status = wmi_unified_vdev_up_send(wma->wmi_handle,
-					bcn_info->bssId,
-					&param);
+			status = wma_send_vdev_up_to_fw(wma, &param,
+							bcn_info->bssId);
 			if (QDF_IS_STATUS_ERROR(status)) {
 				WMA_LOGE(FL("failed to send vdev up"));
 				policy_mgr_set_do_hw_mode_change_flag(
@@ -3490,6 +3500,17 @@ int wma_form_rx_packet(qdf_nbuf_t buf,
 		return -EINVAL;
 	}
 
+	if (cds_is_driver_in_bad_state()) {
+		limit_prints_recovery++;
+		if (limit_prints_recovery == RATE_LIMIT) {
+			WMA_LOGD(FL("Driver in bad state"));
+			limit_prints_recovery = 0;
+		}
+		qdf_nbuf_free(buf);
+		qdf_mem_free(rx_pkt);
+		return -EINVAL;
+	}
+
 	/*
 	 * Fill in meta information needed by pe/lim
 	 * TODO: Try to maintain rx metainfo as part of skb->data.
@@ -3746,7 +3767,6 @@ QDF_STATUS wma_de_register_mgmt_frm_client(void)
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
  * wma_register_roaming_callbacks() - Register roaming callbacks
- * @cds_ctx: CDS Context
  * @csr_roam_synch_cb: CSR roam synch callback routine pointer
  * @pe_roam_synch_cb: PE roam synch callback routine pointer
  *
@@ -3755,7 +3775,7 @@ QDF_STATUS wma_de_register_mgmt_frm_client(void)
  *
  * Return: Success or Failure Status
  */
-QDF_STATUS wma_register_roaming_callbacks(void *cds_ctx,
+QDF_STATUS wma_register_roaming_callbacks(
 	QDF_STATUS (*csr_roam_synch_cb)(tpAniSirGlobal mac,
 		roam_offload_synch_ind *roam_synch_data,
 		tpSirBssDescription  bss_desc_ptr,

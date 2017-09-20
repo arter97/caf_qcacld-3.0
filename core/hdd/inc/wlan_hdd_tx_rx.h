@@ -40,6 +40,8 @@
 #include <linux/skbuff.h>
 #include "cdp_txrx_flow_ctrl_legacy.h"
 
+struct hdd_context;
+
 #define HDD_ETHERTYPE_802_1_X              0x888E
 #define HDD_ETHERTYPE_802_1_X_FRAME_OFFSET 12
 #ifdef FEATURE_WLAN_WAPI
@@ -56,8 +58,8 @@
 int hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev);
 void hdd_tx_timeout(struct net_device *dev);
 
-QDF_STATUS hdd_init_tx_rx(hdd_adapter_t *pAdapter);
-QDF_STATUS hdd_deinit_tx_rx(hdd_adapter_t *pAdapter);
+QDF_STATUS hdd_init_tx_rx(struct hdd_adapter *pAdapter);
+QDF_STATUS hdd_deinit_tx_rx(struct hdd_adapter *pAdapter);
 QDF_STATUS hdd_rx_packet_cbk(void *context, qdf_nbuf_t rxBuf);
 
 #ifdef IPA_OFFLOAD
@@ -65,55 +67,79 @@ QDF_STATUS hdd_rx_mul_packet_cbk(void *cds_context,
 				 qdf_nbuf_t rx_buf_list, uint8_t staId);
 #endif /* IPA_OFFLOAD */
 
-QDF_STATUS hdd_get_peer_sta_id(hdd_station_ctx_t *sta_ctx,
+QDF_STATUS hdd_get_peer_sta_id(struct hdd_station_ctx *sta_ctx,
 				struct qdf_mac_addr *peer_mac_addr,
 				uint8_t *sta_id);
 
 #ifdef QCA_LL_LEGACY_TX_FLOW_CONTROL
 void hdd_tx_resume_cb(void *adapter_context, bool tx_resume);
+
+/**
+ * hdd_tx_flow_control_is_pause() - Is TX Q paused by flow control
+ * @adapter_context: pointer to vdev apdapter
+ *
+ * Return: true if TX Q is paused by flow control
+ */
+bool hdd_tx_flow_control_is_pause(void *adapter_context);
 void hdd_tx_resume_timer_expired_handler(void *adapter_context);
-void hdd_register_tx_flow_control(hdd_adapter_t *adapter,
+
+/**
+ * hdd_register_tx_flow_control() - Register TX Flow control
+ * @adapter: adapter handle
+ * @timer_callback: timer callback
+ * @flow_control_fp: txrx flow control
+ * @flow_control_is_pause_fp: is txrx paused by flow control
+ *
+ * Return: none
+ */
+void hdd_register_tx_flow_control(struct hdd_adapter *adapter,
 		qdf_mc_timer_callback_t timer_callback,
-		ol_txrx_tx_flow_control_fp flowControl);
-void hdd_deregister_tx_flow_control(hdd_adapter_t *adapter);
-void hdd_get_tx_resource(hdd_adapter_t *adapter,
+		ol_txrx_tx_flow_control_fp flowControl,
+		ol_txrx_tx_flow_control_is_pause_fp flow_control_is_pause);
+void hdd_deregister_tx_flow_control(struct hdd_adapter *adapter);
+void hdd_get_tx_resource(struct hdd_adapter *adapter,
 			uint8_t STAId, uint16_t timer_value);
 
 #else
 static inline void hdd_tx_resume_cb(void *adapter_context, bool tx_resume)
 {
 }
+static inline bool hdd_tx_flow_control_is_pause(void *adapter_context)
+{
+	return false;
+}
 static inline void hdd_tx_resume_timer_expired_handler(void *adapter_context)
 {
 }
-static inline void hdd_register_tx_flow_control(hdd_adapter_t *adapter,
+static inline void hdd_register_tx_flow_control(struct hdd_adapter *adapter,
 		qdf_mc_timer_callback_t timer_callback,
-		ol_txrx_tx_flow_control_fp flowControl)
+		ol_txrx_tx_flow_control_fp flowControl,
+		ol_txrx_tx_flow_control_is_pause_fp flow_control_is_pause)
 {
 }
-static inline void hdd_deregister_tx_flow_control(hdd_adapter_t *adapter)
+static inline void hdd_deregister_tx_flow_control(struct hdd_adapter *adapter)
 {
 }
-static inline void hdd_get_tx_resource(hdd_adapter_t *adapter,
+static inline void hdd_get_tx_resource(struct hdd_adapter *adapter,
 			uint8_t STAId, uint16_t timer_value)
 {
 }
 #endif /* QCA_LL_LEGACY_TX_FLOW_CONTROL */
 
-int hdd_get_peer_idx(hdd_station_ctx_t *sta_ctx, struct qdf_mac_addr *addr);
+int hdd_get_peer_idx(struct hdd_station_ctx *sta_ctx, struct qdf_mac_addr *addr);
 
 const char *hdd_reason_type_to_string(enum netif_reason_type reason);
 const char *hdd_action_type_to_string(enum netif_action_type action);
-void wlan_hdd_netif_queue_control(hdd_adapter_t *adapter,
+void wlan_hdd_netif_queue_control(struct hdd_adapter *adapter,
 		enum netif_action_type action, enum netif_reason_type reason);
 int hdd_set_mon_rx_cb(struct net_device *dev);
-void hdd_send_rps_ind(hdd_adapter_t *adapter);
+void hdd_send_rps_ind(struct hdd_adapter *adapter);
 void wlan_hdd_classify_pkt(struct sk_buff *skb);
 
 #ifdef MSM_PLATFORM
-void hdd_reset_tcp_delack(hdd_context_t *hdd_ctx);
+void hdd_reset_tcp_delack(struct hdd_context *hdd_ctx);
 #else
-static inline void hdd_reset_tcp_delack(hdd_context_t *hdd_ctx) {}
+static inline void hdd_reset_tcp_delack(struct hdd_context *hdd_ctx) {}
 #endif
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT

@@ -415,6 +415,7 @@ struct htt_pdev_t {
 				       qdf_nbuf_t msdu, uint16_t msdu_id);
 
 	HTT_TX_MUTEX_TYPE htt_tx_mutex;
+	HTT_TX_MUTEX_TYPE credit_mutex;
 
 	struct {
 		int htc_err_cnt;
@@ -438,12 +439,16 @@ struct htt_pdev_t {
 	int rx_buff_posted_cum;
 	int rx_buff_recvd_cum;
 	int rx_buff_recvd_err;
+#endif
+	/*
+	 * Counters below are being invoked from functions defined outside of
+	 * DEBUG_RX_RING_BUFFER
+	 */
 	int rx_buff_debt_invoked;
 	int rx_buff_fill_n_invoked;
 	int refill_retry_timer_starts;
 	int refill_retry_timer_calls;
 	int refill_retry_timer_doubles;
-#endif
 
 	/* callback function for packetdump */
 	tp_rx_pkt_dump_cb rx_pkt_dump_cb;
