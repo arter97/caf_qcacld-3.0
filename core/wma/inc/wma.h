@@ -2409,4 +2409,14 @@ QDF_STATUS wma_send_udp_resp_offload_cmd(tp_wma_handle wma_handle,
 QDF_STATUS wma_process_roaming_config(tp_wma_handle wma_handle,
 				     tSirRoamOffloadScanReq *roam_req);
 
+/**
+ * wma_send_action_oui() - send of action oui extensions to firmware
+ * @handle: wma handle
+ * @action_oui: action oui buffer containg extensions to be send
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wma_send_action_oui(WMA_HANDLE handle,
+			       struct wmi_action_oui *action_oui);
+
 #endif
