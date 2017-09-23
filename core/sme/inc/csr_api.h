@@ -996,7 +996,7 @@ typedef struct tagCsrRoamProfile {
 	/* addIe params */
 	tSirAddIeParams addIeParams;
 	uint8_t sap_dot11mc;
-	uint8_t beacon_tx_rate;
+	uint16_t beacon_tx_rate;
 	tSirMacRateSet  supported_rates;
 	tSirMacRateSet  extended_rates;
 	struct qdf_mac_addr bssid_hint;
@@ -1008,6 +1008,7 @@ typedef struct tagCsrRoamProfile {
 	bool fils_connection;
 	struct cds_fils_connection_info *fils_con_info;
 #endif
+	bool chan_switch_hostapd_rate_enabled;
 } tCsrRoamProfile;
 
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
@@ -1310,6 +1311,9 @@ typedef struct tagCsrConfigParam {
 	uint32_t roam_dense_traffic_thresh;
 	uint32_t roam_dense_rssi_thresh_offset;
 	uint32_t roam_dense_min_aps;
+	int8_t roam_bg_scan_bad_rssi_thresh;
+	uint8_t roam_bad_rssi_thresh_offset_2g;
+	uint32_t roam_bg_scan_client_bitmap;
 	uint32_t obss_width_interval;
 	uint32_t obss_active_dwelltime;
 	uint32_t obss_passive_dwelltime;

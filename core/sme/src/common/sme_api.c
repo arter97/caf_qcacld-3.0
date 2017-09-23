@@ -160,9 +160,7 @@ static QDF_STATUS sme_process_set_hw_mode_resp(tpAniSirGlobal mac, uint8_t *msg)
 	enum sir_conn_update_reason reason;
 	struct csr_roam_session *session;
 	uint32_t session_id;
-#ifndef NAPIER_SCAN
-	tSmeCmd *saved_cmd;
-#endif
+
 	param = (struct sir_set_hw_mode_resp *)msg;
 	if (!param) {
 		sme_err("HW mode resp param is NULL");
@@ -224,40 +222,6 @@ static QDF_STATUS sme_process_set_hw_mode_resp(tpAniSirGlobal mac, uint8_t *msg)
 		 * needs to be handled after the response of set hw
 		 * mode
 		 */
-#ifndef NAPIER_SCAN
-		saved_cmd = (tSmeCmd *)mac->sme.saved_scan_cmd;
-		if (!saved_cmd) {
-			sme_err("saved cmd is NULL, Check this");
-			goto end;
-		}
-		if (param->status == SET_HW_MODE_STATUS_OK) {
-			sme_err("search for ssid success");
-			csr_scan_handle_search_for_ssid(mac,
-					saved_cmd);
-		} else {
-			sme_debug("search for ssid failure");
-			csr_scan_handle_search_for_ssid_failure(mac,
-					saved_cmd);
-		}
-		if (saved_cmd->u.roamCmd.pRoamBssEntry)
-			qdf_mem_free(
-					saved_cmd->u.roamCmd.pRoamBssEntry);
-		if (saved_cmd->u.scanCmd.u.scanRequest.SSIDs.SSIDList)
-			qdf_mem_free(saved_cmd->u.scanCmd.u.
-					scanRequest.SSIDs.SSIDList);
-		if (saved_cmd->u.scanCmd.pToRoamProfile) {
-			csr_release_profile(mac, saved_cmd->
-					    u.scanCmd.pToRoamProfile);
-			qdf_mem_free(saved_cmd->u.scanCmd.pToRoamProfile);
-			saved_cmd->u.scanCmd.pToRoamProfile = NULL;
-		}
-		if (saved_cmd) {
-			csr_saved_scan_cmd_free_fields(mac, saved_cmd);
-			qdf_mem_free(saved_cmd);
-			saved_cmd = NULL;
-			mac->sme.saved_scan_cmd = NULL;
-		}
-#else
 		if (param->status == SET_HW_MODE_STATUS_OK) {
 			sme_debug("search for ssid success");
 			csr_scan_handle_search_for_ssid(mac,
@@ -268,7 +232,6 @@ static QDF_STATUS sme_process_set_hw_mode_resp(tpAniSirGlobal mac, uint8_t *msg)
 					session_id);
 		}
 		csr_saved_scan_cmd_free_fields(mac, session);
-#endif
 	}
 
 end:
@@ -14147,6 +14110,41 @@ void sme_update_user_configured_nss(tHalHandle hal, uint8_t nss)
 }
 
 /**
+ * sme_set_nud_debug_stats_cb() - set nud debug stats callback
+ * @hal: global hal handle
+ * @cb: callback function pointer
+ *
+ * This function stores nud debug stats callback function.
+ *
+ * Return: QDF_STATUS enumeration.
+ */
+QDF_STATUS sme_set_nud_debug_stats_cb(tHalHandle hal,
+				void (*cb)(void *, struct rsp_stats *))
+{
+	QDF_STATUS status  = QDF_STATUS_SUCCESS;
+	tpAniSirGlobal mac;
+
+	if (!hal) {
+		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
+				  FL("hal is not valid"));
+		return QDF_STATUS_E_INVAL;
+	}
+	mac = PMAC_STRUCT(hal);
+
+	status = sme_acquire_global_lock(&mac->sme);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
+			FL("sme_acquire_global_lock failed!(status=%d)"),
+			status);
+		return status;
+	}
+
+	mac->sme.get_arp_stats_cb = cb;
+	sme_release_global_lock(&mac->sme);
+	return status;
+}
+
+/**
  * sme_set_rssi_threshold_breached_cb() - set rssi threshold breached callback
  * @h_hal: global hal handle
  * @cb: callback function pointer
@@ -16343,6 +16341,80 @@ QDF_STATUS sme_delete_all_tdls_peers(tHalHandle hal, uint8_t session_id)
 	return status;
 }
 
+/* ARP DEBUG STATS */
+
+/**
+ * sme_set_nud_debug_stats() - sme api to set nud debug stats
+ * @hal: handle to hal
+ * @set_stats_param: pointer to set stats param
+ *
+ * Return: Return QDF_STATUS.
+ */
+QDF_STATUS sme_set_nud_debug_stats(tHalHandle hal,
+				   struct set_arp_stats_params
+				   *set_stats_param)
+{
+	struct set_arp_stats_params *arp_set_param;
+	struct scheduler_msg msg;
+
+	arp_set_param = qdf_mem_malloc(sizeof(*arp_set_param));
+	if (arp_set_param == NULL) {
+		sme_err("Memory allocation failure");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	qdf_mem_copy(arp_set_param, set_stats_param, sizeof(*arp_set_param));
+
+	msg.type = WMA_SET_ARP_STATS_REQ;
+	msg.reserved = 0;
+	msg.bodyptr = arp_set_param;
+
+	if (QDF_STATUS_SUCCESS !=
+	    scheduler_post_msg(QDF_MODULE_ID_WMA, &msg)) {
+		sme_err("Not able to post message to WDA");
+		qdf_mem_free(arp_set_param);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * sme_get_nud_debug_stats() - sme api to get nud debug stats
+ * @hal: handle to hal
+ * @get_stats_param: pointer to set stats param
+ *
+ * Return: Return QDF_STATUS.
+ */
+QDF_STATUS sme_get_nud_debug_stats(tHalHandle hal,
+				   struct get_arp_stats_params
+				   *get_stats_param)
+{
+	struct get_arp_stats_params *arp_get_param;
+	struct scheduler_msg msg;
+
+	arp_get_param = qdf_mem_malloc(sizeof(*arp_get_param));
+	if (arp_get_param == NULL) {
+		sme_err("Memory allocation failure");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	qdf_mem_copy(arp_get_param, get_stats_param, sizeof(*arp_get_param));
+
+	msg.type = WMA_GET_ARP_STATS_REQ;
+	msg.reserved = 0;
+	msg.bodyptr = arp_get_param;
+
+	if (QDF_STATUS_SUCCESS !=
+	    scheduler_post_msg(QDF_MODULE_ID_WMA, &msg)) {
+		sme_err("Not able to post message to WDA");
+		qdf_mem_free(arp_get_param);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS sme_set_peer_param(uint8_t *peer_addr, uint32_t param_id,
 			      uint32_t param_value, uint32_t vdev_id)
 {
@@ -16557,4 +16629,40 @@ QDF_STATUS sme_get_chain_rssi(tHalHandle hal,
 
 	SME_EXIT();
 	return status;
+}
+
+void sme_display_disconnect_stats(tHalHandle hal, uint8_t session_id)
+{
+	struct csr_roam_session *session;
+	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal);
+
+	if (!CSR_IS_SESSION_VALID(mac_ctx, session_id)) {
+		sme_err("%s Invalid session id: %d", __func__, session_id);
+		return;
+	}
+
+	session = CSR_GET_SESSION(mac_ctx, session_id);
+	if (!session) {
+		sme_err("%s Failed to get session for id: %d",
+			__func__, session_id);
+		return;
+	}
+
+	sme_debug("Total No. of Disconnections: %d",
+		  session->disconnect_stats.disconnection_cnt);
+
+	sme_debug("No. of Diconnects Triggered by Application: %d",
+		  session->disconnect_stats.disconnection_by_app);
+
+	sme_debug("No. of Disassoc Sent by Peer: %d",
+		  session->disconnect_stats.disassoc_by_peer);
+
+	sme_debug("No. of Deauth Sent by Peer: %d",
+		  session->disconnect_stats.deauth_by_peer);
+
+	sme_debug("No. of Disconnections due to Beacon Miss: %d",
+		  session->disconnect_stats.bmiss);
+
+	sme_debug("No. of Disconnections due to Peer Kickout: %d",
+		  session->disconnect_stats.peer_kickout);
 }

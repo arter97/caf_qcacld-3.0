@@ -330,6 +330,13 @@
 /* Default Psoc id */
 #define DEFAULT_PSOC_ID 1
 
+/* wait time for nud stats in milliseconds */
+#define WLAN_WAIT_TIME_NUD_STATS 800
+/* nud stats skb max length */
+#define WLAN_NUD_STATS_LEN 800
+/* ARP packet type for NUD debug stats */
+#define WLAN_NUD_STATS_ARP_PKT_TYPE 1
+
 /*
  * Generic asynchronous request/response support
  *
@@ -436,6 +443,20 @@ struct hdd_pmf_stats {
 };
 #endif
 
+struct hdd_arp_stats_s {
+	uint16_t tx_count;
+	uint16_t rx_count;
+	uint16_t tx_dropped;
+	uint16_t rx_dropped;
+	uint16_t rx_delivered;
+	uint16_t rx_refused;
+	uint16_t tx_host_fw_sent;
+	uint16_t rx_host_drop_reorder;
+	uint16_t tx_fw_cnt;
+	uint16_t rx_fw_cnt;
+	uint16_t tx_ack_cnt;
+};
+
 /**
  * struct hdd_stats - per-adapter statistics
  * @summary_stat: Summary stats reported by firmware
@@ -451,6 +472,7 @@ struct hdd_stats {
 	tCsrGlobalClassDStatsInfo ClassD_stat;
 	struct csr_per_chain_rssi_stats_info  per_chain_rssi_stats;
 	hdd_tx_rx_stats_t hddTxRxStats;
+	struct hdd_arp_stats_s hdd_arp_stats;
 #ifdef WLAN_FEATURE_11W
 	struct hdd_pmf_stats hddPmfStats;
 #endif
@@ -1313,6 +1335,8 @@ struct hdd_adapter {
 	 * to cater to multiple application.
 	 */
 	u8 restrict_offchannel_cnt;
+	bool con_status;
+	bool dad;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(pAdapter) (&(pAdapter)->sessionCtx.station)
@@ -1509,6 +1533,14 @@ enum hdd_sta_smps_param {
 	HDD_STA_SMPS_PARAM_UPPER_BRSSI_THRESH = 3,
 	HDD_STA_SMPS_PARAM_LOWER_BRSSI_THRESH = 4,
 	HDD_STA_SMPS_PARAM_DTIM_1CHRX_ENABLE = 5
+};
+
+/**
+ * struct hdd_nud_stats_context - hdd NUD stats context
+ * @response_event: NUD stats request wait event
+ */
+struct hdd_nud_stats_context {
+	struct completion response_event;
 };
 
 /** Adapter structure definition */
@@ -1810,6 +1842,7 @@ struct hdd_context {
 #endif
 	uint8_t bt_a2dp_active:1;
 	uint8_t bt_vo_active:1;
+	struct hdd_nud_stats_context nud_stats_context;
 	eCsrBand curr_band;
 };
 
@@ -2230,6 +2263,18 @@ QDF_STATUS wlan_hdd_check_custom_con_channel_rules(struct hdd_adapter *sta_adapt
 						  bool *concurrent_chnl_same);
 void wlan_hdd_stop_sap(struct hdd_adapter *ap_adapter);
 void wlan_hdd_start_sap(struct hdd_adapter *ap_adapter, bool reinit);
+
+/**
+ * hdd_init_nud_stats_ctx() - initialize NUD stats context
+ * @hdd_ctx: Pointer to hdd context
+ *
+ * Return: none
+ */
+static inline void hdd_init_nud_stats_ctx(struct hdd_context *hdd_ctx)
+{
+	init_completion(&hdd_ctx->nud_stats_context.response_event);
+	return;
+}
 
 void wlan_hdd_soc_set_antenna_mode_cb(enum set_antenna_mode_status status);
 
@@ -2740,6 +2785,11 @@ static inline void hdd_clear_fils_connection_info(struct hdd_adapter *adapter)
 #endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+static inline void hdd_dev_setup_destructor(struct net_device *dev)
+{
+	dev->destructor = free_netdev;
+}
+
 static inline int
 hdd_nla_parse(struct nlattr **tb, int maxtype, const struct nlattr *head,
 	      int len, const struct nla_policy *policy)
@@ -2747,13 +2797,18 @@ hdd_nla_parse(struct nlattr **tb, int maxtype, const struct nlattr *head,
 	return nla_parse(tb, maxtype, head, len, policy);
 }
 #else
+static inline void hdd_dev_setup_destructor(struct net_device *dev)
+{
+	dev->needs_free_netdev = true;
+}
+
 static inline int
 hdd_nla_parse(struct nlattr **tb, int maxtype, const struct nlattr *head,
 	      int len, const struct nla_policy *policy)
 {
 	return nla_parse(tb, maxtype, head, len, policy, NULL);
 }
-#endif
+#endif /* KERNEL_VERSION(4, 12, 0) */
 
 /**
  * hdd_dp_trace_init() - initialize DP Trace by calling the QDF API

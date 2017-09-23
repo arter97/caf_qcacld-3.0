@@ -1985,6 +1985,96 @@ enum hdd_dot11_mode {
 
 /*
  * <ini>
+ * roam_bg_scan_bad_rssi_thresh - RSSI threshold for background roam
+ * @Min: -96
+ * @Max: 0
+ * @Default: -76
+ *
+ * If the DUT is connected to an AP with weak signal, then the bad RSSI
+ * threshold will be used as an opportunity to use the scan results
+ * from other scan clients and try to roam if there is a better AP
+ * available in the environment.
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ROAM_BG_SCAN_BAD_RSSI_THRESHOLD_NAME  "roam_bg_scan_bad_rssi_thresh"
+#define CFG_ROAM_BG_SCAN_BAD_RSSI_THRESHOLD_MIN     (-96)
+#define CFG_ROAM_BG_SCAN_BAD_RSSI_THRESHOLD_MAX     (0)
+#define CFG_ROAM_BG_SCAN_BAD_RSSI_THRESHOLD_DEFAULT (-76)
+
+/*
+ * <ini>
+ * roam_bg_scan_client_bitmap - Bitmap used to identify the scan clients
+ * @Min: 0
+ * @Max: 0x3FF
+ * @Default: 0x
+ *
+ * This bitmap is used to define the client scans that need to be used
+ * by the roaming module to perform a background roaming.
+ * Currently supported bit positions are as follows:
+ * Bit 0 is reserved in the firmware.
+ * WMI_SCAN_CLIENT_NLO - 1
+ * WMI_SCAN_CLIENT_EXTSCAN - 2
+ * WMI_SCAN_CLIENT_ROAM - 3
+ * WMI_SCAN_CLIENT_P2P - 4
+ * WMI_SCAN_CLIENT_LPI - 5
+ * WMI_SCAN_CLIENT_NAN - 6
+ * WMI_SCAN_CLIENT_ANQP - 7
+ * WMI_SCAN_CLIENT_OBSS - 8
+ * WMI_SCAN_CLIENT_PLM - 9
+ * WMI_SCAN_CLIENT_HOST - 10
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ROAM_BG_SCAN_CLIENT_BITMAP_NAME     "roam_bg_scan_client_bitmap"
+#define CFG_ROAM_BG_SCAN_CLIENT_BITMAP_MIN      (0)
+#define CFG_ROAM_BG_SCAN_CLIENT_BITMAP_MAX      (0x7FF)
+#define CFG_ROAM_BG_SCAN_CLIENT_BITMAP_DEFAULT  (0x424)
+
+/*
+ * <ini>
+ * roam_bad_rssi_thresh_offset_2g - RSSI threshold offset for 2G to 5G roam
+ * @Min: 0
+ * @Max: 86
+ * @Default: 40
+ *
+ * If the DUT is connected to an AP with weak signal in 2G band, then the
+ * bad RSSI offset for 2g would be used as offset from the bad RSSI
+ * threshold configured and then use the resulting rssi for an opportunity
+ * to use the scan results from other scan clients and try to roam to
+ * 5G Band ONLY if there is a better AP available in the environment.
+ *
+ * For example if the roam_bg_scan_bad_rssi_thresh is -76 and
+ * roam_bad_rssi_thresh_offset_2g is 40 then the difference of -36 would be
+ * used as a trigger to roam to a 5G AP if DUT initially connected to a 2G AP
+ *
+ * Related: roam_bg_scan_bad_rssi_thresh
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ROAM_BG_SCAN_BAD_RSSI_OFFSET_2G_NAME "roam_bad_rssi_thresh_offset_2g"
+#define CFG_ROAM_BG_SCAN_BAD_RSSI_OFFSET_2G_MIN     (0)
+#define CFG_ROAM_BG_SCAN_BAD_RSSI_OFFSET_2G_MAX     (86)
+#define CFG_ROAM_BG_SCAN_BAD_RSSI_OFFSET_2G_DEFAULT (40)
+
+/*
+ * <ini>
  * roamscan_adaptive_dwell_mode - Sets dwell time adaptive mode
  * @Min: 0
  * @Max: 4
@@ -5623,6 +5713,30 @@ enum hdd_link_speed_rpt_type {
 #define CFG_FORCE_SAP_ACS_END_CH_DEFAULT   (11)
 
 /*
+ * <ini>
+ * gEnableSAPManadatoryChanList - Enable SAP Mandatory channel list
+ * Options.
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable/disable the SAP manadatory chan list
+ * 0 - Disable SAP mandatory chan list
+ * 1 - Enable SAP mandatory chan list
+ *
+ * Supported Feature: SAP
+ *
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_SAP_MANDATORY_CHAN_LIST       "gEnableSAPManadatoryChanList"
+#define CFG_ENABLE_SAP_MANDATORY_CHAN_LIST_MIN   (0)
+#define CFG_ENABLE_SAP_MANDATORY_CHAN_LIST_MAX   (1)
+#define CFG_ENABLE_SAP_MANDATORY_CHAN_LIST_DEFAULT (0)
+
+/*
  * Skip DFS Channel in case of P2P Search
  * Options
  * 0 - Don't Skip DFS Channel in case of P2P Search
@@ -6603,6 +6717,15 @@ enum hdd_link_speed_rpt_type {
 #define CFG_TDLS_EXTERNAL_CONTROL_MIN               (0)
 #define CFG_TDLS_EXTERNAL_CONTROL_MAX               (1)
 #define CFG_TDLS_EXTERNAL_CONTROL_DEFAULT           (1)
+
+/*
+ * This INI item is used to control subsystem restart(SSR) test framework
+ * Set it's value to 1 to enable APPS trigerred SSR testing
+ */
+#define CFG_ENABLE_CRASH_INJECT         "gEnableForceTargetAssert"
+#define CFG_ENABLE_CRASH_INJECT_MIN     (0)
+#define CFG_ENABLE_CRASH_INJECT_MAX     (1)
+#define CFG_ENABLE_CRASH_INJECT_DEFAULT (0)
 
 /*
  * <ini>
@@ -11455,6 +11578,92 @@ enum l1ss_sleep_allowed {
 #define CFG_SCAN_BACKOFF_MULTIPLIER_DEFAULT	(0)
 
 /*
+ * <ini>
+ * mawc_nlo_enabled - For NLO/PNO, enable MAWC based scan
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * Enable/Disable the Motion Aided Wireless Connectivity
+ * based NLO using this parameter
+ *
+ * Related: NLO, PNO
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+#define CFG_MAWC_NLO_ENABLED_NAME	"mawc_nlo_enabled"
+#define CFG_MAWC_NLO_ENABLED_MIN	(0)
+#define CFG_MAWC_NLO_ENABLED_MAX	(1)
+#define CFG_MAWC_NLO_ENABLED_DEFAULT	(1)
+
+/*
+ * <ini>
+ * mawc_nlo_exp_backoff_ratio - Exponential back off ratio
+ * @Min: 0
+ * @Max: 300
+ * @Default: 3
+ *
+ * Configure the exponential back off ratio using this
+ * parameter for MAWC based NLO
+ * ratio of exponential backoff, next = current + current*ratio/100
+ *
+ * Related: NLO, PNO
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+#define CFG_MAWC_NLO_EXP_BACKOFF_RATIO_NAME     "mawc_nlo_exp_backoff_ratio"
+#define CFG_MAWC_NLO_EXP_BACKOFF_RATIO_MIN      (0)
+#define CFG_MAWC_NLO_EXP_BACKOFF_RATIO_MAX      (300)
+#define CFG_MAWC_NLO_EXP_BACKOFF_RATIO_DEFAULT  (3)
+
+/*
+ * <ini>
+ * mawc_nlo_init_scan_interval - Initial Scan Interval
+ * @Min: 1000
+ * @Max: 0xFFFFFFFF
+ * @Default: 10000
+ *
+ * Configure the initial scan interval  using this
+ * parameter for MAWC based NLO (Units in Milliseconds)
+ *
+ * Related: NLO, PNO
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+#define CFG_MAWC_NLO_INIT_SCAN_INTERVAL_NAME     "mawc_nlo_init_scan_interval"
+#define CFG_MAWC_NLO_INIT_SCAN_INTERVAL_MIN      (1000)
+#define CFG_MAWC_NLO_INIT_SCAN_INTERVAL_MAX      (0xFFFFFFFF)
+#define CFG_MAWC_NLO_INIT_SCAN_INTERVAL_DEFAULT  (10000)
+
+/*
+ * <ini>
+ * mawc_nlo_max_scan_interval - Maximum Scan Interval
+ * @Min: 1000
+ * @Max: 0xFFFFFFFF
+ * @Default: 60000
+ *
+ * Configure the maximum scan interval  using this
+ * parameter for MAWC based NLO (Units in Milliseconds)
+ *
+ * Related: NLO, PNO
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+#define CFG_MAWC_NLO_MAX_SCAN_INTERVAL_NAME     "mawc_nlo_max_scan_interval"
+#define CFG_MAWC_NLO_MAX_SCAN_INTERVAL_MIN      (1000)
+#define CFG_MAWC_NLO_MAX_SCAN_INTERVAL_MAX      (0xFFFFFFFF)
+#define CFG_MAWC_NLO_MAX_SCAN_INTERVAL_DEFAULT  (60000)
+
+
+/*
  * enum hdd_external_acs_policy - External ACS policy
  * @HDD_EXTERNAL_ACS_PCL_PREFERRED -Preferable for ACS to select a
  *	channel with non-zero pcl weight.
@@ -11830,6 +12039,35 @@ enum hdd_external_acs_freq_band {
 #define CFG_SCAN_11D_INTERVAL_DEFAULT   (3600000)
 #define CFG_SCAN_11D_INTERVAL_MIN       (1000)
 #define CFG_SCAN_11D_INTERVAL_MAX       (36000000)
+
+/*
+ * <ini>
+ * gChanSwitchHostapdRateEnabled - Enable/disable hostapd rate when doing SAP
+ * channel switch
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to set supported rates calculated from hostapd.conf file
+ * or not when doing SAP channel switch. It must set it to 0 when cross-band
+ * channel switch happens such as from 2G to 5G or 5G to 2G.
+ *
+ * Related: When doing SAP channel switch, if gChanSwitchHostapdRateEnabled is
+ * set to 1, supported rates will be calculated from hostapd.conf file,
+ * if gChanSwitchHostapdRateEnabled is set to 0, supported rates will be
+ * calculated from driver default rates.
+ *
+ * Supported Feature: SAP
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_CHAN_SWITCH_HOSTAPD_RATE_ENABLED_NAME \
+	"gChanSwitchHostapdRateEnabled"
+#define CFG_CHAN_SWITCH_HOSTAPD_RATE_ENABLED_MIN     (0)
+#define CFG_CHAN_SWITCH_HOSTAPD_RATE_ENABLED_MAX     (1)
+#define CFG_CHAN_SWITCH_HOSTAPD_RATE_ENABLED_DEFAULT (0)
 
 /*
  * Type declarations
@@ -12351,9 +12589,13 @@ struct hdd_config {
 	uint32_t egap_inact_time;
 	uint32_t egap_wait_time;
 #endif
+	/* Flag to indicate crash inject enabled or not */
+	bool crash_inject_enabled;
 	uint8_t force_sap_acs;
 	uint8_t force_sap_acs_st_ch;
 	uint8_t force_sap_acs_end_ch;
+
+	bool enable_sap_mandatory_chan_list;
 
 	int32_t dfsRadarPriMultiplier;
 	uint8_t reorderOffloadSupport;
@@ -12478,6 +12720,9 @@ struct hdd_config {
 	uint32_t roam_dense_rssi_thresh_offset;
 	bool ignore_peer_ht_opmode;
 	uint32_t roam_dense_min_aps;
+	int8_t roam_bg_scan_bad_rssi_thresh;
+	uint8_t roam_bad_rssi_thresh_offset_2g;
+	uint32_t roam_bg_scan_client_bitmap;
 	bool enable_edca_params;
 	uint32_t edca_vo_cwmin;
 	uint32_t edca_vi_cwmin;
@@ -12597,6 +12842,10 @@ struct hdd_config {
 	uint32_t timer_multiplier;
 	uint8_t fils_max_chan_guard_time;
 	uint8_t scan_backoff_multiplier;
+	bool mawc_nlo_enabled;
+	uint32_t mawc_nlo_exp_backoff_ratio;
+	uint32_t mawc_nlo_init_scan_interval;
+	uint32_t mawc_nlo_max_scan_interval;
 	enum hdd_external_acs_policy external_acs_policy;
 	enum hdd_external_acs_freq_band external_acs_freq_band;
 	/* threshold of packet drops at which FW initiates disconnect */
@@ -12631,6 +12880,7 @@ struct hdd_config {
 	int8_t rssi_thresh_offset_5g;
 	bool is_ndi_mac_randomized;
 	uint32_t scan_11d_interval;
+	bool chan_switch_hostapd_rate_enabled;
 };
 
 #define VAR_OFFSET(_Struct, _Var) (offsetof(_Struct, _Var))

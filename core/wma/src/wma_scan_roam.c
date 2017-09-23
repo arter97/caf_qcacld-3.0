@@ -899,7 +899,13 @@ QDF_STATUS wma_roam_scan_offload_rssi_thresh(tp_wma_handle wma_handle,
 	params.traffic_threshold =
 			roam_params->traffic_threshold;
 	params.initial_dense_status = roam_params->initial_dense_status;
-
+	params.bg_scan_bad_rssi_thresh = roam_params->bg_scan_bad_rssi_thresh -
+		WMA_NOISE_FLOOR_DBM_DEFAULT;
+	params.bg_scan_client_bitmap = roam_params->bg_scan_client_bitmap;
+	params.roam_bad_rssi_thresh_offset_2g =
+				roam_params->roam_bad_rssi_thresh_offset_2g;
+	if (params.roam_bad_rssi_thresh_offset_2g)
+		params.flags |= WMI_ROAM_BG_SCAN_FLAGS_2G_TO_5G_ONLY;
 
 	/*
 	 * The current Noise floor in firmware is -96dBm. Penalty/Boost
@@ -957,8 +963,10 @@ QDF_STATUS wma_roam_scan_offload_rssi_thresh(tp_wma_handle wma_handle,
 
 	status = wmi_unified_roam_scan_offload_rssi_thresh_cmd(
 			wma_handle->wmi_handle, &params);
-	if (QDF_IS_STATUS_ERROR(status))
+	if (QDF_IS_STATUS_ERROR(status)) {
+		WMA_LOGE("roam_scan_offload_rssi_thresh_cmd failed %d", status);
 		return status;
+	}
 
 	WMA_LOGD(FL("roam_scan_rssi_thresh=%d, roam_rssi_thresh_diff=%d"),
 		rssi_thresh, rssi_thresh_diff);
@@ -971,6 +979,10 @@ QDF_STATUS wma_roam_scan_offload_rssi_thresh(tp_wma_handle wma_handle,
 			roam_params->dense_min_aps_cnt,
 			roam_params->traffic_threshold,
 			roam_params->initial_dense_status);
+	WMA_LOGD(FL("BG Scan Bad RSSI:%d, bitmap:0x%x Offset for 2G to 5G Roam:%d"),
+			roam_params->bg_scan_bad_rssi_thresh,
+			roam_params->bg_scan_client_bitmap,
+			roam_params->roam_bad_rssi_thresh_offset_2g);
 	return status;
 }
 
@@ -5422,88 +5434,6 @@ QDF_STATUS wma_scan_probe_setoui(tp_wma_handle wma, tSirScanMacOui *psetoui)
 	return wmi_unified_scan_probe_setoui_cmd(wma->wmi_handle,
 						&set_oui);
 }
-
-/**
- * wma_scan_event_callback() - scan event callback
- * @handle: wma handle
- * @data: event data
- * @len: data length
- *
- * This function process scan event and provide indication
- * to upper layers.
- *
- * Return: 0 for success or error code.
- */
-int wma_scan_event_callback(WMA_HANDLE handle, uint8_t *data,
-			    uint32_t len)
-{
-	tp_wma_handle wma_handle = (tp_wma_handle) handle;
-	WMI_SCAN_EVENTID_param_tlvs *param_buf = NULL;
-	wmi_scan_event_fixed_param *wmi_event = NULL;
-	tSirScanOffloadEvent *scan_event;
-	uint8_t vdev_id;
-	uint32_t scan_id;
-
-	param_buf = (WMI_SCAN_EVENTID_param_tlvs *) data;
-	wmi_event = param_buf->fixed_param;
-	vdev_id = wmi_event->vdev_id;
-	scan_id = wma_handle->interfaces[vdev_id].scan_info.scan_id;
-
-	scan_event = (tSirScanOffloadEvent *) qdf_mem_malloc
-			     (sizeof(tSirScanOffloadEvent));
-	if (!scan_event) {
-		WMA_LOGE("Memory allocation failed for tSirScanOffloadEvent");
-		return -ENOMEM;
-	}
-
-	WMA_LOGD("scan_event: %u, id: 0x%x, requestor: 0x%x, freq: %u, reason: %u",
-		 wmi_event->event, wmi_event->scan_id, wmi_event->requestor,
-		 wmi_event->channel_freq, wmi_event->reason);
-
-	scan_event->event = wmi_event->event;
-	scan_event->scanId = wmi_event->scan_id;
-	scan_event->requestor = wmi_event->requestor;
-	scan_event->chanFreq = wmi_event->channel_freq;
-	scan_event->sessionId = vdev_id;
-	scan_event->reasonCode = eSIR_SME_SCAN_FAILED;
-
-	switch (wmi_event->event) {
-	case WMI_SCAN_EVENT_COMPLETED:
-	case WMI_SCAN_EVENT_DEQUEUED:
-		/*
-		 * return success always so that SME can pick whatever scan
-		 * results is available in scan cache(due to partial or
-		 * aborted scan)
-		 */
-		scan_event->event = WMI_SCAN_EVENT_COMPLETED;
-		scan_event->reasonCode = eSIR_SME_SUCCESS;
-		break;
-	case WMI_SCAN_EVENT_START_FAILED:
-		scan_event->event = WMI_SCAN_EVENT_COMPLETED;
-		scan_event->reasonCode = eSIR_SME_SCAN_FAILED;
-		break;
-	case WMI_SCAN_EVENT_PREEMPTED:
-		WMA_LOGW("%s: Unhandled Scan Event WMI_SCAN_EVENT_PREEMPTED",
-			 __func__);
-		break;
-	case WMI_SCAN_EVENT_RESTARTED:
-		WMA_LOGW("%s: Unhandled Scan Event WMI_SCAN_EVENT_RESTARTED",
-			 __func__);
-		break;
-	}
-
-	/* Stop scan completion timeout if event is WMI_SCAN_EVENT_COMPLETED */
-	if (scan_event->event ==
-			(enum sir_scan_event_type) WMI_SCAN_EVENT_COMPLETED) {
-		WMA_LOGI("scan complete:scan_id 0x%x, requestor 0x%x, vdev %d",
-			 wmi_event->scan_id, wmi_event->requestor, vdev_id);
-	}
-
-	wma_send_msg(wma_handle, WMA_RX_SCAN_EVENT, (void *)scan_event, 0);
-
-	return 0;
-}
-
 /**
  * wma_roam_better_ap_handler() - better ap event handler
  * @wma: wma handle

@@ -723,7 +723,7 @@ typedef struct sSirSmeStartBssReq {
 
 	bool obssEnabled;
 	uint8_t sap_dot11mc;
-	uint8_t beacon_tx_rate;
+	uint16_t beacon_tx_rate;
 	bool vendor_vht_sap;
 	uint32_t cac_duration_ms;
 	uint32_t dfs_regdomain;
@@ -3059,6 +3059,9 @@ typedef enum {
  *                              current AP to avoid ping pong effects
  * @good_rssi_roam:             Lazy Roam
  * @is_5g_pref_enabled:         5GHz BSSID preference feature enable/disable.
+ * @bg_scan_bad_rssi_thresh:    Bad RSSI threshold to perform bg scan.
+ * @bad_rssi_thresh_offset_2g:  Offset from Bad RSSI threshold for 2G to 5G Roam
+ * @bg_scan_client_bitmap:      Bitmap to identify the client scans to snoop.
  *
  * This structure holds all the key parameters related to
  * initial connection and also roaming connections.
@@ -3089,6 +3092,9 @@ struct roam_ext_params {
 	int traffic_threshold;
 	uint8_t num_rssi_rejection_ap;
 	struct rssi_disallow_bssid rssi_rejection_ap[MAX_RSSI_AVOID_BSSID_LIST];
+	int8_t bg_scan_bad_rssi_thresh;
+	uint8_t roam_bad_rssi_thresh_offset_2g;
+	uint32_t bg_scan_client_bitmap;
 };
 
 /**
@@ -7523,6 +7529,53 @@ struct sir_del_all_tdls_peers {
 	uint16_t msg_type;
 	uint16_t msg_len;
 	struct qdf_mac_addr bssid;
+};
+
+/**
+ * struct rsp_stats - arp packet stats
+ * @arp_req_enqueue: fw tx count
+ * @arp_req_tx_success: tx ack count
+ * @arp_req_tx_failure: tx ack fail count
+ * @arp_rsp_recvd: rx fw count
+ * @out_of_order_arp_rsp_drop_cnt: out of order count
+ * @dad_detected: dad detected
+ * @connect_status: connection status
+ * @ba_session_establishment_status: BA session status
+ */
+struct rsp_stats {
+	uint32_t vdev_id;
+	uint32_t arp_req_enqueue;
+	uint32_t arp_req_tx_success;
+	uint32_t arp_req_tx_failure;
+	uint32_t arp_rsp_recvd;
+	uint32_t out_of_order_arp_rsp_drop_cnt;
+	uint32_t dad_detected;
+	uint32_t connect_status;
+	uint32_t ba_session_establishment_status;
+};
+
+/**
+ * struct set_arp_stats_params - set/reset arp stats
+ * @vdev_id: session id
+ * @flag: enable/disable stats
+ * @pkt_type: type of packet(1 - arp)
+ * @ip_addr: subnet ipv4 address in case of encrypted packets
+ */
+struct set_arp_stats_params {
+	uint32_t vdev_id;
+	uint8_t flag;
+	uint8_t pkt_type;
+	uint32_t ip_addr;
+};
+
+/**
+ * struct get_arp_stats_params - get arp stats from firmware
+ * @pkt_type: packet type(1 - ARP)
+ * @vdev_id: session id
+ */
+struct get_arp_stats_params {
+	uint8_t pkt_type;
+	uint32_t vdev_id;
 };
 
 /*

@@ -609,6 +609,8 @@ void wma_set_vdev_intrabss_fwd(tp_wma_handle wma_handle,
 
 void wma_delete_bss_ho_fail(tp_wma_handle wma, tpDeleteBssParams params);
 
+uint32_t wma_get_bcn_rate_code(uint16_t rate);
+
 /*
  * wma_mgmt.c functions declarations
  */
@@ -1287,6 +1289,8 @@ wma_send_vdev_start_to_fw(t_wma_handle *wma, struct vdev_start_params *params);
  * Return: QDF_STATUS
  */
 QDF_STATUS wma_send_vdev_stop_to_fw(t_wma_handle *wma, uint8_t vdev_id);
+
+int wma_get_arp_stats_handler(void *handle, uint8_t *data, uint32_t data_len);
 
 /**
  * wma_send_vdev_up_to_fw() - send the vdev up command to firmware

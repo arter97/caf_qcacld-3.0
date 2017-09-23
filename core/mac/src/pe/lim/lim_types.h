@@ -197,7 +197,7 @@ typedef struct sLimMlmStartReq {
 	uint8_t ssidHidden;
 	uint8_t wps_state;
 	uint8_t obssProtEnabled;
-	uint8_t beacon_tx_rate;
+	uint16_t beacon_tx_rate;
 	uint32_t cac_duration_ms;
 	uint32_t dfs_regdomain;
 } tLimMlmStartReq, *tpLimMlmStartReq;
@@ -920,8 +920,6 @@ QDF_STATUS lim_deauth_tx_complete_cnf(void *context,
 typedef struct sSetLinkCbackParams {
 	void *cbackDataPtr;
 } tSetLinkCbackParams;
-
-void lim_process_rx_scan_event(tpAniSirGlobal mac, void *buf);
 
 int lim_process_remain_on_chnl_req(tpAniSirGlobal pMac, uint32_t *pMsg);
 void lim_remain_on_chn_rsp(tpAniSirGlobal pMac, QDF_STATUS status, uint32_t *data);

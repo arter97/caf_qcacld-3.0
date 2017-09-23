@@ -85,6 +85,7 @@
 #include "wlan_hdd_he.h"
 #include "wlan_dfs_tgt_api.h"
 #include <wlan_reg_ucfg_api.h>
+#include "wlan_utility.h"
 
 #define    IS_UP(_dev) \
 	(((_dev)->flags & (IFF_RUNNING|IFF_UP)) == (IFF_RUNNING|IFF_UP))
@@ -629,7 +630,7 @@ static void hdd_hostapd_inactivity_timer_cb(void *context)
 		 */
 		pHostapdAdapter = netdev_priv(dev);
 		if (WLAN_HDD_ADAPTER_MAGIC != pHostapdAdapter->magic) {
-			hdd_err("invalid adapter: %p", pHostapdAdapter);
+			hdd_err("invalid adapter: %pK", pHostapdAdapter);
 			return;
 		}
 		pHddApCtx = WLAN_HDD_GET_AP_CTX_PTR(pHostapdAdapter);
@@ -1342,7 +1343,6 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 	int i = 0;
 	uint8_t staId;
 	QDF_STATUS qdf_status;
-	bool bWPSState;
 	bool bAuthRequired = true;
 	tpSap_AssocMacAddr pAssocStasArray = NULL;
 	char unknownSTAEvent[IW_CUSTOM_MAX + 1];
@@ -1434,7 +1434,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 		else
 			pHddApCtx->dfs_cac_block_tx = true;
 
-		hdd_debug("The value of dfs_cac_block_tx[%d] for ApCtx[%p]:%d",
+		hdd_debug("The value of dfs_cac_block_tx[%d] for ApCtx[%pK]:%d",
 				pHddApCtx->dfs_cac_block_tx, pHddApCtx,
 				pHostapdAdapter->sessionId);
 
@@ -1826,10 +1826,6 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 		       MAC_ADDR_ARRAY(wrqu.addr.sa_data));
 		we_event = IWEVREGISTERED;
 
-		wlansap_get_wps_state(
-			WLAN_HDD_GET_SAP_CTX_PTR(pHostapdAdapter),
-			&bWPSState);
-
 		if ((eCSR_ENCRYPT_TYPE_NONE == pHddApCtx->ucEncryptType) ||
 		    (eCSR_ENCRYPT_TYPE_WEP40_STATICKEY ==
 		     pHddApCtx->ucEncryptType)
@@ -1838,7 +1834,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 			bAuthRequired = false;
 		}
 
-		if (bAuthRequired || bWPSState == true) {
+		if (bAuthRequired) {
 			qdf_status = hdd_softap_register_sta(
 						pHostapdAdapter,
 						true,
@@ -2929,6 +2925,10 @@ static int __iw_softap_set_two_ints_getnone(struct net_device *dev,
 	case QCSAP_IOCTL_SET_FW_CRASH_INJECT:
 		hdd_err("WE_SET_FW_CRASH_INJECT: %d %d",
 		       value[1], value[2]);
+		if (!hdd_ctx->config->crash_inject_enabled) {
+			hdd_err("Crash Inject ini disabled, Ignore Crash Inject");
+			return 0;
+		}
 		if (value[1] == 3) {
 			cds_trigger_recovery();
 			return 0;
@@ -6474,7 +6474,6 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *pAdapter, bool reinit)
 	struct net_device *dev = pAdapter->dev;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(pAdapter);
 	QDF_STATUS status;
-	v_CONTEXT_t p_cds_context = (WLAN_HDD_GET_CTX(pAdapter))->pcds_context;
 	v_CONTEXT_t sapContext = NULL;
 	int ret;
 	enum tQDF_ADAPTER_MODE mode;
@@ -6487,7 +6486,7 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *pAdapter, bool reinit)
 	if (reinit)
 		sapContext = pAdapter->sessionCtx.ap.sapContext;
 	else {
-		sapContext = wlansap_open(p_cds_context);
+		sapContext = wlansap_open();
 		if (sapContext == NULL) {
 			hdd_err("wlansap_open failed!!");
 			return QDF_STATUS_E_FAULT;
@@ -6678,7 +6677,7 @@ struct hdd_adapter *hdd_wlan_create_ap_dev(struct hdd_context *hdd_ctx,
 		pHostapdAdapter->magic = WLAN_HDD_ADAPTER_MAGIC;
 		pHostapdAdapter->sessionId = HDD_SESSION_ID_INVALID;
 
-		hdd_debug("pWlanHostapdDev = %p, pHostapdAdapter = %p, concurrency_mode=0x%x",
+		hdd_debug("pWlanHostapdDev = %pK, pHostapdAdapter = %pK, concurrency_mode=0x%x",
 			pWlanHostapdDev,
 			pHostapdAdapter,
 			(int)policy_mgr_get_concurrency_mode(
@@ -6705,7 +6704,7 @@ struct hdd_adapter *hdd_wlan_create_ap_dev(struct hdd_context *hdd_ctx,
 			     (void *)macAddr, sizeof(tSirMacAddr));
 
 		pHostapdAdapter->offloads_configured = false;
-		pWlanHostapdDev->destructor = free_netdev;
+		hdd_dev_setup_destructor(pWlanHostapdDev);
 		pWlanHostapdDev->ieee80211_ptr = &pHostapdAdapter->wdev;
 		pHostapdAdapter->wdev.wiphy = hdd_ctx->wiphy;
 		pHostapdAdapter->wdev.netdev = pWlanHostapdDev;
@@ -6811,10 +6810,10 @@ static bool wlan_hdd_get_sap_obss(struct hdd_adapter *pHostapdAdapter)
 	tDot11fIEHTCaps dot11_ht_cap_ie = {0};
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(pHostapdAdapter);
 	beacon_data_t *beacon = pHostapdAdapter->sessionCtx.ap.beacon;
-	uint8_t *ie = NULL;
+	const uint8_t *ie = NULL;
 
-	ie = wlan_hdd_cfg80211_get_ie_ptr(beacon->tail, beacon->tail_len,
-						WLAN_EID_HT_CAPABILITY);
+	ie = wlan_get_ie_ptr_from_eid(WLAN_EID_HT_CAPABILITY,
+					beacon->tail, beacon->tail_len);
 	if (ie && ie[1]) {
 		qdf_mem_copy(ht_cap_ie, &ie[2], DOT11F_IE_HTCAPS_MAX_LEN);
 		dot11f_unpack_ie_ht_caps((tpAniSirGlobal)hdd_ctx->hHal,
@@ -7023,8 +7022,8 @@ int wlan_hdd_set_channel(struct wiphy *wiphy,
  *
  * Return: none
  */
-static void wlan_hdd_check_11gmode(u8 *pIe, u8 *require_ht, u8 *require_vht,
-				   u8 *pCheckRatesfor11g,
+static void wlan_hdd_check_11gmode(const u8 *pIe, u8 *require_ht,
+				   u8 *require_vht, u8 *pCheckRatesfor11g,
 				   eCsrPhyMode *pSapHw_mode)
 {
 	u8 i, num_rates = pIe[0];
@@ -7449,21 +7448,21 @@ static void wlan_hdd_set_sap_hwmode(struct hdd_adapter *pHostapdAdapter)
 		(struct ieee80211_mgmt *)pBeacon->head;
 	u8 checkRatesfor11g = true;
 	u8 require_ht = false, require_vht = false;
-	u8 *pIe = NULL;
+	const u8 *pIe = NULL;
 
 	pConfig->SapHw_mode = eCSR_DOT11_MODE_11b;
 
-	pIe = wlan_hdd_cfg80211_get_ie_ptr(&pMgmt_frame->u.beacon.variable[0],
-					   pBeacon->head_len,
-					   WLAN_EID_SUPP_RATES);
+	pIe = wlan_get_ie_ptr_from_eid(WLAN_EID_HT_CAPABILITY,
+				       &pMgmt_frame->u.beacon.variable[0],
+				       pBeacon->head_len);
 	if (pIe != NULL) {
 		pIe += 1;
 		wlan_hdd_check_11gmode(pIe, &require_ht, &require_vht,
 			&checkRatesfor11g, &pConfig->SapHw_mode);
 	}
 
-	pIe = wlan_hdd_cfg80211_get_ie_ptr(pBeacon->tail, pBeacon->tail_len,
-					   WLAN_EID_EXT_SUPP_RATES);
+	pIe = wlan_get_ie_ptr_from_eid(WLAN_EID_EXT_SUPP_RATES,
+					pBeacon->tail, pBeacon->tail_len);
 	if (pIe != NULL) {
 		pIe += 1;
 		wlan_hdd_check_11gmode(pIe, &require_ht, &require_vht,
@@ -7473,18 +7472,16 @@ static void wlan_hdd_set_sap_hwmode(struct hdd_adapter *pHostapdAdapter)
 	if (pConfig->channel > 14)
 		pConfig->SapHw_mode = eCSR_DOT11_MODE_11a;
 
-	pIe = wlan_hdd_cfg80211_get_ie_ptr(pBeacon->tail, pBeacon->tail_len,
-					   WLAN_EID_HT_CAPABILITY);
-
+	pIe = wlan_get_ie_ptr_from_eid(WLAN_EID_HT_CAPABILITY,
+					pBeacon->tail, pBeacon->tail_len);
 	if (pIe) {
 		pConfig->SapHw_mode = eCSR_DOT11_MODE_11n;
 		if (require_ht)
 			pConfig->SapHw_mode = eCSR_DOT11_MODE_11n_ONLY;
 	}
 
-	pIe = wlan_hdd_cfg80211_get_ie_ptr(pBeacon->tail, pBeacon->tail_len,
-					   WLAN_EID_VHT_CAPABILITY);
-
+	pIe = wlan_get_ie_ptr_from_eid(WLAN_EID_VHT_CAPABILITY,
+					pBeacon->tail, pBeacon->tail_len);
 	if (pIe) {
 		pConfig->SapHw_mode = eCSR_DOT11_MODE_11ac;
 		if (require_vht)
@@ -7494,7 +7491,6 @@ static void wlan_hdd_set_sap_hwmode(struct hdd_adapter *pHostapdAdapter)
 	wlan_hdd_check_11ax_support(pBeacon, pConfig);
 
 	hdd_info("SAP hw_mode: %d", pConfig->SapHw_mode);
-
 }
 
 /**
@@ -7799,7 +7795,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *pHostapdAdapter,
 	tsap_Config_t *pConfig;
 	beacon_data_t *pBeacon = NULL;
 	struct ieee80211_mgmt *pMgmt_frame;
-	uint8_t *pIe = NULL;
+	const uint8_t *pIe = NULL;
 	uint16_t capab_info;
 	eCsrAuthType RSNAuthType;
 	eCsrEncryptionType RSNEncryptType;
@@ -7871,6 +7867,9 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *pHostapdAdapter,
 	/* Protection parameter to enable or disable */
 	pConfig->protEnabled = iniConfig->apProtEnabled;
 
+	pConfig->chan_switch_hostapd_rate_enabled =
+		iniConfig->chan_switch_hostapd_rate_enabled;
+
 	pConfig->enOverLapCh = iniConfig->gEnableOverLapCh;
 	pConfig->dtim_period = pBeacon->dtim_period;
 	hdd_debug("acs_mode %d", pConfig->acs_cfg.acs_mode);
@@ -7893,10 +7892,8 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *pHostapdAdapter,
 		pConfig->dtim_period);
 
 	if (pHostapdAdapter->device_mode == QDF_SAP_MODE) {
-		pIe =
-			wlan_hdd_cfg80211_get_ie_ptr(pBeacon->tail,
-						     pBeacon->tail_len,
-						     WLAN_EID_COUNTRY);
+		pIe = wlan_get_ie_ptr_from_eid(WLAN_EID_COUNTRY,
+					pBeacon->tail, pBeacon->tail_len);
 		if (pIe) {
 			pConfig->ieee80211d = 1;
 			qdf_mem_copy(pConfig->countryCode, &pIe[2], 3);
@@ -8009,8 +8006,8 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *pHostapdAdapter,
 
 	pConfig->RSNWPAReqIELength = 0;
 	memset(&pConfig->RSNWPAReqIE[0], 0, sizeof(pConfig->RSNWPAReqIE));
-	pIe = wlan_hdd_cfg80211_get_ie_ptr(pBeacon->tail, pBeacon->tail_len,
-					   WLAN_EID_RSN);
+	pIe = wlan_get_ie_ptr_from_eid(WLAN_EID_RSN, pBeacon->tail,
+				       pBeacon->tail_len);
 	if (pIe && pIe[1]) {
 		pConfig->RSNWPAReqIELength = pIe[1] + 2;
 		if (pConfig->RSNWPAReqIELength < sizeof(pConfig->RSNWPAReqIE))
@@ -8045,7 +8042,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *pHostapdAdapter,
 		}
 	}
 
-	pIe = wlan_hdd_get_vendor_oui_ie_ptr(WPA_OUI_TYPE, WPA_OUI_TYPE_SIZE,
+	pIe = wlan_get_vendor_ie_ptr_from_oui(WPA_OUI_TYPE, WPA_OUI_TYPE_SIZE,
 					     pBeacon->tail, pBeacon->tail_len);
 
 	if (pIe && pIe[1] && (pIe[0] == DOT11F_EID_WPA)) {
@@ -8146,10 +8143,9 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *pHostapdAdapter,
 		pConfig->cc_switch_mode = iniConfig->WlanMccToSccSwitchMode;
 #endif
 
-	pIe =
-		wlan_hdd_get_vendor_oui_ie_ptr(BLACKLIST_OUI_TYPE,
-					       WPA_OUI_TYPE_SIZE, pBeacon->tail,
-					       pBeacon->tail_len);
+	pIe = wlan_get_vendor_ie_ptr_from_oui(BLACKLIST_OUI_TYPE,
+					      WPA_OUI_TYPE_SIZE, pBeacon->tail,
+					      pBeacon->tail_len);
 
 	/* pIe for black list is following form:
 	 * type    : 1 byte
@@ -8173,7 +8169,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *pHostapdAdapter,
 			acl_entry++;
 		}
 	}
-	pIe = wlan_hdd_get_vendor_oui_ie_ptr(WHITELIST_OUI_TYPE,
+	pIe = wlan_get_vendor_ie_ptr_from_oui(WHITELIST_OUI_TYPE,
 			WPA_OUI_TYPE_SIZE, pBeacon->tail,
 			pBeacon->tail_len);
 
@@ -8202,9 +8198,9 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *pHostapdAdapter,
 	}
 	if (!hdd_ctx->config->force_sap_acs &&
 	    !(ssid && (0 == qdf_mem_cmp(ssid, PRE_CAC_SSID, ssid_len)))) {
-		pIe = wlan_hdd_cfg80211_get_ie_ptr(
-				&pMgmt_frame->u.beacon.variable[0],
-				pBeacon->head_len, WLAN_EID_SUPP_RATES);
+		pIe = wlan_get_ie_ptr_from_eid(WLAN_EID_SUPP_RATES,
+					&pMgmt_frame->u.beacon.variable[0],
+					pBeacon->head_len);
 
 		if (pIe != NULL) {
 			pIe++;
@@ -8219,9 +8215,9 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *pHostapdAdapter,
 				}
 			}
 		}
-		pIe = wlan_hdd_cfg80211_get_ie_ptr(pBeacon->tail,
-				pBeacon->tail_len,
-				WLAN_EID_EXT_SUPP_RATES);
+		pIe = wlan_get_ie_ptr_from_eid(WLAN_EID_EXT_SUPP_RATES,
+					       pBeacon->tail,
+					       pBeacon->tail_len);
 		if (pIe != NULL) {
 			pIe++;
 			pConfig->extended_rates.numRates = pIe[0];
@@ -8253,7 +8249,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *pHostapdAdapter,
 	 * Default: enable QOS for SAP unless WMM IE not present for 11bga
 	 */
 	sme_config->csrConfig.WMMSupportMode = eCsrRoamWmmAuto;
-	pIe = wlan_hdd_get_vendor_oui_ie_ptr(WMM_OUI_TYPE, WMM_OUI_TYPE_SIZE,
+	pIe = wlan_get_vendor_ie_ptr_from_oui(WMM_OUI_TYPE, WMM_OUI_TYPE_SIZE,
 					pBeacon->tail, pBeacon->tail_len);
 	if (!pIe && (pConfig->SapHw_mode == eCSR_DOT11_MODE_11a ||
 		pConfig->SapHw_mode == eCSR_DOT11_MODE_11g ||
@@ -8319,6 +8315,8 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *pHostapdAdapter,
 	       (int)pConfig->RSNWPAReqIELength, pConfig->UapsdEnable);
 	hdd_debug("ProtEnabled = %d, OBSSProtEnabled = %d",
 	       pConfig->protEnabled, pConfig->obssProtEnabled);
+	hdd_debug("ChanSwitchHostapdRateEnabled = %d",
+		pConfig->chan_switch_hostapd_rate_enabled);
 
 	if (test_bit(SOFTAP_BSS_STARTED, &pHostapdAdapter->event_flags)) {
 		wlansap_reset_sap_config_add_ie(pConfig, eUPDATE_IE_ALL);
@@ -8697,6 +8695,80 @@ int wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	return ret;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)) || \
+	defined(CFG80211_BEACON_TX_RATE_CUSTOM_BACKPORT)
+/**
+ * hdd_get_data_rate_from_rate_mask() - convert mask to rate
+ * @wiphy: Pointer to wiphy
+ * @band: band
+ * @bit_rate_mask: pointer to bit_rake_mask
+ *
+ * This function takes band and bit_rate_mask as input and
+ * derives the beacon_tx_rate based on the supported rates
+ * published as part of wiphy register.
+ *
+ * Return: data rate for success or zero for failure
+ */
+static uint16_t hdd_get_data_rate_from_rate_mask(struct wiphy *wiphy,
+		enum nl80211_band band,
+		struct cfg80211_bitrate_mask *bit_rate_mask)
+{
+	struct ieee80211_supported_band *sband = wiphy->bands[band];
+	int sband_n_bitrates;
+	struct ieee80211_rate *sband_bitrates;
+	int i;
+
+	if (sband) {
+		sband_bitrates = sband->bitrates;
+		sband_n_bitrates = sband->n_bitrates;
+		for (i = 0; i < sband_n_bitrates; i++) {
+			if (bit_rate_mask->control[band].legacy ==
+			    sband_bitrates[i].hw_value)
+				return sband_bitrates[i].bitrate;
+		}
+	}
+	return 0;
+}
+
+/**
+ * hdd_update_beacon_rate() - Update beacon tx rate
+ * @pAdapter: Pointer to hdd_adapter_t
+ * @wiphy: Pointer to wiphy
+ * @params: Pointet to cfg80211_ap_settings
+ *
+ * This function updates the beacon tx rate which is provided
+ * as part of cfg80211_ap_settions in to the sapConfig
+ * structure
+ *
+ * Return: none
+ */
+static void hdd_update_beacon_rate(struct hdd_adapter *adapter,
+		struct wiphy *wiphy,
+		struct cfg80211_ap_settings *params)
+{
+	struct cfg80211_bitrate_mask *beacon_rate_mask;
+	enum nl80211_band band;
+
+	band = params->chandef.chan->band;
+	beacon_rate_mask = &params->beacon_rate;
+	if (beacon_rate_mask->control[band].legacy) {
+		adapter->sessionCtx.ap.sapConfig.beacon_tx_rate =
+			hdd_get_data_rate_from_rate_mask(wiphy, band,
+					beacon_rate_mask);
+		hdd_debug("beacon mask value %u, rate %hu",
+			  params->beacon_rate.control[0].legacy,
+			  adapter->sessionCtx.ap.sapConfig.beacon_tx_rate);
+	}
+}
+#else
+static void hdd_update_beacon_rate(struct hdd_adapter *adapter,
+		struct wiphy *wiphy,
+		struct cfg80211_ap_settings *params)
+{
+}
+#endif
+
+
 /**
  * __wlan_hdd_cfg80211_start_ap() - start soft ap mode
  * @wiphy: Pointer to wiphy structure
@@ -8742,7 +8814,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	if (0 != status)
 		return status;
 
-	hdd_debug("pAdapter = %p, Device mode %s(%d) sub20 %d",
+	hdd_debug("pAdapter = %pK, Device mode %s(%d) sub20 %d",
 		pAdapter, hdd_device_mode_to_string(pAdapter->device_mode),
 		pAdapter->device_mode, cds_is_sub_20_mhz_enabled());
 
@@ -8882,6 +8954,8 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		wlan_hdd_set_channel(wiphy, dev,
 				     &params->chandef,
 				     channel_type);
+
+		hdd_update_beacon_rate(pAdapter, wiphy, params);
 
 		/* set authentication type */
 		switch (params->auth_type) {
@@ -9060,7 +9134,7 @@ void hdd_sap_indicate_disconnect_for_sta(struct hdd_adapter *adapter)
 {
 	tSap_Event sap_event;
 	int sta_id;
-	ptSapContext sap_ctx;
+	struct sap_context *sap_ctx;
 
 	ENTER();
 
@@ -9072,7 +9146,7 @@ void hdd_sap_indicate_disconnect_for_sta(struct hdd_adapter *adapter)
 
 	for (sta_id = 0; sta_id < WLAN_MAX_STA_COUNT; sta_id++) {
 		if (adapter->aStaInfo[sta_id].isUsed) {
-			hdd_debug("sta_id: %d isUsed: %d %p",
+			hdd_debug("sta_id: %d isUsed: %d %pK",
 				 sta_id, adapter->aStaInfo[sta_id].isUsed,
 				 adapter);
 
@@ -9108,7 +9182,7 @@ void hdd_sap_indicate_disconnect_for_sta(struct hdd_adapter *adapter)
  */
 void hdd_sap_destroy_events(struct hdd_adapter *adapter)
 {
-	ptSapContext sap_ctx;
+	struct sap_context *sap_ctx;
 
 	ENTER();
 	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
@@ -9118,12 +9192,6 @@ void hdd_sap_destroy_events(struct hdd_adapter *adapter)
 	}
 
 	qdf_event_destroy(&sap_ctx->sap_session_opened_evt);
-	if (!QDF_IS_STATUS_SUCCESS(
-		qdf_mutex_destroy(&sap_ctx->SapGlobalLock))) {
-		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
-			  "wlansap_stop failed destroy lock");
-		return;
-	}
 	EXIT();
 }
 

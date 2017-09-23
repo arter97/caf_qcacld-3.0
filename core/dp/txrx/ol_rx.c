@@ -795,6 +795,8 @@ ol_rx_sec_ind_handler(ol_txrx_pdev_handle pdev,
 			peer->tids_last_pn[i].pn128[0] =
 				qdf_cpu_to_le64(
 					peer->tids_last_pn[i].pn128[0]);
+			if (sec_index == txrx_sec_ucast)
+				peer->tids_rekey_flag[i] = 1;
 		}
 	}
 }
@@ -1505,8 +1507,7 @@ ol_rx_in_order_indication_handler(ol_txrx_pdev_handle pdev,
 	ol_rx_ind_record_event(filled, OL_RX_INDICATION_BUF_REPLENISH);
 
 	if (!head_msdu) {
-		ol_txrx_warn("%s: No packet to send to HDD",
-			     __func__);
+		ol_txrx_dbg("No packet to send to HDD");
 		return;
 	}
 

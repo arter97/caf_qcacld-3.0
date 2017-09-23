@@ -3228,6 +3228,10 @@ int hdd_wlan_dump_stats(struct hdd_adapter *adapter, int value)
 			ret = EFAULT;
 		}
 		break;
+	case CDP_DISCONNECT_STATS:
+		sme_display_disconnect_stats(WLAN_HDD_GET_HAL_CTX(adapter),
+						adapter->sessionId);
+		break;
 	default:
 		status = cdp_display_stats(cds_get_context(QDF_MODULE_ID_SOC),
 							value);
@@ -3911,7 +3915,7 @@ static void hdd_get_peer_rssi_cb(struct sir_peer_info_resp *sta_rssi,
 	uint8_t peer_num;
 
 	if ((!sta_rssi) || (!context)) {
-		hdd_err("Bad param, sta_rssi [%p] context [%p]",
+		hdd_err("Bad param, sta_rssi [%pK] context [%pK]",
 			sta_rssi, context);
 		return;
 	}
@@ -3958,7 +3962,7 @@ int wlan_hdd_get_peer_rssi(struct hdd_adapter *adapter,
 	};
 
 	if (!adapter || !macaddress || !peer_sta_info) {
-		hdd_err("pAdapter [%p], macaddress [%p], peer_sta_info[%p]",
+		hdd_err("pAdapter [%pK], macaddress [%pK], peer_sta_info[%pK]",
 			adapter, macaddress, peer_sta_info);
 		return -EFAULT;
 	}
@@ -4018,7 +4022,7 @@ static void wlan_hdd_get_peer_info_cb(struct sir_peer_info_ext_resp *sta_info,
 	uint8_t sta_num;
 
 	if ((!sta_info) || (!context)) {
-		hdd_err("Bad param, sta_info [%p] context [%p]",
+		hdd_err("Bad param, sta_info [%pK] context [%pK]",
 			sta_info, context);
 		return;
 	}
@@ -4219,49 +4223,6 @@ void hdd_clear_roam_profile_ie(struct hdd_adapter *pAdapter)
 
 	qdf_zero_macaddr(&pWextState->req_bssId);
 	EXIT();
-}
-
-/**
- * wlan_hdd_get_vendor_oui_ie_ptr() - Find a vendor OUI
- * @oui: The OUI that is being searched for
- * @oui_size: The length of @oui
- * @ie: The set of IEs within which we're trying to find @oui
- * @ie_len: The length of @ie
- *
- * This function will scan the IEs contained within @ie looking for @oui.
- *
- * Return: Pointer to @oui embedded within @ie if it is present, NULL
- * if @oui is not present within @ie.
- */
-uint8_t *wlan_hdd_get_vendor_oui_ie_ptr(uint8_t *oui, uint8_t oui_size,
-					uint8_t *ie, int ie_len)
-{
-	int left = ie_len;
-	uint8_t *ptr = ie;
-	uint8_t elem_id, elem_len;
-	uint8_t eid = 0xDD;
-
-	if (NULL == ie || 0 == ie_len)
-		return NULL;
-
-	while (left >= 2) {
-		elem_id = ptr[0];
-		elem_len = ptr[1];
-		left -= 2;
-		if (elem_len > left) {
-			hdd_err("Invalid IEs eid: %d elem_len: %d left: %d",
-				eid, elem_len, left);
-			return NULL;
-		}
-		if ((elem_id == eid) && (elem_len >= oui_size)) {
-			if (memcmp(&ptr[2], oui, oui_size) == 0)
-				return ptr;
-		}
-
-		left -= elem_len;
-		ptr += (elem_len + 2);
-	}
-	return NULL;
 }
 
 /**
@@ -6354,7 +6315,7 @@ static void hdd_get_class_a_statistics_cb(void *stats, void *context)
 
 	ENTER();
 	if ((NULL == stats) || (NULL == context)) {
-		hdd_err("Bad param, stats [%p] context [%p]",
+		hdd_err("Bad param, stats [%pK] context [%pK]",
 			stats, context);
 		return;
 	}
@@ -6465,7 +6426,7 @@ static void hdd_get_station_statistics_cb(void *stats, void *context)
 	struct csr_per_chain_rssi_stats_info *per_chain_rssi_stats;
 
 	if ((NULL == stats) || (NULL == context)) {
-		hdd_err("Bad param, pStats [%p] pContext [%p]",
+		hdd_err("Bad param, pStats [%pK] pContext [%pK]",
 			stats, context);
 		return;
 	}
@@ -12156,7 +12117,7 @@ static int __iw_set_packet_filter_params(struct net_device *dev,
 	}
 
 	if ((NULL == priv_data.pointer) || (0 == priv_data.length)) {
-		hdd_err("invalid priv data %p or invalid priv data length %d",
+		hdd_err("invalid priv data %pK or invalid priv data length %d",
 			priv_data.pointer, priv_data.length);
 		return -EINVAL;
 	}
@@ -13042,6 +13003,10 @@ static int __iw_set_two_ints_getnone(struct net_device *dev,
 		       value[1], value[2]);
 		pr_err("SSR is triggered by iwpriv CRASH_INJECT: %d %d\n",
 			   value[1], value[2]);
+		if (!hdd_ctx->config->crash_inject_enabled) {
+			hdd_err("Crash Inject ini disabled, Ignore Crash Inject");
+			return 0;
+		}
 		if (value[1] == 3) {
 			cds_trigger_recovery();
 			return 0;
@@ -14529,7 +14494,7 @@ int hdd_register_wext(struct net_device *dev)
 
 int hdd_unregister_wext(struct net_device *dev)
 {
-	hdd_debug("dev(%p)", dev);
+	hdd_debug("dev(%pK)", dev);
 
 	if (dev != NULL) {
 		rtnl_lock();
