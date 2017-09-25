@@ -872,6 +872,18 @@ static inline bool hdd_ipa_uc_sta_is_enabled(hdd_context_t *hdd_ctx)
 	return HDD_IPA_IS_CONFIG_ENABLED(hdd_ctx, HDD_IPA_UC_STA_ENABLE_MASK);
 }
 
+#ifdef FEATURE_WLAN_IPA_UC_STA_ONLY
+static inline bool hdd_ipa_uc_sta_only_is_enabled(void)
+{
+	return 1;
+}
+#else
+static inline bool hdd_ipa_uc_sta_only_is_enabled(void)
+{
+	return 0;
+}
+#endif
+
 /**
  * hdd_ipa_uc_sta_reset_sta_connected() - Reset sta_connected flag
  * @hdd_ipa: Global HDD IPA context
@@ -5867,12 +5879,35 @@ static int __hdd_ipa_wlan_evt(hdd_adapter_t *adapter, uint8_t sta_id,
 		}
 
 		if (hdd_ipa_uc_sta_is_enabled(hdd_ipa->hdd_ctx) &&
-		    (hdd_ipa->sap_num_connected_sta > 0) &&
+		    (hdd_ipa->sap_num_connected_sta > 0 ||
+		     hdd_ipa_uc_sta_only_is_enabled()) &&
 		    !hdd_ipa->sta_connected) {
 			qdf_mutex_release(&hdd_ipa->event_lock);
 			hdd_ipa_uc_offload_enable_disable(adapter,
 				SIR_STA_RX_DATA_OFFLOAD, true);
 			qdf_mutex_acquire(&hdd_ipa->event_lock);
+		}
+
+		if (!hdd_ipa_uc_is_enabled(hdd_ipa->hdd_ctx)) {
+			HDD_IPA_LOG(QDF_TRACE_LEVEL_INFO,
+				"%s: Evt: %d, IPA UC OFFLOAD NOT ENABLED",
+				msg_ex->name, meta.msg_type);
+		} else if (!hdd_ipa_uc_sta_only_is_enabled()) {
+			HDD_IPA_LOG(QDF_TRACE_LEVEL_INFO,
+				"%s: Evt: %d, IPA UC STA-only OFFLOAD DISABLED",
+				msg_ex->name, meta.msg_type);
+		} else if ((!hdd_ipa->sap_num_connected_sta) &&
+				(!hdd_ipa->sta_connected)) {
+			/* Enable IPA UC TX PIPE when STA connected */
+			ret = hdd_ipa_uc_handle_first_con(hdd_ipa);
+			if (ret) {
+				qdf_mutex_release(&hdd_ipa->event_lock);
+				HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
+						"handle 1st con ret %d", ret);
+				hdd_ipa_uc_offload_enable_disable(adapter,
+						SIR_STA_RX_DATA_OFFLOAD, 0);
+				goto end;
+			}
 		}
 
 		hdd_ipa->vdev_to_iface[adapter->sessionId] =
@@ -5937,7 +5972,9 @@ static int __hdd_ipa_wlan_evt(hdd_adapter_t *adapter, uint8_t sta_id,
 				msg_ex->name);
 		} else {
 			/* Disable IPA UC TX PIPE when STA disconnected */
-			if ((1 == hdd_ipa->num_iface) &&
+			if (((1 == hdd_ipa->num_iface) ||
+				(hdd_ipa_uc_sta_only_is_enabled() &&
+				!hdd_ipa->sap_num_connected_sta)) &&
 			    (HDD_IPA_UC_NUM_WDI_PIPE ==
 			     hdd_ipa->activated_fw_pipe) &&
 			    !hdd_ipa->ipa_pipes_down)
@@ -5945,7 +5982,8 @@ static int __hdd_ipa_wlan_evt(hdd_adapter_t *adapter, uint8_t sta_id,
 		}
 
 		if (hdd_ipa_uc_sta_is_enabled(hdd_ipa->hdd_ctx) &&
-		    (hdd_ipa->sap_num_connected_sta > 0)) {
+		    (hdd_ipa->sap_num_connected_sta > 0 ||
+		     hdd_ipa_uc_sta_only_is_enabled())) {
 			qdf_mutex_release(&hdd_ipa->event_lock);
 			hdd_ipa_uc_offload_enable_disable(adapter,
 				SIR_STA_RX_DATA_OFFLOAD, false);
@@ -6023,7 +6061,8 @@ static int __hdd_ipa_wlan_evt(hdd_adapter_t *adapter, uint8_t sta_id,
 		if (hdd_ipa->sap_num_connected_sta == 0 &&
 				hdd_ipa->uc_loaded == true) {
 			if (hdd_ipa_uc_sta_is_enabled(hdd_ipa->hdd_ctx) &&
-			    hdd_ipa->sta_connected) {
+			    hdd_ipa->sta_connected &&
+			    !hdd_ipa_uc_sta_only_is_enabled()) {
 				qdf_mutex_release(&hdd_ipa->event_lock);
 				hdd_ipa_uc_offload_enable_disable(
 					hdd_get_adapter(hdd_ipa->hdd_ctx,
@@ -6032,11 +6071,16 @@ static int __hdd_ipa_wlan_evt(hdd_adapter_t *adapter, uint8_t sta_id,
 				qdf_mutex_acquire(&hdd_ipa->event_lock);
 			}
 
-			ret = hdd_ipa_uc_handle_first_con(hdd_ipa);
-			if (ret) {
+			/*
+			 * Pipe already enabled if STA-only mode enabled and
+			 * STA interface is in connected state.
+			 */
+			if ((!(hdd_ipa_uc_sta_only_is_enabled() &&
+					hdd_ipa->sta_connected)) &&
+					hdd_ipa_uc_handle_first_con(hdd_ipa)) {
 				HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
-					    "%s: handle 1st con ret %d",
-					    adapter->dev->name, ret);
+					"%s: handle 1st con error",
+					adapter->dev->name);
 
 				if (hdd_ipa_uc_sta_is_enabled(
 					hdd_ipa->hdd_ctx) &&
@@ -6051,7 +6095,7 @@ static int __hdd_ipa_wlan_evt(hdd_adapter_t *adapter, uint8_t sta_id,
 					qdf_mutex_release(&hdd_ipa->event_lock);
 				}
 
-				return ret;
+				return -EBUSY;
 			}
 		}
 
@@ -6119,7 +6163,9 @@ static int __hdd_ipa_wlan_evt(hdd_adapter_t *adapter, uint8_t sta_id,
 
 		/* Disable IPA UC TX PIPE when last STA disconnected */
 		if (!hdd_ipa->sap_num_connected_sta &&
-				hdd_ipa->uc_loaded == true) {
+				(hdd_ipa->uc_loaded == true) &&
+				!(hdd_ipa_uc_sta_only_is_enabled() &&
+					hdd_ipa->sta_connected)) {
 			if ((false == hdd_ipa->resource_unloading)
 			    && (HDD_IPA_UC_NUM_WDI_PIPE ==
 				hdd_ipa->activated_fw_pipe) &&

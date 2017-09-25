@@ -1576,6 +1576,9 @@ CDEFINES += -DMDM_PLATFORM
 #Disable STA-AP Mode DFS support
 CDEFINES += -DFEATURE_WLAN_STA_AP_MODE_DFS_DISABLE
 
+#Enable STA-only IPA HW path
+CDEFINES += -DFEATURE_WLAN_IPA_UC_STA_ONLY
+
 else #CONFIG_MOBILE_ROUTER
 
 #Open P2P device interface only for non-Mobile router use cases
