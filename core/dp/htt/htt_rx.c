@@ -1574,7 +1574,7 @@ htt_rx_frag_pop_hl(
 	*head_msdu = *tail_msdu = frag_msg;
 
 	qdf_nbuf_set_next(*tail_msdu, NULL);
-	return 0;
+	return 1;
 }
 
 static inline int
