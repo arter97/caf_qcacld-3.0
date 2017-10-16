@@ -42,8 +42,8 @@
 #define OL_TXRX_NUM_LOCAL_PEER_IDS 33   /* default */
 #endif
 
-#define CDP_BA_256_BIT_MAP_SIZE_DWORDS 256
-#define CDP_BA_64_BIT_MAP_SIZE_DWORDS 64
+#define CDP_BA_256_BIT_MAP_SIZE_DWORDS 8
+#define CDP_BA_64_BIT_MAP_SIZE_DWORDS 2
 
 #define OL_TXRX_INVALID_LOCAL_PEER_ID 0xffff
 #define CDP_INVALID_VDEV_ID 0xff
@@ -98,6 +98,9 @@
 		WME_AC_VO)
 
 #define CDP_MAX_RX_RINGS 4
+
+#define CDP_MU_MAX_USERS 8
+#define CDP_MU_MAX_USER_INDEX (CDP_MU_MAX_USERS - 1)
 
 /*
  * DP configuration parameters
@@ -158,6 +161,18 @@ enum cdp_host_txrx_stats {
 	TXRX_SRNG_PTR_STATS	= 6,
 	TXRX_HOST_STATS_MAX,
 };
+
+/*
+ * cdp_ppdu_ftype: PPDU Frame Type
+ * @CDP_PPDU_FTYPE_DATA: SU or MU Data Frame
+ * @CDP_PPDU_FTYPE_CTRL: Control/Management Frames
+*/
+enum cdp_ppdu_ftype {
+	CDP_PPDU_FTYPE_DATA,
+	CDP_PPDU_FTYPE_CTRL,
+	CDP_PPDU_FTYPE_MAX
+};
+
 
 /**
  * @brief General specification of the tx frame contents
@@ -295,7 +310,7 @@ typedef void
 (*ol_txrx_mgmt_tx_cb)(void *ctxt, qdf_nbuf_t tx_mgmt_frm, int had_error);
 
 /**
- * ol_rxrx_data_tx_cb - Function registered with the data path
+ * ol_txrx_data_tx_cb - Function registered with the data path
  * that is called when tx frames marked as "no free" are
  * done being transmitted
  */
@@ -564,6 +579,84 @@ enum cdp_vdev_param_type {
 
 #define PER_RADIO_FW_STATS_REQUEST 0
 #define PER_VDEV_FW_STATS_REQUEST 1
+
+/**
+ * enum data_stall_log_event_indicator - Module triggering data stall
+ * @DATA_STALL_LOG_INDICATOR_UNUSED: Unused
+ * @DATA_STALL_LOG_INDICATOR_HOST_DRIVER: Host driver indicates data stall
+ * @DATA_STALL_LOG_INDICATOR_FIRMWARE: FW indicates data stall
+ * @DATA_STALL_LOG_INDICATOR_FRAMEWORK: Framework indicates data stall
+ *
+ * Enum indicating the module that indicates data stall event
+ */
+enum data_stall_log_event_indicator {
+	DATA_STALL_LOG_INDICATOR_UNUSED,
+	DATA_STALL_LOG_INDICATOR_HOST_DRIVER,
+	DATA_STALL_LOG_INDICATOR_FIRMWARE,
+	DATA_STALL_LOG_INDICATOR_FRAMEWORK,
+};
+
+/**
+ * enum data_stall_log_event_type - data stall event type
+ * @DATA_STALL_LOG_NONE
+ * @DATA_STALL_LOG_FW_VDEV_PAUSE
+ * @DATA_STALL_LOG_HWSCHED_CMD_FILTER
+ * @DATA_STALL_LOG_HWSCHED_CMD_FLUSH
+ * @DATA_STALL_LOG_FW_RX_REFILL_FAILED
+ * @DATA_STALL_LOG_FW_RX_FCS_LEN_ERROR
+ * @DATA_STALL_LOG_FW_WDOG_ERRORS
+ * @DATA_STALL_LOG_BB_WDOG_ERROR
+ * @DATA_STALL_LOG_HOST_STA_TX_TIMEOUT
+ * @DATA_STALL_LOG_HOST_SOFTAP_TX_TIMEOUT
+ * @DATA_STALL_LOG_NUD_FAILURE
+ *
+ * Enum indicating data stall event type
+ */
+enum data_stall_log_event_type {
+	DATA_STALL_LOG_NONE,
+	DATA_STALL_LOG_FW_VDEV_PAUSE,
+	DATA_STALL_LOG_HWSCHED_CMD_FILTER,
+	DATA_STALL_LOG_HWSCHED_CMD_FLUSH,
+	DATA_STALL_LOG_FW_RX_REFILL_FAILED,
+	DATA_STALL_LOG_FW_RX_FCS_LEN_ERROR,
+	DATA_STALL_LOG_FW_WDOG_ERRORS,
+	DATA_STALL_LOG_BB_WDOG_ERROR,
+	DATA_STALL_LOG_HOST_STA_TX_TIMEOUT,
+	DATA_STALL_LOG_HOST_SOFTAP_TX_TIMEOUT,
+	DATA_STALL_LOG_NUD_FAILURE,
+};
+
+/**
+ * enum data_stall_log_recovery_type - data stall recovery type
+ * @DATA_STALL_LOG_RECOVERY_NONE,
+ * @DATA_STALL_LOG_RECOVERY_CONNECT_DISCONNECT,
+ * @DATA_STALL_LOG_RECOVERY_TRIGGER_PDR
+ *
+ * Enum indicating data stall recovery type
+ */
+enum data_stall_log_recovery_type {
+	DATA_STALL_LOG_RECOVERY_NONE = 0,
+	DATA_STALL_LOG_RECOVERY_CONNECT_DISCONNECT,
+	DATA_STALL_LOG_RECOVERY_TRIGGER_PDR,
+};
+
+/**
+ * struct data_stall_event_info - data stall info
+ * @indicator: Module triggering data stall
+ * @data_stall_type: data stall event type
+ * @vdev_id_bitmap: vdev_id_bitmap
+ * @pdev_id: pdev id
+ * @recovery_type: data stall recovery type
+ */
+struct data_stall_event_info {
+	uint32_t indicator;
+	uint32_t data_stall_type;
+	uint32_t vdev_id_bitmap;
+	uint32_t pdev_id;
+	uint32_t recovery_type;
+};
+
+typedef void (*data_stall_detect_cb)(struct data_stall_event_info *);
 
 /*
  * cdp_stats - options for host and firmware
@@ -949,6 +1042,8 @@ struct cdp_pdev_stats {
  * @ba_bitmap: Block Ack bitmap
  * @start_seqa: Sequence number of first MPDU
  * @enq_bitmap: Enqueue MPDU bitmap
+ * @tx_duration: PPDU airtime
+ * @is_mcast: MCAST or UCAST
  */
 struct cdp_tx_completion_ppdu_user {
 	uint32_t completion_status:8,
@@ -963,7 +1058,8 @@ struct cdp_tx_completion_ppdu_user {
 	uint32_t long_retries:4,
 		 short_retries:4,
 		 tx_ratecode:8,
-		 is_ampdu:1;
+		 is_ampdu:1,
+		 ppdu_type:5;
 	uint32_t success_bytes;
 	uint32_t retry_bytes;
 	uint32_t failed_bytes;
@@ -981,14 +1077,15 @@ struct cdp_tx_completion_ppdu_user {
 		 preamble:4,
 		 gi:4,
 		 dcm:1,
-		 ldpc:1,
-		 ppdu_type:2;
+		 ldpc:1;
 	uint32_t ba_seq_no;
 	uint32_t ba_bitmap[CDP_BA_256_BIT_MAP_SIZE_DWORDS];
 	uint32_t start_seq;
 	uint32_t enq_bitmap[CDP_BA_256_BIT_MAP_SIZE_DWORDS];
 	uint32_t num_mpdu:9,
 		 num_msdu:16;
+	uint32_t tx_duration;
+	bool is_mcast;
 };
 
 /**
@@ -1019,7 +1116,7 @@ struct cdp_tx_completion_ppdu {
 	uint32_t ppdu_start_timestamp;
 	uint32_t ppdu_end_timestamp;
 	uint32_t ack_timestamp;
-	struct cdp_tx_completion_ppdu_user user[1];
+	struct cdp_tx_completion_ppdu_user user[CDP_MU_MAX_USERS];
 };
 
 /**
@@ -1090,6 +1187,9 @@ struct cdp_tx_completion_msdu {
  * @duration: PPDU duration
  * @tid: TID number
  * @peer_id: Peer ID
+ * @vdev_id: VAP ID
+ * @mac_addr: Peer MAC Address
+ * @first_data_seq_ctrl: Sequence control field of first data frame
  * @ltf_size: ltf_size
  * @stbc: When set, STBC rate was used
  * @he_re: he_re (range extension)
@@ -1122,6 +1222,9 @@ struct cdp_rx_indication_ppdu {
 	uint16_t duration;
 	uint32_t tid:8,
 		 peer_id:16;
+	uint8_t vdev_id;
+	uint8_t mac_addr[6];
+	uint16_t first_data_seq_ctrl;
 	union {
 		uint32_t rate_info;
 		struct {

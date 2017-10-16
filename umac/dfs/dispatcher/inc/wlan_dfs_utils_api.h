@@ -328,7 +328,7 @@ QDF_STATUS utils_dfs_get_nol_chfreq_and_chwidth(struct wlan_objmgr_pdev *pdev,
 		int index);
 
 /**
- * dfs_get_random_channel() - Get random channel.
+ * utils_dfs_get_random_channel() - Get random channel.
  * @pdev: Pointer to DFS pdev object.
  * @flags: random channel selection flags.
  * @ch_params: current channel params.
@@ -341,50 +341,50 @@ QDF_STATUS utils_dfs_get_nol_chfreq_and_chwidth(struct wlan_objmgr_pdev *pdev,
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS dfs_get_random_channel(struct wlan_objmgr_pdev *pdev,
+QDF_STATUS utils_dfs_get_random_channel(struct wlan_objmgr_pdev *pdev,
 		uint16_t flags, struct ch_params *ch_params,
-		uint32_t *hw_mode, int *target_chan,
+		uint32_t *hw_mode, uint8_t *target_chan,
 		struct dfs_acs_info *acs_info);
 
 /**
- * dfs_init_nol() - Initialize nol from platform driver.
+ * utils_dfs_init_nol() - Initialize nol from platform driver.
  * @pdev: pdev handler.
  *
  * Initialize nol from platform driver.
  *
  * Return: None
  */
-void dfs_init_nol(struct wlan_objmgr_pdev *pdev);
+void utils_dfs_init_nol(struct wlan_objmgr_pdev *pdev);
 
 /**
- * dfs_save_nol() - save nol list to platform driver.
+ * utils_dfs_save_nol() - save nol list to platform driver.
  * @pdev: pdev handler.
  *
  * Save nol list to platform driver.
  *
  * Return: None
  */
-void dfs_save_nol(struct wlan_objmgr_pdev *pdev);
+void utils_dfs_save_nol(struct wlan_objmgr_pdev *pdev);
 
 /**
- * dfs_print_nol_channels() - log nol channels.
+ * utils_dfs_print_nol_channels() - log nol channels.
  * @pdev: pdev handler.
  *
  * log nol channels.
  *
  * Return: None
  */
-void dfs_print_nol_channels(struct wlan_objmgr_pdev *pdev);
+void utils_dfs_print_nol_channels(struct wlan_objmgr_pdev *pdev);
 
 /**
- * dfs_clear_nol_channels() - clear nol list.
+ * utils_dfs_clear_nol_channels() - clear nol list.
  * @pdev: pdev handler.
  *
  * log nol channels.
  *
  * Return: None
  */
-void dfs_clear_nol_channels(struct wlan_objmgr_pdev *pdev);
+void utils_dfs_clear_nol_channels(struct wlan_objmgr_pdev *pdev);
 
 /**
  * utils_is_dfs_ch() - is channel dfs.
@@ -432,8 +432,19 @@ uint32_t utils_dfs_chan_to_freq(uint8_t chan);
  * @pdev: Pointer to DFS pdev object.
  * @flags: New channel flags
  * @flagext: New Extended flags
+ *
+ * Return: QDF_STATUS
  */
 QDF_STATUS utils_dfs_update_cur_chan_flags(struct wlan_objmgr_pdev *pdev,
 		uint64_t flags,
 		uint16_t flagext);
+
+/**
+ * utils_get_dfsdomain() - Get DFS domain.
+ * @pdev: Pointer to PDEV structure.
+ *
+ * Return: DFS domain.
+ */
+int utils_get_dfsdomain(struct wlan_objmgr_pdev *pdev);
+
 #endif /* _WLAN_DFS_UTILS_API_H_ */

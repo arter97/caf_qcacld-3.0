@@ -481,9 +481,6 @@ QDF_STATUS (*send_process_ll_stats_get_cmd)
 	(wmi_unified_t wmi_handle, const struct ll_stats_get_params  *get_req,
 		 uint8_t addr[IEEE80211_ADDR_LEN]);
 
-QDF_STATUS (*send_get_stats_cmd)(wmi_unified_t wmi_handle,
-		       struct pe_stats_req  *get_stats_param,
-			   uint8_t addr[IEEE80211_ADDR_LEN]);
 
 QDF_STATUS (*send_congestion_cmd)(wmi_unified_t wmi_handle,
 			A_UINT8 vdev_id);
@@ -523,6 +520,10 @@ QDF_STATUS (*send_add_clear_mcbc_filter_cmd)(wmi_unified_t wmi_handle,
 				     uint8_t vdev_id,
 				     struct qdf_mac_addr multicast_addr,
 				     bool clearList);
+
+QDF_STATUS (*send_multiple_add_clear_mcbc_filter_cmd)(wmi_unified_t wmi_handle,
+				uint8_t vdev_id,
+				struct pmo_mcast_filter_params *filter_param);
 
 QDF_STATUS (*send_gtk_offload_cmd)(wmi_unified_t wmi_handle, uint8_t vdev_id,
 					   struct pmo_gtk_req *params,
@@ -584,8 +585,7 @@ QDF_STATUS (*send_roam_scan_offload_mode_cmd)(wmi_unified_t wmi_handle,
 				struct roam_offload_scan_params *roam_req);
 
 QDF_STATUS (*send_roam_scan_offload_ap_profile_cmd)(wmi_unified_t wmi_handle,
-				    wmi_ap_profile * ap_profile_p,
-				    uint32_t vdev_id);
+				    struct ap_profile_params *ap_profile);
 
 QDF_STATUS (*send_pktlog_wmi_send_cmd)(wmi_unified_t wmi_handle,
 				   WMI_PKTLOG_EVENT pktlog_event,

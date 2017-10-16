@@ -700,10 +700,6 @@ QDF_STATUS wmi_unified_process_ll_stats_get_cmd
 	(void *wmi_hdl, const struct ll_stats_get_params  *get_req,
 		 uint8_t addr[IEEE80211_ADDR_LEN]);
 
-QDF_STATUS wmi_unified_get_stats_cmd(void *wmi_hdl,
-		       struct pe_stats_req  *get_stats_param,
-			   uint8_t addr[IEEE80211_ADDR_LEN]);
-
 /**
  * wmi_unified_congestion_request_cmd() - send request to fw to get CCA
  * @wmi_hdl: wma handle
@@ -899,8 +895,7 @@ QDF_STATUS wmi_unified_roam_scan_offload_cmd(void *wmi_hdl,
 
 #ifdef CONFIG_MCL
 QDF_STATUS wmi_unified_send_roam_scan_offload_ap_cmd(void *wmi_hdl,
-					    wmi_ap_profile *ap_profile_p,
-					    uint32_t vdev_id);
+				   struct ap_profile_params *ap_profile);
 #endif
 
 QDF_STATUS wmi_unified_roam_scan_offload_scan_period(void *wmi_hdl,

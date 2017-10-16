@@ -335,6 +335,10 @@ static int dp_srng_calculate_msi_group(struct dp_soc *soc,
 		/* dp_mon_process */
 		grp_mask = &soc->wlan_cfg_ctx->int_rx_mon_ring_mask[0];
 	break;
+	case RXDMA_DST:
+		/* dp_rxdma_err_process */
+		grp_mask = &soc->wlan_cfg_ctx->int_rxdma2host_ring_mask[0];
+	break;
 
 	case RXDMA_MONITOR_BUF:
 	case RXDMA_BUF:
@@ -353,7 +357,6 @@ static int dp_srng_calculate_msi_group(struct dp_soc *soc,
 
 	case TCL_STATUS:
 	case REO_REINJECT:
-	case RXDMA_DST:
 		/* misc unused rings */
 		return -QDF_STATUS_E_NOENT;
 	break;
@@ -1013,6 +1016,8 @@ static void dp_soc_interrupt_map_calculate_integrated(struct dp_soc *soc,
 					soc->wlan_cfg_ctx, intr_ctx_num);
 	int reo_status_ring_mask = wlan_cfg_get_reo_status_ring_mask(
 					soc->wlan_cfg_ctx, intr_ctx_num);
+	int rxdma2host_ring_mask = wlan_cfg_get_rxdma2host_ring_mask(
+					soc->wlan_cfg_ctx, intr_ctx_num);
 
 	for (j = 0; j < HIF_MAX_GRP_IRQ; j++) {
 
@@ -1026,10 +1031,18 @@ static void dp_soc_interrupt_map_calculate_integrated(struct dp_soc *soc,
 				(reo2host_destination_ring1 - j);
 		}
 
+		if (rxdma2host_ring_mask & (1 << j)) {
+			irq_id_map[num_irq++] =
+				rxdma2host_destination_ring_mac1 -
+				wlan_cfg_get_hw_mac_idx(soc->wlan_cfg_ctx, j);
+		}
+
 		if (rx_mon_mask & (1 << j)) {
 			irq_id_map[num_irq++] =
-				(ppdu_end_interrupts_mac1 - j);
+				ppdu_end_interrupts_mac1 -
+				wlan_cfg_get_hw_mac_idx(soc->wlan_cfg_ctx, j);
 		}
+
 		if (rx_wbm_rel_ring_mask & (1 << j))
 			irq_id_map[num_irq++] = wbm2host_rx_release;
 
@@ -1059,6 +1072,8 @@ static void dp_soc_interrupt_map_calculate_msi(struct dp_soc *soc,
 					soc->wlan_cfg_ctx, intr_ctx_num);
 	int reo_status_ring_mask = wlan_cfg_get_reo_status_ring_mask(
 					soc->wlan_cfg_ctx, intr_ctx_num);
+	int rxdma2host_ring_mask = wlan_cfg_get_rxdma2host_ring_mask(
+					soc->wlan_cfg_ctx, intr_ctx_num);
 
 	unsigned int vector =
 		(intr_ctx_num % msi_vector_count) + msi_vector_start;
@@ -1067,7 +1082,7 @@ static void dp_soc_interrupt_map_calculate_msi(struct dp_soc *soc,
 	soc->intr_mode = DP_INTR_MSI;
 
 	if (tx_mask | rx_mask | rx_mon_mask | rx_err_ring_mask |
-	    rx_wbm_rel_ring_mask | reo_status_ring_mask)
+	    rx_wbm_rel_ring_mask | reo_status_ring_mask | rxdma2host_ring_mask)
 		irq_id_map[num_irq++] =
 			pld_get_msi_irq(soc->osdev->dev, vector);
 
@@ -1192,6 +1207,7 @@ static void dp_soc_interrupt_detach(void *txrx_soc)
 		soc->intr_ctx[i].rx_err_ring_mask = 0;
 		soc->intr_ctx[i].rx_wbm_rel_ring_mask = 0;
 		soc->intr_ctx[i].reo_status_ring_mask = 0;
+		soc->intr_ctx[i].rxdma2host_ring_mask = 0;
 
 		qdf_lro_deinit(soc->intr_ctx[i].lro_ctx);
 	}
@@ -2509,8 +2525,8 @@ static void dp_soc_detach_wifi3(void *txrx_soc)
 
 	qdf_atomic_set(&soc->cmn_init_done, 0);
 
-	qdf_flush_work(0, &soc->htt_stats.work);
-	qdf_disable_work(0, &soc->htt_stats.work);
+	qdf_flush_work(&soc->htt_stats.work);
+	qdf_disable_work(&soc->htt_stats.work);
 
 	/* Free pending htt stats messages */
 	qdf_nbuf_queue_free(&soc->htt_stats.msg);
@@ -5119,6 +5135,23 @@ static inline void dp_peer_delete_ast_entries(struct dp_soc *soc,
 }
 #endif
 
+/*
+ * dp_txrx_data_tx_cb_set(): set the callback for non standard tx
+ * @vdev_handle - datapath vdev handle
+ * @callback - callback function
+ * @ctxt: callback context
+ *
+ */
+static void
+dp_txrx_data_tx_cb_set(struct cdp_vdev *vdev_handle,
+		       ol_txrx_data_tx_cb callback, void *ctxt)
+{
+	struct dp_vdev *vdev = (struct dp_vdev *)vdev_handle;
+
+	vdev->tx_non_std_data_callback.func = callback;
+	vdev->tx_non_std_data_callback.ctxt = ctxt;
+}
+
 #ifdef CONFIG_WIN
 static void dp_peer_teardown_wifi3(struct cdp_vdev *vdev_hdl, void *peer_hdl)
 {
@@ -5170,6 +5203,7 @@ static struct cdp_cmn_ops dp_ops_cmn = {
 	.txrx_intr_detach = dp_soc_interrupt_detach,
 	.set_pn_check = dp_set_pn_check_wifi3,
 	/* TODO: Add other functions */
+	.txrx_data_tx_cb_set = dp_txrx_data_tx_cb_set
 };
 
 static struct cdp_ctrl_ops dp_ops_ctrl = {
@@ -5309,6 +5343,7 @@ static QDF_STATUS dp_bus_resume(struct cdp_pdev *opaque_pdev)
 
 #ifndef CONFIG_WIN
 static struct cdp_misc_ops dp_ops_misc = {
+	.tx_non_std = dp_tx_non_std,
 	.get_opmode = dp_get_opmode,
 #ifdef FEATURE_RUNTIME_PM
 	.runtime_suspend = dp_runtime_suspend,

@@ -322,26 +322,6 @@ static struct service_to_pipe target_service_to_ce_map_wlan[] = {
 		2,
 	},
 	{
-		WMI_CONTROL_SVC_WMAC1,
-		PIPEDIR_OUT,    /* out = UL = host -> target */
-		7,
-	},
-	{
-		WMI_CONTROL_SVC_WMAC1,
-		PIPEDIR_IN,     /* in = DL = target -> host */
-		2,
-	},
-	{
-		WMI_CONTROL_SVC_WMAC2,
-		PIPEDIR_OUT,    /* out = UL = host -> target */
-		9,
-	},
-	{
-		WMI_CONTROL_SVC_WMAC2,
-		PIPEDIR_IN,     /* in = DL = target -> host */
-		2,
-	},
-	{
 		HTC_CTRL_RSVD_SVC,
 		PIPEDIR_OUT,    /* out = UL = host -> target */
 		0,              /* could be moved to 3 (share with WMI) */
@@ -2917,11 +2897,16 @@ inline unsigned int hif_get_src_ring_read_index(struct hif_softc *scn,
 	struct HIF_CE_state *hif_state = HIF_GET_CE_STATE(scn);
 
 	attr = hif_state->host_ce_config[COPY_ENGINE_ID(CE_ctrl_addr)];
-	if (attr.flags & CE_ATTR_DISABLE_INTR)
+	if (attr.flags & CE_ATTR_DISABLE_INTR) {
 		return CE_SRC_RING_READ_IDX_GET_FROM_DDR(scn, CE_ctrl_addr);
-	else
-		return A_TARGET_READ(scn,
-				(CE_ctrl_addr) + CURRENT_SRRI_ADDRESS);
+	} else {
+		if (TARGET_REGISTER_ACCESS_ALLOWED(scn))
+			return A_TARGET_READ(scn,
+					(CE_ctrl_addr) + CURRENT_SRRI_ADDRESS);
+		else
+			return CE_SRC_RING_READ_IDX_GET_FROM_DDR(scn,
+					CE_ctrl_addr);
+	}
 }
 
 /**
@@ -2943,11 +2928,16 @@ inline unsigned int hif_get_dst_ring_read_index(struct hif_softc *scn,
 
 	attr = hif_state->host_ce_config[COPY_ENGINE_ID(CE_ctrl_addr)];
 
-	if (attr.flags & CE_ATTR_DISABLE_INTR)
+	if (attr.flags & CE_ATTR_DISABLE_INTR) {
 		return CE_DEST_RING_READ_IDX_GET_FROM_DDR(scn, CE_ctrl_addr);
-	else
-		return A_TARGET_READ(scn,
-				(CE_ctrl_addr) + CURRENT_DRRI_ADDRESS);
+	} else {
+		if (TARGET_REGISTER_ACCESS_ALLOWED(scn))
+			return A_TARGET_READ(scn,
+					(CE_ctrl_addr) + CURRENT_DRRI_ADDRESS);
+		else
+			return CE_DEST_RING_READ_IDX_GET_FROM_DDR(scn,
+					CE_ctrl_addr);
+	}
 }
 
 /**
