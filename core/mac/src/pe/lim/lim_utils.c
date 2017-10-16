@@ -511,43 +511,6 @@ void lim_print_msg_name(tpAniSirGlobal pMac, uint16_t logLevel, uint32_t msgType
 	pe_debug("Msg: %s", lim_msg_str(msgType));
 }
 
-void lim_send_open_system_auth(void *ctx, uint32_t param)
-{
-	tLimMlmAuthReq *auth_req;
-	tpPESession session_entry;
-	tpAniSirGlobal mac_ctx = (tpAniSirGlobal)ctx;
-	uint8_t session_id;
-
-	session_id = mac_ctx->lim.limTimers.open_sys_auth_timer.sessionId;
-	session_entry = pe_find_session_by_session_id(mac_ctx, session_id);
-
-	if (!session_entry)
-		return;
-	/* Trigger MAC based Authentication */
-	auth_req = qdf_mem_malloc(sizeof(tLimMlmAuthReq));
-	if (!auth_req) {
-		pe_err("mlmAuthReq :Memory alloc failed");
-		lim_handle_sme_join_result(mac_ctx,
-					eSIR_SME_AUTH_TIMEOUT_RESULT_CODE,
-					eSIR_MAC_AUTH_ALGO_NOT_SUPPORTED_STATUS,
-					session_entry);
-		tx_timer_deactivate(&mac_ctx->lim.limTimers.
-				    open_sys_auth_timer);
-		return;
-	}
-	sir_copy_mac_addr(auth_req->peerMacAddr, session_entry->bssId);
-	auth_req->authType = eSIR_OPEN_SYSTEM;
-	/* Update PE session Id */
-	auth_req->sessionId = session_id;
-	if (wlan_cfg_get_int(mac_ctx, WNI_CFG_AUTHENTICATE_FAILURE_TIMEOUT,
-	    (uint32_t *) &auth_req->authFailureTimeout) != eSIR_SUCCESS) {
-		pe_err("Fail:retrieve AuthFailureTimeout");
-	}
-	lim_post_mlm_message(mac_ctx, LIM_MLM_AUTH_REQ, (uint32_t *) auth_req);
-	tx_timer_deactivate(&mac_ctx->lim.limTimers.open_sys_auth_timer);
-
-}
-
 /**
  * lim_init_mlm() -  This function is called by limProcessSmeMessages() to
  * initialize MLM state machine on STA
@@ -4449,6 +4412,12 @@ void lim_update_sta_run_time_ht_switch_chnl_params(tpAniSirGlobal pMac,
 		    (pMac, eHT_SUPPORTED_CHANNEL_WIDTH_SET, psessionEntry))
 		return;
 
+	if (CDS_IS_CHANNEL_24GHZ(psessionEntry->currentOperChannel) &&
+		psessionEntry->force_24ghz_in_ht20) {
+		pe_debug("force_24ghz_in_ht20 is set and channel is 2.4 Ghz");
+		return;
+	}
+
 	if (psessionEntry->ftPEContext.ftPreAuthSession) {
 		pe_err("FT PREAUTH channel change is in progress");
 		return;
@@ -6201,7 +6170,7 @@ void lim_set_ht_caps(tpAniSirGlobal p_mac, tpPESession p_session_entry,
 	populate_dot11f_ht_caps(p_mac, p_session_entry, &dot11_ht_cap);
 	p_ie = lim_get_ie_ptr_new(p_mac, p_ie_start, num_bytes,
 			DOT11F_EID_HTCAPS, ONE_BYTE);
-	pe_debug("p_ie: %p dot11_ht_cap.supportedMCSSet[0]: 0x%x",
+	pe_debug("p_ie: %pK dot11_ht_cap.supportedMCSSet[0]: 0x%x",
 		p_ie, dot11_ht_cap.supportedMCSSet[0]);
 	if (p_ie) {
 		/* convert from unpacked to packed structure */
@@ -7368,7 +7337,7 @@ QDF_STATUS lim_util_get_type_subtype(void *pkt, uint8_t *type,
 
 	hdr = WMA_GET_RX_MAC_HEADER(rxpktinfor);
 	if (hdr->fc.type == SIR_MAC_MGMT_FRAME) {
-		pe_debug("RxBd: %p mHdr: %p Type: %d Subtype: %d  SizesFC: %zu",
+		pe_debug("RxBd: %pK mHdr: %pK Type: %d Subtype: %d  SizesFC: %zu",
 		  rxpktinfor, hdr, hdr->fc.type, hdr->fc.subType,
 		  sizeof(tSirMacFrameCtl));
 		*type = hdr->fc.type;

@@ -1002,6 +1002,7 @@ typedef struct tagCsrRoamProfile {
 	tSirMacRateSet  supported_rates;
 	tSirMacRateSet  extended_rates;
 	struct qdf_mac_addr bssid_hint;
+	bool force_24ghz_in_ht20;
 	bool do_not_roam;
 #ifdef WLAN_FEATURE_FILS_SK
 	bool fils_connection;
@@ -1209,7 +1210,7 @@ typedef struct tagCsrConfigParam {
 	uint8_t isEseIniFeatureEnabled;
 #endif
 	uint8_t isFastRoamIniFeatureEnabled;
-	struct mawc_params csr_mawc_config;
+	uint8_t MAWCEnabled;
 	uint8_t isFastTransitionEnabled;
 	uint8_t RoamRssiDiff;
 	bool isWESModeEnabled;

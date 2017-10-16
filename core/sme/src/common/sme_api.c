@@ -608,7 +608,7 @@ tSmeCmd *sme_get_command_buffer(tpAniSirGlobal pMac)
 				false,
 				pMac->sme.enableSelfRecovery ? true : false);
 		else if (pMac->sme.enableSelfRecovery)
-			cds_trigger_recovery();
+			cds_trigger_recovery(CDS_GET_MSG_BUFF_FAILURE);
 		else
 			QDF_BUG(0);
 	}
@@ -7794,7 +7794,7 @@ QDF_STATUS sme_8023_multicast_list(tHalHandle hHal, uint8_t sessionId,
 	tCsrRoamSession *pSession = NULL;
 
 	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
-		"%s: ulMulticastAddrCnt: %d, multicastAddr[0]: %p", __func__,
+		"%s: ulMulticastAddrCnt: %d, multicastAddr[0]: %pK", __func__,
 		  pMulticastAddrs->ulMulticastAddrCnt,
 		  pMulticastAddrs->multicastAddr[0].bytes);
 
@@ -9035,10 +9035,8 @@ QDF_STATUS sme_update_is_mawc_ini_feature_enabled(tHalHandle hHal,
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
 			  "%s: MAWCEnabled is changed from %d to %d", __func__,
-			  pMac->roam.configParam.csr_mawc_config.mawc_enabled,
-			  MAWCEnabled);
-		pMac->roam.configParam.csr_mawc_config.mawc_enabled =
-			MAWCEnabled;
+			  pMac->roam.configParam.MAWCEnabled, MAWCEnabled);
+		pMac->roam.configParam.MAWCEnabled = MAWCEnabled;
 		sme_release_global_lock(&pMac->sme);
 	}
 
@@ -9099,6 +9097,23 @@ QDF_STATUS sme_stop_roaming(tHalHandle hal, uint8_t session_id, uint8_t reason)
 	roam_info->last_sent_cmd = ROAM_SCAN_OFFLOAD_STOP;
 
 	return QDF_STATUS_SUCCESS;
+}
+
+void sme_indicate_disconnect_inprogress(tHalHandle hal, uint8_t session_id)
+{
+	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal);
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	tCsrRoamSession *session;
+
+	status = sme_acquire_global_lock(&mac_ctx->sme);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		if (CSR_IS_SESSION_VALID(mac_ctx, session_id)) {
+			session = CSR_GET_SESSION(mac_ctx, session_id);
+			if (session)
+				session->discon_in_progress = true;
+		}
+		sme_release_global_lock(&mac_ctx->sme);
+	}
 }
 
 /**
@@ -12154,7 +12169,7 @@ void active_list_cmd_timeout_handle(void *userData)
 
 	if (mac_ctx->sme.enableSelfRecovery) {
 		sme_save_active_cmd_stats(hal);
-		cds_trigger_recovery();
+		cds_trigger_recovery(CDS_ACTIVE_LIST_TIMEOUT);
 	} else {
 		if (!mac_ctx->roam.configParam.enable_fatal_event &&
 		   !(cds_is_load_or_unload_in_progress() ||
@@ -18468,4 +18483,40 @@ QDF_STATUS sme_set_bmiss_bcnt(uint32_t vdev_id, uint32_t first_cnt,
 		uint32_t final_cnt)
 {
 	return wma_config_bmiss_bcnt_params(vdev_id, first_cnt, final_cnt);
+}
+
+void sme_display_disconnect_stats(tHalHandle hal, uint8_t session_id)
+{
+	tCsrRoamSession *session;
+	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal);
+
+	if (!CSR_IS_SESSION_VALID(mac_ctx, session_id)) {
+		sme_err("%s Invalid session id: %d", __func__, session_id);
+		return;
+	}
+
+	session = CSR_GET_SESSION(mac_ctx, session_id);
+	if (!session) {
+		sme_err("%s Failed to get session for id: %d",
+			__func__, session_id);
+		return;
+	}
+
+	sme_debug("Total No. of Disconnections: %d",
+		  session->disconnect_stats.disconnection_cnt);
+
+	sme_debug("No. of Diconnects Triggered by Application: %d",
+		  session->disconnect_stats.disconnection_by_app);
+
+	sme_debug("No. of Disassoc Sent by Peer: %d",
+		  session->disconnect_stats.disassoc_by_peer);
+
+	sme_debug("No. of Deauth Sent by Peer: %d",
+		  session->disconnect_stats.deauth_by_peer);
+
+	sme_debug("No. of Disconnections due to Beacon Miss: %d",
+		  session->disconnect_stats.bmiss);
+
+	sme_debug("No. of Disconnections due to Peer Kickout: %d",
+		  session->disconnect_stats.peer_kickout);
 }

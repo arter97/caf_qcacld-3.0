@@ -2305,7 +2305,14 @@ alloc_packet:
 
 		if (challenge_req) {
 			if (body_len < SIR_MAC_AUTH_CHALLENGE_BODY_LEN) {
-				qdf_mem_copy(body, (uint8_t *)&auth_frame->type,
+				/* copy challenge IE id, len, challenge text */
+				*body = auth_frame->type;
+				body++;
+				body_len -= sizeof(uint8_t);
+				*body = auth_frame->length;
+				body++;
+				body_len -= sizeof(uint8_t);
+				qdf_mem_copy(body, auth_frame->challengeText,
 					     body_len);
 				pe_err("Incomplete challenge info: length: %d, expected: %d",
 				       body_len,
@@ -2457,7 +2464,7 @@ QDF_STATUS lim_send_deauth_cnf(tpAniSirGlobal pMac)
 #endif
 				 (psessionEntry->isFastRoamIniFeatureEnabled) ||
 				 (psessionEntry->is11Rconnection))) {
-			pe_debug("FT Preauth (%p,%d) Deauth rc %d src = %d",
+			pe_debug("FT Preauth (%pK,%d) Deauth rc %d src = %d",
 					psessionEntry,
 					psessionEntry->peSessionId,
 					pMlmDeauthReq->reasonCode,
@@ -2554,7 +2561,7 @@ QDF_STATUS lim_send_disassoc_cnf(tpAniSirGlobal mac_ctx)
 		if (LIM_IS_STA_ROLE(pe_session) &&
 			(disassoc_req->reasonCode !=
 				eSIR_MAC_DISASSOC_DUE_TO_FTHANDOFF_REASON)) {
-			pe_debug("FT Preauth Session (%p,%d) Clean up"
+			pe_debug("FT Preauth Session (%pK,%d) Clean up"
 #ifdef FEATURE_WLAN_ESE
 				" isESE %d"
 #endif

@@ -5302,7 +5302,7 @@ QDF_STATUS wma_enable_d0wow_in_fw(WMA_HANDLE handle)
 			wmi_get_host_credits(wma->wmi_handle),
 			wmi_get_pending_cmds(wma->wmi_handle));
 		if (!cds_is_driver_recovering())
-			cds_trigger_recovery();
+			cds_trigger_recovery(CDS_SUSPEND_TIMEOUT);
 		else
 			WMA_LOGE("%s: LOGP is in progress, ignore!", __func__);
 
@@ -5321,7 +5321,7 @@ QDF_STATUS wma_enable_d0wow_in_fw(WMA_HANDLE handle)
 			 __func__, host_credits, wmi_pending_cmds);
 		htc_dump_counter_info(wma->htc_handle);
 		if (!cds_is_driver_recovering())
-			cds_trigger_recovery();
+			cds_trigger_recovery(CDS_SUSPEND_TIMEOUT);
 		else
 			WMA_LOGE("%s: SSR in progress, ignore no credit issue",
 				 __func__);
@@ -5403,7 +5403,7 @@ QDF_STATUS wma_enable_wow_in_fw(WMA_HANDLE handle, uint32_t wow_flags)
 			 wmi_get_pending_cmds(wma->wmi_handle));
 		wmi_set_target_suspend(wma->wmi_handle, false);
 		if (!cds_is_driver_recovering()) {
-			cds_trigger_recovery();
+			cds_trigger_recovery(CDS_SUSPEND_TIMEOUT);
 		} else {
 			WMA_LOGE("%s: LOGP is in progress, ignore!", __func__);
 		}
@@ -5425,7 +5425,7 @@ QDF_STATUS wma_enable_wow_in_fw(WMA_HANDLE handle, uint32_t wow_flags)
 			 __func__, host_credits, wmi_pending_cmds);
 		htc_dump_counter_info(wma->htc_handle);
 		if (!cds_is_driver_recovering())
-			cds_trigger_recovery();
+			cds_trigger_recovery(CDS_SUSPEND_TIMEOUT);
 		else
 			WMA_LOGE("%s: SSR in progress, ignore no credit issue",
 				 __func__);
@@ -6169,7 +6169,7 @@ static QDF_STATUS wma_send_host_wakeup_ind_to_fw(tp_wma_handle wma)
 			 wmi_get_host_credits(wma->wmi_handle));
 		if (!cds_is_driver_recovering()) {
 			wmi_tag_crash_inject(wma->wmi_handle, true);
-			cds_trigger_recovery();
+			cds_trigger_recovery(CDS_RESUME_TIMEOUT);
 		} else {
 			WMA_LOGE("%s: SSR in progress, ignore resume timeout",
 				 __func__);
@@ -6225,7 +6225,7 @@ QDF_STATUS wma_disable_d0wow_in_fw(WMA_HANDLE handle)
 			wmi_get_host_credits(wma->wmi_handle));
 
 		if (!cds_is_driver_recovering())
-			cds_trigger_recovery();
+			cds_trigger_recovery(CDS_RESUME_TIMEOUT);
 		else
 			WMA_LOGE("%s: LOGP is in progress, ignore!", __func__);
 
@@ -6606,6 +6606,24 @@ static QDF_STATUS wma_add_clear_mcbc_filter(tp_wma_handle wma_handle,
 }
 
 /**
+ * wma_multiple_add_clear_mcbc_filter() - send multiple mcast filter
+ *					  command to fw
+ * @wma_handle: wma handle
+ * @vdev_id: vdev id
+ * @mcast_filter_params: mcast fliter params
+ *
+ * Return: 0 for success or error code
+ */
+static QDF_STATUS wma_multiple_add_clear_mcbc_filter(tp_wma_handle wma_handle,
+				     uint8_t vdev_id,
+				     struct mcast_filter_params *filter_param)
+{
+	return wmi_unified_multiple_add_clear_mcbc_filter_cmd(
+				wma_handle->wmi_handle,
+				vdev_id, filter_param);
+}
+
+/**
  * wma_config_enhance_multicast_offload() - config enhance multicast offload
  * @wma_handle: wma handle
  * @vdev_id: vdev id
@@ -6662,7 +6680,7 @@ QDF_STATUS wma_process_mcbc_set_filter_req(tp_wma_handle wma_handle,
 					   tSirRcvFltMcAddrList *mcbc_param)
 {
 	uint8_t vdev_id = 0;
-	int i;
+	struct mcast_filter_params *filter_params;
 
 	if (mcbc_param->ulMulticastAddrCnt <= 0) {
 		WMA_LOGW("Number of multicast addresses is 0");
@@ -6696,15 +6714,43 @@ QDF_STATUS wma_process_mcbc_set_filter_req(tp_wma_handle wma_handle,
 		__func__);
 	}
 
-	/* set mcbc_param->action to clear MCList and reset
-	 * to configure the MCList in FW
-	 */
+	if (WMI_SERVICE_IS_ENABLED(wma_handle->wmi_service_bitmap,
+		WMI_SERVICE_MULTIPLE_MCAST_FILTER_SET)) {
+		filter_params = qdf_mem_malloc(
+					    sizeof(struct mcast_filter_params));
 
-	for (i = 0; i < mcbc_param->ulMulticastAddrCnt; i++) {
-		wma_add_clear_mcbc_filter(wma_handle, vdev_id,
-					  mcbc_param->multicastAddr[i],
-					  (mcbc_param->action == 0));
+		if (!filter_params) {
+			WMA_LOGE("Memory alloc failed for filter_params");
+			return QDF_STATUS_E_FAILURE;
+		}
+		WMA_LOGD("%s: FW supports multiple mcast filter", __func__);
+
+		filter_params->multicast_addr_cnt =
+					mcbc_param->ulMulticastAddrCnt;
+		qdf_mem_copy(filter_params->multicast_addr,
+			     mcbc_param->multicastAddr,
+			     mcbc_param->ulMulticastAddrCnt * ATH_MAC_LEN);
+		filter_params->action = mcbc_param->action;
+
+		wma_multiple_add_clear_mcbc_filter(wma_handle, vdev_id,
+						   filter_params);
+		qdf_mem_free(filter_params);
+	} else {
+		int i;
+
+		WMA_LOGD("%s: FW does not support multiple mcast filter",
+			 __func__);
+		/*
+		 * set mcbc_param->action to clear MCList and reset
+		 * to configure the MCList in FW
+		 */
+
+		for (i = 0; i < mcbc_param->ulMulticastAddrCnt; i++)
+			wma_add_clear_mcbc_filter(wma_handle, vdev_id,
+						  mcbc_param->multicastAddr[i],
+						  (mcbc_param->action == 0));
 	}
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -8284,7 +8330,7 @@ static inline void wma_suspend_target_timeout(bool is_self_recovery_enabled)
 		WMA_LOGE("%s: Module in bad state; Ignoring suspend timeout",
 			 __func__);
 	else
-		cds_trigger_recovery();
+		cds_trigger_recovery(CDS_SUSPEND_TIMEOUT);
 }
 
 /**
@@ -8455,7 +8501,7 @@ QDF_STATUS wma_resume_target(WMA_HANDLE handle)
 			wmi_get_pending_cmds(wma->wmi_handle),
 			wmi_get_host_credits(wma->wmi_handle));
 		if (!cds_is_driver_recovering()) {
-			cds_trigger_recovery();
+			cds_trigger_recovery(CDS_RESUME_TIMEOUT);
 		} else {
 			WMA_LOGE("%s: SSR in progress, ignore resume timeout",
 				__func__);
@@ -9604,6 +9650,23 @@ QDF_STATUS wma_set_bpf_instructions(tp_wma_handle wma,
 		return QDF_STATUS_E_NOSUPPORT;
 	}
 
+	if (!bpf_set_offload) {
+		WMA_LOGE("%s: Invalid BPF instruction request", __func__);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (bpf_set_offload->session_id >= wma->max_bssid) {
+		WMA_LOGE(FL("Invalid vdev_id: %d"),
+			bpf_set_offload->session_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!wma->interfaces[bpf_set_offload->session_id].vdev_up) {
+		WMA_LOGE("vdev %d is not up skipping BPF offload",
+			bpf_set_offload->session_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
 	if (bpf_set_offload->total_length) {
 		len_aligned = roundup(bpf_set_offload->current_length,
 					sizeof(A_UINT32));
@@ -9645,6 +9708,8 @@ QDF_STATUS wma_set_bpf_instructions(tp_wma_handle wma,
 		wmi_buf_free(wmi_buf);
 		return QDF_STATUS_E_FAILURE;
 	}
+	WMA_LOGD(FL("BPF offload enabled in fw"));
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -10260,6 +10325,13 @@ int wma_unified_power_debug_stats_event_handler(void *handle,
 		return -EINVAL;
 	}
 
+	if (param_buf->num_debug_register > ((WMI_SVC_MSG_MAX_SIZE -
+		sizeof(wmi_pdev_chip_power_stats_event_fixed_param)) /
+		sizeof(uint32_t))) {
+		WMA_LOGE("excess payload: LEN num_debug_register:%u",
+				param_buf->num_debug_register);
+		return -EINVAL;
+	}
 	debug_registers = param_tlvs->debug_registers;
 	stats_registers_len =
 		(sizeof(uint32_t) * param_buf->num_debug_register);
@@ -10553,7 +10625,7 @@ int wma_peer_ant_info_evt_handler(void *handle, u_int8_t *event,
 
 	WMA_LOGD(FL("num_peers=%d\tvdev_id=%d\n"),
 		fix_param->num_peers, fix_param->vdev_id);
-	WMA_LOGD(FL("peer_ant_info: %p\n"), peer_ant_info);
+	WMA_LOGD(FL("peer_ant_info: %pK\n"), peer_ant_info);
 
 	if (!peer_ant_info) {
 		WMA_LOGE("Invalid peer_ant_info ptr\n");

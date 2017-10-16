@@ -809,6 +809,105 @@ int wlan_hdd_send_avoid_freq_event(hdd_context_t *pHddCtx,
 }
 #endif /* FEATURE_WLAN_CH_AVOID || FEATURE_WLAN_FORCE_SAP_SCC */
 
+/*
+ * define short names for the global vendor params
+ * used by QCA_NL80211_VENDOR_SUBCMD_HANG
+ */
+#define HANG_REASON_INDEX QCA_NL80211_VENDOR_SUBCMD_HANG_REASON_INDEX
+
+/**
+ * hdd_convert_hang_reason() - Convert cds recovery reason to vendor specific
+ * hang reason
+ * @reason: cds recovery reason
+ *
+ * Return: Vendor specific reason code
+ */
+static enum qca_wlan_vendor_hang_reason
+hdd_convert_hang_reason(enum cds_hang_reason reason)
+{
+	uint32_t ret_val;
+
+	switch (reason) {
+	case CDS_RX_HASH_NO_ENTRY_FOUND:
+		ret_val = QCA_WLAN_HANG_RX_HASH_NO_ENTRY_FOUND;
+		break;
+	case CDS_PEER_DELETION_TIMEDOUT:
+		ret_val = QCA_WLAN_HANG_PEER_DELETION_TIMEDOUT;
+		break;
+	case CDS_PEER_UNMAP_TIMEDOUT:
+		ret_val = QCA_WLAN_HANG_PEER_UNMAP_TIMEDOUT;
+		break;
+	case CDS_SCAN_REQ_EXPIRED:
+		ret_val = QCA_WLAN_HANG_SCAN_REQ_EXPIRED;
+		break;
+	case CDS_SCAN_ATTEMPT_FAILURES:
+		ret_val = QCA_WLAN_HANG_SCAN_ATTEMPT_FAILURES;
+		break;
+	case CDS_GET_MSG_BUFF_FAILURE:
+		ret_val = QCA_WLAN_HANG_GET_MSG_BUFF_FAILURE;
+		break;
+	case CDS_ACTIVE_LIST_TIMEOUT:
+		ret_val = QCA_WLAN_HANG_ACTIVE_LIST_TIMEOUT;
+		break;
+	case CDS_SUSPEND_TIMEOUT:
+		ret_val = QCA_WLAN_HANG_SUSPEND_TIMEOUT;
+		break;
+	case CDS_RESUME_TIMEOUT:
+		ret_val = QCA_WLAN_HANG_RESUME_TIMEOUT;
+		break;
+	case CDS_REASON_UNSPECIFIED:
+	default:
+		ret_val = QCA_WLAN_HANG_REASON_UNSPECIFIED;
+	}
+	return ret_val;
+}
+
+/**
+ * wlan_hdd_send_hang_reason_event() - Send hang reason to the userspace
+ * @hdd_ctx: Pointer to hdd context
+ * @reason: cds recovery reason
+ *
+ * Return: 0 on success or failure reason
+ */
+int wlan_hdd_send_hang_reason_event(hdd_context_t *hdd_ctx,
+				    enum cds_hang_reason reason)
+{
+	struct sk_buff *vendor_event;
+	enum qca_wlan_vendor_hang_reason hang_reason;
+
+	ENTER();
+
+	if (!hdd_ctx) {
+		hdd_err("HDD context is null");
+		return -EINVAL;
+	}
+
+	vendor_event = cfg80211_vendor_event_alloc(hdd_ctx->wiphy,
+						   NULL,
+						   sizeof(uint32_t),
+						   HANG_REASON_INDEX,
+						   GFP_KERNEL);
+	if (!vendor_event) {
+		hdd_err("cfg80211_vendor_event_alloc failed");
+		return -ENOMEM;
+	}
+
+	hang_reason = hdd_convert_hang_reason(reason);
+
+	if (nla_put_u32(vendor_event, QCA_WLAN_VENDOR_ATTR_HANG_REASON,
+			(uint32_t) hang_reason)) {
+		hdd_err("QCA_WLAN_VENDOR_ATTR_HANG_REASON put fail");
+		kfree_skb(vendor_event);
+		return -EINVAL;
+	}
+
+	cfg80211_vendor_event(vendor_event, GFP_KERNEL);
+
+	EXIT();
+	return 0;
+}
+#undef HANG_REASON_INDEX
+
 /* vendor specific events */
 static const struct nl80211_vendor_cmd_info wlan_hdd_cfg80211_vendor_events[] = {
 #ifdef FEATURE_WLAN_CH_AVOID
@@ -1113,7 +1212,11 @@ static const struct nl80211_vendor_cmd_info wlan_hdd_cfg80211_vendor_events[] = 
 	[QCA_NL80211_VENDOR_SUBCMD_PWR_SAVE_FAIL_DETECTED_INDEX] = {
 		.vendor_id = QCA_NL80211_VENDOR_ID,
 		.subcmd = QCA_NL80211_VENDOR_SUBCMD_CHIP_PWRSAVE_FAILURE
-	}
+	},
+	[QCA_NL80211_VENDOR_SUBCMD_HANG_REASON_INDEX] = {
+		.vendor_id = QCA_NL80211_VENDOR_ID,
+		.subcmd = QCA_NL80211_VENDOR_SUBCMD_HANG,
+	},
 };
 
 /**
@@ -3789,7 +3892,7 @@ static void hdd_get_peer_txrx_rate_cb(struct sir_peer_info_ext_resp *peer_info,
 	uint8_t staid;
 
 	if ((peer_info == NULL) || (context == NULL)) {
-		hdd_err("Bad param, peer_info [%p] context [%p]",
+		hdd_err("Bad param, peer_info [%pK] context [%pK]",
 			peer_info, context);
 		return;
 	}
@@ -7765,7 +7868,7 @@ void hdd_get_bpf_offload_cb(void *hdd_context,
 	ENTER();
 
 	if (wlan_hdd_validate_context(hdd_ctx) || !data) {
-		hdd_err("HDD context is invalid or data(%p) is null",
+		hdd_err("HDD context is invalid or data(%pK) is null",
 			data);
 		return;
 	}
@@ -10307,6 +10410,11 @@ static int __wlan_hdd_cfg80211_get_nud_stats(struct wiphy *wiphy,
 	context = &hdd_ctx->nud_stats_context;
 	INIT_COMPLETION(context->response_event);
 	spin_unlock(&hdd_context_lock);
+
+	ol_txrx_post_data_stall_event(DATA_STALL_LOG_INDICATOR_FRAMEWORK,
+				      DATA_STALL_LOG_NUD_FAILURE,
+				      0xFF, 0XFF,
+				      DATA_STALL_LOG_RECOVERY_TRIGGER_PDR);
 
 	if (QDF_STATUS_SUCCESS !=
 	    sme_get_nud_debug_stats(hdd_ctx->hHal, &arp_stats_params)) {
@@ -16016,6 +16124,7 @@ int wlan_hdd_try_disconnect(hdd_adapter_t *pAdapter)
 	pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
 	hal = WLAN_HDD_GET_HAL_CTX(pAdapter);
 	if (pAdapter->device_mode ==  QDF_STA_MODE) {
+		sme_indicate_disconnect_inprogress(hal, pAdapter->sessionId);
 		hdd_debug("Stop firmware roaming");
 		sme_stop_roaming(hal, pAdapter->sessionId, eCsrForcedDisassoc);
 
@@ -16158,6 +16267,55 @@ static bool wlan_hdd_reassoc_bssid_hint(hdd_adapter_t *adapter,
 }
 #endif
 
+
+/**
+ * wlan_hdd_check_ht20_ht40_ind() - check if Supplicant has indicated to
+ * connect in HT20 mode
+ * @hdd_ctx: hdd context
+ * @adapter: Pointer to the HDD adapter
+ * @req: Pointer to the structure cfg_connect_params receieved from user space
+ *
+ * This function will check if supplicant has indicated to to connect in HT20
+ * mode. this is currently applicable only for 2.4Ghz mode only.
+ * if feature is enabled and supplicant indicate HT20 set
+ * force_24ghz_in_ht20 to true to force 2.4Ghz in HT20 else set it to false.
+ *
+ * Return: void
+ */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 3, 0)
+static void wlan_hdd_check_ht20_ht40_ind(hdd_context_t *hdd_ctx,
+	hdd_adapter_t *adapter,
+	struct cfg80211_connect_params *req)
+{
+	hdd_wext_state_t *wext_state = WLAN_HDD_GET_WEXT_STATE_PTR(adapter);
+	tCsrRoamProfile *roam_profile;
+
+	roam_profile = &wext_state->roamProfile;
+	roam_profile->force_24ghz_in_ht20 = false;
+
+	if (hdd_ctx->config->override_ht20_40_24g &&
+	    !(req->ht_capa.cap_info &
+	     IEEE80211_HT_CAP_SUP_WIDTH_20_40))
+		roam_profile->force_24ghz_in_ht20 = true;
+
+	hdd_debug("req->ht_capa.cap_info %x override_ht20_40_24g %d",
+		  req->ht_capa.cap_info,
+		  hdd_ctx->config->override_ht20_40_24g);
+}
+#else
+static inline void wlan_hdd_check_ht20_ht40_ind(hdd_context_t *hdd_ctx,
+	hdd_adapter_t *adapter,
+	struct cfg80211_connect_params *req)
+{
+	hdd_wext_state_t *wext_state = WLAN_HDD_GET_WEXT_STATE_PTR(adapter);
+	tCsrRoamProfile *roam_profile;
+
+	roam_profile = &wext_state->roamProfile;
+
+	roam_profile->force_24ghz_in_ht20 = false;
+}
+#endif
+
 /**
  * __wlan_hdd_cfg80211_connect() - cfg80211 connect api
  * @wiphy: Pointer to wiphy
@@ -16271,6 +16429,9 @@ static int __wlan_hdd_cfg80211_connect(struct wiphy *wiphy,
 		channel = req->channel->hw_value;
 	else
 		channel = 0;
+
+	wlan_hdd_check_ht20_ht40_ind(pHddCtx, pAdapter, req);
+
 	status = wlan_hdd_cfg80211_connect_start(pAdapter, req->ssid,
 						 req->ssid_len, req->bssid,
 						 bssid_hint, channel, 0);
@@ -16327,6 +16488,7 @@ static int wlan_hdd_disconnect(hdd_adapter_t *pAdapter, u16 reason)
 	if (0 != status)
 		return status;
 	if (pAdapter->device_mode ==  QDF_STA_MODE) {
+		sme_indicate_disconnect_inprogress(hal, pAdapter->sessionId);
 		hdd_debug("Stop firmware roaming");
 		status = sme_stop_roaming(hal, pAdapter->sessionId,
 				eCsrForcedDisassoc);
@@ -17554,10 +17716,10 @@ static int wlan_hdd_cfg80211_add_station(struct wiphy *wiphy,
 static inline bool wlan_hdd_is_pmksa_valid(struct cfg80211_pmksa *pmksa)
 {
 	if (!pmksa->bssid) {
-		hdd_warn("bssid (%p) is NULL",
+		hdd_warn("bssid (%pK) is NULL",
 				pmksa->bssid);
 		if (!pmksa->ssid || !pmksa->cache_id) {
-			hdd_err("either ssid (%p) or cache_id (%p) are NULL",
+			hdd_err("either ssid (%pK) or cache_id (%pK) are NULL",
 					pmksa->ssid, pmksa->cache_id);
 			return false;
 		}
@@ -17615,7 +17777,7 @@ static void hdd_fill_pmksa_info(tPmkidCacheInfo *pmk_cache,
 static inline bool wlan_hdd_is_pmksa_valid(struct cfg80211_pmksa *pmksa)
 {
 	if (!pmksa->bssid) {
-		hdd_err("both bssid is NULL %p", pmksa->bssid);
+		hdd_err("both bssid is NULL %pK", pmksa->bssid);
 		return false;
 	}
 	return true;
@@ -17680,7 +17842,7 @@ static int __wlan_hdd_cfg80211_set_pmksa(struct wiphy *wiphy,
 	}
 
 	if (!pmksa->pmkid) {
-		hdd_err("pmksa->pmkid(%p) is NULL",
+		hdd_err("pmksa->pmkid(%pK) is NULL",
 		       pmksa->pmkid);
 		return -EINVAL;
 	}
@@ -18546,7 +18708,7 @@ void wlan_hdd_testmode_rx_event(void *buf, size_t buf_len)
 	hdd_context_t *hdd_ctx;
 
 	if (!buf || !buf_len) {
-		hdd_err("buf or buf_len invalid, buf: %p buf_len: %zu", buf, buf_len);
+		hdd_err("buf or buf_len invalid, buf: %pK buf_len: %zu", buf, buf_len);
 		return;
 	}
 
