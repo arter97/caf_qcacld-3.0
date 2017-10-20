@@ -43,4 +43,12 @@ void hdd_reset_global_reg_params(void);
 int hdd_regulatory_init(hdd_context_t *hdd_ctx, struct wiphy *wiphy);
 void hdd_program_country_code(hdd_context_t *hdd_ctx);
 
+/**
+ * hdd_apply_cached_country_info() - apply cached ctry info
+ * @hdd_ctx: hdd context
+ *
+ * Return: void
+ */
+void hdd_apply_cached_country_info(hdd_context_t *hdd_ctx);
+
 #endif

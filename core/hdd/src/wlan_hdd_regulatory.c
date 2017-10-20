@@ -598,6 +598,16 @@ static void hdd_restore_reg_flags(struct wiphy *wiphy, uint32_t flags)
 }
 #endif
 
+void hdd_apply_cached_country_info(hdd_context_t *hdd_ctx)
+{
+
+	hdd_update_regulatory_info(hdd_ctx);
+
+	hdd_process_regulatory_data(hdd_ctx, hdd_ctx->wiphy,
+				    hdd_ctx->reg.reset);
+
+	sme_set_cc_src(hdd_ctx->hHal, hdd_ctx->reg.cc_src);
+}
 
 /**
  * hdd_reg_notifier() - regulatory notifier
@@ -627,11 +637,6 @@ void hdd_reg_notifier(struct wiphy *wiphy,
 	if (cds_is_driver_unloading() || cds_is_driver_recovering()) {
 		hdd_err("%s: unloading or ssr in progress, ignore",
 			__func__);
-		return;
-	}
-
-	if (hdd_ctx->driver_status == DRIVER_MODULES_CLOSED) {
-		hdd_err("Driver module is closed; dropping request");
 		return;
 	}
 
@@ -685,12 +690,10 @@ void hdd_reg_notifier(struct wiphy *wiphy,
 		if (NL80211_REGDOM_SET_BY_CORE == request->initiator) {
 			pld_set_cc_source(hdd_ctx->parent_dev,
 						PLD_SOURCE_CORE);
-			hdd_ctx->reg.cc_src = SOURCE_CORE;
 			if (is_wiphy_custom_regulatory(wiphy))
 				reset = true;
 		} else if (NL80211_REGDOM_SET_BY_DRIVER == request->initiator) {
 			hdd_ctx->reg.cc_src = SOURCE_DRIVER;
-			sme_set_cc_src(hdd_ctx->hHal, SOURCE_DRIVER);
 		} else {
 			if (pld_get_cc_source(hdd_ctx->parent_dev)
 						== PLD_SOURCE_11D)
@@ -705,16 +708,22 @@ void hdd_reg_notifier(struct wiphy *wiphy,
 		hdd_ctx->reg.alpha2[0] = request->alpha2[0];
 		hdd_ctx->reg.alpha2[1] = request->alpha2[1];
 
-		hdd_update_regulatory_info(hdd_ctx);
+		hdd_set_dfs_region(hdd_ctx,
+				   (enum dfs_region) request->dfs_region);
 
-		hdd_process_regulatory_data(hdd_ctx, wiphy, reset);
+
+		if (hdd_ctx->driver_status == DRIVER_MODULES_CLOSED) {
+			hdd_ctx->reg.reset = reset;
+			hdd_debug("Driver module is closed, apply it later");
+			return;
+		}
+
+		hdd_apply_cached_country_info(hdd_ctx);
 
 		sme_generic_change_country_code(hdd_ctx->hHal,
 						hdd_ctx->reg.alpha2);
 
 		cds_fill_and_send_ctl_to_fw(&hdd_ctx->reg);
-
-		hdd_set_dfs_region(hdd_ctx, request->dfs_region);
 
 		cds_get_dfs_region(&dfs_reg);
 		cds_set_wma_dfs_region(dfs_reg);
