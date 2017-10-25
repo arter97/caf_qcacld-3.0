@@ -103,6 +103,12 @@ static void wma_send_bcn_buf_ll(tp_wma_handle wma,
 		WMA_LOGE("%s: Invalid beacon buffer", __func__);
 		return;
 	}
+	if (WMI_UNIFIED_NOA_ATTR_NUM_DESC_GET(p2p_noa_info) >
+			WMI_P2P_MAX_NOA_DESCRIPTORS) {
+		WMA_LOGE("%s: Too many descriptors %d", __func__,
+			WMI_UNIFIED_NOA_ATTR_NUM_DESC_GET(p2p_noa_info));
+		return;
+	}
 
 	qdf_spin_lock_bh(&bcn->lock);
 
@@ -502,6 +508,12 @@ int wma_unified_bcntx_status_event_handler(void *handle,
 	resp_event = param_buf->fixed_param;
 
 	WMA_LOGD("%s", __func__);
+
+	if (resp_event->vdev_id >= wma->max_bssid) {
+		WMA_LOGE("%s: received invalid vdev_id %d",
+			 __func__, resp_event->vdev_id);
+		return -EINVAL;
+	}
 
 	/* Check for valid handle to ensure session is not
 	 * deleted in any race
@@ -2370,7 +2382,7 @@ int wma_tbttoffset_update_event_handler(void *handle, uint8_t *event,
 		return -EINVAL;
 	}
 
-	for (; (vdev_map); vdev_map >>= 1, if_id++) {
+	for (; (if_id < wma->max_bssid && vdev_map); vdev_map >>= 1, if_id++) {
 		if (!(vdev_map & 0x1) || (!(intf[if_id].handle)))
 			continue;
 

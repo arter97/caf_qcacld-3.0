@@ -1997,6 +1997,11 @@ void lim_process_action_frame(tpAniSirGlobal mac_ctx,
 			mac_hdr = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
 			frame_len = WMA_GET_RX_PAYLOAD_LEN(rx_pkt_info);
 			/* Check if it is a P2P public action frame. */
+			if (frame_len < sizeof(pub_action)) {
+				pe_debug("Received action frame of invalid len %d", frame_len);
+				return;
+			}
+
 			if (!qdf_mem_cmp(pub_action->Oui, p2p_oui, 4)) {
 				/*
 				 * Forward to the SME to HDD to wpa_supplicant
@@ -2209,6 +2214,10 @@ void lim_process_action_frame_no_session(tpAniSirGlobal pMac, uint8_t *pBd)
 			frameLen = WMA_GET_RX_PAYLOAD_LEN(pBd);
 
 			/* Check if it is a P2P public action frame. */
+			if (frameLen < sizeof(pActionHdr)) {
+				pe_debug("Received action frame of invalid len %d", frameLen);
+				return;
+			}
 			if (!qdf_mem_cmp(pActionHdr->Oui, P2POui, 4)) {
 				/* Forward to the SME to HDD to wpa_supplicant */
 				/* type is ACTION */
