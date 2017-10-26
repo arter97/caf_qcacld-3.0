@@ -171,6 +171,7 @@ enum hal_ring_type {
 #define HAL_SRNG_DATA_TLV_SWAP			0x00000020
 #define HAL_SRNG_LOW_THRES_INTR_ENABLE	0x00010000
 #define HAL_SRNG_MSI_INTR				0x00020000
+#define HAL_SRNG_CACHED_DESC		0x00040000
 
 #define PN_SIZE_24 0
 #define PN_SIZE_48 1
@@ -377,6 +378,27 @@ static inline bool hal_srng_initialized(void *hal_ring)
 }
 
 /**
+ * hal_srng_dst_peek - Get next entry from a ring without moving tail pointer.
+ * hal_srng_dst_get_next should be called subsequently to move the tail pointer
+ * TODO: See if we need an optimized version of get_next that doesn't check for
+ * loop_cnt
+ *
+ * @hal_soc: Opaque HAL SOC handle
+ * @hal_ring: Destination ring pointer
+ *
+ * Return: Opaque pointer for next ring entry; NULL on failire
+ */
+static inline void *hal_srng_dst_peek(void *hal_soc, void *hal_ring)
+{
+	struct hal_srng *srng = (struct hal_srng *)hal_ring;
+
+	if (srng->u.dst_ring.tp != srng->u.dst_ring.cached_hp)
+		return (void *)&(srng->ring_base_vaddr[srng->u.dst_ring.tp]);
+
+	return NULL;
+}
+
+/**
  * hal_srng_access_start_unlocked - Start ring access (unlocked). Should use
  * hal_srng_access_start if locked access is required
  *
@@ -388,14 +410,28 @@ static inline bool hal_srng_initialized(void *hal_ring)
 static inline int hal_srng_access_start_unlocked(void *hal_soc, void *hal_ring)
 {
 	struct hal_srng *srng = (struct hal_srng *)hal_ring;
+	struct hal_soc *soc = (struct hal_soc *)hal_soc;
+	uint32_t *desc;
 
 	if (srng->ring_dir == HAL_SRNG_SRC_RING)
 		srng->u.src_ring.cached_tp =
 			*(volatile uint32_t *)(srng->u.src_ring.tp_addr);
-	else
+	else {
 		srng->u.dst_ring.cached_hp =
 			*(volatile uint32_t *)(srng->u.dst_ring.hp_addr);
 
+		if (srng->flags & HAL_SRNG_CACHED_DESC) {
+			desc = hal_srng_dst_peek(hal_soc, hal_ring);
+			if (qdf_likely(desc)) {
+				qdf_mem_dma_cache_sync(soc->qdf_dev,
+						       qdf_mem_virt_to_phys
+						       (desc),
+						       QDF_DMA_FROM_DEVICE,
+						       srng->entry_size);
+				prefetch(desc);
+			}
+		}
+	}
 	return 0;
 }
 
@@ -428,7 +464,10 @@ static inline int hal_srng_access_start(void *hal_soc, void *hal_ring)
 static inline void *hal_srng_dst_get_next(void *hal_soc, void *hal_ring)
 {
 	struct hal_srng *srng = (struct hal_srng *)hal_ring;
+	struct hal_soc *soc = (struct hal_soc *)hal_soc;
 	uint32_t *desc;
+	uint32_t *desc_next;
+	uint32_t tp;
 
 	if (srng->u.dst_ring.tp != srng->u.dst_ring.cached_hp) {
 		desc = &(srng->ring_base_vaddr[srng->u.dst_ring.tp]);
@@ -440,6 +479,16 @@ static inline void *hal_srng_dst_get_next(void *hal_soc, void *hal_ring)
 		 */
 		srng->u.dst_ring.tp = (srng->u.dst_ring.tp + srng->entry_size) %
 			srng->ring_size;
+
+		if (srng->flags & HAL_SRNG_CACHED_DESC) {
+			tp = srng->u.dst_ring.tp;
+			desc_next = &srng->ring_base_vaddr[tp];
+			qdf_mem_dma_cache_sync(soc->qdf_dev,
+					       qdf_mem_virt_to_phys(desc_next),
+					       QDF_DMA_FROM_DEVICE,
+					       srng->entry_size);
+			prefetch(desc_next);
+		}
 
 		return (void *)desc;
 	}
@@ -474,27 +523,6 @@ static inline void *hal_srng_dst_get_next_hp(void *hal_soc, void *hal_ring)
 		srng->u.dst_ring.cached_hp = next_hp;
 		return (void *)desc;
 	}
-
-	return NULL;
-}
-
-/**
- * hal_srng_dst_peek - Get next entry from a ring without moving tail pointer.
- * hal_srng_dst_get_next should be called subsequently to move the tail pointer
- * TODO: See if we need an optimized version of get_next that doesn't check for
- * loop_cnt
- *
- * @hal_soc: Opaque HAL SOC handle
- * @hal_ring: Destination ring pointer
- *
- * Return: Opaque pointer for next ring entry; NULL on failire
- */
-static inline void *hal_srng_dst_peek(void *hal_soc, void *hal_ring)
-{
-	struct hal_srng *srng = (struct hal_srng *)hal_ring;
-
-	if (srng->u.dst_ring.tp != srng->u.dst_ring.cached_hp)
-		return (void *)(&(srng->ring_base_vaddr[srng->u.dst_ring.tp]));
 
 	return NULL;
 }

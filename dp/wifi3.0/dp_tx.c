@@ -3276,6 +3276,9 @@ QDF_STATUS dp_tx_soc_attach(struct dp_soc *soc)
 	if (dp_tx_alloc_static_pools(soc, num_pool, num_desc))
 		goto fail;
 
+	if (num_pool > MAX_TXDESC_POOLS)
+		goto fail;
+
 	dp_tx_flow_control_init(soc);
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,

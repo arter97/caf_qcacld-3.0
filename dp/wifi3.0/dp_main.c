@@ -66,6 +66,9 @@ static void *dp_peer_create_wifi3(struct cdp_vdev *vdev_handle,
 static void dp_peer_delete_wifi3(void *peer_handle, uint32_t bitmap);
 static void dp_batch_intr_attach(struct dp_soc *soc);
 
+static uint8_t dp_soc_ring_if_nss_offloaded(struct dp_soc *soc,
+					    enum hal_ring_type ring_type,
+					    int ring_num);
 #define DP_INTR_POLL_TIMER_MS	10
 #define DP_WDS_AGING_TIMER_DEFAULT_MS	120000
 #define DP_MCS_LENGTH (6*MAX_MCS)
@@ -739,6 +742,13 @@ static int dp_srng_setup(struct dp_soc *soc, struct dp_srng *srng,
 	uint32_t ring_base_align = 8;
 	struct hal_srng_params ring_params;
 	uint32_t max_entries = hal_srng_max_entries(hal_soc, ring_type);
+	bool cached = 0;
+
+	if (((((ring_type == WBM2SW_RELEASE) && (ring_num < 3)) ||
+	    (ring_type == REO_DST)) &&
+		!dp_soc_ring_if_nss_offloaded(soc, WBM2SW_RELEASE, ring_num))) {
+		cached = 1;
+	}
 
 	/* TODO: Currently hal layer takes care of endianness related settings.
 	 * See if these settings need to passed from DP layer
@@ -749,11 +759,19 @@ static int dp_srng_setup(struct dp_soc *soc, struct dp_srng *srng,
 
 	num_entries = (num_entries > max_entries) ? max_entries : num_entries;
 	srng->hal_srng = NULL;
+	srng->cached = cached;
 	srng->alloc_size = (num_entries * entry_size) + ring_base_align - 1;
 	srng->num_entries = num_entries;
-	srng->base_vaddr_unaligned = qdf_mem_alloc_consistent(
-		soc->osdev, soc->osdev->dev, srng->alloc_size,
-		&(srng->base_paddr_unaligned));
+
+	if (qdf_likely(!cached)) {
+		srng->base_vaddr_unaligned = qdf_mem_alloc_consistent(
+				soc->osdev, soc->osdev->dev, srng->alloc_size,
+				&srng->base_paddr_unaligned);
+	} else {
+		srng->base_vaddr_unaligned = qdf_mem_malloc(srng->alloc_size);
+		srng->base_paddr_unaligned =
+			qdf_mem_virt_to_phys(srng->base_vaddr_unaligned);
+	}
 
 	if (!srng->base_vaddr_unaligned) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
@@ -820,14 +838,21 @@ static int dp_srng_setup(struct dp_soc *soc, struct dp_srng *srng,
 		ring_params.intr_batch_cntr_thres_entries = 0;
 	}
 
+	if (cached)
+		ring_params.flags |= HAL_SRNG_CACHED_DESC;
+
 	srng->hal_srng = hal_srng_setup(hal_soc, ring_type, ring_num,
 		mac_id, &ring_params);
 
 	if (!srng->hal_srng) {
-		qdf_mem_free_consistent(soc->osdev, soc->osdev->dev,
-				srng->alloc_size,
-				srng->base_vaddr_unaligned,
-				srng->base_paddr_unaligned, 0);
+		if (cached) {
+			qdf_mem_free(srng->base_vaddr_unaligned);
+		} else {
+			qdf_mem_free_consistent(soc->osdev, soc->osdev->dev,
+						srng->alloc_size,
+						srng->base_vaddr_unaligned,
+						srng->base_paddr_unaligned, 0);
+		}
 	}
 
 	return 0;
@@ -850,10 +875,14 @@ static void dp_srng_cleanup(struct dp_soc *soc, struct dp_srng *srng,
 
 	hal_srng_cleanup(soc->hal_soc, srng->hal_srng);
 
-	qdf_mem_free_consistent(soc->osdev, soc->osdev->dev,
-				srng->alloc_size,
-				srng->base_vaddr_unaligned,
-				srng->base_paddr_unaligned, 0);
+	if (!srng->cached) {
+		qdf_mem_free_consistent(soc->osdev, soc->osdev->dev,
+					srng->alloc_size,
+					srng->base_vaddr_unaligned,
+					srng->base_paddr_unaligned, 0);
+	} else {
+		qdf_mem_free(srng->base_vaddr_unaligned);
+	}
 	srng->hal_srng = NULL;
 }
 
