@@ -1820,6 +1820,8 @@ static void hdd_disable_power_management(void)
 static void hdd_update_hw_sw_info(hdd_context_t *hdd_ctx)
 {
 	void *hif_sc;
+	size_t target_hw_name_len;
+	const char *target_hw_name;
 
 	hif_sc = cds_get_context(QDF_MODULE_ID_HIF);
 	if (!hif_sc) {
@@ -1833,12 +1835,21 @@ static void hdd_update_hw_sw_info(hdd_context_t *hdd_ctx)
 	 */
 	hif_get_hw_info(hif_sc, &hdd_ctx->target_hw_version,
 			&hdd_ctx->target_hw_revision,
-			&hdd_ctx->target_hw_name);
+			&target_hw_name);
+
+	target_hw_name_len = strlen(target_hw_name) + 1;
+
+	if (hdd_ctx->target_hw_name)
+		qdf_mem_free(hdd_ctx->target_hw_name);
+
+	hdd_ctx->target_hw_name = qdf_mem_malloc(target_hw_name_len);
+
+	if (hdd_ctx->target_hw_name)
+		qdf_mem_copy(hdd_ctx->target_hw_name, target_hw_name,
+			     target_hw_name_len);
 
 	/* Get the wlan hw/fw version */
 	hdd_wlan_get_version(hdd_ctx, NULL, NULL);
-
-	return;
 }
 
 /**
@@ -9202,6 +9213,11 @@ int hdd_wlan_stop_modules(hdd_context_t *hdd_ctx, bool ftm_mode)
 	if (!hif_ctx) {
 		hdd_err("Hif context is Null");
 		ret = -EINVAL;
+	}
+
+	if (hdd_ctx->target_hw_name) {
+		qdf_mem_free(hdd_ctx->target_hw_name);
+		hdd_ctx->target_hw_name = NULL;
 	}
 
 	hdd_hif_close(hif_ctx);
