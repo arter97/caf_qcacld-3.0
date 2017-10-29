@@ -918,6 +918,11 @@ int wma_vdev_start_resp_handler(void *handle, uint8_t *cmd_param_info,
 		return -EINVAL;
 	}
 
+	if (resp_event->vdev_id >= wma->max_bssid) {
+		WMA_LOGE("Invalid vdev id received from firmware");
+		return -EINVAL;
+	}
+
 	if (wma_is_vdev_in_ap_mode(wma, resp_event->vdev_id)) {
 		qdf_spin_lock_bh(&wma->dfs_ic->chan_lock);
 		wma->dfs_ic->disable_phy_err_processing = false;
@@ -1092,6 +1097,20 @@ int wma_vdev_start_resp_handler(void *handle, uint8_t *cmd_param_info,
 	qdf_mem_free(req_msg);
 
 	return 0;
+}
+
+bool wma_is_vdev_valid(uint32_t vdev_id)
+{
+	tp_wma_handle wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+
+	if (NULL == wma_handle)
+		return false;
+
+	/* No of interface are allocated based on max_bssid value */
+	if (vdev_id >= wma_handle->max_bssid)
+		return false;
+
+	return wma_handle->interfaces[vdev_id].vdev_active;
 }
 
 /**
