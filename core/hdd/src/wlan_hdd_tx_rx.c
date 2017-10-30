@@ -158,9 +158,39 @@ hdd_tx_resume_false(hdd_adapter_t *pAdapter, bool tx_resume)
 static inline struct sk_buff *hdd_skb_orphan(hdd_adapter_t *pAdapter,
 		struct sk_buff *skb)
 {
-	if (pAdapter->tx_flow_low_watermark > 0)
+	hdd_context_t *hdd_ctx = WLAN_HDD_GET_CTX(pAdapter);
+	int need_orphan = 0;
+
+	if (pAdapter->tx_flow_low_watermark > 0) {
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 19, 0))
+		/*
+		 * The TCP TX throttling logic is changed a little after
+		 * 3.19-rc1 kernel, the TCP sending limit will be smaller,
+		 * which will throttle the TCP packets to the host driver.
+		 * The TCP UP LINK throughput will drop heavily. In order to
+		 * fix this issue, need to orphan the socket buffer asap, which
+		 * will call skb's destructor to notify the TCP stack that the
+		 * SKB buffer is unowned. And then the TCP stack will pump more
+		 * packets to host driver.
+		 *
+		 * The TX packets might be dropped for UDP case in the iperf
+		 * testing. So need to be protected by follow control.
+		 */
+		need_orphan = 1;
+#else
+		if (hdd_ctx->config->tx_orphan_enable)
+			need_orphan = 1;
+#endif
+	} else if (hdd_ctx->config->tx_orphan_enable) {
+		if (qdf_nbuf_is_ipv4_tcp_pkt(skb) ||
+		    qdf_nbuf_is_ipv6_tcp_pkt(skb))
+			need_orphan = 1;
+	}
+
+	if (need_orphan) {
 		skb_orphan(skb);
-	else
+		++pAdapter->hdd_stats.hddTxRxStats.txXmitOrphaned;
+	} else
 		skb = skb_unshare(skb, GFP_ATOMIC);
 
 	return skb;
@@ -172,7 +202,7 @@ bool hdd_tx_flow_control_is_pause(void *adapter_context)
 
 	if ((NULL == pAdapter) || (WLAN_HDD_ADAPTER_MAGIC != pAdapter->magic)) {
 		/* INVALID ARG */
-		hdd_err("invalid adapter %p", pAdapter);
+		hdd_err("invalid adapter %pK", pAdapter);
 		return false;
 	}
 
@@ -293,11 +323,14 @@ static inline struct sk_buff *hdd_skb_orphan(hdd_adapter_t *pAdapter,
 		struct sk_buff *skb) {
 
 	struct sk_buff *nskb;
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 19, 0))
 	hdd_context_t *hdd_ctx = pAdapter->pHddCtx;
+#endif
 
 	hdd_skb_fill_gso_size(pAdapter->dev, skb);
 
 	nskb = skb_unshare(skb, GFP_ATOMIC);
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 19, 0))
 	if (unlikely(hdd_ctx->config->tx_orphan_enable) && (nskb == skb)) {
 		/*
 		 * For UDP packets we want to orphan the packet to allow the app
@@ -307,6 +340,7 @@ static inline struct sk_buff *hdd_skb_orphan(hdd_adapter_t *pAdapter,
 		++pAdapter->hdd_stats.hddTxRxStats.txXmitOrphaned;
 		skb_orphan(skb);
 	}
+#endif
 	return nskb;
 }
 #endif /* QCA_LL_LEGACY_TX_FLOW_CONTROL */
@@ -543,26 +577,7 @@ static int __hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	ac = hdd_qdisc_ac_to_tl_ac[skb->queue_mapping];
 
 	if (!qdf_nbuf_ipa_owned_get(skb)) {
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 19, 0))
-		/*
-		 * The TCP TX throttling logic is changed a little after
-		 * 3.19-rc1 kernel, the TCP sending limit will be smaller,
-		 * which will throttle the TCP packets to the host driver.
-		 * The TCP UP LINK throughput will drop heavily. In order to
-		 * fix this issue, need to orphan the socket buffer asap, which
-		 * will call skb's destructor to notify the TCP stack that the
-		 * SKB buffer is unowned. And then the TCP stack will pump more
-		 * packets to host driver.
-		 *
-		 * The TX packets might be dropped for UDP case in the iperf
-		 * testing. So need to be protected by follow control.
-		 */
 		skb = hdd_skb_orphan(pAdapter, skb);
-#else
-		/* Check if the buffer has enough header room */
-		skb = skb_unshare(skb, GFP_ATOMIC);
-#endif
-
 		if (!skb)
 			goto drop_pkt_accounting;
 	}
@@ -845,7 +860,7 @@ static void __hdd_tx_timeout(struct net_device *dev)
 	QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_DEBUG,
 		  "carrier state: %d", netif_carrier_ok(dev));
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	wlan_hdd_display_netif_queue_history(hdd_ctx);
+	wlan_hdd_display_netif_queue_history(hdd_ctx, QDF_STATS_VERB_LVL_HIGH);
 	ol_tx_dump_flow_pool_info();
 
 	++adapter->hdd_stats.hddTxRxStats.tx_timeout_cnt;
@@ -880,7 +895,8 @@ static void __hdd_tx_timeout(struct net_device *dev)
 		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_ERROR,
 			  "Data stall due to continuous TX timeouts");
 		adapter->hdd_stats.hddTxRxStats.cont_txtimeout_cnt = 0;
-		ol_txrx_post_data_stall_event(
+		if (hdd_ctx->config->enable_data_stall_det)
+			ol_txrx_post_data_stall_event(
 					DATA_STALL_LOG_INDICATOR_HOST_DRIVER,
 					DATA_STALL_LOG_HOST_STA_TX_TIMEOUT,
 					0xFF, 0xFF,
@@ -974,7 +990,7 @@ static QDF_STATUS hdd_mon_rx_packet_cbk(void *context, qdf_nbuf_t rxbuf)
 	adapter = (hdd_adapter_t *)context;
 	if ((NULL == adapter) || (WLAN_HDD_ADAPTER_MAGIC != adapter->magic)) {
 		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_ERROR,
-			  "invalid adapter %p", adapter);
+			  "invalid adapter %pK", adapter);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -1017,8 +1033,6 @@ static QDF_STATUS hdd_mon_rx_packet_cbk(void *context, qdf_nbuf_t rxbuf)
 
 		skb = skb_next;
 	}
-
-	adapter->dev->last_rx = jiffies;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1185,6 +1199,24 @@ static bool hdd_is_rx_wake_lock_needed(struct sk_buff *skb)
 	return false;
 }
 
+#ifdef WLAN_FEATURE_TSF_PLUS
+static inline void hdd_tsf_timestamp_rx(hdd_context_t *hdd_ctx,
+					qdf_nbuf_t netbuf,
+					uint64_t target_time)
+{
+	if (!HDD_TSF_IS_RX_SET(hdd_ctx))
+		return;
+
+	hdd_rx_timestamp(netbuf, target_time);
+}
+#else
+static inline void hdd_tsf_timestamp_rx(hdd_context_t *hdd_ctx,
+					qdf_nbuf_t netbuf,
+					uint64_t target_time)
+{
+}
+#endif
+
 /**
  * hdd_resolve_rx_ol_mode() - Resolve Rx offload method, LRO or GRO
  * @hdd_ctx: pointer to HDD Station Context
@@ -1219,7 +1251,7 @@ static inline void hdd_resolve_rx_ol_mode(hdd_context_t *hdd_ctx)
 static inline QDF_STATUS hdd_gro_rx(hdd_adapter_t *adapter,
 					       struct sk_buff *skb)
 {
-	struct napi_struct *napi;
+	struct qca_napi_info *qca_napii;
 	void *napid;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 
@@ -1231,18 +1263,56 @@ static inline QDF_STATUS hdd_gro_rx(hdd_adapter_t *adapter,
 	if (unlikely(napid == NULL))
 		goto out;
 
-	napi = hif_get_napi(QDF_NBUF_CB_RX_CTX_ID(skb), napid);
-	if (unlikely(napi == NULL))
+	qca_napii = hif_get_napi(QDF_NBUF_CB_RX_CTX_ID(skb), napid);
+	if (unlikely(qca_napii == NULL))
 		goto out;
 
 	skb_set_hash(skb, QDF_NBUF_CB_RX_FLOW_ID_TOEPLITZ(skb),
 			PKT_HASH_TYPE_L4);
 
-	if (GRO_DROP != napi_gro_receive(napi, skb))
-		status = QDF_STATUS_SUCCESS;
+	local_bh_disable();
+	/* No need to check return value as it frees the skb */
+	napi_gro_receive((struct napi_struct *)qca_napii->offld_ctx, skb);
+	local_bh_enable();
 
+	status = QDF_STATUS_SUCCESS;
 out:
 	return status;
+}
+
+
+static inline int hdd_rxthread_napi_poll(struct napi_struct *napi, int budget)
+{
+	hdd_err("This napi_poll should not be polled as we dint schedule this napi");
+	QDF_ASSERT(0);
+	return 0;
+}
+
+static inline void *hdd_init_rx_thread_napi(void)
+{
+	struct net_device   *netdev; /* dummy net_dev */
+	struct napi_struct   *napi;
+
+	napi = qdf_mem_malloc(sizeof(struct napi_struct));
+	netdev = qdf_mem_malloc(sizeof(struct net_device));
+	init_dummy_netdev(netdev);
+	netif_napi_add(netdev, napi, hdd_rxthread_napi_poll, 64);
+	napi_enable(napi);
+
+	return napi;
+
+}
+static inline void hdd_gro_flush(void *data)
+{
+	local_bh_disable();
+	napi_gro_flush((struct napi_struct *)data, false);
+	local_bh_enable();
+}
+
+
+static inline void hdd_create_napi_for_rxthread(void)
+{
+	ol_register_offld_flush_cb(hdd_gro_flush, hdd_init_rx_thread_napi);
 }
 
 /**
@@ -1254,20 +1324,57 @@ static inline void hdd_register_rx_ol(void)
 {
 	hdd_context_t *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 
-	if  (!hdd_ctx)
+	if  (!hdd_ctx) {
 		hdd_err("HDD context is NULL");
+		return;
+	}
 
 	if (hdd_ctx->ol_enable == CFG_LRO_ENABLED) {
+		hdd_ctx->receive_offload_cb = hdd_lro_rx;
 		/* Register the flush callback */
 		hdd_lro_create();
-		hdd_ctx->receive_offload_cb = hdd_lro_rx;
 		hdd_debug("LRO is enabled");
 	} else if (hdd_ctx->ol_enable == CFG_GRO_ENABLED) {
 		hdd_ctx->receive_offload_cb = hdd_gro_rx;
+		if (hdd_ctx->enableRxThread)
+			hdd_create_napi_for_rxthread();
 		hdd_debug("GRO is enabled");
 	}
 }
-#else
+
+static void hdd_deinit_gro_mgr(void *data)
+{
+	struct net_device *netdev;
+	struct napi_struct *napi = data;
+
+	if (!napi) {
+		hdd_debug("NAPI instance is NAPI");
+		return;
+	}
+
+	netdev = napi->dev;
+	napi_disable(napi);
+	netif_napi_del(napi);
+	qdf_mem_free(napi);
+	qdf_mem_free(netdev);
+}
+
+
+void hdd_gro_destroy(void)
+{
+	hdd_context_t *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	if  (!hdd_ctx) {
+		hdd_err("HDD context is NULL");
+		return;
+	}
+
+	/* Deregister the flush callback */
+	if ((hdd_ctx->ol_enable == CFG_GRO_ENABLED) &&
+		hdd_ctx->enableRxThread)
+		ol_deregister_offld_flush_cb(hdd_deinit_gro_mgr);
+}
+#else /* HELIUMPLUS */
 static inline void hdd_register_rx_ol(void) { }
 #endif
 
@@ -1448,7 +1555,7 @@ QDF_STATUS hdd_rx_packet_cbk(void *context, qdf_nbuf_t rxBuf)
 		if (qdf_nbuf_data_is_arp_rsp(skb) &&
 		    (pHddCtx->track_arp_ip == qdf_nbuf_get_arp_src_ip(skb))) {
 			++pAdapter->hdd_stats.hdd_arp_stats.rx_arp_rsp_count;
-			QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_INFO,
+			QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_DEBUG,
 					"%s: ARP packet received", __func__);
 			track_arp = true;
 		}
@@ -1531,7 +1638,7 @@ QDF_STATUS hdd_rx_packet_cbk(void *context, qdf_nbuf_t rxBuf)
 	 */
 	qdf_net_buf_debug_release_skb(rxBuf);
 
-	hdd_rx_timestamp(skb, ktime_to_us(skb->tstamp));
+	hdd_tsf_timestamp_rx(pHddCtx, skb, ktime_to_us(skb->tstamp));
 
 	if (hdd_can_handle_receive_offload(pHddCtx, skb) &&
 	    pHddCtx->receive_offload_cb)
@@ -1559,8 +1666,6 @@ QDF_STATUS hdd_rx_packet_cbk(void *context, qdf_nbuf_t rxBuf)
 			++pAdapter->hdd_stats.hdd_arp_stats.
 					rx_refused;
 	}
-
-	pAdapter->dev->last_rx = jiffies;
 
 	return QDF_STATUS_SUCCESS;
 }

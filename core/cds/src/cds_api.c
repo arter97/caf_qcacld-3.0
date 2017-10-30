@@ -44,6 +44,7 @@
 #include "cds_reg_service.h"
 #include "wma_types.h"
 #include "wlan_hdd_main.h"
+#include "wlan_hdd_tsf.h"
 #include <linux/vmalloc.h>
 
 #include "pld_common.h"
@@ -368,20 +369,14 @@ QDF_STATUS cds_open(void)
 	}
 
 	/* Now Open the CDS Scheduler */
-
-	if (pHddCtx->driver_status == DRIVER_MODULES_UNINITIALIZED ||
-	    cds_is_driver_recovering()) {
-		qdf_status = cds_sched_open(gp_cds_context,
-					    &gp_cds_context->qdf_sched,
-					    sizeof(cds_sched_context));
-
-		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
-			/* Critical Error ...  Cannot proceed further */
-			QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_FATAL,
-				  "%s: Failed to open CDS Scheduler", __func__);
-			QDF_ASSERT(0);
-			goto err_concurrency_lock;
-		}
+	qdf_status = cds_sched_open(gp_cds_context,
+				    &gp_cds_context->qdf_sched,
+				    sizeof(cds_sched_context));
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		/* Critical Error ...  Cannot proceed further */
+		cds_alert("Failed to open CDS Scheduler");
+		QDF_ASSERT(0);
+		goto err_concurrency_lock;
 	}
 
 	scn = cds_get_context(QDF_MODULE_ID_HIF);
@@ -462,11 +457,13 @@ QDF_STATUS cds_open(void)
 			  "%s: HTCHandle is null!", __func__);
 		goto err_wma_close;
 	}
-	if (htc_wait_target(HTCHandle)) {
-		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_FATAL,
-			  "%s: Failed to complete BMI phase", __func__);
 
-		if (!cds_is_fw_down())
+	qdf_status = htc_wait_target(HTCHandle);
+	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
+		cds_alert("Failed to complete BMI phase. status: %d", qdf_status);
+
+		if (qdf_status != QDF_STATUS_E_NOMEM
+				&& !cds_is_fw_down())
 			QDF_BUG(0);
 
 		goto err_wma_close;
@@ -535,11 +532,10 @@ err_bmi_close:
 	bmi_cleanup(ol_ctx);
 
 err_sched_close:
-	if (pHddCtx->driver_status == DRIVER_MODULES_UNINITIALIZED ||
-	    cds_is_driver_recovering()) {
+	if (QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		qdf_status = cds_sched_close(gp_cds_context);
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
-			hdd_err("Failed to close CDS Scheduler");
+			cds_err("Failed to close CDS Scheduler");
 			QDF_ASSERT(false);
 		}
 	}
@@ -556,7 +552,7 @@ err_wma_complete_event:
 err_probe_event:
 	qdf_event_destroy(&gp_cds_context->ProbeEvent);
 
-	return QDF_STATUS_E_FAILURE;
+	return qdf_status;
 } /* cds_open() */
 
 /**
@@ -901,6 +897,10 @@ QDF_STATUS cds_post_disable(void)
 	hif_disable_isr(hif_ctx);
 	hif_reset_soc(hif_ctx);
 
+	if (gp_cds_context->htc_ctx) {
+		htc_stop(gp_cds_context->htc_ctx);
+	}
+
 	ol_txrx_pdev_pre_detach(txrx_pdev, 1);
 
 	return QDF_STATUS_SUCCESS;
@@ -927,9 +927,9 @@ QDF_STATUS cds_close(v_CONTEXT_t cds_context)
 	}
 
 	hdd_lro_destroy();
+	hdd_gro_destroy();
 
 	if (gp_cds_context->htc_ctx) {
-		htc_stop(gp_cds_context->htc_ctx);
 		htc_destroy(gp_cds_context->htc_ctx);
 		gp_cds_context->htc_ctx = NULL;
 	}
@@ -1350,6 +1350,9 @@ QDF_STATUS cds_set_context(QDF_MODULE_ID module_id, void *context)
 	switch (module_id) {
 	case QDF_MODULE_ID_HIF:
 		p_cds_context->pHIFContext = context;
+		break;
+	case QDF_MODULE_ID_HDD:
+		p_cds_context->pHDDContext = context;
 		break;
 	default:
 		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
@@ -1776,7 +1779,9 @@ static QDF_STATUS cds_force_assert_target(qdf_device_t qdf_ctx)
 		  "Self Recovery not supported via Platform driver assert");
 
 	cds_set_recovery_in_progress(false);
-	QDF_BUG(0);
+
+	if (!cds_is_fw_down())
+		QDF_BUG(0);
 
 	return QDF_STATUS_E_INVAL;
 }
@@ -1830,6 +1835,12 @@ static void cds_trigger_recovery_work(void *param)
 	QDF_STATUS status;
 	struct qdf_runtime_lock recovery_lock;
 	qdf_device_t qdf_ctx;
+
+	if (!cds_is_self_recovery_enabled()) {
+		cds_err("Recovery is not enabled");
+		QDF_BUG(0);
+		return;
+	}
 
 	if (cds_is_driver_recovering() || cds_is_driver_in_bad_state()) {
 		cds_err("Recovery in progress; ignoring recovery trigger");
@@ -2231,6 +2242,52 @@ bool cds_is_fatal_event_enabled(void)
 	return p_cds_context->enable_fatal_event;
 }
 
+#ifdef WLAN_FEATURE_TSF_PLUS
+bool cds_is_ptp_rx_opt_enabled(void)
+{
+	hdd_context_t *hdd_ctx;
+	p_cds_contextType p_cds_context;
+
+	p_cds_context = cds_get_global_context();
+	if (!p_cds_context) {
+		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
+			  "%s: cds context is Invalid", __func__);
+		return false;
+	}
+
+	hdd_ctx = (hdd_context_t *)(p_cds_context->pHDDContext);
+	if ((NULL == hdd_ctx) || (NULL == hdd_ctx->config)) {
+		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
+			  "%s: Hdd Context is Null", __func__);
+		return false;
+	}
+
+	return HDD_TSF_IS_RX_SET(hdd_ctx);
+}
+
+bool cds_is_ptp_tx_opt_enabled(void)
+{
+	hdd_context_t *hdd_ctx;
+	p_cds_contextType p_cds_context;
+
+	p_cds_context = cds_get_global_context();
+	if (!p_cds_context) {
+		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
+			  "%s: cds context is Invalid", __func__);
+		return false;
+	}
+
+	hdd_ctx = (hdd_context_t *)(p_cds_context->pHDDContext);
+	if ((NULL == hdd_ctx) || (NULL == hdd_ctx->config)) {
+		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
+			  "%s: Hdd Context is Null", __func__);
+		return false;
+	}
+
+	return HDD_TSF_IS_TX_SET(hdd_ctx);
+}
+#endif
+
 /**
  * cds_get_log_indicator() - Get the log flush indicator
  *
@@ -2629,6 +2686,7 @@ QDF_STATUS cds_register_dp_cb(struct cds_dp_cbacks *dp_cbs)
 	cds_ctx->hdd_en_lro_in_cc_cb = dp_cbs->hdd_en_lro_in_cc_cb;
 	cds_ctx->hdd_disable_lro_in_cc_cb = dp_cbs->hdd_disble_lro_in_cc_cb;
 	cds_ctx->hdd_set_rx_mode_rps_cb = dp_cbs->hdd_set_rx_mode_rps_cb;
+	cds_ctx->hdd_ipa_set_mcc_mode_cb = dp_cbs->hdd_ipa_set_mcc_mode_cb;
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -2653,6 +2711,7 @@ QDF_STATUS cds_deregister_dp_cb(void)
 	cds_ctx->hdd_en_lro_in_cc_cb = NULL;
 	cds_ctx->hdd_disable_lro_in_cc_cb = NULL;
 	cds_ctx->hdd_set_rx_mode_rps_cb = NULL;
+	cds_ctx->hdd_ipa_set_mcc_mode_cb = NULL;
 
 	return QDF_STATUS_SUCCESS;
 }

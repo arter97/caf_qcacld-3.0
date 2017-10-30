@@ -30,7 +30,7 @@
  *
  * WLAN HDD NAPI interface implementation
  */
-#include <smp.h> /* get_cpu */
+#include <linux/smp.h> /* get_cpu */
 
 #include "wlan_hdd_napi.h"
 #include "cds_api.h"       /* cds_get_context */
@@ -64,7 +64,7 @@ struct qca_napi_data *hdd_napi_get_all(void)
 	else
 		rp = hif_napi_get_all(hif);
 
-	NAPI_DEBUG("<-- [addr=%p]", rp);
+	NAPI_DEBUG("<-- [addr=%pK]", rp);
 	return rp;
 }
 
@@ -237,7 +237,7 @@ int hdd_napi_event(enum qca_napi_event event, void *data)
 	int rc = -EFAULT;  /* assume err */
 	struct hif_opaque_softc *hif;
 
-	NAPI_DEBUG("-->(event=%d, aux=%p)", event, data);
+	NAPI_DEBUG("-->(event=%d, aux=%pK)", event, data);
 
 	hif = cds_get_context(QDF_MODULE_ID_HIF);
 	if (unlikely(NULL == hif))
@@ -472,7 +472,8 @@ int hdd_display_napi_stats(void)
 		hdd_err("%s unable to retrieve napi structure", __func__);
 		return -EFAULT;
 	}
-	qdf_print("[NAPI %u][BL %d]:  scheds   polls   comps    done t-lim p-lim  corr  max_time napi-buckets(%d)",
+	hdd_log(QDF_TRACE_LEVEL_INFO_LOW,
+		"[NAPI %u][BL %d]:  scheds   polls   comps    done t-lim p-lim  corr  max_time napi-buckets(%d)",
 		  napid->napi_mode,
 		  hif_napi_cpu_blacklist(napid, BLACKLIST_QUERY),
 		  QCA_NAPI_NUM_BUCKETS);
@@ -495,7 +496,8 @@ int hdd_display_napi_stats(void)
 				}
 
 				if (napis->napi_schedules != 0)
-					qdf_print("NAPI[%2d]CPU[%d]: %7d %7d %7d %7d %5d %5d %5d %9llu %s",
+					hdd_log(QDF_TRACE_LEVEL_INFO_LOW,
+					"NAPI[%2d]CPU[%d]: %7d %7d %7d %7d %5d %5d %5d %9llu %s",
 						  i, j,
 						  napis->napi_schedules,
 						  napis->napi_polls,

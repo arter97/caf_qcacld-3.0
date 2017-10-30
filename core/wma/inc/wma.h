@@ -60,7 +60,7 @@
 #define WMA_READY_EVENTID_TIMEOUT          6000
 #define WMA_SERVICE_READY_EXT_TIMEOUT      6000
 #define WMA_TGT_SUSPEND_COMPLETE_TIMEOUT   6000
-#define WMA_WAKE_LOCK_TIMEOUT              1000
+#define WMA_WAKE_LOCK_TIMEOUT              WAKELOCK_DURATION_RECOMMENDED
 #define WMA_RESUME_TIMEOUT                 6000
 #define MAX_MEM_CHUNKS                     32
 #define NAN_CLUSTER_ID_BYTES               4
@@ -87,6 +87,8 @@
 #define WMA_MAX_SUPPORTED_STAS    12
 #endif
 #define WMA_MAX_SUPPORTED_BSS     5
+
+#define WMA_MAX_MGMT_MPDU_LEN 2000
 
 #define FRAGMENT_SIZE 3072
 
@@ -117,6 +119,9 @@
 	QDF_TRACE(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_ERROR, ## args)
 #define WMA_LOGP(args ...) \
 	QDF_TRACE(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_FATAL, ## args)
+#define wma_log_rate_limit_err(rate, args...) \
+	QDF_TRACE_RATE_LIMITED(rate, QDF_MODULE_ID_WMA,\
+			QDF_TRACE_LEVEL_ERROR, ## args)
 
 #define WMA_DEBUG_ALWAYS
 
@@ -187,6 +192,21 @@
 #define WMA_IPV6_PROTO_GET_MIN_LEN        21
 #define WMA_IPV6_PKT_INFO_GET_MIN_LEN     62
 #define WMA_ICMPV6_SUBTYPE_GET_MIN_LEN    55
+
+/* beacon tx rate */
+#define WMA_BEACON_TX_RATE_1_M            10
+#define WMA_BEACON_TX_RATE_2_M            20
+#define WMA_BEACON_TX_RATE_5_5_M          55
+#define WMA_BEACON_TX_RATE_11_M           110
+#define WMA_BEACON_TX_RATE_6_M            60
+#define WMA_BEACON_TX_RATE_9_M            90
+#define WMA_BEACON_TX_RATE_12_M           120
+#define WMA_BEACON_TX_RATE_18_M           180
+#define WMA_BEACON_TX_RATE_24_M           240
+#define WMA_BEACON_TX_RATE_36_M           360
+#define WMA_BEACON_TX_RATE_48_M           480
+#define WMA_BEACON_TX_RATE_54_M           540
+
 /**
  * ds_mode: distribution system mode
  * @IEEE80211_NO_DS: NO DS at either side
@@ -270,9 +290,11 @@ enum ds_mode {
 #define WMA_DEL_P2P_SELF_STA_RSP_START 0x03
 #define WMA_SET_LINK_PEER_RSP 0x04
 #define WMA_DELETE_PEER_RSP 0x05
-#define WMA_VDEV_START_REQUEST_TIMEOUT (6000)   /* 6 seconds */
-#define WMA_VDEV_STOP_REQUEST_TIMEOUT  (6000)   /* 6 seconds */
-#define WMA_VDEV_HW_MODE_REQUEST_TIMEOUT (5000) /* 5 seconds */
+#define WMA_VDEV_START_REQUEST_TIMEOUT		6000 /* 6s */
+#define WMA_VDEV_STOP_REQUEST_TIMEOUT		6000 /* 6s */
+#define WMA_VDEV_HW_MODE_REQUEST_TIMEOUT	5000 /* 5s */
+#define WMA_VDEV_PLCY_MGR_CMD_TIMEOUT		3000 /* 3s */
+#define WMA_VDEV_SET_KEY_WAKELOCK_TIMEOUT	WAKELOCK_DURATION_RECOMMENDED
 
 #define WMA_TGT_INVALID_SNR (0)
 
@@ -322,26 +344,20 @@ enum ds_mode {
 #define WMA_RSSI_THOLD_DEFAULT   -300
 
 #ifdef FEATURE_WLAN_SCAN_PNO
-#define WMA_PNO_MATCH_WAKE_LOCK_TIMEOUT         (5 * 1000)     /* in msec */
-#ifdef CONFIG_SLUB_DEBUG_ON
-#define WMA_PNO_SCAN_COMPLETE_WAKE_LOCK_TIMEOUT (2 * 1000)     /* in msec */
-#else
-#define WMA_PNO_SCAN_COMPLETE_WAKE_LOCK_TIMEOUT (1 * 1000)     /* in msec */
-#endif /* CONFIG_SLUB_DEBUG_ON */
+#define WMA_PNO_MATCH_WAKE_LOCK_TIMEOUT         WAKELOCK_DURATION_RECOMMENDED
+#define WMA_PNO_SCAN_COMPLETE_WAKE_LOCK_TIMEOUT WAKELOCK_DURATION_RECOMMENDED
 #endif /* FEATURE_WLAN_SCAN_PNO */
 
-#define WMA_AUTH_REQ_RECV_WAKE_LOCK_TIMEOUT     (5 * 1000)     /* in msec */
-#define WMA_ASSOC_REQ_RECV_WAKE_LOCK_DURATION   (5 * 1000)     /* in msec */
-#define WMA_DEAUTH_RECV_WAKE_LOCK_DURATION      (5 * 1000)     /* in msec */
-#define WMA_DISASSOC_RECV_WAKE_LOCK_DURATION    (5 * 1000)     /* in msec */
+#define WMA_AUTH_REQ_RECV_WAKE_LOCK_TIMEOUT     WAKELOCK_DURATION_RECOMMENDED
+#define WMA_ASSOC_REQ_RECV_WAKE_LOCK_DURATION   WAKELOCK_DURATION_RECOMMENDED
+#define WMA_DEAUTH_RECV_WAKE_LOCK_DURATION      WAKELOCK_DURATION_RECOMMENDED
+#define WMA_DISASSOC_RECV_WAKE_LOCK_DURATION    WAKELOCK_DURATION_RECOMMENDED
 #define WMA_ROAM_HO_WAKE_LOCK_DURATION          (500)          /* in msec */
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
-#define WMA_AUTO_SHUTDOWN_WAKE_LOCK_DURATION    (5 * 1000)     /* in msec */
-#else
-#define WMA_AUTO_SHUTDOWN_WAKE_LOCK_DURATION    0              /* in msec */
+#define WMA_AUTO_SHUTDOWN_WAKE_LOCK_DURATION    WAKELOCK_DURATION_RECOMMENDED
 #endif
-#define WMA_BMISS_EVENT_WAKE_LOCK_DURATION      (4 * 1000)     /* in msec */
-#define WMA_FW_RSP_EVENT_WAKE_LOCK_DURATION     (3 * 1000)     /* in msec */
+#define WMA_BMISS_EVENT_WAKE_LOCK_DURATION      WAKELOCK_DURATION_RECOMMENDED
+#define WMA_FW_RSP_EVENT_WAKE_LOCK_DURATION     WAKELOCK_DURATION_MAX
 
 #define WMA_TXMIC_LEN 8
 #define WMA_RXMIC_LEN 8
@@ -975,6 +991,17 @@ typedef struct {
 	uint8_t ssidHidden;
 } vdev_restart_params_t;
 
+struct roam_synch_frame_ind {
+	uint32_t bcn_probe_rsp_len;
+	uint8_t *bcn_probe_rsp;
+	uint8_t is_beacon;
+	uint32_t reassoc_req_len;
+	uint8_t *reassoc_req;
+	uint32_t reassoc_rsp_len;
+	uint8_t *reassoc_rsp;
+};
+
+
 /**
  * struct wma_txrx_node - txrx node
  * @addr: mac address
@@ -1042,6 +1069,7 @@ typedef struct {
  * @in_bmps : Whether bmps for this interface has been enabled
  * @vdev_start_wakelock: wakelock to protect vdev start op with firmware
  * @vdev_stop_wakelock: wakelock to protect vdev stop op with firmware
+ * @vdev_set_key_wakelock: wakelock to protect vdev set key op with firmware
  */
 struct wma_txrx_node {
 	uint8_t addr[IEEE80211_ADDR_LEN];
@@ -1086,6 +1114,7 @@ struct wma_txrx_node {
 	tAniGetPEStatsRsp *stats_rsp;
 	uint8_t fw_stats_set;
 	void *del_staself_req;
+	bool is_del_sta_defered;
 	qdf_atomic_t bss_status;
 	uint8_t rate_flags;
 	uint8_t nss;
@@ -1128,6 +1157,8 @@ struct wma_txrx_node {
 	bool beacon_filter_enabled;
 	qdf_wake_lock_t vdev_start_wakelock;
 	qdf_wake_lock_t vdev_stop_wakelock;
+	qdf_wake_lock_t vdev_set_key_wakelock;
+	struct roam_synch_frame_ind roam_synch_frame_ind;
 };
 
 #if defined(QCA_WIFI_FTM)
@@ -1498,7 +1529,9 @@ struct peer_debug_info {
  * @saved_chan: saved channel list sent as part of WMI_SCAN_CHAN_LIST_CMDID
  * @fw_mem_dump_enabled: Fw memory dump support
  * @ss_configs: spectral scan config parameters
+ * @bandcapability: band capability configured through ini
  * @ito_repeat_count: Indicates ito repeated count
+ * @critical_events_in_flight: number of suspend preventing events in flight
  */
 typedef struct {
 	void *wmi_handle;
@@ -1581,6 +1614,8 @@ typedef struct {
 	struct wma_tx_ack_work_ctx *ack_work_ctx;
 	uint8_t powersave_mode;
 	bool ptrn_match_enable_all_vdev;
+	uint8_t wma_ptrn_id_def;
+	uint8_t wma_ptrn_id_usr;
 	void *pGetRssiReq;
 	bool get_one_peer_info;
 	bool get_sta_peer_info;
@@ -1707,14 +1742,16 @@ typedef struct {
 	bool tx_bfee_8ss_enabled;
 	tSirAddonPsReq ps_setting;
 	struct peer_debug_info *peer_dbg;
-	bool auto_power_save_enabled;
+	enum cds_auto_pwr_detect_failure_mode_t auto_power_save_enabled;
 	uint8_t in_imps;
 	uint64_t tx_fail_cnt;
 	uint64_t wmi_desc_fail_count;
+	uint8_t bandcapability;
 #ifdef FEATURE_SPECTRAL_SCAN
 	struct vdev_spectral_configure_params ss_configs;
 #endif
 	uint8_t  ito_repeat_count;
+	qdf_atomic_t critical_events_in_flight;
 #ifdef FEATURE_WLAN_D0WOW
 	atomic_t in_d0wow;
 #endif
@@ -1851,6 +1888,7 @@ struct wma_target_req {
  *			number of transmit streams
  * @preferred_rx_streams: policy manager indicates the preferred
  *			number of receive streams
+ * @beacon_tx_rate: beacon tx rate
  */
 struct wma_vdev_start_req {
 	uint32_t beacon_intval;
@@ -1874,7 +1912,7 @@ struct wma_vdev_start_req {
 	bool is_quarter_rate;
 	uint32_t preferred_tx_streams;
 	uint32_t preferred_rx_streams;
-	uint8_t beacon_tx_rate;
+	uint16_t beacon_tx_rate;
 	bool ldpc_rx_enabled;
 };
 
@@ -2346,8 +2384,6 @@ QDF_STATUS wma_send_pdev_set_dual_mac_config(tp_wma_handle wma_handle,
 		struct sir_dual_mac_config *msg);
 QDF_STATUS wma_send_pdev_set_antenna_mode(tp_wma_handle wma_handle,
 		struct sir_antenna_mode_param *msg);
-QDF_STATUS wma_crash_inject(tp_wma_handle wma_handle, uint32_t type,
-			uint32_t delay_time_ms);
 
 struct wma_target_req *wma_fill_vdev_req(tp_wma_handle wma,
 					 uint8_t vdev_id,

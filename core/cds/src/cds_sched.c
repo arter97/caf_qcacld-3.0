@@ -135,7 +135,7 @@ static int cds_sched_find_attach_cpu(p_cds_sched_context pSchedContext,
 	int i;
 #endif
 
-	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO_LOW,
+	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_DEBUG,
 		"%s: num possible cpu %d",
 		__func__, num_possible_cpus());
 
@@ -242,7 +242,7 @@ static int cds_sched_find_attach_cpu(p_cds_sched_context pSchedContext,
 #endif /* WLAN_OPEN_SOURCE */
 	}
 
-	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO_LOW,
+	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_DEBUG,
 		"%s: NUM PERF CORE %d, HIGH TPUTR REQ %d, RX THRE CPU %lu",
 		__func__, perf_core_count,
 		(int)pSchedContext->high_throughput_required,
@@ -1667,7 +1667,7 @@ void cds_shutdown_notifier_purge(void)
  * Call registered shutdown notifier call back to indicate about remove or
  * shutdown.
  */
-static void cds_shutdown_notifier_call(void)
+void cds_shutdown_notifier_call(void)
 {
 	struct shutdown_notifier *notifier;
 	unsigned long irq_flags;
@@ -1700,8 +1700,6 @@ bool cds_wait_for_external_threads_completion(const char *caller_func)
 	int count = MAX_SSR_WAIT_ITERATIONS;
 	int r;
 
-	cds_shutdown_notifier_call();
-
 	while (count) {
 
 		r = atomic_read(&ssr_protect_entry_count);
@@ -1714,7 +1712,7 @@ bool cds_wait_for_external_threads_completion(const char *caller_func)
 				  "%s: Waiting for %d active entry points to exit",
 				  __func__, r);
 			msleep(SSR_WAIT_SLEEP_TIME);
-			if (count == (MAX_SSR_WAIT_ITERATIONS/2)) {
+			if (count & 0x1) {
 				QDF_TRACE(QDF_MODULE_ID_QDF,
 					QDF_TRACE_LEVEL_ERROR,
 					"%s: in middle of waiting for active entry points:",

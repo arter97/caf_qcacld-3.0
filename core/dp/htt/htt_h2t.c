@@ -47,6 +47,7 @@
 #include <htc_api.h>            /* HTC_PACKET */
 #include <htc.h>                /* HTC_HDR_ALIGNMENT_PADDING */
 #include <htt.h>                /* HTT host->target msg defs */
+#include <wdi_ipa.h>            /* HTT host->target WDI IPA msg defs */
 #include <ol_txrx_htt_api.h>    /* ol_tx_completion_handler, htt_tx_status */
 #include <ol_htt_tx_api.h>
 
@@ -102,8 +103,10 @@ void htt_h2t_send_complete(void *context, HTC_PACKET *htc_pkt)
 	if (pdev->cfg.is_high_latency && !pdev->cfg.default_tx_comp_req) {
 		int32_t credit_delta;
 
+		HTT_TX_MUTEX_ACQUIRE(&pdev->credit_mutex);
 		qdf_atomic_add(1, &pdev->htt_tx_credit.bus_delta);
 		credit_delta = htt_tx_credit_update(pdev);
+		HTT_TX_MUTEX_RELEASE(&pdev->credit_mutex);
 
 		if (credit_delta)
 			ol_tx_credit_completion_handler(pdev->txrx_pdev,
@@ -307,6 +310,8 @@ QDF_STATUS htt_h2t_rx_ring_rfs_cfg_msg_ll(struct htt_pdev_t *pdev)
 	struct htt_htc_pkt *pkt;
 	qdf_nbuf_t msg;
 	uint32_t *msg_word;
+	uint32_t  msg_local;
+	struct cds_config_info *cds_cfg;
 
 	QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_INFO,
 		  "Receive flow steering configuration, disable gEnableFlowSteering(=0) in ini if FW doesnot support it\n");
@@ -340,16 +345,28 @@ QDF_STATUS htt_h2t_rx_ring_rfs_cfg_msg_ll(struct htt_pdev_t *pdev)
 	/* rewind beyond alignment pad to get to the HTC header reserved area */
 	qdf_nbuf_push_head(msg, HTC_HDR_ALIGNMENT_PADDING);
 
-	*msg_word = 0;
-	HTT_H2T_MSG_TYPE_SET(*msg_word, HTT_H2T_MSG_TYPE_RFS_CONFIG);
+	msg_local = 0;
+	HTT_H2T_MSG_TYPE_SET(msg_local, HTT_H2T_MSG_TYPE_RFS_CONFIG);
 	if (ol_cfg_is_flow_steering_enabled(pdev->ctrl_pdev)) {
-		HTT_RX_RFS_CONFIG_SET(*msg_word, 1);
-	    QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_INFO,
-		"Enable Rx flow steering\n");
+		HTT_RX_RFS_CONFIG_SET(msg_local, 1);
+		QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_INFO,
+			  "Enable Rx flow steering");
 	} else {
 	    QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_INFO,
-	    "Disable Rx flow steering\n");
+		      "Disable Rx flow steering");
 	}
+	cds_cfg = cds_get_ini_config();
+	if (cds_cfg != NULL) {
+		msg_local |= ((cds_cfg->max_msdus_per_rxinorderind & 0xff)
+			      << 16);
+		QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_INFO,
+			  "Updated maxMSDUsPerRxInd");
+	}
+
+	*msg_word = msg_local;
+	QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_INFO,
+		  "%s: Sending msg_word: 0x%08x",
+		  __func__, *msg_word);
 
 	SET_HTC_PACKET_INFO_TX(&pkt->htc_pkt,
 			       htt_h2t_send_complete_free_netbuf,
@@ -1376,7 +1393,7 @@ int htt_h2t_ipa_uc_get_share_stats(struct htt_pdev_t *pdev, uint8_t reset_stats)
 	/* reserve room for HTC header */
 	msg = qdf_nbuf_alloc(pdev->osdev,
 		HTT_MSG_BUF_SIZE(HTT_WDI_IPA_OP_REQUEST_SZ)+
-		HTT_MSG_BUF_SIZE(HTT_WDI_IPA_OP_REQ_GET_SHARING_STATS_SZ),
+		HTT_MSG_BUF_SIZE(WLAN_WDI_IPA_GET_SHARING_STATS_REQ_SZ),
 		HTC_HEADER_LEN + HTC_HDR_ALIGNMENT_PADDING, 4, false);
 	if (!msg) {
 		htt_htc_pkt_free(pdev, pkt);
@@ -1384,7 +1401,7 @@ int htt_h2t_ipa_uc_get_share_stats(struct htt_pdev_t *pdev, uint8_t reset_stats)
 	}
 	/* set the length of the message */
 	qdf_nbuf_put_tail(msg, HTT_WDI_IPA_OP_REQUEST_SZ+
-			  HTT_WDI_IPA_OP_REQ_GET_SHARING_STATS_SZ);
+			  WLAN_WDI_IPA_GET_SHARING_STATS_REQ_SZ);
 
 	/* fill in the message contents */
 	msg_word = (uint32_t *) qdf_nbuf_data(msg);
@@ -1399,7 +1416,7 @@ int htt_h2t_ipa_uc_get_share_stats(struct htt_pdev_t *pdev, uint8_t reset_stats)
 
 	msg_word++;
 	*msg_word = 0;
-	HTT_WDI_IPA_OP_REQ_GET_SHARING_STATS_RESET_STATS_SET(*msg_word,
+	WLAN_WDI_IPA_GET_SHARING_STATS_REQ_RESET_STATS_SET(*msg_word,
 							     reset_stats);
 
 	SET_HTC_PACKET_INFO_TX(&pkt->htc_pkt,
@@ -1440,7 +1457,7 @@ int htt_h2t_ipa_uc_set_quota(struct htt_pdev_t *pdev, uint64_t quota_bytes)
 	/* reserve room for HTC header */
 	msg = qdf_nbuf_alloc(pdev->osdev,
 		HTT_MSG_BUF_SIZE(HTT_WDI_IPA_OP_REQUEST_SZ)+
-		HTT_MSG_BUF_SIZE(HTT_WDI_IPA_OP_REQ_SET_QUOTA_SZ),
+		HTT_MSG_BUF_SIZE(WLAN_WDI_IPA_SET_QUOTA_REQ_SZ),
 		HTC_HEADER_LEN + HTC_HDR_ALIGNMENT_PADDING, 4, false);
 	if (!msg) {
 		htt_htc_pkt_free(pdev, pkt);
@@ -1448,7 +1465,7 @@ int htt_h2t_ipa_uc_set_quota(struct htt_pdev_t *pdev, uint64_t quota_bytes)
 	}
 	/* set the length of the message */
 	qdf_nbuf_put_tail(msg, HTT_WDI_IPA_OP_REQUEST_SZ+
-			  HTT_WDI_IPA_OP_REQ_SET_QUOTA_SZ);
+			  WLAN_WDI_IPA_SET_QUOTA_REQ_SZ);
 
 	/* fill in the message contents */
 	msg_word = (uint32_t *) qdf_nbuf_data(msg);
@@ -1463,19 +1480,19 @@ int htt_h2t_ipa_uc_set_quota(struct htt_pdev_t *pdev, uint64_t quota_bytes)
 
 	msg_word++;
 	*msg_word = 0;
-	HTT_WDI_IPA_OP_REQ_SET_QUOTA_SET_QUOTA_SET(*msg_word, quota_bytes > 0);
+	WLAN_WDI_IPA_SET_QUOTA_REQ_SET_QUOTA_SET(*msg_word, quota_bytes > 0);
 
 	msg_word++;
 	*msg_word = 0;
-	HTT_WDI_IPA_OP_REQ_SET_QUOTA_QUOTA_LO_SET(*msg_word,
+	WLAN_WDI_IPA_SET_QUOTA_REQ_QUOTA_LO_SET(*msg_word,
 			(uint32_t)(quota_bytes &
-				   HTT_WDI_IPA_OP_REQ_SET_QUOTA_QUOTA_LO_M));
+				   WLAN_WDI_IPA_SET_QUOTA_REQ_QUOTA_LO_M));
 
 	msg_word++;
 	*msg_word = 0;
-	HTT_WDI_IPA_OP_REQ_SET_QUOTA_QUOTA_HI_SET(*msg_word,
+	WLAN_WDI_IPA_SET_QUOTA_REQ_QUOTA_HI_SET(*msg_word,
 			(uint32_t)(quota_bytes>>32 &
-				   HTT_WDI_IPA_OP_REQ_SET_QUOTA_QUOTA_HI_M));
+				   WLAN_WDI_IPA_SET_QUOTA_REQ_QUOTA_HI_M));
 
 	SET_HTC_PACKET_INFO_TX(&pkt->htc_pkt,
 			       htt_h2t_send_complete_free_netbuf,

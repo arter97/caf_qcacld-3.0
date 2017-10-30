@@ -3175,10 +3175,19 @@ enum qca_wlan_vendor_attr_config {
 	 * 1 - Enable , 0 - Disable.
 	 */
 	QCA_WLAN_VENDOR_ATTR_CONFIG_LRO = 50,
+	/*
+	 * 8 bit unsigned value to globally enable/disable scan
+	 * 1 - Enable, 0 - Disable.
+	 */
+	QCA_WLAN_VENDOR_ATTR_CONFIG_SCAN_ENABLE = 51,
 
 	/* 8-bit unsigned value to set the total beacon miss count */
 	QCA_WLAN_VENDOR_ATTR_CONFIG_TOTAL_BEACON_MISS_COUNT = 52,
 
+	/* 8-bit unsigned value to configure the driver and below layers to
+	 * enable/disable all fils features.
+	 * 0-enable, 1-disable */
+	QCA_WLAN_VENDOR_ATTR_CONFIG_DISABLE_FILS = 53,
 	QCA_WLAN_VENDOR_ATTR_CONFIG_AFTER_LAST,
 	QCA_WLAN_VENDOR_ATTR_CONFIG_MAX =
 	QCA_WLAN_VENDOR_ATTR_CONFIG_AFTER_LAST - 1,

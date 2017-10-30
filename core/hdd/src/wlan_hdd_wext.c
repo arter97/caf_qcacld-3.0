@@ -1046,6 +1046,28 @@ static const struct ccp_freq_chan_map freq_chan_map[] = {
 #define WE_SET_WOW_DATA_INACTIVITY_TO    90
 
 
+/*
+ * <ioctl>
+ * setModDTIM - Change Modulated DTIM
+ *
+ * @INPUT: set_value.
+ *
+ * @OUTPUT: None
+ *
+ * This IOCTL is used to change modulated DTIM
+ * value without WIFI OFF/ON.
+ *
+ * @E.g: iwpriv wlan0 setModDTIM <value>
+ * iwpriv wlan0 setModDTIM 2
+ *
+ * Supported Feature: N/A
+ *
+ * Usage: External
+ *
+ * </ioctl>
+ */
+#define WE_SET_MODULATED_DTIM                 91
+
 /* Private ioctls and their sub-ioctls */
 #define WLAN_PRIV_SET_NONE_GET_INT    (SIOCIWFIRSTPRIV + 1)
 #define WE_GET_11D_STATE     1
@@ -3040,7 +3062,8 @@ int hdd_wlan_dump_stats(hdd_adapter_t *adapter, int value)
 		wlan_hdd_display_tx_rx_histogram(hdd_ctx);
 		break;
 	case WLAN_HDD_NETIF_OPER_HISTORY:
-		wlan_hdd_display_netif_queue_history(hdd_ctx);
+		wlan_hdd_display_netif_queue_history(hdd_ctx,
+					QDF_STATS_VERB_LVL_HIGH);
 		break;
 	case WLAN_HIF_STATS:
 		hdd_display_hif_stats();
@@ -3053,8 +3076,13 @@ int hdd_wlan_dump_stats(hdd_adapter_t *adapter, int value)
 			ret = EFAULT;
 		}
 		break;
+	case WLAN_DISCONNECT_STATS:
+		sme_display_disconnect_stats(WLAN_HDD_GET_HAL_CTX(adapter),
+						adapter->sessionId);
+		break;
 	default:
-		status = ol_txrx_display_stats(value);
+		status = ol_txrx_display_stats(value,
+			QDF_STATS_VERB_LVL_HIGH);
 		if (status == QDF_STATUS_E_INVAL) {
 			hdd_display_stats_help();
 			ret = EINVAL;
@@ -3527,7 +3555,7 @@ static void hdd_get_snr_cb(int8_t snr, uint32_t staId, void *pContext)
 		 * we can do
 		 */
 		spin_unlock(&hdd_context_lock);
-		hdd_warn("Invalid context, pAdapter [%p] magic [%08x]",
+		hdd_warn("Invalid context, pAdapter [%pK] magic [%08x]",
 			 pAdapter, pStatsContext->magic);
 		return;
 	}
@@ -3732,7 +3760,7 @@ hdd_get_link_speed_cb(tSirLinkSpeedInfo *pLinkSpeed, void *pContext)
 	hdd_adapter_t *pAdapter;
 
 	if ((NULL == pLinkSpeed) || (NULL == pContext)) {
-		hdd_err("Bad param, pLinkSpeed [%p] pContext [%p]",
+		hdd_err("Bad param, pLinkSpeed [%pK] pContext [%pK]",
 			pLinkSpeed, pContext);
 		return;
 	}
@@ -3752,7 +3780,7 @@ hdd_get_link_speed_cb(tSirLinkSpeedInfo *pLinkSpeed, void *pContext)
 		 * we can do
 		 */
 		spin_unlock(&hdd_context_lock);
-		hdd_warn("Invalid context, pAdapter [%p] magic [%08x]",
+		hdd_warn("Invalid context, pAdapter [%pK] magic [%08x]",
 			 pAdapter, pLinkSpeedContext->magic);
 		return;
 	}
@@ -3913,7 +3941,7 @@ static void hdd_get_peer_rssi_cb(struct sir_peer_info_resp *sta_rssi,
 	hdd_adapter_t *padapter;
 
 	if ((sta_rssi == NULL) || (context == NULL)) {
-		hdd_err("Bad param, sta_rssi [%p] context [%p]",
+		hdd_err("Bad param, sta_rssi [%pK] context [%pK]",
 			sta_rssi, context);
 		return;
 	}
@@ -3934,7 +3962,7 @@ static void hdd_get_peer_rssi_cb(struct sir_peer_info_resp *sta_rssi,
 		 * we can do
 		 */
 		spin_unlock(&hdd_context_lock);
-		hdd_warn("Invalid context, magic [%08x], adapter [%p]",
+		hdd_warn("Invalid context, magic [%08x], adapter [%pK]",
 			get_rssi_context->magic, padapter);
 		return;
 	}
@@ -3970,7 +3998,7 @@ int wlan_hdd_get_peer_rssi(hdd_adapter_t *adapter,
 	struct sir_peer_info_req rssi_req;
 
 	if (!adapter || !macaddress) {
-		hdd_err("pAdapter [%p], macaddress [%p]", adapter, macaddress);
+		hdd_err("pAdapter [%pK], macaddress [%pK]", adapter, macaddress);
 		return -EFAULT;
 	}
 
@@ -6051,7 +6079,7 @@ static void hdd_get_class_a_statistics_cb(void *pStats, void *pContext)
 	hdd_adapter_t *pAdapter;
 
 	if ((NULL == pStats) || (NULL == pContext)) {
-		hdd_err("Bad param, pStats [%p] pContext [%p]",
+		hdd_err("Bad param, pStats [%pK] pContext [%pK]",
 			pStats, pContext);
 		return;
 	}
@@ -6073,7 +6101,7 @@ static void hdd_get_class_a_statistics_cb(void *pStats, void *pContext)
 		 * we can do
 		 */
 		spin_unlock(&hdd_context_lock);
-		hdd_warn("Invalid context, pAdapter [%p] magic [%08x]",
+		hdd_warn("Invalid context, pAdapter [%pK] magic [%08x]",
 			 pAdapter, pStatsContext->magic);
 		return;
 	}
@@ -6177,7 +6205,7 @@ static void hdd_get_station_statistics_cb(void *pStats, void *pContext)
 	hdd_adapter_t *pAdapter;
 
 	if ((NULL == pStats) || (NULL == pContext)) {
-		hdd_err("Bad param, pStats [%p] pContext [%p]",
+		hdd_err("Bad param, pStats [%pK] pContext [%pK]",
 			pStats, pContext);
 		return;
 	}
@@ -6201,7 +6229,7 @@ static void hdd_get_station_statistics_cb(void *pStats, void *pContext)
 		 * we can do
 		 */
 		spin_unlock(&hdd_context_lock);
-		hdd_warn("Invalid context, pAdapter [%p] magic [%08x]",
+		hdd_warn("Invalid context, pAdapter [%pK] magic [%08x]",
 			 pAdapter, pStatsContext->magic);
 		return;
 	}
@@ -6776,7 +6804,7 @@ static int __iw_set_encodeext(struct net_device *dev,
 	int key_index;
 	struct iw_point *encoding = &wrqu->encoding;
 	tCsrRoamSetKey setKey;
-	uint32_t roamId = 0xFF;
+	uint32_t roamId = INVALID_ROAM_ID;
 
 	ENTER_DEV(dev);
 
@@ -7563,7 +7591,7 @@ static void hdd_get_temperature_cb(int temperature, void *pContext)
 	spin_lock(&hdd_context_lock);
 	if ((NULL == pAdapter) || (TEMP_CONTEXT_MAGIC != pTempContext->magic)) {
 		spin_unlock(&hdd_context_lock);
-		hdd_warn("Invalid context, pAdapter [%p] magic [%08x]",
+		hdd_warn("Invalid context, pAdapter [%pK] magic [%08x]",
 		       pAdapter, pTempContext->magic);
 		return;
 	}
@@ -8859,6 +8887,18 @@ static int __iw_setint_getnone(struct net_device *dev,
 		}
 
 		cds_set_cur_conc_system_pref(set_value);
+		break;
+	}
+	case WE_SET_MODULATED_DTIM:
+	{
+		if ((set_value < CFG_ENABLE_MODULATED_DTIM_MIN) ||
+				(set_value > CFG_ENABLE_MODULATED_DTIM_MAX)) {
+			hdd_err("Invalid gEnableModuleDTIM value %d",
+				set_value);
+			return -EINVAL;
+		} else {
+			hdd_ctx->config->enableModulatedDTIM = set_value;
+		}
 		break;
 	}
 	default:
@@ -10376,7 +10416,7 @@ static int __iw_setnone_getnone(struct net_device *dev,
 
 		tHalHandle hHal = WLAN_HDD_GET_HAL_CTX(adapter);
 		tSirMacAddr bssid;
-		uint32_t roamId = 0;
+		uint32_t roamId = INVALID_ROAM_ID;
 		uint8_t operating_ch =
 			adapter->sessionCtx.station.conn_info.operationChannel;
 		tCsrRoamModifyProfileFields modProfileFields;
@@ -11724,7 +11764,7 @@ static int __iw_set_packet_filter_params(struct net_device *dev,
 	}
 
 	if ((NULL == priv_data.pointer) || (0 == priv_data.length)) {
-		hdd_err("invalid priv data %p or invalid priv data length %d",
+		hdd_err("invalid priv data %pK or invalid priv data length %d",
 			priv_data.pointer, priv_data.length);
 		return -EINVAL;
 	}
@@ -13226,6 +13266,10 @@ static const struct iw_priv_args we_private_args[] = {
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 0, "setConcSysPref" },
 
+	{WE_SET_MODULATED_DTIM,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 0, "setModDTIM" },
+
 	{WLAN_PRIV_SET_NONE_GET_INT,
 	 0,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
@@ -14053,7 +14097,7 @@ int hdd_register_wext(struct net_device *dev)
 
 int hdd_unregister_wext(struct net_device *dev)
 {
-	hdd_debug("dev(%p)", dev);
+	hdd_debug("dev(%pK)", dev);
 
 	if (dev != NULL) {
 		rtnl_lock();

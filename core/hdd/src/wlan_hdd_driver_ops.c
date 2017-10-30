@@ -46,6 +46,7 @@
 #include "cdp_txrx_bus.h"
 #include "pld_common.h"
 #include "wlan_hdd_driver_ops.h"
+#include "wlan_hdd_scan.h"
 
 #ifdef MODULE
 #define WLAN_MODULE_NAME  module_name(THIS_MODULE)
@@ -55,7 +56,7 @@
 
 #define DISABLE_KRAIT_IDLE_PS_VAL      1
 
-#define SSR_MAX_FAIL_CNT 2
+#define SSR_MAX_FAIL_CNT 3
 static uint8_t re_init_fail_cnt, probe_fail_cnt;
 
 /*
@@ -320,6 +321,27 @@ static void hdd_init_qdf_ctx(struct device *dev, void *bdev,
 }
 
 /**
+ * check_for_probe_defer() - API to check return value
+ * @ret: Return Value
+ *
+ * Return: return -EPROBE_DEFER to platform driver if return value
+ * is -ENOMEM. Platform driver will try to re-probe.
+ */
+#ifdef MODULE
+static int check_for_probe_defer(int ret)
+{
+	return ret;
+}
+#else
+static int check_for_probe_defer(int ret)
+{
+	if (ret == -ENOMEM)
+		return -EPROBE_DEFER;
+	return ret;
+}
+#endif
+
+/**
  * wlan_hdd_probe() - handles probe request
  *
  * This function is called to probe the wlan driver
@@ -338,6 +360,11 @@ static int wlan_hdd_probe(struct device *dev, void *bdev, const struct hif_bus_i
 	int ret = 0;
 
 	mutex_lock(&hdd_init_deinit_lock);
+	if (!reinit)
+		hdd_start_driver_ops_timer(eHDD_DRV_OP_PROBE);
+	else
+		hdd_start_driver_ops_timer(eHDD_DRV_OP_REINIT);
+
 	pr_info("%s: %sprobing driver v%s\n", WLAN_MODULE_NAME,
 		reinit ? "re-" : "", QWLAN_VERSIONSTR);
 
@@ -387,6 +414,7 @@ static int wlan_hdd_probe(struct device *dev, void *bdev, const struct hif_bus_i
 	cds_set_driver_in_bad_state(false);
 	probe_fail_cnt = 0;
 	re_init_fail_cnt = 0;
+	hdd_stop_driver_ops_timer();
 	mutex_unlock(&hdd_init_deinit_lock);
 	return 0;
 
@@ -408,8 +436,9 @@ err_hdd_deinit:
 	hdd_remove_pm_qos(dev);
 
 	cds_clear_fw_state(CDS_FW_STATE_DOWN);
+	hdd_stop_driver_ops_timer();
 	mutex_unlock(&hdd_init_deinit_lock);
-	return ret;
+	return check_for_probe_defer(ret);
 }
 
 static inline void hdd_pld_driver_unloading(struct device *dev)
@@ -482,7 +511,7 @@ static inline void hdd_wlan_ssr_shutdown_event(void)
  */
 static void hdd_send_hang_reason(void)
 {
-	uint32_t reason = 0;
+	enum cds_hang_reason reason = CDS_REASON_UNSPECIFIED;
 	hdd_context_t *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 
 	if (wlan_hdd_validate_context(hdd_ctx))
@@ -545,6 +574,30 @@ static void wlan_hdd_shutdown(void)
  */
 static void wlan_hdd_crash_shutdown(void)
 {
+	QDF_STATUS ret;
+	WMA_HANDLE wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+
+	if (!wma_handle) {
+		hdd_err("wma_handle is null");
+		return;
+	}
+
+	/*
+	 * When kernel panic happen, if WiFi FW is still active
+	 * it may cause NOC errors/memory corruption, to avoid
+	 * this, inject a fw crash first.
+	 * send crash_inject to FW directly, because we are now
+	 * in an atomic context, and preempt has been disabled,
+	 * MCThread won't be scheduled at the moment, at the same
+	 * time, TargetFailure event wont't be received after inject
+	 * crash due to the same reason.
+	 */
+	ret = wma_crash_inject(wma_handle, RECOVERY_SIM_ASSERT, 0);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		hdd_err("Failed to send crash inject:%d", ret);
+		return;
+	}
+
 	hif_crash_shutdown(cds_get_context(QDF_MODULE_ID_HIF));
 }
 
@@ -1083,7 +1136,11 @@ static void wlan_hdd_pld_remove(struct device *dev,
 {
 	ENTER();
 	mutex_lock(&hdd_init_deinit_lock);
+	hdd_start_driver_ops_timer(eHDD_DRV_OP_REMOVE);
+
 	wlan_hdd_remove(dev);
+
+	hdd_stop_driver_ops_timer();
 	mutex_unlock(&hdd_init_deinit_lock);
 	EXIT();
 }
@@ -1100,7 +1157,11 @@ static void wlan_hdd_pld_shutdown(struct device *dev,
 {
 	ENTER();
 	mutex_lock(&hdd_init_deinit_lock);
+	hdd_start_driver_ops_timer(eHDD_DRV_OP_SHUTDOWN);
+
 	wlan_hdd_shutdown();
+
+	hdd_stop_driver_ops_timer();
 	mutex_unlock(&hdd_init_deinit_lock);
 	EXIT();
 }
@@ -1239,6 +1300,51 @@ static void wlan_hdd_pld_notify_handler(struct device *dev,
 	wlan_hdd_notify_handler(state);
 }
 
+static void wlan_hdd_purge_notifier(void)
+{
+	hdd_context_t *hdd_ctx;
+
+	ENTER();
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx) {
+		hdd_err("hdd context is NULL return!!");
+		return;
+	}
+
+	qdf_cancel_delayed_work(&hdd_ctx->iface_idle_work);
+
+	mutex_lock(&hdd_ctx->iface_change_lock);
+	cds_shutdown_notifier_call();
+	cds_shutdown_notifier_purge();
+	mutex_unlock(&hdd_ctx->iface_change_lock);
+
+	EXIT();
+}
+
+
+/**
+ * hdd_cleanup_on_fw_down() - cleanup on FW down event
+ *
+ * Return: void
+ */
+static void hdd_cleanup_on_fw_down(void)
+{
+	hdd_context_t *hdd_ctx;
+
+	ENTER();
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	cds_set_fw_state(CDS_FW_STATE_DOWN);
+	cds_set_target_ready(false);
+	if (hdd_ctx != NULL)
+		hdd_cleanup_scan_queue(hdd_ctx, NULL);
+	wlan_hdd_purge_notifier();
+
+	EXIT();
+
+}
+
 /**
  * wlan_hdd_pld_uevent() - update driver status
  * @dev: device
@@ -1249,19 +1355,24 @@ static void wlan_hdd_pld_notify_handler(struct device *dev,
 static void wlan_hdd_pld_uevent(struct device *dev,
 				struct pld_uevent_data *uevent)
 {
+	ENTER();
+
 	switch (uevent->uevent) {
 	case PLD_RECOVERY:
 		cds_set_recovery_in_progress(true);
 		hdd_pld_ipa_uc_shutdown_pipes();
+		wlan_hdd_purge_notifier();
 		break;
 	case PLD_FW_DOWN:
-		cds_set_fw_state(CDS_FW_STATE_DOWN);
-		cds_set_target_ready(false);
+		hdd_cleanup_on_fw_down();
 		break;
 	case PLD_FW_READY:
 		cds_set_target_ready(true);
 		break;
 	}
+
+	EXIT();
+	return;
 }
 
 #ifdef FEATURE_RUNTIME_PM
