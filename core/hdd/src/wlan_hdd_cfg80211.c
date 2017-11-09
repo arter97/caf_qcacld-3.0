@@ -4190,6 +4190,7 @@ wlan_hdd_wifi_config_policy[QCA_WLAN_VENDOR_ATTR_CONFIG_MAX + 1] = {
 	[RX_BLOCKSIZE_WINLIMIT] = {.type = NLA_U32},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_TOTAL_BEACON_MISS_COUNT] = {
 			.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_SCAN_ENABLE] = {.type = NLA_U8 },
 };
 
 /**
@@ -4325,7 +4326,7 @@ __wlan_hdd_cfg80211_wifi_configuration_set(struct wiphy *wiphy,
 	struct sir_set_rx_reorder_timeout_val reorder_timeout;
 	struct sir_peer_set_rx_blocksize rx_blocksize;
 	QDF_STATUS qdf_status;
-	uint8_t retry, delay;
+	uint8_t retry, delay, enable_flag;
 	uint32_t abs_delay;
 	int param_id;
 	uint32_t tx_fail_count;
@@ -4372,6 +4373,12 @@ __wlan_hdd_cfg80211_wifi_configuration_set(struct wiphy *wiphy,
 
 		if (QDF_STATUS_SUCCESS != status)
 			ret_val = -EPERM;
+	}
+
+	if (tb[QCA_WLAN_VENDOR_ATTR_CONFIG_SCAN_ENABLE]) {
+		enable_flag =
+			nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_CONFIG_SCAN_ENABLE]);
+		sme_set_scan_disable(hdd_ctx->hHal, !enable_flag);
 	}
 
 	if (tb[QCA_WLAN_VENDOR_ATTR_CONFIG_QPOWER]) {
@@ -7000,7 +7007,7 @@ void hdd_get_bpf_offload_cb(void *hdd_context,
 	ENTER();
 
 	if (wlan_hdd_validate_context(hdd_ctx) || !data) {
-		hdd_err("HDD context is invalid or data(%p) is null",
+		hdd_err("HDD context is invalid or data(%pK) is null",
 			data);
 		return;
 	}
@@ -16587,10 +16594,10 @@ static int wlan_hdd_cfg80211_add_station(struct wiphy *wiphy,
 static inline bool wlan_hdd_is_pmksa_valid(struct cfg80211_pmksa *pmksa)
 {
 	if (!pmksa->bssid) {
-		hdd_warn("bssid (%p) is NULL",
+		hdd_warn("bssid (%pK) is NULL",
 				pmksa->bssid);
 		if (!pmksa->ssid || !pmksa->cache_id) {
-			hdd_err("either ssid (%p) or cache_id (%p) are NULL",
+			hdd_err("either ssid (%pK) or cache_id (%pK) are NULL",
 					pmksa->ssid, pmksa->cache_id);
 			return false;
 		}
@@ -16646,7 +16653,7 @@ static void hdd_fill_pmksa_info(tPmkidCacheInfo *pmk_cache,
 static inline bool wlan_hdd_is_pmksa_valid(struct cfg80211_pmksa *pmksa)
 {
 	if (!pmksa->bssid) {
-		hdd_err("both bssid is NULL %p", pmksa->bssid);
+		hdd_err("both bssid is NULL %pK", pmksa->bssid);
 		return false;
 	}
 	return true;
@@ -16711,7 +16718,7 @@ static int __wlan_hdd_cfg80211_set_pmksa(struct wiphy *wiphy,
 	}
 
 	if (!pmksa->pmkid) {
-		hdd_err("pmksa->pmkid(%p) is NULL",
+		hdd_err("pmksa->pmkid(%pK) is NULL",
 		       pmksa->pmkid);
 		return -EINVAL;
 	}
@@ -17540,7 +17547,7 @@ void wlan_hdd_testmode_rx_event(void *buf, size_t buf_len)
 	hdd_context_t *hdd_ctx;
 
 	if (!buf || !buf_len) {
-		hdd_err("buf or buf_len invalid, buf: %p buf_len: %zu", buf, buf_len);
+		hdd_err("buf or buf_len invalid, buf: %pK buf_len: %zu", buf, buf_len);
 		return;
 	}
 
