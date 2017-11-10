@@ -585,6 +585,7 @@ enum cdp_vdev_param_type {
 #define TXRX_FW_MAC_PREFETCH_MGR_STATS           23
 #define TXRX_FW_STATS_DURATION_INFO              24
 #define TXRX_FW_STATS_DURATION_INFO_RESET        25
+#define TXRX_FW_HALPHY_STATS                     26
 #define TXRX_FW_STATS_HOST_RX_STATS              27
 
 #define PER_RADIO_FW_STATS_REQUEST 0
@@ -990,6 +991,8 @@ struct cdp_pdev_stats {
 		uint32_t map_err;
 		/* x86 failures */
 		uint32_t x86_fail;
+		/* low threshold interrupts */
+		uint32_t low_thresh_intrs;
 	} replenish;
 
 	/* Rx Raw Packets */
