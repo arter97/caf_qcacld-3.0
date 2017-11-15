@@ -732,6 +732,9 @@ QDF_STATUS wmi_unified_egap_conf_params_cmd(void *wmi_hdl,
 QDF_STATUS wmi_unified_fw_profiling_data_cmd(void *wmi_hdl,
 			uint32_t cmd, uint32_t value1, uint32_t value2);
 
+QDF_STATUS wmi_unified_wow_timer_pattern_cmd(void *wmi_hdl, uint8_t vdev_id,
+					     uint32_t cookie, uint32_t time);
+
 QDF_STATUS wmi_unified_nat_keepalive_en_cmd(void *wmi_hdl, uint8_t vdev_id);
 
 QDF_STATUS wmi_unified_csa_offload_enable(void *wmi_hdl, uint8_t vdev_id);
@@ -1096,6 +1099,16 @@ QDF_STATUS wmi_unified_vdev_set_fwtest_param_cmd_send(void *wmi_hdl,
 QDF_STATUS wmi_unified_vdev_config_ratemask_cmd_send(void *wmi_hdl,
 				struct config_ratemask_params *param);
 
+/**
+ *  wmi_unified_vdev_set_custom_aggr_size_cmd_send() - WMI set custom aggr
+ *						       size command
+ *  @param wmi_hdl      : handle to WMI.
+ *  @param param        : pointer to hold custom aggr size param
+ *
+ *  @return QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_vdev_set_custom_aggr_size_cmd_send(void *wmi_hdl,
+				struct set_custom_aggr_size_params *param);
 
 QDF_STATUS wmi_unified_pdev_set_regdomain_cmd_send(void *wmi_hdl,
 				struct pdev_set_regdomain_params *param);
@@ -1186,6 +1199,18 @@ QDF_STATUS wmi_ready_extract_mac_addr(void *wmi_hdl,
 
 wmi_host_mac_addr *wmi_ready_extract_mac_addr_list(void *wmi_hdl, void *ev,
 					      uint8_t *num_mac_addr);
+
+/**
+ * wmi_extract_ready_params() - Extract data from ready event apart from
+ *                     status, macaddr and version.
+ * @wmi_handle: Pointer to WMI handle.
+ * @evt_buf: Pointer to Ready event buffer.
+ * @ev_param: Pointer to host defined struct to copy the data from event.
+ *
+ * Return: QDF_STATUS_SUCCESS on success.
+ */
+QDF_STATUS wmi_extract_ready_event_params(void *wmi_hdl,
+		void *evt_buf, struct wmi_host_ready_ev_param *ev_param);
 
 QDF_STATUS wmi_extract_fw_version(void *wmi_hdl,
 				void *ev, struct wmi_host_fw_ver *fw_ver);
@@ -1597,4 +1622,14 @@ QDF_STATUS wmi_unified_set_arp_stats_req(void *wmi_hdl,
 					 struct set_arp_stats *req_buf);
 QDF_STATUS wmi_unified_get_arp_stats_req(void *wmi_hdl,
 					 struct get_arp_stats *req_buf);
+
+/**
+ * wmi_send_bcn_offload_control_cmd - send beacon ofload control cmd to fw
+ * @wmi_hdl: wmi handle
+ * @bcn_ctrl_param: pointer to bcn_offload_control param
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS wmi_send_bcn_offload_control_cmd(void *wmi_hdl,
+			struct bcn_offload_control *bcn_ctrl_param);
 #endif /* _WMI_UNIFIED_API_H_ */

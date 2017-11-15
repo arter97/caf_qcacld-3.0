@@ -57,12 +57,12 @@ void dfs_reset_alldelaylines(struct wlan_dfs *dfs)
 	pl = dfs->pulses;
 
 	if (!pl) {
-		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS,  "pl==NULL, dfs=%p", dfs);
+		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS,  "pl==NULL, dfs=%pK", dfs);
 		return;
 	}
 
 	if (!(dfs->dfs_b5radars)) {
-		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS,  "pl==NULL, b5radars=%p",
+		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS,  "pl==NULL, b5radars=%pK",
 				dfs->dfs_b5radars);
 		return;
 	}
@@ -296,6 +296,8 @@ int dfs_init_radar_filters(struct wlan_dfs *dfs,
 
 		rf->rf_numpulses = numpulses;
 		rf->rf_patterntype = dfs_radars[p].rp_patterntype;
+		rf->rf_sidx_spread = dfs_radars[p].rp_sidx_spread;
+		rf->rf_check_delta_peak = dfs_radars[p].rp_check_delta_peak;
 		rf->rf_pulseid = dfs_radars[p].rp_pulseid;
 		rf->rf_mindur = dfs_radars[p].rp_mindur;
 		rf->rf_maxdur = dfs_radars[p].rp_maxdur;

@@ -1871,8 +1871,8 @@ static QDF_STATUS send_scan_start_cmd_non_tlv(wmi_unified_t wmi_handle,
 #ifdef TEST_CODE
 	len += sizeof(wmi_chan_list) + 3 * sizeof(A_UINT32);
 #else
-	if (param->num_chan) {
-		len += sizeof(wmi_chan_list) + (param->num_chan - 1)
+	if (param->chan_list.num_chan) {
+		len += sizeof(wmi_chan_list) + (param->chan_list.num_chan - 1)
 		    * sizeof(A_UINT32);
 	}
 #endif
@@ -1994,13 +1994,14 @@ static QDF_STATUS send_scan_start_cmd_non_tlv(wmi_unified_t wmi_handle,
 	 tmp_ptr +=  (2 + chan_list->num_chan); /* increase by words */-
 #else
 #define FREQUENCY_THRESH 1000
-	if (param->num_chan) {
+	if (param->chan_list.num_chan) {
 		chan_list  = (wmi_chan_list *) tmp_ptr;
 		chan_list->tag = WMI_CHAN_LIST_TAG;
-		chan_list->num_chan = param->num_chan;
-		qdf_mem_copy(chan_list->channel_list, param->chan_list,
-				((param->num_chan) * sizeof(uint32_t)));
-		tmp_ptr +=  (2 + param->num_chan); /* increase by words */
+		chan_list->num_chan = param->chan_list.num_chan;
+		for (i = 0; i < param->chan_list.num_chan; ++i)
+			chan_list->channel_list[i] =
+				param->chan_list.chan[i].freq;
+		tmp_ptr += (2 + param->chan_list.num_chan);
 	}
 #endif
 	if (param->num_ssids) {
@@ -5833,6 +5834,32 @@ static QDF_STATUS ready_extract_mac_addr_non_tlv(wmi_unified_t wmi_hdl,
 }
 
 /**
+ * extract_ready_params_non_tlv() - Extract data from ready event apart from
+ *                     status, macaddr and version.
+ * @wmi_handle: Pointer to WMI handle.
+ * @evt_buf: Pointer to Ready event buffer.
+ * @ev_param: Pointer to host defined struct to copy the data from event.
+ *
+ * Return: QDF_STATUS_SUCCESS on success.
+ */
+static QDF_STATUS extract_ready_event_params_non_tlv(wmi_unified_t wmi_handle,
+		void *evt_buf, struct wmi_host_ready_ev_param *ev_param)
+{
+	wmi_ready_event *ev = (wmi_ready_event *) evt_buf;
+
+	ev_param->num_dscp_table = ev->num_dscp_table;
+	if (ev->agile_capability)
+		ev_param->agile_capability = true;
+	else
+		ev_param->agile_capability = false;
+	/* Following params not present in non-TLV target. Set Defaults */
+	ev_param->num_extra_mac_addr = 0;
+	ev_param->num_total_peer = 0;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * extract_dbglog_data_len_non_tlv() - extract debuglog data length
  * @wmi_handle: wmi handle
  * @param evt_buf: pointer to event buffer
@@ -8273,6 +8300,7 @@ struct wmi_ops non_tlv_ops =  {
 	.extract_dbglog_data_len = extract_dbglog_data_len_non_tlv,
 	.ready_extract_init_status = ready_extract_init_status_non_tlv,
 	.ready_extract_mac_addr = ready_extract_mac_addr_non_tlv,
+	.extract_ready_event_params = extract_ready_event_params_non_tlv,
 	.extract_wds_addr_event = extract_wds_addr_event_non_tlv,
 	.extract_dcs_interference_type = extract_dcs_interference_type_non_tlv,
 	.extract_dcs_cw_int = extract_dcs_cw_int_non_tlv,
@@ -8535,6 +8563,7 @@ static void populate_non_tlv_service(uint32_t *wmi_service)
 	wmi_service[wmi_service_offchan_tx_wmi] = WMI_SERVICE_UNAVAILABLE;
 	wmi_service[wmi_service_chan_load_info] = WMI_SERVICE_UNAVAILABLE;
 	wmi_service[wmi_service_ack_timeout] = WMI_SERVICE_UNAVAILABLE;
+	wmi_service[wmi_service_widebw_scan] = WMI_SERVICE_UNAVAILABLE;
 }
 
 /**
@@ -8819,6 +8848,8 @@ static void populate_pdev_param_non_tlv(uint32_t *pdev_param)
 	pdev_param[wmi_pdev_param_atf_peer_stats] =
 		WMI_PDEV_PARAM_ATF_PEER_STATS;
 	pdev_param[wmi_pdev_param_tx_ack_timeout] = WMI_UNAVAILABLE_PARAM;
+	pdev_param[wmi_pdev_param_soft_tx_chain_mask] =
+		WMI_PDEV_PARAM_SOFT_TX_CHAIN_MASK;
 	pdev_param[wmi_pdev_param_rfkill_enable] = WMI_UNAVAILABLE_PARAM;
 	pdev_param[wmi_pdev_param_hw_rfkill_config] = WMI_UNAVAILABLE_PARAM;
 	pdev_param[wmi_pdev_param_low_power_rf_enable] = WMI_UNAVAILABLE_PARAM;

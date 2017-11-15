@@ -2227,6 +2227,28 @@ QDF_STATUS wmi_unified_fw_profiling_data_cmd(void *wmi_hdl,
 }
 
 /**
+ * wmi_unified_wow_timer_pattern_cmd() - set timer pattern tlv, so that firmware
+ * will wake up host after specified time is elapsed
+ * @wmi_handle: wmi handle
+ * @vdev_id: vdev id
+ * @cookie: value to identify reason why host set up wake call.
+ * @time: time in ms
+ *
+ * Return: QDF status
+ */
+QDF_STATUS wmi_unified_wow_timer_pattern_cmd(void *wmi_hdl, uint8_t vdev_id,
+					     uint32_t cookie, uint32_t time)
+{
+	wmi_unified_t wmi_handle = (wmi_unified_t) wmi_hdl;
+
+	if (wmi_handle->ops->send_wow_timer_pattern_cmd)
+		return wmi_handle->ops->send_wow_timer_pattern_cmd(wmi_handle,
+							vdev_id, cookie, time);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+/**
  * wmi_unified_nat_keepalive_en_cmd() - enable NAT keepalive filter
  * @wmi_handle: wmi handle
  * @vdev_id: vdev id
@@ -4116,6 +4138,25 @@ QDF_STATUS wmi_unified_vdev_config_ratemask_cmd_send(void *wmi_hdl,
 }
 
 /**
+ * wmi_unified_vdev_set_custom_aggr_size_cmd_send() - WMI set custom aggr
+ * size function
+ * @param wmi_handle	: handle to WMI
+ * @param param		: pointer to hold custom aggr size param
+ *
+ * @return QDF_STATUS_SUCCESS on success and QDF_STATUS_R_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_vdev_set_custom_aggr_size_cmd_send(void *wmi_hdl,
+				struct set_custom_aggr_size_params *param)
+{
+	wmi_unified_t wmi = (wmi_unified_t)wmi_hdl;
+
+	if (wmi->ops->send_vdev_set_custom_aggr_size_cmd)
+		return wmi->ops->send_vdev_set_custom_aggr_size_cmd(wmi, param);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+/**
  *  wmi_unified_pdev_set_regdomain_params_cmd_send() - WMI set regdomain function
  *  @param wmi_handle      : handle to WMI.
  *  @param param    : pointer to hold regdomain param
@@ -4674,6 +4715,27 @@ wmi_host_mac_addr *wmi_ready_extract_mac_addr_list(void *wmi_hdl, void *ev,
 	*num_mac_addr = 0;
 
 	return NULL;
+}
+
+/**
+ * wmi_extract_ready_params() - Extract data from ready event apart from
+ *                     status, macaddr and version.
+ * @wmi_handle: Pointer to WMI handle.
+ * @evt_buf: Pointer to Ready event buffer.
+ * @ev_param: Pointer to host defined struct to copy the data from event.
+ *
+ * Return: QDF_STATUS_SUCCESS on success.
+ */
+QDF_STATUS wmi_extract_ready_event_params(void *wmi_hdl,
+		void *evt_buf, struct wmi_host_ready_ev_param *ev_param)
+{
+	wmi_unified_t wmi_handle = (wmi_unified_t) wmi_hdl;
+
+	if (wmi_handle->ops->extract_ready_event_params)
+		return wmi_handle->ops->extract_ready_event_params(wmi_handle,
+			evt_buf, ev_param);
+
+	return QDF_STATUS_E_FAILURE;
 }
 
 /**
@@ -6824,6 +6886,25 @@ QDF_STATUS wmi_unified_send_limit_off_chan_cmd(void *wmi_hdl,
 	if (wmi_handle->ops->send_limit_off_chan_cmd)
 		return wmi_handle->ops->send_limit_off_chan_cmd(wmi_handle,
 				limit_off_chan_param);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+/**
+ * wmi_send_bcn_offload_control_cmd - send beacon ofload control cmd to fw
+ * @wmi_hdl: wmi handle
+ * @bcn_ctrl_param: pointer to bcn_offload_control param
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS wmi_send_bcn_offload_control_cmd(void *wmi_hdl,
+			struct bcn_offload_control *bcn_ctrl_param)
+{
+	wmi_unified_t wmi_handle = (wmi_unified_t) wmi_hdl;
+
+	if (wmi_handle->ops->send_bcn_offload_control_cmd)
+		return wmi_handle->ops->send_bcn_offload_control_cmd(wmi_handle,
+				bcn_ctrl_param);
 
 	return QDF_STATUS_E_FAILURE;
 }

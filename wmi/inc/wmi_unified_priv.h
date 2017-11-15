@@ -895,6 +895,8 @@ QDF_STATUS (*send_vdev_set_fwtest_param_cmd)(wmi_unified_t wmi_handle,
 QDF_STATUS (*send_vdev_config_ratemask_cmd)(wmi_unified_t wmi_handle,
 		struct config_ratemask_params *param);
 
+QDF_STATUS (*send_vdev_set_custom_aggr_size_cmd)(wmi_unified_t wmi_handle,
+		struct set_custom_aggr_size_params *param);
 
 QDF_STATUS (*send_wow_wakeup_cmd)(wmi_unified_t wmi_handle);
 
@@ -986,6 +988,8 @@ QDF_STATUS (*ready_extract_mac_addr)(wmi_unified_t wmi_hdl, void *ev,
 		uint8_t *macaddr);
 wmi_host_mac_addr * (*ready_extract_mac_addr_list)(wmi_unified_t wmi_hdl,
 					void *ev, uint8_t *num_mac_addr);
+QDF_STATUS (*extract_ready_event_params)(wmi_unified_t wmi_handle,
+		void *evt_buf, struct wmi_host_ready_ev_param *ev_param);
 
 QDF_STATUS (*check_and_update_fw_version)(wmi_unified_t wmi_hdl, void *ev);
 uint8_t* (*extract_dbglog_data_len)(wmi_unified_t wmi_handle, void *evt_buf,
@@ -1066,6 +1070,9 @@ QDF_STATUS
 QDF_STATUS
 (*send_coex_config_cmd)(wmi_unified_t wmi_handle,
 			struct coex_config_params *param);
+
+QDF_STATUS (*send_bcn_offload_control_cmd)(wmi_unified_t wmi_handle,
+			struct bcn_offload_control *bcn_ctrl_param);
 
 QDF_STATUS (*extract_wds_addr_event)(wmi_unified_t wmi_handle,
 	void *evt_buf, uint16_t len, wds_addr_event_t *wds_ev);
@@ -1386,6 +1393,9 @@ QDF_STATUS (*send_user_country_code_cmd)(wmi_unified_t wmi_handle,
 		uint8_t pdev_id, struct cc_regdmn_s *rd);
 QDF_STATUS (*send_limit_off_chan_cmd)(wmi_unified_t wmi_handle,
 		struct wmi_limit_off_chan_param *limit_off_chan_param);
+
+QDF_STATUS (*send_wow_timer_pattern_cmd)(wmi_unified_t wmi_handle,
+			uint8_t vdev_id, uint32_t cookie, uint32_t time);
 };
 
 /* Forward declartion for psoc*/

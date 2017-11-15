@@ -3748,6 +3748,37 @@ struct set_fwtest_params {
 };
 
 /**
+ * struct set_custom_aggr_size_params - custom aggr size params
+ * @vdev_id      : vdev id
+ * @tx_aggr_size : TX aggr size
+ * @rx_aggr_size : RX aggr size
+ * @enable_bitmap: Bitmap for aggr size check
+ */
+struct set_custom_aggr_size_params {
+	uint32_t  vdev_id;
+	uint32_t tx_aggr_size;
+	uint32_t rx_aggr_size;
+	uint32_t ac:2,
+		 aggr_type:1,
+		 tx_aggr_size_disable:1,
+		 rx_aggr_size_disable:1,
+		 tx_ac_enable:1,
+		 reserved:26;
+};
+
+/**
+ * enum wmi_host_custom_aggr_type_t: custon aggregate type
+ * @WMI_HOST_CUSTOM_AGGR_TYPE_AMPDU: A-MPDU aggregation
+ * @WMI_HOST_CUSTOM_AGGR_TYPE_AMSDU: A-MSDU aggregation
+ * @WMI_HOST_CUSTOM_AGGR_TYPE_MAX: Max type
+ */
+enum wmi_host_custom_aggr_type_t {
+	WMI_HOST_CUSTOM_AGGR_TYPE_AMPDU = 0,
+	WMI_HOST_CUSTOM_AGGR_TYPE_AMSDU = 1,
+	WMI_HOST_CUSTOM_AGGR_TYPE_MAX,
+};
+
+/**
  * struct config_ratemask_params - ratemask config parameters
  * @vdev_id: vdev id
  * @type: Type
@@ -5335,6 +5366,7 @@ typedef enum {
 	wmi_ba_rsp_ssn_event_id,
 	wmi_aggr_state_trig_event_id,
 	wmi_roam_synch_event_id,
+	wmi_roam_synch_frame_event_id,
 	wmi_p2p_disc_event_id,
 	wmi_p2p_noa_event_id,
 	wmi_p2p_lo_stop_event_id,
@@ -5550,6 +5582,7 @@ typedef enum {
 	wmi_pdev_param_btcoex_cfg,
 	wmi_pdev_param_mesh_mcast_enable,
 	wmi_pdev_param_tx_ack_timeout,
+	wmi_pdev_param_soft_tx_chain_mask,
 
 	wmi_pdev_param_max,
 } wmi_conv_pdev_params_id;
@@ -5666,6 +5699,7 @@ typedef enum {
 	wmi_vdev_param_set_heop,
 	wmi_vdev_param_disable_cabq,
 
+	wmi_vdev_param_rate_dropdown_bmap,
 	wmi_vdev_param_max,
 } wmi_conv_vdev_param_id;
 
@@ -5813,6 +5847,8 @@ typedef enum {
 	wmi_service_chan_load_info,
 	wmi_service_extended_nss_support,
 	wmi_service_ack_timeout,
+	wmi_service_widebw_scan,
+	wmi_service_bcn_offload_start_stop_support,
 
 	wmi_services_max,
 } wmi_conv_service_ids;
@@ -7895,6 +7931,36 @@ struct set_arp_stats {
 struct get_arp_stats {
 	uint8_t pkt_type;
 	uint32_t vdev_id;
+};
+
+/**
+ * struct wmi_host_ready_ev_param - Data revieved in ready event
+ * @num_dscp_table: Number of DSCP table supported in FW
+ * @num_extra_mac_addr: Extra mac address present in ready event. Used
+ *                  in DBDC mode to provide multiple mac per pdev.
+ * @num_total_peer: Total number of peers FW could allocate. Zero means
+ *                  FW could  allocate num peers requested by host in init.
+ *                  Otherwise, host need update it max_peer to this value.
+ * @agile_capability: Boolean specification of whether the target supports
+ *                  agile DFS, by means of using one 80 MHz radio chain for
+ *                  radar detection, concurrently with using another radio
+ *                  chain for non-160 MHz regular operation.
+ */
+struct wmi_host_ready_ev_param {
+	uint32_t num_dscp_table;
+	uint32_t num_extra_mac_addr;
+	uint32_t num_total_peer;
+	bool agile_capability;
+};
+
+/**
+ * struct bcn_offload_control - Beacon offload control params
+ * @vdev_id: vdev identifer of VAP to control beacon tx
+ * @bcn_tx_enable: Enable or Disable beacon TX in offload mode
+ */
+struct bcn_offload_control {
+	uint32_t vdev_id;
+	bool bcn_tx_enable;
 };
 
 #endif /* _WMI_UNIFIED_PARAM_H_ */
