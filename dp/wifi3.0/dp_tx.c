@@ -706,6 +706,7 @@ static qdf_nbuf_t dp_tx_prepare_raw(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 {
 	qdf_nbuf_t curr_nbuf = NULL;
 	uint16_t total_len = 0;
+	qdf_dma_addr_t paddr;
 	int32_t i;
 
 	struct dp_tx_sg_info_s *sg_info = &msdu_info->u.sg_info;
@@ -729,9 +730,9 @@ static qdf_nbuf_t dp_tx_prepare_raw(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 
 	for (curr_nbuf = nbuf, i = 0; curr_nbuf;
 				curr_nbuf = qdf_nbuf_next(curr_nbuf), i++) {
-		seg_info->frags[i].paddr_lo =
-			qdf_nbuf_get_frag_paddr(curr_nbuf, 0);
-		seg_info->frags[i].paddr_hi = 0x0;
+		paddr = qdf_nbuf_get_frag_paddr(curr_nbuf, 0);
+		seg_info->frags[i].paddr_lo = paddr;
+		seg_info->frags[i].paddr_hi = ((uint64_t)paddr >> 32);
 		seg_info->frags[i].len = qdf_nbuf_len(curr_nbuf);
 		seg_info->frags[i].vaddr = (void *) curr_nbuf;
 		total_len += qdf_nbuf_len(curr_nbuf);
@@ -1273,8 +1274,9 @@ static qdf_nbuf_t dp_tx_prepare_sg(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 		return NULL;
 	}
 
-	seg_info->frags[0].paddr_lo = qdf_nbuf_get_frag_paddr(nbuf, 0);
-	seg_info->frags[0].paddr_hi = 0;
+	paddr = qdf_nbuf_get_frag_paddr(nbuf, 0);
+	seg_info->frags[0].paddr_lo = paddr;
+	seg_info->frags[0].paddr_hi = ((uint64_t) paddr) >> 32;
 	seg_info->frags[0].len = qdf_nbuf_headlen(nbuf);
 	seg_info->frags[0].vaddr = (void *) nbuf;
 
@@ -1728,17 +1730,15 @@ static void dp_tx_inspect_handler(struct dp_tx_desc_s *tx_desc, uint8_t *status)
 #ifdef FEATURE_PERPKT_INFO
 static QDF_STATUS
 dp_send_compl_to_stack(struct dp_soc *soc,  struct dp_tx_desc_s *desc,
-				uint16_t peer_id, uint16_t ppdu_id)
+				uint16_t peer_id, uint32_t ppdu_id)
 {
 	struct tx_capture_hdr *ppdu_hdr;
-	struct ethhdr *eh;
 	struct dp_peer *peer = NULL;
 	qdf_nbuf_t netbuf = desc->nbuf;
 
 	if (!desc->pdev->tx_sniffer_enable)
 		return QDF_STATUS_E_NOSUPPORT;
 
-	eh = (struct ethhdr *)(netbuf->data);
 	peer = (peer_id == HTT_INVALID_PEER) ? NULL :
 			dp_peer_find_by_id(soc, peer_id);
 
@@ -1755,7 +1755,7 @@ dp_send_compl_to_stack(struct dp_soc *soc,  struct dp_tx_desc_s *desc,
 	}
 
 	ppdu_hdr = (struct tx_capture_hdr *)qdf_nbuf_data(netbuf);
-	qdf_mem_copy(ppdu_hdr->ta, (eh->h_dest), IEEE80211_ADDR_LEN);
+	qdf_mem_copy(ppdu_hdr->ta, desc->vdev->mac_addr.raw, IEEE80211_ADDR_LEN);
 	ppdu_hdr->ppdu_id = ppdu_id;
 	qdf_mem_copy(ppdu_hdr->ra, peer->mac_addr.raw,
 			IEEE80211_ADDR_LEN);
@@ -1769,7 +1769,7 @@ dp_send_compl_to_stack(struct dp_soc *soc,  struct dp_tx_desc_s *desc,
 #else
 static QDF_STATUS
 dp_send_compl_to_stack(struct dp_soc *soc,  struct dp_tx_desc_s *desc,
-				uint16_t peer_id, uint16_t ppdu_id)
+				uint16_t peer_id, uint32_t ppdu_id)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
@@ -1995,14 +1995,15 @@ static void dp_tx_update_peer_stats(struct dp_peer *peer,
 {
 	struct dp_pdev *pdev = peer->vdev->pdev;
 	struct dp_soc *soc = pdev->soc;
+	uint8_t mcs, pkt_type;
 
-	DP_STATS_INC_PKT(peer, tx.comp_pkt, 1, length);
+	mcs = ts->mcs;
+	pkt_type = ts->pkt_type;
+
 
 	if (!ts->release_src == HAL_TX_COMP_RELEASE_SOURCE_TQM)
 		return;
 
-	DP_STATS_INCC(peer, tx.tx_failed, 1,
-			!(ts->status == HAL_TX_TQM_RR_FRAME_ACKED));
 
 	DP_STATS_INCC(peer, tx.dropped.age_out, 1,
 			(ts->status == HAL_TX_TQM_RR_REM_CMD_AGED));
@@ -2018,39 +2019,39 @@ static void dp_tx_update_peer_stats(struct dp_peer *peer,
 
 	if (!ts->status == HAL_TX_TQM_RR_FRAME_ACKED)
 		return;
+	DP_STATS_INCC(peer, tx.ofdma, 1, ts->ofdma);
+	DP_STATS_INCC(peer, tx.amsdu_cnt, 1, ts->msdu_part_of_amsdu);
 
-	DP_STATS_INCC(peer, tx.pkt_type[ts->pkt_type].mcs_count[MAX_MCS], 1,
-		((ts->mcs >= MAX_MCS_11A) && (ts->pkt_type == DOT11_A)));
-	DP_STATS_INCC(peer, tx.pkt_type[ts->pkt_type].mcs_count[ts->mcs], 1,
-		((ts->mcs <= MAX_MCS_11A) && (ts->pkt_type == DOT11_A)));
+	if (!(soc->process_tx_status))
+		return;
 
-	DP_STATS_INCC(peer, tx.pkt_type[ts->pkt_type].mcs_count[MAX_MCS], 1,
-		((ts->mcs >= MAX_MCS_11B) && (ts->pkt_type == DOT11_B)));
-	DP_STATS_INCC(peer, tx.pkt_type[ts->pkt_type].mcs_count[ts->mcs], 1,
-		((ts->mcs <= MAX_MCS_11B) && (ts->pkt_type == DOT11_B)));
-	DP_STATS_INCC(peer, tx.pkt_type[ts->pkt_type].mcs_count[MAX_MCS], 1,
-		((ts->mcs >= MAX_MCS_11A) && (ts->pkt_type == DOT11_N)));
-	DP_STATS_INCC(peer, tx.pkt_type[ts->pkt_type].mcs_count[ts->mcs], 1,
-		((ts->mcs <= MAX_MCS_11A) && (ts->pkt_type == DOT11_N)));
-	DP_STATS_INCC(peer, tx.pkt_type[ts->pkt_type].mcs_count[MAX_MCS], 1,
-		((ts->mcs >= MAX_MCS_11AC) && (ts->pkt_type == DOT11_AC)));
-	DP_STATS_INCC(peer, tx.pkt_type[ts->pkt_type].mcs_count[ts->mcs], 1,
-		((ts->mcs <= MAX_MCS_11AC) && (ts->pkt_type == DOT11_AC)));
-
-	DP_STATS_INCC(peer, tx.pkt_type[ts->pkt_type].mcs_count[MAX_MCS], 1,
-		((ts->mcs >= (MAX_MCS-1)) && (ts->pkt_type == DOT11_AX)));
-	DP_STATS_INCC(peer, tx.pkt_type[ts->pkt_type].mcs_count[ts->mcs], 1,
-		((ts->mcs <= (MAX_MCS-1)) && (ts->pkt_type == DOT11_AX)));
-
+	DP_STATS_INCC(peer, tx.pkt_type[pkt_type].mcs_count[MAX_MCS], 1,
+			((mcs >= MAX_MCS_11A) && (pkt_type == DOT11_A)));
+	DP_STATS_INCC(peer, tx.pkt_type[pkt_type].mcs_count[mcs], 1,
+			((mcs < (MAX_MCS_11A)) && (pkt_type == DOT11_A)));
+	DP_STATS_INCC(peer, tx.pkt_type[pkt_type].mcs_count[MAX_MCS], 1,
+			((mcs >= MAX_MCS_11B) && (pkt_type == DOT11_B)));
+	DP_STATS_INCC(peer, tx.pkt_type[pkt_type].mcs_count[mcs], 1,
+			((mcs < MAX_MCS_11B) && (pkt_type == DOT11_B)));
+	DP_STATS_INCC(peer, tx.pkt_type[pkt_type].mcs_count[MAX_MCS], 1,
+			((mcs >= MAX_MCS_11A) && (pkt_type == DOT11_N)));
+	DP_STATS_INCC(peer, tx.pkt_type[pkt_type].mcs_count[mcs], 1,
+			((mcs < MAX_MCS_11A) && (pkt_type == DOT11_N)));
+	DP_STATS_INCC(peer, tx.pkt_type[pkt_type].mcs_count[MAX_MCS], 1,
+			((mcs >= MAX_MCS_11AC) && (pkt_type == DOT11_AC)));
+	DP_STATS_INCC(peer, tx.pkt_type[pkt_type].mcs_count[mcs], 1,
+			((mcs < MAX_MCS_11AC) && (pkt_type == DOT11_AC)));
+	DP_STATS_INCC(peer, tx.pkt_type[pkt_type].mcs_count[MAX_MCS], 1,
+			((mcs >= (MAX_MCS - 1)) && (pkt_type == DOT11_AX)));
+	DP_STATS_INCC(peer, tx.pkt_type[pkt_type].mcs_count[mcs], 1,
+			((mcs < (MAX_MCS - 1)) && (pkt_type == DOT11_AX)));
 	DP_STATS_INC(peer, tx.sgi_count[ts->sgi], 1);
 	DP_STATS_INC(peer, tx.bw[ts->bw], 1);
 	DP_STATS_UPD(peer, tx.last_ack_rssi, ts->ack_frame_rssi);
 	DP_STATS_INC(peer, tx.wme_ac_type[TID_TO_WME_AC(ts->tid)], 1);
 	DP_STATS_INCC(peer, tx.stbc, 1, ts->stbc);
-	DP_STATS_INCC(peer, tx.ofdma, 1, ts->ofdma);
 	DP_STATS_INCC(peer, tx.ldpc, 1, ts->ldpc);
 	DP_STATS_INC_PKT(peer, tx.tx_success, 1, length);
-	DP_STATS_INCC(peer, tx.amsdu_cnt, 1, ts->msdu_part_of_amsdu);
 	DP_STATS_INCC(peer, tx.retries, 1, ts->transmit_cnt > 1);
 
 	if (soc->cdp_soc.ol_ops->update_dp_stats) {
@@ -2661,7 +2662,7 @@ QDF_STATUS dp_tx_soc_attach(struct dp_soc *soc)
 	 * only for NPR EMU, should be removed, once NPR platforms
 	 * are stable.
 	 */
-	soc->process_tx_status = 1;
+	soc->process_tx_status = 0;
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
 			"%s HAL Tx init Success\n", __func__);
@@ -2770,7 +2771,7 @@ dp_tx_me_send_convert_ucast(struct cdp_vdev *vdev_handle, qdf_nbuf_t nbuf,
 	/*preparing data fragment*/
 	data_frag.vaddr = qdf_nbuf_data(nbuf) + IEEE80211_ADDR_LEN;
 	data_frag.paddr_lo = (uint32_t)paddr_data;
-	data_frag.paddr_hi = ((uint64_t)paddr_data & 0xffffffff00000000) >> 32;
+	data_frag.paddr_hi = (((uint64_t) paddr_data)  >> 32);
 	data_frag.len = len - DP_MAC_ADDR_LEN;
 
 	for (new_mac_idx = 0; new_mac_idx < new_mac_cnt; new_mac_idx++) {
@@ -2838,7 +2839,7 @@ dp_tx_me_send_convert_ucast(struct cdp_vdev *vdev_handle, qdf_nbuf_t nbuf,
 		seg_info_new->frags[0].vaddr =  (uint8_t *)mc_uc_buf;
 		seg_info_new->frags[0].paddr_lo = (uint32_t) paddr_mcbuf;
 		seg_info_new->frags[0].paddr_hi =
-			((u64)paddr_mcbuf & 0xffffffff00000000) >> 32;
+			((uint64_t) paddr_mcbuf >> 32);
 		seg_info_new->frags[0].len = DP_MAC_ADDR_LEN;
 
 		seg_info_new->frags[1] = data_frag;

@@ -170,7 +170,7 @@ static const struct dp_rate_debug dp_rate_string[DOT11_MAX][MAX_MCS] = {
 		{"VHT MCS 8 (256-QAM 3/4)  ", MCS_VALID},
 		{"VHT MCS 9 (256-QAM 5/6)  ", MCS_VALID},
 		{"VHT MCS 10 (1024-QAM 3/4)", MCS_VALID},
-		{"VHT MCS 10 (1024-QAM 5/6)", MCS_VALID},
+		{"VHT MCS 11 (1024-QAM 5/6)", MCS_VALID},
 		{"INVALID ", MCS_VALID},
 	},
 	{
@@ -185,7 +185,7 @@ static const struct dp_rate_debug dp_rate_string[DOT11_MAX][MAX_MCS] = {
 		{"HE MCS 8 (256-QAM 3/4)  ", MCS_VALID},
 		{"HE MCS 9 (256-QAM 5/6)  ", MCS_VALID},
 		{"HE MCS 10 (1024-QAM 3/4)", MCS_VALID},
-		{"HE MCS 10 (1024-QAM 5/6)", MCS_VALID},
+		{"HE MCS 11 (1024-QAM 5/6)", MCS_VALID},
 		{"INVALID ", MCS_VALID},
 	}
 };
@@ -5571,7 +5571,7 @@ void *dp_soc_attach_wifi3(void *osif_soc, void *hif_handle,
 	wlan_cfg_set_rx_hash(soc->wlan_cfg_ctx, rx_hash);
 
 	if (soc->cdp_soc.ol_ops->get_dp_cfg_param) {
-		int ret = soc->cdp_soc.ol_ops->get_dp_cfg_param(soc,
+		int ret = soc->cdp_soc.ol_ops->get_dp_cfg_param(soc->osif_soc,
 				CDP_CFG_MAX_PEER_ID);
 
 		if (ret != -EINVAL) {
