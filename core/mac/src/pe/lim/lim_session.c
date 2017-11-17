@@ -406,6 +406,7 @@ pe_create_session(tpAniSirGlobal pMac, uint8_t *bssid, uint8_t *sessionId,
 	QDF_STATUS status;
 	uint8_t i;
 	tpPESession session_ptr;
+
 	for (i = 0; i < pMac->lim.maxBssId; i++) {
 		/* Find first free room in session table */
 		if (pMac->lim.gpSession[i].valid == true)
@@ -596,6 +597,7 @@ tpPESession pe_find_session_by_bssid(tpAniSirGlobal pMac, uint8_t *bssid,
 tpPESession pe_find_session_by_bss_idx(tpAniSirGlobal pMac, uint8_t bssIdx)
 {
 	uint8_t i;
+
 	for (i = 0; i < pMac->lim.maxBssId; i++) {
 		/* If BSSID matches return corresponding tables address */
 		if ((pMac->lim.gpSession[i].valid)
@@ -707,6 +709,7 @@ void pe_delete_session(tpAniSirGlobal mac_ctx, tpPESession session)
 	if (LIM_IS_AP_ROLE(session)) {
 		qdf_mc_timer_stop(&session->protection_fields_reset_timer);
 		qdf_mc_timer_destroy(&session->protection_fields_reset_timer);
+		lim_del_pmf_sa_query_timer(mac_ctx, session);
 	}
 
 	/* Delete FT related information */

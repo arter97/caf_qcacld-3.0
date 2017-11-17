@@ -36,6 +36,7 @@
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>
 #include <net/cfg80211.h>
+#include <linux/ieee80211.h>
 #include <qdf_list.h>
 #include <qdf_types.h>
 #include "sir_mac_prot_def.h"
@@ -185,6 +186,11 @@
 #define MAX_GENIE_LEN (512)
 #define MIN_GENIE_LEN (2)
 
+/* One per STA: 1 for BCMC_STA_ID, 1 for each SAP_SELF_STA_ID,
+ * 1 for WDS_STAID
+ */
+#define HDD_MAX_ADAPTERS (WLAN_MAX_STA_COUNT + QDF_MAX_NO_OF_SAP_MODE + 2)
+
 #define WLAN_CHIP_VERSION   "WCNSS"
 
 #define hdd_log_ratelimited(rate, level, args...) \
@@ -323,6 +329,8 @@
 #define WLAN_NUD_STATS_LEN 800
 /* ARP packet type for NUD debug stats */
 #define WLAN_NUD_STATS_ARP_PKT_TYPE 1
+/* Assigned size of driver memory dump is 4096 bytes */
+#define DRIVER_MEM_DUMP_SIZE    4096
 
 /*
  * @eHDD_DRV_OP_PROBE: Refers to .probe operation
@@ -861,10 +869,13 @@ typedef struct hdd_hostapd_state_s {
  *  to maintain SCC mode with the STA role on the same card.
  *  this usually happens when STA is connected to an external
  *  AP that runs on a different channel
+ * @BSS_STOP_DUE_TO_VENDOR_CONFIG_CHAN: BSS stopped due to
+ *  vendor subcmd set sap config channel
  */
 enum bss_stop_reason {
 	BSS_STOP_REASON_INVALID = 0,
 	BSS_STOP_DUE_TO_MCC_SCC_SWITCH = 1,
+	BSS_STOP_DUE_TO_VENDOR_CONFIG_CHAN = 2,
 };
 
 /**
@@ -901,6 +912,14 @@ enum bss_stop_reason {
  * @max_mcs_idx: Max supported mcs index of the station
  * @rx_mcs_map: VHT Rx mcs map
  * @tx_mcs_map: VHT Tx mcs map
+ * @freq : Frequency of the current station
+ * @dot11_mode: 802.11 Mode of the connection
+ * @ht_present: HT caps present or not in the current station
+ * @vht_present: VHT caps present or not in the current station
+ * @ht_caps: HT capabilities of current station
+ * @vht_caps: VHT capabilities of current station
+ * @reason_code: Disconnection reason code for current station
+ * @rssi: RSSI of the current station reported from F/W
  */
 typedef struct {
 	bool isUsed;
@@ -932,6 +951,14 @@ typedef struct {
 	uint8_t max_mcs_idx;
 	uint8_t rx_mcs_map;
 	uint8_t tx_mcs_map;
+	uint32_t freq;
+	uint8_t dot11_mode;
+	bool ht_present;
+	bool vht_present;
+	struct ieee80211_ht_cap ht_caps;
+	struct ieee80211_vht_cap vht_caps;
+	uint32_t reason_code;
+	int8_t rssi;
 } hdd_station_info_t;
 
 /**
@@ -1185,7 +1212,7 @@ struct hdd_adapter_s {
 	/* TODO Move this to sta Ctx */
 	struct wireless_dev wdev;
 	struct cfg80211_scan_request *request;
-	uint8_t scan_source;
+	struct cfg80211_scan_request *vendor_request;
 
 	/** ops checks if Opportunistic Power Save is Enable or Not
 	 * ctw stores ctWindow value once we receive Opps command from
@@ -1268,6 +1295,8 @@ struct hdd_adapter_s {
 	/** Per-station structure */
 	spinlock_t staInfo_lock;        /* To protect access to station Info */
 	hdd_station_info_t aStaInfo[WLAN_MAX_STA_COUNT];
+	hdd_station_info_t cache_sta_info[WLAN_MAX_STA_COUNT];
+
 	/* uint8_t uNumActiveStation; */
 
 /*************************************************************
@@ -1720,10 +1749,7 @@ struct hdd_context_s {
 	hdd_adapter_list_node_t adapter_nodes[CSR_ROAM_SESSION_MAX];
 	qdf_list_t hddAdapters; /* List of adapters */
 
-	/* One per STA: 1 for BCMC_STA_ID, 1 for each SAP_SELF_STA_ID,
-	 * 1 for WDS_STAID
-	 */
-	hdd_adapter_t *sta_to_adapter[WLAN_MAX_STA_COUNT + QDF_MAX_NO_OF_SAP_MODE + 2];
+	hdd_adapter_t *sta_to_adapter[HDD_MAX_ADAPTERS];
 
 	/** Pointer for firmware image data */
 	const struct firmware *fw;
@@ -1922,14 +1948,8 @@ struct hdd_context_s {
 #endif
 	bool mcc_mode;
 	struct hdd_chain_rssi_context chain_rssi_context;
-#ifdef WLAN_FEATURE_MEMDUMP
-	uint8_t *fw_dump_loc;
-	uint32_t dump_loc_paddr;
-	qdf_mc_timer_t memdump_cleanup_timer;
+
 	struct mutex memdump_lock;
-	bool memdump_in_progress;
-	bool memdump_init_done;
-#endif /* WLAN_FEATURE_MEMDUMP */
 	uint16_t driver_dump_size;
 	uint8_t *driver_dump_mem;
 
@@ -1988,7 +2008,6 @@ struct hdd_context_s {
 	qdf_atomic_t disable_lro_in_concurrency;
 	qdf_atomic_t disable_lro_in_low_tput;
 	qdf_atomic_t vendor_disable_lro_flag;
-	bool fw_mem_dump_enabled;
 	uint8_t last_scan_reject_session_id;
 	scan_reject_states last_scan_reject_reason;
 	unsigned long last_scan_reject_timestamp;
@@ -2017,6 +2036,7 @@ struct hdd_context_s {
 	hdd_adapter_t *cap_tsf_context;
 #endif
 	struct sta_ap_intf_check_work_ctx *sta_ap_intf_check_work_info;
+	qdf_wake_lock_t monitor_mode_wakelock;
 };
 
 int hdd_validate_channel_and_bandwidth(hdd_adapter_t *adapter,
@@ -2295,26 +2315,6 @@ static inline bool hdd_scan_random_mac_addr_supported(void)
 void hdd_get_fw_version(hdd_context_t *hdd_ctx,
 			uint32_t *major_spid, uint32_t *minor_spid,
 			uint32_t *siid, uint32_t *crmid);
-
-#ifdef WLAN_FEATURE_MEMDUMP
-/**
- * hdd_is_memdump_supported() - to check if memdump feature support
- *
- * This function is used to check if memdump feature is supported in
- * the host driver
- *
- * Return: true if supported and false otherwise
- */
-static inline bool hdd_is_memdump_supported(hdd_context_t *hdd_ctx)
-{
-	return hdd_ctx->fw_mem_dump_enabled;
-}
-#else
-static inline bool hdd_is_memdump_supported(hdd_context_t *hdd_ctx)
-{
-	return false;
-}
-#endif /* WLAN_FEATURE_MEMDUMP */
 
 void hdd_update_macaddr(struct hdd_config *config,
 			struct qdf_mac_addr hw_macaddr);
@@ -2707,9 +2707,25 @@ void hdd_chip_pwr_save_fail_detected_cb(void *hdd_ctx,
  * Return: None
  */
 void hdd_clear_fils_connection_info(hdd_adapter_t *adapter);
+
+/**
+ * hdd_update_hlp_info() - Update HLP packet received in FILS (re)assoc rsp
+ * @dev: net device
+ * @roam_fils_params: Fils join rsp params
+ *
+ * This API is used to send the received HLP packet in Assoc rsp(FILS AKM)
+ * to the network layer.
+ *
+ * Return: None
+ */
+void hdd_update_hlp_info(struct net_device *dev, tCsrRoamInfo *roam_info);
 #else
 static inline void hdd_clear_fils_connection_info(hdd_adapter_t *adapter)
 { }
+
+static inline void hdd_update_hlp_info(struct net_device *dev,
+					tCsrRoamInfo *roam_info)
+{}
 #endif
 
 /**
@@ -2752,24 +2768,6 @@ int hdd_set_limit_off_chan_for_tos(hdd_adapter_t *adapter, enum tos tos,
  * Return: 0 on success and non zero value on failure
  */
 int hdd_reset_limit_off_chan(hdd_adapter_t *adapter);
-
-#if defined(WLAN_FEATURE_FILS_SK)
-/**
- * hdd_update_hlp_info() - Update HLP packet received in FILS (re)assoc rsp
- * @dev: net device
- * @roam_fils_params: Fils join rsp params
- *
- * This API is used to send the received HLP packet in Assoc rsp(FILS AKM)
- * to the network layer.
- *
- * Return: None
- */
-void hdd_update_hlp_info(struct net_device *dev, tCsrRoamInfo *roam_info);
-#else
-static inline void hdd_update_hlp_info(struct net_device *dev,
-				       tCsrRoamInfo *roam_info)
-{}
-#endif
 
 #undef nla_parse
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
@@ -2842,5 +2840,20 @@ void hdd_start_driver_ops_timer(int drv_op);
  * Return: none
  */
 void hdd_stop_driver_ops_timer(void);
+
+/**
+ * hdd_get_stainfo() - get stainfo for the specified peer
+ * @adapter: hostapd interface
+ * @mac_addr: mac address of requested peer
+ *
+ * This function find the stainfo for the peer with mac_addr
+ *
+ * Return: stainfo if found, NULL if not found
+ */
+hdd_station_info_t *hdd_get_stainfo(hdd_station_info_t *aStaInfo,
+				    struct qdf_mac_addr mac_addr);
+
+int hdd_driver_memdump_init(void);
+void hdd_driver_memdump_deinit(void);
 
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

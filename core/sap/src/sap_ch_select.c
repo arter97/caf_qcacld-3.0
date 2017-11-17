@@ -440,7 +440,7 @@ void sap_update_unsafe_channel_list(ptSapContext pSapCtx)
 			if (CDS_IS_DFS_CH(safe_channels[i].channelNumber)) {
 				safe_channels[i].isSafe = false;
 				QDF_TRACE(QDF_MODULE_ID_SAP,
-					QDF_TRACE_LEVEL_INFO_HIGH,
+					QDF_TRACE_LEVEL_DEBUG,
 					"%s: DFS Ch %d is not safe in"
 					" Concurrent mode",
 					__func__,
@@ -461,7 +461,7 @@ void sap_update_unsafe_channel_list(ptSapContext pSapCtx)
 				/* Found unsafe channel, update it */
 				safe_channels[j].isSafe = false;
 				QDF_TRACE(QDF_MODULE_ID_SAP,
-					  QDF_TRACE_LEVEL_ERROR,
+					  QDF_TRACE_LEVEL_DEBUG,
 					  FL("CH %d is not safe"),
 					  unsafe_channel_list[i]);
 				break;
@@ -704,7 +704,7 @@ static bool sap_chan_sel_init(tHalHandle halHandle,
 			if ((safe_channels[i].channelNumber == *pChans) &&
 			    (false == safe_channels[i].isSafe)) {
 				QDF_TRACE(QDF_MODULE_ID_SAP,
-					  QDF_TRACE_LEVEL_INFO_HIGH,
+					  QDF_TRACE_LEVEL_DEBUG,
 					  "In %s, Ch %d is not safe", __func__,
 					  *pChans);
 				chSafe = false;
@@ -1252,6 +1252,7 @@ static void sap_interference_rssi_count_5G(tSapSpectChInfo *spect_ch,
 {
 	uint16_t num_ch;
 	int32_t offset = 0;
+
 	if (NULL == spect_ch) {
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
 			  FL("spect_ch is NULL"));
@@ -1790,6 +1791,7 @@ static void set_ht80_chl_bit(chan_bonding_bitmap *channel_bitmap,
 	uint8_t i, j;
 	tSapSpectChInfo *spec_info;
 	int start_channel = 0;
+
 	channel_bitmap->chanBondingSet[0].startChannel =
 			acs_ht80_channels[0].chStartNum;
 	channel_bitmap->chanBondingSet[1].startChannel =

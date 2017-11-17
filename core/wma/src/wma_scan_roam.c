@@ -2552,9 +2552,6 @@ static int wma_fill_roam_synch_buffer(tp_wma_handle wma,
 			     SIR_KEK_KEY_LEN);
 		qdf_mem_copy(roam_synch_ind_ptr->replay_ctr,
 			     key->replay_counter, SIR_REPLAY_CTR_LEN);
-		WMA_LOGD("%s: Key Replay Counter dump", __func__);
-		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_DEBUG,
-				   key->replay_counter, SIR_REPLAY_CTR_LEN);
 	}
 	if (param_buf->hw_mode_transition_fixed_param)
 		wma_process_pdev_hw_mode_trans_ind(wma,
@@ -2586,15 +2583,6 @@ static int wma_fill_roam_synch_buffer(tp_wma_handle wma,
 		WMA_LOGD("Update ERP Seq Num %d, Next ERP Seq Num %d",
 			 roam_synch_ind_ptr->update_erp_next_seq_num,
 			 roam_synch_ind_ptr->next_erp_seq_num);
-		WMA_LOGD("%s: KEK dump", __func__);
-		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_DEBUG,
-				   roam_synch_ind_ptr->kek, fils_info->kek_len);
-		WMA_LOGD("%s: PMK dump", __func__);
-		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_DEBUG,
-				   roam_synch_ind_ptr->pmk, fils_info->pmk_len);
-		WMA_LOGD("%s: PMKID dump", __func__);
-		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_DEBUG,
-				   roam_synch_ind_ptr->pmkid, SIR_PMKID_LEN);
 	}
 	return 0;
 }
@@ -2657,10 +2645,10 @@ static void wma_roam_update_vdev(tp_wma_handle wma,
 	wma_add_bss(wma, (tpAddBssParams)roam_synch_ind_ptr->add_bss_params);
 	wma_add_sta(wma, add_sta_params);
 	wma->interfaces[vdev_id].vdev_up = true;
+	WMA_LOGD(FL("Setting vdev_up flag to true"));
 	qdf_mem_copy(wma->interfaces[vdev_id].bssid,
 			roam_synch_ind_ptr->bssid.bytes, IEEE80211_ADDR_LEN);
 	qdf_mem_free(del_bss_params);
-	qdf_mem_free(del_sta_params);
 	qdf_mem_free(set_link_params);
 	qdf_mem_free(add_sta_params);
 }
@@ -6106,6 +6094,11 @@ QDF_STATUS  wma_ipa_offload_enable_disable(tp_wma_handle wma,
 	params.vdev_id = ipa_offload->vdev_id;
 	params.enable = ipa_offload->enable;
 
+	WMA_LOGI("%s: offload_type=%d, vdev_id=%d, enable=%d",
+		__func__,
+		ipa_offload->offload_type, ipa_offload->vdev_id,
+		ipa_offload->enable);
+
 	status = wmi_unified_ipa_offload_control_cmd(wma->wmi_handle,
 						&params);
 	if (QDF_IS_STATUS_ERROR(status))
@@ -6122,7 +6115,7 @@ QDF_STATUS  wma_ipa_offload_enable_disable(tp_wma_handle wma,
 	/* Disable Intra-BSS FWD offload when gDisableIntraBssFwd=1 in INI */
 	rx_fwd_disabled = ol_txrx_is_rx_fwd_disabled(vdev);
 	if (!ipa_offload->enable || rx_fwd_disabled) {
-		WMA_LOGE("%s: ipa_offload->enable=%d, rx_fwd_disabled=%d",
+		WMA_LOGI("%s: ipa_offload->enable=%d, rx_fwd_disabled=%d",
 				__func__,
 				ipa_offload->enable, rx_fwd_disabled);
 		intra_bss_fwd = 1;

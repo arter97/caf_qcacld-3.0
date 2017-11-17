@@ -1527,7 +1527,6 @@ struct peer_debug_info {
  * @wmi_cmd_rsp_wake_lock: wmi command response wake lock
  * @wmi_cmd_rsp_runtime_lock: wmi command response bus lock
  * @saved_chan: saved channel list sent as part of WMI_SCAN_CHAN_LIST_CMDID
- * @fw_mem_dump_enabled: Fw memory dump support
  * @ss_configs: spectral scan config parameters
  * @bandcapability: band capability configured through ini
  * @ito_repeat_count: Indicates ito repeated count
@@ -1611,7 +1610,8 @@ typedef struct {
 	 * with ns info suppose if ns also enabled
 	 */
 	tSirHostOffloadReq mArpInfo;
-	struct wma_tx_ack_work_ctx *ack_work_ctx;
+	struct wma_tx_ack_work_ctx *data_ack_work_ctx;
+	struct wma_tx_ack_work_ctx *mgmt_ack_work_ctx;
 	uint8_t powersave_mode;
 	bool ptrn_match_enable_all_vdev;
 	uint8_t wma_ptrn_id_def;
@@ -1738,7 +1738,6 @@ typedef struct {
 	tp_wma_packetdump_cb wma_mgmt_rx_packetdump_cb;
 	bool rcpi_enabled;
 	tSirLLStatsResults *link_stats_results;
-	bool fw_mem_dump_enabled;
 	bool tx_bfee_8ss_enabled;
 	tSirAddonPsReq ps_setting;
 	struct peer_debug_info *peer_dbg;
@@ -1939,6 +1938,7 @@ struct wma_set_key_params {
 	uint32_t key_idx;
 	bool unicast;
 	uint8_t key_data[SIR_MAC_MAX_KEY_LENGTH];
+	uint8_t key_rsc[SIR_MAC_MAX_KEY_RSC_LEN];
 };
 
 /**
@@ -2706,5 +2706,15 @@ int wma_chan_info_event_handler(void *handle, u_int8_t *event_buf,
  */
 QDF_STATUS wma_config_bmiss_bcnt_params(uint32_t vdev_id, uint32_t first_cnt,
 		uint32_t final_cnt);
+
+/**
+ * wma_send_action_oui() - send of action oui extensions to firmware
+ * @handle: wma handle
+ * @action_oui: action oui buffer containg extensions to be send
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wma_send_action_oui(WMA_HANDLE handle,
+			       struct wmi_action_oui *action_oui);
 
 #endif

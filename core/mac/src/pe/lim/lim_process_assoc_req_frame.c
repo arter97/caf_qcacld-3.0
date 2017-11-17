@@ -1135,6 +1135,7 @@ static bool lim_chk_wmm(tpAniSirGlobal mac_ctx, tpSirMacMgmtHdr hdr,
 			uint8_t sub_type, tHalBitVal qos_mode)
 {
 	tHalBitVal wme_mode;
+
 	limGetWmeMode(session, &wme_mode);
 	if ((qos_mode == eHAL_SET) || (wme_mode == eHAL_SET)) {
 		/*
@@ -1143,6 +1144,7 @@ static bool lim_chk_wmm(tpAniSirGlobal mac_ctx, tpSirMacMgmtHdr hdr,
 		 */
 		if (assoc_req->addtsPresent) {
 			uint8_t tspecIdx = 0;
+
 			if (lim_admit_control_add_ts(mac_ctx, hdr->sa,
 				&(assoc_req->addtsReq),
 				&(assoc_req->qosCapability),
@@ -2296,6 +2298,9 @@ void lim_send_mlm_assoc_ind(tpAniSirGlobal mac_ctx,
 		 * processing in hostapd
 		 */
 		if (assoc_req->HTCaps.present) {
+			qdf_mem_copy(&assoc_ind->HTCaps, &assoc_req->HTCaps,
+				     sizeof(tDot11fIEHTCaps));
+
 			rsn_len = assoc_ind->addIE.length;
 			if (assoc_ind->addIE.length + DOT11F_IE_HTCAPS_MIN_LEN
 				+ 2 < SIR_MAC_MAX_IE_LENGTH) {
@@ -2409,6 +2414,8 @@ void lim_send_mlm_assoc_ind(tpAniSirGlobal mac_ctx,
 		fill_mlm_assoc_ind_vht(assoc_req, sta_ds, assoc_ind);
 
 		/* updates VHT information in assoc indication */
+		 qdf_mem_copy(&assoc_ind->VHTCaps, &assoc_req->VHTCaps,
+			      sizeof(tDot11fIEVHTCaps));
 		lim_fill_assoc_ind_vht_info(mac_ctx, session_entry, assoc_req,
 			assoc_ind);
 		lim_post_sme_message(mac_ctx, LIM_MLM_ASSOC_IND,

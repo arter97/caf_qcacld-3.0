@@ -48,7 +48,6 @@
 #include <cds_sched.h>
 #include <qdf_threads.h>
 #include <qdf_mc_timer.h>
-#include <cds_pack_align.h>
 
 /* Amount of time to wait for WMA to perform an asynchronous activity.
  * This value should be larger than the timeout used by WMI to wait for
@@ -113,7 +112,7 @@ struct cds_sme_cbacks {
  * @hdd_set_rx_mode_rps_cb: enable/disable RPS in SAP mode
  */
 struct cds_dp_cbacks {
-	void (*ol_txrx_update_mac_id_cb)(uint8_t , uint8_t);
+	void (*ol_txrx_update_mac_id_cb)(uint8_t, uint8_t);
 	void (*hdd_en_lro_in_cc_cb)(struct hdd_context_s *);
 	void (*hdd_disble_lro_in_cc_cb)(struct hdd_context_s *);
 	void (*hdd_set_rx_mode_rps_cb)(struct hdd_context_s *, void *, bool);
@@ -549,4 +548,23 @@ void cds_smmu_mem_map_setup(qdf_device_t osdev);
  * Return: Status of map operation
  */
 int cds_smmu_map_unmap(bool map, uint32_t num_buf, qdf_mem_info_t *buf_arr);
+
+/**
+ * cds_get_mcc_to_scc_switch_mode() - get mcc to scc swith mode
+ *
+ * Get the mcc to scc swith mode from ini
+ *
+ * Return: current mcc to scc swith mode
+ */
+uint32_t cds_get_mcc_to_scc_switch_mode(void);
+
+/**
+ * cds_is_sta_sap_scc_allowed_on_dfs_channel() - get the status sta, sap scc on
+ * dfs channel
+ *
+ * Get the status of sta, sap scc on dfs channel
+ *
+ * Return: true if sta, sap scc is allowed on dfs channel otherwise false
+ */
+bool cds_is_sta_sap_scc_allowed_on_dfs_channel(void);
 #endif /* if !defined __CDS_API_H */

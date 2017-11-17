@@ -112,9 +112,6 @@ extern uint8_t lim_get_max_tx_power(int8_t regMax, int8_t apTxPower,
 uint8_t lim_is_addr_bc(tSirMacAddr);
 uint8_t lim_is_group_addr(tSirMacAddr);
 
-/* check for type of scan allowed */
-uint8_t lim_active_scan_allowed(tpAniSirGlobal, uint8_t);
-
 /* AID pool management functions */
 void lim_init_peer_idxpool(tpAniSirGlobal, tpPESession);
 uint16_t lim_assign_peer_idx(tpAniSirGlobal, tpPESession);
@@ -548,7 +545,7 @@ typedef enum {
 	WLAN_PE_DIAG_DEAUTH_CNF_EVENT,
 	WLAN_PE_DIAG_ADDTS_REQ_EVENT,
 	WLAN_PE_DIAG_ADDTS_RSP_EVENT = 30,
-	WLAN_PE_DIAG_DELTS_REQ_EVENT ,
+	WLAN_PE_DIAG_DELTS_REQ_EVENT,
 	WLAN_PE_DIAG_DELTS_RSP_EVENT,
 	WLAN_PE_DIAG_DELTS_IND_EVENT,
 	WLAN_PE_DIAG_ENTER_BMPS_REQ_EVENT,
@@ -562,7 +559,7 @@ typedef enum {
 	WLAN_PE_DIAG_EXIT_IMPS_RSP_EVENT,
 	WLAN_PE_DIAG_ENTER_UAPSD_REQ_EVENT,
 	WLAN_PE_DIAG_ENTER_UAPSD_RSP_EVENT,
-	WLAN_PE_DIAG_EXIT_UAPSD_REQ_EVENT ,
+	WLAN_PE_DIAG_EXIT_UAPSD_REQ_EVENT,
 	WLAN_PE_DIAG_EXIT_UAPSD_RSP_EVENT,
 	WLAN_PE_DIAG_WOWL_ADD_BCAST_PTRN_EVENT,
 	WLAN_PE_DIAG_WOWL_DEL_BCAST_PTRN_EVENT,
@@ -665,6 +662,33 @@ tSirRetStatus lim_strip_extcap_update_struct(tpAniSirGlobal mac_ctx,
 		uint8_t *addn_ie, uint16_t *addn_ielen, tDot11fIEExtCap *dst);
 void lim_merge_extcap_struct(tDot11fIEExtCap *dst, tDot11fIEExtCap *src,
 		bool add);
+
+#ifdef WLAN_FEATURE_11W
+/**
+ * lim_del_pmf_sa_query_timer() - This function deletes SA query timer
+ * @mac_ctx: pointer to mac context
+ * @pe_session: pointer to PE session
+ *
+ * This API is to delete the PMF SA query timer created for each associated STA
+ *
+ * Return: none
+ */
+void lim_del_pmf_sa_query_timer(tpAniSirGlobal mac_ctx, tpPESession pe_session);
+#else
+/**
+ * lim_del_pmf_sa_query_timer() - This function deletes SA query timer
+ * @mac_ctx: pointer to mac context
+ * @pe_session: pointer to PE session
+ *
+ * This API is to delete the PMF SA query timer created for each associated STA
+ *
+ * Return: none
+ */
+static inline void
+lim_del_pmf_sa_query_timer(tpAniSirGlobal mac_ctx, tpPESession pe_session)
+{
+}
+#endif
 
 /**
  * lim_strip_op_class_update_struct - strip sup op class IE and populate

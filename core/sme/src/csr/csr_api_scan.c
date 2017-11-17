@@ -4452,7 +4452,6 @@ bool csr_learn_11dcountry_information(tpAniSirGlobal pMac,
 		goto free_ie;
 	}
 
-	pMac->reg_hint_src = SOURCE_11D;
 	status = csr_get_regulatory_domain_for_country(pMac,
 				pCountryCodeSelected, &domainId, SOURCE_11D);
 	if (status != QDF_STATUS_SUCCESS) {
@@ -7722,14 +7721,10 @@ QDF_STATUS csr_abort_scan_from_active_list(tpAniSirGlobal mac_ctx,
 			if ((cmd->command == scan_cmd_type) &&
 			    ((cmd->u.scanCmd.scanID == scan_id) ||
 			    (cmd->sessionId == session_id))) {
-				if (abort_reason ==
-				    eCSR_SCAN_ABORT_DUE_TO_BAND_CHANGE)
-					cmd->u.scanCmd.abort_scan_indication =
-					eCSR_SCAN_ABORT_DUE_TO_BAND_CHANGE;
-
+				cmd->u.scanCmd.abort_scan_indication =
+						abort_reason;
 				csr_send_scan_abort(mac_ctx, cmd->sessionId,
 						    cmd->u.scanCmd.scanID);
-
 			}
 		}
 	}

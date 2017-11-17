@@ -1004,7 +1004,8 @@ typedef struct tagCsrRoamProfile {
 	tSirMacRateSet  extended_rates;
 	struct qdf_mac_addr bssid_hint;
 	bool force_24ghz_in_ht20;
-	bool do_not_roam;
+	bool supplicant_disabled_roaming;
+	bool roaming_allowed_on_iface;
 #ifdef WLAN_FEATURE_FILS_SK
 	bool fils_connection;
 	uint8_t *hlp_ie;
@@ -1320,6 +1321,7 @@ typedef struct tagCsrConfigParam {
 	uint32_t auto_bmps_timer_val;
 	uint32_t fine_time_meas_cap;
 	uint32_t dual_mac_feature_disable;
+	uint32_t sta_sap_scc_on_dfs_chan;
 	uint32_t roam_dense_traffic_thresh;
 	uint32_t roam_dense_rssi_thresh_offset;
 	uint32_t roam_dense_min_aps;
@@ -1560,6 +1562,9 @@ typedef struct sSirSmeAssocIndToUpperLayerCnf {
 	uint8_t max_mcs_idx;
 	uint8_t rx_mcs_map;
 	uint8_t tx_mcs_map;
+
+	tDot11fIEHTCaps HTCaps;
+	tDot11fIEVHTCaps VHTCaps;
 } tSirSmeAssocIndToUpperLayerCnf, *tpSirSmeAssocIndToUpperLayerCnf;
 
 typedef struct tagCsrSummaryStatsInfo {
