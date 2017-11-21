@@ -603,7 +603,7 @@ typedef struct sap_Config {
 	/* buffer for addn ies comes from hostapd */
 	void *pProbeRespBcnIEsBuffer;
 	uint8_t sap_dot11mc; /* Specify if 11MC is enabled or disabled*/
-	uint8_t beacon_tx_rate;
+	uint16_t beacon_tx_rate;
 	uint8_t *vendor_ie;
 	enum vendor_ie_access_policy vendor_ie_access_policy;
 	uint16_t sta_inactivity_timeout;
@@ -619,6 +619,7 @@ typedef struct sap_Config {
 	uint8_t sap_chanswitch_mode;
 	uint16_t reduced_beacon_interval;
 	bool dfs_beacon_tx_enhanced;
+	bool chan_switch_hostapd_rate_enabled;
 } tsap_Config_t;
 
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE

@@ -544,39 +544,6 @@ tSirRetStatus lim_init_mlm(tpAniSirGlobal pMac)
 	return eSIR_SUCCESS;
 } /*** end lim_init_mlm() ***/
 
-#ifdef WLAN_FEATURE_11W
-/**
- * lim_deactivate_del_sta() - This function deactivate/delete associates STA
- * @mac_ctx: pointer to Global Mac Structure
- * @bss_entry: index for bss_entry
- * @psession_entry: pointer to session entry
- * @sta_ds: pointer to tpDphHashNode
- *
- * Function deactivate/delete associates STA
- *
- * Return: none
- */
-static void lim_deactivate_del_sta(tpAniSirGlobal mac_ctx, uint32_t bss_entry,
-		tpPESession psession_entry, tpDphHashNode sta_ds)
-{
-	uint32_t sta_entry;
-
-	for (sta_entry = 1; sta_entry < mac_ctx->lim.gLimAssocStaLimit;
-				sta_entry++) {
-		psession_entry = &mac_ctx->lim.gpSession[bss_entry];
-		sta_ds = dph_get_hash_entry(mac_ctx, sta_entry,
-					&psession_entry->dph.dphHashTable);
-		if (NULL == sta_ds)
-			continue;
-
-		pe_err("Deleting pmfSaQueryTimer for staid: %d",
-				sta_ds->staIndex);
-		tx_timer_deactivate(&sta_ds->pmfSaQueryTimer);
-		tx_timer_delete(&sta_ds->pmfSaQueryTimer);
-	}
-}
-#endif
-
 void lim_deactivate_timers(tpAniSirGlobal mac_ctx)
 {
 	uint32_t n;
@@ -659,11 +626,6 @@ void lim_cleanup_mlm(tpAniSirGlobal mac_ctx)
 {
 	uint32_t n;
 	tLimPreAuthNode **pAuthNode;
-#ifdef WLAN_FEATURE_11W
-	uint32_t bss_entry;
-	tpDphHashNode sta_ds = NULL;
-	tpPESession psession_entry = NULL;
-#endif
 	tLimTimers *lim_timer = NULL;
 
 	if (mac_ctx->lim.gLimTimersCreated == 1) {
@@ -738,21 +700,6 @@ void lim_cleanup_mlm(tpAniSirGlobal mac_ctx)
 
 		mac_ctx->lim.gLimTimersCreated = 0;
 	}
-#ifdef WLAN_FEATURE_11W
-	/*
-	 * When SSR is triggered, we need to loop through
-	 * each STA associated per BSSId and deactivate/delete
-	 * the pmfSaQueryTimer for it
-	 */
-	for (bss_entry = 0; bss_entry < mac_ctx->lim.maxBssId;
-					bss_entry++) {
-		if (!mac_ctx->lim.gpSession[bss_entry].valid)
-			continue;
-		lim_deactivate_del_sta(mac_ctx, bss_entry,
-				psession_entry, sta_ds);
-	}
-#endif
-
 } /*** end lim_cleanup_mlm() ***/
 
 /**
@@ -6170,7 +6117,7 @@ void lim_set_ht_caps(tpAniSirGlobal p_mac, tpPESession p_session_entry,
 	populate_dot11f_ht_caps(p_mac, p_session_entry, &dot11_ht_cap);
 	p_ie = lim_get_ie_ptr_new(p_mac, p_ie_start, num_bytes,
 			DOT11F_EID_HTCAPS, ONE_BYTE);
-	pe_debug("p_ie: %p dot11_ht_cap.supportedMCSSet[0]: 0x%x",
+	pe_debug("p_ie: %pK dot11_ht_cap.supportedMCSSet[0]: 0x%x",
 		p_ie, dot11_ht_cap.supportedMCSSet[0]);
 	if (p_ie) {
 		/* convert from unpacked to packed structure */
@@ -6714,6 +6661,28 @@ tSirRetStatus lim_strip_ie(tpAniSirGlobal mac_ctx,
 
 	return eSIR_SUCCESS;
 }
+
+#ifdef WLAN_FEATURE_11W
+void lim_del_pmf_sa_query_timer(tpAniSirGlobal mac_ctx, tpPESession pe_session)
+{
+	uint32_t associated_sta;
+	tpDphHashNode sta_ds = NULL;
+
+	for (associated_sta = 1;
+			associated_sta < mac_ctx->lim.gLimAssocStaLimit;
+			associated_sta++) {
+		sta_ds = dph_get_hash_entry(mac_ctx, associated_sta,
+				&pe_session->dph.dphHashTable);
+		if (NULL == sta_ds)
+			continue;
+
+		pe_err("Deleting pmfSaQueryTimer for staid: %d",
+			sta_ds->staIndex);
+		tx_timer_deactivate(&sta_ds->pmfSaQueryTimer);
+		tx_timer_delete(&sta_ds->pmfSaQueryTimer);
+	}
+}
+#endif
 
 tSirRetStatus lim_strip_supp_op_class_update_struct(tpAniSirGlobal mac_ctx,
 		uint8_t *addn_ie, uint16_t *addn_ielen,
@@ -7337,7 +7306,7 @@ QDF_STATUS lim_util_get_type_subtype(void *pkt, uint8_t *type,
 
 	hdr = WMA_GET_RX_MAC_HEADER(rxpktinfor);
 	if (hdr->fc.type == SIR_MAC_MGMT_FRAME) {
-		pe_debug("RxBd: %p mHdr: %p Type: %d Subtype: %d  SizesFC: %zu",
+		pe_debug("RxBd: %pK mHdr: %pK Type: %d Subtype: %d  SizesFC: %zu",
 		  rxpktinfor, hdr, hdr->fc.type, hdr->fc.subType,
 		  sizeof(tSirMacFrameCtl));
 		*type = hdr->fc.type;

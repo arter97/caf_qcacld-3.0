@@ -318,6 +318,7 @@ typedef struct _cds_context_type {
 	void (*hdd_en_lro_in_cc_cb)(struct hdd_context_s *);
 	void (*hdd_disable_lro_in_cc_cb)(struct hdd_context_s *);
 	void (*hdd_set_rx_mode_rps_cb)(struct hdd_context_s *, void *, bool);
+	void (*hdd_ipa_set_mcc_mode_cb)(bool);
 
 	/* This list is not sessionized. This mandatory channel list would be
 	 * as per OEMs preference as per the regulatory/other considerations.
@@ -606,5 +607,11 @@ QDF_STATUS cds_shutdown_notifier_register(void (*cb)(void *priv), void *priv);
  * Return: None
  */
 void cds_shutdown_notifier_purge(void);
-
+/**
+ * cds_shutdown_notifier_call() - Call shutdown notifier call back
+ *
+ * Call registered shutdown notifier call back to indicate about remove or
+ * shutdown.
+ */
+void cds_shutdown_notifier_call(void);
 #endif /* #if !defined __CDS_SCHED_H */

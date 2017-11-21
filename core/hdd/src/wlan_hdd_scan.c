@@ -866,7 +866,7 @@ static QDF_STATUS wlan_hdd_scan_request_dequeue(hdd_context_t *hdd_ctx,
 				*timestamp = hdd_scan_req->timestamp;
 				qdf_mem_free(hdd_scan_req);
 				qdf_spin_unlock(&hdd_ctx->hdd_scan_req_q_lock);
-				hdd_debug("removed Scan id: %d, req = %p, pending scans %d",
+				hdd_debug("removed Scan id: %d, req = %pK, pending scans %d",
 				      scan_id, req,
 				      qdf_list_size(&hdd_ctx->hdd_scan_req_q));
 				return QDF_STATUS_SUCCESS;
@@ -915,7 +915,7 @@ hdd_scan_request_callback(tHalHandle halHandle, void *pContext,
 	uint32_t timestamp;
 
 	ENTER();
-	hdd_debug("called with halHandle = %p, pContext = %p, scanID = %d, returned status = %d",
+	hdd_debug("called with halHandle = %pK, pContext = %pK, scanID = %d, returned status = %d",
 		 halHandle, pContext, (int)scanId, (int)status);
 
 	/* if there is a scan request pending when the wlan driver is unloaded
@@ -924,7 +924,7 @@ hdd_scan_request_callback(tHalHandle halHandle, void *pContext,
 	 * do some quick sanity before proceeding
 	 */
 	if (pAdapter->dev != dev) {
-		hdd_debug("device mismatch %p vs %p", pAdapter->dev, dev);
+		hdd_debug("device mismatch %pK vs %pK", pAdapter->dev, dev);
 		return QDF_STATUS_SUCCESS;
 	}
 
@@ -1440,7 +1440,7 @@ static QDF_STATUS hdd_cfg80211_scan_done_callback(tHalHandle halHandle,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	hdd_debug("called with hal = %p, pContext = %p, ID = %d, status = %d",
+	hdd_debug("called with hal = %pK, pContext = %pK, ID = %d, status = %d",
 		   halHandle, pContext, (int)scanId, (int)status);
 
 	pScanInfo->mScanPendingCounter = 0;
@@ -1614,11 +1614,17 @@ static void __wlan_hdd_cfg80211_scan_block_cb(struct work_struct *work)
 		request->n_channels = 0;
 
 		hdd_err("##In DFS Master mode. Scan aborted. Null result sent");
-		if (NL_SCAN == adapter->scan_source)
-			hdd_cfg80211_scan_done(adapter, request, true);
-		else
-			hdd_vendor_scan_callback(adapter, request, true);
+		hdd_cfg80211_scan_done(adapter, request, true);
 		adapter->request = NULL;
+	}
+	request = adapter->vendor_request;
+	if (request) {
+		request->n_ssids = 0;
+		request->n_channels = 0;
+
+		hdd_err("In DFS Master mode. Scan aborted. Null result sent");
+		hdd_vendor_scan_callback(adapter, request, true);
+		adapter->vendor_request = NULL;
 	}
 }
 
@@ -1919,8 +1925,10 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 						conn_info.connState) &&
 	    (!pHddCtx->config->enable_connected_scan)) {
 		hdd_info("enable_connected_scan is false, Aborting scan");
-		pAdapter->request = request;
-		pAdapter->scan_source = source;
+		if (NL_SCAN == source)
+			pAdapter->request = request;
+		else
+			pAdapter->vendor_request = request;
 		schedule_work(&pAdapter->scan_block_work);
 		return 0;
 	}
@@ -1972,9 +1980,10 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 			 * startup.
 			 */
 			hdd_err("##In DFS Master mode. Scan aborted");
-			pAdapter->request = request;
-			pAdapter->scan_source = source;
-
+			if (NL_SCAN == source)
+				pAdapter->request = request;
+			else
+				pAdapter->vendor_request = request;
 			schedule_work(&pAdapter->scan_block_work);
 			return 0;
 		}
@@ -2073,8 +2082,10 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 	if (pAdapter->device_mode == QDF_SAP_MODE &&
 	   wlan_hdd_sap_skip_scan_check(pHddCtx, request)) {
 		hdd_debug("sap scan skipped");
-		pAdapter->request = request;
-		pAdapter->scan_source = source;
+		if (NL_SCAN == source)
+			pAdapter->request = request;
+		else
+			pAdapter->vendor_request = request;
 		schedule_work(&pAdapter->scan_block_work);
 		return 0;
 	}
@@ -3213,7 +3224,7 @@ static int __wlan_hdd_cfg80211_sched_scan_start(struct wiphy *wiphy,
 	if ((QDF_STA_MODE == pAdapter->device_mode) &&
 	    (eConnectionState_Connecting ==
 	     (WLAN_HDD_GET_STATION_CTX_PTR(pAdapter))->conn_info.connState)) {
-		hdd_err("%p(%d) Connection in progress: sched_scan_start denied (EBUSY)",
+		hdd_err("%pK(%d) Connection in progress: sched_scan_start denied (EBUSY)",
 		       WLAN_HDD_GET_STATION_CTX_PTR(pAdapter),
 		       pAdapter->sessionId);
 		return -EBUSY;
@@ -3728,7 +3739,7 @@ void hdd_cleanup_scan_queue(hdd_context_t *hdd_ctx)
 				hdd_cfg80211_scan_done(adapter, req, aborted);
 			else
 				hdd_vendor_scan_callback(adapter, req, aborted);
-			hdd_debug("removed Scan id: %d, req = %p",
+			hdd_debug("removed Scan id: %d, req = %pK",
 					hdd_scan_req->scan_id, req);
 		}
 		qdf_mem_free(hdd_scan_req);

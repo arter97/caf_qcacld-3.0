@@ -539,6 +539,21 @@ void dfs_detach(struct ieee80211com *ic)
 	ic->ic_dfs = NULL;
 }
 
+
+#ifdef ATH_ENABLE_AR
+bool is_dfs_radar_enable(struct ieee80211com *ic)
+{
+	struct ath_dfs *dfs = (struct ath_dfs *)ic->ic_dfs;
+	return (dfs->dfs_proc_phyerr & DFS_RADAR_EN) &&
+		(dfs->dfs_proc_phyerr & DFS_AR_EN);
+}
+#else
+bool is_dfs_radar_enable(struct ieee80211com *ic)
+{
+	struct ath_dfs *dfs = (struct ath_dfs *)ic->ic_dfs;
+	return (dfs->dfs_proc_phyerr & DFS_RADAR_EN);
+}
+#endif
 /*
  * This is called each time a channel change occurs, to (potentially) enable
  * the radar code.
@@ -577,6 +592,14 @@ int dfs_radar_enable(struct ieee80211com *ic,
 
 		return -EIO;
 	}
+
+	dfs_radar_disable(ic);
+	/*
+	 * set ath_radar_tasksched as 1 to prevent radar task scheduled.
+	 * This is fake value, and it is set as 0 after dfs buffer reinit.
+	 */
+	dfs->ath_radar_tasksched = 1;
+	qdf_timer_sync_cancel(&dfs->ath_dfs_task_timer);
 	ic->ic_dfs_disable(ic);
 
 	/*
@@ -584,6 +607,8 @@ int dfs_radar_enable(struct ieee80211com *ic,
 	 * so initialize the DFS Radar filters
 	 */
 	radar_filters_init_status = dfs_init_radar_filters(ic, radar_info);
+
+	dfs->ath_radar_tasksched = 0;
 
 	/*
 	 * dfs_init_radar_filters() returns 1 on failure and
@@ -703,7 +728,7 @@ dfs_control(struct ieee80211com *ic, u_int id,
 	case DFS_SET_THRESH:
 		if (insize < sizeof(struct dfs_ioctl_params) || !indata) {
 			DFS_DPRINTK(dfs, ATH_DEBUG_DFS1,
-				    "%s: insize=%d, expected=%zu bytes, indata=%p\n",
+				    "%s: insize=%d, expected=%zu bytes, indata=%pK\n",
 				    __func__, insize,
 				    sizeof(struct dfs_ioctl_params), indata);
 			error = -EINVAL;

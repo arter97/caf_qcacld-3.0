@@ -485,7 +485,7 @@ typedef struct sPESession       /* Added to Support BT-AMP */
 	/* Supported NSS is intersection of self and peer NSS */
 	bool supported_nss_1x1;
 	bool is_ext_caps_present;
-	uint8_t beacon_tx_rate;
+	uint16_t beacon_tx_rate;
 	uint8_t *access_policy_vendor_ie;
 	uint8_t access_policy;
 	bool ignore_assoc_disallowed;
@@ -506,6 +506,8 @@ typedef struct sPESession       /* Added to Support BT-AMP */
 	uint8_t ht_client_cnt;
 	bool force_24ghz_in_ht20;
 	bool ch_switch_in_progress;
+	/* previous auth frame's sequence number */
+	uint16_t prev_auth_seq_num;
 } tPESession, *tpPESession;
 
 /*-------------------------------------------------------------------------

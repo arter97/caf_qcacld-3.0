@@ -1912,6 +1912,91 @@ static void sap_mark_dfs_channels(ptSapContext sapContext, uint8_t *channels,
 	}
 }
 
+/*
+ * sap_get_bonding_channels() - get bonding channels from primary channel.
+ * @sapContext: Handle to SAP context.
+ * channel: Channel to get bonded channels.
+ * channels: Bonded channel list
+ * size: Max bonded channels
+ * chanBondState: The channel bonding mode of the passed channel.
+ *
+ * Return: Number of sub channels
+ */
+static uint8_t sap_get_bonding_channels(ptSapContext sapContext,
+					uint8_t channel,
+					uint8_t *channels, uint8_t size,
+					ePhyChanBondState chanBondState)
+{
+	tHalHandle hHal = CDS_GET_HAL_CB(sapContext->p_cds_gctx);
+	tpAniSirGlobal pMac;
+	uint8_t numChannel;
+
+	if (channels == NULL)
+		return 0;
+
+	if (size < MAX_BONDED_CHANNELS)
+		return 0;
+
+	if (NULL != hHal)
+		pMac = PMAC_STRUCT(hHal);
+	else
+		return 0;
+
+	QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_DEBUG,
+		  FL("cbmode: %d, channel: %d"), chanBondState, channel);
+
+	switch (chanBondState) {
+	case PHY_SINGLE_CHANNEL_CENTERED:
+		numChannel = 1;
+		channels[0] = channel;
+		break;
+	case PHY_DOUBLE_CHANNEL_HIGH_PRIMARY:
+		numChannel = 2;
+		channels[0] = channel - 4;
+		channels[1] = channel;
+		break;
+	case PHY_DOUBLE_CHANNEL_LOW_PRIMARY:
+		numChannel = 2;
+		channels[0] = channel;
+		channels[1] = channel + 4;
+		break;
+	case PHY_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_LOW:
+		numChannel = 4;
+		channels[0] = channel;
+		channels[1] = channel + 4;
+		channels[2] = channel + 8;
+		channels[3] = channel + 12;
+		break;
+	case PHY_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_LOW:
+		numChannel = 4;
+		channels[0] = channel - 4;
+		channels[1] = channel;
+		channels[2] = channel + 4;
+		channels[3] = channel + 8;
+		break;
+	case PHY_QUADRUPLE_CHANNEL_20MHZ_LOW_40MHZ_HIGH:
+		numChannel = 4;
+		channels[0] = channel - 8;
+		channels[1] = channel - 4;
+		channels[2] = channel;
+		channels[3] = channel + 4;
+		break;
+	case PHY_QUADRUPLE_CHANNEL_20MHZ_HIGH_40MHZ_HIGH:
+		numChannel = 4;
+		channels[0] = channel - 12;
+		channels[1] = channel - 8;
+		channels[2] = channel - 4;
+		channels[3] = channel;
+		break;
+	default:
+		numChannel = 1;
+		channels[0] = channel;
+		break;
+	}
+
+	return numChannel;
+}
+
 /**
  * sap_dfs_check_if_channel_avaialable() - Check if a channel is out of NOL
  * @nol: Pointer to the Non-Occupancy List.
@@ -2097,8 +2182,14 @@ sap_dfs_is_channel_in_nol_list(ptSapContext sap_context,
 	}
 
 	/* get the bonded channels */
-	num_channels = sap_ch_params_to_bonding_channels(
+	if (channel_number == sap_context->channel && chan_bondState >=
+						PHY_CHANNEL_BONDING_STATE_MAX)
+		num_channels = sap_ch_params_to_bonding_channels(
 					&sap_context->ch_params, channels);
+	else
+		num_channels = sap_get_bonding_channels(sap_context,
+					channel_number, channels,
+					MAX_BONDED_CHANNELS, chan_bondState);
 
 	/* check for NOL, first on will break the loop */
 	for (j = 0; j < num_channels; j++) {
@@ -3375,7 +3466,7 @@ static QDF_STATUS sap_cac_start_notify(tHalHandle hHal)
 		    && pMac->sap.sapCtxList[intf].pSapContext != NULL &&
 		    (false == pSapContext->isCacStartNotified)) {
 			QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_MED,
-				  "sapdfs: Signaling eSAP_DFS_CAC_START to HDD for sapctx[%p]",
+				  "sapdfs: Signaling eSAP_DFS_CAC_START to HDD for sapctx[%pK]",
 				  pSapContext);
 
 			qdf_status = sap_signal_hdd_event(pSapContext, NULL,
@@ -3499,7 +3590,7 @@ static QDF_STATUS sap_cac_end_notify(tHalHandle hHal, tCsrRoamInfo *roamInfo)
 			pSapContext->isCacEndNotified = true;
 			pMac->sap.SapDfsInfo.sap_radar_found_status = false;
 			QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_MED,
-				  "sapdfs: Start beacon request on sapctx[%p]",
+				  "sapdfs: Start beacon request on sapctx[%pK]",
 				  pSapContext);
 
 			/* Start beaconing on the new channel */
@@ -3631,7 +3722,7 @@ static QDF_STATUS sap_fsm_state_disconnected(ptSapContext sap_ctx,
 			FL("from state eSAP_DISCONNECTED => SAP_DFS_CAC_WAIT"));
 		if (mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running != true) {
 			QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_MED,
-			    FL("sapdfs: starting dfs cac timer on sapctx[%p]"),
+			    FL("sapdfs: starting dfs cac timer on sapctx[%pK]"),
 			    sap_ctx);
 			sap_start_dfs_cac_timer(sap_ctx);
 		}
@@ -3673,7 +3764,6 @@ static QDF_STATUS sap_fsm_state_ch_select(ptSapContext sap_ctx,
 {
 	uint32_t msg = sap_event->event;
 	QDF_STATUS qdf_status = QDF_STATUS_E_FAILURE;
-	uint32_t cbmode;
 	bool b_leak_chan = false;
 #ifdef WLAN_ENABLE_CHNL_MATRIX_RESTRICTION
 	uint8_t temp_chan;
@@ -3681,20 +3771,12 @@ static QDF_STATUS sap_fsm_state_ch_select(ptSapContext sap_ctx,
 #endif
 
 	if (msg == eSAP_MAC_SCAN_COMPLETE) {
-		/* get the bonding mode */
-		if (sap_ctx->channel <= 14)
-			cbmode = sme_get_cb_phy_state_from_cb_ini_value(
-					sme_get_channel_bonding_mode24_g(hal));
-		else
-			cbmode = sme_get_cb_phy_state_from_cb_ini_value(
-					sme_get_channel_bonding_mode5_g(hal));
-
 #ifdef WLAN_ENABLE_CHNL_MATRIX_RESTRICTION
 		temp_chan = sap_ctx->channel;
 		p_nol = mac_ctx->sap.SapDfsInfo.sapDfsChannelNolList;
 
 		sap_mark_leaking_ch(sap_ctx,
-			cbmode, p_nol, 1, &temp_chan);
+			sap_ctx->ch_params.ch_width, p_nol, 1, &temp_chan);
 
 		/*
 		 * if selelcted channel has leakage to channels
@@ -3707,7 +3789,7 @@ static QDF_STATUS sap_fsm_state_ch_select(ptSapContext sap_ctx,
 		 * has leakage to the channels in NOL
 		 */
 		if (sap_dfs_is_channel_in_nol_list(sap_ctx, sap_ctx->channel,
-			cbmode) || b_leak_chan) {
+			PHY_CHANNEL_BONDING_STATE_MAX) || b_leak_chan) {
 			uint8_t ch;
 
 			/* find a new available channel */
@@ -3775,6 +3857,8 @@ static QDF_STATUS sap_fsm_state_ch_select(ptSapContext sap_ctx,
 				sap_ctx->ch_params.center_freq_seg1;
 		sap_ctx->csr_roamProfile.ch_params.sec_ch_offset =
 				sap_ctx->ch_params.sec_ch_offset;
+		sap_ctx->csr_roamProfile.beacon_tx_rate =
+				sap_ctx->beacon_tx_rate;
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_HIGH,
 		    FL("notify hostapd about channel selection: %d"),
 		    sap_ctx->channel);
@@ -4077,7 +4161,7 @@ static QDF_STATUS sap_fsm_state_started(ptSapContext sap_ctx,
 				    mac_ctx->sap.sapCtxList[intf].pSapContext;
 				QDF_TRACE(QDF_MODULE_ID_SAP,
 					  QDF_TRACE_LEVEL_INFO_MED,
-					  FL("sapdfs: Sending CSAIE for sapctx[%p]"),
+					  FL("sapdfs: Sending CSAIE for sapctx[%pK]"),
 					  temp_sap_ctx);
 
 				qdf_status = wlansap_dfs_send_csa_ie_request(
@@ -4152,7 +4236,7 @@ static QDF_STATUS sap_fsm_state_disconnecting(ptSapContext sap_ctx,
 		}
 	} else if (msg == eWNI_SME_CHANNEL_CHANGE_REQ) {
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_MED,
-			  FL("sapdfs: Send channel change request on sapctx[%p]"),
+			  FL("sapdfs: Send channel change request on sapctx[%pK]"),
 			  sap_ctx);
 		/*
 		 * Most likely, radar has been detected and SAP wants to
@@ -4214,7 +4298,7 @@ QDF_STATUS sap_fsm(ptSapContext sap_ctx, ptWLAN_SAPEvent sap_event)
 	}
 
 	QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_DEBUG,
-		  FL("sap_ctx=%p, state_var=%d, msg=0x%x"),
+		  FL("sap_ctx=%pK, state_var=%d, msg=0x%x"),
 		  sap_ctx, state_var, msg);
 
 	switch (state_var) {
@@ -4419,6 +4503,9 @@ sapconvert_to_csr_profile(tsap_Config_t *pconfig_params, eCsrRoamBssType bssType
 		profile->extended_rates.numRates =
 			pconfig_params->extended_rates.numRates;
 	}
+
+	profile->chan_switch_hostapd_rate_enabled =
+			pconfig_params->chan_switch_hostapd_rate_enabled;
 
 	return eSAP_STATUS_SUCCESS;     /* Success. */
 }
@@ -5005,7 +5092,7 @@ void sap_dfs_cac_timer_callback(void *data)
 	 * CAC Complete, post eSAP_DFS_CHANNEL_CAC_END to sap_fsm
 	 */
 	QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_MED,
-			"sapdfs: Sending eSAP_DFS_CHANNEL_CAC_END for target_channel = %d on sapctx[%p]",
+			"sapdfs: Sending eSAP_DFS_CHANNEL_CAC_END for target_channel = %d on sapctx[%pK]",
 			sapContext->channel, sapContext);
 
 	sapEvent.event = eSAP_DFS_CHANNEL_CAC_END;
@@ -5291,14 +5378,14 @@ bool is_concurrent_sap_ready_for_channel_change(tHalHandle hHal,
 			if (pSapContext == sapContext) {
 				QDF_TRACE(QDF_MODULE_ID_SAP,
 					  QDF_TRACE_LEVEL_ERROR,
-					  FL("sapCtx matched [%p]"),
+					  FL("sapCtx matched [%pK]"),
 					  sapContext);
 				continue;
 			} else {
 				QDF_TRACE(QDF_MODULE_ID_SAP,
 					  QDF_TRACE_LEVEL_ERROR,
 					  FL
-						  ("concurrent sapCtx[%p] didn't matche with [%p]"),
+						  ("concurrent sapCtx[%pK] didn't matche with [%pK]"),
 					  pSapContext, sapContext);
 				return pSapContext->is_sap_ready_for_chnl_chng;
 			}

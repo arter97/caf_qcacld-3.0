@@ -338,6 +338,11 @@ static int wlan_hdd_probe(struct device *dev, void *bdev, const struct hif_bus_i
 	int ret = 0;
 
 	mutex_lock(&hdd_init_deinit_lock);
+	if (!reinit)
+		hdd_start_driver_ops_timer(eHDD_DRV_OP_PROBE);
+	else
+		hdd_start_driver_ops_timer(eHDD_DRV_OP_REINIT);
+
 	pr_info("%s: %sprobing driver v%s\n", WLAN_MODULE_NAME,
 		reinit ? "re-" : "", QWLAN_VERSIONSTR);
 
@@ -387,6 +392,7 @@ static int wlan_hdd_probe(struct device *dev, void *bdev, const struct hif_bus_i
 	cds_set_driver_in_bad_state(false);
 	probe_fail_cnt = 0;
 	re_init_fail_cnt = 0;
+	hdd_stop_driver_ops_timer();
 	mutex_unlock(&hdd_init_deinit_lock);
 	return 0;
 
@@ -408,6 +414,7 @@ err_hdd_deinit:
 	hdd_remove_pm_qos(dev);
 
 	cds_clear_fw_state(CDS_FW_STATE_DOWN);
+	hdd_stop_driver_ops_timer();
 	mutex_unlock(&hdd_init_deinit_lock);
 	return ret;
 }
@@ -1083,7 +1090,11 @@ static void wlan_hdd_pld_remove(struct device *dev,
 {
 	ENTER();
 	mutex_lock(&hdd_init_deinit_lock);
+	hdd_start_driver_ops_timer(eHDD_DRV_OP_REMOVE);
+
 	wlan_hdd_remove(dev);
+
+	hdd_stop_driver_ops_timer();
 	mutex_unlock(&hdd_init_deinit_lock);
 	EXIT();
 }
@@ -1100,7 +1111,11 @@ static void wlan_hdd_pld_shutdown(struct device *dev,
 {
 	ENTER();
 	mutex_lock(&hdd_init_deinit_lock);
+	hdd_start_driver_ops_timer(eHDD_DRV_OP_SHUTDOWN);
+
 	wlan_hdd_shutdown();
+
+	hdd_stop_driver_ops_timer();
 	mutex_unlock(&hdd_init_deinit_lock);
 	EXIT();
 }
@@ -1239,6 +1254,30 @@ static void wlan_hdd_pld_notify_handler(struct device *dev,
 	wlan_hdd_notify_handler(state);
 }
 
+static void wlan_hdd_purge_notifier(void)
+{
+	hdd_context_t *hdd_ctx;
+
+	ENTER();
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx) {
+		hdd_err("hdd context is NULL return!!");
+		return;
+	}
+
+	mutex_lock(&hdd_ctx->iface_change_lock);
+	if (QDF_TIMER_STATE_RUNNING ==
+		qdf_mc_timer_get_current_state(&hdd_ctx->iface_change_timer)) {
+		qdf_mc_timer_stop(&hdd_ctx->iface_change_timer);
+	}
+	cds_shutdown_notifier_call();
+	cds_shutdown_notifier_purge();
+	mutex_unlock(&hdd_ctx->iface_change_lock);
+
+	EXIT();
+}
+
 /**
  * wlan_hdd_pld_uevent() - update driver status
  * @dev: device
@@ -1249,19 +1288,26 @@ static void wlan_hdd_pld_notify_handler(struct device *dev,
 static void wlan_hdd_pld_uevent(struct device *dev,
 				struct pld_uevent_data *uevent)
 {
+	ENTER();
+
 	switch (uevent->uevent) {
 	case PLD_RECOVERY:
 		cds_set_recovery_in_progress(true);
 		hdd_pld_ipa_uc_shutdown_pipes();
+		wlan_hdd_purge_notifier();
 		break;
 	case PLD_FW_DOWN:
 		cds_set_fw_state(CDS_FW_STATE_DOWN);
 		cds_set_target_ready(false);
+		wlan_hdd_purge_notifier();
 		break;
 	case PLD_FW_READY:
 		cds_set_target_ready(true);
 		break;
 	}
+
+	EXIT();
+	return;
 }
 
 #ifdef FEATURE_RUNTIME_PM

@@ -189,6 +189,21 @@
 #define WMA_IPV6_PROTO_GET_MIN_LEN        21
 #define WMA_IPV6_PKT_INFO_GET_MIN_LEN     62
 #define WMA_ICMPV6_SUBTYPE_GET_MIN_LEN    55
+
+/* beacon tx rate */
+#define WMA_BEACON_TX_RATE_1_M            10
+#define WMA_BEACON_TX_RATE_2_M            20
+#define WMA_BEACON_TX_RATE_5_5_M          55
+#define WMA_BEACON_TX_RATE_11_M           110
+#define WMA_BEACON_TX_RATE_6_M            60
+#define WMA_BEACON_TX_RATE_9_M            90
+#define WMA_BEACON_TX_RATE_12_M           120
+#define WMA_BEACON_TX_RATE_18_M           180
+#define WMA_BEACON_TX_RATE_24_M           240
+#define WMA_BEACON_TX_RATE_36_M           360
+#define WMA_BEACON_TX_RATE_48_M           480
+#define WMA_BEACON_TX_RATE_54_M           540
+
 /**
  * ds_mode: distribution system mode
  * @IEEE80211_NO_DS: NO DS at either side
@@ -275,6 +290,7 @@ enum ds_mode {
 #define WMA_VDEV_START_REQUEST_TIMEOUT (6000)   /* 6 seconds */
 #define WMA_VDEV_STOP_REQUEST_TIMEOUT  (6000)   /* 6 seconds */
 #define WMA_VDEV_HW_MODE_REQUEST_TIMEOUT (5000) /* 5 seconds */
+#define WMA_VDEV_PLCY_MGR_CMD_TIMEOUT (3000)    /* 3 seconds */
 
 #define WMA_TGT_INVALID_SNR (0)
 
@@ -1580,7 +1596,8 @@ typedef struct {
 	 * with ns info suppose if ns also enabled
 	 */
 	tSirHostOffloadReq mArpInfo;
-	struct wma_tx_ack_work_ctx *ack_work_ctx;
+	struct wma_tx_ack_work_ctx *data_ack_work_ctx;
+	struct wma_tx_ack_work_ctx *mgmt_ack_work_ctx;
 	uint8_t powersave_mode;
 	bool ptrn_match_enable_all_vdev;
 	uint8_t wma_ptrn_id_def;
@@ -1855,6 +1872,7 @@ struct wma_target_req {
  *			number of transmit streams
  * @preferred_rx_streams: policy manager indicates the preferred
  *			number of receive streams
+ * @beacon_tx_rate: beacon tx rate
  */
 struct wma_vdev_start_req {
 	uint32_t beacon_intval;
@@ -1878,7 +1896,7 @@ struct wma_vdev_start_req {
 	bool is_quarter_rate;
 	uint32_t preferred_tx_streams;
 	uint32_t preferred_rx_streams;
-	uint8_t beacon_tx_rate;
+	uint16_t beacon_tx_rate;
 	bool ldpc_rx_enabled;
 };
 
@@ -1905,6 +1923,7 @@ struct wma_set_key_params {
 	uint32_t key_idx;
 	bool unicast;
 	uint8_t key_data[SIR_MAC_MAX_KEY_LENGTH];
+	uint8_t key_rsc[SIR_MAC_MAX_KEY_RSC_LEN];
 };
 
 /**

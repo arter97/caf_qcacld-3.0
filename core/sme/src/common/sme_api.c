@@ -1977,7 +1977,7 @@ QDF_STATUS sme_set_plm_request(tHalHandle hHal, tpSirPlmReq pPlmReq)
 	QDF_STATUS status;
 	bool ret = false;
 	tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
-	uint8_t ch_list[WNI_CFG_VALID_CHANNEL_LIST] = { 0 };
+	uint8_t ch_list[WNI_CFG_VALID_CHANNEL_LIST_LEN] = { 0 };
 	uint8_t count, valid_count = 0;
 	cds_msg_t msg;
 	tCsrRoamSession *pSession = CSR_GET_SESSION(pMac, pPlmReq->sessionId);
@@ -3120,9 +3120,20 @@ static QDF_STATUS sme_process_nss_update_resp(tpAniSirGlobal mac, uint8_t *msg)
  */
 void sme_free_msg(tHalHandle hHal, cds_msg_t *pMsg)
 {
+	struct ani_scan_req *scan_msg;
+
 	if (pMsg) {
-		if (pMsg->bodyptr)
+		if (pMsg->bodyptr) {
+			if (pMsg->type == eWNI_SME_SCAN_CMD) {
+				scan_msg = (struct ani_scan_req *)pMsg->bodyptr;
+				if (scan_msg->scan_param) {
+					csr_scan_free_request(NULL,
+						scan_msg->scan_param);
+					qdf_mem_free(scan_msg->scan_param);
+				}
+			}
 			qdf_mem_free(pMsg->bodyptr);
+		}
 	}
 
 }
@@ -7795,7 +7806,7 @@ QDF_STATUS sme_8023_multicast_list(tHalHandle hHal, uint8_t sessionId,
 	tCsrRoamSession *pSession = NULL;
 
 	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
-		"%s: ulMulticastAddrCnt: %d, multicastAddr[0]: %p", __func__,
+		"%s: ulMulticastAddrCnt: %d, multicastAddr[0]: %pK", __func__,
 		  pMulticastAddrs->ulMulticastAddrCnt,
 		  pMulticastAddrs->multicastAddr[0].bytes);
 
@@ -12273,26 +12284,37 @@ QDF_STATUS sme_set_ht2040_mode(tHalHandle hHal, uint8_t sessionId,
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	tpAniSirGlobal pMac = PMAC_STRUCT(hHal);
 	ePhyChanBondState cbMode;
+	tCsrRoamSession *session = CSR_GET_SESSION(pMac, sessionId);
 
-	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
-		  "%s: Update HT operation beacon IE, channel_type=%d",
-		  __func__, channel_type);
+	if (!CSR_IS_SESSION_VALID(pMac, sessionId)) {
+		sme_err("Session not valid for session id %d", sessionId);
+		return QDF_STATUS_E_INVAL;
+	}
+	session = CSR_GET_SESSION(pMac, sessionId);
+	sme_debug("Update HT operation beacon IE, channel_type=%d cur cbmode %d",
+		channel_type, session->bssParams.cbMode);
 
 	switch (channel_type) {
 	case eHT_CHAN_HT20:
+		if (!session->bssParams.cbMode)
+			return QDF_STATUS_SUCCESS;
 		cbMode = PHY_SINGLE_CHANNEL_CENTERED;
 		break;
 	case eHT_CHAN_HT40MINUS:
+		if (session->bssParams.cbMode)
+			return QDF_STATUS_SUCCESS;
 		cbMode = PHY_DOUBLE_CHANNEL_HIGH_PRIMARY;
 		break;
 	case eHT_CHAN_HT40PLUS:
+		if (session->bssParams.cbMode)
+			return QDF_STATUS_SUCCESS;
 		cbMode = PHY_DOUBLE_CHANNEL_LOW_PRIMARY;
 		break;
 	default:
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
-			  "%s:Error!!! Invalid HT20/40 mode !", __func__);
+		sme_err("Error!!! Invalid HT20/40 mode !");
 		return QDF_STATUS_E_FAILURE;
 	}
+	session->bssParams.cbMode = cbMode;
 	status = sme_acquire_global_lock(&pMac->sme);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 		status = csr_set_ht2040_mode(pMac, sessionId,
