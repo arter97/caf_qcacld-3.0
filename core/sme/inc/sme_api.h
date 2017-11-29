@@ -2046,5 +2046,19 @@ bool sme_is_sta_key_exchange_in_progress(tHalHandle hal, uint8_t session_id);
 bool sme_validate_channel_list(tHalHandle hal,
 				      uint8_t *chan_list,
 				      uint8_t num_channels);
+/**
+ * sme_fast_reassoc() - invokes FAST REASSOC command
+ * @hal: handle returned by mac_open
+ * @profile: current connected profile
+ * @bssid: bssid to look for in scan cache
+ * @channel: channel on which reassoc should be send
+ * @vdev_id: vdev id
+ * @connected_bssid: bssid of currently connected profile
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_fast_reassoc(tHalHandle hal, tCsrRoamProfile *profile,
+			    const tSirMacAddr bssid, int channel,
+			    uint8_t vdev_id, const tSirMacAddr connected_bssid);
 
 #endif /* #if !defined( __SME_API_H ) */
