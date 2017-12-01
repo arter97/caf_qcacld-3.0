@@ -2034,6 +2034,7 @@ free_mem:
 	EXIT();
 	return status;
 }
+
 #undef SCAN_FAILURE
 
 /**
@@ -2294,7 +2295,7 @@ static int __wlan_hdd_cfg80211_vendor_scan(struct wiphy *wiphy,
 			tb[QCA_WLAN_VENDOR_ATTR_SCAN_FREQUENCIES], tmp)
 			n_channels++;
 	} else {
-		for (band = 0; band < NUM_NL80211_BANDS; band++)
+		for (band = 0; band < HDD_NUM_NL80211_BANDS; band++)
 			if (wiphy->bands[band])
 				n_channels += wiphy->bands[band]->n_channels;
 	}
@@ -2354,7 +2355,7 @@ static int __wlan_hdd_cfg80211_vendor_scan(struct wiphy *wiphy,
 			count++;
 		}
 	} else {
-		for (band = 0; band < NUM_NL80211_BANDS; band++) {
+		for (band = 0; band < HDD_NUM_NL80211_BANDS; band++) {
 			if (!wiphy->bands[band])
 				continue;
 			for (j = 0; j < wiphy->bands[band]->n_channels;
@@ -2396,7 +2397,7 @@ static int __wlan_hdd_cfg80211_vendor_scan(struct wiphy *wiphy,
 				request->ie_len);
 	}
 
-	for (count = 0; count < NUM_NL80211_BANDS; count++)
+	for (count = 0; count < HDD_NUM_NL80211_BANDS; count++)
 		if (wiphy->bands[count])
 			request->rates[count] =
 				(1 << wiphy->bands[count]->n_bitrates) - 1;
@@ -2406,7 +2407,7 @@ static int __wlan_hdd_cfg80211_vendor_scan(struct wiphy *wiphy,
 				    tb[QCA_WLAN_VENDOR_ATTR_SCAN_SUPP_RATES],
 				    tmp) {
 			band = nla_type(attr);
-			if (band >= NUM_NL80211_BANDS)
+			if (band >= HDD_NUM_NL80211_BANDS)
 				continue;
 			if (!wiphy->bands[band])
 				continue;

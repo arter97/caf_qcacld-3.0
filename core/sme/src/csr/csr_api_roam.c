@@ -3515,6 +3515,12 @@ QDF_STATUS csr_roam_call_callback(tpAniSirGlobal pMac, uint32_t sessionId,
 		pSession->connectedProfile.operationChannel =
 			pRoamInfo->channelChangeRespEvent->newChannelNumber;
 
+	if (eCSR_ROAM_RESULT_LOSTLINK == u2 ||
+	    eCSR_ROAM_LOSTLINK_DETECTED == u1) {
+		sms_log(pMac, LOGE,
+				FL("eCSR_ROAM_RESULT_LOSTLINK"));
+	}
+
 	if (NULL != pSession->callback) {
 		if (pRoamInfo) {
 			pRoamInfo->sessionId = (uint8_t) sessionId;
@@ -9746,6 +9752,12 @@ void csr_roam_joined_state_msg_processor(tpAniSirGlobal pMac, void *pMsgBuf)
 		qdf_mem_copy(&pRoamInfo->chan_info,
 			     &pUpperLayerAssocCnf->chan_info,
 			     sizeof(tSirSmeChanInfo));
+		pRoamInfo->ch_width = pUpperLayerAssocCnf->ch_width;
+		pRoamInfo->mode = pUpperLayerAssocCnf->mode;
+		if (pUpperLayerAssocCnf->HTCaps.present)
+			pRoamInfo->ht_caps = pUpperLayerAssocCnf->HTCaps;
+		if (pUpperLayerAssocCnf->VHTCaps.present)
+			pRoamInfo->vht_caps = pUpperLayerAssocCnf->VHTCaps;
 		if (CSR_IS_INFRA_AP(pRoamInfo->u.pConnectedProfile)) {
 			pMac->roam.roamSession[sessionId].connectState =
 				eCSR_ASSOC_STATE_TYPE_INFRA_CONNECTED;
@@ -10527,8 +10539,7 @@ csr_roam_chk_lnk_assoc_ind(tpAniSirGlobal mac_ctx, tSirSmeRsp *msg_ptr)
 	roam_info_ptr->addIELen = (uint8_t) pAssocInd->addIE.length;
 	roam_info_ptr->paddIE = pAssocInd->addIE.addIEdata;
 	qdf_mem_copy(roam_info_ptr->peerMac.bytes,
-		     pAssocInd->peerMacAddr,
-		     sizeof(tSirMacAddr));
+		     pAssocInd->peerMacAddr, sizeof(tSirMacAddr));
 	qdf_mem_copy(roam_info_ptr->bssid.bytes,
 		     pAssocInd->bssId,
 		     sizeof(struct qdf_mac_addr));
@@ -10537,6 +10548,16 @@ csr_roam_chk_lnk_assoc_ind(tpAniSirGlobal mac_ctx, tSirSmeRsp *msg_ptr)
 	qdf_mem_copy(&roam_info_ptr->chan_info,
 		     &pAssocInd->chan_info,
 		     sizeof(tSirSmeChanInfo));
+
+	if (pAssocInd->HTCaps.present)
+		qdf_mem_copy(&roam_info_ptr->ht_caps,
+			     &pAssocInd->HTCaps,
+			     sizeof(tDot11fIEHTCaps));
+	if (pAssocInd->VHTCaps.present)
+		qdf_mem_copy(&roam_info_ptr->vht_caps,
+			     &pAssocInd->VHTCaps,
+			     sizeof(tDot11fIEVHTCaps));
+
 	if (CSR_IS_INFRA_AP(roam_info_ptr->u.pConnectedProfile)) {
 		if (session->pCurRoamProfile &&
 		    CSR_IS_ENC_TYPE_STATIC(
@@ -11959,29 +11980,45 @@ QDF_STATUS csr_roam_lost_link(tpAniSirGlobal pMac, uint32_t sessionId,
 		return QDF_STATUS_E_FAILURE;
 	}
 	pSession->fCancelRoaming = false;
+
+	qdf_mem_set(&roamInfo, sizeof(tCsrRoamInfo), 0);
+
 	if (eWNI_SME_DISASSOC_IND == type) {
 		result = eCSR_ROAM_RESULT_DISASSOC_IND;
 		pDisassocIndMsg = (tSirSmeDisassocInd *) pSirMsg;
 		pSession->roamingStatusCode = pDisassocIndMsg->statusCode;
 		pSession->joinFailStatusCode.reasonCode =
 			pDisassocIndMsg->reasonCode;
+
+		qdf_copy_macaddr(&roamInfo.peerMac,
+				 &pDisassocIndMsg->peer_macaddr);
+		roamInfo.staId = (uint8_t)pDisassocIndMsg->staId;
 	} else if (eWNI_SME_DEAUTH_IND == type) {
 		result = eCSR_ROAM_RESULT_DEAUTH_IND;
 		pDeauthIndMsg = (tSirSmeDeauthInd *) pSirMsg;
 		pSession->roamingStatusCode = pDeauthIndMsg->statusCode;
 		pSession->joinFailStatusCode.reasonCode =
 			pDeauthIndMsg->reasonCode;
+		qdf_copy_macaddr(&roamInfo.peerMac,
+				 &pDeauthIndMsg->peer_macaddr);
+		roamInfo.staId = (uint8_t)pDeauthIndMsg->staId;
+		roamInfo.rxRssi = pDeauthIndMsg->rssi;
 	} else {
 		sms_log(pMac, LOGW, FL("gets an unknown type (%d)"), type);
 		result = eCSR_ROAM_RESULT_NONE;
 		pSession->joinFailStatusCode.reasonCode = 1;
 	}
+	roamInfo.statusCode = (tSirResultCodes) pSession->roamingStatusCode;
+	roamInfo.reasonCode = pSession->joinFailStatusCode.reasonCode;
 
-	/* call profile lost link routine here */
-	if (!CSR_IS_INFRA_AP(&pSession->connectedProfile)) {
+	sms_log(pMac, LOGE, FL("RC: %d"), roamInfo.reasonCode);
+
+	if (type == eWNI_SME_DISASSOC_IND || type == eWNI_SME_DEAUTH_IND)
+		csr_roam_call_callback(pMac, sessionId, &roamInfo, 0,
+				       eCSR_ROAM_LOSTLINK_DETECTED, result);
+	else
 		csr_roam_call_callback(pMac, sessionId, NULL, 0,
 				       eCSR_ROAM_LOSTLINK_DETECTED, result);
-	}
 
 	if (eWNI_SME_DISASSOC_IND == type) {
 		status = csr_send_mb_disassoc_cnf_msg(pMac, pDisassocIndMsg);
@@ -11989,24 +12026,6 @@ QDF_STATUS csr_roam_lost_link(tpAniSirGlobal pMac, uint32_t sessionId,
 		status = csr_send_mb_deauth_cnf_msg(pMac, pDeauthIndMsg);
 	}
 
-	/* prepare to tell HDD to disconnect */
-	qdf_mem_set(&roamInfo, sizeof(tCsrRoamInfo), 0);
-	roamInfo.statusCode = (tSirResultCodes) pSession->roamingStatusCode;
-	roamInfo.reasonCode = pSession->joinFailStatusCode.reasonCode;
-	if (eWNI_SME_DISASSOC_IND == type) {
-		/* staMacAddr */
-		qdf_copy_macaddr(&roamInfo.peerMac,
-				 &pDisassocIndMsg->peer_macaddr);
-		roamInfo.staId = (uint8_t) pDisassocIndMsg->staId;
-		roamInfo.reasonCode = pDisassocIndMsg->reasonCode;
-	} else if (eWNI_SME_DEAUTH_IND == type) {
-		/* staMacAddr */
-		qdf_copy_macaddr(&roamInfo.peerMac,
-				 &pDeauthIndMsg->peer_macaddr);
-		roamInfo.staId = (uint8_t) pDeauthIndMsg->staId;
-		roamInfo.reasonCode = pDeauthIndMsg->reasonCode;
-		roamInfo.rxRssi = pDeauthIndMsg->rssi;
-	}
 	sms_log(pMac, LOGW, FL("roamInfo.staId: %d"), roamInfo.staId);
 
 	return status;
@@ -15150,6 +15169,17 @@ QDF_STATUS csr_send_assoc_ind_to_upper_layer_cnf_msg(tpAniSirGlobal pMac,
 		pBuf += sizeof(uint8_t);
 		qdf_mem_copy((void *)pBuf, &pAssocInd->chan_info,
 			     sizeof(tSirSmeChanInfo));
+
+		/* ch_width */
+		pBuf = (uint8_t *)&pMsg->ch_width;
+		*((tSirMacHTChannelWidth *)pBuf) = pAssocInd->ch_width;
+		/* mode */
+		pBuf = (uint8_t *)&pMsg->mode;
+		if (pAssocInd->HTCaps.present)
+			pMsg->HTCaps = pAssocInd->HTCaps;
+		if (pAssocInd->VHTCaps.present)
+			pMsg->VHTCaps = pAssocInd->VHTCaps;
+
 		msgQ.type = eWNI_SME_UPPER_LAYER_ASSOC_CNF;
 		msgQ.bodyptr = pMsg;
 		msgQ.bodyval = 0;
@@ -17389,7 +17419,8 @@ csr_fetch_ch_lst_from_occupied_lst(tpAniSirGlobal mac_ctx,
  */
 static QDF_STATUS
 csr_fetch_valid_ch_lst(tpAniSirGlobal mac_ctx,
-		       tSirRoamOffloadScanReq *req_buf)
+		       tSirRoamOffloadScanReq *req_buf,
+		       uint8_t session_id)
 {
 	QDF_STATUS status;
 	uint32_t host_channels = 0;
@@ -17400,6 +17431,7 @@ csr_fetch_valid_ch_lst(tpAniSirGlobal mac_ctx,
 	uint16_t  cnt = 0;
 	bool      is_unsafe_chan;
 	qdf_device_t qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
+	eCsrBand band = eCSR_BAND_ALL;
 
 	if (!qdf_ctx) {
 		cds_err("qdf_ctx is NULL");
@@ -17419,10 +17451,25 @@ csr_fetch_valid_ch_lst(tpAniSirGlobal mac_ctx,
 			  FL("Failed to get the valid channel list"));
 		return status;
 	}
+
+	if (CSR_IS_ROAM_INTRA_BAND_ENABLED(mac_ctx)) {
+		band = get_rf_band(mac_ctx->roam.roamSession[session_id].
+				connectedProfile.operationChannel);
+		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
+				("updated band %d operational ch %d"), band,
+				mac_ctx->roam.roamSession[session_id].
+				connectedProfile.operationChannel);
+	}
 	ch_lst = mac_ctx->roam.validChannelList;
 	mac_ctx->roam.numValidChannels = host_channels;
 	for (i = 0; i < mac_ctx->roam.numValidChannels; i++) {
-		ch_lst++;
+		if (!csr_check_band_channel_match(band, *ch_lst)) {
+			QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
+					("ignoring non-intra band channel %d"),
+					*ch_lst);
+			ch_lst++;
+			continue;
+		}
 		if ((!mac_ctx->roam.configParam.allowDFSChannelRoam ||
 		    (mac_ctx->roam.configParam.sta_roam_policy.dfs_mode ==
 			 CSR_STA_ROAM_POLICY_DFS_DISABLED)) &&
@@ -17457,6 +17504,12 @@ csr_fetch_valid_ch_lst(tpAniSirGlobal mac_ctx,
 		ch_lst++;
 	}
 	req_buf->ValidChannelCount = num_channels;
+
+	if (CSR_IS_ROAM_INTRA_BAND_ENABLED(mac_ctx)) {
+		req_buf->ChannelCacheType = CHANNEL_LIST_STATIC;
+		req_buf->ConnectedNetwork.ChannelCount = num_channels;
+	}
+
 	return status;
 }
 
@@ -17587,41 +17640,50 @@ csr_create_roam_scan_offload_request(tpAniSirGlobal mac_ctx,
 			ese_neighbor_list_recvd,
 			curr_ch_lst_info->numOfChannels);
 #endif
-	if (ese_neighbor_list_recvd || curr_ch_lst_info->numOfChannels == 0) {
-		/*
-		 * Retrieve the Channel Cache either from ini or from the
-		 * occupied channels list. Give Preference to INI Channels
-		 */
-		if (roam_info->cfgParams.channelInfo.numOfChannels) {
-			status = csr_fetch_ch_lst_from_ini(mac_ctx, roam_info,
-							   req_buf);
-			if (!QDF_IS_STATUS_SUCCESS(status)) {
-				QDF_TRACE(QDF_MODULE_ID_SME,
-						QDF_TRACE_LEVEL_DEBUG,
-						FL("Fetch channel list from ini failed"));
-				qdf_mem_free(req_buf);
-				return NULL;
+	if (!CSR_IS_ROAM_INTRA_BAND_ENABLED(mac_ctx)) {
+		if (ese_neighbor_list_recvd ||
+		    curr_ch_lst_info->numOfChannels == 0) {
+			/*
+			 * Retrieve the Channel Cache either from ini or from
+			 * the occupied channels list.
+			 * Give Preference to INI Channels
+			 */
+			if (roam_info->cfgParams.channelInfo.numOfChannels) {
+				status = csr_fetch_ch_lst_from_ini(mac_ctx,
+								   roam_info,
+								   req_buf);
+				if (!QDF_IS_STATUS_SUCCESS(status)) {
+					QDF_TRACE(QDF_MODULE_ID_SME,
+						  QDF_TRACE_LEVEL_DEBUG,
+						  FL("Fetch channel list from ini failed"));
+					qdf_mem_free(req_buf);
+					return NULL;
+				}
+			} else {
+				csr_fetch_ch_lst_from_occupied_lst(mac_ctx,
+								   session_id,
+								   reason,
+								   req_buf,
+								   roam_info);
 			}
-		} else {
-			csr_fetch_ch_lst_from_occupied_lst(mac_ctx, session_id,
-						reason, req_buf, roam_info);
 		}
-	}
 #ifdef FEATURE_WLAN_ESE
-	else {
-		/*
-		 * If ESE is enabled, and a neighbor Report is received,then
-		 * Ignore the INI Channels or the Occupied Channel List.
-		 * Consider the channels in the neighbor list sent by the ESE AP
-		 */
-		 csr_fetch_ch_lst_from_received_list(mac_ctx, roam_info,
-						curr_ch_lst_info, req_buf);
-	}
+		else {
+			/*
+			 * If ESE is enabled, and a neighbor Report is received,
+			 * then ignore the INI Channels or the Occupied Channel
+			 * List. Consider the channels in the neighbor list
+			 * sent by the ESE AP
+			 */
+			csr_fetch_ch_lst_from_received_list(mac_ctx, roam_info,
+					curr_ch_lst_info, req_buf);
+		}
 #endif
+	}
 
 	if (req_buf->ConnectedNetwork.ChannelCount == 0) {
 		/* Maintain the Valid Channels List */
-		status = csr_fetch_valid_ch_lst(mac_ctx, req_buf);
+		status = csr_fetch_valid_ch_lst(mac_ctx, req_buf, session_id);
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
 					"Fetch channel list fail");

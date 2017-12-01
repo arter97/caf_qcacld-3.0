@@ -717,7 +717,7 @@ static QDF_STATUS wma_lphb_conf_tcp_pkt_filter(tp_wma_handle wma_handle,
 	hb_tcp_filter_fp.length = ts_lphb_tcp_filter->length;
 	hb_tcp_filter_fp.offset = ts_lphb_tcp_filter->offset;
 	hb_tcp_filter_fp.session = ts_lphb_tcp_filter->session;
-	memcpy((void *)&hb_tcp_filter_fp.filter,
+	qdf_mem_copy((void *)&hb_tcp_filter_fp.filter,
 	       (void *)&ts_lphb_tcp_filter->filter,
 	       WMI_WLAN_HB_MAX_FILTER_SIZE);
 
@@ -824,7 +824,7 @@ static QDF_STATUS wma_lphb_conf_udp_pkt_filter(tp_wma_handle wma_handle,
 	hb_udp_filter_fp.length = ts_lphb_udp_filter->length;
 	hb_udp_filter_fp.offset = ts_lphb_udp_filter->offset;
 	hb_udp_filter_fp.session = ts_lphb_udp_filter->session;
-	memcpy((void *)&hb_udp_filter_fp.filter,
+	qdf_mem_copy((void *)&hb_udp_filter_fp.filter,
 	       (void *)&ts_lphb_udp_filter->filter,
 	       WMI_WLAN_HB_MAX_FILTER_SIZE);
 
@@ -1100,6 +1100,53 @@ QDF_STATUS wma_get_link_speed(WMA_HANDLE handle, tSirLinkSpeedInfo *pLinkSpeed)
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wma_get_peer_info(WMA_HANDLE handle,
+				struct sir_peer_info_req *peer_info_req)
+{
+	tp_wma_handle wma_handle = (tp_wma_handle)handle;
+	wmi_request_stats_cmd_fixed_param *cmd;
+	wmi_buf_t  wmi_buf;
+	uint32_t  len;
+	uint8_t *buf_ptr;
+
+	if (!wma_handle || !wma_handle->wmi_handle) {
+		WMA_LOGE("%s: WMA is closed, can not issue get rssi",
+			__func__);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	len  = sizeof(wmi_request_stats_cmd_fixed_param);
+	wmi_buf = wmi_buf_alloc(wma_handle->wmi_handle, len);
+	if (!wmi_buf) {
+		WMA_LOGE("%s: wmi_buf_alloc failed", __func__);
+		return QDF_STATUS_E_NOMEM;
+	}
+	buf_ptr = (uint8_t *)wmi_buf_data(wmi_buf);
+
+	cmd = (wmi_request_stats_cmd_fixed_param *)buf_ptr;
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		WMITLV_TAG_STRUC_wmi_request_stats_cmd_fixed_param,
+		WMITLV_GET_STRUCT_TLVLEN(wmi_request_stats_cmd_fixed_param));
+
+	cmd->stats_id = WMI_REQUEST_PEER_STAT;
+	cmd->vdev_id = peer_info_req->sessionid;
+	WMI_CHAR_ARRAY_TO_MAC_ADDR(peer_info_req->peer_macaddr.bytes,
+				&cmd->peer_macaddr);
+	wma_handle->get_sta_peer_info = true;
+
+	if (wmi_unified_cmd_send(wma_handle->wmi_handle, wmi_buf, len,
+				WMI_REQUEST_STATS_CMDID)) {
+		WMA_LOGE("Failed to send host stats request to fw");
+		wmi_buf_free(wmi_buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	qdf_mem_copy(&(wma_handle->peer_macaddr),
+					&(peer_info_req->peer_macaddr),
+					QDF_MAC_ADDR_SIZE);
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -2099,6 +2146,11 @@ static int wma_unified_phyerr_rx_event_handler(void *handle,
 	 */
 	n = 0;                  /* Start just after the header */
 	bufp = param_tlvs->bufp;
+	if (pe_hdr->buf_len > param_tlvs->num_bufp) {
+		WMA_LOGE("%s: Invalid Buff size %d Max allowed buf size %d",
+			   __func__, pe_hdr->buf_len, param_tlvs->num_bufp);
+		return 0;
+	}
 	while (n < pe_hdr->buf_len) {
 		/* ensure there's at least space for the header */
 		if ((pe_hdr->buf_len - n) < sizeof(ev->hdr)) {
@@ -3293,6 +3345,12 @@ int wma_wow_wakeup_host_event(void *handle, uint8_t *event,
 	}
 
 	wake_info = param_buf->fixed_param;
+
+	if (wake_info->vdev_id >= wma->max_bssid) {
+		WMA_LOGE("%s: received invalid vdev_id %d",
+			 __func__, wake_info->vdev_id);
+		return -EINVAL;
+	}
 	wma_vdev = &wma->interfaces[wake_info->vdev_id];
 
 	if ((wake_info->wake_reason != WOW_REASON_UNSPECIFIED) ||
@@ -8725,6 +8783,14 @@ int wma_encrypt_decrypt_msg_handler(void *handle, uint8_t *data,
 
 	encrypt_decrypt_rsp_params.vdev_id = data_event->vdev_id;
 	encrypt_decrypt_rsp_params.status = data_event->status;
+
+	if (data_event->data_length > param_buf->num_enc80211_frame) {
+		WMA_LOGE("FW msg data_len %d more than TLV hdr %d",
+			 data_event->data_length,
+			 param_buf->num_enc80211_frame);
+		return -EINVAL;
+	}
+
 	encrypt_decrypt_rsp_params.data_length = data_event->data_length;
 
 	if (encrypt_decrypt_rsp_params.data_length) {

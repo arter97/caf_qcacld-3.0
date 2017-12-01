@@ -193,6 +193,7 @@ enum eWniMsgTypes {
 	eWNI_SME_DFS_CSAIE_TX_COMPLETE_IND,     /* To indicate completion of CSA IE */
 	/* update in beacons/probe rsp */
 	eWNI_SME_STATS_EXT_EVENT,
+	eWNI_SME_GET_PEER_INFO_IND,
 	eWNI_SME_CSA_OFFLOAD_EVENT,
 	eWNI_SME_UPDATE_ADDITIONAL_IES, /* indicates Additional IE from hdd to PE */
 	eWNI_SME_MODIFY_ADDITIONAL_IES, /* To indicate IE modify from hdd to PE */
@@ -415,8 +416,6 @@ enum ewni_tdls_connection_tracker_notification {
 /*---------------------------------------------------------------------*/
 #define WNI_CFG_DNLD_RSP               (WNI_CFG_MSG_TYPES_BEGIN | 0x80)
 #define WNI_CFG_GET_REQ                (WNI_CFG_MSG_TYPES_BEGIN | 0x81)
-#define WNI_CFG_SET_REQ                (WNI_CFG_MSG_TYPES_BEGIN | 0x82)
-#define WNI_CFG_SET_REQ_NO_RSP         (WNI_CFG_MSG_TYPES_BEGIN | 0x83) /* No RSP for this set */
 
 /* Shall be removed after stats integration */
 

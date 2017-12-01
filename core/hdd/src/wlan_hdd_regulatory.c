@@ -380,9 +380,9 @@ static void hdd_process_regulatory_data(hdd_context_t *hdd_ctx,
 	struct regulatory_channel *cds_chan;
 	uint8_t band_capability;
 
-	band_capability = hdd_ctx->config->nBandCapability;
+	band_capability = hdd_ctx->curr_band;
 
-	for (band_num = 0; band_num < NUM_NL80211_BANDS; band_num++) {
+	for (band_num = 0; band_num < HDD_NUM_NL80211_BANDS; band_num++) {
 
 		if (wiphy->bands[band_num] == NULL)
 			continue;
@@ -563,7 +563,7 @@ static void hdd_restore_custom_reg_settings(struct wiphy *wiphy,
 	    (country_alpha2[1] == '0') &&
 	    (wiphy->flags & WIPHY_FLAG_CUSTOM_REGULATORY)) {
 
-		for (band = 0; band < NUM_NL80211_BANDS; band++) {
+		for (band = 0; band < HDD_NUM_NL80211_BANDS; band++) {
 			sband = wiphy->bands[band];
 			if (!sband)
 				continue;
@@ -683,6 +683,8 @@ void hdd_reg_notifier(struct wiphy *wiphy,
 		}
 
 		if (NL80211_REGDOM_SET_BY_CORE == request->initiator) {
+			pld_set_cc_source(hdd_ctx->parent_dev,
+						PLD_SOURCE_CORE);
 			hdd_ctx->reg.cc_src = SOURCE_CORE;
 			if (is_wiphy_custom_regulatory(wiphy))
 				reset = true;
@@ -690,7 +692,11 @@ void hdd_reg_notifier(struct wiphy *wiphy,
 			hdd_ctx->reg.cc_src = SOURCE_DRIVER;
 			sme_set_cc_src(hdd_ctx->hHal, SOURCE_DRIVER);
 		} else {
-			hdd_ctx->reg.cc_src = SOURCE_USERSPACE;
+			if (pld_get_cc_source(hdd_ctx->parent_dev)
+						== PLD_SOURCE_11D)
+				hdd_ctx->reg.cc_src = SOURCE_11D;
+			else
+				hdd_ctx->reg.cc_src = SOURCE_USERSPACE;
 			hdd_restore_custom_reg_settings(wiphy,
 							request->alpha2,
 							&reset);

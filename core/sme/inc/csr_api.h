@@ -1453,6 +1453,8 @@ typedef struct tagCsrRoamInfo {
 	tDot11fIEVHTOperation vht_operation;
 	tDot11fIEHTInfo ht_operation;
 	bool reassoc;
+	tSirMacHTChannelWidth ch_width;
+	enum sir_sme_phy_mode mode;
 } tCsrRoamInfo;
 
 typedef struct tagCsrFreqScanInfo {
@@ -1480,6 +1482,10 @@ typedef struct sSirSmeAssocIndToUpperLayerCnf {
 	uint8_t timingMeasCap;
 	tSirSmeChanInfo chan_info;
 	uint8_t target_channel;
+	tSirMacHTChannelWidth ch_width;
+	enum sir_sme_phy_mode mode;
+	tDot11fIEHTCaps HTCaps;
+	tDot11fIEVHTCaps VHTCaps;
 } tSirSmeAssocIndToUpperLayerCnf, *tpSirSmeAssocIndToUpperLayerCnf;
 
 typedef struct tagCsrSummaryStatsInfo {

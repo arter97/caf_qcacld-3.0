@@ -42,6 +42,7 @@
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>
 #include <net/cfg80211.h>
+#include <linux/ieee80211.h>
 #include <qdf_list.h>
 #include <qdf_types.h>
 #include "sir_mac_prot_def.h"
@@ -75,6 +76,17 @@
 #define NUM_TX_QUEUES 5
 #else
 #define NUM_TX_QUEUES 4
+#endif
+
+#if (KERNEL_VERSION(4, 7, 0) <= LINUX_VERSION_CODE) || \
+	defined(CFG80211_REMOVE_IEEE80211_BACKPORT)
+#define HDD_NL80211_BAND_2GHZ   NL80211_BAND_2GHZ
+#define HDD_NL80211_BAND_5GHZ   NL80211_BAND_5GHZ
+#define HDD_NUM_NL80211_BANDS   NUM_NL80211_BANDS
+#else
+#define HDD_NL80211_BAND_2GHZ   IEEE80211_BAND_2GHZ
+#define HDD_NL80211_BAND_5GHZ   IEEE80211_BAND_5GHZ
+#define HDD_NUM_NL80211_BANDS   ((enum nl80211_band)IEEE80211_NUM_BANDS)
 #endif
 
 /** Length of the TX queue for the netdev */
@@ -349,6 +361,7 @@ extern spinlock_t hdd_context_lock;
 extern struct mutex hdd_init_deinit_lock;
 
 #define STATS_CONTEXT_MAGIC 0x53544154  /* STAT */
+#define PEER_INFO_CONTEXT_MAGIC 0x50494E46  /* PEER_INFO(PINF) */
 #define RSSI_CONTEXT_MAGIC  0x52535349  /* RSSI */
 #define POWER_CONTEXT_MAGIC 0x504F5752  /* POWR */
 #define SNR_CONTEXT_MAGIC   0x534E5200  /* SNR */
@@ -800,6 +813,39 @@ typedef struct {
 
 	/** Rate Flags for this connection */
 	uint32_t  rate_flags;
+
+	/** Tx rate with current station reported from F/W */
+	uint32_t tx_rate;
+
+	/** Rx rate with current station reported from F/W */
+	uint32_t rx_rate;
+
+	/** Channel Width of the connection */
+	uint8_t ch_width;
+
+	/** 802.11 Mode of the connection */
+	uint8_t dot11_mode;
+
+	/** Frequency of the current station reported from F/W */
+	uint32_t freq;
+
+	/** HT caps present or not in the current station */
+	bool ht_present;
+
+	/** VHT caps present or not in the current station */
+	bool vht_present;
+
+	/** HT capabilities of current station */
+	struct ieee80211_ht_cap ht_caps;
+
+	/** VHT capabilities of current station */
+	struct ieee80211_vht_cap vht_caps;
+
+	/** Disconnection reason code for current station*/
+	uint32_t reason_code;
+
+	/** RSSI of the current station reported from F/W */
+	int8_t rssi;
 } hdd_station_info_t;
 
 struct hdd_ap_ctx_s {
@@ -1023,6 +1069,8 @@ struct hdd_adapter_s {
 	hdd_stats_t hdd_stats;
 	/** linkspeed statistics */
 	tSirLinkSpeedInfo ls_stats;
+	/* SAP peer station info */
+	struct sir_peer_sta_info peer_sta_info;
 
 	uint8_t sessionId;
 
@@ -1082,6 +1130,8 @@ struct hdd_adapter_s {
 	/** Per-station structure */
 	spinlock_t staInfo_lock;        /* To protect access to station Info */
 	hdd_station_info_t aStaInfo[WLAN_MAX_STA_COUNT];
+	hdd_station_info_t cache_sta_info[WLAN_MAX_STA_COUNT];
+
 	/* uint8_t uNumActiveStation; */
 
 /*************************************************************
@@ -1721,9 +1771,11 @@ struct hdd_context_s {
 	bool rcpi_enabled;
 	bool imps_enabled;
 	int user_configured_pkt_filter_rules;
+	uint8_t curr_band;
 	struct hdd_nud_stats_context nud_stats_context;
 	uint32_t track_arp_ip;
 	struct sta_ap_intf_check_work_ctx *sta_ap_intf_check_work_info;
+	qdf_wake_lock_t monitor_mode_wakelock;
 };
 
 /*---------------------------------------------------------------------------
@@ -2306,5 +2358,17 @@ void hdd_chip_pwr_save_fail_detected_cb(void *hdd_ctx,
  */
 int hdd_get_rssi_snr_by_bssid(hdd_adapter_t *adapter, const uint8_t *bssid,
 			      int8_t *rssi, int8_t *snr);
+
+/**
+ * hdd_get_stainfo() - get stainfo for the specified peer
+ * @adapter: hostapd interface
+ * @mac_addr: mac address of requested peer
+ *
+ * This function find the stainfo for the peer with mac_addr
+ *
+ * Return: stainfo if found, NULL if not found
+ */
+hdd_station_info_t *hdd_get_stainfo(hdd_station_info_t *aStaInfo,
+				    struct qdf_mac_addr mac_addr);
 
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

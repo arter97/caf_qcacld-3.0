@@ -1557,6 +1557,8 @@ typedef struct {
 	uint8_t powersave_mode;
 	bool ptrn_match_enable_all_vdev;
 	void *pGetRssiReq;
+	bool get_sta_peer_info;
+	struct qdf_mac_addr peer_macaddr;
 	t_thermal_mgmt thermal_mgmt_info;
 	bool roam_offload_enabled;
 	/* Here ol_ini_info is used to store ini
@@ -1857,6 +1859,7 @@ struct wma_set_key_params {
 	uint32_t key_idx;
 	bool unicast;
 	uint8_t key_data[SIR_MAC_MAX_KEY_LENGTH];
+	uint8_t key_rsc[SIR_MAC_MAX_KEY_RSC_LEN];
 };
 
 /**
@@ -2505,5 +2508,15 @@ void wma_ipa_uc_stat_request(wma_cli_set_cmd_t *privcmd);
  */
 QDF_STATUS wma_configure_smps_params(uint32_t vdev_id, uint32_t param_id,
 							uint32_t param_val);
+
+/**
+ * wma_send_action_oui() - send of action oui extensions to firmware
+ * @handle: wma handle
+ * @action_oui: action oui buffer containg extensions to be send
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wma_send_action_oui(WMA_HANDLE handle,
+			       struct wmi_action_oui *action_oui);
 
 #endif

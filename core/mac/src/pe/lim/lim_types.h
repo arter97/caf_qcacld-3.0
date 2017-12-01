@@ -265,6 +265,10 @@ typedef struct sLimMlmAssocInd {
 	uint32_t assocReqLength;
 	uint8_t *assocReqPtr;
 	tSirSmeChanInfo chan_info;
+	tSirMacHTChannelWidth ch_width;
+	enum sir_sme_phy_mode mode;
+	tDot11fIEHTCaps HTCaps;
+	tDot11fIEVHTCaps VHTCaps;
 } tLimMlmAssocInd, *tpLimMlmAssocInd;
 
 typedef struct sLimMlmReassocReq {

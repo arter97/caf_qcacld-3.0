@@ -1484,6 +1484,7 @@ void hdd_update_tgt_cfg(void *context, void *param)
 		hdd_warn("ini BandCapability not supported by the target");
 	}
 
+	hdd_ctx->curr_band = hdd_ctx->config->nBandCapability;
 	if (!cds_is_driver_recovering()) {
 		hdd_ctx->reg.reg_domain = cfg->reg_domain;
 		hdd_ctx->reg.eeprom_rd_ext = cfg->eeprom_rd_ext;
@@ -5215,6 +5216,8 @@ static void hdd_roc_context_destroy(hdd_context_t *hdd_ctx)
  */
 static int hdd_context_deinit(hdd_context_t *hdd_ctx)
 {
+	qdf_wake_lock_destroy(&hdd_ctx->monitor_mode_wakelock);
+
 	wlan_hdd_cfg80211_deinit(hdd_ctx->wiphy);
 
 	hdd_roc_context_destroy(hdd_ctx);
@@ -5376,6 +5379,12 @@ static void hdd_wlan_exit(hdd_context_t *hdd_ctx)
 	}
 
 	hdd_wlan_stop_modules(hdd_ctx, false);
+
+	if (QDF_GLOBAL_MONITOR_MODE ==  hdd_get_conparam()) {
+		hdd_info("Release wakelock for monitor mode!");
+		qdf_wake_lock_release(&hdd_ctx->monitor_mode_wakelock,
+				      WIFI_POWER_EVENT_WAKELOCK_MONITOR_MODE);
+	}
 
 	qdf_spinlock_destroy(&hdd_ctx->hdd_adapter_lock);
 	qdf_spinlock_destroy(&hdd_ctx->sta_update_info_lock);
@@ -5724,7 +5733,7 @@ bool hdd_is_5g_supported(hdd_context_t *hdd_ctx)
 	if (!hdd_ctx || !hdd_ctx->config)
 		return true;
 
-	if (hdd_ctx->config->nBandCapability != eCSR_BAND_24)
+	if (hdd_ctx->curr_band != eCSR_BAND_24)
 		return true;
 	else
 		return false;
@@ -7108,6 +7117,9 @@ static int hdd_context_init(hdd_context_t *hdd_ctx)
 	if (ret)
 		goto roc_destroy;
 
+	qdf_wake_lock_create(&hdd_ctx->monitor_mode_wakelock,
+			     "monitor_mode_wakelock");
+
 	return 0;
 
 roc_destroy:
@@ -8146,6 +8158,28 @@ static void hdd_tsf_init(hdd_context_t *hdd_ctx)
 #endif
 
 /**
+ * hdd_send_all_sme_action_ouis() - send all action oui extensions to firmware
+ * @hdd_ctx: pointer to hdd context
+ *
+ * Return: None
+ */
+static void hdd_send_all_sme_action_ouis(hdd_context_t *hdd_ctx)
+{
+	QDF_STATUS qdf_status;
+	uint32_t i;
+
+	if (!hdd_ctx->config->enable_action_oui)
+		return;
+
+	for (i = 0; i < WMI_ACTION_OUI_MAXIMUM_ID; i++) {
+		qdf_status = sme_send_action_oui(hdd_ctx->hHal, i);
+		/* print the error and continue for another action */
+		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
+			hdd_err("Failed to send action OUI: %u", i);
+	}
+}
+
+/**
  * hdd_pre_enable_configure() - Configurations prior to cds_enable
  * @hdd_ctx:	HDD context
  *
@@ -8182,6 +8216,8 @@ static int hdd_pre_enable_configure(hdd_context_t *hdd_ctx)
 		ret = qdf_status_to_os_return(status);
 		goto out;
 	}
+
+	hdd_set_all_sme_action_ouis(hdd_ctx);
 
 	ret = sme_cli_set_command(0, WMI_PDEV_PARAM_TX_CHAIN_MASK_1SS,
 				  hdd_ctx->config->tx_chain_mask_1ss,
@@ -8588,6 +8624,8 @@ int hdd_configure_cds(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter)
 		sme_cli_set_command(0, WMI_PDEV_PARAM_FAST_PWR_TRANSITION,
 			hdd_ctx->config->enable_phy_reg_retention, PDEV_CMD);
 
+	hdd_send_all_sme_action_ouis(hdd_ctx);
+
 	return 0;
 
 hdd_features_deinit:
@@ -8616,6 +8654,8 @@ static int hdd_deconfigure_cds(hdd_context_t *hdd_ctx)
 	/* De-register the SME callbacks */
 	hdd_deregister_cb(hdd_ctx);
 	hdd_encrypt_decrypt_deinit(hdd_ctx);
+
+	sme_destroy_config(hdd_ctx->hHal);
 
 	/* De-init Policy Manager */
 	if (!QDF_IS_STATUS_SUCCESS(cds_deinit_policy_mgr())) {
@@ -9391,6 +9431,8 @@ void hdd_softap_sta_disassoc(hdd_adapter_t *adapter,
 	if (pDelStaParams->peerMacAddr.bytes[0] & 0x1)
 		return;
 
+	wlan_hdd_get_peer_rssi(adapter, &pDelStaParams->peerMacAddr,
+			       HDD_WLAN_GET_PEER_RSSI_SOURCE_DRIVER);
 	wlansap_disassoc_sta(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
 			     pDelStaParams);
 }
@@ -10644,8 +10686,11 @@ static void hdd_cleanup_present_mode(hdd_context_t *hdd_ctx,
 	driver_status = hdd_ctx->driver_status;
 
 	switch (curr_mode) {
-	case QDF_GLOBAL_MISSION_MODE:
 	case QDF_GLOBAL_MONITOR_MODE:
+		hdd_info("Release wakelock for monitor mode!");
+		qdf_wake_lock_release(&hdd_ctx->monitor_mode_wakelock,
+				      WIFI_POWER_EVENT_WAKELOCK_MONITOR_MODE);
+	case QDF_GLOBAL_MISSION_MODE:
 	case QDF_GLOBAL_FTM_MODE:
 		if (driver_status != DRIVER_MODULES_CLOSED) {
 			hdd_abort_mac_scan_all_adapters(hdd_ctx);
@@ -10809,6 +10854,12 @@ static int __con_mode_handler(const char *kmessage, struct kernel_param *kp,
 			ret = -EINVAL;
 			goto reset_flags;
 		}
+	}
+
+	if (con_mode == QDF_GLOBAL_MONITOR_MODE) {
+		hdd_info("Acquire wakelock for monitor mode!");
+		qdf_wake_lock_acquire(&hdd_ctx->monitor_mode_wakelock,
+				      WIFI_POWER_EVENT_WAKELOCK_MONITOR_MODE);
 	}
 
 	hdd_info("Mode successfully changed to %s", kmessage);

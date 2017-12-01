@@ -810,6 +810,12 @@ lim_fill_assoc_ind_params(tpAniSirGlobal mac_ctx,
 		sizeof(tSirSmeChanInfo));
 	/* Fill in WmmInfo */
 	sme_assoc_ind->wmmEnabledSta = assoc_ind->WmmStaInfoPresent;
+	sme_assoc_ind->ch_width = assoc_ind->ch_width;
+	sme_assoc_ind->mode = assoc_ind->mode;
+	if (assoc_ind->HTCaps.present)
+		sme_assoc_ind->HTCaps = assoc_ind->HTCaps;
+	if (assoc_ind->VHTCaps.present)
+		sme_assoc_ind->VHTCaps = assoc_ind->VHTCaps;
 }
 
 /**

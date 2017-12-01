@@ -1098,6 +1098,97 @@ static QDF_STATUS hdd_update_scan_result(tpSap_Event sap_event,
 	return QDF_STATUS_SUCCESS;
 }
 
+/**
+ * hdd_convert_dot11mode_from_phymode() - get dot11 mode from phymode
+ * @phymode: phymode of sta associated to SAP
+ *
+ * The function is to convert the phymode to corresponding dot11 mode
+ *
+ * Return: dot11mode.
+ */
+
+
+static int hdd_convert_dot11mode_from_phymode(int phymode)
+{
+
+	switch (phymode) {
+
+	case MODE_11A:
+		return QCA_WLAN_802_11_MODE_11A;
+
+	case MODE_11B:
+		return QCA_WLAN_802_11_MODE_11B;
+
+	case MODE_11G:
+	case MODE_11GONLY:
+		return QCA_WLAN_802_11_MODE_11G;
+
+	case MODE_11NA_HT20:
+	case MODE_11NG_HT20:
+	case MODE_11NA_HT40:
+	case MODE_11NG_HT40:
+		return QCA_WLAN_802_11_MODE_11N;
+
+	case MODE_11AC_VHT20:
+	case MODE_11AC_VHT40:
+	case MODE_11AC_VHT80:
+	case MODE_11AC_VHT20_2G:
+	case MODE_11AC_VHT40_2G:
+	case MODE_11AC_VHT80_2G:
+#ifdef CONFIG_160MHZ_SUPPORT
+	case MODE_11AC_VHT80_80:
+	case MODE_11AC_VHT160:
+#endif
+		return QCA_WLAN_802_11_MODE_11AC;
+	default:
+		return QCA_WLAN_802_11_MODE_INVALID;
+	}
+
+}
+
+/**
+ * hdd_fill_station_info() - fill stainfo once connected
+ * @stainfo: peer stainfo associate to SAP
+ * @event: associate/reassociate event received
+ *
+ * The function is to update rate stats to stainfo
+ *
+ * Return: None.
+ */
+static void hdd_fill_station_info(hdd_adapter_t *pHostapdAdapter,
+				  tSap_StationAssocReassocCompleteEvent *event)
+{
+	hdd_station_info_t *stainfo = &pHostapdAdapter->aStaInfo[event->staId];
+	uint8_t i = 0;
+
+	if (!stainfo) {
+		hdd_err("invalid stainfo");
+		return;
+	}
+
+	stainfo->freq = cds_chan_to_freq(event->chan_info.chan_id);
+	stainfo->nss = event->chan_info.nss;
+	stainfo->dot11_mode =
+		hdd_convert_dot11mode_from_phymode(event->chan_info.info);
+	stainfo->ch_width = event->ch_width;
+
+	if (event->vht_caps.present)
+		hdd_copy_vht_caps(&stainfo->vht_caps, &event->vht_caps);
+	if (event->ht_caps.present)
+		hdd_copy_ht_caps(&stainfo->ht_caps, &event->ht_caps);
+
+	while (i < WLAN_MAX_STA_COUNT) {
+		if (pHostapdAdapter->cache_sta_info[i].isUsed != TRUE)
+			break;
+		i++;
+	}
+	if (i < WLAN_MAX_STA_COUNT)
+		qdf_mem_copy(&pHostapdAdapter->cache_sta_info[i],
+			     stainfo, sizeof(hdd_station_info_t));
+	else
+		hdd_debug("reached max staid, stainfo can't be cached");
+}
+
 QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 				    void *usrDataForCallback)
 {
@@ -1130,6 +1221,9 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct hdd_chan_change_params chan_change;
 	int ret = 0;
+	tSap_StationAssocReassocCompleteEvent *event;
+	tSap_StationDisassocCompleteEvent *disconnect_event;
+	hdd_station_info_t *stainfo;
 
 	dev = (struct net_device *)usrDataForCallback;
 	if (!dev) {
@@ -1571,10 +1665,10 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 
 	case eSAP_STA_ASSOC_EVENT:
 	case eSAP_STA_REASSOC_EVENT:
+		event = &pSapEvent->sapevt.sapStationAssocReassocCompleteEvent;
 		wrqu.addr.sa_family = ARPHRD_ETHER;
 		memcpy(wrqu.addr.sa_data,
-		       &pSapEvent->sapevt.sapStationAssocReassocCompleteEvent.
-		       staMac, QDF_MAC_ADDR_SIZE);
+		       &event->staMac, QDF_MAC_ADDR_SIZE);
 		hdd_notice(" associated " MAC_ADDRESS_STR,
 		       MAC_ADDR_ARRAY(wrqu.addr.sa_data));
 		we_event = IWEVREGISTERED;
@@ -1626,6 +1720,9 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 					  MAC_ADDRESS_STR "", qdf_status,
 				       MAC_ADDR_ARRAY(wrqu.addr.sa_data));
 		}
+
+		if (QDF_IS_STATUS_SUCCESS(qdf_status))
+			hdd_fill_station_info(pHostapdAdapter, event);
 
 		staId =
 		   pSapEvent->sapevt.sapStationAssocReassocCompleteEvent.staId;
@@ -1751,6 +1848,28 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 		}
 		hdd_green_ap_add_sta(pHddCtx);
 		break;
+
+	case eSAP_STA_LOSTLINK_DETECTED:
+		disconnect_event =
+			&pSapEvent->sapevt.sapStationDisassocCompleteEvent;
+
+		wlan_hdd_get_peer_rssi(pHostapdAdapter,
+				       &disconnect_event->staMac,
+				       HDD_WLAN_GET_PEER_RSSI_SOURCE_DRIVER);
+
+		/*
+		 * For user initiated disconnect, reason_code is updated while
+		 * issuing the disconnect from HDD.
+		 */
+		if (disconnect_event->reason != eSAP_USR_INITATED_DISASSOC) {
+			stainfo = hdd_get_stainfo(
+					pHostapdAdapter->cache_sta_info,
+					disconnect_event->staMac);
+			if (stainfo)
+				stainfo->reason_code =
+						disconnect_event->reason_code;
+		}
+		return QDF_STATUS_SUCCESS;
 
 	case eSAP_STA_DISASSOC_EVENT:
 		memcpy(wrqu.addr.sa_data,
@@ -3989,6 +4108,7 @@ static __iw_softap_disassoc_sta(struct net_device *dev,
 	uint8_t *peerMacAddr;
 	int ret;
 	struct tagCsrDelStaParams del_sta_params;
+	hdd_station_info_t *stainfo;
 
 	ENTER_DEV(dev);
 
@@ -4014,6 +4134,12 @@ static __iw_softap_disassoc_sta(struct net_device *dev,
 			(SIR_MAC_MGMT_DISASSOC >> 4),
 			&del_sta_params);
 	hdd_softap_sta_disassoc(pHostapdAdapter, &del_sta_params);
+
+	stainfo = hdd_get_stainfo(pHostapdAdapter->cache_sta_info,
+				  del_sta_params.peerMacAddr);
+	if (stainfo)
+		stainfo->reason_code = del_sta_params.reason_code;
+
 	EXIT();
 	return 0;
 }
