@@ -915,7 +915,9 @@ ol_rx_offload_deliver_ind_handler(ol_txrx_pdev_handle pdev,
 	htt_pdev_handle htt_pdev = pdev->htt_pdev;
 
 	if (msdu_cnt > htt_rx_offload_msdu_cnt(htt_pdev)) {
-		ol_txrx_err("invalid msdu_cnt=%u", msdu_cnt);
+		ol_txrx_err("%s: invalid msdu_cnt=%u\n",
+			__func__,
+			msdu_cnt);
 
 		if (pdev->cfg.is_high_latency)
 			htt_rx_desc_frame_free(htt_pdev, msg);
