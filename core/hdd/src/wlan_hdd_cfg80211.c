@@ -17663,13 +17663,7 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 						pAdapter->aStaInfo[i].
 							macAddrSTA.bytes,
 						QDF_MAC_ADDR_SIZE);
-					if (hdd_ipa_uc_is_enabled(pHddCtx)) {
-						hdd_ipa_wlan_evt(pAdapter,
-						    pAdapter->aStaInfo[i].
-						    ucSTAId,
-						    HDD_IPA_CLIENT_DISCONNECT,
-						    mac);
-					}
+
 					hdd_debug("Delete STA with MAC::"
 						  MAC_ADDRESS_STR,
 					       MAC_ADDR_ARRAY(mac));
@@ -17708,11 +17702,6 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 					  MAC_ADDRESS_STR,
 				       MAC_ADDR_ARRAY(mac));
 				return -ENOENT;
-			}
-
-			if (hdd_ipa_uc_is_enabled(pHddCtx)) {
-				hdd_ipa_wlan_evt(pAdapter, staId,
-					HDD_IPA_CLIENT_DISCONNECT, mac);
 			}
 
 			if (pAdapter->aStaInfo[staId].isDeauthInProgress ==
