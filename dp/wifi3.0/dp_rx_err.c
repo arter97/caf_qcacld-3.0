@@ -444,6 +444,16 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc, struct dp_rx_desc *rx_desc,
 		qdf_nbuf_free(nbuf);
 		goto fail;
 	}
+	/*
+	 * In qwrap mode if the received packet matches with any of the vdev
+	 * mac addresses, drop it. Donot receive multicast packets originated
+	 * from any proxysta.
+	 */
+	if (check_qwrap_multicast_loopback(vdev, nbuf)) {
+		qdf_nbuf_free(nbuf);
+		return;
+	}
+
 
 	/* if the received pkts src mac addr matches with the
 	 * wired PCs MAC addr which is behind the STA or with
