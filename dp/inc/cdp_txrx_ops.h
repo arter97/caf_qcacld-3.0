@@ -430,6 +430,9 @@ struct cdp_ctrl_ops {
 
 	void (*txrx_set_pdev_param)(struct cdp_pdev *pdev,
 			enum cdp_pdev_param_type type, uint8_t val);
+	int (*txrx_wdi_event_handler)(struct cdp_pdev *pdev,
+					uint32_t event, void *evt_data);
+	void * (*txrx_get_pldev)(struct cdp_pdev *pdev);
 };
 
 struct cdp_me_ops {
@@ -902,6 +905,10 @@ struct cdp_peer_ops {
 	QDF_STATUS (*change_peer_state)(uint8_t sta_id,
 			enum ol_txrx_peer_state sta_state,
 			bool roam_synch_in_progress);
+	void * (*peer_get_ref_by_addr)(struct cdp_pdev *pdev,
+				       u8 *peer_addr, uint8_t *peer_id,
+				       enum peer_debug_id_type debug_id);
+	void (*peer_release_ref)(void *peer, enum peer_debug_id_type debug_id);
 	void * (*find_peer_by_addr)(struct cdp_pdev *pdev,
 			uint8_t *peer_addr, uint8_t *peer_id);
 	void * (*find_peer_by_addr_and_vdev)(struct cdp_pdev *pdev,

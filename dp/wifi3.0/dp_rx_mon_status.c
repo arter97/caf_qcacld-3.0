@@ -282,8 +282,9 @@ dp_rx_mon_status_process_tlv(struct dp_soc *soc, uint32_t mac_id,
 		status_nbuf = qdf_nbuf_queue_remove(&pdev->rx_status_q);
 		rx_tlv = qdf_nbuf_data(status_nbuf);
 		rx_tlv_start = rx_tlv;
-#if defined(CONFIG_WIN) && WDI_EVENT_ENABLE
+
 #ifndef REMOVE_PKT_LOG
+#if defined(WDI_EVENT_ENABLE)
 		dp_wdi_event_handler(WDI_EVENT_RX_DESC, soc,
 			status_nbuf, HTT_INVALID_PEER, WDI_NO_VAL, mac_id);
 #endif
@@ -312,7 +313,8 @@ dp_rx_mon_status_process_tlv(struct dp_soc *soc, uint32_t mac_id,
 		}
 
 		if (tlv_status == HAL_TLV_STATUS_PPDU_DONE) {
-			if (pdev->enhanced_stats_en)
+			if (pdev->enhanced_stats_en ||
+					pdev->am_copy_mode)
 				dp_rx_handle_ppdu_stats(soc, pdev, ppdu_info);
 
 			pdev->mon_ppdu_status = DP_PPDU_STATUS_DONE;
