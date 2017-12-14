@@ -18954,6 +18954,7 @@ static int wlan_hdd_cfg80211_set_privacy_ibss(struct hdd_adapter *adapter,
 					      struct cfg80211_ibss_params
 					      *params)
 {
+	uint32_t ret;
 	int status = 0;
 	struct hdd_wext_state *pWextState =
 		WLAN_HDD_GET_WEXT_STATE_PTR(adapter);
@@ -18991,10 +18992,14 @@ static int wlan_hdd_cfg80211_set_privacy_ibss(struct hdd_adapter *adapter,
 					hdd_err("invalid ie len:%d", ie[1]);
 					return -EINVAL;
 				}
-				dot11f_unpack_ie_wpa((tpAniSirGlobal) halHandle,
-						     (uint8_t *)&ie[2 + 4],
-						     ie[1] - 4, &dot11WPAIE,
-						     false);
+				ret = dot11f_unpack_ie_wpa(
+						(tpAniSirGlobal) halHandle,
+						(uint8_t *)&ie[2 + 4],
+						ie[1] - 4, &dot11WPAIE, false);
+				if (DOT11F_FAILED(ret)) {
+					hdd_err("unpack failed ret: 0x%x", ret);
+					return -EINVAL;
+				}
 				/*
 				 * Extract the multicast cipher, the
 				 * encType for unicast cipher for
