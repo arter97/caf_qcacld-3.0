@@ -451,7 +451,7 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc, struct dp_rx_desc *rx_desc,
 	 */
 	if (check_qwrap_multicast_loopback(vdev, nbuf)) {
 		qdf_nbuf_free(nbuf);
-		return;
+		goto fail;
 	}
 
 
