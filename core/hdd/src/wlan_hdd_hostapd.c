@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -2343,11 +2343,11 @@ int hdd_softap_unpack_ie(tHalHandle halHandle,
 			 bool *pMFPRequired,
 			 uint16_t gen_ie_len, uint8_t *gen_ie)
 {
-	tDot11fIERSN dot11RSNIE;
-	tDot11fIEWPA dot11WPAIE;
-
+	uint32_t ret;
 	uint8_t *pRsnIe;
 	uint16_t RSNIeLen;
+	tDot11fIERSN dot11RSNIE;
+	tDot11fIEWPA dot11WPAIE;
 
 	if (NULL == halHandle) {
 		hdd_err("Error haHandle returned NULL");
@@ -2370,8 +2370,12 @@ int hdd_softap_unpack_ie(tHalHandle halHandle,
 		RSNIeLen = gen_ie_len - 2;
 		/* Unpack the RSN IE */
 		memset(&dot11RSNIE, 0, sizeof(tDot11fIERSN));
-		dot11f_unpack_ie_rsn((tpAniSirGlobal) halHandle,
-				     pRsnIe, RSNIeLen, &dot11RSNIE);
+		ret = dot11f_unpack_ie_rsn((tpAniSirGlobal) halHandle,
+					   pRsnIe, RSNIeLen, &dot11RSNIE);
+		if (DOT11F_FAILED(ret)) {
+			hdd_err("unpack failed, ret: 0x%x", ret);
+			return -EINVAL;
+		}
 		/* Copy out the encryption and authentication types */
 		hdd_notice("pairwise cipher suite count: %d",
 		       dot11RSNIE.pwise_cipher_suite_count);
@@ -2406,8 +2410,12 @@ int hdd_softap_unpack_ie(tHalHandle halHandle,
 		RSNIeLen = gen_ie_len - (2 + 4);
 		/* Unpack the WPA IE */
 		memset(&dot11WPAIE, 0, sizeof(tDot11fIEWPA));
-		dot11f_unpack_ie_wpa((tpAniSirGlobal) halHandle,
+		ret = dot11f_unpack_ie_wpa((tpAniSirGlobal) halHandle,
 				     pRsnIe, RSNIeLen, &dot11WPAIE);
+		if (DOT11F_FAILED(ret)) {
+			hdd_err("unpack failed, ret: 0x%x", ret);
+			return -EINVAL;
+		}
 		/* Copy out the encryption and authentication types */
 		hdd_notice("WPA unicast cipher suite count: %d",
 		       dot11WPAIE.unicast_cipher_count);
@@ -6343,18 +6351,24 @@ static bool wlan_hdd_rate_is_11g(u8 rate)
  */
 static bool wlan_hdd_get_sap_obss(hdd_adapter_t *pHostapdAdapter)
 {
-	uint8_t ht_cap_ie[DOT11F_IE_HTCAPS_MAX_LEN];
+	uint32_t ret;
+	uint8_t *ie = NULL;
 	tDot11fIEHTCaps dot11_ht_cap_ie = {0};
+	uint8_t ht_cap_ie[DOT11F_IE_HTCAPS_MAX_LEN];
 	hdd_context_t *hdd_ctx = WLAN_HDD_GET_CTX(pHostapdAdapter);
 	beacon_data_t *beacon = pHostapdAdapter->sessionCtx.ap.beacon;
-	uint8_t *ie = NULL;
 
 	ie = wlan_hdd_cfg80211_get_ie_ptr(beacon->tail, beacon->tail_len,
 						WLAN_EID_HT_CAPABILITY);
 	if (ie && ie[1]) {
 		qdf_mem_copy(ht_cap_ie, &ie[2], DOT11F_IE_HTCAPS_MAX_LEN);
-		dot11f_unpack_ie_ht_caps((tpAniSirGlobal)hdd_ctx->hHal,
-					ht_cap_ie, ie[1], &dot11_ht_cap_ie);
+		ret = dot11f_unpack_ie_ht_caps((tpAniSirGlobal)hdd_ctx->hHal,
+					       ht_cap_ie, ie[1],
+					       &dot11_ht_cap_ie);
+		if (DOT11F_FAILED(ret)) {
+			hdd_err("unpack failed, ret: 0x%x", ret);
+			return false;
+		}
 		return dot11_ht_cap_ie.supportedChannelWidthSet;
 	}
 
