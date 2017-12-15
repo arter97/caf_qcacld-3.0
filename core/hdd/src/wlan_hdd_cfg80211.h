@@ -3805,6 +3805,21 @@ enum qca_wlan_vendor_attr_btm_candidate_info {
 	QCA_WLAN_VENDOR_ATTR_BTM_CANDIDATE_INFO_AFTER_LAST - 1,
 };
 
+/**
+ * hdd_is_ie_valid() - Determine if an IE sequence is valid
+ * @ie: Pointer to the IE buffer
+ * @ie_len: Length of the IE buffer @ie
+ *
+ * This function validates that the IE sequence is valid by verifying
+ * that the sum of the lengths of the embedded elements match the
+ * length of the sequence.
+ *
+ * Note well that a 0-length IE sequence is considered valid.
+ *
+ * Return: true if the IE sequence is valid, false if it is invalid
+ */
+bool hdd_is_ie_valid(const uint8_t *ie, size_t ie_len);
+
 struct cfg80211_bss *wlan_hdd_cfg80211_update_bss_db(hdd_adapter_t *pAdapter,
 						tCsrRoamInfo *pRoamInfo);
 
