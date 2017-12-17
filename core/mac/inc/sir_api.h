@@ -59,6 +59,7 @@ typedef struct sAniSirGlobal *tpAniSirGlobal;
 #include <dot11f.h>
 
 #define MAX_PEERS 32
+#define SIR_MAX_SUPPORTED_BSS 5
 
 #define OFFSET_OF(structType, fldName)   (&((structType *)0)->fldName)
 
@@ -343,6 +344,7 @@ typedef enum eSirResultCodes {
 	eSIR_SME_SEND_ACTION_FAIL,
 	eSIR_SME_DEAUTH_STATUS,
 	eSIR_PNO_SCAN_SUCCESS,
+	eSIR_SME_INVALID_SESSION,
 	eSIR_DONOT_USE_RESULT_CODE = SIR_MAX_ENUM_SIZE
 } tSirResultCodes;
 
@@ -419,8 +421,10 @@ typedef struct sSirSupportedRates {
 
 typedef enum eSirRFBand {
 	SIR_BAND_UNKNOWN,
+	SIR_BAND_ALL,
 	SIR_BAND_2_4_GHZ,
 	SIR_BAND_5_GHZ,
+	SIR_BAND_MAX
 } tSirRFBand;
 
 typedef struct sSirRemainOnChnReq {

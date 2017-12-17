@@ -196,6 +196,8 @@ static const struct reg_dmn_pair g_reg_dmn_pairs[] = {
 	{APL14_WORLD, APL14, WORLD, CTRY_DEFAULT},
 	{APL15_WORLD, APL15, WORLD, CTRY_DEFAULT},
 	{APL16_WORLD, APL16, WORLD, CTRY_DEFAULT},
+	{APL17_ETSID, APL17, ETSID, CTRY_DEFAULT},
+	{APL23_WORLD, APL23, WORLD, CTRY_DEFAULT},
 	{WOR0_WORLD, WOR0_WORLD, WOR0_WORLD, CTRY_DEFAULT},
 	{WOR1_WORLD, WOR1_WORLD, WOR1_WORLD, CTRY_DEFAULT},
 	{WOR2_WORLD, WOR2_WORLD, WOR2_WORLD, CTRY_DEFAULT},
@@ -425,6 +427,8 @@ static const struct reg_dmn g_reg_dmns[] = {
 	{APL14, FCC},
 	{APL15, FCC},
 	{APL16, FCC},
+	{APL17, FCC},
+	{APL23, ETSI},
 	{NULL1, NO_CTL},
 	{MKK3, MKK},
 	{MKK5, MKK},
@@ -434,6 +438,7 @@ static const struct reg_dmn g_reg_dmns[] = {
 	{MKKA, MKK},
 	{MKKC, MKK},
 	{ETSIC, ETSI},
+	{ETSID, ETSI},
 	{WOR0_WORLD, NO_CTL},
 	{WOR1_WORLD, NO_CTL},
 	{WOR2_WORLD, NO_CTL},
@@ -713,6 +718,11 @@ void cds_fill_and_send_ctl_to_fw(struct regulatory *reg)
 		return;
 	}
 
+	if (!reg->regpair) {
+		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
+			  FL("no regpair is found, can not proceed"));
+		return;
+	}
 	regpair = reg->regpair;
 	reg_dmn_2g = get_reg_dmn(regpair->reg_dmn_2ghz);
 	if (!reg_dmn_2g) {

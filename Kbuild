@@ -42,7 +42,9 @@ ifeq ($(KERNEL_BUILD), 0)
 	# Need to explicitly configure for Android-based builds
 
 	ifneq ($(DEVELOPER_DISABLE_BUILD_TIMESTAMP),y)
-	CONFIG_BUILD_TIMESTAMP := y
+	ifneq ($(WLAN_DISABLE_BUILD_TAG),y)
+	CONFIG_BUILD_TAG := y
+	endif
 	endif
 
 	ifeq ($(CONFIG_ARCH_MDM9630), y)
@@ -105,6 +107,14 @@ ifeq ($(KERNEL_BUILD), 0)
 	endif
 
 	ifeq ($(CONFIG_ARCH_SDM630), y)
+	CONFIG_QCACLD_FEATURE_METERING := y
+	endif
+
+	ifeq ($(CONFIG_ARCH_SDM845), y)
+	CONFIG_QCACLD_FEATURE_METERING := y
+	endif
+
+	ifeq ($(CONFIG_ARCH_SDM670), y)
 	CONFIG_QCACLD_FEATURE_METERING := y
 	endif
 
@@ -1739,8 +1749,13 @@ CDEFINES += -DFEATURE_WLAN_D0WOW
 endif
 endif
 
-#Flag to enable SMMU S1 support
+#Flag to enable SMMU S1 support for SDM845
 ifeq ($(CONFIG_ARCH_SDM845), y)
+CDEFINES += -DENABLE_SMMU_S1_TRANSLATION
+endif
+
+#Flag to enable SMMU S1 support for SDM670
+ifeq ($(CONFIG_ARCH_SDM670), y)
 CDEFINES += -DENABLE_SMMU_S1_TRANSLATION
 endif
 
@@ -1783,8 +1798,24 @@ CDEFINES += -DWLAN_HDD_ADAPTER_MAGIC=$(WLAN_HDD_ADAPTER_MAGIC)
 endif
 
 # inject some build related information
-ifeq ($(CONFIG_BUILD_TIMESTAMP), y)
-CDEFINES += -DBUILD_TIMESTAMP=\"$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')\"
+ifeq ($(CONFIG_BUILD_TAG), y)
+CLD_CHECKOUT = $(shell cd "$(WLAN_ROOT)" && \
+	git reflog | grep -vm1 cherry-pick | grep -oE ^[0-f]+)
+CLD_IDS = $(shell cd "$(WLAN_ROOT)" && \
+	git log $(CLD_CHECKOUT)~..HEAD | \
+		sed -nE 's/^\s*Change-Id: (I[0-f]{10})[0-f]{30}\s*$$/\1/p' | \
+		paste -sd "," -)
+
+CMN_CHECKOUT = $(shell cd "$(WLAN_COMMON_INC)" && \
+	git reflog | grep -vm1 cherry-pick | grep -oE ^[0-f]+)
+CMN_IDS = $(shell cd "$(WLAN_COMMON_INC)" && \
+	git log $(CMN_CHECKOUT)~..HEAD | \
+		sed -nE 's/^\s*Change-Id: (I[0-f]{10})[0-f]{30}\s*$$/\1/p' | \
+		paste -sd "," -)
+
+TIMESTAMP = $(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
+BUILD_TAG = "$(TIMESTAMP); cld:$(CLD_IDS); cmn:$(CMN_IDS);"
+CDEFINES += -DBUILD_TAG=\"$(BUILD_TAG)\"
 endif
 
 # Module information used by KBuild framework
