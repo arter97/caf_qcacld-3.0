@@ -5401,6 +5401,13 @@ struct reg_table_entry g_registry_table[] = {
 		     CFG_ENABLE_ESP_FEATURE_MIN,
 		     CFG_ENABLE_ESP_FEATURE_MAX),
 
+	REG_VARIABLE(CFG_FORCE_RSNE_OVERRIDE_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, force_rsne_override,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_FORCE_RSNE_OVERRIDE_DEFAULT,
+		     CFG_FORCE_RSNE_OVERRIDE_MIN,
+		     CFG_FORCE_RSNE_OVERRIDE_MAX),
+
 	REG_VARIABLE(CFG_ENABLE_GCMP_NAME, WLAN_PARAM_Integer,
 		     struct hdd_config, gcmp_enabled,
 		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -7238,6 +7245,9 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
 		pHddCtx->config->chan_switch_hostapd_rate_enabled);
 	hdd_debug("Name = [%s] value = [0x%x]", CFG_VC_MODE_BITMAP,
 		pHddCtx->config->vc_mode_cfg_bitmap);
+	hdd_debug("Name = [%s] Value = [%u]",
+		CFG_FORCE_RSNE_OVERRIDE_NAME,
+		pHddCtx->config->force_rsne_override);
 	hdd_debug("Name = [%s] value = [%d]",
 		  CFG_ENABLE_GCMP_NAME,
 		  pHddCtx->config->gcmp_enabled);
