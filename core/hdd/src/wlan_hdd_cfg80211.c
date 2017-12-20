@@ -85,7 +85,6 @@
 #endif
 #include "cds_concurrency.h"
 #include "qwlan_version.h"
-#include "wlan_hdd_memdump.h"
 
 #include "wlan_hdd_ocb.h"
 #include "wlan_hdd_tsf.h"
@@ -1161,12 +1160,6 @@ static const struct nl80211_vendor_cmd_info wlan_hdd_cfg80211_vendor_events[] = 
 		.vendor_id = QCA_NL80211_VENDOR_ID,
 		.subcmd = QCA_NL80211_VENDOR_SUBCMD_MONITOR_RSSI
 	},
-#ifdef WLAN_FEATURE_MEMDUMP
-	[QCA_NL80211_VENDOR_SUBCMD_WIFI_LOGGER_MEMORY_DUMP_INDEX] = {
-		.vendor_id = QCA_NL80211_VENDOR_ID,
-		.subcmd = QCA_NL80211_VENDOR_SUBCMD_WIFI_LOGGER_MEMORY_DUMP
-	},
-#endif /* WLAN_FEATURE_MEMDUMP */
 #ifdef WLAN_FEATURE_TSF
 	[QCA_NL80211_VENDOR_SUBCMD_TSF_INDEX] = {
 		.vendor_id = QCA_NL80211_VENDOR_ID,
@@ -4962,8 +4955,6 @@ __wlan_hdd_cfg80211_get_logger_supp_feature(struct wiphy *wiphy,
 
 	features = 0;
 
-	if (hdd_is_memdump_supported(hdd_ctx))
-		features |= WIFI_LOGGER_MEMORY_DUMP_SUPPORTED;
 	features |= WIFI_LOGGER_PER_PACKET_TX_RX_STATUS_SUPPORTED;
 	features |= WIFI_LOGGER_CONNECT_EVENT_SUPPORTED;
 	features |= WIFI_LOGGER_WAKE_LOCK_SUPPORTED;
@@ -5208,13 +5199,15 @@ int wlan_hdd_send_roam_auth_event(hdd_adapter_t *adapter, uint8_t *bssid,
 			hdd_err("failed to send replay counter");
 			goto nla_put_failure;
 		}
-		if (nla_put(skb,
+		if (roam_info_ptr->kek_len > SIR_KEK_KEY_LEN_FILS ||
+		    nla_put(skb,
 			QCA_WLAN_VENDOR_ATTR_ROAM_AUTH_PTK_KCK,
 			SIR_KCK_KEY_LEN, roam_info_ptr->kck) ||
 		    nla_put(skb,
 			QCA_WLAN_VENDOR_ATTR_ROAM_AUTH_PTK_KEK,
 			roam_info_ptr->kek_len, roam_info_ptr->kek)) {
-			hdd_err("nla put fail");
+			hdd_err("nla put fail, kek_len %d",
+				roam_info_ptr->kek_len);
 			goto nla_put_failure;
 		}
 
@@ -11792,16 +11785,6 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 			 WIPHY_VENDOR_CMD_NEED_RUNNING,
 		.doit = wlan_hdd_cfg80211_get_logger_supp_feature
 	},
-#ifdef WLAN_FEATURE_MEMDUMP
-	{
-		.info.vendor_id = QCA_NL80211_VENDOR_ID,
-		.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_WIFI_LOGGER_MEMORY_DUMP,
-		.flags = WIPHY_VENDOR_CMD_NEED_WDEV |
-			 WIPHY_VENDOR_CMD_NEED_NETDEV |
-			 WIPHY_VENDOR_CMD_NEED_RUNNING,
-		.doit = wlan_hdd_cfg80211_get_fw_mem_dump
-	},
-#endif /* WLAN_FEATURE_MEMDUMP */
 	{
 		.info.vendor_id = QCA_NL80211_VENDOR_ID,
 		.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_TRIGGER_SCAN,
@@ -14584,7 +14567,7 @@ struct cfg80211_bss *wlan_hdd_cfg80211_inform_bss_frame(hdd_adapter_t *pAdapter,
 	}
 
 	cfg_param = pHddCtx->config;
-	mgmt = qdf_mem_malloc((sizeof(struct ieee80211_mgmt) + ie_length));
+	mgmt = qdf_mem_malloc(frame_len);
 	if (!mgmt) {
 		hdd_err("memory allocation failed");
 		return NULL;
