@@ -285,6 +285,21 @@ typedef struct sHddAvoidFreqList {
 #define CFG_PROPAGATION_DELAY_BASE             (64)
 #define CFG_AGG_RETRY_MIN                      (5)
 
+/**
+ * hdd_is_ie_valid() - Determine if an IE sequence is valid
+ * @ie: Pointer to the IE buffer
+ * @ie_len: Length of the IE buffer @ie
+ *
+ * This function validates that the IE sequence is valid by verifying
+ * that the sum of the lengths of the embedded elements match the
+ * length of the sequence.
+ *
+ * Note well that a 0-length IE sequence is considered valid.
+ *
+ * Return: true if the IE sequence is valid, false if it is invalid
+ */
+bool hdd_is_ie_valid(const uint8_t *ie, size_t ie_len);
+
 struct cfg80211_bss *wlan_hdd_cfg80211_update_bss_db(hdd_adapter_t *pAdapter,
 						tCsrRoamInfo *pRoamInfo);
 
@@ -405,7 +420,7 @@ int wlan_hdd_send_avoid_freq_event(hdd_context_t *pHddCtx,
  *
  * Return: 0 on success or failure reason
  */
-int wlan_hdd_send_hang_reason_event(hdd_context_t *pHddCtx, uint32_t reason);
+int wlan_hdd_send_hang_reason_event(hdd_context_t *hdd_ctx, uint32_t reason);
 #ifdef FEATURE_WLAN_EXTSCAN
 void wlan_hdd_cfg80211_extscan_callback(void *ctx,
 					const uint16_t evType, void *pMsg);
@@ -506,7 +521,7 @@ int wlan_hdd_disable_dfs_chan_scan(hdd_context_t *hdd_ctx,
 				   uint32_t no_dfs_flag);
 
 int wlan_hdd_cfg80211_update_band(struct wiphy *wiphy,
-				  eCsrBand eBand);
+				  tSirRFBand eBand);
 
 void hdd_get_bpf_offload_cb(void *hdd_context,
 			    struct sir_bpf_get_offload *data);

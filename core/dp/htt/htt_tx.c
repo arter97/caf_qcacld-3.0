@@ -971,6 +971,7 @@ htt_tx_send_batch(htt_pdev_handle pdev, qdf_nbuf_t head_msdu, int num_msdus)
 	msdu = head_msdu;
 	while (num_msdus--) {
 		qdf_nbuf_t next_msdu = qdf_nbuf_next(msdu);
+
 		msdu_id_storage = ol_tx_msdu_id_storage(msdu);
 		msdu_id = *msdu_id_storage;
 
@@ -1816,6 +1817,8 @@ htt_tx_desc_init(htt_pdev_handle pdev,
 	} else {
 		HTT_TX_DESC_FRM_LEN_SET(local_word1, qdf_nbuf_len(msdu));
 	}
+
+	QDF_BUG(HTT_TX_DESC_FRM_LEN_GET(local_word1) != 0);
 
 	HTT_TX_DESC_FRM_ID_SET(local_word1, msdu_id);
 	*word1 = local_word1;

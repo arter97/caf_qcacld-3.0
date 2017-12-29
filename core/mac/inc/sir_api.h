@@ -59,6 +59,7 @@ typedef struct sAniSirGlobal *tpAniSirGlobal;
 #include <dot11f.h>
 
 #define MAX_PEERS 32
+#define SIR_MAX_SUPPORTED_BSS 5
 
 #define OFFSET_OF(structType, fldName)   (&((structType *)0)->fldName)
 
@@ -343,6 +344,7 @@ typedef enum eSirResultCodes {
 	eSIR_SME_SEND_ACTION_FAIL,
 	eSIR_SME_DEAUTH_STATUS,
 	eSIR_PNO_SCAN_SUCCESS,
+	eSIR_SME_INVALID_SESSION,
 	eSIR_DONOT_USE_RESULT_CODE = SIR_MAX_ENUM_SIZE
 } tSirResultCodes;
 
@@ -419,8 +421,10 @@ typedef struct sSirSupportedRates {
 
 typedef enum eSirRFBand {
 	SIR_BAND_UNKNOWN,
+	SIR_BAND_ALL,
 	SIR_BAND_2_4_GHZ,
 	SIR_BAND_5_GHZ,
+	SIR_BAND_MAX
 } tSirRFBand;
 
 typedef struct sSirRemainOnChnReq {
@@ -822,7 +826,8 @@ typedef struct sSirBssDescription {
 #endif
 	uint8_t air_time_fraction;
 	uint8_t nss;
-	uint16_t reservedPadding3;
+	uint8_t oce_wan_present;
+	uint8_t oce_wan_down_cap;
 	/* Please keep the structure 4 bytes aligned above the ieFields */
 	uint32_t ieFields[1];
 
@@ -1445,6 +1450,9 @@ typedef struct sSirSmeAssocInd {
 	uint8_t max_mcs_idx;
 	uint8_t rx_mcs_map;
 	uint8_t tx_mcs_map;
+
+	tDot11fIEHTCaps HTCaps;
+	tDot11fIEVHTCaps VHTCaps;
 } tSirSmeAssocInd, *tpSirSmeAssocInd;
 
 /* / Definition for Association confirm */
@@ -3373,19 +3381,17 @@ struct roam_ext_params {
 	uint32_t bg_scan_client_bitmap;
 };
 
-
-#define RSSI_WEIGHTAGE 30
-#define HT_CAPABILITY_WEIGHTAGE 7
-#define VHT_CAP_WEIGHTAGE 5
-#define HE_CAP_WEIGHTAGE 2
-#define CHAN_WIDTH_WEIGHTAGE 5
-#define CHAN_BAND_WEIGHTAGE 5
-#define NSS_WEIGHTAGE 5
+#define RSSI_WEIGHTAGE 20
+#define HT_CAPABILITY_WEIGHTAGE 2
+#define VHT_CAP_WEIGHTAGE 1
+#define CHAN_WIDTH_WEIGHTAGE 17
+#define CHAN_BAND_WEIGHTAGE 2
+#define NSS_WEIGHTAGE 16
 #define BEAMFORMING_CAP_WEIGHTAGE 2
 #define PCL_WEIGHT 10
 #define CHANNEL_CONGESTION_WEIGHTAGE 5
-#define OCE_WAN_WEIGHTAGE 2
-#define RESERVED_WEIGHT 22
+#define OCE_WAN_WEIGHTAGE 0
+
 #define BEST_CANDIDATE_MAX_WEIGHT 100
 #define MAX_INDEX_SCORE 100
 #define MAX_INDEX_PER_INI 4
@@ -3483,6 +3489,7 @@ struct sir_per_slot_scoring {
 };
 
 struct sir_score_config {
+	bool enable_scoring_for_roam;
 	struct sir_weight_config weight_cfg;
 	struct sir_rssi_cfg_score rssi_score;
 	struct sir_per_slot_scoring esp_qbss_scoring;
@@ -3513,7 +3520,7 @@ struct pmkid_mode_bits {
  * @num_disallowed_aps: Maximum number of AP's in LCA list
  *
  */
-struct lca_disallow_config_params{
+struct lca_disallow_config_params {
     uint32_t disallow_duration;
     uint32_t rssi_channel_penalization;
     uint32_t num_disallowed_aps;
@@ -6620,56 +6627,6 @@ struct chip_pwr_save_fail_detected_params {
 };
 
 #define MAX_NUM_FW_SEGMENTS 4
-
-/**
- * struct fw_dump_seg_req - individual segment details
- * @seg_id - segment id.
- * @seg_start_addr_lo - lower address of the segment.
- * @seg_start_addr_hi - higher address of the segment.
- * @seg_length - length of the segment.
- * @dst_addr_lo - lower address of the destination buffer.
- * @dst_addr_hi - higher address of the destination buffer.
- *
- * This structure carries the information to firmware about the
- * individual segments. This structure is part of firmware memory
- * dump request.
- */
-struct fw_dump_seg_req {
-	uint8_t seg_id;
-	uint32_t seg_start_addr_lo;
-	uint32_t seg_start_addr_hi;
-	uint32_t seg_length;
-	uint32_t dst_addr_lo;
-	uint32_t dst_addr_hi;
-};
-
-/**
- * struct fw_dump_req - firmware memory dump request details.
- * @request_id - request id.
- * @num_seg - requested number of segments.
- * @fw_dump_seg_req - individual segment information.
- *
- * This structure carries information about the firmware
- * memory dump request.
- */
-struct fw_dump_req {
-	uint32_t request_id;
-	uint32_t num_seg;
-	struct fw_dump_seg_req segment[MAX_NUM_FW_SEGMENTS];
-};
-
-/**
- * struct fw_dump_rsp - firmware dump response details.
- * @request_id - request id.
- * @dump_complete - copy completion status.
- *
- * This structure is used to store the firmware dump copy complete
- * response from the firmware.
- */
-struct fw_dump_rsp {
-	uint32_t request_id;
-	uint32_t dump_complete;
-};
 
 /**
  * DEFAULT_SCAN_IE_ID - Identifier for the collection of IE's added

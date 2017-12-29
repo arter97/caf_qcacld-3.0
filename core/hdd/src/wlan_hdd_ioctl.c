@@ -597,19 +597,19 @@ hdd_parse_get_ibss_peer_info(uint8_t *pValue, struct qdf_mac_addr *pPeerMacAddr)
 
 static void hdd_get_band_helper(hdd_context_t *hdd_ctx, int *pBand)
 {
-	eCsrBand band = -1;
+	tSirRFBand band = SIR_BAND_UNKNOWN;
 
 	sme_get_freq_band((tHalHandle) (hdd_ctx->hHal), &band);
 	switch (band) {
-	case eCSR_BAND_ALL:
+	case SIR_BAND_ALL:
 		*pBand = WLAN_HDD_UI_BAND_AUTO;
 		break;
 
-	case eCSR_BAND_24:
+	case SIR_BAND_2_4_GHZ:
 		*pBand = WLAN_HDD_UI_BAND_2_4_GHZ;
 		break;
 
-	case eCSR_BAND_5G:
+	case SIR_BAND_5_GHZ:
 		*pBand = WLAN_HDD_UI_BAND_5_GHZ;
 		break;
 
@@ -2312,7 +2312,7 @@ static int hdd_get_dwell_time(struct hdd_config *pCfg, uint8_t *command,
 				 (int)pCfg->nPassiveMinChnTime);
 		return 0;
 	} else if (strncmp(command, "GETDWELLTIME", 12) == 0) {
-		*len = scnprintf(extra, n, "GETDWELLTIME %u \n",
+		*len = scnprintf(extra, n, "GETDWELLTIME %u\n",
 				 (int)pCfg->nActiveMaxChnTime);
 		return 0;
 	}
@@ -4482,7 +4482,7 @@ static int drv_cmd_fast_reassoc(hdd_adapter_t *adapter,
 	uint8_t *value = command;
 	uint8_t channel = 0;
 	tSirMacAddr targetApBssid;
-	uint32_t roamId = 0;
+	uint32_t roamId = INVALID_ROAM_ID;
 	tCsrRoamModifyProfileFields modProfileFields;
 	tCsrHandoffRequest handoffInfo;
 	hdd_station_ctx_t *pHddStaCtx;

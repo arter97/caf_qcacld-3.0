@@ -63,6 +63,7 @@
 #include "wlan_hdd_misc.h"
 #include <cds_utils.h>
 #include "pld_common.h"
+#include "wlan_hdd_regulatory.h"
 
 #include "wma.h"
 #ifdef WLAN_DEBUG
@@ -730,7 +731,7 @@ static void hdd_issue_stored_joinreq(hdd_adapter_t *sta_adapter,
 		hdd_context_t *hdd_ctx)
 {
 	tHalHandle hal_handle;
-	uint32_t roam_id;
+	uint32_t roam_id = INVALID_ROAM_ID;
 
 	if (NULL == sta_adapter) {
 		hdd_err("Invalid station adapter, ignore issueing join req");
@@ -741,7 +742,7 @@ static void hdd_issue_stored_joinreq(hdd_adapter_t *sta_adapter,
 	if (true ==  cds_is_sta_connection_pending()) {
 		MTRACE(qdf_trace(QDF_MODULE_ID_HDD,
 				TRACE_CODE_HDD_ISSUE_JOIN_REQ,
-				sta_adapter->sessionId, roam_id));
+				sta_adapter->sessionId, 0));
 		if (QDF_STATUS_SUCCESS !=
 			sme_issue_stored_joinreq(hal_handle,
 				&roam_id,
@@ -1347,6 +1348,55 @@ static int calcuate_max_phy_rate(int mode, int nss, int ch_width,
 }
 
 /**
+ * hdd_convert_dot11mode_from_phymode() - get dot11 mode from phymode
+ * @phymode: phymode of sta associated to SAP
+ *
+ * The function is to convert the phymode to corresponding dot11 mode
+ *
+ * Return: dot11mode.
+ */
+
+
+static int hdd_convert_dot11mode_from_phymode(int phymode)
+{
+
+	switch (phymode) {
+
+	case MODE_11A:
+		return QCA_WLAN_802_11_MODE_11A;
+
+	case MODE_11B:
+		return QCA_WLAN_802_11_MODE_11B;
+
+	case MODE_11G:
+	case MODE_11GONLY:
+		return QCA_WLAN_802_11_MODE_11G;
+
+	case MODE_11NA_HT20:
+	case MODE_11NG_HT20:
+	case MODE_11NA_HT40:
+	case MODE_11NG_HT40:
+		return QCA_WLAN_802_11_MODE_11N;
+
+	case MODE_11AC_VHT20:
+	case MODE_11AC_VHT40:
+	case MODE_11AC_VHT80:
+	case MODE_11AC_VHT20_2G:
+	case MODE_11AC_VHT40_2G:
+	case MODE_11AC_VHT80_2G:
+#ifdef CONFIG_160MHZ_SUPPORT
+	case MODE_11AC_VHT80_80:
+	case MODE_11AC_VHT160:
+#endif
+		return QCA_WLAN_802_11_MODE_11AC;
+
+	default:
+		return QCA_WLAN_802_11_MODE_INVALID;
+	}
+
+}
+
+/**
  * hdd_fill_station_info() - fill stainfo once connected
  * @stainfo: peer stainfo associate to SAP
  * @event: associate/reassociate event received
@@ -1355,9 +1405,20 @@ static int calcuate_max_phy_rate(int mode, int nss, int ch_width,
  *
  * Return: None.
  */
-static void hdd_fill_station_info(hdd_station_info_t *stainfo,
-		tSap_StationAssocReassocCompleteEvent *event)
+static void hdd_fill_station_info(hdd_adapter_t *pHostapdAdapter,
+				  tSap_StationAssocReassocCompleteEvent *event)
 {
+	hdd_station_info_t *stainfo = &pHostapdAdapter->aStaInfo[event->staId];
+	uint8_t i = 0;
+
+	if (!stainfo) {
+		hdd_err("invalid stainfo");
+		return;
+	}
+
+	stainfo->freq = cds_chan_to_freq(event->chan_info.chan_id);
+	stainfo->dot11_mode =
+		hdd_convert_dot11mode_from_phymode(event->chan_info.info);
 	stainfo->nss = event->chan_info.nss;
 	stainfo->rate_flags = event->chan_info.rate_flags;
 	stainfo->ampdu = event->ampdu;
@@ -1383,6 +1444,23 @@ static void hdd_fill_station_info(hdd_station_info_t *stainfo,
 				stainfo->rx_mcs_map);
 	/* expect max_phy_rate report in kbps */
 	stainfo->max_phy_rate *= 100;
+
+	if (event->vht_caps.present)
+		hdd_copy_vht_caps(&stainfo->vht_caps, &event->vht_caps);
+	if (event->ht_caps.present)
+		hdd_copy_ht_caps(&stainfo->ht_caps, &event->ht_caps);
+
+	while (i < WLAN_MAX_STA_COUNT) {
+		if (pHostapdAdapter->cache_sta_info[i].isUsed != TRUE)
+			break;
+		i++;
+	}
+	if (i < WLAN_MAX_STA_COUNT)
+		qdf_mem_copy(&pHostapdAdapter->cache_sta_info[i],
+			     stainfo, sizeof(hdd_station_info_t));
+	else
+		hdd_debug("reached max staid, stainfo can't be cached");
+
 	hdd_debug("cap %d %d %d %d %d %d %d %d %d %x %d",
 			stainfo->ampdu,
 			stainfo->sgi_enable,
@@ -1429,13 +1507,13 @@ hdd_stop_sap_due_to_invalid_channel(struct work_struct *work)
 	 */
 	hdd_adapter_t *sap_adapter = container_of(work, hdd_adapter_t,
 						  sap_stop_bss_work);
-	hdd_debug("work started for sap session[%d]", sap_adapter->sessionId);
 	cds_ssr_protect(__func__);
 	if (sap_adapter == NULL) {
 	    cds_err("sap_adapter is NULL, no work needed");
 	    cds_ssr_unprotect(__func__);
 	    return;
 	}
+	hdd_debug("work started for sap session[%d]", sap_adapter->sessionId);
 	wlan_hdd_stop_sap(sap_adapter);
 	wlansap_set_invalid_session(WLAN_HDD_GET_SAP_CTX_PTR(sap_adapter));
 	wlansap_cleanup_cac_timer(WLAN_HDD_GET_SAP_CTX_PTR(sap_adapter));
@@ -1479,6 +1557,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 	struct ch_params_s sap_ch_param = {0};
 	eCsrPhyMode phy_mode;
 	bool legacy_phymode;
+	tSap_StationDisassocCompleteEvent *disconnect_event;
+	hdd_station_info_t *stainfo;
 
 	dev = (struct net_device *)usrDataForCallback;
 	if (!dev) {
@@ -1762,9 +1842,13 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 		}
 
 		hdd_debug("bss_stop_reason=%d", pHddApCtx->bss_stop_reason);
-		if (pHddApCtx->bss_stop_reason !=
-			BSS_STOP_DUE_TO_MCC_SCC_SWITCH) {
-			/* when MCC to SCC switching happens, key storage
+		if ((BSS_STOP_DUE_TO_MCC_SCC_SWITCH !=
+			pHddApCtx->bss_stop_reason) &&
+		    (BSS_STOP_DUE_TO_VENDOR_CONFIG_CHAN !=
+			pHddApCtx->bss_stop_reason)) {
+			/*
+			 * when MCC to SCC switching or vendor subcmd
+			 * setting sap config channel happens, key storage
 			 * should not be cleared due to hostapd will not
 			 * repopulate the original keys
 			 */
@@ -1968,11 +2052,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 				       MAC_ADDR_ARRAY(wrqu.addr.sa_data));
 		}
 
-		if (QDF_IS_STATUS_SUCCESS(qdf_status)) {
-			hdd_fill_station_info(
-				&pHostapdAdapter->aStaInfo[event->staId],
-				event);
-		}
+		if (QDF_IS_STATUS_SUCCESS(qdf_status))
+			hdd_fill_station_info(pHostapdAdapter, event);
 
 		pHostapdAdapter->aStaInfo[event->staId].ecsa_capable =
 			event->ecsa_capable;
@@ -2074,6 +2155,28 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 		hdd_green_ap_add_sta(pHddCtx);
 		break;
 
+	case eSAP_STA_LOSTLINK_DETECTED:
+		disconnect_event =
+			&pSapEvent->sapevt.sapStationDisassocCompleteEvent;
+
+		wlan_hdd_get_peer_rssi(pHostapdAdapter,
+				       &disconnect_event->staMac,
+				       HDD_WLAN_GET_PEER_RSSI_SOURCE_DRIVER);
+
+		/*
+		 * For user initiated disconnect, reason_code is updated while
+		 * issuing the disconnect from HDD.
+		 */
+		if (disconnect_event->reason != eSAP_USR_INITATED_DISASSOC) {
+			stainfo = hdd_get_stainfo(
+					pHostapdAdapter->cache_sta_info,
+					disconnect_event->staMac);
+			if (stainfo)
+				stainfo->reason_code =
+					disconnect_event->reason_code;
+		}
+		return QDF_STATUS_SUCCESS;
+
 	case eSAP_STA_DISASSOC_EVENT:
 		memcpy(wrqu.addr.sa_data,
 		       &pSapEvent->sapevt.sapStationDisassocCompleteEvent.
@@ -2100,20 +2203,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 			hdd_err("Failed to find sta id status: %d", qdf_status);
 			return QDF_STATUS_E_FAILURE;
 		}
-#ifdef IPA_OFFLOAD
-		if (hdd_ipa_is_enabled(pHddCtx)) {
-			status = hdd_ipa_wlan_evt(pHostapdAdapter, staId,
-					HDD_IPA_CLIENT_DISCONNECT,
-					pSapEvent->sapevt.
-					sapStationDisassocCompleteEvent.
-					staMac.bytes);
 
-			if (status) {
-				hdd_err("WLAN_CLIENT_DISCONNECT event failed");
-				goto stopbss;
-			}
-		}
-#endif
 		DPTRACE(qdf_dp_trace_mgmt_pkt(QDF_DP_TRACE_MGMT_PACKET_RECORD,
 			pHostapdAdapter->sessionId,
 			QDF_PROTO_TYPE_MGMT, QDF_PROTO_MGMT_DISASSOC));
@@ -2760,30 +2850,44 @@ void hdd_sap_restart_with_channel_switch(hdd_adapter_t *ap_adapter,
 }
 #endif
 
-int
-static __iw_softap_set_ini_cfg(struct net_device *dev,
-			       struct iw_request_info *info,
-			       union iwreq_data *wrqu, char *extra)
+static int __iw_softap_set_ini_cfg(struct net_device *dev,
+				   struct iw_request_info *info,
+				   union iwreq_data *wrqu,
+				   char *extra)
 {
-	QDF_STATUS vstatus;
-	int ret = 0;            /* success */
-	hdd_adapter_t *pAdapter = (netdev_priv(dev));
-	hdd_context_t *pHddCtx;
+	QDF_STATUS status;
+	int errno;
+	hdd_adapter_t *adapter;
+	hdd_context_t *hdd_ctx;
+	char *value;
+	size_t len;
 
 	ENTER_DEV(dev);
 
-	pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
-	ret = wlan_hdd_validate_context(pHddCtx);
-	if (ret)
-		return ret;
+	adapter = netdev_priv(dev);
+	errno = hdd_validate_adapter(adapter);
+	if (errno)
+		return errno;
 
-	hdd_debug("Received data %s", extra);
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno)
+		return errno;
 
-	vstatus = hdd_execute_global_config_command(pHddCtx, extra);
-	if (QDF_STATUS_SUCCESS != vstatus)
-		ret = -EINVAL;
+	/* ensure null termination */
+	len = min_t(size_t, wrqu->data.length, QCSAP_IOCTL_MAX_STR_LEN);
+	value = qdf_mem_malloc(len + 1);
+	if (!value)
+		return -ENOMEM;
 
-	return ret;
+	qdf_mem_copy(value, extra, len);
+	hdd_debug("Received data %s", value);
+	status = hdd_execute_global_config_command(hdd_ctx, value);
+	qdf_mem_free(value);
+
+	EXIT();
+
+	return qdf_status_to_os_return(status);
 }
 
 int
@@ -3554,7 +3658,10 @@ static __iw_softap_setparam(struct net_device *dev,
 		/* If input value is non-zero get stats */
 		switch (set_value) {
 		case 1:
-			hdd_ipa_uc_stat_request(pHostapdAdapter, set_value);
+			hdd_ipa_uc_stat(pHostapdAdapter);
+			break;
+		case 2:
+			hdd_ipa_uc_info(hdd_ctx);
 			break;
 		case 3:
 			hdd_ipa_uc_rt_debug_host_dump(hdd_ctx);
@@ -4339,6 +4446,7 @@ static __iw_softap_disassoc_sta(struct net_device *dev,
 	uint8_t *peerMacAddr;
 	int ret;
 	struct tagCsrDelStaParams del_sta_params;
+	hdd_station_info_t *stainfo;
 
 	ENTER_DEV(dev);
 
@@ -4364,6 +4472,12 @@ static __iw_softap_disassoc_sta(struct net_device *dev,
 			(SIR_MAC_MGMT_DISASSOC >> 4),
 			&del_sta_params);
 	hdd_softap_sta_disassoc(pHostapdAdapter, &del_sta_params);
+
+	stainfo = hdd_get_stainfo(pHostapdAdapter->cache_sta_info,
+				  del_sta_params.peerMacAddr);
+	if (stainfo)
+		stainfo->reason_code = del_sta_params.reason_code;
+
 	EXIT();
 	return 0;
 }
@@ -4486,7 +4600,7 @@ static int __iw_get_channel_list(struct net_device *dev,
 	tHalHandle hal = WLAN_HDD_GET_HAL_CTX(hostapd_adapter);
 	struct channel_list_info *channel_list =
 					(struct channel_list_info *) extra;
-	eCsrBand cur_band = eCSR_BAND_ALL;
+	tSirRFBand cur_band = SIR_BAND_ALL;
 	hdd_context_t *hdd_ctx;
 	int ret;
 	bool is_dfs_mode_enabled = false;
@@ -4504,14 +4618,14 @@ static int __iw_get_channel_list(struct net_device *dev,
 	}
 	wrqu->data.length = sizeof(struct channel_list_info);
 
-	if (eCSR_BAND_24 == cur_band) {
+	if (SIR_BAND_2_4_GHZ == cur_band) {
 		band_start_channel = CHAN_ENUM_1;
 		band_end_channel = CHAN_ENUM_14;
-	} else if (eCSR_BAND_5G == cur_band) {
+	} else if (SIR_BAND_5_GHZ == cur_band) {
 		band_start_channel = CHAN_ENUM_36;
 		band_end_channel = CHAN_ENUM_184;
 	}
-	if (cur_band != eCSR_BAND_24) {
+	if (cur_band != SIR_BAND_2_4_GHZ) {
 		if (hdd_ctx->config->dot11p_mode)
 			band_end_channel = CHAN_ENUM_184;
 		else
@@ -4797,16 +4911,16 @@ static int __iw_set_ap_encodeext(struct net_device *dev,
 		/*Convert from 1-based to 0-based keying */
 		key_index--;
 	}
-	if (!ext->key_len)
-		return ret;
+
+	if (!ext->key_len || ext->key_len > CSR_MAX_KEY_LEN)
+		return -EINVAL;
 
 	qdf_mem_zero(&setKey, sizeof(tCsrRoamSetKey));
 
 	setKey.keyId = key_index;
 	setKey.keyLength = ext->key_len;
 
-	if (ext->key_len <= CSR_MAX_KEY_LEN)
-		qdf_mem_copy(&setKey.Key[0], ext->key, ext->key_len);
+	qdf_mem_copy(&setKey.Key[0], ext->key, ext->key_len);
 
 	if (ext->ext_flags & IW_ENCODE_EXT_GROUP_KEY) {
 		/*Key direction for group is RX only */
@@ -5230,7 +5344,7 @@ __iw_softap_stopbss(struct net_device *dev,
 			WLAN_HDD_GET_SAP_CTX_PTR(pHostapdAdapter));
 		if (QDF_IS_STATUS_SUCCESS(status)) {
 			qdf_status =
-				qdf_wait_single_event(&pHostapdState->
+				qdf_wait_for_event_completion(&pHostapdState->
 					qdf_stop_bss_event,
 					SME_CMD_TIMEOUT_VALUE);
 
@@ -5628,7 +5742,8 @@ __iw_get_peer_rssi(struct net_device *dev, struct iw_request_info *info,
 			hdd_err("String to Hex conversion Failed");
 	}
 
-	ret = wlan_hdd_get_peer_rssi(adapter, &macaddress);
+	ret = wlan_hdd_get_peer_rssi(adapter, &macaddress,
+				     HDD_WLAN_GET_PEER_RSSI_SOURCE_USER);
 	if (ret) {
 		hdd_err("Unable to retrieve peer rssi: %d", ret);
 		return ret;
@@ -7710,6 +7825,7 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 	uint16_t prev_rsn_length = 0;
 	enum dfs_mode mode;
 	bool disable_fw_tdls_state = false;
+	uint8_t ignore_cac = 0;
 
 	ENTER();
 
@@ -7739,6 +7855,18 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 	clear_bit(ACS_PENDING, &pHostapdAdapter->event_flags);
 	clear_bit(ACS_IN_PROGRESS, &pHddCtx->g_event_flags);
 
+	/* Mark the indoor channel (passive) to disable */
+	if (iniConfig->disable_indoor_channel) {
+		hdd_update_indoor_channel(pHddCtx, true);
+		if (QDF_IS_STATUS_ERROR(
+		    sme_update_channel_list(pHddCtx->hHal))) {
+			hdd_update_indoor_channel(pHddCtx, false);
+			hdd_err("Can't start BSS: update channel list failed");
+			qdf_mem_free(sme_config);
+			return -EINVAL;
+		}
+	}
+
 	pConfig = &pHostapdAdapter->sessionCtx.ap.sapConfig;
 
 	pBeacon = pHostapdAdapter->sessionCtx.ap.beacon;
@@ -7747,6 +7875,8 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 
 	pConfig->beacon_int = pMgmt_frame->u.beacon.beacon_int;
 
+	pConfig->auto_channel_select_weight =
+			     iniConfig->auto_channel_select_weight;
 	pConfig->disableDFSChSwitch = iniConfig->disableDFSChSwitch;
 	pConfig->sap_chanswitch_beacon_cnt =
 			    iniConfig->sap_chanswitch_beacon_cnt;
@@ -7765,6 +7895,10 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 
 	pConfig->chan_switch_hostapd_rate_enabled =
 			iniConfig->chan_switch_hostapd_rate_enabled;
+	if (iniConfig->WlanMccToSccSwitchMode !=
+			QDF_MCC_TO_SCC_SWITCH_DISABLE) {
+		pConfig->chan_switch_hostapd_rate_enabled = false;
+	}
 
 	pConfig->enOverLapCh = iniConfig->gEnableOverLapCh;
 	pConfig->dtim_period = pBeacon->dtim_period;
@@ -7781,6 +7915,8 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 		pConfig->acs_dfs_mode = wlan_hdd_get_dfs_mode(mode);
 	}
 
+	pConfig->user_config_channel = pConfig->channel;
+
 	hdd_debug("pConfig->channel %d, pConfig->acs_dfs_mode %d",
 		pConfig->channel, pConfig->acs_dfs_mode);
 
@@ -7793,6 +7929,12 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 						     pBeacon->tail_len,
 						     WLAN_EID_COUNTRY);
 		if (pIe) {
+			if (pIe[1] < IEEE80211_COUNTRY_IE_MIN_LEN) {
+				hdd_err("Invalid Country IE len: %d", pIe[1]);
+				ret = -EINVAL;
+				goto error;
+			}
+
 			pConfig->ieee80211d = 1;
 			qdf_mem_copy(pConfig->countryCode, &pIe[2], 3);
 			sme_set_reg_info(hHal, pConfig->countryCode);
@@ -7836,7 +7978,15 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 				goto error;
 			}
 		}
-		wlansap_set_dfs_ignore_cac(hHal, iniConfig->ignoreCAC);
+
+		if (iniConfig->ignoreCAC ||
+				((iniConfig->WlanMccToSccSwitchMode !=
+				  QDF_MCC_TO_SCC_SWITCH_DISABLE) &&
+				 iniConfig->sta_sap_scc_on_dfs_chan))
+			ignore_cac = 1;
+
+		wlansap_set_dfs_ignore_cac(hHal, ignore_cac);
+
 		wlansap_set_dfs_restrict_japan_w53(hHal,
 			iniConfig->gDisableDfsJapanW53);
 		wlansap_set_dfs_preferred_channel_location(hHal,
@@ -8260,7 +8410,7 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 
 	hdd_debug("Waiting for Scan to complete(auto mode) and BSS to start");
 
-	qdf_status = qdf_wait_single_event(&pHostapdState->qdf_event,
+	qdf_status = qdf_wait_for_event_completion(&pHostapdState->qdf_event,
 						SME_CMD_TIMEOUT_VALUE);
 
 	wlansap_reset_sap_config_add_ie(pConfig, eUPDATE_IE_ALL);
@@ -8309,6 +8459,11 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 	return 0;
 
 error:
+	/* Revert the indoor to passive marking if START BSS fails */
+	if (iniConfig->disable_indoor_channel) {
+		hdd_update_indoor_channel(pHddCtx, false);
+		sme_update_channel_list(pHddCtx->hHal);
+	}
 	if (sme_config)
 		qdf_mem_free(sme_config);
 	clear_bit(SOFTAP_INIT_DONE, &pHostapdAdapter->event_flags);
@@ -8468,7 +8623,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 		status = wlansap_stop_bss(WLAN_HDD_GET_SAP_CTX_PTR(pAdapter));
 		if (QDF_IS_STATUS_SUCCESS(status)) {
 			qdf_status =
-				qdf_wait_single_event(&pHostapdState->
+				qdf_wait_for_event_completion(&pHostapdState->
 					qdf_stop_bss_event,
 					SME_CMD_TIMEOUT_VALUE);
 
@@ -8674,6 +8829,8 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	int status;
 	struct sme_sta_inactivity_timeout  *sta_inactivity_timer;
 	uint8_t channel;
+	bool sta_sap_scc_on_dfs_chan;
+	uint16_t sta_cnt;
 
 	ENTER();
 
@@ -8717,6 +8874,21 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	channel_width = wlan_hdd_get_channel_bw(params->chandef.width);
 	channel = ieee80211_frequency_to_channel(
 				params->chandef.chan->center_freq);
+
+	sta_sap_scc_on_dfs_chan = cds_is_sta_sap_scc_allowed_on_dfs_channel();
+	sta_cnt = cds_mode_specific_connection_count(CDS_STA_MODE, NULL);
+
+	hdd_debug("sta_sap_scc_on_dfs_chan %u, sta_cnt %u",
+			sta_sap_scc_on_dfs_chan, sta_cnt);
+
+	/* if sta_sap_scc_on_dfs_chan ini is set, DFS master capability is
+	 * assumed disabled in the driver.
+	 */
+	if (channel && (cds_get_channel_state(channel) == CHANNEL_STATE_DFS) &&
+			sta_sap_scc_on_dfs_chan && !sta_cnt) {
+		hdd_err("SAP not allowed on DFS channel!!");
+		return -EINVAL;
+	}
 
 	if (cds_is_sap_mandatory_chan_list_enabled()) {
 		if (!cds_get_sap_mandatory_chan_list_len())

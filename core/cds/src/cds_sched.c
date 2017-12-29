@@ -135,7 +135,7 @@ static int cds_sched_find_attach_cpu(p_cds_sched_context pSchedContext,
 	int i;
 #endif
 
-	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO_LOW,
+	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_DEBUG,
 		"%s: num possible cpu %d",
 		__func__, num_possible_cpus());
 
@@ -242,7 +242,7 @@ static int cds_sched_find_attach_cpu(p_cds_sched_context pSchedContext,
 #endif /* WLAN_OPEN_SOURCE */
 	}
 
-	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO_LOW,
+	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_DEBUG,
 		"%s: NUM PERF CORE %d, HIGH TPUTR REQ %d, RX THRE CPU %lu",
 		__func__, perf_core_count,
 		(int)pSchedContext->high_throughput_required,
@@ -467,6 +467,7 @@ QDF_STATUS cds_sched_open(void *p_cds_context,
 		uint32_t SchedCtxSize)
 {
 	QDF_STATUS vStatus = QDF_STATUS_SUCCESS;
+
 	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO_HIGH,
 		  "%s: Opening the CDS Scheduler", __func__);
 	/* Sanity checks */
@@ -1048,6 +1049,21 @@ cds_indicate_rxpkt(p_cds_sched_context pSchedContext,
 	spin_lock_bh(&pSchedContext->ol_rx_queue_lock);
 	list_add_tail(&pkt->list, &pSchedContext->ol_rx_thread_queue);
 	spin_unlock_bh(&pSchedContext->ol_rx_queue_lock);
+	set_bit(RX_POST_EVENT, &pSchedContext->ol_rx_event_flag);
+	wake_up_interruptible(&pSchedContext->ol_rx_wait_queue);
+}
+
+/**
+ * cds_wakeup_rx_thread() - wakeup rx thread
+ * @Arg: Pointer to the global CDS Sched Context
+ *
+ * This api wake up cds_ol_rx_thread() to process pkt
+ *
+ * Return: none
+ */
+void
+cds_wakeup_rx_thread(p_cds_sched_context pSchedContext)
+{
 	set_bit(RX_POST_EVENT, &pSchedContext->ol_rx_event_flag);
 	wake_up_interruptible(&pSchedContext->ol_rx_wait_queue);
 }

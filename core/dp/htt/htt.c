@@ -108,13 +108,16 @@ void htt_htc_pkt_pool_free(struct htt_pdev_t *pdev)
 {
 	struct htt_htc_pkt_union *pkt, *next;
 
+	HTT_TX_MUTEX_ACQUIRE(&pdev->htt_tx_mutex);
 	pkt = pdev->htt_htc_pkt_freelist;
+	pdev->htt_htc_pkt_freelist = NULL;
+	HTT_TX_MUTEX_RELEASE(&pdev->htt_tx_mutex);
+
 	while (pkt) {
 		next = pkt->u.next;
 		qdf_mem_free(pkt);
 		pkt = next;
 	}
-	pdev->htt_htc_pkt_freelist = NULL;
 }
 
 #ifdef ATH_11AC_TXCOMPACT
@@ -174,12 +177,16 @@ void htt_htc_misc_pkt_pool_free(struct htt_pdev_t *pdev)
 	struct htt_htc_pkt_union *pkt, *next;
 	qdf_nbuf_t netbuf;
 
+	HTT_TX_MUTEX_ACQUIRE(&pdev->htt_tx_mutex);
 	pkt = pdev->htt_htc_pkt_misclist;
+	pdev->htt_htc_pkt_misclist = NULL;
+	HTT_TX_MUTEX_RELEASE(&pdev->htt_tx_mutex);
 
 	while (pkt) {
 		next = pkt->u.next;
 		if (htc_packet_get_magic_cookie(&(pkt->u.pkt.htc_pkt)) !=
 				HTC_PACKET_MAGIC_COOKIE) {
+			QDF_ASSERT(0);
 			pkt = next;
 			continue;
 		}
@@ -190,7 +197,6 @@ void htt_htc_misc_pkt_pool_free(struct htt_pdev_t *pdev)
 		qdf_mem_free(pkt);
 		pkt = next;
 	}
-	pdev->htt_htc_pkt_misclist = NULL;
 }
 #endif
 
@@ -435,6 +441,9 @@ success:
 	return pdev;
 
 htt_htc_attach_fail:
+	HTT_TX_MUTEX_DESTROY(&pdev->credit_mutex);
+	HTT_TX_MUTEX_DESTROY(&pdev->htt_tx_mutex);
+	HTT_TX_NBUF_QUEUE_MUTEX_DESTROY(pdev);
 	qdf_mem_free(pdev);
 
 fail1:
@@ -668,7 +677,6 @@ void htt_detach(htt_pdev_handle pdev)
 	HTT_TX_MUTEX_DESTROY(&pdev->credit_mutex);
 	HTT_TX_MUTEX_DESTROY(&pdev->htt_tx_mutex);
 	HTT_TX_NBUF_QUEUE_MUTEX_DESTROY(pdev);
-	htt_rx_dbg_rxbuf_deinit(pdev);
 }
 
 /**
@@ -781,6 +789,21 @@ int htt_htc_attach(struct htt_pdev_t *pdev, uint16_t service_id)
 	return 0;               /* success */
 }
 
+void htt_log_rx_ring_info(htt_pdev_handle pdev)
+{
+	if (!pdev) {
+		QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_ERROR,
+			  "%s: htt pdev is NULL", __func__);
+		return;
+	}
+	QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_DEBUG,
+		  "%s: Data Stall Detected with reason 4 (=FW_RX_REFILL_FAILED)."
+		  "src htt rx ring:  space for %d elements, filled with %d buffers, buffers in the ring %d, refill debt %d",
+		  __func__, pdev->rx_ring.size, pdev->rx_ring.fill_level,
+		  pdev->rx_ring.fill_cnt,
+		  qdf_atomic_read(&pdev->rx_ring.refill_debt));
+}
+
 #if HTT_DEBUG_LEVEL > 5
 void htt_display(htt_pdev_handle pdev, int indent)
 {
@@ -820,6 +843,9 @@ int htt_ipa_uc_attach(struct htt_pdev_t *pdev)
 {
 	int error;
 
+	QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_INFO, "%s: enter",
+		  __func__);
+
 	/* TX resource attach */
 	error = htt_tx_ipa_uc_attach(
 		pdev,
@@ -844,6 +870,8 @@ int htt_ipa_uc_attach(struct htt_pdev_t *pdev)
 		return error;
 	}
 
+	QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_INFO, "%s: exit",
+		  __func__);
 	return 0;               /* success */
 }
 
@@ -855,11 +883,17 @@ int htt_ipa_uc_attach(struct htt_pdev_t *pdev)
  */
 void htt_ipa_uc_detach(struct htt_pdev_t *pdev)
 {
+	QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_INFO, "%s: enter",
+		  __func__);
+
 	/* TX IPA micro controller detach */
 	htt_tx_ipa_uc_detach(pdev);
 
 	/* RX IPA micro controller detach */
 	htt_rx_ipa_uc_detach(pdev);
+
+	QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_INFO, "%s: exit",
+		  __func__);
 }
 
 int

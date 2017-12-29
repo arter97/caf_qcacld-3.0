@@ -1753,6 +1753,33 @@ static QDF_STATUS wma_wow_sta_ra_filter(tp_wma_handle wma, uint8_t vdev_id)
 #endif /* FEATURE_WLAN_RA_FILTERING */
 
 /**
+ * wma_wow_set_wake_time() - set timer pattern tlv, so that firmware will wake
+ * up host after specified time is elapsed
+ * @wma_handle: wma handle
+ * @vdev_id: vdev id
+ * @cookie: value to identify reason why host set up wake call.
+ * @time: time in ms
+ *
+ * Return: QDF status
+ */
+QDF_STATUS wma_wow_set_wake_time(WMA_HANDLE wma_handle, uint8_t vdev_id,
+				 uint32_t cookie, uint32_t time)
+{
+	int ret;
+	tp_wma_handle wma = (tp_wma_handle)wma_handle;
+
+	WMA_LOGD(FL("send timer patter with time: %d and vdev = %d to fw"),
+		 time, vdev_id);
+	ret = wmi_unified_wow_timer_pattern_cmd(wma->wmi_handle, vdev_id,
+						cookie, time);
+	if (ret) {
+		WMA_LOGE(FL("Failed to send timer patter to fw"));
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+/**
  * wmi_unified_nat_keepalive_enable() - enable NAT keepalive filter
  * @wma: wma handle
  * @vdev_id: vdev id
@@ -2125,6 +2152,11 @@ static QDF_STATUS dfs_phyerr_offload_event_handler(void *handle,
 		WMA_LOGE("%s: dfs is  NULL ", __func__);
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	if (!is_dfs_radar_enable(ic)) {
+		WMA_LOGD("%s: DFS_AR_EN not enabled", __func__);
+		return QDF_STATUS_E_FAILURE;
+	}
 	/*
 	 * This parameter holds the number
 	 * of phyerror interrupts to the host
@@ -2162,7 +2194,7 @@ static QDF_STATUS dfs_phyerr_offload_event_handler(void *handle,
 			is_ch_dfs = true;
 	}
 	if (!is_ch_dfs) {
-		WMA_LOGE("%s: Invalid DFS Phyerror event. Channel=%d is Non-DFS",
+		WMA_LOGD("%s: Invalid DFS Phyerror event. Channel=%d is Non-DFS",
 			__func__, chan->ic_ieee);
 		qdf_spin_unlock_bh(&ic->chan_lock);
 		return QDF_STATUS_E_FAILURE;
@@ -2375,6 +2407,11 @@ static QDF_STATUS dfs_phyerr_no_offload_event_handler(void *handle,
 	 */
 	n = 0;                  /* Start just after the header */
 	bufp = param_tlvs->bufp;
+	if (pe_hdr->buf_len > param_tlvs->num_bufp) {
+		WMA_LOGE("%s: Invalid Buff size %d Max allowed buf size %d",
+			   __func__, pe_hdr->buf_len, param_tlvs->num_bufp);
+		return 0;
+	}
 	while (n < pe_hdr->buf_len) {
 		/* ensure there's at least space for the header */
 		if ((pe_hdr->buf_len - n) < sizeof(ev->hdr)) {
@@ -4650,6 +4687,11 @@ int wma_wow_wakeup_host_event(void *handle, uint8_t *event,
 
 	/* unspecified means apps-side wakeup, so there won't be a vdev */
 	if (wake_info->wake_reason != WOW_REASON_UNSPECIFIED) {
+		if (wake_info->vdev_id >= wma->max_bssid) {
+			WMA_LOGE("%s: received invalid vdev_id %d",
+				 __func__, wake_info->vdev_id);
+			return -EINVAL;
+		}
 		wma_vdev = &wma->interfaces[wake_info->vdev_id];
 		WMA_LOGA("WLAN triggered wakeup: %s (%d), vdev: %d (%s)",
 			 wma_wow_wake_reason_str(wake_info->wake_reason),
@@ -4668,13 +4710,28 @@ int wma_wow_wakeup_host_event(void *handle, uint8_t *event,
 
 	qdf_event_set(&wma->wma_resume_event);
 
-	if (param_buf->wow_packet_buffer &&
-	    tlv_check_required(wake_info->wake_reason)) {
+	if (param_buf->wow_packet_buffer) {
 		/*
 		 * In case of wow_packet_buffer, first 4 bytes is the length.
 		 * Following the length is the actual buffer.
 		 */
+		if (param_buf->num_wow_packet_buffer <= 4) {
+			WMA_LOGE("Invalid wow packet buffer from firmware %u",
+				  param_buf->num_wow_packet_buffer);
+			return -EINVAL;
+		}
 		wow_buf_pkt_len = *(uint32_t *)param_buf->wow_packet_buffer;
+		if (wow_buf_pkt_len > (param_buf->num_wow_packet_buffer - 4)) {
+			WMA_LOGE("Invalid wow buf pkt len from firmware, wow_buf_pkt_len: %u, num_wow_packet_buffer: %u",
+				 wow_buf_pkt_len,
+				 param_buf->num_wow_packet_buffer);
+			return -EINVAL;
+		}
+	}
+
+	if (param_buf->wow_packet_buffer &&
+	    tlv_check_required(wake_info->wake_reason)) {
+
 		tlv_hdr = WMITLV_GET_HDR(
 				(uint8_t *)param_buf->wow_packet_buffer + 4);
 
@@ -4708,9 +4765,6 @@ int wma_wow_wakeup_host_event(void *handle, uint8_t *event,
 	case WOW_REASON_BEACON_RECV:
 	case WOW_REASON_ACTION_FRAME_RECV:
 		if (param_buf->wow_packet_buffer) {
-			/* First 4-bytes of wow_packet_buffer is the length */
-			qdf_mem_copy((uint8_t *) &wow_buf_pkt_len,
-				param_buf->wow_packet_buffer, 4);
 			if (wow_buf_pkt_len)
 				wma_wow_dump_mgmt_buffer(
 					param_buf->wow_packet_buffer,
@@ -4782,9 +4836,6 @@ int wma_wow_wakeup_host_event(void *handle, uint8_t *event,
 			break;
 		}
 
-		/* First 4-bytes of wow_packet_buffer is the length */
-		qdf_mem_copy((uint8_t *)&wow_buf_pkt_len,
-			     param_buf->wow_packet_buffer, 4);
 		if (wow_buf_pkt_len == 0) {
 			WMA_LOGE("wow packet buffer is empty");
 			break;
@@ -4896,6 +4947,23 @@ int wma_wow_wakeup_host_event(void *handle, uint8_t *event,
 	case WOW_REASON_CHIP_POWER_FAILURE_DETECT:
 		/* Just update stats and exit */
 		WMA_LOGD("Host woken up because of chip power save failure");
+		break;
+	case WOW_REASON_TIMER_INTR_RECV:
+		/*
+		 * Right now firmware is not returning any cookie host has
+		 * programmed. So do not check for cookie.
+		 */
+		WMA_LOGE("WOW_REASON_TIMER_INTR_RECV received, indicating key exchange did not finish. Initiate disconnect");
+		if (param_buf->wow_packet_buffer) {
+			WMA_LOGD("wow_packet_buffer dump");
+			qdf_trace_hex_dump(QDF_MODULE_ID_WMA,
+				QDF_TRACE_LEVEL_DEBUG,
+				param_buf->wow_packet_buffer, wow_buf_pkt_len);
+			wma_peer_sta_kickout_event_handler(handle,
+				wmi_cmd_struct_ptr, wow_buf_pkt_len);
+		} else {
+		    WMA_LOGD("No wow_packet_buffer present");
+		}
 		break;
 	default:
 		break;
@@ -5500,7 +5568,7 @@ QDF_STATUS wma_enable_d0wow_in_fw(WMA_HANDLE handle)
 		return status;
 	}
 
-	status = qdf_wait_single_event(&wma->target_suspend,
+	status = qdf_wait_for_event_completion(&wma->target_suspend,
 		WMA_TGT_SUSPEND_COMPLETE_TIMEOUT);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		WMA_LOGE("Failed to receive D0-WoW enable HTC ACK from FW! "
@@ -5600,7 +5668,7 @@ QDF_STATUS wma_enable_wow_in_fw(WMA_HANDLE handle, uint32_t wow_flags)
 
 	wmi_set_target_suspend(wma->wmi_handle, true);
 
-	if (qdf_wait_single_event(&wma->target_suspend,
+	if (qdf_wait_for_event_completion(&wma->target_suspend,
 				  WMA_TGT_SUSPEND_COMPLETE_TIMEOUT)
 	    != QDF_STATUS_SUCCESS) {
 		WMA_LOGE("Failed to receive WoW Enable Ack from FW");
@@ -6363,7 +6431,7 @@ static QDF_STATUS wma_send_host_wakeup_ind_to_fw(tp_wma_handle wma)
 
 	WMA_LOGD("Host wakeup indication sent to fw");
 
-	qdf_status = qdf_wait_single_event(&(wma->wma_resume_event),
+	qdf_status = qdf_wait_for_event_completion(&(wma->wma_resume_event),
 					   WMA_RESUME_TIMEOUT);
 	if (QDF_STATUS_SUCCESS != qdf_status) {
 		WMA_LOGP("%s: Timeout waiting for resume event from FW",
@@ -6419,7 +6487,7 @@ QDF_STATUS wma_disable_d0wow_in_fw(WMA_HANDLE handle)
 		return status;
 	}
 
-	status = qdf_wait_single_event(&(wma->wma_resume_event),
+	status = qdf_wait_for_event_completion(&(wma->wma_resume_event),
 				WMA_RESUME_TIMEOUT);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		WMA_LOGP("%s: Timeout waiting for resume event from FW!",
@@ -6912,6 +6980,7 @@ QDF_STATUS wma_process_mcbc_set_filter_req(tp_wma_handle wma_handle,
 					   tSirRcvFltMcAddrList *mcbc_param)
 {
 	uint8_t vdev_id = 0;
+	struct mcast_filter_params *filter_params;
 
 	if (mcbc_param->ulMulticastAddrCnt <= 0) {
 		WMA_LOGW("Number of multicast addresses is 0");
@@ -6947,19 +7016,25 @@ QDF_STATUS wma_process_mcbc_set_filter_req(tp_wma_handle wma_handle,
 
 	if (WMI_SERVICE_IS_ENABLED(wma_handle->wmi_service_bitmap,
 		WMI_SERVICE_MULTIPLE_MCAST_FILTER_SET)) {
-		struct mcast_filter_params filter_params;
+		filter_params = qdf_mem_malloc(
+					    sizeof(struct mcast_filter_params));
 
+		if (!filter_params) {
+			WMA_LOGE("Memory alloc failed for filter_params");
+			return QDF_STATUS_E_FAILURE;
+		}
 		WMA_LOGD("%s: FW supports multiple mcast filter", __func__);
 
-		filter_params.multicast_addr_cnt =
+		filter_params->multicast_addr_cnt =
 					mcbc_param->ulMulticastAddrCnt;
-		qdf_mem_copy(filter_params.multicast_addr,
+		qdf_mem_copy(filter_params->multicast_addr,
 			     mcbc_param->multicastAddr,
 			     mcbc_param->ulMulticastAddrCnt * ATH_MAC_LEN);
-		filter_params.action = mcbc_param->action;
+		filter_params->action = mcbc_param->action;
 
 		wma_multiple_add_clear_mcbc_filter(wma_handle, vdev_id,
-						   &filter_params);
+						   filter_params);
+		qdf_mem_free(filter_params);
 	} else {
 		int i;
 
@@ -8320,7 +8395,7 @@ static QDF_STATUS wma_post_runtime_suspend_msg(WMA_HANDLE handle)
 	if (qdf_status != QDF_STATUS_SUCCESS)
 		goto failure;
 
-	if (qdf_wait_single_event(&wma->runtime_suspend,
+	if (qdf_wait_for_event_completion(&wma->runtime_suspend,
 			WMA_TGT_SUSPEND_COMPLETE_TIMEOUT) !=
 			QDF_STATUS_SUCCESS) {
 		WMA_LOGE("Failed to get runtime suspend event");
@@ -8333,6 +8408,40 @@ msg_timed_out:
 	wma_post_runtime_resume_msg(wma);
 failure:
 	return QDF_STATUS_E_AGAIN;
+}
+
+/**
+ * wma_check_and_set_wake_timer(): checks all interfaces and if any interface
+ * has install_key pending, sets timer pattern in fw to wake up host after
+ * specified time has elapsed.
+ * @wma: wma handle
+ * @time: time after which host wants to be awaken.
+ *
+ * Return: None
+ */
+static void wma_check_and_set_wake_timer(tp_wma_handle wma, uint32_t time)
+{
+	int i;
+	struct wma_txrx_node *iface;
+
+	if (!WMI_SERVICE_EXT_IS_ENABLED(wma->wmi_service_bitmap,
+		wma->wmi_service_ext_bitmap,
+		WMI_SERVICE_WOW_WAKEUP_BY_TIMER_PATTERN)) {
+		WMA_LOGD("TIME_PATTERN is not enabled");
+		return;
+	}
+
+	for (i = 0; i < wma->max_bssid; i++) {
+		iface = &wma->interfaces[i];
+		if (iface->is_vdev_valid && iface->is_waiting_for_key) {
+			/*
+			 * right now cookie is dont care, since FW disregards
+			 * that.
+			 */
+			wma_wow_set_wake_time((WMA_HANDLE)wma, i, 0, time);
+			break;
+		}
+	}
 }
 
 /**
@@ -8399,6 +8508,7 @@ static int __wma_bus_suspend(enum qdf_suspend_type type, uint32_t wow_flags)
 		return qdf_status_to_os_return(status);
 	}
 
+	wma_check_and_set_wake_timer(handle, SIR_INSTALL_KEY_TIMEOUT_MS);
 	status = wma_enable_wow_in_fw(handle, wow_flags);
 
 	return qdf_status_to_os_return(status);
@@ -8554,6 +8664,8 @@ static inline void wma_suspend_target_timeout(bool is_self_recovery_enabled)
 	else if (cds_is_driver_in_bad_state())
 		WMA_LOGE("%s: Module in bad state; Ignoring suspend timeout",
 			 __func__);
+	else if (cds_is_fw_down())
+		WMA_LOGE(FL("FW is down; Ignoring suspend timeout"));
 	else
 		cds_trigger_recovery(CDS_SUSPEND_TIMEOUT);
 }
@@ -8593,7 +8705,7 @@ QDF_STATUS wma_suspend_target(WMA_HANDLE handle, int disable_target_intr)
 
 	wmi_set_target_suspend(wma_handle->wmi_handle, true);
 
-	if (qdf_wait_single_event(&wma_handle->target_suspend,
+	if (qdf_wait_for_event_completion(&wma_handle->target_suspend,
 				  WMA_TGT_SUSPEND_COMPLETE_TIMEOUT)
 	    != QDF_STATUS_SUCCESS) {
 		WMA_LOGE("Failed to get ACK from firmware for pdev suspend");
@@ -8659,6 +8771,7 @@ void wma_handle_initial_wake_up(void)
 int wma_is_target_wake_up_received(void)
 {
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+	int32_t event_count;
 
 	if (NULL == wma) {
 		WMA_LOGE("%s: wma is NULL", __func__);
@@ -8667,6 +8780,13 @@ int wma_is_target_wake_up_received(void)
 
 	if (wma->wow_initial_wake_up) {
 		WMA_LOGE("Target initial wake up received try again");
+		return -EAGAIN;
+	}
+
+	event_count = qdf_atomic_read(&wma->critical_events_in_flight);
+	if (event_count) {
+		WMA_LOGE("%d critical event(s) in flight; Try again",
+			 event_count);
 		return -EAGAIN;
 	}
 
@@ -8717,7 +8837,7 @@ QDF_STATUS wma_resume_target(WMA_HANDLE handle)
 	if (QDF_IS_STATUS_ERROR(qdf_status))
 		WMA_LOGE("Failed to send WMI_PDEV_RESUME_CMDID command");
 
-	qdf_status = qdf_wait_single_event(&(wma->wma_resume_event),
+	qdf_status = qdf_wait_for_event_completion(&(wma->wma_resume_event),
 			WMA_RESUME_TIMEOUT);
 	if (QDF_STATUS_SUCCESS != qdf_status) {
 		WMA_LOGP("%s: Timeout waiting for resume event from FW",
@@ -9579,119 +9699,6 @@ int wma_dfs_indicate_radar(struct ieee80211com *ic,
 	return 0;
 }
 
-#ifdef WLAN_FEATURE_MEMDUMP
-/*
- * wma_process_fw_mem_dump_req() - Function to request fw memory dump from
- *                                 firmware
- * @wma:                Pointer to WMA handle
- * @mem_dump_req:       Pointer for mem_dump_req
- *
- * This function sends memory dump request to firmware
- *
- * Return: QDF_STATUS_SUCCESS for success otherwise failure
- *
- */
-QDF_STATUS wma_process_fw_mem_dump_req(tp_wma_handle wma,
-					struct fw_dump_req *mem_dump_req)
-{
-	int ret;
-
-	if (!mem_dump_req || !wma) {
-		WMA_LOGE(FL("input pointer is NULL"));
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	ret = wmi_unified_process_fw_mem_dump_cmd(wma->wmi_handle,
-			 (struct fw_dump_req_param *) mem_dump_req);
-	if (ret)
-		return QDF_STATUS_E_FAILURE;
-
-	return QDF_STATUS_SUCCESS;
-}
-
-/**
- * wma_fw_mem_dump_rsp() - send fw mem dump response to SME
- *
- * @req_id - request id.
- * @status - copy status from the firmware.
- *
- * This function is called by the memory dump response handler to
- * indicate SME that firmware dump copy is complete
- *
- * Return: QDF_STATUS
- */
-static QDF_STATUS wma_fw_mem_dump_rsp(uint32_t req_id, uint32_t status)
-{
-	struct fw_dump_rsp *dump_rsp;
-	cds_msg_t sme_msg = {0};
-	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
-
-	dump_rsp = qdf_mem_malloc(sizeof(*dump_rsp));
-
-	if (!dump_rsp) {
-		WMA_LOGE(FL("Memory allocation failed."));
-		qdf_status = QDF_STATUS_E_NOMEM;
-		return qdf_status;
-	}
-
-	WMA_LOGD(FL("FW memory dump copy complete status: %d for request: %d"),
-		 status, req_id);
-
-	dump_rsp->request_id = req_id;
-	dump_rsp->dump_complete = status;
-
-	sme_msg.type = eWNI_SME_FW_DUMP_IND;
-	sme_msg.bodyptr = dump_rsp;
-	sme_msg.bodyval = 0;
-
-	qdf_status = cds_mq_post_message(QDF_MODULE_ID_SME, &sme_msg);
-	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
-		WMA_LOGE(FL("Fail to post fw mem dump ind msg"));
-		qdf_mem_free(dump_rsp);
-	}
-
-	return qdf_status;
-}
-
-/**
- * wma_fw_mem_dump_event_handler() - handles fw memory dump event
- *
- * @handle: pointer to wma handle.
- * @cmd_param_info: pointer to TLV info received in the event.
- * @len: length of data in @cmd_param_info
- *
- * This function is a handler for firmware memory dump event.
- *
- * Return: integer (0 for success and error code otherwise)
- */
-int wma_fw_mem_dump_event_handler(void *handle, u_int8_t *cmd_param_info,
-					 u_int32_t len)
-{
-	WMI_UPDATE_FW_MEM_DUMP_EVENTID_param_tlvs *param_buf;
-	wmi_update_fw_mem_dump_fixed_param *event;
-	QDF_STATUS status;
-
-	param_buf =
-	    (WMI_UPDATE_FW_MEM_DUMP_EVENTID_param_tlvs *) cmd_param_info;
-	if (!param_buf) {
-		WMA_LOGA("%s: Invalid stats event", __func__);
-		return -EINVAL;
-	}
-
-	event = param_buf->fixed_param;
-
-	status = wma_fw_mem_dump_rsp(event->request_id,
-					 event->fw_mem_dump_complete);
-	if (QDF_STATUS_SUCCESS != status) {
-		WMA_LOGE("Error posting FW MEM DUMP RSP.");
-		return -EINVAL;
-	}
-
-	WMA_LOGD("FW MEM DUMP RSP posted successfully");
-	return 0;
-}
-#endif /* WLAN_FEATURE_MEMDUMP */
-
 /*
  * wma_process_set_ie_info() - Function to send IE info to firmware
  * @wma:                Pointer to WMA handle
@@ -10178,6 +10185,11 @@ int wma_p2p_lo_event_handler(void *handle, uint8_t *event_buf,
 	param_tlvs = (WMI_P2P_LISTEN_OFFLOAD_STOPPED_EVENTID_param_tlvs *)
 								event_buf;
 	fix_param = param_tlvs->fixed_param;
+	if (fix_param->vdev_id >= wma->max_bssid) {
+		WMA_LOGE("%s: received invalid vdev_id %d",
+			 __func__, fix_param->vdev_id);
+		return -EINVAL;
+	}
 	event = qdf_mem_malloc(sizeof(*event));
 	if (event == NULL) {
 		WMA_LOGE("Event allocation failed");
@@ -10435,6 +10447,14 @@ int wma_encrypt_decrypt_msg_handler(void *handle, uint8_t *data,
 
 	encrypt_decrypt_rsp_params.vdev_id = data_event->vdev_id;
 	encrypt_decrypt_rsp_params.status = data_event->status;
+
+	if (data_event->data_length > param_buf->num_enc80211_frame) {
+		WMA_LOGE("FW msg data_len %d more than TLV hdr %d",
+			 data_event->data_length,
+			 param_buf->num_enc80211_frame);
+		return -EINVAL;
+	}
+
 	encrypt_decrypt_rsp_params.data_length = data_event->data_length;
 
 	if (encrypt_decrypt_rsp_params.data_length) {
@@ -10932,6 +10952,14 @@ int wma_rx_aggr_failure_event_handler(void *handle, u_int8_t *event_buf,
 
 	rx_aggr_failure_info = param_buf->fixed_param;
 	hole_info = param_buf->failure_info;
+
+	if (rx_aggr_failure_info->num_failure_info > ((WMI_SVC_MSG_MAX_SIZE -
+	    sizeof(*rx_aggr_hole_event)) /
+	    sizeof(rx_aggr_hole_event->hole_info_array[0]))) {
+		WMA_LOGE("%s: Excess data from WMI num_failure_info %d",
+			 __func__, rx_aggr_failure_info->num_failure_info);
+		return -EINVAL;
+	}
 
 	alloc_len = sizeof(*rx_aggr_hole_event) +
 		(rx_aggr_failure_info->num_failure_info)*

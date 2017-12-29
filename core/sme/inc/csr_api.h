@@ -811,13 +811,6 @@ typedef enum {
 } eCsrSetKeyAction;
 
 typedef enum {
-	eCSR_BAND_ALL,
-	eCSR_BAND_24,
-	eCSR_BAND_5G,
-	eCSR_BAND_MAX,
-} eCsrBand;
-
-typedef enum {
 	/*
 	 * Roaming because HDD requested for reassoc by changing one of the
 	 * fields in tCsrRoamModifyProfileFields. OR Roaming because SME
@@ -1004,7 +997,8 @@ typedef struct tagCsrRoamProfile {
 	tSirMacRateSet  extended_rates;
 	struct qdf_mac_addr bssid_hint;
 	bool force_24ghz_in_ht20;
-	bool do_not_roam;
+	bool supplicant_disabled_roaming;
+	bool roaming_allowed_on_iface;
 #ifdef WLAN_FEATURE_FILS_SK
 	bool fils_connection;
 	uint8_t *hlp_ie;
@@ -1136,12 +1130,12 @@ typedef struct tagCsrConfigParam {
 	uint32_t channelBondingMode24GHz;
 	uint32_t channelBondingMode5GHz;
 	eCsrPhyMode phyMode;
-	eCsrBand eBand;
+	tSirRFBand eBand;
 	uint32_t RTSThreshold;
 	uint32_t HeartbeatThresh50;
 	uint32_t HeartbeatThresh24;
 	eCsrCBChoice cbChoice;
-	eCsrBand bandCapability;     /* indicate hw capability */
+	tSirRFBand bandCapability;
 	uint16_t TxRate;
 	eCsrRoamWmmUserModeType WMMSupportMode;
 	bool Is11eSupportEnabled;
@@ -1320,6 +1314,7 @@ typedef struct tagCsrConfigParam {
 	uint32_t auto_bmps_timer_val;
 	uint32_t fine_time_meas_cap;
 	uint32_t dual_mac_feature_disable;
+	uint32_t sta_sap_scc_on_dfs_chan;
 	uint32_t roam_dense_traffic_thresh;
 	uint32_t roam_dense_rssi_thresh_offset;
 	uint32_t roam_dense_min_aps;
@@ -1351,6 +1346,7 @@ typedef struct tagCsrConfigParam {
 	uint32_t rx_aggregation_size;
 	struct wmi_per_roam_config per_roam_config;
 	bool enable_bcast_probe_rsp;
+	bool is_fils_enabled;
 	bool qcn_ie_support;
 	uint8_t fils_max_chan_guard_time;
 	uint16_t pkt_err_disconn_th;
@@ -1364,6 +1360,7 @@ typedef struct tagCsrConfigParam {
 	uint32_t scan_probe_repeat_time;
 	uint32_t scan_num_probes;
 	struct sir_score_config bss_score_params;
+	uint8_t oce_feature_bitmap;
 } tCsrConfigParam;
 
 /* Tush */
@@ -1558,6 +1555,9 @@ typedef struct sSirSmeAssocIndToUpperLayerCnf {
 	uint8_t max_mcs_idx;
 	uint8_t rx_mcs_map;
 	uint8_t tx_mcs_map;
+
+	tDot11fIEHTCaps HTCaps;
+	tDot11fIEVHTCaps VHTCaps;
 } tSirSmeAssocIndToUpperLayerCnf, *tpSirSmeAssocIndToUpperLayerCnf;
 
 typedef struct tagCsrSummaryStatsInfo {
@@ -1770,7 +1770,7 @@ QDF_STATUS csr_set_reg_info(tHalHandle hHal, uint8_t *apCntryCode);
 /* enum to string conversion for debug output */
 const char *get_e_roam_cmd_status_str(eRoamCmdStatus val);
 const char *get_e_csr_roam_result_str(eCsrRoamResult val);
-QDF_STATUS csr_set_phy_mode(tHalHandle hHal, uint32_t phyMode, eCsrBand eBand,
+QDF_STATUS csr_set_phy_mode(tHalHandle hHal, uint32_t phyMode, tSirRFBand eBand,
 			    bool *pfRestartNeeded);
 typedef void (*csr_roamLinkQualityIndCallback)
 	(eCsrRoamLinkQualityInd ind, void *pContext);
@@ -1792,8 +1792,8 @@ static inline QDF_STATUS csr_roam_issue_ft_preauth_req(tHalHandle hHal,
 	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
-QDF_STATUS csr_set_band(tHalHandle hHal, uint8_t sessionId, eCsrBand eBand);
-eCsrBand csr_get_current_band(tHalHandle hHal);
+QDF_STATUS csr_set_band(tHalHandle hHal, uint8_t sessionId, tSirRFBand eBand);
+tSirRFBand csr_get_current_band(tHalHandle hHal);
 typedef void (*csr_readyToSuspendCallback)(void *pContext, bool suspended);
 #ifdef WLAN_FEATURE_EXTWOW_SUPPORT
 typedef void (*csr_readyToExtWoWCallback)(void *pContext, bool status);

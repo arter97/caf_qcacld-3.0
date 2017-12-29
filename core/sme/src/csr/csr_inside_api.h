@@ -61,9 +61,6 @@
 #define CSR_MAX_2_4_GHZ_SUPPORTED_CHANNELS 14
 
 #define CSR_MAX_BSS_SUPPORT            512
-#define SYSTEM_TIME_MSEC_TO_USEC      1000
-#define SYSTEM_TIME_SEC_TO_MSEC       1000
-#define SYSTEM_TIME_NSEC_TO_USEC      1000
 
 /* This number minus 1 means the number of times a channel is scanned before
  * a BSS is remvoed from
@@ -98,9 +95,9 @@
 
 /* ***************************************************************************
  * The MAX BSSID Count should be lower than the command timeout value and it
- * can be of a fraction of 3/4 to 1/2 of the total command timeout value.
+ * can be of a fraction of 1/3 to 1/2 of the total command timeout value.
  * ***************************************************************************/
-#define CSR_MAX_BSSID_COUNT     (SME_ACTIVE_LIST_CMD_TIMEOUT_VALUE/2000)
+#define CSR_MAX_BSSID_COUNT     (SME_ACTIVE_LIST_CMD_TIMEOUT_VALUE/3000) - 2
 #define CSR_CUSTOM_CONC_GO_BI    100
 extern uint8_t csr_wpa_oui[][CSR_WPA_OUI_SIZE];
 bool csr_is_supported_channel(tpAniSirGlobal pMac, uint8_t channelId);
@@ -154,15 +151,16 @@ bool csr_is_supported_channel(tpAniSirGlobal pMac, uint8_t channelId);
 /* 2 and 3 are reserved */
 #define WLAN_MAX_BAND_INDEX                  4
 
-#define WLAN_ESP_QBSS_INDEX_0                   0
-#define WLAN_ESP_QBSS_INDEX_3                   3
-#define WLAN_ESP_QBSS_INDEX_7                   7
-#define WLAN_ESP_QBSS_OFFSET_INDEX_7_4          4
-#define WLAN_ESP_QBSS_INDEX_11                  11
-#define WLAN_ESP_QBSS_OFFSET_INDEX_11_8         8
-#define WLAN_ESP_QBSS_MAX_INDEX                 15
-#define WLAN_ESP_QBSS_OFFSET_INDEX_15_12        12
+#define WLAN_SCORE_INDEX_0                   0
+#define WLAN_SCORE_INDEX_3                   3
+#define WLAN_SCORE_INDEX_7                   7
+#define WLAN_SCORE_OFFSET_INDEX_7_4          4
+#define WLAN_SCORE_INDEX_11                  11
+#define WLAN_SCORE_OFFSET_INDEX_11_8         8
+#define WLAN_SCORE_MAX_INDEX                 15
+#define WLAN_SCORE_OFFSET_INDEX_15_12        12
 
+#define MAX_OCE_WAN_DL_CAP 16
 
 enum csr_scancomplete_nextcommand {
 	eCsrNextScanNothing,

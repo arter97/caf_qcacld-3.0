@@ -60,6 +60,7 @@ rrm_get_min_of_max_tx_power(tpAniSirGlobal pMac,
 {
 	uint8_t maxTxPower = 0;
 	uint8_t txPower = QDF_MIN(regMax, (apTxPower));
+
 	if ((txPower >= RRM_MIN_TX_PWR_CAP) && (txPower <= RRM_MAX_TX_PWR_CAP))
 		maxTxPower = txPower;
 	else if (txPower < RRM_MIN_TX_PWR_CAP)
@@ -638,6 +639,7 @@ rrm_process_beacon_report_req(tpAniSirGlobal pMac,
 		uint8_t *ch_lst = pSmeBcnReportReq->channelList.channelNumber;
 		uint8_t len;
 		uint16_t ch_ctr = 0;
+
 		for (num_APChanReport = 0;
 		     num_APChanReport <
 		     pBeaconReq->measurement_request.Beacon.num_APChannelReport;
@@ -692,7 +694,7 @@ rrm_fill_beacon_ies(tpAniSirGlobal pMac,
 		    uint8_t *eids, uint8_t numEids, tpSirBssDescription pBssDesc)
 {
 	uint8_t len, *pBcnIes, count = 0, i;
-	uint8_t BcnNumIes;
+	uint16_t BcnNumIes;
 
 	if ((pIes == NULL) || (pNumIes == NULL) || (pBssDesc == NULL)) {
 		pe_err("Invalid parameters");
@@ -702,7 +704,7 @@ rrm_fill_beacon_ies(tpAniSirGlobal pMac,
 	numEids = (eids == NULL) ? 0 : numEids;
 
 	pBcnIes = (uint8_t *) &pBssDesc->ieFields[0];
-	BcnNumIes = (uint8_t) GET_IE_LEN_IN_BSS(pBssDesc->length);
+	BcnNumIes = GET_IE_LEN_IN_BSS(pBssDesc->length);
 
 	*pNumIes = 0;
 
@@ -961,7 +963,7 @@ static void rrm_process_beacon_request_failure(tpAniSirGlobal pMac,
  * @peer: Macaddress of the peer requesting the radio measurement
  * @session_entry: session entry
  * @curr_req: Pointer to RRM request
- * @report: Pointer to radio measurement report
+ * @radiomes_report: Pointer to radio measurement report
  * @rrm_req: Array of Measurement request IEs
  * @num_report: No.of reports
  * @index: Index for Measurement request
@@ -974,27 +976,29 @@ static void rrm_process_beacon_request_failure(tpAniSirGlobal pMac,
 static
 tSirRetStatus rrm_process_beacon_req(tpAniSirGlobal mac_ctx, tSirMacAddr peer,
 			     tpPESession session_entry, tpRRMReq curr_req,
-			     tpSirMacRadioMeasureReport report,
+			     tpSirMacRadioMeasureReport *radiomes_report,
 			     tDot11fRadioMeasurementRequest *rrm_req,
 			     uint8_t *num_report, int index)
 {
 	tRrmRetStatus rrm_status = eRRM_SUCCESS;
+	tpSirMacRadioMeasureReport report;
 
 	if (curr_req) {
-		if (report == NULL) {
+		if (*radiomes_report == NULL) {
 			/*
 			 * Allocate memory to send reports for
 			 * any subsequent requests.
 			 */
-			report = qdf_mem_malloc(sizeof(*report) *
+			*radiomes_report = qdf_mem_malloc(sizeof(*report) *
 				(rrm_req->num_MeasurementRequest - index));
-			if (NULL == report) {
+			if (NULL == *radiomes_report) {
 				pe_err("Unable to allocate memory during RRM Req processing");
 				return eSIR_MEM_ALLOC_FAILED;
 			}
 			pe_debug("rrm beacon type refused of %d report in beacon table",
 				*num_report);
 		}
+		report = *radiomes_report;
 		report[*num_report].refused = 1;
 		report[*num_report].type = SIR_MAC_RRM_BEACON_TYPE;
 		report[*num_report].token =
@@ -1005,7 +1009,7 @@ tSirRetStatus rrm_process_beacon_req(tpAniSirGlobal mac_ctx, tSirMacAddr peer,
 		curr_req = qdf_mem_malloc(sizeof(*curr_req));
 		if (NULL == curr_req) {
 			pe_err("Unable to allocate memory during RRM Req processing");
-				qdf_mem_free(report);
+				qdf_mem_free(*radiomes_report);
 			return eSIR_MEM_ALLOC_FAILED;
 		}
 		pe_debug("Processing Beacon Report request");
@@ -1129,7 +1133,7 @@ rrm_process_radio_measurement_request(tpAniSirGlobal mac_ctx,
 		case SIR_MAC_RRM_BEACON_TYPE:
 			/* Process beacon request. */
 			status = rrm_process_beacon_req(mac_ctx, peer,
-				 session_entry, curr_req, report, rrm_req,
+				 session_entry, curr_req, &report, rrm_req,
 				 &num_report, i);
 			if (eSIR_SUCCESS != status)
 				return status;

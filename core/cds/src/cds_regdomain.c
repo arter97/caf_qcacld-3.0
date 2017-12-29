@@ -162,6 +162,7 @@ static const struct reg_dmn_pair g_reg_dmn_pairs[] = {
 	{FCC1_WORLD, FCC1, WORLD, CTRY_DEFAULT},
 	{FCC2_WORLD, FCC2, WORLD, CTRY_DEFAULT},
 	{FCC2_ETSIC, FCC2, ETSIC, CTRY_DEFAULT},
+	{FCC2_FCCA, FCC2, FCCA, CTRY_DEFAULT},
 	{FCC3_FCCA, FCC3, FCCA, CTRY_DEFAULT},
 	{FCC3_WORLD, FCC3, WORLD, CTRY_DEFAULT},
 	{FCC3_ETSIC, FCC3, ETSIC, CTRY_DEFAULT},
@@ -174,6 +175,8 @@ static const struct reg_dmn_pair g_reg_dmn_pairs[] = {
 	{FCC9_FCCA, FCC9, FCCA, CTRY_DEFAULT},
 	{FCC10_FCCA, FCC10, FCCA, CTRY_DEFAULT},
 	{FCC11_WORLD, FCC11, WORLD, CTRY_DEFAULT},
+	{FCC13_WORLD, FCC13, WORLD, CTRY_DEFAULT},
+	{FCC14_FCCB, FCC14, FCCB, CTRY_DEFAULT},
 	{ETSI1_WORLD, ETSI1, WORLD, CTRY_DEFAULT},
 	{ETSI3_WORLD, ETSI3, WORLD, CTRY_DEFAULT},
 	{ETSI4_WORLD, ETSI4, WORLD, CTRY_DEFAULT},
@@ -196,6 +199,9 @@ static const struct reg_dmn_pair g_reg_dmn_pairs[] = {
 	{APL14_WORLD, APL14, WORLD, CTRY_DEFAULT},
 	{APL15_WORLD, APL15, WORLD, CTRY_DEFAULT},
 	{APL16_WORLD, APL16, WORLD, CTRY_DEFAULT},
+	{APL17_ETSID, APL17, ETSID, CTRY_DEFAULT},
+	{APL20_WORLD, APL20, WORLD, CTRY_DEFAULT},
+	{APL23_WORLD, APL23, WORLD, CTRY_DEFAULT},
 	{WOR0_WORLD, WOR0_WORLD, WOR0_WORLD, CTRY_DEFAULT},
 	{WOR1_WORLD, WOR1_WORLD, WOR1_WORLD, CTRY_DEFAULT},
 	{WOR2_WORLD, WOR2_WORLD, WOR2_WORLD, CTRY_DEFAULT},
@@ -210,6 +216,7 @@ static const struct reg_dmn_pair g_reg_dmn_pairs[] = {
 	{WORB_WORLD, WORB_WORLD, WORB_WORLD, CTRY_DEFAULT},
 	{WORC_WORLD, WORC_WORLD, WORC_WORLD, CTRY_DEFAULT},
 	{MKK5_MKKC, MKK5, MKKC, CTRY_JAPAN15},
+	{MKK5_MKKA2, MKK5, MKKA, CTRY_DEFAULT},
 };
 
 static const struct country_code_to_reg_dmn g_all_countries[] = {
@@ -399,6 +406,8 @@ static const struct reg_dmn g_reg_dmns[] = {
 	{FCC9, FCC},
 	{FCC10, FCC},
 	{FCC11, FCC},
+	{FCC13, FCC},
+	{FCC14, FCC},
 	{ETSI1, ETSI},
 	{ETSI2, ETSI},
 	{ETSI3, ETSI},
@@ -425,6 +434,9 @@ static const struct reg_dmn g_reg_dmns[] = {
 	{APL14, FCC},
 	{APL15, FCC},
 	{APL16, FCC},
+	{APL17, FCC},
+	{APL20, ETSI},
+	{APL23, ETSI},
 	{NULL1, NO_CTL},
 	{MKK3, MKK},
 	{MKK5, MKK},
@@ -434,6 +446,7 @@ static const struct reg_dmn g_reg_dmns[] = {
 	{MKKA, MKK},
 	{MKKC, MKK},
 	{ETSIC, ETSI},
+	{ETSID, ETSI},
 	{WOR0_WORLD, NO_CTL},
 	{WOR1_WORLD, NO_CTL},
 	{WOR2_WORLD, NO_CTL},
@@ -482,6 +495,7 @@ static bool is_reg_dmn_valid(uint16_t reg_dmn)
 
 	if (reg_dmn & CTRY_FLAG) {
 		uint16_t cc = reg_dmn & ~CTRY_FLAG;
+
 		for (i = 0; i < g_reg_dmn_tbl.all_countries_cnt; i++)
 			if (g_reg_dmn_tbl.all_countries[i].country_code == cc)
 				return true;
@@ -712,6 +726,11 @@ void cds_fill_and_send_ctl_to_fw(struct regulatory *reg)
 		return;
 	}
 
+	if (!reg->regpair) {
+		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
+			  FL("no regpair is found, can not proceed"));
+		return;
+	}
 	regpair = reg->regpair;
 	reg_dmn_2g = get_reg_dmn(regpair->reg_dmn_2ghz);
 	if (!reg_dmn_2g) {

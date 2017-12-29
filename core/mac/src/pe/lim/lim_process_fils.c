@@ -1131,6 +1131,12 @@ void lim_update_fils_config(tpPESession session,
 	csr_fils_info->akm = fils_config_info->akm_type;
 	csr_fils_info->auth = fils_config_info->auth_type;
 	csr_fils_info->sequence_number = fils_config_info->sequence_number;
+	if (fils_config_info->key_nai_length > FILS_MAX_KEYNAME_NAI_LENGTH) {
+		pe_err("Restricting the key_nai_length of  %d to max %d",
+		       fils_config_info->key_nai_length,
+		       FILS_MAX_KEYNAME_NAI_LENGTH);
+		fils_config_info->key_nai_length = FILS_MAX_KEYNAME_NAI_LENGTH;
+	}
 	csr_fils_info->keyname_nai_data =
 		qdf_mem_malloc(fils_config_info->key_nai_length);
 	if (!csr_fils_info->keyname_nai_data) {
@@ -1338,6 +1344,18 @@ static QDF_STATUS lim_parse_kde_elements(tpAniSirGlobal mac_ctx,
 		elem_len = *temp_ie++;
 		rem_len -= 2;
 
+		if (rem_len < elem_len || elem_len > kde_list_len) {
+			pe_err("Invalid elem_len %d rem_len %d list_len %d",
+				elem_len, rem_len, kde_list_len);
+			return QDF_STATUS_E_FAILURE;
+		}
+
+		if (elem_len < KDE_IE_DATA_OFFSET) {
+			pe_err("Not enough len to parse elem_len %d",
+				elem_len);
+			return QDF_STATUS_E_FAILURE;
+		}
+
 		if (lim_check_if_vendor_oui_match(mac_ctx, KDE_OUI_TYPE,
 				KDE_OUI_TYPE_SIZE, current_ie, elem_len)) {
 
@@ -1347,6 +1365,11 @@ static QDF_STATUS lim_parse_kde_elements(tpAniSirGlobal mac_ctx,
 
 			switch (data_type) {
 			case DATA_TYPE_GTK:
+				if (data_len < GTK_OFFSET) {
+					pe_err("Invalid KDE data_len %d",
+						data_len);
+					return QDF_STATUS_E_FAILURE;
+				}
 				qdf_mem_copy(fils_info->gtk, (ie_data +
 					     GTK_OFFSET), (data_len -
 					     GTK_OFFSET));
@@ -1354,6 +1377,11 @@ static QDF_STATUS lim_parse_kde_elements(tpAniSirGlobal mac_ctx,
 				break;
 
 			case DATA_TYPE_IGTK:
+				if (data_len < IGTK_OFFSET) {
+					pe_err("Invalid KDE data_len %d",
+						data_len);
+					return QDF_STATUS_E_FAILURE;
+				}
 				fils_info->igtk_len = (data_len - IGTK_OFFSET);
 				qdf_mem_copy(fils_info->igtk, (ie_data +
 					     IGTK_OFFSET), (data_len -

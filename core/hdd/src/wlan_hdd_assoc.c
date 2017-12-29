@@ -252,10 +252,10 @@ bool hdd_conn_is_connected(hdd_station_ctx_t *pHddStaCtx)
  * hdd_conn_get_connected_band() - get current connection radio band
  * @pHddStaCtx:    pointer to global HDD Station context
  *
- * Return: eCSR_BAND_24 or eCSR_BAND_5G based on current AP connection
- *	eCSR_BAND_ALL if not connected
+ * Return: SIR_BAND_2_4_GHZ or SIR_BAND_5_GHZ based on current AP connection
+ *      SIR_BAND_ALL if not connected
  */
-eCsrBand hdd_conn_get_connected_band(hdd_station_ctx_t *pHddStaCtx)
+tSirRFBand hdd_conn_get_connected_band(hdd_station_ctx_t *pHddStaCtx)
 {
 	uint8_t staChannel = 0;
 
@@ -263,11 +263,11 @@ eCsrBand hdd_conn_get_connected_band(hdd_station_ctx_t *pHddStaCtx)
 		staChannel = pHddStaCtx->conn_info.operationChannel;
 
 	if (staChannel > 0 && staChannel < 14)
-		return eCSR_BAND_24;
+		return SIR_BAND_2_4_GHZ;
 	else if (staChannel >= 36 && staChannel <= 184)
-		return eCSR_BAND_5G;
-	else   /* If station is not connected return as eCSR_BAND_ALL */
-		return eCSR_BAND_ALL;
+		return SIR_BAND_5_GHZ;
+	else   /* If station is not connected return as SIR_BAND_ALL */
+		return SIR_BAND_ALL;
 }
 
 /**
@@ -346,11 +346,9 @@ static int hdd_add_beacon_filter(hdd_adapter_t *adapter)
  *
  * Return: None
  */
-static void hdd_copy_ht_caps(hdd_station_ctx_t *hdd_sta_ctx,
-				     tCsrRoamInfo *roam_info)
+void hdd_copy_ht_caps(struct ieee80211_ht_cap *hdd_ht_cap,
+		      tDot11fIEHTCaps *roam_ht_cap)
 {
-	tDot11fIEHTCaps *roam_ht_cap = &roam_info->ht_caps;
-	struct ieee80211_ht_cap *hdd_ht_cap = &hdd_sta_ctx->conn_info.ht_caps;
 	uint32_t i, temp_ht_cap;
 
 	qdf_mem_zero(hdd_ht_cap, sizeof(struct ieee80211_ht_cap));
@@ -540,12 +538,9 @@ static void hdd_copy_ht_caps(hdd_station_ctx_t *hdd_sta_ctx,
  *
  * Return: None
  */
-static void hdd_copy_vht_caps(hdd_station_ctx_t *hdd_sta_ctx,
-				     tCsrRoamInfo *roam_info)
+void hdd_copy_vht_caps(struct ieee80211_vht_cap *hdd_vht_cap,
+		       tDot11fIEVHTCaps *roam_vht_cap)
 {
-	tDot11fIEVHTCaps *roam_vht_cap = &roam_info->vht_caps;
-	struct ieee80211_vht_cap *hdd_vht_cap =
-		&hdd_sta_ctx->conn_info.vht_caps;
 	uint32_t temp_vht_cap;
 
 	qdf_mem_zero(hdd_vht_cap, sizeof(struct ieee80211_vht_cap));
@@ -799,13 +794,15 @@ static void hdd_save_bss_info(hdd_adapter_t *adapter,
 		hdd_sta_ctx->conn_info.operationChannel);
 	if (roam_info->vht_caps.present) {
 		hdd_sta_ctx->conn_info.conn_flag.vht_present = true;
-		hdd_copy_vht_caps(hdd_sta_ctx, roam_info);
+		hdd_copy_vht_caps(&hdd_sta_ctx->conn_info.vht_caps,
+				  &roam_info->vht_caps);
 	} else {
 		hdd_sta_ctx->conn_info.conn_flag.vht_present = false;
 	}
 	if (roam_info->ht_caps.present) {
 		hdd_sta_ctx->conn_info.conn_flag.ht_present = true;
-		hdd_copy_ht_caps(hdd_sta_ctx, roam_info);
+		hdd_copy_ht_caps(&hdd_sta_ctx->conn_info.ht_caps,
+				 &roam_info->ht_caps);
 	} else {
 		hdd_sta_ctx->conn_info.conn_flag.ht_present = false;
 	}
@@ -1646,7 +1643,10 @@ static QDF_STATUS hdd_dis_connect_handler(hdd_adapter_t *pAdapter,
 					sta_id, status, status);
 			status = QDF_STATUS_E_FAILURE;
 		}
-		pHddCtx->sta_to_adapter[sta_id] = NULL;
+		if (sta_id < HDD_MAX_ADAPTERS)
+			pHddCtx->sta_to_adapter[sta_id] = NULL;
+		else
+			hdd_debug("invalid sta_id %d", sta_id);
 		/* Clear all the peer sta register with TL. */
 		for (i = 0; i < MAX_PEERS; i++) {
 			if (HDD_WLAN_INVALID_STA_ID ==
@@ -1667,8 +1667,10 @@ static QDF_STATUS hdd_dis_connect_handler(hdd_adapter_t *pAdapter,
 						HDD_WLAN_INVALID_STA_ID;
 			qdf_mem_zero(&pHddStaCtx->conn_info.peerMacAddress[i],
 				sizeof(struct qdf_mac_addr));
-			if (sta_id < (WLAN_MAX_STA_COUNT + 3))
+			if (sta_id < HDD_MAX_ADAPTERS)
 				pHddCtx->sta_to_adapter[sta_id] = NULL;
+			else
+				hdd_debug("invalid sta_id %d", sta_id);
 		}
 	} else {
 		sta_id = pHddStaCtx->conn_info.staId[0];
@@ -1682,7 +1684,10 @@ static QDF_STATUS hdd_dis_connect_handler(hdd_adapter_t *pAdapter,
 			sme_remove_bssid_from_scan_list(pHddCtx->hHal,
 			pHddStaCtx->conn_info.bssId.bytes);
 		}
-		pHddCtx->sta_to_adapter[sta_id] = NULL;
+		if (sta_id < HDD_MAX_ADAPTERS)
+			pHddCtx->sta_to_adapter[sta_id] = NULL;
+		else
+			hdd_debug("invalid sta_id %d", sta_id);
 	}
 	/* Clear saved connection information in HDD */
 	hdd_conn_remove_connect_info(pHddStaCtx);
@@ -1712,6 +1717,9 @@ static QDF_STATUS hdd_dis_connect_handler(hdd_adapter_t *pAdapter,
 	pAdapter->dad = false;
 
 	pAdapter->hdd_stats.hddTxRxStats.cont_txtimeout_cnt = 0;
+
+	hdd_debug("check for SAP restart");
+	cds_check_concurrent_intf_and_restart_sap(pAdapter);
 
 	/* Unblock anyone waiting for disconnect to complete */
 	complete(&pAdapter->disconnect_comp_var);
@@ -2545,12 +2553,15 @@ static QDF_STATUS hdd_association_completion_handler(hdd_adapter_t *pAdapter,
 			pHddStaCtx->ft_carrier_on = false;
 			ft_carrier_on = true;
 		}
-		if ((WLAN_MAX_STA_COUNT + 3) > pRoamInfo->staId)
+		if (pRoamInfo->staId < HDD_MAX_ADAPTERS)
 			pHddCtx->sta_to_adapter[pRoamInfo->staId] = pAdapter;
 		else
 			hdd_err("Wrong Staid: %d", pRoamInfo->staId);
 
-		pHddCtx->sta_to_adapter[pRoamInfo->staId] = pAdapter;
+		if (pRoamInfo->staId < HDD_MAX_ADAPTERS)
+			pHddCtx->sta_to_adapter[pRoamInfo->staId] = pAdapter;
+		else
+			hdd_debug("invalid sta_id %d", pRoamInfo->staId);
 
 		if (hdd_ipa_is_enabled(pHddCtx))
 			hdd_ipa_wlan_evt(pAdapter, pRoamInfo->staId,
@@ -2610,6 +2621,10 @@ static QDF_STATUS hdd_association_completion_handler(hdd_adapter_t *pAdapter,
 					   eCSR_DISCONNECT_REASON_UNSPECIFIED);
 				}
 				return QDF_STATUS_E_FAILURE;
+			} else {
+				cfg80211_put_bss(
+					pHddCtx->wiphy,
+					bss);
 			}
 			if (pRoamInfo->u.pConnectedProfile->AuthType ==
 			    eCSR_AUTH_TYPE_FT_RSN
@@ -2825,10 +2840,6 @@ static QDF_STATUS hdd_association_completion_handler(hdd_adapter_t *pAdapter,
 				}
 			}
 			if (!hddDisconInProgress) {
-				cfg80211_put_bss(
-					pHddCtx->wiphy,
-					bss);
-
 				/*
 				 * Perform any WMM-related association
 				 * processing.
@@ -2937,6 +2948,11 @@ static QDF_STATUS hdd_association_completion_handler(hdd_adapter_t *pAdapter,
 		bool connect_timeout = false;
 		hdd_wext_state_t *pWextState =
 			WLAN_HDD_GET_WEXT_STATE_PTR(pAdapter);
+		if (pRoamInfo && pRoamInfo->is_fils_connection &&
+		    eCSR_ROAM_RESULT_SCAN_FOR_SSID_FAILURE == roamResult)
+			qdf_copy_macaddr(&pRoamInfo->bssid,
+					 &pWextState->req_bssId);
+
 		if (pRoamInfo)
 			hdd_err("wlan: connection failed with " MAC_ADDRESS_STR
 				 " result: %d and Status: %d",
@@ -3130,8 +3146,11 @@ static void hdd_roam_ibss_indication_handler(hdd_adapter_t *pAdapter,
 
 		hdd_sta_ctx->broadcast_staid = pRoamInfo->staId;
 
-		pHddCtx->sta_to_adapter[pRoamInfo->staId] =
+		if (pRoamInfo->staId < HDD_MAX_ADAPTERS)
+			pHddCtx->sta_to_adapter[pRoamInfo->staId] =
 			pAdapter;
+		else
+			hdd_debug("invalid sta_id %d", pRoamInfo->staId);
 		hdd_roam_register_sta(pAdapter, pRoamInfo,
 				      pRoamInfo->staId,
 				      &broadcastMacAddr,
@@ -3481,7 +3500,10 @@ roam_roam_connect_status_update_handler(hdd_adapter_t *pAdapter,
 			break;
 		}
 
-		pHddCtx->sta_to_adapter[pRoamInfo->staId] = pAdapter;
+		if (pRoamInfo->staId < HDD_MAX_ADAPTERS)
+			pHddCtx->sta_to_adapter[pRoamInfo->staId] = pAdapter;
+		else
+			hdd_debug("invalid sta_id %d", pRoamInfo->staId);
 
 		/* Register the Station with TL for the new peer. */
 		qdf_status = hdd_roam_register_sta(pAdapter,
@@ -3571,7 +3593,11 @@ roam_roam_connect_status_update_handler(hdd_adapter_t *pAdapter,
 
 		hdd_roam_deregister_sta(pAdapter, pRoamInfo->staId);
 
-		pHddCtx->sta_to_adapter[pRoamInfo->staId] = NULL;
+		if (pRoamInfo->staId < HDD_MAX_ADAPTERS)
+			pHddCtx->sta_to_adapter[pRoamInfo->staId] = NULL;
+		else
+			hdd_debug("invalid sta_id %d", pRoamInfo->staId);
+
 		pHddStaCtx->ibss_sta_generation++;
 
 		cfg80211_del_sta(pAdapter->dev,
@@ -3836,9 +3862,13 @@ hdd_roam_tdls_status_update_handler(hdd_adapter_t *pAdapter,
 					return QDF_STATUS_E_FAILURE;
 				}
 
-				(WLAN_HDD_GET_CTX(pAdapter))->
-				sta_to_adapter[pRoamInfo->staId] =
-					pAdapter;
+				if (pRoamInfo->staId < HDD_MAX_ADAPTERS)
+					(WLAN_HDD_GET_CTX(pAdapter))->
+					sta_to_adapter[pRoamInfo->staId] =
+						pAdapter;
+				else
+					hdd_debug("invalid sta_id %d",
+						pRoamInfo->staId);
 				/*
 				 * store the ucast signature,
 				 * if required for further reference.
@@ -4790,6 +4820,9 @@ static void hdd_roam_channel_switch_handler(hdd_adapter_t *adapter,
 			roam_info->mode == SIR_SME_PHY_MODE_LEGACY);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("channel change notification failed");
+
+	hdd_debug("check for SAP restart");
+	cds_check_concurrent_intf_and_restart_sap(adapter);
 
 	status = cds_set_hw_mode_on_channel_switch(adapter->sessionId);
 	if (QDF_IS_STATUS_ERROR(status))
