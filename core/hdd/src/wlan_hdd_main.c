@@ -2234,8 +2234,12 @@ static int __hdd_open(struct net_device *dev)
 		return -EBUSY;
 	}
 
-	mutex_lock(&hdd_init_deinit_lock);
+	if (qdf_atomic_read(&hdd_ctx->con_mode_flag)) {
+		hdd_err("con_mode_handler is in progress; Please try again.");
+		return -EBUSY;
+	}
 
+	mutex_lock(&hdd_init_deinit_lock);
 	hdd_start_driver_ops_timer(eHDD_DRV_OP_IFF_UP);
 
 	/*
@@ -9918,6 +9922,7 @@ int hdd_wlan_startup(struct device *dev)
 		goto err_hdd_free_context;
 
 	hdd_green_ap_init(hdd_ctx);
+	qdf_atomic_init(&hdd_ctx->con_mode_flag);
 
 	hdd_init_spectral_scan(hdd_ctx);
 
@@ -11710,9 +11715,11 @@ static int __con_mode_handler(const char *kmessage, struct kernel_param *kp,
 	if (ret)
 		return ret;
 
+	qdf_atomic_set(&hdd_ctx->con_mode_flag, 1);
 	cds_set_load_in_progress(true);
 
 	ret = param_set_int(kmessage, kp);
+	mutex_lock(&hdd_init_deinit_lock);
 
 	if (!(is_con_mode_valid(con_mode))) {
 		hdd_err("invlaid con_mode %d", con_mode);
@@ -11727,9 +11734,6 @@ static int __con_mode_handler(const char *kmessage, struct kernel_param *kp,
 		ret = 0;
 		goto reset_flags;
 	}
-
-	if (!cds_wait_for_external_threads_completion(__func__))
-		hdd_warn("Waiting for monitor mode: External threads are active");
 
 	ret = hdd_wlan_stop_modules(hdd_ctx, true);
 	if (ret) {
@@ -11787,7 +11791,9 @@ static int __con_mode_handler(const char *kmessage, struct kernel_param *kp,
 	ret = 0;
 
 reset_flags:
+	mutex_unlock(&hdd_init_deinit_lock);
 	cds_set_load_in_progress(false);
+	qdf_atomic_set(&hdd_ctx->con_mode_flag, 0);
 	return ret;
 }
 
