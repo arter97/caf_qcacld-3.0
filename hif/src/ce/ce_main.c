@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -1287,6 +1287,7 @@ void ce_fini(struct CE_handle *copyeng)
 	struct CE_state *CE_state = (struct CE_state *)copyeng;
 	unsigned int CE_id = CE_state->id;
 	struct hif_softc *scn = CE_state->scn;
+	uint32_t desc_size;
 
 	CE_state->state = CE_UNUSED;
 	scn->ce_id_to_state[CE_id] = NULL;
@@ -1297,13 +1298,14 @@ void ce_fini(struct CE_handle *copyeng)
 		/* Cleanup the datapath Tx ring */
 		ce_h2t_tx_ce_cleanup(copyeng);
 
+		desc_size = ce_get_desc_size(scn, CE_RING_SRC);
 		if (CE_state->src_ring->shadow_base_unaligned)
 			qdf_mem_free(CE_state->src_ring->shadow_base_unaligned);
 		if (CE_state->src_ring->base_addr_owner_space_unaligned)
 			qdf_mem_free_consistent(scn->qdf_dev,
 						scn->qdf_dev->dev,
 					    (CE_state->src_ring->nentries *
-					     sizeof(struct CE_src_desc) +
+					     desc_size +
 					     CE_DESC_RING_ALIGN),
 					    CE_state->src_ring->
 					    base_addr_owner_space_unaligned,
@@ -1315,11 +1317,12 @@ void ce_fini(struct CE_handle *copyeng)
 		/* Cleanup the datapath Rx ring */
 		ce_t2h_msg_ce_cleanup(copyeng);
 
+		desc_size = ce_get_desc_size(scn, CE_RING_DEST);
 		if (CE_state->dest_ring->base_addr_owner_space_unaligned)
 			qdf_mem_free_consistent(scn->qdf_dev,
 						scn->qdf_dev->dev,
 					    (CE_state->dest_ring->nentries *
-					     sizeof(struct CE_dest_desc) +
+					     desc_size +
 					     CE_DESC_RING_ALIGN),
 					    CE_state->dest_ring->
 					    base_addr_owner_space_unaligned,
@@ -1341,11 +1344,12 @@ void ce_fini(struct CE_handle *copyeng)
 			qdf_mem_free(
 				CE_state->status_ring->shadow_base_unaligned);
 
+		desc_size = ce_get_desc_size(scn, CE_RING_STATUS);
 		if (CE_state->status_ring->base_addr_owner_space_unaligned)
 			qdf_mem_free_consistent(scn->qdf_dev,
 						scn->qdf_dev->dev,
 					    (CE_state->status_ring->nentries *
-					     sizeof(struct CE_src_desc) +
+					     desc_size +
 					     CE_DESC_RING_ALIGN),
 					    CE_state->status_ring->
 					    base_addr_owner_space_unaligned,
