@@ -2125,12 +2125,16 @@ static void dp_process_ppdu_stats_user_compltn_flush_tlv(struct dp_pdev *pdev,
 static void dp_process_ppdu_stats_tx_mgmtctrl_payload_tlv(
 	struct dp_pdev *pdev, uint32_t *tag_buf, uint32_t length)
 {
-	htt_ppdu_stats_tx_mgmtctrl_payload_tlv *dp_stats_buf =
-		(htt_ppdu_stats_tx_mgmtctrl_payload_tlv *)tag_buf;
+	htt_ppdu_stats_tx_mgmtctrl_payload_tlv *dp_stats_buf;
+	qdf_nbuf_t nbuf;
+	uint32_t payload_size;
 
-	qdf_nbuf_t nbuf = NULL;
+	if ((!pdev->tx_sniffer_enable) && (!pdev->mcopy_mode))
+		return;
 
-	uint32_t payload_size = length - HTT_MGMT_CTRL_TLV_RESERVERD_LEN;
+	payload_size = length - HTT_MGMT_CTRL_TLV_RESERVERD_LEN;
+	nbuf = NULL;
+	dp_stats_buf = (htt_ppdu_stats_tx_mgmtctrl_payload_tlv *)tag_buf;
 
 	nbuf = qdf_nbuf_alloc(pdev->soc->osdev, payload_size, 0, 4, true);
 
@@ -2271,7 +2275,7 @@ static void dp_txrx_ppdu_stats_handler(struct dp_soc *soc,
 	int i;
 
 	if (!pdev->enhanced_stats_en && !pdev->tx_sniffer_enable &&
-			!pdev->am_copy_mode)
+			!pdev->mcopy_mode)
 		return;
 
 	if (!pdev->tx_ppdu_info.buf) {
@@ -2297,6 +2301,9 @@ static void dp_txrx_ppdu_stats_handler(struct dp_soc *soc,
 			sizeof(struct cdp_tx_completion_ppdu)) == NULL)	{
 			QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 					"No tailroom for HTT PPDU");
+			qdf_nbuf_free(pdev->tx_ppdu_info.buf);
+			pdev->tx_ppdu_info.buf = NULL;
+			pdev->tx_ppdu_info.last_user = 0;
 			return;
 		}
 
@@ -2334,6 +2341,7 @@ static void dp_txrx_ppdu_stats_handler(struct dp_soc *soc,
 		pdev->tx_ppdu_info.buf = NULL;
 		pdev->tx_ppdu_info.last_user = 0;
 	}
+
 }
 #else
 static void dp_txrx_ppdu_stats_handler(struct dp_soc *soc,
