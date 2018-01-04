@@ -1919,6 +1919,7 @@ static int dp_soc_cmn_setup(struct dp_soc *soc)
 		goto fail1;
 	}
 
+	TAILQ_INIT(&soc->rx.defrag.waitlist);
 	hal_reo_init_cmd_ring(soc->hal_soc, soc->reo_cmd_ring.hal_srng);
 	TAILQ_INIT(&soc->rx.reo_cmd_list);
 	qdf_spinlock_create(&soc->rx.reo_cmd_lock);
