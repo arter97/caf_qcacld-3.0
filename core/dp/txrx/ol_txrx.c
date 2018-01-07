@@ -2853,12 +2853,12 @@ ol_txrx_remove_peers_for_vdev(ol_txrx_vdev_handle vdev,
 	temp = NULL;
 	TAILQ_FOREACH_REVERSE(peer, &vdev->peer_list, peer_list_t,
 			      peer_list_elem) {
+		if (qdf_atomic_read(&peer->delete_in_progress))
+			continue;
 		if (temp) {
 			qdf_spin_unlock_bh(&vdev->pdev->peer_ref_mutex);
-			if (qdf_atomic_read(&temp->delete_in_progress) == 0) {
-				callback(callback_context, temp->mac_addr.raw,
-					vdev->vdev_id, temp, false);
-			}
+			callback(callback_context, temp->mac_addr.raw,
+				vdev->vdev_id, temp, false);
 			qdf_spin_lock_bh(&vdev->pdev->peer_ref_mutex);
 		}
 		/* self peer is deleted last */
@@ -5380,8 +5380,10 @@ static void ol_txrx_offld_flush(void *data)
 	} else {
 		pkt = cds_alloc_ol_rx_pkt(sched_ctx);
 		if (qdf_unlikely(!pkt)) {
-			QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-				  "%s: Not able to allocate context", __func__);
+			QDF_TRACE_RATE_LIMITED(128, QDF_MODULE_ID_TXRX,
+				QDF_TRACE_LEVEL_ERROR,
+				"%s: Not able to allocate context", __func__);
+			cds_wakeup_rx_thread(sched_ctx);
 			return;
 		}
 

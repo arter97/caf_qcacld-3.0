@@ -164,8 +164,10 @@ static struct attribute *attrs[] = {
 
 #define HDD_OPS_INACTIVITY_TIMEOUT (120000)
 #define MAX_OPS_NAME_STRING_SIZE 20
+#define RATE_LIMIT_ERROR_LOG (256)
 
 static qdf_timer_t hdd_drv_ops_inactivity_timer;
+static struct task_struct *hdd_drv_ops_task;
 static char drv_ops_string[MAX_OPS_NAME_STRING_SIZE];
 
 /* the Android framework expects this param even though we don't use it */
@@ -2018,9 +2020,25 @@ static void hdd_update_hw_sw_info(hdd_context_t *hdd_ctx)
 	hdd_wlan_get_version(hdd_ctx, NULL, NULL);
 }
 
+/**
+ * hdd_check_for_leaks() - Perform runtime memory leak checks
+ *
+ * This API triggers runtime memory leak detection. This feature enforces the
+ * policy that any memory allocated at runtime must also be released at runtime.
+ *
+ * Allocating memory at runtime and releasing it at unload is effectively a
+ * memory leak for configurations which never unload (e.g. LONU, statically
+ * compiled driver). Such memory leaks are NOT false positives, and must be
+ * fixed.
+ *
+ * Return: None
+ */
 static void hdd_check_for_leaks(void)
 {
+	/* DO NOT REMOVE these checks; for false positives, read above first */
+
 	qdf_mc_timer_check_for_leaks();
+	qdf_nbuf_map_check_for_leaks();
 	qdf_mem_check_for_leaks();
 }
 
@@ -2196,6 +2214,7 @@ int hdd_wlan_start_modules(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 	return 0;
 
 post_disable:
+	sme_destroy_config(hdd_ctx->hHal);
 	cds_post_disable();
 
 close:
@@ -2216,7 +2235,10 @@ power_down:
 release_lock:
 	hdd_ctx->start_modules_in_progress = false;
 	mutex_unlock(&hdd_ctx->iface_change_lock);
-
+	if (hdd_ctx->target_hw_name) {
+		qdf_mem_free(hdd_ctx->target_hw_name);
+		hdd_ctx->target_hw_name = NULL;
+	}
 	/* many adapter resources are not freed by design in SSR case */
 	if (!reinit)
 		hdd_check_for_leaks();
@@ -4121,6 +4143,54 @@ static void hdd_wait_for_sme_close_sesion(hdd_context_t *hdd_ctx,
 	}
 }
 
+/**
+ * hdd_roc_req_q_flush() - Flush the RoC request queue for a given adapter
+ * @hdd_ctx: the global HDD context
+ * @adapter: the adapter for whose RoC requests should be flushed
+ *
+ * Pop each RoC request from the queue. If the request's adapter matches the
+ * given adapter, free the request. Otherwise, requeue the request at the back
+ * of the queue. Continue until queue size number of requests have been
+ * processed.
+ *
+ * Return: None
+ */
+static void hdd_roc_req_q_flush(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter)
+{
+	qdf_list_t *req_q = &hdd_ctx->hdd_roc_req_q;
+	qdf_list_node_t *node;
+	hdd_roc_req_t *req;
+	uint32_t count;
+
+	hdd_debug("Flushing RoC queue for adapter %u", adapter->sessionId);
+
+	flush_delayed_work(&hdd_ctx->roc_req_work);
+
+	qdf_spin_lock(&hdd_ctx->hdd_roc_req_q_lock);
+	for (count = qdf_list_size(req_q); count > 0; count--) {
+		if (QDF_IS_STATUS_ERROR(qdf_list_remove_front(req_q, &node))) {
+			qdf_spin_unlock(&hdd_ctx->hdd_roc_req_q_lock);
+
+			hdd_err("Unexpected number of requests in RoC queue");
+			QDF_BUG(0);
+
+			return;
+		}
+
+		req = qdf_container_of(node, hdd_roc_req_t, node);
+		if (req->pAdapter != adapter) {
+			qdf_list_insert_back(req_q, node);
+			continue;
+		}
+
+		if (req->pRemainChanCtx)
+			qdf_mem_free(req->pRemainChanCtx);
+
+		qdf_mem_free(req);
+	}
+	qdf_spin_unlock(&hdd_ctx->hdd_roc_req_q_lock);
+}
+
 QDF_STATUS hdd_stop_adapter(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 			    const bool bCloseSession)
 {
@@ -4355,6 +4425,8 @@ QDF_STATUS hdd_stop_adapter(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 		qdf_mem_free(adapter->scan_info.default_scan_ies);
 		adapter->scan_info.default_scan_ies = NULL;
 	}
+
+	hdd_roc_req_q_flush(hdd_ctx, adapter);
 
 	EXIT();
 	return QDF_STATUS_SUCCESS;
@@ -5261,7 +5333,8 @@ hdd_adapter_t *hdd_get_adapter_by_vdev(hdd_context_t *hdd_ctx,
 		adapterNode = pNext;
 	}
 
-	hdd_err("vdev_id %d does not exist with host", vdev_id);
+	hdd_err_ratelimited(RATE_LIMIT_ERROR_LOG,
+		"vdev_id %d does not exist with host", vdev_id);
 
 	return NULL;
 }
@@ -5761,52 +5834,16 @@ static int hdd_roc_context_init(hdd_context_t *hdd_ctx)
 }
 
 /**
- * hdd_destroy_roc_req_q() - Free allocations in ROC Req Queue
- * @hdd_ctx: HDD context.
- *
- * Free memory allocations made in ROC Req Queue nodes.
- *
- * Return: None.
- */
-static void hdd_destroy_roc_req_q(hdd_context_t *hdd_ctx)
-{
-	hdd_roc_req_t *hdd_roc_req;
-	QDF_STATUS status;
-
-	qdf_spin_lock(&hdd_ctx->hdd_roc_req_q_lock);
-
-	while (!qdf_list_empty(&hdd_ctx->hdd_roc_req_q)) {
-		status = qdf_list_remove_front(&hdd_ctx->hdd_roc_req_q,
-				(qdf_list_node_t **) &hdd_roc_req);
-
-		if (QDF_STATUS_SUCCESS != status) {
-			qdf_spin_unlock(&hdd_ctx->hdd_roc_req_q_lock);
-			hdd_debug("unable to remove roc element from list");
-			QDF_ASSERT(0);
-			return;
-		}
-
-		if (hdd_roc_req->pRemainChanCtx)
-			qdf_mem_free(hdd_roc_req->pRemainChanCtx);
-
-		qdf_mem_free(hdd_roc_req);
-	}
-
-	qdf_spin_unlock(&hdd_ctx->hdd_roc_req_q_lock);
-}
-
-/**
  * hdd_roc_context_destroy() - Destroy ROC context
  * @hdd_ctx:	HDD context.
  *
- * Destroy roc list and flush the pending roc work.
+ * Destroy roc list and spinlock.
  *
  * Return: None.
  */
 static void hdd_roc_context_destroy(hdd_context_t *hdd_ctx)
 {
-	flush_delayed_work(&hdd_ctx->roc_req_work);
-	hdd_destroy_roc_req_q(hdd_ctx);
+	qdf_list_destroy(&hdd_ctx->hdd_roc_req_q);
 	qdf_spinlock_destroy(&hdd_ctx->hdd_roc_req_q_lock);
 }
 
@@ -8882,6 +8919,11 @@ int hdd_pktlog_enable_disable(hdd_context_t *hdd_ctx, bool enable,
 		return -EINVAL;
 	}
 
+	if (enable == true)
+		hdd_ctx->is_pktlog_enabled = 1;
+	else
+		hdd_ctx->is_pktlog_enabled = 0;
+
 	return 0;
 }
 #endif /* REMOVE_PKT_LOG */
@@ -9576,7 +9618,15 @@ static int hdd_features_init(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter)
 		goto deregister_frames;
 	}
 
-	if (cds_is_packet_log_enabled())
+	/**
+	 * In case of SSR/PDR, if pktlog was enabled manually before
+	 * SSR/PDR, Then enabled it again automatically after Wlan
+	 * device up.
+	 */
+	if (cds_is_driver_recovering()) {
+		if (hdd_ctx->is_pktlog_enabled)
+			hdd_pktlog_enable_disable(hdd_ctx, true, 0, 0);
+	} else if (cds_is_packet_log_enabled())
 		hdd_pktlog_enable_disable(hdd_ctx, true, 0, 0);
 
 	hddtxlimit.txPower2g = hdd_ctx->config->TxPower2g;
@@ -12501,6 +12551,7 @@ void hdd_start_driver_ops_timer(int drv_op)
 		break;
 	}
 
+	hdd_drv_ops_task = current;
 	qdf_timer_start(&hdd_drv_ops_inactivity_timer,
 		HDD_OPS_INACTIVITY_TIMEOUT);
 }
@@ -12525,6 +12576,13 @@ void hdd_drv_ops_inactivity_handler(void)
 {
 	hdd_err("%s: %d Sec timer expired while in .%s",
 		__func__, HDD_OPS_INACTIVITY_TIMEOUT/1000, drv_ops_string);
+
+	if (hdd_drv_ops_task) {
+		printk("Call stack for \"%s\"\n", hdd_drv_ops_task->comm);
+		qdf_print_thread_trace(hdd_drv_ops_task);
+	} else {
+		hdd_err("hdd_drv_ops_task is null");
+	}
 
 	/* Driver shutdown is stuck, no recovery possible at this point */
 	if (0 == qdf_mem_cmp(&drv_ops_string[0], "shutdown",

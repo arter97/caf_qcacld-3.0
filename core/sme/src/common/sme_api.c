@@ -690,8 +690,10 @@ tListElem *csr_get_cmd_to_process(tpAniSirGlobal pMac, tDblLinkList *pList,
 	pCurEntry = csr_ll_peek_head(pList, LL_ACCESS_LOCK);
 	while (pCurEntry) {
 		pCommand = GET_BASE_ADDR(pCurEntry, tSmeCmd, Link);
-		if (pCommand->sessionId != sessionId) {
-			sme_debug("selected the command with different sessionId");
+
+		if (pCommand->sessionId != sessionId ||
+		    pCommand->command ==  eSmeCommandSetKey) {
+			sme_debug("selected the command with different sessionId or setkey");
 			return pCurEntry;
 		}
 
@@ -12287,8 +12289,7 @@ void active_list_cmd_timeout_handle(void *userData)
 		sme_save_active_cmd_stats(hal);
 		cds_trigger_recovery(CDS_ACTIVE_LIST_TIMEOUT);
 	} else {
-		if (!mac_ctx->roam.configParam.enable_fatal_event &&
-		   !(cds_is_load_or_unload_in_progress() ||
+		if (!(cds_is_load_or_unload_in_progress() ||
 		    cds_is_driver_recovering() || cds_is_driver_in_bad_state()))
 			QDF_BUG(0);
 		else
