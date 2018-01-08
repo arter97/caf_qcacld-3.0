@@ -1643,11 +1643,15 @@ static int wlan_hdd_reset_force_acs_chan_range(struct hdd_context *hdd_ctx,
 	if (sap_config->acs_cfg.ch_list)
 		qdf_mem_free(sap_config->acs_cfg.ch_list);
 
+	if (num_channels >= WNI_CFG_VALID_CHANNEL_LIST_LEN)
+		num_channels = WNI_CFG_VALID_CHANNEL_LIST_LEN - 1;
+
 	sap_config->acs_cfg.ch_list = qdf_mem_malloc(num_channels);
 	if (!sap_config->acs_cfg.ch_list) {
 		hdd_err("ACS config alloc fail");
 		return -ENOMEM;
 	}
+
 	qdf_mem_copy(sap_config->acs_cfg.ch_list, channels, num_channels);
 	sap_config->acs_cfg.ch_list_count = num_channels;
 
