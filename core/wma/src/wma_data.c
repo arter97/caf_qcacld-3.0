@@ -1235,6 +1235,8 @@ void wma_set_linkstate(tp_wma_handle wma, tpLinkStateParams params)
 		if (wma_send_vdev_stop_to_fw(wma, vdev_id)) {
 			WMA_LOGP("%s: %d Failed to send vdev stop vdev %d",
 				 __func__, __LINE__, vdev_id);
+			wma_remove_vdev_req(wma, vdev_id,
+					WMA_TARGET_REQ_TYPE_VDEV_STOP);
 			params->status = false;
 		} else {
 			WMA_LOGP("%s: %d vdev stop sent vdev %d",
@@ -2173,7 +2175,8 @@ int wma_ibss_peer_info_event_handler(void *handle, uint8_t *data,
 	}
 
 	/*sanity check */
-	if ((num_peers > 32) || (NULL == peer_info)) {
+	if ((num_peers > 32) || (num_peers > param_tlvs->num_peer_info) ||
+	    (!peer_info)) {
 		WMA_LOGE("%s: Invalid event data from target num_peers %d peer_info %pK",
 			__func__, num_peers, peer_info);
 		status = 1;

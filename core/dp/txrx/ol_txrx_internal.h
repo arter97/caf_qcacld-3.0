@@ -437,7 +437,7 @@ ol_txrx_frms_dump(const char *name,
 			} else {
 				QDF_TRACE(QDF_MODULE_ID_TXRX,
 					  QDF_TRACE_LEVEL_INFO,
-					  "frame %p non-IP ethertype (%x)\n",
+					  "frame %pK non-IP ethertype (%x)\n",
 					  frm, ethtype);
 				goto NOT_IP_TCP;
 			}
@@ -453,12 +453,12 @@ ol_txrx_frms_dump(const char *name,
 					(tcp_hdr->seq_num[1] << 0);
 				QDF_TRACE(QDF_MODULE_ID_TXRX,
 					  QDF_TRACE_LEVEL_INFO,
-					  "frame %p: TCP seq num = %d\n", frm,
+					  "frame %pK: TCP seq num = %d\n", frm,
 					  tcp_seq_num);
 #else
 				QDF_TRACE(QDF_MODULE_ID_TXRX,
 					  QDF_TRACE_LEVEL_INFO,
-					  "frame %p: TCP seq num = %d\n", frm,
+					  "frame %pK: TCP seq num = %d\n", frm,
 					  ((*(p + tcp_offset + 4)) << 24) |
 					  ((*(p + tcp_offset + 5)) << 16) |
 					  ((*(p + tcp_offset + 6)) << 8) |
@@ -467,7 +467,7 @@ ol_txrx_frms_dump(const char *name,
 			} else {
 				QDF_TRACE(QDF_MODULE_ID_TXRX,
 					  QDF_TRACE_LEVEL_INFO,
-					  "frame %p non-TCP IP protocol (%x)\n",
+					  "frame %pK non-TCP IP protocol (%x)\n",
 					  frm, ip_prot);
 			}
 		}
@@ -503,7 +503,7 @@ NOT_IP_TCP:
 			}
 
 			QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO,
-				  "frame %p data (%p), hex dump of bytes 0-%d of %d:\n",
+				  "frame %pK data (%pK), hex dump of bytes 0-%d of %d:\n",
 				frm, p, len_lim - 1, (int)qdf_nbuf_len(frm));
 			p = local_buf;
 			while (len_lim > 16) {

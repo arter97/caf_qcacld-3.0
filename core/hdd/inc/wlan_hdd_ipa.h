@@ -85,6 +85,7 @@ static inline hdd_ipa_nbuf_cb_fn wlan_hdd_stub_ipa_fn(void)
 };
 
 QDF_STATUS hdd_ipa_init(hdd_context_t *hdd_ctx);
+void hdd_ipa_flush(hdd_context_t *hdd_ctx);
 QDF_STATUS hdd_ipa_cleanup(hdd_context_t *hdd_ctx);
 QDF_STATUS hdd_ipa_process_rxt(void *cds_context, qdf_nbuf_t rxBuf,
 	uint8_t sta_id);
@@ -126,6 +127,10 @@ int hdd_ipa_uc_ol_deinit(hdd_context_t *hdd_ctx);
 static inline QDF_STATUS hdd_ipa_init(hdd_context_t *hdd_ctx)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline void hdd_ipa_flush(hdd_context_t *hdd_ctx)
+{
 }
 
 static inline QDF_STATUS hdd_ipa_cleanup(hdd_context_t *hdd_ctx)

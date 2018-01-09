@@ -17622,7 +17622,8 @@ free_scan_flter:
 
 QDF_STATUS sme_get_beacon_frm(tHalHandle hal, tCsrRoamProfile *profile,
 				const tSirMacAddr bssid,
-				uint8_t **frame_buf, uint32_t *frame_len)
+				uint8_t **frame_buf, uint32_t *frame_len,
+				int *channel)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	tScanResultHandle result_handle = NULL;
@@ -17642,6 +17643,7 @@ QDF_STATUS sme_get_beacon_frm(tHalHandle hal, tCsrRoamProfile *profile,
 						profile, scan_filter);
 	if (QDF_STATUS_SUCCESS != status) {
 		sms_log(mac_ctx, LOGE, FL("prepare_filter failed"));
+		status = QDF_STATUS_E_FAULT;
 		goto free_scan_flter;
 	}
 
@@ -17662,6 +17664,7 @@ QDF_STATUS sme_get_beacon_frm(tHalHandle hal, tCsrRoamProfile *profile,
 	status = csr_scan_get_result(mac_ctx, scan_filter, &result_handle);
 	if (QDF_STATUS_SUCCESS != status) {
 		sms_log(mac_ctx, LOGE, FL("parse_scan_result failed"));
+		status = QDF_STATUS_E_FAULT;
 		goto free_scan_flter;
 	}
 
@@ -17686,8 +17689,8 @@ QDF_STATUS sme_get_beacon_frm(tHalHandle hal, tCsrRoamProfile *profile,
 	 */
 	ie_len = bss_descp->length + sizeof(bss_descp->length)
 		- (uint16_t)(offsetof(tSirBssDescription, ieFields[0]));
-	sms_log(mac_ctx, LOG1, FL("found bss_descriptor ie_len: %d"),
-		ie_len);
+	sms_log(mac_ctx, LOG1, FL("found bss_descriptor ie_len: %d channel %d"),
+		ie_len, bss_descp->channelId);
 
 	/* include mac header and fixed params along with IEs in frame */
 	*frame_len = SIR_MAC_HDR_LEN_3A + SIR_MAC_B_PR_SSID_OFFSET + ie_len;
@@ -17700,6 +17703,8 @@ QDF_STATUS sme_get_beacon_frm(tHalHandle hal, tCsrRoamProfile *profile,
 	qdf_mem_zero(*frame_buf, *frame_len);
 	sme_prepare_beacon_from_bss_descp(*frame_buf, bss_descp, bssid, ie_len);
 
+	if (!*channel)
+		*channel = bss_descp->channelId;
 free_scan_flter:
 	/* free scan filter and exit */
 	if (scan_filter) {

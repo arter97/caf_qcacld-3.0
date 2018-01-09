@@ -75,6 +75,9 @@
 #define FRAMES_LOG3(ctx, sev, fmt, p1, p2, p3) \
 	dot11f_log((ctx), (sev), (fmt), (p1), (p2), (p3));
 
+#define FRAMES_LOG4(ctx, sev, fmt, p1, p2, p3, p4) \
+	dot11f_log((ctx), (sev), (fmt), (p1), (p2), (p3), (p4));
+
 #define FRAMES_DUMP(ctx, sev, p, n) \
 	sir_dump_buf((pCtx), SIR_DBG_MODULE_ID, (sev), (p), (n));
 
