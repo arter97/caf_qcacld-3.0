@@ -79,6 +79,7 @@ dp_rx_populate_cdp_indication_ppdu(struct dp_soc *soc,
 	cdp_rx_ppdu->other_msdu_count = ppdu_info->rx_status.other_msdu_count;
 	cdp_rx_ppdu->u.nss = ppdu_info->rx_status.nss;
 	cdp_rx_ppdu->u.mcs = ppdu_info->rx_status.mcs;
+	cdp_rx_ppdu->u.gi = ppdu_info->rx_status.sgi;
 	cdp_rx_ppdu->u.preamble = ppdu_info->rx_status.preamble_type;
 	cdp_rx_ppdu->rssi = ppdu_info->rx_status.rssi_comb;
 	cdp_rx_ppdu->timestamp = ppdu_info->com_info.ppdu_timestamp;
@@ -125,6 +126,8 @@ static void dp_rx_stats_update(struct dp_soc *soc, struct dp_peer *peer,
 		return;
 
 	DP_STATS_UPD(peer, rx.rssi, ppdu->rssi);
+	if (ppdu->u.nss)
+		DP_STATS_INC(peer, rx.nss[ppdu->u.nss - 1], num_msdu);
 	DP_STATS_INC(peer, rx.sgi_count[ppdu->u.gi], num_msdu);
 	DP_STATS_INC(peer, rx.bw[ppdu->u.bw], num_msdu);
 	DP_STATS_INCC(peer, rx.ampdu_cnt, num_msdu, ppdu->is_ampdu);
