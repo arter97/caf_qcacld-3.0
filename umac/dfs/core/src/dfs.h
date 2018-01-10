@@ -1001,6 +1001,7 @@ struct wlan_dfs {
 	struct wlan_objmgr_pdev *dfs_pdev_obj;
 	bool           dfs_is_offload_enabled;
 	int            dfs_use_nol;
+	bool use_nol_subchannel_marking;
 	qdf_spinlock_t dfs_nol_lock;
 };
 
