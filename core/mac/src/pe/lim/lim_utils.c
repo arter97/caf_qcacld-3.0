@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -5945,6 +5945,16 @@ bool lim_set_nss_change(tpAniSirGlobal pMac, tpPESession psessionEntry,
 {
 	tUpdateRxNss tempParam;
 
+	if (!rxNss) {
+		pe_err("Invalid rxNss value: %u", rxNss);
+		if (!cds_is_driver_recovering()) {
+			if (cds_is_self_recovery_enabled())
+				cds_trigger_recovery(CDS_REASON_UNSPECIFIED);
+			else
+				QDF_BUG(0);
+		}
+	}
+
 	tempParam.rxNss = rxNss;
 	tempParam.staId = staId;
 	tempParam.smesessionId = psessionEntry->smeSessionId;
@@ -7100,43 +7110,6 @@ void lim_update_caps_info_for_bss(tpAniSirGlobal mac_ctx,
 	if (!(bss_caps & LIM_IMMEDIATE_BLOCK_ACK_MASK)) {
 		*caps &= (~LIM_IMMEDIATE_BLOCK_ACK_MASK);
 		pe_debug("Clearing Immed Blk Ack:no AP support");
-	}
-}
-/**
- * lim_send_set_dtim_period(): Send SIR_HAL_SET_DTIM_PERIOD message
- * to set dtim period.
- *
- * @sesssion: LIM session
- * @dtim_period: dtim value
- * @mac_ctx: Mac context
- * @return None
- */
-void lim_send_set_dtim_period(tpAniSirGlobal mac_ctx, uint8_t dtim_period,
-			      tpPESession session)
-{
-	struct set_dtim_params *dtim_params = NULL;
-	tSirRetStatus ret = eSIR_SUCCESS;
-	tSirMsgQ msg;
-
-	if (session == NULL) {
-		pe_err("Inavalid parameters");
-		return;
-	}
-	dtim_params = qdf_mem_malloc(sizeof(*dtim_params));
-	if (NULL == dtim_params) {
-		pe_err("Unable to allocate memory");
-		return;
-	}
-	dtim_params->dtim_period = dtim_period;
-	dtim_params->session_id = session->smeSessionId;
-	msg.type = WMA_SET_DTIM_PERIOD;
-	msg.bodyptr = dtim_params;
-	msg.bodyval = 0;
-	pe_debug("Post WMA_SET_DTIM_PERIOD to WMA");
-	ret = wma_post_ctrl_msg(mac_ctx, &msg);
-	if (eSIR_SUCCESS != ret) {
-		pe_err("wma_post_ctrl_msg() failed");
-		qdf_mem_free(dtim_params);
 	}
 }
 
