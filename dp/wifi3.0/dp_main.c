@@ -2203,6 +2203,11 @@ void dp_free_inact_timer(qdf_timer_t *timer)
 }
 #else
 
+void dp_mark_peer_inact(void *peer, bool inactive)
+{
+	return;
+}
+
 void dp_free_inact_timer(qdf_timer_t *timer)
 {
 	return;
@@ -3597,11 +3602,6 @@ void dp_set_overload(struct cdp_pdev *pdev, bool overload)
 bool dp_peer_is_inact(void *peer)
 {
 	return false;
-}
-
-void dp_mark_peer_inact(void *peer, bool inactive)
-{
-	return;
 }
 
 void dp_init_inact_timer(struct dp_soc *soc)
