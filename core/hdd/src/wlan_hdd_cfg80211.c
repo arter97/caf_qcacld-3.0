@@ -14814,18 +14814,11 @@ static int wlan_hdd_cfg80211_set_privacy_ibss(hdd_adapter_t *pAdapter,
 			if (NULL != ie) {
 				pWextState->wpaVersion =
 					IW_AUTH_WPA_VERSION_WPA;
-				/*
-				 * Unpack the WPA IE. Skip past the EID byte and
-				 * length byte - and four byte WiFi OUI
-				 */
-				ret = dot11f_unpack_ie_wpa(
-						(tpAniSirGlobal) halHandle,
-						&ie[2 + 4], ie[1] - 4,
-						&dot11WPAIE);
-				if (DOT11F_FAILED(ret)) {
-					hdd_err("unpack failed ret: 0x%x", ret);
+				if (ie[1] < DOT11F_IE_WPA_MIN_LEN ||
+					ie[1] > DOT11F_IE_WPA_MAX_LEN) {
+					hdd_err("invalid ie len:%d", ie[1]);
 					return -EINVAL;
-				}
+					}
 				/*
 				 * Unpack the WPA IE. Skip past the EID byte and
 				 * length byte - and four byte WiFi OUI
