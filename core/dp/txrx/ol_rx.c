@@ -193,7 +193,7 @@ void ol_rx_trigger_restore(htt_pdev_handle htt_pdev, qdf_nbuf_t head_msdu,
 	while (head_msdu) {
 		next = qdf_nbuf_next(head_msdu);
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO,
-			  "freeing %p\n", head_msdu);
+			  "freeing %pK\n", head_msdu);
 		qdf_nbuf_free(head_msdu);
 		head_msdu = next;
 	}
@@ -748,7 +748,7 @@ ol_rx_sec_ind_handler(ol_txrx_pdev_handle pdev,
 		return;
 	}
 	TXRX_PRINT(TXRX_PRINT_LEVEL_INFO1,
-		   "sec spec for peer %p (%02x:%02x:%02x:%02x:%02x:%02x): "
+		   "sec spec for peer %pK (%02x:%02x:%02x:%02x:%02x:%02x): "
 		   "%s key of type %d\n",
 		   peer,
 		   peer->mac_addr.raw[0], peer->mac_addr.raw[1],
@@ -1162,7 +1162,7 @@ ol_rx_deliver(struct ol_txrx_vdev_t *vdev,
 		if (OL_RX_DECAP(vdev, peer, msdu, &info) != A_OK) {
 			discard = 1;
 			TXRX_PRINT(TXRX_PRINT_LEVEL_WARN,
-				   "decap error %p from peer %p "
+				   "decap error %pK from peer %pK "
 				   "(%02x:%02x:%02x:%02x:%02x:%02x) len %d\n",
 				   msdu, peer,
 				   peer->mac_addr.raw[0], peer->mac_addr.raw[1],
@@ -1340,7 +1340,7 @@ ol_rx_discard(struct ol_txrx_vdev_t *vdev,
 
 		msdu_list = qdf_nbuf_next(msdu_list);
 		TXRX_PRINT(TXRX_PRINT_LEVEL_INFO1,
-			   "discard rx %p from partly-deleted peer %p "
+			   "discard rx %pK from partly-deleted peer %pK "
 			   "(%02x:%02x:%02x:%02x:%02x:%02x)\n",
 			   msdu, peer,
 			   peer->mac_addr.raw[0], peer->mac_addr.raw[1],
@@ -1433,7 +1433,7 @@ ol_rx_in_order_indication_handler(ol_txrx_pdev_handle pdev,
 	}
 
 #if defined(HELIUMPLUS_DEBUG)
-	qdf_print("%s %d: rx_ind_msg 0x%p peer_id %d tid %d is_offload %d\n",
+	qdf_print("%s %d: rx_ind_msg 0x%pK peer_id %d tid %d is_offload %d\n",
 		  __func__, __LINE__, rx_ind_msg, peer_id, tid, is_offload);
 #endif
 
