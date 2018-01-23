@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -551,6 +551,13 @@ void ol_txrx_update_tx_queue_groups(
 	u_int32_t group_vdev_bit_mask, vdev_bit_mask, group_vdev_id_mask;
 	u_int32_t membership;
 	struct ol_txrx_vdev_t *vdev;
+
+	if (group_id >= OL_TX_MAX_TXQ_GROUPS) {
+		ol_txrx_warn("%s: invalid group_id=%u, ignore update.\n",
+			__func__,
+			group_id);
+		return;
+	}
 
 	group = &pdev->txq_grps[group_id];
 
