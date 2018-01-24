@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -911,14 +911,6 @@ struct bss_chan_info_request_params {
 };
 
 /**
- * struct green_ap_ps_params - green ap ps cmd parameter
- * @value: parameter value
- */
-struct green_ap_ps_params {
-	uint32_t value;
-};
-
-/**
  * struct wow_cmd_params - wow cmd parameter
  * @enable: wow enable or disable flag
  * @can_suspend_link: flag to indicate if link can be suspended
@@ -1034,6 +1026,18 @@ struct beacon_params {
 	bool is_dtim_count_zero;
 	bool is_bitctl_reqd;
 	bool is_high_latency;
+};
+
+/**
+ * struct fd_params - FD cmd parameter
+ * @vdev_id: vdev id
+ * @wbuf: FD buffer
+ * @frame_ctrl: frame control field
+ */
+struct fd_params {
+	uint8_t vdev_id;
+	qdf_nbuf_t wbuf;
+	uint16_t frame_ctrl;
 };
 
 /**
@@ -3935,6 +3939,16 @@ struct config_ratemask_params {
 };
 
 /**
+ * struct config_fils_params - FILS config params
+ * @vdev_id:  vdev id
+ * @fd_period:  0 - Disabled, non-zero - Period in ms (mili seconds)
+ */
+struct config_fils_params {
+	uint8_t vdev_id;
+	uint32_t fd_period;
+};
+
+/**
  * struct peer_add_wds_entry_params - WDS peer entry add params
  * @dest_addr: Pointer to destination macaddr
  * @peer_addr: Pointer to peer mac addr
@@ -5648,6 +5662,8 @@ typedef enum {
 	wmi_radio_tx_power_level_stats_event_id,
 	wmi_report_stats_event_id,
 	wmi_dma_buf_release_event_id,
+	wmi_sap_obss_detection_report_event_id,
+	wmi_host_swfda_event_id,
 
 	wmi_events_max,
 } wmi_conv_event_id;
@@ -7714,38 +7730,6 @@ enum wmi_userspace_log_level {
 };
 
 /**
- * struct encrypt_decrypt_req_params - encrypt/decrypt params
- * @vdev_id: virtual device id
- * @key_flag: This indicates firmware to encrypt/decrypt payload
- *    see ENCRYPT_DECRYPT_FLAG
- * @key_idx: Index used in storing key
- * @key_cipher: cipher used for encryption/decryption
- *   Eg: see WMI_CIPHER_AES_CCM for CCMP
- * @key_len: length of key data
- * @key_txmic_len: length of Tx MIC
- * @key_rxmic_len: length of Rx MIC
- * @key_data: Key
- * @pn: packet number
- * @mac_header: MAC header
- * @data_len: length of data
- * @data: pointer to payload
- */
-struct encrypt_decrypt_req_params {
-	uint32_t vdev_id;
-	uint8_t key_flag;
-	uint32_t key_idx;
-	uint32_t key_cipher;
-	uint32_t key_len;
-	uint32_t key_txmic_len;
-	uint32_t key_rxmic_len;
-	uint8_t key_data[MAC_MAX_KEY_LENGTH];
-	uint8_t pn[MAC_PN_LENGTH];
-	uint8_t mac_header[MAX_MAC_HEADER_LEN];
-	uint32_t data_len;
-	uint8_t *data;
-};
-
-/**
  * HW mode config type replicated from FW header
  * @WMI_HOST_HW_MODE_SINGLE: Only one PHY is active.
  * @WMI_HOST_HW_MODE_DBS: Both PHYs are active in different bands,
@@ -8130,6 +8114,21 @@ struct wmi_mawc_roam_params {
 	uint8_t rssi_stationary_high_adjust;
 	uint8_t rssi_stationary_low_adjust;
 };
+/**
+ * struct wmi_btm_config - BSS Transition Management offload params
+ * @vdev_id: VDEV on which the parameters should be applied
+ * @btm_offload_config: BTM config
+ * @btm_solicited_timeout: Timeout value for waiting BTM request
+ * @btm_max_attempt_cnt: Maximum attempt for sending BTM query to ESS
+ * @btm_sticky_time: Stick time after roaming to new AP by BTM
+ */
+struct wmi_btm_config {
+	uint8_t vdev_id;
+	uint32_t btm_offload_config;
+	uint32_t btm_solicited_timeout;
+	uint32_t btm_max_attempt_cnt;
+	uint32_t btm_sticky_time;
+};
 
 /**
  * struct set_arp_stats - set/reset arp stats
@@ -8298,6 +8297,62 @@ struct direct_buf_rx_cfg_req {
 	uint32_t num_elems;
 	uint32_t event_timeout_ms;
 	uint32_t num_resp_per_event;
+};
+
+/**
+ * struct wmi_obss_detection_cfg_param - obss detection cfg
+ * @vdev_id: vdev id
+ * @obss_detect_period_ms: detection period in ms
+ * @obss_11b_ap_detect_mode: detect whether there is 11b ap/ibss
+ * @obss_11b_sta_detect_mode: detect whether there is 11b sta
+ *                            connected with other APs
+ * @obss_11g_ap_detect_mode: detect whether there is 11g AP
+ * @obss_11a_detect_mode: detect whether there is legacy 11a traffic
+ * @obss_ht_legacy_detect_mode: detect whether there is ap which is
+ *                              ht legacy mode
+ * @obss_ht_mixed_detect_mode: detect whether there is ap which is ht mixed mode
+ * @obss_ht_20mhz_detect_mode: detect whether there is ap which has 20M only
+ *                             station
+ */
+struct wmi_obss_detection_cfg_param {
+	uint32_t vdev_id;
+	uint32_t obss_detect_period_ms;
+	uint32_t obss_11b_ap_detect_mode;
+	uint32_t obss_11b_sta_detect_mode;
+	uint32_t obss_11g_ap_detect_mode;
+	uint32_t obss_11a_detect_mode;
+	uint32_t obss_ht_legacy_detect_mode;
+	uint32_t obss_ht_mixed_detect_mode;
+	uint32_t obss_ht_20mhz_detect_mode;
+};
+
+/**
+ * enum sap_obss_detection_reason - obss detection event reasons
+ * @OBSS_OFFLOAD_DETECTION_DISABLED: OBSS detection disabled
+ * @OBSS_OFFLOAD_DETECTION_PRESENT: OBSS present detection
+ * @OBSS_OFFLOAD_DETECTION_ABSENT: OBSS absent detection
+ *
+ * Defines different types of reasons for obss detection event from firmware.
+ */
+enum wmi_obss_detection_reason {
+	OBSS_OFFLOAD_DETECTION_DISABLED = 0,
+	OBSS_OFFLOAD_DETECTION_PRESENT  = 1,
+	OBSS_OFFLOAD_DETECTION_ABSENT   = 2,
+};
+
+/**
+ * struct wmi_obss_detect_info - OBSS detection info from firmware
+ * @vdev_id: IDof the vdev to which this info belongs.
+ * @reason: Indicate if present or Absent detection,
+ *          also if not supported offload for this vdev.
+ * @matched_detection_masks: Detection bit map.
+ * @matched_bssid_addr: MAC address valid for only if info is present detection.
+ */
+struct wmi_obss_detect_info {
+	uint32_t vdev_id;
+	enum wmi_obss_detection_reason reason;
+	uint32_t matched_detection_masks;
+	uint8_t matched_bssid_addr[IEEE80211_ADDR_LEN];
 };
 
 #endif /* _WMI_UNIFIED_PARAM_H_ */

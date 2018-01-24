@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -2117,6 +2117,10 @@ struct category_name_info g_qdf_category_name[MAX_SUPPORTED_CATEGORY] = {
 	[QDF_MODULE_ID_NSS] = {"NSS"},
 	[QDF_MODULE_ID_ROAM_DEBUG] = {"roam debug"},
 	[QDF_MODULE_ID_DIRECT_BUF_RX] = {"DIRECT_BUF_RX"},
+	[QDF_MODULE_ID_DISA] = {"disa"},
+	[QDF_MODULE_ID_GREEN_AP] = {"GREEN_AP"},
+	[QDF_MODULE_ID_EXTAP] = {"EXTAP"},
+	[QDF_MODULE_ID_FD] = {"FILS discovery"},
 	[QDF_MODULE_ID_ANY] = {"ANY"},
 };
 EXPORT_SYMBOL(g_qdf_category_name);
@@ -2585,6 +2589,9 @@ static void set_default_trace_levels(struct category_info *cinfo)
 		[QDF_MODULE_ID_NSS] = QDF_TRACE_LEVEL_ERROR,
 		[QDF_MODULE_ID_ROAM_DEBUG] = QDF_TRACE_LEVEL_ERROR,
 		[QDF_MODULE_ID_DIRECT_BUF_RX] = QDF_TRACE_LEVEL_ERROR,
+		[QDF_MODULE_ID_GREEN_AP] = QDF_TRACE_LEVEL_ERROR,
+		[QDF_MODULE_ID_EXTAP] = QDF_TRACE_LEVEL_NONE,
+		[QDF_MODULE_ID_FD] = QDF_TRACE_LEVEL_ERROR,
 		[QDF_MODULE_ID_ANY] = QDF_TRACE_LEVEL_NONE,
 	};
 

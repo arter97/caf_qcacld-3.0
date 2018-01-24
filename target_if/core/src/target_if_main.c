@@ -34,6 +34,7 @@
 #endif
 #include <target_if_reg.h>
 #include <target_if_scan.h>
+#include <target_if_ftm.h>
 #ifdef DFS_COMPONENT_ENABLE
 #include <target_if_dfs.h>
 #endif
@@ -58,9 +59,16 @@
 #ifdef WLAN_OFFCHAN_TXRX_ENABLE
 #include <target_if_offchan_txrx_api.h>
 #endif
+#ifdef WLAN_SUPPORT_GREEN_AP
+#include <target_if_green_ap.h>
+#endif
 
 #ifdef DIRECT_BUF_RX_ENABLE
 #include <target_if_direct_buf_rx_api.h>
+#endif
+
+#ifdef WLAN_SUPPORT_FILS
+#include <target_if_fd.h>
 #endif
 
 static struct target_if_ctx *g_target_if_ctx;
@@ -84,6 +92,28 @@ struct wlan_objmgr_psoc *target_if_get_psoc_from_scn_hdl(void *scn_handle)
 	return psoc;
 }
 
+#ifdef DIRECT_BUF_RX_ENABLE
+static QDF_STATUS target_if_direct_buf_rx_init(void)
+{
+	return direct_buf_rx_init();
+}
+
+static QDF_STATUS target_if_direct_buf_rx_deinit(void)
+{
+	return direct_buf_rx_deinit();
+}
+#else
+static QDF_STATUS target_if_direct_buf_rx_init(void)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS target_if_direct_buf_rx_deinit(void)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* DIRECT_BUF_RX_ENABLE */
+
 QDF_STATUS target_if_open(get_psoc_handle_callback psoc_hdl_cb)
 {
 	g_target_if_ctx = qdf_mem_malloc(sizeof(*g_target_if_ctx));
@@ -99,6 +129,8 @@ QDF_STATUS target_if_open(get_psoc_handle_callback psoc_hdl_cb)
 	g_target_if_ctx->magic = TGT_MAGIC;
 	g_target_if_ctx->get_psoc_hdl_cb = psoc_hdl_cb;
 	qdf_spin_unlock_bh(&g_target_if_ctx->lock);
+
+	target_if_direct_buf_rx_init();
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -121,6 +153,8 @@ QDF_STATUS target_if_close(void)
 	qdf_mem_free(g_target_if_ctx);
 	g_target_if_ctx = NULL;
 
+	target_if_direct_buf_rx_deinit();
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -142,6 +176,17 @@ static void target_if_sa_api_tx_ops_register(struct wlan_lmac_if_tx_ops *tx_ops)
 {
 }
 #endif /* WLAN_SA_API_ENABLE */
+
+#ifdef WLAN_SUPPORT_FILS
+static void target_if_fd_tx_ops_register(struct wlan_lmac_if_tx_ops *tx_ops)
+{
+	target_if_fd_register_tx_ops(tx_ops);
+}
+#else
+static void target_if_fd_tx_ops_register(struct wlan_lmac_if_tx_ops *tx_ops)
+{
+}
+#endif
 
 #ifdef WIFI_POS_CONVERGED
 static void target_if_wifi_pos_tx_ops_register(
@@ -233,6 +278,20 @@ static void target_if_direct_buf_rx_tx_ops_register(
 }
 #endif /* DIRECT_BUF_RX_ENABLE */
 
+#ifdef WLAN_SUPPORT_GREEN_AP
+static QDF_STATUS target_if_green_ap_tx_ops_register(
+				struct wlan_lmac_if_tx_ops *tx_ops)
+{
+	return target_if_register_green_ap_tx_ops(tx_ops);
+}
+#else
+static QDF_STATUS target_if_green_ap_tx_ops_register(
+				struct wlan_lmac_if_tx_ops *tx_ops)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_SUPPORT_GREEN_AP */
+
 static void target_if_target_tx_ops_register(
 		struct wlan_lmac_if_tx_ops *tx_ops)
 {
@@ -256,6 +315,12 @@ static void target_if_target_tx_ops_register(
 
 	target_tx_ops->tgt_is_tgt_type_qca9888 =
 		target_is_tgt_type_qca9888;
+}
+
+static
+void target_if_ftm_tx_ops_register(struct wlan_lmac_if_tx_ops *tx_ops)
+{
+	target_if_ftm_register_tx_ops(tx_ops);
 }
 
 static
@@ -284,9 +349,15 @@ QDF_STATUS target_if_register_umac_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops)
 
 	target_if_tdls_tx_ops_register(tx_ops);
 
+	target_if_fd_tx_ops_register(tx_ops);
+
 	target_if_target_tx_ops_register(tx_ops);
 
 	target_if_offchan_txrx_ops_register(tx_ops);
+
+	target_if_green_ap_tx_ops_register(tx_ops);
+
+	target_if_ftm_tx_ops_register(tx_ops);
 
 	/* Converged UMAC components to register their TX-ops here */
 	return QDF_STATUS_SUCCESS;

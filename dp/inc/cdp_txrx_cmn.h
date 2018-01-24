@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -773,6 +773,23 @@ static inline int cdp_delba_process(ol_txrx_soc_handle soc,
 			tid, reasoncode);
 }
 
+static inline void cdp_set_addbaresponse(ol_txrx_soc_handle soc,
+	void *peer_handle, int tid, uint16_t statuscode)
+{
+	if (!soc || !soc->ops) {
+		QDF_TRACE(QDF_MODULE_ID_CDP, QDF_TRACE_LEVEL_DEBUG,
+				"%s: Invalid Instance:", __func__);
+		QDF_BUG(0);
+		return;
+	}
+
+	if (!soc->ops->cmn_drv_ops ||
+	    !soc->ops->cmn_drv_ops->set_addba_response)
+		return;
+
+	soc->ops->cmn_drv_ops->set_addba_response(peer_handle, tid, statuscode);
+}
+
 /**
  * cdp_get_peer_mac_addr_frm_id: function to return vdev id and and peer
  * mac address
@@ -1042,5 +1059,53 @@ QDF_STATUS cdp_update_config_parameters(ol_txrx_soc_handle soc,
 
 	return soc->ops->cmn_drv_ops->update_config_parameters(psoc,
 								cfg);
+}
+
+/**
+ * cdp_pdev_get_dp_txrx_handle() - get advanced dp handle from pdev
+ * @soc: opaque soc handle
+ * @pdev: data path pdev handle
+ *
+ * Return: opaque dp handle
+ */
+static inline void *
+cdp_pdev_get_dp_txrx_handle(ol_txrx_soc_handle soc, void *pdev)
+{
+	if (!soc || !soc->ops) {
+		QDF_TRACE(QDF_MODULE_ID_CDP, QDF_TRACE_LEVEL_DEBUG,
+				"%s: Invalid Instance:", __func__);
+		QDF_BUG(0);
+		return 0;
+	}
+
+	if (soc->ops->cmn_drv_ops->get_dp_txrx_handle)
+		return soc->ops->cmn_drv_ops->get_dp_txrx_handle(pdev);
+
+	return 0;
+}
+
+/**
+ * cdp_pdev_set_dp_txrx_handle() - set advanced dp handle in pdev
+ * @soc: opaque soc handle
+ * @pdev: data path pdev handle
+ * @dp_hdl: opaque pointer for dp_txrx_handle
+ *
+ * Return: void
+ */
+static inline void
+cdp_pdev_set_dp_txrx_handle(ol_txrx_soc_handle soc, void *pdev, void *dp_hdl)
+{
+	if (!soc || !soc->ops) {
+		QDF_TRACE(QDF_MODULE_ID_CDP, QDF_TRACE_LEVEL_DEBUG,
+				"%s: Invalid Instance:", __func__);
+		QDF_BUG(0);
+		return;
+	}
+
+	if (!soc->ops->cmn_drv_ops ||
+			!soc->ops->cmn_drv_ops->set_dp_txrx_handle)
+		return;
+
+	soc->ops->cmn_drv_ops->set_dp_txrx_handle(pdev, dp_hdl);
 }
 #endif /* _CDP_TXRX_CMN_H_ */

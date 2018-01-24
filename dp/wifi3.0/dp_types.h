@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -443,6 +443,8 @@ struct dp_rx_tid {
 	uint32_t defrag_timeout_ms;
 	uint16_t dialogtoken;
 	uint16_t statuscode;
+	/* user defined ADDBA response status code */
+	uint16_t userstatuscode;
 };
 
 /* per interrupt context  */
@@ -1101,6 +1103,8 @@ struct dp_pdev {
 		uint16_t tx_peer_id;
 		uint16_t rx_ppdu_id;
 	} am_copy_id;
+
+	void *dp_txrx_handle; /* Advanced data path handle */
 };
 
 struct dp_peer;
@@ -1327,6 +1331,7 @@ struct dp_peer {
 #ifdef WDS_VENDOR_EXTENSION
 	dp_ecm_policy wds_ecm;
 #endif
+	bool delete_in_progress;
 };
 
 #ifdef CONFIG_WIN

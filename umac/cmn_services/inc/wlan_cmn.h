@@ -118,9 +118,14 @@
  * @WLAN_UMAC_COMP_NAN:           Neighbor Aware Networking
  * @WLAN_UMAC_COMP_DFS:           DFS
  * @WLAN_UMAC_COMP_SPECTRAL:      Spectral
- * @WLAN_UMAC_COMP_ID_MAX:        Maximum components in UMAC
  * @WLAN_UMAC_COMP_OFFCHAN_TXRX:  Offchan TxRx
  * @WLAN_UMAC_COMP_SPLITMAC:      SplitMAC
+ * @WLAN_UMAC_COMP_DISA:          DISA encryption test
+ * @WLAN_UMAC_COMP_GREEN_AP:      Green AP
+ * @WLAN_UMAC_COMP_FTM:           FTM component
+ * @WLAN_UMAC_COMP_FD:            FILS Discovery
+ *
+ * @WLAN_UMAC_COMP_ID_MAX:        Maximum components in UMAC
  *
  * This id is static.
  * On Adding new component, new id has to be assigned
@@ -147,6 +152,10 @@ enum wlan_umac_comp_id {
 	WLAN_UMAC_COMP_SON,
 	WLAN_UMAC_COMP_SPECTRAL,
 	WLAN_UMAC_COMP_SPLITMAC,
+	WLAN_UMAC_COMP_DISA,
+	WLAN_UMAC_COMP_GREEN_AP,
+	WLAN_UMAC_COMP_FTM,
+	WLAN_UMAC_COMP_FD,
 	WLAN_UMAC_COMP_ID_MAX,
 };
 
@@ -293,6 +302,7 @@ enum wlan_pmf_cap {
  * @WLAN_AUTH_TYPE_OPEN_SYSTEM: Open auth type
  * @WLAN_AUTH_TYPE_SHARED_KEY: Shared Key Auth type
  * @WLAN_AUTH_TYPE_AUTOSWITCH: Auto switch Open/Shared
+ * @WLAN_AUTH_TYPE_SAE: SAE auth type
  * @WLAN_AUTH_TYPE_WPA: WPA Enterprise
  * @WLAN_AUTH_TYPE_WPA_PSK: WPA PSK
  * @WLAN_AUTH_TYPE_WPA_NONE: WPA None
@@ -316,6 +326,7 @@ enum wlan_auth_type {
 	WLAN_AUTH_TYPE_OPEN_SYSTEM,
 	WLAN_AUTH_TYPE_SHARED_KEY,
 	WLAN_AUTH_TYPE_AUTOSWITCH,
+	WLAN_AUTH_TYPE_SAE,
 	WLAN_AUTH_TYPE_WPA,
 	WLAN_AUTH_TYPE_WPA_PSK,
 	WLAN_AUTH_TYPE_WPA_NONE,
@@ -335,6 +346,8 @@ enum wlan_auth_type {
 	WLAN_AUTH_TYPE_FT_FILS_SHA384,
 	WLAN_AUTH_TYPE_DPP_RSN,
 	WLAN_AUTH_TYPE_OWE,
+	WLAN_AUTH_TYPE_SUITEB_EAP_SHA256,
+	WLAN_AUTH_TYPE_SUITEB_EAP_SHA384,
 
 	WLAN_NUM_OF_SUPPORT_AUTH_TYPE,
 };

@@ -125,21 +125,7 @@ struct dp_rate_debug {
 #define MCS_INVALID 0
 
 static const struct dp_rate_debug dp_rate_string[DOT11_MAX][MAX_MCS] = {
-	{
-		{"CCK 11 Mbps Long  ", MCS_VALID},
-		{"CCK 5.5 Mbps Long ", MCS_VALID},
-		{"CCK 2 Mbps Long   ", MCS_VALID},
-		{"CCK 1 Mbps Long   ", MCS_VALID},
-		{"CCK 11 Mbps Short ", MCS_VALID},
-		{"CCK 5.5 Mbps Short", MCS_VALID},
-		{"CCK 2 Mbps Short  ", MCS_VALID},
-		{"INVALID ", MCS_INVALID},
-		{"INVALID ", MCS_INVALID},
-		{"INVALID ", MCS_INVALID},
-		{"INVALID ", MCS_INVALID},
-		{"INVALID ", MCS_INVALID},
-		{"INVALID ", MCS_VALID},
-	},
+
 	{
 		{"OFDM 48 Mbps", MCS_VALID},
 		{"OFDM 24 Mbps", MCS_VALID},
@@ -149,6 +135,21 @@ static const struct dp_rate_debug dp_rate_string[DOT11_MAX][MAX_MCS] = {
 		{"OFDM 36 Mbps", MCS_VALID},
 		{"OFDM 18 Mbps", MCS_VALID},
 		{"OFDM 9 Mbps ", MCS_VALID},
+		{"INVALID ", MCS_INVALID},
+		{"INVALID ", MCS_INVALID},
+		{"INVALID ", MCS_INVALID},
+		{"INVALID ", MCS_INVALID},
+		{"INVALID ", MCS_VALID},
+	},
+	{
+		{"CCK 11 Mbps Long  ", MCS_VALID},
+		{"CCK 5.5 Mbps Long ", MCS_VALID},
+		{"CCK 2 Mbps Long   ", MCS_VALID},
+		{"CCK 1 Mbps Long   ", MCS_VALID},
+		{"CCK 11 Mbps Short ", MCS_VALID},
+		{"CCK 5.5 Mbps Short", MCS_VALID},
+		{"CCK 2 Mbps Short  ", MCS_VALID},
+		{"INVALID ", MCS_INVALID},
 		{"INVALID ", MCS_INVALID},
 		{"INVALID ", MCS_INVALID},
 		{"INVALID ", MCS_INVALID},
@@ -2541,6 +2542,7 @@ static void dp_pdev_detach_wifi3(struct cdp_pdev *txrx_pdev, int force)
 	soc->pdev_list[pdev->pdev_id] = NULL;
 	soc->pdev_count--;
 	wlan_cfg_pdev_detach(pdev->wlan_cfg_ctx);
+	qdf_mem_free(pdev->dp_txrx_handle);
 	qdf_mem_free(pdev);
 }
 
@@ -2969,7 +2971,10 @@ static void dp_vdev_register_wifi3(struct cdp_vdev *vdev_handle,
 	vdev->me_convert = txrx_ops->me_convert;
 
 	/* TODO: Enable the following once Tx code is integrated */
-	txrx_ops->tx.tx = dp_tx_send;
+	if (vdev->mesh_vdev)
+		txrx_ops->tx.tx = dp_tx_send_mesh;
+	else
+		txrx_ops->tx.tx = dp_tx_send;
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO_LOW,
 		"DP Vdev Register success");
@@ -3680,10 +3685,15 @@ void dp_peer_unref_delete(void *peer_handle)
 		} else {
 			qdf_spin_unlock_bh(&soc->peer_ref_mutex);
 		}
+
+		if (soc->cdp_soc.ol_ops->peer_unref_delete) {
+			soc->cdp_soc.ol_ops->peer_unref_delete(pdev->osif_pdev,
+					vdev->vdev_id, peer->mac_addr.raw);
+		}
 #ifdef notyet
 		qdf_mempool_free(soc->osdev, soc->mempool_ol_ath_peer, peer);
 #else
-		if (!vdev && !vdev->vap_bss_peer)
+		if (!vdev || !vdev->vap_bss_peer)
 			goto free_peer;
 
 		bss_peer = vdev->vap_bss_peer;
@@ -3692,11 +3702,6 @@ void dp_peer_unref_delete(void *peer_handle)
 free_peer:
 		qdf_mem_free(peer);
 #endif
-		if (soc->cdp_soc.ol_ops->peer_unref_delete) {
-			soc->cdp_soc.ol_ops->peer_unref_delete(pdev->osif_pdev,
-					vdev->vdev_id, peer->mac_addr.raw);
-		}
-
 	} else {
 		qdf_spin_unlock_bh(&soc->peer_ref_mutex);
 	}
@@ -4163,7 +4168,8 @@ void dp_aggregate_vdev_stats(struct dp_vdev *vdev)
 
 	if (soc->cdp_soc.ol_ops->update_dp_stats)
 		soc->cdp_soc.ol_ops->update_dp_stats(vdev->pdev->osif_pdev,
-			&vdev->stats, vdev->vdev_id, UPDATE_VDEV_STATS);
+			&vdev->stats, (uint16_t) vdev->vdev_id,
+			UPDATE_VDEV_STATS);
 
 }
 
@@ -4215,6 +4221,8 @@ static inline void dp_aggregate_pdev_stats(struct dp_pdev *pdev)
 		DP_STATS_AGGR(pdev, vdev, tx_i.dropped.res_full);
 		DP_STATS_AGGR(pdev, vdev, tx_i.cce_classified);
 		DP_STATS_AGGR(pdev, vdev, tx_i.cce_classified_raw);
+		DP_STATS_AGGR(pdev, vdev, tx_i.mesh.exception_fw);
+		DP_STATS_AGGR(pdev, vdev, tx_i.mesh.completion_fw);
 
 		pdev->stats.tx_i.dropped.dropped_pkt.num =
 			pdev->stats.tx_i.dropped.dma_error +
@@ -4244,17 +4252,17 @@ dp_print_pdev_tx_stats(struct dp_pdev *pdev)
 	DP_PRINT_STATS("Received From Stack:");
 	DP_PRINT_STATS("	Packets = %d",
 			pdev->stats.tx_i.rcvd.num);
-	DP_PRINT_STATS("	Bytes = %d",
+	DP_PRINT_STATS("	Bytes = %llu",
 			pdev->stats.tx_i.rcvd.bytes);
 	DP_PRINT_STATS("Processed:");
 	DP_PRINT_STATS("	Packets = %d",
 			pdev->stats.tx_i.processed.num);
-	DP_PRINT_STATS("	Bytes = %d",
+	DP_PRINT_STATS("	Bytes = %llu",
 			pdev->stats.tx_i.processed.bytes);
 	DP_PRINT_STATS("Completions:");
 	DP_PRINT_STATS("	Packets = %d",
 			pdev->stats.tx.comp_pkt.num);
-	DP_PRINT_STATS("	Bytes = %d",
+	DP_PRINT_STATS("	Bytes = %llu",
 			pdev->stats.tx.comp_pkt.bytes);
 	DP_PRINT_STATS("Dropped:");
 	DP_PRINT_STATS("	Total = %d",
@@ -4280,7 +4288,7 @@ dp_print_pdev_tx_stats(struct dp_pdev *pdev)
 	DP_PRINT_STATS("Scatter Gather:");
 	DP_PRINT_STATS("	Packets = %d",
 			pdev->stats.tx_i.sg.sg_pkt.num);
-	DP_PRINT_STATS("	Bytes = %d",
+	DP_PRINT_STATS("	Bytes = %llu",
 			pdev->stats.tx_i.sg.sg_pkt.bytes);
 	DP_PRINT_STATS("	Dropped By Host = %d",
 			pdev->stats.tx_i.sg.dropped_host);
@@ -4291,14 +4299,14 @@ dp_print_pdev_tx_stats(struct dp_pdev *pdev)
 			pdev->stats.tx_i.tso.num_seg);
 	DP_PRINT_STATS("	Packets = %d",
 			pdev->stats.tx_i.tso.tso_pkt.num);
-	DP_PRINT_STATS("	Bytes = %d",
+	DP_PRINT_STATS("	Bytes = %llu",
 			pdev->stats.tx_i.tso.tso_pkt.bytes);
 	DP_PRINT_STATS("	Dropped By Host = %d",
 			pdev->stats.tx_i.tso.dropped_host);
 	DP_PRINT_STATS("Mcast Enhancement:");
 	DP_PRINT_STATS("	Packets = %d",
 			pdev->stats.tx_i.mcast_en.mcast_pkt.num);
-	DP_PRINT_STATS("	Bytes = %d",
+	DP_PRINT_STATS("	Bytes = %llu",
 			pdev->stats.tx_i.mcast_en.mcast_pkt.bytes);
 	DP_PRINT_STATS("	Dropped: Map Errors = %d",
 			pdev->stats.tx_i.mcast_en.dropped_map_error);
@@ -4311,30 +4319,35 @@ dp_print_pdev_tx_stats(struct dp_pdev *pdev)
 	DP_PRINT_STATS("Raw:");
 	DP_PRINT_STATS("	Packets = %d",
 			pdev->stats.tx_i.raw.raw_pkt.num);
-	DP_PRINT_STATS("	Bytes = %d",
+	DP_PRINT_STATS("	Bytes = %llu",
 			pdev->stats.tx_i.raw.raw_pkt.bytes);
 	DP_PRINT_STATS("	DMA map error = %d",
 			pdev->stats.tx_i.raw.dma_map_error);
 	DP_PRINT_STATS("Reinjected:");
 	DP_PRINT_STATS("	Packets = %d",
 			pdev->stats.tx_i.reinject_pkts.num);
-	DP_PRINT_STATS("Bytes = %d\n",
+	DP_PRINT_STATS("Bytes = %llu\n",
 				pdev->stats.tx_i.reinject_pkts.bytes);
 	DP_PRINT_STATS("Inspected:");
 	DP_PRINT_STATS("	Packets = %d",
 			pdev->stats.tx_i.inspect_pkts.num);
-	DP_PRINT_STATS("	Bytes = %d",
+	DP_PRINT_STATS("	Bytes = %llu",
 			pdev->stats.tx_i.inspect_pkts.bytes);
 	DP_PRINT_STATS("Nawds Multicast:");
 	DP_PRINT_STATS("	Packets = %d",
 			pdev->stats.tx_i.nawds_mcast.num);
-	DP_PRINT_STATS("	Bytes = %d",
+	DP_PRINT_STATS("	Bytes = %llu",
 			pdev->stats.tx_i.nawds_mcast.bytes);
 	DP_PRINT_STATS("CCE Classified:");
-	DP_TRACE(FATAL, "	CCE Classified Packets: %u",
+	DP_PRINT_STATS("	CCE Classified Packets: %u",
 			pdev->stats.tx_i.cce_classified);
-	DP_TRACE(FATAL, "	RAW CCE Classified Packets: %u",
+	DP_PRINT_STATS("	RAW CCE Classified Packets: %u",
 			pdev->stats.tx_i.cce_classified_raw);
+	DP_PRINT_STATS("Mesh stats:");
+	DP_PRINT_STATS("	frames to firmware: %u",
+			pdev->stats.tx_i.mesh.exception_fw);
+	DP_PRINT_STATS("	completions from fw: %u",
+			pdev->stats.tx_i.mesh.completion_fw);
 }
 
 /**
@@ -4353,7 +4366,7 @@ dp_print_pdev_rx_stats(struct dp_pdev *pdev)
 			pdev->stats.rx.rcvd_reo[1].num,
 			pdev->stats.rx.rcvd_reo[2].num,
 			pdev->stats.rx.rcvd_reo[3].num);
-	DP_PRINT_STATS("	Bytes = %d %d %d %d",
+	DP_PRINT_STATS("	Bytes = %llu %llu %llu %llu",
 			pdev->stats.rx.rcvd_reo[0].bytes,
 			pdev->stats.rx.rcvd_reo[1].bytes,
 			pdev->stats.rx.rcvd_reo[2].bytes,
@@ -4361,7 +4374,7 @@ dp_print_pdev_rx_stats(struct dp_pdev *pdev)
 	DP_PRINT_STATS("Replenished:");
 	DP_PRINT_STATS("	Packets = %d",
 			pdev->stats.replenish.pkts.num);
-	DP_PRINT_STATS("	Bytes = %d",
+	DP_PRINT_STATS("	Bytes = %llu",
 			pdev->stats.replenish.pkts.bytes);
 	DP_PRINT_STATS("	Buffers Added To Freelist = %d",
 			pdev->stats.buf_freelist);
@@ -4373,12 +4386,12 @@ dp_print_pdev_rx_stats(struct dp_pdev *pdev)
 	DP_PRINT_STATS("Sent To Stack:");
 	DP_PRINT_STATS("	Packets = %d",
 			pdev->stats.rx.to_stack.num);
-	DP_PRINT_STATS("	Bytes = %d",
+	DP_PRINT_STATS("	Bytes = %llu",
 			pdev->stats.rx.to_stack.bytes);
 	DP_PRINT_STATS("Multicast/Broadcast:");
 	DP_PRINT_STATS("	Packets = %d",
 			pdev->stats.rx.multicast.num);
-	DP_PRINT_STATS("	Bytes = %d",
+	DP_PRINT_STATS("	Bytes = %llu",
 			pdev->stats.rx.multicast.bytes);
 	DP_PRINT_STATS("Errors:");
 	DP_PRINT_STATS("	Rxdma Ring Un-inititalized = %d",
@@ -4408,7 +4421,7 @@ dp_print_soc_tx_stats(struct dp_soc *soc)
 	DP_PRINT_STATS("Invalid peer:");
 	DP_PRINT_STATS("	Packets = %d",
 			soc->stats.tx.tx_invalid_peer.num);
-	DP_PRINT_STATS("	Bytes = %d",
+	DP_PRINT_STATS("	Bytes = %llu",
 			soc->stats.tx.tx_invalid_peer.bytes);
 	DP_PRINT_STATS("Packets dropped due to TCL ring full = %d %d %d",
 			soc->stats.tx.tcl_ring_full[0],
@@ -4636,7 +4649,7 @@ dp_print_rx_rates(struct dp_vdev *vdev)
 		index += qdf_snprint(&nss[index], DP_NSS_LENGTH - index,
 				" %d", pdev->stats.rx.nss[i]);
 	}
-	DP_PRINT_STATS("NSS(0-7) = %s",
+	DP_PRINT_STATS("NSS(1-8) = %s",
 			nss);
 
 	DP_PRINT_STATS("SGI ="
@@ -4742,19 +4755,19 @@ static inline void dp_print_peer_stats(struct dp_peer *peer)
 	DP_PRINT_STATS("Node Tx Stats:\n");
 	DP_PRINT_STATS("Total Packet Completions = %d",
 			peer->stats.tx.comp_pkt.num);
-	DP_PRINT_STATS("Total Bytes Completions = %d",
+	DP_PRINT_STATS("Total Bytes Completions = %llu",
 			peer->stats.tx.comp_pkt.bytes);
 	DP_PRINT_STATS("Success Packets = %d",
 			peer->stats.tx.tx_success.num);
-	DP_PRINT_STATS("Success Bytes = %d",
+	DP_PRINT_STATS("Success Bytes = %llu",
 			peer->stats.tx.tx_success.bytes);
 	DP_PRINT_STATS("Unicast Success Packets = %d",
 			peer->stats.tx.ucast.num);
-	DP_PRINT_STATS("Unicast Success Bytes = %d",
+	DP_PRINT_STATS("Unicast Success Bytes = %llu",
 			peer->stats.tx.ucast.bytes);
 	DP_PRINT_STATS("Multicast Success Packets = %d",
 			peer->stats.tx.mcast.num);
-	DP_PRINT_STATS("Multicast Success Bytes = %d",
+	DP_PRINT_STATS("Multicast Success Bytes = %llu",
 			peer->stats.tx.mcast.bytes);
 	DP_PRINT_STATS("Packets Failed = %d",
 			peer->stats.tx.tx_failed);
@@ -4783,7 +4796,7 @@ static inline void dp_print_peer_stats(struct dp_peer *peer)
 			peer->stats.tx.nawds_mcast_drop);
 	DP_PRINT_STATS("	Nawds multicast  Tx Packet Count = %d",
 			peer->stats.tx.nawds_mcast.num);
-	DP_PRINT_STATS("	Nawds multicast  Tx Packet Bytes = %d",
+	DP_PRINT_STATS("	Nawds multicast  Tx Packet Bytes = %llu",
 			peer->stats.tx.nawds_mcast.bytes);
 
 	DP_PRINT_STATS("Rate Info:");
@@ -4816,6 +4829,14 @@ static inline void dp_print_peer_stats(struct dp_peer *peer)
 			peer->stats.tx.bw[2], peer->stats.tx.bw[3],
 			peer->stats.tx.bw[4], peer->stats.tx.bw[5]);
 
+	index = 0;
+	for (i = 0; i < SS_COUNT; i++) {
+		index += qdf_snprint(&nss[index], DP_NSS_LENGTH - index,
+				" %d", peer->stats.tx.nss[i]);
+	}
+	DP_PRINT_STATS("NSS(1-8) = %s",
+			nss);
+
 	DP_PRINT_STATS("Aggregation:");
 	DP_PRINT_STATS("	Number of Msdu's Part of Amsdu = %d",
 			peer->stats.tx.amsdu_cnt);
@@ -4825,30 +4846,30 @@ static inline void dp_print_peer_stats(struct dp_peer *peer)
 	DP_PRINT_STATS("Node Rx Stats:");
 	DP_PRINT_STATS("Packets Sent To Stack = %d",
 			peer->stats.rx.to_stack.num);
-	DP_PRINT_STATS("Bytes Sent To Stack = %d",
+	DP_PRINT_STATS("Bytes Sent To Stack = %llu",
 			peer->stats.rx.to_stack.bytes);
 	for (i = 0; i <  CDP_MAX_RX_RINGS; i++) {
 		DP_PRINT_STATS("Ring Id = %d", i);
 		DP_PRINT_STATS("	Packets Received = %d",
 				peer->stats.rx.rcvd_reo[i].num);
-		DP_PRINT_STATS("	Bytes Received = %d",
+		DP_PRINT_STATS("	Bytes Received = %llu",
 				peer->stats.rx.rcvd_reo[i].bytes);
 	}
 	DP_PRINT_STATS("Multicast Packets Received = %d",
 			peer->stats.rx.multicast.num);
-	DP_PRINT_STATS("Multicast Bytes Received = %d",
+	DP_PRINT_STATS("Multicast Bytes Received = %llu",
 			peer->stats.rx.multicast.bytes);
 	DP_PRINT_STATS("WDS Packets Received = %d",
 			peer->stats.rx.wds.num);
-	DP_PRINT_STATS("WDS Bytes Received = %d",
+	DP_PRINT_STATS("WDS Bytes Received = %llu",
 			peer->stats.rx.wds.bytes);
 	DP_PRINT_STATS("Intra BSS Packets Received = %d",
 			peer->stats.rx.intra_bss.pkts.num);
-	DP_PRINT_STATS("Intra BSS Bytes Received = %d",
+	DP_PRINT_STATS("Intra BSS Bytes Received = %llu",
 			peer->stats.rx.intra_bss.pkts.bytes);
 	DP_PRINT_STATS("Raw Packets Received = %d",
 			peer->stats.rx.raw.num);
-	DP_PRINT_STATS("Raw Bytes Received = %d",
+	DP_PRINT_STATS("Raw Bytes Received = %llu",
 			peer->stats.rx.raw.bytes);
 	DP_PRINT_STATS("Errors: MIC Errors = %d",
 			peer->stats.rx.err.mic_err);
@@ -4865,7 +4886,7 @@ static inline void dp_print_peer_stats(struct dp_peer *peer)
 	DP_PRINT_STATS("NAWDS : ");
 	DP_PRINT_STATS("	Nawds multicast Drop Rx Packet = %d",
 			peer->stats.rx.nawds_mcast_drop.num);
-	DP_PRINT_STATS("	Nawds multicast Drop Rx Packet Bytes = %d",
+	DP_PRINT_STATS("	Nawds multicast Drop Rx Packet Bytes = %llu",
 			peer->stats.rx.nawds_mcast_drop.bytes);
 	DP_PRINT_STATS("SGI ="
 			" 0.8us %d"
@@ -4910,7 +4931,7 @@ static inline void dp_print_peer_stats(struct dp_peer *peer)
 		index += qdf_snprint(&nss[index], DP_NSS_LENGTH - index,
 				" %d", peer->stats.rx.nss[i]);
 	}
-	DP_PRINT_STATS("NSS(0-7) = %s",
+	DP_PRINT_STATS("NSS(1-8) = %s",
 			nss);
 
 	DP_PRINT_STATS("Aggregation:");
@@ -5493,13 +5514,13 @@ static void dp_txrx_path_stats(struct dp_soc *soc)
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 			"Tx path Statistics:");
 
-		DP_TRACE(FATAL, "from stack: %u msdus (%u bytes)",
+		DP_TRACE(FATAL, "from stack: %u msdus (%llu bytes)",
 			pdev->stats.tx_i.rcvd.num,
 			pdev->stats.tx_i.rcvd.bytes);
-		DP_TRACE(FATAL, "processed from host: %u msdus (%u bytes)",
+		DP_TRACE(FATAL, "processed from host: %u msdus (%llu bytes)",
 			pdev->stats.tx_i.processed.num,
 			pdev->stats.tx_i.processed.bytes);
-		DP_TRACE(FATAL, "successfully transmitted: %u msdus (%u bytes)",
+		DP_TRACE(FATAL, "successfully transmitted: %u msdus (%llu bytes)",
 			pdev->stats.tx.tx_success.num,
 			pdev->stats.tx.tx_success.bytes);
 
@@ -5550,20 +5571,20 @@ static void dp_txrx_path_stats(struct dp_soc *soc)
 
 		DP_TRACE(FATAL, "Rx path statistics");
 
-		DP_TRACE(FATAL, "delivered %u msdus ( %u bytes),",
+		DP_TRACE(FATAL, "delivered %u msdus ( %llu bytes),",
 			pdev->stats.rx.to_stack.num,
 			pdev->stats.rx.to_stack.bytes);
 		for (i = 0; i <  CDP_MAX_RX_RINGS; i++)
-			DP_TRACE(FATAL, "received on reo[%d] %u msdus ( %u bytes),",
+			DP_TRACE(FATAL, "received on reo[%d] %u msdus ( %llu bytes),",
 					i, pdev->stats.rx.rcvd_reo[i].num,
 					pdev->stats.rx.rcvd_reo[i].bytes);
-		DP_TRACE(FATAL, "intra-bss packets %u msdus ( %u bytes),",
+		DP_TRACE(FATAL, "intra-bss packets %u msdus ( %llu bytes),",
 			pdev->stats.rx.intra_bss.pkts.num,
 			pdev->stats.rx.intra_bss.pkts.bytes);
-		DP_TRACE(FATAL, "intra-bss fails %u msdus ( %u bytes),",
+		DP_TRACE(FATAL, "intra-bss fails %u msdus ( %llu bytes),",
 			pdev->stats.rx.intra_bss.fail.num,
 			pdev->stats.rx.intra_bss.fail.bytes);
-		DP_TRACE(FATAL, "raw packets %u msdus ( %u bytes),",
+		DP_TRACE(FATAL, "raw packets %u msdus ( %llu bytes),",
 			pdev->stats.rx.raw.num,
 			pdev->stats.rx.raw.bytes);
 		DP_TRACE(FATAL, "dropped: error %u msdus",
@@ -5861,6 +5882,34 @@ dp_txrx_data_tx_cb_set(struct cdp_vdev *vdev_handle,
 	vdev->tx_non_std_data_callback.ctxt = ctxt;
 }
 
+/**
+ * dp_pdev_get_dp_txrx_handle() - get dp handle from pdev
+ * @pdev_hdl: datapath pdev handle
+ *
+ * Return: opaque pointer to dp txrx handle
+ */
+static void *dp_pdev_get_dp_txrx_handle(struct cdp_pdev *pdev_hdl)
+{
+	struct dp_pdev *pdev = (struct dp_pdev *)pdev_hdl;
+
+	return pdev->dp_txrx_handle;
+}
+
+/**
+ * dp_pdev_set_dp_txrx_handle() - set dp handle in pdev
+ * @pdev_hdl: datapath pdev handle
+ * @dp_txrx_hdl: opaque pointer for dp_txrx_handle
+ *
+ * Return: void
+ */
+static void
+dp_pdev_set_dp_txrx_handle(struct cdp_pdev *pdev_hdl, void *dp_txrx_hdl)
+{
+	struct dp_pdev *pdev = (struct dp_pdev *)pdev_hdl;
+
+	pdev->dp_txrx_handle = dp_txrx_hdl;
+}
+
 #ifdef CONFIG_WIN
 static void dp_peer_teardown_wifi3(struct cdp_vdev *vdev_hdl, void *peer_hdl)
 {
@@ -5868,6 +5917,7 @@ static void dp_peer_teardown_wifi3(struct cdp_vdev *vdev_hdl, void *peer_hdl)
 	struct dp_peer *peer = (struct dp_peer *) peer_hdl;
 	struct dp_soc *soc = (struct dp_soc *) vdev->pdev->soc;
 
+	peer->delete_in_progress = true;
 	dp_peer_delete_ast_entries(soc, peer);
 }
 #endif
@@ -5894,6 +5944,7 @@ static struct cdp_cmn_ops dp_ops_cmn = {
 	.addba_requestprocess = dp_addba_requestprocess_wifi3,
 	.addba_responsesetup = dp_addba_responsesetup_wifi3,
 	.delba_process = dp_delba_process_wifi3,
+	.set_addba_response = dp_set_addba_response,
 	.get_peer_mac_addr_frm_id = dp_get_peer_mac_addr_frm_id,
 	.flush_cache_rx_queue = NULL,
 	/* TODO: get API's for dscp-tid need to be added*/
@@ -5914,7 +5965,9 @@ static struct cdp_cmn_ops dp_ops_cmn = {
 	.set_pn_check = dp_set_pn_check_wifi3,
 	.update_config_parameters = dp_update_config_parameters,
 	/* TODO: Add other functions */
-	.txrx_data_tx_cb_set = dp_txrx_data_tx_cb_set
+	.txrx_data_tx_cb_set = dp_txrx_data_tx_cb_set,
+	.get_dp_txrx_handle = dp_pdev_get_dp_txrx_handle,
+	.set_dp_txrx_handle = dp_pdev_set_dp_txrx_handle,
 };
 
 static struct cdp_ctrl_ops dp_ops_ctrl = {

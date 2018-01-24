@@ -76,6 +76,7 @@ struct scheduler_msg;
  *                  pointers for mgmt txrx component
  * @mgmt_tx_send: function pointer to transmit mgmt tx frame
  * @beacon_send:  function pointer to transmit beacon frame
+ * @fd_action_frame_send: function pointer to transmit FD action frame
  */
 struct wlan_lmac_if_mgmt_txrx_tx_ops {
 	QDF_STATUS (*mgmt_tx_send)(struct wlan_objmgr_vdev *vdev,
@@ -83,6 +84,8 @@ struct wlan_lmac_if_mgmt_txrx_tx_ops {
 			void *mgmt_tx_params);
 	QDF_STATUS (*beacon_send)(struct wlan_objmgr_vdev *vdev,
 			qdf_nbuf_t nbuf);
+	QDF_STATUS (*fd_action_frame_send)(struct wlan_objmgr_vdev *vdev,
+					   qdf_nbuf_t nbuf);
 };
 
 /**
@@ -110,6 +113,21 @@ struct wlan_lmac_if_scan_tx_ops {
 	QDF_STATUS (*scan_unreg_ev_handler)(struct wlan_objmgr_psoc *psoc,
 			void *arg);
 	QDF_STATUS (*set_chan_list)(struct wlan_objmgr_pdev *pdev, void *arg);
+};
+
+/**
+ * struct wlan_lmac_if_ftm_tx_ops - south bound tx function pointers for ftm
+ * @ftm_attach: function to register event handlers with FW
+ * @ftm_detach: function to de-register event handlers with FW
+ * @ftm_cmd_send: function to send FTM commands to FW
+ *
+ * ftm module uses these functions to avail ol/da lmac services
+ */
+struct wlan_lmac_if_ftm_tx_ops {
+	QDF_STATUS (*ftm_attach)(struct wlan_objmgr_psoc *psoc);
+	QDF_STATUS (*ftm_detach)(struct wlan_objmgr_psoc *psoc);
+	QDF_STATUS (*ftm_cmd_send)(struct wlan_objmgr_pdev *pdev,
+				uint8_t *buf, uint32_t len, uint8_t mac_id);
 };
 
 
@@ -248,6 +266,21 @@ struct wlan_lmac_if_atf_tx_ops {
 };
 #endif
 
+#ifdef WLAN_SUPPORT_FILS
+/**
+ * struct wlan_lmac_if_fd_tx_ops - FILS Discovery specific Tx function pointers
+ * @fd_vdev_config_fils:         Enable and configure FILS Discovery
+ * @fd_register_event_handler:   Register swfda WMI event handler
+ * @fd_unregister_event_handler: Un-register swfda WMI event handler
+ */
+struct wlan_lmac_if_fd_tx_ops {
+	QDF_STATUS (*fd_vdev_config_fils)(struct wlan_objmgr_vdev *vdev,
+					  uint32_t fd_period);
+	void (*fd_register_event_handler)(struct wlan_objmgr_psoc *psoc);
+	void (*fd_unregister_event_handler)(struct wlan_objmgr_psoc *psoc);
+};
+#endif
+
 #ifdef WLAN_SA_API_ENABLE
 
 /**
@@ -345,12 +378,20 @@ struct wlan_lmac_if_wifi_pos_tx_ops {
  * struct wlan_lmac_if_direct_buf_rx_tx_ops - structire of direct buf rx txops
  * @direct_buf_rx_module_register: Registration API callback for modules
  *                                 to register with direct buf rx framework
+ * @direct_buf_rx_register_events: Registration of WMI events for direct
+ *                                 buffer rx framework
+ * @direct_buf_rx_unregister_events: Unregistraton of WMI events for direct
+ *                                   buffer rx framework
  */
 struct wlan_lmac_if_direct_buf_rx_tx_ops {
 	QDF_STATUS (*direct_buf_rx_module_register)(
 			struct wlan_objmgr_pdev *pdev, uint8_t mod_id,
 			int (*dbr_rsp_handler)(struct wlan_objmgr_pdev *pdev,
 				struct direct_buf_rx_data *dbr_data));
+	QDF_STATUS (*direct_buf_rx_register_events)(
+			struct wlan_objmgr_psoc *psoc);
+	QDF_STATUS (*direct_buf_rx_unregister_events)(
+			struct wlan_objmgr_psoc *psoc);
 };
 #endif
 
@@ -410,6 +451,17 @@ struct wlan_lmac_if_nan_tx_ops {
 	QDF_STATUS (*nan_req_tx)(void *req, uint32_t req_id);
 };
 #endif
+
+/**
+ * struct wlan_lmac_if_ftm_rx_ops  - south bound rx function pointers for FTM
+ * @ftm_ev_handler: function to handle FTM event
+ *
+ * lmac modules uses this API to post FTM events to FTM module
+ */
+struct wlan_lmac_if_ftm_rx_ops {
+	QDF_STATUS (*ftm_ev_handler)(struct wlan_objmgr_pdev *pdev,
+					uint8_t *event_buf, uint32_t len);
+};
 
 /**
  * struct wlan_lmac_reg_if_tx_ops - structure of tx function
@@ -531,11 +583,32 @@ struct wlan_lmac_if_offchan_txrx_ops {
 };
 #endif
 
+#ifdef WLAN_SUPPORT_GREEN_AP
+struct wlan_green_ap_egap_params;
+/**
+ * struct wlan_lmac_if_green_ap_tx_ops - structure of tx function
+ *                  pointers for green ap component
+ * @enable_egap: function pointer to send enable egap indication to fw
+ * @ps_on_off_send:  function pointer to send enable/disable green ap ps to fw
+ */
+struct wlan_lmac_if_green_ap_tx_ops {
+	QDF_STATUS (*enable_egap)(struct wlan_objmgr_pdev *pdev,
+				struct wlan_green_ap_egap_params *egap_params);
+	QDF_STATUS (*ps_on_off_send)(struct wlan_objmgr_pdev *pdev,
+				     bool value, uint8_t pdev_id);
+	QDF_STATUS (*reset_dev)(struct wlan_objmgr_pdev *pdev);
+	uint16_t (*get_current_channel)(struct wlan_objmgr_pdev *pdev);
+	uint64_t (*get_current_channel_flags)(struct wlan_objmgr_pdev *pdev);
+	QDF_STATUS (*get_capab)(struct  wlan_objmgr_pdev *pdev);
+};
+#endif
+
 /**
  * struct wlan_lmac_if_tx_ops - south bound tx function pointers
  * @mgmt_txrx_tx_ops: mgmt txrx tx ops
  * @scan: scan tx ops
  * @dfs_tx_ops: dfs tx ops.
+ * @green_ap_tx_ops: green_ap tx_ops
  *
  * Callback function tabled to be registered with umac.
  * umac will use the functional table to send events/frames to lmac/wmi
@@ -583,14 +656,26 @@ struct wlan_lmac_if_tx_ops {
 #ifdef CONVERGED_TDLS_ENABLE
 	struct wlan_lmac_if_tdls_tx_ops tdls_tx_ops;
 #endif
+
+#ifdef WLAN_SUPPORT_FILS
+	struct wlan_lmac_if_fd_tx_ops fd_tx_ops;
+#endif
 	 struct wlan_lmac_if_mlme_tx_ops mops;
 	 struct wlan_lmac_if_target_tx_ops target_tx_ops;
+
 #ifdef WLAN_OFFCHAN_TXRX_ENABLE
 	struct wlan_lmac_if_offchan_txrx_ops offchan_txrx_ops;
 #endif
+
 #ifdef DIRECT_BUF_RX_ENABLE
 	struct wlan_lmac_if_direct_buf_rx_tx_ops dbr_tx_ops;
 #endif
+
+#ifdef WLAN_SUPPORT_GREEN_AP
+	 struct wlan_lmac_if_green_ap_tx_ops green_ap_tx_ops;
+#endif
+
+	struct wlan_lmac_if_ftm_tx_ops ftm_tx_ops;
 };
 
 /**
@@ -640,6 +725,13 @@ struct wlan_lmac_if_reg_rx_ops {
 			struct ch_avoid_ind_type *ch_avoid_ind);
 	uint32_t (*reg_freq_to_chan)(struct wlan_objmgr_pdev *pdev,
 			uint32_t freq);
+	QDF_STATUS (*reg_set_chan_144)(struct wlan_objmgr_pdev *pdev,
+			bool enable_ch_144);
+	bool (*reg_get_chan_144)(struct wlan_objmgr_pdev *pdev);
+	QDF_STATUS (*reg_program_default_cc)(struct wlan_objmgr_pdev *pdev,
+			uint16_t regdmn);
+	QDF_STATUS (*reg_get_current_regdomain)(struct wlan_objmgr_pdev *pdev,
+			struct cur_regdmn_info *cur_regdmn);
 };
 
 #ifdef CONVERGED_P2P_ENABLE
@@ -754,6 +846,24 @@ struct wlan_lmac_if_atf_rx_ops {
 					uint16_t value);
 	void (*atf_set_token_utilized)(struct wlan_objmgr_peer *peer,
 					uint16_t value);
+};
+#endif
+
+#ifdef WLAN_SUPPORT_FILS
+/**
+ * struct wlan_lmac_if_fd_rx_ops - FILS Discovery specific Rx function pointers
+ * @fd_alloc:               Allocate FD buffer
+ * @fd_stop:                Stop and free deferred FD buffer
+ * @fd_free:                Free FD frame buffer
+ * @fd_get_valid_fd_period: Get valid FD period
+ * @fd_swfda_handler:       SWFDA event handler
+ */
+struct wlan_lmac_if_fd_rx_ops {
+	void (*fd_alloc)(struct wlan_objmgr_vdev *vdev);
+	void (*fd_stop)(struct wlan_objmgr_vdev *vdev);
+	void (*fd_free)(struct wlan_objmgr_vdev *vdev);
+	uint32_t (*fd_get_valid_fd_period)(struct wlan_objmgr_vdev *vdev);
+	QDF_STATUS (*fd_swfda_handler)(struct wlan_objmgr_vdev *vdev);
 };
 #endif
 
@@ -969,6 +1079,17 @@ struct wlan_lmac_if_mlme_rx_ops {
 			uint8_t vdev_id);
 	void (*wlan_mlme_end_scan)(struct wlan_objmgr_pdev *pdev);
 };
+
+#ifdef WLAN_SUPPORT_GREEN_AP
+struct wlan_lmac_if_green_ap_rx_ops {
+	bool (*is_ps_enabled)(struct wlan_objmgr_pdev *pdev);
+	bool (*is_dbg_print_enabled)(struct wlan_objmgr_pdev *pdev);
+	QDF_STATUS (*ps_get)(struct wlan_objmgr_pdev *pdev, uint8_t *value);
+	QDF_STATUS (*ps_set)(struct wlan_objmgr_pdev *pdev, uint8_t value);
+	void (*suspend_handle)(struct wlan_objmgr_pdev *pdev);
+};
+#endif
+
 /**
  * struct wlan_lmac_if_rx_ops - south bound rx function pointers
  * @mgmt_txrx_tx_ops: mgmt txrx rx ops
@@ -1015,7 +1136,18 @@ struct wlan_lmac_if_rx_ops {
 #ifdef CONVERGED_TDLS_ENABLE
 	struct wlan_lmac_if_tdls_rx_ops tdls_rx_ops;
 #endif
+
+#ifdef WLAN_SUPPORT_FILS
+	struct wlan_lmac_if_fd_rx_ops fd_rx_ops;
+#endif
+
 	struct wlan_lmac_if_mlme_rx_ops mops;
+
+#ifdef WLAN_SUPPORT_GREEN_AP
+	struct wlan_lmac_if_green_ap_rx_ops green_ap_rx_ops;
+#endif
+
+	struct wlan_lmac_if_ftm_rx_ops ftm_rx_ops;
 };
 
 /* Function pointer to call legacy tx_ops registration in OL/WMA.

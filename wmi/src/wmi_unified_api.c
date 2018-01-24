@@ -285,33 +285,33 @@ QDF_STATUS wmi_unified_peer_rx_reorder_queue_remove_send(void *wmi_hdl,
 	return QDF_STATUS_E_FAILURE;
 }
 
-#if defined(FEATURE_GREEN_AP) || defined(ATH_SUPPORT_GREEN_AP)
+#ifdef WLAN_SUPPORT_GREEN_AP
 /**
  * wmi_unified_green_ap_ps_send() - enable green ap powersave command
  * @wmi_handle: wmi handle
  * @value: value
- * @mac_id: mac id to have radio context
+ * @pdev_id: pdev id to have radio context
  *
  * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
  */
 QDF_STATUS wmi_unified_green_ap_ps_send(void *wmi_hdl,
-						uint32_t value, uint8_t mac_id)
+						uint32_t value, uint8_t pdev_id)
 {
 	wmi_unified_t wmi_handle = (wmi_unified_t) wmi_hdl;
 
 	if (wmi_handle->ops->send_green_ap_ps_cmd)
 		return wmi_handle->ops->send_green_ap_ps_cmd(wmi_handle, value,
-				  mac_id);
+				  pdev_id);
 
 	return QDF_STATUS_E_FAILURE;
 }
 #else
 QDF_STATUS wmi_unified_green_ap_ps_send(void *wmi_hdl,
-						uint32_t value, uint8_t mac_id)
+						uint32_t value, uint8_t pdev_id)
 {
-	return 0;
+	return QDF_STATUS_SUCCESS;
 }
-#endif /* FEATURE_GREEN_AP or ATH_SUPPORT_GREEN_AP*/
+#endif /* WLAN_SUPPORT_GREEN_AP */
 
 /**
  * wmi_unified_pdev_utf_cmd() - send utf command to fw
@@ -2221,7 +2221,9 @@ QDF_STATUS wmi_unified_get_link_speed_cmd(void *wmi_hdl,
 
 	return QDF_STATUS_E_FAILURE;
 }
+#endif
 
+#ifdef WLAN_SUPPORT_GREEN_AP
 /**
  * wmi_unified_egap_conf_params_cmd() - send wmi cmd of egap configuration params
  * @wmi_handle:	 wmi handler
@@ -2230,7 +2232,7 @@ QDF_STATUS wmi_unified_get_link_speed_cmd(void *wmi_hdl,
  * Return:	 0 for success, otherwise appropriate error code
  */
 QDF_STATUS wmi_unified_egap_conf_params_cmd(void *wmi_hdl,
-				     wmi_ap_ps_egap_param_cmd_fixed_param *egap_params)
+				struct wlan_green_ap_egap_params *egap_params)
 {
 	wmi_unified_t wmi_handle = (wmi_unified_t) wmi_hdl;
 
@@ -2240,7 +2242,6 @@ QDF_STATUS wmi_unified_egap_conf_params_cmd(void *wmi_hdl,
 
 	return QDF_STATUS_E_FAILURE;
 }
-
 #endif
 
 /**
@@ -4156,6 +4157,45 @@ QDF_STATUS wmi_unified_vdev_set_fwtest_param_cmd_send(void *wmi_hdl,
 
 	return QDF_STATUS_E_FAILURE;
 }
+
+#ifdef WLAN_SUPPORT_FILS
+QDF_STATUS
+wmi_unified_fils_discovery_send_cmd(void *wmi_hdl, struct fd_params *param)
+{
+	wmi_unified_t wmi_handle = (wmi_unified_t)wmi_hdl;
+
+	if (wmi_handle->ops->send_fils_discovery_send_cmd)
+		return wmi_handle->ops->send_fils_discovery_send_cmd(wmi_handle,
+								     param);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS
+wmi_unified_fils_vdev_config_send_cmd(void *wmi_hdl,
+				      struct config_fils_params *param)
+{
+	wmi_unified_t wmi = (wmi_unified_t)wmi_hdl;
+
+	if (wmi->ops->send_vdev_fils_enable_cmd)
+		return wmi->ops->send_vdev_fils_enable_cmd(wmi, param);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS
+wmi_extract_swfda_vdev_id(void *wmi_hdl, void *evt_buf,
+			  uint32_t *vdev_id)
+{
+	wmi_unified_t wmi_handle = (wmi_unified_t)wmi_hdl;
+
+	if (wmi_handle->ops->extract_swfda_vdev_id)
+		return wmi_handle->ops->extract_swfda_vdev_id(wmi_handle,
+							      evt_buf, vdev_id);
+
+	return QDF_STATUS_E_FAILURE;
+}
+#endif /* WLAN_SUPPORT_FILS */
 
 /**
  *  wmi_unified_vdev_config_ratemask_cmd_send() - WMI config ratemask function
@@ -6608,15 +6648,9 @@ QDF_STATUS wmi_unified_send_sar_limit_cmd(void *wmi_hdl,
 	return QDF_STATUS_E_FAILURE;
 }
 
-/**
- * wmi_unified_encrypt_decrypt_send_cmd() - send encryptdecrypt cmd to fw
- * @wmi_hdl: wmi handle
- * @params: encrypt/decrypt params
- *
- * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
- */
+#ifdef WLAN_FEATURE_DISA
 QDF_STATUS wmi_unified_encrypt_decrypt_send_cmd(void *wmi_hdl,
-				struct encrypt_decrypt_req_params *params)
+				struct disa_encrypt_decrypt_req_params *params)
 {
 	wmi_unified_t wmi_handle = (wmi_unified_t) wmi_hdl;
 
@@ -6626,6 +6660,21 @@ QDF_STATUS wmi_unified_encrypt_decrypt_send_cmd(void *wmi_hdl,
 						params);
 	return QDF_STATUS_E_FAILURE;
 }
+
+QDF_STATUS wmi_extract_encrypt_decrypt_resp_params(void *wmi_hdl,
+			uint8_t *evt_buf,
+			struct disa_encrypt_decrypt_resp_params *resp)
+{
+	struct wmi_unified *wmi_handle = (struct wmi_unified *)wmi_hdl;
+
+	if (wmi_handle->ops->extract_encrypt_decrypt_resp_event)
+		return wmi_handle->ops->extract_encrypt_decrypt_resp_event(
+				wmi_handle, evt_buf, resp);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+#endif
 
 /*
  * wmi_unified_send_btcoex_wlan_priority_cmd() - send btcoex priority commands
@@ -7211,3 +7260,39 @@ QDF_STATUS wmi_extract_ndp_end_ind(wmi_unified_t wmi_handle, uint8_t *data,
 	return QDF_STATUS_E_FAILURE;
 }
 #endif
+QDF_STATUS wmi_unified_send_btm_config(void *wmi_hdl,
+				       struct wmi_btm_config *params)
+{
+	wmi_unified_t wmi_handle = (wmi_unified_t) wmi_hdl;
+
+	if (wmi_handle->ops->send_btm_config)
+		return wmi_handle->ops->send_btm_config(wmi_handle,
+							params);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS wmi_unified_send_obss_detection_cfg_cmd(void *wmi_hdl,
+		struct wmi_obss_detection_cfg_param *obss_cfg_param)
+{
+	wmi_unified_t wmi_handle = (wmi_unified_t)wmi_hdl;
+
+	if (wmi_handle->ops->send_obss_detection_cfg_cmd)
+		return wmi_handle->ops->send_obss_detection_cfg_cmd(wmi_handle,
+				obss_cfg_param);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS wmi_unified_extract_obss_detection_info(void *wmi_hdl,
+						   uint8_t *data,
+						   struct wmi_obss_detect_info
+						   *info)
+{
+	wmi_unified_t wmi_handle = (wmi_unified_t)wmi_hdl;
+
+	if (wmi_handle->ops->extract_obss_detection_info)
+		return wmi_handle->ops->extract_obss_detection_info(data, info);
+
+	return QDF_STATUS_E_FAILURE;
+}

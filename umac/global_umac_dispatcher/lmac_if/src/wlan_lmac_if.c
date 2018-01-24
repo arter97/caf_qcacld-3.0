@@ -23,6 +23,7 @@
 #include "wlan_mgmt_txrx_tgt_api.h"
 #include "wlan_scan_tgt_api.h"
 #include <wlan_reg_services_api.h>
+#include <wlan_reg_ucfg_api.h>
 #ifdef WLAN_ATF_ENABLE
 #include "wlan_atf_tgt_api.h"
 #endif
@@ -49,6 +50,16 @@
 #ifdef DFS_COMPONENT_ENABLE
 #include <wlan_dfs_tgt_api.h>
 #include <wlan_dfs_utils_api.h>
+#endif
+
+#ifdef WLAN_SUPPORT_GREEN_AP
+#include <wlan_green_ap_api.h>
+#include <wlan_green_ap_ucfg_api.h>
+#endif
+#include <wlan_ftm_ucfg_api.h>
+
+#ifdef WLAN_SUPPORT_FILS
+#include <wlan_fd_tgt_api.h>
 #endif
 
 /* Function pointer for OL/WMA specific UMAC tx_ops
@@ -111,6 +122,25 @@ wlan_lmac_if_atf_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
 #else
 static void
 wlan_lmac_if_atf_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
+{
+}
+#endif
+
+#ifdef WLAN_SUPPORT_FILS
+static void
+wlan_lmac_if_fd_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
+{
+	struct wlan_lmac_if_fd_rx_ops *fd_rx_ops = &rx_ops->fd_rx_ops;
+
+	fd_rx_ops->fd_alloc = tgt_fd_alloc;
+	fd_rx_ops->fd_stop = tgt_fd_stop;
+	fd_rx_ops->fd_free = tgt_fd_free;
+	fd_rx_ops->fd_get_valid_fd_period = tgt_fd_get_valid_fd_period;
+	fd_rx_ops->fd_swfda_handler = tgt_fd_swfda_handler;
+}
+#else
+static void
+wlan_lmac_if_fd_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
 {
 }
 #endif
@@ -215,6 +245,18 @@ static void wlan_lmac_if_umac_reg_rx_ops_register(
 
 	rx_ops->reg_rx_ops.reg_freq_to_chan =
 		wlan_reg_freq_to_chan;
+
+	rx_ops->reg_rx_ops.reg_set_chan_144 =
+		ucfg_reg_modify_chan_144;
+
+	rx_ops->reg_rx_ops.reg_get_chan_144 =
+		ucfg_reg_get_en_chan_144;
+
+	rx_ops->reg_rx_ops.reg_program_default_cc =
+		ucfg_reg_program_default_cc;
+
+	rx_ops->reg_rx_ops.reg_get_current_regdomain =
+		wlan_reg_get_curr_regdomain;
 }
 
 #ifdef CONVERGED_P2P_ENABLE
@@ -286,6 +328,39 @@ wlan_lmac_if_umac_tdls_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
 }
 #endif
 
+#ifdef WLAN_SUPPORT_GREEN_AP
+static QDF_STATUS
+wlan_lmac_if_umac_green_ap_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
+{
+	rx_ops->green_ap_rx_ops.is_ps_enabled = wlan_green_ap_is_ps_enabled;
+	rx_ops->green_ap_rx_ops.is_dbg_print_enabled =
+					ucfg_green_ap_get_debug_prints;
+	rx_ops->green_ap_rx_ops.ps_set = ucfg_green_ap_set_ps_config;
+	rx_ops->green_ap_rx_ops.ps_get = ucfg_green_ap_get_ps_config;
+	rx_ops->green_ap_rx_ops.suspend_handle = wlan_green_ap_suspend_handle;
+
+	return QDF_STATUS_SUCCESS;
+}
+#else
+static QDF_STATUS
+wlan_lmac_if_umac_green_ap_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
+static QDF_STATUS
+wlan_lmac_if_umac_ftm_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
+{
+	struct wlan_lmac_if_ftm_rx_ops *ftm_rx_ops;
+
+	ftm_rx_ops = &rx_ops->ftm_rx_ops;
+
+	ftm_rx_ops->ftm_ev_handler = wlan_ftm_process_utf_event;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 /**
  * wlan_lmac_if_umac_rx_ops_register() - UMAC rx handler register
  * @rx_ops: Pointer to rx_ops structure to be populated
@@ -348,6 +423,14 @@ wlan_lmac_if_umac_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
 
 	/* DFS rx_ops */
 	wlan_lmac_if_umac_dfs_rx_ops_register(rx_ops);
+
+	wlan_lmac_if_umac_green_ap_rx_ops_register(rx_ops);
+
+	/* FTM rx_ops */
+	wlan_lmac_if_umac_ftm_rx_ops_register(rx_ops);
+
+	/* FILS Discovery */
+	wlan_lmac_if_fd_rx_ops_register(rx_ops);
 
 	return QDF_STATUS_SUCCESS;
 }

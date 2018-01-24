@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2018 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -671,6 +671,7 @@ enum data_stall_log_event_indicator {
  * @DATA_STALL_LOG_FW_RX_FCS_LEN_ERROR
  * @DATA_STALL_LOG_FW_WDOG_ERRORS
  * @DATA_STALL_LOG_BB_WDOG_ERROR
+ * @DATA_STALL_LOG_POST_TIM_NO_TXRX_ERROR
  * @DATA_STALL_LOG_HOST_STA_TX_TIMEOUT
  * @DATA_STALL_LOG_HOST_SOFTAP_TX_TIMEOUT
  * @DATA_STALL_LOG_NUD_FAILURE
@@ -686,7 +687,9 @@ enum data_stall_log_event_type {
 	DATA_STALL_LOG_FW_RX_FCS_LEN_ERROR,
 	DATA_STALL_LOG_FW_WDOG_ERRORS,
 	DATA_STALL_LOG_BB_WDOG_ERROR,
-	DATA_STALL_LOG_HOST_STA_TX_TIMEOUT,
+	DATA_STALL_LOG_POST_TIM_NO_TXRX_ERROR,
+	/* Stall events triggered by host/framework start from 0x100 onwards. */
+	DATA_STALL_LOG_HOST_STA_TX_TIMEOUT = 0x100,
 	DATA_STALL_LOG_HOST_SOFTAP_TX_TIMEOUT,
 	DATA_STALL_LOG_NUD_FAILURE,
 };
@@ -787,7 +790,7 @@ struct cdp_pkt_info {
 	/*no of packets*/
 	uint32_t num;
 	/* total no of bytes */
-	uint32_t bytes;
+	uint64_t bytes;
 };
 
 /* Tx  Stats */
@@ -832,6 +835,9 @@ struct cdp_tx_stats {
 
 	/* SGI count */
 	uint32_t sgi_count[MAX_GI];
+
+	/* Packet count for different num_spatial_stream values */
+	uint32_t nss[SS_COUNT];
 
 	/* Packet Count for different bandwidths */
 	uint32_t bw[MAX_BW];
@@ -932,6 +938,8 @@ struct cdp_tx_ingress_stats {
 	struct cdp_pkt_info inspect_pkts;
 	/*NAWDS  Multicast Packet Count */
 	struct cdp_pkt_info nawds_mcast;
+	/* Number of broadcast packets */
+	struct cdp_pkt_info bcast;
 
 	struct {
 		/* Total Raw packets */
@@ -997,6 +1005,14 @@ struct cdp_tx_ingress_stats {
 		/* Resource Full: Congestion Control */
 		uint32_t res_full;
 	} dropped;
+
+	/* Mesh packets info */
+	struct {
+		/* packets sent to fw */
+		uint32_t exception_fw;
+		/* packets completions received from fw */
+		uint32_t completion_fw;
+	} mesh;
 
 	/*Number of packets classified by CCE*/
 	uint32_t cce_classified;

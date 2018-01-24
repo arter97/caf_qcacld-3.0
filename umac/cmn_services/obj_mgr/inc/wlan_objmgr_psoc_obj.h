@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -278,10 +278,11 @@ struct wlan_soc_timer {
  * @obj_status[]:          component object status
  * @obj_state:             object state
  * @tgt_if_handle:         target interface handle
+ *    For OL based target it points to wmi handle
  * @total_mac_phy:         number of mac/phy supported by HW
  * @service_param:         FW service capability info
  * @ext_service_param:     extended FW service capability info
- *    For OL based target it points to wmi handle
+ * @dp_handle:             DP module handle
  * @psoc_lock:             psoc lock
  */
 struct wlan_objmgr_psoc {
@@ -299,6 +300,7 @@ struct wlan_objmgr_psoc {
 	uint8_t total_mac_phy;
 	struct wlan_objmgr_psoc_service_ready_param service_param;
 	struct wlan_objmgr_psoc_ext_service_ready_param ext_service_param;
+	void *dp_handle;
 	qdf_spinlock_t psoc_lock;
 };
 
@@ -1265,8 +1267,54 @@ static inline uint8_t wlan_objmgr_psoc_get_band_capability(
 	return psoc->soc_nif.user_config.band_capability;
 }
 
+/**
+ * wlan_psoc_set_dp_handle() - set dp handle
+ * @psoc: psoc object pointer
+ * @dp_handle: Data path module handle
+ *
+ * Return: void
+ */
+static inline void wlan_psoc_set_dp_handle(struct wlan_objmgr_psoc *psoc,
+		void *dp_handle)
+{
+	if (qdf_unlikely(!psoc)) {
+		QDF_BUG(0);
+		return;
+	}
+
+	psoc->dp_handle = dp_handle;
+}
+
+/**
+ * wlan_psoc_get_dp_handle() - get dp handle
+ * @psoc: psoc object pointer
+ *
+ * Return: dp handle
+ */
+static inline void *wlan_psoc_get_dp_handle(struct wlan_objmgr_psoc *psoc)
+{
+	if (qdf_unlikely(!psoc)) {
+		QDF_BUG(0);
+		return NULL;
+	}
+
+	return psoc->dp_handle;
+}
+
 struct wlan_logically_del_peer {
 	qdf_list_node_t list;
 	struct wlan_objmgr_peer *peer;
 };
+
+/**
+ * wlan_psoc_get_lmac_if_txops() - get lmac if txops for the psoc
+ * @psoc: psoc object pointer
+ *
+ * Return: Pointer to wlan_lmac_if_tx_ops
+ */
+static inline struct wlan_lmac_if_tx_ops *
+wlan_psoc_get_lmac_if_txops(struct wlan_objmgr_psoc *psoc)
+{
+	return &((psoc->soc_cb.tx_ops));
+}
 #endif /* _WLAN_OBJMGR_PSOC_OBJ_H_*/

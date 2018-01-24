@@ -49,6 +49,9 @@
 #include <wlan_dfs_public_struct.h>
 #endif
 #include <qdf_threads.h>
+#ifdef WLAN_SUPPORT_GREEN_AP
+#include "wlan_green_ap_api.h"
+#endif
 
 #ifdef WLAN_FEATURE_NAN_CONVERGENCE
 #include "nan_public_structs.h"
@@ -231,8 +234,10 @@ QDF_STATUS (*send_vdev_up_cmd)(wmi_unified_t wmi,
 QDF_STATUS (*send_peer_create_cmd)(wmi_unified_t wmi,
 					struct peer_create_params *param);
 
+#ifdef WLAN_SUPPORT_GREEN_AP
 QDF_STATUS (*send_green_ap_ps_cmd)(wmi_unified_t wmi_handle,
-						uint32_t value, uint8_t mac_id);
+				   uint32_t value, uint8_t pdev_id);
+#endif
 
 QDF_STATUS
 (*send_pdev_utf_cmd)(wmi_unified_t wmi_handle,
@@ -604,9 +609,6 @@ QDF_STATUS (*send_process_dhcp_ind_cmd)(wmi_unified_t wmi_handle,
 QDF_STATUS (*send_get_link_speed_cmd)(wmi_unified_t wmi_handle,
 			wmi_mac_addr peer_macaddr);
 
-QDF_STATUS (*send_egap_conf_params_cmd)(wmi_unified_t wmi_handle,
-				     wmi_ap_ps_egap_param_cmd_fixed_param *egap_params);
-
 QDF_STATUS (*send_bcn_buf_ll_cmd)(wmi_unified_t wmi_handle,
 			wmi_bcn_send_from_host_cmd_fixed_param * param);
 
@@ -620,6 +622,11 @@ QDF_STATUS (*send_roam_scan_offload_ap_profile_cmd)(wmi_unified_t wmi_handle,
 QDF_STATUS (*send_pktlog_wmi_send_cmd)(wmi_unified_t wmi_handle,
 				   WMI_PKTLOG_EVENT pktlog_event,
 				   WMI_CMD_ID cmd_id, uint8_t user_triggered);
+#endif
+
+#ifdef WLAN_SUPPORT_GREEN_AP
+QDF_STATUS (*send_egap_conf_params_cmd)(wmi_unified_t wmi_handle,
+			struct wlan_green_ap_egap_params *egap_params);
 #endif
 
 QDF_STATUS (*send_fw_profiling_cmd)(wmi_unified_t wmi_handle,
@@ -1331,8 +1338,14 @@ QDF_STATUS (*send_dbs_scan_sel_params_cmd)(wmi_unified_t wmi_handle,
 QDF_STATUS (*send_fw_test_cmd)(wmi_unified_t wmi_handle,
 			       struct set_fwtest_params *wmi_fwtest);
 
+#ifdef WLAN_FEATURE_DISA
 QDF_STATUS (*send_encrypt_decrypt_send_cmd)(wmi_unified_t wmi_handle,
-				struct encrypt_decrypt_req_params *params);
+				struct disa_encrypt_decrypt_req_params *params);
+
+QDF_STATUS (*extract_encrypt_decrypt_resp_event)(wmi_unified_t wmi_handle,
+			void *evt_buf,
+			struct disa_encrypt_decrypt_resp_params *resp);
+#endif
 
 QDF_STATUS (*send_sar_limit_cmd)(wmi_unified_t wmi_handle,
 				struct sar_limit_cmd_params *params);
@@ -1477,8 +1490,22 @@ QDF_STATUS (*extract_ndp_end_rsp)(wmi_unified_t wmi_handle,
 		uint8_t *data, struct nan_datapath_end_rsp_event **rsp);
 QDF_STATUS (*extract_ndp_end_ind)(wmi_unified_t wmi_handle,
 		uint8_t *data, struct nan_datapath_end_indication_event **ind);
-
 #endif
+QDF_STATUS (*send_btm_config)(wmi_unified_t wmi_handle,
+			      struct wmi_btm_config *params);
+QDF_STATUS (*send_obss_detection_cfg_cmd)(wmi_unified_t wmi_handle,
+		struct wmi_obss_detection_cfg_param *obss_cfg_param);
+QDF_STATUS (*extract_obss_detection_info)(uint8_t *evt_buf,
+					  struct wmi_obss_detect_info *info);
+
+#ifdef WLAN_SUPPORT_FILS
+QDF_STATUS (*send_vdev_fils_enable_cmd)(wmi_unified_t wmi_handle,
+					struct config_fils_params *param);
+QDF_STATUS (*extract_swfda_vdev_id)(wmi_unified_t wmi_handle, void *evt_buf,
+				    uint32_t *vdev_id);
+QDF_STATUS (*send_fils_discovery_send_cmd)(wmi_unified_t wmi_handle,
+					   struct fd_params *param);
+#endif /* WLAN_SUPPORT_FILS */
 };
 
 /* Forward declartion for psoc*/

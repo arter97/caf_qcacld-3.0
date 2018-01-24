@@ -198,6 +198,9 @@ struct cdp_cmn_ops {
 	int (*delba_process)(void *peer_handle,
 		int tid, uint16_t reasoncode);
 
+	void (*set_addba_response)(void *peer_handle,
+		uint8_t tid, uint16_t statuscode);
+
 	uint8_t (*get_peer_mac_addr_frm_id)(struct cdp_soc_t *soc_handle,
 			uint16_t peer_id, uint8_t *mac_addr);
 
@@ -225,6 +228,9 @@ struct cdp_cmn_ops {
 		 uint32_t *rx_pn);
 	QDF_STATUS (*update_config_parameters)(struct cdp_soc *psoc,
 			struct cdp_config_params *params);
+
+	void *(*get_dp_txrx_handle)(struct cdp_pdev *pdev_hdl);
+	void (*set_dp_txrx_handle)(struct cdp_pdev *pdev_hdl, void *dp_txrx_hdl);
 };
 
 struct cdp_ctrl_ops {

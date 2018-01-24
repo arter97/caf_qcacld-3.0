@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2018 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -86,22 +86,25 @@
 #define HAL_RX_RECEPTION_TYPE_OFDMA	2
 #define HAL_RX_RECEPTION_TYPE_MU_OFDMA	3
 
-#define HAL_11B_RATE_0MCS	11
-#define HAL_11B_RATE_1MCS	5.5
-#define HAL_11B_RATE_2MCS	2
-#define HAL_11B_RATE_3MCS	1
-#define HAL_11B_RATE_4MCS	11
-#define HAL_11B_RATE_5MCS	5.5
-#define HAL_11B_RATE_6MCS	2
+/* Multiply rate by 2 to avoid float point
+ * and get rate in units of 500kbps
+ */
+#define HAL_11B_RATE_0MCS	11*2
+#define HAL_11B_RATE_1MCS	5.5*2
+#define HAL_11B_RATE_2MCS	2*2
+#define HAL_11B_RATE_3MCS	1*2
+#define HAL_11B_RATE_4MCS	11*2
+#define HAL_11B_RATE_5MCS	5.5*2
+#define HAL_11B_RATE_6MCS	2*2
 
-#define HAL_11A_RATE_0MCS	48
-#define HAL_11A_RATE_1MCS	24
-#define HAL_11A_RATE_2MCS	12
-#define HAL_11A_RATE_3MCS	6
-#define HAL_11A_RATE_4MCS	54
-#define HAL_11A_RATE_5MCS	36
-#define HAL_11A_RATE_6MCS	18
-#define HAL_11A_RATE_7MCS	9
+#define HAL_11A_RATE_0MCS	48*2
+#define HAL_11A_RATE_1MCS	24*2
+#define HAL_11A_RATE_2MCS	12*2
+#define HAL_11A_RATE_3MCS	6*2
+#define HAL_11A_RATE_4MCS	54*2
+#define HAL_11A_RATE_5MCS	36*2
+#define HAL_11A_RATE_6MCS	18*2
+#define HAL_11A_RATE_7MCS	9*2
 
 #define HE_GI_0_8 0
 #define HE_GI_1_6 1
@@ -425,6 +428,8 @@ struct hal_rx_ppdu_common_info {
 	uint32_t ppdu_id;
 	uint32_t last_ppdu_id;
 	uint32_t ppdu_timestamp;
+	uint32_t mpdu_cnt_fcs_ok;
+	uint32_t mpdu_cnt_fcs_err;
 };
 
 struct hal_rx_ppdu_info {
@@ -520,6 +525,9 @@ hal_rx_status_get_tlv_info(void *rx_tlv, struct hal_rx_ppdu_info *ppdu_info)
 		ppdu_info->rx_status.ast_index =
 				HAL_RX_GET(rx_tlv, RX_PPDU_END_USER_STATS_4,
 						AST_INDEX);
+		ppdu_info->rx_status.mcs =
+			 HAL_RX_GET(rx_tlv, RX_PPDU_END_USER_STATS_1, MCS);
+
 		tid = HAL_RX_GET(rx_tlv, RX_PPDU_END_USER_STATS_12,
 				RECEIVED_QOS_DATA_TID_BITMAP);
 		ppdu_info->rx_status.tid = qdf_find_first_bit(&tid, sizeof(tid)*8);
@@ -533,13 +541,21 @@ hal_rx_status_get_tlv_info(void *rx_tlv, struct hal_rx_ppdu_info *ppdu_info)
 						UDP_MSDU_COUNT);
 		ppdu_info->rx_status.other_msdu_count =
 			HAL_RX_GET(rx_tlv, RX_PPDU_END_USER_STATS_10,
-						OTHER_MSDU_COUNT);
+					OTHER_MSDU_COUNT);
+		ppdu_info->rx_status.nss =
+			HAL_RX_GET(rx_tlv, RX_PPDU_END_USER_STATS_1, NSS);
 		ppdu_info->rx_status.first_data_seq_ctrl =
 			HAL_RX_GET(rx_tlv, RX_PPDU_END_USER_STATS_3,
 					DATA_SEQUENCE_CONTROL_INFO_VALID);
 		ppdu_info->rx_status.preamble_type =
 			HAL_RX_GET(rx_tlv, RX_PPDU_END_USER_STATS_3,
 						HT_CONTROL_FIELD_PKT_TYPE);
+		ppdu_info->com_info.mpdu_cnt_fcs_ok =
+			HAL_RX_GET(rx_tlv, RX_PPDU_END_USER_STATS_3,
+					MPDU_CNT_FCS_OK);
+		ppdu_info->com_info.mpdu_cnt_fcs_err =
+			HAL_RX_GET(rx_tlv, RX_PPDU_END_USER_STATS_2,
+					MPDU_CNT_FCS_ERR);
 		break;
 	}
 
@@ -565,7 +581,8 @@ hal_rx_status_get_tlv_info(void *rx_tlv, struct hal_rx_ppdu_info *ppdu_info)
 				HT_SIG_INFO_0, MCS);
 		ppdu_info->rx_status.bw = HAL_RX_GET(ht_sig_info,
 				HT_SIG_INFO_0, CBW);
-
+		ppdu_info->rx_status.sgi = HAL_RX_GET(ht_sig_info,
+				HT_SIG_INFO_1, SHORT_GI);
 		break;
 	}
 
@@ -656,6 +673,8 @@ hal_rx_status_get_tlv_info(void *rx_tlv, struct hal_rx_ppdu_info *ppdu_info)
 		ppdu_info->rx_status.vht_flag_values5 = group_id;
 		ppdu_info->rx_status.mcs = HAL_RX_GET(vht_sig_a_info,
 				VHT_SIG_A_INFO_1, MCS);
+		ppdu_info->rx_status.sgi = HAL_RX_GET(vht_sig_a_info,
+				VHT_SIG_A_INFO_1, GI_SETTING);
 #if !defined(QCA_WIFI_QCA6290_11AX)
 		value =  HAL_RX_GET(vht_sig_a_info,
 				VHT_SIG_A_INFO_0, N_STS);
@@ -703,7 +722,7 @@ hal_rx_status_get_tlv_info(void *rx_tlv, struct hal_rx_ppdu_info *ppdu_info)
 		/*data2*/
 		ppdu_info->rx_status.he_data2 =
 			QDF_MON_STATUS_HE_GI_KNOWN;
-		ppdu_info->rx_status.he_data2 =
+		ppdu_info->rx_status.he_data2 |=
 			QDF_MON_STATUS_TXBF_KNOWN |
 			QDF_MON_STATUS_PE_DISAMBIGUITY_KNOWN |
 			QDF_MON_STATUS_TXOP_KNOWN |
@@ -725,6 +744,7 @@ hal_rx_status_get_tlv_info(void *rx_tlv, struct hal_rx_ppdu_info *ppdu_info)
 		ppdu_info->rx_status.he_data3 |= value;
 		value = HAL_RX_GET(he_sig_a_su_info,
 				HE_SIG_A_SU_INFO_0, TRANSMIT_MCS);
+		ppdu_info->rx_status.mcs = value;
 		value = value << QDF_MON_STATUS_TRANSMIT_MCS_SHIFT;
 		ppdu_info->rx_status.he_data3 |= value;
 		value = HAL_RX_GET(he_sig_a_su_info,
@@ -754,6 +774,7 @@ hal_rx_status_get_tlv_info(void *rx_tlv, struct hal_rx_ppdu_info *ppdu_info)
 		value = HAL_RX_GET(he_sig_a_su_info,
 				HE_SIG_A_SU_INFO_0, TRANSMIT_BW);
 		ppdu_info->rx_status.he_data5 = value;
+		ppdu_info->rx_status.bw = value;
 		value = HAL_RX_GET(he_sig_a_su_info,
 				HE_SIG_A_SU_INFO_0, CP_LTF_SIZE);
 		switch (value) {
@@ -774,6 +795,7 @@ hal_rx_status_get_tlv_info(void *rx_tlv, struct hal_rx_ppdu_info *ppdu_info)
 				he_ltf = HE_LTF_4_X;
 				break;
 		}
+		ppdu_info->rx_status.sgi = he_gi;
 		value = he_gi << QDF_MON_STATUS_GI_SHIFT;
 		ppdu_info->rx_status.he_data5 |= value;
 		value = he_ltf << QDF_MON_STATUS_HE_LTF_SHIFT;
@@ -794,6 +816,7 @@ hal_rx_status_get_tlv_info(void *rx_tlv, struct hal_rx_ppdu_info *ppdu_info)
 		/*data6*/
 		value = HAL_RX_GET(he_sig_a_su_info, HE_SIG_A_SU_INFO_0, NSTS);
 		value++;
+		ppdu_info->rx_status.nss = value;
 		ppdu_info->rx_status.he_data6 = value;
 		value = HAL_RX_GET(he_sig_a_su_info, HE_SIG_A_SU_INFO_1,
 							DOPPLER_INDICATION);
@@ -871,8 +894,6 @@ hal_rx_status_get_tlv_info(void *rx_tlv, struct hal_rx_ppdu_info *ppdu_info)
 #else
 			PHYRX_RSSI_LEGACY_0, RECEIVE_BANDWIDTH);
 #endif
-		ppdu_info->rx_status.preamble_type = HAL_RX_GET(rx_tlv,
-			PHYRX_RSSI_LEGACY_0, RECEPTION_TYPE);
 		ppdu_info->rx_status.he_re = 0;
 
 		value = HAL_RX_GET(rssi_info_tlv,

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -30,6 +30,7 @@
  * QCA driver framework(QDF) network buffer management APIs
  */
 
+#include <linux/hashtable.h>
 #include <linux/kernel.h>
 #include <linux/version.h>
 #include <linux/skbuff.h>
@@ -65,8 +66,6 @@
 #define qdf_nbuf_users_set refcount_set
 #define qdf_nbuf_users_read refcount_read
 #endif /* KERNEL_VERSION(4, 13, 0) */
-
-#define RATE_MULTIPLIER		2
 
 #define IEEE80211_RADIOTAP_VHT_BW_20	0
 #define IEEE80211_RADIOTAP_VHT_BW_40	1
@@ -469,6 +468,304 @@ void __qdf_nbuf_free(struct sk_buff *skb)
 #endif
 
 EXPORT_SYMBOL(__qdf_nbuf_free);
+
+#ifdef MEMORY_DEBUG
+enum qdf_nbuf_event_type {
+	QDF_NBUF_ALLOC,
+	QDF_NBUF_FREE,
+	QDF_NBUF_MAP,
+	QDF_NBUF_UNMAP,
+};
+
+struct qdf_nbuf_event {
+	qdf_nbuf_t nbuf;
+	const char *file;
+	uint32_t line;
+	enum qdf_nbuf_event_type type;
+	uint64_t timestamp;
+};
+
+#define QDF_NBUF_HISTORY_SIZE 4096
+static qdf_atomic_t qdf_nbuf_history_index;
+static struct qdf_nbuf_event qdf_nbuf_history[QDF_NBUF_HISTORY_SIZE];
+
+static int32_t qdf_nbuf_circular_index_next(qdf_atomic_t *index, int size)
+{
+	int32_t next = qdf_atomic_inc_return(index);
+
+	if (next == size)
+		qdf_atomic_sub(size, index);
+
+	return next % size;
+}
+
+static void
+qdf_nbuf_history_add(qdf_nbuf_t nbuf, const char *file, uint32_t line,
+		     enum qdf_nbuf_event_type type)
+{
+	int32_t idx = qdf_nbuf_circular_index_next(&qdf_nbuf_history_index,
+						   QDF_NBUF_HISTORY_SIZE);
+	struct qdf_nbuf_event *event = &qdf_nbuf_history[idx];
+
+	event->nbuf = nbuf;
+	event->file = file;
+	event->line = line;
+	event->type = type;
+	event->timestamp = qdf_get_log_timestamp();
+}
+
+#define QDF_NBUF_MAP_HT_BITS 10 /* 1024 buckets */
+static DECLARE_HASHTABLE(qdf_nbuf_map_ht, QDF_NBUF_MAP_HT_BITS);
+static qdf_spinlock_t qdf_nbuf_map_lock;
+
+struct qdf_nbuf_map_metadata {
+	struct hlist_node node;
+	qdf_nbuf_t nbuf;
+	const char *file;
+	uint32_t line;
+};
+
+static void qdf_nbuf_map_tracking_init(void)
+{
+	hash_init(qdf_nbuf_map_ht);
+	qdf_spinlock_create(&qdf_nbuf_map_lock);
+}
+
+void qdf_nbuf_map_check_for_leaks(void)
+{
+	struct qdf_nbuf_map_metadata *meta;
+	int bucket;
+	uint32_t count = 0;
+	bool is_empty;
+
+	qdf_spin_lock_irqsave(&qdf_nbuf_map_lock);
+	is_empty = hash_empty(qdf_nbuf_map_ht);
+	qdf_spin_unlock_irqrestore(&qdf_nbuf_map_lock);
+
+	if (is_empty)
+		return;
+
+	qdf_err("Nbuf map without unmap events detected!");
+	qdf_err("------------------------------------------------------------");
+
+	/* Hold the lock for the entire iteration for safe list/meta access. We
+	 * are explicitly preferring the chance to watchdog on the print, over
+	 * the posibility of invalid list/memory access. Since we are going to
+	 * panic anyway, the worst case is loading up the crash dump to find out
+	 * what was in the hash table.
+	 */
+	qdf_spin_lock_irqsave(&qdf_nbuf_map_lock);
+	hash_for_each(qdf_nbuf_map_ht, bucket, meta, node) {
+		count++;
+		qdf_err("0x%pk @ %s:%u",
+			meta->nbuf, kbasename(meta->file), meta->line);
+	}
+	qdf_spin_unlock_irqrestore(&qdf_nbuf_map_lock);
+
+	panic("%u fatal nbuf map without unmap events detected!", count);
+}
+
+static void qdf_nbuf_map_tracking_deinit(void)
+{
+	qdf_nbuf_map_check_for_leaks();
+	qdf_spinlock_destroy(&qdf_nbuf_map_lock);
+}
+
+static struct qdf_nbuf_map_metadata *qdf_nbuf_meta_get(qdf_nbuf_t nbuf)
+{
+	struct qdf_nbuf_map_metadata *meta;
+
+	hash_for_each_possible(qdf_nbuf_map_ht, meta, node, (size_t)nbuf) {
+		if (meta->nbuf == nbuf)
+			return meta;
+	}
+
+	return NULL;
+}
+
+static QDF_STATUS
+qdf_nbuf_track_map(qdf_nbuf_t nbuf, const char *file, uint32_t line)
+{
+	struct qdf_nbuf_map_metadata *meta;
+
+	QDF_BUG(nbuf);
+	if (!nbuf) {
+		qdf_err("Cannot map null nbuf");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	qdf_spin_lock_irqsave(&qdf_nbuf_map_lock);
+	meta = qdf_nbuf_meta_get(nbuf);
+	qdf_spin_unlock_irqrestore(&qdf_nbuf_map_lock);
+	if (meta)
+		panic("Double nbuf map detected @ %s:%u",
+		      kbasename(file), line);
+
+	meta = qdf_mem_malloc(sizeof(*meta));
+	if (!meta) {
+		qdf_err("Failed to allocate nbuf map tracking metadata");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	meta->nbuf = nbuf;
+	meta->file = file;
+	meta->line = line;
+
+	qdf_spin_lock_irqsave(&qdf_nbuf_map_lock);
+	hash_add(qdf_nbuf_map_ht, &meta->node, (size_t)nbuf);
+	qdf_spin_unlock_irqrestore(&qdf_nbuf_map_lock);
+
+	qdf_nbuf_history_add(nbuf, file, line, QDF_NBUF_MAP);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static void
+qdf_nbuf_untrack_map(qdf_nbuf_t nbuf, const char *file, uint32_t line)
+{
+	struct qdf_nbuf_map_metadata *meta;
+
+	QDF_BUG(nbuf);
+	if (!nbuf) {
+		qdf_err("Cannot unmap null nbuf");
+		return;
+	}
+
+	qdf_spin_lock_irqsave(&qdf_nbuf_map_lock);
+	meta = qdf_nbuf_meta_get(nbuf);
+
+	if (!meta)
+		panic("Double nbuf unmap or unmap without map detected @%s:%u",
+		      kbasename(file), line);
+
+	hash_del(&meta->node);
+	qdf_spin_unlock_irqrestore(&qdf_nbuf_map_lock);
+
+	qdf_mem_free(meta);
+
+	qdf_nbuf_history_add(nbuf, file, line, QDF_NBUF_UNMAP);
+}
+
+QDF_STATUS qdf_nbuf_map_debug(qdf_device_t osdev,
+			      qdf_nbuf_t buf,
+			      qdf_dma_dir_t dir,
+			      const char *file,
+			      uint32_t line)
+{
+	QDF_STATUS status;
+
+	status = qdf_nbuf_track_map(buf, file, line);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	status = __qdf_nbuf_map(osdev, buf, dir);
+	if (QDF_IS_STATUS_ERROR(status))
+		qdf_nbuf_untrack_map(buf, file, line);
+
+	return status;
+}
+
+void qdf_nbuf_unmap_debug(qdf_device_t osdev,
+			  qdf_nbuf_t buf,
+			  qdf_dma_dir_t dir,
+			  const char *file,
+			  uint32_t line)
+{
+	qdf_nbuf_untrack_map(buf, file, line);
+	__qdf_nbuf_unmap_single(osdev, buf, dir);
+}
+
+QDF_STATUS qdf_nbuf_map_single_debug(qdf_device_t osdev,
+				     qdf_nbuf_t buf,
+				     qdf_dma_dir_t dir,
+				     const char *file,
+				     uint32_t line)
+{
+	QDF_STATUS status;
+
+	status = qdf_nbuf_track_map(buf, file, line);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	status = __qdf_nbuf_map_single(osdev, buf, dir);
+	if (QDF_IS_STATUS_ERROR(status))
+		qdf_nbuf_untrack_map(buf, file, line);
+
+	return status;
+}
+
+void qdf_nbuf_unmap_single_debug(qdf_device_t osdev,
+				 qdf_nbuf_t buf,
+				 qdf_dma_dir_t dir,
+				 const char *file,
+				 uint32_t line)
+{
+	qdf_nbuf_untrack_map(buf, file, line);
+	__qdf_nbuf_unmap_single(osdev, buf, dir);
+}
+
+QDF_STATUS qdf_nbuf_map_nbytes_debug(qdf_device_t osdev,
+				     qdf_nbuf_t buf,
+				     qdf_dma_dir_t dir,
+				     int nbytes,
+				     const char *file,
+				     uint32_t line)
+{
+	QDF_STATUS status;
+
+	status = qdf_nbuf_track_map(buf, file, line);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	status = __qdf_nbuf_map_nbytes(osdev, buf, dir, nbytes);
+	if (QDF_IS_STATUS_ERROR(status))
+		qdf_nbuf_untrack_map(buf, file, line);
+
+	return status;
+}
+
+void qdf_nbuf_unmap_nbytes_debug(qdf_device_t osdev,
+				 qdf_nbuf_t buf,
+				 qdf_dma_dir_t dir,
+				 int nbytes,
+				 const char *file,
+				 uint32_t line)
+{
+	qdf_nbuf_untrack_map(buf, file, line);
+	__qdf_nbuf_unmap_nbytes(osdev, buf, dir, nbytes);
+}
+
+QDF_STATUS qdf_nbuf_map_nbytes_single_debug(qdf_device_t osdev,
+					    qdf_nbuf_t buf,
+					    qdf_dma_dir_t dir,
+					    int nbytes,
+					    const char *file,
+					    uint32_t line)
+{
+	QDF_STATUS status;
+
+	status = qdf_nbuf_track_map(buf, file, line);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	status = __qdf_nbuf_map_nbytes_single(osdev, buf, dir, nbytes);
+	if (QDF_IS_STATUS_ERROR(status))
+		qdf_nbuf_untrack_map(buf, file, line);
+
+	return status;
+}
+
+void qdf_nbuf_unmap_nbytes_single_debug(qdf_device_t osdev,
+					qdf_nbuf_t buf,
+					qdf_dma_dir_t dir,
+					int nbytes,
+					const char *file,
+					uint32_t line)
+{
+	qdf_nbuf_untrack_map(buf, file, line);
+	__qdf_nbuf_unmap_nbytes_single(osdev, buf, dir, nbytes);
+}
+#endif /* MEMORY_DEBUG */
 
 /**
  * __qdf_nbuf_map() - map a buffer to local bus address space
@@ -1376,30 +1673,6 @@ static uint32_t qdf_net_buf_track_max_free;
 static uint32_t qdf_net_buf_track_max_allocated;
 
 /**
- * struct qdf_nbuf_free_track_t - Network buffer free track structure
- * @p_next: Pointer to next
- * @net_buf: Pointer to network buffer
- * @file_name: File name
- * @line_num: Line number
- * @time: Time stamp
- */
-struct qdf_nbuf_free_track_t {
-	struct qdf_nbuf_track_t *p_next;
-	qdf_nbuf_t net_buf;
-	uint8_t *file_name;
-	uint32_t line_num;
-	uint64_t time;
-};
-
-struct qdf_nbuf_free_record_t {
-	struct qdf_nbuf_free_track_t gp_qdf_netbuf_free_tbl[
-					QDF_NET_BUF_TRACK_MAX_SIZE];
-	qdf_atomic_t count;
-};
-
-static struct qdf_nbuf_free_record_t qdf_nbuf_free_record_info;
-
-/**
  * update_max_used() - update qdf_net_buf_track_max_used tracking variable
  *
  * tracks the max number of network buffers that the wlan driver was tracking
@@ -1649,6 +1922,9 @@ void qdf_net_buf_debug_init(void)
 {
 	uint32_t i;
 
+	qdf_atomic_set(&qdf_nbuf_history_index, -1);
+
+	qdf_nbuf_map_tracking_init();
 	qdf_nbuf_track_memory_manager_create();
 
 	for (i = 0; i < QDF_NET_BUF_TRACK_MAX_SIZE; i++) {
@@ -1691,6 +1967,7 @@ void qdf_net_buf_debug_exit(void)
 	}
 
 	qdf_nbuf_track_memory_manager_destroy();
+	qdf_nbuf_map_tracking_deinit();
 
 #ifdef CONFIG_HALT_KMEMLEAK
 	if (count) {
@@ -1700,51 +1977,6 @@ void qdf_net_buf_debug_exit(void)
 #endif
 }
 EXPORT_SYMBOL(qdf_net_buf_debug_exit);
-
-/**
- * qdf_nbuf_free_dbg_get_index() - Get the next record index
- * @tbl_index: atomic index variable to increment
- * @size: array size of the circular buffer
- *
- * Return: array index
- */
-static int qdf_nbuf_free_dbg_get_index(qdf_atomic_t *tbl_index, int size)
-{
-	int index = qdf_atomic_inc_return(tbl_index);
-
-	if (index == size)
-		qdf_atomic_sub(size, tbl_index);
-
-	while (index >= size)
-		index -= size;
-
-	return index;
-}
-
-/**
- * qdf_netbuf_free_debug_add() - Add netbuff free info to the debug
- * @netbuf: pointer to network buffer
- * @file_name: fie name from where net buff is freed
- * @line_num: line number
- *
- * Return: none
- */
-void qdf_net_buf_free_debug_add(qdf_nbuf_t net_buf, uint8_t *file_name,
-				uint32_t line_num)
-{
-	struct qdf_nbuf_free_track_t *p_node;
-	uint16_t index;
-
-	index = qdf_nbuf_free_dbg_get_index(&qdf_nbuf_free_record_info.count,
-					  QDF_NET_BUF_TRACK_MAX_SIZE);
-
-	p_node = &qdf_nbuf_free_record_info.gp_qdf_netbuf_free_tbl[index];
-	p_node->net_buf = net_buf;
-	p_node->file_name = file_name;
-	p_node->line_num = line_num;
-	p_node->time = qdf_get_log_timestamp();
-}
-EXPORT_SYMBOL(qdf_net_buf_free_debug_add);
 
 /**
  * qdf_net_buf_debug_hash() - hash network buffer pointer
@@ -1838,9 +2070,8 @@ EXPORT_SYMBOL(qdf_net_buf_debug_add_node);
 void qdf_net_buf_debug_delete_node(qdf_nbuf_t net_buf)
 {
 	uint32_t i;
-	bool found = false;
 	QDF_NBUF_TRACK *p_head;
-	QDF_NBUF_TRACK *p_node;
+	QDF_NBUF_TRACK *p_node = NULL;
 	unsigned long irq_flag;
 	QDF_NBUF_TRACK *p_prev;
 
@@ -1857,7 +2088,6 @@ void qdf_net_buf_debug_delete_node(qdf_nbuf_t net_buf)
 	/* Found at head of the table */
 	if (p_head->net_buf == net_buf) {
 		gp_qdf_net_buf_track_tbl[i] = p_node->p_next;
-		found = true;
 		goto done;
 	}
 
@@ -1867,7 +2097,6 @@ void qdf_net_buf_debug_delete_node(qdf_nbuf_t net_buf)
 		p_node = p_node->p_next;
 		if ((NULL != p_node) && (p_node->net_buf == net_buf)) {
 			p_prev->p_next = p_node->p_next;
-			found = true;
 			break;
 		}
 	}
@@ -1875,13 +2104,13 @@ void qdf_net_buf_debug_delete_node(qdf_nbuf_t net_buf)
 done:
 	spin_unlock_irqrestore(&g_qdf_net_buf_track_lock[i], irq_flag);
 
-	if (!found) {
-		qdf_print("Unallocated buffer ! Double free of net_buf %pK ?",
-			  net_buf);
-		QDF_ASSERT(0);
-	} else {
+	if (p_node) {
 		qdf_mem_skb_dec(p_node->size);
 		qdf_nbuf_track_free(p_node);
+	} else {
+		qdf_print("Unallocated buffer ! Double free of net_buf %pK ?",
+			  net_buf);
+		QDF_BUG(0);
 	}
 }
 EXPORT_SYMBOL(qdf_net_buf_debug_delete_node);
@@ -1934,6 +2163,40 @@ void qdf_net_buf_debug_release_skb(qdf_nbuf_t net_buf)
 	qdf_net_buf_debug_delete_node(net_buf);
 }
 EXPORT_SYMBOL(qdf_net_buf_debug_release_skb);
+
+qdf_nbuf_t qdf_nbuf_alloc_debug(qdf_device_t osdev, qdf_size_t size,
+				int reserve, int align, int prio,
+				uint8_t *file, uint32_t line)
+{
+	qdf_nbuf_t nbuf;
+
+	nbuf = __qdf_nbuf_alloc(osdev, size, reserve, align, prio);
+
+	/* Store SKB in internal QDF tracking table */
+	if (qdf_likely(nbuf)) {
+		qdf_net_buf_debug_add_node(nbuf, size, file, line);
+		qdf_nbuf_history_add(nbuf, file, line, QDF_NBUF_ALLOC);
+	}
+
+	return nbuf;
+}
+qdf_export_symbol(qdf_nbuf_alloc_debug);
+
+void qdf_nbuf_free_debug(qdf_nbuf_t nbuf, uint8_t *file, uint32_t line)
+{
+	if (qdf_nbuf_is_tso(nbuf) && qdf_nbuf_get_users(nbuf) > 1)
+		goto free_buf;
+
+	/* Remove SKB from internal QDF tracking table */
+	if (qdf_likely(nbuf)) {
+		qdf_net_buf_debug_delete_node(nbuf);
+		qdf_nbuf_history_add(nbuf, file, line, QDF_NBUF_FREE);
+	}
+
+free_buf:
+	__qdf_nbuf_free(nbuf);
+}
+qdf_export_symbol(qdf_nbuf_free_debug);
 
 #endif /*MEMORY_DEBUG */
 #if defined(FEATURE_TSO)
@@ -2992,7 +3255,8 @@ static unsigned int qdf_nbuf_update_radiotap_vht_flags(
 		IEEE80211_RADIOTAP_VHT_KNOWN_GI |
 		IEEE80211_RADIOTAP_VHT_KNOWN_LDPC_EXTRA_OFDM_SYM |
 		IEEE80211_RADIOTAP_VHT_KNOWN_BEAMFORMED |
-		IEEE80211_RADIOTAP_VHT_KNOWN_BANDWIDTH;
+		IEEE80211_RADIOTAP_VHT_KNOWN_BANDWIDTH |
+		IEEE80211_RADIOTAP_VHT_KNOWN_GROUP_ID;
 	put_unaligned_le16(vht_flags, &rtap_buf[rtap_len]);
 	rtap_len += 2;
 
@@ -3225,7 +3489,7 @@ unsigned int qdf_nbuf_update_radiotap(struct mon_rx_status *rx_status,
 	if (!rx_status->ht_flags && !rx_status->vht_flags &&
 	    !rx_status->he_flags) {
 		rthdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_RATE);
-		rtap_buf[rtap_len] = rx_status->rate * RATE_MULTIPLIER;
+		rtap_buf[rtap_len] = rx_status->rate;
 	} else
 		rtap_buf[rtap_len] = 0;
 	rtap_len += 1;

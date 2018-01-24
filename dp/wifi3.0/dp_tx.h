@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -115,6 +115,8 @@ struct dp_tx_queue {
  * @u.tso_info: TSO information for TSO frame types
  * 	     (chain of the TSO segments, number of segments)
  * @u.sg_info: Scatter Gather information for non-TSO SG frames
+ * @meta_data: Mesh meta header information
+ * @exception_fw: Duplicate frame to be sent to firmware
  *
  * This structure holds the complete MSDU information needed to program the
  * Hardware TCL and MSDU extension descriptors for different frame types
@@ -129,7 +131,8 @@ struct dp_tx_msdu_info_s {
 		struct qdf_tso_info_t tso_info;
 		struct dp_tx_sg_info_s sg_info;
 	} u;
-	uint32_t meta_data[5];
+	uint32_t meta_data[6];
+	uint8_t exception_fw;
 };
 
 QDF_STATUS dp_tx_vdev_attach(struct dp_vdev *vdev);
@@ -143,6 +146,7 @@ QDF_STATUS dp_tx_pdev_detach(struct dp_pdev *pdev);
 QDF_STATUS dp_tx_pdev_attach(struct dp_pdev *pdev);
 
 qdf_nbuf_t dp_tx_send(void *data_vdev, qdf_nbuf_t nbuf);
+qdf_nbuf_t dp_tx_send_mesh(void *data_vdev, qdf_nbuf_t nbuf);
 
 #ifdef CONVERGED_TDLS_ENABLE
 qdf_nbuf_t dp_tx_non_std(struct cdp_vdev *vdev_handle,
@@ -175,6 +179,14 @@ static inline void dp_non_std_tx_comp_free_buff(struct dp_tx_desc_s *tx_desc,
 void dp_tx_mec_handler(struct dp_vdev *vdev, uint8_t *status);
 #endif
 
+#ifdef ATH_SUPPORT_IQUE
+void dp_tx_me_exit(struct dp_pdev *pdev);
+#else
+static inline void dp_tx_me_exit(struct dp_pdev *pdev)
+{
+	return;
+}
+#endif
 
 #ifdef FEATURE_PERPKT_INFO
 QDF_STATUS

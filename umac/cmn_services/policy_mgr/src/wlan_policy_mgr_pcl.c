@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -171,13 +171,19 @@ void policy_mgr_reg_chan_change_callback(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
+	/*
+	 * The ch_list buffer can accomadate a maximum of
+	 * NUM_CHANNELS and hence the ch_cnt should also not
+	 * exceed NUM_CHANNELS.
+	 */
 	pm_ctx->unsafe_channel_count = avoid_freq_ind->chan_list.ch_cnt >=
-			QDF_MAX_NUM_CHAN ?
-			QDF_MAX_NUM_CHAN : avoid_freq_ind->chan_list.ch_cnt;
+			NUM_CHANNELS ?
+			NUM_CHANNELS : avoid_freq_ind->chan_list.ch_cnt;
 	if (pm_ctx->unsafe_channel_count)
 		qdf_mem_copy(pm_ctx->unsafe_channel_list,
 			avoid_freq_ind->chan_list.ch_list,
-			pm_ctx->unsafe_channel_count);
+			pm_ctx->unsafe_channel_count *
+			sizeof(pm_ctx->unsafe_channel_list[0]));
 	policy_mgr_debug("Channel list update, recieved %d avoided channels",
 		pm_ctx->unsafe_channel_count);
 }
@@ -1535,6 +1541,10 @@ QDF_STATUS policy_mgr_modify_sap_pcl_based_on_mandatory_channel(
 
 	for (i = 0; i < *pcl_len_org; i++) {
 		found = false;
+		if (i >= QDF_MAX_NUM_CHAN) {
+			policy_mgr_debug("index is exceeding QDF_MAX_NUM_CHAN");
+			break;
+		}
 		for (j = 0; j < pm_ctx->sap_mandatory_channels_len; j++) {
 			if (pcl_list_org[i] ==
 			    pm_ctx->sap_mandatory_channels[j]) {
@@ -1542,7 +1552,7 @@ QDF_STATUS policy_mgr_modify_sap_pcl_based_on_mandatory_channel(
 				break;
 			}
 		}
-		if (found) {
+		if (found && (pcl_len < QDF_MAX_NUM_CHAN)) {
 			pcl_list[pcl_len] = pcl_list_org[i];
 			weight_list[pcl_len++] = weight_list_org[i];
 		}

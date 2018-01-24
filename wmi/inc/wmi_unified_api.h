@@ -48,9 +48,15 @@
 #include "wlan_p2p_public_struct.h"
 #endif
 #include "wlan_scan_public_structs.h"
+#ifdef WLAN_FEATURE_DISA
+#include "wlan_disa_public_struct.h"
+#endif
 
 #ifdef WLAN_FEATURE_NAN_CONVERGENCE
 #include "nan_public_structs.h"
+#endif
+#ifdef WLAN_SUPPORT_GREEN_AP
+#include "wlan_green_ap_api.h"
 #endif
 
 typedef qdf_nbuf_t wmi_buf_t;
@@ -418,7 +424,7 @@ QDF_STATUS wmi_unified_stats_request_send(void *wmi_hdl,
 				struct stats_request_params *param);
 
 QDF_STATUS wmi_unified_green_ap_ps_send(void *wmi_hdl,
-						uint32_t value, uint8_t mac_id);
+					uint32_t value, uint8_t pdev_id);
 
 #ifdef FEATURE_WLAN_D0WOW
 QDF_STATUS wmi_unified_d0wow_enable_send(void *wmi_hdl,
@@ -601,8 +607,30 @@ QDF_STATUS wmi_unified_probe_rsp_tmpl_send_cmd(void *wmi_hdl,
 QDF_STATUS wmi_unified_setup_install_key_cmd(void *wmi_hdl,
 			struct set_key_params *key_params);
 
+#ifdef WLAN_FEATURE_DISA
+/**
+ * wmi_unified_encrypt_decrypt_send_cmd() - send encryptdecrypt cmd to fw
+ * @wmi_hdl: wmi handle
+ * @params: encrypt/decrypt params
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
 QDF_STATUS wmi_unified_encrypt_decrypt_send_cmd(void *wmi_hdl,
-			struct encrypt_decrypt_req_params *params);
+			struct disa_encrypt_decrypt_req_params *params);
+
+/**
+ * wmi_extract_encrypt_decrypt_resp_params() -
+ *       extract encrypt decrypt resp params from event buffer
+ * @wmi_handle: wmi handle
+ * @evt_buf: pointer to event buffer
+ * @resp: encrypt decrypt resp params
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS wmi_extract_encrypt_decrypt_resp_params(void *wmi_hdl,
+			uint8_t *evt_buf,
+			struct disa_encrypt_decrypt_resp_params *resp);
+#endif
 
 QDF_STATUS wmi_unified_p2p_go_set_beacon_ie_cmd(void *wmi_hdl,
 				    A_UINT32 vdev_id, uint8_t *p2p_ie);
@@ -732,10 +760,11 @@ QDF_STATUS wmi_unified_process_dhcp_ind(void *wmi_hdl,
 
 QDF_STATUS wmi_unified_get_link_speed_cmd(void *wmi_hdl,
 					wmi_mac_addr peer_macaddr);
+#endif
 
+#ifdef WLAN_SUPPORT_GREEN_AP
 QDF_STATUS wmi_unified_egap_conf_params_cmd(void *wmi_hdl,
-		wmi_ap_ps_egap_param_cmd_fixed_param *egap_params);
-
+		struct wlan_green_ap_egap_params *egap_params);
 #endif
 
 QDF_STATUS wmi_unified_fw_profiling_data_cmd(void *wmi_hdl,
@@ -1738,7 +1767,7 @@ QDF_STATUS wmi_send_bcn_offload_control_cmd(void *wmi_hdl,
 /**
  * wmi_unified_send_wds_entry_list_cmd() - WMI function to get list of
  *  wds entries from FW
- * @wmi_handle: wmi handle
+ * @wmi_hdl: wmi handle
  *
  * Send WMI_PDEV_WDS_ENTRY_LIST_CMDID parameters to fw.
  *
@@ -1749,7 +1778,7 @@ QDF_STATUS wmi_unified_send_dump_wds_table_cmd(void *wmi_hdl);
 
 /**
  * wmi_extract_wds_entry - api to extract wds entry
- * @wmi_handle: wma handle
+ * @wmi_hdl: wmi handle
  * @evt_buf: pointer to event buffer
  * @wds_entry: wds entry
  * @idx: index to point wds entry in event buffer
@@ -1859,4 +1888,79 @@ QDF_STATUS wmi_extract_ndp_end_ind(wmi_unified_t wmi_handle, uint8_t *data,
 			struct nan_datapath_end_indication_event **ind);
 
 #endif
+
+/**
+ * wmi_unified_send_btm_config() - Send BTM config to fw
+ * @wmi_hdl:  wmi handle
+ * @params: pointer to wmi_btm_config
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wmi_unified_send_btm_config(void *wmi_hdl,
+				       struct wmi_btm_config *params);
+
+/**
+ * wmi_unified_send_obss_detection_cfg_cmd() - WMI function to send obss
+ *  detection configuration to FW.
+ * @wmi_hdl: wmi handle
+ * @cfg: obss detection configuration
+ *
+ * Send WMI_SAP_OBSS_DETECTION_CFG_CMDID parameters to fw.
+ *
+ * Return: QDF_STATUS
+ */
+
+QDF_STATUS wmi_unified_send_obss_detection_cfg_cmd(void *wmi_hdl,
+			struct wmi_obss_detection_cfg_param *cfg);
+
+/**
+ * wmi_unified_extract_obss_detection_info() - WMI function to extract obss
+ *  detection info from FW.
+ * @wmi_hdl: wmi handle
+ * @data: event data from firmware
+ * @info: Pointer to hold obss detection info
+ *
+ * This function is used to extract obss info from firmware.
+ *
+ * Return: QDF_STATUS
+ */
+
+QDF_STATUS wmi_unified_extract_obss_detection_info(void *wmi_hdl,
+						   uint8_t *data,
+						   struct wmi_obss_detect_info
+						   *info);
+
+#ifdef WLAN_SUPPORT_FILS
+/**
+ * wmi_unified_fils_vdev_config_send_cmd() - send FILS config cmd to fw
+ * @wmi_hdl: wmi handle
+ * @param:   fils config params
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS
+wmi_unified_fils_vdev_config_send_cmd(void *wmi_hdl,
+				      struct config_fils_params *param);
+
+/**
+ * wmi_extract_swfda_vdev_id() - api to extract vdev id
+ * @wmi_hdl: wmi handle
+ * @evt_buf: pointer to event buffer
+ * @vdev_id: pointer to vdev id
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS wmi_extract_swfda_vdev_id(void *wmi_hdl, void *evt_buf,
+				     uint32_t *vdev_id);
+
+/**
+ * wmi_unified_fils_discovery_send_cmd() - send FILS discovery cmd to fw
+ * @wmi_hdl: wmi handle
+ * @param:   fils discovery params
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS wmi_unified_fils_discovery_send_cmd(void *wmi_hdl,
+					       struct fd_params *param);
+#endif /* WLAN_SUPPORT_FILS */
 #endif /* _WMI_UNIFIED_API_H_ */

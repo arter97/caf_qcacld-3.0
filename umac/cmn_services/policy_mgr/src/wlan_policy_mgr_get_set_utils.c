@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -2053,6 +2053,22 @@ enum policy_mgr_con_mode policy_mgr_convert_device_mode_to_qdf_type(
 	return mode;
 }
 
+QDF_STATUS policy_mgr_mode_specific_num_open_sessions(
+		struct wlan_objmgr_psoc *psoc, enum QDF_OPMODE mode,
+		uint8_t *num_sessions)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid context");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	*num_sessions = pm_ctx->no_of_open_sessions[mode];
+	return QDF_STATUS_SUCCESS;
+}
+
 /**
  * policy_mgr_concurrent_open_sessions_running() - Checks for
  * concurrent open session
@@ -2580,8 +2596,10 @@ uint32_t policy_mgr_get_hw_dbs_nss(struct wlan_objmgr_psoc *psoc,
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 
 	pm_ctx = policy_mgr_get_context(psoc);
-	if (!pm_ctx)
+	if (!pm_ctx) {
 		policy_mgr_err("Invalid Context");
+		return final_max_rf_chains;
+	}
 
 	for (i = 0; i < pm_ctx->num_dbs_hw_modes; i++) {
 		param = pm_ctx->hw_mode.hw_mode_list[i];
