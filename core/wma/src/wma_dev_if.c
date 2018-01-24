@@ -3466,15 +3466,6 @@ void wma_vdev_resp_timer(void *data)
 			QDF_ASSERT(0);
 		}
 		goto free_tgt_req;
-
-	} else if (tgt_req->msg_type == WMA_OCB_SET_CONFIG_CMD) {
-		struct wma_txrx_node *iface;
-
-		WMA_LOGE(FL("Failed to send OCB set config cmd"));
-		iface = &wma->interfaces[tgt_req->vdev_id];
-		wma_vdev_set_mlme_state(wma, tgt_req->vdev_id,
-			WLAN_VDEV_S_STOP);
-		wma_ocb_set_config_resp(wma, QDF_STATUS_E_TIMEOUT);
 	} else if (tgt_req->msg_type == WMA_HIDDEN_SSID_VDEV_RESTART) {
 		WMA_LOGE("Hidden ssid vdev restart Timed Out; vdev_id: %d, type = %d",
 				tgt_req->vdev_id, tgt_req->type);
