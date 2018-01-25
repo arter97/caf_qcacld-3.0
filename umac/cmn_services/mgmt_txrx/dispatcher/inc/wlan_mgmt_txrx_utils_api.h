@@ -669,6 +669,19 @@ typedef QDF_STATUS (*mgmt_frame_rx_callback)(
 			struct mgmt_rx_event_params *mgmt_rx_params,
 			enum mgmt_frame_type frm_type);
 
+/**
+ * mgmt_frame_drain_cb - function pointer for filling peer in the buf
+ * @peer: peer
+ * @buf: buffer
+ *
+ * This is the function pointer to be called during drain to fill the
+ * peer into the buf's cb structure.
+ *
+ * Return: QDF_STATUS_SUCCESS - in case of success
+ */
+typedef QDF_STATUS (*mgmt_frame_drain_cb)(
+			struct wlan_objmgr_peer *peer,
+			qdf_nbuf_t buf);
 
 /**
  * struct mgmt_txrx_mgmt_frame_cb_info - frm and corresponding rx cb info
@@ -754,6 +767,22 @@ QDF_STATUS wlan_mgmt_txrx_register_rx_cb(
 			enum wlan_umac_comp_id comp_id,
 			struct mgmt_txrx_mgmt_frame_cb_info *frm_cb_info,
 			uint8_t num_entries);
+
+/**
+ * wlan_mgmt_txrx_pdev_drain() - Function to drain all mgmt packets
+ * @pdev: pdev context
+ * @mgmt_drain_cb: callback func to UMAC
+ * @status: opaque pointer about the status of the pkts passed to UMAC
+ *
+ * This function drains all mgmt packets. This can be used in the
+ * event of target going down without sending completions.
+ *
+ * Return: QDF_STATUS_SUCCESS - in case of success
+ */
+QDF_STATUS wlan_mgmt_txrx_pdev_drain(
+			struct wlan_objmgr_pdev *pdev,
+			mgmt_frame_drain_cb mgmt_drain_cb,
+			void *status);
 
 /**
  * wlan_mgmt_txrx_deregister_rx_cb() - deregisters the rx cb for mgmt. frames
