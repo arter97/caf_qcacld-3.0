@@ -1965,6 +1965,13 @@ static int dp_soc_cmn_setup(struct dp_soc *soc)
 		reo_params.rx_hash_enabled = true;
 	}
 
+	/* setup the global rx defrag waitlist */
+	TAILQ_INIT(&soc->rx.defrag.waitlist);
+	soc->rx.defrag.timeout_ms =
+		wlan_cfg_get_rx_defrag_min_timeout(soc->wlan_cfg_ctx);
+	soc->rx.flags.defrag_timeout_check =
+		wlan_cfg_get_defrag_timeout_check(soc->wlan_cfg_ctx);
+
 out:
 	hal_reo_setup(soc->hal_soc, &reo_params);
 
@@ -4059,6 +4066,67 @@ static int dp_pdev_set_advance_monitor_filter(struct cdp_pdev *pdev_handle,
 	return QDF_STATUS_SUCCESS;
 }
 
+/**
+ * dp_vdev_get_filter_ucast_data() - get DP VDEV monitor ucast filter
+ * @vdev_handle: Datapath VDEV handle
+ * Return: true on ucast filter flag set
+ */
+static bool dp_vdev_get_filter_ucast_data(struct cdp_vdev *vdev_handle)
+{
+	struct dp_vdev *vdev = (struct dp_vdev *)vdev_handle;
+	struct dp_pdev *pdev;
+
+	pdev = vdev->pdev;
+
+	if ((pdev->fp_data_filter & FILTER_DATA_UCAST) ||
+	    (pdev->mo_data_filter & FILTER_DATA_UCAST))
+		return true;
+
+	return false;
+}
+
+/**
+ * dp_vdev_get_filter_mcast_data() - get DP VDEV monitor mcast filter
+ * @vdev_handle: Datapath VDEV handle
+ * Return: true on mcast filter flag set
+ */
+static bool dp_vdev_get_filter_mcast_data(struct cdp_vdev *vdev_handle)
+{
+	struct dp_vdev *vdev = (struct dp_vdev *)vdev_handle;
+	struct dp_pdev *pdev;
+
+	pdev = vdev->pdev;
+
+	if ((pdev->fp_data_filter & FILTER_DATA_MCAST) ||
+	    (pdev->mo_data_filter & FILTER_DATA_MCAST))
+		return true;
+
+	return false;
+}
+
+/**
+ * dp_vdev_get_filter_non_data() - get DP VDEV monitor non_data filter
+ * @vdev_handle: Datapath VDEV handle
+ * Return: true on non data filter flag set
+ */
+static bool dp_vdev_get_filter_non_data(struct cdp_vdev *vdev_handle)
+{
+	struct dp_vdev *vdev = (struct dp_vdev *)vdev_handle;
+	struct dp_pdev *pdev;
+
+	pdev = vdev->pdev;
+
+	if ((pdev->fp_mgmt_filter & FILTER_MGMT_ALL) ||
+	    (pdev->mo_mgmt_filter & FILTER_MGMT_ALL)) {
+		if ((pdev->fp_ctrl_filter & FILTER_CTRL_ALL) ||
+		    (pdev->mo_ctrl_filter & FILTER_CTRL_ALL)) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 #ifdef MESH_MODE_SUPPORT
 void dp_peer_set_mesh_mode(struct cdp_vdev *vdev_hdl, uint32_t val)
 {
@@ -4182,6 +4250,7 @@ void dp_aggregate_vdev_stats(struct dp_vdev *vdev)
 static inline void dp_aggregate_pdev_stats(struct dp_pdev *pdev)
 {
 	struct dp_vdev *vdev = NULL;
+	struct dp_soc *soc = pdev->soc;
 
 	qdf_mem_set(&(pdev->stats.tx), sizeof(pdev->stats.tx), 0x0);
 	qdf_mem_set(&(pdev->stats.rx), sizeof(pdev->stats.rx), 0x0);
@@ -4236,6 +4305,9 @@ static inline void dp_aggregate_pdev_stats(struct dp_pdev *pdev)
 		pdev->stats.tx_i.tso.num_seg =
 			vdev->stats.tx_i.tso.num_seg;
 	}
+	if (soc->cdp_soc.ol_ops->update_dp_stats)
+		soc->cdp_soc.ol_ops->update_dp_stats(pdev->osif_pdev,
+				&pdev->stats, pdev->pdev_id, UPDATE_PDEV_STATS);
 
 }
 
@@ -4602,6 +4674,8 @@ static inline void
 dp_txrx_host_stats_clr(struct dp_vdev *vdev)
 {
 	struct dp_peer *peer = NULL;
+	struct dp_soc *soc = (struct dp_soc *)vdev->pdev->soc;
+
 	DP_STATS_CLR(vdev->pdev);
 	DP_STATS_CLR(vdev->pdev->soc);
 	DP_STATS_CLR(vdev);
@@ -4609,8 +4683,21 @@ dp_txrx_host_stats_clr(struct dp_vdev *vdev)
 		if (!peer)
 			return;
 		DP_STATS_CLR(peer);
+
+		if (soc->cdp_soc.ol_ops->update_dp_stats) {
+			soc->cdp_soc.ol_ops->update_dp_stats(
+					vdev->pdev->osif_pdev,
+					&peer->stats,
+					peer->peer_ids[0],
+					UPDATE_PEER_STATS);
+		}
+
 	}
 
+	if (soc->cdp_soc.ol_ops->update_dp_stats)
+		soc->cdp_soc.ol_ops->update_dp_stats(vdev->pdev->osif_pdev,
+				&vdev->stats, (uint16_t)vdev->vdev_id,
+				UPDATE_VDEV_STATS);
 }
 
 /**
@@ -6014,9 +6101,9 @@ static struct cdp_mon_ops dp_ops_mon = {
 	.txrx_monitor_set_filter_ucast_data = NULL,
 	.txrx_monitor_set_filter_mcast_data = NULL,
 	.txrx_monitor_set_filter_non_data = NULL,
-	.txrx_monitor_get_filter_ucast_data = NULL,
-	.txrx_monitor_get_filter_mcast_data = NULL,
-	.txrx_monitor_get_filter_non_data = NULL,
+	.txrx_monitor_get_filter_ucast_data = dp_vdev_get_filter_ucast_data,
+	.txrx_monitor_get_filter_mcast_data = dp_vdev_get_filter_mcast_data,
+	.txrx_monitor_get_filter_non_data = dp_vdev_get_filter_non_data,
 	.txrx_reset_monitor_mode = dp_reset_monitor_mode,
 	/* Added support for HK advance filter */
 	.txrx_set_advance_monitor_filter = dp_pdev_set_advance_monitor_filter,

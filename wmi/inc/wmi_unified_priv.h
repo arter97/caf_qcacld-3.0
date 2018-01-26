@@ -212,6 +212,9 @@ QDF_STATUS (*send_vdev_down_cmd)(wmi_unified_t wmi,
 QDF_STATUS (*send_vdev_start_cmd)(wmi_unified_t wmi,
 		struct vdev_start_params *req);
 
+QDF_STATUS (*send_vdev_set_nac_rssi_cmd)(wmi_unified_t wmi,
+		struct vdev_scan_nac_rssi_params *req);
+
 QDF_STATUS (*send_hidden_ssid_vdev_restart_cmd)(wmi_unified_t wmi_handle,
 		struct hidden_ssid_vdev_restart_params *restart_params);
 
@@ -1320,6 +1323,9 @@ QDF_STATUS (*extract_atf_token_info_ev)(wmi_unified_t wmi_handle,
 QDF_STATUS (*extract_vdev_extd_stats)(wmi_unified_t wmi_handle, void *evt_buf,
 		uint32_t index, wmi_host_vdev_extd_stats *vdev_extd_stats);
 
+QDF_STATUS (*extract_vdev_nac_rssi_stats)(wmi_unified_t wmi_handle, void *evt_buf,
+		struct wmi_host_vdev_nac_rssi_event *vdev_nac_rssi_stats);
+
 QDF_STATUS (*extract_bcn_stats)(wmi_unified_t wmi_handle, void *evt_buf,
 		uint32_t index, wmi_host_bcn_stats *bcn_stats);
 
@@ -1349,6 +1355,12 @@ QDF_STATUS (*extract_encrypt_decrypt_resp_event)(wmi_unified_t wmi_handle,
 
 QDF_STATUS (*send_sar_limit_cmd)(wmi_unified_t wmi_handle,
 				struct sar_limit_cmd_params *params);
+
+QDF_STATUS (*get_sar_limit_cmd)(wmi_unified_t wmi_handle);
+
+QDF_STATUS (*extract_sar_limit_event)(wmi_unified_t wmi_handle,
+				      uint8_t *evt_buf,
+				      struct sar_limit_event *event);
 
 QDF_STATUS (*send_peer_rx_reorder_queue_setup_cmd)(wmi_unified_t wmi_handle,
 		struct rx_reorder_queue_setup_params *param);
@@ -1506,6 +1518,11 @@ QDF_STATUS (*extract_swfda_vdev_id)(wmi_unified_t wmi_handle, void *evt_buf,
 QDF_STATUS (*send_fils_discovery_send_cmd)(wmi_unified_t wmi_handle,
 					   struct fd_params *param);
 #endif /* WLAN_SUPPORT_FILS */
+QDF_STATUS (*send_offload_11k_cmd)(wmi_unified_t wmi_handle,
+		struct wmi_11k_offload_params *params);
+
+QDF_STATUS (*send_invoke_neighbor_report_cmd)(wmi_unified_t wmi_handle,
+		struct wmi_invoke_neighbor_report_params *params);
 };
 
 /* Forward declartion for psoc*/
@@ -1583,8 +1600,8 @@ struct wmi_unified {
 #ifndef CONFIG_MCL
 	uint32_t *pdev_param;
 	uint32_t *vdev_param;
-	uint32_t *services;
 #endif
+	uint32_t *services;
 	struct wmi_soc *soc;
 };
 
@@ -1611,8 +1628,9 @@ struct wmi_soc {
 #ifndef CONFIG_MCL
 	uint32_t pdev_param[wmi_pdev_param_max];
 	uint32_t vdev_param[wmi_vdev_param_max];
-	uint32_t services[wmi_services_max];
 #endif
+	uint32_t services[wmi_services_max];
+
 };
 
 #ifdef WMI_NON_TLV_SUPPORT

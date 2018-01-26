@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2018 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -83,7 +83,70 @@ static void dp_rx_clear_saved_desc_info(struct dp_peer *peer, unsigned tid)
 	peer->rx_tid[tid].dst_ring_desc = NULL;
 }
 
-#ifdef DEFRAG_TIMEOUT
+/*
+ * dp_rx_reorder_flush_frag(): Flush the frag list
+ * @peer: Pointer to the peer data structure
+ * @tid: Transmit ID (TID)
+ *
+ * Flush the per-TID frag list
+ *
+ * Returns: None
+ */
+void dp_rx_reorder_flush_frag(struct dp_peer *peer,
+			 unsigned int tid)
+{
+	struct dp_rx_reorder_array_elem *rx_reorder_array_elem;
+
+	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+				FL("Flushing TID %d"), tid);
+
+	rx_reorder_array_elem = peer->rx_tid[tid].array;
+	if (rx_reorder_array_elem->head) {
+		dp_rx_defrag_frames_free(rx_reorder_array_elem->head);
+		rx_reorder_array_elem->head = NULL;
+		rx_reorder_array_elem->tail = NULL;
+	}
+}
+
+/*
+ * dp_rx_defrag_waitlist_flush(): Flush SOC defrag wait list
+ * @soc: DP SOC
+ *
+ * Flush fragments of all waitlisted TID's
+ *
+ * Returns: None
+ */
+void dp_rx_defrag_waitlist_flush(struct dp_soc *soc)
+{
+	struct dp_rx_tid *rx_reorder, *tmp;
+	uint32_t now_ms = qdf_system_ticks_to_msecs(qdf_system_ticks());
+
+	TAILQ_FOREACH_SAFE(rx_reorder, &soc->rx.defrag.waitlist,
+			   defrag_waitlist_elem, tmp) {
+		struct dp_peer *peer;
+		struct dp_rx_tid *rx_reorder_base;
+		unsigned int tid;
+
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+				FL("Current time  %u"), now_ms);
+
+		if (rx_reorder->defrag_timeout_ms > now_ms)
+			break;
+
+		tid = rx_reorder->tid;
+		/* get index 0 of the rx_reorder array */
+		rx_reorder_base = rx_reorder - tid;
+		peer =
+			container_of(rx_reorder_base, struct dp_peer,
+				     rx_tid[0]);
+
+		TAILQ_REMOVE(&soc->rx.defrag.waitlist, rx_reorder,
+			     defrag_waitlist_elem);
+		//dp_rx_defrag_waitlist_remove(peer, tid);
+		dp_rx_reorder_flush_frag(peer, tid);
+	}
+}
+
 /*
  * dp_rx_defrag_waitlist_add(): Update per-PDEV defrag wait list
  * @peer: Pointer to the peer data structure
@@ -97,6 +160,9 @@ static void dp_rx_defrag_waitlist_add(struct dp_peer *peer, unsigned tid)
 {
 	struct dp_soc *psoc = peer->vdev->pdev->soc;
 	struct dp_rx_tid *rx_reorder = &peer->rx_tid[tid];
+
+	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+				FL("Adding TID %u to waitlist"), tid);
 
 	/* TODO: use LIST macros instead of TAIL macros */
 	TAILQ_INSERT_TAIL(&psoc->rx.defrag.waitlist, rx_reorder,
@@ -112,7 +178,7 @@ static void dp_rx_defrag_waitlist_add(struct dp_peer *peer, unsigned tid)
  *
  * Returns: None
  */
-static void dp_rx_defrag_waitlist_remove(struct dp_peer *peer, unsigned tid)
+void dp_rx_defrag_waitlist_remove(struct dp_peer *peer, unsigned tid)
 {
 	struct dp_pdev *pdev = peer->vdev->pdev;
 	struct dp_soc *soc = pdev->soc;
@@ -125,23 +191,16 @@ static void dp_rx_defrag_waitlist_remove(struct dp_peer *peer, unsigned tid)
 		return;
 	}
 
-	rx_reorder = &peer->rx_tid[tid];
+	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+				FL("Remove TID %u from waitlist"), tid);
 
-	if (rx_reorder->defrag_waitlist_elem.tqe_next != NULL) {
-
-		TAILQ_REMOVE(&soc->rx.defrag.waitlist, rx_reorder,
-				defrag_waitlist_elem);
-		rx_reorder->defrag_waitlist_elem.tqe_next = NULL;
-		rx_reorder->defrag_waitlist_elem.tqe_prev = NULL;
-	} else if (rx_reorder->defrag_waitlist_elem.tqe_prev == NULL) {
-
-		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			"waitlist->tqe_prev is NULL");
-		rx_reorder->defrag_waitlist_elem.tqe_next = NULL;
-		qdf_assert(0);
+	TAILQ_FOREACH(rx_reorder, &soc->rx.defrag.waitlist,
+			   defrag_waitlist_elem) {
+		if (rx_reorder->tid == tid)
+			TAILQ_REMOVE(&soc->rx.defrag.waitlist,
+				rx_reorder, defrag_waitlist_elem);
 	}
 }
-#endif
 
 /*
  * dp_rx_defrag_fraglist_insert(): Create a per-sequence fragment list
@@ -154,9 +213,9 @@ static void dp_rx_defrag_waitlist_remove(struct dp_peer *peer, unsigned tid)
  *
  * Build a per-tid, per-sequence fragment list.
  *
- * Returns: None
+ * Returns: Success, if inserted
  */
-static void dp_rx_defrag_fraglist_insert(struct dp_peer *peer, unsigned tid,
+static QDF_STATUS dp_rx_defrag_fraglist_insert(struct dp_peer *peer, unsigned tid,
 	qdf_nbuf_t *head_addr, qdf_nbuf_t *tail_addr, qdf_nbuf_t frag,
 	uint8_t *all_frag_present)
 {
@@ -168,10 +227,12 @@ static void dp_rx_defrag_fraglist_insert(struct dp_peer *peer, unsigned tid,
 	struct dp_rx_tid *rx_tid = &peer->rx_tid[tid];
 	uint8_t *rx_desc_info;
 
+
 	qdf_assert(frag);
 	qdf_assert(head_addr);
 	qdf_assert(tail_addr);
 
+	*all_frag_present = 0;
 	rx_desc_info = qdf_nbuf_data(frag);
 	cur_fragno = dp_rx_frag_get_mpdu_frag_number(rx_desc_info);
 
@@ -181,7 +242,7 @@ static void dp_rx_defrag_fraglist_insert(struct dp_peer *peer, unsigned tid,
 		qdf_nbuf_set_next(*tail_addr, NULL);
 		rx_tid->curr_frag_num = cur_fragno;
 
-		goto end;
+		goto insert_done;
 	}
 
 	/* In sequence fragment */
@@ -198,7 +259,7 @@ static void dp_rx_defrag_fraglist_insert(struct dp_peer *peer, unsigned tid,
 
 		if (cur_fragno == head_fragno) {
 			qdf_nbuf_free(frag);
-			*all_frag_present = 0;
+			goto insert_fail;
 		} else if (head_fragno > cur_fragno) {
 			qdf_nbuf_set_next(frag, cur);
 			cur = frag;
@@ -212,6 +273,12 @@ static void dp_rx_defrag_fraglist_insert(struct dp_peer *peer, unsigned tid,
 					dp_rx_frag_get_mpdu_frag_number(
 								rx_desc_info);
 			}
+
+			if (cur_fragno == head_fragno) {
+				qdf_nbuf_free(frag);
+				goto insert_fail;
+			}
+
 			qdf_nbuf_set_next(prev, frag);
 			qdf_nbuf_set_next(frag, cur);
 		}
@@ -239,12 +306,15 @@ static void dp_rx_defrag_fraglist_insert(struct dp_peer *peer, unsigned tid,
 
 		if (!next) {
 			*all_frag_present = 1;
-			return;
+			return QDF_STATUS_SUCCESS;
 		}
 	}
 
-end:
-	*all_frag_present = 0;
+insert_done:
+	return QDF_STATUS_SUCCESS;
+
+insert_fail:
+	return QDF_STATUS_E_FAILURE;
 }
 
 
@@ -708,7 +778,7 @@ static void dp_rx_defrag_nwifi_to_8023(qdf_nbuf_t nbuf)
 	struct llc_snap_hdr_t *llchdr;
 	struct ethernet_hdr_t *eth_hdr;
 	uint8_t ether_type[2];
-	uint16_t fc;
+	uint16_t fc = 0;
 	union dp_align_mac_addr mac_addr;
 	uint8_t *rx_desc_info = qdf_mem_malloc(RX_PKT_TLVS_LEN);
 
@@ -773,6 +843,14 @@ static void dp_rx_defrag_nwifi_to_8023(qdf_nbuf_t nbuf)
 		break;
 
 	case IEEE80211_FC1_DIR_DSTODS:
+		hal_rx_mpdu_get_addr3(rx_desc_info,
+			&mac_addr.raw[0]);
+		qdf_mem_copy(eth_hdr->dest_addr, &mac_addr.raw[0],
+			IEEE80211_ADDR_LEN);
+		hal_rx_mpdu_get_addr4(rx_desc_info,
+			&mac_addr.raw[0]);
+		qdf_mem_copy(eth_hdr->src_addr, &mac_addr.raw[0],
+			IEEE80211_ADDR_LEN);
 		break;
 
 	default:
@@ -809,7 +887,7 @@ static void dp_rx_defrag_nwifi_to_8023(qdf_nbuf_t nbuf)
 	void *ent_ring_desc, *ent_mpdu_desc_info, *ent_qdesc_addr;
 	void *dst_mpdu_desc_info, *dst_qdesc_addr;
 	qdf_dma_addr_t paddr;
-	uint32_t nbuf_len, seq_no;
+	uint32_t nbuf_len, seq_no, dst_ind;
 	uint32_t *mpdu_wrd;
 
 	void *dst_ring_desc =
@@ -835,6 +913,8 @@ static void dp_rx_defrag_nwifi_to_8023(qdf_nbuf_t nbuf)
 	msdu_desc_info = (uint8_t *)msdu0 +
 		RX_MSDU_DETAILS_2_RX_MSDU_DESC_INFO_RX_MSDU_DESC_INFO_DETAILS_OFFSET;
 
+	dst_ind = hal_rx_msdu_reo_dst_ind_get(link_desc_va);
+
 	qdf_mem_zero(msdu_desc_info, sizeof(struct rx_msdu_desc_info));
 
 	HAL_RX_MSDU_DESC_INFO_SET(msdu_desc_info,
@@ -844,7 +924,7 @@ static void dp_rx_defrag_nwifi_to_8023(qdf_nbuf_t nbuf)
 	HAL_RX_MSDU_DESC_INFO_SET(msdu_desc_info,
 			MSDU_CONTINUATION, 0x0);
 	HAL_RX_MSDU_DESC_INFO_SET(msdu_desc_info,
-			REO_DESTINATION_INDICATION, 1);
+			REO_DESTINATION_INDICATION, dst_ind);
 	HAL_RX_MSDU_DESC_INFO_SET(msdu_desc_info,
 			MSDU_LENGTH, nbuf_len);
 	HAL_RX_MSDU_DESC_INFO_SET(msdu_desc_info,
@@ -914,9 +994,8 @@ static void dp_rx_defrag_nwifi_to_8023(qdf_nbuf_t nbuf)
 
 	qdf_mem_copy(ent_qdesc_addr, dst_qdesc_addr, 8);
 
-	/* dst ind */
 	HAL_RX_FLD_SET(ent_ring_desc, REO_ENTRANCE_RING_5,
-			REO_DESTINATION_INDICATION, 0x1);
+			REO_DESTINATION_INDICATION, dst_ind);
 
 	hal_srng_access_end(soc->hal_soc, hal_srng);
 
@@ -958,6 +1037,12 @@ static QDF_STATUS dp_rx_defrag(struct dp_peer *peer, unsigned tid,
 		prev = cur;
 		qdf_nbuf_set_next(cur, tmp_next);
 		cur = tmp_next;
+	}
+
+	/* Temporary fix to drop all encrypted packets */
+	if (peer->security[index].sec_type !=
+			htt_sec_type_none) {
+		return QDF_STATUS_E_DEFRAG_ERROR;
 	}
 
 	switch (peer->security[index].sec_type) {
@@ -1237,17 +1322,18 @@ static QDF_STATUS dp_rx_defrag_store_fragment(struct dp_soc *soc,
 			rx_reorder_array_elem->head = NULL;
 			rx_reorder_array_elem->tail = NULL;
 
+			QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
+				"%s mismatch, dropping earlier sequence ",
+				(rxseq == rx_tid->curr_seq_num)
+				? "address"
+				: "seq number");
+
 			/*
 			 * The sequence number for this fragment becomes the
 			 * new sequence number to be processed
 			 */
 			rx_tid->curr_seq_num = rxseq;
 
-			QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-				"%s mismatch, dropping earlier sequence ",
-				(rxseq == rx_tid->curr_seq_num)
-				? "address"
-				: "seq number");
 		}
 	} else {
 		/* Start of a new sequence */
@@ -1259,7 +1345,7 @@ static QDF_STATUS dp_rx_defrag_store_fragment(struct dp_soc *soc,
 	 * If the earlier sequence was dropped, this will be the fresh start.
 	 * Else, continue with next fragment in a given sequence
 	 */
-	dp_rx_defrag_fraglist_insert(peer, tid, &rx_reorder_array_elem->head,
+	status = dp_rx_defrag_fraglist_insert(peer, tid, &rx_reorder_array_elem->head,
 			&rx_reorder_array_elem->tail, frag,
 			&all_frag_present);
 
@@ -1269,7 +1355,8 @@ static QDF_STATUS dp_rx_defrag_store_fragment(struct dp_soc *soc,
 	 * have to use the next MSDU link descriptor and chain them together
 	 * before reinjection
 	 */
-	if ((fragno == 0) && (rx_reorder_array_elem->head == frag)) {
+	if ((fragno == 0) && (status == QDF_STATUS_SUCCESS) &&
+			(rx_reorder_array_elem->head == frag)) {
 
 		status = dp_rx_defrag_save_info_from_ring_desc(ring_desc,
 					peer, tid);
@@ -1293,13 +1380,9 @@ static QDF_STATUS dp_rx_defrag_store_fragment(struct dp_soc *soc,
 
 	}
 
-#ifdef DEFRAG_TIMEOUT
-	/* TODO: handle fragment timeout gracefully */
-	if (pdev->soc->rx.flags.defrag_timeout_check) {
+	if (pdev->soc->rx.flags.defrag_timeout_check)
 		dp_rx_defrag_waitlist_remove(peer, tid);
-		goto end;
-	}
-#endif
+
 	/* Yet to receive more fragments for this sequence number */
 	if (!all_frag_present) {
 		uint32_t now_ms =
@@ -1307,6 +1390,8 @@ static QDF_STATUS dp_rx_defrag_store_fragment(struct dp_soc *soc,
 
 		peer->rx_tid[tid].defrag_timeout_ms =
 			now_ms + pdev->soc->rx.defrag.timeout_ms;
+
+		dp_rx_defrag_waitlist_add(peer, tid);
 
 		return QDF_STATUS_SUCCESS;
 	}
@@ -1320,6 +1405,14 @@ static QDF_STATUS dp_rx_defrag_store_fragment(struct dp_soc *soc,
 	if (QDF_IS_STATUS_ERROR(status)) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 			"Fragment processing failed");
+		if (dp_rx_link_desc_return(soc,
+					peer->rx_tid[tid].dst_ring_desc,
+					HAL_BM_ACTION_PUT_IN_IDLE_LIST) !=
+				QDF_STATUS_SUCCESS)
+			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+					"%s: Failed to return link desc\n",
+					__func__);
+		dp_rx_defrag_cleanup(peer, tid);
 		goto end;
 	}
 

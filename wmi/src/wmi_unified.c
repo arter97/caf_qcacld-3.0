@@ -1427,13 +1427,13 @@ QDF_STATUS wmi_unified_cmd_send(wmi_unified_t wmi_handle, wmi_buf_t buf,
 #ifdef WMI_INTERFACE_EVENT_LOGGING
 	if (wmi_handle->log_info.wmi_logging_enable) {
 		qdf_spin_lock_bh(&wmi_handle->log_info.wmi_record_lock);
-		/*Record 16 bytes of WMI cmd data -
-		 * * exclude TLV and WMI headers */
-		if (wmi_handle->ops->is_management_record(cmd_id)) {
-			WMI_MGMT_COMMAND_RECORD(wmi_handle, cmd_id,
-				qdf_nbuf_data(buf) +
-				wmi_handle->log_info.buf_offset_command);
-		} else {
+		/*
+		 * Record 16 bytes of WMI cmd data -
+		 * exclude TLV and WMI headers
+		 *
+		 * WMI mgmt command already recorded in wmi_mgmt_cmd_record
+		 */
+		if (wmi_handle->ops->is_management_record(cmd_id) == false) {
 			WMI_COMMAND_RECORD(wmi_handle, cmd_id,
 					qdf_nbuf_data(buf) +
 			 wmi_handle->log_info.buf_offset_command);
@@ -2034,7 +2034,6 @@ static inline void wmi_target_params_init(struct wmi_soc *soc,
 {
 	wmi_handle->pdev_param = soc->pdev_param;
 	wmi_handle->vdev_param = soc->vdev_param;
-	wmi_handle->services   = soc->services;
 }
 #else
 static inline void wmi_target_params_init(struct wmi_soc *soc,
@@ -2148,6 +2147,7 @@ void *wmi_unified_attach(void *scn_handle,
 	wmi_handle->ctx = soc->ctx;
 	wmi_handle->wmi_events = soc->wmi_events;
 	wmi_target_params_init(soc, wmi_handle);
+	wmi_handle->services = soc->services;
 	wmi_handle->scn_handle = scn_handle;
 	soc->scn_handle = scn_handle;
 	qdf_atomic_init(&wmi_handle->pending_cmds);

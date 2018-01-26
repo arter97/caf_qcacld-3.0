@@ -396,6 +396,15 @@ QDF_STATUS wmi_unified_vdev_down_send(void *wmi_hdl,
 
 QDF_STATUS wmi_unified_vdev_start_send(void *wmi_hdl,
 				struct vdev_start_params *req);
+/**
+ * wmi_unified_vdev_set_nac_rssi_send() - send NAC_RSSI command to fw
+ * @param wmi_handle   : handle to WMI
+ * @param req          : pointer to hold nac rssi request data
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_vdev_set_nac_rssi_send(void *wmi_hdl,
+			struct vdev_scan_nac_rssi_params *req);
 
 QDF_STATUS wmi_unified_hidden_ssid_vdev_restart_send(void *wmi_hdl,
 		struct hidden_ssid_vdev_restart_params *restart_params);
@@ -1561,14 +1570,54 @@ QDF_STATUS wmi_extract_vdev_extd_stats(void *wmi_hdl, void *evt_buf,
 QDF_STATUS wmi_extract_bcn_stats(void *wmi_hdl, void *evt_buf,
 		uint32_t index, wmi_host_bcn_stats *vdev_bcn_stats);
 
+/**
+ * wmi_extract_vdev_nac_rssi_stats() - extract NAC_RSSI stats from event
+ * @wmi_handle: wmi handle
+ * @param evt_buf: pointer to event buffer
+ * @param vdev_extd_stats: Pointer to hold nac rssi stats
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_extract_vdev_nac_rssi_stats(void *wmi_hdl, void *evt_buf,
+		struct wmi_host_vdev_nac_rssi_event *vdev_nac_rssi_stats);
+
 QDF_STATUS wmi_unified_send_power_dbg_cmd(void *wmi_hdl,
 				struct wmi_power_dbg_params *param);
 
 QDF_STATUS wmi_unified_send_multiple_vdev_restart_req_cmd(void *wmi_hdl,
 				struct multiple_vdev_restart_params *param);
 
+/**
+ * wmi_unified_send_sar_limit_cmd() - send sar limit cmd to fw
+ * @wmi_hdl: wmi handle
+ * @params: sar limit command params
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
 QDF_STATUS wmi_unified_send_sar_limit_cmd(void *wmi_hdl,
-				struct sar_limit_cmd_params *params);
+					  struct sar_limit_cmd_params *params);
+
+/**
+ * wmi_unified_get_sar_limit_cmd() - request current SAR limits from FW
+ * @wmi_hdl: wmi handle
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS wmi_unified_get_sar_limit_cmd(void *wmi_hdl);
+
+/**
+ * wmi_unified_extract_sar_limit_event() - extract SAR limits from FW event
+ * @wmi_hdl: wmi handle
+ * @evt_buf: event buffer received from firmware
+ * @event: SAR limit event which is to be populated by data extracted from
+ *         the @evt_buf buffer
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS wmi_unified_extract_sar_limit_event(void *wmi_hdl,
+					       uint8_t *evt_buf,
+					       struct sar_limit_event *event);
+
 QDF_STATUS wmi_unified_send_adapt_dwelltime_params_cmd(void *wmi_hdl,
 				   struct wmi_adaptive_dwelltime_params *
 				   wmi_param);
@@ -1963,4 +2012,27 @@ QDF_STATUS wmi_extract_swfda_vdev_id(void *wmi_hdl, void *evt_buf,
 QDF_STATUS wmi_unified_fils_discovery_send_cmd(void *wmi_hdl,
 					       struct fd_params *param);
 #endif /* WLAN_SUPPORT_FILS */
+
+/**
+ * wmi_unified_offload_11k_cmd() - send 11k offload command
+ * @wmi_hdl: wmi handle
+ * @params: 11k offload params
+ *
+ * This function passes the 11k offload command params to FW
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_offload_11k_cmd(void *wmi_hdl,
+				struct wmi_11k_offload_params *params);
+/**
+ * wmi_unified_invoke_neighbor_report_cmd() - send invoke neighbor report cmd
+ * @wmi_hdl: wmi handle
+ * @params: invoke neighbor report params
+ *
+ * This function passes the invoke neighbor report command to fw
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_invoke_neighbor_report_cmd(void *wmi_hdl,
+			struct wmi_invoke_neighbor_report_params *params);
 #endif /* _WMI_UNIFIED_API_H_ */

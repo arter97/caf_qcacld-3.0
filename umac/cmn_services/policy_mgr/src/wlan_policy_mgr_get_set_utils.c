@@ -33,7 +33,7 @@
  */
 
 /* Include files */
-
+#include "target_if.h"
 #include "wlan_policy_mgr_api.h"
 #include "wlan_policy_mgr_i.h"
 #include "qdf_types.h"
@@ -524,8 +524,10 @@ bool policy_mgr_is_hw_dbs_capable(struct wlan_objmgr_psoc *psoc)
 {
 	uint32_t param, i, found = 0;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	void *wmi_handle;
 
 	pm_ctx = policy_mgr_get_context(psoc);
+
 	if (!pm_ctx) {
 		policy_mgr_err("Invalid Context");
 		return false;
@@ -535,19 +537,23 @@ bool policy_mgr_is_hw_dbs_capable(struct wlan_objmgr_psoc *psoc)
 		policy_mgr_debug("DBS is disabled");
 		return false;
 	}
-	if (pm_ctx->wma_cbacks.wma_is_service_enabled) {
-		policy_mgr_debug("DBS service bit map: %d",
-			pm_ctx->wma_cbacks.wma_is_service_enabled(
-			WMI_SERVICE_DUAL_BAND_SIMULTANEOUS_SUPPORT));
 
-		/* The agreement with FW is that: To know if the target is DBS
-		 * capable, DBS needs to be supported both in the HW mode list
-		 * and in the service ready event
-		 */
-		if (!(pm_ctx->wma_cbacks.wma_is_service_enabled(
-			WMI_SERVICE_DUAL_BAND_SIMULTANEOUS_SUPPORT)))
-			return false;
-	} else
+	wmi_handle = GET_WMI_HDL_FROM_PSOC(psoc);
+	if (!wmi_handle) {
+		policy_mgr_debug("Invalid WMA context");
+		return false;
+	}
+
+	policy_mgr_debug("DBS service bit map: %d",
+		wmi_service_enabled(wmi_handle,
+		wmi_service_dual_band_simultaneous_support));
+
+	/* The agreement with FW is that: To know if the target is DBS
+	 * capable, DBS needs to be supported both in the HW mode list
+	 * and in the service ready event
+	 */
+	if (!(wmi_service_enabled(wmi_handle,
+		wmi_service_dual_band_simultaneous_support)))
 		return false;
 
 	for (i = 0; i < pm_ctx->num_dbs_hw_modes; i++) {
@@ -570,25 +576,26 @@ bool policy_mgr_is_hw_sbs_capable(struct wlan_objmgr_psoc *psoc)
 {
 	uint32_t param, i, found = 0;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	void *wmi_handle;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
 		policy_mgr_err("Invalid Context");
 		return false;
 	}
-	if (pm_ctx->wma_cbacks.wma_is_service_enabled) {
-		policy_mgr_debug("DBS service bit map: %d",
-			pm_ctx->wma_cbacks.wma_is_service_enabled(
-			WMI_SERVICE_DUAL_BAND_SIMULTANEOUS_SUPPORT));
 
-		/* The agreement with FW is that: To know if the target is SBS
-		 * capable, SBS needs to be supported both in the HW mode list
-		 * and DBS needs to be supported in the service ready event
-		 */
-		if (!(pm_ctx->wma_cbacks.wma_is_service_enabled(
-			WMI_SERVICE_DUAL_BAND_SIMULTANEOUS_SUPPORT)))
-			return false;
-	} else
+	wmi_handle = GET_WMI_HDL_FROM_PSOC(psoc);
+
+	policy_mgr_debug("DBS service bit map: %d",
+		wmi_service_enabled(wmi_handle,
+		wmi_service_dual_band_simultaneous_support));
+
+	/* The agreement with FW is that: To know if the target is SBS
+	 * capable, SBS needs to be supported both in the HW mode list
+	 * and DBS needs to be supported in the service ready event
+	 */
+	if (!(wmi_service_enabled(wmi_handle,
+		wmi_service_dual_band_simultaneous_support)))
 		return false;
 
 	for (i = 0; i < pm_ctx->num_dbs_hw_modes; i++) {
@@ -2561,8 +2568,10 @@ QDF_STATUS policy_mgr_is_chan_ok_for_dnbs(struct wlan_objmgr_psoc *psoc,
 	 *   return true.
 	 * If channel is different from operating channel but in same band.
 	 *   return false.
-	 * If operating channel in different band.
+	 * If operating channel in different band (DBS capable).
 	 *   return true.
+	 * If operating channel in different band (not DBS capable).
+	 *   return false.
 	 */
 	/* TODO: To be enhanced for SBS */
 		if (policy_mgr_is_dnsc_set(vdev)) {
@@ -2577,12 +2586,24 @@ QDF_STATUS policy_mgr_is_chan_ok_for_dnbs(struct wlan_objmgr_psoc *psoc,
 				wlan_objmgr_vdev_release_ref(vdev,
 						WLAN_POLICY_MGR_ID);
 				break;
+			} else if (policy_mgr_is_hw_dbs_capable(psoc)) {
+				*ok = true;
+				wlan_objmgr_vdev_release_ref(vdev,
+						WLAN_POLICY_MGR_ID);
+				break;
+			} else {
+				*ok = false;
+				wlan_objmgr_vdev_release_ref(vdev,
+						WLAN_POLICY_MGR_ID);
+				break;
 			}
 		} else {
 			*ok = true;
 		}
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 	}
+	policy_mgr_debug("chan: %d ok %d", channel, *ok);
+
 	return QDF_STATUS_SUCCESS;
 }
 

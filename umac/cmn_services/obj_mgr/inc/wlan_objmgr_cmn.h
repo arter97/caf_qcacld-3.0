@@ -62,6 +62,8 @@
 
 /**
  * enum WLAN_OBJ_STATE - State of Object
+ * @WLAN_OBJ_STATE_ALLOCATED:           Common object is allocated, but not
+ *                                      fully initialized
  * @WLAN_OBJ_STATE_CREATED:             All component objects are created
  * @WLAN_OBJ_STATE_DELETED:             All component objects are destroyed
  * @WLAN_OBJ_STATE_PARTIALLY_CREATED:   Few/All component objects creation is
@@ -82,14 +84,15 @@
  *                                      destroyed
  */
 typedef enum {
-	WLAN_OBJ_STATE_CREATED            = 0,
-	WLAN_OBJ_STATE_DELETED            = 1,
-	WLAN_OBJ_STATE_PARTIALLY_CREATED  = 2,
-	WLAN_OBJ_STATE_PARTIALLY_DELETED  = 3,
-	WLAN_OBJ_STATE_COMP_DEL_PROGRESS  = 4,
-	WLAN_OBJ_STATE_LOGICALLY_DELETED  = 5,
-	WLAN_OBJ_STATE_CREATION_FAILED    = 6,
-	WLAN_OBJ_STATE_DELETION_FAILED    = 7,
+	WLAN_OBJ_STATE_ALLOCATED          = 0,
+	WLAN_OBJ_STATE_CREATED            = 1,
+	WLAN_OBJ_STATE_DELETED            = 2,
+	WLAN_OBJ_STATE_PARTIALLY_CREATED  = 3,
+	WLAN_OBJ_STATE_PARTIALLY_DELETED  = 4,
+	WLAN_OBJ_STATE_COMP_DEL_PROGRESS  = 5,
+	WLAN_OBJ_STATE_LOGICALLY_DELETED  = 6,
+	WLAN_OBJ_STATE_CREATION_FAILED    = 7,
+	WLAN_OBJ_STATE_DELETION_FAILED    = 8,
 } WLAN_OBJ_STATE;
 
 /* Object type is assigned with value */
@@ -198,6 +201,8 @@ typedef void (*wlan_objmgr_peer_status_handler)(
  * @WLAN_REGULATORY_SB_ID:      SB regulatory operations
  * @WLAN_REGULATORY_NB_ID:      NB regulatory operations
  * @WLAN_POLICY_MGR_ID:         Policy Manager operations
+ * @WLAN_SON_ID:                SON
+ * @WLAN_SA_API_ID:             SA PAI
  * @WLAN_SPECTRAL_ID:           Spectral operations
  * @WLAN_SPLITMAC_ID:           SplitMac
  * @WLAN_DEBUG_ID:              Debug operations
@@ -205,6 +210,8 @@ typedef void (*wlan_objmgr_peer_status_handler)(
  * @WLAN_DISA_ID:               DISA (encryption test) operations
  * @WLAN_FTM_ID:                FTM module
  * @WLAN_FD_ID:                 FILS Discovery
+ * @WLAN_OCB_NB_ID:             OCB Northbound operations
+ * @WLAN_OCB_SB_ID:             OCB Southbound operations
  * @WLAN_REF_ID_MAX:            Max id used to generate ref count tracking array
  */
  /* New value added to the enum must also be reflected in function
@@ -243,8 +250,10 @@ typedef enum {
 	WLAN_DEBUG_ID         = 29,
 	WLAN_DIRECT_BUF_RX_ID = 30,
 	WLAN_DISA_ID          = 31,
-	WLAN_FTM_ID           = 31,
+	WLAN_FTM_ID           = 32,
 	WLAN_FD_ID            = 33,
+	WLAN_OCB_NB_ID        = 34,
+	WLAN_OCB_SB_ID        = 35,
 	WLAN_REF_ID_MAX,
 } wlan_objmgr_ref_dbgid;
 

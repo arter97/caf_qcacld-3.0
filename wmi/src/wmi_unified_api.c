@@ -122,6 +122,24 @@ QDF_STATUS wmi_unified_vdev_start_send(void *wmi_hdl,
 }
 
 /**
+ * wmi_unified_vdev_set_nac_rssi_send() - send NAC_RSSI command to fw
+ * @wmi: wmi handle
+ * @req: pointer to hold nac rssi request data
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_vdev_set_nac_rssi_send(void *wmi_hdl,
+			struct vdev_scan_nac_rssi_params *req)
+{
+	wmi_unified_t wmi_handle = (wmi_unified_t) wmi_hdl;
+
+	if (wmi_handle->ops->send_vdev_set_nac_rssi_cmd)
+		return wmi_handle->ops->send_vdev_set_nac_rssi_cmd(wmi_handle, req);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+/**
  * wmi_unified_hidden_ssid_vdev_restart_send() - restart vdev to set hidden ssid
  * @wmi: wmi handle
  * @restart_params: vdev restart params
@@ -4631,7 +4649,6 @@ QDF_STATUS wmi_check_and_update_fw_version(void *wmi_hdl, void *evt_buf)
  *
  * Return: 1 enabled, 0 disabled
  */
-#ifndef CONFIG_MCL
 bool wmi_service_enabled(void *wmi_hdl, uint32_t service_id)
 {
 	wmi_unified_t wmi_handle = (wmi_unified_t) wmi_hdl;
@@ -4645,9 +4662,9 @@ bool wmi_service_enabled(void *wmi_hdl, uint32_t service_id)
 	} else {
 		qdf_print("Support not added yet for Service %d\n", service_id);
 	}
+
 	return false;
 }
-#endif
 
 /**
  * wmi_get_target_cap_from_service_ready() - extract service ready event
@@ -6566,6 +6583,26 @@ QDF_STATUS wmi_extract_bcn_stats(void *wmi_hdl, void *evt_buf,
 }
 
 /**
+ * wmi_extract_vdev_nac_rssi_stats() - extract NAC_RSSI stats from event
+ * @wmi_handle: wmi handle
+ * @param evt_buf: pointer to event buffer
+ * @param vdev_extd_stats: Pointer to hold nac rssi stats
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_extract_vdev_nac_rssi_stats(void *wmi_hdl, void *evt_buf,
+		 struct wmi_host_vdev_nac_rssi_event *vdev_nac_rssi_stats)
+{
+	wmi_unified_t wmi_handle = (wmi_unified_t) wmi_hdl;
+
+	if (wmi_handle->ops->extract_vdev_nac_rssi_stats)
+		return wmi_handle->ops->extract_vdev_nac_rssi_stats(wmi_handle,
+				evt_buf, vdev_nac_rssi_stats);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+/**
  * wmi_unified_send_adapt_dwelltime_params_cmd() - send wmi cmd of
  * adaptive dwelltime configuration params
  * @wma_handle:  wma handler
@@ -6629,13 +6666,6 @@ QDF_STATUS wmi_unified_send_multiple_vdev_restart_req_cmd(void *wmi_hdl,
 	return QDF_STATUS_E_FAILURE;
 }
 
-/**
- * wmi_unified_send_sar_limit_cmd() - send sar limit cmd to fw
- * @wmi_hdl: wmi handle
- * @params: sar limit command params
- *
- * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
- */
 QDF_STATUS wmi_unified_send_sar_limit_cmd(void *wmi_hdl,
 				struct sar_limit_cmd_params *params)
 {
@@ -6647,6 +6677,31 @@ QDF_STATUS wmi_unified_send_sar_limit_cmd(void *wmi_hdl,
 						params);
 	return QDF_STATUS_E_FAILURE;
 }
+
+QDF_STATUS wmi_unified_get_sar_limit_cmd(void *wmi_hdl)
+{
+	wmi_unified_t wmi_handle = wmi_hdl;
+
+	if (wmi_handle->ops->get_sar_limit_cmd)
+		return wmi_handle->ops->get_sar_limit_cmd(wmi_handle);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS wmi_unified_extract_sar_limit_event(void *wmi_hdl,
+					       uint8_t *evt_buf,
+					       struct sar_limit_event *event)
+{
+	wmi_unified_t wmi_handle = wmi_hdl;
+
+	if (wmi_handle->ops->extract_sar_limit_event)
+		return wmi_handle->ops->extract_sar_limit_event(wmi_handle,
+								evt_buf,
+								event);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
 
 #ifdef WLAN_FEATURE_DISA
 QDF_STATUS wmi_unified_encrypt_decrypt_send_cmd(void *wmi_hdl,
@@ -7293,6 +7348,30 @@ QDF_STATUS wmi_unified_extract_obss_detection_info(void *wmi_hdl,
 
 	if (wmi_handle->ops->extract_obss_detection_info)
 		return wmi_handle->ops->extract_obss_detection_info(data, info);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS wmi_unified_offload_11k_cmd(void *wmi_hdl,
+				struct wmi_11k_offload_params *params)
+{
+	wmi_unified_t wmi_handle = (wmi_unified_t) wmi_hdl;
+
+	if (wmi_handle->ops->send_offload_11k_cmd)
+		return wmi_handle->ops->send_offload_11k_cmd(
+				wmi_handle, params);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS wmi_unified_invoke_neighbor_report_cmd(void *wmi_hdl,
+			struct wmi_invoke_neighbor_report_params *params)
+{
+	wmi_unified_t wmi_handle = (wmi_unified_t) wmi_hdl;
+
+	if (wmi_handle->ops->send_invoke_neighbor_report_cmd)
+		return wmi_handle->ops->send_invoke_neighbor_report_cmd(
+				wmi_handle, params);
 
 	return QDF_STATUS_E_FAILURE;
 }
