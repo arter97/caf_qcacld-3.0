@@ -2250,7 +2250,7 @@ static int wma_rx_service_available_event(void *handle, uint8_t *cmd_param_info,
 	wma_handle->wmi_service_ext_offset = ev->wmi_service_segment_offset;
 	qdf_mem_copy(wma_handle->wmi_service_ext_bitmap,
 				&ev->wmi_service_segment_bitmap[0],
-				WMI_SERVICE_EXT_BM_SIZE32);
+				WMI_SERVICE_EXT_BM_SIZE32 * sizeof(A_UINT32));
 
 	return 0;
 }
@@ -3090,6 +3090,12 @@ static int wma_pdev_set_hw_mode_resp_evt_handler(void *handle,
 	}
 
 	wmi_event = param_buf->fixed_param;
+	if (wmi_event->num_vdev_mac_entries >
+	    param_buf->num_wmi_pdev_set_hw_mode_response_vdev_mac_mapping) {
+		WMA_LOGE("Invalid num_vdev_mac_entries: %d",
+				wmi_event->num_vdev_mac_entries);
+		goto fail;
+	}
 	hw_mode_resp->status = wmi_event->status;
 	hw_mode_resp->cfgd_hw_mode_index = wmi_event->cfgd_hw_mode_index;
 	hw_mode_resp->num_vdev_mac_entries = wmi_event->num_vdev_mac_entries;
@@ -3265,6 +3271,13 @@ static int wma_pdev_hw_mode_transition_evt_handler(void *handle,
 	wmi_event = param_buf->fixed_param;
 	vdev_mac_entry =
 		param_buf->wmi_pdev_set_hw_mode_response_vdev_mac_mapping;
+	if (wmi_event->num_vdev_mac_entries >
+	    param_buf->num_wmi_pdev_set_hw_mode_response_vdev_mac_mapping) {
+		WMA_LOGE("Invalid num_vdev_mac_entries: %d",
+			 wmi_event->num_vdev_mac_entries);
+		qdf_mem_free(hw_mode_trans_ind);
+		return -EINVAL;
+	}
 	wma_process_pdev_hw_mode_trans_ind(wma, wmi_event, vdev_mac_entry,
 		hw_mode_trans_ind);
 	/* Pass the message to PE */
@@ -3565,6 +3578,13 @@ QDF_STATUS wma_start(void *cds_ctx)
 			wma_handle);
 	if (qdf_status != QDF_STATUS_SUCCESS) {
 		WMA_LOGE("Failed to initialize log completion timeout");
+		goto end;
+	}
+
+	status = wma_sar_register_event_handlers(wma_handle);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		WMA_LOGE("Failed to register SAR event handlers");
+		qdf_status = QDF_STATUS_E_FAILURE;
 		goto end;
 	}
 
@@ -5810,8 +5830,9 @@ static void wma_populate_soc_caps(t_wma_handle *wma_handle,
 		return;
 	}
 
-	if (param_buf->soc_hw_mode_caps->num_hw_modes >
-			MAX_NUM_HW_MODE) {
+	if ((param_buf->soc_hw_mode_caps->num_hw_modes > MAX_NUM_HW_MODE) ||
+	    (param_buf->soc_hw_mode_caps->num_hw_modes >
+	    param_buf->num_hw_mode_caps)) {
 		WMA_LOGE("Invalid num_hw_modes %u received from firmware",
 			 param_buf->soc_hw_mode_caps->num_hw_modes);
 		return;
@@ -5892,10 +5913,12 @@ static void wma_populate_soc_caps(t_wma_handle *wma_handle,
 	 * next thing is to populate reg caps per phy
 	 */
 
-	if (param_buf->soc_hal_reg_caps->num_phy >
-			MAX_NUM_PHY) {
+	if ((param_buf->soc_hal_reg_caps->num_phy > MAX_NUM_PHY) ||
+	    (param_buf->soc_hal_reg_caps->num_phy >
+	    param_buf->num_hal_reg_caps)) {
 		WMA_LOGE("Invalid num_phy %u received from firmware",
 			 param_buf->soc_hal_reg_caps->num_phy);
+		wma_cleanup_dbs_phy_caps(wma_handle);
 		return;
 	}
 

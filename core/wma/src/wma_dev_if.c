@@ -1204,7 +1204,6 @@ wma_vdev_set_param(wmi_unified_t wmi_handle, uint32_t if_id,
 	if (!wma_is_vdev_valid(if_id)) {
 		WMA_LOGE(FL("vdev_id: %d is not active reject the req: param id %d val %d"),
 			if_id, param_id, param_value);
-		QDF_ASSERT(0);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -2391,10 +2390,19 @@ QDF_STATUS wma_vdev_start(tp_wma_handle wma,
 	uint16_t bw_val;
 	struct wma_txrx_node *iface = &wma->interfaces[req->vdev_id];
 	struct wma_target_req *req_msg;
+	uint32_t chan_mode;
 
 	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
 	if (mac_ctx == NULL) {
 		WMA_LOGE("%s: vdev start failed as mac_ctx is NULL", __func__);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	chan_mode = wma_chan_phy_mode(req->chan, req->chan_width,
+				      req->dot11_mode);
+
+	if (chan_mode == MODE_UNKNOWN) {
+		WMA_LOGE("%s: invalid phy mode!", __func__);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -2425,8 +2433,8 @@ QDF_STATUS wma_vdev_start(tp_wma_handle wma,
 
 	/* Fill channel info */
 	params.chan_freq = cds_chan_to_freq(req->chan);
-	params.chan_mode = wma_chan_phy_mode(req->chan, req->chan_width,
-					     req->dot11_mode);
+	params.chan_mode = chan_mode;
+
 	intr[params.vdev_id].chanmode = params.chan_mode;
 	intr[params.vdev_id].ht_capable = req->ht_capable;
 	intr[params.vdev_id].vht_capable = req->vht_capable;
