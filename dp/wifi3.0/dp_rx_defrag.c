@@ -954,6 +954,7 @@ dp_rx_defrag_nwifi_to_8023(qdf_nbuf_t nbuf, uint16_t hdrsize)
 	qdf_dma_addr_t paddr;
 	uint32_t nbuf_len, seq_no, dst_ind;
 	uint32_t *mpdu_wrd;
+	uint32_t ret, cookie;
 
 	void *dst_ring_desc =
 		peer->rx_tid[tid].dst_ring_desc;
@@ -1000,6 +1001,32 @@ dp_rx_defrag_nwifi_to_8023(qdf_nbuf_t nbuf, uint16_t hdrsize)
 	/* change RX TLV's */
 	hal_rx_msdu_start_msdu_len_set(
 			qdf_nbuf_data(head), nbuf_len);
+
+	cookie = HAL_RX_BUF_COOKIE_GET(msdu0);
+
+	/* map the nbuf before reinject it into HW */
+	ret = qdf_nbuf_map_single(soc->osdev, head,
+					QDF_DMA_BIDIRECTIONAL);
+
+	if (qdf_unlikely(ret == QDF_STATUS_E_FAILURE)) {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+				"%s: nbuf map failed !\n", __func__);
+		qdf_nbuf_free(head);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	paddr = qdf_nbuf_get_frag_paddr(head, 0);
+
+	ret = check_x86_paddr(soc, &head, &paddr, pdev);
+
+	if (ret == QDF_STATUS_E_FAILURE) {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+				"%s: x86 check failed !\n", __func__);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	hal_rxdma_buff_addr_info_set(msdu0, paddr, cookie,
+					HAL_RX_BUF_RBM_SW3_BM);
 
 	/* Lets fill entrance ring now !!! */
 	if (qdf_unlikely(hal_srng_access_start(soc->hal_soc, hal_srng))) {
