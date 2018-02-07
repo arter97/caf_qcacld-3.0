@@ -3216,7 +3216,8 @@ void hif_wlan_disable(struct hif_softc *scn)
 	else
 		mode = PLD_MISSION;
 
-	pld_wlan_disable(scn->qdf_dev->dev, mode);
+	if (scn->target_status != TARGET_STATUS_RESET)
+		pld_wlan_disable(scn->qdf_dev->dev, mode);
 }
 
 int hif_get_wake_ce_id(struct hif_softc *scn, uint8_t *ce_id)
