@@ -182,15 +182,13 @@ dp_rx_mon_mpdu_pop(struct dp_soc *soc, uint32_t mac_id,
 			qdf_assert(rx_desc);
 			msdu = rx_desc->nbuf;
 
-			qdf_nbuf_unmap_single(soc->osdev, msdu,
-				QDF_DMA_FROM_DEVICE);
+			if (rx_desc->unmapped == 0) {
+				qdf_nbuf_unmap_single(soc->osdev, msdu,
+						      QDF_DMA_FROM_DEVICE);
+				rx_desc->unmapped = 1;
+			}
 
 			data = qdf_nbuf_data(msdu);
-
-			QDF_TRACE(QDF_MODULE_ID_DP,
-				QDF_TRACE_LEVEL_DEBUG,
-				"[%s][%d] msdu_nbuf=%pK, data=%pK\n",
-				__func__, __LINE__, msdu, data);
 
 			rx_desc_tlv = HAL_RX_MON_DEST_GET_DESC(data);
 
