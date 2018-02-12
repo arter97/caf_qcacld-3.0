@@ -16856,6 +16856,8 @@ QDF_STATUS csr_process_del_sta_session_rsp(tpAniSirGlobal pMac, uint8_t *pMsg)
 	return QDF_STATUS_SUCCESS;
 }
 
+/* WMA_VDEV_STOP_REQUEST_TIMEOUT + 1 sec */
+#define WAIT_FOR_PEER_DELETE_TIMEOUT	(7*1000)
 
 static QDF_STATUS
 csr_issue_del_sta_for_session_req(tpAniSirGlobal pMac, uint32_t sessionId,
@@ -16865,7 +16867,25 @@ csr_issue_del_sta_for_session_req(tpAniSirGlobal pMac, uint32_t sessionId,
 {
 	struct del_sta_self_params *del_sta_self_req;
 	struct scheduler_msg msg = {0};
+	struct wlan_objmgr_vdev *vdev = NULL;
 	tSirRetStatus status;
+
+	if (!pMac->pdev) {
+		sme_err("pdev is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_macaddr_from_pdev(pMac->pdev,
+							 sessionMacAddr,
+							 WLAN_OSIF_ID);
+	if (!vdev) {
+		sme_err("vdev is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	qdf_wait_for_event_completion(&vdev->peer_delete_completion,
+				      WAIT_FOR_PEER_DELETE_TIMEOUT);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_ID);
 
 	del_sta_self_req = qdf_mem_malloc(sizeof(struct del_sta_self_params));
 	if (NULL == del_sta_self_req) {

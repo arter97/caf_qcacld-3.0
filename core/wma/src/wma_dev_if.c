@@ -573,8 +573,6 @@ wma_cdp_vdev_detach(ol_txrx_soc_handle soc,
 	iface->is_vdev_valid = false;
 }
 
-#define WAIT_FW_PEER_DELETE_TIMEOUT (5*1000)
-
 static QDF_STATUS wma_handle_vdev_detach(tp_wma_handle wma_handle,
 			struct del_sta_self_params *del_sta_self_req_param,
 			uint8_t generate_rsp)
@@ -591,19 +589,13 @@ static QDF_STATUS wma_handle_vdev_detach(tp_wma_handle wma_handle,
 		goto out;
 	}
 
-	while (qdf_atomic_read(&iface->fw_peer_count)) {
-		qdf_wait_for_event_completion(&iface->fw_peer_delete,
-					      WAIT_FW_PEER_DELETE_TIMEOUT);
-		qdf_event_reset(&iface->fw_peer_delete);
-	}
+	QDF_BUG(qdf_atomic_read(&iface->fw_peer_count) == 0);
 
 	status = wmi_unified_vdev_delete_send(wma_handle->wmi_handle, vdev_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		WMA_LOGE("Unable to remove an interface");
 		goto out;
 	}
-
-	qdf_event_destroy(&iface->fw_peer_delete);
 
 	WMA_LOGD("vdev_id:%hu vdev_hdl:%pK", vdev_id, iface->handle);
 	if (!generate_rsp) {
@@ -1426,7 +1418,6 @@ void wma_remove_peer(tp_wma_handle wma, uint8_t *bssid,
 		bitmap = 1 << CDP_PEER_DO_NOT_START_UNMAP_TIMER;
 	} else {
 		qdf_atomic_dec(&wma->interfaces[vdev_id].fw_peer_count);
-		qdf_event_set(&wma->interfaces[vdev_id].fw_peer_delete);
 		WMA_LOGD("%s: vdev-%d fw_peer_count %d", __func__, vdev_id,
 			 qdf_atomic_read(&wma->interfaces[vdev_id].fw_peer_count));
 	}
@@ -2234,8 +2225,6 @@ struct cdp_vdev *wma_vdev_attach(tp_wma_handle wma_handle,
 			[self_sta_req->session_id].bss_status);
 	qdf_atomic_init(&wma_handle->interfaces
 			[self_sta_req->session_id].fw_peer_count);
-	status = qdf_event_create(&wma_handle->interfaces
-				  [self_sta_req->session_id].fw_peer_delete);
 	if (status != QDF_STATUS_SUCCESS)
 		WMA_LOGE("%s: Failed to create fw_peer_delete event", __func__);
 
