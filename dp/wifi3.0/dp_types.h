@@ -1068,6 +1068,8 @@ struct dp_pdev {
 	/* Number of VAPs with mcast enhancement enabled */
 	qdf_atomic_t mc_num_vap_attached;
 
+	qdf_atomic_t stats_cmd_complete;
+
 #ifdef IPA_OFFLOAD
 	ipa_uc_op_cb_type ipa_uc_op_cb;
 	void *usr_ctxt;
@@ -1103,6 +1105,9 @@ struct dp_pdev {
 		uint16_t tx_peer_id;
 		uint16_t rx_ppdu_id;
 	} am_copy_id;
+
+	/* To check if PPDU Tx stats are enabled for Pktlog */
+	bool pktlog_ppdu_stats;
 
 	void *dp_txrx_handle; /* Advanced data path handle */
 };

@@ -35,6 +35,7 @@
 #include <cdp_txrx_handle.h>
 #include <wlan_cfg.h>
 #include "cdp_txrx_cmn_struct.h"
+#include "cdp_txrx_stats_struct.h"
 #include <qdf_util.h>
 #include "dp_peer.h"
 #include "dp_rx_mon.h"
@@ -85,7 +86,12 @@ qdf_declare_param(rx_hash, bool);
 
 #define STR_MAXLEN	64
 
-#define DP_PPDU_STATS_CFG_ALL 0xffff
+#define DP_PPDU_STATS_CFG_ALL 0xFFFF
+
+/* PPDU stats mask sent to FW to enable enhanced stats */
+#define DP_PPDU_STATS_CFG_ENH_STATS 0xE67
+/* PPDU stats mask sent to FW to support debug sniffer feature */
+#define DP_PPDU_STATS_CFG_SNIFFER 0x2FFF
 /**
  * default_dscp_tid_map - Default DSCP-TID mapping
  *
@@ -564,7 +570,8 @@ static int dp_srng_setup(struct dp_soc *soc, struct dp_srng *srng,
 	 * monitor buffer rings.
 	 * TODO: See if this is required for any other ring
 	 */
-	if ((ring_type == RXDMA_BUF) || (ring_type == RXDMA_MONITOR_BUF)) {
+	if ((ring_type == RXDMA_BUF) || (ring_type == RXDMA_MONITOR_BUF) ||
+		(ring_type == RXDMA_MONITOR_STATUS)) {
 		/* TODO: Setting low threshold to 1/8th of ring size
 		 * see if this needs to be configurable
 		 */
@@ -913,6 +920,9 @@ static void dp_soc_interrupt_map_calculate_integrated(struct dp_soc *soc,
 		if (rx_mon_mask & (1 << j)) {
 			irq_id_map[num_irq++] =
 				ppdu_end_interrupts_mac1 -
+				wlan_cfg_get_hw_mac_idx(soc->wlan_cfg_ctx, j);
+			irq_id_map[num_irq++] =
+				rxdma2host_monitor_status_ring_mac1 -
 				wlan_cfg_get_hw_mac_idx(soc->wlan_cfg_ctx, j);
 		}
 
@@ -1423,7 +1433,7 @@ static void dp_hw_link_desc_pool_cleanup(struct dp_soc *soc)
 #define RXDMA_MONITOR_BUF_RING_SIZE 4096
 #define RXDMA_MONITOR_DST_RING_SIZE 2048
 #define RXDMA_MONITOR_STATUS_RING_SIZE 1024
-#define RXDMA_MONITOR_DESC_RING_SIZE 2048
+#define RXDMA_MONITOR_DESC_RING_SIZE 4096
 #define RXDMA_ERR_DST_RING_SIZE 1024
 
 /*
@@ -3209,8 +3219,6 @@ static void dp_peer_setup_wifi3(struct cdp_vdev *vdev_hdl, void *peer_hdl)
 	pdev = vdev->pdev;
 	soc = pdev->soc;
 
-	dp_peer_rx_init(pdev, peer);
-
 	peer->last_assoc_rcvd = 0;
 	peer->last_disassoc_rcvd = 0;
 	peer->last_deauth_rcvd = 0;
@@ -3238,6 +3246,8 @@ static void dp_peer_setup_wifi3(struct cdp_vdev *vdev_hdl, void *peer_hdl)
 			pdev->osif_pdev, peer->mac_addr.raw,
 			 peer->vdev->vdev_id, hash_based, reo_dest);
 	}
+
+	dp_peer_rx_init(pdev, peer);
 	return;
 }
 
@@ -4228,13 +4238,13 @@ dp_aggregate_pdev_ctrl_frames_stats(struct dp_pdev *pdev)
 			}
 			waitcnt = 0;
 			dp_peer_rxtid_stats(peer, dp_rx_bar_stats_cb, pdev);
-			while (!(qdf_atomic_read(&(pdev->stats.cmd_complete)))
+			while (!(qdf_atomic_read(&(pdev->stats_cmd_complete)))
 				&& waitcnt < 10) {
 				schedule_timeout_interruptible(
 						STATS_PROC_TIMEOUT);
 				waitcnt++;
 			}
-			qdf_atomic_set(&(pdev->stats.cmd_complete), 0);
+			qdf_atomic_set(&(pdev->stats_cmd_complete), 0);
 		}
 	}
 }
@@ -4256,12 +4266,12 @@ void dp_rx_bar_stats_cb(struct dp_soc *soc, void *cb_ctxt,
 	if (queue_status->header.status != HAL_REO_CMD_SUCCESS) {
 		DP_TRACE_STATS(FATAL, "REO stats failure %d \n",
 			queue_status->header.status);
-		qdf_atomic_set(&(pdev->stats.cmd_complete), 1);
+		qdf_atomic_set(&(pdev->stats_cmd_complete), 1);
 		return;
 	}
 
 	pdev->stats.rx.bar_recv_cnt += queue_status->bar_rcvd_cnt;
-	qdf_atomic_set(&(pdev->stats.cmd_complete), 1);
+	qdf_atomic_set(&(pdev->stats_cmd_complete), 1);
 
 }
 
@@ -4368,6 +4378,7 @@ static inline void dp_aggregate_pdev_stats(struct dp_pdev *pdev)
 static inline void
 dp_print_pdev_tx_stats(struct dp_pdev *pdev)
 {
+	uint8_t index = 0;
 	DP_PRINT_STATS("PDEV Tx Stats:\n");
 	DP_PRINT_STATS("Received From Stack:");
 	DP_PRINT_STATS("	Packets = %d",
@@ -4468,6 +4479,11 @@ dp_print_pdev_tx_stats(struct dp_pdev *pdev)
 			pdev->stats.tx_i.mesh.exception_fw);
 	DP_PRINT_STATS("	completions from fw: %u",
 			pdev->stats.tx_i.mesh.completion_fw);
+	DP_PRINT_STATS("PPDU stats counter");
+	for (index = 0; index < CDP_PPDU_STATS_MAX_TAG; index++) {
+		DP_PRINT_STATS("	Tag[%d] = %llu", index,
+				pdev->stats.ppdu_stats_counter[index]);
+	}
 }
 
 /**
@@ -5252,9 +5268,12 @@ dp_config_debug_sniffer(struct cdp_pdev *pdev_handle, int val)
 		pdev->tx_sniffer_enable = 0;
 		pdev->mcopy_mode = 0;
 
-		if (!pdev->enhanced_stats_en) {
+		if (!pdev->pktlog_ppdu_stats && !pdev->enhanced_stats_en) {
 			dp_h2t_cfg_stats_msg_send(pdev, 0, pdev->pdev_id);
 			dp_ppdu_ring_reset(pdev);
+		} else if (pdev->enhanced_stats_en) {
+			dp_h2t_cfg_stats_msg_send(pdev,
+				DP_PPDU_STATS_CFG_ENH_STATS, pdev->pdev_id);
 		}
 		break;
 
@@ -5262,18 +5281,19 @@ dp_config_debug_sniffer(struct cdp_pdev *pdev_handle, int val)
 		pdev->tx_sniffer_enable = 1;
 		pdev->mcopy_mode = 0;
 
-		if (!pdev->enhanced_stats_en)
+		if (!pdev->pktlog_ppdu_stats)
 			dp_h2t_cfg_stats_msg_send(pdev,
-				DP_PPDU_STATS_CFG_ALL, pdev->pdev_id);
+				DP_PPDU_STATS_CFG_SNIFFER, pdev->pdev_id);
 		break;
 	case 2:
 		pdev->mcopy_mode = 1;
 		pdev->tx_sniffer_enable = 0;
-		if (!pdev->enhanced_stats_en) {
+		if (!pdev->enhanced_stats_en)
 			dp_ppdu_ring_cfg(pdev);
+
+		if (!pdev->pktlog_ppdu_stats)
 			dp_h2t_cfg_stats_msg_send(pdev,
-				DP_PPDU_STATS_CFG_ALL, pdev->pdev_id);
-		}
+				DP_PPDU_STATS_CFG_SNIFFER, pdev->pdev_id);
 		break;
 	default:
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
@@ -5297,8 +5317,8 @@ dp_enable_enhanced_stats(struct cdp_pdev *pdev_handle)
 	if (!pdev->mcopy_mode)
 		dp_ppdu_ring_cfg(pdev);
 
-	if (!pdev->tx_sniffer_enable && !pdev->mcopy_mode)
-		dp_h2t_cfg_stats_msg_send(pdev, 0xffff, pdev->pdev_id);
+	if (!pdev->pktlog_ppdu_stats && !pdev->tx_sniffer_enable && !pdev->mcopy_mode)
+		dp_h2t_cfg_stats_msg_send(pdev, DP_PPDU_STATS_CFG_ENH_STATS, pdev->pdev_id);
 }
 
 /*
@@ -5314,7 +5334,7 @@ dp_disable_enhanced_stats(struct cdp_pdev *pdev_handle)
 
 	pdev->enhanced_stats_en = 0;
 
-	if (!pdev->tx_sniffer_enable && !pdev->mcopy_mode)
+	if (!pdev->pktlog_ppdu_stats && !pdev->tx_sniffer_enable && !pdev->mcopy_mode)
 		dp_h2t_cfg_stats_msg_send(pdev, 0, pdev->pdev_id);
 
 	if (!pdev->mcopy_mode)
@@ -5499,6 +5519,26 @@ static void dp_set_vdev_dscp_tid_map_wifi3(struct cdp_vdev *vdev_handle,
 	return;
 }
 
+/*
+ * dp_txrx_stats_publish(): publish pdev stats into a buffer
+ * @pdev_handle: DP_PDEV handle
+ * @buf: to hold pdev_stats
+ *
+ * Return: int
+ */
+static int
+dp_txrx_stats_publish(struct cdp_pdev *pdev_handle, void *buf)
+{
+	struct dp_pdev *pdev = (struct dp_pdev *)pdev_handle;
+	struct cdp_pdev_stats *buffer = (struct cdp_pdev_stats *) buf;
+
+	dp_aggregate_pdev_stats(pdev);
+
+	qdf_mem_copy(buffer, &pdev->stats, sizeof(pdev->stats));
+
+	return TXRX_STATS_LEVEL;
+}
+
 /**
  * dp_set_pdev_dscp_tid_map_wifi3(): update dscp tid map in pdev
  * @pdev: DP_PDEV handle
@@ -5540,6 +5580,23 @@ static int dp_fw_stats_process(struct cdp_vdev *vdev_handle,
 		return 1;
 	}
 	pdev = vdev->pdev;
+
+	/*
+	 * For HTT_DBG_EXT_STATS_RESET command, FW need to config
+	 * from param0 to param3 according to below rule:
+	 *
+	 * PARAM:
+	 *   - config_param0 : start_offset (stats type)
+	 *   - config_param1 : stats bmask from start offset
+	 *   - config_param2 : stats bmask from start offset + 32
+	 *   - config_param3 : stats bmask from start offset + 64
+	 */
+	if (req->stats == CDP_TXRX_STATS_0) {
+		req->param0 = HTT_DBG_EXT_STATS_PDEV_TX;
+		req->param1 = 0xFFFFFFFF;
+		req->param2 = 0xFFFFFFFF;
+		req->param3 = 0xFFFFFFFF;
+	}
 
 	return dp_h2t_ext_stats_msg_send(pdev, stats, req->param0,
 				req->param1, req->param2, req->param3, 0);
@@ -6180,6 +6237,7 @@ static struct cdp_host_stats_ops dp_ops_host_stats = {
 	.get_htt_stats = dp_get_htt_stats,
 	.txrx_enable_enhanced_stats = dp_enable_enhanced_stats,
 	.txrx_disable_enhanced_stats = dp_disable_enhanced_stats,
+	.txrx_stats_publish = dp_txrx_stats_publish,
 	/* TODO */
 };
 
@@ -6696,6 +6754,7 @@ int dp_set_pktlog_wifi3(struct dp_pdev *pdev, uint32_t event,
 			 * in htt header file will use proper macros
 			*/
 			for (mac_id = 0; mac_id < max_mac_rings; mac_id++) {
+				pdev->pktlog_ppdu_stats = true;
 				dp_h2t_cfg_stats_msg_send(pdev, 0xffff,
 						pdev->pdev_id + mac_id);
 			}
@@ -6745,8 +6804,17 @@ int dp_set_pktlog_wifi3(struct dp_pdev *pdev, uint32_t event,
 			 * header file will use proper macros
 			*/
 			for (mac_id = 0; mac_id < max_mac_rings; mac_id++) {
-				dp_h2t_cfg_stats_msg_send(pdev, 0,
-						pdev->pdev_id + mac_id);
+				pdev->pktlog_ppdu_stats = false;
+				if (!pdev->enhanced_stats_en && !pdev->tx_sniffer_enable && !pdev->mcopy_mode) {
+					dp_h2t_cfg_stats_msg_send(pdev, 0,
+							pdev->pdev_id + mac_id);
+				} else if (pdev->tx_sniffer_enable || pdev->mcopy_mode) {
+					dp_h2t_cfg_stats_msg_send(pdev, DP_PPDU_STATS_CFG_SNIFFER,
+							pdev->pdev_id + mac_id);
+				} else if (pdev->enhanced_stats_en) {
+					dp_h2t_cfg_stats_msg_send(pdev, DP_PPDU_STATS_CFG_ENH_STATS,
+							pdev->pdev_id + mac_id);
+				}
 			}
 
 			break;

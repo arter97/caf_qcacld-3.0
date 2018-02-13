@@ -149,7 +149,6 @@ wlan_lmac_if_sptrl_register_rx_ops(struct wlan_lmac_if_rx_ops *rx_ops)
 	struct wlan_lmac_if_sptrl_rx_ops *sptrl_rx_ops = &rx_ops->sptrl_rx_ops;
 
 	/* Spectral rx ops */
-	sptrl_rx_ops->sptrlro_send_phydata = tgt_send_phydata;
 	sptrl_rx_ops->sptrlro_get_target_handle = tgt_get_target_handle;
 	sptrl_rx_ops->sptrlro_vdev_get_chan_freq = spectral_vdev_get_chan_freq;
 	sptrl_rx_ops->sptrlro_vdev_get_ch_width = spectral_vdev_get_ch_width;
@@ -164,12 +163,25 @@ wlan_register_wmi_spectral_cmd_ops(struct wlan_objmgr_pdev *pdev,
 	struct spectral_context *sc;
 
 	if (!pdev)
-		spectral_err("PDEV is NULL!\n");
+		spectral_err("PDEV is NULL!");
 
 	sc = spectral_get_spectral_ctx_from_pdev(pdev);
 	if (!sc)
-		spectral_err("spectral context is NULL!\n");
+		spectral_err("spectral context is NULL!");
 
 	return sc->sptrlc_register_wmi_spectral_cmd_ops(pdev, cmd_ops);
 }
 EXPORT_SYMBOL(wlan_register_wmi_spectral_cmd_ops);
+
+QDF_STATUS spectral_pdev_open(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_objmgr_psoc *psoc;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	psoc = wlan_pdev_get_psoc(pdev);
+
+	/* Enable the registartion once FW supports this */
+	spectral_debug("Enable registration to direct dma once FW supports it");
+
+	return status;
+}

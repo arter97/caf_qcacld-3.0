@@ -119,6 +119,12 @@
 #define TSO_DEBUG(fmt, args ...)
 #endif
 
+#define IEEE80211_AMPDU_FLAG    0x01
+
+#ifdef GET_MSDU_AGGREGATION
+#define IEEE80211_AMSDU_FLAG    0x02
+#endif
+
 /**
  * struct mon_rx_status - This will have monitor mode rx_status extracted from
  * htt_rx_desc used later to update radiotap information.
@@ -161,6 +167,7 @@
  * @ast_index: AST table hash index
  * @tid: QoS traffic tid number
  * @rs_fcs_err: FCS error flag
+ * @rs_flags: Flags to indicate AMPDU or AMSDU aggregation
  * @he_per_user_1: HE per user info1
  * @he_per_user_2: HE per user info2
  * @he_per_user_position: HE per user position info
@@ -224,6 +231,7 @@ struct mon_rx_status {
 	uint32_t ast_index;
 	uint32_t tid;
 	uint8_t  rs_fcs_err;
+	uint8_t      rs_flags;
 	/* New HE radiotap fields */
 	uint16_t he_per_user_1;
 	uint16_t he_per_user_2;
@@ -2301,6 +2309,21 @@ bool qdf_nbuf_data_is_ipv6_tcp_pkt(uint8_t *data)
 }
 
 /**
+ * qdf_nbuf_is_bcast_pkt() - check if it is broadcast packet.
+ * @buf: Network buffer
+ *
+ * This func. checks whether packet is broadcast or not.
+ *
+ * Return: TRUE if it is broadcast packet
+ *         FALSE if not
+ */
+static inline
+bool qdf_nbuf_is_bcast_pkt(qdf_nbuf_t buf)
+{
+	return __qdf_nbuf_is_bcast_pkt(buf);
+}
+
+/**
  * qdf_invalidate_range() - invalidate virtual address range
  * @start: start address of the address range
  * @end: end address of the address range
@@ -2470,6 +2493,12 @@ static inline qdf_nbuf_t
 qdf_nbuf_expand(qdf_nbuf_t buf, uint32_t headroom, uint32_t tailroom)
 {
 	return __qdf_nbuf_expand(buf, headroom, tailroom);
+}
+
+static inline int
+qdf_nbuf_linearize(qdf_nbuf_t buf)
+{
+	return __qdf_nbuf_linearize(buf);
 }
 
 static inline qdf_nbuf_t

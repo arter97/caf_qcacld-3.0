@@ -644,6 +644,7 @@ bool __qdf_nbuf_data_is_ipv4_dhcp_pkt(uint8_t *data);
 bool __qdf_nbuf_data_is_ipv6_dhcp_pkt(uint8_t *data);
 bool __qdf_nbuf_data_is_ipv4_eapol_pkt(uint8_t *data);
 bool __qdf_nbuf_data_is_ipv4_arp_pkt(uint8_t *data);
+bool __qdf_nbuf_is_bcast_pkt(__qdf_nbuf_t nbuf);
 enum qdf_proto_subtype  __qdf_nbuf_data_get_dhcp_subtype(uint8_t *data);
 enum qdf_proto_subtype  __qdf_nbuf_data_get_eapol_subtype(uint8_t *data);
 enum qdf_proto_subtype  __qdf_nbuf_data_get_arp_subtype(uint8_t *data);
@@ -1488,6 +1489,24 @@ __qdf_nbuf_realloc_tailroom(struct sk_buff *skb, uint32_t tailroom)
 	 */
 	dev_kfree_skb_any(skb);
 	return NULL;
+}
+
+/**
+ * __qdf_nbuf_linearize() - skb linearize
+ * @skb: sk buff
+ *
+ * create a version of the specified nbuf whose contents
+ * can be safely modified without affecting other
+ * users.If the nbuf is non-linear then this function
+ * linearize. if unable to linearize returns -ENOMEM on
+ * success 0 is returned
+ *
+ * Return: 0 on Success, -ENOMEM on failure is returned.
+ */
+static inline int
+__qdf_nbuf_linearize(struct sk_buff *skb)
+{
+	return skb_linearize(skb);
 }
 
 /**
