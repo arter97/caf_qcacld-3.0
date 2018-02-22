@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2014-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011, 2014-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -746,7 +746,8 @@ void ol_tx_desc_frame_list_free(struct ol_txrx_pdev_t *pdev,
 		/* restore original hdr offset */
 		OL_TX_RESTORE_HDR(tx_desc, msdu);
 #endif
-		if (qdf_nbuf_get_users(msdu) <= 1)
+		if ((qdf_nbuf_get_users(msdu) <= 1) &&
+				!qdf_nbuf_ipa_owned_get(msdu))
 			qdf_nbuf_unmap(pdev->osdev, msdu, QDF_DMA_TO_DEVICE);
 
 		/* free the tx desc */
