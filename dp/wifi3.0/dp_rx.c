@@ -684,6 +684,10 @@ uint8_t dp_rx_process_invalid_peer(struct dp_soc *soc, qdf_nbuf_t mpdu)
 				dp_rx_mon_deliver(soc, i,
 						pdev->invalid_peer_head_msdu,
 						pdev->invalid_peer_tail_msdu);
+
+				pdev->invalid_peer_head_msdu = NULL;
+				pdev->invalid_peer_tail_msdu = NULL;
+
 				return 0;
 			}
 		}
@@ -1288,8 +1292,19 @@ done:
 			deliver_list_tail = NULL;
 		}
 
-		if (qdf_likely(peer != NULL))
+		if (qdf_likely(peer != NULL)) {
 			vdev = peer->vdev;
+		} else {
+			qdf_nbuf_free(nbuf);
+			nbuf = next;
+			continue;
+		}
+
+		if (qdf_unlikely(vdev == NULL)) {
+			qdf_nbuf_free(nbuf);
+			nbuf = next;
+			continue;
+		}
 
 		/*
 		 * Check if DMA completed -- msdu_done is the last bit
@@ -1342,14 +1357,6 @@ done:
 				rx_tlv_hdr = qdf_nbuf_data(nbuf);
 			}
 		}
-
-		/*
-		 * This is a redundant sanity check, Ideally peer
-		 * should never be NULL here. if for any reason it
-		 * is NULL we will assert.
-		 * Do nothing for LFR case.
-		 */
-		dp_rx_peer_validity_check(peer);
 
 		if (!dp_wds_rx_policy_check(rx_tlv_hdr, vdev, peer,
 					hal_rx_msdu_end_da_is_mcbc_get(rx_tlv_hdr))) {
