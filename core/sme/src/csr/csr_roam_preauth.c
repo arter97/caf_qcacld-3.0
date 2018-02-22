@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -240,6 +240,7 @@ QDF_STATUS csr_neighbor_roam_preauth_rsp_handler(tpAniSirGlobal mac_ctx,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	QDF_STATUS preauth_processed = QDF_STATUS_SUCCESS;
 	tpCsrNeighborRoamBSSInfo preauth_rsp_node = NULL;
+	tSmeCmd *command;
 
 	if (false == neighbor_roam_info->FTRoamInfo.preauthRspPending) {
 		/*
@@ -360,6 +361,19 @@ NEXT_PREAUTH:
 		is_dis_pending = is_disconnect_pending(mac_ctx, session_id);
 		if (is_dis_pending) {
 			sme_err("Disconnect in progress, Abort preauth");
+			goto ABORT_PREAUTH;
+		}
+		entry = csr_nonscan_active_ll_peek_head(mac_ctx, LL_ACCESS_LOCK);
+		if (entry) {
+			command = GET_BASE_ADDR(entry, tSmeCmd, Link);
+			if (!command) {
+				sme_err("fail to get command buffer");
+				goto ABORT_PREAUTH;
+			} else {
+				csr_release_command(mac_ctx, command);
+			}
+		} else {
+			sme_err("Entry is invalid, Abort preauth");
 			goto ABORT_PREAUTH;
 		}
 		/* Issue preauth request for the same/next entry */
