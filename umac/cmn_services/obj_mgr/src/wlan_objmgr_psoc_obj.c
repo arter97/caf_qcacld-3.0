@@ -90,16 +90,12 @@ static void wlan_objmgr_psoc_peer_list_deinit(struct wlan_peer_list *peer_list)
 
 static QDF_STATUS wlan_objmgr_psoc_obj_free(struct wlan_objmgr_psoc *psoc)
 {
-	struct wlan_psoc_host_service_ext_param *ext_param =
-		&(psoc->ext_service_param.service_ext_param);
-
 	/* Detach PSOC from global object's psoc list  */
 	if (wlan_objmgr_psoc_object_detach(psoc) == QDF_STATUS_E_FAILURE) {
 		obj_mgr_err("PSOC object detach failed");
 		return QDF_STATUS_E_FAILURE;
 	}
 	wlan_objmgr_psoc_peer_list_deinit(&psoc->soc_objmgr.peer_list);
-	wlan_objmgr_ext_service_ready_chainmask_table_free(ext_param);
 
 	qdf_spinlock_destroy(&psoc->psoc_lock);
 	qdf_mem_free(psoc);
@@ -123,6 +119,7 @@ struct wlan_objmgr_psoc *wlan_objmgr_psoc_obj_create(uint32_t phy_version,
 		obj_mgr_err("PSOC allocation failed");
 		return NULL;
 	}
+	psoc->obj_state = WLAN_OBJ_STATE_ALLOCATED;
 	qdf_spinlock_create(&psoc->psoc_lock);
 	/* Initialize with default values */
 	objmgr = &psoc->soc_objmgr;
@@ -130,6 +127,7 @@ struct wlan_objmgr_psoc *wlan_objmgr_psoc_obj_create(uint32_t phy_version,
 	objmgr->wlan_vdev_count = 0;
 	objmgr->max_vdev_count = WLAN_UMAC_PSOC_MAX_VDEVS;
 	objmgr->wlan_peer_count = 0;
+	objmgr->max_peer_count = WLAN_UMAC_PSOC_MAX_PEERS;
 	qdf_atomic_init(&objmgr->ref_cnt);
 	objmgr->print_cnt = 0;
 	/* set phy version, dev_type in psoc */
@@ -181,6 +179,8 @@ struct wlan_objmgr_psoc *wlan_objmgr_psoc_obj_create(uint32_t phy_version,
 		return NULL;
 	}
 
+	obj_mgr_info("Created psoc %d", psoc->soc_objmgr.psoc_id);
+
 	return psoc;
 }
 EXPORT_SYMBOL(wlan_objmgr_psoc_obj_create);
@@ -196,6 +196,8 @@ static QDF_STATUS wlan_objmgr_psoc_obj_destroy(struct wlan_objmgr_psoc *psoc)
 		obj_mgr_err("psoc is NULL");
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	obj_mgr_info("Physically deleting psoc %d", psoc->soc_objmgr.psoc_id);
 
 	if (psoc->obj_state != WLAN_OBJ_STATE_LOGICALLY_DELETED) {
 		obj_mgr_err("psoc object delete is not invoked");
@@ -243,11 +245,11 @@ QDF_STATUS wlan_objmgr_psoc_obj_delete(struct wlan_objmgr_psoc *psoc)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	print_idx = qdf_get_pidx();
+	obj_mgr_info("Logically deleting psoc %d", psoc->soc_objmgr.psoc_id);
 
+	print_idx = qdf_get_pidx();
 	if (qdf_print_is_verbose_enabled(print_idx, QDF_MODULE_ID_OBJ_MGR,
 		QDF_TRACE_LEVEL_DEBUG)) {
-		obj_mgr_debug("Logically deleting the psoc");
 		wlan_objmgr_print_ref_ids(psoc->soc_objmgr.ref_id_dbg);
 	}
 
@@ -412,6 +414,7 @@ QDF_STATUS wlan_objmgr_iterate_obj_list(
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_objmgr_peer *peer;
 	struct wlan_objmgr_peer *peer_next;
+	uint16_t max_vdev_cnt;
 
 	/* If caller requests for lock free opeation, do not acquire,
 	 * handler will handle the synchronization
@@ -425,9 +428,8 @@ QDF_STATUS wlan_objmgr_iterate_obj_list(
 		for (obj_id = 0; obj_id < WLAN_UMAC_MAX_PDEVS; obj_id++) {
 			pdev = objmgr->wlan_pdev_list[obj_id];
 			if ((pdev != NULL) &&
-			    (pdev->obj_state !=
-				WLAN_OBJ_STATE_LOGICALLY_DELETED)) {
-				wlan_objmgr_pdev_get_ref(pdev, dbg_id);
+			    (wlan_objmgr_pdev_try_get_ref(pdev, dbg_id) ==
+				QDF_STATUS_SUCCESS)) {
 				handler(psoc, (void *)pdev, arg);
 				wlan_objmgr_pdev_release_ref(pdev, dbg_id);
 			}
@@ -435,12 +437,12 @@ QDF_STATUS wlan_objmgr_iterate_obj_list(
 		break;
 	case WLAN_VDEV_OP:
 		/* Iterate through VDEV list, invoke handler for each vdev */
-		for (obj_id = 0; obj_id < WLAN_UMAC_PSOC_MAX_VDEVS; obj_id++) {
+		max_vdev_cnt = wlan_psoc_get_max_vdev_count(psoc);
+		for (obj_id = 0; obj_id < max_vdev_cnt; obj_id++) {
 			vdev = objmgr->wlan_vdev_list[obj_id];
 			if ((vdev != NULL) &&
-			    (vdev->obj_state !=
-				WLAN_OBJ_STATE_LOGICALLY_DELETED)) {
-				wlan_objmgr_vdev_get_ref(vdev, dbg_id);
+			    (wlan_objmgr_vdev_try_get_ref(vdev, dbg_id) ==
+				QDF_STATUS_SUCCESS)) {
 				handler(psoc, vdev, arg);
 				wlan_objmgr_vdev_release_ref(vdev, dbg_id);
 			}
@@ -498,6 +500,7 @@ QDF_STATUS wlan_objmgr_iterate_obj_list_all(
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_objmgr_peer *peer;
 	struct wlan_objmgr_peer *peer_next;
+	uint16_t max_vdev_cnt;
 
 	/* If caller requests for lock free opeation, do not acquire,
 	 * handler will handle the synchronization
@@ -519,7 +522,8 @@ QDF_STATUS wlan_objmgr_iterate_obj_list_all(
 		break;
 	case WLAN_VDEV_OP:
 		/* Iterate through VDEV list, invoke handler for each vdev */
-		for (obj_id = 0; obj_id < WLAN_UMAC_PSOC_MAX_VDEVS; obj_id++) {
+		max_vdev_cnt = wlan_psoc_get_max_vdev_count(psoc);
+		for (obj_id = 0; obj_id < max_vdev_cnt; obj_id++) {
 			vdev = objmgr->wlan_vdev_list[obj_id];
 			if (vdev != NULL) {
 				wlan_objmgr_vdev_get_ref(vdev, dbg_id);
@@ -847,7 +851,7 @@ QDF_STATUS wlan_objmgr_psoc_vdev_detach(struct wlan_objmgr_psoc *psoc,
 
 	id = vdev->vdev_objmgr.vdev_id;
 	/* Invalid vdev id */
-	if (id >= WLAN_UMAC_PSOC_MAX_VDEVS)
+	if (id >= wlan_psoc_get_max_vdev_count(psoc))
 		return QDF_STATUS_E_FAILURE;
 	/*
 	 * Derive map_index and adjust_ix to find actual DWORD
@@ -878,6 +882,7 @@ struct wlan_objmgr_vdev *wlan_objmgr_get_vdev_by_opmode_from_psoc(
 {
 	struct wlan_objmgr_vdev *vdev = NULL;
 	int vdev_cnt = 0;
+	uint16_t max_vdev_cnt;
 
 	/* if PSOC is NULL, return */
 	if (psoc == NULL)
@@ -885,8 +890,9 @@ struct wlan_objmgr_vdev *wlan_objmgr_get_vdev_by_opmode_from_psoc(
 
 	wlan_psoc_obj_lock(psoc);
 
+	max_vdev_cnt = wlan_psoc_get_max_vdev_count(psoc);
 	/* retrieve vdev pointer from vdev list */
-	while (vdev_cnt < WLAN_UMAC_PSOC_MAX_VDEVS) {
+	while (vdev_cnt < max_vdev_cnt) {
 		vdev = psoc->soc_objmgr.wlan_vdev_list[vdev_cnt];
 		vdev_cnt++;
 		if (vdev == NULL)
@@ -918,7 +924,7 @@ struct wlan_objmgr_vdev *wlan_objmgr_get_vdev_by_id_from_psoc(
 	if (psoc == NULL)
 		return NULL;
 	/* vdev id is invalid */
-	if (vdev_id >= WLAN_UMAC_PSOC_MAX_VDEVS)
+	if (vdev_id >= wlan_psoc_get_max_vdev_count(psoc))
 		return NULL;
 
 	wlan_psoc_obj_lock(psoc);
@@ -945,7 +951,7 @@ struct wlan_objmgr_vdev *wlan_objmgr_get_vdev_by_id_from_psoc_no_state(
 	if (psoc == NULL)
 		return NULL;
 	/* vdev id is invalid */
-	if (vdev_id >= WLAN_UMAC_PSOC_MAX_VDEVS)
+	if (vdev_id >= wlan_psoc_get_max_vdev_count(psoc))
 		return NULL;
 
 	wlan_psoc_obj_lock(psoc);
@@ -966,14 +972,16 @@ struct wlan_objmgr_vdev *wlan_objmgr_get_vdev_by_macaddr_from_psoc(
 {
 	struct wlan_objmgr_vdev *vdev;
 	uint8_t id;
+	uint16_t max_vdev_cnt;
 
 	/* if PSOC is NULL, return */
 	if (psoc == NULL)
 		return NULL;
 
 	wlan_psoc_obj_lock(psoc);
+	max_vdev_cnt = wlan_psoc_get_max_vdev_count(psoc);
 	/* Iterate through PSOC's vdev list */
-	for (id = 0; id < WLAN_UMAC_PSOC_MAX_VDEVS; id++) {
+	for (id = 0; id < max_vdev_cnt; id++) {
 		vdev = psoc->soc_objmgr.wlan_vdev_list[id];
 		if (vdev == NULL)
 			continue;
@@ -1001,14 +1009,16 @@ struct wlan_objmgr_vdev *wlan_objmgr_get_vdev_by_macaddr_from_psoc_no_state(
 {
 	struct wlan_objmgr_vdev *vdev;
 	uint8_t id;
+	uint16_t max_vdev_cnt;
 
 	/* if PSOC is NULL, return */
 	if (psoc == NULL)
 		return NULL;
 
 	wlan_psoc_obj_lock(psoc);
+	max_vdev_cnt = wlan_psoc_get_max_vdev_count(psoc);
 	/* Iterate through PSOC's vdev list */
-	for (id = 0; id < WLAN_UMAC_PSOC_MAX_VDEVS; id++) {
+	for (id = 0; id < max_vdev_cnt; id++) {
 		vdev = psoc->soc_objmgr.wlan_vdev_list[id];
 		if (vdev == NULL)
 			continue;
@@ -1364,7 +1374,7 @@ QDF_STATUS wlan_objmgr_psoc_peer_attach(struct wlan_objmgr_psoc *psoc,
 	wlan_psoc_obj_lock(psoc);
 	objmgr = &psoc->soc_objmgr;
 	/* Max peer limit is reached, return failure */
-	if (objmgr->wlan_peer_count >= WLAN_UMAC_PSOC_MAX_PEERS) {
+	if (objmgr->wlan_peer_count >= wlan_psoc_get_max_peer_count(psoc)) {
 		wlan_psoc_obj_unlock(psoc);
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -1703,11 +1713,13 @@ QDF_STATUS wlan_objmgr_psoc_try_get_ref(struct wlan_objmgr_psoc *psoc,
 	}
 
 	wlan_psoc_obj_lock(psoc);
-	if (psoc->obj_state == WLAN_OBJ_STATE_LOGICALLY_DELETED) {
+	if (psoc->obj_state != WLAN_OBJ_STATE_CREATED) {
 		wlan_psoc_obj_unlock(psoc);
 		if (psoc->soc_objmgr.print_cnt++ <=
 				WLAN_OBJMGR_RATELIMIT_THRESH)
-			obj_mgr_err("[Ref id: %d] psoc is in L-Del state", id);
+			obj_mgr_err(
+			"[Ref id: %d] psoc is not in Created state(%d)",
+					id, psoc->obj_state);
 
 		return QDF_STATUS_E_RESOURCES;
 	}
@@ -1827,7 +1839,7 @@ QDF_STATUS wlan_objmgr_psoc_set_user_config(struct wlan_objmgr_psoc *psoc,
 	}
 	wlan_psoc_obj_lock(psoc);
 	qdf_mem_copy(&psoc->soc_nif.user_config, user_config_data,
-				sizeof(psoc->soc_nif.user_config));
+		     sizeof(psoc->soc_nif.user_config));
 	wlan_psoc_obj_unlock(psoc);
 
 	return QDF_STATUS_SUCCESS;

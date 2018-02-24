@@ -664,6 +664,7 @@ struct dfs_state {
  * @nol_next:         Next element pointer.
  */
 struct dfs_nolelem {
+	TAILQ_ENTRY(dfs_nolelem) nolelem_list;
 	struct wlan_dfs *nol_dfs;
 	uint32_t       nol_freq;
 	uint32_t       nol_chwidth;
@@ -890,6 +891,8 @@ struct dfs_event_log {
  * @dfs_seq_num:                     Sequence number.
  * @dfs_nol_event[]:                 NOL event.
  * @dfs_nol_timer:                   NOL list processing.
+ * @dfs_nol_free_list:               NOL free list.
+ * @dfs_nol_elem_free_work:          The work queue to free an NOL element.
  * @dfs_cac_timer:                   CAC timer.
  * @dfs_cac_valid_timer:             Ignore CAC when this timer is running.
  * @dfs_cac_timeout_override:        Overridden cac timeout.
@@ -909,6 +912,7 @@ struct dfs_event_log {
  * @dfs_is_offload_enabled:          Set if DFS offload enabled.
  * @dfs_use_nol:                     Use the NOL when radar found(default: TRUE)
  * @dfs_nol_lock:                    Lock to protect nol list.
+ * @tx_leakage_threshold:            Tx leakage threshold for dfs.
  */
 struct wlan_dfs {
 	uint32_t       dfs_debug_mask;
@@ -980,6 +984,10 @@ struct wlan_dfs {
 	uint32_t       dfs_seq_num;
 	int            dfs_nol_event[DFS_CHAN_MAX];
 	os_timer_t     dfs_nol_timer;
+
+	TAILQ_HEAD(, dfs_nolelem) dfs_nol_free_list;
+	qdf_work_t     dfs_nol_elem_free_work;
+
 	os_timer_t     dfs_cac_timer;
 	os_timer_t     dfs_cac_valid_timer;
 	int            dfs_cac_timeout_override;
@@ -1002,6 +1010,24 @@ struct wlan_dfs {
 	bool           dfs_is_offload_enabled;
 	int            dfs_use_nol;
 	qdf_spinlock_t dfs_nol_lock;
+	uint16_t tx_leakage_threshold;
+};
+
+/**
+ * struct dfs_soc_priv_obj - dfs private data
+ * @psoc: pointer to PSOC object information
+ * @pdev: pointer to PDEV object information
+ * @dfs_is_phyerr_filter_offload: For some chip like Rome indicates too many
+ *                                phyerr packets in a short time, which causes
+ *                                OS hang. If this feild is configured as true,
+ *                                FW will do the pre-check, filter out some
+ *                                kinds of invalid phyerrors and indicate
+ *                                radar detection related information to host.
+ */
+struct dfs_soc_priv_obj {
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_objmgr_pdev *pdev;
+	bool dfs_is_phyerr_filter_offload;
 };
 
 /**
@@ -1254,6 +1280,14 @@ void dfs_nol_update(struct wlan_dfs *dfs);
  * Cancels the NOL timer and frees the NOL elements.
  */
 void dfs_nol_timer_cleanup(struct wlan_dfs *dfs);
+
+/**
+ * dfs_nol_workqueue_cleanup() - Flushes NOL workqueue.
+ * @dfs: Pointer to wlan_dfs structure.
+ *
+ * Flushes the NOL workqueue.
+ */
+void dfs_nol_workqueue_cleanup(struct wlan_dfs *dfs);
 
 /**
  * dfs_retain_bin5_burst_pattern() - Retain the BIN5 burst pattern.
@@ -1574,6 +1608,18 @@ void dfs_process_phyerr(struct wlan_dfs *dfs,
 		uint8_t r_ext_rssi,
 		uint32_t r_rs_tstamp,
 		uint64_t r_fulltsf);
+
+#ifdef QCA_MCL_DFS_SUPPORT
+/**
+ * dfs_process_phyerr_filter_offload() - Process radar event.
+ * @dfs: Pointer to wlan_dfs structure.
+ * @wlan_radar_event: Pointer to radar_event_info structure.
+ *
+ * Return: None
+ */
+void dfs_process_phyerr_filter_offload(struct wlan_dfs *dfs,
+		struct radar_event_info *wlan_radar_event);
+#endif
 
 /**
  * dfs_is_precac_timer_running() - Check whether precac timer is running.
@@ -2103,4 +2149,12 @@ wlan_psoc_get_dfs_txops(struct wlan_objmgr_psoc *psoc);
  * @dfs: Pointer to wlan_dfs structure.
  */
 void dfs_nol_free_list(struct wlan_dfs *dfs);
+
+/**
+ * dfs_set_phyerr_filter_offload - config phyerr filter offload.
+ * @dfs: Pointer to wlan_dfs structure.
+ *
+ * Return: None
+ */
+void dfs_set_phyerr_filter_offload(struct wlan_dfs *dfs);
 #endif  /* _DFS_H_ */

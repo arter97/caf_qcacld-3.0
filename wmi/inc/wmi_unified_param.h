@@ -51,7 +51,7 @@
 #define WMI_SMPS_MASK_LOWER_16BITS 0xFF
 #define WMI_SMPS_MASK_UPPER_3BITS 0x7
 #define WMI_SMPS_PARAM_VALUE_S 29
-#define WMI_MAX_NUM_ARGS 8
+#define WMI_UNIT_TEST_MAX_NUM_ARGS 100
 /* The size of the utc time in bytes. */
 #define WMI_SIZE_UTC_TIME (10)
 /* The size of the utc time error in bytes. */
@@ -766,6 +766,22 @@ struct vdev_start_params {
 };
 
 /**
+ * struct vdev_scan_nac_rssi_params - NAC_RSSI cmd parameter
+ * @vdev_id: vdev id
+ * @bssid_addr: BSSID address
+ * @client_addr: client address
+ * @chan_num: channel number
+ * @action:NAC_RSSI action,
+ */
+struct vdev_scan_nac_rssi_params {
+	uint32_t vdev_id;
+	uint8_t bssid_addr[IEEE80211_ADDR_LEN];
+	uint8_t client_addr[IEEE80211_ADDR_LEN];
+	uint32_t chan_num;
+	uint32_t action; /* WMI_FILTER_NAC_RSSI_ACTION */
+};
+
+/**
  * struct hidden_ssid_vdev_restart_params -
  *                    vdev restart cmd parameter
  * @session_id: session id
@@ -880,6 +896,7 @@ typedef enum {
 	WMI_HOST_REQUEST_INST_STAT  = 0x40,
 	WMI_HOST_REQUEST_PEER_EXTD_STAT =  0x80,
 	WMI_HOST_REQUEST_VDEV_EXTD_STAT =  0x100,
+	WMI_HOST_REQUEST_NAC_RSSI =  0x200,
 	WMI_HOST_REQUEST_BCN_STAT =  0x800,
 } wmi_host_stats_id;
 
@@ -1549,144 +1566,9 @@ struct sta_uapsd_trig_params {
 };
 #endif
 
-/**
- * struct ocb_utc_param
- * @vdev_id: session id
- * @utc_time: number of nanoseconds from Jan 1st 1958
- * @time_error: the error in the UTC time. All 1's for unknown
- */
-struct ocb_utc_param {
-	uint32_t vdev_id;
-	uint8_t utc_time[WMI_SIZE_UTC_TIME];
-	uint8_t time_error[WMI_SIZE_UTC_TIME_ERROR];
-};
-
-/**
- * struct ocb_timing_advert_param
- * @vdev_id: session id
- * @chan_freq: frequency on which to advertise
- * @repeat_rate: the number of times it will send TA in 5 seconds
- * @timestamp_offset: offset of the timestamp field in the TA frame
- * @time_value_offset: offset of the time_value field in the TA frame
- * @template_length: size in bytes of the TA frame
- * @template_value: the TA frame
- */
-struct ocb_timing_advert_param {
-	uint32_t vdev_id;
-	uint32_t chan_freq;
-	uint32_t repeat_rate;
-	uint32_t timestamp_offset;
-	uint32_t time_value_offset;
-	uint32_t template_length;
-	uint8_t *template_value;
-};
-
-/**
- * struct dcc_get_stats_param
- * @vdev_id: session id
- * @channel_count: number of dcc channels
- * @request_array_len: size in bytes of the request array
- * @request_array: the request array
- */
-struct dcc_get_stats_param {
-	uint32_t vdev_id;
-	uint32_t channel_count;
-	uint32_t request_array_len;
-	void *request_array;
-};
-
-/**
- * struct dcc_update_ndl_param
- * @vdev_id: session id
- * @channel_count: number of channels to be updated
- * @dcc_ndl_chan_list_len: size in bytes of the ndl_chan array
- * @dcc_ndl_chan_list: the ndl_chan array
- * @dcc_ndl_active_state_list_len: size in bytes of the active_state array
- * @dcc_ndl_active_state_list: the active state array
- */
-struct dcc_update_ndl_param {
-	uint32_t vdev_id;
-	uint32_t channel_count;
-	uint32_t dcc_ndl_chan_list_len;
-	void *dcc_ndl_chan_list;
-	uint32_t dcc_ndl_active_state_list_len;
-	void *dcc_ndl_active_state_list;
-};
-
-/**
- * struct ocb_config_sched
- * @chan_freq: frequency of the channel
- * @total_duration: duration of the schedule
- * @guard_interval: guard interval on the start of the schedule
- */
-struct ocb_config_sched {
-	uint32_t chan_freq;
-	uint32_t total_duration;
-	uint32_t guard_interval;
-};
-
-/**
- * OCB structures
- */
-
-#define WMI_NUM_AC			(4)
-#define WMI_OCB_CHANNEL_MAX	(5)
+#define WMI_NUM_AC                     (4)
 #define WMI_MAX_NUM_AC 4
-struct wmi_ocb_qos_params {
-	uint8_t aifsn;
-	uint8_t cwmin;
-	uint8_t cwmax;
-};
-/**
- * struct ocb_config_channel
- * @chan_freq: frequency of the channel
- * @bandwidth: bandwidth of the channel, either 10 or 20 MHz
- * @mac_address: MAC address assigned to this channel
- * @qos_params: QoS parameters
- * @max_pwr: maximum transmit power of the channel (dBm)
- * @min_pwr: minimum transmit power of the channel (dBm)
- * @reg_pwr: maximum transmit power specified by the regulatory domain (dBm)
- * @antenna_max: maximum antenna gain specified by the regulatory domain (dB)
- */
-struct ocb_config_channel {
-	uint32_t chan_freq;
-	uint32_t bandwidth;
-	struct qdf_mac_addr mac_address;
-	struct wmi_ocb_qos_params qos_params[WMI_MAX_NUM_AC];
-	uint32_t max_pwr;
-	uint32_t min_pwr;
-	uint8_t reg_pwr;
-	uint8_t antenna_max;
-	uint16_t flags;
-};
 
-/**
- * struct ocb_config_param
- * @session_id: session id
- * @channel_count: number of channels
- * @schedule_size: size of the channel schedule
- * @flags: reserved
- * @channels: array of OCB channels
- * @schedule: array of OCB schedule elements
- * @dcc_ndl_chan_list_len: size of the ndl_chan array
- * @dcc_ndl_chan_list: array of dcc channel info
- * @dcc_ndl_active_state_list_len: size of the active state array
- * @dcc_ndl_active_state_list: array of active states
- * @adapter: the OCB adapter
- * @dcc_stats_callback: callback for the response event
- */
-struct ocb_config_param {
-	uint8_t session_id;
-	uint32_t channel_count;
-	uint32_t schedule_size;
-	uint32_t flags;
-	struct ocb_config_channel *channels;
-	struct ocb_config_sched *schedule;
-	uint32_t dcc_ndl_chan_list_len;
-	void *dcc_ndl_chan_list;
-	uint32_t dcc_ndl_active_state_list_len;
-	void *dcc_ndl_active_state_list;
-};
 
 enum wmi_peer_rate_report_cond_phy_type {
 	WMI_PEER_RATE_REPORT_COND_11B = 0,
@@ -3694,7 +3576,7 @@ struct wmi_unit_test_cmd {
 	uint32_t module_id;
 	uint32_t num_args;
 	uint32_t diag_token;
-	uint32_t args[WMI_MAX_NUM_ARGS];
+	uint32_t args[WMI_UNIT_TEST_MAX_NUM_ARGS];
 };
 
 /**
@@ -5424,6 +5306,20 @@ typedef struct {
 } wmi_host_vdev_extd_stats;
 
 /**
+ * struct wmi_host_vdev_nac_rssi_event - VDEV nac rssi stats
+ * @vdev_id: unique id identifying the VDEV, generated by the caller
+ * @last_rssi: rssi
+ * @avg_rssi: averge rssi
+ * @rssi_seq_num: rssi sequence number
+ */
+struct wmi_host_vdev_nac_rssi_event {
+	uint32_t vdev_id;
+	uint32_t last_rssi;
+	uint32_t avg_rssi;
+	uint32_t rssi_seq_num;
+};
+
+/**
  * struct wmi_host_peer_stats - peer stats
  * @peer_macaddr: peer MAC address
  * @peer_rssi: rssi
@@ -5664,6 +5560,7 @@ typedef enum {
 	wmi_dma_buf_release_event_id,
 	wmi_sap_obss_detection_report_event_id,
 	wmi_host_swfda_event_id,
+	wmi_sar_get_limits_event_id,
 
 	wmi_events_max,
 } wmi_conv_event_id;
@@ -5925,6 +5822,7 @@ typedef enum {
 	wmi_vdev_param_disable_cabq,
 
 	wmi_vdev_param_rate_dropdown_bmap,
+	wmi_vdev_param_tx_power,
 	wmi_vdev_param_max,
 } wmi_conv_vdev_param_id;
 
@@ -6076,6 +5974,10 @@ typedef enum {
 	wmi_service_bcn_offload_start_stop_support,
 	wmi_service_offchan_data_tid_support,
 	wmi_service_support_dma,
+	wmi_service_8ss_tx_bfee,
+	wmi_service_fils_support,
+	wmi_service_mawc_support,
+	wmi_service_wow_wakeup_by_timer_pattern,
 
 	wmi_services_max,
 } wmi_conv_service_ids;
@@ -6803,6 +6705,16 @@ typedef enum {
 	WMI_HOST_PEER_NSS_VHT160 = 0x15,
 	/* peer NSS for 160Mhx */
 	WMI_HOST_PEER_NSS_VHT80_80 = 0x16,
+	/* Set SU sounding interval */
+	WMI_HOST_PEER_PARAM_SU_TXBF_SOUNDING_INTERVAL = 0x17,
+	/* Set MU sounding interval */
+	WMI_HOST_PEER_PARAM_MU_TXBF_SOUNDING_INTERVAL = 0x18,
+	/* Enable sounding interval set */
+	WMI_HOST_PEER_PARAM_TXBF_SOUNDING_ENABLE = 0x19,
+	/* Enable MU support */
+	WMI_HOST_PEER_PARAM_MU_ENABLE = 0x1a,
+	/* Enable OFDMA support */
+	WMI_HOST_PEER_PARAM_OFDMA_ENABLE = 0x1b,
 } PEER_PARAM_ENUM;
 #define WMI_HOST_PEER_MIMO_PS_NONE	0x0
 #define WMI_HOST_PEER_MIMO_PS_STATIC	0x1
@@ -7768,12 +7680,15 @@ typedef struct {
 
 #define MAX_SAR_LIMIT_ROWS_SUPPORTED 64
 /**
- * struct sar_limit_cmd_row - sar limts row
+ * struct sar_limit_cmd_row - sar limits row
  * @band_id: Optional param for frequency band
+ *           See %enum wmi_sar_band_id_flags for possible values
  * @chain_id: Optional param for antenna chain id
  * @mod_id: Optional param for modulation scheme
+ *          See %enum wmi_sar_mod_id_flags for possible values
  * @limit_value: Mandatory param providing power limits in steps of 0.5 dbm
  * @validity_bitmap: bitmap of valid optional params in sar_limit_cmd_row struct
+ *                   See WMI_SAR_*_VALID_MASK for possible values
  */
 struct sar_limit_cmd_row {
 	uint32_t band_id;
@@ -7784,8 +7699,9 @@ struct sar_limit_cmd_row {
 };
 
 /**
- * struct sar_limit_cmd_params - sar limts params
+ * struct sar_limit_cmd_params - sar limits params
  * @sar_enable: flag to enable SAR
+ *              See %enum wmi_sar_feature_state_flags for possible values
  * @num_limit_rows: number of items in sar_limits
  * @commit_limits: indicates firmware to start apply new SAR values
  * @sar_limit_row_list: pointer to array of sar limit rows
@@ -7795,6 +7711,38 @@ struct sar_limit_cmd_params {
 	uint32_t num_limit_rows;
 	uint32_t commit_limits;
 	struct sar_limit_cmd_row *sar_limit_row_list;
+};
+
+/**
+ * struct sar_limit_event_row - sar limits row
+ * @band_id: Frequency band.
+ *           See %enum wmi_sar_band_id_flags for possible values
+ * @chain_id: Chain id
+ * @mod_id: Modulation scheme
+ *          See %enum wmi_sar_mod_id_flags for possible values
+ * @limit_value: Power limits in steps of 0.5 dbm that is currently active for
+ *     the given @band_id, @chain_id, and @mod_id
+ */
+struct sar_limit_event_row {
+	uint32_t band_id;
+	uint32_t chain_id;
+	uint32_t mod_id;
+	uint32_t limit_value;
+};
+
+/**
+ * struct sar_limit_event - sar limits params
+ * @sar_enable: Current status of SAR enablement.
+ *              See %enum wmi_sar_feature_state_flags for possible values
+ * @num_limit_rows: number of items in sar_limits
+ * @sar_limit_row: array of sar limit rows. Only @num_limit_rows
+ *                 should be considered valid.
+ */
+struct sar_limit_event {
+	uint32_t sar_enable;
+	uint32_t num_limit_rows;
+	struct sar_limit_event_row
+			sar_limit_row[MAX_SAR_LIMIT_ROWS_SUPPORTED];
 };
 
 /*
@@ -8353,6 +8301,58 @@ struct wmi_obss_detect_info {
 	enum wmi_obss_detection_reason reason;
 	uint32_t matched_detection_masks;
 	uint8_t matched_bssid_addr[IEEE80211_ADDR_LEN];
+};
+
+/**
+ * @time_offset: time offset after 11k offload command to trigger a neighbor
+ *	report request (in seconds)
+ * @low_rssi_offset: Offset from rssi threshold to trigger a neighbor
+ *	report request (in dBm)
+ * @bmiss_count_trigger: Number of beacon miss events to trigger neighbor
+ *	report request
+ * @per_threshold_offset: offset from PER threshold to trigger neighbor
+ *	report request (in %)
+ * @neighbor_report_cache_timeout: timeout after which new trigger can enable
+ *	sending of a neighbor report request (in seconds)
+ * @max_neighbor_report_req_cap: max number of neighbor report requests that
+ *	can be sent to the peer in the current session
+ * @ssid: Current connect SSID info
+ */
+struct wmi_11k_offload_neighbor_report_params {
+	uint32_t time_offset;
+	uint32_t low_rssi_offset;
+	uint32_t bmiss_count_trigger;
+	uint32_t per_threshold_offset;
+	uint32_t neighbor_report_cache_timeout;
+	uint32_t max_neighbor_report_req_cap;
+	struct mac_ssid ssid;
+};
+
+/**
+ * struct wmi_11k_offload_params - offload 11k features to FW
+ * @vdev_id: vdev id
+ * @offload_11k_bitmask: bitmask to specify offloaded features
+ *	B0: Neighbor Report Request offload
+ *	B1-B31: Reserved
+ * @neighbor_report_params: neighbor report offload params
+ */
+struct wmi_11k_offload_params {
+	uint32_t vdev_id;
+	uint32_t offload_11k_bitmask;
+	struct wmi_11k_offload_neighbor_report_params neighbor_report_params;
+};
+
+/**
+ * struct wmi_invoke_neighbor_report_params - Invoke neighbor report request
+ *	from IW to FW
+ * @vdev_id: vdev id
+ * @send_resp_to_host: bool to send response to host or not
+ * @ssid: ssid given from the IW command
+ */
+struct wmi_invoke_neighbor_report_params {
+	uint32_t vdev_id;
+	uint32_t send_resp_to_host;
+	struct mac_ssid ssid;
 };
 
 #endif /* _WMI_UNIFIED_PARAM_H_ */

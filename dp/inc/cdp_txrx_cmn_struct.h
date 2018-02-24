@@ -103,6 +103,7 @@
 #define CDP_MU_MAX_USERS 8
 #define CDP_MU_MAX_USER_INDEX (CDP_MU_MAX_USERS - 1)
 
+#define CDP_DATA_TID_MAX 8
 /*
  * advance rx monitor filter
  * */
@@ -319,6 +320,23 @@ enum cdp_sec_type {
     cdp_num_sec_types
 };
 
+/**
+ *  struct cdp_tx_exception_metadata - Exception path parameters
+ *  @peer_id: Peer id of the peer
+ *  @tid: Transmit Identifier
+ *  @tx_encap_type: Transmit encap type (i.e. Raw, Native Wi-Fi, Ethernet)
+ *  @sec_type: sec_type to be passed to HAL
+ *
+ *  This structure holds the parameters needed in the exception path of tx
+ *
+ */
+struct cdp_tx_exception_metadata {
+	uint16_t peer_id;
+	uint8_t tid;
+	uint16_t tx_encap_type;
+	enum cdp_sec_type sec_type;
+};
+
 typedef struct cdp_soc_t *ol_txrx_soc_handle;
 
 /**
@@ -375,6 +393,18 @@ typedef void
  */
 typedef qdf_nbuf_t (*ol_txrx_tx_fp)(void *data_vdev,
 				    qdf_nbuf_t msdu_list);
+
+/**
+ * ol_txrx_tx_exc_fp - top-level transmit function on exception path
+ * @data_vdev - handle to the virtual device object
+ * @msdu_list - list of network buffers
+ * @tx_exc_metadata - structure that holds parameters to exception path
+ */
+typedef qdf_nbuf_t (*ol_txrx_tx_exc_fp)(void *data_vdev,
+					qdf_nbuf_t msdu_list,
+					struct cdp_tx_exception_metadata
+						*tx_exc_metadata);
+
 /**
  * ol_txrx_tx_flow_control_fp - tx flow control notification
  * function from txrx to OS shim
@@ -518,6 +548,7 @@ struct ol_txrx_ops {
 	/* tx function pointers - specified by txrx, stored by OS shim */
 	struct {
 		ol_txrx_tx_fp         tx;
+		ol_txrx_tx_exc_fp     tx_exception;
 		ol_txrx_tx_free_ext_fp tx_free_ext;
 	} tx;
 
@@ -640,7 +671,7 @@ enum cdp_vdev_param_type {
 #define TXRX_FW_STATS_DURATION_INFO              24
 #define TXRX_FW_STATS_DURATION_INFO_RESET        25
 #define TXRX_FW_HALPHY_STATS                     26
-#define TXRX_FW_STATS_HOST_RX_STATS              27
+#define TXRX_FW_COEX_STATS                       27
 
 #define PER_RADIO_FW_STATS_REQUEST 0
 #define PER_VDEV_FW_STATS_REQUEST 1
@@ -801,6 +832,8 @@ struct cdp_tx_stats {
 	struct cdp_pkt_info ucast;
 	/* Multicast Packet Count */
 	struct cdp_pkt_info mcast;
+	/* Broadcast Packet Count*/
+	struct cdp_pkt_info bcast;
 	/*NAWDS  Multicast Packet Count */
 	struct cdp_pkt_info nawds_mcast;
 	/*NAWDS  Multicast Drop Count */
@@ -842,14 +875,11 @@ struct cdp_tx_stats {
 	/* Packet Count for different bandwidths */
 	uint32_t bw[MAX_BW];
 
-	/* Excess Retry Count */
-	uint32_t excess_retries[WME_AC_MAX];
-
 	/* Wireless Multimedia type Count */
 	uint32_t wme_ac_type[WME_AC_MAX];
 
 	/* Wireless Multimedia type Count */
-	uint32_t excess_retries_ac[WME_AC_MAX];
+	uint32_t excess_retries_per_ac[WME_AC_MAX];
 
 	/* Packets dropped on the Tx side */
 	struct {
@@ -874,6 +904,8 @@ struct cdp_rx_stats {
 	struct cdp_pkt_info unicast;
 	/* Total multicast packets */
 	struct cdp_pkt_info multicast;
+	/* Broadcast Packet Count*/
+	struct cdp_pkt_info bcast;
 	/* WDS packets received */
 	struct cdp_pkt_info wds;
 	/* Raw Pakets received */

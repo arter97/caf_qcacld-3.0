@@ -85,6 +85,16 @@ QDF_STATUS wlan_reg_get_channel_list_with_power(struct wlan_objmgr_pdev *pdev,
  */
 QDF_STATUS wlan_reg_read_default_country(struct wlan_objmgr_psoc *psoc,
 				   uint8_t *country);
+
+/**
+ * wlan_reg_read_current_country() - Read the current country for the regdomain
+ * @country: pointer to the country code.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_reg_read_current_country(struct wlan_objmgr_psoc *psoc,
+				   uint8_t *country);
+
 /**
  * wlan_reg_get_channel_state() - Get channel state from regulatory
  * @ch: channel number.
@@ -284,6 +294,22 @@ QDF_STATUS regulatory_psoc_open(struct wlan_objmgr_psoc *psoc);
  * Return: Success or Failure
  */
 QDF_STATUS regulatory_psoc_close(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * regulatory_pdev_open() - Open regulatory component
+ * @pdev: Pointer to pdev structure.
+ *
+ * Return: Success or Failure
+ */
+QDF_STATUS regulatory_pdev_open(struct wlan_objmgr_pdev *pdev);
+
+/**
+ * regulatory_pdev_close() - Close regulatory component
+ * @pdev: Pointer to pdev structure.
+ *
+ * Return: Success or Failure
+ */
+QDF_STATUS regulatory_pdev_close(struct wlan_objmgr_pdev *pdev);
 
 /**
  * wlan_reg_update_nol_ch () - set nol channel

@@ -519,6 +519,8 @@ struct dp_tx_ext_desc_elem_s *dp_tx_prepare_ext_desc(struct dp_vdev *vdev,
  * @vdev: DP vdev handle
  * @nbuf: skb
  * @desc_pool_id: Descriptor pool ID
+ * @meta_data: Metadata to the fw
+ * @tx_exc_metadata: Handle that holds exception path metadata
  * Allocate and prepare Tx descriptor with msdu information.
  *
  * Return: Pointer to Tx Descriptor on success,
@@ -527,7 +529,8 @@ struct dp_tx_ext_desc_elem_s *dp_tx_prepare_ext_desc(struct dp_vdev *vdev,
 static
 struct dp_tx_desc_s *dp_tx_prepare_desc_single(struct dp_vdev *vdev,
 		qdf_nbuf_t nbuf, uint8_t desc_pool_id,
-		struct dp_tx_msdu_info_s *msdu_info)
+		struct dp_tx_msdu_info_s *msdu_info,
+		struct cdp_tx_exception_metadata *tx_exc_metadata)
 {
 	uint8_t align_pad;
 	uint8_t is_exception = 0;
@@ -550,7 +553,8 @@ struct dp_tx_desc_s *dp_tx_prepare_desc_single(struct dp_vdev *vdev,
 	/* Initialize the SW tx descriptor */
 	tx_desc->nbuf = nbuf;
 	tx_desc->frm_type = dp_tx_frm_std;
-	tx_desc->tx_encap_type = vdev->tx_encap_type;
+	tx_desc->tx_encap_type = (tx_exc_metadata ?
+			tx_exc_metadata->tx_encap_type : vdev->tx_encap_type);
 	tx_desc->vdev = vdev;
 	tx_desc->pdev = pdev;
 	tx_desc->msdu_ext_desc = NULL;
@@ -624,7 +628,7 @@ struct dp_tx_desc_s *dp_tx_prepare_desc_single(struct dp_vdev *vdev,
 	}
 
 #if !TQM_BYPASS_WAR
-	if (is_exception)
+	if (is_exception || tx_exc_metadata)
 #endif
 	{
 		/* Temporary WAR due to TQM VP issues */
@@ -791,6 +795,7 @@ error:
  * @tid: TID from HLOS for overriding default DSCP-TID mapping
  * @fw_metadata: Metadata to send to Target Firmware along with frame
  * @ring_id: Ring ID of H/W ring to which we enqueue the packet
+ * @tx_exc_metadata: Handle that holds exception path meta data
  *
  *  Gets the next free TCL HW DMA descriptor and sets up required parameters
  *  from software Tx descriptor
@@ -799,13 +804,18 @@ error:
  */
 static QDF_STATUS dp_tx_hw_enqueue(struct dp_soc *soc, struct dp_vdev *vdev,
 				   struct dp_tx_desc_s *tx_desc, uint8_t tid,
-				   uint16_t fw_metadata, uint8_t ring_id)
+				   uint16_t fw_metadata, uint8_t ring_id,
+				   struct cdp_tx_exception_metadata
+					*tx_exc_metadata)
 {
 	uint8_t type;
 	uint16_t length;
 	void *hal_tx_desc, *hal_tx_desc_cached;
 	qdf_dma_addr_t dma_addr;
 	uint8_t cached_desc[HAL_TX_DESC_LEN_BYTES];
+
+	enum cdp_sec_type sec_type = (tx_exc_metadata ?
+			tx_exc_metadata->sec_type : vdev->sec_type);
 
 	/* Return Buffer Manager ID */
 	uint8_t bm_id = ring_id;
@@ -833,7 +843,7 @@ static QDF_STATUS dp_tx_hw_enqueue(struct dp_soc *soc, struct dp_vdev *vdev,
 	hal_tx_desc_set_dscp_tid_table_id(hal_tx_desc_cached,
 			vdev->dscp_tid_map_id);
 	hal_tx_desc_set_encrypt_type(hal_tx_desc_cached,
-			sec_type_map[vdev->sec_type]);
+			sec_type_map[sec_type]);
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
 			"%s length:%d , type = %d, dma_addr %llx, offset %d desc id %u",
@@ -1163,15 +1173,17 @@ static void dp_non_std_tx_comp_free_buff(struct dp_tx_desc_s *tx_desc,
  * @vdev: DP vdev handle
  * @nbuf: skb
  * @tid: TID from HLOS for overriding default DSCP-TID mapping
+ * @meta_data: Metadata to the fw
  * @tx_q: Tx queue to be used for this Tx frame
  * @peer_id: peer_id of the peer in case of NAWDS frames
+ * @tx_exc_metadata: Handle that holds exception path metadata
  *
  * Return: NULL on success,
  *         nbuf when it fails to send
  */
 static qdf_nbuf_t dp_tx_send_msdu_single(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
-		struct dp_tx_msdu_info_s *msdu_info,
-		uint16_t peer_id)
+		struct dp_tx_msdu_info_s *msdu_info, uint16_t peer_id,
+		struct cdp_tx_exception_metadata *tx_exc_metadata)
 {
 	struct dp_pdev *pdev = vdev->pdev;
 	struct dp_soc *soc = pdev->soc;
@@ -1184,7 +1196,8 @@ static qdf_nbuf_t dp_tx_send_msdu_single(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 
 	HTT_TX_TCL_METADATA_VALID_HTT_SET(htt_tcl_metadata, 0);
 	/* Setup Tx descriptor for an MSDU, and MSDU extension descriptor */
-	tx_desc = dp_tx_prepare_desc_single(vdev, nbuf, tx_q->desc_pool_id, msdu_info);
+	tx_desc = dp_tx_prepare_desc_single(vdev, nbuf, tx_q->desc_pool_id,
+			msdu_info, tx_exc_metadata);
 	if (!tx_desc) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 			  "%s Tx_desc prepare Fail vdev %pK queue %d\n",
@@ -1224,7 +1237,7 @@ static qdf_nbuf_t dp_tx_send_msdu_single(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 
 	/* Enqueue the Tx MSDU descriptor to HW for transmit */
 	status = dp_tx_hw_enqueue(soc, vdev, tx_desc, tid,
-			htt_tcl_metadata, tx_q->ring_id);
+			htt_tcl_metadata, tx_q->ring_id, tx_exc_metadata);
 
 	if (status != QDF_STATUS_SUCCESS) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
@@ -1331,7 +1344,7 @@ qdf_nbuf_t dp_tx_send_msdu_multiple(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 		 * Enqueue the Tx MSDU descriptor to HW for transmit
 		 */
 		status = dp_tx_hw_enqueue(soc, vdev, tx_desc, msdu_info->tid,
-			vdev->htt_tcl_metadata, tx_q->ring_id);
+			vdev->htt_tcl_metadata, tx_q->ring_id, NULL);
 
 		if (status != QDF_STATUS_SUCCESS) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
@@ -1502,6 +1515,8 @@ qdf_nbuf_t dp_tx_extract_mesh_meta_data(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 	qdf_mem_set(meta_data, sizeof(struct htt_tx_msdu_desc_ext2_t), 0);
 
 	meta_data->host_tx_desc_pool = 1;
+	meta_data->update_peer_cache = 1;
+	meta_data->learning_frame = 1;
 
 	if (!(mhdr->flags & METAHDR_FLAG_AUTO_RATE)) {
 		meta_data->power = mhdr->power;
@@ -1614,7 +1629,7 @@ static qdf_nbuf_t dp_tx_prepare_nawds(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 
 			peer_id = peer->peer_ids[0];
 			nbuf_copy = dp_tx_send_msdu_single(vdev, nbuf_copy,
-					msdu_info, peer_id);
+					msdu_info, peer_id, NULL);
 			if (nbuf_copy != NULL) {
 				qdf_nbuf_free(nbuf_copy);
 				continue;
@@ -1629,6 +1644,124 @@ static qdf_nbuf_t dp_tx_prepare_nawds(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 	return NULL;
 }
 #endif
+
+/**
+ * dp_check_exc_metadata() - Checks if parameters are valid
+ * @tx_exc - holds all exception path parameters
+ *
+ * Returns true when all the parameters are valid else false
+ *
+ */
+static bool dp_check_exc_metadata(struct cdp_tx_exception_metadata *tx_exc)
+{
+	if ((tx_exc->tid > DP_MAX_TIDS && tx_exc->tid != HTT_INVALID_TID) ||
+	    tx_exc->tx_encap_type > htt_cmn_pkt_num_types ||
+	    tx_exc->sec_type > cdp_num_sec_types) {
+		return false;
+	}
+
+	return true;
+}
+
+/**
+ * dp_tx_send_exception() - Transmit a frame on a given VAP in exception path
+ * @vap_dev: DP vdev handle
+ * @nbuf: skb
+ * @tx_exc_metadata: Handle that holds exception path meta data
+ *
+ * Entry point for Core Tx layer (DP_TX) invoked from
+ * hard_start_xmit in OSIF/HDD to transmit frames through fw
+ *
+ * Return: NULL on success,
+ *         nbuf when it fails to send
+ */
+qdf_nbuf_t dp_tx_send_exception(void *vap_dev, qdf_nbuf_t nbuf,
+		struct cdp_tx_exception_metadata *tx_exc_metadata)
+{
+	struct ether_header *eh = NULL;
+	struct dp_vdev *vdev = (struct dp_vdev *) vap_dev;
+	struct dp_tx_msdu_info_s msdu_info;
+
+	qdf_mem_set(&msdu_info, sizeof(msdu_info), 0x0);
+
+	msdu_info.tid = tx_exc_metadata->tid;
+
+	eh = (struct ether_header *)qdf_nbuf_data(nbuf);
+	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
+			"%s , skb %pM",
+			__func__, nbuf->data);
+
+	DP_STATS_INC_PKT(vdev, tx_i.rcvd, 1, qdf_nbuf_len(nbuf));
+
+	if (qdf_unlikely(!dp_check_exc_metadata(tx_exc_metadata))) {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+			"Invalid parameters in exception path");
+		goto fail;
+	}
+
+	/* Basic sanity checks for unsupported packets */
+
+	/* MESH mode */
+	if (qdf_unlikely(vdev->mesh_vdev)) {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+			"Mesh mode is not supported in exception path");
+		goto fail;
+	}
+
+	/* TSO or SG */
+	if (qdf_unlikely(qdf_nbuf_is_tso(nbuf)) ||
+	    qdf_unlikely(qdf_nbuf_is_nonlinear(nbuf))) {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+			  "TSO and SG are not supported in exception path");
+
+		goto fail;
+	}
+
+	/* RAW */
+	if (qdf_unlikely(tx_exc_metadata->tx_encap_type == htt_cmn_pkt_type_raw)) {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+			  "Raw frame is not supported in exception path");
+		goto fail;
+	}
+
+
+	/* Mcast enhancement*/
+	if (qdf_unlikely(vdev->mcast_enhancement_en > 0)) {
+		if (DP_FRAME_IS_MULTICAST((eh)->ether_dhost)) {
+			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+					  "Ignoring mcast_enhancement_en which is set and sending the mcast packet to the FW\n");
+		}
+	}
+
+	/*
+	 * Get HW Queue to use for this frame.
+	 * TCL supports upto 4 DMA rings, out of which 3 rings are
+	 * dedicated for data and 1 for command.
+	 * "queue_id" maps to one hardware ring.
+	 *  With each ring, we also associate a unique Tx descriptor pool
+	 *  to minimize lock contention for these resources.
+	 */
+	dp_tx_get_queue(vdev, nbuf, &msdu_info.tx_queue);
+
+	/* Reset the control block */
+	qdf_nbuf_reset_ctxt(nbuf);
+
+	/*  Single linear frame */
+	/*
+	 * If nbuf is a simple linear frame, use send_single function to
+	 * prepare direct-buffer type TCL descriptor and enqueue to TCL
+	 * SRNG. There is no need to setup a MSDU extension descriptor.
+	 */
+	nbuf = dp_tx_send_msdu_single(vdev, nbuf, &msdu_info,
+			tx_exc_metadata->peer_id, tx_exc_metadata);
+
+	return nbuf;
+
+fail:
+	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
+			"pkt send failed");
+	return nbuf;
+}
 
 /**
  * dp_tx_send_mesh() - Transmit mesh frame on a given VAP
@@ -1713,10 +1846,11 @@ qdf_nbuf_t dp_tx_send(void *vap_dev, qdf_nbuf_t nbuf)
 	qdf_mem_set(&seg_info, sizeof(seg_info), 0x0);
 
 	eh = (struct ether_header *)qdf_nbuf_data(nbuf);
+
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-			"%s , skb %0x:%0x:%0x:%0x:%0x:%0x\n",
-			__func__, nbuf->data[0], nbuf->data[1], nbuf->data[2],
-			nbuf->data[3], nbuf->data[4], nbuf->data[5]);
+			"%s , skb %pM",
+			__func__, nbuf->data);
+
 	/*
 	 * Set Default Host TID value to invalid TID
 	 * (TID override disabled)
@@ -1806,7 +1940,8 @@ qdf_nbuf_t dp_tx_send(void *vap_dev, qdf_nbuf_t nbuf)
 			DP_STATS_INC_PKT(vdev,
 					tx_i.mcast_en.mcast_pkt, 1,
 					qdf_nbuf_len(nbuf));
-			if (dp_tx_prepare_send_me(vdev, nbuf) > 0) {
+			if (dp_tx_prepare_send_me(vdev, nbuf) !=
+					QDF_STATUS_SUCCESS) {
 				qdf_nbuf_free(nbuf);
 				return NULL;
 			}
@@ -1833,7 +1968,7 @@ qdf_nbuf_t dp_tx_send(void *vap_dev, qdf_nbuf_t nbuf)
 	 * prepare direct-buffer type TCL descriptor and enqueue to TCL
 	 * SRNG. There is no need to setup a MSDU extension descriptor.
 	 */
-	nbuf = dp_tx_send_msdu_single(vdev, nbuf, &msdu_info, peer_id);
+	nbuf = dp_tx_send_msdu_single(vdev, nbuf, &msdu_info, peer_id, NULL);
 
 	return nbuf;
 
@@ -1971,7 +2106,8 @@ void dp_tx_reinject_handler(struct dp_tx_desc_s *tx_desc, uint8_t *status)
 				nbuf_copy = dp_tx_send_msdu_single(vdev,
 						nbuf_copy,
 						&msdu_info,
-						peer_id);
+						peer_id,
+						NULL);
 
 				if (nbuf_copy) {
 					QDF_TRACE(QDF_MODULE_ID_DP,
@@ -1995,7 +2131,9 @@ void dp_tx_reinject_handler(struct dp_tx_desc_s *tx_desc, uint8_t *status)
 					1, qdf_nbuf_len(nbuf));
 
 		nbuf = dp_tx_send_msdu_single(vdev,
-					nbuf, &msdu_info, peer_id);
+				nbuf,
+				&msdu_info,
+				peer_id, NULL);
 
 		if (nbuf) {
 			QDF_TRACE(QDF_MODULE_ID_DP,
@@ -2043,7 +2181,8 @@ static void dp_tx_inspect_handler(struct dp_tx_desc_s *tx_desc, uint8_t *status)
 #ifdef FEATURE_PERPKT_INFO
 QDF_STATUS
 dp_send_compl_to_stack(struct dp_soc *soc,  struct dp_pdev *pdev,
-		      uint16_t peer_id, uint32_t ppdu_id, qdf_nbuf_t netbuf)
+		      uint16_t peer_id, uint32_t ppdu_id, uint8_t first_msdu,
+		      uint8_t last_msdu, qdf_nbuf_t netbuf)
 {
 	struct tx_capture_hdr *ppdu_hdr;
 	struct dp_peer *peer = NULL;
@@ -2082,6 +2221,9 @@ dp_send_compl_to_stack(struct dp_soc *soc,  struct dp_pdev *pdev,
 	ppdu_hdr->ppdu_id = ppdu_id;
 	qdf_mem_copy(ppdu_hdr->ra, peer->mac_addr.raw,
 			IEEE80211_ADDR_LEN);
+	ppdu_hdr->peer_id = peer_id;
+	ppdu_hdr->first_msdu = first_msdu;
+	ppdu_hdr->last_msdu = last_msdu;
 
 	dp_wdi_event_handler(WDI_EVENT_TX_DATA, soc,
 				netbuf, peer_id,
@@ -2092,7 +2234,8 @@ dp_send_compl_to_stack(struct dp_soc *soc,  struct dp_pdev *pdev,
 #else
 static QDF_STATUS
 dp_send_compl_to_stack(struct dp_soc *soc,  struct dp_pdev *pdev,
-		      uint16_t peer_id, uint32_t ppdu_id, qdf_nbuf_t netbuf)
+		      uint16_t peer_id, uint32_t ppdu_id, uint8_t first_msdu,
+		      uint8_t last_msdu, qdf_nbuf_t netbuf)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
@@ -2126,12 +2269,13 @@ static inline void dp_tx_comp_free_buf(struct dp_soc *soc,
 					desc->msdu_ext_desc->vaddr)) {
 			/* If remaining number of segment is 0
 			 * actual TSO may unmap and free */
-			if (!DP_DESC_NUM_FRAG(desc)) {
-				qdf_nbuf_unmap(soc->osdev, nbuf,
+			if (qdf_nbuf_get_users(nbuf) == 1)
+				__qdf_nbuf_unmap_single(soc->osdev,
+						nbuf,
 						QDF_DMA_TO_DEVICE);
-				qdf_nbuf_free(nbuf);
-				return;
-			}
+
+			qdf_nbuf_free(nbuf);
+			return;
 		}
 	}
 
@@ -2141,7 +2285,8 @@ static inline void dp_tx_comp_free_buf(struct dp_soc *soc,
 	qdf_nbuf_unmap(soc->osdev, nbuf, QDF_DMA_TO_DEVICE);
 
 	if (dp_send_compl_to_stack(soc, desc->pdev, ts.peer_id,
-			ts.ppdu_id, nbuf) == QDF_STATUS_SUCCESS)
+			ts.ppdu_id, ts.first_msdu, ts.last_msdu,
+			nbuf) == QDF_STATUS_SUCCESS)
 		return;
 
 	if (qdf_likely(!vdev->mesh_vdev))
@@ -2403,6 +2548,10 @@ static inline void dp_tx_comp_process_tx_status(struct dp_tx_desc_s *tx_desc,
 	struct dp_soc *soc = NULL;
 	struct dp_vdev *vdev = tx_desc->vdev;
 	struct dp_peer *peer = NULL;
+	struct ether_header *eh =
+		(struct ether_header *)qdf_nbuf_data(tx_desc->nbuf);
+	bool isBroadcast;
+
 	hal_tx_comp_get_status(&tx_desc->comp, &ts);
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
@@ -2458,6 +2607,14 @@ static inline void dp_tx_comp_process_tx_status(struct dp_tx_desc_s *tx_desc,
 				"invalid peer");
 		DP_STATS_INC_PKT(soc, tx.tx_invalid_peer, 1, length);
 		goto out;
+	}
+	if (qdf_likely(vdev->tx_encap_type == htt_cmn_pkt_type_ethernet)) {
+		isBroadcast = (IEEE80211_IS_BROADCAST(eh->ether_dhost)) ? 1 : 0 ;
+
+		if (isBroadcast) {
+			DP_STATS_INC_PKT(peer, tx.bcast, 1,
+					qdf_nbuf_len(tx_desc->nbuf));
+		}
 	}
 
 	dp_tx_update_peer_stats(peer, &ts, length);

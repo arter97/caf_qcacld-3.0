@@ -124,6 +124,13 @@ static void scm_scan_entry_put_ref(struct scan_dbs *scan_db,
 	if (lock_needed)
 		qdf_spin_lock_bh(&scan_db->scan_db_lock);
 
+	if (delete && !scan_node->active) {
+		if (lock_needed)
+			qdf_spin_unlock_bh(&scan_db->scan_db_lock);
+		scm_warn("node is already deleted");
+		return;
+	}
+
 	if (!qdf_atomic_read(&scan_node->ref_cnt)) {
 		if (lock_needed)
 			qdf_spin_unlock_bh(&scan_db->scan_db_lock);
@@ -132,13 +139,9 @@ static void scm_scan_entry_put_ref(struct scan_dbs *scan_db,
 		return;
 	}
 
-	if (delete) {
-		if (!scan_node->active) {
-			scm_err("node is already deleted");
-			QDF_ASSERT(0);
-		}
+	if (delete)
 		scan_node->active = false;
-	}
+
 	/* Decrement ref count, free scan_node, if ref count == 0 */
 	if (qdf_atomic_dec_and_test(&scan_node->ref_cnt))
 		scm_del_scan_node_from_db(scan_db, scan_node);
@@ -284,6 +287,10 @@ void scm_age_out_entries(struct wlan_objmgr_psoc *psoc,
 	struct scan_default_params *def_param;
 
 	def_param = wlan_scan_psoc_get_def_params(psoc);
+	if (!def_param) {
+		scm_err("wlan_scan_psoc_get_def_params failed");
+		return;
+	}
 
 	for (i = 0 ; i < SCAN_HASH_SIZE; i++) {
 		cur_node = scm_get_next_node(scan_db,
@@ -331,10 +338,13 @@ static QDF_STATUS scm_flush_oldest_entry(struct scan_dbs *scan_db)
 				oldest_node = cur_node;
 		}
 	}
-	scm_debug("Flush oldest BSSID: %pM with age %d ms",
-			oldest_node->entry->bssid.bytes,
-			util_scan_entry_age(oldest_node->entry));
-	scm_scan_entry_put_ref(scan_db, oldest_node, false, true);
+
+	if (oldest_node) {
+		scm_debug("Flush oldest BSSID: %pM with age %d ms",
+				oldest_node->entry->bssid.bytes,
+				util_scan_entry_age(oldest_node->entry));
+		scm_scan_entry_put_ref(scan_db, oldest_node, false, true);
+	}
 	qdf_spin_unlock_bh(&scan_db->scan_db_lock);
 
 	return QDF_STATUS_SUCCESS;
@@ -467,10 +477,30 @@ static void scm_delete_duplicate_entry(struct scan_dbs *scan_db,
 				scan_params->ssid.length);
 		}
 	}
+
 	/*
-	 * Use old value for rssi if beacon
-	 * was heard on adjacent channel.
+	 * Due to Rx sensitivity issue, sometime beacons are seen on adjacent
+	 * channel so workaround in software is needed. If DS params or HT info
+	 * are present driver can get proper channel info from these IEs and set
+	 * channel_mismatch so that the older RSSI values are used in new entry.
+	 *
+	 * For the cases where DS params and HT info is not present, driver
+	 * needs to check below conditions to get proper channel and set
+	 * channel_mismatch so that the older RSSI values are used in new entry:
+	 *   -- The old entry channel and new entry channel are not same
+	 *   -- RSSI is less than -80, this indicate that the signal has leaked
+	 *       in adjacent channel.
 	 */
+	if ((scan_params->frm_subtype == MGMT_SUBTYPE_BEACON) &&
+	    !util_scan_entry_htinfo(scan_params) &&
+	    !util_scan_entry_ds_param(scan_params) &&
+	    (scan_params->channel.chan_idx != scan_entry->channel.chan_idx) &&
+	    (scan_params->rssi_raw  < ADJACENT_CHANNEL_RSSI_THRESHOLD)) {
+		scan_params->channel.chan_idx = scan_entry->channel.chan_idx;
+		scan_params->channel_mismatch = true;
+	}
+
+	/* Use old value for rssi if beacon was heard on adjacent channel. */
 	if (scan_params->channel_mismatch) {
 		scan_params->rssi_raw = scan_entry->rssi_raw;
 		scan_params->avg_rssi = scan_entry->avg_rssi;
@@ -661,6 +691,14 @@ QDF_STATUS scm_handle_bcn_probe(struct scheduler_msg *msg)
 			struct scan_cache_node, node);
 
 		scan_entry = scan_node->entry;
+
+		status = scm_add_update_entry(scan_db, scan_entry);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			util_scan_free_cache_entry(scan_entry);
+			qdf_mem_free(scan_node);
+			scm_err("failed to add entry");
+			continue;
+		}
 		scm_info("Received %s from BSSID: %pM tsf_delta = %u Seq Num: %x "
 			"ssid:%.*s, rssi: %d",
 			(bcn->frm_type == MGMT_SUBTYPE_PROBE_RESP) ?
@@ -674,12 +712,6 @@ QDF_STATUS scm_handle_bcn_probe(struct scheduler_msg *msg)
 
 		if (scan_obj->cb.inform_beacon)
 			scan_obj->cb.inform_beacon(pdev, scan_entry);
-
-		status = scm_add_update_entry(scan_db, scan_entry);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			util_scan_free_cache_entry(scan_entry);
-			scm_err("failed to add entry");
-		}
 		qdf_mem_free(scan_node);
 	}
 
@@ -723,6 +755,10 @@ static void scm_list_insert_sorted(struct wlan_objmgr_psoc *psoc,
 	int pcl_chan_weight = 0;
 
 	params = wlan_scan_psoc_get_def_params(psoc);
+	if (!params) {
+		scm_err("wlan_scan_psoc_get_def_params failed");
+		return;
+	}
 
 	if (filter->num_of_pcl_channels > 0 &&
 			(scan_node->entry->rssi_raw > SCM_PCL_RSSI_THRESHOLD)) {

@@ -1353,6 +1353,7 @@ fail:
 				soc->wbm_idle_scatter_buf_size,
 				soc->wbm_idle_scatter_buf_base_vaddr[i],
 				soc->wbm_idle_scatter_buf_base_paddr[i], 0);
+			soc->wbm_idle_scatter_buf_base_vaddr[i] = NULL;
 		}
 	}
 
@@ -1363,6 +1364,7 @@ fail:
 				soc->link_desc_banks[i].base_vaddr_unaligned,
 				soc->link_desc_banks[i].base_paddr_unaligned,
 				0);
+			soc->link_desc_banks[i].base_vaddr_unaligned = NULL;
 		}
 	}
 	return QDF_STATUS_E_FAILURE;
@@ -1386,6 +1388,7 @@ static void dp_hw_link_desc_pool_cleanup(struct dp_soc *soc)
 				soc->wbm_idle_scatter_buf_size,
 				soc->wbm_idle_scatter_buf_base_vaddr[i],
 				soc->wbm_idle_scatter_buf_base_paddr[i], 0);
+			soc->wbm_idle_scatter_buf_base_vaddr[i] = NULL;
 		}
 	}
 
@@ -1396,6 +1399,7 @@ static void dp_hw_link_desc_pool_cleanup(struct dp_soc *soc)
 				soc->link_desc_banks[i].base_vaddr_unaligned,
 				soc->link_desc_banks[i].base_paddr_unaligned,
 				0);
+			soc->link_desc_banks[i].base_vaddr_unaligned = NULL;
 		}
 	}
 }
@@ -1763,6 +1767,42 @@ static bool dp_reo_remap_config(struct dp_soc *soc,
 #endif
 
 /*
+ * dp_reo_frag_dst_set() - configure reo register to set the
+ *                        fragment destination ring
+ * @soc : Datapath soc
+ * @frag_dst_ring : output parameter to set fragment destination ring
+ *
+ * Based on offload_radio below fragment destination rings is selected
+ * 0 - TCL
+ * 1 - SW1
+ * 2 - SW2
+ * 3 - SW3
+ * 4 - SW4
+ * 5 - Release
+ * 6 - FW
+ * 7 - alternate select
+ *
+ * return: void
+ */
+static void dp_reo_frag_dst_set(struct dp_soc *soc, uint8_t *frag_dst_ring)
+{
+	uint8_t offload_radio = wlan_cfg_get_dp_soc_nss_cfg(soc->wlan_cfg_ctx);
+
+	switch (offload_radio) {
+	case 0:
+		*frag_dst_ring = HAL_SRNG_REO_EXCEPTION;
+		break;
+	case 3:
+		*frag_dst_ring = HAL_SRNG_REO_ALTERNATE_SELECT;
+		break;
+	default:
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+				FL("dp_reo_frag_dst_set invalid offload radio config"));
+		break;
+	}
+}
+
+/*
  * dp_soc_cmn_setup() - Common SoC level initializion
  * @soc:		Datapath SOC handle
  *
@@ -1965,7 +2005,19 @@ static int dp_soc_cmn_setup(struct dp_soc *soc)
 		reo_params.rx_hash_enabled = true;
 	}
 
+	/* setup the global rx defrag waitlist */
+	TAILQ_INIT(&soc->rx.defrag.waitlist);
+	soc->rx.defrag.timeout_ms =
+		wlan_cfg_get_rx_defrag_min_timeout(soc->wlan_cfg_ctx);
+	soc->rx.flags.defrag_timeout_check =
+		wlan_cfg_get_defrag_timeout_check(soc->wlan_cfg_ctx);
+
 out:
+	/*
+	 * set the fragment destination ring
+	 */
+	dp_reo_frag_dst_set(soc, &reo_params.frag_dst_ring);
+
 	hal_reo_setup(soc->hal_soc, &reo_params);
 
 	qdf_atomic_set(&soc->cmn_init_done, 1);
@@ -2032,7 +2084,7 @@ static void dp_lro_hash_setup(struct dp_soc *soc)
 
 	if (soc->cdp_soc.ol_ops->lro_hash_config)
 		(void)soc->cdp_soc.ol_ops->lro_hash_config
-			(soc->osif_soc, &lro_hash);
+			(soc->ctrl_psoc, &lro_hash);
 }
 
 /*
@@ -2189,11 +2241,18 @@ static os_timer_func(dp_txrx_peer_find_inact_timeout_handler)
 	qdf_timer_mod(&soc->pdev_bs_inact_timer,
 		      soc->pdev_bs_inact_interval * 1000);
 }
+
+#else
+
+void dp_mark_peer_inact(void *peer, bool inactive)
+{
+	return;
+}
 #endif
 
 /*
 * dp_pdev_attach_wifi3() - attach txrx pdev
-* @osif_pdev: Opaque PDEV handle from OSIF/HDD
+* @ctrl_pdev: Opaque PDEV object
 * @txrx_soc: Datapath SOC handle
 * @htc_handle: HTC handle for host-target interface
 * @qdf_osdev: QDF OS device
@@ -2705,7 +2764,7 @@ static void dp_rxdma_ring_config(struct dp_soc *soc)
 			if (soc->cdp_soc.ol_ops->
 				is_hw_dbs_2x2_capable) {
 				dbs_enable = soc->cdp_soc.ol_ops->
-					is_hw_dbs_2x2_capable(soc->psoc);
+					is_hw_dbs_2x2_capable(soc->ctrl_psoc);
 			}
 
 			if (dbs_enable) {
@@ -2975,6 +3034,8 @@ static void dp_vdev_register_wifi3(struct cdp_vdev *vdev_handle,
 		txrx_ops->tx.tx = dp_tx_send_mesh;
 	else
 		txrx_ops->tx.tx = dp_tx_send;
+
+	txrx_ops->tx.tx_exception = dp_tx_send_exception;
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO_LOW,
 		"DP Vdev Register success");
@@ -3573,12 +3634,6 @@ bool dp_peer_is_inact(void *peer)
 {
 	return false;
 }
-
-void dp_mark_peer_inact(void *peer, bool inactive)
-{
-	return;
-}
-
 #endif
 
 /*
@@ -4059,6 +4114,67 @@ static int dp_pdev_set_advance_monitor_filter(struct cdp_pdev *pdev_handle,
 	return QDF_STATUS_SUCCESS;
 }
 
+/**
+ * dp_vdev_get_filter_ucast_data() - get DP VDEV monitor ucast filter
+ * @vdev_handle: Datapath VDEV handle
+ * Return: true on ucast filter flag set
+ */
+static bool dp_vdev_get_filter_ucast_data(struct cdp_vdev *vdev_handle)
+{
+	struct dp_vdev *vdev = (struct dp_vdev *)vdev_handle;
+	struct dp_pdev *pdev;
+
+	pdev = vdev->pdev;
+
+	if ((pdev->fp_data_filter & FILTER_DATA_UCAST) ||
+	    (pdev->mo_data_filter & FILTER_DATA_UCAST))
+		return true;
+
+	return false;
+}
+
+/**
+ * dp_vdev_get_filter_mcast_data() - get DP VDEV monitor mcast filter
+ * @vdev_handle: Datapath VDEV handle
+ * Return: true on mcast filter flag set
+ */
+static bool dp_vdev_get_filter_mcast_data(struct cdp_vdev *vdev_handle)
+{
+	struct dp_vdev *vdev = (struct dp_vdev *)vdev_handle;
+	struct dp_pdev *pdev;
+
+	pdev = vdev->pdev;
+
+	if ((pdev->fp_data_filter & FILTER_DATA_MCAST) ||
+	    (pdev->mo_data_filter & FILTER_DATA_MCAST))
+		return true;
+
+	return false;
+}
+
+/**
+ * dp_vdev_get_filter_non_data() - get DP VDEV monitor non_data filter
+ * @vdev_handle: Datapath VDEV handle
+ * Return: true on non data filter flag set
+ */
+static bool dp_vdev_get_filter_non_data(struct cdp_vdev *vdev_handle)
+{
+	struct dp_vdev *vdev = (struct dp_vdev *)vdev_handle;
+	struct dp_pdev *pdev;
+
+	pdev = vdev->pdev;
+
+	if ((pdev->fp_mgmt_filter & FILTER_MGMT_ALL) ||
+	    (pdev->mo_mgmt_filter & FILTER_MGMT_ALL)) {
+		if ((pdev->fp_ctrl_filter & FILTER_CTRL_ALL) ||
+		    (pdev->mo_ctrl_filter & FILTER_CTRL_ALL)) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 #ifdef MESH_MODE_SUPPORT
 void dp_peer_set_mesh_mode(struct cdp_vdev *vdev_hdl, uint32_t val)
 {
@@ -4182,6 +4298,7 @@ void dp_aggregate_vdev_stats(struct dp_vdev *vdev)
 static inline void dp_aggregate_pdev_stats(struct dp_pdev *pdev)
 {
 	struct dp_vdev *vdev = NULL;
+	struct dp_soc *soc = pdev->soc;
 
 	qdf_mem_set(&(pdev->stats.tx), sizeof(pdev->stats.tx), 0x0);
 	qdf_mem_set(&(pdev->stats.rx), sizeof(pdev->stats.rx), 0x0);
@@ -4236,6 +4353,9 @@ static inline void dp_aggregate_pdev_stats(struct dp_pdev *pdev)
 		pdev->stats.tx_i.tso.num_seg =
 			vdev->stats.tx_i.tso.num_seg;
 	}
+	if (soc->cdp_soc.ol_ops->update_dp_stats)
+		soc->cdp_soc.ol_ops->update_dp_stats(pdev->osif_pdev,
+				&pdev->stats, pdev->pdev_id, UPDATE_PDEV_STATS);
 
 }
 
@@ -4602,6 +4722,8 @@ static inline void
 dp_txrx_host_stats_clr(struct dp_vdev *vdev)
 {
 	struct dp_peer *peer = NULL;
+	struct dp_soc *soc = (struct dp_soc *)vdev->pdev->soc;
+
 	DP_STATS_CLR(vdev->pdev);
 	DP_STATS_CLR(vdev->pdev->soc);
 	DP_STATS_CLR(vdev);
@@ -4609,8 +4731,21 @@ dp_txrx_host_stats_clr(struct dp_vdev *vdev)
 		if (!peer)
 			return;
 		DP_STATS_CLR(peer);
+
+		if (soc->cdp_soc.ol_ops->update_dp_stats) {
+			soc->cdp_soc.ol_ops->update_dp_stats(
+					vdev->pdev->osif_pdev,
+					&peer->stats,
+					peer->peer_ids[0],
+					UPDATE_PEER_STATS);
+		}
+
 	}
 
+	if (soc->cdp_soc.ol_ops->update_dp_stats)
+		soc->cdp_soc.ol_ops->update_dp_stats(vdev->pdev->osif_pdev,
+				&vdev->stats, (uint16_t)vdev->vdev_id,
+				UPDATE_VDEV_STATS);
 }
 
 /**
@@ -4769,6 +4904,10 @@ static inline void dp_print_peer_stats(struct dp_peer *peer)
 			peer->stats.tx.mcast.num);
 	DP_PRINT_STATS("Multicast Success Bytes = %llu",
 			peer->stats.tx.mcast.bytes);
+	DP_PRINT_STATS("Broadcast Success Packets = %d",
+			peer->stats.tx.bcast.num);
+	DP_PRINT_STATS("Broadcast Success Bytes = %llu",
+			peer->stats.tx.bcast.bytes);
 	DP_PRINT_STATS("Packets Failed = %d",
 			peer->stats.tx.tx_failed);
 	DP_PRINT_STATS("Packets In OFDMA = %d",
@@ -4825,6 +4964,15 @@ static inline void dp_print_peer_stats(struct dp_peer *peer)
 			peer->stats.tx.sgi_count[1],
 			peer->stats.tx.sgi_count[2],
 			peer->stats.tx.sgi_count[3]);
+	DP_PRINT_STATS("Excess Retries per AC ");
+	DP_PRINT_STATS("	 Best effort = %d",
+			peer->stats.tx.excess_retries_per_ac[0]);
+	DP_PRINT_STATS("	 Background= %d",
+			peer->stats.tx.excess_retries_per_ac[1]);
+	DP_PRINT_STATS("	 Video = %d",
+			peer->stats.tx.excess_retries_per_ac[2]);
+	DP_PRINT_STATS("	 Voice = %d",
+			peer->stats.tx.excess_retries_per_ac[3]);
 	DP_PRINT_STATS("BW Counts = 20MHZ %d 40MHZ %d 80MHZ %d 160MHZ %d\n",
 			peer->stats.tx.bw[2], peer->stats.tx.bw[3],
 			peer->stats.tx.bw[4], peer->stats.tx.bw[5]);
@@ -4859,6 +5007,10 @@ static inline void dp_print_peer_stats(struct dp_peer *peer)
 			peer->stats.rx.multicast.num);
 	DP_PRINT_STATS("Multicast Bytes Received = %llu",
 			peer->stats.rx.multicast.bytes);
+	DP_PRINT_STATS("Broadcast Packets Received = %d",
+			peer->stats.rx.bcast.num);
+	DP_PRINT_STATS("Broadcast Bytes Received = %llu",
+			peer->stats.rx.bcast.bytes);
 	DP_PRINT_STATS("WDS Packets Received = %d",
 			peer->stats.rx.wds.num);
 	DP_PRINT_STATS("WDS Bytes Received = %llu",
@@ -6014,9 +6166,9 @@ static struct cdp_mon_ops dp_ops_mon = {
 	.txrx_monitor_set_filter_ucast_data = NULL,
 	.txrx_monitor_set_filter_mcast_data = NULL,
 	.txrx_monitor_set_filter_non_data = NULL,
-	.txrx_monitor_get_filter_ucast_data = NULL,
-	.txrx_monitor_get_filter_mcast_data = NULL,
-	.txrx_monitor_get_filter_non_data = NULL,
+	.txrx_monitor_get_filter_ucast_data = dp_vdev_get_filter_ucast_data,
+	.txrx_monitor_get_filter_mcast_data = dp_vdev_get_filter_mcast_data,
+	.txrx_monitor_get_filter_non_data = dp_vdev_get_filter_non_data,
 	.txrx_reset_monitor_mode = dp_reset_monitor_mode,
 	/* Added support for HK advance filter */
 	.txrx_set_advance_monitor_filter = dp_pdev_set_advance_monitor_filter,
@@ -6273,7 +6425,7 @@ static void dp_soc_set_txrx_ring_map(struct dp_soc *soc)
 
 /*
  * dp_soc_attach_wifi3() - Attach txrx SOC
- * @osif_soc:		Opaque SOC handle from OSIF/HDD
+ * @ctrl_psoc:	Opaque SOC handle from control plane
  * @htc_handle:	Opaque HTC handle
  * @hif_handle:	Opaque HIF handle
  * @qdf_osdev:	QDF device
@@ -6285,12 +6437,12 @@ static void dp_soc_set_txrx_ring_map(struct dp_soc *soc)
  * -Wmissing-prototypes. A more correct solution, namely to expose
  * a prototype in an appropriate header file, will come later.
  */
-void *dp_soc_attach_wifi3(void *osif_soc, void *hif_handle,
+void *dp_soc_attach_wifi3(void *ctrl_psoc, void *hif_handle,
 	HTC_HANDLE htc_handle, qdf_device_t qdf_osdev,
-	struct ol_if_ops *ol_ops, struct wlan_objmgr_psoc *psoc);
-void *dp_soc_attach_wifi3(void *osif_soc, void *hif_handle,
+	struct ol_if_ops *ol_ops);
+void *dp_soc_attach_wifi3(void *ctrl_psoc, void *hif_handle,
 	HTC_HANDLE htc_handle, qdf_device_t qdf_osdev,
-	struct ol_if_ops *ol_ops, struct wlan_objmgr_psoc *psoc)
+	struct ol_if_ops *ol_ops)
 {
 	struct dp_soc *soc = qdf_mem_malloc(sizeof(*soc));
 
@@ -6302,13 +6454,12 @@ void *dp_soc_attach_wifi3(void *osif_soc, void *hif_handle,
 
 	soc->cdp_soc.ops = &dp_txrx_ops;
 	soc->cdp_soc.ol_ops = ol_ops;
-	soc->osif_soc = osif_soc;
+	soc->ctrl_psoc = ctrl_psoc;
 	soc->osdev = qdf_osdev;
 	soc->hif_handle = hif_handle;
-	soc->psoc = psoc;
 
 	soc->hal_soc = hif_get_hal_handle(hif_handle);
-	soc->htt_handle = htt_soc_attach(soc, osif_soc, htc_handle,
+	soc->htt_handle = htt_soc_attach(soc, ctrl_psoc, htc_handle,
 		soc->hal_soc, qdf_osdev);
 	if (!soc->htt_handle) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
@@ -6327,14 +6478,14 @@ void *dp_soc_attach_wifi3(void *osif_soc, void *hif_handle,
 	soc->cce_disable = false;
 
 	if (soc->cdp_soc.ol_ops->get_dp_cfg_param) {
-		int ret = soc->cdp_soc.ol_ops->get_dp_cfg_param(soc->osif_soc,
+		int ret = soc->cdp_soc.ol_ops->get_dp_cfg_param(soc->ctrl_psoc,
 				CDP_CFG_MAX_PEER_ID);
 
 		if (ret != -EINVAL) {
 			wlan_cfg_set_max_peer_id(soc->wlan_cfg_ctx, ret);
 		}
 
-		ret = soc->cdp_soc.ol_ops->get_dp_cfg_param(soc->osif_soc,
+		ret = soc->cdp_soc.ol_ops->get_dp_cfg_param(soc->ctrl_psoc,
 				CDP_CFG_CCE_DISABLE);
 		if (ret)
 			soc->cce_disable = true;
@@ -6414,7 +6565,7 @@ void dp_is_hw_dbs_enable(struct dp_soc *soc,
 	bool dbs_enable = false;
 	if (soc->cdp_soc.ol_ops->is_hw_dbs_2x2_capable)
 		dbs_enable = soc->cdp_soc.ol_ops->
-		is_hw_dbs_2x2_capable(soc->psoc);
+		is_hw_dbs_2x2_capable(soc->ctrl_psoc);
 
 	*max_mac_rings = (dbs_enable)?(*max_mac_rings):1;
 }

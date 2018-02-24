@@ -413,17 +413,17 @@ struct sta_uapsd_trig_params;
  * tdls module uses these functions to avail ol/da lmac services
  */
 struct wlan_lmac_if_tdls_tx_ops {
-	QDF_STATUS(*update_fw_state)(struct wlan_objmgr_psoc *psoc,
+	QDF_STATUS (*update_fw_state)(struct wlan_objmgr_psoc *psoc,
 				     struct tdls_info *req);
-	QDF_STATUS(*update_peer_state)(struct wlan_objmgr_psoc *psoc,
+	QDF_STATUS (*update_peer_state)(struct wlan_objmgr_psoc *psoc,
 				       struct tdls_peer_update_state *param);
-	QDF_STATUS(*set_offchan_mode)(struct wlan_objmgr_psoc *psoc,
+	QDF_STATUS (*set_offchan_mode)(struct wlan_objmgr_psoc *psoc,
 				      struct tdls_channel_switch_params *param);
-	QDF_STATUS(*tdls_reg_ev_handler)(struct wlan_objmgr_psoc *psoc,
+	QDF_STATUS (*tdls_reg_ev_handler)(struct wlan_objmgr_psoc *psoc,
 					 void *arg);
-	QDF_STATUS(*tdls_unreg_ev_handler) (struct wlan_objmgr_psoc *psoc,
+	QDF_STATUS (*tdls_unreg_ev_handler) (struct wlan_objmgr_psoc *psoc,
 					    void *arg);
-	QDF_STATUS(*tdls_set_uapsd)(struct wlan_objmgr_psoc *psoc,
+	QDF_STATUS (*tdls_set_uapsd)(struct wlan_objmgr_psoc *psoc,
 				    struct sta_uapsd_trig_params *params);
 };
 
@@ -436,7 +436,7 @@ struct tdls_event_info;
  * lmac modules uses this API to post scan events to tdls module
  */
 struct wlan_lmac_if_tdls_rx_ops {
-	QDF_STATUS(*tdls_ev_handler)(struct wlan_objmgr_psoc *psoc,
+	QDF_STATUS (*tdls_ev_handler)(struct wlan_objmgr_psoc *psoc,
 				     struct tdls_event_info *info);
 };
 #endif
@@ -520,6 +520,7 @@ struct wlan_lmac_if_reg_tx_ops {
  * @dfs_reg_ev_handler:                 Register dfs event handler.
  * @dfs_process_emulate_bang_radar_cmd: Process emulate bang radar test command.
  * @dfs_is_pdev_5ghz:                   Check if the given pdev is 5GHz.
+ * @dfs_set_phyerr_filter_offload:      Config phyerr filter offload.
  */
 
 struct wlan_lmac_if_dfs_tx_ops {
@@ -554,6 +555,11 @@ struct wlan_lmac_if_dfs_tx_ops {
 			struct dfs_emulate_bang_radar_test_cmd *dfs_unit_test);
 	QDF_STATUS (*dfs_is_pdev_5ghz)(struct wlan_objmgr_pdev *pdev,
 			bool *is_5ghz);
+	QDF_STATUS (*dfs_set_phyerr_filter_offload)(
+			struct wlan_objmgr_pdev *pdev,
+			bool dfs_phyerr_filter_offload);
+	QDF_STATUS (*dfs_is_tgt_offload)(struct wlan_objmgr_psoc *psoc,
+			bool *is_tgt_offload);
 };
 
 /**
@@ -563,12 +569,18 @@ struct wlan_lmac_if_dfs_tx_ops {
  * @tgt_is_tgt_type_ipq4019: To check IPQ4019 target type.
  * @tgt_is_tgt_type_qca9984: To check QCA9984 target type.
  * @tgt_is_tgt_type_qca9888: To check QCA9888 target type.
+ * @tgt_get_tgt_type:        Get target type
+ * @tgt_get_tgt_version:     Get target version
+ * @tgt_get_tgt_revision:    Get target revision
  */
 struct wlan_lmac_if_target_tx_ops {
 	bool (*tgt_is_tgt_type_ar900b)(uint32_t);
 	bool (*tgt_is_tgt_type_ipq4019)(uint32_t);
 	bool (*tgt_is_tgt_type_qca9984)(uint32_t);
 	bool (*tgt_is_tgt_type_qca9888)(uint32_t);
+	uint32_t (*tgt_get_tgt_type)(struct wlan_objmgr_psoc *psoc);
+	uint32_t (*tgt_get_tgt_version)(struct wlan_objmgr_psoc *psoc);
+	uint32_t (*tgt_get_tgt_revision)(struct wlan_objmgr_psoc *psoc);
 };
 
 #ifdef WLAN_OFFCHAN_TXRX_ENABLE
@@ -963,6 +975,8 @@ struct wlan_lmac_if_nan_rx_ops {
  * @dfs_process_radar_ind:            Process radar found indication.
  * @dfs_dfs_cac_complete_ind:         Process cac complete indication.
  * @dfs_stop:                         Clear dfs timers.
+ * @dfs_process_phyerr_filter_offload:Process radar event.
+ * @dfs_is_phyerr_filter_offload:     Check whether phyerr filter is offload.
  */
 struct wlan_lmac_if_dfs_rx_ops {
 	QDF_STATUS (*dfs_get_radars)(struct wlan_objmgr_pdev *pdev);
@@ -986,7 +1000,8 @@ struct wlan_lmac_if_dfs_rx_ops {
 			int *error);
 	QDF_STATUS (*dfs_is_precac_timer_running)(struct wlan_objmgr_pdev *pdev,
 			bool *is_precac_timer_running);
-	QDF_STATUS (*dfs_find_vht80_chan_for_precac)(struct wlan_objmgr_pdev *pdev,
+	QDF_STATUS (*dfs_find_vht80_chan_for_precac)(
+			struct wlan_objmgr_pdev *pdev,
 			uint32_t chan_mode,
 			uint8_t ch_freq_seg1,
 			uint32_t *cfreq1,
@@ -1019,6 +1034,12 @@ struct wlan_lmac_if_dfs_rx_ops {
 			uint32_t vdev_id);
 #endif
 	QDF_STATUS (*dfs_stop)(struct wlan_objmgr_pdev *pdev);
+	QDF_STATUS (*dfs_process_phyerr_filter_offload)(
+			struct wlan_objmgr_pdev *pdev,
+			struct radar_event_info *wlan_radar_info);
+	QDF_STATUS (*dfs_is_phyerr_filter_offload)(
+			struct wlan_objmgr_pdev *pdev,
+			bool *is_phyerr_filter_offload);
 };
 
 struct wlan_lmac_if_mlme_rx_ops {

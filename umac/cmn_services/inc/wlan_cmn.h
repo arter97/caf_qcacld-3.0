@@ -53,7 +53,6 @@
 #define WLAN_INVALID_MGMT_DESC_COUNT 0xFFFFFFFF
 
 /* 802.11 cap info */
-/* 802.11 cap info */
 #define WLAN_CAPINFO_ESS               0x0001
 #define WLAN_CAPINFO_IBSS              0x0002
 #define WLAN_CAPINFO_CF_POLLABLE       0x0004
@@ -71,11 +70,11 @@
 
 /* Allowed time to wait for Object creation  */
 #define WLAN_VDEV_CREATE_TIMEOUT_CNT 300
- /* 25 msec */
+/* 25 msec */
 #define WLAN_VDEV_CREATE_TIMEOUT 25
 
 #define WLAN_PDEV_CREATE_TIMEOUT_CNT 300
- /* 25 msec */
+/* 25 msec */
 #define WLAN_PDEV_CREATE_TIMEOUT 25
 
 #define WLAN_PSOC_CREATE_TIMEOUT_CNT 300
@@ -96,6 +95,122 @@
 
 #define WLAN_MAC_EID_VENDOR     221
 #define WLAN_MAC_EID_EXT        255
+
+/* VHT capability flags */
+/* B0-B1 Maximum MPDU Length */
+/* A-MSDU Length 3839 octets */
+#define WLAN_VHTCAP_MAX_MPDU_LEN_3839     0x00000000
+ /* A-MSDU Length 7991 octets */
+#define WLAN_VHTCAP_MAX_MPDU_LEN_7935     0x00000001
+/* A-MSDU Length 11454 octets */
+#define WLAN_VHTCAP_MAX_MPDU_LEN_11454    0x00000002
+
+/* B2-B3 Supported Channel Width */
+/* Does not support 160 or 80+80 */
+#define WLAN_VHTCAP_SUP_CHAN_WIDTH_80     0x00000000
+/* Supports 160 */
+#define WLAN_VHTCAP_SUP_CHAN_WIDTH_160    0x00000004
+/* Support both 160 or 80+80 */
+#define WLAN_VHTCAP_SUP_CHAN_WIDTH_80_160 0x00000008
+/* B2-B3 */
+#define WLAN_VHTCAP_SUP_CHAN_WIDTH_S      2
+#define WLAN_VHTCAP_SUP_CHAN_WIDTH_MASK   0x0000000C
+/* B4 RX LDPC */
+#define WLAN_VHTCAP_RX_LDPC             0x00000010
+/* B5 Short GI for 80MHz */
+#define WLAN_VHTCAP_SHORTGI_80          0x00000020
+/* B6 Short GI for 160 and 80+80 MHz */
+#define WLAN_VHTCAP_SHORTGI_160         0x00000040
+/* B7 Tx STBC */
+#define WLAN_VHTCAP_TX_STBC             0x00000080
+#define WLAN_VHTCAP_TX_STBC_S           7
+/* B8-B10 Rx STBC */
+#define WLAN_VHTCAP_RX_STBC             0x00000700
+#define WLAN_VHTCAP_RX_STBC_S           8
+/* B11 SU Beam former capable */
+#define WLAN_VHTCAP_SU_BFORMER          0x00000800
+#define WLAN_VHTCAP_SU_BFORMER_S        11
+/* B12 SU Beam formee capable */
+#define WLAN_VHTCAP_SU_BFORMEE          0x00001000
+#define WLAN_VHTCAP_SU_BFORMEE_S        12
+
+/* B13-B15 Compressed steering number of beacomformer Antennas supported */
+#define WLAN_VHTCAP_BF_MAX_ANT          0x0000E000
+#define WLAN_VHTCAP_BF_MAX_ANT_S        13
+/* B13-B15 Beamformee STS Capability */
+#define WLAN_VHTCAP_STS_CAP_S           13
+#define WLAN_VHTCAP_STS_CAP_M           0x7
+
+/* B16-B18 Sounding Dimensions */
+#define WLAN_VHTCAP_SOUND_DIM           0x00070000
+#define WLAN_VHTCAP_SOUND_DIM_S         16
+/* B19 MU Beam Former */
+#define WLAN_VHTCAP_MU_BFORMER          0x00080000
+#define WLAN_VHTCAP_MU_BFORMER_S        19
+/* B20 MU Beam Formee */
+#define WLAN_VHTCAP_MU_BFORMEE          0x00100000
+#define WLAN_VHTCAP_MU_BFORMEE_S        20
+/* B21 VHT TXOP PS */
+#define WLAN_VHTCAP_TXOP_PS             0x00200000
+/* B22 +HTC-VHT capable */
+#define WLAN_VHTCAP_PLUS_HTC_VHT        0x00400000
+
+#define WLAN_VHTCAP_MAX_AMPDU_LEN_FACTOR  13
+/* B23-B25 maximum AMPDU Length Exponent */
+#define WLAN_VHTCAP_MAX_AMPDU_LEN_EXP   0x03800000
+#define WLAN_VHTCAP_MAX_AMPDU_LEN_EXP_S 23
+/* B26-B27 VHT Link Adaptation capable */
+#define WLAN_VHTCAP_LINK_ADAPT          0x0C000000
+/* Rx Antenna Pattern Consistency Supported */
+#define WLAN_VHTCAP_RX_ANTENNA_PATTERN  0x10000000
+/* Tx Antenna Pattern Consistency Supported */
+#define WLAN_VHTCAP_TX_ANTENNA_PATTERN  0x20000000
+/* B30-B31 Extended NSS Bandwidth Support */
+#define WLAN_VHTCAP_NO_EXT_NSS_BW_SUPPORT  0x00000000
+/* B30-B31 Extended NSS Bandwidth Support */
+#define WLAN_VHTCAP_EXT_NSS_BW_SUPPORT_1   0x40000000
+/* B30-B31 Extended NSS Bandwidth Support */
+#define WLAN_VHTCAP_EXT_NSS_BW_SUPPORT_2   0x80000000
+/* B30-B31 Extended NSS Bandwidth Support */
+#define WLAN_VHTCAP_EXT_NSS_BW_SUPPORT_3   0xC0000000
+#define WLAN_VHTCAP_EXT_NSS_BW_SUPPORT_S   30
+#define WLAN_VHTCAP_EXT_NSS_BW_SUPPORT_MASK   0xC0000000
+
+#define WLAN_VHTCAP_EXT_NSS_MASK   (WLAN_VHTCAP_SUP_CHAN_WIDTH_MASK |\
+					 WLAN_VHTCAP_EXT_NSS_BW_SUPPORT_MASK)
+/* VHTCAP combinations of "supported channel width" and "ext nss support"
+ * which determine the NSS value supported by STA for <=80 MHz, 160 MHz
+ * and 80+80 MHz. The macros to be read as combination of
+ * "supported channel width" and "ext nss support" followed by NSS for 80MHz,
+ * 160MHz and 80+80MHz defined as a function of Max VHT NSS supported.
+ * Ex: WLAN_EXTNSS_MAP_01_80F1_160FDOT5_80P80NONE - To be reas as
+ * supported channel width = 0
+ * ext nss support = 1
+ * NSS value for <=80MHz = max_vht_nss * 1
+ * NSS value for 160MHz = max_vht_nss * (.5)
+ * NSS value for 80+80MHz = not supported
+ */
+#define WLAN_EXTNSS_MAP_00_80F1_160NONE_80P80NONE \
+	(WLAN_VHTCAP_SUP_CHAN_WIDTH_80 | WLAN_VHTCAP_NO_EXT_NSS_BW_SUPPORT)
+#define WLAN_EXTNSS_MAP_01_80F1_160FDOT5_80P80NONE \
+	(WLAN_VHTCAP_SUP_CHAN_WIDTH_80 | WLAN_VHTCAP_EXT_NSS_BW_SUPPORT_1)
+#define WLAN_EXTNSS_MAP_02_80F1_160FDOT5_80P80FDOT5 \
+	(WLAN_VHTCAP_SUP_CHAN_WIDTH_80 | WLAN_VHTCAP_EXT_NSS_BW_SUPPORT_2)
+#define WLAN_EXTNSS_MAP_03_80F1_160FDOT75_80P80FDOT75 \
+	(WLAN_VHTCAP_SUP_CHAN_WIDTH_80 | WLAN_VHTCAP_EXT_NSS_BW_SUPPORT_3)
+#define WLAN_EXTNSS_MAP_10_80F1_160F1_80P80NONE \
+	(WLAN_VHTCAP_SUP_CHAN_WIDTH_160 | WLAN_VHTCAP_NO_EXT_NSS_BW_SUPPORT)
+#define WLAN_EXTNSS_MAP_11_80F1_160F1_80P80FDOT5 \
+	(WLAN_VHTCAP_SUP_CHAN_WIDTH_160 | WLAN_VHTCAP_EXT_NSS_BW_SUPPORT_1)
+#define WLAN_EXTNSS_MAP_12_80F1_160F1_80P80FDOT75 \
+	(WLAN_VHTCAP_SUP_CHAN_WIDTH_160 | WLAN_VHTCAP_EXT_NSS_BW_SUPPORT_2)
+#define WLAN_EXTNSS_MAP_13_80F2_160F2_80P80F1 \
+	(WLAN_VHTCAP_SUP_CHAN_WIDTH_160 | WLAN_VHTCAP_EXT_NSS_BW_SUPPORT_3)
+#define WLAN_EXTNSS_MAP_20_80F1_160F1_80P80F1 \
+	(WLAN_VHTCAP_SUP_CHAN_WIDTH_80_160 | WLAN_VHTCAP_NO_EXT_NSS_BW_SUPPORT)
+#define WLAN_EXTNSS_MAP_23_80F2_160F1_80P80F1 \
+	(WLAN_VHTCAP_SUP_CHAN_WIDTH_80_160 | WLAN_VHTCAP_EXT_NSS_BW_SUPPORT_3)
+
 
 /**
  * enum wlan_umac_comp_id - UMAC component id
@@ -119,12 +234,14 @@
  * @WLAN_UMAC_COMP_DFS:           DFS
  * @WLAN_UMAC_COMP_SPECTRAL:      Spectral
  * @WLAN_UMAC_COMP_OFFCHAN_TXRX:  Offchan TxRx
+ * @WLAN_UMAC_COMP_SON:           SON
+ * @WLAN_UMAC_COMP_SPECTRAL:      Spectral
  * @WLAN_UMAC_COMP_SPLITMAC:      SplitMAC
  * @WLAN_UMAC_COMP_DISA:          DISA encryption test
  * @WLAN_UMAC_COMP_GREEN_AP:      Green AP
  * @WLAN_UMAC_COMP_FTM:           FTM component
  * @WLAN_UMAC_COMP_FD:            FILS Discovery
- *
+ * @WLAN_UMAC_COMP_OCB:           OCB
  * @WLAN_UMAC_COMP_ID_MAX:        Maximum components in UMAC
  *
  * This id is static.
@@ -156,6 +273,7 @@ enum wlan_umac_comp_id {
 	WLAN_UMAC_COMP_GREEN_AP,
 	WLAN_UMAC_COMP_FTM,
 	WLAN_UMAC_COMP_FD,
+	WLAN_UMAC_COMP_OCB,
 	WLAN_UMAC_COMP_ID_MAX,
 };
 
@@ -192,6 +310,17 @@ typedef enum {
  *  @WLAN_PHYMODE_11AC_VHT80:     5Ghz, VHT80
  *  @WLAN_PHYMODE_11AC_VHT160:    5Ghz, VHT160
  *  @WLAN_PHYMODE_11AC_VHT80_80:  5Ghz, VHT80_80
+ *  @WLAN_PHYMODE_11AXA_HE20:     5GHz, HE20
+ *  @WLAN_PHYMODE_11AXG_HE20:     2GHz, HE20
+ *  @WLAN_PHYMODE_11AXA_HE40PLUS: 5GHz, HE40 (ext ch +1)
+ *  @WLAN_PHYMODE_11AXA_HE40MINUS:5GHz, HE40 (ext ch -1)
+ *  @WLAN_PHYMODE_11AXG_HE40PLUS: 2GHz, HE40 (ext ch +1)
+ *  @WLAN_PHYMODE_11AXG_HE40MINUS:2GHz, HE40 (ext ch -1)
+ *  @WLAN_PHYMODE_11AXA_HE40:     5GHz, HE40
+ *  @WLAN_PHYMODE_11AXG_HE40:     2GHz, HE40
+ *  @WLAN_PHYMODE_11AXA_HE80:     5GHz, HE80
+ *  @WLAN_PHYMODE_11AXA_HE160:    5GHz, HE160
+ *  @WLAN_PHYMODE_11AXA_HE80_80:  5GHz, HE80_80
  */
 enum wlan_phymode {
 	WLAN_PHYMODE_AUTO             = 0,
@@ -213,9 +342,44 @@ enum wlan_phymode {
 	WLAN_PHYMODE_11AC_VHT80       = 16,
 	WLAN_PHYMODE_11AC_VHT160      = 17,
 	WLAN_PHYMODE_11AC_VHT80_80    = 18,
+	WLAN_PHYMODE_11AXA_HE20       = 19,
+	WLAN_PHYMODE_11AXG_HE20       = 20,
+	WLAN_PHYMODE_11AXA_HE40PLUS   = 21,
+	WLAN_PHYMODE_11AXA_HE40MINUS  = 22,
+	WLAN_PHYMODE_11AXG_HE40PLUS   = 23,
+	WLAN_PHYMODE_11AXG_HE40MINUS  = 24,
+	WLAN_PHYMODE_11AXA_HE40       = 25,
+	WLAN_PHYMODE_11AXG_HE40       = 26,
+	WLAN_PHYMODE_11AXA_HE80       = 27,
+	WLAN_PHYMODE_11AXA_HE160      = 28,
+	WLAN_PHYMODE_11AXA_HE80_80    = 29,
 };
 
-#define WLAN_PHYMODE_MAX      (WLAN_PHYMODE_11AC_VHT80_80 + 1)
+#define WLAN_PHYMODE_MAX      (WLAN_PHYMODE_11AXA_HE80_80 + 1)
+
+/**
+ * enum wlan_phy_ch_width - channel width
+ * @WLAN_CH_WIDTH_20MHZ: 20 mhz width
+ * @WLAN_CH_WIDTH_40MHZ: 40 mhz width
+ * @WLAN_CH_WIDTH_80MHZ: 80 mhz width
+ * @WLAN_CH_WIDTH_160MHZ: 160 mhz width
+ * @WLAN_CH_WIDTH_80P80HZ: 80+80 mhz width
+ * @WLAN_CH_WIDTH_5MHZ: 5 mhz width
+ * @WLAN_CH_WIDTH_10MHZ: 10 mhz width
+ * @WLAN_CH_WIDTH_INVALID: invalid width
+ * @WLAN_CH_WIDTH_MAX: max possible width
+ */
+enum wlan_phy_ch_width {
+	WLAN_CH_WIDTH_20MHZ = 0,
+	WLAN_CH_WIDTH_40MHZ,
+	WLAN_CH_WIDTH_80MHZ,
+	WLAN_CH_WIDTH_160MHZ,
+	WLAN_CH_WIDTH_80P80MHZ,
+	WLAN_CH_WIDTH_5MHZ,
+	WLAN_CH_WIDTH_10MHZ,
+	WLAN_CH_WIDTH_INVALID,
+	WLAN_CH_WIDTH_MAX
+};
 
 /**
  * enum wifi_traffic_ac - access category type
@@ -402,5 +566,14 @@ struct wlan_ssid {
 #define WLAN_ADDR_COPY(dst, src)    qdf_mem_copy(dst, src, WLAN_MACADDR_LEN)
 /* Util API to compare the MAC address */
 #define WLAN_ADDR_EQ(a1, a2)   qdf_mem_cmp(a1, a2, WLAN_MACADDR_LEN)
+
+#define PSOC_SERVICE_BM_SIZE ((128 + sizeof(uint32_t) - 1) / sizeof(uint32_t))
+#define PSOC_HOST_MAX_NUM_SS (8)
+#define PSOC_HOST_MAX_PHY_SIZE (3)
+#define PSOC_MAX_HW_MODE (2)
+#define PSOC_MAX_MAC_PHY_CAP (5)
+#define PSOC_MAX_PHY_REG_CAP (3)
+#define PSOC_MAX_CHAINMASK_TABLES (5)
+
 
 #endif /* _WLAN_OBJMGR_CMN_H_*/

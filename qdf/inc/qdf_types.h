@@ -317,7 +317,7 @@ typedef void (*qdf_timer_func_t)(void *);
  * @QDF_MODULE_ID_P2P: P2P module ID
  * @QDF_MODULE_ID_POLICY_MGR: Policy Manager module ID
  * @QDF_MODULE_ID_CONFIG: CONFIG module ID
- * @QDF_MODULE_ID_REGULATORY    : REGULATORY module ID
+ * @QDF_MODULE_ID_REGULATORY: REGULATORY module ID
  * @QDF_MODULE_ID_NAN: NAN module ID
  * @QDF_MODULE_ID_SPECTRAL: Spectral module ID
  * @QDF_MODULE_ID_ROAM_DEBUG: Roam Debug logging
@@ -328,6 +328,7 @@ typedef void (*qdf_timer_func_t)(void *);
  * @QDF_MODULE_ID_FTM: FTM module ID
  * @QDF_MODULE_ID_EXTAP: Extender AP module ID
  * @QDF_MODULE_ID_FD: FILS discovery logging
+ * @QDF_MODULE_ID_OCB: OCB module ID
  * @QDF_MODULE_ID_ANY: anything
  * @QDF_MODULE_ID_MAX: Max place holder module ID
  */
@@ -428,6 +429,7 @@ typedef enum {
 	QDF_MODULE_ID_FTM,
 	QDF_MODULE_ID_EXTAP,
 	QDF_MODULE_ID_FD,
+	QDF_MODULE_ID_OCB,
 	QDF_MODULE_ID_ANY,
 	QDF_MODULE_ID_MAX,
 } QDF_MODULE_ID;
@@ -658,13 +660,6 @@ typedef enum {
 #define QDF_MAC_ADDR_ARRAY(a) (a)[0], (a)[1], (a)[2], (a)[3], (a)[4], (a)[5]
 #define QDF_MAC_ADDR_BCAST_INIT { { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff } }
 #define QDF_MAC_ADDR_ZERO_INIT { { 0, 0, 0, 0, 0, 0 } }
-
-/* backwards compatibility; use QDF_MAC_ADDR_STR instead */
-#define QDF_MAC_ADDRESS_STR QDF_MAC_ADDR_STR
-/* backwards compatibility; use QDF_MAC_ADDR_BCAST_INIT instead */
-#define QDF_MAC_ADDR_BROADCAST_INITIALIZER QDF_MAC_ADDR_BCAST_INIT
-/* backwards compatibility; use QDF_MAC_ADDR_ZERO_INIT instead */
-#define QDF_MAC_ADDR_ZERO_INITIALIZER QDF_MAC_ADDR_ZERO_INIT
 
 /**
  * struct qdf_mac_addr - A MAC address

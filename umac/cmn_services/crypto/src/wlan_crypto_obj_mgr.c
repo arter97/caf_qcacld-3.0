@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2018 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -150,7 +150,6 @@ static QDF_STATUS wlan_crypto_peer_obj_create_handler(
 						void *arg)
 {
 	struct wlan_crypto_comp_priv *crypto_priv;
-	uint8_t keymac[WLAN_ALEN];
 	QDF_STATUS status;
 
 	if (!peer)
@@ -166,10 +165,8 @@ static QDF_STATUS wlan_crypto_peer_obj_create_handler(
 
 	if (status == QDF_STATUS_SUCCESS) {
 		if (wlan_vdev_get_selfpeer(peer->peer_objmgr.vdev) != peer) {
-			qdf_copy_macaddr((struct qdf_mac_addr *)keymac,
-			(struct qdf_mac_addr *)wlan_peer_get_macaddr(peer));
 			wlan_crypto_set_peer_wep_keys(
-					wlan_peer_get_vdev(peer), keymac);
+					wlan_peer_get_vdev(peer), peer);
 		}
 	} else {
 		qdf_print("%s[%d] peer obj failed status %d\n",
@@ -270,8 +267,9 @@ static QDF_STATUS wlan_crypto_peer_obj_destroy_handler(
 	return QDF_STATUS_SUCCESS;
 }
 /**
- * wlan_crypto_init - Init the crypto service with object manager
- *                    Called from umac init context.
+ * __wlan_crypto_init - Init the crypto service with object manager
+ *                    Called from crypto init context.
+ *
  * Return: QDF_STATUS_SUCCESS - in case of success
  */
 QDF_STATUS __wlan_crypto_init(void)
@@ -320,8 +318,9 @@ register_success:
 }
 
 /**
- * wlan_crypto_deinit - Deinit the crypto service with object manager
- *                    Called from umac deinit context.
+ * __wlan_crypto_deinit - Deinit the crypto service with object manager
+ *                         Called from crypto context.
+ *
  * Return: QDF_STATUS_SUCCESS - in case of success
  */
 QDF_STATUS __wlan_crypto_deinit(void)

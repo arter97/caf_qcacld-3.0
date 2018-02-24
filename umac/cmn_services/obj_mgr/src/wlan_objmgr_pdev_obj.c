@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -110,6 +110,7 @@ struct wlan_objmgr_pdev *wlan_objmgr_pdev_obj_create(
 		obj_mgr_err("pdev alloc failed");
 		return NULL;
 	}
+	pdev->obj_state = WLAN_OBJ_STATE_ALLOCATED;
 	/* Attach PDEV with PSOC */
 	if (wlan_objmgr_psoc_pdev_attach(psoc, pdev)
 				!= QDF_STATUS_SUCCESS) {
@@ -127,7 +128,7 @@ struct wlan_objmgr_pdev *wlan_objmgr_pdev_obj_create(
 	pdev->pdev_objmgr.wlan_vdev_count = 0;
 	pdev->pdev_objmgr.max_vdev_count = WLAN_UMAC_PDEV_MAX_VDEVS;
 	pdev->pdev_objmgr.wlan_peer_count = 0;
-	pdev->pdev_objmgr.max_peer_count = WLAN_UMAC_PSOC_MAX_PEERS;
+	pdev->pdev_objmgr.max_peer_count = wlan_psoc_get_max_peer_count(psoc);
 	/* Save HDD/OSIF pointer */
 	pdev->pdev_nif.pdev_ospriv = osdev_priv;
 	qdf_atomic_init(&pdev->pdev_objmgr.ref_cnt);
@@ -168,6 +169,9 @@ struct wlan_objmgr_pdev *wlan_objmgr_pdev_obj_create(
 		wlan_objmgr_pdev_obj_delete(pdev);
 		return NULL;
 	}
+
+	obj_mgr_info("Created pdev %d", pdev->pdev_objmgr.wlan_pdev_id);
+
 	return pdev;
 }
 EXPORT_SYMBOL(wlan_objmgr_pdev_obj_create);
@@ -186,6 +190,8 @@ static QDF_STATUS wlan_objmgr_pdev_obj_destroy(struct wlan_objmgr_pdev *pdev)
 	}
 
 	pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
+
+	obj_mgr_info("Physically deleting pdev %d", pdev_id);
 
 	if (pdev->obj_state != WLAN_OBJ_STATE_LOGICALLY_DELETED) {
 		obj_mgr_err("pdev object delete is not invoked: pdev-id:%d",
@@ -232,11 +238,12 @@ QDF_STATUS wlan_objmgr_pdev_obj_delete(struct wlan_objmgr_pdev *pdev)
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	obj_mgr_info("Logically deleting pdev %d",
+		     pdev->pdev_objmgr.wlan_pdev_id);
+
 	print_idx = qdf_get_pidx();
 	if (qdf_print_is_verbose_enabled(print_idx, QDF_MODULE_ID_OBJ_MGR,
 		QDF_TRACE_LEVEL_DEBUG)) {
-		obj_mgr_debug("Logically deleting the pdev(id:%d)",
-					pdev->pdev_objmgr.wlan_pdev_id);
 		wlan_objmgr_print_ref_ids(pdev->pdev_objmgr.ref_id_dbg);
 	}
 
@@ -824,13 +831,13 @@ QDF_STATUS wlan_objmgr_pdev_try_get_ref(struct wlan_objmgr_pdev *pdev,
 
 	wlan_pdev_obj_lock(pdev);
 	pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
-	if (pdev->obj_state == WLAN_OBJ_STATE_LOGICALLY_DELETED) {
+	if (pdev->obj_state != WLAN_OBJ_STATE_CREATED) {
 		wlan_pdev_obj_unlock(pdev);
 		if (pdev->pdev_objmgr.print_cnt++ <=
 				WLAN_OBJMGR_RATELIMIT_THRESH)
-			obj_mgr_err("[Ref id: %d] pdev [%d] is in L-Del state",
-					id, pdev_id);
-
+			obj_mgr_err(
+			"[Ref id: %d] pdev [%d] is not in Created(st:%d)",
+					id, pdev_id, pdev->obj_state);
 		return QDF_STATUS_E_RESOURCES;
 	}
 

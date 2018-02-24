@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2018 The Linux Foundation. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -21,6 +21,8 @@
  * DOC: target_if_reg.h
  * This file contains regulatory target interface
  */
+#ifndef __TARGET_IF_REG_H__
+#define __TARGET_IF_REG_H__
 
 /**
  * target_if_register_regulatory_tx_ops() - register regulatory tx ops
@@ -38,3 +40,5 @@ QDF_STATUS target_if_register_regulatory_tx_ops(struct wlan_lmac_if_tx_ops
  * Return: Success or Failure
  */
 QDF_STATUS target_if_reg_set_offloaded_info(struct wlan_objmgr_psoc *psoc);
+
+#endif /* __TARGET_IF_REG_H__ */

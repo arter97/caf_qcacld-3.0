@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -73,13 +73,7 @@
 /* WLAN 5GHz channel number 170 freq */
 #define DFS_CHAN_170_FREQ        (5852)
 
-/* dfs offload service bit */
-#define DFS_SERVICE_PHYERR_OFFLOAD 113
 
-/* check if dfs offload enabled */
-#define DFS_OFFLOAD_IS_ENABLED(service_bitmap) \
-	(((service_bitmap)[(DFS_SERVICE_PHYERR_OFFLOAD)/(sizeof(A_UINT32))] & \
-	   (1 << ((DFS_SERVICE_PHYERR_OFFLOAD)%(sizeof(A_UINT32))))) != 0)
 
 extern struct dfs_to_mlme global_dfs_to_mlme;
 
@@ -421,6 +415,26 @@ uint32_t utils_dfs_chan_to_freq(uint8_t chan);
 QDF_STATUS utils_dfs_update_cur_chan_flags(struct wlan_objmgr_pdev *pdev,
 		uint64_t flags,
 		uint16_t flagext);
+
+#ifdef QCA_MCL_DFS_SUPPORT
+/**
+ * utils_dfs_mark_leaking_ch() - to mark channel leaking in to nol
+ * @pdev: Pointer to pdev structure.
+ * @ch_width: channel width
+ * @temp_ch_lst_sz: the target channel list
+ * @temp_ch_lst: the target channel list
+ *
+ * This function removes the channels from temp channel list that
+ * (if selected as target channel) will cause leakage in one of
+ * the NOL channels
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS utils_dfs_mark_leaking_ch(struct wlan_objmgr_pdev *pdev,
+	enum phy_ch_width ch_width,
+	uint8_t temp_ch_lst_sz,
+	uint8_t *temp_ch_lst);
+#endif
 
 /**
  * utils_get_dfsdomain() - Get DFS domain.

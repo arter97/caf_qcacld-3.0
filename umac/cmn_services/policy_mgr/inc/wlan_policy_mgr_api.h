@@ -201,6 +201,7 @@ QDF_STATUS policy_mgr_change_mcc_go_beacon_interval(
  * @vdev_id: Vdev id
  * @channel: Channel to change
  * @ch_width: channel width to change
+ * @forced: Force to switch channel, ignore SCC/MCC check
  *
  * Invoke the callback function to change SAP channel using (E)CSA
  *
@@ -209,12 +210,14 @@ QDF_STATUS policy_mgr_change_mcc_go_beacon_interval(
 void policy_mgr_change_sap_channel_with_csa(
 		struct wlan_objmgr_psoc *psoc,
 		uint8_t vdev_id, uint32_t channel,
-		uint32_t ch_width);
+		uint32_t ch_width,
+		bool forced);
 #else
 static inline void policy_mgr_change_sap_channel_with_csa(
 		struct wlan_objmgr_psoc *psoc,
 		uint8_t vdev_id, uint32_t channel,
-		uint32_t ch_width)
+		uint32_t ch_width,
+		bool forced)
 {
 
 }
@@ -809,7 +812,8 @@ struct policy_mgr_sme_cbacks {
 struct policy_mgr_hdd_cbacks {
 	void (*sap_restart_chan_switch_cb)(struct wlan_objmgr_psoc *psoc,
 				uint8_t vdev_id, uint32_t channel,
-				uint32_t channel_bw);
+				uint32_t channel_bw,
+				bool forced);
 	QDF_STATUS (*wlan_hdd_get_channel_for_sap_restart)(
 				struct wlan_objmgr_psoc *psoc,
 				uint8_t vdev_id, uint8_t *channel,
@@ -857,13 +861,10 @@ struct policy_mgr_dp_cbacks {
  * from policy manager
  * @wma_get_connection_info: Get the connection related info
  *                         from wma table
- * @wma_is_service_enabled: check if certain service is enabled
- *                        by FW
  */
 struct policy_mgr_wma_cbacks {
 	QDF_STATUS (*wma_get_connection_info)(uint8_t vdev_id,
 		struct policy_mgr_vdev_entry_info *conn_table_entry);
-	bool (*wma_is_service_enabled)(WMI_SERVICE service_type);
 };
 
 /**
@@ -980,6 +981,19 @@ QDF_STATUS policy_mgr_get_channel_from_scan_result(
  * Return: QDF_STATUS
  */
 QDF_STATUS policy_mgr_mode_specific_num_open_sessions(
+		struct wlan_objmgr_psoc *psoc, enum QDF_OPMODE mode,
+		uint8_t *num_sessions);
+
+/**
+ * policy_mgr_mode_specific_num_active_sessions() - to get number of active
+ *               sessions for a specific mode
+ * @psoc: PSOC object information
+ * @mode: device mode
+ * @num_sessions: to store num active sessions
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS policy_mgr_mode_specific_num_active_sessions(
 		struct wlan_objmgr_psoc *psoc, enum QDF_OPMODE mode,
 		uint8_t *num_sessions);
 

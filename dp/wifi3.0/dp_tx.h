@@ -146,6 +146,8 @@ QDF_STATUS dp_tx_pdev_detach(struct dp_pdev *pdev);
 QDF_STATUS dp_tx_pdev_attach(struct dp_pdev *pdev);
 
 qdf_nbuf_t dp_tx_send(void *data_vdev, qdf_nbuf_t nbuf);
+qdf_nbuf_t dp_tx_send_exception(void *data_vdev, qdf_nbuf_t nbuf,
+				struct cdp_tx_exception_metadata *tx_exc);
 qdf_nbuf_t dp_tx_send_mesh(void *data_vdev, qdf_nbuf_t nbuf);
 
 #ifdef CONVERGED_TDLS_ENABLE
@@ -155,7 +157,7 @@ qdf_nbuf_t dp_tx_non_std(struct cdp_vdev *vdev_handle,
 
 uint32_t dp_tx_comp_handler(struct dp_soc *soc, void *hal_srng, uint32_t quota);
 
-int32_t
+QDF_STATUS
 dp_tx_prepare_send_me(struct dp_vdev *vdev, qdf_nbuf_t nbuf);
 
 #ifndef CONVERGED_TDLS_ENABLE
@@ -191,7 +193,8 @@ static inline void dp_tx_me_exit(struct dp_pdev *pdev)
 #ifdef FEATURE_PERPKT_INFO
 QDF_STATUS
 dp_send_compl_to_stack(struct dp_soc *soc,  struct dp_pdev *pdev,
-		      uint16_t peer_id, uint32_t ppdu_id, qdf_nbuf_t netbuf);
+		      uint16_t peer_id, uint32_t ppdu_id, uint8_t first_msdu,
+		      uint8_t last_msdu, qdf_nbuf_t netbuf);
 #endif
 
 /* TODO TX_FEATURE_NOT_YET */

@@ -1691,9 +1691,8 @@ void qdf_dp_display_proto_pkt(struct qdf_dp_trace_record_s *record,
 	struct qdf_dp_trace_proto_buf *buf =
 		(struct qdf_dp_trace_proto_buf *)record->data;
 
-	DPTRACE_PRINT("DPT: %04d: %s [%d] [%s%s] SA: "
-		QDF_MAC_ADDRESS_STR " %s DA: "
-		QDF_MAC_ADDRESS_STR,
+	DPTRACE_PRINT("DPT: %04d: %s [%d] [%s%s] SA: " QDF_MAC_ADDR_STR
+		" %s DA: " QDF_MAC_ADDR_STR,
 		index,
 		(live == true) ? "" : record->time,
 		buf->vdev_id,
@@ -2121,6 +2120,8 @@ struct category_name_info g_qdf_category_name[MAX_SUPPORTED_CATEGORY] = {
 	[QDF_MODULE_ID_GREEN_AP] = {"GREEN_AP"},
 	[QDF_MODULE_ID_EXTAP] = {"EXTAP"},
 	[QDF_MODULE_ID_FD] = {"FILS discovery"},
+	[QDF_MODULE_ID_FTM] = {"FTM"},
+	[QDF_MODULE_ID_OCB] = {"OCB"},
 	[QDF_MODULE_ID_ANY] = {"ANY"},
 };
 EXPORT_SYMBOL(g_qdf_category_name);
@@ -2576,7 +2577,7 @@ static void set_default_trace_levels(struct category_info *cinfo)
 		[QDF_MODULE_ID_DP] = QDF_TRACE_LEVEL_FATAL,
 		[QDF_MODULE_ID_SOC] = QDF_TRACE_LEVEL_NONE,
 		[QDF_MODULE_ID_OS_IF] = QDF_TRACE_LEVEL_NONE,
-		[QDF_MODULE_ID_TARGET_IF] = QDF_TRACE_LEVEL_NONE,
+		[QDF_MODULE_ID_TARGET_IF] = QDF_TRACE_LEVEL_INFO,
 		[QDF_MODULE_ID_SCHEDULER] = QDF_TRACE_LEVEL_NONE,
 		[QDF_MODULE_ID_MGMT_TXRX] = QDF_TRACE_LEVEL_NONE,
 		[QDF_MODULE_ID_PMO] = QDF_TRACE_LEVEL_NONE,
@@ -2592,6 +2593,8 @@ static void set_default_trace_levels(struct category_info *cinfo)
 		[QDF_MODULE_ID_GREEN_AP] = QDF_TRACE_LEVEL_ERROR,
 		[QDF_MODULE_ID_EXTAP] = QDF_TRACE_LEVEL_NONE,
 		[QDF_MODULE_ID_FD] = QDF_TRACE_LEVEL_ERROR,
+		[QDF_MODULE_ID_FTM] = QDF_TRACE_LEVEL_ERROR,
+		[QDF_MODULE_ID_OCB] = QDF_TRACE_LEVEL_ERROR,
 		[QDF_MODULE_ID_ANY] = QDF_TRACE_LEVEL_NONE,
 	};
 

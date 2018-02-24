@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2018 The Linux Foundation. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -59,6 +59,15 @@ QDF_STATUS wlan_reg_read_default_country(struct wlan_objmgr_psoc *psoc,
 	 * Get the default country information
 	 */
 	return reg_read_default_country(psoc, country);
+}
+
+QDF_STATUS wlan_reg_read_current_country(struct wlan_objmgr_psoc *psoc,
+					 uint8_t *country)
+{
+	/*
+	 * Get the current country information
+	 */
+	return reg_read_current_country(psoc, country);
 }
 
 /**
@@ -377,6 +386,26 @@ QDF_STATUS regulatory_psoc_close(struct wlan_objmgr_psoc *psoc)
 	if (tx_ops->unregister_ch_avoid_event_handler)
 		tx_ops->unregister_ch_avoid_event_handler(psoc, NULL);
 
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS regulatory_pdev_open(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_objmgr_psoc *parent_psoc;
+	QDF_STATUS status;
+
+	parent_psoc = wlan_pdev_get_psoc(pdev);
+
+	status = reg_send_scheduler_msg_sb(parent_psoc, pdev);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		reg_err("scheduler send msg failed");
+
+	return status;
+}
+
+QDF_STATUS regulatory_pdev_close(struct wlan_objmgr_pdev *pdev)
+{
 	return QDF_STATUS_SUCCESS;
 }
 

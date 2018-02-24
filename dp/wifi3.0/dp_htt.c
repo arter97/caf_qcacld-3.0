@@ -2113,7 +2113,7 @@ static void dp_process_ppdu_stats_user_compltn_flush_tlv(struct dp_pdev *pdev,
 	tid = HTT_PPDU_STATS_FLUSH_TLV_TID_NUM_GET(*tag_buf);
 
 	if (drop_reason == HTT_FLUSH_EXCESS_RETRIES) {
-		DP_STATS_INC(peer, tx.excess_retries[TID_TO_WME_AC(tid)],
+		DP_STATS_INC(peer, tx.excess_retries_per_ac[TID_TO_WME_AC(tid)],
 					num_msdu);
 	}
 }
@@ -2249,6 +2249,10 @@ static QDF_STATUS dp_htt_process_tlv(struct dp_pdev *pdev,
 		if (tlv_type == HTT_PPDU_STATS_SCH_CMD_STATUS_TLV)
 			status = QDF_STATUS_SUCCESS;
 
+		if ((tlv_type == HTT_PPDU_STATS_USR_COMPLTN_ACK_BA_STATUS_TLV) &&
+				(pdev->last_ppdu_id != ppdu_id))
+			status = QDF_STATUS_SUCCESS;
+
 		tlv_length += HTT_TLV_HDR_LEN;
 		dp_process_ppdu_tag(pdev, msg_word, tlv_length);
 
@@ -2256,6 +2260,7 @@ static QDF_STATUS dp_htt_process_tlv(struct dp_pdev *pdev,
 		msg_word = (uint32_t *)((uint8_t *)tlv_buf + tlv_length);
 		length -= (tlv_length);
 	}
+	pdev->last_ppdu_id = ppdu_id;
 	return status;
 }
 #endif /* FEATURE_PERPKT_INFO */
@@ -2274,7 +2279,6 @@ static void dp_txrx_ppdu_stats_handler(struct dp_soc *soc,
 		uint8_t pdev_id, qdf_nbuf_t htt_t2h_msg)
 {
 	struct dp_pdev *pdev = soc->pdev_list[pdev_id];
-	struct dp_vdev *vdev;
 	struct dp_peer *peer;
 	struct cdp_tx_completion_ppdu *ppdu_desc;
 	int status;
@@ -2321,8 +2325,7 @@ static void dp_txrx_ppdu_stats_handler(struct dp_soc *soc,
 		ppdu_desc = (struct cdp_tx_completion_ppdu *)
 			qdf_nbuf_data(pdev->tx_ppdu_info.buf);
 
-		vdev = dp_get_vdev_from_soc_vdev_id_wifi3(soc,
-				ppdu_desc->vdev_id);
+		ppdu_desc->num_users = pdev->tx_ppdu_info.last_user;
 
 		for (i = 0; i < ppdu_desc->num_users; i++) {
 			peer = dp_peer_find_by_id(soc,
@@ -2333,7 +2336,7 @@ static void dp_txrx_ppdu_stats_handler(struct dp_soc *soc,
 			ppdu_desc->num_mpdu += ppdu_desc->user[i].num_mpdu;
 			ppdu_desc->num_msdu += ppdu_desc->user[i].num_msdu;
 
-			if (ppdu_desc->frame_type == CDP_PPDU_FTYPE_DATA) {
+			if (ppdu_desc->user[i].tid < CDP_DATA_TID_MAX) {
 				dp_tx_stats_update(soc, peer,
 						&ppdu_desc->user[i],
 						ppdu_desc->ack_rssi);
@@ -2764,7 +2767,7 @@ htt_htc_soc_attach(struct htt_soc *soc)
 /*
  * htt_soc_attach() - SOC level HTT initialization
  * @dp_soc:	Opaque Data path SOC handle
- * @osif_soc:	Opaque OSIF SOC handle
+ * @ctrl_psoc:	Opaque ctrl SOC handle
  * @htc_soc:	SOC level HTC handle
  * @hal_soc:	Opaque HAL SOC handle
  * @osdev:	QDF device
@@ -2772,7 +2775,7 @@ htt_htc_soc_attach(struct htt_soc *soc)
  * Return: HTT handle on success; NULL on failure
  */
 void *
-htt_soc_attach(void *dp_soc, void *osif_soc, HTC_HANDLE htc_soc,
+htt_soc_attach(void *dp_soc, void *ctrl_psoc, HTC_HANDLE htc_soc,
 	void *hal_soc, qdf_device_t osdev)
 {
 	struct htt_soc *soc;
@@ -2784,7 +2787,7 @@ htt_soc_attach(void *dp_soc, void *osif_soc, HTC_HANDLE htc_soc,
 		goto fail1;
 
 	soc->osdev = osdev;
-	soc->osif_soc = osif_soc;
+	soc->ctrl_psoc = ctrl_psoc;
 	soc->dp_soc = dp_soc;
 	soc->htc_soc = htc_soc;
 	soc->hal_soc = hal_soc;

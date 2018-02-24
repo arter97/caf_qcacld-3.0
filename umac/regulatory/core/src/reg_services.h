@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2018 The Linux Foundation. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -142,6 +142,16 @@ QDF_STATUS reg_set_fcc_constraint(struct wlan_objmgr_pdev *pdev,
  * Return: QDF_STATUS
  */
 QDF_STATUS reg_read_default_country(struct wlan_objmgr_psoc *psoc,
+				   uint8_t *country_code);
+
+/**
+ * reg_read_current_country() - Get the current regulatory country
+ * @psoc: The physical SoC to get current country from
+ * @country_code: the buffer to populate the country code into
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS reg_read_current_country(struct wlan_objmgr_psoc *psoc,
 				   uint8_t *country_code);
 
 /**
@@ -414,4 +424,37 @@ bool reg_get_en_chan_144(struct wlan_objmgr_pdev *pdev);
  */
 QDF_STATUS reg_process_ch_avoid_event(struct wlan_objmgr_psoc *psoc,
 		struct ch_avoid_ind_type *ch_avoid_event);
+
+/**
+ * reg_send_scheduler_msg_sb() - Start scheduler to call list of callbacks
+ * registered whenever current chan list changes.
+ * @psoc: Pointer to PSOC structure.
+ * @pdev: Pointer to PDEV structure.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS reg_send_scheduler_msg_sb(struct wlan_objmgr_psoc *psoc,
+		struct wlan_objmgr_pdev *pdev);
+
+/**
+ * reg_get_hal_reg_cap() - Get HAL REG capabilities
+ * @psoc: psoc for country information
+ *
+ * Return: hal reg cap pointer
+ */
+struct wlan_psoc_host_hal_reg_capabilities_ext *reg_get_hal_reg_cap(
+						struct wlan_objmgr_psoc *psoc);
+
+/**
+ * reg_set_hal_reg_cap() - Set HAL REG capabilities
+ * @psoc: psoc for country information
+ * @reg_cap: Regulatory caps pointer
+ * @phy_cnt: number of phy
+ *
+ * Return: hal reg cap pointer
+ */
+QDF_STATUS reg_set_hal_reg_cap(struct wlan_objmgr_psoc *psoc,
+		struct wlan_psoc_host_hal_reg_capabilities_ext *reg_cap,
+		uint16_t phy_cnt);
+
 #endif

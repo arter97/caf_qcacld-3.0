@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -164,9 +164,31 @@ static inline int qdf_status_to_os_return(QDF_STATUS status)
 #define qdf_wait_queue_interruptible(wait_queue, condition) \
 		__qdf_wait_queue_interruptible(wait_queue, condition)
 
+/**
+ * qdf_wait_queue_timeout() - wait for specified time on given condition
+ * @wait_queue: wait queue to wait on
+ * @condition: condition to wait on
+ * @timeout: timeout value in jiffies
+ *
+ * Return: 0 if condition becomes false after timeout
+ *         1 or remaining jiffies, if condition becomes true during timeout
+ */
+#define qdf_wait_queue_timeout(wait_queue, condition, timeout) \
+			__qdf_wait_queue_timeout(wait_queue, \
+						condition, timeout)
+
+
 #define qdf_init_waitqueue_head(_q) __qdf_init_waitqueue_head(_q)
 
 #define qdf_wake_up_interruptible(_q) __qdf_wake_up_interruptible(_q)
+
+/**
+ * qdf_wake_up() - wakes up sleeping waitqueue
+ * @wait_queue: wait queue, which needs wake up
+ *
+ * Return: none
+ */
+#define qdf_wake_up(_q) __qdf_wake_up(_q)
 
 #define qdf_wake_up_completion(_q) __qdf_wake_up_completion(_q)
 
@@ -225,7 +247,7 @@ static inline bool qdf_is_macaddr_equal(struct qdf_mac_addr *mac_addr1,
  */
 static inline bool qdf_is_macaddr_zero(struct qdf_mac_addr *mac_addr)
 {
-	struct qdf_mac_addr zero_mac_addr = QDF_MAC_ADDR_ZERO_INITIALIZER;
+	struct qdf_mac_addr zero_mac_addr = QDF_MAC_ADDR_ZERO_INIT;
 
 	return qdf_is_macaddr_equal(mac_addr, &zero_mac_addr);
 }
@@ -274,8 +296,7 @@ static inline bool qdf_is_macaddr_group(struct qdf_mac_addr *mac_addr)
  */
 static inline bool qdf_is_macaddr_broadcast(struct qdf_mac_addr *mac_addr)
 {
-	struct qdf_mac_addr broadcast_mac_addr =
-		QDF_MAC_ADDR_BROADCAST_INITIALIZER;
+	struct qdf_mac_addr broadcast_mac_addr = QDF_MAC_ADDR_BCAST_INIT;
 	return qdf_is_macaddr_equal(mac_addr, &broadcast_mac_addr);
 }
 

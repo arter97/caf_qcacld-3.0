@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2018 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -114,7 +114,7 @@ bool util_is_scan_entry_match(
 {
 
 	if (entry1->cap_info.wlan_caps.ess !=
-	   entry1->cap_info.wlan_caps.ess)
+	   entry2->cap_info.wlan_caps.ess)
 		return false;
 
 	if (entry1->cap_info.wlan_caps.ess &&
@@ -455,6 +455,7 @@ util_scan_populate_bcn_ie_list(struct scan_cache_entry *scan_params)
 			scan_params->ie_list.rates = (uint8_t *)ie;
 			break;
 		case WLAN_ELEMID_DSPARMS:
+			scan_params->ie_list.ds_param = (uint8_t *)ie;
 			scan_params->channel.chan_idx =
 				((struct ds_ie *)ie)->cur_chan;
 			break;
