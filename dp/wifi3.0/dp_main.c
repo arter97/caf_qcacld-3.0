@@ -3215,6 +3215,9 @@ static void dp_vdev_detach_wifi3(struct cdp_vdev *vdev_handle,
 	if (hif_get_target_status(soc->hif_handle) == TARGET_STATUS_RESET)
 		dp_vdev_flush_peers(vdev);
 
+	if (wlan_op_mode_sta == vdev->opmode)
+		dp_peer_delete_wifi3(vdev->vap_bss_peer, 0);
+
 	/*
 	 * Use peer_ref_mutex while accessing peer_list, in case
 	 * a peer is in the process of being removed from the list.
@@ -3241,9 +3244,6 @@ static void dp_vdev_detach_wifi3(struct cdp_vdev *vdev_handle,
 	dp_tx_vdev_detach(vdev);
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO_HIGH,
 		FL("deleting vdev object %pK (%pM)"), vdev, vdev->mac_addr.raw);
-
-	if (wlan_op_mode_sta == vdev->opmode)
-		dp_peer_delete_wifi3(vdev->vap_bss_peer, 0);
 
 	qdf_mem_free(vdev);
 
