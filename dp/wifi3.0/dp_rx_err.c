@@ -489,6 +489,7 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc,
 
 	if (!peer) {
 		bool mpdu_done = false;
+		struct dp_pdev *pdev = soc->pdev_list[pool_id];
 
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 		FL("peer is NULL"));
@@ -496,6 +497,9 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc,
 		mpdu_done = dp_rx_chain_msdus(soc, nbuf, rx_tlv_hdr, pool_id);
 		/* Trigger invalid peer handler wrapper */
 		dp_rx_process_invalid_peer_wrapper(soc, nbuf, mpdu_done);
+
+		pdev->invalid_peer_head_msdu = NULL;
+		pdev->invalid_peer_tail_msdu = NULL;
 
 		return;
 	}

@@ -42,6 +42,10 @@ dp_peer_find_by_id(struct dp_soc *soc,
 	peer = (peer_id >= soc->max_peers) ? NULL :
 				soc->peer_id_to_obj_map[peer_id];
 
+	if (peer && peer->delete_in_progress) {
+		return NULL;
+	}
+
 	return peer;
 }
 
