@@ -66,7 +66,7 @@ static inline bool dp_rx_mcast_echo_check(struct dp_soc *soc,
 {
 	struct dp_vdev *vdev = peer->vdev;
 	struct dp_ast_entry *ase;
-	uint16_t sa_idx;
+	uint16_t sa_idx = 0;
 	uint8_t *data;
 
 	/*
@@ -99,7 +99,8 @@ static inline bool dp_rx_mcast_echo_check(struct dp_soc *soc,
 	if (hal_rx_msdu_end_sa_is_valid_get(rx_tlv_hdr)) {
 		sa_idx = hal_rx_msdu_end_sa_idx_get(rx_tlv_hdr);
 
-		if ((sa_idx < 0) || (sa_idx > (WLAN_UMAC_PSOC_MAX_PEERS * 2))) {
+		if ((sa_idx < 0) ||
+				(sa_idx >= (WLAN_UMAC_PSOC_MAX_PEERS * 2))) {
 			qdf_spin_unlock_bh(&soc->ast_lock);
 			QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 					"invalid sa_idx: %d", sa_idx);
@@ -107,10 +108,36 @@ static inline bool dp_rx_mcast_echo_check(struct dp_soc *soc,
 		}
 
 		ase = soc->ast_table[sa_idx];
+		if (!ase) {
+			/* We do not get a peer map event for STA and without
+			 * this event we don't know what is STA's sa_idx.
+			 * For this reason the AST is still not associated to
+			 * any index postion in ast_table.
+			 * In these kind of scenarios where sa is valid but
+			 * ast is not in ast_table, we use the below API to get
+			 * AST entry for STA's own mac_address.
+			 */
+			ase = dp_peer_ast_hash_find(soc,
+							&data[DP_MAC_ADDR_LEN]);
+
+		}
 	} else
-		ase = dp_peer_ast_hash_find(soc, &data[DP_MAC_ADDR_LEN], 0);
+		ase = dp_peer_ast_hash_find(soc, &data[DP_MAC_ADDR_LEN]);
 
 	if (ase) {
+		ase->ast_idx = sa_idx;
+		soc->ast_table[sa_idx] = ase;
+
+		if (ase->pdev_id != vdev->pdev->pdev_id) {
+			qdf_spin_unlock_bh(&soc->ast_lock);
+			QDF_TRACE(QDF_MODULE_ID_DP,
+				QDF_TRACE_LEVEL_INFO,
+				"Detected DBDC Root AP %pM, %d %d",
+				&data[DP_MAC_ADDR_LEN], vdev->pdev->pdev_id,
+				ase->pdev_id);
+			return false;
+		}
+
 		if ((ase->type == CDP_TXRX_AST_TYPE_MEC) ||
 				(ase->peer != peer)) {
 			qdf_spin_unlock_bh(&soc->ast_lock);
@@ -369,7 +396,6 @@ dp_rx_chain_msdus(struct dp_soc *soc, qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr,
 								uint8_t mac_id)
 {
 	bool mpdu_done = false;
-	qdf_nbuf_t curr_nbuf, next_nbuf;
 
 	/* TODO: Currently only single radio is supported, hence
 	 * pdev hard coded to '0' index
@@ -378,13 +404,6 @@ dp_rx_chain_msdus(struct dp_soc *soc, qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr,
 
 	if (hal_rx_msdu_end_first_msdu_get(rx_tlv_hdr)) {
 		qdf_nbuf_set_rx_chfrag_start(nbuf, 1);
-
-		curr_nbuf = dp_pdev->invalid_peer_head_msdu;
-		while (curr_nbuf) {
-			next_nbuf = qdf_nbuf_next(curr_nbuf);
-			qdf_nbuf_free(curr_nbuf);
-			curr_nbuf = next_nbuf;
-		}
 
 		dp_pdev->invalid_peer_head_msdu = NULL;
 		dp_pdev->invalid_peer_tail_msdu = NULL;
@@ -536,7 +555,8 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc,
 	}
 
 	/* WDS Source Port Learning */
-	if (qdf_likely(vdev->rx_decap_type == htt_cmn_pkt_type_ethernet))
+	if (qdf_likely(vdev->rx_decap_type == htt_cmn_pkt_type_ethernet &&
+		vdev->wds_enabled))
 		dp_rx_wds_srcport_learn(soc, rx_tlv_hdr, peer, nbuf);
 
 	if (hal_rx_mpdu_start_mpdu_qos_control_valid_get(rx_tlv_hdr)) {

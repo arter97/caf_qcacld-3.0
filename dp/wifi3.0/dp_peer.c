@@ -314,20 +314,15 @@ static inline void dp_peer_ast_hash_remove(struct dp_soc *soc,
  * Return: AST entry
  */
 struct dp_ast_entry *dp_peer_ast_hash_find(struct dp_soc *soc,
-	uint8_t *ast_mac_addr, int mac_addr_is_aligned)
+						uint8_t *ast_mac_addr)
 {
 	union dp_align_mac_addr local_mac_addr_aligned, *mac_addr;
 	unsigned index;
 	struct dp_ast_entry *ase;
 
-	if (mac_addr_is_aligned) {
-		mac_addr = (union dp_align_mac_addr *) ast_mac_addr;
-	} else {
-		qdf_mem_copy(
-			&local_mac_addr_aligned.raw[0],
+	qdf_mem_copy(&local_mac_addr_aligned.raw[0],
 			ast_mac_addr, DP_MAC_ADDR_LEN);
-		mac_addr = &local_mac_addr_aligned;
-	}
+	mac_addr = &local_mac_addr_aligned;
 
 	index = dp_peer_ast_hash_index(soc, mac_addr);
 	TAILQ_FOREACH(ase, &soc->ast_hash.bins[index], hash_list_elem) {
@@ -408,10 +403,23 @@ static inline void dp_peer_map_ast(struct dp_soc *soc,
  * Return: 0 if new entry is allocated,
  *         1 if entry already exists or if allocation has failed
  */
-int dp_peer_add_ast(struct dp_soc *soc, struct dp_peer *peer,
-		uint8_t *mac_addr, enum dp_ast_type is_self)
+int dp_peer_add_ast(struct dp_soc *soc,
+			struct dp_peer *peer,
+			uint8_t *mac_addr,
+			enum cdp_txrx_ast_entry_type type,
+			uint32_t flags)
 {
 	struct dp_ast_entry *ast_entry;
+	struct dp_vdev *vdev = peer->vdev;
+	uint8_t next_node_mac[6];
+	bool ret = 1;
+
+	if (!vdev) {
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
+			FL("Peers vdev is NULL"));
+		QDF_ASSERT(0);
+		return ret;
+	}
 
 	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 		"%s: peer %pK mac %02x:%02x:%02x:%02x:%02x:%02x\n",
@@ -421,13 +429,14 @@ int dp_peer_add_ast(struct dp_soc *soc, struct dp_peer *peer,
 	qdf_spin_lock_bh(&soc->ast_lock);
 
 	/* If AST entry already exists , just return from here */
-	ast_entry = dp_peer_ast_hash_find(soc, mac_addr, 0);
+	ast_entry = dp_peer_ast_hash_find(soc, mac_addr);
+
 	if (ast_entry) {
 		if (ast_entry->type == CDP_TXRX_AST_TYPE_MEC)
 			ast_entry->is_active = TRUE;
 
 		qdf_spin_unlock_bh(&soc->ast_lock);
-		return 1;
+		return ret;
 	}
 
 	ast_entry = (struct dp_ast_entry *)
@@ -438,22 +447,28 @@ int dp_peer_add_ast(struct dp_soc *soc, struct dp_peer *peer,
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 			FL("fail to allocate ast_entry"));
 		QDF_ASSERT(0);
-		return 1;
+		return ret;
 	}
 
 	qdf_mem_copy(&ast_entry->mac_addr.raw[0], mac_addr, DP_MAC_ADDR_LEN);
 	ast_entry->peer = peer;
+	ast_entry->pdev_id = vdev->pdev->pdev_id;
+	ast_entry->vdev_id = vdev->vdev_id;
 
-	switch (is_self) {
-	case dp_ast_type_static:
+	switch (type) {
+	case CDP_TXRX_AST_TYPE_STATIC:
 		peer->self_ast_entry = ast_entry;
 		ast_entry->type = CDP_TXRX_AST_TYPE_STATIC;
 		break;
-	case dp_ast_type_wds:
+	case CDP_TXRX_AST_TYPE_WDS:
 		ast_entry->next_hop = 1;
 		ast_entry->type = CDP_TXRX_AST_TYPE_WDS;
 		break;
-	case dp_ast_type_mec:
+	case CDP_TXRX_AST_TYPE_WDS_HM:
+		ast_entry->next_hop = 1;
+		ast_entry->type = CDP_TXRX_AST_TYPE_WDS_HM;
+		break;
+	case CDP_TXRX_AST_TYPE_MEC:
 		ast_entry->next_hop = 1;
 		ast_entry->type = CDP_TXRX_AST_TYPE_MEC;
 		break;
@@ -467,7 +482,21 @@ int dp_peer_add_ast(struct dp_soc *soc, struct dp_peer *peer,
 	DP_STATS_INC(soc, ast.added, 1);
 	dp_peer_ast_hash_add(soc, ast_entry);
 	qdf_spin_unlock_bh(&soc->ast_lock);
-	return 0;
+
+	if (ast_entry->type == CDP_TXRX_AST_TYPE_WDS)
+		qdf_mem_copy(next_node_mac, peer->mac_addr.raw, 6);
+	else
+		qdf_mem_copy(next_node_mac, peer->vdev->mac_addr.raw, 6);
+
+	if (ast_entry->type != CDP_TXRX_AST_TYPE_STATIC) {
+		ret = soc->cdp_soc.ol_ops->peer_add_wds_entry(
+				peer->vdev->osif_vdev,
+				mac_addr,
+				next_node_mac,
+				flags);
+	}
+
+	return ret;
 }
 
 /*
@@ -481,31 +510,117 @@ int dp_peer_add_ast(struct dp_soc *soc, struct dp_peer *peer,
  *
  * Return: None
  */
-void dp_peer_del_ast(struct dp_soc *soc,
-		struct dp_ast_entry *ast_entry)
+void dp_peer_del_ast(struct dp_soc *soc, struct dp_ast_entry *ast_entry)
 {
 	struct dp_peer *peer = ast_entry->peer;
+
+	if (ast_entry->next_hop)
+		soc->cdp_soc.ol_ops->peer_del_wds_entry(peer->vdev->osif_vdev,
+						ast_entry->mac_addr.raw);
+
 	soc->ast_table[ast_entry->ast_idx] = NULL;
 	TAILQ_REMOVE(&peer->ast_entry_list, ast_entry, ase_list_elem);
 	DP_STATS_INC(soc, ast.deleted, 1);
 	dp_peer_ast_hash_remove(soc, ast_entry);
 	qdf_mem_free(ast_entry);
 }
+
+/*
+ * dp_peer_update_ast() - Delete and free AST entry
+ * @soc: SoC handle
+ * @peer: peer to which ast node belongs
+ * @ast_entry: AST entry of the node
+ * @flags: wds or hmwds
+ *
+ * This function update the AST entry to the roamed peer and soc tables
+ * It assumes caller has taken the ast lock to protect the access to these
+ * tables
+ *
+ * Return: 0 if ast entry is updated successfully
+ *         1 failure
+ */
+int dp_peer_update_ast(struct dp_soc *soc, struct dp_peer *peer,
+		       struct dp_ast_entry *ast_entry, uint32_t flags)
+{
+	bool ret = 1;
+
+	ast_entry->peer = peer;
+	if (ast_entry->type != CDP_TXRX_AST_TYPE_STATIC) {
+		ret = soc->cdp_soc.ol_ops->peer_update_wds_entry(
+				peer->vdev->osif_vdev,
+				ast_entry->mac_addr.raw,
+				peer->mac_addr.raw,
+				flags);
+	}
+	return ret;
+}
+
+/*
+ * dp_peer_ast_get_pdev_id() - get pdev_id from the ast entry
+ * @soc: SoC handle
+ * @ast_entry: AST entry of the node
+ *
+ * This function gets the pdev_id from the ast entry.
+ *
+ * Return: (uint8_t) pdev_id
+ */
+uint8_t dp_peer_ast_get_pdev_id(struct dp_soc *soc,
+				struct dp_ast_entry *ast_entry)
+{
+	return ast_entry->pdev_id;
+}
+
+/*
+ * dp_peer_ast_get_next_hop() - get next_hop from the ast entry
+ * @soc: SoC handle
+ * @ast_entry: AST entry of the node
+ *
+ * This function gets the next hop from the ast entry.
+ *
+ * Return: (uint8_t) next_hop
+ */
+uint8_t dp_peer_ast_get_next_hop(struct dp_soc *soc,
+				struct dp_ast_entry *ast_entry)
+{
+	return ast_entry->next_hop;
+}
+
+/*
+ * dp_peer_ast_set_type() - set type from the ast entry
+ * @soc: SoC handle
+ * @ast_entry: AST entry of the node
+ *
+ * This function sets the type in the ast entry.
+ *
+ * Return:
+ */
+void dp_peer_ast_set_type(struct dp_soc *soc,
+				struct dp_ast_entry *ast_entry,
+				enum cdp_txrx_ast_entry_type type)
+{
+	ast_entry->type = type;
+}
+
 #else
 int dp_peer_add_ast(struct dp_soc *soc, struct dp_peer *peer,
-		uint8_t *mac_addr, enum dp_ast_type is_self)
+		uint8_t *mac_addr, enum cdp_txrx_ast_entry_type type,
+		uint32_t flags)
 {
 	return 1;
 }
 
-void dp_peer_del_ast(struct dp_soc *soc,
-		struct dp_ast_entry *ast_entry)
+void dp_peer_del_ast(struct dp_soc *soc, struct dp_ast_entry *ast_entry)
 {
 }
 
+int dp_peer_update_ast(struct dp_soc *soc, struct dp_peer *peer,
+			struct dp_ast_entry *ast_entry, uint32_t flags)
+{
+	return 1;
+}
 
 struct dp_ast_entry *dp_peer_ast_hash_find(struct dp_soc *soc,
-	uint8_t *ast_mac_addr, int mac_addr_is_aligned)
+						uint8_t *ast_mac_addr)
 {
 	return NULL;
 }
@@ -524,6 +639,25 @@ static inline void dp_peer_map_ast(struct dp_soc *soc,
 
 static void dp_peer_ast_hash_detach(struct dp_soc *soc)
 {
+}
+
+void dp_peer_ast_set_type(struct dp_soc *soc,
+				struct dp_ast_entry *ast_entry,
+				enum cdp_txrx_ast_entry_type type)
+{
+}
+
+uint8_t dp_peer_ast_get_pdev_id(struct dp_soc *soc,
+				struct dp_ast_entry *ast_entry)
+{
+	return 0xff;
+}
+
+
+uint8_t dp_peer_ast_get_next_hop(struct dp_soc *soc,
+				struct dp_ast_entry *ast_entry)
+{
+	return 0xff;
 }
 #endif
 
@@ -961,46 +1095,36 @@ static int dp_rx_tid_update_wifi3(struct dp_peer *peer, int tid, uint32_t
 }
 
 /*
- * dp_reo_desc_free() - Add reo descriptor to deferred freelist and free any
- * aged out descriptors
+ * dp_reo_desc_free() - Callback free reo descriptor memory after
+ * HW cache flush
  *
  * @soc: DP SOC handle
- * @freedesc: REO descriptor to be freed
+ * @cb_ctxt: Callback context
+ * @reo_status: REO command status
  */
-static void dp_reo_desc_free(struct dp_soc *soc,
-	struct reo_desc_list_node *freedesc)
+static void dp_reo_desc_free(struct dp_soc *soc, void *cb_ctxt,
+	union hal_reo_status *reo_status)
 {
-	uint32_t list_size;
-	struct reo_desc_list_node *desc;
-	unsigned long curr_ts = qdf_get_system_timestamp();
+	struct reo_desc_list_node *freedesc =
+		(struct reo_desc_list_node *)cb_ctxt;
+	struct dp_rx_tid *rx_tid = &freedesc->rx_tid;
 
-	qdf_spin_lock_bh(&soc->reo_desc_freelist_lock);
-	freedesc->free_ts = curr_ts;
-	qdf_list_insert_back_size(&soc->reo_desc_freelist,
-		(qdf_list_node_t *)freedesc, &list_size);
-
-	while ((qdf_list_peek_front(&soc->reo_desc_freelist,
-		(qdf_list_node_t **)&desc) == QDF_STATUS_SUCCESS) &&
-		((list_size >= REO_DESC_FREELIST_SIZE) ||
-		((curr_ts - desc->free_ts) > REO_DESC_FREE_DEFER_MS))) {
-		struct dp_rx_tid *rx_tid;
-
-		qdf_list_remove_front(&soc->reo_desc_freelist,
-				(qdf_list_node_t **)&desc);
-		list_size--;
-		rx_tid = &desc->rx_tid;
-		qdf_mem_unmap_nbytes_single(soc->osdev,
-			rx_tid->hw_qdesc_paddr,
-			QDF_DMA_BIDIRECTIONAL,
-			rx_tid->hw_qdesc_alloc_size);
-		qdf_mem_free(rx_tid->hw_qdesc_vaddr_unaligned);
-		qdf_mem_free(desc);
-
-		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_DEBUG,
-			"%s: Freed: %pK\n",
-			__func__, desc);
+	if (reo_status->rx_queue_status.header.status) {
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
+			"%s: Rx tid HW desc flush failed(%d): tid %d\n",
+			__func__,
+			reo_status->rx_queue_status.header.status,
+			freedesc->rx_tid.tid);
 	}
-	qdf_spin_unlock_bh(&soc->reo_desc_freelist_lock);
+	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
+		"%s: hw_qdesc_paddr: %pK, tid:%d\n", __func__,
+		(void *)(rx_tid->hw_qdesc_paddr), rx_tid->tid);
+	qdf_mem_unmap_nbytes_single(soc->osdev,
+		rx_tid->hw_qdesc_paddr,
+		QDF_DMA_BIDIRECTIONAL,
+		rx_tid->hw_qdesc_alloc_size);
+	qdf_mem_free(rx_tid->hw_qdesc_vaddr_unaligned);
+	qdf_mem_free(freedesc);
 }
 
 #if defined(QCA_WIFI_QCA8074) && defined(BUILD_X86)
@@ -1044,6 +1168,7 @@ int dp_rx_tid_setup_wifi3(struct dp_peer *peer, int tid,
 	if (peer->delete_in_progress)
 		return QDF_STATUS_E_FAILURE;
 
+	rx_tid->ba_win_size = ba_window_size;
 	if (rx_tid->hw_qdesc_vaddr_unaligned != NULL)
 		return dp_rx_tid_update_wifi3(peer, tid, ba_window_size,
 			start_seq);
@@ -1169,13 +1294,24 @@ try_desc_alloc:
 }
 
 /*
- * Rx TID deletion callback to free memory allocated for HW queue descriptor
+ * dp_rx_tid_delete_cb() - Callback to flush reo descriptor HW cache
+ * after deleting the entries (ie., setting valid=0)
+ *
+ * @soc: DP SOC handle
+ * @cb_ctxt: Callback context
+ * @reo_status: REO command status
  */
 static void dp_rx_tid_delete_cb(struct dp_soc *soc, void *cb_ctxt,
 	union hal_reo_status *reo_status)
 {
 	struct reo_desc_list_node *freedesc =
 		(struct reo_desc_list_node *)cb_ctxt;
+	uint32_t list_size;
+	struct reo_desc_list_node *desc;
+	unsigned long curr_ts = qdf_get_system_timestamp();
+	uint32_t desc_size, tot_desc_size;
+	struct hal_reo_cmd_params params;
+
 
 	if (reo_status->rx_queue_status.header.status) {
 		/* Should not happen normally. Just print error for now */
@@ -1191,7 +1327,80 @@ static void dp_rx_tid_delete_cb(struct dp_soc *soc, void *cb_ctxt,
 		freedesc->rx_tid.tid,
 		reo_status->rx_queue_status.header.status);
 
-	dp_reo_desc_free(soc, freedesc);
+	qdf_spin_lock_bh(&soc->reo_desc_freelist_lock);
+	freedesc->free_ts = curr_ts;
+	qdf_list_insert_back_size(&soc->reo_desc_freelist,
+		(qdf_list_node_t *)freedesc, &list_size);
+
+	while ((qdf_list_peek_front(&soc->reo_desc_freelist,
+		(qdf_list_node_t **)&desc) == QDF_STATUS_SUCCESS) &&
+		((list_size >= REO_DESC_FREELIST_SIZE) ||
+		((curr_ts - desc->free_ts) > REO_DESC_FREE_DEFER_MS))) {
+		struct dp_rx_tid *rx_tid;
+
+		qdf_list_remove_front(&soc->reo_desc_freelist,
+				(qdf_list_node_t **)&desc);
+		list_size--;
+		rx_tid = &desc->rx_tid;
+
+		/* Flush and invalidate REO descriptor from HW cache: Base and
+		 * extension descriptors should be flushed separately */
+		tot_desc_size = hal_get_reo_qdesc_size(soc->hal_soc,
+			rx_tid->ba_win_size);
+		desc_size = hal_get_reo_qdesc_size(soc->hal_soc, 0);
+
+		/* Flush reo extension descriptors */
+		while ((tot_desc_size -= desc_size) > 0) {
+			qdf_mem_zero(&params, sizeof(params));
+			params.std.addr_lo =
+				((uint64_t)(rx_tid->hw_qdesc_paddr) +
+				tot_desc_size) & 0xffffffff;
+			params.std.addr_hi =
+				(uint64_t)(rx_tid->hw_qdesc_paddr) >> 32;
+
+			if (QDF_STATUS_SUCCESS != dp_reo_send_cmd(soc,
+							CMD_FLUSH_CACHE,
+							&params,
+							NULL,
+							NULL)) {
+				QDF_TRACE(QDF_MODULE_ID_DP,
+					QDF_TRACE_LEVEL_ERROR,
+					"%s: fail to send CMD_CACHE_FLUSH:"
+					"tid %d desc %pK\n", __func__,
+					rx_tid->tid,
+					(void *)(rx_tid->hw_qdesc_paddr));
+			}
+		}
+
+		/* Flush base descriptor */
+		qdf_mem_zero(&params, sizeof(params));
+		params.std.need_status = 1;
+		params.std.addr_lo =
+			(uint64_t)(rx_tid->hw_qdesc_paddr) & 0xffffffff;
+		params.std.addr_hi = (uint64_t)(rx_tid->hw_qdesc_paddr) >> 32;
+
+		if (QDF_STATUS_SUCCESS != dp_reo_send_cmd(soc,
+							  CMD_FLUSH_CACHE,
+							  &params,
+							  dp_reo_desc_free,
+							  (void *)desc)) {
+			union hal_reo_status reo_status;
+			/*
+			 * If dp_reo_send_cmd return failure, related TID queue desc
+			 * should be unmapped. Also locally reo_desc, together with
+			 * TID queue desc also need to be freed accordingly.
+			 *
+			 * Here invoke desc_free function directly to do clean up.
+			 */
+			QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
+				"%s: fail to send REO cmd to flush cache: tid %d\n",
+				__func__, rx_tid->tid);
+			qdf_mem_zero(&reo_status, sizeof(reo_status));
+			reo_status.fl_cache_status.header.status = 0;
+			dp_reo_desc_free(soc, (void *)desc, &reo_status);
+		}
+	}
+	qdf_spin_unlock_bh(&soc->reo_desc_freelist_lock);
 }
 
 /*
@@ -1226,39 +1435,14 @@ static int dp_rx_tid_delete_wifi3(struct dp_peer *peer, int tid)
 	params.u.upd_queue_params.update_vld = 1;
 	params.u.upd_queue_params.vld = 0;
 
-	dp_reo_send_cmd(soc, CMD_UPDATE_RX_REO_QUEUE, &params, NULL, NULL);
-
-	/* Flush and invalidate the REO descriptor from HW cache */
-	qdf_mem_zero(&params, sizeof(params));
-	params.std.need_status = 1;
-	params.std.addr_lo = rx_tid->hw_qdesc_paddr & 0xffffffff;
-	params.std.addr_hi = (uint64_t)(rx_tid->hw_qdesc_paddr) >> 32;
+	dp_reo_send_cmd(soc, CMD_UPDATE_RX_REO_QUEUE, &params,
+		dp_rx_tid_delete_cb, (void *)freedesc);
 
 	rx_tid->hw_qdesc_vaddr_unaligned = NULL;
 	rx_tid->hw_qdesc_alloc_size = 0;
 	rx_tid->hw_qdesc_paddr = 0;
 
-	if (QDF_STATUS_SUCCESS != dp_reo_send_cmd(soc,
-						  CMD_FLUSH_CACHE,
-						  &params,
-						  dp_rx_tid_delete_cb,
-						  (void *)freedesc)) {
-		/*
-		 * If dp_reo_send_cmd return failure, related TID queue desc
-		 * should be unmapped. Also locally reo_desc, together with
-		 * TID queue desc also need to be freed accordingly.
-		 *
-		 * Here invoke desc_free function directly to do clean up.
-		 */
-		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			"%s: fail to send REO cmd to flush cache: tid %d\n",
-			__func__, tid);
-		dp_reo_desc_free(soc, freedesc);
-
-		return -EBUSY;
-	} else {
-		return 0;
-	}
+	return 0;
 }
 
 #ifdef DP_LFR
@@ -1400,7 +1584,6 @@ int dp_addba_requestprocess_wifi3(void *peer_handle,
 	else
 		rx_tid->statuscode = IEEE80211_STATUS_SUCCESS;
 
-	rx_tid->ba_win_size = buffersize;
 	rx_tid->dialogtoken = dialogtoken;
 	rx_tid->ba_status = DP_RX_BA_ACTIVE;
 	rx_tid->num_of_addba_req++;
@@ -2128,6 +2311,7 @@ void dp_peer_rxtid_stats(struct dp_peer *peer, void (*dp_stats_cmd_cb),
 				rx_tid->hw_qdesc_paddr & 0xffffffff;
 			params.std.addr_hi =
 				(uint64_t)(rx_tid->hw_qdesc_paddr) >> 32;
+			params.u.fl_cache_params.flush_no_inval = 1;
 			dp_reo_send_cmd(soc, CMD_FLUSH_CACHE, &params, NULL,
 				NULL);
 		}

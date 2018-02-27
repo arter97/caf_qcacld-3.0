@@ -334,6 +334,8 @@ struct wmi_spectral_cmd_ops;
  * @sptrlto_clear_chaninfo:         Clear channel information
  * @sptrlto_get_spectral_capinfo:   Get Spectral capability information
  * @sptrlto_get_spectral_diagstats: Get Spectral diagnostic statistics
+ * @sptrlto_register_netlink_cb: Register Spectral Netlink callbacks
+ * @sptrlto_use_nl_bcast: Get whether to use Netlink broadcast/unicast
  **/
 struct wlan_lmac_if_sptrl_tx_ops {
 	void *(*sptrlto_pdev_spectral_init)(struct wlan_objmgr_pdev *pdev);
@@ -358,6 +360,10 @@ struct wlan_lmac_if_sptrl_tx_ops {
 	void (*sptrlto_register_wmi_spectral_cmd_ops)(
 		struct wlan_objmgr_pdev *pdev,
 		struct wmi_spectral_cmd_ops *cmd_ops);
+	void (*sptrlto_register_netlink_cb)(
+		struct wlan_objmgr_pdev *pdev,
+		struct spectral_nl_cb *nl_cb);
+	bool (*sptrlto_use_nl_bcast)(struct wlan_objmgr_pdev *pdev);
 };
 #endif /* WLAN_CONV_SPECTRAL_ENABLE */
 
@@ -864,6 +870,7 @@ struct wlan_lmac_if_atf_rx_ops {
 #ifdef WLAN_SUPPORT_FILS
 /**
  * struct wlan_lmac_if_fd_rx_ops - FILS Discovery specific Rx function pointers
+ * @fd_is_fils_enable:      FILS enabled or not
  * @fd_alloc:               Allocate FD buffer
  * @fd_stop:                Stop and free deferred FD buffer
  * @fd_free:                Free FD frame buffer
@@ -871,10 +878,12 @@ struct wlan_lmac_if_atf_rx_ops {
  * @fd_swfda_handler:       SWFDA event handler
  */
 struct wlan_lmac_if_fd_rx_ops {
+	uint8_t (*fd_is_fils_enable)(struct wlan_objmgr_vdev *vdev);
 	void (*fd_alloc)(struct wlan_objmgr_vdev *vdev);
 	void (*fd_stop)(struct wlan_objmgr_vdev *vdev);
 	void (*fd_free)(struct wlan_objmgr_vdev *vdev);
-	uint32_t (*fd_get_valid_fd_period)(struct wlan_objmgr_vdev *vdev);
+	uint32_t (*fd_get_valid_fd_period)(struct wlan_objmgr_vdev *vdev,
+					   uint8_t *is_modified);
 	QDF_STATUS (*fd_swfda_handler)(struct wlan_objmgr_vdev *vdev);
 };
 #endif
@@ -917,12 +926,9 @@ struct wlan_lmac_if_sa_api_rx_ops {
 /**
  * struct wlan_lmac_if_sptrl_rx_ops - Spectral south bound Rx operations
  *
- * @sptrl_send_phydata:        Send Spectral PHY Data
  * @sptrlro_get_target_handle: Get Spectral handle for target/LMAC private data
  */
 struct wlan_lmac_if_sptrl_rx_ops {
-	int (*sptrlro_send_phydata)(struct wlan_objmgr_pdev *pdev,
-				    struct sock *sock, qdf_nbuf_t nbuf);
 	void * (*sptrlro_get_target_handle)(struct wlan_objmgr_pdev *pdev);
 	int16_t (*sptrlro_vdev_get_chan_freq)(struct wlan_objmgr_vdev *vdev);
 	enum phy_ch_width (*sptrlro_vdev_get_ch_width)(

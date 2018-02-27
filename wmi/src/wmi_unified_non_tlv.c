@@ -2673,7 +2673,7 @@ static QDF_STATUS send_vdev_spectral_configure_cmd_non_tlv(wmi_unified_t wmi_han
 	cmd->spectral_scan_pwr_format = param->pwr_format;
 	cmd->spectral_scan_rpt_mode = param->rpt_mode;
 	cmd->spectral_scan_bin_scale = param->bin_scale;
-	cmd->spectral_scan_dBm_adj = param->dBm_adj;
+	cmd->spectral_scan_dBm_adj = param->dbm_adj;
 	cmd->spectral_scan_chn_mask = param->chn_mask;
 
 	ret = wmi_unified_cmd_send(wmi_handle,
@@ -2720,7 +2720,7 @@ static QDF_STATUS send_vdev_spectral_configure_cmd_non_tlv(wmi_unified_t wmi_han
 			 param->pwr_format,
 			 param->rpt_mode,
 			 param->bin_scale,
-			 param->dBm_adj,
+			 param->dbm_adj,
 			 param->chn_mask);
 	qdf_print("%s: Status: %d\n\n", __func__, ret);
 #endif  /* OL_SPECTRAL_DEBUG_CONFIG_INTERACTIONS */
@@ -8410,6 +8410,16 @@ QDF_STATUS send_wds_entry_list_cmd_non_tlv(wmi_unified_t wmi_handle)
 }
 
 
+/**
+ * wmi_non_tlv_pdev_id_conversion_enable() - Enable pdev_id conversion
+ *
+ * Return None.
+ */
+void wmi_non_tlv_pdev_id_conversion_enable(wmi_unified_t wmi_handle)
+{
+	qdf_print("PDEV conversion Not Available");
+}
+
 struct wmi_ops non_tlv_ops =  {
 	.send_vdev_create_cmd = send_vdev_create_cmd_non_tlv,
 	.send_vdev_delete_cmd = send_vdev_delete_cmd_non_tlv,
@@ -8644,6 +8654,7 @@ struct wmi_ops non_tlv_ops =  {
 	.send_fils_discovery_send_cmd = send_fils_discovery_send_cmd_non_tlv,
 	.extract_swfda_vdev_id = extract_swfda_vdev_id_non_tlv,
 #endif /* WLAN_SUPPORT_FILS */
+	.wmi_pdev_id_conversion_enable = wmi_non_tlv_pdev_id_conversion_enable,
 };
 
 /**
@@ -9322,4 +9333,16 @@ void wmi_non_tlv_attach(struct wmi_unified *wmi_handle)
 #else
 	qdf_print("%s: Not supported\n", __func__);
 #endif
+}
+EXPORT_SYMBOL(wmi_non_tlv_attach);
+
+/**
+ * wmi_non_tlv_init() - Initialize WMI NON TLV module by registering Non TLV
+ * attach routine.
+ *
+ * Return: None
+ */
+void wmi_non_tlv_init(void)
+{
+	wmi_unified_register_module(WMI_NON_TLV_TARGET, &wmi_non_tlv_attach);
 }

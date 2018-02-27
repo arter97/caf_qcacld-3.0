@@ -12753,7 +12753,7 @@ static QDF_STATUS send_vdev_spectral_configure_cmd_tlv(wmi_unified_t wmi_handle,
 	cmd->spectral_scan_pwr_format = param->pwr_format;
 	cmd->spectral_scan_rpt_mode = param->rpt_mode;
 	cmd->spectral_scan_bin_scale = param->bin_scale;
-	cmd->spectral_scan_dBm_adj = param->dBm_adj;
+	cmd->spectral_scan_dBm_adj = param->dbm_adj;
 	cmd->spectral_scan_chn_mask = param->chn_mask;
 
 	ret = wmi_unified_cmd_send(wmi_handle, buf, len,
@@ -12803,7 +12803,7 @@ static QDF_STATUS send_vdev_spectral_configure_cmd_tlv(wmi_unified_t wmi_handle,
 		 param->pwr_format,
 		 param->rpt_mode,
 		 param->bin_scale,
-		 param->dBm_adj,
+		 param->dbm_adj,
 		 param->chn_mask);
 	WMI_LOGI("%s: Status: %d\n\n", __func__, ret);
 
@@ -21344,6 +21344,67 @@ send_pdev_caldata_version_check_cmd_tlv(wmi_unified_t wmi_handle,
 }
 
 /**
+ * convert_host_pdev_id_to_target_pdev_id() - Convert pdev_id from
+ *           host to target defines.
+ * @param pdev_id: host pdev_id to be converted.
+ * Return: target pdev_id after conversion.
+ */
+static uint32_t convert_host_pdev_id_to_target_pdev_id(uint32_t pdev_id)
+{
+	switch (pdev_id) {
+	case WMI_HOST_PDEV_ID_SOC:
+		return WMI_PDEV_ID_SOC;
+	case WMI_HOST_PDEV_ID_0:
+		return WMI_PDEV_ID_1ST;
+	case WMI_HOST_PDEV_ID_1:
+		return WMI_PDEV_ID_2ND;
+	case WMI_HOST_PDEV_ID_2:
+		return WMI_PDEV_ID_3RD;
+	}
+
+	QDF_ASSERT(0);
+
+	return WMI_PDEV_ID_SOC;
+}
+
+/**
+ * convert_target_pdev_id_to_host_pdev_id() - Convert pdev_id from
+ *           target to host defines.
+ * @param pdev_id: target pdev_id to be converted.
+ * Return: host pdev_id after conversion.
+ */
+static uint32_t convert_target_pdev_id_to_host_pdev_id(uint32_t pdev_id)
+{
+	switch (pdev_id) {
+	case WMI_PDEV_ID_SOC:
+		return WMI_HOST_PDEV_ID_SOC;
+	case WMI_PDEV_ID_1ST:
+		return WMI_HOST_PDEV_ID_0;
+	case WMI_PDEV_ID_2ND:
+		return WMI_HOST_PDEV_ID_1;
+	case WMI_PDEV_ID_3RD:
+		return WMI_HOST_PDEV_ID_2;
+	}
+
+	QDF_ASSERT(0);
+
+	return WMI_HOST_PDEV_ID_SOC;
+}
+
+/**
+ * wmi_tlv_pdev_id_conversion_enable() - Enable pdev_id conversion
+ *
+ * Return None.
+ */
+static void wmi_tlv_pdev_id_conversion_enable(wmi_unified_t wmi_handle)
+{
+	wmi_handle->ops->convert_pdev_id_host_to_target =
+		convert_host_pdev_id_to_target_pdev_id;
+	wmi_handle->ops->convert_pdev_id_target_to_host =
+		convert_target_pdev_id_to_host_pdev_id;
+}
+
+/**
  * extract_pdev_caldata_version_check_ev_param_tlv() - extract caldata from event
  * @wmi_handle: wmi handle
  * @param evt_buf: pointer to event buffer
@@ -21458,8 +21519,6 @@ static QDF_STATUS send_obss_detection_cfg_cmd_tlv(wmi_unified_t wmi_handle,
 	cmd->ht_legacy_detect_mode = obss_cfg_param->obss_ht_legacy_detect_mode;
 	cmd->ht_mixed_detect_mode = obss_cfg_param->obss_ht_mixed_detect_mode;
 	cmd->ht_20mhz_detect_mode = obss_cfg_param->obss_ht_20mhz_detect_mode;
-	WMI_LOGD("Sending WMI_SAP_OBSS_DETECTION_CFG_CMDID vdev_id:%d",
-		  cmd->vdev_id);
 
 	if (wmi_unified_cmd_send(wmi_handle, buf, len,
 				 WMI_SAP_OBSS_DETECTION_CFG_CMDID)) {
@@ -21693,6 +21752,170 @@ static QDF_STATUS extract_green_ap_egap_status_info_tlv(
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+/*
+ * send_bss_color_change_enable_cmd_tlv() - Send command to enable or disable of
+ * updating bss color change within firmware when AP announces bss color change.
+ * @wmi_handle: wmi handle
+ * @vdev_id: vdev ID
+ * @enable: enable bss color change within firmware
+ *
+ * Send WMI_BSS_COLOR_CHANGE_ENABLE_CMDID parameters to fw.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS send_bss_color_change_enable_cmd_tlv(wmi_unified_t wmi_handle,
+						       uint32_t vdev_id,
+						       bool enable)
+{
+	wmi_buf_t buf;
+	wmi_bss_color_change_enable_fixed_param *cmd;
+	uint8_t len = sizeof(wmi_bss_color_change_enable_fixed_param);
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf) {
+		WMI_LOGE("%s: Failed to allocate wmi buffer", __func__);
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	cmd = (wmi_bss_color_change_enable_fixed_param *)wmi_buf_data(buf);
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		WMITLV_TAG_STRUC_wmi_bss_color_change_enable_fixed_param,
+		       WMITLV_GET_STRUCT_TLVLEN
+		       (wmi_bss_color_change_enable_fixed_param));
+	cmd->vdev_id = vdev_id;
+	cmd->enable = enable;
+	if (wmi_unified_cmd_send(wmi_handle, buf, len,
+				 WMI_BSS_COLOR_CHANGE_ENABLE_CMDID)) {
+		WMI_LOGE("Failed to send WMI_BSS_COLOR_CHANGE_ENABLE_CMDID");
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * send_obss_color_collision_cfg_cmd_tlv() - send bss color detection
+ *   configurations to firmware.
+ * @wmi_handle: wmi handle
+ * @cfg_param: obss detection configurations
+ *
+ * Send WMI_OBSS_COLOR_COLLISION_DET_CONFIG_CMDID parameters to fw.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS send_obss_color_collision_cfg_cmd_tlv(
+		wmi_unified_t wmi_handle,
+		struct wmi_obss_color_collision_cfg_param *cfg_param)
+{
+	wmi_buf_t buf;
+	wmi_obss_color_collision_det_config_fixed_param *cmd;
+	uint8_t len = sizeof(wmi_obss_color_collision_det_config_fixed_param);
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf) {
+		WMI_LOGE("%s: Failed to allocate wmi buffer", __func__);
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	cmd = (wmi_obss_color_collision_det_config_fixed_param *)wmi_buf_data(
+			buf);
+	WMITLV_SET_HDR(&cmd->tlv_header,
+	WMITLV_TAG_STRUC_wmi_obss_color_collision_det_config_fixed_param,
+		       WMITLV_GET_STRUCT_TLVLEN
+		       (wmi_obss_color_collision_det_config_fixed_param));
+	cmd->vdev_id = cfg_param->vdev_id;
+	cmd->flags = cfg_param->flags;
+	cmd->current_bss_color = cfg_param->current_bss_color;
+	cmd->detection_period_ms = cfg_param->detection_period_ms;
+	cmd->scan_period_ms = cfg_param->scan_period_ms;
+	cmd->free_slot_expiry_time_ms = cfg_param->free_slot_expiry_time_ms;
+
+	switch (cfg_param->evt_type) {
+	case OBSS_COLOR_COLLISION_DETECTION_DISABLE:
+		cmd->evt_type = WMI_BSS_COLOR_COLLISION_DISABLE;
+		break;
+	case OBSS_COLOR_COLLISION_DETECTION:
+		cmd->evt_type = WMI_BSS_COLOR_COLLISION_DETECTION;
+		break;
+	case OBSS_COLOR_FREE_SLOT_TIMER_EXPIRY:
+		cmd->evt_type = WMI_BSS_COLOR_FREE_SLOT_TIMER_EXPIRY;
+		break;
+	case OBSS_COLOR_FREE_SLOT_AVAILABLE:
+		cmd->evt_type = WMI_BSS_COLOR_FREE_SLOT_AVAILABLE;
+		break;
+	default:
+		WMI_LOGE("%s: invalid event type: %d",
+			 __func__, cfg_param->evt_type);
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (wmi_unified_cmd_send(wmi_handle, buf, len,
+				 WMI_OBSS_COLOR_COLLISION_DET_CONFIG_CMDID)) {
+		WMI_LOGE("%s: Sending OBSS color det cmd failed, vdev_id: %d",
+			 __func__, cfg_param->vdev_id);
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * extract_obss_color_collision_info_tlv() - Extract bss color collision info
+ *   received from firmware.
+ * @evt_buf: pointer to event buffer
+ * @info: Pointer to hold bss collision  info
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS extract_obss_color_collision_info_tlv(uint8_t *evt_buf,
+		struct wmi_obss_color_collision_info *info)
+{
+	WMI_OBSS_COLOR_COLLISION_DETECTION_EVENTID_param_tlvs *param_buf;
+	wmi_obss_color_collision_evt_fixed_param *fix_param;
+
+	if (!info) {
+		WMI_LOGE("%s: Invalid obss color buffer", __func__);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	param_buf = (WMI_OBSS_COLOR_COLLISION_DETECTION_EVENTID_param_tlvs *)
+		    evt_buf;
+	if (!param_buf) {
+		WMI_LOGE("%s: Invalid evt_buf", __func__);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	fix_param = param_buf->fixed_param;
+	info->vdev_id = fix_param->vdev_id;
+	info->obss_color_bitmap_bit0to31 = fix_param->bss_color_bitmap_bit0to31;
+	info->obss_color_bitmap_bit32to63 =
+		fix_param->bss_color_bitmap_bit32to63;
+
+	switch (fix_param->evt_type) {
+	case WMI_BSS_COLOR_COLLISION_DISABLE:
+		info->evt_type = OBSS_COLOR_COLLISION_DETECTION_DISABLE;
+		break;
+	case WMI_BSS_COLOR_COLLISION_DETECTION:
+		info->evt_type = OBSS_COLOR_COLLISION_DETECTION;
+		break;
+	case WMI_BSS_COLOR_FREE_SLOT_TIMER_EXPIRY:
+		info->evt_type = OBSS_COLOR_FREE_SLOT_TIMER_EXPIRY;
+		break;
+	case WMI_BSS_COLOR_FREE_SLOT_AVAILABLE:
+		info->evt_type = OBSS_COLOR_FREE_SLOT_AVAILABLE;
+		break;
+	default:
+		WMI_LOGE("%s: invalid event type: %d, vdev_id: %d",
+			 __func__, fix_param->evt_type, fix_param->vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
 
 struct wmi_ops tlv_ops =  {
 	.send_vdev_create_cmd = send_vdev_create_cmd_tlv,
@@ -22156,6 +22379,16 @@ struct wmi_ops tlv_ops =  {
 #endif /* WLAN_SUPPORT_FILS */
 	.send_offload_11k_cmd = send_offload_11k_cmd_tlv,
 	.send_invoke_neighbor_report_cmd = send_invoke_neighbor_report_cmd_tlv,
+	.wmi_pdev_id_conversion_enable = wmi_tlv_pdev_id_conversion_enable,
+	.wmi_free_allocated_event = wmitlv_free_allocated_event_tlvs,
+	.wmi_check_and_pad_event = wmitlv_check_and_pad_event_tlvs,
+	.wmi_check_command_params = wmitlv_check_command_tlv_params,
+	.send_bss_color_change_enable_cmd =
+		send_bss_color_change_enable_cmd_tlv,
+	.send_obss_color_collision_cfg_cmd =
+		send_obss_color_collision_cfg_cmd_tlv,
+	.extract_obss_color_collision_info =
+		extract_obss_color_collision_info_tlv,
 };
 
 /**
@@ -22438,6 +22671,8 @@ static void populate_tlv_events_id(uint32_t *event_ids)
 		WMI_SAP_OBSS_DETECTION_REPORT_EVENTID;
 	event_ids[wmi_host_swfda_event_id] = WMI_HOST_SWFDA_EVENTID;
 	event_ids[wmi_sar_get_limits_event_id] = WMI_SAR_GET_LIMITS_EVENTID;
+	event_ids[wmi_obss_color_collision_report_event_id] =
+		WMI_OBSS_COLOR_COLLISION_DETECTION_EVENTID;
 }
 
 /**
@@ -22640,6 +22875,12 @@ static void populate_tlv_service(uint32_t *wmi_service)
 	wmi_service[wmi_service_8ss_tx_bfee] = WMI_SERVICE_8SS_TX_BFEE;
 	wmi_service[wmi_service_fils_support] = WMI_SERVICE_FILS_SUPPORT;
 	wmi_service[wmi_service_mawc_support] = WMI_SERVICE_MAWC_SUPPORT;
+	wmi_service[wmi_service_11k_neighbour_report_support] =
+				WMI_SERVICE_11K_NEIGHBOUR_REPORT_SUPPORT;
+	wmi_service[wmi_service_ap_obss_detection_offload] =
+				WMI_SERVICE_AP_OBSS_DETECTION_OFFLOAD;
+	wmi_service[wmi_service_bss_color_offload] =
+				WMI_SERVICE_BSS_COLOR_OFFLOAD;
 
 }
 
@@ -23068,67 +23309,6 @@ static void populate_target_defines_tlv(struct wmi_unified *wmi_handle)
 #endif
 
 /**
- * convert_host_pdev_id_to_target_pdev_id() - Convert pdev_id from
- *           host to target defines.
- * @param pdev_id: host pdev_id to be converted.
- * Return: target pdev_id after conversion.
- */
-static uint32_t convert_host_pdev_id_to_target_pdev_id(uint32_t pdev_id)
-{
-	switch (pdev_id) {
-	case WMI_HOST_PDEV_ID_SOC:
-		return WMI_PDEV_ID_SOC;
-	case WMI_HOST_PDEV_ID_0:
-		return WMI_PDEV_ID_1ST;
-	case WMI_HOST_PDEV_ID_1:
-		return WMI_PDEV_ID_2ND;
-	case WMI_HOST_PDEV_ID_2:
-		return WMI_PDEV_ID_3RD;
-	}
-
-	QDF_ASSERT(0);
-
-	return WMI_PDEV_ID_SOC;
-}
-
-/**
- * convert_target_pdev_id_to_host_pdev_id() - Convert pdev_id from
- *           target to host defines.
- * @param pdev_id: target pdev_id to be converted.
- * Return: host pdev_id after conversion.
- */
-static uint32_t convert_target_pdev_id_to_host_pdev_id(uint32_t pdev_id)
-{
-	switch (pdev_id) {
-	case WMI_PDEV_ID_SOC:
-		return WMI_HOST_PDEV_ID_SOC;
-	case WMI_PDEV_ID_1ST:
-		return WMI_HOST_PDEV_ID_0;
-	case WMI_PDEV_ID_2ND:
-		return WMI_HOST_PDEV_ID_1;
-	case WMI_PDEV_ID_3RD:
-		return WMI_HOST_PDEV_ID_2;
-	}
-
-	QDF_ASSERT(0);
-
-	return WMI_HOST_PDEV_ID_SOC;
-}
-
-/**
- * wmi_tlv_pdev_id_conversion_enable() - Enable pdev_id conversion
- *
- * Return None.
- */
-void wmi_tlv_pdev_id_conversion_enable(wmi_unified_t wmi_handle)
-{
-	wmi_handle->ops->convert_pdev_id_host_to_target =
-		convert_host_pdev_id_to_target_pdev_id;
-	wmi_handle->ops->convert_pdev_id_target_to_host =
-		convert_target_pdev_id_to_host_pdev_id;
-}
-
-/**
  * wmi_ocb_ut_attach() - Attach OCB test framework
  * @wmi_handle: wmi handle
  *
@@ -23161,4 +23341,15 @@ void wmi_tlv_attach(wmi_unified_t wmi_handle)
 	populate_tlv_events_id(wmi_handle->wmi_events);
 	populate_tlv_service(wmi_handle->services);
 	populate_target_defines_tlv(wmi_handle);
+}
+EXPORT_SYMBOL(wmi_tlv_attach);
+
+/**
+ * wmi_tlv_init() - Initialize WMI TLV module by registering TLV attach routine
+ *
+ * Return: None
+ */
+void wmi_tlv_init(void)
+{
+	wmi_unified_register_module(WMI_TLV_TARGET, &wmi_tlv_attach);
 }

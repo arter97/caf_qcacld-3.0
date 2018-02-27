@@ -27,6 +27,7 @@
 #include <qdf_lock.h>
 #include <wlan_spectral_public_structs.h>
 #include <reg_services_public_struct.h>
+#include <target_if_direct_buf_rx_api.h>
 
 #ifdef WIN32
 #pragma pack(push, target_if_spectral, 1)
@@ -56,16 +57,17 @@ QDF_PRINT_INFO(QDF_PRINT_IDX_SHARED, QDF_MODULE_ID_SPECTRAL, level, ## args)
 
 #define STATUS_PASS       1
 #define STATUS_FAIL       0
-#define line()   \
-	qdf_print("----------------------------------------------------\n")
-#define SPECTRAL_TODO(str) \
-	qdf_print(KERN_INFO "SPECTRAL : %s (%s : %d)\n", \
-		  (str), __func__, __LINE__)
+#undef spectral_dbg_line
+#define spectral_dbg_line() \
+	spectral_debug("----------------------------------------------------\n")
+
+#undef spectral_ops_not_registered
 #define spectral_ops_not_registered(str) \
-	qdf_print(KERN_INFO "SPECTRAL : %s not registered\n", (str))
+	spectral_info("SPECTRAL : %s not registered\n", (str))
+#undef not_yet_implemented
 #define not_yet_implemented() \
-	qdf_print("SPECTRAL : %s : %d Not yet implemented\n", \
-		  __func__, __LINE__)
+	spectral_info("SPECTRAL : %s : %d Not yet implemented\n", \
+		      __func__, __LINE__)
 
 #define SPECTRAL_HT20_NUM_BINS               56
 #define SPECTRAL_HT20_FFT_LEN                56
@@ -102,16 +104,13 @@ QDF_PRINT_INFO(QDF_PRINT_IDX_SHARED, QDF_MODULE_ID_SPECTRAL, level, ## args)
 	OS_MEMCPY((destp), (srcp), (len));
 #endif
 
+#define DUMMY_NF_VALUE          (-123)
 /* 5 categories x (lower + upper) bands */
 #define MAX_INTERF                   10
 #define HOST_MAX_ANTENNA         3
 /* Mask for time stamp from descriptor */
 #define SPECTRAL_TSMASK              0xFFFFFFFF
 #define SPECTRAL_SIGNATURE           0xdeadbeef
-#define MAX_SPECTRAL_PAYLOAD         1500
-#ifndef NETLINK_ATHEROS
-#define NETLINK_ATHEROS              (NETLINK_GENERIC + 1)
-#endif
 
 /* START of spectral GEN II HW specific details */
 #define SPECTRAL_PHYERR_SIGNATURE_GEN2           0xbb
@@ -303,6 +302,33 @@ struct spectral_phyerr_fft_report_gen3 {
 	uint8_t buf[0];
 } __ATTRIB_PACK;
 
+/**
+ * struct spectral_sscan_report_gen3 - spectral report in phyerr event
+ * @sscan_timestamp:  Timestamp at which fft report was generated
+ * @sscan_hdr_sig:    signature
+ * @sscan_hdr_tag:    tag
+ * @sscan_hdr_length: length
+ * @hdr_a:          Header[0:31]
+ * @resv:           Header[32:63]
+ * @hdr_b:          Header[64:95]
+ * @resv:           Header[96:127]
+ */
+struct spectral_sscan_report_gen3 {
+	u_int32_t sscan_timestamp;
+#ifdef BIG_ENDIAN_HOST
+	u_int8_t  sscan_hdr_sig;
+	u_int8_t  sscan_hdr_tag;
+	u_int16_t sscan_hdr_length;
+#else
+	u_int16_t sscan_hdr_length;
+	u_int8_t  sscan_hdr_tag;
+	u_int8_t  sscan_hdr_sig;
+#endif /* BIG_ENDIAN_HOST */
+	u_int32_t hdr_a;
+	u_int32_t res1;
+	u_int32_t hdr_b;
+	u_int32_t res2;
+} __ATTRIB_PACK;
 /* END of spectral GEN III HW specific details */
 
 typedef signed char pwr_dbm;
@@ -673,6 +699,9 @@ struct wmi_spectral_cmd_ops {
  * header, for the given hardware generation
  * @tlvhdr_size: Expected PHYERR TLV header size, for the given hardware
  * generation
+ * @nl_cb: Netlink callbacks
+ * @use_nl_bcast: Whether to use Netlink broadcast/unicast
+ * @send_phy_data: Send data to the applicaton layer
  */
 struct target_if_spectral {
 	struct wlan_objmgr_pdev *pdev_obj;
@@ -696,13 +725,6 @@ struct target_if_spectral {
 	int                                     lower_is_control;
 	int                                     lower_is_extension;
 	uint8_t                                sc_spectraltest_ieeechan;
-	struct sock *spectral_sock;
-	struct sk_buff *spectral_skb;
-	struct nlmsghdr *spectral_nlh;
-	uint32_t                               spectral_pid;
-
-	STAILQ_HEAD(, target_if_spectral_skb_event)    spectral_skbq;
-	qdf_spinlock_t                          spectral_skbqlock;
 	int                                     spectral_numbins;
 	int                                     spectral_fft_len;
 	int                                     spectral_data_len;
@@ -777,20 +799,10 @@ struct target_if_spectral {
 	uint8_t                                tag_sscan_fft_exp;
 	uint8_t                                tlvhdr_size;
 	struct wmi_spectral_cmd_ops param_wmi_cmd_ops;
-};
-
-/**
- * struct target_if_spectral_skb_event - Used to broadcast FFT report to
- *                                       applications
- * @sp_skb:            Pointer to skb
- * @sp_nlh:            Pointer to nl message header
- * @spectral_skb_list: Linked list to manipulate the reports
- */
-struct target_if_spectral_skb_event {
-	struct sk_buff *sp_skb;
-	struct nlmsghdr *sp_nlh;
-
-	STAILQ_ENTRY(target_if_spectral_skb_event)    spectral_skb_list;
+	struct spectral_nl_cb nl_cb;
+	bool use_nl_bcast;
+	int (*send_phy_data)(struct wlan_objmgr_pdev *pdev);
+	u_int8_t                               fftbin_size_war;
 };
 
 /**
@@ -863,19 +875,10 @@ struct target_if_samp_msg_params {
 	uint16_t   freq_loading;
 	int16_t     noise_floor;
 	int16_t     noise_floor_sec80;
-	struct INTERF_SRC_RSP interf_list;
+	struct interf_src_rsp interf_list;
 	struct spectral_classifier_params classifier_params;
 	struct ath_softc *sc;
 };
-
-/* NETLINK related declarations */
-#ifdef SPECTRAL_USE_NETLINK_SOCKETS
-#if (KERNEL_VERSION(2, 6, 31) > LINUX_VERSION_CODE)
-void target_if_spectral_nl_data_ready(struct sock *sk, int len);
-#else
-void target_if_spectral_nl_data_ready(struct sk_buff *skb);
-#endif /* VERSION CHECK */
-#endif /* SPECTRAL_USE_NETLINK_SOCKETS defined */
 
 /**
  * target_if_spectral_dump_fft() - Dump Spectral FFT
@@ -911,66 +914,6 @@ uint32_t target_if_get_offset_swar_sec80(uint32_t channel_width);
  */
 void target_if_sptrl_register_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops);
 
-/* Init's network namespace */
-extern struct net init_net;
-
-/**
- * target_if_spectral_init_netlink() - Initialize netlink data structures for
- * spectral module
- * @spectral : Pointer to spectral internal structure
- *
- * Return: Success/Failure
- */
-int target_if_spectral_init_netlink(struct target_if_spectral *spectral);
-
-/**
- * target_if_spectral_init_netlink() - De-initialize netlink data structures for
- * spectral module
- * @spectral : Pointer to spectral internal structure
- *
- * Return: Success/Failure
- */
-int target_if_spectral_destroy_netlink(struct target_if_spectral *spectral);
-
-/**
- * target_if_spectral_unicast_msg() - Passes unicast spectral message to host
- * @spectral : Pointer to spectral internal structure
- *
- * Return: void
- */
-void target_if_spectral_unicast_msg(struct target_if_spectral *spectral);
-
-/**
- * target_if_spectral_bcast_msg() - Passes broadcast spectral message to host
- * @spectral : Pointer to spectral internal structure
- *
- * Return: void
- */
-void target_if_spectral_bcast_msg(struct target_if_spectral *spectral);
-
-/**
- * target_if_spectral_prep_skb() - Prepare socket buffer
- * @spectral : Pointer to spectral internal structure
- *
- * Prepare socket buffer to send the data to application layer
- *
- * Return: void
- */
-void target_if_spectral_prep_skb(struct target_if_spectral *spectral);
-
-/**
- * target_if_spectral_skb_dequeue() - Dequeue all the spectral queued socket
- * buffers
- * @data : unsigned long pointer to spectral internal structure.
- *         Have to be typecasted to struct target_if_spectral pointer type.
- *
- * Dequeue all the spectral queued socket buffers queued.
- * Broadcasts spectral data after dequeing each sk_buff.
- *
- * Return: void
- */
-void target_if_spectral_skb_dequeue(void *data);
-
 /**
  * target_if_spectral_create_samp_msg() - Create the spectral samp message
  * @spectral : Pointer to spectral internal structure
@@ -986,25 +929,16 @@ void target_if_spectral_create_samp_msg(
 
 /**
  * target_if_spectral_process_phyerr_gen3() - Process phyerror event for gen3
- * @spectral: Pointer to Spectral object
- * @data: Pointer to phyerror event buffer
- * @datalen: Data length
- * @p_rfqual: RF quality info
- * @p_chaninfo: Channel info
- * @tsf64: 64 bit tsf timestamp
- * @acs_stats: ACS stats
+ * @pdev:    Pointer to pdev object
+ * @payload: Pointer to spectral report
  *
  * Process phyerror event for gen3
  *
  * Return: Success/Failure
  */
 int target_if_spectral_process_phyerr_gen3(
-	struct target_if_spectral *spectral,
-	uint8_t *data,
-	uint32_t datalen, struct target_if_spectral_rfqual_info *p_rfqual,
-	struct target_if_spectral_chan_info *p_chaninfo,
-	uint64_t tsf64,
-	struct target_if_spectral_acs_stats *acs_stats);
+	struct wlan_objmgr_pdev *pdev,
+	struct direct_buf_rx_data *payload);
 
 /**
  * target_if_process_phyerr_gen2() - Process PHY Error for gen2
@@ -1158,25 +1092,6 @@ void target_if_dbg_print_samp_msg(struct spectral_samp_msg *pmsg);
 int target_if_process_sfft_report_gen3(
 	struct spectral_phyerr_fft_report_gen3 *p_fft_report,
 	struct spectral_search_fft_info_gen3 *p_fft_info);
-
-/**
- * target_if_send_phydata() - Send Spectral PHY data over netlink
- * @pdev: Pointer to pdev
- * @sock: Netlink socket to use
- * @nbuf: Network buffer containing PHY data to send
- *
- * Return: 0 on success, negative value on failure
- */
-static inline uint32_t target_if_send_phydata(
-	struct wlan_objmgr_pdev *pdev,
-	struct sock *sock, qdf_nbuf_t nbuf)
-{
-	struct wlan_objmgr_psoc *psoc = NULL;
-
-	psoc = wlan_pdev_get_psoc(pdev);
-	return psoc->soc_cb.rx_ops.sptrl_rx_ops.sptrlro_send_phydata(pdev,
-				sock, nbuf);
-}
 
 /**
  * get_target_if_spectral_handle_from_pdev() - Get handle to target_if internal

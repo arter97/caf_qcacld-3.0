@@ -72,6 +72,7 @@
 #ifdef WLAN_SUPPORT_FILS
 #include <target_if_fd.h>
 #endif
+#include "qdf_module.h"
 
 static struct target_if_ctx *g_target_if_ctx;
 
@@ -174,6 +175,7 @@ QDF_STATUS target_if_close(void)
 
 	return QDF_STATUS_SUCCESS;
 }
+qdf_export_symbol(target_if_close);
 
 QDF_STATUS target_if_store_pdev_target_if_ctx(
 		get_pdev_handle_callback pdev_hdl_cb)
@@ -375,7 +377,7 @@ QDF_STATUS target_if_register_umac_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops)
 	wlan_lmac_if_umac_tx_ops_register(tx_ops);
 
 	/* Register scan tx ops */
-	target_if_register_scan_tx_ops(&tx_ops->scan);
+	target_if_scan_tx_ops_register(tx_ops);
 
 	target_if_atf_tx_ops_register(tx_ops);
 
@@ -420,12 +422,10 @@ QDF_STATUS target_if_register_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops)
 	/* Converged UMAC components to register P2P TX-ops */
 	target_if_p2p_register_tx_ops(tx_ops);
 #endif
-#ifdef CONVERGED_TDLS_ENABLE
-	target_if_tdls_register_tx_ops(tx_ops);
-#endif
 
 	return QDF_STATUS_SUCCESS;
 }
+qdf_export_symbol(target_if_register_tx_ops);
 
 wmi_legacy_service_ready_callback
 target_if_get_psoc_legacy_service_ready_cb(void)
@@ -441,7 +441,7 @@ target_if_get_psoc_legacy_service_ready_cb(void)
 
 	return service_ready_cb;
 }
-EXPORT_SYMBOL(target_if_get_psoc_legacy_service_ready_cb);
+qdf_export_symbol(target_if_get_psoc_legacy_service_ready_cb);
 
 QDF_STATUS target_if_register_legacy_service_ready_cb(
 	wmi_legacy_service_ready_callback service_ready_cb)
@@ -452,7 +452,7 @@ QDF_STATUS target_if_register_legacy_service_ready_cb(
 
 	return QDF_STATUS_SUCCESS;
 }
-EXPORT_SYMBOL(target_if_register_legacy_service_ready_cb);
+qdf_export_symbol(target_if_register_legacy_service_ready_cb);
 
 QDF_STATUS target_if_alloc_pdev_tgt_info(struct wlan_objmgr_pdev *pdev)
 {

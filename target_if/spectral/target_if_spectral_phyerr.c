@@ -30,6 +30,7 @@
 #include <osif_rawmode_sim.h>
 #endif /*CONFIG_WIN*/
 #include <reg_services_public_struct.h>
+#include <target_if_direct_buf_rx_api.h>
 extern int spectral_debug_level;
 
 #if WLAN_SPECTRAL_ENABLE
@@ -49,9 +50,9 @@ target_if_print_buf(uint8_t *pbuf, int len)
 	int i = 0;
 
 	for (i = 0; i < len; i++) {
-		qdf_print("%02X ", pbuf[i]);
+		spectral_debug("%02X ", pbuf[i]);
 		if (i % 32 == 31)
-			qdf_print("\n");
+			spectral_debug("\n");
 	}
 }
 
@@ -64,12 +65,12 @@ target_if_spectral_dump_fft(uint8_t *pfft, int fftlen)
 	 * TODO : Do not delete the following print
 	 *        The scripts used to validate Spectral depend on this Print
 	 */
-	qdf_print("SPECTRAL : FFT Length is 0x%x (%d)\n", fftlen, fftlen);
+	spectral_debug("SPECTRAL : FFT Length is 0x%x (%d)", fftlen, fftlen);
 
-	qdf_print("fft_data # ");
+	spectral_debug("fft_data # ");
 	for (i = 0; i < fftlen; i++)
-		qdf_print("%d ", pfft[i]);
-	qdf_print("\n");
+		spectral_debug("%d ", pfft[i]);
+	spectral_debug("\n");
 	return 0;
 }
 
@@ -88,13 +89,12 @@ target_if_spectral_send_tlv_to_host(struct target_if_spectral *spectral,
 				    uint8_t *data, uint32_t datalen)
 {
 	int status = true;
+	void *nl_data = spectral->nl_cb.get_nbuff(spectral->pdev_obj);
 
-	target_if_spectral_prep_skb(spectral);
-	if (spectral->spectral_skb) {
-		spectral->spectral_nlh =
-		    (struct nlmsghdr *)spectral->spectral_skb->data;
-		memcpy(NLMSG_DATA(spectral->spectral_nlh), data, datalen);
-		target_if_spectral_bcast_msg(spectral);
+	if (nl_data) {
+		memcpy(nl_data, data, datalen);
+		if (spectral->send_phy_data(spectral->pdev_obj) == 0)
+			spectral->spectral_sent_msg++;
 	} else {
 		status = false;
 	}
@@ -104,14 +104,12 @@ target_if_spectral_send_tlv_to_host(struct target_if_spectral *spectral,
 void
 target_if_dbg_print_samp_param(struct target_if_samp_msg_params *p)
 {
-	qdf_print("\nSAMP Packet : -------------------- START --------------"
-		  "------\n");
-	qdf_print("Freq        = %d\n", p->freq);
-	qdf_print("RSSI        = %d\n", p->rssi);
-	qdf_print("Bin Count   = %d\n", p->pwr_count);
-	qdf_print("Timestamp   = %d\n", p->tstamp);
-	qdf_print("SAMP Packet : -------------------- END ------------------"
-		  "-----\n");
+	spectral_debug("\nSAMP Packet : -------------------- START --------------------");
+	spectral_debug("Freq        = %d", p->freq);
+	spectral_debug("RSSI        = %d", p->rssi);
+	spectral_debug("Bin Count   = %d", p->pwr_count);
+	spectral_debug("Timestamp   = %d", p->tstamp);
+	spectral_debug("SAMP Packet : -------------------- END -----------------------");
 }
 
 void
@@ -121,51 +119,52 @@ target_if_dbg_print_samp_msg(struct spectral_samp_msg *ss_msg)
 
 	struct spectral_samp_data *p = &ss_msg->samp_data;
 	struct spectral_classifier_params *pc = &p->classifier_params;
-	struct INTERF_SRC_RSP *pi = &p->interf_list;
+	struct interf_src_rsp *pi = &p->interf_list;
 
-	line();
-	qdf_print("Spectral Message\n");
-	line();
-	qdf_print("Signature   :   0x%x\n", ss_msg->signature);
-	qdf_print("Freq        :   %d\n", ss_msg->freq);
-	qdf_print("Freq load   :   %d\n", ss_msg->freq_loading);
-	qdf_print("Intfnc type :   %d\n", ss_msg->int_type);
-	line();
-	qdf_print("Spectral Data info\n");
-	line();
-	qdf_print("data length     :   %d\n", p->spectral_data_len);
-	qdf_print("rssi            :   %d\n", p->spectral_rssi);
-	qdf_print("combined rssi   :   %d\n", p->spectral_combined_rssi);
-	qdf_print("upper rssi      :   %d\n", p->spectral_upper_rssi);
-	qdf_print("lower rssi      :   %d\n", p->spectral_lower_rssi);
-	qdf_print("bw info         :   %d\n", p->spectral_bwinfo);
-	qdf_print("timestamp       :   %d\n", p->spectral_tstamp);
-	qdf_print("max index       :   %d\n", p->spectral_max_index);
-	qdf_print("max exp         :   %d\n", p->spectral_max_exp);
-	qdf_print("max mag         :   %d\n", p->spectral_max_mag);
-	qdf_print("last timstamp   :   %d\n", p->spectral_last_tstamp);
-	qdf_print("upper max idx   :   %d\n", p->spectral_upper_max_index);
-	qdf_print("lower max idx   :   %d\n", p->spectral_lower_max_index);
-	qdf_print("bin power count :   %d\n", p->bin_pwr_count);
-	line();
-	qdf_print("Classifier info\n");
-	line();
-	qdf_print("20/40 Mode      :   %d\n", pc->spectral_20_40_mode);
-	qdf_print("dc index        :   %d\n", pc->spectral_dc_index);
-	qdf_print("dc in MHz       :   %d\n", pc->spectral_dc_in_mhz);
-	qdf_print("upper channel   :   %d\n", pc->upper_chan_in_mhz);
-	qdf_print("lower channel   :   %d\n", pc->lower_chan_in_mhz);
-	line();
-	qdf_print("Interference info\n");
-	line();
-	qdf_print("inter count     :   %d\n", pi->count);
+	spectral_dbg_line();
+	spectral_debug("Spectral Message");
+	spectral_dbg_line();
+	spectral_debug("Signature   :   0x%x", ss_msg->signature);
+	spectral_debug("Freq        :   %d", ss_msg->freq);
+	spectral_debug("Freq load   :   %d", ss_msg->freq_loading);
+	spectral_debug("Intfnc type :   %d", ss_msg->int_type);
+	spectral_dbg_line();
+	spectral_debug("Spectral Data info");
+	spectral_dbg_line();
+	spectral_debug("data length     :   %d", p->spectral_data_len);
+	spectral_debug("rssi            :   %d", p->spectral_rssi);
+	spectral_debug("combined rssi   :   %d", p->spectral_combined_rssi);
+	spectral_debug("upper rssi      :   %d", p->spectral_upper_rssi);
+	spectral_debug("lower rssi      :   %d", p->spectral_lower_rssi);
+	spectral_debug("bw info         :   %d", p->spectral_bwinfo);
+	spectral_debug("timestamp       :   %d", p->spectral_tstamp);
+	spectral_debug("max index       :   %d", p->spectral_max_index);
+	spectral_debug("max exp         :   %d", p->spectral_max_exp);
+	spectral_debug("max mag         :   %d", p->spectral_max_mag);
+	spectral_debug("last timstamp   :   %d", p->spectral_last_tstamp);
+	spectral_debug("upper max idx   :   %d", p->spectral_upper_max_index);
+	spectral_debug("lower max idx   :   %d", p->spectral_lower_max_index);
+	spectral_debug("bin power count :   %d", p->bin_pwr_count);
+	spectral_dbg_line();
+	spectral_debug("Classifier info");
+	spectral_dbg_line();
+	spectral_debug("20/40 Mode      :   %d", pc->spectral_20_40_mode);
+	spectral_debug("dc index        :   %d", pc->spectral_dc_index);
+	spectral_debug("dc in MHz       :   %d", pc->spectral_dc_in_mhz);
+	spectral_debug("upper channel   :   %d", pc->upper_chan_in_mhz);
+	spectral_debug("lower channel   :   %d", pc->lower_chan_in_mhz);
+	spectral_dbg_line();
+	spectral_debug("Interference info");
+	spectral_dbg_line();
+	spectral_debug("inter count     :   %d", pi->count);
 
 	for (i = 0; i < pi->count; i++) {
-		qdf_print("inter type  :   %d\n", pi->interf[i].interf_type);
-		qdf_print("min freq    :   %d\n",
-			  pi->interf[i].interf_min_freq);
-		qdf_print("max freq    :   %d\n",
-			  pi->interf[i].interf_max_freq);
+		spectral_debug("inter type  :   %d",
+			       pi->interf[i].interf_type);
+		spectral_debug("min freq    :   %d",
+			       pi->interf[i].interf_min_freq);
+		spectral_debug("max freq    :   %d",
+			       pi->interf[i].interf_max_freq);
 	}
 }
 
@@ -238,13 +237,12 @@ target_if_dump_summary_report_gen2(struct spectral_phyerr_tlv_gen2 *ptlv,
 		(uint8_t *)ptlv +
 		sizeof(struct spectral_phyerr_tlv_gen2));
 
-	qdf_print("SPECTRAL : SPECTRAL SUMMARY REPORT\n");
+	spectral_debug("SPECTRAL : SPECTRAL SUMMARY REPORT");
 
 	if (is_160_format) {
 		if (tlvlen != 20) {
-			qdf_print
-			    ("SPECTRAL : Unexpected TLV length %d for Spectral "
-			     "Summary Report! Hexdump follows\n", tlvlen);
+			spectral_err("Unexpected TLV length %d for Spectral Summary Report! Hexdump follows",
+				     tlvlen);
 			target_if_print_buf((uint8_t *)ptlv, tlvlen + 4);
 			return -EPERM;
 		}
@@ -271,8 +269,8 @@ target_if_dump_summary_report_gen2(struct spectral_phyerr_tlv_gen2 *ptlv,
 
 		recent_rfsat = ((ss_summary_A >> 8) & 0x1);
 		sscan_gidx = (ss_summary_A & 0xff);
-		qdf_print("sscan_gidx=%d, is_recent_rfsat=%d\n",
-			  sscan_gidx, recent_rfsat);
+		spectral_debug("sscan_gidx=%d, is_recent_rfsat=%d",
+			       sscan_gidx, recent_rfsat);
 
 		/* First segment */
 		agc_mb_gain = ((ss_summary_B >> 10) & 0x7f);
@@ -284,12 +282,10 @@ target_if_dump_summary_report_gen2(struct spectral_phyerr_tlv_gen2 *ptlv,
 			peak_inx = peak_inx - 4096;
 		peak_mag = ((ss_summary_C >> 12) & 0x3ff);
 
-		qdf_print
-		    ("agc_total_gain_segid0 = 0x%.2x, agc_mb_gain_segid0=%d\n",
-		     agc_total_gain, agc_mb_gain);
-		qdf_print("nb_mask_segid0 = 0x%.2x, ob_flag_segid0=%d, "
-			  "peak_index_segid0=%d, peak_mag_segid0=%d\n", nb_mask,
-			  ob_flag, peak_inx, peak_mag);
+		spectral_debug("agc_total_gain_segid0 = 0x%.2x, agc_mb_gain_segid0=%d",
+			       agc_total_gain, agc_mb_gain);
+		spectral_debug("nb_mask_segid0 = 0x%.2x, ob_flag_segid0=%d, peak_index_segid0=%d, peak_mag_segid0=%d",
+			       nb_mask, ob_flag, peak_inx, peak_mag);
 
 		/* Second segment */
 		agc_mb_gain = ((ss_summary_D >> 10) & 0x7f);
@@ -301,17 +297,14 @@ target_if_dump_summary_report_gen2(struct spectral_phyerr_tlv_gen2 *ptlv,
 			peak_inx = peak_inx - 4096;
 		peak_mag = ((ss_summary_E >> 12) & 0x3ff);
 
-		qdf_print
-		    ("agc_total_gain_segid1 = 0x%.2x, agc_mb_gain_segid1=%d\n",
-		     agc_total_gain, agc_mb_gain);
-		qdf_print("nb_mask_segid1 = 0x%.2x, ob_flag_segid1=%d, "
-			  "peak_index_segid1=%d, peak_mag_segid1=%d\n", nb_mask,
-			  ob_flag, peak_inx, peak_mag);
+		spectral_debug("agc_total_gain_segid1 = 0x%.2x, agc_mb_gain_segid1=%d",
+			       agc_total_gain, agc_mb_gain);
+		spectral_debug("nb_mask_segid1 = 0x%.2x, ob_flag_segid1=%d, peak_index_segid1=%d, peak_mag_segid1=%d",
+			       nb_mask, ob_flag, peak_inx, peak_mag);
 	} else {
 		if (tlvlen != 8) {
-			qdf_print
-			    ("SPECTRAL : Unexpected TLV length %d for Spectral "
-			     "Summary Report! Hexdump follows\n", tlvlen);
+			spectral_err("Unexpected TLV length %d for Spectral Summary Report! Hexdump follows",
+				     tlvlen);
 			target_if_print_buf((uint8_t *)ptlv, tlvlen + 4);
 			return -EPERM;
 		}
@@ -335,12 +328,10 @@ target_if_dump_summary_report_gen2(struct spectral_phyerr_tlv_gen2 *ptlv,
 		sscan_gidx = ((ss_summary_A >> 16) & 0xff);
 		recent_rfsat = ((ss_summary_B >> 31) & 0x1);
 
-		qdf_print
-		    ("nb_mask = 0x%.2x, ob_flag=%d, peak_index=%d, "
-		     "peak_mag=%d, "
-		     "agc_mb_gain=%d, agc_total_gain=%d, sscan_gidx=%d, "
-		     "recent_rfsat=%d\n", nb_mask, ob_flag, peak_inx, peak_mag,
-		     agc_mb_gain, agc_total_gain, sscan_gidx, recent_rfsat);
+		spectral_debug("nb_mask = 0x%.2x, ob_flag=%d, peak_index=%d, peak_mag=%d, agc_mb_gain=%d, agc_total_gain=%d, sscan_gidx=%d, recent_rfsat=%d",
+			       nb_mask, ob_flag, peak_inx, peak_mag,
+			       agc_mb_gain, agc_total_gain, sscan_gidx,
+			       recent_rfsat);
 	}
 
 	return 0;
@@ -390,8 +381,8 @@ target_if_process_sfft_report_gen2(
 
 	/* Relook this */
 	if (tlvlen < 8) {
-		qdf_print("SPECTRAL : Unexpected TLV length %d for Spectral "
-			  "Summary Report! Hexdump follows\n", tlvlen);
+		spectral_err("Unexpected TLV length %d for Spectral Summary Report! Hexdump follows",
+			     tlvlen);
 		target_if_print_buf((uint8_t *)ptlv, tlvlen + 4);
 		return -EPERM;
 	}
@@ -462,12 +453,12 @@ target_if_dump_adc_report_gen2(
 
 	uint8_t *ptmp = (uint8_t *)ptlv;
 
-	qdf_print("SPECTRAL : ADC REPORT\n");
+	spectral_debug("SPECTRAL : ADC REPORT");
 
 	/* Relook this */
 	if (tlvlen < 4) {
-		qdf_print("Unexpected TLV length %d for ADC Report! Hexdump"
-			  " follows\n", tlvlen);
+		spectral_err("Unexpected TLV length %d for ADC Report! Hexdump follows",
+			     tlvlen);
 		target_if_print_buf((uint8_t *)ptlv, tlvlen + 4);
 		return -EPERM;
 	}
@@ -480,9 +471,9 @@ target_if_dump_adc_report_gen2(
 	agc_mb_gain = ((adc_summary >> 16) & 0x7f);
 	agc_total_gain = adc_summary & 0x3ff;
 
-	qdf_print("samp_fmt= %u, chn_idx= %u, recent_rfsat= %u, agc_mb_gain=%u"
-		  " agc_total_gain=%u\n", samp_fmt, chn_idx, recent_rfsat,
-		  agc_mb_gain, agc_total_gain);
+	spectral_debug("samp_fmt= %u, chn_idx= %u, recent_rfsat= %u, agc_mb_gain=%u agc_total_gain=%u",
+		       samp_fmt, chn_idx, recent_rfsat, agc_mb_gain,
+		       agc_total_gain);
 
 	for (i = 0; i < (tlvlen / 4); i++) {
 		pdata = (uint32_t *)(ptmp + 4 + i * 4);
@@ -524,12 +515,11 @@ target_if_dump_adc_report_gen2(
 			else
 				sq2 = q2;
 
-			qdf_print
-			    ("SPECTRAL ADC : Interpreting capture format 1\n");
-			qdf_print("adc_data_format_1 # %d %d %d\n", 2 * i, si1,
-				  sq1);
-			qdf_print("adc_data_format_1 # %d %d %d\n", 2 * i + 1,
-				  si2, sq2);
+			spectral_debug("SPECTRAL ADC : Interpreting capture format 1");
+			spectral_debug("adc_data_format_1 # %d %d %d",
+				       2 * i, si1, sq1);
+			spectral_debug("adc_data_format_1 # %d %d %d",
+				       2 * i + 1, si2, sq2);
 		}
 
 		/* Interpreting capture format 0 */
@@ -550,14 +540,13 @@ target_if_dump_adc_report_gen2(
 				sq1 = q1 - 65536;
 			else
 				sq1 = q1;
-			qdf_print
-			    ("SPECTRAL ADC : Interpreting capture format 0\n");
-			qdf_print("adc_data_format_2 # %d %d %d\n", i, si1,
-				  sq1);
+			spectral_debug("SPECTRAL ADC : Interpreting capture format 0");
+			spectral_debug("adc_data_format_2 # %d %d %d",
+				       i, si1, sq1);
 		}
 	}
 
-	qdf_print("\n");
+	spectral_debug("\n");
 
 	return 0;
 }
@@ -611,12 +600,12 @@ target_if_dump_sfft_report_gen2(struct spectral_phyerr_tlv_gen2 *ptlv,
 	if (is_160_format)
 		segid_skiplen = sizeof(SPECTRAL_SEGID_INFO);
 
-	qdf_print("SPECTRAL : SEARCH FFT REPORT\n");
+	spectral_debug("SPECTRAL : SEARCH FFT REPORT");
 
 	/* Relook this */
 	if (tlvlen < (8 + segid_skiplen)) {
-		qdf_print("SPECTRAL : Unexpected TLV length %d for Spectral "
-			  "Summary Report! Hexdump follows\n", tlvlen);
+		spectral_err("Unexpected TLV length %d for Spectral Summary Report! Hexdump follows",
+			     tlvlen);
 		target_if_print_buf((uint8_t *)ptlv, tlvlen + 4);
 		return -EPERM;
 	}
@@ -645,24 +634,23 @@ target_if_dump_sfft_report_gen2(struct spectral_phyerr_tlv_gen2 *ptlv,
 	avgpwr_db = ((fft_summary_B >> 18) & 0xff);
 	peak_mag = ((fft_summary_B >> 8) & 0x3ff);
 
-	qdf_print("Header A = 0x%x Header B = 0x%x\n",
-		  phdr->hdr_a, phdr->hdr_b);
-	qdf_print("Base Power= 0x%x, Total Gain= %d, relpwr_db=%d, "
-		  "num_str_bins_ib=%d fft_chn_idx=%d peak_inx=%d avgpwr_db=%d "
-		  "peak_mag=%d\n", base_pwr, total_gain_info, relpwr_db,
-		  num_str_bins_ib, fft_chn_idx, peak_inx, avgpwr_db, peak_mag);
+	spectral_debug("Header A = 0x%x Header B = 0x%x",
+		       phdr->hdr_a, phdr->hdr_b);
+	spectral_debug("Base Power= 0x%x, Total Gain= %d, relpwr_db=%d, num_str_bins_ib=%d fft_chn_idx=%d peak_inx=%d avgpwr_db=%d peak_mag=%d",
+		       base_pwr, total_gain_info, relpwr_db, num_str_bins_ib,
+		       fft_chn_idx, peak_inx, avgpwr_db, peak_mag);
 	if (is_160_format) {
 		segid = fft_summary_C & 0x1;
-		qdf_print("Segment ID: %hhu\n", segid);
+		spectral_debug("Segment ID: %hhu", segid);
 	}
 
-	qdf_print("FFT bins:\n");
+	spectral_debug("FFT bins:");
 	for (i = 0; i < (tlvlen - 8 - segid_skiplen); i++) {
 		fft_mag = ((uint8_t *)ptlv)[12 + segid_skiplen + i];
-		qdf_print("%d %d, ", i, fft_mag);
+		spectral_debug("%d %d, ", i, fft_mag);
 	}
 
-	qdf_print("\n");
+	spectral_debug("\n");
 
 	return 0;
 }
@@ -1019,8 +1007,8 @@ target_if_spectral_dump_hdr_gen2(struct spectral_phyerr_hdr_gen2 *phdr)
 		     (uint8_t *)((uint8_t *)phdr + sizeof(int)),
 		     sizeof(int));
 
-	qdf_print("SPECTRAL : HEADER A 0x%x (%d)\n", a, a);
-	qdf_print("SPECTRAL : HEADER B 0x%x (%d)\n", b, b);
+	spectral_debug("SPECTRAL : HEADER A 0x%x (%d)", a, a);
+	spectral_debug("SPECTRAL : HEADER B 0x%x (%d)", b, b);
 	return 0;
 }
 
@@ -1057,8 +1045,8 @@ target_if_spectral_dump_tlv_gen2(
 	 * TODO : Do not delete the following print
 	 *        The scripts used to validate Spectral depend on this Print
 	 */
-	qdf_print("SPECTRAL : TLV Length is 0x%x (%d)\n",
-		  ptlv->length, ptlv->length);
+	spectral_debug("SPECTRAL : TLV Length is 0x%x (%d)",
+		       ptlv->length, ptlv->length);
 
 	switch (ptlv->tag) {
 	case TLV_TAG_SPECTRAL_SUMMARY_REPORT_GEN2:
@@ -1078,7 +1066,7 @@ target_if_spectral_dump_tlv_gen2(
 		break;
 
 	default:
-		qdf_print("SPECTRAL : INVALID TLV\n");
+		spectral_warn("INVALID TLV");
 		ret = -1;
 		break;
 	}
@@ -1096,17 +1084,15 @@ target_if_spectral_dump_phyerr_data_gen2(uint8_t *data, uint32_t datalen,
 	uint32_t curr_tlv_complete_size = 0;
 
 	if (datalen < sizeof(struct spectral_phyerr_tlv_gen2)) {
-		qdf_print
-		    ("DRIVER: Total PHY error data length %u too short to "
-		     "contain any TLVs\n", datalen);
+		spectral_err("Total PHY error data length %u too short to contain any TLVs",
+			     datalen);
 		return -EPERM;
 	}
 
 	while (bytes_processed < datalen) {
 		if (bytes_remaining < sizeof(struct spectral_phyerr_tlv_gen2)) {
-			qdf_print
-			    ("DRIVER: Remaining PHY error data length %u too "
-			     "short to contain a TLV\n", bytes_remaining);
+			spectral_err("Remaining PHY error data length %u too short to contain a TLV",
+				     bytes_remaining);
 			return -EPERM;
 		}
 
@@ -1114,8 +1100,8 @@ target_if_spectral_dump_phyerr_data_gen2(uint8_t *data, uint32_t datalen,
 							   bytes_processed);
 
 		if (ptlv->signature != SPECTRAL_PHYERR_SIGNATURE_GEN2) {
-			qdf_print("DRIVER : Invalid signature 0x%x!\n",
-				  ptlv->signature);
+			spectral_err("Invalid signature 0x%x!",
+				     ptlv->signature);
 			return -EPERM;
 		}
 
@@ -1124,11 +1110,8 @@ target_if_spectral_dump_phyerr_data_gen2(uint8_t *data, uint32_t datalen,
 			ptlv->length;
 
 		if (curr_tlv_complete_size > bytes_remaining) {
-			qdf_print
-			    ("DRIVER : Current indicated complete TLV size %u "
-			     "greater than number of bytes remaining to be "
-			     "processed %u", curr_tlv_complete_size,
-			     bytes_remaining);
+			spectral_err("TLV size %d greater than number of bytes remaining %d",
+				     curr_tlv_complete_size, bytes_remaining);
 			return -EPERM;
 		}
 
@@ -1200,58 +1183,114 @@ target_if_dump_fft_report_gen3(struct spectral_phyerr_fft_report_gen3
 	int fft_hdr_length = (p_fft_report->fft_hdr_length * 4);
 	int report_len = (fft_hdr_length + 8);
 	int fft_bin_len = (fft_hdr_length - 16);
+	int fft_bin_len_adj = fft_bin_len >> 2;
 
-	qdf_print("##############################################"
-		  "###############\n");
-	qdf_print("Spectral search fft_report\n");
-	qdf_print("fft_timestamp  = 0x%x\n"
-		  "fft_hdr_length = %d(32 bit words)\n"
-		  "fft_hdr_tag    = 0x%x\n"
-		  "fft_hdr_sig    = 0x%x\n",
-		  p_fft_report->fft_timestamp,
-		  p_fft_report->fft_hdr_length,
-		  p_fft_report->fft_hdr_tag, p_fft_report->fft_hdr_sig);
+	spectral_debug("#############################################################");
+	spectral_debug("Spectral search fft_report");
+	spectral_debug("fft_timestamp  = 0x%x\nfft_hdr_length = %d(32 bit words)\nfft_hdr_tag    = 0x%x\nfft_hdr_sig    = 0x%x",
+		       p_fft_report->fft_timestamp,
+		       p_fft_report->fft_hdr_length,
+		       p_fft_report->fft_hdr_tag, p_fft_report->fft_hdr_sig);
 
-	qdf_print("Length field in search fft report is %d(0x%x) bytes\n",
-		  fft_hdr_length, fft_hdr_length);
-	qdf_print("Total length of search fft report is %d(0x%x) bytes\n",
-		  report_len, report_len);
-	qdf_print("Number of fftbins in report is %d(0x%x)\n", fft_bin_len,
-		  fft_bin_len);
+	spectral_debug("Length field in search fft report is %d(0x%x) bytes",
+		       fft_hdr_length, fft_hdr_length);
+	spectral_debug("Total length of search fft report is %d(0x%x) bytes",
+		       report_len, report_len);
+	spectral_debug("FW reported fftbins in report is %d(0x%x)", fft_bin_len,
+		       fft_bin_len);
+	spectral_debug("Actual number of fftbins in report is %d(0x%x)\n",
+			fft_bin_len_adj, fft_bin_len_adj);
 
-	qdf_print("fft_detector_id     = %u\n"
-		  "fft_num             = %u\n"
-		  "fft_radar_check     = %u\n"
-		  "fft_peak_sidx       = %d\n"
-		  "fft_chn_idx         = %u\n"
-		  "fft_base_pwr_db     = %u\n"
-		  "fft_total_gain_db   = %u\n"
-		  "fft_num_str_bins_ib = %u\n"
-		  "fft_peak_mag        = %d\n"
-		  "fft_avgpwr_db       = %u\n"
-		  "fft_relpwr_db       = %u\n",
-		  p_sfft->fft_detector_id,
-		  p_sfft->fft_num,
-		  p_sfft->fft_radar_check,
-		  p_sfft->fft_peak_sidx,
-		  p_sfft->fft_chn_idx,
-		  p_sfft->fft_base_pwr_db,
-		  p_sfft->fft_total_gain_db,
-		  p_sfft->fft_num_str_bins_ib,
-		  p_sfft->fft_peak_mag,
-		  p_sfft->fft_avgpwr_db, p_sfft->fft_relpwr_db);
+	spectral_debug("fft_detector_id = %u\nfft_num = %u\nfft_radar_check = %u\nfft_peak_sidx = %d\nfft_chn_idx = %u\nfft_base_pwr_db = %u\nfft_total_gain_db   = %u\nfft_num_str_bins_ib = %u\nfft_peak_mag   = %d\nfft_avgpwr_db  = %u\nfft_relpwr_db  = %u",
+		       p_sfft->fft_detector_id,
+		       p_sfft->fft_num,
+		       p_sfft->fft_radar_check,
+		       p_sfft->fft_peak_sidx,
+		       p_sfft->fft_chn_idx,
+		       p_sfft->fft_base_pwr_db,
+		       p_sfft->fft_total_gain_db,
+		       p_sfft->fft_num_str_bins_ib,
+		       p_sfft->fft_peak_mag,
+		       p_sfft->fft_avgpwr_db, p_sfft->fft_relpwr_db);
 
-	qdf_print("FFT bins:\n");
+	spectral_debug("FFT bins:");
 	for (i = 0; i < (fft_hdr_length - 16); i++) {
+		if (i % 16 == 0)
+			spectral_debug("\n%d :", i);
 		fft_mag =
 		    ((uint8_t *)p_fft_report)[SPECTRAL_FFT_BINS_POS + i];
-		qdf_print("%d: %d, ", i, fft_mag);
-		if (i % 16 == 0)
-			qdf_print("\n");
+		spectral_debug("%d ", fft_mag);
 	}
-	qdf_print("\n");
-	qdf_print("###########################################################"
-		  "##\n");
+	spectral_debug("\n");
+	spectral_debug("#############################################################");
+
+	return 0;
+}
+
+/**
+ * target_if_consume_sscan_report_gen3() - Consume spectral summary report
+ * @spectral: Pointer to spectral object
+ * @data: Pointer to spectral summary
+ *
+ * Consume spectral summary report for gen3
+ *
+ * Return: rssi
+ */
+static int
+target_if_consume_sscan_report_gen3(struct target_if_spectral *spectral,
+				    uint8_t *data) {
+	int rssi;
+	struct spectral_sscan_report_gen3 *psscan_report;
+
+	psscan_report = (struct spectral_sscan_report_gen3 *)data;
+	rssi = get_bitfield(psscan_report->hdr_a, 10, 18);
+
+	return rssi;
+}
+
+/**
+ * target_if_verify_sig_and_tag_gen3() - Verify tag and signature
+ *                                       of spectral report
+ * @spectral: Pointer to spectral object
+ * @data: Pointer to spectral summary report
+ * @exp_tag: iexpected tag value
+ *
+ * Process fft report for gen3
+ *
+ * Return: SUCCESS/FAILURE
+ */
+static int
+target_if_verify_sig_and_tag_gen3(struct target_if_spectral *spectral,
+				  uint8_t *data, uint8_t exp_tag)
+{
+	uint8_t tag = 0;
+	uint8_t signature = 0;
+
+	/* Peek into the data to figure out whether
+	 *      1) Signature matches the expected value
+	 *      2) What is inside the package (TAG ID is used for finding this)
+	 */
+	tag = *(data + PHYERR_HDR_TAG_POS);
+	signature = *(data + PHYERR_HDR_SIG_POS);
+
+	if (signature != SPECTRAL_PHYERR_SIGNATURE_GEN3) {
+		if (spectral_debug_level & DEBUG_SPECTRAL4)
+			spectral_err("Unexpected sig %x in spectral phyerror",
+				  signature);
+			spectral_err("Expected sig is %x\n",
+				  SPECTRAL_PHYERR_SIGNATURE_GEN3);
+		spectral->diag_stats.spectral_mismatch++;
+		return -EINVAL;
+	}
+
+	if (tag != exp_tag) {
+		if (spectral_debug_level & DEBUG_SPECTRAL4)
+			spectral_err("Unexpected tag %x in spectral phyerror",
+				  tag);
+			spectral_err("Expected tag is %x\n", exp_tag);
+		spectral->diag_stats.spectral_mismatch++;
+		return -EINVAL;
+	}
 
 	return 0;
 }
@@ -1259,15 +1298,16 @@ target_if_dump_fft_report_gen3(struct spectral_phyerr_fft_report_gen3
 /**
  * target_if_consume_sfft_report_gen3() -  Process fft report for gen3
  * @spectral: Pointer to spectral object
- * @pinfo: Pointer to phyerror info
+ * @data: Pointer to phyerror data
  *
  * Process fft report for gen3
  *
  * Return: Success/Failure
  */
 static int
-target_if_consume_sfft_report_gen3(struct target_if_spectral *spectral,
-				   struct phyerr_info *pinfo)
+target_if_consume_spectral_report_gen3(
+	 struct target_if_spectral *spectral,
+	 uint8_t *data)
 {
 	/*
 	 * XXX : The classifier do not use all the members of the SAMP
@@ -1294,64 +1334,61 @@ target_if_consume_sfft_report_gen3(struct target_if_spectral *spectral,
 	 *          1. Order of FFT bin values
 	 *
 	 */
-
-	/* Unpack the arguments */
-	uint32_t datalen = pinfo->datalen;
-	struct target_if_spectral_rfqual_info *p_rfqual = pinfo->p_rfqual;
-	struct target_if_spectral_chan_info *p_chaninfo = pinfo->p_chaninfo;
-	uint64_t tsf64 = pinfo->tsf64;
-	struct target_if_spectral_acs_stats *acs_stats = pinfo->acs_stats;
-
+	uint64_t tsf64 = 0;
 	struct target_if_samp_msg_params params;
 	struct spectral_search_fft_info_gen3 search_fft_info;
 	struct spectral_search_fft_info_gen3 *p_sfft = &search_fft_info;
 	int8_t rssi_up = 0;
 	int8_t rssi_low = 0;
 	int8_t chn_idx_highest_enabled = 0;
-	int8_t chn_idx_lowest_enabled = 0;
-	uint8_t control_rssi = 0;
+	int8_t chn_idx_lowest_enabled  = 0;
+	uint8_t control_rssi   = 0;
 	uint8_t extension_rssi = 0;
-	uint32_t tstamp = 0;
 	int fft_hdr_length = 0;
 	int report_len = 0;
 	int fft_bin_len = 0;
 	struct target_if_spectral_ops *p_sops =
 		GET_TARGET_IF_SPECTRAL_OPS(spectral);
-	struct spectral_phyerr_fft_report_gen3 *p_fft_report =
-	    (struct spectral_phyerr_fft_report_gen3 *)(pinfo->data);
+	struct spectral_phyerr_fft_report_gen3 *p_fft_report;
+	int8_t rssi;
 
 	OS_MEMZERO(&params, sizeof(params));
 
+	if (target_if_verify_sig_and_tag_gen3(
+			spectral, data,
+			TLV_TAG_SPECTRAL_SUMMARY_REPORT_GEN3) != 0)
+		goto fail;
+	rssi = target_if_consume_sscan_report_gen3(spectral, data);
+	/* Advance buf pointer to the search fft report */
+	data += sizeof(struct spectral_sscan_report_gen3);
+
+	if (target_if_verify_sig_and_tag_gen3(
+			spectral, data,
+			TLV_TAG_SEARCH_FFT_REPORT_GEN3) != 0)
+		goto fail;
+	p_fft_report = (struct spectral_phyerr_fft_report_gen3 *)data;
 	fft_hdr_length = p_fft_report->fft_hdr_length * 4;
 	if (fft_hdr_length < 16) {
-		qdf_print
-		    ("SPECTRAL : Unexpected TLV length %u for FFT Report! "
-		     "Hexdump follows\n", fft_hdr_length);
+		spectral_err("Unexpected TLV length %u for FFT Report! Hexdump follows",
+			     fft_hdr_length);
 		goto fail;
 	}
 
 	report_len = (fft_hdr_length + 8);
 	fft_bin_len = (fft_hdr_length - 16);
-	if (datalen < report_len) {
-		qdf_print("DRIVER: Total PHY error data length %u too short to"
-			  " contain the search fft report of length %u\n",
-			  datalen, report_len);
-		goto fail;
-	}
+	tsf64 = p_fft_report->fft_timestamp;
 
 	target_if_process_sfft_report_gen3(p_fft_report, p_sfft);
 
 	if (p_sfft->fft_detector_id != 0) {
-		qdf_print("Expected segid is 0 but we got %d\n",
-			  p_sfft->fft_detector_id);
+		spectral_err("Expected segid is 0 but we got %d",
+			     p_sfft->fft_detector_id);
 		spectral->diag_stats.spectral_vhtseg1id_mismatch++;
 		goto fail;
 	}
 
 	if (spectral_debug_level & (DEBUG_SPECTRAL2 | DEBUG_SPECTRAL4))
 		target_if_dump_fft_report_gen3(p_fft_report, p_sfft);
-
-	tstamp = p_sops->get_tsf64(spectral) & SPECTRAL_TSMASK;
 
 	if (spectral->upper_is_control)
 		rssi_up = control_rssi;
@@ -1363,17 +1400,18 @@ target_if_consume_sfft_report_gen3(struct target_if_spectral *spectral,
 	else
 		rssi_low = extension_rssi;
 
-	params.rssi = p_rfqual->rssi_comb;
-	params.lower_rssi = rssi_low;
-	params.upper_rssi = rssi_up;
+	params.rssi         = rssi;
+	params.lower_rssi   = rssi_low;
+	params.upper_rssi   = rssi_up;
 
 	if (spectral->sc_spectral_noise_pwr_cal) {
-		params.chain_ctl_rssi[0] = p_rfqual->pc_rssi_info[0].rssi_pri20;
-		params.chain_ctl_rssi[1] = p_rfqual->pc_rssi_info[1].rssi_pri20;
-		params.chain_ctl_rssi[2] = p_rfqual->pc_rssi_info[2].rssi_pri20;
-		params.chain_ext_rssi[0] = p_rfqual->pc_rssi_info[0].rssi_sec20;
-		params.chain_ext_rssi[1] = p_rfqual->pc_rssi_info[1].rssi_sec20;
-		params.chain_ext_rssi[2] = p_rfqual->pc_rssi_info[2].rssi_sec20;
+	/* Fill 0's till FW provides them */
+		params.chain_ctl_rssi[0] = 0;
+		params.chain_ctl_rssi[1] = 0;
+		params.chain_ctl_rssi[2] = 0;
+		params.chain_ext_rssi[0] = 0;
+		params.chain_ext_rssi[1] = 0;
+		params.chain_ext_rssi[2] = 0;
 	}
 
 	/*
@@ -1398,21 +1436,18 @@ target_if_consume_sfft_report_gen3(struct target_if_spectral *spectral,
 	 *       in to account. This is marked for future enhancements.
 	 */
 	chn_idx_highest_enabled = ((spectral->params.ss_chn_mask & 0x8) ? 3 :
-				   (spectral->params.ss_chn_mask & 0x4) ? 2 :
-				   (spectral->params.ss_chn_mask & 0x2) ? 1 :
-				   0);
-	chn_idx_lowest_enabled =
-	    ((spectral->params.ss_chn_mask & 0x1) ? 0 :
-	     (spectral->params.ss_chn_mask & 0x2) ? 1 :
-	     (spectral->params.ss_chn_mask & 0x4) ? 2 : 3);
-	control_rssi = (uint8_t)
-	    p_rfqual->pc_rssi_info[chn_idx_highest_enabled].rssi_pri20;
-	extension_rssi = (uint8_t)
-	    p_rfqual->pc_rssi_info[chn_idx_highest_enabled].rssi_sec20;
+			(spectral->params.ss_chn_mask & 0x4) ? 2 :
+			(spectral->params.ss_chn_mask & 0x2) ? 1 : 0);
+		chn_idx_lowest_enabled  =
+			((spectral->params.ss_chn_mask & 0x1) ? 0 :
+			(spectral->params.ss_chn_mask & 0x2) ? 1 :
+			(spectral->params.ss_chn_mask & 0x4) ? 2 : 3);
+		control_rssi    = 0;
+		extension_rssi  = 0;
 
-	params.bwinfo = 0;
-	params.tstamp = 0;
-	params.max_mag = p_sfft->fft_peak_mag;
+		params.bwinfo   = 0;
+		params.tstamp   = 0;
+		params.max_mag  = p_sfft->fft_peak_mag;
 
 	/* params.max_index    = p_sfft->peak_inx; */
 	params.max_exp = 0;
@@ -1432,50 +1467,41 @@ target_if_consume_sfft_report_gen3(struct target_if_spectral *spectral,
 	 * corresponding
 	 * to the highest enabled antenna chain
 	 */
-	params.noise_floor = p_rfqual->noise_floor[chn_idx_highest_enabled];
-	params.datalen = (fft_hdr_length * 4);
-	params.pwr_count = fft_bin_len;
-	params.tstamp = (tsf64 & SPECTRAL_TSMASK);
-
-	acs_stats->ctrl_nf = params.noise_floor;
-	acs_stats->ext_nf = params.noise_floor;
-	acs_stats->nfc_ctl_rssi = control_rssi;
-	acs_stats->nfc_ext_rssi = extension_rssi;
+	/* TODO:  Fill proper values once FW provides them*/
+	params.noise_floor       = DUMMY_NF_VALUE;
+	params.datalen           = (fft_hdr_length * 4);
+	params.pwr_count         = fft_bin_len >> 2;
+	params.tstamp            = (tsf64 & SPECTRAL_TSMASK);
 
 	if (spectral->ch_width == CH_WIDTH_160MHZ) {
-		/*
-		 * We expect to see one more Search FFT report, and it should be
+		/* We expect to see one more Search FFT report, and it should be
 		 * equal in size to the current one.
 		 */
-		if (datalen != (2 * report_len)) {
-			spectral->diag_stats.spectral_sec80_sfft_insufflen++;
+		/* Advance to the secondary 80 Mhz spectral report */
+		data += report_len;
+
+		if (target_if_verify_sig_and_tag_gen3(
+				spectral, data,
+				TLV_TAG_SPECTRAL_SUMMARY_REPORT_GEN3) != 0)
 			goto fail;
-		}
+		rssi = target_if_consume_sscan_report_gen3(spectral, data);
+		/* Advance buf pointer to the search fft report */
+		data += sizeof(struct spectral_sscan_report_gen3);
 
-		p_fft_report = (struct spectral_phyerr_fft_report_gen3 *)(
-					(uint8_t *)p_fft_report + report_len);
-
-		if (p_fft_report->fft_hdr_sig !=
-		    SPECTRAL_PHYERR_SIGNATURE_GEN3) {
-			spectral->diag_stats.spectral_mismatch++;
+		if (target_if_verify_sig_and_tag_gen3(
+				spectral, data,
+				TLV_TAG_SEARCH_FFT_REPORT_GEN3) != 0)
 			goto fail;
-		}
-
-		if (p_fft_report->fft_hdr_tag !=
-		    TLV_TAG_SEARCH_FFT_REPORT_GEN3) {
-			spectral->diag_stats.spectral_no_sec80_sfft++;
-			goto fail;
-		}
-
+		p_fft_report = (struct spectral_phyerr_fft_report_gen3 *)(data);
 		fft_hdr_length = p_fft_report->fft_hdr_length * 4;
-		report_len = (fft_hdr_length + 8);
-		fft_bin_len = (fft_hdr_length - 16);
+		report_len     = (fft_hdr_length + 8);
+		fft_bin_len    = (fft_hdr_length - 16);
 
 		target_if_process_sfft_report_gen3(p_fft_report, p_sfft);
 
 		if (p_sfft->fft_detector_id != 1) {
-			qdf_print("Expected segid is 1 but we got %d\n",
-				  p_sfft->fft_detector_id);
+			spectral_err("Expected segid is 1 but we got %d",
+				     p_sfft->fft_detector_id);
 			spectral->diag_stats.spectral_vhtseg2id_mismatch++;
 			goto fail;
 		}
@@ -1484,34 +1510,32 @@ target_if_consume_sfft_report_gen3(struct target_if_spectral *spectral,
 		    (DEBUG_SPECTRAL2 | DEBUG_SPECTRAL4))
 			target_if_dump_fft_report_gen3(p_fft_report, p_sfft);
 
-		params.vhtop_ch_freq_seg1 = p_chaninfo->center_freq1;
-		params.vhtop_ch_freq_seg2 = p_chaninfo->center_freq2;
+		params.vhtop_ch_freq_seg1 = 0;
+		params.vhtop_ch_freq_seg2 = 0;
 
 		/* XXX: Confirm. TBD at SoD. */
-		params.rssi_sec80 = p_rfqual->rssi_comb;
+		params.rssi_sec80 = rssi;
 
 		/* XXX: Determine dynamically. TBD at SoD. */
 
 		/*
-		 * For VHT80_80/VHT160, the noise floor for primary 80MHz
-		 * segment is populated with the
-		 * lowest enabled antenna chain and the noise floor for
-		 * secondary 80MHz segment is populated
+		 * For VHT80_80/VHT160,the noise floor for primary 80MHz segment
+		 * populated with the
+		 * lowest enabled antenna chain and the nf for secondary 80MHz
+		 * segment is populated
 		 * with the highest enabled antenna chain
 		 */
-		params.noise_floor_sec80 =
-		    p_rfqual->noise_floor[chn_idx_highest_enabled];
-		params.noise_floor =
-		    p_rfqual->noise_floor[chn_idx_lowest_enabled];
+		/* TODO:  Fill proper values once FW provides them*/
+		params.noise_floor_sec80    = DUMMY_NF_VALUE;
+		params.noise_floor          = DUMMY_NF_VALUE;
 
-		params.max_mag_sec80 = p_sfft->fft_peak_mag;
+		params.max_mag_sec80        = p_sfft->fft_peak_mag;
 		/* params.max_index_sec80      = p_sfft->peak_inx; */
 		/* XXX Does this definition of datalen *still hold? */
-		params.datalen_sec80 = fft_hdr_length;
-		params.pwr_count_sec80 = fft_bin_len;
-		params.bin_pwr_data_sec80 = (uint8_t *)(
-						(uint8_t *)p_fft_report +
-						SPECTRAL_FFT_BINS_POS);
+		params.datalen_sec80        = fft_hdr_length;
+		params.pwr_count_sec80      = fft_bin_len >> 2;
+		params.bin_pwr_data_sec80   = (u_int8_t *)(
+			(uint8_t *)p_fft_report + SPECTRAL_FFT_BINS_POS);
 	}
 
 	qdf_mem_copy(&params.classifier_params,
@@ -1524,85 +1548,41 @@ target_if_consume_sfft_report_gen3(struct target_if_spectral *spectral,
 	return 0;
 
  fail:
-	qdf_print("Error in function %s while processing search fft report\n",
-		  __func__);
-	target_if_print_buf((uint8_t *)p_fft_report, fft_hdr_length + 8);
+	spectral_err("Error in function while processing search fft report");
 	return -EPERM;
 }
 
-int
-target_if_spectral_process_phyerr_gen3(
-	struct target_if_spectral *spectral,
-	uint8_t *data,
-	uint32_t datalen,
-	struct target_if_spectral_rfqual_info *p_rfqual,
-	struct target_if_spectral_chan_info *p_chaninfo,
-	uint64_t tsf64,
-	struct target_if_spectral_acs_stats *acs_stats)
+int target_if_spectral_process_phyerr_gen3(
+	struct wlan_objmgr_pdev *pdev,
+	struct direct_buf_rx_data *payload)
 {
-	uint8_t tag = 0;
-	uint8_t signature = 0;
-	struct phyerr_info pinfo;
 	int ret = 0;
+	uint8_t *data = (uint8_t *)payload->vaddr;
+	struct target_if_spectral *spectral;
 
-	/*
-	 * pack arguments in a structure as there are
-	 * more than 3 arguments
-	 */
-	pinfo.data = data;
-	pinfo.datalen = datalen;
-	pinfo.p_rfqual = p_rfqual;
-	pinfo.p_chaninfo = p_chaninfo;
-	pinfo.tsf64 = tsf64;
-	pinfo.acs_stats = acs_stats;
+	spectral = get_target_if_spectral_handle_from_pdev(pdev);
+	if (spectral == NULL) {
+		spectral_err("Spectral target object is null");
+		return -EINVAL;
+	}
 
 	if (spectral_debug_level & (DEBUG_SPECTRAL2 | DEBUG_SPECTRAL4)) {
-		qdf_print("Printing the spectral phyerr buffer for debug "
-			  "purpose\n");
-		qdf_print("Dalalength of buffer = 0x%x(%d)\n",
-			  datalen, datalen);
+		spectral_debug("Printing the spectral phyerr buffer for debug");
+		spectral_debug("Datalength of buffer = 0x%x(%d) bufptr = 0x%p",
+			  payload->dbr_len, payload->dbr_len, payload->vaddr);
 #ifdef CONFIG_WIN
-		RAWSIM_PKT_HEXDUMP(data, datalen);
+		RAWSIM_PKT_HEXDUMP((unsigned char *)payload->vaddr, 1024);
 #endif
 	}
 
-	/*
-	 * Peek into the data to figure out whether
-	 * 1) Signature matches the expected value
-	 * 2) What is inside the package (TAG ID is used for finding this)
-	 */
-	tag = *(data + PHYERR_HDR_TAG_POS);
-	signature = *(data + PHYERR_HDR_SIG_POS);
+	ret = target_if_consume_spectral_report_gen3(spectral, data);
 
-	if (signature != SPECTRAL_PHYERR_SIGNATURE_GEN3) {
-		qdf_print("Unexpected signature %x in spectral phyerror "
-			  "event\n", signature);
-		spectral->diag_stats.spectral_mismatch++;
-		ret = -1;
-		goto end;
-	}
-
-	switch (tag) {
-	case TLV_TAG_SPECTRAL_SUMMARY_REPORT_GEN3:
-		/*
-		 * Place holder
-		 * We don't use spectral scan report as of now
-		 */
-		break;
-
-	case TLV_TAG_SEARCH_FFT_REPORT_GEN3:
-		ret = target_if_consume_sfft_report_gen3(spectral, &pinfo);
-		break;
-
-	default:
-		qdf_print("Unknown tag %x in spectral phyerror event\n", tag);
-		break;
-	}
-
- end:
 	if (spectral_debug_level & DEBUG_SPECTRAL4)
 		spectral_debug_level = DEBUG_SPECTRAL;
+
 	return ret;
 }
+EXPORT_SYMBOL(target_if_spectral_process_phyerr_gen3);
+/* END of spectral GEN III HW specific functions */
 
-#endif
+#endif  /* WLAN_SPECTRAL_ENABLE */

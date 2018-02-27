@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2018 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -188,6 +188,35 @@ QDF_STATUS ucfg_scan_set_enable(struct wlan_objmgr_psoc *psoc, bool enable);
  * Return: true if enabled else false.
  */
 bool ucfg_scan_get_enable(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_scan_set_miracast() - Public API to disable/enable miracast flag
+ * @psoc: psoc pointer
+ * @enable: enable miracast if true disable is false
+ *
+ * Return: QDF_STATUS.
+ */
+QDF_STATUS ucfg_scan_set_miracast(
+		struct wlan_objmgr_psoc *psoc, bool enable);
+
+/**
+ * ucfg_scan_set_disable_timeout() - Public API to disable/enable scan timeout
+ * @psoc: psoc on which scan timeout need to be disabled
+ * @disable: disable scan timeout if true else enable scan timeout
+ *
+ * Return: QDF_STATUS.
+ */
+QDF_STATUS
+ucfg_scan_set_disable_timeout(struct wlan_objmgr_psoc *psoc, bool disable);
+
+/**
+ * ucfg_scan_get_disable_timeout() - Public API to get if scan timeout
+ * is enabled or disabled
+ * @psoc: psoc on which scan timeout status need to be checked
+ *
+ * Return: true if timeout is diaabled else false.
+ */
+bool ucfg_scan_get_disable_timeout(struct wlan_objmgr_psoc *psoc);
 
 /**
  * ucfg_scan_set_wide_band_scan() - Public API to disable/enable wide band scan

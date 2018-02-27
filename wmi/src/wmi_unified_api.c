@@ -26,6 +26,7 @@
  */
 #include "wmi_unified_priv.h"
 #include "wmi_unified_param.h"
+#include "qdf_module.h"
 
 /**
  * wmi_unified_vdev_create_send() - send VDEV create command to fw
@@ -628,6 +629,7 @@ wmi_unified_dbglog_cmd_send(void *wmi_hdl,
 
 	return QDF_STATUS_E_FAILURE;
 }
+qdf_export_symbol(wmi_unified_dbglog_cmd_send);
 
 /**
  *  wmi_unified_vdev_set_param_send() - WMI vdev set parameter function
@@ -4040,6 +4042,7 @@ QDF_STATUS wmi_unified_smart_ant_enable_tx_feedback_cmd_send(void *wmi_hdl,
 
 	return QDF_STATUS_E_FAILURE;
 }
+qdf_export_symbol(wmi_unified_smart_ant_enable_tx_feedback_cmd_send);
 
 /**
  *  wmi_unified_vdev_spectral_configure_cmd_send() - WMI set spectral config function
@@ -4847,6 +4850,7 @@ uint8_t *wmi_extract_dbglog_data_len(void *wmi_hdl, void *evt_buf,
 
 	return NULL;
 }
+qdf_export_symbol(wmi_extract_dbglog_data_len);
 
 /**
  * wmi_send_ext_resource_config() - send extended resource configuration
@@ -5189,6 +5193,7 @@ QDF_STATUS wmi_extract_wds_addr_event(void *wmi_hdl, void *evt_buf,
 	}
 	return QDF_STATUS_E_FAILURE;
 }
+qdf_export_symbol(wmi_extract_wds_addr_event);
 
 /**
  * wmi_extract_dcs_interference_type() - extract dcs interference type
@@ -7193,6 +7198,7 @@ QDF_STATUS wmi_extract_wds_entry(void *wmi_hdl, uint8_t *evt_buf,
 
 	return QDF_STATUS_E_FAILURE;
 }
+qdf_export_symbol(wmi_extract_wds_entry);
 
 #ifdef WLAN_FEATURE_NAN_CONVERGENCE
 QDF_STATUS wmi_unified_ndp_initiator_req_cmd_send(void *wmi_hdl,
@@ -7366,3 +7372,40 @@ QDF_STATUS wmi_extract_green_ap_egap_status_info(
 	return QDF_STATUS_E_FAILURE;
 }
 #endif
+
+QDF_STATUS wmi_unified_send_bss_color_change_enable_cmd(void *wmi_hdl,
+							uint32_t vdev_id,
+							bool enable)
+{
+	wmi_unified_t wmi_handle = (wmi_unified_t)wmi_hdl;
+
+	if (wmi_handle->ops->send_bss_color_change_enable_cmd)
+		return wmi_handle->ops->send_bss_color_change_enable_cmd(
+				wmi_handle, vdev_id, enable);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS wmi_unified_send_obss_color_collision_cfg_cmd(void *wmi_hdl,
+		struct wmi_obss_color_collision_cfg_param *cfg)
+{
+	wmi_unified_t wmi_handle = (wmi_unified_t)wmi_hdl;
+
+	if (wmi_handle->ops->send_obss_color_collision_cfg_cmd)
+		return wmi_handle->ops->send_obss_color_collision_cfg_cmd(
+				wmi_handle, cfg);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS wmi_unified_extract_obss_color_collision_info(void *wmi_hdl,
+		uint8_t *data, struct wmi_obss_color_collision_info *info)
+{
+	wmi_unified_t wmi_handle = (wmi_unified_t)wmi_hdl;
+
+	if (wmi_handle->ops->extract_obss_color_collision_info)
+		return wmi_handle->ops->extract_obss_color_collision_info(data,
+									  info);
+
+	return QDF_STATUS_E_FAILURE;
+}

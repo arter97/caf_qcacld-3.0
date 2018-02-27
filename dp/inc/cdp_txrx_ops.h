@@ -26,9 +26,7 @@
 #define _CDP_TXRX_CMN_OPS_H_
 
 #include <cdp_txrx_cmn_struct.h>
-#ifdef CONFIG_WIN
 #include <cdp_txrx_stats_struct.h>
-#endif
 #include "cdp_txrx_handle.h"
 #include <cdp_txrx_mon_struct.h>
 #include "wlan_objmgr_psoc_obj.h"
@@ -81,6 +79,31 @@ struct cdp_cmn_ops {
 
 	void (*txrx_peer_teardown)
 		(struct cdp_vdev *vdev_hdl, void *peer_hdl);
+
+	int (*txrx_peer_add_ast)
+		(ol_txrx_soc_handle soc, struct cdp_peer *peer_hdl,
+		uint8_t *mac_addr, enum  cdp_txrx_ast_entry_type type,
+		uint32_t flags);
+
+	void (*txrx_peer_del_ast)
+		(ol_txrx_soc_handle soc, void *ast_hdl);
+
+	int (*txrx_peer_update_ast)
+		(ol_txrx_soc_handle soc, struct cdp_peer *peer_hdl,
+		void *ast_hdl, uint32_t flags);
+
+	void *(*txrx_peer_ast_hash_find)
+		(ol_txrx_soc_handle soc, uint8_t *ast_mac_addr);
+
+	uint8_t (*txrx_peer_ast_get_pdev_id)
+		(ol_txrx_soc_handle soc, void *ast_hdl);
+
+	uint8_t (*txrx_peer_ast_get_next_hop)
+		(ol_txrx_soc_handle soc, void *ast_hdl);
+
+	void (*txrx_peer_ast_set_type)
+		(ol_txrx_soc_handle soc, void *ast_hdl,
+		enum cdp_txrx_ast_entry_type type);
 
 	void (*txrx_peer_delete)(void *peer, uint32_t bitmap);
 
@@ -230,7 +253,14 @@ struct cdp_cmn_ops {
 			struct cdp_config_params *params);
 
 	void *(*get_dp_txrx_handle)(struct cdp_pdev *pdev_hdl);
-	void (*set_dp_txrx_handle)(struct cdp_pdev *pdev_hdl, void *dp_txrx_hdl);
+	void (*set_dp_txrx_handle)(struct cdp_pdev *pdev_hdl,
+			void *dp_txrx_hdl);
+
+	void *(*get_soc_dp_txrx_handle)(struct cdp_soc *soc_handle);
+	void (*set_soc_dp_txrx_handle)(struct cdp_soc *soc_handle,
+			void *dp_txrx_handle);
+
+	ol_txrx_tx_fp tx_send;
 };
 
 struct cdp_ctrl_ops {
@@ -638,13 +668,13 @@ struct ol_if_ops {
 	int (*peer_unref_delete)(void *scn_handle, uint8_t vdev_id,
 			uint8_t *peer_macaddr);
 	bool (*is_hw_dbs_2x2_capable)(struct wlan_objmgr_psoc *psoc);
-	int (*peer_add_wds_entry)(void *ol_osif_vdev_handle,
+	int (*peer_add_wds_entry)(void *ol_soc_handle,
 			const uint8_t *dest_macaddr, uint8_t *peer_macaddr,
 			uint32_t flags);
-	int (*peer_update_wds_entry)(void *ol_osif_vdev_handle,
+	int (*peer_update_wds_entry)(void *ol_soc_handle,
 			uint8_t *dest_macaddr, uint8_t *peer_macaddr,
 			uint32_t flags);
-	void (*peer_del_wds_entry)(void *ol_osif_vdev_handle,
+	void (*peer_del_wds_entry)(void *ol_soc_handle,
 			uint8_t *wds_macaddr);
 	QDF_STATUS (*lro_hash_config)(void *scn_handle,
 			struct cdp_lro_hash_config *lro_hash);

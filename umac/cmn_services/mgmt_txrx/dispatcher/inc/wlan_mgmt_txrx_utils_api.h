@@ -288,6 +288,15 @@ enum protected_dual_actioncode {
  * @WNM_BSS_TM_QUERY: wnm bss tm query frame
  * @WNM_BSS_TM_REQUEST: wnm bss tm request frame
  * @WNM_BSS_TM_RESPONSE: wnm bss tm response frame
+ * @WNM_FMS_REQ: wnm fms request frame
+ * @WNM_FMS_RESP: wnm fms response frame
+ * @WNM_TFS_REQ: wnm tfs request frame
+ * @WNM_TFS_RESP: wnm tfs response frame
+ * @WNM_TFS_NOTIFY: wnm tfs notify frame
+ * @WNM_SLEEP_REQ: wnm sleep request frame
+ * @WNM_SLEEP_RESP: wnm sleep response frame
+ * @WNM_TIM_REQ: wnm Tim broadcast request frame
+ * @WNM_TIM_RESP: wnm Tim broadcast response frame
  * @WNM_NOTIF_REQUEST: wnm notify request frame
  * @WNM_NOTIF_RESPONSE: wnm notify response frame
  */
@@ -295,6 +304,15 @@ enum wnm_actioncode {
 	WNM_BSS_TM_QUERY = 6,
 	WNM_BSS_TM_REQUEST = 7,
 	WNM_BSS_TM_RESPONSE = 8,
+	WNM_FMS_REQ = 9,
+	WNM_FMS_RESP = 10,
+	WNM_TFS_REQ = 13,
+	WNM_TFS_RESP = 14,
+	WNM_TFS_NOTIFY = 15,
+	WNM_SLEEP_REQ = 16,
+	WNM_SLEEP_RESP = 17,
+	WNM_TIM_REQ = 18,
+	WNM_TIM_RESP = 19,
 	WNM_NOTIF_REQUEST = 26,
 	WNM_NOTIF_RESPONSE = 27,
 };
@@ -468,6 +486,15 @@ struct action_frm_hdr {
  * @MGMT_ACTION_WNM_BSS_TM_RESPONSE: wnm bss tm response action frame
  * @MGMT_ACTION_WNM_NOTIF_REQUEST:  wnm notification request action frame
  * @MGMT_ACTION_WNM_NOTIF_RESPONSE: wnm notification response action frame
+ * @MGMT_ACTION_WNM_FMS_REQ:    wnm fms request frame
+ * @MGMT_ACTION_WNM_FMS_RESP:   wnm fms response frame
+ * @MGMT_ACTION_WNM_TFS_REQ:    wnm tfs request frame
+ * @MGMT_ACTION_WNM_TFS_RESP:   wnm tfs response frame
+ * @MGMT_ACTION_WNM_TFS_NOTIFY: wnm tfs notify frame
+ * @MGMT_ACTION_WNM_SLEEP_REQ:  wnm sleep request frame
+ * @MGMT_ACTION_WNM_SLEEP_RESP: wnm sleep response frame
+ * @MGMT_ACTION_WNM_TIM_REQ:    wnm Tim broadcast request frame
+ * @MGMT_ACTION_WNM_TIM_RESP:   wnm Tim broadcast response frame
  * @MGMT_ACTION_TDLS_SETUP_REQ:     tdls setup request action frame
  * @MGMT_ACTION_TDLS_SETUP_RSP:     tdls setup response frame
  * @MGMT_ACTION_TDLS_SETUP_CNF:     tdls setup confirm frame
@@ -567,6 +594,15 @@ enum mgmt_frame_type {
 	MGMT_ACTION_WNM_BSS_TM_RESPONSE,
 	MGMT_ACTION_WNM_NOTIF_REQUEST,
 	MGMT_ACTION_WNM_NOTIF_RESPONSE,
+	MGMT_ACTION_WNM_FMS_REQ,
+	MGMT_ACTION_WNM_FMS_RESP,
+	MGMT_ACTION_WNM_TFS_REQ,
+	MGMT_ACTION_WNM_TFS_RESP,
+	MGMT_ACTION_WNM_TFS_NOTIFY,
+	MGMT_ACTION_WNM_SLEEP_REQ,
+	MGMT_ACTION_WNM_SLEEP_RESP,
+	MGMT_ACTION_WNM_TIM_REQ,
+	MGMT_ACTION_WNM_TIM_RESP,
 	MGMT_ACTION_TDLS_SETUP_REQ,
 	MGMT_ACTION_TDLS_SETUP_RSP,
 	MGMT_ACTION_TDLS_SETUP_CNF,
@@ -689,6 +725,19 @@ typedef QDF_STATUS (*mgmt_frame_rx_callback)(
 			struct mgmt_rx_event_params *mgmt_rx_params,
 			enum mgmt_frame_type frm_type);
 
+/**
+ * mgmt_frame_fill_peer_cb - Function pointer to fill peer in the buf
+ * @peer: peer
+ * @buf: buffer
+ *
+ * This is the function pointer to be called during drain to fill the
+ * peer into the buf's cb structure.
+ *
+ * Return: QDF_STATUS_SUCCESS - in case of success
+ */
+typedef QDF_STATUS (*mgmt_frame_fill_peer_cb)(
+			struct wlan_objmgr_peer *peer,
+			qdf_nbuf_t buf);
 
 /**
  * struct mgmt_txrx_mgmt_frame_cb_info - frm and corresponding rx cb info
@@ -793,6 +842,22 @@ QDF_STATUS wlan_mgmt_txrx_register_rx_cb(
 			uint8_t num_entries);
 
 /**
+ * wlan_mgmt_txrx_pdev_drain() - Function to drain all mgmt packets
+ * @pdev: pdev context
+ * @mgmt_fill_peer_cb: callback func to UMAC to fill peer into buf
+ * @status: opaque pointer about the status of the pkts passed to UMAC
+ *
+ * This function drains all mgmt packets. This can be used in the
+ * event of target going down without sending completions.
+ *
+ * Return: QDF_STATUS_SUCCESS - in case of success
+ */
+QDF_STATUS wlan_mgmt_txrx_pdev_drain(
+			struct wlan_objmgr_pdev *pdev,
+			mgmt_frame_fill_peer_cb mgmt_fill_peer_cb,
+			void *status);
+
+/**
  * wlan_mgmt_txrx_deregister_rx_cb() - deregisters the rx cb for mgmt. frames
  * @psoc: psoc context
  * @comp_id: umac component id
@@ -825,4 +890,23 @@ QDF_STATUS wlan_mgmt_txrx_psoc_open(struct wlan_objmgr_psoc *psoc);
  * Return: QDF_STATUS_SUCCESS - in case of success
  */
 QDF_STATUS wlan_mgmt_txrx_psoc_close(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mgmt_txrx_pdev_open() - mgmt txrx module pdev open API
+ * @pdev: pdev context
+ *
+ * Return: QDF_STATUS_SUCCESS - in case of success
+ */
+QDF_STATUS wlan_mgmt_txrx_pdev_open(struct wlan_objmgr_pdev *pdev);
+
+
+/**
+ * wlan_mgmt_txrx_pdev_close() - mgmt txrx module pdev close API
+ * @pdev: pdev context
+ *
+ * Return: QDF_STATUS_SUCCESS - in case of success
+ */
+QDF_STATUS wlan_mgmt_txrx_pdev_close(struct wlan_objmgr_pdev *pdev);
 #endif
+
+

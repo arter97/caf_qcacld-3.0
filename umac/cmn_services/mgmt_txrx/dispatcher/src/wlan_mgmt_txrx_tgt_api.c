@@ -399,6 +399,33 @@ mgmt_get_wnm_action_subtype(uint8_t action_code)
 	case WNM_NOTIF_RESPONSE:
 		frm_type = MGMT_ACTION_WNM_NOTIF_RESPONSE;
 		break;
+	case WNM_FMS_REQ:
+		frm_type = MGMT_ACTION_WNM_FMS_REQ;
+		break;
+	case WNM_FMS_RESP:
+		frm_type = MGMT_ACTION_WNM_FMS_RESP;
+		break;
+	case WNM_TFS_REQ:
+		frm_type = MGMT_ACTION_WNM_TFS_REQ;
+		break;
+	case WNM_TFS_RESP:
+		frm_type = MGMT_ACTION_WNM_TFS_RESP;
+		break;
+	case WNM_TFS_NOTIFY:
+		frm_type = MGMT_ACTION_WNM_TFS_NOTIFY;
+		break;
+	case WNM_SLEEP_REQ:
+		frm_type = MGMT_ACTION_WNM_SLEEP_REQ;
+		break;
+	case WNM_SLEEP_RESP:
+		frm_type = MGMT_ACTION_WNM_SLEEP_RESP;
+		break;
+	case WNM_TIM_REQ:
+		frm_type = MGMT_ACTION_WNM_TFS_REQ;
+		break;
+	case WNM_TIM_RESP:
+		frm_type = MGMT_ACTION_WNM_TFS_RESP;
+		break;
 	default:
 		frm_type = MGMT_FRM_UNSPECIFIED;
 		break;
@@ -869,17 +896,24 @@ QDF_STATUS tgt_mgmt_txrx_rx_frame_handler(
 	/* mpdu_data_ptr is pointer to action header */
 	mpdu_data_ptr = (uint8_t *)qdf_nbuf_data(buf) +
 			sizeof(struct ieee80211_frame);
+	if ((wh->i_fc[1] & IEEE80211_FC1_WEP) &&
+	    (mgmt_subtype == MGMT_SUBTYPE_ACTION) &&
+	    !qdf_is_macaddr_group((struct qdf_mac_addr *)wh->i_addr1) &&
+	    !qdf_is_macaddr_broadcast((struct qdf_mac_addr *)wh->i_addr1))
+		mpdu_data_ptr += IEEE80211_CCMP_HEADERLEN;
+
 	frm_type = mgmt_txrx_get_frm_type(mgmt_subtype, mpdu_data_ptr);
 	if (frm_type == MGMT_FRM_UNSPECIFIED) {
-		mgmt_txrx_err("Unspecified mgmt frame type");
+		mgmt_txrx_err("Unspecified mgmt frame type fc: %x %x",
+			      wh->i_fc[0], wh->i_fc[1]);
 		qdf_nbuf_free(buf);
 		status = QDF_STATUS_E_FAILURE;
 		goto dec_peer_ref_cnt;
 	}
 
-	mgmt_txrx_info("Rcvd mgmt frame, mgmt txrx frm type: %u"
-			"seq. no.: %u, peer: %pK",
-			frm_type, *(uint16_t *)wh->i_seq, peer);
+	mgmt_txrx_info("Rcvd mgmt frame, mgmt txrx frm type: %u seq. no.: %u, peer: %pK fc: %x %x",
+		       frm_type, *(uint16_t *)wh->i_seq, peer, wh->i_fc[0],
+		       wh->i_fc[1]);
 
 	mgmt_txrx_psoc_ctx = (struct mgmt_txrx_priv_psoc_context *)
 			wlan_objmgr_psoc_get_comp_private_obj(psoc,
@@ -1007,7 +1041,7 @@ no_registered_cb:
 	 * decrementing the peer ref count that was incremented while
 	 * accessing peer in wlan_mgmt_txrx_mgmt_frame_tx
 	 */
-	wlan_objmgr_peer_release_ref(mgmt_desc->peer, WLAN_MGMT_SB_ID);
+	wlan_objmgr_peer_release_ref(mgmt_desc->peer, WLAN_MGMT_NB_ID);
 	wlan_mgmt_txrx_desc_put(mgmt_txrx_pdev_ctx, desc_id);
 	return QDF_STATUS_SUCCESS;
 }

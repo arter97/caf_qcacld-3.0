@@ -394,6 +394,16 @@ dp_rx_intrabss_fwd(struct dp_soc *soc,
 			memset(nbuf->cb, 0x0, sizeof(nbuf->cb));
 			len = qdf_nbuf_len(nbuf);
 
+			/* linearize the nbuf just before we send to
+			 * dp_tx_send()
+			 */
+			if (qdf_unlikely(qdf_nbuf_get_ext_list(nbuf))) {
+				if (qdf_nbuf_linearize(nbuf) == -ENOMEM)
+					return false;
+
+				nbuf = qdf_nbuf_unshare(nbuf);
+			}
+
 			if (!dp_tx_send(sa_peer->vdev, nbuf)) {
 				DP_STATS_INC_PKT(sa_peer, rx.intra_bss.pkts,
 						1, len);
@@ -498,7 +508,7 @@ void dp_rx_fill_mesh_stats(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 
 	qdf_nbuf_set_rx_fctx_type(nbuf, (void *)rx_info, CB_FTYPE_MESH_RX_INFO);
 
-	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_DEBUG,
+	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO_MED,
 		FL("Mesh rx stats: flags %x, rssi %x, chn %x, rate %x, kix %x"),
 						rx_info->rs_flags,
 						rx_info->rs_rssi,
@@ -641,6 +651,7 @@ uint8_t dp_rx_process_invalid_peer(struct dp_soc *soc, qdf_nbuf_t mpdu)
 	struct ieee80211_frame *wh;
 	uint8_t i;
 	uint8_t *rx_pkt_hdr;
+	qdf_nbuf_t curr_nbuf, next_nbuf;
 
 	rx_pkt_hdr = hal_rx_pkt_hdr_get(qdf_nbuf_data(mpdu));
 	wh = (struct ieee80211_frame *)rx_pkt_hdr;
@@ -648,13 +659,13 @@ uint8_t dp_rx_process_invalid_peer(struct dp_soc *soc, qdf_nbuf_t mpdu)
 	if (!DP_FRAME_IS_DATA(wh)) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
 				"NAWDS valid only for data frames");
-		return 1;
+		goto free;
 	}
 
 	if (qdf_nbuf_len(mpdu) < sizeof(struct ieee80211_frame)) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 				"Invalid nbuf length");
-		return 1;
+		goto free;
 	}
 
 
@@ -687,7 +698,7 @@ uint8_t dp_rx_process_invalid_peer(struct dp_soc *soc, qdf_nbuf_t mpdu)
 	if (!vdev) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 				"VDEV not found");
-		return 1;
+		goto free;
 	}
 
 out:
@@ -696,8 +707,16 @@ out:
 	msg.nbuf = mpdu;
 	msg.vdev_id = vdev->vdev_id;
 	if (pdev->soc->cdp_soc.ol_ops->rx_invalid_peer)
-		return pdev->soc->cdp_soc.ol_ops->rx_invalid_peer(
-				pdev->osif_pdev, &msg);
+		pdev->soc->cdp_soc.ol_ops->rx_invalid_peer(pdev->osif_pdev, &msg);
+
+free:
+	/* Drop and free packet */
+	curr_nbuf = mpdu;
+	while (curr_nbuf) {
+		next_nbuf = qdf_nbuf_next(curr_nbuf);
+		qdf_nbuf_free(curr_nbuf);
+		curr_nbuf = next_nbuf;
+	}
 
 	return 0;
 }
