@@ -135,6 +135,12 @@
 #define MEMORY_DEBUG_STR ""
 #endif
 
+#ifdef PANIC_ON_BUG
+#define PANIC_ON_BUG_STR " +PANIC_ON_BUG"
+#else
+#define PANIC_ON_BUG_STR ""
+#endif
+
 int wlan_start_ret_val;
 static DECLARE_COMPLETION(wlan_start_comp);
 static unsigned int dev_num = 1;
@@ -6268,6 +6274,34 @@ QDF_STATUS hdd_post_cds_enable_config(hdd_context_t *hdd_ctx)
 	return QDF_STATUS_SUCCESS;
 }
 
+hdd_adapter_t *hdd_get_first_valid_adapter()
+{
+	hdd_adapter_list_node_t *adapterNode = NULL, *pNext = NULL;
+	hdd_adapter_t *adapter;
+	QDF_STATUS status;
+	hdd_context_t *hdd_ctx;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	if (!hdd_ctx) {
+		hdd_err("HDD context not valid");
+		return NULL;
+	}
+
+	status = hdd_get_front_adapter(hdd_ctx, &adapterNode);
+
+	while (adapterNode != NULL && status == QDF_STATUS_SUCCESS) {
+		adapter = adapterNode->pAdapter;
+		if (adapter && adapter->magic == WLAN_HDD_ADAPTER_MAGIC)
+			return adapter;
+		status = hdd_get_next_adapter(hdd_ctx, adapterNode, &pNext);
+		adapterNode = pNext;
+	}
+
+
+	return NULL;
+}
+
 /* wake lock APIs for HDD */
 void hdd_prevent_suspend(uint32_t reason)
 {
@@ -6765,11 +6799,6 @@ static void hdd_bus_bw_work_handler(struct work_struct *work)
 	hdd_ipa_uc_stat_query(hdd_ctx, &ipa_tx_packets, &ipa_rx_packets);
 	tx_packets += (uint64_t)ipa_tx_packets;
 	rx_packets += (uint64_t)ipa_rx_packets;
-
-	if (adapter) {
-		adapter->stats.tx_packets += ipa_tx_packets;
-		adapter->stats.rx_packets += ipa_rx_packets;
-	}
 
 	if (!connected) {
 		hdd_err("bus bandwidth timer running in disconnected state");
@@ -11694,7 +11723,7 @@ static int __hdd_module_init(void)
 	pr_err("%s: Loading driver v%s (%s)\n",
 	       WLAN_MODULE_NAME,
 	       g_wlan_driver_version,
-	       TIMER_MANAGER_STR MEMORY_DEBUG_STR);
+	       TIMER_MANAGER_STR MEMORY_DEBUG_STR PANIC_ON_BUG_STR);
 
 	ret = wlan_hdd_state_ctrl_param_create();
 	if (ret) {

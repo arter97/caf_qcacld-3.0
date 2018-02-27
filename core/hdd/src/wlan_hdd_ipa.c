@@ -2609,6 +2609,11 @@ static void hdd_ipa_uc_op_cb(struct op_msg_type *op_msg, void *usr_ctxt)
 	struct ol_txrx_pdev_t *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
+	if (!pdev) {
+		HDD_IPA_LOG(QDF_TRACE_LEVEL_FATAL, "pdev is NULL");
+		return;
+	}
+
 	if (!op_msg || !usr_ctxt) {
 		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR, "INVALID ARG");
 		return;
@@ -4429,6 +4434,9 @@ static void hdd_ipa_send_skb_to_network(qdf_nbuf_t skb,
 	cpu_index = wlan_hdd_get_cpu();
 
 	++adapter->hdd_stats.hddTxRxStats.rxPackets[cpu_index];
+	++adapter->stats.rx_packets;
+	adapter->stats.rx_bytes += skb->len;
+
 	result = hdd_ipa_aggregated_rx_ind(skb);
 	if (result == NET_RX_SUCCESS)
 		++adapter->hdd_stats.hddTxRxStats.rxDelivered[cpu_index];
