@@ -1774,6 +1774,7 @@ struct hdd_context_s {
 	/* mutex lock to block concurrent access */
 	struct mutex power_stats_lock;
 #endif
+	qdf_atomic_t is_acs_allowed;
 };
 
 /*---------------------------------------------------------------------------
