@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -1426,6 +1426,13 @@ htt_rx_frag_pop_hl(
 }
 
 static inline int
+htt_rx_offload_msdu_cnt_hl(
+    htt_pdev_handle pdev)
+{
+    return 1;
+}
+
+static inline int
 htt_rx_offload_msdu_pop_hl(htt_pdev_handle pdev,
 			   qdf_nbuf_t offload_deliver_msg,
 			   int *vdev_id,
@@ -1471,6 +1478,13 @@ htt_rx_offload_msdu_pop_hl(htt_pdev_handle pdev,
 #endif
 
 #ifndef CONFIG_HL_SUPPORT
+static inline int
+htt_rx_offload_msdu_cnt_ll(
+    htt_pdev_handle pdev)
+{
+    return htt_rx_ring_elems(pdev);
+}
+
 static int
 htt_rx_offload_msdu_pop_ll(htt_pdev_handle pdev,
 			   qdf_nbuf_t offload_deliver_msg,
@@ -2816,6 +2830,10 @@ int (*htt_rx_frag_pop)(htt_pdev_handle pdev,
 		       uint32_t *msdu_count);
 
 int
+(*htt_rx_offload_msdu_cnt)(
+    htt_pdev_handle pdev);
+
+int
 (*htt_rx_offload_msdu_pop)(htt_pdev_handle pdev,
 			   qdf_nbuf_t offload_deliver_msg,
 			   int *vdev_id,
@@ -3483,6 +3501,7 @@ int htt_rx_attach(struct htt_pdev_t *pdev)
 	pdev->rx_ring.base_paddr = 0;
 	htt_rx_amsdu_pop = htt_rx_amsdu_pop_hl;
 	htt_rx_frag_pop = htt_rx_frag_pop_hl;
+	htt_rx_offload_msdu_cnt = htt_rx_offload_msdu_cnt_hl;
 	htt_rx_offload_msdu_pop = htt_rx_offload_msdu_pop_hl;
 	htt_rx_mpdu_desc_list_next = htt_rx_mpdu_desc_list_next_hl;
 	htt_rx_mpdu_desc_retry = htt_rx_mpdu_desc_retry_hl;
@@ -3627,6 +3646,7 @@ int htt_rx_attach(struct htt_pdev_t *pdev)
 	if (cds_get_conparam() == QDF_GLOBAL_MONITOR_MODE)
 		htt_rx_amsdu_pop = htt_rx_mon_amsdu_rx_in_order_pop_ll;
 
+	htt_rx_offload_msdu_cnt = htt_rx_offload_msdu_cnt_ll;
 	htt_rx_offload_msdu_pop = htt_rx_offload_msdu_pop_ll;
 	htt_rx_mpdu_desc_retry = htt_rx_mpdu_desc_retry_ll;
 	htt_rx_mpdu_desc_seq_num = htt_rx_mpdu_desc_seq_num_ll;

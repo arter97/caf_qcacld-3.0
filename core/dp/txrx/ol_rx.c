@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -920,13 +920,25 @@ ol_rx_inspect(struct ol_txrx_vdev_t *vdev,
 
 void
 ol_rx_offload_deliver_ind_handler(ol_txrx_pdev_handle pdev,
-				  qdf_nbuf_t msg, int msdu_cnt)
+				  qdf_nbuf_t msg, uint16_t msdu_cnt)
 {
 	int vdev_id, peer_id, tid;
 	qdf_nbuf_t head_buf, tail_buf, buf;
 	struct ol_txrx_peer_t *peer;
 	uint8_t fw_desc;
 	htt_pdev_handle htt_pdev = pdev->htt_pdev;
+
+	if (msdu_cnt > htt_rx_offload_msdu_cnt(htt_pdev)) {
+		TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
+			"%s: invalid msdu_cnt=%u\n",
+			__func__,
+			msdu_cnt);
+
+		if (pdev->cfg.is_high_latency)
+			htt_rx_desc_frame_free(htt_pdev, msg);
+
+		return;
+	}
 
 	while (msdu_cnt) {
 		if (!htt_rx_offload_msdu_pop(htt_pdev, msg, &vdev_id, &peer_id,
@@ -1433,6 +1445,12 @@ ol_rx_in_order_indication_handler(ol_txrx_pdev_handle pdev,
 	uint8_t pktlog_bit;
 #endif
 	uint32_t filled = 0;
+	if (tid >= OL_TXRX_NUM_EXT_TIDS) {
+		TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
+			   "%s:  Invalid tid, %u\n", __func__, tid);
+		WARN_ON(1);
+		return;
+	}
 
 	if (pdev) {
 		if (qdf_unlikely(QDF_GLOBAL_MONITOR_MODE == cds_get_conparam()))

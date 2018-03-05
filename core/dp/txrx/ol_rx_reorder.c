@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2016,2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -471,6 +471,13 @@ ol_rx_addba_handler(ol_txrx_pdev_handle pdev,
 	struct ol_txrx_peer_t *peer;
 	struct ol_rx_reorder_t *rx_reorder;
 
+	if (tid >= OL_TXRX_NUM_EXT_TIDS) {
+		TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
+			   "%s:  Invalid tid, %u\n", __func__, tid);
+		WARN_ON(1);
+		return;
+	}
+
 	peer = ol_txrx_peer_find_by_id(pdev, peer_id);
 	if (peer == NULL)
 		return;
@@ -506,6 +513,13 @@ ol_rx_delba_handler(ol_txrx_pdev_handle pdev, uint16_t peer_id, uint8_t tid)
 {
 	struct ol_txrx_peer_t *peer;
 	struct ol_rx_reorder_t *rx_reorder;
+
+	if (tid >= OL_TXRX_NUM_EXT_TIDS) {
+		TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
+			   "%s:  Invalid tid, %u\n", __func__, tid);
+		WARN_ON(1);
+		return;
+	}
 
 	peer = ol_txrx_peer_find_by_id(pdev, peer_id);
 	if (peer == NULL)
@@ -598,6 +612,12 @@ ol_rx_pn_ind_handler(ol_txrx_pdev_handle pdev,
 	htt_pdev_handle htt_pdev = pdev->htt_pdev;
 	int seq_num, i = 0;
 
+	if (tid >= OL_TXRX_NUM_EXT_TIDS) {
+		TXRX_PRINT(TXRX_PRINT_LEVEL_ERR,
+			   "%s:  Invalid tid, %u\n", __func__, tid);
+		WARN_ON(1);
+		return;
+	}
 	peer = ol_txrx_peer_find_by_id(pdev, peer_id);
 
 	if (!peer) {
