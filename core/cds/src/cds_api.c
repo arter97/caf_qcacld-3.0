@@ -69,6 +69,7 @@
 #include "qdf_cpuhp.h"
 #include "target_type.h"
 #include "wlan_ocb_ucfg_api.h"
+#include "wlan_ipa_ucfg_api.h"
 
 /* Preprocessor Definitions and Constants */
 
