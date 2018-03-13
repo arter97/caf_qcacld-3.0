@@ -1276,8 +1276,6 @@ QDF_STATUS hdd_wlan_shutdown(void)
 	}
 #endif
 
-	hdd_ipa_uc_ssr_deinit();
-
 	hdd_bus_bandwidth_destroy(hdd_ctx);
 
 	hdd_wlan_stop_modules(hdd_ctx, false);
