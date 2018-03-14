@@ -697,6 +697,7 @@ int pld_pcie_get_soc_info(struct device *dev, struct pld_soc_info *info)
 	if (info == NULL)
 		return -ENODEV;
 
+	memset(&cnss_info, 0, sizeof(cnss_info));
 	ret = cnss_get_soc_info(dev, &cnss_info);
 	if (ret)
 		return ret;
