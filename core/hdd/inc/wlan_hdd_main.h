@@ -900,6 +900,7 @@ struct hdd_ap_ctx_s {
 	bool dfs_cac_block_tx;
 
 	enum bss_stop_reason bss_stop_reason;
+	qdf_atomic_t acs_in_progress;
 };
 
 typedef struct hdd_scaninfo_s {
@@ -1774,7 +1775,6 @@ struct hdd_context_s {
 	/* mutex lock to block concurrent access */
 	struct mutex power_stats_lock;
 #endif
-	qdf_atomic_t is_acs_allowed;
 };
 
 /*---------------------------------------------------------------------------
