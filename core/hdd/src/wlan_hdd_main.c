@@ -1897,7 +1897,7 @@ int hdd_start_adapter(hdd_adapter_t *adapter)
 	int ret;
 	enum tQDF_ADAPTER_MODE device_mode = adapter->device_mode;
 
-	ENTER_DEV(adapter->dev);
+	hdd_info("enter(%s)", netdev_name(adapter->dev));
 	hdd_debug("Start_adapter for mode : %d", adapter->device_mode);
 
 	switch (device_mode) {
@@ -2331,6 +2331,9 @@ static int __hdd_open(struct net_device *dev)
 			goto err_hdd_hdd_init_deinit_lock;
 		}
 	}
+
+	if (adapter->device_mode == QDF_FTM_MODE)
+		goto err_hdd_hdd_init_deinit_lock;
 
 	set_bit(DEVICE_IFACE_OPENED, &adapter->event_flags);
 	hdd_info("%s interface up", dev->name);
@@ -3803,7 +3806,6 @@ hdd_adapter_t *hdd_open_adapter(hdd_context_t *hdd_ctx, uint8_t session_type,
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	hdd_cfg80211_state_t *cfgState;
 
-
 	if (hdd_ctx->current_intf_count >= hdd_ctx->max_intf_count) {
 		/*
 		 * Max limit reached on the number of vdevs configured by the
@@ -4021,6 +4023,8 @@ QDF_STATUS hdd_close_adapter(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 	hdd_adapter_list_node_t *adapterNode, *pCurrent, *pNext;
 	QDF_STATUS status;
 
+	hdd_info("enter(%s)", netdev_name(adapter->dev));
+
 	status = hdd_get_front_adapter(hdd_ctx, &pCurrent);
 	if (QDF_STATUS_SUCCESS != status) {
 		hdd_warn("adapter list empty %d",
@@ -4059,6 +4063,7 @@ QDF_STATUS hdd_close_adapter(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 		return QDF_STATUS_SUCCESS;
 	}
 
+	EXIT();
 	return QDF_STATUS_E_FAILURE;
 }
 
@@ -4252,7 +4257,7 @@ QDF_STATUS hdd_stop_adapter(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 	void *sap_ctx;
 	tsap_Config_t *sap_config;
 
-	ENTER();
+	hdd_info("enter(%s)", netdev_name(adapter->dev));
 
 	if (!test_bit(SME_SESSION_OPENED, &adapter->event_flags)) {
 		hdd_err("session %d is not open %lu",
@@ -8004,7 +8009,7 @@ static void hdd_override_ini_config(hdd_context_t *hdd_ctx)
 		hdd_debug("Module enable_11d set to %d", enable_11d);
 	}
 
-	if (!hdd_ipa_is_present(hdd_ctx))
+	if (!hdd_ipa_is_present())
 		hdd_ctx->config->IpaConfig = 0;
 
 	if (!hdd_ctx->config->rssi_assoc_reject_enabled ||
