@@ -3593,6 +3593,39 @@ static uint16_t radiotap_num_to_freq (uint16_t chan_num)
 	return CHANNEL_FREQ_5000 +
 		(chan_num * FREQ_MULTIPLIER_CONST_5MHZ);
 }
+
+/**
+ * qdf_nbuf_update_radiotap_ampdu_flags() - Update radiotap header ampdu flags
+ * @rx_status: Pointer to rx_status.
+ * @rtap_buf: Buf to which AMPDU info has to be updated.
+ * @rtap_len: Current length of radiotap buffer
+ *
+ * Return: Length of radiotap after AMPDU flags updated.
+ */
+static unsigned int qdf_nbuf_update_radiotap_ampdu_flags(
+					struct mon_rx_status *rx_status,
+					uint8_t *rtap_buf,
+					uint32_t rtap_len)
+{
+	/*
+	 * IEEE80211_RADIOTAP_AMPDU_STATUS u32 u16 u8 u8
+	 * First 32 bits of AMPDU represents the reference number
+	 */
+
+	uint32_t ampdu_reference_num = rx_status->ppdu_id;
+	uint16_t ampdu_flags = 0;
+	uint16_t ampdu_reserved_flags = 0;
+
+	put_unaligned_le32(ampdu_reference_num, &rtap_buf[rtap_len]);
+	rtap_len += 4;
+	put_unaligned_le16(ampdu_flags, &rtap_buf[rtap_len]);
+	rtap_len += 2;
+	put_unaligned_le16(ampdu_reserved_flags, &rtap_buf[rtap_len]);
+	rtap_len += 2;
+
+	return rtap_len;
+}
+
 /**
  * qdf_nbuf_update_radiotap() - Update radiotap header from rx_status
  * @rx_status: Pointer to rx_status.
@@ -3683,6 +3716,16 @@ unsigned int qdf_nbuf_update_radiotap(struct mon_rx_status *rx_status,
 		rtap_len += 1;
 	}
 
+	if (rx_status->rs_flags & IEEE80211_AMPDU_FLAG) {
+		/* IEEE80211_RADIOTAP_AMPDU_STATUS u32 u16 u8 u8 */
+		rthdr->it_present |=
+			cpu_to_le32(1 << IEEE80211_RADIOTAP_AMPDU_STATUS);
+		rtap_buf[rtap_len] =
+			qdf_nbuf_update_radiotap_ampdu_flags(rx_status,
+							     rtap_buf,
+							     rtap_len);
+	}
+
 	if (rx_status->vht_flags) {
 		/* IEEE80211_RADIOTAP_VHT u16, u8, u8, u8[4], u8, u8, u16 */
 		rthdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_VHT);
@@ -3739,6 +3782,15 @@ static unsigned int qdf_nbuf_update_radiotap_vht_flags(
 
 unsigned int qdf_nbuf_update_radiotap_he_flags(struct mon_rx_status *rx_status,
 				      int8_t *rtap_buf, uint32_t rtap_len)
+{
+	qdf_print("ERROR: struct ieee80211_radiotap_header not supported");
+	return 0;
+}
+
+static unsigned int qdf_nbuf_update_radiotap_ampdu_flags(
+					struct mon_rx_status *rx_status,
+					uint8_t *rtap_buf,
+					uint32_t rtap_len)
 {
 	qdf_print("ERROR: struct ieee80211_radiotap_header not supported");
 	return 0;
