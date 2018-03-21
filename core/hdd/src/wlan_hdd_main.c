@@ -135,6 +135,12 @@
 #define MEMORY_DEBUG_STR ""
 #endif
 
+#ifdef PANIC_ON_BUG
+#define PANIC_ON_BUG_STR " +PANIC_ON_BUG"
+#else
+#define PANIC_ON_BUG_STR ""
+#endif
+
 int wlan_start_ret_val;
 static DECLARE_COMPLETION(wlan_start_comp);
 static unsigned int dev_num = 1;
@@ -718,6 +724,12 @@ int wlan_hdd_validate_context(hdd_context_t *hdd_ctx)
 
 	if (cds_is_driver_in_bad_state()) {
 		hdd_debug("%pS driver in bad State: 0x%x Ignore!!!",
+			(void *)_RET_IP_, cds_get_driver_state());
+		return -ENODEV;
+	}
+
+	if (cds_is_fw_down()) {
+		hdd_debug("%pS FW is down: 0x%x Ignore!!!",
 			(void *)_RET_IP_, cds_get_driver_state());
 		return -ENODEV;
 	}
@@ -1885,7 +1897,7 @@ int hdd_start_adapter(hdd_adapter_t *adapter)
 	int ret;
 	enum tQDF_ADAPTER_MODE device_mode = adapter->device_mode;
 
-	ENTER_DEV(adapter->dev);
+	hdd_info("enter(%s)", netdev_name(adapter->dev));
 	hdd_debug("Start_adapter for mode : %d", adapter->device_mode);
 
 	switch (device_mode) {
@@ -2319,6 +2331,9 @@ static int __hdd_open(struct net_device *dev)
 			goto err_hdd_hdd_init_deinit_lock;
 		}
 	}
+
+	if (adapter->device_mode == QDF_FTM_MODE)
+		goto err_hdd_hdd_init_deinit_lock;
 
 	set_bit(DEVICE_IFACE_OPENED, &adapter->event_flags);
 	hdd_info("%s interface up", dev->name);
@@ -3292,6 +3307,7 @@ void hdd_cleanup_actionframe(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter)
 	if (NULL != cfgState->buf) {
 		unsigned long rc;
 
+		hdd_debug("Wait for ack for the previous action frame");
 		rc = wait_for_completion_timeout(
 			&adapter->tx_action_cnf_event,
 			msecs_to_jiffies(ACTION_FRAME_TX_TIMEOUT));
@@ -3302,7 +3318,35 @@ void hdd_cleanup_actionframe(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter)
 			 * cfgState->buf
 			 */
 			 hdd_send_action_cnf(adapter, false);
-		}
+		} else
+			hdd_debug("Wait complete");
+	}
+}
+
+/**
+ * hdd_cleanup_actionframe_no_wait() - Clean up pending action frame
+ * @hdd_ctx: global hdd context
+ * @adapter: pointer to adapter
+ *
+ * This function used to cancel the pending action frame without waiting for
+ * ack.
+ *
+ * Return: None.
+ */
+void hdd_cleanup_actionframe_no_wait(hdd_context_t *hdd_ctx,
+		hdd_adapter_t *adapter)
+{
+	hdd_cfg80211_state_t *cfgState;
+
+	cfgState = WLAN_HDD_GET_CFG_STATE_PTR(adapter);
+
+	if (cfgState->buf) {
+		/*
+		 * Inform tx status as FAILURE to upper layer and free
+		 * cfgState->buf
+		 */
+		hdd_debug("Cleanup previous action frame without waiting for the ack");
+		hdd_send_action_cnf(adapter, false);
 	}
 }
 
@@ -3762,7 +3806,6 @@ hdd_adapter_t *hdd_open_adapter(hdd_context_t *hdd_ctx, uint8_t session_type,
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	hdd_cfg80211_state_t *cfgState;
 
-
 	if (hdd_ctx->current_intf_count >= hdd_ctx->max_intf_count) {
 		/*
 		 * Max limit reached on the number of vdevs configured by the
@@ -3980,6 +4023,8 @@ QDF_STATUS hdd_close_adapter(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 	hdd_adapter_list_node_t *adapterNode, *pCurrent, *pNext;
 	QDF_STATUS status;
 
+	hdd_info("enter(%s)", netdev_name(adapter->dev));
+
 	status = hdd_get_front_adapter(hdd_ctx, &pCurrent);
 	if (QDF_STATUS_SUCCESS != status) {
 		hdd_warn("adapter list empty %d",
@@ -4018,6 +4063,7 @@ QDF_STATUS hdd_close_adapter(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 		return QDF_STATUS_SUCCESS;
 	}
 
+	EXIT();
 	return QDF_STATUS_E_FAILURE;
 }
 
@@ -4211,7 +4257,7 @@ QDF_STATUS hdd_stop_adapter(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 	void *sap_ctx;
 	tsap_Config_t *sap_config;
 
-	ENTER();
+	hdd_info("enter(%s)", netdev_name(adapter->dev));
 
 	if (!test_bit(SME_SESSION_OPENED, &adapter->event_flags)) {
 		hdd_err("session %d is not open %lu",
@@ -6233,6 +6279,34 @@ QDF_STATUS hdd_post_cds_enable_config(hdd_context_t *hdd_ctx)
 	return QDF_STATUS_SUCCESS;
 }
 
+hdd_adapter_t *hdd_get_first_valid_adapter()
+{
+	hdd_adapter_list_node_t *adapterNode = NULL, *pNext = NULL;
+	hdd_adapter_t *adapter;
+	QDF_STATUS status;
+	hdd_context_t *hdd_ctx;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	if (!hdd_ctx) {
+		hdd_err("HDD context not valid");
+		return NULL;
+	}
+
+	status = hdd_get_front_adapter(hdd_ctx, &adapterNode);
+
+	while (adapterNode != NULL && status == QDF_STATUS_SUCCESS) {
+		adapter = adapterNode->pAdapter;
+		if (adapter && adapter->magic == WLAN_HDD_ADAPTER_MAGIC)
+			return adapter;
+		status = hdd_get_next_adapter(hdd_ctx, adapterNode, &pNext);
+		adapterNode = pNext;
+	}
+
+
+	return NULL;
+}
+
 /* wake lock APIs for HDD */
 void hdd_prevent_suspend(uint32_t reason)
 {
@@ -6730,11 +6804,6 @@ static void hdd_bus_bw_work_handler(struct work_struct *work)
 	hdd_ipa_uc_stat_query(hdd_ctx, &ipa_tx_packets, &ipa_rx_packets);
 	tx_packets += (uint64_t)ipa_tx_packets;
 	rx_packets += (uint64_t)ipa_rx_packets;
-
-	if (adapter) {
-		adapter->stats.tx_packets += ipa_tx_packets;
-		adapter->stats.rx_packets += ipa_rx_packets;
-	}
 
 	if (!connected) {
 		hdd_err("bus bandwidth timer running in disconnected state");
@@ -7940,7 +8009,7 @@ static void hdd_override_ini_config(hdd_context_t *hdd_ctx)
 		hdd_debug("Module enable_11d set to %d", enable_11d);
 	}
 
-	if (!hdd_ipa_is_present(hdd_ctx))
+	if (!hdd_ipa_is_present())
 		hdd_ctx->config->IpaConfig = 0;
 
 	if (!hdd_ctx->config->rssi_assoc_reject_enabled ||
@@ -10480,6 +10549,15 @@ static void hdd_get_nud_stats_cb(void *data, struct rsp_stats *rsp)
 	adapter->dad |= rsp->dad_detected;
 	adapter->con_status = rsp->connect_status;
 
+	/* Flag true indicates connectivity check stats present. */
+	if (rsp->connect_stats_present) {
+		hdd_notice("rsp->tcp_ack_recvd :%x", rsp->tcp_ack_recvd);
+		hdd_notice("rsp->icmpv4_rsp_recvd :%x", rsp->icmpv4_rsp_recvd);
+		adapter->hdd_stats.hdd_tcp_stats.rx_fw_cnt = rsp->tcp_ack_recvd;
+		adapter->hdd_stats.hdd_icmpv4_stats.rx_fw_cnt =
+							rsp->icmpv4_rsp_recvd;
+	}
+
 	spin_lock(&hdd_context_lock);
 	context = &hdd_ctx->nud_stats_context;
 	complete(&context->response_event);
@@ -11650,7 +11728,7 @@ static int __hdd_module_init(void)
 	pr_err("%s: Loading driver v%s (%s)\n",
 	       WLAN_MODULE_NAME,
 	       g_wlan_driver_version,
-	       TIMER_MANAGER_STR MEMORY_DEBUG_STR);
+	       TIMER_MANAGER_STR MEMORY_DEBUG_STR PANIC_ON_BUG_STR);
 
 	ret = wlan_hdd_state_ctrl_param_create();
 	if (ret) {

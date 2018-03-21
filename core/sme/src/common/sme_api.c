@@ -9197,7 +9197,7 @@ QDF_STATUS sme_stop_roaming(tHalHandle hal, uint8_t session_id, uint8_t reason)
 	if (reason == eCsrForcedDisassoc)
 		req->reason = REASON_ROAM_STOP_ALL;
 	else
-		req->reason = REASON_ROAM_SYNCH_FAILED;
+		req->reason = REASON_SME_ISSUED;
 	req->sessionId = session_id;
 	if (csr_neighbor_middle_of_roaming(mac_ctx, session_id))
 		req->middle_of_roaming = 1;
@@ -12292,7 +12292,8 @@ void active_list_cmd_timeout_handle(void *userData)
 		cds_trigger_recovery(CDS_ACTIVE_LIST_TIMEOUT);
 	} else {
 		if (!(cds_is_load_or_unload_in_progress() ||
-		    cds_is_driver_recovering() || cds_is_driver_in_bad_state()))
+		    cds_is_driver_recovering() ||
+		    cds_is_driver_in_bad_state() || cds_is_fw_down()))
 			QDF_BUG(0);
 		else
 			QDF_ASSERT(0);

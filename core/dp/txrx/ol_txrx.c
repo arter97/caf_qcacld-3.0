@@ -2258,6 +2258,7 @@ void ol_txrx_vdev_register(ol_txrx_vdev_handle vdev,
 
 	vdev->osif_dev = osif_vdev;
 	vdev->rx = txrx_ops->rx.rx;
+	vdev->stats_rx = txrx_ops->rx.stats_rx;
 	txrx_ops->tx.tx = ol_tx_data;
 }
 
@@ -2663,7 +2664,6 @@ ol_txrx_peer_attach(ol_txrx_vdev_handle vdev, uint8_t *peer_mac_addr)
 				vdev->wait_on_peer_id, (int) rc);
 			/* Added for debugging only */
 			wma_peer_debug_dump();
-			cds_trigger_recovery(PEER_DEL_TIMEOUT);
 			vdev->wait_on_peer_id = OL_TXRX_INVALID_LOCAL_PEER_ID;
 			return NULL;
 		}
@@ -3516,8 +3516,12 @@ QDF_STATUS ol_txrx_clear_peer(uint8_t sta_id)
 
 
 	peer = ol_txrx_peer_find_by_local_id(pdev, sta_id);
+
+	/* Return success, if the peer is already cleared by
+	 * data path via peer detach function.
+	 */
 	if (!peer)
-		return QDF_STATUS_E_FAULT;
+		return QDF_STATUS_SUCCESS;
 
 	return ol_txrx_clear_peer_internal(peer);
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -203,6 +203,7 @@ int hdd_sap_context_init(hdd_context_t *hdd_ctx)
 	qdf_spinlock_create(&hdd_ctx->sap_update_info_lock);
 
 	qdf_atomic_init(&hdd_ctx->dfs_radar_found);
+	qdf_atomic_init(&hdd_ctx->is_acs_allowed);
 
 	return 0;
 }
@@ -2526,6 +2527,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 		/* send vendor event to hostapd only for hostapd based acs*/
 		if (!pHddCtx->config->force_sap_acs)
 			wlan_hdd_cfg80211_acs_ch_select_evt(pHostapdAdapter);
+		qdf_atomic_set(&pHddCtx->is_acs_allowed, 0);
 		return QDF_STATUS_SUCCESS;
 	case eSAP_ECSA_CHANGE_CHAN_IND:
 		hdd_debug("Channel change indication from peer for channel %d",
@@ -2639,11 +2641,11 @@ int hdd_softap_unpack_ie(tHalHandle halHandle,
 			 bool *pMFPRequired,
 			 uint16_t gen_ie_len, uint8_t *gen_ie)
 {
-	tDot11fIERSN dot11RSNIE;
-	tDot11fIEWPA dot11WPAIE;
-
+	uint32_t ret;
 	uint8_t *pRsnIe;
 	uint16_t RSNIeLen;
+	tDot11fIERSN dot11RSNIE;
+	tDot11fIEWPA dot11WPAIE;
 
 	if (NULL == halHandle) {
 		hdd_err("Error haHandle returned NULL");
@@ -2666,8 +2668,13 @@ int hdd_softap_unpack_ie(tHalHandle halHandle,
 		RSNIeLen = gen_ie_len - 2;
 		/* Unpack the RSN IE */
 		memset(&dot11RSNIE, 0, sizeof(tDot11fIERSN));
-		dot11f_unpack_ie_rsn((tpAniSirGlobal) halHandle,
-				     pRsnIe, RSNIeLen, &dot11RSNIE, false);
+		ret = dot11f_unpack_ie_rsn((tpAniSirGlobal) halHandle,
+					   pRsnIe, RSNIeLen, &dot11RSNIE,
+					   false);
+		if (DOT11F_FAILED(ret)) {
+			hdd_err("unpack failed, ret: 0x%x", ret);
+			return -EINVAL;
+		}
 		/* Copy out the encryption and authentication types */
 		hdd_debug("pairwise cipher suite count: %d",
 		       dot11RSNIE.pwise_cipher_suite_count);
@@ -2702,8 +2709,12 @@ int hdd_softap_unpack_ie(tHalHandle halHandle,
 		RSNIeLen = gen_ie_len - (2 + 4);
 		/* Unpack the WPA IE */
 		memset(&dot11WPAIE, 0, sizeof(tDot11fIEWPA));
-		dot11f_unpack_ie_wpa((tpAniSirGlobal) halHandle,
+		ret = dot11f_unpack_ie_wpa((tpAniSirGlobal) halHandle,
 				     pRsnIe, RSNIeLen, &dot11WPAIE, false);
+		if (DOT11F_FAILED(ret)) {
+			hdd_err("unpack failed, ret: 0x%x", ret);
+			return -EINVAL;
+		}
 		/* Copy out the encryption and authentication types */
 		hdd_debug("WPA unicast cipher suite count: %d",
 		       dot11WPAIE.unicast_cipher_count);
@@ -6562,7 +6573,7 @@ QDF_STATUS hdd_init_ap_mode(hdd_adapter_t *pAdapter, bool reinit)
 
 	if (!reinit) {
 		pAdapter->sessionCtx.ap.sapConfig.acs_cfg.acs_mode = false;
-		qdf_mem_free(pAdapter->sessionCtx.ap.sapConfig.acs_cfg.ch_list);
+		wlan_hdd_undo_acs(pAdapter);
 		qdf_mem_zero(&pAdapter->sessionCtx.ap.sapConfig.acs_cfg,
 			     sizeof(struct sap_acs_cfg));
 	}
@@ -6747,19 +6758,24 @@ static bool wlan_hdd_rate_is_11g(u8 rate)
  */
 static bool wlan_hdd_get_sap_obss(hdd_adapter_t *pHostapdAdapter)
 {
-	uint8_t ht_cap_ie[DOT11F_IE_HTCAPS_MAX_LEN];
+	uint32_t ret;
+	uint8_t *ie = NULL;
 	tDot11fIEHTCaps dot11_ht_cap_ie = {0};
+	uint8_t ht_cap_ie[DOT11F_IE_HTCAPS_MAX_LEN];
 	hdd_context_t *hdd_ctx = WLAN_HDD_GET_CTX(pHostapdAdapter);
 	beacon_data_t *beacon = pHostapdAdapter->sessionCtx.ap.beacon;
-	uint8_t *ie = NULL;
 
 	ie = wlan_hdd_cfg80211_get_ie_ptr(beacon->tail, beacon->tail_len,
 						WLAN_EID_HT_CAPABILITY);
 	if (ie && ie[1]) {
 		qdf_mem_copy(ht_cap_ie, &ie[2], DOT11F_IE_HTCAPS_MAX_LEN);
-		dot11f_unpack_ie_ht_caps((tpAniSirGlobal)hdd_ctx->hHal,
-					ht_cap_ie, ie[1], &dot11_ht_cap_ie,
-					false);
+		ret = dot11f_unpack_ie_ht_caps((tpAniSirGlobal)hdd_ctx->hHal,
+					       ht_cap_ie, ie[1],
+					       &dot11_ht_cap_ie, false);
+		if (DOT11F_FAILED(ret)) {
+			hdd_err("unpack failed, ret: 0x%x", ret);
+			return false;
+		}
 		return dot11_ht_cap_ie.supportedChannelWidthSet;
 	}
 
@@ -8492,11 +8508,7 @@ error:
 	if (sme_config)
 		qdf_mem_free(sme_config);
 	clear_bit(SOFTAP_INIT_DONE, &pHostapdAdapter->event_flags);
-	if (pHostapdAdapter->sessionCtx.ap.sapConfig.acs_cfg.ch_list) {
-		qdf_mem_free(pHostapdAdapter->sessionCtx.ap.sapConfig.
-			acs_cfg.ch_list);
-		pHostapdAdapter->sessionCtx.ap.sapConfig.acs_cfg.ch_list = NULL;
-	}
+	wlan_hdd_undo_acs(pHostapdAdapter);
 
 ret_status:
 	if (disable_fw_tdls_state)
@@ -8528,7 +8540,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	hdd_adapter_list_node_t *pNext = NULL;
 	tsap_Config_t *pConfig;
 
-	ENTER();
+	hdd_info("enter(%s)", netdev_name(dev));
 
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
 		hdd_err("Command not allowed in FTM mode");
@@ -8644,6 +8656,10 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 		hdd_hostapd_state_t *pHostapdState =
 			WLAN_HDD_GET_HOSTAP_STATE_PTR(pAdapter);
 
+		/* Set the stop_bss_in_progress flag */
+		wlansap_set_stop_bss_inprogress(
+			WLAN_HDD_GET_SAP_CTX_PTR(pAdapter), true);
+
 		qdf_event_reset(&pHostapdState->qdf_stop_bss_event);
 		status = wlansap_stop_bss(WLAN_HDD_GET_SAP_CTX_PTR(pAdapter));
 		if (QDF_IS_STATUS_SUCCESS(status)) {
@@ -8654,10 +8670,19 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 
 			if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 				hdd_err("qdf wait for single_event failed!!");
+
+				if (hdd_ipa_uc_is_enabled(pHddCtx))
+					hdd_ipa_clean_adapter_iface(pAdapter);
+
 				QDF_ASSERT(0);
 			}
 		}
 		clear_bit(SOFTAP_BSS_STARTED, &pAdapter->event_flags);
+
+		/* Clear the stop_bss_in_progress flag */
+		wlansap_set_stop_bss_inprogress(
+			WLAN_HDD_GET_SAP_CTX_PTR(pAdapter), false);
+
 		/*BSS stopped, clear the active sessions for this device mode*/
 		cds_decr_session_set_pcl(pAdapter->device_mode,
 						pAdapter->sessionId);
@@ -8857,7 +8882,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	bool sta_sap_scc_on_dfs_chan;
 	uint16_t sta_cnt;
 
-	ENTER();
+	hdd_info("enter(%s)", netdev_name(dev));
 
 	clear_bit(SOFTAP_INIT_DONE, &pAdapter->event_flags);
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {

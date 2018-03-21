@@ -240,6 +240,7 @@
 
 #define WMA_SET_MAX_TX_POWER_REQ       SIR_HAL_SET_MAX_TX_POWER_REQ
 #define WMA_SET_MAX_TX_POWER_RSP       SIR_HAL_SET_MAX_TX_POWER_RSP
+#define WMA_SET_DTIM_PERIOD            SIR_HAL_SET_DTIM_PERIOD
 
 #define WMA_SET_MAX_TX_POWER_PER_BAND_REQ \
 	SIR_HAL_SET_MAX_TX_POWER_PER_BAND_REQ
@@ -779,7 +780,8 @@ QDF_STATUS wma_register_roaming_callbacks(void *cds_ctx,
 			enum sir_roam_op_code reason),
 		QDF_STATUS (*pe_roam_synch_cb)(tpAniSirGlobal mac,
 			roam_offload_synch_ind *roam_synch_data,
-			tpSirBssDescription  bss_desc_ptr));
+			tpSirBssDescription  bss_desc_ptr,
+			enum sir_roam_op_code reason));
 #else
 static inline QDF_STATUS wma_register_roaming_callbacks(void *cds_ctx,
 		QDF_STATUS (*csr_roam_synch_cb)(tpAniSirGlobal mac,
@@ -788,7 +790,8 @@ static inline QDF_STATUS wma_register_roaming_callbacks(void *cds_ctx,
 			enum sir_roam_op_code reason),
 		QDF_STATUS (*pe_roam_synch_cb)(tpAniSirGlobal mac,
 			roam_offload_synch_ind *roam_synch_data,
-			tpSirBssDescription  bss_desc_ptr))
+			tpSirBssDescription  bss_desc_ptr,
+			enum sir_roam_op_code reason))
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }

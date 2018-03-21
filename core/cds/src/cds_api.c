@@ -2760,22 +2760,45 @@ QDF_STATUS cds_deregister_dp_cb(void)
 	return QDF_STATUS_SUCCESS;
 }
 
+uint32_t cds_get_connectivity_stats_pkt_bitmap(void *context)
+{
+	hdd_adapter_t *adapter = NULL;
+
+	if (!context)
+		return 0;
+
+	adapter = (hdd_adapter_t *)context;
+	if (unlikely(adapter->magic != WLAN_HDD_ADAPTER_MAGIC)) {
+		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_ERROR,
+			  "Magic cookie(%x) for adapter sanity verification is invalid",
+			  adapter->magic);
+		return QDF_STATUS_E_FAILURE;
+	}
+	return adapter->pkt_type_bitmap;
+}
+
 /**
  * cds_get_arp_stats_gw_ip() - get arp stats track IP
  *
  * Return: ARP stats IP to track
  */
-uint32_t cds_get_arp_stats_gw_ip(void)
+uint32_t cds_get_arp_stats_gw_ip(void *context)
 {
-	hdd_context_t *hdd_ctx;
+	hdd_adapter_t *adapter = NULL;
 
-	hdd_ctx = (hdd_context_t *) (gp_cds_context->pHDDContext);
-	if (!hdd_ctx) {
-		cds_err("Hdd Context is Null");
+	if (!context)
+		return 0;
+
+	adapter = (hdd_adapter_t *)context;
+
+	if (unlikely(adapter->magic != WLAN_HDD_ADAPTER_MAGIC)) {
+		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_ERROR,
+			  "Magic cookie(%x) for adapter sanity verification is invalid",
+			  adapter->magic);
 		return 0;
 	}
 
-	return hdd_ctx->track_arp_ip;
+	return adapter->track_arp_ip;
 }
 
 /**
@@ -2857,21 +2880,53 @@ cds_print_htc_credit_history(uint32_t count, qdf_abstract_print *print,
 #endif
 
 #ifdef ENABLE_SMMU_S1_TRANSLATION
-void cds_smmu_mem_map_setup(qdf_device_t osdev)
+QDF_STATUS cds_smmu_mem_map_setup(qdf_device_t osdev, bool ipa_present)
 {
 	int attr = 0;
+	bool ipa_smmu_enable = false;
 	struct dma_iommu_mapping *mapping = pld_smmu_get_mapping(osdev->dev);
 
 	osdev->smmu_s1_enabled = false;
-	if (!mapping) {
-		cds_info("No SMMU mapping present");
-		return;
+
+	if (ipa_present) {
+		ipa_smmu_enable = qdf_get_ipa_smmu_status();
+		if (ipa_smmu_enable)
+			cds_info("SMMU enabled from IPA side");
+		else
+			cds_info("SMMU not enabled from IPA side");
 	}
 
-	if ((iommu_domain_get_attr(mapping->domain,
-				   DOMAIN_ATTR_S1_BYPASS, &attr) == 0) &&
-				   !attr)
-		osdev->smmu_s1_enabled = true;
+	if (mapping && ((iommu_domain_get_attr(mapping->domain,
+			 DOMAIN_ATTR_S1_BYPASS, &attr) == 0) &&
+			 !attr)) {
+		cds_info("SMMU enabled from WLAN side");
+
+		if (ipa_present) {
+			if (ipa_smmu_enable) {
+				cds_info("SMMU enabled from both IPA and WLAN side");
+				osdev->smmu_s1_enabled = true;
+			} else {
+				cds_err("SMMU mismatch: IPA: disable, WLAN: enable");
+				return QDF_STATUS_E_FAILURE;
+			}
+		} else {
+			osdev->smmu_s1_enabled = true;
+		}
+
+	} else {
+		cds_info("No SMMU mapping present or SMMU disabled from WLAN side");
+
+		if (ipa_present) {
+			if (ipa_smmu_enable) {
+				cds_err("SMMU mismatch: IPA: enable, WLAN: disable");
+				return QDF_STATUS_E_FAILURE;
+			} else {
+				cds_info("SMMU diabled from both IPA and WLAN side");
+			}
+		}
+	}
+
+	return QDF_STATUS_SUCCESS;
 }
 
 #ifdef IPA_OFFLOAD
@@ -2887,9 +2942,10 @@ int cds_smmu_map_unmap(bool map, uint32_t num_buf, qdf_mem_info_t *buf_arr)
 #endif
 
 #else
-void cds_smmu_mem_map_setup(qdf_device_t osdev)
+QDF_STATUS cds_smmu_mem_map_setup(qdf_device_t osdev, bool ipa_present)
 {
 	osdev->smmu_s1_enabled = false;
+	return QDF_STATUS_SUCCESS;
 }
 
 int cds_smmu_map_unmap(bool map, uint32_t num_buf, qdf_mem_info_t *buf_arr)

@@ -185,6 +185,7 @@ typedef struct sPESession       /* Added to Support BT-AMP */
 	uint64_t lastBeaconTimeStamp;
 	/* RX Beacon count for the current BSS to which STA is connected. */
 	uint32_t currentBssBeaconCnt;
+	uint8_t bcon_dtim_period;
 
 	uint32_t bcnLen;
 	uint8_t *beacon;        /* Used to store last beacon / probe response before assoc. */
@@ -507,6 +508,10 @@ typedef struct sPESession       /* Added to Support BT-AMP */
 	bool ch_switch_in_progress;
 	/* previous auth frame's sequence number */
 	uint16_t prev_auth_seq_num;
+	bool fw_roaming_started;
+	bool recvd_deauth_while_roaming;
+	bool recvd_disassoc_while_roaming;
+	bool deauth_disassoc_rc;
 } tPESession, *tpPESession;
 
 /*-------------------------------------------------------------------------

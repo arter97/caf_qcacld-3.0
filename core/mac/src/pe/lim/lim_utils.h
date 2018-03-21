@@ -67,6 +67,9 @@ typedef enum {
 #define CENTER_FREQ_DIFF_160MHz 8
 #define CENTER_FREQ_DIFF_80P80MHz 16
 
+#define CH_TO_CNTR_FREQ_DIFF_160MHz 14
+#define CH_TO_CNTR_FREQ_DIFF_80MHz 6
+
 #define IS_VHT_NSS_1x1(__mcs_map)	((__mcs_map & 0xFFFC) == 0xFFFC)
 
 #define MGMT_RX_PACKETS_THRESHOLD 200
@@ -753,6 +756,8 @@ QDF_STATUS lim_p2p_action_cnf(tpAniSirGlobal mac_ctx,
 			uint32_t tx_complete_success);
 void lim_update_caps_info_for_bss(tpAniSirGlobal mac_ctx,
 			uint16_t *caps, uint16_t bss_caps);
+void lim_send_set_dtim_period(tpAniSirGlobal mac_ctx, uint8_t dtim_period,
+			      tpPESession session);
 
 tSirRetStatus lim_strip_ie(tpAniSirGlobal mac_ctx,
 		uint8_t *addn_ie, uint16_t *addn_ielen,
