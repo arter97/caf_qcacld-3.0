@@ -1645,6 +1645,20 @@ static inline void wlan_add_age_ie(uint8_t *mgmt_frame,
 }
 #endif /* WLAN_ENABLE_AGEIE_ON_SCAN_RESULTS */
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 9, 0))
+static inline void wlan_cfg80211_put_bss(struct wiphy *wiphy,
+		struct cfg80211_bss *bss)
+{
+	cfg80211_put_bss(wiphy, bss);
+}
+#else
+static inline void wlan_cfg80211_put_bss(struct wiphy *wiphy,
+		struct cfg80211_bss *bss)
+{
+	cfg80211_put_bss(bss);
+}
+#endif
+
 void wlan_cfg80211_inform_bss_frame(struct wlan_objmgr_pdev *pdev,
 		struct scan_cache_entry *scan_params)
 {
@@ -1654,7 +1668,7 @@ void wlan_cfg80211_inform_bss_frame(struct wlan_objmgr_pdev *pdev,
 	struct ieee80211_mgmt *mgmt = NULL;
 	struct ieee80211_channel *chan;
 	int rssi = 0;
-	struct cfg80211_bss *bss_status = NULL;
+	struct cfg80211_bss *bss = NULL;
 
 	if (!pdev_ospriv) {
 		cfg80211_err("os_priv is NULL");
@@ -1700,8 +1714,10 @@ void wlan_cfg80211_inform_bss_frame(struct wlan_objmgr_pdev *pdev,
 	cfg80211_info("BSSID: %pM Channel:%d RSSI:%d",
 		mgmt->bssid, chan->center_freq, (int)(rssi / 100));
 
-	bss_status =
+	bss =
 		cfg80211_inform_bss_frame(wiphy, chan, mgmt,
 		frame_len, rssi, GFP_KERNEL);
+	if (bss)
+		wlan_cfg80211_put_bss(wiphy, bss);
 	qdf_mem_free(mgmt);
 }
