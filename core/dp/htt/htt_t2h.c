@@ -152,6 +152,8 @@ static uint8_t *htt_t2h_mac_addr_deswizzle(uint8_t *tgt_mac_addr,
 #endif
 }
 
+#define MAX_TARGET_TX_CREDIT    204800
+
 /* Target to host Msg/event  handler  for low priority messages*/
 static void htt_t2h_lp_msg_handler(void *context, qdf_nbuf_t htt_t2h_msg,
 				   bool free_msg_buf)
@@ -363,6 +365,13 @@ static void htt_t2h_lp_msg_handler(void *context, qdf_nbuf_t htt_t2h_msg,
 	{
 		struct htt_mgmt_tx_compl_ind *compl_msg;
 		int32_t credit_delta = 1;
+		int msg_len = qdf_nbuf_len(htt_t2h_msg);
+		if (msg_len < (sizeof(struct htt_mgmt_tx_compl_ind) + sizeof(*msg_word))) {
+			QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_ERROR,
+				  "Invalid msg_word lenght in HTT_T2H_MSG_TYPE_MGMT_TX_COMPL_IND");
+			WARN_ON(1);
+			break;
+		}
 
 		compl_msg =
 			(struct htt_mgmt_tx_compl_ind *)(msg_word + 1);
@@ -418,12 +427,23 @@ static void htt_t2h_lp_msg_handler(void *context, qdf_nbuf_t htt_t2h_msg,
 	{
 		uint32_t htt_credit_delta_abs;
 		int32_t htt_credit_delta;
-		int sign;
+		int sign, old_credit;
 
 		htt_credit_delta_abs =
 			HTT_TX_CREDIT_DELTA_ABS_GET(*msg_word);
 		sign = HTT_TX_CREDIT_SIGN_BIT_GET(*msg_word) ? -1 : 1;
 		htt_credit_delta = sign * htt_credit_delta_abs;
+
+		old_credit = qdf_atomic_read(&pdev->htt_tx_credit.target_delta);
+		if (((old_credit + htt_credit_delta) > MAX_TARGET_TX_CREDIT) ||
+			((old_credit + htt_credit_delta) < -MAX_TARGET_TX_CREDIT)) {
+			qdf_print("%s: invalid credit update,old_credit=%d,"
+				"htt_credit_delta=%d\n",
+				__func__,
+				old_credit,
+				htt_credit_delta);
+			break;
+		}
 
 		if (pdev->cfg.is_high_latency &&
 		    !pdev->cfg.default_tx_comp_req) {
@@ -509,6 +529,14 @@ static void htt_t2h_lp_msg_handler(void *context, qdf_nbuf_t htt_t2h_msg,
 	case HTT_T2H_MSG_TYPE_FLOW_POOL_UNMAP:
 	{
 		struct htt_flow_pool_unmap_t *pool_numap_payload;
+		int msg_len = qdf_nbuf_len(htt_t2h_msg);
+
+		if (msg_len < sizeof(struct htt_flow_pool_unmap_t)) {
+			QDF_TRACE(QDF_MODULE_ID_HTT, QDF_TRACE_LEVEL_ERROR,
+				  "Invalid msg_word lenght in HTT_T2H_MSG_TYPE_FLOW_POOL_UNMAP");
+			WARN_ON(1);
+			break;
+		}
 
 		pool_numap_payload = (struct htt_flow_pool_unmap_t *)msg_word;
 		ol_tx_flow_pool_unmap_handler(pool_numap_payload->flow_id,
@@ -660,6 +688,7 @@ void htt_t2h_msg_handler(void *context, HTC_PACKET *pkt)
 		unsigned num_msdu_bytes;
 		uint16_t peer_id;
 		uint8_t tid;
+		int msg_len = qdf_nbuf_len(htt_t2h_msg);
 
 		if (qdf_unlikely(pdev->cfg.is_full_reorder_offload)) {
 			qdf_print("HTT_T2H_MSG_TYPE_RX_IND not supported ");
@@ -672,6 +701,10 @@ void htt_t2h_msg_handler(void *context, HTC_PACKET *pkt)
 		if (tid >= OL_TXRX_NUM_EXT_TIDS) {
 			qdf_print("HTT_T2H_MSG_TYPE_RX_IND, invalid tid %d\n",
 				tid);
+			break;
+		}
+		if (msg_len < (2 + HTT_RX_PPDU_DESC_SIZE32 + 1) * sizeof(uint32_t)) {
+			qdf_print("HTT_T2H_MSG_TYPE_RX_IND, invalid msg_len\n");
 			break;
 		}
 		num_msdu_bytes =
@@ -689,6 +722,12 @@ void htt_t2h_msg_handler(void *context, HTC_PACKET *pkt)
 		num_mpdu_ranges =
 			HTT_RX_IND_NUM_MPDU_RANGES_GET(*(msg_word + 1));
 		pdev->rx_ind_msdu_byte_idx = 0;
+		if (qdf_unlikely(pdev->rx_mpdu_range_offset_words + (num_mpdu_ranges * 4) > msg_len)) {
+			qdf_print("HTT_T2H_MSG_TYPE_RX_IND, invalid mpdu_ranges %d\n",
+				num_mpdu_ranges);
+			WARN_ON(1);
+			break;
+		}
 
 		ol_rx_indication_handler(pdev->txrx_pdev,
 					 htt_t2h_msg, peer_id,
@@ -701,6 +740,7 @@ void htt_t2h_msg_handler(void *context, HTC_PACKET *pkt)
 	}
 	case HTT_T2H_MSG_TYPE_TX_COMPL_IND:
 	{
+		int old_credit;
 		int num_msdus;
 		enum htt_tx_status status;
 		int msg_len = qdf_nbuf_len(htt_t2h_msg);
@@ -743,22 +783,33 @@ void htt_t2h_msg_handler(void *context, HTC_PACKET *pkt)
 		}
 
 		if (pdev->cfg.is_high_latency) {
-			if (!pdev->cfg.default_tx_comp_req) {
-				int credit_delta;
-
-				qdf_atomic_add(num_msdus,
-					       &pdev->htt_tx_credit.
-								target_delta);
-				credit_delta = htt_tx_credit_update(pdev);
-
-				if (credit_delta) {
-					ol_tx_target_credit_update(
-							pdev->txrx_pdev,
-							credit_delta);
-				}
+			old_credit = qdf_atomic_read(
+						&pdev->htt_tx_credit.target_delta);
+			if (((old_credit + num_msdus) > MAX_TARGET_TX_CREDIT) ||
+				((old_credit + num_msdus) < -MAX_TARGET_TX_CREDIT)) {
+				qdf_print("%s: invalid credit update,old_credit=%d,"
+					"num_msdus=%d\n",
+					__func__,
+					old_credit,
+					num_msdus);
 			} else {
-				ol_tx_target_credit_update(pdev->txrx_pdev,
-							   num_msdus);
+				if (!pdev->cfg.default_tx_comp_req) {
+					int credit_delta;
+
+					qdf_atomic_add(num_msdus,
+						       &pdev->htt_tx_credit.
+							target_delta);
+					credit_delta = htt_tx_credit_update(pdev);
+
+					if (credit_delta) {
+						ol_tx_target_credit_update(
+								pdev->txrx_pdev,
+								credit_delta);
+					}
+				} else {
+					ol_tx_target_credit_update(pdev->txrx_pdev,
+								   num_msdus);
+				}
 			}
 		}
 
