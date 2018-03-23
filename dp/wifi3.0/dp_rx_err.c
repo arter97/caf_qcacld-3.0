@@ -1085,6 +1085,33 @@ dp_rx_wbm_err_process(struct dp_soc *soc, void *hal_ring, uint32_t quota)
 
 		nbuf = rx_desc->nbuf;
 		qdf_nbuf_unmap_single(soc->osdev, nbuf,	QDF_DMA_BIDIRECTIONAL);
+		rx_tlv_hdr = qdf_nbuf_data(nbuf);
+
+		/*
+		 * Check if DMA completed -- msdu_done is the last bit
+		 * to be written
+		 */
+		if (qdf_unlikely(!hal_rx_attn_msdu_done_get(rx_tlv_hdr) ||
+			(hal_rx_msdu_start_msdu_len_get(rx_tlv_hdr)
+				< sizeof(struct ieee80211_frame_min)))) {
+
+			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+					FL("MSDU DONE failure"));
+			dp_pdev = soc->pdev_list[rx_desc->pool_id];
+			DP_STATS_INCC(dp_pdev, dropped.msdu_not_done, 1,
+				    !hal_rx_attn_msdu_done_get(rx_tlv_hdr));
+
+			DP_STATS_INCC(dp_pdev, dropped.msdu_len_0, 1,
+				    !hal_rx_msdu_start_msdu_len_get(rx_tlv_hdr));
+
+			hal_rx_dump_pkt_tlvs(qdf_nbuf_data(nbuf),
+					     QDF_TRACE_LEVEL_INFO);
+			dp_rx_add_to_free_desc_list(&head[rx_desc->pool_id],
+						    &tail[rx_desc->pool_id],
+						    rx_desc);
+			qdf_nbuf_free(nbuf);
+			continue;
+		}
 
 		/*
 		 * save the wbm desc info in nbuf TLV. We will need this
@@ -1097,7 +1124,7 @@ dp_rx_wbm_err_process(struct dp_soc *soc, void *hal_ring, uint32_t quota)
 
 		rx_bufs_reaped[rx_desc->pool_id]++;
 
-		DP_RX_LIST_APPEND(nbuf_head, nbuf_tail, rx_desc->nbuf);
+		DP_RX_LIST_APPEND(nbuf_head, nbuf_tail, nbuf);
 		dp_rx_add_to_free_desc_list(&head[rx_desc->pool_id],
 						&tail[rx_desc->pool_id],
 						rx_desc);

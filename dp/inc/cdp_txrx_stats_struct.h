@@ -732,6 +732,8 @@ struct cdp_pdev_stats {
 	struct {
 		/* packets dropped because nsdu_done bit not set */
 		uint32_t msdu_not_done;
+		/* pkt dropped because msdu length is zero */
+		uint32_t msdu_len_0;
 		/* Multicast Echo check */
 		uint32_t mec;
 		/* Mesh Filtered packets */

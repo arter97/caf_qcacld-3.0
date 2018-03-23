@@ -4756,6 +4756,8 @@ dp_print_pdev_rx_stats(struct dp_pdev *pdev)
 	DP_PRINT_STATS("Dropped:");
 	DP_PRINT_STATS("	msdu_not_done = %d",
 			pdev->stats.dropped.msdu_not_done);
+	DP_PRINT_STATS("	msdu_len_0 = %d",
+			pdev->stats.dropped.msdu_len_0);
 	DP_PRINT_STATS("        mon_rx_drop = %d",
 			pdev->stats.dropped.mon_rx_drop);
 	DP_PRINT_STATS("Sent To Stack:");
