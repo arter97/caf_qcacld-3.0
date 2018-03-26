@@ -4121,6 +4121,8 @@ static int dp_reset_monitor_mode(struct cdp_pdev *pdev_handle)
 
 	return 0;
 }
+
+
 /**
  * dp_vdev_set_monitor_mode() - Set DP VDEV to monitor mode
  * @vdev_handle: Datapath VDEV handle
@@ -4602,6 +4604,33 @@ static inline void dp_aggregate_pdev_stats(struct dp_pdev *pdev)
 		soc->cdp_soc.ol_ops->update_dp_stats(pdev->osif_pdev,
 				&pdev->stats, pdev->pdev_id, UPDATE_PDEV_STATS);
 
+}
+
+/**
+ * dp_pdev_getstats() - get pdev packet level stats
+ * @pdev_handle: Datapath PDEV handle
+ * @stats: Netdevice stats structure
+ *
+ * Return: void
+ */
+static void dp_pdev_getstats(struct cdp_pdev *pdev_handle,
+		struct cdp_dev_stats *stats)
+{
+	struct dp_pdev *pdev = (struct dp_pdev *)pdev_handle;
+
+	dp_aggregate_pdev_stats(pdev);
+
+	stats->tx_packets = pdev->stats.tx_i.rcvd.num;
+	stats->tx_bytes = pdev->stats.tx_i.rcvd.bytes;
+
+	stats->tx_errors = pdev->stats.tx.tx_failed +
+		pdev->stats.tx_i.dropped.dropped_pkt.num;
+	stats->tx_dropped = stats->tx_errors;
+
+	stats->rx_packets = pdev->stats.rx.unicast.num +
+		pdev->stats.rx.multicast.num;
+	stats->rx_bytes = pdev->stats.rx.unicast.bytes +
+		pdev->stats.rx.multicast.bytes;
 }
 
 /**
@@ -6427,6 +6456,7 @@ static struct cdp_cmn_ops dp_ops_cmn = {
 	.txrx_get_vdev_mac_addr = dp_get_vdev_mac_addr_wifi3,
 	.txrx_get_vdev_from_vdev_id = dp_get_vdev_from_vdev_id_wifi3,
 	.txrx_get_ctrl_pdev_from_vdev = dp_get_ctrl_pdev_from_vdev_wifi3,
+	.txrx_ath_getstats = dp_pdev_getstats,
 	.addba_requestprocess = dp_addba_requestprocess_wifi3,
 	.addba_responsesetup = dp_addba_responsesetup_wifi3,
 	.delba_process = dp_delba_process_wifi3,
