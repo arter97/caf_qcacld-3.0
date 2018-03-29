@@ -1445,8 +1445,10 @@ target_if_init_spectral_ops_gen2(void)
 static void
 target_if_init_spectral_ops_gen3(void)
 {
-	/* Placeholder */
-	spectral_debug("Placeholder for gen3 spectral ops registration");
+	struct target_if_spectral_ops *p_sops = &spectral_ops;
+
+	p_sops->process_spectral_report =
+			target_if_spectral_process_report_gen3;
 	return;
 }
 
@@ -1624,6 +1626,13 @@ null_spectral_process_phyerr(struct target_if_spectral *spectral,
 	return 0;
 }
 
+static int
+null_process_spectral_report(struct wlan_objmgr_pdev *pdev,
+			     void *payload)
+{
+	spectral_ops_not_registered("process_spectral_report");
+	return 0;
+}
 /**
  * target_if_spectral_init_dummy_function_table() -
  * Initialize target_if internal
@@ -1659,6 +1668,7 @@ target_if_spectral_init_dummy_function_table(struct target_if_spectral *ps)
 	p_sops->reset_hw = null_reset_hw;
 	p_sops->get_chain_noise_floor = null_get_chain_noise_floor;
 	p_sops->spectral_process_phyerr = null_spectral_process_phyerr;
+	p_sops->process_spectral_report = null_process_spectral_report;
 }
 
 /**
@@ -1695,6 +1705,7 @@ target_if_spectral_register_funcs(struct target_if_spectral *spectral,
 	p_sops->reset_hw = p->reset_hw;
 	p_sops->get_chain_noise_floor = p->get_chain_noise_floor;
 	p_sops->spectral_process_phyerr = p->spectral_process_phyerr;
+	p_sops->process_spectral_report = p->process_spectral_report;
 }
 
 /**
@@ -2800,6 +2811,19 @@ target_if_use_nl_bcast(struct wlan_objmgr_pdev *pdev)
 	return spectral->use_nl_bcast;
 }
 
+static int
+target_if_process_spectral_report(struct wlan_objmgr_pdev *pdev,
+				  void *payload)
+{
+	struct target_if_spectral *spectral = NULL;
+	struct target_if_spectral_ops *p_sops = NULL;
+
+	spectral = get_target_if_spectral_handle_from_pdev(pdev);
+	p_sops = GET_TARGET_IF_SPECTRAL_OPS(spectral);
+
+	return p_sops->process_spectral_report(pdev, payload);
+}
+
 void
 target_if_sptrl_register_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops)
 {
@@ -2833,6 +2857,8 @@ target_if_sptrl_register_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops)
 	    target_if_register_netlink_cb;
 	tx_ops->sptrl_tx_ops.sptrlto_use_nl_bcast =
 	    target_if_use_nl_bcast;
+	tx_ops->sptrl_tx_ops.sptrlto_process_spectral_report =
+		target_if_process_spectral_report;
 }
 EXPORT_SYMBOL(target_if_sptrl_register_tx_ops);
 
