@@ -1694,6 +1694,7 @@ struct hdd_context {
 	/* Interface change lock */
 	struct mutex iface_change_lock;
 	bool rps;
+	bool dynamic_rps;
 	bool enable_rxthread;
 	bool napi_enable;
 	bool stop_modules_in_progress;
