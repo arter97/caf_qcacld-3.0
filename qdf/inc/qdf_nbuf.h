@@ -543,7 +543,7 @@ qdf_nbuf_set_send_complete_flag(qdf_nbuf_t buf, bool flag)
 	__qdf_nbuf_set_send_complete_flag(buf, flag);
 }
 
-#ifdef MEMORY_DEBUG
+#ifdef NBUF_MEMORY_DEBUG
 /**
  * qdf_nbuf_map_check_for_leaks() - check for nbut map leaks
  *
@@ -631,7 +631,7 @@ void qdf_nbuf_unmap_nbytes_single_debug(qdf_device_t osdev,
 	qdf_nbuf_unmap_nbytes_single_debug(osdev, buf, dir, nbytes, \
 					   __FILE__, __LINE__)
 
-#else /* MEMORY_DEBUG */
+#else /* NBUF_MEMORY_DEBUG */
 
 static inline QDF_STATUS
 qdf_nbuf_map(qdf_device_t osdev, qdf_nbuf_t buf, qdf_dma_dir_t dir)
@@ -684,7 +684,7 @@ qdf_nbuf_unmap_nbytes_single(
 {
 	return __qdf_nbuf_unmap_nbytes_single(osdev, buf, dir, nbytes);
 }
-#endif /* MEMORY_DEBUG */
+#endif /* NBUF_MEMORY_DEBUG */
 
 static inline void
 qdf_nbuf_sync_for_cpu(qdf_device_t osdev, qdf_nbuf_t buf, qdf_dma_dir_t dir)
@@ -1038,7 +1038,7 @@ static inline qdf_nbuf_t qdf_nbuf_next(qdf_nbuf_t buf)
 	return __qdf_nbuf_next(buf);
 }
 
-#ifdef MEMORY_DEBUG
+#ifdef NBUF_MEMORY_DEBUG
 void qdf_net_buf_debug_init(void);
 void qdf_net_buf_debug_exit(void);
 void qdf_net_buf_debug_clean(void);
