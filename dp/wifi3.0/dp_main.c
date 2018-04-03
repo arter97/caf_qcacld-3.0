@@ -4110,7 +4110,8 @@ static int dp_reset_monitor_mode(struct cdp_pdev *pdev_handle)
 	pdev_id = pdev->pdev_id;
 	soc = pdev->soc;
 
-	pdev->monitor_vdev = NULL;
+	qdf_spin_lock_bh(&pdev->mon_lock);
+
 	qdf_mem_set(&(htt_tlv_filter), sizeof(htt_tlv_filter), 0x0);
 
 	htt_h2t_rx_ring_cfg(soc->htt_handle, pdev_id,
@@ -4120,6 +4121,10 @@ static int dp_reset_monitor_mode(struct cdp_pdev *pdev_handle)
 	htt_h2t_rx_ring_cfg(soc->htt_handle, pdev_id,
 		pdev->rxdma_mon_status_ring.hal_srng, RXDMA_MONITOR_STATUS,
 		RX_BUFFER_SIZE, &htt_tlv_filter);
+
+	pdev->monitor_vdev = NULL;
+
+	qdf_spin_unlock_bh(&pdev->mon_lock);
 
 	return 0;
 }

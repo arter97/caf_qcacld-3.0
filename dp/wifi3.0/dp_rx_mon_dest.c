@@ -746,6 +746,12 @@ void dp_rx_mon_dest_process(struct dp_soc *soc, uint32_t mac_id, uint32_t quota)
 
 	qdf_assert(hal_soc);
 
+	qdf_spin_lock_bh(&pdev->mon_lock);
+	if (pdev->monitor_vdev == NULL) {
+		qdf_spin_unlock(&pdev->mon_lock);
+		return;
+	}
+
 	if (qdf_unlikely(hal_srng_access_start(hal_soc, mon_dst_srng))) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 			"%s %d : HAL Monitor Destination Ring access Failed -- %pK\n",
@@ -755,6 +761,7 @@ void dp_rx_mon_dest_process(struct dp_soc *soc, uint32_t mac_id, uint32_t quota)
 
 	ppdu_id = pdev->ppdu_info.com_info.ppdu_id;
 	rx_bufs_used = 0;
+
 	while (qdf_likely(rxdma_dst_ring_desc =
 		hal_srng_dst_peek(hal_soc, mon_dst_srng))) {
 		qdf_nbuf_t head_msdu, tail_msdu;
@@ -782,6 +789,8 @@ void dp_rx_mon_dest_process(struct dp_soc *soc, uint32_t mac_id, uint32_t quota)
 	}
 
 	hal_srng_access_end(hal_soc, mon_dst_srng);
+
+	qdf_spin_unlock_bh(&pdev->mon_lock);
 
 	if (rx_bufs_used) {
 		dp_rx_buffers_replenish(soc, pdev_id,
@@ -1093,7 +1102,7 @@ dp_rx_pdev_mon_attach(struct dp_pdev *pdev) {
 			__func__);
 		return status;
 	}
-
+	qdf_spinlock_create(&pdev->mon_lock);
 	return QDF_STATUS_SUCCESS;
 }
 /**
@@ -1112,6 +1121,7 @@ dp_rx_pdev_mon_detach(struct dp_pdev *pdev) {
 	uint8_t pdev_id = pdev->pdev_id;
 	struct dp_soc *soc = pdev->soc;
 
+	qdf_spinlock_destroy(&pdev->mon_lock);
 	dp_mon_link_desc_pool_cleanup(soc, pdev_id);
 	dp_rx_pdev_mon_status_detach(pdev);
 	dp_rx_pdev_mon_buf_detach(pdev);
