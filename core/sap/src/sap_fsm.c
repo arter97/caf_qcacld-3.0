@@ -4919,6 +4919,14 @@ static QDF_STATUS sap_get_channel_list(ptSapContext sap_ctx,
 		      CDS_CHANNEL_STATE(loop_count)))))
 			continue;
 
+		/* Dont scan DFS channels in case of MCC disallowed
+		 * As it can result in SAP starting on DFS channel
+		 * resulting  MCC on DFS channel
+		 */
+		if (CDS_IS_DFS_CH(CDS_CHANNEL_NUM(loop_count)) &&
+				  cds_disallow_mcc(CDS_CHANNEL_NUM(loop_count)))
+			continue;
+
 #ifdef FEATURE_WLAN_CH_AVOID
 		for (i = 0; i < NUM_CHANNELS; i++) {
 			if (safe_channels[i].channelNumber ==
