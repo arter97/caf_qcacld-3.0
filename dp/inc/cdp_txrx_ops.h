@@ -111,6 +111,9 @@ struct cdp_cmn_ops {
 	int (*txrx_set_monitor_mode)(struct cdp_vdev *vdev,
 			uint8_t smart_monitor);
 
+	void (*txrx_ath_getstats)(struct cdp_pdev *pdev,
+			struct cdp_dev_stats *stats);
+
 	void (*txrx_set_curchan)(struct cdp_pdev *pdev, uint32_t chan_mhz);
 
 	void (*txrx_set_privacy_filters)

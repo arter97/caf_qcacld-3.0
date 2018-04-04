@@ -1270,6 +1270,21 @@ cdp_pdev_get_dp_txrx_handle(ol_txrx_soc_handle soc, void *pdev)
 }
 
 /**
+ * cdp_ath_getstats() - get network device level stats
+ * @soc: opaque soc handle
+ * @pdev: data path pdev handle
+ * @cdp device stats: radio level interface stats
+ *
+ * Return: void
+ */
+static inline void cdp_ath_getstats(ol_txrx_soc_handle soc,
+		struct cdp_pdev *pdev, struct cdp_dev_stats *stats)
+{
+	 if (soc && soc->ops && soc->ops->cmn_drv_ops->txrx_ath_getstats)
+		   soc->ops->cmn_drv_ops->txrx_ath_getstats(pdev, stats);
+}
+
+/**
  * cdp_pdev_set_dp_txrx_handle() - set advanced dp handle in pdev
  * @soc: opaque soc handle
  * @pdev: data path pdev handle
