@@ -496,6 +496,9 @@ struct cdp_ctrl_ops {
 	void (*txrx_set_pdev_param)(struct cdp_pdev *pdev,
 			enum cdp_pdev_param_type type, uint8_t val);
 	void * (*txrx_get_pldev)(struct cdp_pdev *pdev);
+
+	void (*set_key)(struct cdp_peer *peer_handle,
+			bool is_unicast, uint32_t *key);
 };
 
 struct cdp_me_ops {
@@ -718,6 +721,8 @@ struct ol_if_ops {
 
 	void (*rx_mic_error)(void *ol_soc_handle,
 			 uint16_t vdev_id, void *wh);
+	bool (*rx_frag_tkip_demic)(void *ol_peer, qdf_nbuf_t nbuf,
+				uint16_t hdr_space);
 	uint8_t (*freq_to_channel)(void *ol_soc_handle,  uint16_t vdev_id);
 
 	void (*record_act_change)(struct wlan_objmgr_pdev *pdev,

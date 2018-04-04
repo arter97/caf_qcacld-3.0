@@ -7034,6 +7034,7 @@ static struct cdp_ctrl_ops dp_ops_ctrl = {
 	.txrx_get_pldev = dp_get_pldev,
 #endif
 	.txrx_set_pdev_param = dp_set_pdev_param,
+	.set_key = dp_set_michael_key,
 };
 
 static struct cdp_me_ops dp_ops_me = {
