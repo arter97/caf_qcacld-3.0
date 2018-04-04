@@ -317,12 +317,6 @@ dp_get_vdev_from_peer(struct dp_soc *soc,
 	}
 	return vdev;
 }
-/*
- * In case of LFR, this is an empty inline function
- */
-static inline void dp_rx_peer_validity_check(struct dp_peer *peer)
-{
-}
 #else
 static inline struct dp_vdev *
 dp_get_vdev_from_peer(struct dp_soc *soc,
@@ -339,14 +333,6 @@ dp_get_vdev_from_peer(struct dp_soc *soc,
 	} else {
 		return peer->vdev;
 	}
-}
-
-/*
- * Assert if PEER is NULL
- */
-static inline void dp_rx_peer_validity_check(struct dp_peer *peer)
-{
-	qdf_assert_always(peer);
 }
 #endif
 
@@ -1303,6 +1289,7 @@ done:
 		if (qdf_unlikely(vdev == NULL)) {
 			qdf_nbuf_free(nbuf);
 			nbuf = next;
+			DP_STATS_INC(soc, rx.err.invalid_vdev, 1);
 			continue;
 		}
 

@@ -23,9 +23,30 @@
 #include "dp_types.h"
 
 #define DP_INVALID_PEER_ID 0xffff
+/**
+ * __dp_peer_find_by_id() - Returns peer object given the peer id
+ *
+ * @soc		: core DP soc context
+ * @peer_id	: peer id from peer object can be retrieved
+ *
+ * Return: struct dp_peer*: Pointer to DP peer object
+ */
+static inline struct dp_peer *
+__dp_peer_find_by_id(struct dp_soc *soc,
+		   uint16_t peer_id)
+{
+	struct dp_peer *peer;
+
+	/* TODO: Hold lock */
+	peer = (peer_id >= soc->max_peers) ? NULL :
+				soc->peer_id_to_obj_map[peer_id];
+
+	return peer;
+}
 
 /**
  * dp_peer_find_by_id() - Returns peer object given the peer id
+ *                        if delete_in_progress in not set for peer
  *
  * @soc		: core DP soc context
  * @peer_id	: peer id from peer object can be retrieved
@@ -38,17 +59,9 @@ dp_peer_find_by_id(struct dp_soc *soc,
 {
 	struct dp_peer *peer;
 
-	/* TODO: Hold lock */
-	peer = (peer_id >= soc->max_peers) ? NULL :
-				soc->peer_id_to_obj_map[peer_id];
+	peer = __dp_peer_find_by_id (soc, peer_id);
 
-
-	/**
-	 * For bss peer, peer is not really deleted
-	 * but reference count is decremented in firmware
-	 * and hence ignore delete in progress for bss peer
-	 */
-	if (peer && !peer->bss_peer && peer->delete_in_progress) {
+	if (peer && peer->delete_in_progress) {
 		return NULL;
 	}
 
