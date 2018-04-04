@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -1250,6 +1250,10 @@ static const struct nl80211_vendor_cmd_info wlan_hdd_cfg80211_vendor_events[] = 
 		.vendor_id = QCA_NL80211_VENDOR_ID,
 		.subcmd = QCA_NL80211_VENDOR_SUBCMD_HANG,
 	},
+	[QCA_NL80211_VENDOR_SUBCMD_LINK_PROPERTIES_INDEX] = {
+	.vendor_id = QCA_NL80211_VENDOR_ID,
+	.subcmd = QCA_NL80211_VENDOR_SUBCMD_LINK_PROPERTIES,
+	},
 };
 
 /**
@@ -1615,9 +1619,6 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 		goto out;
 	}
 
-	sap_config = &adapter->sessionCtx.ap.sapConfig;
-	qdf_mem_zero(&sap_config->acs_cfg, sizeof(struct sap_acs_cfg));
-
 	status = hdd_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_ACS_MAX, data, data_len,
 			       wlan_hdd_cfg80211_do_acs_policy);
 	if (status) {
@@ -1631,6 +1632,14 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 		qdf_atomic_set(&hdd_ctx->is_acs_allowed, 0);
 		goto out;
 	}
+
+	sap_config = &adapter->sessionCtx.ap.sapConfig;
+
+	/* Check and free if memory is already allocated for acs channel list */
+	wlan_hdd_undo_acs(adapter);
+
+	qdf_mem_zero(&sap_config->acs_cfg, sizeof(struct sap_acs_cfg));
+
 	sap_config->acs_cfg.hw_mode = nla_get_u8(
 					tb[QCA_WLAN_VENDOR_ATTR_ACS_HW_MODE]);
 
@@ -1691,7 +1700,6 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	 * is present
 	 */
 
-	wlan_hdd_undo_acs(adapter);
 	if (tb[QCA_WLAN_VENDOR_ATTR_ACS_CH_LIST]) {
 		char *tmp = nla_data(tb[QCA_WLAN_VENDOR_ATTR_ACS_CH_LIST]);
 
@@ -4785,8 +4793,8 @@ static int __wlan_hdd_cfg80211_keymgmt_set_key(struct wiphy *wiphy,
 		return -EPERM;
 	}
 
-	if ((data == NULL) || (data_len == 0) ||
-			(data_len > SIR_ROAM_SCAN_PSK_SIZE)) {
+	if ((data == NULL) || (data_len <= 0) ||
+	    (data_len > SIR_ROAM_SCAN_PSK_SIZE)) {
 		hdd_err("Invalid data");
 		return -EINVAL;
 	}
@@ -11224,6 +11232,11 @@ static int __wlan_hdd_cfg80211_set_nud_stats(struct wiphy *wiphy,
 
 	ENTER();
 
+	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
+		hdd_err("Command not allowed in FTM mode");
+		return -EINVAL;
+	}
+
 	err = wlan_hdd_validate_context(hdd_ctx);
 	if (0 != err)
 		return err;
@@ -11238,6 +11251,12 @@ static int __wlan_hdd_cfg80211_set_nud_stats(struct wiphy *wiphy,
 
 	if (adapter->sessionId == HDD_SESSION_ID_INVALID) {
 		hdd_err("Invalid session id");
+		return -EINVAL;
+	}
+
+	if (adapter->device_mode != QDF_STA_MODE) {
+		QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_ERROR,
+			  "%s STATS supported in only STA mode !!", __func__);
 		return -EINVAL;
 	}
 
@@ -11812,6 +11831,11 @@ static int __wlan_hdd_cfg80211_get_nud_stats(struct wiphy *wiphy,
 
 	ENTER();
 
+	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
+		hdd_err("Command not allowed in FTM mode");
+		return -EINVAL;
+	}
+
 	err = wlan_hdd_validate_context(hdd_ctx);
 	if (0 != err)
 		return err;
@@ -11819,6 +11843,12 @@ static int __wlan_hdd_cfg80211_get_nud_stats(struct wiphy *wiphy,
 	err = hdd_validate_adapter(adapter);
 	if (err)
 		return err;
+
+	if (adapter->device_mode != QDF_STA_MODE) {
+		QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_ERROR,
+			  "%s STATS supported in only STA mode !!", __func__);
+		return -EINVAL;
+	}
 
 	arp_stats_params.pkt_type = WLAN_NUD_STATS_ARP_PKT_TYPE;
 	arp_stats_params.vdev_id = adapter->sessionId;
@@ -14607,6 +14637,58 @@ static bool wlan_hdd_is_duplicate_channel(uint8_t *arr,
 }
 #endif
 
+QDF_STATUS wlan_hdd_send_sta_authorized_event(
+					hdd_adapter_t *pAdapter,
+					hdd_context_t *pHddCtx,
+					const struct qdf_mac_addr *mac_addr)
+{
+	struct sk_buff *vendor_event;
+	uint32_t sta_flags = 0;
+	QDF_STATUS status;
+
+	ENTER();
+
+	if (!pHddCtx) {
+		hdd_err("HDD context is null");
+		return -EINVAL;
+	}
+
+	vendor_event =
+		cfg80211_vendor_event_alloc(
+			pHddCtx->wiphy, &pAdapter->wdev, sizeof(sta_flags) +
+			QDF_MAC_ADDR_SIZE + NLMSG_HDRLEN,
+			QCA_NL80211_VENDOR_SUBCMD_LINK_PROPERTIES_INDEX,
+			GFP_KERNEL);
+	if (!vendor_event) {
+		hdd_err("cfg80211_vendor_event_alloc failed");
+		return -EINVAL;
+	}
+
+	sta_flags |= BIT(NL80211_STA_FLAG_AUTHORIZED);
+
+	status = nla_put_u32(vendor_event,
+			     QCA_WLAN_VENDOR_ATTR_LINK_PROPERTIES_STA_FLAGS,
+			     sta_flags);
+	if (status) {
+		hdd_err("STA flag put fails");
+		kfree_skb(vendor_event);
+		return QDF_STATUS_E_FAILURE;
+	}
+	status = nla_put(vendor_event,
+			 QCA_WLAN_VENDOR_ATTR_LINK_PROPERTIES_STA_MAC,
+			 QDF_MAC_ADDR_SIZE, mac_addr->bytes);
+	if (status) {
+		hdd_err("STA MAC put fails");
+		kfree_skb(vendor_event);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	cfg80211_vendor_event(vendor_event, GFP_KERNEL);
+
+	EXIT();
+	return 0;
+}
+
 /**
  * __wlan_hdd_change_station() - change station
  * @wiphy: Pointer to the wiphy structure
@@ -14676,6 +14758,13 @@ static int __wlan_hdd_change_station(struct wiphy *wiphy,
 
 			if (status != QDF_STATUS_SUCCESS) {
 				hdd_debug("Not able to change TL state to AUTHENTICATED");
+				return -EINVAL;
+			}
+			status = wlan_hdd_send_sta_authorized_event(
+								pAdapter,
+								pHddCtx,
+								&STAMacAddress);
+			if (status != QDF_STATUS_SUCCESS) {
 				return -EINVAL;
 			}
 		}
@@ -18469,6 +18558,11 @@ static int wlan_hdd_cfg80211_set_privacy_ibss(hdd_adapter_t *pAdapter,
 			if (NULL != ie) {
 				pWextState->wpaVersion =
 					IW_AUTH_WPA_VERSION_WPA;
+				if (ie[1] < DOT11F_IE_WPA_MIN_LEN ||
+				    ie[1] > DOT11F_IE_WPA_MAX_LEN) {
+					hdd_err("invalid ie len:%d", ie[1]);
+					return -EINVAL;
+				}
 				/*
 				 * Unpack the WPA IE. Skip past the EID byte and
 				 * length byte - and four byte WiFi OUI

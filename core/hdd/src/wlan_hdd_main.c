@@ -2467,6 +2467,13 @@ static int __hdd_stop(struct net_device *dev)
 	clear_bit(DEVICE_IFACE_OPENED, &adapter->event_flags);
 
 	/*
+	 * Upon wifi turn off, DUT has to flush the scan results so if
+	 * this is the last cli iface, flush the scan database.
+	 */
+	if (!hdd_is_cli_iface_up(hdd_ctx))
+		sme_scan_flush_result(hdd_ctx->hHal);
+
+	/*
 	 * Find if any iface is up. If any iface is up then can't put device to
 	 * sleep/power save mode
 	 */
@@ -6685,7 +6692,8 @@ static void hdd_pld_request_bus_bandwidth(hdd_context_t *hdd_ctx,
 	else
 		next_tx_level = WLAN_SVC_TP_LOW;
 
-	if (hdd_ctx->cur_tx_level != next_tx_level) {
+	if ((hdd_ctx->config->enable_tcp_limit_output) &&
+	    (hdd_ctx->cur_tx_level != next_tx_level)) {
 		hdd_debug("change TCP TX trigger level %d, average_tx: %llu",
 				next_tx_level, temp_tx);
 		hdd_ctx->cur_tx_level = next_tx_level;
@@ -10433,7 +10441,6 @@ int hdd_wlan_startup(struct device *dev)
 		hdd_ctx->config->iface_change_wait_time,
 		WIFI_POWER_EVENT_WAKELOCK_IFACE_CHANGE_TIMER);
 
-	hdd_start_complete(0);
 	goto success;
 
 err_close_adapters:
@@ -11603,6 +11610,10 @@ static ssize_t wlan_hdd_state_ctrl_param_write(struct file *filp,
 		goto exit;
 	}
 
+	if (strncmp(buf, wlan_on_str, strlen(wlan_on_str)) == 0) {
+		pr_info("Wifi Turning On from UI\n");
+	}
+
 	if (strncmp(buf, wlan_on_str, strlen(wlan_on_str)) != 0) {
 		pr_err("Invalid value received from framework");
 		goto exit;
@@ -11615,7 +11626,6 @@ static ssize_t wlan_hdd_state_ctrl_param_write(struct file *filp,
 		if (!rc) {
 			hdd_alert("Timed-out waiting in wlan_hdd_state_ctrl_param_write");
 			ret = -EINVAL;
-			hdd_start_complete(ret);
 			return ret;
 		}
 
@@ -11730,12 +11740,6 @@ static int __hdd_module_init(void)
 	       g_wlan_driver_version,
 	       TIMER_MANAGER_STR MEMORY_DEBUG_STR PANIC_ON_BUG_STR);
 
-	ret = wlan_hdd_state_ctrl_param_create();
-	if (ret) {
-		pr_err("wlan_hdd_state_create:%x\n", ret);
-		goto err_dev_state;
-	}
-
 	pld_init();
 
 	ret = hdd_init();
@@ -11761,6 +11765,12 @@ static int __hdd_module_init(void)
 		goto out;
 	}
 
+	ret = wlan_hdd_state_ctrl_param_create();
+	if (ret) {
+		pr_err("wlan_hdd_state_create:%x\n", ret);
+		goto out;
+	}
+
 	pr_info("%s: driver loaded\n", WLAN_MODULE_NAME);
 
 	return 0;
@@ -11769,8 +11779,6 @@ out:
 	hdd_deinit();
 err_hdd_init:
 	pld_deinit();
-	wlan_hdd_state_ctrl_param_destroy();
-err_dev_state:
 	return ret;
 }
 
@@ -12721,6 +12729,28 @@ void hdd_drv_ops_inactivity_handler(void)
 		cds_trigger_recovery(false);
 	else
 		QDF_BUG(0);
+}
+
+bool hdd_is_cli_iface_up(hdd_context_t *hdd_ctx)
+{
+	hdd_adapter_list_node_t *adapter_node = NULL, *next = NULL;
+	hdd_adapter_t *adapter;
+	QDF_STATUS status;
+
+	status = hdd_get_front_adapter(hdd_ctx, &adapter_node);
+	while (NULL != adapter_node && QDF_STATUS_SUCCESS == status) {
+		adapter = adapter_node->pAdapter;
+		if ((adapter->device_mode == QDF_STA_MODE ||
+		     adapter->device_mode == QDF_P2P_CLIENT_MODE) &&
+		    qdf_atomic_test_bit(DEVICE_IFACE_OPENED,
+					&adapter->event_flags)){
+			return true;
+		}
+		status = hdd_get_next_adapter(hdd_ctx, adapter_node, &next);
+		adapter_node = next;
+	}
+
+	return false;
 }
 
 /* Register the module init/exit functions */

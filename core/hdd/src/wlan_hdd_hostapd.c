@@ -405,6 +405,10 @@ static int __hdd_hostapd_stop(struct net_device *dev)
 	hdd_stop_adapter(hdd_ctx, adapter, true);
 
 	clear_bit(DEVICE_IFACE_OPENED, &adapter->event_flags);
+
+	if (!hdd_is_cli_iface_up(hdd_ctx))
+		sme_scan_flush_result(hdd_ctx->hHal);
+
 	/* Stop all tx queues */
 	hdd_info("Disabling queues");
 	wlan_hdd_netif_queue_control(adapter,
@@ -1673,7 +1677,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 					HDD_IPA_AP_CONNECT,
 					pHostapdAdapter->dev->dev_addr);
 			if (status) {
-				hdd_err("WLAN_AP_CONNECT event failed!!");
+				hdd_err("WLAN_AP_CONNECT event failed");
 				/*
 				 * Make sure to set the event before proceeding
 				 * for error handling otherwise caller thread
@@ -1681,7 +1685,6 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 				 * connection will go through before that.
 				 */
 				qdf_event_set(&pHostapdState->qdf_event);
-				goto stopbss;
 			}
 		}
 
@@ -1815,16 +1818,6 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 
 		/* Invalidate the channel info. */
 		pHddApCtx->operatingChannel = 0;
-		if (hdd_ipa_is_enabled(pHddCtx)) {
-			status = hdd_ipa_wlan_evt(pHostapdAdapter,
-					pHddApCtx->uBCStaId,
-					HDD_IPA_AP_DISCONNECT,
-					pHostapdAdapter->dev->dev_addr);
-			if (status) {
-				hdd_err("WLAN_AP_DISCONNECT event failed!!");
-				goto stopbss;
-			}
-		}
 
 		/* reset the dfs_cac_status and dfs_cac_block_tx flag only when
 		 * the last BSS is stopped
@@ -2063,10 +2056,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 			status = hdd_ipa_wlan_evt(pHostapdAdapter,
 					event->staId, HDD_IPA_CLIENT_CONNECT_EX,
 					event->staMac.bytes);
-			if (status) {
+			if (status)
 				hdd_err("WLAN_CLIENT_CONNECT_EX event failed");
-				goto stopbss;
-			}
 		}
 
 		DPTRACE(qdf_dp_trace_mgmt_pkt(QDF_DP_TRACE_MGMT_PACKET_RECORD,
@@ -8578,6 +8569,18 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	ret = wlan_hdd_validate_context(pHddCtx);
 	if (0 != ret)
 		return ret;
+
+	/*
+	 * If a STA connection is in progress in another adapter, disconnect
+	 * the STA and complete the SAP operation. STA will reconnect
+	 * after SAP stop is done.
+	 */
+	staAdapter = hdd_get_sta_connection_in_progress(pHddCtx);
+	if (staAdapter) {
+		hdd_debug("Disconnecting STA with session id: %d",
+			  staAdapter->sessionId);
+		wlan_hdd_disconnect(staAdapter, eCSR_DISCONNECT_REASON_DEAUTH);
+	}
 
 	if (pAdapter->device_mode == QDF_SAP_MODE) {
 		wlan_hdd_del_station(pAdapter);

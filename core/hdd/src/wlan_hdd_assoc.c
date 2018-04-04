@@ -320,7 +320,8 @@ hdd_adapter_t *hdd_get_sta_connection_in_progress(hdd_context_t *hdd_ctx)
 				return adapter;
 			} else if ((eConnectionState_Associated ==
 				   hdd_sta_ctx->conn_info.connState) &&
-				   !hdd_sta_ctx->conn_info.uIsAuthenticated) {
+				   sme_is_sta_key_exchange_in_progress(
+				   hdd_ctx->hHal, adapter->sessionId)) {
 				hdd_debug("session_id %d: Key exchange is in progress",
 					  adapter->sessionId);
 				return adapter;
@@ -4890,6 +4891,7 @@ hdd_sme_roam_callback(void *pContext, tCsrRoamInfo *pRoamInfo, uint32_t roamId,
 	hdd_station_ctx_t *pHddStaCtx = NULL;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct cfg80211_bss *bss_status;
+	hdd_context_t *pHddCtx;
 
 	hdd_debug("CSR Callback: status= %d result= %d roamID=%d",
 		 roamStatus, roamResult, roamId);
@@ -4902,6 +4904,7 @@ hdd_sme_roam_callback(void *pContext, tCsrRoamInfo *pRoamInfo, uint32_t roamId,
 
 	pWextState = WLAN_HDD_GET_WEXT_STATE_PTR(pAdapter);
 	pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
+	pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
 
 	/* Omitting eCSR_ROAM_UPDATE_SCAN_RESULT as this is too frequent */
 	if (eCSR_ROAM_UPDATE_SCAN_RESULT != roamStatus)
@@ -5239,6 +5242,7 @@ hdd_sme_roam_callback(void *pContext, tCsrRoamInfo *pRoamInfo, uint32_t roamId,
 		pAdapter->roam_ho_fail = false;
 		pHddStaCtx->ft_carrier_on = false;
 		complete(&pAdapter->roaming_comp_var);
+		schedule_delayed_work(&pHddCtx->roc_req_work, 0);
 		break;
 
 	default:

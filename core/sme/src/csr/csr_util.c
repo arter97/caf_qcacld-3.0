@@ -2379,10 +2379,6 @@ bool csr_is_profile11r(tCsrRoamProfile *pProfile)
 				   pProfile->MDID.mdiePresent);
 }
 
-
-#ifdef FEATURE_WLAN_ESE
-
-/* Function to return true if the authtype is ESE */
 bool csr_is_auth_type_ese(eCsrAuthType AuthType)
 {
 	switch (AuthType) {
@@ -2394,6 +2390,8 @@ bool csr_is_auth_type_ese(eCsrAuthType AuthType)
 	}
 	return false;
 }
+
+#ifdef FEATURE_WLAN_ESE
 
 /* Function to return true if the profile is ESE */
 bool csr_is_profile_ese(tCsrRoamProfile *pProfile)
