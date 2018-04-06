@@ -308,10 +308,12 @@ dp_rx_mon_mpdu_pop(struct dp_soc *soc, uint32_t mac_id,
 				msdu_list.msdu_info[i].msdu_len,
 				qdf_nbuf_data(msdu));
 
-			if (*head_msdu == NULL)
+			if (head_msdu && *head_msdu == NULL) {
 				*head_msdu = msdu;
-			else
-				qdf_nbuf_set_next(last, msdu);
+			} else {
+				if (last)
+					qdf_nbuf_set_next(last, msdu);
+			}
 
 			last = msdu;
 			dp_rx_add_to_free_desc_list(head,
@@ -330,7 +332,8 @@ dp_rx_mon_mpdu_pop(struct dp_soc *soc, uint32_t mac_id,
 
 	} while (buf_info.paddr && msdu_cnt);
 
-	qdf_nbuf_set_next(last, NULL);
+	if (last)
+		qdf_nbuf_set_next(last, NULL);
 
 	*tail_msdu = msdu;
 
@@ -369,10 +372,14 @@ qdf_nbuf_t dp_rx_mon_restitch_mpdu_from_msdus(struct dp_soc *soc,
 	struct ieee80211_qoscntl *qos;
 	struct dp_pdev *dp_pdev = soc->pdev_list[mac_id];
 	head_frag_list = NULL;
+	mpdu_buf = NULL;
 
 	/* The nbuf has been pulled just beyond the status and points to the
 	   * payload
 	*/
+	if (!head_msdu)
+		goto mpdu_stitch_fail;
+
 	msdu_orig = head_msdu;
 
 	rx_desc = qdf_nbuf_data(msdu_orig);
@@ -410,9 +417,6 @@ qdf_nbuf_t dp_rx_mon_restitch_mpdu_from_msdus(struct dp_soc *soc,
 		dp_rx_msdus_set_payload(head_msdu);
 
 		mpdu_buf = head_msdu;
-
-		if (!mpdu_buf)
-			goto mpdu_stitch_fail;
 
 		prev_buf = mpdu_buf;
 
