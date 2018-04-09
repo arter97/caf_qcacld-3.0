@@ -222,7 +222,7 @@ cdp_pdev_detach(ol_txrx_soc_handle soc, struct cdp_pdev *pdev, int force)
 
 static inline void *cdp_peer_create
 	(ol_txrx_soc_handle soc, struct cdp_vdev *vdev,
-	uint8_t *peer_mac_addr)
+	uint8_t *peer_mac_addr, void *ol_peer)
 {
 	if (!soc || !soc->ops) {
 		QDF_TRACE(QDF_MODULE_ID_CDP, QDF_TRACE_LEVEL_DEBUG,
@@ -236,7 +236,7 @@ static inline void *cdp_peer_create
 		return NULL;
 
 	return soc->ops->cmn_drv_ops->txrx_peer_create(vdev,
-			peer_mac_addr);
+			peer_mac_addr, ol_peer);
 }
 
 static inline void cdp_peer_setup
@@ -975,6 +975,25 @@ static inline int cdp_delba_process(ol_txrx_soc_handle soc,
 
 	return soc->ops->cmn_drv_ops->delba_process(peer_handle,
 			tid, reasoncode);
+}
+
+static inline int cdp_delba_tx_completion(ol_txrx_soc_handle soc,
+					void *peer_handle,
+					uint8_t tid, int status)
+{
+	if (!soc || !soc->ops) {
+		QDF_TRACE(QDF_MODULE_ID_CDP, QDF_TRACE_LEVEL_DEBUG,
+			"%s: Invalid Instance:", __func__);
+		QDF_BUG(0);
+		return 0;
+	}
+
+	if (!soc->ops->cmn_drv_ops ||
+	    !soc->ops->cmn_drv_ops->delba_tx_completion)
+		return 0;
+
+	return soc->ops->cmn_drv_ops->delba_tx_completion(peer_handle,
+			tid, status);
 }
 
 static inline void cdp_set_addbaresponse(ol_txrx_soc_handle soc,
