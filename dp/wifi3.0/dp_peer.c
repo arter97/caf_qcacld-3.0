@@ -547,6 +547,10 @@ int dp_peer_update_ast(struct dp_soc *soc, struct dp_peer *peer,
 	int ret = -1;
 	struct dp_peer *old_peer;
 
+	if (ast_entry->type == CDP_TXRX_AST_TYPE_STATIC) {
+			return 0;
+	}
+
 	qdf_spin_lock_bh(&soc->ast_lock);
 
 	old_peer = ast_entry->peer;
@@ -559,19 +563,13 @@ int dp_peer_update_ast(struct dp_soc *soc, struct dp_peer *peer,
 	ast_entry->is_active = TRUE;
 	TAILQ_INSERT_TAIL(&peer->ast_entry_list, ast_entry, ase_list_elem);
 
-	if (ast_entry->type != CDP_TXRX_AST_TYPE_STATIC) {
-		if (QDF_STATUS_SUCCESS ==
-				soc->cdp_soc.ol_ops->peer_update_wds_entry(
+	qdf_spin_unlock_bh(&soc->ast_lock);
+
+	ret = soc->cdp_soc.ol_ops->peer_update_wds_entry(
 				peer->vdev->osif_vdev,
 				ast_entry->mac_addr.raw,
 				peer->mac_addr.raw,
-				flags)) {
-			qdf_spin_unlock_bh(&soc->ast_lock);
-			return 0;
-		}
-	}
-
-	qdf_spin_unlock_bh(&soc->ast_lock);
+				flags);
 
 	return ret;
 }
