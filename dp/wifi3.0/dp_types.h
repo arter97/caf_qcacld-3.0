@@ -788,7 +788,7 @@ struct dp_soc {
 	DP_MUTEX_TYPE peer_ref_mutex;
 
 	/* maximum value for peer_id */
-	int max_peers;
+	uint32_t max_peers;
 
 	/* SoC level data path statistics */
 	struct dp_soc_stats stats;
