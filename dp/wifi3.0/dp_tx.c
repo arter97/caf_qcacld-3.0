@@ -2584,7 +2584,11 @@ static void dp_tx_update_peer_stats(struct dp_peer *peer,
 	DP_STATS_INC_PKT(peer, tx.tx_success, 1, length);
 	DP_STATS_INCC(peer, tx.retries, 1, ts->transmit_cnt > 1);
 
-	if (soc->cdp_soc.ol_ops->update_dp_stats) {
+	if (!pdev || !pdev->osif_pdev)
+		return;
+
+	if (soc->cdp_soc.ol_ops &&
+			soc->cdp_soc.ol_ops->update_dp_stats) {
 		soc->cdp_soc.ol_ops->update_dp_stats(pdev->osif_pdev,
 				&peer->stats, ts->peer_id,
 				UPDATE_PEER_STATS);

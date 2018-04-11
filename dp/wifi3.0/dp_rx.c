@@ -1098,10 +1098,14 @@ static inline void dp_rx_msdu_stats_update(struct dp_soc *soc,
 		}
 	}
 
+	if (!vdev->pdev || !vdev->pdev->osif_pdev)
+		return;
 
 	if ((soc->process_rx_status) &&
 		hal_rx_attn_first_mpdu_get(rx_tlv_hdr)) {
-		if (soc->cdp_soc.ol_ops->update_dp_stats) {
+
+		if (soc->cdp_soc.ol_ops &&
+				soc->cdp_soc.ol_ops->update_dp_stats) {
 			soc->cdp_soc.ol_ops->update_dp_stats(
 					vdev->pdev->osif_pdev,
 					&peer->stats,
