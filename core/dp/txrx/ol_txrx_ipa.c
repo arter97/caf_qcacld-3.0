@@ -378,7 +378,7 @@ QDF_STATUS ol_txrx_ipa_setup(struct cdp_pdev *ppdev, void *ipa_i2w_cb,
 		QDF_IPA_WDI_SETUP_INFO_TRANSFER_RING_BASE_PA(tx) =
 			ipa_res->tx_comp_ring_base_paddr;
 		QDF_IPA_WDI_SETUP_INFO_TRANSFER_RING_SIZE(tx) =
-			ipa_res->tx_comp_ring_size * sizeof(qdf_dma_addr_t);
+			ipa_res->tx_comp_ring_size * sizeof(target_paddr_t);
 
 		QDF_IPA_WDI_SETUP_INFO_EVENT_RING_BASE_PA(tx) =
 			ipa_res->ce_sr_base_paddr;
@@ -682,7 +682,7 @@ QDF_STATUS ol_txrx_ipa_setup(struct cdp_pdev *ppdev, void *ipa_i2w_cb,
 	QDF_IPA_PIPE_IN_DL_COMP_RING_BASE_PA(&pipe_in) =
 		ipa_res->tx_comp_ring_base_paddr;
 	QDF_IPA_PIPE_IN_DL_COMP_RING_SIZE(&pipe_in) =
-		ipa_res->tx_comp_ring_size * sizeof(qdf_dma_addr_t);
+		ipa_res->tx_comp_ring_size * sizeof(target_paddr_t);
 	QDF_IPA_PIPE_IN_DL_CE_RING_BASE_PA(&pipe_in) =
 		ipa_res->ce_sr_base_paddr;
 	QDF_IPA_PIPE_IN_DL_CE_DOOR_BELL_PA(&pipe_in) = ipa_res->ce_reg_paddr;
