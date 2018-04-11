@@ -213,7 +213,12 @@ target_if_spectral_info_init_defaults(struct target_if_spectral *spectral)
 	/* Parameters */
 	info->osps_cache.osc_params.ss_count = SPECTRAL_SCAN_COUNT_DEFAULT;
 
-	info->osps_cache.osc_params.ss_period = SPECTRAL_SCAN_PERIOD_DEFAULT;
+	if (spectral->spectral_gen == SPECTRAL_GEN3)
+		info->osps_cache.osc_params.ss_period =
+			SPECTRAL_SCAN_PERIOD_GEN_III_DEFAULT;
+	else
+		info->osps_cache.osc_params.ss_period =
+			SPECTRAL_SCAN_PERIOD_GEN_II_DEFAULT;
 
 	info->osps_cache.osc_params.ss_spectral_pri =
 	    SPECTRAL_SCAN_PRIORITY_DEFAULT;
@@ -1331,6 +1336,7 @@ target_if_init_spectral_capability(struct target_if_spectral *spectral)
 	pcap->radar_cap = 1;
 	pcap->spectral_cap = 1;
 	pcap->advncd_spectral_cap = 1;
+	pcap->hw_gen = spectral->spectral_gen;
 }
 
 #ifdef QCA_SUPPORT_SPECTRAL_SIMULATION
@@ -1796,7 +1802,10 @@ target_if_spectral_init_param_defaults(struct target_if_spectral *spectral)
 	struct spectral_config *params = &spectral->params;
 
 	params->ss_count = SPECTRAL_SCAN_COUNT_DEFAULT;
-	params->ss_period = SPECTRAL_SCAN_PERIOD_DEFAULT;
+	if (spectral->spectral_gen == SPECTRAL_GEN3)
+		params->ss_period = SPECTRAL_SCAN_PERIOD_GEN_III_DEFAULT;
+	else
+		params->ss_period = SPECTRAL_SCAN_PERIOD_GEN_II_DEFAULT;
 	params->ss_spectral_pri = SPECTRAL_SCAN_PRIORITY_DEFAULT;
 	params->ss_fft_size = SPECTRAL_SCAN_FFT_SIZE_DEFAULT;
 	params->ss_gc_ena = SPECTRAL_SCAN_GC_ENA_DEFAULT;
@@ -1984,8 +1993,6 @@ target_if_pdev_spectral_init(struct wlan_objmgr_pdev *pdev)
 	qdf_spinlock_create(&spectral->noise_pwr_reports_lock);
 	target_if_spectral_clear_stats(spectral);
 
-	/* Set the default values for spectral parameters */
-	target_if_spectral_init_param_defaults(spectral);
 #ifdef CONFIG_WIN
 	if (target_type == TARGET_TYPE_QCA8074) {
 		spectral->fftbin_size_war = 1;
@@ -2013,6 +2020,10 @@ target_if_pdev_spectral_init(struct wlan_objmgr_pdev *pdev)
 		spectral->tlvhdr_size = sizeof(struct spectral_phyerr_tlv_gen2);
 	}
 
+	/* Set the default values for spectral parameters */
+	target_if_spectral_init_param_defaults(spectral);
+	/* Init spectral capability */
+	target_if_init_spectral_capability(spectral);
 	if (target_if_spectral_attach_simulation(spectral) < 0)
 		return NULL;
 
