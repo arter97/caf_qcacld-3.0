@@ -2310,20 +2310,8 @@ free_buf:
 }
 qdf_export_symbol(qdf_nbuf_free_debug);
 
-#else
-void qdf_net_buf_debug_init(void)
-{
-}
+#endif /* NBUF_MEMORY_DEBUG */
 
-qdf_export_symbol(qdf_net_buf_debug_init);
-
-void qdf_net_buf_debug_exit(void)
-{
-}
-
-qdf_export_symbol(qdf_net_buf_debug_exit);
-
-#endif /*NBUF_MEMORY_DEBUG */
 #if defined(FEATURE_TSO)
 
 /**
