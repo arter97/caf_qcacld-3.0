@@ -2898,7 +2898,12 @@ QDF_STATUS csr_get_config_param(tpAniSirGlobal pMac, tCsrConfigParam *pParam)
 		pMac->roam.configParam.fils_max_chan_guard_time;
 	pParam->is_bssid_hint_priority =
 		pMac->roam.configParam.is_bssid_hint_priority;
-
+	pParam->wlm_latency_enable = pMac->roam.configParam.wlm_latency_enable;
+	pParam->wlm_latency_level = pMac->roam.configParam.wlm_latency_level;
+	for (i = 0; i < CSR_NUM_WLM_LATENCY_LEVEL; i++) {
+		pParam->wlm_latency_flags[i] =
+			pMac->roam.configParam.wlm_latency_flags[i];
+	}
 	return QDF_STATUS_SUCCESS;
 }
 
