@@ -1022,6 +1022,8 @@ dp_rx_wbm_err_process(struct dp_soc *soc, void *hal_ring, uint32_t quota)
 	qdf_nbuf_t nbuf, next;
 	struct hal_wbm_err_desc_info wbm_err_info = { 0 };
 	uint8_t pool_id;
+	uint8_t tid = 0;
+	uint8_t ac = 0;
 
 	/* Debug -- Remove later */
 	qdf_assert(soc && hal_ring);
@@ -1150,7 +1152,11 @@ done:
 
 	nbuf = nbuf_head;
 	while (nbuf) {
+		struct dp_peer *peer = NULL;
+		uint16_t peer_id = 0xFFFF;
 		rx_tlv_hdr = qdf_nbuf_data(nbuf);
+		peer_id = hal_rx_mpdu_start_sw_peer_id_get(rx_tlv_hdr);
+		peer = dp_peer_find_by_id(soc, peer_id);
 		/*
 		 * retrieve the wbm desc info from nbuf TLV, so we can
 		 * handle error cases appropriately
@@ -1183,6 +1189,12 @@ done:
 								pool_id);
 					nbuf = next;
 					continue;
+				case HAL_REO_ERR_REGULAR_FRAME_OOR:
+					tid = hal_rx_mpdu_start_tid_get(rx_tlv_hdr);
+					ac = TID_TO_WME_AC(tid);
+					if (tid != HAL_TID_INVALID)
+						DP_STATS_DEC(peer, rx.wme_ac_type[ac], 1);
+					break;
 				/* TODO */
 				/* Add per error code accounting */
 
