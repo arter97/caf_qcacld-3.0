@@ -150,6 +150,9 @@ static void dp_tx_stats_update(struct dp_soc *soc, struct dp_peer *peer,
 			tx.pkt_type[preamble].mcs_count[mcs], num_msdu,
 			((mcs < (MAX_MCS - 1)) && (preamble == DOT11_AX)));
 
+	if (!pdev || !pdev->osif_pdev)
+		return;
+
 	if (soc->cdp_soc.ol_ops->update_dp_stats) {
 		soc->cdp_soc.ol_ops->update_dp_stats(pdev->osif_pdev,
 				&peer->stats, ppdu->peer_id,

@@ -2803,6 +2803,8 @@ static void dp_pdev_detach_wifi3(struct cdp_pdev *txrx_pdev, int force)
 	struct dp_soc *soc = pdev->soc;
 	qdf_nbuf_t curr_nbuf, next_nbuf;
 
+	pdev->osif_pdev = NULL;
+
 	dp_wdi_event_detach(pdev);
 
 	dp_tx_pdev_detach(pdev);
@@ -4700,11 +4702,14 @@ void dp_aggregate_vdev_stats(struct dp_vdev *vdev)
 	TAILQ_FOREACH(peer, &vdev->peer_list, peer_list_elem)
 		DP_UPDATE_STATS(vdev, peer);
 
-	if (soc->cdp_soc.ol_ops->update_dp_stats)
-		soc->cdp_soc.ol_ops->update_dp_stats(vdev->pdev->osif_pdev,
-			&vdev->stats, (uint16_t) vdev->vdev_id,
-			UPDATE_VDEV_STATS);
+	if (!vdev->pdev || !vdev->pdev->osif_pdev)
+		return;
 
+	if (soc->cdp_soc.ol_ops &&
+			soc->cdp_soc.ol_ops->update_dp_stats)
+		soc->cdp_soc.ol_ops->update_dp_stats(vdev->pdev->osif_pdev,
+				&vdev->stats, (uint16_t) vdev->vdev_id,
+				UPDATE_VDEV_STATS);
 }
 
 /**
@@ -4773,10 +4778,14 @@ static inline void dp_aggregate_pdev_stats(struct dp_pdev *pdev)
 			vdev->stats.tx_i.tso.num_seg;
 	}
 	qdf_spin_unlock_bh(&pdev->vdev_list_lock);
-	if (soc->cdp_soc.ol_ops->update_dp_stats)
-		soc->cdp_soc.ol_ops->update_dp_stats(pdev->osif_pdev,
-				&pdev->stats, pdev->pdev_id, UPDATE_PDEV_STATS);
 
+	if (!pdev || !pdev->osif_pdev)
+		return;
+
+	if (soc->cdp_soc.ol_ops && soc->cdp_soc.ol_ops->update_dp_stats)
+		soc->cdp_soc.ol_ops->update_dp_stats(pdev->osif_pdev,
+				&pdev->stats, pdev->pdev_id,
+				UPDATE_PDEV_STATS);
 }
 
 /**
@@ -4790,6 +4799,9 @@ static void dp_pdev_getstats(struct cdp_pdev *pdev_handle,
 		struct cdp_dev_stats *stats)
 {
 	struct dp_pdev *pdev = (struct dp_pdev *)pdev_handle;
+
+	if (!pdev || !pdev->osif_pdev)
+		return;
 
 	dp_aggregate_pdev_stats(pdev);
 
@@ -5181,25 +5193,30 @@ dp_txrx_host_stats_clr(struct dp_vdev *vdev)
 	struct dp_peer *peer = NULL;
 	struct dp_soc *soc = (struct dp_soc *)vdev->pdev->soc;
 
+	if (!vdev->pdev || !vdev->pdev->osif_pdev)
+		return;
+
 	DP_STATS_CLR(vdev->pdev);
 	DP_STATS_CLR(vdev->pdev->soc);
 	DP_STATS_CLR(vdev);
+
 	TAILQ_FOREACH(peer, &vdev->peer_list, peer_list_elem) {
 		if (!peer)
 			return;
 		DP_STATS_CLR(peer);
 
-		if (soc->cdp_soc.ol_ops->update_dp_stats) {
+		if (soc->cdp_soc.ol_ops &&
+				soc->cdp_soc.ol_ops->update_dp_stats) {
 			soc->cdp_soc.ol_ops->update_dp_stats(
 					vdev->pdev->osif_pdev,
 					&peer->stats,
 					peer->peer_ids[0],
 					UPDATE_PEER_STATS);
 		}
-
 	}
 
-	if (soc->cdp_soc.ol_ops->update_dp_stats)
+	if (soc->cdp_soc.ol_ops &&
+			soc->cdp_soc.ol_ops->update_dp_stats)
 		soc->cdp_soc.ol_ops->update_dp_stats(vdev->pdev->osif_pdev,
 				&vdev->stats, (uint16_t)vdev->vdev_id,
 				UPDATE_VDEV_STATS);
