@@ -39,6 +39,7 @@
 #include "csr_link_list.h"
 
 #define CSR_INVALID_SCANRESULT_HANDLE       (NULL)
+#define CSR_NUM_WLM_LATENCY_LEVEL   4
 
 typedef enum {
 	/* never used */
@@ -1324,6 +1325,9 @@ typedef struct tagCsrConfigParam {
 	uint16_t num_11ag_tx_chains;
 	uint32_t scan_probe_repeat_time;
 	uint32_t scan_num_probes;
+	uint16_t wlm_latency_enable;
+	uint16_t wlm_latency_level;
+	uint32_t wlm_latency_flags[CSR_NUM_WLM_LATENCY_LEVEL];
 } tCsrConfigParam;
 
 /* Tush */

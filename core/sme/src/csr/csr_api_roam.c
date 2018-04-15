@@ -2171,6 +2171,7 @@ QDF_STATUS csr_change_default_config_param(tpAniSirGlobal pMac,
 					   tCsrConfigParam *pParam)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	int i;
 
 	if (pParam) {
 		pMac->roam.configParam.pkt_err_disconn_th =
@@ -2641,8 +2642,14 @@ QDF_STATUS csr_change_default_config_param(tpAniSirGlobal pMac,
 			pParam->fils_max_chan_guard_time;
 		pMac->roam.configParam.is_bssid_hint_priority =
 			pParam->is_bssid_hint_priority;
-
-
+		pMac->roam.configParam.wlm_latency_enable =
+			pParam->wlm_latency_enable;
+		pMac->roam.configParam.wlm_latency_level =
+			pParam->wlm_latency_level;
+		for (i = 0; i < CSR_NUM_WLM_LATENCY_LEVEL; i++) {
+			pMac->roam.configParam.wlm_latency_flags[i] =
+				pParam->wlm_latency_flags[i];
+		}
 	}
 	return status;
 }

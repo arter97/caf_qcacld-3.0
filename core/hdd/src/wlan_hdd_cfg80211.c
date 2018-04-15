@@ -4614,6 +4614,7 @@ wlan_hdd_wifi_config_policy[QCA_WLAN_VENDOR_ATTR_CONFIG_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_PROPAGATION_DELAY] = {.type = NLA_U8 },
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_TX_FAIL_COUNT] = {.type = NLA_U32 },
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_LRO] = {.type = NLA_U8 },
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_LATENCY_LEVEL] = {.type = NLA_U16 },
 };
 
 /**
@@ -4687,6 +4688,7 @@ __wlan_hdd_cfg80211_wifi_configuration_set(struct wiphy *wiphy,
 	uint8_t retry, delay, enable_flag;
 	int param_id;
 	uint32_t tx_fail_count;
+	uint16_t latency_level;
 
 	ENTER_DEV(dev);
 
@@ -4972,6 +4974,31 @@ __wlan_hdd_cfg80211_wifi_configuration_set(struct wiphy *wiphy,
 					adapter->sessionId,
 					SIR_PARAM_IGNORE_ASSOC_DISALLOWED,
 					ignore_assoc_disallowed);
+	}
+
+	if (tb[QCA_WLAN_VENDOR_ATTR_CONFIG_LATENCY_LEVEL]) {
+		latency_level = nla_get_u16(
+			tb[QCA_WLAN_VENDOR_ATTR_CONFIG_LATENCY_LEVEL]);
+
+		if ((latency_level >
+		    QCA_WLAN_VENDOR_ATTR_CONFIG_LATENCY_LEVEL_MAX) ||
+		    (latency_level ==
+		    QCA_WLAN_VENDOR_ATTR_CONFIG_LATENCY_LEVEL_INVALID)) {
+			hdd_err("Invalid Wlan latency level value");
+			return -EINVAL;
+		}
+
+		/* Mapping the latency value to the level which fw expected
+		 * 0 - normal, 1 - moderate, 2 - low, 3 - ultralow
+		 */
+		latency_level = latency_level - 1;
+		qdf_status = sme_set_wlm_latency_level(hdd_ctx->hHal,
+						       adapter->sessionId,
+						       latency_level);
+		if (qdf_status != QDF_STATUS_SUCCESS) {
+			hdd_err("set Wlan latency level failed");
+			ret_val = -EINVAL;
+		}
 	}
 
 	return ret_val;
