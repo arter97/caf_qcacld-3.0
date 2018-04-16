@@ -1673,7 +1673,7 @@ static void dp_process_ppdu_stats_user_common_tlv(
 		struct dp_pdev *pdev, uint32_t *tag_buf,
 		struct ppdu_info *ppdu_info)
 {
-	uint16_t peer_id;
+	uint16_t peer_id, tid = 0;
 	struct dp_peer *peer;
 	struct cdp_tx_completion_ppdu *ppdu_desc;
 	struct cdp_tx_completion_ppdu_user *ppdu_user_desc;
@@ -1683,6 +1683,7 @@ static void dp_process_ppdu_stats_user_common_tlv(
 
 	tag_buf++;
 	peer_id = HTT_PPDU_STATS_USER_COMMON_TLV_SW_PEER_ID_GET(*tag_buf);
+	tid = HTT_PPDU_STATS_USER_COMMON_TLV_TID_NUM_GET(*tag_buf);
 	peer = dp_peer_find_by_id(pdev->soc, peer_id);
 
 	if (!peer)
@@ -1700,6 +1701,8 @@ static void dp_process_ppdu_stats_user_common_tlv(
 		ppdu_user_desc->mpdu_tried_mcast =
 		HTT_PPDU_STATS_USER_COMMON_TLV_MPDUS_TRIED_GET(*tag_buf);
 		ppdu_user_desc->num_mpdu = ppdu_user_desc->mpdu_tried_mcast;
+		if (tid != HTT_INVALID_TID && tid < 8)
+			DP_STATS_INC(peer, tx.wme_ac_type[TID_TO_WME_AC(tid)], 1);
 	} else {
 		ppdu_user_desc->mpdu_tried_ucast =
 		HTT_PPDU_STATS_USER_COMMON_TLV_MPDUS_TRIED_GET(*tag_buf);
