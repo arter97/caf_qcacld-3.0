@@ -53,6 +53,9 @@ typedef uint32_t tDOT11F_U64[2];
 #pragma warning (disable:4214)	/* nonstandard extension used */
 #endif /* Microsoft C/C++             bit field types other than int */
 
+#if !defined __must_check
+#define __must_check
+#endif
 /*
  * Frames Return Codes:
  *
@@ -2059,7 +2062,7 @@ typedef struct sDot11fIEGTK {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_gtk(
+__must_check uint32_t dot11f_unpack_ie_gtk(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -2100,7 +2103,7 @@ typedef struct sDot11fIEIGTK {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_igtk(
+__must_check uint32_t dot11f_unpack_ie_igtk(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -2139,7 +2142,7 @@ typedef struct sDot11fIER0KH_ID {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_r0_kh_id(
+__must_check uint32_t dot11f_unpack_ie_r0_kh_id(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -2177,7 +2180,7 @@ typedef struct sDot11fIER1KH_ID {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_r1_kh_id(
+__must_check uint32_t dot11f_unpack_ie_r1_kh_id(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -2217,7 +2220,7 @@ typedef struct sDot11fIEAPChannelReport {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_ap_channel_report(
+__must_check uint32_t dot11f_unpack_ie_ap_channel_report(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -2255,7 +2258,7 @@ typedef struct sDot11fIEBcnReportingDetail {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_bcn_reporting_detail(
+__must_check uint32_t dot11f_unpack_ie_bcn_reporting_detail(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -2294,7 +2297,7 @@ typedef struct sDot11fIEBeaconReportFrmBody {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_beacon_report_frm_body(
+__must_check uint32_t dot11f_unpack_ie_beacon_report_frm_body(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -2333,7 +2336,7 @@ typedef struct sDot11fIEBeaconReporting {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_beacon_reporting(
+__must_check uint32_t dot11f_unpack_ie_beacon_reporting(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -2371,7 +2374,7 @@ typedef struct sDot11fIECondensedCountryStr {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_condensed_country_str(
+__must_check uint32_t dot11f_unpack_ie_condensed_country_str(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -2411,7 +2414,7 @@ typedef struct sDot11fIEMeasurementPilot {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_measurement_pilot(
+__must_check uint32_t dot11f_unpack_ie_measurement_pilot(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -2451,7 +2454,7 @@ typedef struct sDot11fIEMultiBssid {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_multi_bssid(
+__must_check uint32_t dot11f_unpack_ie_multi_bssid(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -2491,7 +2494,7 @@ typedef struct sDot11fIERICData {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_ric_data(
+__must_check uint32_t dot11f_unpack_ie_ric_data(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -2531,7 +2534,7 @@ typedef struct sDot11fIERICDescriptor {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_ric_descriptor(
+__must_check uint32_t dot11f_unpack_ie_ric_descriptor(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -2599,7 +2602,7 @@ typedef struct sDot11fIERRMEnabledCap {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_rrm_enabled_cap(
+__must_check uint32_t dot11f_unpack_ie_rrm_enabled_cap(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -2638,7 +2641,7 @@ typedef struct sDot11fIERequestedInfo {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_requested_info(
+__must_check uint32_t dot11f_unpack_ie_requested_info(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -2677,7 +2680,7 @@ typedef struct sDot11fIESSID {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_ssid(
+__must_check uint32_t dot11f_unpack_ie_ssid(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -2722,7 +2725,7 @@ typedef struct sDot11fIESchedule {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_schedule(
+__must_check uint32_t dot11f_unpack_ie_schedule(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -2793,7 +2796,7 @@ typedef struct sDot11fIETCLAS {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_tclas(
+__must_check uint32_t dot11f_unpack_ie_tclas(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -2831,7 +2834,7 @@ typedef struct sDot11fIETCLASSPROC {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_tclasSPROC(
+__must_check uint32_t dot11f_unpack_ie_tclasSPROC(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -2869,7 +2872,7 @@ typedef struct sDot11fIETSDelay {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_ts_delay(
+__must_check uint32_t dot11f_unpack_ie_ts_delay(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -2908,7 +2911,7 @@ typedef struct sDot11fIETSFInfo {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_tsf_info(
+__must_check uint32_t dot11f_unpack_ie_tsf_info(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -2971,7 +2974,7 @@ typedef struct sDot11fIETSPEC {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_tspec(
+__must_check uint32_t dot11f_unpack_ie_tspec(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -3034,7 +3037,7 @@ typedef struct sDot11fIEVHTCaps {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_vht_caps(
+__must_check uint32_t dot11f_unpack_ie_vht_caps(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -3075,7 +3078,7 @@ typedef struct sDot11fIEVHTOperation {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_vht_operation(
+__must_check uint32_t dot11f_unpack_ie_vht_operation(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -3121,7 +3124,7 @@ typedef struct sDot11fIEWMMSchedule {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_wmm_schedule(
+__must_check uint32_t dot11f_unpack_ie_wmm_schedule(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -3193,7 +3196,7 @@ typedef struct sDot11fIEWMMTCLAS {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_wmmtclas(
+__must_check uint32_t dot11f_unpack_ie_wmmtclas(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -3232,7 +3235,7 @@ typedef struct sDot11fIEWMMTCLASPROC {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_wmmtclasproc(
+__must_check uint32_t dot11f_unpack_ie_wmmtclasproc(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -3271,7 +3274,7 @@ typedef struct sDot11fIEWMMTSDelay {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_wmmts_delay(
+__must_check uint32_t dot11f_unpack_ie_wmmts_delay(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -3335,7 +3338,7 @@ typedef struct sDot11fIEWMMTSPEC {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_wmmtspec(
+__must_check uint32_t dot11f_unpack_ie_wmmtspec(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -3375,7 +3378,7 @@ typedef struct sDot11fIEWiderBWChanSwitchAnn {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_wider_bw_chan_switch_ann(
+__must_check uint32_t dot11f_unpack_ie_wider_bw_chan_switch_ann(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -3413,7 +3416,7 @@ typedef struct sDot11fIEazimuth_req {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_azimuth_req(
+__must_check uint32_t dot11f_unpack_ie_azimuth_req(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -3451,7 +3454,7 @@ typedef struct sDot11fIEmax_age {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_max_age(
+__must_check uint32_t dot11f_unpack_ie_max_age(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -3509,7 +3512,7 @@ typedef struct sDot11fIEneighbor_rpt {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_neighbor_rpt(
+__must_check uint32_t dot11f_unpack_ie_neighbor_rpt(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -3547,7 +3550,7 @@ typedef struct sDot11fIEreq_mac_addr {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_req_mac_addr(
+__must_check uint32_t dot11f_unpack_ie_req_mac_addr(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -3585,7 +3588,7 @@ typedef struct sDot11fIEtgt_mac_addr {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_tgt_mac_addr(
+__must_check uint32_t dot11f_unpack_ie_tgt_mac_addr(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -3624,7 +3627,7 @@ typedef struct sDot11fIEvht_transmit_power_env {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_vht_transmit_power_env(
+__must_check uint32_t dot11f_unpack_ie_vht_transmit_power_env(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -3662,7 +3665,7 @@ typedef struct sDot11fIEAID {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_aid(
+__must_check uint32_t dot11f_unpack_ie_aid(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -3703,7 +3706,7 @@ typedef struct sDot11fIECFParams {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_cf_params(
+__must_check uint32_t dot11f_unpack_ie_cf_params(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -3742,7 +3745,7 @@ typedef struct sDot11fIEChallengeText {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_challenge_text(
+__must_check uint32_t dot11f_unpack_ie_challenge_text(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -3782,7 +3785,7 @@ typedef struct sDot11fIEChanSwitchAnn {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_chan_switch_ann(
+__must_check uint32_t dot11f_unpack_ie_chan_switch_ann(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -3821,7 +3824,7 @@ typedef struct sDot11fIEChannelSwitchWrapper {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_channel_switch_wrapper(
+__must_check uint32_t dot11f_unpack_ie_channel_switch_wrapper(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -3861,7 +3864,7 @@ typedef struct sDot11fIECountry {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_country(
+__must_check uint32_t dot11f_unpack_ie_country(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -3899,7 +3902,7 @@ typedef struct sDot11fIEDSParams {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_DSParams(
+__must_check uint32_t dot11f_unpack_ie_DSParams(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -3966,7 +3969,7 @@ typedef struct sDot11fIEEDCAParamSet {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_edca_param_set(
+__must_check uint32_t dot11f_unpack_ie_edca_param_set(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -4007,7 +4010,7 @@ typedef struct sDot11fIEERPInfo {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_erp_info(
+__must_check uint32_t dot11f_unpack_ie_erp_info(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -4046,7 +4049,7 @@ typedef struct sDot11fIEESECckmOpaque {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_ese_cckm_opaque(
+__must_check uint32_t dot11f_unpack_ie_ese_cckm_opaque(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -4086,7 +4089,7 @@ typedef struct sDot11fIEESERadMgmtCap {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_ese_rad_mgmt_cap(
+__must_check uint32_t dot11f_unpack_ie_ese_rad_mgmt_cap(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -4126,7 +4129,7 @@ typedef struct sDot11fIEESETrafStrmMet {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_ese_traf_strm_met(
+__must_check uint32_t dot11f_unpack_ie_ese_traf_strm_met(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -4166,7 +4169,7 @@ typedef struct sDot11fIEESETrafStrmRateSet {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_ese_traf_strm_rate_set(
+__must_check uint32_t dot11f_unpack_ie_ese_traf_strm_rate_set(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -4205,7 +4208,7 @@ typedef struct sDot11fIEESETxmitPower {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_ese_txmit_power(
+__must_check uint32_t dot11f_unpack_ie_ese_txmit_power(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -4243,7 +4246,7 @@ typedef struct sDot11fIEESEVersion {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_ese_version(
+__must_check uint32_t dot11f_unpack_ie_ese_version(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -4282,7 +4285,7 @@ typedef struct sDot11fIEExtCap {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_ext_cap(
+__must_check uint32_t dot11f_unpack_ie_ext_cap(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -4321,7 +4324,7 @@ typedef struct sDot11fIEExtSuppRates {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_ext_supp_rates(
+__must_check uint32_t dot11f_unpack_ie_ext_supp_rates(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -4362,7 +4365,7 @@ typedef struct sDot11fIEFHParamSet {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_fh_param_set(
+__must_check uint32_t dot11f_unpack_ie_fh_param_set(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -4401,7 +4404,7 @@ typedef struct sDot11fIEFHParams {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_fh_params(
+__must_check uint32_t dot11f_unpack_ie_fh_params(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -4444,7 +4447,7 @@ typedef struct sDot11fIEFHPattTable {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_fh_patt_table(
+__must_check uint32_t dot11f_unpack_ie_fh_patt_table(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -4490,7 +4493,7 @@ typedef struct sDot11fIEFTInfo {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_ft_info(
+__must_check uint32_t dot11f_unpack_ie_ft_info(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -4576,7 +4579,7 @@ typedef struct sDot11fIEHTCaps {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_ht_caps(
+__must_check uint32_t dot11f_unpack_ie_ht_caps(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -4634,7 +4637,7 @@ typedef struct sDot11fIEHTInfo {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_ht_info(
+__must_check uint32_t dot11f_unpack_ie_ht_info(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -4672,7 +4675,7 @@ typedef struct sDot11fIEIBSSParams {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_ibss_params(
+__must_check uint32_t dot11f_unpack_ie_ibss_params(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -4712,7 +4715,7 @@ typedef struct sDot11fIELinkIdentifier {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_link_identifier(
+__must_check uint32_t dot11f_unpack_ie_link_identifier(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -4752,7 +4755,7 @@ typedef struct sDot11fIEMBO_IE {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_MBO_IE(
+__must_check uint32_t dot11f_unpack_ie_MBO_IE(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -4841,7 +4844,7 @@ typedef struct sDot11fIEMeasurementReport {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_measurement_report(
+__must_check uint32_t dot11f_unpack_ie_measurement_report(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -4930,7 +4933,7 @@ typedef struct sDot11fIEMeasurementRequest {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_measurement_request(
+__must_check uint32_t dot11f_unpack_ie_measurement_request(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -4971,7 +4974,7 @@ typedef struct sDot11fIEMobilityDomain {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_mobility_domain(
+__must_check uint32_t dot11f_unpack_ie_mobility_domain(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -5029,7 +5032,7 @@ typedef struct sDot11fIENeighborReport {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_neighbor_report(
+__must_check uint32_t dot11f_unpack_ie_neighbor_report(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -5073,7 +5076,7 @@ typedef struct sDot11fIEOBSSScanParameters {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_obss_scan_parameters(
+__must_check uint32_t dot11f_unpack_ie_obss_scan_parameters(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -5114,7 +5117,7 @@ typedef struct sDot11fIEOperatingMode {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_operating_mode(
+__must_check uint32_t dot11f_unpack_ie_operating_mode(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -5154,7 +5157,7 @@ typedef struct sDot11fIEP2PAssocReq {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_p2_p_assoc_req(
+__must_check uint32_t dot11f_unpack_ie_p2_p_assoc_req(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -5193,7 +5196,7 @@ typedef struct sDot11fIEP2PAssocRes {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_p2_p_assoc_res(
+__must_check uint32_t dot11f_unpack_ie_p2_p_assoc_res(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -5233,7 +5236,7 @@ typedef struct sDot11fIEP2PBeacon {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_p2_p_beacon(
+__must_check uint32_t dot11f_unpack_ie_p2_p_beacon(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -5276,7 +5279,7 @@ typedef struct sDot11fIEP2PBeaconProbeRes {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_p2_p_beacon_probe_res(
+__must_check uint32_t dot11f_unpack_ie_p2_p_beacon_probe_res(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -5314,7 +5317,7 @@ typedef struct sDot11fIEP2PDeAuth {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_p2_p_de_auth(
+__must_check uint32_t dot11f_unpack_ie_p2_p_de_auth(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -5352,7 +5355,7 @@ typedef struct sDot11fIEP2PDisAssoc {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_p2_p_dis_assoc(
+__must_check uint32_t dot11f_unpack_ie_p2_p_dis_assoc(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -5391,7 +5394,7 @@ typedef struct sDot11fIEP2PIEOpaque {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_p2_pie_opaque(
+__must_check uint32_t dot11f_unpack_ie_p2_pie_opaque(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -5433,7 +5436,7 @@ typedef struct sDot11fIEP2PProbeReq {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_p2_p_probe_req(
+__must_check uint32_t dot11f_unpack_ie_p2_p_probe_req(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -5475,7 +5478,7 @@ typedef struct sDot11fIEP2PProbeRes {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_p2_p_probe_res(
+__must_check uint32_t dot11f_unpack_ie_p2_p_probe_res(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -5514,7 +5517,7 @@ typedef struct sDot11fIEPTIControl {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_pti_control(
+__must_check uint32_t dot11f_unpack_ie_pti_control(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -5556,7 +5559,7 @@ typedef struct sDot11fIEPUBufferStatus {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_pu_buffer_status(
+__must_check uint32_t dot11f_unpack_ie_pu_buffer_status(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -5595,7 +5598,7 @@ typedef struct sDot11fIEPowerCaps {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_power_caps(
+__must_check uint32_t dot11f_unpack_ie_power_caps(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -5633,7 +5636,7 @@ typedef struct sDot11fIEPowerConstraints {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_power_constraints(
+__must_check uint32_t dot11f_unpack_ie_power_constraints(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -5673,7 +5676,7 @@ typedef struct sDot11fIEQBSSLoad {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_qbss_load(
+__must_check uint32_t dot11f_unpack_ie_qbss_load(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -5711,7 +5714,7 @@ typedef struct sDot11fIEQCN_IE {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_QCN_IE(
+__must_check uint32_t dot11f_unpack_ie_QCN_IE(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -5750,7 +5753,7 @@ typedef struct sDot11fIEQComVendorIE {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_QComVendorIE(
+__must_check uint32_t dot11f_unpack_ie_QComVendorIE(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -5792,7 +5795,7 @@ typedef struct sDot11fIEQOSCapsAp {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_qos_caps_ap(
+__must_check uint32_t dot11f_unpack_ie_qos_caps_ap(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -5836,7 +5839,7 @@ typedef struct sDot11fIEQOSCapsStation {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_qos_caps_station(
+__must_check uint32_t dot11f_unpack_ie_qos_caps_station(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -5875,7 +5878,7 @@ typedef struct sDot11fIEQosMapSet {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_qos_map_set(
+__must_check uint32_t dot11f_unpack_ie_qos_map_set(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -5916,7 +5919,7 @@ typedef struct sDot11fIEQuiet {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_quiet(
+__must_check uint32_t dot11f_unpack_ie_quiet(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -5954,7 +5957,7 @@ typedef struct sDot11fIERCPIIE {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_rcpiie(
+__must_check uint32_t dot11f_unpack_ie_rcpiie(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -6005,7 +6008,7 @@ typedef struct sDot11fIERICDataDesc {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_ric_data_desc(
+__must_check uint32_t dot11f_unpack_ie_ric_data_desc(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -6052,7 +6055,7 @@ typedef struct sDot11fIERSN {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_rsn(
+__must_check uint32_t dot11f_unpack_ie_rsn(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -6090,7 +6093,7 @@ typedef struct sDot11fIERSNIIE {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_rsniie(
+__must_check uint32_t dot11f_unpack_ie_rsniie(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -6129,7 +6132,7 @@ typedef struct sDot11fIERSNOpaque {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_rsn_opaque(
+__must_check uint32_t dot11f_unpack_ie_rsn_opaque(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -6168,7 +6171,7 @@ typedef struct sDot11fIESuppChannels {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_supp_channels(
+__must_check uint32_t dot11f_unpack_ie_supp_channels(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -6207,7 +6210,7 @@ typedef struct sDot11fIESuppOperatingClasses {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_supp_operating_classes(
+__must_check uint32_t dot11f_unpack_ie_supp_operating_classes(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -6259,7 +6262,7 @@ typedef struct sDot11fIESuppRates {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_supp_rates(
+__must_check uint32_t dot11f_unpack_ie_supp_rates(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -6301,7 +6304,7 @@ typedef struct sDot11fIETIM {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_tim(
+__must_check uint32_t dot11f_unpack_ie_tim(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -6340,7 +6343,7 @@ typedef struct sDot11fIETPCReport {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_tpc_report(
+__must_check uint32_t dot11f_unpack_ie_tpc_report(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -6377,7 +6380,7 @@ typedef struct sDot11fIETPCRequest {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_tpc_request(
+__must_check uint32_t dot11f_unpack_ie_tpc_request(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -6417,7 +6420,7 @@ typedef struct sDot11fIETimeAdvertisement {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_time_advertisement(
+__must_check uint32_t dot11f_unpack_ie_time_advertisement(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -6456,7 +6459,7 @@ typedef struct sDot11fIETimeoutInterval {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_timeout_interval(
+__must_check uint32_t dot11f_unpack_ie_timeout_interval(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -6498,7 +6501,7 @@ typedef struct sDot11fIEVHTExtBssLoad {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_vht_ext_bss_load(
+__must_check uint32_t dot11f_unpack_ie_vht_ext_bss_load(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -6535,7 +6538,7 @@ typedef struct sDot11fIEVendor1IE {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_vendor1_ie(
+__must_check uint32_t dot11f_unpack_ie_vendor1_ie(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -6572,7 +6575,7 @@ typedef struct sDot11fIEVendor3IE {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_vendor3_ie(
+__must_check uint32_t dot11f_unpack_ie_vendor3_ie(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -6619,7 +6622,7 @@ typedef struct sDot11fIEWAPI {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_wapi(
+__must_check uint32_t dot11f_unpack_ie_wapi(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -6658,7 +6661,7 @@ typedef struct sDot11fIEWAPIOpaque {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_wapi_opaque(
+__must_check uint32_t dot11f_unpack_ie_wapi_opaque(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -6697,7 +6700,7 @@ typedef struct sDot11fIEWFATPC {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_wfatpc(
+__must_check uint32_t dot11f_unpack_ie_wfatpc(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -6736,7 +6739,7 @@ typedef struct sDot11fIEWFDIEOpaque {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_wfdie_opaque(
+__must_check uint32_t dot11f_unpack_ie_wfdie_opaque(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -6779,7 +6782,7 @@ typedef struct sDot11fIEWMMCaps {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_wmm_caps(
+__must_check uint32_t dot11f_unpack_ie_wmm_caps(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -6820,7 +6823,7 @@ typedef struct sDot11fIEWMMInfoAp {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_wmm_info_ap(
+__must_check uint32_t dot11f_unpack_ie_wmm_info_ap(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -6865,7 +6868,7 @@ typedef struct sDot11fIEWMMInfoStation {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_wmm_info_station(
+__must_check uint32_t dot11f_unpack_ie_wmm_info_station(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -6933,7 +6936,7 @@ typedef struct sDot11fIEWMMParams {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_wmm_params(
+__must_check uint32_t dot11f_unpack_ie_wmm_params(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -6979,7 +6982,7 @@ typedef struct sDot11fIEWPA {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_wpa(
+__must_check uint32_t dot11f_unpack_ie_wpa(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -7018,7 +7021,7 @@ typedef struct sDot11fIEWPAOpaque {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_wpa_opaque(
+__must_check uint32_t dot11f_unpack_ie_wpa_opaque(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -7077,7 +7080,7 @@ typedef struct sDot11fIEWSC {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_wsc(
+__must_check uint32_t dot11f_unpack_ie_wsc(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -7117,7 +7120,7 @@ typedef struct sDot11fIEWscAssocReq {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_wsc_assoc_req(
+__must_check uint32_t dot11f_unpack_ie_wsc_assoc_req(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -7157,7 +7160,7 @@ typedef struct sDot11fIEWscAssocRes {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_wsc_assoc_res(
+__must_check uint32_t dot11f_unpack_ie_wsc_assoc_res(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -7203,7 +7206,7 @@ typedef struct sDot11fIEWscBeacon {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_wsc_beacon(
+__must_check uint32_t dot11f_unpack_ie_wsc_beacon(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -7257,7 +7260,7 @@ typedef struct sDot11fIEWscBeaconProbeRes {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_wsc_beacon_probe_res(
+__must_check uint32_t dot11f_unpack_ie_wsc_beacon_probe_res(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -7296,7 +7299,7 @@ typedef struct sDot11fIEWscIEOpaque {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_wsc_ie_opaque(
+__must_check uint32_t dot11f_unpack_ie_wsc_ie_opaque(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -7348,7 +7351,7 @@ typedef struct sDot11fIEWscProbeReq {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_wsc_probe_req(
+__must_check uint32_t dot11f_unpack_ie_wsc_probe_req(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -7402,7 +7405,7 @@ typedef struct sDot11fIEWscProbeRes {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_wsc_probe_res(
+__must_check uint32_t dot11f_unpack_ie_wsc_probe_res(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -7442,7 +7445,7 @@ typedef struct sDot11fIEWscReassocRes {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_wsc_reassoc_res(
+__must_check uint32_t dot11f_unpack_ie_wsc_reassoc_res(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -7483,7 +7486,7 @@ typedef struct sDot11fIEext_chan_switch_ann {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_ext_chan_switch_ann(
+__must_check uint32_t dot11f_unpack_ie_ext_chan_switch_ann(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -7532,7 +7535,7 @@ typedef struct sDot11fIEhs20vendor_ie {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_hs20vendor_ie(
+__must_check uint32_t dot11f_unpack_ie_hs20vendor_ie(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -7575,7 +7578,7 @@ typedef struct sDot11fIEht2040_bss_coexistence {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_ht2040_bss_coexistence(
+__must_check uint32_t dot11f_unpack_ie_ht2040_bss_coexistence(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -7615,7 +7618,7 @@ typedef struct sDot11fIEht2040_bss_intolerant_report {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_ht2040_bss_intolerant_report(
+__must_check uint32_t dot11f_unpack_ie_ht2040_bss_intolerant_report(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -7653,7 +7656,7 @@ typedef struct sDot11fIEsec_chan_offset_ele {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_sec_chan_offset_ele(
+__must_check uint32_t dot11f_unpack_ie_sec_chan_offset_ele(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
@@ -7694,7 +7697,7 @@ typedef struct sDot11fIEvendor_vht_ie {
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-uint32_t dot11f_unpack_ie_vendor_vht_ie(
+__must_check uint32_t dot11f_unpack_ie_vendor_vht_ie(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
