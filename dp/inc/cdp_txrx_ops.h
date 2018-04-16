@@ -705,6 +705,8 @@ struct ol_if_ops {
 	void (*record_act_change)(struct wlan_objmgr_pdev *pdev,
 				  u_int8_t *dstmac, bool active);
 
+	int (*peer_sta_kickout)(void *osif_pdev, uint8_t *peer_macaddr);
+
 	/* TODO: Add any other control path calls required to OL_IF/WMA layer */
 };
 
