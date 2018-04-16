@@ -1394,7 +1394,7 @@ static QDF_STATUS pe_handle_probe_req_frames(tpAniSirGlobal mac_ctx,
 	status = scheduler_post_msg(QDF_MODULE_ID_SCAN, &msg);
 
 	if (!QDF_IS_STATUS_SUCCESS(status))
-		pe_err_rl("Failed to post probe req frame to Scan Queue");
+		pe_err("Failed to post probe req frame to Scan Queue");
 
 	return status;
 }
