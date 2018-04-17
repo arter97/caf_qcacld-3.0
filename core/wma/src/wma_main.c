@@ -2065,6 +2065,43 @@ void wma_vdev_deinit(struct wma_txrx_node *vdev)
 }
 
 /**
+ * wma_rx_service_available_event() - service available event handler
+ * @handle: pointer to wma handle
+ * @cmd_param_info: Pointer to service available event TLVs
+ * @length: length of the event buffer received
+ *
+ * Return: zero on success, error code on failure
+ */
+static int wma_rx_service_available_event(void *handle, uint8_t *cmd_param_info,
+					  uint32_t length)
+{
+	tp_wma_handle wma_handle = (tp_wma_handle) handle;
+	WMI_SERVICE_AVAILABLE_EVENTID_param_tlvs *param_buf;
+	wmi_service_available_event_fixed_param *ev;
+
+	param_buf = (WMI_SERVICE_AVAILABLE_EVENTID_param_tlvs *) cmd_param_info;
+	if (!(handle && param_buf)) {
+		WMA_LOGE("%s: Invalid arguments", __func__);
+		return -EINVAL;
+	}
+
+	ev = param_buf->fixed_param;
+	if (!ev) {
+		WMA_LOGE("%s: Invalid buffer", __func__);
+		return -EINVAL;
+	}
+
+	WMA_LOGD("WMA <-- WMI_SERVICE_AVAILABLE_EVENTID");
+
+	wma_handle->wmi_service_ext_offset = ev->wmi_service_segment_offset;
+	qdf_mem_copy(wma_handle->wmi_service_ext_bitmap,
+		     &ev->wmi_service_segment_bitmap[0],
+		     WMI_SERVICE_EXT_BM_SIZE32 * sizeof(A_UINT32));
+
+	return 0;
+}
+
+/**
  * wma_open() - Allocate wma context and initialize it.
  * @cds_context:  cds context
  * @wma_tgt_cfg_cb: tgt config callback fun
@@ -2138,6 +2175,10 @@ QDF_STATUS wma_open(void *cds_context,
 	}
 
 	WMA_LOGD("WMA --> wmi_unified_attach - success");
+	wmi_unified_register_event_handler(wmi_handle,
+					   WMI_SERVICE_AVAILABLE_EVENTID,
+					   wma_rx_service_available_event,
+					   WMA_RX_SERIALIZER_CTX);
 	wmi_unified_register_event_handler(wmi_handle,
 					   WMI_SERVICE_READY_EVENTID,
 					   wma_rx_service_ready_event,
@@ -3943,6 +3984,11 @@ static inline void wma_update_target_services(tp_wma_handle wh,
 		WMA_LOGI("%s: TX_MSDU_ID_OLD_PARTITION=%d", __func__,
 				HTT_TX_IPA_MSDU_ID_SPACE_BEGIN);
 	}
+
+	if (WMI_SERVICE_EXT_IS_ENABLED(wh->wmi_service_bitmap,
+			wh->wmi_service_ext_bitmap,
+			WMI_SERVICE_11K_NEIGHBOUR_REPORT_SUPPORT))
+		cfg->is_11k_offload_supported = true;
 }
 
 /**
@@ -6503,6 +6549,59 @@ static void wma_get_arp_req_stats(WMA_HANDLE handle,
 }
 
 /**
+ * wma_send_offload_11k_params() - API to send 11k offload params to FW
+ * @handle: WMA handle
+ * @params: Pointer to 11k offload params
+ *
+ * Return: None
+ */
+static
+void wma_send_offload_11k_params(WMA_HANDLE handle,
+				    struct wmi_11k_offload_params *params)
+{
+	QDF_STATUS status;
+	tp_wma_handle wma_handle = (tp_wma_handle) handle;
+
+	if (!wma_handle || !wma_handle->wmi_handle) {
+		WMA_LOGE("WMA is closed, cannot send 11k offload cmd");
+		return;
+	}
+
+	status = wmi_unified_offload_11k_cmd(wma_handle->wmi_handle, params);
+
+	if (status != QDF_STATUS_SUCCESS)
+		WMA_LOGE("failed to send 11k offload command");
+}
+
+/**
+ * wma_send_invoke_neighbor_report() - API to send invoke neighbor report
+ * command to fw
+ *
+ * @handle: WMA handle
+ * @params: Pointer to invoke neighbor report params
+ *
+ * Return: None
+ */
+static
+void wma_send_invoke_neighbor_report(WMA_HANDLE handle,
+			struct wmi_invoke_neighbor_report_params *params)
+{
+	QDF_STATUS status;
+	tp_wma_handle wma_handle = (tp_wma_handle) handle;
+
+	if (!wma_handle || !wma_handle->wmi_handle) {
+		WMA_LOGE("WMA is closed, cannot send invoke neighbor report");
+		return;
+	}
+
+	status = wmi_unified_invoke_neighbor_report_cmd(wma_handle->wmi_handle,
+							params);
+
+	if (status != QDF_STATUS_SUCCESS)
+		WMA_LOGE("failed to send invoke neighbor report command");
+}
+
+/**
  * wma_mc_process_msg() - process wma messages and call appropriate function.
  * @cds_context: cds context
  * @msg: message
@@ -7359,6 +7458,16 @@ QDF_STATUS wma_mc_process_msg(void *cds_context, cds_msg_t *msg)
 	case WMA_GET_ARP_STATS_REQ:
 		wma_get_arp_req_stats(wma_handle,
 			(struct get_arp_stats_params *)msg->bodyptr);
+		qdf_mem_free(msg->bodyptr);
+		break;
+	case WMA_SET_11K_OFFLOAD:
+		wma_send_offload_11k_params(wma_handle,
+			(struct wmi_11k_offload_params *)msg->bodyptr);
+		qdf_mem_free(msg->bodyptr);
+		break;
+	case WMA_INVOKE_NEIGHBOR_REPORT:
+		wma_send_invoke_neighbor_report(wma_handle,
+		(struct wmi_invoke_neighbor_report_params *)msg->bodyptr);
 		qdf_mem_free(msg->bodyptr);
 		break;
 	default:
