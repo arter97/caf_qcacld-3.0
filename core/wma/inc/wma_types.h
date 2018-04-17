@@ -492,7 +492,6 @@
 #define WMA_SET_PER_ROAM_CONFIG_CMD          SIR_HAL_SET_PER_ROAM_CONFIG_CMD
 #define WMA_SET_ARP_STATS_REQ                SIR_HAL_SET_ARP_STATS_REQ
 #define WMA_GET_ARP_STATS_REQ                SIR_HAL_GET_ARP_STATS_REQ
-#define WMA_SET_11K_OFFLOAD                  SIR_HAL_SET_11K_OFFLOAD
 #define WMA_INVOKE_NEIGHBOR_REPORT           SIR_HAL_INVOKE_NEIGHBOR_REPORT
 
 /* Bit 6 will be used to control BD rate for Management frames */

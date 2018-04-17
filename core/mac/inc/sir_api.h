@@ -3247,6 +3247,7 @@ typedef struct sSirRoamOffloadScanReq {
 	int8_t early_stop_scan_max_threshold;
 	enum wmi_dwelltime_adaptive_mode roamscan_adaptive_dwell_mode;
 	tSirAddie assoc_ie;
+	struct wmi_11k_offload_params offload_11k_params;
 } tSirRoamOffloadScanReq, *tpSirRoamOffloadScanReq;
 
 typedef struct sSirRoamOffloadScanRsp {
