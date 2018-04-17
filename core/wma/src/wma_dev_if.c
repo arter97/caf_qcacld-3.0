@@ -1890,6 +1890,7 @@ ol_txrx_vdev_handle wma_vdev_attach(tp_wma_handle wma_handle,
 	struct vdev_create_params params = { 0 };
 	u_int8_t vdev_id;
 	struct sir_set_tx_rx_aggregation_size tx_rx_aggregation_size;
+	struct sir_set_tx_aggr_sw_retry_threshold tx_aggr_sw_retry_threshold;
 
 	if (NULL == mac) {
 		WMA_LOGE("%s: Failed to get mac", __func__);
@@ -1989,6 +1990,17 @@ ol_txrx_vdev_handle wma_vdev_attach(tp_wma_handle wma_handle,
 	tx_rx_aggregation_size.tx_aggregation_size_vo =
 				self_sta_req->tx_aggregation_size_vo;
 
+	tx_aggr_sw_retry_threshold.tx_aggr_sw_retry_threshold_be =
+				self_sta_req->tx_aggr_sw_retry_threshold_be;
+	tx_aggr_sw_retry_threshold.tx_aggr_sw_retry_threshold_bk =
+				self_sta_req->tx_aggr_sw_retry_threshold_bk;
+	tx_aggr_sw_retry_threshold.tx_aggr_sw_retry_threshold_vi =
+				self_sta_req->tx_aggr_sw_retry_threshold_vi;
+	tx_aggr_sw_retry_threshold.tx_aggr_sw_retry_threshold_vo =
+				self_sta_req->tx_aggr_sw_retry_threshold_vo;
+	tx_aggr_sw_retry_threshold.vdev_id = self_sta_req->session_id;
+
+
 	switch (self_sta_req->type) {
 	case WMI_VDEV_TYPE_STA:
 		status = wma_set_tx_rx_aggregation_size_per_ac(
@@ -2015,6 +2027,12 @@ ol_txrx_vdev_handle wma_vdev_attach(tp_wma_handle wma_handle,
 			wma_set_sta_sa_query_param(wma_handle,
 						   self_sta_req->session_id);
 		}
+
+		status = wma_set_sw_retry_threshold(
+						&tx_aggr_sw_retry_threshold);
+		if (status != QDF_STATUS_SUCCESS)
+			WMA_LOGE("failed to set retry threshold(err=%d)",
+				 status);
 		break;
 	}
 

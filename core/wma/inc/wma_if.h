@@ -1155,6 +1155,10 @@ typedef struct sMaxTxPowerPerBandParams {
  * @enable_bcast_probe_rsp: enable broadcast probe response
  * @fils_max_chan_guard_time: FILS max channel guard time
  * @pkt_err_disconn_th: packet drop threshold
+ * @tx_aggr_sw_retry_threshold_be: sw retry threshold for be
+ * @tx_aggr_sw_retry_threshold_bk: sw retry threshold for bk
+ * @tx_aggr_sw_retry_threshold_vi: sw retry threshold for vi
+ * @tx_aggr_sw_retry_threshold_vo: sw retry threshold for vo
  */
 struct add_sta_self_params {
 	tSirMacAddr self_mac_addr;
@@ -1174,6 +1178,10 @@ struct add_sta_self_params {
 	bool enable_bcast_probe_rsp;
 	uint8_t fils_max_chan_guard_time;
 	uint16_t pkt_err_disconn_th;
+	uint32_t tx_aggr_sw_retry_threshold_be;
+	uint32_t tx_aggr_sw_retry_threshold_bk;
+	uint32_t tx_aggr_sw_retry_threshold_vi;
+	uint32_t tx_aggr_sw_retry_threshold_vo;
 };
 
 /**

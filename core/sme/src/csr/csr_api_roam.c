@@ -2642,6 +2642,14 @@ QDF_STATUS csr_change_default_config_param(tpAniSirGlobal pMac,
 			pParam->tx_aggregation_size_vo;
 		pMac->roam.configParam.rx_aggregation_size =
 			pParam->rx_aggregation_size;
+		pMac->roam.configParam.tx_aggr_sw_retry_threshold_be =
+			pParam->tx_aggr_sw_retry_threshold_be;
+		pMac->roam.configParam.tx_aggr_sw_retry_threshold_bk =
+			pParam->tx_aggr_sw_retry_threshold_bk;
+		pMac->roam.configParam.tx_aggr_sw_retry_threshold_vi =
+			pParam->tx_aggr_sw_retry_threshold_vi;
+		pMac->roam.configParam.tx_aggr_sw_retry_threshold_vo =
+			pParam->tx_aggr_sw_retry_threshold_vo;
 		pMac->roam.configParam.enable_bcast_probe_rsp =
 			pParam->enable_bcast_probe_rsp;
 		pMac->roam.configParam.qcn_ie_support =
@@ -15682,6 +15690,14 @@ QDF_STATUS csr_process_add_sta_session_command(tpAniSirGlobal pMac,
 			pMac->roam.configParam.fils_max_chan_guard_time;
 	add_sta_self_req->pkt_err_disconn_th =
 			pMac->roam.configParam.pkt_err_disconn_th;
+	add_sta_self_req->tx_aggr_sw_retry_threshold_be =
+			pMac->roam.configParam.tx_aggr_sw_retry_threshold_be;
+	add_sta_self_req->tx_aggr_sw_retry_threshold_bk =
+			pMac->roam.configParam.tx_aggr_sw_retry_threshold_bk;
+	add_sta_self_req->tx_aggr_sw_retry_threshold_vi =
+			pMac->roam.configParam.tx_aggr_sw_retry_threshold_vi;
+	add_sta_self_req->tx_aggr_sw_retry_threshold_vo =
+			pMac->roam.configParam.tx_aggr_sw_retry_threshold_vo;
 	msg.type = WMA_ADD_STA_SELF_REQ;
 	msg.reserved = 0;
 	msg.bodyptr = add_sta_self_req;
