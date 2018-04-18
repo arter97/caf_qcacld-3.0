@@ -105,9 +105,11 @@ void dp_rx_reorder_flush_frag(struct dp_peer *peer,
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 				FL("Flushing TID %d"), tid);
 
-	if (peer == NULL)
+	if (!peer) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 					"%s: NULL peer\n", __func__);
+		return;
+	}
 
 	pdev = peer->vdev->pdev;
 	soc = pdev->soc;
@@ -980,7 +982,7 @@ static void dp_rx_defrag_nwifi_to_8023(qdf_nbuf_t nbuf)
 
 	ent_ring_desc = hal_srng_src_get_next(soc->hal_soc, hal_srng);
 
-	qdf_assert(ent_ring_desc);
+	qdf_assert_always(ent_ring_desc);
 
 	paddr = (uint64_t)buf_info.paddr;
 	/* buf addr */

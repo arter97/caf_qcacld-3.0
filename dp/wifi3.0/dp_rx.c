@@ -1051,7 +1051,7 @@ static inline void dp_rx_msdu_stats_update(struct dp_soc *soc,
 	DP_STATS_INC(peer, rx.reception_type[reception_type], 1);
 
 	DP_STATS_INCC(peer, rx.pkt_type[pkt_type].
-			mcs_count[MAX_MCS], 1,
+			mcs_count[MAX_MCS-1], 1,
 			((mcs >= MAX_MCS_11A) && (pkt_type
 				== DOT11_A)));
 	DP_STATS_INCC(peer, rx.pkt_type[pkt_type].
@@ -1059,7 +1059,7 @@ static inline void dp_rx_msdu_stats_update(struct dp_soc *soc,
 			((mcs <= MAX_MCS_11A) && (pkt_type
 				== DOT11_A)));
 	DP_STATS_INCC(peer, rx.pkt_type[pkt_type].
-			mcs_count[MAX_MCS], 1,
+			mcs_count[MAX_MCS-1], 1,
 			((mcs >= MAX_MCS_11B)
 			 && (pkt_type == DOT11_B)));
 	DP_STATS_INCC(peer, rx.pkt_type[pkt_type].
@@ -1067,7 +1067,7 @@ static inline void dp_rx_msdu_stats_update(struct dp_soc *soc,
 			((mcs <= MAX_MCS_11B)
 			 && (pkt_type == DOT11_B)));
 	DP_STATS_INCC(peer, rx.pkt_type[pkt_type].
-			mcs_count[MAX_MCS], 1,
+			mcs_count[MAX_MCS-1], 1,
 			((mcs >= MAX_MCS_11A)
 			 && (pkt_type == DOT11_N)));
 	DP_STATS_INCC(peer, rx.pkt_type[pkt_type].
@@ -1075,7 +1075,7 @@ static inline void dp_rx_msdu_stats_update(struct dp_soc *soc,
 			((mcs <= MAX_MCS_11A)
 			 && (pkt_type == DOT11_N)));
 	DP_STATS_INCC(peer, rx.pkt_type[pkt_type].
-			mcs_count[MAX_MCS], 1,
+			mcs_count[MAX_MCS-1], 1,
 			((mcs >= MAX_MCS_11AC)
 			 && (pkt_type == DOT11_AC)));
 	DP_STATS_INCC(peer, rx.pkt_type[pkt_type].
@@ -1083,7 +1083,7 @@ static inline void dp_rx_msdu_stats_update(struct dp_soc *soc,
 			((mcs <= MAX_MCS_11AC)
 			 && (pkt_type == DOT11_AC)));
 	DP_STATS_INCC(peer, rx.pkt_type[pkt_type].
-			mcs_count[MAX_MCS], 1,
+			mcs_count[MAX_MCS-1], 1,
 			((mcs >= MAX_MCS)
 			 && (pkt_type == DOT11_AX)));
 	DP_STATS_INCC(peer, rx.pkt_type[pkt_type].

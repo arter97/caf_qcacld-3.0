@@ -1026,8 +1026,9 @@ static void dp_tx_classify_tid(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 		struct dp_tx_msdu_info_s *msdu_info)
 {
 	uint8_t tos = 0, dscp_tid_override = 0;
-	uint8_t *hdr_ptr, *L3datap;
 	uint8_t is_mcast = 0;
+	uint8_t *hdr_ptr = NULL;
+	uint8_t *L3datap = NULL;
 	struct ether_header *eh = NULL;
 	qdf_ethervlan_header_t *evh = NULL;
 	uint16_t   ether_type;
@@ -1954,6 +1955,9 @@ qdf_nbuf_t dp_tx_send(void *vap_dev, qdf_nbuf_t nbuf)
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
 			 "%s non-TSO SG frame %pK\n", __func__, vdev);
 
+		if (!nbuf)
+			return NULL;
+
 		DP_STATS_INC_PKT(vdev, tx_i.sg.sg_pkt, 1,
 				qdf_nbuf_len(nbuf));
 
@@ -2776,7 +2780,6 @@ uint32_t dp_tx_comp_handler(struct dp_soc *soc, void *hal_srng, uint32_t quota)
 			hal_srng_dst_get_next(soc->hal_soc, hal_srng))) {
 
 		buffer_src = hal_tx_comp_get_buffer_source(tx_comp_hal_desc);
-
 		/* If this buffer was not released by TQM or FW, then it is not
 		 * Tx completion indication, assert */
 		if ((buffer_src != HAL_TX_COMP_RELEASE_SOURCE_TQM) &&
