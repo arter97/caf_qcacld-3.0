@@ -74,6 +74,10 @@ extern void sch_initializeCfPollTemplate(tpAniSirGlobal pMac);
 /* / Initialize CF End template */
 extern void sch_initializeCfEndTemplate(tpAniSirGlobal pMac);
 
+extern tSirRetStatus sch_get_params(tpAniSirGlobal pMac, uint32_t params[][WNI_CFG_EDCA_ANI_ACBK_LOCAL_LEN], uint8_t local);
+
+extern void set_sch_edca_params(tpAniSirGlobal pMac, uint32_t params[][WNI_CFG_EDCA_ANI_ACBK_LOCAL_LEN], tpPESession psessionEntry);
+
 /* / Process the scheduler messages */
 extern void sch_process_message(tpAniSirGlobal pMac, tpSirMsgQ pSchMsg);
 

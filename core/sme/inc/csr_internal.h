@@ -666,6 +666,7 @@ typedef struct tagCsrConfig {
 	uint32_t edca_vi_aifs;
 	uint32_t edca_bk_aifs;
 	uint32_t edca_be_aifs;
+	uint8_t g_local_edca_enable;
 	bool enable_fatal_event;
 	bool vendor_vht_sap;
 	enum wmi_dwelltime_adaptive_mode scan_adaptive_dwell_mode;

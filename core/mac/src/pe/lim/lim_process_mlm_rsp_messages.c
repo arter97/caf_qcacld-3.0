@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -2379,6 +2379,7 @@ static void
 lim_process_sta_mlm_add_bss_rsp(tpAniSirGlobal mac_ctx,
 	tpSirMsgQ msg, tpPESession session_entry)
 {
+	uint32_t params[4][WNI_CFG_EDCA_ANI_ACBK_LOCAL_LEN];
 	tpAddBssParams add_bss_params = (tpAddBssParams) msg->bodyptr;
 	tLimMlmAssocCnf mlm_assoc_cnf;
 	uint32_t msg_type = LIM_MLM_ASSOC_CNF;
@@ -2467,6 +2468,19 @@ lim_process_sta_mlm_add_bss_rsp(tpAniSirGlobal mac_ctx,
 				add_bss_params->staContext.ucUcastSig;
 			sta_ds->ucBcastSig =
 				add_bss_params->staContext.ucBcastSig;
+
+			/*
+			 * For ETSI, STA should follow AP' country code and
+			 * judge the country of EU.
+			 */
+			if (mac_ctx->roam.configParam.g_local_edca_enable) {
+				if (sch_get_params(mac_ctx, params, true /*local*/) !=
+				    eSIR_SUCCESS)
+					pe_err("schGetParams(local) failed");
+				else
+					set_sch_edca_params(mac_ctx, params, session_entry);
+			}
+
 			/* Downgrade the EDCA parameters if needed */
 			lim_set_active_edca_params(mac_ctx,
 				session_entry->gLimEdcaParams, session_entry);

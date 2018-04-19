@@ -2692,6 +2692,8 @@ QDF_STATUS csr_change_default_config_param(tpAniSirGlobal pMac,
 			pParam->is_sta_connection_in_5gz_enabled;
 		pMac->roam.configParam.sendDeauthBeforeCon =
 			pParam->sendDeauthBeforeCon;
+		pMac->roam.configParam.g_local_edca_enable =
+			pParam->g_local_edca_enable;
 
 		pMac->enable_dot11p = pParam->enable_dot11p;
 		pMac->roam.configParam.early_stop_scan_enable =
@@ -3099,6 +3101,7 @@ QDF_STATUS csr_get_config_param(tpAniSirGlobal pMac, tCsrConfigParam *pParam)
 	qdf_mem_copy(&pParam->best_candidate_weight_config,
 		&pMac->roam.configParam.best_candidate_weight_config,
 		sizeof(struct best_candidate_wt_cfg_param));
+	pParam->g_local_edca_enable =  pMac->roam.configParam.g_local_edca_enable;
 
 	return QDF_STATUS_SUCCESS;
 }

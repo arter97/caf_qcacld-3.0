@@ -50,7 +50,7 @@ static tSirRetStatus get_wmm_local_params(tpAniSirGlobal pMac,
 					  uint32_t
 					  params[]
 					  [WNI_CFG_EDCA_ANI_ACBK_LOCAL_LEN]);
-static void set_sch_edca_params(tpAniSirGlobal pMac,
+void set_sch_edca_params(tpAniSirGlobal pMac,
 				uint32_t params[][WNI_CFG_EDCA_ANI_ACBK_LOCAL_LEN],
 				tpPESession psessionEntry);
 
@@ -218,7 +218,7 @@ void sch_process_message(tpAniSirGlobal pMac, tpSirMsgQ pSchMsg)
 
 /* get the local or broadcast parameters based on the profile sepcified in the config */
 /* params are delivered in this order: BK, BE, VI, VO */
-static tSirRetStatus
+tSirRetStatus
 sch_get_params(tpAniSirGlobal pMac,
 	       uint32_t params[][WNI_CFG_EDCA_ANI_ACBK_LOCAL_LEN],
 	       uint8_t local)
@@ -311,6 +311,15 @@ sch_get_params(tpAniSirGlobal pMac,
 		}
 		for (idx = 0; idx < len; idx++)
 			params[i][idx] = (uint32_t) data[idx];
+	}
+	/*
+	 * If gStaLocalEDCAEnable = 1,
+	 * WNI_CFG_EDCA_ETSI_ACBE Txop limit minus 500us
+	 */
+	if (local && (val == WNI_CFG_EDCA_PROFILE_ETSI_EUROPE) &&
+	    pMac->roam.configParam.g_local_edca_enable) {
+		/* Txop limit 5500us / 32 = 0xab */
+		params[0][WNI_CFG_EDCA_PROFILE_TXOPA_IDX] = 0xab;
 	}
 	pe_debug("GetParams: local=%d, profile = %d Done", local, val);
 
@@ -509,7 +518,7 @@ void sch_set_default_edca_params(tpAniSirGlobal pMac, tpPESession psessionEntry)
    \param   tpAniSirGlobal  pMac
    \return  none
  \ ------------------------------------------------------------ */
-static void
+void
 set_sch_edca_params(tpAniSirGlobal pMac,
 		    uint32_t params[][WNI_CFG_EDCA_ANI_ACBK_LOCAL_LEN],
 		    tpPESession psessionEntry)
