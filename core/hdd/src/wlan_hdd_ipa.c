@@ -359,7 +359,7 @@ void hdd_ipa_send_skb_to_network(qdf_nbuf_t skb, qdf_netdev_t dev)
 	int result;
 	unsigned int cpu_index;
 
-	if (!adapter || adapter->magic != WLAN_HDD_ADAPTER_MAGIC) {
+	if (hdd_validate_adapter(adapter)) {
 		QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
 			  "Invalid adapter: 0x%pK", adapter);
 		kfree_skb(skb);
