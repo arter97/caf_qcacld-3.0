@@ -1036,7 +1036,6 @@ QDF_STATUS csr_start(tpAniSirGlobal pMac)
 			break;
 
 		pMac->roam.sPendingCommands = 0;
-		ucfg_scan_set_enable(pMac->psoc, true);
 		for (i = 0; i < CSR_ROAM_SESSION_MAX; i++)
 			status = csr_neighbor_roam_init(pMac, i);
 		pMac->roam.tlStatsReqInfo.numClient = 0;
@@ -1050,6 +1049,7 @@ QDF_STATUS csr_start(tpAniSirGlobal pMac)
 		pMac->scan.requester_id = ucfg_scan_register_requester(
 						pMac->psoc,
 						"CSR", csr_scan_callback, pMac);
+		ucfg_scan_set_enable(pMac->psoc, true);
 	} while (0);
 	return status;
 }
