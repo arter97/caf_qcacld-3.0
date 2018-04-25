@@ -17794,9 +17794,9 @@ static int wlan_hdd_cfg80211_set_ie(struct hdd_adapter *adapter,
 	uint16_t remLen = ie_len;
 #ifdef FEATURE_WLAN_WAPI
 	uint32_t akmsuite[MAX_NUM_AKM_SUITES];
-	u16 *tmp;
+	uint8_t *tmp;
 	uint16_t akmsuiteCount;
-	int *akmlist;
+	uint32_t *akmlist;
 #endif
 	int status;
 
@@ -17992,10 +17992,9 @@ static int wlan_hdd_cfg80211_set_ie(struct hdd_adapter *adapter,
 			}
 			break;
 		case DOT11F_EID_RSN:
-			hdd_debug("Set RSN IE(len %d)", eLen + 2);
-			if (eLen > (MAX_WPA_RSN_IE_LEN - 2)) {
+			if  (eLen  > DOT11F_IE_RSN_MAX_LEN) {
 				hdd_err("%s: Invalid WPA RSN IE length[%d]",
-					__func__, eLen);
+						__func__, eLen);
 				return -EINVAL;
 			}
 			memset(pWextState->WPARSNIE, 0, MAX_WPA_RSN_IE_LEN);
@@ -18004,6 +18003,7 @@ static int wlan_hdd_cfg80211_set_ie(struct hdd_adapter *adapter,
 			pWextState->roamProfile.pRSNReqIE =
 				pWextState->WPARSNIE;
 			pWextState->roamProfile.nRSNReqIELength = eLen + 2;     /* ie_len; */
+			hdd_debug("Set RSN IE(len %d)", eLen + 2);
 			break;
 		/*
 		 * Appending Extended Capabilities with Interworking bit set
@@ -18041,13 +18041,16 @@ static int wlan_hdd_cfg80211_set_ie(struct hdd_adapter *adapter,
 #ifdef FEATURE_WLAN_WAPI
 		case WLAN_EID_WAPI:
 			/* Setting WAPI Mode to ON=1 */
-			adapter->wapi_info.wapi_mode = true;
+			adapter->wapi_info.wapi_mode = 1;
 			hdd_debug("WAPI MODE IS %u", adapter->wapi_info.wapi_mode);
-			tmp = (u16 *) ie;
-			tmp = tmp + 2;  /* Skip element Id and Len, Version */
+			tmp = (uint8_t *)ie;
+			tmp = tmp + 4;  /* Skip element Id and Len, Version */
+			/* Get the number of AKM suite */
 			akmsuiteCount = WPA_GET_LE16(tmp);
-			tmp = tmp + 1;
-			akmlist = (int *)(tmp);
+			/* Skip the number of AKM suite */
+			tmp = tmp + 2;
+			/* AKM suite list, each OUI contains 4 bytes */
+			akmlist = (uint32_t *)(tmp);
 			if (akmsuiteCount <= MAX_NUM_AKM_SUITES) {
 				memcpy(akmsuite, akmlist, (4 * akmsuiteCount));
 			} else {
