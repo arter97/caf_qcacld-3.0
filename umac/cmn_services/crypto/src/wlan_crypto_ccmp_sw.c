@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2018 The Linux Foundation. All rights reserved.
  */
 /*
  * CTR with CBC-MAC Protocol (CCMP)
@@ -141,7 +141,7 @@ uint8_t *wlan_crypto_ccmp_encrypt(const uint8_t *tk, uint8_t *frame,
 
 	if (len < hdrlen || hdrlen < 24)
 		return NULL;
-	plen = len - hdrlen;
+	plen = len - hdrlen - 8 - 8;
 
 	crypt = qdf_mem_malloc(hdrlen + 8 + plen + 8 + AES_BLOCK_SIZE);
 	if (crypt == NULL) {
@@ -149,7 +149,7 @@ uint8_t *wlan_crypto_ccmp_encrypt(const uint8_t *tk, uint8_t *frame,
 		return NULL;
 	}
 
-	qdf_mem_copy(crypt, frame, hdrlen);
+	qdf_mem_copy(crypt, frame, hdrlen + 8);
 
 	hdr = (struct ieee80211_hdr *) crypt;
 	hdr->frame_control |= qdf_cpu_to_le16(WLAN_FC_ISWEP);
@@ -160,7 +160,7 @@ uint8_t *wlan_crypto_ccmp_encrypt(const uint8_t *tk, uint8_t *frame,
 	wpa_hexdump(MSG_EXCESSIVE, "CCMP AAD", aad, aad_len);
 	wpa_hexdump(MSG_EXCESSIVE, "CCMP nonce", nonce, 13);
 
-	if (wlan_crypto_aes_ccm_ae(tk, 16, nonce, 8, frame + hdrlen,
+	if (wlan_crypto_aes_ccm_ae(tk, 16, nonce, 8, frame + hdrlen + 8,
 			plen, aad, aad_len, pos, pos + plen) < 0) {
 		qdf_mem_free(crypt);
 		return NULL;
