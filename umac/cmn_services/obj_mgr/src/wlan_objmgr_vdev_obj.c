@@ -641,12 +641,24 @@ QDF_STATUS wlan_objmgr_vdev_peer_attach(struct wlan_objmgr_vdev *vdev,
 	wlan_vdev_obj_lock(vdev);
 	pdev = wlan_vdev_get_pdev(vdev);
 	/* If Max peer count exceeds, return failure */
-	if ((objmgr->wlan_peer_count >= objmgr->max_peer_count) ||
-	     (wlan_pdev_get_peer_count(pdev) >=
-			wlan_pdev_get_max_peer_count(pdev))) {
+	if (objmgr->wlan_peer_count >= objmgr->max_peer_count) {
 		wlan_vdev_obj_unlock(vdev);
 		return QDF_STATUS_E_FAILURE;
 	}
+	wlan_vdev_obj_unlock(vdev);
+
+	wlan_pdev_obj_lock(pdev);
+	if (wlan_pdev_get_peer_count(pdev) >=
+			wlan_pdev_get_max_peer_count(pdev)) {
+		wlan_pdev_obj_unlock(pdev);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	wlan_pdev_incr_peer_count(wlan_vdev_get_pdev(vdev));
+	wlan_pdev_obj_unlock(pdev);
+
+	wlan_vdev_obj_lock(vdev);
+
 	/* Add peer to vdev's peer list */
 	wlan_obj_vdev_peerlist_add_tail(&objmgr->wlan_peer_list, peer);
 	objmgr->wlan_peer_count++;
@@ -680,6 +692,7 @@ QDF_STATUS wlan_objmgr_vdev_peer_detach(struct wlan_objmgr_vdev *vdev,
 					struct wlan_objmgr_peer *peer)
 {
 	struct wlan_objmgr_vdev_objmgr *objmgr = &vdev->vdev_objmgr;
+	struct wlan_objmgr_pdev *pdev;
 
 	wlan_vdev_obj_lock(vdev);
 	/* if peer count is 0, return failure */
@@ -721,8 +734,13 @@ QDF_STATUS wlan_objmgr_vdev_peer_detach(struct wlan_objmgr_vdev *vdev,
 	}
 	/* decrement peer count */
 	objmgr->wlan_peer_count--;
-	wlan_pdev_decr_peer_count(wlan_vdev_get_pdev(vdev));
+	pdev = wlan_vdev_get_pdev(vdev);
 	wlan_vdev_obj_unlock(vdev);
+
+	wlan_pdev_obj_lock(pdev);
+	wlan_pdev_decr_peer_count(pdev);
+	wlan_pdev_obj_unlock(pdev);
+
 	/* decrement vdev ref count after peer released its reference */
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_OBJMGR_ID);
 	return QDF_STATUS_SUCCESS;
