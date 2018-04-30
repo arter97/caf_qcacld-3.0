@@ -256,6 +256,7 @@ struct mon_rx_status {
 	uint16_t he_data6;
 	uint32_t ppdu_len;
 	uint32_t prev_ppdu_id;
+	uint32_t ppdu_id;
 };
 
 /* Masks for HE SIG known fields in mon_rx_status structure */
