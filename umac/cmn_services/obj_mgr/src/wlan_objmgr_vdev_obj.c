@@ -662,7 +662,6 @@ QDF_STATUS wlan_objmgr_vdev_peer_attach(struct wlan_objmgr_vdev *vdev,
 	/* Add peer to vdev's peer list */
 	wlan_obj_vdev_peerlist_add_tail(&objmgr->wlan_peer_list, peer);
 	objmgr->wlan_peer_count++;
-	wlan_pdev_incr_peer_count(wlan_vdev_get_pdev(vdev));
 
 	if (WLAN_ADDR_EQ(wlan_peer_get_macaddr(peer),
 			 wlan_vdev_mlme_get_macaddr(vdev)) ==
