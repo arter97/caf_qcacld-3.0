@@ -3391,9 +3391,22 @@ void wma_vdev_resp_timer(void *data)
 		if (wma_crash_on_fw_timeout(wma->fw_timeout_crash) == true) {
 			wma_trigger_recovery_assert_on_fw_timeout(
 				WMA_DEL_STA_SELF_REQ);
+		} else if (!cds_is_driver_unloading() &&
+			   (cds_is_fw_down() || cds_is_driver_recovering())) {
+			qdf_mem_free(iface->del_staself_req);
+			iface->del_staself_req = NULL;
 		} else {
 			wma_send_del_sta_self_resp(iface->del_staself_req);
-			iface->del_staself_req = NULL;
+		}
+
+		if (iface->addBssStaContext) {
+			qdf_mem_free(iface->addBssStaContext);
+			iface->addBssStaContext = NULL;
+		}
+
+		if (iface->staKeyParams) {
+			qdf_mem_free(iface->staKeyParams);
+			iface->staKeyParams = NULL;
 		}
 
 		wma_vdev_deinit(iface);
