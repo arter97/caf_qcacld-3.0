@@ -34,6 +34,7 @@
 #define __QDF_MEMORY_H
 
 /* Include Files */
+#include "qdf_str.h" /* TODO: update references and remove */
 #include <qdf_types.h>
 #include <i_qdf_mem.h>
 
@@ -263,31 +264,6 @@ static inline int32_t qdf_mem_cmp(const void *memory1, const void *memory2,
 }
 
 /**
- * qdf_str_cmp - Compare two strings
- * @str1: First string
- * @str2: Second string
- * Return: =0 equal
- * >0    not equal, if  str1  sorts lexicographically after str2
- * <0    not equal, if  str1  sorts lexicographically before str2
- */
-static inline int32_t qdf_str_cmp(const char *str1, const char *str2)
-{
-	return __qdf_str_cmp(str1, str2);
-}
-
-/**
- * qdf_str_lcopy - Copy from one string to another
- * @dest: destination string
- * @src: source string
- * @bytes: limit of num bytes to copy
- * Return: =0 returns the initial value of dest
- */
-static inline uint32_t qdf_str_lcopy(char *dest, const char *src, uint32_t bytes)
-{
-	return __qdf_str_lcopy(dest, src, bytes);
-}
-
-/**
  * qdf_mem_map_nbytes_single - Map memory for DMA
  * @osdev: pomter OS device context
  * @buf: pointer to memory to be dma mapped
@@ -388,16 +364,6 @@ void qdf_mem_dma_sync_single_for_cpu(qdf_device_t osdev,
 					qdf_dma_addr_t bus_addr,
 					qdf_size_t size,
 					__dma_data_direction direction);
-/**
- * qdf_str_len() - returns the length of a string
- * @str: input string
- * Return:
- * length of string
- */
-static inline int32_t qdf_str_len(const char *str)
-{
-	return __qdf_str_len(str);
-}
 
 void qdf_mem_multi_pages_alloc(qdf_device_t osdev,
 			       struct qdf_mem_multi_page_t *pages,
