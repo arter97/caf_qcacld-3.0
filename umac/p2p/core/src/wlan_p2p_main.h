@@ -28,6 +28,7 @@
 #include <qdf_event.h>
 #include <qdf_list.h>
 #include <qdf_lock.h>
+#include <qdf_idr.h>
 
 #define MAX_QUEUE_LENGTH 20
 #define P2P_NOA_ATTR_IND 0x1090
@@ -167,6 +168,7 @@ enum p2p_connection_status {
  * @cancel_roc_done:  Cancel roc done event
  * @roc_runtime_lock: Runtime lock for roc request
  * @p2p_cb: Callbacks to protocol stack
+ * @p2p_idr:          p2p idr
  * @connection_status:Global P2P connection status
  */
 struct p2p_soc_priv_obj {
@@ -179,6 +181,7 @@ struct p2p_soc_priv_obj {
 	qdf_event_t cancel_roc_done;
 	qdf_runtime_lock_t roc_runtime_lock;
 	struct p2p_protocol_callbacks p2p_cb;
+	qdf_idr p2p_idr;
 #ifdef WLAN_FEATURE_P2P_DEBUG
 	enum p2p_connection_status connection_status;
 #endif
