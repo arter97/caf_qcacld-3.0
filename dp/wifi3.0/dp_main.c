@@ -2043,9 +2043,6 @@ static int dp_soc_cmn_setup(struct dp_soc *soc)
 	if (qdf_atomic_read(&soc->cmn_init_done))
 		return 0;
 
-	if (dp_peer_find_attach(soc))
-		goto fail0;
-
 	if (dp_hw_link_desc_pool_setup(soc))
 		goto fail1;
 
@@ -2252,7 +2249,6 @@ fail1:
 	 * Cleanup will be done as part of soc_detach, which will
 	 * be called on pdev attach failure
 	 */
-fail0:
 	return QDF_STATUS_E_FAILURE;
 }
 
@@ -6641,6 +6637,21 @@ static void dp_peer_teardown_wifi3(struct cdp_vdev *vdev_hdl, void *peer_hdl)
 }
 #endif
 
+static QDF_STATUS dp_peer_map_attach_wifi3(struct cdp_soc_t  *soc_hdl,
+		uint32_t max_peers)
+{
+	struct dp_soc *soc = (struct dp_soc *)soc_hdl;
+
+	soc->max_peers = max_peers;
+
+	qdf_print ("%s max_peers %u\n", __func__, max_peers);
+
+	if (dp_peer_find_attach(soc))
+		return QDF_STATUS_E_FAILURE;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static struct cdp_cmn_ops dp_ops_cmn = {
 	.txrx_soc_attach_target = dp_soc_attach_target_wifi3,
 	.txrx_vdev_attach = dp_vdev_attach_wifi3,
@@ -6701,6 +6712,7 @@ static struct cdp_cmn_ops dp_ops_cmn = {
 	.txrx_peer_reset_ast = dp_wds_reset_ast_wifi3,
 	.txrx_peer_reset_ast_table = dp_wds_reset_ast_table_wifi3,
 	.txrx_peer_flush_ast_table = dp_wds_flush_ast_table_wifi3,
+	.txrx_peer_map_attach = dp_peer_map_attach_wifi3,
 };
 
 static struct cdp_ctrl_ops dp_ops_ctrl = {
