@@ -1884,6 +1884,8 @@ target_if_spectral_detach(struct target_if_spectral *spectral)
 	spectral_info("spectral detach");
 
 	if (spectral) {
+		if (spectral->spectral_gen == SPECTRAL_GEN3)
+			deinit_160mhz_delivery_state_machine(spectral);
 		qdf_spinlock_destroy(&spectral->param_info.osps_lock);
 
 		target_if_spectral_detach_simulation(spectral);
@@ -2075,6 +2077,8 @@ target_if_pdev_spectral_init(struct wlan_objmgr_pdev *pdev)
 #else
 		spectral->use_nl_bcast = false;
 #endif
+		if (spectral->spectral_gen == SPECTRAL_GEN3)
+			init_160mhz_delivery_state_machine(spectral);
 	}
 
 	return spectral;
