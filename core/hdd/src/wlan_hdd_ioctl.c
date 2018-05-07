@@ -5205,9 +5205,6 @@ static int drv_cmd_get_ibss_peer_info_all(hdd_adapter_t *adapter,
 			}
 			hdd_debug("%s", &extra[numOfBytestoPrint]);
 		}
-
-		/* Free temporary buffer */
-		qdf_mem_free(extra);
 	} else {
 		/* Command failed, log error */
 		hdd_err("GETIBSSPEERINFOALL command failed with status code %d",
@@ -6356,7 +6353,7 @@ static int hdd_driver_rxfilter_comand_handler(uint8_t *command,
 		value = command + 13;
 	ret = kstrtou8(value, 10, &type);
 	if (ret < 0) {
-		hdd_err("kstrtou8 failed invalid input value %d", type);
+		hdd_err("kstrtou8 failed invalid input value");
 		return -EINVAL;
 	}
 

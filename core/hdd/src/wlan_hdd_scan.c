@@ -59,6 +59,7 @@
  * Count to ratelimit the HDD logs during Scan and connect
  */
 #define HDD_SCAN_REJECT_RATE_LIMIT 5
+#define HDD_DBS_SCAN_DISABLE_RATE_LIMIT 10
 
 /**
  * enum essid_bcast_type - SSID broadcast type
@@ -624,12 +625,15 @@ static void hdd_update_dbs_scan_ctrl_ext_flag(hdd_context_t *hdd_ctx,
 
 	if (!(hdd_ctx->is_dbs_scan_duty_cycle_enabled)) {
 		scan_dbs_policy = HDD_SCAN_DBS_POLICY_IGNORE_DUTY;
-		hdd_info("DBS scan duty cycle is disabled");
+		hdd_info_ratelimited(HDD_DBS_SCAN_DISABLE_RATE_LIMIT,
+				     "DBS scan duty cycle is disabled");
 		goto end;
 	}
 
-	if (hdd_ctx->config->dual_mac_feature_disable ==
-				DISABLE_DBS_CXN_AND_SCAN) {
+	if ((hdd_ctx->config->dual_mac_feature_disable ==
+	     DISABLE_DBS_CXN_AND_SCAN) ||
+	    (hdd_ctx->config->dual_mac_feature_disable ==
+	     ENABLE_DBS_CXN_AND_DISABLE_DBS_SCAN)) {
 		hdd_debug("DBS is disabled");
 		goto end;
 	}
@@ -2005,8 +2009,10 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 			return 0;
 		}
 	}
-	if (pHddCtx->config->dual_mac_feature_disable ==
-				DISABLE_DBS_CXN_AND_SCAN) {
+	if ((pHddCtx->config->dual_mac_feature_disable ==
+	     DISABLE_DBS_CXN_AND_SCAN) ||
+	    (pHddCtx->config->dual_mac_feature_disable ==
+	     ENABLE_DBS_CXN_AND_DISABLE_DBS_SCAN)) {
 		if (true == pScanInfo->mScanPending) {
 			scan_ebusy_cnt++;
 			if (MAX_PENDING_LOG >
@@ -2365,7 +2371,9 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 				&hdd_cfg80211_scan_done_callback, dev);
 
 	if (QDF_STATUS_SUCCESS != status) {
-		hdd_err("sme_scan_request returned error %d", status);
+		hdd_err_ratelimited(HDD_SCAN_REJECT_RATE_LIMIT,
+				    "sme_scan_request returned error %d",
+				    status);
 		if (QDF_STATUS_E_RESOURCES == status) {
 			scan_ebusy_cnt++;
 			hdd_err("HO is in progress. Defer scan scan_ebusy_cnt: %d",
@@ -2819,7 +2827,8 @@ static int __wlan_hdd_cfg80211_vendor_scan(struct wiphy *wiphy,
 
 	ret = __wlan_hdd_cfg80211_scan(wiphy, request, VENDOR_SCAN);
 	if (0 != ret) {
-		hdd_err("Scan Failed. Ret = %d", ret);
+		hdd_err_ratelimited(HDD_SCAN_REJECT_RATE_LIMIT,
+				    "Scan Failed. Ret = %d", ret);
 		qdf_mem_free(request);
 		return ret;
 	}

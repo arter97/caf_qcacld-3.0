@@ -506,6 +506,56 @@ static void hdd_get_transmit_sta_id(hdd_adapter_t *adapter,
 }
 
 /**
+ * hdd_clear_tx_rx_connectivity_stats() - clear connectivity stats
+ * @hdd_ctx: pointer to HDD Station Context
+ *
+ * Return: None
+ */
+static void hdd_clear_tx_rx_connectivity_stats(hdd_adapter_t *adapter)
+{
+	QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_DEBUG,
+		"Clear txrx connectivity stats");
+	qdf_mem_zero(&adapter->hdd_stats.hdd_arp_stats,
+		     sizeof(adapter->hdd_stats.hdd_arp_stats));
+	qdf_mem_zero(&adapter->hdd_stats.hdd_dns_stats,
+		     sizeof(adapter->hdd_stats.hdd_dns_stats));
+	qdf_mem_zero(&adapter->hdd_stats.hdd_tcp_stats,
+		     sizeof(adapter->hdd_stats.hdd_tcp_stats));
+	qdf_mem_zero(&adapter->hdd_stats.hdd_icmpv4_stats,
+		     sizeof(adapter->hdd_stats.hdd_icmpv4_stats));
+	adapter->pkt_type_bitmap = 0;
+	adapter->track_arp_ip = 0;
+	qdf_mem_zero(adapter->dns_payload, adapter->track_dns_domain_len);
+	adapter->track_dns_domain_len = 0;
+	adapter->track_src_port = 0;
+	adapter->track_dest_port = 0;
+	adapter->track_dest_ipv4 = 0;
+}
+
+void hdd_reset_all_adapters_connectivity_stats(hdd_context_t *hdd_ctx)
+{
+	hdd_adapter_list_node_t *adapterNode = NULL, *pNext = NULL;
+	QDF_STATUS status;
+	hdd_adapter_t *adapter;
+
+	ENTER();
+
+	status = hdd_get_front_adapter(hdd_ctx, &adapterNode);
+
+	while (NULL != adapterNode && QDF_STATUS_SUCCESS == status) {
+		adapter = adapterNode->pAdapter;
+		hdd_clear_tx_rx_connectivity_stats(adapter);
+
+		status = hdd_get_next_adapter(hdd_ctx, adapterNode, &pNext);
+		adapterNode = pNext;
+	}
+
+	EXIT();
+
+}
+
+
+/**
  * hdd_tx_rx_is_dns_domain_name_match() - function to check whether dns
  * domain name in the received skb matches with the tracking dns domain
  * name or not
@@ -759,6 +809,46 @@ void hdd_tx_rx_collect_connectivity_stats_info(struct sk_buff *skb,
 	}
 }
 
+/**
+ * hdd_is_tx_allowed() - check if Tx is allowed based on current peer state
+ * @skb: pointer to OS packet (sk_buff)
+ * @peer_id: Peer STA ID in peer table
+ *
+ * This function gets the peer state from DP and check if it is either
+ * in OL_TXRX_PEER_STATE_CONN or OL_TXRX_PEER_STATE_AUTH. Only EAP packets
+ * are allowed when peer_state is OL_TXRX_PEER_STATE_CONN. All packets
+ * allowed when peer_state is OL_TXRX_PEER_STATE_AUTH.
+ *
+ * Return: true if Tx is allowed and false otherwise.
+ **/
+static inline bool hdd_is_tx_allowed(struct sk_buff *skb, uint8_t peer_id)
+{
+	enum ol_txrx_peer_state peer_state;
+	void *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
+	void *peer;
+
+	QDF_ASSERT(pdev);
+	peer = ol_txrx_peer_find_by_local_id(pdev, peer_id);
+
+	if (peer == NULL) {
+		DPTRACE(qdf_dp_trace(skb, QDF_DP_TRACE_DROP_PACKET_RECORD,
+					(uint8_t *)skb->data,
+					qdf_nbuf_len(skb), QDF_TX));
+		return false;
+	}
+	peer_state = ol_txrx_get_peer_state(peer);
+	if (OL_TXRX_PEER_STATE_AUTH == peer_state)
+		return true;
+	else if (OL_TXRX_PEER_STATE_CONN == peer_state &&
+			(ntohs(skb->protocol) == HDD_ETHERTYPE_802_1_X
+			|| IS_HDD_ETHERTYPE_WAI(skb)))
+		return true;
+	DPTRACE(qdf_dp_trace(skb, QDF_DP_TRACE_DROP_PACKET_RECORD,
+				(uint8_t *)skb->data,
+				qdf_nbuf_len(skb), QDF_TX));
+
+	return false;
+}
 
 /**
  * __hdd_hard_start_xmit() - Transmit a frame
@@ -982,6 +1072,24 @@ static int __hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 				 QDF_TRACE_LEVEL_INFO_HIGH,
 				 "%s: station is not connected. drop the pkt",
 				 __func__);
+		++pAdapter->hdd_stats.hddTxRxStats.txXmitDroppedAC[ac];
+		goto drop_pkt_and_release_skb;
+	}
+	if (!hdd_is_tx_allowed(skb, STAId)) {
+		QDF_TRACE(QDF_MODULE_ID_HDD_DATA,
+			  QDF_TRACE_LEVEL_INFO_HIGH,
+			  "%s: Tx is not allowed. drop the pkt",
+			  __func__);
+		++pAdapter->hdd_stats.hddTxRxStats.txXmitDroppedAC[ac];
+		goto drop_pkt_and_release_skb;
+	}
+
+	/* check whether need to linearize skb, like non-linear udp data */
+	if (hdd_skb_nontso_linearize(skb) != QDF_STATUS_SUCCESS) {
+		QDF_TRACE(QDF_MODULE_ID_HDD_DATA,
+			  QDF_TRACE_LEVEL_INFO_HIGH,
+			  "%s: skb %pK linearize failed. drop the pkt",
+			  __func__, skb);
 		++pAdapter->hdd_stats.hddTxRxStats.txXmitDroppedAC[ac];
 		goto drop_pkt_and_release_skb;
 	}
