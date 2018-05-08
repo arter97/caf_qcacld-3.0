@@ -42,7 +42,7 @@
 #endif
 #include <wlan_hdd_includes.h>
 #include <wlan_hdd_ipa.h>
-
+#include <wlan_hdd_softap_tx_rx.h>
 #include <linux/inetdevice.h>
 #include <wlan_hdd_softap_tx_rx.h>
 #include <ol_txrx.h>
@@ -4346,6 +4346,7 @@ static void hdd_ipa_send_skb_to_network(qdf_nbuf_t skb,
 	int result;
 	struct hdd_ipa_priv *hdd_ipa = ghdd_ipa;
 	unsigned int cpu_index;
+	uint8_t staid;
 
 	if (!adapter || adapter->magic != WLAN_HDD_ADAPTER_MAGIC) {
 		HDD_IPA_LOG(QDF_TRACE_LEVEL_DEBUG, "Invalid adapter: 0x%pK",
@@ -4359,6 +4360,16 @@ static void hdd_ipa_send_skb_to_network(qdf_nbuf_t skb,
 		hdd_ipa->ipa_rx_internal_drop_count++;
 		kfree_skb(skb);
 		return;
+	}
+
+	if (adapter->device_mode == QDF_SAP_MODE) {
+		/* Send DHCP Indication to FW */
+		struct qdf_mac_addr *src_mac =
+			(struct qdf_mac_addr *)(skb->data +
+			QDF_NBUF_SRC_MAC_OFFSET);
+		if (QDF_STATUS_SUCCESS ==
+			hdd_softap_get_sta_id(adapter, src_mac, &staid))
+			hdd_inspect_dhcp_packet(adapter, staid, skb, QDF_RX);
 	}
 
 	skb->destructor = hdd_ipa_uc_rt_debug_destructor;
