@@ -1864,4 +1864,19 @@ static inline QDF_STATUS sme_update_fils_config(tHalHandle hal,
 static inline void sme_free_join_rsp_fils_params(tCsrRoamInfo *roam_info)
 {}
 #endif
+
+/*
+ * sme_validate_channel_list() - Validate the given channel list
+ * @hal: handle to global hal context
+ * @chan_list: Pointer to the channel list
+ * @num_channels: number of channels present in the chan_list
+ *
+ * Validates the given channel list with base channels in mac context
+ *
+ * Return: True if all channels in the list are valid, false otherwise
+ */
+bool sme_validate_channel_list(tHalHandle hal,
+				      uint8_t *chan_list,
+				      uint8_t num_channels);
+
 #endif /* #if !defined( __SME_API_H ) */
