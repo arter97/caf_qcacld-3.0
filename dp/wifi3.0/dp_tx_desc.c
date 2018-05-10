@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -162,6 +162,8 @@ QDF_STATUS dp_tx_ext_desc_pool_alloc(struct dp_soc *soc, uint8_t pool_id,
 	struct qdf_mem_multi_page_t *pages;
 	QDF_STATUS status;
 
+	qdf_assert_always(pool_id < MAX_TXDESC_POOLS);
+
 	/* Coherent tx extension descriptor alloc */
 	soc->tx_ext_desc[pool_id].elem_size = HAL_TX_EXT_DESC_WITH_META_DATA;
 	soc->tx_ext_desc[pool_id].elem_count = num_elem;
@@ -301,6 +303,8 @@ QDF_STATUS dp_tx_tso_desc_pool_alloc(struct dp_soc *soc, uint8_t pool_id,
 	struct qdf_tso_seg_elem_t *c_element;
 	struct qdf_tso_seg_elem_t *temp;
 
+	qdf_assert_always(pool_id < MAX_TXDESC_POOLS);
+
 	soc->tx_tso_desc[pool_id].num_free = 0;
 	c_element = qdf_mem_malloc(sizeof(struct qdf_tso_seg_elem_t));
 
@@ -399,6 +403,8 @@ QDF_STATUS dp_tx_tso_num_seg_pool_alloc(struct dp_soc *soc, uint8_t pool_id,
 	int i;
 	struct qdf_tso_num_seg_elem_t *c_element;
 	struct qdf_tso_num_seg_elem_t *temp;
+
+	qdf_assert_always(pool_id < MAX_TXDESC_POOLS);
 
 	soc->tx_tso_num_seg[pool_id].num_free = 0;
 	c_element = qdf_mem_malloc(sizeof(struct qdf_tso_num_seg_elem_t));
