@@ -293,7 +293,7 @@ int32_t wlan_crypto_get_peer_param(struct wlan_objmgr_peer *peer,
 
 	return value;
 }
-
+qdf_export_symbol(wlan_crypto_get_peer_param);
 /**
  * wlan_crypto_is_htallowed - called to check is HT allowed for cipher
  * @vdev:  vdev
@@ -2813,6 +2813,7 @@ bool wlan_crypto_vdev_has_auth_mode(struct wlan_objmgr_vdev *vdev,
 	return wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_AUTH_MODE)
 			& authvalue;
 }
+qdf_export_symbol(wlan_crypto_vdev_has_auth_mode);
 
 /**
  * wlan_crypto_peer_has_auth_mode - check authmode for peer
@@ -2829,6 +2830,7 @@ bool wlan_crypto_peer_has_auth_mode(struct wlan_objmgr_peer *peer,
 	return wlan_crypto_get_peer_param(peer, WLAN_CRYPTO_PARAM_AUTH_MODE)
 			& authvalue;
 }
+qdf_export_symbol(wlan_crypto_peer_has_auth_mode);
 
 /**
  * wlan_crypto_vdev_has_ucastcipher - check ucastcipher for vdev
