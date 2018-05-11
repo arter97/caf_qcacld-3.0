@@ -1553,6 +1553,8 @@ done:
 
 		dp_rx_cksum_offload(vdev->pdev, nbuf, rx_tlv_hdr);
 
+		dp_set_rx_queue(nbuf, ring_id);
+
 		/*
 		 * HW structures call this L3 header padding --
 		 * even though this is actually the offset from
