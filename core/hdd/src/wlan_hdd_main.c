@@ -12042,14 +12042,10 @@ static void __hdd_module_exit(void)
 	pr_info("%s: Unloading driver v%s\n", WLAN_MODULE_NAME,
 		QWLAN_VERSIONSTR);
 
-	if (!hdd_ctx) {
-		hdd_err("hdd context is NULL return!!");
-		return;
-	}
-
 	hdd_wait_for_recovery_completion();
 
-	qdf_cancel_delayed_work(&hdd_ctx->iface_idle_work);
+	if (hdd_ctx)
+		qdf_cancel_delayed_work(&hdd_ctx->iface_idle_work);
 
 	wlan_hdd_unregister_driver();
 
