@@ -1732,6 +1732,11 @@ static int hdd_ipa_uc_enable_pipes(struct hdd_ipa_priv *hdd_ipa)
 	p_cds_contextType cds_ctx = hdd_ipa->hdd_ctx->pcds_context;
 
 	HDD_IPA_LOG(QDF_TRACE_LEVEL_DEBUG, "enter");
+	if (qdf_unlikely(NULL == cds_ctx)) {
+		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR, "cds_ctx is NULL");
+		result = QDF_STATUS_E_FAILURE;
+		goto end;
+	}
 
 	if (!hdd_ipa->ipa_pipes_down) {
 		/*
