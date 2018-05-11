@@ -1354,6 +1354,7 @@ typedef struct tagCsrConfigParam {
 	uint32_t scan_num_probes;
 	uint32_t offload_11k_enable_bitmask;
 	struct csr_neighbor_report_offload_params neighbor_report_offload;
+	bool roam_force_rssi_trigger;
 } tCsrConfigParam;
 
 /* Tush */

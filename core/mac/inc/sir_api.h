@@ -3281,6 +3281,7 @@ typedef struct sSirRoamOffloadScanReq {
 	struct wmi_11k_offload_params offload_11k_params;
 	uint32_t min_delay_btw_roam_scans;
 	uint32_t roam_trigger_reason_bitmask;
+	bool roam_force_rssi_trigger;
 } tSirRoamOffloadScanReq, *tpSirRoamOffloadScanReq;
 
 typedef struct sSirRoamOffloadScanRsp {
