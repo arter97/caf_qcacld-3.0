@@ -725,13 +725,13 @@ int wlan_hdd_validate_context(hdd_context_t *hdd_ctx)
 	if (cds_is_driver_in_bad_state()) {
 		hdd_debug("%pS driver in bad State: 0x%x Ignore!!!",
 			(void *)_RET_IP_, cds_get_driver_state());
-		return -ENODEV;
+		return -EAGAIN;
 	}
 
 	if (cds_is_fw_down()) {
 		hdd_debug("%pS FW is down: 0x%x Ignore!!!",
 			(void *)_RET_IP_, cds_get_driver_state());
-		return -ENODEV;
+		return -EAGAIN;
 	}
 
 	return 0;
@@ -6821,6 +6821,9 @@ static void hdd_bus_bw_work_handler(struct work_struct *work)
 	tx_packets += (uint64_t)ipa_tx_packets;
 	rx_packets += (uint64_t)ipa_rx_packets;
 
+	adapter->stats.tx_packets += ipa_tx_packets;
+	adapter->stats.rx_packets += ipa_rx_packets;
+
 	if (!connected) {
 		hdd_err("bus bandwidth timer running in disconnected state");
 		return;
@@ -10773,8 +10776,6 @@ void hdd_softap_sta_disassoc(hdd_adapter_t *adapter,
 	if (pDelStaParams->peerMacAddr.bytes[0] & 0x1)
 		return;
 
-	wlan_hdd_get_peer_rssi(adapter, &pDelStaParams->peerMacAddr,
-			       HDD_WLAN_GET_PEER_RSSI_SOURCE_DRIVER);
 	wlansap_disassoc_sta(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
 			     pDelStaParams);
 }

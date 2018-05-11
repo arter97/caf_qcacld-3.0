@@ -1412,9 +1412,15 @@ static int hdd_convert_dot11mode_from_phymode(int phymode)
 static void hdd_fill_station_info(hdd_adapter_t *pHostapdAdapter,
 				  tSap_StationAssocReassocCompleteEvent *event)
 {
-	hdd_station_info_t *stainfo = &pHostapdAdapter->aStaInfo[event->staId];
+	hdd_station_info_t *stainfo;
 	uint8_t i = 0;
 
+	if (event->staId >= WLAN_MAX_STA_COUNT) {
+		hdd_err("invalid sta id");
+		return;
+	}
+
+	stainfo = &pHostapdAdapter->aStaInfo[event->staId];
 	if (!stainfo) {
 		hdd_err("invalid stainfo");
 		return;
@@ -1449,15 +1455,34 @@ static void hdd_fill_station_info(hdd_adapter_t *pHostapdAdapter,
 	/* expect max_phy_rate report in kbps */
 	stainfo->max_phy_rate *= 100;
 
-	if (event->vht_caps.present)
+	if (event->vht_caps.present) {
+		stainfo->vht_present = true;
 		hdd_copy_vht_caps(&stainfo->vht_caps, &event->vht_caps);
-	if (event->ht_caps.present)
+	}
+	if (event->ht_caps.present) {
+		stainfo->ht_present = true;
 		hdd_copy_ht_caps(&stainfo->ht_caps, &event->ht_caps);
+	}
 
 	while (i < WLAN_MAX_STA_COUNT) {
-		if (pHostapdAdapter->cache_sta_info[i].isUsed != TRUE)
+		if (!qdf_mem_cmp(pHostapdAdapter->
+				 cache_sta_info[i].macAddrSTA.bytes,
+				 event->staMac.bytes,
+				 QDF_MAC_ADDR_SIZE)) {
+			qdf_mem_zero(&pHostapdAdapter->cache_sta_info[i],
+				     sizeof(*stainfo));
 			break;
+		}
 		i++;
+	}
+
+	if (i == WLAN_MAX_STA_COUNT) {
+		i = 0;
+		while (i < WLAN_MAX_STA_COUNT) {
+			if (pHostapdAdapter->cache_sta_info[i].isUsed != TRUE)
+				break;
+			i++;
+		}
 	}
 	if (i < WLAN_MAX_STA_COUNT)
 		qdf_mem_copy(&pHostapdAdapter->cache_sta_info[i],
@@ -1561,7 +1586,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 	struct ch_params_s sap_ch_param = {0};
 	eCsrPhyMode phy_mode;
 	bool legacy_phymode;
-	tSap_StationDisassocCompleteEvent *disconnect_event;
+	tSap_StationDisassocCompleteEvent *disassoc_comp;
 	hdd_station_info_t *stainfo;
 
 	dev = (struct net_device *)usrDataForCallback;
@@ -1675,16 +1700,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 					pHddApCtx->uBCStaId,
 					HDD_IPA_AP_CONNECT,
 					pHostapdAdapter->dev->dev_addr);
-			if (status) {
+			if (status)
 				hdd_err("WLAN_AP_CONNECT event failed");
-				/*
-				 * Make sure to set the event before proceeding
-				 * for error handling otherwise caller thread
-				 * will wait till 10 secs and no other
-				 * connection will go through before that.
-				 */
-				qdf_event_set(&pHostapdState->qdf_event);
-			}
 		}
 
 		if (0 !=
@@ -2146,34 +2163,21 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 		hdd_green_ap_add_sta(pHddCtx);
 		break;
 
-	case eSAP_STA_LOSTLINK_DETECTED:
-		disconnect_event =
-			&pSapEvent->sapevt.sapStationDisassocCompleteEvent;
-
-		wlan_hdd_get_peer_rssi(pHostapdAdapter,
-				       &disconnect_event->staMac,
-				       HDD_WLAN_GET_PEER_RSSI_SOURCE_DRIVER);
-
-		/*
-		 * For user initiated disconnect, reason_code is updated while
-		 * issuing the disconnect from HDD.
-		 */
-		if (disconnect_event->reason != eSAP_USR_INITATED_DISASSOC) {
-			stainfo = hdd_get_stainfo(
-					pHostapdAdapter->cache_sta_info,
-					disconnect_event->staMac);
-			if (stainfo)
-				stainfo->reason_code =
-					disconnect_event->reason_code;
-		}
-		return QDF_STATUS_SUCCESS;
-
 	case eSAP_STA_DISASSOC_EVENT:
+		disassoc_comp =
+			&pSapEvent->sapevt.sapStationDisassocCompleteEvent;
 		memcpy(wrqu.addr.sa_data,
-		       &pSapEvent->sapevt.sapStationDisassocCompleteEvent.
-		       staMac, QDF_MAC_ADDR_SIZE);
+		       &disassoc_comp->staMac, QDF_MAC_ADDR_SIZE);
 		hdd_notice(" disassociated " MAC_ADDRESS_STR,
 		       MAC_ADDR_ARRAY(wrqu.addr.sa_data));
+		stainfo = hdd_get_stainfo(pHostapdAdapter->cache_sta_info,
+					  disassoc_comp->staMac);
+		if (stainfo) {
+			stainfo->rssi = disassoc_comp->rssi;
+			stainfo->tx_rate = disassoc_comp->tx_rate;
+			stainfo->rx_rate = disassoc_comp->rx_rate;
+			stainfo->reason_code = disassoc_comp->reason_code;
+		}
 
 		qdf_status = qdf_event_set(&pHostapdState->qdf_sta_disassoc_event);
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
@@ -4448,7 +4452,6 @@ static __iw_softap_disassoc_sta(struct net_device *dev,
 	uint8_t *peerMacAddr;
 	int ret;
 	struct tagCsrDelStaParams del_sta_params;
-	hdd_station_info_t *stainfo;
 
 	ENTER_DEV(dev);
 
@@ -4474,11 +4477,6 @@ static __iw_softap_disassoc_sta(struct net_device *dev,
 			(SIR_MAC_MGMT_DISASSOC >> 4),
 			&del_sta_params);
 	hdd_softap_sta_disassoc(pHostapdAdapter, &del_sta_params);
-
-	stainfo = hdd_get_stainfo(pHostapdAdapter->cache_sta_info,
-				  del_sta_params.peerMacAddr);
-	if (stainfo)
-		stainfo->reason_code = del_sta_params.reason_code;
 
 	EXIT();
 	return 0;
@@ -5268,58 +5266,6 @@ static int iw_get_ap_freq(struct net_device *dev,
 	return ret;
 }
 
-/**
- * __iw_get_mode() - get mode
- * @dev - Pointer to the net device.
- * @info - Pointer to the iw_request_info.
- * @wrqu - Pointer to the iwreq_data.
- * @extra - Pointer to the data.
- *
- * Return: 0 for success, non zero for failure.
- */
-static int __iw_get_mode(struct net_device *dev,
-		       struct iw_request_info *info,
-		       union iwreq_data *wrqu, char *extra) {
-
-	hdd_adapter_t *adapter;
-	hdd_context_t *hdd_ctx;
-	int ret;
-
-	ENTER_DEV(dev);
-
-	adapter = WLAN_HDD_GET_PRIV_PTR(dev);
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	ret = wlan_hdd_validate_context(hdd_ctx);
-	if (0 != ret)
-		return ret;
-
-	wrqu->mode = IW_MODE_MASTER;
-
-	return ret;
-}
-
-/**
- * iw_get_mode() - Wrapper function to protect __iw_get_mode from the SSR.
- * @dev - Pointer to the net device.
- * @info - Pointer to the iw_request_info.
- * @wrqu - Pointer to the iwreq_data.
- * @extra - Pointer to the data.
- *
- * Return: 0 for success, non zero for failure.
- */
-static int iw_get_mode(struct net_device *dev,
-			struct iw_request_info *info,
-			union iwreq_data *wrqu, char *extra)
-{
-	int ret;
-
-	cds_ssr_protect(__func__);
-	ret = __iw_get_mode(dev, info, wrqu, extra);
-	cds_ssr_unprotect(__func__);
-
-	return ret;
-}
-
 static int
 __iw_softap_stopbss(struct net_device *dev,
 		    struct iw_request_info *info,
@@ -5811,7 +5757,7 @@ static const iw_handler hostapd_handler[] = {
 	(iw_handler) NULL,      /* SIOCSIWFREQ */
 	(iw_handler) iw_get_ap_freq,            /* SIOCGIWFREQ */
 	(iw_handler) NULL,      /* SIOCSIWMODE */
-	(iw_handler) iw_get_mode,       /* SIOCGIWMODE */
+	(iw_handler) NULL,       /* SIOCGIWMODE */
 	(iw_handler) NULL,      /* SIOCSIWSENS */
 	(iw_handler) NULL,      /* SIOCGIWSENS */
 	(iw_handler) NULL,      /* SIOCSIWRANGE */
