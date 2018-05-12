@@ -460,7 +460,12 @@ static void dp_peer_ast_set_type_wifi3(
 				type);
 }
 
-
+static enum cdp_txrx_ast_entry_type dp_peer_ast_get_type_wifi3(
+					struct cdp_soc_t *soc_hdl,
+					void *ast_entry_hdl)
+{
+	return ((struct dp_ast_entry *)ast_entry_hdl)->type;
+}
 
 /**
  * dp_srng_find_ring_in_mask() - find which ext_group a ring belongs
@@ -5961,6 +5966,9 @@ static void dp_set_vdev_param(struct cdp_vdev *vdev_handle,
 	struct dp_vdev *vdev = (struct dp_vdev *)vdev_handle;
 	switch (param) {
 	case CDP_ENABLE_WDS:
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+				"wds_enable %d for vdev(%p) id(%d)\n",
+				val, vdev, vdev->vdev_id);
 		vdev->wds_enabled = val;
 		break;
 	case CDP_ENABLE_NAWDS:
@@ -6724,6 +6732,7 @@ static struct cdp_cmn_ops dp_ops_cmn = {
 	.txrx_peer_ast_get_pdev_id = dp_peer_ast_get_pdev_id_wifi3,
 	.txrx_peer_ast_get_next_hop = dp_peer_ast_get_next_hop_wifi3,
 	.txrx_peer_ast_set_type = dp_peer_ast_set_type_wifi3,
+	.txrx_peer_ast_get_type = dp_peer_ast_get_type_wifi3,
 	.txrx_peer_delete = dp_peer_delete_wifi3,
 	.txrx_vdev_register = dp_vdev_register_wifi3,
 	.txrx_soc_detach = dp_soc_detach_wifi3,
