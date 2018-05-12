@@ -75,6 +75,15 @@ static void dp_peer_delete_wifi3(void *peer_handle, uint32_t bitmap);
 #define DP_CURR_FW_STATS_AVAIL 19
 #define DP_HTT_DBG_EXT_STATS_MAX 256
 #define DP_MAX_SLEEP_TIME 100
+/* Macros for BATCH INTR TIMER value */
+#define DP_BATCH_RX_INTR_TIMER 1000
+/* BATCH size for rx min value */
+#define DP_BATCH_RX_INTR_MIN 1
+/* BATCH size for rx max value */
+#define DP_BATCH_RX_INTR_MAX 128
+/* Number of rx packets received per second,
+ * added to change batch from min to max and viceversa */
+#define DP_RX_PACKET_RECEIVED 175000
 
 #ifdef IPA_OFFLOAD
 /* Exclude IPA rings from the interrupt context */
@@ -1747,6 +1756,66 @@ static void dp_soc_wds_detach(struct dp_soc *soc)
 #endif
 
 /*
+ * dp_batch_intr_detach() - Detach batch interrupt structures and timers
+ * @txrx_soc: DP SOC handle
+ *
+ * Return: None
+ */
+static void dp_batch_intr_detach(struct dp_soc *soc)
+{
+	qdf_timer_free(&soc->batch_intr->rx_batch_intr_timer);
+
+	qdf_mem_free(soc->batch_intr);
+}
+
+/*
+ * dp_rx_batch_intr_timer_fn() - called on batch_intr timer every second
+ * @txrx_soc: DP SOC handle
+ *
+ * Return: None
+ */
+static void dp_rx_batch_intr_timer_fn(void *soc_hdl)
+{
+	struct dp_soc *soc = (struct dp_soc *) soc_hdl;
+	struct hal_srng *srng = NULL;
+	int i = 0;
+	bool batch_thres_change = false;
+
+	if (qdf_atomic_read(&soc->batch_intr->pkt_to_stack_per_sec) <
+							DP_RX_PACKET_RECEIVED) {
+		if (soc->batch_intr->int_batch_threshold_rx !=
+							DP_BATCH_RX_INTR_MIN) {
+			soc->batch_intr->int_batch_threshold_rx =
+							DP_BATCH_RX_INTR_MIN;
+			batch_thres_change = true;
+		}
+	} else {
+		if (soc->batch_intr->int_batch_threshold_rx !=
+							DP_BATCH_RX_INTR_MAX) {
+			soc->batch_intr->int_batch_threshold_rx =
+							DP_BATCH_RX_INTR_MAX;
+			batch_thres_change = true;
+		}
+	}
+
+	if (batch_thres_change == true) {
+		for (i = 0; i < soc->num_reo_dest_rings; i++) {
+			srng = soc->reo_dest_ring[i].hal_srng;
+			srng->intr_batch_cntr_thres_entries =
+				soc->batch_intr->int_batch_threshold_rx;
+
+			hal_srng_set_threshold_intr(soc->hal_soc, srng);
+		}
+	}
+
+	soc->pkt_to_stack_per_sec =
+			qdf_atomic_read(&soc->batch_intr->pkt_to_stack_per_sec);
+	qdf_atomic_set(&soc->batch_intr->pkt_to_stack_per_sec, 0);
+	qdf_timer_mod(&soc->batch_intr->rx_batch_intr_timer,
+				DP_BATCH_RX_INTR_TIMER);
+}
+
+/*
  * dp_soc_reset_ring_map() - Reset cpu ring map
  * @soc: Datapath soc handler
  *
@@ -2238,6 +2307,10 @@ static int dp_soc_cmn_setup(struct dp_soc *soc)
 		wlan_cfg_get_rx_defrag_min_timeout(soc->wlan_cfg_ctx);
 	soc->rx.flags.defrag_timeout_check =
 		wlan_cfg_get_defrag_timeout_check(soc->wlan_cfg_ctx);
+
+	soc->batch_intr->int_batch_threshold_rx =
+		wlan_cfg_get_int_batch_threshold_rx(soc->wlan_cfg_ctx);
+
 
 out:
 	/*
@@ -2992,6 +3065,7 @@ static void dp_soc_detach_wifi3(void *txrx_soc)
 
 	dp_soc_wds_detach(soc);
 	qdf_spinlock_destroy(&soc->ast_lock);
+	dp_batch_intr_detach(soc);
 
 	qdf_mem_free(soc);
 }
@@ -3187,6 +3261,27 @@ static void dp_soc_set_nss_cfg_wifi3(struct cdp_soc_t *cdp_soc, int config)
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 				FL("nss-wifi<0> nss config is enabled"));
 }
+
+static void dp_batch_intr_attach(struct dp_soc *soc)
+{
+	struct dp_batch_intr *pbatch_intr =
+			qdf_mem_malloc(sizeof(struct dp_batch_intr));
+
+	qdf_mem_set(pbatch_intr, sizeof(pbatch_intr), 0x0);
+
+	soc->batch_intr = pbatch_intr;
+
+	/*initialize batch intr time for rx*/
+	qdf_timer_init(soc->osdev, &pbatch_intr->rx_batch_intr_timer,
+				dp_rx_batch_intr_timer_fn, (void *)soc,
+				QDF_TIMER_TYPE_SW);
+
+	if (soc->intr_mitigation_enabled)
+		qdf_timer_mod(&pbatch_intr->rx_batch_intr_timer,
+					DP_BATCH_RX_INTR_TIMER);
+}
+
+
 /*
 * dp_vdev_attach_wifi3() - attach txrx vdev
 * @txrx_pdev: Datapath PDEV handle
@@ -5069,6 +5164,8 @@ dp_print_soc_tx_stats(struct dp_soc *soc)
 			soc->stats.tx.tx_invalid_peer.num);
 	DP_PRINT_STATS("	Bytes = %llu",
 			soc->stats.tx.tx_invalid_peer.bytes);
+	DP_PRINT_STATS("Rx Packets per sec = %u",
+			soc->pkt_to_stack_per_sec);
 	DP_PRINT_STATS("Packets dropped due to TCL ring full = %d %d %d",
 			soc->stats.tx.tcl_ring_full[0],
 			soc->stats.tx.tcl_ring_full[1],
@@ -7122,6 +7219,7 @@ void *dp_soc_attach_wifi3(void *ctrl_psoc, void *hif_handle,
 
 	wlan_cfg_set_rx_hash(soc->wlan_cfg_ctx, rx_hash);
 	soc->cce_disable = false;
+	soc->intr_mitigation_enabled = false;
 
 	if (soc->cdp_soc.ol_ops->get_dp_cfg_param) {
 		int ret = soc->cdp_soc.ol_ops->get_dp_cfg_param(soc->ctrl_psoc,
@@ -7135,6 +7233,11 @@ void *dp_soc_attach_wifi3(void *ctrl_psoc, void *hif_handle,
 				CDP_CFG_CCE_DISABLE);
 		if (ret == 1)
 			soc->cce_disable = true;
+
+		ret = soc->cdp_soc.ol_ops->get_dp_cfg_param(soc->ctrl_psoc,
+				CDP_CFG_INTR_MITIGATION_ENABLE);
+		if (ret == 1)
+			soc->intr_mitigation_enabled = true;
 	}
 
 	qdf_spinlock_create(&soc->peer_ref_mutex);
@@ -7151,6 +7254,9 @@ void *dp_soc_attach_wifi3(void *ctrl_psoc, void *hif_handle,
 
 	/*Initialize inactivity timer for wifison */
 	dp_init_inact_timer(soc);
+
+	/*batch intr timer*/
+	dp_batch_intr_attach(soc);
 
 	return (void *)soc;
 

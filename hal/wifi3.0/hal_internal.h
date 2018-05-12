@@ -361,6 +361,8 @@ struct hal_soc {
 	bool use_register_windowing;
 	uint32_t register_window;
 	qdf_spinlock_t register_access_lock;
+
+	uint32_t interrupt_reg_val;
 };
 
 /* TODO: Check if the following can be provided directly by HW headers */

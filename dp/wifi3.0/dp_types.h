@@ -606,6 +606,12 @@ struct htt_t2h_stats {
 	uint32_t num_stats;
 };
 
+struct dp_batch_intr {
+	qdf_timer_t rx_batch_intr_timer;
+	qdf_atomic_t  pkt_to_stack_per_sec;
+	uint32_t int_batch_threshold_rx;
+};
+
 /* SOC level structure for data path */
 struct dp_soc {
 	/* Common base structure - Should be the first member */
@@ -637,6 +643,12 @@ struct dp_soc {
 
 	/*cce disable*/
 	bool cce_disable;
+
+	/*intr mitigation enable*/
+	bool intr_mitigation_enabled;
+
+	struct dp_batch_intr *batch_intr;
+	uint32_t  pkt_to_stack_per_sec;
 
 	/* Link descriptor memory banks */
 	struct {
@@ -811,6 +823,7 @@ struct dp_soc {
 	uint8_t reap_timer_init;
 	qdf_timer_t int_timer;
 	uint8_t intr_mode;
+
 
 	qdf_list_t reo_desc_freelist;
 	qdf_spinlock_t reo_desc_freelist_lock;

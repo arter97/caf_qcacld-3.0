@@ -315,6 +315,9 @@ extern void hal_get_shadow_config(void *hal_soc,
 extern void *hal_srng_setup(void *hal_soc, int ring_type, int ring_num,
 	int mac_id, struct hal_srng_params *ring_params);
 
+extern void hal_srng_set_threshold_intr(struct hal_soc *hal,
+	struct hal_srng *srng);
+
 /* Remapping ids of REO rings */
 #define REO_REMAP_TCL 0
 #define REO_REMAP_SW1 1
