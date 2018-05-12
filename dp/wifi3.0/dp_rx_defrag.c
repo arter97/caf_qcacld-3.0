@@ -433,8 +433,7 @@ static QDF_STATUS dp_rx_defrag_ccmp_decap(qdf_nbuf_t nbuf, uint16_t hdrlen)
 	if (!(ivp[IEEE80211_WEP_IVLEN] & IEEE80211_WEP_EXTIV))
 		return QDF_STATUS_E_DEFRAG_ERROR;
 
-	qdf_mem_move(origHdr + dp_f_ccmp.ic_header, origHdr, hdrlen);
-	qdf_nbuf_pull_head(nbuf, dp_f_ccmp.ic_header);
+	/* Let's pull the header later */
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -456,7 +455,6 @@ static QDF_STATUS dp_rx_defrag_wep_decap(qdf_nbuf_t msdu, uint16_t hdrlen)
 	origHdr = (uint8_t *) (qdf_nbuf_data(msdu) + rx_desc_len);
 	qdf_mem_move(origHdr + dp_f_wep.ic_header, origHdr, hdrlen);
 
-	qdf_nbuf_pull_head(msdu, dp_f_wep.ic_header);
 	qdf_nbuf_trim_tail(msdu, dp_f_wep.ic_trailer);
 
 	return QDF_STATUS_SUCCESS;
@@ -724,15 +722,14 @@ static QDF_STATUS dp_rx_defrag_tkip_demic(const uint8_t *key,
 /*
  * dp_rx_frag_pull_hdr(): Pulls the RXTLV & the 802.11 headers
  * @nbuf: buffer pointer
+ * @hdrsize: size of the header to be pulled
  *
  * Pull the RXTLV & the 802.11 headers
  *
  * Returns: None
  */
-static void dp_rx_frag_pull_hdr(qdf_nbuf_t nbuf)
+static void dp_rx_frag_pull_hdr(qdf_nbuf_t nbuf, uint16_t hdrsize)
 {
-	uint16_t hdrsize = dp_rx_defrag_hdrsize(nbuf);
-
 	qdf_nbuf_pull_head(nbuf,
 			RX_PKT_TLVS_LEN + hdrsize);
 
@@ -746,20 +743,22 @@ static void dp_rx_frag_pull_hdr(qdf_nbuf_t nbuf)
  * dp_rx_construct_fraglist(): Construct a nbuf fraglist
  * @peer: Pointer to the peer
  * @head: Pointer to list of fragments
+ * @hdrsize: Size of the header to be pulled
  *
  * Construct a nbuf fraglist
  *
  * Returns: None
  */
 static void
-dp_rx_construct_fraglist(struct dp_peer *peer, qdf_nbuf_t head)
+dp_rx_construct_fraglist(struct dp_peer *peer,
+		qdf_nbuf_t head, uint16_t hdrsize)
 {
 	qdf_nbuf_t msdu = qdf_nbuf_next(head);
 	qdf_nbuf_t rx_nbuf = msdu;
 	uint32_t len = 0;
 
 	while (msdu) {
-		dp_rx_frag_pull_hdr(msdu);
+		dp_rx_frag_pull_hdr(msdu, hdrsize);
 		len += qdf_nbuf_len(msdu);
 		msdu = qdf_nbuf_next(msdu);
 	}
@@ -802,14 +801,15 @@ static void dp_rx_defrag_err(uint8_t vdev_id, uint8_t *peer_mac_addr,
 /*
  * dp_rx_defrag_nwifi_to_8023(): Transcap 802.11 to 802.3
  * @nbuf: Pointer to the fragment buffer
+ * @hdrsize: Size of headers
  *
  * Transcap the fragment from 802.11 to 802.3
  *
  * Returns: None
  */
-static void dp_rx_defrag_nwifi_to_8023(qdf_nbuf_t nbuf)
+static void
+dp_rx_defrag_nwifi_to_8023(qdf_nbuf_t nbuf, uint16_t hdrsize)
 {
-	uint32_t hdrsize;
 	struct llc_snap_hdr_t *llchdr;
 	struct ethernet_hdr_t *eth_hdr;
 	uint8_t ether_type[2];
@@ -823,8 +823,6 @@ static void dp_rx_defrag_nwifi_to_8023(qdf_nbuf_t nbuf)
 		QDF_ASSERT(0);
 		return;
 	}
-
-	hdrsize = dp_rx_defrag_hdrsize(nbuf);
 
 	qdf_mem_copy(rx_desc_info, qdf_nbuf_data(nbuf), RX_PKT_TLVS_LEN);
 
@@ -1073,10 +1071,15 @@ static QDF_STATUS dp_rx_defrag(struct dp_peer *peer, unsigned tid,
 		qdf_nbuf_set_next(cur, tmp_next);
 		cur = tmp_next;
 	}
+	cur = frag_list_head;
 
-	/* Temporary fix to drop all encrypted packets */
-	if (peer->security[index].sec_type !=
-			htt_sec_type_none) {
+	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO,
+			"%s: Security type: %d\n", __func__,
+			peer->security[index].sec_type);
+
+	/* Temporary fix to drop TKIP encrypted packets */
+	if (peer->security[index].sec_type ==
+			htt_sec_type_tkip) {
 		return QDF_STATUS_E_DEFRAG_ERROR;
 	}
 
@@ -1129,6 +1132,9 @@ static QDF_STATUS dp_rx_defrag(struct dp_peer *peer, unsigned tid,
 			}
 			cur = tmp_next;
 		}
+
+		/* If success, increment header to be stripped later */
+		hdr_space += dp_f_ccmp.ic_header;
 		break;
 	case htt_sec_type_wep40:
 	case htt_sec_type_wep104:
@@ -1148,6 +1154,9 @@ static QDF_STATUS dp_rx_defrag(struct dp_peer *peer, unsigned tid,
 			}
 			cur = tmp_next;
 		}
+
+		/* If success, increment header to be stripped later */
+		hdr_space += dp_f_wep.ic_header;
 		break;
 	default:
 		QDF_TRACE(QDF_MODULE_ID_TXRX,
@@ -1174,8 +1183,8 @@ static QDF_STATUS dp_rx_defrag(struct dp_peer *peer, unsigned tid,
 	}
 
 	/* Convert the header to 802.3 header */
-	dp_rx_defrag_nwifi_to_8023(frag_list_head);
-	dp_rx_construct_fraglist(peer, frag_list_head);
+	dp_rx_defrag_nwifi_to_8023(frag_list_head, hdr_space);
+	dp_rx_construct_fraglist(peer, frag_list_head, hdr_space);
 
 	return QDF_STATUS_SUCCESS;
 }
