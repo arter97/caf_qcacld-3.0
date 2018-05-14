@@ -1147,4 +1147,27 @@ extern void hal_get_srng_params(void *hal_soc, void *hal_ring,
  * @mem: pointer to structure to be updated with hal mem info
  */
 extern void hal_get_meminfo(void *hal_soc,struct hal_mem_info *mem );
+
+/**
+ * hal_get_ba_aging_timeout - Retreive BA aging timeout
+ *
+ * @hal_soc: Opaque HAL SOC handle
+ * @ac: Access category
+ * @value: timeout duration in millisec
+ */
+
+extern void hal_get_ba_aging_timeout(void *hal_soc, uint8_t ac,
+				uint32_t *value);
+
+/**
+ * hal_set_aging_timeout - Set BA aging timeout
+ *
+ * @hal_soc: Opaque HAL SOC handle
+ * @ac: Access category in millisec
+ * @value: timeout duration value
+ */
+
+extern void hal_set_ba_aging_timeout(void *hal_soc, uint8_t ac,
+				uint32_t value);
+
 #endif /* _HAL_APIH_ */
