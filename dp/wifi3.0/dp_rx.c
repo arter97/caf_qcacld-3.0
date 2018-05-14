@@ -1611,7 +1611,8 @@ done:
 
 		if (qdf_likely(vdev->rx_decap_type ==
 					htt_cmn_pkt_type_ethernet) &&
-				(qdf_likely(!vdev->mesh_vdev))) {
+				(qdf_likely(!vdev->mesh_vdev)) &&
+				(vdev->wds_enabled)) {
 			/* WDS Source Port Learning */
 			dp_rx_wds_srcport_learn(soc,
 						rx_tlv_hdr,
