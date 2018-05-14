@@ -877,15 +877,24 @@ void dp_rx_tid_stats_cb(struct dp_soc *soc, void *cb_ctxt,
 		queue_status->late_recv_mpdu_cnt, queue_status->win_jump_2k,
 		queue_status->hole_cnt);
 
-	DP_PRINT_STATS("Num of Addba Req = %d\n", rx_tid->num_of_addba_req);
-	DP_PRINT_STATS("Num of Addba Resp = %d\n", rx_tid->num_of_addba_resp);
-	DP_PRINT_STATS("Num of Addba Resp successful = %d\n",
-		       rx_tid->num_addba_rsp_success);
-	DP_PRINT_STATS("Num of Addba Resp failed = %d\n",
-		       rx_tid->num_addba_rsp_failed);
-	DP_PRINT_STATS("Num of Delba Req = %d\n", rx_tid->num_of_delba_req);
-	DP_PRINT_STATS("BA window size   = %d\n", rx_tid->ba_win_size);
-	DP_PRINT_STATS("Pn size = %d\n", rx_tid->pn_size);
+	DP_PRINT_STATS("Addba Req          : %d\n"
+				   "Addba Resp         : %d\n"
+				   "Addba Resp success : %d\n"
+				   "Addba Resp failed  : %d\n"
+				   "Delba Req          : %d\n"
+				   "Delba Sent         : %d\n"
+				   "Delba Tx Fail      : %d\n"
+				   "BA window size     : %d\n"
+				   "Pn size            : %d\n",
+				   rx_tid->num_of_addba_req,
+				   rx_tid->num_of_addba_resp,
+				   rx_tid->num_addba_rsp_success,
+				   rx_tid->num_addba_rsp_failed,
+				   rx_tid->num_of_delba_req,
+				   rx_tid->delba_tx_success_cnt,
+				   rx_tid->delba_tx_fail_cnt,
+				   rx_tid->ba_win_size,
+				   rx_tid->pn_size);
 }
 
 static inline struct dp_peer *dp_peer_find_add_id(struct dp_soc *soc,
@@ -1210,11 +1219,15 @@ int dp_rx_tid_setup_wifi3(struct dp_peer *peer, int tid,
 	if (rx_tid->hw_qdesc_vaddr_unaligned != NULL)
 		return dp_rx_tid_update_wifi3(peer, tid, ba_window_size,
 			start_seq);
+	rx_tid->delba_tx_status = 0;
+	rx_tid->ppdu_id_2k = 0;
 	rx_tid->num_of_addba_req = 0;
 	rx_tid->num_of_delba_req = 0;
 	rx_tid->num_of_addba_resp = 0;
 	rx_tid->num_addba_rsp_failed = 0;
 	rx_tid->num_addba_rsp_success = 0;
+	rx_tid->delba_tx_success_cnt = 0;
+	rx_tid->delba_tx_fail_cnt = 0;
 #ifdef notyet
 	hw_qdesc_size = hal_get_reo_qdesc_size(soc->hal_soc, ba_window_size);
 #else
@@ -1613,15 +1626,21 @@ int dp_addba_resp_tx_completion_wifi3(void *peer_handle,
 				    uint8_t tid, int status)
 {
 	struct dp_peer *peer = (struct dp_peer *)peer_handle;
-	struct dp_rx_tid *rx_tid = &peer->rx_tid[tid];
+	struct dp_rx_tid *rx_tid = NULL;
 
+	if (!peer || peer->delete_in_progress) {
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_DEBUG,
+			 "%s: Peer is NULL! or delete in progress", __func__);
+		return QDF_STATUS_E_FAILURE;
+	}
+	rx_tid = &peer->rx_tid[tid];
 	qdf_spin_lock(&rx_tid->tid_lock);
 	if (status) {
 		rx_tid->num_addba_rsp_failed++;
 		dp_rx_tid_update_wifi3(peer, tid, 1, 0);
 		rx_tid->ba_status = DP_RX_BA_INACTIVE;
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			 "%s: Rx Tid- %d addba rsp tx completion failed!\n",
+			 "%s: Rx Tid- %d addba rsp tx completion failed!",
 			 __func__, tid);
 		qdf_spin_unlock(&rx_tid->tid_lock);
 		return 0;
@@ -1630,7 +1649,7 @@ int dp_addba_resp_tx_completion_wifi3(void *peer_handle,
 	rx_tid->num_addba_rsp_success++;
 	if (rx_tid->ba_status == DP_RX_BA_INACTIVE) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			"%s: Rx Tid- %d hw qdesc is not in IN_PROGRESS\n",
+			"%s: Rx Tid- %d hw qdesc is not in IN_PROGRESS",
 			__func__, tid);
 		qdf_spin_unlock(&rx_tid->tid_lock);
 		return QDF_STATUS_E_FAILURE;
@@ -1666,7 +1685,14 @@ void dp_addba_responsesetup_wifi3(void *peer_handle, uint8_t tid,
 	uint16_t *buffersize, uint16_t *batimeout)
 {
 	struct dp_peer *peer = (struct dp_peer *)peer_handle;
-	struct dp_rx_tid *rx_tid = &peer->rx_tid[tid];
+	struct dp_rx_tid *rx_tid = NULL;
+
+	if (!peer || peer->delete_in_progress) {
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_DEBUG,
+			 "%s: Peer is NULL! or delete in progress", __func__);
+		return;
+	}
+	rx_tid = &peer->rx_tid[tid];
 
 	qdf_spin_lock(&rx_tid->tid_lock);
 	rx_tid->num_of_addba_resp++;
@@ -1696,18 +1722,24 @@ int dp_addba_requestprocess_wifi3(void *peer_handle,
 				uint16_t startseqnum)
 {
 	struct dp_peer *peer = (struct dp_peer *)peer_handle;
-	struct dp_rx_tid *rx_tid = &peer->rx_tid[tid];
+	struct dp_rx_tid *rx_tid = NULL;
+
+	if (!peer || peer->delete_in_progress) {
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_DEBUG,
+			 "%s: Peer is NULL or delete in progress!", __func__);
+		return QDF_STATUS_E_FAILURE;
+	}
+	rx_tid = &peer->rx_tid[tid];
 
 	qdf_spin_lock(&rx_tid->tid_lock);
 	rx_tid->num_of_addba_req++;
-	if ((rx_tid->ba_status == DP_RX_BA_ACTIVE &&
-		rx_tid->hw_qdesc_vaddr_unaligned != NULL) ||
-		(rx_tid->ba_status == DP_RX_BA_IN_PROGRESS)) {
+	if (rx_tid->ba_status == DP_RX_BA_ACTIVE &&
+		rx_tid->hw_qdesc_vaddr_unaligned != NULL) {
 
 		dp_rx_tid_update_wifi3(peer, tid, 1, 0);
 		rx_tid->ba_status = DP_RX_BA_INACTIVE;
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			"%s: Rx Tid- %d hw qdesc is already setup\n",
+			 "%s: Rx Tid- %d hw qdesc is already setup",
 			__func__, tid);
 		qdf_spin_unlock(&rx_tid->tid_lock);
 		return QDF_STATUS_E_FAILURE;
@@ -1778,6 +1810,55 @@ int dp_delba_process_wifi3(void *peer_handle,
 	dp_rx_tid_update_wifi3(peer, tid, 1, 0);
 
 	rx_tid->ba_status = DP_RX_BA_INACTIVE;
+	qdf_spin_unlock(&rx_tid->tid_lock);
+	return 0;
+}
+
+/*
+ * dp_rx_delba_tx_completion_wifi3() – Send Delba Request
+ *
+ * @peer: Datapath peer handle
+ * @tid: TID number
+ * @status: tx completion status
+ * Return: 0 on success, error code on failure
+ */
+
+int dp_delba_tx_completion_wifi3(void *peer_handle,
+		  uint8_t tid, int status)
+{
+	struct dp_peer *peer = (struct dp_peer *)peer_handle;
+	struct dp_rx_tid *rx_tid = NULL;
+
+	if (!peer || peer->delete_in_progress) {
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_DEBUG,
+			 "%s: Peer is NULL!", __func__);
+		return QDF_STATUS_E_FAILURE;
+	}
+	rx_tid = &peer->rx_tid[tid];
+
+	if (status) {
+		rx_tid->delba_tx_fail_cnt++;
+		qdf_spin_lock(&rx_tid->tid_lock);
+		if (rx_tid->delba_tx_retry < MAX_DELBA_RETRY) {
+			rx_tid->delba_tx_retry++;
+			rx_tid->delba_tx_status = 1;
+			peer->vdev->pdev->soc->cdp_soc.ol_ops->send_delba(
+					peer->ol_peer, tid);
+		}
+		qdf_spin_unlock(&rx_tid->tid_lock);
+		return 0;
+	} else {
+		rx_tid->delba_tx_success_cnt++;
+		qdf_spin_lock(&rx_tid->tid_lock);
+		rx_tid->delba_tx_retry = 0;
+		rx_tid->delba_tx_status = 0;
+		qdf_spin_unlock(&rx_tid->tid_lock);
+	}
+	qdf_spin_lock(&rx_tid->tid_lock);
+	if (rx_tid->delba_tx_retry == MAX_DELBA_RETRY) {
+		rx_tid->delba_tx_retry = 0;
+		rx_tid->delba_tx_status = 0;
+	}
 	qdf_spin_unlock(&rx_tid->tid_lock);
 	return 0;
 }

@@ -72,7 +72,8 @@ struct cdp_cmn_ops {
 	void (*txrx_pdev_detach)(struct cdp_pdev *pdev, int force);
 
 	void *(*txrx_peer_create)
-		(struct cdp_vdev *vdev, uint8_t *peer_mac_addr);
+		(struct cdp_vdev *vdev, uint8_t *peer_mac_addr,
+		 void *ol_peer);
 
 	void (*txrx_peer_setup)
 		(struct cdp_vdev *vdev_hdl, void *peer_hdl);
@@ -228,6 +229,9 @@ struct cdp_cmn_ops {
 
 	int (*delba_process)(void *peer_handle,
 		int tid, uint16_t reasoncode);
+
+	int (*delba_tx_completion)(void *peer_handle,
+				uint8_t tid, int status);
 
 	void (*set_addba_response)(void *peer_handle,
 		uint8_t tid, uint16_t statuscode);
@@ -714,6 +718,7 @@ struct ol_if_ops {
 
 	int (*peer_sta_kickout)(void *osif_pdev, uint8_t *peer_macaddr);
 
+	void (*send_delba)(void *ol_peer, uint8_t tid);
 	/* TODO: Add any other control path calls required to OL_IF/WMA layer */
 };
 
