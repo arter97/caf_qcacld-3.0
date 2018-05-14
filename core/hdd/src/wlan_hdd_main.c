@@ -1975,6 +1975,8 @@ void hdd_update_tgt_cfg(void *context, void *param)
 		}
 	}
 
+	hdd_objmgr_update_tgt_max_vdev_psoc(hdd_ctx, cfg->max_intf_count);
+
 	ret = hdd_update_green_ap_config(hdd_ctx);
 
 	ucfg_ipa_set_dp_handle(hdd_ctx->hdd_psoc,
