@@ -161,6 +161,8 @@
 #define SRNG_MAX_SIZE_DWORDS \
 	(SRNG_MS(SRNG_SRC_FLD(BASE_MSB, RING_SIZE), 0xffffffff))
 
+#define SRNG_BATCH_PRODUCER_INT_SETUP_MASK 0xFFFF8000
+
 /**
  * HW ring configuration table to identify hardware ring attributes like
  * register addresses, number of rings, ring entry size etc., for each type
@@ -1072,6 +1074,13 @@ static inline void hal_srng_dst_hw_init(struct hal_soc *hal,
 			srng->entry_size);
 	}
 
+	if (srng->ring_id == HAL_SRNG_REO2SW1 ||
+		srng->ring_id == HAL_SRNG_REO2SW2 ||
+		srng->ring_id == HAL_SRNG_REO2SW3 ||
+		srng->ring_id == HAL_SRNG_REO2SW4) {
+		hal->interrupt_reg_val = reg_val;
+	}
+
 	SRNG_DST_REG_WRITE(srng, PRODUCER_INT_SETUP, reg_val);
 	hp_addr = (uint64_t)(hal->shadow_rdptr_mem_paddr +
 		((unsigned long)(srng->u.dst_ring.hp_addr) -
@@ -1101,6 +1110,28 @@ static inline void hal_srng_dst_hw_init(struct hal_soc *hal,
 
 	SRNG_DST_REG_WRITE(srng, MISC, reg_val);
 
+}
+
+extern void hal_srng_set_threshold_intr(struct hal_soc *hal,
+	struct hal_srng *srng)
+{
+	uint32_t reg_val = hal->interrupt_reg_val;
+
+	/* clear bits  14:0 used for BATCH_COUNTER_THRESHOLD
+	*  15 used for SW_INTERRUPT_MODE
+	*  31:16 used for INTERRUPT_TIMER_THRESHOLD */
+	reg_val = reg_val & SRNG_BATCH_PRODUCER_INT_SETUP_MASK;
+
+	if (srng->intr_batch_cntr_thres_entries) {
+		reg_val |= SRNG_SM(SRNG_DST_FLD(PRODUCER_INT_SETUP,
+			BATCH_COUNTER_THRESHOLD),
+			srng->intr_batch_cntr_thres_entries  *
+			srng->entry_size);
+	}
+
+	hal->interrupt_reg_val = reg_val;
+
+	SRNG_DST_REG_WRITE(srng, PRODUCER_INT_SETUP, reg_val);
 }
 
 /**

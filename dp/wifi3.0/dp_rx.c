@@ -55,6 +55,8 @@ static inline bool dp_rx_check_ap_bridge(struct dp_vdev *vdev)
 		return false;
 }
 #endif
+
+
 /*
  * dp_rx_buffers_replenish() - replenish rxdma ring with rx nbufs
  *			       called during dp rx initialization
@@ -1638,6 +1640,8 @@ done:
 
 		DP_STATS_INC_PKT(peer, rx.to_stack, 1,
 				qdf_nbuf_len(nbuf));
+
+		qdf_atomic_inc(&soc->batch_intr->pkt_to_stack_per_sec);
 
 		nbuf = next;
 	}
