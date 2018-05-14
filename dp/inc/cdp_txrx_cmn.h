@@ -902,6 +902,25 @@ cdp_soc_detach(ol_txrx_soc_handle soc)
 	soc->ops->cmn_drv_ops->txrx_soc_detach((void *)soc);
 }
 
+static inline int cdp_addba_resp_tx_completion(ol_txrx_soc_handle soc,
+					    void *peer_handle,
+					    uint8_t tid, int status)
+{
+	if (!soc || !soc->ops) {
+		QDF_TRACE(QDF_MODULE_ID_CDP, QDF_TRACE_LEVEL_DEBUG,
+			"%s: Invalid Instance:", __func__);
+		QDF_BUG(0);
+		return 0;
+	}
+
+	if (!soc->ops->cmn_drv_ops ||
+	    !soc->ops->cmn_drv_ops->addba_resp_tx_completion)
+		return 0;
+
+	return soc->ops->cmn_drv_ops->addba_resp_tx_completion(peer_handle, tid,
+					status);
+}
+
 static inline int cdp_addba_requestprocess(ol_txrx_soc_handle soc,
 	void *peer_handle, uint8_t dialogtoken, uint16_t tid,
 	uint16_t batimeout, uint16_t buffersize, uint16_t startseqnum)
