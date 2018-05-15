@@ -189,17 +189,15 @@ struct qdf_nbuf_cb {
 				struct {
 					void *ext_cb_ptr;
 					void *fctx;
-					uint32_t reserved1;
-					uint32_t reserved2;
 				} priv_cb_w;
 				struct {
 					uint32_t tcp_seq_num;
 					uint32_t tcp_ack_num;
 					unsigned char *lro_ctx;
-					uint32_t map_index;
-					uint32_t reserved;
 				} priv_cb_m;
 			} dev;
+			uint32_t map_index;
+			uint32_t peer_mdata;
 			uint32_t lro_eligible:1,
 				peer_cached_buf_frm:1,
 				tcp_proto:1,
@@ -314,6 +312,9 @@ QDF_COMPILE_TIME_ASSERT(qdf_nbuf_cb_size,
 
 #define QDF_NBUF_CB_RX_FLOW_ID(skb) \
 	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.flow_id)
+
+#define QDF_NBUF_CB_RX_PEER_MDATA(skb) \
+	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.peer_mdata)
 
 #define QDF_NBUF_CB_RX_PACKET_STATE(skb)\
 	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.trace.packet_state)
