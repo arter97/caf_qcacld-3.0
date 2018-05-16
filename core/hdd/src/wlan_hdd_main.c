@@ -7130,8 +7130,6 @@ static int hdd_context_init(hdd_context_t *hdd_ctx)
 
 	qdf_list_create(&hdd_ctx->hddAdapters, MAX_NUMBER_OF_ADAPTERS);
 
-	init_completion(&hdd_ctx->set_antenna_mode_cmpl);
-
 	ret = hdd_scan_context_init(hdd_ctx);
 	if (ret)
 		goto list_destroy;
@@ -10128,30 +10126,6 @@ void wlan_hdd_start_sap(hdd_adapter_t *ap_adapter, bool reinit)
 end:
 	mutex_unlock(&hdd_ctx->sap_lock);
 	return;
-}
-
-/**
- * wlan_hdd_soc_set_antenna_mode_cb() - Callback for set dual
- * mac scan config
- * @status: Status of set antenna mode
- *
- * Callback on setting the dual mac configuration
- *
- * Return: None
- */
-void wlan_hdd_soc_set_antenna_mode_cb(
-	enum set_antenna_mode_status status)
-{
-	hdd_context_t *hdd_ctx;
-
-	hdd_info("Status: %d", status);
-
-	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	if (0 != wlan_hdd_validate_context(hdd_ctx))
-		return;
-
-	/* Signal the completion of set dual mac config */
-	complete(&hdd_ctx->set_antenna_mode_cmpl);
 }
 
 /**

@@ -2485,6 +2485,7 @@ static QDF_STATUS sme_process_antenna_mode_resp(tpAniSirGlobal mac,
 	tListElem *entry;
 	tSmeCmd *command;
 	bool found;
+	void *context;
 	antenna_mode_cb callback;
 	struct sir_antenna_mode_resp *param;
 
@@ -2514,20 +2515,15 @@ static QDF_STATUS sme_process_antenna_mode_resp(tpAniSirGlobal mac,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	callback =
-		command->u.set_antenna_mode_cmd.set_antenna_mode_resp;
+	context = command->u.set_antenna_mode_cmd.set_antenna_mode_ctx;
+	callback = command->u.set_antenna_mode_cmd.set_antenna_mode_resp;
 	if (callback) {
-		if (!param) {
-			sms_log(mac, LOGE,
-				FL("Set antenna mode call back is NULL"));
-		} else {
-			sms_log(mac, LOG1,
-				FL("HDD callback for set antenna mode"));
-			callback(param->status);
-		}
-	} else {
-		sms_log(mac, LOGE, FL("Callback does not exist"));
-	}
+		if (!param)
+			sme_err("Set antenna mode call back is NULL");
+		else
+			callback(param->status, context);
+	} else
+		sme_err("Callback does not exist");
 
 	found = csr_ll_remove_entry(&mac->sme.smeCmdActiveList, entry,
 			LL_ACCESS_LOCK);
