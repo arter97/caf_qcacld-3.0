@@ -524,7 +524,6 @@ dp_2k_jump_handle(struct dp_soc *soc,
 	}
 
 	rx_tid->ppdu_id_2k = ppdu_id;
-	qdf_nbuf_free(nbuf);
 
 fail:
 	qdf_nbuf_free(nbuf);
