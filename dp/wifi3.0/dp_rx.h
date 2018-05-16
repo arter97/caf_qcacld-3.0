@@ -420,7 +420,6 @@ dp_rx_wds_srcport_learn(struct dp_soc *soc,
 	sa_idx = hal_rx_msdu_end_sa_idx_get(rx_tlv_hdr);
 	ast = soc->ast_table[sa_idx];
 
-
 	/*
 	 * Ensure we are updating the right AST entry by
 	 * validating ast_idx.
@@ -432,6 +431,15 @@ dp_rx_wds_srcport_learn(struct dp_soc *soc,
 
 	if (ast && sa_sw_peer_id != ta_peer->peer_ids[0]) {
 		sa_peer = ast->peer;
+
+		/*
+		 * Do not kickout STA if it belongs to a different radio.
+		 * For DBDC repeater, it is possible to arrive here
+		 * for multicast loopback frames originated from connected
+		 * clients and looped back (intrabss) by Root AP
+		 */
+		if (ast->pdev_id != ta_peer->vdev->pdev->pdev_id)
+			return;
 
 		if (ast->type != CDP_TXRX_AST_TYPE_STATIC) {
 			dp_peer_update_ast(soc, ta_peer, ast, flags);
