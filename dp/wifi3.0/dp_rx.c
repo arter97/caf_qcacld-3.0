@@ -171,7 +171,7 @@ QDF_STATUS dp_rx_buffers_replenish(struct dp_soc *dp_soc, uint32_t mac_id,
 		}
 
 		ret = qdf_nbuf_map_single(dp_soc->osdev, rx_netbuf,
-				    QDF_DMA_BIDIRECTIONAL);
+				    QDF_DMA_FROM_DEVICE);
 		if (qdf_unlikely(QDF_IS_STATUS_ERROR(ret))) {
 			qdf_nbuf_free(rx_netbuf);
 			DP_STATS_INC(dp_pdev, replenish.map_err, 1);
@@ -1362,38 +1362,18 @@ dp_rx_process(struct dp_intr *int_ctx, void *hal_ring, uint32_t quota)
 		qdf_assert(rx_desc);
 		rx_bufs_reaped[rx_desc->pool_id]++;
 
-		/* TODO */
-		/*
-		 * Need a separate API for unmapping based on
-		 * phyiscal address
-		 */
-		qdf_nbuf_unmap_single(soc->osdev, rx_desc->nbuf,
-					QDF_DMA_BIDIRECTIONAL);
-
-		/*
-		 * Check if DMA completed -- msdu_done is the last bit
-		 * to be written
-		 */
-		rx_tlv_hdr = qdf_nbuf_data(rx_desc->nbuf);
-		if (!hal_rx_attn_msdu_done_get(rx_tlv_hdr)) {
-
-			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-					FL("MSDU DONE failure"));
-			hal_rx_dump_pkt_tlvs(rx_tlv_hdr, QDF_TRACE_LEVEL_INFO);
-			qdf_assert(0);
-		}
-
 		core_id = smp_processor_id();
 		DP_STATS_INC(soc, rx.ring_packets[core_id][ring_id], 1);
 
 		/* Get MPDU DESC info */
 		hal_rx_mpdu_desc_info_get(ring_desc, &mpdu_desc_info);
 
-		hal_rx_mpdu_peer_meta_data_set(qdf_nbuf_data(rx_desc->nbuf),
-						mpdu_desc_info.peer_meta_data);
-
 		/* Get MSDU DESC info */
 		hal_rx_msdu_desc_info_get(ring_desc, &msdu_desc_info);
+
+		/* save peer_mdata in nbuf->cb */
+		QDF_NBUF_CB_RX_PEER_MDATA(rx_desc->nbuf) =
+						mpdu_desc_info.peer_meta_data;
 
 		/*
 		 * save msdu flags first, last and continuation msdu in
@@ -1461,9 +1441,27 @@ done:
 	nbuf = nbuf_head;
 	while (nbuf) {
 		next = nbuf->next;
+
+		/* TODO */
+		/*
+		 * Need a separate API for unmapping based on
+		 * phyiscal address
+		 */
+		qdf_nbuf_unmap_single(soc->osdev, nbuf,	QDF_DMA_FROM_DEVICE);
 		rx_tlv_hdr = qdf_nbuf_data(nbuf);
 
-		peer_mdata = hal_rx_mpdu_peer_meta_data_get(rx_tlv_hdr);
+		/*
+		 * Check if DMA completed -- msdu_done is the last bit
+		 * to be written
+		 */
+		if (qdf_unlikely(!hal_rx_attn_msdu_done_get(rx_tlv_hdr))) {
+			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+				  FL("MSDU DONE failure"));
+			hal_rx_dump_pkt_tlvs(rx_tlv_hdr, QDF_TRACE_LEVEL_INFO);
+			qdf_assert(0);
+		}
+
+		peer_mdata = QDF_NBUF_CB_RX_PEER_MDATA(nbuf);
 		peer_id = DP_PEER_METADATA_PEER_ID_GET(peer_mdata);
 		peer = dp_peer_find_by_id(soc, peer_id);
 
@@ -1765,7 +1763,7 @@ dp_rx_nbuf_prepare(struct dp_soc *soc, struct dp_pdev *pdev)
 		memset(buf, 0, RX_BUFFER_SIZE);
 
 		ret = qdf_nbuf_map_single(soc->osdev, nbuf,
-				    QDF_DMA_BIDIRECTIONAL);
+				    QDF_DMA_FROM_DEVICE);
 
 		/* nbuf map failed */
 		if (qdf_unlikely(QDF_IS_STATUS_ERROR(ret))) {
