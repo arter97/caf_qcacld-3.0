@@ -1580,12 +1580,12 @@ void dp_peer_rx_cleanup(struct dp_vdev *vdev, struct dp_peer *peer)
 	uint32_t tid_delete_mask = 0;
 	for (tid = 0; tid < DP_MAX_TIDS; tid++) {
 		struct dp_rx_tid *rx_tid = &peer->rx_tid[tid];
-		qdf_spin_lock(&rx_tid->tid_lock);
+		qdf_spin_lock_bh(&rx_tid->tid_lock);
 		if (peer->rx_tid[tid].hw_qdesc_vaddr_unaligned != NULL) {
 			dp_rx_tid_delete_wifi3(peer, tid);
 			tid_delete_mask |= (1 << tid);
 		}
-		qdf_spin_unlock(&rx_tid->tid_lock);
+		qdf_spin_unlock_bh(&rx_tid->tid_lock);
 	}
 #ifdef notyet /* See if FW can remove queues as part of peer cleanup */
 	if (soc->ol_ops->peer_rx_reorder_queue_remove) {
@@ -1634,7 +1634,7 @@ int dp_addba_resp_tx_completion_wifi3(void *peer_handle,
 		return QDF_STATUS_E_FAILURE;
 	}
 	rx_tid = &peer->rx_tid[tid];
-	qdf_spin_lock(&rx_tid->tid_lock);
+	qdf_spin_lock_bh(&rx_tid->tid_lock);
 	if (status) {
 		rx_tid->num_addba_rsp_failed++;
 		dp_rx_tid_update_wifi3(peer, tid, 1, 0);
@@ -1642,7 +1642,7 @@ int dp_addba_resp_tx_completion_wifi3(void *peer_handle,
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 			 "%s: Rx Tid- %d addba rsp tx completion failed!",
 			 __func__, tid);
-		qdf_spin_unlock(&rx_tid->tid_lock);
+		qdf_spin_unlock_bh(&rx_tid->tid_lock);
 		return 0;
 	}
 
@@ -1651,13 +1651,13 @@ int dp_addba_resp_tx_completion_wifi3(void *peer_handle,
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 			"%s: Rx Tid- %d hw qdesc is not in IN_PROGRESS",
 			__func__, tid);
-		qdf_spin_unlock(&rx_tid->tid_lock);
+		qdf_spin_unlock_bh(&rx_tid->tid_lock);
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	if (dp_rx_tid_update_wifi3(peer, tid, rx_tid->ba_win_size,
 				rx_tid->startseqnum)) {
-		qdf_spin_unlock(&rx_tid->tid_lock);
+		qdf_spin_unlock_bh(&rx_tid->tid_lock);
 		return QDF_STATUS_E_FAILURE;
 	}
 	if (rx_tid->userstatuscode != IEEE80211_STATUS_SUCCESS)
@@ -1666,7 +1666,7 @@ int dp_addba_resp_tx_completion_wifi3(void *peer_handle,
 		rx_tid->statuscode = IEEE80211_STATUS_SUCCESS;
 
 	rx_tid->ba_status = DP_RX_BA_ACTIVE;
-	qdf_spin_unlock(&rx_tid->tid_lock);
+	qdf_spin_unlock_bh(&rx_tid->tid_lock);
 	return 0;
 }
 
@@ -1694,14 +1694,14 @@ void dp_addba_responsesetup_wifi3(void *peer_handle, uint8_t tid,
 	}
 	rx_tid = &peer->rx_tid[tid];
 
-	qdf_spin_lock(&rx_tid->tid_lock);
+	qdf_spin_lock_bh(&rx_tid->tid_lock);
 	rx_tid->num_of_addba_resp++;
 	/* setup ADDBA response paramters */
 	*dialogtoken = rx_tid->dialogtoken;
 	*statuscode = rx_tid->statuscode;
 	*buffersize = rx_tid->ba_win_size;
 	*batimeout  = 0;
-	qdf_spin_unlock(&rx_tid->tid_lock);
+	qdf_spin_unlock_bh(&rx_tid->tid_lock);
 }
 
 /*
@@ -1731,7 +1731,7 @@ int dp_addba_requestprocess_wifi3(void *peer_handle,
 	}
 	rx_tid = &peer->rx_tid[tid];
 
-	qdf_spin_lock(&rx_tid->tid_lock);
+	qdf_spin_lock_bh(&rx_tid->tid_lock);
 	rx_tid->num_of_addba_req++;
 	if (rx_tid->ba_status == DP_RX_BA_ACTIVE &&
 		rx_tid->hw_qdesc_vaddr_unaligned != NULL) {
@@ -1741,19 +1741,19 @@ int dp_addba_requestprocess_wifi3(void *peer_handle,
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 			 "%s: Rx Tid- %d hw qdesc is already setup",
 			__func__, tid);
-		qdf_spin_unlock(&rx_tid->tid_lock);
+		qdf_spin_unlock_bh(&rx_tid->tid_lock);
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	if (rx_tid->ba_status == DP_RX_BA_IN_PROGRESS) {
 		dp_rx_tid_update_wifi3(peer, tid, 1, 0);
 		rx_tid->ba_status = DP_RX_BA_INACTIVE;
-		qdf_spin_unlock(&rx_tid->tid_lock);
+		qdf_spin_unlock_bh(&rx_tid->tid_lock);
 		return QDF_STATUS_E_FAILURE;
 	}
 	if (dp_rx_tid_setup_wifi3(peer, tid, 1, 0)) {
 		rx_tid->ba_status = DP_RX_BA_INACTIVE;
-		qdf_spin_unlock(&rx_tid->tid_lock);
+		qdf_spin_unlock_bh(&rx_tid->tid_lock);
 		return QDF_STATUS_E_FAILURE;
 	}
 	rx_tid->ba_status = DP_RX_BA_IN_PROGRESS;
@@ -1761,7 +1761,7 @@ int dp_addba_requestprocess_wifi3(void *peer_handle,
 	rx_tid->ba_win_size = buffersize;
 	rx_tid->dialogtoken = dialogtoken;
 	rx_tid->startseqnum = startseqnum;
-	qdf_spin_unlock(&rx_tid->tid_lock);
+	qdf_spin_unlock_bh(&rx_tid->tid_lock);
 	return 0;
 }
 
@@ -1778,9 +1778,9 @@ void dp_set_addba_response(void *peer_handle, uint8_t tid,
 	struct dp_peer *peer = (struct dp_peer *)peer_handle;
 	struct dp_rx_tid *rx_tid = &peer->rx_tid[tid];
 
-	qdf_spin_lock(&rx_tid->tid_lock);
+	qdf_spin_lock_bh(&rx_tid->tid_lock);
 	rx_tid->userstatuscode = statuscode;
-	qdf_spin_unlock(&rx_tid->tid_lock);
+	qdf_spin_unlock_bh(&rx_tid->tid_lock);
 }
 
 /*
@@ -1797,9 +1797,9 @@ int dp_delba_process_wifi3(void *peer_handle,
 	struct dp_peer *peer = (struct dp_peer *)peer_handle;
 	struct dp_rx_tid *rx_tid = &peer->rx_tid[tid];
 
-	qdf_spin_lock(&rx_tid->tid_lock);
+	qdf_spin_lock_bh(&rx_tid->tid_lock);
 	if (rx_tid->ba_status == DP_RX_BA_INACTIVE) {
-		qdf_spin_unlock(&rx_tid->tid_lock);
+		qdf_spin_unlock_bh(&rx_tid->tid_lock);
 		return QDF_STATUS_E_FAILURE;
 	}
 	/* TODO: See if we can delete the existing REO queue descriptor and
@@ -1810,7 +1810,7 @@ int dp_delba_process_wifi3(void *peer_handle,
 	dp_rx_tid_update_wifi3(peer, tid, 1, 0);
 
 	rx_tid->ba_status = DP_RX_BA_INACTIVE;
-	qdf_spin_unlock(&rx_tid->tid_lock);
+	qdf_spin_unlock_bh(&rx_tid->tid_lock);
 	return 0;
 }
 
@@ -1835,31 +1835,27 @@ int dp_delba_tx_completion_wifi3(void *peer_handle,
 		return QDF_STATUS_E_FAILURE;
 	}
 	rx_tid = &peer->rx_tid[tid];
-
+	qdf_spin_lock_bh(&rx_tid->tid_lock);
 	if (status) {
 		rx_tid->delba_tx_fail_cnt++;
-		qdf_spin_lock(&rx_tid->tid_lock);
 		if (rx_tid->delba_tx_retry < MAX_DELBA_RETRY) {
 			rx_tid->delba_tx_retry++;
 			rx_tid->delba_tx_status = 1;
 			peer->vdev->pdev->soc->cdp_soc.ol_ops->send_delba(
 					peer->ol_peer, tid);
 		}
-		qdf_spin_unlock(&rx_tid->tid_lock);
+		if (rx_tid->delba_tx_retry == MAX_DELBA_RETRY) {
+			rx_tid->delba_tx_retry = 0;
+			rx_tid->delba_tx_status = 0;
+		}
+		qdf_spin_unlock_bh(&rx_tid->tid_lock);
 		return 0;
 	} else {
 		rx_tid->delba_tx_success_cnt++;
-		qdf_spin_lock(&rx_tid->tid_lock);
-		rx_tid->delba_tx_retry = 0;
-		rx_tid->delba_tx_status = 0;
-		qdf_spin_unlock(&rx_tid->tid_lock);
-	}
-	qdf_spin_lock(&rx_tid->tid_lock);
-	if (rx_tid->delba_tx_retry == MAX_DELBA_RETRY) {
 		rx_tid->delba_tx_retry = 0;
 		rx_tid->delba_tx_status = 0;
 	}
-	qdf_spin_unlock(&rx_tid->tid_lock);
+	qdf_spin_unlock_bh(&rx_tid->tid_lock);
 	return 0;
 }
 
@@ -1951,7 +1947,7 @@ dp_set_pn_check_wifi3(struct cdp_vdev *vdev_handle, struct cdp_peer *peer_handle
 
 	for (i = 0; i < DP_MAX_TIDS; i++) {
 		struct dp_rx_tid *rx_tid = &peer->rx_tid[i];
-		qdf_spin_lock(&rx_tid->tid_lock);
+		qdf_spin_lock_bh(&rx_tid->tid_lock);
 		if (rx_tid->hw_qdesc_vaddr_unaligned != NULL) {
 			params.std.addr_lo =
 				rx_tid->hw_qdesc_paddr & 0xffffffff;
@@ -1979,7 +1975,7 @@ dp_set_pn_check_wifi3(struct cdp_vdev *vdev_handle, struct cdp_peer *peer_handle
 			QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO_HIGH,
 				"PN Check not setup for TID :%d \n", i);
 		}
-		qdf_spin_unlock(&rx_tid->tid_lock);
+		qdf_spin_unlock_bh(&rx_tid->tid_lock);
 	}
 }
 
