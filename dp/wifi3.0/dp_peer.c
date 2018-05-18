@@ -1843,7 +1843,8 @@ int dp_delba_tx_completion_wifi3(void *peer_handle,
 			rx_tid->delba_tx_retry++;
 			rx_tid->delba_tx_status = 1;
 			peer->vdev->pdev->soc->cdp_soc.ol_ops->send_delba(
-					peer->ol_peer, tid);
+				peer->vdev->pdev, peer->ol_peer,
+				peer->mac_addr.raw, tid);
 		}
 		qdf_spin_unlock(&rx_tid->tid_lock);
 		return 0;

@@ -725,7 +725,8 @@ struct ol_if_ops {
 
 	int (*peer_sta_kickout)(void *osif_pdev, uint8_t *peer_macaddr);
 
-	void (*send_delba)(void *ol_peer, uint8_t tid);
+	int (*send_delba)(void *pdev_handle,  void *ol_peer,
+			  uint8_t *peer_macaddr, uint8_t tid);
 	/* TODO: Add any other control path calls required to OL_IF/WMA layer */
 };
 
