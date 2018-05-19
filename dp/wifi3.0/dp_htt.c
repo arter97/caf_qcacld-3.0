@@ -74,6 +74,7 @@ do {                                                             \
 
 #define HTT_FRAMECTRL_DATATYPE 0x08
 #define HTT_PPDU_DESC_MAX_DEPTH 16
+#define DP_SCAN_PEER_ID 0
 
 /*
  * dp_tx_stats_update() - Update per-peer statistics
@@ -1683,13 +1684,18 @@ static void dp_process_ppdu_stats_user_common_tlv(
 	tag_buf++;
 	peer_id = HTT_PPDU_STATS_USER_COMMON_TLV_SW_PEER_ID_GET(*tag_buf);
 	tid = HTT_PPDU_STATS_USER_COMMON_TLV_TID_NUM_GET(*tag_buf);
-	peer = dp_peer_find_by_id(pdev->soc, peer_id);
 
-	if (!peer)
-		return;
+	if (peer_id == DP_SCAN_PEER_ID) {
+		curr_user_index = dp_get_ppdu_info_user_index(pdev, peer_id, ppdu_info);
+		ppdu_user_desc = &ppdu_desc->user[curr_user_index];
+	} else {
+		peer = dp_peer_find_by_id(pdev->soc, peer_id);
+		if (!peer)
+			return;
 
-	curr_user_index = dp_get_ppdu_info_user_index(pdev, peer_id, ppdu_info);
-	ppdu_user_desc = &ppdu_desc->user[curr_user_index];
+		curr_user_index = dp_get_ppdu_info_user_index(pdev, peer_id, ppdu_info);
+		ppdu_user_desc = &ppdu_desc->user[curr_user_index];
+	}
 
 	ppdu_user_desc->peer_id = peer_id;
 
@@ -1739,21 +1745,24 @@ static void dp_process_ppdu_stats_user_rate_tlv(struct dp_pdev *pdev,
 
 	tag_buf++;
 	peer_id = HTT_PPDU_STATS_USER_RATE_TLV_SW_PEER_ID_GET(*tag_buf);
-	peer = dp_peer_find_by_id(pdev->soc, peer_id);
+	if (peer_id == DP_SCAN_PEER_ID) {
+		curr_user_index = dp_get_ppdu_info_user_index(pdev, peer_id, ppdu_info);
+		ppdu_user_desc = &ppdu_desc->user[curr_user_index];
+	} else {
+		peer = dp_peer_find_by_id(pdev->soc, peer_id);
+		if (!peer)
+			return;
 
-	if (!peer)
-		return;
+		curr_user_index = dp_get_ppdu_info_user_index(pdev, peer_id, ppdu_info);
+		ppdu_user_desc = &ppdu_desc->user[curr_user_index];
+		qdf_mem_copy(ppdu_user_desc->mac_addr, peer->mac_addr.raw,
+				DP_MAC_ADDR_LEN);
+	}
 
-	curr_user_index = dp_get_ppdu_info_user_index(pdev, peer_id, ppdu_info);
-
-	ppdu_user_desc = &ppdu_desc->user[curr_user_index];
 	ppdu_user_desc->peer_id = peer_id;
 
 	ppdu_user_desc->tid =
 		HTT_PPDU_STATS_USER_RATE_TLV_TID_NUM_GET(*tag_buf);
-
-	qdf_mem_copy(ppdu_user_desc->mac_addr, peer->mac_addr.raw,
-			DP_MAC_ADDR_LEN);
 
 	tag_buf += 2;
 
@@ -1815,15 +1824,18 @@ static void dp_process_ppdu_stats_enq_mpdu_bitmap_64_tlv(
 
 	peer_id =
 	HTT_PPDU_STATS_ENQ_MPDU_BITMAP_TLV_SW_PEER_ID_GET(*tag_buf);
+	if (peer_id == DP_SCAN_PEER_ID) {
+		curr_user_index = dp_get_ppdu_info_user_index(pdev, peer_id, ppdu_info);
+		ppdu_user_desc = &ppdu_desc->user[curr_user_index];
+	} else {
+		peer = dp_peer_find_by_id(pdev->soc, peer_id);
+		if (!peer)
+			return;
 
-	peer = dp_peer_find_by_id(pdev->soc, peer_id);
+		curr_user_index = dp_get_ppdu_info_user_index(pdev, peer_id, ppdu_info);
+		ppdu_user_desc = &ppdu_desc->user[curr_user_index];
+	}
 
-	if (!peer)
-		return;
-
-	curr_user_index = dp_get_ppdu_info_user_index(pdev, peer_id, ppdu_info);
-
-	ppdu_user_desc = &ppdu_desc->user[curr_user_index];
 	ppdu_user_desc->peer_id = peer_id;
 
 	ppdu_user_desc->start_seq = dp_stats_buf->start_seq;
@@ -1860,14 +1872,18 @@ static void dp_process_ppdu_stats_enq_mpdu_bitmap_256_tlv(
 	peer_id =
 	HTT_PPDU_STATS_ENQ_MPDU_BITMAP_TLV_SW_PEER_ID_GET(*tag_buf);
 
-	peer = dp_peer_find_by_id(pdev->soc, peer_id);
+	if (peer_id == DP_SCAN_PEER_ID) {
+		curr_user_index = dp_get_ppdu_info_user_index(pdev, peer_id, ppdu_info);
+		ppdu_user_desc = &ppdu_desc->user[curr_user_index];
+	} else {
+		peer = dp_peer_find_by_id(pdev->soc, peer_id);
+		if (!peer)
+			return;
 
-	if (!peer)
-		return;
+		curr_user_index = dp_get_ppdu_info_user_index(pdev, peer_id, ppdu_info);
+		ppdu_user_desc = &ppdu_desc->user[curr_user_index];
+	}
 
-	curr_user_index = dp_get_ppdu_info_user_index(pdev, peer_id, ppdu_info);
-
-	ppdu_user_desc = &ppdu_desc->user[curr_user_index];
 	ppdu_user_desc->peer_id = peer_id;
 
 	ppdu_user_desc->start_seq = dp_stats_buf->start_seq;
@@ -1903,11 +1919,18 @@ static void dp_process_ppdu_stats_user_cmpltn_common_tlv(
 		HTT_PPDU_STATS_USER_CMPLTN_COMMON_TLV_SW_PEER_ID_GET(*tag_buf);
 	peer = dp_peer_find_by_id(pdev->soc, peer_id);
 
-	if (!peer)
-		return;
+	if (peer_id == DP_SCAN_PEER_ID) {
+		curr_user_index = dp_get_ppdu_info_user_index(pdev, peer_id, ppdu_info);
+		ppdu_user_desc = &ppdu_desc->user[curr_user_index];
+	} else {
+		peer = dp_peer_find_by_id(pdev->soc, peer_id);
+		if (!peer)
+			return;
 
-	curr_user_index = dp_get_ppdu_info_user_index(pdev, peer_id, ppdu_info);
-	ppdu_user_desc = &ppdu_desc->user[curr_user_index];
+		curr_user_index = dp_get_ppdu_info_user_index(pdev, peer_id, ppdu_info);
+		ppdu_user_desc = &ppdu_desc->user[curr_user_index];
+	}
+
 	ppdu_user_desc->peer_id = peer_id;
 
 	ppdu_user_desc->completion_status =
@@ -1916,7 +1939,6 @@ static void dp_process_ppdu_stats_user_cmpltn_common_tlv(
 
 	ppdu_user_desc->tid =
 		HTT_PPDU_STATS_USER_CMPLTN_COMMON_TLV_TID_NUM_GET(*tag_buf);
-
 
 	tag_buf++;
 	ppdu_desc->ack_rssi = dp_stats_buf->ack_rssi;
@@ -1970,14 +1992,18 @@ static void dp_process_ppdu_stats_user_compltn_ba_bitmap_64_tlv(
 	peer_id =
 	HTT_PPDU_STATS_USER_CMPLTN_BA_BITMAP_TLV_SW_PEER_ID_GET(*tag_buf);
 
-	peer = dp_peer_find_by_id(pdev->soc, peer_id);
+	if (peer_id == DP_SCAN_PEER_ID) {
+		curr_user_index = dp_get_ppdu_info_user_index(pdev, peer_id, ppdu_info);
+		ppdu_user_desc = &ppdu_desc->user[curr_user_index];
+	} else {
+		peer = dp_peer_find_by_id(pdev->soc, peer_id);
+		if (!peer)
+			return;
 
-	if (!peer)
-		return;
+		curr_user_index = dp_get_ppdu_info_user_index(pdev, peer_id, ppdu_info);
+		ppdu_user_desc = &ppdu_desc->user[curr_user_index];
+	}
 
-	curr_user_index = dp_get_ppdu_info_user_index(pdev, peer_id, ppdu_info);
-
-	ppdu_user_desc = &ppdu_desc->user[curr_user_index];
 	ppdu_user_desc->peer_id = peer_id;
 
 	ppdu_user_desc->ba_seq_no = dp_stats_buf->ba_seq_no;
@@ -2013,14 +2039,17 @@ static void dp_process_ppdu_stats_user_compltn_ba_bitmap_256_tlv(
 	peer_id =
 	HTT_PPDU_STATS_USER_CMPLTN_BA_BITMAP_TLV_SW_PEER_ID_GET(*tag_buf);
 
-	peer = dp_peer_find_by_id(pdev->soc, peer_id);
+	if (peer_id == DP_SCAN_PEER_ID) {
+		curr_user_index = dp_get_ppdu_info_user_index(pdev, peer_id, ppdu_info);
+		ppdu_user_desc = &ppdu_desc->user[curr_user_index];
+	} else {
+		peer = dp_peer_find_by_id(pdev->soc, peer_id);
+		if (!peer)
+			return;
 
-	if (!peer)
-		return;
-
-	curr_user_index = dp_get_ppdu_info_user_index(pdev, peer_id, ppdu_info);
-
-	ppdu_user_desc = &ppdu_desc->user[curr_user_index];
+		curr_user_index = dp_get_ppdu_info_user_index(pdev, peer_id, ppdu_info);
+		ppdu_user_desc = &ppdu_desc->user[curr_user_index];
+	}
 	ppdu_user_desc->peer_id = peer_id;
 
 	ppdu_user_desc->ba_seq_no = dp_stats_buf->ba_seq_no;
@@ -2054,14 +2083,18 @@ static void dp_process_ppdu_stats_user_compltn_ack_ba_status_tlv(
 	HTT_PPDU_STATS_USER_CMPLTN_ACK_BA_STATUS_TLV_SW_PEER_ID_GET(*tag_buf);
 
 
-	peer = dp_peer_find_by_id(pdev->soc, peer_id);
+	if (peer_id == DP_SCAN_PEER_ID) {
+		curr_user_index = dp_get_ppdu_info_user_index(pdev, peer_id, ppdu_info);
+		ppdu_user_desc = &ppdu_desc->user[curr_user_index];
+	} else {
+		peer = dp_peer_find_by_id(pdev->soc, peer_id);
+		if (!peer)
+			return;
 
-	if (!peer)
-		return;
+		curr_user_index = dp_get_ppdu_info_user_index(pdev, peer_id, ppdu_info);
+		ppdu_user_desc = &ppdu_desc->user[curr_user_index];
+	}
 
-	curr_user_index = dp_get_ppdu_info_user_index(pdev, peer_id, ppdu_info);
-
-	ppdu_user_desc = &ppdu_desc->user[curr_user_index];
 	ppdu_user_desc->peer_id = peer_id;
 
 	tag_buf++;
@@ -2108,17 +2141,17 @@ static void dp_process_ppdu_stats_user_common_array_tlv(
 	peer_id =
 		HTT_PPDU_STATS_ARRAY_ITEM_TLV_PEERID_GET(*tag_buf);
 
-	peer = dp_peer_find_by_id(pdev->soc, peer_id);
+	if (peer_id == DP_SCAN_PEER_ID) {
+		curr_user_index = dp_get_ppdu_info_user_index(pdev, peer_id, ppdu_info);
+		ppdu_user_desc = &ppdu_desc->user[curr_user_index];
+	} else {
+		peer = dp_peer_find_by_id(pdev->soc, peer_id);
+		if (!peer)
+			return;
 
-	if (!peer) {
-		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			"Invalid peer");
-		return;
+		curr_user_index = dp_get_ppdu_info_user_index(pdev, peer_id, ppdu_info);
+		ppdu_user_desc = &ppdu_desc->user[curr_user_index];
 	}
-
-	curr_user_index = dp_get_ppdu_info_user_index(pdev, peer_id, ppdu_info);
-
-	ppdu_user_desc = &ppdu_desc->user[curr_user_index];
 
 	ppdu_user_desc->retry_bytes = dp_stats_buf->tx_retry_bytes;
 	ppdu_user_desc->failed_bytes = dp_stats_buf->tx_failed_bytes;
