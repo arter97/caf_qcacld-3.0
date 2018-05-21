@@ -7145,6 +7145,10 @@ int wlan_hdd_cfg80211_update_apies(struct hdd_adapter *adapter)
 
 	pConfig = &adapter->session.ap.sap_config;
 	beacon = adapter->session.ap.beacon;
+	if (!beacon) {
+		hdd_err("Beacon is NULL !");
+		return -EINVAL;
+	}
 
 	genie = qdf_mem_malloc(MAX_GENIE_LEN);
 
