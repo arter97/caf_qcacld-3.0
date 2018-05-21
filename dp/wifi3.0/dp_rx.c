@@ -921,6 +921,7 @@ qdf_nbuf_t dp_rx_sg_create(qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr)
 	uint16_t mpdu_len;
 	bool last_nbuf;
 
+	mpdu_len = hal_rx_msdu_start_msdu_len_get(rx_tlv_hdr);
 	/*
 	 * this is a case where the complete msdu fits in one single nbuf.
 	 * in this case HW sets both start and end bit and we only need to
@@ -930,6 +931,8 @@ qdf_nbuf_t dp_rx_sg_create(qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr)
 					qdf_nbuf_is_rx_chfrag_end(nbuf)) {
 		qdf_nbuf_set_rx_chfrag_start(nbuf, 0);
 		qdf_nbuf_set_rx_chfrag_end(nbuf, 0);
+		qdf_nbuf_set_pktlen (nbuf, mpdu_len + RX_PKT_TLVS_LEN);
+		qdf_nbuf_pull_head(nbuf, RX_PKT_TLVS_LEN);
 		return nbuf;
 	}
 
@@ -952,7 +955,6 @@ qdf_nbuf_t dp_rx_sg_create(qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr)
 	 * nbufs will form the frag_list of the parent nbuf.
 	 */
 	qdf_nbuf_set_rx_chfrag_start(parent, 1);
-	mpdu_len = hal_rx_msdu_start_msdu_len_get(rx_tlv_hdr);
 	last_nbuf = dp_rx_adjust_nbuf_len(parent, &mpdu_len);
 
 	/*
@@ -1292,11 +1294,11 @@ dp_rx_process(struct dp_intr *int_ctx, void *hal_ring, uint32_t quota)
 	union dp_rx_desc_list_elem_t *tail[MAX_PDEV_CNT] = { NULL };
 	uint32_t rx_bufs_used = 0, rx_buf_cookie;
 	uint32_t l2_hdr_offset = 0;
-	uint16_t msdu_len;
+	uint16_t msdu_len = 0;
 	uint16_t peer_id;
 	struct dp_peer *peer = NULL;
 	struct dp_vdev *vdev = NULL;
-	uint32_t pkt_len;
+	uint32_t pkt_len = 0;
 	struct hal_rx_mpdu_desc_info mpdu_desc_info = { 0 };
 	struct hal_rx_msdu_desc_info msdu_desc_info = { 0 };
 	enum hal_reo_error_status error;
@@ -1513,12 +1515,24 @@ done:
 		 */
 		if (qdf_unlikely(vdev->rx_decap_type ==
 				htt_cmn_pkt_type_raw)) {
+			nbuf = dp_rx_sg_create(nbuf, rx_tlv_hdr);
 
 			DP_STATS_INC(vdev->pdev, rx_raw_pkts, 1);
-			DP_STATS_INC_PKT(peer, rx.raw, 1, qdf_nbuf_len(nbuf));
+			DP_STATS_INC_PKT(peer, rx.raw, 1,
+					hal_rx_msdu_start_msdu_len_get(rx_tlv_hdr));
 
-			nbuf = dp_rx_sg_create(nbuf, rx_tlv_hdr);
 			next = nbuf->next;
+		} else {
+			l2_hdr_offset =
+				hal_rx_msdu_end_l3_hdr_padding_get(rx_tlv_hdr);
+
+			msdu_len = hal_rx_msdu_start_msdu_len_get(rx_tlv_hdr);
+			pkt_len = msdu_len + l2_hdr_offset + RX_PKT_TLVS_LEN;
+
+			qdf_nbuf_set_pktlen(nbuf, pkt_len);
+			qdf_nbuf_pull_head(nbuf,
+					RX_PKT_TLVS_LEN +
+					l2_hdr_offset);
 		}
 
 		if (!dp_wds_rx_policy_check(rx_tlv_hdr, vdev, peer,
@@ -1568,25 +1582,6 @@ done:
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
 			FL("rxhash: flow id toeplitz: 0x%x\n"),
 			hal_rx_msdu_start_toeplitz_get(rx_tlv_hdr));
-
-		/*L2 header offset will not be set in raw mode*/
-		if (qdf_likely(vdev->rx_decap_type !=
-				htt_cmn_pkt_type_raw)) {
-			l2_hdr_offset =
-				hal_rx_msdu_end_l3_hdr_padding_get(rx_tlv_hdr);
-		}
-
-		msdu_len = hal_rx_msdu_start_msdu_len_get(rx_tlv_hdr);
-		pkt_len = msdu_len + l2_hdr_offset + RX_PKT_TLVS_LEN;
-
-		if (unlikely(qdf_nbuf_get_ext_list(nbuf)))
-			qdf_nbuf_pull_head(nbuf, RX_PKT_TLVS_LEN);
-		else {
-			qdf_nbuf_set_pktlen(nbuf, pkt_len);
-			qdf_nbuf_pull_head(nbuf,
-					RX_PKT_TLVS_LEN +
-					l2_hdr_offset);
-		}
 
 		dp_rx_msdu_stats_update(soc, nbuf, rx_tlv_hdr, peer, ring_id);
 
