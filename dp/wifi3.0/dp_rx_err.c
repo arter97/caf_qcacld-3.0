@@ -509,22 +509,20 @@ dp_2k_jump_handle(struct dp_soc *soc,
 			 "%s:rx_tid not found", __func__);
 		goto fail;
 	}
+	qdf_spin_lock_bh(&rx_tid->tid_lock);
 	ppdu_id = hal_rx_attn_phy_ppdu_id_get(rx_tlv_hdr);
 
 	if (rx_tid->ppdu_id_2k == ppdu_id) {
-		qdf_spin_lock(&rx_tid->tid_lock);
 		if (!rx_tid->delba_tx_status) {
 			rx_tid->delba_tx_count++;
 			rx_tid->delba_tx_retry++;
 			rx_tid->delba_tx_status = 1;
 			soc->cdp_soc.ol_ops->send_delba(peer->ol_peer, tid);
 		}
-		qdf_spin_unlock(&rx_tid->tid_lock);
-		goto fail;
+	} else {
+		rx_tid->ppdu_id_2k = ppdu_id;
 	}
-
-	rx_tid->ppdu_id_2k = ppdu_id;
-
+	qdf_spin_unlock_bh(&rx_tid->tid_lock);
 fail:
 	qdf_nbuf_free(nbuf);
 	return;
