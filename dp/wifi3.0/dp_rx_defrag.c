@@ -159,10 +159,13 @@ void dp_rx_defrag_waitlist_flush(struct dp_soc *soc)
 	struct dp_rx_tid *rx_reorder;
 	struct dp_rx_tid *tmp;
 	uint32_t now_ms = qdf_system_ticks_to_msecs(qdf_system_ticks());
+	TAILQ_HEAD(, dp_rx_tid) temp_list;
 
+	TAILQ_INIT(&temp_list);
+
+	qdf_spin_lock_bh(&soc->rx.defrag.defrag_lock);
 	TAILQ_FOREACH_SAFE(rx_reorder, &soc->rx.defrag.waitlist,
 			   defrag_waitlist_elem, tmp) {
-		struct dp_peer *peer;
 		unsigned int tid;
 
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
@@ -178,17 +181,24 @@ void dp_rx_defrag_waitlist_flush(struct dp_soc *soc)
 			qdf_assert(0);
 			continue;
 		}
+		TAILQ_REMOVE(&soc->rx.defrag.waitlist, rx_reorder,
+			     defrag_waitlist_elem);
+
+		/* Move to temp list and clean-up later */
+		TAILQ_INSERT_TAIL(&temp_list, rx_reorder,
+				  defrag_waitlist_elem);
+	}
+	qdf_spin_unlock_bh(&soc->rx.defrag.defrag_lock);
+
+	TAILQ_FOREACH_SAFE(rx_reorder, &temp_list,
+			   defrag_waitlist_elem, tmp) {
+		struct dp_peer *peer;
 
 		/* get address of current peer */
 		peer =
 			container_of(rx_reorder, struct dp_peer,
-				     rx_tid[tid]);
-
-		TAILQ_REMOVE(&soc->rx.defrag.waitlist, rx_reorder,
-			     defrag_waitlist_elem);
-
-		DP_STATS_DEC(soc, rx.rx_frag_wait, 1);
-		dp_rx_reorder_flush_frag(peer, tid);
+				     rx_tid[rx_reorder->tid]);
+		dp_rx_reorder_flush_frag(peer, rx_reorder->tid);
 	}
 }
 
@@ -211,9 +221,11 @@ static void dp_rx_defrag_waitlist_add(struct dp_peer *peer, unsigned tid)
 				tid, peer);
 
 	/* TODO: use LIST macros instead of TAIL macros */
+	qdf_spin_lock_bh(&psoc->rx.defrag.defrag_lock);
 	TAILQ_INSERT_TAIL(&psoc->rx.defrag.waitlist, rx_reorder,
 				defrag_waitlist_elem);
 	DP_STATS_INC(psoc, rx.rx_frag_wait, 1);
+	qdf_spin_unlock_bh(&psoc->rx.defrag.defrag_lock);
 }
 
 /*
@@ -242,6 +254,7 @@ void dp_rx_defrag_waitlist_remove(struct dp_peer *peer, unsigned tid)
 				FL("Remove TID %u from waitlist for peer %pK"),
 				tid, peer);
 
+	qdf_spin_lock_bh(&soc->rx.defrag.defrag_lock);
 	TAILQ_FOREACH(rx_reorder, &soc->rx.defrag.waitlist,
 			   defrag_waitlist_elem) {
 		struct dp_peer *peer_on_waitlist;
@@ -258,6 +271,7 @@ void dp_rx_defrag_waitlist_remove(struct dp_peer *peer, unsigned tid)
 			DP_STATS_DEC(soc, rx.rx_frag_wait, 1);
 		}
 	}
+	qdf_spin_unlock_bh(&soc->rx.defrag.defrag_lock);
 }
 
 /*
