@@ -1842,7 +1842,7 @@ int dp_delba_tx_completion_wifi3(void *peer_handle,
 			rx_tid->delba_tx_retry++;
 			rx_tid->delba_tx_status = 1;
 			peer->vdev->pdev->soc->cdp_soc.ol_ops->send_delba(
-				peer->vdev->pdev, peer->ol_peer,
+				peer->vdev->pdev->osif_pdev, peer->ol_peer,
 				peer->mac_addr.raw, tid);
 		}
 		if (rx_tid->delba_tx_retry == MAX_DELBA_RETRY) {
