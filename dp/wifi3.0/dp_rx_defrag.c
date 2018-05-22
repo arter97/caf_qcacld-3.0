@@ -156,13 +156,13 @@ void dp_rx_reorder_flush_frag(struct dp_peer *peer,
  */
 void dp_rx_defrag_waitlist_flush(struct dp_soc *soc)
 {
-	struct dp_rx_tid *rx_reorder, *tmp;
+	struct dp_rx_tid *rx_reorder;
+	struct dp_rx_tid *tmp;
 	uint32_t now_ms = qdf_system_ticks_to_msecs(qdf_system_ticks());
 
 	TAILQ_FOREACH_SAFE(rx_reorder, &soc->rx.defrag.waitlist,
 			   defrag_waitlist_elem, tmp) {
 		struct dp_peer *peer;
-		struct dp_rx_tid *rx_reorder_base;
 		unsigned int tid;
 
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
@@ -178,14 +178,15 @@ void dp_rx_defrag_waitlist_flush(struct dp_soc *soc)
 			qdf_assert(0);
 			continue;
 		}
-		/* get index 0 of the rx_reorder array */
-		rx_reorder_base = rx_reorder - tid;
+
+		/* get address of current peer */
 		peer =
-			container_of(rx_reorder_base, struct dp_peer,
-				     rx_tid[0]);
+			container_of(rx_reorder, struct dp_peer,
+				     rx_tid[tid]);
 
 		TAILQ_REMOVE(&soc->rx.defrag.waitlist, rx_reorder,
 			     defrag_waitlist_elem);
+
 		DP_STATS_DEC(soc, rx.rx_frag_wait, 1);
 		dp_rx_reorder_flush_frag(peer, tid);
 	}
@@ -206,7 +207,8 @@ static void dp_rx_defrag_waitlist_add(struct dp_peer *peer, unsigned tid)
 	struct dp_rx_tid *rx_reorder = &peer->rx_tid[tid];
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-				FL("Adding TID %u to waitlist"), tid);
+				FL("Adding TID %u to waitlist for peer %pK"),
+				tid, peer);
 
 	/* TODO: use LIST macros instead of TAIL macros */
 	TAILQ_INSERT_TAIL(&psoc->rx.defrag.waitlist, rx_reorder,
@@ -237,11 +239,20 @@ void dp_rx_defrag_waitlist_remove(struct dp_peer *peer, unsigned tid)
 	}
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-				FL("Remove TID %u from waitlist"), tid);
+				FL("Remove TID %u from waitlist for peer %pK"),
+				tid, peer);
 
 	TAILQ_FOREACH(rx_reorder, &soc->rx.defrag.waitlist,
 			   defrag_waitlist_elem) {
-		if (rx_reorder->tid == tid) {
+		struct dp_peer *peer_on_waitlist;
+
+		/* get address of current peer */
+		peer_on_waitlist =
+			container_of(rx_reorder, struct dp_peer,
+				     rx_tid[rx_reorder->tid]);
+
+		/* Ensure it is TID for same peer */
+		if (peer_on_waitlist == peer && rx_reorder->tid == tid) {
 			TAILQ_REMOVE(&soc->rx.defrag.waitlist,
 				rx_reorder, defrag_waitlist_elem);
 			DP_STATS_DEC(soc, rx.rx_frag_wait, 1);
