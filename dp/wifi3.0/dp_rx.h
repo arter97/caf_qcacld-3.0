@@ -387,6 +387,9 @@ dp_rx_wds_srcport_learn(struct dp_soc *soc,
 	struct dp_ast_entry *ast;
 	uint16_t sa_idx;
 
+	if (qdf_unlikely(!ta_peer))
+		return;
+
 	/* For AP mode : Do wds source port learning only if it is a
 	 * 4-address mpdu
 	 *
@@ -395,7 +398,7 @@ dp_rx_wds_srcport_learn(struct dp_soc *soc,
 	 * mode, we enable learning even in 3-address mode , to avoid RootAP
 	 * backbone getting wrongly learnt as MEC on repeater
 	 */
-	if (ta_peer && ta_peer->vdev->opmode != wlan_op_mode_sta) {
+	if (ta_peer->vdev->opmode != wlan_op_mode_sta) {
 		if (!(qdf_nbuf_is_rx_chfrag_start(nbuf) &&
 					hal_rx_get_mpdu_mac_ad4_valid(rx_tlv_hdr)))
 			return;

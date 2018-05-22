@@ -1159,7 +1159,7 @@ static inline void dp_rx_msdu_stats_update(struct dp_soc *soc,
 			 && (pkt_type == DOT11_AX)));
 	DP_STATS_INCC(peer, rx.pkt_type[pkt_type].
 			mcs_count[mcs], 1,
-			((mcs <= MAX_MCS)
+			((mcs < MAX_MCS)
 			 && (pkt_type == DOT11_AX)));
 
 	if (!vdev->pdev || !vdev->pdev->osif_pdev)
@@ -1547,7 +1547,7 @@ done:
 			continue;
 		}
 
-		if (qdf_unlikely(peer && peer->bss_peer)) {
+		if (qdf_unlikely(peer->bss_peer)) {
 			QDF_TRACE(QDF_MODULE_ID_DP,
 				QDF_TRACE_LEVEL_ERROR,
 				FL("received pkt with same src MAC"));

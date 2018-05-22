@@ -1771,6 +1771,8 @@ static void dp_batch_intr_detach(struct dp_soc *soc)
 	qdf_timer_free(&soc->batch_intr->rx_batch_intr_timer);
 
 	qdf_mem_free(soc->batch_intr);
+
+	soc->batch_intr = NULL;
 }
 
 /*
@@ -1785,6 +1787,9 @@ static void dp_rx_batch_intr_timer_fn(void *soc_hdl)
 	struct hal_srng *srng = NULL;
 	int i = 0;
 	bool batch_thres_change = false;
+
+	if (!soc->batch_intr)
+		return;
 
 	if (qdf_atomic_read(&soc->batch_intr->pkt_to_stack_per_sec) <
 							DP_RX_PACKET_RECEIVED) {
@@ -2996,6 +3001,7 @@ static void dp_soc_detach_wifi3(void *txrx_soc)
 	qdf_nbuf_queue_free(&soc->htt_stats.msg);
 
 	dp_free_inact_timer(soc);
+	dp_batch_intr_detach(soc);
 
 	for (i = 0; i < MAX_PDEV_CNT; i++) {
 		if (soc->pdev_list[i])
@@ -3070,7 +3076,6 @@ static void dp_soc_detach_wifi3(void *txrx_soc)
 
 	dp_soc_wds_detach(soc);
 	qdf_spinlock_destroy(&soc->ast_lock);
-	dp_batch_intr_detach(soc);
 
 	qdf_mem_free(soc);
 }
@@ -3204,6 +3209,7 @@ static void dp_rxdma_ring_config(struct dp_soc *soc)
 			htt_srng_setup(soc->htt_handle, i,
 				pdev->rxdma_mon_desc_ring.hal_srng,
 				RXDMA_MONITOR_DESC);
+
 			htt_srng_setup(soc->htt_handle, i,
 				pdev->rxdma_err_dst_ring[ring_idx].hal_srng,
 				RXDMA_DST);
@@ -4874,7 +4880,12 @@ void dp_rx_bar_stats_cb(struct dp_soc *soc, void *cb_ctxt,
 void dp_aggregate_vdev_stats(struct dp_vdev *vdev)
 {
 	struct dp_peer *peer = NULL;
-	struct dp_soc *soc = vdev->pdev->soc;
+	struct dp_soc *soc = NULL;
+
+	if (!vdev || !vdev->pdev)
+		return;
+
+	soc = vdev->pdev->soc;
 
 	qdf_mem_set(&(vdev->stats.tx), sizeof(vdev->stats.tx), 0x0);
 	qdf_mem_set(&(vdev->stats.rx), sizeof(vdev->stats.rx), 0x0);
@@ -4882,7 +4893,7 @@ void dp_aggregate_vdev_stats(struct dp_vdev *vdev)
 	TAILQ_FOREACH(peer, &vdev->peer_list, peer_list_elem)
 		DP_UPDATE_STATS(vdev, peer);
 
-	if (!vdev->pdev || !vdev->pdev->osif_pdev)
+	if (!vdev->pdev->osif_pdev)
 		return;
 
 	if (soc->cdp_soc.ol_ops &&
@@ -4901,7 +4912,12 @@ void dp_aggregate_vdev_stats(struct dp_vdev *vdev)
 static inline void dp_aggregate_pdev_stats(struct dp_pdev *pdev)
 {
 	struct dp_vdev *vdev = NULL;
-	struct dp_soc *soc = pdev->soc;
+	struct dp_soc *soc = NULL;
+
+	if (!pdev)
+		return;
+
+	soc = pdev->soc;
 
 	qdf_mem_set(&(pdev->stats.tx), sizeof(pdev->stats.tx), 0x0);
 	qdf_mem_set(&(pdev->stats.rx), sizeof(pdev->stats.rx), 0x0);
@@ -4959,7 +4975,7 @@ static inline void dp_aggregate_pdev_stats(struct dp_pdev *pdev)
 	}
 	qdf_spin_unlock_bh(&pdev->vdev_list_lock);
 
-	if (!pdev || !pdev->osif_pdev)
+	if (!pdev->osif_pdev)
 		return;
 
 	if (soc->cdp_soc.ol_ops && soc->cdp_soc.ol_ops->update_dp_stats)
@@ -5435,10 +5451,12 @@ static inline void
 dp_txrx_host_stats_clr(struct dp_vdev *vdev)
 {
 	struct dp_peer *peer = NULL;
-	struct dp_soc *soc = (struct dp_soc *)vdev->pdev->soc;
+	struct dp_soc *soc = NULL;
 
-	if (!vdev->pdev || !vdev->pdev->osif_pdev)
+	if (!vdev || !vdev->pdev || !vdev->pdev->osif_pdev)
 		return;
+
+	soc = (struct dp_soc *)vdev->pdev->soc;
 
 	DP_STATS_CLR(vdev->pdev);
 	DP_STATS_CLR(vdev->pdev->soc);

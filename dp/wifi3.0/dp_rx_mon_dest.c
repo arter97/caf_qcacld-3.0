@@ -142,7 +142,7 @@ dp_rx_mon_mpdu_pop(struct dp_soc *soc, uint32_t mac_id,
 	uint32_t msdu_ppdu_id, msdu_cnt, last_ppdu_id;
 	uint8_t *data;
 	uint32_t i;
-	uint32_t total_frag_len, frag_len;
+	uint32_t total_frag_len = 0, frag_len;
 	bool is_frag, is_first_msdu;
 	bool drop_mpdu = false;
 

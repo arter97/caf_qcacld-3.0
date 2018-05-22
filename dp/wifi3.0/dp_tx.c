@@ -2482,8 +2482,13 @@ static inline void dp_tx_update_peer_stats(struct dp_peer *peer,
 		struct hal_tx_completion_status *ts)
 {
 	struct dp_pdev *pdev = peer->vdev->pdev;
-	struct dp_soc *soc = pdev->soc;
+	struct dp_soc *soc = NULL;
 	uint8_t mcs, pkt_type;
+
+	if (!pdev)
+		return;
+
+	soc = pdev->soc;
 
 	mcs = ts->mcs;
 	pkt_type = ts->pkt_type;
@@ -2546,7 +2551,7 @@ static inline void dp_tx_update_peer_stats(struct dp_peer *peer,
 	DP_STATS_INCC(peer, tx.ldpc, 1, ts->ldpc);
 	DP_STATS_INCC(peer, tx.retries, 1, ts->transmit_cnt > 1);
 
-	if (!pdev || !pdev->osif_pdev)
+	if (!pdev->osif_pdev)
 		return;
 
 	if (soc->cdp_soc.ol_ops &&
@@ -2891,7 +2896,7 @@ uint32_t dp_tx_comp_handler(struct dp_soc *soc, void *hal_srng, uint32_t quota)
 					htt_tx_status);
 		} else {
 			/* Pool id is not matching. Error */
-			if (tx_desc && (tx_desc->pool_id != pool_id)) {
+			if (tx_desc->pool_id != pool_id) {
 				QDF_TRACE(QDF_MODULE_ID_DP,
 					QDF_TRACE_LEVEL_FATAL,
 					"Tx Comp pool id %d not matched %d",
