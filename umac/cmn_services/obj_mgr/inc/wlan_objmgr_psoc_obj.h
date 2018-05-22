@@ -650,6 +650,22 @@ struct wlan_objmgr_peer *wlan_objmgr_get_peer_by_mac_n_vdev(
 			uint8_t *bssid, wlan_objmgr_ref_dbgid dbg_id);
 
 /**
+ * wlan_objmgr_populate_logically_deleted_peerlist() - get list of
+ *                                     all logically deleted peers
+ * @psoc: PSOC object
+ * @dbg_id: id of the caller
+ *
+ * API to find list of all logically deleted peers.
+ * The caller should free the reference taken for each peer.
+ *
+ * Return: list of peer pointer pointers
+ *         NULL on FAILURE
+ */
+qdf_list_t *wlan_objmgr_populate_logically_deleted_peerlist(
+			struct wlan_objmgr_psoc *psoc,
+			wlan_objmgr_ref_dbgid dbg_id);
+
+/**
  * wlan_objmgr_get_peer_by_mac_n_vdev_no_state() - find peer from psoc's peer
  *                                          list using mac address and bssid
  * @psoc: PSOC object
