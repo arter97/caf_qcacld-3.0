@@ -356,9 +356,11 @@ static void dp_wds_reset_ast_wifi3(struct cdp_soc_t *soc_hdl,
 	qdf_spin_lock_bh(&soc->ast_lock);
 	ast_entry = dp_peer_ast_hash_find(soc, wds_macaddr);
 
-	if (ast_entry->type != CDP_TXRX_AST_TYPE_STATIC) {
+	if ((ast_entry->type != CDP_TXRX_AST_TYPE_STATIC) &&
+	    (ast_entry->type != CDP_TXRX_AST_TYPE_SELF)) {
 		ast_entry->is_active = TRUE;
 	}
+
 	qdf_spin_unlock_bh(&soc->ast_lock);
 }
 
@@ -385,8 +387,10 @@ static void dp_wds_reset_ast_table_wifi3(struct cdp_soc_t  *soc_hdl)
 		DP_PDEV_ITERATE_VDEV_LIST(pdev, vdev) {
 			DP_VDEV_ITERATE_PEER_LIST(vdev, peer) {
 				DP_PEER_ITERATE_ASE_LIST(peer, ase, temp_ase) {
-					if (ase->type ==
-						CDP_TXRX_AST_TYPE_STATIC)
+					if ((ase->type ==
+						CDP_TXRX_AST_TYPE_STATIC) ||
+						(ase->type ==
+						 CDP_TXRX_AST_TYPE_SELF))
 						continue;
 					ase->is_active = TRUE;
 				}
@@ -421,8 +425,10 @@ static void dp_wds_flush_ast_table_wifi3(struct cdp_soc_t  *soc_hdl)
 		DP_PDEV_ITERATE_VDEV_LIST(pdev, vdev) {
 			DP_VDEV_ITERATE_PEER_LIST(vdev, peer) {
 				DP_PEER_ITERATE_ASE_LIST(peer, ase, temp_ase) {
-					if (ase->type ==
-						CDP_TXRX_AST_TYPE_STATIC)
+					if ((ase->type ==
+					    CDP_TXRX_AST_TYPE_STATIC) ||
+					    (ase->type ==
+					    CDP_TXRX_AST_TYPE_SELF))
 						continue;
 					dp_peer_del_ast(soc, ase);
 				}
@@ -646,7 +652,8 @@ static void dp_print_ast_stats(struct dp_soc *soc)
 	struct dp_pdev *pdev;
 	struct dp_peer *peer;
 	struct dp_ast_entry *ase, *tmp_ase;
-	char type[5][10] = {"NONE", "STATIC", "WDS", "MEC", "HMWDS"};
+	char type[CDP_TXRX_AST_TYPE_MAX][10] = {
+			"NONE", "STATIC", "SELF", "WDS", "MEC", "HMWDS"};
 
 	DP_PRINT_STATS("AST Stats:");
 	DP_PRINT_STATS("	Entries Added   = %d", soc->stats.ast.added);
@@ -667,7 +674,8 @@ static void dp_print_ast_stats(struct dp_soc *soc)
 							" is_bss = %d"
 							" ast_idx = %d"
 							" pdev_id = %d"
-							" vdev_id = %d",
+							" vdev_id = %d"
+							" peer_id = %d",
 							++num_entries,
 							ase->mac_addr.raw,
 							ase->peer->mac_addr.raw,
@@ -677,7 +685,8 @@ static void dp_print_ast_stats(struct dp_soc *soc)
 							ase->is_bss,
 							ase->ast_idx,
 							ase->pdev_id,
-							ase->vdev_id);
+							ase->vdev_id,
+							ase->peer->peer_ids[0]);
 				}
 			}
 		}
@@ -3585,6 +3594,7 @@ static void *dp_peer_create_wifi3(struct cdp_vdev *vdev_handle,
 	struct dp_pdev *pdev;
 	struct dp_soc *soc;
 	struct dp_ast_entry *ast_entry;
+	enum cdp_txrx_ast_entry_type ast_type = CDP_TXRX_AST_TYPE_STATIC;
 
 	/* preconditions */
 	qdf_assert(vdev);
@@ -3644,7 +3654,13 @@ static void *dp_peer_create_wifi3(struct cdp_vdev *vdev_handle,
 	/* store provided params */
 	peer->vdev = vdev;
 
-	dp_peer_add_ast(soc, peer, peer_mac_addr, CDP_TXRX_AST_TYPE_STATIC, 0);
+	if ((vdev->opmode == wlan_op_mode_sta) &&
+	    !qdf_mem_cmp(peer_mac_addr, &vdev->mac_addr.raw[0],
+			 DP_MAC_ADDR_LEN)) {
+		ast_type = CDP_TXRX_AST_TYPE_SELF;
+	}
+
+	dp_peer_add_ast(soc, peer, peer_mac_addr, ast_type, 0);
 
 	qdf_spinlock_create(&peer->peer_info_lock);
 

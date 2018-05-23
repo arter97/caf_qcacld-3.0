@@ -139,9 +139,8 @@ static inline bool dp_rx_mcast_echo_check(struct dp_soc *soc,
 
 		if (ase->pdev_id != vdev->pdev->pdev_id) {
 			qdf_spin_unlock_bh(&soc->ast_lock);
-			QDF_TRACE(QDF_MODULE_ID_DP,
-				QDF_TRACE_LEVEL_INFO,
-				"Detected DBDC Root AP %pM, %d %d",
+			QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_DEBUG,
+				  "Detected DBDC Root AP %pM, %d %d",
 				&data[DP_MAC_ADDR_LEN], vdev->pdev->pdev_id,
 				ase->pdev_id);
 			return false;
@@ -150,11 +149,9 @@ static inline bool dp_rx_mcast_echo_check(struct dp_soc *soc,
 		if ((ase->type == CDP_TXRX_AST_TYPE_MEC) ||
 				(ase->peer != peer)) {
 			qdf_spin_unlock_bh(&soc->ast_lock);
-			QDF_TRACE(QDF_MODULE_ID_DP,
-				QDF_TRACE_LEVEL_INFO,
-				"received pkt with same src mac %pM",
+			QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_DEBUG,
+				  "received pkt with same src mac %pM",
 				&data[DP_MAC_ADDR_LEN]);
-
 			return true;
 		}
 	}
@@ -637,7 +634,6 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc,
 		qdf_nbuf_free(nbuf);
 		return;
 	}
-
 
 	if (qdf_unlikely((peer->nawds_enabled == true) &&
 			hal_rx_msdu_end_da_is_mcbc_get(rx_tlv_hdr))) {

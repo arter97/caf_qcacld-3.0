@@ -444,7 +444,8 @@ dp_rx_wds_srcport_learn(struct dp_soc *soc,
 		if (ast->pdev_id != ta_peer->vdev->pdev->pdev_id)
 			return;
 
-		if (ast->type != CDP_TXRX_AST_TYPE_STATIC) {
+		if ((ast->type != CDP_TXRX_AST_TYPE_STATIC) &&
+		    (ast->type != CDP_TXRX_AST_TYPE_SELF)) {
 			dp_peer_update_ast(soc, ta_peer, ast, flags);
 			return;
 		}

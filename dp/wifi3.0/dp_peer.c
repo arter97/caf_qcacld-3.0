@@ -459,6 +459,10 @@ int dp_peer_add_ast(struct dp_soc *soc,
 		peer->self_ast_entry = ast_entry;
 		ast_entry->type = CDP_TXRX_AST_TYPE_STATIC;
 		break;
+	case CDP_TXRX_AST_TYPE_SELF:
+		peer->self_ast_entry = ast_entry;
+		ast_entry->type = CDP_TXRX_AST_TYPE_SELF;
+		break;
 	case CDP_TXRX_AST_TYPE_WDS:
 		ast_entry->next_hop = 1;
 		ast_entry->type = CDP_TXRX_AST_TYPE_WDS;
@@ -487,7 +491,8 @@ int dp_peer_add_ast(struct dp_soc *soc,
 	else
 		qdf_mem_copy(next_node_mac, peer->mac_addr.raw, 6);
 
-	if (ast_entry->type != CDP_TXRX_AST_TYPE_STATIC) {
+	if ((ast_entry->type != CDP_TXRX_AST_TYPE_STATIC) &&
+	    (ast_entry->type != CDP_TXRX_AST_TYPE_SELF)) {
 		if (QDF_STATUS_SUCCESS ==
 				soc->cdp_soc.ol_ops->peer_add_wds_entry(
 				peer->vdev->osif_vdev,
@@ -541,14 +546,14 @@ void dp_peer_del_ast(struct dp_soc *soc, struct dp_ast_entry *ast_entry)
  *         -1 failure
  */
 int dp_peer_update_ast(struct dp_soc *soc, struct dp_peer *peer,
-		       struct dp_ast_entry *ast_entry, uint32_t flags)
+		struct dp_ast_entry *ast_entry, uint32_t flags)
 {
 	int ret = -1;
 	struct dp_peer *old_peer;
 
-	if (ast_entry->type == CDP_TXRX_AST_TYPE_STATIC) {
+	if ((ast_entry->type == CDP_TXRX_AST_TYPE_STATIC) ||
+	    (ast_entry->type == CDP_TXRX_AST_TYPE_SELF))
 			return 0;
-	}
 
 	qdf_spin_lock_bh(&soc->ast_lock);
 
