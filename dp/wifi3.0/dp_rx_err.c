@@ -517,7 +517,7 @@ dp_2k_jump_handle(struct dp_soc *soc,
 			rx_tid->delba_tx_count++;
 			rx_tid->delba_tx_retry++;
 			rx_tid->delba_tx_status = 1;
-			soc->cdp_soc.ol_ops->send_delba(peer->vdev->pdev,
+			soc->cdp_soc.ol_ops->send_delba(peer->vdev->pdev->osif_pdev,
 				peer->ol_peer, peer->mac_addr.raw, tid);
 		}
 	} else {
