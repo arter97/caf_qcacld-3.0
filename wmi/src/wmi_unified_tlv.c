@@ -23551,6 +23551,8 @@ static void populate_vdev_param_tlv(uint32_t *vdev_param)
 					WMI_VDEV_PARAM_AUTORATE_MISC_CFG;
 	vdev_param[wmi_vdev_param_capabilities] =
 					WMI_VDEV_PARAM_CAPABILITIES;
+	vdev_param[wmi_vdev_param_rawmode_open_war] =
+					WMI_VDEV_PARAM_RAW_IS_ENCRYPTED;
 }
 #endif
 
