@@ -64,6 +64,7 @@ static void dp_pktlogmod_exit(struct dp_pdev *handle);
 static void *dp_peer_create_wifi3(struct cdp_vdev *vdev_handle,
 					uint8_t *peer_mac_addr, void *ol_peer);
 static void dp_peer_delete_wifi3(void *peer_handle, uint32_t bitmap);
+static void dp_batch_intr_attach(struct dp_soc *soc);
 
 #define DP_INTR_POLL_TIMER_MS	10
 #define DP_WDS_AGING_TIMER_DEFAULT_MS	120000
@@ -2327,10 +2328,6 @@ static int dp_soc_cmn_setup(struct dp_soc *soc)
 	soc->rx.flags.defrag_timeout_check =
 		wlan_cfg_get_defrag_timeout_check(soc->wlan_cfg_ctx);
 
-	soc->batch_intr->int_batch_threshold_rx =
-		wlan_cfg_get_int_batch_threshold_rx(soc->wlan_cfg_ctx);
-
-
 out:
 	/*
 	 * set the fragment destination ring
@@ -2338,6 +2335,9 @@ out:
 	dp_reo_frag_dst_set(soc, &reo_params.frag_dst_ring);
 
 	hal_reo_setup(soc->hal_soc, &reo_params);
+
+	/*batch intr timer*/
+	dp_batch_intr_attach(soc);
 
 	qdf_atomic_set(&soc->cmn_init_done, 1);
 	qdf_nbuf_queue_init(&soc->htt_stats.msg);
@@ -3290,6 +3290,9 @@ static void dp_batch_intr_attach(struct dp_soc *soc)
 	qdf_mem_set(pbatch_intr, sizeof(pbatch_intr), 0x0);
 
 	soc->batch_intr = pbatch_intr;
+
+	soc->batch_intr->int_batch_threshold_rx =
+		wlan_cfg_get_int_batch_threshold_rx(soc->wlan_cfg_ctx);
 
 	/*initialize batch intr time for rx*/
 	qdf_timer_init(soc->osdev, &pbatch_intr->rx_batch_intr_timer,
@@ -7361,9 +7364,6 @@ void *dp_soc_attach_wifi3(void *ctrl_psoc, void *hif_handle,
 
 	/*Initialize inactivity timer for wifison */
 	dp_init_inact_timer(soc);
-
-	/*batch intr timer*/
-	dp_batch_intr_attach(soc);
 
 	return (void *)soc;
 
