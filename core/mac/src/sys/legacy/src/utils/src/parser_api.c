@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -5600,17 +5600,25 @@ tSirRetStatus populate_dot11f_assoc_res_wsc_ie(tpAniSirGlobal pMac,
 					       tDot11fIEWscAssocRes *pDot11f,
 					       tpSirAssocReq pRcvdAssocReq)
 {
-	tDot11fIEWscAssocReq parsedWscAssocReq = { 0, };
+	uint32_t ret;
 	uint8_t *wscIe;
+	tDot11fIEWscAssocReq parsedWscAssocReq = { 0, };
 
-	wscIe =
-		limGetWscIEPtr(pMac, pRcvdAssocReq->addIE.addIEdata,
+	wscIe = limGetWscIEPtr(pMac, pRcvdAssocReq->addIE.addIEdata,
 			       pRcvdAssocReq->addIE.length);
 	if (wscIe != NULL) {
 		/* retreive WSC IE from given AssocReq */
-		dot11f_unpack_ie_wsc_assoc_req(pMac, wscIe + 2 + 4,     /* EID, length, OUI */
-					       wscIe[1] - 4, /* length without OUI */
-					       &parsedWscAssocReq);
+		ret = dot11f_unpack_ie_wsc_assoc_req(pMac,
+						     /* EID, length, OUI */
+						     wscIe + 2 + 4,
+						     /* length without OUI */
+						     wscIe[1] - 4,
+						     &parsedWscAssocReq);
+		if (!DOT11F_SUCCEEDED(ret)) {
+			lim_log(pMac, LOGE, FL("unpack failed, ret: %d"), ret);
+			return eSIR_HAL_INPUT_INVALID;
+		}
+
 		pDot11f->present = 1;
 		/* version has to be 0x10 */
 		pDot11f->Version.present = 1;
