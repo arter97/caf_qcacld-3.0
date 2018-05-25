@@ -616,7 +616,6 @@ static int __pktlog_enable(struct hif_opaque_softc *scn, int32_t log_state,
 
 		pl_dev->tgt_pktlog_alloced = true;
 	}
-
 	if (log_state != 0) {
 		/* WDI subscribe */
 		if (!pl_dev->is_pktlog_cb_subscribed) {
@@ -866,23 +865,21 @@ int pktlog_clearbuff(struct hif_opaque_softc *scn, bool clear_buff)
  *
  * Return: None
  */
-void pktlog_process_fw_msg(uint32_t *buff)
+void pktlog_process_fw_msg(uint32_t *buff, uint32_t len)
 {
 	uint32_t *pl_hdr;
 	uint32_t log_type;
 	struct cdp_pdev *pdev = get_txrx_context();
-#ifdef CONFIG_MCL
-	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
-#else
-	/*TODO: WIN implementation to get soc */
-#endif
+	struct ol_fw_data pl_fw_data;
 
 	if (!pdev) {
 		qdf_print("%s: txrx_pdev is NULL", __func__);
 		return;
 	}
-
 	pl_hdr = buff;
+	pl_fw_data.data = pl_hdr;
+	pl_fw_data.len = len;
+
 	log_type =
 		(*(pl_hdr + 1) & ATH_PKTLOG_HDR_LOG_TYPE_MASK) >>
 		ATH_PKTLOG_HDR_LOG_TYPE_SHIFT;
@@ -892,20 +889,20 @@ void pktlog_process_fw_msg(uint32_t *buff)
 		|| (log_type == PKTLOG_TYPE_TX_MSDU_ID)
 		|| (log_type == PKTLOG_TYPE_TX_FRM_HDR)
 		|| (log_type == PKTLOG_TYPE_TX_VIRT_ADDR))
-		cdp_wdi_event_handler(soc, pdev,
-				WDI_EVENT_TX_STATUS, pl_hdr);
+		wdi_event_handler(WDI_EVENT_TX_STATUS,
+				  pdev, &pl_fw_data);
 	else if (log_type == PKTLOG_TYPE_RC_FIND)
-		cdp_wdi_event_handler(soc, pdev,
-				WDI_EVENT_RATE_FIND, pl_hdr);
+		wdi_event_handler(WDI_EVENT_RATE_FIND,
+				  pdev, &pl_fw_data);
 	else if (log_type == PKTLOG_TYPE_RC_UPDATE)
-		cdp_wdi_event_handler(soc, pdev,
-				WDI_EVENT_RATE_UPDATE, pl_hdr);
+		wdi_event_handler(WDI_EVENT_RATE_UPDATE,
+				  pdev, &pl_fw_data);
 	else if (log_type == PKTLOG_TYPE_RX_STAT)
-		cdp_wdi_event_handler(soc, pdev,
-				WDI_EVENT_RX_DESC, pl_hdr);
+		wdi_event_handler(WDI_EVENT_RX_DESC,
+				  pdev, &pl_fw_data);
 	else if (log_type == PKTLOG_TYPE_SW_EVENT)
-		cdp_wdi_event_handler(soc, pdev,
-				WDI_EVENT_SW_EVENT, pl_hdr);
+		wdi_event_handler(WDI_EVENT_SW_EVENT,
+				  pdev, &pl_fw_data);
 }
 
 #if defined(QCA_WIFI_3_0_ADRASTEA)
@@ -932,6 +929,7 @@ static void pktlog_t2h_msg_handler(void *context, HTC_PACKET *pkt)
 	struct pktlog_dev_t *pdev = (struct pktlog_dev_t *)context;
 	qdf_nbuf_t pktlog_t2h_msg = (qdf_nbuf_t) pkt->pPktContext;
 	uint32_t *msg_word;
+	uint32_t msg_len;
 
 	/* check for sanity of the packet, have seen corrupted pkts */
 	if (pktlog_nbuf_check_sanity(pktlog_t2h_msg)) {
@@ -954,7 +952,8 @@ static void pktlog_t2h_msg_handler(void *context, HTC_PACKET *pkt)
 	qdf_assert((((unsigned long)qdf_nbuf_data(pktlog_t2h_msg)) & 0x3) == 0);
 
 	msg_word = (uint32_t *) qdf_nbuf_data(pktlog_t2h_msg);
-	pktlog_process_fw_msg(msg_word);
+	msg_len = qdf_nbuf_len(pktlog_t2h_msg);
+	pktlog_process_fw_msg(msg_word, msg_len);
 
 	qdf_nbuf_free(pktlog_t2h_msg);
 }
