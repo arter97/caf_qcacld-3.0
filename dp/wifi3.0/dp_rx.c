@@ -1487,6 +1487,11 @@ done:
 
 		DP_HIST_PACKET_COUNT_INC(vdev->pdev->pdev_id);
 		/*
+		 * First IF condition:
+		 * 802.11 Fragmented pkts are reinjected to REO
+		 * HW block as SG pkts and for these pkts we only
+		 * need to pull the RX TLVS header length.
+		 * Second IF condition:
 		 * The below condition happens when an MSDU is spread
 		 * across multiple buffers. This can happen in two cases
 		 * 1. The nbuf size is smaller then the received msdu.
@@ -1502,8 +1507,13 @@ done:
 		 *
 		 * for these scenarios let us create a skb frag_list and
 		 * append these buffers till the last MSDU of the AMSDU
+		 * Third condition:
+		 * This is the most likely case, we receive 802.3 pkts
+		 * decapsulated by HW, here we need to set the pkt length.
 		 */
-		if (qdf_unlikely(vdev->rx_decap_type ==
+		if (qdf_unlikely(qdf_nbuf_get_ext_list(nbuf)))
+			qdf_nbuf_pull_head(nbuf, RX_PKT_TLVS_LEN);
+		else if (qdf_unlikely(vdev->rx_decap_type ==
 				htt_cmn_pkt_type_raw)) {
 			nbuf = dp_rx_sg_create(soc, nbuf, rx_tlv_hdr);
 
