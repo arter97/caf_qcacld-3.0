@@ -3626,6 +3626,10 @@ static void *dp_peer_create_wifi3(struct cdp_vdev *vdev_handle,
 	 * reuse the peer and reset the state of peer.
 	 */
 	if (peer) {
+		/* cleanup the peer data */
+		qdf_atomic_init(&peer->is_default_route_set);
+
+		dp_peer_cleanup(vdev, peer);
 		peer->delete_in_progress = false;
 
 		dp_peer_delete_ast_entries(soc, peer);
@@ -3802,6 +3806,12 @@ static void dp_peer_setup_wifi3(struct cdp_vdev *vdev_hdl, void *peer_hdl)
 			pdev->osif_pdev, peer->mac_addr.raw,
 			 peer->vdev->vdev_id, hash_based, reo_dest);
 	}
+
+	/* do not setup reo_queues and default route for bss_peer */
+	if (peer->bss_peer && vdev->opmode == wlan_op_mode_ap)
+		return;
+
+	qdf_atomic_set(&peer->is_default_route_set, 1);
 
 	dp_peer_rx_init(pdev, peer);
 	return;

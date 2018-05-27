@@ -1432,9 +1432,10 @@ struct dp_peer {
 	dp_ecm_policy wds_ecm;
 #endif
 	bool delete_in_progress;
-
 	/* Opaque handle to node */
 	void *ol_peer;
+
+	qdf_atomic_t is_default_route_set;
 };
 
 #ifdef CONFIG_WIN

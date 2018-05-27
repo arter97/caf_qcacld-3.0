@@ -1217,7 +1217,8 @@ int dp_rx_tid_setup_wifi3(struct dp_peer *peer, int tid,
 	void *hw_qdesc_vaddr;
 	uint32_t alloc_tries = 0;
 
-	if (peer->delete_in_progress)
+	if (peer->delete_in_progress ||
+	    !qdf_atomic_read(&peer->is_default_route_set))
 		return QDF_STATUS_E_FAILURE;
 
 	rx_tid->ba_win_size = ba_window_size;
@@ -1722,9 +1723,16 @@ int dp_addba_requestprocess_wifi3(void *peer_handle,
 	struct dp_peer *peer = (struct dp_peer *)peer_handle;
 	struct dp_rx_tid *rx_tid = NULL;
 
-	if (!peer || peer->delete_in_progress) {
+	if (!peer) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_DEBUG,
-			 "%s: Peer is NULL or delete in progress!", __func__);
+			  "%s: Peer is NULL or delete in progress!", __func__);
+		return QDF_STATUS_E_FAILURE;
+	}
+	if (peer->delete_in_progress ||
+	    !qdf_atomic_read(&peer->is_default_route_set)) {
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_DEBUG,
+			 "%s: delete in progress or default route is not set",
+			 __func__);
 		return QDF_STATUS_E_FAILURE;
 	}
 	rx_tid = &peer->rx_tid[tid];

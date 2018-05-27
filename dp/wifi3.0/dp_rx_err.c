@@ -667,7 +667,7 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc,
 		 */
 		tid = hal_rx_mpdu_start_tid_get(rx_tlv_hdr);
 		if (peer &&
-			peer->rx_tid[tid].hw_qdesc_vaddr_unaligned == NULL) {
+		    peer->rx_tid[tid].hw_qdesc_vaddr_unaligned == NULL) {
 			/* IEEE80211_SEQ_MAX indicates invalid start_seq */
 			dp_rx_tid_setup_wifi3(peer, tid, 1, IEEE80211_SEQ_MAX);
 		}
