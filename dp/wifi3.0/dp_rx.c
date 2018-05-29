@@ -872,22 +872,29 @@ static void dp_rx_lro(uint8_t *rx_tlv, struct dp_peer *peer,
 /*
  * dp_rx_adjust_nbuf_len() - set appropriate msdu length in nbuf.
  *
+ * @soc: core txrx main context
  * @nbuf: pointer to msdu.
  * @mpdu_len: mpdu length
  *
  * Return: returns true if nbuf is last msdu of mpdu else retuns false.
  */
-static inline bool dp_rx_adjust_nbuf_len(qdf_nbuf_t nbuf, uint16_t *mpdu_len)
+static inline bool dp_rx_adjust_nbuf_len(struct dp_soc *soc, qdf_nbuf_t nbuf,
+					 uint16_t *mpdu_len)
 {
 	bool last_nbuf;
+	uint16_t length;
 
 	if (*mpdu_len >= (RX_BUFFER_SIZE - RX_PKT_TLVS_LEN)) {
-		qdf_nbuf_set_pktlen(nbuf, RX_BUFFER_SIZE);
+		length = RX_BUFFER_SIZE;
 		last_nbuf = false;
 	} else {
-		qdf_nbuf_set_pktlen(nbuf, (*mpdu_len + RX_PKT_TLVS_LEN));
+		length = *mpdu_len + RX_PKT_TLVS_LEN;
 		last_nbuf = true;
 	}
+
+	qdf_nbuf_unmap_nbytes_single(soc->osdev, nbuf, QDF_DMA_FROM_DEVICE,
+				     length);
+	qdf_nbuf_set_pktlen(nbuf, length);
 
 	*mpdu_len -= (RX_BUFFER_SIZE - RX_PKT_TLVS_LEN);
 
@@ -897,23 +904,23 @@ static inline bool dp_rx_adjust_nbuf_len(qdf_nbuf_t nbuf, uint16_t *mpdu_len)
 /**
  * dp_rx_sg_create() - create a frag_list for MSDUs which are spread across
  *		     multiple nbufs.
+ *
  * @soc: core txrx main context
  * @nbuf: pointer to the first msdu of an amsdu.
- * @rx_tlv_hdr: pointer to the start of RX TLV headers.
+ * @mpdu_len: total length of mpdu
  *
  * This function implements the creation of RX frag_list for cases
  * where an MSDU is spread across multiple nbufs.
  *
  * Return: returns the head nbuf which contains complete frag_list.
  */
-qdf_nbuf_t dp_rx_sg_create(struct dp_soc *soc, qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr)
+qdf_nbuf_t dp_rx_sg_create(struct dp_soc *soc, qdf_nbuf_t nbuf,
+			  uint16_t mpdu_len)
 {
 	qdf_nbuf_t parent, next, frag_list;
 	uint16_t frag_list_len = 0;
-	uint16_t mpdu_len;
 	bool last_nbuf;
 
-	mpdu_len = hal_rx_msdu_start_msdu_len_get(rx_tlv_hdr);
 	/*
 	 * this is a case where the complete msdu fits in one single nbuf.
 	 * in this case HW sets both start and end bit and we only need to
@@ -921,8 +928,9 @@ qdf_nbuf_t dp_rx_sg_create(struct dp_soc *soc, qdf_nbuf_t nbuf, uint8_t *rx_tlv_
 	 */
 	if (qdf_nbuf_is_rx_chfrag_start(nbuf) &&
 					qdf_nbuf_is_rx_chfrag_end(nbuf)) {
+		qdf_nbuf_unmap_nbytes_single(soc->osdev, nbuf, QDF_DMA_FROM_DEVICE,
+					     mpdu_len + RX_PKT_TLVS_LEN);
 		qdf_nbuf_set_pktlen (nbuf, mpdu_len + RX_PKT_TLVS_LEN);
-		qdf_nbuf_pull_head(nbuf, RX_PKT_TLVS_LEN);
 		return nbuf;
 	}
 
@@ -945,7 +953,7 @@ qdf_nbuf_t dp_rx_sg_create(struct dp_soc *soc, qdf_nbuf_t nbuf, uint8_t *rx_tlv_
 	 * nbufs will form the frag_list of the parent nbuf.
 	 */
 	qdf_nbuf_set_rx_chfrag_start(parent, 1);
-	last_nbuf = dp_rx_adjust_nbuf_len(parent, &mpdu_len);
+	last_nbuf = dp_rx_adjust_nbuf_len(soc, parent, &mpdu_len);
 
 	/*
 	 * this is where we set the length of the fragments which are
@@ -953,8 +961,7 @@ qdf_nbuf_t dp_rx_sg_create(struct dp_soc *soc, qdf_nbuf_t nbuf, uint8_t *rx_tlv_
 	 * till we hit the last_nbuf of the list.
 	 */
 	do {
-		qdf_nbuf_unmap_single(soc->osdev, nbuf, QDF_DMA_FROM_DEVICE);
-		last_nbuf = dp_rx_adjust_nbuf_len(nbuf, &mpdu_len);
+		last_nbuf = dp_rx_adjust_nbuf_len(soc, nbuf, &mpdu_len);
 		qdf_nbuf_pull_head(nbuf, RX_PKT_TLVS_LEN);
 		frag_list_len += qdf_nbuf_len(nbuf);
 
@@ -971,7 +978,6 @@ qdf_nbuf_t dp_rx_sg_create(struct dp_soc *soc, qdf_nbuf_t nbuf, uint8_t *rx_tlv_
 	qdf_nbuf_append_ext_list(parent, frag_list, frag_list_len);
 	parent->next = next;
 
-	qdf_nbuf_pull_head(parent, RX_PKT_TLVS_LEN);
 	return parent;
 }
 
@@ -1384,6 +1390,8 @@ dp_rx_process(struct dp_intr *int_ctx, void *hal_ring, uint32_t quota)
 		if (msdu_desc_info.msdu_flags & HAL_MSDU_F_LAST_MSDU_IN_MPDU)
 			qdf_nbuf_set_rx_chfrag_end(rx_desc->nbuf, 1);
 
+		QDF_NBUF_CB_RX_PKT_LEN(rx_desc->nbuf) = msdu_desc_info.msdu_len;
+
 		DP_RX_LIST_APPEND(nbuf_head, nbuf_tail, rx_desc->nbuf);
 
 		/*
@@ -1437,25 +1445,6 @@ done:
 	nbuf = nbuf_head;
 	while (nbuf) {
 		next = nbuf->next;
-
-		/* TODO */
-		/*
-		 * Need a separate API for unmapping based on
-		 * phyiscal address
-		 */
-		qdf_nbuf_unmap_single(soc->osdev, nbuf,	QDF_DMA_FROM_DEVICE);
-		rx_tlv_hdr = qdf_nbuf_data(nbuf);
-
-		/*
-		 * Check if DMA completed -- msdu_done is the last bit
-		 * to be written
-		 */
-		if (qdf_unlikely(!hal_rx_attn_msdu_done_get(rx_tlv_hdr))) {
-			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-				  FL("MSDU DONE failure"));
-			hal_rx_dump_pkt_tlvs(rx_tlv_hdr, QDF_TRACE_LEVEL_INFO);
-			qdf_assert(0);
-		}
 
 		peer_mdata = QDF_NBUF_CB_RX_PEER_MDATA(nbuf);
 		peer_id = DP_PEER_METADATA_PEER_ID_GET(peer_mdata);
@@ -1511,23 +1500,50 @@ done:
 		 * This is the most likely case, we receive 802.3 pkts
 		 * decapsulated by HW, here we need to set the pkt length.
 		 */
-		if (qdf_unlikely(qdf_nbuf_get_ext_list(nbuf)))
+		if (qdf_unlikely(qdf_nbuf_get_ext_list(nbuf))) {
+			qdf_nbuf_unmap_single(soc->osdev, nbuf,
+					      QDF_DMA_FROM_DEVICE);
+			rx_tlv_hdr = qdf_nbuf_data(nbuf);
 			qdf_nbuf_pull_head(nbuf, RX_PKT_TLVS_LEN);
+		}
 		else if (qdf_unlikely(vdev->rx_decap_type ==
 				htt_cmn_pkt_type_raw)) {
-			nbuf = dp_rx_sg_create(soc, nbuf, rx_tlv_hdr);
+			msdu_len = QDF_NBUF_CB_RX_PKT_LEN(nbuf);
+			nbuf = dp_rx_sg_create(soc, nbuf, msdu_len);
 
 			DP_STATS_INC(vdev->pdev, rx_raw_pkts, 1);
 			DP_STATS_INC_PKT(peer, rx.raw, 1,
-					hal_rx_msdu_start_msdu_len_get(rx_tlv_hdr));
+					 msdu_len);
 
+			rx_tlv_hdr = qdf_nbuf_data(nbuf);
+			qdf_nbuf_pull_head(nbuf, RX_PKT_TLVS_LEN);
 			next = nbuf->next;
 		} else {
+			msdu_len = QDF_NBUF_CB_RX_PKT_LEN(nbuf);
+			qdf_nbuf_unmap_nbytes_single(soc->osdev, nbuf,
+						     QDF_DMA_FROM_DEVICE,
+						     msdu_len + RX_PKT_TLVS_LEN
+						     + MAX_L2_HDR_OFFSET);
+			rx_tlv_hdr = qdf_nbuf_data(nbuf);
+
 			l2_hdr_offset =
 				hal_rx_msdu_end_l3_hdr_padding_get(rx_tlv_hdr);
 
-			msdu_len = hal_rx_msdu_start_msdu_len_get(rx_tlv_hdr);
 			pkt_len = msdu_len + l2_hdr_offset + RX_PKT_TLVS_LEN;
+
+			/*
+			 * Check if DMA completed -- msdu_done is the last bit
+			 * to be written
+			 */
+			if (qdf_unlikely(
+				 !hal_rx_attn_msdu_done_get(rx_tlv_hdr))) {
+				QDF_TRACE(QDF_MODULE_ID_DP,
+					  QDF_TRACE_LEVEL_ERROR,
+					  FL("MSDU DONE failure"));
+				hal_rx_dump_pkt_tlvs(rx_tlv_hdr,
+						     QDF_TRACE_LEVEL_INFO);
+				qdf_assert(0);
+			}
 
 			qdf_nbuf_set_pktlen(nbuf, pkt_len);
 			qdf_nbuf_pull_head(nbuf,

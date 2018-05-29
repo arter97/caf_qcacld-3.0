@@ -32,6 +32,8 @@
 #define RX_BUFFER_SIZE			2048
 #define RX_BUFFER_RESERVATION   0
 
+#define MAX_L2_HDR_OFFSET       4
+
 #define DP_PEER_METADATA_PEER_ID_MASK	0x0000ffff
 #define DP_PEER_METADATA_PEER_ID_SHIFT	0
 #define DP_PEER_METADATA_VDEV_ID_MASK	0x00070000
@@ -314,7 +316,7 @@ dp_rx_wbm_err_process(struct dp_soc *soc, void *hal_ring, uint32_t quota);
  *		     multiple nbufs.
  * @soc: core txrx main context
  * @nbuf: pointer to the first msdu of an amsdu.
- * @rx_tlv_hdr: pointer to the start of RX TLV headers.
+ * @mpdu_len: total length of mpdu
  *
  * This function implements the creation of RX frag_list for cases
  * where an MSDU is spread across multiple nbufs.
@@ -322,7 +324,7 @@ dp_rx_wbm_err_process(struct dp_soc *soc, void *hal_ring, uint32_t quota);
  * Return: returns the head nbuf which contains complete frag_list.
  */
 qdf_nbuf_t dp_rx_sg_create(struct dp_soc *soc, qdf_nbuf_t nbuf,
-			   uint8_t *rx_tlv_hdr);
+			   uint16_t mpdu_len);
 
 QDF_STATUS dp_rx_desc_pool_alloc(struct dp_soc *soc,
 				uint32_t pool_id,
