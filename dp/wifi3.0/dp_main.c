@@ -1778,6 +1778,10 @@ static void dp_soc_wds_detach(struct dp_soc *soc)
  */
 static void dp_batch_intr_detach(struct dp_soc *soc)
 {
+
+	if (!soc->batch_intr)
+		return;
+
 	qdf_timer_free(&soc->batch_intr->rx_batch_intr_timer);
 
 	qdf_mem_free(soc->batch_intr);
