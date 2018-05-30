@@ -3609,31 +3609,49 @@ static void *dp_peer_create_wifi3(struct cdp_vdev *vdev_handle,
 	peer = dp_peer_find_hash_find(pdev->soc, peer_mac_addr,
 					0, vdev->vdev_id);
 
+	/*
+	 * If a peer entry with given MAC address already exists,
+	 * reuse the peer and reset the state of peer.
+	 */
 	if (peer) {
 		peer->delete_in_progress = false;
 
 		dp_peer_delete_ast_entries(soc, peer);
+
 		qdf_spin_lock_bh(&soc->ast_lock);
 		TAILQ_INIT(&peer->ast_entry_list);
 		qdf_spin_unlock_bh(&soc->ast_lock);
 
+		if ((vdev->opmode == wlan_op_mode_sta) &&
+			!qdf_mem_cmp(peer_mac_addr, &vdev->mac_addr.raw[0],
+					DP_MAC_ADDR_LEN)) {
+			ast_type = CDP_TXRX_AST_TYPE_SELF;
+		}
+
+		dp_peer_add_ast(soc, peer, peer_mac_addr, ast_type, 0);
+
 		/*
-		* on peer create, peer ref count decrements, sice new peer is not
-		* getting created earlier reference is reused, peer_unref_delete will
-		* take care of incrementing count
-		* */
+		* Control path maintains a node count which is incremented
+		* for every new peer create command. Since new peer is not being
+		* created and earlier reference is reused here,
+		* peer_unref_delete event is sent to control path to
+		* increment the count back.
+		*/
 		if (soc->cdp_soc.ol_ops->peer_unref_delete) {
 			soc->cdp_soc.ol_ops->peer_unref_delete(pdev->osif_pdev,
 				vdev->vdev_id, peer->mac_addr.raw);
 		}
 
 		DP_STATS_INIT(peer);
+
 		return (void *)peer;
 	} else {
 		/*
 		 * When a STA roams from RPTR AP to ROOT AP and vice versa, we
 		 * need to remove the AST entry which was earlier added as a WDS
 		 * entry.
+		 * If an AST entry exists, but no peer entry exists with a given
+		 * MAC addresses, we could deduce it as a WDS entry
 		 */
 		ast_entry = dp_peer_ast_hash_find(soc, peer_mac_addr);
 		if (ast_entry)
