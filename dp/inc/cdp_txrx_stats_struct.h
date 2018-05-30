@@ -1239,6 +1239,7 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_WIDE_BAND_SCAN = 362,
 	OL_ATH_PARAM_CCK_TX_ENABLE = 363,
 	OL_ATH_PARAM_ISOLATION = 365,
+	OL_ATH_BCN_STATS_RESET = 368,
 };
 
 /* Enumeration of PDEV Configuration parameter */
