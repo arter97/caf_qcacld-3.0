@@ -54,6 +54,7 @@
 #include "wlan_hdd_power.h"
 #include "wlan_hdd_stats.h"
 #include "wlan_hdd_scan.h"
+#include "wlan_hdd_request_manager.h"
 #include "qdf_types.h"
 #include "qdf_trace.h"
 #include <cdp_txrx_peer_ops.h>
@@ -5888,6 +5889,7 @@ static void hdd_wlan_exit(hdd_context_t *hdd_ctx)
 	 */
 
 	hdd_green_ap_deinit(hdd_ctx);
+	hdd_request_manager_deinit();
 
 	hdd_runtime_suspend_context_deinit(hdd_ctx);
 	hdd_close_all_adapters(hdd_ctx, false);
@@ -9851,6 +9853,7 @@ int hdd_wlan_startup(struct device *dev)
 	if (ret)
 		goto err_hdd_free_context;
 
+	hdd_request_manager_init();
 	hdd_green_ap_init(hdd_ctx);
 
 	hdd_init_spectral_scan(hdd_ctx);
@@ -9978,6 +9981,7 @@ err_exit_nl_srv:
 	}
 
 	hdd_green_ap_deinit(hdd_ctx);
+	hdd_request_manager_deinit();
 	hdd_exit_netlink_services(hdd_ctx);
 
 err_hdd_free_context:
