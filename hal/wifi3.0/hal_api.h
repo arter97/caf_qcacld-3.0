@@ -44,6 +44,7 @@
 #define WINDOW_VALUE_MASK 0x3F
 #define WINDOW_START MAX_UNWINDOWED_ADDRESS
 #define WINDOW_RANGE_MASK 0x7FFFF
+#define HAL_NON_QOS_TID 16
 
 static inline void hal_select_window(struct hal_soc *hal_soc, uint32_t offset)
 {
@@ -1040,13 +1041,24 @@ enum hal_pn_type {
  *
  * @hal_soc: Opaque HAL SOC handle
  * @ba_window_size: BlockAck window size
+ * @tid: TID number
  *
  */
 static inline uint32_t hal_get_reo_qdesc_size(void *hal_soc,
-	uint32_t ba_window_size)
+	uint32_t ba_window_size, int tid)
 {
-	if (ba_window_size <= 1)
-		return sizeof(struct rx_reo_queue);
+	/* Return descriptor size corresponding to window size of 2 since
+	 * we set ba_window_size to 2 while setting up REO descriptors as
+	 * a WAR to get 2k jump exception aggregates are received without
+	 * a BA session.
+	 */
+	if (ba_window_size <= 1) {
+		if (tid != HAL_NON_QOS_TID)
+			return sizeof(struct rx_reo_queue) +
+				sizeof(struct rx_reo_queue_ext);
+		else
+			return sizeof(struct rx_reo_queue);
+	}
 
 	if (ba_window_size <= 105)
 		return sizeof(struct rx_reo_queue) +
