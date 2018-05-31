@@ -1342,8 +1342,24 @@ dp_rx_process(struct dp_intr *int_ctx, void *hal_ring, uint32_t quota)
 	 * them in per vdev queue.
 	 * Process the received pkts in a different per vdev loop.
 	 */
-	while (qdf_likely(quota && (ring_desc =
-				hal_srng_dst_get_next(hal_soc, hal_ring)))) {
+	while (qdf_likely(quota)) {
+
+		ring_desc = hal_srng_dst_get_next(hal_soc, hal_ring);
+
+		/*
+		 * in case HW has updated hp after we cached the hp
+		 * ring_desc can be NULL even there are entries
+		 * available in the ring. Update the cached_hp
+		 * and reap the buffers available to read complete
+		 * mpdu in one reap
+		 */
+		if (qdf_unlikely(ring_desc == NULL)) {
+			hal_srng_access_start_unlocked(hal_soc, hal_ring);
+			ring_desc = hal_srng_dst_get_next(hal_soc, hal_ring);
+			if (!ring_desc) {
+				break;
+			 }
+		}
 
 		error = HAL_RX_ERROR_STATUS_GET(ring_desc);
 		ring_id = hal_srng_ring_id_get(hal_ring);
