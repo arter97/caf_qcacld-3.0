@@ -1233,6 +1233,7 @@ int dp_rx_tid_setup_wifi3(struct dp_peer *peer, int tid,
 	rx_tid->num_addba_rsp_success = 0;
 	rx_tid->delba_tx_success_cnt = 0;
 	rx_tid->delba_tx_fail_cnt = 0;
+	rx_tid->statuscode = 0;
 #ifdef notyet
 	hw_qdesc_size = hal_get_reo_qdesc_size(soc->hal_soc, ba_window_size);
 #else
@@ -1660,16 +1661,6 @@ int dp_addba_resp_tx_completion_wifi3(void *peer_handle,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if (dp_rx_tid_update_wifi3(peer, tid, rx_tid->ba_win_size,
-				rx_tid->startseqnum)) {
-		qdf_spin_unlock_bh(&rx_tid->tid_lock);
-		return QDF_STATUS_E_FAILURE;
-	}
-	if (rx_tid->userstatuscode != IEEE80211_STATUS_SUCCESS)
-		rx_tid->statuscode = rx_tid->userstatuscode;
-	else
-		rx_tid->statuscode = IEEE80211_STATUS_SUCCESS;
-
 	rx_tid->ba_status = DP_RX_BA_ACTIVE;
 	qdf_spin_unlock_bh(&rx_tid->tid_lock);
 	return 0;
@@ -1756,7 +1747,7 @@ int dp_addba_requestprocess_wifi3(void *peer_handle,
 		qdf_spin_unlock_bh(&rx_tid->tid_lock);
 		return QDF_STATUS_E_FAILURE;
 	}
-	if (dp_rx_tid_setup_wifi3(peer, tid, 1, 0)) {
+	if (dp_rx_tid_setup_wifi3(peer, tid, buffersize, 0)) {
 		rx_tid->ba_status = DP_RX_BA_INACTIVE;
 		qdf_spin_unlock_bh(&rx_tid->tid_lock);
 		return QDF_STATUS_E_FAILURE;
@@ -1766,6 +1757,12 @@ int dp_addba_requestprocess_wifi3(void *peer_handle,
 	rx_tid->ba_win_size = buffersize;
 	rx_tid->dialogtoken = dialogtoken;
 	rx_tid->startseqnum = startseqnum;
+
+	if (rx_tid->userstatuscode != IEEE80211_STATUS_SUCCESS)
+		rx_tid->statuscode = rx_tid->userstatuscode;
+	else
+		rx_tid->statuscode = IEEE80211_STATUS_SUCCESS;
+
 	qdf_spin_unlock_bh(&rx_tid->tid_lock);
 	return 0;
 }
