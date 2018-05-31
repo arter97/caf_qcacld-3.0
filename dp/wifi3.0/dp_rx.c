@@ -897,6 +897,7 @@ static inline bool dp_rx_adjust_nbuf_len(qdf_nbuf_t nbuf, uint16_t *mpdu_len)
 /**
  * dp_rx_sg_create() - create a frag_list for MSDUs which are spread across
  *		     multiple nbufs.
+ * @soc: core txrx main context
  * @nbuf: pointer to the first msdu of an amsdu.
  * @rx_tlv_hdr: pointer to the start of RX TLV headers.
  *
@@ -905,7 +906,7 @@ static inline bool dp_rx_adjust_nbuf_len(qdf_nbuf_t nbuf, uint16_t *mpdu_len)
  *
  * Return: returns the head nbuf which contains complete frag_list.
  */
-qdf_nbuf_t dp_rx_sg_create(qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr)
+qdf_nbuf_t dp_rx_sg_create(struct dp_soc *soc, qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr)
 {
 	qdf_nbuf_t parent, next, frag_list;
 	uint16_t frag_list_len = 0;
@@ -920,8 +921,6 @@ qdf_nbuf_t dp_rx_sg_create(qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr)
 	 */
 	if (qdf_nbuf_is_rx_chfrag_start(nbuf) &&
 					qdf_nbuf_is_rx_chfrag_end(nbuf)) {
-		qdf_nbuf_set_rx_chfrag_start(nbuf, 0);
-		qdf_nbuf_set_rx_chfrag_end(nbuf, 0);
 		qdf_nbuf_set_pktlen (nbuf, mpdu_len + RX_PKT_TLVS_LEN);
 		qdf_nbuf_pull_head(nbuf, RX_PKT_TLVS_LEN);
 		return nbuf;
@@ -954,6 +953,7 @@ qdf_nbuf_t dp_rx_sg_create(qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr)
 	 * till we hit the last_nbuf of the list.
 	 */
 	do {
+		qdf_nbuf_unmap_single(soc->osdev, nbuf, QDF_DMA_FROM_DEVICE);
 		last_nbuf = dp_rx_adjust_nbuf_len(nbuf, &mpdu_len);
 		qdf_nbuf_pull_head(nbuf, RX_PKT_TLVS_LEN);
 		frag_list_len += qdf_nbuf_len(nbuf);
@@ -1056,9 +1056,6 @@ static inline void dp_rx_msdu_stats_update(struct dp_soc *soc,
 	struct ether_header *eh;
 	uint16_t msdu_len = qdf_nbuf_len(nbuf);
 
-	peer_id = DP_PEER_METADATA_PEER_ID_GET(
-			       hal_rx_mpdu_peer_meta_data_get(rx_tlv_hdr));
-
 	is_not_amsdu = qdf_nbuf_is_rx_chfrag_start(nbuf) &
 			qdf_nbuf_is_rx_chfrag_end(nbuf);
 
@@ -1158,6 +1155,8 @@ static inline void dp_rx_msdu_stats_update(struct dp_soc *soc,
 
 	if ((soc->process_rx_status) &&
 		hal_rx_attn_first_mpdu_get(rx_tlv_hdr)) {
+
+		peer_id = peer->peer_ids[0];
 
 		if (soc->cdp_soc.ol_ops &&
 				soc->cdp_soc.ol_ops->update_dp_stats) {
@@ -1488,6 +1487,11 @@ done:
 
 		DP_HIST_PACKET_COUNT_INC(vdev->pdev->pdev_id);
 		/*
+		 * First IF condition:
+		 * 802.11 Fragmented pkts are reinjected to REO
+		 * HW block as SG pkts and for these pkts we only
+		 * need to pull the RX TLVS header length.
+		 * Second IF condition:
 		 * The below condition happens when an MSDU is spread
 		 * across multiple buffers. This can happen in two cases
 		 * 1. The nbuf size is smaller then the received msdu.
@@ -1503,10 +1507,15 @@ done:
 		 *
 		 * for these scenarios let us create a skb frag_list and
 		 * append these buffers till the last MSDU of the AMSDU
+		 * Third condition:
+		 * This is the most likely case, we receive 802.3 pkts
+		 * decapsulated by HW, here we need to set the pkt length.
 		 */
-		if (qdf_unlikely(vdev->rx_decap_type ==
+		if (qdf_unlikely(qdf_nbuf_get_ext_list(nbuf)))
+			qdf_nbuf_pull_head(nbuf, RX_PKT_TLVS_LEN);
+		else if (qdf_unlikely(vdev->rx_decap_type ==
 				htt_cmn_pkt_type_raw)) {
-			nbuf = dp_rx_sg_create(nbuf, rx_tlv_hdr);
+			nbuf = dp_rx_sg_create(soc, nbuf, rx_tlv_hdr);
 
 			DP_STATS_INC(vdev->pdev, rx_raw_pkts, 1);
 			DP_STATS_INC_PKT(peer, rx.raw, 1,
