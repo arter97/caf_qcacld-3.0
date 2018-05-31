@@ -5672,16 +5672,18 @@ int wma_rx_service_ready_event(void *handle, uint8_t *cmd_param_info,
 		goto free_hw_mode_list;
 	}
 
-	ret = qdf_mc_timer_start(&wma_handle->service_ready_ext_timer,
-				 WMA_SERVICE_READY_EXT_TIMEOUT);
-	if (!QDF_IS_STATUS_SUCCESS(ret))
-		WMA_LOGE("Failed to start the service ready ext timer");
+	if (wmi_service_enabled(wmi_handle, wmi_service_ext_msg)) {
+		ret = qdf_mc_timer_start(
+				&wma_handle->service_ready_ext_timer,
+				WMA_SERVICE_READY_EXT_TIMEOUT);
+		if (QDF_IS_STATUS_ERROR(ret))
+			WMA_LOGE("Failed to start the service ready ext timer");
+	}
 
 	if (wmi_service_enabled(wmi_handle, wmi_service_8ss_tx_bfee))
 		wma_handle->tx_bfee_8ss_enabled = true;
 	else
 		wma_handle->tx_bfee_8ss_enabled = false;
-
 	target_psoc_set_num_radios(tgt_hdl, 1);
 
 	return 0;
