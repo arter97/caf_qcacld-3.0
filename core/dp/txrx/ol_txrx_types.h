@@ -212,6 +212,7 @@ struct ol_tx_desc_t {
 #endif
 	void *tso_desc;
 	void *tso_num_desc;
+	bool notify_tx_comp;
 };
 
 typedef TAILQ_HEAD(some_struct_name, ol_tx_desc_t) ol_tx_desc_list;
@@ -1066,6 +1067,9 @@ struct ol_txrx_vdev_t {
 						*/
 	ol_txrx_rx_fp rx; /* receive function used by this vdev */
 	ol_txrx_stats_rx_fp stats_rx; /* receive function used by this vdev */
+
+	/* completion function used by this vdev*/
+	ol_txrx_completion_fp tx_comp;
 
 	struct {
 		/*
