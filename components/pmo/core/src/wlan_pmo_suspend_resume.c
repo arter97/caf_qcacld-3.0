@@ -612,13 +612,24 @@ QDF_STATUS pmo_core_enable_wow_in_fw(struct wlan_objmgr_psoc *psoc,
 		break;
 	}
 
+	if (psoc_ctx->psoc_cfg.d0_wow_supported &&
+	    !psoc_ctx->caps.unified_wow &&
+	    !param.can_suspend_link) {
+		psoc_ctx->wow.wow_state = pmo_wow_state_legacy_d0;
+	} else if (param.can_suspend_link) {
+		psoc_ctx->wow.wow_state = pmo_wow_state_unified_d3;
+	} else {
+		psoc_ctx->wow.wow_state = pmo_wow_state_unified_d0;
+	}
+
 	status = pmo_tgt_psoc_send_wow_enable_req(psoc, &param);
 	if (status != QDF_STATUS_SUCCESS) {
 		pmo_err("Failed to enable wow in fw");
 		goto out;
 	}
 
-	pmo_tgt_update_target_suspend_flag(psoc, true);
+	if (psoc_ctx->wow.wow_state != pmo_wow_state_legacy_d0)
+		pmo_tgt_update_target_suspend_flag(psoc, true);
 
 	if (qdf_wait_for_event_completion(&psoc_ctx->wow.target_suspend,
 				  PMO_TGT_SUSPEND_COMPLETE_TIMEOUT)
