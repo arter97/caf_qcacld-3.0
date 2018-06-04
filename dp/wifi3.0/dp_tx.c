@@ -2711,9 +2711,9 @@ static void dp_tx_comp_process_desc_list(struct dp_soc *soc,
 	while (desc) {
 		hal_tx_comp_get_status(&desc->comp, &ts);
 
-		dp_tx_comp_process_desc(soc, desc, &ts);
-
 		dp_tx_comp_process_tx_status(desc, &ts);
+
+		dp_tx_comp_process_desc(soc, desc, &ts);
 
 		DP_HIST_PACKET_COUNT_INC(desc->pdev->pdev_id);
 
@@ -2781,8 +2781,8 @@ void dp_tx_process_htt_completion(struct dp_tx_desc_s *tx_desc, uint8_t *status)
 		if (tx_status != HTT_TX_FW2WBM_TX_STATUS_OK)
 			ts.status = HAL_TX_TQM_RR_REM_CMD_REM;
 
-		dp_tx_comp_process_desc(soc, tx_desc, &ts);
 		dp_tx_comp_process_tx_status(tx_desc, &ts);
+		dp_tx_comp_process_desc(soc, tx_desc, &ts);
 		dp_tx_desc_release(tx_desc, tx_desc->pool_id);
 
 		break;
