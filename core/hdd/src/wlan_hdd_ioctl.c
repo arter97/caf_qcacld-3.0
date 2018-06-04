@@ -1548,6 +1548,13 @@ hdd_parse_set_roam_scan_channels_v1(hdd_adapter_t *adapter,
 		goto exit;
 	}
 
+	if (!sme_validate_channel_list(hdd_ctx->hHal,
+	    channel_list, num_chan)) {
+		hdd_err("List contains invalid channel(s)");
+		ret = -EINVAL;
+		goto exit;
+	}
+
 	status =
 		sme_change_roam_scan_channel_list(hdd_ctx->hHal,
 						  adapter->sessionId,
@@ -1609,6 +1616,13 @@ hdd_parse_set_roam_scan_channels_v2(hdd_adapter_t *adapter,
 
 	for (i = 0; i < num_chan; i++) {
 		channel = *value++;
+		if (!channel) {
+			hdd_err("Channels end at index %d, expected %d",
+				i, num_chan);
+			ret = -EINVAL;
+			goto exit;
+		}
+
 		if (channel > WNI_CFG_CURRENT_CHANNEL_STAMAX) {
 			hdd_err("index %d invalid channel %d",
 				  i, channel);
@@ -1617,6 +1631,14 @@ hdd_parse_set_roam_scan_channels_v2(hdd_adapter_t *adapter,
 		}
 		channel_list[i] = channel;
 	}
+
+	if (!sme_validate_channel_list(hdd_ctx->hHal,
+	    channel_list, num_chan)) {
+		hdd_err("List contains invalid channel(s)");
+		ret = -EINVAL;
+		goto exit;
+	}
+
 	status =
 		sme_change_roam_scan_channel_list(hdd_ctx->hHal,
 						  adapter->sessionId,
@@ -5436,6 +5458,14 @@ static int drv_cmd_set_ccx_roam_scan_channels(hdd_adapter_t *adapter,
 		ret = -EINVAL;
 		goto exit;
 	}
+
+	if (!sme_validate_channel_list(hdd_ctx->hHal,
+	    ChannelList, numChannels)) {
+		hdd_err("List contains invalid channel(s)");
+		ret = -EINVAL;
+		goto exit;
+	}
+
 	status = sme_set_ese_roam_scan_channel_list(hdd_ctx->hHal,
 						    adapter->sessionId,
 						    ChannelList,
@@ -5601,7 +5631,7 @@ static int drv_cmd_ccx_beacon_req(hdd_adapter_t *adapter,
 {
 	int ret;
 	uint8_t *value = command;
-	tCsrEseBeaconReq eseBcnReq;
+	tCsrEseBeaconReq eseBcnReq = {0};
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	if (QDF_STA_MODE != adapter->device_mode) {
@@ -5619,6 +5649,10 @@ static int drv_cmd_ccx_beacon_req(hdd_adapter_t *adapter,
 
 	if (!hdd_conn_is_connected(WLAN_HDD_GET_STATION_CTX_PTR(adapter))) {
 		hdd_debug("Not associated");
+
+		if (!eseBcnReq.numBcnReqIe)
+			return -EINVAL;
+
 		hdd_indicate_ese_bcn_report_no_results(adapter,
 			eseBcnReq.bcnReq[0].measurementToken,
 			0x02, /* BIT(1) set for measurement done */
@@ -5784,7 +5818,7 @@ static int drv_cmd_set_mc_rate(hdd_adapter_t *adapter,
 {
 	int ret = 0;
 	uint8_t *value = command;
-	int targetRate;
+	int targetRate = 0;
 
 	/* input value is in units of hundred kbps */
 
