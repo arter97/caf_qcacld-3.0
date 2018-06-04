@@ -53,7 +53,6 @@ static inline void hal_uniform_desc_hdr_setup(uint32_t *desc, uint32_t owner,
 	(((_tid) == 4) || ((_tid) == 5)) ? WME_AC_VI : \
 	WME_AC_VO)
 #endif
-#define HAL_NON_QOS_TID 16
 
 /**
  * hal_reo_qdesc_setup - Setup HW REO queue descriptor
@@ -104,11 +103,11 @@ void hal_reo_qdesc_setup(void *hal_soc, int tid, uint32_t ba_window_size,
 
 	if (ba_window_size < 1)
 		ba_window_size = 1;
-/* WAR to get 2k exception in Non BA case.
- * Setting window size to 2 to get 2k jump exception
- * when we recieve aggregates in Non BA case
- */
-	if (ba_window_size == 1)
+	/* WAR to get 2k exception in Non BA case.
+	 * Setting window size to 2 to get 2k jump exception
+	 * when we recieve aggregates in Non BA case
+	 */
+	if ((ba_window_size == 1) && (tid != HAL_NON_QOS_TID))
 		ba_window_size++;
 	/* Set RTY bit for non-BA case. Duplicate detection is currently not
 	 * done by HW in non-BA case if RTY bit is not set.

@@ -1234,7 +1234,8 @@ int dp_rx_tid_setup_wifi3(struct dp_peer *peer, int tid,
 	rx_tid->delba_tx_success_cnt = 0;
 	rx_tid->delba_tx_fail_cnt = 0;
 #ifdef notyet
-	hw_qdesc_size = hal_get_reo_qdesc_size(soc->hal_soc, ba_window_size);
+	hw_qdesc_size = hal_get_reo_qdesc_size(soc->hal_soc, ba_window_size,
+		tid);
 #else
 	/* TODO: Allocating HW queue descriptors based on max BA window size
 	 * for all QOS TIDs so that same descriptor can be used later when
@@ -1246,10 +1247,10 @@ int dp_rx_tid_setup_wifi3(struct dp_peer *peer, int tid,
 	 */
 	if (tid != DP_NON_QOS_TID)
 		hw_qdesc_size = hal_get_reo_qdesc_size(soc->hal_soc,
-			HAL_RX_MAX_BA_WINDOW);
+			HAL_RX_MAX_BA_WINDOW, tid);
 	else
 		hw_qdesc_size = hal_get_reo_qdesc_size(soc->hal_soc,
-			ba_window_size);
+			ba_window_size, tid);
 #endif
 
 	hw_qdesc_align = hal_get_reo_qdesc_align(soc->hal_soc);
@@ -1408,9 +1409,10 @@ static void dp_rx_tid_delete_cb(struct dp_soc *soc, void *cb_ctxt,
 
 		/* Flush and invalidate REO descriptor from HW cache: Base and
 		 * extension descriptors should be flushed separately */
-		tot_desc_size = hal_get_reo_qdesc_size(soc->hal_soc,
-			rx_tid->ba_win_size);
-		desc_size = hal_get_reo_qdesc_size(soc->hal_soc, 0);
+		tot_desc_size = rx_tid->hw_qdesc_alloc_size;
+		/* Get base descriptor size by passing non-qos TID */
+		desc_size = hal_get_reo_qdesc_size(soc->hal_soc, 0,
+			DP_NON_QOS_TID);
 
 		/* Flush reo extension descriptors */
 		while ((tot_desc_size -= desc_size) > 0) {
