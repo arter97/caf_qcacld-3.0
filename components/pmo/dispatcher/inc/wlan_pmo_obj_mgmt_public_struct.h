@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2018 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -45,6 +45,11 @@ typedef void (*pmo_notify_pause_bitmap)(
  * typedef for getting vdev pause bitmap
  */
 typedef  uint16_t(*pmo_get_pause_bitmap)(uint8_t vdev_id);
+
+/**
+ * typedef for getting vdev datapath handle
+ */
+typedef struct cdp_vdev * (*pmo_get_vdev_dp_handle)(uint8_t vdev_id);
 
 /**
  * typedef to know is deviec is in power save mode
