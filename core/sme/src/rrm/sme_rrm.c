@@ -35,6 +35,7 @@
 #include "sme_inside.h"
 #include "sme_api.h"
 #include "cfg_api.h"
+#include "cds_regdomain.h"
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
 #include "host_diag_core_event.h"
@@ -834,6 +835,7 @@ QDF_STATUS sme_rrm_process_beacon_report_req_ind(tpAniSirGlobal pMac,
 	tpRrmSMEContext pSmeRrmContext = &pMac->rrm.rrmSmeContext;
 	uint32_t len = 0, i = 0;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint8_t temp = 0;
 
 	sme_debug("Received Beacon report request ind Channel = %d",
 		pBeaconReq->channelInfo.channelNum);
@@ -851,7 +853,19 @@ QDF_STATUS sme_rrm_process_beacon_report_req_ind(tpAniSirGlobal pMac,
 		}
 		csr_get_cfg_valid_channels(pMac, pSmeRrmContext->channelList.
 					ChannelList, &len);
-		pSmeRrmContext->channelList.numOfChannels = (uint8_t) len;
+
+		for (i = 0; i < len; i++) {
+			if (cds_reg_dmn_get_opclass_from_channel(
+			    pMac->scan.countryCodeCurrent,
+			    pSmeRrmContext->channelList.ChannelList[i],
+			    BWALL) ==
+			    pBeaconReq->channelInfo.regulatoryClass) {
+				pSmeRrmContext->channelList.ChannelList[temp] =
+				  pSmeRrmContext->channelList.ChannelList[i];
+				temp++;
+			}
+		}
+		pSmeRrmContext->channelList.numOfChannels = (uint8_t) temp;
 	} else {
 		len = 0;
 		pSmeRrmContext->channelList.numOfChannels = 0;
