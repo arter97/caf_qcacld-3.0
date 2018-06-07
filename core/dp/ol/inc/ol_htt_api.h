@@ -1,8 +1,7 @@
 /*
- * Copyright (c) 2011, 2014-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011, 2014-2016, 2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
- *
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -164,7 +163,7 @@ htt_h2t_dbg_stats_get(struct htt_pdev_t *pdev,
 		      uint32_t stats_type_upload_mask,
 		      uint32_t stats_type_reset_mask,
 		      uint8_t cfg_stats_type,
-		      uint32_t cfg_val, uint64_t cookie);
+		      uint32_t cfg_val, uint8_t cookie);
 
 /**
  * @brief Get the fields from HTT T2H stats upload message's stats info header
