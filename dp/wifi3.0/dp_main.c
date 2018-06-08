@@ -3613,6 +3613,14 @@ static void *dp_peer_create_wifi3(struct cdp_vdev *vdev_handle,
 	peer = dp_peer_find_hash_find(pdev->soc, peer_mac_addr,
 					0, vdev->vdev_id);
 
+#if !ATH_SUPPORT_WRAP
+	if (peer && (peer->vdev->vdev_id != vdev->vdev_id)) {
+		qdf_spin_lock_bh(&soc->peer_ref_mutex)
+		qdf_atomic_dec(&peer->ref_cnt);
+		qdf_spin_unlock_bh(&soc->peer_ref_mutex)
+		peer = NULL;
+	}
+#endif
 	/*
 	 * If a peer entry with given MAC address already exists,
 	 * reuse the peer and reset the state of peer.
