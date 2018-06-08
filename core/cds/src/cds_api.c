@@ -1,9 +1,6 @@
 /*
  * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
  *
- * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
- *
- *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
  * above copyright notice and this permission notice appear in all
@@ -17,12 +14,6 @@
  * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
- */
-
-/*
- * This file was originally distributed by Qualcomm Atheros, Inc.
- * under proprietary terms before Copyright ownership was assigned
- * to the Linux Foundation.
  */
 
 /**
@@ -592,6 +583,45 @@ err_probe_event:
 	return status;
 } /* cds_open() */
 
+static QDF_STATUS cds_pktlog_enable(void *pdev_txrx_ctx, void *scn)
+{
+	int errno;
+
+	switch (cds_get_conparam()) {
+	case QDF_GLOBAL_FTM_MODE:
+	case QDF_GLOBAL_EPPING_MODE:
+		return QDF_STATUS_SUCCESS;
+	default:
+		break;
+	}
+
+	htt_pkt_log_init(pdev_txrx_ctx, scn);
+
+	errno = pktlog_htc_attach();
+	if (errno)
+		goto pktlog_deinit;
+
+	return QDF_STATUS_SUCCESS;
+
+pktlog_deinit:
+	htt_pktlogmod_exit(pdev_txrx_ctx, scn);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+static void cds_pktlog_disable(void *pdev_txrx_ctx, void *scn)
+{
+	switch (cds_get_conparam()) {
+	case QDF_GLOBAL_FTM_MODE:
+	case QDF_GLOBAL_EPPING_MODE:
+		return;
+	default:
+		break;
+	}
+
+	htt_pktlogmod_exit(pdev_txrx_ctx, scn);
+}
+
 /**
  * cds_pre_enable() - pre enable cds
  * @cds_context: CDS context
@@ -635,12 +665,9 @@ QDF_STATUS cds_pre_enable(v_CONTEXT_t cds_context)
 	}
 
 	/* call Packetlog connect service */
-	if (QDF_GLOBAL_FTM_MODE != cds_get_conparam() &&
-	    QDF_GLOBAL_EPPING_MODE != cds_get_conparam()) {
-		htt_pkt_log_init(gp_cds_context->pdev_txrx_ctx, scn);
-		if (pktlog_htc_attach())
-			return QDF_STATUS_E_FAILURE;
-	}
+	qdf_status = cds_pktlog_enable(gp_cds_context->pdev_txrx_ctx, scn);
+	if (QDF_IS_STATUS_ERROR(qdf_status))
+		return qdf_status;
 
 	/* Reset wma wait event */
 	qdf_event_reset(&gp_cds_context->wmaCompleteEvent);
@@ -651,7 +678,7 @@ QDF_STATUS cds_pre_enable(v_CONTEXT_t cds_context)
 		QDF_TRACE(QDF_MODULE_ID_SYS, QDF_TRACE_LEVEL_FATAL,
 			  "Failed to WMA prestart");
 		QDF_ASSERT(0);
-		return QDF_STATUS_E_FAILURE;
+		goto pktlog_disable;
 	}
 
 	/* Need to update time out of complete */
@@ -674,7 +701,7 @@ QDF_STATUS cds_pre_enable(v_CONTEXT_t cds_context)
 		wlan_sys_probe();
 
 		QDF_ASSERT(0);
-		return QDF_STATUS_E_FAILURE;
+		goto pktlog_disable;
 	}
 
 	qdf_status = htc_start(gp_cds_context->htc_ctx);
@@ -682,7 +709,7 @@ QDF_STATUS cds_pre_enable(v_CONTEXT_t cds_context)
 		QDF_TRACE(QDF_MODULE_ID_SYS, QDF_TRACE_LEVEL_FATAL,
 			  "Failed to Start HTC");
 		QDF_ASSERT(0);
-		return QDF_STATUS_E_FAILURE;
+		goto pktlog_disable;
 	}
 	qdf_status = wma_wait_for_ready_event(gp_cds_context->pWMAContext);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
@@ -699,7 +726,7 @@ QDF_STATUS cds_pre_enable(v_CONTEXT_t cds_context)
 
 		wma_wmi_stop();
 		htc_stop(gp_cds_context->htc_ctx);
-		return QDF_STATUS_E_FAILURE;
+		goto pktlog_disable;
 	}
 
 	if (ol_txrx_pdev_post_attach(gp_cds_context->pdev_txrx_ctx)) {
@@ -708,10 +735,16 @@ QDF_STATUS cds_pre_enable(v_CONTEXT_t cds_context)
 		wma_wmi_stop();
 		htc_stop(gp_cds_context->htc_ctx);
 		QDF_ASSERT(0);
-		return QDF_STATUS_E_FAILURE;
+		qdf_status = QDF_STATUS_E_FAILURE;
+		goto pktlog_disable;
 	}
 
 	return QDF_STATUS_SUCCESS;
+
+pktlog_disable:
+	cds_pktlog_disable(gp_cds_context->pdev_txrx_ctx, scn);
+
+	return qdf_status;
 }
 
 /**
@@ -2217,6 +2250,9 @@ QDF_STATUS cds_set_log_completion(uint32_t is_fatal,
 	p_cds_context->log_complete.recovery_needed = recovery_needed;
 	p_cds_context->log_complete.is_report_in_progress = true;
 	qdf_spinlock_release(&p_cds_context->bug_report_lock);
+	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_DEBUG,
+		  "%s: is_fatal %d ind %d reasn_code %d recovery needed %d",
+		   __func__, is_fatal, indicator, reason_code, recovery_needed);
 	return QDF_STATUS_SUCCESS;
 }
 

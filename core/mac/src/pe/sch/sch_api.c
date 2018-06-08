@@ -1,8 +1,5 @@
 /*
- * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
- *
- * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
- *
+ * Copyright (c) 2011-2018 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -17,12 +14,6 @@
  * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
- */
-
-/*
- * This file was originally distributed by Qualcomm Atheros, Inc.
- * under proprietary terms before Copyright ownership was assigned
- * to the Linux Foundation.
  */
 
 /*
@@ -223,6 +214,15 @@ tSirRetStatus sch_send_beacon_req(tpAniSirGlobal pMac, uint8_t *beaconPayload,
 		beaconParams->timIeOffset = 0;
 	} else {
 		beaconParams->timIeOffset = psessionEntry->schBeaconOffsetBegin;
+		if (psessionEntry->dfsIncludeChanSwIe) {
+			beaconParams->csa_count_offset =
+				pMac->sch.schObject.csa_count_offset;
+			beaconParams->ecsa_count_offset =
+				pMac->sch.schObject.ecsa_count_offset;
+			pe_debug("csa_count_offset %d ecsa_count_offset %d",
+				 beaconParams->csa_count_offset,
+				 beaconParams->ecsa_count_offset);
+		}
 	}
 
 	/* p2pIeOffset should be atleast greater than timIeOffset */

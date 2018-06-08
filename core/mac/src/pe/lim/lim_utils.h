@@ -1,9 +1,6 @@
 /*
  * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
  *
- * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
- *
- *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
  * above copyright notice and this permission notice appear in all
@@ -17,12 +14,6 @@
  * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
- */
-
-/*
- * This file was originally distributed by Qualcomm Atheros, Inc.
- * under proprietary terms before Copyright ownership was assigned
- * to the Linux Foundation.
  */
 
 /*
@@ -45,10 +36,6 @@
 #include "lim_scan_result_utils.h"
 #include "lim_timer_utils.h"
 #include "lim_trace.h"
-typedef enum {
-	ONE_BYTE = 1,
-	TWO_BYTE = 2
-} eSizeOfLenField;
 
 #define LIM_STA_ID_MASK                        0x00FF
 #define LIM_AID_MASK                              0xC000
@@ -465,9 +452,6 @@ tpPESession lim_is_ibss_session_active(tpAniSirGlobal pMac);
 tpPESession lim_is_ap_session_active(tpAniSirGlobal pMac);
 void lim_handle_heart_beat_failure_timeout(tpAniSirGlobal pMac);
 
-uint8_t *lim_get_ie_ptr_new(tpAniSirGlobal pMac, uint8_t *pIes, int length,
-		uint8_t eid, eSizeOfLenField size_of_len_field);
-
 #define limGetWscIEPtr(pMac, ie, ie_len) \
 	cfg_get_vendor_ie_ptr_from_oui(pMac, SIR_MAC_WSC_OUI, \
 			SIR_MAC_WSC_OUI_SIZE, ie, ie_len)
@@ -597,6 +581,7 @@ typedef enum {
 	WLAN_PE_DIAG_DISASSOC_FRAME_EVENT,
 	WLAN_PE_DIAG_AUTH_ACK_EVENT,
 	WLAN_PE_DIAG_ASSOC_ACK_EVENT,
+	WLAN_PE_DIAG_AUTH_ALGO_NUM,
 } WLAN_PE_DIAG_EVENT_TYPE;
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
@@ -761,7 +746,7 @@ void lim_send_set_dtim_period(tpAniSirGlobal mac_ctx, uint8_t dtim_period,
 
 tSirRetStatus lim_strip_ie(tpAniSirGlobal mac_ctx,
 		uint8_t *addn_ie, uint16_t *addn_ielen,
-		uint8_t eid, eSizeOfLenField size_of_len_field,
+		uint8_t eid, enum size_of_len_field size_of_len_field,
 		uint8_t *oui, uint8_t out_len, uint8_t *extracted_ie,
 		uint32_t eid_max_len);
 bool lim_get_rx_ldpc(tpAniSirGlobal mac_ctx, enum channel_enum ch,

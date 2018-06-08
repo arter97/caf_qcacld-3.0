@@ -1,9 +1,6 @@
 /*
  * Copyright (c) 2011-2018 The Linux Foundation. All rights reserved.
  *
- * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
- *
- *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
  * above copyright notice and this permission notice appear in all
@@ -17,12 +14,6 @@
  * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
- */
-
-/*
- * This file was originally distributed by Qualcomm Atheros, Inc.
- * under proprietary terms before Copyright ownership was assigned
- * to the Linux Foundation.
  */
 
 /*=== includes ===*/
@@ -1470,6 +1461,7 @@ ol_txrx_pdev_attach(ol_pdev_handle ctrl_pdev,
 	ol_txrx_tso_stats_init(pdev);
 
 	TAILQ_INIT(&pdev->vdev_list);
+	TAILQ_INIT(&pdev->roam_stale_peer_list);
 
 	TAILQ_INIT(&pdev->req_list);
 	pdev->req_list_depth = 0;
@@ -1568,7 +1560,7 @@ void htt_pkt_log_init(struct ol_txrx_pdev_t *handle, void *scn)
  *
  * Return: void
  */
-static void htt_pktlogmod_exit(struct ol_txrx_pdev_t *handle, void *scn)
+void htt_pktlogmod_exit(struct ol_txrx_pdev_t *handle, void *scn)
 {
 	if (scn && cds_get_conparam() != QDF_GLOBAL_FTM_MODE &&
 		!QDF_IS_EPPING_ENABLED(cds_get_conparam()) &&
@@ -1579,7 +1571,7 @@ static void htt_pktlogmod_exit(struct ol_txrx_pdev_t *handle, void *scn)
 }
 #else
 void htt_pkt_log_init(ol_txrx_pdev_handle handle, void *ol_sc) { }
-static void htt_pktlogmod_exit(ol_txrx_pdev_handle handle, void *sc)  { }
+void htt_pktlogmod_exit(ol_txrx_pdev_handle handle, void *sc)  { }
 #endif
 
 /**
@@ -2271,7 +2263,7 @@ static void ol_txrx_debugfs_exit(ol_txrx_pdev_handle pdev)
  */
 void ol_txrx_pdev_detach(ol_txrx_pdev_handle pdev)
 {
-	struct ol_txrx_stats_req_internal *req;
+	struct ol_txrx_stats_req_internal *req, *temp_req;
 	int i = 0;
 
 	/*checking to ensure txrx pdev structure is not NULL */
@@ -2287,7 +2279,7 @@ void ol_txrx_pdev_detach(ol_txrx_pdev_handle pdev)
 			"Warning: the txrx req list is not empty, depth=%d\n",
 			pdev->req_list_depth
 			);
-	TAILQ_FOREACH(req, &pdev->req_list, req_list_elem) {
+	TAILQ_FOREACH_SAFE(req, &pdev->req_list, req_list_elem, temp_req) {
 		TAILQ_REMOVE(&pdev->req_list, req, req_list_elem);
 		pdev->req_list_depth--;
 		ol_txrx_err(
@@ -3510,6 +3502,35 @@ ol_txrx_peer_qoscapable_get(struct ol_txrx_pdev_t *txrx_pdev, uint16_t peer_id)
 	return 0;
 }
 
+bool ol_txrx_is_peer_eligible_for_deletion(ol_txrx_peer_handle peer)
+{
+	struct ol_txrx_vdev_t *vdev;
+	struct ol_txrx_pdev_t *pdev;
+	bool peerdel = true;
+	u_int16_t peer_id;
+	int i;
+
+	vdev = peer->vdev;
+	pdev = vdev->pdev;
+	for (i = 0; i < MAX_NUM_PEER_ID_PER_PEER; i++) {
+		peer_id = peer->peer_ids[i];
+
+		if (!pdev->peer_id_to_obj_map[peer_id].peer_ref)
+			continue;
+
+		if (pdev->peer_id_to_obj_map[peer_id].peer_ref != peer)
+			continue;
+
+		if (qdf_atomic_read(&pdev->peer_id_to_obj_map[peer_id].
+					del_peer_id_ref_cnt)) {
+			peerdel = false;
+			break;
+		}
+
+		pdev->peer_id_to_obj_map[peer_id].peer_ref = NULL;
+	}
+	return peerdel;
+}
 int ol_txrx_peer_unref_delete(ol_txrx_peer_handle peer,
 					const char *fname,
 					int line)
@@ -3692,7 +3713,32 @@ int ol_txrx_peer_unref_delete(ol_txrx_peer_handle peer,
 			}
 		}
 
-		qdf_mem_free(peer);
+		qdf_spin_lock_bh(&pdev->peer_map_unmap_lock);
+		if (ol_txrx_is_peer_eligible_for_deletion(peer)) {
+			qdf_mem_free(peer);
+		} else {
+			/*
+			 * Mark this PEER as a stale peer, to be deleted
+			 * during PEER UNMAP. Remove this peer from
+			 * roam_stale_peer_list during UNMAP.
+			 */
+			struct ol_txrx_roam_stale_peer_t *roam_stale_peer;
+
+			roam_stale_peer = qdf_mem_malloc(
+				sizeof(struct ol_txrx_roam_stale_peer_t));
+			if (roam_stale_peer) {
+				roam_stale_peer->peer = peer;
+				TAILQ_INSERT_TAIL(&pdev->roam_stale_peer_list,
+						  roam_stale_peer,
+						  next_stale_entry);
+			} else {
+				QDF_TRACE(QDF_MODULE_ID_TXRX,
+					  QDF_TRACE_LEVEL_ERROR,
+					  "[%s][%d]: No memory allocated",
+					  fname, line);
+			}
+		}
+		qdf_spin_unlock_bh(&pdev->peer_map_unmap_lock);
 	} else {
 		qdf_spin_unlock_bh(&pdev->peer_ref_mutex);
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO_HIGH,
@@ -3768,7 +3814,7 @@ QDF_STATUS ol_txrx_clear_peer(uint8_t sta_id)
  *
  * Return: none
  */
-void peer_unmap_timer_handler(void *data)
+void peer_unmap_timer_handler(unsigned long data)
 {
 	ol_txrx_peer_handle peer = (ol_txrx_peer_handle)data;
 
@@ -5196,9 +5242,10 @@ static inline int ol_txrx_drop_nbuf_list(qdf_nbuf_t buf_list)
  *
  * Return: None
  */
-static void ol_rx_data_cb(struct ol_txrx_pdev_t *pdev,
-			  qdf_nbuf_t buf_list, uint16_t staid)
+static void ol_rx_data_cb(void *_pdev, void *_buf_list, uint16_t staid)
 {
+	struct ol_txrx_pdev_t *pdev = (struct ol_txrx_pdev_t *)_pdev;
+	qdf_nbuf_t buf_list = (qdf_nbuf_t)_buf_list;
 	void *cds_ctx = cds_get_global_context();
 	void *osif_dev;
 	uint8_t drop_count = 0;
@@ -5398,8 +5445,7 @@ void ol_rx_data_process(struct ol_txrx_peer_t *peer,
 			if (!pkt)
 				goto drop_rx_buf;
 
-			pkt->callback = (cds_ol_rx_thread_cb)
-					ol_rx_data_cb;
+			pkt->callback = ol_rx_data_cb;
 			pkt->context = (void *)pdev;
 			pkt->Rxpkt = (void *)rx_buf_list;
 			pkt->staId = peer->local_id;
@@ -5965,4 +6011,9 @@ QDF_STATUS ol_txrx_set_wisa_mode(ol_txrx_vdev_handle vdev, bool enable)
 
 	vdev->is_wisa_mode_enable = enable;
 	return QDF_STATUS_SUCCESS;
+}
+
+int ol_txrx_rx_hash_smmu_map(ol_txrx_pdev_handle pdev, bool map)
+{
+	return htt_rx_hash_smmu_map_update(pdev->htt_pdev, map);
 }

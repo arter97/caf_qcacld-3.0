@@ -1,9 +1,6 @@
 /*
  * Copyright (c) 2011-2018 The Linux Foundation. All rights reserved.
  *
- * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
- *
- *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
  * above copyright notice and this permission notice appear in all
@@ -17,12 +14,6 @@
  * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
- */
-
-/*
- * This file was originally distributed by Qualcomm Atheros, Inc.
- * under proprietary terms before Copyright ownership was assigned
- * to the Linux Foundation.
  */
 
 #include <qdf_atomic.h>         /* qdf_atomic_inc, etc. */
@@ -617,9 +608,8 @@ static void ol_tx_update_connectivity_stats(struct ol_tx_desc_t *tx_desc,
 	}
 	osif_dev = tx_desc->vdev->osif_dev;
 	stats_rx = tx_desc->vdev->stats_rx;
-	ol_tx_flow_pool_unlock(tx_desc);
-
 	pkt_type_bitmap = cds_get_connectivity_stats_pkt_bitmap(osif_dev);
+	ol_tx_flow_pool_unlock(tx_desc);
 
 	if (pkt_type_bitmap) {
 		if (status != htt_tx_status_download_fail)
@@ -863,6 +853,11 @@ void ol_tx_desc_update_group_credit(ol_txrx_pdev_handle pdev,
 	uint8_t i, is_member;
 	uint16_t vdev_id_mask;
 	struct ol_tx_desc_t *tx_desc;
+
+	if (tx_desc_id >= pdev->tx_desc.pool_size) {
+		qdf_print("%s: Invalid desc id", __func__);
+		return;
+	}
 
 	tx_desc = ol_tx_desc_find(pdev, tx_desc_id);
 	for (i = 0; i < OL_TX_MAX_TXQ_GROUPS; i++) {

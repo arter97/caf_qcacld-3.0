@@ -1,9 +1,6 @@
 /*
  * Copyright (c) 2013-2018 The Linux Foundation. All rights reserved.
  *
- * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
- *
- *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
  * above copyright notice and this permission notice appear in all
@@ -19,17 +16,10 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-/*
- * This file was originally distributed by Qualcomm Atheros, Inc.
- * under proprietary terms before Copyright ownership was assigned
- * to the Linux Foundation.
- */
-
 /**
  * DOC: wlan_hdd_ipa.c
  *
  * WLAN HDD and ipa interface implementation
- * Originally written by Qualcomm Atheros, Inc
  */
 
 #ifdef IPA_OFFLOAD
@@ -98,6 +88,8 @@
 #define IPA_WLAN_RX_SOFTIRQ_THRESH 16
 
 #define HDD_IPA_MAX_BANDWIDTH 800
+
+#define HDD_IPA_UC_STAT_LOG_RATE 10
 
 enum hdd_ipa_uc_op_code {
 	HDD_IPA_UC_OPCODE_TX_SUSPEND = 0,
@@ -1366,12 +1358,26 @@ static int hdd_ipa_wdi_dereg_intf(struct hdd_ipa_priv *hdd_ipa,
 
 static int hdd_ipa_wdi_enable_pipes(struct hdd_ipa_priv *hdd_ipa)
 {
+	struct ol_txrx_pdev_t *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 	int ret;
+
+	/* Map IPA SMMU for all Rx hash table */
+	ret = ol_txrx_rx_hash_smmu_map(pdev, true);
+	if (ret) {
+		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
+			    "IPA SMMU map failed ret=%d", ret);
+		return ret;
+	}
 
 	ret = ipa_wdi_enable_pipes();
 	if (ret) {
 		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
-				"ipa_wdi_enable_pipes failed ret=%d", ret);
+			    "ipa_wdi_enable_pipes failed ret=%d", ret);
+
+		if (ol_txrx_rx_hash_smmu_map(pdev, false)) {
+			HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
+				    "IPA SMMU unmap failed");
+		}
 		return ret;
 	}
 
@@ -1380,12 +1386,21 @@ static int hdd_ipa_wdi_enable_pipes(struct hdd_ipa_priv *hdd_ipa)
 
 static int hdd_ipa_wdi_disable_pipes(struct hdd_ipa_priv *hdd_ipa)
 {
+	struct ol_txrx_pdev_t *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 	int ret;
 
 	ret = ipa_wdi_disable_pipes();
 	if (ret) {
 		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
-				"ipa_wdi_disable_pipes failed ret=%d", ret);
+			    "ipa_wdi_disable_pipes failed ret=%d", ret);
+		return ret;
+	}
+
+	/* Unmap IPA SMMU for all Rx hash table */
+	ret = ol_txrx_rx_hash_smmu_map(pdev, false);
+	if (ret) {
+		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
+			    "IPA SMMU unmap failed");
 		return ret;
 	}
 
@@ -1404,11 +1419,15 @@ static inline int hdd_ipa_wdi_teardown_sys_pipe(struct hdd_ipa_priv *hdd_ipa,
 	return 0;
 }
 
-static inline int hdd_ipa_wdi_rm_set_perf_profile(struct hdd_ipa_priv *hdd_ipa,
-		enum ipa_rm_resource_name resource_name,
-		struct ipa_rm_perf_profile *profile)
+static int hdd_ipa_wdi_rm_set_perf_profile(struct hdd_ipa_priv *hdd_ipa,
+		int client, uint32_t max_supported_bw_mbps)
 {
-	return 0;
+	struct ipa_wdi_perf_profile profile;
+
+	profile.client = client;
+	profile.max_supported_bw_mbps = max_supported_bw_mbps;
+
+	return ipa_wdi_set_perf_profile(&profile);
 }
 
 static inline int hdd_ipa_wdi_rm_request_resource(struct hdd_ipa_priv *hdd_ipa,
@@ -1499,6 +1518,21 @@ static void hdd_ipa_pm_flush(struct work_struct *work)
 	if (dequeued > hdd_ipa->stats.num_max_pm_queue)
 		hdd_ipa->stats.num_max_pm_queue = dequeued;
 }
+
+int hdd_ipa_uc_smmu_map(bool map, uint32_t num_buf, qdf_mem_info_t *buf_arr)
+{
+	if (!num_buf) {
+		HDD_IPA_LOG(QDF_TRACE_LEVEL_DEBUG, "No buffers to map/unmap");
+		return 0;
+	}
+
+	if (map)
+		return ipa_wdi_create_smmu_mapping(num_buf,
+			   (struct ipa_wdi_buffer_info *)buf_arr);
+	else
+		return ipa_wdi_release_smmu_mapping(num_buf,
+			   (struct ipa_wdi_buffer_info *)buf_arr);
+}
 #else /* CONFIG_IPA_WDI_UNIFIED_API */
 static inline void hdd_ipa_wdi_get_wdi_version(struct hdd_ipa_priv *hdd_ipa)
 {
@@ -1567,6 +1601,14 @@ static int hdd_ipa_wdi_conn_pipes(struct hdd_ipa_priv *hdd_ipa,
 	QDF_STATUS stat = QDF_STATUS_SUCCESS;
 	qdf_device_t osdev = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
 	int ret;
+
+	if (qdf_unlikely(NULL == osdev)) {
+		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_ERROR,
+			  "%s: osdev is NULL", __func__);
+		stat = QDF_STATUS_E_FAILURE;
+		goto fail_return;
+	}
+
 
 	qdf_mem_zero(&hdd_ipa->cons_pipe_in, sizeof(struct ipa_wdi_in_params));
 	qdf_mem_zero(&hdd_ipa->prod_pipe_in, sizeof(struct ipa_wdi_in_params));
@@ -2152,8 +2194,16 @@ static int hdd_ipa_wdi_dereg_intf(struct hdd_ipa_priv *hdd_ipa,
 
 static int hdd_ipa_wdi_enable_pipes(struct hdd_ipa_priv *hdd_ipa)
 {
+	struct ol_txrx_pdev_t *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 	int result;
 
+	/* Map IPA SMMU for all Rx hash table */
+	result = ol_txrx_rx_hash_smmu_map(pdev, true);
+	if (result) {
+		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
+			    "IPA SMMU map failed ret=%d", result);
+		return result;
+	}
 	/* ACTIVATE TX PIPE */
 	HDD_IPA_LOG(QDF_TRACE_LEVEL_DEBUG,
 			"Enable TX PIPE(tx_pipe_handle=%d)",
@@ -2163,7 +2213,7 @@ static int hdd_ipa_wdi_enable_pipes(struct hdd_ipa_priv *hdd_ipa)
 		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
 			    "Enable TX PIPE fail, code %d",
 			     result);
-		return result;
+		goto smmu_unmap;
 	}
 
 	result = ipa_resume_wdi_pipe(hdd_ipa->tx_pipe_handle);
@@ -2171,7 +2221,7 @@ static int hdd_ipa_wdi_enable_pipes(struct hdd_ipa_priv *hdd_ipa)
 		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
 			    "Resume TX PIPE fail, code %d",
 			     result);
-		return result;
+		goto smmu_unmap;
 	}
 
 	/* ACTIVATE RX PIPE */
@@ -2183,7 +2233,7 @@ static int hdd_ipa_wdi_enable_pipes(struct hdd_ipa_priv *hdd_ipa)
 		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
 			    "Enable RX PIPE fail, code %d",
 			     result);
-		return result;
+		goto smmu_unmap;
 	}
 
 	result = ipa_resume_wdi_pipe(hdd_ipa->rx_pipe_handle);
@@ -2191,14 +2241,23 @@ static int hdd_ipa_wdi_enable_pipes(struct hdd_ipa_priv *hdd_ipa)
 		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
 			    "Resume RX PIPE fail, code %d",
 			     result);
-		return result;
+		goto smmu_unmap;
 	}
 
 	return 0;
+
+smmu_unmap:
+	if (ol_txrx_rx_hash_smmu_map(pdev, false)) {
+		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
+			    "IPA SMMU unmap failed");
+	}
+
+	return result;
 }
 
 static int hdd_ipa_wdi_disable_pipes(struct hdd_ipa_priv *hdd_ipa)
 {
+	struct ol_txrx_pdev_t *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 	int result;
 
 	HDD_IPA_LOG(QDF_TRACE_LEVEL_DEBUG, "Disable RX PIPE");
@@ -2231,6 +2290,14 @@ static int hdd_ipa_wdi_disable_pipes(struct hdd_ipa_priv *hdd_ipa)
 		return result;
 	}
 
+	/* Unmap IPA SMMU for all Rx hash table */
+	result = ol_txrx_rx_hash_smmu_map(pdev, false);
+	if (result) {
+		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
+			    "IPA SMMU unmap failed");
+		return result;
+	}
+
 	return 0;
 }
 
@@ -2247,10 +2314,24 @@ static int hdd_ipa_wdi_teardown_sys_pipe(struct hdd_ipa_priv *hdd_ipa,
 }
 
 static int hdd_ipa_wdi_rm_set_perf_profile(struct hdd_ipa_priv *hdd_ipa,
-		enum ipa_rm_resource_name resource_name,
-		struct ipa_rm_perf_profile *profile)
+		int client, uint32_t max_supported_bw_mbps)
 {
-	return ipa_rm_set_perf_profile(resource_name, profile);
+	enum ipa_rm_resource_name resource_name;
+	struct ipa_rm_perf_profile profile;
+
+	if (client == IPA_CLIENT_WLAN1_PROD) {
+		resource_name = IPA_RM_RESOURCE_WLAN_PROD;
+	} else if (client == IPA_CLIENT_WLAN1_CONS) {
+		resource_name = IPA_RM_RESOURCE_WLAN_CONS;
+	} else {
+		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR,
+				"not supported client: %d", client);
+		return -EINVAL;
+	}
+
+	profile.max_supported_bandwidth_mbps = max_supported_bw_mbps;
+
+	return ipa_rm_set_perf_profile(resource_name, &profile);
 }
 
 static int hdd_ipa_wdi_rm_request_resource(struct hdd_ipa_priv *hdd_ipa,
@@ -2784,6 +2865,21 @@ static void hdd_ipa_pm_flush(struct work_struct *work)
 	if (dequeued > hdd_ipa->stats.num_max_pm_queue)
 		hdd_ipa->stats.num_max_pm_queue = dequeued;
 }
+
+int hdd_ipa_uc_smmu_map(bool map, uint32_t num_buf, qdf_mem_info_t *buf_arr)
+{
+	if (!num_buf) {
+		HDD_IPA_LOG(QDF_TRACE_LEVEL_DEBUG, "No buffers to map/unmap");
+		return 0;
+	}
+
+	if (map)
+		return ipa_create_wdi_mapping(num_buf,
+			   (struct ipa_wdi_buffer_info *)buf_arr);
+	else
+		return ipa_release_wdi_mapping(num_buf,
+			   (struct ipa_wdi_buffer_info *)buf_arr);
+}
 #endif /* CONFIG_IPA_WDI_UNIFIED_API */
 
 /**
@@ -2936,7 +3032,7 @@ static void hdd_ipa_uc_rt_debug_handler(void *ctext)
 	if (!dummy_ptr) {
 		hdd_ipa_uc_rt_debug_host_dump(hdd_ctx);
 		hdd_ipa_uc_stat_request(
-			hdd_get_adapter(hdd_ctx, QDF_SAP_MODE),
+			hdd_ctx,
 			HDD_IPA_UC_STAT_REASON_DEBUG);
 	} else {
 		kfree(dummy_ptr);
@@ -3370,8 +3466,9 @@ static void __hdd_ipa_uc_stat_query(hdd_context_t *hdd_ctx,
 		(false == hdd_ipa->resource_loading)) {
 		*ipa_tx_diff = hdd_ipa->ipa_tx_packets_diff;
 		*ipa_rx_diff = hdd_ipa->ipa_rx_packets_diff;
-		hdd_debug("STAT Query TX DIFF %d, RX DIFF %d",
-			    *ipa_tx_diff, *ipa_rx_diff);
+		hdd_debug_ratelimited(HDD_IPA_UC_STAT_LOG_RATE,
+				      "STAT Query TX DIFF %d, RX DIFF %d",
+				      *ipa_tx_diff, *ipa_rx_diff);
 	}
 	qdf_mutex_release(&hdd_ipa->ipa_lock);
 }
@@ -3394,20 +3491,14 @@ void hdd_ipa_uc_stat_query(hdd_context_t *hdd_ctx,
 
 /**
  * __hdd_ipa_uc_stat_request() - Get IPA stats from IPA.
- * @adapter: network adapter
+ * @hdd_ctx: Global HDD context
  * @reason: STAT REQ Reason
  *
  * Return: None
  */
-static void __hdd_ipa_uc_stat_request(hdd_adapter_t *adapter, uint8_t reason)
+static void __hdd_ipa_uc_stat_request(hdd_context_t *hdd_ctx, uint8_t reason)
 {
-	hdd_context_t *hdd_ctx;
 	struct hdd_ipa_priv *hdd_ipa;
-
-	if (hdd_validate_adapter(adapter))
-		return;
-
-	hdd_ctx = (hdd_context_t *)adapter->pHddCtx;
 
 	if (wlan_hdd_validate_context(hdd_ctx))
 		return;
@@ -3423,8 +3514,7 @@ static void __hdd_ipa_uc_stat_request(hdd_adapter_t *adapter, uint8_t reason)
 		(false == hdd_ipa->resource_loading)) {
 		hdd_ipa->stat_req_reason = reason;
 		qdf_mutex_release(&hdd_ipa->ipa_lock);
-		sme_ipa_uc_stat_request(WLAN_HDD_GET_HAL_CTX(adapter),
-			adapter->sessionId,
+		sme_ipa_uc_stat_request(hdd_ctx->hHal, 0,
 			WMA_VDEV_TXRX_GET_IPA_UC_FW_STATS_CMDID,
 			0, VDEV_CMD);
 	} else {
@@ -3434,15 +3524,15 @@ static void __hdd_ipa_uc_stat_request(hdd_adapter_t *adapter, uint8_t reason)
 
 /**
  * hdd_ipa_uc_stat_request() - SSR wrapper for __hdd_ipa_uc_stat_request
- * @adapter: network adapter
+ * @hdd_ctx: Global HDD context
  * @reason: STAT REQ Reason
  *
  * Return: None
  */
-void hdd_ipa_uc_stat_request(hdd_adapter_t *adapter, uint8_t reason)
+void hdd_ipa_uc_stat_request(hdd_context_t *hdd_ctx, uint8_t reason)
 {
 	cds_ssr_protect(__func__);
-	__hdd_ipa_uc_stat_request(adapter, reason);
+	__hdd_ipa_uc_stat_request(hdd_ctx, reason);
 	cds_ssr_unprotect(__func__);
 }
 
@@ -3592,6 +3682,11 @@ static int hdd_ipa_uc_enable_pipes(struct hdd_ipa_priv *hdd_ipa)
 	int result = 0;
 
 	HDD_IPA_LOG(QDF_TRACE_LEVEL_DEBUG, "enter");
+	if (qdf_unlikely(NULL == pdev)) {
+		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR, "pdev is NULL");
+		result = QDF_STATUS_E_FAILURE;
+		goto end;
+	}
 
 	if (!hdd_ipa->ipa_pipes_down) {
 		/*
@@ -3929,50 +4024,26 @@ static void hdd_ipa_print_resource_info(struct hdd_ipa_priv *hdd_ipa)
 
 	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO,
 		"\n==== IPA RESOURCE INFO ====\n"
-		"CE RING BASE: %pad\n"
 		"CE RING SIZE: %d\n"
-		"CE REG ADDR: %pad\n"
-		"TX COMP RING BASE: %pad\n"
 		"TX COMP RING SIZE: %d\n"
 		"TX NUM ALLOC BUF: %d\n"
-		"RX IND RING BASE: %pad\n"
 		"RX IND RING SIZE: %d\n"
-		"RX PROC DONE IND ADDR: %pad\n"
 #if defined(QCA_WIFI_3_0) && defined(CONFIG_IPA3)
-		"RX2 IND RING BASE: %pad\n"
 		"RX2 IND RING SIZE: %d\n"
-		"RX2 PROC DONE IND ADDR: %pad\n"
 #endif
 		"PROD CLIENT: %d\n"
 		"TX PIPE HDL: 0x%x\n"
-		"RX PIPE HDL: 0x%x\n"
-		"TX COMP RING DBELL: %pad\n"
-		"RX IND RING DBELL: %pad\n",
-		qdf_mem_get_dma_addr_ptr(osdev,
-				&res->ce_sr->mem_info),
+		"RX PIPE HDL: 0x%x\n",
 		(int)res->ce_sr->mem_info.size,
-		&res->ce_reg_paddr,
-		qdf_mem_get_dma_addr_ptr(osdev,
-				&res->tx_comp_ring->mem_info),
 		(int)res->tx_comp_ring->mem_info.size,
 		res->tx_num_alloc_buffer,
-		qdf_mem_get_dma_addr_ptr(osdev,
-				&res->rx_rdy_ring->mem_info),
 		(int)res->rx_rdy_ring->mem_info.size,
-		qdf_mem_get_dma_addr_ptr(osdev,
-				&res->rx_proc_done_idx->mem_info),
 #if defined(QCA_WIFI_3_0) && defined(CONFIG_IPA3)
-		qdf_mem_get_dma_addr_ptr(osdev,
-				&res->rx2_rdy_ring->mem_info),
 		(int)res->rx2_rdy_ring->mem_info.size,
-		qdf_mem_get_dma_addr_ptr(osdev,
-				&res->rx2_proc_done_idx->mem_info),
 #endif
 		hdd_ipa->prod_client,
 		hdd_ipa->tx_pipe_handle,
-		hdd_ipa->rx_pipe_handle,
-		&hdd_ipa->tx_comp_doorbell_dmaaddr,
-		&hdd_ipa->rx_ready_doorbell_dmaaddr);
+		hdd_ipa->rx_pipe_handle);
 }
 
 /**
@@ -4144,17 +4215,13 @@ static void hdd_ipa_print_fw_wdi_stats(struct hdd_ipa_priv *hdd_ipa,
 {
 	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO,
 		"\n==== WLAN FW WDI TX STATS ====\n"
-		"COMP RING BASE: 0x%x\n"
 		"COMP RING SIZE: %d\n"
-		"COMP RING DBELL : 0x%x\n"
 		"COMP RING DBELL IND VAL : %d\n"
 		"COMP RING DBELL CACHED VAL : %d\n"
 		"PKTS ENQ : %d\n"
 		"PKTS COMP : %d\n"
 		"IS SUSPEND : %d\n",
-		uc_fw_stat->tx_comp_ring_base,
 		uc_fw_stat->tx_comp_ring_size,
-		uc_fw_stat->tx_comp_ring_dbell_addr,
 		uc_fw_stat->tx_comp_ring_dbell_ind_val,
 		uc_fw_stat->tx_comp_ring_dbell_cached_val,
 		uc_fw_stat->tx_pkts_enqueued,
@@ -4163,12 +4230,9 @@ static void hdd_ipa_print_fw_wdi_stats(struct hdd_ipa_priv *hdd_ipa,
 
 	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO,
 		"\n==== WLAN FW WDI RX STATS ====\n"
-		"IND RING BASE: 0x%x\n"
 		"IND RING SIZE: %d\n"
-		"IND RING DBELL : 0x%x\n"
 		"IND RING DBELL IND VAL : %d\n"
 		"IND RING DBELL CACHED VAL : %d\n"
-		"RDY IND ADDR : 0x%x\n"
 		"RDY IND CACHE VAL : %d\n"
 		"RFIL IND : %d\n"
 		"NUM PKT INDICAT : %d\n"
@@ -4176,12 +4240,9 @@ static void hdd_ipa_print_fw_wdi_stats(struct hdd_ipa_priv *hdd_ipa,
 		"NUM DROP NO SPC : %d\n"
 		"NUM DROP NO BUF : %d\n"
 		"IS SUSPND : %d\n",
-		uc_fw_stat->rx_ind_ring_base,
 		uc_fw_stat->rx_ind_ring_size,
-		uc_fw_stat->rx_ind_ring_dbell_addr,
 		uc_fw_stat->rx_ind_ring_dbell_ind_val,
 		uc_fw_stat->rx_ind_ring_dbell_ind_cached_val,
-		uc_fw_stat->rx_ind_ring_rdidx_addr,
 		uc_fw_stat->rx_ind_ring_rd_idx_cached_val,
 		uc_fw_stat->rx_refill_idx,
 		uc_fw_stat->rx_num_pkts_indicated,
@@ -4324,7 +4385,7 @@ void hdd_ipa_uc_stat(hdd_adapter_t *adapter)
 	/* IPA WDI stats */
 	hdd_ipa_print_ipa_wdi_stats(hdd_ipa);
 	/* WLAN FW WDI stats */
-	hdd_ipa_uc_stat_request(adapter, HDD_IPA_UC_STAT_REASON_DEBUG);
+	hdd_ipa_uc_stat_request(hdd_ctx, HDD_IPA_UC_STAT_REASON_DEBUG);
 }
 
 /**
@@ -4344,13 +4405,14 @@ static void hdd_ipa_uc_op_cb(struct op_msg_type *op_msg, void *usr_ctxt)
 	struct ol_txrx_pdev_t *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
-	if (!pdev) {
-		HDD_IPA_LOG(QDF_TRACE_LEVEL_FATAL, "pdev is NULL");
+	if (!op_msg) {
+		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR, "INVALID ARG");
 		return;
 	}
 
-	if (!op_msg || !usr_ctxt) {
-		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR, "INVALID ARG");
+	if (!pdev) {
+		HDD_IPA_LOG(QDF_TRACE_LEVEL_FATAL, "pdev is NULL");
+		qdf_mem_free(op_msg);
 		return;
 	}
 
@@ -5257,7 +5319,6 @@ static int __hdd_ipa_set_perf_level(hdd_context_t *hdd_ctx, uint64_t tx_packets,
 {
 	uint32_t next_cons_bw, next_prod_bw;
 	struct hdd_ipa_priv *hdd_ipa;
-	struct ipa_rm_perf_profile profile;
 	int ret;
 
 	if (wlan_hdd_validate_context(hdd_ctx))
@@ -5268,8 +5329,6 @@ static int __hdd_ipa_set_perf_level(hdd_context_t *hdd_ctx, uint64_t tx_packets,
 	if ((!hdd_ipa_is_enabled(hdd_ctx)) ||
 		(!hdd_ipa_is_clk_scaling_enabled(hdd_ctx)))
 		return 0;
-
-	memset(&profile, 0, sizeof(profile));
 
 	if (tx_packets > (hdd_ctx->config->busBandwidthHighThreshold / 2))
 		next_cons_bw = hdd_ctx->config->IpaHighBandwidthMbps;
@@ -5297,9 +5356,8 @@ static int __hdd_ipa_set_perf_level(hdd_context_t *hdd_ctx, uint64_t tx_packets,
 	if (hdd_ipa->curr_cons_bw != next_cons_bw) {
 		hdd_debug("Requesting CONS perf curr: %d, next: %d",
 			    hdd_ipa->curr_cons_bw, next_cons_bw);
-		profile.max_supported_bandwidth_mbps = next_cons_bw;
 		ret = hdd_ipa_wdi_rm_set_perf_profile(hdd_ipa,
-				IPA_RM_RESOURCE_WLAN_CONS, &profile);
+				IPA_CLIENT_WLAN1_CONS, next_cons_bw);
 		if (ret) {
 			hdd_err("RM CONS set perf profile failed: %d", ret);
 
@@ -5312,9 +5370,8 @@ static int __hdd_ipa_set_perf_level(hdd_context_t *hdd_ctx, uint64_t tx_packets,
 	if (hdd_ipa->curr_prod_bw != next_prod_bw) {
 		hdd_debug("Requesting PROD perf curr: %d, next: %d",
 			    hdd_ipa->curr_prod_bw, next_prod_bw);
-		profile.max_supported_bandwidth_mbps = next_prod_bw;
 		ret = hdd_ipa_wdi_rm_set_perf_profile(hdd_ipa,
-				IPA_RM_RESOURCE_WLAN_PROD, &profile);
+				IPA_CLIENT_WLAN1_PROD, next_prod_bw);
 		if (ret) {
 			hdd_err("RM PROD set perf profile failed: %d", ret);
 			return ret;
@@ -6621,6 +6678,12 @@ static int __hdd_ipa_wlan_evt(hdd_adapter_t *adapter, uint8_t sta_id,
 	struct ipa_wlan_msg_ex *msg_ex = NULL;
 	int ret;
 
+	if (hdd_validate_adapter(adapter)) {
+		HDD_IPA_LOG(QDF_TRACE_LEVEL_ERROR, "Invalid adapter: 0x%pK",
+			    adapter);
+		return -EINVAL;
+	}
+
 	HDD_IPA_LOG(QDF_TRACE_LEVEL_INFO, "%s: EVT: %s, MAC: %pM sta_id: %d",
 		    adapter->dev->name, hdd_ipa_wlan_event_to_str(type),
 		    mac_addr, sta_id);
@@ -7164,7 +7227,6 @@ static QDF_STATUS __hdd_ipa_init(hdd_context_t *hdd_ctx)
 	int ret, i;
 	struct hdd_ipa_iface_context *iface_context = NULL;
 	struct ol_txrx_pdev_t *pdev = NULL;
-	struct ipa_rm_perf_profile profile;
 
 	HDD_IPA_LOG(QDF_TRACE_LEVEL_DEBUG, "enter");
 
@@ -7256,19 +7318,18 @@ static QDF_STATUS __hdd_ipa_init(hdd_context_t *hdd_ctx)
 
 	/* When IPA clock scaling is disabled, initialze maximum clock */
 	if (!hdd_ipa_is_clk_scaling_enabled(hdd_ctx)) {
-		profile.max_supported_bandwidth_mbps = HDD_IPA_MAX_BANDWIDTH;
 		hdd_debug("IPA clock scaling is disabled.");
 		hdd_debug("Set initial CONS/PROD perf: %d",
-			  profile.max_supported_bandwidth_mbps);
+				HDD_IPA_MAX_BANDWIDTH);
 		ret = hdd_ipa_wdi_rm_set_perf_profile(hdd_ipa,
-				IPA_RM_RESOURCE_WLAN_CONS, &profile);
+				IPA_CLIENT_WLAN1_CONS, HDD_IPA_MAX_BANDWIDTH);
 		if (ret) {
 			hdd_err("RM CONS set perf profile failed: %d", ret);
 			goto fail_create_sys_pipe;
 		}
 
 		ret = hdd_ipa_wdi_rm_set_perf_profile(hdd_ipa,
-				IPA_RM_RESOURCE_WLAN_PROD, &profile);
+				IPA_CLIENT_WLAN1_PROD, HDD_IPA_MAX_BANDWIDTH);
 		if (ret) {
 			hdd_err("RM PROD set perf profile failed: %d", ret);
 			goto fail_create_sys_pipe;
@@ -7432,21 +7493,6 @@ QDF_STATUS hdd_ipa_cleanup(hdd_context_t *hdd_ctx)
 	cds_ssr_unprotect(__func__);
 
 	return ret;
-}
-
-int hdd_ipa_uc_smmu_map(bool map, uint32_t num_buf, qdf_mem_info_t *buf_arr)
-{
-	if (!num_buf) {
-		HDD_IPA_LOG(QDF_TRACE_LEVEL_DEBUG, "No buffers to map/unmap");
-		return 0;
-	}
-
-	if (map)
-		return ipa_create_wdi_mapping(num_buf,
-			   (struct ipa_wdi_buffer_info *)buf_arr);
-	else
-		return ipa_release_wdi_mapping(num_buf,
-			   (struct ipa_wdi_buffer_info *)buf_arr);
 }
 
 void hdd_ipa_clean_adapter_iface(hdd_adapter_t *adapter)

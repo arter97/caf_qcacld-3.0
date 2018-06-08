@@ -1,9 +1,6 @@
 /*
  * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
  *
- * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
- *
- *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
  * above copyright notice and this permission notice appear in all
@@ -17,12 +14,6 @@
  * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
- */
-
-/*
- * This file was originally distributed by Qualcomm Atheros, Inc.
- * under proprietary terms before Copyright ownership was assigned
- * to the Linux Foundation.
  */
 
 /**
@@ -663,6 +654,12 @@ static void wlan_hdd_tdls_del_non_forced_peers(tdlsCtx_t *hdd_tdls_ctx)
 		list_for_each_safe(pos, q, head) {
 			peer = list_entry(pos, hddTdlsPeer_t, node);
 			if (false == peer->isForcedPeer) {
+				if (peer->is_peer_idle_timer_initialised) {
+					hdd_debug(MAC_ADDRESS_STR ": destroy idle timer",
+					 MAC_ADDR_ARRAY(peer->peerMac));
+					qdf_mc_timer_destroy(
+						&peer->peer_idle_timer);
+				}
 				list_del(pos);
 				qdf_mem_free(peer);
 			} else {
@@ -1694,7 +1691,7 @@ static void wlan_hdd_tdls_set_mode(hdd_context_t *pHddCtx,
 
 	ENTER();
 
-	hdd_debug("mode %d", (int)tdls_mode);
+	hdd_debug("mode %d, source %d", (int)tdls_mode, source);
 
 	if (0 != (wlan_hdd_validate_context(pHddCtx)))
 		return;
@@ -1996,12 +1993,18 @@ void wlan_hdd_update_tdls_info(hdd_adapter_t *adapter, bool tdls_prohibited,
 	if (tdls_prohibited) {
 		hdd_ctx->tdls_mode = eTDLS_SUPPORT_NOT_ENABLED;
 	} else {
-		if (false == hdd_ctx->config->fEnableTDLSImplicitTrigger)
+		if (false == hdd_ctx->config->fEnableTDLSImplicitTrigger) {
 			hdd_ctx->tdls_mode = eTDLS_SUPPORT_EXPLICIT_TRIGGER_ONLY;
-		else if (true == hdd_ctx->config->fTDLSExternalControl)
+		} else if (true == hdd_ctx->config->fTDLSExternalControl) {
 			hdd_ctx->tdls_mode = eTDLS_SUPPORT_EXTERNAL_CONTROL;
-		else
+			if (!hdd_ctx->tdls_source_bitmap &&
+				hdd_ctx->tdls_external_peer_count)
+				wlan_hdd_tdls_implicit_enable(hdd_tdls_ctx);
+		} else {
 			hdd_ctx->tdls_mode = eTDLS_SUPPORT_ENABLED;
+			if (!hdd_ctx->tdls_source_bitmap)
+				wlan_hdd_tdls_implicit_enable(hdd_tdls_ctx);
+		}
 	}
 	tdls_param = qdf_mem_malloc(sizeof(*tdls_param));
 	if (!tdls_param) {
@@ -4809,10 +4812,15 @@ static int __wlan_hdd_cfg80211_tdls_oper(struct wiphy *wiphy,
 			 pAdapter->sessionId, oper));
 
 	status = wlan_hdd_validate_context(pHddCtx);
-	tdls_ctx = WLAN_HDD_GET_TDLS_CTX_PTR(pAdapter);
-
 	if (0 != status)
 		return status;
+
+	tdls_ctx = WLAN_HDD_GET_TDLS_CTX_PTR(pAdapter);
+	if (!tdls_ctx) {
+		QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_ERROR,
+			  "%s: Invalid tdls context", __func__);
+		return -EINVAL;
+	}
 
 	/* QCA 2.0 Discrete ANDs feature capability in HDD config with that
 	 * received from target, so HDD config gives combined intersected result

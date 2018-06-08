@@ -1,9 +1,6 @@
 /*
  * Copyright (c) 2013-2018 The Linux Foundation. All rights reserved.
  *
- * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
- *
- *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
  * above copyright notice and this permission notice appear in all
@@ -17,12 +14,6 @@
  * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
- */
-
-/*
- * This file was originally distributed by Qualcomm Atheros, Inc.
- * under proprietary terms before Copyright ownership was assigned
- * to the Linux Foundation.
  */
 
 /**
@@ -392,12 +383,6 @@ int wma_cli_get_command(int vdev_id, int param_id, int vpdev)
 			break;
 		case WMI_PDEV_PARAM_TXPOWER_LIMIT5G:
 			ret = wma->pdevconfig.txpow5g;
-			break;
-		case WMI_PDEV_PARAM_BURST_ENABLE:
-			ret = wma->pdevconfig.burst_enable;
-			break;
-		case WMI_PDEV_PARAM_BURST_DUR:
-			ret = wma->pdevconfig.burst_dur;
 			break;
 		default:
 			WMA_LOGE("Invalid cli_get pdev command/Not yet implemented 0x%x",
@@ -1513,18 +1498,6 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 		case WMI_PDEV_PARAM_RX_CHAIN_MASK:
 			wma->pdevconfig.rxchainmask = privcmd->param_value;
 			break;
-		case WMI_PDEV_PARAM_BURST_ENABLE:
-			wma->pdevconfig.burst_enable = privcmd->param_value;
-			if ((wma->pdevconfig.burst_enable == 1) &&
-			    (wma->pdevconfig.burst_dur == 0))
-				wma->pdevconfig.burst_dur =
-					WMA_DEFAULT_SIFS_BURST_DURATION;
-			else if (wma->pdevconfig.burst_enable == 0)
-				wma->pdevconfig.burst_dur = 0;
-			break;
-		case WMI_PDEV_PARAM_BURST_DUR:
-			wma->pdevconfig.burst_dur = privcmd->param_value;
-			break;
 		case WMI_PDEV_PARAM_TXPOWER_LIMIT2G:
 			wma->pdevconfig.txpow2g = privcmd->param_value;
 			if ((pMac->roam.configParam.bandCapability ==
@@ -2088,6 +2061,7 @@ static int wma_flush_complete_evt_handler(void *handle,
 
 	wmi_event = param_buf->fixed_param;
 	reason_code = wmi_event->reserved0;
+	WMA_LOGD("Received reason code %d from FW", reason_code);
 
 	buf_ptr = (uint8_t *)wmi_event;
 	buf_ptr = buf_ptr + sizeof(wmi_debug_mesg_flush_complete_fixed_param) +
@@ -3239,7 +3213,13 @@ void wma_process_pdev_hw_mode_trans_ind(void *handle,
 {
 	uint32_t i;
 	tp_wma_handle wma = (tp_wma_handle) handle;
-
+	if (fixed_param->num_vdev_mac_entries > MAX_VDEV_SUPPORTED) {
+		WMA_LOGE("Number of Vdev mac entries %d exceeded"
+			 " max vdev supported %d",
+			 fixed_param->num_vdev_mac_entries,
+			 MAX_VDEV_SUPPORTED);
+		return;
+	}
 	hw_mode_trans_ind->old_hw_mode_index = fixed_param->old_hw_mode_index;
 	hw_mode_trans_ind->new_hw_mode_index = fixed_param->new_hw_mode_index;
 	hw_mode_trans_ind->num_vdev_mac_entries =
@@ -6035,13 +6015,15 @@ static void wma_populate_soc_caps(t_wma_handle *wma_handle,
 		return;
 	}
 
-	qdf_mem_copy(&phy_caps->sar_capability,
-		     param_buf->sar_caps,
-		     sizeof(WMI_SAR_CAPABILITIES));
-	if (phy_caps->sar_capability.active_version > SAR_VERSION_2) {
-		WMA_LOGE("%s: incorrect SAR version", __func__);
-		wma_cleanup_dbs_phy_caps(wma_handle);
-		return;
+	if (param_buf->sar_caps) {
+		qdf_mem_copy(&phy_caps->sar_capability,
+			     param_buf->sar_caps,
+			     sizeof(WMI_SAR_CAPABILITIES));
+		if (phy_caps->sar_capability.active_version > SAR_VERSION_2) {
+			WMA_LOGE("%s: incorrect SAR version", __func__);
+			wma_cleanup_dbs_phy_caps(wma_handle);
+			return;
+		}
 	}
 
 	phy_caps->each_phy_hal_reg_cap =
