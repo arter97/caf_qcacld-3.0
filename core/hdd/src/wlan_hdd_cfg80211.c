@@ -16724,6 +16724,8 @@ void hdd_select_cbmode(struct hdd_adapter *adapter, uint8_t operationChannel,
 	struct hdd_mon_set_ch_info *ch_info = &station_ctx->ch_info;
 	uint8_t sec_ch = 0;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	eConnectionState connstate;
+	bool cbmode_select = false;
 
 	/*
 	 * CDS api expects secondary channel for calculating
@@ -16740,8 +16742,16 @@ void hdd_select_cbmode(struct hdd_adapter *adapter, uint8_t operationChannel,
 	/* This call decides required channel bonding mode */
 	wlan_reg_set_channel_params(hdd_ctx->hdd_pdev, operationChannel,
 			sec_ch, ch_params);
+	if (adapter->device_mode == QDF_STA_MODE &&
+	    hdd_ctx->config->enable_change_channel_bandwidth) {
+		connstate = station_ctx->conn_info.connState;
+		if (!(eConnectionState_Associated == connstate ||
+		      eConnectionState_Connecting == connstate)) {
+			cbmode_select = true;
+		}
+	}
 
-	if (QDF_GLOBAL_MONITOR_MODE == cds_get_conparam()) {
+	if (cds_get_conparam() == QDF_GLOBAL_MONITOR_MODE || cbmode_select) {
 		enum hdd_dot11_mode hdd_dot11_mode;
 		uint8_t iniDot11Mode =
 			(WLAN_HDD_GET_CTX(adapter))->config->dot11Mode;

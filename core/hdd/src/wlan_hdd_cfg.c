@@ -5570,6 +5570,14 @@ struct reg_table_entry g_registry_table[] = {
 		     CFG_ENABLE_UINT_TEST_FRAMEWORK_DEFAULT,
 		     CFG_ENABLE_UNIT_TEST_FRAMEWORK_MIN,
 		     CFG_ENABLE_UNIT_TEST_FRAMEWORK_MAX),
+
+	REG_VARIABLE(CFG_CHANGE_CHANNEL_BANDWIDTH_NAME,
+		     WLAN_PARAM_Integer,
+		     struct hdd_config, enable_change_channel_bandwidth,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_CHANGE_CHANNEL_BANDWIDTH_DEFAULT,
+		     CFG_CHANGE_CHANNEL_BANDWIDTH_MIN,
+		     CFG_CHANGE_CHANNEL_BANDWIDTH_MAX)
 };
 
 
@@ -7466,6 +7474,9 @@ void hdd_cfg_print(struct hdd_context *hdd_ctx)
 	hdd_debug("Name = [%s] value = [%d]",
 		  CFG_DTIM_SELECTION_DIVERSITY_NAME,
 		  hdd_ctx->config->enable_dtim_selection_diversity);
+	hdd_debug("Name = [%s] value = [%d]",
+		  CFG_CHANGE_CHANNEL_BANDWIDTH_NAME,
+		  hdd_ctx->config->enable_change_channel_bandwidth);
 
 	hdd_cfg_print_11k_offload_params(hdd_ctx);
 	hdd_debug("Name = [%s] value = [0x%x]",
