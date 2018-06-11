@@ -196,7 +196,7 @@ struct qdf_nbuf_cb {
 					unsigned char *lro_ctx;
 				} priv_cb_m;
 			} dev;
-			uint32_t map_index;
+			uint32_t msdu_len;
 			uint32_t peer_mdata;
 			uint32_t lro_eligible:1,
 				peer_cached_buf_frm:1,
@@ -315,6 +315,9 @@ QDF_COMPILE_TIME_ASSERT(qdf_nbuf_cb_size,
 
 #define QDF_NBUF_CB_RX_PEER_MDATA(skb) \
 	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.peer_mdata)
+
+#define QDF_NBUF_CB_RX_PKT_LEN(skb) \
+	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.msdu_len)
 
 #define QDF_NBUF_CB_RX_PACKET_STATE(skb)\
 	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.trace.packet_state)
