@@ -2775,6 +2775,10 @@ static int wma_unified_phyerr_rx_event_handler(void *handle,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	wmi_host_phyerr_t phyerr;
 	uint16_t buf_offset = 0;
+	wmi_single_phyerr_rx_event *ev;
+	uint16_t event_buf_len = 0;
+	wmi_host_phyerr_t phyerr2;
+	bool spectralscan = false;
 
 	if (NULL == wma) {
 		WMA_LOGE("%s:wma handle is NULL", __func__);
@@ -2788,7 +2792,29 @@ static int wma_unified_phyerr_rx_event_handler(void *handle,
 				__func__);
 		return QDF_STATUS_E_FAILURE;
 	}
-
+	ev = (wmi_single_phyerr_rx_event *)phyerr.bufp;
+	event_buf_len = phyerr.buf_len;
+	/* Loop over the bufp, extracting out phyerrors */
+	buf_offset = 0;
+	while (ev && (buf_offset < event_buf_len)) {
+		if (wma_extract_single_phyerr_spectral(handle, ev,
+						       event_buf_len,
+						       &buf_offset,
+						       &phyerr2)) {
+			WMA_LOGE("%s: extract single phy err failed", __func__);
+			return QDF_STATUS_E_FAILURE;
+		}
+		if ((buf_offset != 0) && (phyerr2.phy_err_code == 0x26 ||
+					  phyerr2.phy_err_code == 0x24)) {
+			spectralscan = true;
+		} else {
+			break;
+		}
+	}
+	if (spectralscan) {
+		status = spectral_phyerr_event_handler(wma, data, datalen);
+		return status;
+	}
 	/* handle different PHY Error conditions */
 	if (((phyerr.phy_err_mask0 & (WMI_PHY_ERROR_MASK0_RADAR |
 				WMI_PHY_ERROR_MASK0_FALSE_RADAR_EXT |
