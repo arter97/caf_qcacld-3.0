@@ -108,6 +108,7 @@
 #define HDD_FINISH_ULA_TIME_OUT         800
 #define HDD_SET_MCBC_FILTERS_TO_FW      1
 #define HDD_DELETE_MCBC_FILTERS_FROM_FW 0
+#define HDD_UT_SUSPEND_RESUME_LOG_RL (1024)
 
 /* To Validate Channel against the Frequency and Vice-Versa */
 static const struct ccp_freq_chan_map freq_chan_map[] = {
@@ -10784,15 +10785,26 @@ static int __iw_set_two_ints_getnone(struct net_device *dev,
 	case WE_SET_MON_MODE_CHAN:
 		ret = wlan_hdd_set_mon_chan(adapter, value[1], value[2]);
 		break;
-	case WE_SET_WLAN_SUSPEND: {
-		hdd_info("STA unit-test suspend(%d, %d)", value[1], value[2]);
+
+	case WE_SET_WLAN_SUSPEND:
+		if (!hdd_ctx->config->is_unit_test_framework_enabled) {
+			hdd_warn_ratelimited(HDD_UT_SUSPEND_RESUME_LOG_RL,
+					     "UT suspend is disabled");
+			return 0;
+		}
 		ret = hdd_wlan_fake_apps_suspend(hdd_ctx->wiphy, dev,
 						 value[1], value[2]);
 		break;
-	}
+
 	case WE_SET_WLAN_RESUME:
+		if (!hdd_ctx->config->is_unit_test_framework_enabled) {
+			hdd_warn_ratelimited(HDD_UT_SUSPEND_RESUME_LOG_RL,
+					     "UT resume is disabled");
+			return 0;
+		}
 		ret = hdd_wlan_fake_apps_resume(hdd_ctx->wiphy, dev);
 		break;
+
 	case WE_LOG_BUFFER: {
 		int log_id = value[1];
 		uint32_t count = value[2] < 0 ? 0 : value[2];
