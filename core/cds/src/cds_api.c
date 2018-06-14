@@ -854,6 +854,7 @@ QDF_STATUS cds_pre_enable(void)
 		if ((!cds_is_fw_down()) && (!cds_is_self_recovery_enabled()))
 			QDF_BUG(0);
 
+		wma_wmi_stop();
 		htc_stop(gp_cds_context->htc_ctx);
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -861,6 +862,7 @@ QDF_STATUS cds_pre_enable(void)
 	if (cdp_pdev_post_attach(soc, gp_cds_context->pdev_txrx_ctx)) {
 		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_FATAL,
 			"Failed to attach pdev");
+		wma_wmi_stop();
 		htc_stop(gp_cds_context->htc_ctx);
 		QDF_ASSERT(0);
 		return QDF_STATUS_E_FAILURE;
@@ -1117,6 +1119,7 @@ QDF_STATUS cds_post_disable(void)
 	hif_reset_soc(hif_ctx);
 
 	if (gp_cds_context->htc_ctx) {
+		wma_wmi_stop();
 		htc_stop(gp_cds_context->htc_ctx);
 	}
 
