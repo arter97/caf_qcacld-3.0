@@ -14439,6 +14439,22 @@ enum hdd_external_acs_freq_band {
 #define CFG_CHANNEL_SELECT_LOGIC_CONC_DEFAULT (0x00000003)
 
 /*
+ * <ini>
+ * gEnableUnitTestFramework - Enable/Disable unit test framework
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * Usage: Internal (only for dev and test team)
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_UNIT_TEST_FRAMEWORK_NAME    "gEnableUnitTestFramework"
+#define CFG_ENABLE_UNIT_TEST_FRAMEWORK_MIN     (0)
+#define CFG_ENABLE_UNIT_TEST_FRAMEWORK_MAX     (1)
+#define CFG_ENABLE_UINT_TEST_FRAMEWORK_DEFAULT (0)
+
+/*
  * Type declarations
  */
 struct hdd_config {
@@ -15352,6 +15368,7 @@ struct hdd_config {
 	bool enable_dtim_selection_diversity;
 	uint32_t channel_select_logic_conc;
 	bool enable_bt_chain_separation;
+	bool is_unit_test_framework_enabled;
 };
 
 #define VAR_OFFSET(_Struct, _Var) (offsetof(_Struct, _Var))
