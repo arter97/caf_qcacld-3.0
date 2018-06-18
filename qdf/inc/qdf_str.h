@@ -129,6 +129,17 @@ static inline qdf_size_t qdf_str_len(const char *str)
 void qdf_str_right_trim(char *str);
 
 /**
+ * qdf_str_newline_trim() - Trim trailing newline character from @str
+ * @str: the string to trim
+ *
+ * Note: The final trailing newline character is replaced with a
+ * null-terminator
+ *
+ * Return: None
+ */
+void qdf_str_newline_trim(char *str);
+
+/**
  * qdf_str_trim() - Trim any leading/trailing whitespace from @str
  * @str: the string to trim
  *
