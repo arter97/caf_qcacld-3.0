@@ -4841,7 +4841,8 @@ static int __iw_set_bitrate(struct net_device *dev,
 	hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	hdd_wext_state_t *pWextState;
 	hdd_station_ctx_t *pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
-	uint8_t supp_rates[WNI_CFG_SUPPORTED_RATES_11A_LEN];
+	uint8_t supp_rates[WNI_CFG_SUPPORTED_RATES_11A_LEN +
+			   WNI_CFG_SUPPORTED_RATES_11B_LEN];
 	uint32_t a_len = WNI_CFG_SUPPORTED_RATES_11A_LEN;
 	uint32_t b_len = WNI_CFG_SUPPORTED_RATES_11B_LEN;
 	uint32_t i, rate;
@@ -4877,7 +4878,8 @@ static int __iw_set_bitrate(struct net_device *dev,
 				     &a_len) == QDF_STATUS_SUCCESS)
 			    &&
 			    (sme_cfg_get_str(WLAN_HDD_GET_HAL_CTX(pAdapter),
-				     WNI_CFG_SUPPORTED_RATES_11B, supp_rates,
+				     WNI_CFG_SUPPORTED_RATES_11B,
+				     supp_rates + a_len,
 				     &b_len) == QDF_STATUS_SUCCESS)) {
 				for (i = 0; i < (b_len + a_len); ++i) {
 					/* supported rates returned is double
@@ -5891,66 +5893,52 @@ return_cached_results:
 	return QDF_STATUS_SUCCESS;
 }
 
+struct station_stats {
+	tCsrSummaryStatsInfo summary_stats;
+	tCsrGlobalClassAStatsInfo class_a_stats;
+	struct csr_per_chain_rssi_stats_info per_chain_rssi_stats;
+};
+
 /**
  * hdd_get_station_statistics_cb() - Get stats callback function
- * @pStats: pointer to Class A stats
- * @pContext: user context originally registered with SME
+ * @stats: pointer to combined station stats
+ * @context: user context originally registered with SME (always the
+ *	cookie from the request context)
  *
  * Return: None
  */
-static void hdd_get_station_statistics_cb(void *pStats, void *pContext)
+static void hdd_get_station_statistics_cb(void *stats, void *context)
 {
-	struct statsContext *pStatsContext;
-	tCsrSummaryStatsInfo *pSummaryStats;
-	tCsrGlobalClassAStatsInfo *pClassAStats;
+	struct hdd_request *request;
+	struct station_stats *priv;
+	tCsrSummaryStatsInfo *summary_stats;
+	tCsrGlobalClassAStatsInfo *class_a_stats;
 	struct csr_per_chain_rssi_stats_info *per_chain_rssi_stats;
-	hdd_adapter_t *pAdapter;
 
-	if ((NULL == pStats) || (NULL == pContext)) {
-		hdd_err("Bad param, pStats [%pK] pContext [%pK]",
-			pStats, pContext);
+	if (NULL == stats) {
+		hdd_err("Bad param, pStats [%p]", stats);
 		return;
 	}
 
-	/* there is a race condition that exists between this callback
-	 * function and the caller since the caller could time out
-	 * either before or while this code is executing.  we use a
-	 * spinlock to serialize these actions
-	 */
-	spin_lock(&hdd_context_lock);
+	request = hdd_request_get(context);
+	if (!request) {
+		hdd_err("Obsolete request");
+		return;
+	}
 
-	pSummaryStats = (tCsrSummaryStatsInfo *) pStats;
-	pClassAStats = (tCsrGlobalClassAStatsInfo *) (pSummaryStats + 1);
+	summary_stats = (tCsrSummaryStatsInfo *) stats;
+	class_a_stats = (tCsrGlobalClassAStatsInfo *) (summary_stats + 1);
 	per_chain_rssi_stats = (struct csr_per_chain_rssi_stats_info *)
-				(pClassAStats + 1);
-	pStatsContext = pContext;
-	pAdapter = pStatsContext->pAdapter;
-	if ((NULL == pAdapter) ||
-	    (STATS_CONTEXT_MAGIC != pStatsContext->magic)) {
-		/* the caller presumably timed out so there is nothing
-		 * we can do
-		 */
-		spin_unlock(&hdd_context_lock);
-		hdd_warn("Invalid context, pAdapter [%pK] magic [%08x]",
-			 pAdapter, pStatsContext->magic);
-		return;
-	}
-
-	/* context is valid so caller is still waiting */
-
-	/* paranoia: invalidate the magic */
-	pStatsContext->magic = 0;
+				(class_a_stats + 1);
+	priv = hdd_request_priv(request);
 
 	/* copy over the stats. do so as a struct copy */
-	pAdapter->hdd_stats.summary_stat = *pSummaryStats;
-	pAdapter->hdd_stats.ClassA_stat = *pClassAStats;
-	pAdapter->hdd_stats.per_chain_rssi_stats = *per_chain_rssi_stats;
+	priv->summary_stats = *summary_stats;
+	priv->class_a_stats = *class_a_stats;
+	priv->per_chain_rssi_stats = *per_chain_rssi_stats;
 
-	/* notify the caller */
-	complete(&pStatsContext->completion);
-
-	/* serialization is complete */
-	spin_unlock(&hdd_context_lock);
+	hdd_request_complete(request);
+	hdd_request_put(request);
 }
 
 /**
@@ -5963,18 +5951,26 @@ QDF_STATUS wlan_hdd_get_station_stats(hdd_adapter_t *pAdapter)
 {
 	hdd_station_ctx_t *pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
 	QDF_STATUS hstatus;
-	unsigned long rc;
-	static struct statsContext context;
+	int ret;
+	void *cookie;
+	struct hdd_request *request;
+	struct station_stats *priv;
+	static const struct hdd_request_params params = {
+		.priv_size = sizeof(*priv),
+		.timeout_ms = WLAN_WAIT_TIME_STATS,
+	};
 
 	if (NULL == pAdapter) {
 		hdd_err("pAdapter is NULL");
 		return QDF_STATUS_SUCCESS;
 	}
 
-	/* we are connected so prepare our callback context */
-	init_completion(&context.completion);
-	context.pAdapter = pAdapter;
-	context.magic = STATS_CONTEXT_MAGIC;
+	request = hdd_request_alloc(&params);
+	if (!request) {
+		hdd_err("Request allocation failure");
+		return QDF_STATUS_E_NOMEM;
+	}
+	cookie = hdd_request_cookie(request);
 
 	/* query only for Summary & Class A statistics */
 	hstatus = sme_get_statistics(WLAN_HDD_GET_HAL_CTX(pAdapter),
@@ -5986,36 +5982,32 @@ QDF_STATUS wlan_hdd_get_station_stats(hdd_adapter_t *pAdapter)
 				     0, /* not periodic */
 				     false, /* non-cached results */
 				     pHddStaCtx->conn_info.staId[0],
-				     &context, pAdapter->sessionId);
+				     cookie, pAdapter->sessionId);
 	if (QDF_STATUS_SUCCESS != hstatus) {
 		hdd_err("Unable to retrieve statistics");
 		/* we'll return with cached values */
 	} else {
 		/* request was sent -- wait for the response */
-		rc = wait_for_completion_timeout
-			(&context.completion,
-			 msecs_to_jiffies(WLAN_WAIT_TIME_STATS));
-
-		if (!rc)
-			hdd_err("SME timed out while retrieving statistics");
+		ret = hdd_request_wait_for_response(request);
+		if (ret) {
+			hdd_warn("SME timed out while retrieving statistics");
+			/* we'll returned a cached value below */
+		} else {
+			/* update the adapter with the fresh results */
+			priv = hdd_request_priv(request);
+			pAdapter->hdd_stats.summary_stat = priv->summary_stats;
+			pAdapter->hdd_stats.ClassA_stat = priv->class_a_stats;
+			pAdapter->hdd_stats.per_chain_rssi_stats =
+				priv->per_chain_rssi_stats;
+		}
 	}
 
-	/* either we never sent a request, we sent a request and
-	 * received a response or we sent a request and timed out.  if
-	 * we never sent a request or if we sent a request and got a
-	 * response, we want to clear the magic out of paranoia.  if
-	 * we timed out there is a race condition such that the
-	 * callback function could be executing at the same time we
-	 * are. of primary concern is if the callback function had
-	 * already verified the "magic" but had not yet set the
-	 * completion variable when a timeout occurred. we serialize
-	 * these activities by invalidating the magic while holding a
-	 * shared spinlock which will cause us to block if the
-	 * callback is currently executing
+	/*
+	 * either we never sent a request, we sent a request and
+	 * received a response or we sent a request and timed out.
+	 * regardless we are done with the request.
 	 */
-	spin_lock(&hdd_context_lock);
-	context.magic = 0;
-	spin_unlock(&hdd_context_lock);
+	hdd_request_put(request);
 
 	/* either callback updated pAdapter stats or it has cached data */
 	return QDF_STATUS_SUCCESS;
@@ -11449,6 +11441,38 @@ int wlan_hdd_set_filter(hdd_context_t *hdd_ctx,
 }
 
 /**
+ * validate_packet_filter_params_size() - Validate the size of the params rcvd
+ * @priv_data: Pointer to the priv data from user space
+ * @request: Pointer to the struct containing the copied data from user space
+ *
+ * Return: False on invalid length, true otherwise
+ */
+static bool validate_packet_filter_params_size(struct pkt_filter_cfg *request,
+						uint16_t length)
+{
+	int max_params_size, rcvd_params_size;
+
+	max_params_size = HDD_MAX_CMP_PER_PACKET_FILTER *
+					sizeof(struct pkt_filter_param_cfg);
+
+	if (length < sizeof(struct pkt_filter_cfg) - max_params_size) {
+		hdd_err("Less than minimum number of arguments needed");
+		return false;
+	}
+
+	rcvd_params_size = request->num_params *
+					sizeof(struct pkt_filter_param_cfg);
+
+	if (length != sizeof(struct pkt_filter_cfg) -
+					max_params_size + rcvd_params_size) {
+		hdd_err("Arguments do not match the number of params provided");
+		return false;
+	}
+
+	return true;
+}
+
+/**
  * __iw_set_packet_filter_params() - set packet filter parameters in target
  * @dev: Pointer to netdev
  * @info: Pointer to iw request info
@@ -11484,8 +11508,7 @@ static int __iw_set_packet_filter_params(struct net_device *dev,
 		return -EINVAL;
 	}
 
-	if ((NULL == priv_data.pointer) || (0 == priv_data.length) ||
-	   priv_data.length < sizeof(struct pkt_filter_cfg)) {
+	if ((NULL == priv_data.pointer) || (0 == priv_data.length)) {
 		hdd_err("invalid priv data %pK or invalid priv data length %d",
 			priv_data.pointer, priv_data.length);
 		return -EINVAL;
@@ -11505,9 +11528,16 @@ static int __iw_set_packet_filter_params(struct net_device *dev,
 	/* copy data using copy_from_user */
 	request = mem_alloc_copy_from_user_helper(priv_data.pointer,
 						   priv_data.length);
+
 	if (NULL == request) {
 		hdd_err("mem_alloc_copy_from_user_helper fail");
 		return -ENOMEM;
+	}
+
+	if (!validate_packet_filter_params_size(request, priv_data.length)) {
+		hdd_err("Invalid priv data length %d", priv_data.length);
+		qdf_mem_free(request);
+		return -EINVAL;
 	}
 
 	if (request->filter_action == HDD_RCV_FILTER_SET)
