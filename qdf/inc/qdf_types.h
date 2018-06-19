@@ -599,11 +599,13 @@ void qdf_vtrace_msg(QDF_MODULE_ID module, QDF_TRACE_LEVEL level,
 
 #else /* CONFIG_MCL */
 
-#define qdf_print printk
+#define qdf_print(args...) \
+	qdf_trace_msg(QDF_MODULE_ID_ANY, QDF_TRACE_LEVEL_INFO, ## args)
 #define qdf_alert printk
 #define qdf_err printk
 #define qdf_warn printk
-#define qdf_info printk
+#define qdf_info(args...) \
+	qdf_trace_msg(QDF_MODULE_ID_ANY, QDF_TRACE_LEVEL_INFO, ## args)
 #define qdf_debug printk
 
 #endif /* CONFIG_MCL */

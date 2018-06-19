@@ -1508,19 +1508,22 @@ int wmi_unified_register_event(wmi_unified_t wmi_handle,
 
 	if (event_id >= wmi_events_max ||
 		wmi_handle->wmi_events[event_id] == WMI_EVENT_ID_INVALID) {
-		qdf_print("%s: Event id %d is unavailable\n",
-				 __func__, event_id);
+		QDF_TRACE(QDF_MODULE_ID_WMI, QDF_TRACE_LEVEL_ERROR,
+			  "%s: Event id %d is unavailable",
+					__func__, event_id);
 		return QDF_STATUS_E_FAILURE;
 	}
 	evt_id = wmi_handle->wmi_events[event_id];
 	if (wmi_unified_get_event_handler_ix(wmi_handle, evt_id) != -1) {
-		qdf_print("%s : event handler already registered 0x%x\n",
-		       __func__, evt_id);
+		QDF_TRACE(QDF_MODULE_ID_WMI, QDF_TRACE_LEVEL_ERROR,
+			  "%s : event handler already registered 0x%x",
+				__func__, evt_id);
 		return QDF_STATUS_E_FAILURE;
 	}
 	if (soc->max_event_idx == WMI_UNIFIED_MAX_EVENT) {
-		qdf_print("%s : no more event handlers 0x%x\n",
-		       __func__, evt_id);
+		QDF_TRACE(QDF_MODULE_ID_WMI, QDF_TRACE_LEVEL_ERROR,
+			  "%s : no more event handlers 0x%x",
+					__func__, evt_id);
 		return QDF_STATUS_E_FAILURE;
 	}
 	idx = soc->max_event_idx;
@@ -1555,8 +1558,9 @@ int wmi_unified_register_event_handler(wmi_unified_t wmi_handle,
 
 	if (event_id >= wmi_events_max ||
 		wmi_handle->wmi_events[event_id] == WMI_EVENT_ID_INVALID) {
-		qdf_print("%s: Event id %d is unavailable\n",
-				 __func__, event_id);
+		QDF_TRACE(QDF_MODULE_ID_WMI, QDF_TRACE_LEVEL_ERROR,
+			  "%s: Event id %d is unavailable",
+					__func__, event_id);
 		return QDF_STATUS_E_FAILURE;
 	}
 	evt_id = wmi_handle->wmi_events[event_id];
@@ -1601,8 +1605,9 @@ int wmi_unified_unregister_event(wmi_unified_t wmi_handle,
 
 	if (event_id >= wmi_events_max ||
 		wmi_handle->wmi_events[event_id] == WMI_EVENT_ID_INVALID) {
-		qdf_print("%s: Event id %d is unavailable\n",
-				 __func__, event_id);
+		QDF_TRACE(QDF_MODULE_ID_WMI, QDF_TRACE_LEVEL_ERROR,
+			  "%s: Event id %d is unavailable",
+					__func__, event_id);
 		return QDF_STATUS_E_FAILURE;
 	}
 	evt_id = wmi_handle->wmi_events[event_id];

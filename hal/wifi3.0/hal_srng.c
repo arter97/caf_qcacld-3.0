@@ -546,9 +546,9 @@ static int hal_get_srng_ring_id(struct hal_soc *hal, int ring_type,
 	int ring_id;
 
 	if (ring_num >= ring_config->max_rings) {
-		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			"%s: ring_num exceeded maximum no. of supported rings\n",
-			__func__);
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO,
+			  "%s: ring_num exceeded maximum no. of supported rings\n",
+			  __func__);
 		/* TODO: This is a programming error. Assert if this happens */
 		return -EINVAL;
 	}
@@ -1190,16 +1190,16 @@ void *hal_srng_setup(void *hal_soc, int ring_type, int ring_num,
 	if (ring_id < 0)
 		return NULL;
 
-	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			 "%s: mac_id %d ring_id %d\n",
-			 __func__, mac_id, ring_id);
+	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO,
+		  "%s: mac_id %d ring_id %d\n",
+		  __func__, mac_id, ring_id);
 
 	srng = hal_get_srng(hal_soc, ring_id);
 
 	if (srng->initialized) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			"%s: Ring (ring_type, ring_num) already initialized\n",
-			__func__);
+			  "%s: Ring (ring_type, ring_num) already initialized\n",
+			  __func__);
 		return NULL;
 	}
 

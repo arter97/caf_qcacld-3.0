@@ -1736,8 +1736,8 @@ dp_rx_pdev_attach(struct dp_pdev *pdev)
 	struct rx_desc_pool *rx_desc_pool;
 
 	if (wlan_cfg_get_dp_pdev_nss_enabled(pdev->wlan_cfg_ctx)) {
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			"nss-wifi<4> skip Rx refil %d", pdev_id);
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
+			  "nss-wifi<4> skip Rx refil %d", pdev_id);
 		return QDF_STATUS_SUCCESS;
 	}
 

@@ -520,14 +520,14 @@ int htt_srng_setup(void *htt_soc, int mac_id, void *hal_srng,
 			goto fail1;
 		}
 
-		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			 "%s: ring_type %d ring_id %d\n",
-			 __func__, hal_ring_type, srng_params.ring_id);
-		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			 "%s: hp_addr 0x%llx tp_addr 0x%llx\n",
-			 __func__, (uint64_t)hp_addr, (uint64_t)tp_addr);
-		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			 "%s: htt_ring_id %d\n", __func__, htt_ring_id);
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO,
+			  "%s: ring_type %d ring_id %d\n",
+			  __func__, hal_ring_type, srng_params.ring_id);
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO,
+			  "%s: hp_addr 0x%llx tp_addr 0x%llx\n",
+			  __func__, (uint64_t)hp_addr, (uint64_t)tp_addr);
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO,
+			  "%s: htt_ring_id %d\n", __func__, htt_ring_id);
 		break;
 	case RXDMA_MONITOR_BUF:
 		htt_ring_id = HTT_RXDMA_MONITOR_BUF_RING;
@@ -585,8 +585,8 @@ int htt_srng_setup(void *htt_soc, int mac_id, void *hal_srng,
 	else
 		HTT_SRING_SETUP_PDEV_ID_SET(*msg_word, mac_id);
 
-	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			 "%s: mac_id %d\n", __func__, mac_id);
+	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO,
+		  "%s: mac_id %d\n", __func__, mac_id);
 	HTT_SRING_SETUP_RING_TYPE_SET(*msg_word, htt_ring_type);
 	/* TODO: Discuss with FW on changing this to unique ID and using
 	 * htt_ring_type to send the type of ring
@@ -611,14 +611,14 @@ int htt_srng_setup(void *htt_soc, int mac_id, void *hal_srng,
 	HTT_SRING_SETUP_ENTRY_SIZE_SET(*msg_word, ring_entry_size);
 	HTT_SRING_SETUP_RING_SIZE_SET(*msg_word,
 		(ring_entry_size * srng_params.num_entries));
-	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			 "%s: entry_size %d\n", __func__,
+	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO,
+		  "%s: entry_size %d\n", __func__,
 			 ring_entry_size);
-	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			 "%s: num_entries %d\n", __func__,
+	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO,
+		  "%s: num_entries %d\n", __func__,
 			 srng_params.num_entries);
-	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			 "%s: ring_size %d\n", __func__,
+	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO,
+		  "%s: ring_size %d\n", __func__,
 			 (ring_entry_size * srng_params.num_entries));
 	if (htt_ring_type == HTT_SW_TO_HW_RING)
 		HTT_SRING_SETUP_RING_MISC_CFG_FLAG_LOOPCOUNT_DISABLE_SET(

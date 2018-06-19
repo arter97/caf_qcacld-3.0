@@ -2106,6 +2106,7 @@ struct category_name_info g_qdf_category_name[MAX_SUPPORTED_CATEGORY] = {
 	[QDF_MODULE_ID_MGMT_TXRX] = {"MGMT_TXRX"},
 	[QDF_MODULE_ID_PMO] = {"PMO"},
 	[QDF_MODULE_ID_POLICY_MGR] = {"POLICY_MGR"},
+	[QDF_MODULE_ID_SA_API] = {"SA_API"},
 	[QDF_MODULE_ID_NAN] = {"NAN"},
 	[QDF_MODULE_ID_SPECTRAL] = {"SPECTRAL"},
 	[QDF_MODULE_ID_P2P] = {"P2P"},
@@ -2602,7 +2603,7 @@ static void set_default_trace_levels(struct category_info *cinfo)
 		[QDF_MODULE_ID_EXTAP] = QDF_TRACE_LEVEL_NONE,
 		[QDF_MODULE_ID_FD] = QDF_TRACE_LEVEL_ERROR,
 		[QDF_MODULE_ID_OCB] = QDF_TRACE_LEVEL_ERROR,
-		[QDF_MODULE_ID_ANY] = QDF_TRACE_LEVEL_NONE,
+		[QDF_MODULE_ID_ANY] = QDF_TRACE_LEVEL_INFO,
 	};
 
 	for (i = 0; i < MAX_SUPPORTED_CATEGORY; i++) {
