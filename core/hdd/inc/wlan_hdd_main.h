@@ -116,6 +116,8 @@
 #define TDLS_INIT_DONE         (6)
 #define ACS_PENDING            (7)
 #define SOFTAP_INIT_DONE       (8)
+/* Interface went down during SSR*/
+#define DOWN_DURING_SSR        (9)
 
 /* HDD global event flags */
 #define ACS_IN_PROGRESS        (0)
