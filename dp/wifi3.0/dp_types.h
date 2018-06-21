@@ -489,6 +489,8 @@ struct dp_rx_tid {
 	uint32_t delba_tx_fail_cnt;
 	uint32_t delba_tx_count;
 
+	/* Delba reason code for retries */
+	uint8_t delba_rcode;
 };
 
 /* per interrupt context  */
@@ -1436,6 +1438,17 @@ struct dp_peer {
 	void *ol_peer;
 
 	qdf_atomic_t is_default_route_set;
+
+	/* Active Block ack sessions */
+	uint16_t active_ba_session_cnt;
+
+	/* Current HW buffersize setting */
+	uint16_t hw_buffer_size;
+
+	/* Flag to check if sessions with 256 buffersize
+	 * should be terminated.
+	 */
+	uint8_t kill_256_sessions;
 };
 
 #ifdef CONFIG_WIN

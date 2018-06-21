@@ -691,7 +691,8 @@ struct ol_if_ops {
 			bool hash_based, uint8_t ring_num);
 	int (*peer_rx_reorder_queue_setup)(void *scn_handle,
 			uint8_t vdev_id, uint8_t *peer_mac,
-			qdf_dma_addr_t hw_qdesc, int tid, uint16_t queue_num);
+			qdf_dma_addr_t hw_qdesc, int tid, uint16_t queue_num,
+			uint8_t ba_window_size_valid, uint16_t ba_window_size);
 	int (*peer_rx_reorder_queue_remove)(void *scn_handle,
 			uint8_t vdev_id, uint8_t *peer_macaddr,
 			uint32_t tid_mask);
@@ -731,7 +732,9 @@ struct ol_if_ops {
 	int (*peer_sta_kickout)(void *osif_pdev, uint8_t *peer_macaddr);
 
 	int (*send_delba)(void *pdev_handle,  void *ol_peer,
-			  uint8_t *peer_macaddr, uint8_t tid);
+			 uint8_t *peer_macaddr,
+			 uint8_t tid,
+			 uint8_t reason_code);
 	/* TODO: Add any other control path calls required to OL_IF/WMA layer */
 };
 
