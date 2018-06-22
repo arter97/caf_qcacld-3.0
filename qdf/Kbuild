@@ -43,7 +43,8 @@ linux/src/qdf_module.o    \
 linux/src/qdf_nbuf.o       \
 linux/src/qdf_perf.o        \
 linux/src/qdf_threads.o     \
-linux/src/qdf_trace.o
+linux/src/qdf_trace.o	    \
+src/qdf_str.o
 #linux/src/qdf_net.o \
 #linux/src/qdf_net_event.o \
 #linux/src/qdf_net_ioctl.o

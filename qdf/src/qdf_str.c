@@ -31,3 +31,11 @@ void qdf_str_right_trim(char *str)
 }
 qdf_export_symbol(qdf_str_right_trim);
 
+void qdf_str_newline_trim(char *str)
+{
+	char *end = str + qdf_str_len(str) - 1;
+
+	if (*end == '\n')
+		*end = '\0';
+}
+qdf_export_symbol(qdf_str_newline_trim);

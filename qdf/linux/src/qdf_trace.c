@@ -315,6 +315,10 @@ void qdf_trace_msg(QDF_MODULE_ID module, QDF_TRACE_LEVEL level,
 {
 	va_list val;
 
+	/* Remove trailing newline character if present from string as
+	 * qdf_trace_msg_cmn will append newline character to input string
+	 */
+	qdf_str_newline_trim(str_format);
 	va_start(val, str_format);
 	qdf_trace_msg_cmn(qdf_pidx, module, level, str_format, val);
 	va_end(val);
@@ -2697,12 +2701,6 @@ QDF_STATUS qdf_print_set_category_verbose(unsigned int idx,
 		print_ctrl_obj[idx].cat_info[category].category_verbose_mask |=
 				QDF_TRACE_LEVEL_TO_MODULE_BITMASK(verbose);
 	}
-
-	pr_info("%s: Print control object %d, Category %d, Verbose level %d\n",
-		__func__,
-		idx,
-		category,
-		print_ctrl_obj[idx].cat_info[category].category_verbose_mask);
 
 	return QDF_STATUS_SUCCESS;
 }

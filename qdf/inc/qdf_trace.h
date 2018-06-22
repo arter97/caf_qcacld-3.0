@@ -40,6 +40,8 @@
 #include  <qdf_status.h>
 #include  <qdf_nbuf.h>
 #include  <i_qdf_types.h>
+#include <qdf_debugfs.h>
+#include <qdf_str.h>
 
 /* Type declarations */
 
