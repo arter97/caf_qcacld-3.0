@@ -3370,6 +3370,11 @@ enum station_keepalive_method {
 #define CFG_QOS_WMM_MODE_MAX                           (2)  /* HDD_WMM_NO_QOS */
 #define CFG_QOS_WMM_MODE_DEFAULT                       (0)  /* HDD_WMM_AUTO */
 
+#define CFG_STA_LOCAL_EDCA_FOR_ETSI_NAME                "gStaLocalEDCAForETSI"
+#define CFG_STA_LOCAL_EDCA_FOR_ETSI_MIN                 (0)
+#define CFG_STA_LOCAL_EDCA_FOR_ETSI_MAX                 (1)
+#define CFG_STA_LOCAL_EDCA_FOR_ETSI_DEFAULT             (0)
+
 /*
  * <ini>
  * 80211eIsEnabled - Enable 802.11e feature
@@ -12283,6 +12288,7 @@ struct hdd_config {
 
 	/* WMM QoS Configuration */
 	enum hdd_wmm_user_mode WmmMode;
+	uint8_t g_local_edca_enable;
 	bool b80211eIsEnabled;
 	uint8_t UapsdMask;      /* what ACs to setup U-APSD for at assoc */
 	uint32_t InfraUapsdVoSrvIntv;

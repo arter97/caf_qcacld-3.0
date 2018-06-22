@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2015,2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -60,6 +60,7 @@ extern void sch_qos_update_local(tpAniSirGlobal pMac, tpPESession psessionEntry)
 extern void sch_edca_profile_update(tpAniSirGlobal pMac,
 				    tpPESession psessionEntry);
 
+void sch_edca_profile_update_all(tpAniSirGlobal pmac);
 /* / Set the fixed fields in a beacon frame */
 extern tSirRetStatus sch_set_fixed_beacon_fields(tpAniSirGlobal pMac,
 						 tpPESession psessionEntry);
@@ -72,6 +73,10 @@ extern void sch_initializeCfPollTemplate(tpAniSirGlobal pMac);
 
 /* / Initialize CF End template */
 extern void sch_initializeCfEndTemplate(tpAniSirGlobal pMac);
+
+extern tSirRetStatus sch_get_params(tpAniSirGlobal pMac, uint32_t params[][WNI_CFG_EDCA_ANI_ACBK_LOCAL_LEN], uint8_t local);
+
+extern void set_sch_edca_params(tpAniSirGlobal pMac, uint32_t params[][WNI_CFG_EDCA_ANI_ACBK_LOCAL_LEN], tpPESession psessionEntry);
 
 /* / Process the scheduler messages */
 extern void sch_process_message(tpAniSirGlobal pMac, tpSirMsgQ pSchMsg);

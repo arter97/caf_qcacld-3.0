@@ -992,6 +992,13 @@ struct reg_table_entry g_registry_table[] = {
 		     CFG_QOS_WMM_MODE_MIN,
 		     CFG_QOS_WMM_MODE_MAX),
 
+	REG_VARIABLE(CFG_STA_LOCAL_EDCA_FOR_ETSI_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, g_local_edca_enable,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_STA_LOCAL_EDCA_FOR_ETSI_DEFAULT,
+		     CFG_STA_LOCAL_EDCA_FOR_ETSI_MIN,
+		     CFG_STA_LOCAL_EDCA_FOR_ETSI_MAX),
+
 	REG_VARIABLE(CFG_QOS_WMM_80211E_ENABLED_NAME, WLAN_PARAM_Integer,
 		     struct hdd_config, b80211eIsEnabled,
 		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -8067,7 +8074,7 @@ QDF_STATUS hdd_set_sme_config(hdd_context_t *pHddCtx)
 	smeConfig->csrConfig.Is11eSupportEnabled = pConfig->b80211eIsEnabled;
 	smeConfig->csrConfig.WMMSupportMode =
 		hdd_to_csr_wmm_mode(pConfig->WmmMode);
-
+	smeConfig->csrConfig.g_local_edca_enable = pConfig->g_local_edca_enable;
 	smeConfig->rrmConfig.rrm_enabled = pConfig->fRrmEnable;
 	smeConfig->rrmConfig.max_randn_interval = pConfig->nRrmRandnIntvl;
 	hdd_hex_string_to_u8_array(pConfig->rm_capability,

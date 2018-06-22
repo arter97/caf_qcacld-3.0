@@ -406,20 +406,6 @@ struct linkspeedContext {
 	unsigned int magic;
 };
 
-/**
- * struct random_mac_context - Context used with hdd_random_mac_callback
- * @random_mac_completion: Event on which hdd_set_random_mac will wait
- * @adapter: Pointer to adapter
- * @magic: For valid context this is set to ACTION_FRAME_RANDOM_CONTEXT_MAGIC
- * @set_random_addr: Status of random filter set
- */
-struct random_mac_context {
-	struct completion random_mac_completion;
-	hdd_adapter_t *adapter;
-	unsigned int magic;
-	bool set_random_addr;
-};
-
 extern spinlock_t hdd_context_lock;
 extern struct mutex hdd_init_deinit_lock;
 
@@ -1037,6 +1023,7 @@ struct hdd_ap_ctx_s {
 
 	/* Fw txrx stats info */
 	struct hdd_fw_txrx_stats txrx_stats;
+	qdf_atomic_t acs_in_progress;
 };
 
 typedef struct hdd_scaninfo_s {
@@ -2012,7 +1999,6 @@ struct hdd_context_s {
 	/* mutex lock to block concurrent access */
 	struct mutex power_stats_lock;
 #endif
-	qdf_atomic_t is_acs_allowed;
 };
 
 int hdd_validate_channel_and_bandwidth(hdd_adapter_t *adapter,

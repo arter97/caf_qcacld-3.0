@@ -1168,6 +1168,7 @@ typedef struct tagCsrConfigParam {
 	eCsrBand bandCapability;     /* indicate hw capability */
 	uint16_t TxRate;
 	eCsrRoamWmmUserModeType WMMSupportMode;
+	uint8_t g_local_edca_enable;
 	bool Is11eSupportEnabled;
 	bool Is11dSupportEnabled;
 	bool Is11dSupportEnabledOriginal;
