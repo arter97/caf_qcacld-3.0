@@ -1051,9 +1051,9 @@ void hdd_send_wiphy_regd_sync_event(struct hdd_context *hdd_ctx)
 			  regd_rules[i].power_rule.max_eirp,
 			  regd_rules[i].flags);
 	}
-	rtnl_lock();
-	regulatory_set_wiphy_regd_sync_rtnl(hdd_ctx->wiphy, regd);
-	rtnl_unlock();
+
+	regulatory_set_wiphy_regd(hdd_ctx->wiphy, regd);
+
 	hdd_debug("regd sync event sent with reg rules info");
 	qdf_mem_free(regd);
 }
