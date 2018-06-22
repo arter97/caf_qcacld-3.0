@@ -771,16 +771,16 @@ static int dp_srng_setup(struct dp_soc *soc, struct dp_srng *srng,
 
 	if (soc->intr_mode == DP_INTR_MSI) {
 		dp_srng_msi_setup(soc, &ring_params, ring_type, ring_num);
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			FL("Using MSI for ring_type: %d, ring_num %d"),
-			ring_type, ring_num);
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
+			  FL("Using MSI for ring_type: %d, ring_num %d"),
+			  ring_type, ring_num);
 
 	} else {
 		ring_params.msi_data = 0;
 		ring_params.msi_addr = 0;
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			FL("Skipping MSI for ring_type: %d, ring_num %d"),
-			ring_type, ring_num);
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
+			  FL("Skipping MSI for ring_type: %d, ring_num %d"),
+			  ring_type, ring_num);
 	}
 
 	/*
@@ -2220,7 +2220,7 @@ static int dp_soc_cmn_setup(struct dp_soc *soc)
 		soc->num_reo_dest_rings =
 			wlan_cfg_num_reo_dest_rings(soc->wlan_cfg_ctx);
 		QDF_TRACE(QDF_MODULE_ID_DP,
-			QDF_TRACE_LEVEL_ERROR,
+			QDF_TRACE_LEVEL_INFO,
 			FL("num_reo_dest_rings %d\n"), soc->num_reo_dest_rings);
 		for (i = 0; i < soc->num_reo_dest_rings; i++) {
 			if (dp_srng_setup(soc, &soc->reo_dest_ring[i], REO_DST,
@@ -3282,8 +3282,8 @@ static void dp_soc_set_nss_cfg_wifi3(struct cdp_soc_t *cdp_soc, int config)
 		wlan_cfg_set_num_tx_ext_desc(wlan_cfg_ctx, 0);
 	}
 
-	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-				FL("nss-wifi<0> nss config is enabled"));
+	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
+		  FL("nss-wifi<0> nss config is enabled"));
 }
 
 static void dp_batch_intr_attach(struct dp_soc *soc)

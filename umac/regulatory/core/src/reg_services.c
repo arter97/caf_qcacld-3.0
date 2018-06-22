@@ -1732,7 +1732,7 @@ uint32_t reg_freq_to_chan(struct wlan_objmgr_pdev *pdev,
 		if (chan_list[count].center_freq == freq)
 			return chan_list[count].chan_num;
 
-	reg_err("invalid frequency %d", freq);
+	reg_notice("invalid frequency %d", freq);
 
 	return 0;
 }

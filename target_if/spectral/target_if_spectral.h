@@ -40,7 +40,7 @@
 #endif
 
 #define spectral_log(level, args...) \
-QDF_PRINT_INFO(QDF_PRINT_IDX_SHARED, QDF_MODULE_ID_SPECTRAL, level, ## args)
+QDF_TRACE(QDF_MODULE_ID_SPECTRAL, level, ## args)
 
 #define spectral_logfl(level, format, args...) \
 		spectral_log(level, FL(format), ## args)
