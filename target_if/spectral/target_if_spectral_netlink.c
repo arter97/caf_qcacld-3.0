@@ -126,6 +126,8 @@ target_if_spectral_create_samp_msg(struct target_if_spectral *spectral,
 		spec_samp_msg->freq_loading = params->freq_loading;
 		samp_data->spectral_data_len = params->datalen;
 		samp_data->spectral_rssi = params->rssi;
+		samp_data->spectral_agc_total_gain = params->agc_total_gain;
+		samp_data->spectral_gainchange = params->gainchange;
 		samp_data->ch_width = spectral->ch_width;
 
 		samp_data->spectral_combined_rssi =
@@ -207,6 +209,10 @@ target_if_spectral_create_samp_msg(struct target_if_spectral *spectral,
 		    params->rssi_sec80;
 		samp_data->noise_floor_sec80 =
 		    params->noise_floor_sec80;
+		spec_samp_msg->samp_data.spectral_agc_total_gain_sec80 =
+			params->agc_total_gain_sec80;
+		spec_samp_msg->samp_data.spectral_gainchange_sec80 =
+			params->gainchange_sec80;
 
 		samp_data->spectral_data_len_sec80 =
 		    params->datalen_sec80;
