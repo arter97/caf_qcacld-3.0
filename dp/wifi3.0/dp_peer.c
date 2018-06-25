@@ -1856,7 +1856,6 @@ int dp_addba_requestprocess_wifi3(void *peer_handle,
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 			 "%s: Rx Tid- %d hw qdesc is already setup",
 			__func__, tid);
-		qdf_spin_unlock_bh(&rx_tid->tid_lock);
 		return QDF_STATUS_E_FAILURE;
 	}
 
