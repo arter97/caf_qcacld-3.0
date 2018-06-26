@@ -12273,6 +12273,8 @@ static void populate_pdev_param_tlv(uint32_t *pdev_param)
 				WMI_PDEV_PARAM_NAV_OVERRIDE_CONFIG;
 	pdev_param[wmi_pdev_param_ul_ppdu_duration] =
 				WMI_PDEV_PARAM_SET_UL_PPDU_DURATION;
+	pdev_param[wmi_pdev_param_equal_ru_allocation_enable] =
+				WMI_PDEV_PARAM_EQUAL_RU_ALLOCATION_ENABLE;
 }
 
 /**
