@@ -23450,6 +23450,8 @@ static void populate_pdev_param_tlv(uint32_t *pdev_param)
 	pdev_param[wmi_pdev_param_cck_tx_enable] = WMI_PDEV_PARAM_CCK_TX_ENABLE;
 	pdev_param[wmi_pdev_param_antenna_gain_half_db] =
 		WMI_PDEV_PARAM_ANTENNA_GAIN_HALF_DB;
+	pdev_param[wmi_pdev_param_equal_ru_allocation_enable] =
+				WMI_PDEV_PARAM_EQUAL_RU_ALLOCATION_ENABLE;
 }
 
 /**

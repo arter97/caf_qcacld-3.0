@@ -1241,6 +1241,8 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_ISOLATION = 365,
 	OL_ATH_BCN_STATS_RESET = 368,
 	OL_ATH_PARAM_TWICE_ANTENNA_GAIN = 369,
+	OL_ATH_PARAM_HE_UL_RU_ALLOCATION = 370,
+
 };
 
 /* Enumeration of PDEV Configuration parameter */
