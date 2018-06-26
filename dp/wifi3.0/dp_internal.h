@@ -130,7 +130,14 @@ while (0)
 { \
 	_handle_a->stats._field = _handle_b->stats._field; \
 }
+#define DP_HIST_INIT()
+#define DP_HIST_PACKET_COUNT_INC(_pdev_id)
+#define DP_TX_HISTOGRAM_UPDATE(_pdev, _p_cntrs)
+#define DP_RX_HISTOGRAM_UPDATE(_pdev, _p_cntrs)
+#define DP_RX_HIST_STATS_PER_PDEV()
+#define DP_TX_HIST_STATS_PER_PDEV()
 
+#else
 #define DP_HIST_INIT() \
 	uint32_t num_of_packets[MAX_PDEV_CNT] = {0};
 
@@ -219,7 +226,6 @@ while (0)
 	}  while (0)
 
 
-#else
 #define DP_STATS_INC(_handle, _field, _delta)
 #define DP_STATS_INCC(_handle, _field, _delta, _cond)
 #define DP_STATS_DEC(_handle, _field, _delta)
@@ -228,12 +234,6 @@ while (0)
 #define DP_STATS_INCC_PKT(_handle, _field, _count, _bytes, _cond)
 #define DP_STATS_AGGR(_handle_a, _handle_b, _field)
 #define DP_STATS_AGGR_PKT(_handle_a, _handle_b, _field)
-#define DP_HIST_INIT()
-#define DP_HIST_PACKET_COUNT_INC(_pdev_id)
-#define DP_TX_HISTOGRAM_UPDATE(_pdev, _p_cntrs)
-#define DP_RX_HISTOGRAM_UPDATE(_pdev, _p_cntrs)
-#define DP_RX_HIST_STATS_PER_PDEV()
-#define DP_TX_HIST_STATS_PER_PDEV()
 #endif
 
 #define DP_HTT_T2H_HP_PIPE 5

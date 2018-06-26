@@ -196,8 +196,9 @@ struct qdf_nbuf_cb {
 					unsigned char *lro_ctx;
 				} priv_cb_m;
 			} dev;
-			uint32_t msdu_len;
-			uint32_t peer_mdata;
+			uint32_t map_index;
+			uint16_t msdu_len;
+			uint16_t peer_id;
 			uint32_t lro_eligible:1,
 				peer_cached_buf_frm:1,
 				tcp_proto:1,
@@ -212,7 +213,11 @@ struct qdf_nbuf_cb {
 			uint8_t flag_chfrag_start:1,
 				flag_chfrag_cont:1,
 				flag_chfrag_end:1,
-				rsrvd:5;
+				flag_da_mcbc:1,
+				flag_da_valid:1,
+				flag_sa_valid:1,
+				flag_is_frag:1,
+				rsrvd:1;
 			union {
 				uint8_t packet_state;
 				uint8_t dp_trace:1,
@@ -313,8 +318,8 @@ QDF_COMPILE_TIME_ASSERT(qdf_nbuf_cb_size,
 #define QDF_NBUF_CB_RX_FLOW_ID(skb) \
 	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.flow_id)
 
-#define QDF_NBUF_CB_RX_PEER_MDATA(skb) \
-	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.peer_mdata)
+#define QDF_NBUF_CB_RX_PEER_ID(skb) \
+	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.peer_id)
 
 #define QDF_NBUF_CB_RX_PKT_LEN(skb) \
 	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.msdu_len)
@@ -336,6 +341,22 @@ QDF_COMPILE_TIME_ASSERT(qdf_nbuf_cb_size,
 #define QDF_NBUF_CB_RX_CHFRAG_END(skb) \
 		(((struct qdf_nbuf_cb *) \
 		((skb)->cb))->u.rx.flag_chfrag_end)
+
+#define QDF_NBUF_CB_RX_DA_MCBC(skb) \
+	(((struct qdf_nbuf_cb *) \
+	((skb)->cb))->u.rx.flag_da_mcbc)
+
+#define QDF_NBUF_CB_RX_DA_VALID(skb) \
+	(((struct qdf_nbuf_cb *) \
+	((skb)->cb))->u.rx.flag_da_valid)
+
+#define QDF_NBUF_CB_RX_SA_VALID(skb) \
+	(((struct qdf_nbuf_cb *) \
+	((skb)->cb))->u.rx.flag_sa_valid)
+
+#define QDF_NBUF_CB_RX_IS_FRAG(skb) \
+	(((struct qdf_nbuf_cb *) \
+	((skb)->cb))->u.rx.flag_is_frag)
 
 #define QDF_NBUF_UPDATE_TX_PKT_COUNT(skb, PACKET_STATE) \
 	qdf_nbuf_set_state(skb, PACKET_STATE)
@@ -536,6 +557,29 @@ typedef void (*qdf_nbuf_free_t)(__qdf_nbuf_t);
 #define __qdf_nbuf_is_rx_chfrag_end(skb) \
 	(QDF_NBUF_CB_RX_CHFRAG_END((skb)))
 
+#define __qdf_nbuf_set_da_mcbc(skb, val) \
+	((QDF_NBUF_CB_RX_DA_MCBC((skb))) = val)
+
+#define __qdf_nbuf_is_da_mcbc(skb) \
+	(QDF_NBUF_CB_RX_DA_MCBC((skb)))
+
+#define __qdf_nbuf_set_da_valid(skb, val) \
+	((QDF_NBUF_CB_RX_DA_VALID((skb))) = val)
+
+#define __qdf_nbuf_is_da_valid(skb) \
+	(QDF_NBUF_CB_RX_DA_VALID((skb)))
+
+#define __qdf_nbuf_set_sa_valid(skb, val) \
+	((QDF_NBUF_CB_RX_SA_VALID((skb))) = val)
+
+#define __qdf_nbuf_is_sa_valid(skb) \
+	(QDF_NBUF_CB_RX_SA_VALID((skb)))
+
+#define __qdf_nbuf_set_is_frag(skb, val) \
+	((QDF_NBUF_CB_RX_IS_FRAG((skb))) = val)
+
+#define __qdf_nbuf_is_frag(skb) \
+	(QDF_NBUF_CB_RX_IS_FRAG((skb)))
 
 #define __qdf_nbuf_set_tx_chfrag_start(skb, val) \
 	((QDF_NBUF_CB_TX_EXTRA_FRAG_FLAGS_CHFRAG_START((skb))) = val)
