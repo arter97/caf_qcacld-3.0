@@ -5584,6 +5584,10 @@ QDF_STATUS cds_get_pcl(enum cds_con_mode mode,
 		cds_err("HDD context is NULL");
 		return status;
 	}
+	if ((mode < 0) || (mode >= CDS_MAX_NUM_OF_MODE)) {
+		cds_err("Incorrect concurrency mode:%d recieved", mode);
+		return status;
+	}
 
 	if (mode >= CDS_MAX_NUM_OF_MODE) {
 		cds_err("requested mode:%d is not supported", mode);
@@ -9183,6 +9187,23 @@ static enum cds_conc_next_action cds_get_current_pref_hw_mode(void)
 	qdf_mutex_release(&cds_ctx->qdf_conc_list_lock);
 	return next_action;
 
+}
+
+QDF_STATUS cds_stop_opportunistic_timer(void)
+{
+	p_cds_contextType cds_ctx;
+
+	cds_ctx = cds_get_global_context();
+	if (!cds_ctx) {
+		cds_err("Invalid CDS context");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (cds_ctx->dbs_opportunistic_timer.state != QDF_TIMER_STATE_RUNNING)
+		return QDF_STATUS_SUCCESS;
+
+	qdf_mc_timer_stop(&cds_ctx->dbs_opportunistic_timer);
+	return QDF_STATUS_SUCCESS;
 }
 
 /**

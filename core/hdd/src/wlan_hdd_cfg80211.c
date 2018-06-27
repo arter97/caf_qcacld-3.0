@@ -1607,10 +1607,17 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	if (status)
 		return status;
 
+	if (!((adapter->device_mode == QDF_SAP_MODE) ||
+	      (adapter->device_mode == QDF_P2P_GO_MODE))) {
+		hdd_err("Invalid device mode %d", adapter->device_mode);
+		return -EINVAL;
+	}
+
 	if (cds_is_sub_20_mhz_enabled()) {
 		hdd_err("ACS not supported in sub 20 MHz ch wd.");
 		return -EINVAL;
 	}
+
 	if (qdf_atomic_read(&adapter->sessionCtx.ap.acs_in_progress) > 0) {
 		hdd_err("ACS rejected as previous req already in progress");
 		return -EINVAL;
@@ -4903,6 +4910,12 @@ __wlan_hdd_cfg80211_get_wifi_info(struct wiphy *wiphy,
 			"FW:%d.%d.%d.%d.%d HW:%s", major_spid, minor_spid,
 			siid, crmid, sub_id, hw_version);
 		skb_len += strlen(firmware_version) + 1;
+		count++;
+	}
+
+	if (tb_vendor[QCA_WLAN_VENDOR_ATTR_WIFI_INFO_RADIO_INDEX]) {
+		hdd_debug("Rcvd req for Radio index");
+		skb_len += sizeof(uint32_t);
 		count++;
 	}
 
