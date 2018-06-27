@@ -9933,14 +9933,19 @@ static int hdd_features_init(struct hdd_context *hdd_ctx, struct hdd_adapter *ad
 	QDF_STATUS status;
 	struct sme_5g_band_pref_params band_pref_params;
 	int ret;
+	struct hdd_config *cfg;
 
 	ENTER();
 
+	cfg = hdd_ctx->config;
 	/* FW capabilities received, Set the Dot11 mode */
 	sme_setdef_dot11mode(hdd_ctx->hHal);
 	sme_set_prefer_80MHz_over_160MHz(hdd_ctx->hHal,
-			hdd_ctx->config->sta_prefer_80MHz_over_160MHz);
+					 cfg->sta_prefer_80MHz_over_160MHz);
 
+	sme_set_etsi13_srd_ch_in_master_mode(hdd_ctx->hHal,
+					     cfg->
+					     etsi13_srd_chan_in_master_mode);
 
 	if (hdd_ctx->config->fIsImpsEnabled)
 		hdd_set_idle_ps_config(hdd_ctx, true);

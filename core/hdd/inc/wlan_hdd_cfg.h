@@ -9268,6 +9268,30 @@ enum dot11p_mode {
 
 /*
  * <ini>
+ * etsi13_srd_chan_in_master_mode - Enable/disable ETSI SRD channels in
+ * master mode PCL and ACS functionality
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * etsi13_srd_chan_in_master_mode is to enable/disable ETSI SRD channels in
+ * master mode PCL and ACS functionality
+ *
+ * Related: None
+ *
+ * Supported Feature: SAP/P2P-GO
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+#define CFG_ETSI13_SRD_CHAN_IN_MASTER_MODE    "etsi13_srd_chan_in_master_mode"
+#define CFG_ETSI13_SRD_CHAN_IN_MASTER_MODE_DEF (0)
+#define CFG_ETSI13_SRD_CHAN_IN_MASTER_MODE_MIN (0)
+#define CFG_ETSI13_SRD_CHAN_IN_MASTER_MODE_MAX (1)
+
+/*
+ * <ini>
  * gEnable_go_cts2self_for_sta - Indicate firmware to stop NOA and
  * start using cts2self
  * @Min: 1
@@ -15075,6 +15099,7 @@ struct hdd_config {
 	bool fastpath_enable;
 #endif
 	uint8_t dot11p_mode;
+	bool etsi13_srd_chan_in_master_mode;
 	uint8_t rx_mode;
 	uint8_t cpu_map_list[CFG_RPS_RX_QUEUE_CPU_MAP_LIST_LEN];
 #ifdef FEATURE_WLAN_EXTSCAN
