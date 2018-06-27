@@ -3884,14 +3884,16 @@ int ol_txrx_fw_stats_desc_pool_init(struct ol_txrx_pdev_t *pdev,
 
 	for (i = 0; i < (pool_size - 1); i++) {
 		pdev->ol_txrx_fw_stats_desc_pool.pool[i].desc.desc_id = i;
+		pdev->ol_txrx_fw_stats_desc_pool.pool[i].desc.req = NULL;
 		pdev->ol_txrx_fw_stats_desc_pool.pool[i].next =
 			&pdev->ol_txrx_fw_stats_desc_pool.pool[i + 1];
 	}
 	pdev->ol_txrx_fw_stats_desc_pool.pool[i].desc.desc_id = i;
+	pdev->ol_txrx_fw_stats_desc_pool.pool[i].desc.req = NULL;
 	pdev->ol_txrx_fw_stats_desc_pool.pool[i].next = NULL;
+	qdf_spinlock_create(&pdev->ol_txrx_fw_stats_desc_pool.pool_lock);
 	qdf_atomic_init(&pdev->ol_txrx_fw_stats_desc_pool.initialized);
 	qdf_atomic_set(&pdev->ol_txrx_fw_stats_desc_pool.initialized, 1);
-	qdf_spinlock_create(&pdev->ol_txrx_fw_stats_desc_pool.pool_lock);
 	return 0;
 }
 
@@ -3911,7 +3913,11 @@ void ol_txrx_fw_stats_desc_pool_deinit(struct ol_txrx_pdev_t *pdev)
 		return;
 	}
 	if (!qdf_atomic_read(&pdev->ol_txrx_fw_stats_desc_pool.initialized)) {
-		ol_txrx_err("%s: Pool deinitialized", __func__);
+		ol_txrx_err("%s: Pool is not initialized", __func__);
+		return;
+	}
+	if (!pdev->ol_txrx_fw_stats_desc_pool.pool) {
+		ol_txrx_err("%s: Pool is not allocated", __func__);
 		return;
 	}
 
@@ -3923,7 +3929,7 @@ void ol_txrx_fw_stats_desc_pool_deinit(struct ol_txrx_pdev_t *pdev)
 			qdf_mem_free(desc->desc.req);
 	}
 	qdf_mem_free(pdev->ol_txrx_fw_stats_desc_pool.pool);
-		pdev->ol_txrx_fw_stats_desc_pool.pool = NULL;
+	pdev->ol_txrx_fw_stats_desc_pool.pool = NULL;
 
 	pdev->ol_txrx_fw_stats_desc_pool.freelist = NULL;
 	pdev->ol_txrx_fw_stats_desc_pool.pool_size = 0;
@@ -3988,6 +3994,7 @@ struct ol_txrx_stats_req_internal *ol_txrx_fw_stats_desc_get_req(struct ol_txrx_
 	}
 	desc_elem = &pdev->ol_txrx_fw_stats_desc_pool.pool[desc_id];
 	req = desc_elem->desc.req;
+	desc_elem->desc.req = NULL;
 	desc_elem->next =
 		pdev->ol_txrx_fw_stats_desc_pool.freelist;
 	pdev->ol_txrx_fw_stats_desc_pool.freelist = desc_elem;
@@ -4074,7 +4081,7 @@ ol_txrx_fw_stats_handler(ol_txrx_pdev_handle pdev,
 	int more = 0;
 	int found = 0;
 
-	if (!cookie || cookie < 0 || cookie >= FW_STATS_DESC_POOL_SIZE) {
+	if (cookie >= FW_STATS_DESC_POOL_SIZE) {
 		ol_txrx_err("%s: Cookie is not valid", __func__);
 		return;
 	}
