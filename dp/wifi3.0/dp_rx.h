@@ -33,6 +33,7 @@
 #define RX_BUFFER_RESERVATION   0
 
 #define MAX_L2_HDR_OFFSET       4
+#define ETH_L2_HDR_OFFSET       2
 
 #define DP_PEER_METADATA_PEER_ID_MASK	0x0000ffff
 #define DP_PEER_METADATA_PEER_ID_SHIFT	0
@@ -394,24 +395,10 @@ dp_rx_wds_srcport_learn(struct dp_soc *soc,
 	if (qdf_unlikely(!ta_peer))
 		return;
 
-	/* For AP mode : Do wds source port learning only if it is a
-	 * 4-address mpdu
-	 *
-	 * For STA mode : Frames from RootAP backend will be in 3-address mode,
-	 * till RootAP does the WDS source port learning; Hence in repeater/STA
-	 * mode, we enable learning even in 3-address mode , to avoid RootAP
-	 * backbone getting wrongly learnt as MEC on repeater
-	 */
-	if (ta_peer->vdev->opmode != wlan_op_mode_sta) {
-		if (!(qdf_nbuf_is_rx_chfrag_start(nbuf) &&
-					hal_rx_get_mpdu_mac_ad4_valid(rx_tlv_hdr)))
-			return;
-	}
-
 	memcpy(wds_src_mac, (qdf_nbuf_data(nbuf) + IEEE80211_ADDR_LEN),
 		IEEE80211_ADDR_LEN);
 
-	if (qdf_unlikely(!hal_rx_msdu_end_sa_is_valid_get(rx_tlv_hdr))) {
+	if (qdf_unlikely(!qdf_nbuf_is_sa_valid(nbuf))) {
 		ret = dp_peer_add_ast(soc,
 					ta_peer,
 					wds_src_mac,
@@ -419,6 +406,19 @@ dp_rx_wds_srcport_learn(struct dp_soc *soc,
 					flags);
 		return;
 
+	} else if (ta_peer->vdev->opmode != wlan_op_mode_sta) {
+		if (!(qdf_nbuf_is_rx_chfrag_start(nbuf) &&
+					hal_rx_get_mpdu_mac_ad4_valid(rx_tlv_hdr)))
+			/* For AP mode : Do wds source port learning only if it is a
+			 * 4-address mpdu
+			 *
+			 * For STA mode : Frames from RootAP backend will be in 3-address mode,
+			 * till RootAP does the WDS source port learning; Hence in repeater/STA
+			 * mode, we enable learning even in 3-address mode , to avoid RootAP
+			 * backbone getting wrongly learnt as MEC on repeater
+			 */
+
+			return;
 	}
 
 	/*
@@ -797,7 +797,7 @@ QDF_STATUS dp_rx_filter_mesh_packets(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 					uint8_t *rx_tlv_hdr);
 
 int dp_wds_rx_policy_check(uint8_t *rx_tlv_hdr, struct dp_vdev *vdev,
-				struct dp_peer *peer, int rx_mcast);
+				struct dp_peer *peer);
 
 qdf_nbuf_t
 dp_rx_nbuf_prepare(struct dp_soc *soc, struct dp_pdev *pdev);
