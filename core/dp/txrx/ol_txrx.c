@@ -4007,9 +4007,10 @@ ol_txrx_fw_stats_get(ol_txrx_vdev_handle vdev, struct ol_txrx_stats_req *req,
 			bool per_vdev, bool response_expected)
 {
 	struct ol_txrx_pdev_t *pdev = vdev->pdev;
-	uint8_t cookie;
+	uint8_t cookie =  FW_STATS_DESC_POOL_SIZE;
 	struct ol_txrx_stats_req_internal *non_volatile_req;
-	struct ol_txrx_fw_stats_desc_t *desc;
+	struct ol_txrx_fw_stats_desc_t *desc = NULL;
+	struct ol_txrx_fw_stats_desc_elem_t *elem = NULL;
 
 	if (!pdev ||
 	    req->stats_type_upload_mask >= 1 << HTT_DBG_NUM_STATS ||
@@ -4029,18 +4030,17 @@ ol_txrx_fw_stats_get(ol_txrx_vdev_handle vdev, struct ol_txrx_stats_req *req,
 	non_volatile_req->base = *req;
 	non_volatile_req->serviced = 0;
 	non_volatile_req->offset = 0;
-
-	desc = ol_txrx_fw_stats_desc_alloc(pdev);
-	if (!desc) {
-		qdf_mem_free(non_volatile_req);
-		return A_ERROR;
-	}
-
-	/* use the desc id as the cookie */
-	cookie = desc->desc_id;
-	desc->req = non_volatile_req;
-
 	if (response_expected) {
+		desc = ol_txrx_fw_stats_desc_alloc(pdev);
+		if (!desc) {
+			qdf_mem_free(non_volatile_req);
+			return A_ERROR;
+		}
+
+		/* use the desc id as the cookie */
+		cookie = desc->desc_id;
+		desc->req = non_volatile_req;
+
 		qdf_spin_lock_bh(&pdev->req_list_spinlock);
 		TAILQ_INSERT_TAIL(&pdev->req_list, non_volatile_req, req_list_elem);
 		pdev->req_list_depth++;
@@ -4054,9 +4054,24 @@ ol_txrx_fw_stats_get(ol_txrx_vdev_handle vdev, struct ol_txrx_stats_req *req,
 				  cookie)) {
 		if (response_expected) {
 			qdf_spin_lock_bh(&pdev->req_list_spinlock);
-			TAILQ_REMOVE(&pdev->req_list, non_volatile_req, req_list_elem);
+			TAILQ_REMOVE(&pdev->req_list, non_volatile_req,
+				     req_list_elem);
 			pdev->req_list_depth--;
 			qdf_spin_unlock_bh(&pdev->req_list_spinlock);
+			if (desc) {
+				qdf_spin_lock_bh(&pdev->ol_txrx_fw_stats_desc_pool.
+						 pool_lock);
+				desc->req = NULL;
+				elem = container_of(desc,
+						    struct ol_txrx_fw_stats_desc_elem_t,
+						    desc);
+				elem->next =
+					pdev->ol_txrx_fw_stats_desc_pool.freelist;
+				pdev->ol_txrx_fw_stats_desc_pool.freelist = elem;
+				qdf_spin_unlock_bh(&pdev->
+						   ol_txrx_fw_stats_desc_pool.
+						   pool_lock);
+			}
 		}
 
 		qdf_mem_free(non_volatile_req);
