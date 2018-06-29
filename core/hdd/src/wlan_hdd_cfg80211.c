@@ -18246,8 +18246,13 @@ static int __wlan_hdd_cfg80211_connect(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	if (true == wlan_hdd_reassoc_bssid_hint(pAdapter, req, &status))
+	/*
+	 * Check if this is reassoc to same bssid, if reassoc is success, return
+	 */
+	if (true == wlan_hdd_reassoc_bssid_hint(pAdapter, req, &status)) {
+		hdd_set_roaming_in_progress(true);
 		return status;
+	}
 
 	/* Try disconnecting if already in connected state */
 	status = wlan_hdd_try_disconnect(pAdapter);
