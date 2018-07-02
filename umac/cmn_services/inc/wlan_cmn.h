@@ -47,7 +47,7 @@
 #define WLAN_MAX_SEQ_NUM    4096
 
 /* Max no. of peers for STA vap */
-#define WLAN_UMAC_MAX_STA_PEERS 2
+#define WLAN_UMAC_MAX_STA_PEERS 4
 /* Max vdev_id */
 #define WLAN_UMAC_VDEV_ID_MAX 0xFF
 
