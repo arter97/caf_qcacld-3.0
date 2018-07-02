@@ -584,7 +584,7 @@ static int __hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	uint8_t proto_type = 0;
 #endif
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	bool is_arp;
+	bool is_arp = false;
 
 #ifdef QCA_WIFI_FTM
 	if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE) {
