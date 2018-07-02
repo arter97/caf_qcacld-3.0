@@ -1530,6 +1530,16 @@ done:
 		if (qdf_unlikely(qdf_nbuf_is_frag(nbuf))) {
 			qdf_nbuf_unmap_single(soc->osdev, nbuf, QDF_DMA_FROM_DEVICE);
 			rx_tlv_hdr = qdf_nbuf_data(nbuf);
+
+			qdf_nbuf_set_da_mcbc(nbuf,
+					hal_rx_msdu_end_da_is_mcbc_get(rx_tlv_hdr));
+
+			qdf_nbuf_set_da_valid(nbuf,
+					hal_rx_msdu_end_da_is_valid_get(rx_tlv_hdr));
+
+			qdf_nbuf_set_sa_valid(nbuf,
+					hal_rx_msdu_end_sa_is_valid_get(rx_tlv_hdr));
+
 			qdf_nbuf_pull_head(nbuf, RX_PKT_TLVS_LEN);
 		}
 		else if (qdf_unlikely(vdev->rx_decap_type ==
