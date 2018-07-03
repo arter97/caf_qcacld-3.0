@@ -75,7 +75,7 @@ do {                                                             \
 
 #define HTT_FRAMECTRL_DATATYPE 0x08
 #define HTT_PPDU_DESC_MAX_DEPTH 16
-#define DP_SCAN_PEER_ID 0
+#define DP_SCAN_PEER_ID 0xFFFF
 
 /*
  * dp_tx_stats_update() - Update per-peer statistics
