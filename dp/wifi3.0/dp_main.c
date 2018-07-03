@@ -5014,6 +5014,9 @@ static inline void dp_aggregate_pdev_stats(struct dp_pdev *pdev)
 	qdf_spin_lock_bh(&pdev->vdev_list_lock);
 	TAILQ_FOREACH(vdev, &pdev->vdev_list, vdev_list_elem) {
 
+		if (vdev->opmode == wlan_op_mode_monitor)
+			continue;
+
 		dp_aggregate_vdev_stats(vdev);
 		DP_UPDATE_STATS(pdev, vdev);
 
