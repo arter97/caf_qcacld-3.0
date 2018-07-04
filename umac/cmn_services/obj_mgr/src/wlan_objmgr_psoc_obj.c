@@ -1749,6 +1749,9 @@ qdf_list_t *wlan_objmgr_populate_logically_deleted_peerlist(
 	/* Iterate through peer list, get peer */
 	logical_del_peer_list = qdf_mem_malloc(sizeof(*logical_del_peer_list));
 	if (!logical_del_peer_list) {
+		qdf_spin_unlock_bh(&peer_list->peer_list_lock);
+		wlan_psoc_obj_unlock(psoc);
+
 		obj_mgr_err("failed to allocate list");
 		return NULL;
 	}
