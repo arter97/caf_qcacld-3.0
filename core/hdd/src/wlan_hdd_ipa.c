@@ -38,6 +38,8 @@
 #include "wlan_policy_mgr_api.h"
 #include "wlan_ipa_ucfg_api.h"
 
+#define HDD_IPA_TX_BLOCK_RATE 256
+
 void hdd_ipa_set_tx_flow_info(void)
 {
 	struct hdd_adapter *adapter;
@@ -360,8 +362,8 @@ void hdd_ipa_send_skb_to_network(qdf_nbuf_t skb, qdf_netdev_t dev)
 	unsigned int cpu_index;
 
 	if (hdd_validate_adapter(adapter)) {
-		QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
-			  "Invalid adapter: 0x%pK", adapter);
+		hdd_debug_ratelimited(HDD_IPA_TX_BLOCK_RATE,
+				      "Invalid adapter: 0x%pK", adapter);
 		kfree_skb(skb);
 		return;
 	}
