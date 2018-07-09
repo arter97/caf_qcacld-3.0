@@ -57,13 +57,29 @@ static void hdd_deinit_pdev_os_priv(struct wlan_objmgr_pdev *pdev)
 	wlan_cfg80211_scan_priv_deinit(pdev);
 }
 
-static void hdd_init_vdev_os_priv(struct hdd_adapter *adapter,
-	struct vdev_osif_priv *os_priv)
+static struct vdev_osif_priv *
+hdd_init_vdev_os_priv(struct hdd_adapter *adapter)
 {
+	struct vdev_osif_priv *os_priv;
+
+	os_priv = qdf_mem_malloc(sizeof(*os_priv));
+	if (!os_priv)
+		return NULL;
+
 	/* Initialize the vdev OS private structure*/
 	os_priv->wdev = adapter->dev->ieee80211_ptr;
 	os_priv->legacy_osif_priv = adapter;
 	wlan_cfg80211_tdls_priv_init(os_priv);
+
+	return os_priv;
+}
+
+static void hdd_deinit_vdev_os_priv(struct vdev_osif_priv *os_priv)
+{
+	if (os_priv) {
+		wlan_cfg80211_tdls_priv_deinit(os_priv);
+		qdf_mem_free(os_priv);
+	}
 }
 
 static void hdd_init_psoc_qdf_ctx(struct wlan_objmgr_psoc *psoc)
@@ -244,12 +260,11 @@ int hdd_objmgr_create_and_store_vdev(struct wlan_objmgr_pdev *pdev,
 		return -EINVAL;
 	}
 
-	osif_priv = qdf_mem_malloc(sizeof(*osif_priv));
+	osif_priv = hdd_init_vdev_os_priv(adapter);
 	if (!osif_priv) {
 		hdd_err("Failed to allocate osif_priv; out of memory");
 		return -ENOMEM;
 	}
-	hdd_init_vdev_os_priv(adapter, osif_priv);
 
 	vdev_params.opmode = adapter->device_mode;
 	vdev_params.osifp = osif_priv;
@@ -297,7 +312,7 @@ vdev_destroy:
 	wlan_objmgr_vdev_obj_delete(vdev);
 
 osif_priv_free:
-	qdf_mem_free(osif_priv);
+	hdd_deinit_vdev_os_priv(osif_priv);
 
 	return errno;
 }
@@ -320,10 +335,7 @@ int hdd_objmgr_release_and_destroy_vdev(struct hdd_adapter *adapter)
 	wlan_vdev_reset_ospriv(vdev);
 
 	QDF_BUG(osif_priv);
-	if (osif_priv) {
-		wlan_cfg80211_tdls_priv_deinit(osif_priv);
-		qdf_mem_free(osif_priv);
-	}
+	hdd_deinit_vdev_os_priv(osif_priv);
 
 	self_mac_addr = wlan_vdev_mlme_get_macaddr(vdev);
 	if (hdd_objmgr_remove_peer_object(vdev, self_mac_addr))
