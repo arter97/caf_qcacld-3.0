@@ -271,6 +271,14 @@ QDF_STATUS ucfg_ipa_wlan_evt(struct wlan_objmgr_pdev *pdev,
 			     enum wlan_ipa_wlan_event ipa_event_type,
 			     uint8_t *mac_addr);
 
+/**
+ * ucfg_ipa_is_fw_wdi_activated - Is FW WDI activated?
+ * @pdev: pdev obj
+ *
+ * Return: true if FW WDI activated, false otherwise
+ */
+bool ucfg_ipa_is_fw_wdi_activated(struct wlan_objmgr_pdev *pdev);
+
 #else
 
 static inline bool ucfg_ipa_is_present(void)
@@ -422,5 +430,10 @@ QDF_STATUS ucfg_ipa_wlan_evt(struct wlan_objmgr_pdev *pdev,
 	return QDF_STATUS_SUCCESS;
 }
 
+static inline
+bool ucfg_ipa_is_fw_wdi_activated(struct wlan_objmgr_pdev *pdev)
+{
+	return false;
+}
 #endif /* IPA_OFFLOAD */
 #endif /* _WLAN_IPA_UCFG_API_H_ */

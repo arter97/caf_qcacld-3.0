@@ -525,3 +525,27 @@ QDF_STATUS ipa_wlan_evt(struct wlan_objmgr_pdev *pdev, qdf_netdev_t net_dev,
 	return wlan_ipa_wlan_evt(net_dev, device_mode, sta_id, session_id,
 				 ipa_event_type, mac_addr);
 }
+
+/**
+ * ipa_is_fw_wdi_activated - Is FW WDI activated?
+ * @pdev: pdev obj
+ *
+ * Return: true if FW WDI activated, false otherwise
+ */
+bool ipa_is_fw_wdi_activated(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_ipa_priv *ipa_obj;
+
+	if (!ipa_config_is_enabled()) {
+		ipa_info("ipa is disabled");
+		return false;
+	}
+
+	ipa_obj = ipa_pdev_get_priv_obj(pdev);
+	if (!ipa_obj) {
+		ipa_err("IPA object is NULL");
+		return false;
+	}
+
+	return wlan_ipa_is_fw_wdi_activated(ipa_obj);
+}

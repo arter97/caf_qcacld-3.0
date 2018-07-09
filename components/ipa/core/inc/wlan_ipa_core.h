@@ -584,5 +584,12 @@ QDF_STATUS wlan_ipa_wlan_evt(qdf_netdev_t net_dev, uint8_t device_mode,
 			     enum wlan_ipa_wlan_event ipa_event_type,
 			     uint8_t *mac_addr);
 
+/**
+ * wlan_ipa_is_fw_wdi_activated() - Is FW WDI actived?
+ * @ipa_ctx: IPA contex
+ *
+ * Return: true if FW WDI actived, false otherwise
+ */
+bool wlan_ipa_is_fw_wdi_activated(struct wlan_ipa_priv *ipa_ctx);
 #endif /* IPA_OFFLOAD */
 #endif /* _WLAN_IPA_CORE_H_ */

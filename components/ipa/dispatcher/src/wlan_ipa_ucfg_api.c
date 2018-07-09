@@ -164,3 +164,8 @@ QDF_STATUS ucfg_ipa_wlan_evt(struct wlan_objmgr_pdev *pdev,
 	return ipa_wlan_evt(pdev, net_dev, device_mode, sta_id, session_id,
 			    ipa_event_type, mac_addr);
 }
+
+bool ucfg_ipa_is_fw_wdi_activated(struct wlan_objmgr_pdev *pdev)
+{
+	return ipa_is_fw_wdi_activated(pdev);
+}
