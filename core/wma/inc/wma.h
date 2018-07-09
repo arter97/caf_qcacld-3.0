@@ -111,6 +111,7 @@
 #define WMA_11P_CHANNEL_BEGIN           (170)
 #define WMA_11P_CHANNEL_END             (184)
 
+/* Deprecated logging macros, to be removed. Please do not use in new code */
 #define WMA_LOGD(args ...) \
 	QDF_TRACE(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_DEBUG, ## args)
 #define WMA_LOGI(args ...) \
@@ -122,6 +123,12 @@
 #define WMA_LOGP(args ...) \
 	QDF_TRACE(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_FATAL, ## args)
 #define wma_err_rl(params...) QDF_TRACE_ERROR_RL(QDF_MODULE_ID_WMA, params)
+
+#define wma_alert(params...) QDF_TRACE_FATAL(QDF_MODULE_ID_WMA, params)
+#define wma_err(params...) QDF_TRACE_ERROR(QDF_MODULE_ID_WMA, params)
+#define wma_warn(params...) QDF_TRACE_WARN(QDF_MODULE_ID_WMA, params)
+#define wma_info(params...) QDF_TRACE_INFO(QDF_MODULE_ID_WMA, params)
+#define wma_debug(params...) QDF_TRACE_DEBUG(QDF_MODULE_ID_WMA, params)
 
 #define WMA_DEBUG_ALWAYS
 
