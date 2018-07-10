@@ -591,5 +591,27 @@ QDF_STATUS wlan_ipa_wlan_evt(qdf_netdev_t net_dev, uint8_t device_mode,
  * Return: true if FW WDI actived, false otherwise
  */
 bool wlan_ipa_is_fw_wdi_activated(struct wlan_ipa_priv *ipa_ctx);
+
+/**
+ * wlan_ipa_uc_disconnect_ap() - send ap disconnect event
+ * @ipa_ctx: IPA context
+ * @net_dev: Interface net device
+ *
+ * Send disconnect ap event to IPA driver
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_ipa_uc_disconnect_ap(struct wlan_ipa_priv *ipa_ctx,
+				     qdf_netdev_t net_dev);
+
+/**
+ * wlan_ipa_cleanup_dev_iface() - Clean up net dev IPA interface
+ * @ipa_ctx: IPA context
+ * @net_dev: Interface net device
+ *
+ * Return: None
+ */
+void wlan_ipa_cleanup_dev_iface(struct wlan_ipa_priv *ipa_ctx,
+				qdf_netdev_t net_dev);
 #endif /* IPA_OFFLOAD */
 #endif /* _WLAN_IPA_CORE_H_ */

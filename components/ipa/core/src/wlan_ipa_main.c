@@ -526,12 +526,6 @@ QDF_STATUS ipa_wlan_evt(struct wlan_objmgr_pdev *pdev, qdf_netdev_t net_dev,
 				 ipa_event_type, mac_addr);
 }
 
-/**
- * ipa_is_fw_wdi_activated - Is FW WDI activated?
- * @pdev: pdev obj
- *
- * Return: true if FW WDI activated, false otherwise
- */
 bool ipa_is_fw_wdi_activated(struct wlan_objmgr_pdev *pdev)
 {
 	struct wlan_ipa_priv *ipa_obj;
@@ -548,4 +542,32 @@ bool ipa_is_fw_wdi_activated(struct wlan_objmgr_pdev *pdev)
 	}
 
 	return wlan_ipa_is_fw_wdi_activated(ipa_obj);
+}
+
+QDF_STATUS ipa_uc_disconnect_ap(struct wlan_objmgr_pdev *pdev,
+				qdf_netdev_t net_dev)
+{
+	struct wlan_ipa_priv *ipa_obj;
+
+	ipa_obj = ipa_pdev_get_priv_obj(pdev);
+	if (!ipa_obj) {
+		ipa_err("IPA object is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return wlan_ipa_uc_disconnect_ap(ipa_obj, net_dev);
+}
+
+void ipa_cleanup_dev_iface(struct wlan_objmgr_pdev *pdev,
+			   qdf_netdev_t net_dev)
+{
+	struct wlan_ipa_priv *ipa_obj;
+
+	ipa_obj = ipa_pdev_get_priv_obj(pdev);
+	if (!ipa_obj) {
+		ipa_err("IPA object is NULL");
+		return;
+	}
+
+	return wlan_ipa_cleanup_dev_iface(ipa_obj, net_dev);
 }
