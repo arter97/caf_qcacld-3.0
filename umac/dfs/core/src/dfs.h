@@ -920,6 +920,31 @@ struct dfs_event_log {
  *                                   radar affected subchannel instead of all
  *                                   bonding channels.
  * @dfs_cac_aborted:                 DFS cac is aborted.
+ * @dfs_host_wait_timer:             The timer that is started from host after
+ *                                   sending the average radar parameters.
+ *                                   Before this timeout host expects its dfs
+ *                                   status from fw.
+ * @dfs_average_pri:                 Average pri value of the received radar
+ *                                   pulses.
+ * @dfs_average_duration:            Average duration of the received radar
+ *                                   pulses.
+ * @dfs_average_sidx:                Average sidx of the received radar pulses.
+ * @dfs_is_host_wait_running:        Indicates if host dfs status wait timer is
+ *                                   running.
+ * @dfs_average_params_sent:         Indicates if host has sent the average
+ *                                   radar parameters.
+ * @dfs_no_res_from_fw:              Indicates no response from fw.
+ * @dfs_spoof_check_failed:          Indicates if the spoof check has failed.
+ * @dfs_spoof_test_done:             Indicates if the sppof test is done.
+ * @dfs_status_timeout_override:     Used to change the timeout value of
+ *                                   dfs_host_wait_timer.
+ * @dfs_min_sidx:                    Minimum sidx of the received radar pulses.
+ * @dfs_max_sidx:                    Maximum sidx of the received radar pulses.
+ * @dfs_seg_id:                      Segment ID of the radar hit channel.
+ * @dfs_is_chirp:                    Radar Chirp in pulse present or not.
+ * @dfs_bw_reduced:                  DFS bandwidth reduced channel bit.
+ * @dfs_freq_offset:                 Frequency offset where radar was found.
+ * @dfs_enhanced_bangradar:          DFS enhance bagradar bit for Full offload.
  */
 struct wlan_dfs {
 	uint32_t       dfs_debug_mask;
@@ -1021,6 +1046,13 @@ struct wlan_dfs {
 	uint16_t tx_leakage_threshold;
 	bool dfs_use_nol_subchannel_marking;
 	bool           dfs_cac_aborted;
+	uint32_t       dfs_min_sidx;
+	uint32_t       dfs_max_sidx;
+	uint8_t        dfs_seg_id;
+	uint8_t        dfs_is_chirp;
+	uint8_t        dfs_bw_reduced;
+	int32_t        dfs_freq_offset;
+	uint8_t        dfs_enhanced_bangradar;
 };
 
 /**

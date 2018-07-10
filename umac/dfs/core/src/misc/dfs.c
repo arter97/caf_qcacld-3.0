@@ -328,6 +328,7 @@ int dfs_attach(struct wlan_dfs *dfs)
 	dfs_cac_attach(dfs);
 	dfs_zero_cac_attach(dfs);
 	dfs_nol_attach(dfs);
+	dfs->dfs_use_nol_subchannel_marking = 1;
 
 	/*
 	 * Init of timer ,dfs_testtimer_task is required by both partial
@@ -669,6 +670,7 @@ int dfs_control(struct wlan_dfs *dfs,
 {
 	struct wlan_dfs_phyerr_param peout;
 	struct dfs_ioctl_params *dfsparams;
+	struct dfs_bangradar_enh_params *bangradar_enh_params;
 	int error = 0;
 	uint32_t val = 0;
 	struct dfsreq_nolinfo *nol;
@@ -721,6 +723,41 @@ int dfs_control(struct wlan_dfs *dfs,
 		if (!dfs_set_thresholds(dfs, DFS_PARAM_MAXLEN,
 					dfsparams->dfs_maxlen))
 			error = -EINVAL;
+		break;
+	case DFS_BANGRADAR_ENH:
+		if (insize < sizeof(struct dfs_bangradar_enh_params) ||
+		    !indata) {
+			dfs_debug(dfs, WLAN_DEBUG_DFS1,
+				  "insize = %d, expected = %zu bytes, indata = %pK",
+				  insize,
+				  sizeof(struct dfs_bangradar_enh_params),
+				  indata);
+			error = -EINVAL;
+			break;
+		}
+		bangradar_enh_params =
+				      (struct dfs_bangradar_enh_params *)indata;
+		if (bangradar_enh_params) {
+			dfs->dfs_seg_id = bangradar_enh_params->seg_id;
+			dfs->dfs_is_chirp = bangradar_enh_params->is_chirp;
+			dfs->dfs_freq_offset =
+					      bangradar_enh_params->freq_offset;
+			dfs->dfs_enhanced_bangradar = 1;
+
+			if (dfs->dfs_is_offload_enabled) {
+				error = dfs_fill_emulate_bang_radar_test
+							(dfs, SEG_ID_PRIMARY,
+							 &dfs_unit_test);
+			} else {
+				dfs->dfs_bangradar = 1;
+				dfs->wlan_radar_tasksched = 1;
+				qdf_timer_mod(&dfs->wlan_dfs_task_timer, 0);
+				error = 0;
+			}
+		} else {
+			dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS, "bangradar_enh_params is NULL");
+		}
+
 		break;
 	case DFS_GET_THRESH:
 		if (!outdata || !outsize ||
