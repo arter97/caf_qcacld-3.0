@@ -4618,7 +4618,7 @@ sir_convert_addts_req2_struct(tpAniSirGlobal pMac,
 
 		if (addts.num_WMMTCLAS) {
 			j = (uint8_t) (pAddTs->numTclas + addts.num_WMMTCLAS);
-			if (SIR_MAC_TCLASIE_MAXNUM > j)
+			if (SIR_MAC_TCLASIE_MAXNUM < j)
 				j = SIR_MAC_TCLASIE_MAXNUM;
 
 			for (i = pAddTs->numTclas; i < j; ++i) {
@@ -4778,7 +4778,7 @@ sir_convert_addts_rsp2_struct(tpAniSirGlobal pMac,
 
 		if (addts.num_WMMTCLAS) {
 			j = (uint8_t) (pAddTs->numTclas + addts.num_WMMTCLAS);
-			if (SIR_MAC_TCLASIE_MAXNUM > j)
+			if (SIR_MAC_TCLASIE_MAXNUM < j)
 				j = SIR_MAC_TCLASIE_MAXNUM;
 
 			for (i = pAddTs->numTclas; i < j; ++i) {
