@@ -2250,6 +2250,7 @@ dp_get_completion_indication_for_stack(struct dp_soc *soc,
 	uint32_t ppdu_id = ts->ppdu_id;
 	uint8_t first_msdu = ts->first_msdu;
 	uint8_t last_msdu = ts->last_msdu;
+	struct ether_header *eh;
 
 	if (qdf_unlikely(!pdev->tx_sniffer_enable && !pdev->mcopy_mode))
 		return QDF_STATUS_E_NOSUPPORT;
@@ -2273,6 +2274,8 @@ dp_get_completion_indication_for_stack(struct dp_soc *soc,
 		pdev->m_copy_id.tx_peer_id = peer_id;
 	}
 
+	eh = (struct ether_header *)qdf_nbuf_data(netbuf);
+
 	if (!qdf_nbuf_push_head(netbuf, sizeof(struct tx_capture_hdr))) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 				FL("No headroom"));
@@ -2281,10 +2284,15 @@ dp_get_completion_indication_for_stack(struct dp_soc *soc,
 
 	ppdu_hdr = (struct tx_capture_hdr *)qdf_nbuf_data(netbuf);
 	qdf_mem_copy(ppdu_hdr->ta, peer->vdev->mac_addr.raw,
-			IEEE80211_ADDR_LEN);
+		     IEEE80211_ADDR_LEN);
+	if (peer->bss_peer) {
+		qdf_mem_copy(ppdu_hdr->ra, eh->ether_dhost, IEEE80211_ADDR_LEN);
+	} else {
+		qdf_mem_copy(ppdu_hdr->ra, peer->mac_addr.raw,
+			     IEEE80211_ADDR_LEN);
+	}
+
 	ppdu_hdr->ppdu_id = ppdu_id;
-	qdf_mem_copy(ppdu_hdr->ra, peer->mac_addr.raw,
-			IEEE80211_ADDR_LEN);
 	ppdu_hdr->peer_id = peer_id;
 	ppdu_hdr->first_msdu = first_msdu;
 	ppdu_hdr->last_msdu = last_msdu;
