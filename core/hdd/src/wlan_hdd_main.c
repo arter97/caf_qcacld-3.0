@@ -1159,7 +1159,8 @@ static void hdd_update_tgt_ht_cap(hdd_context_t *hdd_ctx,
 	if (sme_cfg_get_str(hdd_ctx->hHal, WNI_CFG_SUPPORTED_MCS_SET, mcs_set,
 			    &value) == QDF_STATUS_SUCCESS) {
 		hdd_debug("Read MCS rate set");
-
+		if (cfg->num_rf_chains > SIZE_OF_SUPPORTED_MCS_SET)
+			cfg->num_rf_chains = SIZE_OF_SUPPORTED_MCS_SET;
 		if (pconfig->enable2x2) {
 			for (value = 0; value < cfg->num_rf_chains; value++)
 				mcs_set[value] =
@@ -5825,10 +5826,11 @@ void hdd_unregister_notifiers(hdd_context_t *hdd_ctx)
  */
 static void hdd_exit_netlink_services(hdd_context_t *hdd_ctx)
 {
+	spectral_scan_deactivate_service();
+	cnss_diag_deactivate_service();
 	hdd_close_cesium_nl_sock();
-
 	ptt_sock_deactivate_svc();
-
+	oem_deactivate_service();
 	nl_srv_exit();
 }
 
@@ -5858,15 +5860,13 @@ static int hdd_init_netlink_services(hdd_context_t *hdd_ctx)
 		goto err_nl_srv;
 	}
 
-	ret = ptt_sock_activate_svc();
-	if (ret) {
-		hdd_err("ptt_sock_activate_svc failed: %d", ret);
-		goto err_nl_srv;
-	}
+	ptt_sock_activate_svc();
 
 	ret = hdd_open_cesium_nl_sock();
-	if (ret)
+	if (ret) {
 		hdd_err("hdd_open_cesium_nl_sock failed ret: %d", ret);
+		goto err_ptt_sock;
+	}
 
 	ret = cnss_diag_activate_service();
 	if (ret) {
@@ -5877,14 +5877,18 @@ static int hdd_init_netlink_services(hdd_context_t *hdd_ctx)
 	ret = spectral_scan_activate_service();
 	if (ret) {
 		hdd_alert("spectral_scan_activate_service failed: %d", ret);
-		goto err_close_cesium;
+		goto err_cnss_diag;
 	}
 
 	return 0;
 
+err_cnss_diag:
+	cnss_diag_deactivate_service();
 err_close_cesium:
 	hdd_close_cesium_nl_sock();
+err_ptt_sock:
 	ptt_sock_deactivate_svc();
+	oem_deactivate_service();
 err_nl_srv:
 	nl_srv_exit();
 out:
@@ -5929,6 +5933,7 @@ static int hdd_roc_context_init(hdd_context_t *hdd_ctx)
 {
 	qdf_spinlock_create(&hdd_ctx->hdd_roc_req_q_lock);
 	qdf_list_create(&hdd_ctx->hdd_roc_req_q, MAX_ROC_REQ_QUEUE_ENTRY);
+	qdf_idr_create(&hdd_ctx->p2p_idr);
 
 	INIT_DELAYED_WORK(&hdd_ctx->roc_req_work, wlan_hdd_roc_request_dequeue);
 
@@ -5945,6 +5950,7 @@ static int hdd_roc_context_init(hdd_context_t *hdd_ctx)
  */
 static void hdd_roc_context_destroy(hdd_context_t *hdd_ctx)
 {
+	qdf_idr_destroy(&hdd_ctx->p2p_idr);
 	qdf_list_destroy(&hdd_ctx->hdd_roc_req_q);
 	qdf_spinlock_destroy(&hdd_ctx->hdd_roc_req_q_lock);
 }
@@ -7046,7 +7052,8 @@ hdd_display_netif_queue_history_compact(hdd_context_t *hdd_ctx)
 	qdf_time_t total, pause, unpause, curr_time, delta;
 	QDF_STATUS status;
 	char temp_str[20 * WLAN_REASON_TYPE_MAX];
-	char comb_log_str[(ADAP_NETIFQ_LOG_LEN * MAX_NUMBER_OF_ADAPTERS) + 1];
+	char *comb_log_str;
+	uint32_t comb_log_str_size;
 	struct ol_txrx_pdev_t *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 	hdd_adapter_t *adapter = NULL;
 	hdd_adapter_list_node_t *adapter_node = NULL, *next = NULL;
@@ -7056,8 +7063,14 @@ hdd_display_netif_queue_history_compact(hdd_context_t *hdd_ctx)
 		return;
 	}
 
+	comb_log_str_size = (ADAP_NETIFQ_LOG_LEN * MAX_NUMBER_OF_ADAPTERS) + 1;
+	comb_log_str = qdf_mem_malloc(comb_log_str_size);
+	if (!comb_log_str) {
+		hdd_err("failed to alloc comb_log_str");
+		return;
+	}
+
 	bytes_written = 0;
-	qdf_mem_set(comb_log_str, 0, sizeof(comb_log_str));
 	status = hdd_get_front_adapter(hdd_ctx, &adapter_node);
 	while (NULL != adapter_node && QDF_STATUS_SUCCESS == status) {
 		adapter = adapter_node->pAdapter;
@@ -7096,8 +7109,8 @@ hdd_display_netif_queue_history_compact(hdd_context_t *hdd_ctx)
 			hdd_warn("log truncated");
 
 		bytes_written += snprintf(&comb_log_str[bytes_written],
-			bytes_written >= sizeof(comb_log_str) ? 0 :
-					sizeof(comb_log_str) - bytes_written,
+			bytes_written >= comb_log_str_size ? 0 :
+					comb_log_str_size - bytes_written,
 			"[%d %d] (%d) %u/%ums %s|",
 			adapter->sessionId, adapter->device_mode,
 			adapter->pause_map,
@@ -7116,9 +7129,10 @@ hdd_display_netif_queue_history_compact(hdd_context_t *hdd_ctx)
 		pdev->tx_desc.num_free,
 		pdev->tx_desc.pool_size, comb_log_str);
 
-	if (bytes_written >= sizeof(comb_log_str))
+	if (bytes_written >= comb_log_str_size)
 		hdd_warn("log string truncated");
 
+	qdf_mem_free(comb_log_str);
 }
 
 /**
@@ -8115,7 +8129,6 @@ static int hdd_context_init(hdd_context_t *hdd_ctx)
 	hdd_ctx->max_intf_count = CSR_ROAM_SESSION_MAX;
 
 	hdd_init_ll_stats_ctx();
-	hdd_init_nud_stats_ctx(hdd_ctx);
 
 	init_completion(&hdd_ctx->chain_rssi_context.response_event);
 	init_completion(&hdd_ctx->mc_sus_event_var);
@@ -10514,23 +10527,12 @@ void hdd_wlan_update_target_info(hdd_context_t *hdd_ctx, void *context)
 	hdd_ctx->target_type = tgt_info->target_type;
 }
 
-/**
- * hdd_get_nud_stats_cb() - callback api to update the stats
- *	received from the firmware
- * @data: pointer to adapter.
- * @rsp: pointer to data received from FW.
- *
- * This is called when wlan driver received response event for
- *	get arp stats to firmware.
- *
- * Return: None
- */
-static void hdd_get_nud_stats_cb(void *data, struct rsp_stats *rsp)
+void hdd_get_nud_stats_cb(void *data, struct rsp_stats *rsp, void *context)
 {
 	hdd_context_t *hdd_ctx = (hdd_context_t *)data;
-	struct hdd_nud_stats_context *context;
 	int status;
 	hdd_adapter_t *adapter = NULL;
+	struct hdd_request *request = NULL;
 
 	ENTER();
 
@@ -10540,12 +10542,19 @@ static void hdd_get_nud_stats_cb(void *data, struct rsp_stats *rsp)
 	}
 
 	status = wlan_hdd_validate_context(hdd_ctx);
-	if (0 != status)
+	if (status != 0)
 		return;
+
+	request = hdd_request_get(context);
+	if (!request) {
+		hdd_err("obselete request");
+		return;
+	}
 
 	adapter = hdd_get_adapter_by_vdev(hdd_ctx, rsp->vdev_id);
 	if ((NULL == adapter) || (WLAN_HDD_ADAPTER_MAGIC != adapter->magic)) {
 		hdd_err("Invalid adapter or adapter has invalid magic");
+		hdd_request_put(request);
 		return;
 	}
 
@@ -10573,10 +10582,8 @@ static void hdd_get_nud_stats_cb(void *data, struct rsp_stats *rsp)
 							rsp->icmpv4_rsp_recvd;
 	}
 
-	spin_lock(&hdd_context_lock);
-	context = &hdd_ctx->nud_stats_context;
-	complete(&context->response_event);
-	spin_unlock(&hdd_context_lock);
+	hdd_request_complete(request);
+	hdd_request_put(request);
 
 	EXIT();
 }
@@ -10629,9 +10636,6 @@ int hdd_register_cb(hdd_context_t *hdd_ctx)
 
 	sme_set_rssi_threshold_breached_cb(hdd_ctx->hHal,
 					   hdd_rssi_threshold_breached);
-
-	sme_set_nud_debug_stats_cb(hdd_ctx->hHal,
-				   hdd_get_nud_stats_cb);
 
 	status = sme_bpf_offload_register_callback(hdd_ctx->hHal,
 						   hdd_get_bpf_offload_cb);

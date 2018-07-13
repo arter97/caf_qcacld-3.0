@@ -1591,12 +1591,12 @@ static QDF_STATUS hdd_dis_connect_handler(hdd_adapter_t *pAdapter,
 	if ((eConnectionState_Disconnecting ==
 	    pHddStaCtx->conn_info.connState) ||
 	    (eConnectionState_NotConnected ==
+	    pHddStaCtx->conn_info.connState) ||
+	    (eConnectionState_Connecting ==
 	    pHddStaCtx->conn_info.connState)) {
 		hdd_debug("HDD has initiated a disconnect, no need to send disconnect indication to kernel");
 		sendDisconInd = false;
-	}
-
-	if (pHddStaCtx->conn_info.connState != eConnectionState_Disconnecting) {
+	} else {
 		INIT_COMPLETION(pAdapter->disconnect_comp_var);
 		hdd_conn_set_connection_state(pAdapter,
 					      eConnectionState_Disconnecting);
@@ -1727,7 +1727,15 @@ static QDF_STATUS hdd_dis_connect_handler(hdd_adapter_t *pAdapter,
 	}
 	/* Clear saved connection information in HDD */
 	hdd_conn_remove_connect_info(pHddStaCtx);
-	hdd_conn_set_connection_state(pAdapter, eConnectionState_NotConnected);
+	/*
+	 * eConnectionState_Connecting state mean that connection is in
+	 * progress so no need to set state to eConnectionState_NotConnected
+	 */
+	if ((eConnectionState_Connecting !=
+	    pHddStaCtx->conn_info.connState)) {
+		hdd_conn_set_connection_state(pAdapter,
+					      eConnectionState_NotConnected);
+	}
 #ifdef WLAN_FEATURE_GTK_OFFLOAD
 	if ((QDF_STA_MODE == pAdapter->device_mode) ||
 	    (QDF_P2P_CLIENT_MODE == pAdapter->device_mode)) {
@@ -3133,12 +3141,22 @@ static QDF_STATUS hdd_association_completion_handler(hdd_adapter_t *pAdapter,
 			hdd_conn_set_connection_state(pAdapter,
 					eConnectionState_NotConnected);
 		}
+
 		hdd_wmm_init(pAdapter);
 
 		hdd_debug("Disabling queues");
 		wlan_hdd_netif_queue_control(pAdapter,
 					   WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 					   WLAN_CONTROL_PATH);
+		/*
+		 * if hddDisconInProgress is set and roamResult is
+		 * eCSR_ROAM_RESULT_SCAN_FOR_SSID_FAILURE that mean HDD is
+		 * waiting on disconnect_comp_var so unblock anyone waiting for
+		 * disconnect to complete.
+		 */
+		if ((roamResult == eCSR_ROAM_RESULT_SCAN_FOR_SSID_FAILURE) &&
+		    hddDisconInProgress)
+			complete(&pAdapter->disconnect_comp_var);
 	}
 
 	if (QDF_STATUS_SUCCESS != cds_check_and_restart_sap(

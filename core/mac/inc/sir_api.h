@@ -1720,6 +1720,7 @@ typedef struct sSirSmeDisassocInd {
 typedef struct sSirSmeDisassocCnf {
 	uint16_t messageType;   /* eWNI_SME_DISASSOC_CNF */
 	uint16_t length;
+	uint8_t sme_session_id;
 	tSirResultCodes statusCode;
 	struct qdf_mac_addr bssid;
 	struct qdf_mac_addr peer_macaddr;
@@ -2853,12 +2854,8 @@ typedef struct sSirUpdateAPWPARSNIEsReq {
 #define SIR_ROAM_SCAN_MAX_PB_REQ_SIZE    450
 /* Occupied channel list remains static */
 #define CHANNEL_LIST_STATIC                   1
-/* Occupied channel list can be learnt after init */
-#define CHANNEL_LIST_DYNAMIC_INIT             2
-/* Occupied channel list can be learnt after flush */
-#define CHANNEL_LIST_DYNAMIC_FLUSH            3
-/* Occupied channel list can be learnt after update */
-#define CHANNEL_LIST_DYNAMIC_UPDATE           4
+/* Occupied channel list can be dynamic */
+#define CHANNEL_LIST_DYNAMIC                  2
 #define SIR_ROAM_SCAN_24G_DEFAULT_CH     1
 #define SIR_ROAM_SCAN_5G_DEFAULT_CH      36
 #define SIR_ROAM_SCAN_RESERVED_BYTES     61
@@ -4525,6 +4522,17 @@ struct sir_peer_info_ext_resp {
 struct sir_peer_sta_info {
 	uint8_t sta_num;
 	struct sir_peer_info info[MAX_PEER_STA];
+};
+
+/**
+ * @sta_num: number of peer station which has valid info
+ * @info: peer extended information
+ *
+ * all SAP peer station's extended information retrieved
+ */
+struct sir_peer_sta_ext_info {
+	uint8_t sta_num;
+	struct sir_peer_info_ext info[MAX_PEER_STA];
 };
 
 typedef struct sSirAddPeriodicTxPtrn {
