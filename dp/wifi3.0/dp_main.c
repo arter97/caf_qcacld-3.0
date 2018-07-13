@@ -3644,9 +3644,9 @@ static void *dp_peer_create_wifi3(struct cdp_vdev *vdev_handle,
 
 #if !ATH_SUPPORT_WRAP
 	if (peer && (peer->vdev->vdev_id != vdev->vdev_id)) {
-		qdf_spin_lock_bh(&soc->peer_ref_mutex)
+		qdf_spin_lock_bh(&soc->peer_ref_mutex);
 		qdf_atomic_dec(&peer->ref_cnt);
-		qdf_spin_unlock_bh(&soc->peer_ref_mutex)
+		qdf_spin_unlock_bh(&soc->peer_ref_mutex);
 		peer = NULL;
 	}
 #endif
