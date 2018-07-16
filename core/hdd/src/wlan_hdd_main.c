@@ -55,9 +55,7 @@
 #include "wlan_hdd_stats.h"
 #include "wlan_hdd_scan.h"
 #include "wlan_hdd_request_manager.h"
-#ifdef CONFIG_LEAK_DETECTION
 #include "qdf_debug_domain.h"
-#endif
 #include "qdf_str.h"
 #include "qdf_trace.h"
 #include "qdf_types.h"

@@ -413,8 +413,8 @@ endif
 
 ifeq ($(CONFIG_SLUB_DEBUG_ON), y)
 	CONFIG_FEATURE_UNIT_TEST_SUSPEND := 1
-	CONFIG_LEAK_DETECTION := 1
 endif
+CONFIG_LEAK_DETECTION := n
 
 # enable unit-test suspend for napier builds
 ifeq ($(CONFIG_LITHIUM), y)
@@ -845,9 +845,7 @@ ifeq ($(CONFIG_SMP),y)
 	QDF_OBJS += $(QDF_LINUX_OBJ_DIR)/qdf_cpuhp.o
 endif
 
-ifdef CONFIG_LEAK_DETECTION
-	QDF_OBJS += $(QDF_OBJ_DIR)/qdf_debug_domain.o
-endif
+QDF_OBJS += $(QDF_OBJ_DIR)/qdf_debug_domain.o
 
 ##########OS_IF #######
 OS_IF_DIR := $(WLAN_COMMON_ROOT)/os_if
@@ -1964,7 +1962,7 @@ CDEFINES += -DMEMORY_DEBUG
 CDEFINES += -DCONFIG_HALT_KMEMLEAK
 endif
 
-ifdef CONFIG_LEAK_DETECTION
+ifeq ($(CONFIG_LEAK_DETECTION),y)
 	CDEFINES += -DCONFIG_LEAK_DETECTION
 endif
 
