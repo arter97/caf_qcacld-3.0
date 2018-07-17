@@ -439,6 +439,20 @@ dp_rx_wds_srcport_learn(struct dp_soc *soc,
 	if (ast && sa_sw_peer_id != ta_peer->peer_ids[0]) {
 		sa_peer = ast->peer;
 
+		if ((ast->type != CDP_TXRX_AST_TYPE_STATIC) &&
+		    (ast->type != CDP_TXRX_AST_TYPE_SELF)) {
+			if (ast->pdev_id != ta_peer->vdev->pdev->pdev_id) {
+				dp_peer_del_ast(soc, ast);
+				ret = dp_peer_add_ast(soc,
+							ta_peer,
+							wds_src_mac,
+							CDP_TXRX_AST_TYPE_WDS,
+							flags);
+			} else
+				dp_peer_update_ast(soc, ta_peer, ast, flags);
+			return;
+		}
+
 		/*
 		 * Do not kickout STA if it belongs to a different radio.
 		 * For DBDC repeater, it is possible to arrive here
@@ -447,12 +461,6 @@ dp_rx_wds_srcport_learn(struct dp_soc *soc,
 		 */
 		if (ast->pdev_id != ta_peer->vdev->pdev->pdev_id)
 			return;
-
-		if ((ast->type != CDP_TXRX_AST_TYPE_STATIC) &&
-		    (ast->type != CDP_TXRX_AST_TYPE_SELF)) {
-			dp_peer_update_ast(soc, ta_peer, ast, flags);
-			return;
-		}
 
 		/*
 		 * Kickout, when direct associated peer(SA) roams
