@@ -931,8 +931,8 @@ const char *sme_scan_type_to_string(const uint8_t scan_type);
 const char *sme_bss_type_to_string(const uint8_t bss_type);
 QDF_STATUS sme_ap_disable_intra_bss_fwd(tHalHandle hHal, uint8_t sessionId,
 		bool disablefwd);
-uint32_t sme_get_channel_bonding_mode5_g(tHalHandle hHal);
-uint32_t sme_get_channel_bonding_mode24_g(tHalHandle hHal);
+QDF_STATUS sme_get_channel_bonding_mode5_g(tHalHandle hHal, uint32_t *mode);
+QDF_STATUS sme_get_channel_bonding_mode24_g(tHalHandle hHal, uint32_t *mode);
 #ifdef WLAN_FEATURE_STATS_EXT
 typedef struct sStatsExtRequestReq {
 	uint32_t request_data_len;
@@ -1100,6 +1100,16 @@ QDF_STATUS sme_wifi_start_logger(tHalHandle hal,
 
 bool sme_neighbor_middle_of_roaming(tHalHandle hHal,
 						uint8_t sessionId);
+
+/*
+ * sme_is_any_session_in_middle_of_roaming() - check if roaming is in progress
+ * @hal: HAL Handle
+ *
+ * Checks if any SME session is in middle of roaming
+ *
+ * Return : true if roaming is in progress else false
+ */
+bool sme_is_any_session_in_middle_of_roaming(tHalHandle hal);
 
 QDF_STATUS sme_enable_uapsd_for_ac(void *cds_ctx, uint8_t sta_id,
 				      sme_ac_enum_type ac, uint8_t tid,
@@ -1571,7 +1581,8 @@ QDF_STATUS sme_get_nud_debug_stats(tHalHandle hal,
 				   struct get_arp_stats_params
 				   *get_stats_param);
 QDF_STATUS sme_set_nud_debug_stats_cb(tHalHandle hal,
-				      void (*cb)(void *, struct rsp_stats *));
+			void (*cb)(void *, struct rsp_stats *, void *context),
+			void *context);
 
 
 #ifdef WLAN_FEATURE_UDP_RESPONSE_OFFLOAD

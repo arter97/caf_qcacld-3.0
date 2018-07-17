@@ -12040,7 +12040,7 @@ enum hw_filter_mode {
  * </ini>
  */
 #define CFG_IS_BSSID_HINT_PRIORITY_NAME    "g_is_bssid_hint_priority"
-#define CFG_IS_BSSID_HINT_PRIORITY_DEFAULT (1)
+#define CFG_IS_BSSID_HINT_PRIORITY_DEFAULT (0)
 #define CFG_IS_BSSID_HINT_PRIORITY_MIN     (0)
 #define CFG_IS_BSSID_HINT_PRIORITY_MAX     (1)
 
@@ -12686,7 +12686,7 @@ enum hw_filter_mode {
  * </ini>
  */
 #define CFG_PCL_WEIGHT_WEIGHTAGE_NAME "pcl_weightage"
-#define CFG_PCL_WEIGHT_DEFAULT        (10)
+#define CFG_PCL_WEIGHT_DEFAULT        (0)
 #define CFG_PCL_WEIGHT_MIN            (0)
 #define CFG_PCL_WEIGHT_MAX            (100)
 

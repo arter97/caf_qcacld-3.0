@@ -2940,6 +2940,11 @@ static QDF_STATUS spectral_process_phyerr(tp_wma_handle wma, uint8_t *data,
 
 	get_spectral_control_info(wma, &upper_is_control, &lower_is_control);
 
+	if (!wma->dfs_ic || !wma->dfs_ic->ic_curchan) {
+		WMA_LOGE("%s: channel information is not available", __func__);
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	if (upper_is_control)
 		rssi_up = control_rssi;
 	else
@@ -10656,7 +10661,8 @@ int wma_get_arp_stats_handler(void *handle, uint8_t *data,
 			connect_stats_event->icmpv4_rsp_recvd);
 	}
 
-	mac->sme.get_arp_stats_cb(mac->hHdd, &rsp);
+	mac->sme.get_arp_stats_cb(mac->hHdd, &rsp,
+				  mac->sme.get_arp_stats_context);
 
 	EXIT();
 

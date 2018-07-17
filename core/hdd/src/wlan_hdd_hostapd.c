@@ -5599,14 +5599,12 @@ int __iw_get_softap_linkspeed(struct net_device *dev,
 		hdd_err("Invalid peer macaddress");
 		return -EINVAL;
 	}
-	errno = wlan_hdd_get_linkspeed_for_peermac(pHostapdAdapter,
-						   macAddress);
-	if (errno) {
+	rc = wlan_hdd_get_linkspeed_for_peermac(pHostapdAdapter, &macAddress,
+						&link_speed);
+	if (rc) {
 		hdd_err("Unable to retrieve SME linkspeed: %d", errno);
-		return errno;
+		return rc;
 	}
-
-	link_speed = pHostapdAdapter->ls_stats.estLinkSpeed;
 
 	/* linkspeed in units of 500 kbps */
 	link_speed = link_speed / 500;
@@ -7820,11 +7818,28 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 		wlan_hdd_disconnect(sta_adapter, eCSR_DISCONNECT_REASON_DEAUTH);
 	}
 
+	/*
+	 * Reject start bss if reassoc in progress on any adapter.
+	 * sme_is_any_session_in_middle_of_roaming is for LFR2 and
+	 * hdd_is_roaming_in_progress is for LFR3
+	 */
+	if (sme_is_any_session_in_middle_of_roaming(hHal) ||
+	    hdd_is_roaming_in_progress(pHddCtx)) {
+		hdd_info("Reassociation in progress");
+		ret = -EINVAL;
+		goto ret_status;
+	}
+
+	/*
+	 * Disable Roaming on all adapters before starting bss
+	 */
+	wlan_hdd_disable_roaming(pHostapdAdapter);
+
 	sme_config = qdf_mem_malloc(sizeof(tSmeConfigParams));
 	if (!sme_config) {
 		hdd_err("failed to allocate memory");
 		ret = -EINVAL;
-		goto ret_status;
+		goto enable_roaming;
 	}
 
 	iniConfig = pHddCtx->config;
@@ -8432,6 +8447,10 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 	pHostapdState->bCommit = true;
 	if (sme_config)
 		qdf_mem_free(sme_config);
+
+	/* Enable Roaming after start bss */
+	wlan_hdd_enable_roaming(pHostapdAdapter);
+
 	EXIT();
 
 	return 0;
@@ -8449,9 +8468,14 @@ error:
 		&pHostapdAdapter->sessionCtx.ap.acs_in_progress, 0);
 	wlan_hdd_undo_acs(pHostapdAdapter);
 
+enable_roaming:
+	/* Enable Roaming after start bss in case of failure */
+	wlan_hdd_enable_roaming(pHostapdAdapter);
+
 ret_status:
 	if (disable_fw_tdls_state)
 		wlan_hdd_check_conc_and_update_tdls_state(pHddCtx, false);
+
 	return ret;
 }
 
@@ -8954,10 +8978,22 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		hdd_err("ERR: clear event failed");
 
+	/*
+	 * Stop opportunistic timer here if running as we are already doing
+	 * hw mode change before vdev start based on the new concurrency
+	 * situation. If timer is not stopped and if it gets triggered before
+	 * VDEV_UP, it will reset the hw mode to some wrong value.
+	 */
+	status = cds_stop_opportunistic_timer();
+	if (status != QDF_STATUS_SUCCESS) {
+		hdd_err("Failed to stop DBS opportunistic timer");
+		return -EINVAL;
+	}
+
 	status = cds_current_connections_update(pAdapter->sessionId,
 			channel,
 			SIR_UPDATE_REASON_START_AP);
-	if (QDF_STATUS_E_FAILURE == status) {
+	if (status == QDF_STATUS_E_FAILURE) {
 		hdd_err("ERROR: connections update failed!!");
 		return -EINVAL;
 	}

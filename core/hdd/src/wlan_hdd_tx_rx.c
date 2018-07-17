@@ -588,15 +588,13 @@ void hdd_tx_rx_collect_connectivity_stats_info(struct sk_buff *skb,
 			uint8_t *pkt_type)
 {
 	uint32_t pkt_type_bitmap;
+	int errno;
 	hdd_adapter_t *adapter = NULL;
 
 	adapter = (hdd_adapter_t *)context;
-	if (unlikely(adapter->magic != WLAN_HDD_ADAPTER_MAGIC)) {
-		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_ERROR,
-			  "Magic cookie(%x) for adapter sanity verification is invalid",
-			  adapter->magic);
+	errno = hdd_validate_adapter(adapter);
+	if (errno)
 		return;
-	}
 
 	/* ARP tracking is done already. */
 	pkt_type_bitmap = adapter->pkt_type_bitmap;
@@ -827,7 +825,12 @@ static inline bool hdd_is_tx_allowed(struct sk_buff *skb, uint8_t peer_id)
 	void *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 	void *peer;
 
-	QDF_ASSERT(pdev);
+	if (qdf_unlikely(NULL == pdev)) {
+		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_ERROR,
+			  "%s: pdev is NULL", __func__);
+		QDF_ASSERT(pdev);
+		return false;
+	}
 	peer = ol_txrx_peer_find_by_local_id(pdev, peer_id);
 
 	if (peer == NULL) {
