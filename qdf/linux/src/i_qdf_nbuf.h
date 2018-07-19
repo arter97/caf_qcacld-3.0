@@ -1159,7 +1159,7 @@ __qdf_nbuf_copy_bits(struct sk_buff *skb, int32_t offset, int32_t len, void *to)
  */
 static inline void __qdf_nbuf_set_pktlen(struct sk_buff *skb, uint32_t len)
 {
-	if (skb->len > len) {
+	if (skb->len >= len) {
 		skb_trim(skb, len);
 	} else {
 		if (skb_tailroom(skb) < len - skb->len) {
