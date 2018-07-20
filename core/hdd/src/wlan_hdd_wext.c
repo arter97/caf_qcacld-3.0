@@ -10592,10 +10592,20 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter, uint32_t chan,
 	struct qdf_mac_addr bssid;
 	tCsrRoamProfile roam_profile;
 	struct ch_params ch_params;
+	eConnectionState connstate;
 
-	if (QDF_GLOBAL_MONITOR_MODE != hdd_get_conparam()) {
-		hdd_err("Not supported, device is not in monitor mode");
+	if (hdd_get_conparam() != QDF_GLOBAL_MONITOR_MODE &&
+	    adapter->device_mode != QDF_STA_MODE) {
+		hdd_err("Not supported, device is not in monitor mode or sta mission mode");
 		return -EINVAL;
+	}
+	if (adapter->device_mode == QDF_STA_MODE &&
+	    hdd_ctx->config->enable_change_channel_bandwidth) {
+		connstate = sta_ctx->conn_info.connState;
+		if (eConnectionState_Associated == connstate ||
+		    eConnectionState_Connecting == connstate) {
+			return -EINVAL;
+		}
 	}
 
 	hdd_debug("Set monitor mode Channel %d", chan);
@@ -10605,6 +10615,16 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter, uint32_t chan,
 	roam_profile.phyMode = ch_info->phy_mode;
 	roam_profile.ch_params.ch_width = bandwidth;
 	hdd_select_cbmode(adapter, chan, &roam_profile.ch_params);
+	if (hdd_ctx->config->enable_change_channel_bandwidth &&
+	    (!sme_find_session_by_bssid(hal_hdl, adapter->mac_addr.bytes))) {
+		status = sme_create_mon_session(hal_hdl,
+						adapter->mac_addr.bytes);
+		if (status != QDF_STATUS_SUCCESS) {
+			hdd_err("Status: %d Failed to create session.",
+				status);
+			return qdf_status_to_os_return(status);
+		}
+	}
 
 	qdf_mem_copy(bssid.bytes, adapter->mac_addr.bytes,
 		     QDF_MAC_ADDR_SIZE);

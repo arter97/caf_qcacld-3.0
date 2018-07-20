@@ -15919,3 +15919,13 @@ bool sme_is_sta_key_exchange_in_progress(tHalHandle hal, uint8_t session_id)
 
 	return CSR_IS_WAIT_FOR_KEY(mac_ctx, session_id);
 }
+
+bool sme_find_session_by_bssid(tHalHandle hal, uint8_t *bssid)
+{
+	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal);
+	bool ret;
+
+	ret = csr_find_session_by_bssid(mac_ctx, bssid);
+
+	return ret;
+}

@@ -2192,5 +2192,13 @@ static inline int sme_update_he_frag_supp(tHalHandle hal, uint8_t session_id,
  *         false - if not in progress
  */
 bool sme_is_sta_key_exchange_in_progress(tHalHandle hal, uint8_t session_id);
-
+/**
+ * sme_find_session_by_bssid() - checks whether has session
+ * with given bssid
+ * @hal: global hal handle
+ * @bssid: bssid
+ * Return: true - if has the session
+ *         false - if not has the session
+ */
+bool sme_find_session_by_bssid(tHalHandle hal, uint8_t *bssid);
 #endif /* #if !defined( __SME_API_H ) */
