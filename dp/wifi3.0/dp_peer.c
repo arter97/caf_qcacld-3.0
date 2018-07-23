@@ -1697,12 +1697,14 @@ static void dp_teardown_256_ba_sessions(struct dp_peer *peer)
 				rx_tid->delba_rcode =
 				IEEE80211_REASON_QOS_SETUP_REQUIRED;
 			}
+			qdf_spin_unlock_bh(&rx_tid->tid_lock);
 			peer->vdev->pdev->soc->cdp_soc.ol_ops->send_delba(
 					peer->vdev->pdev->osif_pdev,
 					peer->ol_peer,
 					peer->mac_addr.raw,
 					tid,
 					rx_tid->delba_rcode);
+			qdf_spin_lock_bh(&rx_tid->tid_lock);
 		}
 	}
 }
@@ -1996,18 +1998,20 @@ int dp_delba_tx_completion_wifi3(void *peer_handle,
 	qdf_spin_lock_bh(&rx_tid->tid_lock);
 	if (status) {
 		rx_tid->delba_tx_fail_cnt++;
-		if (rx_tid->delba_tx_retry < MAX_DELBA_RETRY) {
+		if (rx_tid->delba_tx_retry >= MAX_DELBA_RETRY) {
+			rx_tid->delba_tx_retry = 0;
+			rx_tid->delba_tx_status = 0;
+			qdf_spin_unlock_bh(&rx_tid->tid_lock);
+		} else {
 			rx_tid->delba_tx_retry++;
 			rx_tid->delba_tx_status = 1;
+
+			qdf_spin_unlock_bh(&rx_tid->tid_lock);
+
 			peer->vdev->pdev->soc->cdp_soc.ol_ops->send_delba(
 				peer->vdev->pdev->osif_pdev, peer->ol_peer,
 				peer->mac_addr.raw, tid, rx_tid->delba_rcode);
 		}
-		if (rx_tid->delba_tx_retry == MAX_DELBA_RETRY) {
-			rx_tid->delba_tx_retry = 0;
-			rx_tid->delba_tx_status = 0;
-		}
-		qdf_spin_unlock_bh(&rx_tid->tid_lock);
 		return 0;
 	} else {
 		rx_tid->delba_tx_success_cnt++;
