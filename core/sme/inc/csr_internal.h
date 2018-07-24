@@ -1021,6 +1021,7 @@ typedef struct tagCsrRoamSession {
 	uint8_t disconnect_reason;
 	uint8_t uapsd_mask;
 	qdf_mc_timer_t roaming_offload_timer;
+	struct rsn_caps rsn_caps;
 	bool ignore_assoc_disallowed;
 } tCsrRoamSession;
 

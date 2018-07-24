@@ -17710,6 +17710,7 @@ csr_create_roam_scan_offload_request(tpAniSirGlobal mac_ctx,
 	req_buf->reason = reason;
 	req_buf->NeighborScanTimerPeriod =
 		roam_info->cfgParams.neighborScanPeriod;
+	req_buf->rsn_caps = session->rsn_caps;
 	req_buf->NeighborRoamScanRefreshPeriod =
 		roam_info->cfgParams.neighborResultsRefreshPeriod;
 	req_buf->NeighborScanChannelMinTime =

@@ -410,6 +410,17 @@ struct sir_roc_rsp {
 	uint32_t scan_id;
 	tSirResultCodes status;
 };
+/* RSN capabilities structure */
+
+struct rsn_caps {
+	uint16_t PreAuthSupported:1;
+	uint16_t NoPairwise:1;
+	uint16_t PTKSAReplayCounter:2;
+	uint16_t GTKSAReplayCounter:2;
+	uint16_t MFPRequired:1;
+	uint16_t MFPCapable:1;
+	uint16_t Reserved:8;
+};
 
 typedef struct sSirRegisterMgmtFrame {
 	uint16_t messageType;
@@ -3202,6 +3213,7 @@ typedef struct sSirRoamOffloadScanReq {
 	uint8_t RoamRssiDiff;
 	uint8_t ChannelCacheType;
 	uint8_t Command;
+	struct rsn_caps rsn_caps;
 	uint8_t reason;
 	uint16_t NeighborScanTimerPeriod;
 	uint16_t NeighborRoamScanRefreshPeriod;
