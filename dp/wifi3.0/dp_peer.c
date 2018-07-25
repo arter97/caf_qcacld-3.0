@@ -475,6 +475,9 @@ int dp_peer_add_ast(struct dp_soc *soc,
 	case CDP_TXRX_AST_TYPE_STATIC:
 		peer->self_ast_entry = ast_entry;
 		ast_entry->type = CDP_TXRX_AST_TYPE_STATIC;
+		if (peer->vdev->opmode == wlan_op_mode_sta) {
+			ast_entry->type = CDP_TXRX_AST_TYPE_BSS;
+		}
 		break;
 	case CDP_TXRX_AST_TYPE_SELF:
 		peer->self_ast_entry = ast_entry;
@@ -509,7 +512,8 @@ int dp_peer_add_ast(struct dp_soc *soc,
 		qdf_mem_copy(next_node_mac, peer->mac_addr.raw, 6);
 
 	if ((ast_entry->type != CDP_TXRX_AST_TYPE_STATIC) &&
-	    (ast_entry->type != CDP_TXRX_AST_TYPE_SELF)) {
+	    (ast_entry->type != CDP_TXRX_AST_TYPE_SELF) &&
+	    (ast_entry->type != CDP_TXRX_AST_TYPE_BSS)) {
 		if (QDF_STATUS_SUCCESS ==
 				soc->cdp_soc.ol_ops->peer_add_wds_entry(
 				peer->vdev->osif_vdev,
@@ -569,7 +573,8 @@ int dp_peer_update_ast(struct dp_soc *soc, struct dp_peer *peer,
 	struct dp_peer *old_peer;
 
 	if ((ast_entry->type == CDP_TXRX_AST_TYPE_STATIC) ||
-	    (ast_entry->type == CDP_TXRX_AST_TYPE_SELF))
+	    (ast_entry->type == CDP_TXRX_AST_TYPE_SELF) ||
+	    (ast_entry->type == CDP_TXRX_AST_TYPE_BSS))
 			return 0;
 
 	qdf_spin_lock_bh(&soc->ast_lock);

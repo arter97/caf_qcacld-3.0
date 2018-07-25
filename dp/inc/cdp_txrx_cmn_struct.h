@@ -282,6 +282,7 @@ enum cdp_txrx_ast_entry_type {
 	CDP_TXRX_AST_TYPE_WDS,	/* WDS peer ast entry type*/
 	CDP_TXRX_AST_TYPE_MEC,	/* Multicast echo ast entry type */
 	CDP_TXRX_AST_TYPE_WDS_HM, /* HM WDS entry */
+	CDP_TXRX_AST_TYPE_BSS,	/* STAs BSS peer */
 	CDP_TXRX_AST_TYPE_MAX
 };
 
