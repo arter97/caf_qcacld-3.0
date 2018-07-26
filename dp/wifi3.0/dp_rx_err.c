@@ -556,7 +556,7 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc,
 			uint8_t *rx_tlv_hdr,
 			uint8_t pool_id)
 {
-	uint32_t pkt_len, l2_hdr_offset;
+	uint32_t pkt_len, l2_hdr_offset = 0;
 	uint16_t msdu_len;
 	struct dp_vdev *vdev;
 	uint16_t peer_id = 0xFFFF;
@@ -570,12 +570,13 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc,
 	qdf_nbuf_set_da_mcbc(nbuf,
 			hal_rx_msdu_end_da_is_mcbc_get(rx_tlv_hdr));
 
-	l2_hdr_offset = hal_rx_msdu_end_l3_hdr_padding_get(rx_tlv_hdr);
-	msdu_len = hal_rx_msdu_start_msdu_len_get(rx_tlv_hdr);
-	pkt_len = msdu_len + l2_hdr_offset + RX_PKT_TLVS_LEN;
-
-	/* Set length in nbuf */
-	qdf_nbuf_set_pktlen(nbuf, pkt_len);
+	if (qdf_likely(!qdf_nbuf_is_frag(nbuf))) {
+		l2_hdr_offset = hal_rx_msdu_end_l3_hdr_padding_get(rx_tlv_hdr);
+		msdu_len = hal_rx_msdu_start_msdu_len_get(rx_tlv_hdr);
+		pkt_len = msdu_len + l2_hdr_offset + RX_PKT_TLVS_LEN;
+		/* Set length in nbuf */
+		qdf_nbuf_set_pktlen(nbuf, pkt_len);
+	}
 
 	/*
 	 * Check if DMA completed -- msdu_done is the last bit
@@ -763,7 +764,6 @@ dp_rx_err_deliver(struct dp_soc *soc, qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr)
 	l2_hdr_offset = hal_rx_msdu_end_l3_hdr_padding_get(rx_tlv_hdr);
 	msdu_len = hal_rx_msdu_start_msdu_len_get(rx_tlv_hdr);
 	pkt_len = msdu_len + l2_hdr_offset + RX_PKT_TLVS_LEN;
-
 	/* Set length in nbuf */
 	qdf_nbuf_set_pktlen(nbuf, pkt_len);
 
