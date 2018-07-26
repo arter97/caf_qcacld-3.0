@@ -83,6 +83,7 @@
 #include "wlan_hdd_packet_filter_api.h"
 #include "wlan_cfg80211_scan.h"
 #include "wlan_ipa_ucfg_api.h"
+#include "wlan_p2p_ucfg_api.h"
 
 /* Preprocessor definitions and constants */
 #ifdef QCA_WIFI_NAPIER_EMULATION
@@ -1741,6 +1742,9 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 			}
 		}
 	}
+	/* p2p cleanup task based on scheduler */
+	ucfg_p2p_cleanup_tx_by_psoc(hdd_ctx->hdd_psoc);
+	ucfg_p2p_cleanup_roc_by_psoc(hdd_ctx->hdd_psoc);
 
 	/* Stop ongoing scan on each interface */
 	hdd_for_each_adapter(hdd_ctx, adapter) {
