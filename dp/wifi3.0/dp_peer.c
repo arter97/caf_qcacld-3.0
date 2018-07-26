@@ -234,6 +234,9 @@ static void dp_peer_ast_hash_detach(struct dp_soc *soc)
 	unsigned int index;
 	struct dp_ast_entry *ast, *ast_next;
 
+	if (!soc->ast_hash.mask)
+		return;
+
 	for (index = 0; index <= soc->ast_hash.mask; index++) {
 		if (!TAILQ_EMPTY(&soc->ast_hash.bins[index])) {
 			TAILQ_FOREACH_SAFE(ast, &soc->ast_hash.bins[index],
