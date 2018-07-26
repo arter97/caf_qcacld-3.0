@@ -6121,7 +6121,7 @@ dp_enable_enhanced_stats(struct cdp_pdev *pdev_handle)
 	struct dp_pdev *pdev = (struct dp_pdev *)pdev_handle;
 	pdev->enhanced_stats_en = 1;
 
-	if (!pdev->mcopy_mode)
+	if (!pdev->mcopy_mode && !pdev->monitor_vdev)
 		dp_ppdu_ring_cfg(pdev);
 
 	if (!pdev->pktlog_ppdu_stats && !pdev->tx_sniffer_enable && !pdev->mcopy_mode)
@@ -6144,7 +6144,7 @@ dp_disable_enhanced_stats(struct cdp_pdev *pdev_handle)
 	if (!pdev->pktlog_ppdu_stats && !pdev->tx_sniffer_enable && !pdev->mcopy_mode)
 		dp_h2t_cfg_stats_msg_send(pdev, 0, pdev->pdev_id);
 
-	if (!pdev->mcopy_mode)
+	if (!pdev->mcopy_mode && !pdev->monitor_vdev)
 		dp_ppdu_ring_reset(pdev);
 }
 
