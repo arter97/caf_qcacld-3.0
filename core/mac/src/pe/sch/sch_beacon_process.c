@@ -1014,8 +1014,8 @@ void sch_beacon_process_for_ap(tpAniSirGlobal mac_ctx,
 	tUpdateBeaconParams bcn_prm;
 
 	if (!bcn || !rx_pkt_info) {
-		pe_err("bcn %pK or rx_pkt_info %pKis NULL",
-			  bcn, rx_pkt_info);
+		pe_debug("bcn %pK or rx_pkt_info %pKis NULL",
+			 bcn, rx_pkt_info);
 		return;
 	}
 
