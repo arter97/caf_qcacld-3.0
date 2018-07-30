@@ -5481,8 +5481,6 @@ static QDF_STATUS cds_modify_pcl_based_on_enabled_channels(
 {
 	cds_context_type *cds_ctx;
 	uint32_t i, pcl_len = 0;
-	uint8_t pcl_list[QDF_MAX_NUM_CHAN];
-	uint8_t weight_list[QDF_MAX_NUM_CHAN];
 
 	cds_ctx = cds_get_context(QDF_MODULE_ID_QDF);
 	if (!cds_ctx) {
@@ -5492,15 +5490,10 @@ static QDF_STATUS cds_modify_pcl_based_on_enabled_channels(
 
 	for (i = 0; i < *pcl_len_org; i++) {
 		if (!CDS_IS_PASSIVE_OR_DISABLE_CH(pcl_list_org[i])) {
-			pcl_list[pcl_len] = pcl_list_org[i];
-			weight_list[pcl_len++] = weight_list_org[i];
+			pcl_list_org[pcl_len] = pcl_list_org[i];
+			weight_list_org[pcl_len++] = weight_list_org[i];
 		}
 	}
-
-	qdf_mem_zero(pcl_list_org, QDF_ARRAY_SIZE(pcl_list_org));
-	qdf_mem_zero(weight_list_org, QDF_ARRAY_SIZE(weight_list_org));
-	qdf_mem_copy(pcl_list_org, pcl_list, pcl_len);
-	qdf_mem_copy(weight_list_org, weight_list, pcl_len);
 	*pcl_len_org = pcl_len;
 
 	return QDF_STATUS_SUCCESS;
@@ -6132,6 +6125,11 @@ bool cds_allow_concurrency(enum cds_con_mode mode,
 
 	if (!cds_allow_sap_go_concurrency(mode, channel)) {
 		hdd_err("This concurrency combination is not allowed");
+		goto done;
+	}
+
+	if (!cds_check_privacy_with_concurrency()) {
+		hdd_err("Privacy setting not allowed with current concurrency setting!");
 		goto done;
 	}
 
@@ -9862,8 +9860,6 @@ QDF_STATUS cds_modify_sap_pcl_based_on_mandatory_channel(uint8_t *pcl_list_org,
 {
 	cds_context_type *cds_ctx;
 	uint32_t i, j, pcl_len = 0;
-	uint8_t pcl_list[QDF_MAX_NUM_CHAN];
-	uint8_t weight_list[QDF_MAX_NUM_CHAN];
 	bool found;
 
 	cds_ctx = cds_get_context(QDF_MODULE_ID_QDF);
@@ -9894,15 +9890,10 @@ QDF_STATUS cds_modify_sap_pcl_based_on_mandatory_channel(uint8_t *pcl_list_org,
 			}
 		}
 		if (found) {
-			pcl_list[pcl_len] = pcl_list_org[i];
-			weight_list[pcl_len++] = weight_list_org[i];
+			pcl_list_org[pcl_len] = pcl_list_org[i];
+			weight_list_org[pcl_len++] = weight_list_org[i];
 		}
 	}
-
-	qdf_mem_zero(pcl_list_org, QDF_ARRAY_SIZE(pcl_list_org));
-	qdf_mem_zero(weight_list_org, QDF_ARRAY_SIZE(weight_list_org));
-	qdf_mem_copy(pcl_list_org, pcl_list, pcl_len);
-	qdf_mem_copy(weight_list_org, weight_list, pcl_len);
 	*pcl_len_org = pcl_len;
 
 	return QDF_STATUS_SUCCESS;
@@ -10743,3 +10734,46 @@ bool cds_is_valid_channel_for_channel_switch(uint8_t channel)
 	cds_debug("Invalid channel for channel switch");
 	return false;
 }
+
+#ifdef FEATURE_WLAN_WAPI
+bool cds_check_privacy_with_concurrency(void)
+{
+	bool ret = true;
+	uint32_t con_count;
+	hdd_adapter_t *adapter;
+	hdd_context_t *hdd_ctx;
+	hdd_adapter_list_node_t *adapter_node, *next;
+	QDF_STATUS status;
+	bool wapi_sta_present = false;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (NULL == hdd_ctx) {
+		cds_err("HDD context is NULL");
+		return false;
+	}
+
+	status = hdd_get_front_adapter(hdd_ctx, &adapter_node);
+	while (NULL != adapter_node && QDF_STATUS_SUCCESS == status) {
+		adapter = adapter_node->pAdapter;
+		if (adapter &&
+		    (QDF_STA_MODE == adapter->device_mode) &&
+		    adapter->wapi_info.nWapiMode &&
+		    (adapter->wapi_info.wapiAuthMode != WAPI_AUTH_MODE_OPEN)) {
+				wapi_sta_present = true;
+				break;
+		}
+		status = hdd_get_next_adapter(hdd_ctx, adapter_node, &next);
+		adapter_node = next;
+	}
+
+	con_count = cds_get_connection_count();
+	cds_debug("No. of concurrent connections: %d", con_count);
+
+	if (wapi_sta_present && con_count) {
+		cds_err("STA with WAPI not allowed when concurrent session(s) exist!");
+		ret = false;
+	}
+
+	return ret;
+}
+#endif
