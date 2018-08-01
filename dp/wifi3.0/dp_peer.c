@@ -1020,6 +1020,11 @@ dp_rx_peer_map_handler(void *soc_handle, uint16_t peer_id, uint16_t hw_peer_id,
 			peer->bss_peer = 1;
 			peer->vdev->vap_bss_peer = peer;
 		}
+		/* In case of sta mode, we receive peer map event only for
+		 * bss peer. No need to compare mac address for sta mode.
+		 */
+		if (peer->vdev->opmode == wlan_op_mode_sta)
+			peer->bss_peer = 1;
 	}
 
 	dp_peer_map_ast(soc, peer, peer_mac_addr,
