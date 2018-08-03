@@ -205,7 +205,9 @@ static QDF_STATUS send_vdev_start_cmd_non_tlv(wmi_unified_t wmi,
 		WMI_SET_CHANNEL_FLAG(&cmd->chan, WMI_CHAN_FLAG_QUARTER);
 
 	if (param->is_restart) {
-		qdf_print("VDEV RESTART\n");
+		QDF_TRACE(QDF_MODULE_ID_DEBUG, QDF_TRACE_LEVEL_DEBUG,
+			  "%s: VDEV RESTART\n", __func__);
+
 		ret =  wmi_unified_cmd_send(wmi, buf, len,
 				WMI_VDEV_RESTART_REQUEST_CMDID);
 	} else {
