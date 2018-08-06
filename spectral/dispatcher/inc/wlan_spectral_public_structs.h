@@ -21,6 +21,10 @@
 #include "wlan_dfs_ioctl.h"
 #include <spectral_ioctl.h>
 
+#ifndef __KERNEL__
+#include <math.h>
+#endif /*  __KERNEL__  */
+
 #ifndef _WLAN_SPECTRAL_PUBLIC_STRUCTS_H_
 #define _WLAN_SPECTRAL_PUBLIC_STRUCTS_H_
 
@@ -102,6 +106,45 @@
 /* The below two definitions apply only to pre-11ac chipsets */
 #define SPECTRAL_SCAN_SHORT_REPORT_DEFAULT     (1)
 #define SPECTRAL_SCAN_FFT_PERIOD_DEFAULT       (1)
+
+/*
+ * Definitions to help in scaling of gen3 linear format Spectral bins to values
+ * similar to those from gen2 chipsets.
+ */
+
+/*
+ * Max gain for QCA9984. Since this chipset is a prime representative of gen2
+ * chipsets, it is chosen for this value.
+ */
+#define SPECTRAL_QCA9984_MAX_GAIN                               (78)
+
+/* Temporary section for hard-coded values. These need to come from FW. */
+
+/* Max gain for IPQ8074 */
+#define SPECTRAL_IPQ8074_DEFAULT_MAX_GAIN_HARDCODE              (62)
+
+/* End of temporary section for hard-coded values */
+
+/*
+ * Section for values needing tuning per customer platform. These too may need
+ * to come from FW. To be considered as hard-coded for now.
+ */
+
+/*
+ * If customers have a different gain line up than QCA reference designs for
+ * IPQ8074 and/or QCA9984, they may have to tune the low level threshold and
+ * the RSSI threshold.
+ */
+#define SPECTRAL_SCALING_LOW_LEVEL_OFFSET                       (7)
+#define SPECTRAL_SCALING_RSSI_THRESH                            (5)
+
+/*
+ * If customers set the AGC backoff differently, they may have to tune the high
+ * level threshold.
+ */
+#define SPECTRAL_SCALING_HIGH_LEVEL_OFFSET                      (5)
+
+/* End of section for values needing fine tuning. */
 
 /**
  * enum wlan_cfg80211_spectral_vendorcmd_handler_idx - Indices to cfg80211
@@ -489,6 +532,46 @@ struct spectral_nl_cb {
 	int (*destroy_netlink)(struct wlan_objmgr_pdev *pdev);
 	void (*free_nbuff)(struct wlan_objmgr_pdev *pdev);
 };
+
+#ifndef __KERNEL__
+
+#define SPECTRAL_SCALING_MAX(a, b) ((a) > (b) ? (a) : (b))
+
+/*
+ * Helper macro for providing RSSI correction factor for gen3 linear format
+ * scaling macro SPECTRAL_SCALE_LINEAR_TO_GEN2().
+ */
+#define SPECTRAL_SCALE_RSSI_CORR(_agc_total_gain_db, _gen3_defmaxgain, \
+	_gen2_maxgain, _lowlevel_offset, _inband_pwr, _rssi_thr) \
+	(((_agc_total_gain_db) < (_gen3_defmaxgain)) ? \
+	 ((_gen2_maxgain) - (_gen3_defmaxgain) + (_lowlevel_offset)) : \
+	 SPECTRAL_SCALING_MAX(((_inband_pwr) - (_rssi_thr)), 0))
+
+/* Macro for scaling a given gen3 linear format bin value into an approximately
+ * equivalent gen2 value. The caller should ensure that correct arguments are
+ * provided.
+ * The values can possibly be higher than 8 bits. If the caller is incapable of
+ * handling values larger than 8 bits, the caller can saturate the value at
+ * 255. This macro does not carry out this saturation for the sake of
+ * flexibility so that callers interested in the larger values can avail of
+ * this.
+ */
+#define SPECTRAL_SCALE_LINEAR_TO_GEN2(gen3_binmag, gen2_maxgain, \
+	gen3_defmaxgain, lowlevel_offset, inband_pwr, rssi_thr, \
+	agc_total_gain_db, highlevel_offset, gen2_bin_scale, gen3_bin_scale) \
+	((gen3_binmag) * \
+	 sqrt(pow(10, (((double)SPECTRAL_SCALING_MAX((gen2_maxgain) - \
+		(gen3_defmaxgain) + (lowlevel_offset) - \
+		SPECTRAL_SCALE_RSSI_CORR((agc_total_gain_db), \
+			(gen3_defmaxgain), (gen2_maxgain), \
+			(lowlevel_offset), (inband_pwr), \
+			(rssi_thr)), \
+		((agc_total_gain_db) < (gen3_defmaxgain)) * \
+			(highlevel_offset))) / 10))) * \
+	 pow(2, ((gen3_bin_scale) - (gen2_bin_scale))))
+
+#endif /*  __KERNEL__  */
+
 #ifdef WIN32
 #pragma pack(pop, spectral)
 #endif
