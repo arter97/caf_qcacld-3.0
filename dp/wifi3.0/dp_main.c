@@ -3777,7 +3777,12 @@ static void *dp_peer_create_wifi3(struct cdp_vdev *vdev_handle,
 	if (memcmp(peer->mac_addr.raw, vdev->mac_addr.raw, 6) == 0) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO_HIGH,
 			"vdev bss_peer!!!!");
-		peer->bss_peer = 1;
+		/* For sta mode, bss_peer will have the AP's mac address
+		 * and will be known only during association. Dont set
+		 * bss_peer as 1 for sta mode during peer create.
+		 */
+		if (vdev->opmode != wlan_op_mode_sta)
+			peer->bss_peer = 1;
 		vdev->vap_bss_peer = peer;
 	}
 	for (i = 0; i < DP_MAX_TIDS; i++)
