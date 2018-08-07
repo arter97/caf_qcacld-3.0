@@ -2626,7 +2626,7 @@ static int __wlan_hdd_cfg80211_vendor_scan(struct wiphy *wiphy,
 	struct cfg80211_scan_request *request = NULL;
 	struct nlattr *attr;
 	enum nl80211_band band;
-	uint8_t n_channels = 0, n_ssid = 0;
+	uint32_t n_channels = 0, n_ssid = 0;
 	uint32_t tmp, count, j;
 	size_t len, ie_len = 0;
 	struct ieee80211_channel *chan;
@@ -2748,7 +2748,7 @@ static int __wlan_hdd_cfg80211_vendor_scan(struct wiphy *wiphy,
 
 	if (ie_len)
 		nla_memcpy((void *)request->ie,
-			   nla_data(tb[QCA_WLAN_VENDOR_ATTR_SCAN_IE]), ie_len);
+			   tb[QCA_WLAN_VENDOR_ATTR_SCAN_IE], ie_len);
 
 	for (count = 0; count < HDD_NUM_NL80211_BANDS; count++)
 		if (wiphy->bands[count])
