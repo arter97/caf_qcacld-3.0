@@ -605,6 +605,8 @@ union dp_align_mac_addr {
  * @pdev_id: pdev ID
  * @vdev_id: vdev ID
  * @type: flag to indicate type of the entry(static/WDS/MEC)
+ * @wmi_sent: Flag to identify of WMI to del ast is sent (AST_HKV1_WORKAROUND)
+ * @cp_ctx: Opaque context used by control path (AST_HKV1_WORKAROUND)
  * @hash_list_elem: node in soc AST hash list (mac address used as hash)
  */
 struct dp_ast_entry {
@@ -618,6 +620,10 @@ struct dp_ast_entry {
 	uint8_t pdev_id;
 	uint8_t vdev_id;
 	enum cdp_txrx_ast_entry_type type;
+#ifdef AST_HKV1_WORKAROUND
+	bool wmi_sent;
+	void *cp_ctx;
+#endif
 	TAILQ_ENTRY(dp_ast_entry) ase_list_elem;
 	TAILQ_ENTRY(dp_ast_entry) hash_list_elem;
 };

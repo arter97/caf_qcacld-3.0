@@ -492,6 +492,58 @@ static enum cdp_txrx_ast_entry_type dp_peer_ast_get_type_wifi3(
 	return ((struct dp_ast_entry *)ast_entry_hdl)->type;
 }
 
+#if defined(FEATURE_AST) && defined(AST_HKV1_WORKAROUND)
+void dp_peer_ast_set_cp_ctx_wifi3(struct cdp_soc_t *soc_handle,
+				  void *ast_entry,
+				  void *cp_ctx)
+{
+	struct dp_soc *soc = (struct dp_soc *)soc_handle;
+
+	qdf_spin_lock_bh(&soc->ast_lock);
+	dp_peer_ast_set_cp_ctx(soc,
+			       (struct dp_ast_entry *)ast_entry, cp_ctx);
+	qdf_spin_unlock_bh(&soc->ast_lock);
+}
+
+void *dp_peer_ast_get_cp_ctx_wifi3(struct cdp_soc_t *soc_handle,
+				   void *ast_entry)
+{
+	struct dp_soc *soc = (struct dp_soc *)soc_handle;
+	void *cp_ctx = NULL;
+
+	qdf_spin_lock_bh(&soc->ast_lock);
+	cp_ctx = dp_peer_ast_get_cp_ctx(soc,
+					(struct dp_ast_entry *)ast_entry);
+	qdf_spin_unlock_bh(&soc->ast_lock);
+
+	return cp_ctx;
+}
+
+bool dp_peer_ast_get_wmi_sent_wifi3(struct cdp_soc_t *soc_handle,
+				    void *ast_entry)
+{
+	struct dp_soc *soc = (struct dp_soc *)soc_handle;
+	bool wmi_sent = false;
+
+	qdf_spin_lock_bh(&soc->ast_lock);
+	wmi_sent = dp_peer_ast_get_wmi_sent(soc,
+					    (struct dp_ast_entry *)ast_entry);
+	qdf_spin_unlock_bh(&soc->ast_lock);
+
+	return wmi_sent;
+}
+
+void dp_peer_ast_free_entry_wifi3(struct cdp_soc_t *soc_handle,
+				  void *ast_entry)
+{
+	struct dp_soc *soc = (struct dp_soc *)soc_handle;
+
+	qdf_spin_lock_bh(&soc->ast_lock);
+	dp_peer_ast_free_entry(soc, (struct dp_ast_entry *)ast_entry);
+	qdf_spin_unlock_bh(&soc->ast_lock);
+}
+#endif
+
 /**
  * dp_srng_find_ring_in_mask() - find which ext_group a ring belongs
  * @ring_num: ring num of the ring being queried
@@ -3620,6 +3672,22 @@ static inline void dp_peer_delete_ast_entries(struct dp_soc *soc,
 }
 #endif
 
+#ifdef AST_HKV1_WORKAROUND
+static inline void dp_peer_ast_handle_roam_del(struct dp_soc *soc,
+					       uint8_t *peer_mac_addr)
+{
+	struct dp_ast_entry *ast_entry;
+
+	ast_entry = dp_peer_ast_hash_find(soc, peer_mac_addr);
+	if (ast_entry)
+		dp_peer_del_ast(soc, ast_entry);
+}
+#else
+static inline void dp_peer_ast_handle_roam_del(struct dp_soc *soc,
+					       uint8_t *peer_mac_addr)
+{
+}
+#endif
 /*
  * dp_peer_create_wifi3() - attach txrx peer
  * @txrx_vdev: Datapath VDEV handle
@@ -3635,7 +3703,6 @@ static void *dp_peer_create_wifi3(struct cdp_vdev *vdev_handle,
 	struct dp_vdev *vdev = (struct dp_vdev *)vdev_handle;
 	struct dp_pdev *pdev;
 	struct dp_soc *soc;
-	struct dp_ast_entry *ast_entry;
 	enum cdp_txrx_ast_entry_type ast_type = CDP_TXRX_AST_TYPE_STATIC;
 
 	/* preconditions */
@@ -3704,9 +3771,7 @@ static void *dp_peer_create_wifi3(struct cdp_vdev *vdev_handle,
 		 * If an AST entry exists, but no peer entry exists with a given
 		 * MAC addresses, we could deduce it as a WDS entry
 		 */
-		ast_entry = dp_peer_ast_hash_find(soc, peer_mac_addr);
-		if (ast_entry)
-			dp_peer_del_ast(soc, ast_entry);
+		dp_peer_ast_handle_roam_del(soc, peer_mac_addr);
 	}
 
 #ifdef notyet
@@ -7060,6 +7125,12 @@ static struct cdp_cmn_ops dp_ops_cmn = {
 	.txrx_peer_ast_get_next_hop = dp_peer_ast_get_next_hop_wifi3,
 	.txrx_peer_ast_set_type = dp_peer_ast_set_type_wifi3,
 	.txrx_peer_ast_get_type = dp_peer_ast_get_type_wifi3,
+#if defined(FEATURE_AST) && defined(AST_HKV1_WORKAROUND)
+	.txrx_peer_ast_set_cp_ctx = dp_peer_ast_set_cp_ctx_wifi3,
+	.txrx_peer_ast_get_cp_ctx = dp_peer_ast_get_cp_ctx_wifi3,
+	.txrx_peer_ast_get_wmi_sent = dp_peer_ast_get_wmi_sent_wifi3,
+	.txrx_peer_ast_free_entry = dp_peer_ast_free_entry_wifi3,
+#endif
 	.txrx_peer_delete = dp_peer_delete_wifi3,
 	.txrx_vdev_register = dp_vdev_register_wifi3,
 	.txrx_soc_detach = dp_soc_detach_wifi3,
