@@ -301,7 +301,6 @@ dp_rx_mon_mpdu_pop(struct dp_soc *soc, uint32_t mac_id,
 				+ frag_len;
 
 			qdf_nbuf_set_pktlen(msdu, rx_buf_size);
-
 #if 0
 			/* Disble it.see packet on msdu done set to 0 */
 			/*
@@ -701,17 +700,45 @@ QDF_STATUS dp_rx_mon_deliver(struct dp_soc *soc, uint32_t mac_id,
 	struct cdp_mon_status *rs = &pdev->rx_mon_recv_status;
 	qdf_nbuf_t mon_skb, skb_next;
 	qdf_nbuf_t mon_mpdu = NULL;
+	uint32_t *nbuf_data;
+	struct ieee80211_frame *wh;
 
-	if ((pdev->monitor_vdev == NULL) ||
-		(pdev->monitor_vdev->osif_rx_mon == NULL)) {
+	if (!pdev->monitor_vdev && !pdev->mcopy_mode)
 		goto mon_deliver_fail;
-	}
 
 	/* restitch mon MPDU for delivery via monitor interface */
 	mon_mpdu = dp_rx_mon_restitch_mpdu_from_msdus(soc, mac_id, head_msdu,
 				tail_msdu, rs);
 
-	if (mon_mpdu && pdev->monitor_vdev && pdev->monitor_vdev->osif_vdev) {
+	if (pdev->mcopy_mode && mon_mpdu) {
+		/*check if this is not a mgmt packet*/
+		wh = (struct ieee80211_frame *)qdf_nbuf_data(mon_mpdu);
+		if (((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) !=
+		     IEEE80211_FC0_TYPE_MGT) &&
+		     ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) !=
+		     IEEE80211_FC0_TYPE_CTL)) {
+			goto mon_deliver_fail;
+		}
+		nbuf_data = (uint32_t *)qdf_nbuf_push_head(mon_mpdu, 4);
+		if (!nbuf_data) {
+			QDF_TRACE(QDF_MODULE_ID_DP,
+				  QDF_TRACE_LEVEL_ERROR,
+				  FL("No headroom"));
+			return QDF_STATUS_E_NOMEM;
+		}
+		*nbuf_data = pdev->ppdu_info.com_info.ppdu_id;
+
+		/* monitor vap cannot be present when mcopy is enabled
+		 * hence same skb can be consumed
+		 */
+		dp_wdi_event_handler(WDI_EVENT_RX_MGMT_CTRL, soc, mon_mpdu,
+				     HTT_INVALID_PEER,
+				     WDI_NO_VAL, pdev->pdev_id);
+		return QDF_STATUS_SUCCESS;
+	}
+
+	if (mon_mpdu && pdev->monitor_vdev && pdev->monitor_vdev->osif_vdev &&
+	    pdev->monitor_vdev->osif_rx_mon) {
 		pdev->ppdu_info.rx_status.ppdu_id =
 			pdev->ppdu_info.com_info.ppdu_id;
 		qdf_nbuf_update_radiotap(&(pdev->ppdu_info.rx_status),
@@ -719,6 +746,11 @@ QDF_STATUS dp_rx_mon_deliver(struct dp_soc *soc, uint32_t mac_id,
 		pdev->monitor_vdev->osif_rx_mon(
 				pdev->monitor_vdev->osif_vdev, mon_mpdu, NULL);
 	} else {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
+			  "[%s][%d] mon_mpdu=%pK monitor_vdev %pK osif_vdev %pK"
+			  , __func__, __LINE__, mon_mpdu, pdev->monitor_vdev,
+			  (pdev->monitor_vdev ? pdev->monitor_vdev->osif_vdev
+			   : NULL));
 		goto mon_deliver_fail;
 	}
 

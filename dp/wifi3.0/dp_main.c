@@ -4570,6 +4570,7 @@ static int dp_reset_monitor_mode(struct cdp_pdev *pdev_handle)
 		RX_BUFFER_SIZE, &htt_tlv_filter);
 
 	pdev->monitor_vdev = NULL;
+	pdev->mcopy_mode = 0;
 
 	qdf_spin_unlock_bh(&pdev->mon_lock);
 
@@ -4577,48 +4578,14 @@ static int dp_reset_monitor_mode(struct cdp_pdev *pdev_handle)
 }
 
 
-/**
- * dp_vdev_set_monitor_mode() - Set DP VDEV to monitor mode
- * @vdev_handle: Datapath VDEV handle
- * @smart_monitor: Flag to denote if its smart monitor mode
- *
- * Return: 0 on success, not 0 on failure
- */
-static int dp_vdev_set_monitor_mode(struct cdp_vdev *vdev_handle,
-		uint8_t smart_monitor)
+static int dp_pdev_configure_monitor_rings(struct dp_pdev *pdev)
 {
-	/* Many monitor VAPs can exists in a system but only one can be up at
-	 * anytime
-	 */
-	struct dp_vdev *vdev = (struct dp_vdev *)vdev_handle;
-	struct dp_pdev *pdev;
 	struct htt_rx_ring_tlv_filter htt_tlv_filter;
 	struct dp_soc *soc;
 	uint8_t pdev_id;
 
-	qdf_assert(vdev);
-
-	pdev = vdev->pdev;
 	pdev_id = pdev->pdev_id;
 	soc = pdev->soc;
-
-	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_WARN,
-		"pdev=%pK, pdev_id=%d, soc=%pK vdev=%pK\n",
-		pdev, pdev_id, soc, vdev);
-
-	/*Check if current pdev's monitor_vdev exists */
-	if (pdev->monitor_vdev) {
-		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			"vdev=%pK\n", vdev);
-		qdf_assert(vdev);
-	}
-
-	pdev->monitor_vdev = vdev;
-
-	/* If smart monitor mode, do not configure monitor ring */
-	if (smart_monitor)
-		return QDF_STATUS_SUCCESS;
-
 	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO_HIGH,
 		"MODE[%x] FP[%02x|%02x|%02x] MO[%02x|%02x|%02x]\n",
 		pdev->mon_filter_mode, pdev->fp_mgmt_filter,
@@ -4686,6 +4653,48 @@ static int dp_vdev_set_monitor_mode(struct cdp_vdev *vdev_handle,
 	htt_h2t_rx_ring_cfg(soc->htt_handle, pdev_id,
 		pdev->rxdma_mon_status_ring.hal_srng, RXDMA_MONITOR_STATUS,
 		RX_BUFFER_SIZE, &htt_tlv_filter);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * dp_vdev_set_monitor_mode() - Set DP VDEV to monitor mode
+ * @vdev_handle: Datapath VDEV handle
+ * @smart_monitor: Flag to denote if its smart monitor mode
+ *
+ * Return: 0 on success, not 0 on failure
+ */
+static int dp_vdev_set_monitor_mode(struct cdp_vdev *vdev_handle,
+				    uint8_t smart_monitor)
+{
+	/* Many monitor VAPs can exists in a system but only one can be up at
+	 * anytime
+	 */
+	struct dp_vdev *vdev = (struct dp_vdev *)vdev_handle;
+	struct dp_pdev *pdev;
+
+	qdf_assert(vdev);
+
+	pdev = vdev->pdev;
+	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_WARN,
+		  "pdev=%pK, pdev_id=%d, soc=%pK vdev=%pK\n",
+		  pdev, pdev->pdev_id, pdev->soc, vdev);
+
+	/*Check if current pdev's monitor_vdev exists */
+	if (pdev->monitor_vdev || pdev->mcopy_mode) {
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
+			  "vdev=%pK\n", vdev);
+		qdf_assert(vdev);
+		return QDF_STATUS_E_RESOURCES;
+	}
+
+	pdev->monitor_vdev = vdev;
+
+	/* If smart monitor mode, do not configure monitor ring */
+	if (smart_monitor)
+		return QDF_STATUS_SUCCESS;
+
+	dp_pdev_configure_monitor_rings(pdev);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -6106,12 +6115,16 @@ dp_ppdu_ring_cfg(struct dp_pdev *pdev)
  * @pdev_handle: DP_PDEV handle
  * @val: user provided value
  *
- * Return: void
+ * Return: QDF_STATUS
  */
-static void
+static QDF_STATUS
 dp_config_debug_sniffer(struct cdp_pdev *pdev_handle, int val)
 {
 	struct dp_pdev *pdev = (struct dp_pdev *)pdev_handle;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (pdev->mcopy_mode && !pdev->enhanced_stats_en)
+		dp_reset_monitor_mode(pdev_handle);
 
 	switch (val) {
 	case 0:
@@ -6136,9 +6149,14 @@ dp_config_debug_sniffer(struct cdp_pdev *pdev_handle, int val)
 				DP_PPDU_STATS_CFG_SNIFFER, pdev->pdev_id);
 		break;
 	case 2:
+		if (pdev->monitor_vdev) {
+			status = QDF_STATUS_E_RESOURCES;
+			break;
+		}
+
 		pdev->mcopy_mode = 1;
+		dp_pdev_configure_monitor_rings(pdev);
 		pdev->tx_sniffer_enable = 0;
-		dp_ppdu_ring_cfg(pdev);
 
 		if (!pdev->pktlog_ppdu_stats)
 			dp_h2t_cfg_stats_msg_send(pdev,
@@ -6149,6 +6167,7 @@ dp_config_debug_sniffer(struct cdp_pdev *pdev_handle, int val)
 			"Invalid value\n");
 		break;
 	}
+	return status;
 }
 
 /*
@@ -6272,18 +6291,19 @@ dp_get_htt_stats(struct cdp_pdev *pdev_handle, void *data, uint32_t data_len)
  * @param: parameter type to be set
  * @val: value of parameter to be set
  *
- * return: void
+ * return: QDF_STATUS
  */
-static void dp_set_pdev_param(struct cdp_pdev *pdev_handle,
-		enum cdp_pdev_param_type param, uint8_t val)
+static QDF_STATUS dp_set_pdev_param(struct cdp_pdev *pdev_handle,
+				    enum cdp_pdev_param_type param,
+				    uint8_t val)
 {
 	switch (param) {
 	case CDP_CONFIG_DEBUG_SNIFFER:
-		dp_config_debug_sniffer(pdev_handle, val);
-		break;
+		return dp_config_debug_sniffer(pdev_handle, val);
 	default:
-		break;
+		return QDF_STATUS_E_INVAL;
 	}
+	return QDF_STATUS_SUCCESS;
 }
 
 /*
