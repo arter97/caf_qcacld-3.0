@@ -91,7 +91,7 @@ target_if_spectral_create_samp_msg(struct target_if_spectral *spectral,
 
 	int temp_samp_msg_len = 0;
 
-	struct spectral_samp_msg *spec_samp_msg;
+	struct spectral_samp_msg *spec_samp_msg = NULL;
 
 	uint8_t *bin_pwr_data = NULL;
 	struct spectral_classifier_params *cp = NULL;
@@ -202,6 +202,9 @@ target_if_spectral_create_samp_msg(struct target_if_spectral *spectral,
 		if (spectral->spectral_gen == SPECTRAL_GEN3)
 			restore_spectral_report_skb(spectral,
 						    (void **)&spec_samp_msg);
+		if (!spec_samp_msg)
+			return;
+
 		samp_data = &spec_samp_msg->samp_data;
 		spec_samp_msg->vhtop_ch_freq_seg1 = params->vhtop_ch_freq_seg1;
 		spec_samp_msg->vhtop_ch_freq_seg2 = params->vhtop_ch_freq_seg2;
