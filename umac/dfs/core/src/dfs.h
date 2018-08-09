@@ -2154,4 +2154,9 @@ wlan_psoc_get_dfs_txops(struct wlan_objmgr_psoc *psoc);
  */
 void dfs_nol_free_list(struct wlan_dfs *dfs);
 
+/**
+ * dfs_task_testtimer_reset() - stop dfs test timer.
+ * @dfs: Pointer to wlan_dfs structure.
+ */
+void dfs_task_testtimer_reset(struct wlan_dfs *dfs);
 #endif  /* _DFS_H_ */
