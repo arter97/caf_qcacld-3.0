@@ -14819,7 +14819,7 @@ static int wlan_hdd_cfg80211_set_privacy_ibss(hdd_adapter_t *pAdapter,
 				ret = dot11f_unpack_ie_wpa(
 						(tpAniSirGlobal) halHandle,
 						&ie[2 + 4], ie[1] - 4,
-						&dot11WPAIE);
+						&dot11WPAIE, false);
 				if (DOT11F_FAILED(ret)) {
 					hdd_err("unpack failed ret: 0x%x", ret);
 					return -EINVAL;

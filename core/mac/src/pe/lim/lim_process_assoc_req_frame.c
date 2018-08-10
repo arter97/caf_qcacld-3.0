@@ -806,7 +806,7 @@ static bool lim_chk_n_process_wpa_rsn_ie(tpAniSirGlobal mac_ctx,
 					if (dot11f_unpack_ie_rsn(mac_ctx,
 						&assoc_req->rsn.info[0],
 						assoc_req->rsn.length,
-						&dot11f_ie_rsn) !=
+						&dot11f_ie_rsn, false) !=
 							DOT11F_PARSE_SUCCESS) {
 						pe_err("Invalid RSN ie");
 						return false;
@@ -885,7 +885,7 @@ static bool lim_chk_n_process_wpa_rsn_ie(tpAniSirGlobal mac_ctx,
 					if (dot11f_unpack_ie_wpa(mac_ctx,
 						&assoc_req->wpa.info[4],
 						assoc_req->wpa.length,
-						&dot11f_ie_wpa) !=
+						&dot11f_ie_wpa, false) !=
 							DOT11F_PARSE_SUCCESS) {
 						pe_err("Invalid WPA IE");
 						return false;

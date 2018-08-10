@@ -2371,7 +2371,7 @@ int hdd_softap_unpack_ie(tHalHandle halHandle,
 		/* Unpack the RSN IE */
 		memset(&dot11RSNIE, 0, sizeof(tDot11fIERSN));
 		ret = dot11f_unpack_ie_rsn((tpAniSirGlobal) halHandle,
-					   pRsnIe, RSNIeLen, &dot11RSNIE);
+					   pRsnIe, RSNIeLen, &dot11RSNIE, false);
 		if (DOT11F_FAILED(ret)) {
 			hdd_err("unpack failed, ret: 0x%x", ret);
 			return -EINVAL;
@@ -2411,7 +2411,7 @@ int hdd_softap_unpack_ie(tHalHandle halHandle,
 		/* Unpack the WPA IE */
 		memset(&dot11WPAIE, 0, sizeof(tDot11fIEWPA));
 		ret = dot11f_unpack_ie_wpa((tpAniSirGlobal) halHandle,
-				     pRsnIe, RSNIeLen, &dot11WPAIE);
+				     pRsnIe, RSNIeLen, &dot11WPAIE, false);
 		if (DOT11F_FAILED(ret)) {
 			hdd_err("unpack failed, ret: 0x%x", ret);
 			return -EINVAL;
@@ -6310,7 +6310,7 @@ static bool wlan_hdd_get_sap_obss(hdd_adapter_t *pHostapdAdapter)
 		qdf_mem_copy(ht_cap_ie, &ie[2], DOT11F_IE_HTCAPS_MAX_LEN);
 		ret = dot11f_unpack_ie_ht_caps((tpAniSirGlobal)hdd_ctx->hHal,
 					       ht_cap_ie, ie[1],
-					       &dot11_ht_cap_ie);
+					       &dot11_ht_cap_ie, false);
 		if (DOT11F_FAILED(ret)) {
 			hdd_err("unpack failed, ret: 0x%x", ret);
 			return false;
