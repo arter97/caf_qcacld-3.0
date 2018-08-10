@@ -511,10 +511,6 @@ int dp_peer_add_ast(struct dp_soc *soc,
 		ast_entry->next_hop = 1;
 		ast_entry->type = CDP_TXRX_AST_TYPE_MEC;
 		break;
-	case CDP_TXRX_AST_TYPE_DA:
-		ast_entry->next_hop = 1;
-		ast_entry->type = CDP_TXRX_AST_TYPE_DA;
-		break;
 	default:
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 			FL("Incorrect AST entry type"));
@@ -526,8 +522,7 @@ int dp_peer_add_ast(struct dp_soc *soc,
 	dp_peer_ast_hash_add(soc, ast_entry);
 	qdf_spin_unlock_bh(&soc->ast_lock);
 
-	if (ast_entry->type == CDP_TXRX_AST_TYPE_MEC ||
-	    ast_entry->type == CDP_TXRX_AST_TYPE_DA)
+	if (ast_entry->type == CDP_TXRX_AST_TYPE_MEC)
 		qdf_mem_copy(next_node_mac, peer->vdev->mac_addr.raw, 6);
 	else
 		qdf_mem_copy(next_node_mac, peer->mac_addr.raw, 6);
