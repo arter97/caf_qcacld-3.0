@@ -5059,8 +5059,7 @@ void dp_aggregate_vdev_stats(struct dp_vdev *vdev)
 	qdf_mem_set(&(vdev->stats.rx), sizeof(vdev->stats.rx), 0x0);
 
 	TAILQ_FOREACH(peer, &vdev->peer_list, peer_list_elem)
-		if (peer->bss_peer)
-			DP_UPDATE_STATS(vdev, peer);
+		DP_UPDATE_STATS(vdev, peer);
 
 	if (!vdev->pdev->osif_pdev)
 		return;
