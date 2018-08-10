@@ -569,6 +569,10 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc,
 			hal_rx_msdu_end_last_msdu_get(rx_tlv_hdr));
 	qdf_nbuf_set_da_mcbc(nbuf,
 			hal_rx_msdu_end_da_is_mcbc_get(rx_tlv_hdr));
+	qdf_nbuf_set_da_valid(nbuf,
+			      hal_rx_msdu_end_da_is_valid_get(rx_tlv_hdr));
+	qdf_nbuf_set_sa_valid(nbuf,
+			      hal_rx_msdu_end_sa_is_valid_get(rx_tlv_hdr));
 
 	if (qdf_likely(!qdf_nbuf_is_frag(nbuf))) {
 		l2_hdr_offset = hal_rx_msdu_end_l3_hdr_padding_get(rx_tlv_hdr);
