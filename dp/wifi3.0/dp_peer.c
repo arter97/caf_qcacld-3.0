@@ -511,6 +511,10 @@ int dp_peer_add_ast(struct dp_soc *soc,
 		ast_entry->next_hop = 1;
 		ast_entry->type = CDP_TXRX_AST_TYPE_MEC;
 		break;
+	case CDP_TXRX_AST_TYPE_DA:
+		ast_entry->next_hop = 1;
+		ast_entry->type = CDP_TXRX_AST_TYPE_DA;
+		break;
 	default:
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 			FL("Incorrect AST entry type"));

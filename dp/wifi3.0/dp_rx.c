@@ -342,6 +342,38 @@ dp_get_vdev_from_peer(struct dp_soc *soc,
 #endif
 
 /**
+ * dp_rx_da_learn() - Add AST entry based on DA lookup
+ *			This is a WAR for HK 1.0 and will
+ *			be removed in HK 2.0
+ *
+ * @soc: core txrx main context
+ * @rx_tlv_hdr	: start address of rx tlvs
+ * @sa_peer	: source peer entry
+ * @nbuf	: nbuf to retrive destination mac for which AST will be added
+ *
+ */
+static void
+dp_rx_da_learn(struct dp_soc *soc,
+		uint8_t *rx_tlv_hdr,
+		struct dp_peer *ta_peer,
+		qdf_nbuf_t nbuf)
+{
+	if (ta_peer && (ta_peer->vdev->opmode != wlan_op_mode_ap))
+		return;
+
+	if (qdf_unlikely(!hal_rx_msdu_end_da_is_valid_get(rx_tlv_hdr) &&
+			 !hal_rx_msdu_end_da_is_mcbc_get(rx_tlv_hdr))) {
+
+		dp_peer_add_ast(soc,
+				ta_peer->vdev->vap_bss_peer,
+				qdf_nbuf_data(nbuf),
+				CDP_TXRX_AST_TYPE_DA,
+				IEEE80211_NODE_F_WDS_HM);
+	}
+}
+
+
+/**
  * dp_rx_intrabss_fwd() - Implements the Intra-BSS forwarding logic
  *
  * @soc: core txrx main context
@@ -375,6 +407,11 @@ dp_rx_intrabss_fwd(struct dp_soc *soc,
 		ast_entry = soc->ast_table[da_idx];
 		if (!ast_entry)
 			return false;
+
+		if (ast_entry->type == CDP_TXRX_AST_TYPE_DA) {
+			ast_entry->is_active = TRUE;
+			return false;
+		}
 
 		da_peer = ast_entry->peer;
 
@@ -1639,6 +1676,7 @@ dp_rx_process(struct dp_intr *int_ctx, void *hal_ring, uint32_t quota)
 				qdf_nbuf_data(nbuf), 128, false);
 #endif /* NAPIER_EMULATION */
 
+		dp_rx_da_learn(soc, rx_tlv_hdr, peer, nbuf);
 		if (qdf_likely(vdev->rx_decap_type ==
 					htt_cmn_pkt_type_ethernet) &&
 				(qdf_likely(!vdev->mesh_vdev)) &&
