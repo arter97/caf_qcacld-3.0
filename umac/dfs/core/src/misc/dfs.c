@@ -344,16 +344,19 @@ void dfs_stop(struct wlan_dfs *dfs)
 	dfs_clear_nolhistory(dfs);
 }
 
+void dfs_task_testtimer_reset(struct wlan_dfs *dfs)
+{
+	if (dfs->wlan_dfstest) {
+		qdf_timer_stop(&dfs->wlan_dfstesttimer);
+		dfs->wlan_dfstest = 0;
+	}
+}
+
 void dfs_main_timer_reset(struct wlan_dfs *dfs)
 {
 	if (dfs->wlan_radar_tasksched) {
 		qdf_timer_stop(&dfs->wlan_dfs_task_timer);
 		dfs->wlan_radar_tasksched = 0;
-	}
-
-	if (dfs->wlan_dfstest) {
-		qdf_timer_stop(&dfs->wlan_dfstesttimer);
-		dfs->wlan_dfstest = 0;
 	}
 }
 
@@ -368,6 +371,7 @@ void dfs_reset(struct wlan_dfs *dfs)
 	dfs_zero_cac_reset(dfs);
 	if (!dfs->dfs_is_offload_enabled)
 		dfs_main_timer_reset(dfs);
+	dfs_task_testtimer_reset(dfs);
 }
 
 void dfs_main_detach(struct wlan_dfs *dfs)
