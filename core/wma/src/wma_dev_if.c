@@ -795,10 +795,10 @@ QDF_STATUS wma_vdev_detach(tp_wma_handle wma_handle,
 	}
 
 	/*
-	 * In SSR case, there is no need to destroy vdev in firmware since
-	 * it has already asserted.
+	 * In SSR case or if FW is down, there is no need to destroy vdev in
+	 * firmware since it has already asserted.
 	 */
-	if (cds_is_driver_recovering()) {
+	if (cds_is_driver_recovering() || !cds_is_target_ready()) {
 		wma_force_vdev_cleanup(wma_handle, vdev_id);
 		goto send_rsp;
 	}
