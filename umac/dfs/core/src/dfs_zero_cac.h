@@ -241,4 +241,10 @@ void dfs_mark_precac_dfs(struct wlan_dfs *dfs,
  * @dfs: Pointer to wlan_dfs structure.
  */
 bool dfs_is_precac_timer_running(struct wlan_dfs *dfs);
+
+/**
+ * dfs_zero_cac_timer_detach() - Free Zero cac DFS variables.
+ * @dfs: Pointer to wlan_dfs structure.
+ */
+void dfs_zero_cac_timer_detach(struct wlan_dfs *dfs);
 #endif /* _DFS_ZERO_CAC_H_ */
