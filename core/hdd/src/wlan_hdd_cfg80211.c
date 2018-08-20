@@ -17675,12 +17675,25 @@ static int wlan_hdd_cfg80211_set_ie(hdd_adapter_t *pAdapter, const uint8_t *ie,
 			/* Setting WAPI Mode to ON=1 */
 			pAdapter->wapi_info.nWapiMode = 1;
 			hdd_debug("WAPI MODE IS %u", pAdapter->wapi_info.nWapiMode);
-			tmp = (uint8_t *)ie;
-			tmp = tmp + 4;  /* Skip element Id and Len, Version */
+			/* genie is pointing to data field of WAPI IE's buffer */
+			tmp = (uint8_t *)genie;
+			/* Validate length for Version(2 bytes) and Number
+			 * of AKM suite (2 bytes) in WAPI IE buffer, coming from
+			 * supplicant*/
+			if (eLen < 4) {
+				hdd_err("Invalid IE Len: %u", eLen);
+				return -EINVAL;
+			}
+			tmp = tmp + 2;  /* Skip Version */
 			/* Get the number of AKM suite */
 			akmsuiteCount = WPA_GET_LE16(tmp);
 			/* Skip the number of AKM suite */
 			tmp = tmp + 2;
+			/* Validate total length for WAPI IE's buffer */
+			if (eLen < (4 + (akmsuiteCount * sizeof(uint32_t)))) {
+				hdd_err("Invalid IE Len: %u", eLen);
+				return -EINVAL;
+			}
 			/* AKM suite list, each OUI contains 4 bytes */
 			akmlist = (uint32_t *)(tmp);
 			if (akmsuiteCount <= MAX_NUM_AKM_SUITES) {
@@ -17927,6 +17940,60 @@ static int wlan_hdd_cfg80211_set_privacy(hdd_adapter_t *pAdapter,
 	}
 
 	return status;
+}
+
+/**
+ * wlan_hdd_clear_wapi_privacy() - reset WAPI settings in HDD layer
+ * @adapter: pointer to HDD adapter object
+ *
+ * This function resets all WAPI related parameters imposed before STA
+ * connection starts. It's invoked when privacy checking against concurrency
+ * fails, to make sure no improper WAPI settings are still populated before
+ * returning an error to the upper layer requester.
+ *
+ * Return: none
+ */
+#ifdef FEATURE_WLAN_WAPI
+static inline void wlan_hdd_clear_wapi_privacy(hdd_adapter_t *adapter)
+{
+	adapter->wapi_info.nWapiMode = 0;
+	adapter->wapi_info.wapiAuthMode = WAPI_AUTH_MODE_OPEN;
+}
+#else
+static inline void wlan_hdd_clear_wapi_privacy(hdd_adapter_t *adapter)
+{
+}
+#endif
+
+/**
+ * wlan_hdd_cfg80211_clear_privacy() - reset STA security parameters
+ * @adapter: pointer to HDD adapter object
+ *
+ * This function resets all privacy related parameters imposed
+ * before STA connection starts. It's invoked when privacy checking
+ * against concurrency fails, to make sure no improper settings are
+ * still populated before returning an error to the upper layer requester.
+ *
+ * Return: none
+ */
+static void wlan_hdd_cfg80211_clear_privacy(hdd_adapter_t *adapter)
+{
+	hdd_wext_state_t *wext_state = WLAN_HDD_GET_WEXT_STATE_PTR(adapter);
+	hdd_station_ctx_t *hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+
+	hdd_debug("reseting all privacy configurations");
+
+	wext_state->wpaVersion = IW_AUTH_WPA_VERSION_DISABLED;
+
+	hdd_sta_ctx->conn_info.authType = eCSR_AUTH_TYPE_NONE;
+	wext_state->roamProfile.AuthType.authType[0] = eCSR_AUTH_TYPE_NONE;
+
+	hdd_sta_ctx->conn_info.ucEncryptionType = eCSR_ENCRYPT_TYPE_NONE;
+	wext_state->roamProfile.EncryptionType.numEntries = 0;
+	hdd_sta_ctx->conn_info.mcEncryptionType = eCSR_ENCRYPT_TYPE_NONE;
+	wext_state->roamProfile.mcEncryptionType.numEntries = 0;
+
+	wlan_hdd_clear_wapi_privacy(adapter);
 }
 
 int wlan_hdd_try_disconnect(hdd_adapter_t *pAdapter)
@@ -18231,30 +18298,37 @@ static int __wlan_hdd_cfg80211_connect(struct wiphy *wiphy,
 		return -EALREADY;
 	}
 
-	/* Check for max concurrent connections after doing disconnect if any */
-	if (req->channel) {
-		if (!cds_allow_concurrency(
-				cds_convert_device_mode_to_qdf_type(
-				pAdapter->device_mode),
-				req->channel->hw_value, HW_MODE_20_MHZ)) {
-			hdd_warn("This concurrency combination is not allowed");
-			return -ECONNREFUSED;
-		}
-	} else {
-		if (!cds_allow_concurrency(
-				cds_convert_device_mode_to_qdf_type(
-				pAdapter->device_mode), 0, HW_MODE_20_MHZ)) {
-			hdd_warn("This concurrency combination is not allowed");
-			return -ECONNREFUSED;
-		}
-	}
-
 	/*initialise security parameters */
 	status = wlan_hdd_cfg80211_set_privacy(pAdapter, req);
 
 	if (0 > status) {
 		hdd_err("Failed to set security params");
 		return status;
+	}
+
+	/*
+	 * Check for max concurrent connections after doing disconnect if any,
+	 * must be called after the invocation of wlan_hdd_cfg80211_set_privacy
+	 * so privacy is already set for the current adapter before it's
+	 * checked against concurrency.
+	 */
+	if (req->channel) {
+		if (!cds_allow_concurrency(
+				cds_convert_device_mode_to_qdf_type(
+				pAdapter->device_mode),
+				req->channel->hw_value, HW_MODE_20_MHZ)) {
+			hdd_warn("This concurrency combination is not allowed");
+			status = -ECONNREFUSED;
+			goto con_chk_failed;
+		}
+	} else {
+		if (!cds_allow_concurrency(
+				cds_convert_device_mode_to_qdf_type(
+				pAdapter->device_mode), 0, HW_MODE_20_MHZ)) {
+			hdd_warn("This concurrency combination is not allowed");
+			status = -ECONNREFUSED;
+			goto con_chk_failed;
+		}
 	}
 
 	if (req->channel)
@@ -18269,8 +18343,11 @@ static int __wlan_hdd_cfg80211_connect(struct wiphy *wiphy,
 						 bssid_hint, channel, 0);
 	if (0 > status) {
 		hdd_err("connect failed");
-		return status;
 	}
+	return status;
+
+con_chk_failed:
+	wlan_hdd_cfg80211_clear_privacy(pAdapter);
 	EXIT();
 	return status;
 }
@@ -19594,8 +19671,7 @@ static void hdd_fill_pmksa_info(tPmkidCacheInfo *pmk_cache,
 		qdf_mem_copy(pmk_cache->BSSID.bytes,
 			     pmksa->bssid, QDF_MAC_ADDR_SIZE);
 	} else {
-		qdf_mem_copy(pmk_cache->ssid, pmksa->ssid,
-			     SIR_MAC_MAX_SSID_LENGTH);
+		qdf_mem_copy(pmk_cache->ssid, pmksa->ssid, pmksa->ssid_len);
 		qdf_mem_copy(pmk_cache->cache_id, pmksa->cache_id,
 			     CACHE_ID_LEN);
 		pmk_cache->ssid_len = pmksa->ssid_len;

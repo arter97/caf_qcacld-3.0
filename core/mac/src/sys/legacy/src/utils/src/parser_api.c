@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -2285,7 +2285,7 @@ static void update_esp_data(struct sir_esp_information *esp_information,
 
 	uint8_t *data;
 	int i = 0;
-	int total_elements;
+	uint64_t total_elements;
 	struct sir_esp_info *esp_info;
 
 	data = esp_indication->variable_data;
@@ -4637,7 +4637,7 @@ sir_convert_addts_req2_struct(tpAniSirGlobal pMac,
 
 		if (addts.num_WMMTCLAS) {
 			j = (uint8_t) (pAddTs->numTclas + addts.num_WMMTCLAS);
-			if (SIR_MAC_TCLASIE_MAXNUM > j)
+			if (SIR_MAC_TCLASIE_MAXNUM < j)
 				j = SIR_MAC_TCLASIE_MAXNUM;
 
 			for (i = pAddTs->numTclas; i < j; ++i) {
@@ -4797,7 +4797,7 @@ sir_convert_addts_rsp2_struct(tpAniSirGlobal pMac,
 
 		if (addts.num_WMMTCLAS) {
 			j = (uint8_t) (pAddTs->numTclas + addts.num_WMMTCLAS);
-			if (SIR_MAC_TCLASIE_MAXNUM > j)
+			if (SIR_MAC_TCLASIE_MAXNUM < j)
 				j = SIR_MAC_TCLASIE_MAXNUM;
 
 			for (i = pAddTs->numTclas; i < j; ++i) {
