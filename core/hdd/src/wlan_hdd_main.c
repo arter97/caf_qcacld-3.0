@@ -5186,7 +5186,6 @@ static int hdd_roc_context_init(hdd_context_t *hdd_ctx)
 {
 	qdf_spinlock_create(&hdd_ctx->hdd_roc_req_q_lock);
 	qdf_list_create(&hdd_ctx->hdd_roc_req_q, MAX_ROC_REQ_QUEUE_ENTRY);
-	qdf_idr_create(&hdd_ctx->p2p_idr);
 
 	INIT_DELAYED_WORK(&hdd_ctx->roc_req_work, wlan_hdd_roc_request_dequeue);
 
@@ -5238,7 +5237,6 @@ static void hdd_destroy_roc_req_q(hdd_context_t *hdd_ctx)
  */
 static void hdd_roc_context_destroy(hdd_context_t *hdd_ctx)
 {
-	qdf_idr_destroy(&hdd_ctx->p2p_idr);
 	flush_delayed_work(&hdd_ctx->roc_req_work);
 	hdd_destroy_roc_req_q(hdd_ctx);
 	qdf_spinlock_destroy(&hdd_ctx->hdd_roc_req_q_lock);

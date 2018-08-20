@@ -734,8 +734,7 @@ QDF_OBJS := 	$(QDF_OBJ_DIR)/qdf_defer.o \
 		$(QDF_OBJ_DIR)/qdf_mem.o \
 		$(QDF_OBJ_DIR)/qdf_nbuf.o \
 		$(QDF_OBJ_DIR)/qdf_threads.o \
-		$(QDF_OBJ_DIR)/qdf_trace.o \
-		$(QDF_OBJ_DIR)/qdf_idr.o
+		$(QDF_OBJ_DIR)/qdf_trace.o
 
 ifeq ($(CONFIG_WLAN_DEBUGFS), y)
 QDF_OBJS += $(QDF_OBJ_DIR)/qdf_debugfs.o
