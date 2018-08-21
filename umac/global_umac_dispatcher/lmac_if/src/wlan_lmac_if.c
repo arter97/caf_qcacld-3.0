@@ -114,16 +114,22 @@ wlan_lmac_if_atf_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
 	atf_rx_ops->atf_get_peers = tgt_atf_get_peers;
 	atf_rx_ops->atf_get_tput_based = tgt_atf_get_tput_based;
 	atf_rx_ops->atf_get_logging = tgt_atf_get_logging;
-	atf_rx_ops->atf_get_txbuf_share = tgt_atf_get_txbuf_share;
-	atf_rx_ops->atf_get_txbuf_max = tgt_atf_get_txbuf_max;
-	atf_rx_ops->atf_get_txbuf_min = tgt_atf_get_txbuf_min;
+	atf_rx_ops->atf_update_buf_held = tgt_atf_update_buf_held;
 	atf_rx_ops->atf_get_ssidgroup = tgt_atf_get_ssidgroup;
-	atf_rx_ops->atf_get_tx_block_count = tgt_atf_get_tx_block_count;
-	atf_rx_ops->atf_get_peer_blk_txtraffic = tgt_atf_get_peer_blk_txtraffic;
+	atf_rx_ops->atf_get_vdev_ac_blk_cnt = tgt_atf_get_vdev_ac_blk_cnt;
+	atf_rx_ops->atf_get_peer_blk_txbitmap = tgt_atf_get_peer_blk_txbitmap;
 	atf_rx_ops->atf_get_vdev_blk_txtraffic = tgt_atf_get_vdev_blk_txtraffic;
 	atf_rx_ops->atf_get_sched = tgt_atf_get_sched;
 	atf_rx_ops->atf_get_tx_tokens = tgt_atf_get_tx_tokens;
-	atf_rx_ops->atf_get_shadow_tx_tokens = tgt_atf_get_shadow_tx_tokens;
+	atf_rx_ops->atf_account_subgroup_txtokens =
+					tgt_atf_account_subgroup_txtokens;
+	atf_rx_ops->atf_adjust_subgroup_txtokens =
+					tgt_atf_adjust_subgroup_txtokens;
+	atf_rx_ops->atf_get_subgroup_airtime = tgt_atf_get_subgroup_airtime;
+	atf_rx_ops->atf_subgroup_free_buf = tgt_atf_subgroup_free_buf;
+	atf_rx_ops->atf_update_subgroup_tidstate =
+					tgt_atf_update_subgroup_tidstate;
+	atf_rx_ops->atf_buf_distribute = tgt_atf_buf_distribute;
 	atf_rx_ops->atf_get_shadow_alloted_tx_tokens =
 					tgt_atf_get_shadow_alloted_tx_tokens;
 	atf_rx_ops->atf_get_txtokens_common = tgt_atf_get_txtokens_common;
@@ -134,14 +140,13 @@ wlan_lmac_if_atf_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
 	atf_rx_ops->atf_set_sched = tgt_atf_set_sched;
 	atf_rx_ops->atf_set_fmcap = tgt_atf_set_fmcap;
 	atf_rx_ops->atf_set_obss_scale = tgt_atf_set_obss_scale;
-	atf_rx_ops->atf_set_mode = tgt_atf_set_mode;
 	atf_rx_ops->atf_set_msdu_desc = tgt_atf_set_msdu_desc;
 	atf_rx_ops->atf_set_max_vdevs = tgt_atf_set_max_vdevs;
 	atf_rx_ops->atf_set_peers = tgt_atf_set_peers;
 	atf_rx_ops->atf_set_peer_stats = tgt_atf_set_peer_stats;
 	atf_rx_ops->atf_set_vdev_blk_txtraffic = tgt_atf_set_vdev_blk_txtraffic;
-	atf_rx_ops->atf_set_peer_blk_txtraffic = tgt_atf_set_peer_blk_txtraffic;
-	atf_rx_ops->atf_set_tx_block_count = tgt_atf_set_tx_block_count;
+	atf_rx_ops->atf_peer_blk_txtraffic = tgt_atf_peer_blk_txtraffic;
+	atf_rx_ops->atf_peer_unblk_txtraffic = tgt_atf_peer_unblk_txtraffic;
 	atf_rx_ops->atf_set_token_allocated = tgt_atf_set_token_allocated;
 	atf_rx_ops->atf_set_token_utilized = tgt_atf_set_token_utilized;
 }
@@ -301,6 +306,25 @@ static void wlan_lmac_if_umac_rx_ops_register_p2p(
 #endif
 
 #ifdef DFS_COMPONENT_ENABLE
+#ifdef WLAN_DFS_PRECAC_AUTO_CHAN_SUPPORT
+static inline void
+register_precac_auto_chan_rx_ops(struct wlan_lmac_if_dfs_rx_ops *rx_ops)
+{
+	if (!rx_ops)
+		return;
+	rx_ops->dfs_set_precac_intermediate_chan =
+		ucfg_dfs_set_precac_intermediate_chan;
+	rx_ops->dfs_get_precac_intermediate_chan =
+		ucfg_dfs_get_precac_intermediate_chan;
+	rx_ops->dfs_get_precac_chan_state = ucfg_dfs_get_precac_chan_state;
+}
+#else
+static inline void
+register_precac_auto_chan_rx_ops(struct wlan_lmac_if_dfs_rx_ops *rx_ops)
+{
+}
+#endif
+
 static QDF_STATUS
 wlan_lmac_if_umac_dfs_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
 {
@@ -318,6 +342,7 @@ wlan_lmac_if_umac_dfs_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
 		tgt_dfs_is_precac_timer_running;
 	dfs_rx_ops->dfs_find_vht80_chan_for_precac =
 		tgt_dfs_find_vht80_chan_for_precac;
+	dfs_rx_ops->dfs_start_precac_timer = utils_dfs_start_precac_timer;
 	dfs_rx_ops->dfs_cancel_precac_timer = utils_dfs_cancel_precac_timer;
 	dfs_rx_ops->dfs_override_precac_timeout =
 		ucfg_dfs_override_precac_timeout;
@@ -340,6 +365,8 @@ wlan_lmac_if_umac_dfs_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
 		ucfg_dfs_get_override_status_timeout;
 	dfs_rx_ops->dfs_reset_spoof_test =
 		tgt_dfs_reset_spoof_test;
+
+	register_precac_auto_chan_rx_ops(dfs_rx_ops);
 
 	return QDF_STATUS_SUCCESS;
 }

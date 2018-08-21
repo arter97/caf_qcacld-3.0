@@ -59,6 +59,8 @@ typedef void *hif_handle_t;
 #define HIF_TYPE_QCA8074 15
 #define HIF_TYPE_QCA6290 16
 #define HIF_TYPE_QCN7605 17
+#define HIF_TYPE_QCA6390 18
+#define HIF_TYPE_QCA8074V2 19
 
 #ifdef IPA_OFFLOAD
 #define DMA_COHERENT_MASK_IPA_VER_3_AND_ABOVE   37
@@ -405,8 +407,8 @@ uint32_t hif_reg_read(struct hif_opaque_softc *hif_ctx, uint32_t offset);
  */
 struct htc_callbacks {
 	void *context;
-	QDF_STATUS(*rwCompletionHandler)(void *rwContext, QDF_STATUS status);
-	QDF_STATUS(*dsrHandler)(void *context);
+	QDF_STATUS(*rw_compl_handler)(void *rw_ctx, QDF_STATUS status);
+	QDF_STATUS(*dsr_handler)(void *context);
 };
 
 /**
@@ -443,6 +445,7 @@ void hif_detach_htc(struct hif_opaque_softc *hif_ctx);
 				     * DiagRead/DiagWrite
 				     */
 
+#ifdef WLAN_FEATURE_BMI
 /*
  * API to handle HIF-specific BMI message exchanges, this API is synchronous
  * and only allowed to be called from a context that can block (sleep)
@@ -453,6 +456,20 @@ QDF_STATUS hif_exchange_bmi_msg(struct hif_opaque_softc *hif_ctx,
 				uint8_t *pResponseMessage,
 				uint32_t *pResponseLength, uint32_t TimeoutMS);
 void hif_register_bmi_callbacks(struct hif_softc *hif_sc);
+bool hif_needs_bmi(struct hif_opaque_softc *hif_ctx);
+#else /* WLAN_FEATURE_BMI */
+static inline void
+hif_register_bmi_callbacks(struct hif_softc *hif_sc)
+{
+}
+
+static inline bool
+hif_needs_bmi(struct hif_opaque_softc *hif_ctx)
+{
+	return false;
+}
+#endif /* WLAN_FEATURE_BMI */
+
 /*
  * APIs to handle HIF specific diagnostic read accesses. These APIs are
  * synchronous and only allowed to be called from a context that
@@ -848,7 +865,6 @@ int ol_copy_ramdump(struct hif_opaque_softc *scn);
 void hif_crash_shutdown(struct hif_opaque_softc *hif_ctx);
 void hif_get_hw_info(struct hif_opaque_softc *hif_ctx, u32 *version,
 		     u32 *revision, const char **target_name);
-bool hif_needs_bmi(struct hif_opaque_softc *hif_ctx);
 enum qdf_bus_type hif_get_bus_type(struct hif_opaque_softc *hif_hdl);
 struct hif_target_info *hif_get_target_info_handle(struct hif_opaque_softc *
 						   scn);
@@ -932,7 +948,7 @@ void hif_set_initial_wakeup_cb(struct hif_opaque_softc *hif_ctx,
  * Note: For MCL, #if defined (HIF_CONFIG_SLUB_DEBUG_ON) needs to be checked
  * for defined here
  */
-#if HIF_CE_DEBUG_DATA_BUF
+#if defined(HIF_CONFIG_SLUB_DEBUG_ON) || defined(HIF_CE_DEBUG_DATA_BUF)
 ssize_t hif_dump_desc_trace_buf(struct device *dev,
 				struct device_attribute *attr, char *buf);
 ssize_t hif_input_desc_trace_buf_index(struct hif_softc *scn,

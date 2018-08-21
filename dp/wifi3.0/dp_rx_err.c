@@ -16,6 +16,7 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "hal_hw_headers.h"
 #include "dp_types.h"
 #include "dp_rx.h"
 #include "dp_peer.h"
@@ -288,7 +289,8 @@ static uint32_t dp_rx_msdus_drop(struct dp_soc *soc, void *ring_desc,
 		}
 
 		rx_bufs_used++;
-		tid = hal_rx_mpdu_start_tid_get(rx_desc->rx_buf_start);
+		tid = hal_rx_mpdu_start_tid_get(soc->hal_soc,
+						rx_desc->rx_buf_start);
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 			"Packet received with PN error for tid :%d", tid);
 
@@ -350,7 +352,7 @@ dp_rx_pn_error_handle(struct dp_soc *soc, void *ring_desc,
 		 */
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 			"discard rx due to PN error for peer  %pK  "
-			"(%02x:%02x:%02x:%02x:%02x:%02x)\n",
+			"(%02x:%02x:%02x:%02x:%02x:%02x)",
 			peer,
 			peer->mac_addr.raw[0], peer->mac_addr.raw[1],
 			peer->mac_addr.raw[2], peer->mac_addr.raw[3],
@@ -446,8 +448,7 @@ dp_rx_chain_msdus(struct dp_soc *soc, qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr,
 
 		dp_pdev->invalid_peer_head_msdu = NULL;
 		dp_pdev->invalid_peer_tail_msdu = NULL;
-
-		hal_rx_mon_hw_desc_get_mpdu_status(rx_tlv_hdr,
+		hal_rx_mon_hw_desc_get_mpdu_status(soc->hal_soc, rx_tlv_hdr,
 				&(dp_pdev->ppdu_info.rx_status));
 
 	}
@@ -525,7 +526,8 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc,
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 				FL("MSDU DONE failure"));
 
-		hal_rx_dump_pkt_tlvs(rx_tlv_hdr, QDF_TRACE_LEVEL_INFO);
+		hal_rx_dump_pkt_tlvs(soc->hal_soc, rx_tlv_hdr,
+				     QDF_TRACE_LEVEL_INFO);
 		qdf_assert(0);
 	}
 
@@ -614,7 +616,7 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc,
 		/* TODO: Assuming that qos_control_valid also indicates
 		 * unicast. Should we check this?
 		 */
-		tid = hal_rx_mpdu_start_tid_get(rx_tlv_hdr);
+		tid = hal_rx_mpdu_start_tid_get(soc->hal_soc, rx_tlv_hdr);
 		if (peer &&
 			peer->rx_tid[tid].hw_qdesc_vaddr_unaligned == NULL) {
 			/* IEEE80211_SEQ_MAX indicates invalid start_seq */
@@ -696,7 +698,8 @@ dp_rx_err_deliver(struct dp_soc *soc, qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr)
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 				FL("MSDU DONE failure"));
 
-		hal_rx_dump_pkt_tlvs(rx_tlv_hdr, QDF_TRACE_LEVEL_INFO);
+		hal_rx_dump_pkt_tlvs(soc->hal_soc, rx_tlv_hdr,
+				     QDF_TRACE_LEVEL_INFO);
 		qdf_assert(0);
 	}
 
@@ -834,7 +837,7 @@ dp_rx_process_mic_error(struct dp_soc *soc,
 		goto fail;
 	}
 
-	tid = hal_rx_mpdu_start_tid_get(qdf_nbuf_data(nbuf));
+	tid = hal_rx_mpdu_start_tid_get(soc->hal_soc, qdf_nbuf_data(nbuf));
 	rx_seq = (((*(uint16_t *)wh->i_seq) &
 			IEEE80211_SEQ_SEQ_MASK) >>
 			IEEE80211_SEQ_SEQ_SHIFT);
@@ -847,7 +850,7 @@ dp_rx_process_mic_error(struct dp_soc *soc,
 						    tid, rx_seq, nbuf);
 
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			  "%s: Frag pkt seq# %d frag# %d consumed status %d !\n",
+			  "%s: Frag pkt seq# %d frag# %d consumed status %d !",
 				__func__, rx_seq, fragno, status);
 			return;
 	}
@@ -1246,7 +1249,8 @@ done:
 			qdf_assert(0);
 		}
 
-		hal_rx_dump_pkt_tlvs(rx_tlv_hdr, QDF_TRACE_LEVEL_DEBUG);
+		hal_rx_dump_pkt_tlvs(hal_soc, rx_tlv_hdr,
+				     QDF_TRACE_LEVEL_DEBUG);
 		qdf_nbuf_free(nbuf);
 		nbuf = next;
 	}
@@ -1334,7 +1338,7 @@ dp_rx_err_mpdu_pop(struct dp_soc *soc, uint32_t mac_id,
 
 					QDF_TRACE(QDF_MODULE_ID_DP,
 						QDF_TRACE_LEVEL_DEBUG,
-						"[%s][%d] msdu_nbuf=%pK \n",
+						"[%s][%d] msdu_nbuf=%pK ",
 						__func__, __LINE__, msdu);
 
 					qdf_nbuf_free(msdu);
@@ -1399,7 +1403,7 @@ dp_rxdma_err_process(struct dp_soc *soc, uint32_t mac_id, uint32_t quota)
 	if (!err_dst_srng) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 			"%s %d : HAL Monitor Destination Ring Init \
-			Failed -- %pK\n",
+			Failed -- %pK",
 			__func__, __LINE__, err_dst_srng);
 		return 0;
 	}
@@ -1411,7 +1415,7 @@ dp_rxdma_err_process(struct dp_soc *soc, uint32_t mac_id, uint32_t quota)
 	if (qdf_unlikely(hal_srng_access_start(hal_soc, err_dst_srng))) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 			"%s %d : HAL Monitor Destination Ring Init \
-			Failed -- %pK\n",
+			Failed -- %pK",
 			__func__, __LINE__, err_dst_srng);
 		return 0;
 	}

@@ -57,22 +57,27 @@
 #define TDLS_DISCOVERY_TIMEOUT_BEFORE_UPDATE     1000
 #define TDLS_SCAN_REJECT_MAX            5
 
+#define tdls_debug(params...) \
+	QDF_TRACE_DEBUG(QDF_MODULE_ID_TDLS, params)
+#define tdls_notice(params...) \
+	QDF_TRACE_INFO(QDF_MODULE_ID_TDLS, params)
+#define tdls_warn(params...) \
+	QDF_TRACE_WARN(QDF_MODULE_ID_TDLS, params)
+#define tdls_err(params...) \
+	QDF_TRACE_ERROR(QDF_MODULE_ID_TDLS, params)
+#define tdls_alert(params...) \
+	QDF_TRACE_FATAL(QDF_MODULE_ID_TDLS, params)
 
-#define tdls_log(level, args...) \
-	QDF_TRACE(QDF_MODULE_ID_TDLS, level, ## args)
-#define tdls_logfl(level, format, args...) \
-	tdls_log(level, FL(format), ## args)
-
-#define tdls_debug(format, args...) \
-	tdls_logfl(QDF_TRACE_LEVEL_DEBUG, format, ## args)
-#define tdls_notice(format, args...) \
-	tdls_logfl(QDF_TRACE_LEVEL_INFO, format, ## args)
-#define tdls_warn(format, args...) \
-	tdls_logfl(QDF_TRACE_LEVEL_WARN, format, ## args)
-#define tdls_err(format, args...) \
-	tdls_logfl(QDF_TRACE_LEVEL_ERROR, format, ## args)
-#define tdls_alert(format, args...) \
-	tdls_logfl(QDF_TRACE_LEVEL_FATAL, format, ## args)
+#define tdls_nofl_debug(params...) \
+	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_TDLS, params)
+#define tdls_nofl_notice(params...) \
+	QDF_TRACE_INFO_NO_FL(QDF_MODULE_ID_TDLS, params)
+#define tdls_nofl_warn(params...) \
+	QDF_TRACE_WARN_NO_FL(QDF_MODULE_ID_TDLS, params)
+#define tdls_nofl_err(params...) \
+	QDF_TRACE_ERROR_NO_FL(QDF_MODULE_ID_TDLS, params)
+#define tdls_nofl_alert(params...) \
+	QDF_TRACE_FATAL_NO_FL(QDF_MODULE_ID_TDLS, params)
 
 #define TDLS_IS_LINK_CONNECTED(peer)  \
 	((TDLS_LINK_CONNECTED == (peer)->link_status) || \
@@ -590,17 +595,16 @@ void tdls_notify_reset_adapter(struct wlan_objmgr_vdev *vdev);
 
 /**
  * tdls_peers_deleted_notification() - peer delete notification
- * @vdev: vdev object
- * @session_id: session id
+ * @notify_info: peer info
  *
  * Legacy lim layer will delete tdls peers for roaming and heart beat failures
  * and notify the component about the delete event to update the tdls.
  * state.
  *
- * Return: None
+ * Return: QDF_STATUS
  */
-void tdls_peers_deleted_notification(struct wlan_objmgr_vdev *vdev,
-					 uint32_t session_id);
+QDF_STATUS tdls_peers_deleted_notification(
+		struct tdls_sta_notify_params *notify_info);
 
 /**
  * tdls_notify_decrement_session() - Notify the session decrement

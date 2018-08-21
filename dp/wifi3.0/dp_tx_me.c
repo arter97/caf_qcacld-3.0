@@ -16,6 +16,7 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "hal_hw_headers.h"
 #include "dp_types.h"
 #include "qdf_nbuf.h"
 #include "qdf_atomic.h"
@@ -141,7 +142,7 @@ dp_tx_me_exit(struct dp_pdev *pdev)
 		if (pdev->me_buf.buf_in_use > 0) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
 					"Tx-comp pending for %d "
-					"ME frames after waiting %ds!!\n",
+					"ME frames after waiting %ds!!",
 					pdev->me_buf.buf_in_use, wait_time);
 			qdf_assert_always(0);
 		}

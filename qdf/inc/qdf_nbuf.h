@@ -119,6 +119,7 @@
 #define QDF_NBUF_TX_PKT_INVALID              0
 #define QDF_NBUF_TX_PKT_DATA_TRACK           1
 #define QDF_NBUF_TX_PKT_MGMT_TRACK           2
+#define QDF_NBUF_RX_PKT_DATA_TRACK           3
 
 /* Different Packet states */
 #define QDF_NBUF_TX_PKT_HDD                  1
@@ -155,6 +156,7 @@
  * struct mon_rx_status - This will have monitor mode rx_status extracted from
  * htt_rx_desc used later to update radiotap information.
  * @tsft: Time Synchronization Function timer
+ * @ppdu_timestamp: Timestamp in the PPDU_START TLV
  * @preamble_type: Preamble type in radio header
  * @chan_freq: Capture channel frequency
  * @chan_num: Capture channel number
@@ -170,6 +172,8 @@
  * @he_sig_A2_known: HE (11ax) sig A2 known field
  * @he_sig_b_common: HE (11ax) sig B common field
  * @he_sig_b_common_known: HE (11ax) sig B common known field
+ * @l_sig_a_info: L_SIG_A value coming in Rx descriptor
+ * @l_sig_b_info: L_SIG_B value coming in Rx descriptor
  * @rate: Rate in terms 500Kbps
  * @rtap_flags: Bit map of available fields in the radiotap
  * @ant_signal_db: Rx packet RSSI
@@ -206,9 +210,16 @@
  * @he_data5: HE property of received frame
  * @prev_ppdu_id: ppdu_id in previously received message
  * @ppdu_id: Id of the PLCP protocol data unit
+ *
+ * The following variables are not coming from the TLVs.
+ * These variables are placeholders for passing information to update_radiotap
+ * function.
+ * @device_id: Device ID coming from sub-system (PCI, AHB etc..)
+ * @chan_noise_floor: Channel Noise Floor for the pdev
  */
 struct mon_rx_status {
 	uint64_t tsft;
+	uint32_t ppdu_timestamp;
 	uint32_t preamble_type;
 	uint16_t chan_freq;
 	uint16_t chan_num;
@@ -223,6 +234,8 @@ struct mon_rx_status {
 	uint16_t he_sig_A2_known;
 	uint16_t he_sig_b_common;
 	uint16_t he_sig_b_common_known;
+	uint32_t l_sig_a_info;
+	uint32_t l_sig_b_info;
 	uint8_t  rate;
 	uint8_t  rtap_flags;
 	uint8_t  ant_signal_db;
@@ -272,7 +285,40 @@ struct mon_rx_status {
 	uint32_t ppdu_len;
 	uint32_t prev_ppdu_id;
 	uint32_t ppdu_id;
+	uint32_t device_id;
+	int16_t chan_noise_floor;
 };
+
+/**
+ * struct qdf_radiotap_vendor_ns - Vendor Namespace header as per
+ * Radiotap spec: https://www.radiotap.org/fields/Vendor%20Namespace.html
+ * @oui: Vendor OUI
+ * @selector: sub_namespace selector
+ * @skip_length: How many bytes of Vendor Namespace data that follows
+ */
+struct qdf_radiotap_vendor_ns {
+	uint8_t oui[3];
+	uint8_t selector;
+	uint16_t skip_length;
+} __attribute__((__packed__));
+
+/**
+ * strcut qdf_radiotap_vendor_ns_ath - Combined QTI Vendor NS
+ * including the Radiotap specified Vendor Namespace header and
+ * QTI specific Vendor Namespace data
+ * @lsig: L_SIG_A (or L_SIG)
+ * @device_id: Device Identification
+ * @lsig_b: L_SIG_B
+ * @ppdu_start_timestamp: Timestamp from RX_PPDU_START TLV
+ */
+struct qdf_radiotap_vendor_ns_ath {
+	struct qdf_radiotap_vendor_ns hdr;
+	/* QTI specific data follows */
+	uint32_t lsig;
+	uint32_t device_id;
+	uint32_t lsig_b;
+	uint32_t ppdu_start_timestamp;
+} __attribute__((__packed__));
 
 /* Masks for HE SIG known fields in mon_rx_status structure */
 #define QDF_MON_STATUS_HE_SIG_B_COMMON_KNOWN_RU0	0x00000001
@@ -384,7 +430,8 @@ struct mon_rx_status {
 
 /* HE radiotap data5 */
 #define QDF_MON_STATUS_GI_SHIFT 4
-#define QDF_MON_STATUS_HE_LTF_SHIFT 8
+#define QDF_MON_STATUS_HE_LTF_SIZE_SHIFT 6
+#define QDF_MON_STATUS_HE_LTF_SYM_SHIFT 8
 #define QDF_MON_STATUS_TXBF_SHIFT 14
 #define QDF_MON_STATUS_PE_DISAMBIGUITY_SHIFT 15
 #define QDF_MON_STATUS_PRE_FEC_PAD_SHIFT 12
@@ -453,6 +500,32 @@ enum qdf_proto_type {
 	QDF_PROTO_TYPE_ICMPv6,
 	QDF_PROTO_TYPE_EVENT,
 	QDF_PROTO_TYPE_MAX
+};
+
+/**
+ * cb_ftype - Frame type information in skb cb
+ * @CB_FTYPE_INVALID - Invalid
+ * @CB_FTYPE_MCAST2UCAST - Multicast to Unicast converted packet
+ * @CB_FTYPE_TSO - TCP Segmentation Offload
+ * @CB_FTYPE_TSO_SG - TSO Scatter Gather
+ * @CB_FTYPE_SG - Scatter Gather
+ * @CB_FTYPE_INTRABSS_FWD - Intra BSS forwarding
+ * @CB_FTYPE_RX_INFO - Rx information
+ * @CB_FTYPE_MESH_RX_INFO - Mesh Rx information
+ * @CB_FTYPE_MESH_TX_INFO - Mesh Tx information
+ * @CB_FTYPE_DMS - Directed Multicast Service
+ */
+enum cb_ftype {
+	CB_FTYPE_INVALID = 0,
+	CB_FTYPE_MCAST2UCAST = 1,
+	CB_FTYPE_TSO = 2,
+	CB_FTYPE_TSO_SG = 3,
+	CB_FTYPE_SG = 4,
+	CB_FTYPE_INTRABSS_FWD = 5,
+	CB_FTYPE_RX_INFO = 6,
+	CB_FTYPE_MESH_RX_INFO = 7,
+	CB_FTYPE_MESH_TX_INFO = 8,
+	CB_FTYPE_DMS = 9,
 };
 
 /**
@@ -828,13 +901,13 @@ qdf_nbuf_set_vdev_ctx(qdf_nbuf_t buf, uint8_t vdev_id)
 }
 
 static inline void
-qdf_nbuf_set_tx_ftype(qdf_nbuf_t buf, uint8_t type)
+qdf_nbuf_set_tx_ftype(qdf_nbuf_t buf, enum cb_ftype type)
 {
 	__qdf_nbuf_set_tx_ftype(buf, type);
 }
 
 static inline void
-qdf_nbuf_set_rx_ftype(qdf_nbuf_t buf, uint8_t type)
+qdf_nbuf_set_rx_ftype(qdf_nbuf_t buf, enum cb_ftype type)
 {
 	__qdf_nbuf_set_rx_ftype(buf, type);
 }
@@ -847,12 +920,12 @@ qdf_nbuf_get_vdev_ctx(qdf_nbuf_t buf)
 	return  __qdf_nbuf_get_vdev_ctx(buf);
 }
 
-static inline uint8_t qdf_nbuf_get_tx_ftype(qdf_nbuf_t buf)
+static inline enum cb_ftype qdf_nbuf_get_tx_ftype(qdf_nbuf_t buf)
 {
 	return  __qdf_nbuf_get_tx_ftype(buf);
 }
 
-static inline uint8_t qdf_nbuf_get_rx_ftype(qdf_nbuf_t buf)
+static inline enum cb_ftype qdf_nbuf_get_rx_ftype(qdf_nbuf_t buf)
 {
 	return  __qdf_nbuf_get_rx_ftype(buf);
 }

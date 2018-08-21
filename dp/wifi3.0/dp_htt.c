@@ -17,6 +17,7 @@
  */
 
 #include <htt.h>
+#include <hal_hw_headers.h>
 #include <hal_api.h>
 #include "dp_htt.h"
 #include "dp_peer.h"
@@ -27,6 +28,10 @@
 #include "htt_ppdu_stats.h"
 #include "qdf_mem.h"   /* qdf_mem_malloc,free */
 #include "cdp_txrx_cmn_struct.h"
+
+#ifdef FEATURE_PERPKT_INFO
+#include "dp_ratetable.h"
+#endif
 
 #define HTT_TLV_HDR_LEN HTT_T2H_EXT_STATS_CONF_TLV_HDR_SIZE
 
@@ -86,6 +91,38 @@ do {                                                             \
  * Return: None
  */
 #ifdef FEATURE_PERPKT_INFO
+static inline void
+dp_tx_rate_stats_update(struct dp_peer *peer,
+			struct cdp_tx_completion_ppdu_user *ppdu)
+{
+	uint32_t ratekbps = 0;
+	uint32_t ppdu_tx_rate = 0;
+
+	if (!peer || !ppdu)
+		return;
+
+	dp_peer_stats_notify(peer);
+
+	ratekbps = dp_getrateindex(ppdu->mcs,
+				   ppdu->nss,
+				   ppdu->preamble,
+				   ppdu->bw);
+
+	DP_STATS_UPD(peer, tx.last_tx_rate, ratekbps);
+
+	if (!ratekbps)
+		return;
+
+	dp_ath_rate_lpf(peer->stats.tx.avg_tx_rate, ratekbps);
+	ppdu_tx_rate = dp_ath_rate_out(peer->stats.tx.avg_tx_rate);
+	DP_STATS_UPD(peer, tx.rnd_avg_tx_rate, ppdu_tx_rate);
+
+	if (peer->vdev) {
+		peer->vdev->stats.tx.last_tx_rate = ratekbps;
+		peer->vdev->stats.tx.last_tx_rate_mcs = ppdu->mcs;
+	}
+}
+
 static void dp_tx_stats_update(struct dp_soc *soc, struct dp_peer *peer,
 		struct cdp_tx_completion_ppdu_user *ppdu, uint32_t ack_rssi)
 {
@@ -149,6 +186,13 @@ static void dp_tx_stats_update(struct dp_soc *soc, struct dp_peer *peer,
 	DP_STATS_INCC(peer,
 			tx.pkt_type[preamble].mcs_count[mcs], num_msdu,
 			((mcs < (MAX_MCS - 1)) && (preamble == DOT11_AX)));
+
+	dp_tx_rate_stats_update(peer, ppdu);
+
+	if (peer->stats.tx.ucast.num)
+		peer->stats.tx.last_per = ((peer->stats.tx.ucast.num -
+					peer->stats.tx.tx_success.num) * 100) /
+					peer->stats.tx.ucast.num;
 
 	if (soc->cdp_soc.ol_ops->update_dp_stats) {
 		soc->cdp_soc.ol_ops->update_dp_stats(pdev->ctrl_pdev,
@@ -296,7 +340,7 @@ htt_htc_misc_pkt_pool_free(struct htt_soc *soc)
 
 		soc->stats.htc_pkt_free++;
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO_LOW,
-			 "%s: Pkt free count %d\n",
+			 "%s: Pkt free count %d",
 			 __func__, soc->stats.htc_pkt_free);
 
 		qdf_nbuf_free(netbuf);
@@ -413,7 +457,7 @@ static int htt_h2t_ver_req_msg(struct htt_soc *soc)
 	 */
 	if (qdf_nbuf_put_tail(msg, HTT_VER_REQ_BYTES) == NULL) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			"%s: Failed to expand head for HTT_H2T_MSG_TYPE_VERSION_REQ msg\n",
+			"%s: Failed to expand head for HTT_H2T_MSG_TYPE_VERSION_REQ msg",
 			__func__);
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -511,19 +555,19 @@ int htt_srng_setup(void *htt_soc, int mac_id, void *hal_srng,
 			htt_ring_type = HTT_SW_TO_HW_RING;
 		} else {
 			QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-				   "%s: Ring %d currently not supported\n",
+				   "%s: Ring %d currently not supported",
 				   __func__, srng_params.ring_id);
 			goto fail1;
 		}
 
-		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			 "%s: ring_type %d ring_id %d\n",
-			 __func__, hal_ring_type, srng_params.ring_id);
-		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			 "%s: hp_addr 0x%llx tp_addr 0x%llx\n",
-			 __func__, (uint64_t)hp_addr, (uint64_t)tp_addr);
-		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			 "%s: htt_ring_id %d\n", __func__, htt_ring_id);
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO,
+			  "%s: ring_type %d ring_id %d",
+			  __func__, hal_ring_type, srng_params.ring_id);
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO,
+			  "%s: hp_addr 0x%llx tp_addr 0x%llx",
+			  __func__, (uint64_t)hp_addr, (uint64_t)tp_addr);
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO,
+			  "%s: htt_ring_id %d", __func__, htt_ring_id);
 		break;
 	case RXDMA_MONITOR_BUF:
 		htt_ring_id = HTT_RXDMA_MONITOR_BUF_RING;
@@ -548,7 +592,7 @@ int htt_srng_setup(void *htt_soc, int mac_id, void *hal_srng,
 
 	default:
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			"%s: Ring currently not supported\n", __func__);
+			"%s: Ring currently not supported", __func__);
 			goto fail1;
 	}
 
@@ -560,7 +604,7 @@ int htt_srng_setup(void *htt_soc, int mac_id, void *hal_srng,
 	 */
 	if (qdf_nbuf_put_tail(htt_msg, HTT_SRING_SETUP_SZ) == NULL) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			"%s: Failed to expand head for SRING_SETUP msg\n",
+			"%s: Failed to expand head for SRING_SETUP msg",
 			__func__);
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -581,8 +625,8 @@ int htt_srng_setup(void *htt_soc, int mac_id, void *hal_srng,
 	else
 		HTT_SRING_SETUP_PDEV_ID_SET(*msg_word, mac_id);
 
-	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			 "%s: mac_id %d\n", __func__, mac_id);
+	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO,
+		  "%s: mac_id %d", __func__, mac_id);
 	HTT_SRING_SETUP_RING_TYPE_SET(*msg_word, htt_ring_type);
 	/* TODO: Discuss with FW on changing this to unique ID and using
 	 * htt_ring_type to send the type of ring
@@ -607,14 +651,14 @@ int htt_srng_setup(void *htt_soc, int mac_id, void *hal_srng,
 	HTT_SRING_SETUP_ENTRY_SIZE_SET(*msg_word, ring_entry_size);
 	HTT_SRING_SETUP_RING_SIZE_SET(*msg_word,
 		(ring_entry_size * srng_params.num_entries));
-	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			 "%s: entry_size %d\n", __func__,
+	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO,
+		  "%s: entry_size %d", __func__,
 			 ring_entry_size);
-	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			 "%s: num_entries %d\n", __func__,
+	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO,
+		  "%s: num_entries %d", __func__,
 			 srng_params.num_entries);
-	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			 "%s: ring_size %d\n", __func__,
+	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO,
+		  "%s: ring_size %d", __func__,
 			 (ring_entry_size * srng_params.num_entries));
 	if (htt_ring_type == HTT_SW_TO_HW_RING)
 		HTT_SRING_SETUP_RING_MISC_CFG_FLAG_LOOPCOUNT_DISABLE_SET(
@@ -780,7 +824,7 @@ int htt_h2t_rx_ring_cfg(void *htt_soc, int pdev_id, void *hal_srng,
 
 	default:
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			"%s: Ring currently not supported\n", __func__);
+			"%s: Ring currently not supported", __func__);
 		goto fail1;
 	}
 
@@ -792,7 +836,7 @@ int htt_h2t_rx_ring_cfg(void *htt_soc, int pdev_id, void *hal_srng,
 	 */
 	if (qdf_nbuf_put_tail(htt_msg, HTT_RX_RING_SELECTION_CFG_SZ) == NULL) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			"%s: Failed to expand head for RX Ring Cfg msg\n",
+			"%s: Failed to expand head for RX Ring Cfg msg",
 			__func__);
 		goto fail1; /* failure */
 	}
@@ -1627,6 +1671,9 @@ static void dp_process_ppdu_stats_common_tlv(struct dp_pdev *pdev,
 	if ((frame_type == HTT_STATS_FTYPE_TIDQ_DATA_SU) ||
 			(frame_type == HTT_STATS_FTYPE_TIDQ_DATA_MU))
 		ppdu_desc->frame_type = CDP_PPDU_FTYPE_DATA;
+	else if ((frame_type == HTT_STATS_FTYPE_SGEN_MU_BAR) ||
+		 (frame_type == HTT_STATS_FTYPE_SGEN_BAR))
+		ppdu_desc->frame_type = CDP_PPDU_FTYPE_BAR;
 	else
 		ppdu_desc->frame_type = CDP_PPDU_FTYPE_CTRL;
 
@@ -1687,6 +1734,10 @@ static void dp_process_ppdu_stats_user_common_tlv(
 
 	tag_buf++;
 
+	if (HTT_PPDU_STATS_USER_COMMON_TLV_DELAYED_BA_GET(*tag_buf)) {
+		ppdu_user_desc->delayed_ba = 1;
+	}
+
 	if (HTT_PPDU_STATS_USER_COMMON_TLV_MCAST_GET(*tag_buf)) {
 		ppdu_user_desc->is_mcast = true;
 		ppdu_user_desc->mpdu_tried_mcast =
@@ -1704,6 +1755,12 @@ static void dp_process_ppdu_stats_user_common_tlv(
 	ppdu_user_desc->frame_ctrl =
 		HTT_PPDU_STATS_USER_COMMON_TLV_FRAME_CTRL_GET(*tag_buf);
 	ppdu_desc->frame_ctrl = ppdu_user_desc->frame_ctrl;
+
+	if (ppdu_user_desc->delayed_ba) {
+		ppdu_user_desc->mpdu_success = 0;
+		ppdu_user_desc->mpdu_tried_mcast = 0;
+		ppdu_user_desc->mpdu_tried_ucast = 0;
+	}
 }
 
 
@@ -2209,10 +2266,6 @@ dp_process_ppdu_stats_tx_mgmtctrl_payload_tlv(struct dp_pdev *pdev,
 				     WDI_NO_VAL, pdev->pdev_id);
 	}
 
-	pdev->mgmtctrl_frm_info.mgmt_buf = NULL;
-	pdev->mgmtctrl_frm_info.mgmt_buf_len = 0;
-	pdev->mgmtctrl_frm_info.ppdu_id = 0;
-
 	return QDF_STATUS_E_ALREADY;
 }
 
@@ -2518,8 +2571,6 @@ static struct ppdu_info *dp_htt_process_tlv(struct dp_pdev *pdev,
 				(uint32_t *)((uint8_t *)tlv_buf + tlv_length);
 			length -= (tlv_length);
 			continue;
-		} else {
-			pdev->mgmtctrl_frm_info.mgmt_buf = NULL;
 		}
 
 		ppdu_info = dp_get_ppdu_desc(pdev, ppdu_id, tlv_type);
@@ -2584,7 +2635,7 @@ static bool dp_txrx_ppdu_stats_handler(struct dp_soc *soc,
 		return true;
 
 	if (!pdev->enhanced_stats_en && !pdev->tx_sniffer_enable &&
-			!pdev->mcopy_mode)
+	    !pdev->mcopy_mode && !pdev->bpr_enable)
 		return free_buf;
 
 	ppdu_info = dp_htt_process_tlv(pdev, htt_t2h_msg);
@@ -2594,6 +2645,10 @@ static bool dp_txrx_ppdu_stats_handler(struct dp_soc *soc,
 		    (pdev, htt_t2h_msg, pdev->mgmtctrl_frm_info.ppdu_id) !=
 		    QDF_STATUS_SUCCESS)
 			free_buf = false;
+
+		pdev->mgmtctrl_frm_info.mgmt_buf = NULL;
+		pdev->mgmtctrl_frm_info.mgmt_buf_len = 0;
+		pdev->mgmtctrl_frm_info.ppdu_id = 0;
 	}
 
 	if (ppdu_info)
@@ -2706,7 +2761,7 @@ dp_ppdu_stats_ind_handler(struct htt_soc *soc,
 	bool free_buf;
 	qdf_nbuf_set_pktlen(htt_t2h_msg, HTT_T2H_MAX_MSG_SIZE);
 	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO,
-		"received HTT_T2H_MSG_TYPE_PPDU_STATS_IND\n");
+		"received HTT_T2H_MSG_TYPE_PPDU_STATS_IND");
 	pdev_id = HTT_T2H_PPDU_STATS_PDEV_ID_GET(*msg_word);
 	pdev_id = DP_HW2SW_MACID(pdev_id);
 	free_buf = dp_txrx_ppdu_stats_handler(soc->dp_soc, pdev_id,
@@ -2742,7 +2797,7 @@ dp_pktlog_msg_handler(struct htt_soc *soc,
 	uint8_t pdev_id;
 	uint32_t *pl_hdr;
 	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO,
-		"received HTT_T2H_MSG_TYPE_PKTLOG\n");
+		"received HTT_T2H_MSG_TYPE_PKTLOG");
 	pdev_id = HTT_T2H_PKTLOG_PDEV_ID_GET(*msg_word);
 	pdev_id = DP_HW2SW_MACID(pdev_id);
 	pl_hdr = (msg_word + 1);
@@ -2853,14 +2908,14 @@ static void dp_htt_t2h_msg_handler(void *context, HTC_PACKET *pkt)
 			soc->tgt_ver.major = HTT_VER_CONF_MAJOR_GET(*msg_word);
 			soc->tgt_ver.minor = HTT_VER_CONF_MINOR_GET(*msg_word);
 			QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO_HIGH,
-				"target uses HTT version %d.%d; host uses %d.%d\n",
+				"target uses HTT version %d.%d; host uses %d.%d",
 				soc->tgt_ver.major, soc->tgt_ver.minor,
 				HTT_CURRENT_VERSION_MAJOR,
 				HTT_CURRENT_VERSION_MINOR);
 			if (soc->tgt_ver.major != HTT_CURRENT_VERSION_MAJOR) {
 				QDF_TRACE(QDF_MODULE_ID_TXRX,
 					QDF_TRACE_LEVEL_ERROR,
-					"*** Incompatible host/target HTT versions!\n");
+					"*** Incompatible host/target HTT versions!");
 			}
 			/* abort if the target is incompatible with the host */
 			qdf_assert(soc->tgt_ver.major ==
@@ -2869,7 +2924,7 @@ static void dp_htt_t2h_msg_handler(void *context, HTC_PACKET *pkt)
 				QDF_TRACE(QDF_MODULE_ID_TXRX,
 					QDF_TRACE_LEVEL_WARN,
 					"*** Warning: host/target HTT versions"
-					" are different, though compatible!\n");
+					" are different, though compatible!");
 			}
 			break;
 		}
@@ -2899,13 +2954,13 @@ static void dp_htt_t2h_msg_handler(void *context, HTC_PACKET *pkt)
 						0, tid, 0, win_sz + 1, 0xffff);
 				QDF_TRACE(QDF_MODULE_ID_TXRX,
 					QDF_TRACE_LEVEL_INFO,
-					FL("PeerID %d BAW %d TID %d stat %d\n"),
+					FL("PeerID %d BAW %d TID %d stat %d"),
 					peer_id, win_sz, tid, status);
 
 			} else {
 				QDF_TRACE(QDF_MODULE_ID_TXRX,
 					QDF_TRACE_LEVEL_ERROR,
-					FL("Peer not found peer id %d\n"),
+					FL("Peer not found peer id %d"),
 					peer_id);
 			}
 			break;
@@ -3155,7 +3210,7 @@ QDF_STATUS dp_h2t_ext_stats_msg_send(struct dp_pdev *pdev,
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
 		"-----%s:%d----\n cookie <-> %d\n config_param_0 %u\n"
 		"config_param_1 %u\n config_param_2 %u\n"
-		"config_param_4 %u\n -------------\n",
+		"config_param_4 %u\n -------------",
 		__func__, __LINE__, cookie_val, config_param_0,
 		config_param_1, config_param_2,	config_param_3);
 
@@ -3251,7 +3306,7 @@ QDF_STATUS dp_h2t_cfg_stats_msg_send(struct dp_pdev *pdev,
 
 	if (!msg) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-		"Fail to allocate HTT_H2T_PPDU_STATS_CFG_MSG_SZ msg buffer\n");
+		"Fail to allocate HTT_H2T_PPDU_STATS_CFG_MSG_SZ msg buffer");
 		qdf_assert(0);
 		return QDF_STATUS_E_NOMEM;
 	}
@@ -3272,7 +3327,7 @@ QDF_STATUS dp_h2t_cfg_stats_msg_send(struct dp_pdev *pdev,
 	 */
 	if (qdf_nbuf_put_tail(msg, HTT_H2T_PPDU_STATS_CFG_MSG_SZ) == NULL) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-				"Failed to expand head for HTT_CFG_STATS\n");
+				"Failed to expand head for HTT_CFG_STATS");
 		qdf_nbuf_free(msg);
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -3289,7 +3344,7 @@ QDF_STATUS dp_h2t_cfg_stats_msg_send(struct dp_pdev *pdev,
 	pkt = htt_htc_pkt_alloc(soc);
 	if (!pkt) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-				"Fail to allocate dp_htt_htc_pkt buffer\n");
+				"Fail to allocate dp_htt_htc_pkt buffer");
 		qdf_assert(0);
 		qdf_nbuf_free(msg);
 		return QDF_STATUS_E_NOMEM;

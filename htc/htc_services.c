@@ -341,7 +341,7 @@ QDF_STATUS htc_connect_service(HTC_HANDLE HTCHandle,
 		if (maxMsgSize % target->TargetCreditSize)
 			pEndpoint->TxCreditsPerMaxMsg++;
 #if DEBUG_CREDIT
-		qdf_print(" Endpoint%d initial credit:%d, size:%d.\n",
+		qdf_print(" Endpoint%d initial credit:%d, size:%d.",
 			  pEndpoint->Id, pEndpoint->TxCredits,
 			  pEndpoint->TxCreditSize);
 #endif
@@ -375,17 +375,14 @@ QDF_STATUS htc_connect_service(HTC_HANDLE HTCHandle,
 				QDF_TIMER_TYPE_SW);
 		}
 
-		AR_DEBUG_PRINTF(ATH_DEBUG_INFO,
-				("SVC:0x%4.4X, ULpipe:%d DLpipe:%d id:%d Ready",
-				 pEndpoint->service_id, pEndpoint->UL_PipeID,
-				 pEndpoint->DL_PipeID, pEndpoint->Id));
+		HTC_TRACE("SVC:0x%4.4X, ULpipe:%d DLpipe:%d id:%d Ready",
+			  pEndpoint->service_id, pEndpoint->UL_PipeID,
+			  pEndpoint->DL_PipeID, pEndpoint->Id);
 
 		if (disableCreditFlowCtrl && pEndpoint->TxCreditFlowEnabled) {
 			pEndpoint->TxCreditFlowEnabled = false;
-			AR_DEBUG_PRINTF(ATH_DEBUG_INFO,
-					("SVC:0x%4.4X ep:%d TX flow control disabled",
-					 pEndpoint->service_id,
-					 assignedEndpoint));
+			HTC_TRACE("SVC:0x%4.4X ep:%d TX flow control disabled",
+				  pEndpoint->service_id, assignedEndpoint);
 		}
 
 	} while (false);
@@ -427,7 +424,7 @@ void htc_set_async_ep(HTC_HANDLE HTCHandle,
 	HTC_ENDPOINT *pEndpoint = &target->endpoint[htc_ep_id];
 
 	pEndpoint->async_update = value;
-	qdf_print("%s: htc_handle %pK, ep %d, value %d\n", __func__,
-					HTCHandle, htc_ep_id, value);
+	qdf_print("%s: htc_handle %pK, ep %d, value %d", __func__,
+		  HTCHandle, htc_ep_id, value);
 }
 

@@ -94,7 +94,7 @@ void hif_ce_war_enable(void)
  * Note: For MCL, #if defined (HIF_CONFIG_SLUB_DEBUG_ON) needs to be checked
  * for defined here
  */
-#if HIF_CE_DEBUG_DATA_BUF
+#if defined(HIF_CONFIG_SLUB_DEBUG_ON) || defined(HIF_CE_DEBUG_DATA_BUF)
 
 #define CE_DEBUG_PRINT_BUF_SIZE(x) (((x) * 3) - 1)
 #define CE_DEBUG_DATA_PER_ROW 16
@@ -349,25 +349,26 @@ void war_ce_src_ring_write_idx_set(struct hif_softc *scn,
 
 		if (!war1_allow_sleep
 		    && ctrl_addr == CE_BASE_ADDRESS(CDC_WAR_DATA_CE)) {
-			hif_write32_mb(indicator_addr,
-				      (CDC_WAR_MAGIC_STR | write_index));
+			hif_write32_mb(scn, indicator_addr,
+				       (CDC_WAR_MAGIC_STR | write_index));
 		} else {
 			unsigned long irq_flags;
 
 			local_irq_save(irq_flags);
-			hif_write32_mb(indicator_addr, 1);
+			hif_write32_mb(scn, indicator_addr, 1);
 
 			/*
 			 * PCIE write waits for ACK in IPQ8K, there is no
 			 * need to read back value.
 			 */
-			(void)hif_read32_mb(indicator_addr);
-			(void)hif_read32_mb(indicator_addr); /* conservative */
+			(void)hif_read32_mb(scn, indicator_addr);
+			/* conservative */
+			(void)hif_read32_mb(scn, indicator_addr);
 
 			CE_SRC_RING_WRITE_IDX_SET(scn,
 						  ctrl_addr, write_index);
 
-			hif_write32_mb(indicator_addr, 0);
+			hif_write32_mb(scn, indicator_addr, 0);
 			local_irq_restore(irq_flags);
 		}
 	} else {
@@ -2792,7 +2793,7 @@ static uint32_t hif_dump_desc_data_buf(uint8_t *buf, ssize_t pos,
  * Note: For MCL, #if defined (HIF_CONFIG_SLUB_DEBUG_ON) needs to be checked
  * for defined here
  */
-#if HIF_CE_DEBUG_DATA_BUF
+#if defined(HIF_CONFIG_SLUB_DEBUG_ON) || defined(HIF_CE_DEBUG_DATA_BUF)
 static const char *ce_event_type_to_str(enum hif_ce_event_type type)
 {
 	switch (type) {
@@ -2874,7 +2875,7 @@ ssize_t hif_dump_desc_event(struct hif_softc *scn, char *buf)
 		(struct hif_ce_desc_event *)ce_hist->hist_ev[ce_hist->hist_id];
 
 	if (!hist_ev) {
-		qdf_print("Low Memory\n");
+		qdf_print("Low Memory");
 		return -EINVAL;
 	}
 
@@ -2882,7 +2883,7 @@ ssize_t hif_dump_desc_event(struct hif_softc *scn, char *buf)
 
 	if ((ce_hist->hist_id >= CE_COUNT_MAX) ||
 		(ce_hist->hist_index >= HIF_CE_HISTORY_MAX)) {
-		qdf_print("Invalid values\n");
+		qdf_print("Invalid values");
 		return -EINVAL;
 	}
 
@@ -2952,7 +2953,7 @@ ssize_t hif_input_desc_trace_buf_index(struct hif_softc *scn,
 	}
 	if ((ce_hist->hist_id >= CE_COUNT_MAX) ||
 	   (ce_hist->hist_index >= HIF_CE_HISTORY_MAX)) {
-		qdf_print("Invalid values\n");
+		qdf_print("Invalid values");
 		return -EINVAL;
 	}
 
@@ -2995,12 +2996,12 @@ ssize_t hif_ce_en_desc_hist(struct hif_softc *scn, const char *buf, size_t size)
 		return -EINVAL;
 	}
 	if (ce_id >= CE_COUNT_MAX) {
-		qdf_print("Invalid value CE Id\n");
+		qdf_print("Invalid value CE Id");
 		return -EINVAL;
 	}
 
 	if ((cfg > 1 || cfg < 0)) {
-		qdf_print("Invalid values: enter 0 or 1\n");
+		qdf_print("Invalid values: enter 0 or 1");
 		return -EINVAL;
 	}
 
@@ -3010,18 +3011,18 @@ ssize_t hif_ce_en_desc_hist(struct hif_softc *scn, const char *buf, size_t size)
 	qdf_mutex_acquire(&ce_dbg_datamem_lock[ce_id]);
 	if (cfg == 1) {
 		if (ce_hist->data_enable[ce_id] == 1) {
-			qdf_print("\nAlready Enabled\n");
+			qdf_print("\nAlready Enabled");
 		} else {
 			if (alloc_mem_ce_debug_hist_data(scn, ce_id)
 							== QDF_STATUS_E_NOMEM){
 				ce_hist->data_enable[ce_id] = 0;
-				qdf_print("%s:Memory Alloc failed\n");
+				qdf_print("%s:Memory Alloc failed");
 			} else
 				ce_hist->data_enable[ce_id] = 1;
 		}
 	} else if (cfg == 0) {
 		if (ce_hist->data_enable[ce_id] == 0) {
-			qdf_print("\nAlready Disabled\n");
+			qdf_print("\nAlready Disabled");
 		} else {
 			ce_hist->data_enable[ce_id] = 0;
 				free_mem_ce_debug_hist_data(scn, ce_id);

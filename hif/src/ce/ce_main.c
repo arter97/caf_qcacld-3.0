@@ -502,6 +502,30 @@ static struct service_to_pipe target_service_to_ce_map_qca6290[] = {
 };
 #endif
 
+#if (defined(QCA_WIFI_QCA6390))
+static struct service_to_pipe target_service_to_ce_map_qca6390[] = {
+	{ WMI_DATA_VO_SVC, PIPEDIR_OUT, 3, },
+	{ WMI_DATA_VO_SVC, PIPEDIR_IN, 2, },
+	{ WMI_DATA_BK_SVC, PIPEDIR_OUT, 3, },
+	{ WMI_DATA_BK_SVC, PIPEDIR_IN, 2, },
+	{ WMI_DATA_BE_SVC, PIPEDIR_OUT, 3, },
+	{ WMI_DATA_BE_SVC, PIPEDIR_IN, 2, },
+	{ WMI_DATA_VI_SVC, PIPEDIR_OUT, 3, },
+	{ WMI_DATA_VI_SVC, PIPEDIR_IN, 2, },
+	{ WMI_CONTROL_SVC, PIPEDIR_OUT, 3, },
+	{ WMI_CONTROL_SVC, PIPEDIR_IN, 2, },
+	{ HTC_CTRL_RSVD_SVC, PIPEDIR_OUT, 0, },
+	{ HTC_CTRL_RSVD_SVC, PIPEDIR_IN, 2, },
+	{ HTT_DATA_MSG_SVC, PIPEDIR_OUT, 4, },
+	{ HTT_DATA_MSG_SVC, PIPEDIR_IN, 1, },
+	/* (Additions here) */
+	{ 0, 0, 0, },
+};
+#else
+static struct service_to_pipe target_service_to_ce_map_qca6390[] = {
+};
+#endif
+
 static struct service_to_pipe target_service_to_ce_map_ar900b[] = {
 	{
 		WMI_DATA_VO_SVC,
@@ -688,7 +712,13 @@ static void hif_select_service_to_pipe_map(struct hif_softc *scn,
 			*sz_tgt_svc_map_to_use =
 				sizeof(target_service_to_ce_map_qca6290);
 			break;
+		case TARGET_TYPE_QCA6390:
+			*tgt_svc_map_to_use = target_service_to_ce_map_qca6390;
+			*sz_tgt_svc_map_to_use =
+				sizeof(target_service_to_ce_map_qca6390);
+			break;
 		case TARGET_TYPE_QCA8074:
+		case TARGET_TYPE_QCA8074V2:
 			*tgt_svc_map_to_use = target_service_to_ce_map_qca8074;
 			*sz_tgt_svc_map_to_use =
 				sizeof(target_service_to_ce_map_qca8074);
@@ -873,7 +903,9 @@ bool ce_srng_based(struct hif_softc *scn)
 
 	switch (tgt_info->target_type) {
 	case TARGET_TYPE_QCA8074:
+	case TARGET_TYPE_QCA8074V2:
 	case TARGET_TYPE_QCA6290:
+	case TARGET_TYPE_QCA6390:
 		return true;
 	default:
 		return false;
@@ -1229,6 +1261,22 @@ static inline void reset_ce_debug_history(struct hif_softc *scn)
 }
 #endif /*Note: defined(HIF_CONFIG_SLUB_DEBUG_ON) || HIF_CE_DEBUG_DATA_BUF */
 
+void ce_enable_polling(void *cestate)
+{
+	struct CE_state *CE_state = (struct CE_state *)cestate;
+
+	if (CE_state && CE_state->attr_flags & CE_ATTR_ENABLE_POLL)
+		CE_state->timer_inited = true;
+}
+
+void ce_disable_polling(void *cestate)
+{
+	struct CE_state *CE_state = (struct CE_state *)cestate;
+
+	if (CE_state && CE_state->attr_flags & CE_ATTR_ENABLE_POLL)
+		CE_state->timer_inited = false;
+}
+
 /*
  * Initialize a Copy Engine based on caller-supplied attributes.
  * This may be called once to initialize both source and destination
@@ -1410,14 +1458,13 @@ struct CE_handle *ce_init(struct hif_softc *scn,
 
 			/* epping */
 			/* poll timer */
-			if ((CE_state->attr_flags & CE_ATTR_ENABLE_POLL) ||
-					scn->polled_mode_on) {
+			if (CE_state->attr_flags & CE_ATTR_ENABLE_POLL) {
 				qdf_timer_init(scn->qdf_dev,
-						       &CE_state->poll_timer,
-						       ce_poll_timeout,
-						       CE_state,
-						       QDF_TIMER_TYPE_SW);
-				CE_state->timer_inited = true;
+						&CE_state->poll_timer,
+						ce_poll_timeout,
+						CE_state,
+						QDF_TIMER_TYPE_WAKE_APPS);
+				ce_enable_polling(CE_state);
 				qdf_timer_mod(&CE_state->poll_timer,
 						      CE_POLL_TIMEOUT);
 			}
@@ -1471,14 +1518,6 @@ void hif_enable_fastpath(struct hif_opaque_softc *hif_ctx)
 	scn->fastpath_mode_on = true;
 }
 
-void hif_enable_polled_mode(struct hif_opaque_softc *hif_ctx)
-{
-	struct hif_softc *scn = HIF_GET_SOFTC(hif_ctx);
-	HIF_DBG("%s, Enabling polled mode", __func__);
-
-	scn->polled_mode_on = true;
-}
-
 /**
  * hif_is_fastpath_mode_enabled - API to query if fasthpath mode is enabled
  * @hif_ctx: HIF Context
@@ -1494,12 +1533,31 @@ bool hif_is_fastpath_mode_enabled(struct hif_opaque_softc *hif_ctx)
 	return scn->fastpath_mode_on;
 }
 
+/**
+ * hif_is_polled_mode_enabled - API to query if polling is enabled on all CEs
+ * @hif_ctx: HIF Context
+ *
+ * API to check if polling is enabled on all CEs. Returns true when polling
+ * is enabled on all CEs.
+ *
+ * Return: bool
+ */
 bool hif_is_polled_mode_enabled(struct hif_opaque_softc *hif_ctx)
 {
 	struct hif_softc *scn = HIF_GET_SOFTC(hif_ctx);
+	struct HIF_CE_state *hif_state = HIF_GET_CE_STATE(scn);
+	struct CE_attr *attr;
+	int id;
 
-	return scn->polled_mode_on;
+	for (id = 0; id < scn->ce_count; id++) {
+		attr = &hif_state->host_ce_config[id];
+		if (attr && (attr->dest_nentries) &&
+		    !(attr->flags & CE_ATTR_ENABLE_POLL))
+			return false;
+	}
+	return true;
 }
+qdf_export_symbol(hif_is_polled_mode_enabled);
 
 /**
  * hif_get_ce_handle - API to get CE handle for FastPath mode
@@ -1661,7 +1719,8 @@ void ce_fini(struct CE_handle *copyeng)
 	CE_state->state = CE_UNUSED;
 	scn->ce_id_to_state[CE_id] = NULL;
 	/* Set the flag to false first to stop processing in ce_poll_timeout */
-	CE_state->timer_inited = false;
+	ce_disable_polling(CE_state);
+
 	qdf_lro_deinit(CE_state->lro_data);
 
 	if (CE_state->src_ring) {
@@ -1742,7 +1801,11 @@ hif_send_head(struct hif_opaque_softc *hif_ctx,
 	int status, i = 0;
 	unsigned int mux_id = 0;
 
-	QDF_ASSERT(nbytes <= qdf_nbuf_len(nbuf));
+	if (nbytes > qdf_nbuf_len(nbuf)) {
+		HIF_ERROR("%s: nbytes:%d nbuf_len:%d", __func__, nbytes,
+			  (uint32_t)qdf_nbuf_len(nbuf));
+		QDF_ASSERT(0);
+	}
 
 	transfer_id =
 		(mux_id & MUX_ID_MASK) |
@@ -2574,11 +2637,11 @@ static void hif_print_hal_shadow_register_cfg(struct pld_wlan_enable_cfg *cfg)
 {
 	int i;
 	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-		  "%s: num_config %d\n", __func__, cfg->num_shadow_reg_v2_cfg);
+		  "%s: num_config %d", __func__, cfg->num_shadow_reg_v2_cfg);
 
 	for (i = 0; i < cfg->num_shadow_reg_v2_cfg; i++) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO,
-		     "%s: i %d, val %x\n", __func__, i,
+		     "%s: i %d, val %x", __func__, i,
 		     cfg->shadow_reg_v2_cfg[i].addr);
 	}
 }
@@ -2587,7 +2650,7 @@ static void hif_print_hal_shadow_register_cfg(struct pld_wlan_enable_cfg *cfg)
 static void hif_print_hal_shadow_register_cfg(struct pld_wlan_enable_cfg *cfg)
 {
 	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-		  "%s: CONFIG_SHADOW_V2 not defined\n", __func__);
+		  "%s: CONFIG_SHADOW_V2 not defined", __func__);
 }
 #endif
 
@@ -2742,6 +2805,7 @@ void hif_ce_prepare_config(struct hif_softc *scn)
 		break;
 
 	case TARGET_TYPE_QCA8074:
+	case TARGET_TYPE_QCA8074V2:
 		if (scn->bus_type == QDF_BUS_TYPE_PCI) {
 			hif_state->host_ce_config =
 					host_ce_config_wlan_qca8074_pci;
@@ -2764,6 +2828,14 @@ void hif_ce_prepare_config(struct hif_softc *scn)
 					sizeof(target_ce_config_wlan_qca6290);
 
 		scn->ce_count = QCA_6290_CE_COUNT;
+		break;
+	case TARGET_TYPE_QCA6390:
+		hif_state->host_ce_config = host_ce_config_wlan_qca6390;
+		hif_state->target_ce_config = target_ce_config_wlan_qca6390;
+		hif_state->target_ce_config_sz =
+					sizeof(target_ce_config_wlan_qca6390);
+
+		scn->ce_count = QCA_6390_CE_COUNT;
 		break;
 	}
 	QDF_BUG(scn->ce_count <= CE_COUNT_MAX);
@@ -2813,13 +2885,18 @@ void hif_unconfig_ce(struct hif_softc *hif_sc)
 		pipe_info = &hif_state->pipe_info[pipe_num];
 		if (pipe_info->ce_hdl) {
 			ce_unregister_irq(hif_state, (1 << pipe_num));
+		}
+	}
+	deinit_tasklet_workers(hif_hdl);
+	for (pipe_num = 0; pipe_num < hif_sc->ce_count; pipe_num++) {
+		pipe_info = &hif_state->pipe_info[pipe_num];
+		if (pipe_info->ce_hdl) {
 			ce_fini(pipe_info->ce_hdl);
 			pipe_info->ce_hdl = NULL;
 			pipe_info->buf_sz = 0;
 			qdf_spinlock_destroy(&pipe_info->recv_bufs_needed_lock);
 		}
 	}
-	deinit_tasklet_workers(hif_hdl);
 	if (hif_sc->athdiag_procfs_inited) {
 		athdiag_procfs_remove();
 		hif_sc->athdiag_procfs_inited = false;
@@ -2848,7 +2925,7 @@ static void hif_post_static_buf_to_target(struct hif_softc *scn)
 		HIF_TRACE("Memory allocation failed could not post target buf");
 		return;
 	}
-	hif_write32_mb(scn->mem + BYPASS_QMI_TEMP_REGISTER, target_pa);
+	hif_write32_mb(scn, scn->mem + BYPASS_QMI_TEMP_REGISTER, target_pa);
 	HIF_TRACE("target va %pK target pa %pa", target_va, &target_pa);
 }
 #else
@@ -3327,11 +3404,9 @@ int hif_map_service_to_pipe(struct hif_opaque_softc *hif_hdl, uint16_t svc_id,
 		}
 	}
 	if (ul_updated == false)
-		HIF_INFO("%s: ul pipe is NOT updated for service %d",
-			 __func__, svc_id);
+		HIF_DBG("ul pipe is NOT updated for service %d", svc_id);
 	if (dl_updated == false)
-		HIF_INFO("%s: dl pipe is NOT updated for service %d",
-			 __func__, svc_id);
+		HIF_DBG("dl pipe is NOT updated for service %d", svc_id);
 
 	return status;
 }
@@ -3527,19 +3602,19 @@ int hif_dump_ce_registers(struct hif_softc *scn)
 		qdf_trace_hex_dump(QDF_MODULE_ID_HIF, QDF_TRACE_LEVEL_DEBUG,
 				   (uint8_t *) &ce_reg_values[0],
 				   ce_reg_word_size * sizeof(uint32_t));
-		qdf_print("ADDR:[0x%08X], SR_WR_INDEX:%d\n", (ce_reg_address
+		qdf_print("ADDR:[0x%08X], SR_WR_INDEX:%d", (ce_reg_address
 				+ SR_WR_INDEX_ADDRESS),
 				ce_reg_values[SR_WR_INDEX_ADDRESS/4]);
-		qdf_print("ADDR:[0x%08X], CURRENT_SRRI:%d\n", (ce_reg_address
+		qdf_print("ADDR:[0x%08X], CURRENT_SRRI:%d", (ce_reg_address
 				+ CURRENT_SRRI_ADDRESS),
 				ce_reg_values[CURRENT_SRRI_ADDRESS/4]);
-		qdf_print("ADDR:[0x%08X], DST_WR_INDEX:%d\n", (ce_reg_address
+		qdf_print("ADDR:[0x%08X], DST_WR_INDEX:%d", (ce_reg_address
 				+ DST_WR_INDEX_ADDRESS),
 				ce_reg_values[DST_WR_INDEX_ADDRESS/4]);
-		qdf_print("ADDR:[0x%08X], CURRENT_DRRI:%d\n", (ce_reg_address
+		qdf_print("ADDR:[0x%08X], CURRENT_DRRI:%d", (ce_reg_address
 				+ CURRENT_DRRI_ADDRESS),
 				ce_reg_values[CURRENT_DRRI_ADDRESS/4]);
-		qdf_print("---\n");
+		qdf_print("---");
 	}
 	return 0;
 }

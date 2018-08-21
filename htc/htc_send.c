@@ -321,7 +321,7 @@ static QDF_STATUS htc_send_bundled_netbuf(HTC_TARGET *target,
 	pEndpoint->ul_outstanding_cnt++;
 	UNLOCK_HTC_TX(target);
 #if DEBUG_BUNDLE
-	qdf_print(" Send bundle EP%d buffer size:0x%x, total:0x%x, count:%d.\n",
+	qdf_print(" Send bundle EP%d buffer size:0x%x, total:0x%x, count:%d.",
 		  pEndpoint->Id,
 		  pEndpoint->TxCreditSize,
 		  data_len, data_len / pEndpoint->TxCreditSize);
@@ -335,7 +335,7 @@ static QDF_STATUS htc_send_bundled_netbuf(HTC_TARGET *target,
 			       pEndpoint->Id, data_len,
 			       bundleBuf, data_attr);
 	if (status != QDF_STATUS_SUCCESS) {
-		qdf_print("%s:hif_send_head failed(len=%zu).\n", __func__,
+		qdf_print("%s:hif_send_head failed(len=%zu).", __func__,
 			  data_len);
 	}
 	return status;
@@ -608,7 +608,7 @@ static QDF_STATUS htc_issue_packets(HTC_TARGET *target,
 		if (pPacket->PktInfo.AsTx.Tag == HTC_TX_PACKET_TAG_RUNTIME_PUT)
 			rt_put = true;
 #if DEBUG_BUNDLE
-		qdf_print(" Send single EP%d buffer size:0x%x, total:0x%x.\n",
+		qdf_print(" Send single EP%d buffer size:0x%x, total:0x%x.",
 			  pEndpoint->Id,
 			  pEndpoint->TxCreditSize,
 			  HTC_HDR_LENGTH + pPacket->ActualLength);
@@ -1358,7 +1358,7 @@ static inline QDF_STATUS __htc_send_pkt(HTC_HANDLE HTCHandle,
 	HTC_ENDPOINT *pEndpoint;
 	HTC_PACKET_QUEUE pPktQueue;
 	qdf_nbuf_t netbuf;
-	HTC_FRAME_HDR *pHtcHdr;
+	HTC_FRAME_HDR *htc_hdr;
 	QDF_STATUS status;
 
 	AR_DEBUG_PRINTF(ATH_DEBUG_SEND,
@@ -1397,12 +1397,17 @@ static inline QDF_STATUS __htc_send_pkt(HTC_HANDLE HTCHandle,
 	/* provide room in each packet's netbuf for the HTC frame header */
 	netbuf = GET_HTC_PACKET_NET_BUF_CONTEXT(pPacket);
 	AR_DEBUG_ASSERT(netbuf);
+	if (!netbuf)
+		return QDF_STATUS_E_INVAL;
 
 	qdf_nbuf_push_head(netbuf, sizeof(HTC_FRAME_HDR));
 	/* setup HTC frame header */
-	pHtcHdr = (HTC_FRAME_HDR *) qdf_nbuf_get_frag_vaddr(netbuf, 0);
-	AR_DEBUG_ASSERT(pHtcHdr);
-	HTC_WRITE32(pHtcHdr,
+	htc_hdr = (HTC_FRAME_HDR *)qdf_nbuf_get_frag_vaddr(netbuf, 0);
+	AR_DEBUG_ASSERT(htc_hdr);
+	if (!htc_hdr)
+		return QDF_STATUS_E_INVAL;
+
+	HTC_WRITE32(htc_hdr,
 		    SM(pPacket->ActualLength,
 		       HTC_FRAME_HDR_PAYLOADLEN) |
 		    SM(pPacket->Endpoint,
@@ -1412,7 +1417,7 @@ static inline QDF_STATUS __htc_send_pkt(HTC_HANDLE HTCHandle,
 	pPacket->PktInfo.AsTx.SeqNo = pEndpoint->SeqNo;
 	pEndpoint->SeqNo++;
 
-	HTC_WRITE32(((uint32_t *) pHtcHdr) + 1,
+	HTC_WRITE32(((uint32_t *)htc_hdr) + 1,
 		    SM(pPacket->PktInfo.AsTx.SeqNo,
 		       HTC_FRAME_HDR_CONTROLBYTES1));
 
@@ -1750,7 +1755,7 @@ QDF_STATUS htc_send_data_pkt(HTC_HANDLE HTCHandle, HTC_PACKET *pPacket,
 				       HTC_HDR_LENGTH + pPacket->ActualLength,
 				       netbuf, data_attr);
 #if DEBUG_BUNDLE
-		qdf_print(" Send single EP%d buffer size:0x%x, total:0x%x.\n",
+		qdf_print(" Send single EP%d buffer size:0x%x, total:0x%x.",
 			  pEndpoint->Id,
 			  pEndpoint->TxCreditSize,
 			  HTC_HDR_LENGTH + pPacket->ActualLength);
@@ -2064,7 +2069,8 @@ void htc_flush_endpoint_tx(HTC_TARGET *target, HTC_ENDPOINT *pEndpoint,
 
 /* flush pending entries in endpoint TX Lookup queue */
 void htc_flush_endpoint_txlookupQ(HTC_TARGET *target,
-				  HTC_ENDPOINT_ID endpoint_id)
+				  HTC_ENDPOINT_ID endpoint_id,
+				  bool call_ep_callback)
 {
 	HTC_PACKET *packet;
 	HTC_ENDPOINT *endpoint;
@@ -2078,8 +2084,12 @@ void htc_flush_endpoint_txlookupQ(HTC_TARGET *target,
 		packet = htc_packet_dequeue(&endpoint->TxLookupQueue);
 
 		if (packet) {
-			packet->Status = QDF_STATUS_E_CANCELED;
-			send_packet_completion(target, packet);
+			if (call_ep_callback == true) {
+				packet->Status = QDF_STATUS_E_CANCELED;
+				send_packet_completion(target, packet);
+			} else {
+				qdf_mem_free(packet);
+			}
 		}
 	}
 }

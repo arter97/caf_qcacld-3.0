@@ -37,4 +37,15 @@ struct cdp_soc;
  * cdp_ctrl_objmgr_pdev - opaque handle for UMAC pdev object
  */
 struct cdp_ctrl_objmgr_pdev;
+
+/**
+ * cdp_ctrl_objmgr_vdev - opaque handle for UMAC vdev object
+ */
+struct cdp_ctrl_objmgr_vdev;
+
+/**
+ * cdp_ctrl_objmgr_peer - opaque handle for UMAC peer object
+ */
+struct cdp_ctrl_objmgr_peer;
+
 #endif

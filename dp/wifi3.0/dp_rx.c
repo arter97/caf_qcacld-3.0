@@ -16,6 +16,7 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "hal_hw_headers.h"
 #include "dp_types.h"
 #include "dp_rx.h"
 #include "dp_peer.h"
@@ -356,15 +357,6 @@ dp_rx_intrabss_fwd(struct dp_soc *soc,
 	struct dp_peer *da_peer;
 	struct dp_ast_entry *ast_entry;
 	qdf_nbuf_t nbuf_copy;
-	struct dp_vdev *vdev = sa_peer->vdev;
-
-	/*
-	 * intrabss forwarding is not applicable if
-	 * vap is nawds enabled or ap_bridge is false.
-	 */
-	if (vdev->nawds_enabled)
-		return false;
-
 
 	/* check if the destination peer is available in peer table
 	 * and also check if the source peer and destination peer
@@ -373,7 +365,7 @@ dp_rx_intrabss_fwd(struct dp_soc *soc,
 
 	if ((hal_rx_msdu_end_da_is_valid_get(rx_tlv_hdr) &&
 	   !hal_rx_msdu_end_da_is_mcbc_get(rx_tlv_hdr))) {
-		da_idx = hal_rx_msdu_end_da_idx_get(rx_tlv_hdr);
+		da_idx = hal_rx_msdu_end_da_idx_get(soc->hal_soc, rx_tlv_hdr);
 
 		ast_entry = soc->ast_table[da_idx];
 		if (!ast_entry)
@@ -508,7 +500,7 @@ void dp_rx_fill_mesh_stats(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 	pkt_type = hal_rx_msdu_start_get_pkt_type(rx_tlv_hdr);
 	rate_mcs = hal_rx_msdu_start_rate_mcs_get(rx_tlv_hdr);
 	bw = hal_rx_msdu_start_bw_get(rx_tlv_hdr);
-	nss = hal_rx_msdu_start_nss_get(rx_tlv_hdr);
+	nss = hal_rx_msdu_start_nss_get(vdev->pdev->soc->hal_soc, rx_tlv_hdr);
 	rx_info->rs_ratephy1 = rate_mcs | (nss << 0x8) | (pkt_type << 16) |
 				(bw << 24);
 
@@ -643,45 +635,6 @@ struct dp_vdev *dp_rx_nac_filter(struct dp_pdev *pdev,
 }
 
 /**
- * dp_rx_process_nac_rssi_frames(): Store RSSI for configured NAC
- * @pdev: DP pdev handle
- * @rx_tlv_hdr: tlv hdr buf
- *
- * return: None
- */
-#ifdef ATH_SUPPORT_NAC_RSSI
-static void dp_rx_process_nac_rssi_frames(struct dp_pdev *pdev, uint8_t *rx_tlv_hdr)
-{
-	struct dp_vdev *vdev = NULL;
-	struct dp_soc *soc  = pdev->soc;
-	uint8_t *rx_pkt_hdr = hal_rx_pkt_hdr_get(rx_tlv_hdr);
-	struct ieee80211_frame *wh = (struct ieee80211_frame *)rx_pkt_hdr;
-
-	if (pdev->nac_rssi_filtering) {
-		TAILQ_FOREACH(vdev, &pdev->vdev_list, vdev_list_elem) {
-			if (vdev->cdp_nac_rssi_enabled &&
-				(qdf_mem_cmp(vdev->cdp_nac_rssi.client_mac,
-					wh->i_addr1, DP_MAC_ADDR_LEN) == 0)) {
-				QDF_TRACE(QDF_MODULE_ID_DP,
-					QDF_TRACE_LEVEL_DEBUG, "RSSI updated");
-				vdev->cdp_nac_rssi.vdev_id = vdev->vdev_id;
-				vdev->cdp_nac_rssi.client_rssi =
-					hal_rx_msdu_start_get_rssi(rx_tlv_hdr);
-				dp_wdi_event_handler(WDI_EVENT_NAC_RSSI, soc,
-					(void *)&vdev->cdp_nac_rssi,
-					HTT_INVALID_PEER, WDI_NO_VAL,
-					pdev->pdev_id);
-			}
-		}
-	}
-}
-#else
-static void dp_rx_process_nac_rssi_frames(struct dp_pdev *pdev, uint8_t *rx_tlv_hdr)
-{
-}
-#endif
-
-/**
  * dp_rx_process_invalid_peer(): Function to pass invalid peer list to umac
  * @soc: DP SOC handle
  * @mpdu: mpdu for which peer is invalid
@@ -737,8 +690,6 @@ uint8_t dp_rx_process_invalid_peer(struct dp_soc *soc, qdf_nbuf_t mpdu)
 			}
 		}
 
-
-		dp_rx_process_nac_rssi_frames(pdev, rx_tlv_hdr);
 
 		TAILQ_FOREACH(vdev, &pdev->vdev_list, vdev_list_elem) {
 
@@ -839,7 +790,7 @@ void dp_rx_process_invalid_peer_wrapper(struct dp_soc *soc,
 static void dp_rx_print_lro_info(uint8_t *rx_tlv)
 {
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-	FL("----------------------RX DESC LRO----------------------\n"));
+	FL("----------------------RX DESC LRO----------------------"));
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
 		FL("lro_eligible 0x%x"), HAL_RX_TLV_GET_LRO_ELIGIBLE(rx_tlv));
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
@@ -859,7 +810,7 @@ static void dp_rx_print_lro_info(uint8_t *rx_tlv)
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
 		FL("toeplitz 0x%x"), HAL_RX_TLV_GET_FLOW_ID_TOEPLITZ(rx_tlv));
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-	FL("---------------------------------------------------------\n"));
+	FL("---------------------------------------------------------"));
 }
 
 /**
@@ -1136,15 +1087,17 @@ static void dp_rx_msdu_stats_update(struct dp_soc *soc,
 
 	sgi = hal_rx_msdu_start_sgi_get(rx_tlv_hdr);
 	mcs = hal_rx_msdu_start_rate_mcs_get(rx_tlv_hdr);
-	tid = hal_rx_mpdu_start_tid_get(rx_tlv_hdr);
+	tid = hal_rx_mpdu_start_tid_get(soc->hal_soc, rx_tlv_hdr);
 	bw = hal_rx_msdu_start_bw_get(rx_tlv_hdr);
-	reception_type = hal_rx_msdu_start_reception_type_get(rx_tlv_hdr);
-	nss = hal_rx_msdu_start_nss_get(rx_tlv_hdr);
+	reception_type = hal_rx_msdu_start_reception_type_get(soc->hal_soc,
+							      rx_tlv_hdr);
+	nss = hal_rx_msdu_start_nss_get(soc->hal_soc, rx_tlv_hdr);
 	pkt_type = hal_rx_msdu_start_get_pkt_type(rx_tlv_hdr);
 
 	/* Save tid to skb->priority */
 	DP_RX_TID_SAVE(nbuf, tid);
 
+	DP_STATS_INC(peer, rx.bw[bw], 1);
 	DP_STATS_INC(peer, rx.nss[nss], 1);
 	DP_STATS_INC(peer, rx.sgi_count[sgi], 1);
 	DP_STATS_INCC(peer, rx.err.mic_err, 1,
@@ -1153,7 +1106,6 @@ static void dp_rx_msdu_stats_update(struct dp_soc *soc,
 		      hal_rx_mpdu_end_decrypt_err_get(rx_tlv_hdr));
 
 	DP_STATS_INC(peer, rx.wme_ac_type[TID_TO_WME_AC(tid)], 1);
-	DP_STATS_INC(peer, rx.bw[bw], 1);
 	DP_STATS_INC(peer, rx.reception_type[reception_type], 1);
 
 	DP_STATS_INCC(peer, rx.pkt_type[pkt_type].mcs_count[MAX_MCS], 1,
@@ -1492,13 +1444,22 @@ done:
 		if (qdf_unlikely(!hal_rx_attn_msdu_done_get(rx_tlv_hdr))) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 				  FL("MSDU DONE failure"));
-			hal_rx_dump_pkt_tlvs(rx_tlv_hdr, QDF_TRACE_LEVEL_INFO);
+			hal_rx_dump_pkt_tlvs(hal_soc, rx_tlv_hdr,
+					     QDF_TRACE_LEVEL_INFO);
 			qdf_assert(0);
 		}
 
 		peer_mdata = hal_rx_mpdu_peer_meta_data_get(rx_tlv_hdr);
 		peer_id = DP_PEER_METADATA_PEER_ID_GET(peer_mdata);
 		peer = dp_peer_find_by_id(soc, peer_id);
+
+		if (peer) {
+			QDF_NBUF_CB_DP_TRACE_PRINT(nbuf) = false;
+			qdf_dp_trace_set_track(nbuf, QDF_RX);
+			QDF_NBUF_CB_RX_DP_TRACE(nbuf) = 1;
+			QDF_NBUF_CB_RX_PACKET_TRACK(nbuf) =
+				QDF_NBUF_RX_PKT_DATA_TRACK;
+		}
 
 		rx_bufs_used++;
 
@@ -1620,7 +1581,7 @@ done:
 		 * begins.
 		 */
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-			FL("rxhash: flow id toeplitz: 0x%x\n"),
+			FL("rxhash: flow id toeplitz: 0x%x"),
 			hal_rx_msdu_start_toeplitz_get(rx_tlv_hdr));
 
 		dp_rx_msdu_stats_update(soc, nbuf, rx_tlv_hdr, peer, ring_id);
@@ -1654,7 +1615,8 @@ done:
 
 		if (qdf_likely(vdev->rx_decap_type ==
 					htt_cmn_pkt_type_ethernet) &&
-				(qdf_likely(!vdev->mesh_vdev))) {
+				(qdf_likely(!vdev->mesh_vdev)) &&
+				(vdev->wds_enabled)) {
 			/* WDS Source Port Learning */
 			dp_rx_wds_srcport_learn(soc,
 						rx_tlv_hdr,
@@ -1740,8 +1702,8 @@ dp_rx_pdev_attach(struct dp_pdev *pdev)
 	struct rx_desc_pool *rx_desc_pool;
 
 	if (wlan_cfg_get_dp_pdev_nss_enabled(pdev->wlan_cfg_ctx)) {
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			"nss-wifi<4> skip Rx refil %d", pdev_id);
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
+			  "nss-wifi<4> skip Rx refil %d", pdev_id);
 		return QDF_STATUS_SUCCESS;
 	}
 

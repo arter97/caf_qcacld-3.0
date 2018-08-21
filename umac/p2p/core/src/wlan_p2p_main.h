@@ -35,21 +35,27 @@
 #define P2P_MODULE_NAME  "P2P"
 #define P2P_INVALID_VDEV_ID 0xFFFFFFFF
 
-#define p2p_log(level, args...) \
-	QDF_TRACE(QDF_MODULE_ID_P2P, level, ## args)
-#define p2p_logl(level, format, args...) \
-	p2p_log(level, FL(format), ## args)
+#define p2p_debug(params ...) \
+	QDF_TRACE_DEBUG(QDF_MODULE_ID_P2P, params)
+#define p2p_info(params ...) \
+	QDF_TRACE_INFO(QDF_MODULE_ID_P2P, params)
+#define p2p_warn(params ...) \
+	QDF_TRACE_WARN(QDF_MODULE_ID_P2P, params)
+#define p2p_err(params ...) \
+	QDF_TRACE_ERROR(QDF_MODULE_ID_P2P, params)
+#define p2p_alert(params ...) \
+	QDF_TRACE_FATAL(QDF_MODULE_ID_P2P, params)
 
-#define p2p_debug(format, args ...) \
-	p2p_logl(QDF_TRACE_LEVEL_DEBUG, format, ## args)
-#define p2p_info(format, args ...) \
-	p2p_logl(QDF_TRACE_LEVEL_INFO, format, ## args)
-#define p2p_warn(format, args ...) \
-	p2p_logl(QDF_TRACE_LEVEL_WARN, format, ## args)
-#define p2p_err(format, args ...) \
-	p2p_logl(QDF_TRACE_LEVEL_ERROR, format, ## args)
-#define p2p_alert(format, args ...) \
-	p2p_logl(QDF_TRACE_LEVEL_FATAL, format, ## args)
+#define p2p_nofl_debug(params ...) \
+	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_P2P, params)
+#define p2p_nofl_info(params ...) \
+	QDF_TRACE_INFO_NO_FL(QDF_MODULE_ID_P2P, params)
+#define p2p_nofl_warn(params ...) \
+	QDF_TRACE_WARN_NO_FL(QDF_MODULE_ID_P2P, params)
+#define p2p_nofl_err(params ...) \
+	QDF_TRACE_ERROR_NO_FL(QDF_MODULE_ID_P2P, params)
+#define p2p_nofl_alert(params ...) \
+	QDF_TRACE_FATAL_NO_FL(QDF_MODULE_ID_P2P, params)
 
 struct scheduler_msg;
 struct p2p_tx_cnf;
@@ -162,6 +168,24 @@ enum p2p_connection_status {
 #endif
 
 /**
+ * struct p2p_param - p2p parameters to be used
+ * @go_keepalive_period:            P2P GO keep alive period
+ * @go_link_monitor_period:         period where link is idle and
+ *                                  where we send NULL frame
+ * @p2p_device_addr_admin:          enable/disable to derive the P2P
+ *                                  MAC address from the primary MAC address
+ * @skip_dfs_channel_p2p_search:    kip DFS Channel in case of P2P Search
+ * @ignore_dynamic_dtim_in_p2p_mode:Ignore Dynamic Dtim in case of P2P options
+ */
+struct p2p_param {
+	uint32_t go_keepalive_period;
+	uint32_t go_link_monitor_period;
+	bool p2p_device_addr_admin;
+	bool skip_dfs_channel_p2p_search;
+	bool ignore_dynamic_dtim_in_p2p_mode;
+};
+
+/**
  * struct p2p_soc_priv_obj - Per SoC p2p private object
  * @soc:              Pointer to SoC context
  * @roc_q:            Queue for pending roc requests
@@ -177,6 +201,7 @@ enum p2p_connection_status {
  * @p2p_cb: Callbacks to protocol stack
  * @cur_roc_vdev_id:  Vdev id of current roc
  * @p2p_idr:          p2p idr
+ * @param:            p2p parameters to be used
  * @connection_status:Global P2P connection status
  */
 struct p2p_soc_priv_obj {
@@ -193,6 +218,7 @@ struct p2p_soc_priv_obj {
 	struct p2p_protocol_callbacks p2p_cb;
 	uint32_t cur_roc_vdev_id;
 	qdf_idr p2p_idr;
+	struct p2p_param param;
 #ifdef WLAN_FEATURE_P2P_DEBUG
 	enum p2p_connection_status connection_status;
 #endif

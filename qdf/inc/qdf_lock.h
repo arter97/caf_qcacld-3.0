@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2018 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -144,7 +144,7 @@ do {\
 		lock->stats.num_large_holds++; \
 	if (QDF_LOCK_STATS_BUG_ON && max_hold_time && \
 	    held_time > qdf_usecs_to_log_timestamp(max_hold_time)) { \
-		qdf_print("BEFORE_UNLOCK: lock held too long (%lluus)\n", \
+		qdf_warn("BEFORE_UNLOCK: lock held too long (%lluus)", \
 		       qdf_log_timestamp_to_usecs(held_time)); \
 		QDF_BUG(0); \
 	} \
@@ -158,11 +158,11 @@ void qdf_lock_stats_cookie_create(struct lock_stats *stats,
 static inline void qdf_lock_stats_destroy(struct lock_stats *stats)
 {
 	if (QDF_LOCK_STATS_DESTROY_PRINT) {
-		qdf_print("%s: lock: %s %d \t"
+		qdf_debug("%s: lock: %s %d \t"
 			"acquired:\t%d\tcontended:\t%d\t"
 			"contention_time\t%llu\tmax_contention_wait:\t%llu\t"
 			"non_contention_time\t%llu\t"
-			"held_time\t%llu\tmax_held:\t%llu\t\n"
+			"held_time\t%llu\tmax_held:\t%llu"
 			, __func__, stats->initialization_fn, stats->line,
 			stats->acquired, stats->contended,
 			qdf_log_timestamp_to_usecs(stats->contention_time),
@@ -297,6 +297,24 @@ static inline int qdf_spin_trylock_bh(qdf_spinlock_t *lock, const char *func)
 #define qdf_spin_trylock_bh(lock) qdf_spin_trylock_bh(lock, __func__)
 
 int qdf_spin_trylock_bh_outline(qdf_spinlock_t *lock);
+
+/**
+ * qdf_spin_trylock() - spin trylock
+ * @lock: spinlock object
+ * Return: int
+ */
+static inline int qdf_spin_trylock(qdf_spinlock_t *lock, const char *func)
+{
+	int result = 0;
+
+	BEFORE_LOCK(lock, qdf_spin_is_locked(lock));
+	result = __qdf_spin_trylock(&lock->lock);
+	AFTER_LOCK(lock, func);
+
+	return result;
+}
+
+#define qdf_spin_trylock(lock) qdf_spin_trylock(lock, __func__)
 
 /**
  * qdf_spin_lock_bh() - locks the spinlock mutex in soft irq context

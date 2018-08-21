@@ -81,7 +81,7 @@ static HTC_PACKET *build_htc_tx_ctrl_packet(qdf_device_t osdev)
 		if (NULL == netbuf) {
 			qdf_mem_free(pPacket);
 			pPacket = NULL;
-			qdf_print("%s: nbuf alloc failed\n", __func__);
+			qdf_print("%s: nbuf alloc failed", __func__);
 			break;
 		}
 		AR_DEBUG_PRINTF(ATH_DEBUG_TRC,
@@ -187,7 +187,7 @@ static void htc_cleanup(HTC_TARGET *target)
 	}
 #endif
 
-	htc_flush_endpoint_txlookupQ(target, ENDPOINT_0);
+	htc_flush_endpoint_txlookupQ(target, ENDPOINT_0, true);
 
 	qdf_spinlock_destroy(&target->HTCLock);
 	qdf_spinlock_destroy(&target->HTCRxLock);
@@ -701,7 +701,7 @@ QDF_STATUS htc_start(HTC_HANDLE HTCHandle)
 		pSendPacket = htc_alloc_control_tx_packet(target);
 		if (NULL == pSendPacket) {
 			AR_DEBUG_ASSERT(false);
-			qdf_print("%s: allocControlTxPacket failed\n",
+			qdf_print("%s: allocControlTxPacket failed",
 				  __func__);
 			status = QDF_STATUS_E_NOMEM;
 			break;
@@ -719,12 +719,12 @@ QDF_STATUS htc_start(HTC_HANDLE HTCHandle)
 			      MESSAGEID, HTC_MSG_SETUP_COMPLETE_EX_ID);
 
 		if (!htc_credit_flow) {
-			AR_DEBUG_PRINTF(ATH_DEBUG_INIT,
+			AR_DEBUG_PRINTF(ATH_DEBUG_TRC,
 					("HTC will not use TX credit flow control"));
 			pSetupComp->SetupFlags |=
 				HTC_SETUP_COMPLETE_FLAGS_DISABLE_TX_CREDIT_FLOW;
 		} else {
-			AR_DEBUG_PRINTF(ATH_DEBUG_INIT,
+			AR_DEBUG_PRINTF(ATH_DEBUG_TRC,
 					("HTC using TX credit flow control"));
 		}
 
@@ -830,6 +830,17 @@ void htc_stop(HTC_HANDLE HTCHandle)
 	RESET_RX_SG_CONFIG(target);
 	UNLOCK_HTC_RX(target);
 #endif
+
+	/**
+	 * In SSR case, HTC tx completion callback for wmi will be blocked
+	 * by TARGET_STATUS_RESET and HTC packets will be left unfreed on
+	 * lookup queue.
+	 */
+	for (i = 0; i < ENDPOINT_MAX; i++) {
+		pEndpoint = &target->endpoint[i];
+		if (pEndpoint->service_id == WMI_CONTROL_SVC)
+			htc_flush_endpoint_txlookupQ(target, i, false);
+	}
 
 	reset_endpoint_states(target);
 

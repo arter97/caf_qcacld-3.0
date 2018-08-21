@@ -17,6 +17,7 @@
  */
 
 #include "htt.h"
+#include "hal_hw_headers.h"
 #include "dp_tx.h"
 #include "dp_tx_desc.h"
 #include "dp_peer.h"
@@ -278,7 +279,7 @@ static uint8_t dp_tx_prepare_htt_metadata(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 		hdr = qdf_nbuf_push_head(nbuf, htt_desc_size_aligned);
 		if (hdr == NULL) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-					"Error in filling HTT metadata\n");
+					"Error in filling HTT metadata");
 
 			return 0;
 		}
@@ -505,7 +506,7 @@ struct dp_tx_ext_desc_elem_s *dp_tx_prepare_ext_desc(struct dp_vdev *vdev,
 	qdf_mem_zero(&cached_ext_desc[0], HAL_TX_EXT_DESC_WITH_META_DATA);
 
 	if (!msdu_ext_desc) {
-		DP_STATS_INC(vdev, tx_i.dropped.desc_na, 1);
+		DP_STATS_INC(vdev, tx_i.dropped.desc_na.num, 1);
 		return NULL;
 	}
 
@@ -552,6 +553,34 @@ struct dp_tx_ext_desc_elem_s *dp_tx_prepare_ext_desc(struct dp_vdev *vdev,
 }
 
 /**
+ * dp_tx_trace_pkt() - Trace TX packet at DP layer
+ *
+ * @skb: skb to be traced
+ * @msdu_id: msdu_id of the packet
+ * @vdev_id: vdev_id of the packet
+ *
+ * Return: None
+ */
+static void dp_tx_trace_pkt(qdf_nbuf_t skb, uint16_t msdu_id,
+			    uint8_t vdev_id)
+{
+	QDF_NBUF_CB_TX_PACKET_TRACK(skb) = QDF_NBUF_TX_PKT_DATA_TRACK;
+	QDF_NBUF_CB_TX_DP_TRACE(skb) = 1;
+	DPTRACE(qdf_dp_trace_ptr(skb,
+				 QDF_DP_TRACE_LI_DP_TX_PACKET_PTR_RECORD,
+				 QDF_TRACE_DEFAULT_PDEV_ID,
+				 qdf_nbuf_data_addr(skb),
+				 sizeof(qdf_nbuf_data(skb)),
+				 msdu_id, vdev_id));
+
+	qdf_dp_trace_log_pkt(vdev_id, skb, QDF_TX, QDF_TRACE_DEFAULT_PDEV_ID);
+
+	DPTRACE(qdf_dp_trace_data_pkt(skb, QDF_TRACE_DEFAULT_PDEV_ID,
+				      QDF_DP_TRACE_LI_DP_TX_PACKET_RECORD,
+				      msdu_id, QDF_TX));
+}
+
+/**
  * dp_tx_desc_prepare_single - Allocate and prepare Tx descriptor
  * @vdev: DP vdev handle
  * @nbuf: skb
@@ -580,7 +609,7 @@ struct dp_tx_desc_s *dp_tx_prepare_desc_single(struct dp_vdev *vdev,
 	/* Allocate software Tx descriptor */
 	tx_desc = dp_tx_desc_alloc(soc, desc_pool_id);
 	if (qdf_unlikely(!tx_desc)) {
-		DP_STATS_INC(vdev, tx_i.dropped.desc_na, 1);
+		DP_STATS_INC(vdev, tx_i.dropped.desc_na.num, 1);
 		return NULL;
 	}
 
@@ -596,6 +625,8 @@ struct dp_tx_desc_s *dp_tx_prepare_desc_single(struct dp_vdev *vdev,
 	tx_desc->pdev = pdev;
 	tx_desc->msdu_ext_desc = NULL;
 	tx_desc->pkt_offset = 0;
+
+	dp_tx_trace_pkt(nbuf, tx_desc->id, vdev->vdev_id);
 
 	/*
 	 * For special modes (vdev_type == ocb or mesh), data frames should be
@@ -633,7 +664,7 @@ struct dp_tx_desc_s *dp_tx_prepare_desc_single(struct dp_vdev *vdev,
 		align_pad = ((unsigned long) qdf_nbuf_data(nbuf)) & 0x7;
 		if (qdf_nbuf_push_head(nbuf, align_pad) == NULL) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-					"qdf_nbuf_push_head failed\n");
+					"qdf_nbuf_push_head failed");
 			goto failure;
 		}
 
@@ -651,7 +682,7 @@ struct dp_tx_desc_s *dp_tx_prepare_desc_single(struct dp_vdev *vdev,
 					QDF_DMA_TO_DEVICE))) {
 		/* Handle failure */
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-				"qdf_nbuf_map failed\n");
+				"qdf_nbuf_map failed");
 		DP_STATS_INC(vdev, tx_i.dropped.dma_error, 1);
 		goto failure;
 	}
@@ -706,7 +737,7 @@ static struct dp_tx_desc_s *dp_tx_prepare_desc(struct dp_vdev *vdev,
 	/* Allocate software Tx descriptor */
 	tx_desc = dp_tx_desc_alloc(soc, desc_pool_id);
 	if (!tx_desc) {
-		DP_STATS_INC(vdev, tx_i.dropped.desc_na, 1);
+		DP_STATS_INC(vdev, tx_i.dropped.desc_na.num, 1);
 		return NULL;
 	}
 
@@ -723,12 +754,14 @@ static struct dp_tx_desc_s *dp_tx_prepare_desc(struct dp_vdev *vdev,
 	tx_desc->tso_desc = msdu_info->u.tso_info.curr_seg;
 	tx_desc->tso_num_desc = msdu_info->u.tso_info.tso_num_seg_list;
 
+	dp_tx_trace_pkt(nbuf, tx_desc->id, vdev->vdev_id);
+
 	/* Handle scattered frames - TSO/SG/ME */
 	/* Allocate and prepare an extension descriptor for scattered frames */
 	msdu_ext_desc = dp_tx_prepare_ext_desc(vdev, msdu_info, desc_pool_id);
 	if (!msdu_ext_desc) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
-				"%s Tx Extension Descriptor Alloc Fail\n",
+				"%s Tx Extension Descriptor Alloc Fail",
 				__func__);
 		goto failure;
 	}
@@ -784,7 +817,7 @@ static qdf_nbuf_t dp_tx_prepare_raw(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 		if (QDF_STATUS_SUCCESS != qdf_nbuf_map(vdev->osdev, curr_nbuf,
 					QDF_DMA_TO_DEVICE)) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-				"%s dma map error \n", __func__);
+				"%s dma map error ", __func__);
 			DP_STATS_INC(vdev, tx_i.raw.dma_map_error, 1);
 			mapped_buf_num = i;
 			goto error;
@@ -881,10 +914,10 @@ static QDF_STATUS dp_tx_hw_enqueue(struct dp_soc *soc, struct dp_vdev *vdev,
 	hal_tx_desc_set_buf_length(hal_tx_desc_cached, length);
 	hal_tx_desc_set_buf_offset(hal_tx_desc_cached, tx_desc->pkt_offset);
 	hal_tx_desc_set_encap_type(hal_tx_desc_cached, tx_desc->tx_encap_type);
-	hal_tx_desc_set_lmac_id(hal_tx_desc_cached,
-					HAL_TX_DESC_DEFAULT_LMAC_ID);
-	hal_tx_desc_set_dscp_tid_table_id(hal_tx_desc_cached,
-			vdev->dscp_tid_map_id);
+	hal_tx_desc_set_lmac_id(soc->hal_soc, hal_tx_desc_cached,
+				HAL_TX_DESC_DEFAULT_LMAC_ID);
+	hal_tx_desc_set_dscp_tid_table_id(soc->hal_soc, hal_tx_desc_cached,
+					  vdev->dscp_tid_map_id);
 	hal_tx_desc_set_encrypt_type(hal_tx_desc_cached,
 			sec_type_map[sec_type]);
 
@@ -919,7 +952,7 @@ static QDF_STATUS dp_tx_hw_enqueue(struct dp_soc *soc, struct dp_vdev *vdev,
 
 	if (!hal_tx_desc) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-			  "%s TCL ring full ring_id:%d\n", __func__, ring_id);
+			  "%s TCL ring full ring_id:%d", __func__, ring_id);
 		DP_STATS_INC(soc, tx.tcl_ring_full[ring_id], 1);
 		DP_STATS_INC(vdev, tx_i.dropped.enqueue_fail, 1);
 		return QDF_STATUS_E_RESOURCES;
@@ -1255,7 +1288,7 @@ static qdf_nbuf_t dp_tx_send_msdu_single(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 			msdu_info, tx_exc_metadata);
 	if (!tx_desc) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  "%s Tx_desc prepare Fail vdev %pK queue %d\n",
+			  "%s Tx_desc prepare Fail vdev %pK queue %d",
 			  __func__, vdev, tx_q->desc_pool_id);
 		return nbuf;
 	}
@@ -1272,7 +1305,7 @@ static qdf_nbuf_t dp_tx_send_msdu_single(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 
 	if (qdf_unlikely(hal_srng_access_start(soc->hal_soc, hal_srng))) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-				"%s %d : HAL RING Access Failed -- %pK\n",
+				"%s %d : HAL RING Access Failed -- %pK",
 				__func__, __LINE__, hal_srng);
 		DP_STATS_INC(vdev, tx_i.dropped.ring_full, 1);
 		dp_tx_desc_release(tx_desc, tx_q->desc_pool_id);
@@ -1301,7 +1334,7 @@ static qdf_nbuf_t dp_tx_send_msdu_single(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 
 	if (status != QDF_STATUS_SUCCESS) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  "%s Tx_hw_enqueue Fail tx_desc %pK queue %d\n",
+			  "%s Tx_hw_enqueue Fail tx_desc %pK queue %d",
 			  __func__, tx_desc, tx_q->ring_id);
 		dp_tx_desc_release(tx_desc, tx_q->desc_pool_id);
 		goto fail_return;
@@ -1352,7 +1385,7 @@ qdf_nbuf_t dp_tx_send_msdu_multiple(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 
 	if (qdf_unlikely(hal_srng_access_start(soc->hal_soc, hal_srng))) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-				"%s %d : HAL RING Access Failed -- %pK\n",
+				"%s %d : HAL RING Access Failed -- %pK",
 				__func__, __LINE__, hal_srng);
 		DP_STATS_INC(vdev, tx_i.dropped.ring_full, 1);
 		return nbuf;
@@ -1414,7 +1447,7 @@ qdf_nbuf_t dp_tx_send_msdu_multiple(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 
 		if (status != QDF_STATUS_SUCCESS) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-				  "%s Tx_hw_enqueue Fail tx_desc %pK queue %d\n",
+				  "%s Tx_hw_enqueue Fail tx_desc %pK queue %d",
 				  __func__, tx_desc, tx_q->ring_id);
 
 			if (tx_desc->flags & DP_TX_DESC_FLAG_ME)
@@ -1506,7 +1539,7 @@ static qdf_nbuf_t dp_tx_prepare_sg(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 	if (QDF_STATUS_SUCCESS != qdf_nbuf_map(vdev->osdev, nbuf,
 				QDF_DMA_TO_DEVICE)) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-				"dma map error\n");
+				"dma map error");
 		DP_STATS_INC(vdev, tx_i.sg.dma_map_error, 1);
 
 		qdf_nbuf_free(nbuf);
@@ -1523,7 +1556,7 @@ static qdf_nbuf_t dp_tx_prepare_sg(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 		if (QDF_STATUS_E_FAILURE == qdf_nbuf_frag_map(vdev->osdev,
 					nbuf, 0, QDF_DMA_TO_DEVICE, cur_frag)) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-					"frag dma map error\n");
+					"frag dma map error");
 			DP_STATS_INC(vdev, tx_i.sg.dma_map_error, 1);
 			qdf_nbuf_free(nbuf);
 			return NULL;
@@ -1614,7 +1647,7 @@ qdf_nbuf_t dp_tx_extract_mesh_meta_data(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 remove_meta_hdr:
 	if (qdf_nbuf_pull_head(nbuf, sizeof(struct meta_hdr_s)) == NULL) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-				"qdf_nbuf_pull_head failed\n");
+				"qdf_nbuf_pull_head failed");
 		qdf_nbuf_free(nbuf);
 		return NULL;
 	}
@@ -1626,7 +1659,7 @@ remove_meta_hdr:
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO_HIGH,
 			"%s , Meta hdr %0x %0x %0x %0x %0x %0x"
-			" tid %d to_fw %d\n",
+			" tid %d to_fw %d",
 			__func__, msdu_info->meta_data[0],
 			msdu_info->meta_data[1],
 			msdu_info->meta_data[2],
@@ -1800,7 +1833,7 @@ qdf_nbuf_t dp_tx_send_exception(void *vap_dev, qdf_nbuf_t nbuf,
 	if (qdf_unlikely(vdev->mcast_enhancement_en > 0)) {
 		if (DP_FRAME_IS_MULTICAST((eh)->ether_dhost)) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-					  "Ignoring mcast_enhancement_en which is set and sending the mcast packet to the FW\n");
+					  "Ignoring mcast_enhancement_en which is set and sending the mcast packet to the FW");
 		}
 	}
 
@@ -1857,7 +1890,7 @@ qdf_nbuf_t dp_tx_send_mesh(void *vap_dev, qdf_nbuf_t nbuf)
 	nbuf_mesh = qdf_nbuf_unshare(nbuf);
 	if (nbuf_mesh == NULL) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-				"qdf_nbuf_unshare failed\n");
+				"qdf_nbuf_unshare failed");
 		return nbuf;
 	}
 	nbuf = nbuf_mesh;
@@ -1873,7 +1906,7 @@ qdf_nbuf_t dp_tx_send_mesh(void *vap_dev, qdf_nbuf_t nbuf)
 		nbuf_clone = qdf_nbuf_clone(nbuf);
 		if (nbuf_clone == NULL) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-				"qdf_nbuf_clone failed\n");
+				"qdf_nbuf_clone failed");
 			return nbuf;
 		}
 		qdf_nbuf_set_tx_ftype(nbuf_clone, CB_FTYPE_MESH_TX_INFO);
@@ -1951,7 +1984,7 @@ qdf_nbuf_t dp_tx_send(void *vap_dev, qdf_nbuf_t nbuf)
 								&msdu_info);
 		if (nbuf_mesh == NULL) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-					"Extracting mesh metadata failed\n");
+					"Extracting mesh metadata failed");
 			return nbuf;
 		}
 		nbuf = nbuf_mesh;
@@ -1991,12 +2024,13 @@ qdf_nbuf_t dp_tx_send(void *vap_dev, qdf_nbuf_t nbuf)
 	 */
 	if (qdf_nbuf_is_tso(nbuf)) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-			  "%s TSO frame %pK\n", __func__, vdev);
+			  "%s TSO frame %pK", __func__, vdev);
 		DP_STATS_INC_PKT(vdev, tx_i.tso.tso_pkt, 1,
 				qdf_nbuf_len(nbuf));
 
 		if (dp_tx_prepare_tso(vdev, nbuf, &msdu_info)) {
-			DP_STATS_INC(vdev, tx_i.tso.dropped_host, 1);
+			DP_STATS_INC_PKT(vdev, tx_i.tso.dropped_host, 1,
+					 qdf_nbuf_len(nbuf));
 			return nbuf;
 		}
 
@@ -2008,7 +2042,7 @@ qdf_nbuf_t dp_tx_send(void *vap_dev, qdf_nbuf_t nbuf)
 		nbuf = dp_tx_prepare_sg(vdev, nbuf, &seg_info, &msdu_info);
 
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-			 "%s non-TSO SG frame %pK\n", __func__, vdev);
+			 "%s non-TSO SG frame %pK", __func__, vdev);
 
 		DP_STATS_INC_PKT(vdev, tx_i.sg.sg_pkt, 1,
 				qdf_nbuf_len(nbuf));
@@ -2022,7 +2056,7 @@ qdf_nbuf_t dp_tx_send(void *vap_dev, qdf_nbuf_t nbuf)
 		eh = (struct ether_header *)qdf_nbuf_data(nbuf);
 		if (DP_FRAME_IS_MULTICAST((eh)->ether_dhost)) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-				  "%s Mcast frm for ME %pK\n", __func__, vdev);
+				  "%s Mcast frm for ME %pK", __func__, vdev);
 
 			DP_STATS_INC_PKT(vdev,
 					tx_i.mcast_en.mcast_pkt, 1,
@@ -2042,7 +2076,7 @@ qdf_nbuf_t dp_tx_send(void *vap_dev, qdf_nbuf_t nbuf)
 			return NULL;
 
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-			  "%s Raw frame %pK\n", __func__, vdev);
+			  "%s Raw frame %pK", __func__, vdev);
 
 		goto send_multiple;
 
@@ -2104,7 +2138,7 @@ void dp_tx_reinject_handler(struct dp_tx_desc_s *tx_desc, uint8_t *status)
 	dp_tx_get_queue(vdev, nbuf, &msdu_info.tx_queue);
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-			"%s Tx reinject path\n", __func__);
+			"%s Tx reinject path", __func__);
 
 	DP_STATS_INC_PKT(vdev, tx_i.reinject_pkts, 1,
 			qdf_nbuf_len(tx_desc->nbuf));
@@ -2251,7 +2285,7 @@ static void dp_tx_inspect_handler(struct dp_tx_desc_s *tx_desc, uint8_t *status)
 	struct dp_pdev *pdev = tx_desc->pdev;
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
-			"%s Tx inspect path\n",
+			"%s Tx inspect path",
 			__func__);
 
 	qdf_assert(pdev);
@@ -2286,6 +2320,7 @@ dp_get_completion_indication_for_stack(struct dp_soc *soc,  struct dp_pdev *pdev
 {
 	struct tx_capture_hdr *ppdu_hdr;
 	struct dp_peer *peer = NULL;
+	struct ether_header *eh;
 
 	if (qdf_unlikely(!pdev->tx_sniffer_enable && !pdev->mcopy_mode))
 		return QDF_STATUS_E_NOSUPPORT;
@@ -2309,6 +2344,8 @@ dp_get_completion_indication_for_stack(struct dp_soc *soc,  struct dp_pdev *pdev
 		pdev->m_copy_id.tx_peer_id = peer_id;
 	}
 
+	eh = (struct ether_header *)qdf_nbuf_data(netbuf);
+
 	if (!qdf_nbuf_push_head(netbuf, sizeof(struct tx_capture_hdr))) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 				FL("No headroom"));
@@ -2317,10 +2354,15 @@ dp_get_completion_indication_for_stack(struct dp_soc *soc,  struct dp_pdev *pdev
 
 	ppdu_hdr = (struct tx_capture_hdr *)qdf_nbuf_data(netbuf);
 	qdf_mem_copy(ppdu_hdr->ta, peer->vdev->mac_addr.raw,
-					IEEE80211_ADDR_LEN);
+		     IEEE80211_ADDR_LEN);
+	if (peer->bss_peer) {
+		qdf_mem_copy(ppdu_hdr->ra, eh->ether_dhost, IEEE80211_ADDR_LEN);
+	} else {
+		qdf_mem_copy(ppdu_hdr->ra, peer->mac_addr.raw,
+			     IEEE80211_ADDR_LEN);
+	}
+
 	ppdu_hdr->ppdu_id = ppdu_id;
-	qdf_mem_copy(ppdu_hdr->ra, peer->mac_addr.raw,
-			IEEE80211_ADDR_LEN);
 	ppdu_hdr->peer_id = peer_id;
 	ppdu_hdr->first_msdu = first_msdu;
 	ppdu_hdr->last_msdu = last_msdu;
@@ -2427,6 +2469,10 @@ void dp_tx_mec_handler(struct dp_vdev *vdev, uint8_t *status)
 	if (!vdev->wds_enabled)
 		return;
 
+	/* MEC required only in STA mode */
+	if (vdev->opmode != wlan_op_mode_sta)
+		return;
+
 	soc = vdev->pdev->soc;
 	qdf_spin_lock_bh(&soc->peer_ref_mutex);
 	peer = TAILQ_FIRST(&vdev->peer_list);
@@ -2439,7 +2485,7 @@ void dp_tx_mec_handler(struct dp_vdev *vdev, uint8_t *status)
 	}
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-			"%s Tx MEC Handler\n",
+			"%s Tx MEC Handler",
 			__func__);
 
 	for (i = 0; i < DP_MAC_ADDR_LEN; i++)
@@ -2507,7 +2553,7 @@ void dp_tx_process_htt_completion(struct dp_tx_desc_s *tx_desc, uint8_t *status)
 	}
 	default:
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-				"%s Invalid HTT tx_status %d\n",
+				"%s Invalid HTT tx_status %d",
 				__func__, tx_status);
 		break;
 	}
@@ -2531,14 +2577,14 @@ void dp_tx_comp_fill_tx_completion_stats(struct dp_tx_desc_s *tx_desc,
 	if (!tx_desc->msdu_ext_desc) {
 		if (qdf_nbuf_pull_head(netbuf, tx_desc->pkt_offset) == NULL) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-				"netbuf %pK offset %d\n",
+				"netbuf %pK offset %d",
 				netbuf, tx_desc->pkt_offset);
 			return;
 		}
 	}
 	if (qdf_nbuf_push_head(netbuf, sizeof(struct meta_hdr_s)) == NULL) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			"netbuf %pK offset %d\n", netbuf,
+			"netbuf %pK offset %d", netbuf,
 			sizeof(struct meta_hdr_s));
 		return;
 	}
@@ -2581,32 +2627,34 @@ static void dp_tx_update_peer_stats(struct dp_peer *peer,
 	if (peer->bss_peer) {
 		DP_STATS_INC_PKT(peer, tx.mcast, 1, length);
 	} else {
-		if (ts->status == HAL_TX_TQM_RR_FRAME_ACKED) {
-			DP_STATS_INC_PKT(peer, tx.tx_success, 1, length);
-		}
 		DP_STATS_INC_PKT(peer, tx.ucast, 1, length);
 	}
 
+	DP_STATS_INC_PKT(peer, tx.comp_pkt, 1, length);
+
+	DP_STATS_INCC_PKT(peer, tx.tx_success, 1, length,
+			  (ts->status == HAL_TX_TQM_RR_FRAME_ACKED));
+
 	DP_STATS_INCC(peer, tx.dropped.age_out, 1,
-			(ts->status == HAL_TX_TQM_RR_REM_CMD_AGED));
+		     (ts->status == HAL_TX_TQM_RR_REM_CMD_AGED));
 
 	DP_STATS_INCC(peer, tx.dropped.fw_rem, 1,
-			(ts->status == HAL_TX_TQM_RR_REM_CMD_REM));
+		     (ts->status == HAL_TX_TQM_RR_REM_CMD_REM));
 
 	DP_STATS_INCC(peer, tx.dropped.fw_rem_notx, 1,
-			(ts->status == HAL_TX_TQM_RR_REM_CMD_NOTX));
+		     (ts->status == HAL_TX_TQM_RR_REM_CMD_NOTX));
 
 	DP_STATS_INCC(peer, tx.dropped.fw_rem_tx, 1,
-			(ts->status == HAL_TX_TQM_RR_REM_CMD_TX));
+		     (ts->status == HAL_TX_TQM_RR_REM_CMD_TX));
 
 	DP_STATS_INCC(peer, tx.dropped.fw_reason1, 1,
-			(ts->status == HAL_TX_TQM_RR_FW_REASON1));
+		     (ts->status == HAL_TX_TQM_RR_FW_REASON1));
 
 	DP_STATS_INCC(peer, tx.dropped.fw_reason2, 1,
-			(ts->status == HAL_TX_TQM_RR_FW_REASON2));
+		     (ts->status == HAL_TX_TQM_RR_FW_REASON2));
 
 	DP_STATS_INCC(peer, tx.dropped.fw_reason3, 1,
-			(ts->status == HAL_TX_TQM_RR_FW_REASON3));
+		     (ts->status == HAL_TX_TQM_RR_FW_REASON3));
 
 	if (!ts->status == HAL_TX_TQM_RR_FRAME_ACKED)
 		return;
@@ -2645,7 +2693,6 @@ static void dp_tx_update_peer_stats(struct dp_peer *peer,
 	DP_STATS_INC(peer, tx.wme_ac_type[TID_TO_WME_AC(ts->tid)], 1);
 	DP_STATS_INCC(peer, tx.stbc, 1, ts->stbc);
 	DP_STATS_INCC(peer, tx.ldpc, 1, ts->ldpc);
-	DP_STATS_INC_PKT(peer, tx.tx_success, 1, length);
 	DP_STATS_INCC(peer, tx.retries, 1, ts->transmit_cnt > 1);
 
 	if (soc->cdp_soc.ol_ops->update_dp_stats) {
@@ -2780,7 +2827,7 @@ static inline void dp_tx_comp_process_tx_status(struct dp_tx_desc_s *tx_desc,
 				"ppdu_id = %d \n"
 				"transmit_cnt = %d \n"
 				"tid = %d \n"
-				"peer_id = %d \n",
+				"peer_id = %d ",
 				ts.ack_frame_rssi, ts.first_msdu, ts.last_msdu,
 				ts.msdu_part_of_amsdu, ts.valid, ts.bw,
 				ts.pkt_type, ts.stbc, ts.ldpc, ts.sgi,
@@ -2859,6 +2906,15 @@ static void dp_tx_comp_process_desc(struct dp_soc *soc,
 
 		dp_tx_comp_process_tx_status(desc, length);
 
+		DPTRACE(qdf_dp_trace_ptr
+				(desc->nbuf,
+				 QDF_DP_TRACE_LI_DP_FREE_PACKET_PTR_RECORD,
+				 QDF_TRACE_DEFAULT_PDEV_ID,
+				 qdf_nbuf_data_addr(desc->nbuf),
+				 sizeof(qdf_nbuf_data(desc->nbuf)),
+				 desc->id, ts.status)
+			);
+
 		/*currently m_copy/tx_capture is not supported for scatter gather packets*/
 		if (!(desc->msdu_ext_desc) && (dp_get_completion_indication_for_stack(soc,
 					desc->pdev, ts.peer_id, ts.ppdu_id,
@@ -2908,7 +2964,7 @@ uint32_t dp_tx_comp_handler(struct dp_soc *soc, void *hal_srng, uint32_t quota)
 
 	if (qdf_unlikely(hal_srng_access_start(soc->hal_soc, hal_srng))) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-				"%s %d : HAL RING Access Failed -- %pK\n",
+				"%s %d : HAL RING Access Failed -- %pK",
 				__func__, __LINE__, hal_srng);
 		return 0;
 	}
@@ -3232,7 +3288,7 @@ static int dp_tx_alloc_static_pools(struct dp_soc *soc, int num_pool,
 	for (i = 0; i < num_pool; i++) {
 		if (dp_tx_desc_pool_alloc(soc, i, num_desc)) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-					"%s Tx Desc Pool alloc %d failed %pK\n",
+					"%s Tx Desc Pool alloc %d failed %pK",
 					__func__, i, soc);
 			return ENOMEM;
 		}
@@ -3248,7 +3304,7 @@ static void dp_tx_delete_static_pools(struct dp_soc *soc, int num_pool)
 		qdf_assert_always(!soc->tx_desc[i].num_allocated);
 		if (dp_tx_desc_pool_free(soc, i)) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
-				"%s Tx Desc Pool Free failed\n", __func__);
+				"%s Tx Desc Pool Free failed", __func__);
 		}
 	}
 }
@@ -3280,20 +3336,20 @@ QDF_STATUS dp_tx_soc_detach(struct dp_soc *soc)
 	dp_tx_delete_static_pools(soc, num_pool);
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
-			"%s Tx Desc Pool Free num_pool = %d, descs = %d\n",
+			"%s Tx Desc Pool Free num_pool = %d, descs = %d",
 			__func__, num_pool, num_desc);
 
 	for (i = 0; i < num_pool; i++) {
 		if (dp_tx_ext_desc_pool_free(soc, i)) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
-					"%s Tx Ext Desc Pool Free failed\n",
+					"%s Tx Ext Desc Pool Free failed",
 					__func__);
 			return QDF_STATUS_E_RESOURCES;
 		}
 	}
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
-			"%s MSDU Ext Desc Pool %d Free descs = %d\n",
+			"%s MSDU Ext Desc Pool %d Free descs = %d",
 			__func__, num_pool, num_ext_desc);
 
 	for (i = 0; i < num_pool; i++) {
@@ -3301,7 +3357,7 @@ QDF_STATUS dp_tx_soc_detach(struct dp_soc *soc)
 	}
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
-			"%s TSO Desc Pool %d Free descs = %d\n",
+			"%s TSO Desc Pool %d Free descs = %d",
 			__func__, num_pool, num_desc);
 
 
@@ -3310,7 +3366,7 @@ QDF_STATUS dp_tx_soc_detach(struct dp_soc *soc)
 
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
-		"%s TSO Num of seg Desc Pool %d Free descs = %d\n",
+		"%s TSO Num of seg Desc Pool %d Free descs = %d",
 		__func__, num_pool, num_desc);
 
 	return QDF_STATUS_SUCCESS;
@@ -3343,14 +3399,14 @@ QDF_STATUS dp_tx_soc_attach(struct dp_soc *soc)
 	dp_tx_flow_control_init(soc);
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
-			"%s Tx Desc Alloc num_pool = %d, descs = %d\n",
+			"%s Tx Desc Alloc num_pool = %d, descs = %d",
 			__func__, num_pool, num_desc);
 
 	/* Allocate extension tx descriptor pools */
 	for (i = 0; i < num_pool; i++) {
 		if (dp_tx_ext_desc_pool_alloc(soc, i, num_ext_desc)) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-				"MSDU Ext Desc Pool alloc %d failed %pK\n",
+				"MSDU Ext Desc Pool alloc %d failed %pK",
 				i, soc);
 
 			goto fail;
@@ -3358,13 +3414,13 @@ QDF_STATUS dp_tx_soc_attach(struct dp_soc *soc)
 	}
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
-			"%s MSDU Ext Desc Alloc %d, descs = %d\n",
+			"%s MSDU Ext Desc Alloc %d, descs = %d",
 			__func__, num_pool, num_ext_desc);
 
 	for (i = 0; i < num_pool; i++) {
 		if (dp_tx_tso_desc_pool_alloc(soc, i, num_desc)) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-				"TSO Desc Pool alloc %d failed %pK\n",
+				"TSO Desc Pool alloc %d failed %pK",
 				i, soc);
 
 			goto fail;
@@ -3372,13 +3428,13 @@ QDF_STATUS dp_tx_soc_attach(struct dp_soc *soc)
 	}
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
-			"%s TSO Desc Alloc %d, descs = %d\n",
+			"%s TSO Desc Alloc %d, descs = %d",
 			__func__, num_pool, num_desc);
 
 	for (i = 0; i < num_pool; i++) {
 		if (dp_tx_tso_num_seg_pool_alloc(soc, i, num_desc)) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-				"TSO Num of seg Pool alloc %d failed %pK\n",
+				"TSO Num of seg Pool alloc %d failed %pK",
 				i, soc);
 
 			goto fail;
@@ -3386,7 +3442,7 @@ QDF_STATUS dp_tx_soc_attach(struct dp_soc *soc)
 	}
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
-			"%s TSO Num of seg pool Alloc %d, descs = %d\n",
+			"%s TSO Num of seg pool Alloc %d, descs = %d",
 			__func__, num_pool, num_desc);
 
 	/* Initialize descriptors in TCL Rings */
@@ -3408,7 +3464,7 @@ QDF_STATUS dp_tx_soc_attach(struct dp_soc *soc)
 	soc->process_tx_status = CONFIG_PROCESS_TX_STATUS;
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
-			"%s HAL Tx init Success\n", __func__);
+			"%s HAL Tx init Success", __func__);
 
 	return QDF_STATUS_SUCCESS;
 

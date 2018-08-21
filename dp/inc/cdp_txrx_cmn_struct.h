@@ -45,6 +45,7 @@
 
 #define CDP_BA_256_BIT_MAP_SIZE_DWORDS 8
 #define CDP_BA_64_BIT_MAP_SIZE_DWORDS 2
+#define CDP_RSSI_CHAIN_LEN 8
 
 #define OL_TXRX_INVALID_LOCAL_PEER_ID 0xffff
 #define CDP_INVALID_VDEV_ID 0xff
@@ -185,17 +186,19 @@ enum htt_cmn_dbg_stats_type {
  * @TXRX_CLEAR_STATS: clear all host stats
  * @TXRX_SRNG_PTR_STATS: Print SRNG pointer stats
  * @TXRX_RX_MON_STATS: Print monitor mode stats
+ * @TXRX_REO_QUEUE_STATS: Print Per peer REO Queue Stats
 */
 enum cdp_host_txrx_stats {
 	TXRX_HOST_STATS_INVALID  = -1,
-	TXRX_CLEAR_STATS    = 0,
-	TXRX_RX_RATE_STATS  = 1,
-	TXRX_TX_RATE_STATS  = 2,
-	TXRX_TX_HOST_STATS  = 3,
-	TXRX_RX_HOST_STATS  = 4,
-	TXRX_AST_STATS = 5,
-	TXRX_SRNG_PTR_STATS	= 6,
-	TXRX_RX_MON_STATS   = 7,
+	TXRX_CLEAR_STATS     = 0,
+	TXRX_RX_RATE_STATS   = 1,
+	TXRX_TX_RATE_STATS   = 2,
+	TXRX_TX_HOST_STATS   = 3,
+	TXRX_RX_HOST_STATS   = 4,
+	TXRX_AST_STATS       = 5,
+	TXRX_SRNG_PTR_STATS  = 6,
+	TXRX_RX_MON_STATS    = 7,
+	TXRX_REO_QUEUE_STATS = 8,
 	TXRX_HOST_STATS_MAX,
 };
 
@@ -203,10 +206,12 @@ enum cdp_host_txrx_stats {
  * cdp_ppdu_ftype: PPDU Frame Type
  * @CDP_PPDU_FTYPE_DATA: SU or MU Data Frame
  * @CDP_PPDU_FTYPE_CTRL: Control/Management Frames
+ * @CDP_PPDU_FTYPE_BAR: SU or MU BAR frames
 */
 enum cdp_ppdu_ftype {
 	CDP_PPDU_FTYPE_CTRL,
 	CDP_PPDU_FTYPE_DATA,
+	CDP_PPDU_FTYPE_BAR,
 	CDP_PPDU_FTYPE_MAX
 };
 
@@ -301,6 +306,7 @@ enum ol_txrx_peer_state {
 enum cdp_txrx_ast_entry_type {
 	CDP_TXRX_AST_TYPE_NONE,	/* static ast entry for connected peer */
 	CDP_TXRX_AST_TYPE_STATIC, /* static ast entry for connected peer */
+	CDP_TXRX_AST_TYPE_SELF, /* static ast entry for self peer (STA mode) */
 	CDP_TXRX_AST_TYPE_WDS,	/* WDS peer ast entry type*/
 	CDP_TXRX_AST_TYPE_MEC,	/* Multicast echo ast entry type */
 	CDP_TXRX_AST_TYPE_WDS_HM, /* HM WDS entry */
@@ -670,10 +676,12 @@ struct cdp_soc_t {
  *			to set values in pdev
  * @CDP_CONFIG_DEBUG_SNIFFER: Enable debug sniffer feature
  * @CDP_CONFIG_BPR_ENABLE: Enable bcast probe feature
+ * @CDP_CONFIG_PRIMARY_RADIO: Configure radio as primary
  */
 enum cdp_pdev_param_type {
 	CDP_CONFIG_DEBUG_SNIFFER,
 	CDP_CONFIG_BPR_ENABLE,
+	CDP_CONFIG_PRIMARY_RADIO,
 };
 
 /*
@@ -858,6 +866,7 @@ enum cdp_stats {
 	CDP_TXRX_STATS_25,
 	CDP_TXRX_STATS_26,
 	CDP_TXRX_STATS_27,
+	CDP_TXRX_STATS_28,
 	CDP_TXRX_STATS_HTT_MAX = 256,
 	CDP_TXRX_MAX_STATS = 512,
 };
@@ -872,6 +881,20 @@ enum cdp_stat_update_type {
 	UPDATE_PEER_STATS = 0,
 	UPDATE_VDEV_STATS = 1,
 	UPDATE_PDEV_STATS = 2,
+};
+
+/*
+ * struct cdp_tx_sojourn_stats - Tx sojourn stats
+ * @ppdu_seq_id: ppdu_seq_id from tx completion
+ * @avg_sojourn_msdu: average sojourn msdu time
+ * @sum_sojourn_msdu: sum sojourn msdu time
+ * @num_msdu: number of msdus per ppdu
+ */
+struct cdp_tx_sojourn_stats {
+	uint32_t ppdu_seq_id;
+	uint32_t avg_sojourn_msdu[CDP_DATA_TID_MAX];
+	uint32_t sum_sojourn_msdu[CDP_DATA_TID_MAX];
+	uint32_t num_msdus[CDP_DATA_TID_MAX];
 };
 
 /**
@@ -905,6 +928,7 @@ enum cdp_stat_update_type {
  * @gi: guard interval 800/400/1600/3200 ns
  * @dcm: dcm
  * @ldpc: ldpc
+ * @delayed_ba: delayed ba bit
  * @ppdu_type: SU/MU_MIMO/MU_OFDMA/MU_MIMO_OFDMA/UL_TRIG/BURST_BCN/UL_BSR_RESP/
  * UL_BSR_TRIG/UNKNOWN
  * @ba_seq_no: Block Ack sequence number
@@ -924,6 +948,7 @@ struct cdp_tx_completion_ppdu_user {
 	uint32_t mpdu_tried_ucast:16,
 		mpdu_tried_mcast:16;
 	uint16_t mpdu_success:16;
+	uint16_t mpdu_failed:16;
 	uint32_t long_retries:4,
 		 short_retries:4,
 		 tx_ratecode:8,
@@ -946,23 +971,29 @@ struct cdp_tx_completion_ppdu_user {
 		 preamble:4,
 		 gi:4,
 		 dcm:1,
-		 ldpc:1;
+		 ldpc:1,
+		 delayed_ba:1;
 	uint32_t ba_seq_no;
 	uint32_t ba_bitmap[CDP_BA_256_BIT_MAP_SIZE_DWORDS];
 	uint32_t start_seq;
 	uint32_t enq_bitmap[CDP_BA_256_BIT_MAP_SIZE_DWORDS];
+	uint32_t failed_bitmap[CDP_BA_256_BIT_MAP_SIZE_DWORDS];
 	uint32_t num_mpdu:9,
 		 num_msdu:16;
 	uint32_t tx_duration;
 	uint16_t ru_tones;
 	bool is_mcast;
 	uint32_t tx_rate;
+	uint32_t tx_ratekbps;
+	/*ack rssi for separate chains*/
+	uint32_t ack_rssi[CDP_RSSI_CHAIN_LEN];
 };
 
 /**
  * struct cdp_tx_completion_ppdu - Tx PPDU completion information
  * @completion_status: completion status - OK/Filter/Abort/Timeout
  * @ppdu_id: PPDU Id
+ * @ppdu_seq_id: ppdu sequence id for sojourn stats
  * @vdev_id: VAP Id
  * @num_users: Number of users
  * @num_mpdu: Number of MPDUs in PPDU
@@ -979,6 +1010,7 @@ struct cdp_tx_completion_ppdu_user {
  */
 struct cdp_tx_completion_ppdu {
 	uint32_t ppdu_id;
+	uint32_t ppdu_seq_id;
 	uint16_t vdev_id;
 	uint32_t num_users;
 	uint32_t num_mpdu:9,
@@ -1150,6 +1182,15 @@ struct cdp_rx_indication_ppdu {
 	uint32_t length;
 	uint8_t channel;
 	uint8_t beamformed;
+
+	uint32_t rx_ratekbps;
+	uint32_t ppdu_rx_rate;
+
+	uint32_t retries;
+	uint32_t rx_byte_count;
+	uint8_t rx_ratecode;
+	uint8_t fcs_error_mpdus;
+
 };
 
 /**
@@ -1215,6 +1256,7 @@ struct cdp_txrx_stats_req {
 	uint32_t	param3;
 	uint32_t	cookie_val;
 	uint8_t		mac_id;
+	char *peer_addr;
 };
 
 /**

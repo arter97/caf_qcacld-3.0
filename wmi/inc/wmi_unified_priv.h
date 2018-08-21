@@ -470,7 +470,7 @@ QDF_STATUS (*send_set_passpoint_network_list_cmd)(wmi_unified_t wmi_handle,
 					struct wifi_passpoint_req_param *req);
 
 QDF_STATUS (*send_set_epno_network_list_cmd)(wmi_unified_t wmi_handle,
-		struct wifi_enhanched_pno_params *req);
+		struct wifi_enhanced_pno_params *req);
 
 QDF_STATUS (*send_extscan_get_capabilities_cmd)(wmi_unified_t wmi_handle,
 			  struct extscan_capabilities_params *pgetcapab);
@@ -487,6 +487,9 @@ QDF_STATUS (*send_extscan_start_change_monitor_cmd)(wmi_unified_t wmi_handle,
 
 QDF_STATUS (*send_extscan_stop_hotlist_monitor_cmd)(wmi_unified_t wmi_handle,
 		struct extscan_bssid_hotlist_reset_params *photlist_reset);
+
+QDF_STATUS (*send_extscan_start_hotlist_monitor_cmd)(wmi_unified_t wmi_handle,
+		struct extscan_bssid_hotlist_set_params *params);
 
 QDF_STATUS (*send_stop_extscan_cmd)(wmi_unified_t wmi_handle,
 		  struct extscan_stop_req_params *pstopcmd);
@@ -806,10 +809,6 @@ QDF_STATUS (*send_set_arp_stats_req_cmd)(wmi_unified_t wmi_handle,
 QDF_STATUS (*send_get_arp_stats_req_cmd)(wmi_unified_t wmi_handle,
 					 struct get_arp_stats *req_buf);
 
-QDF_STATUS (*send_get_buf_extscan_hotlist_cmd)(wmi_unified_t wmi_handle,
-				   struct ext_scan_setbssi_hotlist_params *
-				   photlist, int *buf_len);
-
 #ifdef FEATURE_WLAN_APF
 QDF_STATUS
 (*send_set_active_apf_mode_cmd)(wmi_unified_t wmi_handle, uint8_t vdev_id,
@@ -835,9 +834,6 @@ QDF_STATUS (*send_pdev_get_tpc_config_cmd)(wmi_unified_t wmi_handle,
 
 QDF_STATUS (*send_set_bwf_cmd)(wmi_unified_t wmi_handle,
 		struct set_bwf_params *param);
-
-QDF_STATUS (*send_set_atf_cmd)(wmi_unified_t wmi_handle,
-		struct set_atf_params *param);
 
 QDF_STATUS (*send_pdev_fips_cmd)(wmi_unified_t wmi_handle,
 		struct fips_params *param);
@@ -1099,13 +1095,30 @@ QDF_STATUS (*send_lcr_set_cmd)(wmi_unified_t wmi_handle,
 QDF_STATUS (*send_periodic_chan_stats_config_cmd)(wmi_unified_t wmi_handle,
 			struct periodic_chan_stats_params *param);
 
+#ifdef WLAN_ATF_ENABLE
+QDF_STATUS (*send_set_atf_cmd)(wmi_unified_t wmi_handle,
+			       struct set_atf_params *param);
+
 QDF_STATUS
 (*send_atf_peer_request_cmd)(wmi_unified_t wmi_handle,
-			struct atf_peer_request_params *param);
+			     struct atf_peer_request_params *param);
 
 QDF_STATUS
 (*send_set_atf_grouping_cmd)(wmi_unified_t wmi_handle,
-			struct atf_grouping_params *param);
+			     struct atf_grouping_params *param);
+
+QDF_STATUS
+(*send_set_atf_group_ac_cmd)(wmi_unified_t wmi_handle,
+			     struct atf_group_ac_params *param);
+
+QDF_STATUS (*extract_atf_peer_stats_ev)(wmi_unified_t wmi_handle,
+					void *evt_buf,
+					wmi_host_atf_peer_stats_event *ev);
+
+QDF_STATUS (*extract_atf_token_info_ev)(wmi_unified_t wmi_handle,
+					void *evt_buf, uint8_t idx,
+					wmi_host_atf_peer_stats_info *atf_info);
+#endif
 
 QDF_STATUS (*send_get_user_position_cmd)(wmi_unified_t wmi_handle,
 			uint32_t value);
@@ -1359,14 +1372,6 @@ QDF_STATUS (*extract_inst_rssi_stats_event)(wmi_unified_t wmi_handle,
 QDF_STATUS (*extract_tx_data_traffic_ctrl_ev)(wmi_unified_t wmi_handle,
 		void *evt_buf, wmi_host_tx_data_traffic_ctrl_event *ev);
 
-QDF_STATUS (*extract_atf_peer_stats_ev)(wmi_unified_t wmi_handle,
-		void *evt_buf, wmi_host_atf_peer_stats_event *ev);
-
-QDF_STATUS (*extract_atf_token_info_ev)(wmi_unified_t wmi_handle,
-		void *evt_buf,
-		uint8_t idx,
-		wmi_host_atf_peer_stats_info *atf_token_info);
-
 QDF_STATUS (*extract_vdev_extd_stats)(wmi_unified_t wmi_handle, void *evt_buf,
 		uint32_t index, wmi_host_vdev_extd_stats *vdev_extd_stats);
 
@@ -1403,6 +1408,11 @@ QDF_STATUS (*extract_encrypt_decrypt_resp_event)(wmi_unified_t wmi_handle,
 			void *evt_buf,
 			struct disa_encrypt_decrypt_resp_params *resp);
 #endif
+
+#ifdef WLAN_FEATURE_ACTION_OUI
+QDF_STATUS (*send_action_oui_cmd)(wmi_unified_t wmi_handle,
+				  struct action_oui_request *req);
+#endif /* WLAN_FEATURE_ACTION_OUI */
 
 QDF_STATUS (*send_sar_limit_cmd)(wmi_unified_t wmi_handle,
 				struct sar_limit_cmd_params *params);
@@ -1793,7 +1803,7 @@ void wmi_non_tlv_init(void);
 #ifdef WMI_NON_TLV_SUPPORT
 /* ONLY_NON_TLV_TARGET:TLV attach dummy function definition for case when
  * driver supports only NON-TLV target (WIN mainline) */
-#define wmi_tlv_attach(x) qdf_print("TLV Unavailable\n")
+#define wmi_tlv_attach(x) qdf_print("TLV Unavailable")
 #else
 void wmi_tlv_attach(wmi_unified_t wmi_handle);
 #endif

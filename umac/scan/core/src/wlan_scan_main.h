@@ -31,26 +31,32 @@
 #include "wlan_scan_cache_db.h"
 #include "wlan_scan_11d.h"
 
-#define scm_log(level, args...) \
-		QDF_TRACE(QDF_MODULE_ID_SCAN, level, ## args)
-#define scm_logfl(level, format, args...) \
-		scm_log(level, FL(format), ## args)
-#define scm_alert(format, args...) \
-		scm_logfl(QDF_TRACE_LEVEL_FATAL, format, ## args)
-#define scm_err(format, args...) \
-		scm_logfl(QDF_TRACE_LEVEL_ERROR, format, ## args)
-#define scm_warn(format, args...) \
-		scm_logfl(QDF_TRACE_LEVEL_WARN, format, ## args)
-#define scm_notice(format, args...) \
-		scm_logfl(QDF_TRACE_LEVEL_INFO, format, ## args)
-#define scm_info(format, args...) \
-		scm_logfl(QDF_TRACE_LEVEL_INFO_HIGH, format, ## args)
-#define scm_debug(format, args...) \
-		scm_logfl(QDF_TRACE_LEVEL_DEBUG, format, ## args)
+#define scm_alert(params...) \
+	QDF_TRACE_FATAL(QDF_MODULE_ID_SCAN, params)
+#define scm_err(params...) \
+	QDF_TRACE_ERROR(QDF_MODULE_ID_SCAN, params)
+#define scm_warn(params...) \
+	QDF_TRACE_WARN(QDF_MODULE_ID_SCAN, params)
+#define scm_notice(params...) \
+	QDF_TRACE_INFO(QDF_MODULE_ID_SCAN, params)
+#define scm_info(params...) \
+	QDF_TRACE_INFO(QDF_MODULE_ID_SCAN, params)
+#define scm_debug(params...) \
+	QDF_TRACE_DEBUG(QDF_MODULE_ID_SCAN, params)
+
+#define scm_nofl_alert(params...) \
+	QDF_TRACE_FATAL_NO_FL(QDF_MODULE_ID_SCAN, params)
+#define scm_nofl_err(params...) \
+	QDF_TRACE_ERROR_NO_FL(QDF_MODULE_ID_SCAN, params)
+#define scm_nofl_warn(params...) \
+	QDF_TRACE_WARN_NO_FL(QDF_MODULE_ID_SCAN, params)
+#define scm_nofl_info(params...) \
+	QDF_TRACE_INFO_NO_FL(QDF_MODULE_ID_SCAN, params)
+#define scm_nofl_debug(params...) \
+	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_SCAN, params)
 
 #define scm_hex_dump(level, data, buf_len) \
 		qdf_trace_hex_dump(QDF_MODULE_ID_SCAN, level, data, buf_len)
-
 
 #define MAX_SCAN_EVENT_HANDLERS_PER_PDEV   100
 #define WLAN_MAX_MODULE_NAME    40
@@ -105,11 +111,9 @@ struct probe_time_dwell_time {
 #define SCAN_CONC_IDLE_TIME 25
 #define SCAN_CONC_MAX_REST_TIME 20
 #define SCAN_CONC_MIN_REST_TIME 10
-#define SCAN_REPEAT_PROBE_TIME 20
 #define SCAN_PROBE_SPACING_TIME 0
 #define SCAN_PROBE_DELAY 0
 #define SCAN_MAX_SCAN_TIME 30000
-#define SCAN_NUM_PROBES 2
 #define SCAN_NETWORK_IDLE_TIMEOUT 0
 #define HIDDEN_SSID_TIME (1*60*1000)
 #define SCAN_CHAN_STATS_EVENT_ENAB (false)
@@ -125,11 +129,9 @@ struct probe_time_dwell_time {
 #define SCAN_CONC_IDLE_TIME 0
 #define SCAN_CONC_MAX_REST_TIME 0
 #define SCAN_CONC_MIN_REST_TIME 0
-#define SCAN_REPEAT_PROBE_TIME 50
 #define SCAN_PROBE_SPACING_TIME 0
 #define SCAN_PROBE_DELAY 0
 #define SCAN_MAX_SCAN_TIME 50000
-#define SCAN_NUM_PROBES 0
 #define SCAN_NETWORK_IDLE_TIMEOUT 200
 #define HIDDEN_SSID_TIME (0xFFFFFFFF)
 #define SCAN_CHAN_STATS_EVENT_ENAB (true)
@@ -208,11 +210,15 @@ struct scan_requester_info {
  * @wide_band_scan: wide band scan capability
  * @last_scan_time: time of last scan start on this pdev
  * @custom_chan_list: scan only these channels
+ * @conf_bssid: configured bssid of the hidden AP
+ * @conf_ssid: configured desired ssid
  */
 struct pdev_scan_info {
 	bool wide_band_scan;
 	qdf_time_t last_scan_time;
 	struct chan_list custom_chan_list;
+	uint8_t conf_bssid[QDF_MAC_ADDR_SIZE];
+	struct wlan_ssid conf_ssid;
 };
 
 /**
@@ -255,6 +261,7 @@ struct pno_def_config {
 /**
  * struct scan_default_params - default scan parameters to be used
  * @active_dwell: default active dwell time
+ * @active_dwell_2g: default active dwell time for 2G channels, if it's not zero
  * @passive_dwell:default passive dwell time
  * @max_rest_time: default max rest time
  * @sta_miracast_mcc_rest_time: max rest time for miracast and mcc
@@ -330,6 +337,7 @@ struct pno_def_config {
  */
 struct scan_default_params {
 	uint32_t active_dwell;
+	uint32_t active_dwell_2g;
 	uint32_t passive_dwell;
 	uint32_t max_rest_time;
 	uint32_t sta_miracast_mcc_rest_time;

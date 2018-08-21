@@ -27,9 +27,31 @@
 #include <wlan_cp_stats_mc_ucfg_api.h>
 #include <wlan_cfg80211_mc_cp_stats.h>
 #include "wlan_osif_request_manager.h"
+#include "wlan_objmgr_peer_obj.h"
 
 /* max time in ms, caller may wait for stats request get serviced */
 #define CP_STATS_WAIT_TIME_STAT 800
+
+/**
+ * wlan_cfg80211_mc_cp_stats_dealloc() - callback to free priv
+ * allocations for stats
+ * @priv: Pointer to priv data statucture
+ *
+ * Return: None
+ */
+static void wlan_cfg80211_mc_cp_stats_dealloc(void *priv)
+{
+	struct stats_event *stats = priv;
+
+	if (!stats)
+		return;
+
+	qdf_mem_free(stats->pdev_stats);
+	qdf_mem_free(stats->peer_stats);
+	qdf_mem_free(stats->cca_stats);
+	qdf_mem_free(stats->vdev_summary_stats);
+	qdf_mem_free(stats->vdev_chain_rssi);
+}
 
 /**
  * wlan_cfg80211_mc_cp_stats_send_wake_lock_stats() - API to send wakelock stats
@@ -212,6 +234,7 @@ int wlan_cfg80211_mc_cp_stats_get_tx_power(struct wlan_objmgr_vdev *vdev,
 	void *cookie;
 	QDF_STATUS status;
 	struct request_info info = {0};
+	struct wlan_objmgr_peer *peer;
 	struct tx_power_priv *priv = NULL;
 	struct osif_request *request = NULL;
 	static const struct osif_request_params params = {
@@ -230,8 +253,13 @@ int wlan_cfg80211_mc_cp_stats_get_tx_power(struct wlan_objmgr_vdev *vdev,
 	info.u.get_tx_power_cb = get_tx_power_cb;
 	info.vdev_id = wlan_vdev_get_id(vdev);
 	info.pdev_id = wlan_objmgr_pdev_get_pdev_id(wlan_vdev_get_pdev(vdev));
-	qdf_mem_copy(info.peer_mac_addr, wlan_vdev_mlme_get_macaddr(vdev),
-		     WLAN_MACADDR_LEN);
+	peer = wlan_vdev_get_bsspeer(vdev);
+	if (!peer) {
+		ret = -EINVAL;
+		goto peer_is_null;
+	}
+	qdf_mem_copy(info.peer_mac_addr, peer->macaddr, WLAN_MACADDR_LEN);
+
 	status = ucfg_mc_cp_stats_send_stats_request(vdev,
 						     TYPE_CONNECTION_TX_POWER,
 						     &info);
@@ -259,6 +287,7 @@ fetch_tx_power:
 		}
 	}
 
+peer_is_null:
 	/*
 	 * either we never sent a request, we sent a request and
 	 * received a response or we sent a request and timed out.
@@ -272,7 +301,7 @@ fetch_tx_power:
 
 /**
  * get_peer_rssi_cb() - get_peer_rssi_cb callback function
- * @mac_addr: mac address
+ * @ev: peer stats buffer
  * @cookie: a cookie for the request context
  *
  * Return: None
@@ -281,40 +310,64 @@ static void get_peer_rssi_cb(struct stats_event *ev, void *cookie)
 {
 	struct stats_event *priv;
 	struct osif_request *request;
+	uint32_t rssi_size;
 
 	request = osif_request_get(cookie);
 	if (!request) {
 		cfg80211_err("Obsolete request");
-		ucfg_mc_cp_stats_free_stats_resources(ev);
 		return;
 	}
 
 	priv = osif_request_priv(request);
-	*priv = *ev;
+	rssi_size = sizeof(*ev->peer_stats) * ev->num_peer_stats;
+	if (rssi_size == 0) {
+		cfg80211_err("Invalid rssi stats");
+		goto get_peer_rssi_cb_fail;
+	}
+
+	priv->peer_stats = qdf_mem_malloc(rssi_size);
+	if (!priv->peer_stats) {
+		cfg80211_err("allocation failed");
+		goto get_peer_rssi_cb_fail;
+	}
+
+	priv->num_peer_stats = ev->num_peer_stats;
+	qdf_mem_copy(priv->peer_stats, ev->peer_stats, rssi_size);
+
+get_peer_rssi_cb_fail:
 	osif_request_complete(request);
 	osif_request_put(request);
 }
 
-int wlan_cfg80211_mc_cp_stats_get_peer_rssi(struct wlan_objmgr_vdev *vdev,
-					    uint8_t *mac_addr,
-					    struct stats_event *rssi_info)
+struct stats_event *
+wlan_cfg80211_mc_cp_stats_get_peer_rssi(struct wlan_objmgr_vdev *vdev,
+					uint8_t *mac_addr,
+					int *errno)
 {
-	int ret = 0;
 	void *cookie;
 	QDF_STATUS status;
-	struct stats_event *priv;
+	struct stats_event *priv, *out;
 	struct request_info info = {0};
 	struct osif_request *request = NULL;
 	static const struct osif_request_params params = {
 		.priv_size = sizeof(*priv),
 		.timeout_ms = CP_STATS_WAIT_TIME_STAT,
+		.dealloc = wlan_cfg80211_mc_cp_stats_dealloc,
 	};
 
-	qdf_mem_zero(rssi_info, sizeof(*rssi_info));
+	out = qdf_mem_malloc(sizeof(*out));
+	if (!out) {
+		cfg80211_err("allocation failed");
+		*errno = -ENOMEM;
+		return NULL;
+	}
+
 	request = osif_request_alloc(&params);
 	if (!request) {
 		cfg80211_err("Request allocation failure, return cached value");
-		return -EINVAL;
+		*errno = -ENOMEM;
+		qdf_mem_free(out);
+		return NULL;
 	}
 
 	cookie = osif_request_cookie(request);
@@ -328,74 +381,118 @@ int wlan_cfg80211_mc_cp_stats_get_peer_rssi(struct wlan_objmgr_vdev *vdev,
 						     &info);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		cfg80211_err("stats req failed: %d", status);
-		ret = qdf_status_to_os_return(status);
-	} else {
-		ret = osif_request_wait_for_response(request);
-		if (ret) {
-			cfg80211_err("wait failed or timed out ret: %d", ret);
-		} else {
-			*rssi_info = *priv;
-		}
+		*errno = qdf_status_to_os_return(status);
+		goto get_peer_rssi_fail;
 	}
 
-	/*
-	 * either we never sent a request, we sent a request and
-	 * received a response or we sent a request and timed out.
-	 * regardless we are done with the request.
-	 */
-	if (request)
-		osif_request_put(request);
+	*errno = osif_request_wait_for_response(request);
+	if (*errno) {
+		cfg80211_err("wait failed or timed out ret: %d", *errno);
+		goto get_peer_rssi_fail;
+	}
 
-	return ret;
-}
+	if (!priv->peer_stats || priv->num_peer_stats == 0) {
+		cfg80211_err("Invalid peer stats, count %d, data %pK",
+			     priv->num_peer_stats, priv->peer_stats);
+		*errno = -EINVAL;
+		goto get_peer_rssi_fail;
+	}
+	out->num_peer_stats = priv->num_peer_stats;
+	out->peer_stats = priv->peer_stats;
+	priv->peer_stats = NULL;
+	osif_request_put(request);
 
-void wlan_cfg80211_mc_cp_stats_put_peer_rssi(struct stats_event *rssi_info)
-{
-	ucfg_mc_cp_stats_free_stats_resources(rssi_info);
+	return out;
+
+get_peer_rssi_fail:
+	osif_request_put(request);
+	wlan_cfg80211_mc_cp_stats_free_stats_event(out);
+
+	return NULL;
 }
 
 /**
  * get_station_stats_cb() - get_station_stats_cb callback function
+ * @ev: station stats buffer
  * @cookie: a cookie for the request context
  *
  * Return: None
  */
-static void get_station_stats_cb(struct stats_event *station_info, void *cookie)
+static void get_station_stats_cb(struct stats_event *ev, void *cookie)
 {
 	struct stats_event *priv;
 	struct osif_request *request;
+	uint32_t summary_size, rssi_size;
 
 	request = osif_request_get(cookie);
 	if (!request) {
 		cfg80211_err("Obsolete request");
-		ucfg_mc_cp_stats_free_stats_resources(station_info);
 		return;
 	}
+
 	priv = osif_request_priv(request);
-	*priv = *station_info;
+	summary_size = sizeof(*ev->vdev_summary_stats) * ev->num_summary_stats;
+	rssi_size = sizeof(*ev->vdev_chain_rssi) * ev->num_chain_rssi_stats;
+	if (summary_size == 0 || rssi_size == 0) {
+		cfg80211_err("Invalid stats, summary size %d rssi size %d",
+			     summary_size, rssi_size);
+		goto station_stats_cb_fail;
+	}
+
+	priv->vdev_summary_stats = qdf_mem_malloc(summary_size);
+	if (!priv->vdev_summary_stats) {
+		cfg80211_err("memory allocation failed");
+		goto station_stats_cb_fail;
+	}
+
+	priv->vdev_chain_rssi = qdf_mem_malloc(rssi_size);
+	if (!priv->vdev_chain_rssi) {
+		cfg80211_err("memory allocation failed");
+		goto station_stats_cb_fail;
+	}
+
+	priv->num_summary_stats = ev->num_summary_stats;
+	priv->num_chain_rssi_stats = ev->num_chain_rssi_stats;
+	priv->tx_rate = ev->tx_rate;
+	priv->tx_rate_flags = ev->tx_rate_flags;
+	qdf_mem_copy(priv->vdev_chain_rssi, ev->vdev_chain_rssi, rssi_size);
+	qdf_mem_copy(priv->vdev_summary_stats, ev->vdev_summary_stats,
+		     summary_size);
+
+station_stats_cb_fail:
 	osif_request_complete(request);
 	osif_request_put(request);
 }
 
-int wlan_cfg80211_mc_cp_stats_get_station_stats(struct wlan_objmgr_vdev *vdev,
-						struct stats_event *out)
+struct stats_event *
+wlan_cfg80211_mc_cp_stats_get_station_stats(struct wlan_objmgr_vdev *vdev,
+					    int *errno)
 {
-	int ret;
 	void *cookie;
 	QDF_STATUS status;
-	struct stats_event *priv;
+	struct stats_event *priv, *out;
+	struct wlan_objmgr_peer *peer;
 	struct osif_request *request;
 	struct request_info info = {0};
 	static const struct osif_request_params params = {
 		.priv_size = sizeof(*priv),
 		.timeout_ms = 2 * CP_STATS_WAIT_TIME_STAT,
+		.dealloc = wlan_cfg80211_mc_cp_stats_dealloc,
 	};
 
-	qdf_mem_zero(out, sizeof(*out));
+	out = qdf_mem_malloc(sizeof(*out));
+	if (!out) {
+		cfg80211_err("allocation failed");
+		*errno = -ENOMEM;
+		return NULL;
+	}
+
 	request = osif_request_alloc(&params);
 	if (!request) {
 		cfg80211_err("Request allocation failure, return cached value");
-		return -EINVAL;
+		qdf_mem_free(out);
+		*errno = -ENOMEM;
+		return NULL;
 	}
 
 	cookie = osif_request_cookie(request);
@@ -404,33 +501,65 @@ int wlan_cfg80211_mc_cp_stats_get_station_stats(struct wlan_objmgr_vdev *vdev,
 	info.u.get_station_stats_cb = get_station_stats_cb;
 	info.vdev_id = wlan_vdev_get_id(vdev);
 	info.pdev_id = wlan_objmgr_pdev_get_pdev_id(wlan_vdev_get_pdev(vdev));
-	qdf_mem_copy(info.peer_mac_addr, wlan_vdev_mlme_get_macaddr(vdev),
-		     WLAN_MACADDR_LEN);
+	peer = wlan_vdev_get_bsspeer(vdev);
+	if (!peer) {
+		cfg80211_err("peer is null");
+		*errno = -EINVAL;
+		goto get_station_stats_fail;
+	}
+	qdf_mem_copy(info.peer_mac_addr, peer->macaddr, WLAN_MACADDR_LEN);
+
 	status = ucfg_mc_cp_stats_send_stats_request(vdev, TYPE_STATION_STATS,
 						     &info);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		cfg80211_err("wlan_mc_cp_stats_send_stats_request status: %d",
-			     status);
-		ret = qdf_status_to_os_return(status);
-	} else {
-		ret = osif_request_wait_for_response(request);
-		if (ret)
-			cfg80211_err("wait failed or timed out ret: %d", ret);
-		else
-			*out = *priv;
+		cfg80211_err("Failed to send stats request status: %d", status);
+		*errno = qdf_status_to_os_return(status);
+		goto get_station_stats_fail;
 	}
 
-	/*
-	 * either we never sent a request, we sent a request and
-	 * received a response or we sent a request and timed out.
-	 * regardless we are done with the request.
-	 */
+	*errno = osif_request_wait_for_response(request);
+	if (*errno) {
+		cfg80211_err("wait failed or timed out ret: %d", *errno);
+		goto get_station_stats_fail;
+	}
+
+	if (!priv->vdev_summary_stats || !priv->vdev_chain_rssi ||
+	    priv->num_summary_stats == 0 || priv->num_chain_rssi_stats == 0) {
+		cfg80211_err("Invalid stats, summary %d:%pK, rssi %d:%pK",
+			     priv->num_summary_stats, priv->vdev_summary_stats,
+			     priv->num_chain_rssi_stats, priv->vdev_chain_rssi);
+		*errno = -EINVAL;
+		goto get_station_stats_fail;
+	}
+
+	out->tx_rate = priv->tx_rate;
+	out->tx_rate_flags = priv->tx_rate_flags;
+	out->num_summary_stats = priv->num_summary_stats;
+	out->num_chain_rssi_stats = priv->num_chain_rssi_stats;
+	out->vdev_summary_stats = priv->vdev_summary_stats;
+	priv->vdev_summary_stats = NULL;
+	out->vdev_chain_rssi = priv->vdev_chain_rssi;
+	priv->vdev_chain_rssi = NULL;
 	osif_request_put(request);
 
-	return ret;
+	return out;
+
+get_station_stats_fail:
+	osif_request_put(request);
+	wlan_cfg80211_mc_cp_stats_free_stats_event(out);
+
+	return NULL;
 }
 
-void wlan_cfg80211_mc_cp_stats_put_station_stats(struct stats_event *info)
+void wlan_cfg80211_mc_cp_stats_free_stats_event(struct stats_event *stats)
 {
-	ucfg_mc_cp_stats_free_stats_resources(info);
+	if (!stats)
+		return;
+
+	qdf_mem_free(stats->pdev_stats);
+	qdf_mem_free(stats->peer_stats);
+	qdf_mem_free(stats->cca_stats);
+	qdf_mem_free(stats->vdev_summary_stats);
+	qdf_mem_free(stats->vdev_chain_rssi);
+	qdf_mem_free(stats);
 }

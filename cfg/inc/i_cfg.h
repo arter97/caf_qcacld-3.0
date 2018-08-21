@@ -28,21 +28,20 @@
 #include "qdf_types.h"
 #include "wlan_objmgr_psoc_obj.h"
 
-#define __cfg_log(level, fmt, args...) \
-	QDF_TRACE(QDF_MODULE_ID_CONFIG, level, FL(fmt), ##args)
-#define cfg_err(fmt, args...) __cfg_log(QDF_TRACE_LEVEL_ERROR, fmt, ##args)
-#define cfg_info(fmt, args...) __cfg_log(QDF_TRACE_LEVEL_INFO, fmt, ##args)
-#define cfg_debug(fmt, args...) __cfg_log(QDF_TRACE_LEVEL_DEBUG, fmt, ##args)
-#define cfg_enter() cfg_debug("enter")
-#define cfg_exit() cfg_debug("exit")
+#define cfg_err(params...) QDF_TRACE_ERROR(QDF_MODULE_ID_CONFIG, params)
+#define cfg_info(params...) QDF_TRACE_INFO(QDF_MODULE_ID_CONFIG, params)
+#define cfg_debug(params...) QDF_TRACE_DEBUG(QDF_MODULE_ID_CONFIG, params)
+#define cfg_enter() QDF_TRACE_ENTER(QDF_MODULE_ID_CONFIG, "enter")
+#define cfg_exit() QDF_TRACE_EXIT(QDF_MODULE_ID_CONFIG, "exit")
 
 /* define global config values structure */
 
-#undef __CFG_STRING
-#define __CFG_STRING(id, mtype, ctype, name, min, max, fallback, desc, def...) \
-	const char id##_internal[max + 1];
-#undef __CFG_ANY
-#define __CFG_ANY(id, mtype, ctype, name, min, max, fallback, desc, def...) \
+#undef __CFG_INI_STRING
+#define __CFG_INI_STRING(id, mtype, ctype, name, min, max, fallback, desc, \
+			 def...) \
+	const char id##_internal[(max) + 1];
+#undef __CFG_INI
+#define __CFG_INI(id, mtype, ctype, name, min, max, fallback, desc, def...) \
 	const ctype id##_internal;
 
 struct cfg_values {
@@ -50,10 +49,10 @@ struct cfg_values {
 	CFG_ALL
 };
 
-#undef __CFG_STRING
-#define __CFG_STRING(args...) __CFG_ANY(args)
-#undef __CFG_ANY
-#define __CFG_ANY(args...) (args)
+#undef __CFG_INI_STRING
+#define __CFG_INI_STRING(args...) __CFG_INI(args)
+#undef __CFG_INI
+#define __CFG_INI(args...) (args)
 
 struct cfg_values *cfg_psoc_get_values(struct wlan_objmgr_psoc *psoc);
 

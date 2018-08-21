@@ -26,7 +26,7 @@
 #include "qdf_defer.h"
 #include "wlan_reg_services_api.h"
 
-#define DBS_OPPORTUNISTIC_TIME    10
+#define DBS_OPPORTUNISTIC_TIME   5
 #ifdef QCA_WIFI_3_0_EMU
 #define CONNECTION_UPDATE_TIMEOUT 3000
 #else
@@ -153,23 +153,29 @@
 
 #define POLICY_MGR_DEFAULT_HW_MODE_INDEX 0xFFFF
 
-#define policy_mgr_log(level, args...) \
-		QDF_TRACE(QDF_MODULE_ID_POLICY_MGR, level, ## args)
-#define policy_mgr_logfl(level, format, args...) \
-		policy_mgr_log(level, FL(format), ## args)
+#define policy_mgr_alert(params...) \
+	QDF_TRACE_FATAL(QDF_MODULE_ID_POLICY_MGR, params)
+#define policy_mgr_err(params...) \
+	QDF_TRACE_ERROR(QDF_MODULE_ID_POLICY_MGR, params)
+#define policy_mgr_warn(params...) \
+	QDF_TRACE_WARN(QDF_MODULE_ID_POLICY_MGR, params)
+#define policy_mgr_notice(params...) \
+	QDF_TRACE_INFO(QDF_MODULE_ID_POLICY_MGR, params)
+#define policy_mgr_info(params...) \
+	QDF_TRACE_INFO(QDF_MODULE_ID_POLICY_MGR, params)
+#define policy_mgr_debug(params...) \
+	QDF_TRACE_DEBUG(QDF_MODULE_ID_POLICY_MGR, params)
 
-#define policy_mgr_alert(format, args...) \
-		policy_mgr_logfl(QDF_TRACE_LEVEL_FATAL, format, ## args)
-#define policy_mgr_err(format, args...) \
-		policy_mgr_logfl(QDF_TRACE_LEVEL_ERROR, format, ## args)
-#define policy_mgr_warn(format, args...) \
-		policy_mgr_logfl(QDF_TRACE_LEVEL_WARN, format, ## args)
-#define policy_mgr_notice(format, args...) \
-		policy_mgr_logfl(QDF_TRACE_LEVEL_INFO, format, ## args)
-#define policy_mgr_info(format, args...) \
-		policy_mgr_logfl(QDF_TRACE_LEVEL_INFO_HIGH, format, ## args)
-#define policy_mgr_debug(format, args...) \
-		policy_mgr_logfl(QDF_TRACE_LEVEL_DEBUG, format, ## args)
+#define policymgr_nofl_alert(params...) \
+	QDF_TRACE_FATAL_NO_FL(QDF_MODULE_ID_POLICY_MGR, params)
+#define policymgr_nofl_err(params...) \
+	QDF_TRACE_ERROR_NO_FL(QDF_MODULE_ID_POLICY_MGR, params)
+#define policymgr_nofl_warn(params...) \
+	QDF_TRACE_WARN_NO_FL(QDF_MODULE_ID_POLICY_MGR, params)
+#define policymgr_nofl_info(params...) \
+	QDF_TRACE_INFO_NO_FL(QDF_MODULE_ID_POLICY_MGR, params)
+#define policymgr_nofl_debug(params...) \
+	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_POLICY_MGR, params)
 
 #define PM_CONC_CONNECTION_LIST_VALID_INDEX(index) \
 		((MAX_NUMBER_OF_CONC_CONNECTIONS > index) && \
@@ -342,6 +348,7 @@ int8_t policy_mgr_get_matching_hw_mode_index(
 		enum hw_mode_bandwidth mac0_bw,
 		uint32_t mac1_tx_ss, uint32_t mac1_rx_ss,
 		enum hw_mode_bandwidth mac1_bw,
+		enum hw_mode_mac_band_cap mac0_band_cap,
 		enum hw_mode_dbs_capab dbs,
 		enum hw_mode_agile_dfs_capab dfs,
 		enum hw_mode_sbs_capab sbs);
@@ -351,13 +358,10 @@ int8_t policy_mgr_get_hw_mode_idx_from_dbs_hw_list(
 		enum hw_mode_bandwidth mac0_bw,
 		enum hw_mode_ss_config mac1_ss,
 		enum hw_mode_bandwidth mac1_bw,
+		enum hw_mode_mac_band_cap mac0_band_cap,
 		enum hw_mode_dbs_capab dbs,
 		enum hw_mode_agile_dfs_capab dfs,
 		enum hw_mode_sbs_capab sbs);
-QDF_STATUS policy_mgr_get_hw_mode_from_idx(
-		struct wlan_objmgr_psoc *psoc,
-		uint32_t idx,
-		struct policy_mgr_hw_mode_params *hw_mode);
 QDF_STATUS policy_mgr_get_old_and_new_hw_index(
 		struct wlan_objmgr_psoc *psoc,
 		uint32_t *old_hw_mode_index,
@@ -464,7 +468,41 @@ void policy_mgr_reg_chan_change_callback(struct wlan_objmgr_psoc *psoc,
 		struct avoid_freq_ind_data *avoid_freq_ind,
 		void *arg);
 
+/**
+ * policy_mgr_nss_update() - update nss for AP vdev
+ * @psoc: PSOC object information
+ * @new_nss: new NSS value
+ * @next_action: Next action after nss update
+ * @band: update AP vdev on the Band.
+ * @reason: action reason
+ *
+ * The function will update AP vdevs on specific band.
+ *  eg. band = POLICY_MGR_ANY will request to update all band (2g and 5g)
+ *
+ * Return: QDF_STATUS_SUCCESS, update requested successfully.
+ */
 QDF_STATUS policy_mgr_nss_update(struct wlan_objmgr_psoc *psoc,
 		uint8_t  new_nss, uint8_t next_action,
+		enum policy_mgr_band band,
 		enum policy_mgr_conn_update_reason reason);
+
+/**
+ * policy_mgr_is_concurrency_allowed() - Check for allowed
+ * concurrency combination
+ * @psoc: PSOC object information
+ * @mode: new connection mode
+ * @channel: channel on which new connection is coming up
+ * @bw: Bandwidth requested by the connection (optional)
+ *
+ * When a new connection is about to come up check if current
+ * concurrency combination including the new connection is
+ * allowed or not based on the HW capability, but no need to
+ * invoke get_pcl
+ *
+ * Return: True/False
+ */
+bool policy_mgr_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
+				       enum policy_mgr_con_mode mode,
+				       uint8_t channel,
+				       enum hw_mode_bandwidth bw);
 #endif

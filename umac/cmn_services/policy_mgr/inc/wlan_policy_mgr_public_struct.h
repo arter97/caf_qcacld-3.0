@@ -115,6 +115,26 @@ enum hw_mode_sbs_capab {
 };
 
 /**
+ * enum hw_mode_mac_band_cap - mac band capability
+ * @HW_MODE_MAC_BAND_NONE: No band requirement.
+ * @HW_MODE_MAC_BAND_2G: 2G band supported.
+ * @HW_MODE_MAC_BAND_5G: 5G band supported.
+ *
+ * To add HW_MODE_MAC_BAND_NONE value to help to
+ * match the HW DBS mode in hw mode list.
+ * Other enum values should match with WMI header:
+ * typedef enum {
+ *   WLAN_2G_CAPABILITY = 0x1,
+ *   WLAN_5G_CAPABILITY = 0x2,
+ * } WLAN_BAND_CAPABILITY;
+ */
+enum hw_mode_mac_band_cap {
+	HW_MODE_MAC_BAND_NONE = 0,
+	HW_MODE_MAC_BAND_2G = WLAN_2G_CAPABILITY,
+	HW_MODE_MAC_BAND_5G = WLAN_5G_CAPABILITY,
+};
+
+/**
  * enum policy_mgr_pcl_group_id - Identifies the pcl groups to be used
  * @POLICY_MGR_PCL_GROUP_ID1_ID2: Use weights of group1 and group2
  * @POLICY_MGR_PCL_GROUP_ID2_ID3: Use weights of group2 and group3
@@ -694,6 +714,7 @@ enum policy_mgr_conc_next_action {
  *
  * @POLICY_MGR_BAND_24: 2.4 Ghz band
  * @POLICY_MGR_BAND_5: 5 Ghz band
+ * @POLICY_MGR_ANY: to specify all band
  * @POLICY_MGR_MAX_BAND: Max place holder
  *
  * These are generic IDs that identify the various roles
@@ -702,7 +723,8 @@ enum policy_mgr_conc_next_action {
 enum policy_mgr_band {
 	POLICY_MGR_BAND_24 = 0,
 	POLICY_MGR_BAND_5,
-	POLICY_MGR_MAX_BAND
+	POLICY_MGR_ANY,
+	POLICY_MGR_MAX_BAND = POLICY_MGR_ANY,
 };
 
 /**
@@ -813,6 +835,9 @@ enum policy_mgr_hw_mode_change {
  * connection and scan but switch off the async scan
  * @ENABLE_DBS_CXN_AND_DISABLE_DBS_SCAN: Enable DBS support for connection and
  * disable DBS support for scan
+ * @ENABLE_DBS_CXN_AND_DISABLE_SIMULTANEOUS_SCAN: Enable DBS
+ * support for connection and disable simultaneous scan from
+ * upper layer (DBS scan remains enabled in FW)
  */
 enum dbs_support {
 	ENABLE_DBS_CXN_AND_SCAN,
@@ -820,7 +845,8 @@ enum dbs_support {
 	DISABLE_DBS_CXN_AND_ENABLE_DBS_SCAN,
 	DISABLE_DBS_CXN_AND_ENABLE_DBS_SCAN_WITH_ASYNC_SCAN_OFF,
 	ENABLE_DBS_CXN_AND_ENABLE_SCAN_WITH_ASYNC_SCAN_OFF,
-	ENABLE_DBS_CXN_AND_DISABLE_DBS_SCAN
+	ENABLE_DBS_CXN_AND_DISABLE_DBS_SCAN,
+	ENABLE_DBS_CXN_AND_DISABLE_SIMULTANEOUS_SCAN,
 };
 
 /**
@@ -970,23 +996,6 @@ struct policy_mgr_vdev_entry_info {
 struct dbs_hw_mode_info {
 	uint32_t tlv_header;
 	uint32_t *hw_mode_list;
-};
-
-/**
- * struct extended_caps - new extended caps given by firmware
- * @num_hw_modes: number of hardware modes for current SOC
- * @each_hw_mode_cap: hw mode id to phy id mapping
- * @each_phy_cap_per_hwmode: PHY's caps for each hw mode
- * @num_phy_for_hal_reg_cap: number of phy for hal reg cap
- * @hw_mode_to_mac_cap_map: map between hw_mode to capabilities
- */
-struct extended_caps {
-	WMI_SOC_MAC_PHY_HW_MODE_CAPS num_hw_modes;
-	WMI_HW_MODE_CAPABILITIES *each_hw_mode_cap;
-	WMI_MAC_PHY_CAPABILITIES *each_phy_cap_per_hwmode;
-	WMI_SOC_HAL_REG_CAPABILITIES num_phy_for_hal_reg_cap;
-	WMI_HAL_REG_CAPABILITIES_EXT *each_phy_hal_reg_cap;
-	struct hw_mode_idx_to_mac_cap_idx *hw_mode_to_mac_cap_map;
 };
 
 /**

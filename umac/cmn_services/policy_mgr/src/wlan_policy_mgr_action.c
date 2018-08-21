@@ -93,12 +93,36 @@ void policy_mgr_hw_mode_transition_cb(uint32_t old_hw_mode_index,
 	return;
 }
 
+QDF_STATUS policy_mgr_check_n_start_opportunistic_timer(
+		struct wlan_objmgr_psoc *psoc)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("PM ctx not valid. Oppurtunistic timer cannot start");
+		return QDF_STATUS_E_FAILURE;
+	}
+	if (policy_mgr_need_opportunistic_upgrade(psoc)) {
+	/* let's start the timer */
+	qdf_mc_timer_stop(&pm_ctx->dbs_opportunistic_timer);
+	status = qdf_mc_timer_start(
+				&pm_ctx->dbs_opportunistic_timer,
+				DBS_OPPORTUNISTIC_TIME * 1000);
+	if (!QDF_IS_STATUS_SUCCESS(status))
+		policy_mgr_err("Failed to start dbs opportunistic timer");
+	}
+	return status;
+}
+
 QDF_STATUS policy_mgr_pdev_set_hw_mode(struct wlan_objmgr_psoc *psoc,
 		uint32_t session_id,
 		enum hw_mode_ss_config mac0_ss,
 		enum hw_mode_bandwidth mac0_bw,
 		enum hw_mode_ss_config mac1_ss,
 		enum hw_mode_bandwidth mac1_bw,
+		enum hw_mode_mac_band_cap mac0_band_cap,
 		enum hw_mode_dbs_capab dbs,
 		enum hw_mode_agile_dfs_capab dfs,
 		enum hw_mode_sbs_capab sbs,
@@ -130,7 +154,8 @@ QDF_STATUS policy_mgr_pdev_set_hw_mode(struct wlan_objmgr_psoc *psoc,
 	}
 
 	hw_mode_index = policy_mgr_get_hw_mode_idx_from_dbs_hw_list(psoc,
-			mac0_ss, mac0_bw, mac1_ss, mac1_bw, dbs, dfs, sbs);
+			mac0_ss, mac0_bw, mac1_ss, mac1_bw, mac0_band_cap,
+			dbs, dfs, sbs);
 	if (hw_mode_index < 0) {
 		policy_mgr_err("Invalid HW mode index obtained");
 		return QDF_STATUS_E_FAILURE;
@@ -657,6 +682,7 @@ QDF_STATUS policy_mgr_next_actions(struct wlan_objmgr_psoc *psoc,
 						     HW_MODE_80_MHZ,
 						     nss_dbs.mac1_ss,
 						     HW_MODE_40_MHZ,
+						     HW_MODE_MAC_BAND_NONE,
 						     HW_MODE_DBS,
 						     HW_MODE_AGILE_DFS_NONE,
 						     HW_MODE_SBS_NONE,
@@ -670,6 +696,7 @@ QDF_STATUS policy_mgr_next_actions(struct wlan_objmgr_psoc *psoc,
 						HW_MODE_SS_2x2,
 						HW_MODE_80_MHZ,
 						HW_MODE_SS_0x0, HW_MODE_BW_NONE,
+						HW_MODE_MAC_BAND_NONE,
 						HW_MODE_DBS_NONE,
 						HW_MODE_AGILE_DFS_NONE,
 						HW_MODE_SBS_NONE,
@@ -680,6 +707,7 @@ QDF_STATUS policy_mgr_next_actions(struct wlan_objmgr_psoc *psoc,
 						HW_MODE_SS_2x2,
 						HW_MODE_80_MHZ,
 						HW_MODE_SS_0x0, HW_MODE_BW_NONE,
+						HW_MODE_MAC_BAND_NONE,
 						HW_MODE_DBS_NONE,
 						HW_MODE_AGILE_DFS_NONE,
 						HW_MODE_SBS_NONE,
@@ -690,6 +718,7 @@ QDF_STATUS policy_mgr_next_actions(struct wlan_objmgr_psoc *psoc,
 						HW_MODE_SS_2x2,
 						HW_MODE_80_MHZ,
 						HW_MODE_SS_2x2, HW_MODE_80_MHZ,
+						HW_MODE_MAC_BAND_NONE,
 						HW_MODE_DBS,
 						HW_MODE_AGILE_DFS_NONE,
 						HW_MODE_SBS_NONE,
@@ -704,6 +733,7 @@ QDF_STATUS policy_mgr_next_actions(struct wlan_objmgr_psoc *psoc,
 						HW_MODE_SS_1x1,
 						HW_MODE_80_MHZ,
 						HW_MODE_SS_1x1, HW_MODE_80_MHZ,
+						HW_MODE_MAC_BAND_NONE,
 						HW_MODE_DBS,
 						HW_MODE_AGILE_DFS_NONE,
 						HW_MODE_SBS,
@@ -715,7 +745,7 @@ QDF_STATUS policy_mgr_next_actions(struct wlan_objmgr_psoc *psoc,
 		 * intially. If yes, update the beacon template & notify FW.
 		 */
 		status = policy_mgr_nss_update(psoc, POLICY_MGR_RX_NSS_1,
-					PM_NOP, reason);
+					PM_NOP, POLICY_MGR_ANY, reason);
 		break;
 	case PM_UPGRADE:
 		/*
@@ -723,7 +753,7 @@ QDF_STATUS policy_mgr_next_actions(struct wlan_objmgr_psoc *psoc,
 		 * intially. If yes, update the beacon template & notify FW.
 		 */
 		status = policy_mgr_nss_update(psoc, POLICY_MGR_RX_NSS_2,
-					PM_NOP, reason);
+					PM_NOP, POLICY_MGR_ANY, reason);
 		break;
 	default:
 		policy_mgr_err("unexpected action value %d", action);
@@ -799,7 +829,7 @@ static bool policy_mgr_is_restart_sap_allowed(
 		QDF_MCC_TO_SCC_SWITCH_FORCE_PREFERRED_WITHOUT_DISCONNECTION) &&
 		((policy_mgr_get_concurrency_mode(psoc) & sta_go_bit_mask)
 			== sta_go_bit_mask)))) {
-		policy_mgr_err("MCC switch disabled or not concurrent STA/SAP, STA/GO");
+		policy_mgr_debug("MCC switch disabled or not concurrent STA/SAP, STA/GO");
 		return false;
 	}
 
@@ -1451,13 +1481,22 @@ void policy_mgr_checkn_update_hw_mode_single_mac_mode(
 
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
-		if (pm_conc_connection_list[i].in_use)
+		if (pm_conc_connection_list[i].in_use) {
 			if (!WLAN_REG_IS_SAME_BAND_CHANNELS(channel,
 				pm_conc_connection_list[i].chan)) {
 				qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 				policy_mgr_debug("DBS required");
 				return;
 			}
+			if (policy_mgr_is_hw_dbs_2x2_capable(psoc) &&
+			    (WLAN_REG_IS_24GHZ_CH(channel) ||
+			    WLAN_REG_IS_24GHZ_CH
+				(pm_conc_connection_list[i].chan))) {
+				qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+				policy_mgr_debug("DBS required");
+				return;
+			}
+		}
 	}
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 	pm_dbs_opportunistic_timer_handler((void *)psoc);
@@ -1541,9 +1580,10 @@ enum policy_mgr_hw_mode_change policy_mgr_get_hw_mode_change_from_hw_mode_index(
 	struct wlan_objmgr_psoc *psoc, uint32_t hw_mode_index)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
-	uint32_t param = 0;
+	struct policy_mgr_hw_mode_params hw_mode;
 	enum policy_mgr_hw_mode_change value
 		= POLICY_MGR_HW_MODE_NOT_IN_PROGRESS;
+	QDF_STATUS status;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -1551,16 +1591,20 @@ enum policy_mgr_hw_mode_change policy_mgr_get_hw_mode_change_from_hw_mode_index(
 		return value;
 	}
 
-	policy_mgr_info("HW param: %x", param);
-	param = pm_ctx->hw_mode.hw_mode_list[hw_mode_index];
-	if (POLICY_MGR_HW_MODE_DBS_MODE_GET(param)) {
+	status = policy_mgr_get_hw_mode_from_idx(psoc, hw_mode_index, &hw_mode);
+	if (status != QDF_STATUS_SUCCESS) {
+		policy_mgr_err("Failed to get HW mode index");
+		return value;
+	}
+
+	if (hw_mode.dbs_cap) {
 		policy_mgr_info("DBS is requested with HW (%d)",
 		hw_mode_index);
 		value = POLICY_MGR_DBS_IN_PROGRESS;
 		goto ret_value;
 	}
 
-	if (POLICY_MGR_HW_MODE_SBS_MODE_GET(param)) {
+	if (hw_mode.sbs_cap) {
 		policy_mgr_info("SBS is requested with HW (%d)",
 		hw_mode_index);
 		value = POLICY_MGR_SBS_IN_PROGRESS;

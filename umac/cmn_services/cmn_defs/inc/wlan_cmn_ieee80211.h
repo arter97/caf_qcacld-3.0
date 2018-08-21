@@ -66,6 +66,9 @@
 #define QCA_OUI 0xf0fd8c
 #define QCA_OUI_WHC_TYPE  0x00
 
+/* Extender vendor specific IE */
+#define QCA_OUI_EXTENDER_TYPE           0x03
+
 /* Temporary vendor specific IE for 11n pre-standard interoperability */
 #define VENDOR_HT_OUI       0x00904c
 #define VENDOR_HT_CAP_ID    51
@@ -245,10 +248,13 @@ enum ext_chan_offset {
  * @WLAN_ELEMID_WAPI: WAPI IE
  * @WLAN_ELEMID_TIME_ADVERTISEMENT: Time IE
  * @WLAN_ELEMID_RRM: Radio resource measurement IE
+ * @WLAN_ELEMID_MULTIPLE_BSSID: Multiple BSSID IE
  * @WLAN_ELEMID_2040_COEXT: 20-40 COext ext IE
  * @WLAN_ELEMID_2040_INTOL:20-40 INT OL IE
  * @WLAN_ELEMID_OBSS_SCAN: OBSS scan IE
  * @WLAN_ELEMID_MMIE: 802.11w Management MIC IE
+ * @WLAN_ELEMID_NONTX_BSSID_CAP: Nontransmitted BSSID Capability IE
+ * @WLAN_ELEMID_MULTI_BSSID_IDX: Multiple BSSID index
  * @WLAN_ELEMID_FMS_DESCRIPTOR: 802.11v FMS descriptor IE
  * @WLAN_ELEMID_FMS_REQUEST: 802.11v FMS request IE
  * @WLAN_ELEMID_FMS_RESPONSE: 802.11v FMS response IE
@@ -315,10 +321,13 @@ enum element_ie {
 	WLAN_ELEMID_WAPI             = 68,
 	WLAN_ELEMID_TIME_ADVERTISEMENT = 69,
 	WLAN_ELEMID_RRM              = 70,
+	WLAN_ELEMID_MULTIPLE_BSSID   = 71,
 	WLAN_ELEMID_2040_COEXT       = 72,
 	WLAN_ELEMID_2040_INTOL       = 73,
 	WLAN_ELEMID_OBSS_SCAN        = 74,
 	WLAN_ELEMID_MMIE             = 76,
+	WLAN_ELEMID_NONTX_BSSID_CAP  = 83,
+	WLAN_ELEMID_MULTI_BSSID_IDX  = 85,
 	WLAN_ELEMID_FMS_DESCRIPTOR   = 86,
 	WLAN_ELEMID_FMS_REQUEST      = 87,
 	WLAN_ELEMID_FMS_RESPONSE     = 88,
@@ -1351,6 +1360,21 @@ is_he_op_oui(uint8_t *frm)
 {
 	return (frm[1] > 4) && (LE_READ_4(frm + 2) ==
 		((ATH_HE_OP_SUBTYPE << 24) | ATH_HE_OUI));
+}
+
+/**
+ * is_extender_oui() - If vendor IE is EXTENDER OUI
+ * @frm: vendor IE pointer
+ *
+ * API to check if vendor IE is EXTENDER OUI
+ *
+ * Return: true if its EXTENDER OUI
+ */
+static inline bool
+is_extender_oui(uint8_t *frm)
+{
+	return (frm[1] > 4) && (LE_READ_4(frm + 2) ==
+		((QCA_OUI_EXTENDER_TYPE << 24) | QCA_OUI));
 }
 
 /**

@@ -1544,16 +1544,38 @@ static bool policy_mgr_is_sub_20_mhz_enabled(struct wlan_objmgr_psoc *psoc)
 	return pm_ctx->user_cfg.sub_20_mhz_enabled;
 }
 
-bool policy_mgr_allow_concurrency(struct wlan_objmgr_psoc *psoc,
-				enum policy_mgr_con_mode mode,
-				uint8_t channel, enum hw_mode_bandwidth bw)
+/**
+ * policy_mgr_check_privacy_for_new_conn() - Check privacy mode concurrency
+ * @pm_ctx: policy_mgr_psoc_priv_obj policy mgr context
+ *
+ * This routine is called to check vdev security mode allowed in concurrency.
+ * At present, WAPI security mode is not allowed to run concurrency with any
+ * other vdev.
+ *
+ * Return: true - allow
+ */
+static bool policy_mgr_check_privacy_for_new_conn(
+	struct policy_mgr_psoc_priv_obj *pm_ctx)
+{
+	if (!pm_ctx->hdd_cbacks.hdd_wapi_security_sta_exist)
+		return true;
+
+	if (pm_ctx->hdd_cbacks.hdd_wapi_security_sta_exist() &&
+	    (policy_mgr_get_connection_count(pm_ctx->psoc) > 0))
+		return false;
+
+	return true;
+}
+
+bool policy_mgr_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
+				       enum policy_mgr_con_mode mode,
+				       uint8_t channel,
+				       enum hw_mode_bandwidth bw)
 {
 	uint32_t num_connections = 0, count = 0, index = 0;
 	bool status = false, match = false;
 	uint32_t list[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
-	QDF_STATUS ret;
-	struct policy_mgr_pcl_list pcl;
 	bool sta_sap_scc_on_dfs_chan;
 
 	pm_ctx = policy_mgr_get_context(psoc);
@@ -1561,16 +1583,6 @@ bool policy_mgr_allow_concurrency(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_err("Invalid Context");
 		return status;
 	}
-
-
-	qdf_mem_zero(&pcl, sizeof(pcl));
-	ret = policy_mgr_get_pcl(psoc, mode, pcl.pcl_list, &pcl.pcl_len,
-			pcl.weight_list, QDF_ARRAY_SIZE(pcl.weight_list));
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		policy_mgr_err("disallow connection:%d", ret);
-		goto done;
-	}
-
 	/* find the current connection state from pm_conc_connection_list*/
 	num_connections = policy_mgr_get_connection_count(psoc);
 
@@ -1742,10 +1754,34 @@ bool policy_mgr_allow_concurrency(struct wlan_objmgr_psoc *psoc,
 		qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 	}
 
+	if (!policy_mgr_check_privacy_for_new_conn(pm_ctx)) {
+		policy_mgr_err("Don't allow new conn when wapi security conn existing");
+		goto done;
+	}
+
 	status = true;
 
 done:
 	return status;
+}
+
+bool policy_mgr_allow_concurrency(struct wlan_objmgr_psoc *psoc,
+				  enum policy_mgr_con_mode mode,
+				  uint8_t channel, enum hw_mode_bandwidth bw)
+{
+	QDF_STATUS status;
+	struct policy_mgr_pcl_list pcl;
+
+	qdf_mem_zero(&pcl, sizeof(pcl));
+	status = policy_mgr_get_pcl(psoc, mode, pcl.pcl_list, &pcl.pcl_len,
+				    pcl.weight_list,
+				    QDF_ARRAY_SIZE(pcl.weight_list));
+	if (QDF_IS_STATUS_ERROR(status)) {
+		policy_mgr_err("disallow connection:%d", status);
+		return false;
+	}
+
+	return policy_mgr_is_concurrency_allowed(psoc, mode, channel, bw);
 }
 
 /**
@@ -2732,6 +2768,8 @@ bool policy_mgr_is_scan_simultaneous_capable(struct wlan_objmgr_psoc *psoc)
 	if ((DISABLE_DBS_CXN_AND_SCAN ==
 	     wlan_objmgr_psoc_get_dual_mac_disable(psoc)) ||
 	    (ENABLE_DBS_CXN_AND_DISABLE_DBS_SCAN ==
+	     wlan_objmgr_psoc_get_dual_mac_disable(psoc)) ||
+	    (ENABLE_DBS_CXN_AND_DISABLE_SIMULTANEOUS_SCAN ==
 	     wlan_objmgr_psoc_get_dual_mac_disable(psoc)))
 		return false;
 
@@ -2887,7 +2925,7 @@ void policy_mgr_trim_acs_channel_list(struct wlan_objmgr_psoc *psoc,
 		uint8_t *org_ch_list, uint8_t *org_ch_list_count)
 {
 	uint32_t list[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	uint32_t index, count, i, ch_list_count;
+	uint32_t index = 0, count, i, ch_list_count;
 	uint8_t band_mask = 0, ch_5g = 0, ch_24g = 0;
 	uint8_t ch_list[QDF_MAX_NUM_CHAN];
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
@@ -2909,61 +2947,67 @@ void policy_mgr_trim_acs_channel_list(struct wlan_objmgr_psoc *psoc,
 	 */
 	count = policy_mgr_mode_specific_connection_count(
 				psoc, PM_STA_MODE, list);
-	if (policy_mgr_is_force_scc(psoc) && count) {
-		index = 0;
-		while (index < count) {
-			if (WLAN_REG_IS_24GHZ_CH(
-				pm_conc_connection_list[list[index]].chan) &&
-				policy_mgr_is_safe_channel(psoc,
-				pm_conc_connection_list[list[index]].chan)) {
-				band_mask |= 1;
-				ch_24g = pm_conc_connection_list[list[index]].chan;
-			}
-			if (WLAN_REG_IS_5GHZ_CH(
-				pm_conc_connection_list[list[index]].chan) &&
-				policy_mgr_is_safe_channel(psoc,
-				pm_conc_connection_list[list[index]].chan) &&
-				!wlan_reg_is_dfs_ch(pm_ctx->pdev,
-				pm_conc_connection_list[list[index]].chan) &&
-				!wlan_reg_is_passive_or_disable_ch(pm_ctx->pdev,
-				pm_conc_connection_list[list[index]].chan)) {
-				band_mask |= 2;
-				ch_5g = pm_conc_connection_list[list[index]].chan;
-			}
-			index++;
+	if (!(policy_mgr_is_force_scc(psoc) && count))
+		return;
+	while (index < count) {
+		if (WLAN_REG_IS_24GHZ_CH(
+			pm_conc_connection_list[list[index]].chan) &&
+			policy_mgr_is_safe_channel(psoc,
+			pm_conc_connection_list[list[index]].chan)) {
+			band_mask |= 1;
+			ch_24g = pm_conc_connection_list[list[index]].chan;
 		}
-		ch_list_count = 0;
-		if (band_mask == 1) {
-			ch_list[ch_list_count++] = ch_24g;
-			for (i = 0; i < *org_ch_list_count; i++) {
-				if (WLAN_REG_IS_24GHZ_CH(
-					org_ch_list[i]))
-					continue;
-				ch_list[ch_list_count++] =
-					org_ch_list[i];
-			}
-		} else if (band_mask == 2) {
-			ch_list[ch_list_count++] = ch_5g;
-			for (i = 0; i < *org_ch_list_count; i++) {
-				if (WLAN_REG_IS_5GHZ_CH(
-					org_ch_list[i]))
-					continue;
-				ch_list[ch_list_count++] =
-					org_ch_list[i];
-			}
-		} else if (band_mask == 3) {
-			ch_list[ch_list_count++] = ch_24g;
-			ch_list[ch_list_count++] = ch_5g;
-		} else {
-			policy_mgr_debug("unexpected band_mask value %d",
-				band_mask);
-			return;
+		if (WLAN_REG_IS_5GHZ_CH(
+			pm_conc_connection_list[list[index]].chan) &&
+			policy_mgr_is_safe_channel(psoc,
+			pm_conc_connection_list[list[index]].chan) &&
+			!wlan_reg_is_dfs_ch(pm_ctx->pdev,
+			pm_conc_connection_list[list[index]].chan) &&
+			!wlan_reg_is_passive_or_disable_ch(pm_ctx->pdev,
+			pm_conc_connection_list[list[index]].chan)) {
+			band_mask |= 2;
+			ch_5g = pm_conc_connection_list[list[index]].chan;
 		}
-
-		*org_ch_list_count = ch_list_count;
-		for (i = 0; i < *org_ch_list_count; i++)
-			org_ch_list[i] = ch_list[i];
+		index++;
 	}
+	ch_list_count = 0;
+	if (band_mask == 1) {
+		ch_list[ch_list_count++] = ch_24g;
+		for (i = 0; i < *org_ch_list_count; i++) {
+			if (WLAN_REG_IS_24GHZ_CH(
+				org_ch_list[i]))
+				continue;
+			ch_list[ch_list_count++] =
+				org_ch_list[i];
+		}
+	} else if (band_mask == 2) {
+		if ((reg_get_channel_state(pm_ctx->pdev, ch_5g) ==
+			CHANNEL_STATE_DFS) &&
+		      policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(psoc))
+			ch_list[ch_list_count++] = ch_5g;
+		else if (!(reg_get_channel_state(pm_ctx->pdev, ch_5g) ==
+			CHANNEL_STATE_DFS))
+			ch_list[ch_list_count++] = ch_5g;
+		for (i = 0; i < *org_ch_list_count; i++) {
+			if (WLAN_REG_IS_5GHZ_CH(
+				org_ch_list[i]))
+				continue;
+			ch_list[ch_list_count++] =
+				org_ch_list[i];
+		}
+	} else if (band_mask == 3) {
+		ch_list[ch_list_count++] = ch_24g;
+		ch_list[ch_list_count++] = ch_5g;
+	} else {
+		policy_mgr_debug("unexpected band_mask value %d",
+			band_mask);
+		return;
+	}
+
+	*org_ch_list_count = ch_list_count;
+	for (i = 0; i < *org_ch_list_count; i++)
+		org_ch_list[i] = ch_list[i];
+
 }
 
 uint32_t policy_mgr_get_connection_info(struct wlan_objmgr_psoc *psoc,

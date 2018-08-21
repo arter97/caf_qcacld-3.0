@@ -28,22 +28,29 @@
 #include "reg_db.h"
 #include "reg_services.h"
 
-#define reg_log(level, args...) \
-	QDF_TRACE(QDF_MODULE_ID_REGULATORY, level, ## args)
-#define reg_logfl(level, format, args...) reg_log(level, FL(format), ## args)
+#define reg_alert(params...) \
+	QDF_TRACE_FATAL(QDF_MODULE_ID_REGULATORY, params)
+#define reg_err(params...) \
+	QDF_TRACE_ERROR(QDF_MODULE_ID_REGULATORY, params)
+#define reg_warn(params...) \
+	QDF_TRACE_WARN(QDF_MODULE_ID_REGULATORY, params)
+#define reg_notice(params...) \
+	QDF_TRACE_INFO(QDF_MODULE_ID_REGULATORY, params)
+#define reg_info(params...) \
+	QDF_TRACE_INFO(QDF_MODULE_ID_REGULATORY, params)
+#define reg_debug(params...) \
+	QDF_TRACE_DEBUG(QDF_MODULE_ID_REGULATORY, params)
 
-#define reg_alert(format, args...) \
-		reg_logfl(QDF_TRACE_LEVEL_FATAL, format, ## args)
-#define reg_err(format, args...) \
-		reg_logfl(QDF_TRACE_LEVEL_ERROR, format, ## args)
-#define reg_warn(format, args...) \
-		reg_logfl(QDF_TRACE_LEVEL_WARN, format, ## args)
-#define reg_notice(format, args...) \
-		reg_logfl(QDF_TRACE_LEVEL_INFO, format, ## args)
-#define reg_info(format, args...) \
-		reg_logfl(QDF_TRACE_LEVEL_INFO_HIGH, format, ## args)
-#define reg_debug(format, args...) \
-		reg_logfl(QDF_TRACE_LEVEL_DEBUG, format, ## args)
+#define reg_nofl_alert(params...) \
+	QDF_TRACE_FATAL_NO_FL(QDF_MODULE_ID_REGULATORY, params)
+#define reg_nofl_err(params...) \
+	QDF_TRACE_ERROR_NO_FL(QDF_MODULE_ID_REGULATORY, params)
+#define reg_nofl_warn(params...) \
+	QDF_TRACE_WARN_NO_FL(QDF_MODULE_ID_REGULATORY, params)
+#define reg_nofl_info(params...) \
+	QDF_TRACE_INFO_NO_FL(QDF_MODULE_ID_REGULATORY, params)
+#define reg_nofl_debug(params...) \
+	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_REGULATORY, params)
 
 struct wlan_regulatory_psoc_priv_obj {
 	struct mas_chan_params mas_chan_params[PSOC_MAX_PHY_REG_CAP];
@@ -87,6 +94,11 @@ struct wlan_regulatory_psoc_priv_obj {
 struct wlan_regulatory_pdev_priv_obj {
 	struct regulatory_channel cur_chan_list[NUM_CHANNELS];
 	struct regulatory_channel mas_chan_list[NUM_CHANNELS];
+#ifdef DISABLE_CHANNEL_LIST
+	struct regulatory_channel cache_disable_chan_list[NUM_CHANNELS];
+	uint32_t num_cache_channels;
+	bool disable_cached_channels;
+#endif
 	char default_country[REG_ALPHA2_LEN + 1];
 	uint16_t def_region_domain;
 	uint16_t def_country_code;

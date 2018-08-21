@@ -269,12 +269,11 @@ qdf_mem_header_assert_valid(struct qdf_mem_header *header,
 		qdf_err("Corrupted memory domain 0x%x", header->domain);
 
 	if (error_bitmap & QDF_MEM_WRONG_DOMAIN)
-		qdf_err("Memory domain mismatch; found %s(%d), expected %s(%d)",
+		qdf_err("Memory domain mismatch; allocated:%s(%d), current:%s(%d)",
 			qdf_debug_domain_name(header->domain), header->domain,
 			qdf_debug_domain_name(current_domain), current_domain);
 
-	panic("A fatal memory error was detected @ %s:%d",
-	      file, line);
+	QDF_DEBUG_PANIC("Fatal memory error detected @ %s:%d", file, line);
 }
 #endif /* MEMORY_DEBUG */
 
@@ -1001,9 +1000,6 @@ static void qdf_mem_debug_init(void)
 	for (i = 0; i < QDF_DEBUG_DOMAIN_COUNT; ++i)
 		qdf_list_create(&qdf_mem_dma_domains[i], 0);
 	qdf_spinlock_create(&qdf_mem_dma_list_lock);
-
-	/* skb */
-	qdf_net_buf_debug_init();
 }
 
 static uint32_t
@@ -1041,9 +1037,6 @@ static void qdf_mem_domain_set_check_for_leaks(qdf_list_t *domains)
 static void qdf_mem_debug_exit(void)
 {
 	int i;
-
-	/* skb */
-	qdf_net_buf_debug_exit();
 
 	/* mem */
 	qdf_mem_domain_set_check_for_leaks(qdf_mem_domains);
@@ -1518,6 +1511,52 @@ void qdf_mem_zero(void *ptr, uint32_t num_bytes)
 qdf_export_symbol(qdf_mem_zero);
 
 /**
+ * qdf_mem_copy_toio() - copy memory
+ * @dst_addr: Pointer to destination memory location (to copy to)
+ * @src_addr: Pointer to source memory location (to copy from)
+ * @num_bytes: Number of bytes to copy.
+ *
+ * Return: none
+ */
+void qdf_mem_copy_toio(void *dst_addr, const void *src_addr, uint32_t num_bytes)
+{
+	if (0 == num_bytes) {
+		/* special case where dst_addr or src_addr can be NULL */
+		return;
+	}
+
+	if ((!dst_addr) || (!src_addr)) {
+		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
+			  "%s called with NULL parameter, source:%pK destination:%pK",
+			  __func__, src_addr, dst_addr);
+		QDF_ASSERT(0);
+		return;
+	}
+	memcpy_toio(dst_addr, src_addr, num_bytes);
+}
+
+qdf_export_symbol(qdf_mem_copy_toio);
+
+/**
+ * qdf_mem_set_io() - set (fill) memory with a specified byte value.
+ * @ptr: Pointer to memory that will be set
+ * @value: Byte set in memory
+ * @num_bytes: Number of bytes to be set
+ *
+ * Return: None
+ */
+void qdf_mem_set_io(void *ptr, uint32_t num_bytes, uint32_t value)
+{
+	if (!ptr) {
+		qdf_print("%s called with NULL parameter ptr", __func__);
+		return;
+	}
+	memset_io(ptr, value, num_bytes);
+}
+
+qdf_export_symbol(qdf_mem_set_io);
+
+/**
  * qdf_mem_set() - set (fill) memory with a specified byte value.
  * @ptr: Pointer to memory that will be set
  * @num_bytes: Number of bytes to be set
@@ -1606,7 +1645,7 @@ void *qdf_mem_dma_alloc(qdf_device_t osdev, void *dev, qdf_size_t size,
 					   qdf_mem_malloc_flags());
 
 		if (!vaddr) {
-			qdf_print("%s failed , size: %zu!\n", __func__, size);
+			qdf_err("%s failed , size: %zu!", __func__, size);
 			return NULL;
 		}
 
@@ -1792,6 +1831,7 @@ qdf_export_symbol(qdf_mem_dma_sync_single_for_cpu);
 void qdf_mem_init(void)
 {
 	qdf_mem_debug_init();
+	qdf_net_buf_debug_init();
 	qdf_mem_debugfs_init();
 	qdf_mem_debug_debugfs_init();
 }
@@ -1801,6 +1841,7 @@ void qdf_mem_exit(void)
 {
 	qdf_mem_debug_debugfs_exit();
 	qdf_mem_debugfs_exit();
+	qdf_net_buf_debug_exit();
 	qdf_mem_debug_exit();
 }
 qdf_export_symbol(qdf_mem_exit);

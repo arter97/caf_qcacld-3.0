@@ -50,6 +50,7 @@
 #include "wlan_scan_cache_db_i.h"
 #include "wlan_reg_services_api.h"
 #include "wlan_reg_ucfg_api.h"
+#include <wlan_dfs_utils_api.h>
 
 /**
  * scm_del_scan_node() - API to remove scan node from the list
@@ -314,9 +315,9 @@ static void scm_check_and_age_out(struct scan_dbs *scan_db,
 {
 	if (util_scan_entry_age(node->entry) >=
 	   scan_aging_time) {
-		scm_info("Aging out BSSID: %pM with age %d ms",
-			node->entry->bssid.bytes,
-			util_scan_entry_age(node->entry));
+		scm_debug("Aging out BSSID: %pM with age %d ms",
+			  node->entry->bssid.bytes,
+			  util_scan_entry_age(node->entry));
 		qdf_spin_lock_bh(&scan_db->scan_db_lock);
 		scm_scan_entry_del(scan_db, node);
 		qdf_spin_unlock_bh(&scan_db->scan_db_lock);
@@ -649,14 +650,14 @@ static QDF_STATUS scm_add_update_entry(struct wlan_objmgr_psoc *psoc,
 	if (scan_params->frm_subtype ==
 	   MGMT_SUBTYPE_PROBE_RESP &&
 	   !scan_params->ie_list.ssid)
-		scm_info("Probe resp doesn't contain SSID");
+		scm_debug("Probe resp doesn't contain SSID");
 
 
 	if (scan_params->ie_list.csa ||
 	   scan_params->ie_list.xcsa ||
 	   scan_params->ie_list.cswrp)
-		scm_info("CSA IE present for BSSID: %pM",
-			scan_params->bssid.bytes);
+		scm_debug("CSA IE present for BSSID: %pM",
+			  scan_params->bssid.bytes);
 
 	is_dup_found = scm_find_duplicate(scan_db, scan_params, &dup_node);
 
@@ -745,6 +746,11 @@ QDF_STATUS scm_handle_bcn_probe(struct scheduler_msg *msg)
 		scm_debug("invalid beacon/probe length");
 		status = QDF_STATUS_E_INVAL;
 		goto free_nbuf;
+	}
+
+	if (bcn->frm_type == MGMT_SUBTYPE_BEACON &&
+	    utils_is_dfs_ch(pdev, bcn->rx_data->channel)) {
+		util_scan_add_hidden_ssid(pdev, bcn->buf);
 	}
 
 	scan_list =
@@ -1263,7 +1269,7 @@ void scm_filter_valid_channel(struct wlan_objmgr_pdev *pdev,
 	struct scan_cache_node *cur_node;
 	struct scan_cache_node *next_node = NULL;
 
-	scm_info("num_chan = %d", num_chan);
+	scm_debug("num_chan = %d", num_chan);
 
 	if (!pdev) {
 		scm_err("pdev is NULL");

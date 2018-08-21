@@ -486,7 +486,8 @@ void hif_close(struct hif_opaque_softc *hif_ctx)
 	qdf_mem_free(scn);
 }
 
-#ifdef QCA_WIFI_QCA8074
+#if defined(QCA_WIFI_QCA8074) || \
+	defined(QCA_WIFI_QCA6290) || defined(QCA_WIFI_QCA6390)
 static QDF_STATUS hif_hal_attach(struct hif_softc *scn)
 {
 	if (ce_srng_based(scn)) {
@@ -799,10 +800,6 @@ int hif_get_device_type(uint32_t device_id,
 		break;
 
 	case QCA8074_DEVICE_ID:
-	case RUMIM2M_DEVICE_ID_NODE0:
-	case RUMIM2M_DEVICE_ID_NODE1:
-	case RUMIM2M_DEVICE_ID_NODE2:
-	case RUMIM2M_DEVICE_ID_NODE3:
 		*hif_type = HIF_TYPE_QCA8074;
 		*target_type = TARGET_TYPE_QCA8074;
 		HIF_INFO(" *********** QCA8074  *************\n");
@@ -822,8 +819,26 @@ int hif_get_device_type(uint32_t device_id,
 		HIF_INFO(" *********** QCN7605 *************\n");
 		break;
 
+	case QCA6390_DEVICE_ID:
+	case QCA6390_EMULATION_DEVICE_ID:
+		*hif_type = HIF_TYPE_QCA6390;
+		*target_type = TARGET_TYPE_QCA6390;
+		HIF_INFO(" *********** QCA6390 *************\n");
+		break;
+
+	case QCA8074V2_DEVICE_ID:
+	case RUMIM2M_DEVICE_ID_NODE0:
+	case RUMIM2M_DEVICE_ID_NODE1:
+	case RUMIM2M_DEVICE_ID_NODE2:
+	case RUMIM2M_DEVICE_ID_NODE3:
+		*hif_type = HIF_TYPE_QCA8074V2;
+		*target_type = TARGET_TYPE_QCA8074V2;
+		HIF_INFO(" *********** QCA8074V2 *************\n");
+		break;
+
 	default:
-		HIF_ERROR("%s: Unsupported device ID!", __func__);
+		HIF_ERROR("%s: Unsupported device ID = 0x%x!",
+			  __func__, device_id);
 		ret = -ENODEV;
 		break;
 	}
@@ -1205,7 +1220,7 @@ void hif_reg_write(struct hif_opaque_softc *hif_ctx, uint32_t offset,
 {
 	struct hif_softc *scn = HIF_GET_SOFTC(hif_ctx);
 
-	hif_write32_mb(scn->mem + offset, value);
+	hif_write32_mb(scn, scn->mem + offset, value);
 
 }
 qdf_export_symbol(hif_reg_write);
@@ -1223,7 +1238,7 @@ uint32_t hif_reg_read(struct hif_opaque_softc *hif_ctx, uint32_t offset)
 
 	struct hif_softc *scn = HIF_GET_SOFTC(hif_ctx);
 
-	return hif_read32_mb(scn->mem + offset);
+	return hif_read32_mb(scn, scn->mem + offset);
 }
 qdf_export_symbol(hif_reg_read);
 

@@ -15,6 +15,7 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
+#include "hal_hw_headers.h"
 #include "dp_types.h"
 #include "dp_rx.h"
 #include "dp_peer.h"
@@ -26,6 +27,10 @@
 #include "dp_rx_mon.h"
 #include "dp_internal.h"
 #include "qdf_mem.h"   /* qdf_mem_malloc,free */
+
+#ifdef FEATURE_PERPKT_INFO
+#include "dp_ratetable.h"
+#endif
 
 /**
 * dp_rx_populate_cdp_indication_ppdu() - Populate cdp rx indication structure
@@ -124,6 +129,38 @@ dp_rx_populate_cdp_indication_ppdu(struct dp_pdev *pdev,
  * Return: None
  */
 #ifdef FEATURE_PERPKT_INFO
+static inline void dp_rx_rate_stats_update(struct dp_peer *peer,
+					   struct cdp_rx_indication_ppdu *ppdu)
+{
+	uint32_t ratekbps = 0;
+	uint32_t ppdu_rx_rate = 0;
+	uint32_t nss = 0;
+
+	if (!peer || !ppdu)
+		return;
+
+	if (ppdu->u.nss == 0)
+		nss = 0;
+	else
+		nss = ppdu->u.nss - 1;
+
+	ratekbps = dp_getrateindex(ppdu->u.mcs,
+				   nss,
+				   ppdu->u.preamble,
+				   ppdu->u.bw);
+
+	if (!ratekbps)
+		return;
+
+	DP_STATS_UPD(peer, rx.last_rx_rate, ratekbps);
+	dp_ath_rate_lpf(peer->stats.rx.avg_rx_rate, ratekbps);
+	ppdu_rx_rate = dp_ath_rate_out(peer->stats.rx.avg_rx_rate);
+	DP_STATS_UPD(peer, rx.rnd_avg_rx_rate, ppdu_rx_rate);
+
+	if (peer->vdev)
+		peer->vdev->stats.rx.last_rx_rate = ratekbps;
+}
+
 static void dp_rx_stats_update(struct dp_soc *soc, struct dp_peer *peer,
 		struct cdp_rx_indication_ppdu *ppdu)
 {
@@ -196,6 +233,10 @@ static void dp_rx_stats_update(struct dp_soc *soc, struct dp_peer *peer,
 	ac = TID_TO_WME_AC(ppdu->tid);
 	if (ppdu->tid != HAL_TID_INVALID)
 		DP_STATS_INC(peer, rx.wme_ac_type[ac], num_msdu);
+	dp_peer_stats_notify(peer);
+	DP_STATS_UPD(peer, rx.last_rssi, ppdu->rssi);
+
+	dp_rx_rate_stats_update(peer, ppdu);
 
 	if (soc->cdp_soc.ol_ops->update_dp_stats) {
 		soc->cdp_soc.ol_ops->update_dp_stats(pdev->ctrl_pdev,
@@ -279,6 +320,27 @@ dp_rx_handle_ppdu_stats(struct dp_soc *soc, struct dp_pdev *pdev,
 	if (ppdu_info->com_info.mpdu_cnt_fcs_ok == 0)
 		return;
 
+	if (ppdu_info->nac_info.fc_valid &&
+	    ppdu_info->nac_info.to_ds_flag &&
+	    ppdu_info->nac_info.mac_addr2_valid) {
+		struct dp_neighbour_peer *peer = NULL;
+		uint8_t rssi = ppdu_info->rx_status.rssi_comb;
+
+		qdf_spin_lock_bh(&pdev->neighbour_peer_mutex);
+		if (pdev->neighbour_peers_added) {
+			TAILQ_FOREACH(peer, &pdev->neighbour_peers_list,
+				      neighbour_peer_list_elem) {
+				if (!qdf_mem_cmp(&peer->neighbour_peers_macaddr,
+						 &ppdu_info->nac_info.mac_addr2,
+						 DP_MAC_ADDR_LEN)) {
+					peer->rssi = rssi;
+					break;
+				}
+			}
+		}
+		qdf_spin_unlock_bh(&pdev->neighbour_peer_mutex);
+	}
+
 	if (!pdev->mcopy_mode) {
 		if (!ppdu_info->rx_status.frame_control_info_valid)
 			return;
@@ -361,7 +423,7 @@ dp_rx_mon_status_process_tlv(struct dp_soc *soc, uint32_t mac_id,
 
 			do {
 				tlv_status = hal_rx_status_get_tlv_info(rx_tlv,
-						ppdu_info);
+						ppdu_info, pdev->soc->hal_soc);
 
 				dp_rx_mon_update_dbg_ppdu_stats(ppdu_info,
 								rx_mon_stats);
@@ -383,7 +445,9 @@ dp_rx_mon_status_process_tlv(struct dp_soc *soc, uint32_t mac_id,
 			qdf_nbuf_free(status_nbuf);
 		}
 
-		if (tlv_status == HAL_TLV_STATUS_PPDU_DONE) {
+		if (tlv_status == HAL_TLV_STATUS_PPDU_NON_STD_DONE) {
+			dp_rx_mon_deliver_non_std(soc, mac_id);
+		} else if (tlv_status == HAL_TLV_STATUS_PPDU_DONE) {
 			rx_mon_stats->status_ppdu_done++;
 			if (pdev->enhanced_stats_en ||
 					pdev->mcopy_mode)
@@ -430,7 +494,7 @@ dp_rx_mon_status_srng_process(struct dp_soc *soc, uint32_t mac_id,
 	if (!mon_status_srng || !hal_srng_initialized(mon_status_srng)) {
 
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			"%s %d : HAL Monitor Status Ring Init Failed -- %pK\n",
+			"%s %d : HAL Monitor Status Ring Init Failed -- %pK",
 			__func__, __LINE__, mon_status_srng);
 		return work_done;
 	}
@@ -615,6 +679,7 @@ dp_mon_process(struct dp_soc *soc, uint32_t mac_id, uint32_t quota) {
  * Return: QDF_STATUS_SUCCESS: success
  *         QDF_STATUS_E_RESOURCES: Error return
  */
+#ifndef QCA_WIFI_QCA6390
 QDF_STATUS
 dp_rx_pdev_mon_status_detach(struct dp_pdev *pdev, int mac_id)
 {
@@ -627,6 +692,7 @@ dp_rx_pdev_mon_status_detach(struct dp_pdev *pdev, int mac_id)
 
 	return QDF_STATUS_SUCCESS;
 }
+#endif
 
 /*
  * dp_rx_buffers_replenish() -  replenish monitor status ring with
@@ -672,7 +738,7 @@ QDF_STATUS dp_rx_mon_status_buffers_replenish(struct dp_soc *dp_soc,
 	qdf_assert(rxdma_srng);
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-		"[%s][%d] requested %d buffers for replenish\n",
+		"[%s][%d] requested %d buffers for replenish",
 		__func__, __LINE__, num_req_buffers);
 
 	/*
@@ -688,13 +754,13 @@ QDF_STATUS dp_rx_mon_status_buffers_replenish(struct dp_soc *dp_soc,
 
 		if (!num_alloc_desc) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			"[%s][%d] no free rx_descs in freelist\n",
+			"[%s][%d] no free rx_descs in freelist",
 			__func__, __LINE__);
 			return QDF_STATUS_E_NOMEM;
 		}
 
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-			"[%s][%d] %d rx desc allocated\n", __func__, __LINE__,
+			"[%s][%d] %d rx desc allocated", __func__, __LINE__,
 			num_alloc_desc);
 
 		num_req_buffers = num_alloc_desc;
@@ -705,7 +771,7 @@ QDF_STATUS dp_rx_mon_status_buffers_replenish(struct dp_soc *dp_soc,
 				rxdma_srng, sync_hw_ptr);
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-		"[%s][%d] no of available entries in rxdma ring: %d\n",
+		"[%s][%d] no of available entries in rxdma ring: %d",
 		  __func__, __LINE__, num_entries_avail);
 
 	if (num_entries_avail < num_req_buffers) {
@@ -737,7 +803,7 @@ QDF_STATUS dp_rx_mon_status_buffers_replenish(struct dp_soc *dp_soc,
 
 		if (qdf_unlikely(rxdma_ring_entry == NULL)) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-					"[%s][%d] rxdma_ring_entry is NULL, count - %d\n",
+					"[%s][%d] rxdma_ring_entry is NULL, count - %d",
 					__func__, __LINE__, count);
 			qdf_nbuf_unmap_single(dp_soc->osdev, rx_netbuf,
 					      QDF_DMA_BIDIRECTIONAL);
@@ -754,7 +820,7 @@ QDF_STATUS dp_rx_mon_status_buffers_replenish(struct dp_soc *dp_soc,
 
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
 			"[%s][%d] rx_desc=%pK, cookie=%d, nbuf=%pK, \
-			paddr=%pK\n",
+			paddr=%pK",
 			__func__, __LINE__, &(*desc_list)->rx_desc,
 			(*desc_list)->rx_desc.cookie, rx_netbuf,
 			(void *)paddr);
@@ -765,13 +831,13 @@ QDF_STATUS dp_rx_mon_status_buffers_replenish(struct dp_soc *dp_soc,
 	hal_srng_access_end(dp_soc->hal_soc, rxdma_srng);
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-		"successfully replenished %d buffers\n", num_req_buffers);
+		"successfully replenished %d buffers", num_req_buffers);
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-		"%d rx desc added back to free list\n", num_desc_to_free);
+		"%d rx desc added back to free list", num_desc_to_free);
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-		"[%s][%d] desc_list=%pK, tail=%pK rx_desc=%pK, cookie=%d\n",
+		"[%s][%d] desc_list=%pK, tail=%pK rx_desc=%pK, cookie=%d",
 		__func__, __LINE__, desc_list, tail, &(*desc_list)->rx_desc,
 		(*desc_list)->rx_desc.cookie);
 
@@ -795,6 +861,7 @@ QDF_STATUS dp_rx_mon_status_buffers_replenish(struct dp_soc *dp_soc,
  * Return: QDF_STATUS_SUCCESS: success
  *         QDF_STATUS_E_RESOURCES: Error return
  */
+#ifndef QCA_WIFI_QCA6390
 QDF_STATUS
 dp_rx_pdev_mon_status_attach(struct dp_pdev *pdev, int ring_id) {
 	struct dp_soc *soc = pdev->soc;
@@ -814,19 +881,19 @@ dp_rx_pdev_mon_status_attach(struct dp_pdev *pdev, int ring_id) {
 	rx_desc_pool = &soc->rx_desc_status[ring_id];
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO_LOW,
-			"%s: Mon RX Status Pool[%d] allocation size=%d\n",
+			"%s: Mon RX Status Pool[%d] allocation size=%d",
 			__func__, ring_id, rxdma_entries);
 
 	status = dp_rx_desc_pool_alloc(soc, ring_id, rxdma_entries+1,
 			rx_desc_pool);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			"%s: dp_rx_desc_pool_alloc() failed \n", __func__);
+			"%s: dp_rx_desc_pool_alloc() failed ", __func__);
 		return status;
 	}
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO_LOW,
-			"%s: Mon RX Status Buffers Replenish ring_id=%d\n",
+			"%s: Mon RX Status Buffers Replenish ring_id=%d",
 			__func__, ring_id);
 
 	status = dp_rx_mon_status_buffers_replenish(soc, ring_id, rxdma_srng,
@@ -834,7 +901,7 @@ dp_rx_pdev_mon_status_attach(struct dp_pdev *pdev, int ring_id) {
 			HAL_RX_BUF_RBM_SW3_BM);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			"%s: dp_rx_buffers_replenish() failed \n", __func__);
+			"%s: dp_rx_buffers_replenish() failed ", __func__);
 		return status;
 	}
 
@@ -854,3 +921,4 @@ dp_rx_pdev_mon_status_attach(struct dp_pdev *pdev, int ring_id) {
 
 	return QDF_STATUS_SUCCESS;
 }
+#endif

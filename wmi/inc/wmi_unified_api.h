@@ -43,7 +43,9 @@
 #ifdef WLAN_FEATURE_DISA
 #include "wlan_disa_public_struct.h"
 #endif
-
+#ifdef WLAN_FEATURE_ACTION_OUI
+#include "wlan_action_oui_public_struct.h"
+#endif
 #ifdef WLAN_FEATURE_NAN_CONVERGENCE
 #include "nan_public_structs.h"
 #endif
@@ -405,10 +407,6 @@ QDF_STATUS wmi_unified_vdev_create_send(void *wmi_hdl,
 
 QDF_STATUS wmi_unified_vdev_delete_send(void *wmi_hdl,
 					  uint8_t if_id);
-
-QDF_STATUS wmi_unified_vdev_restart_send(void *wmi_hdl,
-				uint8_t macaddr[IEEE80211_ADDR_LEN],
-				struct vdev_start_params *param);
 
 QDF_STATUS wmi_unified_vdev_stop_send(void *wmi_hdl,
 					uint8_t vdev_id);
@@ -1199,9 +1197,6 @@ QDF_STATUS wmi_unified_send_coex_ver_cfg_cmd(void *wmi_hdl,
 QDF_STATUS wmi_unified_send_coex_config_cmd(void *wmi_hdl,
 					    struct coex_config_params *param);
 
-QDF_STATUS wmi_unified_set_atf_cmd_send(void *wmi_hdl,
-				struct set_atf_params *param);
-
 QDF_STATUS wmi_unified_pdev_fips_cmd_send(void *wmi_hdl,
 				struct fips_params *param);
 
@@ -1498,13 +1493,32 @@ QDF_STATUS wmi_unified_lcr_set_cmd_send(void *wmi_hdl,
 QDF_STATUS wmi_unified_send_periodic_chan_stats_config_cmd(void *wmi_hdl,
 			struct periodic_chan_stats_params *param);
 
+#ifdef WLAN_ATF_ENABLE
+QDF_STATUS
+wmi_unified_set_atf_cmd_send(void *wmi_hdl,
+			     struct set_atf_params *param);
+
 QDF_STATUS
 wmi_send_atf_peer_request_cmd(void *wmi_hdl,
-			struct atf_peer_request_params *param);
+			      struct atf_peer_request_params *param);
 
 QDF_STATUS
 wmi_send_set_atf_grouping_cmd(void *wmi_hdl,
-			struct atf_grouping_params *param);
+			      struct atf_grouping_params *param);
+
+QDF_STATUS
+wmi_send_set_atf_group_ac_cmd(void *wmi_hdl,
+			      struct atf_group_ac_params *param);
+
+QDF_STATUS
+wmi_extract_atf_peer_stats_ev(void *wmi_hdl, void *evt_buf,
+			      wmi_host_atf_peer_stats_event *ev);
+
+QDF_STATUS
+wmi_extract_atf_token_info_ev(void *wmi_hdl, void *evt_buf, uint8_t idx,
+			      wmi_host_atf_peer_stats_info *atf_token_info);
+#endif
+
 /* Extract APIs */
 
 QDF_STATUS wmi_extract_wds_addr_event(void *wmi_hdl,
@@ -1725,12 +1739,6 @@ QDF_STATUS wmi_extract_peer_stats(void *wmi_hdl, void *evt_buf,
 QDF_STATUS wmi_extract_tx_data_traffic_ctrl_ev(void *wmi_hdl, void *evt_buf,
 		wmi_host_tx_data_traffic_ctrl_event *ev);
 
-QDF_STATUS wmi_extract_atf_peer_stats_ev(void *wmi_hdl, void *evt_buf,
-		wmi_host_atf_peer_stats_event *ev);
-
-QDF_STATUS wmi_extract_atf_token_info_ev(void *wmi_hdl, void *evt_buf,
-		uint8_t idx, wmi_host_atf_peer_stats_info *atf_token_info);
-
 QDF_STATUS wmi_extract_vdev_stats(void *wmi_hdl, void *evt_buf,
 		uint32_t index, wmi_host_vdev_stats *vdev_stats);
 
@@ -1940,6 +1948,20 @@ QDF_STATUS wmi_unified_dfs_phyerr_offload_dis_cmd(void *wmi_hdl,
 
 QDF_STATUS wmi_unified_set_country_cmd_send(void *wmi_hdl,
 				struct set_country *param);
+
+#ifdef WLAN_FEATURE_ACTION_OUI
+/**
+ * wmi_unified_send_action_oui_cmd() - send action oui cmd to fw
+ * @wmi_hdl: wma handle
+ * @req: wmi action oui message to be send
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS
+wmi_unified_send_action_oui_cmd(void *wmi_hdl,
+				struct action_oui_request *req);
+#endif /* WLAN_FEATURE_ACTION_OUI */
+
 /*
  * wmi_unified_set_del_pmkid_cache() - set delete PMKID
  * @wmi_hdl: wma handle

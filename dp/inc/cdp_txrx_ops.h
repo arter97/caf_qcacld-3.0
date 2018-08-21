@@ -86,7 +86,7 @@ struct cdp_cmn_ops {
 
 	void *(*txrx_peer_create)
 		(struct cdp_vdev *vdev, uint8_t *peer_mac_addr,
-		 void *ol_peer);
+		 struct cdp_ctrl_objmgr_peer *ctrl_peer);
 
 	void (*txrx_peer_setup)
 		(struct cdp_vdev *vdev_hdl, void *peer_hdl);
@@ -120,12 +120,18 @@ struct cdp_cmn_ops {
 		(ol_txrx_soc_handle soc, void *ast_hdl,
 		enum cdp_txrx_ast_entry_type type);
 
+	enum cdp_txrx_ast_entry_type (*txrx_peer_ast_get_type)
+		(ol_txrx_soc_handle soc, void *ast_hdl);
+
 	void (*txrx_peer_delete)(void *peer, uint32_t bitmap);
 
 	int (*txrx_set_monitor_mode)(struct cdp_vdev *vdev,
 			uint8_t smart_monitor);
 
 	uint8_t (*txrx_get_pdev_id_frm_pdev)(struct cdp_pdev *pdev);
+
+	void (*txrx_pdev_set_chan_noise_floor)(struct cdp_pdev *pdev,
+					       int16_t chan_noise_floor);
 
 	void (*txrx_set_nac)(struct cdp_peer *peer);
 
@@ -159,7 +165,8 @@ struct cdp_cmn_ops {
 	 ********************************************************************/
 
 	void (*txrx_vdev_register)(struct cdp_vdev *vdev,
-			void *osif_vdev, struct ol_txrx_ops *txrx_ops);
+			void *osif_vdev, struct cdp_ctrl_objmgr_vdev *ctrl_vdev,
+			struct ol_txrx_ops *txrx_ops);
 
 	int (*txrx_mgmt_send)(struct cdp_vdev *vdev,
 			qdf_nbuf_t tx_mgmt_frm, uint8_t type);
@@ -249,9 +256,13 @@ struct cdp_cmn_ops {
 
 	void (*txrx_soc_detach)(void *soc);
 
+	int (*addba_resp_tx_completion)(void *peer_handle, uint8_t tid,
+					int status);
+
 	int (*addba_requestprocess)(void *peer_handle, uint8_t dialogtoken,
-		uint16_t tid, uint16_t batimeout, uint16_t buffersize,
-		uint16_t startseqnum);
+				   uint16_t tid, uint16_t batimeout,
+				   uint16_t buffersize,
+				   uint16_t startseqnum);
 
 	void (*addba_responsesetup)(void *peer_handle, uint8_t tid,
 		uint8_t *dialogtoken, uint16_t *statuscode,
@@ -308,6 +319,9 @@ struct cdp_cmn_ops {
 	QDF_STATUS (*txrx_peer_map_attach)(ol_txrx_soc_handle soc,
 			uint32_t num_peers);
 
+	void (*txrx_pdev_set_ctrl_pdev)(struct cdp_pdev *pdev_hdl,
+					struct cdp_ctrl_objmgr_pdev *ctrl_pdev);
+
 	ol_txrx_tx_fp tx_send;
 };
 
@@ -321,7 +335,7 @@ struct cdp_ctrl_ops {
 				uint32_t val);
 	int
 		(*txrx_update_filter_neighbour_peers)(
-				struct cdp_pdev *pdev,
+				struct cdp_vdev *vdev,
 				uint32_t cmd, uint8_t *macaddr);
 	/**
 	 * @brief set the safemode of the device
@@ -520,6 +534,9 @@ struct cdp_ctrl_ops {
 	QDF_STATUS (*txrx_vdev_config_for_nac_rssi)(struct cdp_vdev *vdev,
 		enum cdp_nac_param_cmd cmd, char *bssid, char *client_macaddr,
 		uint8_t chan_num);
+	QDF_STATUS (*txrx_vdev_get_neighbour_rssi)(struct cdp_vdev *vdev,
+						   char *macaddr,
+						   uint8_t *rssi);
 #endif
 	void (*set_key)(struct cdp_peer *peer_handle,
 			bool is_unicast, uint32_t *key);
@@ -570,7 +587,7 @@ struct cdp_mon_ops {
 	void (*txrx_monitor_set_filter_mcast_data)
 		(struct cdp_pdev *, u_int8_t val);
 	void (*txrx_monitor_set_filter_non_data)
-		(struct cdp_pdev *, u_int8_t val);
+	      (struct cdp_pdev *, u_int8_t val);
 
 	bool (*txrx_monitor_get_filter_ucast_data)
 		(struct cdp_vdev *vdev_txrx_handle);
@@ -641,8 +658,10 @@ struct cdp_host_stats_ops {
 
 	A_STATUS
 		(*txrx_host_me_stats)(struct cdp_vdev *vdev);
+
 	void
 		(*txrx_per_peer_stats)(struct cdp_pdev *pdev, char *addr);
+
 	int (*txrx_host_msdu_ttl_stats)(struct cdp_vdev *vdev,
 			struct ol_txrx_stats_req *req);
 
@@ -658,6 +677,25 @@ struct cdp_host_stats_ops {
 	void
 		(*get_htt_stats)(struct cdp_pdev *pdev, void *data,
 				uint32_t data_len);
+	void
+		(*txrx_update_pdev_stats)(struct cdp_pdev *pdev, void *data,
+					  uint16_t stats_id);
+	struct cdp_peer_stats*
+		(*txrx_get_peer_stats)(struct cdp_peer *peer);
+	void
+		(*txrx_reset_peer_ald_stats)(struct cdp_peer *peer);
+	void
+		(*txrx_reset_peer_stats)(struct cdp_peer *peer);
+	int
+		(*txrx_get_vdev_stats)(struct cdp_vdev *vdev, void *buf,
+				       bool is_aggregate);
+	int
+		(*txrx_process_wmi_host_vdev_stats)(ol_txrx_soc_handle soc,
+						    void *data, uint32_t len,
+						    uint32_t stats_id);
+	int
+		(*txrx_get_vdev_extd_stats)(struct cdp_vdev *vdev_handle,
+					    void *buffer);
 };
 
 struct cdp_wds_ops {
@@ -710,15 +748,21 @@ struct cdp_lro_hash_config {
 };
 
 struct ol_if_ops {
-	void (*peer_set_default_routing)(void *scn_handle,
-			uint8_t *peer_macaddr, uint8_t vdev_id,
-			bool hash_based, uint8_t ring_num);
-	int (*peer_rx_reorder_queue_setup)(void *scn_handle,
-			uint8_t vdev_id, uint8_t *peer_mac,
-			qdf_dma_addr_t hw_qdesc, int tid, uint16_t queue_num);
-	int (*peer_rx_reorder_queue_remove)(void *scn_handle,
-			uint8_t vdev_id, uint8_t *peer_macaddr,
-			uint32_t tid_mask);
+	void
+	(*peer_set_default_routing)(struct cdp_ctrl_objmgr_pdev *ctrl_pdev,
+				    uint8_t *peer_macaddr, uint8_t vdev_id,
+				    bool hash_based, uint8_t ring_num);
+	QDF_STATUS
+	(*peer_rx_reorder_queue_setup)(struct cdp_ctrl_objmgr_pdev *ctrl_pdev,
+				       uint8_t vdev_id, uint8_t *peer_mac,
+				       qdf_dma_addr_t hw_qdesc, int tid,
+				       uint16_t queue_num,
+				       uint8_t ba_window_size_valid,
+				       uint16_t ba_window_size);
+	QDF_STATUS
+	(*peer_rx_reorder_queue_remove)(struct cdp_ctrl_objmgr_pdev *ctrl_pdev,
+					uint8_t vdev_id, uint8_t *peer_macaddr,
+					uint32_t tid_mask);
 	int (*peer_unref_delete)(void *scn_handle, uint8_t vdev_id,
 			uint8_t *peer_macaddr);
 	bool (*is_hw_dbs_2x2_capable)(struct wlan_objmgr_psoc *psoc);
@@ -730,8 +774,9 @@ struct ol_if_ops {
 			uint32_t flags);
 	void (*peer_del_wds_entry)(void *ol_soc_handle,
 			uint8_t *wds_macaddr);
-	QDF_STATUS (*lro_hash_config)(void *scn_handle,
-			struct cdp_lro_hash_config *rx_offld_hash);
+	QDF_STATUS
+	(*lro_hash_config)(struct wlan_objmgr_psoc *ctrl_psoc,
+			   struct cdp_lro_hash_config *rx_offld_hash);
 	void (*update_dp_stats)(void *soc, void *stats, uint16_t id,
 			uint8_t type);
 	uint8_t (*rx_invalid_peer)(void *ctrl_pdev, void *msg);
@@ -745,7 +790,8 @@ struct ol_if_ops {
 
 	void (*rx_mic_error)(void *ol_soc_handle,
 			 uint16_t vdev_id, void *wh);
-	bool (*rx_frag_tkip_demic)(void *ol_peer, qdf_nbuf_t nbuf,
+	bool (*rx_frag_tkip_demic)(struct wlan_objmgr_peer *ctrl_peer,
+				   qdf_nbuf_t nbuf,
 				   uint16_t hdr_space);
 	uint8_t (*freq_to_channel)(void *ol_soc_handle,  uint16_t vdev_id);
 
@@ -1025,9 +1071,8 @@ struct cdp_ocb_ops {
  * @remove_peers_for_vdev_no_lock:
  * @copy_mac_addr_raw:
  * @add_last_real_peer:
- * @last_assoc_received:
- * @last_disassoc_received:
- * @last_deauth_received:
+ * @get_last_mgmt_timestamp:
+ * @set_last_mgmt_timestamp:
  * @is_vdev_restore_last_peer:
  * @update_last_real_peer:
  */
@@ -1071,13 +1116,18 @@ struct cdp_peer_ops {
 	void (*copy_mac_addr_raw)(struct cdp_vdev *vdev, uint8_t *bss_addr);
 	void (*add_last_real_peer)(struct cdp_pdev *pdev,
 		struct cdp_vdev *vdev, uint8_t *peer_id);
-	qdf_time_t * (*last_assoc_received)(void *peer);
-	qdf_time_t * (*last_disassoc_received)(void *peer);
-	qdf_time_t * (*last_deauth_received)(void *peer);
 	bool (*is_vdev_restore_last_peer)(void *peer);
 	void (*update_last_real_peer)(struct cdp_pdev *pdev, void *peer,
 			uint8_t *peer_id, bool restore_last_peer);
 	void (*peer_detach_force_delete)(void *peer);
+	bool (*get_last_mgmt_timestamp)(struct cdp_pdev *ppdev,
+					u8 *peer_addr,
+					u8 subtype,
+					qdf_time_t *timestamp);
+	bool (*update_last_mgmt_timestamp)(struct cdp_pdev *ppdev,
+					   u8 *peer_addr,
+					   qdf_time_t timestamp,
+					   u8 subtype);
 };
 
 /**

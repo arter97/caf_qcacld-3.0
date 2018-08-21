@@ -57,6 +57,17 @@ QDF_STATUS utils_dfs_reset(struct wlan_objmgr_pdev *pdev)
 	return QDF_STATUS_SUCCESS;
 }
 
+bool utils_dfs_freq_is_in_nol(struct wlan_objmgr_pdev *pdev, uint32_t freq)
+{
+	struct wlan_dfs *dfs;
+
+	dfs = global_dfs_to_mlme.pdev_get_comp_private_obj(pdev);
+	if (!dfs)
+		return false;
+
+	return dfs_freq_is_in_nol(dfs, freq);
+}
+
 QDF_STATUS utils_dfs_cac_valid_reset(struct wlan_objmgr_pdev *pdev,
 		uint8_t prevchan_ieee,
 		uint32_t prevchan_flags)
@@ -118,6 +129,36 @@ QDF_STATUS utils_dfs_cancel_precac_timer(struct wlan_objmgr_pdev *pdev)
 }
 qdf_export_symbol(utils_dfs_cancel_precac_timer);
 
+QDF_STATUS utils_dfs_start_precac_timer(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_dfs *dfs;
+
+	dfs = global_dfs_to_mlme.pdev_get_comp_private_obj(pdev);
+	if (!dfs) {
+		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS, "NULL dfs");
+		return  QDF_STATUS_E_FAILURE;
+	}
+	dfs_start_precac_timer(dfs, dfs->dfs_precac_secondary_freq);
+	return QDF_STATUS_SUCCESS;
+}
+
+#ifdef WLAN_DFS_PRECAC_AUTO_CHAN_SUPPORT
+QDF_STATUS utils_dfs_precac_decide_pref_chan(struct wlan_objmgr_pdev *pdev,
+					     uint8_t *ch_ieee)
+{
+	struct wlan_dfs *dfs;
+
+	dfs = global_dfs_to_mlme.pdev_get_comp_private_obj(pdev);
+	if (!dfs) {
+		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS, "NULL dfs");
+		return  QDF_STATUS_E_FAILURE;
+	}
+	dfs_decide_precac_preferred_chan(dfs, ch_ieee);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 QDF_STATUS utils_dfs_is_precac_done(struct wlan_objmgr_pdev *pdev,
 		bool *is_precac_done)
 {
@@ -127,7 +168,7 @@ QDF_STATUS utils_dfs_is_precac_done(struct wlan_objmgr_pdev *pdev,
 	if (!dfs)
 		return  QDF_STATUS_E_FAILURE;
 
-	*is_precac_done = dfs_is_precac_done(dfs);
+	*is_precac_done = dfs_is_precac_done(dfs, dfs->dfs_curchan);
 
 	return QDF_STATUS_SUCCESS;
 }

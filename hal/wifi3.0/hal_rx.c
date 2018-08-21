@@ -17,6 +17,7 @@
  */
 
 #include "hal_api.h"
+#include "hal_hw_headers.h"
 #include "qdf_module.h"
 
 /* TODO: See if the following definition is available in HW headers */
@@ -242,13 +243,23 @@ void hal_reo_setup(void *hal_soc,
 	 struct hal_reo_params *reo_params)
 {
 	struct hal_soc *soc = (struct hal_soc *)hal_soc;
+	uint32_t reg_val;
 
-	HAL_REG_WRITE(soc, HWIO_REO_R0_GENERAL_ENABLE_ADDR(
-		SEQ_WCSS_UMAC_REO_REG_OFFSET),
-		HAL_SM(HWIO_REO_R0_GENERAL_ENABLE,
+	reg_val = HAL_REG_READ(soc, HWIO_REO_R0_GENERAL_ENABLE_ADDR(
+		SEQ_WCSS_UMAC_REO_REG_OFFSET));
+
+	reg_val &= ~(HWIO_REO_R0_GENERAL_ENABLE_FRAGMENT_DEST_RING_BMSK |
+		HWIO_REO_R0_GENERAL_ENABLE_AGING_LIST_ENABLE_BMSK |
+		HWIO_REO_R0_GENERAL_ENABLE_AGING_FLUSH_ENABLE_BMSK);
+
+	reg_val |= HAL_SM(HWIO_REO_R0_GENERAL_ENABLE,
 		FRAGMENT_DEST_RING, reo_params->frag_dst_ring) |
 		HAL_SM(HWIO_REO_R0_GENERAL_ENABLE, AGING_LIST_ENABLE, 1) |
-		HAL_SM(HWIO_REO_R0_GENERAL_ENABLE, AGING_FLUSH_ENABLE, 1));
+		HAL_SM(HWIO_REO_R0_GENERAL_ENABLE, AGING_FLUSH_ENABLE, 1);
+
+	HAL_REG_WRITE(soc, HWIO_REO_R0_GENERAL_ENABLE_ADDR(
+		SEQ_WCSS_UMAC_REO_REG_OFFSET), reg_val);
+
 	/* Other ring enable bits and REO_ENABLE will be set by FW */
 
 	/* TODO: Setup destination ring mapping if enabled */
@@ -297,7 +308,7 @@ void hal_reo_setup(void *hal_soc,
 			reo_params->remap1);
 
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			FL("HWIO_REO_R0_DESTINATION_RING_CTRL_IX_2_ADDR 0x%x\n"),
+			FL("HWIO_REO_R0_DESTINATION_RING_CTRL_IX_2_ADDR 0x%x"),
 			HAL_REG_READ(soc,
 			HWIO_REO_R0_DESTINATION_RING_CTRL_IX_2_ADDR(
 			SEQ_WCSS_UMAC_REO_REG_OFFSET)));
@@ -308,7 +319,7 @@ void hal_reo_setup(void *hal_soc,
 			reo_params->remap2);
 
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			FL("HWIO_REO_R0_DESTINATION_RING_CTRL_IX_3_ADDR 0x%x\n"),
+			FL("HWIO_REO_R0_DESTINATION_RING_CTRL_IX_3_ADDR 0x%x"),
 			HAL_REG_READ(soc,
 			HWIO_REO_R0_DESTINATION_RING_CTRL_IX_3_ADDR(
 			SEQ_WCSS_UMAC_REO_REG_OFFSET)));

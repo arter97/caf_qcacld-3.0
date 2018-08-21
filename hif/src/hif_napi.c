@@ -82,8 +82,23 @@ static void hif_init_rx_thread_napi(struct qca_napi_info *napii)
 		       hif_rxthread_napi_poll, 64);
 	napi_enable(&napii->rx_thread_napi);
 }
+
+/**
+ * hif_deinit_rx_thread_napi() - Deinitialize dummy Rx_thread NAPI
+ * @napii: Handle to napi_info holding rx_thread napi
+ *
+ * Return: None
+ */
+static void hif_deinit_rx_thread_napi(struct qca_napi_info *napii)
+{
+	netif_napi_del(&napii->rx_thread_napi);
+}
 #else /* RECEIVE_OFFLOAD */
 static void hif_init_rx_thread_napi(struct qca_napi_info *napii)
+{
+}
+
+static void hif_deinit_rx_thread_napi(struct qca_napi_info *napii)
 {
 }
 #endif
@@ -373,6 +388,7 @@ int hif_napi_destroy(struct hif_opaque_softc *hif_ctx,
 
 			qdf_lro_deinit(napii->lro_ctx);
 			netif_napi_del(&(napii->napi));
+			hif_deinit_rx_thread_napi(napii);
 
 			napid->ce_map &= ~(0x01 << ce);
 			napid->napis[ce] = NULL;
@@ -750,16 +766,13 @@ inline void hif_napi_enable_irq(struct hif_opaque_softc *hif, int id)
  * @scn:  hif context
  * @ce_id: index of napi instance
  *
- * Return: void
+ * Return: false if napi didn't enable or already scheduled, otherwise true
  */
-int hif_napi_schedule(struct hif_opaque_softc *hif_ctx, int ce_id)
+bool hif_napi_schedule(struct hif_opaque_softc *hif_ctx, int ce_id)
 {
 	int cpu = smp_processor_id();
 	struct hif_softc *scn = HIF_GET_SOFTC(hif_ctx);
 	struct qca_napi_info *napii;
-
-	hif_record_ce_desc_event(scn,  ce_id, NAPI_SCHEDULE,
-				 NULL, NULL, 0, 0);
 
 	napii = scn->napi_data.napis[ce_id];
 	if (qdf_unlikely(!napii)) {
@@ -769,6 +782,14 @@ int hif_napi_schedule(struct hif_opaque_softc *hif_ctx, int ce_id)
 		return false;
 	}
 
+	if (test_bit(NAPI_STATE_SCHED, &napii->napi.state)) {
+		NAPI_DEBUG("napi scheduled, return");
+		qdf_atomic_dec(&scn->active_tasklet_cnt);
+		return false;
+	}
+
+	hif_record_ce_desc_event(scn,  ce_id, NAPI_SCHEDULE,
+				 NULL, NULL, 0, 0);
 	napii->stats[cpu].napi_schedules++;
 	NAPI_DEBUG("scheduling napi %d (ce:%d)", napii->id, ce_id);
 	napi_schedule(&(napii->napi));
@@ -1137,7 +1158,6 @@ static int hnc_link_clusters(struct qca_napi_data *napid)
 				   i, cl);
 			if ((cl < HNC_MIN_CLUSTER) || (cl > HNC_MAX_CLUSTER)) {
 				NAPI_DEBUG("Bad cluster (%d). SKIPPED\n", cl);
-				QDF_ASSERT(0);
 				/* continue if ASSERTs are disabled */
 				continue;
 			};

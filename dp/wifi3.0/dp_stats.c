@@ -66,7 +66,7 @@ static inline void dp_print_stats_string_tlv(uint32_t *tag_buf)
 
 	if (!data) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Output buffer not allocated\n"));
+			  FL("Output buffer not allocated"));
 		return;
 	}
 
@@ -191,7 +191,7 @@ static inline void dp_print_tx_pdev_stats_urrn_tlv_v(uint32_t *tag_buf)
 
 	if (!urrn_stats) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Output buffer not allocated\n"));
+			  FL("Output buffer not allocated"));
 		return;
 	}
 
@@ -223,7 +223,7 @@ static inline void dp_print_tx_pdev_stats_flush_tlv_v(uint32_t *tag_buf)
 
 	if (!flush_errs) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Output buffer not allocated\n"));
+			  FL("Output buffer not allocated"));
 		return;
 	}
 
@@ -257,7 +257,7 @@ static inline void dp_print_tx_pdev_stats_sifs_tlv_v(uint32_t *tag_buf)
 
 	if (!sifs_status) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Output buffer not allocated\n"));
+			  FL("Output buffer not allocated"));
 		return;
 	}
 
@@ -290,7 +290,7 @@ static inline void dp_print_tx_pdev_stats_phy_err_tlv_v(uint32_t *tag_buf)
 
 	if (!phy_errs) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Output buffer not allocated\n"));
+			  FL("Output buffer not allocated"));
 		return;
 	}
 
@@ -322,7 +322,7 @@ static inline void dp_print_hw_stats_intr_misc_tlv(uint32_t *tag_buf)
 
 	if (!hw_intr_name) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Output buffer not allocated\n"));
+			  FL("Output buffer not allocated"));
 		return;
 	}
 
@@ -356,7 +356,7 @@ static inline void dp_print_hw_stats_wd_timeout_tlv(uint32_t *tag_buf)
 
 	if (!hw_module_name) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Output buffer not allocated\n"));
+			  FL("Output buffer not allocated"));
 		return;
 	}
 
@@ -452,7 +452,7 @@ static inline void dp_print_tx_tid_stats_tlv(uint32_t *tag_buf)
 
 	if (!tid_name) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Output buffer not allocated\n"));
+			  FL("Output buffer not allocated"));
 		return;
 	}
 
@@ -509,7 +509,7 @@ static inline void dp_print_tx_tid_stats_v1_tlv(uint32_t *tag_buf)
 
 	if (!tid_name) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Output buffer not allocated\n"));
+			  FL("Output buffer not allocated"));
 		return;
 	}
 
@@ -566,7 +566,7 @@ static inline void dp_print_rx_tid_stats_tlv(uint32_t *tag_buf)
 
 	if (!tid_name) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Output buffer not allocated\n"));
+			  FL("Output buffer not allocated"));
 		return;
 	}
 
@@ -606,7 +606,7 @@ static inline void dp_print_counter_tlv(uint32_t *tag_buf)
 
 	if (!counter_name) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Output buffer not allocated\n"));
+			  FL("Output buffer not allocated"));
 		return;
 	}
 
@@ -693,7 +693,7 @@ static inline void dp_print_tx_peer_rate_stats_tlv(uint32_t *tag_buf)
 
 	if (!str_buf) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Output buffer not allocated\n"));
+			  FL("Output buffer not allocated"));
 		return;
 	}
 
@@ -811,7 +811,7 @@ static inline void dp_print_rx_peer_rate_stats_tlv(uint32_t *tag_buf)
 
 	if (!str_buf) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Output buffer not allocated\n"));
+			  FL("Output buffer not allocated"));
 		return;
 	}
 
@@ -1055,7 +1055,7 @@ static inline void dp_print_tx_hwq_difs_latency_stats_tlv_v(uint32_t *tag_buf)
 
 	if (!difs_latency_hist) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Output buffer not allocated\n"));
+			  FL("Output buffer not allocated"));
 		return;
 	}
 
@@ -1093,7 +1093,7 @@ static inline void dp_print_tx_hwq_cmd_result_stats_tlv_v(uint32_t *tag_buf)
 
 	if (!cmd_result) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Output buffer not allocated\n"));
+			  FL("Output buffer not allocated"));
 		return;
 	}
 
@@ -1126,7 +1126,7 @@ static inline void dp_print_tx_hwq_cmd_stall_stats_tlv_v(uint32_t *tag_buf)
 
 	if (!cmd_stall_status) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Output buffer not allocated\n"));
+			  FL("Output buffer not allocated"));
 		return;
 	}
 
@@ -1160,7 +1160,7 @@ static inline void dp_print_tx_hwq_fes_result_stats_tlv_v(uint32_t *tag_buf)
 
 	if (!fes_result) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Output buffer not allocated\n"));
+			  FL("Output buffer not allocated"));
 		return;
 	}
 
@@ -1424,7 +1424,7 @@ static inline void dp_print_sched_txq_cmd_posted_tlv_v(uint32_t *tag_buf)
 
 	if (!sched_cmd_posted) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Output buffer not allocated\n"));
+			  FL("Output buffer not allocated"));
 		return;
 	}
 
@@ -1458,7 +1458,7 @@ static inline void dp_print_sched_txq_cmd_reaped_tlv_v(uint32_t *tag_buf)
 
 	if (!sched_cmd_reaped) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Output buffer not allocated\n"));
+			  FL("Output buffer not allocated"));
 		return;
 	}
 
@@ -1565,7 +1565,7 @@ static inline void dp_print_tx_tqm_gen_mpdu_stats_tlv_v(uint32_t *tag_buf)
 
 	if (!gen_mpdu_end_reason) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Output buffer not allocated\n"));
+			  FL("Output buffer not allocated"));
 		return;
 	}
 
@@ -1600,7 +1600,7 @@ static inline void dp_print_tx_tqm_list_mpdu_stats_tlv_v(uint32_t *tag_buf)
 
 	if (!list_mpdu_end_reason) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Output buffer not allocated\n"));
+			  FL("Output buffer not allocated"));
 		return;
 	}
 
@@ -1636,7 +1636,7 @@ static inline void dp_print_tx_tqm_list_mpdu_cnt_tlv_v(uint32_t *tag_buf)
 
 	if (!list_mpdu_cnt_hist) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Output buffer not allocated\n"));
+			  FL("Output buffer not allocated"));
 		return;
 	}
 
@@ -2086,7 +2086,7 @@ static inline void dp_print_ring_if_stats_tlv(uint32_t *tag_buf)
 
 	if (!wm_hit_count) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Output buffer not allocated\n"));
+			  FL("Output buffer not allocated"));
 		return;
 	}
 
@@ -2169,7 +2169,7 @@ static inline void dp_print_sfm_client_user_tlv_v(uint32_t *tag_buf)
 
 	if (!dwords_used_by_user_n) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Output buffer not allocated\n"));
+			  FL("Output buffer not allocated"));
 		return;
 	}
 
@@ -2302,7 +2302,7 @@ static inline void dp_print_tx_pdev_rate_stats_tlv(uint32_t *tag_buf)
 
 	if (!str_buf) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Output buffer not allocated\n"));
+			  FL("Output buffer not allocated"));
 		return;
 	}
 
@@ -2431,7 +2431,7 @@ static inline void dp_print_rx_pdev_rate_stats_tlv(uint32_t *tag_buf)
 
 	if (!str_buf) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Output buffer not allocated\n"));
+			  FL("Output buffer not allocated"));
 		return;
 	}
 
@@ -2595,7 +2595,7 @@ static inline void dp_print_rx_soc_fw_refill_ring_empty_tlv_v(uint32_t *tag_buf)
 
 	if (!refill_ring_empty_cnt) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Output buffer not allocated\n"));
+			  FL("Output buffer not allocated"));
 		return;
 	}
 
@@ -2632,7 +2632,7 @@ static inline void dp_print_rx_soc_fw_refill_ring_num_refill_tlv_v(
 
 	if (!refill_ring_num_refill) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Output buffer not allocated\n"));
+			  FL("Output buffer not allocated"));
 		return;
 	}
 
@@ -2788,7 +2788,7 @@ static inline void dp_print_rx_pdev_fw_ring_mpdu_err_tlv_v(uint32_t *tag_buf)
 
 	if (!fw_ring_mpdu_err) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Output buffer not allocated\n"));
+			  FL("Output buffer not allocated"));
 		return;
 	}
 
@@ -2820,7 +2820,7 @@ static inline void dp_print_rx_pdev_fw_mpdu_drop_tlv_v(uint32_t *tag_buf)
 
 	if (!fw_mpdu_drop) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Output buffer not allocated\n"));
+			  FL("Output buffer not allocated"));
 		return;
 	}
 
@@ -3330,3 +3330,39 @@ void dp_htt_stats_copy_tag(struct dp_pdev *pdev, uint8_t tag_type, uint32_t *tag
 	if (dest_ptr)
 		qdf_mem_copy(dest_ptr, tag_buf, size);
 }
+
+#if defined(CONFIG_WIN) && WDI_EVENT_ENABLE
+QDF_STATUS dp_peer_stats_notify(struct dp_peer *peer)
+{
+	struct dp_pdev *dp_pdev;
+	struct cdp_interface_peer_stats peer_stats_intf;
+	struct cdp_peer_stats *peer_stats = &peer->stats;
+
+	if (!peer->vdev)
+		return QDF_STATUS_E_FAULT;
+
+	dp_pdev = peer->vdev->pdev;
+	qdf_mem_zero(&peer_stats_intf, sizeof(peer_stats_intf));
+	if (peer_stats->rx.last_rssi != peer_stats->rx.rssi)
+		peer_stats_intf.rssi_changed = true;
+
+	if ((peer_stats->rx.rssi && peer_stats_intf.rssi_changed) ||
+	    (peer_stats->tx.tx_rate &&
+	     peer_stats->tx.tx_rate != peer_stats->tx.last_tx_rate)) {
+		peer_stats_intf.peer_hdl = peer->ctrl_peer;
+		peer_stats_intf.last_peer_tx_rate = peer_stats->tx.last_tx_rate;
+		peer_stats_intf.peer_tx_rate = peer_stats->tx.tx_rate;
+		peer_stats_intf.peer_rssi = peer_stats->rx.rssi;
+		peer_stats_intf.tx_packet_count = peer_stats->tx.ucast.num;
+		peer_stats_intf.rx_packet_count = peer_stats->rx.to_stack.num;
+		peer_stats_intf.tx_byte_count = peer_stats->tx.tx_success.bytes;
+		peer_stats_intf.rx_byte_count = peer_stats->rx.to_stack.bytes;
+		peer_stats_intf.per = peer_stats->tx.last_per;
+		dp_wdi_event_handler(WDI_EVENT_PEER_STATS, dp_pdev->soc,
+				     (void *)&peer_stats_intf, 0,
+				     WDI_NO_VAL, dp_pdev->pdev_id);
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -19,6 +19,7 @@
 #include <qdf_ipa_wdi3.h>
 #include <qdf_types.h>
 #include <qdf_lock.h>
+#include <hal_hw_headers.h>
 #include <hal_api.h>
 #include <hif.h>
 #include <htt.h>
@@ -183,7 +184,7 @@ static int dp_tx_ipa_uc_attach(struct dp_soc *soc, struct dp_pdev *pdev)
 				(void *)wbm_srng);
 		if (!ring_entry) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
-				  "%s: Failed to get WBM ring entry\n",
+				  "%s: Failed to get WBM ring entry",
 				  __func__);
 			qdf_mem_free_consistent(soc->osdev, soc->osdev->dev,
 				alloc_size, buffer_vaddr_unaligned,
@@ -214,11 +215,11 @@ static int dp_tx_ipa_uc_attach(struct dp_soc *soc, struct dp_pdev *pdev)
 
 	if (tx_buffer_count) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
-			  "%s: IPA WDI TX buffer: %d allocated\n",
+			  "%s: IPA WDI TX buffer: %d allocated",
 			  __func__, tx_buffer_count);
 	} else {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  "%s: No IPA WDI TX buffer allocated\n",
+			  "%s: No IPA WDI TX buffer allocated",
 			  __func__);
 		qdf_mem_free(soc->ipa_uc_tx_rsc.tx_buf_pool_vaddr_unaligned);
 		soc->ipa_uc_tx_rsc.tx_buf_pool_vaddr_unaligned = NULL;
@@ -254,7 +255,7 @@ int dp_ipa_uc_attach(struct dp_soc *soc, struct dp_pdev *pdev)
 	error = dp_tx_ipa_uc_attach(soc, pdev);
 	if (error) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  "%s: DP IPA UC TX attach fail code %d\n",
+			  "%s: DP IPA UC TX attach fail code %d",
 			  __func__, error);
 		return error;
 	}
@@ -263,7 +264,7 @@ int dp_ipa_uc_attach(struct dp_soc *soc, struct dp_pdev *pdev)
 	error = dp_rx_ipa_uc_attach(soc, pdev);
 	if (error) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  "%s: DP IPA UC RX attach fail code %d\n",
+			  "%s: DP IPA UC RX attach fail code %d",
 			  __func__, error);
 		dp_tx_ipa_uc_detach(soc, pdev);
 		return error;

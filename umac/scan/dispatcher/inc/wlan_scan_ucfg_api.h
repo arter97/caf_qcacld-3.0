@@ -252,7 +252,29 @@ bool ucfg_scan_get_wide_band_scan(struct wlan_objmgr_pdev *pdev);
  */
 QDF_STATUS ucfg_scan_set_custom_scan_chan_list(
 		struct wlan_objmgr_pdev *pdev, struct chan_list *chan_list);
-
+/**
+ * ucfg_scan_set_ssid_bssid_hidden_ssid_beacon() - API to configure
+ * ssid, bssid of hidden beacon
+ * @pdev: psoc on which ssid bssid need to configure
+ * @bssid: bssid of the hidden AP
+ * @ssid: desired ssid
+ *
+ * Return: QDF_STATUS.
+ */
+#ifdef WLAN_DFS_CHAN_HIDDEN_SSID
+QDF_STATUS
+ucfg_scan_config_hidden_ssid_for_bssid(struct wlan_objmgr_pdev *pdev,
+				       uint8_t *bssid,
+				       struct wlan_ssid *ssid);
+#else
+static inline QDF_STATUS
+ucfg_scan_config_hidden_ssid_for_bssid(struct wlan_objmgr_pdev *pdev,
+				       uint8_t *bssid,
+				       struct wlan_ssid *ssid)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_DFS_CHAN_HIDDEN_SSID */
 /**
  * ucfg_scan_cancel() - Public API to stop a scan
  * @req: stop scan request params
@@ -605,4 +627,43 @@ void ucfg_scan_set_vdev_del_in_progress(struct wlan_objmgr_vdev *vdev);
  * Return: none
  */
 void ucfg_scan_clear_vdev_del_in_progress(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_scan_cfg_set_active_dwelltime() - API to set scan active dwelltime
+ * @psoc: pointer to psoc object
+ * @dwell_time: scan active dwell time
+ *
+ * Return: none
+ */
+void wlan_scan_cfg_set_active_dwelltime(struct wlan_objmgr_psoc *psoc,
+					uint32_t dwell_time);
+/**
+ * wlan_scan_cfg_get_active_dwelltime() - API to get active dwelltime
+ * @psoc: pointer to psoc object
+ * @dwell_time: scan active dwelltime
+ *
+ * Return: scan active dwell time
+ */
+void wlan_scan_cfg_get_active_dwelltime(struct wlan_objmgr_psoc *psoc,
+					uint32_t *dwell_time);
+
+/**
+ * wlan_scan_cfg_set_passive_dwelltime() - API to set scan active dwelltime
+ * @psoc: pointer to psoc object
+ * @dwell_time: scan active dwell time
+ *
+ * Return: none
+ */
+void wlan_scan_cfg_set_passive_dwelltime(struct wlan_objmgr_psoc *psoc,
+					 uint32_t dwell_time);
+/**
+ * wlan_scan_cfg_get_passive_dwelltime() - API to get active dwelltime
+ * @psoc: pointer to psoc object
+ * @dwell_time: scan active dwelltime
+ *
+ * Return: scan active dwell time
+ */
+void wlan_scan_cfg_get_passive_dwelltime(struct wlan_objmgr_psoc *psoc,
+					 uint32_t *dwell_time);
+
 #endif

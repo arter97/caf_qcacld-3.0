@@ -270,7 +270,7 @@ cdp_pdev_detach(ol_txrx_soc_handle soc, struct cdp_pdev *pdev, int force)
 
 static inline void *cdp_peer_create
 	(ol_txrx_soc_handle soc, struct cdp_vdev *vdev,
-	uint8_t *peer_mac_addr, void *ol_peer)
+	uint8_t *peer_mac_addr, struct cdp_ctrl_objmgr_peer *ctrl_peer)
 {
 	if (!soc || !soc->ops) {
 		QDF_TRACE(QDF_MODULE_ID_CDP, QDF_TRACE_LEVEL_DEBUG,
@@ -284,7 +284,7 @@ static inline void *cdp_peer_create
 		return NULL;
 
 	return soc->ops->cmn_drv_ops->txrx_peer_create(vdev,
-			peer_mac_addr, ol_peer);
+			peer_mac_addr, ctrl_peer);
 }
 
 static inline void cdp_peer_setup
@@ -472,6 +472,31 @@ static inline uint8_t cdp_peer_ast_get_next_hop
 								ast_handle);
 }
 
+/**
+ * cdp_peer_ast_get_type() - Return type (Static, WDS, MEC) of AST entry
+ * @soc: DP SoC handle
+ * @ast_handle: Opaque handle to AST entry
+ *
+ * Return: AST entry type (Static/WDS/MEC)
+ */
+static inline enum cdp_txrx_ast_entry_type cdp_peer_ast_get_type
+	(ol_txrx_soc_handle soc, void *ast_handle)
+
+{
+	if (!soc || !soc->ops) {
+		QDF_TRACE(QDF_MODULE_ID_CDP, QDF_TRACE_LEVEL_DEBUG,
+			  "%s: Invalid Instance:", __func__);
+		QDF_BUG(0);
+		return 0;
+	}
+
+	if (!soc->ops->cmn_drv_ops ||
+	    !soc->ops->cmn_drv_ops->txrx_peer_ast_get_type)
+		return 0;
+
+	return soc->ops->cmn_drv_ops->txrx_peer_ast_get_type(soc, ast_handle);
+}
+
 static inline void cdp_peer_ast_set_type
 	(ol_txrx_soc_handle soc, void *ast_handle,
 	 enum cdp_txrx_ast_entry_type type)
@@ -597,7 +622,8 @@ cdp_set_monitor_filter(ol_txrx_soc_handle soc, struct cdp_pdev *pdev,
  *****************************************************************************/
 static inline void
 cdp_vdev_register(ol_txrx_soc_handle soc, struct cdp_vdev *vdev,
-	 void *osif_vdev, struct ol_txrx_ops *txrx_ops)
+	 void *osif_vdev, struct cdp_ctrl_objmgr_vdev *ctrl_vdev,
+	 struct ol_txrx_ops *txrx_ops)
 {
 	if (!soc || !soc->ops) {
 		QDF_TRACE(QDF_MODULE_ID_CDP, QDF_TRACE_LEVEL_DEBUG,
@@ -611,7 +637,7 @@ cdp_vdev_register(ol_txrx_soc_handle soc, struct cdp_vdev *vdev,
 		return;
 
 	soc->ops->cmn_drv_ops->txrx_vdev_register(vdev,
-			osif_vdev, txrx_ops);
+			osif_vdev, ctrl_vdev, txrx_ops);
 }
 
 static inline int
@@ -948,6 +974,35 @@ cdp_soc_detach(ol_txrx_soc_handle soc)
 		return;
 
 	soc->ops->cmn_drv_ops->txrx_soc_detach((void *)soc);
+}
+
+/**
+ * cdp_addba_resp_tx_completion() - Indicate addba response tx
+ * completion to dp to change tid state.
+ * @soc: soc handle
+ * @peer_handle: peer handle
+ * @tid: tid
+ * @status: Tx completion status
+ *
+ * Return: success/failure of tid update
+ */
+static inline int cdp_addba_resp_tx_completion(ol_txrx_soc_handle soc,
+					       void *peer_handle,
+					       uint8_t tid, int status)
+{
+	if (!soc || !soc->ops) {
+		QDF_TRACE(QDF_MODULE_ID_CDP, QDF_TRACE_LEVEL_DEBUG,
+			  "%s: Invalid Instance:", __func__);
+		QDF_BUG(0);
+		return 0;
+	}
+
+	if (!soc->ops->cmn_drv_ops ||
+	    !soc->ops->cmn_drv_ops->addba_resp_tx_completion)
+		return 0;
+
+	return soc->ops->cmn_drv_ops->addba_resp_tx_completion(peer_handle, tid,
+					status);
 }
 
 static inline int cdp_addba_requestprocess(ol_txrx_soc_handle soc,
@@ -1427,6 +1482,24 @@ uint8_t cdp_get_pdev_id_frm_pdev(ol_txrx_soc_handle soc,
 }
 
 /**
+ * cdp_pdev_set_chan_noise_floor() - Set channel noise floor to DP layer
+ * @soc: opaque soc handle
+ * @pdev: data path pdev handle
+ * @chan_noise_floor: Channel Noise Floor (in dbM) obtained from control path
+ *
+ * Return: None
+ */
+static inline
+void cdp_pdev_set_chan_noise_floor(ol_txrx_soc_handle soc,
+				   struct cdp_pdev *pdev,
+				   int16_t chan_noise_floor)
+{
+	if (soc->ops->cmn_drv_ops->txrx_pdev_set_chan_noise_floor)
+		return soc->ops->cmn_drv_ops->txrx_pdev_set_chan_noise_floor(
+				pdev, chan_noise_floor);
+}
+
+/**
  * cdp_set_nac() - set nac
  * @soc: opaque soc handle
  * @peer: data path peer handle
@@ -1578,6 +1651,25 @@ cdp_peer_map_attach(ol_txrx_soc_handle soc, uint32_t max_peers)
 	if (soc && soc->ops && soc->ops->cmn_drv_ops &&
 	    soc->ops->cmn_drv_ops->txrx_peer_map_attach)
 		soc->ops->cmn_drv_ops->txrx_peer_map_attach(soc, max_peers);
+}
+
+/**
+
+ * cdp_pdev_set_ctrl_pdev() - set UMAC ctrl pdev to dp pdev
+ * @soc: opaque soc handle
+ * @pdev: opaque dp pdev handle
+ * @ctrl_pdev: opaque ctrl pdev handle
+ *
+ * Return: void
+ */
+static inline void
+cdp_pdev_set_ctrl_pdev(ol_txrx_soc_handle soc, struct cdp_pdev *dp_pdev,
+		       struct cdp_ctrl_objmgr_pdev *ctrl_pdev)
+{
+	if (soc && soc->ops && soc->ops->cmn_drv_ops &&
+	    soc->ops->cmn_drv_ops->txrx_pdev_set_ctrl_pdev)
+		soc->ops->cmn_drv_ops->txrx_pdev_set_ctrl_pdev(dp_pdev,
+							       ctrl_pdev);
 }
 
 #ifdef RECEIVE_OFFLOAD

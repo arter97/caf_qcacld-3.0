@@ -39,28 +39,13 @@
 #endif
 #endif
 
-#define spectral_log(level, args...) \
-QDF_PRINT_INFO(QDF_PRINT_IDX_SHARED, QDF_MODULE_ID_SPECTRAL, level, ## args)
-
-#define spectral_logfl(level, format, args...) \
-		spectral_log(level, FL(format), ## args)
-
-#define spectral_fatal(format, args...) \
-	spectral_logfl(QDF_TRACE_LEVEL_FATAL, format, ## args)
-#define spectral_err(format, args...) \
-	spectral_logfl(QDF_TRACE_LEVEL_ERROR, format, ## args)
-#define spectral_warn(format, args...) \
-	spectral_logfl(QDF_TRACE_LEVEL_WARN, format, ## args)
-#define spectral_info(format, args...) \
-	spectral_logfl(QDF_TRACE_LEVEL_INFO, format, ## args)
-#define spectral_debug(format, args...) \
-	spectral_logfl(QDF_TRACE_LEVEL_DEBUG, format, ## args)
+#include <spectral_defs_i.h>
 
 #define STATUS_PASS       1
 #define STATUS_FAIL       0
 #undef spectral_dbg_line
 #define spectral_dbg_line() \
-	spectral_debug("----------------------------------------------------\n")
+	spectral_debug("----------------------------------------------------")
 
 #undef spectral_ops_not_registered
 #define spectral_ops_not_registered(str) \
@@ -302,6 +287,20 @@ struct spectral_phyerr_fft_report_gen3 {
 	uint32_t resv;
 	uint8_t buf[0];
 } __ATTRIB_PACK;
+
+/**
+ * struct sscan_report_fields_gen3 - Fields of spectral report
+ * @sscan_agc_total_gain:  The AGC total gain in DB.
+ * @inband_pwr_db: The in-band power of the signal in 1/2 DB steps
+ * @sscan_gainchange: This bit is set to 1 if a gainchange occurred during
+ *                 the spectral scan FFT.  Software may choose to
+ *                 disregard the results.
+ */
+struct sscan_report_fields_gen3 {
+	uint8_t sscan_agc_total_gain;
+	int16_t inband_pwr_db;
+	uint8_t sscan_gainchange;
+};
 
 /**
  * struct spectral_sscan_report_gen3 - spectral report in phyerr event
@@ -903,6 +902,10 @@ struct target_if_samp_msg_params {
 	struct interf_src_rsp interf_list;
 	struct spectral_classifier_params classifier_params;
 	struct ath_softc *sc;
+	uint8_t agc_total_gain;
+	uint8_t agc_total_gain_sec80;
+	uint8_t gainchange;
+	uint8_t gainchange_sec80;
 };
 
 #ifdef WLAN_CONV_SPECTRAL_ENABLE

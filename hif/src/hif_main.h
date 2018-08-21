@@ -80,6 +80,8 @@
 #define AR6320_FW_3_2  (0x32)
 #define QCA6290_EMULATION_DEVICE_ID (0xabcd)
 #define QCA6290_DEVICE_ID (0x1100)
+#define QCA6390_EMULATION_DEVICE_ID (0x0108)
+#define QCA6390_DEVICE_ID (0x1101)
 #define ADRASTEA_DEVICE_ID_P2_E12 (0x7021)
 #define AR9887_DEVICE_ID    (0x0050)
 #define AR900B_DEVICE_ID    (0x0040)
@@ -92,6 +94,7 @@
 					actual number once available.
 					currently defining this to 0xffff for
 					emulation purpose */
+#define QCA8074V2_DEVICE_ID (0xfffe) /* Todo: replace this with actual number */
 /* Genoa */
 #define QCN7605_COMPOSITE  (0x9900)
 #define QCN7605_STANDALONE  (0x9901)
@@ -118,7 +121,7 @@ struct hif_ce_stats {
  * Note: For MCL, #if defined (HIF_CONFIG_SLUB_DEBUG_ON) needs to be checked
  * for defined here
  */
-#if HIF_CE_DEBUG_DATA_BUF
+#if defined(HIF_CONFIG_SLUB_DEBUG_ON) || defined(HIF_CE_DEBUG_DATA_BUF)
 struct ce_desc_hist {
 	qdf_atomic_t history_index[CE_COUNT_MAX];
 	uint32_t enable[CE_COUNT_MAX];
@@ -163,7 +166,6 @@ struct hif_softc {
 	qdf_dma_addr_t paddr_rri_on_ddr;
 	int linkstate_vote;
 	bool fastpath_mode_on;
-	bool polled_mode_on;
 	atomic_t tasklet_from_intr;
 	int htc_htt_tx_endpoint;
 	qdf_dma_addr_t mem_pa;
@@ -194,7 +196,7 @@ struct hif_softc {
  * Note: For MCL, #if defined (HIF_CONFIG_SLUB_DEBUG_ON) needs to be checked
  * for defined here
  */
-#if HIF_CE_DEBUG_DATA_BUF
+#if defined(HIF_CONFIG_SLUB_DEBUG_ON) || defined(HIF_CE_DEBUG_DATA_BUF)
 	struct ce_desc_hist hif_ce_desc_hist;
 #endif /* #if defined(HIF_CONFIG_SLUB_DEBUG_ON) || HIF_CE_DEBUG_DATA_BUF */
 #ifdef IPA_OFFLOAD

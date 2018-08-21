@@ -116,6 +116,9 @@ struct hif_pci_softc {
 	u16 devid;
 	struct hif_tasklet_entry tasklet_entries[HIF_MAX_TASKLET_NUM];
 	bool pci_enabled;
+	bool use_register_windowing;
+	uint32_t register_window;
+	qdf_spinlock_t register_access_lock;
 	qdf_spinlock_t irq_lock;
 	qdf_work_t reschedule_tasklet_work;
 	uint32_t lcr_val;
@@ -133,6 +136,11 @@ struct hif_pci_softc {
 	struct dentry *pm_dentry;
 #endif
 #endif
+	int (*hif_enable_pci)(struct hif_pci_softc *sc, struct pci_dev *pdev,
+			      const struct pci_device_id *id);
+	void (*hif_pci_deinit)(struct hif_pci_softc *sc);
+	void (*hif_pci_get_soc_info)(struct hif_pci_softc *sc,
+				     struct device *dev);
 };
 
 bool hif_pci_targ_is_present(struct hif_softc *scn, void *__iomem *mem);

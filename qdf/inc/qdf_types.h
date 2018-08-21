@@ -356,6 +356,8 @@ typedef void (*qdf_timer_func_t)(void *);
  * @QDF_MODULE_ID_OCB: OCB module ID
  * @QDF_MODULE_ID_IPA: IPA module ID
  * @QDF_MODULE_ID_CP_STATS: Control Plane Statistics ID
+ * @QDF_MODULE_ID_ACTION_OUI: ACTION OUI module ID
+ * @QDF_MODULE_ID_TARGET: Target module ID
  * @QDF_MODULE_ID_ANY: anything
  * @QDF_MODULE_ID_MAX: Max place holder module ID
  */
@@ -459,6 +461,8 @@ typedef enum {
 	QDF_MODULE_ID_OCB,
 	QDF_MODULE_ID_IPA,
 	QDF_MODULE_ID_CP_STATS,
+	QDF_MODULE_ID_ACTION_OUI,
+	QDF_MODULE_ID_TARGET,
 	QDF_MODULE_ID_ANY,
 	QDF_MODULE_ID_MAX,
 } QDF_MODULE_ID;
@@ -480,6 +484,10 @@ typedef enum {
  * @QDF_TRACE_LEVEL_INFO_LOW: Low level operational messages that require
  *			      no action
  * @QDF_TRACE_LEVEL_DEBUG: Information useful to developers for debugging
+ * @QDF_TRACE_LEVEL_TRACE: Indicates trace level for automation scripts,
+ *			whenever there is a context switch in driver, one
+ *			print using this trace level will be added with
+ *			the help of qdf_trace api.
  * @QDF_TRACE_LEVEL_ALL: All trace levels
  * @QDF_TRACE_LEVEL_MAX: Max trace level
  */
@@ -493,6 +501,7 @@ typedef enum {
 	QDF_TRACE_LEVEL_INFO_MED,
 	QDF_TRACE_LEVEL_INFO_LOW,
 	QDF_TRACE_LEVEL_DEBUG,
+	QDF_TRACE_LEVEL_TRACE,
 	QDF_TRACE_LEVEL_ALL,
 	QDF_TRACE_LEVEL_MAX
 } QDF_TRACE_LEVEL;
@@ -596,9 +605,8 @@ void qdf_vtrace_msg(QDF_MODULE_ID module, QDF_TRACE_LEVEL level,
 		    char *str_format, va_list val);
 
 #ifdef CONFIG_MCL
-#define qdf_print(args...) \
-	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR, ## args)
 
+#define qdf_print(params...) QDF_TRACE_ERROR(QDF_MODULE_ID_QDF, ## params)
 #define qdf_alert(params...) QDF_TRACE_FATAL(QDF_MODULE_ID_QDF, ## params)
 #define qdf_err(params...) QDF_TRACE_ERROR(QDF_MODULE_ID_QDF, ## params)
 #define qdf_warn(params...) QDF_TRACE_WARN(QDF_MODULE_ID_QDF, ## params)
@@ -607,14 +615,25 @@ void qdf_vtrace_msg(QDF_MODULE_ID module, QDF_TRACE_LEVEL level,
 
 #else /* CONFIG_MCL */
 
-#define qdf_print printk
-#define qdf_alert printk
-#define qdf_err printk
-#define qdf_warn printk
-#define qdf_info printk
-#define qdf_debug printk
+#define qdf_print(args...) QDF_TRACE_INFO(QDF_MODULE_ID_ANY, ## args)
+#define qdf_alert(args...) QDF_TRACE_FATAL(QDF_MODULE_ID_ANY, ## args)
+#define qdf_err(args...)   QDF_TRACE_ERROR(QDF_MODULE_ID_ANY, ## args)
+#define qdf_warn(args...)  QDF_TRACE_WARN(QDF_MODULE_ID_ANY, ## args)
+#define qdf_info(args...)  QDF_TRACE_INFO(QDF_MODULE_ID_ANY, ## args)
+#define qdf_debug(args...) QDF_TRACE_DEBUG(QDF_MODULE_ID_ANY, ## args)
 
 #endif /* CONFIG_MCL */
+
+#define qdf_nofl_alert(params...) \
+	QDF_TRACE_FATAL_NO_FL(QDF_MODULE_ID_QDF, ## params)
+#define qdf_nofl_err(params...) \
+	QDF_TRACE_ERROR_NO_FL(QDF_MODULE_ID_QDF, ## params)
+#define qdf_nofl_warn(params...) \
+	QDF_TRACE_WARN_NO_FL(QDF_MODULE_ID_QDF, ## params)
+#define qdf_nofl_info(params...) \
+	QDF_TRACE_INFO_NO_FL(QDF_MODULE_ID_QDF, ## params)
+#define qdf_nofl_debug(params...) \
+	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_QDF, ## params)
 
 #define qdf_vprint    __qdf_vprint
 #define qdf_snprint   __qdf_snprint

@@ -33,10 +33,8 @@
 #include "wlan_p2p_main.h"
 #include "wlan_p2p_roc.h"
 #include "wlan_p2p_off_chan_tx.h"
-
-#ifdef WLAN_POWER_MANAGEMENT_OFFLOAD
-#include <wlan_pmo_obj_mgmt_api.h>
-#endif
+#include "wlan_p2p_cfg.h"
+#include "cfg_ucfg_api.h"
 
 /**
  * p2p_get_cmd_type_str() - parse cmd to string
@@ -515,6 +513,34 @@ static QDF_STATUS process_peer_for_noa(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 
+/**
+ * p2p_object_init_params() - init parameters for p2p object
+ * @psoc:        pointer to psoc object
+ * @p2p_soc_obj: pointer to p2p psoc object
+ *
+ * This function init parameters for p2p object
+ */
+static QDF_STATUS p2p_object_init_params(
+	struct wlan_objmgr_psoc *psoc,
+	struct p2p_soc_priv_obj *p2p_soc_obj)
+{
+	if (!psoc || !p2p_soc_obj) {
+		p2p_err("invalid param");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	p2p_soc_obj->param.go_keepalive_period =
+			cfg_get(psoc, CFG_GO_KEEP_ALIVE_PERIOD);
+	p2p_soc_obj->param.go_link_monitor_period =
+			cfg_get(psoc, CFG_GO_LINK_MONITOR_PERIOD);
+	p2p_soc_obj->param.p2p_device_addr_admin =
+			cfg_get(psoc, CFG_P2P_DEVICE_ADDRESS_ADMINISTRATED);
+	p2p_soc_obj->param.skip_dfs_channel_p2p_search =
+			cfg_get(psoc, CFG_ENABLE_SKIP_DFS_IN_P2P_SEARCH);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 #ifdef WLAN_FEATURE_P2P_DEBUG
 /**
  * wlan_p2p_init_connection_status() - init connection status
@@ -540,133 +566,6 @@ static void wlan_p2p_init_connection_status(
 {
 }
 #endif /* WLAN_FEATURE_P2P_DEBUG */
-
-#ifdef WLAN_POWER_MANAGEMENT_OFFLOAD
-
-/**
- * p2p_suspend_handler() - suspend handler of P2P
- * @psoc: pointer to psoc object
- * @arg:  pointer to input argument
- *
- * This function is suspend handler of P2P component.
- *
- * Return: QDF_STATUS_SUCCESS - in case of success
- */
-static QDF_STATUS p2p_suspend_handler(struct wlan_objmgr_psoc *psoc, void *arg)
-{
-	struct p2p_soc_priv_obj *p2p_soc_obj;
-
-	if (!psoc) {
-		p2p_err("psoc context passed is NULL");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	p2p_soc_obj = wlan_objmgr_psoc_get_comp_private_obj(psoc,
-			WLAN_UMAC_COMP_P2P);
-	if (!p2p_soc_obj) {
-		p2p_err("P2P soc object is NULL");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	/* clean up queue of p2p psoc private object */
-	p2p_cleanup_tx_sync(p2p_soc_obj, NULL);
-	p2p_cleanup_roc_sync(p2p_soc_obj, NULL);
-
-	p2p_debug("handle suspend complete");
-
-	return QDF_STATUS_SUCCESS;
-}
-
-/**
- * p2p_resume_handler() - resume handler of P2P
- * @psoc: pointer to psoc object
- * @arg:  pointer to input argument
- *
- * This function is resume handler of P2P component.
- *
- * Return: QDF_STATUS_SUCCESS - in case of success
- */
-static QDF_STATUS p2p_resume_handler(struct wlan_objmgr_psoc *psoc, void *arg)
-{
-	p2p_debug("handle resume complete");
-
-	return QDF_STATUS_SUCCESS;
-}
-
-/**
- * p2p_register_pmo_handler() - register pmo handler
- *
- * This function registers pmo handler of P2P component.
- *
- * Return: QDF_STATUS_SUCCESS - in case of success
- */
-static inline QDF_STATUS p2p_register_pmo_handler(void)
-{
-	QDF_STATUS status;
-
-	status = pmo_register_suspend_handler(WLAN_UMAC_COMP_P2P,
-		p2p_suspend_handler, NULL);
-	if (status != QDF_STATUS_SUCCESS) {
-		p2p_err("Failed to register suspend handler");
-		return status;
-	}
-
-	status = pmo_register_resume_handler(WLAN_UMAC_COMP_P2P,
-		p2p_resume_handler, NULL);
-	if (status != QDF_STATUS_SUCCESS) {
-		p2p_err("Failed to register resume handler");
-		pmo_unregister_suspend_handler(WLAN_UMAC_COMP_P2P,
-			p2p_suspend_handler);
-		return status;
-	}
-
-	p2p_debug("Register pmo handler success");
-
-	return status;
-}
-
-/**
- * p2p_unregister_pmo_handler() - unregister pmo handler
- *
- * This function unregisters pmo handler of P2P component.
- *
- * Return: QDF_STATUS_SUCCESS - in case of success
- */
-static inline QDF_STATUS p2p_unregister_pmo_handler(void)
-{
-	QDF_STATUS status;
-	QDF_STATUS ret_status = QDF_STATUS_SUCCESS;
-
-	status = pmo_unregister_suspend_handler(WLAN_UMAC_COMP_P2P,
-		p2p_suspend_handler);
-	if (status != QDF_STATUS_SUCCESS) {
-		p2p_err("Failed to unregister suspend handler");
-		ret_status = status;
-	}
-
-	status = pmo_unregister_resume_handler(WLAN_UMAC_COMP_P2P,
-		p2p_resume_handler);
-	if (status != QDF_STATUS_SUCCESS) {
-		p2p_err("Failed to unregister resume handler");
-		ret_status = status;
-	}
-
-	p2p_debug("Unregister pmo handler complete");
-
-	return status;
-}
-
-#else
-static inline QDF_STATUS p2p_register_pmo_handler(void)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS p2p_unregister_pmo_handler(void)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif /* End of WLAN_POWER_MANAGEMENT_OFFLOAD */
 
 QDF_STATUS p2p_component_init(void)
 {
@@ -815,6 +714,7 @@ QDF_STATUS p2p_psoc_object_open(struct wlan_objmgr_psoc *soc)
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	p2p_object_init_params(soc, p2p_soc_obj);
 	qdf_list_create(&p2p_soc_obj->roc_q, MAX_QUEUE_LENGTH);
 	qdf_list_create(&p2p_soc_obj->tx_q_roc, MAX_QUEUE_LENGTH);
 	qdf_list_create(&p2p_soc_obj->tx_q_ack, MAX_QUEUE_LENGTH);
@@ -840,7 +740,6 @@ QDF_STATUS p2p_psoc_object_open(struct wlan_objmgr_psoc *soc)
 	qdf_runtime_lock_init(&p2p_soc_obj->roc_runtime_lock);
 	p2p_soc_obj->cur_roc_vdev_id = P2P_INVALID_VDEV_ID;
 	qdf_idr_create(&p2p_soc_obj->p2p_idr);
-	p2p_register_pmo_handler();
 
 	p2p_debug("p2p psoc object open successful");
 
@@ -876,7 +775,6 @@ QDF_STATUS p2p_psoc_object_close(struct wlan_objmgr_psoc *soc)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	p2p_unregister_pmo_handler();
 	qdf_idr_destroy(&p2p_soc_obj->p2p_idr);
 	qdf_runtime_lock_deinit(&p2p_soc_obj->roc_runtime_lock);
 	qdf_event_destroy(&p2p_soc_obj->cleanup_tx_done);

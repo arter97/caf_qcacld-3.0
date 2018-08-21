@@ -234,7 +234,7 @@ struct wlan_lmac_if_p2p_tx_ops {
 
 /**
  * struct wlan_lmac_if_atf_tx_ops - ATF specific tx function pointers
- * @atf_update_peer_txtoken:      Update peer Tx token
+ * @atf_node_unblock:             Resume node
  * @atf_set_enable_disable:       Set atf enable/disable
  * @atf_tokens_used:              Get used atf tokens
  * @atf_get_unused_txtoken:       Get unused atf tokens
@@ -247,6 +247,7 @@ struct wlan_lmac_if_p2p_tx_ops {
  * @atf_ssid_sched_policy:        Set ssid schedule policy
  * @atf_set:                      Set atf
  * @atf_set_grouping:             Set atf grouping
+ * @atf_set_group_ac:             Set atf Group AC
  * @atf_send_peer_request:        Send peer requests
  * @atf_set_bwf:                  Set bandwidth fairness
  * @atf_peer_buf_held:            Get buffer held
@@ -257,9 +258,8 @@ struct wlan_lmac_if_p2p_tx_ops {
  * @atf_unregister_event_handler  ATF unregister wmi event handlers
  */
 struct wlan_lmac_if_atf_tx_ops {
-	void (*atf_update_peer_txtoken)(struct wlan_objmgr_pdev *pdev,
-					struct wlan_objmgr_peer *peer,
-					struct atf_stats *stats);
+	void (*atf_node_unblock)(struct wlan_objmgr_pdev *pdev,
+				 struct wlan_objmgr_peer *peer);
 	void (*atf_set_enable_disable)(struct wlan_objmgr_pdev *pdev,
 				       uint8_t value);
 	uint8_t (*atf_tokens_used)(struct wlan_objmgr_pdev *pdev,
@@ -279,8 +279,8 @@ struct wlan_lmac_if_atf_tx_ops {
 					 uint32_t tput,
 					 uint32_t *possible_tput);
 	uint32_t (*atf_debug_peerstate)(struct wlan_objmgr_pdev *pdev,
-					struct wlan_objmgr_peer *peer);
-
+					struct wlan_objmgr_peer *peer,
+					struct atf_peerstate *peerstate);
 	int32_t (*atf_enable_disable)(struct wlan_objmgr_vdev *vdev,
 				      uint8_t value);
 	int32_t (*atf_ssid_sched_policy)(struct wlan_objmgr_vdev *vdev,
@@ -290,6 +290,9 @@ struct wlan_lmac_if_atf_tx_ops {
 			   uint8_t atf_tput_based);
 	int32_t (*atf_set_grouping)(struct wlan_objmgr_pdev *pdev,
 				    struct pdev_atf_ssid_group_req *atf_grp_req,
+				    uint8_t atf_tput_based);
+	int32_t (*atf_set_group_ac)(struct wlan_objmgr_pdev *pdev,
+				    struct pdev_atf_group_wmm_ac_req *atf_acreq,
 				    uint8_t atf_tput_based);
 	int32_t (*atf_send_peer_request)(struct wlan_objmgr_pdev *pdev,
 					 struct pdev_atf_peer_ext_request *atfr,
@@ -845,32 +848,34 @@ struct wlan_lmac_if_p2p_rx_ops {
  * @atf_get_peers:                     Get number of peers for a radio
  * @atf_get_tput_based:                Get throughput based enabled/disabled
  * @atf_get_logging:                   Get logging enabled/disabled
- * @atf_get_txbuf_share:               Get TxBuff share state
- * @atf_get_txbuf_max:                 Get TxBuff MAX number
- * @atf_get_txbuf_min:                 Get TxBuff MIN number
+ * @atf_update_buf_held:               Set Num buf held by subgroup
  * @atf_get_ssidgroup:                 Get ssid group state
- * @atf_get_tx_block_count:            Get tx block count
- * @atf_get_peer_blk_txtraffic:        Get peer tx traffic block state
+ * @atf_get_vdev_ac_blk_cnt:           Get AC block count for vdev
+ * @atf_get_peer_blk_txbitmap:         Get peer tx traffic AC bitmap
  * @atf_get_vdev_blk_txtraffic:        Get vdev tx traffic block state
  * @atf_get_sched:                     Get ATF scheduled policy
  * @atf_get_tx_tokens:                 Get Tx tokens
- * @atf_get_shadow_tx_tokens:          Get shadow tx tokens
+ * @atf_buf_distribute:                Distribute Buffers
  * @atf_get_tx_tokens_common:          Get common tx tokens
  * @atf_get_shadow_alloted_tx_tokens:  Get shadow alloted tx tokens
  * @atf_get_peer_stats:                Get atf peer stats
+ * @atf_adjust_subgroup_txtokens:      Adjust tokens based on actual duration
+ * @atf_account_subgroup_txtokens:     Estimate tx time & update subgroup tokens
+ * @atf_subgroup_free_buf:             On tx completion, update num buf held
+ * @atf_update_subgroup_tidstate:      TID state (Paused/unpaused) of node
+ * @atf_get_subgroup_airtime:          Get subgroup airtime
  * @atf_get_token_allocated:           Get atf token allocated
  * @atf_get_token_utilized:            Get atf token utilized
  * @atf_set_sched:                     Set ATF schedule policy
  * @atf_set_fmcap:                     Set firmware capability for ATF
  * @atf_set_obss_scale:                Set ATF obss scale
- * @atf_set_mode:                      Set ATF mode
  * @atf_set_msdu_desc:                 Set msdu desc
  * @atf_set_max_vdevs:                 Set maximum vdevs number
  * @atf_set_peers:                     Set peers number
  * @atf_set_peer_stats:                Set peer stats
  * @atf_set_vdev_blk_txtraffic:        Set Block/unblock vdev tx traffic
- * @atf_set_peer_blk_txtraffic:        Set Block/unblock peer tx traffic
- * @atf_set_tx_block_count:            Set tx block count
+ * @atf_peer_blk_txtraffic:            Block peer tx traffic
+ * @atf_peer_unblk_txtraffic:          Unblock peer tx traffic
  * @atf_set_token_allocated:           Set atf token allocated
  * @atf_set_token_utilized:            Set atf token utilized
  */
@@ -884,29 +889,43 @@ struct wlan_lmac_if_atf_rx_ops {
 	uint32_t (*atf_get_peers)(struct wlan_objmgr_psoc *psoc);
 	uint32_t (*atf_get_tput_based)(struct wlan_objmgr_pdev *pdev);
 	uint32_t (*atf_get_logging)(struct wlan_objmgr_pdev *pdev);
-	uint8_t (*atf_get_txbuf_share)(struct wlan_objmgr_pdev *pdev);
-	uint16_t (*atf_get_txbuf_max)(struct wlan_objmgr_pdev *pdev);
-	uint16_t (*atf_get_txbuf_min)(struct wlan_objmgr_pdev *pdev);
+	void*   (*atf_update_buf_held)(struct wlan_objmgr_peer *peer,
+				       int8_t ac);
 	uint32_t (*atf_get_ssidgroup)(struct wlan_objmgr_pdev *pdev);
-	uint32_t (*atf_get_tx_block_count)(struct wlan_objmgr_vdev *vdev);
-	uint8_t (*atf_get_peer_blk_txtraffic)(struct wlan_objmgr_peer *peer);
+	uint32_t (*atf_get_vdev_ac_blk_cnt)(struct wlan_objmgr_vdev *vdev);
+	uint8_t (*atf_get_peer_blk_txbitmap)(struct wlan_objmgr_peer *peer);
 	uint8_t (*atf_get_vdev_blk_txtraffic)(struct wlan_objmgr_vdev *vdev);
 	uint32_t (*atf_get_sched)(struct wlan_objmgr_pdev *pdev);
 	uint32_t (*atf_get_tx_tokens)(struct wlan_objmgr_peer *peer);
-	uint32_t (*atf_get_shadow_tx_tokens)(struct wlan_objmgr_peer *peer);
+	uint32_t (*atf_buf_distribute)(struct wlan_objmgr_pdev *pdev,
+				       struct wlan_objmgr_peer *peer,
+				       int8_t ac);
 	uint32_t (*atf_get_txtokens_common)(struct wlan_objmgr_pdev *pdev);
 	uint32_t (*atf_get_shadow_alloted_tx_tokens)(
 						struct wlan_objmgr_pdev *pdev);
 	void (*atf_get_peer_stats)(struct wlan_objmgr_peer *peer,
 				   struct atf_stats *stats);
+	QDF_STATUS
+	(*atf_adjust_subgroup_txtokens)(struct wlan_objmgr_peer *pr,
+					uint8_t ac, uint32_t actual_duration,
+					uint32_t est_duration);
+	QDF_STATUS
+	(*atf_account_subgroup_txtokens)(struct wlan_objmgr_peer *pr,
+					 uint8_t ac,
+					 uint32_t duration);
+	QDF_STATUS
+	(*atf_subgroup_free_buf)(uint16_t buf_acc_size, void *bf_atf_sg);
+	QDF_STATUS
+	(*atf_update_subgroup_tidstate)(struct wlan_objmgr_peer *peer,
+					uint8_t atf_nodepaused);
+	uint8_t (*atf_get_subgroup_airtime)(struct wlan_objmgr_peer *peer,
+					    uint8_t ac);
 	uint16_t (*atf_get_token_allocated)(struct wlan_objmgr_peer *peer);
 	uint16_t (*atf_get_token_utilized)(struct wlan_objmgr_peer *peer);
-
 	void (*atf_set_sched)(struct wlan_objmgr_pdev *pdev, uint32_t value);
 	void (*atf_set_fmcap)(struct wlan_objmgr_psoc *psoc, uint32_t value);
 	void (*atf_set_obss_scale)(struct wlan_objmgr_pdev *pdev,
 				   uint32_t value);
-	void (*atf_set_mode)(struct wlan_objmgr_psoc *psoc, uint8_t value);
 	void (*atf_set_msdu_desc)(struct wlan_objmgr_psoc *psoc,
 				  uint32_t value);
 	void (*atf_set_max_vdevs)(struct wlan_objmgr_psoc *psoc,
@@ -916,10 +935,10 @@ struct wlan_lmac_if_atf_rx_ops {
 				   struct atf_stats *stats);
 	void (*atf_set_vdev_blk_txtraffic)(struct wlan_objmgr_vdev *vdev,
 					   uint8_t value);
-	void (*atf_set_peer_blk_txtraffic)(struct wlan_objmgr_peer *peer,
-					   uint8_t value);
-	void (*atf_set_tx_block_count)(struct wlan_objmgr_vdev *vdev,
-					uint32_t count);
+	void (*atf_peer_blk_txtraffic)(struct wlan_objmgr_peer *peer,
+				       int8_t ac_id);
+	void (*atf_peer_unblk_txtraffic)(struct wlan_objmgr_peer *peer,
+					 int8_t ac_id);
 	void (*atf_set_token_allocated)(struct wlan_objmgr_peer *peer,
 					uint16_t value);
 	void (*atf_set_token_utilized)(struct wlan_objmgr_peer *peer,
@@ -1037,6 +1056,12 @@ struct wlan_lmac_if_nan_rx_ops {
  * @dfs_override_precac_timeout:      Override the default precac timeout.
  * @dfs_set_precac_enable:            Set precac enable flag.
  * @dfs_get_precac_enable:            Get precac enable flag.
+ * @dfs_set_precac_intermediate_chan: Set intermediate channel for precac.
+ * @dfs_get_precac_intermediate_chan: Get intermediate channel for precac.
+ * @dfs_precac_preferred_chan:        Configure preferred channel during
+ *                                    precac.
+ * dfs_get_precac_chan_state:         Get precac status for given channel.
+ * dfs_start_precac_timer:            Start precac timer.
  * @dfs_get_override_precac_timeout:  Get precac timeout.
  * @dfs_set_current_channel:          Set DFS current channel.
  * @dfs_process_radar_ind:            Process radar found indication.
@@ -1086,6 +1111,7 @@ struct wlan_lmac_if_dfs_rx_ops {
 					      uint32_t *phy_mode,
 					      bool *dfs_set_cfreq2,
 					      bool *set_agile);
+	QDF_STATUS (*dfs_start_precac_timer)(struct wlan_objmgr_pdev *pdev);
 	QDF_STATUS (*dfs_cancel_precac_timer)(struct wlan_objmgr_pdev *pdev);
 	QDF_STATUS (*dfs_override_precac_timeout)(
 			struct wlan_objmgr_pdev *pdev,
@@ -1094,6 +1120,16 @@ struct wlan_lmac_if_dfs_rx_ops {
 			uint32_t value);
 	QDF_STATUS (*dfs_get_precac_enable)(struct wlan_objmgr_pdev *pdev,
 			int *buff);
+#ifdef WLAN_DFS_PRECAC_AUTO_CHAN_SUPPORT
+	QDF_STATUS (*dfs_set_precac_intermediate_chan)(struct wlan_objmgr_pdev *pdev,
+						       uint32_t value);
+	QDF_STATUS (*dfs_get_precac_intermediate_chan)(struct wlan_objmgr_pdev *pdev,
+						       int *buff);
+	QDF_STATUS (*dfs_decide_precac_preferred_chan)(struct wlan_objmgr_pdev *pdev,
+						       uint8_t *pref_chan);
+	enum precac_chan_state (*dfs_get_precac_chan_state)(struct wlan_objmgr_pdev *pdev,
+							    uint8_t precac_chan);
+#endif
 	QDF_STATUS (*dfs_get_override_precac_timeout)(
 			struct wlan_objmgr_pdev *pdev,
 			int *precac_timeout);

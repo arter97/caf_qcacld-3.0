@@ -32,6 +32,8 @@
 #include <wlan_objmgr_cmn.h>
 #include "wlan_policy_mgr_api.h"
 #include "wlan_scan_ucfg_api.h"
+#include "wlan_tdls_cfg.h"
+#include "cfg_ucfg_api.h"
 
 QDF_STATUS ucfg_tdls_init(void)
 {
@@ -116,11 +118,116 @@ QDF_STATUS ucfg_tdls_deinit(void)
 	return ret;
 }
 
+/**
+ * tdls_update_feature_flag() - update tdls feature flag
+ * @tdls_soc_obj:   pointer to tdls psoc object
+ *
+ * This function updates tdls feature flag
+ */
+static void
+tdls_update_feature_flag(struct tdls_soc_priv_obj *tdls_soc_obj)
+{
+	tdls_soc_obj->tdls_configs.tdls_feature_flags =
+		((tdls_soc_obj->tdls_configs.tdls_off_chan_enable ?
+		  1 << TDLS_FEATURE_OFF_CHANNEL : 0) |
+		 (tdls_soc_obj->tdls_configs.tdls_wmm_mode_enable ?
+		  1 << TDLS_FEATURE_WMM : 0) |
+		 (tdls_soc_obj->tdls_configs.tdls_buffer_sta_enable ?
+		  1 << TDLS_FEATURE_BUFFER_STA : 0) |
+		 (tdls_soc_obj->tdls_configs.tdls_sleep_sta_enable ?
+		  1 << TDLS_FEATURE_SLEEP_STA : 0) |
+		 (tdls_soc_obj->tdls_configs.tdls_scan_enable ?
+		  1 << TDLS_FEATURE_SCAN : 0) |
+		 (tdls_soc_obj->tdls_configs.tdls_support_enable ?
+		  1 << TDLS_FEATURE_ENABLE : 0) |
+		 (tdls_soc_obj->tdls_configs.tdls_implicit_trigger_enable ?
+		  1 << TDLS_FEAUTRE_IMPLICIT_TRIGGER : 0) |
+		 (tdls_soc_obj->tdls_configs.tdls_external_control ?
+		  1 << TDLS_FEATURE_EXTERNAL_CONTROL : 0));
+}
+
+/**
+ * tdls_object_init_params() - init parameters for tdls object
+ * @tdls_soc_obj: pointer to tdls psoc object
+ *
+ * This function init parameters for tdls object
+ */
+static QDF_STATUS tdls_object_init_params(
+	struct tdls_soc_priv_obj *tdls_soc_obj)
+{
+	struct wlan_objmgr_psoc *psoc;
+
+	if (!tdls_soc_obj) {
+		tdls_err("invalid param");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	psoc = tdls_soc_obj->soc;
+	if (!psoc) {
+		tdls_err("invalid psoc object");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	tdls_soc_obj->tdls_configs.tdls_tx_states_period =
+			cfg_get(psoc, CFG_TDLS_TX_STATS_PERIOD);
+	tdls_soc_obj->tdls_configs.tdls_tx_pkt_threshold =
+			cfg_get(psoc, CFG_TDLS_TX_PACKET_THRESHOLD);
+	tdls_soc_obj->tdls_configs.tdls_rx_pkt_threshold =
+			cfg_get(psoc, CFG_TDLS_PUAPSD_RX_FRAME_THRESHOLD);
+	tdls_soc_obj->tdls_configs.tdls_max_discovery_attempt =
+			cfg_get(psoc, CFG_TDLS_MAX_DISCOVERY_ATTEMPT);
+	tdls_soc_obj->tdls_configs.tdls_idle_timeout =
+			cfg_get(psoc, CFG_TDLS_IDLE_TIMEOUT);
+	tdls_soc_obj->tdls_configs.tdls_idle_pkt_threshold =
+			cfg_get(psoc, CFG_TDLS_IDLE_PACKET_THRESHOLD);
+	tdls_soc_obj->tdls_configs.tdls_rssi_trigger_threshold =
+			cfg_get(psoc, CFG_TDLS_RSSI_TRIGGER_THRESHOLD);
+	tdls_soc_obj->tdls_configs.tdls_rssi_teardown_threshold =
+			cfg_get(psoc, CFG_TDLS_RSSI_TEARDOWN_THRESHOLD);
+	tdls_soc_obj->tdls_configs.tdls_rssi_delta =
+			cfg_get(psoc, CFG_TDLS_RSSI_DELTA);
+	tdls_soc_obj->tdls_configs.tdls_uapsd_mask =
+			cfg_get(psoc, CFG_TDLS_QOS_WMM_UAPSD_MASK);
+	tdls_soc_obj->tdls_configs.tdls_uapsd_inactivity_time =
+			cfg_get(psoc, CFG_TDLS_PUAPSD_INACT_TIME);
+	tdls_soc_obj->tdls_configs.tdls_uapsd_pti_window =
+			cfg_get(psoc, CFG_TDLS_PUAPSD_PEER_TRAFFIC_IND_WINDOW);
+	tdls_soc_obj->tdls_configs.tdls_uapsd_ptr_timeout =
+			cfg_get(psoc, CFG_TDLS_PUAPSD_PEER_TRAFFIC_RSP_TIMEOUT);
+	tdls_soc_obj->tdls_configs.tdls_pre_off_chan_num =
+			cfg_get(psoc, CFG_TDLS_PREFERRED_OFF_CHANNEL_NUM);
+	tdls_soc_obj->tdls_configs.tdls_pre_off_chan_bw =
+			cfg_get(psoc, CFG_TDLS_PREFERRED_OFF_CHANNEL_BW);
+	tdls_soc_obj->tdls_configs.tdls_peer_kickout_threshold =
+			cfg_get(psoc, CFG_TDLS_PEER_KICKOUT_THRESHOLD);
+	tdls_soc_obj->tdls_configs.delayed_trig_framint =
+			cfg_get(psoc, CFG_TDLS_DELAYED_TRGR_FRM_INT);
+	tdls_soc_obj->tdls_configs.tdls_wmm_mode_enable =
+			cfg_get(psoc,  CFG_TDLS_WMM_MODE_ENABLE);
+	tdls_soc_obj->tdls_configs.tdls_off_chan_enable =
+			cfg_get(psoc, CFG_TDLS_OFF_CHANNEL_ENABLED);
+	tdls_soc_obj->tdls_configs.tdls_buffer_sta_enable =
+			cfg_get(psoc, CFG_TDLS_BUF_STA_ENABLED);
+	tdls_soc_obj->tdls_configs.tdls_scan_enable =
+			cfg_get(psoc, CFG_TDLS_SCAN_ENABLE);
+	tdls_soc_obj->tdls_configs.tdls_support_enable =
+			cfg_get(psoc, CFG_TDLS_SUPPORT_ENABLE);
+	tdls_soc_obj->tdls_configs.tdls_implicit_trigger_enable =
+			cfg_get(psoc, CFG_TDLS_IMPLICIT_TRIGGER);
+	tdls_soc_obj->tdls_configs.tdls_external_control =
+			cfg_get(psoc, CFG_TDLS_EXTERNAL_CONTROL);
+
+	tdls_update_feature_flag(tdls_soc_obj);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static QDF_STATUS tdls_global_init(struct tdls_soc_priv_obj *soc_obj)
 {
 	uint8_t sta_idx;
 	uint32_t feature;
 
+	tdls_object_init_params(soc_obj);
 	soc_obj->connected_peer_count = 0;
 	soc_obj->tdls_nss_switch_in_progress = false;
 	soc_obj->tdls_teardown_peers_cnt = 0;
@@ -162,7 +269,7 @@ QDF_STATUS ucfg_tdls_psoc_open(struct wlan_objmgr_psoc *psoc)
 	QDF_STATUS status;
 	struct tdls_soc_priv_obj *soc_obj;
 
-	tdls_notice("tdls psoc open");
+	tdls_debug("tdls psoc open");
 	soc_obj = wlan_objmgr_psoc_get_comp_private_obj(psoc,
 							WLAN_UMAC_COMP_TDLS);
 	if (!soc_obj) {
@@ -182,7 +289,7 @@ QDF_STATUS ucfg_tdls_update_config(struct wlan_objmgr_psoc *psoc,
 	uint32_t tdls_feature_flags;
 	struct policy_mgr_tdls_cbacks tdls_pm_call_backs;
 
-	tdls_notice("tdls update config ");
+	tdls_debug("tdls update config ");
 	if (!psoc || !req) {
 		tdls_err("psoc: 0x%pK, req: 0x%pK", psoc, req);
 		return QDF_STATUS_E_FAILURE;
@@ -228,8 +335,7 @@ QDF_STATUS ucfg_tdls_update_config(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	/* Update TDLS user config */
-	qdf_mem_copy(&soc_obj->tdls_configs, &req->config, sizeof(req->config));
+	tdls_update_feature_flag(soc_obj);
 	tdls_feature_flags = soc_obj->tdls_configs.tdls_feature_flags;
 
 	if (!TDLS_IS_IMPLICIT_TRIG_ENABLED(tdls_feature_flags))
@@ -627,11 +733,7 @@ QDF_STATUS ucfg_tdls_notify_sta_connect(
 	if (!notify)
 		return QDF_STATUS_E_NULL_VALUE;
 
-	notify->session_id = notify_info->session_id;
-	notify->tdls_chan_swit_prohibited =
-			notify_info->tdls_chan_swit_prohibited;
-	notify->tdls_prohibited = notify_info->tdls_prohibited;
-	notify->vdev = notify_info->vdev;
+	*notify = *notify_info;
 
 	msg.bodyptr = notify;
 	msg.callback = tdls_process_cmd;
@@ -659,12 +761,7 @@ QDF_STATUS ucfg_tdls_notify_sta_disconnect(
 	if (!notify)
 		return QDF_STATUS_E_NULL_VALUE;
 
-	notify->session_id = notify_info->session_id;
-	notify->tdls_chan_swit_prohibited = false;
-	notify->tdls_prohibited = false;
-	notify->vdev = notify_info->vdev;
-	notify->lfr_roam = notify_info->lfr_roam;
-	notify->user_disconnect = notify_info->user_disconnect;
+	*notify = *notify_info;
 
 	msg.bodyptr = notify;
 	msg.callback = tdls_process_cmd;

@@ -97,7 +97,7 @@ int dfs_main_attach(struct wlan_dfs *dfs)
 
 	dfs_clear_stats(dfs);
 	dfs->dfs_event_log_on = 1;
-	dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS, "event log enabled by default");
+	dfs_debug(dfs, WLAN_DEBUG_DFS_ALWAYS, "event log enabled by default");
 
 	dfs->dfs_enable = 1;
 
@@ -219,10 +219,23 @@ bad1:
 void dfs_main_timer_reset(struct wlan_dfs *dfs)
 {
 	if (dfs->wlan_radar_tasksched) {
-		qdf_timer_stop(&dfs->wlan_dfs_task_timer);
+		qdf_timer_sync_cancel(&dfs->wlan_dfs_task_timer);
 		dfs->wlan_radar_tasksched = 0;
 	}
 }
+
+void dfs_main_timer_detach(struct wlan_dfs *dfs)
+{
+	qdf_timer_free(&dfs->wlan_dfs_task_timer);
+	dfs->wlan_radar_tasksched = 0;
+}
+
+#if defined(WLAN_DFS_PARTIAL_OFFLOAD) && defined(HOST_DFS_SPOOF_TEST)
+void dfs_host_wait_timer_detach(struct wlan_dfs *dfs)
+{
+	qdf_timer_free(&dfs->dfs_host_wait_timer);
+}
+#endif
 
 void dfs_main_detach(struct wlan_dfs *dfs)
 {

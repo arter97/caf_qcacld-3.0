@@ -40,6 +40,7 @@
 #include <wdi_event_api.h>    /* WDI subscriber event list */
 #endif
 
+#include "hal_hw_headers.h"
 #include <hal_tx.h>
 #include <hal_reo.h>
 #include "wlan_cfg.h"
@@ -409,6 +410,7 @@ struct dp_rx_reorder_array_elem {
 
 #define DP_RX_BA_INACTIVE 0
 #define DP_RX_BA_ACTIVE 1
+#define DP_RX_BA_IN_PROGRESS 2
 struct dp_reo_cmd_info {
 	uint16_t cmd;
 	enum hal_reo_cmd_type cmd_type;
@@ -431,6 +433,12 @@ struct dp_rx_tid {
 	/* Num of delba requests */
 	uint32_t num_of_delba_req;
 
+	/* Num of addba responses successful */
+	uint32_t num_addba_rsp_success;
+
+	/* Num of addba responses failed */
+	uint32_t num_addba_rsp_failed;
+
 	/* pn size */
 	uint8_t pn_size;
 	/* REO TID queue descriptors */
@@ -445,6 +453,9 @@ struct dp_rx_tid {
 	/* RX BA window size */
 	uint16_t ba_win_size;
 
+	/* Starting sequence number in Addba request */
+	uint16_t startseqnum;
+
 	/* TODO: Check the following while adding defragmentation support */
 	struct dp_rx_reorder_array_elem *array;
 	/* base - single rx reorder element used for non-aggr cases */
@@ -456,6 +467,9 @@ struct dp_rx_tid {
 	/* Store dst desc for reinjection */
 	void *dst_ring_desc;
 	struct dp_rx_desc *head_frag_desc;
+
+	/* rx_tid lock */
+	qdf_spinlock_t tid_lock;
 
 	/* Sequence and fragments that are being processed currently */
 	uint32_t curr_seq_num;
@@ -875,6 +889,8 @@ struct dp_soc {
 		qdf_dma_addr_t ipa_rx_refill_buf_hp_paddr;
 	} ipa_uc_rx_rsc;
 #endif
+	/* Device ID coming from Bus sub-system */
+	uint32_t device_id;
 };
 
 #ifdef IPA_OFFLOAD
@@ -935,10 +951,15 @@ enum dp_nac_param_cmd {
  * struct dp_neighbour_peer - neighbour peer list type for smart mesh
  * @neighbour_peers_macaddr: neighbour peer's mac address
  * @neighbour_peer_list_elem: neighbour peer list TAILQ element
+ * @ast_entry: ast_entry for neighbour peer
+ * @rssi: rssi value
  */
 struct dp_neighbour_peer {
 	/* MAC address of neighbour's peer */
 	union dp_align_mac_addr neighbour_peers_macaddr;
+	struct dp_vdev *vdev;
+	struct dp_ast_entry *ast_entry;
+	uint8_t rssi;
 	/* node in the list of neighbour's peer */
 	TAILQ_ENTRY(dp_neighbour_peer) neighbour_peer_list_elem;
 };
@@ -1052,6 +1073,9 @@ struct dp_pdev {
 
 	/* Smart Mesh */
 	bool filter_neighbour_peers;
+
+	/*flag to indicate neighbour_peers_list not empty */
+	bool neighbour_peers_added;
 	/* smart mesh mutex */
 	qdf_spinlock_t neighbour_peer_mutex;
 	/* Neighnour peer list */
@@ -1177,6 +1201,21 @@ struct dp_pdev {
 		uint32_t mgmt_buf_len; /* Len of mgmt. payload in ppdu stats */
 		uint32_t ppdu_id;
 	} mgmtctrl_frm_info;
+
+	/* Current noise-floor reading for the pdev channel */
+	int16_t chan_noise_floor;
+
+	/*
+	 * For multiradio device, this flag indicates if
+	 * this radio is primary or secondary.
+	 *
+	 * For HK 1.0, this is used for WAR for the AST issue.
+	 * HK 1.x mandates creation of only 1 AST entry with same MAC address
+	 * across 2 radios. is_primary indicates the radio on which DP should
+	 * install HW AST entry if there is a request to add 2 AST entries
+	 * with same MAC address across 2 radios
+	 */
+	uint8_t is_primary;
 };
 
 struct dp_peer;
@@ -1191,6 +1230,8 @@ struct dp_vdev {
 	/* Handle to the OS shim SW's virtual device */
 	ol_osif_vdev_handle osif_vdev;
 
+	/* Handle to the UMAC handle */
+	struct cdp_ctrl_objmgr_vdev *ctrl_vdev;
 	/* vdev_id - ID used to specify a particular vdev to the target */
 	uint8_t vdev_id;
 
@@ -1319,18 +1360,6 @@ struct dp_vdev {
 	uint32_t ap_bridge_enabled;
 
 	enum cdp_sec_type  sec_type;
-
-#ifdef ATH_SUPPORT_NAC_RSSI
-	bool cdp_nac_rssi_enabled;
-	struct {
-		uint8_t bssid_mac[6];
-		uint8_t client_mac[6];
-		uint8_t  chan_num;
-		uint8_t client_rssi_valid;
-		uint8_t client_rssi;
-		uint8_t vdev_id;
-	} cdp_nac_rssi;
-#endif
 };
 
 
@@ -1354,6 +1383,8 @@ typedef struct {
 struct dp_peer {
 	/* VDEV to which this peer is associated */
 	struct dp_vdev *vdev;
+
+	struct cdp_ctrl_objmgr_peer *ctrl_peer;
 
 	struct dp_ast_entry *self_ast_entry;
 
@@ -1421,9 +1452,6 @@ struct dp_peer {
 	dp_ecm_policy wds_ecm;
 #endif
 	bool delete_in_progress;
-
-	/* Opaque handle to node */
-	void *ol_peer;
 };
 
 #ifdef CONFIG_WIN

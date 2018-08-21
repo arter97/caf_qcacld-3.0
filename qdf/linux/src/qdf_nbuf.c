@@ -122,42 +122,42 @@ static qdf_atomic_t nbuf_count;
  */
 void qdf_nbuf_tx_desc_count_display(void)
 {
-	qdf_print("Current Snapshot of the Driver:\n");
-	qdf_print("Data Packets:\n");
-	qdf_print("HDD %d TXRX_Q %d TXRX %d HTT %d",
-		nbuf_tx_data[QDF_NBUF_TX_PKT_HDD] -
-		(nbuf_tx_data[QDF_NBUF_TX_PKT_TXRX] +
-		nbuf_tx_data[QDF_NBUF_TX_PKT_TXRX_ENQUEUE] -
-		nbuf_tx_data[QDF_NBUF_TX_PKT_TXRX_DEQUEUE]),
-		nbuf_tx_data[QDF_NBUF_TX_PKT_TXRX_ENQUEUE] -
-		nbuf_tx_data[QDF_NBUF_TX_PKT_TXRX_DEQUEUE],
-		nbuf_tx_data[QDF_NBUF_TX_PKT_TXRX] -
-			 nbuf_tx_data[QDF_NBUF_TX_PKT_HTT],
-		nbuf_tx_data[QDF_NBUF_TX_PKT_HTT]  -
-			 nbuf_tx_data[QDF_NBUF_TX_PKT_HTC]);
-	qdf_print(" HTC %d  HIF %d CE %d TX_COMP %d\n",
-		nbuf_tx_data[QDF_NBUF_TX_PKT_HTC] -
-			nbuf_tx_data[QDF_NBUF_TX_PKT_HIF],
-		nbuf_tx_data[QDF_NBUF_TX_PKT_HIF] -
-			 nbuf_tx_data[QDF_NBUF_TX_PKT_CE],
-		nbuf_tx_data[QDF_NBUF_TX_PKT_CE] -
-			 nbuf_tx_data[QDF_NBUF_TX_PKT_FREE],
-		nbuf_tx_data[QDF_NBUF_TX_PKT_FREE]);
-	qdf_print("Mgmt Packets:\n");
-	qdf_print("TXRX_Q %d TXRX %d HTT %d HTC %d HIF %d CE %d TX_COMP %d\n",
-		nbuf_tx_mgmt[QDF_NBUF_TX_PKT_TXRX_ENQUEUE] -
-		nbuf_tx_mgmt[QDF_NBUF_TX_PKT_TXRX_DEQUEUE],
-		nbuf_tx_mgmt[QDF_NBUF_TX_PKT_TXRX] -
-			 nbuf_tx_mgmt[QDF_NBUF_TX_PKT_HTT],
-		nbuf_tx_mgmt[QDF_NBUF_TX_PKT_HTT] -
-			 nbuf_tx_mgmt[QDF_NBUF_TX_PKT_HTC],
-		nbuf_tx_mgmt[QDF_NBUF_TX_PKT_HTC] -
-			 nbuf_tx_mgmt[QDF_NBUF_TX_PKT_HIF],
-		nbuf_tx_mgmt[QDF_NBUF_TX_PKT_HIF] -
-			 nbuf_tx_mgmt[QDF_NBUF_TX_PKT_CE],
-		nbuf_tx_mgmt[QDF_NBUF_TX_PKT_CE] -
-			 nbuf_tx_mgmt[QDF_NBUF_TX_PKT_FREE],
-		nbuf_tx_mgmt[QDF_NBUF_TX_PKT_FREE]);
+	qdf_debug("Current Snapshot of the Driver:");
+	qdf_debug("Data Packets:");
+	qdf_debug("HDD %d TXRX_Q %d TXRX %d HTT %d",
+		  nbuf_tx_data[QDF_NBUF_TX_PKT_HDD] -
+		  (nbuf_tx_data[QDF_NBUF_TX_PKT_TXRX] +
+		  nbuf_tx_data[QDF_NBUF_TX_PKT_TXRX_ENQUEUE] -
+		  nbuf_tx_data[QDF_NBUF_TX_PKT_TXRX_DEQUEUE]),
+		  nbuf_tx_data[QDF_NBUF_TX_PKT_TXRX_ENQUEUE] -
+		  nbuf_tx_data[QDF_NBUF_TX_PKT_TXRX_DEQUEUE],
+		  nbuf_tx_data[QDF_NBUF_TX_PKT_TXRX] -
+		  nbuf_tx_data[QDF_NBUF_TX_PKT_HTT],
+		  nbuf_tx_data[QDF_NBUF_TX_PKT_HTT]  -
+		  nbuf_tx_data[QDF_NBUF_TX_PKT_HTC]);
+	qdf_debug(" HTC %d  HIF %d CE %d TX_COMP %d",
+		  nbuf_tx_data[QDF_NBUF_TX_PKT_HTC] -
+		  nbuf_tx_data[QDF_NBUF_TX_PKT_HIF],
+		  nbuf_tx_data[QDF_NBUF_TX_PKT_HIF] -
+		  nbuf_tx_data[QDF_NBUF_TX_PKT_CE],
+		  nbuf_tx_data[QDF_NBUF_TX_PKT_CE] -
+		  nbuf_tx_data[QDF_NBUF_TX_PKT_FREE],
+		  nbuf_tx_data[QDF_NBUF_TX_PKT_FREE]);
+	qdf_debug("Mgmt Packets:");
+	qdf_debug("TXRX_Q %d TXRX %d HTT %d HTC %d HIF %d CE %d TX_COMP %d",
+		  nbuf_tx_mgmt[QDF_NBUF_TX_PKT_TXRX_ENQUEUE] -
+		  nbuf_tx_mgmt[QDF_NBUF_TX_PKT_TXRX_DEQUEUE],
+		  nbuf_tx_mgmt[QDF_NBUF_TX_PKT_TXRX] -
+		  nbuf_tx_mgmt[QDF_NBUF_TX_PKT_HTT],
+		  nbuf_tx_mgmt[QDF_NBUF_TX_PKT_HTT] -
+		  nbuf_tx_mgmt[QDF_NBUF_TX_PKT_HTC],
+		  nbuf_tx_mgmt[QDF_NBUF_TX_PKT_HTC] -
+		  nbuf_tx_mgmt[QDF_NBUF_TX_PKT_HIF],
+		  nbuf_tx_mgmt[QDF_NBUF_TX_PKT_HIF] -
+		  nbuf_tx_mgmt[QDF_NBUF_TX_PKT_CE],
+		  nbuf_tx_mgmt[QDF_NBUF_TX_PKT_CE] -
+		  nbuf_tx_mgmt[QDF_NBUF_TX_PKT_FREE],
+		  nbuf_tx_mgmt[QDF_NBUF_TX_PKT_FREE]);
 }
 qdf_export_symbol(qdf_nbuf_tx_desc_count_display);
 
@@ -401,7 +401,7 @@ skb_alloc:
 	if (virt_to_phys(qdf_nbuf_data(skb)) < 0x50000040) {
 		lowmem_alloc_tries++;
 		if (lowmem_alloc_tries > 100) {
-			qdf_print("%s Failed \n",__func__);
+			qdf_err("Failed");
 			return NULL;
 		} else {
 			/* Not freeing to make sure it
@@ -679,8 +679,9 @@ qdf_nbuf_track_map(qdf_nbuf_t nbuf, const char *file, uint32_t line)
 	meta = qdf_nbuf_meta_get(nbuf);
 	qdf_spin_unlock_irqrestore(&qdf_nbuf_map_lock);
 	if (meta)
-		panic("Double nbuf map detected @ %s:%u",
-		      kbasename(file), line);
+		QDF_DEBUG_PANIC(
+			"Double nbuf map detected @ %s:%u; last map from %s:%u",
+			kbasename(file), line, meta->file, meta->line);
 
 	meta = qdf_flex_mem_alloc(&qdf_nbuf_map_pool);
 	if (!meta) {
@@ -716,7 +717,8 @@ qdf_nbuf_untrack_map(qdf_nbuf_t nbuf, const char *file, uint32_t line)
 	meta = qdf_nbuf_meta_get(nbuf);
 
 	if (!meta)
-		panic("Double nbuf unmap or unmap without map detected @%s:%u",
+		QDF_DEBUG_PANIC(
+		      "Double nbuf unmap or unmap without map detected @ %s:%u",
 		      kbasename(file), line);
 
 	hash_del(&meta->node);
@@ -2307,19 +2309,19 @@ static void qdf_nbuf_track_memory_manager_destroy(void)
 			  __func__);
 
 	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO,
-		  "%s: %d residual freelist size\n",
+		  "%s: %d residual freelist size",
 		  __func__, qdf_net_buf_track_free_list_count);
 
 	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO,
-		  "%s: %d max freelist size observed\n",
+		  "%s: %d max freelist size observed",
 		  __func__, qdf_net_buf_track_max_free);
 
 	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO,
-		  "%s: %d max buffers used observed\n",
+		  "%s: %d max buffers used observed",
 		  __func__, qdf_net_buf_track_max_used);
 
 	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO,
-		  "%s: %d max buffers allocated observed\n",
+		  "%s: %d max buffers allocated observed",
 		  __func__, qdf_net_buf_track_max_allocated);
 
 	while (node) {
@@ -2330,12 +2332,12 @@ static void qdf_nbuf_track_memory_manager_destroy(void)
 	}
 
 	if (qdf_net_buf_track_free_list_count != 0)
-		qdf_print("%s: %d unfreed tracking memory lost in freelist\n",
-			  __func__, qdf_net_buf_track_free_list_count);
+		qdf_info("%d unfreed tracking memory lost in freelist",
+			 qdf_net_buf_track_free_list_count);
 
 	if (qdf_net_buf_track_used_list_count != 0)
-		qdf_print("%s: %d unfreed tracking memory still in use\n",
-			  __func__, qdf_net_buf_track_used_list_count);
+		qdf_info("%d unfreed tracking memory still in use",
+			 qdf_net_buf_track_used_list_count);
 
 	spin_unlock_irqrestore(&qdf_net_buf_track_free_list_lock, irq_flag);
 	kmem_cache_destroy(nbuf_tracking_cache);
@@ -2393,9 +2395,9 @@ void qdf_net_buf_debug_exit(void)
 			p_prev = p_node;
 			p_node = p_node->p_next;
 			count++;
-			qdf_print("SKB buf memory Leak@ File %s, @Line %d, size %zu, nbuf %pK\n",
-				  p_prev->file_name, p_prev->line_num,
-				  p_prev->size, p_prev->net_buf);
+			qdf_info("SKB buf memory Leak@ File %s, @Line %d, size %zu, nbuf %pK",
+				 p_prev->file_name, p_prev->line_num,
+				 p_prev->size, p_prev->net_buf);
 			qdf_nbuf_track_free(p_prev);
 		}
 		spin_unlock_irqrestore(&g_qdf_net_buf_track_lock[i], irq_flag);
@@ -2406,7 +2408,7 @@ void qdf_net_buf_debug_exit(void)
 
 #ifdef CONFIG_HALT_KMEMLEAK
 	if (count) {
-		qdf_print("%d SKBs leaked .. please fix the SKB leak", count);
+		qdf_err("%d SKBs leaked .. please fix the SKB leak", count);
 		QDF_BUG(0);
 	}
 #endif
@@ -2636,6 +2638,16 @@ void qdf_nbuf_free_debug(qdf_nbuf_t nbuf, uint8_t *file, uint32_t line)
 
 	/* Remove SKB from internal QDF tracking table */
 	if (qdf_likely(nbuf)) {
+		struct qdf_nbuf_map_metadata *meta;
+
+		qdf_spin_lock_irqsave(&qdf_nbuf_map_lock);
+		meta = qdf_nbuf_meta_get(nbuf);
+		if (meta)
+			QDF_DEBUG_PANIC(
+				"Nbuf freed @ %s:%u while mapped from %s:%u",
+				kbasename(file), line, meta->file, meta->line);
+		qdf_spin_unlock_irqrestore(&qdf_nbuf_map_lock);
+
 		qdf_net_buf_debug_delete_node(nbuf);
 		qdf_nbuf_history_add(nbuf, file, line, QDF_NBUF_FREE);
 	}
@@ -2711,16 +2723,16 @@ static uint8_t __qdf_nbuf_get_tso_cmn_seg_info(qdf_device_t osdev,
 		tso_info->ipv4_csum_en = 1;
 		tso_info->tcp_ipv4_csum_en = 1;
 		if (qdf_unlikely(ipv4_hdr->protocol != IPPROTO_TCP)) {
-			qdf_print("TSO IPV4 proto 0x%x not TCP\n",
-				 ipv4_hdr->protocol);
+			qdf_err("TSO IPV4 proto 0x%x not TCP",
+				ipv4_hdr->protocol);
 			return 1;
 		}
 	} else if (tso_info->ethproto == htons(ETH_P_IPV6)) { /* IPv6 */
 		/* for IPv6, enable TCP csum. No IP ID or IP csum */
 		tso_info->tcp_ipv6_csum_en = 1;
 	} else {
-		qdf_print("TSO: ethertype 0x%x is not supported!\n",
-			 tso_info->ethproto);
+		qdf_err("TSO: ethertype 0x%x is not supported!",
+			tso_info->ethproto);
 		return 1;
 	}
 	tso_info->l2_len = (skb_network_header(skb) - skb_mac_header(skb));
@@ -2736,7 +2748,7 @@ static uint8_t __qdf_nbuf_get_tso_cmn_seg_info(qdf_device_t osdev,
 							DMA_TO_DEVICE);
 	if (unlikely(dma_mapping_error(osdev->dev,
 				       tso_info->eit_hdr_dma_map_addr))) {
-		qdf_print("DMA mapping error!\n");
+		qdf_err("DMA mapping error!");
 		qdf_assert(0);
 		return 1;
 	}
@@ -2763,26 +2775,6 @@ static uint8_t __qdf_nbuf_get_tso_cmn_seg_info(qdf_device_t osdev,
 	return 0;
 }
 
-
-/**
- * qdf_dmaaddr_to_32s - return high and low parts of dma_addr
- *
- * Returns the high and low 32-bits of the DMA addr in the provided ptrs
- *
- * Return: N/A
- */
-void __qdf_dmaaddr_to_32s(qdf_dma_addr_t dmaaddr,
-				      uint32_t *lo, uint32_t *hi)
-{
-	if (sizeof(dmaaddr) > sizeof(uint32_t)) {
-		*lo = lower_32_bits(dmaaddr);
-		*hi = upper_32_bits(dmaaddr);
-	} else {
-		*lo = dmaaddr;
-		*hi = 0;
-	}
-}
-qdf_export_symbol(__qdf_dmaaddr_to_32s);
 
 /**
  * __qdf_nbuf_fill_tso_cmn_seg_info() - Init function for each TSO nbuf segment
@@ -2878,7 +2870,7 @@ uint32_t __qdf_nbuf_get_tso_info(qdf_device_t osdev, struct sk_buff *skb,
 
 	if (qdf_unlikely(__qdf_nbuf_get_tso_cmn_seg_info(osdev,
 						skb, &tso_cmn_info))) {
-		qdf_print("TSO: error getting common segment info\n");
+		qdf_warn("TSO: error getting common segment info");
 		return 0;
 	}
 
@@ -2905,7 +2897,7 @@ uint32_t __qdf_nbuf_get_tso_info(qdf_device_t osdev, struct sk_buff *skb,
 
 	if (unlikely(dma_mapping_error(osdev->dev,
 					tso_frag_paddr))) {
-		qdf_print("%s:%d DMA mapping error!\n", __func__, __LINE__);
+		qdf_err("DMA mapping error!");
 		qdf_assert(0);
 		return 0;
 	}
@@ -3001,13 +2993,13 @@ uint32_t __qdf_nbuf_get_tso_info(qdf_device_t osdev, struct sk_buff *skb,
 
 			} else { /* the next fragment is not contiguous */
 				if (skb_shinfo(skb)->nr_frags == 0) {
-					qdf_print("TSO: nr_frags == 0!\n");
+					qdf_info("TSO: nr_frags == 0!");
 					qdf_assert(0);
 					return 0;
 				}
 				if (j >= skb_shinfo(skb)->nr_frags) {
-					qdf_print("TSO: nr_frags %d j %d\n",
-						  skb_shinfo(skb)->nr_frags, j);
+					qdf_info("TSO: nr_frags %d j %d",
+						 skb_shinfo(skb)->nr_frags, j);
 					qdf_assert(0);
 					return 0;
 				}
@@ -3035,8 +3027,7 @@ uint32_t __qdf_nbuf_get_tso_info(qdf_device_t osdev, struct sk_buff *skb,
 						 DMA_TO_DEVICE);
 			if (unlikely(dma_mapping_error(osdev->dev,
 							tso_frag_paddr))) {
-				qdf_print("%s:%d DMA mapping error!\n",
-						__func__, __LINE__);
+				qdf_err("DMA mapping error!");
 				qdf_assert(0);
 				return 0;
 			}
@@ -3076,16 +3067,16 @@ void __qdf_nbuf_unmap_tso_segment(qdf_device_t osdev,
 	/*Num of frags in a tso seg cannot be less than 2 */
 	if (num_frags < 1) {
 		qdf_assert(0);
-		qdf_print("ERROR: num of frags in a tso segment is %d\n",
-				  (num_frags + 1));
+		qdf_err("ERROR: num of frags in a tso segment is %d",
+			(num_frags + 1));
 		return;
 	}
 
 	while (num_frags) {
 		/*Do dma unmap the tso seg except the 0th frag */
 		if (0 ==  tso_seg->seg.tso_frags[num_frags].paddr) {
-			qdf_print("ERROR: TSO seg frag %d mapped physical address is NULL\n",
-				  num_frags);
+			qdf_err("ERROR: TSO seg frag %d mapped physical address is NULL",
+				num_frags);
 			qdf_assert(0);
 			return;
 		}
@@ -3101,7 +3092,7 @@ void __qdf_nbuf_unmap_tso_segment(qdf_device_t osdev,
 	if (is_last_seg) {
 		/*Do dma unmap for the tso seg 0th frag */
 		if (0 ==  tso_seg->seg.tso_frags[0].paddr) {
-			qdf_print("ERROR: TSO seg frag 0 mapped physical address is NULL\n");
+			qdf_err("ERROR: TSO seg frag 0 mapped physical address is NULL");
 			qdf_assert(0);
 			return;
 		}
@@ -3164,8 +3155,8 @@ uint32_t __qdf_nbuf_get_tso_num_seg(struct sk_buff *skb)
 
 	while (skb_nr_frags) {
 		if (j >= skb_shinfo(skb)->nr_frags) {
-			qdf_print("TSO: nr_frags %d j %d\n",
-			skb_shinfo(skb)->nr_frags, j);
+			qdf_info("TSO: nr_frags %d j %d",
+				 skb_shinfo(skb)->nr_frags, j);
 			qdf_assert(0);
 			return 0;
 		}
@@ -3276,6 +3267,27 @@ fail:
 qdf_export_symbol(__qdf_nbuf_get_tso_num_seg);
 
 #endif /* FEATURE_TSO */
+
+/**
+ * qdf_dmaaddr_to_32s - return high and low parts of dma_addr
+ *
+ * Returns the high and low 32-bits of the DMA addr in the provided ptrs
+ *
+ * Return: N/A
+ */
+void __qdf_dmaaddr_to_32s(qdf_dma_addr_t dmaaddr,
+			  uint32_t *lo, uint32_t *hi)
+{
+	if (sizeof(dmaaddr) > sizeof(uint32_t)) {
+		*lo = lower_32_bits(dmaaddr);
+		*hi = upper_32_bits(dmaaddr);
+	} else {
+		*lo = dmaaddr;
+		*hi = 0;
+	}
+}
+
+qdf_export_symbol(__qdf_dmaaddr_to_32s);
 
 struct sk_buff *__qdf_nbuf_inc_users(struct sk_buff *skb)
 {
@@ -3415,7 +3427,7 @@ __qdf_nbuf_unmap_nbytes_single(
 	qdf_device_t osdev, struct sk_buff *buf, qdf_dma_dir_t dir, int nbytes)
 {
 	if (0 ==  QDF_NBUF_CB_PADDR(buf)) {
-		qdf_print("ERROR: NBUF mapped physical address is NULL\n");
+		qdf_err("ERROR: NBUF mapped physical address is NULL");
 		return;
 	}
 	dma_unmap_single(osdev->dev, QDF_NBUF_CB_PADDR(buf),
@@ -3661,7 +3673,7 @@ static void __qdf_nbuf_sync_single_for_cpu(
 	qdf_device_t osdev, qdf_nbuf_t buf, qdf_dma_dir_t dir)
 {
 	if (0 ==  QDF_NBUF_CB_PADDR(buf)) {
-		qdf_print("ERROR: NBUF mapped physical address is NULL\n");
+		qdf_err("ERROR: NBUF mapped physical address is NULL");
 		return;
 	}
 	dma_sync_single_for_cpu(osdev->dev, QDF_NBUF_CB_PADDR(buf),
@@ -3707,6 +3719,8 @@ static unsigned int qdf_nbuf_update_radiotap_vht_flags(
 					uint32_t rtap_len)
 {
 	uint16_t vht_flags = 0;
+
+	rtap_len = qdf_align(rtap_len, 2);
 
 	/* IEEE80211_RADIOTAP_VHT u16, u8, u8, u8[4], u8, u8, u16 */
 	vht_flags |= IEEE80211_RADIOTAP_VHT_KNOWN_STBC |
@@ -3779,6 +3793,8 @@ qdf_nbuf_update_radiotap_he_flags(struct mon_rx_status *rx_status,
 	 * IEEE80211_RADIOTAP_HE u16, u16, u16, u16, u16, u16
 	 * Enable all "known" HE radiotap flags for now
 	 */
+	rtap_len = qdf_align(rtap_len, 2);
+
 	put_unaligned_le16(rx_status->he_data1, &rtap_buf[rtap_len]);
 	rtap_len += 2;
 
@@ -3819,6 +3835,8 @@ static unsigned int
 qdf_nbuf_update_radiotap_he_mu_flags(struct mon_rx_status *rx_status,
 				     int8_t *rtap_buf, uint32_t rtap_len)
 {
+	rtap_len = qdf_align(rtap_len, 2);
+
 	/*
 	 * IEEE80211_RADIOTAP_HE_MU u16, u16, u8[4]
 	 * Enable all "known" he-mu radiotap flags for now
@@ -3863,6 +3881,8 @@ static unsigned int
 qdf_nbuf_update_radiotap_he_mu_other_flags(struct mon_rx_status *rx_status,
 				     int8_t *rtap_buf, uint32_t rtap_len)
 {
+	rtap_len = qdf_align(rtap_len, 2);
+
 	/*
 	 * IEEE80211_RADIOTAP_HE-MU-OTHER u16, u16, u8, u8
 	 * Enable all "known" he-mu-other radiotap flags for now
@@ -3885,21 +3905,24 @@ qdf_nbuf_update_radiotap_he_mu_other_flags(struct mon_rx_status *rx_status,
 	return rtap_len;
 }
 
-#define NORMALIZED_TO_NOISE_FLOOR (-96)
 
-/* This is the length for radiotap, combined length
+/**
+ * This is the length for radiotap, combined length
  * (Mandatory part struct ieee80211_radiotap_header + RADIOTAP_HEADER_LEN)
  * cannot be more than available headroom_sz.
  * increase this when we add more radiotap elements.
+ * Number after '+' indicates maximum possible increase due to alignment
  */
 
-#define RADIOTAP_VHT_FLAGS_LEN 12
-#define RADIOTAP_HE_FLAGS_LEN 12
-#define RADIOTAP_HE_MU_FLAGS_LEN 8
-#define RADIOTAP_HE_MU_OTHER_FLAGS_LEN 18
-#define RADIOTAP_FIXED_HEADER_LEN 16
+#define RADIOTAP_VHT_FLAGS_LEN (12 + 1)
+#define RADIOTAP_HE_FLAGS_LEN (12 + 1)
+#define RADIOTAP_HE_MU_FLAGS_LEN (8 + 1)
+#define RADIOTAP_HE_MU_OTHER_FLAGS_LEN (18 + 1)
+#define RADIOTAP_FIXED_HEADER_LEN 17
 #define RADIOTAP_HT_FLAGS_LEN 3
-#define RADIOTAP_AMPDU_STATUS_LEN 8
+#define RADIOTAP_AMPDU_STATUS_LEN (8 + 3)
+#define RADIOTAP_VENDOR_NS_LEN \
+	(sizeof(struct qdf_radiotap_vendor_ns_ath) + 1)
 #define RADIOTAP_HEADER_LEN (sizeof(struct ieee80211_radiotap_header) + \
 				RADIOTAP_FIXED_HEADER_LEN + \
 				RADIOTAP_HT_FLAGS_LEN + \
@@ -3907,11 +3930,13 @@ qdf_nbuf_update_radiotap_he_mu_other_flags(struct mon_rx_status *rx_status,
 				RADIOTAP_AMPDU_STATUS_LEN + \
 				RADIOTAP_HE_FLAGS_LEN + \
 				RADIOTAP_HE_MU_FLAGS_LEN + \
-				RADIOTAP_HE_MU_OTHER_FLAGS_LEN)
+				RADIOTAP_HE_MU_OTHER_FLAGS_LEN + \
+				RADIOTAP_VENDOR_NS_LEN)
 
 #define IEEE80211_RADIOTAP_HE 23
 #define IEEE80211_RADIOTAP_HE_MU	24
 #define IEEE80211_RADIOTAP_HE_MU_OTHER	25
+uint8_t ATH_OUI[] = {0x00, 0x03, 0x7f}; /* Atheros OUI */
 
 /**
  * radiotap_num_to_freq() - Get frequency from chan number
@@ -3963,6 +3988,8 @@ static unsigned int qdf_nbuf_update_radiotap_ampdu_flags(
 	uint16_t ampdu_flags = 0;
 	uint16_t ampdu_reserved_flags = 0;
 
+	rtap_len = qdf_align(rtap_len, 4);
+
 	put_unaligned_le32(ampdu_reference_num, &rtap_buf[rtap_len]);
 	rtap_len += 4;
 	put_unaligned_le16(ampdu_flags, &rtap_buf[rtap_len]);
@@ -3990,14 +4017,15 @@ unsigned int qdf_nbuf_update_radiotap(struct mon_rx_status *rx_status,
 	uint32_t rtap_hdr_len = sizeof(struct ieee80211_radiotap_header);
 	uint32_t rtap_len = rtap_hdr_len;
 	uint8_t length = rtap_len;
+	struct qdf_radiotap_vendor_ns_ath *radiotap_vendor_ns_ath;
 
 	/* IEEE80211_RADIOTAP_TSFT              __le64       microseconds*/
-	rthdr->it_present = cpu_to_le32(1 << IEEE80211_RADIOTAP_TSFT);
+	rthdr->it_present = (1 << IEEE80211_RADIOTAP_TSFT);
 	put_unaligned_le64(rx_status->tsft, &rtap_buf[rtap_len]);
 	rtap_len += 8;
 
 	/* IEEE80211_RADIOTAP_FLAGS u8 */
-	rthdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_FLAGS);
+	rthdr->it_present |= (1 << IEEE80211_RADIOTAP_FLAGS);
 
 	if (rx_status->rs_fcs_err)
 		rx_status->rtap_flags |= IEEE80211_RADIOTAP_F_BADFCS;
@@ -4008,14 +4036,14 @@ unsigned int qdf_nbuf_update_radiotap(struct mon_rx_status *rx_status,
 	/* IEEE80211_RADIOTAP_RATE  u8           500kb/s */
 	if (!rx_status->ht_flags && !rx_status->vht_flags &&
 	    !rx_status->he_flags) {
-		rthdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_RATE);
+		rthdr->it_present |= (1 << IEEE80211_RADIOTAP_RATE);
 		rtap_buf[rtap_len] = rx_status->rate;
 	} else
 		rtap_buf[rtap_len] = 0;
 	rtap_len += 1;
 
 	/* IEEE80211_RADIOTAP_CHANNEL 2 x __le16   MHz, bitmap */
-	rthdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_CHANNEL);
+	rthdr->it_present |= (1 << IEEE80211_RADIOTAP_CHANNEL);
 	rx_status->chan_freq = radiotap_num_to_freq(rx_status->chan_num);
 	put_unaligned_le16(rx_status->chan_freq, &rtap_buf[rtap_len]);
 	rtap_len += 2;
@@ -4034,17 +4062,21 @@ unsigned int qdf_nbuf_update_radiotap(struct mon_rx_status *rx_status,
 	/* IEEE80211_RADIOTAP_DBM_ANTSIGNAL s8  decibels from one milliwatt
 	 *					(dBm)
 	 */
-	rthdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_DBM_ANTSIGNAL);
+	rthdr->it_present |= (1 << IEEE80211_RADIOTAP_DBM_ANTSIGNAL);
 	/*
 	 * rssi_comb is int dB, need to convert it to dBm.
 	 * normalize value to noise floor of -96 dBm
 	 */
-	rtap_buf[rtap_len] = rx_status->rssi_comb +
-		NORMALIZED_TO_NOISE_FLOOR;
+	rtap_buf[rtap_len] = rx_status->rssi_comb + rx_status->chan_noise_floor;
+	rtap_len += 1;
+
+	/* RX signal noise floor */
+	rthdr->it_present |= (1 << IEEE80211_RADIOTAP_DBM_ANTNOISE);
+	rtap_buf[rtap_len] = (uint8_t)rx_status->chan_noise_floor;
 	rtap_len += 1;
 
 	/* IEEE80211_RADIOTAP_ANTENNA   u8      antenna index */
-	rthdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_ANTENNA);
+	rthdr->it_present |= (1 << IEEE80211_RADIOTAP_ANTENNA);
 	rtap_buf[rtap_len] = rx_status->nr_ant;
 	rtap_len += 1;
 
@@ -4056,7 +4088,7 @@ unsigned int qdf_nbuf_update_radiotap(struct mon_rx_status *rx_status,
 	if (rx_status->ht_flags) {
 		length = rtap_len;
 		/* IEEE80211_RADIOTAP_VHT u8, u8, u8 */
-		rthdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_MCS);
+		rthdr->it_present |= (1 << IEEE80211_RADIOTAP_MCS);
 		rtap_buf[rtap_len] = IEEE80211_RADIOTAP_MCS_HAVE_BW |
 					IEEE80211_RADIOTAP_MCS_HAVE_MCS |
 					IEEE80211_RADIOTAP_MCS_HAVE_GI;
@@ -4081,8 +4113,7 @@ unsigned int qdf_nbuf_update_radiotap(struct mon_rx_status *rx_status,
 
 	if (rx_status->rs_flags & IEEE80211_AMPDU_FLAG) {
 		/* IEEE80211_RADIOTAP_AMPDU_STATUS u32 u16 u8 u8 */
-		rthdr->it_present |=
-			cpu_to_le32(1 << IEEE80211_RADIOTAP_AMPDU_STATUS);
+		rthdr->it_present |= (1 << IEEE80211_RADIOTAP_AMPDU_STATUS);
 		rtap_len = qdf_nbuf_update_radiotap_ampdu_flags(rx_status,
 								rtap_buf,
 								rtap_len);
@@ -4091,7 +4122,7 @@ unsigned int qdf_nbuf_update_radiotap(struct mon_rx_status *rx_status,
 	if (rx_status->vht_flags) {
 		length = rtap_len;
 		/* IEEE80211_RADIOTAP_VHT u16, u8, u8, u8[4], u8, u8, u16 */
-		rthdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_VHT);
+		rthdr->it_present |= (1 << IEEE80211_RADIOTAP_VHT);
 		rtap_len = qdf_nbuf_update_radiotap_vht_flags(rx_status,
 								rtap_buf,
 								rtap_len);
@@ -4105,7 +4136,7 @@ unsigned int qdf_nbuf_update_radiotap(struct mon_rx_status *rx_status,
 	if (rx_status->he_flags) {
 		length = rtap_len;
 		/* IEEE80211_RADIOTAP_HE */
-		rthdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_HE);
+		rthdr->it_present |= (1 << IEEE80211_RADIOTAP_HE);
 		rtap_len = qdf_nbuf_update_radiotap_he_flags(rx_status,
 								rtap_buf,
 								rtap_len);
@@ -4119,7 +4150,7 @@ unsigned int qdf_nbuf_update_radiotap(struct mon_rx_status *rx_status,
 	if (rx_status->he_mu_flags) {
 		length = rtap_len;
 		/* IEEE80211_RADIOTAP_HE-MU */
-		rthdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_HE_MU);
+		rthdr->it_present |= (1 << IEEE80211_RADIOTAP_HE_MU);
 		rtap_len = qdf_nbuf_update_radiotap_he_mu_flags(rx_status,
 								rtap_buf,
 								rtap_len);
@@ -4133,8 +4164,7 @@ unsigned int qdf_nbuf_update_radiotap(struct mon_rx_status *rx_status,
 	if (rx_status->he_mu_other_flags) {
 		length = rtap_len;
 		/* IEEE80211_RADIOTAP_HE-MU-OTHER */
-		rthdr->it_present |=
-			cpu_to_le32(1 << IEEE80211_RADIOTAP_HE_MU_OTHER);
+		rthdr->it_present |= (1 << IEEE80211_RADIOTAP_HE_MU_OTHER);
 		rtap_len =
 			qdf_nbuf_update_radiotap_he_mu_other_flags(rx_status,
 								rtap_buf,
@@ -4146,10 +4176,37 @@ unsigned int qdf_nbuf_update_radiotap(struct mon_rx_status *rx_status,
 		}
 	}
 
+	rtap_len = qdf_align(rtap_len, 2);
+	/*
+	 * Radiotap Vendor Namespace
+	 */
+	rthdr->it_present |= (1 << IEEE80211_RADIOTAP_VENDOR_NAMESPACE);
+	radiotap_vendor_ns_ath = (struct qdf_radiotap_vendor_ns_ath *)
+					(rtap_buf + rtap_len);
+	/*
+	 * Copy Atheros OUI - 3 bytes (4th byte is 0)
+	 */
+	qdf_mem_copy(radiotap_vendor_ns_ath->hdr.oui, ATH_OUI, sizeof(ATH_OUI));
+	/*
+	 * Name space selector = 0
+	 * We only will have one namespace for now
+	 */
+	radiotap_vendor_ns_ath->hdr.selector = 0;
+	radiotap_vendor_ns_ath->hdr.skip_length = cpu_to_le16(
+					sizeof(*radiotap_vendor_ns_ath) -
+					sizeof(radiotap_vendor_ns_ath->hdr));
+	radiotap_vendor_ns_ath->device_id = cpu_to_le32(rx_status->device_id);
+	radiotap_vendor_ns_ath->lsig = cpu_to_le32(rx_status->l_sig_a_info);
+	radiotap_vendor_ns_ath->lsig_b = cpu_to_le32(rx_status->l_sig_b_info);
+	radiotap_vendor_ns_ath->ppdu_start_timestamp =
+				cpu_to_le32(rx_status->ppdu_timestamp);
+	rtap_len += sizeof(*radiotap_vendor_ns_ath);
+
 	rthdr->it_len = cpu_to_le16(rtap_len);
+	rthdr->it_present = cpu_to_le32(rthdr->it_present);
 
 	if (headroom_sz < rtap_len) {
-		qdf_print("ERROR: not enough space to update radiotap\n");
+		qdf_err("ERROR: not enough space to update radiotap");
 		return 0;
 	}
 	qdf_nbuf_push_head(nbuf, rtap_len);
@@ -4162,14 +4219,14 @@ static unsigned int qdf_nbuf_update_radiotap_vht_flags(
 					int8_t *rtap_buf,
 					uint32_t rtap_len)
 {
-	qdf_print("ERROR: struct ieee80211_radiotap_header not supported");
+	qdf_err("ERROR: struct ieee80211_radiotap_header not supported");
 	return 0;
 }
 
 unsigned int qdf_nbuf_update_radiotap_he_flags(struct mon_rx_status *rx_status,
 				      int8_t *rtap_buf, uint32_t rtap_len)
 {
-	qdf_print("ERROR: struct ieee80211_radiotap_header not supported");
+	qdf_err("ERROR: struct ieee80211_radiotap_header not supported");
 	return 0;
 }
 
@@ -4178,14 +4235,14 @@ static unsigned int qdf_nbuf_update_radiotap_ampdu_flags(
 					uint8_t *rtap_buf,
 					uint32_t rtap_len)
 {
-	qdf_print("ERROR: struct ieee80211_radiotap_header not supported");
+	qdf_err("ERROR: struct ieee80211_radiotap_header not supported");
 	return 0;
 }
 
 unsigned int qdf_nbuf_update_radiotap(struct mon_rx_status *rx_status,
 				      qdf_nbuf_t nbuf, uint32_t headroom_sz)
 {
-	qdf_print("ERROR: struct ieee80211_radiotap_header not supported");
+	qdf_err("ERROR: struct ieee80211_radiotap_header not supported");
 	return 0;
 }
 #endif

@@ -102,7 +102,8 @@ cfg_int_item_handler(struct cfg_value_store *store,
 
 	switch (meta->fallback) {
 	default:
-		QDF_DEBUG_PANIC();
+		QDF_DEBUG_PANIC("Unknown fallback method %d for cfg item '%s'",
+				meta->fallback, meta->name);
 		/* fall through */
 	case CFG_VALUE_OR_DEFAULT:
 		/* store already contains default */
@@ -155,7 +156,8 @@ cfg_uint_item_handler(struct cfg_value_store *store,
 
 	switch (meta->fallback) {
 	default:
-		QDF_DEBUG_PANIC();
+		QDF_DEBUG_PANIC("Unknown fallback method %d for cfg item '%s'",
+				meta->fallback, meta->name);
 		/* fall through */
 	case CFG_VALUE_OR_DEFAULT:
 		/* store already contains default */
@@ -271,8 +273,8 @@ cfg_ipv6_item_handler(struct cfg_value_store *store,
 }
 
 /* populate metadata lookup table */
-#undef __CFG_ANY
-#define __CFG_ANY(_id, _mtype, _ctype, _name, _min, _max, _fallback, ...) \
+#undef __CFG_INI
+#define __CFG_INI(_id, _mtype, _ctype, _name, _min, _max, _fallback, ...) \
 { \
 	.name = _name, \
 	.field_offset = qdf_offsetof(struct cfg_values, _id##_internal), \
@@ -298,17 +300,17 @@ static const struct cfg_meta cfg_meta_lookup_table[] = {
 
 static void cfg_store_set_defaults(struct cfg_value_store *store)
 {
-#undef __CFG_ANY
-#define __CFG_ANY(id, mtype, ctype, name, min, max, fallback, desc, def...) \
+#undef __CFG_INI
+#define __CFG_INI(id, mtype, ctype, name, min, max, fallback, desc, def...) \
 	ctype id = def;
 
 	CFG_ALL
 
-#undef __CFG_STRING
-#define __CFG_STRING(id, mtype, ctype, name, min_len, max_len, ...) \
-	qdf_str_lcopy((char *)&store->values.id##_internal, id, max_len + 1);
-#undef __CFG_ANY
-#define __CFG_ANY(id, mtype, ctype, name, min, max, fallback, desc, def...) \
+#undef __CFG_INI_STRING
+#define __CFG_INI_STRING(id, mtype, ctype, name, min_len, max_len, ...) \
+	qdf_str_lcopy((char *)&store->values.id##_internal, id, (max_len) + 1);
+#undef __CFG_INI
+#define __CFG_INI(id, mtype, ctype, name, min, max, fallback, desc, def...) \
 	*(ctype *)&store->values.id##_internal = id;
 
 	CFG_ALL
@@ -428,10 +430,9 @@ static void cfg_store_free(struct cfg_value_store *store)
 	qdf_spin_lock_bh(&__cfg_stores_lock);
 	status = qdf_list_remove_node(&__cfg_stores_list, &store->node);
 	qdf_spin_unlock_bh(&__cfg_stores_lock);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		cfg_err("Failed config store list removal; status:%d", status);
-		QDF_DEBUG_PANIC();
-	}
+	if (QDF_IS_STATUS_ERROR(status))
+		QDF_DEBUG_PANIC("Failed config store list removal; status:%d",
+				status);
 
 	qdf_mem_free(store->path);
 	qdf_mem_free(store);
@@ -499,6 +500,26 @@ cfg_ini_parse_to_store(const char *path, struct cfg_value_store *store)
 
 	return status;
 }
+
+QDF_STATUS cfg_parse_to_psoc_store(struct wlan_objmgr_psoc *psoc,
+				   const char *path)
+{
+	return cfg_ini_parse_to_store(path, cfg_psoc_get_ctx(psoc)->store);
+}
+
+qdf_export_symbol(cfg_parse_to_psoc_store);
+
+QDF_STATUS cfg_parse_to_global_store(const char *path)
+{
+	if (!__cfg_global_store) {
+		cfg_err("Global INI store is not valid");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	return cfg_ini_parse_to_store(path, __cfg_global_store);
+}
+
+qdf_export_symbol(cfg_parse_to_global_store);
 
 static void cfg_init(void)
 {
