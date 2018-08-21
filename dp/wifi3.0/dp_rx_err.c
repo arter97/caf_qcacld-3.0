@@ -738,6 +738,16 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc,
 					 qdf_nbuf_len(nbuf));
 
 			vdev->osif_rx(vdev->osif_vdev, nbuf);
+			if (qdf_unlikely(hal_rx_msdu_end_da_is_mcbc_get(rx_tlv_hdr) &&
+						(vdev->rx_decap_type == htt_cmn_pkt_type_ethernet))) {
+				eh = (struct ether_header *)qdf_nbuf_data(nbuf);
+
+				DP_STATS_INC_PKT(peer, rx.multicast, 1,
+					qdf_nbuf_len(nbuf));
+				if (IEEE80211_IS_BROADCAST(eh->ether_dhost)) {
+					DP_STATS_INC_PKT(peer, rx.bcast, 1, qdf_nbuf_len(nbuf));
+				}
+			}
 		} else {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 				FL("INVALID vdev %pK OR osif_rx"), vdev);
