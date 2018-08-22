@@ -5736,6 +5736,7 @@ typedef enum {
 	wmi_pdev_param_soft_tx_chain_mask,
 	wmi_pdev_param_cck_tx_enable,
 	wmi_pdev_param_antenna_gain_half_db,
+	wmi_pdev_param_equal_ru_allocation_enable,
 
 	wmi_pdev_param_max,
 } wmi_conv_pdev_params_id;
