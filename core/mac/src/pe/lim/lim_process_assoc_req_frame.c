@@ -872,6 +872,9 @@ static bool lim_chk_n_process_wpa_rsn_ie(tpAniSirGlobal mac_ctx,
 						&dot11f_ie_rsn, false);
 					if (!DOT11F_SUCCEEDED(ret)) {
 						pe_err("Invalid RSN ie");
+						lim_send_assoc_rsp_mgmt_frame(mac_ctx,
+							eSIR_MAC_INVALID_INFORMATION_ELEMENT_STATUS, 1,
+							hdr->sa, sub_type, 0, session);
 						return false;
 					}
 
@@ -948,6 +951,9 @@ static bool lim_chk_n_process_wpa_rsn_ie(tpAniSirGlobal mac_ctx,
 						   &dot11f_ie_wpa, false);
 					if (!DOT11F_SUCCEEDED(ret)) {
 						pe_err("Invalid WPA IE");
+						lim_send_assoc_rsp_mgmt_frame(mac_ctx,
+							eSIR_MAC_INVALID_INFORMATION_ELEMENT_STATUS, 1,
+							hdr->sa, sub_type, 0, session);
 						return false;
 					}
 					/*
