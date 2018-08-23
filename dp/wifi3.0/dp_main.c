@@ -5391,6 +5391,8 @@ dp_print_pdev_rx_stats(struct dp_pdev *pdev)
 			pdev->stats.dropped.msdu_len_0);
 	DP_PRINT_STATS("        mon_rx_drop = %d",
 			pdev->stats.dropped.mon_rx_drop);
+	DP_PRINT_STATS("        mec_drop = %d",
+		       pdev->stats.rx.mec_drop);
 	DP_PRINT_STATS("Sent To Stack:");
 	DP_PRINT_STATS("	Packets = %d",
 			pdev->stats.rx.to_stack.num);
@@ -5513,6 +5515,10 @@ dp_print_soc_rx_stats(struct dp_soc *soc)
 			soc->stats.rx.err.rx_invalid_peer.num);
 	DP_PRINT_STATS("HAL Ring Access Fail = %d",
 			soc->stats.rx.err.hal_ring_access_fail);
+	DP_PRINT_STATS("\nRX frags: %d",
+		       soc->stats.rx.rx_frags);
+	DP_PRINT_STATS("\nRX HP out_of_sync: %d",
+		       soc->stats.rx.hp_oos);
 
 	for (i = 0; i < HAL_RXDMA_ERR_MAX; i++) {
 		index += qdf_snprint(&rxdma_error[index],
