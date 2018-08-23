@@ -61,6 +61,22 @@
 #define MAX_BW 7
 #define MAX_RECEPTION_TYPES 4
 
+#define MAX_TRANSMIT_TYPES	9
+#define SU_TX			0
+#define MUMIMO_TX		1
+#define MUOFDMA_TX		2
+#define MUMIMO_OFDMA_TX		3
+
+#define MAX_USER_POS		8
+#define MAX_MU_GROUP_ID		64
+#define MAX_RU_LOCATIONS	6
+#define RU_26			1
+#define RU_52			2
+#define RU_106			4
+#define RU_242			9
+#define RU_484			18
+#define RU_996			37
+
 /* WME stream classes */
 #define WME_AC_BE    0    /* best effort */
 #define WME_AC_BK    1    /* background */
@@ -162,6 +178,17 @@ struct cdp_tx_stats {
 		/* aged out in mpdu/msdu queues*/
 		uint32_t age_out;
 	} dropped;
+
+	/* TX transmit type */
+	uint32_t transmit_type[MAX_TRANSMIT_TYPES];
+	/* mu group id */
+	uint8_t mu_group_id[MAX_MU_GROUP_ID];
+	/* RU start index */
+	uint32_t ru_start;
+	/* RU tones */
+	uint32_t ru_tones;
+	/* RU location */
+	uint32_t ru_loc[MAX_RU_LOCATIONS];
 };
 
 /* Rx Level Stats */

@@ -832,8 +832,12 @@ enum cdp_stat_update_type {
  * @ba_bitmap: Block Ack bitmap
  * @start_seqa: Sequence number of first MPDU
  * @enq_bitmap: Enqueue MPDU bitmap
+ * @ru_tones: RU tones length
+ * @ru_start: RU start index
  * @is_mcast: MCAST or UCAST
  * @tx_rate: Transmission Rate
+ * @user_pos: user position
+ * @mu_group_id: mu group id
  */
 struct cdp_tx_completion_ppdu_user {
 	uint32_t completion_status:8,
@@ -876,9 +880,12 @@ struct cdp_tx_completion_ppdu_user {
 	uint32_t num_mpdu:9,
 		 num_msdu:16;
 	uint32_t tx_duration;
+	uint16_t ru_start;
 	uint16_t ru_tones;
 	bool is_mcast;
 	uint32_t tx_rate;
+	uint32_t user_pos;
+	uint32_t mu_group_id;
 };
 
 /**
