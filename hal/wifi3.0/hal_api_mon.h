@@ -106,6 +106,15 @@
 #define HAL_11A_RATE_6MCS	18*2
 #define HAL_11A_RATE_7MCS	9*2
 
+#define HAL_LEGACY_MCS0  0
+#define HAL_LEGACY_MCS1  1
+#define HAL_LEGACY_MCS2  2
+#define HAL_LEGACY_MCS3  3
+#define HAL_LEGACY_MCS4  4
+#define HAL_LEGACY_MCS5  5
+#define HAL_LEGACY_MCS6  6
+#define HAL_LEGACY_MCS7  7
+
 #define HE_GI_0_8 0
 #define HE_GI_1_6 1
 #define HE_GI_3_2 2
@@ -672,24 +681,31 @@ hal_rx_status_get_tlv_info(void *rx_tlv, struct hal_rx_ppdu_info *ppdu_info)
 		switch (value) {
 		case 1:
 			ppdu_info->rx_status.rate = HAL_11B_RATE_3MCS;
+			ppdu_info->rx_status.mcs = HAL_LEGACY_MCS3;
 			break;
 		case 2:
 			ppdu_info->rx_status.rate = HAL_11B_RATE_2MCS;
+			ppdu_info->rx_status.mcs = HAL_LEGACY_MCS2;
 			break;
 		case 3:
 			ppdu_info->rx_status.rate = HAL_11B_RATE_1MCS;
+			ppdu_info->rx_status.mcs = HAL_LEGACY_MCS1;
 			break;
 		case 4:
 			ppdu_info->rx_status.rate = HAL_11B_RATE_0MCS;
+			ppdu_info->rx_status.mcs = HAL_LEGACY_MCS0;
 			break;
 		case 5:
 			ppdu_info->rx_status.rate = HAL_11B_RATE_6MCS;
+			ppdu_info->rx_status.mcs = HAL_LEGACY_MCS6;
 			break;
 		case 6:
 			ppdu_info->rx_status.rate = HAL_11B_RATE_5MCS;
+			ppdu_info->rx_status.mcs = HAL_LEGACY_MCS5;
 			break;
 		case 7:
 			ppdu_info->rx_status.rate = HAL_11B_RATE_4MCS;
+			ppdu_info->rx_status.mcs = HAL_LEGACY_MCS4;
 			break;
 		default:
 			break;
@@ -709,27 +725,35 @@ hal_rx_status_get_tlv_info(void *rx_tlv, struct hal_rx_ppdu_info *ppdu_info)
 		switch (value) {
 		case 8:
 			ppdu_info->rx_status.rate = HAL_11A_RATE_0MCS;
+			ppdu_info->rx_status.mcs = HAL_LEGACY_MCS0;
 			break;
 		case 9:
 			ppdu_info->rx_status.rate = HAL_11A_RATE_1MCS;
+			ppdu_info->rx_status.mcs = HAL_LEGACY_MCS1;
 			break;
 		case 10:
 			ppdu_info->rx_status.rate = HAL_11A_RATE_2MCS;
+			ppdu_info->rx_status.mcs = HAL_LEGACY_MCS2;
 			break;
 		case 11:
 			ppdu_info->rx_status.rate = HAL_11A_RATE_3MCS;
+			ppdu_info->rx_status.mcs = HAL_LEGACY_MCS3;
 			break;
 		case 12:
 			ppdu_info->rx_status.rate = HAL_11A_RATE_4MCS;
+			ppdu_info->rx_status.mcs = HAL_LEGACY_MCS4;
 			break;
 		case 13:
 			ppdu_info->rx_status.rate = HAL_11A_RATE_5MCS;
+			ppdu_info->rx_status.mcs = HAL_LEGACY_MCS5;
 			break;
 		case 14:
 			ppdu_info->rx_status.rate = HAL_11A_RATE_6MCS;
+			ppdu_info->rx_status.mcs = HAL_LEGACY_MCS6;
 			break;
 		case 15:
 			ppdu_info->rx_status.rate = HAL_11A_RATE_7MCS;
+			ppdu_info->rx_status.mcs = HAL_LEGACY_MCS7;
 			break;
 		default:
 			break;
