@@ -47,6 +47,14 @@ const struct wlan_crypto_cipher *wlan_crypto_cipher_ops[WLAN_CRYPTO_CIPHER_MAX];
 	WLAN_CRYPTO_ADDSELECTOR(frm,\
 				wlan_crypto_rsn_cipher_to_suite(cipher))
 
+#define WPA_ADD_KEYMGMT_TO_SUITE(frm, keymgmt)\
+	WLAN_CRYPTO_ADDSELECTOR(frm,\
+				wlan_crypto_wpa_keymgmt_to_suite(keymgmt))
+
+#define RSN_ADD_KEYMGMT_TO_SUITE(frm, keymgmt)\
+	WLAN_CRYPTO_ADDSELECTOR(frm,\
+				wlan_crypto_rsn_keymgmt_to_suite(keymgmt))
+
 /**
  * wlan_crypto_vdev_get_crypto_params - called by mlme to get crypto params
  * @vdev:vdev
@@ -2269,24 +2277,16 @@ uint8_t *wlan_crypto_build_wpaie(struct wlan_objmgr_vdev *vdev,
 
 	if (HAS_KEY_MGMT(crypto_params, WLAN_CRYPTO_KEY_MGMT_IEEE8021X)) {
 		selcnt[0]++;
-		WLAN_CRYPTO_ADDSELECTOR(frm,
-			wlan_crypto_wpa_keymgmt_to_suite(
-					WLAN_CRYPTO_KEY_MGMT_IEEE8021X));
+		WPA_ADD_KEYMGMT_TO_SUITE(frm, WLAN_CRYPTO_KEY_MGMT_IEEE8021X);
 	} else if (HAS_KEY_MGMT(crypto_params, WLAN_CRYPTO_KEY_MGMT_PSK)) {
 		selcnt[0]++;
-		WLAN_CRYPTO_ADDSELECTOR(frm,
-			wlan_crypto_wpa_keymgmt_to_suite(
-						WLAN_CRYPTO_KEY_MGMT_PSK));
+		WPA_ADD_KEYMGMT_TO_SUITE(frm, WLAN_CRYPTO_KEY_MGMT_PSK);
 	} else if (HAS_KEY_MGMT(crypto_params, WLAN_CRYPTO_KEY_MGMT_CCKM)) {
 		selcnt[0]++;
-		WLAN_CRYPTO_ADDSELECTOR(frm,
-			wlan_crypto_wpa_keymgmt_to_suite(
-						WLAN_CRYPTO_KEY_MGMT_CCKM));
+		WPA_ADD_KEYMGMT_TO_SUITE(frm, WLAN_CRYPTO_KEY_MGMT_CCKM);
 	} else {
 		selcnt[0]++;
-		WLAN_CRYPTO_ADDSELECTOR(frm,
-			wlan_crypto_wpa_keymgmt_to_suite(
-						WLAN_CRYPTO_KEY_MGMT_NONE));
+		WPA_ADD_KEYMGMT_TO_SUITE(frm, WLAN_CRYPTO_KEY_MGMT_NONE);
 	}
 	/* calculate element length */
 	iebuf[1] = frm - iebuf - 2;
@@ -2367,55 +2367,106 @@ uint8_t *wlan_crypto_build_rsnie(struct wlan_objmgr_vdev *vdev,
 	WLAN_CRYPTO_ADDSHORT(frm, 0);
 	if (HAS_KEY_MGMT(crypto_params, WLAN_CRYPTO_KEY_MGMT_CCKM)) {
 		selcnt[0]++;
+		RSN_ADD_KEYMGMT_TO_SUITE(frm, WLAN_CRYPTO_KEY_MGMT_CCKM);
 		WLAN_CRYPTO_ADDSELECTOR(frm,
 			wlan_crypto_rsn_keymgmt_to_suite(
 					WLAN_CRYPTO_KEY_MGMT_CCKM));
 	} else {
-		if (HAS_KEY_MGMT(crypto_params, WLAN_CRYPTO_KEY_MGMT_PSK)) {
-			selcnt[0]++;
-			WLAN_CRYPTO_ADDSELECTOR(frm,
-				wlan_crypto_rsn_keymgmt_to_suite(
-					WLAN_CRYPTO_KEY_MGMT_PSK));
-		}
 		if (HAS_KEY_MGMT(crypto_params,
 					WLAN_CRYPTO_KEY_MGMT_IEEE8021X)) {
+			uint32_t kmgmt = WLAN_CRYPTO_KEY_MGMT_IEEE8021X;
 			selcnt[0]++;
-			WLAN_CRYPTO_ADDSELECTOR(frm,
-				wlan_crypto_rsn_keymgmt_to_suite(
-					WLAN_CRYPTO_KEY_MGMT_IEEE8021X));
+			RSN_ADD_KEYMGMT_TO_SUITE(frm, kmgmt);
+		}
+		if (HAS_KEY_MGMT(crypto_params, WLAN_CRYPTO_KEY_MGMT_PSK)) {
+			selcnt[0]++;
+			RSN_ADD_KEYMGMT_TO_SUITE(frm,
+						 WLAN_CRYPTO_KEY_MGMT_PSK);
 		}
 		if (HAS_KEY_MGMT(crypto_params,
 					WLAN_CRYPTO_KEY_MGMT_FT_IEEE8021X)) {
+			uint32_t kmgmt = WLAN_CRYPTO_KEY_MGMT_FT_IEEE8021X;
 			selcnt[0]++;
-			WLAN_CRYPTO_ADDSELECTOR(frm,
-				wlan_crypto_rsn_keymgmt_to_suite(
-					WLAN_CRYPTO_KEY_MGMT_FT_IEEE8021X));
+			RSN_ADD_KEYMGMT_TO_SUITE(frm, kmgmt);
 		}
 		if (HAS_KEY_MGMT(crypto_params, WLAN_CRYPTO_KEY_MGMT_FT_PSK)) {
+			uint32_t kmgmt = WLAN_CRYPTO_KEY_MGMT_FT_PSK;
 			selcnt[0]++;
-			WLAN_CRYPTO_ADDSELECTOR(frm,
-				wlan_crypto_rsn_keymgmt_to_suite(
-					WLAN_CRYPTO_KEY_MGMT_FT_PSK));
+			RSN_ADD_KEYMGMT_TO_SUITE(frm, kmgmt);
 		}
 		if (HAS_KEY_MGMT(crypto_params,
 				WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SHA256)) {
+			uint32_t kmgmt = WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SHA256;
 			selcnt[0]++;
-			WLAN_CRYPTO_ADDSELECTOR(frm,
-				wlan_crypto_rsn_keymgmt_to_suite(
-					WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SHA256));
+			RSN_ADD_KEYMGMT_TO_SUITE(frm, kmgmt);
 		}
 		if (HAS_KEY_MGMT(crypto_params,
 					WLAN_CRYPTO_KEY_MGMT_PSK_SHA256)) {
+			uint32_t kmgmt = WLAN_CRYPTO_KEY_MGMT_PSK_SHA256;
 			selcnt[0]++;
-			WLAN_CRYPTO_ADDSELECTOR(frm,
-				wlan_crypto_rsn_keymgmt_to_suite(
-					WLAN_CRYPTO_KEY_MGMT_PSK_SHA256));
+			RSN_ADD_KEYMGMT_TO_SUITE(frm, kmgmt);
+		}
+		if (HAS_KEY_MGMT(crypto_params, WLAN_CRYPTO_KEY_MGMT_SAE)) {
+			selcnt[0]++;
+			RSN_ADD_KEYMGMT_TO_SUITE(frm,
+						 WLAN_CRYPTO_KEY_MGMT_SAE);
+		}
+		if (HAS_KEY_MGMT(crypto_params, WLAN_CRYPTO_KEY_MGMT_FT_SAE)) {
+			selcnt[0]++;
+			RSN_ADD_KEYMGMT_TO_SUITE(frm,
+						 WLAN_CRYPTO_KEY_MGMT_FT_SAE);
+		}
+		if (HAS_KEY_MGMT(crypto_params,
+				WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SUITE_B)) {
+			uint32_t kmgmt = WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SUITE_B;
+			selcnt[0]++;
+			RSN_ADD_KEYMGMT_TO_SUITE(frm, kmgmt);
+		}
+		if (HAS_KEY_MGMT(crypto_params,
+				WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SUITE_B_192)) {
+			uint32_t kmgmt;
+			kmgmt =  WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SUITE_B_192;
+			selcnt[0]++;
+			RSN_ADD_KEYMGMT_TO_SUITE(frm, kmgmt);
+		}
+		if (HAS_KEY_MGMT(crypto_params,
+				WLAN_CRYPTO_KEY_MGMT_FILS_SHA256)) {
+			uint32_t kmgmt = WLAN_CRYPTO_KEY_MGMT_FILS_SHA256;
+			selcnt[0]++;
+			RSN_ADD_KEYMGMT_TO_SUITE(frm, kmgmt);
+		}
+		if (HAS_KEY_MGMT(crypto_params,
+				WLAN_CRYPTO_KEY_MGMT_FILS_SHA384)) {
+			uint32_t kmgmt = WLAN_CRYPTO_KEY_MGMT_FILS_SHA384;
+			selcnt[0]++;
+			RSN_ADD_KEYMGMT_TO_SUITE(frm, kmgmt);
+		}
+		if (HAS_KEY_MGMT(crypto_params,
+				WLAN_CRYPTO_KEY_MGMT_FT_FILS_SHA256)) {
+			uint32_t kmgmt = WLAN_CRYPTO_KEY_MGMT_FT_FILS_SHA256;
+			selcnt[0]++;
+			RSN_ADD_KEYMGMT_TO_SUITE(frm, kmgmt);
+		}
+		if (HAS_KEY_MGMT(crypto_params,
+				WLAN_CRYPTO_KEY_MGMT_FT_FILS_SHA384)) {
+			uint32_t kmgmt = WLAN_CRYPTO_KEY_MGMT_FT_FILS_SHA384;
+			selcnt[0]++;
+			RSN_ADD_KEYMGMT_TO_SUITE(frm, kmgmt);
+		}
+		if (HAS_KEY_MGMT(crypto_params, WLAN_CRYPTO_KEY_MGMT_OWE)) {
+			selcnt[0]++;
+			RSN_ADD_KEYMGMT_TO_SUITE(frm,
+						 WLAN_CRYPTO_KEY_MGMT_OWE);
+		}
+		if (HAS_KEY_MGMT(crypto_params, WLAN_CRYPTO_KEY_MGMT_DPP)) {
+			selcnt[0]++;
+			RSN_ADD_KEYMGMT_TO_SUITE(frm,
+						 WLAN_CRYPTO_KEY_MGMT_DPP);
 		}
 		if (HAS_KEY_MGMT(crypto_params, WLAN_CRYPTO_KEY_MGMT_OSEN)) {
 			selcnt[0]++;
-			WLAN_CRYPTO_ADDSELECTOR(frm,
-				wlan_crypto_rsn_keymgmt_to_suite(
-					WLAN_CRYPTO_KEY_MGMT_OSEN));
+			RSN_ADD_KEYMGMT_TO_SUITE(frm,
+						 WLAN_CRYPTO_KEY_MGMT_OSEN);
 		}
 	}
 
