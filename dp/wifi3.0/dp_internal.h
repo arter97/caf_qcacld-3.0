@@ -318,6 +318,7 @@ while (0)
 		DP_STATS_AGGR_PKT(_tgtobj, _srcobj, rx.raw); \
 		DP_STATS_AGGR_PKT(_tgtobj, _srcobj, rx.intra_bss.pkts); \
 		DP_STATS_AGGR_PKT(_tgtobj, _srcobj, rx.intra_bss.fail); \
+		DP_STATS_AGGR_PKT(_tgtobj, _srcobj, rx.mec_drop); \
 								  \
 		_tgtobj->stats.tx.last_ack_rssi =	\
 			_srcobj->stats.tx.last_ack_rssi; \
