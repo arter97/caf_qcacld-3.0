@@ -1553,7 +1553,7 @@ target_if_consume_spectral_report_gen3(
 		if (spectral->ch_width == CH_WIDTH_160MHZ) {
 			ret = target_if_160mhz_delivery_state_change(
 					spectral,
-					SPECTRAL_REPORT_EVENT_DETECTORID0);
+					detector_id);
 			if (ret != QDF_STATUS_SUCCESS)
 				goto fail;
 		}
@@ -1717,7 +1717,7 @@ target_if_consume_spectral_report_gen3(
 		if (spectral->ch_width == CH_WIDTH_160MHZ) {
 			ret = target_if_160mhz_delivery_state_change(
 					spectral,
-					SPECTRAL_REPORT_EVENT_DETECTORID1);
+					detector_id);
 			if (ret != QDF_STATUS_SUCCESS)
 				goto fail;
 		}
