@@ -3678,15 +3678,17 @@ static inline void dp_peer_delete_ast_entries(struct dp_soc *soc,
 }
 #endif
 
-#ifdef AST_HKV1_WORKAROUND
+#ifndef AST_HKV1_WORKAROUND
 static inline void dp_peer_ast_handle_roam_del(struct dp_soc *soc,
 					       uint8_t *peer_mac_addr)
 {
 	struct dp_ast_entry *ast_entry;
 
+	qdf_spin_lock_bh(&soc->ast_lock);
 	ast_entry = dp_peer_ast_hash_find(soc, peer_mac_addr);
 	if (ast_entry)
 		dp_peer_del_ast(soc, ast_entry);
+	qdf_spin_unlock_bh(&soc->ast_lock);
 }
 #else
 static inline void dp_peer_ast_handle_roam_del(struct dp_soc *soc,
