@@ -1940,6 +1940,7 @@ static void wma_shutdown_notifier_cb(void *priv)
 	tp_wma_handle wma_handle = priv;
 
 	qdf_event_set(&wma_handle->wma_resume_event);
+	wmi_stop(wma_handle->wmi_handle);
 	wma_cleanup_vdev_resp_queue(wma_handle);
 	wma_cleanup_hold_req(wma_handle);
 }
