@@ -1122,6 +1122,7 @@ dp_rx_defrag_nwifi_to_8023(qdf_nbuf_t nbuf, uint16_t hdrsize)
 
 	hal_srng_access_end(soc->hal_soc, hal_srng);
 
+	DP_STATS_INC(soc, rx.reo_reinject, 1);
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
 				"%s: reinjection done !\n", __func__);
 	return QDF_STATUS_SUCCESS;

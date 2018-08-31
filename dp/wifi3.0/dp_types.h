@@ -556,6 +556,8 @@ struct dp_soc_stats {
 		/* Fragments dropped due to errors */
 		uint32_t rx_frag_err;
 		uint32_t hp_oos;
+		/* No of reinjected packets */
+		uint32_t reo_reinject;
 		struct {
 			/* Invalid RBM error count */
 			uint32_t invalid_rbm;
