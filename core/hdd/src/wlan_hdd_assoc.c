@@ -1735,6 +1735,7 @@ static QDF_STATUS hdd_dis_connect_handler(hdd_adapter_t *pAdapter,
 	    pHddStaCtx->conn_info.connState)) {
 		hdd_conn_set_connection_state(pAdapter,
 					      eConnectionState_NotConnected);
+		hdd_set_roaming_in_progress(false);
 	}
 #ifdef WLAN_FEATURE_GTK_OFFLOAD
 	if ((QDF_STA_MODE == pAdapter->device_mode) ||
