@@ -284,4 +284,12 @@ QDF_STATUS tgt_dfs_process_emulate_bang_radar_cmd(struct wlan_objmgr_pdev *pdev,
  */
 QDF_STATUS tgt_dfs_set_phyerr_filter_offload(struct wlan_objmgr_pdev *pdev);
 #endif
+
+/**
+ * tgt_dfs_is_pdev_5ghz() - Check if the input pdev is 5GHZ.
+ * @pdev: Pointer to DFS pdev object.
+ *
+ * Return: true if the pdev supports 5GHz, else false.
+ */
+bool tgt_dfs_is_pdev_5ghz(struct wlan_objmgr_pdev *pdev);
 #endif /* _WLAN_DFS_TGT_API_H_ */
