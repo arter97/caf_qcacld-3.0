@@ -292,7 +292,8 @@ while (0)
 		DP_STATS_AGGR(_tgtobj, _srcobj, tx.dropped.age_out); \
 								\
 		DP_STATS_AGGR(_tgtobj, _srcobj, rx.err.mic_err); \
-		DP_STATS_UPD_STRUCT(_tgtobj, _srcobj, rx.rssi); \
+		if (_srcobj->stats.rx.rssi != 0) \
+			DP_STATS_UPD_STRUCT(_tgtobj, _srcobj, rx.rssi); \
 		DP_STATS_UPD_STRUCT(_tgtobj, _srcobj, rx.rx_rate); \
 		DP_STATS_AGGR(_tgtobj, _srcobj, rx.err.decrypt_err); \
 		DP_STATS_AGGR(_tgtobj, _srcobj, rx.non_ampdu_cnt); \
