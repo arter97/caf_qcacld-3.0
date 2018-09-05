@@ -1721,6 +1721,7 @@ static struct wmi_unified *wmi_get_pdev_ep(struct wmi_soc *soc,
 	return soc->wmi_pdev[i];
 }
 
+uint64_t time_svc_ready, time_svc_ext_ready, time_wmi_ready;
 /**
  * wmi_control_rx() - process fw events callbacks
  * @ctx: handle to wmi
@@ -1774,6 +1775,13 @@ static void wmi_control_rx(void *ctx, HTC_PACKET *htc_packet)
 #endif
 
 	if (exec_ctx == WMI_RX_WORK_CTX) {
+		if (wmi_handle->wmi_events[wmi_service_ready_event_id] == id)
+			time_svc_ready = qdf_get_log_timestamp();
+		else if (wmi_handle->wmi_events[wmi_service_ready_ext_event_id] == id)
+			time_svc_ext_ready =  qdf_get_log_timestamp();
+		else if (wmi_handle->wmi_events[wmi_ready_event_id] == id)
+			time_wmi_ready = qdf_get_log_timestamp();
+
 		wmi_process_fw_event_worker_thread_ctx
 					(wmi_handle, htc_packet);
 	} else if (exec_ctx > WMI_RX_WORK_CTX) {
