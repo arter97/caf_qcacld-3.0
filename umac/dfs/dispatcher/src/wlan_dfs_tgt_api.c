@@ -37,6 +37,34 @@ wlan_psoc_get_dfs_txops(struct wlan_objmgr_psoc *psoc)
 	return &((psoc->soc_cb.tx_ops.dfs_tx_ops));
 }
 
+bool tgt_dfs_is_pdev_5ghz(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_lmac_if_dfs_tx_ops *dfs_tx_ops;
+	struct wlan_objmgr_psoc *psoc;
+	bool is_5ghz = false;
+	QDF_STATUS status;
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc) {
+		dfs_err(NULL, WLAN_DEBUG_DFS_ALWAYS,  "null psoc");
+		return false;
+	}
+
+	dfs_tx_ops = wlan_psoc_get_dfs_txops(psoc);
+	if (!(dfs_tx_ops && dfs_tx_ops->dfs_is_pdev_5ghz)) {
+		dfs_err(NULL, WLAN_DEBUG_DFS_ALWAYS,  "dfs_tx_ops is null");
+		return false;
+	}
+
+	status = dfs_tx_ops->dfs_is_pdev_5ghz(pdev, &is_5ghz);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		dfs_err(NULL, WLAN_DEBUG_DFS_ALWAYS,  "Failed to get is_5ghz value");
+		return false;
+	}
+
+	return is_5ghz;
+}
+
 QDF_STATUS tgt_dfs_set_current_channel(struct wlan_objmgr_pdev *pdev,
 				       uint16_t dfs_ch_freq,
 				       uint64_t dfs_ch_flags,
@@ -45,7 +73,12 @@ QDF_STATUS tgt_dfs_set_current_channel(struct wlan_objmgr_pdev *pdev,
 				       uint8_t dfs_ch_vhtop_ch_freq_seg1,
 				       uint8_t dfs_ch_vhtop_ch_freq_seg2)
 {
-	struct wlan_dfs *dfs;
+	struct wlan_dfs *dfs = NULL;
+	bool is_5ghz = false;
+
+	is_5ghz = tgt_dfs_is_pdev_5ghz(pdev);
+	if (!is_5ghz)
+		return QDF_STATUS_SUCCESS;
 
 	dfs = global_dfs_to_mlme.pdev_get_comp_private_obj(pdev);
 	if (!dfs) {
@@ -198,7 +231,12 @@ QDF_STATUS tgt_dfs_is_phyerr_filter_offload(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS tgt_dfs_is_precac_timer_running(struct wlan_objmgr_pdev *pdev,
 					   bool *is_precac_timer_running)
 {
-	struct wlan_dfs *dfs;
+	struct wlan_dfs *dfs = NULL;
+	bool is_5ghz = false;
+
+	is_5ghz = tgt_dfs_is_pdev_5ghz(pdev);
+	if (!is_5ghz)
+		return QDF_STATUS_SUCCESS;
 
 	dfs = global_dfs_to_mlme.pdev_get_comp_private_obj(pdev);
 	if (!dfs) {
@@ -376,7 +414,12 @@ qdf_export_symbol(tgt_dfs_reg_ev_handler);
 
 QDF_STATUS tgt_dfs_stop(struct wlan_objmgr_pdev *pdev)
 {
-	struct wlan_dfs *dfs;
+	struct wlan_dfs *dfs = NULL;
+	bool is_5ghz = false;
+
+	is_5ghz = tgt_dfs_is_pdev_5ghz(pdev);
+	if (!is_5ghz)
+		return QDF_STATUS_SUCCESS;
 
 	dfs = global_dfs_to_mlme.pdev_get_comp_private_obj(pdev);
 	if (!dfs) {

@@ -290,9 +290,7 @@ QDF_STATUS wlan_dfs_pdev_obj_create_notification(struct wlan_objmgr_pdev *pdev,
 {
 	struct wlan_dfs *dfs = NULL;
 	struct wlan_objmgr_psoc *psoc;
-	struct wlan_lmac_if_dfs_tx_ops *dfs_tx_ops;
 	uint8_t pdev_id;
-	QDF_STATUS status;
 	bool is_5ghz = false;
 
 	if (!pdev) {
@@ -306,18 +304,7 @@ QDF_STATUS wlan_dfs_pdev_obj_create_notification(struct wlan_objmgr_pdev *pdev,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	dfs_tx_ops = wlan_psoc_get_dfs_txops(psoc);
-	if (!(dfs_tx_ops && dfs_tx_ops->dfs_is_pdev_5ghz)) {
-		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS,  "dfs_tx_ops is null");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	status = dfs_tx_ops->dfs_is_pdev_5ghz(pdev, &is_5ghz);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS,  "Failed to get is_5ghz value");
-		return QDF_STATUS_E_FAILURE;
-	}
-
+	is_5ghz = tgt_dfs_is_pdev_5ghz(pdev);
 	if (!is_5ghz) {
 		pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
 		dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
@@ -380,10 +367,7 @@ static void dfs_scan_serialization_comp_info_cb(
 {
 	struct wlan_dfs *dfs = NULL;
 	struct wlan_objmgr_pdev *pdev;
-	struct wlan_lmac_if_dfs_tx_ops *dfs_tx_ops;
-	struct wlan_objmgr_psoc *psoc;
 	bool is_5ghz = false;
-	QDF_STATUS status;
 
 	if (!comp_info) {
 		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS,  "comp_info is NULL");
@@ -403,24 +387,7 @@ static void dfs_scan_serialization_comp_info_cb(
 
 	comp_info->scan_info.is_cac_in_progress = false;
 
-	psoc = wlan_pdev_get_psoc(pdev);
-	if (!psoc) {
-		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS,  "null psoc");
-		return;
-	}
-
-	dfs_tx_ops = wlan_psoc_get_dfs_txops(psoc);
-	if (!(dfs_tx_ops && dfs_tx_ops->dfs_is_pdev_5ghz)) {
-		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS,  "dfs_tx_ops is null");
-		return;
-	}
-
-	status = dfs_tx_ops->dfs_is_pdev_5ghz(pdev, &is_5ghz);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS,  "Failed to get is_5ghz value");
-		return;
-	}
-
+	is_5ghz = tgt_dfs_is_pdev_5ghz(pdev);
 	if (!is_5ghz)
 		return;
 
