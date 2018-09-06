@@ -532,6 +532,8 @@ struct dp_soc_stats {
 	struct {
 		/* packets dropped on tx because of no peer */
 		struct cdp_pkt_info tx_invalid_peer;
+		/* packets dropped on tx because invalid vdev*/
+		struct cdp_pkt_info tx_invalid_vdev;
 		/* descriptors in each tcl ring */
 		uint32_t tcl_ring_full[MAX_TCL_DATA_RINGS];
 		/* Descriptors in use at soc */

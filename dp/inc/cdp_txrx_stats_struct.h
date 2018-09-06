@@ -261,8 +261,17 @@ struct cdp_tx_ingress_stats {
 	struct cdp_pkt_info rcvd;
 	/* Tx packets processed*/
 	struct cdp_pkt_info processed;
-	/* Total packets passed Reinject handler */
-	struct cdp_pkt_info reinject_pkts;
+
+	struct {
+		/* Total packets passed Reinject handler */
+		struct cdp_pkt_info reinject_pkts;
+		/* Total packets reinjected to FW */
+		uint32_t to_fw;
+		/* Total packets reinjected to FW failed*/
+		uint32_t reinject_err;
+		/* invalid reinject events*/
+		uint32_t invalid_events;
+	} reinject;
 	/*  Total packets passed to inspect handler */
 	struct cdp_pkt_info inspect_pkts;
 	/*NAWDS  Multicast Packet Count */
@@ -341,6 +350,8 @@ struct cdp_tx_ingress_stats {
 		uint32_t exception_fw;
 		/* packets completions received from fw */
 		uint32_t completion_fw;
+		/* packets dropped due to invalid length*/
+		uint32_t msdu_len_invalid;
 	} mesh;
 
 	/*Number of packets classified by CCE*/
@@ -348,6 +359,8 @@ struct cdp_tx_ingress_stats {
 
 	/*Number of raw packets classified by CCE*/
 	uint32_t cce_classified_raw;
+	/*Number of eapol packets classified by CCE*/
+	uint32_t cce_classified_eapol;
 };
 
 struct cdp_vdev_stats {
