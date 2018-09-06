@@ -32,6 +32,7 @@
 #include <service_ready_param.h>
 #include <init_cmd_api.h>
 #include <cdp_txrx_cmn.h>
+extern uint64_t time_svc_ready, time_svc_ext_ready, time_wmi_ready;
 
 static int init_deinit_service_ready_event_handler(ol_scn_t scn_handle,
 							uint8_t *event,
@@ -43,6 +44,16 @@ static int init_deinit_service_ready_event_handler(ol_scn_t scn_handle,
 	wmi_legacy_service_ready_callback legacy_callback;
 	void *wmi_handle;
 	QDF_STATUS ret_val;
+	uint64_t current_time, secs, usecs;
+
+	current_time =  qdf_get_log_timestamp();
+	qdf_log_timestamp_to_secs(time_svc_ready, &secs, &usecs);
+	qdf_print(" SVC ready arrival: %lld.%06lld\n", secs, usecs);
+	qdf_log_timestamp_to_secs(current_time, &secs, &usecs);
+	qdf_print(" SVC ready execution: %lld.%06lld\n", secs, usecs);
+	qdf_log_timestamp_to_secs(current_time - time_svc_ready, &secs, &usecs);
+	qdf_print(" SVC ready time to schedule: %lld.%06lld\n", secs, usecs);
+
 
 	if (!scn_handle) {
 		target_if_err("scn handle NULL in service ready handler");
@@ -176,6 +187,16 @@ static int init_deinit_service_ext_ready_event_handler(ol_scn_t scn_handle,
 	void *wmi_handle;
 	struct tgt_info *info;
 	wmi_legacy_service_ready_callback legacy_callback;
+	uint64_t current_time, secs, usecs;
+
+	current_time =  qdf_get_log_timestamp();
+	qdf_log_timestamp_to_secs(time_svc_ext_ready, &secs, &usecs);
+	qdf_print(" SVC ext ready arrival: %lld.%06lld\n", secs, usecs);
+	qdf_log_timestamp_to_secs(current_time, &secs, &usecs);
+	qdf_print(" SVC ext ready execution: %lld.%06lld\n", secs, usecs);
+	qdf_log_timestamp_to_secs(current_time - time_svc_ext_ready,
+				  &secs, &usecs);
+	qdf_print(" SVC ext ready time to schedule:%lld.%06lld\n", secs, usecs);
 
 	if (!scn_handle) {
 		target_if_err("scn handle NULL in service ready handler");
@@ -311,6 +332,15 @@ static int init_deinit_ready_event_handler(ol_scn_t scn_handle,
 	wmi_legacy_service_ready_callback legacy_callback;
 	uint8_t num_radios, i;
 	uint32_t max_peers;
+	uint64_t current_time, secs, usecs;
+
+	current_time =  qdf_get_log_timestamp();
+	qdf_log_timestamp_to_secs(time_wmi_ready, &secs, &usecs);
+	qdf_print(" WMI ready arrival: %lld.%06lld\n", secs, usecs);
+	qdf_log_timestamp_to_secs(current_time, &secs, &usecs);
+	qdf_print(" WMI ready execution: %lld.%06lld\n", secs, usecs);
+	qdf_log_timestamp_to_secs(current_time - time_wmi_ready, &secs, &usecs);
+	qdf_print(" WMI ready time to schedule: %lld.%06lld\n", secs, usecs);
 
 	if (!scn_handle) {
 		target_if_err("scn handle NULL");
