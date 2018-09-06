@@ -73,11 +73,9 @@ QDF_STATUS tgt_dfs_set_current_channel(struct wlan_objmgr_pdev *pdev,
 				       uint8_t dfs_ch_vhtop_ch_freq_seg1,
 				       uint8_t dfs_ch_vhtop_ch_freq_seg2)
 {
-	struct wlan_dfs *dfs = NULL;
-	bool is_5ghz = false;
+	struct wlan_dfs *dfs;
 
-	is_5ghz = tgt_dfs_is_pdev_5ghz(pdev);
-	if (!is_5ghz)
+	if (!tgt_dfs_is_pdev_5ghz(pdev))
 		return QDF_STATUS_SUCCESS;
 
 	dfs = global_dfs_to_mlme.pdev_get_comp_private_obj(pdev);
@@ -231,11 +229,9 @@ QDF_STATUS tgt_dfs_is_phyerr_filter_offload(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS tgt_dfs_is_precac_timer_running(struct wlan_objmgr_pdev *pdev,
 					   bool *is_precac_timer_running)
 {
-	struct wlan_dfs *dfs = NULL;
-	bool is_5ghz = false;
+	struct wlan_dfs *dfs;
 
-	is_5ghz = tgt_dfs_is_pdev_5ghz(pdev);
-	if (!is_5ghz)
+	if (!tgt_dfs_is_pdev_5ghz(pdev))
 		return QDF_STATUS_SUCCESS;
 
 	dfs = global_dfs_to_mlme.pdev_get_comp_private_obj(pdev);
@@ -414,11 +410,9 @@ qdf_export_symbol(tgt_dfs_reg_ev_handler);
 
 QDF_STATUS tgt_dfs_stop(struct wlan_objmgr_pdev *pdev)
 {
-	struct wlan_dfs *dfs = NULL;
-	bool is_5ghz = false;
+	struct wlan_dfs *dfs;
 
-	is_5ghz = tgt_dfs_is_pdev_5ghz(pdev);
-	if (!is_5ghz)
+	if (!tgt_dfs_is_pdev_5ghz(pdev))
 		return QDF_STATUS_SUCCESS;
 
 	dfs = global_dfs_to_mlme.pdev_get_comp_private_obj(pdev);

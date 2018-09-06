@@ -367,7 +367,6 @@ static void dfs_scan_serialization_comp_info_cb(
 {
 	struct wlan_dfs *dfs = NULL;
 	struct wlan_objmgr_pdev *pdev;
-	bool is_5ghz = false;
 
 	if (!comp_info) {
 		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS,  "comp_info is NULL");
@@ -387,8 +386,7 @@ static void dfs_scan_serialization_comp_info_cb(
 
 	comp_info->scan_info.is_cac_in_progress = false;
 
-	is_5ghz = tgt_dfs_is_pdev_5ghz(pdev);
-	if (!is_5ghz)
+	if (!tgt_dfs_is_pdev_5ghz(pdev))
 		return;
 
 	dfs = wlan_pdev_get_dfs_obj(pdev);
