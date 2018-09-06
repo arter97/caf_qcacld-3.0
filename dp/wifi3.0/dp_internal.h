@@ -299,6 +299,7 @@ while (0)
 		DP_STATS_AGGR(_tgtobj, _srcobj, rx.ampdu_cnt); \
 		DP_STATS_AGGR(_tgtobj, _srcobj, rx.non_amsdu_cnt); \
 		DP_STATS_AGGR(_tgtobj, _srcobj, rx.amsdu_cnt); \
+		DP_STATS_AGGR(_tgtobj, _srcobj, rx.nawds_mcast_drop); \
 		DP_STATS_AGGR_PKT(_tgtobj, _srcobj, rx.to_stack); \
 		DP_STATS_AGGR_PKT(_tgtobj, _srcobj, rx.bcast);\
 								\
