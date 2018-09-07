@@ -1002,6 +1002,8 @@ static bool dp_cce_classify(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
 			qdf_nbuf_is_ipv6_dhcp_pkt(nbuf)))) {
 		if (qdf_unlikely(nbuf_clone != NULL))
 			qdf_nbuf_free(nbuf_clone);
+		DP_STATS_INCC(vdev, tx_i.cce_classified_eapol, 1,
+			      qdf_nbuf_is_ipv4_eapol_pkt(nbuf));
 		return true;
 	}
 
@@ -1576,6 +1578,7 @@ remove_meta_hdr:
 	if (qdf_nbuf_pull_head(nbuf, sizeof(struct meta_hdr_s)) == NULL) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 				"qdf_nbuf_pull_head failed\n");
+		DP_STATS_INC(vdev, tx_i.mesh.msdu_len_invalid, 1);
 		qdf_nbuf_free(nbuf);
 		return NULL;
 	}
@@ -1893,8 +1896,6 @@ qdf_nbuf_t dp_tx_send(void *vap_dev, qdf_nbuf_t nbuf)
 	qdf_mem_set(&msdu_info, sizeof(msdu_info), 0x0);
 	qdf_mem_set(&seg_info, sizeof(seg_info), 0x0);
 
-	eh = (struct ether_header *)qdf_nbuf_data(nbuf);
-
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
 			"%s , skb %pM",
 			__func__, nbuf->data);
@@ -2069,7 +2070,7 @@ void dp_tx_reinject_handler(struct dp_tx_desc_s *tx_desc, uint8_t *status)
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
 			"%s Tx reinject path\n", __func__);
 
-	DP_STATS_INC_PKT(vdev, tx_i.reinject_pkts, 1,
+	DP_STATS_INC_PKT(vdev, tx_i.reinject.reinject_pkts, 1,
 			qdf_nbuf_len(tx_desc->nbuf));
 
 	qdf_spin_lock_bh(&(soc->ast_lock));
@@ -2153,6 +2154,7 @@ void dp_tx_reinject_handler(struct dp_tx_desc_s *tx_desc, uint8_t *status)
 					break;
 				}
 
+				DP_STATS_INC(vdev, tx_i.reinject.to_fw, 1);
 				nbuf_copy = dp_tx_send_msdu_single(vdev,
 						nbuf_copy,
 						&msdu_info,
@@ -2163,6 +2165,8 @@ void dp_tx_reinject_handler(struct dp_tx_desc_s *tx_desc, uint8_t *status)
 					QDF_TRACE(QDF_MODULE_ID_DP,
 						QDF_TRACE_LEVEL_DEBUG,
 						FL("pkt send failed"));
+					DP_STATS_INC(vdev,
+						tx_i.reinject.reinject_err, 1);
 					qdf_nbuf_free(nbuf_copy);
 				} else {
 					if (peer_id != DP_INVALID_PEER)
@@ -2191,8 +2195,10 @@ void dp_tx_reinject_handler(struct dp_tx_desc_s *tx_desc, uint8_t *status)
 				FL("pkt send failed"));
 			qdf_nbuf_free(nbuf);
 		}
-	} else
+	} else {
+		DP_STATS_INC(vdev, tx_i.reinject.invalid_events, 1);
 		qdf_nbuf_free(nbuf);
+	}
 
 	dp_tx_desc_release(tx_desc, tx_desc->pool_id);
 }
@@ -2648,6 +2654,7 @@ static inline void dp_tx_comp_process_tx_status(struct dp_tx_desc_s *tx_desc,
 	if (!vdev) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
 				"invalid vdev");
+		DP_STATS_INC_PKT(soc, tx.tx_invalid_vdev, 1, length);
 		goto out;
 	}
 

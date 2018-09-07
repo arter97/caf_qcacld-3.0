@@ -5115,7 +5115,10 @@ static inline void dp_aggregate_pdev_stats(struct dp_pdev *pdev)
 
 		DP_STATS_AGGR_PKT(pdev, vdev, tx_i.rcvd);
 		DP_STATS_AGGR_PKT(pdev, vdev, tx_i.processed);
-		DP_STATS_AGGR_PKT(pdev, vdev, tx_i.reinject_pkts);
+		DP_STATS_AGGR_PKT(pdev, vdev, tx_i.reinject.reinject_pkts);
+		DP_STATS_AGGR(pdev, vdev, tx_i.reinject.to_fw);
+		DP_STATS_AGGR(pdev, vdev, tx_i.reinject.reinject_err);
+		DP_STATS_AGGR(pdev, vdev, tx_i.reinject.invalid_events);
 		DP_STATS_AGGR_PKT(pdev, vdev, tx_i.inspect_pkts);
 		DP_STATS_AGGR_PKT(pdev, vdev, tx_i.raw.raw_pkt);
 		DP_STATS_AGGR(pdev, vdev, tx_i.raw.dma_map_error);
@@ -5140,8 +5143,10 @@ static inline void dp_aggregate_pdev_stats(struct dp_pdev *pdev)
 		DP_STATS_AGGR(pdev, vdev, tx_i.dropped.res_full);
 		DP_STATS_AGGR(pdev, vdev, tx_i.cce_classified);
 		DP_STATS_AGGR(pdev, vdev, tx_i.cce_classified_raw);
+		DP_STATS_AGGR(pdev, vdev, tx_i.cce_classified_eapol);
 		DP_STATS_AGGR(pdev, vdev, tx_i.mesh.exception_fw);
 		DP_STATS_AGGR(pdev, vdev, tx_i.mesh.completion_fw);
+		DP_STATS_AGGR(pdev, vdev, tx_i.mesh.msdu_len_invalid);
 
 		pdev->stats.tx_i.dropped.dropped_pkt.num =
 			pdev->stats.tx_i.dropped.dma_error +
@@ -5329,9 +5334,15 @@ dp_print_pdev_tx_stats(struct dp_pdev *pdev)
 			pdev->stats.tx_i.raw.dma_map_error);
 	DP_PRINT_STATS("Reinjected:");
 	DP_PRINT_STATS("	Packets = %d",
-			pdev->stats.tx_i.reinject_pkts.num);
+			pdev->stats.tx_i.reinject.reinject_pkts.num);
 	DP_PRINT_STATS("Bytes = %llu\n",
-				pdev->stats.tx_i.reinject_pkts.bytes);
+				pdev->stats.tx_i.reinject.reinject_pkts.bytes);
+	DP_PRINT_STATS("Reinjected pkts queueted to FW = %u\n",
+				pdev->stats.tx_i.reinject.to_fw);
+	DP_PRINT_STATS("Tx errors for reinjected pkts = %u\n",
+				pdev->stats.tx_i.reinject.reinject_err);
+	DP_PRINT_STATS("Invalid reinject events = %u\n",
+				pdev->stats.tx_i.reinject.invalid_events);
 	DP_PRINT_STATS("Inspected:");
 	DP_PRINT_STATS("	Packets = %d",
 			pdev->stats.tx_i.inspect_pkts.num);
@@ -5346,12 +5357,16 @@ dp_print_pdev_tx_stats(struct dp_pdev *pdev)
 	DP_PRINT_STATS("	CCE Classified Packets: %u",
 			pdev->stats.tx_i.cce_classified);
 	DP_PRINT_STATS("	RAW CCE Classified Packets: %u",
+			pdev->stats.tx_i.cce_classified_eapol);
+	DP_PRINT_STATS("	EAPOL CCE Classified Packets: %u",
 			pdev->stats.tx_i.cce_classified_raw);
 	DP_PRINT_STATS("Mesh stats:");
 	DP_PRINT_STATS("	frames to firmware: %u",
 			pdev->stats.tx_i.mesh.exception_fw);
 	DP_PRINT_STATS("	completions from fw: %u",
 			pdev->stats.tx_i.mesh.completion_fw);
+	DP_PRINT_STATS("	Frames dropped due to invalid length: %u",
+			pdev->stats.tx_i.mesh.msdu_len_invalid);
 	DP_PRINT_STATS("PPDU stats counter");
 	for (index = 0; index < CDP_PPDU_STATS_MAX_TAG; index++) {
 		DP_PRINT_STATS("	Tag[%d] = %llu", index,
@@ -5481,6 +5496,12 @@ dp_print_soc_tx_stats(struct dp_soc *soc)
 			soc->stats.tx.tx_invalid_peer.num);
 	DP_PRINT_STATS("	Bytes = %llu",
 			soc->stats.tx.tx_invalid_peer.bytes);
+	DP_PRINT_STATS("Invalid vdev:");
+	DP_PRINT_STATS("	Packets = %d",
+			soc->stats.tx.tx_invalid_vdev.num);
+	DP_PRINT_STATS("	Bytes = %llu",
+			soc->stats.tx.tx_invalid_vdev.bytes);
+
 	DP_PRINT_STATS("Rx Packets per sec = %u",
 			soc->pkt_to_stack_per_sec);
 	DP_PRINT_STATS("Packets dropped due to TCL ring full = %d %d %d",
@@ -6748,6 +6769,9 @@ static void dp_txrx_path_stats(struct dp_soc *soc)
 			pdev->stats.tx.dropped.fw_rem_notx);
 		DP_TRACE(FATAL, "peer_invalid: %u",
 			pdev->soc->stats.tx.tx_invalid_peer.num);
+		DP_TRACE(FATAL, "vdev_invalid: %u",
+			pdev->soc->stats.tx.tx_invalid_vdev.num);
+
 
 
 		DP_TRACE(FATAL, "Tx packets sent per interrupt:");
