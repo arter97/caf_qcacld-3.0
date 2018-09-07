@@ -361,9 +361,8 @@ dp_rx_da_learn(struct dp_soc *soc,
 	if (ta_peer && (ta_peer->vdev->opmode != wlan_op_mode_ap))
 		return;
 
-	if (qdf_unlikely(!hal_rx_msdu_end_da_is_valid_get(rx_tlv_hdr) &&
-			 !hal_rx_msdu_end_da_is_mcbc_get(rx_tlv_hdr))) {
-
+	if (qdf_unlikely(!qdf_nbuf_is_da_valid(nbuf) &&
+			 !qdf_nbuf_is_da_mcbc(nbuf))) {
 		dp_peer_add_ast(soc,
 				ta_peer->vdev->vap_bss_peer,
 				qdf_nbuf_data(nbuf),
@@ -1676,11 +1675,11 @@ dp_rx_process(struct dp_intr *int_ctx, void *hal_ring, uint32_t quota)
 				qdf_nbuf_data(nbuf), 128, false);
 #endif /* NAPIER_EMULATION */
 
-		dp_rx_da_learn(soc, rx_tlv_hdr, peer, nbuf);
 		if (qdf_likely(vdev->rx_decap_type ==
 					htt_cmn_pkt_type_ethernet) &&
 				(qdf_likely(!vdev->mesh_vdev)) &&
 				(vdev->wds_enabled)) {
+			dp_rx_da_learn(soc, rx_tlv_hdr, peer, nbuf);
 			/* WDS Source Port Learning */
 			dp_rx_wds_srcport_learn(soc,
 						rx_tlv_hdr,
