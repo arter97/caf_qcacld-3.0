@@ -1773,7 +1773,7 @@ static void dp_hw_link_desc_pool_cleanup(struct dp_soc *soc)
 #define RXDMA_MONITOR_DST_RING_SIZE 2048
 #define RXDMA_MONITOR_STATUS_RING_SIZE 1024
 #define RXDMA_MONITOR_DESC_RING_SIZE 4096
-#define RXDMA_ERR_DST_RING_SIZE 1024
+#define RXDMA_ERR_DST_RING_SIZE 4096
 
 /*
  * dp_wds_aging_timer_fn() - Timer callback function for WDS aging
