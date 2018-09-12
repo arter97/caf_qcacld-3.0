@@ -168,6 +168,40 @@ QDF_STATUS utils_dfs_stacac_stop(struct wlan_objmgr_pdev *pdev)
 }
 qdf_export_symbol(utils_dfs_stacac_stop);
 
+bool utils_dfs_is_curchan_subset_of_cac_started_chan(
+		struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_dfs *dfs;
+
+	dfs = global_dfs_to_mlme.pdev_get_comp_private_obj(pdev);
+	if (!dfs)
+		return false;
+
+	return dfs_is_curchan_subset_of_cac_started_chan(dfs);
+}
+
+bool utils_dfs_is_cac_aborted(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_dfs *dfs;
+
+	dfs = global_dfs_to_mlme.pdev_get_comp_private_obj(pdev);
+	if (!dfs)
+		return false;
+
+	return dfs->dfs_cac_aborted;
+}
+
+void utils_dfs_clear_cac_started_chan(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_dfs *dfs;
+
+	dfs = global_dfs_to_mlme.pdev_get_comp_private_obj(pdev);
+	if (!dfs)
+		return;
+
+	dfs_clear_cac_started_chan(dfs);
+}
+
 QDF_STATUS utils_dfs_get_usenol(struct wlan_objmgr_pdev *pdev, uint16_t *usenol)
 {
 	struct wlan_dfs *dfs;
