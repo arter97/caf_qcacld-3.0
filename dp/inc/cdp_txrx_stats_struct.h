@@ -342,6 +342,8 @@ struct cdp_tx_ingress_stats {
 		uint32_t dma_error;
 		/* Resource Full: Congestion Control */
 		uint32_t res_full;
+		/* headroom insufficient */
+		uint32_t headroom_insufficient;
 	} dropped;
 
 	/* Mesh packets info */
