@@ -428,6 +428,26 @@ dp_rx_wds_srcport_learn(struct dp_soc *soc,
 	ast = soc->ast_table[sa_idx];
 
 	/*
+	 * There are roaming scenarios where HW reports SA_IS_VALID
+	 * even though the entry is removed from AST table, mainly
+	 * because the entry is still found in the HW cache.
+	 * for this reason we still go ahead and add an AST entry
+	 * in the table if the AST entry is not found at the
+	 * corresponding SA_IDX. There is a potential issue here
+	 * for cases where a different MAC address has the same
+	 * SA_IDX, we will never be adding the WDS entry at all
+	 * this is very unlikely scenario.
+	 */
+	if (!ast) {
+		ret = dp_peer_add_ast(soc,
+				      ta_peer,
+				      wds_src_mac,
+				      CDP_TXRX_AST_TYPE_WDS,
+				      flags);
+		return;
+	}
+
+	/*
 	 * Ensure we are updating the right AST entry by
 	 * validating ast_idx.
 	 * There is a possibility we might arrive here without
@@ -442,14 +462,22 @@ dp_rx_wds_srcport_learn(struct dp_soc *soc,
 		if ((ast->type != CDP_TXRX_AST_TYPE_STATIC) &&
 		    (ast->type != CDP_TXRX_AST_TYPE_SELF) &&
 		    (ast->type != CDP_TXRX_AST_TYPE_BSS)) {
-			if (ast->pdev_id != ta_peer->vdev->pdev->pdev_id) {
+			if (ast->pdev_id != ta_peer->vdev->pdev->pdev_id)
+				/* this case is when a STA roams from one
+				 * reapter to another repeater, but these
+				 * repeaters are connected to ROOT AP on
+				 * different radios.
+				 * ex: rptr1 connected to ROOT AP over 5G
+				 * radio and rptr2 connected to ROOT AP
+				 * over 2G radio.
+				 */
 				dp_peer_del_ast(soc, ast);
-				ret = dp_peer_add_ast(soc,
-							ta_peer,
-							wds_src_mac,
-							CDP_TXRX_AST_TYPE_WDS,
-							flags);
-			} else
+			else
+				/* this case is when a STA roams from one
+				 * reapter to another repeater, but these
+				 * repeaters are connected to ROOT AP on
+				 * same radio.
+				 */
 				dp_peer_update_ast(soc, ta_peer, ast, flags);
 			return;
 		}
