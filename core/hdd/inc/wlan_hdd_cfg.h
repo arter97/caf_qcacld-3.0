@@ -12834,7 +12834,7 @@ enum hdd_external_acs_freq_band {
  */
 
 #define CFG_IS_SAE_ENABLED_NAME    "sae_enabled"
-#define CFG_IS_SAE_ENABLED_DEFAULT (0)
+#define CFG_IS_SAE_ENABLED_DEFAULT (1)
 #define CFG_IS_SAE_ENABLED_MIN     (0)
 #define CFG_IS_SAE_ENABLED_MAX     (1)
 
