@@ -3240,6 +3240,12 @@ int wma_process_bip(tp_wma_handle wma_handle,
 	uint8_t *efrm;
 
 	efrm = qdf_nbuf_data(wbuf) + qdf_nbuf_len(wbuf);
+	/* Check if frame is invalid length */
+	if (efrm - (uint8_t *)wh < sizeof(*wh) + cds_get_mmie_size()) {
+		WMA_LOGE(FL("Invalid frame length"));
+		return -EINVAL;
+	}
+
 	key_id = (uint16_t)*(efrm - cds_get_mmie_size() + 2);
 
 	if (!((key_id == WMA_IGTK_KEY_INDEX_4)
