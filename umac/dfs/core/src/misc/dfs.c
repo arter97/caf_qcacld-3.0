@@ -344,16 +344,25 @@ void dfs_stop(struct wlan_dfs *dfs)
 	dfs_clear_nolhistory(dfs);
 }
 
+void dfs_task_testtimer_reset(struct wlan_dfs *dfs)
+{
+	if (dfs->wlan_dfstest) {
+		qdf_timer_sync_cancel(&dfs->wlan_dfstesttimer);
+		dfs->wlan_dfstest = 0;
+	}
+}
+
+void dfs_task_testtimer_detach(struct wlan_dfs *dfs)
+{
+	qdf_timer_free(&dfs->wlan_dfstesttimer);
+	dfs->wlan_dfstest = 0;
+}
+
 void dfs_main_timer_reset(struct wlan_dfs *dfs)
 {
 	if (dfs->wlan_radar_tasksched) {
-		qdf_timer_stop(&dfs->wlan_dfs_task_timer);
+		qdf_timer_sync_cancel(&dfs->wlan_dfs_task_timer);
 		dfs->wlan_radar_tasksched = 0;
-	}
-
-	if (dfs->wlan_dfstest) {
-		qdf_timer_stop(&dfs->wlan_dfstesttimer);
-		dfs->wlan_dfstest = 0;
 	}
 }
 
@@ -368,6 +377,7 @@ void dfs_reset(struct wlan_dfs *dfs)
 	dfs_zero_cac_reset(dfs);
 	if (!dfs->dfs_is_offload_enabled)
 		dfs_main_timer_reset(dfs);
+	dfs_task_testtimer_reset(dfs);
 }
 
 void dfs_main_detach(struct wlan_dfs *dfs)
@@ -434,8 +444,27 @@ void dfs_main_detach(struct wlan_dfs *dfs)
 	WLAN_DFSEVENTQ_LOCK_DESTROY(dfs);
 }
 
+void dfs_main_timer_detach(struct wlan_dfs *dfs)
+{
+	qdf_timer_free(&dfs->wlan_dfs_task_timer);
+	dfs->wlan_radar_tasksched = 0;
+}
+
+void dfs_timer_detach(struct wlan_dfs *dfs)
+{
+	dfs_cac_timer_detach(dfs);
+	dfs_zero_cac_timer_detach(dfs);
+
+	if (!dfs->dfs_is_offload_enabled)
+		dfs_main_timer_detach(dfs);
+
+	dfs_task_testtimer_detach(dfs);
+	dfs_nol_timer_detach(dfs);
+}
+
 void dfs_detach(struct wlan_dfs *dfs)
 {
+	dfs_timer_detach(dfs);
 	if (!dfs->dfs_is_offload_enabled)
 		dfs_main_detach(dfs);
 	dfs_zero_cac_detach(dfs);

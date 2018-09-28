@@ -34,7 +34,7 @@ QDF_STATUS wmi_extract_dfs_cac_complete_event(void *wmi_hdl,
 {
 	struct wmi_unified *wmi_handle = (struct wmi_unified *)wmi_hdl;
 
-	if (wmi_handle->ops->extract_dfs_cac_complete_event)
+	if (wmi_handle && wmi_handle->ops->extract_dfs_cac_complete_event)
 		return wmi_handle->ops->extract_dfs_cac_complete_event(
 				wmi_handle, evt_buf, vdev_id, len);
 
@@ -49,7 +49,7 @@ QDF_STATUS wmi_extract_dfs_radar_detection_event(void *wmi_hdl,
 {
 	struct wmi_unified *wmi_handle = (struct wmi_unified *)wmi_hdl;
 
-	if (wmi_handle->ops->extract_dfs_radar_detection_event)
+	if (wmi_handle && wmi_handle->ops->extract_dfs_radar_detection_event)
 		return wmi_handle->ops->extract_dfs_radar_detection_event(
 				wmi_handle, evt_buf, radar_found, len);
 

@@ -119,6 +119,26 @@ QDF_TRACE(QDF_MODULE_ID_SPECTRAL, level, ## args)
 #define TLV_TAG_ADC_REPORT_GEN2                  0xFA
 #define TLV_TAG_SEARCH_FFT_REPORT_GEN2           0xFB
 
+enum spectral_160mhz_report_delivery_state {
+	SPECTRAL_REPORT_WAIT_PRIMARY80,
+	SPECTRAL_REPORT_RX_PRIMARY80,
+	SPECTRAL_REPORT_WAIT_SECONDARY80,
+	SPECTRAL_REPORT_RX_SECONDARY80,
+};
+
+enum spectral_detector_id {
+	SPECTRAL_DETECTOR_PRIMARY,
+	SPECTRAL_DETECTOR_SECONDARY,
+	SPECTRAL_DETECTOR_AGILE,
+	SPECTRAL_DETECTOR_INVALID,
+};
+
+enum spectral_160mhz_report_delivery_event {
+	SPECTRAL_REPORT_EVENT_DETECTORID0,
+	SPECTRAL_REPORT_EVENT_DETECTORID1,
+	SPECTRAL_REPORT_EVENT_DETECTORID_INVALID,
+};
+
 /**
  * struct spectral_search_fft_info_gen2 - spectral search fft report for gen2
  * @relpwr_db:       Total bin power in db
@@ -213,6 +233,8 @@ struct spectral_phyerr_fft_gen2 {
 	(((value) >= (1 << ((width) - 1))) ? \
 		(value - (1 << (width))) : (value))
 
+#define SSCAN_REPORT_DETECTOR_ID_POS_GEN3        (29)
+#define SSCAN_REPORT_DETECTOR_ID_SIZE_GEN3       (2)
 #define SPECTRAL_PHYERR_SIGNATURE_GEN3           (0xFA)
 #define TLV_TAG_SPECTRAL_SUMMARY_REPORT_GEN3     (0x02)
 #define TLV_TAG_SEARCH_FFT_REPORT_GEN3           (0x03)
@@ -302,6 +324,20 @@ struct spectral_phyerr_fft_report_gen3 {
 	uint32_t resv;
 	uint8_t buf[0];
 } __ATTRIB_PACK;
+
+/**
+ * struct sscan_report_fields_gen3 - Fields of spectral report
+ * @sscan_agc_total_gain:  The AGC total gain in DB
+ * @inband_pwr_db: The in-band power of the signal in 1/2 DB steps
+ * @sscan_gainchange: This bit is set to 1 if a gainchange occurred during
+ *                 the spectral scan FFT.  Software may choose to
+ *                 disregard the results.
+ */
+struct sscan_report_fields_gen3 {
+	uint8_t sscan_agc_total_gain;
+	int16_t inband_pwr_db;
+	uint8_t sscan_gainchange;
+};
 
 /**
  * struct spectral_sscan_report_gen3 - spectral report in phyerr event
@@ -726,6 +762,15 @@ struct wmi_spectral_cmd_ops {
  * DMA cannot change this value. On such chipsets the adjustment required at the
  * host driver is to check if report format is 2, and if so halve the number of
  * bins reported to get the number actually DMA'ed.
+ * @null_fftbin_adj: Whether to remove NULL FFT bins for report mode (1) in
+ * which only summary of metrics for each completed FFT + spectral scan summary
+ * report are to be provided. This would be required on some chipsets under the
+ * following circumstances: In report mode 1, HW reports a length corresponding
+ * to all bins, and provides bins with value 0. This is because the subsystem
+ * arranging for the FFT information does not arrange for DMA of FFT bin values
+ * (as expected), but cannot arrange for a smaller length to be reported by HW.
+ * In these circumstances, the driver would have to disregard the NULL bins and
+ * report a bin count of 0 to higher layers.
  */
 struct target_if_spectral {
 	struct wlan_objmgr_pdev *pdev_obj;
@@ -828,6 +873,9 @@ struct target_if_spectral {
 	int (*send_phy_data)(struct wlan_objmgr_pdev *pdev);
 	u_int8_t                               fftbin_size_war;
 	u_int8_t                               inband_fftbin_size_adj;
+	u_int8_t                               null_fftbin_adj;
+	enum spectral_160mhz_report_delivery_state state_160mhz_delivery;
+	void *spectral_report_cache;
 };
 
 /**
@@ -903,6 +951,10 @@ struct target_if_samp_msg_params {
 	struct interf_src_rsp interf_list;
 	struct spectral_classifier_params classifier_params;
 	struct ath_softc *sc;
+	uint8_t agc_total_gain;
+	uint8_t agc_total_gain_sec80;
+	uint8_t gainchange;
+	uint8_t gainchange_sec80;
 };
 
 /**
@@ -1266,6 +1318,108 @@ void target_if_spectral_process_phyerr(
 					p_rfqual, p_chaninfo,
 					tsf64, acs_stats);
 }
+
+static inline void
+save_spectral_report_skb(struct target_if_spectral *spectral, void *skb) {
+	if (spectral->ch_width == CH_WIDTH_160MHZ)
+		spectral->spectral_report_cache = skb;
+}
+
+static inline void
+restore_spectral_report_skb(struct target_if_spectral *spectral, void **dest) {
+	if (spectral->ch_width == CH_WIDTH_160MHZ) {
+		QDF_ASSERT(spectral->spectral_report_cache);
+		*dest = spectral->spectral_report_cache;
+	}
+}
+
+static inline void
+clear_spectral_report_skb(struct target_if_spectral *spectral) {
+	if (spectral->ch_width == CH_WIDTH_160MHZ)
+		spectral->spectral_report_cache = NULL;
+}
+
+static inline void
+free_and_clear_spectral_report_skb(struct target_if_spectral *spectral) {
+	if (spectral->spectral_report_cache)
+		spectral->nl_cb.free_nbuff(spectral->pdev_obj);
+	spectral->spectral_report_cache = NULL;
+}
+
+static inline void
+init_160mhz_delivery_state_machine(struct target_if_spectral *spectral) {
+	spectral->state_160mhz_delivery =
+		SPECTRAL_REPORT_WAIT_PRIMARY80;
+	spectral->spectral_report_cache = NULL;
+}
+
+static inline void
+deinit_160mhz_delivery_state_machine(struct target_if_spectral *spectral) {
+	if (spectral->spectral_report_cache)
+		spectral->nl_cb.free_nbuff(spectral->pdev_obj);
+	spectral->spectral_report_cache = NULL;
+}
+
+static inline void
+reset_160mhz_delivery_state_machine(struct target_if_spectral *spectral) {
+	if (spectral->ch_width == CH_WIDTH_160MHZ) {
+		spectral->state_160mhz_delivery =
+			SPECTRAL_REPORT_WAIT_PRIMARY80;
+		free_and_clear_spectral_report_skb(spectral);
+	}
+}
+
+static inline
+bool is_secondaryseg_expected(struct target_if_spectral *spectral)
+{
+	return
+	((spectral->ch_width == CH_WIDTH_160MHZ) &&
+	(spectral->state_160mhz_delivery == SPECTRAL_REPORT_WAIT_SECONDARY80));
+}
+
+static inline
+bool is_primaryseg_expected(struct target_if_spectral *spectral)
+{
+	return
+	((spectral->ch_width != CH_WIDTH_160MHZ) ||
+	((spectral->ch_width == CH_WIDTH_160MHZ) &&
+	(spectral->state_160mhz_delivery == SPECTRAL_REPORT_WAIT_PRIMARY80)));
+}
+
+static inline
+bool is_primaryseg_rx_inprog(struct target_if_spectral *spectral)
+{
+	return
+	((spectral->ch_width != CH_WIDTH_160MHZ) ||
+	((spectral->ch_width == CH_WIDTH_160MHZ) &&
+	((spectral->spectral_gen == SPECTRAL_GEN2) ||
+	((spectral->spectral_gen == SPECTRAL_GEN3) &&
+	(spectral->state_160mhz_delivery == SPECTRAL_REPORT_RX_PRIMARY80)))));
+}
+
+static inline
+bool is_secondaryseg_rx_inprog(struct target_if_spectral *spectral)
+{
+	return
+	((spectral->ch_width == CH_WIDTH_160MHZ) &&
+	((spectral->spectral_gen == SPECTRAL_GEN2) ||
+	((spectral->spectral_gen == SPECTRAL_GEN3) &&
+	(spectral->state_160mhz_delivery == SPECTRAL_REPORT_RX_SECONDARY80))));
+}
+
+/**
+ * target_if_160mhz_delivery_state_change() - State transition for 160Mhz
+ *                                            Spectral
+ * @spectral: Pointer to spectral object
+ * @detector_id: Detector id
+ *
+ * Move the states of state machine for 160MHz spectral scan report receive
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+target_if_160mhz_delivery_state_change(struct target_if_spectral *spectral,
+				       uint8_t detector_id);
 
 /**
  * target_if_sops_is_spectral_enabled() - Get whether Spectral is enabled

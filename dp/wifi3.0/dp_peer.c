@@ -223,6 +223,21 @@ static int dp_peer_ast_hash_attach(struct dp_soc *soc)
 	return 0;
 }
 
+#if defined(FEATURE_AST) && defined(AST_HKV1_WORKAROUND)
+static inline void dp_peer_ast_cleanup(struct dp_soc *soc,
+				       struct dp_ast_entry *ast)
+{
+	struct cdp_soc_t *cdp_soc = &soc->cdp_soc;
+
+	if (ast->cp_ctx && cdp_soc->ol_ops->peer_del_wds_cp_ctx)
+		cdp_soc->ol_ops->peer_del_wds_cp_ctx(ast->cp_ctx);
+}
+#else
+static inline void dp_peer_ast_cleanup(struct dp_soc *soc,
+				       struct dp_ast_entry *ast)
+{
+}
+#endif
 /*
  * dp_peer_ast_hash_detach() - Free AST Hash table
  * @soc: SoC handle
@@ -231,6 +246,24 @@ static int dp_peer_ast_hash_attach(struct dp_soc *soc)
  */
 static void dp_peer_ast_hash_detach(struct dp_soc *soc)
 {
+	unsigned int index;
+	struct dp_ast_entry *ast, *ast_next;
+
+	if (!soc->ast_hash.mask)
+		return;
+
+	for (index = 0; index <= soc->ast_hash.mask; index++) {
+		if (!TAILQ_EMPTY(&soc->ast_hash.bins[index])) {
+			TAILQ_FOREACH_SAFE(ast, &soc->ast_hash.bins[index],
+					   hash_list_elem, ast_next) {
+				TAILQ_REMOVE(&soc->ast_hash.bins[index], ast,
+					     hash_list_elem);
+				dp_peer_ast_cleanup(soc, ast);
+				qdf_mem_free(ast);
+			}
+		}
+	}
+
 	qdf_mem_free(soc->ast_hash.bins);
 }
 
@@ -458,6 +491,9 @@ int dp_peer_add_ast(struct dp_soc *soc,
 	case CDP_TXRX_AST_TYPE_STATIC:
 		peer->self_ast_entry = ast_entry;
 		ast_entry->type = CDP_TXRX_AST_TYPE_STATIC;
+		if (peer->vdev->opmode == wlan_op_mode_sta) {
+			ast_entry->type = CDP_TXRX_AST_TYPE_BSS;
+		}
 		break;
 	case CDP_TXRX_AST_TYPE_SELF:
 		peer->self_ast_entry = ast_entry;
@@ -474,6 +510,10 @@ int dp_peer_add_ast(struct dp_soc *soc,
 	case CDP_TXRX_AST_TYPE_MEC:
 		ast_entry->next_hop = 1;
 		ast_entry->type = CDP_TXRX_AST_TYPE_MEC;
+		break;
+	case CDP_TXRX_AST_TYPE_DA:
+		ast_entry->next_hop = 1;
+		ast_entry->type = CDP_TXRX_AST_TYPE_DA;
 		break;
 	default:
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
@@ -492,7 +532,8 @@ int dp_peer_add_ast(struct dp_soc *soc,
 		qdf_mem_copy(next_node_mac, peer->mac_addr.raw, 6);
 
 	if ((ast_entry->type != CDP_TXRX_AST_TYPE_STATIC) &&
-	    (ast_entry->type != CDP_TXRX_AST_TYPE_SELF)) {
+	    (ast_entry->type != CDP_TXRX_AST_TYPE_SELF) &&
+	    (ast_entry->type != CDP_TXRX_AST_TYPE_BSS)) {
 		if (QDF_STATUS_SUCCESS ==
 				soc->cdp_soc.ol_ops->peer_add_wds_entry(
 				peer->vdev->osif_vdev,
@@ -505,6 +546,22 @@ int dp_peer_add_ast(struct dp_soc *soc,
 	return ret;
 }
 
+#if defined(FEATURE_AST) && defined(AST_HKV1_WORKAROUND)
+void dp_peer_del_ast(struct dp_soc *soc, struct dp_ast_entry *ast_entry)
+{
+	struct dp_peer *peer = ast_entry->peer;
+
+	if (ast_entry->next_hop) {
+		dp_peer_ast_send_wds_del(soc, ast_entry);
+	} else {
+		soc->ast_table[ast_entry->ast_idx] = NULL;
+		TAILQ_REMOVE(&peer->ast_entry_list, ast_entry, ase_list_elem);
+		DP_STATS_INC(soc, ast.deleted, 1);
+		dp_peer_ast_hash_remove(soc, ast_entry);
+		qdf_mem_free(ast_entry);
+	}
+}
+#else
 /*
  * dp_peer_del_ast() - Delete and free AST entry
  * @soc: SoC handle
@@ -530,6 +587,7 @@ void dp_peer_del_ast(struct dp_soc *soc, struct dp_ast_entry *ast_entry)
 	dp_peer_ast_hash_remove(soc, ast_entry);
 	qdf_mem_free(ast_entry);
 }
+#endif
 
 /*
  * dp_peer_update_ast() - Delete and free AST entry
@@ -552,7 +610,8 @@ int dp_peer_update_ast(struct dp_soc *soc, struct dp_peer *peer,
 	struct dp_peer *old_peer;
 
 	if ((ast_entry->type == CDP_TXRX_AST_TYPE_STATIC) ||
-	    (ast_entry->type == CDP_TXRX_AST_TYPE_SELF))
+	    (ast_entry->type == CDP_TXRX_AST_TYPE_SELF) ||
+	    (ast_entry->type == CDP_TXRX_AST_TYPE_BSS))
 			return 0;
 
 	qdf_spin_lock_bh(&soc->ast_lock);
@@ -681,6 +740,57 @@ uint8_t dp_peer_ast_get_next_hop(struct dp_soc *soc,
 				struct dp_ast_entry *ast_entry)
 {
 	return 0xff;
+}
+#endif
+
+#if defined(FEATURE_AST) && defined(AST_HKV1_WORKAROUND)
+void dp_peer_ast_set_cp_ctx(struct dp_soc *soc,
+			    struct dp_ast_entry *ast_entry,
+			    void *cp_ctx)
+{
+	ast_entry->cp_ctx = cp_ctx;
+}
+
+void *dp_peer_ast_get_cp_ctx(struct dp_soc *soc,
+			     struct dp_ast_entry *ast_entry)
+{
+	void *cp_ctx = NULL;
+
+	cp_ctx = ast_entry->cp_ctx;
+	ast_entry->cp_ctx = NULL;
+
+	return cp_ctx;
+}
+
+void dp_peer_ast_send_wds_del(struct dp_soc *soc,
+			      struct dp_ast_entry *ast_entry)
+{
+	struct dp_peer *peer = ast_entry->peer;
+	struct cdp_soc_t *cdp_soc = &soc->cdp_soc;
+
+	if (!ast_entry->wmi_sent) {
+		cdp_soc->ol_ops->peer_del_wds_entry(peer->vdev->osif_vdev,
+						    ast_entry->mac_addr.raw);
+		ast_entry->wmi_sent = true;
+	}
+}
+
+bool dp_peer_ast_get_wmi_sent(struct dp_soc *soc,
+			      struct dp_ast_entry *ast_entry)
+{
+	return ast_entry->wmi_sent;
+}
+
+void dp_peer_ast_free_entry(struct dp_soc *soc,
+			    struct dp_ast_entry *ast_entry)
+{
+	struct dp_peer *peer = ast_entry->peer;
+
+	soc->ast_table[ast_entry->ast_idx] = NULL;
+	TAILQ_REMOVE(&peer->ast_entry_list, ast_entry, ase_list_elem);
+	DP_STATS_INC(soc, ast.deleted, 1);
+	dp_peer_ast_hash_remove(soc, ast_entry);
+	qdf_mem_free(ast_entry);
 }
 #endif
 
@@ -1525,7 +1635,7 @@ static int dp_rx_tid_delete_wifi3(struct dp_peer *peer, int tid)
 
 	qdf_mem_zero(&params, sizeof(params));
 
-	params.std.need_status = 0;
+	params.std.need_status = 1;
 	params.std.addr_lo = rx_tid->hw_qdesc_paddr & 0xffffffff;
 	params.std.addr_hi = (uint64_t)(rx_tid->hw_qdesc_paddr) >> 32;
 	params.u.upd_queue_params.update_vld = 1;
@@ -1683,12 +1793,14 @@ static void dp_teardown_256_ba_sessions(struct dp_peer *peer)
 				rx_tid->delba_rcode =
 				IEEE80211_REASON_QOS_SETUP_REQUIRED;
 			}
+			qdf_spin_unlock_bh(&rx_tid->tid_lock);
 			peer->vdev->pdev->soc->cdp_soc.ol_ops->send_delba(
 					peer->vdev->pdev->osif_pdev,
 					peer->ol_peer,
 					peer->mac_addr.raw,
 					tid,
 					rx_tid->delba_rcode);
+			qdf_spin_lock_bh(&rx_tid->tid_lock);
 		}
 	}
 }
@@ -1982,18 +2094,20 @@ int dp_delba_tx_completion_wifi3(void *peer_handle,
 	qdf_spin_lock_bh(&rx_tid->tid_lock);
 	if (status) {
 		rx_tid->delba_tx_fail_cnt++;
-		if (rx_tid->delba_tx_retry < MAX_DELBA_RETRY) {
+		if (rx_tid->delba_tx_retry >= MAX_DELBA_RETRY) {
+			rx_tid->delba_tx_retry = 0;
+			rx_tid->delba_tx_status = 0;
+			qdf_spin_unlock_bh(&rx_tid->tid_lock);
+		} else {
 			rx_tid->delba_tx_retry++;
 			rx_tid->delba_tx_status = 1;
+
+			qdf_spin_unlock_bh(&rx_tid->tid_lock);
+
 			peer->vdev->pdev->soc->cdp_soc.ol_ops->send_delba(
 				peer->vdev->pdev->osif_pdev, peer->ol_peer,
 				peer->mac_addr.raw, tid, rx_tid->delba_rcode);
 		}
-		if (rx_tid->delba_tx_retry == MAX_DELBA_RETRY) {
-			rx_tid->delba_tx_retry = 0;
-			rx_tid->delba_tx_status = 0;
-		}
-		qdf_spin_unlock_bh(&rx_tid->tid_lock);
 		return 0;
 	} else {
 		rx_tid->delba_tx_success_cnt++;

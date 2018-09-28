@@ -104,6 +104,40 @@ static void dp_tx_stats_update(struct dp_soc *soc, struct dp_peer *peer,
 	if (soc->process_tx_status)
 		return;
 
+	DP_STATS_INC(peer, tx.transmit_type[ppdu->ppdu_type], 1);
+
+	if (ppdu->mu_group_id <= MAX_MU_GROUP_ID && ppdu->ppdu_type != SU_TX) {
+		DP_STATS_UPD(peer, tx.mu_group_id[ppdu->mu_group_id],
+			     (ppdu->user_pos + 1));
+	}
+
+	if (ppdu->ppdu_type == MUMIMO_TX ||
+	    ppdu->ppdu_type == MUMIMO_OFDMA_TX) {
+		DP_STATS_UPD(peer, tx.ru_tones, ppdu->ru_tones);
+		DP_STATS_UPD(peer, tx.ru_start, ppdu->ru_start);
+		switch (ppdu->ru_tones) {
+		case RU_26:
+		DP_STATS_INC(peer, tx.ru_loc[0], 1);
+		break;
+		case RU_52:
+		DP_STATS_INC(peer, tx.ru_loc[1], 1);
+		break;
+		case RU_106:
+		DP_STATS_INC(peer, tx.ru_loc[2], 1);
+		break;
+		case RU_242:
+		DP_STATS_INC(peer, tx.ru_loc[3], 1);
+		break;
+		case RU_484:
+		DP_STATS_INC(peer, tx.ru_loc[4], 1);
+		break;
+		case RU_996:
+		DP_STATS_INC(peer, tx.ru_loc[5], 1);
+		break;
+		}
+	}
+
+	DP_STATS_INC(peer, tx.transmit_type[ppdu->ppdu_type], 1);
 	DP_STATS_INC_PKT(peer, tx.comp_pkt,
 			num_msdu, (ppdu->success_bytes +
 				ppdu->retry_bytes + ppdu->failed_bytes));
@@ -1636,6 +1670,9 @@ static void dp_process_ppdu_stats_common_tlv(struct dp_pdev *pdev,
 	if ((frame_type == HTT_STATS_FTYPE_TIDQ_DATA_SU) ||
 			(frame_type == HTT_STATS_FTYPE_TIDQ_DATA_MU))
 		ppdu_desc->frame_type = CDP_PPDU_FTYPE_DATA;
+	else if ((frame_type == HTT_STATS_FTYPE_SGEN_MU_BAR) ||
+		 (frame_type == HTT_STATS_FTYPE_SGEN_BAR))
+		ppdu_desc->frame_type = CDP_PPDU_FTYPE_BAR;
 	else
 		ppdu_desc->frame_type = CDP_PPDU_FTYPE_CTRL;
 
@@ -1702,6 +1739,10 @@ static void dp_process_ppdu_stats_user_common_tlv(
 
 	tag_buf++;
 
+	if (HTT_PPDU_STATS_USER_COMMON_TLV_DELAYED_BA_GET(*tag_buf)) {
+		ppdu_user_desc->delayed_ba = true;
+	}
+
 	if (HTT_PPDU_STATS_USER_COMMON_TLV_MCAST_GET(*tag_buf)) {
 		ppdu_user_desc->is_mcast = true;
 		ppdu_user_desc->mpdu_tried_mcast =
@@ -1721,6 +1762,12 @@ static void dp_process_ppdu_stats_user_common_tlv(
 	ppdu_user_desc->frame_ctrl =
 		HTT_PPDU_STATS_USER_COMMON_TLV_FRAME_CTRL_GET(*tag_buf);
 	ppdu_desc->frame_ctrl = ppdu_user_desc->frame_ctrl;
+
+	if (ppdu_user_desc->delayed_ba) {
+		ppdu_user_desc->mpdu_success = 0;
+		ppdu_user_desc->mpdu_tried_mcast = 0;
+		ppdu_user_desc->mpdu_tried_ucast = 0;
+	}
 }
 
 
@@ -1765,8 +1812,17 @@ static void dp_process_ppdu_stats_user_rate_tlv(struct dp_pdev *pdev,
 	ppdu_user_desc->tid =
 		HTT_PPDU_STATS_USER_RATE_TLV_TID_NUM_GET(*tag_buf);
 
-	tag_buf += 2;
+	tag_buf += 1;
 
+	ppdu_user_desc->user_pos =
+		HTT_PPDU_STATS_USER_RATE_TLV_USER_POS_GET(*tag_buf);
+	ppdu_user_desc->mu_group_id =
+		HTT_PPDU_STATS_USER_RATE_TLV_MU_GROUPID_GET(*tag_buf);
+
+	tag_buf += 1;
+
+	ppdu_user_desc->ru_start =
+		HTT_PPDU_STATS_USER_RATE_TLV_RU_START_GET(*tag_buf);
 	ppdu_user_desc->ru_tones = (HTT_PPDU_STATS_USER_RATE_TLV_RU_END_GET(*tag_buf) -
 			HTT_PPDU_STATS_USER_RATE_TLV_RU_START_GET(*tag_buf)) + 1;
 

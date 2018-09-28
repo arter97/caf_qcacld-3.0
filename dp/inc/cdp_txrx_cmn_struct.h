@@ -182,6 +182,7 @@ enum htt_cmn_dbg_stats_type {
  * @TXRX_RX_HOST_STATS: Print host Rx stats
  * @TXRX_CLEAR_STATS: clear all host stats
  * @TXRX_SRNG_PTR_STATS: Print SRNG pointer stats
+ * @TXRX_RX_MON_STATS: Print monitor mode stats
 */
 enum cdp_host_txrx_stats {
 	TXRX_HOST_STATS_INVALID  = -1,
@@ -192,6 +193,7 @@ enum cdp_host_txrx_stats {
 	TXRX_RX_HOST_STATS  = 4,
 	TXRX_AST_STATS = 5,
 	TXRX_SRNG_PTR_STATS	= 6,
+	TXRX_RX_MON_STATS   = 7,
 	TXRX_HOST_STATS_MAX,
 };
 
@@ -199,10 +201,12 @@ enum cdp_host_txrx_stats {
  * cdp_ppdu_ftype: PPDU Frame Type
  * @CDP_PPDU_FTYPE_DATA: SU or MU Data Frame
  * @CDP_PPDU_FTYPE_CTRL: Control/Management Frames
+ * @CDP_PPDU_FTYPE_BAR: SU or MU BAR frames
 */
 enum cdp_ppdu_ftype {
 	CDP_PPDU_FTYPE_CTRL,
 	CDP_PPDU_FTYPE_DATA,
+	CDP_PPDU_FTYPE_BAR,
 	CDP_PPDU_FTYPE_MAX
 };
 
@@ -280,6 +284,8 @@ enum cdp_txrx_ast_entry_type {
 	CDP_TXRX_AST_TYPE_WDS,	/* WDS peer ast entry type*/
 	CDP_TXRX_AST_TYPE_MEC,	/* Multicast echo ast entry type */
 	CDP_TXRX_AST_TYPE_WDS_HM, /* HM WDS entry */
+	CDP_TXRX_AST_TYPE_BSS,	/* STAs BSS peer */
+	CDP_TXRX_AST_TYPE_DA,	/* AST entry based on Destination address */
 	CDP_TXRX_AST_TYPE_MAX
 };
 
@@ -820,14 +826,19 @@ enum cdp_stat_update_type {
  * @gi: guard interval 800/400/1600/3200 ns
  * @dcm: dcm
  * @ldpc: ldpc
+ * @delayed_ba: delayed ba bit
  * @ppdu_type: SU/MU_MIMO/MU_OFDMA/MU_MIMO_OFDMA/UL_TRIG/BURST_BCN/UL_BSR_RESP/
  * UL_BSR_TRIG/UNKNOWN
  * @ba_seq_no: Block Ack sequence number
  * @ba_bitmap: Block Ack bitmap
  * @start_seqa: Sequence number of first MPDU
  * @enq_bitmap: Enqueue MPDU bitmap
+ * @ru_tones: RU tones length
+ * @ru_start: RU start index
  * @is_mcast: MCAST or UCAST
  * @tx_rate: Transmission Rate
+ * @user_pos: user position
+ * @mu_group_id: mu group id
  */
 struct cdp_tx_completion_ppdu_user {
 	uint32_t completion_status:8,
@@ -861,7 +872,8 @@ struct cdp_tx_completion_ppdu_user {
 		 preamble:4,
 		 gi:4,
 		 dcm:1,
-		 ldpc:1;
+		 ldpc:1,
+		 delayed_ba:1;
 	uint32_t ba_seq_no;
 	uint32_t ba_bitmap[CDP_BA_256_BIT_MAP_SIZE_DWORDS];
 	uint32_t start_seq;
@@ -869,9 +881,12 @@ struct cdp_tx_completion_ppdu_user {
 	uint32_t num_mpdu:9,
 		 num_msdu:16;
 	uint32_t tx_duration;
+	uint16_t ru_start;
 	uint16_t ru_tones;
 	bool is_mcast;
 	uint32_t tx_rate;
+	uint32_t user_pos;
+	uint32_t mu_group_id;
 };
 
 /**

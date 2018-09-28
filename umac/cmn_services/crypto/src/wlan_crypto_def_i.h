@@ -518,6 +518,18 @@ static inline int ieee80211_hdrsize(const void *data)
 static inline uint16_t wlan_crypto_get_keyid(uint8_t *data)
 {
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)data;
+	uint8_t stype = WLAN_FC_GET_STYPE(hdr->frame_control);
+
+	/*
+	 * In FILS SK (Re)Association request/response frame has
+	 * to be decrypted
+	 */
+	if ((stype == WLAN_FC_STYPE_ASSOC_REQ) ||
+	    (stype == WLAN_FC_STYPE_REASSOC_REQ) ||
+	    (stype == WLAN_FC_STYPE_ASSOC_RESP) ||
+	    (stype == WLAN_FC_STYPE_REASSOC_RESP)) {
+		return 0;
+	}
 
 	if (hdr->frame_control & WLAN_FC_ISWEP) {
 		uint8_t *iv;

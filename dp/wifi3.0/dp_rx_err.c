@@ -556,12 +556,13 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc,
 			uint8_t *rx_tlv_hdr,
 			uint8_t pool_id)
 {
-	uint32_t pkt_len, l2_hdr_offset;
+	uint32_t pkt_len, l2_hdr_offset = 0;
 	uint16_t msdu_len;
 	struct dp_vdev *vdev;
 	uint16_t peer_id = 0xFFFF;
 	struct dp_peer *peer = NULL;
 	uint8_t tid;
+	struct ether_header *eh;
 
 	qdf_nbuf_set_rx_chfrag_start(nbuf,
 			hal_rx_msdu_end_first_msdu_get(rx_tlv_hdr));
@@ -569,13 +570,18 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc,
 			hal_rx_msdu_end_last_msdu_get(rx_tlv_hdr));
 	qdf_nbuf_set_da_mcbc(nbuf,
 			hal_rx_msdu_end_da_is_mcbc_get(rx_tlv_hdr));
+	qdf_nbuf_set_da_valid(nbuf,
+			      hal_rx_msdu_end_da_is_valid_get(rx_tlv_hdr));
+	qdf_nbuf_set_sa_valid(nbuf,
+			      hal_rx_msdu_end_sa_is_valid_get(rx_tlv_hdr));
 
-	l2_hdr_offset = hal_rx_msdu_end_l3_hdr_padding_get(rx_tlv_hdr);
-	msdu_len = hal_rx_msdu_start_msdu_len_get(rx_tlv_hdr);
-	pkt_len = msdu_len + l2_hdr_offset + RX_PKT_TLVS_LEN;
-
-	/* Set length in nbuf */
-	qdf_nbuf_set_pktlen(nbuf, pkt_len);
+	if (qdf_likely(!qdf_nbuf_is_frag(nbuf))) {
+		l2_hdr_offset = hal_rx_msdu_end_l3_hdr_padding_get(rx_tlv_hdr);
+		msdu_len = hal_rx_msdu_start_msdu_len_get(rx_tlv_hdr);
+		pkt_len = msdu_len + l2_hdr_offset + RX_PKT_TLVS_LEN;
+		/* Set length in nbuf */
+		qdf_nbuf_set_pktlen(nbuf, pkt_len);
+	}
 
 	/*
 	 * Check if DMA completed -- msdu_done is the last bit
@@ -599,6 +605,11 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc,
 
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 		FL("peer is NULL"));
+
+		DP_STATS_INC_PKT(soc,
+				 rx.err.rx_invalid_peer,
+				 1,
+				 qdf_nbuf_len(nbuf));
 
 		mpdu_done = dp_rx_chain_msdus(soc, nbuf, rx_tlv_hdr, pool_id);
 		/* Trigger invalid peer handler wrapper */
@@ -629,6 +640,7 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc,
 
 	if (dp_rx_mcast_echo_check(soc, peer, rx_tlv_hdr, nbuf)) {
 		/* this is a looped back MCBC pkt, drop it */
+		DP_STATS_INC_PKT(peer, rx.mec_drop, 1, qdf_nbuf_len(nbuf));
 		qdf_nbuf_free(nbuf);
 		return;
 	}
@@ -638,6 +650,7 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc,
 	 * from any proxysta.
 	 */
 	if (check_qwrap_multicast_loopback(vdev, nbuf)) {
+		DP_STATS_INC_PKT(peer, rx.mec_drop, 1, qdf_nbuf_len(nbuf));
 		qdf_nbuf_free(nbuf);
 		return;
 	}
@@ -693,9 +706,10 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc,
 		dp_rx_deliver_raw(vdev, nbuf, peer);
 	} else {
 		if (qdf_unlikely(peer->bss_peer)) {
-			QDF_TRACE(QDF_MODULE_ID_DP,
-					QDF_TRACE_LEVEL_INFO,
-					FL("received pkt with same src MAC"));
+			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
+				  FL("received pkt with same src MAC"));
+			DP_STATS_INC_PKT(peer, rx.mec_drop, 1,
+					 qdf_nbuf_len(nbuf));
 			/* Drop & free packet */
 			qdf_nbuf_free(nbuf);
 			return;
@@ -706,13 +720,34 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc,
 				FL("vdev %pK osif_rx %pK"), vdev,
 				vdev->osif_rx);
 			qdf_nbuf_set_next(nbuf, NULL);
+			if (qdf_unlikely(qdf_nbuf_is_da_mcbc(nbuf))) {
+				eh = (struct ether_header *)qdf_nbuf_data(nbuf);
+				if (IEEE80211_IS_BROADCAST(eh->ether_dhost)) {
+					DP_STATS_INC_PKT(peer,
+							 rx.bcast,
+							 1,
+							 qdf_nbuf_len(nbuf));
+				} else {
+					DP_STATS_INC_PKT(peer,
+							 rx.multicast,
+							 1,
+							 qdf_nbuf_len(nbuf));
+				}
+			}
+			DP_STATS_INC_PKT(peer, rx.to_stack, 1,
+					 qdf_nbuf_len(nbuf));
+
 			vdev->osif_rx(vdev->osif_vdev, nbuf);
-			DP_STATS_INCC_PKT(vdev->pdev, rx.multicast, 1,
-				qdf_nbuf_len(nbuf),
-				hal_rx_msdu_end_da_is_mcbc_get(
-					rx_tlv_hdr));
-			DP_STATS_INC_PKT(vdev->pdev, rx.to_stack, 1,
-							qdf_nbuf_len(nbuf));
+			if (qdf_unlikely(hal_rx_msdu_end_da_is_mcbc_get(rx_tlv_hdr) &&
+						(vdev->rx_decap_type == htt_cmn_pkt_type_ethernet))) {
+				eh = (struct ether_header *)qdf_nbuf_data(nbuf);
+
+				DP_STATS_INC_PKT(peer, rx.multicast, 1,
+					qdf_nbuf_len(nbuf));
+				if (IEEE80211_IS_BROADCAST(eh->ether_dhost)) {
+					DP_STATS_INC_PKT(peer, rx.bcast, 1, qdf_nbuf_len(nbuf));
+				}
+			}
 		} else {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 				FL("INVALID vdev %pK OR osif_rx"), vdev);
@@ -763,7 +798,6 @@ dp_rx_err_deliver(struct dp_soc *soc, qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr)
 	l2_hdr_offset = hal_rx_msdu_end_l3_hdr_padding_get(rx_tlv_hdr);
 	msdu_len = hal_rx_msdu_start_msdu_len_get(rx_tlv_hdr);
 	pkt_len = msdu_len + l2_hdr_offset + RX_PKT_TLVS_LEN;
-
 	/* Set length in nbuf */
 	qdf_nbuf_set_pktlen(nbuf, pkt_len);
 

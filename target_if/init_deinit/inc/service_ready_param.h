@@ -173,7 +173,7 @@ struct wlan_psoc_host_mac_phy_caps {
 	uint32_t ht_cap_info_2G;
 	uint32_t vht_cap_info_2G;
 	uint32_t vht_supp_mcs_2G;
-	uint32_t he_cap_info_2G;
+	uint32_t he_cap_info_2G[PSOC_HOST_MAX_MAC_SIZE];
 	uint32_t he_supp_mcs_2G;
 	uint32_t tx_chain_mask_2G;
 	uint32_t rx_chain_mask_2G;
@@ -181,7 +181,7 @@ struct wlan_psoc_host_mac_phy_caps {
 	uint32_t ht_cap_info_5G;
 	uint32_t vht_cap_info_5G;
 	uint32_t vht_supp_mcs_5G;
-	uint32_t he_cap_info_5G;
+	uint32_t he_cap_info_5G[PSOC_HOST_MAX_MAC_SIZE];
 	uint32_t he_supp_mcs_5G;
 	uint32_t tx_chain_mask_5G;
 	uint32_t rx_chain_mask_5G;

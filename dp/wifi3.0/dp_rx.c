@@ -342,6 +342,37 @@ dp_get_vdev_from_peer(struct dp_soc *soc,
 #endif
 
 /**
+ * dp_rx_da_learn() - Add AST entry based on DA lookup
+ *			This is a WAR for HK 1.0 and will
+ *			be removed in HK 2.0
+ *
+ * @soc: core txrx main context
+ * @rx_tlv_hdr	: start address of rx tlvs
+ * @sa_peer	: source peer entry
+ * @nbuf	: nbuf to retrive destination mac for which AST will be added
+ *
+ */
+static void
+dp_rx_da_learn(struct dp_soc *soc,
+		uint8_t *rx_tlv_hdr,
+		struct dp_peer *ta_peer,
+		qdf_nbuf_t nbuf)
+{
+	if (ta_peer && (ta_peer->vdev->opmode != wlan_op_mode_ap))
+		return;
+
+	if (qdf_unlikely(!qdf_nbuf_is_da_valid(nbuf) &&
+			 !qdf_nbuf_is_da_mcbc(nbuf))) {
+		dp_peer_add_ast(soc,
+				ta_peer->vdev->vap_bss_peer,
+				qdf_nbuf_data(nbuf),
+				CDP_TXRX_AST_TYPE_DA,
+				IEEE80211_NODE_F_WDS_HM);
+	}
+}
+
+
+/**
  * dp_rx_intrabss_fwd() - Implements the Intra-BSS forwarding logic
  *
  * @soc: core txrx main context
@@ -375,6 +406,11 @@ dp_rx_intrabss_fwd(struct dp_soc *soc,
 		ast_entry = soc->ast_table[da_idx];
 		if (!ast_entry)
 			return false;
+
+		if (ast_entry->type == CDP_TXRX_AST_TYPE_DA) {
+			ast_entry->is_active = TRUE;
+			return false;
+		}
 
 		da_peer = ast_entry->peer;
 
@@ -1072,10 +1108,10 @@ static inline void dp_rx_msdu_stats_update(struct dp_soc *soc,
 	if (qdf_unlikely(qdf_nbuf_is_da_mcbc(nbuf) &&
 			 (vdev->rx_decap_type == htt_cmn_pkt_type_ethernet))) {
 		eh = (struct ether_header *)qdf_nbuf_data(nbuf);
+		DP_STATS_INC_PKT(peer, rx.multicast, 1, msdu_len);
 		if (IEEE80211_IS_BROADCAST(eh->ether_dhost)) {
 			DP_STATS_INC_PKT(peer, rx.bcast, 1, msdu_len);
-		} else {
-			DP_STATS_INC_PKT(peer, rx.multicast, 1, msdu_len);
+
 		}
 	}
 
@@ -1334,7 +1370,7 @@ dp_rx_process(struct dp_intr *int_ctx, void *hal_ring, uint32_t quota)
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 			FL("HAL RING Access Failed -- %pK"), hal_ring);
 		hal_srng_access_end(hal_soc, hal_ring);
-		goto done;
+		return rx_bufs_used;
 	}
 
 	ring_id = hal_srng_ring_id_get(hal_ring);
@@ -1359,7 +1395,8 @@ dp_rx_process(struct dp_intr *int_ctx, void *hal_ring, uint32_t quota)
 			ring_desc = hal_srng_dst_get_next(hal_soc, hal_ring);
 			if (!ring_desc) {
 				break;
-			 }
+			}
+			DP_STATS_INC(soc, rx.hp_oos, 1);
 		}
 
 		error = HAL_RX_ERROR_STATUS_GET(ring_desc);
@@ -1429,7 +1466,6 @@ dp_rx_process(struct dp_intr *int_ctx, void *hal_ring, uint32_t quota)
 						&tail[rx_desc->pool_id],
 						rx_desc);
 	}
-done:
 	hal_srng_access_end(hal_soc, hal_ring);
 
 	/* Update histogram statistics by looping through pdev's */
@@ -1489,6 +1525,8 @@ done:
 		if (qdf_likely((peer != NULL) && !peer->delete_in_progress)) {
 			vdev = peer->vdev;
 		} else {
+			DP_STATS_INC_PKT(soc, rx.err.rx_invalid_peer, 1,
+					 QDF_NBUF_CB_RX_PKT_LEN(nbuf));
 			qdf_nbuf_free(nbuf);
 			nbuf = next;
 			continue;
@@ -1548,8 +1586,7 @@ done:
 			nbuf = dp_rx_sg_create(soc, nbuf, msdu_len);
 
 			DP_STATS_INC(vdev->pdev, rx_raw_pkts, 1);
-			DP_STATS_INC_PKT(peer, rx.raw, 1,
-					 msdu_len);
+			DP_STATS_INC_PKT(peer, rx.raw, 1, msdu_len);
 
 			rx_tlv_hdr = qdf_nbuf_data(nbuf);
 			qdf_nbuf_pull_head(nbuf, RX_PKT_TLVS_LEN);
@@ -1586,7 +1623,7 @@ done:
 			QDF_TRACE(QDF_MODULE_ID_DP,
 				QDF_TRACE_LEVEL_ERROR,
 				FL("received pkt with same src MAC"));
-			DP_STATS_INC(vdev->pdev, dropped.mec, 1);
+			DP_STATS_INC_PKT(peer, rx.mec_drop, 1, msdu_len);
 
 			/* Drop & free packet */
 			qdf_nbuf_free(nbuf);
@@ -1642,6 +1679,7 @@ done:
 					htt_cmn_pkt_type_ethernet) &&
 				(qdf_likely(!vdev->mesh_vdev)) &&
 				(vdev->wds_enabled)) {
+			dp_rx_da_learn(soc, rx_tlv_hdr, peer, nbuf);
 			/* WDS Source Port Learning */
 			dp_rx_wds_srcport_learn(soc,
 						rx_tlv_hdr,

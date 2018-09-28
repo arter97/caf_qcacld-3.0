@@ -293,7 +293,7 @@ int hif_ahb_configure_grp_irq(struct hif_softc *scn,
 	hif_ext_group->irq_disable = &hif_ahb_exec_grp_irq_disable;
 	hif_ext_group->work_complete = &hif_dummy_grp_done;
 
-	hif_ext_group->irq_requested = true;
+	qdf_spin_lock_irqsave(&hif_ext_group->irq_lock);
 
 	for (j = 0; j < hif_ext_group->numirq; j++) {
 		irq_name = ic_irqname[hif_ext_group->irq[j]];
@@ -313,8 +313,10 @@ int hif_ahb_configure_grp_irq(struct hif_softc *scn,
 		}
 		hif_ext_group->os_irq[j] = irq;
 	}
+	hif_ext_group->irq_requested = true;
 
 end:
+	qdf_spin_unlock_irqrestore(&hif_ext_group->irq_lock);
 	return ret;
 }
 
@@ -329,6 +331,7 @@ void hif_ahb_deconfigure_grp_irq(struct hif_softc *scn)
 	for (i = 0; i < hif_state->hif_num_extgroup; i++) {
 		hif_ext_group = hif_state->hif_ext_group[i];
 		if (hif_ext_group->irq_requested == true) {
+			qdf_spin_lock_irqsave(&hif_ext_group->irq_lock);
 			hif_ext_group->irq_requested = false;
 			for (j = 0; j < hif_ext_group->numirq; j++) {
 				irq = hif_ext_group->os_irq[j];
@@ -336,6 +339,7 @@ void hif_ahb_deconfigure_grp_irq(struct hif_softc *scn)
 						       IRQ_DISABLE_UNLAZY);
 				free_irq(irq, hif_ext_group);
 			}
+			qdf_spin_unlock_irqrestore(&hif_ext_group->irq_lock);
 		}
 	}
 }

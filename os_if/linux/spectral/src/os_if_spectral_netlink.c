@@ -250,8 +250,7 @@ os_if_spectral_prep_skb(struct wlan_objmgr_pdev *pdev)
 	skb_put(ps->skb, MAX_SPECTRAL_PAYLOAD);
 	spectral_nlh = (struct nlmsghdr *)ps->skb->data;
 
-	OS_MEMZERO(spectral_nlh,
-		   sizeof(*spectral_nlh));
+	qdf_mem_zero(spectral_nlh, sizeof(*spectral_nlh));
 
 	/*
 	 * Possible bug that size of  struct spectral_samp_msg and
@@ -264,6 +263,8 @@ os_if_spectral_prep_skb(struct wlan_objmgr_pdev *pdev)
 	spectral_nlh->nlmsg_flags = 0;
 	spectral_nlh->nlmsg_type = WLAN_NL_MSG_SPECTRAL_SCAN;
 
+	qdf_mem_zero(NLMSG_DATA(spectral_nlh),
+		     sizeof(struct spectral_samp_msg));
 	return NLMSG_DATA(spectral_nlh);
 }
 
@@ -387,6 +388,7 @@ os_if_spectral_nl_unicast_msg(struct wlan_objmgr_pdev *pdev)
 }
 
 #endif
+
 /**
  * os_if_spectral_nl_bcast_msg() - Sends broadcast Spectral message to user
  * space
@@ -436,6 +438,44 @@ os_if_spectral_nl_bcast_msg(struct wlan_objmgr_pdev *pdev)
 	return status;
 }
 
+/**
+ * os_if_spectral_free_skb() - Free spectral SAMP message skb
+ *
+ * @pdev : Pointer to pdev
+ *
+ * Return: void
+ */
+static void
+os_if_spectral_free_skb(struct wlan_objmgr_pdev *pdev)
+{
+	struct pdev_spectral *ps = NULL;
+
+	if (!pdev) {
+		spectral_err("PDEV is NULL!");
+		return;
+	}
+	ps = wlan_objmgr_pdev_get_comp_private_obj(pdev,
+						   WLAN_UMAC_COMP_SPECTRAL);
+
+	if (!ps) {
+		spectral_err("PDEV SPECTRAL object is NULL!");
+		return;
+	}
+
+	if (!ps->skb) {
+		spectral_err("Socket buffer is null");
+		return;
+	}
+
+	/* Free buffer */
+	qdf_nbuf_free(ps->skb);
+
+	/* clear the local copy */
+	ps->skb = NULL;
+}
+
+qdf_export_symbol(os_if_spectral_free_skb);
+
 void
 os_if_spectral_netlink_init(struct wlan_objmgr_pdev *pdev)
 {
@@ -461,8 +501,10 @@ os_if_spectral_netlink_init(struct wlan_objmgr_pdev *pdev)
 	nl_cb.send_nl_bcast = os_if_spectral_nl_bcast_msg;
 	nl_cb.send_nl_unicast = os_if_spectral_nl_unicast_msg;
 	nl_cb.destroy_netlink = os_if_spectral_destroy_netlink;
+	nl_cb.free_nbuff = os_if_spectral_free_skb;
 
 	if (sptrl_ctx->sptrlc_register_netlink_cb)
 		sptrl_ctx->sptrlc_register_netlink_cb(pdev, &nl_cb);
 }
 EXPORT_SYMBOL(os_if_spectral_netlink_init);
+

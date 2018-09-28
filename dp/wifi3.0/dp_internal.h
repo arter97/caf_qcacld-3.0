@@ -292,13 +292,15 @@ while (0)
 		DP_STATS_AGGR(_tgtobj, _srcobj, tx.dropped.age_out); \
 								\
 		DP_STATS_AGGR(_tgtobj, _srcobj, rx.err.mic_err); \
-		DP_STATS_UPD_STRUCT(_tgtobj, _srcobj, rx.rssi); \
+		if (_srcobj->stats.rx.rssi != 0) \
+			DP_STATS_UPD_STRUCT(_tgtobj, _srcobj, rx.rssi); \
 		DP_STATS_UPD_STRUCT(_tgtobj, _srcobj, rx.rx_rate); \
 		DP_STATS_AGGR(_tgtobj, _srcobj, rx.err.decrypt_err); \
 		DP_STATS_AGGR(_tgtobj, _srcobj, rx.non_ampdu_cnt); \
 		DP_STATS_AGGR(_tgtobj, _srcobj, rx.ampdu_cnt); \
 		DP_STATS_AGGR(_tgtobj, _srcobj, rx.non_amsdu_cnt); \
 		DP_STATS_AGGR(_tgtobj, _srcobj, rx.amsdu_cnt); \
+		DP_STATS_AGGR(_tgtobj, _srcobj, rx.nawds_mcast_drop); \
 		DP_STATS_AGGR_PKT(_tgtobj, _srcobj, rx.to_stack); \
 		DP_STATS_AGGR_PKT(_tgtobj, _srcobj, rx.bcast);\
 								\
@@ -307,17 +309,16 @@ while (0)
 									\
 		_srcobj->stats.rx.unicast.num = \
 			_srcobj->stats.rx.to_stack.num - \
-					(_srcobj->stats.rx.multicast.num +  \
-					_srcobj->stats.rx.bcast.num); \
+					_srcobj->stats.rx.multicast.num; \
 		_srcobj->stats.rx.unicast.bytes = \
 			_srcobj->stats.rx.to_stack.bytes - \
-					(_srcobj->stats.rx.multicast.bytes + \
-					_srcobj->stats.rx.bcast.bytes); \
+					_srcobj->stats.rx.multicast.bytes; \
 		DP_STATS_AGGR_PKT(_tgtobj, _srcobj, rx.unicast); \
 		DP_STATS_AGGR_PKT(_tgtobj, _srcobj, rx.multicast); \
 		DP_STATS_AGGR_PKT(_tgtobj, _srcobj, rx.raw); \
 		DP_STATS_AGGR_PKT(_tgtobj, _srcobj, rx.intra_bss.pkts); \
 		DP_STATS_AGGR_PKT(_tgtobj, _srcobj, rx.intra_bss.fail); \
+		DP_STATS_AGGR_PKT(_tgtobj, _srcobj, rx.mec_drop); \
 								  \
 		_tgtobj->stats.tx.last_ack_rssi =	\
 			_srcobj->stats.tx.last_ack_rssi; \

@@ -166,7 +166,6 @@
 #define WMI_HOST_TXBF_CONF_SU_TX_BFEE_SET(x, z) \
 	WMI_HOST_F_RMW(x, z, WMI_HOST_TXBF_CONF_SU_TX_BFEE)
 
-
 #define WMI_HOST_TXBF_CONF_MU_TX_BFEE_S 1
 #define WMI_HOST_TXBF_CONF_MU_TX_BFEE_M 0x1
 #define WMI_HOST_TXBF_CONF_MU_TX_BFEE \
@@ -306,6 +305,38 @@
 	WMI_HOST_F_MS(x, WMI_HOST_HE_BF_CONF_UL_MUMIMO)
 #define WMI_HOST_HE_BF_CONF_UL_MUMIMO_SET(x, z) \
 	WMI_HOST_F_RMW(x, z, WMI_HOST_HE_BF_CONF_UL_MUMIMO)
+
+/* HE or VHT Sounding */
+#define WMI_HOST_HE_VHT_SOUNDING_MODE_S 0
+#define WMI_HOST_HE_VHT_SOUNDING_MODE_M 0x1
+#define WMI_HOST_HE_VHT_SOUNDING_MODE \
+	(WMI_HOST_HE_VHT_SOUNDING_MODE_M << WMI_HOST_HE_VHT_SOUNDING_MODE_S)
+#define WMI_HOST_HE_VHT_SOUNDING_MODE_GET(x) \
+	WMI_HOST_F_MS(x, WMI_HOST_HE_VHT_SOUNDING_MODE)
+#define WMI_HOST_HE_VHT_SOUNDING_MODE_SET(x, z) \
+	WMI_HOST_F_RMW(x, z, WMI_HOST_HE_VHT_SOUNDING_MODE)
+
+/* SU or MU Sounding */
+#define WMI_HOST_SU_MU_SOUNDING_MODE_S 2
+#define WMI_HOST_SU_MU_SOUNDING_MODE_M 0x1
+#define WMI_HOST_SU_MU_SOUNDING_MODE \
+	(WMI_HOST_SU_MU_SOUNDING_MODE_M << \
+	 WMI_HOST_SU_MU_SOUNDING_MODE_S)
+#define WMI_HOST_SU_MU_SOUNDING_MODE_GET(x) \
+	WMI_HOST_F_MS(x, WMI_HOST_SU_MU_SOUNDING_MODE)
+#define WMI_HOST_SU_MU_SOUNDING_MODE_SET(x, z) \
+	WMI_HOST_F_RMW(x, z, WMI_HOST_SU_MU_SOUNDING_MODE)
+
+/* Trig or Non-Trig Sounding */
+#define WMI_HOST_TRIG_NONTRIG_SOUNDING_MODE_S  3
+#define WMI_HOST_TRIG_NONTRIG_SOUNDING_MODE_M 0x1
+#define WMI_HOST_TRIG_NONTRIG_SOUNDING_MODE \
+	(WMI_HOST_TRIG_NONTRIG_SOUNDING_MODE_M << \
+	 WMI_HOST_TRIG_NONTRIG_SOUNDING_MODE_S)
+#define WMI_HOST_TRIG_NONTRIG_SOUNDING_MODE_GET(x) \
+	WMI_HOST_F_MS(x, WMI_HOST_TRIG_NONTRIG_SOUNDING_MODE)
+#define WMI_HOST_HE_VHT_SU_MU_SOUNDING_MODE_SET(x, z) \
+	WMI_HOST_F_RMW(x, z, WMI_HOST_TRIG_NONTRIG_SOUNDING_MODE)
 
 #define WMI_HOST_TPC_RATE_MAX	160
 #define WMI_HOST_TPC_TX_NUM_CHAIN	4
@@ -1110,6 +1141,9 @@ typedef struct {
 
 #define WMI_HOST_MAX_NUM_SS		8
 #define WMI_HOST_MAX_HECAP_PHY_SIZE	3
+#define WMI_HOST_MAX_HECAP_MAC_SIZE	2
+#define WMI_HOST_HECAP_MAC_WORD1	0
+#define WMI_HOST_HECAP_MAC_WORD2	1
 #define WMI_HOST_MAX_HE_RATE_SET	3
 /**
  * struct wmi_host_ppe_threshold -PPE threshold
@@ -1238,7 +1272,7 @@ struct peer_assoc_params {
 	uint8_t peer_mac[IEEE80211_ADDR_LEN];
 #endif
 	bool he_flag;
-	uint32_t peer_he_cap_macinfo;
+	uint32_t peer_he_cap_macinfo[WMI_HOST_MAX_HECAP_MAC_SIZE];
 	uint32_t peer_he_ops;
 	uint32_t peer_he_cap_phyinfo[WMI_HOST_MAX_HECAP_PHY_SIZE];
 	uint32_t peer_he_mcs_count;
@@ -5735,6 +5769,8 @@ typedef enum {
 	wmi_pdev_param_tx_ack_timeout,
 	wmi_pdev_param_soft_tx_chain_mask,
 	wmi_pdev_param_cck_tx_enable,
+	wmi_pdev_param_antenna_gain_half_db,
+	wmi_pdev_param_equal_ru_allocation_enable,
 
 	wmi_pdev_param_max,
 } wmi_conv_pdev_params_id;
@@ -5855,6 +5891,7 @@ typedef enum {
 	wmi_vdev_param_set_ba_mode,
 	wmi_vdev_param_autorate_misc_cfg,
 	wmi_vdev_param_rawmode_open_war,
+	wmi_vdev_param_set_he_sounding_mode,
 
 	wmi_vdev_param_max,
 } wmi_conv_vdev_param_id;

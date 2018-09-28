@@ -61,6 +61,22 @@
 #define MAX_BW 7
 #define MAX_RECEPTION_TYPES 4
 
+#define MAX_TRANSMIT_TYPES	9
+#define SU_TX			0
+#define MUMIMO_TX		1
+#define MUOFDMA_TX		2
+#define MUMIMO_OFDMA_TX		3
+
+#define MAX_USER_POS		8
+#define MAX_MU_GROUP_ID		64
+#define MAX_RU_LOCATIONS	6
+#define RU_26			1
+#define RU_52			2
+#define RU_106			4
+#define RU_242			9
+#define RU_484			18
+#define RU_996			37
+
 /* WME stream classes */
 #define WME_AC_BE    0    /* best effort */
 #define WME_AC_BK    1    /* background */
@@ -162,6 +178,17 @@ struct cdp_tx_stats {
 		/* aged out in mpdu/msdu queues*/
 		uint32_t age_out;
 	} dropped;
+
+	/* TX transmit type */
+	uint32_t transmit_type[MAX_TRANSMIT_TYPES];
+	/* mu group id */
+	uint8_t mu_group_id[MAX_MU_GROUP_ID];
+	/* RU start index */
+	uint32_t ru_start;
+	/* RU tones */
+	uint32_t ru_tones;
+	/* RU location */
+	uint32_t ru_loc[MAX_RU_LOCATIONS];
 };
 
 /* Rx Level Stats */
@@ -180,6 +207,8 @@ struct cdp_rx_stats {
 	struct cdp_pkt_info raw;
 	/* Total multicast packets */
 	uint32_t nawds_mcast_drop;
+	/* Total MEC packets */
+	struct cdp_pkt_info mec_drop;
 
 	struct {
 	/* Intra BSS packets received */
@@ -232,8 +261,17 @@ struct cdp_tx_ingress_stats {
 	struct cdp_pkt_info rcvd;
 	/* Tx packets processed*/
 	struct cdp_pkt_info processed;
-	/* Total packets passed Reinject handler */
-	struct cdp_pkt_info reinject_pkts;
+
+	struct {
+		/* Total packets passed Reinject handler */
+		struct cdp_pkt_info reinject_pkts;
+		/* Total packets reinjected to FW */
+		uint32_t to_fw;
+		/* Total packets reinjected to FW failed*/
+		uint32_t reinject_err;
+		/* invalid reinject events*/
+		uint32_t invalid_events;
+	} reinject;
 	/*  Total packets passed to inspect handler */
 	struct cdp_pkt_info inspect_pkts;
 	/*NAWDS  Multicast Packet Count */
@@ -312,6 +350,8 @@ struct cdp_tx_ingress_stats {
 		uint32_t exception_fw;
 		/* packets completions received from fw */
 		uint32_t completion_fw;
+		/* packets dropped due to invalid length*/
+		uint32_t msdu_len_invalid;
 	} mesh;
 
 	/*Number of packets classified by CCE*/
@@ -319,6 +359,8 @@ struct cdp_tx_ingress_stats {
 
 	/*Number of raw packets classified by CCE*/
 	uint32_t cce_classified_raw;
+	/*Number of eapol packets classified by CCE*/
+	uint32_t cce_classified_eapol;
 };
 
 struct cdp_vdev_stats {
@@ -1240,6 +1282,9 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_CCK_TX_ENABLE = 363,
 	OL_ATH_PARAM_ISOLATION = 365,
 	OL_ATH_BCN_STATS_RESET = 368,
+	OL_ATH_PARAM_TWICE_ANTENNA_GAIN = 369,
+	OL_ATH_PARAM_HE_UL_RU_ALLOCATION = 370,
+
 };
 
 /* Enumeration of PDEV Configuration parameter */

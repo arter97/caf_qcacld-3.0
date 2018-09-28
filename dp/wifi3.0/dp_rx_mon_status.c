@@ -224,6 +224,8 @@ dp_rx_handle_mcopy_mode(struct dp_soc *soc, struct dp_pdev *pdev,
 			struct hal_rx_ppdu_info *ppdu_info, qdf_nbuf_t nbuf)
 {
 	uint8_t size = 0;
+	struct ieee80211_frame *wh;
+	uint32_t *nbuf_data;
 
 	if (ppdu_info->msdu_info.first_msdu_payload == NULL)
 		return QDF_STATUS_SUCCESS;
@@ -233,14 +235,23 @@ dp_rx_handle_mcopy_mode(struct dp_soc *soc, struct dp_pdev *pdev,
 
 	pdev->m_copy_id.rx_ppdu_id = ppdu_info->com_info.ppdu_id;
 
-	/* Include 2 bytes of reserved space appended to the msdu payload */
+	wh = (struct ieee80211_frame *)(ppdu_info->msdu_info.first_msdu_payload
+					+ 4);
 	size = (ppdu_info->msdu_info.first_msdu_payload -
-				qdf_nbuf_data(nbuf)) + 2;
+				qdf_nbuf_data(nbuf));
 	ppdu_info->msdu_info.first_msdu_payload = NULL;
 
 	if (qdf_nbuf_pull_head(nbuf, size) == NULL)
 		return QDF_STATUS_SUCCESS;
 
+	if (((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) ==
+	     IEEE80211_FC0_TYPE_MGT) ||
+	     ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) ==
+	     IEEE80211_FC0_TYPE_CTL)) {
+		return QDF_STATUS_SUCCESS;
+	}
+	nbuf_data = (uint32_t *)qdf_nbuf_data(nbuf);
+	*nbuf_data = pdev->ppdu_info.com_info.ppdu_id;
 	/* only retain RX MSDU payload in the skb */
 	qdf_nbuf_trim_tail(nbuf, qdf_nbuf_len(nbuf) -
 				ppdu_info->msdu_info.payload_len);
@@ -339,8 +350,10 @@ dp_rx_mon_status_process_tlv(struct dp_soc *soc, uint32_t mac_id,
 	uint8_t *rx_tlv_start;
 	uint32_t tlv_status = HAL_TLV_STATUS_BUF_DONE;
 	QDF_STATUS m_copy_status = QDF_STATUS_SUCCESS;
+	struct cdp_pdev_mon_stats *rx_mon_stats;
 
 	ppdu_info = &pdev->ppdu_info;
+	rx_mon_stats = &pdev->rx_mon_stats;
 
 	if (pdev->mon_ppdu_status != DP_PPDU_STATUS_START)
 		return;
@@ -364,6 +377,10 @@ dp_rx_mon_status_process_tlv(struct dp_soc *soc, uint32_t mac_id,
 			do {
 				tlv_status = hal_rx_status_get_tlv_info(rx_tlv,
 						ppdu_info);
+
+				dp_rx_mon_update_dbg_ppdu_stats(ppdu_info,
+								rx_mon_stats);
+
 				rx_tlv = hal_rx_status_get_next_tlv(rx_tlv);
 
 				if ((rx_tlv - rx_tlv_start) >= RX_BUFFER_SIZE)
@@ -382,6 +399,8 @@ dp_rx_mon_status_process_tlv(struct dp_soc *soc, uint32_t mac_id,
 		}
 
 		if (tlv_status == HAL_TLV_STATUS_PPDU_DONE) {
+
+			rx_mon_stats->status_ppdu_done++;
 			if (pdev->enhanced_stats_en ||
 					pdev->mcopy_mode)
 				dp_rx_handle_ppdu_stats(soc, pdev, ppdu_info);
@@ -389,8 +408,6 @@ dp_rx_mon_status_process_tlv(struct dp_soc *soc, uint32_t mac_id,
 			pdev->mon_ppdu_status = DP_PPDU_STATUS_DONE;
 			dp_rx_mon_dest_process(soc, mac_id, quota);
 			pdev->mon_ppdu_status = DP_PPDU_STATUS_START;
-			pdev->ppdu_info.com_info.last_ppdu_id =
-				pdev->ppdu_info.com_info.ppdu_id;
 		}
 	}
 	return;
@@ -838,9 +855,15 @@ dp_rx_pdev_mon_status_attach(struct dp_pdev *pdev) {
 	qdf_nbuf_queue_init(&pdev->rx_status_q);
 
 	pdev->mon_ppdu_status = DP_PPDU_STATUS_START;
-	pdev->ppdu_info.com_info.last_ppdu_id = 0;
+
 	qdf_mem_zero(&(pdev->ppdu_info.rx_status),
 		sizeof(pdev->ppdu_info.rx_status));
+
+	qdf_mem_zero(&pdev->rx_mon_stats,
+		     sizeof(pdev->rx_mon_stats));
+
+	dp_rx_mon_init_dbg_ppdu_stats(&pdev->ppdu_info,
+				      &pdev->rx_mon_stats);
 
 	return QDF_STATUS_SUCCESS;
 }

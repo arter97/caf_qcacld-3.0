@@ -439,6 +439,21 @@ dp_rx_wds_srcport_learn(struct dp_soc *soc,
 	if (ast && sa_sw_peer_id != ta_peer->peer_ids[0]) {
 		sa_peer = ast->peer;
 
+		if ((ast->type != CDP_TXRX_AST_TYPE_STATIC) &&
+		    (ast->type != CDP_TXRX_AST_TYPE_SELF) &&
+		    (ast->type != CDP_TXRX_AST_TYPE_BSS)) {
+			if (ast->pdev_id != ta_peer->vdev->pdev->pdev_id) {
+				dp_peer_del_ast(soc, ast);
+				ret = dp_peer_add_ast(soc,
+							ta_peer,
+							wds_src_mac,
+							CDP_TXRX_AST_TYPE_WDS,
+							flags);
+			} else
+				dp_peer_update_ast(soc, ta_peer, ast, flags);
+			return;
+		}
+
 		/*
 		 * Do not kickout STA if it belongs to a different radio.
 		 * For DBDC repeater, it is possible to arrive here
@@ -447,12 +462,6 @@ dp_rx_wds_srcport_learn(struct dp_soc *soc,
 		 */
 		if (ast->pdev_id != ta_peer->vdev->pdev->pdev_id)
 			return;
-
-		if ((ast->type != CDP_TXRX_AST_TYPE_STATIC) &&
-		    (ast->type != CDP_TXRX_AST_TYPE_SELF)) {
-			dp_peer_update_ast(soc, ta_peer, ast, flags);
-			return;
-		}
 
 		/*
 		 * Kickout, when direct associated peer(SA) roams
@@ -699,27 +708,22 @@ static inline bool check_qwrap_multicast_loopback(struct dp_vdev *vdev,
 {
 	struct dp_vdev *psta_vdev;
 	struct dp_pdev *pdev = vdev->pdev;
-	struct dp_soc *soc = pdev->soc;
 	uint8_t *data = qdf_nbuf_data(nbuf);
-	uint8_t i;
 
-	for (i = 0; i < MAX_PDEV_CNT && soc->pdev_list[i]; i++) {
-		pdev = soc->pdev_list[i];
-		if (qdf_unlikely(vdev->proxysta_vdev)) {
-			/* In qwrap isolation mode, allow loopback packets as all
-			 * packets go to RootAP and Loopback on the mpsta.
-			 */
-			if (vdev->isolation_vdev)
-				return false;
-			TAILQ_FOREACH(psta_vdev, &pdev->vdev_list, vdev_list_elem) {
-				if (qdf_unlikely(psta_vdev->proxysta_vdev &&
-					!qdf_mem_cmp(psta_vdev->mac_addr.raw,
-					&data[DP_MAC_ADDR_LEN], DP_MAC_ADDR_LEN))) {
-					/* Drop packet if source address is equal to
-					 * any of the vdev addresses.
-					 */
-					return true;
-				}
+	if (qdf_unlikely(vdev->proxysta_vdev)) {
+		/* In qwrap isolation mode, allow loopback packets as all
+		 * packets go to RootAP and Loopback on the mpsta.
+		 */
+		if (vdev->isolation_vdev)
+			return false;
+		TAILQ_FOREACH(psta_vdev, &pdev->vdev_list, vdev_list_elem) {
+			if (qdf_unlikely(psta_vdev->proxysta_vdev &&
+				!qdf_mem_cmp(psta_vdev->mac_addr.raw,
+				&data[DP_MAC_ADDR_LEN], DP_MAC_ADDR_LEN))) {
+				/* Drop packet if source address is equal to
+				 * any of the vdev addresses.
+				 */
+				return true;
 			}
 		}
 	}

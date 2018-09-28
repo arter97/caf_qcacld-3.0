@@ -2250,7 +2250,10 @@ static QDF_STATUS send_peer_assoc_cmd_tlv(wmi_unified_t wmi_handle,
 	cmd->peer_phymode = param->peer_phymode;
 
 	/* Update 11ax capabilities */
-	cmd->peer_he_cap_info = param->peer_he_cap_macinfo;
+	cmd->peer_he_cap_info =
+		param->peer_he_cap_macinfo[WMI_HOST_HECAP_MAC_WORD1];
+	cmd->peer_he_cap_info_ext =
+		param->peer_he_cap_macinfo[WMI_HOST_HECAP_MAC_WORD2];
 	cmd->peer_he_ops = param->peer_he_ops;
 	qdf_mem_copy(&cmd->peer_he_cap_phy, &param->peer_he_cap_phyinfo,
 				sizeof(param->peer_he_cap_phyinfo));
@@ -2320,6 +2323,7 @@ static QDF_STATUS send_peer_assoc_cmd_tlv(wmi_unified_t wmi_handle,
 		 "nss %d phymode %d peer_mpdu_density %d "
 		 "cmd->peer_vht_caps %x "
 		 "HE cap_info %x ops %x "
+		 "HE cap_info_ext %x "
 		 "HE phy %x  %x  %x  "
 		 "peer_bw_rxnss_override %x", __func__,
 		 cmd->vdev_id, cmd->peer_associd, cmd->peer_flags,
@@ -2328,8 +2332,9 @@ static QDF_STATUS send_peer_assoc_cmd_tlv(wmi_unified_t wmi_handle,
 		 cmd->peer_max_mpdu, cmd->peer_nss, cmd->peer_phymode,
 		 cmd->peer_mpdu_density,
 		 cmd->peer_vht_caps, cmd->peer_he_cap_info,
-		 cmd->peer_he_ops, cmd->peer_he_cap_phy[0],
-		 cmd->peer_he_cap_phy[1], cmd->peer_he_cap_phy[2],
+		 cmd->peer_he_ops, cmd->peer_he_cap_info_ext,
+		 cmd->peer_he_cap_phy[0], cmd->peer_he_cap_phy[1],
+		 cmd->peer_he_cap_phy[2],
 		 cmd->peer_bw_rxnss_override);
 
 	ret = wmi_unified_cmd_send(wmi_handle, buf, len,
@@ -5160,7 +5165,7 @@ static QDF_STATUS send_vdev_set_gtx_cfg_cmd_tlv(wmi_unified_t wmi_handle, uint32
  * Return: CDF Status
  */
 static QDF_STATUS send_process_update_edca_param_cmd_tlv(wmi_unified_t wmi_handle,
-				    uint8_t vdev_id,
+				    uint8_t vdev_id, bool mu_edca_param,
 				    struct wmi_host_wme_vparams wmm_vparams[WMI_MAX_NUM_AC])
 {
 	uint8_t *buf_ptr;
@@ -5185,6 +5190,7 @@ static QDF_STATUS send_process_update_edca_param_cmd_tlv(wmi_unified_t wmi_handl
 		       WMITLV_GET_STRUCT_TLVLEN
 			       (wmi_vdev_set_wmm_params_cmd_fixed_param));
 	cmd->vdev_id = vdev_id;
+	cmd->wmm_param_type = mu_edca_param;
 
 	for (ac = 0; ac < WMI_MAX_NUM_AC; ac++) {
 		wmm_param = (wmi_wmm_vparams *) (&cmd->wmm_params[ac]);
@@ -5195,7 +5201,10 @@ static QDF_STATUS send_process_update_edca_param_cmd_tlv(wmi_unified_t wmi_handl
 		wmm_param->cwmin = twmm_param->cwmin;
 		wmm_param->cwmax = twmm_param->cwmax;
 		wmm_param->aifs = twmm_param->aifs;
-		wmm_param->txoplimit = twmm_param->txoplimit;
+		if (mu_edca_param)
+			wmm_param->mu_edca_timer = twmm_param->mu_edca_timer;
+		else
+			wmm_param->txoplimit = twmm_param->txoplimit;
 		wmm_param->acm = twmm_param->acm;
 		wmm_param->no_ack = twmm_param->noackpolicy;
 	}
@@ -10091,7 +10100,7 @@ static QDF_STATUS send_stats_ext_req_cmd_tlv(wmi_unified_t wmi_handle,
 	QDF_STATUS ret;
 	wmi_req_stats_ext_cmd_fixed_param *cmd;
 	wmi_buf_t buf;
-	uint16_t len;
+	size_t len;
 	uint8_t *buf_ptr;
 
 	len = sizeof(*cmd) + WMI_TLV_HDR_SIZE + preq->request_data_len;
@@ -17521,6 +17530,7 @@ static QDF_STATUS extract_ndp_ind_tlv(wmi_unified_t wmi_handle,
 {
 	WMI_NDP_INDICATION_EVENTID_param_tlvs *event;
 	wmi_ndp_indication_event_fixed_param *fixed_params;
+	size_t total_array_len;
 
 	event = (WMI_NDP_INDICATION_EVENTID_param_tlvs *)data;
 	fixed_params =
@@ -17536,6 +17546,31 @@ static QDF_STATUS extract_ndp_ind_tlv(wmi_unified_t wmi_handle,
 		WMI_LOGE("FW message ndp app info length %d more than TLV hdr %d",
 			 fixed_params->ndp_app_info_len,
 			 event->num_ndp_app_info);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (fixed_params->ndp_cfg_len >
+		(WMI_SVC_MSG_MAX_SIZE - sizeof(*fixed_params))) {
+		WMI_LOGE("%s: excess wmi buffer: ndp_cfg_len %d",
+			 __func__, fixed_params->ndp_cfg_len);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	total_array_len = fixed_params->ndp_cfg_len +
+					sizeof(*fixed_params);
+
+	if (fixed_params->ndp_app_info_len >
+		(WMI_SVC_MSG_MAX_SIZE - total_array_len)) {
+		WMI_LOGE("%s: excess wmi buffer: ndp_cfg_len %d",
+			 __func__, fixed_params->ndp_app_info_len);
+		return QDF_STATUS_E_INVAL;
+	}
+	total_array_len += fixed_params->ndp_app_info_len;
+
+	if (fixed_params->nan_scid_len >
+		(WMI_SVC_MSG_MAX_SIZE - total_array_len)) {
+		WMI_LOGE("%s: excess wmi buffer: ndp_cfg_len %d",
+			 __func__, fixed_params->nan_scid_len);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -17605,6 +17640,7 @@ static QDF_STATUS extract_ndp_confirm_tlv(wmi_unified_t wmi_handle,
 {
 	WMI_NDP_CONFIRM_EVENTID_param_tlvs *event;
 	wmi_ndp_confirm_event_fixed_param *fixed_params;
+	size_t total_array_len;
 
 	event = (WMI_NDP_CONFIRM_EVENTID_param_tlvs *) data;
 	fixed_params = (wmi_ndp_confirm_event_fixed_param *)event->fixed_param;
@@ -17635,6 +17671,23 @@ static QDF_STATUS extract_ndp_confirm_tlv(wmi_unified_t wmi_handle,
 			fixed_params->ndp_app_info_len);
 	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_DEBUG,
 		&event->ndp_app_info, fixed_params->ndp_app_info_len);
+
+	if (fixed_params->ndp_cfg_len >
+			(WMI_SVC_MSG_MAX_SIZE - sizeof(*fixed_params))) {
+		WMI_LOGE("%s: excess wmi buffer: ndp_cfg_len %d",
+			 __func__, fixed_params->ndp_cfg_len);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	total_array_len = fixed_params->ndp_cfg_len +
+				sizeof(*fixed_params);
+
+	if (fixed_params->ndp_app_info_len >
+		(WMI_SVC_MSG_MAX_SIZE - total_array_len)) {
+		WMI_LOGE("%s: excess wmi buffer: ndp_cfg_len %d",
+			 __func__, fixed_params->ndp_app_info_len);
+		return QDF_STATUS_E_INVAL;
+	}
 
 	*rsp = qdf_mem_malloc(sizeof(**rsp));
 	if (!(*rsp)) {
@@ -18881,6 +18934,7 @@ static QDF_STATUS extract_pdev_tpc_config_ev_param_tlv(wmi_unified_t wmi_handle,
 	param->chanFreq = event->chanFreq;
 	param->phyMode = event->phyMode;
 	param->twiceAntennaReduction = event->twiceAntennaReduction;
+	param->twiceAntennaGain = event->twiceAntennaGain;
 	param->twiceMaxRDPower = event->twiceMaxRDPower;
 	param->powerLimit = event->powerLimit;
 	param->rateMax = event->rateMax;
@@ -19961,7 +20015,10 @@ static QDF_STATUS extract_mac_phy_cap_service_ready_ext_tlv(
 	param->ht_cap_info_2G = mac_phy_caps->ht_cap_info_2G;
 	param->vht_cap_info_2G = mac_phy_caps->vht_cap_info_2G;
 	param->vht_supp_mcs_2G = mac_phy_caps->vht_supp_mcs_2G;
-	param->he_cap_info_2G = mac_phy_caps->he_cap_info_2G;
+	param->he_cap_info_2G[WMI_HOST_HECAP_MAC_WORD1] =
+		mac_phy_caps->he_cap_info_2G;
+	param->he_cap_info_2G[WMI_HOST_HECAP_MAC_WORD2] =
+		mac_phy_caps->he_cap_info_2G_ext;
 	param->he_supp_mcs_2G = mac_phy_caps->he_supp_mcs_2G;
 	param->tx_chain_mask_2G = mac_phy_caps->tx_chain_mask_2G;
 	param->rx_chain_mask_2G = mac_phy_caps->rx_chain_mask_2G;
@@ -19969,7 +20026,10 @@ static QDF_STATUS extract_mac_phy_cap_service_ready_ext_tlv(
 	param->ht_cap_info_5G = mac_phy_caps->ht_cap_info_5G;
 	param->vht_cap_info_5G = mac_phy_caps->vht_cap_info_5G;
 	param->vht_supp_mcs_5G = mac_phy_caps->vht_supp_mcs_5G;
-	param->he_cap_info_5G = mac_phy_caps->he_cap_info_5G;
+	param->he_cap_info_5G[WMI_HOST_HECAP_MAC_WORD1] =
+		mac_phy_caps->he_cap_info_5G;
+	param->he_cap_info_5G[WMI_HOST_HECAP_MAC_WORD2] =
+		mac_phy_caps->he_cap_info_5G_ext;
 	param->he_supp_mcs_5G = mac_phy_caps->he_supp_mcs_5G;
 	param->tx_chain_mask_5G = mac_phy_caps->tx_chain_mask_5G;
 	param->rx_chain_mask_5G = mac_phy_caps->rx_chain_mask_5G;
@@ -20725,6 +20785,8 @@ static QDF_STATUS extract_wds_addr_event_tlv(wmi_unified_t wmi_handle,
 		wds_ev->dest_mac[4+i] =
 			((u_int8_t *)&(ev->dest_mac.mac_addr47to32))[i];
 	}
+	wds_ev->vdev_id = ev->vdev_id;
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -22946,6 +23008,9 @@ static void populate_tlv_events_id(uint32_t *event_ids)
 	event_ids[wmi_sar_get_limits_event_id] = WMI_SAR_GET_LIMITS_EVENTID;
 	event_ids[wmi_obss_color_collision_report_event_id] =
 		WMI_OBSS_COLOR_COLLISION_DETECTION_EVENTID;
+#ifdef AST_HKV1_WORKAROUND
+	event_ids[wmi_wds_peer_event_id] = WMI_WDS_PEER_EVENTID;
+#endif
 }
 
 /**
@@ -23394,6 +23459,10 @@ static void populate_pdev_param_tlv(uint32_t *pdev_param)
 	pdev_param[wmi_pdev_param_rx_decap_mode] = WMI_PDEV_PARAM_RX_DECAP_MODE;
 	pdev_param[wmi_pdev_param_tx_ack_timeout] = WMI_PDEV_PARAM_ACK_TIMEOUT;
 	pdev_param[wmi_pdev_param_cck_tx_enable] = WMI_PDEV_PARAM_CCK_TX_ENABLE;
+	pdev_param[wmi_pdev_param_antenna_gain_half_db] =
+		WMI_PDEV_PARAM_ANTENNA_GAIN_HALF_DB;
+	pdev_param[wmi_pdev_param_equal_ru_allocation_enable] =
+				WMI_PDEV_PARAM_EQUAL_RU_ALLOCATION_ENABLE;
 }
 
 /**
@@ -23537,6 +23606,8 @@ static void populate_vdev_param_tlv(uint32_t *vdev_param)
 				 WMI_VDEV_PARAM_HE_RANGE_EXT;
 	vdev_param[wmi_vdev_param_he_bss_color] = WMI_VDEV_PARAM_BSS_COLOR;
 	vdev_param[wmi_vdev_param_set_hemu_mode] = WMI_VDEV_PARAM_SET_HEMU_MODE;
+	vdev_param[wmi_vdev_param_set_he_sounding_mode]
+					= WMI_VDEV_PARAM_SET_HE_SOUNDING_MODE;
 	vdev_param[wmi_vdev_param_set_heop]      = WMI_VDEV_PARAM_HEOPS_0_31;
 	vdev_param[wmi_vdev_param_sensor_ap] = WMI_VDEV_PARAM_SENSOR_AP;
 	vdev_param[wmi_vdev_param_dtim_enable_cts] =

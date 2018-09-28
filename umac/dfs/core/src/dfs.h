@@ -1286,6 +1286,12 @@ void dfs_nol_update(struct wlan_dfs *dfs);
 void dfs_nol_timer_cleanup(struct wlan_dfs *dfs);
 
 /**
+ * dfs_nol_timer_detach() - Free NOL timer.
+ * @dfs: Pointer to wlan_dfs structure.
+ */
+void dfs_nol_timer_detach(struct wlan_dfs *dfs);
+
+/**
  * dfs_nol_workqueue_cleanup() - Flushes NOL workqueue.
  * @dfs: Pointer to wlan_dfs structure.
  *
@@ -1873,6 +1879,12 @@ void dfs_cac_attach(struct wlan_dfs *dfs);
 void dfs_cac_timer_reset(struct wlan_dfs *dfs);
 
 /**
+ * dfs_cac_timer_detach() - Free dfs cac timers.
+ * @dfs: Pointer to wlan_dfs structure.
+ */
+void dfs_cac_timer_detach(struct wlan_dfs *dfs);
+
+/**
  * dfs_nol_timer_init() - Initialize NOL timers.
  * @dfs: Pointer to wlan_dfs structure.
  */
@@ -2154,4 +2166,27 @@ wlan_psoc_get_dfs_txops(struct wlan_objmgr_psoc *psoc);
  */
 void dfs_nol_free_list(struct wlan_dfs *dfs);
 
+/**
+ * dfs_task_testtimer_reset() - stop dfs test timer.
+ * @dfs: Pointer to wlan_dfs structure.
+ */
+void dfs_task_testtimer_reset(struct wlan_dfs *dfs);
+
+/**
+ * dfs_task_testtimer_detach() - Free dfs test timer.
+ * @dfs: Pointer to wlan_dfs structure.
+ */
+void dfs_task_testtimer_detach(struct wlan_dfs *dfs);
+
+/**
+ * dfs_timer_detach() - Free dfs timers.
+ * @dfs: Pointer to wlan_dfs structure.
+ */
+void dfs_timer_detach(struct wlan_dfs *dfs);
+
+/**
+ * dfs_main_timer_detach() - Free dfs timers.
+ * @dfs: Pointer to wlan_dfs structure.
+ */
+void dfs_main_timer_detach(struct wlan_dfs *dfs);
 #endif  /* _DFS_H_ */

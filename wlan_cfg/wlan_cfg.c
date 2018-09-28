@@ -98,7 +98,7 @@
  * As this is not a power of 2 it does not work with nss offload so the
  * nearest available size which is power of 2 is 4096 choosen for nss
  */
-#define NSS_TX_COMP_RING_SIZE (4 << 10)
+#define NSS_TX_COMP_RING_SIZE (8 << 10)
 
 #define RXDMA_BUF_RING_SIZE 2048
 #define RXDMA_MONITOR_BUF_RING_SIZE 2048

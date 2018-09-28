@@ -1884,6 +1884,8 @@ target_if_spectral_detach(struct target_if_spectral *spectral)
 	spectral_info("spectral detach");
 
 	if (spectral) {
+		if (spectral->spectral_gen == SPECTRAL_GEN3)
+			deinit_160mhz_delivery_state_machine(spectral);
 		qdf_spinlock_destroy(&spectral->param_info.osps_lock);
 
 		target_if_spectral_detach_simulation(spectral);
@@ -2008,10 +2010,13 @@ target_if_pdev_spectral_init(struct wlan_objmgr_pdev *pdev)
 	if (target_type == TARGET_TYPE_QCA8074) {
 		spectral->fftbin_size_war = 1;
 		spectral->inband_fftbin_size_adj = 1;
+		spectral->null_fftbin_adj = 1;
 	} else {
 		spectral->fftbin_size_war = 0;
 		spectral->inband_fftbin_size_adj = 0;
+		spectral->null_fftbin_adj = 0;
 	}
+
 	if ((target_type == TARGET_TYPE_QCA8074) || (
 		target_type == TARGET_TYPE_QCA6290)) {
 		spectral->spectral_gen = SPECTRAL_GEN3;
@@ -2075,6 +2080,8 @@ target_if_pdev_spectral_init(struct wlan_objmgr_pdev *pdev)
 #else
 		spectral->use_nl_bcast = false;
 #endif
+		if (spectral->spectral_gen == SPECTRAL_GEN3)
+			init_160mhz_delivery_state_machine(spectral);
 	}
 
 	return spectral;

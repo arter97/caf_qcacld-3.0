@@ -106,6 +106,20 @@ struct cdp_cmn_ops {
 	void (*txrx_peer_ast_set_type)
 		(ol_txrx_soc_handle soc, void *ast_hdl,
 		enum cdp_txrx_ast_entry_type type);
+#if defined(FEATURE_AST) && defined(AST_HKV1_WORKAROUND)
+	void (*txrx_peer_ast_set_cp_ctx)(ol_txrx_soc_handle soc,
+					 void *ast_entry,
+					 void *cp_ctx);
+
+	void * (*txrx_peer_ast_get_cp_ctx)(ol_txrx_soc_handle soc,
+					   void *ast_entry);
+
+	bool (*txrx_peer_ast_get_wmi_sent)(ol_txrx_soc_handle soc,
+					   void *ast_entry);
+
+	void (*txrx_peer_ast_free_entry)(ol_txrx_soc_handle soc,
+					 void *ast_entry);
+#endif
 
 	enum cdp_txrx_ast_entry_type (*txrx_peer_ast_get_type)
 		(ol_txrx_soc_handle soc, void *ast_hdl);
@@ -493,8 +507,9 @@ struct cdp_ctrl_ops {
 	void (*txrx_update_mgmt_txpow_vdev)(struct cdp_vdev *vdev,
 			uint8_t subtype, uint8_t tx_power);
 
-	void (*txrx_set_pdev_param)(struct cdp_pdev *pdev,
-			enum cdp_pdev_param_type type, uint8_t val);
+	QDF_STATUS (*txrx_set_pdev_param)(struct cdp_pdev *pdev,
+					  enum cdp_pdev_param_type type,
+					  uint8_t val);
 	void * (*txrx_get_pldev)(struct cdp_pdev *pdev);
 
 	void (*set_key)(struct cdp_peer *peer_handle,
@@ -707,6 +722,9 @@ struct ol_if_ops {
 			uint32_t flags);
 	void (*peer_del_wds_entry)(void *ol_soc_handle,
 			uint8_t *wds_macaddr);
+#if defined(FEATURE_AST) && defined(AST_HKV1_WORKAROUND)
+	void (*peer_del_wds_cp_ctx)(void *cp_ctx);
+#endif
 	QDF_STATUS (*lro_hash_config)(void *scn_handle,
 			struct cdp_lro_hash_config *lro_hash);
 	void (*update_dp_stats)(void *soc, void *stats, uint16_t id,
