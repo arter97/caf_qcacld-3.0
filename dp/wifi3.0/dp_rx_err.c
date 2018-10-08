@@ -498,35 +498,39 @@ dp_2k_jump_handle(struct dp_soc *soc,
 	if (!peer) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 			 "%s:peer not found", __func__);
-		goto fail;
+		goto free_nbuf;
 	}
 	rx_tid = &peer->rx_tid[tid];
 	if (qdf_unlikely(rx_tid == NULL)) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 			 "%s:rx_tid not found", __func__);
-		goto fail;
+		goto free_nbuf;
 	}
-	qdf_spin_lock_bh(&rx_tid->tid_lock);
 	ppdu_id = hal_rx_attn_phy_ppdu_id_get(rx_tlv_hdr);
 
-	if (rx_tid->ppdu_id_2k == ppdu_id) {
-		if (!rx_tid->delba_tx_status) {
-			rx_tid->delba_tx_count++;
-			rx_tid->delba_tx_retry++;
-			rx_tid->delba_tx_status = 1;
-			rx_tid->delba_rcode =
-				IEEE80211_REASON_QOS_SETUP_REQUIRED;
-			soc->cdp_soc.ol_ops->send_delba(peer->vdev->pdev->osif_pdev,
+	qdf_spin_lock_bh(&rx_tid->tid_lock);
+	if (rx_tid->ppdu_id_2k != ppdu_id) {
+		rx_tid->ppdu_id_2k = ppdu_id;
+		qdf_spin_unlock_bh(&rx_tid->tid_lock);
+		goto free_nbuf;
+	}
+	if (!rx_tid->delba_tx_status) {
+		rx_tid->delba_tx_count++;
+		rx_tid->delba_tx_retry++;
+		rx_tid->delba_tx_status = 1;
+		rx_tid->delba_rcode =
+			IEEE80211_REASON_QOS_SETUP_REQUIRED;
+		qdf_spin_unlock_bh(&rx_tid->tid_lock);
+		soc->cdp_soc.ol_ops->send_delba(peer->vdev->pdev->osif_pdev,
 				peer->ol_peer,
 				peer->mac_addr.raw,
 				tid,
 				rx_tid->delba_rcode);
-		}
 	} else {
-		rx_tid->ppdu_id_2k = ppdu_id;
+		qdf_spin_unlock_bh(&rx_tid->tid_lock);
 	}
-	qdf_spin_unlock_bh(&rx_tid->tid_lock);
-fail:
+
+free_nbuf:
 	qdf_nbuf_free(nbuf);
 	return;
 }
