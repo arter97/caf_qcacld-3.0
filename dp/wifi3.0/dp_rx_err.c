@@ -1549,10 +1549,8 @@ dp_rxdma_err_process(struct dp_soc *soc, uint32_t mac_id, uint32_t quota)
 	uint32_t work_done = 0;
 	uint32_t rx_bufs_used = 0;
 
-#ifdef DP_INTR_POLL_BASED
 	if (!pdev)
 		return 0;
-#endif
 	pdev_id = pdev->pdev_id;
 	err_dst_srng = pdev->rxdma_err_dst_ring[ring_idx].hal_srng;
 
