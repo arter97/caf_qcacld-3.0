@@ -1132,9 +1132,6 @@ static inline void dp_rx_msdu_stats_update(struct dp_soc *soc,
 	nss = hal_rx_msdu_start_nss_get(rx_tlv_hdr);
 	pkt_type = hal_rx_msdu_start_get_pkt_type(rx_tlv_hdr);
 
-	/* Save tid to skb->priority */
-	DP_RX_TID_SAVE(nbuf, tid);
-
 	DP_STATS_INC(vdev->pdev, rx.bw[bw], 1);
 	DP_STATS_INC(vdev->pdev, rx.reception_type[reception_type], 1);
 	DP_STATS_INCC(vdev->pdev, rx.nss[nss], 1,
@@ -1348,6 +1345,7 @@ dp_rx_process(struct dp_intr *int_ctx, void *hal_ring, uint32_t quota)
 	qdf_nbuf_t nbuf_tail = NULL;
 	qdf_nbuf_t deliver_list_head = NULL;
 	qdf_nbuf_t deliver_list_tail = NULL;
+	int32_t tid = 0;
 
 	DP_HIST_INIT();
 	/* Debug -- Remove later */
@@ -1696,6 +1694,12 @@ dp_rx_process(struct dp_intr *int_ctx, void *hal_ring, uint32_t quota)
 					continue; /* Get next desc */
 				}
 		}
+
+		/* Get TID from first msdu per MPDU, save to skb->priority */
+		if (qdf_nbuf_is_rx_chfrag_start(nbuf)) {
+			tid = hal_rx_mpdu_start_tid_get(rx_tlv_hdr);
+		}
+		DP_RX_TID_SAVE(nbuf, tid);
 
 		dp_rx_lro(rx_tlv_hdr, peer, nbuf, int_ctx->lro_ctx);
 
