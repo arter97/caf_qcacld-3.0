@@ -3490,7 +3490,7 @@ void ol_txrx_peer_detach(ol_txrx_peer_handle peer)
 			sizeof(union ol_txrx_align_mac_addr_t));
 		qdf_timer_start(&peer->peer_unmap_timer,
 				OL_TXRX_PEER_UNMAP_TIMEOUT);
-		ol_txrx_info_high("%s: started peer_unmap_timer for peer %p",
+		ol_txrx_info_high("%s: started peer_unmap_timer for peer %pK",
 			     __func__, peer);
 	}
 
