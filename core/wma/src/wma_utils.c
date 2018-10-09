@@ -1415,7 +1415,8 @@ static int wma_unified_link_peer_stats_event_handler(void *handle,
 	 */
 	pMac->sme.pLinkLayerStatsIndCallback(pMac->hHdd,
 					     WMA_LINK_LAYER_STATS_RESULTS_RSP,
-					     link_stats_results);
+					     link_stats_results,
+					     pMac->sme.ll_stats_context);
 	qdf_mem_free(link_stats_results);
 
 	return 0;
@@ -1610,8 +1611,9 @@ post_stats:
 	 * used to retrieve the correct HDD context
 	 */
 	mac->sme.pLinkLayerStatsIndCallback(mac->hHdd,
-		WMA_LINK_LAYER_STATS_RESULTS_RSP,
-		link_stats_results);
+					    WMA_LINK_LAYER_STATS_RESULTS_RSP,
+					    link_stats_results,
+					    mac->sme.ll_stats_context);
 	wma_unified_radio_tx_mem_free(handle);
 
 	return 0;
@@ -1815,7 +1817,8 @@ static int wma_unified_link_radio_stats_event_handler(void *handle,
 
 	pMac->sme.pLinkLayerStatsIndCallback(pMac->hHdd,
 					     WMA_LINK_LAYER_STATS_RESULTS_RSP,
-					     link_stats_results);
+					     link_stats_results,
+					     pMac->sme.ll_stats_context);
 	wma_unified_radio_tx_mem_free(handle);
 
 	return 0;
@@ -2293,7 +2296,8 @@ int wma_unified_link_iface_stats_event_handler(void *handle,
 	 */
 	pMac->sme.pLinkLayerStatsIndCallback(pMac->hHdd,
 					     WMA_LINK_LAYER_STATS_RESULTS_RSP,
-					     link_stats_results);
+					     link_stats_results,
+					     pMac->sme.ll_stats_context);
 	qdf_mem_free(link_stats_results);
 
 	return 0;
