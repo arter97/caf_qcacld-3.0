@@ -16504,7 +16504,7 @@ static QDF_STATUS extract_all_stats_counts_tlv(wmi_unified_t wmi_handle,
 	 * to save total length calculated
 	 */
 	min_data_len =
-		(((uint64_t)ev->num_pdev_stats) * sizeof(wmi_pdev_stats)) +
+		(((uint64_t)ev->num_pdev_stats) * sizeof(wmi_pdev_stats_v2)) +
 		(((uint64_t)ev->num_vdev_stats) * sizeof(wmi_vdev_stats)) +
 		(((uint64_t)ev->num_peer_stats) * sizeof(wmi_peer_stats)) +
 		(((uint64_t)ev->num_bcnflt_stats) *
@@ -16556,7 +16556,8 @@ static QDF_STATUS extract_all_stats_counts_tlv(wmi_unified_t wmi_handle,
 /**
  * extract_pdev_tx_stats() - extract pdev tx stats from event
  */
-static void extract_pdev_tx_stats(wmi_host_dbg_tx_stats *tx, struct wlan_dbg_tx_stats *tx_stats)
+static void extract_pdev_tx_stats(wmi_host_dbg_tx_stats *tx,
+				  struct wlan_dbg_tx_stats_v2 *tx_stats)
 {
 	/* Tx Stats */
 	tx->comp_queued = tx_stats->comp_queued;
@@ -16589,7 +16590,8 @@ static void extract_pdev_tx_stats(wmi_host_dbg_tx_stats *tx, struct wlan_dbg_tx_
 /**
  * extract_pdev_rx_stats() - extract pdev rx stats from event
  */
-static void extract_pdev_rx_stats(wmi_host_dbg_rx_stats *rx, struct wlan_dbg_rx_stats *rx_stats)
+static void extract_pdev_rx_stats(wmi_host_dbg_rx_stats *rx,
+				  struct wlan_dbg_rx_stats_v2 *rx_stats)
 {
 	/* Rx Stats */
 	rx->mid_ppdu_route_change = rx_stats->mid_ppdu_route_change;
@@ -16633,8 +16635,8 @@ static QDF_STATUS extract_pdev_stats_tlv(wmi_unified_t wmi_handle,
 	data = param_buf->data;
 
 	if (index < ev_param->num_pdev_stats) {
-		wmi_pdev_stats *ev = (wmi_pdev_stats *) ((data) +
-				(index * sizeof(wmi_pdev_stats)));
+		wmi_pdev_stats_v2 *ev = (wmi_pdev_stats_v2 *) ((data) +
+				(index * sizeof(wmi_pdev_stats_v2)));
 
 		pdev_stats->chan_nf = ev->chan_nf;
 		pdev_stats->tx_frame_count = ev->tx_frame_count;
@@ -16733,7 +16735,7 @@ static QDF_STATUS extract_vdev_stats_tlv(wmi_unified_t wmi_handle,
 	if (index < ev_param->num_vdev_stats) {
 		wmi_vdev_stats *ev = (wmi_vdev_stats *) ((data) +
 				((ev_param->num_pdev_stats) *
-				sizeof(wmi_pdev_stats)) +
+				sizeof(wmi_pdev_stats_v2)) +
 				(index * sizeof(wmi_vdev_stats)));
 
 		vdev_stats->vdev_id = ev->vdev_id;
@@ -16836,7 +16838,8 @@ static QDF_STATUS extract_bcn_stats_tlv(wmi_unified_t wmi_handle,
 
 	if (index < ev_param->num_bcn_stats) {
 		wmi_bcn_stats *ev = (wmi_bcn_stats *) ((data) +
-			((ev_param->num_pdev_stats) * sizeof(wmi_pdev_stats)) +
+			((ev_param->num_pdev_stats) *
+			 sizeof(wmi_pdev_stats_v2)) +
 			((ev_param->num_vdev_stats) * sizeof(wmi_vdev_stats)) +
 			((ev_param->num_peer_stats) * sizeof(wmi_peer_stats)) +
 			((ev_param->num_chan_stats) * sizeof(wmi_chan_stats)) +
@@ -16873,7 +16876,8 @@ static QDF_STATUS extract_peer_stats_tlv(wmi_unified_t wmi_handle,
 
 	if (index < ev_param->num_peer_stats) {
 		wmi_peer_stats *ev = (wmi_peer_stats *) ((data) +
-			((ev_param->num_pdev_stats) * sizeof(wmi_pdev_stats)) +
+			((ev_param->num_pdev_stats) *
+			 sizeof(wmi_pdev_stats_v2)) +
 			((ev_param->num_vdev_stats) * sizeof(wmi_vdev_stats)) +
 			(index * sizeof(wmi_peer_stats)));
 
@@ -16943,7 +16947,8 @@ static QDF_STATUS extract_chan_stats_tlv(wmi_unified_t wmi_handle,
 
 	if (index < ev_param->num_chan_stats) {
 		wmi_chan_stats *ev = (wmi_chan_stats *) ((data) +
-			((ev_param->num_pdev_stats) * sizeof(wmi_pdev_stats)) +
+			((ev_param->num_pdev_stats) *
+			 sizeof(wmi_pdev_stats_v2)) +
 			((ev_param->num_vdev_stats) * sizeof(wmi_vdev_stats)) +
 			((ev_param->num_peer_stats) * sizeof(wmi_peer_stats)) +
 			(index * sizeof(wmi_chan_stats)));
