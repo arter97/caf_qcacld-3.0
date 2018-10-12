@@ -3111,6 +3111,8 @@ static void dp_soc_detach_wifi3(void *txrx_soc)
 	dp_free_inact_timer(soc);
 	dp_batch_intr_detach(soc);
 
+	dp_reo_cmdlist_destroy(soc);
+
 	for (i = 0; i < MAX_PDEV_CNT; i++) {
 		if (soc->pdev_list[i])
 			dp_pdev_detach_wifi3(
@@ -3176,7 +3178,6 @@ static void dp_soc_detach_wifi3(void *txrx_soc)
 
 	htt_soc_detach(soc->htt_handle);
 
-	dp_reo_cmdlist_destroy(soc);
 	qdf_spinlock_destroy(&soc->rx.reo_cmd_lock);
 	dp_reo_desc_freelist_destroy(soc);
 
@@ -5042,6 +5043,9 @@ void dp_rx_bar_stats_cb(struct dp_soc *soc, void *cb_ctxt,
 {
 	struct dp_pdev *pdev = (struct dp_pdev *)cb_ctxt;
 	struct hal_reo_queue_status *queue_status = &(reo_status->queue_status);
+
+	if (!qdf_atomic_read(&soc->cmn_init_done))
+		return;
 
 	if (queue_status->header.status != HAL_REO_CMD_SUCCESS) {
 		DP_TRACE_STATS(FATAL, "REO stats failure %d \n",
