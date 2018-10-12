@@ -59,6 +59,11 @@ target_if_tdls_event_handler(ol_scn_t scn, uint8_t *data, uint32_t datalen)
 	}
 	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
 
+	if (!wmi_handle) {
+		target_if_err("null wmi_handle");
+		return -EINVAL;
+	}
+
 	if (wmi_extract_vdev_tdls_ev_param(wmi_handle, data, &info)) {
 		target_if_err("Failed to extract wmi tdls event");
 		return -EINVAL;
@@ -82,6 +87,13 @@ target_if_tdls_update_fw_state(struct wlan_objmgr_psoc *psoc,
 {
 	QDF_STATUS status;
 	uint8_t tdls_state;
+	struct wmi_unified *wmi_handle;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("Invalid WMI handle");
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	if (TDLS_SUPPORT_EXP_TRIG_ONLY == param->tdls_state)
 		tdls_state = WMI_TDLS_ENABLE_PASSIVE;
@@ -91,7 +103,7 @@ target_if_tdls_update_fw_state(struct wlan_objmgr_psoc *psoc,
 	else
 		tdls_state = WMI_TDLS_DISABLE;
 
-	status = wmi_unified_update_fw_tdls_state_cmd(GET_WMI_HDL_FROM_PSOC(psoc),
+	status = wmi_unified_update_fw_tdls_state_cmd(wmi_handle,
 						      param, tdls_state);
 
 	target_if_debug("vdev_id %d", param->vdev_id);
@@ -110,8 +122,14 @@ target_if_tdls_set_offchan_mode(struct wlan_objmgr_psoc *psoc,
 				struct tdls_channel_switch_params *params)
 {
 	QDF_STATUS status;
+	struct wmi_unified *wmi_handle;
 
-	status = wmi_unified_set_tdls_offchan_mode_cmd(GET_WMI_HDL_FROM_PSOC(psoc),
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("Invalid WMI handle");
+		return QDF_STATUS_E_FAILURE;
+	}
+	status = wmi_unified_set_tdls_offchan_mode_cmd(wmi_handle,
 						       params);
 
 	return status;
@@ -122,8 +140,13 @@ target_if_tdls_set_uapsd(struct wlan_objmgr_psoc *psoc,
 			 struct sta_uapsd_trig_params *params)
 {
 	QDF_STATUS ret;
-	wmi_unified_t wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	struct wmi_unified *wmi_handle;
 
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("Invalid WMI handle");
+		return QDF_STATUS_E_FAILURE;
+	}
 	if (!wmi_service_enabled(wmi_handle,
 				    wmi_sta_uapsd_basic_auto_trig) ||
 	    !wmi_service_enabled(wmi_handle,
@@ -132,7 +155,7 @@ target_if_tdls_set_uapsd(struct wlan_objmgr_psoc *psoc,
 				params->vdevid);
 		return QDF_STATUS_SUCCESS;
 	}
-	ret = wmi_unified_set_sta_uapsd_auto_trig_cmd(GET_WMI_HDL_FROM_PSOC(psoc),
+	ret = wmi_unified_set_sta_uapsd_auto_trig_cmd(wmi_handle,
 						      params);
 
 	if (QDF_IS_STATUS_ERROR(ret))
@@ -145,19 +168,31 @@ QDF_STATUS
 target_if_tdls_register_event_handler(struct wlan_objmgr_psoc *psoc,
 				      void *arg)
 {
-	return wmi_unified_register_event(
-			get_wmi_unified_hdl_from_psoc(psoc),
-			wmi_tdls_peer_event_id,
-			target_if_tdls_event_handler);
+	struct wmi_unified *wmi_handle;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("null wmi_handle");
+		return QDF_STATUS_E_INVAL;
+	}
+	return wmi_unified_register_event(wmi_handle,
+					  wmi_tdls_peer_event_id,
+					  target_if_tdls_event_handler);
 }
 
 QDF_STATUS
 target_if_tdls_unregister_event_handler(struct wlan_objmgr_psoc *psoc,
 					void *arg)
 {
-	return wmi_unified_unregister_event(
-			get_wmi_unified_hdl_from_psoc(psoc),
-			wmi_tdls_peer_event_id);
+	struct wmi_unified *wmi_handle;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("null wmi_handle");
+		return QDF_STATUS_E_INVAL;
+	}
+	return wmi_unified_unregister_event(wmi_handle,
+					    wmi_tdls_peer_event_id);
 }
 
 QDF_STATUS

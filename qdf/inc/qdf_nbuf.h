@@ -51,6 +51,8 @@
 #define QDF_NBUF_TRAC_EAPOL_ETH_TYPE		0x888E
 #define QDF_NBUF_TRAC_WAPI_ETH_TYPE		0x88b4
 #define QDF_NBUF_TRAC_ARP_ETH_TYPE		0x0806
+#define QDF_NBUF_PKT_IPV4_DSCP_MASK     0xFC
+#define QDF_NBUF_PKT_IPV4_DSCP_SHIFT  0x02
 #define QDF_NBUF_TRAC_TDLS_ETH_TYPE		0x890D
 #define QDF_NBUF_TRAC_IPV4_ETH_TYPE     0x0800
 #define QDF_NBUF_TRAC_IPV6_ETH_TYPE     0x86dd
@@ -156,6 +158,7 @@
  * struct mon_rx_status - This will have monitor mode rx_status extracted from
  * htt_rx_desc used later to update radiotap information.
  * @tsft: Time Synchronization Function timer
+ * @ppdu_timestamp: Timestamp in the PPDU_START TLV
  * @preamble_type: Preamble type in radio header
  * @chan_freq: Capture channel frequency
  * @chan_num: Capture channel number
@@ -171,6 +174,8 @@
  * @he_sig_A2_known: HE (11ax) sig A2 known field
  * @he_sig_b_common: HE (11ax) sig B common field
  * @he_sig_b_common_known: HE (11ax) sig B common known field
+ * @l_sig_a_info: L_SIG_A value coming in Rx descriptor
+ * @l_sig_b_info: L_SIG_B value coming in Rx descriptor
  * @rate: Rate in terms 500Kbps
  * @rtap_flags: Bit map of available fields in the radiotap
  * @ant_signal_db: Rx packet RSSI
@@ -186,7 +191,8 @@
  * @he_sig_b_common_RU[4]: HE (11ax) common RU assignment index
  * @rssi_comb: Combined RSSI
  * @duration: 802.11 Duration
- * @first_data_seq_ctrl: Sequence ctrl field of first data frame
+ * @frame_control_info_valid: field indicates if fc value is valid
+ * @frame_control: frame control field
  * @ast_index: AST table hash index
  * @tid: QoS traffic tid number
  * @rs_fcs_err: FCS error flag
@@ -207,9 +213,18 @@
  * @he_data5: HE property of received frame
  * @prev_ppdu_id: ppdu_id in previously received message
  * @ppdu_id: Id of the PLCP protocol data unit
+ *
+ * The following variables are not coming from the TLVs.
+ * These variables are placeholders for passing information to update_radiotap
+ * function.
+ * @device_id: Device ID coming from sub-system (PCI, AHB etc..)
+ * @chan_noise_floor: Channel Noise Floor for the pdev
+ * @data_sequence_control_info_valid: field to indicate validity of seq control
+ * @first_data_seq_ctrl: Sequence ctrl field of first data frame
  */
 struct mon_rx_status {
 	uint64_t tsft;
+	uint32_t ppdu_timestamp;
 	uint32_t preamble_type;
 	uint16_t chan_freq;
 	uint16_t chan_num;
@@ -224,6 +239,8 @@ struct mon_rx_status {
 	uint16_t he_sig_A2_known;
 	uint16_t he_sig_b_common;
 	uint16_t he_sig_b_common_known;
+	uint32_t l_sig_a_info;
+	uint32_t l_sig_b_info;
 	uint8_t  rate;
 	uint8_t  rtap_flags;
 	uint8_t  ant_signal_db;
@@ -249,7 +266,7 @@ struct mon_rx_status {
 	uint8_t  reception_type;
 	uint16_t duration;
 	uint8_t frame_control_info_valid;
-	int16_t first_data_seq_ctrl;
+	uint16_t frame_control;
 	uint32_t ast_index;
 	uint32_t tid;
 	uint8_t  rs_fcs_err;
@@ -273,7 +290,43 @@ struct mon_rx_status {
 	uint32_t ppdu_len;
 	uint32_t prev_ppdu_id;
 	uint32_t ppdu_id;
+	uint32_t device_id;
+	int16_t chan_noise_floor;
+	uint8_t monitor_direct_used;
+	uint8_t data_sequence_control_info_valid;
+	uint16_t first_data_seq_ctrl;
 };
+
+/**
+ * struct qdf_radiotap_vendor_ns - Vendor Namespace header as per
+ * Radiotap spec: https://www.radiotap.org/fields/Vendor%20Namespace.html
+ * @oui: Vendor OUI
+ * @selector: sub_namespace selector
+ * @skip_length: How many bytes of Vendor Namespace data that follows
+ */
+struct qdf_radiotap_vendor_ns {
+	uint8_t oui[3];
+	uint8_t selector;
+	uint16_t skip_length;
+} __attribute__((__packed__));
+
+/**
+ * strcut qdf_radiotap_vendor_ns_ath - Combined QTI Vendor NS
+ * including the Radiotap specified Vendor Namespace header and
+ * QTI specific Vendor Namespace data
+ * @lsig: L_SIG_A (or L_SIG)
+ * @device_id: Device Identification
+ * @lsig_b: L_SIG_B
+ * @ppdu_start_timestamp: Timestamp from RX_PPDU_START TLV
+ */
+struct qdf_radiotap_vendor_ns_ath {
+	struct qdf_radiotap_vendor_ns hdr;
+	/* QTI specific data follows */
+	uint32_t lsig;
+	uint32_t device_id;
+	uint32_t lsig_b;
+	uint32_t ppdu_start_timestamp;
+} __attribute__((__packed__));
 
 /* Masks for HE SIG known fields in mon_rx_status structure */
 #define QDF_MON_STATUS_HE_SIG_B_COMMON_KNOWN_RU0	0x00000001
@@ -563,6 +616,11 @@ enum qdf_proto_subtype {
 typedef __qdf_nbuf_t qdf_nbuf_t;
 
 /**
+ * typedef qdf_nbuf_queue_head_t - Platform indepedent nbuf queue head
+ */
+typedef __qdf_nbuf_queue_head_t qdf_nbuf_queue_head_t;
+
+/**
  * @qdf_dma_map_cb_t - Dma map callback prototype
  */
 typedef void (*qdf_dma_map_cb_t)(void *arg, qdf_nbuf_t buf,
@@ -599,7 +657,7 @@ qdf_nbuf_set_send_complete_flag(qdf_nbuf_t buf, bool flag)
 	__qdf_nbuf_set_send_complete_flag(buf, flag);
 }
 
-#ifdef NBUF_MEMORY_DEBUG
+#ifdef NBUF_MAP_UNMAP_DEBUG
 /**
  * qdf_nbuf_map_check_for_leaks() - check for nbut map leaks
  *
@@ -687,7 +745,9 @@ void qdf_nbuf_unmap_nbytes_single_debug(qdf_device_t osdev,
 	qdf_nbuf_unmap_nbytes_single_debug(osdev, buf, dir, nbytes, \
 					   __FILE__, __LINE__)
 
-#else /* NBUF_MEMORY_DEBUG */
+#else /* NBUF_MAP_UNMAP_DEBUG */
+
+static inline void qdf_nbuf_map_check_for_leaks(void) {}
 
 static inline QDF_STATUS
 qdf_nbuf_map(qdf_device_t osdev, qdf_nbuf_t buf, qdf_dma_dir_t dir)
@@ -740,7 +800,69 @@ qdf_nbuf_unmap_nbytes_single(
 {
 	return __qdf_nbuf_unmap_nbytes_single(osdev, buf, dir, nbytes);
 }
-#endif /* NBUF_MEMORY_DEBUG */
+#endif /* NBUF_MAP_UNMAP_DEBUG */
+
+/**
+ * qdf_nbuf_queue_head_dequeue() - dequeue nbuf from the head of queue
+ * @nbuf_queue_head: pointer to nbuf queue head
+ *
+ * Return: pointer to network buffer dequeued
+ */
+static inline
+qdf_nbuf_t qdf_nbuf_queue_head_dequeue(qdf_nbuf_queue_head_t *nbuf_queue_head)
+{
+	return __qdf_nbuf_queue_head_dequeue(nbuf_queue_head);
+}
+
+/**
+ * qdf_nbuf_queue_head_qlen() - length of the queue
+ * @nbuf_queue_head: pointer to nbuf queue head
+ *
+ * Return: length of queue (number of nbufs) pointed by qdf_nbuf_queue_head_t
+ */
+static inline
+uint32_t qdf_nbuf_queue_head_qlen(qdf_nbuf_queue_head_t *nbuf_queue_head)
+{
+	return __qdf_nbuf_queue_head_qlen(nbuf_queue_head);
+}
+
+/**
+ * qdf_nbuf_queue_head_enqueue_tail() - enqueue nbuf into queue tail
+ * @nbuf_queue_head: pointer to nbuf queue head
+ * @nbuf: nbuf to be enqueued
+ *
+ * Return: None
+ */
+static inline
+void qdf_nbuf_queue_head_enqueue_tail(qdf_nbuf_queue_head_t *nbuf_queue_head,
+				      qdf_nbuf_t nbuf)
+{
+	return __qdf_nbuf_queue_head_enqueue_tail(nbuf_queue_head, nbuf);
+}
+
+/**
+ * qdf_nbuf_queue_head_init() - initialize qdf_nbuf_queue_head_t
+ * @nbuf_queue_head: pointer to nbuf queue head to be initialized
+ *
+ * Return: None
+ */
+static inline
+void qdf_nbuf_queue_head_init(qdf_nbuf_queue_head_t *nbuf_queue_head)
+{
+	return __qdf_nbuf_queue_head_init(nbuf_queue_head);
+}
+
+/**
+ * qdf_nbuf_queue_head_purge() - purge qdf_nbuf_queue_head_t
+ * @nbuf_queue_head: pointer to nbuf queue head to be purged
+ *
+ * Return: None
+ */
+static inline
+void qdf_nbuf_queue_head_purge(qdf_nbuf_queue_head_t *nbuf_queue_head)
+{
+	return __qdf_nbuf_queue_head_purge(nbuf_queue_head);
+}
 
 static inline void
 qdf_nbuf_sync_for_cpu(qdf_device_t osdev, qdf_nbuf_t buf, qdf_dma_dir_t dir)
@@ -1100,6 +1222,13 @@ void qdf_net_buf_debug_exit(void);
 void qdf_net_buf_debug_clean(void);
 void qdf_net_buf_debug_add_node(qdf_nbuf_t net_buf, size_t size,
 			uint8_t *file_name, uint32_t line_num);
+/**
+ * qdf_net_buf_debug_update_node() - update nbuf in debug hash table
+ *
+ * Return: none
+ */
+void qdf_net_buf_debug_update_node(qdf_nbuf_t net_buf, uint8_t *file_name,
+				   uint32_t line_num);
 void qdf_net_buf_debug_delete_node(qdf_nbuf_t net_buf);
 
 /**
@@ -1205,18 +1334,28 @@ static inline void qdf_net_buf_debug_release_skb(qdf_nbuf_t net_buf)
 {
 }
 
+static inline void
+qdf_net_buf_debug_update_node(qdf_nbuf_t net_buf, uint8_t *file_name,
+			      uint32_t line_num)
+{
+}
+
 /* Nbuf allocation rouines */
 
+#define qdf_nbuf_alloc(osdev, size, reserve, align, prio) \
+	qdf_nbuf_alloc_fl(osdev, size, reserve, align, prio, \
+			  __func__, __LINE__)
 static inline qdf_nbuf_t
-qdf_nbuf_alloc(qdf_device_t osdev,
-		qdf_size_t size, int reserve, int align, int prio)
+qdf_nbuf_alloc_fl(qdf_device_t osdev, qdf_size_t size, int reserve, int align,
+		  int prio, const char *func, uint32_t line)
 {
-	return __qdf_nbuf_alloc(osdev, size, reserve, align, prio);
+	return __qdf_nbuf_alloc(osdev, size, reserve, align, prio, func, line);
 }
 
 static inline void qdf_nbuf_free(qdf_nbuf_t buf)
 {
-	__qdf_nbuf_free(buf);
+	if (qdf_likely(buf))
+		__qdf_nbuf_free(buf);
 }
 
 /**
@@ -1260,14 +1399,25 @@ static inline qdf_nbuf_t qdf_nbuf_copy(qdf_nbuf_t buf)
 void qdf_nbuf_init_fast(qdf_nbuf_t nbuf);
 #endif /* WLAN_FEATURE_FASTPATH */
 
-static inline void qdf_nbuf_tx_free(qdf_nbuf_t buf_list, int tx_err)
+/**
+ * @qdf_nbuf_list_free() - free a list of nbufs
+ * @buf_list: A list of nbufs to be freed
+ *
+ * Return: none
+ */
+
+static inline void qdf_nbuf_list_free(qdf_nbuf_t buf_list)
 {
 	while (buf_list) {
 		qdf_nbuf_t next = qdf_nbuf_next(buf_list);
-
 		qdf_nbuf_free(buf_list);
 		buf_list = next;
 	}
+}
+
+static inline void qdf_nbuf_tx_free(qdf_nbuf_t buf_list, int tx_err)
+{
+	qdf_nbuf_list_free(buf_list);
 }
 
 static inline void qdf_nbuf_ref(qdf_nbuf_t buf)
@@ -1442,6 +1592,55 @@ static inline void qdf_nbuf_set_pktlen(qdf_nbuf_t buf, uint32_t len)
 static inline void qdf_nbuf_reserve(qdf_nbuf_t buf, qdf_size_t size)
 {
 	__qdf_nbuf_reserve(buf, size);
+}
+
+/**
+ * qdf_nbuf_reset() - reset the buffer data and pointer
+ * @buf: Network buf instance
+ * @reserve: reserve
+ * @align: align
+ *
+ * Return: none
+ */
+static inline void qdf_nbuf_reset(qdf_nbuf_t buf, int reserve, int align)
+{
+	__qdf_nbuf_reset(buf, reserve, align);
+}
+
+/**
+ * qdf_nbuf_dev_scratch_is_supported() - dev_scratch support for network buffer
+ *                                       in kernel
+ *
+ * Return: true if dev_scratch is supported
+ *         false if dev_scratch is not supported
+ */
+static inline bool qdf_nbuf_is_dev_scratch_supported(void)
+{
+	return __qdf_nbuf_is_dev_scratch_supported();
+}
+
+/**
+ * qdf_nbuf_get_dev_scratch() - get dev_scratch of network buffer
+ * @buf: Pointer to network buffer
+ *
+ * Return: dev_scratch if dev_scratch supported
+ *         0 if dev_scratch not supported
+ */
+static inline unsigned long qdf_nbuf_get_dev_scratch(qdf_nbuf_t buf)
+{
+	return __qdf_nbuf_get_dev_scratch(buf);
+}
+
+/**
+ * qdf_nbuf_set_dev_scratch() - set dev_scratch of network buffer
+ * @buf: Pointer to network buffer
+ * @value: value to be set in dev_scratch of network buffer
+ *
+ * Return: void
+ */
+static inline void qdf_nbuf_set_dev_scratch(qdf_nbuf_t buf, unsigned long value)
+{
+	__qdf_nbuf_set_dev_scratch(buf, value);
 }
 
 /**

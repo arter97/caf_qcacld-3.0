@@ -153,7 +153,7 @@ QDF_STATUS tdls_vdev_obj_create_notification(struct wlan_objmgr_vdev *vdev,
 	struct tdls_soc_priv_obj *tdls_soc_obj;
 	uint32_t tdls_feature_flags;
 
-	tdls_notice("tdls vdev mode %d", wlan_vdev_mlme_get_opmode(vdev));
+	tdls_debug("tdls vdev mode %d", wlan_vdev_mlme_get_opmode(vdev));
 	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE &&
 	    wlan_vdev_mlme_get_opmode(vdev) != QDF_P2P_CLIENT_MODE)
 		return QDF_STATUS_SUCCESS;
@@ -203,7 +203,7 @@ QDF_STATUS tdls_vdev_obj_create_notification(struct wlan_objmgr_vdev *vdev,
 		goto err;
 	}
 
-	tdls_notice("tdls object attach to vdev successfully");
+	tdls_debug("tdls object attach to vdev successfully");
 	return status;
 err:
 	qdf_mem_free(tdls_vdev_obj);
@@ -218,7 +218,7 @@ QDF_STATUS tdls_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev,
 	struct tdls_soc_priv_obj *tdls_soc_obj;
 	uint32_t tdls_feature_flags;
 
-	tdls_notice("tdls vdev mode %d", wlan_vdev_mlme_get_opmode(vdev));
+	tdls_debug("tdls vdev mode %d", wlan_vdev_mlme_get_opmode(vdev));
 	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE &&
 	    wlan_vdev_mlme_get_opmode(vdev) != QDF_P2P_CLIENT_MODE)
 		return QDF_STATUS_SUCCESS;
@@ -252,6 +252,110 @@ QDF_STATUS tdls_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev,
 	qdf_mem_free(tdls_vdev_obj);
 
 	return status;
+}
+
+/**
+ * __tdls_get_all_peers_from_list() - get all the tdls peers from the list
+ * @get_tdls_peers: get_tdls_peers object
+ *
+ * Return: int
+ */
+static int __tdls_get_all_peers_from_list(
+			struct tdls_get_all_peers *get_tdls_peers)
+{
+	int i;
+	int len, init_len;
+	qdf_list_t *head;
+	qdf_list_node_t *p_node;
+	struct tdls_peer *curr_peer;
+	char *buf;
+	int buf_len;
+	struct tdls_vdev_priv_obj *tdls_vdev;
+	QDF_STATUS status;
+
+	tdls_notice("Enter ");
+
+	buf = get_tdls_peers->buf;
+	buf_len = get_tdls_peers->buf_len;
+
+	if (!tdls_is_vdev_connected(get_tdls_peers->vdev)) {
+		len = qdf_scnprintf(buf, buf_len,
+				"\nSTA is not associated\n");
+		return len;
+	}
+
+	tdls_vdev = wlan_vdev_get_tdls_vdev_obj(get_tdls_peers->vdev);
+
+	if (!tdls_vdev) {
+		len = qdf_scnprintf(buf, buf_len, "TDLS not enabled\n");
+		return len;
+	}
+
+	init_len = buf_len;
+	len = qdf_scnprintf(buf, buf_len,
+			"\n%-18s%-3s%-4s%-3s%-5s\n",
+			"MAC", "Id", "cap", "up", "RSSI");
+	buf += len;
+	buf_len -= len;
+	len = qdf_scnprintf(buf, buf_len,
+			    "---------------------------------\n");
+	buf += len;
+	buf_len -= len;
+
+	for (i = 0; i < WLAN_TDLS_PEER_LIST_SIZE; i++) {
+		head = &tdls_vdev->peer_list[i];
+		status = qdf_list_peek_front(head, &p_node);
+		while (QDF_IS_STATUS_SUCCESS(status)) {
+			curr_peer = qdf_container_of(p_node,
+						     struct tdls_peer, node);
+			if (buf_len < 32 + 1)
+				break;
+			len = qdf_scnprintf(buf, buf_len,
+				QDF_MAC_ADDR_STR "%3d%4s%3s%5d\n",
+				QDF_MAC_ADDR_ARRAY(curr_peer->peer_mac.bytes),
+				curr_peer->sta_id,
+				(curr_peer->tdls_support ==
+				 TDLS_CAP_SUPPORTED) ? "Y" : "N",
+				TDLS_IS_LINK_CONNECTED(curr_peer) ? "Y" :
+				"N", curr_peer->rssi);
+			buf += len;
+			buf_len -= len;
+			status = qdf_list_peek_next(head, p_node, &p_node);
+		}
+	}
+
+	tdls_notice("Exit ");
+	return init_len - buf_len;
+}
+
+/**
+ * tdls_get_all_peers_from_list() - get all the tdls peers from the list
+ * @get_tdls_peers: get_tdls_peers object
+ *
+ * Return: None
+ */
+static void tdls_get_all_peers_from_list(
+			struct tdls_get_all_peers *get_tdls_peers)
+{
+	int32_t len;
+	struct tdls_soc_priv_obj *tdls_soc_obj;
+	struct tdls_osif_indication indication;
+
+	if (!get_tdls_peers->vdev) {
+		qdf_mem_free(get_tdls_peers);
+		return;
+	}
+	len = __tdls_get_all_peers_from_list(get_tdls_peers);
+
+	indication.status = len;
+	indication.vdev = get_tdls_peers->vdev;
+
+	tdls_soc_obj = wlan_vdev_get_tdls_soc_obj(get_tdls_peers->vdev);
+	if (tdls_soc_obj && tdls_soc_obj->tdls_event_cb)
+		tdls_soc_obj->tdls_event_cb(tdls_soc_obj->tdls_evt_cb_data,
+			TDLS_EVENT_USER_CMD, &indication);
+
+	qdf_mem_free(get_tdls_peers);
 }
 
 QDF_STATUS tdls_process_cmd(struct scheduler_msg *msg)
@@ -321,6 +425,15 @@ QDF_STATUS tdls_process_cmd(struct scheduler_msg *msg)
 		break;
 	case TDLS_CMD_GET_ALL_PEERS:
 		tdls_get_all_peers_from_list(msg->bodyptr);
+		break;
+	case TDLS_CMD_SET_OFFCHANNEL:
+		tdls_process_set_offchannel(msg->bodyptr);
+		break;
+	case TDLS_CMD_SET_OFFCHANMODE:
+		tdls_process_set_offchan_mode(msg->bodyptr);
+		break;
+	case TDLS_CMD_SET_SECOFFCHANOFFSET:
+		tdls_process_set_secoffchanneloffset(msg->bodyptr);
 		break;
 	default:
 		break;
@@ -693,7 +806,9 @@ static void tdls_process_session_update(struct wlan_objmgr_psoc *psoc,
 	msg.callback = tdls_process_cmd;
 	msg.type = (uint16_t)cmd_type;
 
-	status = scheduler_post_msg(QDF_MODULE_ID_OS_IF, &msg);
+	status = scheduler_post_message(QDF_MODULE_ID_TDLS,
+					QDF_MODULE_ID_TDLS,
+					QDF_MODULE_ID_OS_IF, &msg);
 	if (QDF_IS_STATUS_ERROR(status))
 		tdls_alert("message post failed ");
 }
@@ -708,31 +823,12 @@ void tdls_notify_decrement_session(struct wlan_objmgr_psoc *psoc)
 	tdls_process_session_update(psoc, TDLS_CMD_SESSION_DECREMENT);
 }
 
-/**
- * tdls_send_update_to_fw - update tdls status info
- * @tdls_vdev_obj: tdls vdev private object.
- * @tdls_prohibited: indicates whether tdls is prohibited.
- * @tdls_chan_swit_prohibited: indicates whether tdls channel switch
- *                             is prohibited.
- * @sta_connect_event: indicate sta connect or disconnect event
- * @session_id: session id
- *
- * Normally an AP does not influence TDLS connection between STAs
- * associated to it. But AP may set bits for TDLS Prohibited or
- * TDLS Channel Switch Prohibited in Extended Capability IE in
- * Assoc/Re-assoc response to STA. So after STA is connected to
- * an AP, call this function to update TDLS status as per those
- * bits set in Ext Cap IE in received Assoc/Re-assoc response
- * from AP.
- *
- * Return: None.
- */
-static void tdls_send_update_to_fw(struct tdls_vdev_priv_obj *tdls_vdev_obj,
-				   struct tdls_soc_priv_obj *tdls_soc_obj,
-				   bool tdls_prohibited,
-				   bool tdls_chan_swit_prohibited,
-				   bool sta_connect_event,
-				   uint8_t session_id)
+void tdls_send_update_to_fw(struct tdls_vdev_priv_obj *tdls_vdev_obj,
+			    struct tdls_soc_priv_obj *tdls_soc_obj,
+			    bool tdls_prohibited,
+			    bool tdls_chan_swit_prohibited,
+			    bool sta_connect_event,
+			    uint8_t session_id)
 {
 	struct tdls_info *tdls_info_to_fw;
 	struct tdls_config_params *threshold_params;
@@ -1014,97 +1110,6 @@ static void tdls_process_reset_adapter(struct wlan_objmgr_vdev *vdev)
 	tdls_timers_stop(tdls_vdev);
 }
 
-static int __tdls_get_all_peers_from_list(
-			struct tdls_get_all_peers *get_tdls_peers)
-{
-	int i;
-	int len, init_len;
-	qdf_list_t *head;
-	qdf_list_node_t *p_node;
-	struct tdls_peer *curr_peer;
-	char *buf;
-	int buf_len;
-	struct tdls_vdev_priv_obj *tdls_vdev;
-	QDF_STATUS status;
-
-	tdls_notice("Enter ");
-
-	buf = get_tdls_peers->buf;
-	buf_len = get_tdls_peers->buf_len;
-
-	if (!tdls_is_vdev_connected(get_tdls_peers->vdev)) {
-		len = qdf_scnprintf(buf, buf_len,
-				"\nSTA is not associated\n");
-		return len;
-	}
-
-	tdls_vdev = wlan_vdev_get_tdls_vdev_obj(get_tdls_peers->vdev);
-
-	if (!tdls_vdev) {
-		len = qdf_scnprintf(buf, buf_len, "TDLS not enabled\n");
-		return len;
-	}
-
-	init_len = buf_len;
-	len = qdf_scnprintf(buf, buf_len,
-			"\n%-18s%-3s%-4s%-3s%-5s\n",
-			"MAC", "Id", "cap", "up", "RSSI");
-	buf += len;
-	buf_len -= len;
-	len = qdf_scnprintf(buf, buf_len,
-			    "---------------------------------\n");
-	buf += len;
-	buf_len -= len;
-
-	for (i = 0; i < WLAN_TDLS_PEER_LIST_SIZE; i++) {
-		head = &tdls_vdev->peer_list[i];
-		status = qdf_list_peek_front(head, &p_node);
-		while (QDF_IS_STATUS_SUCCESS(status)) {
-			curr_peer = qdf_container_of(p_node,
-						     struct tdls_peer, node);
-			if (buf_len < 32 + 1)
-				break;
-			len = qdf_scnprintf(buf, buf_len,
-				QDF_MAC_ADDR_STR "%3d%4s%3s%5d\n",
-				QDF_MAC_ADDR_ARRAY(curr_peer->peer_mac.bytes),
-				curr_peer->sta_id,
-				(curr_peer->tdls_support ==
-				 TDLS_CAP_SUPPORTED) ? "Y" : "N",
-				TDLS_IS_LINK_CONNECTED(curr_peer) ? "Y" :
-				"N", curr_peer->rssi);
-			buf += len;
-			buf_len -= len;
-			status = qdf_list_peek_next(head, p_node, &p_node);
-		}
-	}
-
-	tdls_notice("Exit ");
-	return init_len - buf_len;
-}
-
-void tdls_get_all_peers_from_list(
-			struct tdls_get_all_peers *get_tdls_peers)
-{
-	int32_t len;
-	struct tdls_soc_priv_obj *tdls_soc_obj;
-	struct tdls_osif_indication indication;
-
-	if (!get_tdls_peers->vdev)
-		qdf_mem_free(get_tdls_peers);
-
-	len = __tdls_get_all_peers_from_list(get_tdls_peers);
-
-	indication.status = len;
-	indication.vdev = get_tdls_peers->vdev;
-
-	tdls_soc_obj = wlan_vdev_get_tdls_soc_obj(get_tdls_peers->vdev);
-	if (tdls_soc_obj && tdls_soc_obj->tdls_event_cb)
-		tdls_soc_obj->tdls_event_cb(tdls_soc_obj->tdls_evt_cb_data,
-			TDLS_EVENT_USER_CMD, &indication);
-
-	qdf_mem_free(get_tdls_peers);
-}
-
 void tdls_notify_reset_adapter(struct wlan_objmgr_vdev *vdev)
 {
 	if (!vdev) {
@@ -1139,7 +1144,9 @@ QDF_STATUS tdls_peers_deleted_notification(
 	msg.callback = tdls_process_cmd;
 	msg.type = TDLS_NOTIFY_STA_DISCONNECTION;
 
-	status = scheduler_post_msg(QDF_MODULE_ID_OS_IF, &msg);
+	status = scheduler_post_message(QDF_MODULE_ID_TDLS,
+					QDF_MODULE_ID_TDLS,
+					QDF_MODULE_ID_OS_IF, &msg);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		qdf_mem_free(notify);
 		tdls_alert("message post failed ");
@@ -1343,7 +1350,7 @@ void tdls_scan_done_callback(struct tdls_soc_priv_obj *tdls_soc)
 		return;
 
 	if (TDLS_SUPPORT_DISABLED == tdls_soc->tdls_current_mode) {
-		tdls_notice("TDLS mode is disabled OR not enabled");
+		tdls_debug("TDLS mode is disabled OR not enabled");
 		return;
 	}
 
@@ -1378,7 +1385,9 @@ static QDF_STATUS tdls_post_scan_done_msg(struct tdls_soc_priv_obj *tdls_soc)
 	msg.bodyptr = tdls_soc;
 	msg.callback = tdls_process_cmd;
 	msg.type = TDLS_CMD_SCAN_DONE;
-	scheduler_post_msg(QDF_MODULE_ID_OS_IF, &msg);
+	scheduler_post_message(QDF_MODULE_ID_TDLS,
+			       QDF_MODULE_ID_TDLS,
+			       QDF_MODULE_ID_OS_IF, &msg);
 
 	return QDF_STATUS_SUCCESS;
 }

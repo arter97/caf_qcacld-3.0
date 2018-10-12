@@ -28,6 +28,7 @@
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/dma-mapping.h>
+#include <linux/version.h>
 #include <asm/cacheflush.h>
 #include <qdf_types.h>
 #include <qdf_net_types.h>
@@ -43,6 +44,13 @@
  * so we use sk_buffer to represent both skbuf .
  */
 typedef struct sk_buff *__qdf_nbuf_t;
+
+/**
+ * typedef __qdf_nbuf_queue_head_t - abstraction for sk_buff_head linux struct
+ *
+ * This is used for skb queue management via linux skb buff head APIs
+ */
+typedef struct sk_buff_head __qdf_nbuf_queue_head_t;
 
 #define QDF_NBUF_CB_TX_MAX_OS_FRAGS 1
 
@@ -95,7 +103,7 @@ typedef union {
  * @rx.dev.priv_cb_m.tcp_ack_num: TCP ACK number
  * @rx.dev.priv_cb_m.lro_ctx: LRO context
  * @rx.dev.priv_cb_m.map_index:
- * @rx.dev.priv_cb_m.reserved: reserved
+ * @rx.dev.priv_cb_m.peer_local_id: peer_local_id for RX pkt
  *
  * @rx.lro_eligible: flag to indicate whether the MSDU is LRO eligible
  * @rx.peer_cached_buf_frm: peer cached buffer
@@ -105,6 +113,8 @@ typedef union {
  * @rx.ip_offset: offset to IP header
  * @rx.tcp_offset: offset to TCP header
  * @rx_ctx_id: Rx context id
+ * @flush_ind: flush indication
+ * @num_elements_in_list: number of elements in the nbuf list
  *
  * @rx.tcp_udp_chksum: L4 payload checksum
  * @rx.tcp_wim: TCP window size
@@ -114,6 +124,7 @@ typedef union {
  * @rx.flag_chfrag_start: first MSDU in an AMSDU
  * @rx.flag_chfrag_cont: middle or part of MSDU in an AMSDU
  * @rx.flag_chfrag_end: last MSDU in an AMSDU
+ * @rx.packet_buff_pool: indicate packet from pre-allocated pool for Rx ring
  * @rx.rsrvd: reserved
  *
  * @rx.trace: combined structure for DP and protocol trace
@@ -187,7 +198,7 @@ struct qdf_nbuf_cb {
 					uint32_t tcp_ack_num;
 					unsigned char *lro_ctx;
 					uint32_t map_index;
-					uint32_t reserved;
+					uint32_t peer_local_id;
 				} priv_cb_m;
 			} dev;
 			uint32_t lro_eligible:1,
@@ -197,14 +208,17 @@ struct qdf_nbuf_cb {
 				ipv6_proto:1,
 				ip_offset:7,
 				tcp_offset:7,
-				rx_ctx_id:4;
+				rx_ctx_id:4,
+				flush_ind:1,
+				num_elements_in_list:8;
 			uint32_t tcp_udp_chksum:16,
-				tcp_win:16;
+				 tcp_win:16;
 			uint32_t flow_id;
 			uint8_t flag_chfrag_start:1,
 				flag_chfrag_cont:1,
 				flag_chfrag_end:1,
-				rsrvd:5;
+				packet_buff_pool:1,
+				rsrvd:4;
 			union {
 				uint8_t packet_state;
 				uint8_t dp_trace:1,
@@ -297,6 +311,10 @@ QDF_COMPILE_TIME_ASSERT(qdf_nbuf_cb_size,
 	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.tcp_offset)
 #define QDF_NBUF_CB_RX_CTX_ID(skb) \
 	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.rx_ctx_id)
+#define QDF_NBUF_CB_RX_FLUSH_IND(skb) \
+		(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.flush_ind)
+#define QDF_NBUF_CB_RX_NUM_ELEMENTS_IN_LIST(skb) \
+		(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.num_elements_in_list)
 
 #define QDF_NBUF_CB_RX_TCP_CHKSUM(skb) \
 	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.tcp_udp_chksum)
@@ -323,6 +341,9 @@ QDF_COMPILE_TIME_ASSERT(qdf_nbuf_cb_size,
 #define QDF_NBUF_CB_RX_CHFRAG_END(skb) \
 		(((struct qdf_nbuf_cb *) \
 		((skb)->cb))->u.rx.flag_chfrag_end)
+#define QDF_NBUF_CB_RX_PACKET_BUFF_POOL(skb) \
+		(((struct qdf_nbuf_cb *) \
+		((skb)->cb))->u.rx.packet_buff_pool)
 
 #define QDF_NBUF_UPDATE_TX_PKT_COUNT(skb, PACKET_STATE) \
 	qdf_nbuf_set_state(skb, PACKET_STATE)
@@ -576,8 +597,27 @@ void __qdf_nbuf_num_frags_init(struct sk_buff *skb)
 /*
  * prototypes. Implemented in qdf_nbuf.c
  */
-__qdf_nbuf_t __qdf_nbuf_alloc(__qdf_device_t osdev, size_t size, int reserve,
-			int align, int prio);
+
+/**
+ * __qdf_nbuf_alloc() - Allocate nbuf
+ * @osdev: Device handle
+ * @size: Netbuf requested size
+ * @reserve: headroom to start with
+ * @align: Align
+ * @prio: Priority
+ * @func: Function name of the call site
+ * @line: line number of the call site
+ *
+ * This allocates an nbuf aligns if needed and reserves some space in the front,
+ * since the reserve is done after alignment the reserve value if being
+ * unaligned will result in an unaligned address.
+ *
+ * Return: nbuf or %NULL if no memory
+ */
+__qdf_nbuf_t
+__qdf_nbuf_alloc(__qdf_device_t osdev, size_t size, int reserve, int align,
+		 int prio, const char *func, uint32_t line);
+
 void __qdf_nbuf_free(struct sk_buff *skb);
 QDF_STATUS __qdf_nbuf_map(__qdf_device_t osdev,
 			struct sk_buff *skb, qdf_dma_dir_t dir);
@@ -882,6 +922,99 @@ static inline struct sk_buff *__qdf_nbuf_copy(struct sk_buff *skb)
 
 #define __qdf_nbuf_reserve      skb_reserve
 
+/**
+ * __qdf_nbuf_reset() - reset the buffer data and pointer
+ * @buf: Network buf instance
+ * @reserve: reserve
+ * @align: align
+ *
+ * Return: none
+ */
+static inline void
+__qdf_nbuf_reset(struct sk_buff *skb, int reserve, int align)
+{
+	int offset;
+
+	skb_push(skb, skb_headroom(skb));
+	skb_put(skb, skb_tailroom(skb));
+	memset(skb->data, 0x0, skb->len);
+	skb_trim(skb, 0);
+	skb_reserve(skb, NET_SKB_PAD);
+	memset(skb->cb, 0x0, sizeof(skb->cb));
+
+	/*
+	 * The default is for netbuf fragments to be interpreted
+	 * as wordstreams rather than bytestreams.
+	 */
+	QDF_NBUF_CB_TX_EXTRA_FRAG_WORDSTR_EFRAG(skb) = 1;
+	QDF_NBUF_CB_TX_EXTRA_FRAG_WORDSTR_NBUF(skb) = 1;
+
+	/*
+	 * Align & make sure that the tail & data are adjusted properly
+	 */
+
+	if (align) {
+		offset = ((unsigned long)skb->data) % align;
+		if (offset)
+			skb_reserve(skb, align - offset);
+	}
+
+	skb_reserve(skb, reserve);
+}
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0))
+/**
+ * qdf_nbuf_dev_scratch_is_supported() - dev_scratch support for network buffer
+ *                                       in kernel
+ *
+ * Return: true if dev_scratch is supported
+ *         false if dev_scratch is not supported
+ */
+static inline bool __qdf_nbuf_is_dev_scratch_supported(void)
+{
+	return true;
+}
+
+/**
+ * qdf_nbuf_get_dev_scratch() - get dev_scratch of network buffer
+ * @skb: Pointer to network buffer
+ *
+ * Return: dev_scratch if dev_scratch supported
+ *         0 if dev_scratch not supported
+ */
+static inline unsigned long __qdf_nbuf_get_dev_scratch(struct sk_buff *skb)
+{
+	return skb->dev_scratch;
+}
+
+/**
+ * qdf_nbuf_set_dev_scratch() - set dev_scratch of network buffer
+ * @skb: Pointer to network buffer
+ * @value: value to be set in dev_scratch of network buffer
+ *
+ * Return: void
+ */
+static inline void
+__qdf_nbuf_set_dev_scratch(struct sk_buff *skb, unsigned long value)
+{
+	skb->dev_scratch = value;
+}
+#else
+static inline bool __qdf_nbuf_is_dev_scratch_supported(void)
+{
+	return false;
+}
+
+static inline unsigned long __qdf_nbuf_get_dev_scratch(struct sk_buff *skb)
+{
+	return 0;
+}
+
+static inline void
+__qdf_nbuf_set_dev_scratch(struct sk_buff *skb, unsigned long value)
+{
+}
+#endif /* KERNEL_VERSION(4, 14, 0) */
 
 /**
  * __qdf_nbuf_head() - return the pointer the skb's head pointer
@@ -1837,6 +1970,38 @@ static inline void __qdf_nbuf_orphan(struct sk_buff *skb)
 {
 	return skb_orphan(skb);
 }
+
+static inline struct sk_buff *
+__qdf_nbuf_queue_head_dequeue(struct sk_buff_head *skb_queue_head)
+{
+	return skb_dequeue(skb_queue_head);
+}
+
+static inline
+uint32_t __qdf_nbuf_queue_head_qlen(struct sk_buff_head *skb_queue_head)
+{
+	return skb_queue_head->qlen;
+}
+
+static inline
+void __qdf_nbuf_queue_head_enqueue_tail(struct sk_buff_head *skb_queue_head,
+					struct sk_buff *skb)
+{
+	return skb_queue_tail(skb_queue_head, skb);
+}
+
+static inline
+void __qdf_nbuf_queue_head_init(struct sk_buff_head *skb_queue_head)
+{
+	return skb_queue_head_init(skb_queue_head);
+}
+
+static inline
+void __qdf_nbuf_queue_head_purge(struct sk_buff_head *skb_queue_head)
+{
+	return skb_queue_purge(skb_queue_head);
+}
+
 #ifdef CONFIG_WIN
 #include <i_qdf_nbuf_w.h>
 #else

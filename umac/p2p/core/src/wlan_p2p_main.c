@@ -201,7 +201,7 @@ static QDF_STATUS p2p_vdev_obj_create_notification(
 	}
 
 	mode = wlan_vdev_mlme_get_opmode(vdev);
-	p2p_info("vdev mode:%d", mode);
+	p2p_debug("vdev mode:%d", mode);
 	if (mode != QDF_P2P_GO_MODE) {
 		p2p_debug("won't create p2p vdev private object if it is not GO");
 		return QDF_STATUS_SUCCESS;
@@ -256,7 +256,7 @@ static QDF_STATUS p2p_vdev_obj_destroy_notification(
 	}
 
 	mode = wlan_vdev_mlme_get_opmode(vdev);
-	p2p_info("vdev mode:%d", mode);
+	p2p_debug("vdev mode:%d", mode);
 	if (mode != QDF_P2P_GO_MODE) {
 		p2p_debug("no p2p vdev private object if it is not GO");
 		return QDF_STATUS_SUCCESS;
@@ -360,7 +360,7 @@ static QDF_STATUS p2p_peer_obj_destroy_notification(
 						WLAN_UMAC_COMP_P2P);
 	psoc = wlan_vdev_get_psoc(vdev);
 	if (!p2p_vdev_obj || !psoc) {
-		p2p_err("p2p_vdev_obj:%pK psoc:%pK", p2p_vdev_obj, psoc);
+		p2p_debug("p2p_vdev_obj:%pK psoc:%pK", p2p_vdev_obj, psoc);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -452,7 +452,9 @@ static QDF_STATUS p2p_send_noa_to_pe(struct p2p_noa_info *noa_info)
 	msg.type = P2P_NOA_ATTR_IND;
 	msg.bodyval = 0;
 	msg.bodyptr = noa_attr;
-	scheduler_post_msg(QDF_MODULE_ID_PE,  &msg);
+	scheduler_post_message(QDF_MODULE_ID_P2P,
+			       QDF_MODULE_ID_P2P,
+			       QDF_MODULE_ID_PE,  &msg);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -789,6 +791,20 @@ QDF_STATUS p2p_psoc_object_close(struct wlan_objmgr_psoc *soc)
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef FEATURE_P2P_LISTEN_OFFLOAD
+static inline void p2p_init_lo_event(struct p2p_start_param *start_param,
+				     struct p2p_start_param *req)
+{
+	start_param->lo_event_cb = req->lo_event_cb;
+	start_param->lo_event_cb_data = req->lo_event_cb_data;
+}
+#else
+static inline void p2p_init_lo_event(struct p2p_start_param *start_param,
+				     struct p2p_start_param *req)
+{
+}
+#endif
+
 QDF_STATUS p2p_psoc_start(struct wlan_objmgr_psoc *soc,
 	struct p2p_start_param *req)
 {
@@ -818,8 +834,7 @@ QDF_STATUS p2p_psoc_start(struct wlan_objmgr_psoc *soc,
 	start_param->event_cb_data = req->event_cb_data;
 	start_param->tx_cnf_cb = req->tx_cnf_cb;
 	start_param->tx_cnf_cb_data = req->tx_cnf_cb_data;
-	start_param->lo_event_cb = req->lo_event_cb;
-	start_param->lo_event_cb_data = req->lo_event_cb_data;
+	p2p_init_lo_event(start_param, req);
 	p2p_soc_obj->start_param = start_param;
 
 	wlan_p2p_init_connection_status(p2p_soc_obj);
@@ -995,6 +1010,7 @@ QDF_STATUS p2p_process_evt(struct scheduler_msg *msg)
 	return status;
 }
 
+#ifdef FEATURE_P2P_LISTEN_OFFLOAD
 QDF_STATUS p2p_process_lo_stop(
 	struct p2p_lo_stop_event *lo_stop_event)
 {
@@ -1034,6 +1050,7 @@ QDF_STATUS p2p_process_lo_stop(
 
 	return QDF_STATUS_SUCCESS;
 }
+#endif
 
 QDF_STATUS p2p_process_noa(struct p2p_noa_event *noa_event)
 {

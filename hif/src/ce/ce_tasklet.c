@@ -73,7 +73,8 @@ static void reschedule_ce_tasklet_work_handler(struct work_struct *work)
 		HIF_ERROR("%s: wlan driver is unloaded", __func__);
 		return;
 	}
-	tasklet_schedule(&hif_ce_state->tasklets[ce_work->id].intr_tq);
+	if (hif_ce_state->tasklets[ce_work->id].inited)
+		tasklet_schedule(&hif_ce_state->tasklets[ce_work->id].intr_tq);
 }
 
 static struct tasklet_work tasklet_workers[CE_ID_MAX];
@@ -127,22 +128,6 @@ void deinit_tasklet_workers(struct hif_opaque_softc *scn)
 	work_initialized = false;
 }
 
-#ifdef HIF_CONFIG_SLUB_DEBUG_ON
-/**
- * ce_schedule_tasklet() - schedule ce tasklet
- * @tasklet_entry: struct ce_tasklet_entry
- *
- * Return: N/A
- */
-static inline void ce_schedule_tasklet(struct ce_tasklet_entry *tasklet_entry)
-{
-	if (work_initialized && (tasklet_entry->ce_id < CE_ID_MAX))
-		schedule_work(&tasklet_workers[tasklet_entry->ce_id].work);
-	else
-		HIF_ERROR("%s: work_initialized = %d, ce_id = %d",
-			__func__, work_initialized, tasklet_entry->ce_id);
-}
-#else
 /**
  * ce_schedule_tasklet() - schedule ce tasklet
  * @tasklet_entry: struct ce_tasklet_entry
@@ -153,7 +138,6 @@ static inline void ce_schedule_tasklet(struct ce_tasklet_entry *tasklet_entry)
 {
 	tasklet_schedule(&tasklet_entry->intr_tq);
 }
-#endif
 
 /**
  * ce_tasklet() - ce_tasklet
@@ -228,6 +212,7 @@ void ce_tasklet_init(struct HIF_CE_state *hif_ce_state, uint32_t mask)
  * ce_tasklet_kill() - ce_tasklet_kill
  * @hif_ce_state: hif_ce_state
  *
+ * Context: Non-Atomic context
  * Return: N/A
  */
 void ce_tasklet_kill(struct hif_softc *scn)
@@ -235,12 +220,23 @@ void ce_tasklet_kill(struct hif_softc *scn)
 	int i;
 	struct HIF_CE_state *hif_ce_state = HIF_GET_CE_STATE(scn);
 
-	for (i = 0; i < CE_COUNT_MAX; i++)
+	work_initialized = false;
+
+	for (i = 0; i < CE_COUNT_MAX; i++) {
 		if (hif_ce_state->tasklets[i].inited) {
-			tasklet_disable(&hif_ce_state->tasklets[i].intr_tq);
 			hif_ce_state->tasklets[i].inited = false;
+			/*
+			 * Cancel the tasklet work before tasklet_disable
+			 * to avoid race between tasklet_schedule and
+			 * tasklet_kill. Here cancel_work_sync() won't
+			 * return before reschedule_ce_tasklet_work_handler()
+			 * completes. Even if tasklet_schedule() happens
+			 * tasklet_disable() will take care of that.
+			 */
+			cancel_work_sync(&tasklet_workers[i].work);
 			tasklet_kill(&hif_ce_state->tasklets[i].intr_tq);
 		}
+	}
 	qdf_atomic_set(&scn->active_tasklet_cnt, 0);
 }
 

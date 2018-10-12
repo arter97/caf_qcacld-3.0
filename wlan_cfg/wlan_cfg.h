@@ -127,6 +127,7 @@ struct wlan_cfg_dp_pdev_ctxt;
  * @reo_status_ring - reo status ting size
  * @rxdma_refill_ring - rxdma refill ring size
  * @rxdma_err_dst_ring - rxdma error detination ring size
+ * @raw_mode_war - enable/disable raw mode war
  */
 struct wlan_cfg_dp_soc_ctxt {
 	int num_int_ctxts;
@@ -163,9 +164,15 @@ struct wlan_cfg_dp_soc_ctxt {
 	int int_host2rxdma_ring_mask[WLAN_CFG_INT_NUM_CONTEXTS];
 	int hw_macid[MAX_PDEV_CNT];
 	int base_hw_macid;
-	bool lro_enabled;
 	bool rx_hash;
 	bool tso_enabled;
+	bool lro_enabled;
+	bool sg_enabled;
+	bool gro_enabled;
+	bool ol_tx_csum_enabled;
+	bool ol_rx_csum_enabled;
+	bool rawmode_enabled;
+	bool peer_flow_ctrl_enabled;
 	bool napi_enabled;
 	bool tcp_udp_checksumoffload;
 	bool defrag_timeout_check;
@@ -187,6 +194,7 @@ struct wlan_cfg_dp_soc_ctxt {
 
 	int rxdma_refill_ring;
 	int rxdma_err_dst_ring;
+	bool raw_mode_war;
 };
 
 /**
@@ -529,6 +537,24 @@ void wlan_cfg_set_reo_dst_ring_size(struct wlan_cfg_dp_soc_ctxt *cfg,
 				    int reo_dst_ring_size);
 
 /*
+ * wlan_cfg_set_raw_mode_war() - Set raw mode war configuration
+ *
+ * @wlan_cfg_ctx - Configuration Handle
+ * @raw_mode_war - raw mode war configuration
+ */
+void wlan_cfg_set_raw_mode_war(struct wlan_cfg_dp_soc_ctxt *cfg,
+			       bool raw_mode_war);
+
+/*
+ * wlan_cfg_get_raw_mode_war() - Get raw mode war configuration
+ *
+ * @wlan_cfg_ctx - Configuration Handle
+ *
+ * Return: reo_dst_ring_size
+ */
+bool wlan_cfg_get_raw_mode_war(struct wlan_cfg_dp_soc_ctxt *cfg);
+
+/*
  * wlan_cfg_set_num_tx_ext_desc_pool() -  Set the number of Tx MSDU ext Descriptor
  *					pools
  * @wlan_cfg_ctx - Configuration Handle
@@ -845,6 +871,17 @@ wlan_cfg_get_dp_soc_rxdma_refill_ring_size(struct wlan_cfg_dp_soc_ctxt *cfg);
  */
 int
 wlan_cfg_get_dp_soc_rxdma_err_dst_ring_size(struct wlan_cfg_dp_soc_ctxt *cfg);
+
+/*
+ * wlan_cfg_get_dp_caps - Get dp capablities
+ * @wlan_cfg_soc_ctx
+ * @dp_caps: enum for dp capablities
+ *
+ * Return: bool if a dp capabilities is enabled
+ */
+bool
+wlan_cfg_get_dp_caps(struct wlan_cfg_dp_soc_ctxt *cfg,
+		     enum cdp_capabilities dp_caps);
 
 #ifdef QCA_LL_TX_FLOW_CONTROL_V2
 int wlan_cfg_get_tx_flow_stop_queue_th(struct wlan_cfg_dp_soc_ctxt *cfg);

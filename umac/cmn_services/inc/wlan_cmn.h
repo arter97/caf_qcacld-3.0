@@ -250,6 +250,7 @@
  * @WLAN_UMAC_COMP_IPA:           IPA
  * @WLAN_UMAC_COMP_CP_STATS:      Control Plane Statistics
  * @WLAN_UMAC_COMP_ACTION_OUI:    ACTION OUI
+ * @WLAN_UMAC_COMP_FWOL           FW Offload
  * @WLAN_UMAC_COMP_ID_MAX:        Maximum components in UMAC
  *
  * This id is static.
@@ -285,6 +286,7 @@ enum wlan_umac_comp_id {
 	WLAN_UMAC_COMP_IPA                = 26,
 	WLAN_UMAC_COMP_CP_STATS           = 27,
 	WLAN_UMAC_COMP_ACTION_OUI         = 28,
+	WLAN_UMAC_COMP_FWOL               = 29,
 	WLAN_UMAC_COMP_ID_MAX,
 };
 
@@ -369,27 +371,27 @@ enum wlan_phymode {
 #define WLAN_PHYMODE_MAX      (WLAN_PHYMODE_11AXA_HE80_80 + 1)
 
 /**
- * enum wlan_phy_ch_width - channel width
- * @WLAN_CH_WIDTH_20MHZ: 20 mhz width
- * @WLAN_CH_WIDTH_40MHZ: 40 mhz width
- * @WLAN_CH_WIDTH_80MHZ: 80 mhz width
- * @WLAN_CH_WIDTH_160MHZ: 160 mhz width
- * @WLAN_CH_WIDTH_80P80HZ: 80+80 mhz width
- * @WLAN_CH_WIDTH_5MHZ: 5 mhz width
- * @WLAN_CH_WIDTH_10MHZ: 10 mhz width
- * @WLAN_CH_WIDTH_INVALID: invalid width
- * @WLAN_CH_WIDTH_MAX: max possible width
+ * enum phy_ch_width - channel width
+ * @CH_WIDTH_20MHZ: 20 mhz width
+ * @CH_WIDTH_40MHZ: 40 mhz width
+ * @CH_WIDTH_80MHZ: 80 mhz width
+ * @CH_WIDTH_160MHZ: 160 mhz width
+ * @CH_WIDTH_80P80HZ: 80+80 mhz width
+ * @CH_WIDTH_5MHZ: 5 mhz width
+ * @CH_WIDTH_10MHZ: 10 mhz width
+ * @CH_WIDTH_INVALID: invalid width
+ * @CH_WIDTH_MAX: max possible width
  */
-enum wlan_phy_ch_width {
-	WLAN_CH_WIDTH_20MHZ = 0,
-	WLAN_CH_WIDTH_40MHZ,
-	WLAN_CH_WIDTH_80MHZ,
-	WLAN_CH_WIDTH_160MHZ,
-	WLAN_CH_WIDTH_80P80MHZ,
-	WLAN_CH_WIDTH_5MHZ,
-	WLAN_CH_WIDTH_10MHZ,
-	WLAN_CH_WIDTH_INVALID,
-	WLAN_CH_WIDTH_MAX
+enum phy_ch_width {
+	CH_WIDTH_20MHZ = 0,
+	CH_WIDTH_40MHZ,
+	CH_WIDTH_80MHZ,
+	CH_WIDTH_160MHZ,
+	CH_WIDTH_80P80MHZ,
+	CH_WIDTH_5MHZ,
+	CH_WIDTH_10MHZ,
+	CH_WIDTH_INVALID,
+	CH_WIDTH_MAX
 };
 
 /**
@@ -440,12 +442,14 @@ enum wlan_peer_type {
  * @WLAN_BAND_2_4_GHZ: 2.4 GHz band
  * @WLAN_BAND_5_GHZ: 5 GHz band
  * @WLAN_BAND_4_9_GHZ: 4.9 GHz band
+ * @WLAN_BAND_NUM_MAX: Max num band
  */
 enum wlan_band {
 	WLAN_BAND_ALL,
 	WLAN_BAND_2_4_GHZ,
 	WLAN_BAND_5_GHZ,
 	WLAN_BAND_4_9_GHZ,
+	WLAN_BAND_NUM_MAX,
 };
 
 /**
@@ -586,6 +590,7 @@ struct wlan_ssid {
 #define PSOC_SERVICE_BM_SIZE ((128 + sizeof(uint32_t) - 1) / sizeof(uint32_t))
 #define PSOC_HOST_MAX_NUM_SS (8)
 #define PSOC_HOST_MAX_PHY_SIZE (3)
+#define PSOC_HOST_MAX_MAC_SIZE (2)
 #define PSOC_MAX_HW_MODE (2)
 #define PSOC_MAX_MAC_PHY_CAP (5)
 #define PSOC_MAX_PHY_REG_CAP (3)

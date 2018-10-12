@@ -50,6 +50,17 @@
 #define TARGET_IF_EXIT() \
 	QDF_TRACE_EXIT(QDF_MODULE_ID_TARGET_IF, "exit")
 
+#define targetif_nofl_fatal(params...) \
+	QDF_TRACE_FATAL_NO_FL(QDF_MODULE_ID_TARGET_IF, params)
+#define targetif_nofl_err(params...) \
+	QDF_TRACE_ERROR_NO_FL(QDF_MODULE_ID_TARGET_IF, params)
+#define targetif_nofl_warn(params...) \
+	QDF_TRACE_WARN_NO_FL(QDF_MODULE_ID_TARGET_IF, params)
+#define targetif_nofl_info(params...) \
+	QDF_TRACE_INFO_NO_FL(QDF_MODULE_ID_TARGET_IF, params)
+#define targetif_nofl_debug(params...) \
+	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_TARGET_IF, params)
+
 #ifdef CONFIG_MCL
 #define TARGET_TYPE_AR900B    9  /* Beeliner */
 #define TARGET_TYPE_QCA9984   15 /* cascade */
@@ -250,6 +261,9 @@ struct target_ops {
 		 struct target_psoc_info *tgt_hdl,
 		 uint8_t *evt_buf);
 	void (*smart_log_enable)
+		(struct wlan_objmgr_psoc *psoc,
+		 struct target_psoc_info *tgt_info, uint8_t *event);
+	void (*eapol_minrate_enable)
 		(struct wlan_objmgr_psoc *psoc,
 		 struct target_psoc_info *tgt_info, uint8_t *event);
 };
@@ -1583,6 +1597,24 @@ static inline void target_if_mesh_support_enable(struct wlan_objmgr_psoc *psoc,
 	if ((tgt_hdl->tif_ops) &&
 		(tgt_hdl->tif_ops->mesh_support_enable))
 		tgt_hdl->tif_ops->mesh_support_enable(psoc, tgt_hdl, evt_buf);
+}
+
+/**
+ * target_if_eapol_minrate_enable - Enable EAPOL Minrate in Tunnel Mode
+ * @psoc: psoc object
+ * @tgt_hdl: target_psoc_info pointer
+ * @evt_buf: Event buffer received from FW
+ *
+ * API to enable eapol minrate
+ *
+ * Return: none
+ */
+static inline void target_if_eapol_minrate_enable(struct wlan_objmgr_psoc *psoc,
+			struct target_psoc_info *tgt_hdl, uint8_t *evt_buf)
+{
+	if ((tgt_hdl->tif_ops) &&
+	    (tgt_hdl->tif_ops->eapol_minrate_enable))
+		tgt_hdl->tif_ops->eapol_minrate_enable(psoc, tgt_hdl, evt_buf);
 }
 
 /**

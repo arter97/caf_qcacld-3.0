@@ -422,6 +422,37 @@ static struct service_to_pipe target_service_to_ce_map_qca8074[] = {
 };
 #endif
 
+#if (defined(QCA_WIFI_QCA8074V2))
+static struct service_to_pipe target_service_to_ce_map_qca8074_v2[] = {
+	{ WMI_DATA_VO_SVC, PIPEDIR_OUT, 3, },
+	{ WMI_DATA_VO_SVC, PIPEDIR_IN, 2, },
+	{ WMI_DATA_BK_SVC, PIPEDIR_OUT, 3, },
+	{ WMI_DATA_BK_SVC, PIPEDIR_IN, 2, },
+	{ WMI_DATA_BE_SVC, PIPEDIR_OUT, 3, },
+	{ WMI_DATA_BE_SVC, PIPEDIR_IN, 2, },
+	{ WMI_DATA_VI_SVC, PIPEDIR_OUT, 3, },
+	{ WMI_DATA_VI_SVC, PIPEDIR_IN, 2, },
+	{ WMI_CONTROL_SVC, PIPEDIR_OUT, 3, },
+	{ WMI_CONTROL_SVC, PIPEDIR_IN, 2, },
+	{ WMI_CONTROL_SVC_WMAC1, PIPEDIR_OUT, 7},
+	{ WMI_CONTROL_SVC_WMAC1, PIPEDIR_IN, 2},
+	{ WMI_CONTROL_SVC_WMAC2, PIPEDIR_OUT, 9},
+	{ WMI_CONTROL_SVC_WMAC2, PIPEDIR_IN, 2},
+	{ HTC_CTRL_RSVD_SVC, PIPEDIR_OUT, 0, },
+	{ HTC_CTRL_RSVD_SVC, PIPEDIR_IN, 1, },
+	{ HTC_RAW_STREAMS_SVC, PIPEDIR_OUT, 0},
+	{ HTC_RAW_STREAMS_SVC, PIPEDIR_IN, 1 },
+	{ HTT_DATA_MSG_SVC, PIPEDIR_OUT, 4, },
+	{ HTT_DATA_MSG_SVC, PIPEDIR_IN, 1, },
+	{ PACKET_LOG_SVC, PIPEDIR_IN, 5, },
+	/* (Additions here) */
+	{ 0, 0, 0, },
+};
+#else
+static struct service_to_pipe target_service_to_ce_map_qca8074_v2[] = {
+};
+#endif
+
 /* PIPEDIR_OUT = HOST to Target */
 /* PIPEDIR_IN  = TARGET to HOST */
 #ifdef QCN7605_SUPPORT
@@ -499,6 +530,30 @@ static struct service_to_pipe target_service_to_ce_map_qca6290[] = {
 #endif
 #else
 static struct service_to_pipe target_service_to_ce_map_qca6290[] = {
+};
+#endif
+
+#if (defined(QCA_WIFI_QCA6390))
+static struct service_to_pipe target_service_to_ce_map_qca6390[] = {
+	{ WMI_DATA_VO_SVC, PIPEDIR_OUT, 3, },
+	{ WMI_DATA_VO_SVC, PIPEDIR_IN, 2, },
+	{ WMI_DATA_BK_SVC, PIPEDIR_OUT, 3, },
+	{ WMI_DATA_BK_SVC, PIPEDIR_IN, 2, },
+	{ WMI_DATA_BE_SVC, PIPEDIR_OUT, 3, },
+	{ WMI_DATA_BE_SVC, PIPEDIR_IN, 2, },
+	{ WMI_DATA_VI_SVC, PIPEDIR_OUT, 3, },
+	{ WMI_DATA_VI_SVC, PIPEDIR_IN, 2, },
+	{ WMI_CONTROL_SVC, PIPEDIR_OUT, 3, },
+	{ WMI_CONTROL_SVC, PIPEDIR_IN, 2, },
+	{ HTC_CTRL_RSVD_SVC, PIPEDIR_OUT, 0, },
+	{ HTC_CTRL_RSVD_SVC, PIPEDIR_IN, 2, },
+	{ HTT_DATA_MSG_SVC, PIPEDIR_OUT, 4, },
+	{ HTT_DATA_MSG_SVC, PIPEDIR_IN, 1, },
+	/* (Additions here) */
+	{ 0, 0, 0, },
+};
+#else
+static struct service_to_pipe target_service_to_ce_map_qca6390[] = {
 };
 #endif
 
@@ -688,10 +743,21 @@ static void hif_select_service_to_pipe_map(struct hif_softc *scn,
 			*sz_tgt_svc_map_to_use =
 				sizeof(target_service_to_ce_map_qca6290);
 			break;
+		case TARGET_TYPE_QCA6390:
+			*tgt_svc_map_to_use = target_service_to_ce_map_qca6390;
+			*sz_tgt_svc_map_to_use =
+				sizeof(target_service_to_ce_map_qca6390);
+			break;
 		case TARGET_TYPE_QCA8074:
 			*tgt_svc_map_to_use = target_service_to_ce_map_qca8074;
 			*sz_tgt_svc_map_to_use =
 				sizeof(target_service_to_ce_map_qca8074);
+			break;
+		case TARGET_TYPE_QCA8074V2:
+			*tgt_svc_map_to_use =
+				target_service_to_ce_map_qca8074_v2;
+			*sz_tgt_svc_map_to_use =
+				sizeof(target_service_to_ce_map_qca8074_v2);
 			break;
 		}
 	}
@@ -855,6 +921,21 @@ static void ce_free_desc_ring(struct hif_softc *scn, unsigned int CE_id,
 }
 #endif /* IPA_OFFLOAD */
 
+/*
+ * TODO: Need to explore the possibility of having this as part of a
+ * target context instead of a global array.
+ */
+static struct ce_ops* (*ce_attach_register[CE_MAX_TARGET_TYPE])(void);
+
+void ce_service_register_module(enum ce_target_type target_type,
+				struct ce_ops* (*ce_attach)(void))
+{
+	if (target_type < CE_MAX_TARGET_TYPE)
+		ce_attach_register[target_type] = ce_attach;
+}
+
+qdf_export_symbol(ce_service_register_module);
+
 /**
  * ce_srng_based() - Does this target use srng
  * @ce_state : pointer to the state context of the CE
@@ -873,7 +954,9 @@ bool ce_srng_based(struct hif_softc *scn)
 
 	switch (tgt_info->target_type) {
 	case TARGET_TYPE_QCA8074:
+	case TARGET_TYPE_QCA8074V2:
 	case TARGET_TYPE_QCA6290:
+	case TARGET_TYPE_QCA6390:
 		return true;
 	default:
 		return false;
@@ -885,17 +968,26 @@ qdf_export_symbol(ce_srng_based);
 #ifdef QCA_WIFI_SUPPORT_SRNG
 static struct ce_ops *ce_services_attach(struct hif_softc *scn)
 {
-	if (ce_srng_based(scn))
-		return ce_services_srng();
+	struct ce_ops *ops = NULL;
 
-	return ce_services_legacy();
+	if (ce_srng_based(scn)) {
+		if (ce_attach_register[CE_SVC_SRNG])
+			ops = ce_attach_register[CE_SVC_SRNG]();
+	} else if (ce_attach_register[CE_SVC_LEGACY]) {
+		ops = ce_attach_register[CE_SVC_LEGACY]();
+	}
+
+	return ops;
 }
 
 
 #else	/* QCA_LITHIUM */
 static struct ce_ops *ce_services_attach(struct hif_softc *scn)
 {
-	return ce_services_legacy();
+	if (ce_attach_register[CE_SVC_LEGACY])
+		return ce_attach_register[CE_SVC_LEGACY]();
+
+	return NULL;
 }
 #endif /* QCA_LITHIUM */
 
@@ -953,7 +1045,7 @@ static struct CE_ring_state *ce_alloc_ring_state(struct CE_state *CE_state,
 	    QDF_STATUS_SUCCESS) {
 		HIF_ERROR("%s: ring has no DMA mem",
 				__func__);
-		qdf_mem_free(ptr);
+		qdf_mem_free(ce_ring);
 		return NULL;
 	}
 	ce_ring->base_addr_CE_space_unaligned = base_addr;
@@ -1144,7 +1236,7 @@ void free_mem_ce_debug_hist_data(struct hif_softc *scn, uint32_t ce_id)
  * Note: For MCL, #if defined (HIF_CONFIG_SLUB_DEBUG_ON) needs to be checked
  * for defined here
  */
-#if HIF_CE_DEBUG_DATA_BUF
+#if defined(HIF_CONFIG_SLUB_DEBUG_ON) || HIF_CE_DEBUG_DATA_BUF
 /**
  * alloc_mem_ce_debug_history() - Allocate mem for the CE descriptors storing
  * @scn: hif scn handle
@@ -1921,9 +2013,9 @@ hif_pci_ce_send_done(struct CE_handle *copyeng, void *ce_context,
 					toeplitz_hash_result);
 		}
 
-		qdf_spin_lock(&pipe_info->completion_freeq_lock);
+		qdf_spin_lock_bh(&pipe_info->completion_freeq_lock);
 		pipe_info->num_sends_allowed++;
-		qdf_spin_unlock(&pipe_info->completion_freeq_lock);
+		qdf_spin_unlock_bh(&pipe_info->completion_freeq_lock);
 	} while (ce_completed_send_next(copyeng,
 			&ce_context, &transfer_context,
 			&CE_data, &nbytes, &transfer_id,
@@ -2605,11 +2697,11 @@ static void hif_print_hal_shadow_register_cfg(struct pld_wlan_enable_cfg *cfg)
 {
 	int i;
 	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-		  "%s: num_config %d\n", __func__, cfg->num_shadow_reg_v2_cfg);
+		  "%s: num_config %d", __func__, cfg->num_shadow_reg_v2_cfg);
 
 	for (i = 0; i < cfg->num_shadow_reg_v2_cfg; i++) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO,
-		     "%s: i %d, val %x\n", __func__, i,
+		     "%s: i %d, val %x", __func__, i,
 		     cfg->shadow_reg_v2_cfg[i].addr);
 	}
 }
@@ -2618,7 +2710,7 @@ static void hif_print_hal_shadow_register_cfg(struct pld_wlan_enable_cfg *cfg)
 static void hif_print_hal_shadow_register_cfg(struct pld_wlan_enable_cfg *cfg)
 {
 	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-		  "%s: CONFIG_SHADOW_V2 not defined\n", __func__);
+		  "%s: CONFIG_SHADOW_V2 not defined", __func__);
 }
 #endif
 
@@ -2708,6 +2800,25 @@ void hif_set_ce_config_qcn7605(struct hif_softc *scn,
 }
 #endif
 
+#ifdef CE_SVC_CMN_INIT
+#ifdef QCA_WIFI_SUPPORT_SRNG
+static inline void hif_ce_service_init(void)
+{
+	ce_service_srng_init();
+}
+#else
+static inline void hif_ce_service_init(void)
+{
+	ce_service_legacy_init();
+}
+#endif
+#else
+static inline void hif_ce_service_init(void)
+{
+}
+#endif
+
+
 /**
  * hif_ce_prepare_config() - load the correct static tables.
  * @scn: hif context
@@ -2721,6 +2832,7 @@ void hif_ce_prepare_config(struct hif_softc *scn)
 	struct hif_target_info *tgt_info = hif_get_target_info_handle(hif_hdl);
 	struct HIF_CE_state *hif_state = HIF_GET_CE_STATE(scn);
 
+	hif_ce_service_init();
 	hif_state->ce_services = ce_services_attach(scn);
 
 	scn->ce_count = HOST_CE_COUNT;
@@ -2773,6 +2885,7 @@ void hif_ce_prepare_config(struct hif_softc *scn)
 		break;
 
 	case TARGET_TYPE_QCA8074:
+	case TARGET_TYPE_QCA8074V2:
 		if (scn->bus_type == QDF_BUS_TYPE_PCI) {
 			hif_state->host_ce_config =
 					host_ce_config_wlan_qca8074_pci;
@@ -2795,6 +2908,14 @@ void hif_ce_prepare_config(struct hif_softc *scn)
 					sizeof(target_ce_config_wlan_qca6290);
 
 		scn->ce_count = QCA_6290_CE_COUNT;
+		break;
+	case TARGET_TYPE_QCA6390:
+		hif_state->host_ce_config = host_ce_config_wlan_qca6390;
+		hif_state->target_ce_config = target_ce_config_wlan_qca6390;
+		hif_state->target_ce_config_sz =
+					sizeof(target_ce_config_wlan_qca6390);
+
+		scn->ce_count = QCA_6390_CE_COUNT;
 		break;
 	}
 	QDF_BUG(scn->ce_count <= CE_COUNT_MAX);
@@ -2844,13 +2965,18 @@ void hif_unconfig_ce(struct hif_softc *hif_sc)
 		pipe_info = &hif_state->pipe_info[pipe_num];
 		if (pipe_info->ce_hdl) {
 			ce_unregister_irq(hif_state, (1 << pipe_num));
+		}
+	}
+	deinit_tasklet_workers(hif_hdl);
+	for (pipe_num = 0; pipe_num < hif_sc->ce_count; pipe_num++) {
+		pipe_info = &hif_state->pipe_info[pipe_num];
+		if (pipe_info->ce_hdl) {
 			ce_fini(pipe_info->ce_hdl);
 			pipe_info->ce_hdl = NULL;
 			pipe_info->buf_sz = 0;
 			qdf_spinlock_destroy(&pipe_info->recv_bufs_needed_lock);
 		}
 	}
-	deinit_tasklet_workers(hif_hdl);
 	if (hif_sc->athdiag_procfs_inited) {
 		athdiag_procfs_remove();
 		hif_sc->athdiag_procfs_inited = false;
@@ -3556,19 +3682,19 @@ int hif_dump_ce_registers(struct hif_softc *scn)
 		qdf_trace_hex_dump(QDF_MODULE_ID_HIF, QDF_TRACE_LEVEL_DEBUG,
 				   (uint8_t *) &ce_reg_values[0],
 				   ce_reg_word_size * sizeof(uint32_t));
-		qdf_print("ADDR:[0x%08X], SR_WR_INDEX:%d\n", (ce_reg_address
+		qdf_print("ADDR:[0x%08X], SR_WR_INDEX:%d", (ce_reg_address
 				+ SR_WR_INDEX_ADDRESS),
 				ce_reg_values[SR_WR_INDEX_ADDRESS/4]);
-		qdf_print("ADDR:[0x%08X], CURRENT_SRRI:%d\n", (ce_reg_address
+		qdf_print("ADDR:[0x%08X], CURRENT_SRRI:%d", (ce_reg_address
 				+ CURRENT_SRRI_ADDRESS),
 				ce_reg_values[CURRENT_SRRI_ADDRESS/4]);
-		qdf_print("ADDR:[0x%08X], DST_WR_INDEX:%d\n", (ce_reg_address
+		qdf_print("ADDR:[0x%08X], DST_WR_INDEX:%d", (ce_reg_address
 				+ DST_WR_INDEX_ADDRESS),
 				ce_reg_values[DST_WR_INDEX_ADDRESS/4]);
-		qdf_print("ADDR:[0x%08X], CURRENT_DRRI:%d\n", (ce_reg_address
+		qdf_print("ADDR:[0x%08X], CURRENT_DRRI:%d", (ce_reg_address
 				+ CURRENT_DRRI_ADDRESS),
 				ce_reg_values[CURRENT_DRRI_ADDRESS/4]);
-		qdf_print("---\n");
+		qdf_print("---");
 	}
 	return 0;
 }

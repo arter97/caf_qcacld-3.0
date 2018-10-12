@@ -75,8 +75,9 @@ fils_parse_ie(qdf_nbuf_t wbuf, uint8_t hdrlen, uint8_t **cap_info,
 	pktlen_left = qdf_nbuf_len(wbuf);
 
 	if (pktlen_left < hdrlen) {
-		qdf_print(FL("Parse error.pktlen_left:%d Framehdr size:%d\n"),
-			  pktlen_left, hdrlen);
+		crypto_err(
+		"Parse error.pktlen_left:%d Framehdr size:%d",
+		pktlen_left, hdrlen);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -90,9 +91,9 @@ fils_parse_ie(qdf_nbuf_t wbuf, uint8_t hdrlen, uint8_t **cap_info,
 	    subtype == WLAN_FC0_STYPE_REASSOC_RESP) {
 		/* assoc resp frame - capability (2), status (2), associd (2) */
 		if (pktlen_left < ASSOC_RESP_FIXED_FIELDS_LEN) {
-			qdf_print(
-			FL("Parse error.pktlen_left:%d Fixed Fields len:%d\n"),
-				pktlen_left, ASSOC_RESP_FIXED_FIELDS_LEN);
+			crypto_err(
+			"Parse error.pktlen_left:%d Fixed Fields len:%d",
+			pktlen_left, ASSOC_RESP_FIXED_FIELDS_LEN);
 			return QDF_STATUS_E_INVAL;
 		}
 
@@ -101,9 +102,9 @@ fils_parse_ie(qdf_nbuf_t wbuf, uint8_t hdrlen, uint8_t **cap_info,
 	} else if (subtype == WLAN_FC0_STYPE_ASSOC_REQ) {
 		/* assoc req frame - capability(2), listen interval (2) */
 		if (pktlen_left < ASSOC_REQ_FIXED_FIELDS_LEN) {
-			qdf_print(
-			FL("Parse Error.pktlen_left:%d Fixed Fields len:%d\n"),
-				pktlen_left, ASSOC_REQ_FIXED_FIELDS_LEN);
+			crypto_err(
+			"Parse Error.pktlen_left:%d Fixed Fields len:%d",
+			pktlen_left, ASSOC_REQ_FIXED_FIELDS_LEN);
 			return QDF_STATUS_E_INVAL;
 		}
 
@@ -115,12 +116,11 @@ fils_parse_ie(qdf_nbuf_t wbuf, uint8_t hdrlen, uint8_t **cap_info,
 		 * Current AP address(6)
 		 */
 		if (pktlen_left < REASSOC_REQ_FIXED_FIELDS_LEN) {
-			qdf_print(
-			FL("Parse Error.pktlen_left:%d Fixed Fields len:%d\n"),
-				pktlen_left, REASSOC_REQ_FIXED_FIELDS_LEN);
+			crypto_err(
+			"Parse Error.pktlen_left:%d Fixed Fields len:%d",
+			pktlen_left, REASSOC_REQ_FIXED_FIELDS_LEN);
 			return QDF_STATUS_E_INVAL;
 		}
-
 		frm += REASSOC_REQ_FIXED_FIELDS_LEN;
 		pktlen_left -= REASSOC_REQ_FIXED_FIELDS_LEN;
 	}
@@ -138,24 +138,25 @@ fils_parse_ie(qdf_nbuf_t wbuf, uint8_t hdrlen, uint8_t **cap_info,
 		/* for extension element, check the sub element ID */
 		if (elem_id == WLAN_ELEMID_EXTN_ELEM) {
 			if ((len + 1) > pktlen_left) {
-				qdf_print(FL("Parse Error.pktlen_left:%did:%d"),
-					  pktlen_left, elem_id);
-				qdf_print("len:%dextid:%d\n", len, *frm);
+				crypto_err(
+				"Parse Error.pktlen_left:%did:%d",
+				pktlen_left, elem_id);
+				crypto_err("len:%dextid:%d", len, *frm);
 				return QDF_STATUS_E_INVAL;
-			}
+		}
 
-			if (*frm == WLAN_ELEMID_EXT_FILS_SESSION) {
-				fils_found = 1;
-				break;
+		if (*frm == WLAN_ELEMID_EXT_FILS_SESSION) {
+			fils_found = 1;
+			break;
 			}
-			frm++;
-			pktlen_left--;
+		frm++;
+		pktlen_left--;
 		}
 
 		if (len > pktlen_left) {
-			qdf_print(
-			FL("Parse Error.pktlen_left:%did:%dlen:%dextid:%d\n"),
-				pktlen_left, elem_id, len, *frm);
+			crypto_err(
+			"Parse Error.pktlen_left:%d id:%dlen:%d extid:%d",
+			pktlen_left, elem_id, len, *frm);
 			return QDF_STATUS_E_INVAL;
 		}
 
@@ -165,7 +166,7 @@ fils_parse_ie(qdf_nbuf_t wbuf, uint8_t hdrlen, uint8_t **cap_info,
 	}
 
 	if (!fils_found) {
-		qdf_print(FL("FILS session element not found. Parse failed\n"));
+		crypto_err("FILS session element not found. Parse failed");
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -187,13 +188,13 @@ static QDF_STATUS fils_aead_setkey(struct wlan_crypto_key *key)
 	struct wlan_crypto_fils_aad_key *fils_key;
 
 	if (!key || !key->private) {
-		qdf_print(FL("Failed to set FILS key\n"));
+		crypto_err("Failed to set FILS key");
 		return QDF_STATUS_E_INVAL;
 	}
 	req_key = key->private;
 	fils_key = qdf_mem_malloc(sizeof(struct wlan_crypto_fils_aad_key));
 	if (!fils_key) {
-		qdf_print(FL("FILS key alloc failed\n"));
+		crypto_err("FILS key alloc failed");
 		return QDF_STATUS_E_NOMEM;
 	}
 	qdf_mem_copy(fils_key, &req_key->filsaad,
@@ -231,24 +232,24 @@ fils_aead_encap(struct wlan_crypto_key *key, qdf_nbuf_t wbuf,
 	uint8_t subtype = 0;
 
 	if (!key) {
-		qdf_print(FL("Invalid Input\n"));
+		crypto_err("Invalid Input");
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	fils_key = (struct wlan_crypto_fils_aad_key *)key->private;
 	if (!fils_key) {
-		qdf_print(FL("Key is not set\n"));
+		crypto_err("Key is not set");
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	if (!fils_key->kek_len) {
-		qdf_print(FL("Key len is zero. Returning error\n"));
+		crypto_err("Key len is zero. Returning error");
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	hdr = (struct ieee80211_hdr *)qdf_nbuf_data(wbuf);
 	if (!hdr) {
-		qdf_print(FL("Invalid header\n"));
+		crypto_err("Invalid header");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -259,7 +260,7 @@ fils_aead_encap(struct wlan_crypto_key *key, qdf_nbuf_t wbuf,
 
 	if (fils_parse_ie(wbuf, hdrlen, &cap_info, &fils_session, &ie_start)
 			!= QDF_STATUS_SUCCESS) {
-		qdf_print(FL("FILS Parsing failed\n"));
+		crypto_err("FILS Parsing failed");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -285,7 +286,7 @@ fils_aead_encap(struct wlan_crypto_key *key, qdf_nbuf_t wbuf,
 					+ AES_BLOCK_SIZE;
 	buf = qdf_mem_malloc(bufsize);
 	if (!buf) {
-		qdf_print(FL("temp buf allocation failed\n"));
+		crypto_err("temp buf allocation failed");
 		return QDF_STATUS_E_NOMEM;
 	}
 	qdf_mem_copy(buf, ie_start, bufsize);
@@ -294,13 +295,13 @@ fils_aead_encap(struct wlan_crypto_key *key, qdf_nbuf_t wbuf,
 					fils_session, crypt_len, 5, address,
 					length, buf + (fils_session - ie_start))
 					< 0) {
-		qdf_print(FL("aes siv_encryption failed\n"));
+		crypto_err("aes siv_encryption failed");
 		qdf_mem_free(buf);
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	if (!qdf_nbuf_put_tail(wbuf, AES_BLOCK_SIZE))
-		qdf_print(FL("Unable to put data in nbuf\n"));
+		crypto_err("Unable to put data in nbuf");
 
 	qdf_mem_copy(ie_start, buf, bufsize);
 	qdf_mem_free(buf);
@@ -333,30 +334,30 @@ fils_aead_decap(struct wlan_crypto_key *key, qdf_nbuf_t wbuf,
 	uint32_t bufsize = 0;
 
 	if (!key) {
-		qdf_print(FL("Invalid Input\n"));
+		crypto_err("Invalid Input");
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	fils_key = (struct wlan_crypto_fils_aad_key *)key->private;
 	if (!fils_key) {
-		qdf_print(FL("Key is not set\n"));
+		crypto_err("Key is not set");
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	if (!fils_key->kek_len) {
-		qdf_print(FL("Key len is zero. Returning error\n"));
+		crypto_err("Key len is zero. Returning error");
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	if (fils_parse_ie(wbuf, hdrlen, &cap_info, &fils_session, &ie_start)
 			!= QDF_STATUS_SUCCESS) {
-		qdf_print(FL("IE parse failed\n"));
+		crypto_err("IE parse failed");
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	hdr = (struct ieee80211_hdr *)qdf_nbuf_data(wbuf);
 	if (!hdr) {
-		qdf_print(FL("Invalid header\n"));
+		crypto_err("Invalid header");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -379,11 +380,11 @@ fils_aead_decap(struct wlan_crypto_key *key, qdf_nbuf_t wbuf,
 	crypt_len = ((uint8_t *)hdr + (uint32_t)qdf_nbuf_len(wbuf))
 				- fils_session;
 	if (crypt_len < AES_BLOCK_SIZE) {
-		qdf_print(FL(
-			"Not enough room for AES-SIV data after FILS Session"));
-		qdf_print(
-		" element in (Re)Association Request frame from %pM\n",
-						hdr->addr1);
+		crypto_err(
+		"Not enough room for AES-SIV data after FILS Session");
+		crypto_err(
+		" element in (Re)Association Request frame from %pM",
+		hdr->addr1);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -391,7 +392,7 @@ fils_aead_decap(struct wlan_crypto_key *key, qdf_nbuf_t wbuf,
 	bufsize = (uint8_t *)hdr + (uint32_t)qdf_nbuf_len(wbuf) - ie_start;
 	buf = qdf_mem_malloc(bufsize);
 	if (!buf) {
-		qdf_print(FL("temp buf allocation failed\n"));
+		crypto_err("temp buf allocation failed");
 		return QDF_STATUS_E_NOMEM;
 	}
 	qdf_mem_copy(buf, ie_start, bufsize);
@@ -400,8 +401,8 @@ fils_aead_decap(struct wlan_crypto_key *key, qdf_nbuf_t wbuf,
 					fils_session, crypt_len, 5, address,
 					length, buf + (fils_session - ie_start))
 					< 0) {
-		qdf_print(FL("AES decrypt of assocreq frame from %s failed\n"),
-			  ether_sprintf(hdr->addr1));
+		crypto_err("AES decrypt of assocreq frame from %s failed",
+			   ether_sprintf(hdr->addr1));
 		qdf_mem_free(buf);
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -418,13 +419,13 @@ void wlan_crypto_fils_delkey(struct wlan_objmgr_peer *peer)
 	struct wlan_crypto_key *key = NULL;
 
 	if (!peer) {
-		qdf_print(FL("Invalid Input\n"));
+		crypto_err("Invalid Input");
 		return;
 	}
 
 	crypto_priv = wlan_get_peer_crypto_obj(peer);
 	if (!crypto_priv) {
-		qdf_print(FL("crypto_priv NULL\n"));
+		crypto_err("crypto_priv NULL");
 		return;
 	}
 

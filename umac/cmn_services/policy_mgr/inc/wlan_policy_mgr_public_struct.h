@@ -689,6 +689,12 @@ enum policy_mgr_two_connection_mode {
  * @PM_SBS_DOWNGRADE: switch to SBS mode & downgrade to 1x1
  * @PM_DOWNGRADE: downgrade to 1x1
  * @PM_UPGRADE: upgrade to 2x2
+ * @PM_DBS1: switch to DBS 1
+ * @PM_DBS1_DOWNGRADE: downgrade 2G beaconing entity to 1x1 and switch to DBS1.
+ * @PM_DBS2: switch to DBS 2
+ * @PM_DBS2_DOWNGRADE: downgrade 5G beaconing entity to 1x1 and switch to DBS2.
+ * @PM_UPGRADE_5G: upgrade 5g beaconing entity to 2x2.
+ * @PM_UPGRADE_2G: upgrade 2g beaconing entity to 2x2.
  * @PM_MAX_CONC_PRIORITY_MODE: Max place holder
  *
  * These are generic IDs that identify the various roles
@@ -705,6 +711,12 @@ enum policy_mgr_conc_next_action {
 	PM_SBS_DOWNGRADE,
 	PM_DOWNGRADE,
 	PM_UPGRADE,
+	PM_DBS1,
+	PM_DBS1_DOWNGRADE,
+	PM_DBS2,
+	PM_DBS2_DOWNGRADE,
+	PM_UPGRADE_5G,
+	PM_UPGRADE_2G,
 
 	PM_MAX_CONC_NEXT_ACTION
 };
@@ -835,6 +847,9 @@ enum policy_mgr_hw_mode_change {
  * connection and scan but switch off the async scan
  * @ENABLE_DBS_CXN_AND_DISABLE_DBS_SCAN: Enable DBS support for connection and
  * disable DBS support for scan
+ * @ENABLE_DBS_CXN_AND_DISABLE_SIMULTANEOUS_SCAN: Enable DBS
+ * support for connection and disable simultaneous scan from
+ * upper layer (DBS scan remains enabled in FW)
  */
 enum dbs_support {
 	ENABLE_DBS_CXN_AND_SCAN,
@@ -842,7 +857,8 @@ enum dbs_support {
 	DISABLE_DBS_CXN_AND_ENABLE_DBS_SCAN,
 	DISABLE_DBS_CXN_AND_ENABLE_DBS_SCAN_WITH_ASYNC_SCAN_OFF,
 	ENABLE_DBS_CXN_AND_ENABLE_SCAN_WITH_ASYNC_SCAN_OFF,
-	ENABLE_DBS_CXN_AND_DISABLE_DBS_SCAN
+	ENABLE_DBS_CXN_AND_DISABLE_DBS_SCAN,
+	ENABLE_DBS_CXN_AND_DISABLE_SIMULTANEOUS_SCAN,
 };
 
 /**
@@ -878,8 +894,10 @@ struct policy_mgr_conc_connection_info {
  * @mac0_bw: MAC0 bandwidth
  * @mac1_bw: MAC1 bandwidth
  * @mac0_band_cap: mac0 band (5g/2g) capability
- * @dbs_cap: DBS capability
- * @agile_dfs_cap: Agile DFS capability
+ * @dbs_cap: DBS capabality
+ * @agile_dfs_cap: Agile DFS capabality
+ * @action_type: for dbs mode, the field indicates the "Action type" to be
+ * used to switch to the mode. To help the hw mode validation.
  */
 struct policy_mgr_hw_mode_params {
 	uint8_t mac0_tx_ss;
@@ -892,6 +910,7 @@ struct policy_mgr_hw_mode_params {
 	uint8_t dbs_cap;
 	uint8_t agile_dfs_cap;
 	uint8_t sbs_cap;
+	enum policy_mgr_conc_next_action action_type;
 };
 
 /**
@@ -1013,6 +1032,25 @@ struct dual_mac_config {
 };
 
 /**
+ * enum policy_mgr_pri_id - vdev type priority id
+ * @PM_STA_PRI_ID: station vdev type priority id
+ * @PM_SAP_PRI_ID: sap vdev type priority id
+ * @PM_P2P_GO_PRI_ID: p2p go vdev type priority id
+ * @PM_P2P_CLI_PRI_ID: p2p cli vdev type priority id
+ * @PM_MAX_PRI_ID: vdev type priority id max value
+ */
+enum policy_mgr_pri_id {
+	PM_STA_PRI_ID = 1,
+	PM_SAP_PRI_ID,
+	PM_P2P_GO_PRI_ID,
+	PM_P2P_CLI_PRI_ID,
+	PM_MAX_PRI_ID = 0xF,
+};
+
+#define PM_GET_BAND_PREFERRED(_policy_) ((_policy_) & 0x1)
+#define PM_GET_VDEV_PRIORITY_ENABLED(_policy_) (((_policy_) & 0x2) >> 1)
+
+/**
  * struct policy_mgr_user_cfg - Policy manager user config variables
  * @enable_mcc_adaptive_scheduler: Enable MCC adaptive scheduler
  * @max_concurrent_active_sessions: User allowed maximum active
@@ -1021,6 +1059,17 @@ struct dual_mac_config {
  * @enable2x2: 2x2 chain mask user config
  * @mcc_to_scc_switch_mode: Control SAP channel in concurrency
  * @sub_20_mhz_enabled: Is 5 or 10 Mhz enabled
+ * @dbs_selection_policy: band preference or Vdev preference
+ *      bit[0] = 0: 5G 2x2 preferred to select 2x2 5G + 1x1 2G DBS mode.
+ *      bit[0] = 1: 2G 2x2 preferred to select 2x2 2G + 1x1 5G DBS mode.
+ *      bit[1] = 1: vdev priority enabled.
+ *      bit[1] = 0: vdev priority disabled.
+ * @vdev_priority_list: vdev priority list
+ *      bit[0-3]: pri_id (policy_mgr_pri_id) of highest priority
+ *      bit[4-7]: pri_id (policy_mgr_pri_id) of second priority
+ *      bit[8-11]: pri_id (policy_mgr_pri_id) of third priority
+ *      bit[12-15]: pri_id (policy_mgr_pri_id) of fourth priority
+ *      example: 0x4321 - CLI < GO < SAP < STA
  */
 struct policy_mgr_user_cfg {
 	uint8_t enable_mcc_adaptive_scheduler;
@@ -1032,6 +1081,8 @@ struct policy_mgr_user_cfg {
 	bool is_sta_sap_scc_allowed_on_dfs_chan;
 	uint32_t channel_select_logic_conc;
 	uint32_t sta_sap_scc_on_lte_coex_chan;
+	uint32_t dbs_selection_policy;
+	uint32_t vdev_priority_list;
 };
 
 /**

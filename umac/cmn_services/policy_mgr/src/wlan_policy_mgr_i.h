@@ -166,6 +166,17 @@
 #define policy_mgr_debug(params...) \
 	QDF_TRACE_DEBUG(QDF_MODULE_ID_POLICY_MGR, params)
 
+#define policymgr_nofl_alert(params...) \
+	QDF_TRACE_FATAL_NO_FL(QDF_MODULE_ID_POLICY_MGR, params)
+#define policymgr_nofl_err(params...) \
+	QDF_TRACE_ERROR_NO_FL(QDF_MODULE_ID_POLICY_MGR, params)
+#define policymgr_nofl_warn(params...) \
+	QDF_TRACE_WARN_NO_FL(QDF_MODULE_ID_POLICY_MGR, params)
+#define policymgr_nofl_info(params...) \
+	QDF_TRACE_INFO_NO_FL(QDF_MODULE_ID_POLICY_MGR, params)
+#define policymgr_nofl_debug(params...) \
+	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_POLICY_MGR, params)
+
 #define PM_CONC_CONNECTION_LIST_VALID_INDEX(index) \
 		((MAX_NUMBER_OF_CONC_CONNECTIONS > index) && \
 			(pm_conc_connection_list[index].in_use))
@@ -184,6 +195,11 @@ extern policy_mgr_next_action_two_connection_table_type
 		*next_action_two_connection_table;
 extern policy_mgr_next_action_three_connection_table_type
 		*next_action_three_connection_table;
+extern policy_mgr_next_action_two_connection_table_type
+		*next_action_two_connection_2x2_2g_1x1_5g_table;
+extern policy_mgr_next_action_three_connection_table_type
+		*next_action_three_connection_2x2_2g_1x1_5g_table;
+
 extern enum policy_mgr_conc_next_action
 	(*policy_mgr_get_current_pref_hw_mode_ptr)
 	(struct wlan_objmgr_psoc *psoc);
@@ -371,6 +387,27 @@ void policy_mgr_store_and_del_conn_info(struct wlan_objmgr_psoc *psoc,
 				bool all_matching_cxn_to_del,
 				struct policy_mgr_conc_connection_info *info,
 				uint8_t *num_cxn_del);
+
+/**
+ * policy_mgr_store_and_del_conn_info_by_vdev_id() - Store and del a
+ * connection info by vdev id
+ * @psoc: PSOC object information
+ * @vdev_id: vdev id whose entry has to be deleted
+ * @info: struture array pointer where the connection info will be saved
+ * @num_cxn_del: number of connection which are going to be deleted
+ *
+ * Saves the connection info corresponding to the provided mode
+ * and deleted that corresponding entry based on vdev from the
+ * connection info structure
+ *
+ * Return: None
+ */
+void policy_mgr_store_and_del_conn_info_by_vdev_id(
+			struct wlan_objmgr_psoc *psoc,
+			uint32_t vdev_id,
+			struct policy_mgr_conc_connection_info *info,
+			uint8_t *num_cxn_del);
+
 void policy_mgr_restore_deleted_conn_info(struct wlan_objmgr_psoc *psoc,
 				struct policy_mgr_conc_connection_info *info,
 				uint8_t num_cxn_del);
@@ -386,8 +423,6 @@ void policy_mgr_pdev_set_hw_mode_cb(uint32_t status,
 				enum policy_mgr_conn_update_reason reason,
 				uint32_t session_id, void *context);
 void policy_mgr_dump_current_concurrency(struct wlan_objmgr_psoc *psoc);
-void policy_mgr_pdev_set_pcl(struct wlan_objmgr_psoc *psoc,
-				enum QDF_OPMODE mode);
 void policy_mgr_set_pcl_for_existing_combo(
 		struct wlan_objmgr_psoc *psoc, enum policy_mgr_con_mode mode);
 void pm_dbs_opportunistic_timer_handler(void *data);

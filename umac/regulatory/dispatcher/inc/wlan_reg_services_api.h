@@ -104,6 +104,17 @@ enum channel_state wlan_reg_get_channel_state(struct wlan_objmgr_pdev *pdev,
 					      uint32_t ch);
 
 /**
+ * wlan_reg_chan_has_dfs_attribute() - check channel has dfs attribute flag
+ * @ch: channel number.
+ *
+ * This API get chan initial dfs attribute from regdomain
+ *
+ * Return: true if chan is dfs, otherwise false
+ */
+bool
+wlan_reg_chan_has_dfs_attribute(struct wlan_objmgr_pdev *pdev, uint32_t ch);
+
+/**
  * wlan_reg_get_5g_bonded_channel_state() - Get 5G bonded channel state
  * @pdev: The physical dev to program country code or regdomain
  * @ch: channel number.
@@ -479,12 +490,12 @@ void wlan_reg_unregister_chan_change_callback(struct wlan_objmgr_psoc *psoc,
 					      reg_chan_change_callback cbk);
 
 /**
- * wlan_reg_11d_original_enabled_on_host() - 11d original enabled don host
+ * wlan_reg_is_11d_offloaded() - 11d offloaded supported
  * @psoc: psoc ptr
  *
  * Return: bool
  */
-bool wlan_reg_11d_original_enabled_on_host(struct wlan_objmgr_psoc *psoc);
+bool wlan_reg_is_11d_offloaded(struct wlan_objmgr_psoc *psoc);
 
 /**
  * wlan_reg_11d_enabled_on_host() - 11d enabled don host

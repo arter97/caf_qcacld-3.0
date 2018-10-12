@@ -126,6 +126,20 @@ uint8_t policy_mgr_search_and_check_for_session_conc(
 		uint8_t session_id, void *roam_profile);
 
 /**
+ * policy_mgr_is_chnl_in_diff_band() - to check that given channel
+ * is in diff band from existing channel or not
+ * @psoc: pointer to psoc
+ * @channel: given channel
+ *
+ * This API will check that if the passed channel is in diff band than the
+ * already existing connections or not.
+ *
+ * Return: true if channel is in diff band
+ */
+bool policy_mgr_is_chnl_in_diff_band(struct wlan_objmgr_psoc *psoc,
+					    uint8_t channel);
+
+/**
  * policy_mgr_check_for_session_conc() - Check if concurrency is
  * allowed for a session
  * @psoc: PSOC object information
@@ -228,6 +242,16 @@ static inline void policy_mgr_change_sap_channel_with_csa(
 
 }
 #endif
+
+/**
+ * policy_mgr_pdev_set_pcl() - SET PCL channel list and send to firmware
+ * @psoc: PSOC object information
+ * @mode:	Adapter mode
+ *
+ * Return: None
+ */
+void policy_mgr_pdev_set_pcl(struct wlan_objmgr_psoc *psoc,
+			     enum QDF_OPMODE mode);
 
 /**
  * policy_mgr_incr_active_session() - increments the number of active sessions
@@ -396,6 +420,31 @@ bool policy_mgr_allow_concurrency(struct wlan_objmgr_psoc *psoc,
 		uint8_t channel, enum hw_mode_bandwidth bw);
 
 /**
+ * policy_mgr_allow_concurrency_csa() - Check for allowed concurrency
+ * combination when channel switch
+ * @psoc:	PSOC object information
+ * @mode:	connection mode
+ * @channel:	target channel to switch
+ * @vdev_id:	vdev id of channel switch interface
+ *
+ * There is already existing SAP+GO combination but due to upper layer
+ * notifying LTE-COEX event or sending command to move one of the connections
+ * to different channel. In such cases before moving existing connection to new
+ * channel, check if new channel can co-exist with the other existing
+ * connection. For example, one SAP1 is on channel-6 and second SAP2 is on
+ * channel-36 and lets say they are doing DBS, and lets say upper layer sends
+ * LTE-COEX to move SAP1 from channel-6 to channel-149. In this case, SAP1 and
+ * SAP2 will end up doing MCC which may not be desirable result. such cases
+ * will be prevented with this API.
+ *
+ * Return: True/False
+ */
+bool policy_mgr_allow_concurrency_csa(struct wlan_objmgr_psoc *psoc,
+				      enum policy_mgr_con_mode mode,
+				      uint8_t channel,
+				      uint32_t vdev_id);
+
+/**
  * policy_mgr_get_first_connection_pcl_table_index() - provides the
  * row index to firstConnectionPclTable to get to the correct
  * pcl
@@ -520,6 +569,33 @@ QDF_STATUS policy_mgr_current_connections_update(struct wlan_objmgr_psoc *psoc,
  */
 bool policy_mgr_is_dbs_allowed_for_concurrency(
 		struct wlan_objmgr_psoc *psoc, enum QDF_OPMODE new_conn_mode);
+
+/**
+ * policy_mgr_get_preferred_dbs_action_table() - get dbs action table type
+ * @psoc: Pointer to psoc
+ * @vdev_id: vdev Id
+ * @channel: channel of vdev.
+ * @reason: reason of request
+ *
+ * 1. Based on band preferred and vdev priority setting to choose the preferred
+ * dbs action.
+ * 2. This routine will be used to get DBS switching action tables.
+ * In Genoa, two action tables for DBS1 (2x2 5G + 1x1 2G), DBS2
+ *  (2x2 2G + 1x1 5G).
+ * 3. It can be used in mode change case in CSA channel switching or Roaming,
+ * opportunistic upgrade. If needs switch to DBS, we needs to query this
+ * function to get preferred DBS mode.
+ * 4. This is mainly used for dual dbs mode HW. For Legacy HW, there is
+ * only single DBS mode. This function will return PM_NOP.
+ *
+ * return : PM_NOP, PM_DBS1, PM_DBS2
+ */
+enum policy_mgr_conc_next_action
+policy_mgr_get_preferred_dbs_action_table(
+	struct wlan_objmgr_psoc *psoc,
+	uint32_t vdev_id,
+	uint8_t channel,
+	enum policy_mgr_conn_update_reason reason);
 
 /**
  * policy_mgr_is_ibss_conn_exist() - to check if IBSS connection already present
@@ -705,6 +781,18 @@ enum QDF_OPMODE policy_mgr_get_qdf_mode_from_pm(
 			enum policy_mgr_con_mode device_mode);
 
 /**
+ * policy_mgr_check_n_start_opportunistic_timer - check single mac upgrade
+ * needed or not, if needed start the oppurtunistic timer.
+ * @psoc: pointer to SOC
+ *
+ * This function starts the oppurtunistic timer if hw_mode change is needed
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS policy_mgr_check_n_start_opportunistic_timer(
+		struct wlan_objmgr_psoc *psoc);
+
+/**
  * policy_mgr_pdev_set_hw_mode() - Set HW mode command to FW
  * @psoc: PSOC object information
  * @session_id: Session ID
@@ -859,6 +947,10 @@ struct policy_mgr_sme_cbacks {
  *                      SAP
  * @get_mode_for_non_connected_vdev: Get the mode for a non
  *                                 connected vdev
+ * @hdd_get_device_mode: Get QDF_OPMODE type for session id (vdev id)
+ * @hdd_wapi_security_sta_exist: Get whether wapi encription station existing
+ * or not. Some hw doesn't support WAPI encryption concurrency with other
+ * encryption type.
  */
 struct policy_mgr_hdd_cbacks {
 	void (*sap_restart_chan_switch_cb)(struct wlan_objmgr_psoc *psoc,
@@ -873,6 +965,7 @@ struct policy_mgr_hdd_cbacks {
 				struct wlan_objmgr_psoc *psoc,
 				uint8_t vdev_id);
 	enum QDF_OPMODE (*hdd_get_device_mode)(uint32_t session_id);
+	bool (*hdd_wapi_security_sta_exist)(void);
 };
 
 
@@ -1713,10 +1806,50 @@ bool policy_mgr_is_current_hwmode_dbs(struct wlan_objmgr_psoc *psoc);
  * DBS and there is no need for downgrading while entering DBS.
  *    true: DBS 2x2 can always be supported
  *    false: hw_modes support DBS 1x1 as well
+ * Genoa DBS 2x2 + 1x1 will not be included.
  *
  * Return: true - DBS2x2, false - DBS1x1
  */
 bool policy_mgr_is_hw_dbs_2x2_capable(struct wlan_objmgr_psoc *psoc);
+
+/*
+ * policy_mgr_is_2x2_1x1_dbs_capable() - check 2x2+1x1 DBS supported or not
+ * @psoc: PSOC object data
+ *
+ * This routine is called to check 2x2 5G + 1x1 2G (DBS1) or
+ * 2x2 2G + 1x1 5G (DBS2) support or not.
+ * Either DBS1 or DBS2 supported
+ *
+ * Return: true/false
+ */
+bool policy_mgr_is_2x2_1x1_dbs_capable(struct wlan_objmgr_psoc *psoc);
+
+/*
+ * policy_mgr_is_2x2_5G_1x1_2G_dbs_capable() - check Genoa DBS1 enabled or not
+ * @psoc: PSOC object data
+ *
+ * This routine is called to check support DBS1 or not.
+ * Notes: DBS1: 2x2 5G + 1x1 2G.
+ * This function will call policy_mgr_get_hw_mode_idx_from_dbs_hw_list to match
+ * the HW mode from hw mode list. The parameters will also be matched to
+ * 2x2 5G +2x2 2G HW mode. But firmware will not report 2x2 5G + 2x2 2G alone
+ * with 2x2 5G + 1x1 2G at same time. So, it is safe to find DBS1 with
+ * policy_mgr_get_hw_mode_idx_from_dbs_hw_list.
+ *
+ * Return: true/false
+ */
+bool policy_mgr_is_2x2_5G_1x1_2G_dbs_capable(struct wlan_objmgr_psoc *psoc);
+
+/*
+ * policy_mgr_is_2x2_2G_1x1_5G_dbs_capable() - check Genoa DBS2 enabled or not
+ * @psoc: PSOC object data
+ *
+ * This routine is called to check support DBS2 or not.
+ * Notes: DBS2: 2x2 2G + 1x1 5G
+ *
+ * Return: true/false
+ */
+bool policy_mgr_is_2x2_2G_1x1_5G_dbs_capable(struct wlan_objmgr_psoc *psoc);
 
 /**
  * policy_mgr_init() - Policy Manager component initialization
@@ -2387,19 +2520,37 @@ QDF_STATUS policy_mgr_register_mode_change_cb(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS policy_mgr_deregister_mode_change_cb(struct wlan_objmgr_psoc *psoc);
 
 /**
- * policy_mgr_allow_sap_go_concurrency() - check whether multiple SAP/GO
- * interfaces are allowed
+ * policy_mgr_allow_sap_go_concurrency() - check whether SAP/GO concurrency is
+ * allowed.
  * @psoc: pointer to soc
- * @policy_mgr_con_mode: operating mode of the new interface
- * @channel: operating channel of the new interface
- * This function checks whether second SAP/GO interface is allowed on the same
- * MAC.
+ * @policy_mgr_con_mode: operating mode of interface to be checked
+ * @channel: new operating channel of the interface to be checked
+ * @vdev_id: vdev id of the connection to be checked, 0xff for new connection
+ *
+ * Checks whether new channel SAP/GO can co-exist with the channel of existing
+ * SAP/GO connection. This API mainly used for two purposes:
+ *
+ * 1) When new GO/SAP session is coming up and needs to check if this session's
+ * channel can co-exist with existing existing GO/SAP sessions. For example,
+ * when single radio platform comes, MCC for SAP/GO+SAP/GO is not supported, in
+ * such case this API should prevent bringing the second connection.
+ *
+ * 2) There is already existing SAP+GO combination but due to upper layer
+ * notifying LTE-COEX event or sending command to move one of the connections
+ * to different channel. In such cases before moving existing connection to new
+ * channel, check if new channel can co-exist with the other existing
+ * connection. For example, one SAP1 is on channel-6 and second SAP2 is on
+ * channel-36 and lets say they are doing DBS, and lets say upper layer sends
+ * LTE-COEX to move SAP1 from channel-6 to channel-149. In this case, SAP1 and
+ * SAP2 will end up doing MCC which may not be desirable result. such cases
+ * will be prevented with this API.
  *
  * Return: true or false
  */
 bool policy_mgr_allow_sap_go_concurrency(struct wlan_objmgr_psoc *psoc,
 					 enum policy_mgr_con_mode mode,
-					 uint8_t channel);
+					 uint8_t channel,
+					 uint32_t vdev_id);
 
 /**
  * policy_mgr_dual_beacon_on_single_mac_scc_capable() - get capability that

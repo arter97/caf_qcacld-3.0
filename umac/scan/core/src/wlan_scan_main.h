@@ -44,9 +44,31 @@
 #define scm_debug(params...) \
 	QDF_TRACE_DEBUG(QDF_MODULE_ID_SCAN, params)
 
+/* Rate Limited Logs */
+#define scm_alert_rl(params...) \
+	QDF_TRACE_FATAL_RL(QDF_MODULE_ID_SCAN, params)
+#define scm_err_rl(params...) \
+	QDF_TRACE_ERROR_RL(QDF_MODULE_ID_SCAN, params)
+#define scm_warn_rl(params...) \
+	QDF_TRACE_WARN_RL(QDF_MODULE_ID_SCAN, params)
+#define scm_info_rl(params...) \
+	QDF_TRACE_INFO_RL(QDF_MODULE_ID_SCAN, params)
+#define scm_debug_rl(params...) \
+	QDF_TRACE_DEBUG_RL(QDF_MODULE_ID_SCAN, params)
+
+#define scm_nofl_alert(params...) \
+	QDF_TRACE_FATAL_NO_FL(QDF_MODULE_ID_SCAN, params)
+#define scm_nofl_err(params...) \
+	QDF_TRACE_ERROR_NO_FL(QDF_MODULE_ID_SCAN, params)
+#define scm_nofl_warn(params...) \
+	QDF_TRACE_WARN_NO_FL(QDF_MODULE_ID_SCAN, params)
+#define scm_nofl_info(params...) \
+	QDF_TRACE_INFO_NO_FL(QDF_MODULE_ID_SCAN, params)
+#define scm_nofl_debug(params...) \
+	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_SCAN, params)
+
 #define scm_hex_dump(level, data, buf_len) \
 		qdf_trace_hex_dump(QDF_MODULE_ID_SCAN, level, data, buf_len)
-
 
 #define MAX_SCAN_EVENT_HANDLERS_PER_PDEV   100
 #define WLAN_MAX_MODULE_NAME    40
@@ -247,6 +269,21 @@ struct pno_def_config {
 	struct nlo_mawc_params mawc_params;
 };
 
+/**
+ * struct extscan_def_config - def configuration for EXTSCAN
+ * @extscan_enabled: enable extscan
+ * @extscan_passive_max_chn_time: max passive channel time
+ * @extscan_passive_min_chn_time: min passive channel time
+ * @extscan_active_max_chn_time: max active channel time
+ * @extscan_active_min_chn_time: min active channel time
+ */
+struct extscan_def_config {
+	bool     extscan_enabled;
+	uint32_t extscan_passive_max_chn_time;
+	uint32_t extscan_passive_min_chn_time;
+	uint32_t extscan_active_max_chn_time;
+	uint32_t extscan_active_min_chn_time;
+};
 
 /**
  * struct scan_default_params - default scan parameters to be used
@@ -434,6 +471,7 @@ struct scan_cb {
  * @global_evhandlers:  registered scan event handlers
  * @pdev_info: pointer to pdev info
  * @pno_cfg: default pno configuration
+ * @extscan_cfg: default extscan configuration
  * @ie_whitelist: default ie whitelist attrs
  * @bt_a2dp_enabled: if bt a2dp is enabled
  * @miracast_enabled: miracast enabled
@@ -454,6 +492,9 @@ struct wlan_scan_obj {
 	struct global_scan_ev_handlers global_evhandlers;
 	struct pdev_scan_info pdev_info[WLAN_UMAC_MAX_PDEVS];
 	struct pno_def_config pno_cfg;
+#ifdef FEATURE_WLAN_EXTSCAN
+	struct extscan_def_config extscan_cfg;
+#endif
 	struct probe_req_whitelist_attr ie_whitelist;
 	bool bt_a2dp_enabled;
 	bool miracast_enabled;

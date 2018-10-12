@@ -24,6 +24,7 @@
 #include "reg_services.h"
 #include "reg_priv.h"
 #include "reg_db_parser.h"
+#include "reg_host_11d.h"
 #include <scheduler_api.h>
 
 #define CHAN_12_CENT_FREQ 2467
@@ -891,6 +892,29 @@ enum channel_state reg_get_channel_state(struct wlan_objmgr_pdev *pdev,
 	return pdev_priv_obj->cur_chan_list[ch_idx].state;
 }
 
+bool reg_chan_has_dfs_attribute(struct wlan_objmgr_pdev *pdev, uint32_t ch)
+{
+	enum channel_enum ch_idx;
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+
+	ch_idx = reg_get_chan_enum(ch);
+
+	if (ch_idx == INVALID_CHANNEL)
+		return false;
+
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+
+	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
+		reg_err("pdev reg obj is NULL");
+		return false;
+	}
+	if (pdev_priv_obj->cur_chan_list[ch_idx].chan_flags &
+	    REGULATORY_CHAN_RADAR)
+		return true;
+
+	return false;
+}
+
 /**
  * reg_get_5g_bonded_chan_array() - get ptr to bonded channel
  * @oper_ch: operating channel number
@@ -1485,6 +1509,7 @@ QDF_STATUS reg_set_11d_country(struct wlan_objmgr_pdev *pdev,
 	struct wlan_objmgr_psoc *psoc;
 	struct cc_regdmn_s rd;
 	QDF_STATUS status;
+	struct wlan_lmac_if_reg_tx_ops *tx_ops;
 
 	if (!country) {
 		reg_err("country code is NULL");
@@ -1514,8 +1539,15 @@ QDF_STATUS reg_set_11d_country(struct wlan_objmgr_pdev *pdev,
 	psoc_reg->new_11d_ctry_pending = true;
 
 	if (psoc_reg->offload_enabled) {
-		reg_err("reg offload, 11d offload too!");
-		status = QDF_STATUS_E_FAULT;
+		tx_ops = reg_get_psoc_tx_ops(psoc);
+		if (tx_ops->set_country_code) {
+			tx_ops->set_country_code(psoc, &country_code);
+		} else {
+			reg_err("country set fw handler not present");
+			psoc_reg->new_11d_ctry_pending = false;
+			return QDF_STATUS_E_FAULT;
+		}
+		status = QDF_STATUS_SUCCESS;
 	} else {
 		qdf_mem_copy(rd.cc.alpha, country, REG_ALPHA2_LEN + 1);
 		rd.flags = ALPHA_IS_SET;
@@ -1573,23 +1605,23 @@ static void reg_init_channel_map(enum dfs_reg dfs_region)
 static void reg_init_channel_map(enum dfs_reg dfs_region)
 {
 	switch (dfs_region) {
-	case DFS_UNINIT_REG:
-	case DFS_UNDEF_REG:
+	case DFS_UNINIT_REGION:
+	case DFS_UNDEF_REGION:
 		channel_map = channel_map_global;
 		break;
-	case DFS_FCC_REG:
+	case DFS_FCC_REGION:
 		channel_map = channel_map_us;
 		break;
-	case DFS_ETSI_REG:
+	case DFS_ETSI_REGION:
 		channel_map = channel_map_eu;
 		break;
-	case DFS_MKK_REG:
+	case DFS_MKK_REGION:
 		channel_map = channel_map_jp;
 		break;
-	case DFS_CN_REG:
+	case DFS_CN_REGION:
 		channel_map = channel_map_china;
 		break;
-	case DFS_KR_REG:
+	case DFS_KR_REGION:
 		channel_map = channel_map_eu;
 		break;
 	}
@@ -1840,17 +1872,16 @@ uint32_t reg_chan_to_freq(struct wlan_objmgr_pdev *pdev,
 	for (count = 0; count < NUM_CHANNELS; count++)
 		if (chan_list[count].chan_num == chan_num) {
 			if (reg_chan_in_range(chan_list,
-						pdev_priv_obj->range_2g_low,
-						pdev_priv_obj->range_2g_high,
-						pdev_priv_obj->range_5g_low,
-						pdev_priv_obj->range_5g_high,
-						count)) {
+					      pdev_priv_obj->range_2g_low,
+					      pdev_priv_obj->range_2g_high,
+					      pdev_priv_obj->range_5g_low,
+					      pdev_priv_obj->range_5g_high,
+					      count)) {
 				return chan_list[count].center_freq;
 			}
 		}
 
-
-	reg_err("invalid channel %d", chan_num);
+	reg_debug_rl("invalid channel %d", chan_num);
 
 	return 0;
 }
@@ -2728,7 +2759,9 @@ QDF_STATUS reg_send_scheduler_msg_sb(struct wlan_objmgr_psoc *psoc,
 	msg.callback = reg_sched_chan_change_cbks_sb;
 	msg.flush_callback = reg_chan_change_flush_cbk_sb;
 
-	status = scheduler_post_msg(QDF_MODULE_ID_TARGET_IF, &msg);
+	status = scheduler_post_message(QDF_MODULE_ID_REGULATORY,
+					QDF_MODULE_ID_REGULATORY,
+					QDF_MODULE_ID_TARGET_IF, &msg);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		wlan_objmgr_pdev_release_ref(pdev, WLAN_REGULATORY_SB_ID);
 		wlan_objmgr_psoc_release_ref(psoc, WLAN_REGULATORY_SB_ID);
@@ -2770,7 +2803,9 @@ static QDF_STATUS reg_send_scheduler_msg_nb(struct wlan_objmgr_psoc *psoc,
 	msg.callback = reg_sched_chan_change_cbks_nb;
 	msg.flush_callback = reg_chan_change_flush_cbk_nb;
 
-	status = scheduler_post_msg(QDF_MODULE_ID_OS_IF, &msg);
+	status = scheduler_post_message(QDF_MODULE_ID_REGULATORY,
+					QDF_MODULE_ID_REGULATORY,
+					QDF_MODULE_ID_OS_IF, &msg);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		wlan_objmgr_pdev_release_ref(pdev, WLAN_REGULATORY_NB_ID);
 		wlan_objmgr_psoc_release_ref(psoc, WLAN_REGULATORY_NB_ID);
@@ -2839,7 +2874,9 @@ static QDF_STATUS reg_sched_11d_msg(struct wlan_objmgr_psoc *psoc)
 	msg.callback = reg_send_11d_msg_cbk;
 	msg.flush_callback = reg_send_11d_flush_cbk;
 
-	status = scheduler_post_msg(QDF_MODULE_ID_TARGET_IF, &msg);
+	status = scheduler_post_message(QDF_MODULE_ID_REGULATORY,
+					QDF_MODULE_ID_REGULATORY,
+					QDF_MODULE_ID_TARGET_IF, &msg);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		wlan_objmgr_psoc_release_ref(psoc, WLAN_REGULATORY_SB_ID);
 		reg_err("scheduler msg posting failed");
@@ -2868,8 +2905,6 @@ static QDF_STATUS reg_sched_11d_msg(struct wlan_objmgr_psoc *psoc)
 
 void reg_reset_reg_rules(struct reg_rule_info *reg_rules)
 {
-	if (reg_rules->reg_rules_ptr)
-		qdf_mem_free(reg_rules->reg_rules_ptr);
 	qdf_mem_zero(reg_rules, sizeof(*reg_rules));
 }
 
@@ -2880,28 +2915,29 @@ static void reg_save_reg_rules_to_pdev(struct reg_rule_info *psoc_reg_rules,
 	uint32_t reg_rule_len;
 	struct reg_rule_info *pdev_reg_rules;
 
+	qdf_spin_lock_bh(&pdev_priv_obj->reg_rules_lock);
+
 	pdev_reg_rules = &pdev_priv_obj->reg_rules;
 	reg_reset_reg_rules(pdev_reg_rules);
+
 	pdev_reg_rules->num_of_reg_rules = psoc_reg_rules->num_of_reg_rules;
 	if (!pdev_reg_rules->num_of_reg_rules) {
-		reg_debug("no reg rules in psoc");
+		qdf_spin_unlock_bh(&pdev_priv_obj->reg_rules_lock);
+		reg_err("no reg rules in psoc");
 		return;
 	}
+
 	reg_rule_len = pdev_reg_rules->num_of_reg_rules *
 		       sizeof(struct cur_reg_rule);
-	pdev_reg_rules->reg_rules_ptr = qdf_mem_malloc(reg_rule_len);
-	if (!pdev_reg_rules->reg_rules_ptr) {
-		reg_err("mem alloc failed for pdev reg rules");
-		return;
-	}
-	qdf_mem_copy(pdev_reg_rules->reg_rules_ptr,
-		     psoc_reg_rules->reg_rules_ptr,
+	qdf_mem_copy(pdev_reg_rules->reg_rules,
+		     psoc_reg_rules->reg_rules,
 		     reg_rule_len);
+
 	qdf_mem_copy(pdev_reg_rules->alpha2, pdev_priv_obj->current_country,
 		     REG_ALPHA2_LEN + 1);
 	pdev_reg_rules->dfs_region = pdev_priv_obj->dfs_region;
-	reg_debug("num pdev reg rules saved %d",
-		  pdev_reg_rules->num_of_reg_rules);
+
+	qdf_spin_unlock_bh(&pdev_priv_obj->reg_rules_lock);
 }
 
 static void reg_propagate_mas_chan_list_to_pdev(struct wlan_objmgr_psoc *psoc,
@@ -2954,6 +2990,7 @@ static void reg_run_11d_state_machine(struct wlan_objmgr_psoc *psoc)
 {
 	bool temp_11d_support;
 	struct wlan_regulatory_psoc_priv_obj *psoc_priv_obj;
+	bool world_mode;
 
 	psoc_priv_obj = wlan_objmgr_psoc_get_comp_private_obj(psoc,
 						 WLAN_UMAC_COMP_REGULATORY);
@@ -2962,19 +2999,33 @@ static void reg_run_11d_state_machine(struct wlan_objmgr_psoc *psoc)
 		return;
 	}
 
+	world_mode = reg_is_world_alpha2(psoc_priv_obj->cur_country);
+
 	temp_11d_support = psoc_priv_obj->enable_11d_supp;
-	if (((psoc_priv_obj->user_ctry_set) &&
-	     (psoc_priv_obj->user_ctry_priority)) ||
-	    (psoc_priv_obj->master_vdev_cnt))
+	if ((psoc_priv_obj->enable_11d_in_world_mode) && (world_mode))
+		psoc_priv_obj->enable_11d_supp = true;
+	else if (((psoc_priv_obj->user_ctry_set) &&
+		  (psoc_priv_obj->user_ctry_priority)) ||
+		 (psoc_priv_obj->master_vdev_cnt))
 		psoc_priv_obj->enable_11d_supp = false;
 	else
 		psoc_priv_obj->enable_11d_supp =
 			psoc_priv_obj->enable_11d_supp_original;
 
-	reg_debug("inside 11d state machine");
-	if ((temp_11d_support != psoc_priv_obj->enable_11d_supp) &&
-	    (psoc_priv_obj->is_11d_offloaded)) {
-		reg_sched_11d_msg(psoc);
+	reg_debug("inside 11d state machine:tmp %d 11d_supp %d org %d set %d pri %d cnt %d vdev %d",
+		  temp_11d_support,
+		  psoc_priv_obj->enable_11d_supp,
+		  psoc_priv_obj->enable_11d_supp_original,
+		  psoc_priv_obj->user_ctry_set,
+		  psoc_priv_obj->user_ctry_priority,
+		  psoc_priv_obj->master_vdev_cnt,
+		  psoc_priv_obj->vdev_id_for_11d_scan);
+
+	if (temp_11d_support != psoc_priv_obj->enable_11d_supp) {
+		if (psoc_priv_obj->is_11d_offloaded)
+			reg_sched_11d_msg(psoc);
+		else
+			reg_11d_host_scan(psoc_priv_obj);
 	}
 }
 
@@ -3084,24 +3135,21 @@ QDF_STATUS reg_process_master_chan_list(struct cur_regulatory_info
 	reg_reset_reg_rules(reg_rules);
 
 	reg_rules->num_of_reg_rules = num_5g_reg_rules + num_2g_reg_rules;
+	if (reg_rules->num_of_reg_rules > MAX_REG_RULES) {
+		reg_err("number of reg rules exceeds limit");
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	if (reg_rules->num_of_reg_rules) {
-		reg_rules->reg_rules_ptr =
-			qdf_mem_malloc(reg_rules->num_of_reg_rules *
-					sizeof(struct cur_reg_rule));
-		if (!reg_rules->reg_rules_ptr) {
-			reg_err("mem alloc failed for reg_rules");
-		} else {
-			if (num_2g_reg_rules)
-				qdf_mem_copy(reg_rules->reg_rules_ptr,
-					     reg_rule_2g, num_2g_reg_rules *
-					     sizeof(struct cur_reg_rule));
-			if (num_5g_reg_rules)
-				qdf_mem_copy(reg_rules->reg_rules_ptr +
-					     num_2g_reg_rules, reg_rule_5g,
-					     num_5g_reg_rules *
-					     sizeof(struct cur_reg_rule));
-		}
+		if (num_2g_reg_rules)
+			qdf_mem_copy(reg_rules->reg_rules,
+				     reg_rule_2g, num_2g_reg_rules *
+				     sizeof(struct cur_reg_rule));
+		if (num_5g_reg_rules)
+			qdf_mem_copy(reg_rules->reg_rules +
+				     num_2g_reg_rules, reg_rule_5g,
+				     num_5g_reg_rules *
+				     sizeof(struct cur_reg_rule));
 	}
 
 	if (num_5g_reg_rules != 0)
@@ -3134,15 +3182,19 @@ QDF_STATUS reg_process_master_chan_list(struct cur_regulatory_info
 		soc_reg->new_11d_ctry_pending = false;
 		soc_reg->cc_src = SOURCE_11D;
 		soc_reg->user_ctry_set = false;
+		reg_run_11d_state_machine(psoc);
 	} else if (soc_reg->world_country_pending == true) {
 		soc_reg->world_country_pending = false;
 		soc_reg->cc_src = SOURCE_CORE;
 		soc_reg->user_ctry_set = false;
+		reg_run_11d_state_machine(psoc);
 	} else {
 		soc_reg->cc_src = SOURCE_DRIVER;
 
-		if (reg_is_world_alpha2(regulat_info->alpha2))
+		if (reg_is_world_alpha2(regulat_info->alpha2)) {
 			soc_reg->cc_src = SOURCE_CORE;
+			reg_run_11d_state_machine(psoc);
+		}
 
 		qdf_mem_copy(soc_reg->mas_chan_params[phy_id].default_country,
 			     regulat_info->alpha2,
@@ -3208,6 +3260,7 @@ QDF_STATUS wlan_regulatory_psoc_obj_created_notification(
 	soc_reg_obj->vdev_cnt_11d = 0;
 	soc_reg_obj->restart_beaconing = CH_AVOID_RULE_RESTART;
 	soc_reg_obj->enable_srd_chan_in_master_mode = false;
+	soc_reg_obj->enable_11d_in_world_mode = false;
 
 	for (i = 0; i < MAX_STA_VDEV_CNT; i++)
 		soc_reg_obj->vdev_ids_11d[i] = INVALID_VDEV_ID;
@@ -3594,6 +3647,8 @@ QDF_STATUS wlan_regulatory_pdev_obj_created_notification(
 		psoc_priv_obj->indoor_chan_enabled;
 	pdev_priv_obj->en_chan_144 = true;
 
+	qdf_spinlock_create(&pdev_priv_obj->reg_rules_lock);
+
 	reg_cap_ptr = psoc_priv_obj->reg_cap;
 	pdev_priv_obj->force_ssc_disable_indoor_channel =
 		psoc_priv_obj->force_ssc_disable_indoor_channel;
@@ -3641,6 +3696,9 @@ QDF_STATUS wlan_regulatory_pdev_obj_created_notification(
 						     WLAN_UMAC_COMP_REGULATORY,
 						     pdev_priv_obj,
 						     QDF_STATUS_SUCCESS);
+	if (QDF_IS_STATUS_SUCCESS(status) &&
+	    !psoc_priv_obj->is_11d_offloaded)
+		reg_11d_host_scan_init(parent_psoc);
 
 	reg_debug("reg pdev obj created with status %d", status);
 
@@ -3652,6 +3710,7 @@ QDF_STATUS wlan_regulatory_pdev_obj_destroyed_notification(
 {
 	QDF_STATUS status;
 	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+	struct wlan_regulatory_psoc_priv_obj *psoc_priv_obj;
 
 	pdev_priv_obj = reg_get_pdev_obj(pdev);
 
@@ -3659,6 +3718,15 @@ QDF_STATUS wlan_regulatory_pdev_obj_destroyed_notification(
 		reg_err("reg pdev private obj is NULL");
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	psoc_priv_obj = reg_get_psoc_obj(wlan_pdev_get_psoc(pdev));
+	if (!IS_VALID_PSOC_REG_OBJ(psoc_priv_obj)) {
+		reg_err("reg psoc private obj is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!psoc_priv_obj->is_11d_offloaded)
+		reg_11d_host_scan_deinit(wlan_pdev_get_psoc(pdev));
 
 	pdev_priv_obj->pdev_ptr = NULL;
 
@@ -3671,7 +3739,12 @@ QDF_STATUS wlan_regulatory_pdev_obj_destroyed_notification(
 
 	reg_debug("reg pdev obj deleted with status %d", status);
 
+	qdf_spin_lock_bh(&pdev_priv_obj->reg_rules_lock);
 	reg_reset_reg_rules(&pdev_priv_obj->reg_rules);
+	qdf_spin_unlock_bh(&pdev_priv_obj->reg_rules_lock);
+
+	qdf_spinlock_destroy(&pdev_priv_obj->reg_rules_lock);
+
 	qdf_mem_free(pdev_priv_obj);
 
 	return status;
@@ -3946,6 +4019,8 @@ QDF_STATUS reg_set_config_vars(struct wlan_objmgr_psoc *psoc,
 	psoc_priv_obj->restart_beaconing = config_vars.restart_beaconing;
 	psoc_priv_obj->enable_srd_chan_in_master_mode =
 		config_vars.enable_srd_chan_in_master_mode;
+	psoc_priv_obj->enable_11d_in_world_mode =
+		config_vars.enable_11d_in_world_mode;
 
 	status = wlan_objmgr_psoc_try_get_ref(psoc, WLAN_REGULATORY_SB_ID);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -4197,22 +4272,28 @@ QDF_STATUS reg_program_default_cc(struct wlan_objmgr_pdev *pdev,
 	return QDF_STATUS_SUCCESS;
 }
 
-struct reg_rule_info *reg_get_regd_rules(struct wlan_objmgr_pdev *pdev)
+QDF_STATUS reg_get_regd_rules(struct wlan_objmgr_pdev *pdev,
+			      struct reg_rule_info *reg_rules)
 {
 	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
 
 	if (!pdev) {
 		reg_err("pdev is NULL");
-		return NULL;
+		return QDF_STATUS_E_FAILURE;
 	}
-	pdev_priv_obj = reg_get_pdev_obj(pdev);
 
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
 	if (!pdev_priv_obj) {
 		reg_err("pdev priv obj is NULL");
-		return NULL;
+		return QDF_STATUS_E_FAILURE;
 	}
 
-	return &pdev_priv_obj->reg_rules;
+	qdf_spin_lock_bh(&pdev_priv_obj->reg_rules_lock);
+	qdf_mem_copy(reg_rules, &pdev_priv_obj->reg_rules,
+		     sizeof(struct reg_rule_info));
+	qdf_spin_unlock_bh(&pdev_priv_obj->reg_rules_lock);
+
+	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS reg_program_chan_list(struct wlan_objmgr_pdev *pdev,
@@ -4561,23 +4642,6 @@ QDF_STATUS reg_save_new_11d_country(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
-bool reg_11d_original_enabled_on_host(struct wlan_objmgr_psoc *psoc)
-{
-	struct wlan_regulatory_psoc_priv_obj *psoc_priv_obj;
-
-	psoc_priv_obj =
-	     wlan_objmgr_psoc_get_comp_private_obj(psoc,
-						   WLAN_UMAC_COMP_REGULATORY);
-
-	if (NULL == psoc_priv_obj) {
-		reg_err("reg psoc private obj is NULL");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	return (psoc_priv_obj->enable_11d_supp_original &&
-		!psoc_priv_obj->is_11d_offloaded);
-}
-
 bool reg_11d_enabled_on_host(struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_regulatory_psoc_priv_obj *psoc_priv_obj;
@@ -4624,8 +4688,24 @@ QDF_STATUS reg_set_11d_offloaded(struct wlan_objmgr_psoc *psoc,
 	}
 
 	soc_reg->is_11d_offloaded = val;
-
+	reg_debug("set is_11d_offloaded %d", val);
 	return QDF_STATUS_SUCCESS;
+}
+
+bool reg_is_11d_offloaded(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_regulatory_psoc_priv_obj *psoc_priv_obj;
+
+	psoc_priv_obj =
+	     wlan_objmgr_psoc_get_comp_private_obj(psoc,
+						   WLAN_UMAC_COMP_REGULATORY);
+
+	if (!psoc_priv_obj) {
+		reg_err("reg psoc private obj is NULL");
+		return false;
+	}
+
+	return psoc_priv_obj->is_11d_offloaded;
 }
 
 QDF_STATUS reg_get_curr_regdomain(struct wlan_objmgr_pdev *pdev,

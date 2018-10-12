@@ -20,6 +20,7 @@
 #include <ce_main.h>
 #include <hif_irq_affinity.h>
 #include "qdf_module.h"
+#include "qdf_net_if.h"
 
 /* mapping NAPI budget 0 to internal budget 0
  * NAPI budget 1 to internal budget [1,scaler -1]
@@ -46,7 +47,7 @@ void hif_print_napi_stats(struct hif_opaque_softc *hif_ctx)
 	int i, j;
 
 	QDF_TRACE(QDF_MODULE_ID_HIF, QDF_TRACE_LEVEL_FATAL,
-		"NAPI[#ctx]CPU[#] |schedules |polls |completes |workdone\n");
+		"NAPI[#ctx]CPU[#] |schedules |polls |completes |workdone");
 
 	for (i = 0; i < hif_state->hif_num_extgroup; i++) {
 		if (hif_state->hif_ext_group[i]) {
@@ -57,7 +58,7 @@ void hif_print_napi_stats(struct hif_opaque_softc *hif_ctx)
 					QDF_TRACE(QDF_MODULE_ID_HIF,
 						QDF_TRACE_LEVEL_FATAL,
 						"NAPI[%2d]CPU[%d]: "
-						"%7d %7d %7d %7d \n",
+						"%7d %7d %7d %7d ",
 						i, j,
 						napi_stats->napi_schedules,
 						napi_stats->napi_polls,
@@ -197,7 +198,7 @@ static struct hif_exec_context *hif_exec_napi_create(uint32_t scale)
 	ctx->exec_ctx.sched_ops = &napi_sched_ops;
 	ctx->exec_ctx.inited = true;
 	ctx->exec_ctx.scale_bin_shift = scale;
-	init_dummy_netdev(&(ctx->netdev));
+	qdf_net_if_create_dummy_if((struct qdf_net_if *)&ctx->netdev);
 	netif_napi_add(&(ctx->netdev), &(ctx->napi), hif_exec_poll,
 		       QCA_NAPI_BUDGET);
 	napi_enable(&ctx->napi);
@@ -329,10 +330,12 @@ irqreturn_t hif_ext_group_interrupt_handler(int irq, void *context)
 	struct hif_exec_context *hif_ext_group = context;
 	struct hif_softc *scn = HIF_GET_SOFTC(hif_ext_group->hif);
 
-	hif_ext_group->irq_disable(hif_ext_group);
-	qdf_atomic_inc(&scn->active_grp_tasklet_cnt);
+	if (hif_ext_group->irq_requested) {
+		hif_ext_group->irq_disable(hif_ext_group);
+		qdf_atomic_inc(&scn->active_grp_tasklet_cnt);
 
-	hif_ext_group->sched_ops->schedule(hif_ext_group);
+		hif_ext_group->sched_ops->schedule(hif_ext_group);
+	}
 
 	return IRQ_HANDLED;
 }

@@ -26,6 +26,27 @@
 
 /*
  * <ini>
+ * drop_bcn_on_chan_mismatch - drop the beacon for chan mismatch
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to decide drop the beacon or not if channel received
+ * in metadata doesn't match the one in beacon.
+ *
+ * Related: None
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_DROP_BCN_ON_CHANNEL_MISMATCH CFG_INI_BOOL(\
+		"drop_bcn_on_chan_mismatch",\
+		true,\
+		"drop bcn on channel mismatch")
+
+/*
+ * <ini>
  * gActiveMaxChannelTime - Set max channel time for active scan
  * @Min: 0
  * @Max: 10000
@@ -185,13 +206,75 @@
 			CFG_VALUE_OR_DEFAULT, \
 			"Set priority for connection with bssid_hint")
 
+#ifdef FEATURE_WLAN_SCAN_PNO
+/*
+ * These scan PNO ini params are used only once by HDD to store the
+ * values in wiphy structure
+ */
+
+/*
+ * <ini>
+ * g_max_sched_scan_plan_iterations - pno sched max scan plan iterations.
+ * @Min: 1
+ * @Max: 100
+ * @Default: 10
+ *
+ * This ini is used to set max sched scan plan iterations for pno scan
+ * (value in seconds).
+ *
+ * Related: gPNOScanSupport
+ *
+ * Supported Feature: PNO scan
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_MAX_SCHED_SCAN_PLAN_ITERATIONS CFG_INI_UINT( \
+			"g_max_sched_scan_plan_iterations", \
+			1, 100, 10, \
+			CFG_VALUE_OR_DEFAULT, \
+			"Max sched scan plan iterations")
+
+/*
+ * <ini>
+ * g_max_sched_scan_plan_int - pno sched max scan plan interval.
+ * @Min: 1
+ * @Max: 7200
+ * @Default: 3600
+ *
+ * This ini is used to set max sched scan plan interval for pno scan
+ * (value in seconds).
+ *
+ * Related: gPNOScanSupport
+ *
+ * Supported Feature: PNO scan
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_MAX_SCHED_SCAN_PLAN_INTERVAL CFG_INI_UINT( \
+			"g_max_sched_scan_plan_int", \
+			1, 7200, 3600, \
+			CFG_VALUE_OR_DEFAULT, \
+			"Max sched scan plan interval")
+
+#define CFG_SCAN_PNO \
+	CFG(CFG_MAX_SCHED_SCAN_PLAN_ITERATIONS) \
+	CFG(CFG_MAX_SCHED_SCAN_PLAN_INTERVAL)
+#else
+#define CFG_SCAN_PNO
+#endif
+
 #define CFG_SCAN_ALL \
+	CFG(CFG_DROP_BCN_ON_CHANNEL_MISMATCH) \
 	CFG(CFG_ACTIVE_MAX_CHANNEL_TIME) \
 	CFG(CFG_ACTIVE_MAX_2G_CHANNEL_TIME) \
 	CFG(CFG_PASSIVE_MAX_CHANNEL_TIME) \
 	CFG(CFG_SCAN_NUM_PROBES) \
 	CFG(CFG_SCAN_PROBE_REPEAT_TIME) \
 	CFG(CFG_ADAPTIVE_SCAN_DWELL_MODE) \
-	CFG(CFG_IS_BSSID_HINT_PRIORITY)
-
+	CFG(CFG_IS_BSSID_HINT_PRIORITY) \
+	CFG_SCAN_PNO
 #endif

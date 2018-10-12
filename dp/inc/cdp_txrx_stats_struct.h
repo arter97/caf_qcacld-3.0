@@ -62,6 +62,31 @@
 
 #define CDP_MAX_RX_RINGS 4
 
+/* TID level VoW stats macros
+ * to add and get stats
+ */
+#define PFLOW_TXRX_TIDQ_STATS_ADD(_peer, _tid, _var, _val) \
+	(((_peer)->tidq_stats[_tid]).stats[_var]) += _val
+#define PFLOW_TXRX_TIDQ_STATS_GET(_peer, _tid, _var, _val) \
+	((_peer)->tidq_stats[_tid].stats[_var])
+/*
+ * Video only stats
+ */
+#define PFLOW_CTRL_PDEV_VIDEO_STATS_SET(_pdev, _var, _val) \
+	(((_pdev)->vow.vistats[_var]).value) = _val
+#define PFLOW_CTRL_PDEV_VIDEO_STATS_GET(_pdev, _var) \
+	((_pdev)->vow.vistats[_var].value)
+#define PFLOW_CTRL_PDEV_VIDEO_STATS_ADD(_pdev, _var, _val) \
+	(((_pdev)->vow.vistats[_var]).value) += _val
+/*
+ * video delay stats
+ */
+#define PFLOW_CTRL_PDEV_DELAY_VIDEO_STATS_SET(_pdev, _var, _val) \
+	(((_pdev)->vow.delaystats[_var]).value) = _val
+#define PFLOW_CTRL_PDEV_DELAY_VIDEO_STATS_GET(_pdev, _var) \
+	((_pdev)->vow.delaystats[_var].value)
+#define PFLOW_CTRL_PDEV_DELAY_VIDEO_STATS_ADD(_pdev, _var, _val) \
+	(((_pdev)->vow.delaystats[_var]).value) += _val
 /*
  * Number of TLVs sent by FW. Needs to reflect
  * HTT_PPDU_STATS_MAX_TAG declared in FW
@@ -78,6 +103,47 @@ enum cdp_packet_type {
 	DOT11_MAX = 5,
 };
 
+/* TID level Tx/Rx stats
+ *
+ */
+enum cdp_txrx_tidq_stats {
+	/* Tx Counters */
+	TX_MSDU_TOTAL_LINUX_SUBSYSTEM,
+	TX_MSDU_TOTAL_FROM_OSIF,
+	TX_MSDU_TX_COMP_PKT_CNT,
+	/* Rx Counters */
+	RX_MSDU_TOTAL_FROM_FW,
+	RX_MSDU_MCAST_FROM_FW,
+	RX_TID_MISMATCH_FROM_FW,
+	RX_MSDU_MISC_PKTS,
+	RX_MSDU_IS_ARP,
+	RX_MSDU_IS_EAP,
+	RX_MSDU_IS_DHCP,
+	RX_AGGREGATE_10,
+	RX_AGGREGATE_20,
+	RX_AGGREGATE_30,
+	RX_AGGREGATE_40,
+	RX_AGGREGATE_50,
+	RX_AGGREGATE_60,
+	RX_AGGREGATE_MORE,
+	RX_AMSDU_1,
+	RX_AMSDU_2,
+	RX_AMSDU_3,
+	RX_AMSDU_4,
+	RX_AMSDU_MORE,
+	RX_MSDU_CHAINED_FROM_FW,
+	RX_MSDU_REORDER_FAILED_FROM_FW,
+	RX_MSDU_REORDER_FLUSHED_FROM_FW,
+	RX_MSDU_DISCARD_FROM_FW,
+	RX_MSDU_DUPLICATE_FROM_FW,
+	RX_MSDU_DELIVERED_TO_STACK,
+	TIDQ_STATS_MAX,
+};
+
+struct cdp_tidq_stats {
+	uint32_t stats[TIDQ_STATS_MAX];
+};
+
 /* struct cdp_pkt_info - packet info
  * @num: no of packets
  * @bytes: total no of bytes
@@ -85,6 +151,13 @@ enum cdp_packet_type {
 struct cdp_pkt_info {
 	uint32_t num;
 	uint64_t bytes;
+};
+
+/* struct cdp_pkt_type - packet type
+ * @mcs_count: Counter array for each MCS index
+ */
+struct cdp_pkt_type {
+	uint32_t mcs_count[MAX_MCS];
 };
 
 /* struct cdp_tx_stats - tx stats
@@ -103,8 +176,10 @@ struct cdp_pkt_info {
  * @non_amsdu_cnt: Number of MSDUs with no MSDU level aggregation
  * @amsdu_cnt: Number of MSDUs part of AMSDU
  * @tx_rate: Tx Rate
- * @last_tx_rate: Last tx rate
- * @last_tx_rate_mcs: Tx rate mcs
+ * @last_tx_rate: Last tx rate for unicast packets
+ * @last_tx_rate_mcs: Tx rate mcs for unicast packets
+ * @mcast_last_tx_rate: Last tx rate for multicast packets
+ * @mcast_last_tx_rate_mcs: Last tx rate mcs for multicast
  * @last_per: Tx Per
  * @rnd_avg_tx_rate: Rounded average tx rate
  * @avg_tx_rate: Average TX rate
@@ -170,6 +245,8 @@ struct cdp_tx_stats {
 	uint32_t tx_rate;
 	uint32_t last_tx_rate;
 	uint32_t last_tx_rate_mcs;
+	uint32_t mcast_last_tx_rate;
+	uint32_t mcast_last_tx_rate_mcs;
 	uint32_t last_per;
 	uint32_t rnd_avg_tx_rate;
 	uint32_t avg_tx_rate;
@@ -178,10 +255,7 @@ struct cdp_tx_stats {
 	uint32_t tx_data_success_last;
 	uint32_t tx_byte_rate;
 	uint32_t tx_data_rate;
-	struct {
-		uint32_t mcs_count[MAX_MCS];
-	} pkt_type[DOT11_MAX];
-
+	struct cdp_pkt_type pkt_type[DOT11_MAX];
 	uint32_t sgi_count[MAX_GI];
 
 	uint32_t nss[SS_COUNT];
@@ -235,6 +309,7 @@ struct cdp_tx_stats {
  * @bcast:  Broadcast Packet Count
  * @raw: Raw Pakets received
  * @nawds_mcast_drop: Total multicast packets
+ * @mec_drop: Total MEC packets dropped
  * @pkts: Intra BSS packets received
  * @fail: Intra BSS packets failed
  * @mic_err: Rx MIC errors CCMP
@@ -273,6 +348,7 @@ struct cdp_tx_stats {
  * @rx_wpimic: rx MIC check failed (WPI)
  * @rx_wepfail: rx wep processing failed
  * @rx_aggr: aggregation on rx
+ * @rx_discard: packets discard in rx
  */
 struct cdp_rx_stats {
 	struct cdp_pkt_info to_stack;
@@ -282,6 +358,7 @@ struct cdp_rx_stats {
 	struct cdp_pkt_info bcast;
 	struct cdp_pkt_info raw;
 	uint32_t nawds_mcast_drop;
+	struct cdp_pkt_info mec_drop;
 	struct {
 		struct cdp_pkt_info pkts;
 		struct cdp_pkt_info fail;
@@ -295,9 +372,7 @@ struct cdp_rx_stats {
 
 	uint32_t wme_ac_type[WME_AC_MAX];
 	uint32_t reception_type[MAX_RECEPTION_TYPES];
-	struct {
-		uint32_t mcs_count[MAX_MCS];
-	} pkt_type[DOT11_MAX];
+	struct cdp_pkt_type pkt_type[DOT11_MAX];
 	uint32_t sgi_count[MAX_GI];
 	uint32_t nss[SS_COUNT];
 	uint32_t bw[MAX_BW];
@@ -325,6 +400,7 @@ struct cdp_rx_stats {
 
 	/*add for peer updated for ppdu*/
 	uint32_t rx_aggr;
+	uint32_t rx_discard;
 };
 
 /* struct cdp_tx_ingress_stats - Tx ingress Stats
@@ -417,6 +493,8 @@ struct cdp_tx_ingress_stats {
 		uint32_t enqueue_fail;
 		uint32_t dma_error;
 		uint32_t res_full;
+		/* headroom insufficient */
+		uint32_t headroom_insufficient;
 	} dropped;
 
 	/* Mesh packets info */
@@ -1082,6 +1160,11 @@ struct ol_ath_radiostats {
 	uint8_t     ap_stats_tx_cal_enable;
 	uint8_t     self_bss_util;
 	uint8_t     obss_util;
+	uint8_t     ap_rx_util;
+	uint8_t     free_medium;
+	uint8_t     ap_tx_util;
+	uint8_t     obss_rx_util;
+	uint8_t     non_wifi_util;
 	uint32_t    tgt_asserts;
 	int16_t     chan_nf;
 	int16_t     chan_nf_sec80;
@@ -1415,6 +1498,15 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_CBS_CSA = 386,
 	OL_ATH_PARAM_TWICE_ANTENNA_GAIN = 387,
 	OL_ATH_PARAM_ACTIVITY_FACTOR = 388,
+	OL_ATH_PARAM_CHAN_AP_RX_UTIL = 389,
+	OL_ATH_PARAM_CHAN_FREE  = 390,
+	OL_ATH_PARAM_CHAN_AP_TX_UTIL = 391,
+	OL_ATH_PARAM_CHAN_OBSS_RX_UTIL = 392,
+	OL_ATH_PARAM_CHAN_NON_WIFI = 393,
+#if PEER_FLOW_CONTROL
+	OL_ATH_PARAM_VIDEO_STATS_FC = 394,
+	OL_ATH_PARAM_VIDEO_DELAY_STATS_FC = 395,
+#endif
 };
 
 /* Enumeration of PDEV Configuration parameter */

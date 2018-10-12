@@ -27,6 +27,9 @@
 
 #include "reg_db.h"
 #include "reg_services.h"
+#ifdef HOST_11D_SCAN
+#include <qdf_mc_timer.h>
+#endif
 
 #define reg_alert(params...) \
 	QDF_TRACE_FATAL(QDF_MODULE_ID_REGULATORY, params)
@@ -40,6 +43,19 @@
 	QDF_TRACE_INFO(QDF_MODULE_ID_REGULATORY, params)
 #define reg_debug(params...) \
 	QDF_TRACE_DEBUG(QDF_MODULE_ID_REGULATORY, params)
+#define reg_debug_rl(params...) \
+	QDF_TRACE_DEBUG_RL(QDF_MODULE_ID_REGULATORY, params)
+
+#define reg_nofl_alert(params...) \
+	QDF_TRACE_FATAL_NO_FL(QDF_MODULE_ID_REGULATORY, params)
+#define reg_nofl_err(params...) \
+	QDF_TRACE_ERROR_NO_FL(QDF_MODULE_ID_REGULATORY, params)
+#define reg_nofl_warn(params...) \
+	QDF_TRACE_WARN_NO_FL(QDF_MODULE_ID_REGULATORY, params)
+#define reg_nofl_info(params...) \
+	QDF_TRACE_INFO_NO_FL(QDF_MODULE_ID_REGULATORY, params)
+#define reg_nofl_debug(params...) \
+	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_REGULATORY, params)
 
 struct wlan_regulatory_psoc_priv_obj {
 	struct mas_chan_params mas_chan_params[PSOC_MAX_PHY_REG_CAP];
@@ -64,6 +80,12 @@ struct wlan_regulatory_psoc_priv_obj {
 	uint8_t master_vdev_cnt;
 	uint8_t vdev_cnt_11d;
 	uint32_t scan_11d_interval;
+#ifdef HOST_11D_SCAN
+	bool is_host_11d_inited;
+	wlan_scan_requester scan_req_id;
+	uint32_t scan_id;
+	qdf_mc_timer_t timer;
+#endif
 	uint8_t vdev_ids_11d[MAX_STA_VDEV_CNT];
 	bool user_ctry_priority;
 	bool user_ctry_set;
@@ -77,6 +99,7 @@ struct wlan_regulatory_psoc_priv_obj {
 			reg_cap[PSOC_MAX_PHY_REG_CAP];
 	bool force_ssc_disable_indoor_channel;
 	bool enable_srd_chan_in_master_mode;
+	bool enable_11d_in_world_mode;
 	qdf_spinlock_t cbk_list_lock;
 };
 
@@ -111,6 +134,7 @@ struct wlan_regulatory_pdev_priv_obj {
 	bool force_ssc_disable_indoor_channel;
 	bool sap_state;
 	struct reg_rule_info reg_rules;
+	qdf_spinlock_t reg_rules_lock;
 };
 
 #endif

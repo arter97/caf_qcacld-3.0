@@ -56,6 +56,11 @@ target_if_scan_event_handler(ol_scn_t scn, uint8_t *data, uint32_t datalen)
 	}
 	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
 
+	if (!wmi_handle) {
+		target_if_err("wmi_handle is NULL");
+		return -EINVAL;
+	}
+
 	event_info = qdf_mem_malloc(sizeof(*event_info));
 
 	if (!event_info) {
@@ -192,9 +197,16 @@ target_if_scan_register_pno_event_handler(struct wlan_objmgr_psoc *psoc,
 	void *arg)
 {
 	QDF_STATUS status;
+	struct wmi_unified *wmi_handle;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("Invalid WMI handle");
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	status = wmi_unified_register_event(
-			get_wmi_unified_hdl_from_psoc(psoc),
+			wmi_handle,
 			wmi_nlo_match_event_id,
 			target_if_nlo_match_event_handler);
 	if (status) {
@@ -203,7 +215,7 @@ target_if_scan_register_pno_event_handler(struct wlan_objmgr_psoc *psoc,
 	}
 
 	status = wmi_unified_register_event(
-			get_wmi_unified_hdl_from_psoc(psoc),
+			wmi_handle,
 			wmi_nlo_scan_complete_event_id,
 			target_if_nlo_complete_handler);
 	if (status) {
@@ -219,9 +231,16 @@ target_if_scan_unregister_pno_event_handler(struct wlan_objmgr_psoc *psoc,
 		void *arg)
 {
 	QDF_STATUS status;
+	struct wmi_unified *wmi_handle;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("Invalid WMI handle");
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	status = wmi_unified_unregister_event(
-			get_wmi_unified_hdl_from_psoc(psoc),
+			wmi_handle,
 			wmi_nlo_match_event_id);
 	if (status) {
 		target_if_err("Failed to unregister nlo match event cb");
@@ -229,7 +248,7 @@ target_if_scan_unregister_pno_event_handler(struct wlan_objmgr_psoc *psoc,
 	}
 
 	status = wmi_unified_unregister_event(
-			get_wmi_unified_hdl_from_psoc(psoc),
+			wmi_handle,
 			wmi_nlo_scan_complete_event_id);
 	if (status) {
 		target_if_err("Failed to unregister nlo scan comp event cb");
@@ -244,13 +263,19 @@ target_if_pno_start(struct wlan_objmgr_psoc *psoc,
 	struct pno_scan_req_params *req)
 {
 	QDF_STATUS status;
+	struct wmi_unified *wmi_handle;
 
-	status = wmi_unified_pno_start_cmd(GET_WMI_HDL_FROM_PSOC(psoc), req);
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("Invalid WMI handle");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	status = wmi_unified_pno_start_cmd(wmi_handle, req);
 	if (status == QDF_STATUS_SUCCESS) {
 		if (req->mawc_params.enable)
-			status = wmi_unified_nlo_mawc_cmd(
-					GET_WMI_HDL_FROM_PSOC(psoc),
-					&req->mawc_params);
+			status = wmi_unified_nlo_mawc_cmd(wmi_handle,
+							  &req->mawc_params);
 	}
 
 	return status;
@@ -260,7 +285,15 @@ static QDF_STATUS
 target_if_pno_stop(struct wlan_objmgr_psoc *psoc,
 	uint8_t vdev_id)
 {
-	return wmi_unified_pno_stop_cmd(GET_WMI_HDL_FROM_PSOC(psoc), vdev_id);
+	struct wmi_unified *wmi_handle;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("Invalid WMI handle");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return wmi_unified_pno_stop_cmd(wmi_handle, vdev_id);
 }
 
 #else
@@ -299,9 +332,16 @@ QDF_STATUS
 target_if_scan_register_event_handler(struct wlan_objmgr_psoc *psoc, void *arg)
 {
 	QDF_STATUS status;
+	struct wmi_unified *wmi_handle;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("Invalid WMI handle");
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	status = wmi_unified_register_event(
-			get_wmi_unified_hdl_from_psoc(psoc),
+			wmi_handle,
 			wmi_scan_event_id,
 			target_if_scan_event_handler);
 	if (status) {
@@ -319,9 +359,16 @@ target_if_scan_unregister_event_handler(struct wlan_objmgr_psoc *psoc,
 		void *arg)
 {
 	QDF_STATUS status;
+	struct wmi_unified *wmi_handle;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("Invalid WMI handle");
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	status = wmi_unified_unregister_event(
-			get_wmi_unified_hdl_from_psoc(psoc),
+			wmi_handle,
 			wmi_scan_event_id);
 	if (status) {
 		target_if_err("Failed to unregister Scan match event cb");

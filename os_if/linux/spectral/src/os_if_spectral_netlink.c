@@ -27,6 +27,20 @@
 #include <net/cnss_nl.h>
 #endif
 
+/**
+ * os_if_spectral_remove_nbuf_debug_entry() - Remove nbuf from nbuf debug table
+ * @nbuf - nbuf to remove from the nbuf debug table
+ *
+ * Remove nbuf from the nbuf debug hash table and decrement the nbuf count
+ *
+ * Return: None
+ */
+static inline void os_if_spectral_remove_nbuf_debug_entry(qdf_nbuf_t nbuf)
+{
+	qdf_nbuf_count_dec(nbuf);
+	qdf_net_buf_debug_release_skb(nbuf);
+}
+
 #ifndef CNSS_GENL
 static struct sock *os_if_spectral_nl_sock;
 static atomic_t spectral_nl_users = ATOMIC_INIT(0);
@@ -334,7 +348,7 @@ os_if_spectral_nl_unicast_msg(struct wlan_objmgr_pdev *pdev)
 
 	if (!ps->spectral_sock) {
 		spectral_err("Spectral Socket is invalid");
-		dev_kfree_skb(ps->skb);
+		qdf_nbuf_free(ps->skb);
 		return -EINVAL;
 	}
 
@@ -345,6 +359,7 @@ os_if_spectral_nl_unicast_msg(struct wlan_objmgr_pdev *pdev)
 	/* to mcast group 1<<0 */
 	NETLINK_CB(ps->skb).dst_group = 0;
 
+	os_if_spectral_remove_nbuf_debug_entry(ps->skb);
 	status = netlink_unicast(ps->spectral_sock,
 				 ps->skb,
 				 ps->spectral_pid, MSG_DONTWAIT);
@@ -378,6 +393,7 @@ os_if_spectral_nl_unicast_msg(struct wlan_objmgr_pdev *pdev)
 
 	os_if_init_spectral_skb_pid_portid(ps->skb);
 
+	os_if_spectral_remove_nbuf_debug_entry(ps->skb);
 	status = nl_srv_ucast(ps->skb, ps->spectral_pid, MSG_DONTWAIT,
 			WLAN_NL_MSG_SPECTRAL_SCAN, CLD80211_MCGRP_OEM_MSGS);
 	if (status < 0)
@@ -387,6 +403,7 @@ os_if_spectral_nl_unicast_msg(struct wlan_objmgr_pdev *pdev)
 }
 
 #endif
+
 /**
  * os_if_spectral_nl_bcast_msg() - Sends broadcast Spectral message to user
  * space
@@ -425,16 +442,55 @@ os_if_spectral_nl_bcast_msg(struct wlan_objmgr_pdev *pdev)
 	}
 
 	if (!ps->spectral_sock) {
-		dev_kfree_skb(ps->skb);
+		qdf_nbuf_free(ps->skb);
 		return -EINVAL;
 	}
 
+	os_if_spectral_remove_nbuf_debug_entry(ps->skb);
 	status = netlink_broadcast(ps->spectral_sock,
 				   ps->skb,
 				   0, 1, GFP_ATOMIC);
 
 	return status;
 }
+
+/**
+ * os_if_spectral_free_skb() - Free spectral SAMP message skb
+ *
+ * @pdev : Pointer to pdev
+ *
+ * Return: void
+ */
+static void
+os_if_spectral_free_skb(struct wlan_objmgr_pdev *pdev)
+{
+	struct pdev_spectral *ps = NULL;
+
+	if (!pdev) {
+		spectral_err("PDEV is NULL!");
+		return;
+	}
+	ps = wlan_objmgr_pdev_get_comp_private_obj(pdev,
+						   WLAN_UMAC_COMP_SPECTRAL);
+
+	if (!ps) {
+		spectral_err("PDEV SPECTRAL object is NULL!");
+		return;
+	}
+
+	if (!ps->skb) {
+		spectral_err("Socket buffer is null");
+		return;
+	}
+
+	/* Free buffer */
+	qdf_nbuf_free(ps->skb);
+
+	/* clear the local copy */
+	ps->skb = NULL;
+}
+
+qdf_export_symbol(os_if_spectral_free_skb);
 
 void
 os_if_spectral_netlink_init(struct wlan_objmgr_pdev *pdev)
@@ -460,6 +516,7 @@ os_if_spectral_netlink_init(struct wlan_objmgr_pdev *pdev)
 	nl_cb.get_nbuff = os_if_spectral_prep_skb;
 	nl_cb.send_nl_bcast = os_if_spectral_nl_bcast_msg;
 	nl_cb.send_nl_unicast = os_if_spectral_nl_unicast_msg;
+	nl_cb.free_nbuff = os_if_spectral_free_skb;
 
 	if (sptrl_ctx->sptrlc_register_netlink_cb)
 		sptrl_ctx->sptrlc_register_netlink_cb(pdev, &nl_cb);

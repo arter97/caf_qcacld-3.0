@@ -98,7 +98,7 @@
 			(WMI_HOST_BCN_FLT_MAX_SUPPORTED_IES/32)
 #define LTEU_MAX_BINS	10
 #define ATF_ACTIVED_MAX_CLIENTS   50
-#define ATF_ACTIVED_MAX_ATFGROUPS 8
+#define ATF_ACTIVED_MAX_ATFGROUPS 16
 #define CTL_5G_SIZE 1536
 #define CTL_2G_SIZE 684
 #define MAX_CTL_SIZE (CTL_5G_SIZE > CTL_2G_SIZE ? CTL_5G_SIZE : CTL_2G_SIZE)
@@ -613,6 +613,8 @@ typedef enum {
  * @nss_2g: NSS for 2G
  * @nss_5g: NSS for 5G
  * @pdev_id: pdev id on pdev for this vdev
+ * @mbssid-flags: MBSS IE flags indicating vdev type
+ * @vdevid_trans: id of transmitting vdev for MBSS IE
  */
 struct vdev_create_params {
 	uint8_t if_id;
@@ -621,6 +623,8 @@ struct vdev_create_params {
 	uint8_t nss_2g;
 	uint8_t nss_5g;
 	uint32_t pdev_id;
+	uint32_t mbssid_flags;
+	uint8_t vdevid_trans;
 };
 
 /**
@@ -689,10 +693,18 @@ struct vdev_stop_params {
  * struct vdev_up_params - vdev up cmd parameter
  * @vdev_id: vdev id
  * @assoc_id: association id
+ * @profile_idx: profile index of the connected non-trans ap (mbssid case).
+ *		0  means invalid.
+ * @profile_num: the total profile numbers of non-trans aps (mbssid case).
+ *		0 means non-MBSS AP.
+ * @trans_bssid: bssid of transmitted AP (MBSS IE case)
  */
 struct vdev_up_params {
 	uint8_t vdev_id;
 	uint16_t assoc_id;
+	uint32_t profile_idx;
+	uint32_t profile_num;
+	uint8_t trans_bssid[IEEE80211_ADDR_LEN];
 };
 
 /**
@@ -852,7 +864,9 @@ struct hidden_ssid_vdev_restart_params {
 	uint32_t info;
 	uint32_t reg_info_1;
 	uint32_t reg_info_2;
+#ifndef CONFIG_VDEV_SM
 	qdf_atomic_t hidden_ssid_restart_in_progress;
+#endif
 };
 
 /**
@@ -937,6 +951,7 @@ typedef enum {
 	WMI_HOST_REQUEST_VDEV_EXTD_STAT =  0x100,
 	WMI_HOST_REQUEST_NAC_RSSI =  0x200,
 	WMI_HOST_REQUEST_BCN_STAT =  0x800,
+	WMI_HOST_REQUEST_BCN_STAT_RESET =  0x1000,
 } wmi_host_stats_id;
 
 typedef struct {
@@ -1046,19 +1061,23 @@ struct pdev_params {
  * struct beacon_tmpl_params - beacon template cmd parameter
  * @vdev_id: vdev id
  * @tim_ie_offset: tim ie offset
+ * @mbssid_ie_offset: mbssid ie offset
  * @tmpl_len: beacon template length
  * @tmpl_len_aligned: beacon template alignment
  * @csa_switch_count_offset: CSA swith count offset in beacon frame
  * @ext_csa_switch_count_offset: ECSA switch count offset in beacon frame
+ * @esp_ie_offset: ESP IE offset in beacon frame
  * @frm: beacon template parameter
  */
 struct beacon_tmpl_params {
 	uint8_t vdev_id;
 	uint32_t tim_ie_offset;
+	uint32_t mbssid_ie_offset;
 	uint32_t tmpl_len;
 	uint32_t tmpl_len_aligned;
 	uint32_t csa_switch_count_offset;
 	uint32_t ext_csa_switch_count_offset;
+	uint32_t esp_ie_offset;
 	uint8_t *frm;
 };
 
@@ -1126,6 +1145,9 @@ typedef struct {
 
 #define WMI_HOST_MAX_NUM_SS		8
 #define WMI_HOST_MAX_HECAP_PHY_SIZE	3
+#define WMI_HOST_MAX_HECAP_MAC_SIZE	2
+#define WMI_HOST_HECAP_MAC_WORD1	0
+#define WMI_HOST_HECAP_MAC_WORD2	1
 #define WMI_HOST_MAX_HE_RATE_SET	3
 /**
  * struct wmi_host_ppe_threshold -PPE threshold
@@ -1196,6 +1218,8 @@ typedef struct {
  * @amsdu_disable: AMSDU disble
  * @peer_mac: Peer mac address
  * @he_flag: HE flags
+ * @twt_requester: TWT Requester Support bit in Extended Capabilities element
+ * @twt_responder: TWT Responder Support bit in Extended Capabilities element
  * @peer_he_cap_macinfo: Peer HE Cap MAC info
  * @peer_he_ops: Peer HE operation info
  * @peer_he_cap_phyinfo: Peer HE Cap PHY info
@@ -1254,7 +1278,9 @@ struct peer_assoc_params {
 	uint8_t peer_mac[IEEE80211_ADDR_LEN];
 #endif
 	bool he_flag;
-	uint32_t peer_he_cap_macinfo;
+	bool twt_requester;
+	bool twt_responder;
+	uint32_t peer_he_cap_macinfo[WMI_HOST_MAX_HECAP_MAC_SIZE];
 	uint32_t peer_he_ops;
 	uint32_t peer_he_cap_phyinfo[WMI_HOST_MAX_HECAP_PHY_SIZE];
 	uint32_t peer_he_mcs_count;
@@ -1697,6 +1723,7 @@ struct thermal_cmd_params {
  * 5-tuple toeplitz hash for ipv4 packets
  * @toeplitz_hash_ipv6: contains seed needed to compute the flow id
  * 5-tuple toeplitz hash for ipv6 packets
+ * @pdev_id: radio on which lro hash is configured
  */
 struct wmi_lro_config_cmd_t {
 	uint32_t lro_enable;
@@ -1704,6 +1731,7 @@ struct wmi_lro_config_cmd_t {
 		tcp_flag_mask:9;
 	uint32_t toeplitz_hash_ipv4[WMI_LRO_IPV4_SEED_ARR_SZ];
 	uint32_t toeplitz_hash_ipv6[WMI_LRO_IPV6_SEED_ARR_SZ];
+	uint32_t pdev_id;
 };
 
 /**
@@ -1909,6 +1937,8 @@ typedef struct {
 	/* since this is 4 byte aligned, we don't declare it as tlv array */
 	uint32_t mcsset[WMI_HOST_ROAM_OFFLOAD_NUM_MCS_SET >> 2];
 	uint32_t ho_delay_for_rx;
+	uint32_t roam_preauth_retry_count;
+	uint32_t roam_preauth_no_ack_timeout;
 } roam_offload_param;
 
 #define WMI_FILS_MAX_RRK_LENGTH 64
@@ -2819,6 +2849,7 @@ struct dhcp_stop_ind_params {
  * @tspec: tspec value
  * @status: CDF status
  * @sessionId: session id
+ * @vdev_id: vdev id
  */
 struct aggr_add_ts_param {
 	uint16_t staIdx;
@@ -2826,6 +2857,7 @@ struct aggr_add_ts_param {
 	struct mac_tspec_ie tspec[WMI_QOS_NUM_AC_MAX];
 	QDF_STATUS status[WMI_QOS_NUM_AC_MAX];
 	uint8_t sessionId;
+	uint8_t vdev_id;
 };
 
 
@@ -3580,8 +3612,6 @@ struct extscan_bssid_hotlist_set_params {
 	uint32_t  num_ap;
 	struct ap_threshold_params ap[WMI_WLAN_EXTSCAN_MAX_HOTLIST_APS];
 };
-/* legacy naming */
-#define ext_scan_setbssid_hotlist_params extscan_bssid_hotlist_set_params
 
 /**
  * struct host_mem_req - Host memory request paramseters request by target
@@ -3887,68 +3917,6 @@ struct thermal_mitigation_params {
 };
 
 /**
- * struct smart_ant_enable_params - Smart antenna params
- * @enable: Enable/Disable
- * @mode: SA mode
- * @rx_antenna: RX antenna config
- * @gpio_pin : GPIO pin config
- * @gpio_func : GPIO function config
- */
-struct smart_ant_enable_params {
-	uint32_t enable;
-	uint32_t mode;
-	uint32_t rx_antenna;
-	uint32_t gpio_pin[WMI_HAL_MAX_SANTENNA];
-	uint32_t gpio_func[WMI_HAL_MAX_SANTENNA];
-	uint32_t pdev_id;
-};
-
-/**
- * struct smart_ant_rx_ant_params - RX antenna params
- * @antenna: RX antenna
- */
-struct smart_ant_rx_ant_params {
-	uint32_t antenna;
-	uint32_t pdev_id;
-};
-
-/**
- * struct smart_ant_tx_ant_params - TX antenna param
- * @antenna_array: Antenna arry
- * @vdev_id: VDEV id
- */
-struct smart_ant_tx_ant_params {
-	uint32_t *antenna_array;
-	uint8_t vdev_id;
-};
-
-/**
- * struct smart_ant_training_info_params - SA training params
- * @vdev_id: VDEV id
- * @rate_array: Rates array
- * @antenna_array: Antenna array
- * @numpkts: num packets for training
- */
-struct smart_ant_training_info_params {
-	uint8_t vdev_id;
-	uint32_t *rate_array;
-	uint32_t *antenna_array;
-	uint32_t numpkts;
-};
-
-/**
- * struct smart_ant_node_config_params - SA node config params
- * @vdev_id: VDEV id
- * @cmd_id: Command id
- * @args_count: Arguments count
- */
-struct smart_ant_node_config_params {
-	uint8_t vdev_id;
-	uint32_t cmd_id;
-	uint16_t args_count;
-	uint32_t *args_arr;
-};
-/**
  * struct smart_ant_enable_tx_feedback_params - SA tx feeback params
  * @enable: Enable TX feedback for SA
  */
@@ -4199,108 +4167,6 @@ struct wmi_macaddr_t {
 };
 
 /**
- * struct atf_peer_info - ATF peer info params
- * @peer_macaddr: peer mac addr
- * @percentage_peer: percentage of air time for this peer
- * @vdev_id: Associated vdev id
- * @pdev_id: Associated pdev id
- */
-typedef struct {
-	struct wmi_macaddr_t peer_macaddr;
-	uint32_t percentage_peer;
-	uint32_t vdev_id;
-	uint32_t pdev_id;
-} atf_peer_info;
-
-/**
- * struct bwf_peer_info_t - BWF peer info params
- * @peer_macaddr: peer mac addr
- * @throughput: Throughput
- * @max_airtime: Max airtime
- * @priority: Priority level
- * @reserved: Reserved array
- * @vdev_id: Associated vdev id
- * @pdev_id: Associated pdev id
- */
-typedef struct {
-	struct wmi_macaddr_t peer_macaddr;
-	uint32_t     throughput;
-	uint32_t     max_airtime;
-	uint32_t     priority;
-	uint32_t     reserved[4];
-	uint32_t     vdev_id;
-	uint32_t     pdev_id;
-} bwf_peer_info;
-
-/**
- * struct set_bwf_params - BWF params
- * @num_peers: number of peers
- * @atf_peer_info: BWF peer info
- */
-struct set_bwf_params {
-	uint32_t num_peers;
-	bwf_peer_info peer_info[1];
-};
-
-/**
- * struct atf_peer_ext_info - ATF peer ext info params
- * @peer_macaddr: peer mac address
- * @group_index: group index
- * @atf_index_reserved: ATF index rsvd
- * @vdev_id: Associated vdev id
- * @pdev_id: Associated pdev id
- */
-typedef struct {
-	struct wmi_macaddr_t peer_macaddr;
-	uint32_t group_index;
-	uint32_t atf_index_reserved;
-	uint16_t vdev_id;
-	uint16_t pdev_id;
-} atf_peer_ext_info;
-
-/**
- * struct set_atf_params - ATF params
- * @num_peers: number of peers
- * @atf_peer_info: ATF peer info
- */
-struct set_atf_params {
-	uint32_t num_peers;
-	atf_peer_info peer_info[ATF_ACTIVED_MAX_CLIENTS];
-};
-
-/**
- * struct atf_peer_request_params - ATF peer req params
- * @num_peers: number of peers
- * @atf_peer_ext_info: ATF peer ext info
- */
-struct atf_peer_request_params {
-	uint32_t num_peers;
-	atf_peer_ext_info peer_ext_info[ATF_ACTIVED_MAX_CLIENTS];
-};
-
-/**
- * struct atf_group_info - ATF group info params
- * @percentage_group: Percentage AT for group
- * @atf_group_units_reserved: ATF group information
- * @pdev_id: Associated pdev id
- */
-typedef struct {
-	uint32_t percentage_group;
-	uint32_t atf_group_units_reserved;
-	uint32_t pdev_id;
-} atf_group_info;
-
-/**
- * struct atf_grouping_params - ATF grouping params
- * @num_groups: number of groups
- * @group_inf: Group informaition
- */
-struct atf_grouping_params {
-	uint32_t num_groups;
-	atf_group_info group_info[ATF_ACTIVED_MAX_ATFGROUPS];
-};
-
-/**
  * struct wlan_profile_params - WLAN profile params
  * @param_id: param id
  * @profile_id: profile id
@@ -4383,18 +4249,6 @@ struct wmi_host_wme_vparams {
 		u_int32_t mu_edca_timer;
 	};
 	u_int32_t	noackpolicy;
-};
-
-/**
- * struct ant_switch_tbl_params - Antenna switch table params
- * @ant_ctrl_common1: ANtenna control common param 1
- * @ant_ctrl_common2: Antenna control commn param 2
- */
-struct ant_switch_tbl_params {
-	uint32_t ant_ctrl_common1;
-	uint32_t ant_ctrl_common2;
-	uint32_t pdev_id;
-	uint32_t antCtrlChain;
 };
 
 /**
@@ -4863,6 +4717,8 @@ struct rtt_keepalive_req_params {
  * @hw_qdesc_paddr_lo: lower 32 bits of queue desc adddress
  * @hw_qdesc_paddr_hi: upper 32 bits of queue desc adddress
  * @queue_no: 16-bit number assigned by host for queue
+ * @ba_window_size_valid: BA window size validity flag
+ * @ba_window_size: BA window size
  */
 struct rx_reorder_queue_setup_params {
 	uint8_t *peer_macaddr;
@@ -4871,6 +4727,9 @@ struct rx_reorder_queue_setup_params {
 	uint32_t hw_qdesc_paddr_lo;
 	uint32_t hw_qdesc_paddr_hi;
 	uint16_t queue_no;
+	uint8_t ba_window_size_valid;
+	uint16_t ba_window_size;
+
 };
 
 /**
@@ -5563,6 +5422,7 @@ typedef enum {
 #endif
 	wmi_twt_enable_complete_event_id,
 	wmi_apf_get_vdev_work_memory_resp_event_id,
+	wmi_roam_scan_stats_event_id,
 
 #ifdef OL_ATH_SMART_LOGGING
 	wmi_debug_fatal_condition_eventid,
@@ -5714,6 +5574,10 @@ typedef enum {
 	wmi_pdev_param_cck_tx_enable,
 	wmi_pdev_param_esp_indication_period,
 	wmi_pdev_param_antenna_gain_half_db,
+	wmi_pdev_param_ru26_allowed,
+	wmi_pdev_param_esp_ba_window,
+	wmi_pdev_param_esp_airtime_fraction,
+	wmi_pdev_param_esp_ppdu_duration,
 	wmi_pdev_param_max,
 } wmi_conv_pdev_params_id;
 
@@ -5834,6 +5698,7 @@ typedef enum {
 	wmi_vdev_param_autorate_misc_cfg,
 	wmi_vdev_param_amsdu_subframe_size_per_ac,
 	wmi_vdev_param_set_he_sounding_mode,
+	wmi_vdev_param_sifs_trigger_rate,
 
 	wmi_vdev_param_max,
 } wmi_conv_vdev_param_id;
@@ -6004,6 +5869,9 @@ typedef enum {
 #ifdef OL_ATH_SMART_LOGGING
 	wmi_service_smart_logging_support,
 #endif
+	wmi_service_infra_mbssid,
+	wmi_service_esp_support,
+	wmi_service_obss_spatial_reuse,
 	wmi_services_max,
 } wmi_conv_service_ids;
 #define WMI_SERVICE_UNAVAILABLE 0xFFFF
@@ -6118,9 +5986,11 @@ struct wmi_host_fw_abi_ver {
  * @use_pdev_id:
  * @max_num_dbs_scan_duty_cycle: max dbs can duty cycle value
  * @cce_disable: disable cce component
+ * @peer_map_unmap_v2: enable peer map/unmap version 2 messaging
  * @twt_ap_pdev_count: Number of MAC on which AP TWT feature is supported
  * @twt_ap_sta_count: Max no of STA with which TWT sessions can be formed
  *                    by the AP
+ * @max_bssid_indicator: max number of MBSS VAPs
  */
 typedef struct {
 	uint32_t num_vdevs;
@@ -6193,8 +6063,12 @@ typedef struct {
 	uint32_t use_pdev_id;
 	uint32_t max_num_dbs_scan_duty_cycle;
 	bool cce_disable;
+	bool peer_map_unmap_v2;
 	uint32_t twt_ap_pdev_count;
 	uint32_t twt_ap_sta_count;
+	uint32_t max_bssid_indicator;
+	uint32_t eapol_minrate_set:1,
+		 eapol_minrate_ac_set:2;
 } target_resource_config;
 
 /**
@@ -7082,6 +6956,8 @@ typedef struct _hp_dcs_mib_stats  {
  *      in mib structure
  * @chan_nf: Channel noise floor (Units are in dBm)
  * @my_bss_rx_cycle_count: BSS rx cycle count
+ * @reg_rxclr_ext40_cnt: extension channel 40Mhz rxclear count
+ * @reg_rxclr_ext80_cnt: extension channel 80Mhz rxclear count
  */
 typedef struct _wmi_host_dcs_im_tgt_stats {
 	uint32_t                     reg_tsf32;
@@ -7092,6 +6968,11 @@ typedef struct _wmi_host_dcs_im_tgt_stats {
 	wmi_host_dcs_mib_stats_t     mib_stats;
 	uint32_t		     chan_nf;
 	uint32_t		     my_bss_rx_cycle_count;
+	/* these fields are added here for backward compatibility instead of
+	 * wmi_host_dcs_mib_stats_t
+	 */
+	uint32_t                     reg_rxclr_ext40_cnt;
+	uint32_t                     reg_rxclr_ext80_cnt;
 } wmi_host_dcs_im_tgt_stats_t;
 
 /**
@@ -7466,75 +7347,18 @@ typedef struct {
  *                WMI_INVALID_PEER_AST_INDEX
  * @vdev_id: only applies if peer_ast_idx == INVALID
  * @ctrl_cmd: WMI_TX_DATA_TRAFFIC_CTRL_BLOCK or
- *                WMI_TX_DATA_TRAFFIC_CTRL_UNBLOCK
+ *            WMI_TX_DATA_TRAFFIC_CTRL_UNBLOCK
+ * @wmm_ac: Indicates AC to be blocked or unblocked
+ *          Bits  4-31 : Reserved (Shall be zero)
+ *          Bits  0-3  : WMM AC NO [ BE (1), BK (2), VI (3), VO (4)]
+ *          Started numbering from 1 to preserve backward compatibility
  */
 typedef struct {
 	uint32_t peer_ast_idx;
 	uint32_t vdev_id;
 	uint32_t ctrl_cmd;
+	uint32_t wmm_ac;
 } wmi_host_tx_data_traffic_ctrl_event;
-
-enum {
-	WMI_HOST_ATF_PEER_STATS_DISABLED = 0,
-	WMI_HOST_ATF_PEER_STATS_ENABLED  = 1,
-};
-
-#define WMI_HOST_ATF_PEER_STATS_GET_PEER_AST_IDX(token_info) \
-	(token_info.field1 & 0xffff)
-
-#define WMI_HOST_ATF_PEER_STATS_GET_USED_TOKENS(token_info) \
-	((token_info.field2 & 0xffff0000) >> 16)
-
-#define WMI_HOST_ATF_PEER_STATS_GET_UNUSED_TOKENS(token_info) \
-	(token_info.field2 & 0xffff)
-
-#define WMI_HOST_ATF_PEER_STATS_SET_PEER_AST_IDX(token_info, peer_ast_idx) \
-	do { \
-		token_info.field1 &= 0xffff0000; \
-		token_info.field1 |= ((peer_ast_idx) & 0xffff); \
-	} while (0)
-
-#define WMI_HOST_ATF_PEER_STATS_SET_USED_TOKENS(token_info, used_token) \
-	do { \
-		token_info.field2 &= 0x0000ffff; \
-		token_info.field2 |= (((used_token) & 0xffff) << 16); \
-	} while (0)
-
-#define WMI_HOST_ATF_PEER_STATS_SET_UNUSED_TOKENS(token_info, unused_token) \
-	do { \
-		token_info.field2 &= 0xffff0000; \
-		token_info.field2 |= ((unused_token) & 0xffff); \
-	} while (0)
-
-/**
- * struct wmi_host_atf_peer_stats_info
- * @field1: bits 15:0   peer_ast_index  WMI_ATF_PEER_STATS_GET_PEER_AST_IDX
- *          bits 31:16  reserved
- * @field2: bits 15:0   used tokens     WMI_ATF_PEER_STATS_GET_USED_TOKENS
- *          bits 31:16  unused tokens   WMI_ATF_PEER_STATS_GET_UNUSED_TOKENS
- * @field3: for future use
- */
-typedef struct {
-	uint32_t    field1;
-	uint32_t    field2;
-	uint32_t    field3;
-} wmi_host_atf_peer_stats_info;
-
-/**
- * struct wmi_host_atf_peer_stats_event
- * @pdev_id: pdev_id
- * @num_atf_peers: number of peers in token_info_list
- * @comp_usable_airtime: computed usable airtime in tokens
- * @reserved[4]: reserved for future use
- * @wmi_host_atf_peer_stats_info token_info_list: list of num_atf_peers
- */
-typedef struct {
-	uint32_t pdev_id;
-	uint32_t num_atf_peers;
-	uint32_t comp_usable_airtime;
-	uint32_t reserved[4];
-	wmi_host_atf_peer_stats_info token_info_list[1];
-} wmi_host_atf_peer_stats_event;
 
 /**
  * struct wmi_host_ath_dcs_cw_int
@@ -8336,6 +8160,23 @@ struct bcn_offload_control {
 	enum bcn_offload_control_param bcn_ctrl_op;
 };
 
+#ifdef OBSS_PD
+/**
+ * struct wmi_host_obss_spatial_reuse_set_param - OBSS_PD_SPATIAL Reuse
+ *                                                structure
+ * @enable: Enable/Disable Spatial Reuse
+ * @obss_min: Minimum OBSS level to use
+ * @obss_max: Maximum OBSS level to use
+ * @pdev_id: Pdev id
+ */
+struct wmi_host_obss_spatial_reuse_set_param {
+	uint32_t enable;
+	uint32_t obss_min;
+	uint32_t obss_max;
+	uint32_t vdev_id;
+};
+#endif
+
 /**
  * struct wds_entry - WDS entry structure
  * @peer_mac: peer mac
@@ -8346,113 +8187,6 @@ struct wdsentry {
 	u_int8_t peer_mac[IEEE80211_ADDR_LEN];
 	u_int8_t wds_mac[IEEE80211_ADDR_LEN];
 	uint32_t flags;
-};
-
-#define WMI_HOST_DBR_RING_ADDR_LO_S 0
-#define WMI_HOST_DBR_RING_ADDR_LO 0xffffffff
-
-#define WMI_HOST_DBR_RING_ADDR_LO_GET(dword) \
-			WMI_HOST_F_MS(dword, WMI_HOST_DBR_RING_ADDR_LO)
-#define WMI_HOST_DBR_RING_ADDR_LO_SET(dword, val) \
-			WMI_HOST_F_RMW(dword, val, WMI_HOST_DBR_RING_ADDR_LO)
-
-#define WMI_HOST_DBR_RING_ADDR_HI_S 0
-#define WMI_HOST_DBR_RING_ADDR_HI 0xf
-
-#define WMI_HOST_DBR_RING_ADDR_HI_GET(dword) \
-			WMI_HOST_F_MS(dword, WMI_HOST_DBR_RING_ADDR_HI)
-#define WMI_HOST_DBR_RING_ADDR_HI_SET(dword, val) \
-			WMI_HOST_F_RMW(dword, val, WMI_HOST_DBR_RING_ADDR_HI)
-
-#define WMI_HOST_DBR_DATA_ADDR_LO_S 0
-#define WMI_HOST_DBR_DATA_ADDR_LO 0xffffffff
-
-#define WMI_HOST_DBR_DATA_ADDR_LO_GET(dword) \
-			WMI_HOST_F_MS(dword, WMI_HOST_DBR_DATA_ADDR_LO)
-#define WMI_HOST_DBR_DATA_ADDR_LO_SET(dword, val) \
-			WMI_HOST_F_RMW(dword, val, WMI_HOST_DBR_DATA_ADDR_LO)
-
-#define WMI_HOST_DBR_DATA_ADDR_HI_S 0
-#define WMI_HOST_DBR_DATA_ADDR_HI 0xf
-
-#define WMI_HOST_DBR_DATA_ADDR_HI_GET(dword) \
-			WMI_HOST_F_MS(dword, WMI_HOST_DBR_DATA_ADDR_HI)
-#define WMI_HOST_DBR_DATA_ADDR_HI_SET(dword, val) \
-			WMI_HOST_F_RMW(dword, val, WMI_HOST_DBR_DATA_ADDR_HI)
-
-#define WMI_HOST_DBR_DATA_ADDR_HI_HOST_DATA_S 12
-#define WMI_HOST_DBR_DATA_ADDR_HI_HOST_DATA 0x7fffff
-
-#define WMI_HOST_DBR_DATA_ADDR_HI_HOST_DATA_GET(dword) \
-		WMI_HOST_F_MS(dword, WMI_HOST_DBR_DATA_ADDR_HI_HOST_DATA)
-#define WMI_HOST_DBR_DATA_ADDR_HI_HOST_DATA_SET(dword, val) \
-		WMI_HOST_F_RMW(dword, val, WMI_HOST_DBR_DATA_ADDR_HI_HOST_DATA)
-
-/**
- * struct direct_buf_rx_metadata: direct buffer metadata
- *
- * @noisefloor: noisefloor
- */
-struct direct_buf_rx_metadata {
-	int32_t noisefloor[WMI_HOST_MAX_NUM_CHAINS];
-};
-
-/**
- * struct direct_buf_rx_entry: direct buffer rx release entry structure
- *
- * @addr_lo: LSB 32-bits of the buffer
- * @addr_hi: MSB 32-bits of the buffer
- * @len: Length of the buffer
- */
-struct direct_buf_rx_entry {
-	uint32_t paddr_lo;
-	uint32_t paddr_hi;
-	uint32_t len;
-};
-
-/**
- * struct direct_buf_rx_rsp: direct buffer rx response structure
- *
- * @pdev_id: Index of the pdev for which response is received
- * @mod_mod: Index of the module for which respone is received
- * @num_buf_release_entry: Number of buffers released through event
- * @dbr_entries: Pointer to direct buffer rx entry struct
- */
-struct direct_buf_rx_rsp {
-	uint32_t pdev_id;
-	uint32_t mod_id;
-	uint32_t num_buf_release_entry;
-	uint32_t num_meta_data_entry;
-	struct direct_buf_rx_entry *dbr_entries;
-};
-
-/**
- * struct direct_buf_rx_cfg_req: direct buffer rx config request structure
- *
- * @pdev_id: Index of the pdev for which response is received
- * @mod_id: Index of the module for which respone is received
- * @base_paddr_lo: Lower 32bits of ring base address
- * @base_paddr_hi: Higher 32bits of ring base address
- * @head_idx_paddr_lo: Lower 32bits of head idx register address
- * @head_idx_paddr_hi: Higher 32bits of head idx register address
- * @tail_idx_paddr_lo: Lower 32bits of tail idx register address
- * @tail_idx_paddr_hi: Higher 32bits of tail idx register address
- * @buf_size: Size of the buffer for each pointer in the ring
- * @num_elems: Number of pointers allocated and part of the source ring
- */
-struct direct_buf_rx_cfg_req {
-	uint32_t pdev_id;
-	uint32_t mod_id;
-	uint32_t base_paddr_lo;
-	uint32_t base_paddr_hi;
-	uint32_t head_idx_paddr_lo;
-	uint32_t head_idx_paddr_hi;
-	uint32_t tail_idx_paddr_hi;
-	uint32_t tail_idx_paddr_lo;
-	uint32_t buf_size;
-	uint32_t num_elems;
-	uint32_t event_timeout_ms;
-	uint32_t num_resp_per_event;
 };
 
 /**
@@ -8679,5 +8413,88 @@ struct wmi_apf_read_memory_resp_event_params {
 	uint8_t *data;
 };
 #endif /* FEATURE_WLAN_APF */
+
+/* vdev control flags (per bits) */
+#define WMI_HOST_VDEV_FLAGS_NON_MBSSID_AP      0x00000001
+#define WMI_HOST_VDEV_FLAGS_TRANSMIT_AP        0x00000002
+#define WMI_HOST_VDEV_FLAGS_NON_TRANSMIT_AP    0x00000004
+
+/* Begin of roam scan stats definitions */
+
+#define WMI_ROAM_SCAN_STATS_MAX             5
+#define WMI_ROAM_SCAN_STATS_CANDIDATES_MAX  4
+#define WMI_ROAM_SCAN_STATS_CHANNELS_MAX    50
+
+/**
+ * struct wmi_roam_scan_stats_req - Structure to hold roam scan stats request
+ * @vdev_id: interface id
+ */
+struct wmi_roam_scan_stats_req {
+	uint32_t vdev_id;
+};
+
+/**
+ * struct wmi_roam_scan_cand - Roam scan candidates
+ * @score: score of AP
+ * @rssi: rssi of the AP
+ * @freq: center frequency
+ * @bssid: bssid of AP
+ */
+struct wmi_roam_scan_cand {
+	uint32_t score;
+	uint32_t rssi;
+	uint32_t freq;
+	uint8_t  bssid[QDF_MAC_ADDR_SIZE];
+};
+
+/**
+ * struct wmi_roam_scan_stats_params - Roam scan details
+ * @time_stamp: time at which this roam scan happened
+ * @client_id: id of client which triggered this scan
+ * @num_scan_chans: number of channels that were scanned as part of this scan
+ * @scan_freqs: frequencies of the channels that were scanned
+ * @is_roam_successful: whether a successful roaming happened after this scan
+ * @old_bssid: bssid to which STA is connected just before this scan
+ * @new_bssid: bssid to which STA is roamed to in case of successful roaming
+ * @num_roam_candidates: no.of roam candidates that are being reported
+ * @roam_candidate: roam scan candidate details
+ * @trigger_id: reason for triggering this roam or roam scan
+ * @trigger_value: threshold value related to trigger_id
+ */
+struct wmi_roam_scan_stats_params {
+	uint64_t time_stamp;
+	uint32_t client_id;
+	uint32_t num_scan_chans;
+	uint32_t scan_freqs[WMI_ROAM_SCAN_STATS_CHANNELS_MAX];
+	uint32_t is_roam_successful;
+
+	/* Bssid to which STA is connected when the roam scan is triggered */
+	uint8_t  old_bssid[QDF_MAC_ADDR_SIZE];
+
+	/*
+	 * Bssid to which STA is connected after roaming. Will be valid only
+	 * if is_roam_successful is true.
+	 */
+	uint8_t  new_bssid[QDF_MAC_ADDR_SIZE];
+
+	/* Number of roam candidates that are being reported in the stats */
+	uint32_t num_roam_candidates;
+	struct wmi_roam_scan_cand cand[WMI_ROAM_SCAN_STATS_CANDIDATES_MAX];
+	uint32_t trigger_id;
+	uint32_t trigger_value;
+};
+
+/**
+ * struct wmi_roam_scan_stats_res - Roam scan stats response from firmware
+ * @num_roam_scan: number of roam scans triggered
+ * @roam_scan: place holder to indicate the array of
+ *             wmi_roam_scan_stats_params followed by this structure
+ */
+struct wmi_roam_scan_stats_res {
+	uint32_t num_roam_scans;
+	struct wmi_roam_scan_stats_params roam_scan[0];
+};
+
+/* End of roam scan stats definitions */
 
 #endif /* _WMI_UNIFIED_PARAM_H_ */

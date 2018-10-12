@@ -114,16 +114,22 @@ wlan_lmac_if_atf_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
 	atf_rx_ops->atf_get_peers = tgt_atf_get_peers;
 	atf_rx_ops->atf_get_tput_based = tgt_atf_get_tput_based;
 	atf_rx_ops->atf_get_logging = tgt_atf_get_logging;
-	atf_rx_ops->atf_get_txbuf_share = tgt_atf_get_txbuf_share;
-	atf_rx_ops->atf_get_txbuf_max = tgt_atf_get_txbuf_max;
-	atf_rx_ops->atf_get_txbuf_min = tgt_atf_get_txbuf_min;
+	atf_rx_ops->atf_update_buf_held = tgt_atf_update_buf_held;
 	atf_rx_ops->atf_get_ssidgroup = tgt_atf_get_ssidgroup;
-	atf_rx_ops->atf_get_tx_block_count = tgt_atf_get_tx_block_count;
-	atf_rx_ops->atf_get_peer_blk_txtraffic = tgt_atf_get_peer_blk_txtraffic;
+	atf_rx_ops->atf_get_vdev_ac_blk_cnt = tgt_atf_get_vdev_ac_blk_cnt;
+	atf_rx_ops->atf_get_peer_blk_txbitmap = tgt_atf_get_peer_blk_txbitmap;
 	atf_rx_ops->atf_get_vdev_blk_txtraffic = tgt_atf_get_vdev_blk_txtraffic;
 	atf_rx_ops->atf_get_sched = tgt_atf_get_sched;
 	atf_rx_ops->atf_get_tx_tokens = tgt_atf_get_tx_tokens;
-	atf_rx_ops->atf_get_shadow_tx_tokens = tgt_atf_get_shadow_tx_tokens;
+	atf_rx_ops->atf_account_subgroup_txtokens =
+					tgt_atf_account_subgroup_txtokens;
+	atf_rx_ops->atf_adjust_subgroup_txtokens =
+					tgt_atf_adjust_subgroup_txtokens;
+	atf_rx_ops->atf_get_subgroup_airtime = tgt_atf_get_subgroup_airtime;
+	atf_rx_ops->atf_subgroup_free_buf = tgt_atf_subgroup_free_buf;
+	atf_rx_ops->atf_update_subgroup_tidstate =
+					tgt_atf_update_subgroup_tidstate;
+	atf_rx_ops->atf_buf_distribute = tgt_atf_buf_distribute;
 	atf_rx_ops->atf_get_shadow_alloted_tx_tokens =
 					tgt_atf_get_shadow_alloted_tx_tokens;
 	atf_rx_ops->atf_get_txtokens_common = tgt_atf_get_txtokens_common;
@@ -139,8 +145,8 @@ wlan_lmac_if_atf_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
 	atf_rx_ops->atf_set_peers = tgt_atf_set_peers;
 	atf_rx_ops->atf_set_peer_stats = tgt_atf_set_peer_stats;
 	atf_rx_ops->atf_set_vdev_blk_txtraffic = tgt_atf_set_vdev_blk_txtraffic;
-	atf_rx_ops->atf_set_peer_blk_txtraffic = tgt_atf_set_peer_blk_txtraffic;
-	atf_rx_ops->atf_set_tx_block_count = tgt_atf_set_tx_block_count;
+	atf_rx_ops->atf_peer_blk_txtraffic = tgt_atf_peer_blk_txtraffic;
+	atf_rx_ops->atf_peer_unblk_txtraffic = tgt_atf_peer_unblk_txtraffic;
 	atf_rx_ops->atf_set_token_allocated = tgt_atf_set_token_allocated;
 	atf_rx_ops->atf_set_token_utilized = tgt_atf_set_token_utilized;
 }
@@ -286,12 +292,20 @@ static void wlan_lmac_if_umac_reg_rx_ops_register(
 }
 
 #ifdef CONVERGED_P2P_ENABLE
+#ifdef FEATURE_P2P_LISTEN_OFFLOAD
 static void wlan_lmac_if_umac_rx_ops_register_p2p(
 				struct wlan_lmac_if_rx_ops *rx_ops)
 {
 	rx_ops->p2p.lo_ev_handler = tgt_p2p_lo_event_cb;
 	rx_ops->p2p.noa_ev_handler = tgt_p2p_noa_event_cb;
 }
+#else
+static void wlan_lmac_if_umac_rx_ops_register_p2p(
+				struct wlan_lmac_if_rx_ops *rx_ops)
+{
+	rx_ops->p2p.noa_ev_handler = tgt_p2p_noa_event_cb;
+}
+#endif
 #else
 static void wlan_lmac_if_umac_rx_ops_register_p2p(
 				struct wlan_lmac_if_rx_ops *rx_ops)
@@ -409,6 +423,7 @@ wlan_lmac_if_umac_green_ap_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
 }
 #endif
 
+#ifdef QCA_WIFI_FTM
 static QDF_STATUS
 wlan_lmac_if_umac_ftm_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
 {
@@ -420,7 +435,13 @@ wlan_lmac_if_umac_ftm_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
 
 	return QDF_STATUS_SUCCESS;
 }
-
+#else
+static QDF_STATUS
+wlan_lmac_if_umac_ftm_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 /**
  * wlan_lmac_if_umac_rx_ops_register() - UMAC rx handler register
  * @rx_ops: Pointer to rx_ops structure to be populated

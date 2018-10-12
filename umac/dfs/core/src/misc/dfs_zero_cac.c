@@ -94,6 +94,7 @@
 #include "wlan_dfs_mlme_api.h"
 #include "wlan_dfs_utils_api.h"
 #include "../dfs_internal.h"
+#include "../dfs_etsi_precac.h"
 
 void dfs_zero_cac_reset(struct wlan_dfs *dfs)
 {
@@ -101,7 +102,7 @@ void dfs_zero_cac_reset(struct wlan_dfs *dfs)
 
 	dfs_get_override_precac_timeout(dfs,
 			&(dfs->dfs_precac_timeout_override));
-	qdf_timer_stop(&dfs->dfs_precac_timer);
+	qdf_timer_sync_cancel(&dfs->dfs_precac_timer);
 	dfs->dfs_precac_primary_freq = 0;
 	dfs->dfs_precac_secondary_freq = 0;
 
@@ -111,12 +112,17 @@ void dfs_zero_cac_reset(struct wlan_dfs *dfs)
 				&dfs->dfs_precac_nol_list,
 				pe_list,
 				tmp_precac_entry) {
-			qdf_timer_stop(&precac_entry->precac_nol_timer);
+			qdf_timer_free(&precac_entry->precac_nol_timer);
 			TAILQ_REMOVE(&dfs->dfs_precac_required_list,
-					precac_entry, pe_list);
+				     precac_entry, pe_list);
 			qdf_mem_free(precac_entry);
 		}
 	PRECAC_LIST_UNLOCK(dfs);
+}
+
+void dfs_zero_cac_timer_detach(struct wlan_dfs *dfs)
+{
+	qdf_timer_free(&dfs->dfs_precac_timer);
 }
 
 int dfs_override_precac_timeout(struct wlan_dfs *dfs, int precac_timeout)
@@ -791,9 +797,23 @@ void dfs_start_precac_timer(struct wlan_dfs *dfs, uint8_t precac_chan)
 	 * which cancels any previous CAC timer and starts a new CAC again.
 	 * So CAC expiry does not happen and moreover a new CAC is started.
 	 * Therefore do not disturb the CAC by channel restart (vdev_restart).
+	 *
+	 * If CAC/preCAC was already completed on primary, then we do not need
+	 * to calculate which CAC timeout is maximum.
+	 * For example: If primary's CAC is 600 seconds and secondary's CAC
+	 * is 60 seconds then maximum gives 600 seconds which is not needed
+	 * if CAC/preCAC was already completed on primary. It is to be noted
+	 * that etsi_precac/cac is done on primary segment.
 	 */
-	precac_timeout = QDF_MAX(primary_cac_timeout, secondary_cac_timeout) +
-		EXTRA_TIME_IN_SEC;
+	if (WLAN_IS_CHAN_DFS(dfs->dfs_curchan) &&
+	    !dfs_is_etsi_precac_done(dfs) &&
+	    !dfs_is_precac_done(dfs, dfs->dfs_curchan))
+		precac_timeout = QDF_MAX(primary_cac_timeout,
+					 secondary_cac_timeout) +
+				 EXTRA_TIME_IN_SEC;
+	else
+		precac_timeout = secondary_cac_timeout + EXTRA_TIME_IN_SEC;
+
 	dfs_debug(dfs, WLAN_DEBUG_DFS,
 		"precactimeout = %d", (precac_timeout)*1000);
 	qdf_timer_mod(&dfs->dfs_precac_timer, (precac_timeout) * 1000);

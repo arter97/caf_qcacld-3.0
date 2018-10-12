@@ -167,7 +167,9 @@ static QDF_STATUS tdls_pe_add_peer(struct tdls_add_peer_request *req)
 		   QDF_MAC_ADDR_ARRAY(addstareq->peermac.bytes));
 	msg.type = soc_obj->tdls_add_sta_req;
 	msg.bodyptr = addstareq;
-	status = scheduler_post_msg(QDF_MODULE_ID_PE, &msg);
+	status = scheduler_post_message(QDF_MODULE_ID_TDLS,
+					QDF_MODULE_ID_PE,
+					QDF_MODULE_ID_PE, &msg);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		tdls_err("fail to post pe msg to add peer");
 		goto error;
@@ -232,7 +234,9 @@ QDF_STATUS tdls_pe_del_peer(struct tdls_del_peer_request *req)
 		   QDF_MAC_ADDR_ARRAY(delstareq->peermac.bytes));
 	msg.type = soc_obj->tdls_del_sta_req;
 	msg.bodyptr = delstareq;
-	status = scheduler_post_msg(QDF_MODULE_ID_PE, &msg);
+	status = scheduler_post_message(QDF_MODULE_ID_TDLS,
+					QDF_MODULE_ID_PE,
+					QDF_MODULE_ID_PE, &msg);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		tdls_err("fail to post pe msg to del peer");
 		goto error;
@@ -318,7 +322,9 @@ static QDF_STATUS tdls_pe_update_peer(struct tdls_update_peer_request *req)
 
 	msg.type = soc_obj->tdls_add_sta_req;
 	msg.bodyptr = addstareq;
-	status = scheduler_post_msg(QDF_MODULE_ID_PE, &msg);
+	status = scheduler_post_message(QDF_MODULE_ID_TDLS,
+					QDF_MODULE_ID_PE,
+					QDF_MODULE_ID_PE, &msg);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		tdls_err("fail to post pe msg to update peer");
 		goto error;
@@ -819,6 +825,7 @@ QDF_STATUS tdls_process_add_peer(struct tdls_add_peer_request *req)
 	cmd.is_high_priority = false;
 	cmd.cmd_timeout_duration = WAIT_TIME_TDLS_ADD_STA;
 	cmd.vdev = vdev;
+	cmd.is_blocking = true;
 
 	ser_cmd_status = wlan_serialization_request(&cmd);
 	tdls_debug("req: 0x%pK wlan_serialization_request status:%d", req,
@@ -1028,6 +1035,7 @@ QDF_STATUS tdls_process_update_peer(struct tdls_update_peer_request *req)
 	cmd.is_high_priority = false;
 	cmd.cmd_timeout_duration = WAIT_TIME_TDLS_ADD_STA;
 	cmd.vdev = req->vdev;
+	cmd.is_blocking = true;
 
 	ser_cmd_status = wlan_serialization_request(&cmd);
 	tdls_debug("req: 0x%pK wlan_serialization_request status:%d", req,
@@ -1141,7 +1149,7 @@ QDF_STATUS tdls_process_del_peer(struct tdls_oper_request *req)
 	if (!req || !req->vdev) {
 		tdls_err("req: %pK", req);
 		status = QDF_STATUS_E_INVAL;
-		goto error;
+		goto free_req;
 	}
 
 	vdev = req->vdev;
@@ -1181,6 +1189,7 @@ QDF_STATUS tdls_process_del_peer(struct tdls_oper_request *req)
 	cmd.is_high_priority = false;
 	cmd.cmd_timeout_duration = WAIT_TIME_TDLS_DEL_STA;
 	cmd.vdev = vdev;
+	cmd.is_blocking = true;
 
 	ser_cmd_status = wlan_serialization_request(&cmd);
 	tdls_debug("req: 0x%pK wlan_serialization_request status:%d", req,
@@ -1213,6 +1222,8 @@ QDF_STATUS tdls_process_del_peer(struct tdls_oper_request *req)
 	return status;
 error:
 	status = tdls_internal_del_peer_rsp(req);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_TDLS_NB_ID);
+free_req:
 	qdf_mem_free(req);
 	return status;
 }
@@ -1559,7 +1570,9 @@ tdls_wma_update_peer_state(struct tdls_soc_priv_obj *soc_obj,
 	msg.reserved = 0;
 	msg.bodyptr = peer_state;
 
-	status = scheduler_post_msg(QDF_MODULE_ID_WMA, &msg);
+	status = scheduler_post_message(QDF_MODULE_ID_TDLS,
+					QDF_MODULE_ID_WMA,
+					QDF_MODULE_ID_WMA, &msg);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		tdls_err("scheduler_post_msg failed");
 		status = QDF_STATUS_E_FAILURE;
@@ -2333,4 +2346,84 @@ QDF_STATUS tdls_antenna_switch_flush_callback(struct scheduler_msg *msg)
 	qdf_mem_free(req);
 
 	return QDF_STATUS_SUCCESS;
+}
+
+void wlan_tdls_offchan_parms_callback(struct wlan_objmgr_vdev *vdev)
+{
+	if (!vdev) {
+		tdls_err("vdev is NULL");
+		return;
+	}
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_TDLS_NB_ID);
+}
+
+int tdls_process_set_offchannel(struct tdls_set_offchannel *req)
+{
+	int status;
+	struct tdls_vdev_priv_obj *tdls_vdev_obj;
+	struct tdls_soc_priv_obj *tdls_soc_obj;
+
+	if (tdls_get_vdev_objects(req->vdev, &tdls_vdev_obj, &tdls_soc_obj) !=
+		QDF_STATUS_SUCCESS) {
+		status = -ENOTSUPP;
+		goto free;
+	}
+
+	tdls_debug("TDLS offchannel to be configured %d", req->offchannel);
+
+	if (req->offchannel)
+		status = tdls_set_tdls_offchannel(tdls_soc_obj,
+						  req->offchannel);
+	else
+		status = -ENOTSUPP;
+
+free:
+
+	if (req->callback)
+		req->callback(req->vdev);
+	qdf_mem_free(req);
+
+	return status;
+}
+
+int tdls_process_set_offchan_mode(struct tdls_set_offchanmode *req)
+{
+	int status;
+
+	tdls_debug("TDLS offchan mode to be configured %d", req->offchan_mode);
+	status = tdls_set_tdls_offchannelmode(req->vdev, req->offchan_mode);
+
+	if (req->callback)
+		req->callback(req->vdev);
+	qdf_mem_free(req);
+
+	return status;
+}
+
+int tdls_process_set_secoffchanneloffset(
+		struct tdls_set_secoffchanneloffset *req)
+{
+	int status;
+	struct tdls_vdev_priv_obj *tdls_vdev_obj;
+	struct tdls_soc_priv_obj *tdls_soc_obj;
+
+	if (tdls_get_vdev_objects(req->vdev, &tdls_vdev_obj, &tdls_soc_obj) !=
+		QDF_STATUS_SUCCESS) {
+		status = -ENOTSUPP;
+		goto free;
+	}
+
+	tdls_debug("TDLS offchannel offset to be configured %d",
+		   req->offchan_offset);
+	status = tdls_set_tdls_secoffchanneloffset(tdls_soc_obj,
+						   req->offchan_offset);
+
+free:
+
+	if (req->callback)
+		req->callback(req->vdev);
+	qdf_mem_free(req);
+
+	return status;
 }

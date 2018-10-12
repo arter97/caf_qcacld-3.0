@@ -45,6 +45,17 @@ struct wifi_pos_req_msg;
 #define wifi_pos_debug(params...) \
 	QDF_TRACE_DEBUG(QDF_MODULE_ID_WIFIPOS, params)
 
+#define wifipos_nofl_alert(params...) \
+	QDF_TRACE_FATAL_NO_FL(QDF_MODULE_ID_WIFIPOS, params)
+#define wifipos_nofl_err(params...) \
+	QDF_TRACE_ERROR_NO_FL(QDF_MODULE_ID_WIFIPOS, params)
+#define wifipos_nofl_warn(params...) \
+	QDF_TRACE_WARN_NO_FL(QDF_MODULE_ID_WIFIPOS, params)
+#define wifipos_nofl_notice(params...) \
+	QDF_TRACE_INFO_NO_FL(QDF_MODULE_ID_WIFIPOS, params)
+#define wifipos_nofl_debug(params...) \
+	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_WIFIPOS, params)
+
 #define OEM_APP_SIGNATURE_LEN      16
 #define OEM_APP_SIGNATURE_STR      "QUALCOMM-OEM-APP"
 
@@ -293,6 +304,7 @@ struct wifi_pos_psoc_priv_obj {
 	QDF_STATUS (*wifi_pos_req_handler)(struct wlan_objmgr_psoc *psoc,
 				    struct wifi_pos_req_msg *req);
 	void (*wifi_pos_send_rsp)(uint32_t, uint32_t, uint32_t, uint8_t *);
+	void (*wifi_pos_get_phy_mode)(uint8_t, uint32_t, uint32_t *);
 };
 
 /**

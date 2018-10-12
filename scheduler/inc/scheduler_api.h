@@ -41,6 +41,12 @@
  */
 #define SYS_MSG_COOKIE      0xFACE
 
+#define scheduler_get_src_id(qid)       (((qid) >> 20) & 0x3FF)
+#define scheduler_get_dest_id(qid)      (((qid) >> 10) & 0x3FF)
+#define scheduler_get_que_id(qid)       ((qid) & 0x3FF)
+#define scheduler_get_qid(src, dest, que_id)    ((que_id) | ((dest) << 10) |\
+					     ((src) << 20))
+
 typedef enum {
 	SYS_MSG_ID_MC_TIMER,
 	SYS_MSG_ID_FTM_RSP,
@@ -67,6 +73,9 @@ typedef enum {
  *   callback in message body pointer for those messages which have taken ref
  *   count for above mentioned common objects.
  * @node: list node for queue membership
+ * @queue_id: Id of the queue the message was added to
+ * @queue_depth: depth of the queue when the message was queued
+ * @queued_at_us: timestamp when the message was queued in microseconds
  */
 struct scheduler_msg {
 	uint16_t type;
@@ -76,6 +85,11 @@ struct scheduler_msg {
 	void *callback;
 	void *flush_callback;
 	qdf_list_node_t node;
+#ifdef WLAN_SCHED_HISTORY_SIZE
+	QDF_MODULE_ID queue_id;
+	uint32_t queue_depth;
+	uint64_t queued_at_us;
+#endif /* WLAN_SCHED_HISTORY_SIZE */
 };
 
 typedef QDF_STATUS (*scheduler_msg_process_fn_t) (struct scheduler_msg  *msg);
@@ -140,26 +154,47 @@ QDF_STATUS scheduler_deregister_module(QDF_MODULE_ID qid);
 
 /**
  * scheduler_post_msg_by_priority() - post messages by priority
- * @qid: queue id to to post message
+ * @qid: queue id to which the message has to be posted.
  * @msg: message pointer
  * @is_high_priority: set to true for high priority message else false
  *
  * Return: QDF status
  */
-QDF_STATUS scheduler_post_msg_by_priority(QDF_MODULE_ID qid,
-		struct scheduler_msg *msg, bool is_high_priority);
+QDF_STATUS scheduler_post_msg_by_priority(uint32_t qid,
+					  struct scheduler_msg *msg,
+					  bool is_high_priority);
 
 /**
  * scheduler_post_msg() - post normal messages(no priority)
- * @qid: queue id to to post message
+ * @qid: queue id to which the message has to be posted.
  * @msg: message pointer
  *
  * Return: QDF status
  */
-static inline QDF_STATUS scheduler_post_msg(QDF_MODULE_ID qid,
-		struct scheduler_msg *msg)
+static inline QDF_STATUS scheduler_post_msg(uint32_t qid,
+					    struct scheduler_msg *msg)
 {
 	return scheduler_post_msg_by_priority(qid, msg, false);
+}
+
+/**
+ * scheduler_post_message() - post normal messages(no priority)
+ * @src_id: Source module of the message
+ * @dest_id: Destination module of the message
+ * @que_id: Queue to which the message has to posted.
+ * @msg: message pointer
+ *
+ * This function will mask the src_id, and destination id to qid of
+ * scheduler_post_msg
+ * Return: QDF status
+ */
+static inline QDF_STATUS scheduler_post_message(QDF_MODULE_ID src_id,
+						QDF_MODULE_ID dest_id,
+						QDF_MODULE_ID que_id,
+						struct scheduler_msg *msg)
+{
+	return scheduler_post_msg(scheduler_get_qid(src_id, dest_id, que_id),
+						    msg);
 }
 
 /**
@@ -283,4 +318,14 @@ QDF_STATUS scheduler_deregister_wma_legacy_handler(void);
  */
 void scheduler_mc_timer_callback(unsigned long data);
 
+/**
+ * scheduler_get_queue_size() - Get the current size of the scheduler queue
+ * @qid: Queue ID for which the size is requested
+ * @size: Pointer to size where the size would be returned to the caller
+ *
+ * This API finds the size of the scheduler queue for the given Queue ID
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS scheduler_get_queue_size(QDF_MODULE_ID qid, uint32_t *size);
 #endif

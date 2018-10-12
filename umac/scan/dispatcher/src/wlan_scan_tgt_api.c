@@ -243,7 +243,9 @@ tgt_scan_event_handler(struct wlan_objmgr_psoc *psoc,
 	msg.callback = scm_scan_event_handler;
 	msg.flush_callback = scm_scan_event_flush_callback;
 
-	status = scheduler_post_msg(QDF_MODULE_ID_SCAN, &msg);
+	status = scheduler_post_message(QDF_MODULE_ID_SCAN,
+					QDF_MODULE_ID_SCAN,
+					QDF_MODULE_ID_SCAN, &msg);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		wlan_objmgr_vdev_release_ref(event_info->vdev, WLAN_SCAN_ID);
 	}
@@ -257,29 +259,29 @@ QDF_STATUS tgt_scan_bcn_probe_rx_callback(struct wlan_objmgr_psoc *psoc,
 	enum mgmt_frame_type frm_type)
 {
 	struct scheduler_msg msg = {0};
-	struct scan_bcn_probe_event *bcn;
+	struct scan_bcn_probe_event *bcn = NULL;
 	QDF_STATUS status;
+	uint32_t scan_queue_size = 0;
 
 	if ((frm_type != MGMT_PROBE_RESP) &&
 	   (frm_type != MGMT_BEACON)) {
 		scm_err("frame is not beacon or probe resp");
-		qdf_nbuf_free(buf);
-		return QDF_STATUS_E_INVAL;
+		status = QDF_STATUS_E_INVAL;
+		goto free;
 	}
 	bcn = qdf_mem_malloc_atomic(sizeof(*bcn));
 
 	if (!bcn) {
 		scm_err("Failed to allocate memory for bcn");
-		qdf_nbuf_free(buf);
-		return QDF_STATUS_E_NOMEM;
+		status = QDF_STATUS_E_NOMEM;
+		goto free;
 	}
 	bcn->rx_data =
 		qdf_mem_malloc_atomic(sizeof(*rx_param));
 	if (!bcn->rx_data) {
 		scm_err("Failed to allocate memory for rx_data");
-		qdf_mem_free(bcn);
-		qdf_nbuf_free(buf);
-		return QDF_STATUS_E_NOMEM;
+		status = QDF_STATUS_E_NOMEM;
+		goto free;
 	}
 
 	if (frm_type == MGMT_PROBE_RESP)
@@ -287,13 +289,20 @@ QDF_STATUS tgt_scan_bcn_probe_rx_callback(struct wlan_objmgr_psoc *psoc,
 	else
 		bcn->frm_type = MGMT_SUBTYPE_BEACON;
 
+	/* Check if the beacon/probe frame can be posted in the scan queue */
+	status = scheduler_get_queue_size(QDF_MODULE_ID_SCAN, &scan_queue_size);
+	if (!QDF_IS_STATUS_SUCCESS(status) ||
+	    scan_queue_size > MAX_BCN_PROBE_IN_SCAN_QUEUE) {
+		scm_debug_rl("Dropping beacon/probe frame, queue size %d",
+			     scan_queue_size);
+		status = QDF_STATUS_E_FAILURE;
+		goto free;
+	}
+
 	status = wlan_objmgr_psoc_try_get_ref(psoc, WLAN_SCAN_ID);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		scm_info("unable to get reference");
-		qdf_mem_free(bcn->rx_data);
-		qdf_mem_free(bcn);
-		qdf_nbuf_free(buf);
-		return status;
+		goto free;
 	}
 
 	bcn->psoc = psoc;
@@ -304,15 +313,22 @@ QDF_STATUS tgt_scan_bcn_probe_rx_callback(struct wlan_objmgr_psoc *psoc,
 	msg.callback = scm_handle_bcn_probe;
 	msg.flush_callback = scm_bcn_probe_flush_callback;
 
-	status = scheduler_post_msg(QDF_MODULE_ID_SCAN, &msg);
+	status = scheduler_post_message(QDF_MODULE_ID_SCAN,
+					QDF_MODULE_ID_SCAN,
+					QDF_MODULE_ID_SCAN, &msg);
 
-	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		wlan_objmgr_psoc_release_ref(psoc, WLAN_SCAN_ID);
-		scm_err("failed to post to QDF_MODULE_ID_SCAN");
+	if (QDF_IS_STATUS_SUCCESS(status))
+		return status;
+
+	wlan_objmgr_psoc_release_ref(psoc, WLAN_SCAN_ID);
+
+free:
+	if (bcn && bcn->rx_data)
 		qdf_mem_free(bcn->rx_data);
+	if (bcn)
 		qdf_mem_free(bcn);
+	if (buf)
 		qdf_nbuf_free(buf);
-	}
 
 	return status;
 }

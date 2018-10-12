@@ -68,6 +68,17 @@
 #define tdls_alert(params...) \
 	QDF_TRACE_FATAL(QDF_MODULE_ID_TDLS, params)
 
+#define tdls_nofl_debug(params...) \
+	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_TDLS, params)
+#define tdls_nofl_notice(params...) \
+	QDF_TRACE_INFO_NO_FL(QDF_MODULE_ID_TDLS, params)
+#define tdls_nofl_warn(params...) \
+	QDF_TRACE_WARN_NO_FL(QDF_MODULE_ID_TDLS, params)
+#define tdls_nofl_err(params...) \
+	QDF_TRACE_ERROR_NO_FL(QDF_MODULE_ID_TDLS, params)
+#define tdls_nofl_alert(params...) \
+	QDF_TRACE_FATAL_NO_FL(QDF_MODULE_ID_TDLS, params)
+
 #define TDLS_IS_LINK_CONNECTED(peer)  \
 	((TDLS_LINK_CONNECTED == (peer)->link_status) || \
 	 (TDLS_LINK_TEARING == (peer)->link_status))
@@ -562,16 +573,6 @@ QDF_STATUS tdls_notify_sta_connect(struct tdls_sta_notify_params *notify);
  */
 QDF_STATUS tdls_notify_sta_disconnect(struct tdls_sta_notify_params *notify);
 
-
-/**
- * tdls_get_all_peers_from_list() - get all the tdls peers from the list
- * @get_tdls_peers: get_tdls_peers object
- *
- * Return: None
- */
-void tdls_get_all_peers_from_list(
-		struct tdls_get_all_peers *get_tdls_peers);
-
 /**
  * tdls_notify_reset_adapter() - notify reset adapter
  * @vdev: vdev object manager
@@ -604,6 +605,32 @@ QDF_STATUS tdls_peers_deleted_notification(
  * Return: None
  */
 void tdls_notify_decrement_session(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * tdls_send_update_to_fw - update tdls status info
+ * @tdls_vdev_obj: tdls vdev private object.
+ * @tdls_prohibited: indicates whether tdls is prohibited.
+ * @tdls_chan_swit_prohibited: indicates whether tdls channel switch
+ *                             is prohibited.
+ * @sta_connect_event: indicate sta connect or disconnect event
+ * @session_id: session id
+ *
+ * Normally an AP does not influence TDLS connection between STAs
+ * associated to it. But AP may set bits for TDLS Prohibited or
+ * TDLS Channel Switch Prohibited in Extended Capability IE in
+ * Assoc/Re-assoc response to STA. So after STA is connected to
+ * an AP, call this function to update TDLS status as per those
+ * bits set in Ext Cap IE in received Assoc/Re-assoc response
+ * from AP.
+ *
+ * Return: None.
+ */
+void tdls_send_update_to_fw(struct tdls_vdev_priv_obj *tdls_vdev_obj,
+			    struct tdls_soc_priv_obj *tdls_soc_obj,
+			    bool tdls_prohibited,
+			    bool tdls_chan_swit_prohibited,
+			    bool sta_connect_event,
+			    uint8_t session_id);
 
 /**
  * tdls_notify_increment_session() - Notify the session increment

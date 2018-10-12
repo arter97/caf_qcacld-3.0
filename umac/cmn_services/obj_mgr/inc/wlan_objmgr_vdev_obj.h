@@ -31,6 +31,7 @@
 #include "wlan_objmgr_cmn.h"
 #include "wlan_objmgr_pdev_obj.h"
 #include "wlan_objmgr_psoc_obj.h"
+#include "wlan_vdev_mlme_main.h"
 
 	/* CONF: privacy enabled */
 #define WLAN_VDEV_F_PRIVACY              0x00000001
@@ -218,27 +219,6 @@
 /* Invalid VDEV identifier */
 #define WLAN_INVALID_VDEV_ID 255
 
-/**
- * enum wlan_vdev_state - VDEV state
- * @WLAN_VDEV_S_INIT:    Default state, IDLE state
- * @WLAN_VDEV_S_SCAN:    SCAN state
- * @WLAN_VDEV_S_JOIN:    Join state
- * @WLAN_VDEV_S_DFS_WAIT:CAC period
- * @WLAN_VDEV_S_RUN:     RUN state
- * @WLAN_VDEV_S_STOP:    STOP state
- * @WLAN_VDEV_S_RESET:   RESET state, STOP+INIT+JOIN
- * @WLAN_VDEV_S_MAX:     MAX state
- */
-enum wlan_vdev_state {
-	WLAN_VDEV_S_INIT     = 0,
-	WLAN_VDEV_S_SCAN     = 1,
-	WLAN_VDEV_S_JOIN     = 2,
-	WLAN_VDEV_S_DFS_WAIT = 3,
-	WLAN_VDEV_S_RUN      = 4,
-	WLAN_VDEV_S_STOP     = 5,
-	WLAN_VDEV_S_RESET    = 6,
-	WLAN_VDEV_S_MAX,
-};
 
 /**
  * struct wlan_vdev_create_params - Create params, HDD/OSIF passes this
@@ -277,14 +257,15 @@ struct wlan_channel {
 	int8_t       ch_maxpower;
 	uint8_t      ch_freq_seg1;
 	uint8_t      ch_freq_seg2;
-	enum wlan_phy_ch_width ch_width;
+	enum phy_ch_width ch_width;
 	enum wlan_phymode ch_phymode;
 };
 
 /**
  * struct wlan_objmgr_vdev_mlme - VDEV MLME specific sub structure
  * @vdev_opmode:        Opmode of VDEV
- * @mlme_state:         VDEV state
+ * @mlme_state:         VDEV MLME SM state
+ * @mlme_state:         VDEV MLME SM substate
  * @bss_chan:           BSS channel
  * @des_chan:           Desired channel, for STA Desired may not be used
  * @nss:                Num. Spatial streams
@@ -296,6 +277,7 @@ struct wlan_channel {
  * @vdev_feat_ext_caps: VDEV Extended feature caps
  * @max_rate:           MAX rate
  * @tx_mgmt_rate:       TX Mgmt. Rate
+ * @per_band_mgmt_rate: Per-band TX Mgmt. Rate
  * @vdev_op_flags:      Operation flags
  * @mataddr[]:          MAT address
  * @macaddr[]:          VDEV self MAC address
@@ -305,8 +287,9 @@ struct wlan_channel {
 struct wlan_objmgr_vdev_mlme {
 	enum QDF_OPMODE vdev_opmode;
 	enum wlan_vdev_state mlme_state;
-	struct wlan_channel  *bss_chan;   /* Define wlan_channel */
-	struct wlan_channel  *des_chan;  /*TODO ??? */
+	enum wlan_vdev_state mlme_substate;
+	struct wlan_channel *bss_chan;
+	struct wlan_channel *des_chan;
 	uint8_t nss;
 	uint8_t tx_chainmask;
 	uint8_t rx_chainmask;
@@ -316,6 +299,7 @@ struct wlan_objmgr_vdev_mlme {
 	uint32_t vdev_feat_ext_caps;
 	uint32_t max_rate;
 	uint32_t tx_mgmt_rate;
+	uint32_t per_band_mgmt_rate[WLAN_BAND_NUM_MAX];
 	uint32_t vdev_op_flags;
 	uint8_t  mataddr[QDF_MAC_ADDR_SIZE];
 	uint8_t  macaddr[QDF_MAC_ADDR_SIZE];
@@ -1291,6 +1275,21 @@ static inline enum wlan_vdev_state wlan_vdev_mlme_get_state(
 	return vdev->vdev_mlme.mlme_state;
 }
 
+#ifdef CMN_VDEV_MLME_SM_ENABLE
+/**
+ * wlan_vdev_mlme_get_substate() - get mlme substate
+ * @vdev: VDEV object
+ *
+ * API to get VDEV MLME substate
+ *
+ * Return: substate of VDEV MLME
+ */
+static inline enum wlan_vdev_state wlan_vdev_mlme_get_substate(
+				struct wlan_objmgr_vdev *vdev)
+{
+	return vdev->vdev_mlme.mlme_substate;
+}
+#else
 /**
  * wlan_vdev_mlme_set_state() - set mlme state
  * @vdev: VDEV object
@@ -1301,11 +1300,12 @@ static inline enum wlan_vdev_state wlan_vdev_mlme_get_state(
  * Return: void
  */
 static inline void wlan_vdev_mlme_set_state(struct wlan_objmgr_vdev *vdev,
-					enum wlan_vdev_state state)
+						enum wlan_vdev_state state)
 {
 	if (state < WLAN_VDEV_S_MAX)
 		vdev->vdev_mlme.mlme_state = state;
 }
+#endif
 
 /**
  * wlan_vdev_set_selfpeer() - set self peer

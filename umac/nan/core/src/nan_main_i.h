@@ -46,9 +46,38 @@ struct scheduler_msg;
 #define nan_debug(params...) \
 	QDF_TRACE_DEBUG(QDF_MODULE_ID_NAN, params)
 
+#define nan_nofl_alert(params...) \
+	QDF_TRACE_FATAL_NO_FL(QDF_MODULE_ID_NAN, params)
+#define nan_nofl_err(params...) \
+	QDF_TRACE_ERROR_NO_FL(QDF_MODULE_ID_NAN, params)
+#define nan_nofl_warn(params...) \
+	QDF_TRACE_WARN_NO_FL(QDF_MODULE_ID_NAN, params)
+#define nan_nofl_info(params...) \
+	QDF_TRACE_INFO_NO_FL(QDF_MODULE_ID_NAN, params)
+#define nan_nofl_debug(params...) \
+	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_NAN, params)
+
 #ifndef MAX_PEERS
 #define MAX_PEERS 32
 #endif
+
+/**
+ * struct nan_cfg_params - NAN INI config params
+ * @enable: NAN feature enable
+ * @dp_enable: NAN Datapath feature enable
+ * @ndi_ch: NAN Datapath channel
+ * @ndi_mac_randomize: Randomize NAN datapath interface MAC
+ */
+struct nan_cfg_params {
+#ifdef WLAN_FEATURE_NAN
+	bool enable;
+#endif
+#ifdef WLAN_FEATURE_NAN_DATAPATH
+	bool dp_enable;
+	uint32_t ndi_ch;
+	bool ndi_mac_randomize;
+#endif
+};
 
 /**
  * struct nan_psoc_priv_obj - nan private psoc obj
@@ -58,6 +87,7 @@ struct scheduler_msg;
 struct nan_psoc_priv_obj {
 	qdf_spinlock_t lock;
 	struct nan_callbacks cb_obj;
+	struct nan_cfg_params cfg_param;
 };
 
 /**

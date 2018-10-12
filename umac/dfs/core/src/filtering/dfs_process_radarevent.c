@@ -292,7 +292,11 @@ static int dfs_confirm_radar(struct wlan_dfs *dfs,
 			  rf->rf_threshold);
 		return 0;
 	}
+	dfs_debug(dfs, WLAN_DEBUG_DFS_FALSE_DET, "%s : dl->dl_min_sidx: %d , dl->dl_max_sidx :%d",
+		  __func__, dl->dl_min_sidx, dl->dl_max_sidx);
 
+	dfs->dfs_freq_offset = DFS_SIDX_TO_FREQ_OFFSET((dl->dl_min_sidx +
+							dl->dl_max_sidx) / 2);
 	return 1;
 }
 
@@ -393,7 +397,7 @@ void __dfs_process_radarevent(struct wlan_dfs *dfs,
 
 	for (p = 0, *found = 0; (p < ft->ft_numfilters) &&
 			(!(*found)) && !(*false_radar_found); p++) {
-		rf = &(ft->ft_filters[p]);
+		rf = ft->ft_filters[p];
 		if ((re->re_dur >= rf->rf_mindur) &&
 				(re->re_dur <= rf->rf_maxdur)) {
 			/* The above check is probably not necessary. */
@@ -590,7 +594,6 @@ static inline int dfs_handle_bangradar(
 		 * channel.
 		 */
 		*rs = &dfs->dfs_radar[dfs->dfs_curchan_radindex];
-		dfs->dfs_bangradar = 0; /* Reset */
 		dfs_debug(dfs, WLAN_DEBUG_DFS, "bangradar");
 		*retval = 1;
 		return 1;
@@ -611,7 +614,6 @@ static inline int dfs_handle_bangradar(
 			dfs_debug(dfs, WLAN_DEBUG_DFS,
 					"Do not process the second segment bangradar");
 		}
-		dfs->dfs_second_segment_bangradar = 0; /* Reset */
 		return 1;
 	}
 
@@ -1238,9 +1240,16 @@ static inline int dfs_process_each_radarevent(
 		dfs_conditional_clear_delaylines(dfs, diff_ts, this_ts, re);
 
 		found = 0;
+		if (events_processed == 1) {
+			dfs->dfs_min_sidx = (re).re_sidx;
+			dfs->dfs_max_sidx = (re).re_sidx;
+		}
+
 		dfs_check_if_bin5(dfs, &re, this_ts, diff_ts, &found);
 		if (found) {
 			*retval |= found;
+			dfs->dfs_freq_offset = DFS_SIDX_TO_FREQ_OFFSET(
+				   (dfs->dfs_min_sidx + dfs->dfs_max_sidx) / 2);
 			return 1;
 		}
 
@@ -1269,8 +1278,7 @@ static inline void dfs_false_radarfound_reset_vars(
 	dfs->dfs_phyerr_w53_counter  = 0;
 }
 
-void dfs_radarfound_action_generic(struct wlan_dfs *dfs,
-		uint8_t seg_id, int false_radar_found)
+void dfs_radarfound_action_generic(struct wlan_dfs *dfs, uint8_t seg_id)
 {
 	struct radar_found_info *radar_found;
 
@@ -1288,15 +1296,11 @@ void dfs_radarfound_action_generic(struct wlan_dfs *dfs,
 
 	dfs_process_radar_ind(dfs, radar_found);
 	qdf_mem_free(radar_found);
-
-	if (false_radar_found)
-		dfs_false_radarfound_reset_vars(dfs);
 }
 
 void dfs_radar_found_action(struct wlan_dfs *dfs,
 			    bool bangradar,
-			    uint8_t seg_id,
-			    int false_radar_found)
+			    uint8_t seg_id)
 {
 	/* If Host DFS confirmation is supported, save the curchan as
 	 * radar found chan, send radar found indication along with
@@ -1304,11 +1308,12 @@ void dfs_radar_found_action(struct wlan_dfs *dfs,
 	 * wait timer.
 	 */
 	if (!bangradar &&
-	    (utils_get_dfsdomain(dfs->dfs_pdev_obj) == DFS_FCC_DOMAIN) &&
-	    lmac_is_host_dfs_check_support_enabled(dfs->dfs_pdev_obj)) {
-		dfs_radarfound_action_fcc(dfs, seg_id, false_radar_found);
+	   (utils_get_dfsdomain(dfs->dfs_pdev_obj) == DFS_FCC_DOMAIN) &&
+	   lmac_is_host_dfs_check_support_enabled(dfs->dfs_pdev_obj) &&
+	   (dfs->dfs_spoof_test_done ? dfs->dfs_use_nol : 1)) {
+		dfs_radarfound_action_fcc(dfs, seg_id);
 	} else {
-		dfs_radarfound_action_generic(dfs, seg_id, false_radar_found);
+		dfs_radarfound_action_generic(dfs, seg_id);
 	}
 }
 
@@ -1343,8 +1348,9 @@ void dfs_process_radarevent(
 dfsfound:
 	if (retval) {
 		dfs_radarfound_reset_vars(dfs, rs, chan, seg_id);
-		dfs_radar_found_action(dfs, bangradar, seg_id,
-				       false_radar_found);
+		dfs_radar_found_action(dfs, bangradar, seg_id);
 	}
 
+	if (false_radar_found)
+		dfs_false_radarfound_reset_vars(dfs);
 }

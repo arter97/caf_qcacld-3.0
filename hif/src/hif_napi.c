@@ -46,6 +46,8 @@
 #include <hif_irq_affinity.h>
 #include "qdf_cpuhp.h"
 #include "qdf_module.h"
+#include "qdf_net_if.h"
+#include "qdf_dev.h"
 
 enum napi_decision_vector {
 	HIF_NAPI_NOEVENT = 0,
@@ -82,8 +84,23 @@ static void hif_init_rx_thread_napi(struct qca_napi_info *napii)
 		       hif_rxthread_napi_poll, 64);
 	napi_enable(&napii->rx_thread_napi);
 }
+
+/**
+ * hif_deinit_rx_thread_napi() - Deinitialize dummy Rx_thread NAPI
+ * @napii: Handle to napi_info holding rx_thread napi
+ *
+ * Return: None
+ */
+static void hif_deinit_rx_thread_napi(struct qca_napi_info *napii)
+{
+	netif_napi_del(&napii->rx_thread_napi);
+}
 #else /* RECEIVE_OFFLOAD */
 static void hif_init_rx_thread_napi(struct qca_napi_info *napii)
+{
+}
+
+static void hif_deinit_rx_thread_napi(struct qca_napi_info *napii)
 {
 }
 #endif
@@ -262,7 +279,7 @@ void hif_napi_rx_offld_flush_cb_register(struct hif_opaque_softc *hif_hdl,
 		if (ce_state && (ce_state->htt_rx_data)) {
 			napii = napid->napis[i];
 			napii->offld_flush_cb = offld_flush_handler;
-			HIF_DBG("Registering offload for ce_id %d NAPI callback for %d flush_cb %p\n",
+			HIF_DBG("Registering offload for ce_id %d NAPI callback for %d flush_cb %pK\n",
 				i, napii->id, napii->offld_flush_cb);
 		}
 	}
@@ -373,6 +390,7 @@ int hif_napi_destroy(struct hif_opaque_softc *hif_ctx,
 
 			qdf_lro_deinit(napii->lro_ctx);
 			netif_napi_del(&(napii->napi));
+			hif_deinit_rx_thread_napi(napii);
 
 			napid->ce_map &= ~(0x01 << ce);
 			napid->napis[ce] = NULL;
@@ -676,7 +694,8 @@ int hif_napi_event(struct hif_opaque_softc *hif_ctx, enum qca_napi_event event,
 						   __func__, i);
 					napi_disable(napi);
 					/* in case it is affined, remove it */
-					irq_set_affinity_hint(napii->irq, NULL);
+					qdf_dev_set_irq_affinity(napii->irq,
+								 NULL);
 				}
 			}
 		}
@@ -798,6 +817,7 @@ bool hif_napi_correct_cpu(struct qca_napi_info *napi_info)
 	cpumask_t cpumask;
 	int cpu;
 	struct qca_napi_data *napid;
+	QDF_STATUS ret;
 
 	napid = hif_napi_get_all(GET_HIF_OPAQUE_HDL(napi_info->hif_ctx));
 
@@ -813,8 +833,10 @@ bool hif_napi_correct_cpu(struct qca_napi_info *napi_info)
 			cpumask.bits[0] = (0x01 << napi_info->cpu);
 
 			irq_modify_status(napi_info->irq, IRQ_NO_BALANCING, 0);
-			rc = irq_set_affinity_hint(napi_info->irq,
-						   &cpumask);
+			ret = qdf_dev_set_irq_affinity(napi_info->irq,
+						       (struct qdf_cpu_mask *)
+						       &cpumask);
+			rc = qdf_status_to_os_return(ret);
 			irq_modify_status(napi_info->irq, 0, IRQ_NO_BALANCING);
 
 			if (rc)
@@ -910,11 +932,14 @@ int hif_napi_poll(struct hif_opaque_softc *hif_ctx,
 		normalized = (rc / napi_info->scale);
 		if (normalized == 0)
 			normalized++;
-		bucket = normalized / (QCA_NAPI_BUDGET / QCA_NAPI_NUM_BUCKETS);
+		bucket = (normalized - 1) /
+				(QCA_NAPI_BUDGET / QCA_NAPI_NUM_BUCKETS);
 		if (bucket >= QCA_NAPI_NUM_BUCKETS) {
 			bucket = QCA_NAPI_NUM_BUCKETS - 1;
-			HIF_ERROR("Bad bucket#(%d) > QCA_NAPI_NUM_BUCKETS(%d)",
-				bucket, QCA_NAPI_NUM_BUCKETS);
+			HIF_ERROR("Bad bucket#(%d) > QCA_NAPI_NUM_BUCKETS(%d)"
+					" normalized %d, napi budget %d",
+					bucket, QCA_NAPI_NUM_BUCKETS,
+					normalized, QCA_NAPI_BUDGET);
 		}
 		napi_info->stats[cpu].napi_budget_uses[bucket]++;
 	} else {
@@ -1447,6 +1472,7 @@ static int hncm_migrate_to(struct qca_napi_data *napid,
 {
 	int rc = 0;
 	cpumask_t cpumask;
+	QDF_STATUS status;
 
 	NAPI_DEBUG("-->%s(napi_cd=%d, didx=%d)", __func__, napi_ce, didx);
 
@@ -1455,7 +1481,9 @@ static int hncm_migrate_to(struct qca_napi_data *napid,
 		return -EINVAL;
 
 	irq_modify_status(napid->napis[napi_ce]->irq, IRQ_NO_BALANCING, 0);
-	rc = irq_set_affinity_hint(napid->napis[napi_ce]->irq, &cpumask);
+	status = qdf_dev_set_irq_affinity(napid->napis[napi_ce]->irq,
+					  (struct qdf_cpu_mask *)&cpumask);
+	rc = qdf_status_to_os_return(status);
 
 	/* unmark the napis bitmap in the cpu table */
 	napid->napi_cpu[napid->napis[napi_ce]->cpu].napis &= ~(0x01 << napi_ce);

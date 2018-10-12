@@ -38,13 +38,13 @@
 /**
  * struct dfs_etsi_precac_entry - PreCAC entry for ETSI domain
  * @pe_list:           ETSI PreCAC entry.
- * @freq:              primary freq.
+ * @ieee:              channel number
  * @etsi_caclst_ticks  start tick, OS speicfic.
  * @dfs:               Pointer to wlan_dfs structure.
  */
 struct dfs_etsi_precac_entry {
 	TAILQ_ENTRY(dfs_etsi_precac_entry) pe_list;
-	uint16_t          freq;
+	uint16_t          ieee;
 	unsigned long     etsi_caclst_ticks;
 	struct wlan_dfs   *dfs;
 };
@@ -213,25 +213,6 @@ void dfs_add_to_etsi_precac_done_list(struct wlan_dfs *dfs);
 #else
 static inline void dfs_add_to_etsi_precac_done_list(struct wlan_dfs *dfs)
 {
-}
-#endif
-
-/**
- * dfs_get_bonding_channels_without_seg_info() - Get bonding channels in curchan
- * @curchan: Pointer to dfs_channel structure.
- * @channels: channel array holding list of bonded channels.
- *
- * Return: number of sub channels in the current channel.
- */
-#ifdef QCA_SUPPORT_ETSI_PRECAC_DFS
-uint8_t dfs_get_bonding_channels_without_seg_info(struct dfs_channel *curchan,
-						  uint8_t *channels);
-#else
-static inline uint8_t
-dfs_get_bonding_channels_without_seg_info(struct dfs_channel *curchan,
-					  uint8_t *channels)
-{
-	return 0;
 }
 #endif
 

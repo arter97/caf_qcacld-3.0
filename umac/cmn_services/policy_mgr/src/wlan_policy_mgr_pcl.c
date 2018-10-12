@@ -55,6 +55,10 @@ policy_mgr_next_action_two_connection_table_type
 		*next_action_two_connection_table;
 policy_mgr_next_action_three_connection_table_type
 		*next_action_three_connection_table;
+policy_mgr_next_action_two_connection_table_type
+		*next_action_two_connection_2x2_2g_1x1_5g_table;
+policy_mgr_next_action_three_connection_table_type
+		*next_action_three_connection_2x2_2g_1x1_5g_table;
 
 QDF_STATUS policy_mgr_get_pcl_for_existing_conn(struct wlan_objmgr_psoc *psoc,
 		enum policy_mgr_con_mode mode,
@@ -110,7 +114,7 @@ void policy_mgr_decr_session_set_pcl(struct wlan_objmgr_psoc *psoc,
 
 	qdf_status = policy_mgr_decr_active_session(psoc, mode, session_id);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
-		policy_mgr_err("Invalid active session");
+		policy_mgr_debug("Invalid active session");
 		return;
 	}
 
@@ -130,16 +134,7 @@ void policy_mgr_decr_session_set_pcl(struct wlan_objmgr_psoc *psoc,
 	 */
 	policy_mgr_set_pcl_for_existing_combo(psoc, PM_STA_MODE);
 	/* do we need to change the HW mode */
-	if (policy_mgr_need_opportunistic_upgrade(psoc)) {
-		/* let's start the timer */
-		qdf_mc_timer_stop(&pm_ctx->dbs_opportunistic_timer);
-		qdf_status = qdf_mc_timer_start(
-					&pm_ctx->dbs_opportunistic_timer,
-					DBS_OPPORTUNISTIC_TIME * 1000);
-		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
-			policy_mgr_err("Failed to start dbs opportunistic timer");
-	}
-
+	policy_mgr_check_n_start_opportunistic_timer(psoc);
 	return;
 }
 

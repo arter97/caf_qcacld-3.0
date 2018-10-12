@@ -92,6 +92,9 @@
 
 #define DP_MAX_INTERRUPT_CONTEXTS 8
 
+/* Maximum retries for Delba per tid per peer */
+#define DP_MAX_DELBA_RETRY 3
+
 #ifndef REMOVE_PKT_LOG
 enum rx_pktlog_mode {
 	DP_RX_PKTLOG_DISABLED = 0,
@@ -151,6 +154,25 @@ union dp_rx_desc_list_elem_t;
 #define DP_SW2HW_MACID(id) ((id) + 1)
 #define DP_HW2SW_MACID(id) ((id) > 0 ? ((id) - 1) : 0)
 #define DP_MAC_ADDR_LEN 6
+
+/**
+ * Number of Tx Queues
+ * enum and macro to define how many threshold levels is used
+ * for the AC based flow control
+ */
+#ifdef QCA_AC_BASED_FLOW_CONTROL
+enum dp_fl_ctrl_threshold {
+	DP_TH_BE_BK = 0,
+	DP_TH_VI,
+	DP_TH_VO,
+	DP_TH_HI,
+};
+
+#define FL_TH_MAX (4)
+#define FL_TH_VI_PERCENTAGE (80)
+#define FL_TH_VO_PERCENTAGE (60)
+#define FL_TH_HI_PERCENTAGE (40)
+#endif
 
 /**
  * enum dp_intr_mode
@@ -296,6 +318,7 @@ struct dp_tx_desc_s {
 	void *me_buffer;
 	void *tso_desc;
 	void *tso_num_desc;
+	uint64_t timestamp;
 };
 
 /**
@@ -310,8 +333,11 @@ struct dp_tx_desc_s {
 enum flow_pool_status {
 	FLOW_POOL_ACTIVE_UNPAUSED = 0,
 	FLOW_POOL_ACTIVE_PAUSED = 1,
-	FLOW_POOL_INVALID = 2,
-	FLOW_POOL_INACTIVE = 3,
+	FLOW_POOL_BE_BK_PAUSED = 2,
+	FLOW_POOL_VI_PAUSED = 3,
+	FLOW_POOL_VO_PAUSED = 4,
+	FLOW_POOL_INVALID = 5,
+	FLOW_POOL_INACTIVE = 6,
 };
 
 /**
@@ -319,12 +345,14 @@ enum flow_pool_status {
  * @pool_size: total number of pool elements
  * @num_free: free element count
  * @freelist: first free element pointer
+ * @desc_pages: multiple page allocation information for actual descriptors
  * @lock: lock for accessing the pool
  */
 struct dp_tx_tso_seg_pool_s {
 	uint16_t pool_size;
 	uint16_t num_free;
 	struct qdf_tso_seg_elem_t *freelist;
+	struct qdf_mem_multi_page_t desc_pages;
 	qdf_spinlock_t lock;
 };
 
@@ -333,6 +361,7 @@ struct dp_tx_tso_seg_pool_s {
  * @num_seg_pool_size: total number of pool elements
  * @num_free: free element count
  * @freelist: first free element pointer
+ * @desc_pages: multiple page allocation information for actual descriptors
  * @lock: lock for accessing the pool
  */
 
@@ -340,6 +369,7 @@ struct dp_tx_tso_num_seg_pool_s {
 	uint16_t num_seg_pool_size;
 	uint16_t num_free;
 	struct qdf_tso_num_seg_elem_t *freelist;
+	struct qdf_mem_multi_page_t desc_pages;
 	/*tso mutex */
 	qdf_spinlock_t lock;
 };
@@ -369,8 +399,15 @@ struct dp_tx_desc_pool_s {
 	uint16_t avail_desc;
 	enum flow_pool_status status;
 	enum htt_flow_type flow_type;
+#ifdef QCA_AC_BASED_FLOW_CONTROL
+	uint16_t stop_th[FL_TH_MAX];
+	uint16_t start_th[FL_TH_MAX];
+	qdf_time_t max_pause_time[FL_TH_MAX];
+	qdf_time_t latest_pause_time[FL_TH_MAX];
+#else
 	uint16_t stop_th;
 	uint16_t start_th;
+#endif
 	uint16_t pkt_drop_no_desc;
 	qdf_spinlock_t flow_pool_lock;
 	uint8_t pool_create_cnt;
@@ -480,6 +517,23 @@ struct dp_rx_tid {
 	uint16_t statuscode;
 	/* user defined ADDBA response status code */
 	uint16_t userstatuscode;
+
+	/* Store ppdu_id when 2k exception is received */
+	uint32_t ppdu_id_2k;
+
+	/* Delba Tx completion status */
+	uint8_t delba_tx_status;
+
+	/* Delba Tx retry count */
+	uint8_t delba_tx_retry;
+
+	/* Delba stats */
+	uint32_t delba_tx_success_cnt;
+	uint32_t delba_tx_fail_cnt;
+
+	/* Delba reason code for retries */
+	uint8_t delba_rcode;
+
 };
 
 /* per interrupt context  */
@@ -536,6 +590,10 @@ struct dp_soc_stats {
 		uint32_t err_ring_pkts;
 		/* No of Fragments */
 		uint32_t rx_frags;
+		/* No of reinjected packets */
+		uint32_t reo_reinject;
+		/* Head pointer Out of sync */
+		uint32_t hp_oos;
 		struct {
 			/* Invalid RBM error count */
 			uint32_t invalid_rbm;
@@ -572,12 +630,13 @@ union dp_align_mac_addr {
 		uint32_t bytes_abcd;
 		uint16_t bytes_ef;
 	} align4;
-	struct {
+	struct __attribute__((__packed__)) {
 		uint16_t bytes_ab;
 		uint32_t bytes_cdef;
 	} align4_2;
 };
 
+#define DP_INVALID_AST_IDX 0xFFFF
 /*
  * dp_ast_entry
  *
@@ -592,7 +651,11 @@ union dp_align_mac_addr {
  * @is_bss: flag to indicate if entry corresponds to bss peer
  * @pdev_id: pdev ID
  * @vdev_id: vdev ID
+ * @ast_hash_value: hast value in HW
+ * @ref_cnt: reference count
  * @type: flag to indicate type of the entry(static/WDS/MEC)
+ * @wmi_sent: Flag to identify of WMI to del ast is sent (AST_HKV1_WORKAROUND)
+ * @cp_ctx: Opaque context used by control path (AST_HKV1_WORKAROUND)
  * @hash_list_elem: node in soc AST hash list (mac address used as hash)
  */
 struct dp_ast_entry {
@@ -605,7 +668,13 @@ struct dp_ast_entry {
 	bool is_bss;
 	uint8_t pdev_id;
 	uint8_t vdev_id;
+	uint16_t ast_hash_value;
+	qdf_atomic_t ref_cnt;
 	enum cdp_txrx_ast_entry_type type;
+#ifdef AST_HKV1_WORKAROUND
+	bool wmi_sent;
+	void *cp_ctx;
+#endif
 	TAILQ_ENTRY(dp_ast_entry) ase_list_elem;
 	TAILQ_ENTRY(dp_ast_entry) hash_list_elem;
 };
@@ -656,6 +725,12 @@ struct dp_soc {
 
 	/*cce disable*/
 	bool cce_disable;
+
+	/*ast override support in HW*/
+	bool ast_override_support;
+
+	/*number of hw dscp tid map*/
+	uint8_t num_hw_dscp_tid_map;
 
 	/* Link descriptor memory banks */
 	struct {
@@ -889,6 +964,13 @@ struct dp_soc {
 		qdf_dma_addr_t ipa_rx_refill_buf_hp_paddr;
 	} ipa_uc_rx_rsc;
 #endif
+	/* Device ID coming from Bus sub-system */
+	uint32_t device_id;
+
+	/* Smart monitor capability for HKv2 */
+	uint8_t hw_nac_monitor_support;
+	/* Flag to indicate if HTT v2 is enabled*/
+	bool is_peer_map_unmap_v2;
 };
 
 #ifdef IPA_OFFLOAD
@@ -949,10 +1031,15 @@ enum dp_nac_param_cmd {
  * struct dp_neighbour_peer - neighbour peer list type for smart mesh
  * @neighbour_peers_macaddr: neighbour peer's mac address
  * @neighbour_peer_list_elem: neighbour peer list TAILQ element
+ * @ast_entry: ast_entry for neighbour peer
+ * @rssi: rssi value
  */
 struct dp_neighbour_peer {
 	/* MAC address of neighbour's peer */
 	union dp_align_mac_addr neighbour_peers_macaddr;
+	struct dp_vdev *vdev;
+	struct dp_ast_entry *ast_entry;
+	uint8_t rssi;
 	/* node in the list of neighbour's peer */
 	TAILQ_ENTRY(dp_neighbour_peer) neighbour_peer_list_elem;
 };
@@ -987,6 +1074,9 @@ struct dp_pdev {
 
 	/* PDEV Id */
 	int pdev_id;
+
+	/* LMAC Id */
+	int lmac_id;
 
 	/* TXRX SOC handle */
 	struct dp_soc *soc;
@@ -1066,6 +1156,9 @@ struct dp_pdev {
 
 	/* Smart Mesh */
 	bool filter_neighbour_peers;
+
+	/*flag to indicate neighbour_peers_list not empty */
+	bool neighbour_peers_added;
 	/* smart mesh mutex */
 	qdf_spinlock_t neighbour_peer_mutex;
 	/* Neighnour peer list */
@@ -1094,6 +1187,7 @@ struct dp_pdev {
 	uint16_t mo_mgmt_filter;
 	uint16_t mo_ctrl_filter;
 	uint16_t mo_data_filter;
+	uint16_t md_data_filter;
 
 	qdf_atomic_t num_tx_outstanding;
 
@@ -1191,6 +1285,26 @@ struct dp_pdev {
 		uint32_t mgmt_buf_len; /* Len of mgmt. payload in ppdu stats */
 		uint32_t ppdu_id;
 	} mgmtctrl_frm_info;
+
+	/* Current noise-floor reading for the pdev channel */
+	int16_t chan_noise_floor;
+
+	/*
+	 * For multiradio device, this flag indicates if
+	 * this radio is primary or secondary.
+	 *
+	 * For HK 1.0, this is used for WAR for the AST issue.
+	 * HK 1.x mandates creation of only 1 AST entry with same MAC address
+	 * across 2 radios. is_primary indicates the radio on which DP should
+	 * install HW AST entry if there is a request to add 2 AST entries
+	 * with same MAC address across 2 radios
+	 */
+	uint8_t is_primary;
+	/* Context of cal client timer */
+	void *cal_client_ctx;
+	struct cdp_tx_sojourn_stats sojourn_stats;
+	qdf_nbuf_t sojourn_buf;
+
 };
 
 struct dp_peer;
@@ -1219,8 +1333,10 @@ struct dp_vdev {
 	/* dp_peer list */
 	TAILQ_HEAD(, dp_peer) peer_list;
 
-	/* callback to hand rx frames to the OS shim */
+	/* default RX call back function called by dp */
 	ol_txrx_rx_fp osif_rx;
+	/* callback to deliver rx frames to the OS */
+	ol_txrx_rx_fp osif_rx_stack;
 	ol_txrx_rsim_rx_decap_fp osif_rsim_rx_decap;
 	ol_txrx_get_key_fp osif_get_key;
 	ol_txrx_tx_free_ext_fp osif_tx_free_ext;
@@ -1336,17 +1452,14 @@ struct dp_vdev {
 
 	enum cdp_sec_type  sec_type;
 
-#ifdef ATH_SUPPORT_NAC_RSSI
-	bool cdp_nac_rssi_enabled;
-	struct {
-		uint8_t bssid_mac[6];
-		uint8_t client_mac[6];
-		uint8_t  chan_num;
-		uint8_t client_rssi_valid;
-		uint8_t client_rssi;
-		uint8_t vdev_id;
-	} cdp_nac_rssi;
-#endif
+	/* SWAR for HW: Enable WEP bit in the AMSDU frames for RAW mode */
+	bool raw_mode_war;
+
+	/* Address search type to be set in TX descriptor */
+	uint8_t search_type;
+
+	/* AST hash value for BSS peer in HW valid for STA VAP*/
+	uint16_t bss_ast_hash;
 };
 
 
@@ -1439,6 +1552,18 @@ struct dp_peer {
 	dp_ecm_policy wds_ecm;
 #endif
 	bool delete_in_progress;
+
+	/* Active Block ack sessions */
+	uint16_t active_ba_session_cnt;
+
+	/* Current HW buffersize setting */
+	uint16_t hw_buffer_size;
+
+	/*
+	 * Flag to check if sessions with 256 buffersize
+	 * should be terminated.
+	 */
+	uint8_t kill_256_sessions;
 };
 
 #ifdef CONFIG_WIN

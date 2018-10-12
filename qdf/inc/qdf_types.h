@@ -357,6 +357,11 @@ typedef void (*qdf_timer_func_t)(void *);
  * @QDF_MODULE_ID_IPA: IPA module ID
  * @QDF_MODULE_ID_CP_STATS: Control Plane Statistics ID
  * @QDF_MODULE_ID_ACTION_OUI: ACTION OUI module ID
+ * @QDF_MODULE_ID_TARGET: Target module ID
+ * @QDF_MODULE_ID_MBSSIE: MBSS IE ID
+ * @QDF_MODULE_ID_FWOL: FW Offload module ID
+ * @QDF_MODULE_ID_SM_ENGINE: SM engine module ID
+ * @QDF_MODULE_ID_CMN_MLME: CMN MLME module ID
  * @QDF_MODULE_ID_ANY: anything
  * @QDF_MODULE_ID_MAX: Max place holder module ID
  */
@@ -461,6 +466,12 @@ typedef enum {
 	QDF_MODULE_ID_IPA,
 	QDF_MODULE_ID_CP_STATS,
 	QDF_MODULE_ID_ACTION_OUI,
+	QDF_MODULE_ID_TARGET,
+	QDF_MODULE_ID_MBSSIE,
+	QDF_MODULE_ID_FWOL,
+	QDF_MODULE_ID_SM_ENGINE,
+	QDF_MODULE_ID_CMN_MLME,
+	QDF_MODULE_ID_BSSCOLOR,
 	QDF_MODULE_ID_ANY,
 	QDF_MODULE_ID_MAX,
 } QDF_MODULE_ID;
@@ -482,6 +493,10 @@ typedef enum {
  * @QDF_TRACE_LEVEL_INFO_LOW: Low level operational messages that require
  *			      no action
  * @QDF_TRACE_LEVEL_DEBUG: Information useful to developers for debugging
+ * @QDF_TRACE_LEVEL_TRACE: Indicates trace level for automation scripts,
+ *			whenever there is a context switch in driver, one
+ *			print using this trace level will be added with
+ *			the help of qdf_trace api.
  * @QDF_TRACE_LEVEL_ALL: All trace levels
  * @QDF_TRACE_LEVEL_MAX: Max trace level
  */
@@ -495,6 +510,7 @@ typedef enum {
 	QDF_TRACE_LEVEL_INFO_MED,
 	QDF_TRACE_LEVEL_INFO_LOW,
 	QDF_TRACE_LEVEL_DEBUG,
+	QDF_TRACE_LEVEL_TRACE,
 	QDF_TRACE_LEVEL_ALL,
 	QDF_TRACE_LEVEL_MAX
 } QDF_TRACE_LEVEL;
@@ -608,12 +624,12 @@ void qdf_vtrace_msg(QDF_MODULE_ID module, QDF_TRACE_LEVEL level,
 
 #else /* CONFIG_MCL */
 
-#define qdf_print printk
-#define qdf_alert printk
-#define qdf_err printk
-#define qdf_warn printk
-#define qdf_info printk
-#define qdf_debug printk
+#define qdf_print(args...) QDF_TRACE_INFO(QDF_MODULE_ID_ANY, ## args)
+#define qdf_alert(args...) QDF_TRACE_FATAL(QDF_MODULE_ID_ANY, ## args)
+#define qdf_err(args...)   QDF_TRACE_ERROR(QDF_MODULE_ID_ANY, ## args)
+#define qdf_warn(args...)  QDF_TRACE_WARN(QDF_MODULE_ID_ANY, ## args)
+#define qdf_info(args...)  QDF_TRACE_INFO(QDF_MODULE_ID_ANY, ## args)
+#define qdf_debug(args...) QDF_TRACE_DEBUG(QDF_MODULE_ID_ANY, ## args)
 
 #endif /* CONFIG_MCL */
 
@@ -628,10 +644,28 @@ void qdf_vtrace_msg(QDF_MODULE_ID module, QDF_TRACE_LEVEL level,
 #define qdf_nofl_debug(params...) \
 	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_QDF, ## params)
 
+#define qdf_rl_alert(params...) QDF_TRACE_FATAL_RL(QDF_MODULE_ID_QDF, ## params)
+#define qdf_rl_err(params...) QDF_TRACE_ERROR_RL(QDF_MODULE_ID_QDF, ## params)
+#define qdf_rl_warn(params...) QDF_TRACE_WARN_RL(QDF_MODULE_ID_QDF, ## params)
+#define qdf_rl_info(params...) QDF_TRACE_INFO_RL(QDF_MODULE_ID_QDF, ## params)
+#define qdf_rl_debug(params...) QDF_TRACE_DEBUG_RL(QDF_MODULE_ID_QDF, ## params)
+
+#define qdf_rl_nofl_alert(params...) \
+	QDF_TRACE_FATAL_RL_NO_FL(QDF_MODULE_ID_QDF, ## params)
+#define qdf_rl_nofl_err(params...) \
+	QDF_TRACE_ERROR_RL_NO_FL(QDF_MODULE_ID_QDF, ## params)
+#define qdf_rl_nofl_warn(params...) \
+	QDF_TRACE_WARN_RL_NO_FL(QDF_MODULE_ID_QDF, ## params)
+#define qdf_rl_nofl_info(params...) \
+	QDF_TRACE_INFO_RL_NO_FL(QDF_MODULE_ID_QDF, ## params)
+#define qdf_rl_nofl_debug(params...) \
+	QDF_TRACE_DEBUG_RL_NO_FL(QDF_MODULE_ID_QDF, ## params)
+
 #define qdf_vprint    __qdf_vprint
 #define qdf_snprint   __qdf_snprint
 
 #define qdf_kstrtoint __qdf_kstrtoint
+#define qdf_kstrtouint __qdf_kstrtouint
 
 #ifdef WLAN_OPEN_P2P_INTERFACE
 /* This should match with WLAN_MAX_INTERFACES */
@@ -861,6 +895,21 @@ struct qdf_ipv6_addr {
  */
 QDF_STATUS qdf_ipv6_parse(const char *ipv6_str, struct qdf_ipv6_addr *out_addr);
 
+/**
+ * qdf_uint8_array_parse() - parse the given string as uint8 array
+ * @in_str: the input string to parse
+ * @out_array: the output uint8 array, populated on success
+ * @array_size: size of the array
+ * @out_size: size of the populated array
+ *
+ * This API is called to convert string (each byte separated by
+ * a comma) into an u8 array
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS qdf_uint8_array_parse(const char *in_str, uint8_t *out_array,
+				 qdf_size_t array_size, qdf_size_t *out_size);
+
 #define QDF_MAX_NUM_CHAN   (128)
 
 #define QDF_BCAST_MAC_ADDR (0xFF)
@@ -996,16 +1045,16 @@ struct qdf_tso_seg_dbg_t {
 
 /**
  * qdf_tso_seg_elem_t - tso segment element
- * @seg: instance of segment
  * @next: pointer to the next segment
+ * @seg: instance of segment
  */
 struct qdf_tso_seg_elem_t {
+	struct qdf_tso_seg_elem_t *next;
 	struct qdf_tso_seg_t seg;
 	uint32_t cookie:13,
 		on_freelist:1,
 		sent_to_target:1,
 		force_free:1;
-	struct qdf_tso_seg_elem_t *next;
 #ifdef TSOSEG_DEBUG
 	struct qdf_tso_seg_dbg_t dbg;
 #endif /* TSOSEG_DEBUG */
@@ -1024,12 +1073,12 @@ struct qdf_tso_num_seg_t {
 
 /**
  * qdf_tso_num_seg_elem_t - num of tso segment element for jumbo skb
- * @num_seg: instance of num of seg
  * @next: pointer to the next segment
+ * @num_seg: instance of num of seg
  */
 struct qdf_tso_num_seg_elem_t {
-	struct qdf_tso_num_seg_t num_seg;
 	struct qdf_tso_num_seg_elem_t *next;
+	struct qdf_tso_num_seg_t num_seg;
 };
 
 /**

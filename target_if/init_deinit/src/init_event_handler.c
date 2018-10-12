@@ -101,12 +101,23 @@ static int init_deinit_service_ready_event_handler(ol_scn_t scn_handle,
 	if (wmi_service_enabled(wmi_handle, wmi_service_check_cal_version))
 		wlan_psoc_nif_fw_ext_cap_set(psoc, WLAN_SOC_CEXT_SW_CAL);
 
+	if (wmi_service_enabled(wmi_handle, wmi_service_twt_requestor))
+		wlan_psoc_nif_fw_ext_cap_set(psoc, WLAN_SOC_CEXT_TWT_REQUESTER);
+
+	if (wmi_service_enabled(wmi_handle, wmi_service_twt_responder))
+		wlan_psoc_nif_fw_ext_cap_set(psoc, WLAN_SOC_CEXT_TWT_RESPONDER);
+
+	if (wmi_service_enabled(wmi_handle, wmi_service_bss_color_offload))
+		target_if_debug(" BSS COLOR OFFLOAD supported");
+
 	target_if_debug(" TT support %d, Wide BW Scan %d, SW cal %d",
 		wlan_psoc_nif_fw_ext_cap_get(psoc, WLAN_SOC_CEXT_TT_SUPPORT),
 		wlan_psoc_nif_fw_ext_cap_get(psoc, WLAN_SOC_CEXT_WIDEBAND_SCAN),
 		wlan_psoc_nif_fw_ext_cap_get(psoc, WLAN_SOC_CEXT_SW_CAL));
 
 	target_if_mesh_support_enable(psoc, tgt_hdl, event);
+
+	target_if_eapol_minrate_enable(psoc, tgt_hdl, event);
 
 	target_if_smart_antenna_enable(psoc, tgt_hdl, event);
 
@@ -248,6 +259,8 @@ static int init_deinit_service_ext_ready_event_handler(ol_scn_t scn_handle,
 	info->wlan_res_cfg.beacon_tx_offload_max_vdev =
 				(target_psoc_get_num_radios(tgt_hdl) *
 				info->wlan_res_cfg.beacon_tx_offload_max_vdev);
+	info->wlan_res_cfg.max_bssid_indicator =
+				info->service_ext_param.max_bssid_indicator;
 
 	info->wmi_service_ready = TRUE;
 
@@ -312,6 +325,7 @@ static int init_deinit_ready_event_handler(ol_scn_t scn_handle,
 	wmi_legacy_service_ready_callback legacy_callback;
 	uint8_t num_radios, i;
 	uint32_t max_peers;
+	target_resource_config *tgt_cfg;
 
 	if (!scn_handle) {
 		target_if_err("scn handle NULL");
@@ -366,10 +380,11 @@ static int init_deinit_ready_event_handler(ol_scn_t scn_handle,
 	 * allocate peer memory in this case
 	 */
 	if (ready_ev.num_total_peer != 0) {
-		max_peers = info->wlan_res_cfg.num_peers +
-			ready_ev.num_extra_peer + 1;
+		tgt_cfg = &info->wlan_res_cfg;
+		max_peers = tgt_cfg->num_peers + ready_ev.num_extra_peer + 1;
 
-		cdp_peer_map_attach(wlan_psoc_get_dp_handle(psoc), max_peers);
+		cdp_peer_map_attach(wlan_psoc_get_dp_handle(psoc), max_peers,
+				    tgt_cfg->peer_map_unmap_v2);
 	}
 
 	/* Indicate to the waiting thread that the ready

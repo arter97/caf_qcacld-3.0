@@ -46,6 +46,17 @@
 #define p2p_alert(params ...) \
 	QDF_TRACE_FATAL(QDF_MODULE_ID_P2P, params)
 
+#define p2p_nofl_debug(params ...) \
+	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_P2P, params)
+#define p2p_nofl_info(params ...) \
+	QDF_TRACE_INFO_NO_FL(QDF_MODULE_ID_P2P, params)
+#define p2p_nofl_warn(params ...) \
+	QDF_TRACE_WARN_NO_FL(QDF_MODULE_ID_P2P, params)
+#define p2p_nofl_err(params ...) \
+	QDF_TRACE_ERROR_NO_FL(QDF_MODULE_ID_P2P, params)
+#define p2p_nofl_alert(params ...) \
+	QDF_TRACE_FATAL_NO_FL(QDF_MODULE_ID_P2P, params)
+
 struct scheduler_msg;
 struct p2p_tx_cnf;
 struct p2p_rx_mgmt_frame;
@@ -343,6 +354,7 @@ QDF_STATUS p2p_process_cmd(struct scheduler_msg *msg);
  */
 QDF_STATUS p2p_process_evt(struct scheduler_msg *msg);
 
+#ifdef FEATURE_P2P_LISTEN_OFFLOAD
 /**
  * p2p_process_lo_stop() - Process lo stop event
  * @lo_stop_event: listen offload stop event information
@@ -354,7 +366,13 @@ QDF_STATUS p2p_process_evt(struct scheduler_msg *msg);
  */
 QDF_STATUS p2p_process_lo_stop(
 	struct p2p_lo_stop_event *lo_stop_event);
-
+#else
+static inline QDF_STATUS p2p_process_lo_stop(
+	struct p2p_lo_stop_event *lo_stop_event)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 /**
  * p2p_process_noa() - Process noa event
  * @noa_event: noa event information

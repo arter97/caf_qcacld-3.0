@@ -59,6 +59,8 @@ typedef void *hif_handle_t;
 #define HIF_TYPE_QCA8074 15
 #define HIF_TYPE_QCA6290 16
 #define HIF_TYPE_QCN7605 17
+#define HIF_TYPE_QCA6390 18
+#define HIF_TYPE_QCA8074V2 19
 
 #ifdef IPA_OFFLOAD
 #define DMA_COHERENT_MASK_IPA_VER_3_AND_ABOVE   37
@@ -69,7 +71,7 @@ typedef void *hif_handle_t;
  * defining irq nubers that can be used by external modules like datapath
  */
 enum hif_ic_irq {
-	host2wbm_desc_feed = 18,
+	host2wbm_desc_feed = 16,
 	host2reo_re_injection,
 	host2reo_command,
 	host2rxdma_monitor_ring3,

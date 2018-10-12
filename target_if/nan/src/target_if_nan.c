@@ -219,7 +219,9 @@ static int target_if_ndp_initiator_rsp_handler(ol_scn_t scn, uint8_t *data,
 	msg.callback = target_if_nan_event_dispatcher;
 	msg.flush_callback = target_if_nan_event_flush_cb;
 	target_if_debug("NDP_INITIATOR_RSP sent: %d", msg.type);
-	status = scheduler_post_msg(QDF_MODULE_ID_TARGET_IF, &msg);
+	status = scheduler_post_message(QDF_MODULE_ID_TARGET_IF,
+					QDF_MODULE_ID_TARGET_IF,
+					QDF_MODULE_ID_TARGET_IF, &msg);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		target_if_err("failed to post msg, status: %d", status);
 		target_if_nan_event_flush_cb(&msg);
@@ -268,7 +270,9 @@ static int target_if_ndp_ind_handler(ol_scn_t scn, uint8_t *data,
 	msg.callback = target_if_nan_event_dispatcher;
 	msg.flush_callback = target_if_nan_event_flush_cb;
 	target_if_debug("NDP_INDICATION sent: %d", msg.type);
-	status = scheduler_post_msg(QDF_MODULE_ID_TARGET_IF, &msg);
+	status = scheduler_post_message(QDF_MODULE_ID_TARGET_IF,
+					QDF_MODULE_ID_TARGET_IF,
+					QDF_MODULE_ID_TARGET_IF, &msg);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		target_if_err("failed to post msg, status: %d", status);
 		target_if_nan_event_flush_cb(&msg);
@@ -317,7 +321,9 @@ static int target_if_ndp_confirm_handler(ol_scn_t scn, uint8_t *data,
 	msg.callback = target_if_nan_event_dispatcher;
 	msg.flush_callback = target_if_nan_event_flush_cb;
 	target_if_debug("NDP_CONFIRM sent: %d", msg.type);
-	status = scheduler_post_msg(QDF_MODULE_ID_TARGET_IF, &msg);
+	status = scheduler_post_message(QDF_MODULE_ID_TARGET_IF,
+					QDF_MODULE_ID_TARGET_IF,
+					QDF_MODULE_ID_TARGET_IF, &msg);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		target_if_err("failed to post msg, status: %d", status);
 		target_if_nan_event_flush_cb(&msg);
@@ -415,7 +421,9 @@ static int target_if_ndp_responder_rsp_handler(ol_scn_t scn, uint8_t *data,
 	msg.callback = target_if_nan_event_dispatcher;
 	msg.flush_callback = target_if_nan_event_flush_cb;
 	target_if_debug("NDP_INITIATOR_RSP sent: %d", msg.type);
-	status = scheduler_post_msg(QDF_MODULE_ID_TARGET_IF, &msg);
+	status = scheduler_post_message(QDF_MODULE_ID_TARGET_IF,
+					QDF_MODULE_ID_TARGET_IF,
+					QDF_MODULE_ID_TARGET_IF, &msg);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		target_if_err("failed to post msg, status: %d", status);
 		target_if_nan_event_flush_cb(&msg);
@@ -513,7 +521,9 @@ static int target_if_ndp_end_rsp_handler(ol_scn_t scn, uint8_t *data,
 	msg.callback = target_if_nan_event_dispatcher;
 	msg.flush_callback = target_if_nan_event_flush_cb;
 	target_if_debug("NDP_END_RSP sent: %d", msg.type);
-	status = scheduler_post_msg(QDF_MODULE_ID_TARGET_IF, &msg);
+	status = scheduler_post_message(QDF_MODULE_ID_TARGET_IF,
+					QDF_MODULE_ID_TARGET_IF,
+					QDF_MODULE_ID_TARGET_IF, &msg);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		target_if_err("failed to post msg, status: %d", status);
 		target_if_nan_event_flush_cb(&msg);
@@ -550,12 +560,22 @@ static int target_if_ndp_end_ind_handler(ol_scn_t scn, uint8_t *data,
 		return -EINVAL;
 	}
 
+	rsp->vdev = wlan_objmgr_get_vdev_by_opmode_from_psoc(
+			  wmi_handle->soc->wmi_psoc, QDF_NDI_MODE, WLAN_NAN_ID);
+	if (!rsp->vdev) {
+		target_if_err("vdev is null");
+		qdf_mem_free(rsp);
+		return -EINVAL;
+	}
+
 	msg.bodyptr = rsp;
 	msg.type = NDP_END_IND;
 	msg.callback = target_if_nan_event_dispatcher;
 	msg.flush_callback = target_if_nan_event_flush_cb;
 	target_if_debug("NDP_END_IND sent: %d", msg.type);
-	status = scheduler_post_msg(QDF_MODULE_ID_TARGET_IF, &msg);
+	status = scheduler_post_message(QDF_MODULE_ID_TARGET_IF,
+					QDF_MODULE_ID_TARGET_IF,
+					QDF_MODULE_ID_TARGET_IF, &msg);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		target_if_err("failed to post msg, status: %d", status);
 		target_if_nan_event_flush_cb(&msg);
@@ -604,7 +624,9 @@ static int target_if_ndp_sch_update_handler(ol_scn_t scn, uint8_t *data,
 	msg.callback = target_if_nan_event_dispatcher;
 	msg.flush_callback = target_if_nan_event_flush_cb;
 	target_if_debug("NDP_SCHEDULE_UPDATE sent: %d", msg.type);
-	status = scheduler_post_msg(QDF_MODULE_ID_TARGET_IF, &msg);
+	status = scheduler_post_message(QDF_MODULE_ID_TARGET_IF,
+					QDF_MODULE_ID_TARGET_IF,
+					QDF_MODULE_ID_TARGET_IF, &msg);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		target_if_err("failed to post msg, status: %d", status);
 		target_if_nan_event_flush_cb(&msg);
@@ -671,6 +693,10 @@ QDF_STATUS target_if_nan_register_events(struct wlan_objmgr_psoc *psoc)
 	int ret;
 	wmi_unified_t handle = get_wmi_unified_hdl_from_psoc(psoc);
 
+	if (!handle) {
+		target_if_err("handle is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
 	ret = wmi_unified_register_event_handler(handle,
 		wmi_ndp_initiator_rsp_event_id,
 		target_if_ndp_initiator_rsp_handler,
@@ -748,6 +774,10 @@ QDF_STATUS target_if_nan_deregister_events(struct wlan_objmgr_psoc *psoc)
 	int ret, status = 0;
 	wmi_unified_t handle = get_wmi_unified_hdl_from_psoc(psoc);
 
+	if (!handle) {
+		target_if_err("handle is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
 	ret = wmi_unified_unregister_event_handler(handle,
 				wmi_ndl_schedule_update_event_id);
 	if (ret) {

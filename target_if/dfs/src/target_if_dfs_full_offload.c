@@ -46,6 +46,7 @@ static int target_if_dfs_cac_complete_event_handler(
 	struct wlan_objmgr_pdev *pdev;
 	int ret = 0;
 	uint32_t vdev_id = 0;
+	struct wmi_unified *wmi_handle;
 
 	if (!scn || !data) {
 		target_if_err("scn: %pK, data: %pK", scn, data);
@@ -64,8 +65,14 @@ static int target_if_dfs_cac_complete_event_handler(
 		return -EINVAL;
 	}
 
-	if (wmi_extract_dfs_cac_complete_event(GET_WMI_HDL_FROM_PSOC(psoc),
-			data, &vdev_id, datalen) != QDF_STATUS_SUCCESS) {
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("Invalid WMI handle");
+		return -EINVAL;
+	}
+
+	if (wmi_extract_dfs_cac_complete_event(wmi_handle, data, &vdev_id,
+					       datalen) != QDF_STATUS_SUCCESS) {
 		target_if_err("failed to extract cac complete event");
 		return -EFAULT;
 	}
@@ -109,6 +116,7 @@ static int target_if_dfs_radar_detection_event_handler(
 	struct wlan_objmgr_pdev *pdev = NULL;
 	struct wlan_lmac_if_dfs_rx_ops *dfs_rx_ops;
 	int ret = 0;
+	struct wmi_unified *wmi_handle;
 
 	if (!scn || !data) {
 		target_if_err("scn: %pK, data: %pK", scn, data);
@@ -127,8 +135,15 @@ static int target_if_dfs_radar_detection_event_handler(
 		return -EINVAL;
 	}
 
-	if (wmi_extract_dfs_radar_detection_event(GET_WMI_HDL_FROM_PSOC(psoc),
-			data, &radar, datalen) != QDF_STATUS_SUCCESS) {
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("Invalid WMI handle");
+		return -EINVAL;
+	}
+
+	if (wmi_extract_dfs_radar_detection_event(wmi_handle, data, &radar,
+						  datalen)
+	    != QDF_STATUS_SUCCESS) {
 		target_if_err("failed to extract cac complete event");
 		return -EFAULT;
 	}
@@ -183,6 +198,7 @@ QDF_STATUS target_process_bang_radar_cmd(
 	struct wmi_unit_test_cmd wmi_utest;
 	int i;
 	wmi_unified_t wmi_handle;
+	uint32_t target_pdev_id = 0;
 
 	if (!pdev) {
 		target_if_err("null pdev");
@@ -205,8 +221,14 @@ QDF_STATUS target_process_bang_radar_cmd(
 	 * Host to Target  conversion for pdev id required
 	 * before we send a wmi unit test command
 	 */
-	wmi_utest.args[IDX_PDEV_ID] = wmi_handle->ops->
-		convert_pdev_id_host_to_target(pdev->pdev_objmgr.wlan_pdev_id);
+	if (wmi_convert_pdev_id_host_to_target(
+				wmi_handle, pdev->pdev_objmgr.wlan_pdev_id,
+				&target_pdev_id) != QDF_STATUS_SUCCESS) {
+		target_if_err("failed to convert host pdev id to target");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	wmi_utest.args[IDX_PDEV_ID] = target_pdev_id;
 
 	status = wmi_unified_unit_test_cmd(wmi_handle, &wmi_utest);
 	if (QDF_IS_STATUS_ERROR(status))

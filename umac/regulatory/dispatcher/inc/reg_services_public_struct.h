@@ -25,6 +25,7 @@
 #define __REG_SERVICES_PUBLIC_STRUCT_H_
 
 #include "../../core/src/reg_db.h"
+#include "wlan_cmn.h"
 
 #define REG_SBS_SEPARATION_THRESHOLD 100
 #define REG_MAX_CHANNELS_PER_OPERATING_CLASS  25
@@ -509,31 +510,6 @@ typedef enum {
 	REGDOMAIN_COUNT
 } v_REGDOMAIN_t;
 
-
-/**
- * enum phy_ch_width - channel width
- * @CH_WIDTH_20MHZ: 20 mhz width
- * @CH_WIDTH_40MHZ: 40 mhz width
- * @CH_WIDTH_80MHZ: 80 mhz width
- * @CH_WIDTH_160MHZ: 160 mhz width
- * @CH_WIDTH_80P80HZ: 80+80 mhz width
- * @CH_WIDTH_5MHZ: 5 mhz width
- * @CH_WIDTH_10MHZ: 10 mhz width
- * @CH_WIDTH_INVALID: invalid width
- * @CH_WIDTH_MAX: max possible width
- */
-enum phy_ch_width {
-	CH_WIDTH_20MHZ = 0,
-	CH_WIDTH_40MHZ,
-	CH_WIDTH_80MHZ,
-	CH_WIDTH_160MHZ,
-	CH_WIDTH_80P80MHZ,
-	CH_WIDTH_5MHZ,
-	CH_WIDTH_10MHZ,
-	CH_WIDTH_INVALID,
-	CH_WIDTH_MAX
-};
-
 /**
  * struct ch_params
  * @ch_width: channel width
@@ -807,13 +783,13 @@ struct cur_regulatory_info {
  * @alpha2: alpha2 of reg rules
  * @dfs_region: dfs region
  * @num_of_reg_rules: number of reg rules
- * @reg_rules_ptr: regulatory rules pointer
+ * @reg_rules: regulatory rules array
  */
 struct reg_rule_info {
 	uint8_t alpha2[REG_ALPHA2_LEN + 1];
 	enum dfs_reg dfs_region;
 	uint8_t num_of_reg_rules;
-	struct cur_reg_rule *reg_rules_ptr;
+	struct cur_reg_rule reg_rules[MAX_REG_RULES];
 };
 
 /**
@@ -857,6 +833,7 @@ enum restart_beaconing_on_ch_avoid_rule {
  * @restart_beaconing: control the beaconing entity to move
  * away from active LTE channels
  * @enable_srd_chan_in_master_mode: SRD channel support in master mode
+ * @enable_11d_in_world_mode: enable 11d in world mode
  */
 struct reg_config_vars {
 	uint32_t enable_11d_support;
@@ -868,6 +845,7 @@ struct reg_config_vars {
 	uint32_t force_ssc_disable_indoor_channel;
 	enum restart_beaconing_on_ch_avoid_rule restart_beaconing;
 	bool enable_srd_chan_in_master_mode;
+	bool enable_11d_in_world_mode;
 };
 
 /**

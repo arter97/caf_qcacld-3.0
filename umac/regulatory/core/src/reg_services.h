@@ -106,6 +106,16 @@ QDF_STATUS reg_get_channel_list_with_power(struct wlan_objmgr_pdev *pdev,
 enum channel_state reg_get_channel_state(struct wlan_objmgr_pdev *pdev,
 					 uint32_t ch);
 
+/**
+ * reg_chan_has_dfs_attribute() - check channel has dfs attribue or not
+ * @ch: channel number.
+ *
+ * This API get chan initial dfs attribue flag from regdomain
+ *
+ * Return: true if chan is dfs, otherwise false
+ */
+bool reg_chan_has_dfs_attribute(struct wlan_objmgr_pdev *pdev, uint32_t ch);
+
 enum channel_state reg_get_5g_bonded_channel_state(struct wlan_objmgr_pdev
 						   *pdev,
 						   uint8_t ch,
@@ -445,10 +455,12 @@ void reg_program_mas_chan_list(struct wlan_objmgr_psoc *psoc,
 /**
  * reg_get_regd_rules() - provides the reg domain rules info
  * @pdev: pdev pointer
+ * @reg_rules: regulatory rules
  *
- * Return: reg_rule_info pointer
+ * Return: QDF_STATUS
  */
-struct reg_rule_info *reg_get_regd_rules(struct wlan_objmgr_pdev *pdev);
+QDF_STATUS reg_get_regd_rules(struct wlan_objmgr_pdev *pdev,
+			      struct reg_rule_info *reg_rules);
 
 /**
  * reg_reset_reg_rules() - provides the reg domain rules info
@@ -502,12 +514,12 @@ QDF_STATUS reg_save_new_11d_country(struct wlan_objmgr_psoc *psoc,
 		uint8_t *country);
 
 /**
- * reg_11d_original_enabled_on_host() - whether 11d original enabled on host
+ * reg_is_11d_offloaded() - whether 11d offloaded supported or not
  * @psoc: psoc ptr
  *
  * Return: bool
  */
-bool reg_11d_original_enabled_on_host(struct wlan_objmgr_psoc *psoc);
+bool reg_is_11d_offloaded(struct wlan_objmgr_psoc *psoc);
 
 /**
  * reg_11d_enabled_on_host() - know whether 11d enabled on host

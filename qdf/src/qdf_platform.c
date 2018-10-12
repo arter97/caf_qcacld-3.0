@@ -57,13 +57,15 @@ void qdf_register_self_recovery_callback(qdf_self_recovery_callback callback)
 
 qdf_export_symbol(qdf_register_self_recovery_callback);
 
-void qdf_trigger_self_recovery(void)
+void __qdf_trigger_self_recovery(const char *func, const uint32_t line)
 {
 	if (self_recovery_cb)
-		self_recovery_cb(QDF_REASON_UNSPECIFIED);
+		self_recovery_cb(QDF_REASON_UNSPECIFIED, func, line);
+	else
+		QDF_DEBUG_PANIC_FL(func, line, "");
 }
 
-qdf_export_symbol(qdf_trigger_self_recovery);
+qdf_export_symbol(__qdf_trigger_self_recovery);
 
 void qdf_register_ssr_protect_callbacks(qdf_ssr_callback protect,
 					qdf_ssr_callback unprotect)

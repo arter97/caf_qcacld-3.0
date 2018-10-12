@@ -286,15 +286,6 @@ irqreturn_t hif_pci_legacy_ce_interrupt_handler(int irq, void *arg)
 	return IRQ_HANDLED;
 }
 
-static irqreturn_t hif_pci_msi_fw_handler(int irq, void *arg)
-{
-	struct hif_pci_softc *sc = (struct hif_pci_softc *)arg;
-
-	(irqreturn_t) hif_fw_interrupt_handler(sc->irq_event, arg);
-
-	return IRQ_HANDLED;
-}
-
 bool hif_pci_targ_is_present(struct hif_softc *scn, void *__iomem *mem)
 {
 	return 1;               /* FIX THIS */
@@ -315,7 +306,7 @@ int hif_get_irq_num(struct hif_opaque_softc *scn, int *irq, uint32_t size)
 	}
 
 	if (sc->num_msi_intrs > size) {
-		qdf_print("Not enough space in irq buffer to return irqs\n");
+		qdf_print("Not enough space in irq buffer to return irqs");
 		return -EINVAL;
 	}
 
@@ -842,29 +833,6 @@ int hif_pci_dump_registers(struct hif_softc *hif_ctx)
 	__hif_pci_dump_registers(scn);
 
 	return 0;
-}
-
-/*
- * Handler for a per-engine interrupt on a PARTICULAR CE.
- * This is used in cases where each CE has a private
- * MSI interrupt.
- */
-static irqreturn_t ce_per_engine_handler(int irq, void *arg)
-{
-	int CE_id = irq - MSI_ASSIGN_CE_INITIAL;
-
-	/*
-	 * NOTE: We are able to derive CE_id from irq because we
-	 * use a one-to-one mapping for CE's 0..5.
-	 * CE's 6 & 7 do not use interrupts at all.
-	 *
-	 * This mapping must be kept in sync with the mapping
-	 * used by firmware.
-	 */
-
-	ce_per_engine_service(arg, CE_id);
-
-	return IRQ_HANDLED;
 }
 
 #ifdef HIF_CONFIG_SLUB_DEBUG_ON
@@ -1547,8 +1515,8 @@ static void hif_set_hia_extnd(struct hif_softc *scn)
 		tgt_info->target_revision
 			= CHIP_ID_REVISION_GET(hif_read32_mb(scn, scn->mem
 					+ CHIP_ID_ADDRESS));
-		qdf_print(KERN_INFO"chip_id 0x%x chip_revision 0x%x\n",
-			target_type, tgt_info->target_revision);
+		qdf_print("chip_id 0x%x chip_revision 0x%x",
+			  target_type, tgt_info->target_revision);
 	}
 
 	{
@@ -1561,14 +1529,14 @@ static void hif_set_hia_extnd(struct hif_softc *scn)
 			(frac != -1) && (intval != -1)) {
 			hif_diag_read_access(hif_hdl, flag2_targ_addr,
 				&flag2_value);
-			qdf_print("\n Setting clk_override\n");
+			qdf_print("\n Setting clk_override");
 			flag2_value |= CLOCK_OVERRIDE;
 
 			hif_diag_write_access(hif_hdl, flag2_targ_addr,
 					flag2_value);
-			qdf_print("\n CLOCK PLL val set %d\n", flag2_value);
+			qdf_print("\n CLOCK PLL val set %d", flag2_value);
 		} else {
-			qdf_print(KERN_INFO"\n CLOCK PLL skipped\n");
+			qdf_print("\n CLOCK PLL skipped");
 		}
 	}
 
@@ -1583,7 +1551,7 @@ static void hif_set_hia_extnd(struct hif_softc *scn)
 		 */
 
 		qdf_print(KERN_INFO
-			  "%s: setting the target pll frac %x intval %x\n",
+			  "%s: setting the target pll frac %x intval %x",
 			  __func__, frac, intval);
 
 		/* do not touch frac, and int val, let them be default -1,
@@ -1599,16 +1567,16 @@ static void hif_set_hia_extnd(struct hif_softc *scn)
 					hi_clock_info));
 			hif_diag_read_access(hif_hdl,
 				flag2_targ_addr, &flag2_value);
-			qdf_print("\n ====> FRAC Val %x Address %x\n", frac,
-				flag2_value);
+			qdf_print("\n ====> FRAC Val %x Address %x", frac,
+				  flag2_value);
 			hif_diag_write_access(hif_hdl, flag2_value, frac);
-			qdf_print("\n INT Val %x  Address %x\n",
-				intval, flag2_value + 4);
+			qdf_print("\n INT Val %x  Address %x",
+				  intval, flag2_value + 4);
 			hif_diag_write_access(hif_hdl,
 					flag2_value + 4, intval);
 		} else {
 			qdf_print(KERN_INFO
-				  "%s: no frac provided, skipping pre-configuring PLL\n",
+				  "%s: no frac provided, skipping pre-configuring PLL",
 				  __func__);
 		}
 
@@ -1625,7 +1593,7 @@ static void hif_set_hia_extnd(struct hif_softc *scn)
 					hi_desired_cpu_speed_hz));
 			hif_diag_read_access(hif_hdl, flag2_targ_addr,
 							&flag2_value);
-			qdf_print("\n ==> hi_desired_cpu_speed_hz Address %x\n",
+			qdf_print("\n ==> hi_desired_cpu_speed_hz Address %x",
 				  flag2_value);
 			hif_diag_write_access(hif_hdl, flag2_value,
 				ar900b_20_targ_clk/*300000000u*/);
@@ -1644,7 +1612,7 @@ static void hif_set_hia_extnd(struct hif_softc *scn)
 			hif_diag_write_access(hif_hdl, flag2_targ_addr,
 				qca9888_20_targ_clk);
 		} else {
-			qdf_print(KERN_INFO"%s: targ_clk is not provided, skipping pre-configuring PLL\n",
+			qdf_print("%s: targ_clk is not provided, skipping pre-configuring PLL",
 				  __func__);
 		}
 	} else {
@@ -1656,13 +1624,13 @@ static void hif_set_hia_extnd(struct hif_softc *scn)
 							hi_clock_info));
 			hif_diag_read_access(hif_hdl, flag2_targ_addr,
 						&flag2_value);
-			qdf_print("\n ====> FRAC Val %x Address %x\n", frac,
-							flag2_value);
+			qdf_print("\n ====> FRAC Val %x Address %x", frac,
+				  flag2_value);
 			hif_diag_write_access(hif_hdl, flag2_value, frac);
-			qdf_print("\n INT Val %x  Address %x\n", intval,
-							flag2_value + 4);
+			qdf_print("\n INT Val %x  Address %x", intval,
+				  flag2_value + 4);
 			hif_diag_write_access(hif_hdl, flag2_value + 4,
-					intval);
+					      intval);
 		}
 	}
 }
@@ -2014,8 +1982,9 @@ int hif_pci_bus_configure(struct hif_softc *hif_sc)
 	}
 
 	/* todo: consider replacing this with an srng field */
-	if ((hif_sc->target_info.target_type == TARGET_TYPE_QCA8074) &&
-			(hif_sc->bus_type == QDF_BUS_TYPE_AHB)) {
+	if (((hif_sc->target_info.target_type == TARGET_TYPE_QCA8074) ||
+	     (hif_sc->target_info.target_type == TARGET_TYPE_QCA8074V2)) &&
+	    (hif_sc->bus_type == QDF_BUS_TYPE_AHB)) {
 		hif_sc->per_ce_irq = true;
 	}
 
@@ -2034,8 +2003,9 @@ int hif_pci_bus_configure(struct hif_softc *hif_sc)
 		hif_register_bmi_callbacks(hif_sc);
 	}
 
-	if ((hif_sc->target_info.target_type == TARGET_TYPE_QCA8074) &&
-			(hif_sc->bus_type == QDF_BUS_TYPE_PCI))
+	if (((hif_sc->target_info.target_type == TARGET_TYPE_QCA8074) ||
+	     (hif_sc->target_info.target_type == TARGET_TYPE_QCA8074V2)) &&
+	    (hif_sc->bus_type == QDF_BUS_TYPE_PCI))
 		HIF_INFO_MED("%s: Skip irq config for PCI based 8074 target",
 						__func__);
 	else {
@@ -2160,12 +2130,9 @@ static int hif_enable_pci_nopld(struct hif_pci_softc *sc,
 		goto err_iomap;
 	}
 
-	pr_err("*****BAR is %pK\n", mem);
+	HIF_INFO("*****BAR is %pK\n", (void *)mem);
 
 	sc->mem = mem;
-
-	HIF_INFO("%s, mem after pci_iomap:%pK\n",
-	       __func__, sc->mem);
 
 	/* Hawkeye emulation specific change */
 	if ((device_id == RUMIM2M_DEVICE_ID_NODE0) ||
@@ -2295,159 +2262,6 @@ static int hif_pci_probe_tgt_wakeup(struct hif_pci_softc *sc)
 #endif
 
 end:
-	return ret;
-}
-
-static void wlan_tasklet_msi(unsigned long data)
-{
-	struct hif_tasklet_entry *entry = (struct hif_tasklet_entry *)data;
-	struct hif_pci_softc *sc = (struct hif_pci_softc *) entry->hif_handler;
-	struct hif_softc *scn = HIF_GET_SOFTC(sc);
-
-	if (scn->hif_init_done == false)
-		goto irq_handled;
-
-	if (qdf_atomic_read(&scn->link_suspended))
-		goto irq_handled;
-
-	qdf_atomic_inc(&scn->active_tasklet_cnt);
-
-	if (entry->id == HIF_MAX_TASKLET_NUM) {
-		/* the last tasklet is for fw IRQ */
-		(irqreturn_t)hif_fw_interrupt_handler(sc->irq_event, scn);
-		if (scn->target_status == TARGET_STATUS_RESET)
-			goto irq_handled;
-	} else if (entry->id < scn->ce_count) {
-		ce_per_engine_service(scn, entry->id);
-	} else {
-		HIF_ERROR("%s: ERROR - invalid CE_id = %d",
-		       __func__, entry->id);
-	}
-	return;
-
-irq_handled:
-	qdf_atomic_dec(&scn->active_tasklet_cnt);
-
-}
-
-/* deprecated */
-static int hif_configure_msi(struct hif_pci_softc *sc)
-{
-	int ret = 0;
-	int num_msi_desired;
-	int rv = -1;
-	struct hif_softc *scn = HIF_GET_SOFTC(sc);
-
-	HIF_TRACE("%s: E", __func__);
-
-	num_msi_desired = MSI_NUM_REQUEST; /* Multiple MSI */
-	if (num_msi_desired < 1) {
-		HIF_ERROR("%s: MSI is not configured", __func__);
-		return -EINVAL;
-	}
-
-	if (num_msi_desired > 1) {
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 16, 0))
-		rv = pci_enable_msi_range(sc->pdev, num_msi_desired,
-						num_msi_desired);
-#else
-		rv = pci_enable_msi_block(sc->pdev, num_msi_desired);
-#endif
-	}
-	HIF_TRACE("%s: num_msi_desired = %d, available_msi = %d",
-		  __func__, num_msi_desired, rv);
-
-	if (rv == 0 || rv >= HIF_MAX_TASKLET_NUM) {
-		int i;
-
-		sc->num_msi_intrs = HIF_MAX_TASKLET_NUM;
-		sc->tasklet_entries[HIF_MAX_TASKLET_NUM-1].hif_handler =
-			(void *)sc;
-		sc->tasklet_entries[HIF_MAX_TASKLET_NUM-1].id =
-			HIF_MAX_TASKLET_NUM;
-		tasklet_init(&sc->intr_tq, wlan_tasklet_msi,
-			 (unsigned long)&sc->tasklet_entries[
-			 HIF_MAX_TASKLET_NUM-1]);
-		ret = request_irq(sc->pdev->irq + MSI_ASSIGN_FW,
-				  hif_pci_msi_fw_handler,
-				  IRQF_SHARED, "wlan_pci", sc);
-		if (ret) {
-			HIF_ERROR("%s: request_irq failed", __func__);
-			goto err_intr;
-		}
-		for (i = 0; i <= scn->ce_count; i++) {
-			sc->tasklet_entries[i].hif_handler = (void *)sc;
-			sc->tasklet_entries[i].id = i;
-			tasklet_init(&sc->intr_tq, wlan_tasklet_msi,
-				 (unsigned long)&sc->tasklet_entries[i]);
-			ret = request_irq((sc->pdev->irq +
-					   i + MSI_ASSIGN_CE_INITIAL),
-					  ce_per_engine_handler, IRQF_SHARED,
-					  "wlan_pci", sc);
-			if (ret) {
-				HIF_ERROR("%s: request_irq failed", __func__);
-				goto err_intr;
-			}
-		}
-	} else if (rv > 0) {
-		HIF_TRACE("%s: use single msi", __func__);
-
-		ret = pci_enable_msi(sc->pdev);
-		if (ret < 0) {
-			HIF_ERROR("%s: single MSI allocation failed",
-				  __func__);
-			/* Try for legacy PCI line interrupts */
-			sc->num_msi_intrs = 0;
-		} else {
-			sc->num_msi_intrs = 1;
-			tasklet_init(&sc->intr_tq,
-				wlan_tasklet, (unsigned long)sc);
-			ret = request_irq(sc->pdev->irq,
-					 hif_pci_legacy_ce_interrupt_handler,
-					  IRQF_SHARED, "wlan_pci", sc);
-			if (ret) {
-				HIF_ERROR("%s: request_irq failed", __func__);
-				goto err_intr;
-			}
-		}
-	} else {
-		sc->num_msi_intrs = 0;
-		ret = -EIO;
-		HIF_ERROR("%s: do not support MSI, rv = %d", __func__, rv);
-	}
-	ret = pci_enable_msi(sc->pdev);
-	if (ret < 0) {
-		HIF_ERROR("%s: single MSI interrupt allocation failed",
-			  __func__);
-		/* Try for legacy PCI line interrupts */
-		sc->num_msi_intrs = 0;
-	} else {
-		sc->num_msi_intrs = 1;
-		tasklet_init(&sc->intr_tq, wlan_tasklet, (unsigned long)sc);
-		ret = request_irq(sc->pdev->irq,
-				  hif_pci_legacy_ce_interrupt_handler,
-				  IRQF_SHARED, "wlan_pci", sc);
-		if (ret) {
-			HIF_ERROR("%s: request_irq failed", __func__);
-			goto err_intr;
-		}
-	}
-
-	if (ret == 0) {
-		hif_write32_mb(sc, sc->mem + (SOC_CORE_BASE_ADDRESS |
-			  PCIE_INTR_ENABLE_ADDRESS),
-			  HOST_GROUP0_MASK);
-		hif_write32_mb(sc, sc->mem +
-			  PCIE_LOCAL_BASE_ADDRESS + PCIE_SOC_WAKE_ADDRESS,
-			  PCIE_SOC_WAKE_RESET);
-	}
-	HIF_TRACE("%s: X, ret = %d", __func__, ret);
-
-	return ret;
-
-err_intr:
-	if (sc->num_msi_intrs >= 1)
-		pci_disable_msi(sc->pdev);
 	return ret;
 }
 
@@ -3529,10 +3343,14 @@ static void hif_ce_srng_msi_irq_enable(struct hif_softc *hif_sc, int ce_id)
 }
 
 static void hif_ce_legacy_msi_irq_disable(struct hif_softc *hif_sc, int ce_id)
-{}
+{
+	disable_irq_nosync(hif_ce_msi_map_ce_to_irq(hif_sc, ce_id));
+}
 
 static void hif_ce_legacy_msi_irq_enable(struct hif_softc *hif_sc, int ce_id)
-{}
+{
+	enable_irq(hif_ce_msi_map_ce_to_irq(hif_sc, ce_id));
+}
 
 static int hif_ce_msi_configure_irq(struct hif_softc *scn)
 {
@@ -3695,17 +3513,12 @@ int hif_configure_irq(struct hif_softc *scn)
 		goto end;
 	}
 
-	if (ENABLE_MSI) {
-		ret = hif_configure_msi(sc);
-		if (ret == 0)
-			goto end;
-	}
-	/* MSI failed. Try legacy irq */
 	switch (scn->target_info.target_type) {
 	case TARGET_TYPE_IPQ4019:
 		ret = hif_ahb_configure_legacy_irq(sc);
 		break;
 	case TARGET_TYPE_QCA8074:
+	case TARGET_TYPE_QCA8074V2:
 		ret = hif_ahb_configure_irq(sc);
 		break;
 	default:
@@ -3720,6 +3533,30 @@ int hif_configure_irq(struct hif_softc *scn)
 end:
 	scn->request_irq_done = true;
 	return 0;
+}
+
+/**
+ * hif_trigger_timer_irq() : Triggers interrupt on LF_Timer 0
+ * @scn: hif control structure
+ *
+ * Sets IRQ bit in LF Timer Status Address to awake peregrine/swift
+ * stuck at a polling loop in pcie_address_config in FW
+ *
+ * Return: none
+ */
+static void hif_trigger_timer_irq(struct hif_softc *scn)
+{
+	int tmp;
+	/* Trigger IRQ on Peregrine/Swift by setting
+	 * IRQ Bit of LF_TIMER 0
+	 */
+	tmp = hif_read32_mb(scn, scn->mem + (RTC_SOC_BASE_ADDRESS +
+						SOC_LF_TIMER_STATUS0_ADDRESS));
+	/* Set Raw IRQ Bit */
+	tmp |= 1;
+	/* SOC_LF_TIMER_STATUS0 */
+	hif_write32_mb(scn, scn->mem + (RTC_SOC_BASE_ADDRESS +
+		       SOC_LF_TIMER_STATUS0_ADDRESS), tmp);
 }
 
 /**
@@ -3751,7 +3588,9 @@ static void hif_target_sync(struct hif_softc *scn)
 	if (HAS_FW_INDICATOR) {
 		int wait_limit = 500;
 		int fw_ind = 0;
-
+		int retry_count = 0;
+		uint32_t target_type = scn->target_info.target_type;
+fw_retry:
 		HIF_TRACE("%s: Loop checking FW signal", __func__);
 		while (1) {
 			fw_ind = hif_read32_mb(scn, scn->mem +
@@ -3769,12 +3608,20 @@ static void hif_target_sync(struct hif_softc *scn)
 
 			qdf_mdelay(10);
 		}
-		if (wait_limit < 0)
+		if (wait_limit < 0) {
+			if (target_type == TARGET_TYPE_AR9888 &&
+			    retry_count++ < 2) {
+				hif_trigger_timer_irq(scn);
+				wait_limit = 500;
+				goto fw_retry;
+			}
 			HIF_TRACE("%s: FW signal timed out",
 					__func__);
-		else
+			qdf_assert_always(0);
+		} else {
 			HIF_TRACE("%s: Got FW signal, retries = %x",
 					__func__, 500-wait_limit);
+		}
 	}
 	hif_write32_mb(scn, scn->mem + PCIE_LOCAL_BASE_ADDRESS +
 			PCIE_SOC_WAKE_ADDRESS, PCIE_SOC_WAKE_RESET);
@@ -3804,6 +3651,7 @@ static bool hif_is_pld_based_target(int device_id)
 	case QCA6390_DEVICE_ID:
 #endif
 	case AR6320_DEVICE_ID:
+	case QCN7605_DEVICE_ID:
 		return true;
 	}
 	return false;
@@ -4514,6 +4362,7 @@ int hif_pci_addr_in_boundary(struct hif_softc *scn, uint32_t offset)
 	tgt_info = hif_get_target_info_handle(GET_HIF_OPAQUE_HDL(scn));
 
 	if (tgt_info->target_type == TARGET_TYPE_QCA6290 ||
+	    tgt_info->target_type == TARGET_TYPE_QCA6390 ||
 	    tgt_info->target_type == TARGET_TYPE_QCA8074) {
 		/*
 		 * Need to consider offset's memtype for QCA6290/QCA8074,

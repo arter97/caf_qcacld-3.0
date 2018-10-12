@@ -97,6 +97,11 @@ enum netif_action_type {
 	WLAN_NETIF_CARRIER_OFF,
 	WLAN_NETIF_PRIORITY_QUEUE_ON,
 	WLAN_NETIF_PRIORITY_QUEUE_OFF,
+	WLAN_NETIF_VO_QUEUE_ON,
+	WLAN_NETIF_VO_QUEUE_OFF,
+	WLAN_NETIF_VI_QUEUE_ON,
+	WLAN_NETIF_VI_QUEUE_OFF,
+	WLAN_NETIF_BE_BK_QUEUE_OFF,
 	WLAN_WAKE_NON_PRIORITY_QUEUE,
 	WLAN_STOP_NON_PRIORITY_QUEUE,
 	WLAN_NETIF_ACTION_TYPE_MAX,
@@ -198,16 +203,28 @@ enum ol_tx_spec {
  * @PEER_DEBUG_ID_LIM_SEND_ADDBA_RESP: debug id for send ADDBA response
  * @PEER_DEBUG_ID_OL_RX_THREAD: debug id for rx thread
  * @PEER_DEBUG_ID_WMA_CCMP_REPLAY_ATTACK: debug id for CCMP replay
+ * @PEER_DEBUG_ID_WMA_DEL_BSS:debug id for remove BSS
+ * @PEER_DEBUG_ID_WMA_VDEV_STOP_RESP:debug id for vdev stop response handler
+ * @PEER_DEBUG_ID_OL_PEER_MAP:debug id for peer map/unmap
+ * @PEER_DEBUG_ID_OL_PEER_ATTACH: debug id for peer attach/detach
+ * @PEER_DEBUG_ID_OL_TXQ_VDEV_FL: debug id for vdev flush
+ * @PEER_DEBUG_ID_OL_HASH_ERS:debug id for peer find hash erase
  * @PEER_DEBUG_ID_MAX: debug id MAX
  */
 enum peer_debug_id_type {
-	PEER_DEBUG_ID_OL_INTERNAL = 0,
-	PEER_DEBUG_ID_WMA_PKT_DROP = 1,
-	PEER_DEBUG_ID_WMA_ADDBA_REQ = 2,
-	PEER_DEBUG_ID_WMA_DELBA_REQ = 3,
-	PEER_DEBUG_ID_LIM_SEND_ADDBA_RESP = 4,
-	PEER_DEBUG_ID_OL_RX_THREAD = 5,
-	PEER_DEBUG_ID_WMA_CCMP_REPLAY_ATTACK = 6,
+	PEER_DEBUG_ID_OL_INTERNAL,
+	PEER_DEBUG_ID_WMA_PKT_DROP,
+	PEER_DEBUG_ID_WMA_ADDBA_REQ,
+	PEER_DEBUG_ID_WMA_DELBA_REQ,
+	PEER_DEBUG_ID_LIM_SEND_ADDBA_RESP,
+	PEER_DEBUG_ID_OL_RX_THREAD,
+	PEER_DEBUG_ID_WMA_CCMP_REPLAY_ATTACK,
+	PEER_DEBUG_ID_WMA_DEL_BSS,
+	PEER_DEBUG_ID_WMA_VDEV_STOP_RESP,
+	PEER_DEBUG_ID_OL_PEER_MAP,
+	PEER_DEBUG_ID_OL_PEER_ATTACH,
+	PEER_DEBUG_ID_OL_TXQ_VDEV_FL,
+	PEER_DEBUG_ID_OL_HASH_ERS,
 	PEER_DEBUG_ID_MAX
 };
 
@@ -419,5 +436,17 @@ typedef void (*tx_pause_callback)(uint8_t vdev_id,
 
 typedef void (*ipa_uc_op_cb_type)(uint8_t *op_msg,
 			void *osif_ctxt);
+
+/**
+ * struct ol_rx_inv_peer_params - rx invalid peer data parameters
+ * @vdev_id: Virtual device ID
+ * @ra: RX data receiver MAC address
+ * @ta: RX data transmitter MAC address
+ */
+struct ol_rx_inv_peer_params {
+	uint8_t vdev_id;
+	uint8_t ra[OL_TXRX_MAC_ADDR_LEN];
+	uint8_t ta[OL_TXRX_MAC_ADDR_LEN];
+};
 
 #endif /* __CDP_TXRX_MOB_DEF_H */

@@ -41,6 +41,7 @@
 #include <wlan_policy_mgr_api.h>
 #endif
 #include "cfg_ucfg_api.h"
+#include "wlan_extscan_api.h"
 
 QDF_STATUS ucfg_scan_register_bcn_cb(struct wlan_objmgr_psoc *psoc,
 	update_beacon_cb cb, enum scan_cb_type type)
@@ -190,7 +191,7 @@ QDF_STATUS ucfg_scan_pno_stop(struct wlan_objmgr_vdev *vdev)
 		return QDF_STATUS_E_INVAL;
 	}
 	if (!scan_vdev_obj->pno_in_progress) {
-		scm_err("pno already stopped");
+		scm_debug("pno already stopped");
 		return QDF_STATUS_E_ALREADY;
 	}
 
@@ -324,6 +325,7 @@ ucfg_scan_get_pno_def_params(struct wlan_objmgr_vdev *vdev,
 	pno_def = &scan->pno_cfg;
 	req->active_dwell_time = scan_def->active_dwell;
 	req->passive_dwell_time = scan_def->passive_dwell;
+	req->scan_random.randomize = scan_def->enable_mac_spoofing;
 
 	/*
 	 *  Update active and passive dwell time depending
@@ -954,7 +956,9 @@ ucfg_scan_start(struct scan_start_request *req)
 	msg.callback = scm_scan_start_req;
 	msg.flush_callback = scm_scan_start_flush_callback;
 
-	status = scheduler_post_msg(QDF_MODULE_ID_OS_IF, &msg);
+	status = scheduler_post_message(QDF_MODULE_ID_OS_IF,
+					QDF_MODULE_ID_SCAN,
+					QDF_MODULE_ID_OS_IF, &msg);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		wlan_objmgr_vdev_release_ref(req->vdev, WLAN_SCAN_ID);
 		scm_err("failed to post to QDF_MODULE_ID_OS_IF");
@@ -1095,7 +1099,9 @@ ucfg_scan_cancel(struct scan_cancel_request *req)
 	msg.callback = scm_scan_cancel_req;
 	msg.flush_callback = scm_scan_cancel_flush_callback;
 
-	status = scheduler_post_msg(QDF_MODULE_ID_OS_IF, &msg);
+	status = scheduler_post_message(QDF_MODULE_ID_OS_IF,
+					QDF_MODULE_ID_SCAN,
+					QDF_MODULE_ID_OS_IF, &msg);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		scm_err("failed to post to QDF_MODULE_ID_OS_IF");
 		goto vdev_put;
@@ -1143,6 +1149,7 @@ ucfg_scan_cancel_sync(struct scan_cancel_request *req)
 		return status;
 	}
 
+	memset(&cancel_scan_event, 0, sizeof(cancel_scan_event));
 	/*
 	 * If cancel req is to cancel all scan of pdev or vdev
 	 * wait until all scan of pdev or vdev get cancelled
@@ -1340,8 +1347,8 @@ ucfg_scan_register_event_handler(struct wlan_objmgr_pdev *pdev,
 		if ((cb_handler->func == event_cb) &&
 			(cb_handler->arg == arg)) {
 			qdf_spin_unlock_bh(&scan->lock);
-			scm_warn("func: %pK, arg: %pK already exists",
-				event_cb, arg);
+			scm_debug("func: %pK, arg: %pK already exists",
+				  event_cb, arg);
 			return QDF_STATUS_SUCCESS;
 		}
 	}
@@ -1475,7 +1482,20 @@ wlan_scan_global_init(struct wlan_objmgr_psoc *psoc,
 	/* init scan id seed */
 	qdf_atomic_init(&scan_obj->scan_ids);
 
+	/* init extscan */
+	wlan_extscan_global_init(psoc, scan_obj);
+
 	return wlan_pno_global_init(&scan_obj->pno_cfg);
+}
+
+static void
+wlan_scan_global_deinit(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_scan_obj *scan_obj;
+
+	scan_obj = wlan_psoc_get_scan_obj(psoc);
+	wlan_pno_global_deinit(&scan_obj->pno_cfg);
+	wlan_extscan_global_deinit();
 }
 
 static QDF_STATUS
@@ -2118,7 +2138,7 @@ ucfg_scan_psoc_close(struct wlan_objmgr_psoc *psoc)
 	}
 	ucfg_scan_unregister_pmo_handler();
 	qdf_spinlock_destroy(&scan_obj->lock);
-	wlan_pno_global_deinit(&scan_obj->pno_cfg);
+	wlan_scan_global_deinit(psoc);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2161,7 +2181,7 @@ ucfg_scan_psoc_enable(struct wlan_objmgr_psoc *psoc)
 	/* Subscribe for scan events from lmac layesr */
 	status = tgt_scan_register_ev_handler(psoc);
 	QDF_ASSERT(status == QDF_STATUS_SUCCESS);
-	if (wlan_reg_11d_original_enabled_on_host(psoc))
+	if (!wlan_reg_is_11d_offloaded(psoc))
 		scm_11d_cc_db_init(psoc);
 	ucfg_scan_register_unregister_bcn_cb(psoc, true);
 	status = wlan_serialization_register_apply_rules_cb(psoc,
@@ -2185,7 +2205,7 @@ ucfg_scan_psoc_disable(struct wlan_objmgr_psoc *psoc)
 	status = tgt_scan_unregister_ev_handler(psoc);
 	QDF_ASSERT(status == QDF_STATUS_SUCCESS);
 	ucfg_scan_register_unregister_bcn_cb(psoc, false);
-	if (wlan_reg_11d_original_enabled_on_host(psoc))
+	if (!wlan_reg_is_11d_offloaded(psoc))
 		scm_11d_cc_db_deinit(psoc);
 
 	return status;

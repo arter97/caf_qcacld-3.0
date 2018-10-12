@@ -360,6 +360,54 @@ static uint8_t dfs_find_radar_affected_subchans(struct wlan_dfs *dfs,
 	return i;
 }
 
+uint8_t dfs_get_bonding_channels_without_seg_info(struct dfs_channel *chan,
+						  uint8_t *channels)
+{
+	uint8_t center_chan;
+	uint8_t nchannels = 0;
+
+	center_chan = chan->dfs_ch_vhtop_ch_freq_seg1;
+
+	if (WLAN_IS_CHAN_MODE_20(chan)) {
+		nchannels = 1;
+		channels[0] = center_chan;
+	} else if (WLAN_IS_CHAN_MODE_40(chan)) {
+		nchannels = 2;
+		channels[0] = center_chan - DFS_5GHZ_NEXT_CHAN_OFFSET;
+		channels[1] = center_chan + DFS_5GHZ_NEXT_CHAN_OFFSET;
+	} else if (WLAN_IS_CHAN_MODE_80(chan)) {
+		nchannels = 4;
+		channels[0] = center_chan - DFS_5GHZ_2ND_CHAN_OFFSET;
+		channels[1] = center_chan - DFS_5GHZ_NEXT_CHAN_OFFSET;
+		channels[2] = center_chan + DFS_5GHZ_NEXT_CHAN_OFFSET;
+		channels[3] = center_chan + DFS_5GHZ_2ND_CHAN_OFFSET;
+	} else if (WLAN_IS_CHAN_MODE_80_80(chan)) {
+		nchannels = 8;
+		channels[0] = center_chan - DFS_5GHZ_2ND_CHAN_OFFSET;
+		channels[1] = center_chan - DFS_5GHZ_NEXT_CHAN_OFFSET;
+		channels[2] = center_chan + DFS_5GHZ_NEXT_CHAN_OFFSET;
+		channels[3] = center_chan + DFS_5GHZ_2ND_CHAN_OFFSET;
+		center_chan = chan->dfs_ch_vhtop_ch_freq_seg2;
+		channels[4] = center_chan - DFS_5GHZ_2ND_CHAN_OFFSET;
+		channels[5] = center_chan - DFS_5GHZ_NEXT_CHAN_OFFSET;
+		channels[6] = center_chan + DFS_5GHZ_NEXT_CHAN_OFFSET;
+		channels[7] = center_chan + DFS_5GHZ_2ND_CHAN_OFFSET;
+	} else if (WLAN_IS_CHAN_MODE_160(chan)) {
+		nchannels = 8;
+		center_chan = chan->dfs_ch_vhtop_ch_freq_seg2;
+		channels[0] = center_chan - DFS_5GHZ_4TH_CHAN_OFFSET;
+		channels[1] = center_chan - DFS_5GHZ_3RD_CHAN_OFFSET;
+		channels[2] = center_chan - DFS_5GHZ_2ND_CHAN_OFFSET;
+		channels[3] = center_chan - DFS_5GHZ_NEXT_CHAN_OFFSET;
+		channels[4] = center_chan + DFS_5GHZ_NEXT_CHAN_OFFSET;
+		channels[5] = center_chan + DFS_5GHZ_2ND_CHAN_OFFSET;
+		channels[6] = center_chan + DFS_5GHZ_3RD_CHAN_OFFSET;
+		channels[7] = center_chan + DFS_5GHZ_4TH_CHAN_OFFSET;
+	}
+
+	return nchannels;
+}
+
 uint8_t dfs_get_bonding_channels(struct dfs_channel *curchan,
 				 uint32_t segment_id,
 				 uint8_t *channels)
@@ -444,6 +492,12 @@ int dfs_second_segment_radar_disable(struct wlan_dfs *dfs)
 	return 0;
 }
 
+static inline void dfs_reset_bangradar(struct wlan_dfs *dfs)
+{
+	dfs->dfs_bangradar  = 0;
+	dfs->dfs_second_segment_bangradar = 0;
+}
+
 QDF_STATUS dfs_process_radar_ind(struct wlan_dfs *dfs,
 				 struct radar_found_info *radar_found)
 {
@@ -475,11 +529,25 @@ QDF_STATUS dfs_process_radar_ind(struct wlan_dfs *dfs,
 			 dfs->dfs_curchan->dfs_ch_freq);
 
 	if (!dfs->dfs_use_nol) {
+		dfs_reset_bangradar(dfs);
 		dfs_send_csa_to_current_chan(dfs);
 		return QDF_STATUS_SUCCESS;
 	}
 
-	if (dfs->dfs_use_nol_subchannel_marking)
+	/* For Full Offload, FW sends segment id,freq_offset and
+	 * is chirp information and gets assigned when there is radar detect.
+	 * In case of radartool bangradar enhanced command and real radar
+	 * for FO and PO, we assign these information here.
+	 */
+	if (!dfs->dfs_is_offload_enabled || dfs->dfs_enhanced_bangradar) {
+		radar_found->segment_id = dfs->dfs_seg_id;
+		radar_found->freq_offset = dfs->dfs_freq_offset;
+		radar_found->is_chirp = dfs->dfs_is_chirp;
+		dfs->dfs_enhanced_bangradar = 0;
+	}
+
+	if (dfs->dfs_use_nol_subchannel_marking &&
+	    !(dfs->dfs_bangradar || dfs->dfs_second_segment_bangradar))
 		num_channels = dfs_find_radar_affected_subchans(dfs,
 								radar_found,
 								channels);
@@ -488,6 +556,7 @@ QDF_STATUS dfs_process_radar_ind(struct wlan_dfs *dfs,
 							radar_found->segment_id,
 							channels);
 
+	dfs_reset_bangradar(dfs);
 	status = dfs_radar_add_channel_list_to_nol(dfs, channels, num_channels);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		dfs_err(dfs, WLAN_DEBUG_DFS,

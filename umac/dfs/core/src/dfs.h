@@ -310,10 +310,6 @@
 #define NUM_BINS 128
 #define THOUSAND 1000
 
-/* Check if the dfs current channel is 5.8GHz */
-#define DFS_CURCHAN_IS_58GHz(freq) \
-	((((freq) >= 5745) && ((freq) <= 5865)) ? true : false)
-
 /* ETSI11_WORLD regdmn pair id */
 #define ETSI11_WORLD_REGDMN_PAIR_ID 0x26
 #define ETSI12_WORLD_REGDMN_PAIR_ID 0x28
@@ -322,6 +318,9 @@
 
 /* Array offset to ETSI legacy pulse */
 #define ETSI_LEGACY_PULSE_ARR_OFFSET 2
+
+#define ETSI_RADAR_EN302_502_FREQ_LOWER 5725
+#define ETSI_RADAR_EN302_502_FREQ_UPPER 5865
 
 #define DFS_NOL_ADD_CHAN_LOCKED(dfs, freq, timeout)         \
 	do {                                                \
@@ -617,8 +616,8 @@ struct dfs_filter {
 } qdf_packed;
 
 /**
- * struct dfs_filtertype - DFS Filter type.
- * @ft_filterdur[]:    Filter array.
+ * struct dfs_filtertype - Structure of DFS Filter type.
+ * @ft_filters[]:      Array of ptrs storing addresses for struct of dfs_filter.
  * @ft_filterdur:      Duration of pulse which specifies filter type.
  * @ft_numfilters:     Num filters of this type.
  * @ft_last_ts:        Last timestamp this filtertype was used (in usecs).
@@ -632,7 +631,7 @@ struct dfs_filter {
  *                     lower than in non TURBO mode. This will offset that diff.
  */
 struct dfs_filtertype {
-	struct dfs_filter ft_filters[DFS_MAX_NUM_RADAR_FILTERS];
+	struct dfs_filter *ft_filters[DFS_MAX_NUM_RADAR_FILTERS];
 	uint32_t  ft_filterdur;
 	uint32_t  ft_numfilters;
 	uint64_t  ft_last_ts;
@@ -943,6 +942,9 @@ struct dfs_event_log {
  * @dfs_precac_required_list:        PreCAC required list.
  * @dfs_precac_done_list:            PreCAC done list.
  * @dfs_precac_nol_list:             PreCAC NOL List.
+ * @dfs_curchan:                     DFS current channel.
+ * @dfs_cac_started_chan:            CAC started channel.
+ * @dfs_pdev_obj:                    DFS pdev object.
  * @dfs_is_offload_enabled:          Set if DFS offload enabled.
  * @dfs_use_nol:                     Use the NOL when radar found(default: TRUE)
  * @dfs_nol_lock:                    Lock to protect nol list.
@@ -966,10 +968,16 @@ struct dfs_event_log {
  * @dfs_no_res_from_fw:              Indicates no response from fw.
  * @dfs_spoof_check_failed:          Indicates if the spoof check has failed.
  * @dfs_spoof_test_done:             Indicates if the sppof test is done.
- * @dfs_seg_id:                      Segment ID of the radar hit channel.
- * @dfs_false_radar_found:           Indicates if false radar is found.
  * @dfs_status_timeout_override:     Used to change the timeout value of
  *                                   dfs_host_wait_timer.
+ * @dfs_min_sidx:                    Minimum sidx of the received radar pulses.
+ * @dfs_max_sidx:                    Maximum sidx of the received radar pulses.
+ * @dfs_seg_id:                      Segment ID of the radar hit channel.
+ * @dfs_is_chirp:                    Radar Chirp in pulse present or not.
+ * @dfs_bw_reduced:                  DFS bandwidth reduced channel bit.
+ * @dfs_freq_offset:                 Frequency offset where radar was found.
+ * @dfs_enhanced_bangradar:          DFS enhance bagradar bit for Full offload.
+ * @dfs_cac_aborted:                 DFS cac is aborted.
  */
 struct wlan_dfs {
 	uint32_t       dfs_debug_mask;
@@ -1072,12 +1080,14 @@ struct wlan_dfs {
 #endif
 
 	struct dfs_channel *dfs_curchan;
+	struct dfs_channel dfs_cac_started_chan;
 	struct wlan_objmgr_pdev *dfs_pdev_obj;
 	bool           dfs_is_offload_enabled;
 	int            dfs_use_nol;
 	qdf_spinlock_t dfs_nol_lock;
 	uint16_t tx_leakage_threshold;
 	bool dfs_use_nol_subchannel_marking;
+	uint8_t        dfs_spoof_test_done:1;
 #if defined(WLAN_DFS_PARTIAL_OFFLOAD) && defined(HOST_DFS_SPOOF_TEST)
 	os_timer_t     dfs_host_wait_timer;
 	uint32_t       dfs_average_pri;
@@ -1086,13 +1096,18 @@ struct wlan_dfs {
 	uint8_t        dfs_is_host_wait_running:1,
 				   dfs_average_params_sent:1,
 				   dfs_no_res_from_fw:1,
-				   dfs_spoof_check_failed:1,
-				   dfs_spoof_test_done:1;
-	uint8_t        dfs_seg_id;
-	int            dfs_false_radar_found;
+				   dfs_spoof_check_failed:1;
 	struct dfs_channel dfs_radar_found_chan;
 	int            dfs_status_timeout_override;
 #endif
+	uint32_t       dfs_min_sidx;
+	uint32_t       dfs_max_sidx;
+	uint8_t        dfs_seg_id;
+	uint8_t        dfs_is_chirp;
+	uint8_t        dfs_bw_reduced;
+	int32_t        dfs_freq_offset;
+	uint8_t        dfs_enhanced_bangradar;
+	bool           dfs_cac_aborted;
 };
 
 /**
@@ -1382,6 +1397,12 @@ void dfs_nol_update(struct wlan_dfs *dfs);
  * Cancels the NOL timer and frees the NOL elements.
  */
 void dfs_nol_timer_cleanup(struct wlan_dfs *dfs);
+
+/**
+ * dfs_nol_timer_detach() - Free NOL timer.
+ * @dfs: Pointer to wlan_dfs structure.
+ */
+void dfs_nol_timer_detach(struct wlan_dfs *dfs);
 
 /**
  * dfs_nol_workqueue_cleanup() - Flushes NOL workqueue.
@@ -1843,6 +1864,37 @@ void dfs_cancel_cac_timer(struct wlan_dfs *dfs);
 void dfs_start_cac_timer(struct wlan_dfs *dfs);
 
 /**
+ * dfs_is_subset_channel() - Check if the new_chan is subset of the old_chan.
+ * @old_chan: Pointer to old channel.
+ * @new_chan: Pointer to new channel.
+ *
+ * Return: true if the new channel is subset of or same as the old channel,
+ * else false.
+ */
+bool dfs_is_subset_channel(struct dfs_channel *old_chan,
+			   struct dfs_channel *new_chan);
+
+/**
+ * dfs_is_curchan_subset_of_cac_started_chan() - Check if the dfs current
+ * channel is subset of cac started channel.
+ * @dfs: Pointer to wlan_dfs structure.
+ *
+ * If the current channel and the cac_started_chan is same or
+ * if the current channel is subset of the cac_started_chan then
+ * this function returns true.
+ *
+ * Return: true if current channel is same or subset of  cac started channel,
+ * else false.
+ */
+bool dfs_is_curchan_subset_of_cac_started_chan(struct wlan_dfs *dfs);
+
+/**
+ * dfs_clear_cac_started_chan() - Clear dfs cac started channel.
+ * @dfs: Pointer to wlan_dfs structure.
+ */
+void dfs_clear_cac_started_chan(struct wlan_dfs *dfs);
+
+/**
  * dfs_set_update_nol_flag() - Sets update_nol flag.
  * @dfs: Pointer to wlan_dfs structure.
  * @val: update_nol flag.
@@ -2014,6 +2066,12 @@ void dfs_cac_attach(struct wlan_dfs *dfs);
 void dfs_cac_timer_reset(struct wlan_dfs *dfs);
 
 /**
+ * dfs_cac_timer_detach() - Free dfs cac timers.
+ * @dfs: Pointer to wlan_dfs structure.
+ */
+void dfs_cac_timer_detach(struct wlan_dfs *dfs);
+
+/**
  * dfs_nol_timer_init() - Initialize NOL timers.
  * @dfs: Pointer to wlan_dfs structure.
  */
@@ -2104,6 +2162,64 @@ static inline int dfs_set_thresholds(struct wlan_dfs *dfs,
 		const uint32_t value)
 {
 		return 0;
+}
+#endif
+
+/**
+ * dfs_check_intersect_excl() - Check whether curfreq falls within lower_freq
+ * and upper_freq, exclusively.
+ * @low_freq : lower bound frequency value.
+ * @high_freq: upper bound frequency value.
+ * @chan_freq: Current frequency value to be checked.
+ *
+ * Return: returns true if overlap found, else returns false.
+ */
+#if defined(WLAN_DFS_DIRECT_ATTACH) || defined(WLAN_DFS_PARTIAL_OFFLOAD)
+bool dfs_check_intersect_excl(int low_freq, int high_freq, int chan_freq);
+#else
+static inline bool dfs_check_intersect_excl(int low_freq, int high_freq,
+					    int chan_freq)
+{
+		return false;
+}
+#endif
+
+/**
+ * dfs_check_etsi_overlap() - Check whether given frequency centre/channel
+ * width entry overlap with frequency spread in any way.
+ * @center_freq         : current channel centre frequency.
+ * @chan_width          : current channel width.
+ * @en302_502_freq_low  : overlap frequency lower bound.
+ * @en302_502_freq_high : overlap frequency upper bound.
+ *
+ * Return: returns 1 if overlap found, else returns 0.
+ */
+#if defined(WLAN_DFS_DIRECT_ATTACH) || defined(WLAN_DFS_PARTIAL_OFFLOAD)
+int dfs_check_etsi_overlap(int center_freq, int chan_width,
+			   int en302_502_freq_low, int en302_502_freq_high);
+#else
+static inline int dfs_check_etsi_overlap(int center_freq, int chan_width,
+					 int en302_502_freq_low,
+					 int en302_502_freq_high)
+{
+		return 0;
+}
+#endif
+
+/**
+ * dfs_is_en302_502_applicable() - Check whether current channel frequecy spread
+ *					overlaps with EN 302 502 radar type
+ *					frequency range.
+ *@dfs: Pointer to wlan_dfs structure.
+ *
+ * Return: returns true if overlap found, else returns false.
+ */
+#if defined(WLAN_DFS_DIRECT_ATTACH) || defined(WLAN_DFS_PARTIAL_OFFLOAD)
+bool dfs_is_en302_502_applicable(struct wlan_dfs *dfs);
+#else
+static inline bool dfs_is_en302_502_applicable(struct wlan_dfs *dfs)
+{
+		return false;
 }
 #endif
 
@@ -2230,12 +2346,10 @@ void __dfs_process_radarevent(struct wlan_dfs *dfs,
  * @dfs: Pointer to wlan_dfs structure.
  * @bangradar: true if radar is due to bangradar command.
  * @seg_id: Segment id.
- * @false_radar_found: value is 1 if false radar is found.
  */
 void dfs_radar_found_action(struct wlan_dfs *dfs,
 			    bool bangradar,
-			    uint8_t seg_id,
-			    int false_radar_found);
+			    uint8_t seg_id);
 
 /**
  * bin5_rules_check_internal() - This is a extension of dfs_bin5_check().
@@ -2316,6 +2430,18 @@ void dfs_nol_free_list(struct wlan_dfs *dfs);
 int dfs_second_segment_radar_disable(struct wlan_dfs *dfs);
 
 /**
+ * dfs_check_for_cac_start() - Check for DFS CAC start conditions.
+ * @dfs: Pointer to wlan_dfs structure.
+ * @continue_current_cac: If AP can start CAC then this variable indicates
+ * whether to continue with the current CAC or restart the CAC. This variable
+ * is valid only if this function returns true.
+ *
+ * Return: true if AP can start or continue the current CAC, else false.
+ */
+bool dfs_check_for_cac_start(struct wlan_dfs *dfs,
+			     bool *continue_current_cac);
+
+/**
  * dfs_task_testtimer_reset() - stop dfs test timer.
  * @dfs: Pointer to wlan_dfs structure.
  */
@@ -2332,4 +2458,15 @@ void dfs_task_testtimer_reset(struct wlan_dfs *dfs);
  */
 bool dfs_freq_is_in_nol(struct wlan_dfs *dfs, uint32_t freq);
 
+/**
+ * dfs_task_testtimer_detach() - Free dfs test timer.
+ * @dfs: Pointer to wlan_dfs structure.
+ */
+void dfs_task_testtimer_detach(struct wlan_dfs *dfs);
+
+/**
+ * dfs_timer_detach() - Free dfs timers.
+ * @dfs: Pointer to wlan_dfs structure.
+ */
+void dfs_timer_detach(struct wlan_dfs *dfs);
 #endif  /* _DFS_H_ */

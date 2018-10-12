@@ -85,6 +85,12 @@ enum channel_state wlan_reg_get_channel_state(struct wlan_objmgr_pdev *pdev,
 	return reg_get_channel_state(pdev, ch);
 }
 
+bool
+wlan_reg_chan_has_dfs_attribute(struct wlan_objmgr_pdev *pdev, uint32_t ch)
+{
+	return reg_chan_has_dfs_attribute(pdev, ch);
+}
+
 /**
  * wlan_reg_get_5g_bonded_channel_state() - Get 5G bonded channel state
  * @ch: channel number.
@@ -498,9 +504,9 @@ void wlan_reg_unregister_chan_change_callback(struct wlan_objmgr_psoc *psoc,
 	reg_unregister_chan_change_callback(psoc, cbk);
 }
 
-bool wlan_reg_11d_original_enabled_on_host(struct wlan_objmgr_psoc *psoc)
+bool wlan_reg_is_11d_offloaded(struct wlan_objmgr_psoc *psoc)
 {
-	return reg_11d_original_enabled_on_host(psoc);
+	return reg_is_11d_offloaded(psoc);
 }
 
 bool wlan_reg_11d_enabled_on_host(struct wlan_objmgr_psoc *psoc)

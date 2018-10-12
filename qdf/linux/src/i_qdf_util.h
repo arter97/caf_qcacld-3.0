@@ -29,6 +29,7 @@
 #include <linux/types.h>
 #include <linux/mm.h>
 #include <linux/errno.h>
+#include <linux/average.h>
 
 #include <linux/random.h>
 #include <linux/io.h>
@@ -281,6 +282,22 @@ static inline bool __qdf_is_macaddr_equal(struct qdf_mac_addr *mac_addr1,
 #define __qdf_min(_a, _b) min(_a, _b)
 #define __qdf_max(_a, _b) max(_a, _b)
 
+/**
+ * Setting it to blank as feature is not intended to be supported
+ * on linux version less than 4.3
+ */
+#if LINUX_VERSION_CODE  < KERNEL_VERSION(4, 3, 0) || \
+	LINUX_VERSION_CODE  >= KERNEL_VERSION(4, 11, 0)
+#define __QDF_DECLARE_EWMA(name, _factor, _weight)
+
+#define __qdf_ewma_tx_lag int
+#else
+#define __QDF_DECLARE_EWMA(name, _factor, _weight) \
+	DECLARE_EWMA(name, _factor, _weight)
+
+#define __qdf_ewma_tx_lag struct ewma_tx_lag
+#endif
+
 #define __qdf_ffz(mask) (~(mask) == 0 ? -1 : ffz(mask))
 
 #define MEMINFO_KB(x)  ((x) << (PAGE_SHIFT - 10))   /* In kilobytes */
@@ -302,7 +319,7 @@ static inline bool __qdf_is_macaddr_equal(struct qdf_mac_addr *mac_addr1,
  */
 #define __qdf_target_assert(expr)  do {    \
 	if (unlikely(!(expr))) {                                 \
-		qdf_print("Assertion failed! %s:%s %s:%d\n",   \
+		qdf_err("Assertion failed! %s:%s %s:%d",   \
 		#expr, __FUNCTION__, __FILE__, __LINE__);      \
 		dump_stack();                                      \
 		panic("Take care of the TARGET ASSERT first\n");          \
@@ -349,6 +366,22 @@ static inline bool __qdf_is_macaddr_equal(struct qdf_mac_addr *mac_addr1,
 #define __qdf_iowrite32(offset, value)     iowrite32(value, offset)
 
 #define __qdf_roundup(x, y) roundup(x, y)
+
+#if LINUX_VERSION_CODE  < KERNEL_VERSION(4, 3, 0) || \
+	LINUX_VERSION_CODE  >= KERNEL_VERSION(4, 11, 0)
+#define  __qdf_ewma_tx_lag_init(tx_lag)
+#define  __qdf_ewma_tx_lag_add(tx_lag, value)
+#define  __qdf_ewma_tx_lag_read(tx_lag)
+#else
+#define  __qdf_ewma_tx_lag_init(tx_lag) \
+	ewma_tx_lag_init(tx_lag)
+
+#define  __qdf_ewma_tx_lag_add(tx_lag, value) \
+	ewma_tx_lag_add(tx_lag, value)
+
+#define  __qdf_ewma_tx_lag_read(tx_lag) \
+	ewma_tx_lag_read(tx_lag)
+#endif
 
 #ifdef QCA_CONFIG_SMP
 /**

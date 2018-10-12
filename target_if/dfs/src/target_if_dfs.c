@@ -119,6 +119,7 @@ static int target_if_radar_event_handler(
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_pdev *pdev;
 	struct wlan_lmac_if_dfs_rx_ops *dfs_rx_ops;
+	struct wmi_unified *wmi_handle;
 
 	if (!scn || !data) {
 		target_if_err("scn: %pK, data: %pK", scn, data);
@@ -135,8 +136,15 @@ static int target_if_radar_event_handler(
 		target_if_err("Invalid dfs_rx_ops: %pK", dfs_rx_ops);
 		return -EINVAL;
 	}
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("Invalid WMI context");
+		return -EINVAL;
+	}
+
 	if (QDF_IS_STATUS_ERROR(wmi_extract_wlan_radar_event_info(
-			GET_WMI_HDL_FROM_PSOC(psoc), data,
+			wmi_handle, data,
 			&wlan_radar_event, datalen))) {
 		target_if_err("failed to extract wlan radar event");
 		return -EFAULT;
@@ -164,22 +172,18 @@ static int target_if_radar_event_handler(
 static QDF_STATUS target_if_reg_phyerr_events_dfs2(
 				struct wlan_objmgr_psoc *psoc)
 {
-	int ret = -1;
-	struct wlan_lmac_if_dfs_rx_ops *dfs_rx_ops;
-	bool is_phyerr_filter_offload;
+	int ret;
+	wmi_unified_t wmi_handle;
 
-	dfs_rx_ops = target_if_dfs_get_rx_ops(psoc);
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("null wmi_handle");
+		return QDF_STATUS_E_INVAL;
+	}
 
-	if (dfs_rx_ops && dfs_rx_ops->dfs_is_phyerr_filter_offload)
-		if (QDF_IS_STATUS_SUCCESS(
-			dfs_rx_ops->dfs_is_phyerr_filter_offload(psoc,
-						&is_phyerr_filter_offload)))
-			if (is_phyerr_filter_offload)
-				ret = wmi_unified_register_event(
-						get_wmi_unified_hdl_from_psoc(psoc),
-						wmi_dfs_radar_event_id,
-						target_if_radar_event_handler);
-
+	ret = wmi_unified_register_event(wmi_handle,
+					 wmi_dfs_radar_event_id,
+					 target_if_radar_event_handler);
 	if (ret) {
 		target_if_err("failed to register wmi_dfs_radar_event_id");
 		return QDF_STATUS_E_FAILURE;
@@ -197,7 +201,15 @@ static QDF_STATUS target_if_reg_phyerr_events_dfs2(
 
 static bool target_if_dfs_offload(struct wlan_objmgr_psoc *psoc)
 {
-	return wmi_service_enabled(get_wmi_unified_hdl_from_psoc(psoc),
+	wmi_unified_t wmi_handle;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("null wmi_handle");
+		return false;
+	}
+
+	return wmi_service_enabled(wmi_handle,
 				   wmi_service_dfs_phyerr_offload);
 }
 

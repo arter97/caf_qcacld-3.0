@@ -121,6 +121,10 @@
 #define WLAN_SOC_CEXT_WMI_MGMT_REF     0x00000800
 	/* Wideband scan */
 #define WLAN_SOC_CEXT_WIDEBAND_SCAN    0x00001000
+	/* TWT Requester capable */
+#define WLAN_SOC_CEXT_TWT_REQUESTER    0x00002000
+	/* TWT Responder capable */
+#define WLAN_SOC_CEXT_TWT_RESPONDER    0x00004000
 
 /* feature_flags */
 	/* CONF: ATH FF enabled */
@@ -173,6 +177,8 @@
 #define WLAN_SOC_F_BTCOEX_SUPPORT      0x00200000
 	/* HOST 80211 enable*/
 #define WLAN_SOC_F_HOST_80211_ENABLE   0x00400000
+	/* MBSS IE enable */
+#define WLAN_SOC_F_MBSS_IE_ENABLE      0x00800000
 
 /* PSOC op flags */
 

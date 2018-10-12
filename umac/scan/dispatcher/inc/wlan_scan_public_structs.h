@@ -69,6 +69,12 @@ typedef uint32_t wlan_scan_id;
 #define MAX_INDEX_SCORE 100
 #define MAX_INDEX_PER_INI 4
 
+#ifdef CONFIG_MCL
+#define MAX_BCN_PROBE_IN_SCAN_QUEUE 150
+#else
+#define MAX_BCN_PROBE_IN_SCAN_QUEUE 2000
+#endif
+
 #define WLAN_GET_BITS(_val, _index, _num_bits) \
 	(((_val) >> (_index)) & ((1 << (_num_bits)) - 1))
 
@@ -469,7 +475,8 @@ struct scoring_config {
 	uint32_t band_weight_per_index;
 	uint8_t cb_mode_24G;
 	uint8_t cb_mode_5G;
-	uint8_t nss;
+	uint8_t vdev_nss_24g;
+	uint8_t vdev_nss_5g;
 	uint8_t ht_cap:1,
 		vht_cap:1,
 		he_cap:1,
@@ -1370,4 +1377,16 @@ enum scan_config {
 	SCAN_CFG_DISABLE_SCAN_COMMAND_TIMEOUT,
 	SCAN_CFG_DROP_BCN_ON_CHANNEL_MISMATCH,
 };
+
+/**
+ * enum ext_cap_bit_field - Extended capabilities bit field
+ * @BSS_2040_COEX_MGMT_SUPPORT: 20/40 BSS Coexistence Management Support field
+ * @OBSS_NARROW_BW_RU_IN_ULOFDMA_TOLERENT_SUPPORT: OBSS Narrow  Bandwidth RU
+ *     in UL OFDMA  Tolerance Support
+ */
+enum ext_cap_bit_field {
+	BSS_2040_COEX_MGMT_SUPPORT = 0,
+	OBSS_NARROW_BW_RU_IN_ULOFDMA_TOLERENT_SUPPORT = 79,
+};
+
 #endif

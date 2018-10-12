@@ -54,12 +54,12 @@ QDF_STATUS dp_reo_send_cmd(struct dp_soc *soc, enum hal_reo_cmd_type type,
 		break;
 	default:
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			"%s: Invalid REO command type\n", __func__);
+			"%s: Invalid REO command type", __func__);
 		return QDF_STATUS_E_FAILURE;
 	};
 
 	if (num < 0) {
-		qdf_print("%s: Error with sending REO command\n", __func__);
+		qdf_print("%s: Error with sending REO command", __func__);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -67,7 +67,7 @@ QDF_STATUS dp_reo_send_cmd(struct dp_soc *soc, enum hal_reo_cmd_type type,
 		reo_cmd = qdf_mem_malloc(sizeof(*reo_cmd));
 		if (!reo_cmd) {
 			QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-				"%s: alloc failed for REO cmd:%d!!\n",
+				"%s: alloc failed for REO cmd:%d!!",
 				__func__, type);
 			return QDF_STATUS_E_NOMEM;
 		}
@@ -105,17 +105,20 @@ void dp_reo_status_ring_handler(struct dp_soc *soc)
 		switch (tlv) {
 		case HAL_REO_QUEUE_STATS_STATUS_TLV:
 			hal_reo_queue_stats_status(reo_desc,
-					   &reo_status.queue_status);
+					   &reo_status.queue_status,
+					   soc->hal_soc);
 			num = reo_status.queue_status.header.cmd_num;
 			break;
 		case HAL_REO_FLUSH_QUEUE_STATUS_TLV:
 			hal_reo_flush_queue_status(reo_desc,
-						   &reo_status.fl_queue_status);
+						   &reo_status.fl_queue_status,
+						   soc->hal_soc);
 			num = reo_status.fl_queue_status.header.cmd_num;
 			break;
 		case HAL_REO_FLUSH_CACHE_STATUS_TLV:
 			hal_reo_flush_cache_status(reo_desc, soc->hal_soc,
-						   &reo_status.fl_cache_status);
+						   &reo_status.fl_cache_status,
+						   soc->hal_soc);
 			num = reo_status.fl_cache_status.header.cmd_num;
 			break;
 		case HAL_REO_UNBLK_CACHE_STATUS_TLV:
@@ -125,22 +128,25 @@ void dp_reo_status_ring_handler(struct dp_soc *soc)
 			break;
 		case HAL_REO_TIMOUT_LIST_STATUS_TLV:
 			hal_reo_flush_timeout_list_status(reo_desc,
-						&reo_status.fl_timeout_status);
+						&reo_status.fl_timeout_status,
+						soc->hal_soc);
 			num = reo_status.fl_timeout_status.header.cmd_num;
 			break;
 		case HAL_REO_DESC_THRES_STATUS_TLV:
 			hal_reo_desc_thres_reached_status(reo_desc,
-						&reo_status.thres_status);
+						&reo_status.thres_status,
+						soc->hal_soc);
 			num = reo_status.thres_status.header.cmd_num;
 			break;
 		case HAL_REO_UPDATE_RX_QUEUE_STATUS_TLV:
 			hal_reo_rx_update_queue_status(reo_desc,
-						&reo_status.rx_queue_status);
+						&reo_status.rx_queue_status,
+						soc->hal_soc);
 			num = reo_status.rx_queue_status.header.cmd_num;
 			break;
 		default:
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_WARN,
-				"%s, no handler for TLV:%d\n", __func__, tlv);
+				"%s, no handler for TLV:%d", __func__, tlv);
 			goto next;
 		} /* switch */
 

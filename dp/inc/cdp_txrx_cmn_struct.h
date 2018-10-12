@@ -136,6 +136,8 @@
 #define FILTER_DATA_DATA		0x0001
 #define FILTER_DATA_NULL		0x0008
 
+QDF_DECLARE_EWMA(tx_lag, 1024, 8)
+
 /*
  * DP configuration parameters
  */
@@ -206,10 +208,12 @@ enum cdp_host_txrx_stats {
  * cdp_ppdu_ftype: PPDU Frame Type
  * @CDP_PPDU_FTYPE_DATA: SU or MU Data Frame
  * @CDP_PPDU_FTYPE_CTRL: Control/Management Frames
+ * @CDP_PPDU_FTYPE_BAR: SU or MU BAR frames
 */
 enum cdp_ppdu_ftype {
 	CDP_PPDU_FTYPE_CTRL,
 	CDP_PPDU_FTYPE_DATA,
+	CDP_PPDU_FTYPE_BAR,
 	CDP_PPDU_FTYPE_MAX
 };
 
@@ -304,9 +308,13 @@ enum ol_txrx_peer_state {
 enum cdp_txrx_ast_entry_type {
 	CDP_TXRX_AST_TYPE_NONE,	/* static ast entry for connected peer */
 	CDP_TXRX_AST_TYPE_STATIC, /* static ast entry for connected peer */
+	CDP_TXRX_AST_TYPE_SELF, /* static ast entry for self peer (STA mode) */
 	CDP_TXRX_AST_TYPE_WDS,	/* WDS peer ast entry type*/
 	CDP_TXRX_AST_TYPE_MEC,	/* Multicast echo ast entry type */
 	CDP_TXRX_AST_TYPE_WDS_HM, /* HM WDS entry */
+	CDP_TXRX_AST_TYPE_STA_BSS,	 /* BSS entry(STA mode) */
+	CDP_TXRX_AST_TYPE_DA,	/* AST entry based on Destination address */
+	CDP_TXRX_AST_TYPE_WDS_HM_SEC, /* HM WDS entry for secondary radio */
 	CDP_TXRX_AST_TYPE_MAX
 };
 
@@ -354,6 +362,66 @@ typedef struct cdp_soc_t *ol_txrx_soc_handle;
  * detach
  */
 typedef void (*ol_txrx_vdev_delete_cb)(void *context);
+
+/**
+ * ol_txrx_pkt_direction - Packet Direction
+ * @rx_direction: rx path packet
+ * @tx_direction: tx path packet
+ */
+enum txrx_direction {
+	rx_direction = 1,
+	tx_direction = 0,
+};
+
+/**
+ * cdp_capabilities- DP capabilities
+ */
+enum cdp_capabilities {
+	CDP_CFG_DP_TSO,
+	CDP_CFG_DP_LRO,
+	CDP_CFG_DP_SG,
+	CDP_CFG_DP_GRO,
+	CDP_CFG_DP_OL_TX_CSUM,
+	CDP_CFG_DP_OL_RX_CSUM,
+	CDP_CFG_DP_RAWMODE,
+	CDP_CFG_DP_PEER_FLOW_CTRL,
+};
+
+/**
+ * ol_txrx_nbuf_classify - Packet classification object
+ * @peer_id: unique peer identifier from fw
+ * @tid: traffic identifier(could be overridden)
+ * @pkt_tid: traffic identifier(cannot be overridden)
+ * @pkt_tos: ip header tos value
+ * @pkt_dscp: ip header dscp value
+ * @tos: index value in map
+ * @dscp: DSCP_TID map index
+ * @is_mcast: multicast pkt check
+ * @is_eap: eapol pkt check
+ * @is_arp: arp pkt check
+ * @is_tcp: tcp pkt check
+ * @is_dhcp: dhcp pkt check
+ * @is_igmp: igmp pkt check
+ * @is_ipv4: ip version 4 pkt check
+ * @is_ipv6: ip version 6 pkt check
+ */
+struct ol_txrx_nbuf_classify {
+	uint16_t peer_id;
+	uint8_t tid;
+	uint8_t pkt_tid;
+	uint8_t pkt_tos;
+	uint8_t pkt_dscp;
+	uint8_t tos;
+	uint8_t dscp;
+	uint8_t is_mcast;
+	uint8_t is_eap;
+	uint8_t is_arp;
+	uint8_t is_tcp;
+	uint8_t is_dhcp;
+	uint8_t is_igmp;
+	uint8_t is_ipv4;
+	uint8_t is_ipv6;
+};
 
 /**
  * ol_osif_vdev_handle - paque handle for OS shim virtual device
@@ -570,7 +638,7 @@ typedef void (*ol_txrx_stats_callback)(void *ctxt,
  * OSIF which is called from txrx to
  * indicate whether the transmit OS
  * queues should be paused/resumed
- * @rx.std - the OS shim rx function to deliver rx data
+ * @rx.rx - the OS shim rx function to deliver rx data
  * frames to. This can have different values for
  * different virtual devices, e.g. so one virtual
  * device's OS shim directly hands rx frames to the OS,
@@ -578,7 +646,11 @@ typedef void (*ol_txrx_stats_callback)(void *ctxt,
  * messages before sending the rx frames to the OS. The
  * netbufs delivered to the osif_rx function are in the
  * format specified by the OS to use for tx and rx
- * frames (either 802.3 or native WiFi)
+ * frames (either 802.3 or native WiFi). In case RX Threads are enabled, pkts
+ * are given to the thread, instead of the stack via this pointer.
+ * @rx.stack - function to give packets to the stack. Differs from @rx.rx.
+ * In case RX Threads are enabled, this pointer holds the callback to give
+ * packets to the stack.
  * @rx.wai_check - the tx function pointer for WAPI frames
  * @rx.mon - the OS shim rx monitor function to deliver
  * monitor data to Though in practice, it is probable
@@ -610,12 +682,12 @@ struct ol_txrx_ops {
 	/* rx function pointers - specified by OS shim, stored by txrx */
 	struct {
 		ol_txrx_rx_fp           rx;
+		ol_txrx_rx_fp           rx_stack;
 		ol_txrx_rx_check_wai_fp wai_check;
 		ol_txrx_rx_mon_fp       mon;
 		ol_txrx_stats_rx_fp           stats_rx;
 		ol_txrx_rsim_rx_decap_fp rsim_rx_decap;
 	} rx;
-
 	/* proxy arp function pointer - specified by OS shim, stored by txrx */
 	ol_txrx_proxy_arp_fp      proxy_arp;
 	ol_txrx_mcast_me_fp          me_convert;
@@ -673,10 +745,12 @@ struct cdp_soc_t {
  *			to set values in pdev
  * @CDP_CONFIG_DEBUG_SNIFFER: Enable debug sniffer feature
  * @CDP_CONFIG_BPR_ENABLE: Enable bcast probe feature
+ * @CDP_CONFIG_PRIMARY_RADIO: Configure radio as primary
  */
 enum cdp_pdev_param_type {
 	CDP_CONFIG_DEBUG_SNIFFER,
 	CDP_CONFIG_BPR_ENABLE,
+	CDP_CONFIG_PRIMARY_RADIO,
 };
 
 /*
@@ -746,7 +820,6 @@ enum cdp_vdev_param_type {
 
 #define PER_RADIO_FW_STATS_REQUEST 0
 #define PER_VDEV_FW_STATS_REQUEST 1
-
 /**
  * enum data_stall_log_event_indicator - Module triggering data stall
  * @DATA_STALL_LOG_INDICATOR_UNUSED: Unused
@@ -863,7 +936,7 @@ enum cdp_stats {
 	CDP_TXRX_STATS_27,
 	CDP_TXRX_STATS_28,
 	CDP_TXRX_STATS_HTT_MAX = 256,
-	CDP_TXRX_MAX_STATS = 512,
+	CDP_TXRX_MAX_STATS = 265,
 };
 
 /*
@@ -887,7 +960,7 @@ enum cdp_stat_update_type {
  */
 struct cdp_tx_sojourn_stats {
 	uint32_t ppdu_seq_id;
-	uint32_t avg_sojourn_msdu[CDP_DATA_TID_MAX];
+	qdf_ewma_tx_lag avg_sojourn_msdu[CDP_DATA_TID_MAX];
 	uint32_t sum_sojourn_msdu[CDP_DATA_TID_MAX];
 	uint32_t num_msdus[CDP_DATA_TID_MAX];
 };
@@ -923,6 +996,7 @@ struct cdp_tx_sojourn_stats {
  * @gi: guard interval 800/400/1600/3200 ns
  * @dcm: dcm
  * @ldpc: ldpc
+ * @delayed_ba: delayed ba bit
  * @ppdu_type: SU/MU_MIMO/MU_OFDMA/MU_MIMO_OFDMA/UL_TRIG/BURST_BCN/UL_BSR_RESP/
  * UL_BSR_TRIG/UNKNOWN
  * @ba_seq_no: Block Ack sequence number
@@ -965,7 +1039,8 @@ struct cdp_tx_completion_ppdu_user {
 		 preamble:4,
 		 gi:4,
 		 dcm:1,
-		 ldpc:1;
+		 ldpc:1,
+		 delayed_ba:1;
 	uint32_t ba_seq_no;
 	uint32_t ba_bitmap[CDP_BA_256_BIT_MAP_SIZE_DWORDS];
 	uint32_t start_seq;
@@ -980,6 +1055,7 @@ struct cdp_tx_completion_ppdu_user {
 	uint32_t tx_ratekbps;
 	/*ack rssi for separate chains*/
 	uint32_t ack_rssi[CDP_RSSI_CHAIN_LEN];
+	bool ack_rssi_valid;
 };
 
 /**
@@ -1137,6 +1213,7 @@ struct cdp_tx_completion_msdu {
  * @length: PPDU length
  * @channel: Channel informartion
  * @lsig_A: L-SIG in 802.11 PHY header
+ * @frame_ctrl: frame control field
  */
 struct cdp_rx_indication_ppdu {
 	uint32_t ppdu_id;
@@ -1183,7 +1260,7 @@ struct cdp_rx_indication_ppdu {
 	uint32_t rx_byte_count;
 	uint8_t rx_ratecode;
 	uint8_t fcs_error_mpdus;
-
+	uint16_t frame_ctrl;
 };
 
 /**

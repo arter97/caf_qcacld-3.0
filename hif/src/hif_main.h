@@ -80,6 +80,8 @@
 #define AR6320_FW_3_2  (0x32)
 #define QCA6290_EMULATION_DEVICE_ID (0xabcd)
 #define QCA6290_DEVICE_ID (0x1100)
+#define QCA6390_EMULATION_DEVICE_ID (0x0108)
+#define QCA6390_DEVICE_ID (0x1101)
 #define ADRASTEA_DEVICE_ID_P2_E12 (0x7021)
 #define AR9887_DEVICE_ID    (0x0050)
 #define AR900B_DEVICE_ID    (0x0040)
@@ -92,7 +94,9 @@
 					actual number once available.
 					currently defining this to 0xffff for
 					emulation purpose */
+#define QCA8074V2_DEVICE_ID (0xfffe) /* Todo: replace this with actual number */
 /* Genoa */
+#define QCN7605_DEVICE_ID  (0x1102) /* Genoa PCIe device ID*/
 #define QCN7605_COMPOSITE  (0x9900)
 #define QCN7605_STANDALONE  (0x9901)
 

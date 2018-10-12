@@ -28,6 +28,10 @@
 #include "dp_internal.h"
 #include "qdf_mem.h"   /* qdf_mem_malloc,free */
 
+#ifdef FEATURE_PERPKT_INFO
+#include "dp_ratetable.h"
+#endif
+
 /**
 * dp_rx_populate_cdp_indication_ppdu() - Populate cdp rx indication structure
 * @pdev: pdev ctx
@@ -52,6 +56,8 @@ dp_rx_populate_cdp_indication_ppdu(struct dp_pdev *pdev,
 
 	cdp_rx_ppdu->first_data_seq_ctrl =
 		ppdu_info->rx_status.first_data_seq_ctrl;
+	cdp_rx_ppdu->frame_ctrl =
+		ppdu_info->rx_status.frame_control;
 	cdp_rx_ppdu->ppdu_id = ppdu_info->com_info.ppdu_id;
 	cdp_rx_ppdu->length = ppdu_info->rx_status.ppdu_len;
 	cdp_rx_ppdu->duration = ppdu_info->rx_status.duration;
@@ -125,6 +131,39 @@ dp_rx_populate_cdp_indication_ppdu(struct dp_pdev *pdev,
  * Return: None
  */
 #ifdef FEATURE_PERPKT_INFO
+static inline void dp_rx_rate_stats_update(struct dp_peer *peer,
+					   struct cdp_rx_indication_ppdu *ppdu)
+{
+	uint32_t ratekbps = 0;
+	uint32_t ppdu_rx_rate = 0;
+	uint32_t nss = 0;
+
+	if (!peer || !ppdu)
+		return;
+
+	if (ppdu->u.nss == 0)
+		nss = 0;
+	else
+		nss = ppdu->u.nss - 1;
+
+	ratekbps = dp_getrateindex(ppdu->u.gi,
+				   ppdu->u.mcs,
+				   nss,
+				   ppdu->u.preamble,
+				   ppdu->u.bw);
+
+	if (!ratekbps)
+		return;
+
+	DP_STATS_UPD(peer, rx.last_rx_rate, ratekbps);
+	dp_ath_rate_lpf(peer->stats.rx.avg_rx_rate, ratekbps);
+	ppdu_rx_rate = dp_ath_rate_out(peer->stats.rx.avg_rx_rate);
+	DP_STATS_UPD(peer, rx.rnd_avg_rx_rate, ppdu_rx_rate);
+
+	if (peer->vdev)
+		peer->vdev->stats.rx.last_rx_rate = ratekbps;
+}
+
 static void dp_rx_stats_update(struct dp_soc *soc, struct dp_peer *peer,
 		struct cdp_rx_indication_ppdu *ppdu)
 {
@@ -200,6 +239,8 @@ static void dp_rx_stats_update(struct dp_soc *soc, struct dp_peer *peer,
 	dp_peer_stats_notify(peer);
 	DP_STATS_UPD(peer, rx.last_rssi, ppdu->rssi);
 
+	dp_rx_rate_stats_update(peer, ppdu);
+
 	if (soc->cdp_soc.ol_ops->update_dp_stats) {
 		soc->cdp_soc.ol_ops->update_dp_stats(pdev->ctrl_pdev,
 				&peer->stats, ppdu->peer_id,
@@ -257,6 +298,57 @@ dp_rx_handle_mcopy_mode(struct dp_soc *soc, struct dp_pdev *pdev,
 }
 #endif
 
+/**
+ * dp_rx_handle_smart_mesh_mode() - Deliver header for smart mesh
+ * @soc: Datapath SOC handle
+ * @pdev: Datapath PDEV handle
+ * @ppdu_info: Structure for rx ppdu info
+ * @nbuf: Qdf nbuf abstraction for linux skb
+ *
+ * Return: 0 on success, 1 on failure
+ */
+static inline int
+dp_rx_handle_smart_mesh_mode(struct dp_soc *soc, struct dp_pdev *pdev,
+			      struct hal_rx_ppdu_info *ppdu_info,
+			      qdf_nbuf_t nbuf)
+{
+	uint8_t size = 0;
+
+	if (!pdev->monitor_vdev) {
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
+			  "[%s]:[%d] Monitor vdev is NULL !!",
+			  __func__, __LINE__);
+		return 1;
+	}
+	if (ppdu_info->msdu_info.first_msdu_payload == NULL) {
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
+			  "[%s]:[%d] First msdu payload not present",
+			  __func__, __LINE__);
+		return 1;
+	}
+
+	/* Include 2 bytes of reserved space appended to the msdu payload */
+	size = (ppdu_info->msdu_info.first_msdu_payload -
+		qdf_nbuf_data(nbuf)) + 2;
+	ppdu_info->msdu_info.first_msdu_payload = NULL;
+
+	if (qdf_nbuf_pull_head(nbuf, size) == NULL) {
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
+			  "[%s]:[%d] No header present",
+			__func__, __LINE__);
+		return 1;
+	}
+
+	/* only retain RX MSDU payload in the skb */
+	qdf_nbuf_trim_tail(nbuf, qdf_nbuf_len(nbuf) -
+			   ppdu_info->msdu_info.payload_len);
+	qdf_nbuf_update_radiotap(&(pdev->ppdu_info.rx_status),
+				 nbuf, sizeof(struct rx_pkt_tlvs));
+	pdev->monitor_vdev->osif_rx_mon(pdev->monitor_vdev->osif_vdev,
+					nbuf, NULL);
+
+	return 0;
+}
 
 /**
 * dp_rx_handle_ppdu_stats() - Allocate and deliver ppdu stats to cdp layer
@@ -282,6 +374,27 @@ dp_rx_handle_ppdu_stats(struct dp_soc *soc, struct dp_pdev *pdev,
 	if (ppdu_info->com_info.mpdu_cnt_fcs_ok == 0)
 		return;
 
+	if (ppdu_info->nac_info.fc_valid &&
+	    ppdu_info->nac_info.to_ds_flag &&
+	    ppdu_info->nac_info.mac_addr2_valid) {
+		struct dp_neighbour_peer *peer = NULL;
+		uint8_t rssi = ppdu_info->rx_status.rssi_comb;
+
+		qdf_spin_lock_bh(&pdev->neighbour_peer_mutex);
+		if (pdev->neighbour_peers_added) {
+			TAILQ_FOREACH(peer, &pdev->neighbour_peers_list,
+				      neighbour_peer_list_elem) {
+				if (!qdf_mem_cmp(&peer->neighbour_peers_macaddr,
+						 &ppdu_info->nac_info.mac_addr2,
+						 DP_MAC_ADDR_LEN)) {
+					peer->rssi = rssi;
+					break;
+				}
+			}
+		}
+		qdf_spin_unlock_bh(&pdev->neighbour_peer_mutex);
+	}
+
 	if (!pdev->mcopy_mode) {
 		if (!ppdu_info->rx_status.frame_control_info_valid)
 			return;
@@ -297,12 +410,15 @@ dp_rx_handle_ppdu_stats(struct dp_soc *soc, struct dp_pdev *pdev,
 				sizeof(struct cdp_rx_indication_ppdu));
 		cdp_rx_ppdu = (struct cdp_rx_indication_ppdu *)ppdu_nbuf->data;
 
-		peer = dp_peer_find_by_id(soc, cdp_rx_ppdu->peer_id);
-		if (peer && cdp_rx_ppdu->peer_id != HTT_INVALID_PEER) {
-			dp_rx_stats_update(soc, peer, cdp_rx_ppdu);
-			dp_wdi_event_handler(WDI_EVENT_RX_PPDU_DESC, soc,
-					ppdu_nbuf, cdp_rx_ppdu->peer_id,
+		if (cdp_rx_ppdu->peer_id != HTT_INVALID_PEER) {
+			peer = dp_peer_find_by_id(soc, cdp_rx_ppdu->peer_id);
+			if (peer) {
+				dp_rx_stats_update(soc, peer, cdp_rx_ppdu);
+				dp_wdi_event_handler(WDI_EVENT_RX_PPDU_DESC,
+					soc, ppdu_nbuf, cdp_rx_ppdu->peer_id,
 					WDI_NO_VAL, pdev->pdev_id);
+				dp_peer_unref_del_find_by_id(peer);
+			}
 		} else if (pdev->mcopy_mode) {
 			dp_wdi_event_handler(WDI_EVENT_RX_PPDU_DESC, soc,
 					ppdu_nbuf, HTT_INVALID_PEER,
@@ -340,6 +456,7 @@ dp_rx_mon_status_process_tlv(struct dp_soc *soc, uint32_t mac_id,
 	uint32_t tlv_status = HAL_TLV_STATUS_BUF_DONE;
 	QDF_STATUS m_copy_status = QDF_STATUS_SUCCESS;
 	struct cdp_pdev_mon_stats *rx_mon_stats;
+	int smart_mesh_status;
 
 	ppdu_info = &pdev->ppdu_info;
 	rx_mon_stats = &pdev->rx_mon_stats;
@@ -377,26 +494,33 @@ dp_rx_mon_status_process_tlv(struct dp_soc *soc, uint32_t mac_id,
 			} while (tlv_status == HAL_TLV_STATUS_PPDU_NOT_DONE);
 		}
 
+		if (ppdu_info->rx_status.monitor_direct_used && pdev->neighbour_peers_added
+		    && pdev->monitor_vdev) {
+			smart_mesh_status = dp_rx_handle_smart_mesh_mode(soc,
+						pdev, ppdu_info, status_nbuf);
+			if (smart_mesh_status)
+				qdf_nbuf_free(status_nbuf);
+		}
 		if (pdev->mcopy_mode) {
 			m_copy_status = dp_rx_handle_mcopy_mode(soc,
 						pdev, ppdu_info, status_nbuf);
 			if (m_copy_status == QDF_STATUS_SUCCESS)
 				qdf_nbuf_free(status_nbuf);
-		} else {
-			qdf_nbuf_free(status_nbuf);
 		}
+		if (!pdev->neighbour_peers_added && !pdev->mcopy_mode)
+			qdf_nbuf_free(status_nbuf);
 
-		if (tlv_status == HAL_TLV_STATUS_PPDU_DONE) {
+		if (tlv_status == HAL_TLV_STATUS_PPDU_NON_STD_DONE) {
+			dp_rx_mon_deliver_non_std(soc, mac_id);
+		} else if (tlv_status == HAL_TLV_STATUS_PPDU_DONE) {
 			rx_mon_stats->status_ppdu_done++;
 			if (pdev->enhanced_stats_en ||
-					pdev->mcopy_mode)
+			    pdev->mcopy_mode || pdev->neighbour_peers_added)
 				dp_rx_handle_ppdu_stats(soc, pdev, ppdu_info);
 
 			pdev->mon_ppdu_status = DP_PPDU_STATUS_DONE;
 			dp_rx_mon_dest_process(soc, mac_id, quota);
 			pdev->mon_ppdu_status = DP_PPDU_STATUS_START;
-			pdev->ppdu_info.com_info.last_ppdu_id =
-				pdev->ppdu_info.com_info.ppdu_id;
 		}
 	}
 	return;
@@ -433,7 +557,7 @@ dp_rx_mon_status_srng_process(struct dp_soc *soc, uint32_t mac_id,
 	if (!mon_status_srng || !hal_srng_initialized(mon_status_srng)) {
 
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			"%s %d : HAL Monitor Status Ring Init Failed -- %pK\n",
+			"%s %d : HAL Monitor Status Ring Init Failed -- %pK",
 			__func__, __LINE__, mon_status_srng);
 		return work_done;
 	}
@@ -677,7 +801,7 @@ QDF_STATUS dp_rx_mon_status_buffers_replenish(struct dp_soc *dp_soc,
 	qdf_assert(rxdma_srng);
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-		"[%s][%d] requested %d buffers for replenish\n",
+		"[%s][%d] requested %d buffers for replenish",
 		__func__, __LINE__, num_req_buffers);
 
 	/*
@@ -693,13 +817,13 @@ QDF_STATUS dp_rx_mon_status_buffers_replenish(struct dp_soc *dp_soc,
 
 		if (!num_alloc_desc) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			"[%s][%d] no free rx_descs in freelist\n",
+			"[%s][%d] no free rx_descs in freelist",
 			__func__, __LINE__);
 			return QDF_STATUS_E_NOMEM;
 		}
 
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-			"[%s][%d] %d rx desc allocated\n", __func__, __LINE__,
+			"[%s][%d] %d rx desc allocated", __func__, __LINE__,
 			num_alloc_desc);
 
 		num_req_buffers = num_alloc_desc;
@@ -710,7 +834,7 @@ QDF_STATUS dp_rx_mon_status_buffers_replenish(struct dp_soc *dp_soc,
 				rxdma_srng, sync_hw_ptr);
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-		"[%s][%d] no of available entries in rxdma ring: %d\n",
+		"[%s][%d] no of available entries in rxdma ring: %d",
 		  __func__, __LINE__, num_entries_avail);
 
 	if (num_entries_avail < num_req_buffers) {
@@ -742,7 +866,7 @@ QDF_STATUS dp_rx_mon_status_buffers_replenish(struct dp_soc *dp_soc,
 
 		if (qdf_unlikely(rxdma_ring_entry == NULL)) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-					"[%s][%d] rxdma_ring_entry is NULL, count - %d\n",
+					"[%s][%d] rxdma_ring_entry is NULL, count - %d",
 					__func__, __LINE__, count);
 			qdf_nbuf_unmap_single(dp_soc->osdev, rx_netbuf,
 					      QDF_DMA_BIDIRECTIONAL);
@@ -759,7 +883,7 @@ QDF_STATUS dp_rx_mon_status_buffers_replenish(struct dp_soc *dp_soc,
 
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
 			"[%s][%d] rx_desc=%pK, cookie=%d, nbuf=%pK, \
-			paddr=%pK\n",
+			paddr=%pK",
 			__func__, __LINE__, &(*desc_list)->rx_desc,
 			(*desc_list)->rx_desc.cookie, rx_netbuf,
 			(void *)paddr);
@@ -770,13 +894,13 @@ QDF_STATUS dp_rx_mon_status_buffers_replenish(struct dp_soc *dp_soc,
 	hal_srng_access_end(dp_soc->hal_soc, rxdma_srng);
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-		"successfully replenished %d buffers\n", num_req_buffers);
+		"successfully replenished %d buffers", num_req_buffers);
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-		"%d rx desc added back to free list\n", num_desc_to_free);
+		"%d rx desc added back to free list", num_desc_to_free);
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-		"[%s][%d] desc_list=%pK, tail=%pK rx_desc=%pK, cookie=%d\n",
+		"[%s][%d] desc_list=%pK, tail=%pK rx_desc=%pK, cookie=%d",
 		__func__, __LINE__, desc_list, tail, &(*desc_list)->rx_desc,
 		(*desc_list)->rx_desc.cookie);
 
@@ -820,19 +944,19 @@ dp_rx_pdev_mon_status_attach(struct dp_pdev *pdev, int ring_id) {
 	rx_desc_pool = &soc->rx_desc_status[ring_id];
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO_LOW,
-			"%s: Mon RX Status Pool[%d] allocation size=%d\n",
+			"%s: Mon RX Status Pool[%d] allocation size=%d",
 			__func__, ring_id, rxdma_entries);
 
 	status = dp_rx_desc_pool_alloc(soc, ring_id, rxdma_entries+1,
 			rx_desc_pool);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			"%s: dp_rx_desc_pool_alloc() failed \n", __func__);
+			"%s: dp_rx_desc_pool_alloc() failed ", __func__);
 		return status;
 	}
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO_LOW,
-			"%s: Mon RX Status Buffers Replenish ring_id=%d\n",
+			"%s: Mon RX Status Buffers Replenish ring_id=%d",
 			__func__, ring_id);
 
 	status = dp_rx_mon_status_buffers_replenish(soc, ring_id, rxdma_srng,
@@ -840,14 +964,13 @@ dp_rx_pdev_mon_status_attach(struct dp_pdev *pdev, int ring_id) {
 			HAL_RX_BUF_RBM_SW3_BM);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			"%s: dp_rx_buffers_replenish() failed \n", __func__);
+			"%s: dp_rx_buffers_replenish() failed ", __func__);
 		return status;
 	}
 
 	qdf_nbuf_queue_init(&pdev->rx_status_q);
 
 	pdev->mon_ppdu_status = DP_PPDU_STATUS_START;
-	pdev->ppdu_info.com_info.last_ppdu_id = 0;
 
 	qdf_mem_zero(&(pdev->ppdu_info.rx_status),
 		sizeof(pdev->ppdu_info.rx_status));

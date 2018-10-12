@@ -16,7 +16,6 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
-
 /**
  * @file cdp_txrx_ops.h
  * @brief Define the host data path converged API functions
@@ -106,9 +105,12 @@ struct cdp_cmn_ops {
 		(ol_txrx_soc_handle soc, struct cdp_peer *peer_hdl,
 		uint8_t *mac_addr, uint32_t flags);
 
-
-	void *(*txrx_peer_ast_hash_find)
+	void *(*txrx_peer_ast_hash_find_soc)
 		(ol_txrx_soc_handle soc, uint8_t *ast_mac_addr);
+
+	void *(*txrx_peer_ast_hash_find_by_pdevid)
+		(ol_txrx_soc_handle soc, uint8_t *ast_mac_addr,
+		 uint8_t pdev_id);
 
 	uint8_t (*txrx_peer_ast_get_pdev_id)
 		(ol_txrx_soc_handle soc, void *ast_hdl);
@@ -119,6 +121,29 @@ struct cdp_cmn_ops {
 	void (*txrx_peer_ast_set_type)
 		(ol_txrx_soc_handle soc, void *ast_hdl,
 		enum cdp_txrx_ast_entry_type type);
+#if defined(FEATURE_AST) && defined(AST_HKV1_WORKAROUND)
+	void (*txrx_peer_ast_set_cp_ctx)(ol_txrx_soc_handle soc,
+					 void *ast_entry,
+					 void *cp_ctx);
+
+	void * (*txrx_peer_ast_get_cp_ctx)(ol_txrx_soc_handle soc,
+					   void *ast_entry);
+
+	bool (*txrx_peer_ast_get_wmi_sent)(ol_txrx_soc_handle soc,
+					   void *ast_entry);
+
+	void (*txrx_peer_ast_free_entry)(ol_txrx_soc_handle soc,
+					 void *ast_entry);
+#endif
+
+	enum cdp_txrx_ast_entry_type (*txrx_peer_ast_get_type)
+		(ol_txrx_soc_handle soc, void *ast_hdl);
+
+	struct cdp_peer* (*txrx_peer_ast_get_peer)
+		(ol_txrx_soc_handle soc, void *ast_hdl);
+
+	uint32_t (*txrx_peer_ast_get_nexthop_peer_id)
+		(ol_txrx_soc_handle soc, void *ast_hdl);
 
 	void (*txrx_peer_delete)(void *peer, uint32_t bitmap);
 
@@ -126,6 +151,9 @@ struct cdp_cmn_ops {
 			uint8_t smart_monitor);
 
 	uint8_t (*txrx_get_pdev_id_frm_pdev)(struct cdp_pdev *pdev);
+
+	void (*txrx_pdev_set_chan_noise_floor)(struct cdp_pdev *pdev,
+					       int16_t chan_noise_floor);
 
 	void (*txrx_set_nac)(struct cdp_peer *peer);
 
@@ -265,6 +293,17 @@ struct cdp_cmn_ops {
 	int (*delba_process)(void *peer_handle,
 		int tid, uint16_t reasoncode);
 
+	/**
+	 * delba_tx_completion() - Indicate delba tx status
+	 * @peer_handle: Peer handle
+	 * @tid: Tid number
+	 * @status: Tx completion status
+	 *
+	 * Return: 0 on Success, 1 on failure
+	 */
+	int (*delba_tx_completion)(void *peer_handle,
+				   uint8_t tid, int status);
+
 	void (*set_addba_response)(void *peer_handle,
 		uint8_t tid, uint16_t statuscode);
 
@@ -278,8 +317,8 @@ struct cdp_cmn_ops {
 	void (*set_pdev_dscp_tid_map)(struct cdp_pdev *pdev, uint8_t map_id,
 			uint8_t tos, uint8_t tid);
 
-	int (*txrx_stats_request)(struct cdp_vdev *vdev,
-			struct cdp_txrx_stats_req *req);
+	QDF_STATUS (*txrx_stats_request)(struct cdp_vdev *vdev,
+					 struct cdp_txrx_stats_req *req);
 
 	QDF_STATUS (*display_stats)(void *psoc, uint16_t value,
 				    enum qdf_stats_verbosity_level level);
@@ -309,14 +348,36 @@ struct cdp_cmn_ops {
 					  void *vdev_hdl);
 
 	void (*txrx_peer_flush_ast_table)(ol_txrx_soc_handle soc);
+	void (*txrx_set_ba_aging_timeout)(struct cdp_soc_t *soc_handle,
+					  uint8_t ac, uint32_t value);
+	void (*txrx_get_ba_aging_timeout)(struct cdp_soc_t *soc_handle,
+					  uint8_t ac, uint32_t *value);
 
 	QDF_STATUS (*txrx_peer_map_attach)(ol_txrx_soc_handle soc,
-			uint32_t num_peers);
+					   uint32_t num_peers,
+					   bool peer_map_unmap_v2);
 
 	void (*txrx_pdev_set_ctrl_pdev)(struct cdp_pdev *pdev_hdl,
 					struct cdp_ctrl_objmgr_pdev *ctrl_pdev);
 
 	ol_txrx_tx_fp tx_send;
+	/**
+	 * txrx_get_os_rx_handles_from_vdev() - Return function, osif vdev
+	 *					to deliver pkt to stack.
+	 * @vdev: vdev handle
+	 * @stack_fn: pointer to - function pointer to deliver RX pkt to stack
+	 * @osif_vdev: pointer to - osif vdev to deliver RX packet to.
+	 */
+	void (*txrx_get_os_rx_handles_from_vdev)
+					(struct cdp_vdev *vdev,
+					 ol_txrx_rx_fp *stack_fn,
+					 ol_osif_vdev_handle *osif_vdev);
+	int (*txrx_classify_update)
+		(struct cdp_vdev *vdev, qdf_nbuf_t skb,
+		 enum txrx_direction, struct ol_txrx_nbuf_classify *nbuf_class);
+
+	bool (*get_dp_capabilities)(struct cdp_soc_t *soc,
+				    enum cdp_capabilities dp_caps);
 };
 
 struct cdp_ctrl_ops {
@@ -329,7 +390,7 @@ struct cdp_ctrl_ops {
 				uint32_t val);
 	int
 		(*txrx_update_filter_neighbour_peers)(
-				struct cdp_pdev *pdev,
+				struct cdp_vdev *vdev,
 				uint32_t cmd, uint8_t *macaddr);
 	/**
 	 * @brief set the safemode of the device
@@ -528,6 +589,9 @@ struct cdp_ctrl_ops {
 	QDF_STATUS (*txrx_vdev_config_for_nac_rssi)(struct cdp_vdev *vdev,
 		enum cdp_nac_param_cmd cmd, char *bssid, char *client_macaddr,
 		uint8_t chan_num);
+	QDF_STATUS (*txrx_vdev_get_neighbour_rssi)(struct cdp_vdev *vdev,
+						   char *macaddr,
+						   uint8_t *rssi);
 #endif
 	void (*set_key)(struct cdp_peer *peer_handle,
 			bool is_unicast, uint32_t *key);
@@ -687,6 +751,9 @@ struct cdp_host_stats_ops {
 	int
 		(*txrx_get_vdev_extd_stats)(struct cdp_vdev *vdev_handle,
 					    void *buffer);
+	void
+		(*txrx_update_vdev_stats)(struct cdp_vdev *vdev, void *buf,
+					  uint16_t stats_id);
 };
 
 struct cdp_wds_ops {
@@ -747,7 +814,9 @@ struct ol_if_ops {
 	(*peer_rx_reorder_queue_setup)(struct cdp_ctrl_objmgr_pdev *ctrl_pdev,
 				       uint8_t vdev_id, uint8_t *peer_mac,
 				       qdf_dma_addr_t hw_qdesc, int tid,
-				       uint16_t queue_num);
+				       uint16_t queue_num,
+				       uint8_t ba_window_size_valid,
+				       uint16_t ba_window_size);
 	QDF_STATUS
 	(*peer_rx_reorder_queue_remove)(struct cdp_ctrl_objmgr_pdev *ctrl_pdev,
 					uint8_t vdev_id, uint8_t *peer_macaddr,
@@ -763,16 +832,23 @@ struct ol_if_ops {
 			uint32_t flags);
 	void (*peer_del_wds_entry)(void *ol_soc_handle,
 			uint8_t *wds_macaddr);
+#if defined(FEATURE_AST) && defined(AST_HKV1_WORKAROUND)
+	void (*peer_del_wds_cp_ctx)(void *cp_ctx);
+#endif
 	QDF_STATUS
-	(*lro_hash_config)(struct wlan_objmgr_psoc *ctrl_psoc,
+	(*lro_hash_config)(struct cdp_ctrl_objmgr_pdev *ctrl_pdev,
 			   struct cdp_lro_hash_config *rx_offld_hash);
 	void (*update_dp_stats)(void *soc, void *stats, uint16_t id,
 			uint8_t type);
+#ifdef CONFIG_WIN
 	uint8_t (*rx_invalid_peer)(void *ctrl_pdev, void *msg);
-
+#else
+	uint8_t (*rx_invalid_peer)(uint8_t vdev_id, void *wh);
+#endif
 	int  (*peer_map_event)(void *ol_soc_handle, uint16_t peer_id, uint16_t hw_peer_id,
 			uint8_t vdev_id, uint8_t *peer_mac_addr,
-			enum cdp_txrx_ast_entry_type peer_type);
+			enum cdp_txrx_ast_entry_type peer_type,
+			uint32_t tx_ast_hashidx);
 	int (*peer_unmap_event)(void *ol_soc_handle, uint16_t peer_id);
 
 	int (*get_dp_cfg_param)(void *ol_soc_handle, enum cdp_cfg_param_type param_num);
@@ -795,6 +871,18 @@ struct ol_if_ops {
 #endif
 	int (*peer_sta_kickout)(void *ctrl_pdev, uint8_t *peer_macaddr);
 
+	/**
+	 * send_delba() - Send delba to peer
+	 * @pdev_handle: Dp pdev handle
+	 * @ctrl_peer: Peer handle
+	 * @peer_macaddr: Peer mac addr
+	 * @tid: Tid number
+	 *
+	 * Return: 0 for success, non-zero for failure
+	 */
+	int (*send_delba)(void *pdev_handle,  void *ctrl_peer,
+			  uint8_t *peer_macaddr, uint8_t tid, void *vdev_handle,
+			  uint8_t reason_code);
 	/* TODO: Add any other control path calls required to OL_IF/WMA layer */
 };
 
@@ -1060,8 +1148,6 @@ struct cdp_ocb_ops {
  * @remove_peers_for_vdev_no_lock:
  * @copy_mac_addr_raw:
  * @add_last_real_peer:
- * @get_last_mgmt_timestamp:
- * @set_last_mgmt_timestamp:
  * @is_vdev_restore_last_peer:
  * @update_last_real_peer:
  */
@@ -1109,14 +1195,6 @@ struct cdp_peer_ops {
 	void (*update_last_real_peer)(struct cdp_pdev *pdev, void *peer,
 			uint8_t *peer_id, bool restore_last_peer);
 	void (*peer_detach_force_delete)(void *peer);
-	bool (*get_last_mgmt_timestamp)(struct cdp_pdev *ppdev,
-					u8 *peer_addr,
-					u8 subtype,
-					qdf_time_t *timestamp);
-	bool (*update_last_mgmt_timestamp)(struct cdp_pdev *ppdev,
-					   u8 *peer_addr,
-					   qdf_time_t timestamp,
-					   u8 subtype);
 };
 
 /**

@@ -269,12 +269,11 @@ qdf_mem_header_assert_valid(struct qdf_mem_header *header,
 		qdf_err("Corrupted memory domain 0x%x", header->domain);
 
 	if (error_bitmap & QDF_MEM_WRONG_DOMAIN)
-		qdf_err("Memory domain mismatch; found %s(%d), expected %s(%d)",
+		qdf_err("Memory domain mismatch; allocated:%s(%d), current:%s(%d)",
 			qdf_debug_domain_name(header->domain), header->domain,
 			qdf_debug_domain_name(current_domain), current_domain);
 
-	panic("A fatal memory error was detected @ %s:%d",
-	      file, line);
+	QDF_DEBUG_PANIC("Fatal memory error detected @ %s:%d", file, line);
 }
 #endif /* MEMORY_DEBUG */
 
@@ -1159,19 +1158,7 @@ static void qdf_mem_debug_init(void) {}
 
 static void qdf_mem_debug_exit(void) {}
 
-/**
- * qdf_mem_malloc() - allocation QDF memory
- * @size: Number of bytes of memory to allocate.
- *
- * This function will dynamicallly allocate the specified number of bytes of
- * memory.
- *
- * Return:
- * Upon successful allocate, returns a non-NULL pointer to the allocated
- * memory.  If this function is unable to allocate the amount of memory
- * specified (for any reason) it returns NULL.
- */
-void *qdf_mem_malloc(size_t size)
+void *qdf_mem_malloc_fl(size_t size, const char *func, uint32_t line)
 {
 	void *ptr;
 
@@ -1180,28 +1167,19 @@ void *qdf_mem_malloc(size_t size)
 		return ptr;
 
 	ptr = kzalloc(size, qdf_mem_malloc_flags());
-	if (!ptr)
+	if (!ptr) {
+		qdf_nofl_warn("Failed to malloc %zuB @ %s:%d",
+			      size, func, line);
 		return NULL;
+	}
 
 	qdf_mem_kmalloc_inc(ksize(ptr));
 
 	return ptr;
 }
-qdf_export_symbol(qdf_mem_malloc);
+qdf_export_symbol(qdf_mem_malloc_fl);
 
-/**
- * qdf_mem_malloc_atomic() - allocation QDF memory atomically
- * @size: Number of bytes of memory to allocate.
- *
- * This function will dynamicallly allocate the specified number of bytes of
- * memory.
- *
- * Return:
- * Upon successful allocate, returns a non-NULL pointer to the allocated
- * memory.  If this function is unable to allocate the amount of memory
- * specified (for any reason) it returns NULL.
- */
-void *qdf_mem_malloc_atomic(size_t size)
+void *qdf_mem_malloc_atomic_fl(size_t size, const char *func, uint32_t line)
 {
 	void *ptr;
 
@@ -1210,15 +1188,17 @@ void *qdf_mem_malloc_atomic(size_t size)
 		return ptr;
 
 	ptr = kzalloc(size, GFP_ATOMIC);
-	if (!ptr)
+	if (!ptr) {
+		qdf_nofl_warn("Failed to malloc %zuB @ %s:%d",
+			      size, func, line);
 		return NULL;
+	}
 
 	qdf_mem_kmalloc_inc(ksize(ptr));
 
 	return ptr;
 }
-
-qdf_export_symbol(qdf_mem_malloc_atomic);
+qdf_export_symbol(qdf_mem_malloc_atomic_fl);
 
 /**
  * qdf_mem_free() - free QDF memory
@@ -1512,6 +1492,52 @@ void qdf_mem_zero(void *ptr, uint32_t num_bytes)
 qdf_export_symbol(qdf_mem_zero);
 
 /**
+ * qdf_mem_copy_toio() - copy memory
+ * @dst_addr: Pointer to destination memory location (to copy to)
+ * @src_addr: Pointer to source memory location (to copy from)
+ * @num_bytes: Number of bytes to copy.
+ *
+ * Return: none
+ */
+void qdf_mem_copy_toio(void *dst_addr, const void *src_addr, uint32_t num_bytes)
+{
+	if (0 == num_bytes) {
+		/* special case where dst_addr or src_addr can be NULL */
+		return;
+	}
+
+	if ((!dst_addr) || (!src_addr)) {
+		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
+			  "%s called with NULL parameter, source:%pK destination:%pK",
+			  __func__, src_addr, dst_addr);
+		QDF_ASSERT(0);
+		return;
+	}
+	memcpy_toio(dst_addr, src_addr, num_bytes);
+}
+
+qdf_export_symbol(qdf_mem_copy_toio);
+
+/**
+ * qdf_mem_set_io() - set (fill) memory with a specified byte value.
+ * @ptr: Pointer to memory that will be set
+ * @value: Byte set in memory
+ * @num_bytes: Number of bytes to be set
+ *
+ * Return: None
+ */
+void qdf_mem_set_io(void *ptr, uint32_t num_bytes, uint32_t value)
+{
+	if (!ptr) {
+		qdf_print("%s called with NULL parameter ptr", __func__);
+		return;
+	}
+	memset_io(ptr, value, num_bytes);
+}
+
+qdf_export_symbol(qdf_mem_set_io);
+
+/**
  * qdf_mem_set() - set (fill) memory with a specified byte value.
  * @ptr: Pointer to memory that will be set
  * @num_bytes: Number of bytes to be set
@@ -1600,7 +1626,7 @@ void *qdf_mem_dma_alloc(qdf_device_t osdev, void *dev, qdf_size_t size,
 					   qdf_mem_malloc_flags());
 
 		if (!vaddr) {
-			qdf_print("%s failed , size: %zu!\n", __func__, size);
+			qdf_err("%s failed , size: %zu!", __func__, size);
 			return NULL;
 		}
 

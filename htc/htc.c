@@ -81,7 +81,7 @@ static HTC_PACKET *build_htc_tx_ctrl_packet(qdf_device_t osdev)
 		if (NULL == netbuf) {
 			qdf_mem_free(pPacket);
 			pPacket = NULL;
-			qdf_print("%s: nbuf alloc failed\n", __func__);
+			qdf_print("%s: nbuf alloc failed", __func__);
 			break;
 		}
 		AR_DEBUG_PRINTF(ATH_DEBUG_TRC,
@@ -392,6 +392,7 @@ htc_setup_epping_credit_allocation(struct hif_opaque_softc *scn,
 {
 	switch (hif_get_bus_type(scn)) {
 	case QDF_BUS_TYPE_PCI:
+	case QDF_BUS_TYPE_USB:
 		pEntry++;
 		pEntry->service_id = WMI_DATA_BE_SVC;
 		pEntry->CreditAllocation = (credits >> 1);
@@ -701,7 +702,7 @@ QDF_STATUS htc_start(HTC_HANDLE HTCHandle)
 		pSendPacket = htc_alloc_control_tx_packet(target);
 		if (NULL == pSendPacket) {
 			AR_DEBUG_ASSERT(false);
-			qdf_print("%s: allocControlTxPacket failed\n",
+			qdf_print("%s: allocControlTxPacket failed",
 				  __func__);
 			status = QDF_STATUS_E_NOMEM;
 			break;
@@ -719,12 +720,12 @@ QDF_STATUS htc_start(HTC_HANDLE HTCHandle)
 			      MESSAGEID, HTC_MSG_SETUP_COMPLETE_EX_ID);
 
 		if (!htc_credit_flow) {
-			AR_DEBUG_PRINTF(ATH_DEBUG_INIT,
+			AR_DEBUG_PRINTF(ATH_DEBUG_TRC,
 					("HTC will not use TX credit flow control"));
 			pSetupComp->SetupFlags |=
 				HTC_SETUP_COMPLETE_FLAGS_DISABLE_TX_CREDIT_FLOW;
 		} else {
-			AR_DEBUG_PRINTF(ATH_DEBUG_INIT,
+			AR_DEBUG_PRINTF(ATH_DEBUG_TRC,
 					("HTC using TX credit flow control"));
 		}
 
