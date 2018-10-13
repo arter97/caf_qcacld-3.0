@@ -1225,6 +1225,8 @@ static void dp_soc_interrupt_map_calculate_integrated(struct dp_soc *soc,
 					soc->wlan_cfg_ctx, intr_ctx_num);
 	int host2rxdma_ring_mask = wlan_cfg_get_host2rxdma_ring_mask(
 					soc->wlan_cfg_ctx, intr_ctx_num);
+	int host2rxdma_mon_ring_mask = wlan_cfg_get_host2rxdma_mon_ring_mask(
+					soc->wlan_cfg_ctx, intr_ctx_num);
 
 	for (j = 0; j < HIF_MAX_GRP_IRQ; j++) {
 
@@ -1247,6 +1249,12 @@ static void dp_soc_interrupt_map_calculate_integrated(struct dp_soc *soc,
 		if (host2rxdma_ring_mask & (1 << j)) {
 			irq_id_map[num_irq++] =
 				host2rxdma_host_buf_ring_mac1 -
+				wlan_cfg_get_hw_mac_idx(soc->wlan_cfg_ctx, j);
+		}
+
+		if (host2rxdma_mon_ring_mask & (1 << j)) {
+			irq_id_map[num_irq++] =
+				host2rxdma_monitor_ring1 -
 				wlan_cfg_get_hw_mac_idx(soc->wlan_cfg_ctx, j);
 		}
 
@@ -1364,7 +1372,9 @@ static QDF_STATUS dp_soc_interrupt_attach(void *txrx_soc)
 			wlan_cfg_get_rxdma2host_ring_mask(soc->wlan_cfg_ctx, i);
 		int host2rxdma_ring_mask =
 			wlan_cfg_get_host2rxdma_ring_mask(soc->wlan_cfg_ctx, i);
-
+		int host2rxdma_mon_ring_mask =
+			wlan_cfg_get_host2rxdma_mon_ring_mask(soc->wlan_cfg_ctx,
+							      i);
 
 		soc->intr_ctx[i].dp_intr_id = i;
 		soc->intr_ctx[i].tx_ring_mask = tx_mask;
@@ -1375,6 +1385,8 @@ static QDF_STATUS dp_soc_interrupt_attach(void *txrx_soc)
 		soc->intr_ctx[i].host2rxdma_ring_mask = host2rxdma_ring_mask;
 		soc->intr_ctx[i].rx_wbm_rel_ring_mask = rx_wbm_rel_ring_mask;
 		soc->intr_ctx[i].reo_status_ring_mask = reo_status_ring_mask;
+		soc->intr_ctx[i].host2rxdma_mon_ring_mask =
+			host2rxdma_mon_ring_mask;
 
 		soc->intr_ctx[i].soc = soc;
 
@@ -1429,6 +1441,7 @@ static void dp_soc_interrupt_detach(void *txrx_soc)
 		soc->intr_ctx[i].reo_status_ring_mask = 0;
 		soc->intr_ctx[i].rxdma2host_ring_mask = 0;
 		soc->intr_ctx[i].host2rxdma_ring_mask = 0;
+		soc->intr_ctx[i].host2rxdma_mon_ring_mask = 0;
 
 		qdf_lro_deinit(soc->intr_ctx[i].lro_ctx);
 	}
@@ -1770,7 +1783,7 @@ static void dp_hw_link_desc_pool_cleanup(struct dp_soc *soc)
 #define RXDMA_BUF_RING_SIZE 1024
 #define RXDMA_REFILL_RING_SIZE 4096
 #define RXDMA_MONITOR_BUF_RING_SIZE 8192
-#define RXDMA_MONITOR_DST_RING_SIZE 2048
+#define RXDMA_MONITOR_DST_RING_SIZE 8192
 #define RXDMA_MONITOR_STATUS_RING_SIZE 1024
 #define RXDMA_MONITOR_DESC_RING_SIZE 4096
 #define RXDMA_ERR_DST_RING_SIZE 4096
