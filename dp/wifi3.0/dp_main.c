@@ -6506,6 +6506,44 @@ dp_get_host_peer_stats(struct cdp_pdev *pdev_handle, char *mac_addr)
 }
 
 /**
+ * dp_txrx_stats_help() - Helper function for Txrx_Stats
+ *
+ * Return: None
+ */
+static void dp_txrx_stats_help(void)
+{
+	dp_info("Command: iwpriv wlan0 txrx_stats <stats_option> <mac_id>");
+	dp_info("stats_option:");
+	dp_info("  1 -- HTT Tx Statistics");
+	dp_info("  2 -- HTT Rx Statistics");
+	dp_info("  3 -- HTT Tx HW Queue Statistics");
+	dp_info("  4 -- HTT Tx HW Sched Statistics");
+	dp_info("  5 -- HTT Error Statistics");
+	dp_info("  6 -- HTT TQM Statistics");
+	dp_info("  7 -- HTT TQM CMDQ Statistics");
+	dp_info("  8 -- HTT TX_DE_CMN Statistics");
+	dp_info("  9 -- HTT Tx Rate Statistics");
+	dp_info(" 10 -- HTT Rx Rate Statistics");
+	dp_info(" 11 -- HTT Peer Statistics");
+	dp_info(" 12 -- HTT Tx SelfGen Statistics");
+	dp_info(" 13 -- HTT Tx MU HWQ Statistics");
+	dp_info(" 14 -- HTT RING_IF_INFO Statistics");
+	dp_info(" 15 -- HTT SRNG Statistics");
+	dp_info(" 16 -- HTT SFM Info Statistics");
+	dp_info(" 17 -- HTT PDEV_TX_MU_MIMO_SCHED INFO Statistics");
+	dp_info(" 18 -- HTT Peer List Details");
+	dp_info(" 20 -- Clear Host Statistics");
+	dp_info(" 21 -- Host Rx Rate Statistics");
+	dp_info(" 22 -- Host Tx Rate Statistics");
+	dp_info(" 23 -- Host Tx Statistics");
+	dp_info(" 24 -- Host Rx Statistics");
+	dp_info(" 25 -- Host AST Statistics");
+	dp_info(" 26 -- Host SRNG PTR Statistics");
+	dp_info(" 27 -- Host Mon Statistics");
+	dp_info(" 28 -- Host REO Queue Statistics");
+}
+
+/**
  * dp_print_host_stats()- Function to print the stats aggregated at host
  * @vdev_handle: DP_VDEV handle
  * @type: host stats type
@@ -6564,7 +6602,8 @@ dp_print_host_stats(struct cdp_vdev *vdev_handle,
 		dp_get_host_peer_stats((struct cdp_pdev *)pdev, req->peer_addr);
 		break;
 	default:
-		DP_TRACE(FATAL, "Wrong Input For TxRx Host Stats");
+		dp_info("Wrong Input For TxRx Host Stats");
+		dp_txrx_stats_help();
 		break;
 	}
 	return 0;
@@ -7067,6 +7106,23 @@ static int  dp_txrx_get_vdev_stats(struct cdp_vdev *vdev_handle, void *buf,
 		qdf_mem_copy(vdev_stats, &vdev->stats, sizeof(vdev->stats));
 
 	return 0;
+}
+
+/*
+ * dp_get_total_per(): get total per
+ * @pdev_handle: DP_PDEV handle
+ *
+ * Return: % error rate using retries per packet and success packets
+ */
+static int dp_get_total_per(struct cdp_pdev *pdev_handle)
+{
+	struct dp_pdev *pdev = (struct dp_pdev *)pdev_handle;
+
+	dp_aggregate_pdev_stats(pdev);
+	if ((pdev->stats.tx.tx_success.num + pdev->stats.tx.retries) == 0)
+		return 0;
+	return ((pdev->stats.tx.retries * 100) /
+		((pdev->stats.tx.tx_success.num) + (pdev->stats.tx.retries)));
 }
 
 /*
@@ -7897,6 +7953,7 @@ static struct cdp_cmn_ops dp_ops_cmn = {
 	/* TODO: get API's for dscp-tid need to be added*/
 	.set_vdev_dscp_tid_map = dp_set_vdev_dscp_tid_map_wifi3,
 	.set_pdev_dscp_tid_map = dp_set_pdev_dscp_tid_map_wifi3,
+	.txrx_get_total_per = dp_get_total_per,
 	.txrx_stats_request = dp_txrx_stats_request,
 	.txrx_set_monitor_mode = dp_vdev_set_monitor_mode,
 	.txrx_get_pdev_id_frm_pdev = dp_get_pdev_id_frm_pdev,
