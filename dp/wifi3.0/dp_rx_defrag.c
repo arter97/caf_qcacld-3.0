@@ -977,6 +977,13 @@ dp_rx_defrag_nwifi_to_8023(qdf_nbuf_t nbuf, uint16_t hdrsize)
 		peer->rx_tid[tid].dst_ring_desc;
 	void *hal_srng = soc->reo_reinject_ring.hal_srng;
 
+	ent_ring_desc = hal_srng_src_get_next(soc->hal_soc, hal_srng);
+	if (!ent_ring_desc) {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+			  "HAL src ring next entry NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	hal_rx_reo_buf_paddr_get(dst_ring_desc, &buf_info);
 
 	link_desc_va = dp_rx_cookie_2_link_desc_va(soc, &buf_info);
@@ -1028,7 +1035,6 @@ dp_rx_defrag_nwifi_to_8023(qdf_nbuf_t nbuf, uint16_t hdrsize)
 	if (qdf_unlikely(ret == QDF_STATUS_E_FAILURE)) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 				"%s: nbuf map failed !", __func__);
-		qdf_nbuf_free(head);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -1053,15 +1059,11 @@ dp_rx_defrag_nwifi_to_8023(qdf_nbuf_t nbuf, uint16_t hdrsize)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	ent_ring_desc = hal_srng_src_get_next(soc->hal_soc, hal_srng);
-
-	qdf_assert(ent_ring_desc);
-
 	paddr = (uint64_t)buf_info.paddr;
 	/* buf addr */
 	hal_rxdma_buff_addr_info_set(ent_ring_desc, paddr,
-					buf_info.sw_cookie,
-					HAL_RX_BUF_RBM_WBM_IDLE_DESC_LIST);
+				     buf_info.sw_cookie,
+				     HAL_RX_BUF_RBM_WBM_IDLE_DESC_LIST);
 	/* mpdu desc info */
 	ent_mpdu_desc_info = (uint8_t *)ent_ring_desc +
 	RX_MPDU_DETAILS_2_RX_MPDU_DESC_INFO_RX_MPDU_DESC_INFO_DETAILS_OFFSET;
@@ -1156,10 +1158,10 @@ static QDF_STATUS dp_rx_defrag(struct dp_peer *peer, unsigned tid,
 			index, peer->security[index].sec_type);
 
 	switch (peer->security[index].sec_type) {
-	case htt_sec_type_tkip:
+	case cdp_sec_type_tkip:
 		tkip_demic = 1;
 
-	case htt_sec_type_tkip_nomic:
+	case cdp_sec_type_tkip_nomic:
 		while (cur) {
 			tmp_next = qdf_nbuf_next(cur);
 			if (dp_rx_defrag_tkip_decap(cur, hdr_space)) {
@@ -1177,7 +1179,7 @@ static QDF_STATUS dp_rx_defrag(struct dp_peer *peer, unsigned tid,
 		hdr_space += dp_f_tkip.ic_header;
 		break;
 
-	case htt_sec_type_aes_ccmp:
+	case cdp_sec_type_aes_ccmp:
 		while (cur) {
 			tmp_next = qdf_nbuf_next(cur);
 			if (dp_rx_defrag_ccmp_demic(cur, hdr_space)) {
@@ -1203,9 +1205,9 @@ static QDF_STATUS dp_rx_defrag(struct dp_peer *peer, unsigned tid,
 		hdr_space += dp_f_ccmp.ic_header;
 		break;
 
-	case htt_sec_type_wep40:
-	case htt_sec_type_wep104:
-	case htt_sec_type_wep128:
+	case cdp_sec_type_wep40:
+	case cdp_sec_type_wep104:
+	case cdp_sec_type_wep128:
 		while (cur) {
 			tmp_next = qdf_nbuf_next(cur);
 			if (dp_rx_defrag_wep_decap(cur, hdr_space)) {
