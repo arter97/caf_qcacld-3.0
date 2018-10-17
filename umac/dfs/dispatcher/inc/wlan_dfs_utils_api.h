@@ -571,4 +571,10 @@ void utils_dfs_get_chan_list(struct wlan_objmgr_pdev *pdev,
  */
 bool utils_dfs_check_for_cac_start(struct wlan_objmgr_pdev *pdev,
 				   bool *continue_current_cac);
+
+/**
+ * utils_dfs_clear_cac_started_chan() - Clear dfs cac started channel.
+ * @pdev: pdev ptr
+ */
+void utils_dfs_clear_cac_started_chan(struct wlan_objmgr_pdev *pdev);
 #endif /* _WLAN_DFS_UTILS_API_H_ */
