@@ -1734,6 +1734,7 @@ struct hdd_context {
 	bool lte_coex_ant_share;
 	int sscan_pid;
 	uint32_t track_arp_ip;
+	struct qdf_mac_addr dynamic_mac_list[QDF_MAX_CONCURRENCY_PERSONA];
 };
 
 /**
@@ -2972,5 +2973,21 @@ static inline void hdd_send_update_owe_info_event(struct hdd_adapter *adapter,
 {
 }
 #endif
+
+/**
+ * hdd_update_dynamic_mac() - Updates the dynamic MAC list
+ * @hdd_ctx: Pointer to HDD context
+ * @curr_mac_addr: Current interface mac address
+ * @new_mac_addr: New mac address which needs to be updated
+ *
+ * This function updates newly configured MAC address to the
+ * dynamic MAC address list corresponding to the current
+ * adapter MAC address
+ *
+ * Return: None
+ */
+void hdd_update_dynamic_mac(struct hdd_context *hdd_ctx,
+			    struct qdf_mac_addr *curr_mac_addr,
+			    struct qdf_mac_addr *new_mac_addr);
 
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */
