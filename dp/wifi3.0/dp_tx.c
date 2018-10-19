@@ -3275,7 +3275,7 @@ void dp_tx_vdev_update_search_flags(struct dp_vdev *vdev)
 		vdev->hal_desc_addr_search_flags =
 			(HAL_TX_DESC_ADDRX_EN | HAL_TX_DESC_ADDRY_EN);
 	else if ((vdev->opmode == wlan_op_mode_sta &&
-				(!vdev->wds_enabled || vdev->proxysta_vdev)))
+				vdev->proxysta_vdev))
 		vdev->hal_desc_addr_search_flags = HAL_TX_DESC_ADDRY_EN;
 	else
 		vdev->hal_desc_addr_search_flags = HAL_TX_DESC_ADDRX_EN;
