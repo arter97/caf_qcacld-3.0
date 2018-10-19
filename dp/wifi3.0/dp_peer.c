@@ -466,6 +466,7 @@ static inline void dp_peer_map_ast(struct dp_soc *soc,
 		ast_entry->is_active = TRUE;
 		peer_type = ast_entry->type;
 		ast_entry->ast_hash_value = ast_hash;
+		ast_entry->is_mapped = TRUE;
 	}
 
 	if (ast_entry || (peer->vdev && peer->vdev->proxysta_vdev)) {
@@ -574,7 +575,7 @@ add_ast_entry:
 	ast_entry->peer = peer;
 	ast_entry->pdev_id = vdev->pdev->pdev_id;
 	ast_entry->vdev_id = vdev->vdev_id;
-	ast_entry->ast_idx = DP_INVALID_AST_IDX;
+	ast_entry->is_mapped = false;
 
 	switch (type) {
 	case CDP_TXRX_AST_TYPE_STATIC:
@@ -650,7 +651,12 @@ void dp_peer_del_ast(struct dp_soc *soc, struct dp_ast_entry *ast_entry)
 	    ast_entry->type != CDP_TXRX_AST_TYPE_WDS_HM_SEC) {
 		dp_peer_ast_send_wds_del(soc, ast_entry);
 	} else {
-		soc->ast_table[ast_entry->ast_idx] = NULL;
+		/*
+		 * release the reference only if it is mapped
+		 * to ast_table
+		 */
+		if (ast_entry->is_mapped)
+			soc->ast_table[ast_entry->ast_idx] = NULL;
 		TAILQ_REMOVE(&peer->ast_entry_list, ast_entry, ase_list_elem);
 
 		if (ast_entry == peer->self_ast_entry)
@@ -682,7 +688,12 @@ void dp_peer_del_ast(struct dp_soc *soc, struct dp_ast_entry *ast_entry)
 		soc->cdp_soc.ol_ops->peer_del_wds_entry(peer->vdev->osif_vdev,
 						ast_entry->mac_addr.raw);
 
-	soc->ast_table[ast_entry->ast_idx] = NULL;
+	/*
+	 * release the reference only if it is mapped
+	 * to ast_table
+	 */
+	if (ast_entry->is_mapped)
+		soc->ast_table[ast_entry->ast_idx] = NULL;
 	TAILQ_REMOVE(&peer->ast_entry_list, ast_entry, ase_list_elem);
 
 	if (ast_entry == peer->self_ast_entry)
@@ -895,7 +906,12 @@ void dp_peer_ast_free_entry(struct dp_soc *soc,
 {
 	struct dp_peer *peer = ast_entry->peer;
 
-	soc->ast_table[ast_entry->ast_idx] = NULL;
+	/*
+	 * release the reference only if it is mapped
+	 * to ast_table
+	 */
+	if (ast_entry->is_mapped)
+		soc->ast_table[ast_entry->ast_idx] = NULL;
 	TAILQ_REMOVE(&peer->ast_entry_list, ast_entry, ase_list_elem);
 	DP_STATS_INC(soc, ast.deleted, 1);
 	dp_peer_ast_hash_remove(soc, ast_entry);
@@ -1213,7 +1229,7 @@ dp_rx_peer_map_handler(void *soc_handle, uint16_t peer_id,
 
 		if (peer) {
 			/*
-			 * For every peer MAp message search and set if bss_peer
+			 * For every peer Map message search and set if bss_peer
 			 */
 			if (!(qdf_mem_cmp(peer->mac_addr.raw,
 					  peer->vdev->mac_addr.raw,
