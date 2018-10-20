@@ -976,9 +976,8 @@ hal_rx_status_get_tlv_info(void *rx_tlv, struct hal_rx_ppdu_info *ppdu_info)
 	case WIFIPHYRX_HE_SIG_B1_MU_E:
 	{
 		uint8_t *he_sig_b1_mu_info = (uint8_t *)rx_tlv +
-			*((uint32_t *)((uint8_t *)rx_tlv +
 			HAL_RX_OFFSET(PHYRX_HE_SIG_B1_MU_0,
-			HE_SIG_B1_MU_INFO_PHYRX_HE_SIG_B1_MU_INFO_DETAILS)));
+			HE_SIG_B1_MU_INFO_PHYRX_HE_SIG_B1_MU_INFO_DETAILS);
 
 		ppdu_info->rx_status.he_sig_b_common_RU[0] =
 			HAL_RX_GET(he_sig_b1_mu_info, HE_SIG_B1_MU_INFO_0,
