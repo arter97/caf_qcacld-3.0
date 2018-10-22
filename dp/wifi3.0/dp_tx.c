@@ -2478,7 +2478,7 @@ void dp_tx_mec_handler(struct dp_vdev *vdev, uint8_t *status)
 	uint32_t flags = IEEE80211_NODE_F_WDS_HM;
 	struct dp_peer *peer;
 
-	if (!vdev->wds_enabled)
+	if (!vdev->mec_enabled)
 		return;
 
 	/* MEC required only in STA mode */

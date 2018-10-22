@@ -6646,6 +6646,12 @@ static void dp_set_vdev_param(struct cdp_vdev *vdev_handle,
 			  val, vdev, vdev->vdev_id);
 		vdev->wds_enabled = val;
 		break;
+	case CDP_ENABLE_MEC:
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+			  "mec_enable %d for vdev(%p) id(%d)\n",
+			  val, vdev, vdev->vdev_id);
+		vdev->mec_enabled = val;
+		break;
 	case CDP_ENABLE_NAWDS:
 		vdev->nawds_enabled = val;
 		break;
