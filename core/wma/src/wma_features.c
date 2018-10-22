@@ -10365,7 +10365,7 @@ static int wma_sar_event_handler(void *handle, uint8_t *evt_buf, uint32_t len)
 {
 	tp_wma_handle wma_handle;
 	wmi_unified_t wmi_handle;
-	struct sar_limit_event event;
+	struct sar_limit_event *event;
 	wma_sar_cb callback;
 	QDF_STATUS status;
 
@@ -10383,17 +10383,26 @@ static int wma_sar_event_handler(void *handle, uint8_t *evt_buf, uint32_t len)
 		return QDF_STATUS_E_INVAL;
 	}
 
+	event = qdf_mem_malloc(sizeof(*event));
+	if (!event) {
+		WMA_LOGE(FL("failed to malloc sar_limit_event"));
+		return QDF_STATUS_E_NOMEM;
+	}
+
 	status = wmi_unified_extract_sar_limit_event(wmi_handle,
-						     evt_buf, &event);
+						     evt_buf, event);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		WMA_LOGE(FL("Event extract failure: %d"), status);
+		qdf_mem_free(event);
 		return QDF_STATUS_E_INVAL;
 	}
 
 	callback = sar_callback;
 	sar_callback = NULL;
 	if (callback)
-		callback(sar_context, &event);
+		callback(sar_context, event);
+
+	qdf_mem_free(event);
 
 	return 0;
 }
@@ -10564,7 +10573,9 @@ int wma_encrypt_decrypt_msg_handler(void *handle, uint8_t *data,
 	encrypt_decrypt_rsp_params.vdev_id = data_event->vdev_id;
 	encrypt_decrypt_rsp_params.status = data_event->status;
 
-	if (data_event->data_length > param_buf->num_enc80211_frame) {
+	if ((data_event->data_length > param_buf->num_enc80211_frame) ||
+	    (data_event->data_length > WMI_SVC_MSG_MAX_SIZE - WMI_TLV_HDR_SIZE -
+	     sizeof(*data_event))) {
 		WMA_LOGE("FW msg data_len %d more than TLV hdr %d",
 			 data_event->data_length,
 			 param_buf->num_enc80211_frame);
@@ -10995,6 +11006,11 @@ int wma_peer_ant_info_evt_handler(void *handle, u_int8_t *event,
 		return -EINVAL;
 	}
 
+	if (!pmac->sme.pchain_rssi_ind_cb) {
+		WMA_LOGE("%s: callback not registered", __func__);
+		return -EINVAL;
+	}
+
 	param_buf = (WMI_PEER_ANTDIV_INFO_EVENTID_param_tlvs *) event;
 	if (!param_buf) {
 		WMA_LOGE("Invalid peer_ant_info event buffer");
@@ -11020,7 +11036,8 @@ int wma_peer_ant_info_evt_handler(void *handle, u_int8_t *event,
 				peer_ant_info->chain_rssi,
 				sizeof(peer_ant_info->chain_rssi));
 
-	pmac->sme.pchain_rssi_ind_cb(pmac->hHdd, &chain_rssi_result);
+	pmac->sme.pchain_rssi_ind_cb(pmac->hHdd, &chain_rssi_result,
+				     pmac->sme.pchain_rssi_ind_ctx);
 
 	return 0;
 }
@@ -11052,7 +11069,10 @@ void wma_spectral_scan_config(WMA_HANDLE wma_handle,
 
 	if (wma == NULL)
 		return;
-
+	if (!wma_is_vdev_valid(req->vdev_id)) {
+		WMA_LOGE(FL("Invalid vdev id"));
+		return;
+	}
 	/* save the copy of the config params */
 	qdf_mem_copy(&wma->ss_configs, req, sizeof(*req));
 

@@ -2819,6 +2819,14 @@ QDF_STATUS csr_change_default_config_param(tpAniSirGlobal pMac,
 
 		pMac->f_sta_miracast_mcc_rest_time_val =
 			pParam->f_sta_miracast_mcc_rest_time_val;
+		pMac->sta_scan_burst_duration =
+			pParam->sta_scan_burst_duration;
+		pMac->p2p_scan_burst_duration =
+			pParam->p2p_scan_burst_duration;
+		pMac->go_scan_burst_duration =
+			pParam->go_scan_burst_duration;
+		pMac->ap_scan_burst_duration =
+			pParam->ap_scan_burst_duration;
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE
 		pMac->sap.sap_channel_avoidance =
 			pParam->sap_channel_avoidance;
@@ -3103,6 +3111,14 @@ QDF_STATUS csr_get_config_param(tpAniSirGlobal pMac, tCsrConfigParam *pParam)
 	pParam->enable5gEBT = pMac->enable5gEBT;
 	pParam->f_sta_miracast_mcc_rest_time_val =
 		pMac->f_sta_miracast_mcc_rest_time_val;
+	pParam->sta_scan_burst_duration =
+		pMac->sta_scan_burst_duration;
+	pParam->p2p_scan_burst_duration =
+		pMac->p2p_scan_burst_duration;
+	pParam->go_scan_burst_duration =
+		pMac->go_scan_burst_duration;
+	pParam->ap_scan_burst_duration =
+		pMac->ap_scan_burst_duration;
 	sme_update_roam_pno_channel_prediction_config(pMac, pParam,
 			ROAM_CONFIG_TO_SME_CONFIG);
 	pParam->early_stop_scan_enable =
@@ -6024,7 +6040,7 @@ static QDF_STATUS csr_roam_trigger_reassociate(tpAniSirGlobal mac_ctx,
 
 QDF_STATUS csr_roam_process_command(tpAniSirGlobal pMac, tSmeCmd *pCommand)
 {
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	QDF_STATUS lock_status, status = QDF_STATUS_SUCCESS;
 	tCsrRoamInfo roamInfo;
 	uint32_t sessionId = pCommand->sessionId;
 	tCsrRoamSession *pSession = CSR_GET_SESSION(pMac, sessionId);
@@ -6042,7 +6058,18 @@ QDF_STATUS csr_roam_process_command(tpAniSirGlobal pMac, tSmeCmd *pCommand)
 	case eCsrForcedDisassoc:
 		status = csr_roam_process_disassoc_deauth(pMac, pCommand,
 				true, false);
+		lock_status = sme_acquire_global_lock(&pMac->sme);
+		if (!QDF_IS_STATUS_SUCCESS(lock_status)) {
+			csr_roam_complete(pMac, eCsrNothingToJoin, NULL);
+			/*
+			 * Return success so that caller will not remove cmd
+			 * again from smeCmdActiveList as it is already removed
+			 * as part of csr_roam_complete.
+			 */
+			return QDF_STATUS_SUCCESS;
+		}
 		csr_free_roam_profile(pMac, sessionId);
+		sme_release_global_lock(&pMac->sme);
 		break;
 	case eCsrSmeIssuedDisassocForHandoff:
 		/* Not to free pMac->roam.pCurRoamProfile (via
@@ -6055,12 +6082,34 @@ QDF_STATUS csr_roam_process_command(tpAniSirGlobal pMac, tSmeCmd *pCommand)
 	case eCsrForcedDisassocMICFailure:
 		status = csr_roam_process_disassoc_deauth(pMac, pCommand,
 				true, true);
+		lock_status = sme_acquire_global_lock(&pMac->sme);
+		if (!QDF_IS_STATUS_SUCCESS(lock_status)) {
+			csr_roam_complete(pMac, eCsrNothingToJoin, NULL);
+			/*
+			 * Return success so that caller will not remove cmd
+			 * again from smeCmdActiveList as it is already removed
+			 * as part of csr_roam_complete.
+			 */
+			return QDF_STATUS_SUCCESS;
+		}
 		csr_free_roam_profile(pMac, sessionId);
+		sme_release_global_lock(&pMac->sme);
 		break;
 	case eCsrForcedDeauth:
 		status = csr_roam_process_disassoc_deauth(pMac, pCommand,
 				false, false);
+		lock_status = sme_acquire_global_lock(&pMac->sme);
+		if (!QDF_IS_STATUS_SUCCESS(lock_status)) {
+			csr_roam_complete(pMac, eCsrNothingToJoin, NULL);
+			/*
+			 * Return success so that caller will not remove cmd
+			 * again from smeCmdActiveList as it is already removed
+			 * as part of csr_roam_complete.
+			 */
+			return QDF_STATUS_SUCCESS;
+		}
 		csr_free_roam_profile(pMac, sessionId);
+		sme_release_global_lock(&pMac->sme);
 		break;
 	case eCsrHddIssuedReassocToSameAP:
 	case eCsrSmeIssuedReassocToSameAP:
@@ -6120,6 +6169,17 @@ QDF_STATUS csr_roam_process_command(tpAniSirGlobal pMac, tSmeCmd *pCommand)
 
 		if (pCommand->u.roamCmd.fUpdateCurRoamProfile) {
 			/* Remember the roaming profile */
+			lock_status = sme_acquire_global_lock(&pMac->sme);
+			if (!QDF_IS_STATUS_SUCCESS(lock_status)) {
+				csr_roam_complete(pMac,
+					eCsrNothingToJoin, NULL);
+				/*
+				 * Return success so that caller will not remove
+				 * cmd again from smeCmdActiveList as it is
+				 * already removed as part of csr_roam_complete.
+				 */
+				return QDF_STATUS_SUCCESS;
+			}
 			csr_free_roam_profile(pMac, sessionId);
 			pSession->pCurRoamProfile =
 					qdf_mem_malloc(sizeof(tCsrRoamProfile));
@@ -6128,6 +6188,7 @@ QDF_STATUS csr_roam_process_command(tpAniSirGlobal pMac, tSmeCmd *pCommand)
 					pSession->pCurRoamProfile,
 					&pCommand->u.roamCmd.roamProfile);
 			}
+			sme_release_global_lock(&pMac->sme);
 		}
 		/*
 		 * At this point original uapsd_mask is saved in
@@ -11275,6 +11336,44 @@ csr_roam_chk_lnk_assoc_ind(tpAniSirGlobal mac_ctx, tSirSmeRsp *msg_ptr)
 	}
 }
 
+static bool csr_is_deauth_disassoc_already_active(tpAniSirGlobal mac_ctx,
+		uint8_t session_id, struct qdf_mac_addr peer_macaddr)
+{
+	bool ret = false, active_cmd = false;
+	tSmeCmd *sme_cmd;
+	tListElem *entry;
+
+	entry = csr_ll_peek_head(&mac_ctx->sme.smeCmdActiveList,
+				 LL_ACCESS_LOCK);
+	while (entry) {
+		sme_cmd = GET_BASE_ADDR(entry, tSmeCmd, Link);
+		if (sme_cmd->command == eSmeCommandRoam &&
+		    (sme_cmd->u.roamCmd.roamReason == eCsrForcedDeauthSta ||
+		     sme_cmd->u.roamCmd.roamReason == eCsrForcedDisassocSta) &&
+		    sme_cmd->sessionId == session_id) {
+			active_cmd = true;
+			break;
+		}
+		entry = csr_ll_next(&mac_ctx->sme.smeCmdActiveList, entry,
+				    LL_ACCESS_LOCK);
+	}
+
+	if (!active_cmd)
+		return ret;
+
+	if ((mac_ctx->roam.curSubState[session_id] ==
+	     eCSR_ROAM_SUBSTATE_DEAUTH_REQ ||
+	     mac_ctx->roam.curSubState[session_id] ==
+	     eCSR_ROAM_SUBSTATE_DISASSOC_REQ) &&
+	    !qdf_mem_cmp(peer_macaddr.bytes, sme_cmd->u.roamCmd.peerMac,
+			 QDF_MAC_ADDR_SIZE)) {
+			sme_err("Ignore DEAUTH_IND/DIASSOC_IND as Deauth/Disassoc already in progress");
+			ret = true;
+	}
+
+	return ret;
+}
+
 static void
 csr_roam_chk_lnk_disassoc_ind(tpAniSirGlobal mac_ctx, tSirSmeRsp *msg_ptr)
 {
@@ -11301,6 +11400,12 @@ csr_roam_chk_lnk_disassoc_ind(tpAniSirGlobal mac_ctx, tSirSmeRsp *msg_ptr)
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		sme_err("Session Id not found for BSSID "MAC_ADDRESS_STR,
 			MAC_ADDR_ARRAY(pDisassocInd->bssid.bytes));
+		qdf_mem_free(cmd);
+		return;
+	}
+
+	if (csr_is_deauth_disassoc_already_active(mac_ctx, sessionId,
+	    pDisassocInd->peer_macaddr)) {
 		qdf_mem_free(cmd);
 		return;
 	}
@@ -11436,6 +11541,11 @@ csr_roam_chk_lnk_deauth_ind(tpAniSirGlobal mac_ctx, tSirSmeRsp *msg_ptr)
 						   &sessionId);
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		return;
+
+	if (csr_is_deauth_disassoc_already_active(mac_ctx, sessionId,
+	    pDeauthInd->peer_macaddr))
+		return;
+
 	/* If we are in neighbor preauth done state then on receiving
 	 * disassoc or deauth we dont roam instead we just disassoc
 	 * from current ap and then go to disconnected state
@@ -19215,6 +19325,7 @@ static void csr_update_fils_params_rso(tpAniSirGlobal mac,
 {
 	struct roam_fils_params *roam_fils_params;
 	struct cds_fils_connection_info *fils_info;
+	uint32_t usr_name_len;
 
 	if (!session->pCurRoamProfile)
 		return;
@@ -19236,11 +19347,19 @@ static void csr_update_fils_params_rso(tpAniSirGlobal mac,
 		return;
 	}
 
+	usr_name_len = copy_all_before_char(fils_info->keyname_nai,
+					    roam_fils_params->username,
+					    '@',
+					    WMI_FILS_MAX_USERNAME_LENGTH);
+
+	if (fils_info->key_nai_length <= usr_name_len) {
+		sme_err("Fils info len error: key nai len %d, user name len %d",
+			fils_info->key_nai_length, usr_name_len);
+		return;
+	}
+
+	roam_fils_params->username_length = usr_name_len;
 	req_buffer->is_fils_connection = true;
-	roam_fils_params->username_length =
-			copy_all_before_char(fils_info->keyname_nai,
-				roam_fils_params->username, '@',
-				WMI_FILS_MAX_USERNAME_LENGTH);
 
 	roam_fils_params->next_erp_seq_num =
 			(fils_info->sequence_number + 1);

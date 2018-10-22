@@ -631,7 +631,7 @@ static void hdd_update_dbs_scan_ctrl_ext_flag(hdd_context_t *hdd_ctx,
 
 	if (!(hdd_ctx->is_dbs_scan_duty_cycle_enabled)) {
 		scan_dbs_policy = HDD_SCAN_DBS_POLICY_IGNORE_DUTY;
-		hdd_info_ratelimited(HDD_DBS_SCAN_DISABLE_RATE_LIMIT,
+		hdd_debug_ratelimited(HDD_DBS_SCAN_DISABLE_RATE_LIMIT,
 				     "DBS scan duty cycle is disabled");
 		goto end;
 	}
@@ -2069,19 +2069,20 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 		    !pHddCtx->last_scan_reject_timestamp) {
 			pHddCtx->last_scan_reject_session_id = curr_session_id;
 			pHddCtx->last_scan_reject_reason = curr_reason;
-			pHddCtx->last_scan_reject_timestamp =
-				jiffies_to_msecs(jiffies) +
-				SCAN_REJECT_THRESHOLD_TIME;
+			pHddCtx->last_scan_reject_timestamp = jiffies +
+				msecs_to_jiffies(SCAN_REJECT_THRESHOLD_TIME);
 			pHddCtx->scan_reject_cnt = 0;
 		} else {
 			pHddCtx->scan_reject_cnt++;
 			if ((pHddCtx->scan_reject_cnt >=
 			   SCAN_REJECT_THRESHOLD) &&
-			   qdf_system_time_after(jiffies_to_msecs(jiffies),
+			   qdf_system_time_after(jiffies,
 			   pHddCtx->last_scan_reject_timestamp)) {
-				hdd_err("scan reject threshold reached Session %d Reason %d count %d",
+				hdd_err("scan reject threshold reached Session %d Reason %d count %d reject timestamp %lu jiffies %lu",
 					curr_session_id, curr_reason,
-					pHddCtx->scan_reject_cnt);
+					pHddCtx->scan_reject_cnt,
+					pHddCtx->last_scan_reject_timestamp,
+					jiffies);
 				pHddCtx->last_scan_reject_timestamp = 0;
 				pHddCtx->scan_reject_cnt = 0;
 				if (pHddCtx->config->enable_fatal_event) {
