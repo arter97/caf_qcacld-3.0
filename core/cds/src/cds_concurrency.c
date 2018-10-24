@@ -3775,8 +3775,18 @@ void cds_clear_concurrency_mode(enum tQDF_ADAPTER_MODE mode)
 		hdd_green_ap_start_bss(hdd_ctx);
 }
 
+/**
+ * cds_pdev_set_pcl() - Sets PCL to FW
+ * @mode: adapter mode
+ *
+ * Fetches the PCL and sends the PCL to SME
+ * module which in turn will send the WMI
+ * command WMI_PDEV_SET_PCL_CMDID to the fw
+ *
+ * Return: None
+ */
 #if defined(QCA_WIFI_3_0)
-void cds_pdev_set_pcl(enum tQDF_ADAPTER_MODE mode)
+static void cds_pdev_set_pcl(enum tQDF_ADAPTER_MODE mode)
 {
 	QDF_STATUS status;
 	enum cds_con_mode con_mode;
@@ -3833,15 +3843,7 @@ static void cds_pdev_set_pcl(enum tQDF_ADAPTER_MODE mode)
 }
 #endif
 
-/**
- * cds_set_pcl_for_existing_combo() - Set PCL for existing connection
- * @mode: Connection mode of type 'cds_con_mode'
- *
- * Set the PCL for an existing connection
- *
- * Return: None
- */
-static void cds_set_pcl_for_existing_combo(enum cds_con_mode mode)
+void cds_set_pcl_for_existing_combo(enum cds_con_mode mode)
 {
 	struct cds_conc_connection_info
 				info[MAX_NUMBER_OF_CONC_CONNECTIONS] = { {0} };
