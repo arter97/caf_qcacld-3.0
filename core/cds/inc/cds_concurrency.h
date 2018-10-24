@@ -978,14 +978,12 @@ bool cds_disallow_mcc(uint8_t channel);
 uint8_t cds_get_alternate_channel_for_sap(void);
 
 /**
- * cds_pdev_set_pcl() - Sets PCL to FW
- * @mode: adapter mode
+ * cds_set_pcl_for_existing_combo() - Set PCL for existing connection
+ * @mode: Connection mode of type 'cds_con_mode'
  *
- * Fetches the PCL and sends the PCL to SME
- * module which in turn will send the WMI
- * command WMI_PDEV_SET_PCL_CMDID to the fw
+ * Set the PCL for an existing connection
  *
  * Return: None
  */
-void cds_pdev_set_pcl(enum tQDF_ADAPTER_MODE mode);
+void cds_set_pcl_for_existing_combo(enum cds_con_mode mode);
 #endif /* __CDS_CONCURRENCY_H */
