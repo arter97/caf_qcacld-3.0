@@ -1782,25 +1782,35 @@ static void dp_teardown_256_ba_sessions(struct dp_peer *peer)
 
 	for (tid = 0; tid < DP_MAX_TIDS; tid++) {
 		rx_tid = &peer->rx_tid[tid];
-		if (rx_tid->ba_win_size > 64 &&
-		   (rx_tid->ba_status == DP_RX_BA_ACTIVE ||
-		    rx_tid->ba_status == DP_RX_BA_IN_PROGRESS)) {
-			/* send delba */
-			if (!rx_tid->delba_tx_status) {
-				rx_tid->delba_tx_count++;
-				rx_tid->delba_tx_retry++;
-				rx_tid->delba_tx_status = 1;
-				rx_tid->delba_rcode =
-				IEEE80211_REASON_QOS_SETUP_REQUIRED;
-			}
+		qdf_spin_lock_bh(&rx_tid->tid_lock);
+
+		if (rx_tid->ba_win_size <= 64) {
 			qdf_spin_unlock_bh(&rx_tid->tid_lock);
-			peer->vdev->pdev->soc->cdp_soc.ol_ops->send_delba(
-					peer->vdev->pdev->osif_pdev,
-					peer->ol_peer,
-					peer->mac_addr.raw,
-					tid,
-					rx_tid->delba_rcode);
-			qdf_spin_lock_bh(&rx_tid->tid_lock);
+			continue;
+		} else {
+			if (rx_tid->ba_status == DP_RX_BA_ACTIVE ||
+				rx_tid->ba_status == DP_RX_BA_IN_PROGRESS) {
+				/* send delba */
+				if (!rx_tid->delba_tx_status) {
+					rx_tid->delba_tx_count++;
+					rx_tid->delba_tx_retry++;
+					rx_tid->delba_tx_status = 1;
+					rx_tid->delba_rcode =
+					IEEE80211_REASON_QOS_SETUP_REQUIRED;
+
+					qdf_spin_unlock_bh(&rx_tid->tid_lock);
+					peer->vdev->pdev->soc->cdp_soc.ol_ops->send_delba(
+						peer->vdev->pdev->osif_pdev,
+						peer->ol_peer,
+						peer->mac_addr.raw,
+						tid,
+						rx_tid->delba_rcode);
+				} else {
+					qdf_spin_unlock_bh(&rx_tid->tid_lock);
+				}
+			} else {
+				qdf_spin_unlock_bh(&rx_tid->tid_lock);
+			}
 		}
 	}
 }
@@ -1856,6 +1866,8 @@ int dp_addba_resp_tx_completion_wifi3(void *peer_handle,
 	rx_tid->ba_status = DP_RX_BA_ACTIVE;
 	peer->active_ba_session_cnt++;
 
+	qdf_spin_unlock_bh(&rx_tid->tid_lock);
+
 	/* Kill any session having 256 buffer size
 	 * when 64 buffer size request is received.
 	 * Also, latch on to 64 as new buffer size.
@@ -1865,7 +1877,6 @@ int dp_addba_resp_tx_completion_wifi3(void *peer_handle,
 		peer->kill_256_sessions = 0;
 	}
 
-	qdf_spin_unlock_bh(&rx_tid->tid_lock);
 	return 0;
 }
 
@@ -1909,33 +1920,35 @@ void dp_addba_responsesetup_wifi3(void *peer_handle, uint8_t tid,
  * @peer: Datapath peer
  * @tid: Tid
  * @buffersize: Block ack window size
+ * @window_size: Selected window size
  *
  * Return: void
  */
 static void dp_check_ba_buffersize(struct dp_peer *peer,
 				   uint16_t tid,
-				   uint16_t buffersize)
+				   uint16_t buffersize,
+				   uint16_t *window_size)
 {
 	struct dp_rx_tid *rx_tid = NULL;
 
 	rx_tid = &peer->rx_tid[tid];
 
 	if (peer->active_ba_session_cnt == 0)
-		rx_tid->ba_win_size = buffersize;
+		*window_size = buffersize;
 
 	else {
 		/* Second session onwards */
 		if (peer->hw_buffer_size == 64) {
 			if (buffersize <= 64)
-				rx_tid->ba_win_size = buffersize;
+				*window_size = buffersize;
 			else
-				rx_tid->ba_win_size = peer->hw_buffer_size;
+				*window_size = peer->hw_buffer_size;
 		}
 		else if (peer->hw_buffer_size == 256) {
 			if (buffersize > 64)
-				rx_tid->ba_win_size = buffersize;
+				*window_size = buffersize;
 			else {
-				rx_tid->ba_win_size = buffersize;
+				*window_size = buffersize;
 				peer->hw_buffer_size = 64;
 				peer->kill_256_sessions = 1;
 			}
@@ -1962,6 +1975,7 @@ int dp_addba_requestprocess_wifi3(void *peer_handle,
 {
 	struct dp_peer *peer = (struct dp_peer *)peer_handle;
 	struct dp_rx_tid *rx_tid = NULL;
+	uint16_t window_size;
 
 	if (!peer) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_DEBUG,
@@ -1997,9 +2011,9 @@ int dp_addba_requestprocess_wifi3(void *peer_handle,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	dp_check_ba_buffersize(peer, tid, buffersize);
+	dp_check_ba_buffersize(peer, tid, buffersize, &window_size);
 
-	if (dp_rx_tid_setup_wifi3(peer, tid, buffersize, startseqnum)) {
+	if (dp_rx_tid_setup_wifi3(peer, tid, window_size, startseqnum)) {
 		rx_tid->ba_status = DP_RX_BA_INACTIVE;
 		qdf_spin_unlock_bh(&rx_tid->tid_lock);
 		return QDF_STATUS_E_FAILURE;
