@@ -3105,6 +3105,11 @@ static int wma_pdev_set_hw_mode_resp_evt_handler(void *handle,
 			QDF_BUG(0);
 			goto fail;
 		}
+		if (vdev_id >= wma->max_bssid) {
+			WMA_LOGE("%s: vdev_id: %d is invalid, max_bssid: %d",
+					__func__, vdev_id, wma->max_bssid);
+			goto fail;
+		}
 		mac_id = WMA_PDEV_TO_MAC_MAP(vdev_mac_entry[i].pdev_id);
 
 		WMA_LOGE("%s: vdev_id:%d mac_id:%d",
@@ -3191,6 +3196,11 @@ void wma_process_pdev_hw_mode_trans_ind(void *handle,
 			WMA_LOGE("%s: soc level id received for mac id)",
 					__func__);
 			QDF_BUG(0);
+			return;
+		}
+		if (vdev_id >= wma->max_bssid) {
+			WMA_LOGE("%s: vdev_id: %d is invalid, max_bssid: %d",
+					__func__, vdev_id, wma->max_bssid);
 			return;
 		}
 
@@ -6103,8 +6113,9 @@ QDF_STATUS wma_wait_for_ready_event(WMA_HANDLE handle)
 	QDF_STATUS qdf_status;
 
 	/* wait until WMI_READY_EVENTID received from FW */
-	qdf_status = qdf_wait_single_event(&(wma_handle->wma_ready_event),
-					   WMA_READY_EVENTID_TIMEOUT);
+	qdf_status = qdf_wait_for_event_completion(
+					&wma_handle->wma_ready_event,
+					WMA_READY_EVENTID_TIMEOUT);
 
 	if (QDF_STATUS_SUCCESS != qdf_status) {
 		WMA_LOGE("%s: Timeout waiting for ready event from FW",

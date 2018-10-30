@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2018 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -1503,6 +1503,13 @@ static int wma_unified_radio_tx_power_level_stats_event_handler(void *handle,
 		return -EINVAL;
 	}
 
+	if (fixed_param->radio_id >= link_stats_results->num_radio) {
+		WMA_LOGE("%s: Invalid radio_id %d num_radio %d",
+			 __func__, fixed_param->radio_id,
+			 link_stats_results->num_radio);
+		return -EINVAL;
+	}
+
 	rs_results = (tSirWifiRadioStat *) &link_stats_results->results[0] +
 							 fixed_param->radio_id;
 	tx_power_level_values = (uint8_t *) param_tlvs->tx_time_per_power_level;
@@ -1653,6 +1660,13 @@ static int wma_unified_link_radio_stats_event_handler(void *handle,
 	}
 	link_stats_results_size = sizeof(*link_stats_results) +
 				  fixed_param->num_radio * radio_stats_size;
+
+	if (radio_stats->radio_id >= fixed_param->num_radio) {
+		WMA_LOGE("%s: Invalid radio_id %d num_radio %d",
+			 __func__, radio_stats->radio_id,
+			 fixed_param->num_radio);
+		return -EINVAL;
+	}
 
 	if (!wma_handle->link_stats_results) {
 		wma_handle->link_stats_results = qdf_mem_malloc(
