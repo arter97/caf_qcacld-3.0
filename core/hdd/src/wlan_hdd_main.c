@@ -3914,7 +3914,6 @@ int hdd_vdev_destroy(struct hdd_adapter *adapter)
 	}
 
 release_vdev:
-	ucfg_scan_clear_vdev_del_in_progress(adapter->hdd_vdev);
 	/*
 	 * In SSR or driver unloading case, directly exit may cause objects
 	 * leak, if sme_close_session failed. Free objects anyway.
