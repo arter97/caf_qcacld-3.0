@@ -250,13 +250,13 @@ dp_rx_link_desc_return(struct dp_soc *soc, void *ring_desc, uint8_t bm_action)
  */
 static uint32_t dp_rx_msdus_drop(struct dp_soc *soc, void *ring_desc,
 		struct hal_rx_mpdu_desc_info *mpdu_desc_info,
-		union dp_rx_desc_list_elem_t **head,
-		union dp_rx_desc_list_elem_t **tail,
+		uint8_t *mac_id,
 		uint32_t quota)
 {
 	uint32_t rx_bufs_used = 0;
 	void *link_desc_va;
 	struct hal_buf_info buf_info;
+	struct dp_pdev *pdev;
 	struct hal_rx_msdu_list msdu_list; /* MSDU's per MPDU */
 	int i;
 	uint8_t *rx_tlv_hdr;
@@ -277,6 +277,10 @@ static uint32_t dp_rx_msdus_drop(struct dp_soc *soc, void *ring_desc,
 
 		qdf_assert(rx_desc);
 
+		/* all buffers from a MSDU link link belong to same pdev */
+		*mac_id = rx_desc->pool_id;
+		pdev = soc->pdev_list[rx_desc->pool_id];
+
 		if (!dp_rx_desc_check_magic(rx_desc)) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 					FL("Invalid rx_desc cookie=%d"),
@@ -296,7 +300,8 @@ static uint32_t dp_rx_msdus_drop(struct dp_soc *soc, void *ring_desc,
 		/* Just free the buffers */
 		qdf_nbuf_free(rx_desc->nbuf);
 
-		dp_rx_add_to_free_desc_list(head, tail, rx_desc);
+		dp_rx_add_to_free_desc_list(&pdev->free_list_head,
+					    &pdev->free_list_tail, rx_desc);
 	}
 
 	/* Return link descriptor through WBM ring (SW2WBM)*/
@@ -326,8 +331,7 @@ static uint32_t dp_rx_msdus_drop(struct dp_soc *soc, void *ring_desc,
 static uint32_t
 dp_rx_pn_error_handle(struct dp_soc *soc, void *ring_desc,
 		      struct hal_rx_mpdu_desc_info *mpdu_desc_info,
-		      union dp_rx_desc_list_elem_t **head,
-		      union dp_rx_desc_list_elem_t **tail,
+		      uint8_t *mac_id,
 		      uint32_t quota)
 {
 	uint16_t peer_id;
@@ -361,7 +365,7 @@ dp_rx_pn_error_handle(struct dp_soc *soc, void *ring_desc,
 	if (!peer_pn_policy)
 		rx_bufs_used = dp_rx_msdus_drop(soc, ring_desc,
 						mpdu_desc_info,
-						head, tail, quota);
+						mac_id, quota);
 
 	return rx_bufs_used;
 }
@@ -389,12 +393,10 @@ dp_rx_pn_error_handle(struct dp_soc *soc, void *ring_desc,
 static uint32_t
 dp_rx_2k_jump_handle(struct dp_soc *soc, void *ring_desc,
 		     struct hal_rx_mpdu_desc_info *mpdu_desc_info,
-		     union dp_rx_desc_list_elem_t **head,
-		     union dp_rx_desc_list_elem_t **tail,
-		     uint32_t quota)
+		     uint8_t *mac_id, uint32_t quota)
 {
 	return dp_rx_msdus_drop(soc, ring_desc, mpdu_desc_info,
-				head, tail, quota);
+				mac_id, quota);
 }
 
 /**
@@ -973,9 +975,10 @@ dp_rx_err_process(struct dp_soc *soc, void *hal_ring, uint32_t quota)
 {
 	void *hal_soc;
 	void *ring_desc;
-	union dp_rx_desc_list_elem_t *head = NULL;
-	union dp_rx_desc_list_elem_t *tail = NULL;
+	uint32_t count = 0;
 	uint32_t rx_bufs_used = 0;
+	uint32_t rx_bufs_reaped[MAX_PDEV_CNT] = { 0 };
+	uint8_t mac_id = 0;
 	uint8_t buf_type;
 	uint8_t error, rbm;
 	struct hal_rx_mpdu_desc_info mpdu_desc_info;
@@ -1062,9 +1065,10 @@ dp_rx_err_process(struct dp_soc *soc, void *hal_ring, uint32_t quota)
 
 		if (mpdu_desc_info.mpdu_flags & HAL_MPDU_F_FRAGMENT) {
 			/* TODO */
-			rx_bufs_used += dp_rx_frag_handle(soc,
+			count = dp_rx_frag_handle(soc,
 					ring_desc, &mpdu_desc_info,
-					&head, &tail, quota);
+					&mac_id, quota);
+			rx_bufs_reaped[mac_id] += count;
 			DP_STATS_INC(soc, rx.rx_frags, 1);
 			continue;
 		}
@@ -1075,9 +1079,10 @@ dp_rx_err_process(struct dp_soc *soc, void *hal_ring, uint32_t quota)
 				rx.err.
 				reo_error[HAL_REO_ERR_PN_CHECK_FAILED],
 				1);
-			rx_bufs_used += dp_rx_pn_error_handle(soc,
+			count = dp_rx_pn_error_handle(soc,
 					ring_desc, &mpdu_desc_info,
-					&head, &tail, quota);
+					&mac_id, quota);
+			rx_bufs_reaped[mac_id] += count;
 			continue;
 		}
 
@@ -1087,9 +1092,10 @@ dp_rx_err_process(struct dp_soc *soc, void *hal_ring, uint32_t quota)
 				rx.err.
 				reo_error[HAL_REO_ERR_REGULAR_FRAME_2K_JUMP],
 				1);
-			rx_bufs_used += dp_rx_2k_jump_handle(soc,
+			count = dp_rx_2k_jump_handle(soc,
 					ring_desc, &mpdu_desc_info,
-					&head, &tail, quota);
+					&mac_id, quota);
+			rx_bufs_reaped[mac_id] += count;
 			continue;
 		}
 	}
@@ -1100,14 +1106,19 @@ done:
 	if (soc->rx.flags.defrag_timeout_check)
 		dp_rx_defrag_waitlist_flush(soc);
 
-	/* Assume MAC id = 0, owner = 0 */
-	if (rx_bufs_used) {
-		dp_pdev = soc->pdev_list[0];
-		dp_rxdma_srng = &dp_pdev->rx_refill_buf_ring;
-		rx_desc_pool = &soc->rx_desc_buf[0];
+	for (mac_id = 0; mac_id < MAX_PDEV_CNT; mac_id++) {
+		if (rx_bufs_reaped[mac_id]) {
+			dp_pdev = soc->pdev_list[mac_id];
+			dp_rxdma_srng = &dp_pdev->rx_refill_buf_ring;
+			rx_desc_pool = &soc->rx_desc_buf[mac_id];
 
-		dp_rx_buffers_replenish(soc, 0, dp_rxdma_srng, rx_desc_pool,
-			rx_bufs_used, &head, &tail, HAL_RX_BUF_RBM_SW3_BM);
+			dp_rx_buffers_replenish(soc, mac_id, dp_rxdma_srng,
+					rx_desc_pool, rx_bufs_reaped[mac_id],
+					&dp_pdev->free_list_head,
+					&dp_pdev->free_list_tail,
+					HAL_RX_BUF_RBM_SW3_BM);
+			rx_bufs_used += rx_bufs_reaped[mac_id];
+		}
 	}
 
 	return rx_bufs_used; /* Assume no scale factor for now */

@@ -1224,6 +1224,9 @@ struct dp_pdev {
 		uint32_t mgmt_buf_len; /* Len of mgmt. payload in ppdu stats */
 		uint32_t ppdu_id;
 	} mgmtctrl_frm_info;
+
+	union dp_rx_desc_list_elem_t *free_list_head;
+	union dp_rx_desc_list_elem_t *free_list_tail;
 };
 
 struct dp_peer;
