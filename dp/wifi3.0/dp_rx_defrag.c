@@ -22,6 +22,7 @@
 #include "hal_api.h"
 #include "qdf_trace.h"
 #include "qdf_nbuf.h"
+#include "dp_internal.h"
 #include "dp_rx_defrag.h"
 #include <enet.h>	/* LLC_SNAP_HDR_LEN */
 #include "dp_rx_defrag.h"
@@ -185,7 +186,7 @@ void dp_rx_defrag_waitlist_flush(struct dp_soc *soc)
 
 		TAILQ_REMOVE(&soc->rx.defrag.waitlist, rx_reorder,
 			     defrag_waitlist_elem);
-		//dp_rx_defrag_waitlist_remove(peer, tid);
+		DP_STATS_DEC(soc, rx.rx_frag_wait, 1);
 		dp_rx_reorder_flush_frag(peer, tid);
 	}
 }
@@ -210,6 +211,7 @@ static void dp_rx_defrag_waitlist_add(struct dp_peer *peer, unsigned tid)
 	/* TODO: use LIST macros instead of TAIL macros */
 	TAILQ_INSERT_TAIL(&psoc->rx.defrag.waitlist, rx_reorder,
 				defrag_waitlist_elem);
+	DP_STATS_INC(psoc, rx.rx_frag_wait, 1);
 }
 
 /*
@@ -239,9 +241,11 @@ void dp_rx_defrag_waitlist_remove(struct dp_peer *peer, unsigned tid)
 
 	TAILQ_FOREACH(rx_reorder, &soc->rx.defrag.waitlist,
 			   defrag_waitlist_elem) {
-		if (rx_reorder->tid == tid)
+		if (rx_reorder->tid == tid) {
 			TAILQ_REMOVE(&soc->rx.defrag.waitlist,
 				rx_reorder, defrag_waitlist_elem);
+			DP_STATS_DEC(soc, rx.rx_frag_wait, 1);
+		}
 	}
 }
 
@@ -1317,7 +1321,7 @@ static QDF_STATUS dp_rx_defrag_store_fragment(struct dp_soc *soc,
 		dp_rx_add_to_free_desc_list(head, tail, rx_desc);
 		*rx_bfs = 1;
 
-		return QDF_STATUS_E_DEFRAG_ERROR;
+		goto end;
 	}
 
 	pdev = peer->vdev->pdev;
@@ -1391,11 +1395,9 @@ static QDF_STATUS dp_rx_defrag_store_fragment(struct dp_soc *soc,
 			/* Drop stored fragments if out of sequence
 			 * fragment is received
 			 */
-			dp_rx_defrag_frames_free(rx_reorder_array_elem->head);
+			dp_rx_reorder_flush_frag(peer, tid);
 
-			rx_reorder_array_elem->head = NULL;
-			rx_reorder_array_elem->tail = NULL;
-
+			DP_STATS_INC(soc, rx.rx_frag_err, 1);
 			QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 				"%s mismatch, dropping earlier sequence ",
 				(rxseq == rx_tid->curr_seq_num)
@@ -1407,7 +1409,6 @@ static QDF_STATUS dp_rx_defrag_store_fragment(struct dp_soc *soc,
 			 * new sequence number to be processed
 			 */
 			rx_tid->curr_seq_num = rxseq;
-
 		}
 	} else {
 		/* Start of a new sequence */
@@ -1513,6 +1514,7 @@ static QDF_STATUS dp_rx_defrag_store_fragment(struct dp_soc *soc,
 	return QDF_STATUS_SUCCESS;
 
 end:
+	DP_STATS_INC(soc, rx.rx_frag_err, 1);
 	return QDF_STATUS_E_DEFRAG_ERROR;
 }
 
@@ -1548,7 +1550,8 @@ uint32_t dp_rx_frag_handle(struct dp_soc *soc, void *ring_desc,
 	uint32_t tid, msdu_len;
 	int idx, rx_bfs = 0;
 	struct dp_pdev *pdev;
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct dp_rx_desc *rx_desc = NULL;
 
 	qdf_assert(soc);
 	qdf_assert(mpdu_desc_info);
@@ -1576,16 +1579,16 @@ uint32_t dp_rx_frag_handle(struct dp_soc *soc, void *ring_desc,
 		&mpdu_desc_info->msdu_count);
 
 	/* Process all MSDUs in the current MPDU */
-	for (idx = 0; (idx < mpdu_desc_info->msdu_count) && quota--; idx++) {
+	for (idx = 0; (idx < mpdu_desc_info->msdu_count); idx++) {
 		struct dp_rx_desc *rx_desc =
 			dp_rx_cookie_2_va_rxdma_buf(soc,
 				msdu_list.sw_cookie[idx]);
 
+		qdf_assert_always(rx_desc);
+
 		/* all buffers in MSDU link belong to same pdev */
 		pdev = soc->pdev_list[rx_desc->pool_id];
 		*mac_id = rx_desc->pool_id;
-
-		qdf_assert(rx_desc);
 
 		msdu = rx_desc->nbuf;
 
@@ -1621,6 +1624,30 @@ uint32_t dp_rx_frag_handle(struct dp_soc *soc, void *ring_desc,
 			/* No point in processing rest of the fragments */
 			break;
 		}
+	}
+
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		/* drop any remaining buffers in current descriptor */
+		idx++;
+		for (; (idx < mpdu_desc_info->msdu_count); idx++) {
+			rx_desc =
+				dp_rx_cookie_2_va_rxdma_buf(soc,
+							    msdu_list.sw_cookie[idx]);
+			qdf_assert(rx_desc);
+			msdu = rx_desc->nbuf;
+			qdf_nbuf_unmap_single(soc->osdev, msdu,
+					      QDF_DMA_BIDIRECTIONAL);
+			qdf_nbuf_free(msdu);
+			dp_rx_add_to_free_desc_list(&pdev->free_list_head,
+						    &pdev->free_list_tail,
+						    rx_desc);
+			rx_bufs_used++;
+		}
+		if (dp_rx_link_desc_return(soc, ring_desc,
+					   HAL_BM_ACTION_PUT_IN_IDLE_LIST) !=
+					   QDF_STATUS_SUCCESS)
+			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+				  "%s: Failed to return link desc", __func__);
 	}
 
 	return rx_bufs_used;
