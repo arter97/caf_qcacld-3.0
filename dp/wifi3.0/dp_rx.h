@@ -22,6 +22,7 @@
 #include "hal_rx.h"
 #include "dp_tx.h"
 #include "dp_peer.h"
+#include "dp_internal.h"
 
 #ifdef RXDMA_OPTIMIZATION
 #define RX_BUFFER_ALIGNMENT     128
@@ -392,8 +393,10 @@ dp_rx_wds_srcport_learn(struct dp_soc *soc,
 	uint32_t ret = 0;
 	uint8_t wds_src_mac[IEEE80211_ADDR_LEN];
 	struct dp_peer *sa_peer;
+	struct dp_peer *wds_peer;
 	struct dp_ast_entry *ast;
 	uint16_t sa_idx;
+	bool del_in_progress;
 
 	if (qdf_unlikely(!ta_peer))
 		return;
@@ -442,6 +445,23 @@ dp_rx_wds_srcport_learn(struct dp_soc *soc,
 	 * this is very unlikely scenario.
 	 */
 	if (!ast) {
+		wds_peer = dp_peer_find_hash_find(soc, wds_src_mac,
+						  0, DP_VDEV_ALL);
+		if (wds_peer) {
+		    del_in_progress = wds_peer->delete_in_progress;
+		    dp_peer_unref_delete(wds_peer);
+		    if (!del_in_progress) {
+			QDF_TRACE(QDF_MODULE_ID_DP,
+				QDF_TRACE_LEVEL_DEBUG,
+				"wds peer %pM found",
+				wds_src_mac);
+			QDF_TRACE(QDF_MODULE_ID_DP,
+				QDF_TRACE_LEVEL_DEBUG,
+				"No AST no Del in progress");
+		    } else {
+			return;
+		    }
+		}
 		ret = dp_peer_add_ast(soc,
 				      ta_peer,
 				      wds_src_mac,
