@@ -2296,6 +2296,14 @@ ifeq ($(CONFIG_ARCH_MSM8996), y)
 CDEFINES += -DCHANNEL_HOPPING_ALL_BANDS
 endif
 
+ifeq ($(CONFIG_ARCH_MSM8996), y)
+CONFIG_FEATURE_SG := y
+endif
+
+ifeq ($(CONFIG_FEATURE_SG), y)
+CDEFINES += -DFEATURE_SG
+endif
+
 #Enable Signed firmware support for split binary format
 ifeq ($(CONFIG_QCA_SIGNED_SPLIT_BINARY_SUPPORT), 1)
 CDEFINES += -DQCA_SIGNED_SPLIT_BINARY_SUPPORT
