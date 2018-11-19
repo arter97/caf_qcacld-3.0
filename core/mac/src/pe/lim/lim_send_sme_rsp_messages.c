@@ -935,7 +935,12 @@ lim_send_sme_disassoc_ntf(tpAniSirGlobal pMac,
 					pe_err("could not Add STA with assocId: %d",
 					sta_ds->assocId);
 		}
-		failure = true;
+		status = lim_prepare_disconnect_done_ind(pMac, &pMsg,
+				smesessionId, reasonCode, &peerMacAddr[0]);
+		if (!QDF_IS_STATUS_SUCCESS(status)) {
+			pe_err("Failed to prepare message");
+			return;
+		}
 		break;
 
 	case eLIM_HOST_DISASSOC:
@@ -2214,6 +2219,12 @@ void lim_handle_csa_offload_msg(tpAniSirGlobal mac_ctx, tpSirMsgQ msg)
 		return;
 	}
 
+	csa_offload_ind = qdf_mem_malloc(sizeof(tSmeCsaOffloadInd));
+	if (NULL == csa_offload_ind) {
+		pe_err("memalloc fail eWNI_SME_CSA_OFFLOAD_EVENT");
+		goto err;
+	}
+
 	session_entry =
 		pe_find_session_by_bssid(mac_ctx,
 			csa_params->bssId, &session_id);
@@ -2409,12 +2420,15 @@ void lim_handle_csa_offload_msg(tpAniSirGlobal mac_ctx, tpSirMsgQ msg)
 		goto err;
 	}
 
+	if (CDS_IS_CHANNEL_24GHZ(csa_params->channel) &&
+	    (session_entry->dot11mode == WNI_CFG_DOT11_MODE_11A))
+		session_entry->dot11mode = WNI_CFG_DOT11_MODE_11G;
+	else if (CDS_IS_CHANNEL_5GHZ(csa_params->channel) &&
+		 ((session_entry->dot11mode == WNI_CFG_DOT11_MODE_11G) ||
+		 (session_entry->dot11mode == WNI_CFG_DOT11_MODE_11G_ONLY)))
+		session_entry->dot11mode = WNI_CFG_DOT11_MODE_11A;
+
 	lim_prepare_for11h_channel_switch(mac_ctx, session_entry);
-	csa_offload_ind = qdf_mem_malloc(sizeof(tSmeCsaOffloadInd));
-	if (NULL == csa_offload_ind) {
-		pe_err("memalloc fail eWNI_SME_CSA_OFFLOAD_EVENT");
-		goto err;
-	}
 
 	csa_offload_ind->mesgType = eWNI_SME_CSA_OFFLOAD_EVENT;
 	csa_offload_ind->mesgLen = sizeof(tSmeCsaOffloadInd);
