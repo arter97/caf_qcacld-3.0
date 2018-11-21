@@ -730,20 +730,25 @@ QDF_STATUS dp_rx_mon_deliver(struct dp_soc *soc, uint32_t mac_id,
 	mon_mpdu = dp_rx_mon_restitch_mpdu_from_msdus(soc, mac_id, head_msdu,
 				tail_msdu, rs);
 
-	if (pdev->mcopy_mode && mon_mpdu) {
+	if (!mon_mpdu)
+		goto mon_deliver_fail;
+
+	if (pdev->mcopy_mode) {
 		/*check if this is not a mgmt packet*/
 		wh = (struct ieee80211_frame *)qdf_nbuf_data(mon_mpdu);
 		if (((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) !=
 		     IEEE80211_FC0_TYPE_MGT) &&
 		     ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) !=
 		     IEEE80211_FC0_TYPE_CTL)) {
-			goto mon_deliver_fail;
+			qdf_nbuf_free(mon_mpdu);
+			return QDF_STATUS_E_FAILURE;
 		}
 		nbuf_data = (uint32_t *)qdf_nbuf_push_head(mon_mpdu, 4);
 		if (!nbuf_data) {
 			QDF_TRACE(QDF_MODULE_ID_DP,
 				  QDF_TRACE_LEVEL_ERROR,
 				  FL("No headroom"));
+			qdf_nbuf_free(mon_mpdu);
 			return QDF_STATUS_E_NOMEM;
 		}
 		*nbuf_data = pdev->ppdu_info.com_info.ppdu_id;
@@ -757,7 +762,7 @@ QDF_STATUS dp_rx_mon_deliver(struct dp_soc *soc, uint32_t mac_id,
 		return QDF_STATUS_SUCCESS;
 	}
 
-	if (mon_mpdu && pdev->monitor_vdev && pdev->monitor_vdev->osif_vdev &&
+	if (pdev->monitor_vdev && pdev->monitor_vdev->osif_vdev &&
 	    pdev->monitor_vdev->osif_rx_mon) {
 		pdev->ppdu_info.rx_status.ppdu_id =
 			pdev->ppdu_info.com_info.ppdu_id;
@@ -772,7 +777,7 @@ QDF_STATUS dp_rx_mon_deliver(struct dp_soc *soc, uint32_t mac_id,
 			  , __func__, __LINE__, mon_mpdu, pdev->monitor_vdev,
 			  (pdev->monitor_vdev ? pdev->monitor_vdev->osif_vdev
 			   : NULL));
-		goto mon_deliver_fail;
+		qdf_nbuf_free(mon_mpdu);
 	}
 
 	return QDF_STATUS_SUCCESS;
