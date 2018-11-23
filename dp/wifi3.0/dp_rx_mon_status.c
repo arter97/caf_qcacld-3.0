@@ -423,6 +423,9 @@ dp_rx_handle_ppdu_stats(struct dp_soc *soc, struct dp_pdev *pdev,
 					soc, ppdu_nbuf, cdp_rx_ppdu->peer_id,
 					WDI_NO_VAL, pdev->pdev_id);
 				dp_peer_unref_del_find_by_id(peer);
+
+			} else {
+				qdf_nbuf_free(ppdu_nbuf);
 			}
 		} else if (pdev->mcopy_mode) {
 			dp_rx_stats_update(pdev, peer, cdp_rx_ppdu);
