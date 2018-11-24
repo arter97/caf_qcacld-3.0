@@ -6274,6 +6274,10 @@ void wmi_copy_resource_config(wmi_resource_config *resource_cfg,
 				tgt_res_cfg->eapol_minrate_ac_set);
 		}
 	}
+	if (tgt_res_cfg->new_htt_msg_format) {
+		WMI_RSRC_CFG_FLAG_HTT_H2T_NO_HTC_HDR_LEN_IN_MSG_LEN_SET(
+			resource_cfg->flag1, 1);
+	}
 
 	wmi_copy_twt_resource_config(resource_cfg, tgt_res_cfg);
 	resource_cfg->peer_map_unmap_v2_support =
@@ -6374,6 +6378,64 @@ static inline void copy_fw_abi_version_tlv(wmi_unified_t wmi_handle,
 	 */
 	qdf_mem_copy(&wmi_handle->final_abi_vers, &cmd->host_abi_vers,
 			sizeof(wmi_abi_version));
+}
+
+/*
+ * send_cfg_action_frm_tb_ppdu_cmd_tlv() - send action frame tb ppdu cfg to FW
+ * @wmi_handle:    Pointer to WMi handle
+ * @ie_data:       Pointer for ie data
+ *
+ * This function sends action frame tb ppdu cfg to FW
+ *
+ * Return: QDF_STATUS_SUCCESS for success otherwise failure
+ *
+ */
+static QDF_STATUS send_cfg_action_frm_tb_ppdu_cmd_tlv(wmi_unified_t wmi_handle,
+				struct cfg_action_frm_tb_ppdu_param *cfg_msg)
+{
+	wmi_pdev_he_tb_action_frm_cmd_fixed_param *cmd;
+	wmi_buf_t buf;
+	uint8_t *buf_ptr;
+	uint32_t len, frm_len_aligned;
+	QDF_STATUS ret;
+
+	frm_len_aligned = roundup(cfg_msg->frm_len, sizeof(uint32_t));
+	/* Allocate memory for the WMI command */
+	len = sizeof(*cmd) + WMI_TLV_HDR_SIZE + frm_len_aligned;
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf) {
+		WMI_LOGE(FL("wmi_buf_alloc failed"));
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	buf_ptr = wmi_buf_data(buf);
+	qdf_mem_zero(buf_ptr, len);
+
+	/* Populate the WMI command */
+	cmd = (wmi_pdev_he_tb_action_frm_cmd_fixed_param *)buf_ptr;
+
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		WMITLV_TAG_STRUC_wmi_pdev_he_tb_action_frm_cmd_fixed_param,
+		WMITLV_GET_STRUCT_TLVLEN(
+				wmi_pdev_he_tb_action_frm_cmd_fixed_param));
+	cmd->enable = cfg_msg->cfg;
+	cmd->data_len = cfg_msg->frm_len;
+
+	buf_ptr += sizeof(*cmd);
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_BYTE, frm_len_aligned);
+	buf_ptr += WMI_TLV_HDR_SIZE;
+
+	qdf_mem_copy(buf_ptr, cfg_msg->data, cmd->data_len);
+
+	ret = wmi_unified_cmd_send(wmi_handle, buf, len,
+				   WMI_PDEV_HE_TB_ACTION_FRM_CMDID);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		WMI_LOGE(FL("HE TB action frame cmnd send fail, ret %d"), ret);
+		wmi_buf_free(buf);
+	}
+
+	return ret;
 }
 
 static QDF_STATUS save_fw_version_cmd_tlv(wmi_unified_t wmi_handle, void *evt_buf)
@@ -11123,6 +11185,7 @@ struct wmi_ops tlv_ops =  {
 	.send_pdev_set_regdomain_cmd =
 				send_pdev_set_regdomain_cmd_tlv,
 	.send_regdomain_info_to_fw_cmd = send_regdomain_info_to_fw_cmd_tlv,
+	.send_cfg_action_frm_tb_ppdu_cmd = send_cfg_action_frm_tb_ppdu_cmd_tlv,
 	.save_fw_version_cmd = save_fw_version_cmd_tlv,
 	.check_and_update_fw_version =
 		 check_and_update_fw_version_cmd_tlv,
@@ -11797,6 +11860,9 @@ static void populate_tlv_service(uint32_t *wmi_service)
 			WMI_SERVICE_OBSS_SPATIAL_REUSE;
 	wmi_service[wmi_service_per_vdev_chain_support] =
 			WMI_SERVICE_PER_VDEV_CHAINMASK_CONFIG_SUPPORT;
+	wmi_service[wmi_service_new_htt_msg_format] =
+			WMI_SERVICE_HTT_H2T_NO_HTC_HDR_LEN_IN_MSG_LEN;
+
 }
 
 #ifndef CONFIG_MCL
@@ -12052,6 +12118,8 @@ static void populate_pdev_param_tlv(uint32_t *pdev_param)
 	/* Trigger interval for all trigger types. */
 	pdev_param[wmi_pdev_param_ul_trig_int] =
 				WMI_PDEV_PARAM_SET_UL_BSR_TRIG_INTERVAL;
+	pdev_param[wmi_pdev_param_sub_channel_marking] =
+				WMI_PDEV_PARAM_SUB_CHANNEL_MARKING;
 }
 
 /**

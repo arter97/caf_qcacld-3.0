@@ -485,6 +485,18 @@ static inline void dp_peer_map_ast(struct dp_soc *soc,
 	return;
 }
 
+#ifdef AST_HKV1_WORKAROUND
+static inline void
+dp_peer_ast_init_del_cmd_sent_flag(struct dp_ast_entry *ast_entry)
+{
+	ast_entry->del_cmd_sent = false;
+}
+#else
+static inline void
+dp_peer_ast_init_del_cmd_sent_flag(struct dp_ast_entry *ast_entry)
+{}
+#endif
+
 /*
  * dp_peer_add_ast() - Allocate and add AST entry into peer list
  * @soc: SoC handle
@@ -609,6 +621,7 @@ add_ast_entry:
 	ast_entry->pdev_id = vdev->pdev->pdev_id;
 	ast_entry->vdev_id = vdev->vdev_id;
 	ast_entry->is_mapped = false;
+	dp_peer_ast_init_del_cmd_sent_flag(ast_entry);
 
 	switch (type) {
 	case CDP_TXRX_AST_TYPE_STATIC:
@@ -695,14 +708,23 @@ void dp_peer_del_ast(struct dp_soc *soc, struct dp_ast_entry *ast_entry)
 	if (ast_entry->next_hop &&
 	    ast_entry->type != CDP_TXRX_AST_TYPE_WDS_HM_SEC) {
 		dp_peer_ast_send_wds_del(soc, ast_entry);
-	} else {
+	}
+	/* AST free happens in completion handler for HKV1 */
+	if (soc->ast_override_support || !ast_entry->del_cmd_sent) {
 		/*
 		 * release the reference only if it is mapped
 		 * to ast_table
 		 */
 		if (ast_entry->is_mapped)
 			soc->ast_table[ast_entry->ast_idx] = NULL;
-		TAILQ_REMOVE(&peer->ast_entry_list, ast_entry, ase_list_elem);
+
+		/* ast_entry like next_hop is already removed as part of
+		 * AST del command send, Remove ast_entry that dont
+		 * send ast del command.
+		 */
+		if (!ast_entry->del_cmd_sent)
+			TAILQ_REMOVE(&peer->ast_entry_list, ast_entry,
+				     ase_list_elem);
 
 		if (ast_entry == peer->self_ast_entry)
 			peer->self_ast_entry = NULL;
@@ -939,18 +961,18 @@ void dp_peer_ast_send_wds_del(struct dp_soc *soc,
 	struct dp_peer *peer = ast_entry->peer;
 	struct cdp_soc_t *cdp_soc = &soc->cdp_soc;
 
-	if (!ast_entry->wmi_sent) {
+	if (!ast_entry->del_cmd_sent) {
 		cdp_soc->ol_ops->peer_del_wds_entry(peer->vdev->osif_vdev,
 						    ast_entry->mac_addr.raw);
-		ast_entry->wmi_sent = true;
+		ast_entry->del_cmd_sent = true;
 		TAILQ_REMOVE(&peer->ast_entry_list, ast_entry, ase_list_elem);
 	}
 }
 
-bool dp_peer_ast_get_wmi_sent(struct dp_soc *soc,
-			      struct dp_ast_entry *ast_entry)
+bool dp_peer_ast_get_del_cmd_sent(struct dp_soc *soc,
+				  struct dp_ast_entry *ast_entry)
 {
-	return ast_entry->wmi_sent;
+	return ast_entry->del_cmd_sent;
 }
 
 void dp_peer_ast_free_entry(struct dp_soc *soc,
@@ -1955,6 +1977,10 @@ void dp_peer_cleanup(struct dp_vdev *vdev, struct dp_peer *peer)
  *                                64 window size is received.
  *                                This is done as a WAR since HW can
  *                                have only one setting per peer (64 or 256).
+ *                                For HKv2, we use per tid buffersize setting
+ *                                for 0 to per_tid_basize_max_tid. For tid
+ *                                more than per_tid_basize_max_tid we use HKv1
+ *                                method.
  * @peer: Datapath peer
  *
  * Return: void
@@ -1965,7 +1991,8 @@ static void dp_teardown_256_ba_sessions(struct dp_peer *peer)
 	int tid;
 	struct dp_rx_tid *rx_tid = NULL;
 
-	for (tid = 0; tid < DP_MAX_TIDS; tid++) {
+	tid = peer->vdev->pdev->soc->per_tid_basize_max_tid;
+	for (; tid < DP_MAX_TIDS; tid++) {
 		rx_tid = &peer->rx_tid[tid];
 		qdf_spin_lock_bh(&rx_tid->tid_lock);
 
@@ -2123,22 +2150,27 @@ static void dp_check_ba_buffersize(struct dp_peer *peer,
 	struct dp_rx_tid *rx_tid = NULL;
 
 	rx_tid = &peer->rx_tid[tid];
-
-	if (peer->active_ba_session_cnt == 0) {
+	if (peer->vdev->pdev->soc->per_tid_basize_max_tid &&
+	    tid < peer->vdev->pdev->soc->per_tid_basize_max_tid) {
 		rx_tid->ba_win_size = buffersize;
+		return;
 	} else {
-		if (peer->hw_buffer_size == 64) {
-			if (buffersize <= 64)
-				rx_tid->ba_win_size = buffersize;
-			else
-				rx_tid->ba_win_size = peer->hw_buffer_size;
-		} else if (peer->hw_buffer_size == 256) {
-			if (buffersize > 64) {
-				rx_tid->ba_win_size = buffersize;
-			} else {
-				rx_tid->ba_win_size = buffersize;
-				peer->hw_buffer_size = 64;
-				peer->kill_256_sessions = 1;
+		if (peer->active_ba_session_cnt == 0) {
+			rx_tid->ba_win_size = buffersize;
+		} else {
+			if (peer->hw_buffer_size == 64) {
+				if (buffersize <= 64)
+					rx_tid->ba_win_size = buffersize;
+				else
+					rx_tid->ba_win_size = peer->hw_buffer_size;
+			} else if (peer->hw_buffer_size == 256) {
+				if (buffersize > 64) {
+					rx_tid->ba_win_size = buffersize;
+				} else {
+					rx_tid->ba_win_size = buffersize;
+					peer->hw_buffer_size = 64;
+					peer->kill_256_sessions = 1;
+				}
 			}
 		}
 	}
@@ -2190,17 +2222,16 @@ int dp_addba_requestprocess_wifi3(void *peer_handle,
 		qdf_spin_unlock_bh(&rx_tid->tid_lock);
 		return QDF_STATUS_E_FAILURE;
 	}
-
 	dp_check_ba_buffersize(peer, tid, buffersize);
 
-	if (dp_rx_tid_setup_wifi3(peer, tid, buffersize, startseqnum)) {
+	if (dp_rx_tid_setup_wifi3(peer, tid,
+	    rx_tid->ba_win_size, startseqnum)) {
 		rx_tid->ba_status = DP_RX_BA_INACTIVE;
 		qdf_spin_unlock_bh(&rx_tid->tid_lock);
 		return QDF_STATUS_E_FAILURE;
 	}
 	rx_tid->ba_status = DP_RX_BA_IN_PROGRESS;
 
-	rx_tid->ba_win_size = buffersize;
 	rx_tid->dialogtoken = dialogtoken;
 	rx_tid->startseqnum = startseqnum;
 

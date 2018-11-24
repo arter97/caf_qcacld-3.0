@@ -2584,6 +2584,18 @@ struct rcv_pkt_filter_config {
 	struct rcv_pkt_filter_params paramsData[WMI_MAX_NUM_TESTS_PER_FILTER];
 };
 
+/**
+ * struct cfg_action_frm_tb_ppdu_param - action frm in TB PPDU cfg
+ * @cfg - enable/disable
+ * @frm_len - length of the frame
+ * @data - data pointer
+ */
+struct cfg_action_frm_tb_ppdu_param {
+	uint32_t cfg;
+	uint32_t frm_len;
+	uint8_t *data;
+};
+
 #define WMI_MAX_NUM_FW_SEGMENTS 4
 
 /**
@@ -4922,6 +4934,7 @@ typedef enum {
 	wmi_pdev_param_enable_peer_retry_stats,
 	wmi_pdev_param_ul_trig_int,
 	wmi_pdev_param_max,
+	wmi_pdev_param_sub_channel_marking,
 } wmi_conv_pdev_params_id;
 
 
@@ -5224,6 +5237,7 @@ typedef enum {
 	wmi_service_esp_support,
 	wmi_service_obss_spatial_reuse,
 	wmi_service_per_vdev_chain_support,
+	wmi_service_new_htt_msg_format,
 	wmi_services_max,
 } wmi_conv_service_ids;
 #define WMI_SERVICE_UNAVAILABLE 0xFFFF
@@ -5387,7 +5401,8 @@ typedef struct {
 	uint32_t tt_support;
 	uint32_t atf_config:1,
 		 mgmt_comp_evt_bundle_support:1,
-		 tx_msdu_new_partition_id_support:1;
+		 tx_msdu_new_partition_id_support:1,
+		 new_htt_msg_format:1;
 	uint32_t iphdr_pad_config;
 	uint32_t
 		qwrap_config:16,

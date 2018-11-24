@@ -219,12 +219,15 @@ enum dp_ast_type {
  * @dp_nss_cfg_first_radio: First radio offloaded
  * @dp_nss_cfg_second_radio: Second radio offloaded
  * @dp_nss_cfg_dbdc: Dual radios offloaded
+ * @dp_nss_cfg_dbtc: Three radios offloaded
  */
 enum dp_nss_cfg {
-	dp_nss_cfg_default,
-	dp_nss_cfg_first_radio,
-	dp_nss_cfg_second_radio,
-	dp_nss_cfg_dbdc,
+	dp_nss_cfg_default = 0x0,
+	dp_nss_cfg_first_radio = 0x1,
+	dp_nss_cfg_second_radio = 0x2,
+	dp_nss_cfg_dbdc = 0x3,
+	dp_nss_cfg_dbtc = 0x7,
+	dp_nss_cfg_max
 };
 
 /**
@@ -652,7 +655,7 @@ union dp_align_mac_addr {
  * @ast_hash_value: hast value in HW
  * @ref_cnt: reference count
  * @type: flag to indicate type of the entry(static/WDS/MEC)
- * @wmi_sent: Flag to identify of WMI to del ast is sent (AST_HKV1_WORKAROUND)
+ * @del_cmd_sent: Flag to identify if WMI to del ast is sent
  * @cp_ctx: Opaque context used by control path (AST_HKV1_WORKAROUND)
  * @hash_list_elem: node in soc AST hash list (mac address used as hash)
  */
@@ -670,7 +673,7 @@ struct dp_ast_entry {
 	uint16_t ast_hash_value;
 	qdf_atomic_t ref_cnt;
 	enum cdp_txrx_ast_entry_type type;
-	bool wmi_sent;
+	bool del_cmd_sent;
 	void *cp_ctx;
 	TAILQ_ENTRY(dp_ast_entry) ase_list_elem;
 	TAILQ_ENTRY(dp_ast_entry) hash_list_elem;
@@ -950,6 +953,8 @@ struct dp_soc {
 	uint8_t hw_nac_monitor_support;
 	/* Flag to indicate if HTT v2 is enabled*/
 	bool is_peer_map_unmap_v2;
+	/* Per peer per Tid ba window size support */
+	uint8_t per_tid_basize_max_tid;
 };
 
 #ifdef IPA_OFFLOAD

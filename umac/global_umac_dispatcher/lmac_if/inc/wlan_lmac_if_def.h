@@ -597,6 +597,7 @@ struct wlan_lmac_if_reg_tx_ops {
  *                                      support.
  * @dfs_send_avg_radar_params_to_fw:    Send average radar parameters to FW.
  * @dfs_send_usenol_pdev_param:         Send usenol pdev param to FW.
+ * @dfs_send_subchan_marking_pdev_param: Send subchan marking pdev param to FW.
  */
 
 struct wlan_lmac_if_dfs_tx_ops {
@@ -643,6 +644,9 @@ struct wlan_lmac_if_dfs_tx_ops {
 			struct dfs_radar_found_params *params);
 	QDF_STATUS (*dfs_send_usenol_pdev_param)(struct wlan_objmgr_pdev *pdev,
 						 bool usenol);
+	QDF_STATUS (*dfs_send_subchan_marking_pdev_param)(
+			struct wlan_objmgr_pdev *pdev,
+			bool subchanmark);
 };
 
 /**
@@ -1197,6 +1201,12 @@ struct wlan_lmac_if_dfs_rx_ops {
 	QDF_STATUS (*dfs_is_disable_radar_marking_set)(struct wlan_objmgr_pdev
 						 *pdev,
 						 bool *disable_radar_marking);
+	QDF_STATUS (*dfs_set_nol_subchannel_marking)(
+			struct wlan_objmgr_pdev *pdev,
+			bool value);
+	QDF_STATUS (*dfs_get_nol_subchannel_marking)(
+			struct wlan_objmgr_pdev *pdev,
+			bool *value);
 };
 
 struct wlan_lmac_if_mlme_rx_ops {
