@@ -15003,7 +15003,6 @@ QDF_STATUS csr_send_join_req_msg(tpAniSirGlobal pMac, uint32_t sessionId,
 	uint32_t value = 0, value1 = 0;
 	QDF_STATUS packetdump_timer_status;
 	enum hw_mode_dbs_capab hw_mode_to_use;
-	tDot11fIEVHTCaps *vht_caps = NULL;
 
 	if (!pSession) {
 		sme_err("session %d not found", sessionId);
@@ -15536,12 +15535,8 @@ QDF_STATUS csr_send_join_req_msg(tpAniSirGlobal pMac, uint32_t sessionId,
 
 		csr_join_req->vht_config.su_beam_formee = value;
 
-		if (pIes->VHTCaps.present)
-			vht_caps = &pIes->VHTCaps;
-		else if (pIes->vendor_vht_ie.VHTCaps.present)
-			vht_caps = &pIes->vendor_vht_ie.VHTCaps;
 		/* Set BF CSN value only if SU Bformee is enabled */
-		if (vht_caps && csr_join_req->vht_config.su_beam_formee) {
+		if (csr_join_req->vht_config.su_beam_formee) {
 			txBFCsnValue = (uint8_t)value1;
 			/*
 			 * Certain commercial AP display a bad behavior when
@@ -15551,11 +15546,18 @@ QDF_STATUS csr_send_join_req_msg(tpAniSirGlobal pMac, uint32_t sessionId,
 			 * CSN cap of less than 4. To avoid such issues, take a
 			 * min of self and peer CSN while sending ASSOC request.
 			 */
-			if (pIes->Vendor1IE.present &&
-					vht_caps->csnofBeamformerAntSup < 4) {
-				if (vht_caps->csnofBeamformerAntSup)
+			if (txBFCsnValue < 4) {
+				if (IS_BSS_VHT_CAPABLE(pIes->VHTCaps) &&
+					pIes->VHTCaps.csnofBeamformerAntSup)
 					txBFCsnValue = QDF_MIN(txBFCsnValue,
-					  vht_caps->csnofBeamformerAntSup);
+					  pIes->VHTCaps.csnofBeamformerAntSup);
+				else if (IS_BSS_VHT_CAPABLE(
+					pIes->vendor_vht_ie.VHTCaps)
+					&& pIes->vendor_vht_ie.VHTCaps.
+					csnofBeamformerAntSup)
+					txBFCsnValue = QDF_MIN(txBFCsnValue,
+					  pIes->vendor_vht_ie.
+					  VHTCaps.csnofBeamformerAntSup);
 			}
 		}
 		csr_join_req->vht_config.csnof_beamformer_antSup = txBFCsnValue;
@@ -18169,6 +18171,40 @@ QDF_STATUS csr_roam_set_key_mgmt_offload(tpAniSirGlobal mac_ctx,
 }
 
 /**
+ * csr_update_roam_scan_ese_params() - Update ESE related params in RSO request
+ * @req_buf: Roam Scan Offload Request buffer
+ * @session: Current Roam Session
+ *
+ * This API will set the KRK and BTK required in case of Auth Type is CCKM.
+ * It will also clear the PMK Len as CCKM PMK Caching is not supported
+ *
+ * Return: None
+ */
+#ifdef FEATURE_WLAN_ESE
+static
+void csr_update_roam_scan_ese_params(tSirRoamOffloadScanReq *req_buf,
+				     tCsrRoamSession *session)
+{
+	if (csr_is_auth_type_ese(req_buf->ConnectedNetwork.authentication)) {
+		qdf_mem_copy(req_buf->KRK, session->eseCckmInfo.krk,
+			     SIR_KRK_KEY_LEN);
+		qdf_mem_copy(req_buf->BTK, session->eseCckmInfo.btk,
+			     SIR_BTK_KEY_LEN);
+		req_buf->pmkid_modes.fw_okc = 0;
+		req_buf->pmkid_modes.fw_pmksa_cache = 0;
+		req_buf->pmk_len = 0;
+		qdf_mem_zero(&req_buf->PSK_PMK[0], sizeof(req_buf->PSK_PMK));
+	}
+}
+#else
+static inline
+void csr_update_roam_scan_ese_params(tSirRoamOffloadScanReq *req_buf,
+				     tCsrRoamSession *session)
+{
+}
+#endif
+
+/**
  * csr_update_roam_scan_offload_request() - updates req msg with roam offload
  * paramters
  * @pMac:          mac global context
@@ -18200,14 +18236,9 @@ csr_update_roam_scan_offload_request(tpAniSirGlobal mac_ctx,
 		req_buf->ReassocFailureTimeout =
 			DEFAULT_REASSOC_FAILURE_TIMEOUT;
 	}
-#ifdef FEATURE_WLAN_ESE
-	if (csr_is_auth_type_ese(req_buf->ConnectedNetwork.authentication)) {
-		qdf_mem_copy(req_buf->KRK, session->eseCckmInfo.krk,
-			     SIR_KRK_KEY_LEN);
-		qdf_mem_copy(req_buf->BTK, session->eseCckmInfo.btk,
-			     SIR_BTK_KEY_LEN);
-	}
-#endif
+
+	csr_update_roam_scan_ese_params(req_buf, session);
+
 	req_buf->AcUapsd.acbe_uapsd = SIR_UAPSD_GET(ACBE, session->uapsd_mask);
 	req_buf->AcUapsd.acbk_uapsd = SIR_UAPSD_GET(ACBK, session->uapsd_mask);
 	req_buf->AcUapsd.acvi_uapsd = SIR_UAPSD_GET(ACVI, session->uapsd_mask);
