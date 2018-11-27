@@ -726,26 +726,13 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc,
 				FL("vdev %pK osif_rx %pK"), vdev,
 				vdev->osif_rx);
 			qdf_nbuf_set_next(nbuf, NULL);
-			if (qdf_unlikely(qdf_nbuf_is_da_mcbc(nbuf))) {
-				eh = (struct ether_header *)qdf_nbuf_data(nbuf);
-				if (IEEE80211_IS_BROADCAST(eh->ether_dhost)) {
-					DP_STATS_INC_PKT(peer,
-							 rx.bcast,
-							 1,
-							 qdf_nbuf_len(nbuf));
-				} else {
-					DP_STATS_INC_PKT(peer,
-							 rx.multicast,
-							 1,
-							 qdf_nbuf_len(nbuf));
-				}
-			}
 			DP_STATS_INC_PKT(peer, rx.to_stack, 1,
 					 qdf_nbuf_len(nbuf));
 
-			vdev->osif_rx(vdev->osif_vdev, nbuf);
-			if (qdf_unlikely(hal_rx_msdu_end_da_is_mcbc_get(rx_tlv_hdr) &&
-						(vdev->rx_decap_type == htt_cmn_pkt_type_ethernet))) {
+			if (qdf_unlikely(hal_rx_msdu_end_da_is_mcbc_get(
+						rx_tlv_hdr) &&
+					 (vdev->rx_decap_type ==
+					  htt_cmn_pkt_type_ethernet))) {
 				eh = (struct ether_header *)qdf_nbuf_data(nbuf);
 
 				DP_STATS_INC_PKT(peer, rx.multicast, 1,
@@ -754,6 +741,9 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc,
 					DP_STATS_INC_PKT(peer, rx.bcast, 1, qdf_nbuf_len(nbuf));
 				}
 			}
+
+			vdev->osif_rx(vdev->osif_vdev, nbuf);
+
 		} else {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 				FL("INVALID vdev %pK OR osif_rx"), vdev);
