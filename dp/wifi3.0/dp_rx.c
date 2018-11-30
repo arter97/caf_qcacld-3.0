@@ -358,7 +358,10 @@ dp_rx_da_learn(struct dp_soc *soc,
 		struct dp_peer *ta_peer,
 		qdf_nbuf_t nbuf)
 {
-	if (ta_peer && (ta_peer->vdev->opmode != wlan_op_mode_ap))
+	if (unlikely(!ta_peer))
+		return;
+
+	if (ta_peer->vdev->opmode != wlan_op_mode_ap)
 		return;
 
 	if (qdf_unlikely(!qdf_nbuf_is_da_valid(nbuf) &&
