@@ -554,6 +554,12 @@ void dp_peer_del_ast(struct dp_soc *soc, struct dp_ast_entry *ast_entry)
 	if (ast_entry->next_hop) {
 		dp_peer_ast_send_wds_del(soc, ast_entry);
 	} else {
+		if (!peer->self_ast_entry) {
+			qdf_print("%s Self AST entry already deleted %pM\n",
+				  __func__, peer->mac_addr.raw);
+			return;
+		}
+		peer->self_ast_entry = NULL;
 		soc->ast_table[ast_entry->ast_idx] = NULL;
 		TAILQ_REMOVE(&peer->ast_entry_list, ast_entry, ase_list_elem);
 		DP_STATS_INC(soc, ast.deleted, 1);
@@ -788,6 +794,17 @@ bool dp_peer_ast_get_wmi_sent(struct dp_soc *soc,
 void dp_peer_ast_free_entry(struct dp_soc *soc,
 			    struct dp_ast_entry *ast_entry)
 {
+	struct dp_peer *peer = ast_entry->peer;
+
+	if (!ast_entry->next_hop) {
+		if (peer->self_ast_entry == NULL) {
+			qdf_print("%s Self AST entry already deleted %pM \n",
+				   __func__, peer->mac_addr.raw);
+			return;
+		}
+		peer->self_ast_entry = NULL;
+	}
+
 	soc->ast_table[ast_entry->ast_idx] = NULL;
 	DP_STATS_INC(soc, ast.deleted, 1);
 	dp_peer_ast_hash_remove(soc, ast_entry);

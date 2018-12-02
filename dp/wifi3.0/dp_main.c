@@ -320,6 +320,7 @@ static void dp_peer_del_ast_wifi3(struct cdp_soc_t *soc_hdl,
 					 void *ast_entry_hdl)
 {
 	struct dp_soc *soc = (struct dp_soc *)soc_hdl;
+
 	qdf_spin_lock_bh(&soc->ast_lock);
 	dp_peer_del_ast((struct dp_soc *)soc_hdl,
 			(struct dp_ast_entry *)ast_entry_hdl);
@@ -1792,6 +1793,14 @@ static void dp_wds_aging_timer_fn(void *soc_hdl)
 	struct dp_ast_entry *ase, *temp_ase;
 	int i;
 
+	/*
+	 * Peer list access lock
+	 */
+	qdf_spin_lock_bh(&soc->peer_ref_mutex);
+
+	/*
+	 * AST list access lock
+	 */
 	qdf_spin_lock_bh(&soc->ast_lock);
 
 	for (i = 0; i < MAX_PDEV_CNT && soc->pdev_list[i]; i++) {
@@ -1821,6 +1830,7 @@ static void dp_wds_aging_timer_fn(void *soc_hdl)
 	}
 
 	qdf_spin_unlock_bh(&soc->ast_lock);
+	qdf_spin_unlock_bh(&soc->peer_ref_mutex);
 
 	if (qdf_atomic_read(&soc->cmn_init_done))
 		qdf_timer_mod(&soc->wds_aging_timer, DP_WDS_AGING_TIMER_DEFAULT_MS);
@@ -2392,8 +2402,6 @@ static int dp_soc_cmn_setup(struct dp_soc *soc)
 		goto fail1;
 	}
 
-	qdf_spinlock_create(&soc->ast_lock);
-	dp_soc_wds_attach(soc);
 
 	/* Reset the cpu ring map if radio is NSS offloaded */
 	if (wlan_cfg_get_dp_soc_nss_cfg(soc->wlan_cfg_ctx)) {
@@ -3171,7 +3179,10 @@ static void dp_soc_detach_wifi3(void *txrx_soc)
 	/* REO command and status rings */
 	dp_srng_cleanup(soc, &soc->reo_cmd_ring, REO_CMD, 0);
 	dp_srng_cleanup(soc, &soc->reo_status_ring, REO_STATUS, 0);
+
 	dp_hw_link_desc_pool_cleanup(soc);
+
+	dp_soc_wds_detach(soc);
 
 	qdf_spinlock_destroy(&soc->peer_ref_mutex);
 	qdf_spinlock_destroy(&soc->htt_stats.lock);
@@ -3183,7 +3194,6 @@ static void dp_soc_detach_wifi3(void *txrx_soc)
 
 	wlan_cfg_soc_detach(soc->wlan_cfg_ctx);
 
-	dp_soc_wds_detach(soc);
 	qdf_spinlock_destroy(&soc->ast_lock);
 
 	qdf_mem_free(soc);
@@ -7635,6 +7645,8 @@ void *dp_soc_attach_wifi3(void *ctrl_psoc, void *hif_handle,
 	}
 
 	qdf_spinlock_create(&soc->peer_ref_mutex);
+	qdf_spinlock_create(&soc->ast_lock);
+	dp_soc_wds_attach(soc);
 
 	qdf_spinlock_create(&soc->reo_desc_freelist_lock);
 	qdf_list_create(&soc->reo_desc_freelist, REO_DESC_FREELIST_SIZE);
