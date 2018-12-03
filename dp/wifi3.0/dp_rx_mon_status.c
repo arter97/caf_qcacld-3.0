@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -85,7 +85,7 @@ dp_rx_populate_cdp_indication_ppdu(struct dp_pdev *pdev,
 	cdp_rx_ppdu->lsig_a = ppdu_info->rx_status.rate;
 
 	ast_index = ppdu_info->rx_status.ast_index;
-	if (ast_index >= (WLAN_UMAC_PSOC_MAX_PEERS * 2)) {
+	if (ast_index >= wlan_cfg_get_max_ast_idx(soc->wlan_cfg_ctx)) {
 		cdp_rx_ppdu->peer_id = HTT_INVALID_PEER;
 		return;
 	}

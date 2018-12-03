@@ -942,6 +942,8 @@ struct dp_soc {
 	} ipa_uc_rx_rsc;
 #endif
 	uint8_t enable_da;
+	/* number of active ast entries */
+	uint32_t num_ast_entries;
 };
 
 #ifdef IPA_OFFLOAD

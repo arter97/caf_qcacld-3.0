@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -333,6 +333,7 @@ static int init_deinit_ready_event_handler(ol_scn_t scn_handle,
 	uint8_t num_radios, i;
 	uint32_t max_peers;
 	uint64_t current_time, secs, usecs;
+	uint32_t max_ast_index;
 
 	current_time =  qdf_get_log_timestamp();
 	qdf_log_timestamp_to_secs(time_wmi_ready, &secs, &usecs);
@@ -397,8 +398,10 @@ static int init_deinit_ready_event_handler(ol_scn_t scn_handle,
 	if (ready_ev.num_total_peer != 0) {
 		max_peers = info->wlan_res_cfg.num_peers +
 			ready_ev.num_extra_peer + 1;
+		max_ast_index = ready_ev.max_ast_index + 1;
 
-		cdp_peer_map_attach(wlan_psoc_get_dp_handle(psoc), max_peers);
+		cdp_peer_map_attach(wlan_psoc_get_dp_handle(psoc), max_peers,
+				    max_ast_index);
 	}
 
 	/* Indicate to the waiting thread that the ready

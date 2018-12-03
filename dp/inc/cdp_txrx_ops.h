@@ -301,7 +301,7 @@ struct cdp_cmn_ops {
 					  uint8_t ac, uint32_t *value);
 
 	QDF_STATUS (*txrx_peer_map_attach)(ol_txrx_soc_handle soc,
-			uint32_t num_peers);
+			uint32_t num_peers, uint32_t max_ast_index);
 
 	ol_txrx_tx_fp tx_send;
 };

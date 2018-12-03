@@ -1545,11 +1545,13 @@ cdp_tx_send(ol_txrx_soc_handle soc, struct cdp_vdev *vdev, qdf_nbuf_t nbuf)
 }
 
 static inline void
-cdp_peer_map_attach(ol_txrx_soc_handle soc, uint32_t max_peers)
+cdp_peer_map_attach(ol_txrx_soc_handle soc, uint32_t max_peers,
+		    uint32_t max_ast_index)
 {
 	if (soc && soc->ops && soc->ops->cmn_drv_ops &&
 	    soc->ops->cmn_drv_ops->txrx_peer_map_attach)
-		soc->ops->cmn_drv_ops->txrx_peer_map_attach(soc, max_peers);
+		soc->ops->cmn_drv_ops->txrx_peer_map_attach(soc, max_peers,
+							    max_ast_index);
 }
 
 /**
