@@ -993,6 +993,8 @@ struct dp_soc {
 	bool is_peer_map_unmap_v2;
 	/* Per peer per Tid ba window size support */
 	uint8_t per_tid_basize_max_tid;
+	/* number of active ast entries */
+	uint32_t num_ast_entries;
 };
 
 #ifdef IPA_OFFLOAD
