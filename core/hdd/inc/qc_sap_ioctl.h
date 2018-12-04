@@ -72,11 +72,6 @@ typedef enum {
 
 typedef uint8_t qcmacaddr[QCSAP_ADDR_LEN];
 
-struct qc_mac_acl_entry {
-	qcmacaddr addr;
-	int vlan_id;
-};
-
 typedef enum {
 	eQC_AUTH_TYPE_OPEN_SYSTEM,
 	eQC_AUTH_TYPE_SHARED_KEY,
