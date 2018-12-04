@@ -614,6 +614,9 @@ int dp_peer_update_ast(struct dp_soc *soc, struct dp_peer *peer,
 	    (ast_entry->type == CDP_TXRX_AST_TYPE_BSS))
 			return 0;
 
+	if (ast_entry->wmi_sent)
+		return ret;
+
 	qdf_spin_lock_bh(&soc->ast_lock);
 
 	old_peer = ast_entry->peer;
@@ -772,6 +775,7 @@ void dp_peer_ast_send_wds_del(struct dp_soc *soc,
 		cdp_soc->ol_ops->peer_del_wds_entry(peer->vdev->osif_vdev,
 						    ast_entry->mac_addr.raw);
 		ast_entry->wmi_sent = true;
+		TAILQ_REMOVE(&peer->ast_entry_list, ast_entry, ase_list_elem);
 	}
 }
 
@@ -784,10 +788,7 @@ bool dp_peer_ast_get_wmi_sent(struct dp_soc *soc,
 void dp_peer_ast_free_entry(struct dp_soc *soc,
 			    struct dp_ast_entry *ast_entry)
 {
-	struct dp_peer *peer = ast_entry->peer;
-
 	soc->ast_table[ast_entry->ast_idx] = NULL;
-	TAILQ_REMOVE(&peer->ast_entry_list, ast_entry, ase_list_elem);
 	DP_STATS_INC(soc, ast.deleted, 1);
 	dp_peer_ast_hash_remove(soc, ast_entry);
 	qdf_mem_free(ast_entry);
