@@ -122,7 +122,7 @@ void hdd_softap_sta_disassoc(struct hdd_adapter *adapter,
 int hdd_softap_unpack_ie(tHalHandle halHandle,
 			 eCsrEncryptionType *pEncryptType,
 			 eCsrEncryptionType *mcEncryptType,
-			 eCsrAuthType *pAuthType,
+			 tCsrAuthList *akm_list,
 			 bool *pMFPCapable,
 			 bool *pMFPRequired,
 			 uint16_t gen_ie_len, uint8_t *gen_ie);
