@@ -1273,6 +1273,7 @@ typedef struct sSirSmeAssocInd {
 	uint8_t uniSig;         /* DPU signature for unicast packets */
 	uint8_t bcastSig;       /* DPU signature for broadcast packets */
 	tAniAuthType authType;
+	enum ani_akm_type akm_type;
 	tAniSSID ssId;          /* SSID used by STA to associate */
 	tSirWAPIie wapiIE;      /* WAPI IE received from peer */
 	tSirRSNie rsnIE;        /* RSN IE received from peer */
