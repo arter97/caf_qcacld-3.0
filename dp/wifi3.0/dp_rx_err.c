@@ -136,7 +136,9 @@ static inline bool dp_rx_mcast_echo_check(struct dp_soc *soc,
 			}
 		}
 	} else
-		ase = dp_peer_ast_hash_find_soc(soc, &data[DP_MAC_ADDR_LEN]);
+		ase = dp_peer_ast_hash_find_by_pdevid(soc,
+						      &data[DP_MAC_ADDR_LEN],
+						      vdev->pdev->pdev_id);
 
 	if (ase) {
 
