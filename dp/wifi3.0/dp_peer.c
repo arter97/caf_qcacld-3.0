@@ -773,6 +773,7 @@ add_ast_entry:
 void dp_peer_del_ast(struct dp_soc *soc, struct dp_ast_entry *ast_entry)
 {
 	struct dp_peer *peer = ast_entry->peer;
+	uint16_t peer_id = peer->peer_ids[0];
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_TRACE,
 		  "%s: ast_entry->type: %d pdevid: %u vdev: %u mac_addr: %pM next_hop: %u peer_mac: %pM\n",
@@ -788,8 +789,11 @@ void dp_peer_del_ast(struct dp_soc *soc, struct dp_ast_entry *ast_entry)
 		 * if peer map v2 is enabled we are not freeing ast entry
 		 * here and it is supposed to be freed in unmap event (after
 		 * we receive delete confirmation from target)
+		 *
+		 * if peer_id is invalid we did not get the peer map event
+		 * for the peer free ast entry from here only in this case
 		 */
-		if (soc->is_peer_map_unmap_v2)
+		if (soc->is_peer_map_unmap_v2 && (peer_id != HTT_INVALID_PEER))
 			return;
 	}
 
@@ -1383,17 +1387,21 @@ dp_rx_peer_unmap_handler(void *soc_handle, uint16_t peer_id,
 	uint8_t i;
 
 	peer = __dp_peer_find_by_id(soc, peer_id);
+	/*
+	 * Currently peer IDs are assigned for vdevs as well as peers.
+	 * If the peer ID is for a vdev, then the peer pointer stored
+	 * in peer_id_to_obj_map will be NULL.
+	 */
+	if (!peer) {
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
+			"%s: Received unmap event for invalid peer_id"
+			" %u", __func__, peer_id);
+		return;
+	}
 
 	/* If V2 Peer map messages are enabled AST entry has to be freed here
 	 */
 	if (soc->is_peer_map_unmap_v2) {
-		if (!peer) {
-			QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_FATAL,
-				  "%s:%d AST unmap for wrong peer_id %u\n",
-				  __func__, __LINE__, peer_id);
-			DP_AST_ASSERT(0);
-			return;
-		}
 
 		/* In STA mode currently due to FW bug we are getting
 		 * mac address of STA vdev in unmap event hence get
@@ -1449,18 +1457,6 @@ peer_unmap:
 	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO_HIGH,
 		"peer_unmap_event (soc:%pK) peer_id %d peer %pK",
 		soc, peer_id, peer);
-
-	/*
-	 * Currently peer IDs are assigned for vdevs as well as peers.
-	 * If the peer ID is for a vdev, then the peer pointer stored
-	 * in peer_id_to_obj_map will be NULL.
-	 */
-	if (!peer) {
-		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			"%s: Received unmap event for invalid peer_id"
-			" %u", __func__, peer_id);
-		return;
-	}
 
 	soc->peer_id_to_obj_map[peer_id] = NULL;
 	for (i = 0; i < MAX_NUM_PEER_ID_PER_PEER; i++) {
