@@ -1442,14 +1442,6 @@ struct suspend_resume_stats {
 	uint32_t suspend_fail[SUSPEND_FAIL_MAX_COUNT];
 };
 
-/**
- * struct hdd_nud_stats_context - hdd NUD stats context
- * @response_event: NUD stats request wait event
- */
-struct hdd_nud_stats_context {
-	struct completion response_event;
-};
-
 enum hdd_sta_smps_param {
 	/* RSSI threshold to enter Dynamic SMPS mode from inactive mode */
 	HDD_STA_SMPS_PARAM_UPPER_RSSI_THRESH = 0,
@@ -1751,7 +1743,6 @@ struct hdd_context_s {
 	bool imps_enabled;
 	int user_configured_pkt_filter_rules;
 	uint8_t curr_band;
-	struct hdd_nud_stats_context nud_stats_context;
 	uint32_t track_arp_ip;
 	struct sta_ap_intf_check_work_ctx *sta_ap_intf_check_work_info;
 	qdf_wake_lock_t monitor_mode_wakelock;
@@ -2260,18 +2251,6 @@ void wlan_hdd_start_sap(hdd_adapter_t *ap_adapter, bool reinit);
 void hdd_set_rx_mode_rps(hdd_context_t *hdd_ctx, void *padapter, bool enable);
 
 /**
- * hdd_init_nud_stats_ctx() - initialize NUD stats context
- * @hdd_ctx: Pointer to hdd context
- *
- * Return: none
- */
-static inline void hdd_init_nud_stats_ctx(hdd_context_t *hdd_ctx)
-{
-	init_completion(&hdd_ctx->nud_stats_context.response_event);
-	return;
-}
-
-/**
  * hdd_start_complete()- complete the start event
  * @ret: return value for complete event.
  *
@@ -2335,5 +2314,18 @@ hdd_station_info_t *hdd_get_stainfo(hdd_station_info_t *aStaInfo,
 
 int hdd_driver_memdump_init(void);
 void hdd_driver_memdump_deinit(void);
+
+/**
+ * hdd_get_nud_stats_cb() - callback api to update the stats received from FW
+ * @data: pointer to hdd context.
+ * @rsp: pointer to data received from FW.
+ * @context: callback context
+ *
+ * This is called when wlan driver received response event for
+ * get arp stats to firmware.
+ *
+ * Return: None
+ */
+void hdd_get_nud_stats_cb(void *data, struct rsp_stats *rsp, void *context);
 
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

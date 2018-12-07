@@ -8761,7 +8761,8 @@ int wma_get_arp_stats_handler(void *handle, uint8_t *data,
 	rsp.ba_session_establishment_status =
 		data_event->ba_session_establishment_status;
 
-	mac->sme.get_arp_stats_cb(mac->hHdd, &rsp);
+	mac->sme.get_arp_stats_cb(mac->hHdd, &rsp,
+				  mac->sme.get_arp_stats_context);
 
 	EXIT();
 
