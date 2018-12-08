@@ -492,11 +492,11 @@ QDF_STATUS dfs_process_radar_ind(struct wlan_dfs *dfs,
 	}
 
 	if (radar_found->segment_id == SEG_ID_SECONDARY)
-		dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
+		dfs_info(dfs, WLAN_DEBUG_DFS,
 			 "Radar found on second segment VHT80 freq=%d MHz",
 			 dfs->dfs_precac_secondary_freq);
 	else
-		dfs_info(NULL, WLAN_DEBUG_DFS_ALWAYS,
+		dfs_info(NULL, WLAN_DEBUG_DFS,
 			 "Radar found on channel=%d, freq=%d MHz",
 			 dfs->dfs_curchan->dfs_ch_ieee,
 			 dfs->dfs_curchan->dfs_ch_freq);
