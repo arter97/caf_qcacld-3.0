@@ -4453,7 +4453,6 @@ static inline void dp_peer_delete_ast_entries(struct dp_soc *soc,
 	DP_PEER_ITERATE_ASE_LIST(peer, ast_entry, temp_ast_entry)
 		dp_peer_del_ast(soc, ast_entry);
 
-	peer->self_ast_entry = NULL;
 	qdf_spin_unlock_bh(&soc->ast_lock);
 }
 #else
@@ -4562,6 +4561,12 @@ static void *dp_peer_create_wifi3(struct cdp_vdev *vdev_handle,
 
 		dp_peer_add_ast(soc, peer, peer_mac_addr, ast_type, 0);
 
+		/* Reset delete in progress flag for self ast entry
+		 * to reuse the AST entry as well
+		 */
+		if (peer->self_ast_entry &&
+		    peer->self_ast_entry->delete_in_progress)
+			peer->self_ast_entry->delete_in_progress = false;
 		/*
 		* Control path maintains a node count which is incremented
 		* for every new peer create command. Since new peer is not being

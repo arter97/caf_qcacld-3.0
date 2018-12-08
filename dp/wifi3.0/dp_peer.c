@@ -1010,10 +1010,10 @@ static void dp_peer_ast_free_entry(struct dp_soc *soc,
 	 * to ast_table
 	 */
 
+	qdf_spin_lock_bh(&soc->ast_lock);
 	if (ast_entry->is_mapped)
 		soc->ast_table[ast_entry->ast_idx] = NULL;
 
-	qdf_spin_lock_bh(&soc->ast_lock);
 	TAILQ_REMOVE(&peer->ast_entry_list, ast_entry, ase_list_elem);
 	DP_STATS_INC(soc, ast.deleted, 1);
 	dp_peer_ast_hash_remove(soc, ast_entry);
@@ -1023,6 +1023,8 @@ static void dp_peer_ast_free_entry(struct dp_soc *soc,
 	ast_entry->callback = NULL;
 	ast_entry->cookie = NULL;
 
+	if (ast_entry == peer->self_ast_entry)
+		peer->self_ast_entry = NULL;
 	qdf_spin_unlock_bh(&soc->ast_lock);
 
 	if (cb) {
@@ -1426,8 +1428,7 @@ dp_rx_peer_unmap_handler(void *soc_handle, uint16_t peer_id,
 			ast_entry = dp_peer_ast_list_find(soc, peer,
 							  mac_addr);
 
-		if (!ast_entry ||
-		    !ast_entry->delete_in_progress) {
+		if (!ast_entry) {
 			/* in case of qwrap we have multiple BSS peers
 			 * with same mac address
 			 *
@@ -1443,11 +1444,17 @@ dp_rx_peer_unmap_handler(void *soc_handle, uint16_t peer_id,
 				  "%s:%d peer %pK peer_id %u peer_mac %pM\n",
 				  __func__, __LINE__, peer, peer->peer_ids[0],
 				  peer->mac_addr.raw);
+			qdf_spin_unlock_bh(&soc->ast_lock);
 			DP_AST_ASSERT(0);
+			return;
 		}
 		qdf_spin_unlock_bh(&soc->ast_lock);
 
-		dp_peer_ast_free_entry(soc, ast_entry);
+		/* Reuse the AST entry if delete_in_progess
+		 * not set
+		 */
+		if (ast_entry->delete_in_progress)
+			dp_peer_ast_free_entry(soc, ast_entry);
 
 		if (is_wds)
 			return;
