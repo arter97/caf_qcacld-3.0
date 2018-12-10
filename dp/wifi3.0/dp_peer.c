@@ -1321,6 +1321,8 @@ dp_rx_peer_map_handler(void *soc_handle, uint16_t peer_id,
 {
 	struct dp_soc *soc = (struct dp_soc *)soc_handle;
 	struct dp_peer *peer = NULL;
+	uint32_t flags = IEEE80211_NODE_F_WDS_HM;
+	enum cdp_txrx_ast_entry_type type = CDP_TXRX_AST_TYPE_STATIC;
 
 	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO_HIGH,
 		"peer_map_event (soc:%pK): peer_id %di, hw_peer_id %d, peer_mac "
@@ -1357,9 +1359,27 @@ dp_rx_peer_map_handler(void *soc_handle, uint16_t peer_id,
 				peer->bss_peer = 1;
 				peer->vdev->vap_bss_peer = peer;
 			}
-
 			if (peer->vdev->opmode == wlan_op_mode_sta)
 				peer->vdev->bss_ast_hash = ast_hash;
+
+			/* Add ast entry incase self ast entry is
+			 * deleted due to DP CP sync issue
+			 *
+			 * self_ast_entry is modified in peer create
+			 * and peer unmap path which cannot run in
+			 * parllel with peer map, no lock need before
+			 * referring it
+			 */
+			if (!peer->self_ast_entry) {
+				QDF_TRACE(QDF_MODULE_ID_DP,
+					  QDF_TRACE_LEVEL_INFO_HIGH,
+					  "Add self ast from map %pM",
+					  peer_mac_addr);
+				dp_peer_add_ast(soc, peer,
+						peer_mac_addr,
+						type,
+						flags);
+			}
 		}
 	}
 
@@ -1440,13 +1460,16 @@ dp_rx_peer_unmap_handler(void *soc_handle, uint16_t peer_id,
 				goto peer_unmap;
 			}
 
-			QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_FATAL,
-				  "%s:%d peer %pK peer_id %u peer_mac %pM\n",
+			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_FATAL,
+				  "%s:%d peer %pK peer_id %u peer_mac %pM mac_addr %pM vdev_id %u next_hop %u\n",
 				  __func__, __LINE__, peer, peer->peer_ids[0],
-				  peer->mac_addr.raw);
-			qdf_spin_unlock_bh(&soc->ast_lock);
-			DP_AST_ASSERT(0);
-			return;
+				  peer->mac_addr.raw, mac_addr, vdev_id,
+				  is_wds);
+
+			if (!is_wds) {
+				qdf_spin_unlock_bh(&soc->ast_lock);
+				goto peer_unmap;
+			}
 		}
 		qdf_spin_unlock_bh(&soc->ast_lock);
 
