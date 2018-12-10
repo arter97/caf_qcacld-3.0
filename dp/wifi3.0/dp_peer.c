@@ -315,6 +315,7 @@ static inline void dp_peer_ast_hash_add(struct dp_soc *soc,
 	uint32_t index;
 
 	index = dp_peer_ast_hash_index(soc, &ase->mac_addr);
+	soc->num_ast_entries++;
 	TAILQ_INSERT_TAIL(&soc->ast_hash.bins[index], ase, hash_list_elem);
 }
 
@@ -346,6 +347,7 @@ static inline void dp_peer_ast_hash_remove(struct dp_soc *soc,
 	}
 
 	QDF_ASSERT(found);
+	soc->num_ast_entries--;
 	TAILQ_REMOVE(&soc->ast_hash.bins[index], ase, hash_list_elem);
 }
 
@@ -674,6 +676,15 @@ int dp_peer_add_ast(struct dp_soc *soc,
 	}
 
 add_ast_entry:
+	if (soc->num_ast_entries >= (soc->max_peers *2)) {
+		qdf_spin_unlock_bh(&soc->ast_lock);
+		if (peer_ref_cnt)
+			dp_peer_unref_delete(peer);
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
+			  FL("Max ast entries reached"));
+		return ret;
+	}
+
 	ast_entry = (struct dp_ast_entry *)
 			qdf_mem_malloc(sizeof(struct dp_ast_entry));
 
@@ -1331,7 +1342,7 @@ dp_rx_peer_map_handler(void *soc_handle, uint16_t peer_id,
 		peer_mac_addr[2], peer_mac_addr[3], peer_mac_addr[4],
 		peer_mac_addr[5], vdev_id);
 
-	if ((hw_peer_id < 0) || (hw_peer_id > (WLAN_UMAC_PSOC_MAX_PEERS * 2))) {
+	if ((hw_peer_id < 0) || (hw_peer_id > (soc->max_peers * 2))) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 			"invalid hw_peer_id: %d", hw_peer_id);
 		qdf_assert_always(0);

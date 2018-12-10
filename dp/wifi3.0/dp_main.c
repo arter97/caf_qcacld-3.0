@@ -1012,6 +1012,7 @@ void dp_print_ast_stats(struct dp_soc *soc)
 			"DA", "HMWDS_SEC"};
 
 	DP_PRINT_STATS("AST Stats:");
+	DP_PRINT("		No of Entries	= %d", soc->num_ast_entries);
 	DP_PRINT_STATS("	Entries Added   = %d", soc->stats.ast.added);
 	DP_PRINT_STATS("	Entries Deleted = %d", soc->stats.ast.deleted);
 	DP_PRINT_STATS("	Entries Agedout = %d", soc->stats.ast.aged_out);
