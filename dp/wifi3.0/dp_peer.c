@@ -678,8 +678,6 @@ int dp_peer_add_ast(struct dp_soc *soc,
 add_ast_entry:
 	if (soc->num_ast_entries >= (soc->max_peers *2)) {
 		qdf_spin_unlock_bh(&soc->ast_lock);
-		if (peer_ref_cnt)
-			dp_peer_unref_delete(peer);
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 			  FL("Max ast entries reached"));
 		return ret;
