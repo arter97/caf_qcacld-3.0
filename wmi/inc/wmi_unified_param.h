@@ -3205,6 +3205,18 @@ struct peer_update_wds_entry_params {
 };
 
 /**
+ * struct peer_del_all_wds_entries_params - WDS peer entries del params
+ * @wds_macaddr: Pointer to destination macaddr
+ * @peer_macaddr: Pointer to peer mac addr
+ * @flags: flags
+ */
+struct peer_del_all_wds_entries_params {
+	uint8_t *wds_macaddr;
+	uint8_t *peer_macaddr;
+	uint32_t flags;
+};
+
+/**
  * struct set_ps_mode_params - PS mode params
  * @vdev_id: vdev id
  * @psmode: PS mode
@@ -4949,8 +4961,8 @@ typedef enum {
 	wmi_pdev_param_use_nol,
 	wmi_pdev_param_enable_peer_retry_stats,
 	wmi_pdev_param_ul_trig_int,
-	wmi_pdev_param_max,
 	wmi_pdev_param_sub_channel_marking,
+	wmi_pdev_param_max,
 } wmi_conv_pdev_params_id;
 
 

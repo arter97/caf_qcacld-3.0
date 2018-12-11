@@ -1462,6 +1462,8 @@ static void dp_soc_interrupt_map_calculate_integrated(struct dp_soc *soc,
 					soc->wlan_cfg_ctx, intr_ctx_num);
 	int host2rxdma_ring_mask = wlan_cfg_get_host2rxdma_ring_mask(
 					soc->wlan_cfg_ctx, intr_ctx_num);
+	int host2rxdma_mon_ring_mask = wlan_cfg_get_host2rxdma_mon_ring_mask(
+					soc->wlan_cfg_ctx, intr_ctx_num);
 
 	for (j = 0; j < HIF_MAX_GRP_IRQ; j++) {
 
@@ -1484,6 +1486,12 @@ static void dp_soc_interrupt_map_calculate_integrated(struct dp_soc *soc,
 		if (host2rxdma_ring_mask & (1 << j)) {
 			irq_id_map[num_irq++] =
 				host2rxdma_host_buf_ring_mac1 -
+				wlan_cfg_get_hw_mac_idx(soc->wlan_cfg_ctx, j);
+		}
+
+		if (host2rxdma_mon_ring_mask & (1 << j)) {
+			irq_id_map[num_irq++] =
+				host2rxdma_monitor_ring1 -
 				wlan_cfg_get_hw_mac_idx(soc->wlan_cfg_ctx, j);
 		}
 
@@ -1601,7 +1609,9 @@ static QDF_STATUS dp_soc_interrupt_attach(void *txrx_soc)
 			wlan_cfg_get_rxdma2host_ring_mask(soc->wlan_cfg_ctx, i);
 		int host2rxdma_ring_mask =
 			wlan_cfg_get_host2rxdma_ring_mask(soc->wlan_cfg_ctx, i);
-
+		int host2rxdma_mon_ring_mask =
+			wlan_cfg_get_host2rxdma_mon_ring_mask(
+				soc->wlan_cfg_ctx, i);
 
 		soc->intr_ctx[i].dp_intr_id = i;
 		soc->intr_ctx[i].tx_ring_mask = tx_mask;
@@ -1612,6 +1622,8 @@ static QDF_STATUS dp_soc_interrupt_attach(void *txrx_soc)
 		soc->intr_ctx[i].host2rxdma_ring_mask = host2rxdma_ring_mask;
 		soc->intr_ctx[i].rx_wbm_rel_ring_mask = rx_wbm_rel_ring_mask;
 		soc->intr_ctx[i].reo_status_ring_mask = reo_status_ring_mask;
+		soc->intr_ctx[i].host2rxdma_mon_ring_mask =
+			 host2rxdma_mon_ring_mask;
 
 		soc->intr_ctx[i].soc = soc;
 
@@ -1666,6 +1678,7 @@ static void dp_soc_interrupt_detach(void *txrx_soc)
 		soc->intr_ctx[i].reo_status_ring_mask = 0;
 		soc->intr_ctx[i].rxdma2host_ring_mask = 0;
 		soc->intr_ctx[i].host2rxdma_ring_mask = 0;
+		soc->intr_ctx[i].host2rxdma_mon_ring_mask = 0;
 
 		qdf_lro_deinit(soc->intr_ctx[i].lro_ctx);
 	}
@@ -3658,7 +3671,7 @@ static void dp_soc_deinit(void *txrx_soc)
 	qdf_spinlock_destroy(&soc->peer_ref_mutex);
 	qdf_spinlock_destroy(&soc->htt_stats.lock);
 
-	htt_soc_detach(soc->htt_handle);
+	htt_soc_htc_dealloc(soc->htt_handle);
 
 	qdf_spinlock_destroy(&soc->rx.defrag.defrag_lock);
 
@@ -3758,8 +3771,8 @@ static void dp_soc_detach(void *txrx_soc)
 	dp_srng_cleanup(soc, &soc->reo_status_ring, REO_STATUS, 0);
 	dp_hw_link_desc_pool_cleanup(soc);
 
-	soc->dp_soc_reinit = 0;
 	htt_soc_detach(soc->htt_handle);
+	soc->dp_soc_reinit = 0;
 
 	wlan_cfg_soc_detach(soc->wlan_cfg_ctx);
 
@@ -6835,8 +6848,8 @@ static inline void dp_print_peer_stats(struct dp_peer *peer)
 	DP_PRINT_STATS("	 Voice = %d",
 			peer->stats.tx.excess_retries_per_ac[3]);
 	DP_PRINT_STATS("BW Counts = 20MHZ %d 40MHZ %d 80MHZ %d 160MHZ %d\n",
-			peer->stats.tx.bw[2], peer->stats.tx.bw[3],
-			peer->stats.tx.bw[4], peer->stats.tx.bw[5]);
+			peer->stats.tx.bw[0], peer->stats.tx.bw[1],
+			peer->stats.tx.bw[2], peer->stats.tx.bw[3]);
 
 	index = 0;
 	for (i = 0; i < SS_COUNT; i++) {
@@ -6962,6 +6975,12 @@ dp_get_host_peer_stats(struct cdp_pdev *pdev_handle, char *mac_addr)
 {
 	struct dp_peer *peer;
 	uint8_t local_id;
+
+	if (!mac_addr) {
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
+			  "Invalid MAC address\n");
+		return;
+	}
 
 	peer = (struct dp_peer *)dp_find_peer_by_addr(pdev_handle, mac_addr,
 			&local_id);
@@ -8681,6 +8700,37 @@ static QDF_STATUS dp_config_for_nac_rssi(struct cdp_vdev *vdev_handle,
 }
 #endif
 
+/**
+ * dp_enable_peer_based_pktlog() - Set Flag for peer based filtering
+ * for pktlog
+ * @txrx_pdev_handle: cdp_pdev handle
+ * @enb_dsb: Enable or disable peer based filtering
+ *
+ * Return: QDF_STATUS
+ */
+static int
+dp_enable_peer_based_pktlog(
+	struct cdp_pdev *txrx_pdev_handle,
+	char *mac_addr, uint8_t enb_dsb)
+{
+	struct dp_peer *peer;
+	uint8_t local_id;
+	struct dp_pdev *pdev = (struct dp_pdev *)txrx_pdev_handle;
+
+	peer = (struct dp_peer *)dp_find_peer_by_addr(txrx_pdev_handle,
+			mac_addr, &local_id);
+
+	if (!peer) {
+		dp_err("Invalid Peer");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	peer->peer_based_pktlog_filter = enb_dsb;
+	pdev->dp_peer_based_pktlog = enb_dsb;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static QDF_STATUS dp_peer_map_attach_wifi3(struct cdp_soc_t  *soc_hdl,
 					   uint32_t max_peers,
 					   bool peer_map_unmap_v2)
@@ -8881,6 +8931,7 @@ static struct cdp_ctrl_ops dp_ops_ctrl = {
 #endif
 	.set_key = dp_set_michael_key,
 	.txrx_get_vdev_param = dp_get_vdev_param,
+	.enable_peer_based_pktlog = dp_enable_peer_based_pktlog,
 };
 
 static struct cdp_me_ops dp_ops_me = {
@@ -9331,6 +9382,8 @@ void *dp_soc_init(void *dpsoc, HTC_HANDLE htc_handle, void *hif_handle)
 		wlan_cfg_set_raw_mode_war(soc->wlan_cfg_ctx, true);
 		soc->ast_override_support = 1;
 		if (con_mode_monitor == QDF_GLOBAL_MONITOR_MODE) {
+			int int_ctx;
+
 			for (int_ctx = 0; int_ctx < WLAN_CFG_INT_NUM_CONTEXTS; int_ctx++) {
 				soc->wlan_cfg_ctx->int_rx_ring_mask[int_ctx] = 0;
 				soc->wlan_cfg_ctx->int_rxdma2host_ring_mask[int_ctx] = 0;

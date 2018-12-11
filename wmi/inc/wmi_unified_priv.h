@@ -797,6 +797,11 @@ QDF_STATUS (*send_obss_color_collision_cfg_cmd)(wmi_unified_t wmi_handle,
 QDF_STATUS (*extract_obss_color_collision_info)(uint8_t *evt_buf,
 		struct wmi_obss_color_collision_info *info);
 
+QDF_STATUS (*send_peer_based_pktlog_cmd)(wmi_unified_t wmi_handle,
+					 uint8_t *macaddr,
+					 uint8_t mac_id,
+					 uint8_t enb_dsb);
+
 #ifdef WMI_STA_SUPPORT
 QDF_STATUS (*send_del_ts_cmd)(wmi_unified_t wmi_handle, uint8_t vdev_id,
 				uint8_t ac);
@@ -1851,6 +1856,10 @@ QDF_STATUS
 		wmi_unified_t wmi_handle,
 		void *evt_buf,
 		struct wmi_host_pdev_ctl_failsafe_event *param);
+
+QDF_STATUS (*send_peer_del_all_wds_entries_cmd)(wmi_unified_t wmi_handle,
+		struct peer_del_all_wds_entries_params *param);
+
 };
 
 /* Forward declartion for psoc*/

@@ -548,6 +548,8 @@ struct dp_intr {
 	uint8_t reo_status_ring_mask; /* REO command response ring */
 	uint8_t rxdma2host_ring_mask; /* RXDMA to host destination ring */
 	uint8_t host2rxdma_ring_mask; /* Host to RXDMA buffer ring */
+	/* Host to RXDMA monitor  buffer ring */
+	uint8_t host2rxdma_mon_ring_mask;
 	struct dp_soc *soc;    /* Reference to SoC structure ,
 				to get DMA ring handles */
 	qdf_lro_ctx_t lro_ctx;
@@ -821,21 +823,28 @@ struct dp_soc {
 
 	/* Number of REO destination rings */
 	uint8_t num_reo_dest_rings;
+
+#ifdef QCA_LL_TX_FLOW_CONTROL_V2
+	/* lock to control access to soc TX descriptors */
+	qdf_spinlock_t flow_pool_array_lock;
+
+	/* pause callback to pause TX queues as per flow control */
+	tx_pause_callback pause_cb;
+
+	/* flow pool related statistics */
+	struct dp_txrx_pool_stats pool_stats;
+#endif /* !QCA_LL_TX_FLOW_CONTROL_V2 */
+
 	/*
-	 * re-use memory section ends
-	 * reuse memory indicator
-	 *
-	 * DO NOT CHANGE NAME OR MOVE THIS VARIABLE
+	 * Re-use memory section ends. reuse memory indicator.
+	 * Everything above this variable "dp_soc_reinit" is retained across
+	 * WiFi up/down for AP use-cases.
+	 * Everything below this variable "dp_soc_reinit" is reset during
+	 * dp_soc_deinit.
 	 */
 	bool dp_soc_reinit;
 
 	uint32_t wbm_idle_scatter_buf_size;
-
-#ifdef QCA_LL_TX_FLOW_CONTROL_V2
-	qdf_spinlock_t flow_pool_array_lock;
-	tx_pause_callback pause_cb;
-	struct dp_txrx_pool_stats pool_stats;
-#endif /* !QCA_LL_TX_FLOW_CONTROL_V2 */
 
 	/* Tx H/W queues lock */
 	qdf_spinlock_t tx_queue_lock[MAX_TX_HW_QUEUES];
@@ -1329,6 +1338,10 @@ struct dp_pdev {
 
 	union dp_rx_desc_list_elem_t *free_list_head;
 	union dp_rx_desc_list_elem_t *free_list_tail;
+	/* Pdev level flag to check peer based pktlog enabled or
+	 * disabled
+	 */
+	uint8_t dp_peer_based_pktlog;
 };
 
 struct dp_peer;
@@ -1595,6 +1608,10 @@ struct dp_peer {
 	 */
 	uint8_t kill_256_sessions;
 	qdf_atomic_t is_default_route_set;
+	/* Peer level flag to check peer based pktlog enabled or
+	 * disabled
+	 */
+	uint8_t peer_based_pktlog_filter;
 };
 
 #ifdef CONFIG_WIN
