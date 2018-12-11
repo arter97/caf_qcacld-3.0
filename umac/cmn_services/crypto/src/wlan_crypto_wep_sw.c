@@ -63,7 +63,7 @@ void wlan_crypto_try_wep(const uint8_t *key, size_t key_len,
 
 uint8_t *wlan_crypto_wep_encrypt(const uint8_t *key, uint16_t key_len,
 					uint8_t *data, size_t data_len){
-	uint8_t k[16];
+	uint8_t k[IEEE80211_KEY_WEP128_LEN + IEEE80211_WEP_IVLEN];
 	uint32_t icv;
 
 	if (data_len < 4 + 4) {

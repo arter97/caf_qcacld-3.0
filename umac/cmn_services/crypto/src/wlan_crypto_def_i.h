@@ -37,6 +37,9 @@
 #define WLAN_FC1_ISWEP     0x40
 #define WLAN_FC1_ORDER     0x80
 
+#define IEEE80211_KEY_WEP128_LEN   16   /* 128 bit key */
+#define IEEE80211_WEP_IVLEN         3   /* 24bit */
+
 #define WLAN_FC0_GET_TYPE(fc)    (((fc) & 0x0c) >> 2)
 #define WLAN_FC0_GET_STYPE(fc)   (((fc) & 0xf0) >> 4)
 
