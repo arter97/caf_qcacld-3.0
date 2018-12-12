@@ -544,15 +544,14 @@ dp_rx_mon_status_process_tlv(struct dp_soc *soc, uint32_t mac_id,
 						pdev, ppdu_info, status_nbuf);
 			if (smart_mesh_status)
 				qdf_nbuf_free(status_nbuf);
-		}
-		if (pdev->mcopy_mode) {
+		} else if (pdev->mcopy_mode) {
 			m_copy_status = dp_rx_handle_mcopy_mode(soc,
 						pdev, ppdu_info, status_nbuf);
 			if (m_copy_status == QDF_STATUS_SUCCESS)
 				qdf_nbuf_free(status_nbuf);
-		}
-		if (!pdev->neighbour_peers_added && !pdev->mcopy_mode)
+		} else {
 			qdf_nbuf_free(status_nbuf);
+		}
 
 		if (tlv_status == HAL_TLV_STATUS_PPDU_NON_STD_DONE) {
 			dp_rx_mon_deliver_non_std(soc, mac_id);
