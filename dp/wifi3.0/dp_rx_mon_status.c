@@ -401,6 +401,12 @@ dp_rx_handle_ppdu_stats(struct dp_soc *soc, struct dp_pdev *pdev,
 		qdf_spin_unlock_bh(&pdev->neighbour_peer_mutex);
 	}
 
+	/* need not generate wdi event when mcopy and
+	 * enhanced stats are not enabled
+	 */
+	if (!pdev->mcopy_mode && !pdev->enhanced_stats_en)
+		return;
+
 	if (!pdev->mcopy_mode) {
 		if (!ppdu_info->rx_status.frame_control_info_valid)
 			return;
