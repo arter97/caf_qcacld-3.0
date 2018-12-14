@@ -1213,4 +1213,34 @@ extern void hal_get_ba_aging_timeout(void *hal_soc, uint8_t ac,
 extern void hal_set_ba_aging_timeout(void *hal_soc, uint8_t ac,
 				uint32_t value);
 
+static inline void hal_srng_dump_ring_desc(struct hal_soc *hal, void *hal_ring,
+					   void *ring_desc)
+{
+	struct hal_srng *srng = (struct hal_srng *)hal_ring;
+
+	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+			   ring_desc, (srng->entry_size << 2));
+}
+
+static inline void hal_srng_dump_ring(struct hal_soc *hal, void *hal_ring)
+{
+	struct hal_srng *srng = (struct hal_srng *)hal_ring;
+	uint32_t *desc;
+	uint32_t tp, i;
+
+	tp = srng->u.dst_ring.tp;
+
+	for (i = 0; i < 128; i++) {
+		if (!tp)
+			tp = srng->ring_size;
+
+		desc = &srng->ring_base_vaddr[tp - srng->entry_size];
+		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_DP,
+				   QDF_TRACE_LEVEL_ERROR,
+				   desc, (srng->entry_size << 2));
+
+		tp -= srng->entry_size;
+	}
+}
+
 #endif /* _HAL_APIH_ */
