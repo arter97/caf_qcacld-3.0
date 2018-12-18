@@ -465,7 +465,7 @@ dp_rx_wds_srcport_learn(struct dp_soc *soc,
 		if ((ast->type != CDP_TXRX_AST_TYPE_STATIC) &&
 		    (ast->type != CDP_TXRX_AST_TYPE_SELF) &&
 		    (ast->type != CDP_TXRX_AST_TYPE_BSS)) {
-			if (ast->pdev_id != ta_peer->vdev->pdev->pdev_id)
+			if (ast->pdev_id != ta_peer->vdev->pdev->pdev_id) {
 				/* this case is when a STA roams from one
 				 * reapter to another repeater, but these
 				 * repeaters are connected to ROOT AP on
@@ -474,14 +474,17 @@ dp_rx_wds_srcport_learn(struct dp_soc *soc,
 				 * radio and rptr2 connected to ROOT AP
 				 * over 2G radio.
 				 */
+				qdf_spin_lock_bh(&soc->ast_lock);
 				dp_peer_del_ast(soc, ast);
-			else
+				qdf_spin_unlock_bh(&soc->ast_lock);
+			} else {
 				/* this case is when a STA roams from one
 				 * reapter to another repeater, but these
 				 * repeaters are connected to ROOT AP on
 				 * same radio.
 				 */
 				dp_peer_update_ast(soc, ta_peer, ast, flags);
+			}
 			return;
 		}
 
