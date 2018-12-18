@@ -5991,17 +5991,22 @@ void dp_aggregate_vdev_stats(struct dp_vdev *vdev,
 {
 	struct dp_peer *peer = NULL;
 
+	if (!vdev)
+		return;
+
 	qdf_mem_copy(vdev_stats, &vdev->stats, sizeof(vdev->stats));
 
 	TAILQ_FOREACH(peer, &vdev->peer_list, peer_list_elem)
 		dp_update_vdev_stats(vdev_stats, peer);
 
 #if defined(FEATURE_PERPKT_INFO) && WDI_EVENT_ENABLE
+	if (!vdev->pdev)
+		return;
+
 	dp_wdi_event_handler(WDI_EVENT_UPDATE_DP_STATS, vdev->pdev->soc,
 			     vdev_stats, vdev->vdev_id,
 			     UPDATE_VDEV_STATS, vdev->pdev->pdev_id);
 #endif
-
 }
 
 /**
@@ -6087,7 +6092,6 @@ static inline void dp_aggregate_pdev_stats(struct dp_pdev *pdev)
 	dp_wdi_event_handler(WDI_EVENT_UPDATE_DP_STATS, pdev->soc, &pdev->stats,
 			     pdev->pdev_id, UPDATE_PDEV_STATS, pdev->pdev_id);
 #endif
-
 }
 
 /**
@@ -6702,6 +6706,9 @@ static inline void
 dp_txrx_host_stats_clr(struct dp_vdev *vdev)
 {
 	struct dp_peer *peer = NULL;
+
+	if (!vdev || !vdev->pdev)
+		return;
 
 	DP_STATS_CLR(vdev->pdev);
 	DP_STATS_CLR(vdev->pdev->soc);
