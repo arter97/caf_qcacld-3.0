@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -974,7 +974,7 @@ static inline bool dp_rx_adjust_nbuf_len(qdf_nbuf_t nbuf, uint16_t *mpdu_len)
 {
 	bool last_nbuf;
 
-	if (*mpdu_len >= (RX_BUFFER_SIZE - RX_PKT_TLVS_LEN)) {
+	if (*mpdu_len > (RX_BUFFER_SIZE - RX_PKT_TLVS_LEN)) {
 		qdf_nbuf_set_pktlen(nbuf, RX_BUFFER_SIZE);
 		last_nbuf = false;
 	} else {
