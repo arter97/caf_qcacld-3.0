@@ -5566,6 +5566,10 @@ dp_print_soc_rx_stats(struct dp_soc *soc)
 			soc->stats.rx.err.hal_ring_access_fail);
 	DP_PRINT_STATS("\nRX frags: %d",
 		       soc->stats.rx.rx_frags);
+	DP_PRINT_STATS("\nRX frag wait: %d",
+		       soc->stats.rx.rx_frag_wait);
+	DP_PRINT_STATS("\nRX frag err: %d",
+		       soc->stats.rx.rx_frag_err);
 	DP_PRINT_STATS("\nRX HP out_of_sync: %d",
 		       soc->stats.rx.hp_oos);
 
