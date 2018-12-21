@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1198,6 +1198,9 @@ struct dp_pdev {
 
 	/*tx_mutex for me*/
 	DP_MUTEX_TYPE tx_mutex;
+
+	/* monitor */
+	bool monitor_configured;
 
 	/* Smart Mesh */
 	bool filter_neighbour_peers;
