@@ -1780,7 +1780,7 @@ static void dp_hw_link_desc_pool_cleanup(struct dp_soc *soc)
 #define RX_RELEASE_RING_SIZE 1024
 #define REO_EXCEPTION_RING_SIZE 128
 #define REO_CMD_RING_SIZE 128
-#define REO_STATUS_RING_SIZE 256
+#define REO_STATUS_RING_SIZE 1024
 #define RXDMA_BUF_RING_SIZE 1024
 #define RXDMA_REFILL_RING_SIZE 4096
 #define RXDMA_MONITOR_BUF_RING_SIZE 8192
