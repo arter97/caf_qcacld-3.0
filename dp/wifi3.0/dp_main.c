@@ -6524,6 +6524,10 @@ static void dp_set_vdev_param(struct cdp_vdev *vdev_handle,
 	case CDP_ENABLE_QWRAP_ISOLATION:
 		vdev->isolation_vdev = val;
 		break;
+	case CDP_ENABLE_DA:
+		vdev->pdev->soc->enable_da = val;
+		dp_wds_flush_ast_table_wifi3(((struct cdp_soc_t *)vdev->pdev->soc));
+		break;
 	default:
 		break;
 	}

@@ -364,6 +364,9 @@ dp_rx_da_learn(struct dp_soc *soc,
 	if (ta_peer->vdev->opmode != wlan_op_mode_ap)
 		return;
 
+	if (!soc->enable_da)
+		return;
+
 	if (qdf_unlikely(!qdf_nbuf_is_da_valid(nbuf) &&
 			 !qdf_nbuf_is_da_mcbc(nbuf))) {
 		dp_peer_add_ast(soc,
