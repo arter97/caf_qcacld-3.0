@@ -31,6 +31,9 @@
 #define INTERNAL_BUDGET_TO_NAPI_BUDGET(n, s) \
 	(((n) + 1) >> (s))
 
+/*Number of max hif irq*/
+#define HIF_IC_MAX_IRQ 52
+
 static struct hif_exec_context *hif_exec_tasklet_create(void);
 
 /**
@@ -39,12 +42,43 @@ static struct hif_exec_context *hif_exec_tasklet_create(void);
  *
  * return: void
  */
+void hif_clear_napi_stats(struct hif_opaque_softc *hif_ctx)
+{
+	struct HIF_CE_state *hif_state = HIF_GET_CE_STATE(hif_ctx);
+	struct hif_exec_context *hif_ext_group;
+	uint32_t i;
+
+	for (i = 0; i < hif_state->hif_num_extgroup; i++) {
+		hif_ext_group = hif_state->hif_ext_group[i];
+
+		if (!hif_ext_group)
+			return;
+
+		qdf_mem_set(hif_ext_group->sched_latency_stats,
+			    sizeof(hif_ext_group->sched_latency_stats),
+			    0x0);
+	}
+}
+
+qdf_export_symbol(hif_clear_napi_stats);
+
 void hif_print_napi_stats(struct hif_opaque_softc *hif_ctx)
 {
 	struct HIF_CE_state *hif_state = HIF_GET_CE_STATE(hif_ctx);
 	struct hif_exec_context *hif_ext_group;
 	struct qca_napi_stat *napi_stats;
 	int i, j;
+
+	char time_str[HIF_SCHED_LATENCY_BUCKETS][15] =  {
+		"0-2   ms",
+		"3-10  ms",
+		"11-20 ms",
+		"21-50 ms",
+		"51-100 ms",
+		"101-250 ms",
+		"251-500 ms",
+		"> 500 ms"
+	};
 
 	QDF_TRACE(QDF_MODULE_ID_HIF, QDF_TRACE_LEVEL_FATAL,
 		"NAPI[#ctx]CPU[#] |schedules |polls |completes |workdone");
@@ -64,6 +98,34 @@ void hif_print_napi_stats(struct hif_opaque_softc *hif_ctx)
 						napi_stats->napi_polls,
 						napi_stats->napi_completes,
 						napi_stats->napi_workdone);
+			}
+		}
+	}
+
+	for (i = 0; i < hif_state->hif_num_extgroup; i++) {
+		if (hif_state->hif_ext_group[i]) {
+			hif_ext_group = hif_state->hif_ext_group[i];
+
+			QDF_TRACE(QDF_MODULE_ID_HIF, QDF_TRACE_LEVEL_FATAL,
+				  "\nInterrupts in the HIF Group\n");
+
+			for (j = 0; j < hif_ext_group->numirq; j++) {
+				QDF_TRACE(QDF_MODULE_ID_HIF,
+					  QDF_TRACE_LEVEL_FATAL,
+					  "  %s ",
+					  hif_ext_group->irq_name
+					  (hif_ext_group->irq[j]));
+			}
+
+			QDF_TRACE(QDF_MODULE_ID_HIF, QDF_TRACE_LEVEL_FATAL,
+				  "Latency Bucket     | Frequency");
+
+			for (j = 0; j < HIF_SCHED_LATENCY_BUCKETS; j++) {
+				QDF_TRACE(QDF_MODULE_ID_HIF,
+					  QDF_TRACE_LEVEL_FATAL,
+					  "%s     |    %lld", time_str[j],
+					  hif_ext_group->
+					  sched_latency_stats[j]);
 			}
 		}
 	}
@@ -102,10 +164,49 @@ static void hif_exec_tasklet_fn(unsigned long data)
 }
 
 /**
- * hif_exec_poll() - grp tasklet
- * data: context
+ * hif_latency_calculate() - calculate latency and update histogram
+ * hif_ext_group: hif exec context
  *
- * return: void
+ * return: None
+ */
+static void hif_latency_calculate(struct hif_exec_context *hif_ext_group)
+{
+	int64_t cur_tstamp;
+	int64_t time_elapsed;
+
+	cur_tstamp = qdf_ktime_to_ms(qdf_ktime_get());
+
+	if (cur_tstamp > hif_ext_group->tstamp)
+		time_elapsed = (cur_tstamp - hif_ext_group->tstamp);
+	else
+		time_elapsed = ~0x0 - (hif_ext_group->tstamp - cur_tstamp);
+
+	hif_ext_group->tstamp = cur_tstamp;
+
+	if (time_elapsed <= HIF_SCHED_LATENCY_BUCKET_0_2)
+		hif_ext_group->sched_latency_stats[0]++;
+	else if (time_elapsed <= HIF_SCHED_LATENCY_BUCKET_3_10)
+		hif_ext_group->sched_latency_stats[1]++;
+	else if (time_elapsed <= HIF_SCHED_LATENCY_BUCKET_11_20)
+		hif_ext_group->sched_latency_stats[2]++;
+	else if (time_elapsed <= HIF_SCHED_LATENCY_BUCKET_21_50)
+		hif_ext_group->sched_latency_stats[3]++;
+	else if (time_elapsed <= HIF_SCHED_LATENCY_BUCKET_51_100)
+		hif_ext_group->sched_latency_stats[4]++;
+	else if (time_elapsed <= HIF_SCHED_LATENCY_BUCKET_101_250)
+		hif_ext_group->sched_latency_stats[5]++;
+	else if (time_elapsed <= HIF_SCHED_LATENCY_BUCKET_251_500)
+		hif_ext_group->sched_latency_stats[6]++;
+	else
+		hif_ext_group->sched_latency_stats[7]++;
+}
+
+/**
+ * hif_exec_poll() - napi pool
+ * napi: napi struct
+ * budget: budget for napi
+ *
+ * return: mapping of internal budget to napi
  */
 static int hif_exec_poll(struct napi_struct *napi, int budget)
 {
@@ -120,8 +221,11 @@ static int hif_exec_poll(struct napi_struct *napi, int budget)
 
 	if (budget)
 		normalized_budget = NAPI_BUDGET_TO_INTERNAL_BUDGET(budget, shift);
+
+	hif_latency_calculate(hif_ext_group);
+
 	work_done = hif_ext_group->handler(hif_ext_group->context,
-							normalized_budget);
+					   normalized_budget);
 
 	if (work_done < normalized_budget) {
 		napi_complete(napi);
@@ -331,6 +435,8 @@ irqreturn_t hif_ext_group_interrupt_handler(int irq, void *context)
 	struct hif_softc *scn = HIF_GET_SOFTC(hif_ext_group->hif);
 
 	if (hif_ext_group->irq_requested) {
+		hif_ext_group->tstamp = qdf_ktime_to_ms(qdf_ktime_get());
+
 		hif_ext_group->irq_disable(hif_ext_group);
 		qdf_atomic_inc(&scn->active_grp_tasklet_cnt);
 
