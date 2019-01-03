@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -5998,13 +5998,10 @@ void dp_aggregate_vdev_stats(struct dp_vdev *vdev,
 	struct dp_peer *peer = NULL;
 	struct dp_soc *soc = NULL;
 
-	if (!vdev)
+	if (!vdev || !vdev->pdev)
 		return;
 
 	soc = vdev->pdev->soc;
-
-	if (!vdev)
-		return;
 
 	qdf_mem_copy(vdev_stats, &vdev->stats, sizeof(vdev->stats));
 
@@ -6014,9 +6011,6 @@ void dp_aggregate_vdev_stats(struct dp_vdev *vdev,
 	qdf_spin_unlock_bh(&soc->peer_ref_mutex);
 
 #if defined(FEATURE_PERPKT_INFO) && WDI_EVENT_ENABLE
-	if (!vdev->pdev)
-		return;
-
 	dp_wdi_event_handler(WDI_EVENT_UPDATE_DP_STATS, vdev->pdev->soc,
 			     vdev_stats, vdev->vdev_id,
 			     UPDATE_VDEV_STATS, vdev->pdev->pdev_id);
