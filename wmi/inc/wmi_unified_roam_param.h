@@ -376,6 +376,10 @@ struct param_slot_scoring {
  *                  BITS 16-23 :- It contains scoring percentage of 3x3
  *                  BITS 24-31 :- It contains scoring percentage of 4x4
  *                  The value of each index must be 0-100
+ * @roam_score_delta: delta value expected over the roam score of the candidate
+ * ap over the roam score of the current ap
+ * @roam_trigger_bitmap: bitmap of roam triggers on which roam_score_delta
+ * will be applied
  * @rssi_scoring: RSSI scoring information.
  * @esp_qbss_scoring: ESP/QBSS scoring percentage information
  * @oce_wan_scoring: OCE WAN metrics percentage information
@@ -396,6 +400,8 @@ struct scoring_param {
 	uint32_t bw_index_score;
 	uint32_t band_index_score;
 	uint32_t nss_index_score;
+	uint32_t roam_score_delta;
+	uint32_t roam_trigger_bitmap;
 	struct rssi_scoring rssi_scoring;
 	struct param_slot_scoring esp_qbss_scoring;
 	struct param_slot_scoring oce_wan_scoring;
@@ -515,6 +521,8 @@ struct hlp_params {
  * @btm_solicited_timeout: Timeout value for waiting BTM request
  * @btm_max_attempt_cnt: Maximum attempt for sending BTM query to ESS
  * @btm_sticky_time: Stick time after roaming to new AP by BTM
+ * @disassoc_timer_threshold: threshold value till which the firmware can
+ * wait before triggering the roam scan after receiving the disassoc iminent
  */
 struct wmi_btm_config {
 	uint8_t vdev_id;
@@ -522,6 +530,20 @@ struct wmi_btm_config {
 	uint32_t btm_solicited_timeout;
 	uint32_t btm_max_attempt_cnt;
 	uint32_t btm_sticky_time;
+	uint32_t disassoc_timer_threshold;
+};
+
+/**
+ * struct wmi_bss_load_config - BSS load trigger parameters
+ * @vdev_id: VDEV on which the parameters should be applied
+ * @bss_load_threshold: BSS load threshold after which roam scan should trigger
+ * @bss_load_sample_time: Time duration in milliseconds for which the bss load
+ * trigger needs to be enabled
+ */
+struct wmi_bss_load_config {
+	uint32_t vdev_id;
+	uint32_t bss_load_threshold;
+	uint32_t bss_load_sample_time;
 };
 
 /**

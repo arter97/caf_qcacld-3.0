@@ -6360,6 +6360,10 @@ void wmi_copy_resource_config(wmi_resource_config *resource_cfg,
 			resource_cfg->flag1, 1);
 	}
 
+	if (tgt_res_cfg->peer_unmap_conf_support)
+		WMI_RSRC_CFG_FLAG_PEER_UNMAP_RESPONSE_SUPPORT_SET(
+			resource_cfg->flag1, 1);
+
 	wmi_copy_twt_resource_config(resource_cfg, tgt_res_cfg);
 	resource_cfg->peer_map_unmap_v2_support =
 		tgt_res_cfg->peer_map_unmap_v2;
@@ -9904,10 +9908,13 @@ static QDF_STATUS extract_reg_chan_list_update_event_tlv(
 	reg_info->min_bw_5g = chan_list_event_hdr->min_bw_5g;
 	reg_info->max_bw_5g = chan_list_event_hdr->max_bw_5g;
 
-	WMI_LOGD("%s:cc %s dsf %d BW: min_2g %d max_2g %d min_5g %d max_5g %d",
-			__func__, reg_info->alpha2, reg_info->dfs_region,
-			reg_info->min_bw_2g, reg_info->max_bw_2g,
-			reg_info->min_bw_5g, reg_info->max_bw_5g);
+	WMI_LOGD(FL("num_phys = %u and phy_id = %u"),
+		 reg_info->num_phy, reg_info->phy_id);
+
+	WMI_LOGD("%s:cc %s dfs %d BW: min_2g %d max_2g %d min_5g %d max_5g %d",
+		 __func__, reg_info->alpha2, reg_info->dfs_region,
+		 reg_info->min_bw_2g, reg_info->max_bw_2g,
+		 reg_info->min_bw_5g, reg_info->max_bw_5g);
 
 	WMI_LOGD("%s: num_2g_reg_rules %d num_5g_reg_rules %d", __func__,
 			num_2g_reg_rules, num_5g_reg_rules);
@@ -10319,6 +10326,7 @@ static QDF_STATUS send_set_country_cmd_tlv(wmi_unified_t wmi_handle,
 	QDF_STATUS qdf_status;
 	wmi_set_current_country_cmd_fixed_param *cmd;
 	uint16_t len = sizeof(*cmd);
+	uint8_t pdev_id = params->pdev_id;
 
 	buf = wmi_buf_alloc(wmi_handle, len);
 	if (!buf) {
@@ -10333,11 +10341,11 @@ static QDF_STATUS send_set_country_cmd_tlv(wmi_unified_t wmi_handle,
 		       WMITLV_GET_STRUCT_TLVLEN
 			       (wmi_set_current_country_cmd_fixed_param));
 
-	WMI_LOGD("setting cuurnet country to  %s", params->country);
+	cmd->pdev_id = wmi_handle->ops->convert_host_pdev_id_to_target(pdev_id);
+	WMI_LOGD("setting current country to  %s and target pdev_id = %u",
+		 params->country, cmd->pdev_id);
 
 	qdf_mem_copy((uint8_t *)&cmd->new_alpha2, params->country, 3);
-
-	cmd->pdev_id = params->pdev_id;
 
 	wmi_mtrace(WMI_SET_CURRENT_COUNTRY_CMDID, NO_SESSION, 0);
 	qdf_status = wmi_unified_cmd_send(wmi_handle,
@@ -11387,6 +11395,11 @@ struct wmi_ops tlv_ops =  {
 	.convert_pdev_id_target_to_host =
 		convert_target_pdev_id_to_host_pdev_id_legacy,
 
+	.convert_host_pdev_id_to_target =
+		convert_host_pdev_id_to_target_pdev_id,
+	.convert_target_pdev_id_to_host =
+		convert_target_pdev_id_to_host_pdev_id,
+
 	.send_start_11d_scan_cmd = send_start_11d_scan_cmd_tlv,
 	.send_stop_11d_scan_cmd = send_stop_11d_scan_cmd_tlv,
 	.extract_reg_11d_new_country_event =
@@ -11720,6 +11733,9 @@ static void populate_tlv_events_id(uint32_t *event_ids)
 #endif
 	event_ids[wmi_pdev_ctl_failsafe_check_event_id] =
 		WMI_PDEV_CTL_FAILSAFE_CHECK_EVENTID;
+	event_ids[wmi_vdev_bcn_reception_stats_event_id] =
+		WMI_VDEV_BCN_RECEPTION_STATS_EVENTID;
+	event_ids[wmi_roam_blacklist_event_id] = WMI_ROAM_BLACKLIST_EVENTID;
 }
 
 /**
@@ -11947,9 +11963,21 @@ static void populate_tlv_service(uint32_t *wmi_service)
 			WMI_SERVICE_PER_VDEV_CHAINMASK_CONFIG_SUPPORT;
 	wmi_service[wmi_service_new_htt_msg_format] =
 			WMI_SERVICE_HTT_H2T_NO_HTC_HDR_LEN_IN_MSG_LEN;
-
+	wmi_service[wmi_service_peer_unmap_cnf_support] =
+			WMI_SERVICE_PEER_UNMAP_RESPONSE_SUPPORT;
+	wmi_service[wmi_service_beacon_reception_stats] =
+			WMI_SERVICE_BEACON_RECEPTION_STATS;
+	wmi_service[wmi_service_vdev_latency_config] =
+			WMI_SERVICE_VDEV_LATENCY_CONFIG;
+	wmi_service[wmi_service_nan_dbs_support] = WMI_SERVICE_NAN_DBS_SUPPORT;
+	wmi_service[wmi_service_ndi_dbs_support] = WMI_SERVICE_NDI_DBS_SUPPORT;
+	wmi_service[wmi_service_nan_sap_support] = WMI_SERVICE_NAN_SAP_SUPPORT;
+	wmi_service[wmi_service_ndi_sap_support] = WMI_SERVICE_NDI_SAP_SUPPORT;
+	wmi_service[wmi_service_nan_disable_support] =
+			WMI_SERVICE_NAN_DISABLE_SUPPORT;
+	wmi_service[wmi_service_hw_db2dbm_support] =
+			WMI_SERVICE_HW_DB2DBM_CONVERSION_SUPPORT;
 }
-
 #ifndef CONFIG_MCL
 
 /**

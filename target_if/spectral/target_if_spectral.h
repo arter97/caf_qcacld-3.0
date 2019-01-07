@@ -41,6 +41,10 @@
 
 #include <spectral_defs_i.h>
 
+#ifndef SPECTRAL_USE_NL_BCAST
+#define SPECTRAL_USE_NL_BCAST  (0)
+#endif
+
 #define STATUS_PASS       1
 #define STATUS_FAIL       0
 #undef spectral_dbg_line
@@ -377,10 +381,12 @@ struct spectral_sscan_report_gen3 {
  * struct Spectral_report - spectral report
  * @data: Report buffer
  * @noisefloor: Noise floor values
+ * @reset_delay: Time taken for warm reset in us
  */
 struct spectral_report {
 	uint8_t *data;
 	int32_t noisefloor[DBR_MAX_CHAINS];
+	uint32_t reset_delay;
 };
 #endif
 /* END of spectral GEN III HW specific details */
@@ -792,6 +798,8 @@ struct wmi_spectral_cmd_ops {
  * (as expected), but cannot arrange for a smaller length to be reported by HW.
  * In these circumstances, the driver would have to disregard the NULL bins and
  * report a bin count of 0 to higher layers.
+ * @last_fft_timestamp: last fft report timestamp
+ * @timestamp_war_offset: Offset to be added to correct timestamp
  */
 struct target_if_spectral {
 	struct wlan_objmgr_pdev *pdev_obj;
@@ -846,6 +854,7 @@ struct target_if_spectral {
 	int                                     classify_scan;
 	os_timer_t                              classify_timer;
 	struct spectral_config                  params;
+	bool                                    params_valid;
 	struct spectral_classifier_params       classifier_params;
 	int                                     last_capture_time;
 	int                                     num_spectral_data;
@@ -897,6 +906,8 @@ struct target_if_spectral {
 	u_int8_t                               null_fftbin_adj;
 	enum spectral_160mhz_report_delivery_state state_160mhz_delivery;
 	void *spectral_report_cache;
+	uint32_t last_fft_timestamp;
+	uint32_t timestamp_war_offset;
 };
 
 /**

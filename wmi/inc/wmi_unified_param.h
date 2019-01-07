@@ -1909,10 +1909,14 @@ struct roam_fils_params {
  * @roam_offload_params: roam offload tlv params
  * @min_delay_btw_roam_scans: Delay btw two scans
  * @roam_trigger_reason_bitmask: Roam reason bitmark
+ * @roam_offload_params: roam offload tlv params, unused
+ *     in non tlv target, only for roam offload feature
  * @assoc_ie_length: Assoc IE length
  * @assoc_ie: Assoc IE buffer
  * @add_fils_tlv: add FILS TLV boolean
  * @roam_fils_params: roam fils params
+ * @rct_validity_timer: duration value for which the entries in
+ * roam candidate table are valid
  */
 struct roam_offload_scan_params {
 	uint8_t is_roam_req_valid;
@@ -1934,16 +1938,14 @@ struct roam_offload_scan_params {
 	int auth_mode;
 	bool fw_okc;
 	bool fw_pmksa_cache;
+	uint32_t rct_validity_timer;
 #endif
 	uint32_t min_delay_btw_roam_scans;
 	uint32_t roam_trigger_reason_bitmask;
 	bool is_ese_assoc;
 	bool is_11r_assoc;
 	struct mobility_domain_info mdid;
-#ifdef CONFIG_MCL
-	/* THis is not available in non tlv target.
-	* please remove this and replace with a host based
-	* structure */
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
 	roam_offload_param roam_offload_params;
 #endif
 	uint32_t assoc_ie_length;
@@ -2633,43 +2635,6 @@ struct fw_dump_req_param {
 	uint32_t request_id;
 	uint32_t num_seg;
 	struct fw_dump_seg_req_param segment[WMI_MAX_NUM_FW_SEGMENTS];
-};
-
-/**
- * struct wmi_tdls_params - TDLS parameters
- * @vdev_id: vdev id
- * @tdls_state: TDLS state
- * @notification_interval_ms: notification inerval
- * @tx_discovery_threshold: tx discovery threshold
- * @tx_teardown_threshold: tx teardown threashold
- * @rssi_teardown_threshold: RSSI teardown threshold
- * @rssi_delta: RSSI delta
- * @tdls_options: TDLS options
- * @peer_traffic_ind_window: raffic indication window
- * @peer_traffic_response_timeout: traffic response timeout
- * @puapsd_mask: uapsd mask
- * @puapsd_inactivity_time: uapsd inactivity time
- * @puapsd_rx_frame_threshold: uapsd rx frame threshold
- * @teardown_notification_ms: tdls teardown notification interval
- * @tdls_peer_kickout_threshold: tdls packet threshold for
- *    peer kickout operation
- */
-struct wmi_tdls_params {
-	uint32_t vdev_id;
-	uint32_t tdls_state;
-	uint32_t notification_interval_ms;
-	uint32_t tx_discovery_threshold;
-	uint32_t tx_teardown_threshold;
-	int32_t rssi_teardown_threshold;
-	int32_t rssi_delta;
-	uint32_t tdls_options;
-	uint32_t peer_traffic_ind_window;
-	uint32_t peer_traffic_response_timeout;
-	uint32_t puapsd_mask;
-	uint32_t puapsd_inactivity_time;
-	uint32_t puapsd_rx_frame_threshold;
-	uint32_t teardown_notification_ms;
-	uint32_t tdls_peer_kickout_threshold;
 };
 
 /**
@@ -4570,7 +4535,7 @@ struct wmi_host_per_chain_rssi_stats {
  */
 typedef struct {
 	wmi_host_mac_addr peer_macaddr;
-	uint32_t  peer_rssi;
+	int8_t  peer_rssi;
 	uint32_t  peer_rssi_seq_num;
 	uint32_t  peer_tx_rate;
 	uint32_t  peer_rx_rate;
@@ -4809,6 +4774,8 @@ typedef enum {
 	wmi_wlan_sar2_result_event_id,
 	wmi_esp_estimate_event_id,
 	wmi_pdev_ctl_failsafe_check_event_id,
+	wmi_vdev_bcn_reception_stats_event_id,
+	wmi_roam_blacklist_event_id,
 	wmi_events_max,
 } wmi_conv_event_id;
 
@@ -5266,6 +5233,15 @@ typedef enum {
 	wmi_service_obss_spatial_reuse,
 	wmi_service_per_vdev_chain_support,
 	wmi_service_new_htt_msg_format,
+	wmi_service_peer_unmap_cnf_support,
+	wmi_service_beacon_reception_stats,
+	wmi_service_vdev_latency_config,
+	wmi_service_nan_dbs_support,
+	wmi_service_ndi_dbs_support,
+	wmi_service_nan_sap_support,
+	wmi_service_ndi_sap_support,
+	wmi_service_nan_disable_support,
+	wmi_service_hw_db2dbm_support,
 	wmi_services_max,
 } wmi_conv_service_ids;
 #define WMI_SERVICE_UNAVAILABLE 0xFFFF
@@ -5355,6 +5331,7 @@ struct wmi_host_fw_abi_ver {
  * @atf_config: ATF config
  * @mgmt_comp_evt_bundle_support: bundle support required for mgmt complete evt
  * @tx_msdu_new_partition_id_support: new partiition id support for tx msdu
+ * @peer_unmap_conf_support: peer unmap conf support in fw
  * @iphdr_pad_config: ipheader pad config
  * @qwrap_config: Qwrap configuration
  * @alloc_frag_desc_for_data_pkt: Frag desc for data
@@ -5430,7 +5407,8 @@ typedef struct {
 	uint32_t atf_config:1,
 		 mgmt_comp_evt_bundle_support:1,
 		 tx_msdu_new_partition_id_support:1,
-		 new_htt_msg_format:1;
+		 new_htt_msg_format:1,
+		 peer_unmap_conf_support:1;
 	uint32_t iphdr_pad_config;
 	uint32_t
 		qwrap_config:16,
@@ -6847,6 +6825,8 @@ enum wmi_userspace_log_level {
  * @WMI_HOST_HW_MODE_DBS_OR_SBS: Two PHY with one PHY capabale of both 2G and
  *                        5G. It can support SBS (5G + 5G) OR DBS (5G + 2G).
  * @WMI_HOST_HW_MODE_MAX: Max hw_mode_id. Used to indicate invalid mode.
+ * @WMI_HOST_HW_MODE_DETECT: Mode id used by host to choose mode from target
+ *                        supported modes.
  */
 enum wmi_host_hw_mode_config_type {
 	WMI_HOST_HW_MODE_SINGLE       = 0,
@@ -6856,6 +6836,7 @@ enum wmi_host_hw_mode_config_type {
 	WMI_HOST_HW_MODE_DBS_SBS      = 4,
 	WMI_HOST_HW_MODE_DBS_OR_SBS   = 5,
 	WMI_HOST_HW_MODE_MAX,
+	WMI_HOST_HW_MODE_DETECT,
 };
 
 /*

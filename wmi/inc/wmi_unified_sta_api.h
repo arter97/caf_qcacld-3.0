@@ -146,18 +146,6 @@ QDF_STATUS wmi_unified_nat_keepalive_en_cmd(void *wmi_hdl, uint8_t vdev_id);
 QDF_STATUS wmi_unified_wlm_latency_level_cmd(void *wmi_hdl,
 					struct wlm_latency_level_param *param);
 
-#ifdef WLAN_FEATURE_NAN
-/**
- * wmi_unified_nan_req_cmd() - to send nan request to target
- * @wmi_handle: wmi handle
- * @nan_req: request data which will be non-null
- *
- * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
- */
-QDF_STATUS wmi_unified_nan_req_cmd(void *wmi_hdl,
-				   struct nan_req_params *nan_req);
-#endif
-
 /**
  * wmi_unified_process_set_ie_info_cmd() - Function to send IE info to firmware
  * @wmi_handle:    Pointer to WMi handle
@@ -197,13 +185,14 @@ QDF_STATUS wmi_unified_set_tdls_offchan_mode_cmd(void *wmi_hdl,
 /**
  * wmi_unified_update_fw_tdls_state_cmd() - send enable/disable tdls for a vdev
  * @wmi_handle: wmi handle
- * @pwmaTdlsparams: TDLS params
+ * @tdls_param: TDLS params
+ * @tdls_state: TDLS state
  *
  * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
  */
 QDF_STATUS wmi_unified_update_fw_tdls_state_cmd(void *wmi_hdl,
-						void *tdls_param,
-						uint8_t tdls_state);
+						struct tdls_info *tdls_param,
+						enum wmi_tdls_state tdls_state);
 
 /**
  * wmi_unified_update_tdls_peer_state_cmd() - update TDLS peer state
@@ -459,5 +448,19 @@ QDF_STATUS wmi_unified_set_arp_stats_req(void *wmi_hdl,
  */
 QDF_STATUS wmi_unified_get_arp_stats_req(void *wmi_hdl,
 					 struct get_arp_stats *req_buf);
+
+/**
+ * wmi_unified_peer_unmap_conf_send() - send PEER unmap conf command to fw
+ * @wmi: wmi handle
+ * @vdev_id: vdev id
+ * @peer_id_cnt: number of peer id
+ * @peer_id_list: list of peer ids
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_peer_unmap_conf_send(void *wmi_hdl,
+					    uint8_t vdev_id,
+					    uint32_t peer_id_cnt,
+					    uint16_t *peer_id_list);
 
 #endif /* _WMI_UNIFIED_STA_API_H_ */

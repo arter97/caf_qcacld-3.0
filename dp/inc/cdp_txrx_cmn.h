@@ -37,8 +37,15 @@
 #define dp_alert(params...) QDF_TRACE_FATAL(QDF_MODULE_ID_DP, params)
 #define dp_err(params...) QDF_TRACE_ERROR(QDF_MODULE_ID_DP, params)
 #define dp_warn(params...) QDF_TRACE_WARN(QDF_MODULE_ID_DP, params)
-#define dp_info(params...) QDF_TRACE_INFO(QDF_MODULE_ID_DP, params)
+#define dp_info(params...) \
+	__QDF_TRACE_FL(QDF_TRACE_LEVEL_INFO_HIGH, QDF_MODULE_ID_DP, ## params)
 #define dp_debug(params...) QDF_TRACE_DEBUG(QDF_MODULE_ID_DP, params)
+
+#define dp_alert_rl(params...) QDF_TRACE_FATAL_RL(QDF_MODULE_ID_DP, params)
+#define dp_err_rl(params...) QDF_TRACE_ERROR_RL(QDF_MODULE_ID_DP, params)
+#define dp_warn_rl(params...) QDF_TRACE_WARN_RL(QDF_MODULE_ID_DP, params)
+#define dp_info_rl(params...) QDF_TRACE_INFO_RL(QDF_MODULE_ID_DP, params)
+#define dp_debug_rl(params...) QDF_TRACE_DEBUG_RL(QDF_MODULE_ID_DP, params)
 
 static inline QDF_STATUS
 cdp_soc_attach_target(ol_txrx_soc_handle soc)
@@ -1959,16 +1966,16 @@ void cdp_set_nac(ol_txrx_soc_handle soc,
  * @pdev: data path pdev handle
  * @val: value of pdev_tx_capture
  *
- * Return: void
+ * Return: status: 0 - Success, non-zero: Failure
  */
 static inline
-void cdp_set_pdev_tx_capture(ol_txrx_soc_handle soc,
-		struct cdp_pdev *pdev, int val)
+QDF_STATUS cdp_set_pdev_tx_capture(ol_txrx_soc_handle soc,
+				   struct cdp_pdev *pdev, int val)
 {
 	if (soc->ops->cmn_drv_ops->txrx_set_pdev_tx_capture)
 		return soc->ops->cmn_drv_ops->txrx_set_pdev_tx_capture(pdev,
 				val);
-
+	return QDF_STATUS_SUCCESS;
 }
 
 /**

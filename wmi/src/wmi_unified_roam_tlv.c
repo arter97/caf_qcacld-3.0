@@ -1155,6 +1155,8 @@ static QDF_STATUS send_roam_scan_offload_mode_cmd_tlv(wmi_unified_t wmi_handle,
 			req_offload_params->roam_preauth_no_ack_timeout;
 		roam_offload_params->reassoc_failure_timeout =
 			roam_req->reassoc_failure_timeout;
+		roam_offload_params->roam_candidate_validity_time =
+			roam_req->rct_validity_timer;
 
 		/* Fill the capabilities */
 		roam_offload_params->capability =
@@ -1552,6 +1554,13 @@ static QDF_STATUS send_roam_scan_offload_ap_profile_cmd_tlv(wmi_unified_t wmi_ha
 		 score_param->oce_wan_scoring.score_pcnt7_to_4,
 		 score_param->oce_wan_scoring.score_pcnt11_to_8,
 		 score_param->oce_wan_scoring.score_pcnt15_to_12);
+
+	score_param->roam_score_delta_pcnt = ap_profile->param.roam_score_delta;
+	score_param->roam_score_delta_mask =
+				ap_profile->param.roam_trigger_bitmap;
+	WMI_LOGD("Roam score delta:%d Roam_trigger_bitmap:%x",
+		 score_param->roam_score_delta_pcnt,
+		 score_param->roam_score_delta_mask);
 
 	wmi_mtrace(WMI_ROAM_AP_PROFILE, NO_SESSION, 0);
 	status = wmi_unified_cmd_send(wmi_handle, buf,
@@ -2033,11 +2042,57 @@ static QDF_STATUS send_btm_config_cmd_tlv(wmi_unified_t wmi_handle,
 	cmd->max_attempt_cnt = params->btm_max_attempt_cnt;
 	cmd->solicited_timeout_ms = params->btm_solicited_timeout;
 	cmd->stick_time_seconds = params->btm_sticky_time;
+	cmd->disassoc_timer_threshold = params->disassoc_timer_threshold;
 
 	wmi_mtrace(WMI_ROAM_BTM_CONFIG_CMDID, cmd->vdev_id, 0);
 	if (wmi_unified_cmd_send(wmi_handle, buf, len,
 	    WMI_ROAM_BTM_CONFIG_CMDID)) {
 		WMI_LOGE("%s: failed to send WMI_ROAM_BTM_CONFIG_CMDID",
+			 __func__);
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * send_roam_bss_load_config_tlv() - send roam load bss trigger configuration
+ * @wmi_handle: wmi handle
+ * @parms: pointer to wmi_bss_load_config
+ *
+ * This function sends the roam load bss trigger configuration to fw.
+ * the bss_load_threshold parameter is used to configure the maximum
+ * bss load percentage, above which the firmware should trigger roaming
+ *
+ * Return: QDF status
+ */
+static QDF_STATUS
+send_roam_bss_load_config_tlv(wmi_unified_t wmi_handle,
+			      struct wmi_bss_load_config *params)
+{
+	wmi_roam_bss_load_config_cmd_fixed_param *cmd;
+	wmi_buf_t buf;
+	uint32_t len;
+
+	len = sizeof(*cmd);
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf)
+		return QDF_STATUS_E_NOMEM;
+
+	cmd = (wmi_roam_bss_load_config_cmd_fixed_param *)wmi_buf_data(buf);
+	WMITLV_SET_HDR(
+	    &cmd->tlv_header,
+	    WMITLV_TAG_STRUC_wmi_roam_bss_load_config_cmd_fixed_param,
+	    WMITLV_GET_STRUCT_TLVLEN(wmi_roam_bss_load_config_cmd_fixed_param));
+	cmd->vdev_id = params->vdev_id;
+	cmd->bss_load_threshold = params->bss_load_threshold;
+	cmd->monitor_time_window = params->bss_load_sample_time;
+
+	wmi_mtrace(WMI_ROAM_BSS_LOAD_CONFIG_CMDID, cmd->vdev_id, 0);
+	if (wmi_unified_cmd_send(wmi_handle, buf, len,
+				 WMI_ROAM_BSS_LOAD_CONFIG_CMDID)) {
+		WMI_LOGE("%s: failed to send WMI_ROAM_BSS_LOAD_CONFIG_CMDID ",
 			 __func__);
 		wmi_buf_free(buf);
 		return QDF_STATUS_E_FAILURE;
@@ -2214,6 +2269,7 @@ void wmi_roam_attach_tlv(wmi_unified_t wmi_handle)
 	ops->send_offload_11k_cmd = send_offload_11k_cmd_tlv;
 	ops->send_invoke_neighbor_report_cmd =
 			send_invoke_neighbor_report_cmd_tlv;
+	ops->send_roam_bss_load_config = send_roam_bss_load_config_tlv;
 
 	wmi_lfr_subnet_detection_attach_tlv(wmi_handle);
 	wmi_rssi_monitor_attach_tlv(wmi_handle);

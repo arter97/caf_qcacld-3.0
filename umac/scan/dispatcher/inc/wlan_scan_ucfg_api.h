@@ -174,21 +174,46 @@ QDF_STATUS
 ucfg_scan_start(struct scan_start_request *req);
 
 /**
- * ucfg_scan_set_enable() - Public API to disable/enable scans
+ * ucfg_scan_set_psoc_enable() - Public API to enable scans for psoc
  * @psoc: psoc on which scans need to be disabled
- * @enable: enable scan if true disable is false
+ * @reason: reason for enable/disabled
  *
  * Return: QDF_STATUS.
  */
-QDF_STATUS ucfg_scan_set_enable(struct wlan_objmgr_psoc *psoc, bool enable);
+QDF_STATUS ucfg_scan_psoc_set_enable(struct wlan_objmgr_psoc *psoc,
+				     enum scan_disable_reason reason);
 
 /**
- * ucfg_scan_get_enable() - Public API to get if scan is enabled or disabled
- * @psoc: psoc on which scans status need to be checked
+ * ucfg_scan_psoc_set_disable() - Public API to disable scans for psoc
+ * @psoc: psoc on which scans need to be disabled
+ * @reason: reason for enable/disabled
  *
- * Return: true if enabled else false.
+ * Return: QDF_STATUS.
  */
-bool ucfg_scan_get_enable(struct wlan_objmgr_psoc *psoc);
+QDF_STATUS ucfg_scan_psoc_set_disable(struct wlan_objmgr_psoc *psoc,
+				      enum scan_disable_reason reason);
+
+/**
+ * ucfg_scan_vdev_set_enable() - Public API to enable scans for vdev
+ * @psoc: psoc on which scans need to be disabled
+ * @reason: reason for enable/disabled
+ *
+ * Return: QDF_STATUS.
+ */
+QDF_STATUS ucfg_scan_vdev_set_enable(struct wlan_objmgr_vdev *vdev,
+				     enum scan_disable_reason reason);
+
+/**
+ * ucfg_scan_vdev_set_disable() - Public API to disable scans for vdev
+ * @psoc: psoc on which scans need to be disabled
+ * @reason: reason for enable/disabled
+ *
+ * Return: QDF_STATUS.
+ */
+QDF_STATUS ucfg_scan_vdev_set_disable(struct wlan_objmgr_vdev *vdev,
+				      enum scan_disable_reason reason);
+
+
 
 /**
  * ucfg_scan_set_miracast() - Public API to disable/enable miracast flag
@@ -615,21 +640,6 @@ void ucfg_scan_set_bt_activity(struct wlan_objmgr_psoc *psoc,
 bool ucfg_scan_get_bt_activity(struct wlan_objmgr_psoc *psoc);
 
 /**
- * ucfg_scan_set_vdev_del_in_progress() - API to mark vdev delete in progress
- * @vdev: pointer to vdev object
- *
- * Return: none
- */
-void ucfg_scan_set_vdev_del_in_progress(struct wlan_objmgr_vdev *vdev);
-/**
- * ucfg_scan_clear_vdev_del_in_progress() - API to reset vdev delete in progress
- * @vdev: pointer to vdev object
- *
- * Return: none
- */
-void ucfg_scan_clear_vdev_del_in_progress(struct wlan_objmgr_vdev *vdev);
-
-/**
  * ucfg_scan_cfg_set_active_dwelltime() - API to set scan active dwelltime
  * @psoc: pointer to psoc object
  * @dwell_time: scan active dwell time
@@ -682,6 +692,90 @@ void ucfg_scan_cfg_get_passive_dwelltime(struct wlan_objmgr_psoc *psoc,
 					 uint32_t *dwell_time)
 {
 	return wlan_scan_cfg_get_passive_dwelltime(psoc, dwell_time);
+}
+
+/**
+ * ucfg_scan_cfg_get_conc_active_dwelltime() - Get concurrent active dwelltime
+ * @psoc: pointer to psoc object
+ * @dwell_time: scan active dwelltime
+ *
+ * Return: scan concurrent active dwell time
+ */
+static inline
+void ucfg_scan_cfg_get_conc_active_dwelltime(struct wlan_objmgr_psoc *psoc,
+					     uint32_t *dwell_time)
+{
+	return wlan_scan_cfg_get_conc_active_dwelltime(psoc, dwell_time);
+}
+
+/**
+ * ucfg_scan_cfg_set_conc_active_dwelltime() - Set concurrent active dwelltime
+ * @psoc: pointer to psoc object
+ * @dwell_time: scan active dwelltime
+ *
+ * Return: scan concurrent active dwell time
+ */
+static inline
+void ucfg_scan_cfg_set_conc_active_dwelltime(struct wlan_objmgr_psoc *psoc,
+					     uint32_t dwell_time)
+{
+	return wlan_scan_cfg_set_conc_active_dwelltime(psoc, dwell_time);
+}
+
+/**
+ * ucfg_scan_cfg_get_conc_passive_dwelltime() - Get passive concurrent dwelltime
+ * @psoc: pointer to psoc object
+ * @dwell_time: scan passive dwelltime
+ *
+ * Return: scan concurrent passive dwell time
+ */
+static inline
+void ucfg_scan_cfg_get_conc_passive_dwelltime(struct wlan_objmgr_psoc *psoc,
+					      uint32_t *dwell_time)
+{
+	return wlan_scan_cfg_get_conc_passive_dwelltime(psoc, dwell_time);
+}
+
+/**
+ * ucfg_scan_cfg_set_conc_passive_dwelltime() - Set passive concurrent dwelltime
+ * @psoc: pointer to psoc object
+ * @dwell_time: scan passive dwelltime
+ *
+ * Return: scan concurrent passive dwell time
+ */
+static inline
+void ucfg_scan_cfg_set_conc_passive_dwelltime(struct wlan_objmgr_psoc *psoc,
+					      uint32_t dwell_time)
+{
+	return wlan_scan_cfg_set_conc_passive_dwelltime(psoc, dwell_time);
+}
+
+/**
+ * ucfg_scan_cfg_get_conc_max_resttime() - API to get max rest time
+ * @psoc: pointer to psoc object
+ * @rest_time: scan concurrent max resttime
+ *
+ * Return: scan concurrent max rest time
+ */
+static inline
+void ucfg_scan_cfg_get_conc_max_resttime(struct wlan_objmgr_psoc *psoc,
+					 uint32_t *rest_time)
+{
+	return wlan_scan_cfg_get_conc_max_resttime(psoc, rest_time);
+}
+
+/**
+ * ucfg_scan_cfg_get_conc_min_resttime() - API to get concurrent min rest time
+ * @psoc: pointer to psoc object
+ * @rest_time: scan concurrent min rest time
+ *
+ * Return: scan concurrent min rest time
+ */
+static inline
+void ucfg_scan_cfg_get_conc_min_resttime(struct wlan_objmgr_psoc *psoc,
+					 uint32_t *rest_time)
+{
+	return wlan_scan_cfg_get_conc_min_resttime(psoc, rest_time);
 }
 
 #endif

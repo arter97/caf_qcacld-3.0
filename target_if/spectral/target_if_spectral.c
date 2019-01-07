@@ -27,13 +27,11 @@
 #include <wlan_osif_priv.h>
 #include <init_deinit_lmac.h>
 #include <reg_services_public_struct.h>
-#ifdef CONFIG_WIN
-#include <wlan_mlme_dispatcher.h>
-#endif /*CONFIG_WIN*/
 #include <reg_services_public_struct.h>
 #include <target_if_spectral_sim.h>
 #include <target_if.h>
 #include <qdf_module.h>
+
 /**
  * @spectral_ops - Spectral function table, holds the Spectral functions that
  * depend on whether the architecture is Direct Attach or Offload. This is used
@@ -270,6 +268,12 @@ target_if_spectral_info_init_defaults(struct target_if_spectral *spectral)
 	info->osps_cache.osc_params.ss_chn_mask =
 	    wlan_vdev_mlme_get_rxchainmask(vdev);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_SPECTRAL_ID);
+
+	info->osps_cache.osc_params.ss_short_report =
+		SPECTRAL_SCAN_SHORT_REPORT_DEFAULT;
+
+	info->osps_cache.osc_params.ss_fft_period =
+		SPECTRAL_SCAN_FFT_PERIOD_DEFAULT;
 
 	/* The cache is now valid */
 	info->osps_cache.osc_is_valid = 1;
@@ -1797,57 +1801,6 @@ target_if_spectral_check_hw_capability(struct target_if_spectral *spectral)
 	return is_spectral_supported;
 }
 
-/**
- * target_if_spectral_init_param_defaults() - Initialize Spectral
- * parameter defaults
- * @spectral: Pointer to Spectral target_if internal private data
- *
- * It is the caller's responsibility to ensure that the Spectral parameters
- * structure passed as part of Spectral target_if internal private data is
- * valid.
- *
- * Return: None
- */
-static void
-target_if_spectral_init_param_defaults(struct target_if_spectral *spectral)
-{
-	struct spectral_config *params = &spectral->params;
-
-	params->ss_count = SPECTRAL_SCAN_COUNT_DEFAULT;
-	if (spectral->spectral_gen == SPECTRAL_GEN3)
-		params->ss_period = SPECTRAL_SCAN_PERIOD_GEN_III_DEFAULT;
-	else
-		params->ss_period = SPECTRAL_SCAN_PERIOD_GEN_II_DEFAULT;
-	params->ss_spectral_pri = SPECTRAL_SCAN_PRIORITY_DEFAULT;
-	params->ss_fft_size = SPECTRAL_SCAN_FFT_SIZE_DEFAULT;
-	params->ss_gc_ena = SPECTRAL_SCAN_GC_ENA_DEFAULT;
-	params->ss_restart_ena = SPECTRAL_SCAN_RESTART_ENA_DEFAULT;
-	params->ss_noise_floor_ref = SPECTRAL_SCAN_NOISE_FLOOR_REF_DEFAULT;
-	params->ss_init_delay = SPECTRAL_SCAN_INIT_DELAY_DEFAULT;
-	params->ss_nb_tone_thr = SPECTRAL_SCAN_NB_TONE_THR_DEFAULT;
-	params->ss_str_bin_thr = SPECTRAL_SCAN_STR_BIN_THR_DEFAULT;
-	params->ss_wb_rpt_mode = SPECTRAL_SCAN_WB_RPT_MODE_DEFAULT;
-	params->ss_rssi_rpt_mode = SPECTRAL_SCAN_RSSI_RPT_MODE_DEFAULT;
-	params->ss_rssi_thr = SPECTRAL_SCAN_RSSI_THR_DEFAULT;
-	params->ss_pwr_format = SPECTRAL_SCAN_PWR_FORMAT_DEFAULT;
-	params->ss_rpt_mode = SPECTRAL_SCAN_RPT_MODE_DEFAULT;
-	params->ss_bin_scale = SPECTRAL_SCAN_BIN_SCALE_DEFAULT;
-	params->ss_dbm_adj = SPECTRAL_SCAN_DBM_ADJ_DEFAULT;
-	/*
-	 * XXX
-	 * SPECTRAL_SCAN_CHN_MASK_DEFAULT (0x1) specifies that chain 0 is to be
-	 * used
-	 * for Spectral. This is expected to be an optimal configuration for
-	 * most chipsets considering aspects like power save. But this can later
-	 * optionally be changed to be set to the default system Rx chainmask
-	 * advertised by FW (if required for some purpose), once the Convergence
-	 * framework supports such retrieval at pdev attach time.
-	 */
-	params->ss_chn_mask = SPECTRAL_SCAN_CHN_MASK_DEFAULT;
-	params->ss_short_report = SPECTRAL_SCAN_SHORT_REPORT_DEFAULT;
-	params->ss_fft_period = SPECTRAL_SCAN_FFT_PERIOD_DEFAULT;
-}
-
 #ifdef QCA_SUPPORT_SPECTRAL_SIMULATION
 /**
  * target_if_spectral_detach_simulation() - De-initialize Spectral
@@ -1942,12 +1895,10 @@ target_if_pdev_spectral_init(struct wlan_objmgr_pdev *pdev)
 {
 	struct target_if_spectral_ops *p_sops = NULL;
 	struct target_if_spectral *spectral = NULL;
-#ifdef CONFIG_WIN
 	uint32_t target_type;
 	uint32_t target_revision;
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_lmac_if_target_tx_ops *tx_ops;
-#endif
 
 	if (!pdev) {
 		spectral_err("SPECTRAL: pdev is NULL!");
@@ -1963,7 +1914,6 @@ target_if_pdev_spectral_init(struct wlan_objmgr_pdev *pdev)
 	/* Store pdev in Spectral */
 	spectral->pdev_obj = pdev;
 
-#ifdef CONFIG_WIN
 	psoc = wlan_pdev_get_psoc(pdev);
 
 	tx_ops = &psoc->soc_cb.tx_ops.target_tx_ops;
@@ -1981,7 +1931,6 @@ target_if_pdev_spectral_init(struct wlan_objmgr_pdev *pdev)
 		qdf_mem_free(spectral);
 		return NULL;
 	}
-#endif
 
 	/* init the function ptr table */
 	target_if_spectral_init_dummy_function_table(spectral);
@@ -2005,7 +1954,6 @@ target_if_pdev_spectral_init(struct wlan_objmgr_pdev *pdev)
 	qdf_spinlock_create(&spectral->noise_pwr_reports_lock);
 	target_if_spectral_clear_stats(spectral);
 
-#ifdef CONFIG_WIN
 	if (target_type == TARGET_TYPE_QCA8074V2 ||
 	    target_type == TARGET_TYPE_QCA6018)
 		spectral->fftbin_size_war =
@@ -2025,6 +1973,8 @@ target_if_pdev_spectral_init(struct wlan_objmgr_pdev *pdev)
 		spectral->inband_fftbin_size_adj = 0;
 		spectral->null_fftbin_adj = 0;
 	}
+	spectral->last_fft_timestamp = 0;
+	spectral->timestamp_war_offset = 0;
 
 	if ((target_type == TARGET_TYPE_QCA8074) ||
 	    (target_type == TARGET_TYPE_QCA8074V2) ||
@@ -2036,9 +1986,7 @@ target_if_pdev_spectral_init(struct wlan_objmgr_pdev *pdev)
 		    TLV_TAG_SPECTRAL_SUMMARY_REPORT_GEN3;
 		spectral->tag_sscan_fft_exp = TLV_TAG_SEARCH_FFT_REPORT_GEN3;
 		spectral->tlvhdr_size = SPECTRAL_PHYERR_TLVSIZE_GEN3;
-	} else
-#endif
-	{
+	} else {
 		spectral->spectral_gen = SPECTRAL_GEN2;
 		spectral->hdr_sig_exp = SPECTRAL_PHYERR_SIGNATURE_GEN2;
 		spectral->tag_sscan_summary_exp =
@@ -2047,8 +1995,7 @@ target_if_pdev_spectral_init(struct wlan_objmgr_pdev *pdev)
 		spectral->tlvhdr_size = sizeof(struct spectral_phyerr_tlv_gen2);
 	}
 
-	/* Set the default values for spectral parameters */
-	target_if_spectral_init_param_defaults(spectral);
+	spectral->params_valid = false;
 	/* Init spectral capability */
 	target_if_init_spectral_capability(spectral);
 	if (target_if_spectral_attach_simulation(spectral) < 0)
@@ -2072,7 +2019,6 @@ target_if_pdev_spectral_init(struct wlan_objmgr_pdev *pdev)
 		spectral->is_160_format = false;
 		spectral->is_lb_edge_extrabins_format = false;
 		spectral->is_rb_edge_extrabins_format = false;
-#ifdef CONFIG_WIN
 
 		if (target_type == TARGET_TYPE_QCA9984 ||
 		    target_type == TARGET_TYPE_QCA9888) {
@@ -2087,10 +2033,9 @@ target_if_pdev_spectral_init(struct wlan_objmgr_pdev *pdev)
 		if (target_type == TARGET_TYPE_QCA9984 ||
 		    target_type == TARGET_TYPE_QCA9888)
 			spectral->is_sec80_rssi_war_required = true;
-		spectral->use_nl_bcast = true;
-#else
-		spectral->use_nl_bcast = false;
-#endif
+
+		spectral->use_nl_bcast = SPECTRAL_USE_NL_BCAST;
+
 		if (spectral->spectral_gen == SPECTRAL_GEN3)
 			init_160mhz_delivery_state_machine(spectral);
 	}
@@ -2145,6 +2090,14 @@ target_if_set_spectral_config(struct wlan_objmgr_pdev *pdev,
 	if (!spectral) {
 		spectral_err("spectral object is NULL");
 		return -EPERM;
+	}
+
+	if (!spectral->params_valid) {
+		target_if_spectral_info_read(spectral,
+					     TARGET_IF_SPECTRAL_INFO_PARAMS,
+					     &spectral->params,
+					     sizeof(spectral->params));
+		spectral->params_valid = true;
 	}
 
 	switch (threshtype) {
@@ -2611,6 +2564,8 @@ target_if_spectral_scan_enable_params(struct target_if_spectral *spectral,
 	if (!p_sops->is_spectral_active(spectral)) {
 		p_sops->configure_spectral(spectral, spectral_params);
 		p_sops->start_spectral_scan(spectral);
+		spectral->timestamp_war_offset = 0;
+		spectral->last_fft_timestamp = 0;
 	} else {
 	}
 
@@ -2642,6 +2597,14 @@ target_if_start_spectral_scan(struct wlan_objmgr_pdev *pdev)
 		return -EPERM;
 	}
 	p_sops = GET_TARGET_IF_SPECTRAL_OPS(spectral);
+
+	if (!spectral->params_valid) {
+		target_if_spectral_info_read(spectral,
+					     TARGET_IF_SPECTRAL_INFO_PARAMS,
+					     &spectral->params,
+					     sizeof(spectral->params));
+		spectral->params_valid = true;
+	}
 
 	qdf_spin_lock(&spectral->spectral_lock);
 	target_if_spectral_scan_enable_params(spectral, &spectral->params);

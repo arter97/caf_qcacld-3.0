@@ -123,20 +123,6 @@ QDF_STATUS wmi_unified_wlm_latency_level_cmd(void *wmi_hdl,
 	return QDF_STATUS_E_FAILURE;
 }
 
-#ifdef WLAN_FEATURE_NAN
-QDF_STATUS wmi_unified_nan_req_cmd(void *wmi_hdl,
-			struct nan_req_params *nan_req)
-{
-	wmi_unified_t wmi_handle = (wmi_unified_t) wmi_hdl;
-
-	if (wmi_handle->ops->send_nan_req_cmd)
-		return wmi_handle->ops->send_nan_req_cmd(wmi_handle,
-							 nan_req);
-
-	return QDF_STATUS_E_FAILURE;
-}
-#endif
-
 QDF_STATUS wmi_unified_process_set_ie_info_cmd(void *wmi_hdl,
 				   struct vdev_ie_info_param *ie_info)
 {
@@ -175,13 +161,14 @@ QDF_STATUS wmi_unified_set_tdls_offchan_mode_cmd(void *wmi_hdl,
 }
 
 QDF_STATUS wmi_unified_update_fw_tdls_state_cmd(void *wmi_hdl,
-					 void *tdls_param, uint8_t tdls_state)
+						struct tdls_info *tdls_param,
+						enum wmi_tdls_state tdls_state)
 {
 	wmi_unified_t wmi_handle = (wmi_unified_t) wmi_hdl;
 
 	if (wmi_handle->ops->send_update_fw_tdls_state_cmd)
-		return wmi_handle->ops->send_update_fw_tdls_state_cmd(wmi_handle,
-			    tdls_param, tdls_state);
+		return wmi_handle->ops->send_update_fw_tdls_state_cmd(
+				wmi_handle, tdls_param, tdls_state);
 
 	return QDF_STATUS_E_FAILURE;
 }
@@ -487,6 +474,20 @@ QDF_STATUS wmi_unified_get_arp_stats_req(void *wmi_hdl,
 	if (wmi_handle->ops->send_get_arp_stats_req_cmd)
 		return wmi_handle->ops->send_get_arp_stats_req_cmd(wmi_handle,
 								   req_buf);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS wmi_unified_peer_unmap_conf_send(void *wmi_hdl,
+					    uint8_t vdev_id,
+					    uint32_t peer_id_cnt,
+					    uint16_t *peer_id_list)
+{
+	wmi_unified_t wmi_handle = (wmi_unified_t)wmi_hdl;
+
+	if (wmi_handle->ops->send_peer_unmap_conf_cmd)
+		return wmi_handle->ops->send_peer_unmap_conf_cmd(wmi_handle,
+				  vdev_id, peer_id_cnt, peer_id_list);
 
 	return QDF_STATUS_E_FAILURE;
 }

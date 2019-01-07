@@ -93,7 +93,7 @@ dp_rx_populate_cdp_indication_ppdu(struct dp_pdev *pdev,
 	cdp_rx_ppdu->lsig_a = ppdu_info->rx_status.rate;
 
 	ast_index = ppdu_info->rx_status.ast_index;
-	if (ast_index > (WLAN_UMAC_PSOC_MAX_PEERS * 2)) {
+	if (ast_index >= (WLAN_UMAC_PSOC_MAX_PEERS * 2)) {
 		cdp_rx_ppdu->peer_id = HTT_INVALID_PEER;
 		return;
 	}
@@ -271,6 +271,8 @@ dp_rx_handle_mcopy_mode(struct dp_soc *soc, struct dp_pdev *pdev,
 			struct hal_rx_ppdu_info *ppdu_info, qdf_nbuf_t nbuf)
 {
 	uint8_t size = 0;
+	struct ieee80211_frame *wh;
+	uint32_t *nbuf_data;
 
 	if (ppdu_info->msdu_info.first_msdu_payload == NULL)
 		return QDF_STATUS_SUCCESS;
@@ -280,14 +282,24 @@ dp_rx_handle_mcopy_mode(struct dp_soc *soc, struct dp_pdev *pdev,
 
 	pdev->m_copy_id.rx_ppdu_id = ppdu_info->com_info.ppdu_id;
 
-	/* Include 2 bytes of reserved space appended to the msdu payload */
+	wh = (struct ieee80211_frame *)(ppdu_info->msdu_info.first_msdu_payload
+					+ 4);
 	size = (ppdu_info->msdu_info.first_msdu_payload -
-				qdf_nbuf_data(nbuf)) + 2;
+				qdf_nbuf_data(nbuf));
 	ppdu_info->msdu_info.first_msdu_payload = NULL;
 
 	if (qdf_nbuf_pull_head(nbuf, size) == NULL)
 		return QDF_STATUS_SUCCESS;
 
+	if (((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) ==
+	     IEEE80211_FC0_TYPE_MGT) ||
+	     ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) ==
+	     IEEE80211_FC0_TYPE_CTL)) {
+		return QDF_STATUS_SUCCESS;
+	}
+
+	nbuf_data = (uint32_t *)qdf_nbuf_data(nbuf);
+	*nbuf_data = pdev->ppdu_info.com_info.ppdu_id;
 	/* only retain RX MSDU payload in the skb */
 	qdf_nbuf_trim_tail(nbuf, qdf_nbuf_len(nbuf) -
 				ppdu_info->msdu_info.payload_len);
@@ -333,9 +345,9 @@ dp_rx_handle_smart_mesh_mode(struct dp_soc *soc, struct dp_pdev *pdev,
 		return 1;
 	}
 
-	/* Include 2 bytes of reserved space appended to the msdu payload */
+	/* Adding 4 bytes to get to start of 802.11 frame after phy_ppdu_id */
 	size = (ppdu_info->msdu_info.first_msdu_payload -
-		qdf_nbuf_data(nbuf)) + 2;
+		qdf_nbuf_data(nbuf)) + 4;
 	ppdu_info->msdu_info.first_msdu_payload = NULL;
 
 	if (qdf_nbuf_pull_head(nbuf, size) == NULL) {
@@ -345,14 +357,14 @@ dp_rx_handle_smart_mesh_mode(struct dp_soc *soc, struct dp_pdev *pdev,
 		return 1;
 	}
 
-	/* only retain RX MSDU payload in the skb */
+	/* Only retain RX MSDU payload in the skb */
 	qdf_nbuf_trim_tail(nbuf, qdf_nbuf_len(nbuf) -
 			   ppdu_info->msdu_info.payload_len);
 	qdf_nbuf_update_radiotap(&(pdev->ppdu_info.rx_status),
 				 nbuf, sizeof(struct rx_pkt_tlvs));
 	pdev->monitor_vdev->osif_rx_mon(pdev->monitor_vdev->osif_vdev,
 					nbuf, NULL);
-
+	pdev->ppdu_info.rx_status.monitor_direct_used = 0;
 	return 0;
 }
 
@@ -400,6 +412,12 @@ dp_rx_handle_ppdu_stats(struct dp_soc *soc, struct dp_pdev *pdev,
 		}
 		qdf_spin_unlock_bh(&pdev->neighbour_peer_mutex);
 	}
+
+	/* need not generate wdi event when mcopy and
+	 * enhanced stats are not enabled
+	 */
+	if (!pdev->mcopy_mode && !pdev->enhanced_stats_en)
+		return;
 
 	if (!pdev->mcopy_mode) {
 		if (!ppdu_info->rx_status.frame_control_info_valid)
@@ -510,6 +528,7 @@ dp_rx_mon_status_process_tlv(struct dp_soc *soc, uint32_t mac_id,
 	while (!qdf_nbuf_is_queue_empty(&pdev->rx_status_q)) {
 
 		status_nbuf = qdf_nbuf_queue_remove(&pdev->rx_status_q);
+
 		rx_tlv = qdf_nbuf_data(status_nbuf);
 		rx_tlv_start = rx_tlv;
 
@@ -538,21 +557,22 @@ dp_rx_mon_status_process_tlv(struct dp_soc *soc, uint32_t mac_id,
 					     status_nbuf, HTT_INVALID_PEER,
 					     WDI_NO_VAL, mac_id);
 		}
+
+		/* smart monitor vap and m_copy cannot co-exist */
 		if (ppdu_info->rx_status.monitor_direct_used && pdev->neighbour_peers_added
 		    && pdev->monitor_vdev) {
 			smart_mesh_status = dp_rx_handle_smart_mesh_mode(soc,
 						pdev, ppdu_info, status_nbuf);
 			if (smart_mesh_status)
 				qdf_nbuf_free(status_nbuf);
-		}
-		if (pdev->mcopy_mode) {
+		} else if (pdev->mcopy_mode) {
 			m_copy_status = dp_rx_handle_mcopy_mode(soc,
 						pdev, ppdu_info, status_nbuf);
 			if (m_copy_status == QDF_STATUS_SUCCESS)
 				qdf_nbuf_free(status_nbuf);
-		}
-		if (!pdev->neighbour_peers_added && !pdev->mcopy_mode)
+		} else {
 			qdf_nbuf_free(status_nbuf);
+		}
 
 		if (tlv_status == HAL_TLV_STATUS_PPDU_NON_STD_DONE) {
 			dp_rx_mon_deliver_non_std(soc, mac_id);
@@ -941,11 +961,6 @@ QDF_STATUS dp_rx_mon_status_buffers_replenish(struct dp_soc *dp_soc,
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
 		"%d rx desc added back to free list", num_desc_to_free);
 
-	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-		"[%s][%d] desc_list=%pK, tail=%pK rx_desc=%pK, cookie=%d",
-		__func__, __LINE__, desc_list, tail, &(*desc_list)->rx_desc,
-		(*desc_list)->rx_desc.cookie);
-
 	/*
 	 * add any available free desc back to the free list
 	 */
@@ -971,50 +986,44 @@ dp_rx_pdev_mon_status_attach(struct dp_pdev *pdev, int ring_id) {
 	struct dp_soc *soc = pdev->soc;
 	union dp_rx_desc_list_elem_t *desc_list = NULL;
 	union dp_rx_desc_list_elem_t *tail = NULL;
-	struct dp_srng *rxdma_srng;
-	uint32_t rxdma_entries;
+	struct dp_srng *mon_status_ring;
+	uint32_t num_entries;
 	struct rx_desc_pool *rx_desc_pool;
 	QDF_STATUS status;
 	int mac_for_pdev = dp_get_mac_id_for_mac(soc, ring_id);
 
-	rxdma_srng = &pdev->rxdma_mon_status_ring[mac_for_pdev];
+	mon_status_ring = &pdev->rxdma_mon_status_ring[mac_for_pdev];
 
-	rxdma_entries = rxdma_srng->alloc_size/hal_srng_get_entrysize(
-		soc->hal_soc, RXDMA_MONITOR_STATUS);
+	num_entries = mon_status_ring->num_entries;
 
 	rx_desc_pool = &soc->rx_desc_status[ring_id];
 
-	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO_LOW,
-			"%s: Mon RX Status Pool[%d] allocation size=%d",
-			__func__, ring_id, rxdma_entries);
+	dp_info("Mon RX Status Pool[%d] entries=%d",
+		ring_id, num_entries);
 
-	status = dp_rx_desc_pool_alloc(soc, ring_id, rxdma_entries+1,
-			rx_desc_pool);
-	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			"%s: dp_rx_desc_pool_alloc() failed ", __func__);
+	status = dp_rx_desc_pool_alloc(soc, ring_id, num_entries + 1,
+				       rx_desc_pool);
+	if (!QDF_IS_STATUS_SUCCESS(status))
 		return status;
-	}
 
-	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO_LOW,
-			"%s: Mon RX Status Buffers Replenish ring_id=%d",
-			__func__, ring_id);
+	dp_debug("Mon RX Status Buffers Replenish ring_id=%d", ring_id);
 
-	status = dp_rx_mon_status_buffers_replenish(soc, ring_id, rxdma_srng,
-			rx_desc_pool, rxdma_entries, &desc_list, &tail,
-			HAL_RX_BUF_RBM_SW3_BM);
-	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			"%s: dp_rx_buffers_replenish() failed ", __func__);
+	status = dp_rx_mon_status_buffers_replenish(soc, ring_id,
+						    mon_status_ring,
+						    rx_desc_pool,
+						    num_entries,
+						    &desc_list, &tail,
+						    HAL_RX_BUF_RBM_SW3_BM);
+
+	if (!QDF_IS_STATUS_SUCCESS(status))
 		return status;
-	}
 
 	qdf_nbuf_queue_init(&pdev->rx_status_q);
 
 	pdev->mon_ppdu_status = DP_PPDU_STATUS_START;
 
 	qdf_mem_zero(&(pdev->ppdu_info.rx_status),
-		sizeof(pdev->ppdu_info.rx_status));
+		     sizeof(pdev->ppdu_info.rx_status));
 
 	qdf_mem_zero(&pdev->rx_mon_stats,
 		     sizeof(pdev->rx_mon_stats));

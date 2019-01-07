@@ -22,6 +22,9 @@
 #include "wmi_unified_priv.h"
 #include "wmi_unified_sta_param.h"
 #include "wmi_unified_sta_api.h"
+#ifdef CONVERGED_TDLS_ENABLE
+#include <wlan_tdls_public_structs.h>
+#endif
 
 /**
  * send_set_sta_sa_query_param_cmd_tlv() - set sta sa query parameters
@@ -502,87 +505,6 @@ static QDF_STATUS send_wlm_latency_level_cmd_tlv(wmi_unified_t wmi_handle,
 	return 0;
 }
 
-#ifdef WLAN_FEATURE_NAN
-/**
- * send_nan_req_cmd_tlv() - to send nan request to target
- * @wmi_handle: wmi handle
- * @nan_req: request data which will be non-null
- *
- * Return: CDF status
- */
-static QDF_STATUS send_nan_req_cmd_tlv(wmi_unified_t wmi_handle,
-			struct nan_req_params *nan_req)
-{
-	QDF_STATUS ret;
-	wmi_nan_cmd_param *cmd;
-	wmi_buf_t buf;
-	uint16_t len = sizeof(*cmd);
-	uint16_t nan_data_len, nan_data_len_aligned;
-	uint8_t *buf_ptr;
-
-	/*
-	 *    <----- cmd ------------><-- WMI_TLV_HDR_SIZE --><--- data ---->
-	 *    +------------+----------+-----------------------+--------------+
-	 *    | tlv_header | data_len | WMITLV_TAG_ARRAY_BYTE | nan_req_data |
-	 *    +------------+----------+-----------------------+--------------+
-	 */
-	if (!nan_req) {
-		WMI_LOGE("%s:nan req is not valid", __func__);
-		return QDF_STATUS_E_FAILURE;
-	}
-	nan_data_len = nan_req->request_data_len;
-	nan_data_len_aligned = roundup(nan_req->request_data_len,
-				       sizeof(uint32_t));
-	if (nan_data_len_aligned < nan_req->request_data_len) {
-		WMI_LOGE("%s: integer overflow while rounding up data_len",
-			 __func__);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	if (nan_data_len_aligned > WMI_SVC_MSG_MAX_SIZE - WMI_TLV_HDR_SIZE) {
-		WMI_LOGE("%s: wmi_max_msg_size overflow for given datalen",
-			 __func__);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	len += WMI_TLV_HDR_SIZE + nan_data_len_aligned;
-	buf = wmi_buf_alloc(wmi_handle, len);
-	if (!buf) {
-		return QDF_STATUS_E_NOMEM;
-	}
-	buf_ptr = (uint8_t *) wmi_buf_data(buf);
-	cmd = (wmi_nan_cmd_param *) buf_ptr;
-	WMITLV_SET_HDR(&cmd->tlv_header,
-		       WMITLV_TAG_STRUC_wmi_nan_cmd_param,
-		       WMITLV_GET_STRUCT_TLVLEN(wmi_nan_cmd_param));
-	cmd->data_len = nan_req->request_data_len;
-	WMI_LOGD("%s: The data len value is %u",
-		 __func__, nan_req->request_data_len);
-	buf_ptr += sizeof(wmi_nan_cmd_param);
-	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_BYTE, nan_data_len_aligned);
-	buf_ptr += WMI_TLV_HDR_SIZE;
-	qdf_mem_copy(buf_ptr, nan_req->request_data, cmd->data_len);
-
-	wmi_mtrace(WMI_NAN_CMDID, NO_SESSION, 0);
-	ret = wmi_unified_cmd_send(wmi_handle, buf, len,
-				   WMI_NAN_CMDID);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		WMI_LOGE("%s Failed to send set param command ret = %d",
-			 __func__, ret);
-		wmi_buf_free(buf);
-	}
-
-	return ret;
-}
-
-void wmi_nan_feature_attach_tlv(struct wmi_unified *wmi_handle)
-{
-	struct wmi_ops *ops = wmi_handle->ops;
-
-	ops->send_nan_req_cmd = send_nan_req_cmd_tlv;
-}
-#endif /* WLAN_FEATURE_NAN */
-
 #ifdef CONVERGED_TDLS_ENABLE
 /**
  * tdls_get_wmi_offchannel_mode - Get WMI tdls off channel mode
@@ -716,13 +638,14 @@ static QDF_STATUS send_set_tdls_offchan_mode_cmd_tlv(wmi_unified_t wmi_handle,
  *
  * Return: 0 for success or error code
  */
-static QDF_STATUS send_update_fw_tdls_state_cmd_tlv(wmi_unified_t wmi_handle,
-					 void *tdls_param, uint8_t tdls_state)
+static QDF_STATUS
+send_update_fw_tdls_state_cmd_tlv(wmi_unified_t wmi_handle,
+				  struct tdls_info *tdls_param,
+				  enum wmi_tdls_state tdls_state)
 {
 	wmi_tdls_set_state_cmd_fixed_param *cmd;
 	wmi_buf_t wmi_buf;
 
-	struct wmi_tdls_params *wmi_tdls = (struct wmi_tdls_params *) tdls_param;
 	uint16_t len = sizeof(wmi_tdls_set_state_cmd_fixed_param);
 
 	wmi_buf = wmi_buf_alloc(wmi_handle, len);
@@ -734,25 +657,26 @@ static QDF_STATUS send_update_fw_tdls_state_cmd_tlv(wmi_unified_t wmi_handle,
 		  WMITLV_TAG_STRUC_wmi_tdls_set_state_cmd_fixed_param,
 		  WMITLV_GET_STRUCT_TLVLEN
 			(wmi_tdls_set_state_cmd_fixed_param));
-	cmd->vdev_id = wmi_tdls->vdev_id;
-	cmd->state = tdls_state;
-	cmd->notification_interval_ms = wmi_tdls->notification_interval_ms;
-	cmd->tx_discovery_threshold = wmi_tdls->tx_discovery_threshold;
-	cmd->tx_teardown_threshold = wmi_tdls->tx_teardown_threshold;
-	cmd->rssi_teardown_threshold = wmi_tdls->rssi_teardown_threshold;
-	cmd->rssi_delta = wmi_tdls->rssi_delta;
-	cmd->tdls_options = wmi_tdls->tdls_options;
-	cmd->tdls_peer_traffic_ind_window = wmi_tdls->peer_traffic_ind_window;
+	cmd->vdev_id = tdls_param->vdev_id;
+	cmd->state = (A_UINT32)tdls_state;
+	cmd->notification_interval_ms = tdls_param->notification_interval_ms;
+	cmd->tx_discovery_threshold = tdls_param->tx_discovery_threshold;
+	cmd->tx_teardown_threshold = tdls_param->tx_teardown_threshold;
+	cmd->rssi_teardown_threshold = tdls_param->rssi_teardown_threshold;
+	cmd->rssi_delta = tdls_param->rssi_delta;
+	cmd->tdls_options = tdls_param->tdls_options;
+	cmd->tdls_peer_traffic_ind_window = tdls_param->peer_traffic_ind_window;
 	cmd->tdls_peer_traffic_response_timeout_ms =
-		wmi_tdls->peer_traffic_response_timeout;
-	cmd->tdls_puapsd_mask = wmi_tdls->puapsd_mask;
-	cmd->tdls_puapsd_inactivity_time_ms = wmi_tdls->puapsd_inactivity_time;
+		tdls_param->peer_traffic_response_timeout;
+	cmd->tdls_puapsd_mask = tdls_param->puapsd_mask;
+	cmd->tdls_puapsd_inactivity_time_ms =
+		tdls_param->puapsd_inactivity_time;
 	cmd->tdls_puapsd_rx_frame_threshold =
-		wmi_tdls->puapsd_rx_frame_threshold;
+		tdls_param->puapsd_rx_frame_threshold;
 	cmd->teardown_notification_ms =
-		wmi_tdls->teardown_notification_ms;
+		tdls_param->teardown_notification_ms;
 	cmd->tdls_peer_kickout_threshold =
-		wmi_tdls->tdls_peer_kickout_threshold;
+		tdls_param->tdls_peer_kickout_threshold;
 
 	WMI_LOGD("%s: tdls_state: %d, state: %d, "
 		 "notification_interval_ms: %d, "
@@ -790,7 +714,7 @@ static QDF_STATUS send_update_fw_tdls_state_cmd_tlv(wmi_unified_t wmi_handle,
 		wmi_buf_free(wmi_buf);
 		return QDF_STATUS_E_FAILURE;
 	}
-	WMI_LOGD("%s: vdev_id %d", __func__, wmi_tdls->vdev_id);
+	WMI_LOGD("%s: vdev_id %d", __func__, tdls_param->vdev_id);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1586,7 +1510,7 @@ static QDF_STATUS send_set_del_pmkid_cache_cmd_tlv(wmi_unified_t wmi_handle,
 		 WMITLV_GET_STRUCT_TLVLEN(
 			wmi_pdev_update_pmk_cache_cmd_fixed_param));
 
-	cmd->vdev_id = pmk_info->session_id;
+	cmd->vdev_id = pmk_info->vdev_id;
 
 	/* If pmk_info->pmk_len is 0, this is a flush request */
 	if (!pmk_info->pmk_len) {
@@ -2468,6 +2392,76 @@ error:
 	return status;
 }
 
+/**
+ * send_peer_unmap_conf_cmd_tlv() - send PEER UNMAP conf command to fw
+ * @wmi: wmi handle
+ * @vdev_id: vdev id
+ * @peer_id_cnt: no. of peer ids
+ * @peer_id_list: list of peer ids
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+static QDF_STATUS send_peer_unmap_conf_cmd_tlv(wmi_unified_t wmi,
+					       uint8_t vdev_id,
+					       uint32_t peer_id_cnt,
+					       uint16_t *peer_id_list)
+{
+	int i;
+	wmi_buf_t buf;
+	uint8_t *buf_ptr;
+	A_UINT32 *peer_ids;
+	wmi_peer_unmap_response_cmd_fixed_param *cmd;
+	uint32_t peer_id_list_len;
+	uint32_t len = sizeof(*cmd);
+
+	if (!peer_id_cnt || !peer_id_list)
+		return QDF_STATUS_E_FAILURE;
+
+	len += WMI_TLV_HDR_SIZE;
+
+	peer_id_list_len = peer_id_cnt * sizeof(A_UINT32);
+
+	len += peer_id_list_len;
+
+	buf = wmi_buf_alloc(wmi, len);
+
+	if (!buf) {
+		WMI_LOGP("%s: wmi_buf_alloc failed", __func__);
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	cmd = (wmi_peer_unmap_response_cmd_fixed_param *)wmi_buf_data(buf);
+	buf_ptr = (uint8_t *)wmi_buf_data(buf);
+
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		       WMITLV_TAG_STRUC_wmi_peer_unmap_response_cmd_fixed_param,
+		       WMITLV_GET_STRUCT_TLVLEN
+			       (wmi_peer_unmap_response_cmd_fixed_param));
+
+	buf_ptr += sizeof(wmi_peer_unmap_response_cmd_fixed_param);
+
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_UINT32,
+		       peer_id_list_len);
+
+	peer_ids = (A_UINT32 *)(buf_ptr + WMI_TLV_HDR_SIZE);
+
+	for (i = 0; i < peer_id_cnt; i++)
+		peer_ids[i] = peer_id_list[i];
+
+	WMI_LOGD("%s: vdev_id %d peer_id_cnt %d", __func__,
+		 vdev_id, peer_id_cnt);
+	wmi_mtrace(WMI_PEER_UNMAP_RESPONSE_CMDID, vdev_id, 0);
+	if (wmi_unified_cmd_send(wmi, buf, len,
+				 WMI_PEER_UNMAP_RESPONSE_CMDID)) {
+		WMI_LOGP("%s: Failed to send peer delete conf command",
+			 __func__);
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 void wmi_sta_attach_tlv(wmi_unified_t wmi_handle)
 {
 	struct wmi_ops *ops = wmi_handle->ops;
@@ -2509,10 +2503,10 @@ void wmi_sta_attach_tlv(wmi_unified_t wmi_handle)
 		send_dbs_scan_sel_params_cmd_tlv;
 	ops->send_set_arp_stats_req_cmd = send_set_arp_stats_req_cmd_tlv;
 	ops->send_get_arp_stats_req_cmd = send_get_arp_stats_req_cmd_tlv;
+	ops->send_peer_unmap_conf_cmd = send_peer_unmap_conf_cmd_tlv;
 
 	wmi_tdls_attach_tlv(wmi_handle);
 	wmi_disa_attach_tlv(wmi_handle);
 	wmi_policy_mgr_attach_tlv(wmi_handle);
-	wmi_nan_feature_attach_tlv(wmi_handle);
 }
 

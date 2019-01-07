@@ -114,16 +114,9 @@ struct probe_time_dwell_time {
 
 #ifdef CONFIG_MCL
 #define MAX_SCAN_CACHE_SIZE 300
-#define SCAN_ACTIVE_DWELL_TIME 40
-#define SCAN_PASSIVE_DWELL_TIME 110
 #define SCAN_MAX_REST_TIME 0
 #define SCAN_MIN_REST_TIME 0
 #define SCAN_BURST_DURATION 0
-#define SCAN_CONC_ACTIVE_DWELL_TIME 20
-#define SCAN_CONC_PASSIVE_DWELL_TIME 100
-#define SCAN_CONC_IDLE_TIME 25
-#define SCAN_CONC_MAX_REST_TIME 20
-#define SCAN_CONC_MIN_REST_TIME 10
 #define SCAN_PROBE_SPACING_TIME 0
 #define SCAN_PROBE_DELAY 0
 #define SCAN_MAX_SCAN_TIME 30000
@@ -132,16 +125,9 @@ struct probe_time_dwell_time {
 #define SCAN_CHAN_STATS_EVENT_ENAB (false)
 #else
 #define MAX_SCAN_CACHE_SIZE 1024
-#define SCAN_ACTIVE_DWELL_TIME 105
-#define SCAN_PASSIVE_DWELL_TIME 300
 #define SCAN_MAX_REST_TIME 0
 #define SCAN_MIN_REST_TIME 50
 #define SCAN_BURST_DURATION 0
-#define SCAN_CONC_ACTIVE_DWELL_TIME 0
-#define SCAN_CONC_PASSIVE_DWELL_TIME 0
-#define SCAN_CONC_IDLE_TIME 0
-#define SCAN_CONC_MAX_REST_TIME 0
-#define SCAN_CONC_MIN_REST_TIME 0
 #define SCAN_PROBE_SPACING_TIME 0
 #define SCAN_PROBE_DELAY 0
 #define SCAN_MAX_SCAN_TIME 50000
@@ -238,12 +224,12 @@ struct pdev_scan_info {
  * struct scan_vdev_obj - scan vdev obj
  * @pno_match_evt_received: pno match received
  * @pno_in_progress: pno in progress
- * @is_vdev_delete_in_progress: flag to indicate if vdev del is in progress
+ * @scan_disabled: if scan is disabled for this vdev
  */
 struct scan_vdev_obj {
 	bool pno_match_evt_received;
 	bool pno_in_progress;
-	bool is_vdev_delete_in_progress;
+	uint32_t scan_disabled;
 };
 
 /**
@@ -307,18 +293,17 @@ struct extscan_def_config {
  * @max_scan_time: default max scan time
  * @num_probes: default maximum number of probes to sent
  * @cache_aging_time: default scan cache aging time
- * @prefer_5ghz: Prefer 5ghz AP over 2.4Ghz AP
  * @select_5gh_margin: Prefer connecting to 5G AP even if
  *      its RSSI is lower by select_5gh_margin dbm than 2.4G AP.
  *      applicable if prefer_5ghz is set.
  * @is_bssid_hint_priority: True if bssid_hint is given priority
  * @enable_mac_spoofing: enable mac address spoof in scan
- * @bss_prefer_val: bss prefer value for the RSSI category
- * @rssi_cat: RSSI category
  * @max_bss_per_pdev: maximum number of bss entries to be maintained per pdev
  * @max_active_scans_allowed: maximum number of active parallel scan allowed
  *                            per psoc
  * @scan_priority: default scan priority
+ * @adaptive_dwell_time_mode: adaptive dwell mode with connection
+ * @adaptive_dwell_time_mode_nc: adaptive dwell mode without connection
  * @scan_f_passive: passively scan all channels including active channels
  * @scan_f_bcast_probe: add wild card ssid prbreq even if ssid_list is specified
  * @scan_f_cck_rates: add cck rates to rates/xrates ie in prb req
@@ -383,19 +368,16 @@ struct scan_default_params {
 	uint32_t max_scan_time;
 	uint32_t num_probes;
 	uint32_t scan_cache_aging_time;
-	uint32_t prefer_5ghz;
 	uint32_t select_5ghz_margin;
 	bool enable_mac_spoofing;
 	bool is_bssid_hint_priority;
 	uint32_t usr_cfg_probe_rpt_time;
 	uint32_t usr_cfg_num_probes;
-	/* each RSSI category has one value */
-	uint32_t bss_prefer_val[SCM_NUM_RSSI_CAT];
-	int rssi_cat[SCM_NUM_RSSI_CAT];
 	uint16_t max_bss_per_pdev;
 	uint32_t max_active_scans_allowed;
 	enum scan_priority scan_priority;
 	enum scan_dwelltime_adaptive_mode adaptive_dwell_time_mode;
+	enum scan_dwelltime_adaptive_mode adaptive_dwell_time_mode_nc;
 	union {
 		struct {
 			uint32_t scan_f_passive:1,
@@ -461,7 +443,7 @@ struct scan_cb {
 
 /**
  * struct wlan_scan_obj - scan object definition
- * @enable_scan: if scan is enabled
+ * @scan_disabled: if scan is disabled
  * @scan_db:    scan cache data base
  * @cc_db:      pointer of country code data base
  * @lock:       spin lock
@@ -482,7 +464,7 @@ struct scan_cb {
  *      scan config to event handlers
  */
 struct wlan_scan_obj {
-	bool enable_scan;
+	uint32_t scan_disabled;
 	qdf_spinlock_t lock;
 	qdf_atomic_t scan_ids;
 	struct scan_dbs scan_db[WLAN_UMAC_MAX_PDEVS];

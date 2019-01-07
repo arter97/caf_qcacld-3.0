@@ -32,9 +32,25 @@
 
 #ifdef QCA_HOST2FW_RXBUF_RING
 #define DP_WBM2SW_RBM HAL_RX_BUF_RBM_SW1_BM
+
+/**
+ * For MCL cases, allocate as many RX descriptors as buffers in the SW2RXDMA
+ * ring. This value may need to be tuned later.
+ */
+#define DP_RX_DESC_ALLOC_MULTIPLIER 1
 #else
 #define DP_WBM2SW_RBM HAL_RX_BUF_RBM_SW3_BM
-#endif
+
+/**
+ * AP use cases need to allocate more RX Descriptors than the number of
+ * entries avaialable in the SW2RXDMA buffer replenish ring. This is to account
+ * for frames sitting in REO queues, HW-HW DMA rings etc. Hence using a
+ * multiplication factor of 3, to allocate three times as many RX descriptors
+ * as RX buffers.
+ */
+#define DP_RX_DESC_ALLOC_MULTIPLIER 3
+#endif /* QCA_HOST2FW_RXBUF_RING */
+
 #define RX_BUFFER_SIZE			2048
 #define RX_BUFFER_RESERVATION   0
 
@@ -405,6 +421,9 @@ dp_rx_wds_srcport_learn(struct dp_soc *soc,
 	struct dp_ast_entry *ast;
 	uint16_t sa_idx;
 	bool del_in_progress;
+	uint8_t sa_is_valid;
+	struct dp_neighbour_peer *neighbour_peer = NULL;
+	struct dp_pdev *pdev = ta_peer->vdev->pdev;
 
 	if (qdf_unlikely(!ta_peer))
 		return;
@@ -432,7 +451,8 @@ dp_rx_wds_srcport_learn(struct dp_soc *soc,
 	memcpy(wds_src_mac, (qdf_nbuf_data(nbuf) + IEEE80211_ADDR_LEN),
 		IEEE80211_ADDR_LEN);
 
-	if (qdf_unlikely(!hal_rx_msdu_end_sa_is_valid_get(rx_tlv_hdr))) {
+	sa_is_valid = hal_rx_msdu_end_sa_is_valid_get(rx_tlv_hdr);
+	if (qdf_unlikely(!sa_is_valid)) {
 		ret = dp_peer_add_ast(soc,
 					ta_peer,
 					wds_src_mac,
@@ -486,8 +506,38 @@ dp_rx_wds_srcport_learn(struct dp_soc *soc,
 					      wds_src_mac,
 					      CDP_TXRX_AST_TYPE_WDS,
 					      flags);
+			return;
+		} else {
+			/* In HKv2 smart monitor case, when NAC client is
+			 * added first and this client roams within BSS to
+			 * connect to RE, since we have an AST entry for
+			 * NAC we get sa_is_valid bit set. So we check if
+			 * smart monitor is enabled and send add_ast command
+			 * to FW.
+			 */
+			if (pdev->neighbour_peers_added) {
+				qdf_spin_lock_bh(&pdev->neighbour_peer_mutex);
+				TAILQ_FOREACH(neighbour_peer,
+					      &pdev->neighbour_peers_list,
+					      neighbour_peer_list_elem) {
+					if (!qdf_mem_cmp(&neighbour_peer->neighbour_peers_macaddr,
+							 wds_src_mac,
+							 DP_MAC_ADDR_LEN)) {
+						ret = dp_peer_add_ast(soc,
+								      ta_peer,
+								      wds_src_mac,
+								      CDP_TXRX_AST_TYPE_WDS,
+								      flags);
+						QDF_TRACE(QDF_MODULE_ID_DP,
+							  QDF_TRACE_LEVEL_INFO,
+							  "sa valid and nac roamed to wds");
+						break;
+					}
+				}
+				qdf_spin_unlock_bh(&pdev->neighbour_peer_mutex);
+			}
+			return;
 		}
-		return;
 	}
 
 

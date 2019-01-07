@@ -68,6 +68,7 @@
 #define CDP_WLAN_RX_BUF_DEBUG_STATS 10
 #define CDP_RX_RING_STATS          11
 #define CDP_DP_NAPI_STATS          12
+#define CDP_DP_RX_THREAD_STATS     13
 #define CDP_SCHEDULER_STATS        21
 #define CDP_TX_QUEUE_STATS         22
 #define CDP_BUNDLE_STATS           23
@@ -1341,7 +1342,8 @@ struct cdp_rx_indication_msdu {
  * struct cdp_config_params - Propagate configuration parameters to datapath
  * @tso_enable: Enable/Disable TSO
  * @lro_enable: Enable/Disable LRO
- * @flow_steering_enable: Enable/Disable Rx Hash
+ * @gro_enable: Enable/Disable GRO
+ * @flow_steering_enable: Enable/Disable Rx Hash based flow steering
  * @tcp_Udp_ChecksumOffload: Enable/Disable tcp-Udp checksum Offload
  * @napi_enable: Enable/Disable Napi
  * @ipa_enable: Flag indicating if IPA is enabled or not
@@ -1352,6 +1354,7 @@ struct cdp_rx_indication_msdu {
 struct cdp_config_params {
 	unsigned int tso_enable:1;
 	unsigned int lro_enable:1;
+	unsigned int gro_enable:1;
 	unsigned int flow_steering_enable:1;
 	unsigned int tcp_udp_checksumoffload:1;
 	unsigned int napi_enable:1;

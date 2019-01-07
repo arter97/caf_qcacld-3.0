@@ -77,13 +77,15 @@ wlan_serialization_enqueue_cmd(struct wlan_serialization_command *cmd,
  * wlan_serialization_activate_cmd() - activate cmd in active queue
  * @cmd_list: Command needs to be activated
  * @ser_pdev_obj: Serialization private pdev object
+ * @ser_reason: reason the activation cb would be called
  *
  * Return: Status of activation of the command
  */
 QDF_STATUS
 wlan_serialization_activate_cmd(
 		struct wlan_serialization_command_list *cmd_list,
-		struct wlan_ser_pdev_obj *ser_pdev_obj);
+		struct wlan_ser_pdev_obj *ser_pdev_obj,
+		enum ser_queue_reason ser_reason);
 
 /**
  * wlan_serialization_move_pending_to_active() - Move a cmd from pending
@@ -142,6 +144,20 @@ void wlan_serialization_generic_timer_cb(void *arg);
 QDF_STATUS
 wlan_serialization_find_and_start_timer(struct wlan_objmgr_psoc *psoc,
 					struct wlan_serialization_command *cmd);
+
+/**
+ * wlan_serialization_find_and_update_timer() - to find and update the timer
+ * @psoc: pointer to psoc
+ * @cmd: pointer to command attributes
+ *
+ * Find the timer associated with command, and update it
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_serialization_find_and_update_timer(
+		struct wlan_objmgr_psoc *psoc,
+		struct wlan_serialization_command *cmd);
 
 /**
  * wlan_serialization_find_and_stop_timer() - to find and stop the timer

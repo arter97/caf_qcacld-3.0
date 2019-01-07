@@ -172,7 +172,15 @@ struct cdp_cmn_ops {
 
 	void (*txrx_set_nac)(struct cdp_peer *peer);
 
-	void (*txrx_set_pdev_tx_capture)(struct cdp_pdev *pdev, int val);
+	/**
+	 * txrx_set_pdev_tx_capture() - callback to set pdev tx_capture
+	 * @soc: opaque soc handle
+	 * @pdev: data path pdev handle
+	 * @val: value of pdev_tx_capture
+	 *
+	 * Return: status: 0 - Success, non-zero: Failure
+	 */
+	QDF_STATUS (*txrx_set_pdev_tx_capture)(struct cdp_pdev *pdev, int val);
 
 	void (*txrx_get_peer_mac_from_peer_id)
 		(struct cdp_pdev *pdev_handle,
@@ -601,8 +609,17 @@ struct cdp_ctrl_ops {
 	void (*txrx_update_mgmt_txpow_vdev)(struct cdp_vdev *vdev,
 			uint8_t subtype, uint8_t tx_power);
 
-	void (*txrx_set_pdev_param)(struct cdp_pdev *pdev,
-			enum cdp_pdev_param_type type, uint8_t val);
+	/**
+	 * txrx_set_pdev_param() - callback to set pdev parameter
+	 * @soc: opaque soc handle
+	 * @pdev: data path pdev handle
+	 * @val: value of pdev_tx_capture
+	 *
+	 * Return: status: 0 - Success, non-zero: Failure
+	 */
+	QDF_STATUS (*txrx_set_pdev_param)(struct cdp_pdev *pdev,
+					  enum cdp_pdev_param_type type,
+					  uint8_t val);
 	void * (*txrx_get_pldev)(struct cdp_pdev *pdev);
 
 #ifdef ATH_SUPPORT_NAC_RSSI
@@ -856,8 +873,8 @@ struct ol_if_ops {
 	(*peer_rx_reorder_queue_remove)(struct cdp_ctrl_objmgr_pdev *ctrl_pdev,
 					uint8_t vdev_id, uint8_t *peer_macaddr,
 					uint32_t tid_mask);
-	int (*peer_unref_delete)(void *scn_handle, uint8_t vdev_id,
-			uint8_t *peer_macaddr);
+	int (*peer_unref_delete)(void *scn_handle, uint8_t *peer_mac,
+				 uint8_t *vdev_mac, enum wlan_op_mode opmode);
 	bool (*is_hw_dbs_2x2_capable)(struct wlan_objmgr_psoc *psoc);
 	int (*peer_add_wds_entry)(void *vdev_handle,
 				  struct cdp_peer *peer_handle,
@@ -972,6 +989,7 @@ struct cdp_misc_ops {
 		uint64_t *fwd_tx_packets, uint64_t *fwd_rx_packets);
 	void (*pkt_log_init)(struct cdp_pdev *handle, void *scn);
 	void (*pkt_log_con_service)(struct cdp_pdev *pdev, void *scn);
+	int (*get_num_rx_contexts)(struct cdp_soc_t *soc);
 };
 
 /**
@@ -1265,7 +1283,7 @@ struct cdp_mob_stats_ops {
 
 #ifdef RECEIVE_OFFLOAD
 /**
- * struct cdp_rx_offld_ops - mcl receive offload ops
+ * struct cdp_rx_offld_ops - mcl host receive offload ops
  * @register_rx_offld_flush_cb:
  * @deregister_rx_offld_flush_cb:
  */

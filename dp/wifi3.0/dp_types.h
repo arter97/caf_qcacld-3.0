@@ -592,6 +592,10 @@ struct dp_soc_stats {
 		uint32_t err_ring_pkts;
 		/* No of Fragments */
 		uint32_t rx_frags;
+		/* No of incomplete fragments in waitlist */
+		uint32_t rx_frag_wait;
+		/* Fragments dropped due to errors */
+		uint32_t rx_frag_err;
 		/* No of reinjected packets */
 		uint32_t reo_reinject;
 		/* Head pointer Out of sync */
@@ -1478,7 +1482,6 @@ struct dp_vdev {
 
 	/* VDEV Stats */
 	struct cdp_vdev_stats stats;
-	bool lro_enable;
 
 	/* Is this a proxySTA VAP */
 	bool proxysta_vdev;

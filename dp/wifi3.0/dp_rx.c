@@ -28,6 +28,7 @@
 #endif
 #include "dp_internal.h"
 #include "dp_rx_mon.h"
+
 #ifdef RX_DESC_DEBUG_CHECK
 static inline void dp_rx_desc_prep(struct dp_rx_desc *rx_desc, qdf_nbuf_t nbuf)
 {
@@ -199,10 +200,10 @@ QDF_STATUS dp_rx_buffers_replenish(struct dp_soc *dp_soc, uint32_t mac_id,
 		dp_rx_desc_prep(&((*desc_list)->rx_desc), rx_netbuf);
 		(*desc_list)->rx_desc.in_use = 1;
 
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-				"rx_netbuf=%pK, buf=%pK, paddr=0x%llx, cookie=%d",
-			rx_netbuf, qdf_nbuf_data(rx_netbuf),
-			(unsigned long long)paddr, (*desc_list)->rx_desc.cookie);
+		dp_debug("rx_netbuf=%pK, buf=%pK, paddr=0x%llx, cookie=%d",
+			 rx_netbuf, qdf_nbuf_data(rx_netbuf),
+			 (unsigned long long)paddr,
+			 (*desc_list)->rx_desc.cookie);
 
 		hal_rxdma_buff_addr_info_set(rxdma_ring_entry, paddr,
 						(*desc_list)->rx_desc.cookie,
@@ -213,10 +214,8 @@ QDF_STATUS dp_rx_buffers_replenish(struct dp_soc *dp_soc, uint32_t mac_id,
 
 	hal_srng_access_end(dp_soc->hal_soc, rxdma_srng);
 
-	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-		"successfully replenished %d buffers", num_req_buffers);
-	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-		"%d rx desc added back to free list", num_desc_to_free);
+	dp_debug("replenished buffers %d, rx desc added back to free list %u",
+		 num_req_buffers, num_desc_to_free);
 
 	DP_STATS_INC_PKT(dp_pdev, replenish.pkts, num_req_buffers,
 			(RX_BUFFER_SIZE * num_req_buffers));
@@ -358,7 +357,10 @@ dp_rx_da_learn(struct dp_soc *soc,
 	if (qdf_likely(soc->ast_override_support))
 		return;
 
-	if (ta_peer && (ta_peer->vdev->opmode != wlan_op_mode_ap))
+	if (qdf_unlikely(!ta_peer))
+		return;
+
+	if (qdf_unlikely(ta_peer->vdev->opmode != wlan_op_mode_ap))
 		return;
 
 	if (qdf_unlikely(!hal_rx_msdu_end_da_is_valid_get(rx_tlv_hdr) &&
@@ -812,8 +814,8 @@ uint8_t dp_rx_process_invalid_peer(struct dp_soc *soc, qdf_nbuf_t mpdu)
 	wh = (struct ieee80211_frame *)rx_pkt_hdr;
 
 	if (!DP_FRAME_IS_DATA(wh)) {
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-			  "only for data frames");
+		QDF_TRACE_ERROR_RL(QDF_MODULE_ID_DP,
+				   "only for data frames");
 		goto free;
 	}
 
@@ -822,7 +824,7 @@ uint8_t dp_rx_process_invalid_peer(struct dp_soc *soc, qdf_nbuf_t mpdu)
 			  "Invalid nbuf length");
 		goto free;
 	}
-	/* reset the head and tail pointers */
+
 	for (i = 0; i < MAX_PDEV_CNT; i++) {
 		pdev = soc->pdev_list[i];
 		if (!pdev) {
@@ -831,9 +833,6 @@ uint8_t dp_rx_process_invalid_peer(struct dp_soc *soc, qdf_nbuf_t mpdu)
 				  "PDEV not found");
 			continue;
 		}
-
-		pdev->invalid_peer_head_msdu = NULL;
-		pdev->invalid_peer_tail_msdu = NULL;
 
 		qdf_spin_lock_bh(&pdev->vdev_list_lock);
 		DP_PDEV_ITERATE_VDEV_LIST(pdev, vdev) {
@@ -856,6 +855,20 @@ out:
 	if (soc->cdp_soc.ol_ops->rx_invalid_peer)
 		soc->cdp_soc.ol_ops->rx_invalid_peer(vdev->vdev_id, wh);
 free:
+	/* reset the head and tail pointers */
+	for (i = 0; i < MAX_PDEV_CNT; i++) {
+		pdev = soc->pdev_list[i];
+		if (!pdev) {
+			QDF_TRACE(QDF_MODULE_ID_DP,
+				  QDF_TRACE_LEVEL_ERROR,
+				  "PDEV not found");
+			continue;
+		}
+
+		pdev->invalid_peer_head_msdu = NULL;
+		pdev->invalid_peer_tail_msdu = NULL;
+	}
+
 	/* Drop and free packet */
 	curr_nbuf = mpdu;
 	while (curr_nbuf) {
@@ -877,62 +890,51 @@ void dp_rx_process_invalid_peer_wrapper(struct dp_soc *soc,
 }
 #endif
 
-#if defined(FEATURE_LRO)
-static void dp_rx_print_lro_info(uint8_t *rx_tlv)
+#ifdef RECEIVE_OFFLOAD
+/**
+ * dp_rx_print_offload_info() - Print offload info from RX TLV
+ * @rx_tlv: RX TLV for which offload information is to be printed
+ *
+ * Return: None
+ */
+static void dp_rx_print_offload_info(uint8_t *rx_tlv)
 {
-	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-	FL("----------------------RX DESC LRO----------------------"));
-	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-		FL("lro_eligible 0x%x"), HAL_RX_TLV_GET_LRO_ELIGIBLE(rx_tlv));
-	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-		FL("pure_ack 0x%x"), HAL_RX_TLV_GET_TCP_PURE_ACK(rx_tlv));
-	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-		FL("chksum 0x%x"), HAL_RX_TLV_GET_TCP_CHKSUM(rx_tlv));
-	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-		FL("TCP seq num 0x%x"), HAL_RX_TLV_GET_TCP_SEQ(rx_tlv));
-	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-		FL("TCP ack num 0x%x"), HAL_RX_TLV_GET_TCP_ACK(rx_tlv));
-	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-		FL("TCP window 0x%x"), HAL_RX_TLV_GET_TCP_WIN(rx_tlv));
-	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-		FL("TCP protocol 0x%x"), HAL_RX_TLV_GET_TCP_PROTO(rx_tlv));
-	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-		FL("TCP offset 0x%x"), HAL_RX_TLV_GET_TCP_OFFSET(rx_tlv));
-	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-		FL("toeplitz 0x%x"), HAL_RX_TLV_GET_FLOW_ID_TOEPLITZ(rx_tlv));
-	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-	FL("---------------------------------------------------------"));
+	dp_debug("----------------------RX DESC LRO/GRO----------------------");
+	dp_debug("lro_eligible 0x%x", HAL_RX_TLV_GET_LRO_ELIGIBLE(rx_tlv));
+	dp_debug("pure_ack 0x%x", HAL_RX_TLV_GET_TCP_PURE_ACK(rx_tlv));
+	dp_debug("chksum 0x%x", HAL_RX_TLV_GET_TCP_CHKSUM(rx_tlv));
+	dp_debug("TCP seq num 0x%x", HAL_RX_TLV_GET_TCP_SEQ(rx_tlv));
+	dp_debug("TCP ack num 0x%x", HAL_RX_TLV_GET_TCP_ACK(rx_tlv));
+	dp_debug("TCP window 0x%x", HAL_RX_TLV_GET_TCP_WIN(rx_tlv));
+	dp_debug("TCP protocol 0x%x", HAL_RX_TLV_GET_TCP_PROTO(rx_tlv));
+	dp_debug("TCP offset 0x%x", HAL_RX_TLV_GET_TCP_OFFSET(rx_tlv));
+	dp_debug("toeplitz 0x%x", HAL_RX_TLV_GET_FLOW_ID_TOEPLITZ(rx_tlv));
+	dp_debug("---------------------------------------------------------");
 }
 
 /**
- * dp_rx_lro() - LRO related processing
- * @rx_tlv: TLV data extracted from the rx packet
- * @peer: destination peer of the msdu
- * @msdu: network buffer
- * @ctx: LRO context
+ * dp_rx_fill_gro_info() - Fill GRO info from RX TLV into skb->cb
+ * @soc: DP SOC handle
+ * @rx_tlv: RX TLV received for the msdu
+ * @msdu: msdu for which GRO info needs to be filled
  *
- * This function performs the LRO related processing of the msdu
- *
- * Return: true: LRO enabled false: LRO is not enabled
+ * Return: None
  */
-static void dp_rx_lro(uint8_t *rx_tlv, struct dp_peer *peer,
-	 qdf_nbuf_t msdu, qdf_lro_ctx_t ctx)
+static
+void dp_rx_fill_gro_info(struct dp_soc *soc, uint8_t *rx_tlv,
+			 qdf_nbuf_t msdu)
 {
-	if (!peer || !peer->vdev || !peer->vdev->lro_enable) {
-		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_DEBUG,
-			 FL("no peer, no vdev or LRO disabled"));
-		QDF_NBUF_CB_RX_LRO_ELIGIBLE(msdu) = 0;
+	if (!wlan_cfg_is_gro_enabled(soc->wlan_cfg_ctx))
 		return;
-	}
-	qdf_assert(rx_tlv);
-	dp_rx_print_lro_info(rx_tlv);
+
+	/* Filling up RX offload info only for TCP packets */
+	if (!HAL_RX_TLV_GET_TCP_PROTO(rx_tlv))
+		return;
 
 	QDF_NBUF_CB_RX_LRO_ELIGIBLE(msdu) =
 		 HAL_RX_TLV_GET_LRO_ELIGIBLE(rx_tlv);
-
 	QDF_NBUF_CB_RX_TCP_PURE_ACK(msdu) =
 			HAL_RX_TLV_GET_TCP_PURE_ACK(rx_tlv);
-
 	QDF_NBUF_CB_RX_TCP_CHKSUM(msdu) =
 			 HAL_RX_TLV_GET_TCP_CHKSUM(rx_tlv);
 	QDF_NBUF_CB_RX_TCP_SEQ_NUM(msdu) =
@@ -949,15 +951,15 @@ static void dp_rx_lro(uint8_t *rx_tlv, struct dp_peer *peer,
 			 HAL_RX_TLV_GET_TCP_OFFSET(rx_tlv);
 	QDF_NBUF_CB_RX_FLOW_ID(msdu) =
 			 HAL_RX_TLV_GET_FLOW_ID_TOEPLITZ(rx_tlv);
-	QDF_NBUF_CB_RX_LRO_CTX(msdu) = (unsigned char *)ctx;
 
+	dp_rx_print_offload_info(rx_tlv);
 }
 #else
-static void dp_rx_lro(uint8_t *rx_tlv, struct dp_peer *peer,
-	 qdf_nbuf_t msdu, qdf_lro_ctx_t ctx)
+static void dp_rx_fill_gro_info(struct dp_soc *soc, uint8_t *rx_tlv,
+				qdf_nbuf_t msdu)
 {
 }
-#endif
+#endif /* RECEIVE_OFFLOAD */
 
 /**
  * dp_rx_adjust_nbuf_len() - set appropriate msdu length in nbuf.
@@ -1223,6 +1225,9 @@ static void dp_rx_msdu_stats_update(struct dp_soc *soc,
 	if ((soc->process_rx_status) &&
 	    hal_rx_attn_first_mpdu_get(rx_tlv_hdr)) {
 #if defined(FEATURE_PERPKT_INFO) && WDI_EVENT_ENABLE
+		if (!vdev->pdev)
+			return;
+
 		dp_wdi_event_handler(WDI_EVENT_UPDATE_DP_STATS, vdev->pdev->soc,
 				     &peer->stats, peer_id,
 				     UPDATE_PEER_STATS,
@@ -1746,7 +1751,7 @@ done:
 				}
 		}
 
-		dp_rx_lro(rx_tlv_hdr, peer, nbuf, int_ctx->lro_ctx);
+		dp_rx_fill_gro_info(soc, rx_tlv_hdr, nbuf);
 		qdf_nbuf_cb_update_peer_local_id(nbuf, peer->local_id);
 		DP_RX_LIST_APPEND(deliver_list_head,
 				  deliver_list_tail,
@@ -1806,7 +1811,6 @@ dp_rx_pdev_attach(struct dp_pdev *pdev)
 {
 	uint8_t pdev_id = pdev->pdev_id;
 	struct dp_soc *soc = pdev->soc;
-	struct dp_srng rxdma_srng;
 	uint32_t rxdma_entries;
 	union dp_rx_desc_list_elem_t *desc_list = NULL;
 	union dp_rx_desc_list_elem_t *tail = NULL;
@@ -1820,20 +1824,21 @@ dp_rx_pdev_attach(struct dp_pdev *pdev)
 	}
 
 	pdev = soc->pdev_list[pdev_id];
-	rxdma_srng = pdev->rx_refill_buf_ring;
+	dp_rxdma_srng = &pdev->rx_refill_buf_ring;
+	rxdma_entries = dp_rxdma_srng->num_entries;
+
 	soc->process_rx_status = CONFIG_PROCESS_RX_STATUS;
-	rxdma_entries = rxdma_srng.alloc_size/hal_srng_get_entrysize(
-						     soc->hal_soc, RXDMA_BUF);
 
 	rx_desc_pool = &soc->rx_desc_buf[pdev_id];
-
-	dp_rx_desc_pool_alloc(soc, pdev_id, rxdma_entries*3, rx_desc_pool);
+	dp_rx_desc_pool_alloc(soc, pdev_id,
+			      DP_RX_DESC_ALLOC_MULTIPLIER * rxdma_entries,
+			      rx_desc_pool);
 
 	rx_desc_pool->owner = DP_WBM2SW_RBM;
 	/* For Rx buffers, WBM release ring is SW RING 3,for all pdev's */
-	dp_rxdma_srng = &pdev->rx_refill_buf_ring;
+
 	dp_rx_buffers_replenish(soc, pdev_id, dp_rxdma_srng, rx_desc_pool,
-		0, &desc_list, &tail);
+				0, &desc_list, &tail);
 
 	return QDF_STATUS_SUCCESS;
 }

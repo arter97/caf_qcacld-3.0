@@ -27,9 +27,6 @@
 #include <target_if_spectral.h>
 #include <wlan_lmac_if_def.h>
 #include <wlan_osif_priv.h>
-#ifdef CONFIG_WIN
-#include <osif_rawmode_sim.h>
-#endif /*CONFIG_WIN*/
 #include <reg_services_public_struct.h>
 #ifdef DIRECT_BUF_RX_ENABLE
 #include <target_if_direct_buf_rx_api.h>
@@ -37,6 +34,32 @@
 extern int spectral_debug_level;
 
 #ifdef WLAN_CONV_SPECTRAL_ENABLE
+
+static inline void target_if_spectral_hexdump(unsigned char *_buf, int _len)
+{
+	int i, mod;
+	unsigned char ascii[17];
+	unsigned char *pc = (_buf);
+
+	for (i = 0; i < _len; i++) {
+		mod = i % 16;
+		if (!mod) {
+			if (i)
+				spectral_debug("  %s\n", ascii);
+		}
+		spectral_debug(" %02x", pc[i]);
+		if ((pc[i] < 0x20) || (pc[i] > 0x7e))
+			ascii[mod] = '.';
+		else
+			ascii[mod] = pc[i];
+		ascii[(mod) + 1] = '\0';
+	}
+	while ((i % 16) != 0) {
+		spectral_debug("   ");
+		i++;
+	}
+	spectral_debug("  %s\n", ascii);
+}
 
 /**
  * target_if_print_buf() - Prints given buffer for given length
@@ -1554,9 +1577,17 @@ target_if_consume_spectral_report_gen3(
 			}
 		}
 
-		tsf64 = p_fft_report->fft_timestamp;
 		target_if_process_sfft_report_gen3(p_fft_report, p_sfft);
 		detector_id = p_sfft->fft_detector_id;
+
+		if (report->reset_delay) {
+			spectral->timestamp_war_offset += (report->reset_delay +
+					spectral->last_fft_timestamp);
+		}
+		tsf64 = p_sfft->timestamp;
+		spectral->last_fft_timestamp = p_sfft->timestamp;
+		tsf64 += spectral->timestamp_war_offset;
+
 		/* Agile detector is not supported */
 		if (detector_id >= SPECTRAL_DETECTOR_AGILE) {
 			spectral->diag_stats.spectral_invalid_detector_id++;
@@ -1782,9 +1813,12 @@ int target_if_spectral_process_report_gen3(
 	}
 
 	report.data = payload->vaddr;
-	if (payload->meta_data_valid)
-		qdf_mem_copy(report.noisefloor, &payload->meta_data,
-			     sizeof(payload->meta_data));
+	if (payload->meta_data_valid) {
+		qdf_mem_copy(report.noisefloor, payload->meta_data.noisefloor,
+			     qdf_min(sizeof(report.noisefloor),
+				     sizeof(payload->meta_data.noisefloor)));
+		report.reset_delay = payload->meta_data.reset_delay;
+	}
 
 	if (spectral_debug_level & (DEBUG_SPECTRAL2 | DEBUG_SPECTRAL4)) {
 		spectral_debug("Printing the spectral phyerr buffer for debug");
@@ -1792,9 +1826,8 @@ int target_if_spectral_process_report_gen3(
 			       payload->dbr_len,
 			       payload->dbr_len,
 			       payload->vaddr);
-#ifdef CONFIG_WIN
-		RAWSIM_PKT_HEXDUMP((unsigned char *)payload->vaddr, 1024);
-#endif
+		target_if_spectral_hexdump((unsigned char *)payload->vaddr,
+					   1024);
 	}
 
 	ret = target_if_consume_spectral_report_gen3(spectral, &report);

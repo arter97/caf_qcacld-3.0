@@ -298,6 +298,12 @@ QDF_STATUS (*send_peer_delete_cmd)(wmi_unified_t wmi,
 				    uint8_t peer_addr[IEEE80211_ADDR_LEN],
 				    uint8_t vdev_id);
 
+QDF_STATUS
+(*send_peer_unmap_conf_cmd)(wmi_unified_t wmi,
+			    uint8_t vdev_id,
+			    uint32_t peer_id_cnt,
+			    uint16_t *peer_id_list);
+
 QDF_STATUS (*send_peer_param_cmd)(wmi_unified_t wmi,
 				uint8_t peer_addr[IEEE80211_ADDR_LEN],
 				struct peer_set_params *param);
@@ -568,6 +574,9 @@ QDF_STATUS (*send_offload_11k_cmd)(wmi_unified_t wmi_handle,
 QDF_STATUS (*send_invoke_neighbor_report_cmd)(wmi_unified_t wmi_handle,
 		struct wmi_invoke_neighbor_report_params *params);
 
+QDF_STATUS (*send_roam_bss_load_config)(wmi_unified_t wmi_handle,
+					struct wmi_bss_load_config *params);
+
 QDF_STATUS (*send_btm_config)(wmi_unified_t wmi_handle,
 			      struct wmi_btm_config *params);
 
@@ -826,7 +835,14 @@ QDF_STATUS (*send_set_auto_shutdown_timer_cmd)(wmi_unified_t wmi_handle,
 
 #ifdef WLAN_FEATURE_NAN
 QDF_STATUS (*send_nan_req_cmd)(wmi_unified_t wmi_handle,
-			struct nan_req_params *nan_req);
+			struct nan_msg_params *nan_req);
+
+QDF_STATUS (*send_nan_disable_req_cmd)(wmi_unified_t wmi_handle,
+				       struct nan_disable_req *nan_msg);
+
+QDF_STATUS (*extract_nan_event_rsp)(wmi_unified_t wmi_handle, void *evt_buf,
+				    struct nan_event_params *evt_params,
+				    uint8_t **msg_buf);
 #endif
 
 QDF_STATUS (*send_process_ch_avoid_update_cmd)(wmi_unified_t wmi_handle);
@@ -919,7 +935,8 @@ QDF_STATUS (*send_set_tdls_offchan_mode_cmd)(wmi_unified_t wmi_handle,
 			      struct tdls_channel_switch_params *chan_switch_params);
 
 QDF_STATUS (*send_update_fw_tdls_state_cmd)(wmi_unified_t wmi_handle,
-					 void *tdls_param, uint8_t tdls_state);
+					    struct tdls_info *tdls_param,
+					    enum wmi_tdls_state tdls_state);
 
 QDF_STATUS (*send_update_tdls_peer_state_cmd)(wmi_unified_t wmi_handle,
 				struct tdls_peer_state_params *peerStateParams,
@@ -1709,6 +1726,19 @@ QDF_STATUS (*send_set_country_cmd)(wmi_unified_t wmi_handle,
 uint32_t (*convert_pdev_id_host_to_target)(uint32_t pdev_id);
 uint32_t (*convert_pdev_id_target_to_host)(uint32_t pdev_id);
 
+/*
+ * For MCL, convert_pdev_id_host_to_target returns legacy pdev id value.
+ * But in converged firmware, WMI_SET_CURRENT_COUNTRY_CMDID expects target
+ * mapping of pdev_id to give only one WMI_REG_CHAN_LIST_CC_EVENTID.
+ * wmi_pdev_id_conversion_enable cannot be used since it overwrites
+ * convert_pdev_id_host_to_target which effects legacy cases.
+ * Below two commands: convert_host_pdev_id_to_target and
+ * convert_target_pdev_id_to_host should be used for any WMI
+ * command/event where FW expects target/host mapping of pdev_id respectively.
+ */
+uint32_t (*convert_host_pdev_id_to_target)(uint32_t pdev_id);
+uint32_t (*convert_target_pdev_id_to_host)(uint32_t pdev_id);
+
 QDF_STATUS (*send_user_country_code_cmd)(wmi_unified_t wmi_handle,
 		uint8_t pdev_id, struct cc_regdmn_s *rd);
 
@@ -2229,20 +2259,6 @@ void wmi_policy_mgr_attach_tlv(struct wmi_unified *wmi_handle)
 void wmi_sta_attach_tlv(struct wmi_unified *wmi_handle);
 #else
 static inline void wmi_sta_attach_tlv(struct wmi_unified *wmi_handle)
-{
-}
-#endif
-
-#ifdef WLAN_FEATURE_NAN
-/**
- * wmi_nan_feature_attach_tlv() - set NAN feature wmi callback
- * @wmi_handle: wmi handle
- *
- * Return: none
- */
-void wmi_nan_feature_attach_tlv(struct wmi_unified *wmi_handle);
-#else
-static inline void wmi_nan_feature_attach_tlv(struct wmi_unified *wmi_handle)
 {
 }
 #endif

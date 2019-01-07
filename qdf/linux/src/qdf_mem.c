@@ -30,6 +30,7 @@
 #include <qdf_trace.h>
 #include "qdf_atomic.h"
 #include "qdf_str.h"
+#include "qdf_talloc.h"
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
 #include <linux/string.h>
@@ -272,12 +273,12 @@ static struct __qdf_mem_stat {
 	qdf_atomic_t skb;
 } qdf_mem_stat;
 
-static inline void qdf_mem_kmalloc_inc(qdf_size_t size)
+void qdf_mem_kmalloc_inc(qdf_size_t size)
 {
 	qdf_atomic_add(size, &qdf_mem_stat.kmalloc);
 }
 
-static inline void qdf_mem_dma_inc(qdf_size_t size)
+static void qdf_mem_dma_inc(qdf_size_t size)
 {
 	qdf_atomic_add(size, &qdf_mem_stat.dma);
 }
@@ -287,7 +288,7 @@ void qdf_mem_skb_inc(qdf_size_t size)
 	qdf_atomic_add(size, &qdf_mem_stat.skb);
 }
 
-static inline void qdf_mem_kmalloc_dec(qdf_size_t size)
+void qdf_mem_kmalloc_dec(qdf_size_t size)
 {
 	qdf_atomic_sub(size, &qdf_mem_stat.kmalloc);
 }
@@ -648,11 +649,8 @@ static QDF_STATUS qdf_mem_debugfs_init(void)
 
 #else /* WLAN_DEBUGFS */
 
-static inline void qdf_mem_kmalloc_inc(qdf_size_t size) {}
 static inline void qdf_mem_dma_inc(qdf_size_t size) {}
-static inline void qdf_mem_kmalloc_dec(qdf_size_t size) {}
 static inline void qdf_mem_dma_dec(qdf_size_t size) {}
-
 
 static QDF_STATUS qdf_mem_debugfs_init(void)
 {
@@ -1093,6 +1091,8 @@ void qdf_mem_free_debug(void *ptr, const char *file, uint32_t line)
 	if (qdf_unlikely((qdf_size_t)ptr <= sizeof(*header)))
 		panic("Failed to free invalid memory location %pK", ptr);
 
+	qdf_talloc_assert_no_children_fl(ptr, file, line);
+
 	qdf_spin_lock_irqsave(&qdf_mem_list_lock);
 	header = qdf_mem_get_header(ptr);
 	error_bitmap = qdf_mem_header_validate(header, current_domain);
@@ -1174,13 +1174,37 @@ void *qdf_mem_malloc_atomic_fl(size_t size, const char *func, uint32_t line)
 }
 qdf_export_symbol(qdf_mem_malloc_atomic_fl);
 
+/**
+ * qdf_mem_free() - free QDF memory
+ * @ptr: Pointer to the starting address of the memory to be free'd.
+ *
+ * This function will free the memory pointed to by 'ptr'.
+ *
+ * Return: None
+ */
+void qdf_mem_free(void *ptr)
+{
+	if (!ptr)
+		return;
+
+	if (qdf_mem_prealloc_put(ptr))
+		return;
+
+	qdf_mem_kmalloc_dec(ksize(ptr));
+
+	kfree(ptr);
+}
+
+qdf_export_symbol(qdf_mem_free);
+#endif
+
 void *qdf_aligned_malloc_fl(qdf_size_t size, uint32_t ring_base_align,
 			    void **vaddr_unaligned,
 			    const char *func, uint32_t line)
 {
 	void *vaddr_aligned;
 
-	*vaddr_unaligned = qdf_mem_malloc(size);
+	*vaddr_unaligned = qdf_mem_malloc_fl(size, func, line);
 	if (!*vaddr_unaligned) {
 		qdf_warn("Failed to alloc %zuB @ %s:%d", size, func, line);
 		return NULL;
@@ -1188,7 +1212,8 @@ void *qdf_aligned_malloc_fl(qdf_size_t size, uint32_t ring_base_align,
 
 	if ((unsigned long)(*vaddr_unaligned) % ring_base_align) {
 		qdf_mem_free(*vaddr_unaligned);
-		*vaddr_unaligned = qdf_mem_malloc(size + ring_base_align - 1);
+		*vaddr_unaligned = qdf_mem_malloc_fl(size + ring_base_align - 1,
+						  func, line);
 		if (!*vaddr_unaligned) {
 			qdf_warn("Failed to alloc %zuB @ %s:%d",
 				 size, func, line);
@@ -1202,29 +1227,6 @@ void *qdf_aligned_malloc_fl(qdf_size_t size, uint32_t ring_base_align,
 	return vaddr_aligned;
 }
 qdf_export_symbol(qdf_aligned_malloc_fl);
-
-/**
- * qdf_mem_free() - free QDF memory
- * @ptr: Pointer to the starting address of the memory to be free'd.
- *
- * This function will free the memory pointed to by 'ptr'.
- *
- * Return: None
- */
-void qdf_mem_free(void *ptr)
-{
-	if (ptr == NULL)
-		return;
-
-	if (qdf_mem_prealloc_put(ptr))
-		return;
-
-	qdf_mem_kmalloc_dec(ksize(ptr));
-
-	kfree(ptr);
-}
-qdf_export_symbol(qdf_mem_free);
-#endif
 
 /**
  * qdf_mem_multi_pages_alloc() - allocate large size of kernel memory
@@ -1467,6 +1469,56 @@ void qdf_mem_copy(void *dst_addr, const void *src_addr, uint32_t num_bytes)
 	memcpy(dst_addr, src_addr, num_bytes);
 }
 qdf_export_symbol(qdf_mem_copy);
+
+qdf_shared_mem_t *qdf_mem_shared_mem_alloc(qdf_device_t osdev, uint32_t size)
+{
+	qdf_shared_mem_t *shared_mem;
+	qdf_dma_addr_t dma_addr, paddr;
+	int ret;
+
+	shared_mem = qdf_mem_malloc(sizeof(*shared_mem));
+	if (!shared_mem) {
+		qdf_err("Unable to allocate memory for shared resource struct");
+		return NULL;
+	}
+
+	shared_mem->vaddr = qdf_mem_alloc_consistent(osdev, osdev->dev,
+				size, qdf_mem_get_dma_addr_ptr(osdev,
+						&shared_mem->mem_info));
+	if (!shared_mem->vaddr) {
+		qdf_err("Unable to allocate DMA memory for shared resource");
+		qdf_mem_free(shared_mem);
+		return NULL;
+	}
+
+	qdf_mem_set_dma_size(osdev, &shared_mem->mem_info, size);
+	size = qdf_mem_get_dma_size(osdev, &shared_mem->mem_info);
+
+	qdf_mem_zero(shared_mem->vaddr, size);
+	dma_addr = qdf_mem_get_dma_addr(osdev, &shared_mem->mem_info);
+	paddr = qdf_mem_paddr_from_dmaaddr(osdev, dma_addr);
+
+	qdf_mem_set_dma_pa(osdev, &shared_mem->mem_info, paddr);
+	ret = qdf_mem_dma_get_sgtable(osdev->dev, &shared_mem->sgtable,
+				      shared_mem->vaddr, dma_addr, size);
+	if (ret) {
+		qdf_err("Unable to get DMA sgtable");
+		qdf_mem_free_consistent(osdev, osdev->dev,
+					shared_mem->mem_info.size,
+					shared_mem->vaddr,
+					dma_addr,
+					qdf_get_dma_mem_context(shared_mem,
+								memctx));
+		qdf_mem_free(shared_mem);
+		return NULL;
+	}
+
+	qdf_dma_get_sgtable_dma_addr(&shared_mem->sgtable);
+
+	return shared_mem;
+}
+
+qdf_export_symbol(qdf_mem_shared_mem_alloc);
 
 /**
  * qdf_mem_zero() - zero out memory
@@ -1723,6 +1775,8 @@ void qdf_mem_free_consistent_debug(qdf_device_t osdev, void *dev,
 	/* freeing a null pointer is valid */
 	if (qdf_unlikely(!vaddr))
 		return;
+
+	qdf_talloc_assert_no_children_fl(vaddr, file, line);
 
 	qdf_spin_lock_irqsave(&qdf_mem_dma_list_lock);
 	/* For DMA buffers we only add trailers, this function will retrieve

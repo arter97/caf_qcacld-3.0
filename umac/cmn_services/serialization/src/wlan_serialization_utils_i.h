@@ -629,16 +629,6 @@ QDF_STATUS wlan_serialization_peek_next(
 #include "wlan_serialization_debug_i.h"
 #endif
 
-enum ser_queue_reason {
-	SER_REQUEST,
-	SER_REMOVE,
-	SER_CANCEL,
-	SER_TIMEOUT,
-	SER_ACTIVATION_FAILED,
-	SER_PENDING_TO_ACTIVE,
-	SER_QUEUE_ACTION_MAX,
-};
-
 /*
  * Below bit positions are used to identify if a
  * serialization command is in use or marked for
@@ -646,9 +636,10 @@ enum ser_queue_reason {
  * CMD_MARKED_FOR_ACTIVATION - The command is about to be activated
  * CMD_IS_ACTIVE - The command is active and currently in use
  */
-#define CMD_MARKED_FOR_ACTIVATION 1
-#define CMD_IS_ACTIVE             2
-#define CMD_ACTIVE_MARKED_FOR_CANCEL 3
+#define CMD_MARKED_FOR_ACTIVATION     1
+#define CMD_IS_ACTIVE                 2
+#define CMD_ACTIVE_MARKED_FOR_CANCEL  3
+#define CMD_ACTIVE_MARKED_FOR_REMOVAL 4
 /**
  * struct wlan_serialization_timer - Timer used for serialization
  * @cmd:      Cmd to which the timer is linked
@@ -719,10 +710,12 @@ struct wlan_serialization_pdev_queue {
  * struct wlan_serialization_vdev_queue - queue data related to vdev
  * @active_list: list to hold the commands currently being executed
  * @pending_list list: to hold the commands currently pending
+ * @queue_disable: is the queue disabled
  */
 struct wlan_serialization_vdev_queue {
 	qdf_list_t active_list;
 	qdf_list_t pending_list;
+	bool queue_disable;
 };
 
 /**
