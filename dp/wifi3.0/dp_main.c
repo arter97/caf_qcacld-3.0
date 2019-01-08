@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3072,15 +3072,15 @@ void  dp_iterate_update_peer_list(void *pdev_hdl)
 	struct dp_vdev *vdev = NULL;
 	struct dp_peer *peer = NULL;
 
-	qdf_spin_lock_bh(&pdev->vdev_list_lock);
 	qdf_spin_lock_bh(&soc->peer_ref_mutex);
+	qdf_spin_lock_bh(&pdev->vdev_list_lock);
 	DP_PDEV_ITERATE_VDEV_LIST(pdev, vdev) {
 		DP_VDEV_ITERATE_PEER_LIST(vdev, peer) {
 			dp_cal_client_update_peer_stats(&peer->stats);
 		}
 	}
-	qdf_spin_unlock_bh(&soc->peer_ref_mutex);
 	qdf_spin_unlock_bh(&pdev->vdev_list_lock);
+	qdf_spin_unlock_bh(&soc->peer_ref_mutex);
 }
 #else
 void  dp_iterate_update_peer_list(void *pdev_hdl)
@@ -5990,6 +5990,9 @@ void dp_rx_bar_stats_cb(struct dp_soc *soc, void *cb_ctxt,
  * dp_aggregate_vdev_stats(): Consolidate stats at VDEV level
  * @vdev: DP VDEV handle
  *
+ * Caller needs to take peer_list lock to avoid race
+ * API assumes caller has taken peer_list lock
+ *
  * return: void
  */
 void dp_aggregate_vdev_stats(struct dp_vdev *vdev,
@@ -6008,10 +6011,11 @@ void dp_aggregate_vdev_stats(struct dp_vdev *vdev,
 
 	qdf_mem_copy(vdev_stats, &vdev->stats, sizeof(vdev->stats));
 
-	qdf_spin_lock_bh(&soc->peer_ref_mutex);
+	/* Caller needs to take peer_list lock to avoid race
+	 * API assumes caller has taken peer_list lock
+	 */
 	TAILQ_FOREACH(peer, &vdev->peer_list, peer_list_elem)
 		dp_update_vdev_stats(vdev_stats, peer);
-	qdf_spin_unlock_bh(&soc->peer_ref_mutex);
 
 #if defined(FEATURE_PERPKT_INFO) && WDI_EVENT_ENABLE
 	if (!vdev->pdev)
@@ -6032,6 +6036,7 @@ void dp_aggregate_vdev_stats(struct dp_vdev *vdev,
 static inline void dp_aggregate_pdev_stats(struct dp_pdev *pdev)
 {
 	struct dp_vdev *vdev = NULL;
+	struct dp_soc *soc;
 	struct cdp_vdev_stats *vdev_stats =
 			qdf_mem_malloc(sizeof(struct cdp_vdev_stats));
 
@@ -6048,6 +6053,8 @@ static inline void dp_aggregate_pdev_stats(struct dp_pdev *pdev)
 	if (pdev->mcopy_mode)
 		DP_UPDATE_STATS(pdev, pdev->invalid_peer);
 
+	soc = pdev->soc;
+	qdf_spin_lock_bh(&soc->peer_ref_mutex);
 	qdf_spin_lock_bh(&pdev->vdev_list_lock);
 	TAILQ_FOREACH(vdev, &pdev->vdev_list, vdev_list_elem) {
 
@@ -6100,6 +6107,7 @@ static inline void dp_aggregate_pdev_stats(struct dp_pdev *pdev)
 			vdev->stats.tx_i.tso.num_seg;
 	}
 	qdf_spin_unlock_bh(&pdev->vdev_list_lock);
+	qdf_spin_unlock_bh(&soc->peer_ref_mutex);
 	qdf_mem_free(vdev_stats);
 
 #if defined(FEATURE_PERPKT_INFO) && WDI_EVENT_ENABLE
@@ -6119,8 +6127,20 @@ static void dp_vdev_getstats(void *vdev_handle,
 		struct cdp_dev_stats *stats)
 {
 	struct dp_vdev *vdev = (struct dp_vdev *)vdev_handle;
-	struct cdp_vdev_stats *vdev_stats =
-			qdf_mem_malloc(sizeof(struct cdp_vdev_stats));
+	struct dp_pdev *pdev;
+	struct dp_soc *soc;
+	struct cdp_vdev_stats *vdev_stats;
+
+	if (!vdev)
+		return;
+
+	pdev = vdev->pdev;
+	if (!pdev)
+		return;
+
+	soc = pdev->soc;
+
+	vdev_stats = qdf_mem_malloc(sizeof(struct cdp_vdev_stats));
 
 	if (!vdev_stats) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
@@ -6128,7 +6148,9 @@ static void dp_vdev_getstats(void *vdev_handle,
 		return;
 	}
 
+	qdf_spin_lock_bh(&soc->peer_ref_mutex);
 	dp_aggregate_vdev_stats(vdev, vdev_stats);
+	qdf_spin_unlock_bh(&soc->peer_ref_mutex);
 
 	stats->tx_packets = vdev_stats->tx_i.rcvd.num;
 	stats->tx_bytes = vdev_stats->tx_i.rcvd.bytes;
@@ -8038,12 +8060,27 @@ static int  dp_txrx_get_vdev_stats(struct cdp_vdev *vdev_handle, void *buf,
 				   bool is_aggregate)
 {
 	struct dp_vdev *vdev = (struct dp_vdev *)vdev_handle;
-	struct cdp_vdev_stats *vdev_stats = (struct cdp_vdev_stats *)buf;
+	struct cdp_vdev_stats *vdev_stats;
+	struct dp_pdev *pdev;
+	struct dp_soc *soc;
 
-	if (is_aggregate)
+	if (!vdev)
+		return 1;
+
+	pdev = vdev->pdev;
+	if (!pdev)
+		return 1;
+
+	soc = pdev->soc;
+	vdev_stats = (struct cdp_vdev_stats *)buf;
+
+	if (is_aggregate) {
+		qdf_spin_lock_bh(&soc->peer_ref_mutex);
 		dp_aggregate_vdev_stats(vdev, buf);
-	else
+		qdf_spin_unlock_bh(&soc->peer_ref_mutex);
+	} else {
 		qdf_mem_copy(vdev_stats, &vdev->stats, sizeof(vdev->stats));
+	}
 
 	return 0;
 }
