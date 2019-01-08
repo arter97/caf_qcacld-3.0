@@ -5146,6 +5146,7 @@ static inline void dp_aggregate_pdev_stats(struct dp_pdev *pdev)
 	qdf_mem_set(&(pdev->stats.rx), sizeof(pdev->stats.rx), 0x0);
 	qdf_mem_set(&(pdev->stats.tx_i), sizeof(pdev->stats.tx_i), 0x0);
 
+	qdf_spin_lock_bh(&soc->peer_ref_mutex);
 	qdf_spin_lock_bh(&pdev->vdev_list_lock);
 	TAILQ_FOREACH(vdev, &pdev->vdev_list, vdev_list_elem) {
 
@@ -5203,6 +5204,7 @@ static inline void dp_aggregate_pdev_stats(struct dp_pdev *pdev)
 			vdev->stats.tx_i.tso.num_seg;
 	}
 	qdf_spin_unlock_bh(&pdev->vdev_list_lock);
+	qdf_spin_unlock_bh(&soc->peer_ref_mutex);
 
 	if (!pdev->osif_pdev)
 		return;
@@ -5224,8 +5226,15 @@ static void dp_vdev_getstats(void *vdev_handle,
 		struct cdp_dev_stats *stats)
 {
 	struct dp_vdev *vdev = (struct dp_vdev *)vdev_handle;
+	struct dp_soc *soc;
 
+	if (!vdev)
+		return;
+
+	soc = vdev->pdev->soc;
+	qdf_spin_lock_bh(&soc->peer_ref_mutex);
 	dp_aggregate_vdev_stats(vdev);
+	qdf_spin_unlock_bh(&soc->peer_ref_mutex);
 }
 
 
