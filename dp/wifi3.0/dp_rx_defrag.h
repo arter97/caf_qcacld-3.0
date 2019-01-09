@@ -55,7 +55,7 @@ struct dp_rx_defrag_cipher {
 	uint8_t ic_miclen;
 };
 
-uint32_t dp_rx_frag_handle(struct dp_soc *soc, void *ring_desc,
+uint32_t dp_rx_frag_handle(struct dp_soc *soc, void *hal_ring, void *ring_desc,
 		struct hal_rx_mpdu_desc_info *mpdu_desc_info,
 		uint8_t *mac_id,
 		uint32_t quota);
