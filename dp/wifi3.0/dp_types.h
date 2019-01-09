@@ -1378,6 +1378,9 @@ struct dp_pdev {
 	 * disabled
 	 */
 	uint8_t dp_peer_based_pktlog;
+	/* Cached peer_id from htt_peer_details_tlv */
+	uint8_t fw_stats_peer_id;
+	qdf_event_t fw_peer_stats;
 };
 
 struct dp_peer;
