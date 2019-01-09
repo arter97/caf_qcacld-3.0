@@ -357,6 +357,9 @@ enum {
 	WNI_CFG_EDCA_ETSI_ACVO,
 	WNI_CFG_OBSS_DETECTION_OFFLOAD,
 	WNI_CFG_OBSS_COLOR_COLLISION_OFFLOAD,
+#ifdef WLAN_FEATURE_SAE
+	WNI_CFG_SAP_SAE_ENABLED,
+#endif
 	/* Any new items to be added should be above this strictly */
 	CFG_PARAM_MAX_NUM
 };
