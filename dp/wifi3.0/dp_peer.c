@@ -315,7 +315,6 @@ static inline void dp_peer_ast_hash_add(struct dp_soc *soc,
 	uint32_t index;
 
 	index = dp_peer_ast_hash_index(soc, &ase->mac_addr);
-	soc->num_ast_entries++;
 	TAILQ_INSERT_TAIL(&soc->ast_hash.bins[index], ase, hash_list_elem);
 }
 
@@ -347,7 +346,6 @@ static inline void dp_peer_ast_hash_remove(struct dp_soc *soc,
 	}
 
 	QDF_ASSERT(found);
-	soc->num_ast_entries--;
 	TAILQ_REMOVE(&soc->ast_hash.bins[index], ase, hash_list_elem);
 }
 
@@ -572,6 +570,15 @@ int dp_peer_add_ast(struct dp_soc *soc,
 
 	qdf_spin_lock_bh(&soc->ast_lock);
 
+	/* fw supports only 2 times the max_peers ast entries */
+	if (soc->num_ast_entries >=
+	    wlan_cfg_get_max_ast_idx(soc->wlan_cfg_ctx)) {
+		qdf_spin_unlock_bh(&soc->ast_lock);
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+			  FL("Max ast entries reached"));
+		return ret;
+	}
+
 	/* If AST entry already exists , just return from here
 	 * ast entry with same mac address can exist on different radios
 	 * if ast_override support is enabled use search by pdev in this
@@ -676,13 +683,6 @@ int dp_peer_add_ast(struct dp_soc *soc,
 	}
 
 add_ast_entry:
-	if (soc->num_ast_entries >= (soc->max_peers *2)) {
-		qdf_spin_unlock_bh(&soc->ast_lock);
-		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			  FL("Max ast entries reached"));
-		return ret;
-	}
-
 	ast_entry = (struct dp_ast_entry *)
 			qdf_mem_malloc(sizeof(struct dp_ast_entry));
 
@@ -739,6 +739,7 @@ add_ast_entry:
 
 	ast_entry->is_active = TRUE;
 	DP_STATS_INC(soc, ast.added, 1);
+	soc->num_ast_entries++;
 	dp_peer_ast_hash_add(soc, ast_entry);
 
 	ast_entry->peer = peer;
@@ -821,6 +822,7 @@ void dp_peer_del_ast(struct dp_soc *soc, struct dp_ast_entry *ast_entry)
 	dp_peer_ast_hash_remove(soc, ast_entry);
 	dp_peer_ast_cleanup(soc, ast_entry);
 	qdf_mem_free(ast_entry);
+	soc->num_ast_entries--;
 }
 
 /*
@@ -1043,6 +1045,7 @@ static void dp_peer_ast_free_entry(struct dp_soc *soc,
 		   CDP_TXRX_AST_DELETED);
 	}
 	qdf_mem_free(ast_entry);
+	soc->num_ast_entries--;
 }
 
 struct dp_peer *dp_peer_find_hash_find(struct dp_soc *soc,
@@ -1340,7 +1343,8 @@ dp_rx_peer_map_handler(void *soc_handle, uint16_t peer_id,
 		peer_mac_addr[2], peer_mac_addr[3], peer_mac_addr[4],
 		peer_mac_addr[5], vdev_id);
 
-	if ((hw_peer_id < 0) || (hw_peer_id > (soc->max_peers * 2))) {
+	if ((hw_peer_id < 0) ||
+	    (hw_peer_id >= wlan_cfg_get_max_ast_idx(soc->wlan_cfg_ctx))) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 			"invalid hw_peer_id: %d", hw_peer_id);
 		qdf_assert_always(0);
