@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -824,6 +824,9 @@ static QDF_STATUS convert_host_peer_id_to_target_id_tlv(
 		break;
 	case WMI_HOST_PEER_PARAM_OFDMA_ENABLE:
 		*targ_paramid = WMI_PEER_PARAM_OFDMA_ENABLE;
+		break;
+	case WMI_HOST_PEER_PARAM_ENABLE_FT:
+		*targ_paramid = WMI_PEER_PARAM_ENABLE_FT;
 		break;
 	default:
 		return QDF_STATUS_E_NOSUPPORT;
