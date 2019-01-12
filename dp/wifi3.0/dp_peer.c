@@ -766,7 +766,7 @@ add_ast_entry:
 			return 0;
 	}
 
-	return ret;
+	return 0;
 }
 
 /*
