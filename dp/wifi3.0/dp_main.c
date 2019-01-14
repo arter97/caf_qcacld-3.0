@@ -9054,6 +9054,7 @@ static struct cdp_cmn_ops dp_ops_cmn = {
 	.txrx_stats_request = dp_txrx_stats_request,
 	.txrx_set_monitor_mode = dp_vdev_set_monitor_mode,
 	.txrx_get_pdev_id_frm_pdev = dp_get_pdev_id_frm_pdev,
+	.txrx_get_vow_config_frm_pdev = NULL,
 	.txrx_pdev_set_chan_noise_floor = dp_pdev_set_chan_noise_floor,
 	.txrx_set_nac = dp_set_nac,
 	.txrx_get_tx_pending = dp_get_tx_pending,
