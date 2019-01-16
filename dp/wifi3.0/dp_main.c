@@ -6017,13 +6017,10 @@ void dp_aggregate_vdev_stats(struct dp_vdev *vdev,
 	struct dp_peer *peer = NULL;
 	struct dp_soc *soc = NULL;
 
-	if (!vdev)
+	if (!vdev || !vdev->pdev)
 		return;
 
 	soc = vdev->pdev->soc;
-
-	if (!vdev)
-		return;
 
 	qdf_mem_copy(vdev_stats, &vdev->stats, sizeof(vdev->stats));
 
@@ -6034,9 +6031,6 @@ void dp_aggregate_vdev_stats(struct dp_vdev *vdev,
 		dp_update_vdev_stats(vdev_stats, peer);
 
 #if defined(FEATURE_PERPKT_INFO) && WDI_EVENT_ENABLE
-	if (!vdev->pdev)
-		return;
-
 	dp_wdi_event_handler(WDI_EVENT_UPDATE_DP_STATS, vdev->pdev->soc,
 			     vdev_stats, vdev->vdev_id,
 			     UPDATE_VDEV_STATS, vdev->pdev->pdev_id);
