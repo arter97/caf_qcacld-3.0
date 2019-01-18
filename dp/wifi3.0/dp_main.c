@@ -4348,8 +4348,9 @@ static void dp_vdev_register_wifi3(struct cdp_vdev *vdev_handle,
  *
  * Return: void
  */
-static void dp_vdev_flush_peers(struct dp_vdev *vdev)
+static void dp_vdev_flush_peers(struct cdp_vdev *vdev_handle)
 {
+	struct dp_vdev *vdev = (struct dp_vdev *)vdev_handle;
 	struct dp_pdev *pdev = vdev->pdev;
 	struct dp_soc *soc = pdev->soc;
 	struct dp_peer *peer;
@@ -4411,14 +4412,6 @@ static void dp_vdev_detach_wifi3(struct cdp_vdev *vdev_handle,
 
 	if (wlan_op_mode_sta == vdev->opmode)
 		dp_peer_delete_wifi3(vdev->vap_bss_peer, 0);
-
-	/*
-	 * If Target is hung, flush all peers before detaching vdev
-	 * this will free all references held due to missing
-	 * unmap commands from Target
-	 */
-	if (hif_get_target_status(soc->hif_handle) == TARGET_STATUS_RESET)
-		dp_vdev_flush_peers(vdev);
 
 	/*
 	 * Use peer_ref_mutex while accessing peer_list, in case
@@ -9002,6 +8995,7 @@ static struct cdp_cmn_ops dp_ops_cmn = {
 		dp_peer_ast_del_by_pdev,
 	.txrx_peer_delete = dp_peer_delete_wifi3,
 	.txrx_vdev_register = dp_vdev_register_wifi3,
+	.txrx_vdev_flush_peers = dp_vdev_flush_peers,
 	.txrx_soc_detach = dp_soc_detach_wifi3,
 	.txrx_soc_deinit = dp_soc_deinit_wifi3,
 	.txrx_soc_init = dp_soc_init_wifi3,

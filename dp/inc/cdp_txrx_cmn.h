@@ -583,6 +583,23 @@ static inline void cdp_peer_teardown
 }
 
 static inline void
+cdp_vdev_flush_peers(ol_txrx_soc_handle soc, struct cdp_vdev *vdev)
+{
+	if (!soc || !soc->ops) {
+		QDF_TRACE(QDF_MODULE_ID_CDP, QDF_TRACE_LEVEL_DEBUG,
+			  "%s: Invalid Instance:", __func__);
+		QDF_BUG(0);
+		return;
+	}
+
+	if (!soc->ops->cmn_drv_ops ||
+	    !soc->ops->cmn_drv_ops->txrx_vdev_flush_peers)
+		return;
+
+	soc->ops->cmn_drv_ops->txrx_vdev_flush_peers(vdev);
+}
+
+static inline void
 cdp_peer_delete(ol_txrx_soc_handle soc, void *peer, uint32_t bitmap)
 {
 	if (!soc || !soc->ops) {
