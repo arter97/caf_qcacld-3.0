@@ -9145,6 +9145,30 @@ enum dot11p_mode {
 #define CFG_STA_SAP_SCC_ON_DFS_CHAN_DEFAULT      (0)
 
 /*
+ * <ini>
+ * g_sta_sap_scc_on_lte_coex_chan - Allow STA+SAP SCC on LTE coex channel
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to allow STA+SAP SCC on LTE coex channel
+ * 0 - Disallow STA+SAP SCC on LTE coex channel
+ * 1 - Allow STA+SAP SCC on LTE coex channel
+ *
+ * Related: None.
+ *
+ * Supported Feature: Non-DBS, DBS
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+#define CFG_STA_SAP_SCC_ON_LTE_COEX_CHAN              "g_sta_sap_scc_on_lte_coex_chan"
+#define CFG_STA_SAP_SCC_ON_LTE_COEX_CHAN_MIN          (0)
+#define CFG_STA_SAP_SCC_ON_LTE_COEX_CHAN_MAX          (1)
+#define CFG_STA_SAP_SCC_ON_LTE_COEX_CHAN_DEFAULT      (0)
+
+/*
  * gPNOChannelPrediction will allow user to enable/disable the
  * PNO channel prediction feature.
  * In current PNO implementation, scan is always done until all configured
@@ -13600,6 +13624,30 @@ enum hw_filter_mode {
 
 /*
  * <ini>
+ * force_rsne_override - force rsnie override from user
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable/disable test mode to force rsne override used in
+ * security enhancement test cases to pass the RSNIE sent by user in
+ * assoc request.
+ *
+ * Related: None
+ *
+ * Supported Feature: STA
+ *
+ * Usage: internal
+ *
+ * </ini>
+ */
+#define CFG_FORCE_RSNE_OVERRIDE_NAME    "force_rsne_override"
+#define CFG_FORCE_RSNE_OVERRIDE_MIN     (0)
+#define CFG_FORCE_RSNE_OVERRIDE_MAX     (1)
+#define CFG_FORCE_RSNE_OVERRIDE_DEFAULT (0)
+
+/*
+ * <ini>
  * gcmp_enabled - ini to enable/disable GCMP
  * @Min: 0
  * @Max: 1
@@ -14271,6 +14319,7 @@ struct hdd_config {
 	uint32_t dual_mac_feature_disable;
 	uint8_t dbs_scan_selection[CFG_DBS_SCAN_PARAM_LENGTH];
 	uint32_t sta_sap_scc_on_dfs_chan;
+	uint32_t sta_sap_scc_on_lte_coex_chan;
 	bool     tx_chain_mask_cck;
 	uint8_t  tx_chain_mask_1ss;
 	bool smart_chainmask_enabled;
@@ -14515,6 +14564,7 @@ struct hdd_config {
 	bool probe_req_deferral_enabled;
 	bool fils_discovery_sap_enabled;
 	bool esp_for_roam_enabled;
+	bool force_rsne_override;
 	bool gcmp_enabled;
 	bool is_unit_test_framework_enabled;
 	bool enable_ftopen;

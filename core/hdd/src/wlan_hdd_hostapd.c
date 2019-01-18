@@ -393,8 +393,10 @@ static int __hdd_hostapd_stop(struct net_device *dev)
 
 	ENTER_DEV(dev);
 	ret = wlan_hdd_validate_context(hdd_ctx);
-	if (ret)
+	if (ret) {
+		set_bit(DOWN_DURING_SSR, &adapter->event_flags);
 		return ret;
+	}
 
 	if (!sap_ctx) {
 		hdd_err("invalid sap ctx: %pK", sap_ctx);
@@ -2675,8 +2677,8 @@ int hdd_softap_unpack_ie(tHalHandle halHandle,
 	uint32_t ret;
 	uint8_t *pRsnIe;
 	uint16_t RSNIeLen;
-	tDot11fIERSN dot11RSNIE;
-	tDot11fIEWPA dot11WPAIE;
+	tDot11fIERSN dot11RSNIE = {0};
+	tDot11fIEWPA dot11WPAIE = {0};
 
 	if (NULL == halHandle) {
 		hdd_err("Error haHandle returned NULL");
@@ -2699,10 +2701,9 @@ int hdd_softap_unpack_ie(tHalHandle halHandle,
 		RSNIeLen = gen_ie_len - 2;
 		/* Unpack the RSN IE */
 		memset(&dot11RSNIE, 0, sizeof(tDot11fIERSN));
-		ret = dot11f_unpack_ie_rsn((tpAniSirGlobal) halHandle,
-					   pRsnIe, RSNIeLen, &dot11RSNIE,
-					   false);
-		if (DOT11F_FAILED(ret)) {
+		ret = sme_unpack_rsn_ie(halHandle, pRsnIe, RSNIeLen,
+					&dot11RSNIE, false);
+		if (!DOT11F_SUCCEEDED(ret)) {
 			hdd_err("unpack failed, ret: 0x%x", ret);
 			return -EINVAL;
 		}
@@ -2710,14 +2711,14 @@ int hdd_softap_unpack_ie(tHalHandle halHandle,
 		hdd_debug("pairwise cipher suite count: %d",
 		       dot11RSNIE.pwise_cipher_suite_count);
 		hdd_debug("authentication suite count: %d",
-		       dot11RSNIE.akm_suite_count);
+		       dot11RSNIE.akm_suite_cnt);
 		/* Here we have followed the apple base code,
 		 * but probably I suspect we can do something different
-		 * dot11RSNIE.akm_suite_count
+		 * dot11RSNIE.akm_suite_cnt
 		 * Just translate the FIRST one
 		 */
 		*pAuthType =
-			hdd_translate_rsn_to_csr_auth_type(dot11RSNIE.akm_suites[0]);
+		    hdd_translate_rsn_to_csr_auth_type(dot11RSNIE.akm_suite[0]);
 		/* dot11RSNIE.pwise_cipher_suite_count */
 		*pEncryptType =
 			hdd_translate_rsn_to_csr_encryption_type(dot11RSNIE.
@@ -2841,7 +2842,7 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_channel,
 	status = wlansap_set_channel_change_with_csa(
 		WLAN_HDD_GET_SAP_CTX_PTR(pHostapdAdapter),
 		(uint32_t)target_channel,
-		target_bw, true);
+		target_bw, !(pHddCtx->config->sta_sap_scc_on_lte_coex_chan));
 
 	if (QDF_STATUS_SUCCESS != status) {
 		hdd_err("SAP set channel failed for channel: %d, bw: %d",
