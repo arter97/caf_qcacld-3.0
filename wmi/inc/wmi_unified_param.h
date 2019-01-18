@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -37,7 +37,6 @@
 
 #define IEEE80211_ADDR_LEN  6  /* size of 802.11 address */
 #define WMI_MAC_MAX_SSID_LENGTH              32
-#define WMI_SCAN_MAX_NUM_SSID                0x0A
 #ifndef CONFIG_HL_SUPPORT
 #define mgmt_tx_dl_frm_len 64
 #else
@@ -1747,6 +1746,8 @@ struct wmi_probe_resp_params {
  * @key_rxmic_len: rx mic length
  * @key_tsc_counter:  key tx sc counter
  * @key_rsc_counter:  key rx sc counter
+ * @key_rsc_ctr:  key rx sc counter (stack variable, unnecessary heap alloc for
+ *                key_rsc_counter should be cleaned up eventually)
  * @rx_iv: receive IV, applicable only in case of WAPI
  * @tx_iv: transmit IV, applicable only in case of WAPI
  * @key_data: key data
@@ -1762,6 +1763,7 @@ struct set_key_params {
 	uint32_t key_rxmic_len;
 	uint64_t key_tsc_counter;
 	uint64_t *key_rsc_counter;
+	uint64_t key_rsc_ctr;
 #if defined(ATH_SUPPORT_WAPI) || defined(FEATURE_WLAN_WAPI)
 	uint8_t rx_iv[16];
 	uint8_t tx_iv[16];
@@ -5991,6 +5993,8 @@ typedef enum {
 	WMI_HOST_PEER_PARAM_MU_ENABLE = 0x1a,
 	/* Enable OFDMA support */
 	WMI_HOST_PEER_PARAM_OFDMA_ENABLE = 0x1b,
+	/* Notify FT roam */
+	WMI_HOST_PEER_PARAM_ENABLE_FT = 0x1c,
 } PEER_PARAM_ENUM;
 #define WMI_HOST_PEER_MIMO_PS_NONE	0x0
 #define WMI_HOST_PEER_MIMO_PS_STATIC	0x1

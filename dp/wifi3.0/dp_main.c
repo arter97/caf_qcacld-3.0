@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -91,6 +91,11 @@ static void dp_ppdu_ring_cfg(struct dp_pdev *pdev);
 #define DP_CURR_FW_STATS_AVAIL 19
 #define DP_HTT_DBG_EXT_STATS_MAX 256
 #define DP_MAX_SLEEP_TIME 100
+#ifndef QCA_WIFI_3_0_EMU
+#define SUSPEND_DRAIN_WAIT 500
+#else
+#define SUSPEND_DRAIN_WAIT 3000
+#endif
 
 #ifdef IPA_OFFLOAD
 /* Exclude IPA rings from the interrupt context */
@@ -3027,13 +3032,13 @@ void  dp_iterate_update_peer_list(void *pdev_hdl)
 	struct dp_peer *peer = NULL;
 
 	qdf_spin_lock_bh(&pdev->vdev_list_lock);
+	qdf_spin_lock_bh(&soc->peer_ref_mutex);
 	DP_PDEV_ITERATE_VDEV_LIST(pdev, vdev) {
-		qdf_spin_lock_bh(&soc->peer_ref_mutex);
 		DP_VDEV_ITERATE_PEER_LIST(vdev, peer) {
 			dp_cal_client_update_peer_stats(&peer->stats);
 		}
-		qdf_spin_unlock_bh(&soc->peer_ref_mutex);
 	}
+	qdf_spin_unlock_bh(&soc->peer_ref_mutex);
 	qdf_spin_unlock_bh(&pdev->vdev_list_lock);
 }
 #else
@@ -5975,13 +5980,10 @@ void dp_aggregate_vdev_stats(struct dp_vdev *vdev,
 	struct dp_peer *peer = NULL;
 	struct dp_soc *soc = NULL;
 
-	if (!vdev)
+	if (!vdev || !vdev->pdev)
 		return;
 
 	soc = vdev->pdev->soc;
-
-	if (!vdev)
-		return;
 
 	qdf_mem_copy(vdev_stats, &vdev->stats, sizeof(vdev->stats));
 
@@ -5991,9 +5993,6 @@ void dp_aggregate_vdev_stats(struct dp_vdev *vdev,
 	qdf_spin_unlock_bh(&soc->peer_ref_mutex);
 
 #if defined(FEATURE_PERPKT_INFO) && WDI_EVENT_ENABLE
-	if (!vdev->pdev)
-		return;
-
 	dp_wdi_event_handler(WDI_EVENT_UPDATE_DP_STATS, vdev->pdev->soc,
 			     vdev_stats, vdev->vdev_id,
 			     UPDATE_VDEV_STATS, vdev->pdev->pdev_id);
@@ -6030,51 +6029,7 @@ static inline void dp_aggregate_pdev_stats(struct dp_pdev *pdev)
 
 		dp_aggregate_vdev_stats(vdev, vdev_stats);
 		dp_update_pdev_stats(pdev, vdev_stats);
-
-		DP_STATS_AGGR_PKT(pdev, vdev, tx_i.nawds_mcast);
-
-		DP_STATS_AGGR_PKT(pdev, vdev, tx_i.rcvd);
-		DP_STATS_AGGR_PKT(pdev, vdev, tx_i.processed);
-		DP_STATS_AGGR_PKT(pdev, vdev, tx_i.reinject_pkts);
-		DP_STATS_AGGR_PKT(pdev, vdev, tx_i.inspect_pkts);
-		DP_STATS_AGGR_PKT(pdev, vdev, tx_i.raw.raw_pkt);
-		DP_STATS_AGGR(pdev, vdev, tx_i.raw.dma_map_error);
-		DP_STATS_AGGR_PKT(pdev, vdev, tx_i.tso.tso_pkt);
-		DP_STATS_AGGR(pdev, vdev, tx_i.tso.dropped_host.num);
-		DP_STATS_AGGR(pdev, vdev, tx_i.tso.dropped_target);
-		DP_STATS_AGGR(pdev, vdev, tx_i.sg.dropped_host.num);
-		DP_STATS_AGGR(pdev, vdev, tx_i.sg.dropped_target);
-		DP_STATS_AGGR_PKT(pdev, vdev, tx_i.sg.sg_pkt);
-		DP_STATS_AGGR_PKT(pdev, vdev, tx_i.mcast_en.mcast_pkt);
-		DP_STATS_AGGR(pdev, vdev,
-				tx_i.mcast_en.dropped_map_error);
-		DP_STATS_AGGR(pdev, vdev,
-				tx_i.mcast_en.dropped_self_mac);
-		DP_STATS_AGGR(pdev, vdev,
-				tx_i.mcast_en.dropped_send_fail);
-		DP_STATS_AGGR(pdev, vdev, tx_i.mcast_en.ucast);
-		DP_STATS_AGGR(pdev, vdev, tx_i.dropped.dma_error);
-		DP_STATS_AGGR(pdev, vdev, tx_i.dropped.ring_full);
-		DP_STATS_AGGR(pdev, vdev, tx_i.dropped.enqueue_fail);
-		DP_STATS_AGGR(pdev, vdev, tx_i.dropped.desc_na.num);
-		DP_STATS_AGGR(pdev, vdev, tx_i.dropped.res_full);
-		DP_STATS_AGGR(pdev, vdev, tx_i.dropped.headroom_insufficient);
-		DP_STATS_AGGR(pdev, vdev, tx_i.cce_classified);
-		DP_STATS_AGGR(pdev, vdev, tx_i.cce_classified_raw);
-		DP_STATS_AGGR(pdev, vdev, tx_i.mesh.exception_fw);
-		DP_STATS_AGGR(pdev, vdev, tx_i.mesh.completion_fw);
-
-		pdev->stats.tx_i.dropped.dropped_pkt.num =
-			pdev->stats.tx_i.dropped.dma_error +
-			pdev->stats.tx_i.dropped.ring_full +
-			pdev->stats.tx_i.dropped.enqueue_fail +
-			pdev->stats.tx_i.dropped.desc_na.num +
-			pdev->stats.tx_i.dropped.res_full;
-
-		pdev->stats.tx.last_ack_rssi =
-			vdev->stats.tx.last_ack_rssi;
-		pdev->stats.tx_i.tso.num_seg =
-			vdev->stats.tx_i.tso.num_seg;
+		dp_update_pdev_ingress_stats(pdev, vdev);
 	}
 	qdf_spin_unlock_bh(&pdev->vdev_list_lock);
 	qdf_mem_free(vdev_stats);
@@ -8980,6 +8935,7 @@ static struct cdp_cmn_ops dp_ops_cmn = {
 	.txrx_stats_request = dp_txrx_stats_request,
 	.txrx_set_monitor_mode = dp_vdev_set_monitor_mode,
 	.txrx_get_pdev_id_frm_pdev = dp_get_pdev_id_frm_pdev,
+	.txrx_get_vow_config_frm_pdev = NULL,
 	.txrx_pdev_set_chan_noise_floor = dp_pdev_set_chan_noise_floor,
 	.txrx_set_nac = dp_set_nac,
 	.txrx_get_tx_pending = dp_get_tx_pending,
@@ -9154,6 +9110,19 @@ static QDF_STATUS dp_bus_suspend(struct cdp_pdev *opaque_pdev)
 {
 	struct dp_pdev *pdev = (struct dp_pdev *)opaque_pdev;
 	struct dp_soc *soc = pdev->soc;
+	int timeout = SUSPEND_DRAIN_WAIT;
+	int drain_wait_delay = 50; /* 50 ms */
+
+	/* Abort if there are any pending TX packets */
+	while (dp_get_tx_pending(opaque_pdev) > 0) {
+		qdf_sleep(drain_wait_delay);
+		if (timeout <= 0) {
+			dp_err("TX frames are pending, abort suspend");
+			return QDF_STATUS_E_TIMEOUT;
+		}
+		timeout = timeout - drain_wait_delay;
+	}
+
 
 	if (soc->intr_mode == DP_INTR_POLL)
 		qdf_timer_stop(&soc->int_timer);
@@ -9192,6 +9161,7 @@ static struct cdp_flowctl_ops dp_ops_flowctl = {
 	.flow_pool_unmap_handler = dp_tx_flow_pool_unmap,
 	.register_pause_cb = dp_txrx_register_pause_cb,
 	.dump_flow_pool_info = dp_tx_dump_flow_pool_info,
+	.tx_desc_thresh_reached = dp_tx_desc_thresh_reached,
 #endif /* QCA_LL_TX_FLOW_CONTROL_V2 */
 };
 

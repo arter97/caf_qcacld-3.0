@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -824,6 +824,9 @@ static QDF_STATUS convert_host_peer_id_to_target_id_tlv(
 		break;
 	case WMI_HOST_PEER_PARAM_OFDMA_ENABLE:
 		*targ_paramid = WMI_PEER_PARAM_OFDMA_ENABLE;
+		break;
+	case WMI_HOST_PEER_PARAM_ENABLE_FT:
+		*targ_paramid = WMI_PEER_PARAM_ENABLE_FT;
 		break;
 	default:
 		return QDF_STATUS_E_NOSUPPORT;
@@ -2569,8 +2572,8 @@ static QDF_STATUS send_scan_start_cmd_tlv(wmi_unified_t wmi_handle,
 	buf_ptr += WMI_TLV_HDR_SIZE +
 			(params->chan_list.num_chan * sizeof(uint32_t));
 
-	if (params->num_ssids > WMI_SCAN_MAX_NUM_SSID) {
-		WMI_LOGE("Invalid value for numSsid");
+	if (params->num_ssids > WLAN_SCAN_MAX_NUM_SSID) {
+		WMI_LOGE("Invalid value for num_ssids %d", params->num_ssids);
 		goto error;
 	}
 
@@ -3996,9 +3999,8 @@ static QDF_STATUS send_setup_install_key_cmd_tlv(wmi_unified_t wmi_handle,
 	key_data = (uint8_t *) (buf_ptr + WMI_TLV_HDR_SIZE);
 	qdf_mem_copy((void *)key_data,
 		     (const void *)key_params->key_data, key_params->key_len);
-	if (key_params->key_rsc_counter)
-	    qdf_mem_copy(&cmd->key_rsc_counter, key_params->key_rsc_counter,
-			 sizeof(wmi_key_seq_counter));
+	qdf_mem_copy(&cmd->key_rsc_counter, &key_params->key_rsc_ctr,
+		     sizeof(wmi_key_seq_counter));
 	cmd->key_len = key_params->key_len;
 
 	wmi_mtrace(WMI_VDEV_INSTALL_KEY_CMDID, cmd->vdev_id, 0);
@@ -4646,7 +4648,6 @@ static QDF_STATUS send_process_ll_stats_clear_cmd_tlv(wmi_unified_t wmi_handle,
 	WMI_LOGD("Clear Stat Mask : %d", cmd->stats_clear_req_mask);
 	/* WMI_LOGD("Peer MAC Addr   : %pM",
 		 cmd->peer_macaddr); */
-
 	wmi_mtrace(WMI_CLEAR_LINK_STATS_CMDID, cmd->vdev_id, 0);
 	ret = wmi_unified_cmd_send(wmi_handle, buf, len,
 				   WMI_CLEAR_LINK_STATS_CMDID);
@@ -6013,24 +6014,24 @@ static QDF_STATUS send_vdev_spectral_configure_cmd_tlv(wmi_unified_t wmi_handle,
 	WMI_LOGI("%s: Sent WMI_VDEV_SPECTRAL_SCAN_CONFIGURE_CMDID",
 		 __func__);
 
-	WMI_LOGI("vdev_id = %u"
-		 "spectral_scan_count = %u"
-		 "spectral_scan_period = %u"
-		 "spectral_scan_priority = %u"
-		 "spectral_scan_fft_size = %u"
-		 "spectral_scan_gc_ena = %u"
-		 "spectral_scan_restart_ena = %u"
-		 "spectral_scan_noise_floor_ref = %u"
-		 "spectral_scan_init_delay = %u"
-		 "spectral_scan_nb_tone_thr = %u"
-		 "spectral_scan_str_bin_thr = %u"
-		 "spectral_scan_wb_rpt_mode = %u"
-		 "spectral_scan_rssi_rpt_mode = %u"
-		 "spectral_scan_rssi_thr = %u"
-		 "spectral_scan_pwr_format = %u"
-		 "spectral_scan_rpt_mode = %u"
-		 "spectral_scan_bin_scale = %u"
-		 "spectral_scan_dBm_adj = %u"
+	WMI_LOGI("vdev_id = %u\n"
+		 "spectral_scan_count = %u\n"
+		 "spectral_scan_period = %u\n"
+		 "spectral_scan_priority = %u\n"
+		 "spectral_scan_fft_size = %u\n"
+		 "spectral_scan_gc_ena = %u\n"
+		 "spectral_scan_restart_ena = %u\n"
+		 "spectral_scan_noise_floor_ref = %u\n"
+		 "spectral_scan_init_delay = %u\n"
+		 "spectral_scan_nb_tone_thr = %u\n"
+		 "spectral_scan_str_bin_thr = %u\n"
+		 "spectral_scan_wb_rpt_mode = %u\n"
+		 "spectral_scan_rssi_rpt_mode = %u\n"
+		 "spectral_scan_rssi_thr = %u\n"
+		 "spectral_scan_pwr_format = %u\n"
+		 "spectral_scan_rpt_mode = %u\n"
+		 "spectral_scan_bin_scale = %u\n"
+		 "spectral_scan_dBm_adj = %u\n"
 		 "spectral_scan_chn_mask = %u",
 		 param->vdev_id,
 		 param->count,
@@ -6051,7 +6052,7 @@ static QDF_STATUS send_vdev_spectral_configure_cmd_tlv(wmi_unified_t wmi_handle,
 		 param->bin_scale,
 		 param->dbm_adj,
 		 param->chn_mask);
-	WMI_LOGI("%s: Status: %d\n", __func__, ret);
+	WMI_LOGI("%s: Status: %d", __func__, ret);
 
 	return ret;
 }
@@ -6101,6 +6102,13 @@ static QDF_STATUS send_vdev_spectral_enable_cmd_tlv(wmi_unified_t wmi_handle,
 		cmd->enable_cmd = 0; /* 0: Ignore */
 	}
 
+	WMI_LOGI("vdev_id = %u\n"
+				 "trigger_cmd = %u\n"
+				 "enable_cmd = %u",
+				 cmd->vdev_id,
+				 cmd->trigger_cmd,
+				 cmd->enable_cmd);
+
 	wmi_mtrace(WMI_VDEV_SPECTRAL_SCAN_ENABLE_CMDID, cmd->vdev_id, 0);
 	ret = wmi_unified_cmd_send(wmi_handle, buf, len,
 				   WMI_VDEV_SPECTRAL_SCAN_ENABLE_CMDID);
@@ -6112,14 +6120,7 @@ static QDF_STATUS send_vdev_spectral_enable_cmd_tlv(wmi_unified_t wmi_handle,
 
 	WMI_LOGI("%s: Sent WMI_VDEV_SPECTRAL_SCAN_ENABLE_CMDID", __func__);
 
-	WMI_LOGI("vdev_id = %u"
-				 "trigger_cmd = %u"
-				 "enable_cmd = %u",
-				 cmd->vdev_id,
-				 cmd->trigger_cmd,
-				 cmd->enable_cmd);
-
-	WMI_LOGI("%s: Status: %d\n", __func__, ret);
+	WMI_LOGI("%s: Status: %d", __func__, ret);
 
 	return ret;
 }
@@ -8124,7 +8125,10 @@ static QDF_STATUS extract_hal_reg_cap_tlv(wmi_unified_t wmi_handle,
 	WMI_SERVICE_READY_EVENTID_param_tlvs *param_buf;
 
 	param_buf = (WMI_SERVICE_READY_EVENTID_param_tlvs *) evt_buf;
-
+	if (!param_buf) {
+		WMI_LOGE("%s: Invalid arguments", __func__);
+		return QDF_STATUS_E_FAILURE;
+	}
 	qdf_mem_copy(cap, (((uint8_t *)param_buf->hal_reg_capabilities) +
 		sizeof(uint32_t)),
 		sizeof(struct wlan_psoc_hal_reg_capability));
@@ -8154,6 +8158,12 @@ static host_mem_req *extract_host_mem_req_tlv(wmi_unified_t wmi_handle,
 	ev = (wmi_service_ready_event_fixed_param *) param_buf->fixed_param;
 	if (!ev) {
 		qdf_print("%s: wmi_buf_alloc failed", __func__);
+		return NULL;
+	}
+
+	if (ev->num_mem_reqs > param_buf->num_mem_reqs) {
+		WMI_LOGE("Invalid num_mem_reqs %d:%d",
+			 ev->num_mem_reqs, param_buf->num_mem_reqs);
 		return NULL;
 	}
 
@@ -9101,6 +9111,7 @@ static QDF_STATUS extract_chainmask_tables_tlv(wmi_unified_t wmi_handle,
 	WMI_MAC_PHY_CHAINMASK_CAPABILITY *chainmask_caps;
 	WMI_SOC_MAC_PHY_HW_MODE_CAPS *hw_caps;
 	uint8_t i = 0, j = 0;
+	uint32_t num_mac_phy_chainmask_caps = 0;
 
 	param_buf = (WMI_SERVICE_READY_EXT_EVENTID_param_tlvs *) event;
 	if (!param_buf)
@@ -9120,6 +9131,26 @@ static QDF_STATUS extract_chainmask_tables_tlv(wmi_unified_t wmi_handle,
 
 	if (chainmask_caps == NULL)
 		return QDF_STATUS_E_INVAL;
+
+	for (i = 0; i < hw_caps->num_chainmask_tables; i++) {
+		if (chainmask_table[i].num_valid_chainmasks >
+		    (UINT_MAX - num_mac_phy_chainmask_caps)) {
+			wmi_err_rl("integer overflow, num_mac_phy_chainmask_caps:%d, i:%d, um_valid_chainmasks:%d",
+				   num_mac_phy_chainmask_caps, i,
+				   chainmask_table[i].num_valid_chainmasks);
+			return QDF_STATUS_E_INVAL;
+		}
+		num_mac_phy_chainmask_caps +=
+			chainmask_table[i].num_valid_chainmasks;
+	}
+
+	if (num_mac_phy_chainmask_caps >
+	    param_buf->num_mac_phy_chainmask_caps) {
+		wmi_err_rl("invalid chainmask caps num, num_mac_phy_chainmask_caps:%d, param_buf->num_mac_phy_chainmask_caps:%d",
+			   num_mac_phy_chainmask_caps,
+			   param_buf->num_mac_phy_chainmask_caps);
+		return QDF_STATUS_E_INVAL;
+	}
 
 	for (i = 0; i < hw_caps->num_chainmask_tables; i++) {
 
@@ -9314,6 +9345,12 @@ static QDF_STATUS extract_hw_mode_cap_service_ready_ext_tlv(
 
 	hw_caps = param_buf->soc_hw_mode_caps;
 	if (!hw_caps)
+		return QDF_STATUS_E_INVAL;
+
+	if (!hw_caps->num_hw_modes ||
+	    !param_buf->hw_mode_caps ||
+	    hw_caps->num_hw_modes > PSOC_MAX_HW_MODE ||
+	    hw_caps->num_hw_modes > param_buf->num_hw_mode_caps)
 		return QDF_STATUS_E_INVAL;
 
 	if (hw_mode_idx >= hw_caps->num_hw_modes)

@@ -431,11 +431,15 @@ hal_rx_status_get_tlv_info_generic(void *rx_tlv_hdr, void *ppduinfo,
 			1 : 0;
 		ppdu_info->rx_status.mcs = HAL_RX_GET(ht_sig_info,
 				HT_SIG_INFO_0, MCS);
+		ppdu_info->rx_status.ht_mcs = ppdu_info->rx_status.mcs;
 		ppdu_info->rx_status.bw = HAL_RX_GET(ht_sig_info,
 				HT_SIG_INFO_0, CBW);
 		ppdu_info->rx_status.sgi = HAL_RX_GET(ht_sig_info,
 				HT_SIG_INFO_1, SHORT_GI);
 		ppdu_info->rx_status.reception_type = HAL_RX_TYPE_SU;
+		ppdu_info->rx_status.nss = ((ppdu_info->rx_status.mcs) >>
+				HT_SIG_SU_NSS_SHIFT) + 1;
+		ppdu_info->rx_status.mcs &= ((1 << HT_SIG_SU_NSS_SHIFT) - 1);
 		break;
 	}
 
@@ -1052,6 +1056,7 @@ hal_rx_status_get_tlv_info_generic(void *rx_tlv_hdr, void *ppduinfo,
 	}
 	case WIFIPHYRX_RSSI_LEGACY_E:
 	{
+		uint8_t reception_type;
 		uint8_t *rssi_info_tlv = (uint8_t *)rx_tlv +
 			HAL_RX_OFFSET(UNIFIED_PHYRX_RSSI_LEGACY_3,
 			RECEIVE_RSSI_INFO_PRE_RSSI_INFO_DETAILS);
@@ -1061,6 +1066,22 @@ hal_rx_status_get_tlv_info_generic(void *rx_tlv_hdr, void *ppduinfo,
 		ppdu_info->rx_status.bw = hal->ops->hal_rx_get_tlv(rx_tlv);
 		ppdu_info->rx_status.he_re = 0;
 
+		reception_type = HAL_RX_GET(rx_tlv,
+					    PHYRX_RSSI_LEGACY_0,
+					    RECEPTION_TYPE);
+		switch (reception_type) {
+		case QDF_RECEPTION_TYPE_ULOFMDA:
+			ppdu_info->rx_status.ulofdma_flag = 1;
+			ppdu_info->rx_status.he_data1 =
+				QDF_MON_STATUS_HE_TRIG_FORMAT_TYPE;
+			break;
+		case QDF_RECEPTION_TYPE_ULMIMO:
+			ppdu_info->rx_status.he_data1 =
+				QDF_MON_STATUS_HE_MU_FORMAT_TYPE;
+			break;
+		default:
+			break;
+		}
 		value = HAL_RX_GET(rssi_info_tlv,
 			RECEIVE_RSSI_INFO_0, RSSI_PRI20_CHAIN0);
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,

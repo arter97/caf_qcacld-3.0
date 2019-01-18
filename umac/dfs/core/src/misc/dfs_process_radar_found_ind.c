@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -325,7 +325,7 @@ dfs_compute_radar_found_cfreq(struct wlan_dfs *dfs,
 			      uint32_t *freq_center)
 {
 	struct dfs_channel *curchan = dfs->dfs_curchan;
-	uint32_t flag;
+	uint64_t flag;
 
 	flag = curchan->dfs_ch_flags;
 	if (!radar_found->segment_id) {
@@ -338,7 +338,8 @@ dfs_compute_radar_found_cfreq(struct wlan_dfs *dfs,
 		} else {
 			*freq_center = utils_dfs_chan_to_freq(
 					curchan->dfs_ch_vhtop_ch_freq_seg2);
-			if (flag & WLAN_CHAN_VHT160)
+			if ((flag & WLAN_CHAN_VHT160) ||
+			    (flag & WLAN_CHAN_HE160))
 				*freq_center += DFS_160MHZ_SECOND_SEG_OFFSET;
 		}
 	}
@@ -772,6 +773,15 @@ QDF_STATUS dfs_process_radar_ind(struct wlan_dfs *dfs,
 			"radar event received on invalid channel");
 		return status;
 	}
+	dfs->dfs_is_nol_ie_sent = false;
+	(dfs->is_radar_during_precac) ?
+		(dfs->dfs_is_rcsa_ie_sent = false) :
+		(dfs->dfs_is_rcsa_ie_sent = true);
+	if (dfs->dfs_use_nol_subchannel_marking) {
+		dfs_prepare_nol_ie_bitmap(dfs, radar_found, channels,
+					  num_channels);
+		dfs->dfs_is_nol_ie_sent = true;
+	}
 
 	/*
 	 * If precac is running and the radar found in secondary
@@ -808,15 +818,7 @@ QDF_STATUS dfs_process_radar_ind(struct wlan_dfs *dfs,
 	 * saying not to send RCSA, but only the radar affected subchannel
 	 * information.
 	 */
-	dfs->dfs_is_nol_ie_sent = false;
-	(dfs->is_radar_during_precac) ?
-		(dfs->dfs_is_rcsa_ie_sent = false) :
-		(dfs->dfs_is_rcsa_ie_sent = true);
-	if (dfs->dfs_use_nol_subchannel_marking) {
-		dfs_prepare_nol_ie_bitmap(dfs, radar_found, channels,
-					  num_channels);
-		dfs->dfs_is_nol_ie_sent = true;
-	}
+
 	dfs_mlme_start_rcsa(dfs->dfs_pdev_obj, &wait_for_csa);
 
 	if (!dfs->dfs_is_offload_enabled &&

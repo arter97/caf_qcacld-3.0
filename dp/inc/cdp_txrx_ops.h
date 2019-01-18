@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -166,6 +166,7 @@ struct cdp_cmn_ops {
 				      uint32_t bitmap);
 
 	uint8_t (*txrx_get_pdev_id_frm_pdev)(struct cdp_pdev *pdev);
+	bool (*txrx_get_vow_config_frm_pdev)(struct cdp_pdev *pdev);
 
 	void (*txrx_pdev_set_chan_noise_floor)(struct cdp_pdev *pdev,
 					       int16_t chan_noise_floor);
@@ -956,6 +957,8 @@ struct ol_if_ops {
  * @txrx_post_data_stall_event
  * @runtime_suspend:
  * @runtime_resume:
+ * @register_packetdump_cb:
+ * @unregister_packetdump_cb:
  */
 struct cdp_misc_ops {
 	uint16_t (*set_ibss_vdev_heart_beat_timer)(struct cdp_vdev *vdev,
@@ -990,6 +993,9 @@ struct cdp_misc_ops {
 	void (*pkt_log_init)(struct cdp_pdev *handle, void *scn);
 	void (*pkt_log_con_service)(struct cdp_pdev *pdev, void *scn);
 	int (*get_num_rx_contexts)(struct cdp_soc_t *soc);
+	void (*register_pktdump_cb)(ol_txrx_pktdump_cb tx_cb,
+				    ol_txrx_pktdump_cb rx_cb);
+	void (*unregister_pktdump_cb)(void);
 };
 
 /**
@@ -1073,6 +1079,8 @@ struct cdp_flowctl_ops {
 	void (*set_desc_global_pool_size)(uint32_t num_msdu_desc);
 
 	void (*dump_flow_pool_info)(void *);
+
+	bool (*tx_desc_thresh_reached)(struct cdp_vdev *vdev);
 };
 
 /**
