@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -246,6 +246,7 @@ dp_rx_link_desc_return(struct dp_soc *soc, void *ring_desc, uint8_t bm_action)
  * dp_rx_msdus_drop() - Drops all MSDU's per MPDU
  *
  * @soc: core txrx main context
+ * @hal_ring: opaque pointer to the HAL Rx Error Ring, which will be serviced
  * @ring_desc: opaque pointer to the REO error ring descriptor
  * @mpdu_desc_info: MPDU descriptor information from ring descriptor
  * @head: head of the local descriptor free-list
@@ -256,10 +257,10 @@ dp_rx_link_desc_return(struct dp_soc *soc, void *ring_desc, uint8_t bm_action)
  *
  * Return: uint32_t: No. of elements processed
  */
-static uint32_t dp_rx_msdus_drop(struct dp_soc *soc, void *ring_desc,
-		struct hal_rx_mpdu_desc_info *mpdu_desc_info,
-		uint8_t *mac_id,
-		uint32_t quota)
+static uint32_t dp_rx_msdus_drop(struct dp_soc *soc, void *hal_ring,
+				 void *ring_desc,
+				 struct hal_rx_mpdu_desc_info *mpdu_desc_info,
+				 uint8_t *mac_id, uint32_t quota)
 {
 	uint32_t rx_bufs_used = 0;
 	void *link_desc_va;
@@ -284,6 +285,19 @@ static uint32_t dp_rx_msdus_drop(struct dp_soc *soc, void *ring_desc,
 			msdu_list.sw_cookie[i]);
 
 		qdf_assert_always(rx_desc);
+
+		/*
+		 * this is a unlikely scenario where the host is reaping
+		 * a descriptor which it already reaped just a while ago
+		 * but is yet to replenish it back to HW.
+		 * In this case host will dump the last 128 descriptors
+		 * including the software descriptor rx_desc and assert.
+		 */
+		if (qdf_unlikely(!rx_desc->in_use)) {
+			DP_STATS_INC(soc, rx.err.hal_rx_err_dup, 1);
+			dp_rx_dump_info(soc, hal_ring, ring_desc, rx_desc);
+			continue;
+		}
 
 		/* all buffers from a MSDU link link belong to same pdev */
 		*mac_id = rx_desc->pool_id;
@@ -323,6 +337,7 @@ static uint32_t dp_rx_msdus_drop(struct dp_soc *soc, void *ring_desc,
  * dp_rx_pn_error_handle() - Handles PN check errors
  *
  * @soc: core txrx main context
+ * @hal_ring: opaque pointer to the HAL Rx Error Ring, which will be serviced
  * @ring_desc: opaque pointer to the REO error ring descriptor
  * @mpdu_desc_info: MPDU descriptor information from ring descriptor
  * @head: head of the local descriptor free-list
@@ -338,7 +353,7 @@ static uint32_t dp_rx_msdus_drop(struct dp_soc *soc, void *ring_desc,
  * Return: uint32_t: No. of elements processed
  */
 static uint32_t
-dp_rx_pn_error_handle(struct dp_soc *soc, void *ring_desc,
+dp_rx_pn_error_handle(struct dp_soc *soc, void *hal_ring, void *ring_desc,
 		      struct hal_rx_mpdu_desc_info *mpdu_desc_info,
 		      uint8_t *mac_id,
 		      uint32_t quota)
@@ -373,7 +388,7 @@ dp_rx_pn_error_handle(struct dp_soc *soc, void *ring_desc,
 
 	/* No peer PN policy -- definitely drop */
 	if (!peer_pn_policy)
-		rx_bufs_used = dp_rx_msdus_drop(soc, ring_desc,
+		rx_bufs_used = dp_rx_msdus_drop(soc, hal_ring, ring_desc,
 						mpdu_desc_info,
 						mac_id, quota);
 
@@ -384,6 +399,7 @@ dp_rx_pn_error_handle(struct dp_soc *soc, void *ring_desc,
  * dp_rx_2k_jump_handle() - Handles Sequence Number Jump by 2K
  *
  * @soc: core txrx main context
+ * @hal_ring: opaque pointer to the HAL Rx Error Ring, which will be serviced
  * @ring_desc: opaque pointer to the REO error ring descriptor
  * @mpdu_desc_info: MPDU descriptor information from ring descriptor
  * @head: head of the local descriptor free-list
@@ -401,11 +417,11 @@ dp_rx_pn_error_handle(struct dp_soc *soc, void *ring_desc,
  * Return: uint32_t: No. of elements processed
  */
 static uint32_t
-dp_rx_2k_jump_handle(struct dp_soc *soc, void *ring_desc,
+dp_rx_2k_jump_handle(struct dp_soc *soc, void *hal_ring, void *ring_desc,
 		     struct hal_rx_mpdu_desc_info *mpdu_desc_info,
 		     uint8_t *mac_id, uint32_t quota)
 {
-	return dp_rx_msdus_drop(soc, ring_desc, mpdu_desc_info,
+	return dp_rx_msdus_drop(soc, hal_ring, ring_desc, mpdu_desc_info,
 				mac_id, quota);
 }
 
@@ -1053,7 +1069,7 @@ dp_rx_err_process(struct dp_soc *soc, void *hal_ring, uint32_t quota)
 
 		if (mpdu_desc_info.mpdu_flags & HAL_MPDU_F_FRAGMENT) {
 			/* TODO */
-			count = dp_rx_frag_handle(soc,
+			count = dp_rx_frag_handle(soc, hal_ring,
 						  ring_desc, &mpdu_desc_info,
 						  &mac_id, quota);
 
@@ -1069,6 +1085,7 @@ dp_rx_err_process(struct dp_soc *soc, void *hal_ring, uint32_t quota)
 				reo_error[HAL_REO_ERR_PN_CHECK_FAILED],
 				1);
 			count = dp_rx_pn_error_handle(soc,
+						      hal_ring,
 						      ring_desc,
 						      &mpdu_desc_info, &mac_id,
 						      quota);
@@ -1085,6 +1102,7 @@ dp_rx_err_process(struct dp_soc *soc, void *hal_ring, uint32_t quota)
 				1);
 
 			count = dp_rx_2k_jump_handle(soc,
+						     hal_ring,
 						     ring_desc, &mpdu_desc_info,
 						     &mac_id, quota);
 
@@ -1212,6 +1230,19 @@ dp_rx_wbm_err_process(struct dp_soc *soc, void *hal_ring, uint32_t quota)
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 					FL("Invalid rx_desc cookie=%d"),
 					rx_buf_cookie);
+			continue;
+		}
+
+		/*
+		 * this is a unlikely scenario where the host is reaping
+		 * a descriptor which it already reaped just a while ago
+		 * but is yet to replenish it back to HW.
+		 * In this case host will dump the last 128 descriptors
+		 * including the software descriptor rx_desc and assert.
+		 */
+		if (qdf_unlikely(!rx_desc->in_use)) {
+			DP_STATS_INC(soc, rx.err.hal_wbm_rel_dup, 1);
+			dp_rx_dump_info(soc, hal_ring, ring_desc, rx_desc);
 			continue;
 		}
 
@@ -1390,6 +1421,7 @@ done:
  * dp_rx_err_mpdu_pop() - extract the MSDU's from link descs
  *
  * @soc: core DP main context
+ * @hal_ring: opaque pointer to the HAL Rx Error Ring, which will be serviced
  * @mac_id: mac id which is one of 3 mac_ids
  * @rxdma_dst_ring_desc: void pointer to monitor link descriptor buf addr info
  * @head: head of descs list to be freed
@@ -1398,7 +1430,7 @@ done:
  * Return: number of msdu in MPDU to be popped
  */
 static inline uint32_t
-dp_rx_err_mpdu_pop(struct dp_soc *soc, uint32_t mac_id,
+dp_rx_err_mpdu_pop(struct dp_soc *soc, void *hal_ring, uint32_t mac_id,
 	void *rxdma_dst_ring_desc,
 	union dp_rx_desc_list_elem_t **head,
 	union dp_rx_desc_list_elem_t **tail)
@@ -1461,6 +1493,26 @@ dp_rx_err_mpdu_pop(struct dp_soc *soc, uint32_t mac_id,
 						dp_rx_cookie_2_va_rxdma_buf(soc,
 							msdu_list.sw_cookie[i]);
 					qdf_assert_always(rx_desc);
+
+					/*
+					 * this is a unlikely scenario where the
+					 * host is reaping a descriptor which it
+					 * already reaped just a while ago but
+					 * is yet to replenish it back to HW.
+					 * In this case host will dump the last
+					 * 128 descriptors including the
+					 * sw descriptor rx_desc and assert.
+					 */
+					if (qdf_unlikely(!rx_desc->in_use)) {
+						DP_STATS_INC(soc,
+							     rx.err.hal_dma_dup,
+							     1);
+						dp_rx_dump_info(soc,
+								hal_ring,
+								rxdma_dst_ring_desc,
+								rx_desc);
+					}
+
 					msdu = rx_desc->nbuf;
 
 					qdf_nbuf_unmap_single(soc->osdev, msdu,
@@ -1552,9 +1604,10 @@ dp_rxdma_err_process(struct dp_soc *soc, uint32_t mac_id, uint32_t quota)
 	while (qdf_likely(quota-- && (rxdma_dst_ring_desc =
 		hal_srng_dst_get_next(hal_soc, err_dst_srng)))) {
 
-			rx_bufs_used += dp_rx_err_mpdu_pop(soc, mac_id,
-						rxdma_dst_ring_desc,
-						&head, &tail);
+			rx_bufs_used += dp_rx_err_mpdu_pop(soc, err_dst_srng,
+							   mac_id,
+							   rxdma_dst_ring_desc,
+							   &head, &tail);
 	}
 
 	hal_srng_access_end(hal_soc, err_dst_srng);

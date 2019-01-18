@@ -1594,6 +1594,7 @@ end:
  * dp_rx_frag_handle() - Handles fragmented Rx frames
  *
  * @soc: core txrx main context
+ * @hal_ring: opaque pointer to the HAL Rx Error Ring, which will be serviced
  * @ring_desc: opaque pointer to the REO error ring descriptor
  * @mpdu_desc_info: MPDU descriptor information from ring descriptor
  * @head: head of the local descriptor free-list
@@ -1609,10 +1610,11 @@ end:
  *
  * Return: uint32_t: No. of elements processed
  */
-uint32_t dp_rx_frag_handle(struct dp_soc *soc, void *ring_desc,
-		struct hal_rx_mpdu_desc_info *mpdu_desc_info,
-		uint8_t *mac_id,
-		uint32_t quota)
+uint32_t dp_rx_frag_handle(struct dp_soc *soc, void *hal_ring,
+			   void *ring_desc,
+			   struct hal_rx_mpdu_desc_info *mpdu_desc_info,
+			   uint8_t *mac_id,
+			   uint32_t quota)
 {
 	uint32_t rx_bufs_used = 0;
 	void *link_desc_va;
@@ -1657,6 +1659,18 @@ uint32_t dp_rx_frag_handle(struct dp_soc *soc, void *ring_desc,
 				msdu_list.sw_cookie[idx]);
 
 		qdf_assert_always(rx_desc);
+		/*
+		 * this is a unlikely scenario where the host is reaping
+		 * a descriptor which it already reaped just a while ago
+		 * but is yet to replenish it back to HW.
+		 * In this case host will dump the last 128 descriptors
+		 * including the software descriptor rx_desc and assert.
+		 */
+		if (qdf_unlikely(!rx_desc->in_use)) {
+			DP_STATS_INC(soc, rx.err.hal_rx_err_dup, 1);
+			dp_rx_dump_info(soc, hal_ring, ring_desc, rx_desc);
+			continue;
+		}
 
 		/* all buffers in MSDU link belong to same pdev */
 		pdev = soc->pdev_list[rx_desc->pool_id];
