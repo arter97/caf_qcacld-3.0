@@ -794,7 +794,7 @@ dp_rx_err_deliver(struct dp_soc *soc, qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr,
 	uint16_t msdu_len;
 	struct dp_vdev *vdev;
 	struct ether_header *eh;
-	bool isBroadcast;
+	bool is_broadcast;
 
 	/*
 	 * Check if DMA completed -- msdu_done is the last bit
@@ -841,6 +841,25 @@ dp_rx_err_deliver(struct dp_soc *soc, qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr,
 		return;
 	}
 
+	/*
+	 * Advance the packet start pointer by total size of
+	 * pre-header TLV's
+	 */
+	qdf_nbuf_pull_head(nbuf, (l2_hdr_offset + RX_PKT_TLVS_LEN));
+
+	if (vdev->rx_decap_type == htt_cmn_pkt_type_raw)
+		goto process_mesh;
+
+	/*
+	 * In dynamic WEP case rekey frames are not encrypted
+	 * similar to WAPI. Allow EAPOL when 8021+wep is enabled and
+	 * key install is already done
+	 */
+	if ((vdev->sec_type == cdp_sec_type_wep104) &&
+	    (qdf_nbuf_is_ipv4_eapol_pkt(nbuf)))
+		goto process_rx;
+
+process_mesh:
 	/* Drop & free packet if mesh mode not enabled */
 	if (!vdev->mesh_vdev) {
 		qdf_nbuf_free(nbuf);
@@ -848,11 +867,6 @@ dp_rx_err_deliver(struct dp_soc *soc, qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr,
 		return;
 	}
 
-	/*
-	 * Advance the packet start pointer by total size of
-	 * pre-header TLV's
-	 */
-	qdf_nbuf_pull_head(nbuf, (l2_hdr_offset + RX_PKT_TLVS_LEN));
 
 	if (dp_rx_filter_mesh_packets(vdev, nbuf, rx_tlv_hdr)
 							== QDF_STATUS_SUCCESS) {
@@ -862,18 +876,18 @@ dp_rx_err_deliver(struct dp_soc *soc, qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr,
 
 		qdf_nbuf_free(nbuf);
 		return;
-
 	}
 	dp_rx_fill_mesh_stats(vdev, nbuf, rx_tlv_hdr, peer);
 
+process_rx:
 	if (qdf_unlikely(hal_rx_msdu_end_da_is_mcbc_get(rx_tlv_hdr) &&
 				(vdev->rx_decap_type ==
 				htt_cmn_pkt_type_ethernet))) {
 		eh = (struct ether_header *)qdf_nbuf_data(nbuf);
-		isBroadcast = (IEEE80211_IS_BROADCAST
+		is_broadcast = (IEEE80211_IS_BROADCAST
 				(eh->ether_dhost)) ? 1 : 0 ;
 		DP_STATS_INC_PKT(peer, rx.multicast, 1, qdf_nbuf_len(nbuf));
-		if (isBroadcast) {
+		if (is_broadcast) {
 			DP_STATS_INC_PKT(peer, rx.bcast, 1,
 					qdf_nbuf_len(nbuf));
 		}
