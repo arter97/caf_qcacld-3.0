@@ -306,6 +306,10 @@ wlan_lmac_if_umac_dfs_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
 		tgt_dfs_process_phyerr_filter_offload;
 	dfs_rx_ops->dfs_is_phyerr_filter_offload =
 		tgt_dfs_is_phyerr_filter_offload;
+	dfs_rx_ops->dfs_set_nol_subchannel_marking =
+		ucfg_dfs_set_nol_subchannel_marking;
+	dfs_rx_ops->dfs_get_nol_subchannel_marking =
+		ucfg_dfs_get_nol_subchannel_marking;
 
 	return QDF_STATUS_SUCCESS;
 }
