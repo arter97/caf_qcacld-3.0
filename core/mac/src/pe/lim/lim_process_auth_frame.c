@@ -1135,6 +1135,14 @@ lim_process_auth_frame(tpAniSirGlobal mac_ctx, uint8_t *rx_pkt_info,
 	tSirMacAuthFrameBody *rx_auth_frm_body, *rx_auth_frame, *auth_frame;
 	tpSirMacMgmtHdr mac_hdr;
 	struct tLimPreAuthNode *auth_node;
+#ifdef WLAN_FEATURE_SAE
+	int sap_sae_enabled;
+
+	if (wlan_cfg_get_int(mac_ctx, WNI_CFG_SAP_SAE_ENABLED,
+			     &sap_sae_enabled) != eSIR_SUCCESS) {
+		sap_sae_enabled = 0;
+	}
+#endif
 
 	/* Get pointer to Authentication frame header and body */
 	mac_hdr = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
@@ -1416,11 +1424,14 @@ lim_process_auth_frame(tpAniSirGlobal mac_ctx, uint8_t *rx_pkt_info,
 			pe_err("failed to convert Auth Frame to structure or Auth is not valid");
 			goto free;
 		}
-	} else if ((auth_alg ==
-		    eSIR_AUTH_TYPE_SAE) && (LIM_IS_STA_ROLE(pe_session))) {
-		lim_process_sae_auth_frame(mac_ctx,
-					rx_pkt_info, pe_session);
+#ifdef WLAN_FEATURE_SAE
+	} else if (auth_alg == eSIR_AUTH_TYPE_SAE) {
+		if (LIM_IS_STA_ROLE(pe_session) ||
+		    (LIM_IS_AP_ROLE(pe_session) && sap_sae_enabled))
+			lim_process_sae_auth_frame(mac_ctx, rx_pkt_info,
+						   pe_session);
 		goto free;
+#endif
 	} else if ((sir_convert_auth_frame2_struct(mac_ctx, body_ptr,
 				frame_len, rx_auth_frame) != eSIR_SUCCESS)
 				|| (!is_auth_valid(mac_ctx, rx_auth_frame,
