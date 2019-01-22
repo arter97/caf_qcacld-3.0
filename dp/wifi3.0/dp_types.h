@@ -931,6 +931,7 @@ struct dp_soc {
 		qdf_dma_addr_t ipa_rx_refill_buf_hp_paddr;
 	} ipa_uc_rx_rsc;
 #endif
+	uint8_t enable_da;
 };
 
 #ifdef IPA_OFFLOAD
