@@ -98,6 +98,12 @@ static inline int dfs_fill_emulate_bang_radar_test(struct wlan_dfs *dfs,
 		return -EINVAL;
 	}
 
+	if (segid > SEG_ID_SECONDARY) {
+		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS,
+				"Segment id should be 0 or 1");
+		return -EINVAL;
+	}
+
 	dfs_unit_test->num_args = DFS_UNIT_TEST_NUM_ARGS;
 	dfs_unit_test->args[IDX_CMD_ID] =
 			DFS_PHYERR_OFFLOAD_TEST_SET_RADAR;
@@ -745,8 +751,8 @@ int dfs_control(struct wlan_dfs *dfs,
 
 			if (dfs->dfs_is_offload_enabled) {
 				error = dfs_fill_emulate_bang_radar_test
-							(dfs, SEG_ID_PRIMARY,
-							 &dfs_unit_test);
+						 (dfs, dfs->dfs_seg_id,
+						  &dfs_unit_test);
 			} else {
 				dfs->dfs_bangradar = 1;
 				dfs->wlan_radar_tasksched = 1;
