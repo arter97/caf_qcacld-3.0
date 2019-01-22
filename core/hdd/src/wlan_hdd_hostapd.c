@@ -7735,6 +7735,7 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 	tsap_Config_t *pConfig;
 	beacon_data_t *pBeacon = NULL;
 	struct ieee80211_mgmt *pMgmt_frame;
+	struct ieee80211_mgmt mgmt;
 	uint8_t *pIe = NULL;
 	uint16_t capab_info;
 	eCsrAuthType RSNAuthType;
@@ -7745,7 +7746,6 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 	tpWLAN_SAPEventCB pSapEventCallback;
 	hdd_hostapd_state_t *pHostapdState;
 	tHalHandle hHal = WLAN_HDD_GET_HAL_CTX(pHostapdAdapter);
-	struct qc_mac_acl_entry *acl_entry = NULL;
 	int32_t i;
 	struct hdd_config *iniConfig;
 	hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pHostapdAdapter);
@@ -7756,6 +7756,7 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 	enum dfs_mode mode;
 	bool disable_fw_tdls_state = false;
 	uint8_t ignore_cac = 0;
+	uint8_t beacon_fixed_len;
 	hdd_adapter_t *sta_adapter;
 
 	ENTER();
@@ -7842,6 +7843,21 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 	pConfig = &pHostapdAdapter->sessionCtx.ap.sapConfig;
 
 	pBeacon = pHostapdAdapter->sessionCtx.ap.beacon;
+
+	/*
+	 * beacon_fixed_len is the fixed length of beacon
+	 * frame which includes only mac header length and
+	 * beacon manadatory fields like timestamp,
+	 * beacon_int and capab_info.
+	 * (From the reference of struct ieee80211_mgmt)
+	 */
+	beacon_fixed_len = sizeof(mgmt) - sizeof(mgmt.u) +
+			   sizeof(mgmt.u.beacon);
+	if (pBeacon->head_len < beacon_fixed_len) {
+		hdd_err("Invalid beacon head len");
+		ret = -EINVAL;
+		goto error;
+	}
 
 	pMgmt_frame = (struct ieee80211_mgmt *)pBeacon->head;
 
@@ -8159,66 +8175,15 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 		pConfig->cc_switch_mode = iniConfig->WlanMccToSccSwitchMode;
 #endif
 
-	pIe =
-		wlan_hdd_get_vendor_oui_ie_ptr(BLACKLIST_OUI_TYPE,
-					       WPA_OUI_TYPE_SIZE, pBeacon->tail,
-					       pBeacon->tail_len);
-
-	/* pIe for black list is following form:
-	 * type    : 1 byte
-	 * length  : 1 byte
-	 * OUI     : 4 bytes
-	 * acl type : 1 byte
-	 * no of mac addr in black list: 1 byte
-	 * list of mac_acl_entries: variable, 6 bytes per mac
-	 * address + sizeof(int) for vlan id
-	 */
-	if ((pIe != NULL) && (pIe[1] != 0)) {
-		pConfig->SapMacaddr_acl = pIe[6];
-		pConfig->num_deny_mac = pIe[7];
-		hdd_debug("acl type = %d no deny mac = %d", pIe[6], pIe[7]);
-		if (pConfig->num_deny_mac > MAX_ACL_MAC_ADDRESS)
-			pConfig->num_deny_mac = MAX_ACL_MAC_ADDRESS;
-		acl_entry = (struct qc_mac_acl_entry *)(pIe + 8);
-		for (i = 0; i < pConfig->num_deny_mac; i++) {
-			qdf_mem_copy(&pConfig->deny_mac[i], acl_entry->addr,
-				     sizeof(qcmacaddr));
-			acl_entry++;
-		}
-	}
-	pIe = wlan_hdd_get_vendor_oui_ie_ptr(WHITELIST_OUI_TYPE,
-			WPA_OUI_TYPE_SIZE, pBeacon->tail,
-			pBeacon->tail_len);
-
-	/* pIe for white list is following form:
-	 * type    : 1 byte
-	 * length  : 1 byte
-	 * OUI     : 4 bytes
-	 * acl type : 1 byte
-	 * no of mac addr in white list: 1 byte
-	 * list of mac_acl_entries: variable, 6 bytes per mac
-	 * address + sizeof(int) for vlan id
-	 */
-	if ((pIe != NULL) && (pIe[1] != 0)) {
-		pConfig->SapMacaddr_acl = pIe[6];
-		pConfig->num_accept_mac = pIe[7];
-		hdd_debug("acl type = %d no accept mac = %d",
-		       pIe[6], pIe[7]);
-		if (pConfig->num_accept_mac > MAX_ACL_MAC_ADDRESS)
-			pConfig->num_accept_mac = MAX_ACL_MAC_ADDRESS;
-		acl_entry = (struct qc_mac_acl_entry *)(pIe + 8);
-		for (i = 0; i < pConfig->num_accept_mac; i++) {
-			qdf_mem_copy(&pConfig->accept_mac[i], acl_entry->addr,
-				     sizeof(qcmacaddr));
-			acl_entry++;
-		}
-	}
 	if (!pHddCtx->config->force_sap_acs &&
 	    !(ssid && qdf_str_len(PRE_CAC_SSID) == ssid_len &&
 	      (0 == qdf_mem_cmp(ssid, PRE_CAC_SSID, ssid_len)))) {
+		uint16_t beacon_data_len;
+
+		beacon_data_len = pBeacon->head_len - beacon_fixed_len;
 		pIe = wlan_hdd_cfg80211_get_ie_ptr(
 				&pMgmt_frame->u.beacon.variable[0],
-				pBeacon->head_len, WLAN_EID_SUPP_RATES);
+				beacon_data_len, WLAN_EID_SUPP_RATES);
 
 		if (pIe != NULL) {
 			pIe++;
