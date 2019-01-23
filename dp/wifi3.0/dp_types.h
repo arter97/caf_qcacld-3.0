@@ -553,6 +553,8 @@ struct dp_soc_stats {
 		/* Fragments dropped due to errors */
 		uint32_t rx_frag_err;
 		uint32_t hp_oos;
+		/* No of reinjected packets */
+		uint32_t reo_reinject;
 		struct {
 			/* Invalid RBM error count */
 			uint32_t invalid_rbm;
@@ -811,6 +813,7 @@ struct dp_soc {
 		struct {
 			TAILQ_HEAD(, dp_rx_tid) waitlist;
 			uint32_t timeout_ms;
+			qdf_spinlock_t defrag_lock;
 		} defrag;
 		struct {
 			int defrag_timeout_check;

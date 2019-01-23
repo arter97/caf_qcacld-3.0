@@ -156,38 +156,47 @@ void dp_rx_reorder_flush_frag(struct dp_peer *peer,
  */
 void dp_rx_defrag_waitlist_flush(struct dp_soc *soc)
 {
-	struct dp_rx_tid *rx_reorder, *tmp;
+	struct dp_rx_tid *rx_reorder;
+	struct dp_rx_tid *tmp;
 	uint32_t now_ms = qdf_system_ticks_to_msecs(qdf_system_ticks());
+	TAILQ_HEAD(, dp_rx_tid) temp_list;
 
+	TAILQ_INIT(&temp_list);
+
+	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
+		  FL("Current time  %u"), now_ms);
+
+	qdf_spin_lock_bh(&soc->rx.defrag.defrag_lock);
 	TAILQ_FOREACH_SAFE(rx_reorder, &soc->rx.defrag.waitlist,
 			   defrag_waitlist_elem, tmp) {
-		struct dp_peer *peer;
-		struct dp_rx_tid *rx_reorder_base;
-		unsigned int tid;
-
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-				FL("Current time  %u"), now_ms);
+		uint32_t tid;
 
 		if (rx_reorder->defrag_timeout_ms > now_ms)
 			break;
 
 		tid = rx_reorder->tid;
 		if (tid >= DP_MAX_TIDS) {
-			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-				  "%s: TID out of bounds: %d", __func__, tid);
 			qdf_assert(0);
 			continue;
 		}
-		/* get index 0 of the rx_reorder array */
-		rx_reorder_base = rx_reorder - tid;
-		peer =
-			container_of(rx_reorder_base, struct dp_peer,
-				     rx_tid[0]);
-
 		TAILQ_REMOVE(&soc->rx.defrag.waitlist, rx_reorder,
 			     defrag_waitlist_elem);
-		DP_STATS_DEC(soc, rx.rx_frag_wait, 1);
-		dp_rx_reorder_flush_frag(peer, tid);
+
+		/* Move to temp list and clean-up later */
+		TAILQ_INSERT_TAIL(&temp_list, rx_reorder,
+				  defrag_waitlist_elem);
+	}
+	qdf_spin_unlock_bh(&soc->rx.defrag.defrag_lock);
+
+	TAILQ_FOREACH_SAFE(rx_reorder, &temp_list,
+			   defrag_waitlist_elem, tmp) {
+		struct dp_peer *peer;
+
+		/* get address of current peer */
+		peer =
+			container_of(rx_reorder, struct dp_peer,
+				     rx_tid[rx_reorder->tid]);
+		dp_rx_reorder_flush_frag(peer, rx_reorder->tid);
 	}
 }
 
@@ -206,12 +215,15 @@ static void dp_rx_defrag_waitlist_add(struct dp_peer *peer, unsigned tid)
 	struct dp_rx_tid *rx_reorder = &peer->rx_tid[tid];
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-				FL("Adding TID %u to waitlist"), tid);
+				FL("Adding TID %u to waitlist for peer %pK"),
+				tid, peer);
 
 	/* TODO: use LIST macros instead of TAIL macros */
+	qdf_spin_lock_bh(&psoc->rx.defrag.defrag_lock);
 	TAILQ_INSERT_TAIL(&psoc->rx.defrag.waitlist, rx_reorder,
 				defrag_waitlist_elem);
 	DP_STATS_INC(psoc, rx.rx_frag_wait, 1);
+	qdf_spin_unlock_bh(&psoc->rx.defrag.defrag_lock);
 }
 
 /*
@@ -237,16 +249,27 @@ void dp_rx_defrag_waitlist_remove(struct dp_peer *peer, unsigned tid)
 	}
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-				FL("Remove TID %u from waitlist"), tid);
+				FL("Remove TID %u from waitlist for peer %pK"),
+				tid, peer);
 
+	qdf_spin_lock_bh(&soc->rx.defrag.defrag_lock);
 	TAILQ_FOREACH(rx_reorder, &soc->rx.defrag.waitlist,
 			   defrag_waitlist_elem) {
-		if (rx_reorder->tid == tid) {
+		struct dp_peer *peer_on_waitlist;
+
+		/* get address of current peer */
+		peer_on_waitlist =
+			container_of(rx_reorder, struct dp_peer,
+				     rx_tid[rx_reorder->tid]);
+
+		/* Ensure it is TID for same peer */
+		if (peer_on_waitlist == peer && rx_reorder->tid == tid) {
 			TAILQ_REMOVE(&soc->rx.defrag.waitlist,
 				rx_reorder, defrag_waitlist_elem);
 			DP_STATS_DEC(soc, rx.rx_frag_wait, 1);
 		}
 	}
+	qdf_spin_unlock_bh(&soc->rx.defrag.defrag_lock);
 }
 
 /*
@@ -724,6 +747,12 @@ static QDF_STATUS dp_rx_defrag_tkip_demic(const uint8_t *key,
 		next = qdf_nbuf_next(next);
 	}
 
+	if (!prev) {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+			  "%s Defrag chaining failed !\n", __func__);
+		return QDF_STATUS_E_DEFRAG_ERROR;
+	}
+
 	qdf_nbuf_copy_bits(prev, qdf_nbuf_len(prev) - dp_f_tkip.ic_miclen,
 				dp_f_tkip.ic_miclen, (caddr_t)mic0);
 	qdf_nbuf_trim_tail(prev, dp_f_tkip.ic_miclen);
@@ -954,10 +983,18 @@ dp_rx_defrag_nwifi_to_8023(qdf_nbuf_t nbuf, uint16_t hdrsize)
 	qdf_dma_addr_t paddr;
 	uint32_t nbuf_len, seq_no, dst_ind;
 	uint32_t *mpdu_wrd;
+	uint32_t ret, cookie;
 
 	void *dst_ring_desc =
 		peer->rx_tid[tid].dst_ring_desc;
 	void *hal_srng = soc->reo_reinject_ring.hal_srng;
+
+	ent_ring_desc = hal_srng_src_get_next(soc->hal_soc, hal_srng);
+	if (!ent_ring_desc) {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+			  "HAL src ring next entry NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	hal_rx_reo_buf_paddr_get(dst_ring_desc, &buf_info);
 
@@ -1001,6 +1038,31 @@ dp_rx_defrag_nwifi_to_8023(qdf_nbuf_t nbuf, uint16_t hdrsize)
 	hal_rx_msdu_start_msdu_len_set(
 			qdf_nbuf_data(head), nbuf_len);
 
+	cookie = HAL_RX_BUF_COOKIE_GET(msdu0);
+
+	/* map the nbuf before reinject it into HW */
+	ret = qdf_nbuf_map_single(soc->osdev, head,
+					QDF_DMA_BIDIRECTIONAL);
+
+	if (qdf_unlikely(ret == QDF_STATUS_E_FAILURE)) {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+				"%s: nbuf map failed !", __func__);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	paddr = qdf_nbuf_get_frag_paddr(head, 0);
+
+	ret = check_x86_paddr(soc, &head, &paddr, pdev);
+
+	if (ret == QDF_STATUS_E_FAILURE) {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+				"%s: x86 check failed !\n", __func__);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	hal_rxdma_buff_addr_info_set(msdu0, paddr, cookie,
+					HAL_RX_BUF_RBM_SW3_BM);
+
 	/* Lets fill entrance ring now !!! */
 	if (qdf_unlikely(hal_srng_access_start(soc->hal_soc, hal_srng))) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
@@ -1010,15 +1072,11 @@ dp_rx_defrag_nwifi_to_8023(qdf_nbuf_t nbuf, uint16_t hdrsize)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	ent_ring_desc = hal_srng_src_get_next(soc->hal_soc, hal_srng);
-
-	qdf_assert_always(ent_ring_desc);
-
 	paddr = (uint64_t)buf_info.paddr;
 	/* buf addr */
 	hal_rxdma_buff_addr_info_set(ent_ring_desc, paddr,
-					buf_info.sw_cookie,
-					HAL_RX_BUF_RBM_WBM_IDLE_DESC_LIST);
+				     buf_info.sw_cookie,
+				     HAL_RX_BUF_RBM_WBM_IDLE_DESC_LIST);
 	/* mpdu desc info */
 	ent_mpdu_desc_info = (uint8_t *)ent_ring_desc +
 	RX_MPDU_DETAILS_2_RX_MPDU_DESC_INFO_RX_MPDU_DESC_INFO_DETAILS_OFFSET;
@@ -1064,6 +1122,7 @@ dp_rx_defrag_nwifi_to_8023(qdf_nbuf_t nbuf, uint16_t hdrsize)
 
 	hal_srng_access_end(soc->hal_soc, hal_srng);
 
+	DP_STATS_INC(soc, rx.reo_reinject, 1);
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
 				"%s: reinjection done !\n", __func__);
 	return QDF_STATUS_SUCCESS;
