@@ -2629,6 +2629,16 @@ struct ppdu_info *dp_get_ppdu_desc(struct dp_pdev *pdev, uint32_t ppdu_id,
 
 	if (ppdu_info) {
 		/**
+		 * for MUMIMO and OFDMA, In a PPDU we have multiple user
+		 * and same tlv type are populated for multiple users.
+		 * tlv bitmap is used to check whether SU or MU_MIMO/OFDMA
+		 */
+		if ((ppdu_info->tlv_bitmap & (1 << tlv_type)) &&
+		    !(ppdu_info->tlv_bitmap &
+		    (1 << HTT_PPDU_STATS_SCH_CMD_STATUS_TLV)))
+			return ppdu_info;
+
+		/**
 		 * if we get tlv_type that is already been processed for ppdu,
 		 * that means we got a new ppdu with same ppdu id.
 		 * Hence Flush the older ppdu
