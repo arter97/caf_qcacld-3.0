@@ -1574,6 +1574,7 @@ dp_rx_process(struct dp_intr *int_ctx, void *hal_ring, uint32_t quota)
 			continue;
 		}
 
+
 		DP_HIST_PACKET_COUNT_INC(vdev->pdev->pdev_id);
 		/*
 		 * First IF condition:
@@ -1715,6 +1716,30 @@ dp_rx_process(struct dp_intr *int_ctx, void *hal_ring, uint32_t quota)
 				(qdf_likely(!vdev->mesh_vdev)) &&
 				(vdev->wds_enabled)) {
 			dp_rx_da_learn(soc, rx_tlv_hdr, peer, nbuf);
+
+			/* Due to HW issue, sometimes we see that the sa_idx
+			 * and da_idx are invalid with sa_valid and da_valid
+			 * bits set
+			 *
+			 * in this case we also see that value of
+			 * sa_sw_peer_id is set as 0
+			 *
+			 * Drop the packet if sa_idx and da_idx OOB or
+			 * sa_sw_peerid is 0
+			 */
+			if ((qdf_nbuf_is_sa_valid(nbuf) &&
+			    (!hal_rx_msdu_end_sa_sw_peer_id_get(rx_tlv_hdr) ||
+			     (hal_rx_msdu_end_sa_idx_get(rx_tlv_hdr) >
+				(WLAN_UMAC_PSOC_MAX_PEERS *2)))) ||
+			    (qdf_nbuf_is_da_valid(nbuf) &&
+			     (hal_rx_msdu_end_da_idx_get(rx_tlv_hdr) >
+			      (WLAN_UMAC_PSOC_MAX_PEERS *2)))) {
+
+				qdf_nbuf_free(nbuf);
+				nbuf = next;
+				DP_STATS_INC(soc, rx.err.invalid_sa_da_idx, 1);
+				continue;
+			}
 			/* WDS Source Port Learning */
 			dp_rx_wds_srcport_learn(soc,
 						rx_tlv_hdr,
