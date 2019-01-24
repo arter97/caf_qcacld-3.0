@@ -327,6 +327,26 @@ static inline void cdp_peer_setup
 			peer);
 }
 
+static inline void cdp_cp_peer_del_response
+	(ol_txrx_soc_handle soc,
+	 struct cdp_vdev *vdev_hdl,
+	 uint8_t *peer_mac_addr)
+{
+	if (!soc || !soc->ops) {
+		QDF_TRACE(QDF_MODULE_ID_CDP, QDF_TRACE_LEVEL_DEBUG,
+			  "%s: Invalid Instance:", __func__);
+		QDF_BUG(0);
+		return;
+	}
+
+	if (!soc->ops->cmn_drv_ops ||
+	    !soc->ops->cmn_drv_ops->txrx_cp_peer_del_response)
+		return;
+
+	return soc->ops->cmn_drv_ops->txrx_cp_peer_del_response(soc,
+								vdev_hdl,
+								peer_mac_addr);
+}
 /**
  * cdp_peer_get_ast_info_by_soc() - search the soc AST hash table
  *                                  and return ast entry information
