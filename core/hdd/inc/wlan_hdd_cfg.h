@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2723,7 +2723,7 @@ enum hdd_dot11_mode {
  *
  * @min: 0
  * @max: 1
- * @default: 0
+ * @default: 1
  *
  * 0 - disable
  * 1 - enable
@@ -2733,7 +2733,7 @@ enum hdd_dot11_mode {
 #define CFG_LATENCY_ENABLE_NAME    "wlm_latency_enable"
 #define CFG_LATENCY_ENABLE_MIN     (0)
 #define CFG_LATENCY_ENABLE_MAX     (1)
-#define CFG_LATENCY_ENABLE_DEFAULT (0)
+#define CFG_LATENCY_ENABLE_DEFAULT (1)
 
 /*
  * <ini>
@@ -4796,27 +4796,6 @@ enum station_keepalive_method {
 #define CFG_ENABLE_BYPASS_11D_MIN                  (0)
 #define CFG_ENABLE_BYPASS_11D_MAX                  (1)
 #define CFG_ENABLE_BYPASS_11D_DEFAULT              (1)
-
-/*
- * gEnableDFSChnlScan - enable dfs channel scan.
- * @Min: 0
- * @Max: 1
- * @Default: 1
- *
- * This ini is used to enable/disable dfs channels in scan, enabling this
- * will enable driver to include dfs channels in its scan list.
- * Related: NA
- *
- * Supported Feature: DFS, Scan
- *
- * Usage: Internal/External
- *
- * </ini>
- */
-#define CFG_ENABLE_DFS_CHNL_SCAN_NAME              "gEnableDFSChnlScan"
-#define CFG_ENABLE_DFS_CHNL_SCAN_MIN               (0)
-#define CFG_ENABLE_DFS_CHNL_SCAN_MAX               (1)
-#define CFG_ENABLE_DFS_CHNL_SCAN_DEFAULT           (1)
 
 /*
  * <ini>
@@ -15931,6 +15910,19 @@ enum hdd_external_acs_policy {
 #define CFG_BSS_LOAD_SAMPLE_TIME_MAX        0xffffffff
 
 /*
+ * gEnableRTTsupport
+ * @Min: 0 - Disabled
+ * @Max: 1 - Enabled
+ * @Default: 1 - Enabled
+ *
+ * The param is used to enable/disable support for RTT
+ */
+#define CFG_ENABLE_RTT_SUPPORT            "gEnableRTTSupport"
+#define CFG_ENABLE_RTT_SUPPORT_DEFAULT    (1)
+#define CFG_ENABLE_RTT_SUPPORT_MIN        (0)
+#define CFG_ENABLE_RTT_SUPPORT_MAX        (1)
+
+/*
  * Type declarations
  */
 
@@ -16876,6 +16868,7 @@ struct hdd_config {
 	uint32_t provisioned_intf_pool;
 	uint32_t derived_intf_pool;
 	bool enable_peer_unmap_conf_support;
+	uint8_t enable_rtt_support;
 
 	uint32_t roam_score_delta;
 	uint32_t roam_score_delta_bitmap;
