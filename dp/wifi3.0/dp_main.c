@@ -1032,8 +1032,8 @@ static uint32_t dp_service_srngs(void *dp_ctx, uint32_t dp_budget)
 				soc->rx_rel_ring.hal_srng, remaining_quota);
 
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-			"WBM Release Ring: work_done %d budget %d",
-			work_done, budget);
+			  "WBM Release Ring: work_done %d budget %d",
+			  work_done, budget);
 
 		budget -=  work_done;
 		if (budget <= 0) {
@@ -5651,6 +5651,16 @@ dp_print_ring_stat_from_hal(struct dp_soc *soc,  struct dp_srng *srng,
 	}
 }
 
+/*
+ * dp_print_napi_stats(): NAPI stats
+ * @soc - soc handle
+ */
+static void dp_print_napi_stats(struct dp_soc *soc)
+{
+	hif_print_napi_stats(soc->hif_handle);
+}
+
+
 /**
  * dp_print_ring_stats(): Print tail and head pointer
  * @pdev: DP_PDEV handle
@@ -5739,6 +5749,9 @@ dp_print_ring_stats(struct dp_pdev *pdev)
 				&pdev->rx_mac_buf_ring[i],
 				ring_name);
 	}
+
+	dp_print_napi_stats(pdev->soc);
+
 }
 
 /**
@@ -5761,6 +5774,8 @@ dp_txrx_host_stats_clr(struct dp_vdev *vdev)
 	DP_STATS_CLR(vdev->pdev);
 	DP_STATS_CLR(vdev->pdev->soc);
 	DP_STATS_CLR(vdev);
+
+	hif_clear_napi_stats(vdev->pdev->soc->hif_handle);
 
 	TAILQ_FOREACH(peer, &vdev->peer_list, peer_list_elem) {
 		if (!peer)
@@ -6747,15 +6762,6 @@ static int dp_txrx_stats(struct cdp_vdev *vdev, enum cdp_stats stats)
 	req.stats = stats;
 
 	return dp_txrx_stats_request(vdev, &req);
-}
-
-/*
- * dp_print_napi_stats(): NAPI stats
- * @soc - soc handle
- */
-static void dp_print_napi_stats(struct dp_soc *soc)
-{
-	hif_print_napi_stats(soc->hif_handle);
 }
 
 /*
