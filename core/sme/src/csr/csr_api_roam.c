@@ -18419,6 +18419,30 @@ csr_roam_offload_per_scan(tpAniSirGlobal mac_ctx, uint8_t session_id)
 	return QDF_STATUS_SUCCESS;
 }
 
+uint8_t csr_get_roam_enabled_sta_sessionid(tpAniSirGlobal mac_ctx)
+{
+	tCsrRoamSession *session;
+	tpCsrNeighborRoamControlInfo roam_info;
+	uint8_t i;
+
+	for (i = 0; i < CSR_ROAM_SESSION_MAX; i++) {
+		session = CSR_GET_SESSION(mac_ctx, i);
+		if (!session || !CSR_IS_SESSION_VALID(mac_ctx, i))
+			continue;
+		if (!session->pCurRoamProfile ||
+		    session->pCurRoamProfile->csrPersona != QDF_STA_MODE)
+			continue;
+		roam_info = &mac_ctx->roam.neighborRoamInfo[i];
+		if (roam_info->b_roam_scan_offload_started) {
+			sms_log(mac_ctx, LOG1,
+				"Roaming enabled on iface, session: %d", i);
+			return i;
+		}
+	}
+
+	return CSR_SESSION_ID_INVALID;
+}
+
 /**
  * csr_roam_offload_scan() - populates roam offload scan request and sends to
  * WMA
@@ -18445,6 +18469,7 @@ csr_roam_offload_scan(tpAniSirGlobal mac_ctx, uint8_t session_id,
 	struct roam_ext_params *roam_params_src;
 	uint8_t i;
 	uint8_t op_channel;
+	bool prev_roaming_state;
 
 	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
 			"RSO Command %d, Session id %d, Reason %d",
@@ -18633,17 +18658,21 @@ csr_roam_offload_scan(tpAniSirGlobal mac_ctx, uint8_t session_id,
 		 reason == REASON_DISCONNECTED)
 		csr_update_11k_offload_params(mac_ctx, session, req_buf, FALSE);
 
+	prev_roaming_state = roam_info->b_roam_scan_offload_started;
+	if (ROAM_SCAN_OFFLOAD_START == command)
+		roam_info->b_roam_scan_offload_started = true;
+	else if (ROAM_SCAN_OFFLOAD_STOP == command)
+		roam_info->b_roam_scan_offload_started = false;
+	cds_pdev_set_pcl(QDF_STA_MODE);
+
 	if (!QDF_IS_STATUS_SUCCESS(
 		csr_roam_send_rso_cmd(mac_ctx, session_id, req_buf))) {
 		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
 			  "%s: Not able to post message to PE",
 			  __func__);
+		roam_info->b_roam_scan_offload_started = prev_roaming_state;
+		cds_pdev_set_pcl(QDF_STA_MODE);
 		return QDF_STATUS_E_FAILURE;
-	} else {
-		if (ROAM_SCAN_OFFLOAD_START == command)
-			roam_info->b_roam_scan_offload_started = true;
-		else if (ROAM_SCAN_OFFLOAD_STOP == command)
-			roam_info->b_roam_scan_offload_started = false;
 	}
 	/* update the last sent cmd */
 	roam_info->last_sent_cmd = command;
