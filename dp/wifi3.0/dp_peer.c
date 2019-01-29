@@ -1008,12 +1008,13 @@ void dp_peer_ast_send_wds_del(struct dp_soc *soc,
 		  peer->vdev->vdev_id, ast_entry->mac_addr.raw,
 		  ast_entry->next_hop, ast_entry->peer->mac_addr.raw);
 
-	if (ast_entry->next_hop) {
+	if (ast_entry->next_hop &&
+	    ast_entry->type != CDP_TXRX_AST_TYPE_WDS_HM_SEC)
 		cdp_soc->ol_ops->peer_del_wds_entry(peer->vdev->osif_vdev,
-						    ast_entry->mac_addr.raw,
-						    ast_entry->type);
-	} else {
-		/* Remove SELF and STATIC entries in teardown itself */
+						    ast_entry->mac_addr.raw);
+
+	/* Remove SELF and STATIC entries in teardown itself */
+	if (!ast_entry->next_hop) {
 		TAILQ_REMOVE(&peer->ast_entry_list, ast_entry, ase_list_elem);
 		peer->self_ast_entry = NULL;
 		ast_entry->peer = NULL;
