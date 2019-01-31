@@ -7093,6 +7093,9 @@ dp_print_soc_rx_stats(struct dp_soc *soc)
 	DP_PRINT_STATS("RX REL DUP DESC: %d",
 		       soc->stats.rx.err.hal_wbm_rel_dup);
 
+	DP_PRINT_STATS("RXDMA ERR DUP DESC: %d",
+		       soc->stats.rx.err.hal_rxdma_err_dup);
+
 	for (i = 0; i < HAL_RXDMA_ERR_MAX; i++) {
 		index += qdf_snprint(&rxdma_error[index],
 				DP_RXDMA_ERR_LENGTH - index,
