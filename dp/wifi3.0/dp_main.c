@@ -1060,12 +1060,6 @@ static uint32_t dp_service_srngs(void *dp_ctx, uint32_t dp_budget)
 				remaining_quota = budget;
 			}
 		}
-		for (ring = 0; ring < MAX_RX_MAC_RINGS; ring++) {
-			/* Need to check on this, why is required */
-			work_done = dp_rxdma_err_process(soc, ring,
-						remaining_quota);
-			budget -= work_done;
-		}
 	}
 
 	if (reo_status_mask)
@@ -5609,6 +5603,8 @@ dp_print_soc_rx_stats(struct dp_soc *soc)
 		       soc->stats.rx.err.hal_reo_dest_dup);
 	DP_PRINT_STATS("RX REL DUP DESC: %d",
 		       soc->stats.rx.err.hal_wbm_rel_dup);
+	DP_PRINT_STATS("RXDMA ERR DUP DESC: %d",
+		       soc->stats.rx.err.hal_rxdma_err_dup);
 
 	for (i = 0; i < HAL_RXDMA_ERR_MAX; i++) {
 		index += qdf_snprint(&rxdma_error[index],
