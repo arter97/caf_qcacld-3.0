@@ -2641,7 +2641,7 @@ void dp_tx_mec_handler(struct dp_vdev *vdev, uint8_t *status)
 
 	struct dp_soc *soc;
 	uint32_t flags = IEEE80211_NODE_F_WDS_HM;
-	struct dp_peer *peer;
+	struct dp_peer *peer = NULL;
 	uint8_t mac_addr[QDF_MAC_ADDR_SIZE], i;
 
 	if (!vdev->mec_enabled)
@@ -2653,14 +2653,21 @@ void dp_tx_mec_handler(struct dp_vdev *vdev, uint8_t *status)
 
 	soc = vdev->pdev->soc;
 	qdf_spin_lock_bh(&soc->peer_ref_mutex);
-	peer = TAILQ_FIRST(&vdev->peer_list);
-	qdf_spin_unlock_bh(&soc->peer_ref_mutex);
+
+	/* find STA bss peer from the list */
+	TAILQ_FOREACH(peer, &vdev->peer_list, peer_list_elem) {
+		if (peer->sta_bss_peer)
+			break;
+	}
 
 	if (!peer) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-				FL("peer is NULL"));
+				FL("STA BSS peer not found"));
+		qdf_spin_unlock_bh(&soc->peer_ref_mutex);
 		return;
 	}
+
+	qdf_spin_unlock_bh(&soc->peer_ref_mutex);
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
 			"%s Tx MEC Handler",
@@ -2676,6 +2683,7 @@ void dp_tx_mec_handler(struct dp_vdev *vdev, uint8_t *status)
 				mac_addr,
 				CDP_TXRX_AST_TYPE_MEC,
 				flags);
+
 }
 #endif
 
