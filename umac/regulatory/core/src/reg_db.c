@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -25,6 +25,8 @@
 
 #include <qdf_types.h>
 #include <qdf_trace.h>
+#include <wlan_cmn.h>
+#include <reg_services_public_struct.h>
 #include "reg_db.h"
 
 enum country_code {
@@ -1065,6 +1067,7 @@ enum reg_rules_5g {
 	CHAN_5735_5835_6,
 	CHAN_5735_5835_7,
 	CHAN_5735_5835_8,
+	CHAN_5735_5835_9,
 	CHAN_5735_5875_1,
 	CHAN_5735_5875_2,
 	CHAN_5735_5875_3,
@@ -1141,6 +1144,7 @@ const struct regulatory_rule reg_rules_5g[] = {
 	[CHAN_5735_5835_6] = {5735, 5835, 80, 24, 0},
 	[CHAN_5735_5835_7] = {5735, 5835, 80, 36, 0},
 	[CHAN_5735_5835_8] = {5735, 5835, 80, 23, REGULATORY_CHAN_RADAR},
+	[CHAN_5735_5835_9] = {5735, 5835, 80, 30, REGULATORY_CHAN_RADAR},
 	[CHAN_5735_5875_1] = {5735, 5875, 20, 27, REGULATORY_CHAN_RADAR},
 	[CHAN_5735_5875_2] = {5735, 5875, 20, 30, 0},
 	[CHAN_5735_5875_3] = {5735, 5875, 80, 30, 0},
@@ -1255,7 +1259,7 @@ const struct regdomain regdomains_5g[] = {
 	[ETSI15] = {CTL_ETSI, DFS_ETSI_REGION, 2, 0, 4, {CHAN_5170_5250_2,
 							 CHAN_5250_5330_1,
 							 CHAN_5490_5710_1,
-							 CHAN_5735_5835_2} },
+							 CHAN_5735_5835_9} },
 
 	[APL1] = {CTL_ETSI, DFS_UNINIT_REGION, 2, 0, 1, {CHAN_5735_5835_2} },
 

@@ -133,6 +133,8 @@ struct cdp_cmn_ops {
 
 	void (*txrx_peer_delete)(void *peer, uint32_t bitmap);
 
+	void (*txrx_vdev_flush_peers)(struct cdp_vdev *vdev, bool unmap_only);
+
 	QDF_STATUS (*txrx_set_monitor_mode)(struct cdp_vdev *vdev,
 					    uint8_t smart_monitor);
 	void (*txrx_peer_delete_sync)(void *peer,
@@ -852,7 +854,8 @@ struct ol_if_ops {
 					uint8_t vdev_id, uint8_t *peer_macaddr,
 					uint32_t tid_mask);
 	int (*peer_unref_delete)(void *scn_handle, uint8_t *peer_mac,
-				 uint8_t *vdev_mac, enum wlan_op_mode opmode);
+				 uint8_t *vdev_mac, enum wlan_op_mode opmode,
+				 void *old_peer, void *new_peer);
 	bool (*is_hw_dbs_2x2_capable)(struct wlan_objmgr_psoc *psoc);
 	int (*peer_add_wds_entry)(void *vdev_handle,
 				  struct cdp_peer *peer_handle,

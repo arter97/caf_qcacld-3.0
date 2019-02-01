@@ -696,9 +696,6 @@ struct dp_tx_desc_s *dp_tx_prepare_desc_single(struct dp_vdev *vdev,
 
 	dp_tx_trace_pkt(nbuf, tx_desc->id, vdev->vdev_id);
 
-	/* Reset the control block */
-	qdf_nbuf_reset_ctxt(nbuf);
-
 	/*
 	 * For special modes (vdev_type == ocb or mesh), data frames should be
 	 * transmitted using varying transmit parameters (tx spec) which include
@@ -833,9 +830,6 @@ static struct dp_tx_desc_s *dp_tx_prepare_desc(struct dp_vdev *vdev,
 	tx_desc->tso_num_desc = msdu_info->u.tso_info.tso_num_seg_list;
 
 	dp_tx_trace_pkt(nbuf, tx_desc->id, vdev->vdev_id);
-
-	/* Reset the control block */
-	qdf_nbuf_reset_ctxt(nbuf);
 
 	/* Handle scattered frames - TSO/SG/ME */
 	/* Allocate and prepare an extension descriptor for scattered frames */
@@ -2655,6 +2649,7 @@ dp_tx_update_peer_stats(struct dp_peer *peer,
 		return;
 	}
 
+	DP_STATS_INC_PKT(peer, tx.comp_pkt, 1, length);
 	DP_STATS_INCC(peer, tx.dropped.age_out, 1,
 		     (ts->status == HAL_TX_TQM_RR_REM_CMD_AGED));
 
@@ -2679,7 +2674,6 @@ dp_tx_update_peer_stats(struct dp_peer *peer,
 	if (ts->status != HAL_TX_TQM_RR_FRAME_ACKED) {
 		return;
 	}
-
 	DP_STATS_INCC(peer, tx.ofdma, 1, ts->ofdma);
 
 	DP_STATS_INCC(peer, tx.amsdu_cnt, 1, ts->msdu_part_of_amsdu);
@@ -2931,6 +2925,14 @@ void dp_tx_comp_process_tx_status(struct dp_tx_desc_s *tx_desc,
 				"invalid vdev");
 		goto out;
 	}
+
+	DPTRACE(qdf_dp_trace_ptr(tx_desc->nbuf,
+				 QDF_DP_TRACE_LI_DP_FREE_PACKET_PTR_RECORD,
+				 QDF_TRACE_DEFAULT_PDEV_ID,
+				 qdf_nbuf_data_addr(tx_desc->nbuf),
+				 sizeof(qdf_nbuf_data(tx_desc->nbuf)),
+				 tx_desc->id,
+				 ts->status));
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
 				"-------------------- \n"

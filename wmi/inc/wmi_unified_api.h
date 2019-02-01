@@ -123,16 +123,17 @@ typedef qdf_nbuf_t wmi_buf_t;
 struct wmi_soc;
 struct policy_mgr_dual_mac_config;
 /**
- * struct wmi_ops - service callbacks to upper layer
- * @service_ready_cbk: service ready callback
- * @service_ready_ext_cbk: service ready ext callback
- * @ready_cbk: ready calback
+ * struct wmi_rx_ops - handle to wmi rx ops
+ * @scn_handle: handle to scn
+ * @ev: event buffer
+ * @rx_ctx: rx execution context
  * @wma_process_fw_event_handler_cbk: generic event handler callback
  */
 struct wmi_rx_ops {
 
-	int (*wma_process_fw_event_handler_cbk)(void *ctx,
-				  void *ev, uint8_t rx_ctx);
+	int (*wma_process_fw_event_handler_cbk)(ol_scn_t scn_handle,
+						void *ev,
+						uint8_t rx_ctx);
 };
 
 /**
@@ -231,10 +232,10 @@ wmi_unified_remove_work(struct wmi_unified *wmi_handle);
  *  @return wmi_buf_t.
  */
 #ifdef NBUF_MEMORY_DEBUG
-#define wmi_buf_alloc(h, l) wmi_buf_alloc_debug(h, l, __FILE__, __LINE__)
+#define wmi_buf_alloc(h, l) wmi_buf_alloc_debug(h, l, __func__, __LINE__)
 wmi_buf_t
 wmi_buf_alloc_debug(wmi_unified_t wmi_handle, uint32_t len,
-		    uint8_t *file_name, uint32_t line_num);
+		    const char *func_name, uint32_t line_num);
 #else
 /**
  * wmi_buf_alloc() - generic function to allocate WMI buffer
@@ -712,8 +713,15 @@ QDF_STATUS wmi_unified_snr_request_cmd(void *wmi_hdl);
 
 QDF_STATUS wmi_unified_snr_cmd(void *wmi_hdl, uint8_t vdev_id);
 
-QDF_STATUS wmi_unified_link_status_req_cmd(void *wmi_hdl,
-				 struct link_status_params *link_status);
+/**
+ * wmi_unified_link_status_req_cmd() - process link status request from UMAC
+ * @wmi_handle: wmi handle
+ * @params: get link status params
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_link_status_req_cmd(wmi_unified_t wmi_handle,
+					   struct link_status_params *params);
 
 #ifdef WLAN_SUPPORT_GREEN_AP
 QDF_STATUS wmi_unified_egap_conf_params_cmd(void *wmi_hdl,
@@ -1581,8 +1589,19 @@ QDF_STATUS wmi_extract_smartlog_ev
 
 #endif /* OL_ATH_SMART_LOGGING */
 
+/**
+ * wmi_process_fw_event_worker_thread_ctx() - process in worker thread context
+ * @wmi_handle: handle to wmi
+ * @evt_buf: pointer to event buffer
+ *
+ * Event process by below function will be in worker thread context.
+ * Use this method for events which are not critical and not
+ * handled in protocol stack.
+ *
+ * Return: none
+ */
 void wmi_process_fw_event_worker_thread_ctx(struct wmi_unified *wmi_handle,
-					    HTC_PACKET * htc_packet);
+					    void *evt_buf);
 
 /**
  * wmi_extract_ctl_failsafe_check_ev_param() - extract ctl failsafe

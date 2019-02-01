@@ -1334,36 +1334,6 @@ struct ap_ps_params {
 
 /**
  * struct scan_chan_list_params  - scan channel list cmd parameter
- * @num_scan_chans: no of scan channels
- * @chan_info: pointer to wmi channel info
- */
-#ifdef CONFIG_MCL
-/* TODO: This needs clean-up based on how its processed. */
-typedef struct {
-	/* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_channel */
-	uint32_t tlv_header;
-	/** primary 20 MHz channel frequency in mhz */
-	uint32_t mhz;
-	/** Center frequency 1 in MHz*/
-	uint32_t band_center_freq1;
-	/** Center frequency 2 in MHz - valid only for 11acvht 80plus80 mode*/
-	uint32_t band_center_freq2;
-	/** channel info described below */
-	uint32_t info;
-	/** contains min power, max power, reg power and reg class id.  */
-	uint32_t reg_info_1;
-	/** contains antennamax */
-	uint32_t reg_info_2;
-} wmi_channel_param;
-
-struct scan_chan_list_params {
-	uint32_t pdev_id;
-	uint8_t num_scan_chans;
-	wmi_channel_param *chan_info;
-};
-#else
-/**
- * struct scan_chan_list_params  - scan channel list cmd parameter
  * @pdev_id: pdev_id
  * @num_chan: no of scan channels
  * @nallchans: nall chans
@@ -1376,7 +1346,6 @@ struct scan_chan_list_params {
 	bool append;
 	struct channel_param ch_param[1];
 };
-#endif
 
 /**
  * struct multiple_vdev_restart_params - Multiple vdev restart cmd parameter
@@ -2365,7 +2334,7 @@ struct mac_tspec_ie {
  * @sessionId: session id
  * @tsm_interval: TSM interval period passed from UMAC to WMI
  * @setRICparams: RIC parameters
- * @sme_session_id: sme session id
+ * @vdev_id: vdev id
  */
 struct add_ts_param {
 	uint16_t staIdx;
@@ -2379,7 +2348,10 @@ struct add_ts_param {
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 	uint8_t setRICparams;
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
+	union {
 	uint8_t sme_session_id;
+	uint8_t vdev_id;
+	};
 };
 
 /**
@@ -2463,16 +2435,10 @@ struct ll_stats_get_params {
 
 /**
  * struct link_status_params - link stats parameter
- * @msg_type: message type is same as the request type
- * @msg_len: length of the entire request
- * @link_status: wme ts spec flag
- * @session_id: wsm ts spec flag
+ * @vdev_id: ID of the vdev for which link status is desired
  */
 struct link_status_params {
-	uint16_t msg_type;
-	uint16_t msg_len;
-	uint8_t link_status;
-	uint8_t session_id;
+	uint8_t vdev_id;
 };
 
 /**

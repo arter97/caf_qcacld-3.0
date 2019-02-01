@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -45,6 +45,8 @@
 #define QCOM_VENDOR_IE_AGE_TYPE  0x100
 #define QCOM_VENDOR_IE_AGE_LEN   (sizeof(qcom_ie_age) - 2)
 #define SCAN_DONE_EVENT_BUF_SIZE 4096
+#define SCAN_WAKE_LOCK_CONNECT_DURATION (1 * 1000) /* in msec */
+#define SCAN_WAKE_LOCK_SCAN_DURATION (5 * 1000) /* in msec */
 
 /**
  * typedef struct qcom_ie_age - age ie
@@ -79,12 +81,14 @@ typedef struct {
  * scan_req_q_lock: Protect scan request queue
  * req_id: Scan request Id
  * runtime_pm_lock: Runtime suspend lock
+ * scan_wake_lock: Scan wake lock
  */
 struct osif_scan_pdev{
 	qdf_list_t scan_req_q;
 	qdf_mutex_t scan_req_q_lock;
 	wlan_scan_requester req_id;
 	qdf_runtime_lock_t runtime_pm_lock;
+	qdf_wake_lock_t scan_wake_lock;
 };
 
 /*
@@ -312,5 +316,43 @@ QDF_STATUS wlan_abort_scan(struct wlan_objmgr_pdev *pdev,
 void wlan_cfg80211_cleanup_scan_queue(struct wlan_objmgr_pdev *pdev,
 				      struct net_device *dev);
 
+/**
+ * wlan_hdd_cfg80211_add_connected_pno_support() - Set connected PNO support
+ * @wiphy: Pointer to wireless phy
+ *
+ * This function is used to set connected PNO support to kernel
+ *
+ * Return: None
+ */
+#if defined(CFG80211_REPORT_BETTER_BSS_IN_SCHED_SCAN) || \
+	(LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0))
+void wlan_scan_cfg80211_add_connected_pno_support(struct wiphy *wiphy);
+
+#else
+static inline
+void wlan_scan_cfg80211_add_connected_pno_support(struct wiphy *wiphy)
+{
+}
+#endif
+
+#if ((LINUX_VERSION_CODE > KERNEL_VERSION(4, 4, 0)) || \
+		defined(CFG80211_MULTI_SCAN_PLAN_BACKPORT)) && \
+		defined(FEATURE_WLAN_SCAN_PNO)
+/**
+ * hdd_config_sched_scan_plans_to_wiphy() - configure sched scan plans to wiphy
+ * @wiphy: pointer to wiphy
+ * @config: pointer to config
+ *
+ * Return: None
+ */
+void wlan_config_sched_scan_plans_to_wiphy(struct wiphy *wiphy,
+					   struct wlan_objmgr_psoc *psoc);
+#else
+static inline
+void wlan_config_sched_scan_plans_to_wiphy(struct wiphy *wiphy,
+					   struct wlan_objmgr_psoc *psoc)
+{
+}
+#endif /* FEATURE_WLAN_SCAN_PNO */
 
 #endif

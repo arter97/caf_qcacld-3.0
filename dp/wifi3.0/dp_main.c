@@ -84,6 +84,8 @@ static void dp_ppdu_ring_cfg(struct dp_pdev *pdev);
 ((DP_WDS_AST_AGING_TIMER_DEFAULT_MS / DP_AST_AGING_TIMER_DEFAULT_MS) - 1)
 #define DP_MCS_LENGTH (6*MAX_MCS)
 #define DP_NSS_LENGTH (6*SS_COUNT)
+#define DP_MU_GROUP_SHOW 16
+#define DP_MU_GROUP_LENGTH (6 * DP_MU_GROUP_SHOW)
 #define DP_RXDMA_ERR_LENGTH (6*HAL_RXDMA_ERR_MAX)
 #define DP_MAX_INT_CONTEXTS_STRING_LENGTH (6 * WLAN_CFG_INT_NUM_CONTEXTS)
 #define DP_REO_ERR_LENGTH (6*HAL_REO_ERR_MAX)
@@ -1245,6 +1247,15 @@ static int dp_srng_setup(struct dp_soc *soc, struct dp_srng *srng,
 static void dp_srng_deinit(struct dp_soc *soc, struct dp_srng *srng,
 			   int ring_type, int ring_num)
 {
+	if (!srng->hal_srng) {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+			  FL("Ring type: %d, num:%d not setup"),
+			  ring_type, ring_num);
+		return;
+	}
+
+	hal_srng_cleanup(soc->hal_soc, srng->hal_srng);
+	srng->hal_srng = NULL;
 }
 
 /**
@@ -1255,20 +1266,27 @@ static void dp_srng_deinit(struct dp_soc *soc, struct dp_srng *srng,
 static void dp_srng_cleanup(struct dp_soc *soc, struct dp_srng *srng,
 	int ring_type, int ring_num)
 {
-	if (!srng->hal_srng) {
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			FL("Ring type: %d, num:%d not setup"),
-			ring_type, ring_num);
-		return;
+	if (!soc->dp_soc_reinit) {
+		if (!srng->hal_srng && (srng->alloc_size == 0)) {
+			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+				  FL("Ring type: %d, num:%d not setup"),
+				  ring_type, ring_num);
+			return;
+		}
+
+		if (srng->hal_srng) {
+			hal_srng_cleanup(soc->hal_soc, srng->hal_srng);
+			srng->hal_srng = NULL;
+		}
 	}
 
-	hal_srng_cleanup(soc->hal_soc, srng->hal_srng);
-
-	qdf_mem_free_consistent(soc->osdev, soc->osdev->dev,
-				srng->alloc_size,
-				srng->base_vaddr_unaligned,
-				srng->base_paddr_unaligned, 0);
-	srng->hal_srng = NULL;
+	if (srng->alloc_size) {
+		qdf_mem_free_consistent(soc->osdev, soc->osdev->dev,
+					srng->alloc_size,
+					srng->base_vaddr_unaligned,
+					srng->base_paddr_unaligned, 0);
+		srng->alloc_size = 0;
+	}
 }
 
 /* TODO: Need this interface from HIF */
@@ -2798,6 +2816,8 @@ out:
 	hal_reo_setup(soc->hal_soc, &reo_params);
 
 	qdf_atomic_set(&soc->cmn_init_done, 1);
+	dp_soc_wds_attach(soc);
+
 	qdf_nbuf_queue_init(&soc->htt_stats.msg);
 	return 0;
 fail1:
@@ -3105,15 +3125,15 @@ void  dp_iterate_update_peer_list(void *pdev_hdl)
 	struct dp_vdev *vdev = NULL;
 	struct dp_peer *peer = NULL;
 
-	qdf_spin_lock_bh(&pdev->vdev_list_lock);
 	qdf_spin_lock_bh(&soc->peer_ref_mutex);
+	qdf_spin_lock_bh(&pdev->vdev_list_lock);
 	DP_PDEV_ITERATE_VDEV_LIST(pdev, vdev) {
 		DP_VDEV_ITERATE_PEER_LIST(vdev, peer) {
 			dp_cal_client_update_peer_stats(&peer->stats);
 		}
 	}
-	qdf_spin_unlock_bh(&soc->peer_ref_mutex);
 	qdf_spin_unlock_bh(&pdev->vdev_list_lock);
+	qdf_spin_unlock_bh(&soc->peer_ref_mutex);
 }
 #else
 void  dp_iterate_update_peer_list(void *pdev_hdl)
@@ -3205,6 +3225,7 @@ static struct cdp_pdev *dp_pdev_attach_wifi3(struct cdp_soc_t *txrx_soc,
 	qdf_spinlock_create(&pdev->neighbour_peer_mutex);
 	TAILQ_INIT(&pdev->neighbour_peers_list);
 	pdev->neighbour_peers_added = false;
+	pdev->monitor_configured = false;
 
 	if (dp_soc_cmn_setup(soc)) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
@@ -4353,11 +4374,13 @@ static void dp_vdev_register_wifi3(struct cdp_vdev *vdev_handle,
 /**
  * dp_vdev_flush_peers() - Forcibily Flush peers of vdev
  * @vdev: Datapath VDEV handle
+ * @unmap_only: Flag to indicate "only unmap"
  *
  * Return: void
  */
-static void dp_vdev_flush_peers(struct dp_vdev *vdev)
+static void dp_vdev_flush_peers(struct cdp_vdev *vdev_handle, bool unmap_only)
 {
+	struct dp_vdev *vdev = (struct dp_vdev *)vdev_handle;
 	struct dp_pdev *pdev = vdev->pdev;
 	struct dp_soc *soc = pdev->soc;
 	struct dp_peer *peer;
@@ -4385,7 +4408,9 @@ static void dp_vdev_flush_peers(struct dp_vdev *vdev)
 		if (peer) {
 			dp_info("peer: %pM is getting flush",
 				peer->mac_addr.raw);
-			dp_peer_delete_wifi3(peer, 0);
+
+			if (!unmap_only)
+				dp_peer_delete_wifi3(peer, 0);
 			/*
 			 * we need to call dp_peer_unref_del_find_by_id()
 			 * to remove additional ref count incremented
@@ -4438,9 +4463,8 @@ static void dp_vdev_detach_wifi3(struct cdp_vdev *vdev_handle,
 	 * this will free all references held due to missing
 	 * unmap commands from Target
 	 */
-	if ((hif_get_target_status(soc->hif_handle) == TARGET_STATUS_RESET) ||
-	    !hif_is_target_ready(HIF_GET_SOFTC(soc->hif_handle)))
-		dp_vdev_flush_peers(vdev);
+	if (!hif_is_target_ready(HIF_GET_SOFTC(soc->hif_handle)))
+		dp_vdev_flush_peers((struct cdp_vdev *)vdev, false);
 
 	/*
 	 * Use peer_ref_mutex while accessing peer_list, in case
@@ -4632,7 +4656,7 @@ static void *dp_peer_create_wifi3(struct cdp_vdev *vdev_handle,
 		if (soc->cdp_soc.ol_ops->peer_unref_delete) {
 			soc->cdp_soc.ol_ops->peer_unref_delete(pdev->ctrl_pdev,
 				peer->mac_addr.raw, vdev->mac_addr.raw,
-				vdev->opmode);
+				vdev->opmode, peer->ctrl_peer, ctrl_peer);
 		}
 		peer->ctrl_peer = ctrl_peer;
 
@@ -5130,7 +5154,8 @@ static void dp_reset_and_release_peer_mem(struct dp_soc *soc,
 		m_addr = peer->mac_addr.raw;
 		if (soc->cdp_soc.ol_ops->peer_unref_delete)
 			soc->cdp_soc.ol_ops->peer_unref_delete(pdev->ctrl_pdev,
-				m_addr, vdev->mac_addr.raw, vdev->opmode);
+				m_addr, vdev->mac_addr.raw, vdev->opmode,
+				peer->ctrl_peer, NULL);
 
 		if (vdev && vdev->vap_bss_peer) {
 		    bss_peer = vdev->vap_bss_peer;
@@ -5304,7 +5329,15 @@ static void dp_peer_delete_wifi3(void *peer_handle, uint32_t bitmap)
 	 */
 
 	peer->rx_opt_proc = dp_rx_discard;
-	peer->ctrl_peer = NULL;
+
+	/* Do not make ctrl_peer to NULL for connected sta peers.
+	 * We need ctrl_peer to release the reference during dp
+	 * peer free. This reference was held for
+	 * obj_mgr peer during the creation of dp peer.
+	 */
+	if (!(peer->vdev && (peer->vdev->opmode != wlan_op_mode_sta) &&
+	      !peer->bss_peer))
+		peer->ctrl_peer = NULL;
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO_HIGH,
 		FL("peer %pK (%pM)"),  peer, peer->mac_addr.raw);
@@ -5491,6 +5524,7 @@ static QDF_STATUS dp_reset_monitor_mode(struct cdp_pdev *pdev_handle)
 
 	pdev->monitor_vdev = NULL;
 	pdev->mcopy_mode = 0;
+	pdev->monitor_configured = false;
 
 	qdf_spin_unlock_bh(&pdev->mon_lock);
 
@@ -5673,7 +5707,7 @@ static QDF_STATUS dp_vdev_set_monitor_mode(struct cdp_vdev *vdev_handle,
 		  pdev, pdev->pdev_id, pdev->soc, vdev);
 
 	/*Check if current pdev's monitor_vdev exists */
-	if (pdev->monitor_vdev || pdev->mcopy_mode) {
+	if (pdev->monitor_configured) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 			  "monitor vap already created vdev=%pK\n", vdev);
 		qdf_assert(vdev);
@@ -5681,6 +5715,7 @@ static QDF_STATUS dp_vdev_set_monitor_mode(struct cdp_vdev *vdev_handle,
 	}
 
 	pdev->monitor_vdev = vdev;
+	pdev->monitor_configured = true;
 
 	/* If smart monitor mode, do not configure monitor ring */
 	if (smart_monitor)
@@ -6049,10 +6084,8 @@ void dp_aggregate_vdev_stats(struct dp_vdev *vdev,
 
 	qdf_mem_copy(vdev_stats, &vdev->stats, sizeof(vdev->stats));
 
-	qdf_spin_lock_bh(&soc->peer_ref_mutex);
 	TAILQ_FOREACH(peer, &vdev->peer_list, peer_list_elem)
 		dp_update_vdev_stats(vdev_stats, peer);
-	qdf_spin_unlock_bh(&soc->peer_ref_mutex);
 
 #if defined(FEATURE_PERPKT_INFO) && WDI_EVENT_ENABLE
 	dp_wdi_event_handler(WDI_EVENT_UPDATE_DP_STATS, vdev->pdev->soc,
@@ -6070,6 +6103,7 @@ void dp_aggregate_vdev_stats(struct dp_vdev *vdev,
 static inline void dp_aggregate_pdev_stats(struct dp_pdev *pdev)
 {
 	struct dp_vdev *vdev = NULL;
+	struct dp_soc *soc;
 	struct cdp_vdev_stats *vdev_stats =
 			qdf_mem_malloc(sizeof(struct cdp_vdev_stats));
 
@@ -6086,6 +6120,8 @@ static inline void dp_aggregate_pdev_stats(struct dp_pdev *pdev)
 	if (pdev->mcopy_mode)
 		DP_UPDATE_STATS(pdev, pdev->invalid_peer);
 
+	soc = pdev->soc;
+	qdf_spin_lock_bh(&soc->peer_ref_mutex);
 	qdf_spin_lock_bh(&pdev->vdev_list_lock);
 	TAILQ_FOREACH(vdev, &pdev->vdev_list, vdev_list_elem) {
 
@@ -6094,6 +6130,7 @@ static inline void dp_aggregate_pdev_stats(struct dp_pdev *pdev)
 		dp_update_pdev_ingress_stats(pdev, vdev);
 	}
 	qdf_spin_unlock_bh(&pdev->vdev_list_lock);
+	qdf_spin_unlock_bh(&soc->peer_ref_mutex);
 	qdf_mem_free(vdev_stats);
 
 #if defined(FEATURE_PERPKT_INFO) && WDI_EVENT_ENABLE
@@ -6113,8 +6150,20 @@ static void dp_vdev_getstats(void *vdev_handle,
 		struct cdp_dev_stats *stats)
 {
 	struct dp_vdev *vdev = (struct dp_vdev *)vdev_handle;
-	struct cdp_vdev_stats *vdev_stats =
-			qdf_mem_malloc(sizeof(struct cdp_vdev_stats));
+	struct dp_pdev *pdev;
+	struct dp_soc *soc;
+	struct cdp_vdev_stats *vdev_stats;
+
+	if (!vdev)
+		return;
+
+	pdev = vdev->pdev;
+	if (!pdev)
+		return;
+
+	soc = pdev->soc;
+
+	vdev_stats = qdf_mem_malloc(sizeof(struct cdp_vdev_stats));
 
 	if (!vdev_stats) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
@@ -6122,7 +6171,9 @@ static void dp_vdev_getstats(void *vdev_handle,
 		return;
 	}
 
+	qdf_spin_lock_bh(&soc->peer_ref_mutex);
 	dp_aggregate_vdev_stats(vdev, vdev_stats);
+	qdf_spin_unlock_bh(&soc->peer_ref_mutex);
 
 	stats->tx_packets = vdev_stats->tx_i.rcvd.num;
 	stats->tx_bytes = vdev_stats->tx_i.rcvd.bytes;
@@ -6208,6 +6259,7 @@ static inline void
 dp_print_pdev_tx_stats(struct dp_pdev *pdev)
 {
 	uint8_t index = 0;
+
 	DP_PRINT_STATS("PDEV Tx Stats:\n");
 	DP_PRINT_STATS("Received From Stack:");
 	DP_PRINT_STATS("	Packets = %d",
@@ -6333,6 +6385,7 @@ dp_print_pdev_tx_stats(struct dp_pdev *pdev)
 		DP_PRINT_STATS("	Tag[%d] = %llu", index,
 				pdev->stats.ppdu_stats_counter[index]);
 	}
+
 }
 
 /**
@@ -6454,7 +6507,7 @@ dp_print_soc_tx_stats(struct dp_soc *soc)
 
 	DP_PRINT_STATS("Tx Descriptors In Use = %d",
 			soc->stats.tx.desc_in_use);
-	DP_PRINT_STATS("Invalid peer:");
+	DP_PRINT_STATS("Tx Invalid peer:");
 	DP_PRINT_STATS("	Packets = %d",
 			soc->stats.tx.tx_invalid_peer.num);
 	DP_PRINT_STATS("	Bytes = %llu",
@@ -6590,9 +6643,10 @@ dp_print_ring_stat_from_hal(struct dp_soc *soc,  struct dp_srng *srng,
 	int32_t hw_headp = -1;
 	int32_t hw_tailp = -1;
 	const char *ring_name;
-	struct hal_soc *hal_soc = (struct hal_soc *)soc->hal_soc;
+	struct hal_soc *hal_soc;
 
 	if (soc && srng && srng->hal_srng) {
+		hal_soc = (struct hal_soc *)soc->hal_soc;
 		ring_name = dp_srng_get_str_from_hal_ring_type(ring_type);
 
 		hal_get_sw_hptp(soc->hal_soc, srng->hal_srng, &tailp, &headp);
@@ -6890,7 +6944,10 @@ static inline void dp_print_peer_stats(struct dp_peer *peer)
 {
 	uint8_t i;
 	uint32_t index;
+	uint32_t j;
 	char nss[DP_NSS_LENGTH];
+	char mu_group_id[DP_MU_GROUP_LENGTH];
+
 	DP_PRINT_STATS("Node Tx Stats:\n");
 	DP_PRINT_STATS("Total Packet Completions = %d",
 			peer->stats.tx.comp_pkt.num);
@@ -6975,8 +7032,39 @@ static inline void dp_print_peer_stats(struct dp_peer *peer)
 		index += qdf_snprint(&nss[index], DP_NSS_LENGTH - index,
 				" %d", peer->stats.tx.nss[i]);
 	}
-	DP_PRINT_STATS("NSS(1-8) = %s",
-			nss);
+	DP_PRINT_STATS("NSS(1-8) = %s", nss);
+
+	DP_PRINT_STATS("Transmit Type :");
+	DP_PRINT_STATS("SU %d, MU_MIMO %d, MU_OFDMA %d, MU_MIMO_OFDMA %d",
+		       peer->stats.tx.transmit_type[0],
+		       peer->stats.tx.transmit_type[1],
+		       peer->stats.tx.transmit_type[2],
+		       peer->stats.tx.transmit_type[3]);
+
+	for (i = 0; i < MAX_MU_GROUP_ID;) {
+		index = 0;
+		for (j = 0; j < DP_MU_GROUP_SHOW && i < MAX_MU_GROUP_ID;
+		     j++) {
+			index += qdf_snprint(&mu_group_id[index],
+					     DP_MU_GROUP_LENGTH - index,
+					     " %d",
+					     peer->stats.tx.mu_group_id[i]);
+			i++;
+		}
+
+		DP_PRINT_STATS("User position list for GID %02d->%d: [%s]",
+			       i - DP_MU_GROUP_SHOW, i - 1, mu_group_id);
+	}
+
+	DP_PRINT_STATS("Last Packet RU index [%d], Size [%d]",
+		       peer->stats.tx.ru_start, peer->stats.tx.ru_tones);
+	DP_PRINT_STATS("RU Locations RU[26 52 106 242 484 996]:");
+	DP_PRINT_STATS("RU_26: %d", peer->stats.tx.ru_loc[0]);
+	DP_PRINT_STATS("RU 52: %d", peer->stats.tx.ru_loc[1]);
+	DP_PRINT_STATS("RU 106: %d", peer->stats.tx.ru_loc[2]);
+	DP_PRINT_STATS("RU 242: %d", peer->stats.tx.ru_loc[3]);
+	DP_PRINT_STATS("RU 484: %d", peer->stats.tx.ru_loc[4]);
+	DP_PRINT_STATS("RU 996: %d", peer->stats.tx.ru_loc[5]);
 
 	DP_PRINT_STATS("Aggregation:");
 	DP_PRINT_STATS("	Number of Msdu's Part of Amsdu = %d",
@@ -7627,6 +7715,7 @@ dp_config_debug_sniffer(struct cdp_pdev *pdev_handle, int val)
 	case 0:
 		pdev->tx_sniffer_enable = 0;
 		pdev->mcopy_mode = 0;
+		pdev->monitor_configured = false;
 
 		if (!pdev->pktlog_ppdu_stats && !pdev->enhanced_stats_en &&
 		    !pdev->bpr_enable) {
@@ -7649,6 +7738,7 @@ dp_config_debug_sniffer(struct cdp_pdev *pdev_handle, int val)
 	case 1:
 		pdev->tx_sniffer_enable = 1;
 		pdev->mcopy_mode = 0;
+		pdev->monitor_configured = false;
 
 		if (!pdev->pktlog_ppdu_stats)
 			dp_h2t_cfg_stats_msg_send(pdev,
@@ -7662,6 +7752,7 @@ dp_config_debug_sniffer(struct cdp_pdev *pdev_handle, int val)
 
 		pdev->mcopy_mode = 1;
 		dp_pdev_configure_monitor_rings(pdev);
+		pdev->monitor_configured = true;
 		pdev->tx_sniffer_enable = 0;
 
 		if (!pdev->pktlog_ppdu_stats)
@@ -8022,12 +8113,27 @@ static int  dp_txrx_get_vdev_stats(struct cdp_vdev *vdev_handle, void *buf,
 				   bool is_aggregate)
 {
 	struct dp_vdev *vdev = (struct dp_vdev *)vdev_handle;
-	struct cdp_vdev_stats *vdev_stats = (struct cdp_vdev_stats *)buf;
+	struct cdp_vdev_stats *vdev_stats;
+	struct dp_pdev *pdev;
+	struct dp_soc *soc;
 
-	if (is_aggregate)
+	if (!vdev)
+		return 1;
+
+	pdev = vdev->pdev;
+	if (!pdev)
+		return 1;
+
+	soc = pdev->soc;
+	vdev_stats = (struct cdp_vdev_stats *)buf;
+
+	if (is_aggregate) {
+		qdf_spin_lock_bh(&soc->peer_ref_mutex);
 		dp_aggregate_vdev_stats(vdev, buf);
-	else
+		qdf_spin_unlock_bh(&soc->peer_ref_mutex);
+	} else {
 		qdf_mem_copy(vdev_stats, &vdev->stats, sizeof(vdev->stats));
+	}
 
 	return 0;
 }
@@ -8350,7 +8456,7 @@ static void dp_txrx_path_stats(struct dp_soc *soc)
 			       pdev->stats.tx.dropped.fw_rem_tx);
 		DP_TRACE_STATS(INFO_HIGH, "firmware removed notx %u",
 			       pdev->stats.tx.dropped.fw_rem_notx);
-		DP_TRACE_STATS(INFO_HIGH, "peer_invalid: %u",
+		DP_TRACE_STATS(INFO_HIGH, "Invalid peer on tx path: %u",
 			       pdev->soc->stats.tx.tx_invalid_peer.num);
 
 		DP_TRACE_STATS(INFO_HIGH, "Tx packets sent per interrupt:");
@@ -8396,7 +8502,7 @@ static void dp_txrx_path_stats(struct dp_soc *soc)
 			       pdev->stats.rx.raw.bytes);
 		DP_TRACE_STATS(INFO_HIGH, "dropped: error %u msdus",
 			       pdev->stats.rx.err.mic_err);
-		DP_TRACE_STATS(INFO_HIGH, "peer invalid %u",
+		DP_TRACE_STATS(INFO_HIGH, "Invalid peer on rx path: %u",
 			       pdev->soc->stats.rx.err.rx_invalid_peer.num);
 
 		DP_TRACE_STATS(INFO_HIGH, "Reo Statistics");
@@ -8965,6 +9071,7 @@ static struct cdp_cmn_ops dp_ops_cmn = {
 		dp_peer_ast_entry_del_by_pdev,
 	.txrx_peer_delete = dp_peer_delete_wifi3,
 	.txrx_vdev_register = dp_vdev_register_wifi3,
+	.txrx_vdev_flush_peers = dp_vdev_flush_peers,
 	.txrx_soc_detach = dp_soc_detach_wifi3,
 	.txrx_soc_deinit = dp_soc_deinit_wifi3,
 	.txrx_soc_init = dp_soc_init_wifi3,
@@ -9162,41 +9269,6 @@ static QDF_STATUS dp_runtime_resume(struct cdp_pdev *opaque_pdev)
 }
 #endif /* FEATURE_RUNTIME_PM */
 
-static QDF_STATUS dp_bus_suspend(struct cdp_pdev *opaque_pdev)
-{
-	struct dp_pdev *pdev = (struct dp_pdev *)opaque_pdev;
-	struct dp_soc *soc = pdev->soc;
-	int timeout = SUSPEND_DRAIN_WAIT;
-	int drain_wait_delay = 50; /* 50 ms */
-
-	/* Abort if there are any pending TX packets */
-	while (dp_get_tx_pending(opaque_pdev) > 0) {
-		qdf_sleep(drain_wait_delay);
-		if (timeout <= 0) {
-			dp_err("TX frames are pending, abort suspend");
-			return QDF_STATUS_E_TIMEOUT;
-		}
-		timeout = timeout - drain_wait_delay;
-	}
-
-
-	if (soc->intr_mode == DP_INTR_POLL)
-		qdf_timer_stop(&soc->int_timer);
-
-	return QDF_STATUS_SUCCESS;
-}
-
-static QDF_STATUS dp_bus_resume(struct cdp_pdev *opaque_pdev)
-{
-	struct dp_pdev *pdev = (struct dp_pdev *)opaque_pdev;
-	struct dp_soc *soc = pdev->soc;
-
-	if (soc->intr_mode == DP_INTR_POLL)
-		qdf_timer_mod(&soc->int_timer, DP_INTR_POLL_TIMER_MS);
-
-	return QDF_STATUS_SUCCESS;
-}
-
 #ifndef CONFIG_WIN
 static struct cdp_misc_ops dp_ops_misc = {
 	.tx_non_std = dp_tx_non_std,
@@ -9244,6 +9316,40 @@ static struct cdp_ipa_ops dp_ops_ipa = {
 	.ipa_set_perf_level = dp_ipa_set_perf_level
 };
 #endif
+
+static QDF_STATUS dp_bus_suspend(struct cdp_pdev *opaque_pdev)
+{
+	struct dp_pdev *pdev = (struct dp_pdev *)opaque_pdev;
+	struct dp_soc *soc = pdev->soc;
+	int timeout = SUSPEND_DRAIN_WAIT;
+	int drain_wait_delay = 50; /* 50 ms */
+
+	/* Abort if there are any pending TX packets */
+	while (dp_get_tx_pending(opaque_pdev) > 0) {
+		qdf_sleep(drain_wait_delay);
+		if (timeout <= 0) {
+			dp_err("TX frames are pending, abort suspend");
+			return QDF_STATUS_E_TIMEOUT;
+		}
+		timeout = timeout - drain_wait_delay;
+	}
+
+	if (soc->intr_mode == DP_INTR_POLL)
+		qdf_timer_stop(&soc->int_timer);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS dp_bus_resume(struct cdp_pdev *opaque_pdev)
+{
+	struct dp_pdev *pdev = (struct dp_pdev *)opaque_pdev;
+	struct dp_soc *soc = pdev->soc;
+
+	if (soc->intr_mode == DP_INTR_POLL)
+		qdf_timer_mod(&soc->int_timer, DP_INTR_POLL_TIMER_MS);
+
+	return QDF_STATUS_SUCCESS;
+}
 
 static struct cdp_bus_ops dp_ops_bus = {
 	.bus_suspend = dp_bus_suspend,
@@ -9571,7 +9677,6 @@ void *dp_soc_init(void *dpsoc, HTC_HANDLE htc_handle, void *hif_handle)
 
 	qdf_spinlock_create(&soc->peer_ref_mutex);
 	qdf_spinlock_create(&soc->ast_lock);
-	dp_soc_wds_attach(soc);
 
 	qdf_spinlock_create(&soc->reo_desc_freelist_lock);
 	qdf_list_create(&soc->reo_desc_freelist, REO_DESC_FREELIST_SIZE);

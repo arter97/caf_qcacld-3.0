@@ -1,19 +1,17 @@
 /*
  * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
  *
- * Permission to use, copy, modify, and/or distribute this software for
- * any purpose with or without fee is hereby granted, provided that the
- * above copyright notice and this permission notice appear in all
- * copies.
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
- * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
- * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
- * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
 /*
@@ -37,6 +35,7 @@
 #include <wlan_pmo_obj_mgmt_api.h>
 #endif
 #ifdef WLAN_POLICY_MGR_ENABLE
+#include <wlan_objmgr_vdev_obj.h>
 #include <wlan_dfs_utils_api.h>
 #include <wlan_policy_mgr_api.h>
 #endif
@@ -231,22 +230,39 @@ bool ucfg_scan_get_pno_match(struct wlan_objmgr_vdev *vdev)
 }
 
 static QDF_STATUS
-wlan_pno_global_init(struct pno_def_config *pno_def)
+wlan_pno_global_init(struct wlan_objmgr_psoc *psoc,
+		     struct pno_def_config *pno_def)
 {
 	struct nlo_mawc_params *mawc_cfg;
 
 	qdf_wake_lock_create(&pno_def->pno_wake_lock, "wlan_pno_wl");
 	mawc_cfg = &pno_def->mawc_params;
-	pno_def->channel_prediction = SCAN_PNO_CHANNEL_PREDICTION;
-	pno_def->top_k_num_of_channels = SCAN_TOP_K_NUM_OF_CHANNELS;
-	pno_def->stationary_thresh = SCAN_STATIONARY_THRESHOLD;
+	pno_def->channel_prediction = cfg_get(psoc, CFG_PNO_CHANNEL_PREDICTION);
+	pno_def->top_k_num_of_channels =
+			cfg_get(psoc, CFG_TOP_K_NUM_OF_CHANNELS);
+	pno_def->stationary_thresh = cfg_get(psoc, CFG_STATIONARY_THRESHOLD);
 	pno_def->channel_prediction_full_scan =
-			SCAN_CHANNEL_PREDICTION_FULL_SCAN_MS;
-	pno_def->adaptive_dwell_mode = SCAN_ADAPTIVE_PNOSCAN_DWELL_MODE;
-	mawc_cfg->enable = SCAN_MAWC_NLO_ENABLED;
-	mawc_cfg->exp_backoff_ratio = SCAN_MAWC_NLO_EXP_BACKOFF_RATIO;
-	mawc_cfg->init_scan_interval = SCAN_MAWC_NLO_INIT_SCAN_INTERVAL;
-	mawc_cfg->max_scan_interval = SCAN_MAWC_NLO_MAX_SCAN_INTERVAL;
+			cfg_get(psoc, CFG_CHANNEL_PREDICTION_SCAN_TIMER);
+	pno_def->adaptive_dwell_mode =
+			cfg_get(psoc, CFG_ADAPTIVE_PNOSCAN_DWELL_MODE);
+	pno_def->dfs_chnl_scan_enabled =
+			cfg_get(psoc, CFG_ENABLE_DFS_PNO_CHNL_SCAN);
+	pno_def->scan_support_enabled =
+			cfg_get(psoc, CFG_PNO_SCAN_SUPPORT);
+	pno_def->scan_timer_repeat_value =
+			cfg_get(psoc, CFG_PNO_SCAN_TIMER_REPEAT_VALUE);
+	pno_def->slow_scan_multiplier =
+			cfg_get(psoc, CFG_PNO_SLOW_SCAN_MULTIPLIER);
+	pno_def->scan_backoff_multiplier =
+			cfg_get(psoc, CFG_SCAN_BACKOFF_MULTIPLIER);
+
+	mawc_cfg->enable = cfg_get(psoc, CFG_MAWC_NLO_ENABLED);
+	mawc_cfg->exp_backoff_ratio =
+			cfg_get(psoc, CFG_MAWC_NLO_EXP_BACKOFF_RATIO);
+	mawc_cfg->init_scan_interval =
+			cfg_get(psoc, CFG_MAWC_NLO_INIT_SCAN_INTERVAL);
+	mawc_cfg->max_scan_interval =
+			cfg_get(psoc, CFG_MAWC_NLO_MAX_SCAN_INTERVAL);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -345,21 +361,6 @@ ucfg_scan_get_pno_def_params(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 
-static QDF_STATUS ucfg_scan_update_pno_config(struct pno_def_config *pno,
-	struct pno_user_cfg *pno_cfg)
-{
-	pno->channel_prediction = pno_cfg->channel_prediction;
-	pno->top_k_num_of_channels = pno_cfg->top_k_num_of_channels;
-	pno->stationary_thresh = pno_cfg->stationary_thresh;
-	pno->adaptive_dwell_mode = pno_cfg->adaptive_dwell_mode;
-	pno->channel_prediction_full_scan =
-		pno_cfg->channel_prediction_full_scan;
-	qdf_mem_copy(&pno->mawc_params, &pno_cfg->mawc_params,
-			sizeof(pno->mawc_params));
-
-	return QDF_STATUS_SUCCESS;
-}
-
 QDF_STATUS
 ucfg_scan_register_pno_cb(struct wlan_objmgr_psoc *psoc,
 	scan_event_handler event_cb, void *arg)
@@ -383,19 +384,13 @@ ucfg_scan_register_pno_cb(struct wlan_objmgr_psoc *psoc,
 #else
 
 static inline QDF_STATUS
-wlan_pno_global_init(struct pno_def_config *pno_def)
+wlan_pno_global_init(struct wlan_objmgr_psoc *psoc,
+		     struct pno_def_config *pno_def)
 {
 	return QDF_STATUS_SUCCESS;
 }
 static inline QDF_STATUS
 wlan_pno_global_deinit(struct pno_def_config *pno_def)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS
-ucfg_scan_update_pno_config(struct pno_def_config *pno,
-	struct pno_user_cfg *pno_cfg)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -585,7 +580,7 @@ static void ucfg_scan_req_update_concurrency_params(
 		req->scan_req.idle_time = scan_obj->scan_def.conc_idle_time;
 	}
 
-	if (!wlan_vdev_is_up(req->vdev))
+	if (wlan_vdev_is_up(req->vdev) != QDF_STATUS_SUCCESS)
 		req->scan_req.adaptive_dwell_time_mode =
 			scan_obj->scan_def.adaptive_dwell_time_mode_nc;
 	/*
@@ -596,6 +591,14 @@ static void ucfg_scan_req_update_concurrency_params(
 	if (ap_present || go_present) {
 		req->scan_req.dwell_time_active_2g = 0;
 		req->scan_req.min_rest_time = req->scan_req.max_rest_time;
+	}
+
+	/*
+	 * If scan req for SAP (ACS Sacn) use dwell_time_active_def as dwell
+	 * time for 2g channels instead of dwell_time_active_2g
+	 */
+	if (vdev->vdev_mlme.vdev_opmode == QDF_SAP_MODE) {
+		req->scan_req.dwell_time_active_2g = 0;
 	}
 
 	if (req->scan_req.p2p_scan_type == SCAN_NON_P2P_DEFAULT) {
@@ -989,7 +992,6 @@ ucfg_scan_start(struct scan_start_request *req)
 					QDF_MODULE_ID_OS_IF, &msg);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		wlan_objmgr_vdev_release_ref(req->vdev, WLAN_SCAN_ID);
-		scm_err("failed to post to QDF_MODULE_ID_OS_IF");
 		scm_scan_free_scan_request_mem(req);
 	}
 
@@ -1182,10 +1184,8 @@ ucfg_scan_cancel(struct scan_cancel_request *req)
 	status = scheduler_post_message(QDF_MODULE_ID_OS_IF,
 					QDF_MODULE_ID_SCAN,
 					QDF_MODULE_ID_OS_IF, &msg);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		scm_err("failed to post to QDF_MODULE_ID_OS_IF");
+	if (QDF_IS_STATUS_ERROR(status))
 		goto vdev_put;
-	}
 
 	return QDF_STATUS_SUCCESS;
 
@@ -1224,10 +1224,8 @@ ucfg_scan_cancel_sync(struct scan_cancel_request *req)
 
 	vdev = req->vdev;
 	status = ucfg_scan_cancel(req);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		scm_err("failed to post to QDF_MODULE_ID_OS_IF");
+	if (QDF_IS_STATUS_ERROR(status))
 		return status;
-	}
 
 	memset(&cancel_scan_event, 0, sizeof(cancel_scan_event));
 	/*
@@ -1480,6 +1478,8 @@ wlan_scan_global_init(struct wlan_objmgr_psoc *psoc,
 				!cfg_get(psoc, CFG_INITIAL_NO_DFS_SCAN);
 	scan_obj->scan_def.allow_dfs_chan_in_scan =
 				cfg_get(psoc, CFG_ENABLE_DFS_SCAN);
+	scan_obj->scan_def.use_wake_lock_in_user_scan =
+				cfg_get(psoc, CFG_ENABLE_WAKE_LOCK_IN_SCAN);
 	scan_obj->scan_def.active_dwell_2g =
 			 cfg_get(psoc, CFG_ACTIVE_MAX_2G_CHANNEL_TIME);
 	scan_obj->scan_def.passive_dwell =
@@ -1537,7 +1537,7 @@ wlan_scan_global_init(struct wlan_objmgr_psoc *psoc,
 	/* init extscan */
 	wlan_extscan_global_init(psoc, scan_obj);
 
-	return wlan_pno_global_init(&scan_obj->pno_cfg);
+	return wlan_pno_global_init(psoc, &scan_obj->pno_cfg);
 }
 
 static void
@@ -2004,9 +2004,6 @@ QDF_STATUS ucfg_scan_update_user_config(struct wlan_objmgr_psoc *psoc,
 	scan_def->sta_miracast_mcc_rest_time =
 				scan_cfg->sta_miracast_mcc_rest_time;
 
-	ucfg_scan_update_pno_config(&scan_obj->pno_cfg,
-		&scan_cfg->pno_cfg);
-
 	qdf_mem_copy(&scan_def->score_config, &scan_cfg->score_config,
 		sizeof(struct scoring_config));
 	scm_validate_scoring_config(&scan_def->score_config);
@@ -2195,6 +2192,12 @@ static bool scm_serialization_scan_rules_cb(
 			return false;
 		}
 		break;
+	case WLAN_UMAC_COMP_MLME:
+		if (comp_info->scan_info.is_mlme_op_in_progress) {
+			scm_debug("Cancel scan. MLME operation in progress");
+			return false;
+		}
+		break;
 	default:
 		scm_debug("not handled comp_id %d", comp_id);
 		break;
@@ -2324,6 +2327,17 @@ bool ucfg_scan_get_bt_activity(struct wlan_objmgr_psoc *psoc)
 	return scan_obj->bt_a2dp_enabled;
 }
 
+bool ucfg_scan_wake_lock_in_user_scan(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_scan_obj *scan_obj;
+
+	scan_obj = wlan_psoc_get_scan_obj(psoc);
+	if (!scan_obj)
+		return false;
+
+	return scan_obj->scan_def.use_wake_lock_in_user_scan;
+}
+
 QDF_STATUS
 ucfg_scan_set_global_config(struct wlan_objmgr_psoc *psoc,
 			       enum scan_config config, uint32_t val)
@@ -2391,3 +2405,92 @@ ucfg_scan_get_global_config(struct wlan_objmgr_psoc *psoc,
 
 	return status;
 }
+
+#ifdef FEATURE_WLAN_SCAN_PNO
+bool ucfg_scan_is_pno_offload_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_scan_obj *scan_obj;
+
+	scan_obj = wlan_psoc_get_scan_obj(psoc);
+	if (!scan_obj) {
+		scm_err("NULL scan obj");
+		return false;
+	}
+
+	return scan_obj->pno_cfg.pno_offload_enabled;
+}
+
+void ucfg_scan_set_pno_offload(struct wlan_objmgr_psoc *psoc, bool value)
+{
+	 struct wlan_scan_obj *scan_obj;
+
+	scan_obj = wlan_psoc_get_scan_obj(psoc);
+	if (!scan_obj) {
+		scm_err("NULL scan obj");
+		return;
+	}
+
+	scan_obj->pno_cfg.pno_offload_enabled = value;
+}
+
+bool ucfg_scan_get_pno_scan_support(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_scan_obj *scan_obj;
+
+	scan_obj = wlan_psoc_get_scan_obj(psoc);
+	if (!scan_obj) {
+		scm_err("NULL scan obj");
+		return cfg_default(CFG_PNO_SCAN_SUPPORT);
+	}
+
+	return scan_obj->pno_cfg.scan_support_enabled;
+}
+
+uint8_t ucfg_get_scan_backoff_multiplier(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_scan_obj *scan_obj;
+
+	scan_obj = wlan_psoc_get_scan_obj(psoc);
+	if (!scan_obj) {
+		scm_err("NULL scan obj");
+		return cfg_default(CFG_SCAN_BACKOFF_MULTIPLIER);
+	}
+	return scan_obj->pno_cfg.scan_backoff_multiplier;
+}
+
+bool ucfg_scan_is_dfs_chnl_scan_enabled(struct wlan_objmgr_psoc *psoc)
+{
+		struct wlan_scan_obj *scan_obj;
+
+		scan_obj = wlan_psoc_get_scan_obj(psoc);
+		if (!scan_obj) {
+			scm_err("NULL scan obj");
+			return cfg_default(CFG_ENABLE_DFS_PNO_CHNL_SCAN);
+		}
+		return scan_obj->pno_cfg.dfs_chnl_scan_enabled;
+}
+
+uint32_t ucfg_scan_get_scan_timer_repeat_value(struct wlan_objmgr_psoc *psoc)
+{
+		struct wlan_scan_obj *scan_obj;
+
+		scan_obj = wlan_psoc_get_scan_obj(psoc);
+		if (!scan_obj) {
+			scm_err("NULL scan obj");
+			return cfg_default(CFG_PNO_SCAN_TIMER_REPEAT_VALUE);
+		}
+		return scan_obj->pno_cfg.scan_timer_repeat_value;
+}
+
+uint32_t ucfg_scan_get_slow_scan_multiplier(struct wlan_objmgr_psoc *psoc)
+{
+		struct wlan_scan_obj *scan_obj;
+
+		scan_obj = wlan_psoc_get_scan_obj(psoc);
+		if (!scan_obj) {
+			scm_err("NULL scan obj");
+			return cfg_default(CFG_PNO_SLOW_SCAN_MULTIPLIER);
+		}
+		return scan_obj->pno_cfg.slow_scan_multiplier;
+}
+#endif

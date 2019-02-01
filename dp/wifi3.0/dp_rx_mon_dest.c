@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -782,6 +782,11 @@ qdf_nbuf_t dp_rx_mon_restitch_mpdu_from_msdus(struct dp_soc *soc,
 	qdf_nbuf_append_ext_list(mpdu_buf, head_frag_list,
 			frag_list_sum_len);
 
+	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
+		  "%s %d mpdu_buf %pK mpdu_buf->len %u",
+		  __func__, __LINE__,
+		  mpdu_buf, mpdu_buf->len);
+
 mpdu_stitch_done:
 	/* Check if this buffer contains the PPDU end status for TSF */
 	/* Need revist this code to see where we can get tsf timestamp */
@@ -796,10 +801,6 @@ mpdu_stitch_done:
 		rx_status->rs_tstamp.tsf = rx_desc->ppdu_end.tsf_timestamp;
 
 #endif
-	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-		  "%s %d mpdu_buf %pK mpdu_buf->len %u",
-		  __func__, __LINE__,
-		  mpdu_buf, mpdu_buf->len);
 	return mpdu_buf;
 
 mpdu_stitch_fail:
@@ -935,8 +936,9 @@ QDF_STATUS dp_rx_mon_deliver(struct dp_soc *soc, uint32_t mac_id,
 
 		qdf_nbuf_update_radiotap(&(pdev->ppdu_info.rx_status),
 			mon_mpdu, sizeof(struct rx_pkt_tlvs));
-		pdev->monitor_vdev->osif_rx_mon(
-				pdev->monitor_vdev->osif_vdev, mon_mpdu, NULL);
+		pdev->monitor_vdev->osif_rx_mon(pdev->monitor_vdev->osif_vdev,
+						mon_mpdu,
+						&pdev->ppdu_info.rx_status);
 	} else {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
 			  "[%s][%d] mon_mpdu=%pK monitor_vdev %pK osif_vdev %pK"

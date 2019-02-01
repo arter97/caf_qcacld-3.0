@@ -1,19 +1,17 @@
 /*
- * Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
  *
- * Permission to use, copy, modify, and/or distribute this software for
- * any purpose with or without fee is hereby granted, provided that the
- * above copyright notice and this permission notice appear in all
- * copies.
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
- * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
- * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
- * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
 #include "cfg_dispatcher.h"
@@ -27,7 +25,7 @@
 #include <wlan_ftm_init_deinit_api.h>
 #include <wlan_mgmt_txrx_utils_api.h>
 #include <wlan_serialization_api.h>
-#include <wlan_vdev_mlme_main.h>
+#include <include/wlan_mlme_cmn.h>
 #ifdef WLAN_ATF_ENABLE
 #include <wlan_atf_utils_api.h>
 #endif
@@ -721,8 +719,8 @@ QDF_STATUS dispatcher_init(void)
 	if (QDF_STATUS_SUCCESS != dispatcher_spectral_init())
 		goto spectral_init_fail;
 
-	if (QDF_STATUS_SUCCESS != wlan_vdev_mlme_init())
-		goto vdev_mlme_init_fail;
+	if (QDF_STATUS_SUCCESS != wlan_cmn_mlme_init())
+		goto cmn_mlme_init_fail;
 
 	/*
 	 * scheduler INIT has to be the last as each component's
@@ -735,8 +733,8 @@ QDF_STATUS dispatcher_init(void)
 	return QDF_STATUS_SUCCESS;
 
 scheduler_init_fail:
-	wlan_vdev_mlme_deinit();
-vdev_mlme_init_fail:
+	wlan_cmn_mlme_deinit();
+cmn_mlme_init_fail:
 	dispatcher_spectral_deinit();
 spectral_init_fail:
 	cfg_dispatcher_deinit();
@@ -786,7 +784,7 @@ QDF_STATUS dispatcher_deinit(void)
 
 	QDF_BUG(QDF_STATUS_SUCCESS == scheduler_deinit());
 
-	QDF_BUG(QDF_STATUS_SUCCESS == wlan_vdev_mlme_deinit());
+	QDF_BUG(QDF_STATUS_SUCCESS == wlan_cmn_mlme_deinit());
 
 	status = cfg_dispatcher_deinit();
 	QDF_BUG(QDF_IS_STATUS_SUCCESS(status));
@@ -857,9 +855,6 @@ QDF_STATUS dispatcher_psoc_open(struct wlan_objmgr_psoc *psoc)
 	if (QDF_STATUS_SUCCESS != ucfg_scan_psoc_open(psoc))
 		goto scan_psoc_open_fail;
 
-	if (QDF_STATUS_SUCCESS != wlan_serialization_psoc_open(psoc))
-		goto serialization_psoc_open_fail;
-
 	if (QDF_STATUS_SUCCESS != cp_stats_psoc_open(psoc))
 		goto cp_stats_psoc_open_fail;
 
@@ -886,8 +881,6 @@ regulatory_psoc_open_fail:
 atf_psoc_open_fail:
 	cp_stats_psoc_close(psoc);
 cp_stats_psoc_open_fail:
-	wlan_serialization_psoc_close(psoc);
-serialization_psoc_open_fail:
 	ucfg_scan_psoc_close(psoc);
 scan_psoc_open_fail:
 	wlan_mgmt_txrx_psoc_close(psoc);
@@ -909,8 +902,6 @@ QDF_STATUS dispatcher_psoc_close(struct wlan_objmgr_psoc *psoc)
 
 	QDF_BUG(QDF_STATUS_SUCCESS == cp_stats_psoc_close(psoc));
 
-	QDF_BUG(QDF_STATUS_SUCCESS == wlan_serialization_psoc_close(psoc));
-
 	QDF_BUG(QDF_STATUS_SUCCESS == ucfg_scan_psoc_close(psoc));
 
 	QDF_BUG(QDF_STATUS_SUCCESS == wlan_mgmt_txrx_psoc_close(psoc));
@@ -921,8 +912,11 @@ qdf_export_symbol(dispatcher_psoc_close);
 
 QDF_STATUS dispatcher_psoc_enable(struct wlan_objmgr_psoc *psoc)
 {
-	if (QDF_STATUS_SUCCESS != ucfg_scan_psoc_enable(psoc))
+	if (QDF_STATUS_SUCCESS != wlan_serialization_psoc_enable(psoc))
 		goto out;
+
+	if (QDF_STATUS_SUCCESS != ucfg_scan_psoc_enable(psoc))
+		goto serialization_psoc_enable_fail;
 
 	if (QDF_STATUS_SUCCESS != sa_api_psoc_enable(psoc))
 		goto sa_api_psoc_enable_fail;
@@ -945,8 +939,13 @@ QDF_STATUS dispatcher_psoc_enable(struct wlan_objmgr_psoc *psoc)
 	if (QDF_STATUS_SUCCESS != dispatcher_dbr_psoc_enable(psoc))
 		goto dbr_psoc_enable_fail;
 
+	if (QDF_STATUS_SUCCESS != wlan_mlme_psoc_enable(psoc))
+		goto mlme_psoc_enable_fail;
+
 	return QDF_STATUS_SUCCESS;
 
+mlme_psoc_enable_fail:
+	dispatcher_dbr_psoc_disable(psoc);
 dbr_psoc_enable_fail:
 	fd_psoc_disable(psoc);
 fd_psoc_enable_fail:
@@ -961,7 +960,8 @@ cp_stats_psoc_enable_fail:
 	sa_api_psoc_disable(psoc);
 sa_api_psoc_enable_fail:
 	ucfg_scan_psoc_disable(psoc);
-
+serialization_psoc_enable_fail:
+	wlan_serialization_psoc_disable(psoc);
 out:
 	return QDF_STATUS_E_FAILURE;
 }
@@ -969,6 +969,8 @@ qdf_export_symbol(dispatcher_psoc_enable);
 
 QDF_STATUS dispatcher_psoc_disable(struct wlan_objmgr_psoc *psoc)
 {
+	QDF_BUG(QDF_STATUS_SUCCESS == wlan_mlme_psoc_disable(psoc));
+
 	QDF_BUG(QDF_STATUS_SUCCESS == dispatcher_dbr_psoc_disable(psoc));
 
 	QDF_BUG(QDF_STATUS_SUCCESS == fd_psoc_disable(psoc));
@@ -984,6 +986,8 @@ QDF_STATUS dispatcher_psoc_disable(struct wlan_objmgr_psoc *psoc)
 	QDF_BUG(QDF_STATUS_SUCCESS == sa_api_psoc_disable(psoc));
 
 	QDF_BUG(QDF_STATUS_SUCCESS == ucfg_scan_psoc_disable(psoc));
+
+	QDF_BUG(QDF_STATUS_SUCCESS == wlan_serialization_psoc_disable(psoc));
 
 	return QDF_STATUS_SUCCESS;
 }

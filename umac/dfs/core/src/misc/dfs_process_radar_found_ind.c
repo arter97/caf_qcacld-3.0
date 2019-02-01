@@ -26,6 +26,7 @@
 #include "../dfs_etsi_precac.h"
 #include "../dfs_process_radar_found_ind.h"
 #include <wlan_reg_services_api.h>
+#include <wlan_objmgr_vdev_obj.h>
 #include <wlan_dfs_utils_api.h>
 #include <wlan_dfs_tgt_api.h>
 #include "wlan_dfs_mlme_api.h"
@@ -360,9 +361,13 @@ static uint8_t dfs_find_radar_affected_subchans(struct wlan_dfs *dfs,
 						uint8_t *channels,
 						uint32_t freq_center)
 {
-	int i;
+	int i, j;
+	uint8_t num_radar_subchans;
 	uint32_t flag;
 	int32_t sidx;
+	uint8_t candidate_subchan;
+	uint8_t cur_subchans[NUM_CHANNELS_160MHZ];
+	uint8_t n_cur_subchans;
 	struct dfs_channel *curchan = dfs->dfs_curchan;
 	struct freqs_offsets freq_offset;
 
@@ -408,13 +413,25 @@ static uint8_t dfs_find_radar_affected_subchans(struct wlan_dfs *dfs,
 		return 0;
 	}
 
-	for (i = 0; i < DFS_NUM_FREQ_OFFSET; i++) {
-		channels[i] = utils_dfs_freq_to_chan(freq_offset.freq[i]);
-		dfs_info(dfs, WLAN_DEBUG_DFS, "offset=%d, channel=%d",
-			 i, channels[i]);
-	}
+	n_cur_subchans = dfs_get_bonding_channels(dfs, curchan,
+						  radar_found->segment_id,
+						  cur_subchans);
 
-	return i;
+	for (i = 0, num_radar_subchans = 0; i < DFS_NUM_FREQ_OFFSET; i++) {
+		candidate_subchan = utils_dfs_freq_to_chan(freq_offset.freq[i]);
+		for (j = 0; j < n_cur_subchans; j++) {
+			if (cur_subchans[j] == candidate_subchan) {
+				channels[num_radar_subchans++] =
+						candidate_subchan;
+				dfs_info(dfs, WLAN_DEBUG_DFS,
+					 "offset=%d, channel=%d",
+					 num_radar_subchans,
+					 channels[num_radar_subchans - 1]);
+				break;
+			}
+		}
+	}
+	return num_radar_subchans;
 }
 
 uint8_t dfs_get_bonding_channels_without_seg_info(struct dfs_channel *chan,
@@ -516,18 +533,23 @@ uint8_t dfs_get_bonding_channels(struct wlan_dfs *dfs,
 	return nchannels;
 }
 
+static inline void dfs_reset_bangradar(struct wlan_dfs *dfs)
+{
+	dfs->dfs_bangradar_type = DFS_NO_BANGRADAR;
+}
+
 int dfs_radarevent_basic_sanity(struct wlan_dfs *dfs,
 		struct dfs_channel *chan)
 {
-	if (!(dfs->dfs_second_segment_bangradar ||
-				dfs_is_precac_timer_running(dfs)))
+	if (!(dfs->dfs_seg_id == SEG_ID_SECONDARY &&
+	      dfs_is_precac_timer_running(dfs)))
 		if (!(WLAN_IS_PRIMARY_OR_SECONDARY_CHAN_DFS(chan))) {
 			dfs_debug(dfs, WLAN_DEBUG_DFS2,
 					"radar event on non-DFS chan");
 			if (!(dfs->dfs_is_offload_enabled)) {
 				dfs_reset_radarq(dfs);
 				dfs_reset_alldelaylines(dfs);
-				dfs->dfs_bangradar = 0;
+				dfs_reset_bangradar(dfs);
 			}
 			return 0;
 		}
@@ -556,13 +578,6 @@ int dfs_second_segment_radar_disable(struct wlan_dfs *dfs)
 	dfs->dfs_proc_phyerr &= ~DFS_SECOND_SEGMENT_RADAR_EN;
 
 	return 0;
-}
-
-static inline void dfs_reset_bangradar(struct wlan_dfs *dfs)
-{
-	dfs->dfs_bangradar  = 0;
-	dfs->dfs_second_segment_bangradar = 0;
-	dfs->dfs_enh_bangradar = false;
 }
 
 /* dfs_prepare_nol_ie_bitmap: Create a Bitmap from the radar found subchannels
@@ -692,7 +707,6 @@ QDF_STATUS dfs_process_radar_ind(struct wlan_dfs *dfs,
 	QDF_STATUS status;
 	uint32_t freq_center;
 	uint32_t radarfound_freq;
-	struct dfs_channel *dfs_curchan;
 
 	if (!dfs->dfs_curchan) {
 		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS, "dfs->dfs_curchan is NULL");
@@ -718,21 +732,7 @@ QDF_STATUS dfs_process_radar_ind(struct wlan_dfs *dfs,
 	}
 
 	dfs_compute_radar_found_cfreq(dfs, radar_found, &freq_center);
-
-	if (dfs->dfs_bangradar || dfs->dfs_second_segment_bangradar) {
-		dfs_curchan = dfs->dfs_curchan;
-		if (radar_found->segment_id == SEG_ID_SECONDARY)
-			if (dfs_is_precac_timer_running(dfs))
-				radarfound_freq =
-					dfs->dfs_precac_secondary_freq;
-			else
-				radarfound_freq =
-					dfs_curchan->dfs_ch_vhtop_ch_freq_seg2;
-		else
-			radarfound_freq = dfs->dfs_curchan->dfs_ch_freq;
-	} else {
-		radarfound_freq = freq_center + dfs->dfs_freq_offset;
-	}
+	radarfound_freq = freq_center + dfs->dfs_freq_offset;
 
 	if (radar_found->segment_id == SEG_ID_SECONDARY)
 		dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
@@ -751,11 +751,14 @@ QDF_STATUS dfs_process_radar_ind(struct wlan_dfs *dfs,
 		return QDF_STATUS_SUCCESS;
 	}
 
+	if (dfs->dfs_bangradar_type == DFS_BANGRADAR_FOR_ALL_SUBCHANS)
+		num_channels = dfs_get_bonding_channels_without_seg_info(
+				 dfs->dfs_curchan, channels);
 	/* BW reduction is dependent on subchannel marking */
-
-	if ((dfs->dfs_use_nol_subchannel_marking ||
-	     (dfs->dfs_use_nol_subchannel_marking && dfs->dfs_bw_reduced)) &&
-	      !(dfs->dfs_bangradar || dfs->dfs_second_segment_bangradar))
+	else if ((dfs->dfs_use_nol_subchannel_marking) &&
+		 (!(dfs->dfs_bangradar_type) ||
+		 (dfs->dfs_bangradar_type ==
+		 DFS_BANGRADAR_FOR_SPECIFIC_SUBCHANS)))
 		num_channels = dfs_find_radar_affected_subchans(dfs,
 								radar_found,
 								channels,

@@ -256,6 +256,7 @@ wlan_serialization_enqueue_cmd(struct wlan_serialization_command *cmd,
 	if (status != WLAN_SER_CMD_PENDING && status != WLAN_SER_CMD_ACTIVE) {
 		qdf_mem_zero(&cmd_list->cmd,
 			     sizeof(struct wlan_serialization_command));
+		cmd_list->cmd_in_use = 0;
 		wlan_serialization_insert_back(
 			&pdev_queue->cmd_pool_list,
 			&cmd_list->pdev_node);
@@ -772,7 +773,13 @@ wlan_serialization_find_and_start_timer(struct wlan_objmgr_psoc *psoc,
 			       qdf_timer_mod(&ser_timer->timer,
 			       cmd->cmd_timeout_duration);
 
-		ser_debug("starting timer for cmd: type[%d] id[%d] high_priority[%d] blocking[%d]",
+		ser_debug("Started timer for cmd: type[%d] id[%d] high_priority[%d] blocking[%d]",
+			  cmd->cmd_type,
+			  cmd->cmd_id,
+			  cmd->is_high_priority,
+			  cmd->is_blocking);
+	} else {
+		ser_err("Failed to start timer for cmd: type[%d] id[%d] high_priority[%d] blocking[%d]",
 			  cmd->cmd_type,
 			  cmd->cmd_id,
 			  cmd->is_high_priority,

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1515,7 +1515,8 @@ int wmi_get_host_credits(wmi_unified_t wmi_handle);
 
 #ifdef NBUF_MEMORY_DEBUG
 wmi_buf_t
-wmi_buf_alloc_debug(wmi_unified_t wmi_handle, uint32_t len, uint8_t *file_name,
+wmi_buf_alloc_debug(wmi_unified_t wmi_handle, uint32_t len,
+		    const char *func_name,
 		    uint32_t line_num)
 {
 	wmi_buf_t wmi_buf;
@@ -1525,15 +1526,14 @@ wmi_buf_alloc_debug(wmi_unified_t wmi_handle, uint32_t len, uint8_t *file_name,
 		return NULL;
 	}
 
-	wmi_buf = wbuff_buff_get(wmi_handle->wbuff_handle, len, file_name,
+	wmi_buf = wbuff_buff_get(wmi_handle->wbuff_handle, len, func_name,
 				 line_num);
 	if (!wmi_buf)
 		wmi_buf = qdf_nbuf_alloc_debug(NULL,
 					       roundup(len + WMI_MIN_HEAD_ROOM,
 						       4),
 					       WMI_MIN_HEAD_ROOM, 4, false,
-					       file_name, line_num);
-
+					       func_name, line_num);
 	if (!wmi_buf)
 		return NULL;
 
@@ -1568,7 +1568,7 @@ wmi_buf_t wmi_buf_alloc_fl(wmi_unified_t wmi_handle, uint32_t len,
 		return NULL;
 	}
 
-	wmi_buf = wbuff_buff_get(wmi_handle->wbuff_handle, len, __FILE__,
+	wmi_buf = wbuff_buff_get(wmi_handle->wbuff_handle, len, __func__,
 				 __LINE__);
 	if (!wmi_buf)
 		wmi_buf = qdf_nbuf_alloc_fl(NULL, roundup(len +
@@ -2001,34 +2001,15 @@ static void wmi_process_fw_event_default_ctx(struct wmi_unified *wmi_handle,
 	wmi_buf_t evt_buf;
 	evt_buf = (wmi_buf_t) htc_packet->pPktContext;
 
-#ifndef CONFIG_MCL
 	wmi_handle->rx_ops.wma_process_fw_event_handler_cbk
 		(wmi_handle->scn_handle, evt_buf, exec_ctx);
-#else
-	wmi_handle->rx_ops.wma_process_fw_event_handler_cbk(wmi_handle,
-					 htc_packet, exec_ctx);
-#endif
 
 	return;
 }
 
-/**
- * wmi_process_fw_event_worker_thread_ctx() - process in worker thread context
- * @wmi_handle: handle to wmi
- * @htc_packet: pointer to htc packet
- *
- * Event process by below function will be in worker thread context.
- * Use this method for events which are not critical and not
- * handled in protocol stack.
- *
- * Return: none
- */
 void wmi_process_fw_event_worker_thread_ctx(struct wmi_unified *wmi_handle,
-					    HTC_PACKET *htc_packet)
+					    void *evt_buf)
 {
-	wmi_buf_t evt_buf;
-
-	evt_buf = (wmi_buf_t) htc_packet->pPktContext;
 
 	qdf_spin_lock_bh(&wmi_handle->eventq_lock);
 	qdf_nbuf_queue_add(&wmi_handle->event_queue, evt_buf);
@@ -2154,7 +2135,7 @@ static void wmi_control_rx(void *ctx, HTC_PACKET *htc_packet)
 
 	if (exec_ctx == WMI_RX_WORK_CTX) {
 		wmi_process_fw_event_worker_thread_ctx
-					(wmi_handle, htc_packet);
+					(wmi_handle, evt_buf);
 	} else if (exec_ctx > WMI_RX_WORK_CTX) {
 		wmi_process_fw_event_default_ctx
 					(wmi_handle, htc_packet, exec_ctx);

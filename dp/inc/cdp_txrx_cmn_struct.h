@@ -813,11 +813,19 @@ struct cdp_soc_t {
  * @CDP_CONFIG_DEBUG_SNIFFER: Enable debug sniffer feature
  * @CDP_CONFIG_BPR_ENABLE: Enable bcast probe feature
  * @CDP_CONFIG_PRIMARY_RADIO: Configure radio as primary
+ * @CDP_CONFIG_ENABLE_PERPKT_TXSTATS: Enable per packet statistics
+ * @CDP_CONFIG_IGMPMLD_OVERRIDE: Override IGMP/MLD
+ * @CDP_CONFIG_IGMPMLD_TID: Configurable TID value when igmmld_override is set
+ * @CDP_CONFIG_ARP_DBG_CONF: Enable ARP debug
  */
 enum cdp_pdev_param_type {
 	CDP_CONFIG_DEBUG_SNIFFER,
 	CDP_CONFIG_BPR_ENABLE,
 	CDP_CONFIG_PRIMARY_RADIO,
+	CDP_CONFIG_ENABLE_PERPKT_TXSTATS,
+	CDP_CONFIG_IGMPMLD_OVERRIDE,
+	CDP_CONFIG_IGMPMLD_TID,
+	CDP_CONFIG_ARP_DBG_CONF,
 };
 
 /*
@@ -1105,8 +1113,12 @@ struct cdp_tx_sojourn_stats {
  * @ba_bitmap: Block Ack bitmap
  * @start_seqa: Sequence number of first MPDU
  * @enq_bitmap: Enqueue MPDU bitmap
+ * @ru_start: RU start index
+ * @ru_tones: RU tones length
  * @is_mcast: MCAST or UCAST
  * @tx_rate: Transmission Rate
+ * @user_pos: user position
+ * @mu_group_id: mu group id
  */
 struct cdp_tx_completion_ppdu_user {
 	uint32_t completion_status:8,
@@ -1151,6 +1163,7 @@ struct cdp_tx_completion_ppdu_user {
 	uint32_t num_mpdu:9,
 		 num_msdu:16;
 	uint32_t tx_duration;
+	uint16_t ru_start;
 	uint16_t ru_tones;
 	bool is_mcast;
 	uint32_t tx_rate;
@@ -1158,6 +1171,8 @@ struct cdp_tx_completion_ppdu_user {
 	/*ack rssi for separate chains*/
 	uint32_t ack_rssi[CDP_RSSI_CHAIN_LEN];
 	bool ack_rssi_valid;
+	uint32_t user_pos;
+	uint32_t mu_group_id;
 };
 
 /**
