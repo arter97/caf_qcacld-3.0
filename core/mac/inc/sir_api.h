@@ -1314,6 +1314,9 @@ typedef struct sSirSmeAssocInd {
 	tDot11fIEHTCaps HTCaps;
 	tDot11fIEVHTCaps VHTCaps;
 	bool is_sae_authenticated;
+	const uint8_t *owe_ie;
+	uint32_t owe_ie_len;
+	uint16_t owe_status;
 } tSirSmeAssocInd, *tpSirSmeAssocInd;
 
 /**
@@ -1338,6 +1341,8 @@ typedef struct sSirSmeAssocCnf {
 	struct qdf_mac_addr alternate_bssid;
 	uint8_t alternateChannelId;
 	tSirMacStatusCodes mac_status_code;
+	uint8_t *owe_ie;
+	uint32_t owe_ie_len;
 } tSirSmeAssocCnf, *tpSirSmeAssocCnf;
 
 /* / Enum definition for  Wireless medium status change codes */
