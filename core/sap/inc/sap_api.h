@@ -1443,6 +1443,20 @@ void wlansap_cleanup_cac_timer(struct sap_context *sap_ctx);
 void wlansap_set_stop_bss_inprogress(struct sap_context *sap_ctx,
 					bool in_progress);
 
+/*
+ * wlansap_update_owe_info() - Update OWE info
+ * @sap_ctx: sap context
+ * @peer: peer mac
+ * @ie: IE from hostapd
+ * @ie_len: IE length
+ * @owe_status: status from hostapd
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlansap_update_owe_info(struct sap_context *sap_ctx,
+				   uint8_t *peer, const uint8_t *ie,
+				   uint32_t ie_len, uint16_t owe_status);
+
 #ifdef __cplusplus
 }
 #endif
