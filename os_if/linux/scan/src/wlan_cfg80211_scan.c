@@ -447,10 +447,14 @@ int wlan_cfg80211_sched_scan_start(struct wlan_objmgr_vdev *vdev,
 
 	enable_dfs_pno_chnl_scan = ucfg_scan_is_dfs_chnl_scan_enabled(psoc);
 	if (request->n_channels) {
-		char chl[(request->n_channels * 5) + 1];
+		char *chl = qdf_mem_malloc((request->n_channels * 5) + 1);
 		int len = 0;
 		bool ap_or_go_present = wlan_cfg80211_is_ap_go_present(psoc);
 
+		if (!chl) {
+			ret = -ENOMEM;
+			goto error;
+		}
 		for (i = 0; i < request->n_channels; i++) {
 			channel = request->channels[i]->hw_value;
 			if ((!enable_dfs_pno_chnl_scan) &&
@@ -471,6 +475,8 @@ int wlan_cfg80211_sched_scan_start(struct wlan_objmgr_vdev *vdev,
 								  &ok);
 				if (QDF_IS_STATUS_ERROR(status)) {
 					cfg80211_err("DNBS check failed");
+					qdf_mem_free(chl);
+					chl = NULL;
 					ret = -EINVAL;
 					goto error;
 				}
@@ -482,6 +488,8 @@ int wlan_cfg80211_sched_scan_start(struct wlan_objmgr_vdev *vdev,
 		}
 		cfg80211_notice("No. of Scan Channels: %d", num_chan);
 		cfg80211_notice("Channel-List: %s", chl);
+		qdf_mem_free(chl);
+		chl = NULL;
 		/* If all channels are DFS and dropped,
 		 * then ignore the PNO request
 		 */
@@ -1255,6 +1263,20 @@ static inline void wlan_cfg80211_update_scan_policy_type_flags(
 }
 #endif
 
+#ifdef WLAN_POLICY_MGR_ENABLE
+static bool
+wlan_cfg80211_allow_simultaneous_scan(struct wlan_objmgr_psoc *psoc)
+{
+	return policy_mgr_is_scan_simultaneous_capable(psoc);
+}
+#else
+static bool
+wlan_cfg80211_allow_simultaneous_scan(struct wlan_objmgr_psoc *psoc)
+{
+	return true;
+}
+#endif
+
 int wlan_cfg80211_scan(struct wlan_objmgr_vdev *vdev,
 		       struct cfg80211_scan_request *request,
 		       struct scan_params *params)
@@ -1280,6 +1302,24 @@ int wlan_cfg80211_scan(struct wlan_objmgr_vdev *vdev,
 		cfg80211_err("Invalid psoc object");
 		return -EINVAL;
 	}
+
+	/* Get NL global context from objmgr*/
+	osif_priv = wlan_pdev_get_ospriv(pdev);
+	if (!osif_priv) {
+		cfg80211_err("Invalid osif priv object");
+		return -EINVAL;
+	}
+
+	/*
+	 * If a scan is already going on i.e the qdf_list ( scan que) is not
+	 * empty, and the simultaneous scan is disabled, dont allow 2nd scan
+	 */
+	if (!wlan_cfg80211_allow_simultaneous_scan(psoc) &&
+	    !qdf_list_empty(&osif_priv->osif_scan->scan_req_q)) {
+		cfg80211_err("Simultaneous scan disabled, reject scan");
+		return -EINVAL;
+	}
+
 	req = qdf_mem_malloc(sizeof(*req));
 	if (!req) {
 		cfg80211_err("Failed to allocate scan request memory");
@@ -1288,8 +1328,6 @@ int wlan_cfg80211_scan(struct wlan_objmgr_vdev *vdev,
 	/* Initialize the scan global params */
 	ucfg_scan_init_default_params(vdev, req);
 
-	/* Get NL global context from objmgr*/
-	osif_priv = wlan_pdev_get_ospriv(pdev);
 	req_id = osif_priv->osif_scan->req_id;
 	scan_id = ucfg_scan_get_scan_id(psoc);
 	if (!scan_id) {
@@ -1297,6 +1335,7 @@ int wlan_cfg80211_scan(struct wlan_objmgr_vdev *vdev,
 		qdf_mem_free(req);
 		return -EINVAL;
 	}
+
 	/* fill the scan request structure */
 	req->vdev = vdev;
 	req->scan_req.vdev_id = wlan_vdev_get_id(vdev);
@@ -1379,7 +1418,7 @@ int wlan_cfg80211_scan(struct wlan_objmgr_vdev *vdev,
 		qdf_set_macaddr_broadcast(&req->scan_req.bssid_list[0]);
 
 	if (request->n_channels) {
-		char chl[(request->n_channels * 5) + 1];
+		char *chl = qdf_mem_malloc((request->n_channels * 5) + 1);
 		int len = 0;
 #ifdef WLAN_POLICY_MGR_ENABLE
 		bool ap_or_go_present =
@@ -1388,7 +1427,10 @@ int wlan_cfg80211_scan(struct wlan_objmgr_vdev *vdev,
 			     policy_mgr_mode_specific_connection_count(
 			     psoc, PM_P2P_GO_MODE, NULL);
 #endif
-
+		if (!chl) {
+			ret = -ENOMEM;
+			goto end;
+		}
 		for (i = 0; i < request->n_channels; i++) {
 			channel = request->channels[i]->hw_value;
 			c_freq = wlan_reg_chan_to_freq(pdev, channel);
@@ -1406,6 +1448,8 @@ int wlan_cfg80211_scan(struct wlan_objmgr_vdev *vdev,
 				if (QDF_IS_STATUS_ERROR(qdf_status)) {
 					cfg80211_err("DNBS check failed");
 					qdf_mem_free(req);
+					qdf_mem_free(chl);
+					chl = NULL;
 					ret = -EINVAL;
 					goto end;
 				}
@@ -1427,6 +1471,8 @@ int wlan_cfg80211_scan(struct wlan_objmgr_vdev *vdev,
 				break;
 		}
 		cfg80211_info("Channel-List: %s", chl);
+		qdf_mem_free(chl);
+		chl = NULL;
 		cfg80211_info("No. of Scan Channels: %d", num_chan);
 	}
 	if (!num_chan) {
