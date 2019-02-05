@@ -4932,6 +4932,8 @@ typedef enum {
 	wmi_pdev_param_ul_trig_int,
 	wmi_pdev_param_sub_channel_marking,
 	wmi_pdev_param_nav_override_config,
+	wmi_pdev_param_ul_ppdu_duration,
+
 	wmi_pdev_param_max,
 } wmi_conv_pdev_params_id;
 
