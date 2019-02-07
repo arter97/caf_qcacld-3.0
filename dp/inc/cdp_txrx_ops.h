@@ -468,6 +468,9 @@ struct cdp_ctrl_ops {
 
 	int (*txrx_is_target_ar900b)(struct cdp_vdev *vdev);
 
+	uint32_t (*txrx_get_vdev_param)(struct cdp_vdev *vdev,
+					enum cdp_vdev_param_type param);
+
 	void (*txrx_set_vdev_param)(struct cdp_vdev *vdev,
 			enum cdp_vdev_param_type param, uint32_t val);
 

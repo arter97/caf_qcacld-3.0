@@ -6510,6 +6510,33 @@ static QDF_STATUS dp_set_pdev_param(struct cdp_pdev *pdev_handle,
 }
 
 /*
+ * dp_get_vdev_param: function to get parameters from vdev
+ * @param: parameter type to get value
+ *
+ * return: void
+ */
+static uint32_t dp_get_vdev_param(struct cdp_vdev *vdev_handle,
+				  enum cdp_vdev_param_type param)
+{
+	struct dp_vdev *vdev = (struct dp_vdev *)vdev_handle;
+	uint32_t val;
+
+	switch (param) {
+	case CDP_ENABLE_DA:
+		val = vdev->pdev->soc->enable_da;
+		break;
+	default:
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+			  "param value %d is wrong\n",
+			  param);
+		val = -1;
+		break;
+	}
+
+	return val;
+}
+
+/*
  * dp_set_vdev_param: function to set parameters in vdev
  * @param: parameter type to be set
  * @val: value of parameter to be set
@@ -7354,6 +7381,7 @@ static struct cdp_ctrl_ops dp_ops_ctrl = {
 #endif
 	.txrx_set_pdev_param = dp_set_pdev_param,
 	.set_key = dp_set_michael_key,
+	.txrx_get_vdev_param = dp_get_vdev_param,
 };
 
 static struct cdp_me_ops dp_ops_me = {
@@ -7716,6 +7744,9 @@ void *dp_soc_attach_wifi3(void *ctrl_psoc, void *hif_handle,
 
 	/*Initialize inactivity timer for wifison */
 	dp_init_inact_timer(soc);
+
+	/* by default enable DA WAR */
+	soc->enable_da = 1;
 
 	return (void *)soc;
 
