@@ -56,6 +56,8 @@
 #include <pktlog.h>
 #endif
 
+#define WAIT_TIME_INVALID_PEER_MS 1000
+
 #define REPT_MU_MIMO 1
 #define REPT_MU_OFDMA_MIMO 3
 #define DP_VO_TID 6
@@ -1126,6 +1128,8 @@ struct dp_pdev {
 	/* msdu chain head & tail */
 	qdf_nbuf_t invalid_peer_head_msdu;
 	qdf_nbuf_t invalid_peer_tail_msdu;
+
+	uint32_t invalid_peer_timeout_ms;
 
 	/* Band steering  */
 	/* TBD */

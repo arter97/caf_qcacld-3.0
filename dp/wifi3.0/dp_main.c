@@ -2897,6 +2897,9 @@ static struct cdp_pdev *dp_pdev_attach_wifi3(struct cdp_soc_t *txrx_soc,
 	pdev->mo_ctrl_filter = FILTER_CTRL_ALL;
 	pdev->mo_data_filter = FILTER_DATA_ALL;
 
+	pdev->invalid_peer_timeout_ms = qdf_system_ticks_to_msecs(qdf_system_ticks()) +
+					WAIT_TIME_INVALID_PEER_MS;
+
 #ifndef CONFIG_WIN
 	/* MCL */
 	dp_local_peer_id_pool_init(pdev);

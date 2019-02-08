@@ -463,6 +463,11 @@ dp_rx_chain_msdus(struct dp_soc *soc, qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr,
 				dp_pdev->invalid_peer_tail_msdu,
 				nbuf);
 
+	/* update timestamp of last appended invalid_peer_head_msdu */
+	dp_pdev->invalid_peer_timeout_ms =
+		qdf_system_ticks_to_msecs(qdf_system_ticks()) +
+		WAIT_TIME_INVALID_PEER_MS;
+
 	return mpdu_done;
 }
 
@@ -904,8 +909,11 @@ dp_rx_process_mic_error(struct dp_soc *soc,
 	unsigned int tid;
 	QDF_STATUS status;
 
-	if (!hal_rx_msdu_end_first_msdu_get(rx_tlv_hdr))
-		return;
+	if (!hal_rx_msdu_end_first_msdu_get(rx_tlv_hdr)) {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+			  "First MSDU status fail");
+		goto fail;
+	}
 
 	rx_pkt_hdr = hal_rx_pkt_hdr_get(qdf_nbuf_data(nbuf));
 	wh = (struct ieee80211_frame *)rx_pkt_hdr;
@@ -946,7 +954,7 @@ dp_rx_process_mic_error(struct dp_soc *soc,
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 				"%s: Frag pkt seq# %d frag# %d consumed status %d !\n",
 				__func__, rx_seq, fragno, status);
-			return;
+		return;
 	}
 
 	tops = pdev->soc->cdp_soc.ol_ops;
@@ -1128,6 +1136,60 @@ done:
 
 	return rx_bufs_used; /* Assume no scale factor for now */
 }
+
+#ifdef CONFIG_MCL
+/**
+ * dp_rx_invalid_peer_msdu_flush() - Flush invalid peer msdu
+ *
+ * @soc: core txrx main context
+ *
+ * This function flush invalid peer msdu based on timeout
+ *
+ * Return: void
+ */
+static inline void dp_rx_invalid_peer_msdu_flush(struct dp_soc *soc)
+{
+}
+#else
+
+/**
+ * dp_rx_invalid_peer_msdu_flush() - Flush invalid peer msdu
+ *
+ * @soc: core txrx main context
+ *
+ * This function flush invalid peer msdu based on timeout
+ *
+ * Return: void
+ */
+static inline void dp_rx_invalid_peer_msdu_flush(struct dp_soc *soc)
+{
+	struct dp_pdev *dp_pdev;
+	qdf_nbuf_t curr_nbuf, next;
+	uint32_t mac_id;
+	uint32_t now_ms = qdf_system_ticks_to_msecs(qdf_system_ticks());
+
+	now_ms = qdf_system_ticks_to_msecs(qdf_system_ticks());
+
+	for (mac_id = 0; mac_id < MAX_PDEV_CNT; mac_id++) {
+		dp_pdev = soc->pdev_list[mac_id];
+		if (!dp_pdev)
+			continue;
+		if (now_ms >= dp_pdev->invalid_peer_timeout_ms) {
+			curr_nbuf = dp_pdev->invalid_peer_head_msdu;
+			while (curr_nbuf) {
+				next = qdf_nbuf_next(curr_nbuf);
+				qdf_nbuf_free(curr_nbuf);
+				curr_nbuf = next;
+			}
+			dp_pdev->invalid_peer_head_msdu = NULL;
+			dp_pdev->invalid_peer_tail_msdu = NULL;
+			dp_pdev->invalid_peer_timeout_ms =
+				now_ms + WAIT_TIME_INVALID_PEER_MS;
+		}
+	}
+
+}
+#endif
 
 /**
  * dp_rx_wbm_err_process() - Processes error frames routed to WBM release ring
@@ -1438,6 +1500,9 @@ done:
 		qdf_nbuf_free(nbuf);
 		nbuf = next;
 	}
+
+	dp_rx_invalid_peer_msdu_flush(soc);
+
 	return rx_bufs_used; /* Assume no scale factor for now */
 }
 
