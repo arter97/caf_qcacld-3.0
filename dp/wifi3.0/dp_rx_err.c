@@ -998,6 +998,7 @@ dp_rx_err_process(struct dp_soc *soc, void *hal_ring, uint32_t quota)
 	void *link_desc_va;
 	struct hal_rx_msdu_list msdu_list; /* MSDU's per MPDU */
 	uint16_t num_msdus;
+	struct dp_rx_desc *rx_desc = NULL;;
 
 	/* Debug -- Remove later */
 	qdf_assert(soc && hal_ring);
@@ -1051,6 +1052,10 @@ dp_rx_err_process(struct dp_soc *soc, void *hal_ring, uint32_t quota)
 		link_desc_va = dp_rx_cookie_2_link_desc_va(soc, &hbi);
 		hal_rx_msdu_list_get(link_desc_va, &msdu_list, &num_msdus);
 
+		rx_desc = dp_rx_cookie_2_va_rxdma_buf(soc,
+						      msdu_list.sw_cookie[0]);
+		mac_id = rx_desc->pool_id;
+
 		if (qdf_unlikely((msdu_list.rbm[0] !=
 						HAL_RX_BUF_RBM_SW3_BM) &&
 				(msdu_list.rbm[0] !=
@@ -1072,10 +1077,23 @@ dp_rx_err_process(struct dp_soc *soc, void *hal_ring, uint32_t quota)
 		hal_rx_mpdu_desc_info_get(ring_desc, &mpdu_desc_info);
 
 		if (mpdu_desc_info.mpdu_flags & HAL_MPDU_F_FRAGMENT) {
-			/* TODO */
+			/*
+			 * We only handle one msdu per link desc for fragmented
+			 * case. We drop the msdus and release the link desc
+			 * back if there are more than one msdu in link desc.
+			 */
+			if (qdf_unlikely(num_msdus > 1)) {
+				count = dp_rx_msdus_drop(soc, ring_desc,
+							 &mpdu_desc_info,
+							 &mac_id, quota);
+				rx_bufs_reaped[mac_id] += count;
+				continue;
+			}
+
 			count = dp_rx_frag_handle(soc,
-					ring_desc, &mpdu_desc_info,
-					&mac_id, quota);
+						  ring_desc, &mpdu_desc_info,
+						  rx_desc, &mac_id, quota);
+
 			rx_bufs_reaped[mac_id] += count;
 			DP_STATS_INC(soc, rx.rx_frags, 1);
 			continue;
