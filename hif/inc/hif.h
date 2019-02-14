@@ -61,6 +61,7 @@ typedef void *hif_handle_t;
 #define HIF_TYPE_QCN7605 17
 #define HIF_TYPE_QCA6390 18
 #define HIF_TYPE_QCA8074V2 19
+#define HIF_TYPE_QCA6018  20
 
 #ifdef IPA_OFFLOAD
 #define DMA_COHERENT_MASK_IPA_VER_3_AND_ABOVE   37
@@ -927,6 +928,15 @@ void hif_update_pipe_callback(struct hif_opaque_softc *osc,
 				struct hif_msg_callbacks *callbacks);
 
 void hif_print_napi_stats(struct hif_opaque_softc *hif_ctx);
+
+/*hif_clear_napi_stats() - function clears the stats of the
+ * latency when called.
+ * @hif_ctx - the HIF context to assign the callback to
+ *
+ * Return: None
+ */
+void hif_clear_napi_stats(struct hif_opaque_softc *hif_ctx);
+
 #ifdef __cplusplus
 }
 #endif

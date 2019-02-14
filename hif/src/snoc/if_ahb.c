@@ -101,6 +101,19 @@ const char *ic_irqname[HIF_IC_MAX_IRQ] = {
 "tcl2host-status-ring",
 };
 
+/** hif_ahb_get_irq_name() - get irqname
+ * This function gives irqnumber to irqname
+ * mapping.
+ *
+ * @irq_no: irq number
+ *
+ * Return: irq name
+ */
+const char *hif_ahb_get_irq_name(int irq_no)
+{
+	return ic_irqname[irq_no];
+}
+
 /**
  * hif_disable_isr() - disable isr
  *
@@ -289,6 +302,7 @@ int hif_ahb_configure_grp_irq(struct hif_softc *scn,
 	/* configure external interrupts */
 	hif_ext_group->irq_enable = &hif_ahb_exec_grp_irq_enable;
 	hif_ext_group->irq_disable = &hif_ahb_exec_grp_irq_disable;
+	hif_ext_group->irq_name = &hif_ahb_get_irq_name;
 	hif_ext_group->work_complete = &hif_dummy_grp_done;
 
 	qdf_spin_lock_irqsave(&hif_ext_group->irq_lock);
@@ -442,7 +456,8 @@ void hif_ahb_disable_bus(struct hif_softc *scn)
 
 		/* Should not be executed on 8074 platform */
 		if ((tgt_info->target_type != TARGET_TYPE_QCA8074) &&
-		    (tgt_info->target_type != TARGET_TYPE_QCA8074V2)) {
+		    (tgt_info->target_type != TARGET_TYPE_QCA8074V2) &&
+		    (tgt_info->target_type != TARGET_TYPE_QCA6018)) {
 			hif_ahb_clk_enable_disable(&pdev->dev, 0);
 
 			hif_ahb_device_reset(scn);
@@ -545,7 +560,8 @@ QDF_STATUS hif_ahb_enable_bus(struct hif_softc *ol_sc,
 
 	/* QCA_WIFI_QCA8074_VP:Should not be executed on 8074 VP platform */
 	if ((tgt_info->target_type != TARGET_TYPE_QCA8074) &&
-	    (tgt_info->target_type != TARGET_TYPE_QCA8074V2)) {
+	    (tgt_info->target_type != TARGET_TYPE_QCA8074V2) &&
+	    (tgt_info->target_type != TARGET_TYPE_QCA6018)) {
 		if (hif_ahb_enable_radio(sc, pdev, id) != 0) {
 			HIF_INFO("error in enabling soc\n");
 			return -EIO;
@@ -563,7 +579,8 @@ QDF_STATUS hif_ahb_enable_bus(struct hif_softc *ol_sc,
 err_target_sync:
 	/* QCA_WIFI_QCA8074_VP:Should not be executed on 8074 VP platform */
 	if ((tgt_info->target_type != TARGET_TYPE_QCA8074) &&
-	    (tgt_info->target_type != TARGET_TYPE_QCA8074V2)) {
+	    (tgt_info->target_type != TARGET_TYPE_QCA8074V2) &&
+	    (tgt_info->target_type != TARGET_TYPE_QCA6018)) {
 		HIF_INFO("Error: Disabling target\n");
 		hif_ahb_disable_bus(ol_sc);
 	}
@@ -668,9 +685,10 @@ void hif_ahb_irq_enable(struct hif_softc *scn, int ce_id)
 			regval |= HOST_IE_REG2_CE_BIT(ce_id);
 			hif_write32_mb(scn, scn->mem + reg_offset, regval);
 			if (tgt_info->target_type == TARGET_TYPE_QCA8074 ||
-			    tgt_info->target_type == TARGET_TYPE_QCA8074V2) {
+			    tgt_info->target_type == TARGET_TYPE_QCA8074V2 ||
+			    tgt_info->target_type == TARGET_TYPE_QCA6018) {
 				/* Enable destination ring interrupts for
-				 * 8074 and 8074V2
+				 * 8074, 8074V2 and 6018
 				 */
 				regval = hif_read32_mb(scn, scn->mem +
 					HOST_IE_ADDRESS_3);
@@ -717,9 +735,10 @@ void hif_ahb_irq_disable(struct hif_softc *scn, int ce_id)
 			regval &= ~HOST_IE_REG2_CE_BIT(ce_id);
 			hif_write32_mb(scn, scn->mem + reg_offset, regval);
 			if (tgt_info->target_type == TARGET_TYPE_QCA8074 ||
-			    tgt_info->target_type == TARGET_TYPE_QCA8074V2) {
+			    tgt_info->target_type == TARGET_TYPE_QCA8074V2 ||
+			    tgt_info->target_type == TARGET_TYPE_QCA6018) {
 				/* Disable destination ring interrupts for
-				 * 8074 and 8074V2
+				 * 8074, 8074V2 and 6018
 				 */
 				regval = hif_read32_mb(scn, scn->mem +
 					HOST_IE_ADDRESS_3);

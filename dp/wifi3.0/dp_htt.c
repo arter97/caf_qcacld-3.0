@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -65,22 +65,54 @@ do {                                                             \
 	(1 << HTT_PPDU_STATS_USR_COMPLTN_ACK_BA_STATUS_TLV)
 
 /**
- * Bitmap of HTT PPDU TLV types for Sniffer mode
+ * Bitmap of HTT PPDU TLV types for Sniffer mode bitmap 64
  */
-#define HTT_PPDU_SNIFFER_AMPDU_TLV_BITMAP \
-	(1 << HTT_PPDU_STATS_COMMON_TLV) | \
+#define HTT_PPDU_SNIFFER_AMPDU_TLV_BITMAP_64 \
+	((1 << HTT_PPDU_STATS_COMMON_TLV) | \
 	(1 << HTT_PPDU_STATS_USR_COMMON_TLV) | \
 	(1 << HTT_PPDU_STATS_USR_RATE_TLV) | \
 	(1 << HTT_PPDU_STATS_SCH_CMD_STATUS_TLV) | \
 	(1 << HTT_PPDU_STATS_USR_COMPLTN_COMMON_TLV) | \
 	(1 << HTT_PPDU_STATS_USR_COMPLTN_ACK_BA_STATUS_TLV) | \
 	(1 << HTT_PPDU_STATS_USR_COMPLTN_BA_BITMAP_64_TLV) | \
-	(1 << HTT_PPDU_STATS_USR_MPDU_ENQ_BITMAP_64_TLV) | \
-	(1 << HTT_PPDU_STATS_USR_COMPLTN_BA_BITMAP_256_TLV)
+	(1 << HTT_PPDU_STATS_USR_MPDU_ENQ_BITMAP_64_TLV))
+
+/**
+ * Bitmap of HTT PPDU TLV types for Sniffer mode bitmap 256
+ */
+#define HTT_PPDU_SNIFFER_AMPDU_TLV_BITMAP_256 \
+	((1 << HTT_PPDU_STATS_COMMON_TLV) | \
+	(1 << HTT_PPDU_STATS_USR_COMMON_TLV) | \
+	(1 << HTT_PPDU_STATS_USR_RATE_TLV) | \
+	(1 << HTT_PPDU_STATS_SCH_CMD_STATUS_TLV) | \
+	(1 << HTT_PPDU_STATS_USR_COMPLTN_COMMON_TLV) | \
+	(1 << HTT_PPDU_STATS_USR_COMPLTN_ACK_BA_STATUS_TLV) | \
+	(1 << HTT_PPDU_STATS_USR_COMPLTN_BA_BITMAP_256_TLV) | \
+	(1 << HTT_PPDU_STATS_USR_MPDU_ENQ_BITMAP_256_TLV))
 
 #define HTT_FRAMECTRL_DATATYPE 0x08
 #define HTT_PPDU_DESC_MAX_DEPTH 16
 #define DP_SCAN_PEER_ID 0xFFFF
+
+/*
+ * dp_htt_get_ppdu_sniffer_ampdu_tlv_bitmap() - Get ppdu stats tlv
+ * bitmap for sniffer mode
+ * @bitmap: received bitmap
+ *
+ * Return: expected bitmap value, returns zero if doesn't match with
+ * either 64-bit Tx window or 256-bit window tlv bitmap
+ */
+
+static inline int
+dp_htt_get_ppdu_sniffer_ampdu_tlv_bitmap(uint32_t bitmap)
+{
+	if (bitmap == (HTT_PPDU_SNIFFER_AMPDU_TLV_BITMAP_64))
+		return HTT_PPDU_SNIFFER_AMPDU_TLV_BITMAP_64;
+	else if (bitmap == (HTT_PPDU_SNIFFER_AMPDU_TLV_BITMAP_256))
+		return HTT_PPDU_SNIFFER_AMPDU_TLV_BITMAP_256;
+
+	return 0;
+}
 
 /*
  * dp_tx_stats_update() - Update per-peer statistics
@@ -114,7 +146,8 @@ dp_tx_rate_stats_update(struct dp_peer *peer,
 	if (!ratekbps)
 		return;
 
-	dp_ath_rate_lpf(peer->stats.tx.avg_tx_rate, ratekbps);
+	peer->stats.tx.avg_tx_rate =
+		dp_ath_rate_lpf(peer->stats.tx.avg_tx_rate, ratekbps);
 	ppdu_tx_rate = dp_ath_rate_out(peer->stats.tx.avg_tx_rate);
 	DP_STATS_UPD(peer, tx.rnd_avg_tx_rate, ppdu_tx_rate);
 
@@ -146,6 +179,42 @@ static void dp_tx_stats_update(struct dp_soc *soc, struct dp_peer *peer,
 	if (soc->process_tx_status)
 		return;
 
+	if (ppdu->mu_group_id <= MAX_MU_GROUP_ID && ppdu->ppdu_type != SU_TX) {
+		if (unlikely(!(ppdu->mu_group_id & (MAX_MU_GROUP_ID - 1))))
+			QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
+				  "mu_group_id out of bound!!\n");
+		else
+			DP_STATS_UPD(peer, tx.mu_group_id[ppdu->mu_group_id],
+				     (ppdu->user_pos + 1));
+	}
+
+	if (ppdu->ppdu_type == MUOFDMA_TX ||
+	    ppdu->ppdu_type == MUMIMO_OFDMA_TX) {
+		DP_STATS_UPD(peer, tx.ru_tones, ppdu->ru_tones);
+		DP_STATS_UPD(peer, tx.ru_start, ppdu->ru_start);
+		switch (ppdu->ru_tones) {
+		case RU_26:
+			DP_STATS_INC(peer, tx.ru_loc[0], 1);
+		break;
+		case RU_52:
+			DP_STATS_INC(peer, tx.ru_loc[1], 1);
+		break;
+		case RU_106:
+			DP_STATS_INC(peer, tx.ru_loc[2], 1);
+		break;
+		case RU_242:
+			DP_STATS_INC(peer, tx.ru_loc[3], 1);
+		break;
+		case RU_484:
+			DP_STATS_INC(peer, tx.ru_loc[4], 1);
+		break;
+		case RU_996:
+			DP_STATS_INC(peer, tx.ru_loc[5], 1);
+		break;
+		}
+	}
+
+	DP_STATS_INC(peer, tx.transmit_type[ppdu->ppdu_type], num_msdu);
 	DP_STATS_INC_PKT(peer, tx.comp_pkt,
 			num_msdu, (ppdu->success_bytes +
 				ppdu->retry_bytes + ppdu->failed_bytes));
@@ -1888,8 +1957,17 @@ static void dp_process_ppdu_stats_user_rate_tlv(struct dp_pdev *pdev,
 	ppdu_user_desc->tid =
 		HTT_PPDU_STATS_USER_RATE_TLV_TID_NUM_GET(*tag_buf);
 
-	tag_buf += 2;
+	tag_buf += 1;
 
+	ppdu_user_desc->user_pos =
+		HTT_PPDU_STATS_USER_RATE_TLV_USER_POS_GET(*tag_buf);
+	ppdu_user_desc->mu_group_id =
+		HTT_PPDU_STATS_USER_RATE_TLV_MU_GROUPID_GET(*tag_buf);
+
+	tag_buf += 1;
+
+	ppdu_user_desc->ru_start =
+		HTT_PPDU_STATS_USER_RATE_TLV_RU_START_GET(*tag_buf);
 	ppdu_user_desc->ru_tones =
 		(HTT_PPDU_STATS_USER_RATE_TLV_RU_END_GET(*tag_buf) -
 		HTT_PPDU_STATS_USER_RATE_TLV_RU_START_GET(*tag_buf)) + 1;
@@ -2045,7 +2123,8 @@ static void dp_process_ppdu_stats_user_cmpltn_common_tlv(
 
 
 	tag_buf++;
-	if (qdf_likely(ppdu_user_desc->completion_status)) {
+	if (qdf_likely(ppdu_user_desc->completion_status ==
+			HTT_PPDU_STATS_USER_STATUS_OK)) {
 		ppdu_desc->ack_rssi = dp_stats_buf->ack_rssi;
 		ppdu_user_desc->ack_rssi_valid = 1;
 	} else {
@@ -2358,65 +2437,65 @@ static void dp_process_ppdu_tag(struct dp_pdev *pdev, uint32_t *tag_buf,
 
 	switch (tlv_type) {
 	case HTT_PPDU_STATS_COMMON_TLV:
-		qdf_assert_always(tlv_len ==
+		qdf_assert_always(tlv_len >=
 				sizeof(htt_ppdu_stats_common_tlv));
 		dp_process_ppdu_stats_common_tlv(pdev, tag_buf, ppdu_info);
 		break;
 	case HTT_PPDU_STATS_USR_COMMON_TLV:
-		qdf_assert_always(tlv_len ==
+		qdf_assert_always(tlv_len >=
 				sizeof(htt_ppdu_stats_user_common_tlv));
 		dp_process_ppdu_stats_user_common_tlv(
 				pdev, tag_buf, ppdu_info);
 		break;
 	case HTT_PPDU_STATS_USR_RATE_TLV:
-		qdf_assert_always(tlv_len ==
+		qdf_assert_always(tlv_len >=
 				sizeof(htt_ppdu_stats_user_rate_tlv));
 		dp_process_ppdu_stats_user_rate_tlv(pdev, tag_buf, ppdu_info);
 		break;
 	case HTT_PPDU_STATS_USR_MPDU_ENQ_BITMAP_64_TLV:
-		qdf_assert_always(tlv_len ==
+		qdf_assert_always(tlv_len >=
 				sizeof(htt_ppdu_stats_enq_mpdu_bitmap_64_tlv));
 		dp_process_ppdu_stats_enq_mpdu_bitmap_64_tlv(
 				pdev, tag_buf, ppdu_info);
 		break;
 	case HTT_PPDU_STATS_USR_MPDU_ENQ_BITMAP_256_TLV:
-		qdf_assert_always(tlv_len ==
+		qdf_assert_always(tlv_len >=
 				sizeof(htt_ppdu_stats_enq_mpdu_bitmap_256_tlv));
 		dp_process_ppdu_stats_enq_mpdu_bitmap_256_tlv(
 				pdev, tag_buf, ppdu_info);
 		break;
 	case HTT_PPDU_STATS_USR_COMPLTN_COMMON_TLV:
-		qdf_assert_always(tlv_len ==
+		qdf_assert_always(tlv_len >=
 				sizeof(htt_ppdu_stats_user_cmpltn_common_tlv));
 		dp_process_ppdu_stats_user_cmpltn_common_tlv(
 				pdev, tag_buf, ppdu_info);
 		break;
 	case HTT_PPDU_STATS_USR_COMPLTN_BA_BITMAP_64_TLV:
-		qdf_assert_always(tlv_len ==
+		qdf_assert_always(tlv_len >=
 			sizeof(htt_ppdu_stats_user_compltn_ba_bitmap_64_tlv));
 		dp_process_ppdu_stats_user_compltn_ba_bitmap_64_tlv(
 				pdev, tag_buf, ppdu_info);
 		break;
 	case HTT_PPDU_STATS_USR_COMPLTN_BA_BITMAP_256_TLV:
-		qdf_assert_always(tlv_len ==
+		qdf_assert_always(tlv_len >=
 			sizeof(htt_ppdu_stats_user_compltn_ba_bitmap_256_tlv));
 		dp_process_ppdu_stats_user_compltn_ba_bitmap_256_tlv(
 				pdev, tag_buf, ppdu_info);
 		break;
 	case HTT_PPDU_STATS_USR_COMPLTN_ACK_BA_STATUS_TLV:
-		qdf_assert_always(tlv_len ==
+		qdf_assert_always(tlv_len >=
 			sizeof(htt_ppdu_stats_user_compltn_ack_ba_status_tlv));
 		dp_process_ppdu_stats_user_compltn_ack_ba_status_tlv(
 				pdev, tag_buf, ppdu_info);
 		break;
 	case HTT_PPDU_STATS_USR_COMMON_ARRAY_TLV:
-		qdf_assert_always(tlv_len ==
+		qdf_assert_always(tlv_len >=
 			sizeof(htt_ppdu_stats_usr_common_array_tlv_v));
 		dp_process_ppdu_stats_user_common_array_tlv(
 				pdev, tag_buf, ppdu_info);
 		break;
 	case HTT_PPDU_STATS_USR_COMPLTN_FLUSH_TLV:
-		qdf_assert_always(tlv_len ==
+		qdf_assert_always(tlv_len >=
 			sizeof(htt_ppdu_stats_flush_tlv));
 		dp_process_ppdu_stats_user_compltn_flush_tlv(
 				pdev, tag_buf);
@@ -2453,7 +2532,9 @@ void dp_ppdu_desc_deliver(struct dp_pdev *pdev,
 	tlv_bitmap_expected = HTT_PPDU_DEFAULT_TLV_BITMAP;
 	if (pdev->tx_sniffer_enable || pdev->mcopy_mode) {
 		if (ppdu_info->is_ampdu)
-			tlv_bitmap_expected = HTT_PPDU_SNIFFER_AMPDU_TLV_BITMAP;
+			tlv_bitmap_expected =
+				dp_htt_get_ppdu_sniffer_ampdu_tlv_bitmap(
+					ppdu_info->tlv_bitmap);
 	}
 	for (i = 0; i < ppdu_desc->num_users; i++) {
 
@@ -2547,6 +2628,16 @@ struct ppdu_info *dp_get_ppdu_desc(struct dp_pdev *pdev, uint32_t ppdu_id,
 	}
 
 	if (ppdu_info) {
+		/**
+		 * for MUMIMO and OFDMA, In a PPDU we have multiple user
+		 * and same tlv type are populated for multiple users.
+		 * tlv bitmap is used to check whether SU or MU_MIMO/OFDMA
+		 */
+		if ((ppdu_info->tlv_bitmap & (1 << tlv_type)) &&
+		    !(ppdu_info->tlv_bitmap &
+		    (1 << HTT_PPDU_STATS_SCH_CMD_STATUS_TLV)))
+			return ppdu_info;
+
 		/**
 		 * if we get tlv_type that is already been processed for ppdu,
 		 * that means we got a new ppdu with same ppdu id.
@@ -2687,14 +2778,17 @@ static struct ppdu_info *dp_htt_process_tlv(struct dp_pdev *pdev,
 
 	if (pdev->tx_sniffer_enable || pdev->mcopy_mode) {
 		if (ppdu_info->is_ampdu)
-			tlv_bitmap_expected = HTT_PPDU_SNIFFER_AMPDU_TLV_BITMAP;
+			tlv_bitmap_expected =
+				dp_htt_get_ppdu_sniffer_ampdu_tlv_bitmap(
+					ppdu_info->tlv_bitmap);
 	}
 
 	/**
 	 * Once all the TLVs for a given PPDU has been processed,
 	 * return PPDU status to be delivered to higher layer
 	 */
-	if (ppdu_info->tlv_bitmap == tlv_bitmap_expected)
+	if (ppdu_info->tlv_bitmap != 0 &&
+	    ppdu_info->tlv_bitmap == tlv_bitmap_expected)
 		return ppdu_info;
 
 	return NULL;
@@ -2965,11 +3059,12 @@ static void dp_htt_t2h_msg_handler(void *context, HTC_PACKET *pkt)
 		{
 			u_int16_t peer_id;
 			u_int8_t vdev_id;
+			u_int8_t mac_addr[HTT_MAC_ADDR_LEN] = {0};
 			peer_id = HTT_RX_PEER_UNMAP_PEER_ID_GET(*msg_word);
 			vdev_id = HTT_RX_PEER_UNMAP_VDEV_ID_GET(*msg_word);
 
 			dp_rx_peer_unmap_handler(soc->dp_soc, peer_id,
-						 vdev_id, NULL, 0);
+						 vdev_id, mac_addr, 0);
 			break;
 		}
 	case HTT_T2H_MSG_TYPE_SEC_IND:
@@ -3112,7 +3207,7 @@ static void dp_htt_t2h_msg_handler(void *context, HTC_PACKET *pkt)
 	case HTT_T2H_MSG_TYPE_PEER_UNMAP_V2:
 		{
 			u_int8_t mac_addr_deswizzle_buf[HTT_MAC_ADDR_LEN];
-			u_int8_t *peer_mac_addr;
+			u_int8_t *mac_addr;
 			u_int16_t peer_id;
 			u_int8_t vdev_id;
 			u_int8_t is_wds;
@@ -3120,7 +3215,7 @@ static void dp_htt_t2h_msg_handler(void *context, HTC_PACKET *pkt)
 			peer_id =
 			HTT_RX_PEER_UNMAP_V2_SW_PEER_ID_GET(*msg_word);
 			vdev_id = HTT_RX_PEER_UNMAP_V2_VDEV_ID_GET(*msg_word);
-			peer_mac_addr =
+			mac_addr =
 			htt_t2h_mac_addr_deswizzle((u_int8_t *)(msg_word + 1),
 						   &mac_addr_deswizzle_buf[0]);
 			is_wds =
@@ -3131,7 +3226,7 @@ static void dp_htt_t2h_msg_handler(void *context, HTC_PACKET *pkt)
 				  peer_id, vdev_id);
 
 			dp_rx_peer_unmap_handler(soc->dp_soc, peer_id,
-						 vdev_id, peer_mac_addr,
+						 vdev_id, mac_addr,
 						 is_wds);
 			break;
 		}
@@ -3242,80 +3337,77 @@ htt_htc_soc_attach(struct htt_soc *soc)
 }
 
 /*
- * htt_soc_attach() - SOC level HTT initialization
- * @dp_soc:	Opaque Data path SOC handle
- * @ctrl_psoc:	Opaque ctrl SOC handle
- * @htc_soc:	SOC level HTC handle
- * @hal_soc:	Opaque HAL SOC handle
- * @osdev:	QDF device
+ * htt_soc_initialize() - SOC level HTT initialization
+ * @htt_soc: Opaque htt SOC handle
+ * @ctrl_psoc: Opaque ctrl SOC handle
+ * @htc_soc: SOC level HTC handle
+ * @hal_soc: Opaque HAL SOC handle
+ * @osdev: QDF device
  *
  * Return: HTT handle on success; NULL on failure
  */
 void *
-htt_soc_attach(void *dp_soc, void *ctrl_psoc, HTC_HANDLE htc_soc,
-	void *hal_soc, qdf_device_t osdev)
+htt_soc_initialize(void *htt_soc, void *ctrl_psoc, HTC_HANDLE htc_soc,
+		   void *hal_soc, qdf_device_t osdev)
 {
-	struct htt_soc *soc;
-	int i;
-
-	soc = qdf_mem_malloc(sizeof(*soc));
-
-	if (!soc)
-		goto fail1;
+	struct htt_soc *soc = (struct htt_soc *)htt_soc;
 
 	soc->osdev = osdev;
 	soc->ctrl_psoc = ctrl_psoc;
-	soc->dp_soc = dp_soc;
 	soc->htc_soc = htc_soc;
 	soc->hal_soc = hal_soc;
-
-	/* TODO: See if any NSS related context is required in htt_soc */
-
-	soc->htt_htc_pkt_freelist = NULL;
 
 	if (htt_htc_soc_attach(soc))
 		goto fail2;
 
-	/* TODO: See if any Rx data specific intialization is required. For
-	 * MCL use cases, the data will be received as single packet and
-	 * should not required any descriptor or reorder handling
-	 */
+	return soc;
+
+fail2:
+	return NULL;
+}
+
+void htt_soc_htc_dealloc(struct htt_soc *htt_handle)
+{
+	htt_htc_misc_pkt_pool_free(htt_handle);
+	htt_htc_pkt_pool_free(htt_handle);
+}
+
+/*
+ * htt_soc_htc_prealloc() - HTC memory prealloc
+ * @htt_soc: SOC level HTT handle
+ *
+ * Return: QDF_STATUS_SUCCESS on Success or
+ * QDF_STATUS_E_NOMEM on allocation failure
+ */
+QDF_STATUS htt_soc_htc_prealloc(struct htt_soc *soc)
+{
+	int i;
 
 	HTT_TX_MUTEX_INIT(&soc->htt_tx_mutex);
 
+	soc->htt_htc_pkt_freelist = NULL;
 	/* pre-allocate some HTC_PACKET objects */
 	for (i = 0; i < HTT_HTC_PKT_POOL_INIT_SIZE; i++) {
 		struct dp_htt_htc_pkt_union *pkt;
 		pkt = qdf_mem_malloc(sizeof(*pkt));
 		if (!pkt)
-			break;
+			return QDF_STATUS_E_NOMEM;
 
 		htt_htc_pkt_free(soc, &pkt->u.pkt);
 	}
-
-	return soc;
-
-fail2:
-	qdf_mem_free(soc);
-
-fail1:
-	return NULL;
+	return QDF_STATUS_SUCCESS;
 }
 
-
 /*
- * htt_soc_detach() - Detach SOC level HTT
- * @htt_soc:	HTT SOC handle
+ * htt_soc_detach() - Free SOC level HTT handle
+ * @htt_hdl: HTT SOC handle
  */
-void
-htt_soc_detach(void *htt_soc)
+void htt_soc_detach(void *htt_hdl)
 {
-	struct htt_soc *soc = (struct htt_soc *)htt_soc;
+	struct htt_soc *htt_handle = (struct htt_soc *)htt_hdl;
 
-	htt_htc_misc_pkt_pool_free(soc);
-	htt_htc_pkt_pool_free(soc);
-	HTT_TX_MUTEX_DESTROY(&soc->htt_tx_mutex);
-	qdf_mem_free(soc);
+	HTT_TX_MUTEX_DESTROY(&htt_handle->htt_tx_mutex);
+	qdf_mem_free(htt_handle);
 }
 
 /**

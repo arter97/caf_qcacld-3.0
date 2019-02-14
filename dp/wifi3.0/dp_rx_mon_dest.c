@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -360,6 +360,8 @@ dp_rx_mon_mpdu_pop(struct dp_soc *soc, uint32_t mac_id,
 					drop_mpdu = true;
 					qdf_nbuf_free(msdu);
 					msdu = NULL;
+					dp_pdev->mon_last_linkdesc_paddr =
+						buf_info.paddr;
 					goto next_msdu;
 				}
 
@@ -440,7 +442,6 @@ dp_rx_mon_mpdu_pop(struct dp_soc *soc, uint32_t mac_id,
 					+ frag_len;
 
 			qdf_nbuf_set_pktlen(msdu, rx_buf_size);
-
 #if 0
 			/* Disble it.see packet on msdu done set to 0 */
 			/*
@@ -783,6 +784,11 @@ qdf_nbuf_t dp_rx_mon_restitch_mpdu_from_msdus(struct dp_soc *soc,
 	qdf_nbuf_append_ext_list(mpdu_buf, head_frag_list,
 			frag_list_sum_len);
 
+	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
+		  "%s %d mpdu_buf %pK mpdu_buf->len %u",
+		  __func__, __LINE__,
+		  mpdu_buf, mpdu_buf->len);
+
 mpdu_stitch_done:
 	/* Check if this buffer contains the PPDU end status for TSF */
 	/* Need revist this code to see where we can get tsf timestamp */
@@ -797,10 +803,6 @@ mpdu_stitch_done:
 		rx_status->rs_tstamp.tsf = rx_desc->ppdu_end.tsf_timestamp;
 
 #endif
-	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-		  "%s %d mpdu_buf %pK mpdu_buf->len %u",
-		  __func__, __LINE__,
-		  mpdu_buf, mpdu_buf->len);
 	return mpdu_buf;
 
 mpdu_stitch_fail:
@@ -813,6 +815,60 @@ mpdu_stitch_fail:
 	}
 	return NULL;
 }
+
+/**
+ * dp_send_mgmt_packet_to_stack(): send indicataion to upper layers
+ *
+ * @soc: soc handle
+ * @nbuf: Mgmt packet
+ * @pdev: pdev handle
+ *
+ * Return: QDF_STATUS_SUCCESS on success
+ *         QDF_STATUS_E_INVAL in error
+ */
+#ifdef FEATURE_PERPKT_INFO
+static inline QDF_STATUS dp_send_mgmt_packet_to_stack(struct dp_soc *soc,
+						      qdf_nbuf_t nbuf,
+						      struct dp_pdev *pdev)
+{
+	uint32_t *nbuf_data;
+	struct ieee80211_frame *wh;
+
+	if (!nbuf)
+		return QDF_STATUS_E_INVAL;
+
+	/*check if this is not a mgmt packet*/
+	wh = (struct ieee80211_frame *)qdf_nbuf_data(nbuf);
+	if (((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) !=
+	     IEEE80211_FC0_TYPE_MGT) &&
+	     ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) !=
+	     IEEE80211_FC0_TYPE_CTL)) {
+		qdf_nbuf_free(nbuf);
+		return QDF_STATUS_E_INVAL;
+	}
+	nbuf_data = (uint32_t *)qdf_nbuf_push_head(nbuf, 4);
+	if (!nbuf_data) {
+		QDF_TRACE(QDF_MODULE_ID_DP,
+			  QDF_TRACE_LEVEL_ERROR,
+			  FL("No headroom"));
+		qdf_nbuf_free(nbuf);
+		return QDF_STATUS_E_INVAL;
+	}
+	*nbuf_data = pdev->ppdu_info.com_info.ppdu_id;
+
+	dp_wdi_event_handler(WDI_EVENT_RX_MGMT_CTRL, soc, nbuf,
+			     HTT_INVALID_PEER,
+			     WDI_NO_VAL, pdev->pdev_id);
+	return QDF_STATUS_SUCCESS;
+}
+#else
+static inline QDF_STATUS dp_send_mgmt_packet_to_stack(struct dp_soc *soc,
+						      qdf_nbuf_t nbuf,
+						      struct dp_pdev *pdev)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 /**
  * dp_rx_extract_radiotap_info(): Extract and populate information in
@@ -842,6 +898,15 @@ void dp_rx_extract_radiotap_info(struct cdp_mon_status *rx_status,
 	/* TODO: rx_mon_status->vht_flag_values1 */
 }
 
+/*
+ * dp_rx_mon_deliver(): function to deliver packets to stack
+ * @soc: DP soc
+ * @mac_id: MAC ID
+ * @head_msdu: head of msdu list
+ * @tail_msdu: tail of msdu list
+ *
+ * Return: status: 0 - Success, non-zero: Failure
+ */
 QDF_STATUS dp_rx_mon_deliver(struct dp_soc *soc, uint32_t mac_id,
 	qdf_nbuf_t head_msdu, qdf_nbuf_t tail_msdu)
 {
@@ -850,16 +915,21 @@ QDF_STATUS dp_rx_mon_deliver(struct dp_soc *soc, uint32_t mac_id,
 	qdf_nbuf_t mon_skb, skb_next;
 	qdf_nbuf_t mon_mpdu = NULL;
 
-	if ((pdev->monitor_vdev == NULL) ||
-		(pdev->monitor_vdev->osif_rx_mon == NULL)) {
+	if (!pdev->monitor_vdev && !pdev->mcopy_mode)
 		goto mon_deliver_fail;
-	}
 
 	/* restitch mon MPDU for delivery via monitor interface */
 	mon_mpdu = dp_rx_mon_restitch_mpdu_from_msdus(soc, mac_id, head_msdu,
 				tail_msdu, rs);
 
-	if (mon_mpdu && pdev->monitor_vdev && pdev->monitor_vdev->osif_vdev) {
+	/* monitor vap cannot be present when mcopy is enabled
+	 * hence same skb can be consumed
+	 */
+	if (pdev->mcopy_mode)
+		return dp_send_mgmt_packet_to_stack(soc, mon_mpdu, pdev);
+
+	if (mon_mpdu && pdev->monitor_vdev && pdev->monitor_vdev->osif_vdev &&
+	    pdev->monitor_vdev->osif_rx_mon) {
 		pdev->ppdu_info.rx_status.ppdu_id =
 			pdev->ppdu_info.com_info.ppdu_id;
 		pdev->ppdu_info.rx_status.device_id = soc->device_id;
@@ -872,9 +942,10 @@ QDF_STATUS dp_rx_mon_deliver(struct dp_soc *soc, uint32_t mac_id,
 				pdev->monitor_vdev->osif_vdev, mon_mpdu, NULL);
 	} else {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-				  "[%s][%d] mon_mpdu=%pK pdev->monitor_vdev %pK osif_vdev %pK",
-				  __func__, __LINE__, mon_mpdu, pdev->monitor_vdev,
-				  pdev->monitor_vdev->osif_vdev);
+			  "[%s][%d] mon_mpdu=%pK monitor_vdev %pK osif_vdev %pK"
+			  , __func__, __LINE__, mon_mpdu, pdev->monitor_vdev,
+			  (pdev->monitor_vdev ? pdev->monitor_vdev->osif_vdev
+			   : NULL));
 		goto mon_deliver_fail;
 	}
 
@@ -1148,6 +1219,7 @@ QDF_STATUS dp_mon_link_desc_pool_setup(struct dp_soc *soc, uint32_t mac_id)
 	uint32_t num_replenish_buf;
 	struct dp_srng *dp_srng;
 	int i;
+	qdf_dma_addr_t *baseaddr = NULL;
 
 	dp_srng = &dp_pdev->rxdma_mon_desc_ring[mac_for_pdev];
 
@@ -1160,8 +1232,8 @@ QDF_STATUS dp_mon_link_desc_pool_setup(struct dp_soc *soc, uint32_t mac_id)
 		total_link_descs <<= 1;
 
 	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO_HIGH,
-		"%s: total_link_descs: %u, link_desc_size: %d",
-		__func__, total_link_descs, link_desc_size);
+		  "%s: total_link_descs: %u, link_desc_size: %d",
+		  __func__, total_link_descs, link_desc_size);
 
 	total_mem_size =  total_link_descs * link_desc_size;
 
@@ -1178,24 +1250,31 @@ QDF_STATUS dp_mon_link_desc_pool_setup(struct dp_soc *soc, uint32_t mac_id)
 	}
 
 	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_WARN,
-		"%s: total_mem_size: %d, num_link_desc_banks: %u, \
-		max_alloc_size: %d last_bank_size: %d",
-		__func__, total_mem_size, num_link_desc_banks, max_alloc_size,
-		last_bank_size);
+		  "%s: total_mem_size: %d, num_link_desc_banks: %u",
+		  __func__, total_mem_size, num_link_desc_banks);
+	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_WARN,
+		  "%s: max_alloc_size: %d last_bank_size: %d",
+		  __func__, max_alloc_size, last_bank_size);
 
 	for (i = 0; i < num_link_desc_banks; i++) {
-		dp_pdev->link_desc_banks[mac_for_pdev][i].base_vaddr_unaligned =
-		qdf_mem_alloc_consistent(soc->osdev, soc->osdev->dev,
-		 max_alloc_size,
-		 &(dp_pdev->link_desc_banks[mac_for_pdev][i].
-							base_paddr_unaligned));
+		baseaddr = &dp_pdev->link_desc_banks[mac_for_pdev][i].
+			base_paddr_unaligned;
+		if (!soc->dp_soc_reinit) {
+			dp_pdev->link_desc_banks[mac_for_pdev][i].
+				base_vaddr_unaligned =
+				qdf_mem_alloc_consistent(soc->osdev,
+							 soc->osdev->dev,
+							 max_alloc_size,
+							 baseaddr);
 
-		if (!dp_pdev->link_desc_banks[mac_for_pdev][i].
-							base_vaddr_unaligned) {
-			QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-				"%s: Link desc memory allocation failed",
-				__func__);
-			goto fail;
+			if (!dp_pdev->link_desc_banks[mac_for_pdev][i].
+					base_vaddr_unaligned) {
+				QDF_TRACE(QDF_MODULE_ID_TXRX,
+					  QDF_TRACE_LEVEL_ERROR,
+					  "%s: Link desc mem alloc failed",
+					  __func__);
+				goto fail;
+			}
 		}
 		dp_pdev->link_desc_banks[mac_for_pdev][i].size = max_alloc_size;
 
@@ -1223,18 +1302,24 @@ QDF_STATUS dp_mon_link_desc_pool_setup(struct dp_soc *soc, uint32_t mac_id)
 		/* Allocate last bank in case total memory required is not exact
 		 * multiple of max_alloc_size
 		 */
-		dp_pdev->link_desc_banks[mac_for_pdev][i].base_vaddr_unaligned =
-		qdf_mem_alloc_consistent(soc->osdev,
-		soc->osdev->dev, last_bank_size,
-		&(dp_pdev->link_desc_banks[mac_for_pdev][i].
-							base_paddr_unaligned));
+		baseaddr = &dp_pdev->link_desc_banks[mac_for_pdev][i].
+			base_paddr_unaligned;
+		if (!soc->dp_soc_reinit) {
+			dp_pdev->link_desc_banks[mac_for_pdev][i].
+				base_vaddr_unaligned =
+				qdf_mem_alloc_consistent(soc->osdev,
+							 soc->osdev->dev,
+							 last_bank_size,
+							 baseaddr);
 
-		if (dp_pdev->link_desc_banks[mac_for_pdev][i].
-						base_vaddr_unaligned == NULL) {
-			QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-				"%s: allocation failed for mon link desc pool",
-				__func__);
-			goto fail;
+			if (!dp_pdev->link_desc_banks[mac_for_pdev][i].
+					base_vaddr_unaligned) {
+				QDF_TRACE(QDF_MODULE_ID_TXRX,
+					  QDF_TRACE_LEVEL_ERROR,
+					  "%s: alloc fail:mon link desc pool",
+					  __func__);
+				goto fail;
+			}
 		}
 		dp_pdev->link_desc_banks[mac_for_pdev][i].size = last_bank_size;
 
@@ -1436,6 +1521,20 @@ dp_rx_pdev_mon_attach(struct dp_pdev *pdev) {
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS
+dp_mon_link_free(struct dp_pdev *pdev) {
+	uint8_t pdev_id = pdev->pdev_id;
+	struct dp_soc *soc = pdev->soc;
+	int mac_id;
+
+	for (mac_id = 0; mac_id < NUM_RXDMA_RINGS_PER_PDEV; mac_id++) {
+		int mac_for_pdev = dp_get_mac_id_for_pdev(mac_id, pdev_id);
+
+		dp_mon_link_desc_pool_cleanup(soc, mac_for_pdev);
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
 /**
  * dp_rx_pdev_mon_detach() - detach dp rx for monitor mode
  * @pdev: core txrx pdev context
@@ -1450,14 +1549,12 @@ dp_rx_pdev_mon_attach(struct dp_pdev *pdev) {
 QDF_STATUS
 dp_rx_pdev_mon_detach(struct dp_pdev *pdev) {
 	uint8_t pdev_id = pdev->pdev_id;
-	struct dp_soc *soc = pdev->soc;
 	int mac_id;
 
 	qdf_spinlock_destroy(&pdev->mon_lock);
 	for (mac_id = 0; mac_id < NUM_RXDMA_RINGS_PER_PDEV; mac_id++) {
 		int mac_for_pdev = dp_get_mac_id_for_pdev(mac_id, pdev_id);
 
-		dp_mon_link_desc_pool_cleanup(soc, mac_for_pdev);
 		dp_rx_pdev_mon_status_detach(pdev, mac_for_pdev);
 		dp_rx_pdev_mon_buf_detach(pdev, mac_for_pdev);
 	}
@@ -1472,6 +1569,11 @@ dp_rx_pdev_mon_attach(struct dp_pdev *pdev) {
 
 QDF_STATUS
 dp_rx_pdev_mon_detach(struct dp_pdev *pdev) {
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+dp_mon_link_free(struct dp_pdev *pdev) {
 	return QDF_STATUS_SUCCESS;
 }
 #endif /* DISABLE_MON_CONFIG */

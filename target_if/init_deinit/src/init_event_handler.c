@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -125,7 +125,9 @@ static int init_deinit_service_ready_event_handler(ol_scn_t scn_handle,
 
 	target_if_atf_cfg_enable(psoc, tgt_hdl, event);
 
-	target_if_qwrap_cfg_enable(psoc, tgt_hdl, event);
+	if (!wmi_service_enabled(wmi_handle, wmi_service_ext_msg)) {
+		target_if_qwrap_cfg_enable(psoc, tgt_hdl, event);
+	}
 
 	target_if_lteu_cfg_enable(psoc, tgt_hdl, event);
 
@@ -254,6 +256,8 @@ static int init_deinit_service_ext_ready_event_handler(ol_scn_t scn_handle,
 		legacy_callback(wmi_service_ready_ext_event_id,
 				scn_handle, event, data_len);
 
+	target_if_qwrap_cfg_enable(psoc, tgt_hdl, event);
+
 	info->wlan_res_cfg.num_vdevs = (target_psoc_get_num_radios(tgt_hdl) *
 					info->wlan_res_cfg.num_vdevs);
 	info->wlan_res_cfg.beacon_tx_offload_max_vdev =
@@ -325,6 +329,7 @@ static int init_deinit_ready_event_handler(ol_scn_t scn_handle,
 	wmi_legacy_service_ready_callback legacy_callback;
 	uint8_t num_radios, i;
 	uint32_t max_peers;
+	uint32_t max_ast_index;
 	target_resource_config *tgt_cfg;
 
 	if (!scn_handle) {
@@ -382,9 +387,10 @@ static int init_deinit_ready_event_handler(ol_scn_t scn_handle,
 	if (ready_ev.num_total_peer != 0) {
 		tgt_cfg = &info->wlan_res_cfg;
 		max_peers = tgt_cfg->num_peers + ready_ev.num_extra_peer + 1;
+		max_ast_index = ready_ev.max_ast_index + 1;
 
 		cdp_peer_map_attach(wlan_psoc_get_dp_handle(psoc), max_peers,
-				    tgt_cfg->peer_map_unmap_v2);
+				    max_ast_index, tgt_cfg->peer_map_unmap_v2);
 	}
 
 	/* Indicate to the waiting thread that the ready

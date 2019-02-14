@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -320,6 +320,50 @@ enum cdp_txrx_ast_entry_type {
 	CDP_TXRX_AST_TYPE_DA,	/* AST entry based on Destination address */
 	CDP_TXRX_AST_TYPE_WDS_HM_SEC, /* HM WDS entry for secondary radio */
 	CDP_TXRX_AST_TYPE_MAX
+};
+
+/*
+ * cdp_ast_free_status: status passed to callback function before freeing ast
+ * @CDP_TXRX_AST_DELETED - AST is deleted from FW and delete response received
+ * @CDP_TXRX_AST_DELETE_IN_PROGRESS - AST delete command sent to FW and host
+ *                                    is waiting for FW response
+ */
+enum cdp_ast_free_status {
+	CDP_TXRX_AST_DELETED,
+	CDP_TXRX_AST_DELETE_IN_PROGRESS,
+};
+
+/**
+ * txrx_ast_free_cb - callback registered for ast free
+ * @ctrl_soc: control path soc context
+ * @cdp_soc: DP soc context
+ * @cookie: cookie
+ * @cdp_ast_free_status: ast free status
+ */
+typedef void (*txrx_ast_free_cb)(void *ctrl_soc,
+				 void *cdp_soc,
+				 void *cookie,
+				 enum cdp_ast_free_status);
+
+#define CDP_MAC_ADDR_LEN 6
+
+/**
+ *  struct cdp_ast_entry_info - AST entry information
+ *  @peer_mac_addr: mac address of peer on which AST entry is added
+ *  @type: ast entry type
+ *  @vdev_id: vdev_id
+ *  @pdev_id: pdev_id
+ *  @peer_id: peer_id
+ *
+ *  This structure holds the ast entry information
+ *
+ */
+struct cdp_ast_entry_info {
+	uint8_t peer_mac_addr[CDP_MAC_ADDR_LEN];
+	enum cdp_txrx_ast_entry_type type;
+	uint8_t vdev_id;
+	uint8_t pdev_id;
+	uint16_t peer_id;
 };
 
 /**
@@ -750,11 +794,19 @@ struct cdp_soc_t {
  * @CDP_CONFIG_DEBUG_SNIFFER: Enable debug sniffer feature
  * @CDP_CONFIG_BPR_ENABLE: Enable bcast probe feature
  * @CDP_CONFIG_PRIMARY_RADIO: Configure radio as primary
+ * @CDP_CONFIG_ENABLE_PERPKT_TXSTATS: Enable per packet statistics
+ * @CDP_CONFIG_IGMPMLD_OVERRIDE: Override IGMP/MLD
+ * @CDP_CONFIG_IGMPMLD_TID: Configurable TID value when igmmld_override is set
+ * @CDP_CONFIG_ARP_DBG_CONF: Enable ARP debug
  */
 enum cdp_pdev_param_type {
 	CDP_CONFIG_DEBUG_SNIFFER,
 	CDP_CONFIG_BPR_ENABLE,
 	CDP_CONFIG_PRIMARY_RADIO,
+	CDP_CONFIG_ENABLE_PERPKT_TXSTATS,
+	CDP_CONFIG_IGMPMLD_OVERRIDE,
+	CDP_CONFIG_IGMPMLD_TID,
+	CDP_CONFIG_ARP_DBG_CONF,
 };
 
 /*
@@ -1042,8 +1094,12 @@ struct cdp_tx_sojourn_stats {
  * @ba_bitmap: Block Ack bitmap
  * @start_seqa: Sequence number of first MPDU
  * @enq_bitmap: Enqueue MPDU bitmap
+ * @ru_start: RU start index
+ * @ru_tones: RU tones length
  * @is_mcast: MCAST or UCAST
  * @tx_rate: Transmission Rate
+ * @user_pos: user position
+ * @mu_group_id: mu group id
  */
 struct cdp_tx_completion_ppdu_user {
 	uint32_t completion_status:8,
@@ -1088,6 +1144,7 @@ struct cdp_tx_completion_ppdu_user {
 	uint32_t num_mpdu:9,
 		 num_msdu:16;
 	uint32_t tx_duration;
+	uint16_t ru_start;
 	uint16_t ru_tones;
 	bool is_mcast;
 	uint32_t tx_rate;
@@ -1095,6 +1152,8 @@ struct cdp_tx_completion_ppdu_user {
 	/*ack rssi for separate chains*/
 	uint32_t ack_rssi[CDP_RSSI_CHAIN_LEN];
 	bool ack_rssi_valid;
+	uint32_t user_pos;
+	uint32_t mu_group_id;
 };
 
 /**

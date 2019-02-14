@@ -93,7 +93,7 @@ dp_rx_populate_cdp_indication_ppdu(struct dp_pdev *pdev,
 	cdp_rx_ppdu->lsig_a = ppdu_info->rx_status.rate;
 
 	ast_index = ppdu_info->rx_status.ast_index;
-	if (ast_index > (WLAN_UMAC_PSOC_MAX_PEERS * 2)) {
+	if (ast_index >= wlan_cfg_get_max_ast_idx(soc->wlan_cfg_ctx)) {
 		cdp_rx_ppdu->peer_id = HTT_INVALID_PEER;
 		return;
 	}
@@ -271,6 +271,8 @@ dp_rx_handle_mcopy_mode(struct dp_soc *soc, struct dp_pdev *pdev,
 			struct hal_rx_ppdu_info *ppdu_info, qdf_nbuf_t nbuf)
 {
 	uint8_t size = 0;
+	struct ieee80211_frame *wh;
+	uint32_t *nbuf_data;
 
 	if (ppdu_info->msdu_info.first_msdu_payload == NULL)
 		return QDF_STATUS_SUCCESS;
@@ -280,14 +282,24 @@ dp_rx_handle_mcopy_mode(struct dp_soc *soc, struct dp_pdev *pdev,
 
 	pdev->m_copy_id.rx_ppdu_id = ppdu_info->com_info.ppdu_id;
 
-	/* Include 2 bytes of reserved space appended to the msdu payload */
+	wh = (struct ieee80211_frame *)(ppdu_info->msdu_info.first_msdu_payload
+					+ 4);
 	size = (ppdu_info->msdu_info.first_msdu_payload -
-				qdf_nbuf_data(nbuf)) + 2;
+				qdf_nbuf_data(nbuf));
 	ppdu_info->msdu_info.first_msdu_payload = NULL;
 
 	if (qdf_nbuf_pull_head(nbuf, size) == NULL)
 		return QDF_STATUS_SUCCESS;
 
+	if (((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) ==
+	     IEEE80211_FC0_TYPE_MGT) ||
+	     ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) ==
+	     IEEE80211_FC0_TYPE_CTL)) {
+		return QDF_STATUS_SUCCESS;
+	}
+
+	nbuf_data = (uint32_t *)qdf_nbuf_data(nbuf);
+	*nbuf_data = pdev->ppdu_info.com_info.ppdu_id;
 	/* only retain RX MSDU payload in the skb */
 	qdf_nbuf_trim_tail(nbuf, qdf_nbuf_len(nbuf) -
 				ppdu_info->msdu_info.payload_len);
@@ -401,6 +413,12 @@ dp_rx_handle_ppdu_stats(struct dp_soc *soc, struct dp_pdev *pdev,
 		qdf_spin_unlock_bh(&pdev->neighbour_peer_mutex);
 	}
 
+	/* need not generate wdi event when mcopy and
+	 * enhanced stats are not enabled
+	 */
+	if (!pdev->mcopy_mode && !pdev->enhanced_stats_en)
+		return;
+
 	if (!pdev->mcopy_mode) {
 		if (!ppdu_info->rx_status.frame_control_info_valid)
 			return;
@@ -423,6 +441,9 @@ dp_rx_handle_ppdu_stats(struct dp_soc *soc, struct dp_pdev *pdev,
 					soc, ppdu_nbuf, cdp_rx_ppdu->peer_id,
 					WDI_NO_VAL, pdev->pdev_id);
 				dp_peer_unref_del_find_by_id(peer);
+
+			} else {
+				qdf_nbuf_free(ppdu_nbuf);
 			}
 		} else if (pdev->mcopy_mode) {
 			dp_rx_stats_update(pdev, peer, cdp_rx_ppdu);
@@ -441,6 +462,43 @@ dp_rx_handle_ppdu_stats(struct dp_soc *soc, struct dp_pdev *pdev,
 {
 }
 #endif
+
+/**
+* dp_rx_process_peer_based_pktlog() - Process Rx pktlog if peer based
+* filtering enabled
+* @soc: core txrx main context
+* @ppdu_info: Structure for rx ppdu info
+* @status_nbuf: Qdf nbuf abstraction for linux skb
+* @mac_id: mac_id/pdev_id correspondinggly for MCL and WIN
+*
+* Return: none
+*/
+static inline void
+dp_rx_process_peer_based_pktlog(struct dp_soc *soc,
+				struct hal_rx_ppdu_info *ppdu_info,
+				qdf_nbuf_t status_nbuf, uint32_t mac_id)
+{
+	struct dp_peer *peer;
+	struct dp_ast_entry *ast_entry;
+	uint32_t ast_index;
+
+	ast_index = ppdu_info->rx_status.ast_index;
+	if (ast_index < (WLAN_UMAC_PSOC_MAX_PEERS * 2)) {
+		ast_entry = soc->ast_table[ast_index];
+		if (ast_entry) {
+			peer = ast_entry->peer;
+			if (peer && (peer->peer_ids[0] != HTT_INVALID_PEER)) {
+				if (peer->peer_based_pktlog_filter) {
+					dp_wdi_event_handler(
+							WDI_EVENT_RX_DESC, soc,
+							status_nbuf,
+							peer->peer_ids[0],
+							WDI_NO_VAL, mac_id);
+				}
+			}
+		}
+	}
+}
 
 /**
 * dp_rx_mon_status_process_tlv() - Process status TLV in status
@@ -473,15 +531,10 @@ dp_rx_mon_status_process_tlv(struct dp_soc *soc, uint32_t mac_id,
 	while (!qdf_nbuf_is_queue_empty(&pdev->rx_status_q)) {
 
 		status_nbuf = qdf_nbuf_queue_remove(&pdev->rx_status_q);
+
 		rx_tlv = qdf_nbuf_data(status_nbuf);
 		rx_tlv_start = rx_tlv;
 
-#ifndef REMOVE_PKT_LOG
-#if defined(WDI_EVENT_ENABLE)
-		dp_wdi_event_handler(WDI_EVENT_RX_DESC, soc,
-			status_nbuf, HTT_INVALID_PEER, WDI_NO_VAL, mac_id);
-#endif
-#endif
 		if ((pdev->monitor_vdev != NULL) || (pdev->enhanced_stats_en) ||
 				pdev->mcopy_mode) {
 
@@ -499,22 +552,28 @@ dp_rx_mon_status_process_tlv(struct dp_soc *soc, uint32_t mac_id,
 
 			} while (tlv_status == HAL_TLV_STATUS_PPDU_NOT_DONE);
 		}
-
+		if (pdev->dp_peer_based_pktlog) {
+			dp_rx_process_peer_based_pktlog(soc, ppdu_info,
+							status_nbuf, mac_id);
+		} else {
+			dp_wdi_event_handler(WDI_EVENT_RX_DESC, soc,
+					     status_nbuf, HTT_INVALID_PEER,
+					     WDI_NO_VAL, mac_id);
+		}
 		if (ppdu_info->rx_status.monitor_direct_used && pdev->neighbour_peers_added
 		    && pdev->monitor_vdev) {
 			smart_mesh_status = dp_rx_handle_smart_mesh_mode(soc,
 						pdev, ppdu_info, status_nbuf);
 			if (smart_mesh_status)
 				qdf_nbuf_free(status_nbuf);
-		}
-		if (pdev->mcopy_mode) {
+		} else if (pdev->mcopy_mode) {
 			m_copy_status = dp_rx_handle_mcopy_mode(soc,
 						pdev, ppdu_info, status_nbuf);
 			if (m_copy_status == QDF_STATUS_SUCCESS)
 				qdf_nbuf_free(status_nbuf);
-		}
-		if (!pdev->neighbour_peers_added && !pdev->mcopy_mode)
+		} else {
 			qdf_nbuf_free(status_nbuf);
+		}
 
 		if (tlv_status == HAL_TLV_STATUS_PPDU_NON_STD_DONE) {
 			dp_rx_mon_deliver_non_std(soc, mac_id);

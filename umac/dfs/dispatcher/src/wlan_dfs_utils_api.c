@@ -211,6 +211,37 @@ void utils_dfs_clear_cac_started_chan(struct wlan_objmgr_pdev *pdev)
 	dfs_clear_cac_started_chan(dfs);
 }
 
+/** utils_fill_dfs_chan_info() - Fill the dfs channel structure with wlan
+ * channel.
+ * @chan: Pointer to DFS channel structure.
+ * @wlan_chan: Pointer to WLAN Channel structure.
+ *
+ * Return: void
+ */
+static void utils_fill_dfs_chan_info(struct dfs_channel *chan,
+				     struct wlan_channel *wlan_chan)
+{
+	chan->dfs_ch_freq = wlan_chan->ch_freq;
+	chan->dfs_ch_flags = wlan_chan->ch_flags;
+	chan->dfs_ch_flagext = wlan_chan->ch_flagext;
+	chan->dfs_ch_ieee = wlan_chan->ch_ieee;
+	chan->dfs_ch_vhtop_ch_freq_seg1 = wlan_chan->ch_freq_seg1;
+	chan->dfs_ch_vhtop_ch_freq_seg2 = wlan_chan->ch_freq_seg2;
+}
+
+bool utils_dfs_is_precac_done(struct wlan_objmgr_pdev *pdev,
+			      struct wlan_channel *wlan_chan)
+{
+	struct wlan_dfs *dfs;
+	struct dfs_channel chan;
+
+	dfs = global_dfs_to_mlme.pdev_get_comp_private_obj(pdev);
+	if (!dfs)
+		return false;
+	utils_fill_dfs_chan_info(&chan, wlan_chan);
+	return dfs_is_precac_done(dfs, &chan);
+}
+
 bool utils_dfs_check_for_cac_start(struct wlan_objmgr_pdev *pdev,
 				   bool *continue_current_cac)
 {
@@ -366,6 +397,67 @@ QDF_STATUS utils_dfs_second_segment_radar_disable(struct wlan_objmgr_pdev *pdev)
 	dfs_second_segment_radar_disable(dfs);
 
 	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS utils_dfs_fetch_nol_ie_info(struct wlan_objmgr_pdev *pdev,
+				       uint8_t *nol_ie_bandwidth,
+				       uint16_t *nol_ie_startfreq,
+				       uint8_t *nol_ie_bitmap)
+{
+	struct wlan_dfs *dfs;
+
+	dfs = global_dfs_to_mlme.pdev_get_comp_private_obj(pdev);
+	if (!dfs)
+		return  QDF_STATUS_E_FAILURE;
+
+	dfs_fetch_nol_ie_info(dfs, nol_ie_bandwidth, nol_ie_startfreq,
+			      nol_ie_bitmap);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS utils_dfs_set_rcsa_flags(struct wlan_objmgr_pdev *pdev,
+				    bool is_rcsa_ie_sent,
+				    bool is_nol_ie_sent)
+{
+	struct wlan_dfs *dfs;
+
+	dfs = global_dfs_to_mlme.pdev_get_comp_private_obj(pdev);
+	if (!dfs)
+		return  QDF_STATUS_E_FAILURE;
+
+	dfs_set_rcsa_flags(dfs, is_rcsa_ie_sent, is_nol_ie_sent);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS utils_dfs_get_rcsa_flags(struct wlan_objmgr_pdev *pdev,
+				    bool *is_rcsa_ie_sent,
+				    bool *is_nol_ie_sent)
+{
+	struct wlan_dfs *dfs;
+
+	dfs = global_dfs_to_mlme.pdev_get_comp_private_obj(pdev);
+	if (!dfs)
+		return  QDF_STATUS_E_FAILURE;
+	dfs_get_rcsa_flags(dfs, is_rcsa_ie_sent, is_nol_ie_sent);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+bool utils_dfs_process_nol_ie_bitmap(struct wlan_objmgr_pdev *pdev,
+				     uint8_t nol_ie_bandwidth,
+				     uint16_t nol_ie_startfreq,
+				     uint8_t nol_ie_bitmap)
+{
+	struct wlan_dfs *dfs;
+
+	dfs = global_dfs_to_mlme.pdev_get_comp_private_obj(pdev);
+	if (!dfs)
+		return  false;
+	return dfs_process_nol_ie_bitmap(dfs, nol_ie_bandwidth,
+					 nol_ie_startfreq,
+					 nol_ie_bitmap);
 }
 
 QDF_STATUS utils_dfs_set_cac_timer_running(struct wlan_objmgr_pdev *pdev,

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -520,9 +520,9 @@ QDF_STATUS wmi_set_peer_param_send(void *wmi_hdl,
 QDF_STATUS wmi_unified_peer_create_send(void *wmi_hdl,
 					struct peer_create_params *param);
 
-QDF_STATUS wmi_unified_stats_request_send(void *wmi_hdl,
-				uint8_t macaddr[IEEE80211_ADDR_LEN],
-				struct stats_request_params *param);
+QDF_STATUS wmi_unified_stats_request_send(wmi_unified_t wmi_handle,
+					  uint8_t macaddr[IEEE80211_ADDR_LEN],
+					  struct stats_request_params *param);
 
 QDF_STATUS wmi_unified_green_ap_ps_send(void *wmi_hdl,
 					uint32_t value, uint8_t pdev_id);
@@ -545,6 +545,22 @@ QDF_STATUS wmi_unified_wow_remove_wakeup_pattern_send(void *wmi_hdl,
 #ifndef CONFIG_MCL
 QDF_STATUS wmi_unified_packet_log_enable_send(void *wmi_hdl,
 			WMI_HOST_PKTLOG_EVENT PKTLOG_EVENT, uint8_t mac_id);
+
+/**
+ *  wmi_unified_peer_based_pktlog_send() - WMI request enable peer
+ *  based filtering
+ *  @wmi_handle: handle to WMI.
+ *  @macaddr: PEER mac address to be filtered
+ *  @mac_id: Mac id
+ *  @enb_dsb: Enable or Disable peer based pktlog
+ *            filtering
+ *
+ *  Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_peer_based_pktlog_send(void *wmi_hdl,
+					      uint8_t *macaddr,
+					      uint8_t mac_id,
+					      uint8_t enb_dsb);
 #else
 QDF_STATUS wmi_unified_packet_log_enable_send(void *wmi_hdl,
 				uint8_t macaddr[IEEE80211_ADDR_LEN],
@@ -842,10 +858,6 @@ wmi_extract_apf_read_memory_resp_event(wmi_unified_t wmi, void *evt_buf,
 				struct wmi_apf_read_memory_resp_event_params
 								*read_mem_evt);
 #endif /* FEATURE_WLAN_APF */
-
-QDF_STATUS wmi_unified_stats_request_send(void *wmi_hdl,
-				uint8_t macaddr[IEEE80211_ADDR_LEN],
-				struct stats_request_params *param);
 
 QDF_STATUS wmi_send_get_user_position_cmd(void *wmi_hdl, uint32_t value);
 

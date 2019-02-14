@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -401,10 +401,8 @@ dp_rx_wds_srcport_learn(struct dp_soc *soc,
 	uint32_t ret = 0;
 	uint8_t wds_src_mac[IEEE80211_ADDR_LEN];
 	struct dp_peer *sa_peer;
-	struct dp_peer *wds_peer;
 	struct dp_ast_entry *ast;
 	uint16_t sa_idx;
-	bool del_in_progress;
 
 	if (qdf_unlikely(!ta_peer))
 		return;
@@ -465,22 +463,6 @@ dp_rx_wds_srcport_learn(struct dp_soc *soc,
 		 * cached.
 		 */
 		if (!soc->ast_override_support) {
-			wds_peer = dp_peer_find_hash_find(soc, wds_src_mac,
-							  0, DP_VDEV_ALL);
-			if (wds_peer) {
-				del_in_progress = wds_peer->delete_in_progress;
-				dp_peer_unref_delete(wds_peer);
-				if (!del_in_progress) {
-					QDF_TRACE(QDF_MODULE_ID_DP,
-						  QDF_TRACE_LEVEL_DEBUG,
-						  "wds peer %pM found",
-						  wds_src_mac);
-					QDF_TRACE(QDF_MODULE_ID_DP,
-						  QDF_TRACE_LEVEL_DEBUG,
-						  "No AST no Del in progress");
-				}
-				return;
-			}
 			ret = dp_peer_add_ast(soc,
 					      ta_peer,
 					      wds_src_mac,
@@ -575,6 +557,9 @@ void dp_rx_process_invalid_peer_wrapper(struct dp_soc *soc,
 		qdf_nbuf_t mpdu, bool mpdu_done);
 void dp_rx_process_mic_error(struct dp_soc *soc, qdf_nbuf_t nbuf,
 			     uint8_t *rx_tlv_hdr, struct dp_peer *peer);
+void dp_2k_jump_handle(struct dp_soc *soc, qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr,
+		       uint16_t peer_id, uint8_t tid);
+
 
 #define DP_RX_LIST_APPEND(head, tail, elem) \
 	do {                                                          \
@@ -782,6 +767,19 @@ static inline QDF_STATUS dp_rx_ast_set_active(struct dp_soc *soc, uint16_t sa_id
 #endif
 
 /*
+ * dp_rx_desc_dump() - dump the sw rx descriptor
+ *
+ * @rx_desc: sw rx descriptor
+ */
+static inline void dp_rx_desc_dump(struct dp_rx_desc *rx_desc)
+{
+	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
+		  "rx_desc->nbuf: %pK, rx_desc->cookie: %d, rx_desc->pool_id: %d, rx_desc->in_use: %d, rx_desc->unmapped: %d",
+		  rx_desc->nbuf, rx_desc->cookie, rx_desc->pool_id,
+		  rx_desc->in_use, rx_desc->unmapped);
+}
+
+/*
  * check_qwrap_multicast_loopback() - Check if rx packet is a loopback packet.
  *					In qwrap mode, packets originated from
  *					any vdev should not loopback and
@@ -796,27 +794,22 @@ static inline bool check_qwrap_multicast_loopback(struct dp_vdev *vdev,
 {
 	struct dp_vdev *psta_vdev;
 	struct dp_pdev *pdev = vdev->pdev;
-	struct dp_soc *soc = pdev->soc;
 	uint8_t *data = qdf_nbuf_data(nbuf);
-	uint8_t i;
 
-	for (i = 0; i < MAX_PDEV_CNT && soc->pdev_list[i]; i++) {
-		pdev = soc->pdev_list[i];
-		if (qdf_unlikely(vdev->proxysta_vdev)) {
-			/* In qwrap isolation mode, allow loopback packets as all
-			 * packets go to RootAP and Loopback on the mpsta.
-			 */
-			if (vdev->isolation_vdev)
-				return false;
-			TAILQ_FOREACH(psta_vdev, &pdev->vdev_list, vdev_list_elem) {
-				if (qdf_unlikely(psta_vdev->proxysta_vdev &&
-					!qdf_mem_cmp(psta_vdev->mac_addr.raw,
-					&data[DP_MAC_ADDR_LEN], DP_MAC_ADDR_LEN))) {
-					/* Drop packet if source address is equal to
-					 * any of the vdev addresses.
-					 */
-					return true;
-				}
+	if (qdf_unlikely(vdev->proxysta_vdev)) {
+		/* In qwrap isolation mode, allow loopback packets as all
+		 * packets go to RootAP and Loopback on the mpsta.
+		 */
+		if (vdev->isolation_vdev)
+			return false;
+		TAILQ_FOREACH(psta_vdev, &pdev->vdev_list, vdev_list_elem) {
+			if (qdf_unlikely(psta_vdev->proxysta_vdev &&
+				!qdf_mem_cmp(psta_vdev->mac_addr.raw,
+				&data[DP_MAC_ADDR_LEN], DP_MAC_ADDR_LEN))) {
+				/* Drop packet if source address is equal to
+				 * any of the vdev addresses.
+				 */
+				return true;
 			}
 		}
 	}
@@ -896,5 +889,8 @@ int dp_wds_rx_policy_check(uint8_t *rx_tlv_hdr, struct dp_vdev *vdev,
 
 qdf_nbuf_t
 dp_rx_nbuf_prepare(struct dp_soc *soc, struct dp_pdev *pdev);
+
+void dp_rx_dump_info(struct dp_soc *soc, void *hal_ring,
+		     void *ring_desc, struct dp_rx_desc *rx_desc);
 
 #endif /* _DP_RX_H */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -324,7 +324,7 @@ dfs_compute_radar_found_cfreq(struct wlan_dfs *dfs,
 			      uint32_t *freq_center)
 {
 	struct dfs_channel *curchan = dfs->dfs_curchan;
-	uint32_t flag;
+	uint64_t flag;
 
 	flag = curchan->dfs_ch_flags;
 	if (!radar_found->segment_id) {
@@ -337,7 +337,8 @@ dfs_compute_radar_found_cfreq(struct wlan_dfs *dfs,
 		} else {
 			*freq_center = utils_dfs_chan_to_freq(
 					curchan->dfs_ch_vhtop_ch_freq_seg2);
-			if (flag & WLAN_CHAN_VHT160)
+			if ((flag & WLAN_CHAN_VHT160) ||
+			    (flag & WLAN_CHAN_HE160))
 				*freq_center += DFS_160MHZ_SECOND_SEG_OFFSET;
 		}
 	}
@@ -562,6 +563,124 @@ static inline void dfs_reset_bangradar(struct wlan_dfs *dfs)
 	dfs->dfs_second_segment_bangradar = 0;
 }
 
+/* dfs_prepare_nol_ie_bitmap: Create a Bitmap from the radar found subchannels
+ * to be sent along with RCSA.
+ *
+ * Get the subchannels affected by radar and all the channels in current
+ * channel.
+ * start from the first bit pointing to first subchannel in the current
+ * channel, set as 1 if radar affected, 0 if unaffected.
+ * If the number of subchannels increases (future cases), the bitmap should
+ * be an array of required size.
+ *
+ * Please change macro "MIN_DFS_SUBCHAN_BW" when NOL logic changes.
+ */
+static void dfs_prepare_nol_ie_bitmap(struct wlan_dfs *dfs,
+				      struct radar_found_info *radar_found,
+				      uint8_t *in_sub_channels,
+				      uint8_t n_in_sub_channels)
+{
+	uint8_t cur_subchans[NUM_CHANNELS_160MHZ];
+	uint8_t n_cur_subchans;
+	uint8_t i;
+	uint8_t j;
+	uint8_t bits = 0x01;
+
+	n_cur_subchans = dfs_get_bonding_channels(dfs, dfs->dfs_curchan,
+						  radar_found->segment_id,
+						  cur_subchans);
+	dfs->dfs_nol_ie_bandwidth = MIN_DFS_SUBCHAN_BW;
+	dfs->dfs_nol_ie_startfreq =
+		(uint16_t)utils_dfs_chan_to_freq(cur_subchans[0]);
+
+	/* Search through the array list of radar affected subchannels
+	 * to find if the subchannel in our current channel has radar hit.
+	 * Break if found to reduce loop count.
+	 */
+	for (i = 0; i < n_cur_subchans; i++) {
+		for (j = 0; j < n_in_sub_channels; j++) {
+			if (cur_subchans[i] == in_sub_channels[j]) {
+				dfs->dfs_nol_ie_bitmap |= bits;
+				break;
+			}
+		}
+		bits <<= 1;
+	}
+}
+
+void dfs_fetch_nol_ie_info(struct wlan_dfs *dfs,
+			   uint8_t *nol_ie_bandwidth,
+			   uint16_t *nol_ie_startfreq,
+			   uint8_t *nol_ie_bitmap)
+{
+	if (nol_ie_bandwidth)
+		*nol_ie_bandwidth = dfs->dfs_nol_ie_bandwidth;
+	if (nol_ie_startfreq)
+		*nol_ie_startfreq = dfs->dfs_nol_ie_startfreq;
+	if (nol_ie_bitmap)
+		*nol_ie_bitmap = dfs->dfs_nol_ie_bitmap;
+}
+
+void dfs_get_rcsa_flags(struct wlan_dfs *dfs, bool *is_rcsa_ie_sent,
+			bool *is_nol_ie_sent)
+{
+	if (is_rcsa_ie_sent)
+		*is_rcsa_ie_sent = dfs->dfs_is_rcsa_ie_sent;
+	if (is_nol_ie_sent)
+		*is_nol_ie_sent = dfs->dfs_is_nol_ie_sent;
+}
+
+void dfs_set_rcsa_flags(struct wlan_dfs *dfs, bool is_rcsa_ie_sent,
+			bool is_nol_ie_sent)
+{
+	dfs->dfs_is_rcsa_ie_sent = is_rcsa_ie_sent;
+	dfs->dfs_is_nol_ie_sent = is_nol_ie_sent;
+}
+
+bool dfs_process_nol_ie_bitmap(struct wlan_dfs *dfs, uint8_t nol_ie_bandwidth,
+			       uint16_t nol_ie_startfreq, uint8_t nol_ie_bitmap)
+{
+	uint8_t num_subchans;
+	uint8_t bits = 0x01;
+	uint8_t radar_subchans[NUM_CHANNELS_160MHZ];
+	bool should_nol_ie_be_sent = true;
+
+	qdf_mem_zero(radar_subchans, sizeof(radar_subchans));
+	if (!dfs->dfs_use_nol_subchannel_marking) {
+		/* Since subchannel marking is disabled, disregard
+		 * NOL IE and set NOL IE flag as false, so it
+		 * can't be sent to uplink.
+		 */
+		num_subchans =
+			dfs_get_bonding_channels(dfs,
+						 dfs->dfs_curchan,
+						 dfs->dfs_curchan->dfs_ch_freq,
+						 radar_subchans);
+		should_nol_ie_be_sent = false;
+	} else {
+		/* Add the NOL IE information in DFS structure so that RCSA
+		 * and NOL IE can be sent to uplink if uplink exists.
+		 */
+		uint32_t frequency = (uint32_t)nol_ie_startfreq;
+
+		dfs->dfs_nol_ie_bandwidth = nol_ie_bandwidth;
+		dfs->dfs_nol_ie_startfreq = nol_ie_startfreq;
+		dfs->dfs_nol_ie_bitmap = nol_ie_bitmap;
+		for (num_subchans = 0; num_subchans < NUM_CHANNELS_160MHZ;
+			num_subchans++) {
+			if (nol_ie_bitmap & bits) {
+				radar_subchans[num_subchans] =
+					utils_dfs_freq_to_chan(frequency);
+			}
+			bits <<= 1;
+			frequency += nol_ie_bandwidth;
+		}
+	}
+
+	dfs_radar_add_channel_list_to_nol(dfs, radar_subchans, num_subchans);
+	return should_nol_ie_be_sent;
+}
+
 QDF_STATUS dfs_process_radar_ind(struct wlan_dfs *dfs,
 				 struct radar_found_info *radar_found)
 {
@@ -614,11 +733,11 @@ QDF_STATUS dfs_process_radar_ind(struct wlan_dfs *dfs,
 	}
 
 	if (radar_found->segment_id == SEG_ID_SECONDARY)
-		dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
+		dfs_info(dfs, WLAN_DEBUG_DFS,
 			 "Radar found on second segment.Radarfound Freq=%d MHz.Secondary Chan cfreq=%d MHz.",
-			 radarfound_freq, freq_center);
+			  radarfound_freq, freq_center);
 	else
-		dfs_info(NULL, WLAN_DEBUG_DFS_ALWAYS,
+		dfs_info(NULL, WLAN_DEBUG_DFS,
 			 "Radar found on channel=%d, freq=%d MHz. Primary beaconning chan:%d, freq=%d MHz.",
 			 utils_dfs_freq_to_chan(radarfound_freq),
 			 radarfound_freq, dfs->dfs_curchan->dfs_ch_ieee,
@@ -660,12 +779,12 @@ QDF_STATUS dfs_process_radar_ind(struct wlan_dfs *dfs,
 		  "found_on_second=%d is_pre=%d",
 		  dfs->is_radar_found_on_secondary_seg,
 		  dfs_is_precac_timer_running(dfs));
-
 	/*
 	 * Even if radar found on primary, we need to move the channel
 	 * from precac-required-list and precac-done-list to
 	 * precac-nol-list.
 	 */
+
 	if (dfs->dfs_precac_enable)
 		dfs_mark_precac_dfs(dfs, dfs->is_radar_found_on_secondary_seg);
 
@@ -676,6 +795,25 @@ QDF_STATUS dfs_process_radar_ind(struct wlan_dfs *dfs,
 			 __func__, __LINE__);
 		dfs_mark_etsi_precac_dfs(dfs, channels, num_channels);
 	}
+	/*
+	 * This calls into the umac DFS code, which sets the umac
+	 * related radar flags and begins the channel change
+	 * machinery.
+
+	 * Even during precac, this API is called, but with a flag
+	 * saying not to send RCSA, but only the radar affected subchannel
+	 * information.
+	 */
+	dfs->dfs_is_nol_ie_sent = false;
+	(dfs->is_radar_during_precac) ?
+		(dfs->dfs_is_rcsa_ie_sent = false) :
+		(dfs->dfs_is_rcsa_ie_sent = true);
+	if (dfs->dfs_use_nol_subchannel_marking) {
+		dfs_prepare_nol_ie_bitmap(dfs, radar_found, channels,
+					  num_channels);
+		dfs->dfs_is_nol_ie_sent = true;
+	}
+	dfs_mlme_start_rcsa(dfs->dfs_pdev_obj, &wait_for_csa);
 
 	if (!dfs->dfs_is_offload_enabled &&
 	    dfs->is_radar_found_on_secondary_seg) {
@@ -689,15 +827,11 @@ QDF_STATUS dfs_process_radar_ind(struct wlan_dfs *dfs,
 	}
 
 	/*
-	 * This calls into the umac DFS code, which sets the umac
-	 * related radar flags and begins the channel change
-	 * machinery.
 	 * XXX TODO: the umac NOL code isn't used, but
 	 * WLAN_CHAN_DFS_RADAR still gets set. Since the umac
 	 * NOL code isn't used, that flag is never cleared. This
 	 * needs to be fixed. See EV 105776.
 	 */
-	dfs_mlme_start_rcsa(dfs->dfs_pdev_obj, &wait_for_csa);
 	if (wait_for_csa)
 		return QDF_STATUS_SUCCESS;
 

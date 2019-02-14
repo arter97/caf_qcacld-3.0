@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -630,7 +630,7 @@ static struct CE_attr host_ce_config_wlan_qca8074[] = {
 	/* target->host HTT + HTC control */
 	{ /* CE1 */ CE_ATTR_FLAGS, 0, 0,  2048, 512, NULL,},
 	/* target->host WMI */
-	{ /* CE2 */ CE_ATTR_FLAGS, 0, 0,  2048, 256, NULL,},
+	{ /* CE2 */ CE_ATTR_FLAGS, 0, 0,  2048, 512, NULL,},
 	/* host->target WMI (mac0) */
 	{ /* CE3 */ CE_ATTR_FLAGS, 0, 32, 2048, 0, NULL,},
 	/* host->target HTT */
@@ -649,7 +649,7 @@ static struct CE_attr host_ce_config_wlan_qca8074[] = {
 	{ /* CE9 */ CE_ATTR_FLAGS, 0, 32,  2048, 0, NULL,},
 	/* target->host HTT */
 	{ /* CE10 */ CE_ATTR_FLAGS, 0, 0,  2048, 512, NULL,},
-	/* CE11 unused */
+	{ /* CE11 unused */ 0, 0, 0, 0, 0, NULL,},
 };
 
 static struct CE_pipe_config target_ce_config_wlan_qca8074[] = {
@@ -704,7 +704,7 @@ static struct CE_attr host_ce_config_wlan_qca8074_pci[] = {
 	{ /* CE9 */ EPPING_CE_FLAGS_POLL, 0, 32,  2048, 0, NULL,},
 	/* target->host HTT */
 	{ /* CE10 */ CE_ATTR_FLAGS, 0, 0,  2048, 512, NULL,},
-	/* CE11 unused */
+	{ /* CE11 unused */ 0, 0, 0, 0, 0, NULL,},
 };
 
 static struct CE_pipe_config target_ce_config_wlan_qca8074_pci[] = {

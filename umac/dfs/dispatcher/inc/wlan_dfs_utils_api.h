@@ -316,6 +316,60 @@ QDF_STATUS utils_dfs_second_segment_radar_disable(
 		struct wlan_objmgr_pdev *pdev);
 
 /**
+ * utils_dfs_fetch_nol_ie_info() - Fills the arguments with NOL information
+ * needed for sending RCSA.
+ * pdev: Pointer to DFS pdev object.
+ * nol_ie_bandwidth: Minimum DFS subchannel Bandwidth.
+ * nol_ie_startfreq: Radar affected channel list start subchannel's centre
+ * frequency.
+ * nol_ie_bitmap: Bitmap of radar affected subchannels.
+ */
+QDF_STATUS utils_dfs_fetch_nol_ie_info(struct wlan_objmgr_pdev *pdev,
+				       uint8_t *nol_ie_bandwidth,
+				       uint16_t *nol_ie_startfreq,
+				       uint8_t *nol_ie_bitmap);
+
+/**
+ * utils_dfs_set_rcsa_flags() - Set flags that are required for sending
+ * RCSA and NOL IE.
+ * pdev: Pointer to DFS pdev object.
+ * is_rcsa_ie_sent: Boolean to check if RCSA IE should be sent or not.
+ * is_nol_ie_sent: Boolean to check if NOL IE should be sent or not.
+ */
+
+QDF_STATUS utils_dfs_set_rcsa_flags(struct wlan_objmgr_pdev *pdev,
+				    bool is_rcsa_ie_sent,
+				    bool is_nol_ie_sent);
+
+/**
+ * utils_dfs_get_rcsa_flags() - Get flags that are required for sending
+ * RCSA and NOL IE.
+ * pdev: Pointer to DFS pdev object.
+ * is_rcsa_ie_sent: Boolean to check if RCSA IE should be sent or not.
+ * is_nol_ie_sent: Boolean to check if NOL IE should be sent or not.
+ */
+
+QDF_STATUS utils_dfs_get_rcsa_flags(struct wlan_objmgr_pdev *pdev,
+				    bool *is_rcsa_ie_sent,
+				    bool *is_nol_ie_sent);
+
+/**
+ * utils_dfs_process_nol_ie_bitmap() - Update NOL with external radar
+ * information.
+ * pdev: Pointer to DFS pdev object.
+ * nol_ie_bandwidth: Minimum DFS subchannel Bandwidth.
+ * nol_ie_startfreq: Radar affected channel list start channel's
+ * centre frequency.
+ * nol_ie_bitmap: Bitmap of radar affected subchannels.
+ *
+ * Return: True if NOL IE should be propagated, else false.
+ */
+bool utils_dfs_process_nol_ie_bitmap(struct wlan_objmgr_pdev *pdev,
+				     uint8_t nol_ie_bandwidth,
+				     uint16_t nol_ie_startfreq,
+				     uint8_t nol_ie_bitmap);
+
+/**
  * utils_dfs_set_cac_timer_running() - Sets the cac timer running.
  * @pdev: Pointer to DFS pdev object.
  * @val: Set this value to dfs_cac_timer_running variable.
@@ -603,6 +657,19 @@ void utils_dfs_reg_update_nol_history_ch(struct wlan_objmgr_pdev *pdev,
 bool utils_dfs_check_for_cac_start(struct wlan_objmgr_pdev *pdev,
 				   bool *continue_current_cac);
 
+/** utils_dfs_is_precac_done() - Check if precac has been done in chosen channel
+ * @pdev: Pointer to DFS pdev object.
+ * @wlan_chan: Pointer to wlan channel object that can be accessed by other
+ * components.
+ * Wrapper function for dfs_is_precac_done(). This API is called from outside
+ * the dfs component.
+ *
+ * Return:
+ * * True :If precac is done on channel.
+ * * False:If precac is not done on channel.
+ */
+bool utils_dfs_is_precac_done(struct wlan_objmgr_pdev *pdev,
+			      struct wlan_channel *wlan_chan);
 /**
  * utils_dfs_get_disable_radar_marking - Retrieve the value of disable radar
  * marking.

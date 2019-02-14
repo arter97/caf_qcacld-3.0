@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3348,6 +3348,22 @@ struct set_quiet_mode_params {
 };
 
 /**
+ * struct set_bcn_offload_quiet_mode_params - Set quiet mode params
+ * @vdev_id: Vdev ID
+ * @period: Quite period
+ * @duration: Quite duration
+ * @next_start: Next quiet start
+ * @flag: 0 - disable, 1 - enable and continuous, 3 - enable and single shot
+ */
+struct set_bcn_offload_quiet_mode_params {
+	uint32_t vdev_id;
+	uint32_t period;
+	uint32_t duration;
+	uint32_t next_start;
+	uint32_t flag;
+};
+
+/**
  * struct set_beacon_filter_params - Set beacon filter params
  * @vdev_id: VDEV id
  * @ie: Pointer to IE fields
@@ -4933,8 +4949,8 @@ typedef enum {
 	wmi_pdev_param_use_nol,
 	wmi_pdev_param_enable_peer_retry_stats,
 	wmi_pdev_param_ul_trig_int,
-	wmi_pdev_param_max,
 	wmi_pdev_param_sub_channel_marking,
+	wmi_pdev_param_max,
 } wmi_conv_pdev_params_id;
 
 
@@ -5985,6 +6001,8 @@ typedef enum {
 	WMI_HOST_PEER_PARAM_MU_ENABLE = 0x1a,
 	/* Enable OFDMA support */
 	WMI_HOST_PEER_PARAM_OFDMA_ENABLE = 0x1b,
+	/* Notify FT roam */
+	WMI_HOST_PEER_PARAM_ENABLE_FT = 0x1c,
 } PEER_PARAM_ENUM;
 #define WMI_HOST_PEER_MIMO_PS_NONE	0x0
 #define WMI_HOST_PEER_MIMO_PS_STATIC	0x1
@@ -7272,6 +7290,7 @@ struct tbttoffset_params {
  *                  agile DFS, by means of using one 80 MHz radio chain for
  *                  radar detection, concurrently with using another radio
  *                  chain for non-160 MHz regular operation.
+ * @max_ast_index: Max number of AST entries that FW could allocate.
  */
 struct wmi_host_ready_ev_param {
 	uint32_t status;
@@ -7280,6 +7299,7 @@ struct wmi_host_ready_ev_param {
 	uint32_t num_total_peer;
 	uint32_t num_extra_peer;
 	bool agile_capability;
+	uint32_t max_ast_index;
 };
 
 enum bcn_offload_control_param {

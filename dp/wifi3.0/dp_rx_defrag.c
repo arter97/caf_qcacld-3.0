@@ -23,6 +23,7 @@
 #include "hal_api.h"
 #include "qdf_trace.h"
 #include "qdf_nbuf.h"
+#include "dp_internal.h"
 #include "dp_rx_defrag.h"
 #include <enet.h>	/* LLC_SNAP_HDR_LEN */
 #include "dp_rx_defrag.h"
@@ -182,6 +183,7 @@ void dp_rx_defrag_waitlist_flush(struct dp_soc *soc)
 
 		TAILQ_REMOVE(&soc->rx.defrag.waitlist, rx_reorder,
 			     defrag_waitlist_elem);
+		DP_STATS_DEC(soc, rx.rx_frag_wait, 1);
 
 		/* Move to temp list and clean-up later */
 		TAILQ_INSERT_TAIL(&temp_list, rx_reorder,
@@ -197,7 +199,10 @@ void dp_rx_defrag_waitlist_flush(struct dp_soc *soc)
 		peer =
 			container_of(rx_reorder, struct dp_peer,
 				     rx_tid[rx_reorder->tid]);
+
+		qdf_spin_lock_bh(&rx_reorder->tid_lock);
 		dp_rx_reorder_flush_frag(peer, rx_reorder->tid);
+		qdf_spin_unlock_bh(&rx_reorder->tid_lock);
 	}
 }
 
@@ -223,6 +228,7 @@ static void dp_rx_defrag_waitlist_add(struct dp_peer *peer, unsigned tid)
 	qdf_spin_lock_bh(&psoc->rx.defrag.defrag_lock);
 	TAILQ_INSERT_TAIL(&psoc->rx.defrag.waitlist, rx_reorder,
 				defrag_waitlist_elem);
+	DP_STATS_INC(psoc, rx.rx_frag_wait, 1);
 	qdf_spin_unlock_bh(&psoc->rx.defrag.defrag_lock);
 }
 
@@ -259,9 +265,11 @@ void dp_rx_defrag_waitlist_remove(struct dp_peer *peer, unsigned tid)
 				     rx_tid[rx_reorder->tid]);
 
 		/* Ensure it is TID for same peer */
-		if (peer_on_waitlist == peer && rx_reorder->tid == tid)
+		if (peer_on_waitlist == peer && rx_reorder->tid == tid) {
 			TAILQ_REMOVE(&soc->rx.defrag.waitlist,
 				rx_reorder, defrag_waitlist_elem);
+			DP_STATS_DEC(soc, rx.rx_frag_wait, 1);
+		}
 	}
 	qdf_spin_unlock_bh(&soc->rx.defrag.defrag_lock);
 }
@@ -778,10 +786,9 @@ static void dp_rx_frag_pull_hdr(qdf_nbuf_t nbuf, uint16_t hdrsize)
 	qdf_nbuf_pull_head(nbuf,
 			RX_PKT_TLVS_LEN + hdrsize);
 
-	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
-			"%s: final pktlen %d .11len %d",
-			__func__,
-			(uint32_t)qdf_nbuf_len(nbuf), hdrsize);
+	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
+		  "%s: final pktlen %d .11len %d",
+		  __func__, (uint32_t)qdf_nbuf_len(nbuf), hdrsize);
 }
 
 /*
@@ -811,12 +818,12 @@ dp_rx_construct_fraglist(struct dp_peer *peer,
 	qdf_nbuf_append_ext_list(head, rx_nbuf, len);
 	qdf_nbuf_set_next(head, NULL);
 
-	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
-			"%s: head len %d ext len %d data len %d ",
-			__func__,
-			(uint32_t)qdf_nbuf_len(head),
-			(uint32_t)qdf_nbuf_len(rx_nbuf),
-			(uint32_t)(head->data_len));
+	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
+		  "%s: head len %d ext len %d data len %d ",
+		  __func__,
+		  (uint32_t)qdf_nbuf_len(head),
+		  (uint32_t)qdf_nbuf_len(rx_nbuf),
+		  (uint32_t)(head->data_len));
 }
 
 /**
@@ -1114,8 +1121,8 @@ dp_rx_defrag_nwifi_to_8023(qdf_nbuf_t nbuf, uint16_t hdrsize)
 	hal_srng_access_end(soc->hal_soc, hal_srng);
 
 	DP_STATS_INC(soc, rx.reo_reinject, 1);
-	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
-				"%s: reinjection done !", __func__);
+	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
+		  "%s: reinjection done !", __func__);
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -1157,9 +1164,9 @@ static QDF_STATUS dp_rx_defrag(struct dp_peer *peer, unsigned tid,
 	}
 	cur = frag_list_head;
 
-	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO,
-			"%s: index %d Security type: %d", __func__,
-			index, peer->security[index].sec_type);
+	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_DEBUG,
+		  "%s: index %d Security type: %d", __func__,
+		  index, peer->security[index].sec_type);
 
 	switch (peer->security[index].sec_type) {
 	case cdp_sec_type_tkip:
@@ -1382,7 +1389,7 @@ static QDF_STATUS dp_rx_defrag_store_fragment(struct dp_soc *soc,
 		dp_rx_add_to_free_desc_list(head, tail, rx_desc);
 		*rx_bfs = 1;
 
-		return QDF_STATUS_E_DEFRAG_ERROR;
+		goto end;
 	}
 
 	pdev = peer->vdev->pdev;
@@ -1456,11 +1463,9 @@ static QDF_STATUS dp_rx_defrag_store_fragment(struct dp_soc *soc,
 			/* Drop stored fragments if out of sequence
 			 * fragment is received
 			 */
-			dp_rx_defrag_frames_free(rx_reorder_array_elem->head);
+			dp_rx_reorder_flush_frag(peer, tid);
 
-			rx_reorder_array_elem->head = NULL;
-			rx_reorder_array_elem->tail = NULL;
-
+			DP_STATS_INC(soc, rx.rx_frag_err, 1);
 			QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 				"%s mismatch, dropping earlier sequence ",
 				(rxseq == rx_tid->curr_seq_num)
@@ -1472,7 +1477,6 @@ static QDF_STATUS dp_rx_defrag_store_fragment(struct dp_soc *soc,
 			 * new sequence number to be processed
 			 */
 			rx_tid->curr_seq_num = rxseq;
-
 		}
 	} else {
 		/* Start of a new sequence */
@@ -1536,8 +1540,8 @@ static QDF_STATUS dp_rx_defrag_store_fragment(struct dp_soc *soc,
 		return QDF_STATUS_SUCCESS;
 	}
 
-	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO,
-		"All fragments received for sequence: %d", rxseq);
+	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_DEBUG,
+		  "All fragments received for sequence: %d", rxseq);
 
 	/* Process the fragments */
 	status = dp_rx_defrag(peer, tid, rx_reorder_array_elem->head,
@@ -1567,8 +1571,8 @@ static QDF_STATUS dp_rx_defrag_store_fragment(struct dp_soc *soc,
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 		rx_reorder_array_elem->head = NULL;
 		rx_reorder_array_elem->tail = NULL;
-		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO,
-		"Fragmented sequence successfully reinjected");
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_DEBUG,
+			  "Fragmented sequence successfully reinjected");
 	} else {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 		"Fragmented sequence reinjection failed");
@@ -1582,8 +1586,10 @@ static QDF_STATUS dp_rx_defrag_store_fragment(struct dp_soc *soc,
 	return QDF_STATUS_SUCCESS;
 
 end:
-	dp_peer_unref_del_find_by_id(peer);
+	if (peer)
+		dp_peer_unref_del_find_by_id(peer);
 
+	DP_STATS_INC(soc, rx.rx_frag_err, 1);
 	return QDF_STATUS_E_DEFRAG_ERROR;
 }
 
@@ -1591,6 +1597,7 @@ end:
  * dp_rx_frag_handle() - Handles fragmented Rx frames
  *
  * @soc: core txrx main context
+ * @hal_ring: opaque pointer to the HAL Rx Error Ring, which will be serviced
  * @ring_desc: opaque pointer to the REO error ring descriptor
  * @mpdu_desc_info: MPDU descriptor information from ring descriptor
  * @head: head of the local descriptor free-list
@@ -1606,10 +1613,11 @@ end:
  *
  * Return: uint32_t: No. of elements processed
  */
-uint32_t dp_rx_frag_handle(struct dp_soc *soc, void *ring_desc,
-		struct hal_rx_mpdu_desc_info *mpdu_desc_info,
-		uint8_t *mac_id,
-		uint32_t quota)
+uint32_t dp_rx_frag_handle(struct dp_soc *soc, void *hal_ring,
+			   void *ring_desc,
+			   struct hal_rx_mpdu_desc_info *mpdu_desc_info,
+			   uint8_t *mac_id,
+			   uint32_t quota)
 {
 	uint32_t rx_bufs_used = 0;
 	void *link_desc_va;
@@ -1619,7 +1627,8 @@ uint32_t dp_rx_frag_handle(struct dp_soc *soc, void *ring_desc,
 	uint32_t tid, msdu_len;
 	int idx, rx_bfs = 0;
 	struct dp_pdev *pdev;
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct dp_rx_desc *rx_desc = NULL;
 
 	qdf_assert(soc);
 	qdf_assert(mpdu_desc_info);
@@ -1647,12 +1656,24 @@ uint32_t dp_rx_frag_handle(struct dp_soc *soc, void *ring_desc,
 			     &mpdu_desc_info->msdu_count);
 
 	/* Process all MSDUs in the current MPDU */
-	for (idx = 0; (idx < mpdu_desc_info->msdu_count) && quota--; idx++) {
+	for (idx = 0; (idx < mpdu_desc_info->msdu_count); idx++) {
 		struct dp_rx_desc *rx_desc =
 			dp_rx_cookie_2_va_rxdma_buf(soc,
 				msdu_list.sw_cookie[idx]);
 
 		qdf_assert_always(rx_desc);
+		/*
+		 * this is a unlikely scenario where the host is reaping
+		 * a descriptor which it already reaped just a while ago
+		 * but is yet to replenish it back to HW.
+		 * In this case host will dump the last 128 descriptors
+		 * including the software descriptor rx_desc and assert.
+		 */
+		if (qdf_unlikely(!rx_desc->in_use)) {
+			DP_STATS_INC(soc, rx.err.hal_rx_err_dup, 1);
+			dp_rx_dump_info(soc, hal_ring, ring_desc, rx_desc);
+			continue;
+		}
 
 		/* all buffers in MSDU link belong to same pdev */
 		pdev = soc->pdev_list[rx_desc->pool_id];
@@ -1694,6 +1715,29 @@ uint32_t dp_rx_frag_handle(struct dp_soc *soc, void *ring_desc,
 			/* No point in processing rest of the fragments */
 			break;
 		}
+	}
+
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		/* drop any remaining buffers in current descriptor */
+		idx++;
+		for (; (idx < mpdu_desc_info->msdu_count); idx++) {
+			rx_desc =
+				dp_rx_cookie_2_va_rxdma_buf(soc,
+							    msdu_list.sw_cookie[idx]);
+			qdf_assert(rx_desc);
+			msdu = rx_desc->nbuf;
+			qdf_nbuf_unmap_single(soc->osdev, msdu,
+					      QDF_DMA_BIDIRECTIONAL);
+			qdf_nbuf_free(msdu);
+			dp_rx_add_to_free_desc_list(&pdev->free_list_head,
+						    &pdev->free_list_tail,
+						    rx_desc);
+			rx_bufs_used++;
+		}
+		if (dp_rx_link_desc_return(soc, ring_desc,
+					   HAL_BM_ACTION_PUT_IN_IDLE_LIST) !=
+					   QDF_STATUS_SUCCESS)
+			dp_err("Failed to return link desc");
 	}
 
 	return rx_bufs_used;
