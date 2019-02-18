@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2014,2016-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -131,7 +132,8 @@ void lim_convert_active_channel_to_passive_channel(tpAniSirGlobal pMac)
 void lim_send_sme_mgmt_frame_ind(tpAniSirGlobal pMac, uint8_t frameType,
 				 uint8_t *frame, uint32_t frameLen,
 				 uint16_t sessionId, uint32_t rxChannel,
-				 tpPESession psessionEntry, int8_t rxRssi)
+				 tpPESession psessionEntry, int8_t rxRssi,
+				 enum rxmgmt_flags rx_flags)
 {
 	tpSirSmeMgmtFrameInd pSirSmeMgmtFrame = NULL;
 	uint16_t length;
