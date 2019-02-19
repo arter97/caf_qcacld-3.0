@@ -11552,11 +11552,43 @@ enum dot11p_mode {
 #define CFG_SUB_20_CHANNEL_WIDTH_MAX               (WLAN_SUB_20_CH_WIDTH_10)
 #define CFG_SUB_20_CHANNEL_WIDTH_DEFAULT           (WLAN_SUB_20_CH_WIDTH_NONE)
 
+/*
+ * <ini>
+ * tgt_gtx_usr_cfg - target gtx user config
+ * @Min: 0
+ * @Max: 32
+ * @Default: 32
+ *
+ * This ini is used to set target gtx user config.
+ *
+ * Related: None
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_TGT_GTX_USR_CFG_NAME    "tgt_gtx_usr_cfg"
 #define CFG_TGT_GTX_USR_CFG_MIN     (0)
 #define CFG_TGT_GTX_USR_CFG_MAX     (32)
 #define CFG_TGT_GTX_USR_CFG_DEFAULT (32)
 
+/*
+ * <ini>
+ * gEnableSapInternalRestart - Sap internal restart name
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used for sap internal restart name
+ *
+ * Related: None
+ *
+ * Supported Feature: SAP
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_SAP_INTERNAL_RESTART_NAME    "gEnableSapInternalRestart"
 #define CFG_SAP_INTERNAL_RESTART_MIN     (0)
 #define CFG_SAP_INTERNAL_RESTART_MAX     (1)
@@ -11592,6 +11624,12 @@ enum dot11p_mode {
 #define CFG_RESTART_BEACONING_ON_CH_AVOID_MAX     (CH_AVOID_RULE_RESTART_24G_ONLY)
 #define CFG_RESTART_BEACONING_ON_CH_AVOID_DEFAULT (CH_AVOID_RULE_RESTART)
 /*
+ * <ini>
+ * gSapMaxInactivityOverride - Configure
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
  * This parameter will avoid updating ap_sta_inactivity from hostapd.conf
  * file. If a station does not send anything in ap_max_inactivity seconds, an
  * empty data frame is sent to it in order to verify whether it is
@@ -11599,7 +11637,13 @@ enum dot11p_mode {
  * disassociated and then deauthenticated. This feature is used to
  * clear station table of old entries when the STAs move out of the
  * range.
- * Default : Disable
+ *
+ * Related: None
+ *
+ * Supported Feature: SAP
+ *
+ * Usage: Internal/External
+ * </ini>
  */
 #define CFG_SAP_MAX_INACTIVITY_OVERRIDE_NAME     "gSapMaxInactivityOverride"
 #define CFG_SAP_MAX_INACTIVITY_OVERRIDE_MIN      (0)
@@ -11680,9 +11724,21 @@ enum dot11p_mode {
 
 #ifdef WLAN_FEATURE_WOW_PULSE
 /*
- * Enable/Disable  WOW PULSE feature
- * Set the wakeup pulse which FW use to wake up HOST
- * Default : Disable
+ * <ini>
+ * gwow_pulse_support - WOW pulse feature configuration
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * When set to 1 WOW pulse feature will be enabled.
+ *
+ * Related: gwow_pulse_pin, gwow_pulse_interval_low, gwow_pulse_interval_high
+ *
+ * Supported Feature: WOW pulse
+ *
+ * Usage: External
+ *
+ * </ini>
  */
 #define CFG_WOW_PULSE_SUPPORT_NAME     "gwow_pulse_support"
 #define CFG_WOW_PULSE_SUPPORT_MIN      (0)
@@ -11690,8 +11746,19 @@ enum dot11p_mode {
 #define CFG_WOW_PULSE_SUPPORT_DEFAULT  (CFG_WOW_PULSE_SUPPORT_MIN)
 
 /*
- * GPIO PIN for Pulse
+ * <ini>
+ * gwow_pulse_pin - GPIO pin for WOW pulse
+ * @Min: 0
+ * @Max: 254
+ * @Default: 35
+ *
  * Which PIN to send the Pulse
+ *
+ * Supported Feature: WOW pulse
+ *
+ * Usage: External
+ *
+ * </ini>
  */
 #define CFG_WOW_PULSE_PIN_NAME         "gwow_pulse_pin"
 #define CFG_WOW_PULSE_PIN_MIN          (CFG_SET_TSF_GPIO_PIN_MIN)
@@ -11699,9 +11766,19 @@ enum dot11p_mode {
 #define CFG_WOW_PULSE_PIN_DEFAULT      (35)
 
 /*
- * Pulse interval low
+ * <ini>
+ * gwow_pulse_interval_low - Pulse interval low
+ * @Min: 160
+ * @Max: 480
+ * @Default: 180
+ *
  * The interval of low level in the pulse
- * The value which defined by customer should between 160 and 480
+ *
+ * Supported Feature: WOW pulse
+ *
+ * Usage: External
+ *
+ * </ini>
  */
 #define CFG_WOW_PULSE_INTERVAL_LOW_NAME     "gwow_pulse_interval_low"
 #define CFG_WOW_PULSE_INTERVAL_LOW_MIN      (160)
@@ -11709,9 +11786,19 @@ enum dot11p_mode {
 #define CFG_WOW_PULSE_INTERVAL_LOW_DEFAULT  (180)
 
 /*
- * Pulse interval high
+ * <ini>
+ * gwow_pulse_interval_high - Pulse interval high
+ * @Min: 20
+ * @Max: 40
+ * @Default: 20
+ *
  * The interval of high level in the pulse
- * The value which defined by customer should between 20 and 40
+ *
+ * Supported Feature: WOW pulse
+ *
+ * Usage: External
+ *
+ * </ini>
  */
 #define CFG_WOW_PULSE_INTERVAL_HIGH_NAME    "gwow_pulse_interval_high"
 #define CFG_WOW_PULSE_INTERVAL_HIGH_MIN     (20)
@@ -11720,9 +11807,22 @@ enum dot11p_mode {
 #endif
 
 /*
- * Support to start sap in indoor channel
+ * <ini>
+ * gindoor_channel_support - support to start sap in indoor channel
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is to support to start sap in indoor channel.
  * Customer can config this item to enable/disable sap in indoor channel
- * Default: Disable
+ *
+ * Related: None
+ *
+ * Supported Feature: SAP
+ *
+ * Usage: External
+ *
+ * </ini>
  */
 #define CFG_INDOOR_CHANNEL_SUPPORT_NAME     "gindoor_channel_support"
 #define CFG_INDOOR_CHANNEL_SUPPORT_MIN      (0)
@@ -11730,23 +11830,68 @@ enum dot11p_mode {
 #define CFG_INDOOR_CHANNEL_SUPPORT_DEFAULT  (0)
 
 /*
- * Force softap to 11n, when gSapForce11NFor11AC is set to 1 from ini
- * despite of hostapd.conf request for 11ac
+ * <ini>
+ * gSapForce11NFor11AC - Restrict SAP to 11n if set 1 even though
+ * hostapd.conf request for 11ac.
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * Restrict SAP to 11n if set 1 even though hostapd.conf request for 11ac.
+ *
+ * 0- Do not force 11n for 11ac.
+ * 1- Force 11n for 11ac.
+ *
+ * Supported Feature: SAP
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
  */
 #define CFG_SAP_FORCE_11N_FOR_11AC_NAME    "gSapForce11NFor11AC"
 #define CFG_SAP_FORCE_11N_FOR_11AC_MIN     (0)
 #define CFG_SAP_FORCE_11N_FOR_11AC_MAX     (1)
 #define CFG_SAP_FORCE_11N_FOR_11AC_DEFAULT (0)
 
+/*
+ * <ini>
+ * gGoForce11NFor11AC - Restrict GO to 11n if set 1 even though
+ * hostapd.conf request for 11ac.
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * Restrict GO to 11n if set 1 even though hostapd.conf request for 11ac.
+ *
+ * 0- Do not force 11n for 11ac.
+ * 1- Force 11n for 11ac.
+ *
+ * Supported Feature: GO
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_GO_FORCE_11N_FOR_11AC_NAME    "gGoForce11NFor11AC"
 #define CFG_GO_FORCE_11N_FOR_11AC_MIN     (0)
 #define CFG_GO_FORCE_11N_FOR_11AC_MAX     (1)
 #define CFG_GO_FORCE_11N_FOR_11AC_DEFAULT (0)
 
 /*
- * sap tx leakage threshold
+ * <ini>
+ * gsap_tx_leakage_threshold - sap tx leakage threshold
+ * @Min: 100
+ * @Max: 1000
+ * @Default: 310
+ *
  * customer can set this value from 100 to 1000 which means
  * sap tx leakage threshold is -10db to -100db
+ *
+ * Related: none
+ *
+ * Usage: External
+ *
+ * </ini>
  */
 #define CFG_SAP_TX_LEAKAGE_THRESHOLD_NAME    "gsap_tx_leakage_threshold"
 #define CFG_SAP_TX_LEAKAGE_THRESHOLD_MIN     (100)
@@ -11775,7 +11920,22 @@ enum dot11p_mode {
 #define CFG_SIFS_BURST_DURATION_MAX      (12)
 #define CFG_SIFS_BURST_DURATION_DEFAULT  (8)
 
-/* Optimize channel avoidance indication comming from firmware */
+/*
+ * <ini>
+ * goptimize_chan_avoid_event - Optimize channel avoidance indication
+ *				coming from firmware
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * Related: None
+ *
+ * Supported Feature: General
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_OPTIMIZE_CA_EVENT_NAME       "goptimize_chan_avoid_event"
 #define CFG_OPTIMIZE_CA_EVENT_DISABLE    (0)
 #define CFG_OPTIMIZE_CA_EVENT_ENABLE     (1)
@@ -13006,7 +13166,6 @@ enum hdd_wext_control {
  *
  * </ini>
  */
-
 #define CFG_ACS_WITH_MORE_PARAM_NAME    "acs_with_more_param"
 #define CFG_ACS_WITH_MORE_PARAM_MIN     (0)
 #define CFG_ACS_WITH_MORE_PARAM_MAX     (1)
@@ -13083,7 +13242,6 @@ enum hdd_wext_control {
  *
  * </ini>
  */
-
 #define CFG_ENABLE_UL_MIMO_NAME    "enable_ul_mimo"
 #define CFG_ENABLE_UL_MIMO_MIN     (0)
 #define CFG_ENABLE_UL_MIMO_MAX     (1)
@@ -14035,7 +14193,7 @@ enum hdd_external_acs_freq_band {
 
 /*
  * <ini>
- * gLowerrBrssiThresh - Sets Lower threshold for beacon RSSI
+ * gLowerBrssiThresh - Sets Lower threshold for beacon RSSI
  * @Min: 6
  * @Max: 36
  * @Default: 26
@@ -15637,7 +15795,7 @@ enum hdd_external_acs_freq_band {
 
 /*
  * <ini>
- * sticky_time - Stick time after roaming to new AP by BTM
+ * btm_sticky_time - Stick time after roaming to new AP by BTM
  * @Min: 0
  * @Max: 0x0000FFFF
  * @Default: 300
