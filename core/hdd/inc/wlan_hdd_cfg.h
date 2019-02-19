@@ -8582,6 +8582,23 @@ enum hdd_link_speed_rpt_type {
 #define CFG_IPA_DESC_SIZE_MAX                    (8000)
 #define CFG_IPA_DESC_SIZE_DEFAULT                (800)
 
+/*
+ * <ini>
+ * gIPAHighBandwidthMbps - IPA high bw threshold
+ * @Min: 200
+ * @Max: 1000
+ * @Default: 400
+ *
+ * This ini specifies the IPA high bw threshold
+ *
+ * Related: N/A
+ *
+ * Supported Feature: IPA
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
 #define CFG_IPA_HIGH_BANDWIDTH_MBPS              "gIPAHighBandwidthMbps"
 #define CFG_IPA_HIGH_BANDWIDTH_MBPS_MIN          (200)
 #define CFG_IPA_HIGH_BANDWIDTH_MBPS_MAX          (1000)
@@ -8598,7 +8615,13 @@ enum hdd_link_speed_rpt_type {
 #define CFG_IPA_LOW_BANDWIDTH_MBPS_DEFAULT       (100)
 
 /*
- * Firmware uart print
+ * <ini>
+ * gEnablefwprint - Enable FW uart print
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * </ini>
  */
 #define CFG_ENABLE_FW_UART_PRINT_NAME             "gEnablefwprint"
 #define CFG_ENABLE_FW_UART_PRINT_DISABLE          (0)
@@ -8606,7 +8629,13 @@ enum hdd_link_speed_rpt_type {
 #define CFG_ENABLE_FW_UART_PRINT_DEFAULT          (CFG_ENABLE_FW_UART_PRINT_DISABLE)
 
 /*
- * Firmware log
+ * <ini>
+ * gEnablefwlog - Enable FW log
+ * @Min: 0
+ * @Max: 2
+ * @Default: 1
+ *
+ * </ini>
  */
 #define CFG_ENABLE_FW_LOG_NAME                   "gEnablefwlog"
 #define CFG_ENABLE_FW_LOG_DISABLE                (0)
@@ -8642,17 +8671,63 @@ enum hdd_link_speed_rpt_type {
 #define CFG_ENABLE_FW_SELF_RECOVERY_ENABLE       (1)
 #define CFG_ENABLE_FW_SELF_RECOVERY_DEFAULT      (CFG_ENABLE_FW_SELF_RECOVERY_DISABLE)
 
-/* Macro to handle maximum receive AMPDU size configuration */
+/*
+ * <ini>
+ * gVhtAmpduLenExponent - maximum receive AMPDU size configuration
+ * @Min: 0
+ * @Max: 7
+ * @Default: 3
+ *
+ * Related: NA
+ *
+ * Supported Feature: 11AC
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_VHT_AMPDU_LEN_EXPONENT_NAME                "gVhtAmpduLenExponent"
 #define CFG_VHT_AMPDU_LEN_EXPONENT_MIN                 (0)
 #define CFG_VHT_AMPDU_LEN_EXPONENT_MAX                 (7)
 #define CFG_VHT_AMPDU_LEN_EXPONENT_DEFAULT             (3)
 
+/*
+ * <ini>
+ * gVhtMpduLen - VHT MPDU length
+ * @Min: 0
+ * @Max: 2
+ * @Default: 0
+ *
+ * Related: NA
+ *
+ * Supported Feature: 11AC
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_VHT_MPDU_LEN_NAME                          "gVhtMpduLen"
 #define CFG_VHT_MPDU_LEN_MIN                           (0)
 #define CFG_VHT_MPDU_LEN_MAX                           (2)
 #define CFG_VHT_MPDU_LEN_DEFAULT                       (0)
 
+/*
+ * <ini>
+ * gSoftApMaxPeers - Set Max peers connected for SAP
+ * @Min: 1
+ * @Max: 32
+ * @Default: 32
+ *
+ * This ini is used to set Max peers connected for SAP
+ *
+ * Related: None
+ *
+ * Supported Feature: SAP
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_SAP_MAX_NO_PEERS                       "gSoftApMaxPeers"
 #define CFG_SAP_MAX_NO_PEERS_MIN                   (1)
 #define CFG_SAP_MAX_NO_PEERS_MAX                   (SIR_SAP_MAX_NUM_PEERS)
@@ -8687,13 +8762,33 @@ enum hdd_link_speed_rpt_type {
 #define CFG_ENABLE_DEBUG_CONNECT_ISSUE_MAX         (0xFF)
 #define CFG_ENABLE_DEBUG_CONNECT_ISSUE_DEFAULT     (0x0F)
 
-/* SAR Thermal limit values for 2g and 5g */
-
+/*
+ * <ini>
+ * TxPower2g - Limit power in case of 2.4ghz
+ * @Min: 0
+ * @Max: 30
+ * @Default: 30
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_SET_TXPOWER_LIMIT2G_NAME               "TxPower2g"
 #define CFG_SET_TXPOWER_LIMIT2G_MIN                (0)
 #define CFG_SET_TXPOWER_LIMIT2G_MAX                (30)
 #define CFG_SET_TXPOWER_LIMIT2G_DEFAULT            (30)
 
+/*
+ * <ini>
+ * TxPower5g - Limit power in case of 5ghz
+ * @Min: 0
+ * @Max: 30
+ * @Default: 30
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_SET_TXPOWER_LIMIT5G_NAME               "TxPower5g"
 #define CFG_SET_TXPOWER_LIMIT5G_MIN                (0)
 #define CFG_SET_TXPOWER_LIMIT5G_MAX                (30)
@@ -9005,22 +9100,81 @@ enum hdd_link_speed_rpt_type {
 
 #endif /* QCA_LL_TX_FLOW_CONTROL_V2 */
 
+/*
+ * <ini>
+ * gMaxOffloadPeers - Set max offload peers
+ * @Min: 2
+ * @Max: 5
+ * @Default: 2
+ *
+ * This ini is used to set default teles copic beacon wakeup
+ *
+ * Related: None
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_SAP_MAX_OFFLOAD_PEERS                  "gMaxOffloadPeers"
 #define CFG_SAP_MAX_OFFLOAD_PEERS_MIN              (2)
 #define CFG_SAP_MAX_OFFLOAD_PEERS_MAX              (5)
 #define CFG_SAP_MAX_OFFLOAD_PEERS_DEFAULT          (2)
 
+/*
+ * <ini>
+ * gMaxOffloadReorderBuffs - Set max offload reorder buffs
+ * @Min: 0
+ * @Max: 3
+ * @Default: 2
+ *
+ * This ini is used to set max offload reorder buffs
+ *
+ * Related: None
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_SAP_MAX_OFFLOAD_REORDER_BUFFS          "gMaxOffloadReorderBuffs"
 #define CFG_SAP_MAX_OFFLOAD_REORDER_BUFFS_MIN      (0)
 #define CFG_SAP_MAX_OFFLOAD_REORDER_BUFFS_MAX      (3)
 #define CFG_SAP_MAX_OFFLOAD_REORDER_BUFFS_DEFAULT  (2)
 
 #ifdef FEATURE_WLAN_RA_FILTERING
+/*
+ * <ini>
+ * gRAFilterEnable
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * Related: None
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
 #define CFG_RA_FILTER_ENABLE_NAME                  "gRAFilterEnable"
 #define CFG_RA_FILTER_ENABLE_MIN                   (0)
 #define CFG_RA_FILTER_ENABLE_MAX                   (1)
 #define CFG_RA_FILTER_ENABLE_DEFAULT               (1)
 
+/*
+ * <ini>
+ * gRArateLimitInterval - RA rate limit interval
+ * @Min: 60
+ * @Max: 3600
+ * @Default: 60
+ * This ini is used to set RA rate limit interval.
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_RA_RATE_LIMIT_INTERVAL_NAME            "gRArateLimitInterval"
 #define CFG_RA_RATE_LIMIT_INTERVAL_MIN             (60)
 #define CFG_RA_RATE_LIMIT_INTERVAL_MAX             (3600)
@@ -9188,21 +9342,77 @@ enum hdd_link_speed_rpt_type {
 #define CFG_ROAMING_DFS_CHANNEL_DEFAULT            (CFG_ROAMING_DFS_CHANNEL_DISABLED)
 
 #ifdef MSM_PLATFORM
+/*
+ * <ini>
+ * gBusBandwidthHighThreshold - bus bandwidth high threshold
+ *
+ * @Min: 0
+ * @Max: 4294967295UL
+ * @Default: 2000
+ *
+ * This ini specifies thebus bandwidth high threshold
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
 #define CFG_BUS_BANDWIDTH_HIGH_THRESHOLD           "gBusBandwidthHighThreshold"
 #define CFG_BUS_BANDWIDTH_HIGH_THRESHOLD_DEFAULT   (2000)
 #define CFG_BUS_BANDWIDTH_HIGH_THRESHOLD_MIN       (0)
 #define CFG_BUS_BANDWIDTH_HIGH_THRESHOLD_MAX       (4294967295UL)
 
+/*
+ * <ini>
+ * gBusBandwidthMediumThreshold - bus bandwidth medium threshold
+ *
+ * @Min: 0
+ * @Max: 4294967295UL
+ * @Default: 500
+ *
+ * This ini specifies thebus bandwidth medium threshold
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
 #define CFG_BUS_BANDWIDTH_MEDIUM_THRESHOLD         "gBusBandwidthMediumThreshold"
 #define CFG_BUS_BANDWIDTH_MEDIUM_THRESHOLD_DEFAULT (500)
 #define CFG_BUS_BANDWIDTH_MEDIUM_THRESHOLD_MIN     (0)
 #define CFG_BUS_BANDWIDTH_MEDIUM_THRESHOLD_MAX     (4294967295UL)
 
+/*
+ * <ini>
+ * gBusBandwidthLowThreshold - bus bandwidth low threshold
+ *
+ * @Min: 0
+ * @Max: 4294967295UL
+ * @Default: 150
+ *
+ * This ini specifies thebus bandwidth low threshold
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
 #define CFG_BUS_BANDWIDTH_LOW_THRESHOLD            "gBusBandwidthLowThreshold"
 #define CFG_BUS_BANDWIDTH_LOW_THRESHOLD_DEFAULT    (150)
 #define CFG_BUS_BANDWIDTH_LOW_THRESHOLD_MIN        (0)
 #define CFG_BUS_BANDWIDTH_LOW_THRESHOLD_MAX        (4294967295UL)
 
+/*
+ * <ini>
+ * gBusBandwidthComputeInterval - bus bandwidth compute interval
+ *
+ * @Min: 0
+ * @Max: 10000
+ * @Default: 100
+ *
+ * This ini specifies thebus bandwidth compute interval
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
 #define CFG_BUS_BANDWIDTH_COMPUTE_INTERVAL         "gBusBandwidthComputeInterval"
 #define CFG_BUS_BANDWIDTH_COMPUTE_INTERVAL_DEFAULT (100)
 #define CFG_BUS_BANDWIDTH_COMPUTE_INTERVAL_MIN     (0)
@@ -9210,10 +9420,8 @@ enum hdd_link_speed_rpt_type {
 
 /*
  * <ini>
- * gEnableTcpLimitOutput - Control to enable TCP limit output byte
- * @Min: 0
- * @Max: 1
- * @Default: 1
+ * gTcpLimitOutputEnable - Control to enable TCP limit output byte
+ * @Default: true
  *
  * This ini is used to enable dynamic configuration of TCP limit output bytes
  * tcp_limit_output_bytes param. Enabling this will let driver post message to
@@ -9518,7 +9726,23 @@ enum hdd_link_speed_rpt_type {
 #define CFG_REORDER_OFFLOAD_SUPPORT_MAX     (1)
 #define CFG_REORDER_OFFLOAD_SUPPORT_DEFAULT (1)
 
-/* IpaUcTxBufCount should be power of 2 */
+/*
+ * <ini>
+ * IpaUcTxBufCount - IPA tx buffer count
+ * @Min: 0
+ * @Max: 2048
+ * @Default: 512
+ *
+ * This ini specifies the IPA tx buffer count
+ *
+ * Related: N/A
+ *
+ * Supported Feature: IPA
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
 #define CFG_IPA_UC_TX_BUF_COUNT_NAME               "IpaUcTxBufCount"
 #define CFG_IPA_UC_TX_BUF_COUNT_MIN                (0)
 #define CFG_IPA_UC_TX_BUF_COUNT_MAX                (2048)
@@ -9541,13 +9765,29 @@ enum hdd_link_speed_rpt_type {
 #define CFG_IPA_UC_TX_PARTITION_BASE_DEFAULT       (3000)
 
 #ifdef WLAN_LOGGING_SOCK_SVC_ENABLE
-/* Enable WLAN Logging to app space */
+/*
+ * <ini>
+ * wlanLoggingEnable - Wlan logging enable
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * </ini>
+ */
 #define CFG_WLAN_LOGGING_SUPPORT_NAME               "wlanLoggingEnable"
 #define CFG_WLAN_LOGGING_SUPPORT_ENABLE             (1)
 #define CFG_WLAN_LOGGING_SUPPORT_DISABLE            (0)
 #define CFG_WLAN_LOGGING_SUPPORT_DEFAULT            (1)
 
-/* Enable forwarding the driver logs to kmsg console */
+/*
+ * <ini>
+ * wlanLoggingToConsole - Wlan logging to console
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * </ini>
+ */
 #define CFG_WLAN_LOGGING_CONSOLE_SUPPORT_NAME    "wlanLoggingToConsole"
 #define CFG_WLAN_LOGGING_CONSOLE_SUPPORT_ENABLE  (1)
 #define CFG_WLAN_LOGGING_CONSOLE_SUPPORT_DISABLE (0)
@@ -9587,12 +9827,24 @@ enum hdd_link_speed_rpt_type {
 #define CFG_ENABLE_LPASS_SUPPORT_MAX                      (1)
 #endif
 
-/*
- * NaN feature support configuration
- * gEnableNanSupport = 0 means NaN is not supported
- * gEnableNanSupport = 1 means NaN is supported
- */
 #ifdef WLAN_FEATURE_NAN
+/*
+ * <ini>
+ * gEnableNanSupport - NAN feature support configuration
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * When set to 1 NAN feature will be enabled.
+ *
+ * Related: None
+ *
+ * Supported Feature: NAN
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_ENABLE_NAN_SUPPORT                          "gEnableNanSupport"
 #define CFG_ENABLE_NAN_SUPPORT_DEFAULT                  (0)
 #define CFG_ENABLE_NAN_SUPPORT_MIN                      (0)
@@ -9604,6 +9856,22 @@ enum hdd_link_speed_rpt_type {
 #define CFG_ENABLE_SELF_RECOVERY_MAX               (1)
 #define CFG_ENABLE_SELF_RECOVERY_DEFAULT           (0)
 
+/*
+ * <ini>
+ * gEnableSapSuspend - Enable/disable SAP Suspend
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ *
+ * Related: None
+ *
+ * Supported Feature: SAP
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_ENABLE_SAP_SUSPEND                     "gEnableSapSuspend"
 #define CFG_ENABLE_SAP_SUSPEND_MIN                 (0)
 #define CFG_ENABLE_SAP_SUSPEND_MAX                 (1)
