@@ -5027,6 +5027,23 @@ enum station_keepalive_method {
 #define CFG_TELE_BCN_MAX_LI_NUM_IDLE_BCNS_MAX        (255)
 #define CFG_TELE_BCN_MAX_LI_NUM_IDLE_BCNS_DEFAULT    (15)
 
+/*
+ * <ini>
+ * gNeighborLookupThreshold - Set neighbor lookup rssi threshold
+ * @Min: 10
+ * @Max: 120
+ * @Default: 78
+ *
+ * This is used to control the RSSI threshold for neighbor lookup.
+ *
+ * Related: None
+ *
+ * Supported Feature: LFR Scan
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_NEIGHBOR_LOOKUP_RSSI_THRESHOLD_NAME      "gNeighborLookupThreshold"
 #define CFG_NEIGHBOR_LOOKUP_RSSI_THRESHOLD_MIN       (10)
 #define CFG_NEIGHBOR_LOOKUP_RSSI_THRESHOLD_MAX       (120)
@@ -5065,6 +5082,21 @@ enum station_keepalive_method {
 #define CFG_5G_RSSI_THRESHOLD_OFFSET_MAX       (120)
 #define CFG_5G_RSSI_THRESHOLD_OFFSET_DEFAULT   (0)
 
+/*
+ * <ini>
+ * gDelayBeforeVdevStop - wait time for tx complete before vdev stop
+ * @Min: 2
+ * @Max: 200
+ * @Default: 20
+ *
+ * This INI is used to set wait time for tx complete before vdev stop.
+ *
+ * Related: None
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_DELAY_BEFORE_VDEV_STOP_NAME              "gDelayBeforeVdevStop"
 #define CFG_DELAY_BEFORE_VDEV_STOP_MIN               (2)
 #define CFG_DELAY_BEFORE_VDEV_STOP_MAX               (200)
@@ -5075,16 +5107,65 @@ enum station_keepalive_method {
 #define CFG_11R_NEIGHBOR_REQ_MAX_TRIES_MAX            (4)
 #define CFG_11R_NEIGHBOR_REQ_MAX_TRIES_DEFAULT        (3)
 
+/*
+ * <ini>
+ * gRoamBmissFirstBcnt - Beacon miss count to trigger 1st bmiss event
+ * @Min: 5
+ * @Max: 100
+ * @Default: 10
+ *
+ * This ini used to control how many beacon miss will trigger first bmiss
+ * event. First bmiss event will result in roaming scan.
+ *
+ * Related: None
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_ROAM_BMISS_FIRST_BCNT_NAME                  "gRoamBmissFirstBcnt"
 #define CFG_ROAM_BMISS_FIRST_BCNT_MIN                   (5)
 #define CFG_ROAM_BMISS_FIRST_BCNT_MAX                   (100)
 #define CFG_ROAM_BMISS_FIRST_BCNT_DEFAULT               (10)
 
+/*
+ * <ini>
+ * gRoamBmissFinalBcnt - Beacon miss count to trigger final bmiss event
+ * @Min: 5
+ * @Max: 100
+ * @Default: 20
+ *
+ * This ini used to control how many beacon miss will trigger final bmiss
+ * event. Final bmiss event will make roaming take place or cause the
+ * indication of final bmiss event.
+ *
+ * Related: None
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_ROAM_BMISS_FINAL_BCNT_NAME                  "gRoamBmissFinalBcnt"
 #define CFG_ROAM_BMISS_FINAL_BCNT_MIN                   (5)
 #define CFG_ROAM_BMISS_FINAL_BCNT_MAX                   (100)
 #define CFG_ROAM_BMISS_FINAL_BCNT_DEFAULT               (20)
 
+/*
+ * <ini>
+ * gRoamBeaconRssiWeight - Set beacon miss weight
+ * @Min: 5
+ * @Max: 16
+ * @Default: 14
+ *
+ * This ini controls how many beacons' RSSI values will be used to calculate
+ * the average value of RSSI.
+ *
+ * Related: None
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_ROAM_BEACON_RSSI_WEIGHT_NAME                "gRoamBeaconRssiWeight"
 #define CFG_ROAM_BEACON_RSSI_WEIGHT_MIN                 (0)
 #define CFG_ROAM_BEACON_RSSI_WEIGHT_MAX                 (16)
@@ -5169,16 +5250,55 @@ enum station_keepalive_method {
 #define CFG_AP_DATA_AVAIL_POLL_PERIOD_MAX       (WNI_CFG_AP_DATA_AVAIL_POLL_PERIOD_STAMAX)
 #define CFG_AP_DATA_AVAIL_POLL_PERIOD_DEFAULT   (WNI_CFG_AP_DATA_AVAIL_POLL_PERIOD_STADEF)
 
+/*
+ * <ini>
+ * hostArpOffload - Enable/disable host ARP offload
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to enable/disable host ARP offload.
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_ENABLE_HOST_ARPOFFLOAD_NAME         "hostArpOffload"
 #define CFG_ENABLE_HOST_ARPOFFLOAD_MIN          (0)
 #define CFG_ENABLE_HOST_ARPOFFLOAD_MAX          (1)
 #define CFG_ENABLE_HOST_ARPOFFLOAD_DEFAULT      (1)
 
+/*
+ * <ini>
+ * ssdp - Enable/disable ssdp
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to enable/disable ssdp.
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_ENABLE_HOST_SSDP_NAME              "ssdp"
 #define CFG_ENABLE_HOST_SSDP_MIN               (0)
 #define CFG_ENABLE_HOST_SSDP_MAX               (1)
 #define CFG_ENABLE_HOST_SSDP_DEFAULT           (1)
 
+/*
+ * <ini>
+ * hostNSOffload - Enable/disable NS offload
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to enable/disable NS offload.
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_ENABLE_HOST_NSOFFLOAD_NAME         "hostNSOffload"
 #define CFG_ENABLE_HOST_NSOFFLOAD_MIN          (0)
 #define CFG_ENABLE_HOST_NSOFFLOAD_MAX          (1)
@@ -5678,11 +5798,43 @@ enum hdd_link_speed_rpt_type {
 #define CFG_VHT_ENABLE_MU_BFORMEE_CAP_FEATURE_MAX     (1)
 #define CFG_VHT_ENABLE_MU_BFORMEE_CAP_FEATURE_DEFAULT (0)
 
+/*
+ * <ini>
+ * gEnablePAID - VHT partial AID feature
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This option enables/disables VHT partial AID feature.
+ * Related: NA
+ *
+ * Supported Feature: 11AC
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_VHT_ENABLE_PAID_FEATURE             "gEnablePAID"
 #define CFG_VHT_ENABLE_PAID_FEATURE_MIN         (0)
 #define CFG_VHT_ENABLE_PAID_FEATURE_MAX         (1)
 #define CFG_VHT_ENABLE_PAID_FEATURE_DEFAULT     (0)
 
+/*
+ * <ini>
+ * gEnableGID - VHT Group ID feature
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This option enables/disables VHT Group ID feature.
+ * Related: NA
+ *
+ * Supported Feature: 11AC
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_VHT_ENABLE_GID_FEATURE              "gEnableGID"
 #define CFG_VHT_ENABLE_GID_FEATURE_MIN          (0)
 #define CFG_VHT_ENABLE_GID_FEATURE_MAX          (1)
@@ -5767,11 +5919,49 @@ enum hdd_link_speed_rpt_type {
 #define CFG_ENABLE_AMPDUPS_FEATURE_MAX          (1)
 #define CFG_ENABLE_AMPDUPS_FEATURE_DEFAULT      (0)
 
+/*
+ * <ini>
+ * gEnableHtSMPS - Enable the SM Power Save
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable SM Power Save
+ *
+ * Related: None
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_HT_ENABLE_SMPS_CAP_FEATURE          "gEnableHtSMPS"
 #define CFG_HT_ENABLE_SMPS_CAP_FEATURE_MIN      (0)
 #define CFG_HT_ENABLE_SMPS_CAP_FEATURE_MAX      (1)
 #define CFG_HT_ENABLE_SMPS_CAP_FEATURE_DEFAULT  (0)
 
+/*
+ * <ini>
+ * gHtSMPS - SMPS Mode
+ * @Min: 0
+ * @Max: 3
+ * @Default: 3
+ *
+ * This ini is used to set default SM Power Save Antenna mode
+ * 0 - Static
+ * 1 - Dynamic
+ * 2 - Reserved/Invalid
+ * 3 - Disabled
+ *
+ * Related: None
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_HT_SMPS_CAP_FEATURE                 "gHtSMPS"
 #define CFG_HT_SMPS_CAP_FEATURE_MIN             (0)
 #define CFG_HT_SMPS_CAP_FEATURE_MAX             (3)
@@ -5871,10 +6061,10 @@ enum hdd_link_speed_rpt_type {
 
 /*
  * <ini>
- * gDisableDfsJapanW53 - Enable dfs phyerror filtering offload in FW
+ * dfsPhyerrFilterOffload - Enable dfs phyerror filtering offload in FW
  * @Min: 0
  * @Max: 1
- * @Default: 1
+ * @Default: 0
  *
  * This ini is used to to enable dfs phyerror filtering offload to firmware
  * Enabling it will cause basic phy error to be discarding in firmware.
@@ -5891,6 +6081,23 @@ enum hdd_link_speed_rpt_type {
 #define CFG_ENABLE_DFS_PHYERR_FILTEROFFLOAD_MAX        (1)
 #define CFG_ENABLE_DFS_PHYERR_FILTEROFFLOAD_DEFAULT    (0)
 
+/*
+ * <ini>
+ * gReportMaxLinkSpeed - Max link speed
+ * @Min: CFG_STATS_LINK_SPEED_REPORT_ACTUAL
+ * @Max: CFG_STATS_LINK_SPEED_REPORT_MAX_SCALED
+ * @Default: CFG_STATS_LINK_SPEED_REPORT_ACTUAL
+ *
+ * This ini is used to set Max link speed
+ *
+ * Related: None
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal / External
+ *
+ * </ini>
+ */
 #define CFG_REPORT_MAX_LINK_SPEED                  "gReportMaxLinkSpeed"
 #define CFG_REPORT_MAX_LINK_SPEED_MIN              (eHDD_LINK_SPEED_REPORT_ACTUAL)
 #define CFG_REPORT_MAX_LINK_SPEED_MAX              (eHDD_LINK_SPEED_REPORT_MAX_SCALED)
@@ -6081,6 +6288,22 @@ enum hdd_link_speed_rpt_type {
 #define CFG_PPS_ENABLE_5G_EBT_FEATURE_MAX     (1)
 #define CFG_PPS_ENABLE_5G_EBT_FEATURE_DEFAULT (1)
 
+/*
+ * <ini>
+ * gEnableMemDeepSleep - Sets Memory Deep Sleep on/off.
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This option enables/disables memory deep sleep.
+ * Related: None
+ *
+ * Supported Feature: General
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_ENABLE_MEMORY_DEEP_SLEEP          "gEnableMemDeepSleep"
 #define CFG_ENABLE_MEMORY_DEEP_SLEEP_MIN      (0)
 #define CFG_ENABLE_MEMORY_DEEP_SLEEP_MAX      (1)
@@ -6137,6 +6360,17 @@ enum hdd_link_speed_rpt_type {
 #define CFG_DEFAULT_RATE_INDEX_24GH_MAX           (9)
 #define CFG_DEFAULT_RATE_INDEX_24GH_DEFAULT       (1)
 
+/*
+ * <ini>
+ * gEnablePacketLog - Enale packet log
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1 if packet log code is enabled, 0 otherwise
+ *
+ * This option enables/disables packet log collecting.
+ *
+ * </ini>
+ */
 #define CFG_ENABLE_PACKET_LOG            "gEnablePacketLog"
 #define CFG_ENABLE_PACKET_LOG_MIN        (0)
 #define CFG_ENABLE_PACKET_LOG_MAX        (1)
@@ -6146,29 +6380,80 @@ enum hdd_link_speed_rpt_type {
 #define CFG_ENABLE_PACKET_LOG_DEFAULT    (0)
 #endif
 
-
-
-/* gFwDebugLogType takes values from enum dbglog_process_t,
- * make default value as DBGLOG_PROCESS_NET_RAW to give the
- * logs to net link since cnss_diag service is started at boot
- * time by default.
+/* <ini>
+ * gFwDebugLogType - Firmware debug log type
+ * @Min: 0
+ * @Max: 255
+ * @Default: 3
+ *
+ * This option controls how driver is to give the firmware logs to net link
+ * when cnss_diag service is started.
+ *
+ * Related: None
+ *
+ * Supported Features: Debugging
+ *
+ * Usage: Internal
+ *
+ * </ini>
  */
 #define CFG_ENABLE_FW_LOG_TYPE            "gFwDebugLogType"
 #define CFG_ENABLE_FW_LOG_TYPE_MIN        (0)
 #define CFG_ENABLE_FW_LOG_TYPE_MAX        (255)
 #define CFG_ENABLE_FW_LOG_TYPE_DEFAULT    (3)
 
-/* gFwDebugLogLevel takes values from enum DBGLOG_LOG_LVL,
- * make default value as DBGLOG_WARN to enable error and
- * warning logs by default.
+/* <ini>
+ * gFwDebugLogLevel - Firmware debug log level
+ * @Min: 0
+ * @Max: 255
+ * @Default: 3
+ *
+ * This option controls the level of firmware debug log. Default value is
+ * DBGLOG_WARN, which is to enable error and warning logs.
+ *
+ * Related: None
+ *
+ * Supported Features: Debugging
+ *
+ * Usage: Internal
+ *
+ * </ini>
  */
 #define CFG_ENABLE_FW_DEBUG_LOG_LEVEL          "gFwDebugLogLevel"
 #define CFG_ENABLE_FW_DEBUG_LOG_LEVEL_MIN      (0)
 #define CFG_ENABLE_FW_DEBUG_LOG_LEVEL_MAX      (255)
 #define CFG_ENABLE_FW_DEBUG_LOG_LEVEL_DEFAULT  (3)
 
-/* For valid values of log levels check enum DBGLOG_LOG_LVL and
+/*
+ * <ini>
+ * gFwDebugModuleLoglevel - modulized firmware debug log level
+ * @Min: N/A
+ * @Max: N/A
+ * @Default: N/A
+ *
+ * This ini is used to set modulized firmware debug log level.
+ * FW module log level input string format looks like below:
+ * gFwDebugModuleLoglevel="<FW Module ID>,<Log Level>,..."
+ * For example:
+ * gFwDebugModuleLoglevel="1,0,2,1,3,2,4,3,5,4,6,5,7,6"
+ * The above input string means:
+ * For FW module ID 1 enable log level 0
+ * For FW module ID 2 enable log level 1
+ * For FW module ID 3 enable log level 2
+ * For FW module ID 4 enable log level 3
+ * For FW module ID 5 enable log level 4
+ * For FW module ID 6 enable log level 5
+ * For FW module ID 7 enable log level 6
+ * For valid values of log levels check enum DBGLOG_LOG_LVL and
  * for valid values of module ids check enum WLAN_MODULE_ID.
+ *
+ * Related: None
+ *
+ * Supported Feature: Debugging
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
  */
 #define CFG_ENABLE_FW_MODULE_LOG_LEVEL    "gFwDebugModuleLoglevel"
 #define CFG_ENABLE_FW_MODULE_LOG_DEFAULT  "2,1,3,1,5,1,9,1,13,1,14,1,18,1,19,1,26,1,28,1,29,1,31,1,36,1,38,1,46,1,47,1,50,1,52,1,53,1,56,1,60,1,61,1,4,1"
@@ -6346,11 +6631,21 @@ enum hdd_link_speed_rpt_type {
 #define HDD_MULTICAST_FILTER_LIST_CLEAR                        0x05
 
 /*
- * Enable Dynamic DTIM
- * Options
+ * <ini>
+ * gEnableDynamicDTIM - Enable Dynamic DTIM
+ * @Min: 0
+ * @Max: 9
+ * @Default: 0
+ *
+ * This ini is used to enable/disable ssdp.
+ *
  * 0 -Disable DynamicDTIM
  * 1 to 5 - SLM will switch to DTIM specified here when host suspends and
  *          switch DTIM1 when host resumes
+ *
+ * Usage: External
+ *
+ * </ini>
  */
 #define CFG_ENABLE_DYNAMIC_DTIM_NAME            "gEnableDynamicDTIM"
 #define CFG_ENABLE_DYNAMIC_DTIM_MIN        (0)
@@ -6359,10 +6654,10 @@ enum hdd_link_speed_rpt_type {
 
 /*
  * <ini>
- * gConfigVCmodeBitmap - Bitmap for operating voltage corner mode
+ * gConfigVCmode - Bitmap for operating voltage corner mode
  * @Min: 0x00000000
  * @Max: 0x0fffffff
- * @Default: 0x0000000a
+ * @Default: 0x00000005
  * This ini is used to set operating voltage corner mode for differenet
  * phymode and bw configurations. Every 2 bits till BIT27 are dedicated
  * for a specific configuration. Bit values decide the type of voltage
@@ -6397,7 +6692,6 @@ enum hdd_link_speed_rpt_type {
  *
  * </ini>
  */
-
 #define CFG_VC_MODE_BITMAP                  "gConfigVCmode"
 #define CFG_VC_MODE_BITMAP_MIN              (0x00000000)
 #define CFG_VC_MODE_BITMAP_MAX              (0x0fffffff)
@@ -6769,10 +7063,16 @@ enum hdd_link_speed_rpt_type {
 #define CFG_BAD_PEER_TX_CTL_TX_LIMIT_LEVEL_IEEEAC_DEFAULT (3)
 #endif
 
-
 /*
- * Enable/Disable Thermal Mitigation feature
- * Default: Enable
+ * <ini>
+ * gThermalMitigationEnable - Set Thermal mitigation feature control
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * Usage: External
+ *
+ * </ini>
  */
 #define CFG_THERMAL_MIGRATION_ENABLE_NAME      "gThermalMitigationEnable"
 #define CFG_THERMAL_MIGRATION_ENABLE_MIN       (0)
