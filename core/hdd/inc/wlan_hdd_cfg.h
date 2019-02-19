@@ -7079,72 +7079,209 @@ enum hdd_link_speed_rpt_type {
 #define CFG_THERMAL_MIGRATION_ENABLE_MAX       (1)
 #define CFG_THERMAL_MIGRATION_ENABLE_DEFAULT   (0)
 
+/*
+ * <ini>
+ * gThrottlePeriod - Set Thermal mitigation throttle period
+ * @Min: 10
+ * @Max: 10000
+ * @Default: 4000
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_THROTTLE_PERIOD_NAME               "gThrottlePeriod"
 #define CFG_THROTTLE_PERIOD_MIN                (10)
 #define CFG_THROTTLE_PERIOD_MAX                (10000)
 #define CFG_THROTTLE_PERIOD_DEFAULT            (4000)
 
 /*
- * Configure Throttle Period Different Level Duty Cycle in percentage
- * When temperature measured is greater than threshold at particular level,
- * then throtling level will get increased by one level and
- * will reduce TX duty by the given percentage
+ * <ini>
+ * gThrottleDutyCycleLevel0 - Set Thermal mitigation throttle duty cycle level0
+ * @Min: 0
+ * @Max: 0
+ * @Default: 0
+ *
+ * Usage: External
+ *
+ * </ini>
  */
 #define CFG_THROTTLE_DUTY_CYCLE_LEVEL0_NAME    "gThrottleDutyCycleLevel0"
 #define CFG_THROTTLE_DUTY_CYCLE_LEVEL0_MIN     (0)
 #define CFG_THROTTLE_DUTY_CYCLE_LEVEL0_MAX     (0)
 #define CFG_THROTTLE_DUTY_CYCLE_LEVEL0_DEFAULT (0)
 
+/*
+ * <ini>
+ * gThrottleDutyCycleLevel1 - Set Thermal mitigation throttle duty cycle level1
+ * @Min: 0
+ * @Max: 100
+ * @Default: 50
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_THROTTLE_DUTY_CYCLE_LEVEL1_NAME    "gThrottleDutyCycleLevel1"
 #define CFG_THROTTLE_DUTY_CYCLE_LEVEL1_MIN     (0)
 #define CFG_THROTTLE_DUTY_CYCLE_LEVEL1_MAX     (100)
 #define CFG_THROTTLE_DUTY_CYCLE_LEVEL1_DEFAULT (50)
 
+/*
+ * <ini>
+ * gThrottleDutyCycleLevel2 - Set Thermal mitigation throttle duty cycle level2
+ * @Min: 0
+ * @Max: 100
+ * @Default: 75
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_THROTTLE_DUTY_CYCLE_LEVEL2_NAME    "gThrottleDutyCycleLevel2"
 #define CFG_THROTTLE_DUTY_CYCLE_LEVEL2_MIN     (0)
 #define CFG_THROTTLE_DUTY_CYCLE_LEVEL2_MAX     (100)
 #define CFG_THROTTLE_DUTY_CYCLE_LEVEL2_DEFAULT (75)
 
+/*
+ * <ini>
+ * gThrottleDutyCycleLevel3 - Set Thermal mitigation throttle duty cycle level3
+ * @Min: 0
+ * @Max: 100
+ * @Default: 94
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_THROTTLE_DUTY_CYCLE_LEVEL3_NAME    "gThrottleDutyCycleLevel3"
 #define CFG_THROTTLE_DUTY_CYCLE_LEVEL3_MIN     (0)
 #define CFG_THROTTLE_DUTY_CYCLE_LEVEL3_MAX     (100)
 #define CFG_THROTTLE_DUTY_CYCLE_LEVEL3_DEFAULT (94)
 
+/*
+ * <ini>
+ * gThermalTempMinLevel0 - Set Thermal Temp Min Level0
+ * @Min: 0
+ * @Max: 1000
+ * @Default: 0
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_THERMAL_TEMP_MIN_LEVEL0_NAME      "gThermalTempMinLevel0"
 #define CFG_THERMAL_TEMP_MIN_LEVEL0_MIN       (0)
 #define CFG_THERMAL_TEMP_MIN_LEVEL0_MAX       (1000)
 #define CFG_THERMAL_TEMP_MIN_LEVEL0_DEFAULT   (0)
 
+/*
+ * <ini>
+ * gThermalTempMaxLevel0 - Set Thermal Temp Max Level0
+ * @Min: 0
+ * @Max: 1000
+ * @Default: 90
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_THERMAL_TEMP_MAX_LEVEL0_NAME      "gThermalTempMaxLevel0"
 #define CFG_THERMAL_TEMP_MAX_LEVEL0_MIN       (0)
 #define CFG_THERMAL_TEMP_MAX_LEVEL0_MAX       (1000)
 #define CFG_THERMAL_TEMP_MAX_LEVEL0_DEFAULT   (90)
 
+/*
+ * <ini>
+ * gThermalTempMinLevel1 - Set Thermal Temp Min Level1
+ * @Min: 0
+ * @Max: 1000
+ * @Default: 70
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_THERMAL_TEMP_MIN_LEVEL1_NAME      "gThermalTempMinLevel1"
 #define CFG_THERMAL_TEMP_MIN_LEVEL1_MIN       (0)
 #define CFG_THERMAL_TEMP_MIN_LEVEL1_MAX       (1000)
 #define CFG_THERMAL_TEMP_MIN_LEVEL1_DEFAULT   (70)
 
+/*
+ * <ini>
+ * gThermalTempMaxLevel1 - Set Thermal Temp Max Level1
+ * @Min: 0
+ * @Max: 1000
+ * @Default: 110
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_THERMAL_TEMP_MAX_LEVEL1_NAME      "gThermalTempMaxLevel1"
 #define CFG_THERMAL_TEMP_MAX_LEVEL1_MIN       (0)
 #define CFG_THERMAL_TEMP_MAX_LEVEL1_MAX       (1000)
 #define CFG_THERMAL_TEMP_MAX_LEVEL1_DEFAULT   (110)
 
+/*
+ * <ini>
+ * gThermalTempMinLevel2 - Set Thermal Temp Min Level2
+ * @Min: 0
+ * @Max: 1000
+ * @Default: 90
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_THERMAL_TEMP_MIN_LEVEL2_NAME      "gThermalTempMinLevel2"
 #define CFG_THERMAL_TEMP_MIN_LEVEL2_MIN       (0)
 #define CFG_THERMAL_TEMP_MIN_LEVEL2_MAX       (1000)
 #define CFG_THERMAL_TEMP_MIN_LEVEL2_DEFAULT   (90)
 
+/*
+ * <ini>
+ * gThermalTempMaxLevel2 - Set Thermal Temp Max Level2
+ * @Min: 0
+ * @Max: 1000
+ * @Default: 125
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_THERMAL_TEMP_MAX_LEVEL2_NAME      "gThermalTempMaxLevel2"
 #define CFG_THERMAL_TEMP_MAX_LEVEL2_MIN       (0)
 #define CFG_THERMAL_TEMP_MAX_LEVEL2_MAX       (1000)
 #define CFG_THERMAL_TEMP_MAX_LEVEL2_DEFAULT   (125)
 
+/*
+ * <ini>
+ * gThermalTempMinLevel3 - Set Thermal Temp Min Level3
+ * @Min: 0
+ * @Max: 1000
+ * @Default: 110
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_THERMAL_TEMP_MIN_LEVEL3_NAME      "gThermalTempMinLevel3"
 #define CFG_THERMAL_TEMP_MIN_LEVEL3_MIN       (0)
 #define CFG_THERMAL_TEMP_MIN_LEVEL3_MAX       (1000)
 #define CFG_THERMAL_TEMP_MIN_LEVEL3_DEFAULT   (110)
 
+/*
+ * <ini>
+ * gThermalTempMaxLevel3 - Set Thermal Temp Max Level3
+ * @Min: 0
+ * @Max: 1000
+ * @Default: 0
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_THERMAL_TEMP_MAX_LEVEL3_NAME      "gThermalTempMaxLevel3"
 #define CFG_THERMAL_TEMP_MAX_LEVEL3_MIN       (0)
 #define CFG_THERMAL_TEMP_MAX_LEVEL3_MAX       (1000)
@@ -8051,6 +8188,21 @@ enum hdd_link_speed_rpt_type {
 #define CFG_ENABLE_MCC_ADATIVE_SCHEDULER_ENABLED_MAX              (1)
 #define CFG_ENABLE_MCC_ADATIVE_SCHEDULER_ENABLED_DEFAULT          (1)
 
+/*
+ * <ini>
+ * gTxBFEnable - Enables SU beamformee caps
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * Related: NA
+ *
+ * Supported Feature: 11AC
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_VHT_SU_BEAMFORMEE_CAP_FEATURE         "gTxBFEnable"
 #define CFG_VHT_SU_BEAMFORMEE_CAP_FEATURE_MIN     (WNI_CFG_VHT_SU_BEAMFORMEE_CAP_STAMIN)
 #define CFG_VHT_SU_BEAMFORMEE_CAP_FEATURE_MAX     (WNI_CFG_VHT_SU_BEAMFORMEE_CAP_STAMAX)
@@ -8080,24 +8232,85 @@ enum hdd_link_speed_rpt_type {
 #define CFG_ENABLE_SUBFEE_IN_VENDOR_VHTIE_DEFAULT (1)
 
 /*
- * Enable / Disable Tx beamformee in SAP mode
- * Default: Disable
+ * <ini>
+ * gEnableTxBFeeSAP - Enable / Disable Tx beamformee in SAP mode
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * Related: NA
+ *
+ * Supported Feature: 11AC
+ *
+ * Usage: External
+ *
+ * </ini>
  */
 #define CFG_VHT_ENABLE_TXBF_SAP_MODE         "gEnableTxBFeeSAP"
 #define CFG_VHT_ENABLE_TXBF_SAP_MODE_MIN     (0)
 #define CFG_VHT_ENABLE_TXBF_SAP_MODE_MAX     (1)
 #define CFG_VHT_ENABLE_TXBF_SAP_MODE_DEFAULT (0)
 
+/*
+ * <ini>
+ * gTxBFCsnValue - ini to set VHT/HE STS Caps field
+ * @Min: 0
+ * @Max: 7
+ * @Default: 7
+ *
+ * This ini is used to configure the STS capability shown in AC/AX mode
+ * MGMT frame IE, the final STS field shown in VHT/HE IE will be calculated
+ * by MIN of (INI set, target report value). Only if gTxBFEnable is enabled
+ * and SU/MU BEAMFORMEE Caps is shown, then STS Caps make sense.
+ *
+ * Related: gTxBFEnable.
+ *
+ * Supported Feature: STA/SAP
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
 #define CFG_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED         "gTxBFCsnValue"
 #define CFG_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_MIN     (WNI_CFG_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_STAMIN)
 #define CFG_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_MAX     (WNI_CFG_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_STAMAX - 1)
 #define CFG_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_DEFAULT (WNI_CFG_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_STADEF - 1)
 
+/*
+ * <ini>
+ * gEnableTxBFin20MHz - Enables TXBF in 20mhz
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * Related: NA
+ *
+ * Supported Feature: 11AC
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_VHT_ENABLE_TXBF_IN_20MHZ               "gEnableTxBFin20MHz"
 #define CFG_VHT_ENABLE_TXBF_IN_20MHZ_MIN           (0)
 #define CFG_VHT_ENABLE_TXBF_IN_20MHZ_MAX           (1)
 #define CFG_VHT_ENABLE_TXBF_IN_20MHZ_DEFAULT       (0)
 
+/*
+ * <ini>
+ * gEnableTxSUBeamformer - Enables TX Su beam former
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * Related: NA
+ *
+ * Supported Feature: 11AC
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_VHT_ENABLE_TX_SU_BEAM_FORMER         "gEnableTxSUBeamformer"
 #define CFG_VHT_ENABLE_TX_SU_BEAM_FORMER_MIN     (0)
 #define CFG_VHT_ENABLE_TX_SU_BEAM_FORMER_MAX     (1)
@@ -8110,19 +8323,62 @@ enum hdd_link_speed_rpt_type {
 #define CFG_DEBUG_P2P_REMAIN_ON_CHANNEL_MAX     (1)
 
 /*
- * SAP ALLOW All Channels
+ * <ini>
+ * gSapAllowAllChannel - Sap allow all channels
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to allow all channels for SAP
+ *
+ * Related: None
+ *
+ * Supported Feature: SAP
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
  */
 #define CFG_SAP_ALLOW_ALL_CHANNEL_PARAM_NAME          "gSapAllowAllChannel"
 #define CFG_SAP_ALLOW_ALL_CHANNEL_PARAM_MIN           (0)
 #define CFG_SAP_ALLOW_ALL_CHANNEL_PARAM_MAX           (1)
 #define CFG_SAP_ALLOW_ALL_CHANNEL_PARAM_DEFAULT       (0)
 
+/*
+ * <ini>
+ * gDisableLDPCWithTxbfAP - Disable LDPC with tx bf AP
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * Related: NA
+ *
+ * Supported Feature: 11AC
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_DISABLE_LDPC_WITH_TXBF_AP             "gDisableLDPCWithTxbfAP"
 #define CFG_DISABLE_LDPC_WITH_TXBF_AP_MIN         (0)
 #define CFG_DISABLE_LDPC_WITH_TXBF_AP_MAX         (1)
 #define CFG_DISABLE_LDPC_WITH_TXBF_AP_DEFAULT     (0)
 
-/* Parameter to control VHT support in 2.4 GHz band */
+/*
+ * <ini>
+ * gEnableVhtFor24GHzBand - Enable VHT for 2.4GHZ in SAP mode
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * Related: NA
+ *
+ * Supported Feature: 11AC
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_ENABLE_VHT_FOR_24GHZ_NAME             "gEnableVhtFor24GHzBand"
 #define CFG_ENABLE_VHT_FOR_24GHZ_MIN              (0)
 #define CFG_ENABLE_VHT_FOR_24GHZ_MAX              (1)
@@ -8291,12 +8547,27 @@ enum hdd_link_speed_rpt_type {
 #endif /* WLAN_FEATURE_FASTPATH */
 
 /*
+ * <ini>
+ * gIPAConfig - IPA configuration
+ * @Min: 0
+ * @Max: 0xFFFFFFFF
+ * @Default: 0
+ *
+ * This ini specifies the IPA configuration
  * IPA Offload configuration - Each bit enables a feature
  * bit0 - IPA Enable
  * bit1 - IPA Pre filter enable
  * bit2 - IPv6 enable
  * bit3 - IPA Resource Manager (RM) enable
  * bit4 - IPA Clock scaling enable
+ *
+ * Related: N/A
+ *
+ * Supported Feature: IPA
+ *
+ * Usage: Internal
+ *
+ * </ini>
  */
 #define CFG_IPA_OFFLOAD_CONFIG_NAME              "gIPAConfig"
 #define CFG_IPA_OFFLOAD_CONFIG_MIN               (0)
