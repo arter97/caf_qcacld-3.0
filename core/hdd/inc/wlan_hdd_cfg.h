@@ -9901,11 +9901,41 @@ enum hdd_link_speed_rpt_type {
 #define CFG_ENABLE_DEAUTH_TO_DISASSOC_MAP_DEFAULT (0)
 
 #ifdef DHCP_SERVER_OFFLOAD
+/*
+ * <ini>
+ * gDHCPServerOffloadEnable
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * DHCP Server offload support
+ *
+ * Related: None
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
 #define CFG_DHCP_SERVER_OFFLOAD_SUPPORT_NAME      "gDHCPServerOffloadEnable"
 #define CFG_DHCP_SERVER_OFFLOAD_SUPPORT_MIN       (0)
 #define CFG_DHCP_SERVER_OFFLOAD_SUPPORT_MAX       (1)
 #define CFG_DHCP_SERVER_OFFLOAD_SUPPORT_DEFAULT   (CFG_DHCP_SERVER_OFFLOAD_SUPPORT_MIN)
 
+
+/* <ini>
+ * gDHCPMaxNumClients
+ * @Min: 1
+ * @Max: 8
+ * @Default: 8
+ *
+ * Number of DHCP server offload clients
+ *
+ * Related: None
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
 #define CFG_DHCP_SERVER_OFFLOAD_NUM_CLIENT_NAME     "gDHCPMaxNumClients"
 #define CFG_DHCP_SERVER_OFFLOAD_NUM_CLIENT_MIN      (1)
 #define CFG_DHCP_SERVER_OFFLOAD_NUM_CLIENT_MAX      (8)
@@ -9990,11 +10020,44 @@ enum hdd_link_speed_rpt_type {
 #define CFG_ENABLE_CUSTOM_CONC_RULE2_NAME_MAX     (1)
 #define CFG_ENABLE_CUSTOM_CONC_RULE2_NAME_DEFAULT (0)
 
+/*
+ * <ini>
+ * gEnableStaConnectionIn5Ghz - To enable/disable STA connection in 5G
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to enable/disable STA connection in 5G band
+ *
+ * Related: STA
+ *
+ * Supported Feature: Concurrency
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_ENABLE_STA_CONNECTION_IN_5GHZ         "gEnableStaConnectionIn5Ghz"
 #define CFG_ENABLE_STA_CONNECTION_IN_5GHZ_MIN     (0)
 #define CFG_ENABLE_STA_CONNECTION_IN_5GHZ_MAX     (1)
 #define CFG_ENABLE_STA_CONNECTION_IN_5GHZ_DEFAULT (1)
 
+/*
+ * <ini>
+ * gEnableMacAddrSpoof - Enable mac address randomization feature.
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to enable/disable mac address randomization for scan.
+ *
+ * Supported Feature: SCAN
+ *
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_ENABLE_MAC_ADDR_SPOOFING                "gEnableMacAddrSpoof"
 #define CFG_ENABLE_MAC_ADDR_SPOOFING_MIN            (0)
 #define CFG_ENABLE_MAC_ADDR_SPOOFING_MAX            (1)
@@ -10109,11 +10172,35 @@ enum hdd_link_speed_rpt_type {
 #define CFG_SAP_DOT11MC_MAX           (1)
 #define CFG_SAP_DOT11MC_DEFAULT       (0)
 
+/*
+ * <ini>
+ * gPreferNonDfsChanOnRadar - During random channel selection prefer non dfs
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * During random channel selection prefer non dfs.
+ *
+ * Related: none
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_ENABLE_NON_DFS_CHAN_ON_RADAR           "gPreferNonDfsChanOnRadar"
 #define CFG_ENABLE_NON_DFS_CHAN_ON_RADAR_MIN       (0)
 #define CFG_ENABLE_NON_DFS_CHAN_ON_RADAR_MAX       (1)
 #define CFG_ENABLE_NON_DFS_CHAN_ON_RADAR_DEFAULT   (0)
 
+/*
+ * <ini>
+ * gMulticastHostFwMsgs - Multicast host FW messages
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0 for MDM platform and 1 for other
+ *
+ * </ini>
+ */
 #define CFG_MULTICAST_HOST_FW_MSGS          "gMulticastHostFwMsgs"
 #define CFG_MULTICAST_HOST_FW_MSGS_MIN      (0)
 #define CFG_MULTICAST_HOST_FW_MSGS_MAX      (1)
@@ -10191,10 +10278,18 @@ enum hdd_link_speed_rpt_type {
 #define CFG_LRO_ENABLED_DEFAULT        (0)
 
 /*
+ * <ini>
+ * gEnableFlowSteering - Enable rx traffic flow steering
+ * @Default: false
+ *
  * Enable Rx traffic flow steering to enable Rx interrupts on multiple CEs based
  * on the flows. Different CEs<==>different IRQs<==>probably different CPUs.
  * Parallel Rx paths.
  * 1 - enable  0 - disable
+ *
+ * Usage: Internal
+ *
+ * </ini>
  */
 #define CFG_FLOW_STEERING_ENABLED_NAME        "gEnableFlowSteering"
 #define CFG_FLOW_STEERING_ENABLED_MIN         (0)
@@ -10215,33 +10310,47 @@ enum hdd_link_speed_rpt_type {
 #define CFG_MAX_MSDUS_PER_RXIND_MIN           (4)
 #define CFG_MAX_MSDUS_PER_RXIND_MAX           (32)
 #define CFG_MAX_MSDUS_PER_RXIND_DEFAULT       (32)
-/*
- * In static display use case when APPS is in stand alone power save mode enable
- * active offload mode which helps FW to filter out MC/BC data packets to avoid
- * APPS wake up and save more power.
- *
- * By default enable active mode offload as it helps to save more power in
- * static display usecase(APPS stand alone power collapse).
- *
- * If active mode offload(gActiveModeOffload=1) is enabled then all applicable
- * data offload/filtering is enabled immediately in FW once config is available
- * in WLAN driver and FW caches this configuration accross suspend/resume
- *
- * If active mode offload is disabled(gActiveModeOffload=0) then all applicable
- * data offload/filtering is enabled during cfg80211 suspend and disabled
- * during cfg80211 resume
- *
- * Active mode offload feature is bydefault enabled for all targets
- */
 
+/*
+ * <ini>
+ * gActiveModeOffload - Active offload mode configuration
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * When set to 1 active mode offload will be enabled.
+ *
+ * If active mode offload is enabled then all applicable data offload/filtering
+ * is enabled immediately in FW once config is available in WLAN driver and FW
+ * caches this configuration across suspend/resume;
+ * If active mode offload is disabled then all applicable data offload/filtering
+ * is enabled during cfg80211 suspend and disabled during cfg80211 resume.
+ *
+ * Supported Feature: Active mode offload
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_ACTIVE_MODE_OFFLOAD            "gActiveModeOffload"
 #define CFG_ACTIVE_MODE_OFFLOAD_MIN        (0)
 #define CFG_ACTIVE_MODE_OFFLOAD_MAX        (1)
 #define CFG_ACTIVE_MODE_OFFLOAD_DEFAULT    (1)
 
 /*
- * 0: Disable BPF packet filter
- * 1: Enable BPF packet filter
+ * <ini>
+ * gBpfFilterEnable - APF feature support configuration
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * When set to 1 APF feature will be enabled.
+ *
+ * Supported Feature: Android packet filter
+ *
+ * Usage: External
+ *
+ * </ini>
  */
 #define CFG_BPF_PACKET_FILTER_OFFLOAD           "gBpfFilterEnable"
 #define CFG_BPF_PACKET_FILTER_OFFLOAD_MIN       (0)
@@ -10343,8 +10452,23 @@ enum hdd_link_speed_rpt_type {
 #define CFG_ENABLE_COEX_ALT_CHAINMASK_DEFAULT (0)
 
 /*
- * set the self gen power value from
- * 0 to 0xffff
+ * <ini>
+ * gSelfGenFrmPwr - self-generated frame power in tx chain mask
+ * for CCK rates
+ * @Min: 0
+ * @Max: 0xffff
+ * @Default: 0
+ *
+ * gSelfGenFrmPwr is to set self-generated frame power in tx chain mask
+ * for CCK rates
+ *
+ * Related: None
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
  */
 #define CFG_SELF_GEN_FRM_PWR        "gSelfGenFrmPwr"
 #define CFG_SELF_GEN_FRM_PWR_MIN      (0)
@@ -10402,15 +10526,21 @@ enum hdd_link_speed_rpt_type {
 #define CFG_RX_AGGREGATION_SIZE_DEFAULT  (64)
 
 /*
+ * <ini>
+ * gfine_time_meas_cap - fine timing measurement capability information
+ * @Min: 0x0000
+ * @Max: 0x00BD
+ * @Default: 0x00BD
+ *
  * fine timing measurement capability information
  *
  * <----- fine_time_meas_cap (in bits) ----->
- *+----------+-----+-----+------+------+-------+-------+-----+-----+
- *|   8-31   |  7  |  6  |   5  |   4  |   3   |   2   |  1  |  0  |
- *+----------+-----+-----+------+------+-------+-------+-----+-----+
- *| reserved | SAP | SAP |P2P-GO|P2P-GO|P2P-CLI|P2P-CLI| STA | STA |
- *|          |resp |init |resp  |init  |resp   |init   |resp |init |
- *+----------+-----+-----+------+------+-------+-------+-----+-----+
+ * +----------+-----+-----+------+------+-------+-------+-----+-----+
+ * |   8-31   |  7  |  6  |   5  |   4  |   3   |   2   |  1  |  0  |
+ * +----------+-----+-----+------+------+-------+-------+-----+-----+
+ * | reserved | SAP | SAP |P2P-GO|P2P-GO|P2P-CLI|P2P-CLI| STA | STA |
+ * |          |resp |init |resp  |init  |resp   |init   |resp |init |
+ * +----------+-----+-----+------+------+-------+-------+-----+-----+
  *
  * resp - responder role; init- initiator role
  *
@@ -10423,6 +10553,14 @@ enum hdd_link_speed_rpt_type {
  * |   P2P-GO        |       Y         |     Y     |
  * |   SAP           |       N         |     Y     |
  * +-----------------+-----------------+-----------+
+ *
+ * Related: None
+ *
+ * Supported Feature: WIFI POS
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
  */
 #define CFG_FINE_TIME_MEAS_CAPABILITY              "gfine_time_meas_cap"
 #define CFG_FINE_TIME_MEAS_CAPABILITY_MIN          (0x0000)
@@ -10586,23 +10724,49 @@ enum dot11p_mode {
 #define CFG_STA_SAP_SCC_ON_DFS_CHAN_DEFAULT      (0)
 
 /*
- * gPNOChannelPrediction will allow user to enable/disable the
- * PNO channel prediction feature.
+ * <ini>
+ * gPNOChannelPrediction - Enable/disable the PNO channel
+ * prediction feature.
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
  * In current PNO implementation, scan is always done until all configured
  * channels are scanned. If we can determine DUT is stationary based on
  * scanning a subset of channels, we may cancel the remaining channels.
  * Hence, we can save additional power consumption.
+ *
+ * Related: None
+ *
+ * Supported Feature: Scan
+ *
+ * Usage: External
+ *
+ * </ini>
  */
 #define CFG_PNO_CHANNEL_PREDICTION_NAME      "gPNOChannelPrediction"
 #define CFG_PNO_CHANNEL_PREDICTION_MIN       (0)
 #define CFG_PNO_CHANNEL_PREDICTION_MAX       (1)
 #define CFG_PNO_CHANNEL_PREDICTION_DEFAULT   (0)
+
 /*
- * The top K number of channels are used for tanimoto distance
- * calculation. These are the top channels on which the probability
- * of finding the AP's is extremely high. This number is intended
- * for tweaking the internal algorithm for experiments. This should
- * not be changed externally.
+ * <ini>
+ * gTopKNumOfChannels - top K number of channels are used for tanimoto distance
+ * @Min: 1
+ * @Max: 5
+ * @Default: 3
+ *
+ * These are the top channels on which the probability of finding the AP's is
+ * extremely high. This number is intended for tweaking the internal algorithm
+ * for experiments. This should not be changed externally.
+ *
+ * Related: None
+ *
+ * Supported Feature: Scan
+ *
+ * Usage: External
+ *
+ * </ini>
  */
 #define CFG_TOP_K_NUM_OF_CHANNELS_NAME      "gTopKNumOfChannels"
 #define CFG_TOP_K_NUM_OF_CHANNELS_MIN       (1)
@@ -10620,16 +10784,42 @@ enum dot11p_mode {
 #define CFG_STATIONARY_THRESHOLD_MAX       (100)
 #define CFG_STATIONARY_THRESHOLD_DEFAULT   (10)
 
-/* Option to report rssi in cfg80211_inform_bss_frame()
- * 0 = use rssi value based on noise floor = -96 dBm
- * 1 = use rssi value based on actual noise floor in hardware
+/*
+ * <ini>
+ * gInformBssRssiRaw - Report rssi in cfg80211_inform_bss_frame
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * Option to report rssi in cfg80211_inform_bss_frame()
+ *
+ * Related: None
+ *
+ * Supported Feature: N/A
+ *
+ * Usage: External
+ *
+ * </ini>
  */
 #define CFG_INFORM_BSS_RSSI_RAW_NAME               "gInformBssRssiRaw"
 #define CFG_INFORM_BSS_RSSI_RAW_MIN                (0)
 #define CFG_INFORM_BSS_RSSI_RAW_MAX                (1)
 #define CFG_INFORM_BSS_RSSI_RAW_DEFAULT            (1)
 
-/* GPIO pin to toggle when capture tsf */
+/* <ini>
+ * gtsf_gpio_pin
+ * @Min: 0
+ * @Max: 254
+ * @Default: 255
+ *
+ * GPIO pin to toggle when capture tsf
+ *
+ * Related: None
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
 #define CFG_SET_TSF_GPIO_PIN_NAME                  "gtsf_gpio_pin"
 #define CFG_SET_TSF_GPIO_PIN_MIN                   (0)
 #define CFG_SET_TSF_GPIO_PIN_MAX                   (254)
@@ -10637,7 +10827,24 @@ enum dot11p_mode {
 #define CFG_SET_TSF_GPIO_PIN_DEFAULT               (TSF_GPIO_PIN_INVALID)
 
 #ifdef WLAN_FEATURE_TSF_PLUS
-/* PTP options */
+/*
+ * <ini>
+ * gtsf_ptp_options: TSF Plus feature options
+ * @Min: 0
+ * @Max: 0xff
+ * @Default: 0xf
+ *
+ * CFG_SET_TSF_PTP_OPT_RX                    (0x1)
+ * CFG_SET_TSF_PTP_OPT_TX                    (0x2)
+ * CFG_SET_TSF_PTP_OPT_RAW                   (0x4)
+ * CFG_SET_TSF_DBG_FS                        (0x8)
+ *
+ * Related: None
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
 #define CFG_SET_TSF_PTP_OPT_NAME                  "gtsf_ptp_options"
 #define CFG_SET_TSF_PTP_OPT_MIN                   (0)
 #define CFG_SET_TSF_PTP_OPT_MAX                   (0xff)
@@ -10649,9 +10856,23 @@ enum dot11p_mode {
 #endif
 
 /*
+ * <ini>
+ * gtraffic_threshold - Dense traffic threshold
+ * @Min: 0
+ * @Max: 0xffffffff
+ * @Default: 400
+ *
  * Dense traffic threshold
  * traffic threshold required for dense roam scan
  * Measured in kbps
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
  */
 #define CFG_ROAM_DENSE_TRAFFIC_THRESHOLD         "gtraffic_threshold"
 #define CFG_ROAM_DENSE_TRAFFIC_THRESHOLD_MIN     (0)
@@ -10703,8 +10924,20 @@ enum dot11p_mode {
 #define CFG_USER_ACS_DFS_LTE_DEFAULT   (0)
 
 /*
+ * <ini>
+ * gignore_peer_ht_opmode
+ *
+ * @min 0
+ * @max 1
+ * @default 1
+ *
  * Enabling gignore_peer_ht_opmode will enable 11g
  * protection only when there is a 11g AP in vicinity.
+ *
+ * Related: None
+ *
+ * Supported Feature: SAP Protection
+ * </ini>
  */
 #define CFG_IGNORE_PEER_HT_MODE_NAME       "gignore_peer_ht_opmode"
 #define CFG_IGNORE_PEER_HT_MODE_MIN        (0)
@@ -10713,9 +10946,23 @@ enum dot11p_mode {
 
 #ifdef WLAN_FEATURE_NAN_DATAPATH
 /*
- * Enable NaN data path feature. NaN data path enables
- * NaN supported devices to exchange data over traditional
- * TCP/UDP network stack.
+ * <ini>
+ * genable_nan_datapath - Enable NaN data path feature. NaN data path
+ *                        enables NAN supported devices to exchange
+ *                        data over TCP/UDP network stack.
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * When set to 1 NAN Datapath feature will be enabled.
+ *
+ * Related: gEnableNanSupport
+ *
+ * Supported Feature: NAN
+ *
+ * Usage: External
+ *
+ * </ini>
  */
 #define CFG_ENABLE_NAN_DATAPATH_NAME    "genable_nan_datapath"
 #define CFG_ENABLE_NAN_DATAPATH_MIN     (0)
@@ -11185,9 +11432,23 @@ enum dot11p_mode {
 #define CFG_ENABLE_DP_TRACE_CONFIG_DEFAULT	"1, 8, 1, 126"
 
 /*
- * This parameter will set the weight to calculate the average low pass
- * filter for channel congestion.
+ * <ini>
+ * adapt_dwell_lpf_weight - weight to caclulate avg low pass filter.
+ * @Min: 0
+ * @Max: 100
+ * @Default: 80
+ *
+ * This ini is used to set the weight to calculate
+ * the average low pass filter for channel congestion.
  * Acceptable values for this: 0-100 (In %)
+ *
+ * Related: None.
+ *
+ * Supported Feature: Scan
+ *
+ * Usage: External
+ *
+ * </ini>
  */
 #define CFG_ADAPT_DWELL_LPF_WEIGHT_NAME       "adapt_dwell_lpf_weight"
 #define CFG_ADAPT_DWELL_LPF_WEIGHT_MIN        (0)
@@ -11195,9 +11456,22 @@ enum dot11p_mode {
 #define CFG_ADAPT_DWELL_LPF_WEIGHT_DEFAULT    (80)
 
 /*
- * This parameter will set interval to monitor wifi activity
- * in passive scan in msec.
- * Acceptable values for this: 0-25
+ * <ini>
+ * adapt_dwell_passive_mon_intval - Interval to monitor passive scan in msec.
+ * @Min: 0
+ * @Max: 25
+ * @Default: 10
+ *
+ * This ini is used to set interval to monitor wifi
+ * activity in passive scan in milliseconds.
+ *
+ * Related: None.
+ *
+ * Supported Feature: Scan
+ *
+ * Usage: External
+ *
+ * </ini>
  */
 #define CFG_ADAPT_DWELL_PASMON_INTVAL_NAME     "adapt_dwell_passive_mon_intval"
 #define CFG_ADAPT_DWELL_PASMON_INTVAL_MIN      (0)
@@ -11205,8 +11479,22 @@ enum dot11p_mode {
 #define CFG_ADAPT_DWELL_PASMON_INTVAL_DEFAULT  (10)
 
 /*
- * This parameter will set % of wifi activity used in passive scan 0-100.
+ * <ini>
+ * adapt_dwell_wifi_act_threshold - % of wifi activity used in passive scan
+ * @Min: 0
+ * @Max: 100
+ * @Default: 10
+ *
+ * This ini is used to set % of wifi activity used in passive scan
  * Acceptable values for this: 0-100 (in %)
+ *
+ * Related: None.
+ *
+ * Supported Feature: Scan
+ *
+ * Usage: External
+ *
+ * </ini>
  */
 #define CFG_ADAPT_DWELL_WIFI_THRESH_NAME       "adapt_dwell_wifi_act_threshold"
 #define CFG_ADAPT_DWELL_WIFI_THRESH_MIN        (0)
