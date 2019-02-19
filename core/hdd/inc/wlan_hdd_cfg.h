@@ -144,6 +144,24 @@ struct hdd_context;
 #define CFG_FRAG_THRESHOLD_MAX                 WNI_CFG_FRAGMENTATION_THRESHOLD_STAMAX
 #define CFG_FRAG_THRESHOLD_DEFAULT             WNI_CFG_FRAGMENTATION_THRESHOLD_STADEF
 
+/*
+ * <ini>
+ * gOperatingChannel- Default STA operating channel
+ * @Min: 0
+ * @Max: 14
+ * @Default: 1
+ *
+ * This ini is used to specify the default operating channel of a STA during
+ * initialization.
+ *
+ * Related: None
+ *
+ * Supported Feature: STA
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_OPERATING_CHANNEL_NAME             "gOperatingChannel"
 #define CFG_OPERATING_CHANNEL_MIN              (0)
 #define CFG_OPERATING_CHANNEL_MAX              (14)
@@ -172,22 +190,85 @@ struct hdd_context;
 #define CFG_SHORT_SLOT_TIME_ENABLED_MAX        WNI_CFG_SHORT_SLOT_TIME_STAMAX
 #define CFG_SHORT_SLOT_TIME_ENABLED_DEFAULT    WNI_CFG_SHORT_SLOT_TIME_STADEF
 
+/*
+ * <ini>
+ * g11dSupportEnabled - Enable 11d support
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to set 11d support flag
+ *
+ * Related: None
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_11D_SUPPORT_ENABLED_NAME           "g11dSupportEnabled"
 #define CFG_11D_SUPPORT_ENABLED_MIN            WNI_CFG_11D_ENABLED_STAMIN
 #define CFG_11D_SUPPORT_ENABLED_MAX            WNI_CFG_11D_ENABLED_STAMAX
 #define CFG_11D_SUPPORT_ENABLED_DEFAULT        WNI_CFG_11D_ENABLED_STADEF       /* Default is ON */
 
+/*
+ * <ini>
+ * g11hSupportEnabled - Enable 11h support
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to set 11h support flag
+ *
+ * Related: None
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_11H_SUPPORT_ENABLED_NAME           "g11hSupportEnabled"
 #define CFG_11H_SUPPORT_ENABLED_MIN            (0)
 #define CFG_11H_SUPPORT_ENABLED_MAX            (1)
 #define CFG_11H_SUPPORT_ENABLED_DEFAULT        (1)    /* Default is ON */
 
-/* COUNTRY Code Priority */
+/*
+ * <ini>
+ * gCountryCodePriority - Priority to set country code
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to set default gCountryCodePriority
+ *
+ * Related: None
+ *
+ * Supported Feature: SAP
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_COUNTRY_CODE_PRIORITY_NAME         "gCountryCodePriority"
 #define CFG_COUNTRY_CODE_PRIORITY_MIN          (0)
 #define CFG_COUNTRY_CODE_PRIORITY_MAX          (1)
 #define CFG_COUNTRY_CODE_PRIORITY_DEFAULT      (0)
 
+/*
+ * <ini>
+ * gHeartbeat24 - Heart beat threashold value
+ * @Min: 0
+ * @Max: 65535
+ * @Default: 40
+ *
+ * This cfg is used to configure the Heart beat threashold.
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_HEARTBEAT_THRESH_24_NAME           "gHeartbeat24"
 #define CFG_HEARTBEAT_THRESH_24_MIN            WNI_CFG_HEART_BEAT_THRESHOLD_STAMIN
 #define CFG_HEARTBEAT_THRESH_24_MAX            WNI_CFG_HEART_BEAT_THRESHOLD_STAMAX
@@ -216,7 +297,22 @@ struct hdd_context;
 #define CFG_MAX_RX_AMPDU_FACTOR_MAX          WNI_CFG_MAX_RX_AMPDU_FACTOR_STAMAX
 #define CFG_MAX_RX_AMPDU_FACTOR_DEFAULT      WNI_CFG_MAX_RX_AMPDU_FACTOR_STADEF
 
-/* Configuration option for HT MPDU density (Table 8-125 802.11-2012)
+/*
+ * <ini>
+ * ght_mpdu_density - Configuration option for HT MPDU density
+ * @Min: 0
+ * @Max: 7
+ * @Default: 7
+ *
+ * This ini is used to set default MPDU Density
+ *
+ * Related: None
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * As per (Table 8-125 802.11-2012)
  * 0 for no restriction
  * 1 for 1/4 micro sec
  * 2 for 1/2 micro sec
@@ -225,6 +321,8 @@ struct hdd_context;
  * 5 for 4 micro sec
  * 6 for 8 micro sec
  * 7 for 16 micro sec
+ *
+ * </ini>
  */
 #define CFG_HT_MPDU_DENSITY_NAME               "ght_mpdu_density"
 #define CFG_HT_MPDU_DENSITY_MIN                WNI_CFG_MPDU_DENSITY_STAMIN
@@ -260,6 +358,24 @@ struct hdd_context;
 #define CFG_REG_CHANGE_DEF_COUNTRY_MIN           (0)
 #define CFG_REG_CHANGE_DEF_COUNTRY_MAX           (1)
 
+/*
+ * <ini>
+ * gAdvertiseConcurrentOperation - Iface combination advertising
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to control whether driver should indicate to kernel
+ * wiphy layer the combination of all its interfaces' supportability.
+ *
+ * Related: None
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_ADVERTISE_CONCURRENT_OPERATION_NAME    "gAdvertiseConcurrentOperation"
 #define CFG_ADVERTISE_CONCURRENT_OPERATION_DEFAULT (1)
 #define CFG_ADVERTISE_CONCURRENT_OPERATION_MIN     (0)
@@ -2228,9 +2344,23 @@ enum hdd_dot11_mode {
 #define CFG_ADAPTIVE_ROAMSCAN_DWELL_MODE_DEFAULT (1)
 
 /*
+ * <ini>
+ * gInterfaceChangeWait - Interface change wait
+ * @Min: 0,
+ * @Max: 500000
+ * @Default: 10000
+ *
  * Timer waiting for interface up from the upper layer. If
  * this timer expires all the cds modules shall be closed.
  * Time Units: ms
+ *
+ * Value 0 can be used to disable idle module stop.
+ *
+ * Related: None
+ *
+ * Supported Feature: All
+ *
+ * </ini>
  */
 #define CFG_INTERFACE_CHANGE_WAIT_NAME    "gInterfaceChangeWait"
 #define CFG_INTERFACE_CHANGE_WAIT_MIN     (10)
@@ -3068,6 +3198,22 @@ enum hdd_dot11_mode {
 #endif
 
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
+/*
+ * <ini>
+ * gWlanAutoShutdown - Wlan auto shutdown timer value
+ * @Min: 0
+ * @Max: 86400
+ * @Default: 0
+ *
+ * This ini specifies the seconds of WLAN inactivity firmware has to wait
+ * before indicating WLAN idle event to driver. Upon receiving firmware's
+ * WLAN idle indication, driver may indicate similar event to upper layer
+ * daemons(SCM, or any other components working to achieve the same purpose),
+ * who may choose what to do next, e.g. whether to unload driver module or not.
+ * 0 indicates no auto shutdown will take place.
+ *
+ * </ini>
+ */
 #define CFG_WLAN_AUTO_SHUTDOWN              "gWlanAutoShutdown"
 #define CFG_WLAN_AUTO_SHUTDOWN_MIN          (0)
 #define CFG_WLAN_AUTO_SHUTDOWN_MAX          (86400)   /* Max 1 day timeout */
@@ -3106,6 +3252,20 @@ enum hdd_dot11_mode {
 #define CFG_WLAN_MCC_TO_SCC_SWITCH_MODE_DEFAULT  (QDF_MCC_TO_SCC_SWITCH_DISABLE)
 #endif
 
+/*
+ * <ini>
+ * gDisablePacketFilter - Disable packet filter disable
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ *
+ * Related: None
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_DISABLE_PACKET_FILTER		"gDisablePacketFilter"
 #define CFG_DISABLE_PACKET_FILTER_MIN		(0)
 #define CFG_DISABLE_PACKET_FILTER_MAX		(1)
@@ -3116,13 +3276,45 @@ enum hdd_dot11_mode {
 #define CFG_ENABLE_LTE_COEX_MAX               (1)
 #define CFG_ENABLE_LTE_COEX_DEFAULT           (0)
 
+/*
+ * <ini>
+ * gGoKeepAlivePeriod - P2P GO keep alive period.
+ * @Min: 1
+ * @Max: 65535
+ * @Default: 20
+ *
+ * This is P2P GO keep alive period.
+ *
+ * Related: None.
+ *
+ * Supported Feature: P2P
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_GO_KEEP_ALIVE_PERIOD_NAME          "gGoKeepAlivePeriod"
 #define CFG_GO_KEEP_ALIVE_PERIOD_MIN           WNI_CFG_GO_KEEP_ALIVE_TIMEOUT_STAMIN
 #define CFG_GO_KEEP_ALIVE_PERIOD_MAX           WNI_CFG_GO_KEEP_ALIVE_TIMEOUT_STAMAX
 #define CFG_GO_KEEP_ALIVE_PERIOD_DEFAULT       WNI_CFG_GO_KEEP_ALIVE_TIMEOUT_STADEF
 
-/* gGoLinkMonitorPeriod is period where link is idle and where
+/*
+ * <ini>
+ * gGoLinkMonitorPeriod - period where link is idle and where
  * we send NULL frame
+ * @Min: 3
+ * @Max: 50
+ * @Default: 10
+ *
+ * This is period where link is idle and where we send NULL frame for P2P GO.
+ *
+ * Related: None.
+ *
+ * Supported Feature: P2P
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
  */
 #define CFG_GO_LINK_MONITOR_PERIOD_NAME          "gGoLinkMonitorPeriod"
 #define CFG_GO_LINK_MONITOR_PERIOD_MIN           (3)
@@ -3321,18 +3513,64 @@ enum hdd_dot11_mode {
 #define CFG_IDLE_TIME_DEFAULT                       (25)
 #endif
 
+/*
+ * <ini>
+ * gMaxPsPoll - Max powersave poll
+ * @Min: 0
+ * @Max: 255
+ * @Default: 0
+ *
+ * This ini is used to set max powersave poll.
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_MAX_PS_POLL_NAME                   "gMaxPsPoll"
 #define CFG_MAX_PS_POLL_MIN                    WNI_CFG_MAX_PS_POLL_STAMIN
 #define CFG_MAX_PS_POLL_MAX                    WNI_CFG_MAX_PS_POLL_STAMAX
 #define CFG_MAX_PS_POLL_DEFAULT                WNI_CFG_MAX_PS_POLL_STADEF
 
+/*
+ * <ini>
+ * gTxPowerCap - WLAN max tx power
+ * @Min: 0
+ * @Max: 128
+ * @Default: 128
+ *
+ * This ini is used to configure the device max tx power.
+ *
+ * Related: None.
+ *
+ * Supported Feature: Concurrency
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_MAX_TX_POWER_NAME                   "gTxPowerCap"
 #define CFG_MAX_TX_POWER_MIN                    WNI_CFG_CURRENT_TX_POWER_LEVEL_STAMIN
 #define CFG_MAX_TX_POWER_MAX                    WNI_CFG_CURRENT_TX_POWER_LEVEL_STAMAX
 /* Not to use CFG default because if no registry setting, this is ignored by SME. */
 #define CFG_MAX_TX_POWER_DEFAULT                WNI_CFG_CURRENT_TX_POWER_LEVEL_STAMAX
 
-/* This ini controls driver to honor/dishonor power constraint from AP */
+/*
+ * <ini>
+ * gAllowTPCfromAP - Support for AP power constraint
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini controls driver to honor/dishonor power constraint from AP.
+ *
+ * Related: None.
+ *
+ * Supported Feature: Concurrency
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_TX_POWER_CTRL_NAME                 "gAllowTPCfromAP"
 #define CFG_TX_POWER_CTRL_DEFAULT              (1)
 #define CFG_TX_POWER_CTRL_MIN                  (0)
@@ -4458,6 +4696,23 @@ enum station_keepalive_method {
 #define CFG_QOS_WMM_INFRA_INACTIVITY_INTERVAL_MAX      (4294967295UL)
 #define CFG_QOS_WMM_INFRA_INACTIVITY_INTERVAL_DEFAULT  (0) /* disabled */
 
+/*
+ * <ini>
+ * EseEnabled - Enable ESE feature
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable/disable ESE feature
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_ESE_FEATURE_ENABLED_NAME                       "EseEnabled"
 #define CFG_ESE_FEATURE_ENABLED_MIN                         (0)
 #define CFG_ESE_FEATURE_ENABLED_MAX                         (1)
@@ -4579,7 +4834,7 @@ enum station_keepalive_method {
 
 /*
  * <ini>
- * mawc_roam_rssi_high_adjust - Adjust MAWC roam low RSSI
+ * mawc_roam_rssi_low_adjust - Adjust MAWC roam low RSSI
  * @Min: 3
  * @Max: 5
  * @Default: 5
@@ -4600,12 +4855,43 @@ enum station_keepalive_method {
 #define CFG_MAWC_ROAM_RSSI_LOW_ADJUST_MAX         (5)
 #define CFG_MAWC_ROAM_RSSI_LOW_ADJUST_DEFAULT     (5)
 
-/*This parameter is used to set Wireless Extended Security Mode.*/
+/*
+ * <ini>
+ * gWESModeEnabled - Enable WES mode
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable/disable Wireless Extended Security mode.
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
 #define CFG_ENABLE_WES_MODE_NAME                            "gWESModeEnabled"
 #define CFG_ENABLE_WES_MODE_NAME_MIN                        (0)
 #define CFG_ENABLE_WES_MODE_NAME_MAX                        (1)
 #define CFG_ENABLE_WES_MODE_NAME_DEFAULT                    (0)
 
+/*
+ * <ini>
+ * DelayedTriggerFrmInt - UAPSD delay interval
+ * @Min: 1
+ * @Max: 4294967295
+ * @Default: 3000
+ *
+ * This parameter controls the delay interval(in ms) of UAPSD auto trigger.
+ *
+ * Supported Feature: WMM
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_TL_DELAYED_TRGR_FRM_INT_NAME                   "DelayedTriggerFrmInt"
 #define CFG_TL_DELAYED_TRGR_FRM_INT_MIN                     1
 #define CFG_TL_DELAYED_TRGR_FRM_INT_MAX                     (4294967295UL)
@@ -4697,11 +4983,45 @@ enum station_keepalive_method {
 #define CFG_TELE_BCN_TRANS_LI_NUM_IDLE_BCNS_MAX      (255)
 #define CFG_TELE_BCN_TRANS_LI_NUM_IDLE_BCNS_DEFAULT  (10)
 
+/*
+ * <ini>
+ * telescopicBeaconMaxListenInterval - Set teles scopic beacon max listen value
+ * @Min: 0
+ * @Max: 7
+ * @Default: 5
+ *
+ * This ini is used to set teles scopic beacon max listen interval value
+ *
+ * Related: None
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_TELE_BCN_MAX_LI_NAME                     "telescopicBeaconMaxListenInterval"
 #define CFG_TELE_BCN_MAX_LI_MIN                      (0)
 #define CFG_TELE_BCN_MAX_LI_MAX                      (7)
 #define CFG_TELE_BCN_MAX_LI_DEFAULT                  (5)
 
+/*
+ * <ini>
+ * telescopicBeaconMaxListenInterval - Set teles scopic beacon max listen value
+ * @Min: 0
+ * @Max: 7
+ * @Default: 5
+ *
+ * This ini is used to set teles scopic beacon max listen interval value
+ *
+ * Related: None
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_TELE_BCN_MAX_LI_NUM_IDLE_BCNS_NAME       "telescopicBeaconMaxListenIntervalNumIdleBcns"
 #define CFG_TELE_BCN_MAX_LI_NUM_IDLE_BCNS_MIN        (5)
 #define CFG_TELE_BCN_MAX_LI_NUM_IDLE_BCNS_MAX        (255)
