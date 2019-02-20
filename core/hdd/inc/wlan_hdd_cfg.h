@@ -3271,6 +3271,23 @@ enum hdd_dot11_mode {
 #define CFG_DISABLE_PACKET_FILTER_MAX		(1)
 #define CFG_DISABLE_PACKET_FILTER_DEFAULT	(1)
 
+/*
+ * <ini>
+ * gEnableLTECoex - enable LTE COEX
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable LTE COEX
+ *
+ * Related: None
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_ENABLE_LTE_COEX              "gEnableLTECoex"
 #define CFG_ENABLE_LTE_COEX_MIN               (0)
 #define CFG_ENABLE_LTE_COEX_MAX               (1)
@@ -4691,6 +4708,24 @@ enum station_keepalive_method {
 #define CFG_QOS_ADDTS_WHEN_ACM_IS_OFF_DEFAULT            (0)
 
 #ifdef FEATURE_WLAN_ESE
+/*
+ * <ini>
+ * InfraInactivityInterval - To setup Infra Inactivity Interval for ACs
+ * @Min: 0
+ * @Max: 4294967295UL
+ * @Default: 0
+ *
+ * This ini is used to setup Infra Inactivity Interval for
+ * ACs.
+ *
+ * Related: None.
+ *
+ * Supported Feature: WMM
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_QOS_WMM_INFRA_INACTIVITY_INTERVAL_NAME    "InfraInactivityInterval"
 #define CFG_QOS_WMM_INFRA_INACTIVITY_INTERVAL_MIN      (0)
 #define CFG_QOS_WMM_INFRA_INACTIVITY_INTERVAL_MAX      (4294967295UL)
@@ -6517,27 +6552,111 @@ enum hdd_link_speed_rpt_type {
 #define CFG_ENABLE_FW_RTS_PROFILE_DEFAULT      (33)
 
 #ifdef WLAN_SUPPORT_GREEN_AP
+/*
+ * <ini>
+ * gEnableGreenAp - Enable green ap feature
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to enable green ap feature
+ *
+ * Related: None
+ *
+ * Supported Feature: SAP
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_ENABLE_GREEN_AP_FEATURE         "gEnableGreenAp"
 #define CFG_ENABLE_GREEN_AP_FEATURE_MIN     (0)
 #define CFG_ENABLE_GREEN_AP_FEATURE_MAX     (1)
 #define CFG_ENABLE_GREEN_AP_FEATURE_DEFAULT (1)
 
-/* Enhanced Green AP (EGAP) flags/params */
+/*
+ * <ini>
+ * gEnableEGAP - Enable the enhanced green ap feature
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to enable the enhanced green ap feature
+ *
+ * Related: None
+ *
+ * Supported Feature: SAP
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_ENABLE_EGAP_ENABLE_FEATURE             "gEnableEGAP"
 #define CFG_ENABLE_EGAP_ENABLE_FEATURE_MIN         (0)
 #define CFG_ENABLE_EGAP_ENABLE_FEATURE_MAX         (1)
 #define CFG_ENABLE_EGAP_ENABLE_FEATURE_DEFAULT     (1)
 
+/*
+ * <ini>
+ * gEGAPInactTime - configure the inactive time for EGAP
+ * @Min: 0
+ * @Max: 300000
+ * @Default: 2000
+ *
+ * This ini is used to configure the inactive time for EGAP
+ *
+ * Related: None
+ *
+ * Supported Feature: SAP
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_ENABLE_EGAP_INACT_TIME_FEATURE         "gEGAPInactTime"
 #define CFG_ENABLE_EGAP_INACT_TIME_FEATURE_MIN     (0)
 #define CFG_ENABLE_EGAP_INACT_TIME_FEATURE_MAX     (300000)
 #define CFG_ENABLE_EGAP_INACT_TIME_FEATURE_DEFAULT (2000)
 
+/*
+ * <ini>
+ * gEGAPWaitTime - configure the wait time for EGAP
+ * @Min: 0
+ * @Max: 300000
+ * @Default: 150
+ *
+ * This ini is used to configure the wait time for EGAP
+ *
+ * Related: None
+ *
+ * Supported Feature: SAP
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_ENABLE_EGAP_WAIT_TIME_FEATURE          "gEGAPWaitTime"
 #define CFG_ENABLE_EGAP_WAIT_TIME_FEATURE_MIN      (0)
 #define CFG_ENABLE_EGAP_WAIT_TIME_FEATURE_MAX      (300000)
 #define CFG_ENABLE_EGAP_WAIT_TIME_FEATURE_DEFAULT  (150)
 
+/*
+ * <ini>
+ * gEGAPFeatures - Configure the EGAP flags
+ * @Min: 0
+ * @Max: 15
+ * @Default: 3
+ *
+ * This ini is used to configure the EGAP flags
+ *
+ * Related: None
+ *
+ * Supported Feature: SAP
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_ENABLE_EGAP_FLAGS_FEATURE              "gEGAPFeatures"
 #define CFG_ENABLE_EGAP_FLAGS_FEATURE_MIN          (0)
 #define CFG_ENABLE_EGAP_FLAGS_FEATURE_MAX          (15)
@@ -7288,8 +7407,17 @@ enum hdd_link_speed_rpt_type {
 #define CFG_THERMAL_TEMP_MAX_LEVEL3_DEFAULT   (0)
 
 /*
- * Enable/Disable Modulated DTIM feature
- * Default: Disable
+ * <ini>
+ * gEnableModulatedDTIM - Enable/Disable modulated DTIM feature
+ * @Min: 0
+ * @Max: 5
+ * @Default: 0
+ *
+ * This ini is used to enable/disable modulated DTIM feature.
+ *
+ * Usage: External
+ *
+ * </ini>
  */
 #define CFG_ENABLE_MODULATED_DTIM_NAME       "gEnableModulatedDTIM"
 #define CFG_ENABLE_MODULATED_DTIM_MIN        (0)
@@ -7923,8 +8051,23 @@ enum hdd_link_speed_rpt_type {
 #define CFG_TDLS_EXTERNAL_CONTROL_DEFAULT           (1)
 
 /*
+ * <ini>
+ *
+ * gEnableForceTargetAssert - Enable/disable SSR
+ * @Min: 0 (disabled)
+ * @Max: 1 (enabled)
+ * @Default: 0 (disabled)
+ *
  * This INI item is used to control subsystem restart(SSR) test framework
  * Set it's value to 1 to enable APPS trigerred SSR testing
+ *
+ * Related: None
+ *
+ * Supported Feature: General
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
  */
 #define CFG_ENABLE_CRASH_INJECT         "gEnableForceTargetAssert"
 #define CFG_ENABLE_CRASH_INJECT_MIN     (0)
@@ -8575,7 +8718,21 @@ enum hdd_link_speed_rpt_type {
 #define CFG_IPA_OFFLOAD_CONFIG_DEFAULT           (CFG_IPA_OFFLOAD_CONFIG_MIN)
 
 /*
- * IPA DESC SIZE
+ * <ini>
+ * gIPADescSize - IPA descriptor size
+ * @Min: 800
+ * @Max: 8000
+ * @Default: 800
+ *
+ * This ini specifies the IPA descriptor size
+ *
+ * Related: N/A
+ *
+ * Supported Feature: IPA
+ *
+ * Usage: Internal
+ *
+ * </ini>
  */
 #define CFG_IPA_DESC_SIZE_NAME                   "gIPADescSize"
 #define CFG_IPA_DESC_SIZE_MIN                    (800)
@@ -8604,11 +8761,45 @@ enum hdd_link_speed_rpt_type {
 #define CFG_IPA_HIGH_BANDWIDTH_MBPS_MAX          (1000)
 #define CFG_IPA_HIGH_BANDWIDTH_MBPS_DEFAULT      (400)
 
+/*
+ * <ini>
+ * gIPAMediumBandwidthMbps - IPA medium bw threshold
+ * @Min: 100
+ * @Max: 400
+ * @Default: 200
+ *
+ * This ini specifies the IPA medium bw threshold
+ *
+ * Related: N/A
+ *
+ * Supported Feature: IPA
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
 #define CFG_IPA_MEDIUM_BANDWIDTH_MBPS            "gIPAMediumBandwidthMbps"
 #define CFG_IPA_MEDIUM_BANDWIDTH_MBPS_MIN        (100)
 #define CFG_IPA_MEDIUM_BANDWIDTH_MBPS_MAX        (400)
 #define CFG_IPA_MEDIUM_BANDWIDTH_MBPS_DEFAULT    (200)
 
+/*
+ * <ini>
+ * gIPALowBandwidthMbps - IPA low bw threshold
+ * @Min: 0
+ * @Max: 100
+ * @Default: 100
+ *
+ * This ini specifies the IPA low bw threshold
+ *
+ * Related: N/A
+ *
+ * Supported Feature: IPA
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
 #define CFG_IPA_LOW_BANDWIDTH_MBPS               "gIPALowBandwidthMbps"
 #define CFG_IPA_LOW_BANDWIDTH_MBPS_MIN           (0)
 #define CFG_IPA_LOW_BANDWIDTH_MBPS_MAX           (100)
@@ -9821,6 +10012,22 @@ enum hdd_link_speed_rpt_type {
 #define CFG_ENABLE_SIFS_BURST_DEFAULT              (0)
 
 #ifdef WLAN_FEATURE_LPSS
+/*
+ * <ini>
+ *
+ * gEnableLpassSupport - Enable/disable LPASS Support
+ * @Min: 0 (disabled)
+ * @Max: 1 (enabled)
+ * @Default: 0 (disabled)
+ *
+ * Related: None
+ *
+ * Supported Feature: General
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_ENABLE_LPASS_SUPPORT                          "gEnableLpassSupport"
 #define CFG_ENABLE_LPASS_SUPPORT_DEFAULT                  (0)
 #define CFG_ENABLE_LPASS_SUPPORT_MIN                      (0)
@@ -9851,6 +10058,22 @@ enum hdd_link_speed_rpt_type {
 #define CFG_ENABLE_NAN_SUPPORT_MAX                      (1)
 #endif
 
+/*
+ * <ini>
+ *
+ * gEnableSelfRecovery - Enable/disable Self Recovery
+ * @Min: 0 (disabled)
+ * @Max: 1 (enabled)
+ * @Default: 0 (disabled)
+ *
+ * Related: None
+ *
+ * Supported Feature: General
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_ENABLE_SELF_RECOVERY                   "gEnableSelfRecovery"
 #define CFG_ENABLE_SELF_RECOVERY_MIN               (0)
 #define CFG_ENABLE_SELF_RECOVERY_MAX               (1)
@@ -10167,6 +10390,22 @@ enum hdd_link_speed_rpt_type {
 #define CFG_SAP_P2P_11AC_OVERRIDE_MAX              (1)
 #define CFG_SAP_P2P_11AC_OVERRIDE_DEFAULT          (1)
 
+/*
+ * <ini>
+ *
+ * gSapDot11mc - Enable/disable SAP 802.11mc support
+ * @Min: 0 (disabled)
+ * @Max: 1 (enabled)
+ * @Default: 0 (disabled)
+ *
+ * Related: None
+ *
+ * Supported Feature: General
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_SAP_DOT11MC               "gSapDot11mc"
 #define CFG_SAP_DOT11MC_MIN           (0)
 #define CFG_SAP_DOT11MC_MAX           (1)
@@ -10297,14 +10536,17 @@ enum hdd_link_speed_rpt_type {
 #define CFG_FLOW_STEERING_ENABLED_DEFAULT     (0)
 
 /*
- * Max number of MSDUs per HTT RX IN ORDER INDICATION msg.
+ * <ini>
+ * maxMSDUsPerRxInd - Max number of MSDUs per HTT RX IN ORDER INDICATION msg.
  * Note that this has a direct impact on the size of source CE rings.
  * It is possible to go below 8, but would require testing; so we are
  * restricting the lower limit to 8 artificially
  *
  * It is recommended that this value is a POWER OF 2.
  *
- * Values lower than 8 are for experimental purposes only.
+ * Values lower than 8 are for experimental purposes only
+ *
+ * </ini>.
  */
 #define CFG_MAX_MSDUS_PER_RXIND_NAME          "maxMSDUsPerRxInd"
 #define CFG_MAX_MSDUS_PER_RXIND_MIN           (4)
@@ -10579,6 +10821,20 @@ enum dot11p_mode {
 	WLAN_HDD_11P_CONCURRENT,
 };
 
+/*
+ * <ini>
+ * gDot11PMode - 802.11p mode
+ * @Min: WLAN_HDD_11P_DISABLED
+ * @Max: WLAN_HDD_11P_CONCURRENT
+ * @Default: WLAN_HDD_11P_DISABLED
+ *
+ * This ini used to set 802.11p mode.
+ *
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_DOT11P_MODE_NAME             "gDot11PMode"
 #define CFG_DOT11P_MODE_DEFAULT          (WLAN_HDD_11P_DISABLED)
 #define CFG_DOT11P_MODE_MIN              (WLAN_HDD_11P_DISABLED)
@@ -10979,8 +11235,20 @@ enum dot11p_mode {
 #endif
 
 /*
- * Enable/Disable to initiate BUG report in case of fatal event
- * Default: Enable
+ * <ini>
+ *
+ * gEnableFatalEvent - Enable/Disable BUG report in case of fatal event
+ * @Min: 0 (disabled)
+ * @Max: 1 (enabled)
+ * @Default: 1 (enabled)
+ *
+ * Related: None
+ *
+ * Supported Feature: General
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
  */
 #define CFG_ENABLE_FATAL_EVENT_TRIGGER                 "gEnableFatalEvent"
 #define CFG_ENABLE_FATAL_EVENT_TRIGGER_MIN             (0)
