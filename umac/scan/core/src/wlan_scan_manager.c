@@ -366,6 +366,44 @@ scm_scan_serialize_callback(struct wlan_serialization_command *cmd,
 	return status;
 }
 
+bool scm_is_scan_allowed(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_scan_obj *scan_psoc_obj;
+	struct scan_vdev_obj *scan_vdev_obj;
+
+	if (!vdev) {
+		scm_err("vdev is NULL");
+		return false;
+	}
+
+	scan_psoc_obj = wlan_vdev_get_scan_obj(vdev);
+	if (!scan_psoc_obj) {
+		scm_err("Couldn't find scan psoc object");
+		return false;
+	}
+
+	if (scan_psoc_obj->scan_disabled) {
+		scm_err("scan disabled %x, for psoc",
+			   scan_psoc_obj->scan_disabled);
+		return false;
+	}
+
+	scan_vdev_obj = wlan_get_vdev_scan_obj(vdev);
+	if (!scan_vdev_obj) {
+		scm_err("Couldn't find scan vdev object");
+		return false;
+	}
+
+	if (scan_vdev_obj->scan_disabled) {
+		scm_err("scan disabled %x on vdev_id:%d",
+			   scan_vdev_obj->scan_disabled,
+			   wlan_vdev_get_id(vdev));
+		return false;
+	}
+
+	return true;
+}
+
 QDF_STATUS
 scm_scan_start_req(struct scheduler_msg *msg)
 {
@@ -381,10 +419,18 @@ scm_scan_start_req(struct scheduler_msg *msg)
 	}
 
 	req = msg->bodyptr;
+
+	if (!scm_is_scan_allowed(req->vdev)) {
+		scm_err("scan disabled, rejecting the scan req");
+		status = QDF_STATUS_E_NULL_VALUE;
+		goto err;
+	}
+
 	scan_obj = wlan_vdev_get_scan_obj(req->vdev);
 	if (!scan_obj) {
 		scm_debug("Couldn't find scan object");
-		return QDF_STATUS_E_NULL_VALUE;
+		status = QDF_STATUS_E_NULL_VALUE;
+		goto err;
 	}
 
 	cmd.cmd_type = WLAN_SER_CMD_SCAN;
@@ -418,26 +464,27 @@ scm_scan_start_req(struct scheduler_msg *msg)
 	case WLAN_SER_CMD_DENIED_LIST_FULL:
 	case WLAN_SER_CMD_DENIED_RULES_FAILED:
 	case WLAN_SER_CMD_DENIED_UNSPECIFIED:
-		/* notify registered scan event handlers
-		 * about internal error
-		 */
-		scm_post_internal_scan_complete_event(req,
-				SCAN_REASON_INTERNAL_FAILURE);
-		/* cmd can't be serviced.
-		 * release vdev reference and free scan_start_request memory
-		 */
-		wlan_objmgr_vdev_release_ref(req->vdev, WLAN_SCAN_ID);
-		scm_scan_free_scan_request_mem(req);
-		break;
+        goto err;
 	default:
-		QDF_ASSERT(0);
 		status = QDF_STATUS_E_INVAL;
-		/* cmd can't be serviced.
-		 * release vdev reference and free scan_start_request memory
-		 */
+		QDF_ASSERT(0);
+		goto err;
+	}
+
+	return status;
+
+err:
+	/* notify registered scan event handlers
+	 * about internal error
+	 */
+	scm_post_internal_scan_complete_event(req,
+			SCAN_REASON_INTERNAL_FAILURE);
+	/* cmd can't be serviced.
+	 * release vdev reference and free scan_start_request memory
+	 */
+	if (req) {
 		wlan_objmgr_vdev_release_ref(req->vdev, WLAN_SCAN_ID);
 		scm_scan_free_scan_request_mem(req);
-		break;
 	}
 
 	return status;
