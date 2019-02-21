@@ -11949,7 +11949,15 @@ enum dot11p_mode {
 #define CFG_RX_MODE_DEFAULT  (CFG_ENABLE_RX_THREAD | CFG_ENABLE_NAPI)
 #endif
 
-/* List of RPS CPU maps for different rx queues registered by WLAN driver
+/*
+ * <ini>
+ * rpsRxQueueCpuMapList - RPS map for different RX queues
+ *
+ * @Default: e
+ *
+ * This ini is used to set RPS map for different RX queues.
+ *
+ * List of RPS CPU maps for different rx queues registered by WLAN driver
  * Ref - Kernel/Documentation/networking/scaling.txt
  * RPS CPU map for a particular RX queue, selects CPU(s) for bottom half
  * processing of RX packets. For example, for a system with 4 CPUs,
@@ -11968,9 +11976,25 @@ enum dot11p_mode {
  * 0xd - (1101) use CPU0, CPU2 and CPU3 for rx queue 3
 
  * In practice, we may want to avoid the cores which are heavily loaded.
+ *
+ * Default value of rpsRxQueueCpuMapList. Different platforms may have
+ * different configurations for NUM_TX_QUEUES and # of cpus, and will need to
+ * configure an appropriate value via ini file. Setting default value to 'e' to
+ * avoid use of CPU0 (since its heavily used by other system processes) by rx
+ * queue 0, which is currently being used for rx packet processing.
+ *
+ * Maximum length of string used to hold a list of cpu maps for various rx
+ * queues. Considering a 16 core system with 5 rx queues, a RPS CPU map
+ * list may look like -
+ * rpsRxQueueCpuMapList = ffff ffff ffff ffff ffff
+ * (all 5 rx queues can be processed on all 16 cores)
+ * max string len = 24 + 1(for '\0'). Considering 30 to be on safe side.
+ *
+ * Supported Feature: Rx_thread
+ *
+ * Usage: Internal
+ * </ini>
  */
-
-/* Name of the ini file entry to specify RPS map for different RX queus */
 #define CFG_RPS_RX_QUEUE_CPU_MAP_LIST_NAME         "rpsRxQueueCpuMapList"
 
 /* Default value of rpsRxQueueCpuMapList. Different platforms may have
@@ -12166,13 +12190,17 @@ enum dot11p_mode {
 #define CFG_SAP_TX_LEAKAGE_THRESHOLD_MAX     (1000)
 #define CFG_SAP_TX_LEAKAGE_THRESHOLD_DEFAULT (310)
 
-
 /*
- * Enable filtering of replayed multicast packets
+ * <ini>
+ * enable_multicast_replay_filter - Enable filtering of replayed multicast
+ * packets
+ *
  * In a typical infrastructure setup, it is quite normal to receive
  * replayed multicast packets. These packets may cause more harm than
  * help if not handled properly. Providing a configuration option
  * to enable filtering of such packets
+ *
+ * </ini>
  */
 #define CFG_FILTER_MULTICAST_REPLAY_NAME    "enable_multicast_replay_filter"
 #define CFG_FILTER_MULTICAST_REPLAY_MIN      (0)
@@ -13345,6 +13373,7 @@ enum hdd_wext_control {
 #define CFG_ENABLE_BCAST_PROBE_RESP_DEFAULT (1)
 
 /**
+ * <ini>
  * arp_ac_category - ARP access category
  * @Min: 0
  * @Max: 3
@@ -14000,6 +14029,7 @@ enum l1ss_sleep_allowed {
 #define CFG_FILS_MAX_CHAN_GUARD_TIME_DEFAULT (0)
 
 /**
+ * <ini>
  * gSetRTSForSIFSBursting - set rts for sifs bursting
  * @Min: 0
  * @Max: 1
@@ -14205,7 +14235,7 @@ enum hdd_external_acs_freq_band {
 
 /*
  * <ini>
- * external_acs_freq_band - External ACS freq band
+ * acs_freq_band - External ACS freq band
  * @Min: 0
  * @Max: 1
  * @Default: 0
@@ -14231,6 +14261,7 @@ enum hdd_external_acs_freq_band {
 #define CFG_EXTERNAL_ACS_FREQ_BAND_DEFAULT  (HDD_EXTERNAL_ACS_FREQ_BAND_24GHZ)
 
 /*
+ * <ini>
  * gSapMaxMCSForTxData - sap 11n max mcs
  * @Min: 0
  * @Max: 383
@@ -15673,6 +15704,7 @@ enum hdd_external_acs_freq_band {
 #define CFG_DFS_BEACON_TX_ENHANCED_DEFAULT (0)
 
 /*
+ * <ini>
  * gReducedBeaconInterval - beacon interval reduced
  * @Min: 0
  * @Max: 100
@@ -15697,6 +15729,7 @@ enum hdd_external_acs_freq_band {
 #define CFG_REDUCED_BEACON_INTERVAL_DEFAULT (0)
 
 /*
+ * <ini>
  * oce_enable_rssi_assoc_reject - Enable/disable rssi based assoc rejection
  * @Min: 0
  * @Max: 1
