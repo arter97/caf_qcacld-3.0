@@ -10770,8 +10770,7 @@ static int __iw_set_two_ints_getnone(struct net_device *dev,
 
 	case WE_SET_WLAN_SUSPEND:
 		if (!hdd_ctx->config->is_unit_test_framework_enabled) {
-			hdd_warn_ratelimited(HDD_UT_SUSPEND_RESUME_LOG_RL,
-					     "UT suspend is disabled");
+			hdd_warn_rl("UT suspend is disabled");
 			return 0;
 		}
 		ret = hdd_wlan_fake_apps_suspend(hdd_ctx->wiphy, dev,
@@ -10780,8 +10779,7 @@ static int __iw_set_two_ints_getnone(struct net_device *dev,
 
 	case WE_SET_WLAN_RESUME:
 		if (!hdd_ctx->config->is_unit_test_framework_enabled) {
-			hdd_warn_ratelimited(HDD_UT_SUSPEND_RESUME_LOG_RL,
-					     "UT resume is disabled");
+			hdd_warn_rl("UT resume is disabled");
 			return 0;
 		}
 		ret = hdd_wlan_fake_apps_resume(hdd_ctx->wiphy, dev);
