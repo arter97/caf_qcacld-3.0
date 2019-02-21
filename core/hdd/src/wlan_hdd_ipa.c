@@ -362,8 +362,7 @@ void hdd_ipa_send_skb_to_network(qdf_nbuf_t skb, qdf_netdev_t dev)
 	unsigned int cpu_index;
 
 	if (hdd_validate_adapter(adapter)) {
-		hdd_debug_ratelimited(HDD_IPA_TX_BLOCK_RATE,
-				      "Invalid adapter: 0x%pK", adapter);
+		hdd_debug_rl("Invalid adapter: 0x%pK", adapter);
 		kfree_skb(skb);
 		return;
 	}

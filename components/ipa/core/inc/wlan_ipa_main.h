@@ -44,23 +44,11 @@
 #define ipa_debug(format, args...) \
 		ipa_logfl(QDF_TRACE_LEVEL_DEBUG, format, ## args)
 
-#define ipa_log_rl(rate, level, args...) \
-		QDF_TRACE_RATE_LIMITED(rate, QDF_MODULE_ID_IPA, level, ## args)
-#define ipa_log_rl_fl(rate, level, format, args...) \
-		ipa_log_rl(rate, level, FL(format), ## args)
-
-#define WLAN_IPA_LOG_RATE 256
-
-#define ipa_fatal_rl(format, args...) \
-	ipa_log_rl_fl(WLAN_IPA_LOG_RATE, QDF_TRACE_LEVEL_FATAL, format, ## args)
-#define ipa_err_rl(format, args...) \
-	ipa_log_rl_fl(WLAN_IPA_LOG_RATE, QDF_TRACE_LEVEL_ERROR, format, ## args)
-#define ipa_warn_rl(format, args...) \
-	ipa_log_rl_fl(WLAN_IPA_LOG_RATE, QDF_TRACE_LEVEL_WARN, format, ## args)
-#define ipa_info_rl(format, args...) \
-	ipa_log_rl_fl(WLAN_IPA_LOG_RATE, QDF_TRACE_LEVEL_INFO, format, ## args)
-#define ipa_debug_rl(format, args...) \
-	ipa_log_rl_fl(WLAN_IPA_LOG_RATE, QDF_TRACE_LEVEL_DEBUG, format, ## args)
+#define ipa_fatal_rl(params...) QDF_TRACE_FATAL_RL(QDF_MODULE_ID_IPA, params)
+#define ipa_err_rl(params...) QDF_TRACE_ERROR_RL(QDF_MODULE_ID_IPA, params)
+#define ipa_warn_rl(params...) QDF_TRACE_WARN_RL(QDF_MODULE_ID_IPA, params)
+#define ipa_info_rl(params...) QDF_TRACE_INFO_RL(QDF_MODULE_ID_IPA, params)
+#define ipa_debug_rl(params...) QDF_TRACE_DEBUG_RL(QDF_MODULE_ID_IPA, params)
 
 #define IPA_ENTER() ipa_debug("enter")
 #define IPA_EXIT() ipa_debug("exit")
