@@ -3404,16 +3404,6 @@ enum hdd_dot11_mode {
 #define CFG_GO_LINK_MONITOR_PERIOD_MAX           (50)
 #define CFG_GO_LINK_MONITOR_PERIOD_DEFAULT       (10)
 
-#define CFG_VCC_RSSI_TRIGGER_NAME             "gVccRssiTrigger"
-#define CFG_VCC_RSSI_TRIGGER_MIN              (0)
-#define CFG_VCC_RSSI_TRIGGER_MAX              (80)
-#define CFG_VCC_RSSI_TRIGGER_DEFAULT          (80)
-
-#define CFG_VCC_UL_MAC_LOSS_THRESH_NAME       "gVccUlMacLossThresh"
-#define CFG_VCC_UL_MAC_LOSS_THRESH_MIN        (0)
-#define CFG_VCC_UL_MAC_LOSS_THRESH_MAX        (9)
-#define CFG_VCC_UL_MAC_LOSS_THRESH_DEFAULT    (9)
-
 #ifdef WLAN_AP_STA_CONCURRENCY
 /*
  * <ini>
@@ -5205,11 +5195,6 @@ enum station_keepalive_method {
 #define CFG_BAND_CAPABILITY_MIN           (0)
 #define CFG_BAND_CAPABILITY_MAX           (2)
 #define CFG_BAND_CAPABILITY_DEFAULT       (0)
-
-#define CFG_ENABLE_BYPASS_11D_NAME                 "gEnableBypass11d"
-#define CFG_ENABLE_BYPASS_11D_MIN                  (0)
-#define CFG_ENABLE_BYPASS_11D_MAX                  (1)
-#define CFG_ENABLE_BYPASS_11D_DEFAULT              (1)
 
 /*
  * gEnableDFSChnlScan - enable dfs channel scan.
@@ -16143,8 +16128,6 @@ struct hdd_config {
 	int32_t nhi_rssi_scan_rssi_ub;
 
 	/* Additional Handoff params */
-	uint16_t nVccRssiTrigger;
-	uint32_t nVccUlMacLossThreshold;
 
 	uint32_t nPassiveMinChnTime;    /* in units of milliseconds */
 	uint32_t nPassiveMaxChnTime;    /* in units of milliseconds */
@@ -16298,7 +16281,6 @@ struct hdd_config {
 	uint16_t qdf_trace_enable_regulatory;
 
 	uint16_t nTeleBcnMaxListenInterval;
-	uint8_t enableBypass11d;
 	uint8_t enableDFSChnlScan;
 	uint8_t enable_dfs_pno_chnl_scan;
 	uint8_t enableDynamicDTIM;
