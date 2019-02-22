@@ -1372,13 +1372,6 @@ struct reg_table_entry g_registry_table[] = {
 			     CFG_NEIGHBOR_SCAN_MAX_CHAN_TIME_MAX,
 			     cb_notify_set_neighbor_scan_max_chan_time, 0),
 
-	REG_VARIABLE(CFG_11R_NEIGHBOR_REQ_MAX_TRIES_NAME, WLAN_PARAM_Integer,
-		     struct hdd_config, nMaxNeighborReqTries,
-		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-		     CFG_11R_NEIGHBOR_REQ_MAX_TRIES_DEFAULT,
-		     CFG_11R_NEIGHBOR_REQ_MAX_TRIES_MIN,
-		     CFG_11R_NEIGHBOR_REQ_MAX_TRIES_MAX),
-
 	REG_DYNAMIC_VARIABLE(CFG_NEIGHBOR_SCAN_RESULTS_REFRESH_PERIOD_NAME,
 			     WLAN_PARAM_Integer,
 			     struct hdd_config, nNeighborResultsRefreshPeriod,

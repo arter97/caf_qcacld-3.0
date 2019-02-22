@@ -4888,6 +4888,8 @@ enum station_keepalive_method {
 /*
  * <ini>
  * rm_capability - Configure RM enabled capabilities IE
+ * @Min: N/A
+ * @Max: N/A
  * @Default: 73,10,91,00,04
  *
  * This ini is used to configure RM enabled capabilities IE.
@@ -5006,11 +5008,6 @@ enum station_keepalive_method {
 #define CFG_DELAY_BEFORE_VDEV_STOP_MAX               (200)
 #define CFG_DELAY_BEFORE_VDEV_STOP_DEFAULT           (20)
 
-#define CFG_11R_NEIGHBOR_REQ_MAX_TRIES_NAME           "gMaxNeighborReqTries"
-#define CFG_11R_NEIGHBOR_REQ_MAX_TRIES_MIN            (1)
-#define CFG_11R_NEIGHBOR_REQ_MAX_TRIES_MAX            (4)
-#define CFG_11R_NEIGHBOR_REQ_MAX_TRIES_DEFAULT        (3)
-
 /*
  * <ini>
  * gRoamBmissFirstBcnt - Beacon miss count to trigger 1st bmiss event
@@ -5097,11 +5094,6 @@ enum station_keepalive_method {
 #define CFG_TELE_BCN_WAKEUP_EN_MIN             (0)
 #define CFG_TELE_BCN_WAKEUP_EN_MAX             (1)
 #define CFG_TELE_BCN_WAKEUP_EN_DEFAULT         (0)
-
-#define CFG_AP_DATA_AVAIL_POLL_PERIOD_NAME      "gApDataAvailPollInterval"
-#define CFG_AP_DATA_AVAIL_POLL_PERIOD_MIN       (WNI_CFG_AP_DATA_AVAIL_POLL_PERIOD_STAMIN)
-#define CFG_AP_DATA_AVAIL_POLL_PERIOD_MAX       (WNI_CFG_AP_DATA_AVAIL_POLL_PERIOD_STAMAX)
-#define CFG_AP_DATA_AVAIL_POLL_PERIOD_DEFAULT   (WNI_CFG_AP_DATA_AVAIL_POLL_PERIOD_STADEF)
 
 /*
  * <ini>
