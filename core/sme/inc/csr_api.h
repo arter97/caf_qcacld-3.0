@@ -1410,6 +1410,7 @@ typedef struct tagCsrConfigParam {
 	uint32_t btm_solicited_timeout;
 	uint32_t btm_max_attempt_cnt;
 	uint32_t btm_sticky_time;
+	uint32_t btm_query_bitmask;
 } tCsrConfigParam;
 
 /* Tush */
