@@ -165,6 +165,15 @@ struct chain_rssi_result;
 typedef void (*get_chain_rssi_callback)(void *context,
 					struct chain_rssi_result *data);
 
+#ifdef FEATURE_FW_STATE
+/**
+ * typedef fw_state_callback - get firmware state callback
+ * @context: Opaque context that the client can use to associate the
+ *    callback with the request
+ */
+typedef void (*fw_state_callback)(void *context);
+#endif /* FEATURE_FW_STATE */
+
 typedef struct tagSmeStruct {
 	eSmeState state;
 	qdf_mutex_t lkSmeGlobalLock;
@@ -264,6 +273,10 @@ typedef struct tagSmeStruct {
 	void (*get_arp_stats_cb)(void *, struct rsp_stats *, void *);
 	get_chain_rssi_callback get_chain_rssi_cb;
 	void *get_chain_rssi_context;
+#ifdef FEATURE_FW_STATE
+	fw_state_callback fw_state_cb;
+	void *fw_state_context;
+#endif /* FEATURE_FW_STATE */
 	void (*tx_queue_cb)(void *, uint32_t vdev_id,
 			    enum netif_action_type action,
 			    enum netif_reason_type reason);
