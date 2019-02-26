@@ -8042,12 +8042,6 @@ enum hdd_link_speed_rpt_type {
 #define CFG_VHT_ENABLE_TX_SU_BEAM_FORMER_MAX     (1)
 #define CFG_VHT_ENABLE_TX_SU_BEAM_FORMER_DEFAULT (0)
 
-/* Enable debug for remain on channel issues */
-#define CFG_DEBUG_P2P_REMAIN_ON_CHANNEL_NAME    "gDebugP2pRemainOnChannel"
-#define CFG_DEBUG_P2P_REMAIN_ON_CHANNEL_DEFAULT (0)
-#define CFG_DEBUG_P2P_REMAIN_ON_CHANNEL_MIN     (0)
-#define CFG_DEBUG_P2P_REMAIN_ON_CHANNEL_MAX     (1)
-
 /*
  * <ini>
  * gSapAllowAllChannel - Sap allow all channels
@@ -9398,15 +9392,27 @@ enum hdd_link_speed_rpt_type {
 #define CFG_IGNORE_CAC_MAX                         (1)
 #define CFG_IGNORE_CAC_DEFAULT                     (0)
 
+/*
+ * <ini>
+ * gEnableSAPDfsChSifsBurst - SIFS Burst enable or not for SAP DFS channel
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is a flag about SIFS Burst enable or not for SAP DFS channel.
+ *
+ * Related: None
+ *
+ * Supported Feature: SAP
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_ENABLE_SAP_DFS_CH_SIFS_BURST_NAME      "gEnableSAPDfsChSifsBurst"
 #define CFG_ENABLE_SAP_DFS_CH_SIFS_BURST_MIN       (0)
 #define CFG_ENABLE_SAP_DFS_CH_SIFS_BURST_MAX       (1)
 #define CFG_ENABLE_SAP_DFS_CH_SIFS_BURST_DEFAULT   (1)
-
-#define CFG_DFS_RADAR_PRI_MULTIPLIER_NAME          "gDFSradarMappingPriMultiplier"
-#define CFG_DFS_RADAR_PRI_MULTIPLIER_DEFAULT       (4)
-#define CFG_DFS_RADAR_PRI_MULTIPLIER_MIN           (0)
-#define CFG_DFS_RADAR_PRI_MULTIPLIER_MAX           (10)
 
 /*
  * <ini>
@@ -9453,17 +9459,67 @@ enum hdd_link_speed_rpt_type {
 #define CFG_IPA_UC_TX_BUF_COUNT_MAX                (2048)
 #define CFG_IPA_UC_TX_BUF_COUNT_DEFAULT            (512)
 
+/*
+ * <ini>
+ * IpaUcTxBufSize - IPA TX buffer size
+ * @Min: 0
+ * @Max: 4096
+ * @Default: 2048
+ *
+ * This ini specifies IPA TX buffer size
+ *
+ * Related: N/A
+ *
+ * Supported Feature: IPA
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
 #define CFG_IPA_UC_TX_BUF_SIZE_NAME                "IpaUcTxBufSize"
 #define CFG_IPA_UC_TX_BUF_SIZE_MIN                (0)
 #define CFG_IPA_UC_TX_BUF_SIZE_MAX                (4096)
 #define CFG_IPA_UC_TX_BUF_SIZE_DEFAULT            (2048)
 
-/* IpaUcRxIndRingCount should be power of 2 */
+/*
+ * <ini>
+ * IpaUcRxIndRingCount - IPA RX indication ring count
+ * @Min: 0
+ * @Max: 2048
+ * @Default: 1024
+ *
+ * This ini specifies the IPA RX indication ring count. It should be power of 2.
+ *
+ * Related: N/A
+ *
+ * Supported Feature: IPA
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
 #define CFG_IPA_UC_RX_IND_RING_COUNT_NAME          "IpaUcRxIndRingCount"
 #define CFG_IPA_UC_RX_IND_RING_COUNT_MIN           (0)
 #define CFG_IPA_UC_RX_IND_RING_COUNT_MAX           (2048)
 #define CFG_IPA_UC_RX_IND_RING_COUNT_DEFAULT       (1024)
 
+/*
+ * <ini>
+ * IpaUcTxPartitionBase - IPA TX partition base
+ * @Min: 0
+ * @Max: 9000
+ * @Default: 3000
+ *
+ * This ini specifies the IPA TX partition base.
+ *
+ * Related: N/A
+ *
+ * Supported Feature: IPA
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
 #define CFG_IPA_UC_TX_PARTITION_BASE_NAME          "IpaUcTxPartitionBase"
 #define CFG_IPA_UC_TX_PARTITION_BASE_MIN           (0)
 #define CFG_IPA_UC_TX_PARTITION_BASE_MAX           (9000)
@@ -9678,6 +9734,17 @@ enum hdd_link_speed_rpt_type {
 #define CFG_DHCP_SERVER_OFFLOAD_NUM_CLIENT_MAX      (8)
 #define CFG_DHCP_SERVER_OFFLOAD_NUM_CLIENT_DEFAULT  (CFG_DHCP_SERVER_OFFLOAD_NUM_CLIENT_MAX)
 
+/* <ini>
+ * gDHCPServerIP - DHCP server IP address
+ *
+ * This ini sets DHCP server IP address for DHCP server offload feature
+ *
+ * Related: None
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
 #define CFG_DHCP_SERVER_IP_NAME     "gDHCPServerIP"
 #define CFG_DHCP_SERVER_IP_DEFAULT  ""
 #endif /* DHCP_SERVER_OFFLOAD */
@@ -10404,6 +10471,19 @@ enum dot11p_mode {
 #define CFG_ENABLE_GO_CTS2SELF_FOR_STA_MIN      (0)
 #define CFG_ENABLE_GO_CTS2SELF_FOR_STA_MAX      (1)
 
+/*
+ * <ini>
+ * gCEClassifyEnable - CE classification enabled through INI
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini enables CE classification.
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
 #define CFG_CE_CLASSIFY_ENABLE_NAME	"gCEClassifyEnable"
 #define CFG_CE_CLASSIFY_ENABLE_MIN	(0)
 #define CFG_CE_CLASSIFY_ENABLE_MAX	(1)
@@ -10740,7 +10820,20 @@ enum dot11p_mode {
 #define CFG_ENABLE_NAN_DATAPATH_DEFAULT (0)
 
 /*
- * NAN channel on which NAN data interface to start
+ * <ini>
+ * gnan_datapath_ndi_channel - Default channel for NAN Datapath
+ * @Min: 6
+ * @Max: 149
+ * @Default: 6
+ *
+ * Host suggests this channel for NAN datapath. But FW is free to
+ * choose other channels based on system constraints.
+ *
+ * Supported Feature: NAN
+ *
+ * Usage: External
+ *
+ * </ini>
  */
 #define CFG_ENABLE_NAN_NDI_CHANNEL_NAME    "gnan_datapath_ndi_channel"
 #define CFG_ENABLE_NAN_NDI_CHANNEL_MIN     (6)
@@ -12601,7 +12694,7 @@ enum hdd_wext_control {
 
 /*
  * <ini>
- * gExtWoWApp2KAIncPingInterval - Set TCP source port
+ * gExtWoWApp2TcpSrcPort - Set TCP source port
  * @Min: 0
  * @Max: 65535
  * @Default: 5000
@@ -14160,24 +14253,6 @@ enum hdd_external_acs_freq_band {
 
 /*
  * <ini>
- * chan_band_weightage - Channel Band perferance to 5GHZ to
- * calculate best candidate
- * @Min: 0
- * @Max: 100
- * @Default: 2
- *
- * This ini is used to increase/decrease Channel Band Preference weightage
- * in best candidate selection. 5GHZ AP get this additional boost compare to
- * 2GHZ AP before   rssi_pref_5g_rssi_thresh and 2.4Ghz get weightage after
- * rssi_pref_5g_rssi_thresh.
- *
- * Related: rssi_pref_5g_rssi_thresh, band_weight_per_index
- *
- * Supported Feature: STA Candidate selection
- *
- * Usage: External
- *
- * </ini>
  * gEnableFastPwrTransition - Configuration for fast power transition
  * @Min: 0
  * @Max: 2

@@ -2959,13 +2959,6 @@ struct reg_table_entry g_registry_table[] = {
 		     CFG_ENABLE_CCK_TX_FIR_OVERRIDE_MIN,
 		     CFG_ENABLE_CCK_TX_FIR_OVERRIDE_MAX),
 
-	REG_VARIABLE(CFG_DEBUG_P2P_REMAIN_ON_CHANNEL_NAME, WLAN_PARAM_Integer,
-		     struct hdd_config, debugP2pRemainOnChannel,
-		     VAR_FLAGS_OPTIONAL,
-		     CFG_DEBUG_P2P_REMAIN_ON_CHANNEL_DEFAULT,
-		     CFG_DEBUG_P2P_REMAIN_ON_CHANNEL_MIN,
-		     CFG_DEBUG_P2P_REMAIN_ON_CHANNEL_MAX),
-
 	REG_VARIABLE(CFG_ENABLE_PACKET_LOG, WLAN_PARAM_Integer,
 		     struct hdd_config, enablePacketLog,
 		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -3172,13 +3165,6 @@ struct reg_table_entry g_registry_table[] = {
 		     CFG_ENABLE_SAP_DFS_CH_SIFS_BURST_DEFAULT,
 		     CFG_ENABLE_SAP_DFS_CH_SIFS_BURST_MIN,
 		     CFG_ENABLE_SAP_DFS_CH_SIFS_BURST_MAX),
-
-	REG_VARIABLE(CFG_DFS_RADAR_PRI_MULTIPLIER_NAME, WLAN_PARAM_Integer,
-		     struct hdd_config, dfsRadarPriMultiplier,
-		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-		     CFG_DFS_RADAR_PRI_MULTIPLIER_DEFAULT,
-		     CFG_DFS_RADAR_PRI_MULTIPLIER_MIN,
-		     CFG_DFS_RADAR_PRI_MULTIPLIER_MAX),
 
 	REG_VARIABLE(CFG_REORDER_OFFLOAD_SUPPORT_NAME, WLAN_PARAM_Integer,
 		     struct hdd_config, reorderOffloadSupport,
@@ -8195,13 +8181,6 @@ bool hdd_update_config_cfg(struct hdd_context *hdd_ctx)
 	}
 #endif
 
-	if (sme_cfg_set_int(hdd_ctx->hHal,
-			    WNI_CFG_DEBUG_P2P_REMAIN_ON_CHANNEL,
-			    config->debugP2pRemainOnChannel) ==
-			QDF_STATUS_E_FAILURE) {
-		status = false;
-		hdd_err("Couldn't pass on WNI_CFG_DEBUG_P2P_REMAIN_ON_CHANNEL to CFG");
-	}
 #ifdef WLAN_FEATURE_11W
 	if (sme_cfg_set_int(hdd_ctx->hHal, WNI_CFG_PMF_SA_QUERY_MAX_RETRIES,
 			    config->pmfSaQueryMaxRetries) ==
