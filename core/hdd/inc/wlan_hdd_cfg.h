@@ -4170,7 +4170,7 @@ enum station_keepalive_method {
 
 /*
  * <ini>
- * iInfraMinPhyRateAcVi - Set min PHY rate for VI
+ * InfraMinPhyRateAcVi - Set min PHY rate for VI
  * @Min: 0x0
  * @Max: 0xFFFFFFFF
  * @Default: 0x5B8D80
@@ -4392,7 +4392,7 @@ enum station_keepalive_method {
 
 /*
  * <ini>
- * InfraMinPhyRateAcBke - Set min PHY rate for BK
+ * InfraMinPhyRateAcBk - Set min PHY rate for BK
  * @Min: 0x0
  * @Max: 0xFFFFFFFF
  * @Default: 0x5B8D80
@@ -5338,7 +5338,7 @@ enum hdd_link_speed_rpt_type {
 
 /*
  * <ini>
- * enable_bt_chain_separation - Enables/disables bt /wlan chainmask assignment
+ * enableBTChainSeparation - Enables/disables bt /wlan chainmask assignment
  * @Min: 0
  * @Max: 1
  * @Default: 0
@@ -13719,7 +13719,7 @@ enum hdd_external_acs_policy {
 
 /*
  * <ini>
- * external_acs_policy - External ACS policy control
+ * acs_policy - External ACS policy control
  * @Min: 0
  * @Max: 1
  * @Default: 0
