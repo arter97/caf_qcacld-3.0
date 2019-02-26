@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -943,7 +943,8 @@ lim_change_channel_with_callback(tpAniSirGlobal pMac, uint8_t newChannel,
 void lim_send_sme_mgmt_frame_ind(tpAniSirGlobal pMac, uint8_t frameType,
 				 uint8_t *frame, uint32_t frameLen,
 				 uint16_t sessionId, uint32_t rxChan,
-				 tpPESession psessionEntry, int8_t rxRssi);
+				 tpPESession psessionEntry, int8_t rxRssi,
+				 enum rxmgmt_flags rx_flags);
 void lim_process_remain_on_chn_timeout(tpAniSirGlobal pMac);
 void lim_process_insert_single_shot_noa_timeout(tpAniSirGlobal pMac);
 void lim_convert_active_channel_to_passive_channel(tpAniSirGlobal pMac);
