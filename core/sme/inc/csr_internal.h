@@ -462,9 +462,6 @@ struct csr_config {
 	/* Country Code Priority */
 	bool fSupplicantCountryCodeHasPriority;
 
-	uint16_t vccRssiThreshold;
-	uint32_t vccUlMacLossThreshold;
-
 	uint32_t nPassiveMinChnTime;    /* in units of milliseconds */
 	uint32_t nPassiveMaxChnTime;    /* in units of milliseconds */
 	uint32_t nActiveMinChnTime;     /* in units of milliseconds */
@@ -676,13 +673,6 @@ struct csr_scanstruct {
 	/* keep a track of channels to be scnned while in traffic condition */
 	struct csr_oschannel_mask osScanChannelMask;
 	uint16_t nBssLimit;     /* the maximum number of BSS in scan cache */
-	/*
-	 * Customer wants to start with an active scan based on the default
-	 * country code. This optimization will minimize the driver load to
-	 * association time. Based on this flag we will bypass the initial
-	 * passive scan needed for 11d to determine the country code & domain
-	 */
-	bool fEnableBypass11d;
 	/*
 	 * Customer wants to optimize the scan time. Avoiding scans(passive)
 	 * on DFS channels while swipping through both bands can save some time
