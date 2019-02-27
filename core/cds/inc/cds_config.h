@@ -79,7 +79,6 @@ enum active_bpf_mode {
  * @ra_ratelimit_interval: RA rate limit value
  * @is_ra_ratelimit_enabled: Indicate RA rate limit enabled or not
  * @reorder_offload: is RX re-ordering offloaded to the fw
- * @dfs_pri_multiplier: dfs radar pri multiplier
  * @uc_offload_enabled: IPA Micro controller data path offload enable flag
  * @uc_txbuf_count: IPA Micro controller data path offload TX buffer count
  * @uc_txbuf_size: IPA Micro controller data path offload TX buffer size
@@ -136,7 +135,6 @@ struct cds_config_info {
 	bool is_ra_ratelimit_enabled;
 #endif
 	uint8_t reorder_offload;
-	int32_t dfs_pri_multiplier;
 	uint8_t uc_offload_enabled;
 	uint32_t uc_txbuf_count;
 	uint32_t uc_txbuf_size;

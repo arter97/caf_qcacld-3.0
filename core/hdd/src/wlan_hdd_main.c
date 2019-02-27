@@ -9088,8 +9088,6 @@ static int hdd_update_cds_config(struct hdd_context *hdd_ctx)
 	cds_cfg->ap_disable_intrabss_fwd =
 		hdd_ctx->config->apDisableIntraBssFwd;
 
-	cds_cfg->dfs_pri_multiplier =
-		hdd_ctx->config->dfsRadarPriMultiplier;
 	cds_cfg->reorder_offload =
 			hdd_ctx->config->reorderOffloadSupport;
 
