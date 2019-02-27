@@ -329,6 +329,24 @@ struct hdd_context;
 #define CFG_HT_MPDU_DENSITY_MAX                WNI_CFG_MPDU_DENSITY_STAMAX
 #define CFG_HT_MPDU_DENSITY_DEFAULT            WNI_CFG_MPDU_DENSITY_STADEF
 
+/*
+ * <ini>
+ * gRegulatoryChangeCountry - Default world regdmn overriding
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to control whether default regdmn settings should be
+ * overridden when there is no world regdmn configuration available.
+ *
+ * Related: None
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_REG_CHANGE_DEF_COUNTRY_NAME          "gRegulatoryChangeCountry"
 #define CFG_REG_CHANGE_DEF_COUNTRY_DEFAULT       (0)
 #define CFG_REG_CHANGE_DEF_COUNTRY_MIN           (0)
@@ -2875,21 +2893,93 @@ enum hdd_dot11_mode {
 #define CFG_LATENCY_FLAGS_ULTRALOW_MAX     (0xffffffff)
 #define CFG_LATENCY_FLAGS_ULTRALOW_DEFAULT (0xc8a)
 
+/*
+ * <ini>
+ * Intf0MacAddress - Default MAC address of VIF0
+ * @Min: 000000000000
+ * @Max: ffffffffffff
+ * @Default: 000AF58989FF
+ *
+ * This ini is used to set the default MAC address of virtual interface 0
+ * created by WLAN driver.
+ *
+ * Related: None.
+ *
+ * Supported Feature: SAP
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_INTF0_MAC_ADDR_NAME                  "Intf0MacAddress"
 #define CFG_INTF0_MAC_ADDR_MIN                   "000000000000"
 #define CFG_INTF0_MAC_ADDR_MAX                   "ffffffffffff"
 #define CFG_INTF0_MAC_ADDR_DEFAULT               "000AF58989FF"
 
+/*
+ * <ini>
+ * Intf1MacAddress - Default MAC address of VIF1
+ * @Min: 000000000000
+ * @Max: ffffffffffff
+ * @Default: 000AF58989FE
+ *
+ * This ini is used to set the default MAC address of virtual interface 1
+ * created by WLAN driver.
+ *
+ * Related: None.
+ *
+ * Supported Feature: SAP
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_INTF1_MAC_ADDR_NAME                  "Intf1MacAddress"
 #define CFG_INTF1_MAC_ADDR_MIN                   "000000000000"
 #define CFG_INTF1_MAC_ADDR_MAX                   "ffffffffffff"
 #define CFG_INTF1_MAC_ADDR_DEFAULT               "000AF58989FE"
 
+/*
+ * <ini>
+ * Intf2MacAddress - Default MAC address of VIF2
+ * @Min: 000000000000
+ * @Max: ffffffffffff
+ * @Default: 000AF58989FD
+ *
+ * This ini is used to set the default MAC address of virtual interface 2
+ * created by WLAN driver.
+ *
+ * Related: None.
+ *
+ * Supported Feature: SAP
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_INTF2_MAC_ADDR_NAME                  "Intf2MacAddress"
 #define CFG_INTF2_MAC_ADDR_MIN                   "000000000000"
 #define CFG_INTF2_MAC_ADDR_MAX                   "ffffffffffff"
 #define CFG_INTF2_MAC_ADDR_DEFAULT               "000AF58989FD"
 
+/*
+ * <ini>
+ * Intf3MacAddress - Default MAC address of VIF3
+ * @Min: 000000000000
+ * @Max: ffffffffffff
+ * @Default: 000AF58989FC
+ *
+ * This ini is used to set the default MAC address of virtual interface 3
+ * created by WLAN driver.
+ *
+ * Related: None.
+ *
+ * Supported Feature: SAP
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
 #define CFG_INTF3_MAC_ADDR_NAME                  "Intf3MacAddress"
 #define CFG_INTF3_MAC_ADDR_MIN                   "000000000000"
 #define CFG_INTF3_MAC_ADDR_MAX                   "ffffffffffff"
