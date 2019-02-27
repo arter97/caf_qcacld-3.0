@@ -89,7 +89,7 @@ struct hdd_context;
  *
  * Usage: External
  *
- * <ini>
+ * </ini>
  */
 
 #define CFG_ENABLE_CONNECTED_SCAN_NAME        "gEnableConnectedScan"
@@ -727,6 +727,7 @@ enum hdd_dot11_mode {
  *
  * This ini is used to enable or disable DFS channel
  * scan
+ * </ini>
  */
 #define CFG_ENABLE_DFS_CHNL_SCAN_NAME              "gEnableDFSChnlScan"
 #define CFG_ENABLE_DFS_CHNL_SCAN_MIN               (0)
@@ -5454,6 +5455,7 @@ enum hdd_link_speed_rpt_type {
  * Supported Feature: 11n
  *
  * Usage: External
+ * </ini>
  */
 #define CFG_DISABLE_HIGH_HT_RX_MCS_2x2         "disable_high_ht_mcs_2x2"
 #define CFG_DISABLE_HIGH_HT_RX_MCS_2x2_MIN     (0)
@@ -8056,6 +8058,7 @@ enum hdd_link_speed_rpt_type {
 #define CFG_ENABLE_VHT_FOR_24GHZ_DEFAULT          (0)
 
 /*
+ * <ini>
  * gEnableVendorVhtFor24GHzBand:Parameter to control VHT support
  * based on vendor ie in 2.4 GHz band
  * @Min: 0
@@ -10573,12 +10576,28 @@ enum dot11p_mode {
 #define CFG_TOP_K_NUM_OF_CHANNELS_MIN       (1)
 #define CFG_TOP_K_NUM_OF_CHANNELS_MAX       (5)
 #define CFG_TOP_K_NUM_OF_CHANNELS_DEFAULT   (3)
+
 /*
+ * <ini>
+ * gStationaryThreshold - STA threshold value to determine if it is stationary
+ * @Min: 0
+ * @Max: 100
+ * @Default: 10
+ *
  * This is the threshold value to determine that the STA is
  * stationary. If the tanimoto distance is less than this
  * value, then the device is considered to be stationary.
  * This parameter is intended to tweak the internal algorithm
  * for experiments. This should not be changed externally.
+ *
+ *
+ * Related: None
+ *
+ * Supported Feature: Scan
+ *
+ * Usage: External
+ *
+ * </ini>
  */
 #define CFG_STATIONARY_THRESHOLD_NAME      "gStationaryThreshold"
 #define CFG_STATIONARY_THRESHOLD_MIN       (0)
@@ -11143,6 +11162,8 @@ enum dot11p_mode {
  * OL_TX_SCHED_WRR_ADV_CAT_CFG_SPEC. The user can tune the
  * WRR TX sched parameters such as skip, credit, limit, credit, disc for VO.
  * e.g., gEnableTxSchedWrrVO = 10, 9, 8, 1, 8
+ *
+ * </ini>
  */
 #define CFG_ENABLE_TX_SCHED_WRR_VO_NAME     "gEnableTxSchedWrrVO"
 #define CFG_ENABLE_TX_SCHED_WRR_VO_DEFAULT  ""
@@ -11156,6 +11177,8 @@ enum dot11p_mode {
  * OL_TX_SCHED_WRR_ADV_CAT_CFG_SPEC. The user can tune the
  * WRR TX sched parameters such as skip, credit, limit, credit, disc for VI.
  * e.g., gEnableTxSchedWrrVI = 10, 9, 8, 1, 8
+ *
+ * </ini>
  */
 #define CFG_ENABLE_TX_SCHED_WRR_VI_NAME     "gEnableTxSchedWrrVI"
 #define CFG_ENABLE_TX_SCHED_WRR_VI_DEFAULT  ""
@@ -11169,6 +11192,8 @@ enum dot11p_mode {
  * OL_TX_SCHED_WRR_ADV_CAT_CFG_SPEC. The user can tune the
  * WRR TX sched parameters such as skip, credit, limit, credit, disc for BE.
  * e.g., gEnableTxSchedWrrBE = 10, 9, 8, 1, 8
+ *
+ * </ini>
  */
 #define CFG_ENABLE_TX_SCHED_WRR_BE_NAME     "gEnableTxSchedWrrBE"
 #define CFG_ENABLE_TX_SCHED_WRR_BE_DEFAULT  ""
@@ -11182,13 +11207,22 @@ enum dot11p_mode {
  * OL_TX_SCHED_WRR_ADV_CAT_CFG_SPEC. The user can tune the
  * WRR TX sched parameters such as skip, credit, limit, credit, disc for BK.
  * e.g., gEnableTxSchedWrrBK = 10, 9, 8, 1, 8
+ *
+ * </ini>
  */
 #define CFG_ENABLE_TX_SCHED_WRR_BK_NAME     "gEnableTxSchedWrrBK"
 #define CFG_ENABLE_TX_SCHED_WRR_BK_DEFAULT  ""
 
 /*
- * Enable/disable DPTRACE
- * Enabling this might have performace impact.
+ * <ini>
+ * enable_dp_trace - Enable/disable DPTRACE
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * Enable/disable DPTRACE. Enabling this might have performace impact.
+ *
+ * </ini>
  */
 #define CFG_ENABLE_DP_TRACE		"enable_dp_trace"
 #define CFG_ENABLE_DP_TRACE_MIN		(0)
@@ -11238,7 +11272,8 @@ enum dot11p_mode {
 /* Default verbosity, in case its missing in gDptraceConfig string*/
 #define DP_TRACE_CONFIG_DEFAULT_VERBOSTY QDF_DP_TRACE_VERBOSITY_LOW
 /*
- * Config DPTRACE
+ * <ini>
+ * gDptraceConfig - Config DPTRACE
  * The sequence of params is important. If some param is missing, defaults are
  * considered.
  * Param 1: Enable/Disable DP Trace live mode (uint8_t)
@@ -11253,6 +11288,8 @@ enum dot11p_mode {
  * e.g., to enable dptrace live mode and set the thresh as 4,
  * use the following param in the ini file.
  * gDptraceConfig = 1, 4
+ *
+ * </ini>
  */
 #define CFG_ENABLE_DP_TRACE_CONFIG		"gDptraceConfig"
 #define CFG_ENABLE_DP_TRACE_CONFIG_DEFAULT	"1, 8, 1, 126"
@@ -11551,6 +11588,7 @@ enum dot11p_mode {
  * Supported Feature: Rx_thread
  *
  * Usage: Internal
+ *
  * </ini>
  */
 #define CFG_RPS_RX_QUEUE_CPU_MAP_LIST_NAME         "rpsRxQueueCpuMapList"
@@ -11766,8 +11804,16 @@ enum dot11p_mode {
 #define CFG_FILTER_MULTICAST_REPLAY_DEFAULT  (1)
 
 /*
+ * <ini>
+ * g_sifs_burst_duration - Sets SIFS burst duration in FW
+ * @Min: 0
+ * @Max: 12
+ * @Default: 8
+ *
  * This parameter will control SIFS burst duration in FW from 0 to 12 ms.
  * Default value is set to 8ms.
+ *
+ * </ini>
  */
 #define CFG_SIFS_BURST_DURATION_NAME     "g_sifs_burst_duration"
 #define CFG_SIFS_BURST_DURATION_MIN      (0)
@@ -14271,7 +14317,25 @@ enum hdd_external_acs_freq_band {
 #define CFG_IS_SAP_SAE_ENABLED_MAX     (1)
 
 /*
- * Type declarations
+ * <ini>
+ * chan_band_weightage - Channel Band perferance to 5GHZ to
+ * calculate best candidate
+ * @Min: 0
+ * @Max: 100
+ * @Default: 2
+ *
+ * This ini is used to increase/decrease Channel Band Preference weightage
+ * in best candidate selection. 5GHZ AP get this additional boost compare to
+ * 2GHZ AP before   rssi_pref_5g_rssi_thresh and 2.4Ghz get weightage after
+ * rssi_pref_5g_rssi_thresh.
+ *
+ * Related: rssi_pref_5g_rssi_thresh, band_weight_per_index
+ *
+ * Supported Feature: STA Candidate selection
+ *
+ * Usage: External
+ *
+ * </ini>
  */
 #define CFG_CHAN_BAND_WEIGHTAGE_NAME    "chan_band_weightage"
 #define CFG_CHAN_BAND_WEIGHTAGE_DEFAULT (2)
