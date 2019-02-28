@@ -753,6 +753,8 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc,
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 				FL("INVALID vdev %pK OR osif_rx"), vdev);
 			DP_STATS_INC(soc, rx.err.invalid_vdev, 1);
+			/* Drop & free packet */
+			qdf_nbuf_free(nbuf);
 		}
 	}
 	return;
