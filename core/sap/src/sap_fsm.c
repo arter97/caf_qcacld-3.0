@@ -1578,6 +1578,7 @@ QDF_STATUS sap_signal_hdd_event(struct sap_context *sap_ctx,
 		  FL("SAP event callback event = %s"),
 		  sap_hdd_event_to_string(sap_hddevent));
 
+	qdf_mem_zero(&sap_ap_event, sizeof(sap_ap_event));
 	switch (sap_hddevent) {
 	case eSAP_STA_ASSOC_IND:
 		if (!csr_roaminfo) {
