@@ -33,6 +33,9 @@
 #include "dp_tx.h"
 #include "dp_tx_desc.h"
 #include "dp_rx.h"
+#ifdef DP_RATETABLE_SUPPORT
+#include "dp_ratetable.h"
+#endif
 #include <cdp_txrx_handle.h>
 #include <wlan_cfg.h>
 #include "cdp_txrx_cmn_struct.h"
@@ -415,7 +418,7 @@ void dp_pkt_log_init(struct cdp_pdev *ppdev, void *scn)
 	}
 
 	pktlog_sethandle(&handle->pl_dev, scn);
-	pktlog_set_callback_regtype(PKTLOG_LITE_CALLBACK_REGISTRATION);
+	pktlog_set_callback_regtype(PKTLOG_DEFAULT_CALLBACK_REGISTRATION);
 
 	if (pktlogmod_init(scn)) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
@@ -2803,6 +2806,7 @@ static int dp_soc_cmn_setup(struct dp_soc *soc)
 	TAILQ_INIT(&soc->rx.defrag.waitlist);
 	soc->rx.defrag.timeout_ms =
 		wlan_cfg_get_rx_defrag_min_timeout(soc_cfg_ctx);
+	soc->rx.defrag.next_flush_ms = 0;
 	soc->rx.flags.defrag_timeout_check =
 		wlan_cfg_get_defrag_timeout_check(soc_cfg_ctx);
 	qdf_spinlock_create(&soc->rx.defrag.defrag_lock);
@@ -4595,12 +4599,17 @@ static inline struct dp_peer *dp_peer_can_reuse(struct dp_vdev *vdev,
 
 #ifdef FEATURE_AST
 static inline void dp_peer_ast_handle_roam_del(struct dp_soc *soc,
+					       struct dp_pdev *pdev,
 					       uint8_t *peer_mac_addr)
 {
 	struct dp_ast_entry *ast_entry;
 
 	qdf_spin_lock_bh(&soc->ast_lock);
-	ast_entry = dp_peer_ast_hash_find_soc(soc, peer_mac_addr);
+	if (soc->ast_override_support)
+		ast_entry = dp_peer_ast_hash_find_by_pdevid(soc, peer_mac_addr,
+							    pdev->pdev_id);
+	else
+		ast_entry = dp_peer_ast_hash_find_soc(soc, peer_mac_addr);
 
 	if (ast_entry && ast_entry->next_hop &&
 	    !ast_entry->delete_in_progress)
@@ -4683,7 +4692,7 @@ static void *dp_peer_create_wifi3(struct cdp_vdev *vdev_handle,
 		 * If an AST entry exists, but no peer entry exists with a given
 		 * MAC addresses, we could deduce it as a WDS entry
 		 */
-		dp_peer_ast_handle_roam_del(soc, peer_mac_addr);
+		dp_peer_ast_handle_roam_del(soc, pdev, peer_mac_addr);
 	}
 
 #ifdef notyet
@@ -8092,6 +8101,21 @@ static void dp_set_vdev_dscp_tid_map_wifi3(struct cdp_vdev *vdev_handle,
 	return;
 }
 
+#ifdef DP_RATETABLE_SUPPORT
+static int dp_txrx_get_ratekbps(int preamb, int mcs,
+				int htflag, int gintval)
+{
+	return dp_getrateindex((uint32_t)gintval, (uint16_t)mcs, 1,
+			       (uint8_t)preamb, 1);
+}
+#else
+static int dp_txrx_get_ratekbps(int preamb, int mcs,
+				int htflag, int gintval)
+{
+	return 0;
+}
+#endif
+
 /* dp_txrx_get_pdev_stats - Returns cdp_pdev_stats
  * @peer_handle: DP pdev handle
  *
@@ -9236,6 +9260,7 @@ static struct cdp_host_stats_ops dp_ops_host_stats = {
 	.txrx_get_peer_stats = dp_txrx_get_peer_stats,
 	.txrx_reset_peer_stats = dp_txrx_reset_peer_stats,
 	.txrx_get_pdev_stats = dp_txrx_get_pdev_stats,
+	.txrx_get_ratekbps = dp_txrx_get_ratekbps,
 	/* TODO */
 };
 

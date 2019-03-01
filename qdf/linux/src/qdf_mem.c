@@ -35,12 +35,6 @@
 #include <linux/seq_file.h>
 #include <linux/string.h>
 
-#ifdef CONFIG_MCL
-#include <host_diag_core_event.h>
-#else
-#define host_log_low_resource_failure(code) do {} while (0)
-#endif
-
 #if defined(CONFIG_CNSS)
 #include <net/cnss.h>
 #endif
@@ -1587,6 +1581,9 @@ qdf_export_symbol(qdf_mem_set_io);
  * @ptr: Pointer to memory that will be set
  * @num_bytes: Number of bytes to be set
  * @value: Byte set in memory
+ *
+ * WARNING: parameter @num_bytes and @value are swapped comparing with
+ * standard C function "memset", please ensure correct usage of this function!
  *
  * Return: None
  */

@@ -54,6 +54,8 @@ struct vdev_mlme_obj;
  * @beacon_interval: beacon interval
  * @ldpc: low density parity check value
  * @nss: number of spatial stream
+ * @nss_2g: 2.4GHz number of spatial stream
+ * @nss_5g: 5GHz number of spatial stream
  * @tsfadjust: adjusted timer sync value
  */
 struct vdev_mlme_proto_generic {
@@ -63,6 +65,8 @@ struct vdev_mlme_proto_generic {
 	uint16_t beacon_interval;
 	uint8_t ldpc;
 	uint8_t nss;
+	uint8_t nss_2g;
+	uint8_t nss_5g;
 	uint64_t tsfadjust;
 };
 
@@ -198,6 +202,7 @@ struct vdev_mlme_proto {
  * @is_11ax_stub_enabled: 11AX stub status indication flag
  * @nss_2g: 2G spatial streams
  * @nss_5g: 5G spatial streams
+ * @bssid: bssid
  */
 struct vdev_mlme_mgmt_generic {
 	uint32_t rts_threshold;
@@ -231,6 +236,7 @@ struct vdev_mlme_mgmt_generic {
 	uint8_t is_11ax_stub_enabled;
 	uint8_t nss_2g;
 	uint8_t nss_5g;
+	uint8_t bssid[QDF_MAC_ADDR_SIZE];
 };
 
 /**
@@ -407,6 +413,16 @@ enum vdev_cmd_type {
 };
 
 /**
+ * enum vdev_start_resp_type - start respone type
+ * @START_RESPONSE:  Start response
+ * @RESTART_RESPONSE: Restart response
+ */
+enum vdev_start_resp_type {
+	START_RESPONSE = 0,
+	RESTART_RESPONSE,
+};
+
+/**
  * enum vdev_rsp_type - Response type
  * @START_RSP:      Start Response
  * @RESTART_RSP:    Restart Response
@@ -414,7 +430,7 @@ enum vdev_cmd_type {
  * @DELETE_RSP: DELETE Response
  */
 enum vdev_rsp_type {
-	START_RSP,
+	START_RSP = 0,
 	RESTART_RSP,
 	STOP_RSP,
 	DELETE_RSP,
@@ -507,15 +523,6 @@ struct vdev_mlme_ops {
 	QDF_STATUS (*mlme_vdev_notify_down_complete)(
 				struct vdev_mlme_obj *vdev_mlme,
 				uint16_t event_data_len, void *event_data);
-	QDF_STATUS (*mlme_vdev_ext_hdl_create)(
-				struct vdev_mlme_obj *vdev_mlme);
-	QDF_STATUS (*mlme_vdev_ext_hdl_post_create)(
-				struct vdev_mlme_obj *vdev_mlme);
-	QDF_STATUS (*mlme_vdev_ext_hdl_destroy)(
-				struct vdev_mlme_obj *vdev_mlme);
-	QDF_STATUS (*mlme_vdev_enqueue_exp_cmd)(
-				struct vdev_mlme_obj *vdev_mlme,
-				uint8_t cmd_type);
 	QDF_STATUS (*mlme_vdev_ext_delete_rsp)(
 				struct vdev_mlme_obj *vdev_mlme,
 				struct vdev_delete_response *rsp);

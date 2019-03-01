@@ -21,6 +21,21 @@
 #ifndef _WLAN_VDEV_MLME_MAIN_H_
 #define _WLAN_VDEV_MLME_MAIN_H_
 
+#include <wlan_objmgr_psoc_obj.h>
+#include <wlan_lmac_if_def.h>
+
+/**
+ * wlan_mlme_get_lmac_tx_ops() - get tx ops
+ * @psoc: pointer to psoc obj
+ *
+ * Return: pointer to tx ops
+ */
+static inline struct wlan_lmac_if_mlme_tx_ops *
+wlan_mlme_get_lmac_tx_ops(struct wlan_objmgr_psoc *psoc)
+{
+	return &psoc->soc_cb.tx_ops.mops;
+}
+
 #ifdef CMN_VDEV_MLME_SM_ENABLE
 /**
  * enum wlan_vdev_state - VDEV state
@@ -101,6 +116,7 @@ enum wlan_vdev_state {
  * @WLAN_VDEV_SM_EV_MLME_DOWN_REQ:       Invoke DOWN command operation
  * @WLAN_VDEV_SM_EV_DOWN_COMPLETE:       Notification of DOWN complete
  * @WLAN_VDEV_SM_EV_ROAM:                Notifiction on ROAMING
+ * @WLAN_VDEV_SM_EV_STOP_REQ:            Invoke API to initiate STOP handshake
  */
 enum wlan_vdev_sm_evt {
 	WLAN_VDEV_SM_EV_START = 0,
@@ -132,6 +148,7 @@ enum wlan_vdev_sm_evt {
 	WLAN_VDEV_SM_EV_MLME_DOWN_REQ = 26,
 	WLAN_VDEV_SM_EV_DOWN_COMPLETE = 27,
 	WLAN_VDEV_SM_EV_ROAM = 28,
+	WLAN_VDEV_SM_EV_STOP_REQ = 29,
 };
 
 #else

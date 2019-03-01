@@ -467,6 +467,7 @@ typedef enum {
 	WMI_HOST_VDEV_START_CHAN_INVALID,
 	WMI_HOST_VDEV_START_CHAN_BLOCKED,
 	WMI_HOST_VDEV_START_CHAN_DFS_VIOLATION,
+	WMI_HOST_VDEV_START_TIMEOUT,
 } WMI_HOST_VDEV_START_STATUS;
 
 /*
@@ -841,7 +842,7 @@ struct vdev_nss_chains {
 /**
  * struct hidden_ssid_vdev_restart_params -
  *                    vdev restart cmd parameter
- * @session_id: session id
+ * @vdev_id: ID of the vdev that needs to be restarted
  * @ssid_len: ssid length
  * @ssid: ssid
  * @flags: flags
@@ -858,7 +859,7 @@ struct vdev_nss_chains {
  *      flag to check if restart is in progress
  */
 struct hidden_ssid_vdev_restart_params {
-	uint8_t session_id;
+	uint8_t vdev_id;
 	uint32_t ssid_len;
 	uint32_t ssid[8];
 	uint32_t flags;
@@ -874,6 +875,31 @@ struct hidden_ssid_vdev_restart_params {
 	qdf_atomic_t hidden_ssid_restart_in_progress;
 #endif
 };
+
+#ifdef WLAN_CFR_ENABLE
+
+#define WMI_HOST_PEER_CFR_TIMER_ENABLE   1
+#define WMI_HOST_PEER_CFR_TIMER_DISABLE  0
+
+/**
+ * struct peer_cfr_params - peer cfr capture cmd parameter
+ * @request: enable/disable cfr capture
+ * @macaddr: macaddr of the client
+ * @vdev_id: vdev id
+ * @periodicity: cfr capture period
+ * @bandwidth: bandwidth of cfr capture
+ * @capture_method: cfr capture method/type
+ */
+struct peer_cfr_params {
+	uint32_t request;
+	uint8_t  *macaddr;
+	uint32_t vdev_id;
+	uint32_t periodicity;
+	uint32_t bandwidth;
+	uint32_t capture_method;
+};
+
+#endif /* WLAN_CFR_ENABLE */
 
 #ifndef CMN_VDEV_MGR_TGT_IF_ENABLE
 /**
@@ -4882,7 +4908,7 @@ typedef enum {
 	wmi_pdev_param_sub_channel_marking,
 	wmi_pdev_param_ul_ppdu_duration,
 	wmi_pdev_param_equal_ru_allocation_enable,
-
+	wmi_pdev_param_per_peer_prd_cfr_enable,
 	wmi_pdev_param_max,
 } wmi_conv_pdev_params_id;
 
@@ -5198,6 +5224,7 @@ typedef enum {
 	wmi_service_hw_db2dbm_support,
 	wmi_service_wlm_stats_support,
 	wmi_service_ul_ru26_allowed,
+	wmi_service_cfr_capture_support,
 	wmi_services_max,
 } wmi_conv_service_ids;
 #define WMI_SERVICE_UNAVAILABLE 0xFFFF

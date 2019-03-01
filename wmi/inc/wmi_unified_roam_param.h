@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -26,7 +26,7 @@
 /**
  * struct gateway_update_req_param - gateway parameter update request
  * @request_id: request id
- * @session_id: session id
+ * @vdev_id: vdev id
  * @max_retries: Max ARP/NS retry attempts
  * @timeout: Retry interval
  * @ipv4_addr_type: on ipv4 network
@@ -37,7 +37,7 @@
  */
 struct gateway_update_req_param {
 	uint32_t     request_id;
-	uint32_t     session_id;
+	uint32_t     vdev_id;
 	uint32_t     max_retries;
 	uint32_t     timeout;
 	uint32_t     ipv4_addr_type;
@@ -50,14 +50,14 @@ struct gateway_update_req_param {
 /**
  * struct rssi_monitor_param - rssi monitoring
  * @request_id: request id
- * @session_id: session id
+ * @vdev_id: vdev id
  * @min_rssi: minimum rssi
  * @max_rssi: maximum rssi
  * @control: flag to indicate start or stop
  */
 struct rssi_monitor_param {
 	uint32_t request_id;
-	uint32_t session_id;
+	uint32_t vdev_id;
 	int8_t   min_rssi;
 	int8_t   max_rssi;
 	bool     control;
@@ -72,7 +72,7 @@ struct rssi_monitor_param {
  * @hi_rssi_scan_rssi_delta: 5G scan rssi change threshold value
  * @hi_rssi_scan_rssi_ub: 5G scan upper bound
  * @raise_rssi_thresh_5g: flag to determine penalty and boost thresholds
- * @session_id: vdev id
+ * @vdev_id: vdev id
  * @penalty_threshold_5g: RSSI threshold below which 5GHz RSSI is penalized
  * @boost_threshold_5g: RSSI threshold above which 5GHz RSSI is favored
  * @raise_factor_5g: factor by which 5GHz RSSI is boosted
@@ -105,7 +105,7 @@ struct roam_offload_scan_rssi_params {
 	uint32_t hi_rssi_scan_rssi_delta;
 	int32_t hi_rssi_scan_rssi_ub;
 	int raise_rssi_thresh_5g;
-	uint8_t session_id;
+	uint8_t vdev_id;
 	uint32_t penalty_threshold_5g;
 	uint32_t boost_threshold_5g;
 	uint8_t raise_factor_5g;

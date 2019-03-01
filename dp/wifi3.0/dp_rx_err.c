@@ -651,7 +651,7 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc, qdf_nbuf_t nbuf,
 	uint16_t msdu_len;
 	struct dp_vdev *vdev;
 	uint8_t tid;
-	struct ether_header *eh;
+	qdf_ether_header_t *eh;
 
 	qdf_nbuf_set_rx_chfrag_start(nbuf,
 			hal_rx_msdu_end_first_msdu_get(rx_tlv_hdr));
@@ -823,11 +823,11 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc, qdf_nbuf_t nbuf,
 						rx_tlv_hdr) &&
 					 (vdev->rx_decap_type ==
 					  htt_cmn_pkt_type_ethernet))) {
-				eh = (struct ether_header *)qdf_nbuf_data(nbuf);
+				eh = (qdf_ether_header_t *)qdf_nbuf_data(nbuf);
 
 				DP_STATS_INC_PKT(peer, rx.multicast, 1,
 						 qdf_nbuf_len(nbuf));
-				if (IEEE80211_IS_BROADCAST(eh->ether_dhost)) {
+				if (QDF_IS_ADDR_BROADCAST(eh->ether_dhost)) {
 					DP_STATS_INC_PKT(peer, rx.bcast, 1,
 							 qdf_nbuf_len(nbuf));
 				}
@@ -858,7 +858,7 @@ dp_rx_process_err_unencrypted(struct dp_soc *soc, qdf_nbuf_t nbuf,
 	uint32_t pkt_len, l2_hdr_offset;
 	uint16_t msdu_len;
 	struct dp_vdev *vdev;
-	struct ether_header *eh;
+	qdf_ether_header_t *eh;
 	bool is_broadcast;
 
 	/*
@@ -958,8 +958,8 @@ process_rx:
 	if (qdf_unlikely(hal_rx_msdu_end_da_is_mcbc_get(rx_tlv_hdr) &&
 				(vdev->rx_decap_type ==
 				htt_cmn_pkt_type_ethernet))) {
-		eh = (struct ether_header *)qdf_nbuf_data(nbuf);
-		is_broadcast = (IEEE80211_IS_BROADCAST
+		eh = (qdf_ether_header_t *)qdf_nbuf_data(nbuf);
+		is_broadcast = (QDF_IS_ADDR_BROADCAST
 				(eh->ether_dhost)) ? 1 : 0 ;
 		DP_STATS_INC_PKT(peer, rx.multicast, 1, qdf_nbuf_len(nbuf));
 		if (is_broadcast) {
@@ -1201,8 +1201,13 @@ dp_rx_err_process(struct dp_soc *soc, void *hal_ring, uint32_t quota)
 done:
 	hal_srng_access_end(hal_soc, hal_ring);
 
-	if (soc->rx.flags.defrag_timeout_check)
-		dp_rx_defrag_waitlist_flush(soc);
+	if (soc->rx.flags.defrag_timeout_check) {
+		uint32_t now_ms =
+			qdf_system_ticks_to_msecs(qdf_system_ticks());
+
+		if (now_ms >= soc->rx.defrag.next_flush_ms)
+			dp_rx_defrag_waitlist_flush(soc);
+	}
 
 	for (mac_id = 0; mac_id < MAX_PDEV_CNT; mac_id++) {
 		if (rx_bufs_reaped[mac_id]) {
