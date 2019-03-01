@@ -1806,4 +1806,14 @@ struct lim_channel_status *csr_get_channel_status(void *p_mac,
  * Return: none
  */
 void csr_clear_channel_status(void *p_mac);
+
+/**
+ * csr_update_owe_info() - Update OWE info
+ * @mac: mac context
+ * @assoc_ind: assoc ind
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS csr_update_owe_info(tpAniSirGlobal mac,
+			       tSirSmeAssocInd *assoc_ind);
 #endif

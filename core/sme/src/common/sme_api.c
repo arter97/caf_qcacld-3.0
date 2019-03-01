@@ -15937,3 +15937,9 @@ bool sme_find_session_by_bssid(tHalHandle hal, uint8_t *bssid)
 
 	return ret;
 }
+
+QDF_STATUS sme_update_owe_info(tpAniSirGlobal mac,
+			       tSirSmeAssocInd *assoc_ind)
+{
+	return csr_update_owe_info(mac, assoc_ind);
+}

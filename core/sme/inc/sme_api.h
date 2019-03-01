@@ -2205,4 +2205,14 @@ bool sme_is_sta_key_exchange_in_progress(tHalHandle hal, uint8_t session_id);
  *         false - if not has the session
  */
 bool sme_find_session_by_bssid(tHalHandle hal, uint8_t *bssid);
+
+/**
+ * sme_update_owe_info() - Update OWE info
+ * @mac: mac context
+ * @assoc_ind: assoc ind
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_update_owe_info(tpAniSirGlobal mac,
+			       tSirSmeAssocInd *assoc_ind);
 #endif /* #if !defined( __SME_API_H ) */
