@@ -5339,6 +5339,27 @@ struct reg_table_entry g_registry_table[] = {
 		     CFG_ROAM_FORCE_RSSI_TRIGGER_MIN,
 		     CFG_ROAM_FORCE_RSSI_TRIGGER_MAX),
 
+	REG_VARIABLE(CFG_BTM_SOLICITED_TIMEOUT, WLAN_PARAM_Integer,
+				 struct hdd_config, btm_solicited_timeout,
+				 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+				 CFG_BTM_SOLICITED_TIMEOUT_DEFAULT,
+				 CFG_BTM_SOLICITED_TIMEOUT_MIN,
+				 CFG_BTM_SOLICITED_TIMEOUT_MAX),
+
+	REG_VARIABLE(CFG_BTM_MAX_ATTEMPT_CNT, WLAN_PARAM_Integer,
+			 struct hdd_config, btm_max_attempt_cnt,
+				 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+				 CFG_BTM_MAX_ATTEMPT_CNT_DEFAULT,
+				 CFG_BTM_MAX_ATTEMPT_CNT_MIN,
+				 CFG_BTM_MAX_ATTEMPT_CNT_MAX),
+
+	REG_VARIABLE(CFG_BTM_STICKY_TIME, WLAN_PARAM_Integer,
+				 struct hdd_config, btm_sticky_time,
+				 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+				 CFG_BTM_STICKY_TIME_DEFAULT,
+				 CFG_BTM_STICKY_TIME_MIN,
+				 CFG_BTM_STICKY_TIME_MAX),
+
 	REG_VARIABLE(CFG_ENABLE_UNIT_TEST_FRAMEWORK_NAME,
 		     WLAN_PARAM_Integer,
 		     struct hdd_config, is_unit_test_framework_enabled,
@@ -7187,6 +7208,12 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
 	hdd_debug("Name = [%s] value = [0x%x]",
 			  CFG_BTM_ENABLE_NAME,
 			  pHddCtx->config->btm_offload_config);
+	hdd_debug("Name = [btm_solicited_timeout] value = [0x%x]",
+			  pHddCtx->config->btm_solicited_timeout);
+	hdd_debug("Name = [btm_max_attempt_cnt] value = [0x%x]",
+			  pHddCtx->config->btm_max_attempt_cnt);
+	hdd_debug("Name = [btm_sticky_time] value = [0x%x]",
+			  pHddCtx->config->btm_sticky_time);
 
 }
 
@@ -9769,6 +9796,12 @@ QDF_STATUS hdd_set_sme_config(hdd_context_t *pHddCtx)
 			pHddCtx->config->num_11ag_tx_chains;
 	smeConfig->csrConfig.btm_offload_config =
 			pHddCtx->config->btm_offload_config;
+	smeConfig->csrConfig.btm_solicited_timeout =
+					pHddCtx->config->btm_solicited_timeout;
+	smeConfig->csrConfig.btm_max_attempt_cnt =
+					pHddCtx->config->btm_max_attempt_cnt;
+	smeConfig->csrConfig.btm_sticky_time =
+					pHddCtx->config->btm_sticky_time;
 
 	hdd_update_bss_score_params(pHddCtx->config,
 			&smeConfig->csrConfig.bss_score_params);

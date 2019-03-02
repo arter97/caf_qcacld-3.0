@@ -3608,6 +3608,9 @@ typedef struct sSirRoamOffloadScanReq {
 	uint32_t roam_trigger_reason_bitmask;
 	bool roam_force_rssi_trigger;
 	uint32_t btm_offload_config;
+	uint32_t btm_solicited_timeout;
+	uint32_t btm_max_attempt_cnt;
+	uint32_t btm_sticky_time;
 } tSirRoamOffloadScanReq, *tpSirRoamOffloadScanReq;
 
 typedef struct sSirRoamOffloadScanRsp {
