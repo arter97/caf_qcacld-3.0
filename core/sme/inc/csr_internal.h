@@ -684,6 +684,7 @@ typedef struct tagCsrConfig {
 	uint32_t offload_11k_enable_bitmask;
 	struct csr_neighbor_report_offload_params neighbor_report_offload;
 	bool roam_force_rssi_trigger;
+	uint32_t btm_offload_config;
 } tCsrConfig;
 
 typedef struct tagCsrChannelPowerInfo {

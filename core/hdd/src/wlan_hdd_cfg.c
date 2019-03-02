@@ -5317,6 +5317,13 @@ struct reg_table_entry g_registry_table[] = {
 		     CFG_TX_SCH_DELAY_MIN,
 		     CFG_TX_SCH_DELAY_MAX),
 
+	REG_VARIABLE(CFG_BTM_ENABLE_NAME, WLAN_PARAM_HexInteger,
+		     struct hdd_config, btm_offload_config,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_BTM_ENABLE_DEFAULT,
+		     CFG_BTM_ENABLE_MIN,
+		     CFG_BTM_ENABLE_MAX),
+
 	REG_VARIABLE(CFG_FORCE_RSNE_OVERRIDE_NAME, WLAN_PARAM_Integer,
 		     struct hdd_config, force_rsne_override,
 		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -7177,6 +7184,10 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
 	hdd_debug("Name = [%s] Value = [%u]",
 		  CFG_ROAM_PREAUTH_NO_ACK_TIMEOUT_NAME,
 		  pHddCtx->config->roam_preauth_no_ack_timeout);
+	hdd_debug("Name = [%s] value = [0x%x]",
+			  CFG_BTM_ENABLE_NAME,
+			  pHddCtx->config->btm_offload_config);
+
 }
 
 /**
@@ -9756,6 +9767,8 @@ QDF_STATUS hdd_set_sme_config(hdd_context_t *pHddCtx)
 			pHddCtx->config->num_11b_tx_chains;
 	smeConfig->csrConfig.num_11ag_tx_chains =
 			pHddCtx->config->num_11ag_tx_chains;
+	smeConfig->csrConfig.btm_offload_config =
+			pHddCtx->config->btm_offload_config;
 
 	hdd_update_bss_score_params(pHddCtx->config,
 			&smeConfig->csrConfig.bss_score_params);
