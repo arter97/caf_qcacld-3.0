@@ -200,8 +200,9 @@ void dp_peer_find_hash_add(struct dp_soc *soc, struct dp_peer *peer)
 static int dp_peer_ast_hash_attach(struct dp_soc *soc)
 {
 	int i, hash_elems, log2;
+	unsigned max_ast_index = wlan_cfg_get_max_ast_idx(soc->wlan_cfg_ctx);
 
-	hash_elems = ((soc->max_peers * DP_AST_HASH_LOAD_MULT) >>
+	hash_elems = ((max_ast_index * DP_AST_HASH_LOAD_MULT) >>
 		DP_AST_HASH_LOAD_SHIFT);
 
 	log2 = dp_log2_ceil(hash_elems);
@@ -210,6 +211,8 @@ static int dp_peer_ast_hash_attach(struct dp_soc *soc)
 	soc->ast_hash.mask = hash_elems - 1;
 	soc->ast_hash.idx_bits = log2;
 
+	qdf_print("ast hash_elems: %d, max_ast_idx: %d\n",
+		  hash_elems, max_ast_index);
 	/* allocate an array of TAILQ peer object lists */
 	soc->ast_hash.bins = qdf_mem_malloc(
 		hash_elems * sizeof(TAILQ_HEAD(anonymous_tail_q,
