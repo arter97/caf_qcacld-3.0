@@ -5408,6 +5408,7 @@ wlan_hdd_wifi_config_policy[QCA_WLAN_VENDOR_ATTR_CONFIG_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_SCAN_ENABLE] = {.type = NLA_U8 },
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_TOTAL_BEACON_MISS_COUNT] = {
 			.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_RSN_IE] = {.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_GTX] = {.type = NLA_U8},
 };
 
@@ -6169,6 +6170,22 @@ __wlan_hdd_cfg80211_wifi_configuration_set(struct wiphy *wiphy,
 			hdd_err("set disable_fils failed");
 			ret_val = -EINVAL;
 		}
+	}
+
+	if (tb[QCA_WLAN_VENDOR_ATTR_CONFIG_RSN_IE] &&
+	    hdd_ctx->config->force_rsne_override) {
+		uint8_t force_rsne_override;
+
+		force_rsne_override =
+			nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_CONFIG_RSN_IE]);
+		if (force_rsne_override > 1) {
+			hdd_err("Invalid test_mode %d", force_rsne_override);
+			ret_val = -EINVAL;
+		}
+
+		hdd_ctx->force_rsne_override = force_rsne_override;
+		hdd_debug("force_rsne_override - %d",
+			   hdd_ctx->force_rsne_override);
 	}
 
 	if (tb[QCA_WLAN_VENDOR_ATTR_CONFIG_GTX]) {
@@ -10868,10 +10885,16 @@ static inline uint8_t *hdd_dns_unmake_name_query(uint8_t *name)
  *
  * Return: Byte following constructed DNS name
  */
-static uint8_t *hdd_dns_make_name_query(const uint8_t *string, uint8_t *buf)
+static uint8_t *hdd_dns_make_name_query(const uint8_t *string,
+					uint8_t *buf, uint8_t len)
 {
 	uint8_t *length_byte = buf++;
 	uint8_t c;
+
+	if (string[len - 1]) {
+		hdd_debug("DNS name is not null terminated");
+		return NULL;
+	}
 
 	while ((c = *(string++))) {
 		if (c == '.') {
@@ -10961,8 +10984,12 @@ static int hdd_set_clear_connectivity_check_stats_info(
 					adapter->track_dns_domain_len =
 						nla_len(tb2[
 							STATS_DNS_DOMAIN_NAME]);
-					hdd_dns_make_name_query(domain_name,
-							adapter->dns_payload);
+					if (!hdd_dns_make_name_query(
+						domain_name,
+						adapter->dns_payload,
+						adapter->track_dns_domain_len))
+						adapter->track_dns_domain_len =
+							0;
 					/* DNStracking isn't supported in FW. */
 					arp_stats_params->pkt_type_bitmap &=
 						~CONNECTIVITY_CHECK_SET_DNS;

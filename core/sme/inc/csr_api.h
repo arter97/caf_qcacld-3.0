@@ -412,6 +412,7 @@ typedef struct tagCsrScanResultFilter {
 	struct sCsrChannel_ pcl_channels;
 	struct qdf_mac_addr bssid_hint;
 	enum tQDF_ADAPTER_MODE csrPersona;
+	bool ignore_pmf_cap;
 #ifdef WLAN_FEATURE_FILS_SK
 	bool realm_check;
 	uint8_t fils_realm[2];
@@ -1005,6 +1006,7 @@ typedef struct tagCsrRoamProfile {
 	uint32_t hlp_ie_len;
 	struct cds_fils_connection_info *fils_con_info;
 #endif
+	bool force_rsne_override;
 } tCsrRoamProfile;
 
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
