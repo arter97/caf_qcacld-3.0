@@ -41,6 +41,7 @@
 #include "wma_types.h"
 #include "wma_if.h"
 #include "wma_fips_api.h"
+#include "wma_fw_state.h"
 #include "qdf_trace.h"
 #include "sme_trace.h"
 #include "qdf_types.h"
@@ -86,6 +87,8 @@ QDF_STATUS sme_unprotected_mgmt_frm_ind(tHalHandle hHal,
 /* Channel Change Response Indication Handler */
 static QDF_STATUS sme_process_channel_change_resp(tpAniSirGlobal pMac,
 					   uint16_t msg_type, void *pMsgBuf);
+
+static QDF_STATUS sme_fw_state_resp(tpAniSirGlobal mac);
 
 /* Internal SME APIs */
 QDF_STATUS sme_acquire_global_lock(tSmeStruct *psSme)
@@ -2163,6 +2166,9 @@ QDF_STATUS sme_process_msg(tHalHandle hHal, struct scheduler_msg *pMsg)
 			pMac->sme.pget_peer_info_ext_ind_cb(pMsg->bodyptr,
 				pMac->sme.pget_peer_info_ext_cb_context);
 		qdf_mem_free(pMsg->bodyptr);
+		break;
+	case eWNI_SME_FW_STATUS_IND:
+		status = sme_fw_state_resp(pMac);
 		break;
 	case eWNI_SME_CSA_OFFLOAD_EVENT:
 		if (pMsg->bodyptr) {
@@ -10729,6 +10735,53 @@ QDF_STATUS sme_stats_ext_event(tHalHandle hHal, void *pMsg)
 }
 
 #endif
+
+#ifdef FEATURE_FW_STATE
+QDF_STATUS sme_get_fw_state(tHalHandle hal,
+			    fw_state_callback callback,
+			    void *context)
+{
+	QDF_STATUS status;
+	tpAniSirGlobal mac_ctx = PMAC_STRUCT(hal);
+	tp_wma_handle wma_handle;
+
+	SME_ENTER();
+
+	mac_ctx->sme.fw_state_cb = callback;
+	mac_ctx->sme.fw_state_context = context;
+	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+	status = wma_get_fw_state(wma_handle);
+
+	SME_EXIT();
+	return status;
+}
+
+/**
+ * sme_fw_state_resp() - eWNI_SME_FW_STATUS_IND processor
+ * @mac: Global MAC context
+
+ * This callback function called when SME received eWNI_SME_FW_STATUS_IND
+ * response from WMA
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS sme_fw_state_resp(tpAniSirGlobal mac)
+{
+	if (mac->sme.fw_state_cb)
+		mac->sme.fw_state_cb(mac->sme.fw_state_context);
+	mac->sme.fw_state_cb = NULL;
+	mac->sme.fw_state_context = NULL;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+#else /* FEATURE_FW_STATE */
+static QDF_STATUS sme_fw_state_resp(tpAniSirGlobal mac)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+#endif /* FEATURE_FW_STATE */
 
 /*
  * sme_update_dfs_scan_mode() -

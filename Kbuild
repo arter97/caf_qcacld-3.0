@@ -401,6 +401,9 @@ CONFIG_FEATURE_SECURE_FIRMWARE := 0
 #Flag to enable Stats Ext implementation
 CONFIG_FEATURE_STATS_EXT := 1
 
+#Flag to enable get firmware state
+CONFIG_QCACLD_FEATURE_FW_STATE := y
+
 ifeq ($(CONFIG_CFG80211),y)
 HAVE_CFG80211 := 1
 else
@@ -536,6 +539,10 @@ endif
 
 ifeq ($(CONFIG_LITHIUM), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_rx_monitor.o
+endif
+
+ifeq ($(CONFIG_QCACLD_FEATURE_FW_STATE), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_fw_state.o
 endif
 
 ########### HOST DIAG LOG ###########
@@ -1585,6 +1592,9 @@ endif
 ifeq ($(CONFIG_WLAN_FEATURE_11AX), y)
 WMA_OBJS+=	$(WMA_SRC_DIR)/wma_he.o
 endif
+ifeq ($(CONFIG_QCACLD_FEATURE_FW_STATE), y)
+WMA_OBJS +=	$(WMA_SRC_DIR)/wma_fw_state.o
+endif
 
 ############## PLD ##########
 PLD_DIR := core/pld
@@ -2341,6 +2351,11 @@ endif
 
 ifeq ($(CONFIG_WLAN_SYNC_TSF_PLUS), y)
 CDEFINES += -DWLAN_FEATURE_TSF_PLUS
+endif
+
+# Flag to enable get firmware state feature
+ifeq ($(CONFIG_QCACLD_FEATURE_FW_STATE), y)
+CDEFINES += -DFEATURE_FW_STATE
 endif
 
 # Enable full rx re-order offload for adrastea
