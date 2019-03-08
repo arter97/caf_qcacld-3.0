@@ -157,6 +157,7 @@ void lim_send_sme_mgmt_frame_ind(tpAniSirGlobal pMac, uint8_t frameType,
 	pSirSmeMgmtFrame->frameType = frameType;
 	pSirSmeMgmtFrame->rxRssi = rxRssi;
 	pSirSmeMgmtFrame->rxChan = rxChannel;
+	pSirSmeMgmtFrame->rx_flags = rx_flags;
 
 	qdf_mem_zero(pSirSmeMgmtFrame->frameBuf, frameLen);
 	qdf_mem_copy(pSirSmeMgmtFrame->frameBuf, frame, frameLen);
