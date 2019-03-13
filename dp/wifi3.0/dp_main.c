@@ -2781,6 +2781,7 @@ static int dp_soc_cmn_setup(struct dp_soc *soc)
 	TAILQ_INIT(&soc->rx.defrag.waitlist);
 	soc->rx.defrag.timeout_ms =
 		wlan_cfg_get_rx_defrag_min_timeout(soc_cfg_ctx);
+	soc->rx.defrag.next_flush_ms = 0;
 	soc->rx.flags.defrag_timeout_check =
 		wlan_cfg_get_defrag_timeout_check(soc_cfg_ctx);
 	qdf_spinlock_create(&soc->rx.defrag.defrag_lock);
@@ -3337,6 +3338,7 @@ static struct cdp_pdev *dp_pdev_attach_wifi3(struct cdp_soc_t *txrx_soc,
 	/* initlialize cal client timer */
 	dp_cal_client_attach(&pdev->cal_client_ctx, pdev, pdev->soc->osdev,
 			     &dp_iterate_update_peer_list);
+	qdf_event_create(&pdev->fw_peer_stats);
 
 	return (struct cdp_pdev *)pdev;
 
@@ -7863,7 +7865,7 @@ dp_disable_enhanced_stats(struct cdp_pdev *pdev_handle)
  */
 static void
 dp_get_fw_peer_stats(struct cdp_pdev *pdev_handle, uint8_t *mac_addr,
-		uint32_t cap)
+		uint32_t cap, uint32_t is_wait)
 {
 	struct dp_pdev *pdev = (struct dp_pdev *)pdev_handle;
 	int i;
@@ -7887,9 +7889,20 @@ dp_get_fw_peer_stats(struct cdp_pdev *pdev_handle, uint8_t *mac_addr,
 	config_param3 |= (mac_addr[4] & 0x000000ff);
 	config_param3 |= ((mac_addr[5] << 8) & 0x0000ff00);
 
-	dp_h2t_ext_stats_msg_send(pdev, HTT_DBG_EXT_STATS_PEER_INFO,
-			config_param0, config_param1, config_param2,
-			config_param3, 0, 0, 0);
+	if (is_wait) {
+		qdf_event_reset(&pdev->fw_peer_stats);
+		dp_h2t_ext_stats_msg_send(pdev, HTT_DBG_EXT_STATS_PEER_INFO,
+					  config_param0, config_param1,
+					  config_param2, config_param3,
+					  0, 1, 0);
+		qdf_wait_single_event(&pdev->fw_peer_stats,
+				      DP_FW_PEER_STATS_CMP_TIMEOUT);
+	} else {
+		dp_h2t_ext_stats_msg_send(pdev, HTT_DBG_EXT_STATS_PEER_INFO,
+					  config_param0, config_param1,
+					  config_param2, config_param3,
+					  0, 0, 0);
+	}
 
 }
 
