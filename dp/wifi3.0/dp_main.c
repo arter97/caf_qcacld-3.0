@@ -4433,6 +4433,9 @@ void dp_peer_unref_delete(void *peer_handle)
 	int found = 0;
 	uint16_t peer_id;
 	uint16_t vdev_id;
+	uint8_t vdev_mac[QDF_NET_MAC_ADDR_MAX_LEN];
+	enum wlan_op_mode opmode;
+
 
 	/*
 	 * Hold the lock all the way from checking if the peer ref count
@@ -4484,6 +4487,10 @@ void dp_peer_unref_delete(void *peer_handle)
 		/* cleanup the peer data */
 		dp_peer_cleanup(vdev, peer);
 
+		qdf_mem_copy(vdev_mac, vdev->mac_addr.raw,
+				QDF_NET_MAC_ADDR_MAX_LEN);
+		opmode = vdev->opmode;
+
 		/* check whether the parent vdev has no peers left */
 		if (TAILQ_EMPTY(&vdev->peer_list)) {
 			/*
@@ -4533,8 +4540,8 @@ void dp_peer_unref_delete(void *peer_handle)
 
 		if (soc->cdp_soc.ol_ops->peer_unref_delete) {
 			soc->cdp_soc.ol_ops->peer_unref_delete(pdev->osif_pdev,
-					peer->mac_addr.raw, vdev->mac_addr.raw,
-					vdev->opmode);
+					peer->mac_addr.raw, vdev_mac,
+					opmode);
 		}
 
 		if (!vdev || !vdev->vap_bss_peer) {
