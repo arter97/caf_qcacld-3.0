@@ -215,6 +215,18 @@ int dfs_mlme_get_cac_timeout(struct wlan_objmgr_pdev *pdev,
 		uint64_t dfs_ch_flags);
 
 /**
+ * dfs_mlme_get_precac_timeout() - Get cac_timeout.
+ * @pdev: Pointer to DFS pdev object.
+ * @dfs_ch_freq:                Frequency in Mhz.
+ * @dfs_ch_vhtop_ch_freq_seg2:  Channel Center frequency applicable for 80+80MHz
+ *                          mode of operation.
+ * @dfs_ch_flags:               Channel flags.
+ */
+int dfs_mlme_get_precac_timeout(struct wlan_objmgr_pdev *pdev,
+				uint16_t dfs_ch_freq,
+				uint8_t dfs_ch_vhtop_ch_freq_seg2,
+				uint64_t dfs_ch_flags);
+/**
  * dfs_mlme_rebuild_chan_list_with_non_dfs_channels() - Rebuild the channel list
  * with only non DFS channels.
  * @pdev: Pointer to DFS pdev object.

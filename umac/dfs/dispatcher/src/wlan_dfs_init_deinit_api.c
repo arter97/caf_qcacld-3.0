@@ -98,6 +98,7 @@ void register_dfs_callbacks(void)
 		mlme_dfs_nol_timeout_notification;
 	tmp_dfs_to_mlme->mlme_clist_update = mlme_dfs_clist_update;
 	tmp_dfs_to_mlme->mlme_get_cac_timeout = mlme_dfs_get_cac_timeout;
+	tmp_dfs_to_mlme->mlme_get_precac_timeout = mlme_dfs_get_precac_timeout;
 	tmp_dfs_to_mlme->mlme_rebuild_chan_list_with_non_dfs_channels =
 		mlme_dfs_rebuild_chan_list_with_non_dfs_channels;
 	tmp_dfs_to_mlme->mlme_restart_vaps_with_non_dfs_chan =

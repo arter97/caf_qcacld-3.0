@@ -344,7 +344,7 @@ free_vdevref:
 }
 
 QDF_STATUS target_send_agile_ch_cfg_cmd(struct wlan_objmgr_pdev *pdev,
-					uint8_t *ch_freq)
+					uint8_t *ch_freq, uint32_t pcac_time)
 {
 	wmi_unified_t wmi_handle;
 	struct vdev_adfs_ch_cfg_params param;
@@ -373,8 +373,8 @@ QDF_STATUS target_send_agile_ch_cfg_cmd(struct wlan_objmgr_pdev *pdev,
 	qdf_mem_set(&param, sizeof(param), 0);
 	param.vdev_id = wlan_vdev_get_id(vdev);
 	param.ocac_mode = QUICK_OCAC_MODE;
-	param.min_duration_ms = 60000;
-	param.max_duration_ms = 0;
+	param.min_duration_ms = pcac_time;
+	param.max_duration_ms = pcac_time;
 	param.chan_freq = *ch_freq;
 	param.chan_width = wlan_vdev_get_ch_width(vdev);
 	param.center_freq = *ch_freq;

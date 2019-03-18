@@ -54,6 +54,7 @@
  * @mlme_clist_update:                 Updates the channel list.
  * @mlme_is_opmode_sta:                Check if pdev opmode is STA.
  * @mlme_get_cac_timeout:              Gets the CAC timeout.
+ * @mlme_get_precac_timeout:           Gets the agile preCAC timeout.
  * @mlme_rebuild_chan_list_with_non_dfs_channel: Rebuild channels with non-dfs
  *                                     channels.
  * @mlme_restart_vaps_with_non_dfs_chan: Restart vaps with non-dfs channel.
@@ -138,6 +139,11 @@ struct dfs_to_mlme {
 			uint8_t c_vhtop_ch_freq_seg2,
 			uint64_t dfs_ch_flags,
 			int *cac_timeout);
+	QDF_STATUS (*mlme_get_precac_timeout)(struct wlan_objmgr_pdev *pdev,
+					      uint16_t dfs_ch_freq,
+					      uint8_t c_vhtop_ch_freq_seg2,
+					      uint64_t dfs_ch_flags,
+					      int *precac_timeout);
 	QDF_STATUS (*mlme_rebuild_chan_list_with_non_dfs_channels)
 			(struct wlan_objmgr_pdev *pdev);
 	QDF_STATUS (*mlme_restart_vaps_with_non_dfs_chan)
@@ -207,18 +213,7 @@ QDF_STATUS ucfg_dfs_override_cac_timeout(struct wlan_objmgr_pdev *pdev,
  * This function called from outside of dfs component.
  */
 QDF_STATUS ucfg_dfs_get_override_cac_timeout(struct wlan_objmgr_pdev *pdev,
-		int *cac_timeout, int *status);
-
-/**
- * ucfg_dfs_get_override_precac_timeout() - Get precac timeout.
- * @pdev: Pointer to DFS pdev object.
- * @precac_timeout: Get precac timeout value in this variable.
- *
- * Wrapper function for dfs_get_override_precac_timeout().
- * This function called from outside of dfs component.
- */
-QDF_STATUS ucfg_dfs_get_override_precac_timeout(struct wlan_objmgr_pdev *pdev,
-		int *precac_timeout);
+					     int *cac_timeout, int *status);
 
 /**
  * ucfg_dfs_override_precac_timeout() - Override the default precac timeout.
@@ -229,7 +224,18 @@ QDF_STATUS ucfg_dfs_get_override_precac_timeout(struct wlan_objmgr_pdev *pdev,
  * This function called from outside of dfs component.
  */
 QDF_STATUS ucfg_dfs_override_precac_timeout(struct wlan_objmgr_pdev *pdev,
-		int precac_timeout);
+					    int precac_timeout);
+
+/**
+ * ucfg_dfs_get_override_precac_timeout() -  Get override preCAC timeout value.
+ * @pdev: Pointer to DFS pdev object.
+ * @precac_timeout: Pointer to save the preCAC timeout value.
+ *
+ * Wrapper function for dfs_get_override_precac_timeout().
+ * This function called from outside of dfs component.
+ */
+QDF_STATUS ucfg_dfs_get_override_precac_timeout(struct wlan_objmgr_pdev *pdev,
+						int *precac_timeout);
 
 /**
  * ucfg_dfs_set_precac_enable() - Set precac enable flag.

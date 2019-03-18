@@ -7162,8 +7162,11 @@ QDF_STATUS send_adfs_ch_cfg_cmd_tlv(wmi_unified_t wmi_handle,
 	cmd->min_duration_ms = param->min_duration_ms;
 	cmd->max_duration_ms = param->max_duration_ms;
 	WMI_LOGD("%s:cmd->vdev_id: %d ,cmd->ocac_mode: %d cmd->center_freq: %d",
+		 "cmd->chan_width: %d cmd->min_duration_ms: %d",
+		 "cmd->max_duration_ms: %d",
 		 __func__, cmd->vdev_id, cmd->ocac_mode,
-		 cmd->center_freq);
+		 cmd->center_freq, cmd->chan_width,
+		 cmd->min_duration_ms, cmd->max_duration_ms);
 
 	wmi_mtrace(WMI_VDEV_ADFS_CH_CFG_CMDID, NO_SESSION, 0);
 	ret = wmi_unified_cmd_send(wmi_handle, buf, len,

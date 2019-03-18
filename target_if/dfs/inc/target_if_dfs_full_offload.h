@@ -77,7 +77,7 @@ QDF_STATUS target_send_ocac_abort_cmd(struct wlan_objmgr_pdev *pdev);
  * Return: QDF_STATUS
  */
 QDF_STATUS target_send_agile_ch_cfg_cmd(struct wlan_objmgr_pdev *pdev,
-					uint8_t *ch_freq);
+					uint8_t *ch_freq, uint32_t pcac_time);
 #else
 static inline QDF_STATUS
 target_send_ocac_abort_cmd(struct wlan_objmgr_pdev *pdev)

@@ -291,6 +291,23 @@ int dfs_mlme_get_cac_timeout(struct wlan_objmgr_pdev *pdev,
 	return cac_timeout;
 }
 
+int dfs_mlme_get_precac_timeout(struct wlan_objmgr_pdev *pdev,
+				uint16_t dfs_ch_freq,
+				uint8_t dfs_ch_vhtop_ch_freq_seg2,
+				uint64_t dfs_ch_flags)
+{
+	int precac_timeout = 0;
+
+	if (global_dfs_to_mlme.mlme_get_precac_timeout)
+		global_dfs_to_mlme.mlme_get_precac_timeout(pdev,
+				dfs_ch_freq,
+				dfs_ch_vhtop_ch_freq_seg2,
+				dfs_ch_flags,
+				&precac_timeout);
+
+	return precac_timeout;
+}
+
 #if defined(WLAN_DFS_PARTIAL_OFFLOAD) && defined(HOST_DFS_SPOOF_TEST)
 int dfs_mlme_rebuild_chan_list_with_non_dfs_channels(
 		struct wlan_objmgr_pdev *pdev)
