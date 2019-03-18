@@ -98,6 +98,9 @@
 #include "target_if.h"
 #include "wlan_dfs_init_deinit_api.h"
 
+#define MAX_WEATHR_PRECAC_TIME 14400
+#define MAX_PRECAC_TIME 86400
+
 void dfs_zero_cac_reset(struct wlan_dfs *dfs)
 {
 	struct dfs_precac_entry *tmp_precac_entry, *precac_entry;
@@ -266,7 +269,44 @@ bool dfs_is_precac_done(struct wlan_dfs *dfs, struct dfs_channel *chan)
 	return ret_val;
 }
 
+#define VHT80_IEEE_FREQ_OFFSET 6
+
 #ifdef QCA_SUPPORT_AGILE_DFS
+int dfs_is_agile_weather_radar_channel(struct dfs_channel *chan)
+{
+	uint64_t mode_mask = (WLAN_CHAN_11NA_HT20 |
+			WLAN_CHAN_11NA_HT40PLUS |
+			WLAN_CHAN_11NA_HT40MINUS |
+			WLAN_CHAN_11AC_VHT20 |
+			WLAN_CHAN_11AC_VHT40PLUS |
+			WLAN_CHAN_11AC_VHT40MINUS |
+			WLAN_CHAN_11AC_VHT80 |
+			WLAN_CHAN_11AC_VHT160 |
+			WLAN_CHAN_11AC_VHT80_80);
+
+	switch ((chan->dfs_ch_flags) & mode_mask) {
+	case WLAN_CHAN_11NA_HT40PLUS:
+	case WLAN_CHAN_11AC_VHT40PLUS:
+	case WLAN_CHAN_11NA_HT40MINUS:
+	case WLAN_CHAN_11AC_VHT40MINUS:
+	case WLAN_CHAN_11AC_VHT80:
+	case WLAN_CHAN_11AC_VHT80_80:
+		return ((chan->dfs_ch_freq >= 5580) &&
+			(chan->dfs_ch_freq <= 5650));
+	case WLAN_CHAN_11AC_VHT160:
+		return ((chan->dfs_ch_freq >= 5500) &&
+			(chan->dfs_ch_freq <= 5650));
+
+	case WLAN_CHAN_11NA_HT20:
+	case WLAN_CHAN_11AC_VHT20:
+	default: /* neither HT40+ nor HT40-, finish this call */
+		return ((chan->dfs_ch_freq >= 5600) &&
+			(chan->dfs_ch_freq <= 5650));
+	}
+
+	return 0;
+}
+
 void dfs_find_pdev_for_agile_precac(struct wlan_objmgr_pdev *pdev,
 				    uint8_t *cur_precac_dfs_index)
 {
@@ -292,6 +332,10 @@ void dfs_prepare_agile_precac_chan(struct wlan_dfs *dfs)
 	struct wlan_lmac_if_dfs_tx_ops *dfs_tx_ops;
 	uint8_t ch_freq = 0;
 	uint8_t cur_dfs_idx = 0;
+	struct dfs_channel *ichan, lc;
+	uint8_t first_primary_dfs_ch_ieee = 0;
+	int agile_cac_timeout;
+	int agile_cac_timeout_max;
 	int i;
 
 	psoc = wlan_pdev_get_psoc(dfs->dfs_pdev_obj);
@@ -326,8 +370,36 @@ void dfs_prepare_agile_precac_chan(struct wlan_dfs *dfs)
 	if (ch_freq) {
 		qdf_info("%s : %d ADFS channel set request sent for pdev: %pK ch_freq: %d",
 			 __func__, __LINE__, pdev, ch_freq);
+		ichan = &lc;
+		first_primary_dfs_ch_ieee = ch_freq - VHT80_IEEE_FREQ_OFFSET;
+		dfs_mlme_find_dot11_channel(
+					dfs->dfs_pdev_obj,
+					first_primary_dfs_ch_ieee, 0,
+					WLAN_PHYMODE_11AC_VHT80,
+					&ichan->dfs_ch_freq,
+					&ichan->dfs_ch_flags,
+					&ichan->dfs_ch_flagext,
+					&ichan->dfs_ch_ieee,
+					&ichan->dfs_ch_vhtop_ch_freq_seg1,
+					&ichan->dfs_ch_vhtop_ch_freq_seg2);
+		agile_cac_timeout = (dfs->dfs_precac_timeout_override != -1) ?
+				dfs->dfs_precac_timeout_override :
+				dfs_mlme_get_precac_timeout(
+				dfs->dfs_pdev_obj,
+				ichan->dfs_ch_freq,
+				ichan->dfs_ch_vhtop_ch_freq_seg2,
+				ichan->dfs_ch_flags);
+
+		if (dfs_is_agile_weather_radar_channel(ichan))
+			agile_cac_timeout_max = MAX_WEATHR_PRECAC_TIME;
+		else
+			agile_cac_timeout_max = MAX_PRECAC_TIME;
+
 		if (dfs_tx_ops && dfs_tx_ops->dfs_agile_ch_cfg_cmd)
-			dfs_tx_ops->dfs_agile_ch_cfg_cmd(pdev, &ch_freq);
+			dfs_tx_ops->dfs_agile_ch_cfg_cmd(
+						pdev, &ch_freq,
+						(agile_cac_timeout) * 1000,
+						(agile_cac_timeout_max) * 1000);
 		else
 			dfs_err(NULL, WLAN_DEBUG_DFS_ALWAYS,
 				"dfs_tx_ops=%pK", dfs_tx_ops);
@@ -336,8 +408,6 @@ void dfs_prepare_agile_precac_chan(struct wlan_dfs *dfs)
 	}
 }
 #endif
-
-#define VHT80_IEEE_FREQ_OFFSET 6
 
 void dfs_mark_precac_dfs(struct wlan_dfs *dfs,
 		uint8_t is_radar_found_on_secondary_seg, uint8_t detector_id)
@@ -536,16 +606,17 @@ void dfs_process_ocac_complete(struct wlan_objmgr_pdev *pdev,
 
 	dfs = wlan_pdev_get_dfs_obj(pdev);
 
-	/* STOP TIMER irrespective of status */
-	utils_dfs_cancel_precac_timer(pdev);
 	if (ocac_status == OCAC_RESET) {
 		dfs_debug(NULL, WLAN_DEBUG_DFS_ALWAYS,
-			  "PreCAC timer reset, Sending Agile chan set command");
-		dfs_prepare_agile_precac_chan(dfs);
+			  "PreCAC timer reset,  Wait till timer expires to Send new Agile chan set command");
 	} else if (ocac_status == OCAC_CANCEL) {
+		/* STOP TIMER irrespective of status */
+		utils_dfs_cancel_precac_timer(pdev);
 		dfs_debug(NULL, WLAN_DEBUG_DFS_ALWAYS,
 			  "PreCAC timer abort, agile precac stopped");
 	} else if (ocac_status == OCAC_SUCCESS) {
+		/* STOP TIMER irrespective of status */
+		utils_dfs_cancel_precac_timer(pdev);
 		dfs_debug(NULL, WLAN_DEBUG_DFS_ALWAYS,
 			  "PreCAC timer Completed for agile freq: %d",
 			  center_freq);
@@ -1039,10 +1110,10 @@ void dfs_start_agile_precac_timer(struct wlan_dfs *dfs, uint8_t precac_chan,
 				    &ichan->dfs_ch_vhtop_ch_freq_seg2);
 	agile_cac_timeout = (dfs->dfs_precac_timeout_override != -1) ?
 				dfs->dfs_precac_timeout_override :
-	dfs_mlme_get_cac_timeout(dfs->dfs_pdev_obj,
-				 ichan->dfs_ch_freq,
-				 ichan->dfs_ch_vhtop_ch_freq_seg2,
-				 ichan->dfs_ch_flags);
+	dfs_mlme_get_precac_timeout(dfs->dfs_pdev_obj,
+				    ichan->dfs_ch_freq,
+				    ichan->dfs_ch_vhtop_ch_freq_seg2,
+				    ichan->dfs_ch_flags);
 	if (ocac_status == OCAC_SUCCESS) {
 		dfs_soc_obj->ocac_status = OCAC_SUCCESS;
 		agile_cac_timeout = 0;
