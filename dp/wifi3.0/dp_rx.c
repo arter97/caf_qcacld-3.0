@@ -1861,10 +1861,7 @@ dp_rx_pdev_detach(struct dp_pdev *pdev)
 	rx_desc_pool = &soc->rx_desc_buf[pdev_id];
 
 	if (rx_desc_pool->pool_size != 0) {
-		if (!dp_is_soc_reinit(soc))
-			dp_rx_desc_pool_free(soc, pdev_id, rx_desc_pool);
-		else
-			dp_rx_desc_nbuf_pool_free(soc, rx_desc_pool);
+		dp_rx_desc_pool_free(soc, pdev_id, rx_desc_pool);
 	}
 
 	return;
