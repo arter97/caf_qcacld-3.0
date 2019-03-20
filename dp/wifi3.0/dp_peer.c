@@ -1495,7 +1495,7 @@ dp_rx_peer_unmap_handler(void *soc_handle, uint16_t peer_id,
 
 	if (soc->cdp_soc.ol_ops->peer_unmap_event) {
 		soc->cdp_soc.ol_ops->peer_unmap_event(soc->ctrl_psoc,
-				peer_id);
+				peer_id, vdev_id);
 	}
 
 	/*
