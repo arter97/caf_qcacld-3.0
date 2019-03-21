@@ -4889,7 +4889,9 @@ static void lim_tx_mgmt_frame(tpAniSirGlobal mac_ctx,
 	sme_session_id = mb_msg->session_id;
 	session = pe_find_session_by_sme_session_id(mac_ctx, sme_session_id);
 	if (session == NULL) {
-		pe_err("session not found for given sme session");
+		cds_packet_free((void *)packet);
+		pe_err("session not found for given sme session %d",
+		       sme_session_id);
 		return;
 	}
 
