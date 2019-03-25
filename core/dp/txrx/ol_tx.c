@@ -816,6 +816,16 @@ ol_tx_ll_fast(ol_txrx_vdev_handle vdev, qdf_nbuf_t msdu_list)
 					}
 
 					/*
+					 * ol_tx_prepare_ll_fast/htt_tx_desc_init/qdf_nbuf_map_single
+					 * attached meta, clean it to avoid Double nbuf map issue
+					 */
+					if (QDF_NBUF_CB_PADDR(msdu) == 0) {
+						qdf_device_t qdf_ctx;
+						qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
+						qdf_nbuf_unmap_single(qdf_ctx, msdu, QDF_DMA_TO_DEVICE);
+					}
+
+					/*
 					 * The packet could not be sent.
 					 * Free the descriptor, return the
 					 * packet to the caller.
@@ -933,6 +943,16 @@ ol_tx_ll_fast(ol_txrx_vdev_handle vdev, qdf_nbuf_t msdu_list)
 			next = qdf_nbuf_next(msdu);
 			if ((0 == ce_send_fast(pdev->ce_tx_hdl, msdu,
 					       ep_id, pkt_download_len))) {
+				/*
+				 * ol_tx_prepare_ll_fast/htt_tx_desc_init/qdf_nbuf_map_single
+				 * attached meta, clean it to avoid Double nbuf map issue
+				 */
+				if (QDF_NBUF_CB_PADDR(msdu) == 0) {
+					qdf_device_t qdf_ctx;
+					qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
+					qdf_nbuf_unmap_single(qdf_ctx, msdu, QDF_DMA_TO_DEVICE);
+				}
+
 				/*
 				 * The packet could not be sent
 				 * Free the descriptor, return the packet to the
