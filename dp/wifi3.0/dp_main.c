@@ -535,25 +535,48 @@ static int dp_peer_update_ast_wifi3(struct cdp_soc_t *soc_hdl,
  * Return: None
  */
 static void dp_wds_reset_ast_wifi3(struct cdp_soc_t *soc_hdl,
-				   uint8_t *wds_macaddr, void *vdev_handle)
+				   uint8_t *wds_macaddr,
+				   uint8_t *peer_mac_addr,
+				   void *vdev_handle)
 {
 	struct dp_soc *soc = (struct dp_soc *)soc_hdl;
 	struct dp_ast_entry *ast_entry = NULL;
+	struct dp_ast_entry *tmp_ast_entry;
+	struct dp_peer *peer;
 	struct dp_vdev *vdev = (struct dp_vdev *)vdev_handle;
+	struct dp_pdev *pdev;
 
-	qdf_spin_lock_bh(&soc->ast_lock);
-	ast_entry = dp_peer_ast_hash_find_by_pdevid(soc, wds_macaddr,
-						    vdev->pdev->pdev_id);
+	if (!vdev)
+		return;
 
-	if (ast_entry) {
-		if ((ast_entry->type != CDP_TXRX_AST_TYPE_STATIC) &&
-			(ast_entry->type != CDP_TXRX_AST_TYPE_SELF) &&
-			(ast_entry->type != CDP_TXRX_AST_TYPE_STA_BSS)) {
-			ast_entry->is_active = TRUE;
+	pdev = vdev->pdev;
+
+	if (peer_mac_addr) {
+		peer = dp_peer_find_hash_find(soc, peer_mac_addr,
+					      0, vdev->vdev_id);
+		if (!peer)
+			return;
+		qdf_spin_lock_bh(&soc->ast_lock);
+		DP_PEER_ITERATE_ASE_LIST(peer, ast_entry, tmp_ast_entry) {
+			if ((ast_entry->type == CDP_TXRX_AST_TYPE_WDS_HM) ||
+			    (ast_entry->type == CDP_TXRX_AST_TYPE_WDS_HM_SEC))
+				dp_peer_del_ast(soc, ast_entry);
+		 }
+		qdf_spin_unlock_bh(&soc->ast_lock);
+		dp_peer_unref_delete(peer);
+
+	} else if (wds_macaddr) {
+		qdf_spin_lock_bh(&soc->ast_lock);
+		ast_entry = dp_peer_ast_hash_find_by_pdevid(soc, wds_macaddr,
+							    pdev->pdev_id);
+
+		if (ast_entry) {
+			if ((ast_entry->type == CDP_TXRX_AST_TYPE_WDS_HM) ||
+			    (ast_entry->type == CDP_TXRX_AST_TYPE_WDS_HM_SEC))
+				dp_peer_del_ast(soc, ast_entry);
 		}
+		qdf_spin_unlock_bh(&soc->ast_lock);
 	}
-
-	qdf_spin_unlock_bh(&soc->ast_lock);
 }
 
 /*
@@ -581,13 +604,10 @@ static void dp_wds_reset_ast_table_wifi3(struct cdp_soc_t  *soc_hdl,
 			DP_VDEV_ITERATE_PEER_LIST(vdev, peer) {
 				DP_PEER_ITERATE_ASE_LIST(peer, ase, temp_ase) {
 					if ((ase->type ==
-						CDP_TXRX_AST_TYPE_STATIC) ||
-						(ase->type ==
-						CDP_TXRX_AST_TYPE_SELF) ||
-						(ase->type ==
-						CDP_TXRX_AST_TYPE_STA_BSS))
-						continue;
-					ase->is_active = TRUE;
+						CDP_TXRX_AST_TYPE_WDS_HM) ||
+					    (ase->type ==
+						CDP_TXRX_AST_TYPE_WDS_HM_SEC))
+						dp_peer_del_ast(soc, ase);
 				}
 			}
 		}
@@ -661,21 +681,23 @@ static bool dp_peer_get_ast_info_by_soc_wifi3
 	qdf_spin_lock_bh(&soc->ast_lock);
 
 	ast_entry = dp_peer_ast_hash_find_soc(soc, ast_mac_addr);
-
-	if (ast_entry && !ast_entry->delete_in_progress) {
-		ast_entry_info->type = ast_entry->type;
-		ast_entry_info->pdev_id = ast_entry->pdev_id;
-		ast_entry_info->vdev_id = ast_entry->vdev_id;
-		ast_entry_info->peer_id = ast_entry->peer->peer_ids[0];
-		qdf_mem_copy(&ast_entry_info->peer_mac_addr[0],
-			     &ast_entry->peer->mac_addr.raw[0],
-			     DP_MAC_ADDR_LEN);
+	if (!ast_entry || !ast_entry->peer) {
 		qdf_spin_unlock_bh(&soc->ast_lock);
-		return true;
+		return false;
 	}
-
+	if (ast_entry->delete_in_progress && !ast_entry->callback) {
+		qdf_spin_unlock_bh(&soc->ast_lock);
+		return false;
+	}
+	ast_entry_info->type = ast_entry->type;
+	ast_entry_info->pdev_id = ast_entry->pdev_id;
+	ast_entry_info->vdev_id = ast_entry->vdev_id;
+	ast_entry_info->peer_id = ast_entry->peer->peer_ids[0];
+	qdf_mem_copy(&ast_entry_info->peer_mac_addr[0],
+		     &ast_entry->peer->mac_addr.raw[0],
+		     DP_MAC_ADDR_LEN);
 	qdf_spin_unlock_bh(&soc->ast_lock);
-	return false;
+	return true;
 }
 
 /**
@@ -704,20 +726,23 @@ static bool dp_peer_get_ast_info_by_pdevid_wifi3
 
 	ast_entry = dp_peer_ast_hash_find_by_pdevid(soc, ast_mac_addr, pdev_id);
 
-	if (ast_entry && !ast_entry->delete_in_progress) {
-		ast_entry_info->type = ast_entry->type;
-		ast_entry_info->pdev_id = ast_entry->pdev_id;
-		ast_entry_info->vdev_id = ast_entry->vdev_id;
-		ast_entry_info->peer_id = ast_entry->peer->peer_ids[0];
-		qdf_mem_copy(&ast_entry_info->peer_mac_addr[0],
-			     &ast_entry->peer->mac_addr.raw[0],
-			     DP_MAC_ADDR_LEN);
+	if (!ast_entry || !ast_entry->peer) {
 		qdf_spin_unlock_bh(&soc->ast_lock);
-		return true;
+		return false;
 	}
-
+	if (ast_entry->delete_in_progress && !ast_entry->callback) {
+		qdf_spin_unlock_bh(&soc->ast_lock);
+		return false;
+	}
+	ast_entry_info->type = ast_entry->type;
+	ast_entry_info->pdev_id = ast_entry->pdev_id;
+	ast_entry_info->vdev_id = ast_entry->vdev_id;
+	ast_entry_info->peer_id = ast_entry->peer->peer_ids[0];
+	qdf_mem_copy(&ast_entry_info->peer_mac_addr[0],
+		     &ast_entry->peer->mac_addr.raw[0],
+		     DP_MAC_ADDR_LEN);
 	qdf_spin_unlock_bh(&soc->ast_lock);
-	return false;
+	return true;
 }
 
 /**
@@ -6665,7 +6690,7 @@ dp_print_ring_stat_from_hal(struct dp_soc *soc,  struct dp_srng *srng,
 		DP_PRINT_STATS("%s:SW:Head pointer = %d Tail Pointer = %d\n",
 			       ring_name, headp, tailp);
 
-		hal_get_hw_hptp(hal_soc, srng->hal_srng, &hw_headp,
+		hal_get_hw_hptp(soc->hal_soc, srng->hal_srng, &hw_headp,
 				&hw_tailp, ring_type);
 
 		DP_PRINT_STATS("%s:HW:Head pointer = %d Tail Pointer = %d\n",
@@ -9637,6 +9662,7 @@ void *dp_soc_init(void *dpsoc, HTC_HANDLE htc_handle, void *hif_handle)
 		wlan_cfg_set_reo_dst_ring_size(soc->wlan_cfg_ctx,
 					       REO_DST_RING_SIZE_QCA6290);
 		soc->ast_override_support = 1;
+		soc->da_war_enabled = false;
 		break;
 #ifdef QCA_WIFI_QCA6390
 	case TARGET_TYPE_QCA6390:
@@ -9660,6 +9686,7 @@ void *dp_soc_init(void *dpsoc, HTC_HANDLE htc_handle, void *hif_handle)
 					       REO_DST_RING_SIZE_QCA8074);
 		wlan_cfg_set_raw_mode_war(soc->wlan_cfg_ctx, true);
 		soc->hw_nac_monitor_support = 1;
+		soc->da_war_enabled = true;
 		break;
 	case TARGET_TYPE_QCA8074V2:
 	case TARGET_TYPE_QCA6018:
@@ -9670,6 +9697,7 @@ void *dp_soc_init(void *dpsoc, HTC_HANDLE htc_handle, void *hif_handle)
 		soc->ast_override_support = 1;
 		soc->per_tid_basize_max_tid = 8;
 		soc->num_hw_dscp_tid_map = HAL_MAX_HW_DSCP_TID_V2_MAPS;
+		soc->da_war_enabled = false;
 		break;
 	default:
 		qdf_print("%s: Unknown tgt type %d\n", __func__, target_type);

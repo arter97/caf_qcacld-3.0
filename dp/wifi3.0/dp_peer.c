@@ -201,8 +201,9 @@ void dp_peer_find_hash_add(struct dp_soc *soc, struct dp_peer *peer)
 static int dp_peer_ast_hash_attach(struct dp_soc *soc)
 {
 	int i, hash_elems, log2;
+	unsigned max_ast_index = wlan_cfg_get_max_ast_idx(soc->wlan_cfg_ctx);
 
-	hash_elems = ((soc->max_peers * DP_AST_HASH_LOAD_MULT) >>
+	hash_elems = ((max_ast_index * DP_AST_HASH_LOAD_MULT) >>
 		DP_AST_HASH_LOAD_SHIFT);
 
 	log2 = dp_log2_ceil(hash_elems);
@@ -211,6 +212,8 @@ static int dp_peer_ast_hash_attach(struct dp_soc *soc)
 	soc->ast_hash.mask = hash_elems - 1;
 	soc->ast_hash.idx_bits = log2;
 
+	qdf_print("ast hash_elems: %d, max_ast_idx: %d\n",
+		  hash_elems, max_ast_index);
 	/* allocate an array of TAILQ peer object lists */
 	soc->ast_hash.bins = qdf_mem_malloc(
 		hash_elems * sizeof(TAILQ_HEAD(anonymous_tail_q,
@@ -654,6 +657,8 @@ int dp_peer_add_ast(struct dp_soc *soc,
 				param->flags = flags;
 				param->vdev_id = vdev->vdev_id;
 				ast_entry->callback = dp_peer_free_hmwds_cb;
+				ast_entry->pdev_id = vdev->pdev->pdev_id;
+				ast_entry->type = type;
 				ast_entry->cookie = (void *)param;
 				if (!ast_entry->delete_in_progress)
 					dp_peer_del_ast(soc, ast_entry);
@@ -1008,13 +1013,12 @@ void dp_peer_ast_send_wds_del(struct dp_soc *soc,
 		  peer->vdev->vdev_id, ast_entry->mac_addr.raw,
 		  ast_entry->next_hop, ast_entry->peer->mac_addr.raw);
 
-	if (ast_entry->next_hop &&
-	    ast_entry->type != CDP_TXRX_AST_TYPE_WDS_HM_SEC)
+	if (ast_entry->next_hop) {
 		cdp_soc->ol_ops->peer_del_wds_entry(peer->vdev->osif_vdev,
-						    ast_entry->mac_addr.raw);
-
-	/* Remove SELF and STATIC entries in teardown itself */
-	if (!ast_entry->next_hop) {
+						    ast_entry->mac_addr.raw,
+						    ast_entry->type);
+	} else {
+		/* Remove SELF and STATIC entries in teardown itself */
 		TAILQ_REMOVE(&peer->ast_entry_list, ast_entry, ase_list_elem);
 		peer->self_ast_entry = NULL;
 		ast_entry->peer = NULL;
