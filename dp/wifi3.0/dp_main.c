@@ -4386,6 +4386,7 @@ static void dp_vdev_flush_peers(struct cdp_vdev *vdev_handle)
 	struct dp_soc *soc = pdev->soc;
 	struct dp_peer *peer;
 	uint16_t *peer_ids;
+	struct dp_ast_entry *ase, *tmp_ase;
 	uint8_t i = 0, j = 0;
 
 	peer_ids = qdf_mem_malloc(soc->max_peers * sizeof(peer_ids[0]));
@@ -4407,6 +4408,20 @@ static void dp_vdev_flush_peers(struct cdp_vdev *vdev_handle)
 	for (i = 0; i < j ; i++) {
 		peer = dp_peer_find_by_id(soc, peer_ids[i]);
 		if (peer) {
+			if (soc->is_peer_map_unmap_v2) {
+				/* free AST entries of peer before
+				 * release peer reference
+				 */
+				DP_PEER_ITERATE_ASE_LIST(peer, ase,
+							 tmp_ase) {
+					dp_rx_peer_unmap_handler
+						(soc, peer_ids[i],
+						 vdev->vdev_id,
+						 ase->mac_addr.raw,
+						 1);
+				}
+			}
+
 			dp_rx_peer_unmap_handler(soc, peer_ids[i],
 						 vdev->vdev_id,
 						 peer->mac_addr.raw, 0);
