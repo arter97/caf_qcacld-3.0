@@ -230,5 +230,6 @@ struct cdp_pdev_mon_stats {
 	uint32_t dest_mpdu_drop;
 	uint32_t dup_mon_linkdesc_cnt;
 	uint32_t dup_mon_buf_cnt;
+	uint32_t dup_desc_inv_addr_cnt;
 };
 #endif
