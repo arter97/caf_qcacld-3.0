@@ -11910,7 +11910,7 @@ csr_roam_chk_lnk_swt_ch_ind(tpAniSirGlobal mac_ctx, tSirSmeRsp *msg_ptr)
 				(uint8_t) pSwitchChnInd->newChannelId;
 		}
 
-		roam_info = qdf_mem_malloc(sizeof(!roam_info));
+		roam_info = qdf_mem_malloc(sizeof(struct csr_roam_info));
 		if (!roam_info)
 			return;
 		roam_info->chan_info.chan_id = pSwitchChnInd->newChannelId;
