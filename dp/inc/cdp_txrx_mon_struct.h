@@ -201,6 +201,8 @@ enum {
 	CDP_MON_PPDU_END,
 };
 
+#define MAX_PPDU_ID_HIST 128
+
 /**
  * struct cdp_pdev_mon_stats
  * @status_ppdu_state: state on PPDU start and end
@@ -231,5 +233,8 @@ struct cdp_pdev_mon_stats {
 	uint32_t dup_mon_linkdesc_cnt;
 	uint32_t dup_mon_buf_cnt;
 	uint32_t dup_desc_inv_addr_cnt;
+	uint32_t stat_ring_ppdu_id_hist[MAX_PPDU_ID_HIST];
+	uint32_t dest_ring_ppdu_id_hist[MAX_PPDU_ID_HIST];
+	uint32_t ppdu_id_hist_idx;
 };
 #endif
