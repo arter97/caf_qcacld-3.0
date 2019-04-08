@@ -1530,6 +1530,13 @@ ol_txrx_pdev_attach(ol_txrx_soc_handle soc, struct cdp_cfg *ctrl_pdev,
 	pdev->tid_to_ac[OL_TX_NUM_TIDS + OL_TX_VDEV_DEFAULT_MGMT] =
 		OL_TX_SCHED_WRR_ADV_CAT_MCAST_MGMT;
 
+	if (ol_cfg_is_flow_steering_enabled(pdev->ctrl_pdev))
+		pdev->peer_id_unmap_ref_cnt =
+			TXRX_RFS_ENABLE_PEER_ID_UNMAP_COUNT;
+	else
+		pdev->peer_id_unmap_ref_cnt =
+			TXRX_RFS_DISABLE_PEER_ID_UNMAP_COUNT;
+
 	ol_txrx_debugfs_init(pdev);
 
 	return (struct cdp_pdev *)pdev;
@@ -2115,7 +2122,7 @@ ol_attach_fail:
  *
  * Return: 0 - success 1 - failure
  */
-static A_STATUS ol_txrx_pdev_attach_target(struct cdp_pdev *ppdev)
+static int ol_txrx_pdev_attach_target(struct cdp_pdev *ppdev)
 {
 	struct ol_txrx_pdev_t *pdev = (struct ol_txrx_pdev_t *)ppdev;
 
@@ -2337,6 +2344,7 @@ static void ol_txrx_pdev_detach(struct cdp_pdev *ppdev, int force)
 
 	htt_pdev_free(pdev->htt_pdev);
 	ol_txrx_peer_find_detach(pdev);
+	qdf_flush_work(&pdev->peer_unmap_timer_work);
 	ol_txrx_tso_stats_deinit(pdev);
 	ol_txrx_fw_stats_desc_pool_deinit(pdev);
 
@@ -2981,10 +2989,6 @@ ol_txrx_peer_attach(struct cdp_vdev *pvdev, uint8_t *peer_mac_addr)
 	for (i = 0; i < MAX_NUM_PEER_ID_PER_PEER; i++)
 		peer->peer_ids[i] = HTT_INVALID_PEER;
 
-	if (pdev->enable_peer_unmap_conf_support)
-		for (i = 0; i < MAX_NUM_PEER_ID_PER_PEER; i++)
-			peer->map_unmap_peer_ids[i] = HTT_INVALID_PEER;
-
 	qdf_spinlock_create(&peer->peer_info_lock);
 	qdf_spinlock_create(&peer->bufq_info.bufq_lock);
 
@@ -3614,45 +3618,6 @@ ol_txrx_peer_qoscapable_get(struct ol_txrx_pdev_t *txrx_pdev, uint16_t peer_id)
 }
 
 /**
- * ol_txrx_send_peer_unmap_conf() - send peer unmap conf cmd to FW
- * @pdev: pdev_handle
- * @peer: peer_handle
- *
- * Return: None
- */
-static inline void
-ol_txrx_send_peer_unmap_conf(ol_txrx_pdev_handle pdev,
-			     ol_txrx_peer_handle peer)
-{
-	int i;
-	int peer_cnt = 0;
-	uint16_t peer_ids[MAX_NUM_PEER_ID_PER_PEER];
-	QDF_STATUS status = QDF_STATUS_E_FAILURE;
-
-	qdf_spin_lock_bh(&pdev->peer_map_unmap_lock);
-
-	for (i = 0; i < MAX_NUM_PEER_ID_PER_PEER &&
-	     peer_cnt < MAX_NUM_PEER_ID_PER_PEER; i++) {
-		if (peer->map_unmap_peer_ids[i] == HTT_INVALID_PEER)
-			continue;
-		peer_ids[peer_cnt++] = peer->map_unmap_peer_ids[i];
-		peer->map_unmap_peer_ids[i] = HTT_INVALID_PEER;
-	}
-
-	qdf_spin_unlock_bh(&pdev->peer_map_unmap_lock);
-
-	if (peer->peer_unmap_sync_cb && peer_cnt) {
-		ol_txrx_dbg("send unmap conf cmd [%d]", peer_cnt);
-		status = peer->peer_unmap_sync_cb(
-				DEBUG_INVALID_VDEV_ID,
-				peer_cnt, peer_ids);
-		if (status != QDF_STATUS_SUCCESS)
-			ol_txrx_err("unable to send unmap conf cmd [%d]",
-				    peer_cnt);
-	}
-}
-
-/**
  * ol_txrx_peer_free_tids() - free tids for the peer
  * @peer: peer handle
  *
@@ -3870,10 +3835,6 @@ int ol_txrx_peer_release_ref(ol_txrx_peer_handle peer,
 
 		ol_txrx_peer_tx_queue_free(pdev, peer);
 
-		/* send peer unmap conf cmd to fw for unmapped peer_ids */
-		if (pdev->enable_peer_unmap_conf_support)
-			ol_txrx_send_peer_unmap_conf(pdev, peer);
-
 		/* Remove mappings from peer_id to peer object */
 		ol_txrx_peer_clear_map_peer(pdev, peer);
 
@@ -3974,6 +3935,7 @@ void peer_unmap_timer_work_function(void *param)
 	WMA_LOGI("Enter: %s", __func__);
 	/* Added for debugging only */
 	ol_txrx_dump_peer_access_list(param);
+	ol_txrx_peer_release_ref(param, PEER_DEBUG_ID_OL_UNMAP_TIMER_WORK);
 	wlan_roam_debug_dump_table();
 	cds_trigger_recovery(QDF_PEER_UNMAP_TIMEDOUT);
 }
@@ -4000,6 +3962,8 @@ void peer_unmap_timer_handler(void *data)
 		qdf_create_work(0, &txrx_pdev->peer_unmap_timer_work,
 				peer_unmap_timer_work_function,
 				peer);
+		/* Make sure peer is present before scheduling work */
+		ol_txrx_peer_get_ref(peer, PEER_DEBUG_ID_OL_UNMAP_TIMER_WORK);
 		qdf_sched_work(0, &txrx_pdev->peer_unmap_timer_work);
 	} else {
 		ol_txrx_err("Recovery is in progress, ignore!");
@@ -4111,7 +4075,6 @@ static void ol_txrx_peer_detach_force_delete(void *ppeer)
  * @peer_unmap_sync - peer unmap sync cb.
  * @bitmap - bitmap indicating special handling of request.
  *
- *
  * Return: None
  */
 static void ol_txrx_peer_detach_sync(void *ppeer,
@@ -4119,12 +4082,32 @@ static void ol_txrx_peer_detach_sync(void *ppeer,
 				     uint32_t bitmap)
 {
 	ol_txrx_peer_handle peer = ppeer;
+	ol_txrx_pdev_handle pdev = peer->vdev->pdev;
 
 	ol_txrx_info_high("%s peer %pK, peer->ref_cnt %d", __func__,
 			  peer, qdf_atomic_read(&peer->ref_cnt));
 
-	peer->peer_unmap_sync_cb = peer_unmap_sync;
+	if (!pdev->peer_unmap_sync_cb)
+		pdev->peer_unmap_sync_cb = peer_unmap_sync;
+
 	ol_txrx_peer_detach(peer, bitmap);
+}
+
+/**
+ * ol_txrx_peer_unmap_sync_cb_set() - set peer unmap sync callback
+ * @ppdev - TXRX pdev context
+ * @peer_unmap_sync - peer unmap sync callback
+ *
+ * Return: None
+ */
+static void ol_txrx_peer_unmap_sync_cb_set(
+				struct cdp_pdev *ppdev,
+				ol_txrx_peer_unmap_sync_cb peer_unmap_sync)
+{
+	struct ol_txrx_pdev_t *pdev = (struct ol_txrx_pdev_t *)ppdev;
+
+	if (!pdev->peer_unmap_sync_cb)
+		pdev->peer_unmap_sync_cb = peer_unmap_sync;
 }
 
 /**
@@ -5489,15 +5472,15 @@ static inline int ol_txrx_drop_nbuf_list(qdf_nbuf_t buf_list)
 }
 
 /**
- * ol_rx_data_cb() - data rx callback
- * @peer: peer
+ * ol_rx_data_handler() - data rx handler
+ * @pdev: dev handle
  * @buf_list: buffer list
  * @staid: Station id
  *
  * Return: None
  */
-static void ol_rx_data_cb(struct ol_txrx_pdev_t *pdev,
-			  qdf_nbuf_t buf_list, uint16_t staid)
+static void ol_rx_data_handler(struct ol_txrx_pdev_t *pdev,
+			       qdf_nbuf_t buf_list, uint16_t staid)
 {
 	void *osif_dev;
 	uint8_t drop_count = 0;
@@ -5557,6 +5540,22 @@ static void ol_rx_data_cb(struct ol_txrx_pdev_t *pdev,
 free_buf:
 	drop_count = ol_txrx_drop_nbuf_list(buf_list);
 	ol_txrx_warn("%s:Dropped frames %u", __func__, drop_count);
+}
+
+/**
+ * ol_rx_data_cb() - data rx callback
+ * @context: dev handle
+ * @buf_list: buffer list
+ * @staid: Station id
+ *
+ * Return: None
+ */
+static inline void
+ol_rx_data_cb(void *context, qdf_nbuf_t buf_list, uint16_t staid)
+{
+	struct ol_txrx_pdev_t *pdev = context;
+
+	ol_rx_data_handler(pdev, buf_list, staid);
 }
 
 /* print for every 16th packet */
@@ -5685,7 +5684,7 @@ void ol_rx_data_process(struct ol_txrx_peer_t *peer,
 		 * better use multicores.
 		 */
 		if (!ol_cfg_is_rx_thread_enabled(pdev->ctrl_pdev)) {
-			ol_rx_data_cb(pdev, rx_buf_list, peer->local_id);
+			ol_rx_data_handler(pdev, rx_buf_list, peer->local_id);
 		} else {
 			p_cds_sched_context sched_ctx =
 				get_cds_sched_ctxt();
@@ -5698,15 +5697,14 @@ void ol_rx_data_process(struct ol_txrx_peer_t *peer,
 			if (!pkt)
 				goto drop_rx_buf;
 
-			pkt->callback = (cds_ol_rx_thread_cb)
-					ol_rx_data_cb;
-			pkt->context = (void *)pdev;
-			pkt->Rxpkt = (void *)rx_buf_list;
+			pkt->callback = ol_rx_data_cb;
+			pkt->context = pdev;
+			pkt->Rxpkt = rx_buf_list;
 			pkt->staId = peer->local_id;
 			cds_indicate_rxpkt(sched_ctx, pkt);
 		}
 #else                           /* QCA_CONFIG_SMP */
-		ol_rx_data_cb(pdev, rx_buf_list, peer->local_id);
+		ol_rx_data_handler(pdev, rx_buf_list, peer->local_id);
 #endif /* QCA_CONFIG_SMP */
 	}
 
@@ -5880,8 +5878,8 @@ static QDF_STATUS ol_txrx_register_pause_cb(struct cdp_soc_t *soc,
  * Return: none
  */
 static void ol_txrx_offld_flush_handler(void *context,
-				      void *rxpkt,
-				      uint16_t staid)
+					qdf_nbuf_t rxpkt,
+					uint16_t staid)
 {
 	ol_txrx_pdev_handle pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 
@@ -6444,6 +6442,7 @@ static struct cdp_cmn_ops ol_ops_cmn = {
 	.txrx_mgmt_send_ext = ol_txrx_mgmt_send_ext,
 	.txrx_mgmt_tx_cb_set = ol_txrx_mgmt_tx_cb_set,
 	.txrx_data_tx_cb_set = ol_txrx_data_tx_cb_set,
+	.txrx_peer_unmap_sync_cb_set = ol_txrx_peer_unmap_sync_cb_set,
 	.txrx_get_tx_pending = ol_txrx_get_tx_pending,
 	.flush_cache_rx_queue = ol_txrx_flush_cache_rx_queue,
 	.txrx_fw_stats_get = ol_txrx_fw_stats_get,

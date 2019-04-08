@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3069,16 +3069,7 @@ static void wma_register_apf_events(tp_wma_handle wma_handle)
 }
 #endif /* FEATURE_WLAN_APF */
 
-/**
- * wma_get_phy_mode_cb() - Callback to get current PHY Mode.
- * @chan: channel number
- * @chan_width: maximum channel width possible
- * @phy_mode: PHY Mode
- *
- * Return: None
- */
-static void wma_get_phy_mode_cb(uint8_t chan, uint32_t chan_width,
-				uint32_t *phy_mode)
+void wma_get_phy_mode_cb(uint8_t chan, uint32_t chan_width, uint32_t *phy_mode)
 {
 	uint32_t dot11_mode;
 	struct sAniSirGlobal *mac = cds_get_context(QDF_MODULE_ID_PE);
@@ -3481,6 +3472,11 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 					   wmi_roam_scan_stats_event_id,
 					   wma_roam_scan_stats_event_handler,
 					   WMA_RX_SERIALIZER_CTX);
+
+	wmi_unified_register_event_handler(wma_handle->wmi_handle,
+					   wmi_pdev_cold_boot_cal_event_id,
+					   wma_cold_boot_cal_event_handler,
+					   WMA_RX_WORK_CTX);
 
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS
 	/* Register event handler for processing Link Layer Stats
@@ -5482,6 +5478,53 @@ static void wma_green_ap_register_handlers(tp_wma_handle wma_handle)
 }
 #endif
 
+static uint8_t
+wma_convert_chainmask_to_chain(uint8_t chainmask)
+{
+	uint8_t num_chains = 0;
+
+	while (chainmask) {
+		chainmask &= (chainmask - 1);
+		num_chains++;
+	}
+
+	return num_chains;
+}
+
+static void
+wma_fill_chain_cfg(struct wma_tgt_cfg *tgt_cfg,
+		   struct target_psoc_info *tgt_hdl,
+		   uint8_t phy)
+{
+	uint8_t num_chain;
+	struct wlan_psoc_host_mac_phy_caps *mac_phy_cap =
+						tgt_hdl->info.mac_phy_cap;
+
+	num_chain = wma_convert_chainmask_to_chain(mac_phy_cap[phy].
+						   tx_chain_mask_2G);
+
+	if (num_chain > tgt_cfg->chain_cfg.max_tx_chains_2g)
+		tgt_cfg->chain_cfg.max_tx_chains_2g = num_chain;
+
+	num_chain = wma_convert_chainmask_to_chain(mac_phy_cap[phy].
+						   tx_chain_mask_5G);
+
+	if (num_chain > tgt_cfg->chain_cfg.max_tx_chains_5g)
+		tgt_cfg->chain_cfg.max_tx_chains_5g = num_chain;
+
+	num_chain = wma_convert_chainmask_to_chain(mac_phy_cap[phy].
+						   rx_chain_mask_2G);
+
+	if (num_chain > tgt_cfg->chain_cfg.max_rx_chains_2g)
+		tgt_cfg->chain_cfg.max_rx_chains_2g = num_chain;
+
+	num_chain = wma_convert_chainmask_to_chain(mac_phy_cap[phy].
+						   rx_chain_mask_5G);
+
+	if (num_chain > tgt_cfg->chain_cfg.max_rx_chains_5g)
+		tgt_cfg->chain_cfg.max_rx_chains_5g = num_chain;
+}
+
 /**
  * wma_update_hdd_cfg() - update HDD config
  * @wma_handle: wma handle
@@ -5491,6 +5534,7 @@ static void wma_green_ap_register_handlers(tp_wma_handle wma_handle)
 static void wma_update_hdd_cfg(tp_wma_handle wma_handle)
 {
 	struct wma_tgt_cfg tgt_cfg;
+	uint8_t i;
 	void *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	target_resource_config *wlan_res_cfg;
 	struct wlan_psoc_host_service_ext_param *service_ext_param;
@@ -5576,6 +5620,11 @@ static void wma_update_hdd_cfg(tp_wma_handle wma_handle)
 	wma_update_obss_detection_support(wma_handle, &tgt_cfg);
 	wma_update_obss_color_collision_support(wma_handle, &tgt_cfg);
 	wma_update_hdd_cfg_ndp(wma_handle, &tgt_cfg);
+
+	/* Take the max of chains supported by FW, which will limit nss */
+	for (i = 0; i < tgt_hdl->info.total_mac_phy_cnt; i++)
+		wma_fill_chain_cfg(&tgt_cfg, tgt_hdl, i);
+
 	wma_handle->tgt_cfg_update_cb(hdd_ctx, &tgt_cfg);
 	target_if_store_pdev_target_if_ctx(wma_get_pdev_from_scn_handle);
 	target_pdev_set_wmi_handle(wma_handle->pdev->tgt_if_handle,
@@ -7994,6 +8043,12 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 	case WMA_ADD_STA_REQ:
 		wma_add_sta(wma_handle, (tpAddStaParams) msg->bodyptr);
 		break;
+	case WMA_SEND_PEER_UNMAP_CONF:
+		wma_peer_unmap_conf_send(
+			wma_handle,
+			(struct send_peer_unmap_conf_params *)msg->bodyptr);
+		qdf_mem_free(msg->bodyptr);
+		break;
 	case WMA_SET_BSSKEY_REQ:
 		wma_set_bsskey(wma_handle, (tpSetBssKeyParams) msg->bodyptr);
 		break;
@@ -8582,7 +8637,11 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 	case SIR_HAL_SET_DEL_PMKID_CACHE:
 		wma_set_del_pmkid_cache(wma_handle,
 			(struct wmi_unified_pmk_cache *) msg->bodyptr);
-		qdf_mem_free(msg->bodyptr);
+		if (msg->bodyptr) {
+			qdf_mem_zero(msg->bodyptr,
+				     sizeof(struct wmi_unified_pmk_cache));
+			qdf_mem_free(msg->bodyptr);
+		}
 		break;
 	case SIR_HAL_HLP_IE_INFO:
 		wma_roam_scan_send_hlp(wma_handle,
