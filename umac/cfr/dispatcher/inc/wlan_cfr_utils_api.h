@@ -37,6 +37,9 @@
 #define cfr_debug(format, args...) \
 		QDF_TRACE_DEBUG(QDF_MODULE_ID_CFR, format, ## args)
 
+#define DBR_EVENT_TIMEOUT_IN_MS_CFR 1
+#define DBR_NUM_RESP_PER_EVENT_CFR 1
+
 #define IEEE80211_ADDR_LEN 6
 enum cfrmetaversion {
 	CFR_META_VERSION_NONE,
@@ -73,6 +76,14 @@ enum cfrradiotype {
 	CFR_CAPTURE_RADIO_BESRA,
 	CFR_CAPTURE_RADIO_HKV2,
 	CFR_CAPTURE_RADIO_MAX = 0xFF,
+};
+
+enum ack_capture_mode {
+	CFR_LEGACY_ACK     = 0,
+	CFR_DUP_LEGACY_ACK = 1,
+	CFR_HT_ACK         = 2,
+	CFR_VHT_ACK        = 3,
+	CFR_INVALID_ACK, /*Always keep this at last*/
 };
 
 struct cfr_metadata_version_1 {
