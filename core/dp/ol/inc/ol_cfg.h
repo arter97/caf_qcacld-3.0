@@ -47,6 +47,13 @@ enum wlan_frm_fmt {
 #define TARGET_TX_CREDIT 900
 #endif
 
+/* Max throughput */
+#ifdef QCS403_MEM_OPTIMIZE
+#define MAX_THROUGHPUT 400
+#else
+#define MAX_THROUGHPUT 800
+#endif
+
 /* Throttle period Different level Duty Cycle values*/
 #define THROTTLE_DUTY_CYCLE_LEVEL0 (0)
 #define THROTTLE_DUTY_CYCLE_LEVEL1 (50)
