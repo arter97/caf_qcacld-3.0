@@ -2780,12 +2780,21 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx,
 		hdd_debug_domain_set(QDF_DEBUG_DOMAIN_ACTIVE);
 
 		if (!reinit && !unint) {
+			pld_cnss_lock();
+			if (cds_is_driver_recovering()) {
+				pld_cnss_unlock();
+				hdd_err("driver is recovering, return busy");
+				ret = -EBUSY;
+				goto release_lock;
+			}
 			ret = pld_power_on(qdf_dev->dev);
 			if (ret) {
+				pld_cnss_unlock();
 				hdd_err("Failed to Powerup the device; errno: %d",
 					ret);
 				goto release_lock;
 			}
+			pld_cnss_unlock();
 		}
 
 		pld_set_fw_log_mode(hdd_ctx->parent_dev,

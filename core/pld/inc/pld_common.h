@@ -367,6 +367,8 @@ void pld_is_pci_link_down(struct device *dev);
 int pld_shadow_control(struct device *dev, bool enable);
 void pld_schedule_recovery_work(struct device *dev,
 				enum pld_recovery_reason reason);
+void pld_cnss_lock(void);
+void pld_cnss_unlock(void);
 #ifdef CONFIG_CNSS_UTILS
 /**
  * pld_set_wlan_unsafe_channel() - Set unsafe channel

@@ -56,6 +56,7 @@
 #define PLD_BUS_MASK 0xf
 
 static struct pld_context *pld_ctx;
+static DEFINE_MUTEX(pld_cnss_mutex_lock);
 
 /**
  * pld_init() - Initialize PLD module
@@ -1565,5 +1566,15 @@ bool pld_have_platform_driver_support(struct device *dev)
 	}
 
 	return ret;
+}
+
+void pld_cnss_lock(void)
+{
+	mutex_lock(&pld_cnss_mutex_lock);
+}
+
+void pld_cnss_unlock(void)
+{
+	mutex_unlock(&pld_cnss_mutex_lock);
 }
 
