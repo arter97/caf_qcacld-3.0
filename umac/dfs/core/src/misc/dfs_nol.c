@@ -154,6 +154,7 @@ void dfs_nol_attach(struct wlan_dfs *dfs)
 			dfs_nol_elem_free_work_cb, dfs);
 	TAILQ_INIT(&dfs->dfs_nol_free_list);
 	dfs->dfs_use_nol = 1;
+	dfs->dfs_use_precacnol = 1;
 	WLAN_DFSNOL_LOCK_CREATE(dfs);
 }
 

@@ -73,11 +73,16 @@ QDF_STATUS target_send_ocac_abort_cmd(struct wlan_objmgr_pdev *pdev);
  * target_send_agile_ch_cfg_cmd() - Send agile channel to target for
  * off channel precac.
  * @pdev: Pointer to DFS pdev object.
+ * @agile_chan: agile channel number.
+ * @pcac_time_min: Min off channel CAC time.
+ * @pcac_time_max: Max off channel CAC time.
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS target_send_agile_ch_cfg_cmd(struct wlan_objmgr_pdev *pdev,
-					uint8_t *ch_freq, uint32_t pcac_time);
+					uint8_t *agile_chan,
+					uint32_t pcac_time_min,
+					uint32_t pcac_time_max);
 #else
 static inline QDF_STATUS
 target_send_ocac_abort_cmd(struct wlan_objmgr_pdev *pdev)
@@ -87,7 +92,9 @@ target_send_ocac_abort_cmd(struct wlan_objmgr_pdev *pdev)
 
 static inline QDF_STATUS
 target_send_agile_ch_cfg_cmd(struct wlan_objmgr_pdev *pdev,
-			     uint8_t *ch_freq)
+			     uint8_t *agile_chan,
+			     uint32_t pcac_time_min,
+			     uint32_t pcac_time_max)
 {
 	return QDF_STATUS_SUCCESS;
 }

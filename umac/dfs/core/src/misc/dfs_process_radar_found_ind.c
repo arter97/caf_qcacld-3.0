@@ -714,7 +714,8 @@ QDF_STATUS dfs_process_radar_ind(struct wlan_dfs *dfs,
 	}
 
 	/* Check if the current channel is a non DFS channel */
-	if (!dfs_radarevent_basic_sanity(dfs, dfs->dfs_curchan)) {
+	if (!dfs_radarevent_basic_sanity(dfs, dfs->dfs_curchan) &&
+	    radar_found->detector_id != AGILE_DETECTOR_ID) {
 		dfs_err(dfs, WLAN_DEBUG_DFS,
 			"radar event on a non-DFS channel");
 		return QDF_STATUS_E_FAILURE;
@@ -731,19 +732,21 @@ QDF_STATUS dfs_process_radar_ind(struct wlan_dfs *dfs,
 		radar_found->is_chirp = dfs->dfs_is_chirp;
 	}
 
-	dfs_compute_radar_found_cfreq(dfs, radar_found, &freq_center);
-	radarfound_freq = freq_center + radar_found->freq_offset;
+	if (radar_found->detector_id != AGILE_DETECTOR_ID) {
+		dfs_compute_radar_found_cfreq(dfs, radar_found, &freq_center);
+		radarfound_freq = freq_center + radar_found->freq_offset;
 
-	if (radar_found->segment_id == SEG_ID_SECONDARY)
-		dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
-			 "Radar found on second segment.Radarfound Freq=%d MHz.Secondary Chan cfreq=%d MHz.",
-			 radarfound_freq, freq_center);
-	else
-		dfs_info(NULL, WLAN_DEBUG_DFS_ALWAYS,
-			 "Radar found on channel=%d, freq=%d MHz. Primary beaconning chan:%d, freq=%d MHz.",
-			 utils_dfs_freq_to_chan(radarfound_freq),
-			 radarfound_freq, dfs->dfs_curchan->dfs_ch_ieee,
-			 dfs->dfs_curchan->dfs_ch_freq);
+		if (radar_found->segment_id == SEG_ID_SECONDARY)
+			dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
+				 "Radar found on second segment.Radarfound Freq=%d MHz.Secondary Chan cfreq=%d MHz.",
+				 radarfound_freq, freq_center);
+		else
+			dfs_info(NULL, WLAN_DEBUG_DFS_ALWAYS,
+				 "Radar found on channel=%d, freq=%d MHz. Primary beaconning chan:%d, freq=%d MHz.",
+				 utils_dfs_freq_to_chan(radarfound_freq),
+				 radarfound_freq, dfs->dfs_curchan->dfs_ch_ieee,
+				 dfs->dfs_curchan->dfs_ch_freq);
+	}
 
 	if (!dfs->dfs_use_nol) {
 		dfs_reset_bangradar(dfs);
@@ -774,8 +777,12 @@ QDF_STATUS dfs_process_radar_ind(struct wlan_dfs *dfs,
 	if (dfs->dfs_agile_precac_enable && radar_found->detector_id ==
 			AGILE_DETECTOR_ID) {
 		dfs_debug(dfs, WLAN_DEBUG_DFS,
-			  "%s: %d Radar found on agile detector:%d , STAY in Same operating Channel",
-			  __func__, __LINE__, radar_found->detector_id);
+			  "%s: %d Radar found on agile channel: %d agile detector:%d , STAY in Same operating Channel",
+			  __func__, __LINE__, dfs->dfs_agile_precac_freq,
+			  radar_found->detector_id);
+		if (!dfs->dfs_use_precacnol)
+			return QDF_STATUS_SUCCESS;
+
 		dfs_mark_precac_dfs(dfs, dfs->is_radar_found_on_secondary_seg,
 				    radar_found->detector_id);
 		return QDF_STATUS_SUCCESS;

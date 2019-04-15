@@ -647,6 +647,21 @@ int dfs_control(struct wlan_dfs *dfs,
 						       usenol_pdev_param);
 		}
 		break;
+	case DFS_GET_USE_PRECACNOL:
+		if (!outdata || !outsize || *outsize < sizeof(uint32_t)) {
+			error = -EINVAL;
+			break;
+		}
+		*outsize = sizeof(uint32_t);
+		*((uint32_t *)outdata) = dfs->dfs_use_precacnol;
+		break;
+	case DFS_SET_USE_PRECACNOL:
+		if (insize < sizeof(uint32_t) || !indata) {
+			error = -EINVAL;
+			break;
+		}
+		dfs->dfs_use_precacnol = *(uint32_t *)indata;
+		break;
 	case DFS_SET_DISABLE_RADAR_MARKING:
 		if (dfs->dfs_is_offload_enabled &&
 		    (utils_get_dfsdomain(dfs->dfs_pdev_obj) ==

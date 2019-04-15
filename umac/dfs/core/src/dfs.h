@@ -987,6 +987,8 @@ struct dfs_event_log {
  * @dfs_pdev_obj:                    DFS pdev object.
  * @dfs_is_offload_enabled:          Set if DFS offload enabled.
  * @dfs_use_nol:                     Use the NOL when radar found(default: TRUE)
+ * @dfs_use_precacnol:               Use the preCAC NOL when
+ *                                   radar found(default: TRUE)
  * @dfs_nol_lock:                    Lock to protect nol list.
  * @tx_leakage_threshold:            Tx leakage threshold for dfs.
  * @dfs_use_nol_subchannel_marking:  Use subchannel marking logic to add only
@@ -1142,6 +1144,7 @@ struct wlan_dfs {
 #if defined(QCA_SUPPORT_AGILE_DFS) || defined(ATH_SUPPORT_ZERO_CAC_DFS)
 	uint8_t dfs_psoc_idx;
 	uint8_t        dfs_agile_precac_freq;
+	int            dfs_use_precacnol;
 #endif
 	bool           dfs_is_offload_enabled;
 	int            dfs_use_nol;

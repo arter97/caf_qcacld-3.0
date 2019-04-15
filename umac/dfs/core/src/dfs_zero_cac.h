@@ -352,6 +352,12 @@ static inline void dfs_find_vht80_chan_for_precac(struct wlan_dfs *dfs,
 
 #if defined(QCA_SUPPORT_AGILE_DFS)
 /**
+ * dfs_is_agile_weather_radar_channel() - Check chan is weather radar channel.
+ * @chan: dfs channel info to be be checked for weather frequency
+ */
+int dfs_is_agile_weather_radar_channel(struct dfs_channel *chan);
+
+/**
  * dfs_find_pdev_for_agile_precac() - Find pdev to select channel for precac.
  * @pdev: Pointer to wlan_objmgr_pdev structure.
  * @cur_precac_dfs_index: current precac index
@@ -402,6 +408,11 @@ void dfs_start_agile_precac_timer(struct wlan_dfs *dfs,
 				  uint8_t precac_chan,
 				  uint8_t ocac_status);
 #else
+static inline int dfs_is_agile_weather_radar_channel(struct dfs_channel *chan)
+{
+	return 0;
+}
+
 static inline void dfs_find_pdev_for_agile_precac(struct wlan_objmgr_pdev *pdev,
 						  uint8_t *cur_precac_dfs_index)
 {
