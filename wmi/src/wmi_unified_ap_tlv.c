@@ -596,7 +596,7 @@ static QDF_STATUS send_vdev_config_ratemask_cmd_tlv(wmi_unified_t wmi_handle,
  *  @return QDF_STATUS_SUCCESS  on success and -ve on failure.
  */
 static QDF_STATUS send_vdev_set_neighbour_rx_cmd_tlv(wmi_unified_t wmi_handle,
-					uint8_t macaddr[IEEE80211_ADDR_LEN],
+					uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 					struct set_neighbour_rx_params *param)
 {
 	wmi_vdev_filter_nrp_config_cmd_fixed_param *cmd;
@@ -1378,11 +1378,7 @@ static QDF_STATUS send_multiple_vdev_restart_req_cmd_tlv(
 	uint8_t *buf_ptr;
 	uint32_t *vdev_ids;
 	wmi_channel *chan_info;
-#ifndef CMN_VDEV_MGR_TGT_IF_ENABLE
-	struct channel_param *tchan_info;
-#else
 	struct mlme_channel_param *tchan_info;
-#endif
 	uint16_t len = sizeof(*cmd) + WMI_TLV_HDR_SIZE;
 
 	len += sizeof(wmi_channel);
@@ -2015,7 +2011,7 @@ send_fils_discovery_send_cmd_tlv(wmi_unified_t wmi_handle,
  */
 static QDF_STATUS
 send_set_qboost_param_cmd_tlv(wmi_unified_t wmi_handle,
-			      uint8_t macaddr[IEEE80211_ADDR_LEN],
+			      uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 			      struct set_qboost_params *param)
 {
 	WMI_QBOOST_CFG_CMD_fixed_param *cmd;

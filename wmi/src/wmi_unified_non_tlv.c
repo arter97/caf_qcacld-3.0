@@ -44,7 +44,7 @@ static const uint32_t svc_ids[] = {WMI_CONTROL_SVC};
  * Return: 0 for success or error code
  */
 static QDF_STATUS send_vdev_create_cmd_non_tlv(wmi_unified_t wmi_handle,
-				 uint8_t macaddr[IEEE80211_ADDR_LEN],
+				 uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 				 struct vdev_create_params *param)
 {
 	wmi_vdev_create_cmd *cmd;
@@ -57,20 +57,12 @@ static QDF_STATUS send_vdev_create_cmd_non_tlv(wmi_unified_t wmi_handle,
 		return QDF_STATUS_E_NOMEM;
 	}
 	cmd = (wmi_vdev_create_cmd *)wmi_buf_data(buf);
-#ifdef CMN_VDEV_MGR_TGT_IF_ENABLE
 	cmd->vdev_id = param->vdev_id;
-#else
-	cmd->vdev_id = param->if_id;
-#endif
 	cmd->vdev_type = param->type;
 	cmd->vdev_subtype = param->subtype;
 	WMI_CHAR_ARRAY_TO_MAC_ADDR(macaddr, &cmd->vdev_macaddr);
 	WMI_LOGD("%s: ID = %d Type = %d, Subtype = %d VAP Addr = %02x:%02x:%02x:%02x:%02x:%02x:",
-#ifdef CMN_VDEV_MGR_TGT_IF_ENABLE
 		  __func__, param->vdev_id, param->type, param->subtype,
-#else
-		  __func__, param->if_id, param->type, param->subtype,
-#endif
 		  macaddr[0], macaddr[1], macaddr[2],
 		  macaddr[3], macaddr[4], macaddr[5]);
 	return wmi_unified_cmd_send(wmi_handle, buf, len,
@@ -270,7 +262,7 @@ QDF_STATUS send_vdev_set_nac_rssi_cmd_non_tlv(wmi_unified_t wmi,
  * Return: 0 for success or error code
  */
 static QDF_STATUS send_vdev_set_neighbour_rx_cmd_non_tlv(wmi_unified_t wmi_handle,
-					uint8_t macaddr[IEEE80211_ADDR_LEN],
+					uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 					struct set_neighbour_rx_params *param)
 {
 	wmi_vdev_filter_nrp_config_cmd *cmd;
@@ -502,7 +494,7 @@ static QDF_STATUS send_peer_cfr_capture_cmd_non_tlv(wmi_unified_t wmi_handle,
  * Return: 0 for success or error code
  */
 static QDF_STATUS send_peer_flush_tids_cmd_non_tlv(wmi_unified_t wmi_handle,
-					 uint8_t peer_addr[IEEE80211_ADDR_LEN],
+					 uint8_t peer_addr[QDF_MAC_ADDR_SIZE],
 					 struct peer_flush_params *param)
 {
 	wmi_peer_flush_tids_cmd *cmd;
@@ -532,7 +524,7 @@ static QDF_STATUS send_peer_flush_tids_cmd_non_tlv(wmi_unified_t wmi_handle,
  */
 static QDF_STATUS send_peer_delete_cmd_non_tlv(wmi_unified_t wmi_handle,
 					uint8_t
-					peer_addr[IEEE80211_ADDR_LEN],
+					peer_addr[QDF_MAC_ADDR_SIZE],
 					uint8_t vdev_id)
 {
 	wmi_peer_delete_cmd *cmd;
@@ -616,7 +608,7 @@ static QDF_STATUS convert_host_peer_id_to_target_id_non_tlv(
  * Return: 0 for success or error code
  */
 static QDF_STATUS send_peer_param_cmd_non_tlv(wmi_unified_t wmi_handle,
-				uint8_t peer_addr[IEEE80211_ADDR_LEN],
+				uint8_t peer_addr[QDF_MAC_ADDR_SIZE],
 				struct peer_set_params *param)
 {
 	wmi_peer_set_param_cmd *cmd;
@@ -651,7 +643,7 @@ static QDF_STATUS send_peer_param_cmd_non_tlv(wmi_unified_t wmi_handle,
  * Return: 0 for success or error code
  */
 static QDF_STATUS send_vdev_up_cmd_non_tlv(wmi_unified_t wmi_handle,
-				 uint8_t bssid[IEEE80211_ADDR_LEN],
+				 uint8_t bssid[QDF_MAC_ADDR_SIZE],
 				 struct vdev_up_params *param)
 {
 	wmi_vdev_up_cmd *cmd;
@@ -835,7 +827,7 @@ QDF_STATUS send_set_bridge_mac_addr_cmd_non_tlv(wmi_unified_t wmi_handle,
 {
 	wmi_peer_add_wds_entry_cmd *cmd;
 	wmi_buf_t buf;
-	uint8_t null_macaddr[IEEE80211_ADDR_LEN];
+	uint8_t null_macaddr[QDF_MAC_ADDR_SIZE];
 	int len = sizeof(wmi_peer_add_wds_entry_cmd);
 
 	buf = wmi_buf_alloc(wmi_handle, len);
@@ -843,7 +835,7 @@ QDF_STATUS send_set_bridge_mac_addr_cmd_non_tlv(wmi_unified_t wmi_handle,
 		WMI_LOGE("%s: wmi_buf_alloc failed", __func__);
 		return QDF_STATUS_E_NOMEM;
 	}
-	qdf_mem_zero(null_macaddr, IEEE80211_ADDR_LEN);
+	qdf_mem_zero(null_macaddr, QDF_MAC_ADDR_SIZE);
 	cmd = (wmi_peer_add_wds_entry_cmd *)wmi_buf_data(buf);
 	WMI_CHAR_ARRAY_TO_MAC_ADDR(param->bridge_addr, &cmd->wds_macaddr);
 	WMI_CHAR_ARRAY_TO_MAC_ADDR(null_macaddr, &cmd->peer_macaddr);
@@ -1115,7 +1107,8 @@ send_pdev_param_cmd_non_tlv(wmi_unified_t wmi_handle,
 	int len = sizeof(wmi_pdev_set_param_cmd);
 
 	if ((param->param_id < wmi_pdev_param_max) &&
-		(wmi_handle->pdev_param[param->param_id]
+		wmi_handle->soc->pdev_param &&
+		(wmi_handle->soc->pdev_param[param->param_id]
 				!= WMI_UNAVAILABLE_PARAM)) {
 
 		buf = wmi_buf_alloc(wmi_handle, len);
@@ -1124,7 +1117,7 @@ send_pdev_param_cmd_non_tlv(wmi_unified_t wmi_handle,
 			return QDF_STATUS_E_FAILURE;
 		}
 		cmd = (wmi_pdev_set_param_cmd *)wmi_buf_data(buf);
-		cmd->param_id = wmi_handle->pdev_param[param->param_id];
+		cmd->param_id = wmi_handle->soc->pdev_param[param->param_id];
 		cmd->param_value = param->param_value;
 		return wmi_unified_cmd_send(wmi_handle, buf, len,
 			WMI_PDEV_SET_PARAM_CMDID);
@@ -1396,11 +1389,7 @@ static QDF_STATUS send_set_sta_ps_param_cmd_non_tlv(wmi_unified_t wmi_handle,
 
 	cmd = (wmi_sta_powersave_param_cmd *)wmi_buf_data(buf);
 	cmd->vdev_id = param->vdev_id;
-#ifdef CMN_VDEV_MGR_TGT_IF_ENABLE
 	cmd->param = param->param_id;
-#else
-	cmd->param = param->param;
-#endif
 	cmd->value = param->value;
 
 	return wmi_unified_cmd_send(wmi_handle, buf, sizeof(*cmd),
@@ -1521,7 +1510,8 @@ static QDF_STATUS send_vdev_set_param_cmd_non_tlv(wmi_unified_t wmi_handle,
 	int len = sizeof(wmi_vdev_set_param_cmd);
 
 	if ((param->param_id < wmi_vdev_param_max) &&
-		(wmi_handle->vdev_param[param->param_id] !=
+		wmi_handle->soc->vdev_param &&
+		(wmi_handle->soc->vdev_param[param->param_id] !=
 				WMI_UNAVAILABLE_PARAM)) {
 
 		buf = wmi_buf_alloc(wmi_handle, len);
@@ -1530,12 +1520,8 @@ static QDF_STATUS send_vdev_set_param_cmd_non_tlv(wmi_unified_t wmi_handle,
 			return QDF_STATUS_E_FAILURE;
 		}
 		cmd = (wmi_vdev_set_param_cmd *)wmi_buf_data(buf);
-#ifdef CMN_VDEV_MGR_TGT_IF_ENABLE
 		cmd->vdev_id = param->vdev_id;
-#else
-		cmd->vdev_id = param->if_id;
-#endif
-		cmd->param_id = wmi_handle->vdev_param[param->param_id];
+		cmd->param_id = wmi_handle->soc->vdev_param[param->param_id];
 		cmd->param_value = param->param_value;
 		return wmi_unified_cmd_send(wmi_handle, buf, len,
 				WMI_VDEV_SET_PARAM_CMDID);
@@ -1563,11 +1549,7 @@ QDF_STATUS send_vdev_sifs_trigger_cmd_non_tlv(wmi_unified_t wmi_handle,
 		return QDF_STATUS_E_NOMEM;
 	}
 	cmd = (wmi_vdev_sifs_trigger_time_cmd *)wmi_buf_data(buf);
-#ifdef CMN_VDEV_MGR_TGT_IF_ENABLE
 	cmd->vdev_id = param->vdev_id;
-#else
-	cmd->vdev_id = param->if_id;
-#endif
 	cmd->sifs_trigger_time = param->param_value;
 
 	return wmi_unified_cmd_send(wmi_handle, buf, len,
@@ -1608,7 +1590,7 @@ static uint32_t get_stats_id_non_tlv(wmi_host_stats_id host_stats_id)
  *  @return QDF_STATUS_SUCCESS  on success and -ve on failure.
  */
 static QDF_STATUS send_stats_request_cmd_non_tlv(wmi_unified_t wmi_handle,
-				uint8_t macaddr[IEEE80211_ADDR_LEN],
+				uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 				struct stats_request_params *param)
 {
 	wmi_buf_t buf;
@@ -2606,7 +2588,7 @@ static QDF_STATUS send_smart_ant_set_rx_ant_cmd_non_tlv(wmi_unified_t wmi_handle
  *  @return QDF_STATUS_SUCCESS  on success and -ve on failure.
  */
 static QDF_STATUS send_smart_ant_set_tx_ant_cmd_non_tlv(wmi_unified_t wmi_handle,
-				uint8_t macaddr[IEEE80211_ADDR_LEN],
+				uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 				struct smart_ant_tx_ant_params *param)
 {
 	wmi_peer_sant_set_tx_antenna_cmd *cmd;
@@ -2656,7 +2638,7 @@ static QDF_STATUS send_smart_ant_set_tx_ant_cmd_non_tlv(wmi_unified_t wmi_handle
  */
 static QDF_STATUS send_smart_ant_set_training_info_cmd_non_tlv(
 				wmi_unified_t wmi_handle,
-				uint8_t macaddr[IEEE80211_ADDR_LEN],
+				uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 				struct smart_ant_training_info_params *param)
 {
 	wmi_peer_sant_set_train_antenna_cmd *cmd;
@@ -2709,7 +2691,7 @@ static QDF_STATUS send_smart_ant_set_training_info_cmd_non_tlv(
  *  @return QDF_STATUS_SUCCESS  on success and -ve on failure.
  */
 static QDF_STATUS send_smart_ant_set_node_config_cmd_non_tlv(wmi_unified_t wmi_handle,
-				uint8_t macaddr[IEEE80211_ADDR_LEN],
+				uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 				struct smart_ant_node_config_params *param)
 {
 	wmi_peer_sant_set_node_config_ops_cmd *cmd;
@@ -3252,7 +3234,7 @@ send_mgmt_cmd_non_tlv(wmi_unified_t wmi_handle,
  */
 static QDF_STATUS
 send_addba_clearresponse_cmd_non_tlv(wmi_unified_t wmi_handle,
-			uint8_t macaddr[IEEE80211_ADDR_LEN],
+			uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 			struct addba_clearresponse_params *param)
 {
 	wmi_addba_clear_resp_cmd *cmd;
@@ -3282,7 +3264,7 @@ send_addba_clearresponse_cmd_non_tlv(wmi_unified_t wmi_handle,
  */
 static QDF_STATUS
 send_addba_send_cmd_non_tlv(wmi_unified_t wmi_handle,
-				uint8_t macaddr[IEEE80211_ADDR_LEN],
+				uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 				struct addba_send_params *param)
 {
 	wmi_addba_send_cmd *cmd;
@@ -3314,7 +3296,7 @@ send_addba_send_cmd_non_tlv(wmi_unified_t wmi_handle,
  */
 static QDF_STATUS
 send_delba_send_cmd_non_tlv(wmi_unified_t wmi_handle,
-				uint8_t macaddr[IEEE80211_ADDR_LEN],
+				uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 				struct delba_send_params *param)
 {
 	wmi_delba_send_cmd *cmd;
@@ -3348,7 +3330,7 @@ send_delba_send_cmd_non_tlv(wmi_unified_t wmi_handle,
  */
 static QDF_STATUS
 send_addba_setresponse_cmd_non_tlv(wmi_unified_t wmi_handle,
-				uint8_t macaddr[IEEE80211_ADDR_LEN],
+				uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 				struct addba_setresponse_params *param)
 {
 	wmi_addba_setresponse_cmd *cmd;
@@ -3381,7 +3363,7 @@ send_addba_setresponse_cmd_non_tlv(wmi_unified_t wmi_handle,
  */
 static QDF_STATUS
 send_singleamsdu_cmd_non_tlv(wmi_unified_t wmi_handle,
-				uint8_t macaddr[IEEE80211_ADDR_LEN],
+				uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 				struct singleamsdu_params *param)
 {
 	wmi_send_singleamsdu_cmd *cmd;
@@ -3413,7 +3395,7 @@ send_singleamsdu_cmd_non_tlv(wmi_unified_t wmi_handle,
  */
 static QDF_STATUS
 send_set_qboost_param_cmd_non_tlv(wmi_unified_t wmi_handle,
-				uint8_t macaddr[IEEE80211_ADDR_LEN],
+				uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 				struct set_qboost_params *param)
 {
 
@@ -5278,7 +5260,7 @@ send_rtt_meas_req_cmd_non_tlv(wmi_unified_t wmi_handle,
 		WMI_SET_CHANNEL_FLAG(w_chan, WMI_CHAN_FLAG_DFS);
 
 	WMI_CHAR_ARRAY_TO_MAC_ADDR(((uint8_t *)peer), &body->dest_mac);
-	qdf_mem_set(spoof, IEEE80211_ADDR_LEN, 0);
+	qdf_mem_set(spoof, QDF_MAC_ADDR_SIZE, 0);
 	WMI_CHAR_ARRAY_TO_MAC_ADDR(((uint8_t *)param->spoof_mac_addr),
 		&body->spoof_bssid);
 
@@ -5379,7 +5361,7 @@ send_lci_set_cmd_non_tlv(wmi_unified_t wmi_handle,
 		/* Convert num_vaps to octets:
 		   6*Num_of_vap + 1 (Max BSSID Indicator field) */
 		param->colocated_bss[1] =
-			(param->colocated_bss[1]*IEEE80211_ADDR_LEN)+1;
+			(param->colocated_bss[1]*QDF_MAC_ADDR_SIZE)+1;
 		colocated_bss_len =  param->colocated_bss[1]+2;
 		qdf_mem_copy(rtt_req->colocated_bssids_info,
 				param->colocated_bss,
@@ -8939,6 +8921,86 @@ QDF_STATUS send_peer_del_all_wds_entries_cmd_non_tlv(wmi_unified_t wmi_handle,
 }
 
 /**
+ * send_multiple_vdev_restart_req_cmd_non_tlv() - send multi vdev restart req
+ * @wmi_handle: wmi handle
+ * @param: wmi multiple vdev restart req param
+ *
+ * Send WMI_PDEV_MULTIPLE_VDEV_RESTART_REQUEST_CMDID parameters to fw.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
+ */
+QDF_STATUS send_multiple_vdev_restart_req_cmd_non_tlv(
+		wmi_unified_t wmi_handle,
+		struct multiple_vdev_restart_params *param)
+{
+	int i;
+	wmi_buf_t buf;
+	wmi_channel *chan_info;
+	struct mlme_channel_param *tchan_info;
+	wmi_pdev_multiple_vdev_restart_request_cmd *cmd;
+	uint16_t len = sizeof(*cmd);
+
+	if (param->num_vdevs)
+		len += sizeof(uint32_t) * param->num_vdevs;
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf) {
+		WMI_LOGE("Failed to allocate memory");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	cmd = (wmi_pdev_multiple_vdev_restart_request_cmd *)wmi_buf_data(buf);
+
+	cmd->requestor_id = param->requestor_id;
+	cmd->disable_hw_ack = param->disable_hw_ack;
+	cmd->num_vdevs = param->num_vdevs;
+
+	WMI_LOGI("req_id:%d dis_hw_ack:%d num_vdevs:%d",
+		 cmd->requestor_id, cmd->disable_hw_ack, cmd->num_vdevs);
+
+	for (i = 0; i < param->num_vdevs; i++)
+		cmd->vdev_ids[i] = param->vdev_ids[i];
+
+	chan_info = &cmd->chan;
+	tchan_info = &param->ch_param;
+	chan_info->mhz = tchan_info->mhz;
+	chan_info->band_center_freq1 = tchan_info->cfreq1;
+	chan_info->band_center_freq2 = tchan_info->cfreq2;
+
+	if (tchan_info->is_chan_passive)
+		WMI_SET_CHANNEL_FLAG(chan_info, WMI_CHAN_FLAG_PASSIVE);
+
+	if (tchan_info->dfs_set)
+		WMI_SET_CHANNEL_FLAG(chan_info, WMI_CHAN_FLAG_DFS);
+
+	if (tchan_info->allow_vht)
+		WMI_SET_CHANNEL_FLAG(chan_info, WMI_CHAN_FLAG_ALLOW_VHT);
+	else  if (tchan_info->allow_ht)
+		WMI_SET_CHANNEL_FLAG(chan_info, WMI_CHAN_FLAG_ALLOW_HT);
+
+	WMI_SET_CHANNEL_MODE(chan_info, tchan_info->phy_mode);
+	WMI_SET_CHANNEL_MIN_POWER(chan_info, tchan_info->minpower);
+	WMI_SET_CHANNEL_MAX_POWER(chan_info, tchan_info->maxpower);
+	WMI_SET_CHANNEL_REG_POWER(chan_info, tchan_info->maxregpower);
+	WMI_SET_CHANNEL_ANTENNA_MAX(chan_info, tchan_info->antennamax);
+	WMI_SET_CHANNEL_REG_CLASSID(chan_info, tchan_info->reg_class_id);
+	WMI_SET_CHANNEL_MAX_TX_POWER(chan_info, tchan_info->maxregpower);
+
+	WMI_LOGI("is_chan_passive:%d dfs_set:%d allow_vht:%d allow_ht:%d",
+		 tchan_info->is_chan_passive, tchan_info->dfs_set,
+		 tchan_info->allow_vht, tchan_info->allow_ht);
+	WMI_LOGI("antennamax:%d phy_mode:%d minpower:%d maxpower:%d",
+		 tchan_info->antennamax, tchan_info->phy_mode,
+		 tchan_info->minpower, tchan_info->maxpower);
+	WMI_LOGI("maxregpower:%d reg_class_id:%d",
+		 tchan_info->maxregpower, tchan_info->reg_class_id);
+
+	return wmi_unified_cmd_send(
+			wmi_handle, buf, len,
+			WMI_PDEV_MULTIPLE_VDEV_RESTART_REQUEST_CMDID);
+}
+
+/**
  * wmi_non_tlv_pdev_id_conversion_enable() - Enable pdev_id conversion
  *
  * Return None.
@@ -9283,6 +9345,8 @@ struct wmi_ops non_tlv_ops =  {
 			send_peer_del_all_wds_entries_cmd_non_tlv,
 	.send_vdev_pcp_tid_map_cmd = send_vdev_pcp_tid_map_cmd_non_tlv,
 	.send_vdev_tidmap_prec_cmd = send_vdev_tidmap_prec_cmd_non_tlv,
+	.send_multiple_vdev_restart_req_cmd =
+			send_multiple_vdev_restart_req_cmd_non_tlv,
 };
 
 /**
@@ -9432,7 +9496,7 @@ static void populate_non_tlv_service(uint32_t *wmi_service)
 	wmi_service[wmi_service_ext_msg] = WMI_SERVICE_UNAVAILABLE;
 	wmi_service[wmi_service_mawc] = WMI_SERVICE_UNAVAILABLE;
 	wmi_service[wmi_service_multiple_vdev_restart] =
-				WMI_SERVICE_UNAVAILABLE;
+				WMI_SERVICE_MULTIPLE_VDEV_RESTART;
 	wmi_service[wmi_service_peer_assoc_conf] = WMI_SERVICE_UNAVAILABLE;
 	wmi_service[wmi_service_egap] = WMI_SERVICE_UNAVAILABLE;
 	wmi_service[wmi_service_sta_pmf_offload] = WMI_SERVICE_UNAVAILABLE;
@@ -9983,8 +10047,10 @@ void wmi_non_tlv_attach(struct wmi_unified *wmi_handle)
 	wmi_handle->soc->svc_ids = &svc_ids[0];
 	populate_non_tlv_service(wmi_handle->services);
 	populate_non_tlv_events_id(wmi_handle->wmi_events);
-	populate_pdev_param_non_tlv(wmi_handle->pdev_param);
-	populate_vdev_param_non_tlv(wmi_handle->vdev_param);
+	if (wmi_handle->soc->pdev_param)
+		populate_pdev_param_non_tlv(wmi_handle->soc->pdev_param);
+	if (wmi_handle->soc->vdev_param)
+		populate_vdev_param_non_tlv(wmi_handle->soc->vdev_param);
 
 #ifdef WMI_INTERFACE_EVENT_LOGGING
 	wmi_handle->soc->buf_offset_command = 0;
