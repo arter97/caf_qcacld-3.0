@@ -1755,6 +1755,10 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_RX_MON_LITE = 407,
 	/* Enable/disable Tx capture mode */
 	OL_ATH_PARAM_TX_CAPTURE = 409,
+	/* Set SELF AP OBSS_PD_THRESHOLD value */
+	OL_ATH_PARAM_SET_CMD_OBSS_PD_THRESHOLD = 416,
+	/* Enable/disable AP OBSS_PD_THRESHOLD */
+	OL_ATH_PARAM_SET_CMD_OBSS_PD_THRESHOLD_ENABLE = 421,
 };
 
 /* Enumeration of PDEV Configuration parameter */
