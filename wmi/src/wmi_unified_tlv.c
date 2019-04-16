@@ -12359,6 +12359,8 @@ static void populate_pdev_param_tlv(uint32_t *pdev_param)
 				WMI_PDEV_PARAM_EQUAL_RU_ALLOCATION_ENABLE;
 	pdev_param[wmi_pdev_param_per_peer_prd_cfr_enable] =
 				WMI_PDEV_PARAM_PER_PEER_PERIODIC_CFR_ENABLE;
+	pdev_param[wmi_pdev_param_set_cmd_obss_pd_threshold] =
+				WMI_PDEV_PARAM_SET_CMD_OBSS_PD_THRESHOLD;
 }
 
 /**
