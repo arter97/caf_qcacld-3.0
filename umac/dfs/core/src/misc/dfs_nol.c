@@ -192,7 +192,7 @@ static void dfs_nol_delete(struct wlan_dfs *dfs,
 		 delfreq, delchwidth);
 	prev_next = &(dfs->dfs_nol);
 	nol = dfs->dfs_nol;
-	while (nol != NULL) {
+	while (nol) {
 		if (nol->nol_freq == delfreq &&
 			nol->nol_chwidth == delchwidth) {
 			*prev_next = nol->nol_next;
@@ -269,7 +269,7 @@ void dfs_print_nol(struct wlan_dfs *dfs)
 
 	nol = dfs->dfs_nol;
 	dfs_debug(dfs, WLAN_DEBUG_DFS_NOL, "NOL");
-	while (nol != NULL) {
+	while (nol) {
 		diff_ms = qdf_system_ticks_to_msecs(qdf_system_ticks() -
 				nol->nol_start_ticks);
 		diff_ms = (nol->nol_timeout_ms - diff_ms);
@@ -331,7 +331,7 @@ void dfs_get_nol(struct wlan_dfs *dfs,
 	}
 
 	nol = dfs->dfs_nol;
-	while (nol != NULL) {
+	while (nol) {
 		dfs_nol[*nchan].nol_freq = nol->nol_freq;
 		dfs_nol[*nchan].nol_chwidth = nol->nol_chwidth;
 		dfs_nol[*nchan].nol_start_ticks = nol->nol_start_ticks;
@@ -396,7 +396,7 @@ void dfs_nol_addchan(struct wlan_dfs *dfs,
 	nol = dfs->dfs_nol;
 	prev = dfs->dfs_nol;
 	elem = NULL;
-	while (nol != NULL) {
+	while (nol) {
 		if ((nol->nol_freq == freq) &&
 				(nol->nol_chwidth == ch_width)) {
 			nol->nol_start_ticks = qdf_system_ticks();
@@ -487,16 +487,14 @@ void dfs_nol_update(struct wlan_dfs *dfs)
 	dfs_nol = (struct dfsreq_nolelem *)qdf_mem_malloc(
 		sizeof(struct dfsreq_nolelem) * dfs->dfs_nol_count);
 
-	if (!dfs_nol) {
-		/*
-		 * XXX TODO: if this fails, just schedule a task to retry
-		 * updating the NOL at a later stage.  That way the NOL
-		 * update _DOES_ happen - hopefully the failure was just
-		 * temporary.
-		 */
-		dfs_alert(dfs, WLAN_DEBUG_DFS_ALWAYS, "failed to allocate NOL update memory!");
+	/*
+	 * XXX TODO: if this fails, just schedule a task to retry
+	 * updating the NOL at a later stage.  That way the NOL
+	 * update _DOES_ happen - hopefully the failure was just
+	 * temporary.
+	 */
+	if (!dfs_nol)
 		return;
-	}
 
 	DFS_GET_NOL_LOCKED(dfs, dfs_nol, &nlen);
 

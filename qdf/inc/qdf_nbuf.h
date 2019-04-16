@@ -299,6 +299,7 @@ struct mon_rx_status {
 	uint8_t monitor_direct_used;
 	uint8_t data_sequence_control_info_valid;
 	uint16_t first_data_seq_ctrl;
+	uint8_t ltf_size;
 };
 
 /**
@@ -3272,6 +3273,19 @@ static inline void
 qdf_nbuf_set_timestamp(struct sk_buff *skb)
 {
 	__qdf_nbuf_set_timestamp(skb);
+}
+
+/**
+ * qdf_nbuf_get_timestamp() - get the timestamp for frame
+ *
+ * @buf: sk buff
+ *
+ * Return: timestamp stored in skb in ms
+ */
+static inline uint64_t
+qdf_nbuf_get_timestamp(struct sk_buff *skb)
+{
+	return __qdf_nbuf_get_timestamp(skb);
 }
 
 /**

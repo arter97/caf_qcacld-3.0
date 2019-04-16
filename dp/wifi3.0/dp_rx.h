@@ -25,7 +25,11 @@
 #include "dp_internal.h"
 
 #ifdef RXDMA_OPTIMIZATION
+#ifdef NO_RX_PKT_HDR_TLV
+#define RX_BUFFER_ALIGNMENT     0
+#else
 #define RX_BUFFER_ALIGNMENT     128
+#endif /* NO_RX_PKT_HDR_TLV */
 #else /* RXDMA_OPTIMIZATION */
 #define RX_BUFFER_ALIGNMENT     4
 #endif /* RXDMA_OPTIMIZATION */
@@ -51,7 +55,6 @@
 #define DP_RX_DESC_ALLOC_MULTIPLIER 3
 #endif /* QCA_HOST2FW_RXBUF_RING */
 
-#define RX_BUFFER_SIZE			2048
 #define RX_BUFFER_RESERVATION   0
 
 #define DP_PEER_METADATA_PEER_ID_MASK	0x0000ffff
@@ -114,6 +117,16 @@ struct dp_rx_desc {
 #define DP_RX_DESC_COOKIE_INDEX_GET(_cookie)		\
 	(((_cookie) & RX_DESC_COOKIE_INDEX_MASK) >>	\
 			RX_DESC_COOKIE_INDEX_SHIFT)
+
+/* DOC: Offset to obtain LLC hdr
+ *
+ * In the case of Wifi parse error
+ * to reach LLC header from beginning
+ * of VLAN tag we need to skip 8 bytes.
+ * Vlan_tag(4)+length(2)+length added
+ * by HW(2) = 8 bytes.
+ */
+#define DP_SKIP_VLAN		8
 
 /*
  *dp_rx_xor_block() - xor block of data
@@ -364,6 +377,12 @@ void dp_rx_desc_pool_free(struct dp_soc *soc,
 				uint32_t pool_id,
 				struct rx_desc_pool *rx_desc_pool);
 
+void dp_rx_desc_nbuf_pool_free(struct dp_soc *soc,
+			       struct rx_desc_pool *rx_desc_pool);
+
+void dp_rx_desc_free_array(struct dp_soc *soc,
+			   struct rx_desc_pool *rx_desc_pool);
+
 void dp_rx_deliver_raw(struct dp_vdev *vdev, qdf_nbuf_t nbuf_list,
 				struct dp_peer *peer);
 
@@ -385,11 +404,10 @@ void dp_rx_add_to_free_desc_list(union dp_rx_desc_list_elem_t **head,
 
 	new->nbuf = NULL;
 	new->in_use = 0;
-	new->unmapped = 0;
 
 	((union dp_rx_desc_list_elem_t *)new)->next = *head;
 	*head = (union dp_rx_desc_list_elem_t *)new;
-	if (*tail == NULL)
+	if (!*tail)
 		*tail = *head;
 
 }
@@ -490,7 +508,7 @@ dp_rx_wds_add_or_update_ast(struct dp_soc *soc, struct dp_peer *ta_peer,
 					      neighbour_peer_list_elem) {
 					if (!qdf_mem_cmp(&neighbour_peer->neighbour_peers_macaddr,
 							 wds_src_mac,
-							 DP_MAC_ADDR_LEN)) {
+							 QDF_MAC_ADDR_SIZE)) {
 						ret = dp_peer_add_ast(soc,
 								      ta_peer,
 								      wds_src_mac,
@@ -596,7 +614,7 @@ dp_rx_wds_srcport_learn(struct dp_soc *soc,
 {
 	uint16_t sa_sw_peer_id = hal_rx_msdu_end_sa_sw_peer_id_get(rx_tlv_hdr);
 	uint8_t sa_is_valid = hal_rx_msdu_end_sa_is_valid_get(rx_tlv_hdr);
-	uint8_t wds_src_mac[IEEE80211_ADDR_LEN];
+	uint8_t wds_src_mac[QDF_MAC_ADDR_SIZE];
 	uint16_t sa_idx;
 	uint8_t is_chfrag_start = 0;
 	uint8_t is_ad4_valid = 0;
@@ -608,8 +626,8 @@ dp_rx_wds_srcport_learn(struct dp_soc *soc,
 	if (is_chfrag_start)
 		is_ad4_valid = hal_rx_get_mpdu_mac_ad4_valid(rx_tlv_hdr);
 
-	memcpy(wds_src_mac, (qdf_nbuf_data(nbuf) + IEEE80211_ADDR_LEN),
-	       IEEE80211_ADDR_LEN);
+	memcpy(wds_src_mac, (qdf_nbuf_data(nbuf) + QDF_MAC_ADDR_SIZE),
+	       QDF_MAC_ADDR_SIZE);
 
 	/*
 	 * Get the AST entry from HW SA index and mark it as active
@@ -803,10 +821,17 @@ static inline QDF_STATUS dp_rx_defrag_concat(qdf_nbuf_t dst, qdf_nbuf_t src)
 	 * (This is needed, because the headroom of the dst buffer
 	 * contains the rx desc.)
 	 */
-	if (qdf_nbuf_cat(dst, src))
-		return QDF_STATUS_E_DEFRAG_ERROR;
+	if (!qdf_nbuf_cat(dst, src)) {
+		/*
+		 * qdf_nbuf_cat does not free the src memory.
+		 * Free src nbuf before returning
+		 * For failure case the caller takes of freeing the nbuf
+		 */
+		qdf_nbuf_free(src);
+		return QDF_STATUS_SUCCESS;
+	}
 
-	return QDF_STATUS_SUCCESS;
+	return QDF_STATUS_E_DEFRAG_ERROR;
 }
 
 /*
@@ -885,8 +910,8 @@ static inline bool check_qwrap_multicast_loopback(struct dp_vdev *vdev,
 		TAILQ_FOREACH(psta_vdev, &pdev->vdev_list, vdev_list_elem) {
 			if (qdf_unlikely(psta_vdev->proxysta_vdev &&
 					 !qdf_mem_cmp(psta_vdev->mac_addr.raw,
-						      &data[DP_MAC_ADDR_LEN],
-						      DP_MAC_ADDR_LEN))) {
+						      &data[QDF_MAC_ADDR_SIZE],
+						      QDF_MAC_ADDR_SIZE))) {
 				/* Drop packet if source address is equal to
 				 * any of the vdev addresses.
 				 */
@@ -973,5 +998,56 @@ dp_rx_nbuf_prepare(struct dp_soc *soc, struct dp_pdev *pdev);
 
 void dp_rx_dump_info_and_assert(struct dp_soc *soc, void *hal_ring,
 				void *ring_desc, struct dp_rx_desc *rx_desc);
+
+void dp_rx_compute_delay(struct dp_vdev *vdev, qdf_nbuf_t nbuf);
+#ifdef RX_DESC_DEBUG_CHECK
+/**
+ * dp_rx_desc_check_magic() - check the magic value in dp_rx_desc
+ * @rx_desc: rx descriptor pointer
+ *
+ * Return: true, if magic is correct, else false.
+ */
+static inline bool dp_rx_desc_check_magic(struct dp_rx_desc *rx_desc)
+{
+	if (qdf_unlikely(rx_desc->magic != DP_RX_DESC_MAGIC))
+		return false;
+
+	rx_desc->magic = 0;
+	return true;
+}
+
+/**
+ * dp_rx_desc_prep() - prepare rx desc
+ * @rx_desc: rx descriptor pointer to be prepared
+ * @nbuf: nbuf to be associated with rx_desc
+ *
+ * Note: assumption is that we are associating a nbuf which is mapped
+ *
+ * Return: none
+ */
+static inline void dp_rx_desc_prep(struct dp_rx_desc *rx_desc, qdf_nbuf_t nbuf)
+{
+	rx_desc->magic = DP_RX_DESC_MAGIC;
+	rx_desc->nbuf = nbuf;
+	rx_desc->unmapped = 0;
+}
+
+#else
+
+static inline bool dp_rx_desc_check_magic(struct dp_rx_desc *rx_desc)
+{
+	return true;
+}
+
+static inline void dp_rx_desc_prep(struct dp_rx_desc *rx_desc, qdf_nbuf_t nbuf)
+{
+	rx_desc->nbuf = nbuf;
+	rx_desc->unmapped = 0;
+}
+#endif /* RX_DESC_DEBUG_CHECK */
+
+void dp_rx_process_rxdma_err(struct dp_soc *soc, qdf_nbuf_t nbuf,
+			     uint8_t *rx_tlv_hdr, struct dp_peer *peer,
+			     uint8_t err_code);
 
 #endif /* _DP_RX_H */

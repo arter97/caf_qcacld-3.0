@@ -21,6 +21,8 @@
 #define _WLAN_VDEV_MLME_H_
 
 #include <wlan_vdev_mgr_tgt_if_rx_defs.h>
+#include <wlan_objmgr_vdev_obj.h>
+#include <wlan_vdev_mlme_api.h>
 
 struct vdev_mlme_obj;
 
@@ -115,6 +117,7 @@ struct vdev_mlme_proto_bss_color {
  * @mubfee: mu beam formee capability
  * @implicit_bf: Implicit BF support
  * @sounding_dimension: Beamformer number of sounding dimension
+ * @bfee_sts_cap: beam formee STA capability
  * @en_2gvht: 256 qam status
  * @allow_vht: vht capability status
  */
@@ -126,6 +129,7 @@ struct vdev_mlme_vht_info {
 	uint8_t  mubfee;
 	uint8_t  implicit_bf;
 	uint8_t  sounding_dimension;
+	uint8_t  bfee_sts_cap;
 	uint8_t  en_2gvht;
 	bool     allow_vht;
 };
@@ -237,6 +241,7 @@ struct vdev_mlme_mgmt_generic {
 	uint8_t nss_2g;
 	uint8_t nss_5g;
 	uint8_t bssid[QDF_MAC_ADDR_SIZE];
+	uint32_t phy_mode;
 };
 
 /**
@@ -423,20 +428,6 @@ enum vdev_start_resp_type {
 };
 
 /**
- * enum vdev_rsp_type - Response type
- * @START_RSP:      Start Response
- * @RESTART_RSP:    Restart Response
- * @STOP_RSP: STOP Response
- * @DELETE_RSP: DELETE Response
- */
-enum vdev_rsp_type {
-	START_RSP = 0,
-	RESTART_RSP,
-	STOP_RSP,
-	DELETE_RSP,
-};
-
-/**
  * struct vdev_mlme_ops - VDEV MLME operation callbacks structure
  * @mlme_vdev_validate_basic_params:    callback to validate VDEV basic params
  * @mlme_vdev_reset_proto_params:       callback to Reset protocol params
@@ -465,6 +456,8 @@ enum vdev_rsp_type {
  *                                      peer delete completion
  * @mlme_vdev_down_send:                callback to initiate actions of VDEV
  *                                      MLME down operation
+ * @mlme_vdev_notify_start_state_exit:  callback to notify on vdev start
+ *                                      start state exit
  */
 struct vdev_mlme_ops {
 	QDF_STATUS (*mlme_vdev_validate_basic_params)(
@@ -532,6 +525,8 @@ struct vdev_mlme_ops {
 	QDF_STATUS (*mlme_vdev_ext_start_rsp)(
 				struct vdev_mlme_obj *vdev_mlme,
 				struct vdev_start_response *rsp);
+	QDF_STATUS (*mlme_vdev_notify_start_state_exit)(
+				struct vdev_mlme_obj *vdev_mlme);
 };
 
 /**
@@ -999,4 +994,356 @@ static inline QDF_STATUS mlme_vdev_notify_down_complete(
 	return ret;
 }
 
+/**
+ * mlme_vdev_notify_start_state_exit - VDEV SM start state exit notification
+ * @vdev_mlme_obj:  VDEV MLME comp object
+ *
+ * API notifies on start state exit
+ *
+ * Return: SUCCESS on successful completion of notification
+ *         FAILURE, if it fails due to any
+ */
+static inline QDF_STATUS mlme_vdev_notify_start_state_exit(
+				struct vdev_mlme_obj *vdev_mlme)
+{
+	QDF_STATUS ret = QDF_STATUS_SUCCESS;
+
+	if ((vdev_mlme->ops) &&
+	    vdev_mlme->ops->mlme_vdev_notify_start_state_exit)
+		ret = vdev_mlme->ops->mlme_vdev_notify_start_state_exit(
+								vdev_mlme);
+
+	return ret;
+}
+
+#ifdef CMN_VDEV_MGR_TGT_IF_ENABLE
+/**
+ * wlan_vdev_mlme_set_ssid() - set ssid
+ * @vdev: VDEV object
+ * @ssid: SSID (input)
+ * @ssid_len: Length of SSID
+ *
+ * API to set the SSID of VDEV
+ *
+ * Caller need to acquire lock with wlan_vdev_obj_lock()
+ *
+ * Return: SUCCESS, if update is done
+ *          FAILURE, if ssid length is > max ssid len
+ */
+static inline QDF_STATUS wlan_vdev_mlme_set_ssid(
+				struct wlan_objmgr_vdev *vdev,
+				const uint8_t *ssid, uint8_t ssid_len)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	/* This API is invoked with lock acquired, do not add log prints */
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme)
+		return QDF_STATUS_E_FAILURE;
+
+	if (ssid_len <= WLAN_SSID_MAX_LEN) {
+		qdf_mem_copy(vdev_mlme->mgmt.generic.ssid, ssid, ssid_len);
+		vdev_mlme->mgmt.generic.ssid_len = ssid_len;
+	} else {
+		vdev_mlme->mgmt.generic.ssid_len = 0;
+		return QDF_STATUS_E_FAILURE;
+	}
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * wlan_vdev_mlme_get_ssid() - get ssid
+ * @vdev: VDEV object
+ * @ssid: SSID
+ * @ssid_len: Length of SSID
+ *
+ * API to get the SSID of VDEV, it updates the SSID and its length
+ * in @ssid, @ssid_len respectively
+ *
+ * Caller need to acquire lock with wlan_vdev_obj_lock()
+ *
+ * Return: SUCCESS, if update is done
+ *          FAILURE, if ssid length is > max ssid len
+ */
+static inline QDF_STATUS wlan_vdev_mlme_get_ssid(
+				struct wlan_objmgr_vdev *vdev,
+				 uint8_t *ssid, uint8_t *ssid_len)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	/* This API is invoked with lock acquired, do not add log prints */
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme)
+		return QDF_STATUS_E_FAILURE;
+
+	if (vdev_mlme->mgmt.generic.ssid_len > 0) {
+		*ssid_len = vdev_mlme->mgmt.generic.ssid_len;
+		qdf_mem_copy(ssid, vdev_mlme->mgmt.generic.ssid, *ssid_len);
+	} else {
+		*ssid_len = 0;
+		return QDF_STATUS_E_FAILURE;
+	}
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * wlan_vdev_mlme_set_nss() - set NSS
+ * @vdev: VDEV object
+ * @nss: nss configured by user
+ *
+ * API to set the Number of Spatial streams
+ *
+ * Return: void
+ */
+static inline void wlan_vdev_mlme_set_nss(
+				struct wlan_objmgr_vdev *vdev,
+				uint8_t nss)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme)
+		return;
+
+	vdev_mlme->proto.generic.nss = nss;
+}
+
+/**
+ * wlan_vdev_mlme_get_nss() - get NSS
+ * @vdev: VDEV object
+ *
+ * API to get the Number of Spatial Streams
+ *
+ * Return:
+ * @nss: nss value
+ */
+static inline uint8_t wlan_vdev_mlme_get_nss(
+				struct wlan_objmgr_vdev *vdev)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme)
+		return 0;
+
+	return vdev_mlme->proto.generic.nss;
+}
+
+/**
+ * wlan_vdev_mlme_set_txchainmask() - set Tx chainmask
+ * @vdev: VDEV object
+ * @chainmask : chainmask either configured by user or max supported
+ *
+ * API to set the Tx chainmask
+ *
+ * Return: void
+ */
+static inline void wlan_vdev_mlme_set_txchainmask(
+				struct wlan_objmgr_vdev *vdev,
+				uint8_t chainmask)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+
+	if (!vdev_mlme)
+		return;
+
+	vdev_mlme->mgmt.chainmask_info.tx_chainmask = chainmask;
+}
+
+/**
+ * wlan_vdev_mlme_get_txchainmask() - get Tx chainmask
+ * @vdev: VDEV object
+ *
+ * API to get the Tx chainmask
+ *
+ * Return:
+ * @chainmask : Tx chainmask either configured by user or max supported
+ */
+static inline uint8_t wlan_vdev_mlme_get_txchainmask(
+				struct wlan_objmgr_vdev *vdev)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme)
+		return 0;
+
+	return vdev_mlme->mgmt.chainmask_info.tx_chainmask;
+}
+
+/**
+ * wlan_vdev_mlme_set_rxchainmask() - set Rx chainmask
+ * @vdev: VDEV object
+ * @chainmask : Rx chainmask either configured by user or max supported
+ *
+ * API to set the Rx chainmask
+ *
+ * Return: void
+ */
+static inline void wlan_vdev_mlme_set_rxchainmask(
+				struct wlan_objmgr_vdev *vdev,
+				uint8_t chainmask)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme)
+		return;
+
+	vdev_mlme->mgmt.chainmask_info.rx_chainmask = chainmask;
+}
+
+/**
+ * wlan_vdev_mlme_get_rxchainmask() - get Rx chainmask
+ * @vdev: VDEV object
+ *
+ * API to get the Rx chainmask
+ *
+ * Return:
+ * @chainmask : Rx chainmask either configured by user or max supported
+ */
+static inline uint8_t wlan_vdev_mlme_get_rxchainmask(
+				struct wlan_objmgr_vdev *vdev)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	/* This API is invoked with lock acquired, do not add log prints */
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme)
+		return 0;
+
+	return vdev_mlme->mgmt.chainmask_info.rx_chainmask;
+}
+
+/**
+ * wlan_vdev_mlme_set_txpower() - set tx power
+ * @vdev: VDEV object
+ * @txpow: tx power either configured by used or max allowed
+ *
+ * API to set the tx power
+ *
+ * Return: void
+ */
+static inline void wlan_vdev_mlme_set_txpower(
+					struct wlan_objmgr_vdev *vdev,
+					uint8_t txpow)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme)
+		return;
+
+	vdev_mlme->mgmt.generic.tx_power = txpow;
+}
+
+/**
+ * wlan_vdev_mlme_get_txpower() - get tx power
+ * @vdev: VDEV object
+ *
+ * API to get the tx power
+ *
+ * Return:
+ * @txpow: tx power either configured by used or max allowed
+ */
+static inline uint8_t wlan_vdev_mlme_get_txpower(
+				struct wlan_objmgr_vdev *vdev)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme)
+		return 0;
+
+	return vdev_mlme->mgmt.generic.tx_power;
+}
+
+/**
+ * wlan_vdev_mlme_set_maxrate() - set max rate
+ * @vdev: VDEV object
+ * @maxrate: configured by used or based on configured mode
+ *
+ * API to set the max rate the vdev supports
+ *
+ * Return: void
+ */
+static inline void wlan_vdev_mlme_set_maxrate(
+				struct wlan_objmgr_vdev *vdev,
+				uint32_t maxrate)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme)
+		return;
+
+	vdev_mlme->mgmt.rate_info.max_rate = maxrate;
+}
+
+/**
+ * wlan_vdev_mlme_get_maxrate() - get max rate
+ * @vdev: VDEV object
+ *
+ * API to get the max rate the vdev supports
+ *
+ * Return:
+ * @maxrate: configured by used or based on configured mode
+ */
+static inline uint32_t wlan_vdev_mlme_get_maxrate(
+				struct wlan_objmgr_vdev *vdev)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme)
+		return 0;
+
+	return vdev_mlme->mgmt.rate_info.max_rate;
+}
+
+/**
+ * wlan_vdev_mlme_set_txmgmtrate() - set txmgmtrate
+ * @vdev: VDEV object
+ * @txmgmtrate: Tx Mgmt rate
+ *
+ * API to set Mgmt Tx rate
+ *
+ * Return: void
+ */
+static inline void wlan_vdev_mlme_set_txmgmtrate(
+				struct wlan_objmgr_vdev *vdev,
+				uint32_t txmgmtrate)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme)
+		return;
+
+	vdev_mlme->mgmt.rate_info.tx_mgmt_rate = txmgmtrate;
+}
+
+/**
+ * wlan_vdev_mlme_get_txmgmtrate() - get txmgmtrate
+ * @vdev: VDEV object
+ *
+ * API to get Mgmt Tx rate
+ *
+ * Return:
+ * @txmgmtrate: Tx Mgmt rate
+ */
+static inline uint32_t wlan_vdev_mlme_get_txmgmtrate(
+				struct wlan_objmgr_vdev *vdev)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme)
+		return 0;
+
+	return vdev_mlme->mgmt.rate_info.tx_mgmt_rate;
+}
+#endif /* CMN_VDEV_MGR_TGT_IF_ENABLE */
 #endif

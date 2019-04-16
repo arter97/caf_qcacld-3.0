@@ -129,6 +129,8 @@
 #define WLAN_SOC_CEXT_HW_DB2DBM        0x00008000
 	/* OBSS Narrow Bandwidth RU Tolerance */
 #define WLAN_SOC_CEXT_OBSS_NBW_RU      0x00010000
+	/* MBSS IE support */
+#define WLAN_SOC_CEXT_MBSS_IE          0x00020000
 
 /* feature_flags */
 	/* CONF: ATH FF enabled */
@@ -181,12 +183,10 @@
 #define WLAN_SOC_F_BTCOEX_SUPPORT      0x00200000
 	/* HOST 80211 enable*/
 #define WLAN_SOC_F_HOST_80211_ENABLE   0x00400000
-	/* MBSS IE enable */
-#define WLAN_SOC_F_MBSS_IE_ENABLE      0x00800000
 	/* Spectral disable */
-#define WLAN_SOC_F_SPECTRAL_DISABLE    0x01000000
+#define WLAN_SOC_F_SPECTRAL_DISABLE    0x00800000
 	/* FTM testmode enable */
-#define WLAN_SOC_F_TESTMODE_ENABLE     0x02000000
+#define WLAN_SOC_F_TESTMODE_ENABLE     0x01000000
 
 /* PSOC op flags */
 
@@ -934,7 +934,7 @@ static inline void wlan_psoc_set_nif_phy_version(struct wlan_objmgr_psoc *psoc,
 static inline uint32_t wlan_psoc_get_nif_phy_version(
 			struct wlan_objmgr_psoc *psoc)
 {
-	if (psoc == NULL)
+	if (!psoc)
 		return (uint32_t)-1;
 
 	return psoc->soc_nif.phy_version;
@@ -966,7 +966,7 @@ static inline void wlan_psoc_set_dev_type(struct wlan_objmgr_psoc *psoc,
 static inline WLAN_DEV_TYPE wlan_objmgr_psoc_get_dev_type(
 				struct wlan_objmgr_psoc *psoc)
 {
-	if (psoc == NULL)
+	if (!psoc)
 		return (uint32_t)-1;
 
 	return psoc->soc_nif.phy_type;
@@ -1167,7 +1167,7 @@ static inline void wlan_psoc_set_hw_macaddr(struct wlan_objmgr_psoc *psoc,
 					uint8_t *macaddr)
 {
 	/* This API is invoked with lock acquired, do not add log prints */
-	if (psoc != NULL)
+	if (psoc)
 		WLAN_ADDR_COPY(psoc->soc_nif.soc_hw_macaddr, macaddr);
 }
 
@@ -1181,7 +1181,7 @@ static inline void wlan_psoc_set_hw_macaddr(struct wlan_objmgr_psoc *psoc,
  */
 static inline uint8_t *wlan_psoc_get_hw_macaddr(struct wlan_objmgr_psoc *psoc)
 {
-	if (psoc == NULL)
+	if (!psoc)
 		return NULL;
 
 	return psoc->soc_nif.soc_hw_macaddr;
@@ -1209,7 +1209,7 @@ void *wlan_objmgr_psoc_get_comp_private_obj(struct wlan_objmgr_psoc *psoc,
  */
 static inline uint8_t wlan_psoc_get_pdev_count(struct wlan_objmgr_psoc *psoc)
 {
-	if (psoc == NULL)
+	if (!psoc)
 		return 0;
 
 	return psoc->soc_objmgr.wlan_pdev_count;
@@ -1227,7 +1227,7 @@ static inline uint8_t wlan_psoc_get_pdev_count(struct wlan_objmgr_psoc *psoc)
 static inline void wlan_psoc_set_tgt_if_handle(struct wlan_objmgr_psoc *psoc,
 			void *tgt_if_handle)
 {
-	if (psoc == NULL)
+	if (!psoc)
 		return;
 
 	psoc->tgt_if_handle = tgt_if_handle;
@@ -1243,7 +1243,7 @@ static inline void wlan_psoc_set_tgt_if_handle(struct wlan_objmgr_psoc *psoc,
  */
 static inline void *wlan_psoc_get_tgt_if_handle(struct wlan_objmgr_psoc *psoc)
 {
-	if (psoc == NULL)
+	if (!psoc)
 		return NULL;
 
 	return psoc->tgt_if_handle;
@@ -1260,7 +1260,7 @@ static inline void *wlan_psoc_get_tgt_if_handle(struct wlan_objmgr_psoc *psoc)
 static inline qdf_device_t wlan_psoc_get_qdf_dev(
 			struct wlan_objmgr_psoc *psoc)
 {
-	if (psoc == NULL)
+	if (!psoc)
 		return NULL;
 
 	return psoc->soc_objmgr.qdf_dev;
@@ -1279,7 +1279,7 @@ static inline void wlan_psoc_set_qdf_dev(
 			struct wlan_objmgr_psoc *psoc,
 			qdf_device_t dev)
 {
-	if (psoc == NULL)
+	if (!psoc)
 		return;
 
 	psoc->soc_objmgr.qdf_dev = dev;
@@ -1476,7 +1476,7 @@ void wlan_objmgr_psoc_check_for_peer_leaks(struct wlan_objmgr_psoc *psoc);
 static inline uint8_t wlan_objmgr_psoc_get_band_capability(
 		struct wlan_objmgr_psoc *psoc)
 {
-	if (psoc == NULL)
+	if (!psoc)
 		return 0;
 
 	return psoc->soc_nif.user_config.band_capability;
@@ -1531,5 +1531,22 @@ static inline struct wlan_lmac_if_tx_ops *
 wlan_psoc_get_lmac_if_txops(struct wlan_objmgr_psoc *psoc)
 {
 	return &((psoc->soc_cb.tx_ops));
+}
+
+/**
+ * wlan_psoc_get_id() - get psoc id
+ * @psoc: PSOC object
+ *
+ * API to get psoc id
+ *
+ * Return: @psoc_id: psoc id
+ */
+static inline uint8_t wlan_psoc_get_id(
+			struct wlan_objmgr_psoc *psoc)
+{
+	if (!psoc)
+		return (uint8_t)-1;
+
+	return psoc->soc_objmgr.psoc_id;
 }
 #endif /* _WLAN_OBJMGR_PSOC_OBJ_H_*/

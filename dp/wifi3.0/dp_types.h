@@ -88,10 +88,10 @@
 #define DEFAULT_HW_PEER_ID 0xffff
 
 #define MAX_TX_HW_QUEUES MAX_TCL_DATA_RINGS
-
-
 /* Maximum retries for Delba per tid per peer */
 #define DP_MAX_DELBA_RETRY 3
+
+#define PCP_TID_MAP_MAX 8
 
 #ifndef REMOVE_PKT_LOG
 enum rx_pktlog_mode {
@@ -107,6 +107,8 @@ struct dp_vdev;
 struct dp_tx_desc_s;
 struct dp_soc;
 union dp_rx_desc_list_elem_t;
+struct cdp_peer_rate_stats_ctx;
+struct cdp_soc_rate_stats_ctx;
 
 #define DP_PDEV_ITERATE_VDEV_LIST(_pdev, _vdev) \
 	TAILQ_FOREACH((_vdev), &(_pdev)->vdev_list, vdev_list_elem)
@@ -151,7 +153,6 @@ union dp_rx_desc_list_elem_t;
  */
 #define DP_SW2HW_MACID(id) ((id) + 1)
 #define DP_HW2SW_MACID(id) ((id) > 0 ? ((id) - 1) : 0)
-#define DP_MAC_ADDR_LEN 6
 
 /**
  * Number of Tx Queues
@@ -608,16 +609,23 @@ struct dp_soc_stats {
 			uint32_t invalid_vdev;
 			/* Invalid PDEV error count */
 			uint32_t invalid_pdev;
+
 			/* Invalid sa_idx or da_idx*/
 			uint32_t invalid_sa_da_idx;
+			/* MSDU DONE failures */
+			uint32_t msdu_done_fail;
 			/* Invalid PEER Error count */
 			struct cdp_pkt_info rx_invalid_peer;
 			/* Invalid PEER ID count */
 			struct cdp_pkt_info rx_invalid_peer_id;
+			/* Invalid packet length */
+			struct cdp_pkt_info rx_invalid_pkt_len;
 			/* HAL ring access Fail error count */
 			uint32_t hal_ring_access_fail;
 			/* RX DMA error count */
 			uint32_t rxdma_error[HAL_RXDMA_ERR_MAX];
+			/* RX REO DEST Desc Invalid Magic count */
+			uint32_t rx_desc_invalid_magic;
 			/* REO Error count */
 			uint32_t reo_error[HAL_REO_ERR_MAX];
 			/* HAL REO ERR Count */
@@ -633,9 +641,8 @@ struct dp_soc_stats {
 	} rx;
 };
 
-#define DP_MAC_ADDR_LEN 6
 union dp_align_mac_addr {
-	uint8_t raw[DP_MAC_ADDR_LEN];
+	uint8_t raw[QDF_MAC_ADDR_SIZE];
 	struct {
 		uint16_t bytes_ab;
 		uint16_t bytes_cd;
@@ -945,7 +952,7 @@ struct dp_soc {
 	/* Enable processing of Tx completion status words */
 	bool process_tx_status;
 	bool process_rx_status;
-	struct dp_ast_entry *ast_table[WLAN_UMAC_PSOC_MAX_PEERS * 2];
+	struct dp_ast_entry **ast_table;
 	struct {
 		unsigned mask;
 		unsigned idx_bits;
@@ -1006,6 +1013,9 @@ struct dp_soc {
 		uint32_t ipa_rx_refill_buf_ring_size;
 		qdf_dma_addr_t ipa_rx_refill_buf_hp_paddr;
 	} ipa_uc_rx_rsc;
+
+	bool reo_remapped; /* Indicate if REO2IPA rings are remapped */
+	qdf_spinlock_t remap_lock;
 #endif
 
 	/* Smart monitor capability for HKv2 */
@@ -1018,6 +1028,15 @@ struct dp_soc {
 	uint8_t da_war_enabled;
 	/* number of active ast entries */
 	uint32_t num_ast_entries;
+	/* rdk rate statistics context at soc level*/
+	struct cdp_soc_rate_stats_ctx *rate_stats_ctx;
+	/* rdk rate statistics control flag */
+	bool wlanstats_enabled;
+
+	/* 8021p PCP-TID map values */
+	uint8_t pcp_tid_map[PCP_TID_MAP_MAX];
+	/* TID map priority value */
+	uint8_t tidmap_prty;
 };
 
 #ifdef IPA_OFFLOAD
@@ -1025,18 +1044,12 @@ struct dp_soc {
  * dp_ipa_resources - Resources needed for IPA
  */
 struct dp_ipa_resources {
-	qdf_dma_addr_t tx_ring_base_paddr;
-	uint32_t tx_ring_size;
+	qdf_shared_mem_t tx_ring;
 	uint32_t tx_num_alloc_buffer;
 
-	qdf_dma_addr_t tx_comp_ring_base_paddr;
-	uint32_t tx_comp_ring_size;
-
-	qdf_dma_addr_t rx_rdy_ring_base_paddr;
-	uint32_t rx_rdy_ring_size;
-
-	qdf_dma_addr_t rx_refill_ring_base_paddr;
-	uint32_t rx_refill_ring_size;
+	qdf_shared_mem_t tx_comp_ring;
+	qdf_shared_mem_t rx_rdy_ring;
+	qdf_shared_mem_t rx_refill_ring;
 
 	/* IPA UC doorbell registers paddr */
 	qdf_dma_addr_t tx_comp_doorbell_paddr;
@@ -1327,6 +1340,12 @@ struct dp_pdev {
 	/* mirror copy mode */
 	bool mcopy_mode;
 	bool bpr_enable;
+
+	/* enable time latency check for tx completion */
+	bool latency_capture_enable;
+
+	/* enable calculation of delay stats*/
+	bool delay_stats_flag;
 	struct {
 		uint16_t tx_ppdu_id;
 		uint16_t tx_peer_id;
@@ -1387,6 +1406,12 @@ struct dp_pdev {
 
 	/* qdf_event for fw_peer_stats */
 	qdf_event_t fw_peer_stats_event;
+
+	/* User configured max number of tx buffers */
+	uint32_t num_tx_allowed;
+
+	/* unique cookie required for peer session */
+	uint32_t next_peer_cookie;
 };
 
 struct dp_peer;
@@ -1544,6 +1569,21 @@ struct dp_vdev {
 
 	/* AST hash value for BSS peer in HW valid for STA VAP*/
 	uint16_t bss_ast_hash;
+
+	/* Capture timestamp of previous tx packet enqueued */
+	uint64_t prev_tx_enq_tstamp;
+
+	/* Capture timestamp of previous rx packet delivered */
+	uint64_t prev_rx_deliver_tstamp;
+
+	/* 8021p PCP-TID mapping table ID */
+	uint8_t tidmap_tbl_id;
+
+	/* 8021p PCP-TID map values */
+	uint8_t pcp_tid_map[PCP_TID_MAP_MAX];
+
+	/* TIDmap priority */
+	uint8_t tidmap_prty;
 };
 
 
@@ -1653,6 +1693,9 @@ struct dp_peer {
 	 * disabled
 	 */
 	uint8_t peer_based_pktlog_filter;
+
+	/* rdk statistics context */
+	struct cdp_peer_rate_stats_ctx *wlanstats_ctx;
 };
 
 #ifdef CONFIG_WIN
@@ -1678,7 +1721,7 @@ struct dp_tx_me_buf_t {
 	/* Note: ME buf pool initialization logic expects next pointer to
 	 * be the first element. Dont add anything before next */
 	struct dp_tx_me_buf_t *next;
-	uint8_t data[DP_MAC_ADDR_LEN];
+	uint8_t data[QDF_MAC_ADDR_SIZE];
 };
 
 #endif /* _DP_TYPES_H_ */

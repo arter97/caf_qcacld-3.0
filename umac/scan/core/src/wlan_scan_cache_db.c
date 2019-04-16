@@ -108,7 +108,7 @@ static QDF_STATUS scm_del_scan_node_from_db(struct scan_dbs *scan_db,
  */
 static void scm_scan_entry_get_ref(struct scan_cache_node *scan_node)
 {
-	if (scan_node == NULL) {
+	if (!scan_node) {
 		scm_err("scan_node is NULL");
 		QDF_ASSERT(0);
 		return;
@@ -474,6 +474,8 @@ scm_update_mlme_info(struct scan_cache_entry *src,
 /**
  * scm_copy_info_from_dup_entry() - copy duplicate node info
  * to new scan entry
+ * @pdev: pdev ptr
+ * @scan_obj: scan obj ptr
  * @scan_db: scan database
  * @scan_params: new entry to be added
  * @scan_node: duplicate entry
@@ -483,7 +485,9 @@ scm_update_mlme_info(struct scan_cache_entry *src,
  * Return: void
  */
 static void
-scm_copy_info_from_dup_entry(struct scan_dbs *scan_db,
+scm_copy_info_from_dup_entry(struct wlan_objmgr_pdev *pdev,
+			     struct wlan_scan_obj *scan_obj,
+			     struct scan_dbs *scan_db,
 			     struct scan_cache_entry *scan_params,
 			     struct scan_cache_node *scan_node)
 {
@@ -491,6 +495,29 @@ scm_copy_info_from_dup_entry(struct scan_dbs *scan_db,
 	uint64_t time_gap;
 
 	scan_entry = scan_node->entry;
+
+	/* Update probe resp entry as well if AP is in hidden mode */
+	if (scan_params->frm_subtype == MGMT_SUBTYPE_PROBE_RESP &&
+	    scan_entry->is_hidden_ssid)
+		scan_params->is_hidden_ssid = true;
+
+	/*
+	 * If AP changed its beacon from not having an SSID to showing it the
+	 * kernel will drop the entry asumming that something is wrong with AP.
+	 * This can result in connection failure while updating the bss during
+	 * connection. So flush the hidden entry from kernel before indicating
+	 * the new entry.
+	 */
+	if (scan_entry->is_hidden_ssid &&
+	    scan_params->frm_subtype == MGMT_SUBTYPE_BEACON &&
+	    !util_scan_is_null_ssid(&scan_params->ssid)) {
+		if (scan_obj->cb.unlink_bss) {
+			scm_debug("Hidden AP %pM switch to non-hidden SSID, So unlink the entry",
+				  scan_entry->bssid.bytes);
+			scan_obj->cb.unlink_bss(pdev, scan_entry);
+		}
+	}
+
 	/* If old entry have the ssid but new entry does not */
 	if (util_scan_is_null_ssid(&scan_params->ssid) &&
 	    scan_entry->ssid.length) {
@@ -579,6 +606,8 @@ scm_copy_info_from_dup_entry(struct scan_dbs *scan_db,
  * scm_find_duplicate() - find duplicate entry,
  * if present, add input scan entry before it and delete
  * duplicate entry. otherwise add entry to tail
+ * @pdev: pdev ptr
+ * @scan_obj: scan obj ptr
  * @scan_db: scan db
  * @entry: input scan cache entry
  * @dup_node: node before which new entry to be added
@@ -589,7 +618,9 @@ scm_copy_info_from_dup_entry(struct scan_dbs *scan_db,
  * Return: bool
  */
 static bool
-scm_find_duplicate(struct scan_dbs *scan_db,
+scm_find_duplicate(struct wlan_objmgr_pdev *pdev,
+		   struct wlan_scan_obj *scan_obj,
+		   struct scan_dbs *scan_db,
 		   struct scan_cache_entry *entry,
 		   struct scan_cache_node **dup_node)
 {
@@ -606,7 +637,8 @@ scm_find_duplicate(struct scan_dbs *scan_db,
 	while (cur_node) {
 		if (util_is_scan_entry_match(entry,
 		   cur_node->entry)) {
-			scm_copy_info_from_dup_entry(scan_db, entry, cur_node);
+			scm_copy_info_from_dup_entry(pdev, scan_obj, scan_db,
+						     entry, cur_node);
 			*dup_node = cur_node;
 			return true;
 		}
@@ -661,7 +693,8 @@ static QDF_STATUS scm_add_update_entry(struct wlan_objmgr_psoc *psoc,
 		scm_debug("CSA IE present for BSSID: %pM",
 			  scan_params->bssid.bytes);
 
-	is_dup_found = scm_find_duplicate(scan_db, scan_params, &dup_node);
+	is_dup_found = scm_find_duplicate(pdev, scan_obj, scan_db, scan_params,
+					  &dup_node);
 
 	if (scan_obj->cb.inform_beacon)
 		scan_obj->cb.inform_beacon(pdev, scan_params);
@@ -771,7 +804,7 @@ QDF_STATUS scm_handle_bcn_probe(struct scheduler_msg *msg)
 	list_count = qdf_list_size(scan_list);
 	for (i = 0; i < list_count; i++) {
 		status = qdf_list_remove_front(scan_list, &next_node);
-		if (QDF_IS_STATUS_ERROR(status) || next_node == NULL) {
+		if (QDF_IS_STATUS_ERROR(status) || !next_node) {
 			scm_debug("list remove failure i:%d, lsize:%d, BSSID: %pM",
 				  i, list_count, hdr->i_addr3);
 			status = QDF_STATUS_E_INVAL;
@@ -1327,6 +1360,9 @@ QDF_STATUS scm_scan_register_bcn_cb(struct wlan_objmgr_psoc *psoc,
 		break;
 	case SCAN_CB_TYPE_UPDATE_BCN:
 		scan_obj->cb.update_beacon = cb;
+		break;
+	case SCAN_CB_TYPE_UNLINK_BSS:
+		scan_obj->cb.unlink_bss = cb;
 		break;
 	default:
 		scm_err("invalid cb type %d", type);

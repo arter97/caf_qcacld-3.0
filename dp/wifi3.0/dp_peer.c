@@ -32,6 +32,9 @@
 #endif
 #include <cdp_txrx_handle.h>
 #include <wlan_cfg.h>
+#ifdef SERIALIZE_QUEUE_SETUP
+#include "scheduler_api.h"
+#endif
 
 #ifdef DP_LFR
 static inline void
@@ -65,6 +68,24 @@ static inline int dp_peer_find_mac_addr_cmp(
 		 */
 		&
 		(mac_addr1->align4.bytes_ef == mac_addr2->align4.bytes_ef));
+}
+
+static int dp_peer_ast_table_attach(struct dp_soc *soc)
+{
+	uint32_t max_ast_index;
+
+	max_ast_index = wlan_cfg_get_max_ast_idx(soc->wlan_cfg_ctx);
+	/* allocate ast_table for ast entry to ast_index map */
+	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
+		  "\n<=== cfg max ast idx %d ====>", max_ast_index);
+	soc->ast_table = qdf_mem_malloc(max_ast_index *
+					sizeof(struct dp_ast_entry *));
+	if (!soc->ast_table) {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+			  "%s: ast_table memory allocation failed", __func__);
+		return QDF_STATUS_E_NOMEM;
+	}
+	return 0; /* success */
 }
 
 static int dp_peer_find_map_attach(struct dp_soc *soc)
@@ -156,7 +177,10 @@ static int dp_peer_find_hash_attach(struct dp_soc *soc)
 
 static void dp_peer_find_hash_detach(struct dp_soc *soc)
 {
-	qdf_mem_free(soc->peer_hash.bins);
+	if (soc->peer_hash.bins) {
+		qdf_mem_free(soc->peer_hash.bins);
+		soc->peer_hash.bins = NULL;
+	}
 }
 
 static inline unsigned dp_peer_find_hash_index(struct dp_soc *soc,
@@ -201,8 +225,9 @@ void dp_peer_find_hash_add(struct dp_soc *soc, struct dp_peer *peer)
 static int dp_peer_ast_hash_attach(struct dp_soc *soc)
 {
 	int i, hash_elems, log2;
+	unsigned int max_ast_idx = wlan_cfg_get_max_ast_idx(soc->wlan_cfg_ctx);
 
-	hash_elems = ((soc->max_peers * DP_AST_HASH_LOAD_MULT) >>
+	hash_elems = ((max_ast_idx * DP_AST_HASH_LOAD_MULT) >>
 		DP_AST_HASH_LOAD_SHIFT);
 
 	log2 = dp_log2_ceil(hash_elems);
@@ -210,6 +235,10 @@ static int dp_peer_ast_hash_attach(struct dp_soc *soc)
 
 	soc->ast_hash.mask = hash_elems - 1;
 	soc->ast_hash.idx_bits = log2;
+
+	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
+		  "ast hash_elems: %d, max_ast_idx: %d",
+		  hash_elems, max_ast_idx);
 
 	/* allocate an array of TAILQ peer object lists */
 	soc->ast_hash.bins = qdf_mem_malloc(
@@ -263,6 +292,9 @@ static void dp_peer_ast_hash_detach(struct dp_soc *soc)
 	if (!soc->ast_hash.mask)
 		return;
 
+	if (!soc->ast_hash.bins)
+		return;
+
 	qdf_spin_lock_bh(&soc->ast_lock);
 	for (index = 0; index <= soc->ast_hash.mask; index++) {
 		if (!TAILQ_EMPTY(&soc->ast_hash.bins[index])) {
@@ -278,6 +310,7 @@ static void dp_peer_ast_hash_detach(struct dp_soc *soc)
 	qdf_spin_unlock_bh(&soc->ast_lock);
 
 	qdf_mem_free(soc->ast_hash.bins);
+	soc->ast_hash.bins = NULL;
 }
 
 /*
@@ -395,7 +428,7 @@ struct dp_ast_entry *dp_peer_ast_hash_find_by_pdevid(struct dp_soc *soc,
 	struct dp_ast_entry *ase;
 
 	qdf_mem_copy(&local_mac_addr_aligned.raw[0],
-		     ast_mac_addr, DP_MAC_ADDR_LEN);
+		     ast_mac_addr, QDF_MAC_ADDR_SIZE);
 	mac_addr = &local_mac_addr_aligned;
 
 	index = dp_peer_ast_hash_index(soc, mac_addr);
@@ -426,7 +459,7 @@ struct dp_ast_entry *dp_peer_ast_hash_find_soc(struct dp_soc *soc,
 	struct dp_ast_entry *ase;
 
 	qdf_mem_copy(&local_mac_addr_aligned.raw[0],
-			ast_mac_addr, DP_MAC_ADDR_LEN);
+			ast_mac_addr, QDF_MAC_ADDR_SIZE);
 	mac_addr = &local_mac_addr_aligned;
 
 	index = dp_peer_ast_hash_index(soc, mac_addr);
@@ -646,14 +679,16 @@ int dp_peer_add_ast(struct dp_soc *soc,
 				}
 
 				qdf_mem_copy(&param->mac_addr.raw[0], mac_addr,
-					     DP_MAC_ADDR_LEN);
+					     QDF_MAC_ADDR_SIZE);
 				qdf_mem_copy(&param->peer_mac_addr.raw[0],
 					     &peer->mac_addr.raw[0],
-					     DP_MAC_ADDR_LEN);
+					     QDF_MAC_ADDR_SIZE);
 				param->type = type;
 				param->flags = flags;
 				param->vdev_id = vdev->vdev_id;
 				ast_entry->callback = dp_peer_free_hmwds_cb;
+				ast_entry->pdev_id = vdev->pdev->pdev_id;
+				ast_entry->type = type;
 				ast_entry->cookie = (void *)param;
 				if (!ast_entry->delete_in_progress)
 					dp_peer_del_ast(soc, ast_entry);
@@ -698,7 +733,7 @@ add_ast_entry:
 		return ret;
 	}
 
-	qdf_mem_copy(&ast_entry->mac_addr.raw[0], mac_addr, DP_MAC_ADDR_LEN);
+	qdf_mem_copy(&ast_entry->mac_addr.raw[0], mac_addr, QDF_MAC_ADDR_SIZE);
 	ast_entry->pdev_id = vdev->pdev->pdev_id;
 	ast_entry->vdev_id = vdev->vdev_id;
 	ast_entry->is_mapped = false;
@@ -1010,10 +1045,11 @@ void dp_peer_ast_send_wds_del(struct dp_soc *soc,
 		  peer->vdev->vdev_id, ast_entry->mac_addr.raw,
 		  ast_entry->next_hop, ast_entry->peer->mac_addr.raw);
 
-	if (ast_entry->next_hop &&
-	    ast_entry->type != CDP_TXRX_AST_TYPE_WDS_HM_SEC)
+	if (ast_entry->next_hop) {
 		cdp_soc->ol_ops->peer_del_wds_entry(peer->vdev->osif_vdev,
-						    ast_entry->mac_addr.raw);
+						    ast_entry->mac_addr.raw,
+						    ast_entry->type);
+	}
 
 	ast_entry->delete_in_progress = true;
 }
@@ -1070,7 +1106,7 @@ struct dp_peer *dp_peer_find_hash_find(struct dp_soc *soc,
 	} else {
 		qdf_mem_copy(
 			&local_mac_addr_aligned.raw[0],
-			peer_mac_addr, DP_MAC_ADDR_LEN);
+			peer_mac_addr, QDF_MAC_ADDR_SIZE);
 		mac_addr = &local_mac_addr_aligned;
 	}
 	index = dp_peer_find_hash_index(soc, mac_addr);
@@ -1169,9 +1205,20 @@ void dp_peer_find_hash_erase(struct dp_soc *soc)
 	}
 }
 
+static void dp_peer_ast_table_detach(struct dp_soc *soc)
+{
+	if (soc->ast_table) {
+		qdf_mem_free(soc->ast_table);
+		soc->ast_table = NULL;
+	}
+}
+
 static void dp_peer_find_map_detach(struct dp_soc *soc)
 {
-	qdf_mem_free(soc->peer_id_to_obj_map);
+	if (soc->peer_id_to_obj_map) {
+		qdf_mem_free(soc->peer_id_to_obj_map);
+		soc->peer_id_to_obj_map = NULL;
+	}
 }
 
 int dp_peer_find_attach(struct dp_soc *soc)
@@ -1184,11 +1231,19 @@ int dp_peer_find_attach(struct dp_soc *soc)
 		return 1;
 	}
 
-	if (dp_peer_ast_hash_attach(soc)) {
+	if (dp_peer_ast_table_attach(soc)) {
 		dp_peer_find_hash_detach(soc);
 		dp_peer_find_map_detach(soc);
 		return 1;
 	}
+
+	if (dp_peer_ast_hash_attach(soc)) {
+		dp_peer_ast_table_detach(soc);
+		dp_peer_find_hash_detach(soc);
+		dp_peer_find_map_detach(soc);
+		return 1;
+	}
+
 	return 0; /* success */
 }
 
@@ -1374,7 +1429,7 @@ dp_rx_peer_map_handler(void *soc_handle, uint16_t peer_id,
 			 */
 			if (!(qdf_mem_cmp(peer->mac_addr.raw,
 					  peer->vdev->mac_addr.raw,
-					  DP_MAC_ADDR_LEN))) {
+					  QDF_MAC_ADDR_SIZE))) {
 				QDF_TRACE(QDF_MODULE_ID_DP,
 					  QDF_TRACE_LEVEL_INFO_HIGH,
 					  "vdev bss_peer!!!!");
@@ -1508,7 +1563,7 @@ peer_unmap:
 
 	if (soc->cdp_soc.ol_ops->peer_unmap_event) {
 		soc->cdp_soc.ol_ops->peer_unmap_event(soc->ctrl_psoc,
-				peer_id);
+				peer_id, vdev_id);
 	}
 
 	/*
@@ -1524,6 +1579,7 @@ dp_peer_find_detach(struct dp_soc *soc)
 	dp_peer_find_map_detach(soc);
 	dp_peer_find_hash_detach(soc);
 	dp_peer_ast_hash_detach(soc);
+	dp_peer_ast_table_detach(soc);
 }
 
 static void dp_rx_tid_update_cb(struct dp_soc *soc, void *cb_ctxt,
@@ -1565,7 +1621,7 @@ void *dp_find_peer_by_addr(struct cdp_pdev *dev, uint8_t *peer_mac_addr,
 
 	/* Multiple peer ids? How can know peer id? */
 	*local_id = peer->local_id;
-	DP_TRACE(INFO, "%s: peer %pK id %d", __func__, peer, *local_id);
+	dp_verbose_debug("peer %pK id %d", peer, *local_id);
 
 	/* ref_cnt is incremented inside dp_peer_find_hash_find().
 	 * Decrement it here.
@@ -1574,6 +1630,112 @@ void *dp_find_peer_by_addr(struct cdp_pdev *dev, uint8_t *peer_mac_addr,
 
 	return peer;
 }
+
+#ifdef SERIALIZE_QUEUE_SETUP
+static QDF_STATUS
+dp_rx_reorder_queue_setup(struct scheduler_msg *msg)
+{
+	struct cdp_reorder_q_setup *q_params;
+	struct dp_soc *soc;
+
+	if (!(msg->bodyptr)) {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+			  "Invalid message body");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	q_params = msg->bodyptr;
+	soc = (struct dp_soc *)q_params->soc;
+	if (soc->cdp_soc.ol_ops->peer_rx_reorder_queue_setup) {
+		soc->cdp_soc.ol_ops->peer_rx_reorder_queue_setup(
+				q_params->ctrl_pdev, q_params->vdev_id,
+				q_params->peer_mac, q_params->hw_qdesc_paddr,
+				q_params->tid, q_params->queue_no,
+				q_params->ba_window_size_valid,
+				q_params->ba_window_size);
+	}
+
+	qdf_mem_free(q_params);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
+dp_flush_queue_setup_msg(struct scheduler_msg *msg)
+{
+	if (msg->bodyptr)
+		qdf_mem_free(msg->bodyptr);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * dp_rx_reorder_update_queue_setup() - update rx reorder queue setup
+ * @peer: dp peer pointer
+ * @hw_qdesc: hw queue descriptor
+ * @tid: tid number
+ * @queue_no: queue number
+ * @size_valid: BA window size validity flag
+ * @window_size: BA window size
+ *
+ * return: QDF_STATUS_SUCCESS for success or error code
+ */
+static QDF_STATUS
+dp_rx_reorder_update_queue_setup(struct dp_peer *peer, qdf_dma_addr_t hw_qdesc,
+				 int tid, uint16_t queue_no, uint8_t size_valid,
+				 uint16_t window_size)
+{
+	struct dp_soc *soc = peer->vdev->pdev->soc;
+	struct scheduler_msg msg = {0};
+	struct cdp_reorder_q_setup *q_params;
+	QDF_STATUS status;
+
+	q_params = qdf_mem_malloc(sizeof(*q_params));
+	qdf_mem_zero(q_params, sizeof(*q_params));
+
+	q_params->soc = (struct cdp_soc *)soc;
+	q_params->ctrl_pdev = peer->vdev->pdev->ctrl_pdev;
+	q_params->vdev_id = peer->vdev->vdev_id;
+	q_params->hw_qdesc_paddr = hw_qdesc;
+	q_params->tid = tid;
+	q_params->queue_no = queue_no;
+	q_params->ba_window_size_valid = size_valid;
+	q_params->ba_window_size = window_size;
+	qdf_mem_copy(q_params->peer_mac, peer->mac_addr.raw, QDF_MAC_ADDR_SIZE);
+
+	msg.bodyptr = q_params;
+	msg.callback = dp_rx_reorder_queue_setup;
+	msg.flush_callback = dp_flush_queue_setup_msg;
+	status = scheduler_post_message(QDF_MODULE_ID_DP,
+					QDF_MODULE_ID_DP,
+					QDF_MODULE_ID_TARGET_IF, &msg);
+
+	if (status != QDF_STATUS_SUCCESS)
+		qdf_mem_free(q_params);
+
+	return status;
+}
+#else
+
+static QDF_STATUS
+dp_rx_reorder_update_queue_setup(struct dp_peer *peer, qdf_dma_addr_t hw_qdesc,
+				 int tid, uint16_t queue_no, uint8_t size_valid,
+				 uint16_t window_size)
+{
+	struct dp_soc *soc = peer->vdev->pdev->soc;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (soc->cdp_soc.ol_ops->peer_rx_reorder_queue_setup) {
+		status = soc->cdp_soc.ol_ops->peer_rx_reorder_queue_setup(
+					peer->vdev->pdev->ctrl_pdev,
+					peer->vdev->vdev_id, peer->mac_addr.raw,
+					hw_qdesc, tid, tid, size_valid,
+					window_size);
+	}
+
+	return status;
+}
+#endif
 
 /*
  * dp_rx_tid_update_wifi3() – Update receive TID state
@@ -1605,17 +1767,14 @@ static int dp_rx_tid_update_wifi3(struct dp_peer *peer, int tid, uint32_t
 	}
 
 	dp_set_ssn_valid_flag(&params, 0);
-
-	dp_reo_send_cmd(soc, CMD_UPDATE_RX_REO_QUEUE, &params, dp_rx_tid_update_cb, rx_tid);
+	dp_reo_send_cmd(soc, CMD_UPDATE_RX_REO_QUEUE, &params,
+			dp_rx_tid_update_cb, rx_tid);
 
 	rx_tid->ba_win_size = ba_window_size;
-	if (soc->cdp_soc.ol_ops->peer_rx_reorder_queue_setup) {
-		soc->cdp_soc.ol_ops->peer_rx_reorder_queue_setup(
-			peer->vdev->pdev->ctrl_pdev,
-			peer->vdev->vdev_id, peer->mac_addr.raw,
-			rx_tid->hw_qdesc_paddr, tid, tid, 1, ba_window_size);
 
-	}
+	dp_rx_reorder_update_queue_setup(peer, rx_tid->hw_qdesc_paddr, tid,
+					 tid, 1, ba_window_size);
+
 	return 0;
 }
 
@@ -1699,7 +1858,7 @@ int dp_rx_tid_setup_wifi3(struct dp_peer *peer, int tid,
 		return QDF_STATUS_E_FAILURE;
 
 	rx_tid->ba_win_size = ba_window_size;
-	if (rx_tid->hw_qdesc_vaddr_unaligned != NULL)
+	if (rx_tid->hw_qdesc_vaddr_unaligned)
 		return dp_rx_tid_update_wifi3(peer, tid, ba_window_size,
 			start_seq);
 	rx_tid->delba_tx_status = 0;
@@ -1834,7 +1993,7 @@ try_desc_alloc:
 	}
 	return 0;
 error:
-	if (NULL != rx_tid->hw_qdesc_vaddr_unaligned) {
+	if (rx_tid->hw_qdesc_vaddr_unaligned) {
 		if (dp_reo_desc_addr_chk(rx_tid->hw_qdesc_paddr) ==
 		    QDF_STATUS_SUCCESS)
 			qdf_mem_unmap_nbytes_single(
@@ -2360,8 +2519,7 @@ int dp_addba_requestprocess_wifi3(void *peer_handle,
 	qdf_spin_lock_bh(&rx_tid->tid_lock);
 	rx_tid->num_of_addba_req++;
 	if ((rx_tid->ba_status == DP_RX_BA_ACTIVE &&
-	     rx_tid->hw_qdesc_vaddr_unaligned != NULL) ||
-	    (rx_tid->ba_status == DP_RX_BA_IN_PROGRESS)) {
+	     rx_tid->hw_qdesc_vaddr_unaligned)) {
 		dp_rx_tid_update_wifi3(peer, tid, 1, 0);
 		rx_tid->ba_status = DP_RX_BA_INACTIVE;
 		peer->active_ba_session_cnt--;
@@ -2598,7 +2756,7 @@ dp_set_pn_check_wifi3(struct cdp_vdev *vdev_handle, struct cdp_peer *peer_handle
 	for (i = 0; i < DP_MAX_TIDS; i++) {
 		struct dp_rx_tid *rx_tid = &peer->rx_tid[i];
 		qdf_spin_lock_bh(&rx_tid->tid_lock);
-		if (rx_tid->hw_qdesc_vaddr_unaligned != NULL) {
+		if (rx_tid->hw_qdesc_vaddr_unaligned) {
 			params.std.addr_lo =
 				rx_tid->hw_qdesc_paddr & 0xffffffff;
 			params.std.addr_hi =
@@ -2851,7 +3009,7 @@ QDF_STATUS dp_peer_state_update(struct cdp_pdev *pdev_handle, uint8_t *peer_mac,
 	struct dp_pdev *pdev = (struct dp_pdev *)pdev_handle;
 
 	peer =  dp_peer_find_hash_find(pdev->soc, peer_mac, 0, DP_VDEV_ALL);
-	if (NULL == peer) {
+	if (!peer) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 			  "Failed to find peer for: [%pM]", peer_mac);
 		return QDF_STATUS_E_FAILURE;
@@ -3104,7 +3262,7 @@ void dp_peer_rxtid_stats(struct dp_peer *peer, void (*dp_stats_cmd_cb),
 	qdf_mem_zero(&params, sizeof(params));
 	for (i = 0; i < DP_MAX_TIDS; i++) {
 		struct dp_rx_tid *rx_tid = &peer->rx_tid[i];
-		if (rx_tid->hw_qdesc_vaddr_unaligned != NULL) {
+		if (rx_tid->hw_qdesc_vaddr_unaligned) {
 			params.std.need_status = 1;
 			params.std.addr_lo =
 				rx_tid->hw_qdesc_paddr & 0xffffffff;

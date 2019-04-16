@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -62,6 +62,7 @@
  *                 TWT slots for STAs. (units = milliseconds)
  * @remove_sta_slot_interval: Inrerval between decisions making to remove TWT
  *                 slot of STAs. (units = milliseconds)
+ * @flags: Flag to enable or disable capabilities, example bcast twt.
  */
 struct wmi_twt_enable_param {
 	uint32_t pdev_id;
@@ -81,6 +82,7 @@ struct wmi_twt_enable_param {
 	uint32_t mode_check_interval;
 	uint32_t add_sta_slot_interval;
 	uint32_t remove_sta_slot_interval;
+	uint32_t flags;
 };
 
 /* status code of enabling TWT
@@ -163,7 +165,7 @@ enum WMI_HOST_TWT_COMMAND {
  */
 struct wmi_twt_add_dialog_param {
 	uint32_t vdev_id;
-	uint8_t  peer_macaddr[IEEE80211_ADDR_LEN];
+	uint8_t  peer_macaddr[QDF_MAC_ADDR_SIZE];
 	uint32_t dialog_id;
 	uint32_t wake_intvl_us;
 	uint32_t wake_intvl_mantis;
@@ -212,7 +214,7 @@ enum WMI_HOST_ADD_TWT_STATUS {
  */
 struct wmi_twt_add_dialog_complete_event_param {
 	uint32_t vdev_id;
-	uint8_t  peer_macaddr[IEEE80211_ADDR_LEN];
+	uint8_t  peer_macaddr[QDF_MAC_ADDR_SIZE];
 	uint32_t dialog_id;
 	uint32_t status;
 };
@@ -224,7 +226,7 @@ struct wmi_twt_add_dialog_complete_event_param {
  */
 struct wmi_twt_del_dialog_param {
 	uint32_t vdev_id;
-	uint8_t  peer_macaddr[IEEE80211_ADDR_LEN];
+	uint8_t  peer_macaddr[QDF_MAC_ADDR_SIZE];
 	uint32_t dialog_id;
 };
 
@@ -258,7 +260,7 @@ enum WMI_HOST_DEL_TWT_STATUS {
  */
 struct wmi_twt_del_dialog_complete_event_param {
 	uint32_t vdev_id;
-	uint8_t  peer_macaddr[IEEE80211_ADDR_LEN];
+	uint8_t  peer_macaddr[QDF_MAC_ADDR_SIZE];
 	uint32_t dialog_id;
 	uint32_t status;
 };
@@ -270,7 +272,7 @@ struct wmi_twt_del_dialog_complete_event_param {
  */
 struct wmi_twt_pause_dialog_cmd_param {
 	uint32_t vdev_id;
-	uint8_t  peer_macaddr[IEEE80211_ADDR_LEN];
+	uint8_t  peer_macaddr[QDF_MAC_ADDR_SIZE];
 	uint32_t dialog_id;
 };
 
@@ -304,7 +306,7 @@ enum WMI_HOST_PAUSE_TWT_STATUS {
  */
 struct wmi_twt_pause_dialog_complete_event_param {
 	uint32_t vdev_id;
-	uint8_t  peer_macaddr[IEEE80211_ADDR_LEN];
+	uint8_t  peer_macaddr[QDF_MAC_ADDR_SIZE];
 	uint32_t dialog_id;
 	uint32_t status;
 };
@@ -319,7 +321,7 @@ struct wmi_twt_pause_dialog_complete_event_param {
  */
 struct wmi_twt_resume_dialog_cmd_param {
 	uint32_t vdev_id;
-	uint8_t  peer_macaddr[IEEE80211_ADDR_LEN];
+	uint8_t  peer_macaddr[QDF_MAC_ADDR_SIZE];
 	uint32_t dialog_id;
 	uint32_t sp_offset_us;
 	uint32_t next_twt_size;
@@ -357,7 +359,7 @@ enum WMI_HOST_RESUME_TWT_STATUS {
  */
 struct wmi_twt_resume_dialog_complete_event_param {
 	uint32_t vdev_id;
-	uint8_t  peer_macaddr[IEEE80211_ADDR_LEN];
+	uint8_t  peer_macaddr[QDF_MAC_ADDR_SIZE];
 	uint32_t dialog_id;
 	uint32_t status;
 };

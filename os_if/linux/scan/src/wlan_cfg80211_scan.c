@@ -79,7 +79,7 @@ static void wlan_fill_scan_rand_attrs(struct wlan_objmgr_vdev *vdev,
 	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE)
 		return;
 
-	if (wlan_vdev_is_connected(vdev))
+	if (wlan_vdev_is_up(vdev) == QDF_STATUS_SUCCESS)
 		return;
 
 	*randomize = true;
@@ -718,7 +718,7 @@ static QDF_STATUS wlan_scan_request_dequeue(
 
 	cfg80211_debug("Dequeue Scan id: %d", scan_id);
 
-	if ((source == NULL) || (req == NULL)) {
+	if ((!source) || (!req)) {
 		cfg80211_err("source or request is NULL");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
@@ -1294,6 +1294,7 @@ int wlan_cfg80211_scan(struct wlan_objmgr_vdev *vdev,
 	enum wlan_band band;
 	struct net_device *netdev = NULL;
 	QDF_STATUS qdf_status;
+	uint32_t extra_ie_len = 0;
 
 	psoc = wlan_pdev_get_psoc(pdev);
 	if (!psoc) {
@@ -1315,7 +1316,7 @@ int wlan_cfg80211_scan(struct wlan_objmgr_vdev *vdev,
 	if (!wlan_cfg80211_allow_simultaneous_scan(psoc) &&
 	    !qdf_list_empty(&osif_priv->osif_scan->scan_req_q)) {
 		cfg80211_err("Simultaneous scan disabled, reject scan");
-		return -EINVAL;
+		return -EBUSY;
 	}
 
 	req = qdf_mem_malloc(sizeof(*req));
@@ -1452,7 +1453,6 @@ int wlan_cfg80211_scan(struct wlan_objmgr_vdev *vdev,
 
 				if (QDF_IS_STATUS_ERROR(qdf_status)) {
 					cfg80211_err("DNBS check failed");
-					qdf_mem_free(req);
 					qdf_mem_free(chl);
 					chl = NULL;
 					ret = -EINVAL;
@@ -1490,25 +1490,39 @@ int wlan_cfg80211_scan(struct wlan_objmgr_vdev *vdev,
 	/* P2P increase the scan priority */
 	if (is_p2p_scan)
 		req->scan_req.scan_priority = SCAN_PRIORITY_HIGH;
-	if (request->ie_len) {
-		req->scan_req.extraie.ptr = qdf_mem_malloc(request->ie_len);
+
+	if (request->ie_len)
+		extra_ie_len = request->ie_len;
+	else if (params->default_ie.ptr && params->default_ie.len)
+		extra_ie_len = params->default_ie.len;
+
+	if (params->vendor_ie.ptr && params->vendor_ie.len)
+		extra_ie_len += params->vendor_ie.len;
+
+	if (extra_ie_len) {
+		req->scan_req.extraie.ptr = qdf_mem_malloc(extra_ie_len);
 		if (!req->scan_req.extraie.ptr) {
 			ret = -ENOMEM;
 			goto err;
 		}
+	}
+
+	if (request->ie_len) {
 		req->scan_req.extraie.len = request->ie_len;
 		qdf_mem_copy(req->scan_req.extraie.ptr, request->ie,
-				request->ie_len);
+			     request->ie_len);
 	} else if (params->default_ie.ptr && params->default_ie.len) {
-		req->scan_req.extraie.ptr =
-			qdf_mem_malloc(params->default_ie.len);
-		if (!req->scan_req.extraie.ptr) {
-			ret = -ENOMEM;
-			goto err;
-		}
 		req->scan_req.extraie.len = params->default_ie.len;
 		qdf_mem_copy(req->scan_req.extraie.ptr, params->default_ie.ptr,
 			     params->default_ie.len);
+	}
+
+	if (params->vendor_ie.ptr && params->vendor_ie.len) {
+		qdf_mem_copy((req->scan_req.extraie.ptr +
+			      req->scan_req.extraie.len),
+			     params->vendor_ie.ptr, params->vendor_ie.len);
+
+		req->scan_req.extraie.len += params->vendor_ie.len;
 	}
 
 	if (!is_p2p_scan) {
@@ -1934,6 +1948,57 @@ void wlan_cfg80211_inform_bss_frame(struct wlan_objmgr_pdev *pdev,
 		wlan_cfg80211_put_bss(wiphy, bss);
 
 	qdf_mem_free(bss_data.mgmt);
+}
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 1, 0)) && \
+	!defined(WITH_BACKPORTS) && !defined(IEEE80211_PRIVACY)
+struct cfg80211_bss *wlan_cfg80211_get_bss(struct wiphy *wiphy,
+					   struct ieee80211_channel *channel,
+					   const u8 *bssid, const u8 *ssid,
+					   size_t ssid_len)
+{
+	return cfg80211_get_bss(wiphy, channel, bssid,
+				ssid, ssid_len,
+				WLAN_CAPABILITY_ESS,
+				WLAN_CAPABILITY_ESS);
+}
+#else
+struct cfg80211_bss *wlan_cfg80211_get_bss(struct wiphy *wiphy,
+					   struct ieee80211_channel *channel,
+					   const u8 *bssid, const u8 *ssid,
+					   size_t ssid_len)
+{
+	return cfg80211_get_bss(wiphy, channel, bssid,
+				ssid, ssid_len,
+				IEEE80211_BSS_TYPE_ESS,
+				IEEE80211_PRIVACY_ANY);
+}
+#endif
+
+void wlan_cfg80211_unlink_bss_list(struct wlan_objmgr_pdev *pdev,
+				   struct scan_cache_entry *scan_entry)
+{
+	struct cfg80211_bss *bss = NULL;
+	struct pdev_osif_priv *pdev_ospriv = wlan_pdev_get_ospriv(pdev);
+	struct wiphy *wiphy;
+
+	if (!pdev_ospriv) {
+		cfg80211_err("os_priv is NULL");
+		return;
+	}
+
+	wiphy = pdev_ospriv->wiphy;
+	bss = wlan_cfg80211_get_bss(wiphy, NULL, scan_entry->bssid.bytes,
+				    scan_entry->ssid.ssid,
+				    scan_entry->ssid.length);
+	if (!bss) {
+		cfg80211_err("BSS %pM not found", scan_entry->bssid.bytes);
+	} else {
+		cfg80211_debug("cfg80211_unlink_bss called for BSSID %pM",
+			       scan_entry->bssid.bytes);
+		cfg80211_unlink_bss(wiphy, bss);
+		wlan_cfg80211_put_bss(wiphy, bss);
+	}
 }
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0))

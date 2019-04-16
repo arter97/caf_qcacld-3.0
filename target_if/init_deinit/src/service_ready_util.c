@@ -51,7 +51,7 @@ QDF_STATUS init_deinit_chainmask_table_alloc(
 			 ser_ext_par->chainmask_table[i].num_valid_chainmasks);
 
 		ser_ext_par->chainmask_table[i].cap_list =
-			qdf_mem_alloc_outline(NULL, alloc_size);
+			qdf_mem_malloc(alloc_size);
 		if (!ser_ext_par->chainmask_table[i].cap_list) {
 			init_deinit_chainmask_table_free(ser_ext_par);
 			status = QDF_STATUS_E_NOMEM;
@@ -570,7 +570,7 @@ QDF_STATUS init_deinit_validate_160_80p80_fw_caps(
 	}
 
 	reg_cap = ucfg_reg_get_hal_reg_cap(psoc);
-	if (reg_cap == NULL) {
+	if (!reg_cap) {
 		target_if_err("reg cap is NULL");
 		return QDF_STATUS_E_FAILURE;
 	}

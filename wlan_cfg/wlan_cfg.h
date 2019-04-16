@@ -1,5 +1,5 @@
 /*
-* * Copyright (c) 2013-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -96,6 +96,7 @@ struct wlan_cfg_dp_pdev_ctxt;
  * @num_tx_desc_pool: Number of Tx Descriptor pools
  * @num_tx_ext_desc_pool: Number of Tx MSDU extension Descriptor pools
  * @num_tx_desc: Number of Tx Descriptors per pool
+ * @min_tx_desc: Minimum number of Tx Descriptors per pool
  * @num_tx_ext_desc: Number of Tx MSDU extension Descriptors per pool
  * @max_peer_id: Maximum value of peer id that FW can assign for a client
  * @htt_packet_type: Default 802.11 encapsulation type for any VAP created
@@ -149,6 +150,7 @@ struct wlan_cfg_dp_soc_ctxt {
 	int num_tx_desc_pool;
 	int num_tx_ext_desc_pool;
 	int num_tx_desc;
+	int min_tx_desc;
 	int num_tx_ext_desc;
 	int max_peer_id;
 	int htt_packet_type;
@@ -203,6 +205,7 @@ struct wlan_cfg_dp_soc_ctxt {
 	int reo_status_ring;
 	int rxdma_refill_ring;
 	int rxdma_err_dst_ring;
+	uint32_t per_pkt_trace;
 	bool raw_mode_war;
 	bool enable_data_stall_detection;
 	bool disable_intra_bss_fwd;
@@ -647,6 +650,14 @@ void wlan_cfg_set_num_tx_ext_desc_pool(struct wlan_cfg_dp_soc_ctxt *cfg, int num
 int wlan_cfg_get_num_tx_desc(struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx);
 
 /*
+ * wlan_cfg_get_min_tx_desc() - Minimum number of Tx Descriptors per pool
+ * @wlan_cfg_ctx - Configuration Handle
+ *
+ * Return: num_tx_desc
+ */
+int wlan_cfg_get_min_tx_desc(struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx);
+
+/*
  * wlan_cfg_set_num_tx_desc() - Set the number of Tx Descriptors per pool
  *
  * @wlan_cfg_ctx - Configuration Handle
@@ -982,7 +993,6 @@ wlan_cfg_get_dp_soc_rxdma_err_dst_ring_size(struct wlan_cfg_dp_soc_ctxt *cfg);
 bool
 wlan_cfg_get_dp_caps(struct wlan_cfg_dp_soc_ctxt *cfg,
 		     enum cdp_capabilities dp_caps);
-
 #ifdef QCA_LL_TX_FLOW_CONTROL_V2
 int wlan_cfg_get_tx_flow_stop_queue_th(struct wlan_cfg_dp_soc_ctxt *cfg);
 

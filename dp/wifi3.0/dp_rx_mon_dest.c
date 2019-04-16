@@ -195,21 +195,23 @@ struct dp_srng *dp_rxdma_get_mon_buf_ring(struct dp_pdev *pdev,
 }
 
 /**
- * dp_rx_get_desc_pool() - Return monitor descriptor pool
- *			      based on target
+ * dp_rx_get_mon_desc_pool() - Return monitor descriptor pool
+ *			       based on target
  * @soc: soc handle
  * @mac_id: mac id number
+ * @pdev_id: pdev id number
  *
  * Return: descriptor pool address
  */
 static inline
-struct rx_desc_pool *dp_rx_get_desc_pool(struct dp_soc *soc,
-					 uint8_t mac_id)
+struct rx_desc_pool *dp_rx_get_mon_desc_pool(struct dp_soc *soc,
+					     uint8_t mac_id,
+					     uint8_t pdev_id)
 {
 	if (soc->wlan_cfg_ctx->rxdma1_enable)
 		return &soc->rx_desc_mon[mac_id];
 
-	return &soc->rx_desc_buf[mac_id];
+	return &soc->rx_desc_buf[pdev_id];
 }
 
 /**
@@ -470,7 +472,7 @@ dp_rx_mon_mpdu_pop(struct dp_soc *soc, uint32_t mac_id,
 					  qdf_nbuf_data(msdu),
 					  (uint32_t)qdf_nbuf_len(msdu));
 
-			if (head_msdu && *head_msdu == NULL) {
+			if (head_msdu && !*head_msdu) {
 				*head_msdu = msdu;
 			} else {
 				if (last)
@@ -653,7 +655,7 @@ qdf_nbuf_t dp_rx_mon_restitch_mpdu_from_msdus(struct dp_soc *soc,
 		wifi_hdr_len += 6;
 
 	is_amsdu = 0;
-	if (wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_QOS) {
+	if (wh->i_fc[0] & QDF_IEEE80211_FC0_SUBTYPE_QOS) {
 		qos = (struct ieee80211_qoscntl *)
 			(hdr_desc + wifi_hdr_len);
 		wifi_hdr_len += 2;
@@ -1039,6 +1041,7 @@ mon_deliver_non_std_fail:
 void dp_rx_mon_dest_process(struct dp_soc *soc, uint32_t mac_id, uint32_t quota)
 {
 	struct dp_pdev *pdev = dp_get_pdev_for_mac_id(soc, mac_id);
+	uint8_t pdev_id;
 	void *hal_soc;
 	void *rxdma_dst_ring_desc;
 	void *mon_dst_srng;
@@ -1060,7 +1063,7 @@ void dp_rx_mon_dest_process(struct dp_soc *soc, uint32_t mac_id, uint32_t quota)
 
 	hal_soc = soc->hal_soc;
 
-	qdf_assert(hal_soc);
+	qdf_assert((hal_soc && pdev));
 
 	qdf_spin_lock_bh(&pdev->mon_lock);
 
@@ -1071,6 +1074,7 @@ void dp_rx_mon_dest_process(struct dp_soc *soc, uint32_t mac_id, uint32_t quota)
 		return;
 	}
 
+	pdev_id = pdev->pdev_id;
 	ppdu_id = pdev->ppdu_info.com_info.ppdu_id;
 	rx_bufs_used = 0;
 	rx_mon_stats = &pdev->rx_mon_stats;
@@ -1099,7 +1103,7 @@ void dp_rx_mon_dest_process(struct dp_soc *soc, uint32_t mac_id, uint32_t quota)
 			break;
 		}
 
-		if (qdf_likely((head_msdu != NULL) && (tail_msdu != NULL))) {
+		if (qdf_likely((head_msdu) && (tail_msdu))) {
 			rx_mon_stats->dest_mpdu_done++;
 			dp_rx_mon_deliver(soc, mac_id, head_msdu, tail_msdu);
 		}
@@ -1114,12 +1118,15 @@ void dp_rx_mon_dest_process(struct dp_soc *soc, uint32_t mac_id, uint32_t quota)
 	if (rx_bufs_used) {
 		rx_mon_stats->dest_ppdu_done++;
 		dp_rx_buffers_replenish(soc, mac_id,
-			dp_rxdma_get_mon_buf_ring(pdev, mac_for_pdev),
-			dp_rx_get_desc_pool(soc, mac_id),
-			rx_bufs_used, &head, &tail);
+					dp_rxdma_get_mon_buf_ring(pdev,
+								  mac_for_pdev),
+					dp_rx_get_mon_desc_pool(soc, mac_id,
+								pdev_id),
+					rx_bufs_used, &head, &tail);
 	}
 }
 
+#ifndef DISABLE_MON_CONFIG
 #ifndef QCA_WIFI_QCA6390
 /**
  * dp_rx_pdev_mon_buf_attach() - Allocate the monitor descriptor pool
@@ -1173,8 +1180,12 @@ dp_rx_pdev_mon_buf_detach(struct dp_pdev *pdev, int mac_id)
 	struct rx_desc_pool *rx_desc_pool;
 
 	rx_desc_pool = &soc->rx_desc_mon[mac_id];
-	if (rx_desc_pool->pool_size != 0)
-		dp_rx_desc_pool_free(soc, mac_id, rx_desc_pool);
+	if (rx_desc_pool->pool_size != 0) {
+		if (!dp_is_soc_reinit(soc))
+			dp_rx_desc_pool_free(soc, mac_id, rx_desc_pool);
+		else
+			dp_rx_desc_nbuf_pool_free(soc, rx_desc_pool);
+	}
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1462,7 +1473,6 @@ dp_rx_pdev_mon_buf_detach(struct dp_pdev *pdev, int mac_id)
  * Return: QDF_STATUS_SUCCESS: success
  *         QDF_STATUS_E_RESOURCES: Error return
  */
-#ifndef DISABLE_MON_CONFIG
 QDF_STATUS
 dp_rx_pdev_mon_attach(struct dp_pdev *pdev) {
 	struct dp_soc *soc = pdev->soc;

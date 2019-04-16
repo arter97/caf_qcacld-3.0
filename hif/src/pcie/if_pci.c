@@ -62,10 +62,6 @@
  */
 #define CPU_WARM_RESET_WAR
 
-#ifdef CONFIG_WIN
-extern int32_t frac, intval, ar900b_20_targ_clk, qca9888_20_targ_clk;
-#endif
-
 /*
  * Top-level interrupt handler for all PCI interrupts from a Target.
  * When a block of MSI interrupts is allocated, this top-level handler
@@ -1284,7 +1280,7 @@ static void hif_disable_power_gating(struct hif_opaque_softc *hif_ctx)
 	struct hif_softc *scn = HIF_GET_SOFTC(hif_ctx);
 	struct hif_pci_softc *sc = HIF_GET_PCI_SOFTC(hif_ctx);
 
-	if (NULL == scn) {
+	if (!scn) {
 		HIF_ERROR("%s: Could not disable ASPM scn is null",
 		       __func__);
 		return;
@@ -1303,7 +1299,7 @@ static void hif_disable_power_gating(struct hif_opaque_softc *hif_ctx)
  */
 static void hif_enable_power_gating(struct hif_pci_softc *sc)
 {
-	if (NULL == sc) {
+	if (!sc) {
 		HIF_ERROR("%s: Could not disable ASPM scn is null",
 		       __func__);
 		return;
@@ -1328,7 +1324,7 @@ void hif_pci_enable_power_management(struct hif_softc *hif_sc,
 {
 	struct hif_pci_softc *pci_ctx = HIF_GET_PCI_SOFTC(hif_sc);
 
-	if (pci_ctx == NULL) {
+	if (!pci_ctx) {
 		HIF_ERROR("%s, hif_ctx null", __func__);
 		return;
 	}
@@ -1360,7 +1356,7 @@ void hif_pci_disable_power_management(struct hif_softc *hif_ctx)
 {
 	struct hif_pci_softc *pci_ctx = HIF_GET_PCI_SOFTC(hif_ctx);
 
-	if (pci_ctx == NULL) {
+	if (!pci_ctx) {
 		HIF_ERROR("%s, hif_ctx null", __func__);
 		return;
 	}
@@ -1372,7 +1368,7 @@ void hif_pci_display_stats(struct hif_softc *hif_ctx)
 {
 	struct hif_pci_softc *pci_ctx = HIF_GET_PCI_SOFTC(hif_ctx);
 
-	if (pci_ctx == NULL) {
+	if (!pci_ctx) {
 		HIF_ERROR("%s, hif_ctx null", __func__);
 		return;
 	}
@@ -1383,7 +1379,7 @@ void hif_pci_clear_stats(struct hif_softc *hif_ctx)
 {
 	struct hif_pci_softc *pci_ctx = HIF_GET_PCI_SOFTC(hif_ctx);
 
-	if (pci_ctx == NULL) {
+	if (!pci_ctx) {
 		HIF_ERROR("%s, hif_ctx null", __func__);
 		return;
 	}
@@ -1498,7 +1494,8 @@ static void hif_sleep_entry(void *arg)
 #define HIF_HIA_MAX_POLL_LOOP    1000000
 #define HIF_HIA_POLLING_DELAY_MS 10
 
-#ifdef CONFIG_WIN
+#ifdef QCA_HIF_HIA_EXTND
+
 static void hif_set_hia_extnd(struct hif_softc *scn)
 {
 	struct hif_opaque_softc *hif_hdl = GET_HIF_OPAQUE_HDL(scn);
@@ -2189,7 +2186,7 @@ static void hif_disable_pci(struct hif_pci_softc *sc)
 {
 	struct hif_softc *ol_sc = HIF_GET_SOFTC(sc);
 
-	if (ol_sc == NULL) {
+	if (!ol_sc) {
 		HIF_ERROR("%s: ol_sc = NULL", __func__);
 		return;
 	}
@@ -2535,6 +2532,16 @@ void hif_pci_prevent_linkdown(struct hif_softc *scn, bool flag)
  */
 int hif_pci_bus_suspend(struct hif_softc *scn)
 {
+	hif_apps_irqs_disable(GET_HIF_OPAQUE_HDL(scn));
+
+	if (hif_drain_tasklets(scn)) {
+		hif_apps_irqs_enable(GET_HIF_OPAQUE_HDL(scn));
+		return -EBUSY;
+	}
+
+	/* Stop the HIF Sleep Timer */
+	hif_cancel_deferred_target_sleep(scn);
+
 	return 0;
 }
 
@@ -2584,7 +2591,15 @@ static int __hif_check_link_status(struct hif_softc *scn)
  */
 int hif_pci_bus_resume(struct hif_softc *scn)
 {
-	return __hif_check_link_status(scn);
+	int errno;
+
+	errno = __hif_check_link_status(scn);
+	if (errno)
+		return errno;
+
+	hif_apps_irqs_enable(GET_HIF_OPAQUE_HDL(scn));
+
+	return 0;
 }
 
 /**
@@ -2598,14 +2613,10 @@ int hif_pci_bus_resume(struct hif_softc *scn)
  */
 int hif_pci_bus_suspend_noirq(struct hif_softc *scn)
 {
-	if (hif_drain_tasklets(scn) != 0)
-		return -EBUSY;
-
-	/* Stop the HIF Sleep Timer */
-	hif_cancel_deferred_target_sleep(scn);
-
 	if (hif_can_suspend_link(GET_HIF_OPAQUE_HDL(scn)))
 		qdf_atomic_set(&scn->link_suspended, 1);
+
+	hif_apps_wake_irq_enable(GET_HIF_OPAQUE_HDL(scn));
 
 	return 0;
 }
@@ -2621,6 +2632,8 @@ int hif_pci_bus_suspend_noirq(struct hif_softc *scn)
  */
 int hif_pci_bus_resume_noirq(struct hif_softc *scn)
 {
+	hif_apps_wake_irq_disable(GET_HIF_OPAQUE_HDL(scn));
+
 	if (hif_can_suspend_link(GET_HIF_OPAQUE_HDL(scn)))
 		qdf_atomic_set(&scn->link_suspended, 0);
 
@@ -2639,7 +2652,7 @@ static void __hif_runtime_pm_set_state(struct hif_softc *scn,
 {
 	struct hif_pci_softc *sc = HIF_GET_PCI_SOFTC(scn);
 
-	if (NULL == sc) {
+	if (!sc) {
 		HIF_ERROR("%s: HIF_CTX not initialized",
 		       __func__);
 		return;
@@ -2685,7 +2698,7 @@ static void hif_log_runtime_suspend_success(struct hif_softc *hif_ctx)
 {
 	struct hif_pci_softc *sc = HIF_GET_PCI_SOFTC(hif_ctx);
 
-	if (sc == NULL)
+	if (!sc)
 		return;
 
 	sc->pm_stats.suspended++;
@@ -2702,7 +2715,7 @@ static void hif_log_runtime_suspend_failure(void *hif_ctx)
 {
 	struct hif_pci_softc *sc = HIF_GET_PCI_SOFTC(hif_ctx);
 
-	if (sc == NULL)
+	if (!sc)
 		return;
 
 	sc->pm_stats.suspend_err++;
@@ -2718,7 +2731,7 @@ static void hif_log_runtime_resume_success(void *hif_ctx)
 {
 	struct hif_pci_softc *sc = HIF_GET_PCI_SOFTC(hif_ctx);
 
-	if (sc == NULL)
+	if (!sc)
 		return;
 
 	sc->pm_stats.resumed++;
@@ -2737,7 +2750,7 @@ void hif_process_runtime_suspend_failure(struct hif_opaque_softc *hif_ctx)
 	struct hif_softc *scn = HIF_GET_SOFTC(hif_ctx);
 
 	hif_log_runtime_suspend_failure(hif_ctx);
-	if (hif_pci_sc != NULL)
+	if (hif_pci_sc)
 		hif_pm_runtime_mark_last_busy(hif_pci_sc->dev);
 	hif_runtime_pm_set_state_on(scn);
 }
@@ -2804,7 +2817,7 @@ void hif_process_runtime_resume_success(struct hif_opaque_softc *hif_ctx)
 	struct hif_softc *scn = HIF_GET_SOFTC(hif_ctx);
 
 	hif_log_runtime_resume_success(hif_ctx);
-	if (hif_pci_sc != NULL)
+	if (hif_pci_sc)
 		hif_pm_runtime_mark_last_busy(hif_pci_sc->dev);
 	hif_runtime_pm_set_state_on(scn);
 }
@@ -3411,6 +3424,19 @@ static void hif_exec_grp_irq_enable(struct hif_exec_context *hif_ext_group)
 		enable_irq(hif_ext_group->os_irq[i]);
 }
 
+/**
+ * hif_pci_get_irq_name() - get irqname
+ * This function gives irqnumber to irqname
+ * mapping.
+ *
+ * @irq_no: irq number
+ *
+ * Return: irq name
+ */
+const char *hif_pci_get_irq_name(int irq_no)
+{
+	return "pci-dummy";
+}
 
 int hif_pci_configure_grp_irq(struct hif_softc *scn,
 			      struct hif_exec_context *hif_ext_group)
@@ -3421,6 +3447,7 @@ int hif_pci_configure_grp_irq(struct hif_softc *scn,
 
 	hif_ext_group->irq_enable = &hif_exec_grp_irq_enable;
 	hif_ext_group->irq_disable = &hif_exec_grp_irq_disable;
+	hif_ext_group->irq_name = &hif_pci_get_irq_name;
 	hif_ext_group->work_complete = &hif_dummy_grp_done;
 
 	for (j = 0; j < hif_ext_group->numirq; j++) {
@@ -3836,7 +3863,7 @@ void hif_pm_runtime_get_noresume(struct hif_opaque_softc *hif_ctx)
 {
 	struct hif_pci_softc *sc = HIF_GET_PCI_SOFTC(hif_ctx);
 
-	if (NULL == sc)
+	if (!sc)
 		return;
 
 	sc->pm_stats.runtime_get++;
@@ -3863,7 +3890,7 @@ int hif_pm_runtime_get(struct hif_opaque_softc *hif_ctx)
 	int ret;
 	int pm_state;
 
-	if (NULL == scn) {
+	if (!scn) {
 		HIF_ERROR("%s: Could not do runtime get, scn is null",
 				__func__);
 		return -EFAULT;
@@ -3919,7 +3946,7 @@ int hif_pm_runtime_put(struct hif_opaque_softc *hif_ctx)
 	int pm_state, usage_count;
 	char *error = NULL;
 
-	if (NULL == scn) {
+	if (!scn) {
 		HIF_ERROR("%s: Could not do runtime put, scn is null",
 				__func__);
 		return -EFAULT;

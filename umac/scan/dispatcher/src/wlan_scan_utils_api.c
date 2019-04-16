@@ -101,7 +101,10 @@ util_get_last_scan_time(struct wlan_objmgr_vdev *vdev)
 	pdev_id = wlan_scan_vdev_get_pdev_id(vdev);
 	scan_obj = wlan_vdev_get_scan_obj(vdev);
 
-	return scan_obj->pdev_info[pdev_id].last_scan_time;
+	if (scan_obj)
+		return scan_obj->pdev_info[pdev_id].last_scan_time;
+	else
+		return 0;
 }
 
 enum wlan_band util_scan_scm_chan_to_band(uint32_t chan)
@@ -386,7 +389,7 @@ static QDF_STATUS
 util_scan_parse_vendor_ie(struct scan_cache_entry *scan_params,
 	struct ie_header *ie)
 {
-	if (scan_params->ie_list.vendor == NULL)
+	if (!scan_params->ie_list.vendor)
 		scan_params->ie_list.vendor = (uint8_t *)ie;
 
 	if (is_wpa_oui((uint8_t *)ie)) {
@@ -413,7 +416,7 @@ util_scan_parse_vendor_ie(struct scan_cache_entry *scan_params,
 		scan_params->ie_list.sonadv = (uint8_t *)ie;
 	} else if (is_ht_cap((uint8_t *)ie)) {
 		/* we only care if there isn't already an HT IE (ANA) */
-		if (scan_params->ie_list.htcap == NULL) {
+		if (!scan_params->ie_list.htcap) {
 			if (ie->ie_len != (WLAN_VENDOR_HT_IE_OFFSET_LEN +
 					   sizeof(struct htcap_cmn_ie)))
 				return QDF_STATUS_E_INVAL;
@@ -422,7 +425,7 @@ util_scan_parse_vendor_ie(struct scan_cache_entry *scan_params,
 		}
 	} else if (is_ht_info((uint8_t *)ie)) {
 		/* we only care if there isn't already an HT IE (ANA) */
-		if (scan_params->ie_list.htinfo == NULL) {
+		if (!scan_params->ie_list.htinfo) {
 			if (ie->ie_len != WLAN_VENDOR_HT_IE_OFFSET_LEN +
 					  sizeof(struct wlan_ie_htinfo_cmn))
 				return QDF_STATUS_E_INVAL;
@@ -860,6 +863,10 @@ util_scan_add_hidden_ssid(struct wlan_objmgr_pdev *pdev, qdf_nbuf_t bcnbuf)
 	}
 	pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
 	scan_obj = wlan_pdev_get_scan_obj(pdev);
+	if (!scan_obj) {
+		scm_warn("null scan_obj");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
 
 	conf_ssid = &scan_obj->pdev_info[pdev_id].conf_ssid;
 
@@ -939,10 +946,9 @@ util_scan_add_hidden_ssid(struct wlan_objmgr_pdev *pdev, qdf_nbuf_t bcnbuf)
 			 * after ssid ie.
 			 */
 			tmp = qdf_mem_malloc(tmplen * sizeof(u_int8_t));
-			if (!tmp) {
-				scm_debug("tmp memory alloc failed");
+			if (!tmp)
 				return  QDF_STATUS_E_NOMEM;
-			}
+
 			/* Copy beacon data after ssid ie to tmp */
 			qdf_nbuf_copy_bits(bcnbuf, (sizeof(*hdr) +
 					   ssid_ie_end_offset), tmplen, tmp);
@@ -976,6 +982,7 @@ util_scan_gen_scan_entry(struct wlan_objmgr_pdev *pdev,
 			 uint8_t *frame, qdf_size_t frame_len,
 			 uint32_t frm_subtype,
 			 struct mgmt_rx_event_params *rx_param,
+			 struct scan_mbssid_info *mbssid_info,
 			 qdf_list_t *scan_list)
 {
 	struct wlan_frame_hdr *hdr;
@@ -1091,6 +1098,7 @@ util_scan_gen_scan_entry(struct wlan_objmgr_pdev *pdev,
 
 	if (util_scan_is_hidden_ssid(ssid)) {
 		scan_entry->ie_list.ssid = NULL;
+		scan_entry->is_hidden_ssid = true;
 	} else {
 		qdf_mem_copy(scan_entry->ssid.ssid,
 				ssid->ssid, ssid->ssid_len);
@@ -1098,7 +1106,8 @@ util_scan_gen_scan_entry(struct wlan_objmgr_pdev *pdev,
 		scan_entry->hidden_ssid_timestamp =
 			scan_entry->scan_entry_time;
 	}
-
+	qdf_mem_copy(&scan_entry->mbssid_info, mbssid_info,
+		     sizeof(scan_entry->mbssid_info));
 	if (WLAN_CHAN_IS_5GHZ(scan_entry->channel.chan_idx))
 		scan_entry->phy_mode = util_scan_get_phymode_5g(scan_entry);
 	else
@@ -1278,6 +1287,7 @@ static QDF_STATUS util_scan_parse_mbssid(struct wlan_objmgr_pdev *pdev,
 {
 	struct wlan_bcn_frame *bcn;
 	struct wlan_frame_hdr *hdr;
+	struct scan_mbssid_info mbssid_info;
 	QDF_STATUS status;
 	uint8_t *pos, *subelement, *mbssid_end_pos;
 	uint8_t *tmp, *mbssid_index_ie;
@@ -1301,10 +1311,8 @@ static QDF_STATUS util_scan_parse_mbssid(struct wlan_objmgr_pdev *pdev,
 	pos = ie;
 
 	new_ie = qdf_mem_malloc(MAX_IE_LEN);
-	if (!new_ie) {
-		scm_err("Failed to allocate memory for new ie");
+	if (!new_ie)
 		return QDF_STATUS_E_NOMEM;
-	}
 
 	while (pos < ie + ielen + 2) {
 		tmp = util_scan_find_ie(WLAN_ELEMID_MULTIPLE_BSSID, pos,
@@ -1312,6 +1320,7 @@ static QDF_STATUS util_scan_parse_mbssid(struct wlan_objmgr_pdev *pdev,
 		if (!tmp)
 			break;
 
+		mbssid_info.profile_count = 1 << tmp[2];
 		mbssid_end_pos = tmp + tmp[1] + 2;
 		/* Skip Element ID, Len, MaxBSSID Indicator */
 		if (tmp[1] < 4)
@@ -1344,7 +1353,9 @@ static QDF_STATUS util_scan_parse_mbssid(struct wlan_objmgr_pdev *pdev,
 				/* No valid Multiple BSSID-Index element */
 				continue;
 			}
-
+			qdf_mem_copy(&mbssid_info.trans_bssid, bssid,
+				     QDF_MAC_ADDR_SIZE);
+			mbssid_info.profile_num = mbssid_index_ie[2];
 			util_gen_new_bssid(bssid, tmp[2], mbssid_index_ie[2],
 					   new_bssid);
 			new_ie_len = util_gen_new_ie(ie, ielen, subelement + 2,
@@ -1356,7 +1367,6 @@ static QDF_STATUS util_scan_parse_mbssid(struct wlan_objmgr_pdev *pdev,
 			new_frame = qdf_mem_malloc(new_frame_len);
 			if (!new_frame) {
 				qdf_mem_free(new_ie);
-				scm_err("failed to allocate memory");
 				return QDF_STATUS_E_NOMEM;
 			}
 
@@ -1379,7 +1389,9 @@ static QDF_STATUS util_scan_parse_mbssid(struct wlan_objmgr_pdev *pdev,
 			status = util_scan_gen_scan_entry(pdev, new_frame,
 							  new_frame_len,
 							  frm_subtype,
-							  rx_param, scan_list);
+							  rx_param,
+							  &mbssid_info,
+							  scan_list);
 			if (QDF_IS_STATUS_ERROR(status)) {
 				qdf_mem_free(new_frame);
 				scm_err("failed to generate a scan entry");
@@ -1415,17 +1427,30 @@ util_scan_parse_beacon_frame(struct wlan_objmgr_pdev *pdev,
 			     qdf_list_t *scan_list)
 {
 	struct wlan_bcn_frame *bcn;
+	struct wlan_frame_hdr *hdr;
+	uint8_t *mbssid_ie = NULL;
 	uint32_t ie_len = 0;
 	QDF_STATUS status;
+	struct scan_mbssid_info mbssid_info = { 0 };
 
+	hdr = (struct wlan_frame_hdr *)frame;
 	bcn = (struct wlan_bcn_frame *)
 			   (frame + sizeof(struct wlan_frame_hdr));
 	ie_len = (uint16_t)(frame_len -
 		sizeof(struct wlan_frame_hdr) -
 		offsetof(struct wlan_bcn_frame, ie));
 
+	mbssid_ie = util_scan_find_ie(WLAN_ELEMID_MULTIPLE_BSSID,
+				      (uint8_t *)&bcn->ie, ie_len);
+	if (mbssid_ie) {
+		qdf_mem_copy(&mbssid_info.trans_bssid,
+			     hdr->i_addr3, QDF_MAC_ADDR_SIZE);
+		mbssid_info.profile_count = 1 << mbssid_ie[2];
+	}
+
 	status = util_scan_gen_scan_entry(pdev, frame, frame_len,
 					  frm_subtype, rx_param,
+					  &mbssid_info,
 					  scan_list);
 
 	/*
@@ -1433,8 +1458,7 @@ util_scan_parse_beacon_frame(struct wlan_objmgr_pdev *pdev,
 	 * scan component will create a new entry for
 	 * each BSSID found in the MBSSID
 	 */
-	if (util_scan_find_ie(WLAN_ELEMID_MULTIPLE_BSSID,
-			      (uint8_t *)&bcn->ie, ie_len))
+	if (mbssid_ie)
 		status = util_scan_parse_mbssid(pdev, frame, frame_len,
 						frm_subtype, rx_param,
 						scan_list);

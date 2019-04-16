@@ -27,6 +27,22 @@
 #include <cdp_txrx_cmn_struct.h>
 #include <wlan_mlme_dbg.h>
 
+static QDF_STATUS vdev_mgr_config_ratemask_update(
+				struct vdev_mlme_obj *mlme_obj,
+				struct config_ratemask_params *param)
+{
+	struct wlan_objmgr_vdev *vdev;
+
+	vdev = mlme_obj->vdev;
+	param->vdev_id = wlan_vdev_get_id(vdev);
+	param->type = mlme_obj->mgmt.rate_info.type;
+	param->lower32 = mlme_obj->mgmt.rate_info.lower32;
+	param->higher32 = mlme_obj->mgmt.rate_info.higher32;
+	param->lower32_2 = mlme_obj->mgmt.rate_info.lower32_2;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 enum wlan_op_mode
 wlan_util_vdev_get_cdp_txrx_opmode(struct wlan_objmgr_vdev *vdev)
 {
@@ -50,6 +66,23 @@ wlan_util_vdev_get_cdp_txrx_opmode(struct wlan_objmgr_vdev *vdev)
 
 	return cdp_txrx_opmode;
 }
+
+QDF_STATUS
+wlan_util_vdev_mlme_set_ratemask_config(struct vdev_mlme_obj *vdev_mlme)
+{
+	struct config_ratemask_params rm_param = {0};
+
+	if (!vdev_mlme) {
+		mlme_err("VDEV MLME is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	vdev_mgr_config_ratemask_update(vdev_mlme, &rm_param);
+
+	return tgt_vdev_mgr_config_ratemask_cmd_send(vdev_mlme, &rm_param);
+}
+
+qdf_export_symbol(wlan_util_vdev_mlme_set_ratemask_config);
 
 QDF_STATUS
 wlan_util_vdev_mlme_set_param(struct vdev_mlme_obj *vdev_mlme,
@@ -124,6 +157,9 @@ wlan_util_vdev_mlme_set_param(struct vdev_mlme_obj *vdev_mlme,
 		break;
 	case WLAN_MLME_CFG_SOUNDING_DIM:
 		mlme_proto->vht_info.sounding_dimension = mlme_cfg.value;
+		break;
+	case WLAN_MLME_CFG_BFEE_STS_CAP:
+		mlme_proto->vht_info.bfee_sts_cap = mlme_cfg.value;
 		break;
 	case WLAN_MLME_CFG_TXBF_CAPS:
 		is_wmi_cmd = 1;
@@ -220,11 +256,12 @@ wlan_util_vdev_mlme_set_param(struct vdev_mlme_obj *vdev_mlme,
 		break;
 	case WLAN_MLME_CFG_LISTEN_INTERVAL:
 		mlme_mgmt->powersave_info.listen_interval = mlme_cfg.value;
+		is_wmi_cmd = 1;
 		break;
 	case WLAN_MLME_CFG_MODDTIM_CNT:
 		mlme_mgmt->powersave_info.moddtim_cnt = mlme_cfg.value;
 		break;
-	case WLAN_MLME_CFG_PROILE_IDX:
+	case WLAN_MLME_CFG_PROFILE_IDX:
 		mlme_mgmt->mbss_11ax.profile_idx = mlme_cfg.value;
 		break;
 	case WLAN_MLME_CFG_PROFILE_NUM:
@@ -281,6 +318,12 @@ wlan_util_vdev_mlme_set_param(struct vdev_mlme_obj *vdev_mlme,
 		break;
 	case WLAN_MLME_CFG_BCN_TX_RATE:
 		mlme_mgmt->rate_info.bcn_tx_rate = mlme_cfg.value;
+		break;
+	case WLAN_MLME_CFG_BCN_TX_RATE_CODE:
+		is_wmi_cmd = 1;
+		break;
+	case WLAN_MLME_CFG_TX_MGMT_RATE_CODE:
+		is_wmi_cmd = 1;
 		break;
 	default:
 		break;
@@ -356,6 +399,9 @@ void wlan_util_vdev_mlme_get_param(struct vdev_mlme_obj *vdev_mlme,
 		break;
 	case WLAN_MLME_CFG_SOUNDING_DIM:
 		*value = mlme_proto->vht_info.sounding_dimension;
+		break;
+	case WLAN_MLME_CFG_BFEE_STS_CAP:
+		*value = mlme_proto->vht_info.bfee_sts_cap;
 		break;
 	case WLAN_MLME_CFG_HT_CAPS:
 		*value = mlme_proto->ht_info.ht_caps;
@@ -444,7 +490,7 @@ void wlan_util_vdev_mlme_get_param(struct vdev_mlme_obj *vdev_mlme,
 	case WLAN_MLME_CFG_MODDTIM_CNT:
 		*value = mlme_mgmt->powersave_info.moddtim_cnt;
 		break;
-	case WLAN_MLME_CFG_PROILE_IDX:
+	case WLAN_MLME_CFG_PROFILE_IDX:
 		*value = mlme_mgmt->mbss_11ax.profile_idx;
 		break;
 	case WLAN_MLME_CFG_PROFILE_NUM:

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -16,30 +16,12 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-/**
- * DOC: qal_devcfg
- * This file provides OS dependent device config related APIs
- */
+#ifndef __I_QDF_PERIODIC_WORK_H
+#define __I_QDF_PERIODIC_WORK_H
 
-#include "qdf_debugfs.h"
-#include "qdf_mem.h"
-#include "qdf_types.h"
-#include "qdf_nbuf.h"
-#include "qdf_module.h"
-#include "qal_devcfg.h"
-#include <net/cfg80211.h>
+#include "linux/workqueue.h"
 
-QDF_STATUS
-qal_devcfg_send_response(qdf_nbuf_t cfgbuf)
-{
-	int ret;
+#define __qdf_opaque_delayed_work delayed_work
 
-	if (!cfgbuf)
-		return QDF_STATUS_E_INVAL;
+#endif /* __I_QDF_PERIODIC_WORK_H */
 
-	ret = cfg80211_vendor_cmd_reply(cfgbuf);
-
-	return qdf_status_from_os_return(ret);
-}
-
-qdf_export_symbol(qal_devcfg_send_response);

@@ -151,19 +151,14 @@ void dfs_main_task_testtimer_init(struct wlan_dfs *dfs)
 int dfs_create_object(struct wlan_dfs **dfs)
 {
 	*dfs = dfs_alloc_wlan_dfs();
-	if (!(*dfs)) {
-		dfs_alert(NULL, WLAN_DEBUG_DFS_ALWAYS,
-			  "wlan_dfs allocation failed");
+	if (!(*dfs))
 		return 1;
-	}
 
 	qdf_mem_zero(*dfs, sizeof(**dfs));
 
 	(*dfs)->dfs_curchan = dfs_alloc_dfs_curchan();
 	if (!((*dfs)->dfs_curchan)) {
 		dfs_free_wlan_dfs(*dfs);
-		dfs_alert(*dfs, WLAN_DEBUG_DFS_ALWAYS,
-			  "dfs_curchan allocation failed");
 		return 1;
 	}
 
@@ -244,7 +239,7 @@ void dfs_reset(struct wlan_dfs *dfs)
 void dfs_timer_detach(struct wlan_dfs *dfs)
 {
 	dfs_cac_timer_detach(dfs);
-	dfs_zero_cac_timer_detach(dfs);
+	dfs_zero_cac_timer_detach(dfs->dfs_soc_obj);
 
 	if (!dfs->dfs_is_offload_enabled) {
 		dfs_main_timer_detach(dfs);

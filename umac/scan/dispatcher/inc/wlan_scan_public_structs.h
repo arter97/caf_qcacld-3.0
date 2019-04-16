@@ -268,11 +268,24 @@ struct security_info {
 };
 
 /**
+ * struct scan_mbssid_info - Scan mbssid information
+ * @profile_num: profile number
+ * @profile_count: total profile count
+ * @trans_bssid: TX BSSID address
+ */
+struct scan_mbssid_info {
+	uint8_t profile_num;
+	uint8_t profile_count;
+	uint8_t trans_bssid[QDF_MAC_ADDR_SIZE];
+};
+
+/**
  * struct scan_cache_entry: structure containing scan entry
  * @frm_subtype: updated from beacon/probe
  * @bssid: bssid
  * @mac_addr: mac address
  * @ssid: ssid
+ * @is_hidden_ssid: is AP having hidden ssid.
  * @seq_num: sequence number
  * @phy_mode: Phy mode of the AP
  * @avg_rssi: Average RSSI fof the AP
@@ -290,6 +303,7 @@ struct security_info {
  * @rssi_timestamp: boottime in microsec when RSSI was updated
  * @hidden_ssid_timestamp: boottime in microsec when hidden
  *                         ssid was received
+ * @mbssid_info: Multi bssid information
  * @channel: channel info on which AP is present
  * @channel_mismatch: if channel received in metadata
  *                    doesnot match the one in beacon
@@ -309,6 +323,7 @@ struct scan_cache_entry {
 	struct qdf_mac_addr bssid;
 	struct qdf_mac_addr mac_addr;
 	struct wlan_ssid ssid;
+	bool is_hidden_ssid;
 	uint16_t seq_num;
 	enum wlan_phymode phy_mode;
 	int32_t avg_rssi;
@@ -328,6 +343,7 @@ struct scan_cache_entry {
 	qdf_time_t scan_entry_time;
 	qdf_time_t rssi_timestamp;
 	qdf_time_t hidden_ssid_timestamp;
+	struct scan_mbssid_info mbssid_info;
 	struct channel_info channel;
 	bool channel_mismatch;
 	struct mlme_info mlme_info;
@@ -1139,12 +1155,14 @@ typedef void (*scan_event_handler) (struct wlan_objmgr_vdev *vdev,
  * enum scan_cb_type - update beacon cb type
  * @SCAN_CB_TYPE_INFORM_BCN: Calback to indicate beacon to OS
  * @SCAN_CB_TYPE_UPDATE_BCN: Calback to indicate beacon
+ * @SCAN_CB_TYPE_UNLINK_BSS: cb to unlink bss entry
  *                    to MLME and update MLME info
  *
  */
 enum scan_cb_type {
 	SCAN_CB_TYPE_INFORM_BCN,
 	SCAN_CB_TYPE_UPDATE_BCN,
+	SCAN_CB_TYPE_UNLINK_BSS,
 };
 
 /* Set PNO */
@@ -1281,13 +1299,11 @@ struct pno_scan_req_params {
 
 /**
  * struct scan_user_cfg - user configuration required for for scan
- * @is_snr_monitoring_enabled: whether snr monitoring enabled or not
  * @ie_whitelist: probe req IE whitelist attrs
  * @sta_miracast_mcc_rest_time: sta miracast mcc rest time
  * @score_config: scoring logic configuration
  */
 struct scan_user_cfg {
-	bool is_snr_monitoring_enabled;
 	struct probe_req_whitelist_attr ie_whitelist;
 	uint32_t sta_miracast_mcc_rest_time;
 	struct scoring_config score_config;

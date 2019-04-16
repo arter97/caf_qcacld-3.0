@@ -1011,6 +1011,23 @@ target_if_sops_stop_spectral_scan(void *arg)
 	struct target_if_spectral *spectral = (struct target_if_spectral *)arg;
 	uint8_t val = 0;
 	int tempret, ret = 0;
+	uint8_t enabled = 0;
+
+	tempret = target_if_spectral_info_read(
+		spectral,
+		TARGET_IF_SPECTRAL_INFO_ENABLED,
+		&enabled, sizeof(enabled));
+
+	if (tempret)
+		/*
+		 * Could not determine if Spectral is enabled. Assume scan is
+		 * not in progress
+		 */
+		enabled = 0;
+
+	/* if scan is not enabled, no need to send stop to FW */
+	if (!enabled)
+		return -EPERM;
 
 	tempret = target_if_spectral_info_write(
 			spectral,
@@ -1256,7 +1273,7 @@ target_if_spectral_get_macaddr(void *arg, char *addr)
 	wlan_pdev_obj_lock(pdev);
 	myaddr = wlan_pdev_get_hw_macaddr(pdev);
 	wlan_pdev_obj_unlock(pdev);
-	qdf_mem_copy(addr, myaddr, IEEE80211_ADDR_LEN);
+	qdf_mem_copy(addr, myaddr, QDF_MAC_ADDR_SIZE);
 
 	return 0;
 }

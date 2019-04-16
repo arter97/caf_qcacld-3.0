@@ -21,26 +21,13 @@
 
 #include "qdf_types.h"
 #include "qdf_status.h"
+#include <target_if_direct_buf_rx_api.h>
 
 struct wlan_objmgr_psoc;
 struct wlan_lmac_if_tx_ops;
 struct direct_buf_rx_data;
 
 #define DBR_RING_BASE_ALIGN 8
-#define DBR_EVENT_TIMEOUT_IN_MS 1
-#define DBR_NUM_RESP_PER_EVENT 2
-
-/**
- * enum DBR_MODULE - Enum containing the modules supporting direct buf rx
- * @DBR_MODULE_SPECTRAL: Module ID for Spectral
- * @DBR_MODULE_CFR: Module ID for CFR
- * @DBR_MODULE_MAX: Max module ID
- */
-enum DBR_MODULE {
-	DBR_MODULE_SPECTRAL = 0,
-	DBR_MODULE_CFR      = 1,
-	DBR_MODULE_MAX,
-};
 
 /**
  * struct direct_buf_rx_info - direct buffer rx operation info struct
@@ -96,6 +83,7 @@ struct direct_buf_rx_ring_cap {
 /**
  * struct direct_buf_rx_module_param - DMA module param
  * @mod_id: Module ID
+ * @dbr_config: Pointer to dirct buf rx module configuration struct
  * @dbr_ring_cap: Pointer to direct buf rx ring capabilities struct
  * @dbr_ring_cfg: Pointer to direct buf rx ring config struct
  * @dbr_buf_pool: Pointer to direct buf rx buffer pool struct
@@ -103,11 +91,12 @@ struct direct_buf_rx_ring_cap {
  */
 struct direct_buf_rx_module_param {
 	enum DBR_MODULE mod_id;
+	struct dbr_module_config dbr_config;
 	struct direct_buf_rx_ring_cap *dbr_ring_cap;
 	struct direct_buf_rx_ring_cfg *dbr_ring_cfg;
 	struct direct_buf_rx_buf_info *dbr_buf_pool;
-	int (*dbr_rsp_handler)(struct wlan_objmgr_pdev *pdev,
-			       struct direct_buf_rx_data *dbr_data);
+	bool (*dbr_rsp_handler)(struct wlan_objmgr_pdev *pdev,
+				struct direct_buf_rx_data *dbr_data);
 };
 
 /**
@@ -233,6 +222,7 @@ QDF_STATUS target_if_deinit_dbr_ring(struct wlan_objmgr_pdev *pdev,
  *                                             buffer rx module
  * @pdev: pointer to pdev object
  * @mod_id: module id indicating the module using direct buffer rx framework
+ * @dbr_config: dbr module configuration params
  * @dbr_rsp_handler: function pointer pointing to the response handler to be
  *                   invoked for the module registering to direct buffer rx
  *                   module
@@ -241,8 +231,10 @@ QDF_STATUS target_if_deinit_dbr_ring(struct wlan_objmgr_pdev *pdev,
  */
 QDF_STATUS target_if_direct_buf_rx_module_register(
 			struct wlan_objmgr_pdev *pdev, uint8_t mod_id,
-			int (*dbr_rsp_handler)(struct wlan_objmgr_pdev *pdev,
-				struct direct_buf_rx_data *dbr_data));
+			struct dbr_module_config *dbr_config,
+			bool (*dbr_rsp_handler)
+			     (struct wlan_objmgr_pdev *pdev,
+			      struct direct_buf_rx_data *dbr_data));
 
 /**
  * target_if_direct_buf_rx_module_unregister() - Function to unregister to

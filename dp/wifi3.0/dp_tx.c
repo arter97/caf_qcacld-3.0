@@ -203,7 +203,7 @@ static void dp_tx_tso_desc_release(struct dp_soc *soc,
  *
  * Return:
  */
-static void
+void
 dp_tx_desc_release(struct dp_tx_desc_s *tx_desc, uint8_t desc_pool_id)
 {
 	struct dp_pdev *pdev = tx_desc->pdev;
@@ -286,7 +286,7 @@ static uint8_t dp_tx_prepare_htt_metadata(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 		}
 		/* Fill and add HTT metaheader */
 		hdr = qdf_nbuf_push_head(nbuf, htt_desc_size_aligned);
-		if (hdr == NULL) {
+		if (!hdr) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 					"Error in filling HTT metadata");
 
@@ -649,6 +649,39 @@ static void dp_tx_trace_pkt(qdf_nbuf_t skb, uint16_t msdu_id,
 				      msdu_id, QDF_TX));
 }
 
+#ifdef QCA_512M_CONFIG
+/**
+ * dp_tx_pdev_pflow_control - Check if allocated tx descriptors reached max
+ * tx descriptor configured value
+ * @vdev: DP vdev handle
+ *
+ * Return: true if allocated tx descriptors reached max configured value, else
+ * false.
+ */
+static inline bool
+dp_tx_pdev_pflow_control(struct dp_vdev *vdev)
+{
+	struct dp_pdev *pdev = vdev->pdev;
+
+	if (qdf_atomic_read(&pdev->num_tx_outstanding) >=
+			pdev->num_tx_allowed) {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
+			  "%s: queued packets are more than max tx, drop the frame",
+			  __func__);
+		DP_STATS_INC(vdev, tx_i.dropped.desc_na.num, 1);
+		return true;
+	}
+
+	return false;
+}
+#else
+static inline bool
+dp_tx_pdev_pflow_control(struct dp_vdev *vdev)
+{
+	return false;
+}
+#endif
+
 /**
  * dp_tx_desc_prepare_single - Allocate and prepare Tx descriptor
  * @vdev: DP vdev handle
@@ -674,6 +707,9 @@ struct dp_tx_desc_s *dp_tx_prepare_desc_single(struct dp_vdev *vdev,
 	struct dp_tx_desc_s *tx_desc;
 	struct dp_pdev *pdev = vdev->pdev;
 	struct dp_soc *soc = pdev->soc;
+
+	if (dp_tx_pdev_pflow_control(vdev))
+		return NULL;
 
 	/* Allocate software Tx descriptor */
 	tx_desc = dp_tx_desc_alloc(soc, desc_pool_id);
@@ -810,6 +846,9 @@ static struct dp_tx_desc_s *dp_tx_prepare_desc(struct dp_vdev *vdev,
 	struct dp_pdev *pdev = vdev->pdev;
 	struct dp_soc *soc = pdev->soc;
 
+	if (dp_tx_pdev_pflow_control(vdev))
+		return NULL;
+
 	/* Allocate software Tx descriptor */
 	tx_desc = dp_tx_desc_alloc(soc, desc_pool_id);
 	if (!tx_desc) {
@@ -885,7 +924,7 @@ static qdf_nbuf_t dp_tx_prepare_raw(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 
 	/* SWAR for HW: Enable WEP bit in the AMSDU frames for RAW mode */
 	if (vdev->raw_mode_war &&
-	    (qos_wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_QOS))
+	    (qos_wh->i_fc[0] & QDF_IEEE80211_FC0_SUBTYPE_QOS))
 		qos_wh->i_fc[1] |= IEEE80211_FC1_WEP;
 
 	for (curr_nbuf = nbuf, i = 0; curr_nbuf;
@@ -969,7 +1008,7 @@ static QDF_STATUS dp_tx_hw_enqueue(struct dp_soc *soc, struct dp_vdev *vdev,
 	void *hal_srng = soc->tcl_data_ring[ring_id].hal_srng;
 
 	hal_tx_desc_cached = (void *) cached_desc;
-	qdf_mem_zero_outline(hal_tx_desc_cached, HAL_TX_DESC_LEN_BYTES);
+	qdf_mem_zero(hal_tx_desc_cached, HAL_TX_DESC_LEN_BYTES);
 
 	if (tx_desc->flags & DP_TX_DESC_FLAG_FRAG) {
 		length = HAL_TX_EXT_DESC_WITH_META_DATA;
@@ -1003,10 +1042,9 @@ static QDF_STATUS dp_tx_hw_enqueue(struct dp_soc *soc, struct dp_vdev *vdev,
 	hal_tx_desc_set_encrypt_type(hal_tx_desc_cached,
 			sec_type_map[sec_type]);
 
-	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-			"%s length:%d , type = %d, dma_addr %llx, offset %d desc id %u",
-			__func__, length, type, (uint64_t)dma_addr,
-			tx_desc->pkt_offset, tx_desc->id);
+	dp_verbose_debug("length:%d , type = %d, dma_addr %llx, offset %d desc id %u",
+			 length, type, (uint64_t)dma_addr,
+			 tx_desc->pkt_offset, tx_desc->id);
 
 	if (tx_desc->flags & DP_TX_DESC_FLAG_TO_FW)
 		hal_tx_desc_set_to_fw(hal_tx_desc_cached, 1);
@@ -1029,12 +1067,12 @@ static QDF_STATUS dp_tx_hw_enqueue(struct dp_soc *soc, struct dp_vdev *vdev,
 		hal_tx_desc_set_mesh_en(hal_tx_desc_cached, 1);
 
 
+	tx_desc->timestamp = qdf_ktime_to_ms(qdf_ktime_get());
 	/* Sync cached descriptor with HW */
 	hal_tx_desc = hal_srng_src_get_next(soc->hal_soc, hal_srng);
 
 	if (!hal_tx_desc) {
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-			  "%s TCL ring full ring_id:%d", __func__, ring_id);
+		dp_verbose_debug("TCL ring full ring_id:%d", ring_id);
 		DP_STATS_INC(soc, tx.tcl_ring_full[ring_id], 1);
 		DP_STATS_INC(vdev, tx_i.dropped.enqueue_fail, 1);
 		return QDF_STATUS_E_RESOURCES;
@@ -1114,7 +1152,7 @@ static bool dp_cce_classify(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
 	}
 
 	if (qdf_unlikely(DP_FRAME_IS_SNAP(llcHdr))) {
-		ether_type = *(uint16_t *)(nbuf->data + 2*ETHER_ADDR_LEN +
+		ether_type = *(uint16_t *)(nbuf->data + 2*QDF_MAC_ADDR_SIZE +
 				sizeof(*llcHdr));
 		nbuf_clone = qdf_nbuf_clone(nbuf);
 		if (qdf_unlikely(nbuf_clone)) {
@@ -1147,31 +1185,28 @@ static bool dp_cce_classify(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
 			&& qdf_nbuf_is_ipv4_dhcp_pkt(nbuf))
 		|| (qdf_nbuf_is_ipv6_pkt(nbuf) &&
 			qdf_nbuf_is_ipv6_dhcp_pkt(nbuf)))) {
-		if (qdf_unlikely(nbuf_clone != NULL))
+		if (qdf_unlikely(nbuf_clone))
 			qdf_nbuf_free(nbuf_clone);
 		return true;
 	}
 
-	if (qdf_unlikely(nbuf_clone != NULL))
+	if (qdf_unlikely(nbuf_clone))
 		qdf_nbuf_free(nbuf_clone);
 
 	return false;
 }
 
 /**
- * dp_tx_classify_tid() - Obtain TID to be used for this frame
+ * dp_tx_get_tid() - Obtain TID to be used for this frame
  * @vdev: DP vdev handle
  * @nbuf: skb
  *
  * Extract the DSCP or PCP information from frame and map into TID value.
- * Software based TID classification is required when more than 2 DSCP-TID
- * mapping tables are needed.
- * Hardware supports 2 DSCP-TID mapping tables
  *
  * Return: void
  */
-static void dp_tx_classify_tid(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
-		struct dp_tx_msdu_info_s *msdu_info)
+static void dp_tx_get_tid(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
+			  struct dp_tx_msdu_info_s *msdu_info)
 {
 	uint8_t tos = 0, dscp_tid_override = 0;
 	uint8_t *hdr_ptr, *L3datap;
@@ -1183,14 +1218,6 @@ static void dp_tx_classify_tid(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 	struct dp_pdev *pdev = (struct dp_pdev *)vdev->pdev;
 
 	DP_TX_TID_OVERRIDE(msdu_info, nbuf);
-
-	if (pdev->soc && vdev->dscp_tid_map_id < pdev->soc->num_hw_dscp_tid_map)
-		return;
-
-	/* for mesh packets don't do any classification */
-	if (qdf_unlikely(vdev->mesh_vdev))
-		return;
-
 	if (qdf_likely(vdev->tx_encap_type != htt_cmn_pkt_type_raw)) {
 		eh = (qdf_ether_header_t *)nbuf->data;
 		hdr_ptr = eh->ether_dhost;
@@ -1211,13 +1238,13 @@ static void dp_tx_classify_tid(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 	 * Check if packet is dot3 or eth2 type.
 	 */
 	if (DP_FRAME_IS_LLC(ether_type) && DP_FRAME_IS_SNAP(llcHdr)) {
-		ether_type = (uint16_t)*(nbuf->data + 2*ETHER_ADDR_LEN +
+		ether_type = (uint16_t)*(nbuf->data + 2*QDF_MAC_ADDR_SIZE +
 				sizeof(*llcHdr));
 
 		if (ether_type == htons(ETHERTYPE_VLAN)) {
 			L3datap = hdr_ptr + sizeof(qdf_ethervlan_header_t) +
 				sizeof(*llcHdr);
-			ether_type = (uint16_t)*(nbuf->data + 2*ETHER_ADDR_LEN
+			ether_type = (uint16_t)*(nbuf->data + 2*QDF_MAC_ADDR_SIZE
 					+ sizeof(*llcHdr) +
 					sizeof(qdf_net_vlanhdr_t));
 		} else {
@@ -1288,7 +1315,39 @@ static void dp_tx_classify_tid(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 		tos = (tos >> DP_IP_DSCP_SHIFT) & DP_IP_DSCP_MASK;
 		msdu_info->tid = pdev->dscp_tid_map[vdev->dscp_tid_map_id][tos];
 	}
+
+	if (msdu_info->tid >= CDP_MAX_DATA_TIDS)
+		msdu_info->tid = CDP_MAX_DATA_TIDS - 1;
+
 	return;
+}
+
+/**
+ * dp_tx_classify_tid() - Obtain TID to be used for this frame
+ * @vdev: DP vdev handle
+ * @nbuf: skb
+ *
+ * Software based TID classification is required when more than 2 DSCP-TID
+ * mapping tables are needed.
+ * Hardware supports 2 DSCP-TID mapping tables for HKv1 and 48 for HKv2.
+ *
+ * Return: void
+ */
+static void dp_tx_classify_tid(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
+			       struct dp_tx_msdu_info_s *msdu_info)
+{
+	struct dp_pdev *pdev = (struct dp_pdev *)vdev->pdev;
+
+	DP_TX_TID_OVERRIDE(msdu_info, nbuf);
+
+	if (pdev->soc && vdev->dscp_tid_map_id < pdev->soc->num_hw_dscp_tid_map)
+		return;
+
+	/* for mesh packets don't do any classification */
+	if (qdf_unlikely(vdev->mesh_vdev))
+		return;
+
+	dp_tx_get_tid(vdev, nbuf, msdu_info);
 }
 
 #ifdef FEATURE_WLAN_TDLS
@@ -1366,14 +1425,17 @@ static qdf_nbuf_t dp_tx_send_msdu_single(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 	void *hal_srng = soc->tcl_data_ring[tx_q->ring_id].hal_srng;
 	uint16_t htt_tcl_metadata = 0;
 	uint8_t tid = msdu_info->tid;
+	struct cdp_tid_tx_stats *tid_stats = NULL;
 
 	/* Setup Tx descriptor for an MSDU, and MSDU extension descriptor */
 	tx_desc = dp_tx_prepare_desc_single(vdev, nbuf, tx_q->desc_pool_id,
 			msdu_info, tx_exc_metadata);
 	if (!tx_desc) {
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  "%s Tx_desc prepare Fail vdev %pK queue %d",
-			  __func__, vdev, tx_q->desc_pool_id);
+		dp_err_rl("Tx_desc prepare Fail vdev %pK queue %d",
+			  vdev, tx_q->desc_pool_id);
+		dp_tx_get_tid(vdev, nbuf, msdu_info);
+		tid_stats = &pdev->stats.tid_stats.tid_tx_stats[msdu_info->tid];
+		tid_stats->swdrop_cnt[TX_DESC_ERR]++;
 		return nbuf;
 	}
 
@@ -1391,6 +1453,9 @@ static qdf_nbuf_t dp_tx_send_msdu_single(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 				"%s %d : HAL RING Access Failed -- %pK",
 				__func__, __LINE__, hal_srng);
+		dp_tx_get_tid(vdev, nbuf, msdu_info);
+		tid_stats = &pdev->stats.tid_stats.tid_tx_stats[msdu_info->tid];
+		tid_stats->swdrop_cnt[TX_HAL_RING_ACCESS_ERR]++;
 		DP_STATS_INC(vdev, tx_i.dropped.ring_full, 1);
 		dp_tx_desc_release(tx_desc, tx_q->desc_pool_id);
 		qdf_nbuf_unmap(vdev->osdev, nbuf, QDF_DMA_TO_DEVICE);
@@ -1421,6 +1486,9 @@ static qdf_nbuf_t dp_tx_send_msdu_single(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 			  "%s Tx_hw_enqueue Fail tx_desc %pK queue %d",
 			  __func__, tx_desc, tx_q->ring_id);
+		dp_tx_get_tid(vdev, nbuf, msdu_info);
+		tid_stats = &pdev->stats.tid_stats.tid_tx_stats[msdu_info->tid];
+		tid_stats->swdrop_cnt[TX_HW_ENQUEUE]++;
 		dp_tx_desc_release(tx_desc, tx_q->desc_pool_id);
 		qdf_nbuf_unmap(vdev->osdev, nbuf, QDF_DMA_TO_DEVICE);
 		goto fail_return;
@@ -1468,11 +1536,15 @@ qdf_nbuf_t dp_tx_send_msdu_multiple(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 
 	struct dp_tx_queue *tx_q = &msdu_info->tx_queue;
 	void *hal_srng = soc->tcl_data_ring[tx_q->ring_id].hal_srng;
+	struct cdp_tid_tx_stats *tid_stats = NULL;
 
 	if (qdf_unlikely(hal_srng_access_start(soc->hal_soc, hal_srng))) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 				"%s %d : HAL RING Access Failed -- %pK",
 				__func__, __LINE__, hal_srng);
+		dp_tx_get_tid(vdev, nbuf, msdu_info);
+		tid_stats = &pdev->stats.tid_stats.tid_tx_stats[msdu_info->tid];
+		tid_stats->swdrop_cnt[TX_HAL_RING_ACCESS_ERR]++;
 		DP_STATS_INC(vdev, tx_i.dropped.ring_full, 1);
 		return nbuf;
 	}
@@ -1533,9 +1605,13 @@ qdf_nbuf_t dp_tx_send_msdu_multiple(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 
 		if (status != QDF_STATUS_SUCCESS) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-				  "%s Tx_hw_enqueue Fail tx_desc %pK queue %d",
-				  __func__, tx_desc, tx_q->ring_id);
+					"%s Tx_hw_enqueue Fail tx_desc %pK queue %d",
+					__func__, tx_desc, tx_q->ring_id);
 
+			dp_tx_get_tid(vdev, nbuf, msdu_info);
+			tid_stats = &pdev->stats.tid_stats.
+				tid_tx_stats[msdu_info->tid];
+			tid_stats->swdrop_cnt[TX_HW_ENQUEUE]++;
 			if (tx_desc->flags & DP_TX_DESC_FLAG_ME)
 				dp_tx_me_free_buf(pdev, tx_desc->me_buffer);
 
@@ -1820,7 +1896,7 @@ static qdf_nbuf_t dp_tx_prepare_nawds(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 			peer_id = peer->peer_ids[0];
 			nbuf_copy = dp_tx_send_msdu_single(vdev, nbuf_copy,
 					msdu_info, peer_id, NULL);
-			if (nbuf_copy != NULL) {
+			if (nbuf_copy) {
 				qdf_nbuf_free(nbuf_copy);
 				continue;
 			}
@@ -1877,9 +1953,7 @@ qdf_nbuf_t dp_tx_send_exception(void *vap_dev, qdf_nbuf_t nbuf,
 	msdu_info.tid = tx_exc_metadata->tid;
 
 	eh = (qdf_ether_header_t *)qdf_nbuf_data(nbuf);
-	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-			"%s , skb %pM",
-			__func__, nbuf->data);
+	dp_verbose_debug("skb %pM", nbuf->data);
 
 	DP_STATS_INC_PKT(vdev, tx_i.rcvd, 1, qdf_nbuf_len(nbuf));
 
@@ -1946,8 +2020,7 @@ qdf_nbuf_t dp_tx_send_exception(void *vap_dev, qdf_nbuf_t nbuf,
 	return nbuf;
 
 fail:
-	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-			"pkt send failed");
+	dp_verbose_debug("pkt send failed");
 	return nbuf;
 }
 
@@ -1972,7 +2045,7 @@ qdf_nbuf_t dp_tx_send_mesh(void *vap_dev, qdf_nbuf_t nbuf)
 	uint8_t no_enc_frame = 0;
 
 	nbuf_mesh = qdf_nbuf_unshare(nbuf);
-	if (nbuf_mesh == NULL) {
+	if (!nbuf_mesh) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 				"qdf_nbuf_unshare failed");
 		return nbuf;
@@ -1991,7 +2064,7 @@ qdf_nbuf_t dp_tx_send_mesh(void *vap_dev, qdf_nbuf_t nbuf)
 	if ((mhdr->flags & METAHDR_FLAG_INFO_UPDATED) &&
 		       !no_enc_frame) {
 		nbuf_clone = qdf_nbuf_clone(nbuf);
-		if (nbuf_clone == NULL) {
+		if (!nbuf_clone) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 				"qdf_nbuf_clone failed");
 			return nbuf;
@@ -2013,7 +2086,7 @@ qdf_nbuf_t dp_tx_send_mesh(void *vap_dev, qdf_nbuf_t nbuf)
 		qdf_nbuf_set_tx_ftype(nbuf, CB_FTYPE_INVALID);
 
 	nbuf = dp_tx_send(vap_dev, nbuf);
-	if ((nbuf == NULL) && no_enc_frame) {
+	if ((!nbuf) && no_enc_frame) {
 		DP_STATS_INC(vdev, tx_i.mesh.exception_fw, 1);
 	}
 
@@ -2055,9 +2128,7 @@ qdf_nbuf_t dp_tx_send(void *vap_dev, qdf_nbuf_t nbuf)
 
 	eh = (qdf_ether_header_t *)qdf_nbuf_data(nbuf);
 
-	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-			"%s , skb %pM",
-			__func__, nbuf->data);
+	dp_verbose_debug("skb %pM", nbuf->data);
 
 	/*
 	 * Set Default Host TID value to invalid TID
@@ -2069,9 +2140,8 @@ qdf_nbuf_t dp_tx_send(void *vap_dev, qdf_nbuf_t nbuf)
 	if (qdf_unlikely(vdev->mesh_vdev)) {
 		nbuf_mesh = dp_tx_extract_mesh_meta_data(vdev, nbuf,
 								&msdu_info);
-		if (nbuf_mesh == NULL) {
-			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-					"Extracting mesh metadata failed");
+		if (!nbuf_mesh) {
+			dp_verbose_debug("Extracting mesh metadata failed");
 			return nbuf;
 		}
 		nbuf = nbuf_mesh;
@@ -2107,8 +2177,7 @@ qdf_nbuf_t dp_tx_send(void *vap_dev, qdf_nbuf_t nbuf)
 	 * SW and HW descriptors.
 	 */
 	if (qdf_nbuf_is_tso(nbuf)) {
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-			  "%s TSO frame %pK", __func__, vdev);
+		dp_verbose_debug("TSO frame %pK", vdev);
 		DP_STATS_INC_PKT(vdev, tx_i.tso.tso_pkt, 1,
 				qdf_nbuf_len(nbuf));
 
@@ -2128,8 +2197,7 @@ qdf_nbuf_t dp_tx_send(void *vap_dev, qdf_nbuf_t nbuf)
 		if (!nbuf)
 			return NULL;
 
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-			 "%s non-TSO SG frame %pK", __func__, vdev);
+		dp_verbose_debug("non-TSO SG frame %pK", vdev);
 
 		DP_STATS_INC_PKT(vdev, tx_i.sg.sg_pkt, 1,
 				qdf_nbuf_len(nbuf));
@@ -2143,8 +2211,7 @@ qdf_nbuf_t dp_tx_send(void *vap_dev, qdf_nbuf_t nbuf)
 		eh = (qdf_ether_header_t *)qdf_nbuf_data(nbuf);
 		if (DP_FRAME_IS_MULTICAST((eh)->ether_dhost) &&
 		    !DP_FRAME_IS_BROADCAST((eh)->ether_dhost)) {
-			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-				  "%s Mcast frm for ME %pK", __func__, vdev);
+			dp_verbose_debug("Mcast frm for ME %pK", vdev);
 
 			DP_STATS_INC_PKT(vdev,
 					tx_i.mcast_en.mcast_pkt, 1,
@@ -2160,11 +2227,10 @@ qdf_nbuf_t dp_tx_send(void *vap_dev, qdf_nbuf_t nbuf)
 	/* RAW */
 	if (qdf_unlikely(vdev->tx_encap_type == htt_cmn_pkt_type_raw)) {
 		nbuf = dp_tx_prepare_raw(vdev, nbuf, &seg_info, &msdu_info);
-		if (nbuf == NULL)
+		if (!nbuf)
 			return NULL;
 
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-			  "%s Raw frame %pK", __func__, vdev);
+		dp_verbose_debug("Raw frame %pK", vdev);
 
 		goto send_multiple;
 
@@ -2407,7 +2473,8 @@ dp_get_completion_indication_for_stack(struct dp_soc *soc,
 				       struct dp_pdev *pdev,
 				       struct dp_peer *peer,
 				       struct hal_tx_completion_status *ts,
-				       qdf_nbuf_t netbuf)
+				       qdf_nbuf_t netbuf,
+				       uint64_t time_latency)
 {
 	struct tx_capture_hdr *ppdu_hdr;
 	uint16_t peer_id = ts->peer_id;
@@ -2415,7 +2482,8 @@ dp_get_completion_indication_for_stack(struct dp_soc *soc,
 	uint8_t first_msdu = ts->first_msdu;
 	uint8_t last_msdu = ts->last_msdu;
 
-	if (qdf_unlikely(!pdev->tx_sniffer_enable && !pdev->mcopy_mode))
+	if (qdf_unlikely(!pdev->tx_sniffer_enable && !pdev->mcopy_mode &&
+			 !pdev->latency_capture_enable))
 		return QDF_STATUS_E_NOSUPPORT;
 
 	if (!peer) {
@@ -2442,13 +2510,17 @@ dp_get_completion_indication_for_stack(struct dp_soc *soc,
 
 	ppdu_hdr = (struct tx_capture_hdr *)qdf_nbuf_data(netbuf);
 	qdf_mem_copy(ppdu_hdr->ta, peer->vdev->mac_addr.raw,
-		     IEEE80211_ADDR_LEN);
+		     QDF_MAC_ADDR_SIZE);
 	qdf_mem_copy(ppdu_hdr->ra, peer->mac_addr.raw,
-		     IEEE80211_ADDR_LEN);
+		     QDF_MAC_ADDR_SIZE);
 	ppdu_hdr->ppdu_id = ppdu_id;
 	ppdu_hdr->peer_id = peer_id;
 	ppdu_hdr->first_msdu = first_msdu;
 	ppdu_hdr->last_msdu = last_msdu;
+	if (qdf_unlikely(pdev->latency_capture_enable)) {
+		ppdu_hdr->tsf = ts->tsf;
+		ppdu_hdr->time_latency = time_latency;
+	}
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2479,7 +2551,8 @@ dp_get_completion_indication_for_stack(struct dp_soc *soc,
 				       struct dp_pdev *pdev,
 				       struct dp_peer *peer,
 				       struct hal_tx_completion_status *ts,
-				       qdf_nbuf_t netbuf)
+				       qdf_nbuf_t netbuf,
+				       uint64_t time_latency)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
@@ -2498,11 +2571,14 @@ dp_send_completion_to_stack(struct dp_soc *soc,  struct dp_pdev *pdev,
  *
  * Return: none
  */
-static inline void dp_tx_comp_free_buf(struct dp_soc *soc,
-		struct dp_tx_desc_s *desc)
+void dp_tx_comp_free_buf(struct dp_soc *soc, struct dp_tx_desc_s *desc)
 {
 	struct dp_vdev *vdev = desc->vdev;
 	qdf_nbuf_t nbuf = desc->nbuf;
+
+	/* nbuf already freed in vdev detach path */
+	if (!nbuf)
+		return;
 
 	/* If it is TDLS mgmt, don't unmap or free the frame */
 	if (desc->flags & DP_TX_DESC_FLAG_TDLS_FRAME)
@@ -2550,7 +2626,7 @@ void dp_tx_mec_handler(struct dp_vdev *vdev, uint8_t *status)
 	struct dp_soc *soc;
 	uint32_t flags = IEEE80211_NODE_F_WDS_HM;
 	struct dp_peer *peer;
-	uint8_t mac_addr[DP_MAC_ADDR_LEN], i;
+	uint8_t mac_addr[QDF_MAC_ADDR_SIZE], i;
 
 	if (!vdev->mec_enabled)
 		return;
@@ -2574,11 +2650,11 @@ void dp_tx_mec_handler(struct dp_vdev *vdev, uint8_t *status)
 			"%s Tx MEC Handler",
 			__func__);
 
-	for (i = 0; i < DP_MAC_ADDR_LEN; i++)
-		mac_addr[(DP_MAC_ADDR_LEN - 1) - i] =
-					status[(DP_MAC_ADDR_LEN - 2) + i];
+	for (i = 0; i < QDF_MAC_ADDR_SIZE; i++)
+		mac_addr[(QDF_MAC_ADDR_SIZE - 1) - i] =
+					status[(QDF_MAC_ADDR_SIZE - 2) + i];
 
-	if (qdf_mem_cmp(mac_addr, vdev->mac_addr.raw, DP_MAC_ADDR_LEN))
+	if (qdf_mem_cmp(mac_addr, vdev->mac_addr.raw, QDF_MAC_ADDR_SIZE))
 		dp_peer_add_ast(soc,
 				peer,
 				mac_addr,
@@ -2632,23 +2708,82 @@ void dp_tx_comp_fill_tx_completion_stats(struct dp_tx_desc_s *tx_desc,
 #endif
 
 /**
+ * dp_tx_compute_delay() - Compute and fill in all timestamps
+ *				to pass in correct fields
+ *
+ * @vdev: pdev handle
+ * @tx_desc: tx descriptor
+ * @tid: tid value
+ * Return: none
+ */
+static void dp_tx_compute_delay(struct dp_vdev *vdev,
+				struct dp_tx_desc_s *tx_desc, uint8_t tid)
+{
+	int64_t current_timestamp, timestamp_ingress, timestamp_hw_enqueue;
+	uint32_t sw_enqueue_delay, fwhw_transmit_delay, interframe_delay;
+
+	if (qdf_likely(!vdev->pdev->delay_stats_flag))
+		return;
+
+	current_timestamp = qdf_ktime_to_ms(qdf_ktime_get());
+	timestamp_ingress = qdf_nbuf_get_timestamp(tx_desc->nbuf);
+	timestamp_hw_enqueue = tx_desc->timestamp;
+	sw_enqueue_delay = (uint32_t)(timestamp_hw_enqueue - timestamp_ingress);
+	fwhw_transmit_delay = (uint32_t)(current_timestamp -
+					 timestamp_hw_enqueue);
+	interframe_delay = (uint32_t)(timestamp_ingress -
+				      vdev->prev_tx_enq_tstamp);
+
+	/*
+	 * Delay in software enqueue
+	 */
+	dp_update_delay_stats(vdev->pdev, sw_enqueue_delay, tid,
+			      CDP_DELAY_STATS_SW_ENQ);
+	/*
+	 * Delay between packet enqueued to HW and Tx completion
+	 */
+	dp_update_delay_stats(vdev->pdev, fwhw_transmit_delay, tid,
+			      CDP_DELAY_STATS_FW_HW_TRANSMIT);
+
+	/*
+	 * Update interframe delay stats calculated at hardstart receive point.
+	 * Value of vdev->prev_tx_enq_tstamp will be 0 for 1st frame, so
+	 * interframe delay will not be calculate correctly for 1st frame.
+	 * On the other side, this will help in avoiding extra per packet check
+	 * of !vdev->prev_tx_enq_tstamp.
+	 */
+	dp_update_delay_stats(vdev->pdev, interframe_delay, tid,
+			      CDP_DELAY_STATS_TX_INTERFRAME);
+	vdev->prev_tx_enq_tstamp = timestamp_ingress;
+}
+
+/**
  * dp_tx_update_peer_stats() - Update peer stats from Tx completion indications
- * @peer: Handle to DP peer
- * @ts: pointer to HAL Tx completion stats
+ * @tx_desc: software descriptor head pointer
+ * @ts: Tx completion status
+ * @peer: peer handle
  *
  * Return: None
  */
 static inline void
-dp_tx_update_peer_stats(struct dp_peer *peer,
-			struct hal_tx_completion_status *ts, uint32_t length)
+dp_tx_update_peer_stats(struct dp_tx_desc_s *tx_desc,
+			struct hal_tx_completion_status *ts,
+			struct dp_peer *peer)
 {
 	struct dp_pdev *pdev = peer->vdev->pdev;
 	struct dp_soc *soc = NULL;
 	uint8_t mcs, pkt_type;
+	uint8_t tid = ts->tid;
+	uint32_t length;
+	struct cdp_tid_tx_stats *tid_stats;
 
 	if (!pdev)
 		return;
 
+	if (qdf_unlikely(tid >= CDP_MAX_DATA_TIDS))
+		tid = CDP_MAX_DATA_TIDS - 1;
+
+	tid_stats = &pdev->stats.tid_stats.tid_tx_stats[tid];
 	soc = pdev->soc;
 
 	mcs = ts->mcs;
@@ -2659,7 +2794,12 @@ dp_tx_update_peer_stats(struct dp_peer *peer,
 		return;
 	}
 
+	length = qdf_nbuf_len(tx_desc->nbuf);
 	DP_STATS_INC_PKT(peer, tx.comp_pkt, 1, length);
+
+	if (qdf_unlikely(pdev->delay_stats_flag))
+		dp_tx_compute_delay(peer->vdev, tx_desc, tid);
+	tid_stats->complete_cnt++;
 	DP_STATS_INCC(peer, tx.dropped.age_out, 1,
 		     (ts->status == HAL_TX_TQM_RR_REM_CMD_AGED));
 
@@ -2682,8 +2822,12 @@ dp_tx_update_peer_stats(struct dp_peer *peer,
 		     (ts->status == HAL_TX_TQM_RR_FW_REASON3));
 
 	if (ts->status != HAL_TX_TQM_RR_FRAME_ACKED) {
+		tid_stats->comp_fail_cnt++;
 		return;
 	}
+
+	tid_stats->success_cnt++;
+
 	DP_STATS_INCC(peer, tx.ofdma, 1, ts->ofdma);
 
 	DP_STATS_INCC(peer, tx.amsdu_cnt, 1, ts->msdu_part_of_amsdu);
@@ -2827,12 +2971,14 @@ static inline void dp_tx_notify_completion(struct dp_soc *soc,
  */
 #ifdef FEATURE_PERPKT_INFO
 static inline void dp_tx_sojourn_stats_process(struct dp_pdev *pdev,
+					       struct dp_peer *peer,
 					       uint8_t tid,
 					       uint64_t txdesc_ts,
 					       uint32_t ppdu_id)
 {
 	uint64_t delta_ms;
 	struct cdp_tx_sojourn_stats *sojourn_stats;
+	uint8_t tidno;
 
 	if (pdev->enhanced_stats_en == 0)
 		return;
@@ -2850,8 +2996,12 @@ static inline void dp_tx_sojourn_stats_process(struct dp_pdev *pdev,
 		qdf_mem_copy(sojourn_stats, &pdev->sojourn_stats,
 			     sizeof(struct cdp_tx_sojourn_stats));
 
-		qdf_mem_zero(&pdev->sojourn_stats,
-			     sizeof(struct cdp_tx_sojourn_stats));
+		sojourn_stats->cookie = (void *)peer->wlanstats_ctx;
+
+		for (tidno = 0; tidno < CDP_DATA_TID_MAX; tidno++) {
+			pdev->sojourn_stats.sum_sojourn_msdu[tidno] = 0;
+			pdev->sojourn_stats.num_msdus[tidno] = 0;
+		}
 
 		dp_wdi_event_handler(WDI_EVENT_TX_SOJOURN_STAT, pdev->soc,
 				     pdev->sojourn_buf, HTT_INVALID_PEER,
@@ -2893,13 +3043,19 @@ dp_tx_comp_process_desc(struct dp_soc *soc,
 			struct hal_tx_completion_status *ts,
 			struct dp_peer *peer)
 {
+	uint64_t time_latency = 0;
 	/*
 	 * m_copy/tx_capture modes are not supported for
 	 * scatter gather packets
 	 */
+	if (qdf_unlikely(!!desc->pdev->latency_capture_enable)) {
+		time_latency = (qdf_ktime_to_ms(qdf_ktime_get()) -
+				desc->timestamp);
+	}
 	if (!(desc->msdu_ext_desc) &&
 	    (dp_get_completion_indication_for_stack(soc, desc->pdev,
-						    peer, ts, desc->nbuf)
+						    peer, ts, desc->nbuf,
+						    time_latency)
 			== QDF_STATUS_SUCCESS)) {
 		qdf_nbuf_unmap(soc->osdev, desc->nbuf,
 			       QDF_DMA_TO_DEVICE);
@@ -2925,22 +3081,24 @@ void dp_tx_comp_process_tx_status(struct dp_tx_desc_s *tx_desc,
 				  struct dp_peer *peer)
 {
 	uint32_t length;
+	qdf_ether_header_t *eh;
 	struct dp_soc *soc = NULL;
 	struct dp_vdev *vdev = tx_desc->vdev;
-	qdf_ether_header_t *eh =
-		(qdf_ether_header_t *)qdf_nbuf_data(tx_desc->nbuf);
+	qdf_nbuf_t nbuf = tx_desc->nbuf;
 
-	if (!vdev) {
+	if (!vdev || !nbuf) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
-				"invalid vdev");
+				"invalid tx descriptor. vdev or nbuf NULL");
 		goto out;
 	}
+
+	eh = (qdf_ether_header_t *)qdf_nbuf_data(nbuf);
 
 	DPTRACE(qdf_dp_trace_ptr(tx_desc->nbuf,
 				 QDF_DP_TRACE_LI_DP_FREE_PACKET_PTR_RECORD,
 				 QDF_TRACE_DEFAULT_PDEV_ID,
-				 qdf_nbuf_data_addr(tx_desc->nbuf),
-				 sizeof(qdf_nbuf_data(tx_desc->nbuf)),
+				 qdf_nbuf_data_addr(nbuf),
+				 sizeof(qdf_nbuf_data(nbuf)),
 				 tx_desc->id,
 				 ts->status));
 
@@ -2984,7 +3142,7 @@ void dp_tx_comp_process_tx_status(struct dp_tx_desc_s *tx_desc,
 			!(tx_desc->flags & DP_TX_DESC_FLAG_TO_FW))
 		dp_tx_comp_fill_tx_completion_stats(tx_desc, ts);
 
-	length = qdf_nbuf_len(tx_desc->nbuf);
+	length = qdf_nbuf_len(nbuf);
 	/* Update peer level stats */
 	if (!peer) {
 		QDF_TRACE_DEBUG_RL(QDF_MODULE_ID_DP,
@@ -3010,7 +3168,14 @@ void dp_tx_comp_process_tx_status(struct dp_tx_desc_s *tx_desc,
 		}
 	}
 
-	dp_tx_update_peer_stats(peer, ts, length);
+	dp_tx_update_peer_stats(tx_desc, ts, peer);
+
+#ifdef QCA_SUPPORT_RDK_STATS
+	if (soc->wlanstats_enabled)
+		dp_tx_sojourn_stats_process(vdev->pdev, peer, ts->tid,
+					    tx_desc->timestamp,
+					    ts->ppdu_id);
+#endif
 
 out:
 	return;
@@ -3033,6 +3198,7 @@ dp_tx_comp_process_desc_list(struct dp_soc *soc,
 	struct dp_tx_desc_s *next;
 	struct hal_tx_completion_status ts = {0};
 	struct dp_peer *peer;
+	qdf_nbuf_t netbuf;
 
 	DP_HIST_INIT();
 	desc = comp_head;
@@ -3041,6 +3207,12 @@ dp_tx_comp_process_desc_list(struct dp_soc *soc,
 		hal_tx_comp_get_status(&desc->comp, &ts, soc->hal_soc);
 		peer = dp_peer_find_by_id(soc, ts.peer_id);
 		dp_tx_comp_process_tx_status(desc, &ts, peer);
+
+		netbuf = desc->nbuf;
+		/* check tx complete notification */
+		if (QDF_NBUF_CB_TX_EXTRA_FRAG_FLAGS_NOTIFY_COMP(netbuf))
+			dp_tx_notify_completion(soc, desc, netbuf);
+
 		dp_tx_comp_process_desc(soc, desc, &ts, peer);
 
 		if (peer)
@@ -3076,12 +3248,16 @@ void dp_tx_process_htt_completion(struct dp_tx_desc_s *tx_desc, uint8_t *status)
 	struct hal_tx_completion_status ts = {0};
 	uint32_t *htt_desc = (uint32_t *)status;
 	struct dp_peer *peer;
+	struct cdp_tid_tx_stats *tid_stats = NULL;
 
 	qdf_assert(tx_desc->pdev);
 
 	pdev = tx_desc->pdev;
 	vdev = tx_desc->vdev;
 	soc = pdev->soc;
+
+	if (!vdev)
+		return;
 
 	tx_status = HTT_TX_WBM_COMPLETION_V2_TX_STATUS_GET(htt_desc[0]);
 
@@ -3090,6 +3266,7 @@ void dp_tx_process_htt_completion(struct dp_tx_desc_s *tx_desc, uint8_t *status)
 	case HTT_TX_FW2WBM_TX_STATUS_DROP:
 	case HTT_TX_FW2WBM_TX_STATUS_TTL:
 	{
+		uint8_t tid;
 		if (HTT_TX_WBM_COMPLETION_V2_VALID_GET(htt_desc[2])) {
 			ts.peer_id =
 				HTT_TX_WBM_COMPLETION_V2_SW_PEER_ID_GET(
@@ -3110,9 +3287,21 @@ void dp_tx_process_htt_completion(struct dp_tx_desc_s *tx_desc, uint8_t *status)
 
 		ts.first_msdu = 1;
 		ts.last_msdu = 1;
+		tid = ts.tid;
+		if (qdf_unlikely(tid >= CDP_MAX_DATA_TIDS))
+			tid = CDP_MAX_DATA_TIDS - 1;
 
-		if (tx_status != HTT_TX_FW2WBM_TX_STATUS_OK)
+		tid_stats = &pdev->stats.tid_stats.tid_tx_stats[tid];
+
+		if (qdf_unlikely(pdev->delay_stats_flag))
+			dp_tx_compute_delay(vdev, tx_desc, tid);
+		tid_stats->complete_cnt++;
+		if (qdf_unlikely(tx_status != HTT_TX_FW2WBM_TX_STATUS_OK)) {
 			ts.status = HAL_TX_TQM_RR_REM_CMD_REM;
+			tid_stats->comp_fail_cnt++;
+		} else {
+			tid_stats->success_cnt++;
+		}
 
 		peer = dp_peer_find_by_id(soc, ts.peer_id);
 
@@ -3496,8 +3685,8 @@ static void dp_tx_desc_flush(struct dp_vdev *vdev)
 		}
 	}
 }
-#endif /* !QCA_LL_TX_FLOW_CONTROL_V2 */
 
+#endif /* !QCA_LL_TX_FLOW_CONTROL_V2 */
 /**
  * dp_tx_vdev_detach() - detach vdev from dp tx
  * @vdev: virtual device instance
@@ -3869,7 +4058,7 @@ static void dp_tx_me_mem_free(struct dp_pdev *pdev,
 		phy_addr =  (phy_addr << 32) | seg_info_head->frags[0].paddr_lo;
 		qdf_mem_unmap_nbytes_single(pdev->soc->osdev,
 				phy_addr,
-				QDF_DMA_TO_DEVICE , DP_MAC_ADDR_LEN);
+				QDF_DMA_TO_DEVICE , QDF_MAC_ADDR_SIZE);
 		dp_tx_me_free_buf(pdev, mc_uc_buf);
 		qdf_nbuf_free(nbuf);
 		seg_info_new = seg_info_head;
@@ -3889,7 +4078,7 @@ static void dp_tx_me_mem_free(struct dp_pdev *pdev,
  */
 uint16_t
 dp_tx_me_send_convert_ucast(struct cdp_vdev *vdev_handle, qdf_nbuf_t nbuf,
-		uint8_t newmac[][DP_MAC_ADDR_LEN], uint8_t new_mac_cnt)
+		uint8_t newmac[][QDF_MAC_ADDR_SIZE], uint8_t new_mac_cnt)
 {
 	struct dp_vdev *vdev = (struct dp_vdev *) vdev_handle;
 	struct dp_pdev *pdev = vdev->pdev;
@@ -3900,7 +4089,7 @@ dp_tx_me_send_convert_ucast(struct cdp_vdev *vdev_handle, qdf_nbuf_t nbuf,
 	/* reference to frame dst addr */
 	uint8_t *dstmac;
 	/* copy of original frame src addr */
-	uint8_t srcmac[DP_MAC_ADDR_LEN];
+	uint8_t srcmac[QDF_MAC_ADDR_SIZE];
 
 	/* local index into newmac */
 	uint8_t new_mac_idx = 0;
@@ -3910,10 +4099,9 @@ dp_tx_me_send_convert_ucast(struct cdp_vdev *vdev_handle, qdf_nbuf_t nbuf,
 	struct dp_tx_seg_info_s *seg_info_head = NULL;
 	struct dp_tx_seg_info_s *seg_info_tail = NULL;
 	struct dp_tx_seg_info_s *seg_info_new;
-	struct dp_tx_frag_info_s data_frag;
 	qdf_dma_addr_t paddr_data;
 	qdf_dma_addr_t paddr_mcbuf = 0;
-	uint8_t empty_entry_mac[DP_MAC_ADDR_LEN] = {0};
+	uint8_t empty_entry_mac[QDF_MAC_ADDR_SIZE] = {0};
 	QDF_STATUS status;
 
 	qdf_mem_zero(&msdu_info, sizeof(msdu_info));
@@ -3921,7 +4109,7 @@ dp_tx_me_send_convert_ucast(struct cdp_vdev *vdev_handle, qdf_nbuf_t nbuf,
 	dp_tx_get_queue(vdev, nbuf, &msdu_info.tx_queue);
 
 	eh = (qdf_ether_header_t *)nbuf;
-	qdf_mem_copy(srcmac, eh->ether_shost, DP_MAC_ADDR_LEN);
+	qdf_mem_copy(srcmac, eh->ether_shost, QDF_MAC_ADDR_SIZE);
 
 	len = qdf_nbuf_len(nbuf);
 
@@ -3938,13 +4126,7 @@ dp_tx_me_send_convert_ucast(struct cdp_vdev *vdev_handle, qdf_nbuf_t nbuf,
 		return 1;
 	}
 
-	paddr_data = qdf_nbuf_get_frag_paddr(nbuf, 0) + IEEE80211_ADDR_LEN;
-
-	/*preparing data fragment*/
-	data_frag.vaddr = qdf_nbuf_data(nbuf) + IEEE80211_ADDR_LEN;
-	data_frag.paddr_lo = (uint32_t)paddr_data;
-	data_frag.paddr_hi = (((uint64_t) paddr_data)  >> 32);
-	data_frag.len = len - DP_MAC_ADDR_LEN;
+	paddr_data = qdf_nbuf_mapped_paddr_get(nbuf) + QDF_MAC_ADDR_SIZE;
 
 	for (new_mac_idx = 0; new_mac_idx < new_mac_cnt; new_mac_idx++) {
 		dstmac = newmac[new_mac_idx];
@@ -3952,11 +4134,11 @@ dp_tx_me_send_convert_ucast(struct cdp_vdev *vdev_handle, qdf_nbuf_t nbuf,
 				"added mac addr (%pM)", dstmac);
 
 		/* Check for NULL Mac Address */
-		if (!qdf_mem_cmp(dstmac, empty_entry_mac, DP_MAC_ADDR_LEN))
+		if (!qdf_mem_cmp(dstmac, empty_entry_mac, QDF_MAC_ADDR_SIZE))
 			continue;
 
 		/* frame to self mac. skip */
-		if (!qdf_mem_cmp(dstmac, srcmac, DP_MAC_ADDR_LEN))
+		if (!qdf_mem_cmp(dstmac, srcmac, QDF_MAC_ADDR_SIZE))
 			continue;
 
 		/*
@@ -3973,7 +4155,7 @@ dp_tx_me_send_convert_ucast(struct cdp_vdev *vdev_handle, qdf_nbuf_t nbuf,
 		}
 
 		mc_uc_buf = dp_tx_me_alloc_buf(pdev);
-		if (mc_uc_buf == NULL)
+		if (!mc_uc_buf)
 			goto fail_buf_alloc;
 
 		/*
@@ -3982,7 +4164,7 @@ dp_tx_me_send_convert_ucast(struct cdp_vdev *vdev_handle, qdf_nbuf_t nbuf,
 		 */
 		if (new_mac_idx < (new_mac_cnt - 1)) {
 			nbuf_clone = qdf_nbuf_clone((qdf_nbuf_t)nbuf);
-			if (nbuf_clone == NULL) {
+			if (!nbuf_clone) {
 				DP_STATS_INC(vdev, tx_i.mcast_en.clone_fail, 1);
 				goto fail_clone;
 			}
@@ -3995,10 +4177,10 @@ dp_tx_me_send_convert_ucast(struct cdp_vdev *vdev_handle, qdf_nbuf_t nbuf,
 			nbuf_clone = nbuf;
 		}
 
-		qdf_mem_copy(mc_uc_buf->data, dstmac, DP_MAC_ADDR_LEN);
+		qdf_mem_copy(mc_uc_buf->data, dstmac, QDF_MAC_ADDR_SIZE);
 
 		status = qdf_mem_map_nbytes_single(vdev->osdev, mc_uc_buf->data,
-				QDF_DMA_TO_DEVICE, DP_MAC_ADDR_LEN,
+				QDF_DMA_TO_DEVICE, QDF_MAC_ADDR_SIZE,
 				&paddr_mcbuf);
 
 		if (status) {
@@ -4011,17 +4193,24 @@ dp_tx_me_send_convert_ucast(struct cdp_vdev *vdev_handle, qdf_nbuf_t nbuf,
 		seg_info_new->frags[0].vaddr =  (uint8_t *)mc_uc_buf;
 		seg_info_new->frags[0].paddr_lo = (uint32_t) paddr_mcbuf;
 		seg_info_new->frags[0].paddr_hi =
-			((uint64_t) paddr_mcbuf >> 32);
-		seg_info_new->frags[0].len = DP_MAC_ADDR_LEN;
+			(uint16_t)((uint64_t)paddr_mcbuf >> 32);
+		seg_info_new->frags[0].len = QDF_MAC_ADDR_SIZE;
 
-		seg_info_new->frags[1] = data_frag;
+		/*preparing data fragment*/
+		seg_info_new->frags[1].vaddr =
+			qdf_nbuf_data(nbuf) + QDF_MAC_ADDR_SIZE;
+		seg_info_new->frags[1].paddr_lo = (uint32_t)paddr_data;
+		seg_info_new->frags[1].paddr_hi =
+			(uint16_t)(((uint64_t)paddr_data) >> 32);
+		seg_info_new->frags[1].len = len - QDF_MAC_ADDR_SIZE;
+
 		seg_info_new->nbuf = nbuf_clone;
 		seg_info_new->frag_cnt = 2;
 		seg_info_new->total_len = len;
 
 		seg_info_new->next = NULL;
 
-		if (seg_info_head == NULL)
+		if (!seg_info_head)
 			seg_info_head = seg_info_new;
 		else
 			seg_info_tail->next = seg_info_new;

@@ -31,10 +31,9 @@
 #include <host_diag_core_event.h>
 #endif
 #ifdef WLAN_POLICY_MGR_ENABLE
-#include <wlan_dfs_utils_api.h>
 #include <wlan_policy_mgr_api.h>
 #endif
-
+#include <wlan_dfs_utils_api.h>
 
 QDF_STATUS
 scm_scan_free_scan_request_mem(struct scan_start_request *req)
@@ -150,6 +149,8 @@ static void scm_scan_post_event(struct wlan_objmgr_vdev *vdev,
 	}
 	scan = wlan_vdev_get_scan_obj(vdev);
 	pdev_ev_handler = wlan_vdev_get_pdev_scan_ev_handlers(vdev);
+	if (!pdev_ev_handler)
+		return;
 	cb_handlers = &(pdev_ev_handler->cb_handlers[0]);
 	requesters = scan->requesters;
 
@@ -764,6 +765,7 @@ scm_update_channel_list(struct scan_start_request *req,
 	struct wlan_objmgr_pdev *pdev;
 	bool first_scan_done = true;
 	bool p2p_search = false;
+	bool skip_dfs_ch = true;
 
 	pdev = wlan_vdev_get_pdev(req->vdev);
 
@@ -782,7 +784,10 @@ scm_update_channel_list(struct scan_start_request *req,
 		p2p_search = true;
 	/*
 	 * No need to update channels if req is passive scan and single channel
-	 * ie ROC, Preauth etc
+	 * ie ROC, Preauth etc.
+	 * If the single chan in the scan channel list is an NOL channel,it is
+	 * not removed as it would reduce the number of scan channels to 0
+	 * and FW would scan all chans which is unexpected in this scenerio.
 	 */
 	if (req->scan_req.scan_f_passive &&
 	    req->scan_req.chan_list.num_chan == 1)
@@ -792,20 +797,25 @@ scm_update_channel_list(struct scan_start_request *req,
 	if ((!(wlan_vdev_mlme_get_opmode(req->vdev) == QDF_STA_MODE) &&
 	    !(wlan_vdev_mlme_get_opmode(req->vdev) == QDF_P2P_CLIENT_MODE)) &&
 	    !p2p_search)
-		return;
+		skip_dfs_ch = false;
 
 	if ((scan_obj->scan_def.allow_dfs_chan_in_scan &&
 	    (scan_obj->scan_def.allow_dfs_chan_in_first_scan ||
 	     first_scan_done)) &&
 	     !(scan_obj->scan_def.skip_dfs_chan_in_p2p_search && p2p_search))
-		return;
+		skip_dfs_ch = false;
 
 	for (i = 0; i < req->scan_req.chan_list.num_chan; i++) {
-		if (wlan_reg_is_dfs_ch(pdev, wlan_reg_freq_to_chan(pdev,
-				       req->scan_req.chan_list.chan[i].freq)))
+		uint32_t freq;
+
+		freq = req->scan_req.chan_list.chan[i].freq;
+		if (skip_dfs_ch &&
+		    wlan_reg_is_dfs_ch(pdev, wlan_reg_freq_to_chan(pdev, freq)))
+			continue;
+		if (utils_dfs_is_freq_in_nol(pdev, freq))
 			continue;
 		req->scan_req.chan_list.chan[num_scan_channels++] =
-				req->scan_req.chan_list.chan[i];
+			req->scan_req.chan_list.chan[i];
 	}
 	req->scan_req.chan_list.num_chan = num_scan_channels;
 }
@@ -982,8 +992,16 @@ scm_scan_start_req(struct scheduler_msg *msg)
 	}
 
 	scm_scan_req_update_params(req->vdev, req, scan_obj);
+
+	if (!req->scan_req.chan_list.num_chan) {
+		scm_err("Scan Aborted, 0 channel to scan");
+		status = QDF_STATUS_E_NULL_VALUE;
+		goto err;
+	}
+
 	scm_info("request to scan %d channels",
 		 req->scan_req.chan_list.num_chan);
+
 	for (idx = 0; idx < req->scan_req.chan_list.num_chan; idx++)
 		scm_debug("chan[%d]: freq:%d, phymode:%d", idx,
 			  req->scan_req.chan_list.chan[idx].freq,
@@ -991,8 +1009,7 @@ scm_scan_start_req(struct scheduler_msg *msg)
 
 	cmd.cmd_type = WLAN_SER_CMD_SCAN;
 	cmd.cmd_id = req->scan_req.scan_id;
-	cmd.cmd_cb = (wlan_serialization_cmd_callback)
-		scm_scan_serialize_callback;
+	cmd.cmd_cb = scm_scan_serialize_callback;
 	cmd.umac_cmd = req;
 	cmd.source = WLAN_UMAC_COMP_SCAN;
 	cmd.is_high_priority = false;

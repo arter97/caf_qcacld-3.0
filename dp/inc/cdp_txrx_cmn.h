@@ -29,6 +29,11 @@
 #include "cdp_txrx_ops.h"
 #include "cdp_txrx_handle.h"
 #include "cdp_txrx_cmn_struct.h"
+
+#ifdef ENABLE_VERBOSE_DEBUG
+extern bool is_dp_verbose_debug_enabled;
+#endif
+
 /******************************************************************************
  *
  * Common Data Path Header File
@@ -40,6 +45,30 @@
 #define dp_info(params...) \
 	__QDF_TRACE_FL(QDF_TRACE_LEVEL_INFO_HIGH, QDF_MODULE_ID_DP, ## params)
 #define dp_debug(params...) QDF_TRACE_DEBUG(QDF_MODULE_ID_DP, params)
+#ifdef ENABLE_VERBOSE_DEBUG
+/**
+ * @enum verbose_debug_module:
+ * if INI "enable_verbose_debug" has to set following bit positions to enable
+ * respective module's excessive logging,
+ *
+ * @hif_verbose_debug_mask: 1st bit [0th index] is  for HIF module
+ * @hal_verbose_debug_mask: 2nd bit [1st index] is for HAL module
+ * @dp_verbose_debug_mask:  3rd bit [2nd index] is for DP module
+ */
+enum verbose_debug_module {
+	hif_vebose_debug_mask    = 1 << 0,
+	hal_verbose_debug_mask   = 1 << 1,
+	dp_verbose_debug_mask    = 1 << 2,
+};
+
+#define dp_verbose_debug(params...) \
+		if (unlikely(is_dp_verbose_debug_enabled)) \
+			do {\
+				QDF_TRACE_DEBUG(QDF_MODULE_ID_DP, params); \
+			} while (0)
+#else
+#define dp_verbose_debug(params...) QDF_TRACE_DEBUG(QDF_MODULE_ID_DP, params)
+#endif
 
 #define dp_alert_rl(params...) QDF_TRACE_FATAL_RL(QDF_MODULE_ID_DP, params)
 #define dp_err_rl(params...) QDF_TRACE_ERROR_RL(QDF_MODULE_ID_DP, params)
@@ -500,7 +529,8 @@ static inline int cdp_peer_add_ast
 }
 
 static inline void cdp_peer_reset_ast
-	(ol_txrx_soc_handle soc, uint8_t *wds_macaddr, void *vdev_hdl)
+	(ol_txrx_soc_handle soc, uint8_t *wds_macaddr, uint8_t *peer_macaddr,
+	 void *vdev_hdl)
 {
 
 	if (!soc || !soc->ops) {
@@ -513,7 +543,8 @@ static inline void cdp_peer_reset_ast
 	    !soc->ops->cmn_drv_ops->txrx_peer_reset_ast)
 		return;
 
-	soc->ops->cmn_drv_ops->txrx_peer_reset_ast(soc, wds_macaddr, vdev_hdl);
+	soc->ops->cmn_drv_ops->txrx_peer_reset_ast(soc, wds_macaddr,
+						   peer_macaddr, vdev_hdl);
 }
 
 static inline void cdp_peer_reset_ast_table
@@ -1933,6 +1964,67 @@ QDF_STATUS cdp_set_pdev_tx_capture(ol_txrx_soc_handle soc,
 }
 
 /**
+ * cdp_set_pdev_pcp_tid_map() - set pdev pcp-tid-map
+ * @soc: opaque soc handle
+ * @pdev: data path pdev handle
+ * @pcp: pcp value
+ * @tid: tid value
+ *
+ * This API is used to configure the pcp-to-tid mapping for a pdev.
+ *
+ * Return: QDF_STATUS_SUCCESS if value set successfully
+ *          QDF_STATUS_E_INVAL false if error
+ */
+static inline
+QDF_STATUS cdp_set_pdev_pcp_tid_map(ol_txrx_soc_handle soc,
+				    struct cdp_pdev *pdev,
+				    uint32_t pcp, uint32_t tid)
+{
+	if (!soc || !soc->ops) {
+		QDF_TRACE(QDF_MODULE_ID_CDP, QDF_TRACE_LEVEL_DEBUG,
+			  "%s: Invalid Instance", __func__);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!soc->ops->cmn_drv_ops ||
+	    !soc->ops->cmn_drv_ops->set_pdev_pcp_tid_map)
+		return QDF_STATUS_E_INVAL;
+
+	return soc->ops->cmn_drv_ops->set_pdev_pcp_tid_map(pdev, pcp, tid);
+}
+
+/**
+ * cdp_set_pdev_pcp_tidmap_prty() - set pdev tidmap priority
+ * @soc: opaque soc handle
+ * @pdev: data path pdev handle
+ * @val: priority value
+ *
+ * This API is used to configure the tidmap priority for a pdev.
+ * The tidmap priority decides which mapping, namely DSCP-TID, SVLAN_PCP-TID,
+ * CVLAN_PCP-TID will be used.
+ *
+ * Return: QDF_STATUS_SUCCESS if value set successfully
+ *          QDF_STATUS_E_INVAL false if error
+ */
+static inline
+QDF_STATUS  cdp_set_pdev_tidmap_prty(ol_txrx_soc_handle soc,
+				     struct cdp_pdev *pdev_handle,
+				     uint32_t val)
+{
+	if (!soc || !soc->ops) {
+		QDF_TRACE(QDF_MODULE_ID_CDP, QDF_TRACE_LEVEL_DEBUG,
+			  "%s: Invalid Instance", __func__);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!soc->ops->cmn_drv_ops ||
+	    !soc->ops->cmn_drv_ops->set_pdev_tidmap_prty)
+		return QDF_STATUS_E_INVAL;
+
+	return soc->ops->cmn_drv_ops->set_pdev_tidmap_prty(pdev_handle, val);
+}
+
+/**
  * cdp_get_peer_mac_from_peer_id() - get peer mac addr from peer id
  * @soc: opaque soc handle
  * @pdev: data path pdev handle
@@ -2053,17 +2145,20 @@ void cdp_if_mgmt_drain(ol_txrx_soc_handle soc,
  * @peer_map_unmap_v2: flag indicates HTT peer map v2 is enabled in FW
  *
  *
- * Return: void
+ * Return: QDF_STATUS
  */
-static inline void
+static inline QDF_STATUS
 cdp_peer_map_attach(ol_txrx_soc_handle soc, uint32_t max_peers,
 		    uint32_t max_ast_index, bool peer_map_unmap_v2)
 {
 	if (soc && soc->ops && soc->ops->cmn_drv_ops &&
 	    soc->ops->cmn_drv_ops->txrx_peer_map_attach)
-		soc->ops->cmn_drv_ops->txrx_peer_map_attach(soc, max_peers,
-							    max_ast_index,
-							    peer_map_unmap_v2);
+		return soc->ops->cmn_drv_ops->txrx_peer_map_attach(soc,
+							max_peers,
+							max_ast_index,
+							peer_map_unmap_v2);
+
+	return QDF_STATUS_SUCCESS;
 }
 
 /**
@@ -2343,5 +2438,100 @@ cdp_flush_rate_stats_request(struct cdp_soc_t *soc, struct cdp_pdev *pdev)
 		return;
 
 	soc->ops->cmn_drv_ops->txrx_flush_rate_stats_request(soc, pdev);
+}
+
+/**
+ * cdp_set_vdev_pcp_tid_map() - set vdev pcp-tid-map
+ * @soc: opaque soc handle
+ * @vdev: data path vdev handle
+ * @pcp: pcp value
+ * @tid: tid value
+ *
+ * This API is used to configure the pcp-to-tid mapping for a pdev.
+ *
+ * Return: QDF_STATUS_SUCCESS if value set successfully
+ *          QDF_STATUS_E_INVAL false if error
+ */
+static inline
+QDF_STATUS cdp_set_vdev_pcp_tid_map(ol_txrx_soc_handle soc,
+				    struct cdp_vdev *vdev_handle,
+				    uint8_t pcp, uint8_t tid)
+{
+	if (!soc || !soc->ops) {
+		QDF_TRACE(QDF_MODULE_ID_CDP, QDF_TRACE_LEVEL_DEBUG,
+			  "%s: Invalid Instance", __func__);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!soc->ops->cmn_drv_ops ||
+	    !soc->ops->cmn_drv_ops->set_vdev_pcp_tid_map)
+		return QDF_STATUS_E_INVAL;
+
+	return soc->ops->cmn_drv_ops->set_vdev_pcp_tid_map(vdev_handle,
+							   pcp, tid);
+}
+
+/**
+ * cdp_set_vdev_tidmap_tbl_id() - set vdev tidmap table id
+ *
+ * @soc: opaque soc handle
+ * @vdev: data path vdev handle
+ * @mapid: value of mapid
+ *
+ * This API is used to configure the table-id of the tid-mapping for a vdev.
+ * Table '0' is for using the pdev's pcp-tid mapping and '1' is for using
+ * the vdev's pcp-tid mapping.
+ *
+ * Return: QDF_STATUS_SUCCESS if value set successfully
+ *          QDF_STATUS_E_INVAL false if error
+ */
+static inline
+QDF_STATUS cdp_set_vdev_tidmap_tbl_id(ol_txrx_soc_handle soc,
+				      struct cdp_vdev *vdev_handle,
+				      uint8_t mapid)
+{
+	if (!soc || !soc->ops) {
+		QDF_TRACE(QDF_MODULE_ID_CDP, QDF_TRACE_LEVEL_DEBUG,
+			  "%s: Invalid Instance", __func__);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!soc->ops->cmn_drv_ops ||
+	    !soc->ops->cmn_drv_ops->set_vdev_tidmap_tbl_id)
+		return QDF_STATUS_E_INVAL;
+
+	return soc->ops->cmn_drv_ops->set_vdev_tidmap_tbl_id(vdev_handle,
+							     mapid);
+}
+
+/**
+ * cdp_set_vdev_tidmap_prty() - set vdev tidmap priority
+ * @soc: opaque soc handle
+ * @vdev: data path vdev handle
+ * @prio: tidmap priority value
+ *
+ * This API is used to configure the tidmap priority for a vdev.
+ * The tidmap priority decides which mapping, namely DSCP-TID, SVLAN_PCP-TID,
+ * CVLAN_PCP-TID will be used.
+ * The vdev tidmap priority will be used only when the tidmap_tbl_id is '1'.
+ *
+ * Return: QDF_STATUS_SUCCESS if value set successfully
+ *          QDF_STATUS_E_INVAL false if error
+ */
+static inline
+QDF_STATUS cdp_set_vdev_tidmap_prty(ol_txrx_soc_handle soc,
+				    struct cdp_vdev *vdev_handle, uint8_t prio)
+{
+	if (!soc || !soc->ops) {
+		QDF_TRACE(QDF_MODULE_ID_CDP, QDF_TRACE_LEVEL_DEBUG,
+			  "%s: Invalid Instance", __func__);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!soc->ops->cmn_drv_ops ||
+	    !soc->ops->cmn_drv_ops->set_vdev_tidmap_prty)
+		return QDF_STATUS_E_INVAL;
+
+	return soc->ops->cmn_drv_ops->set_vdev_tidmap_prty(vdev_handle, prio);
 }
 #endif /* _CDP_TXRX_CMN_H_ */

@@ -28,7 +28,6 @@
 #include <host_diag_core_event.h>
 #include "cds_utils.h"
 #include "csr_api.h"
-#include "wlan_hdd_main.h"
 #include "wma.h"
 #include "ol_txrx_api.h"
 #include "pktlog_ac.h"
@@ -570,7 +569,7 @@ static int pktlog_send_per_pkt_stats_to_user(void)
 	while (!list_empty(&gwlan_logging.pkt_stat_filled_list)
 		&& !gwlan_logging.exit) {
 		skb_new = dev_alloc_skb(MAX_SKBMSG_LENGTH);
-		if (skb_new == NULL) {
+		if (!skb_new) {
 			if (!rate_limit) {
 				pr_err("%s: dev_alloc_skb() failed for msg size[%d] drop count = %u\n",
 					__func__, MAX_SKBMSG_LENGTH,
@@ -646,7 +645,7 @@ static int send_filled_buffers_to_user(void)
 	       && !gwlan_logging.exit) {
 
 		skb = dev_alloc_skb(MAX_LOGMSG_LENGTH);
-		if (skb == NULL) {
+		if (!skb) {
 			if (!rate_limit) {
 				pr_err
 					("%s: dev_alloc_skb() failed for msg size[%d] drop count = %u\n",
@@ -672,7 +671,7 @@ static int send_filled_buffers_to_user(void)
 		tot_msg_len = NLMSG_SPACE(payload_len);
 		nlh = nlmsg_put(skb, 0, nlmsg_seq++,
 				ANI_NL_MSG_LOG, payload_len, NLM_F_REQUEST);
-		if (NULL == nlh) {
+		if (!nlh) {
 			spin_lock_irqsave(&gwlan_logging.spin_lock, flags);
 			list_add_tail(&plog_msg->node,
 				      &gwlan_logging.free_list);
@@ -981,7 +980,7 @@ int wlan_logging_sock_init_svc(void)
 
 	for (i = 0; i < MAX_PKTSTATS_BUFF; i++) {
 		gpkt_stats_buffers[i].skb = dev_alloc_skb(MAX_PKTSTATS_LENGTH);
-		if (gpkt_stats_buffers[i].skb == NULL) {
+		if (!gpkt_stats_buffers[i].skb) {
 			pr_err("%s: Memory alloc failed for skb", __func__);
 			/* free previously allocated skb and return */
 			for (j = 0; j < i ; j++)
@@ -1236,7 +1235,7 @@ void wlan_pkt_stats_to_logger_thread(void *pl_hdr, void *pkt_dump, void *data)
 
 	pktlog_hdr = (struct ath_pktlog_hdr *)pl_hdr;
 
-	if (pktlog_hdr == NULL) {
+	if (!pktlog_hdr) {
 		pr_err("%s : Invalid pkt_stats_header\n", __func__);
 		return;
 	}
@@ -1327,9 +1326,10 @@ static void driver_hal_status_map(uint8_t *status)
 
 /*
  * send_packetdump() - send packet dump
+ * @soc: soc handle
+ * @vdev: vdev handle
  * @netbuf: netbuf
  * @status: status of tx packet
- * @vdev_id: virtual device id
  * @type: type of packet
  *
  * This function is used to send packet dump to HAL layer
@@ -1338,24 +1338,20 @@ static void driver_hal_status_map(uint8_t *status)
  * Return: None
  *
  */
-static void send_packetdump(qdf_nbuf_t netbuf, uint8_t status,
-				uint8_t vdev_id, uint8_t type)
+static void send_packetdump(ol_txrx_soc_handle soc,
+			    struct cdp_vdev *vdev, qdf_nbuf_t netbuf,
+			    uint8_t status, uint8_t type)
 {
 	struct ath_pktlog_hdr pktlog_hdr = {0};
 	struct packet_dump pd_hdr = {0};
-	struct hdd_context *hdd_ctx;
-	struct hdd_adapter *adapter;
 
-	hdd_ctx = (struct hdd_context *)cds_get_context(QDF_MODULE_ID_HDD);
-	if (!hdd_ctx)
+	if (!netbuf) {
+		pr_err("%s: Invalid netbuf.\n", __func__);
 		return;
-
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
-	if (!adapter)
-		return;
+	}
 
 	/* Send packet dump only for STA interface */
-	if (adapter->device_mode != QDF_STA_MODE)
+	if (wlan_op_mode_sta != cdp_get_opmode(soc, vdev))
 		return;
 
 #if defined(HELIUMPLUS)
@@ -1464,9 +1460,10 @@ static bool check_txrx_packetdump_count(void)
 
 /*
  * tx_packetdump_cb() - tx packet dump callback
+ * @soc: soc handle
+ * @vdev: vdev handle
  * @netbuf: netbuf
  * @status: status of tx packet
- * @vdev_id: virtual device id
  * @type: packet type
  *
  * This function is used to send tx packet dump to HAL layer
@@ -1475,25 +1472,30 @@ static bool check_txrx_packetdump_count(void)
  * Return: None
  *
  */
-static void tx_packetdump_cb(qdf_nbuf_t netbuf, uint8_t status,
-				uint8_t vdev_id, uint8_t type)
+static void tx_packetdump_cb(ol_txrx_soc_handle soc,
+			     struct cdp_vdev *vdev, qdf_nbuf_t netbuf,
+			     uint8_t status, uint8_t type)
 {
 	bool temp;
+
+	if (!soc || !vdev)
+		return;
 
 	temp = check_txrx_packetdump_count();
 	if (temp)
 		return;
 
 	driver_hal_status_map(&status);
-	send_packetdump(netbuf, status, vdev_id, type);
+	send_packetdump(soc, vdev, netbuf, status, type);
 }
 
 
 /*
  * rx_packetdump_cb() - rx packet dump callback
+ * @soc: soc handle
+ * @vdev: vdev handle
  * @netbuf: netbuf
  * @status: status of rx packet
- * @vdev_id: virtual device id
  * @type: packet type
  *
  * This function is used to send rx packet dump to HAL layer
@@ -1502,16 +1504,20 @@ static void tx_packetdump_cb(qdf_nbuf_t netbuf, uint8_t status,
  * Return: None
  *
  */
-static void rx_packetdump_cb(qdf_nbuf_t netbuf, uint8_t status,
-				uint8_t vdev_id, uint8_t type)
+static void rx_packetdump_cb(ol_txrx_soc_handle soc,
+			     struct cdp_vdev *vdev, qdf_nbuf_t netbuf,
+			     uint8_t status, uint8_t type)
 {
 	bool temp;
+
+	if (!soc || !vdev)
+		return;
 
 	temp = check_txrx_packetdump_count();
 	if (temp)
 		return;
 
-	send_packetdump(netbuf, status, vdev_id, type);
+	send_packetdump(soc, vdev, netbuf, status, type);
 }
 
 

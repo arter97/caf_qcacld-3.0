@@ -129,7 +129,7 @@ static const int rx_mon_ring_mask[WLAN_CFG_INT_NUM_CONTEXTS] = {
 					WLAN_CFG_RX_MON_RING_MASK_3};
 
 static const int host2rxdma_ring_mask[WLAN_CFG_INT_NUM_CONTEXTS] = {
-					WLAN_CFG_HOST2RXDMA_RING_MASK_0,
+					0,
 					0,
 					0,
 					0,
@@ -251,7 +251,7 @@ struct wlan_cfg_dp_soc_ctxt *wlan_cfg_soc_attach(void *psoc)
 	struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx =
 		qdf_mem_malloc(sizeof(struct wlan_cfg_dp_soc_ctxt));
 
-	if (wlan_cfg_ctx == NULL)
+	if (!wlan_cfg_ctx)
 		return NULL;
 
 	wlan_cfg_ctx->rxdma1_enable = WLAN_CFG_RXDMA1_ENABLE;
@@ -267,6 +267,7 @@ struct wlan_cfg_dp_soc_ctxt *wlan_cfg_soc_attach(void *psoc)
 	wlan_cfg_ctx->num_tx_ext_desc_pool = cfg_get(psoc,
 						     CFG_DP_TX_EXT_DESC_POOLS);
 	wlan_cfg_ctx->num_tx_desc = cfg_get(psoc, CFG_DP_TX_DESC);
+	wlan_cfg_ctx->min_tx_desc = WLAN_CFG_NUM_TX_DESC_MIN;
 	wlan_cfg_ctx->num_tx_ext_desc = cfg_get(psoc, CFG_DP_TX_EXT_DESC);
 	wlan_cfg_ctx->htt_packet_type = cfg_get(psoc, CFG_DP_HTT_PACKET_TYPE);
 	wlan_cfg_ctx->max_peer_id = cfg_get(psoc, CFG_DP_MAX_PEER_ID);
@@ -333,7 +334,7 @@ struct wlan_cfg_dp_soc_ctxt *wlan_cfg_soc_attach(void *psoc)
 	/*Enable checksum offload by default*/
 	wlan_cfg_ctx->tcp_udp_checksumoffload =
 			cfg_get(psoc, CFG_DP_TCP_UDP_CKSUM_OFFLOAD);
-
+	wlan_cfg_ctx->per_pkt_trace = cfg_get(psoc, CFG_DP_PER_PKT_LOGGING);
 	wlan_cfg_ctx->defrag_timeout_check =
 			cfg_get(psoc, CFG_DP_DEFRAG_TIMEOUT_CHECK);
 	wlan_cfg_ctx->rx_defrag_min_timeout =
@@ -381,7 +382,7 @@ struct wlan_cfg_dp_pdev_ctxt *wlan_cfg_pdev_attach(void *psoc)
 	struct wlan_cfg_dp_pdev_ctxt *wlan_cfg_ctx =
 		qdf_mem_malloc(sizeof(struct wlan_cfg_dp_pdev_ctxt));
 
-	if (wlan_cfg_ctx == NULL)
+	if (!wlan_cfg_ctx)
 		return NULL;
 
 	wlan_cfg_ctx->rx_dma_buf_ring_size = cfg_get(psoc,
@@ -682,6 +683,11 @@ int wlan_cfg_get_num_tx_desc(struct wlan_cfg_dp_soc_ctxt *cfg)
 void wlan_cfg_set_num_tx_desc(struct wlan_cfg_dp_soc_ctxt *cfg, int num_desc)
 {
 	cfg->num_tx_desc = num_desc;
+}
+
+int wlan_cfg_get_min_tx_desc(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return cfg->min_tx_desc;
 }
 
 int wlan_cfg_get_num_tx_ext_desc(struct wlan_cfg_dp_soc_ctxt *cfg)

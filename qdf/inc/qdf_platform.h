@@ -37,20 +37,6 @@ typedef void (*qdf_self_recovery_callback)(enum qdf_hang_reason reason,
 					   const uint32_t line);
 
 /**
- * qdf_ssr_callback() - callback for ssr
- *
- * Return: true if fw is down and false if fw is not down
- */
-typedef void (*qdf_ssr_callback)(const char *);
-
-/**
- * qdf_is_module_state_transitioning_cb() - callback to check module state
- *
- * Return: true if module is in transition, else false
- */
-typedef int (*qdf_is_module_state_transitioning_cb)(void);
-
-/**
  * qdf_is_fw_down_callback() - callback to query if fw is down
  *
  * Return: true if fw is down and false if fw is not down
@@ -95,43 +81,6 @@ void qdf_register_self_recovery_callback(qdf_self_recovery_callback callback);
 void __qdf_trigger_self_recovery(const char *func, const uint32_t line);
 
 /**
- * qdf_register_ssr_protect_callbacks() - register [un]protect callbacks
- *
- * Return: None
- */
-void qdf_register_ssr_protect_callbacks(qdf_ssr_callback protect,
-					qdf_ssr_callback unprotect);
-
-/**
- * qdf_ssr_protect() - start SSR protection
- *
- * Return: None
- */
-void qdf_ssr_protect(const char *caller);
-
-/**
- * qdf_ssr_unprotect() - remove SSR protection
- *
- * Return: None
- */
-void qdf_ssr_unprotect(const char *caller);
-
-/**
- * qdf_register_module_state_query_callback() - register module state query
- *
- * Return: None
- */
-void qdf_register_module_state_query_callback(
-			qdf_is_module_state_transitioning_cb query);
-
-/**
- * qdf_is_module_state_transitioning() - query module state transition
- *
- * Return: true if in transition else false
- */
-bool qdf_is_module_state_transitioning(void);
-
-/**
  * qdf_is_recovering_callback() - callback to get driver recovering in progress
  * or not
  *
@@ -157,39 +106,42 @@ void qdf_register_recovering_state_query_callback(
 bool qdf_is_recovering(void);
 
 /**
- * qdf_psoc_start_callback() - callback for starting the psoc operation
- *
- * Return: true if driver psoc operation can be started else false
+ * struct qdf_op_sync - opaque operation synchronization context handle
  */
-typedef QDF_STATUS (*qdf_psoc_start_callback)(void);
+struct qdf_op_sync;
+
+typedef int (*qdf_op_protect_cb)(void **out_sync, const char *func);
+typedef void (*qdf_op_unprotect_cb)(void *sync, const char *func);
 
 /**
- * qdf_psoc_stop_callback - callback for stopping the psoc operation
+ * qdf_op_protect() - attempt to protect a driver operation
+ * @out_sync: output parameter for the synchronization context, populated on
+ *	success
+ *
+ * Return: Errno
+ */
+#define qdf_op_protect(out_sync) __qdf_op_protect(out_sync, __func__)
+
+qdf_must_check int
+__qdf_op_protect(struct qdf_op_sync **out_sync, const char *func);
+
+/**
+ * qdf_op_unprotect() - release driver operation protection
+ * @sync: synchronization context returned from qdf_op_protect()
  *
  * Return: None
  */
-typedef void (*qdf_psoc_stop_callback)(void);
+#define qdf_op_unprotect(sync) __qdf_op_unprotect(sync, __func__)
+
+void __qdf_op_unprotect(struct qdf_op_sync *sync, const char *func);
 
 /**
- * qdf_psoc_op_start() - start DSC psoc operation
- *
- * Return: Success for starting psoc operation or failure
- */
-QDF_STATUS qdf_psoc_op_start(void);
-
-/**
- * qdf_psoc_op_stop() - stop DSC psoc operation
- * @context: Context information
+ * qdf_op_callbacks_register() - register driver operation protection callbacks
  *
  * Return: None
  */
-void qdf_psoc_op_stop(void);
+void qdf_op_callbacks_register(qdf_op_protect_cb on_protect,
+			       qdf_op_unprotect_cb on_unprotect);
 
-/**
- * qdf_register_dsc_psoc_callbacks() - register dsc psoc start/stop callbacks
- *
- * Return: None
- */
-void qdf_register_dsc_psoc_callbacks(qdf_psoc_start_callback protect,
-				     qdf_psoc_stop_callback unprotect);
 #endif /*_QDF_PLATFORM_H*/
+

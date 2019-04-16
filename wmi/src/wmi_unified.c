@@ -1671,7 +1671,12 @@ QDF_STATUS wmi_unified_cmd_send_fl(wmi_unified_t wmi_handle, wmi_buf_t buf,
 							      cmd_id);
 	} else if (qdf_atomic_read(&wmi_handle->is_target_suspended) &&
 		   !wmi_is_pm_resume_cmd(cmd_id)) {
-		QDF_DEBUG_PANIC("Target is suspended (via %s:%u)", func, line);
+		if (!wmi_handle->wmi_stopinprogress)
+			QDF_DEBUG_PANIC("Target is suspended (via %s:%u)",
+					func, line);
+		else
+			wmi_nofl_err("Target is suspended (via %s:%u)",
+				     func, line);
 		return QDF_STATUS_E_BUSY;
 	}
 
@@ -1783,7 +1788,7 @@ static int wmi_unified_get_event_handler_ix(wmi_unified_t wmi_handle,
 	for (idx = 0; (idx < soc->max_event_idx &&
 		       idx < WMI_UNIFIED_MAX_EVENT); ++idx) {
 		if (wmi_handle->event_id[idx] == event_id &&
-		    wmi_handle->event_handler[idx] != NULL) {
+		    wmi_handle->event_handler[idx]) {
 			return idx;
 		}
 	}
@@ -2097,7 +2102,7 @@ static void wmi_control_rx(void *ctx, HTC_PACKET *htc_packet)
 	evt_buf = (wmi_buf_t) htc_packet->pPktContext;
 
 	wmi_handle = wmi_get_pdev_ep(soc, htc_packet->Endpoint);
-	if (wmi_handle == NULL) {
+	if (!wmi_handle) {
 		WMI_LOGE
 		("unable to get wmi_handle to Endpoint %d\n",
 		 htc_packet->Endpoint);
@@ -2393,29 +2398,6 @@ static inline void wmi_interface_logging_init(struct wmi_unified *wmi_handle,
 #endif
 
 /**
- * wmi_target_params_init: Target specific params init
- * @param wmi_soc: Pointer to wmi soc object
- * @param wmi_handle: Pointer to wmi handle object
- *
- * return: None
- */
-#ifndef CONFIG_MCL
-static inline void wmi_target_params_init(struct wmi_soc *soc,
-				struct wmi_unified *wmi_handle)
-{
-	wmi_handle->pdev_param = soc->pdev_param;
-	wmi_handle->vdev_param = soc->vdev_param;
-	wmi_handle->services = soc->services;
-}
-#else
-static inline void wmi_target_params_init(struct wmi_soc *soc,
-				struct wmi_unified *wmi_handle)
-{
-	wmi_handle->services = soc->services;
-}
-#endif
-
-/**
  * wmi_unified_get_pdev_handle: Get WMI SoC handle
  * @param wmi_soc: Pointer to wmi soc object
  * @param pdev_idx: pdev index
@@ -2429,7 +2411,7 @@ void *wmi_unified_get_pdev_handle(struct wmi_soc *soc, uint32_t pdev_idx)
 	if (pdev_idx >= WMI_MAX_RADIOS)
 		return NULL;
 
-	if (soc->wmi_pdev[pdev_idx] == NULL) {
+	if (!soc->wmi_pdev[pdev_idx]) {
 		wmi_handle =
 			(struct wmi_unified *) qdf_mem_malloc(
 					sizeof(struct wmi_unified));
@@ -2448,12 +2430,12 @@ void *wmi_unified_get_pdev_handle(struct wmi_soc *soc, uint32_t pdev_idx)
 				wmi_rx_event_work, wmi_handle);
 		wmi_handle->wmi_rx_work_queue =
 			qdf_alloc_unbound_workqueue("wmi_rx_event_work_queue");
-		if (NULL == wmi_handle->wmi_rx_work_queue) {
+		if (!wmi_handle->wmi_rx_work_queue) {
 			WMI_LOGE("failed to create wmi_rx_event_work_queue");
 			goto error;
 		}
 		wmi_handle->wmi_events = soc->wmi_events;
-		wmi_target_params_init(soc, wmi_handle);
+		wmi_handle->services = soc->services;
 		wmi_handle->soc = soc;
 		wmi_interface_logging_init(wmi_handle, pdev_idx);
 		qdf_atomic_init(&wmi_handle->pending_cmds);
@@ -2561,8 +2543,23 @@ void *wmi_unified_attach(void *scn_handle,
 	wmi_handle->event_handler = soc->event_handler;
 	wmi_handle->ctx = soc->ctx;
 	wmi_handle->wmi_events = soc->wmi_events;
-	wmi_target_params_init(soc, wmi_handle);
+	wmi_handle->services = soc->services;
 	wmi_handle->scn_handle = scn_handle;
+	if (param->enable_vdev_pdev_param_conversion) {
+		if (wmi_pdev_param_max > SIZE_MAX / sizeof(uint32_t))
+			goto error;
+		soc->pdev_param = qdf_mem_malloc(
+				wmi_pdev_param_max * sizeof(uint32_t));
+		if (!soc->pdev_param)
+			goto error;
+
+		if (wmi_vdev_param_max > SIZE_MAX / sizeof(uint32_t))
+			goto error;
+		soc->vdev_param = qdf_mem_malloc(
+				wmi_vdev_param_max * sizeof(uint32_t));
+		if (!soc->vdev_param)
+			goto error;
+	}
 	soc->scn_handle = scn_handle;
 	qdf_atomic_init(&wmi_handle->pending_cmds);
 	qdf_atomic_init(&wmi_handle->is_target_suspended);
@@ -2573,7 +2570,7 @@ void *wmi_unified_attach(void *scn_handle,
 			wmi_rx_event_work, wmi_handle);
 	wmi_handle->wmi_rx_work_queue =
 		qdf_alloc_unbound_workqueue("wmi_rx_event_work_queue");
-	if (NULL == wmi_handle->wmi_rx_work_queue) {
+	if (!wmi_handle->wmi_rx_work_queue) {
 		WMI_LOGE("failed to create wmi_rx_event_work_queue");
 		goto error;
 	}
@@ -2613,6 +2610,14 @@ void *wmi_unified_attach(void *scn_handle,
 	return wmi_handle;
 
 error:
+	if (soc->pdev_param) {
+		qdf_mem_free(soc->pdev_param);
+		soc->pdev_param = NULL;
+	}
+	if (soc->vdev_param) {
+		qdf_mem_free(soc->vdev_param);
+		soc->vdev_param = NULL;
+	}
 	qdf_mem_free(soc);
 	qdf_mem_free(wmi_handle);
 
@@ -2664,6 +2669,16 @@ void wmi_unified_detach(struct wmi_unified *wmi_handle)
 		}
 	}
 	qdf_spinlock_destroy(&soc->ctx_lock);
+
+	if (soc->pdev_param) {
+		qdf_mem_free(soc->pdev_param);
+		soc->pdev_param = NULL;
+	}
+
+	if (soc->vdev_param) {
+		qdf_mem_free(soc->vdev_param);
+		soc->vdev_param = NULL;
+	}
 
 	if (soc->wmi_service_bitmap) {
 		qdf_mem_free(soc->wmi_service_bitmap);
@@ -2727,7 +2742,7 @@ static void wmi_htc_tx_complete(void *ctx, HTC_PACKET *htc_pkt)
 
 	ASSERT(wmi_cmd_buf);
 	wmi_handle = wmi_get_pdev_ep(soc, htc_pkt->Endpoint);
-	if (wmi_handle == NULL) {
+	if (!wmi_handle) {
 		WMI_LOGE("%s: Unable to get wmi handle\n", __func__);
 		QDF_ASSERT(0);
 		return;
@@ -2881,6 +2896,19 @@ int wmi_get_pending_cmds(wmi_unified_t wmi_handle)
 void wmi_set_target_suspend(wmi_unified_t wmi_handle, A_BOOL val)
 {
 	qdf_atomic_set(&wmi_handle->is_target_suspended, val);
+}
+
+/**
+ * wmi_is_target_suspended() - WMI API to check target suspend state
+ * @wmi_handle: handle to WMI.
+ *
+ * WMI API to check target suspend state
+ *
+ * Return: true if target is suspended, else false.
+ */
+bool wmi_is_target_suspended(struct wmi_unified *wmi_handle)
+{
+	return qdf_atomic_read(&wmi_handle->is_target_suspended);
 }
 
 /**

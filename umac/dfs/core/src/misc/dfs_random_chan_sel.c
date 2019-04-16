@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -764,7 +764,7 @@ dfs_find_target_channel_in_channel_matrix(enum phy_ch_width ch_width,
 		}
 	}
 
-	if (NULL == target_chan_matrix) {
+	if (!target_chan_matrix) {
 		return false;
 	} else {
 		*pTarget_chnl_mtrx = target_chan_matrix;
@@ -1206,7 +1206,7 @@ static void dfs_remove_cur_ch_from_list(
 	return;
 }
 
-bool dfs_freq_is_in_nol(struct wlan_dfs *dfs, uint32_t freq)
+bool dfs_is_freq_in_nol(struct wlan_dfs *dfs, uint32_t freq)
 {
 	struct dfs_nolelem *nol;
 
@@ -1360,7 +1360,7 @@ static void dfs_apply_rules(struct wlan_dfs *dfs,
 			continue;
 		}
 
-		if (dfs_freq_is_in_nol(dfs, chan->dfs_ch_freq)) {
+		if (dfs_is_freq_in_nol(dfs, chan->dfs_ch_freq)) {
 			dfs_debug(dfs, WLAN_DEBUG_DFS_RANDOM_CHAN,
 				  "skip nol channel=%d", chan->dfs_ch_ieee);
 			continue;
@@ -1403,11 +1403,8 @@ uint8_t dfs_prepare_random_channel(struct wlan_dfs *dfs,
 	}
 
 	random_chan_list = qdf_mem_malloc(ch_cnt * sizeof(*random_chan_list));
-	if (!random_chan_list) {
-		dfs_alert(dfs, WLAN_DEBUG_DFS_RANDOM_CHAN,
-				"Memory allocation failed");
+	if (!random_chan_list)
 		return 0;
-	}
 
 	if (flags & DFS_RANDOM_CH_FLAG_NO_CURR_OPE_CH)
 		dfs_remove_cur_ch_from_list(ch_list, &ch_cnt, ch_wd, cur_chan);
@@ -1421,8 +1418,6 @@ uint8_t dfs_prepare_random_channel(struct wlan_dfs *dfs,
 	/* list adjusted after leakage has been marked */
 	leakage_adjusted_lst = qdf_mem_malloc(random_chan_cnt);
 	if (!leakage_adjusted_lst) {
-		dfs_alert(dfs, WLAN_DEBUG_DFS_RANDOM_CHAN,
-				"Memory allocation failed");
 		qdf_mem_free(random_chan_list);
 		return 0;
 	}

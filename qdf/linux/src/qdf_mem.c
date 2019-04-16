@@ -691,7 +691,7 @@ int __qdf_mempool_init(qdf_device_t osdev, __qdf_mempool_t *pool_addr,
 		 */
 		new_pool = (__qdf_mempool_ctxt_t *)
 			kmalloc(sizeof(__qdf_mempool_ctxt_t), GFP_KERNEL);
-		if (new_pool == NULL)
+		if (!new_pool)
 			return QDF_STATUS_E_NOMEM;
 
 		memset(new_pool, 0, sizeof(*new_pool));
@@ -704,7 +704,7 @@ int __qdf_mempool_init(qdf_device_t osdev, __qdf_mempool_t *pool_addr,
 	}
 
 	for (pool_id = 0; pool_id < MAX_MEM_POOLS; pool_id++) {
-		if (osdev->mem_pool[pool_id] == NULL)
+		if (!osdev->mem_pool[pool_id])
 			break;
 	}
 
@@ -713,7 +713,7 @@ int __qdf_mempool_init(qdf_device_t osdev, __qdf_mempool_t *pool_addr,
 
 	new_pool = osdev->mem_pool[pool_id] = (__qdf_mempool_ctxt_t *)
 		kmalloc(sizeof(__qdf_mempool_ctxt_t), GFP_KERNEL);
-	if (new_pool == NULL)
+	if (!new_pool)
 		return -ENOMEM;
 
 	memset(new_pool, 0, sizeof(*new_pool));
@@ -727,7 +727,7 @@ int __qdf_mempool_init(qdf_device_t osdev, __qdf_mempool_t *pool_addr,
 				((align)?(align - 1):0);
 
 	new_pool->pool_mem = kzalloc(new_pool->mem_size, GFP_KERNEL);
-	if (new_pool->pool_mem == NULL) {
+	if (!new_pool->pool_mem) {
 			/* TBD: Check if we need get_free_pages above */
 		kfree(new_pool);
 		osdev->mem_pool[pool_id] = NULL;
@@ -802,7 +802,7 @@ void *__qdf_mempool_alloc(qdf_device_t osdev, __qdf_mempool_t pool)
 	spin_lock_bh(&pool->lock);
 
 	buf = STAILQ_FIRST(&pool->free_list);
-	if (buf != NULL) {
+	if (buf) {
 		STAILQ_REMOVE_HEAD(&pool->free_list, mempool_entry);
 		pool->free_cnt--;
 	}
@@ -839,59 +839,6 @@ void __qdf_mempool_free(qdf_device_t osdev, __qdf_mempool_t pool, void *buf)
 	spin_unlock_bh(&pool->lock);
 }
 qdf_export_symbol(__qdf_mempool_free);
-
-/**
- * qdf_mem_alloc_outline() - allocation QDF memory
- * @osdev: platform device object
- * @size: Number of bytes of memory to allocate.
- *
- * This function will dynamicallly allocate the specified number of bytes of
- * memory.
- *
- * Return:
- * Upon successful allocate, returns a non-NULL pointer to the allocated
- * memory.  If this function is unable to allocate the amount of memory
- * specified (for any reason) it returns NULL.
- */
-void *
-qdf_mem_alloc_outline(qdf_device_t osdev, size_t size)
-{
-	return qdf_mem_malloc(size);
-}
-qdf_export_symbol(qdf_mem_alloc_outline);
-
-/**
- * qdf_mem_free_outline() - QDF memory free API
- * @ptr: Pointer to the starting address of the memory to be free'd.
- *
- * This function will free the memory pointed to by 'ptr'. It also checks
- * is memory is corrupted or getting double freed and panic.
- *
- * Return: none
- */
-void
-qdf_mem_free_outline(void *buf)
-{
-	qdf_mem_free(buf);
-}
-qdf_export_symbol(qdf_mem_free_outline);
-
-/**
- * qdf_mem_zero_outline() - zero out memory
- * @buf: pointer to memory that will be set to zero
- * @size: number of bytes zero
- *
- * This function sets the memory location to all zeros, essentially clearing
- * the memory.
- *
- * Return: none
- */
-void
-qdf_mem_zero_outline(void *buf, qdf_size_t size)
-{
-	qdf_mem_zero(buf, size);
-}
-qdf_export_symbol(qdf_mem_zero_outline);
 
 #ifdef CONFIG_WCNSS_MEM_PRE_ALLOC
 /**
@@ -1423,35 +1370,17 @@ int qdf_mem_multi_page_link(qdf_device_t osdev,
 }
 qdf_export_symbol(qdf_mem_multi_page_link);
 
-/**
- * qdf_mem_copy() - copy memory
- * @dst_addr: Pointer to destination memory location (to copy to)
- * @src_addr: Pointer to source memory location (to copy from)
- * @num_bytes: Number of bytes to copy.
- *
- * Copy host memory from one location to another, similar to memcpy in
- * standard C.  Note this function does not specifically handle overlapping
- * source and destination memory locations.  Calling this function with
- * overlapping source and destination memory locations will result in
- * unpredictable results.  Use qdf_mem_move() if the memory locations
- * for the source and destination are overlapping (or could be overlapping!)
- *
- * Return: none
- */
 void qdf_mem_copy(void *dst_addr, const void *src_addr, uint32_t num_bytes)
 {
-	if (0 == num_bytes) {
-		/* special case where dst_addr or src_addr can be NULL */
+	/* special case where dst_addr or src_addr can be NULL */
+	if (!num_bytes)
 		return;
-	}
 
-	if ((dst_addr == NULL) || (src_addr == NULL)) {
-		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
-			  "%s called with NULL parameter, source:%pK destination:%pK",
-			  __func__, src_addr, dst_addr);
-		QDF_ASSERT(0);
+	QDF_BUG(dst_addr);
+	QDF_BUG(src_addr);
+	if (!dst_addr || !src_addr)
 		return;
-	}
+
 	memcpy(dst_addr, src_addr, num_bytes);
 }
 qdf_export_symbol(qdf_mem_copy);
@@ -1505,32 +1434,6 @@ qdf_shared_mem_t *qdf_mem_shared_mem_alloc(qdf_device_t osdev, uint32_t size)
 qdf_export_symbol(qdf_mem_shared_mem_alloc);
 
 /**
- * qdf_mem_zero() - zero out memory
- * @ptr: pointer to memory that will be set to zero
- * @num_bytes: number of bytes zero
- *
- * This function sets the memory location to all zeros, essentially clearing
- * the memory.
- *
- * Return: None
- */
-void qdf_mem_zero(void *ptr, uint32_t num_bytes)
-{
-	if (0 == num_bytes) {
-		/* special case where ptr can be NULL */
-		return;
-	}
-
-	if (ptr == NULL) {
-		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
-			  "%s called with NULL parameter ptr", __func__);
-		return;
-	}
-	memset(ptr, 0, num_bytes);
-}
-qdf_export_symbol(qdf_mem_zero);
-
-/**
  * qdf_mem_copy_toio() - copy memory
  * @dst_addr: Pointer to destination memory location (to copy to)
  * @src_addr: Pointer to source memory location (to copy from)
@@ -1576,56 +1479,39 @@ void qdf_mem_set_io(void *ptr, uint32_t num_bytes, uint32_t value)
 
 qdf_export_symbol(qdf_mem_set_io);
 
-/**
- * qdf_mem_set() - set (fill) memory with a specified byte value.
- * @ptr: Pointer to memory that will be set
- * @num_bytes: Number of bytes to be set
- * @value: Byte set in memory
- *
- * WARNING: parameter @num_bytes and @value are swapped comparing with
- * standard C function "memset", please ensure correct usage of this function!
- *
- * Return: None
- */
 void qdf_mem_set(void *ptr, uint32_t num_bytes, uint32_t value)
 {
-	if (ptr == NULL) {
-		qdf_print("%s called with NULL parameter ptr", __func__);
+	QDF_BUG(ptr);
+	if (!ptr)
 		return;
-	}
+
 	memset(ptr, value, num_bytes);
 }
 qdf_export_symbol(qdf_mem_set);
 
-/**
- * qdf_mem_move() - move memory
- * @dst_addr: pointer to destination memory location (to move to)
- * @src_addr: pointer to source memory location (to move from)
- * @num_bytes: number of bytes to move.
- *
- * Move host memory from one location to another, similar to memmove in
- * standard C.  Note this function *does* handle overlapping
- * source and destination memory locations.
-
- * Return: None
- */
 void qdf_mem_move(void *dst_addr, const void *src_addr, uint32_t num_bytes)
 {
-	if (0 == num_bytes) {
-		/* special case where dst_addr or src_addr can be NULL */
+	/* special case where dst_addr or src_addr can be NULL */
+	if (!num_bytes)
 		return;
-	}
 
-	if ((dst_addr == NULL) || (src_addr == NULL)) {
-		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
-			  "%s called with NULL parameter, source:%pK destination:%pK",
-			  __func__, src_addr, dst_addr);
-		QDF_ASSERT(0);
+	QDF_BUG(dst_addr);
+	QDF_BUG(src_addr);
+	if (!dst_addr || !src_addr)
 		return;
-	}
+
 	memmove(dst_addr, src_addr, num_bytes);
 }
 qdf_export_symbol(qdf_mem_move);
+
+int qdf_mem_cmp(const void *left, const void *right, size_t size)
+{
+	QDF_BUG(left);
+	QDF_BUG(right);
+
+	return memcmp(left, right, size);
+}
+qdf_export_symbol(qdf_mem_cmp);
 
 #if defined(A_SIMOS_DEVHOST) || defined(HIF_SDIO) || defined(HIF_USB)
 /**
@@ -1919,7 +1805,7 @@ qdf_export_symbol(qdf_mem_exit);
  */
 void qdf_ether_addr_copy(void *dst_addr, const void *src_addr)
 {
-	if ((dst_addr == NULL) || (src_addr == NULL)) {
+	if ((!dst_addr) || (!src_addr)) {
 		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
 			  "%s called with NULL parameter, source:%pK destination:%pK",
 			  __func__, src_addr, dst_addr);

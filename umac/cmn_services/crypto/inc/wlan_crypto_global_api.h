@@ -223,6 +223,16 @@ QDF_STATUS wlan_crypto_demic(struct wlan_objmgr_vdev *vdev,
 bool wlan_crypto_vdev_is_pmf_enabled(struct wlan_objmgr_vdev *vdev);
 
 /**
+ * wlan_crypto_vdev_is_pmf_required - called to check is pmf required in vdev
+ * @vdev: vdev
+ *
+ * This function gets called to check is pmf required or not in vdev.
+ *
+ * Return: true or false
+ */
+bool wlan_crypto_vdev_is_pmf_required(struct wlan_objmgr_vdev *vdev);
+
+/**
  * wlan_crypto_is_pmf_enabled - called by mgmt txrx to check is pmf enabled
  * @vdev: vdev
  * @peer: peer
@@ -484,6 +494,30 @@ bool wlan_crypto_vdev_has_mcastcipher(struct wlan_objmgr_vdev *vdev,
  */
 bool wlan_crypto_peer_has_mcastcipher(struct wlan_objmgr_peer *peer,
 					wlan_crypto_cipher_type mcastcipher);
+
+/**
+ * wlan_crypto_vdev_has_mgmtcipher - check mgmtcipher for vdev
+ * @vdev: vdev
+ * @mgmtcipher: mgmtcipher to be checked
+ *
+ * This function checks any one of mgmtciphers are supported by vdev or not.
+ *
+ * Return: true or false
+ */
+bool wlan_crypto_vdev_has_mgmtcipher(struct wlan_objmgr_vdev *vdev,
+				     uint32_t mgmtcipher);
+
+/**
+ * wlan_crypto_peer_has_mgmtcipher - check mgmtcipher for peer
+ * @peer: peer
+ * @mgmtcipher: mgmtcipher to be checked
+ *
+ * This function checks any one of mgmtciphers are supported by peer or not.
+ *
+ * Return: true or false
+ */
+bool wlan_crypto_peer_has_mgmtcipher(struct wlan_objmgr_peer *peer,
+				     uint32_t mgmtcipher);
 
 /**
  * wlan_crypto_get_keytype - get keytype
@@ -804,6 +838,19 @@ QDF_STATUS wlan_crypto_set_key_req(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 #endif /* CRYPTO_SET_KEY_CONVERGED */
+/**
+ * wlan_crypto_get_pmksa - called to get pmksa of bssid passed.
+ * @vdev: vdev
+ * @bssid: bssid
+ *
+ * This function gets called from to get pmksa for the bssid.
+ *
+ * Return: wlan_crypto_pmksa when match found else NULL.
+ */
+struct wlan_crypto_pmksa *
+wlan_crypto_get_pmksa(struct wlan_objmgr_vdev *vdev,
+		      struct qdf_mac_addr *bssid);
+
 /**
  * wlan_crypto_pmksa_flush - called to flush saved pmksa
  * @crypto_params: crypto_params

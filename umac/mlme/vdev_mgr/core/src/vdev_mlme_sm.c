@@ -888,7 +888,9 @@ static void mlme_vdev_subst_start_conn_progress_entry(void *ctx)
  */
 static void mlme_vdev_subst_start_conn_progress_exit(void *ctx)
 {
-	/* NONE */
+	struct vdev_mlme_obj *vdev_mlme = (struct vdev_mlme_obj *)ctx;
+
+	mlme_vdev_notify_start_state_exit(vdev_mlme);
 }
 
 /**
@@ -1838,9 +1840,9 @@ void mlme_vdev_sm_print_state_event(struct vdev_mlme_obj *vdev_mlme,
 	state = wlan_vdev_mlme_get_state(vdev);
 	substate = wlan_vdev_mlme_get_substate(vdev);
 
-	mlme_nofl_info("[%s]%s - %s, %s", vdev_mlme->sm_hdl->name,
-		       sm_info[state].name, sm_info[substate].name,
-		       vdev_sm_event_names[event]);
+	mlme_nofl_debug("[%s]%s - %s, %s", vdev_mlme->sm_hdl->name,
+			sm_info[state].name, sm_info[substate].name,
+			vdev_sm_event_names[event]);
 }
 
 void mlme_vdev_sm_print_state(struct vdev_mlme_obj *vdev_mlme)
@@ -1854,8 +1856,8 @@ void mlme_vdev_sm_print_state(struct vdev_mlme_obj *vdev_mlme)
 	state = wlan_vdev_mlme_get_state(vdev);
 	substate = wlan_vdev_mlme_get_substate(vdev);
 
-	mlme_nofl_info("[%s]%s - %s", vdev_mlme->sm_hdl->name,
-		       sm_info[state].name, sm_info[substate].name);
+	mlme_nofl_debug("[%s]%s - %s", vdev_mlme->sm_hdl->name,
+			sm_info[state].name, sm_info[substate].name);
 }
 
 #ifdef SM_ENG_HIST_ENABLE

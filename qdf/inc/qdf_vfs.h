@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -31,6 +31,7 @@ struct qdf_vfs_attr;
 struct qdf_vf_bin_attr;
 struct qdf_dev_obj;
 
+#ifdef ENHANCED_OS_ABSTRACTION
 /**
  * qdf_vfs_set_file_attributes() - set file attributes
  * @devobj: Device object
@@ -82,4 +83,33 @@ qdf_vfs_create_binfile(struct qdf_dev_obj *devobj,
 QDF_STATUS
 qdf_vfs_delete_binfile(struct qdf_dev_obj *devobj,
 		       struct qdf_vf_bin_attr *attr);
+#else
+static inline QDF_STATUS
+qdf_vfs_set_file_attributes(struct qdf_dev_obj *devobj,
+			    struct qdf_vfs_attr *attr)
+{
+	return __qdf_vfs_set_file_attributes(devobj, attr);
+}
+
+static inline QDF_STATUS
+qdf_vfs_clear_file_attributes(struct qdf_dev_obj *devobj,
+			      struct qdf_vfs_attr *attr)
+{
+	return __qdf_vfs_clear_file_attributes(devobj, attr);
+}
+
+statuc inline QDF_STATUS
+qdf_vfs_create_binfile(struct qdf_dev_obj *devobj,
+		       struct qdf_vf_bin_attr *attr)
+{
+	return __qdf_vfs_create_binfile(devobj, attr);
+}
+
+static inline QDF_STATUS
+qdf_vfs_delete_binfile(struct qdf_dev_obj *devobj,
+		       struct qdf_vf_bin_attr *attr)
+{
+	return __qdf_vfs_delete_binfile(devobj, attr);
+}
 #endif
+#endif /* __QDF_VFS_H */

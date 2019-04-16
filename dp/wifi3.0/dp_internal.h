@@ -23,6 +23,15 @@
 
 #define RX_BUFFER_SIZE_PKTLOG_LITE 1024
 
+
+#define DP_RSSI_AVG_WEIGHT 2
+/*
+ * Formula to derive avg_rssi is taken from wifi2.o firmware
+ */
+#define DP_GET_AVG_RSSI(avg_rssi, last_rssi) \
+	(((avg_rssi) - (((uint8_t)(avg_rssi)) >> DP_RSSI_AVG_WEIGHT)) \
+	+ ((((uint8_t)(last_rssi)) >> DP_RSSI_AVG_WEIGHT)))
+
 /* Macro For NYSM value received in VHT TLV */
 #define VHT_SGI_NYSM 3
 
@@ -68,10 +77,16 @@ while (0)
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_##LVL,       \
 		fmt, ## args)
 
-#define DP_PRINT_STATS(fmt, args ...)	\
-	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_FATAL,       \
-		fmt, ## args)
-
+#ifdef CONFIG_MCL
+/* Stat prints should not go to console or kernel logs.*/
+#define DP_PRINT_STATS(fmt, args ...)\
+	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO_HIGH,       \
+		  fmt, ## args)
+#else
+#define DP_PRINT_STATS(fmt, args ...)\
+	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_FATAL,\
+		  fmt, ## args)
+#endif
 #define DP_STATS_INIT(_handle) \
 	qdf_mem_zero(&((_handle)->stats), sizeof((_handle)->stats))
 
@@ -740,7 +755,7 @@ void dp_rx_tid_stats_cb(struct dp_soc *soc, void *cb_ctxt,
 void dp_rx_bar_stats_cb(struct dp_soc *soc, void *cb_ctxt,
 		union hal_reo_status *reo_status);
 uint16_t dp_tx_me_send_convert_ucast(struct cdp_vdev *vdev_handle,
-		qdf_nbuf_t nbuf, uint8_t newmac[][DP_MAC_ADDR_LEN],
+		qdf_nbuf_t nbuf, uint8_t newmac[][QDF_MAC_ADDR_SIZE],
 		uint8_t new_mac_cnt);
 void dp_tx_me_alloc_descriptor(struct cdp_pdev *pdev);
 
@@ -761,6 +776,13 @@ void dp_set_pn_check_wifi3(struct cdp_vdev *vdev_handle,
 void *dp_get_pdev_for_mac_id(struct dp_soc *soc, uint32_t mac_id);
 void dp_set_michael_key(struct cdp_peer *peer_handle,
 			bool is_unicast, uint32_t *key);
+#ifdef CONFIG_WIN
+uint32_t dp_pdev_tid_stats_display(void *pdev_handle,
+			enum _ol_ath_param_t param, uint32_t value, void *buff);
+#endif
+
+void dp_update_delay_stats(struct dp_pdev *pdev, uint32_t delay,
+			   uint8_t tid, uint8_t mode);
 
 /*
  * dp_get_mac_id_for_pdev() -  Return mac corresponding to pdev for mac
@@ -928,4 +950,21 @@ static inline void dp_peer_unref_del_find_by_id(struct dp_peer *peer)
 }
 #endif
 
+#ifdef CONFIG_WIN
+/**
+ * dp_pdev_print_delay_stats(): Print pdev level delay stats
+ * @pdev: DP_PDEV handle
+ *
+ * Return:void
+ */
+void dp_pdev_print_delay_stats(struct dp_pdev *pdev);
+
+/**
+ * dp_pdev_print_tid_stats(): Print pdev level tid stats
+ * @pdev: DP_PDEV handle
+ *
+ * Return:void
+ */
+void dp_pdev_print_tid_stats(struct dp_pdev *pdev);
+#endif /* CONFIG_WIN */
 #endif /* #ifndef _DP_INTERNAL_H_ */

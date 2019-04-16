@@ -903,6 +903,10 @@ ucfg_scan_register_event_handler(struct wlan_objmgr_pdev *pdev,
 
 	scan = wlan_pdev_get_scan_obj(pdev);
 	pdev_ev_handler = wlan_pdev_get_pdev_scan_ev_handlers(pdev);
+	if (!pdev_ev_handler) {
+		scm_err("null pdev_ev_handler");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
 	cb_handler = &(pdev_ev_handler->cb_handlers[0]);
 
 	qdf_spin_lock_bh(&scan->lock);
@@ -1007,7 +1011,8 @@ wlan_scan_global_init(struct wlan_objmgr_psoc *psoc,
 	scan_obj->scan_def.scan_f_ofdm_rates = true;
 	scan_obj->scan_def.scan_f_2ghz = true;
 	scan_obj->scan_def.scan_f_5ghz = true;
-	scan_obj->scan_def.scan_f_chan_stat_evnt = SCAN_CHAN_STATS_EVENT_ENAB;
+	scan_obj->scan_def.scan_f_chan_stat_evnt =
+				cfg_get(psoc, CFG_ENABLE_SNR_MONITORING);
 	/* scan event flags */
 	scan_obj->scan_def.scan_ev_started = true;
 	scan_obj->scan_def.scan_ev_completed = true;
@@ -1018,6 +1023,8 @@ wlan_scan_global_init(struct wlan_objmgr_psoc *psoc,
 	scan_obj->scan_def.scan_ev_preempted = true;
 	scan_obj->scan_def.scan_ev_start_failed = true;
 	scan_obj->scan_def.scan_ev_restarted = true;
+	scan_obj->scan_def.enable_connected_scan =
+		cfg_get(psoc, CFG_ENABLE_CONNECTED_SCAN);
 	/* init scan id seed */
 	qdf_atomic_init(&scan_obj->scan_ids);
 
@@ -1081,6 +1088,9 @@ ucfg_scan_unregister_event_handler(struct wlan_objmgr_pdev *pdev,
 		return;
 
 	pdev_ev_handler = wlan_pdev_get_pdev_scan_ev_handlers(pdev);
+	if (!pdev_ev_handler)
+		return;
+
 	cb_handler = &(pdev_ev_handler->cb_handlers[0]);
 
 	qdf_spin_lock_bh(&scan->lock);
@@ -1478,13 +1488,12 @@ QDF_STATUS ucfg_scan_update_user_config(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_FAILURE;
 	}
 	scan_obj = wlan_psoc_get_scan_obj(psoc);
-	if (scan_obj == NULL) {
+	if (!scan_obj) {
 		scm_err("Failed to get scan object");
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	scan_def = &scan_obj->scan_def;
-	scan_def->scan_f_chan_stat_evnt = scan_cfg->is_snr_monitoring_enabled;
 	scan_obj->ie_whitelist = scan_cfg->ie_whitelist;
 	scan_def->sta_miracast_mcc_rest_time =
 				scan_cfg->sta_miracast_mcc_rest_time;
@@ -1624,7 +1633,7 @@ ucfg_scan_psoc_open(struct wlan_objmgr_psoc *psoc)
 		return QDF_STATUS_E_FAILURE;
 	}
 	scan_obj = wlan_psoc_get_scan_obj(psoc);
-	if (scan_obj == NULL) {
+	if (!scan_obj) {
 		scm_err("Failed to get scan object");
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -1649,7 +1658,7 @@ ucfg_scan_psoc_close(struct wlan_objmgr_psoc *psoc)
 	}
 	scm_db_deinit(psoc);
 	scan_obj = wlan_psoc_get_scan_obj(psoc);
-	if (scan_obj == NULL) {
+	if (!scan_obj) {
 		scm_err("Failed to get scan object");
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -1777,7 +1786,7 @@ bool ucfg_ie_whitelist_enabled(struct wlan_objmgr_psoc *psoc,
 		return false;
 
 	if ((wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE) ||
-	    wlan_vdev_is_connected(vdev))
+	    wlan_vdev_is_up(vdev) == QDF_STATUS_SUCCESS)
 		return false;
 
 	if (!scan_obj->ie_whitelist.white_list)
@@ -1821,6 +1830,19 @@ bool ucfg_scan_wake_lock_in_user_scan(struct wlan_objmgr_psoc *psoc)
 		return false;
 
 	return scan_obj->scan_def.use_wake_lock_in_user_scan;
+}
+
+bool ucfg_scan_is_connected_scan_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_scan_obj *scan_obj;
+
+	scan_obj = wlan_psoc_get_scan_obj(psoc);
+	if (!scan_obj) {
+		scm_err("Failed to get scan object");
+		return cfg_default(CFG_ENABLE_CONNECTED_SCAN);
+	}
+
+	return scan_obj->scan_def.enable_connected_scan;
 }
 
 bool ucfg_scan_is_mac_spoofing_enabled(struct wlan_objmgr_psoc *psoc)

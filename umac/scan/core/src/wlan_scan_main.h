@@ -112,18 +112,7 @@ struct probe_time_dwell_time {
 #define SCM_NUM_RSSI_CAT        15
 #define SCAN_STA_MIRACAST_MCC_REST_TIME 400
 
-#ifdef CONFIG_MCL
-#define MAX_SCAN_CACHE_SIZE 300
-#define SCAN_MAX_REST_TIME 0
-#define SCAN_MIN_REST_TIME 0
-#define SCAN_BURST_DURATION 0
-#define SCAN_PROBE_SPACING_TIME 0
-#define SCAN_PROBE_DELAY 0
-#define SCAN_MAX_SCAN_TIME 30000
-#define SCAN_NETWORK_IDLE_TIMEOUT 0
-#define HIDDEN_SSID_TIME (1*60*1000)
-#define SCAN_CHAN_STATS_EVENT_ENAB (false)
-#else
+#ifndef CONFIG_MCL
 #define MAX_SCAN_CACHE_SIZE 1024
 #define SCAN_MAX_REST_TIME 0
 #define SCAN_MIN_REST_TIME 50
@@ -319,6 +308,7 @@ struct extscan_def_config {
  * @max_bss_per_pdev: maximum number of bss entries to be maintained per pdev
  * @max_active_scans_allowed: maximum number of active parallel scan allowed
  *                            per psoc
+ * @enable_connected_scan: enable scans after connection
  * @scan_priority: default scan priority
  * @adaptive_dwell_time_mode: adaptive dwell mode with connection
  * @adaptive_dwell_time_mode_nc: adaptive dwell mode without connection
@@ -402,6 +392,7 @@ struct scan_default_params {
 	uint8_t p2p_scan_burst_duration;
 	uint8_t go_scan_burst_duration;
 	uint8_t ap_scan_burst_duration;
+	bool enable_connected_scan;
 	enum scan_priority scan_priority;
 	enum scan_dwelltime_adaptive_mode adaptive_dwell_time_mode;
 	enum scan_dwelltime_adaptive_mode adaptive_dwell_time_mode_nc;
@@ -462,10 +453,12 @@ struct scan_default_params {
  * struct scan_cb - nif/sif function callbacks
  * @inform_beacon: cb to indicate frame to OS
  * @update_beacon: cb to indicate frame to MLME
+ * @unlink_bss: cb to unlink bss from kernel cache
  */
 struct scan_cb {
 	update_beacon_cb inform_beacon;
 	update_beacon_cb update_beacon;
+	update_beacon_cb unlink_bss;
 	/* Define nif/sif function callbacks here */
 };
 
@@ -619,17 +612,22 @@ static inline struct pdev_scan_ev_handler*
 wlan_pdev_get_pdev_scan_ev_handlers(struct wlan_objmgr_pdev *pdev)
 {
 	uint8_t pdevid;
-	struct wlan_scan_obj *scan;
-	struct pdev_scan_ev_handler *pdev_ev_handler;
+	struct wlan_scan_obj *scan = NULL;
+
+	if (!pdev)
+		goto err;
 
 	pdevid = wlan_objmgr_pdev_get_pdev_id(pdev);
-
 	scan = wlan_pdev_get_scan_obj(pdev);
+	if (!scan)
+		goto err;
 
-	pdev_ev_handler =
-		&scan->global_evhandlers.pdev_ev_handlers[pdevid];
+	return &scan->global_evhandlers.pdev_ev_handlers[pdevid];
 
-	return pdev_ev_handler;
+err:
+	scm_err("NULL pointer, pdev: 0x%pK, scan_obj: 0x%pK",
+		pdev, scan);
+	return NULL;
 }
 
 /**

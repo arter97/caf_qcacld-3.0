@@ -430,7 +430,7 @@ struct ap_profile_params {
  */
 struct wmi_roam_invoke_cmd {
 	uint32_t vdev_id;
-	uint8_t bssid[IEEE80211_ADDR_LEN];
+	uint8_t bssid[QDF_MAC_ADDR_SIZE];
 	uint32_t channel;
 	uint32_t frame_len;
 	uint8_t *frame_buf;
@@ -523,6 +523,7 @@ struct hlp_params {
  * @btm_sticky_time: Stick time after roaming to new AP by BTM
  * @disassoc_timer_threshold: threshold value till which the firmware can
  * wait before triggering the roam scan after receiving the disassoc iminent
+ * @btm_query_bitmask: bitmask to btm query with candidate list
  */
 struct wmi_btm_config {
 	uint8_t vdev_id;
@@ -531,6 +532,7 @@ struct wmi_btm_config {
 	uint32_t btm_max_attempt_cnt;
 	uint32_t btm_sticky_time;
 	uint32_t disassoc_timer_threshold;
+	uint32_t btm_query_bitmask;
 };
 
 /**

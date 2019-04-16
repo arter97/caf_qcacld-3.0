@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -26,11 +26,13 @@
 
 /* Include Files */
 #include <qdf_types.h>
+#include "i_qdf_dev.h"
 
 struct qdf_cpu_mask;
 struct qdf_devm;
 struct qdf_dev;
 
+#ifdef ENHANCED_OS_ABSTRACTION
 /**
  * qdf_dev_alloc_mem() - allocate memory
  * @qdfdev: Device handle
@@ -83,4 +85,31 @@ qdf_dev_modify_irq_status(uint32_t irnum, unsigned long cmask,
  */
 QDF_STATUS
 qdf_dev_set_irq_affinity(uint32_t irnum, struct qdf_cpu_mask *cpmask);
+#else
+static inline QDF_STATUS
+qdf_dev_alloc_mem(struct qdf_dev *qdfdev, struct qdf_devm **mrptr,
+		  uint32_t reqsize, uint32_t mask)
+{
+	return __qdf_dev_alloc_mem(qdfdev, mrptr, reqsize, mask);
+}
+
+static inline QDF_STATUS
+qdf_dev_release_mem(struct qdf_dev *qdfdev, struct qdf_devm *mrptr)
+{
+	return __qdf_dev_release_mem(qdfdev, mrptr);
+}
+
+static inline QDF_STATUS
+qdf_dev_modify_irq_status(uint32_t irnum, unsigned long cmask,
+			  unsigned long smask)
+{
+	return __qdf_dev_modify_irq_status(irnum, cmask, smask);
+}
+
+static inline QDF_STATUS
+qdf_dev_set_irq_affinity(uint32_t irnum, struct qdf_cpu_mask *cpmask)
+{
+	return __qdf_dev_set_irq_affinity(irnum, cpmask);
+}
 #endif
+#endif /* __QDF_DEV_H */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -32,6 +32,9 @@
 #include "qdf_event.h"
 
 #define MAX_NUM_CHAINS              2
+
+#define IS_MSB_SET(__num) ((__num) & BIT(31))
+#define IS_LSB_SET(__num) ((__num) & BIT(0))
 
 /**
  * enum stats_req_type - enum indicating bit position of various stats type in
@@ -145,7 +148,7 @@ struct request_info {
 	} u;
 	uint32_t vdev_id;
 	uint32_t pdev_id;
-	uint8_t peer_mac_addr[WLAN_MACADDR_LEN];
+	uint8_t peer_mac_addr[QDF_MAC_ADDR_SIZE];
 };
 
 /**
@@ -235,6 +238,28 @@ struct vdev_mc_cp_stats {
 };
 
 /**
+ * struct peer_extd_stats - Peer extension statistics
+ * @peer_macaddr: peer MAC address
+ * @rx_duration: lower 32 bits of rx duration in microseconds
+ * @peer_tx_bytes: Total TX bytes (including dot11 header) sent to peer
+ * @peer_rx_bytes: Total RX bytes (including dot11 header) received from peer
+ * @last_tx_rate_code: last TX ratecode
+ * @last_tx_power: TX power used by peer - units are 0.5 dBm
+ * @rx_mc_bc_cnt: Total number of received multicast & broadcast data frames
+ * corresponding to this peer, 1 in the MSB of rx_mc_bc_cnt represents a
+ * valid data
+ */
+struct peer_extd_stats {
+	uint8_t peer_macaddr[QDF_MAC_ADDR_SIZE];
+	uint32_t rx_duration;
+	uint32_t peer_tx_bytes;
+	uint32_t peer_rx_bytes;
+	uint32_t last_tx_rate_code;
+	int32_t last_tx_power;
+	uint32_t rx_mc_bc_cnt;
+};
+
+/**
  * struct peer_mc_cp_stats - peer specific stats
  * @tx_rate: tx rate
  * @rx_rate: rx rate
@@ -245,7 +270,21 @@ struct peer_mc_cp_stats {
 	uint32_t tx_rate;
 	uint32_t rx_rate;
 	int8_t peer_rssi;
-	uint8_t peer_macaddr[WLAN_MACADDR_LEN];
+	uint8_t peer_macaddr[QDF_MAC_ADDR_SIZE];
+};
+
+/**
+ * struct peer_adv_mc_cp_stats - peer specific adv stats
+ * @peer_macaddr: mac address
+ * @fcs_count: fcs count
+ * @rx_bytes: rx bytes
+ * @rx_count: rx count
+ */
+struct peer_adv_mc_cp_stats {
+	uint8_t peer_macaddr[QDF_MAC_ADDR_SIZE];
+	uint32_t fcs_count;
+	uint32_t rx_count;
+	uint64_t rx_bytes;
 };
 
 /**
@@ -284,6 +323,10 @@ struct chain_rssi_event {
  * @pdev_stats: if populated array indicating pdev stats (index = pdev_id)
  * @num_peer_stats: num peer stats
  * @peer_stats: if populated array indicating peer stats
+ * @peer_adv_stats: if populated, indicates peer adv (extd2) stats
+ * @num_peer_adv_stats: number of peer adv (extd2) stats
+ * @num_peer_extd_stats: Num peer extended stats
+ * @peer_extended_stats: Peer extended stats
  * @cca_stats: if populated indicates congestion stats
  * @num_summary_stats: number of summary stats
  * @vdev_summary_stats: if populated indicates array of summary stats per vdev
@@ -291,12 +334,18 @@ struct chain_rssi_event {
  * @vdev_chain_rssi: if populated indicates array of chain rssi per vdev
  * @tx_rate: tx rate (kbps)
  * @tx_rate_flags: tx rate flags, (enum tx_rate_info)
+ * @last_event: The LSB indicates if the event is the last event or not and the
+ *              MSB indicates if this feature is supported by FW or not.
  */
 struct stats_event {
 	uint32_t num_pdev_stats;
 	struct pdev_mc_cp_stats *pdev_stats;
 	uint32_t num_peer_stats;
 	struct peer_mc_cp_stats *peer_stats;
+	uint32_t num_peer_adv_stats;
+	struct peer_adv_mc_cp_stats *peer_adv_stats;
+	uint32_t num_peer_extd_stats;
+	struct peer_extd_stats *peer_extended_stats;
 	struct congestion_stats_event *cca_stats;
 	uint32_t num_summary_stats;
 	struct summary_stats_event *vdev_summary_stats;
@@ -305,6 +354,7 @@ struct stats_event {
 	uint32_t tx_rate;
 	uint32_t rx_rate;
 	enum tx_rate_info tx_rate_flags;
+	uint32_t last_event;
 };
 
 #endif /* CONFIG_MCL */

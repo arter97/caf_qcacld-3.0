@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -18,6 +18,7 @@
 
 #include "dp_types.h"
 #include "dp_rx.h"
+#include "dp_ipa.h"
 
 /*
  * dp_rx_desc_pool_alloc() - create a pool of software rx_descs
@@ -35,15 +36,17 @@ QDF_STATUS dp_rx_desc_pool_alloc(struct dp_soc *soc, uint32_t pool_id,
 {
 	uint32_t i;
 
-	rx_desc_pool->array =
-			qdf_mem_malloc(pool_size *
-				       sizeof(union dp_rx_desc_list_elem_t));
+	if (!dp_is_soc_reinit(soc)) {
+		rx_desc_pool->array =
+		qdf_mem_malloc(pool_size *
+		sizeof(union dp_rx_desc_list_elem_t));
 
-	if (!(rx_desc_pool->array)) {
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_FATAL,
-			"%s: RX Desc Pool[%d] allocation failed",
-			__func__, pool_id);
-		return QDF_STATUS_E_NOMEM;
+		if (!(rx_desc_pool->array)) {
+			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_FATAL,
+				  "%s: RX Desc Pool[%d] allocation failed",
+				  __func__, pool_id);
+			return QDF_STATUS_E_NOMEM;
+		}
 	}
 
 	/* Initialize the lock */
@@ -79,21 +82,75 @@ QDF_STATUS dp_rx_desc_pool_alloc(struct dp_soc *soc, uint32_t pool_id,
 void dp_rx_desc_pool_free(struct dp_soc *soc, uint32_t pool_id,
 	struct rx_desc_pool *rx_desc_pool)
 {
+	qdf_nbuf_t nbuf;
 	int i;
 
 	qdf_spin_lock_bh(&rx_desc_pool->lock);
 	for (i = 0; i < rx_desc_pool->pool_size; i++) {
 		if (rx_desc_pool->array[i].rx_desc.in_use) {
-			if (!(rx_desc_pool->array[i].rx_desc.unmapped))
-				qdf_nbuf_unmap_single(soc->osdev,
-					rx_desc_pool->array[i].rx_desc.nbuf,
-					QDF_DMA_BIDIRECTIONAL);
-			qdf_nbuf_free(rx_desc_pool->array[i].rx_desc.nbuf);
+			nbuf = rx_desc_pool->array[i].rx_desc.nbuf;
+
+			if (!(rx_desc_pool->array[i].rx_desc.unmapped)) {
+				dp_ipa_handle_rx_buf_smmu_mapping(soc, nbuf,
+								  false);
+
+				qdf_nbuf_unmap_single(soc->osdev, nbuf,
+						      QDF_DMA_BIDIRECTIONAL);
+			}
+			qdf_nbuf_free(nbuf);
 		}
 	}
 	qdf_mem_free(rx_desc_pool->array);
 	qdf_spin_unlock_bh(&rx_desc_pool->lock);
 	qdf_spinlock_destroy(&rx_desc_pool->lock);
+}
+
+/*
+ * dp_rx_desc_pool_free_nbuf() - free the sw rx desc nbufs called during
+ *			         de-initialization of wifi module.
+ *
+ * @soc: core txrx main context
+ * @pool_id: pool_id which is one of 3 mac_ids
+ * @rx_desc_pool: rx descriptor pool pointer
+ */
+void dp_rx_desc_nbuf_pool_free(struct dp_soc *soc,
+			       struct rx_desc_pool *rx_desc_pool)
+{
+	qdf_nbuf_t nbuf;
+	int i;
+
+	qdf_spin_lock_bh(&rx_desc_pool->lock);
+	for (i = 0; i < rx_desc_pool->pool_size; i++) {
+		if (rx_desc_pool->array[i].rx_desc.in_use) {
+			nbuf = rx_desc_pool->array[i].rx_desc.nbuf;
+
+			if (!(rx_desc_pool->array[i].rx_desc.unmapped)) {
+				dp_ipa_handle_rx_buf_smmu_mapping(soc, nbuf,
+								  false);
+
+				qdf_nbuf_unmap_single(soc->osdev, nbuf,
+						      QDF_DMA_BIDIRECTIONAL);
+			}
+
+			qdf_nbuf_free(nbuf);
+		}
+	}
+	qdf_spin_unlock_bh(&rx_desc_pool->lock);
+	qdf_spinlock_destroy(&rx_desc_pool->lock);
+}
+
+/*
+ * dp_rx_desc_pool_free_array() - free the sw rx desc array called during
+ *			         de-initialization of wifi module.
+ *
+ * @soc: core txrx main context
+ * @pool_id: pool_id which is one of 3 mac_ids
+ * @rx_desc_pool: rx descriptor pool pointer
+ */
+void dp_rx_desc_free_array(struct dp_soc *soc,
+			   struct rx_desc_pool *rx_desc_pool)
+{
+	qdf_mem_free(rx_desc_pool->array);
 }
 
 /*

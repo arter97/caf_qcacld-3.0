@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -21,12 +21,14 @@
  * QCA abstraction layer (QAL) device config APIs
  */
 
-#if !defined(__QDF_DEVCFG_H)
-#define __QDF_DEVCFG_H
+#if !defined(__QAL_DEVCFG_H)
+#define __QAL_DEVCFG_H
 
 /* Include Files */
 #include <qdf_types.h>
+#include <i_qal_devcfg.h>
 
+#ifdef ENHANCED_OS_ABSTRACTION
 /**
  * qal_devcfg_send_response() - send devcfg response
  * @cfgbuf: response buffer
@@ -37,4 +39,11 @@
  */
 QDF_STATUS
 qal_devcfg_send_response(qdf_nbuf_t cfgbuf);
+#else
+static inline QDF_STATUS
+qal_devcfg_send_response(qdf_nbuf_t cfgbuf)
+{
+	return __qal_devcfg_send_response(cfgbuf);
+}
 #endif
+#endif /* __QAL_DEVCFG_H */

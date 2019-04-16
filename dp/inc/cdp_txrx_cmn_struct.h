@@ -88,7 +88,7 @@
 		(((_tid) == 4) || ((_tid) == 5)) ? WME_AC_VI : \
 		WME_AC_VO)
 
-#define CDP_MU_MAX_USERS 8
+#define CDP_MU_MAX_USERS 37
 #define CDP_MU_MAX_USER_INDEX (CDP_MU_MAX_USERS - 1)
 #define CDP_INVALID_PEER 0xffff
 #define CDP_INVALID_TID	 31
@@ -199,6 +199,7 @@ enum htt_cmn_dbg_stats_type {
  * @TXRX_REO_QUEUE_STATS: Print Per peer REO Queue Stats
  * @TXRX_SOC_CFG_PARAMS: Print soc cfg params info
  * @TXRX_PDEV_CFG_PARAMS: Print pdev cfg params info
+ * @TXRX_NAPI_STATS: Print NAPI scheduling statistics
  */
 enum cdp_host_txrx_stats {
 	TXRX_HOST_STATS_INVALID  = -1,
@@ -213,6 +214,7 @@ enum cdp_host_txrx_stats {
 	TXRX_REO_QUEUE_STATS = 8,
 	TXRX_SOC_CFG_PARAMS   = 9,
 	TXRX_PDEV_CFG_PARAMS  = 10,
+	TXRX_NAPI_STATS       = 11,
 	TXRX_HOST_STATS_MAX,
 };
 
@@ -353,8 +355,6 @@ typedef void (*txrx_ast_free_cb)(void *ctrl_soc,
 				 void *cookie,
 				 enum cdp_ast_free_status);
 
-#define CDP_MAC_ADDR_LEN 6
-
 /**
  *  struct cdp_ast_entry_info - AST entry information
  *  @peer_mac_addr: mac address of peer on which AST entry is added
@@ -367,7 +367,7 @@ typedef void (*txrx_ast_free_cb)(void *ctrl_soc,
  *
  */
 struct cdp_ast_entry_info {
-	uint8_t peer_mac_addr[CDP_MAC_ADDR_LEN];
+	uint8_t peer_mac_addr[QDF_MAC_ADDR_SIZE];
 	enum cdp_txrx_ast_entry_type type;
 	uint8_t vdev_id;
 	uint8_t pdev_id;
@@ -681,8 +681,11 @@ typedef void (*ol_txrx_stats_callback)(void *ctxt,
 /**
  * ol_txrx_pktdump_cb - callback for packet dump feature
  */
-typedef void (*ol_txrx_pktdump_cb)(qdf_nbuf_t netbuf, uint8_t status,
-				   uint8_t vdev_id, uint8_t type);
+typedef void (*ol_txrx_pktdump_cb)(ol_txrx_soc_handle soc,
+				struct cdp_vdev *vdev,
+				qdf_nbuf_t netbuf,
+				uint8_t status,
+				uint8_t type);
 
 /**
  * ol_txrx_ops - (pointers to) the functions used for tx and rx
@@ -819,6 +822,9 @@ struct cdp_soc_t {
  * @CDP_CONFIG_IGMPMLD_OVERRIDE: Override IGMP/MLD
  * @CDP_CONFIG_IGMPMLD_TID: Configurable TID value when igmmld_override is set
  * @CDP_CONFIG_ARP_DBG_CONF: Enable ARP debug
+ * @CDP_CONFIG_CAPTURE_LATENCY: Capture time latency
+ * @CDP_INGRESS_STATS: Accumulate ingress statistics
+ * @CDP_OSIF_DROP: Accumulate drops in OSIF layer
  */
 enum cdp_pdev_param_type {
 	CDP_CONFIG_DEBUG_SNIFFER,
@@ -828,6 +834,9 @@ enum cdp_pdev_param_type {
 	CDP_CONFIG_IGMPMLD_OVERRIDE,
 	CDP_CONFIG_IGMPMLD_TID,
 	CDP_CONFIG_ARP_DBG_CONF,
+	CDP_CONFIG_CAPTURE_LATENCY,
+	CDP_INGRESS_STATS,
+	CDP_OSIF_DROP,
 };
 
 /*
@@ -1207,6 +1216,7 @@ struct cdp_tx_completion_ppdu {
 	uint32_t ppdu_seq_id;
 	uint16_t vdev_id;
 	uint32_t num_users;
+	uint8_t last_usr_index;
 	uint32_t num_mpdu:9,
 		 num_msdu:16;
 	uint16_t frame_type;
@@ -1516,7 +1526,7 @@ enum cdp_dp_cfg {
  */
 struct cdp_peer_cookie {
 	uint8_t peer_id;
-	uint8_t mac_addr[CDP_MAC_ADDR_LEN];
+	uint8_t mac_addr[QDF_MAC_ADDR_SIZE];
 	uint8_t cookie;
 	struct cdp_stats_cookie *ctx;
 };

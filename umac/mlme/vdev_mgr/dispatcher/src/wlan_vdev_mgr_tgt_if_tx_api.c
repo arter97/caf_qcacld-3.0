@@ -111,7 +111,6 @@ QDF_STATUS tgt_vdev_mgr_create_send(
 QDF_STATUS tgt_vdev_mgr_create_complete(struct vdev_mlme_obj *vdev_mlme)
 {
 	struct wlan_objmgr_vdev *vdev;
-	enum QDF_OPMODE opmode;
 	struct vdev_set_params param = {0};
 	struct wlan_lmac_if_mlme_tx_ops *txops;
 	struct vdev_mlme_inactivity_params *inactivity;
@@ -126,18 +125,7 @@ QDF_STATUS tgt_vdev_mgr_create_complete(struct vdev_mlme_obj *vdev_mlme)
 		return QDF_STATUS_E_INVAL;
 	}
 
-	opmode = wlan_vdev_mlme_get_opmode(vdev);
 	inactivity = &vdev_mlme->mgmt.inactivity_params;
-	if (opmode == QDF_SAP_MODE) {
-		param.vdev_id = wlan_vdev_get_id(vdev);
-
-		param.param_value = vdev_mlme->mgmt.rate_info.bcn_tx_rate;
-		param.param_id = WLAN_MLME_CFG_BCN_TX_RATE;
-		status = txops->vdev_set_param_send(vdev, &param);
-		if (QDF_IS_STATUS_ERROR(status))
-			mlme_err("VDEV_%d: Failed to set beacon rate!",
-				 vdev_id);
-	}
 
 	param.param_value =
 		inactivity->keepalive_min_idle_inactive_time_secs;
@@ -202,9 +190,6 @@ QDF_STATUS tgt_vdev_mgr_delete_send(
 	QDF_STATUS status;
 	struct wlan_lmac_if_mlme_tx_ops *txops;
 	struct wlan_objmgr_vdev *vdev;
-	struct wlan_objmgr_psoc *psoc;
-	ol_txrx_soc_handle soc_txrx_handle;
-	struct cdp_vdev *vdev_txrx_handle;
 	uint8_t vdev_id;
 
 	if (!param) {
@@ -218,15 +203,6 @@ QDF_STATUS tgt_vdev_mgr_delete_send(
 	if (!txops || !txops->vdev_delete_send) {
 		mlme_err("VDEV_%d: No Tx Ops", vdev_id);
 		return QDF_STATUS_E_INVAL;
-	}
-
-	psoc = wlan_vdev_get_psoc(vdev);
-	soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
-	vdev_txrx_handle = wlan_vdev_get_dp_handle(vdev);
-	if (soc_txrx_handle && vdev_txrx_handle) {
-		wlan_vdev_set_dp_handle(vdev, NULL);
-		cdp_vdev_detach(soc_txrx_handle, vdev_txrx_handle,
-				NULL, NULL);
 	}
 
 	status = txops->vdev_delete_send(vdev, param);

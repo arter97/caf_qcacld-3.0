@@ -41,6 +41,10 @@ static void target_if_cp_stats_free_stats_event(struct stats_event *ev)
 	ev->pdev_stats = NULL;
 	qdf_mem_free(ev->peer_stats);
 	ev->peer_stats = NULL;
+	qdf_mem_free(ev->peer_adv_stats);
+	ev->peer_adv_stats = NULL;
+	qdf_mem_free(ev->peer_extended_stats);
+	ev->peer_extended_stats = NULL;
 	qdf_mem_free(ev->cca_stats);
 	ev->cca_stats = NULL;
 	qdf_mem_free(ev->vdev_summary_stats);
@@ -84,6 +88,43 @@ static QDF_STATUS target_if_cp_stats_extract_pdev_stats(
 	return QDF_STATUS_SUCCESS;
 }
 
+static void target_if_cp_stats_extract_peer_extd_stats(
+	struct wmi_unified *wmi_hdl,
+	wmi_host_stats_event *stats_param,
+	struct stats_event *ev,
+	uint8_t *data)
+
+{
+	QDF_STATUS status;
+	uint32_t i;
+	wmi_host_peer_extd_stats peer_extd_stats;
+
+	if (!stats_param->num_peer_extd_stats)
+		return;
+
+	ev->peer_extended_stats =
+			qdf_mem_malloc(sizeof(*ev->peer_extended_stats) *
+				       stats_param->num_peer_extd_stats);
+	if (!ev->peer_extended_stats)
+		return;
+
+	ev->num_peer_extd_stats = stats_param->num_peer_extd_stats;
+
+	for (i = 0; i < ev->num_peer_extd_stats; i++) {
+		status = wmi_extract_peer_extd_stats(wmi_hdl, data, i,
+						     &peer_extd_stats);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			cp_stats_err("wmi_extract_peer_extd_stats failed");
+			continue;
+		}
+		WMI_MAC_ADDR_TO_CHAR_ARRAY(
+			     &peer_extd_stats.peer_macaddr,
+			ev->peer_extended_stats[i].peer_macaddr);
+		ev->peer_extended_stats[i].rx_mc_bc_cnt =
+						peer_extd_stats.rx_mc_bc_cnt;
+	}
+}
+
 static QDF_STATUS target_if_cp_stats_extract_peer_stats(
 					struct wmi_unified *wmi_hdl,
 					wmi_host_stats_event *stats_param,
@@ -94,26 +135,28 @@ static QDF_STATUS target_if_cp_stats_extract_peer_stats(
 	QDF_STATUS status;
 	wmi_host_peer_stats peer_stats;
 	bool db2dbm_enabled;
+	struct wmi_host_peer_adv_stats *peer_adv_stats;
 
-	ev->num_peer_stats = stats_param->num_peer_stats;
-	if (!ev->num_peer_stats)
+	/* Extract peer_stats */
+	if (!stats_param->num_peer_stats)
 		return QDF_STATUS_SUCCESS;
 
 	ev->peer_stats = qdf_mem_malloc(sizeof(*ev->peer_stats) *
-						ev->num_peer_stats);
+						stats_param->num_peer_stats);
 	if (!ev->peer_stats)
 		return QDF_STATUS_E_NOMEM;
+	ev->num_peer_stats = stats_param->num_peer_stats;
 
 	db2dbm_enabled = wmi_service_enabled(wmi_hdl,
 					     wmi_service_hw_db2dbm_support);
 	for (i = 0; i < ev->num_peer_stats; i++) {
 		status = wmi_extract_peer_stats(wmi_hdl, data, i, &peer_stats);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			cp_stats_err("wmi_extract_pdev_stats failed");
+			cp_stats_err("wmi_extract_peer_stats failed");
 			continue;
 		}
 		WMI_MAC_ADDR_TO_CHAR_ARRAY(&peer_stats.peer_macaddr,
-						ev->peer_stats[i].peer_macaddr);
+					   ev->peer_stats[i].peer_macaddr);
 		ev->peer_stats[i].tx_rate = peer_stats.peer_tx_rate;
 		ev->peer_stats[i].rx_rate = peer_stats.peer_rx_rate;
 		if (db2dbm_enabled)
@@ -123,6 +166,44 @@ static QDF_STATUS target_if_cp_stats_extract_peer_stats(
 							TGT_NOISE_FLOOR_DBM;
 	}
 
+	target_if_cp_stats_extract_peer_extd_stats(wmi_hdl, stats_param, ev,
+						   data);
+
+	/* Extract peer_adv_stats */
+	ev->num_peer_adv_stats = stats_param->num_peer_adv_stats;
+	if (!ev->num_peer_adv_stats)
+		return QDF_STATUS_SUCCESS;
+
+	ev->peer_adv_stats = qdf_mem_malloc(sizeof(*ev->peer_adv_stats) *
+					    ev->num_peer_adv_stats);
+	if (!ev->peer_adv_stats)
+		return QDF_STATUS_E_NOMEM;
+
+	peer_adv_stats = qdf_mem_malloc(sizeof(*peer_adv_stats) *
+					ev->num_peer_adv_stats);
+	if (!peer_adv_stats) {
+		qdf_mem_free(ev->peer_adv_stats);
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	status = wmi_extract_peer_adv_stats(wmi_hdl, data, peer_adv_stats);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		cp_stats_err("wmi_extract_peer_stats failed");
+		qdf_mem_free(peer_adv_stats);
+		qdf_mem_free(ev->peer_adv_stats);
+		ev->peer_adv_stats = NULL;
+		return QDF_STATUS_SUCCESS;
+	}
+
+	for (i = 0; i < ev->num_peer_adv_stats; i++) {
+		qdf_mem_copy(&ev->peer_adv_stats[i].peer_macaddr,
+			     &peer_adv_stats[i].peer_macaddr,
+			     QDF_MAC_ADDR_SIZE);
+		ev->peer_adv_stats[i].fcs_count = peer_adv_stats[i].fcs_count;
+		ev->peer_adv_stats[i].rx_bytes = peer_adv_stats[i].rx_bytes;
+		ev->peer_adv_stats[i].rx_count = peer_adv_stats[i].rx_count;
+	}
+	qdf_mem_free(peer_adv_stats);
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -280,6 +361,7 @@ static QDF_STATUS target_if_cp_stats_extract_event(struct wmi_unified *wmi_hdl,
 		       stats_param.num_pdev_stats, stats_param.num_vdev_stats,
 		       stats_param.num_peer_stats, stats_param.num_rssi_stats);
 
+	ev->last_event = stats_param.last_event;
 	status = target_if_cp_stats_extract_pdev_stats(wmi_hdl, &stats_param,
 						       ev, data);
 	if (QDF_IS_STATUS_ERROR(status))
@@ -406,12 +488,6 @@ static void target_if_cp_stats_inc_wake_lock_stats(uint32_t reason,
 		stats->mgmt_action++;
 		break;
 
-	case WOW_REASON_RA_MATCH:
-		stats->ipv6_mcast_wake_up_count++;
-		stats->ipv6_mcast_ra_stats++;
-		stats->icmpv6_count++;
-		break;
-
 	case WOW_REASON_NLOD:
 		stats->pno_match_wake_up_count++;
 		break;
@@ -506,12 +582,13 @@ static uint32_t get_stats_id(enum stats_req_type type)
 	case TYPE_CONNECTION_TX_POWER:
 		return WMI_REQUEST_PDEV_STAT;
 	case TYPE_PEER_STATS:
-		return WMI_REQUEST_PEER_STAT;
+		return WMI_REQUEST_PEER_STAT | WMI_REQUEST_PEER_EXTD_STAT;
 	case TYPE_STATION_STATS:
 		return (WMI_REQUEST_AP_STAT   |
 			WMI_REQUEST_PEER_STAT |
 			WMI_REQUEST_VDEV_STAT |
 			WMI_REQUEST_PDEV_STAT |
+			WMI_REQUEST_PEER_EXTD2_STAT |
 			WMI_REQUEST_RSSI_PER_CHAIN_STAT);
 	}
 

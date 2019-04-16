@@ -265,7 +265,7 @@ struct wmi_wq_dbg_info {
 
 struct wmi_ops {
 QDF_STATUS (*send_vdev_create_cmd)(wmi_unified_t wmi_handle,
-				 uint8_t macaddr[IEEE80211_ADDR_LEN],
+				 uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 				 struct vdev_create_params *param);
 
 QDF_STATUS (*send_vdev_delete_cmd)(wmi_unified_t wmi_handle,
@@ -291,11 +291,11 @@ QDF_STATUS (*send_hidden_ssid_vdev_restart_cmd)(wmi_unified_t wmi_handle,
 		struct hidden_ssid_vdev_restart_params *restart_params);
 
 QDF_STATUS (*send_peer_flush_tids_cmd)(wmi_unified_t wmi,
-					 uint8_t peer_addr[IEEE80211_ADDR_LEN],
+					 uint8_t peer_addr[QDF_MAC_ADDR_SIZE],
 					 struct peer_flush_params *param);
 
 QDF_STATUS (*send_peer_delete_cmd)(wmi_unified_t wmi,
-				    uint8_t peer_addr[IEEE80211_ADDR_LEN],
+				    uint8_t peer_addr[QDF_MAC_ADDR_SIZE],
 				    uint8_t vdev_id);
 
 QDF_STATUS
@@ -305,11 +305,11 @@ QDF_STATUS
 			    uint16_t *peer_id_list);
 
 QDF_STATUS (*send_peer_param_cmd)(wmi_unified_t wmi,
-				uint8_t peer_addr[IEEE80211_ADDR_LEN],
+				uint8_t peer_addr[QDF_MAC_ADDR_SIZE],
 				struct peer_set_params *param);
 
 QDF_STATUS (*send_vdev_up_cmd)(wmi_unified_t wmi,
-			     uint8_t bssid[IEEE80211_ADDR_LEN],
+			     uint8_t bssid[QDF_MAC_ADDR_SIZE],
 				 struct vdev_up_params *params);
 
 QDF_STATUS (*send_peer_create_cmd)(wmi_unified_t wmi,
@@ -373,7 +373,7 @@ QDF_STATUS (*send_vdev_sifs_trigger_cmd)(wmi_unified_t wmi_handle,
 					 struct sifs_trigger_param *param);
 
 QDF_STATUS (*send_stats_request_cmd)(wmi_unified_t wmi_handle,
-				uint8_t macaddr[IEEE80211_ADDR_LEN],
+				uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 				struct stats_request_params *param);
 
 #ifdef CONFIG_WIN
@@ -381,7 +381,7 @@ QDF_STATUS (*send_packet_log_enable_cmd)(wmi_unified_t wmi_handle,
 			WMI_HOST_PKTLOG_EVENT PKTLOG_EVENT, uint8_t mac_id);
 #else
 QDF_STATUS (*send_packet_log_enable_cmd)(wmi_unified_t wmi_handle,
-				uint8_t macaddr[IEEE80211_ADDR_LEN],
+				uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 				struct packet_enable_params *param);
 #endif
 
@@ -660,21 +660,19 @@ QDF_STATUS (*send_ipa_offload_control_cmd)(wmi_unified_t wmi_handle,
 		struct ipa_uc_offload_control_params *ipa_offload);
 #endif
 
-QDF_STATUS (*send_process_ll_stats_clear_cmd)
-	   (wmi_unified_t wmi_handle,
-	   const struct ll_stats_clear_params *clear_req,
-	   uint8_t addr[IEEE80211_ADDR_LEN]);
+#ifdef WLAN_FEATURE_LINK_LAYER_STATS
+QDF_STATUS (*send_process_ll_stats_clear_cmd)(wmi_unified_t wmi_handle,
+				const struct ll_stats_clear_params *clear_req);
 
-QDF_STATUS (*send_process_ll_stats_set_cmd)
-	(wmi_unified_t wmi_handle, const struct ll_stats_set_params *set_req);
+QDF_STATUS (*send_process_ll_stats_set_cmd)(wmi_unified_t wmi_handle,
+				const struct ll_stats_set_params *set_req);
 
-QDF_STATUS (*send_process_ll_stats_get_cmd)
-	(wmi_unified_t wmi_handle, const struct ll_stats_get_params  *get_req,
-		 uint8_t addr[IEEE80211_ADDR_LEN]);
-
+QDF_STATUS (*send_process_ll_stats_get_cmd)(wmi_unified_t wmi_handle,
+				const struct ll_stats_get_params *get_req);
+#endif
 
 QDF_STATUS (*send_congestion_cmd)(wmi_unified_t wmi_handle,
-			uint8_t vdev_id);
+				  uint8_t vdev_id);
 
 QDF_STATUS (*send_snr_request_cmd)(wmi_unified_t wmi_handle);
 
@@ -1107,15 +1105,15 @@ QDF_STATUS (*send_smart_ant_set_rx_ant_cmd)(wmi_unified_t wmi_handle,
 		struct smart_ant_rx_ant_params *param);
 
 QDF_STATUS (*send_smart_ant_set_tx_ant_cmd)(wmi_unified_t wmi_handle,
-		uint8_t macaddr[IEEE80211_ADDR_LEN],
+		uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 		struct smart_ant_tx_ant_params *param);
 
 QDF_STATUS (*send_smart_ant_set_training_info_cmd)(wmi_unified_t wmi_handle,
-		uint8_t macaddr[IEEE80211_ADDR_LEN],
+		uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 		struct smart_ant_training_info_params *param);
 
 QDF_STATUS (*send_smart_ant_set_node_config_cmd)(wmi_unified_t wmi_handle,
-		uint8_t macaddr[IEEE80211_ADDR_LEN],
+		uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 		struct smart_ant_node_config_params *param);
 #endif
 
@@ -1135,7 +1133,7 @@ QDF_STATUS (*send_thermal_mitigation_param_cmd)(wmi_unified_t wmi_handle,
 		struct thermal_mitigation_params *param);
 
 QDF_STATUS (*send_vdev_set_neighbour_rx_cmd)(wmi_unified_t wmi_handle,
-		uint8_t macaddr[IEEE80211_ADDR_LEN],
+		uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 		struct set_neighbour_rx_params *param);
 
 QDF_STATUS (*send_vdev_set_fwtest_param_cmd)(wmi_unified_t wmi_handle,
@@ -1180,32 +1178,32 @@ QDF_STATUS (*send_remove_beacon_filter_cmd)(wmi_unified_t wmi_handle,
 		struct remove_beacon_filter_params *param);
 /*
 QDF_STATUS (*send_mgmt_cmd)(wmi_unified_t wmi_handle,
-		uint8_t macaddr[IEEE80211_ADDR_LEN],
+		uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 		struct mgmt_params *param);
 		*/
 
 QDF_STATUS (*send_addba_clearresponse_cmd)(wmi_unified_t wmi_handle,
-		uint8_t macaddr[IEEE80211_ADDR_LEN],
+		uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 		struct addba_clearresponse_params *param);
 
 QDF_STATUS (*send_addba_send_cmd)(wmi_unified_t wmi_handle,
-		uint8_t macaddr[IEEE80211_ADDR_LEN],
+		uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 		struct addba_send_params *param);
 
 QDF_STATUS (*send_delba_send_cmd)(wmi_unified_t wmi_handle,
-		uint8_t macaddr[IEEE80211_ADDR_LEN],
+		uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 		struct delba_send_params *param);
 
 QDF_STATUS (*send_addba_setresponse_cmd)(wmi_unified_t wmi_handle,
-		uint8_t macaddr[IEEE80211_ADDR_LEN],
+		uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 		struct addba_setresponse_params *param);
 
 QDF_STATUS (*send_singleamsdu_cmd)(wmi_unified_t wmi_handle,
-		uint8_t macaddr[IEEE80211_ADDR_LEN],
+		uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 		struct singleamsdu_params *param);
 
 QDF_STATUS (*send_set_qboost_param_cmd)(wmi_unified_t wmi_handle,
-		uint8_t macaddr[IEEE80211_ADDR_LEN],
+		uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 		struct set_qboost_params *param);
 
 QDF_STATUS (*send_mu_scan_cmd)(wmi_unified_t wmi_handle,
@@ -1540,6 +1538,10 @@ QDF_STATUS (*extract_peer_retry_stats)(wmi_unified_t wmi_handle, void *evt_buf,
 	    uint32_t index,
 	    struct wmi_host_peer_retry_stats *peer_retry_stats);
 
+QDF_STATUS (*extract_peer_adv_stats)(wmi_unified_t wmi_handle, void *evt_buf,
+				     struct wmi_host_peer_adv_stats
+				     *peer_adv_stats);
+
 QDF_STATUS (*extract_chan_stats)(wmi_unified_t wmi_handle, void *evt_buf,
 			 uint32_t index, wmi_host_chan_stats *chan_stats);
 
@@ -1592,7 +1594,14 @@ QDF_STATUS (*send_power_dbg_cmd)(wmi_unified_t wmi_handle,
 
 QDF_STATUS (*send_multiple_vdev_restart_req_cmd)(wmi_unified_t wmi_handle,
 				struct multiple_vdev_restart_params *param);
+#ifdef QCA_SUPPORT_AGILE_DFS
+QDF_STATUS
+(*send_adfs_ocac_abort_cmd)(wmi_unified_t wmi_handle,
+			    struct vdev_adfs_abort_params *param);
 
+QDF_STATUS (*send_adfs_ch_cfg_cmd)(wmi_unified_t wmi_handle,
+				   struct vdev_adfs_ch_cfg_params *param);
+#endif
 QDF_STATUS (*send_fw_test_cmd)(wmi_unified_t wmi_handle,
 			       struct set_fwtest_params *wmi_fwtest);
 
@@ -1717,6 +1726,11 @@ QDF_STATUS (*extract_dfs_cac_complete_event)(wmi_unified_t wmi_handle,
 		uint8_t *evt_buf,
 		uint32_t *vdev_id,
 		uint32_t len);
+QDF_STATUS
+(*extract_dfs_ocac_complete_event)(wmi_unified_t wmi_handle,
+				   uint8_t *evt_buf,
+				   struct vdev_adfs_complete_status *oca_stats);
+
 QDF_STATUS (*extract_dfs_radar_detection_event)(wmi_unified_t wmi_handle,
 		uint8_t *evt_buf,
 		struct radar_found_info *radar_found,
@@ -1761,6 +1775,8 @@ QDF_STATUS (*send_ndp_responder_req_cmd)(wmi_unified_t wmi_handle,
 				struct nan_datapath_responder_req *req);
 QDF_STATUS (*send_ndp_end_req_cmd)(wmi_unified_t wmi_handle,
 				struct nan_datapath_end_req *req);
+QDF_STATUS (*send_terminate_all_ndps_req_cmd)(wmi_unified_t wmi_handle,
+					      uint32_t vdev_id);
 
 QDF_STATUS (*extract_ndp_initiator_rsp)(wmi_unified_t wmi_handle,
 		uint8_t *data, struct nan_datapath_initiator_rsp *rsp);
@@ -1776,6 +1792,8 @@ QDF_STATUS (*extract_ndp_end_ind)(wmi_unified_t wmi_handle,
 		uint8_t *data, struct nan_datapath_end_indication_event **ind);
 QDF_STATUS (*extract_ndp_sch_update)(wmi_unified_t wmi_handle,
 		uint8_t *data, struct nan_datapath_sch_update_event *ind);
+QDF_STATUS (*extract_ndp_host_event)(wmi_unified_t wmi_handle, uint8_t *data,
+		struct nan_datapath_host_event *evt);
 #endif /* WLAN_FEATURE_NAN */
 
 QDF_STATUS (*send_obss_detection_cfg_cmd)(wmi_unified_t wmi_handle,
@@ -1877,6 +1895,10 @@ QDF_STATUS (*extract_dfs_status_from_fw)(wmi_unified_t wmi_handle,
 					 uint32_t *dfs_status_check);
 #endif
 
+QDF_STATUS
+(*extract_cfr_peer_tx_event_param)(wmi_unified_t *wmi_handle, void *evt_buf,
+				   wmi_cfr_peer_tx_event_param * peer_tx_event);
+
 #ifdef OBSS_PD
 QDF_STATUS (*send_obss_spatial_reuse_set)(wmi_unified_t wmi_handle,
 		struct wmi_host_obss_spatial_reuse_set_param
@@ -1903,10 +1925,11 @@ QDF_STATUS (*send_peer_cfr_capture_cmd)(wmi_unified_t wmi_handle,
 #ifdef WMI_AP_SUPPORT
 QDF_STATUS (*send_vdev_pcp_tid_map_cmd)(wmi_unified_t wmi_handle,
 					struct vap_pcp_tid_map_params *param);
-
 QDF_STATUS (*send_vdev_tidmap_prec_cmd)(wmi_unified_t wmi_handle,
 					struct vap_tidmap_prec_params *param);
 #endif
+QDF_STATUS (*send_mws_coex_status_req_cmd)(wmi_unified_t wmi_handle,
+					   uint32_t vdev_id, uint32_t cmd_id);
 };
 
 /* Forward declartion for psoc*/
@@ -1983,10 +2006,6 @@ struct wmi_unified {
 	bool use_cookie;
 	bool wmi_stopinprogress;
 	uint32_t *wmi_events;
-#ifndef CONFIG_MCL
-	uint32_t *pdev_param;
-	uint32_t *vdev_param;
-#endif
 	uint32_t *services;
 	struct wmi_soc *soc;
 	uint16_t wmi_max_cmds;
@@ -2021,10 +2040,8 @@ struct wmi_soc {
 	/* WMI service bitmap received from target */
 	uint32_t *wmi_service_bitmap;
 	uint32_t *wmi_ext_service_bitmap;
-#ifndef CONFIG_MCL
-	uint32_t pdev_param[wmi_pdev_param_max];
-	uint32_t vdev_param[wmi_vdev_param_max];
-#endif
+	uint32_t *pdev_param;
+	uint32_t *vdev_param;
 	uint32_t services[wmi_services_max];
 	uint16_t wmi_max_cmds;
 	uint32_t soc_idx;

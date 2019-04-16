@@ -113,6 +113,9 @@ static int init_deinit_service_ready_event_handler(ol_scn_t scn_handle,
 	if (wmi_service_enabled(wmi_handle, wmi_service_ul_ru26_allowed))
 		wlan_psoc_nif_fw_ext_cap_set(psoc, WLAN_SOC_CEXT_OBSS_NBW_RU);
 
+	if (wmi_service_enabled(wmi_handle, wmi_service_infra_mbssid))
+		wlan_psoc_nif_fw_ext_cap_set(psoc, WLAN_SOC_CEXT_MBSS_IE);
+
 	target_if_debug(" TT support %d, Wide BW Scan %d, SW cal %d",
 		wlan_psoc_nif_fw_ext_cap_get(psoc, WLAN_SOC_CEXT_TT_SUPPORT),
 		wlan_psoc_nif_fw_ext_cap_get(psoc, WLAN_SOC_CEXT_WIDEBAND_SCAN),
@@ -397,6 +400,11 @@ static int init_deinit_ready_event_handler(ol_scn_t scn_handle,
 		return -EINVAL;
 	}
 
+	if (!ready_ev.agile_capability)
+		target_if_err("agile capability disabled in HW");
+	else
+		info->wlan_res_cfg.agile_capability = ready_ev.agile_capability;
+
 	if ((ready_ev.num_total_peer != 0) &&
 	    (info->wlan_res_cfg.num_peers != ready_ev.num_total_peer)) {
 		/* FW allocated number of peers is different than host
@@ -416,8 +424,13 @@ static int init_deinit_ready_event_handler(ol_scn_t scn_handle,
 		max_peers = tgt_cfg->num_peers + ready_ev.num_extra_peer + 1;
 		max_ast_index = ready_ev.max_ast_index + 1;
 
-		cdp_peer_map_attach(wlan_psoc_get_dp_handle(psoc), max_peers,
-				    max_ast_index, tgt_cfg->peer_map_unmap_v2);
+		if (cdp_peer_map_attach(wlan_psoc_get_dp_handle(psoc),
+					max_peers, max_ast_index,
+					tgt_cfg->peer_map_unmap_v2) !=
+				QDF_STATUS_SUCCESS) {
+			target_if_err("DP peer map attach failed");
+			return -EINVAL;
+		}
 	}
 
 	/* Indicate to the waiting thread that the ready

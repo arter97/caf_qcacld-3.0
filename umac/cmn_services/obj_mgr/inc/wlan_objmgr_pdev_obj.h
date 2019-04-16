@@ -84,6 +84,8 @@
 #define WLAN_PDEV_F_CHAN_CONCURRENCY        0x08000000
 /* Multivdev restart enabled */
 #define WLAN_PDEV_F_MULTIVDEV_RESTART       0x10000000
+/* MBSS IE enable */
+#define WLAN_PDEV_F_MBSS_IE_ENABLE          0x20000000
 
 /* PDEV op flags */
    /* Enable htrate for wep and tkip */
@@ -119,6 +121,8 @@
 #define WLAN_PDEV_OP_RESTART_INPROGRESS 0x00020000
    /* PDEV MBSSID VDEV restart trigger */
 #define WLAN_PDEV_OP_MBSSID_RESTART     0x00040000
+   /* RADAR DETECT Defer */
+#define WLAN_PDEV_OP_RADAR_DETECT_DEFER 0x00080000
 
 
 struct osif_pdev_priv;
@@ -830,7 +834,7 @@ static inline void wlan_pdev_set_tgt_if_handle(struct wlan_objmgr_pdev *pdev,
 			void *tgt_if_handle)
 {
 	/* This API is invoked with lock acquired, do not add log prints */
-	if (pdev == NULL)
+	if (!pdev)
 		return;
 
 	pdev->tgt_if_handle = tgt_if_handle;
@@ -846,7 +850,7 @@ static inline void wlan_pdev_set_tgt_if_handle(struct wlan_objmgr_pdev *pdev,
  */
 static inline void *wlan_pdev_get_tgt_if_handle(struct wlan_objmgr_pdev *pdev)
 {
-	if (pdev == NULL)
+	if (!pdev)
 		return NULL;
 
 	return pdev->tgt_if_handle;

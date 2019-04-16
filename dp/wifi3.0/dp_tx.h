@@ -206,7 +206,8 @@ dp_get_completion_indication_for_stack(struct dp_soc *soc,
 				       struct dp_pdev *pdev,
 				       struct dp_peer *peer,
 				       struct hal_tx_completion_status *ts,
-				       qdf_nbuf_t netbuf);
+				       qdf_nbuf_t netbuf,
+				       uint64_t time_latency);
 
 void  dp_send_completion_to_stack(struct dp_soc *soc,  struct dp_pdev *pdev,
 		uint16_t peer_id, uint32_t ppdu_id,
@@ -222,17 +223,14 @@ void  dp_iterate_update_peer_list(void *pdev_hdl);
 #define DP_TX_TID_OVERRIDE(_msdu_info, _nbuf)
 #endif
 
-#ifdef ATH_RX_PRI_SAVE
-#define DP_RX_TID_SAVE(_nbuf, _tid) \
-	(qdf_nbuf_set_priority(_nbuf, _tid))
-#else
-#define DP_RX_TID_SAVE(_nbuf, _tid)
-#endif
-
 /* TODO TX_FEATURE_NOT_YET */
 static inline void dp_tx_comp_process_exception(struct dp_tx_desc_s *tx_desc)
 {
 	return;
 }
 /* TODO TX_FEATURE_NOT_YET */
+
+void dp_tx_comp_free_buf(struct dp_soc *soc, struct dp_tx_desc_s *desc);
+void dp_tx_desc_release(struct dp_tx_desc_s *tx_desc, uint8_t desc_pool_id);
+
 #endif

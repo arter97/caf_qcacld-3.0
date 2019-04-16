@@ -402,7 +402,8 @@ struct cdp_cmn_ops {
 			void *dp_txrx_handle);
 
 	void (*txrx_peer_reset_ast)
-		(ol_txrx_soc_handle soc, uint8_t *ast_macaddr, void *vdev_hdl);
+		(ol_txrx_soc_handle soc, uint8_t *ast_macaddr,
+		 uint8_t *peer_macaddr, void *vdev_hdl);
 
 	void (*txrx_peer_reset_ast_table)(ol_txrx_soc_handle soc,
 					  void *vdev_hdl);
@@ -446,6 +447,14 @@ struct cdp_cmn_ops {
 					   void *buf);
 	void (*txrx_flush_rate_stats_request)(struct cdp_soc_t *soc,
 					      struct cdp_pdev *pdev);
+	QDF_STATUS (*set_pdev_pcp_tid_map)(struct cdp_pdev *pdev,
+					   uint8_t pcp, uint8_t tid);
+	QDF_STATUS (*set_pdev_tidmap_prty)(struct cdp_pdev *pdev, uint8_t prty);
+	QDF_STATUS (*set_vdev_pcp_tid_map)(struct cdp_vdev *vdev,
+					   uint8_t pcp, uint8_t tid);
+	QDF_STATUS (*set_vdev_tidmap_prty)(struct cdp_vdev *vdev, uint8_t prty);
+	QDF_STATUS (*set_vdev_tidmap_tbl_id)(struct cdp_vdev *vdev,
+					     uint8_t mapid);
 };
 
 struct cdp_ctrl_ops {
@@ -632,6 +641,7 @@ struct cdp_ctrl_ops {
 	int (*enable_peer_based_pktlog)(struct cdp_pdev
 			*txrx_pdev_handle, char *macaddr, uint8_t enb_dsb);
 
+	void (*calculate_delay_stats)(struct cdp_vdev *vdev, qdf_nbuf_t nbuf);
 };
 
 struct cdp_me_ops {
@@ -833,6 +843,30 @@ struct cdp_pflow_ops {
 #define LRO_IPV6_SEED_ARR_SZ 11
 
 /**
+ * struct cdp_reorder_q_setup - reorder queue setup params
+ * @soc: dp soc pointer
+ * @ctrl_pdev: umac ctrl pdev pointer
+ * @vdev_id: vdev id
+ * @peer_macaddr: peer mac address
+ * @hw_qdesc: hw queue descriptor
+ * @tid: tid number
+ * @queue_no: queue number
+ * @ba_window_size_valid: BA window size validity flag
+ * @ba_window_size: BA window size
+ */
+struct cdp_reorder_q_setup {
+	struct cdp_soc *soc;
+	struct cdp_ctrl_objmgr_pdev *ctrl_pdev;
+	uint8_t vdev_id;
+	uint8_t peer_mac[QDF_MAC_ADDR_SIZE];
+	qdf_dma_addr_t hw_qdesc_paddr;
+	uint8_t tid;
+	uint16_t queue_no;
+	uint8_t ba_window_size_valid;
+	uint16_t ba_window_size;
+};
+
+/**
  * struct cdp_lro_hash_config - set rx_offld(LRO/GRO) init parameters
  * @lro_enable: indicates whether rx_offld is enabled
  * @tcp_flag: If the TCP flags from the packet do not match
@@ -882,7 +916,8 @@ struct ol_if_ops {
 			uint8_t *dest_macaddr, uint8_t *peer_macaddr,
 			uint32_t flags);
 	void (*peer_del_wds_entry)(void *ol_soc_handle,
-			uint8_t *wds_macaddr);
+				   uint8_t *wds_macaddr,
+				   uint8_t type);
 	QDF_STATUS
 	(*lro_hash_config)(struct cdp_ctrl_objmgr_pdev *ctrl_pdev,
 			   struct cdp_lro_hash_config *rx_offld_hash);
@@ -897,7 +932,8 @@ struct ol_if_ops {
 			uint8_t vdev_id, uint8_t *peer_mac_addr,
 			enum cdp_txrx_ast_entry_type peer_type,
 			uint32_t tx_ast_hashidx);
-	int (*peer_unmap_event)(void *ol_soc_handle, uint16_t peer_id);
+	int (*peer_unmap_event)(void *ol_soc_handle, uint16_t peer_id,
+				uint8_t vdev_id);
 
 	int (*get_dp_cfg_param)(void *ol_soc_handle, enum cdp_cfg_param_type param_num);
 
@@ -931,6 +967,10 @@ struct ol_if_ops {
 	int (*send_delba)(void *pdev_handle,  void *ctrl_peer,
 			  uint8_t *peer_macaddr, uint8_t tid, void *vdev_handle,
 			  uint8_t reason_code);
+	int (*peer_delete_multiple_wds_entries)(void *vdev_handle,
+						uint8_t *dest_macaddr,
+						uint8_t *peer_macaddr,
+						uint32_t flags);
 	/* TODO: Add any other control path calls required to OL_IF/WMA layer */
 };
 
@@ -1147,7 +1187,8 @@ struct cdp_ipa_ops {
 		void *ipa_w2i_cb, void *ipa_wdi_meter_notifier_cb,
 		uint32_t ipa_desc_size, void *ipa_priv, bool is_rm_enabled,
 		uint32_t *tx_pipe_handle, uint32_t *rx_pipe_handle,
-		bool is_smmu_enabled, qdf_ipa_sys_connect_params_t *sys_in);
+		bool is_smmu_enabled, qdf_ipa_sys_connect_params_t *sys_in,
+		bool over_gsi);
 #else /* CONFIG_IPA_WDI_UNIFIED_API */
 	QDF_STATUS (*ipa_setup)(struct cdp_pdev *pdev, void *ipa_i2w_cb,
 		void *ipa_w2i_cb, void *ipa_wdi_meter_notifier_cb,
@@ -1255,7 +1296,7 @@ struct cdp_peer_ops {
 	void (*add_last_real_peer)(struct cdp_pdev *pdev,
 		struct cdp_vdev *vdev, uint8_t *peer_id);
 	bool (*is_vdev_restore_last_peer)(void *peer);
-	void (*update_last_real_peer)(struct cdp_pdev *pdev, void *peer,
+	void (*update_last_real_peer)(struct cdp_pdev *pdev, void *vdev,
 			uint8_t *peer_id, bool restore_last_peer);
 	void (*peer_detach_force_delete)(void *peer);
 };

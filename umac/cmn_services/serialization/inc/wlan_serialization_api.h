@@ -98,6 +98,8 @@ union wlan_serialization_rules_info {
 	struct wlan_serialization_scan_info scan_info;
 };
 
+struct wlan_serialization_command;
+
 /**
  * wlan_serialization_cmd_callback() - Callback registered by the component
  * @wlan_cmd: Command passed by the component for serialization
@@ -110,8 +112,9 @@ union wlan_serialization_rules_info {
  *
  * Return: QDF_STATUS_SUCCESS or QDF_STATUS_E_FAILURE
  */
-typedef QDF_STATUS (*wlan_serialization_cmd_callback)(void *wlan_cmd,
-				 enum wlan_serialization_cb_reason reason);
+typedef QDF_STATUS
+(*wlan_serialization_cmd_callback)(struct wlan_serialization_command *wlan_cmd,
+				   enum wlan_serialization_cb_reason reason);
 
 /**
  * wlan_serialization_comp_info_cb() - callback to fill the rules information
@@ -164,6 +167,7 @@ enum wlan_serialization_cmd_type {
 	WLAN_SER_CMD_NDP_INIT_REQ,
 	WLAN_SER_CMD_NDP_RESP_REQ,
 	WLAN_SER_CMD_NDP_DATA_END_INIT_REQ,
+	WLAN_SER_CMD_NDP_END_ALL_REQ,
 	WLAN_SER_CMD_ADDTS,
 	WLAN_SER_CMD_DELTS,
 	WLAN_SER_CMD_TDLS_SEND_MGMT,
@@ -548,8 +552,8 @@ void *wlan_serialization_get_active_cmd(
 		enum wlan_serialization_cmd_type cmd_type);
 
 /**
- * wlan_serialization_get_active_cmd() - Return active umac command which
- *  matches vdev and cmd type
+ * wlan_serialization_get_vdev_active_cmd_type() - Return cmd type of the
+ *  active command for the given vdev
  * @vdev: vdev object
  *
  * This API fetches command type of the command in the vdev active queue
@@ -559,4 +563,17 @@ void *wlan_serialization_get_active_cmd(
 
 enum wlan_serialization_cmd_type
 wlan_serialization_get_vdev_active_cmd_type(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_ser_get_cmd_activation_status - Return active command status
+ * @vdev: vdev object
+ *
+ * This API fetches active command state in the vdev active queue
+ *
+ * Return: success if CMD_MARKED_FOR_ACTIVATION bit is set, else fail
+ */
+
+QDF_STATUS
+wlan_ser_get_cmd_activation_status(struct wlan_objmgr_vdev *vdev);
+
 #endif

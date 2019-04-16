@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -30,6 +30,26 @@
 #define hal_warn(params...) QDF_TRACE_WARN(QDF_MODULE_ID_TXRX, params)
 #define hal_info(params...) QDF_TRACE_INFO(QDF_MODULE_ID_TXRX, params)
 #define hal_debug(params...) QDF_TRACE_DEBUG(QDF_MODULE_ID_TXRX, params)
+#ifdef ENABLE_VERBOSE_DEBUG
+extern bool is_hal_verbose_debug_enabled;
+#define hal_verbose_debug(params...) \
+	if (unlikely(is_hal_verbose_debug_enabled)) \
+		do {\
+			QDF_TRACE_DEBUG(QDF_MODULE_ID_TXRX, params); \
+		} while (0)
+#define hal_verbose_hex_dump(params...) \
+	if (unlikely(is_hal_verbose_debug_enabled)) \
+		do {\
+			QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_TXRX, \
+					   QDF_TRACE_LEVEL_DEBUG, \
+					   params); \
+		} while (0)
+#else
+#define hal_verbose_debug(params...) QDF_TRACE_DEBUG(QDF_MODULE_ID_TXRX, params)
+#define hal_verbose_hex_dump(params...) \
+		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_DEBUG, \
+				   params)
+#endif
 
 
 /* TBD: This should be movded to shared HW header file */
@@ -323,6 +343,11 @@ struct hal_hw_txrx_ops {
 				void *wbm_er_info);
 	void (*hal_rx_dump_mpdu_start_tlv)(void *mpdustart,
 						uint8_t dbg_level);
+
+	void (*hal_tx_set_pcp_tid_map)(void *hal_soc, uint8_t *map);
+	void (*hal_tx_update_pcp_tid_map)(void *hal_soc, uint8_t pcp,
+					  uint8_t id);
+	void (*hal_tx_set_tidmap_prty)(void *hal_soc, uint8_t prio);
 };
 
 /**

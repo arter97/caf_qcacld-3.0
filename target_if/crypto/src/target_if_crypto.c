@@ -139,7 +139,7 @@ QDF_STATUS target_if_crypto_set_key(struct wlan_objmgr_vdev *vdev,
 	}
 	params.vdev_id = wlan_vdev_get_id(vdev);
 	params.key_idx = req->keyix;
-	qdf_mem_copy(params.peer_mac, req->macaddr, IEEE80211_ADDR_LEN);
+	qdf_mem_copy(params.peer_mac, req->macaddr, QDF_MAC_ADDR_SIZE);
 	pdev_wmi_handle = GET_WMI_HDL_FROM_PDEV(pdev);
 	if (!pdev_wmi_handle) {
 		target_if_err("Invalid PDEV WMI handle");
@@ -182,6 +182,8 @@ QDF_STATUS target_if_crypto_set_key(struct wlan_objmgr_vdev *vdev,
 
 	switch (req->cipher_type) {
 	case WLAN_CRYPTO_CIPHER_WEP:
+	case WLAN_CRYPTO_CIPHER_WEP_40:
+	case WLAN_CRYPTO_CIPHER_WEP_104:
 		def_tx_idx = wlan_crypto_get_default_key_idx(vdev, false);
 		if (pairwise && params.key_idx == def_tx_idx)
 			params.key_flags |= TX_USAGE;
@@ -203,6 +205,7 @@ QDF_STATUS target_if_crypto_set_key(struct wlan_objmgr_vdev *vdev,
 	params.key_len = req->keylen;
 	if (peer) {
 		/* Set PN check & security type in data path */
+		qdf_mem_copy(&pn[0], &params.key_rsc_ctr, sizeof(pn));
 		cdp_set_pn_check(soc, txrx_vdev, peer, sec_type, pn);
 		cdp_set_key(soc, peer, pairwise, (uint32_t *)(req->keyval +
 			    WLAN_CRYPTO_IV_SIZE + WLAN_CRYPTO_MIC_LEN));

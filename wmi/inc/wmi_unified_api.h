@@ -116,7 +116,8 @@ typedef qdf_nbuf_t wmi_buf_t;
 #define WMI_LOGP(args ...) \
 	QDF_TRACE(QDF_MODULE_ID_WMI, QDF_TRACE_LEVEL_FATAL, ## args)
 
-
+/* Number of bits to shift to combine 32 bit integer to 64 bit */
+#define WMI_LOWER_BITS_SHIFT_32	0x20
 
 #define PHYERROR_MAX_BUFFER_LENGTH 0x7F000000
 
@@ -164,6 +165,9 @@ enum wmi_rx_exec_ctx {
  *  @param osdev            : NIC device
  *  @param target_type      : type of supported wmi command
  *  @param use_cookie       : flag to indicate cookie based allocation
+ *  @param enable_vdev_pdev_param_conversion : To enable pdev vdev parametric
+ *                                             id conversion from host type to
+ *                                             target type
  *  @param ops              : handle to wmi ops
  *  @psoc                   : objmgr psoc
  *  @max_commands           : max commands
@@ -173,6 +177,7 @@ struct wmi_unified_attach_params {
 	enum wmi_target_type target_type;
 	bool use_cookie;
 	bool is_async_ep;
+	bool enable_vdev_pdev_param_conversion;
 	struct wmi_rx_ops *rx_ops;
 	struct wlan_objmgr_psoc *psoc;
 	uint16_t max_commands;
@@ -371,6 +376,16 @@ int wmi_get_pending_cmds(wmi_unified_t wmi_handle);
 void wmi_set_target_suspend(wmi_unified_t wmi_handle, bool val);
 
 /**
+ * wmi_is_target_suspended() - WMI API to check target suspend state
+ * @wmi_handle: handle to WMI.
+ *
+ * WMI API to check target suspend state
+ *
+ * Return: true if target is suspended, else false.
+ */
+bool wmi_is_target_suspended(struct wmi_unified *wmi_handle);
+
+/**
  * WMI API to set bus suspend state
  * @param wmi_handle:	handle to WMI.
  * @param val:		suspend state boolean
@@ -456,7 +471,7 @@ uint16_t wmi_get_max_msg_len(wmi_unified_t wmi_handle);
 
 
 QDF_STATUS wmi_unified_vdev_create_send(void *wmi_hdl,
-				 uint8_t macaddr[IEEE80211_ADDR_LEN],
+				 uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 				 struct vdev_create_params *param);
 
 QDF_STATUS wmi_unified_vdev_delete_send(void *wmi_hdl,
@@ -478,7 +493,7 @@ QDF_STATUS wmi_unified_vdev_stop_send(void *wmi_hdl,
 					uint8_t vdev_id);
 
 QDF_STATUS wmi_unified_vdev_up_send(void *wmi_hdl,
-			     uint8_t bssid[IEEE80211_ADDR_LEN],
+			     uint8_t bssid[QDF_MAC_ADDR_SIZE],
 				 struct vdev_up_params *params);
 
 QDF_STATUS wmi_unified_vdev_down_send(void *wmi_hdl,
@@ -507,22 +522,22 @@ QDF_STATUS wmi_unified_sifs_trigger_send(void *wmi_hdl,
 
 QDF_STATUS wmi_unified_peer_delete_send(void *wmi_hdl,
 				    uint8_t
-				    peer_addr[IEEE80211_ADDR_LEN],
+				    peer_addr[QDF_MAC_ADDR_SIZE],
 				    uint8_t vdev_id);
 
 QDF_STATUS wmi_unified_peer_flush_tids_send(void *wmi_hdl,
-					 uint8_t peer_addr[IEEE80211_ADDR_LEN],
+					 uint8_t peer_addr[QDF_MAC_ADDR_SIZE],
 					 struct peer_flush_params *param);
 
 QDF_STATUS wmi_set_peer_param_send(void *wmi_hdl,
-				uint8_t peer_addr[IEEE80211_ADDR_LEN],
+				uint8_t peer_addr[QDF_MAC_ADDR_SIZE],
 				struct peer_set_params *param);
 
 QDF_STATUS wmi_unified_peer_create_send(void *wmi_hdl,
 					struct peer_create_params *param);
 
 QDF_STATUS wmi_unified_stats_request_send(wmi_unified_t wmi_handle,
-					  uint8_t macaddr[IEEE80211_ADDR_LEN],
+					  uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 					  struct stats_request_params *param);
 
 QDF_STATUS wmi_unified_green_ap_ps_send(void *wmi_hdl,
@@ -564,7 +579,7 @@ QDF_STATUS wmi_unified_peer_based_pktlog_send(void *wmi_hdl,
 					      uint8_t enb_dsb);
 #else
 QDF_STATUS wmi_unified_packet_log_enable_send(void *wmi_hdl,
-				uint8_t macaddr[IEEE80211_ADDR_LEN],
+				uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 				struct packet_enable_params *param);
 #endif
 
@@ -593,7 +608,7 @@ QDF_STATUS wmi_unified_sta_ps_cmd_send(void *wmi_hdl,
 				struct sta_ps_params *param);
 
 QDF_STATUS wmi_unified_ap_ps_cmd_send(void *wmi_hdl,
-				uint8_t macaddr[IEEE80211_ADDR_LEN],
+				uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 				struct ap_ps_params *param);
 
 QDF_STATUS wmi_unified_scan_start_cmd_send(void *wmi_hdl,
@@ -688,16 +703,37 @@ QDF_STATUS wmi_unified_pno_start_cmd(void *wmi_hdl,
 QDF_STATUS wmi_unified_nlo_mawc_cmd(void *wmi_hdl,
 		struct nlo_mawc_params *params);
 
-QDF_STATUS wmi_unified_process_ll_stats_clear_cmd
-	(void *wmi_hdl, const struct ll_stats_clear_params *clear_req,
-	 uint8_t addr[IEEE80211_ADDR_LEN]);
+#ifdef WLAN_FEATURE_LINK_LAYER_STATS
+/**
+ * wmi_unified_process_ll_stats_clear_cmd() - clear link layer stats
+ * @wmi_handle: wmi handle
+ * @clear_req: ll stats clear request command params
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_process_ll_stats_clear_cmd(wmi_unified_t wmi_handle,
+				 const struct ll_stats_clear_params *clear_req);
 
-QDF_STATUS wmi_unified_process_ll_stats_set_cmd
-	(void *wmi_hdl, const struct ll_stats_set_params *set_req);
+/**
+ * wmi_unified_process_ll_stats_set_cmd() - link layer stats set request
+ * @wmi_handle: wmi handle
+ * @set_req: ll stats set request command params
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_process_ll_stats_set_cmd(wmi_unified_t wmi_handle,
+				 const struct ll_stats_set_params *set_req);
 
-QDF_STATUS wmi_unified_process_ll_stats_get_cmd
-	(void *wmi_hdl, const struct ll_stats_get_params  *get_req,
-		 uint8_t addr[IEEE80211_ADDR_LEN]);
+/**
+ * wmi_unified_process_ll_stats_get_cmd() - link layer stats get request
+ * @wmi_handle: wmi handle
+ * @get_req: ll stats get request command params
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_process_ll_stats_get_cmd(wmi_unified_t wmi_handle,
+				 const struct ll_stats_get_params *get_req);
+#endif /* WLAN_FEATURE_LINK_LAYER_STATS */
 
 /**
  * wmi_unified_congestion_request_cmd() - send request to fw to get CCA
@@ -980,23 +1016,23 @@ QDF_STATUS wmi_unified_remove_beacon_filter_cmd_send(void *wmi_hdl,
 				struct remove_beacon_filter_params *param);
 
 QDF_STATUS wmi_unified_addba_clearresponse_cmd_send(void *wmi_hdl,
-				uint8_t macaddr[IEEE80211_ADDR_LEN],
+				uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 				struct addba_clearresponse_params *param);
 
 QDF_STATUS wmi_unified_addba_send_cmd_send(void *wmi_hdl,
-				uint8_t macaddr[IEEE80211_ADDR_LEN],
+				uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 				struct addba_send_params *param);
 
 QDF_STATUS wmi_unified_delba_send_cmd_send(void *wmi_hdl,
-				uint8_t macaddr[IEEE80211_ADDR_LEN],
+				uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 				struct delba_send_params *param);
 
 QDF_STATUS wmi_unified_addba_setresponse_cmd_send(void *wmi_hdl,
-				uint8_t macaddr[IEEE80211_ADDR_LEN],
+				uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 				struct addba_setresponse_params *param);
 
 QDF_STATUS wmi_unified_singleamsdu_cmd_send(void *wmi_hdl,
-				uint8_t macaddr[IEEE80211_ADDR_LEN],
+				uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 				struct singleamsdu_params *param);
 
 QDF_STATUS wmi_unified_mu_scan_cmd_send(void *wmi_hdl,
@@ -1197,6 +1233,10 @@ QDF_STATUS wmi_extract_peer_extd_stats(void *wmi_hdl, void *evt_buf,
 			uint32_t index,
 			wmi_host_peer_extd_stats *peer_extd_stats);
 
+QDF_STATUS wmi_extract_peer_adv_stats(wmi_unified_t wmi_handle, void *evt_buf,
+				      struct wmi_host_peer_adv_stats
+				      *peer_adv_stats);
+
 QDF_STATUS wmi_extract_bss_chan_info_event(void *wmi_hdl, void *evt_buf,
 			wmi_host_pdev_bss_chan_info_event *bss_chan_info);
 
@@ -1344,6 +1384,30 @@ QDF_STATUS wmi_unified_dfs_phyerr_offload_en_cmd(void *wmi_hdl,
  */
 QDF_STATUS wmi_unified_dfs_phyerr_offload_dis_cmd(void *wmi_hdl,
 		uint32_t pdev_id);
+
+#ifdef QCA_SUPPORT_AGILE_DFS
+/**
+ * wmi_unified_send_vdev_adfs_ch_cfg_cmd() - send adfs channel config command
+ * @wmi_handle: wmi handle
+ * @vdev_adfs_ch_cfg_params: adfs channel config params
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wmi_unified_send_vdev_adfs_ch_cfg_cmd(void *wmi_hdl,
+				      struct vdev_adfs_ch_cfg_params *param);
+
+/**
+ * wmi_unified_send_vdev_adfs_ocac_abort_cmd() - send adfs o-cac abort command
+ * @wmi_handle: wmi handle
+ * @vdev_adfs_abort_params: adfs channel o-cac abort params
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wmi_unified_send_vdev_adfs_ocac_abort_cmd(void *wmi_hdl,
+					  struct vdev_adfs_abort_params *param);
+#endif
 
 QDF_STATUS wmi_unified_set_country_cmd_send(void *wmi_hdl,
 				struct set_country *param);
@@ -1731,6 +1795,19 @@ enum cdp_sec_type wlan_crypto_cipher_to_cdp_sec_type(
 
 #endif
 
+/**
+ * wmi_unified_send_mws_coex_req_cmd() - WMI function to send coex req cmd
+ * @wmi_hdl: wmi handle
+ * @vdev_id: Vdev Id
+ * @cmd_id: Coex cmd for which info is required
+ *
+ * Send wmi coex command to fw.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wmi_unified_send_mws_coex_req_cmd(struct wmi_unified *wmi_handle,
+					     uint32_t vdev_id, uint32_t cmd_id);
+
 #ifdef WLAN_CFR_ENABLE
 /**
  * wmi_unified_send_peer_cfr_capture_cmd() - WMI function to start CFR capture
@@ -1743,5 +1820,17 @@ enum cdp_sec_type wlan_crypto_cipher_to_cdp_sec_type(
 QDF_STATUS
 wmi_unified_send_peer_cfr_capture_cmd(void *wmi_hdl,
 				      struct peer_cfr_params *param);
+/**
+ * wmi_extract_cfr_peer_tx_event_param() - WMI function to extract cfr tx event
+ * for a peer
+ * @wmi_hdl: WMI handle
+ * @evt_buf: Buffer holding event data
+ * @peer_tx_event: pointer to hold tx event data
+ *
+ * Return: QDF_STATUS_SUCCESS if success, else returns proper error code.
+ */
+QDF_STATUS
+wmi_extract_cfr_peer_tx_event_param(void *wmi_hdl, void *evt_buf,
+				    wmi_cfr_peer_tx_event_param *peer_tx_event);
 #endif /* WLAN_CFR_ENABLE */
 #endif /* _WMI_UNIFIED_API_H_ */

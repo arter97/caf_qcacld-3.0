@@ -320,7 +320,7 @@ qdf_export_symbol(qdf_snprintf);
  * Return: None
  */
 void qdf_trace_msg(QDF_MODULE_ID module, QDF_TRACE_LEVEL level,
-		   char *str_format, ...)
+		   const char *str_format, ...)
 {
 	va_list val;
 
@@ -331,7 +331,7 @@ void qdf_trace_msg(QDF_MODULE_ID module, QDF_TRACE_LEVEL level,
 qdf_export_symbol(qdf_trace_msg);
 
 void qdf_vtrace_msg(QDF_MODULE_ID module, QDF_TRACE_LEVEL level,
-		    char *str_format, va_list val)
+		    const char *str_format, va_list val)
 {
 	qdf_trace_msg_cmn(qdf_pidx, module, level, str_format, val);
 }
@@ -449,7 +449,7 @@ void qdf_trace_enable(uint32_t bitmask_of_module_id, uint8_t enable)
 	} else {
 		if (enable) {
 			for (i = 0; i < QDF_MODULE_ID_MAX; i++) {
-				if (NULL != qdf_trace_restore_cb_table[i]) {
+				if (qdf_trace_restore_cb_table[i]) {
 					qdf_trace_cb_table[i] =
 						qdf_trace_restore_cb_table[i];
 				}
@@ -536,7 +536,7 @@ void qdf_trace(uint8_t module, uint8_t code, uint16_t session, uint32_t data)
 		return;
 
 	/* if module is not registered, don't record for that module */
-	if (NULL == qdf_trace_cb_table[module])
+	if (!qdf_trace_cb_table[module])
 		return;
 
 	qdf_get_time_of_the_day_in_hr_min_sec_usec(time, sizeof(time));
@@ -710,7 +710,7 @@ void qdf_trace_dump_all(void *p_mac, uint8_t code, uint8_t session,
 		spin_unlock(&ltrace_lock);
 		for (;; ) {
 			if ((code == 0 || (code == p_record.code)) &&
-			    (qdf_trace_cb_table[p_record.module] != NULL)) {
+			    (qdf_trace_cb_table[p_record.module])) {
 				if (0 == bitmask_of_module) {
 					qdf_trace_cb_table[p_record.
 							   module] (p_mac,
@@ -799,7 +799,7 @@ QDF_STATUS qdf_state_info_dump_all(char *buf, uint16_t size,
 	char *buf_ptr = buf;
 
 	for (module = 0; module < QDF_MODULE_ID_MAX; module++) {
-		if (NULL != qdf_state_info_table[module]) {
+		if (qdf_state_info_table[module]) {
 			qdf_state_info_table[module](&buf_ptr, &buf_len);
 			if (!buf_len) {
 				ret = QDF_STATUS_E_NOMEM;
@@ -917,10 +917,11 @@ void qdf_dp_trace_init(bool live_mode_config, uint8_t thresh,
 						qdf_dp_display_ptr_record;
 	qdf_dp_trace_cb_table[QDF_DP_TRACE_EAPOL_PACKET_RECORD] =
 	qdf_dp_trace_cb_table[QDF_DP_TRACE_DHCP_PACKET_RECORD] =
+						qdf_dp_display_proto_pkt_always;
 	qdf_dp_trace_cb_table[QDF_DP_TRACE_ARP_PACKET_RECORD] =
 	qdf_dp_trace_cb_table[QDF_DP_TRACE_ICMP_PACKET_RECORD] =
 	qdf_dp_trace_cb_table[QDF_DP_TRACE_ICMPv6_PACKET_RECORD] =
-						qdf_dp_display_proto_pkt;
+						qdf_dp_display_proto_pkt_debug;
 	qdf_dp_trace_cb_table[QDF_DP_TRACE_MGMT_PACKET_RECORD] =
 					qdf_dp_display_mgmt_pkt;
 	qdf_dp_trace_cb_table[QDF_DP_TRACE_EVENT_RECORD] =
@@ -1931,8 +1932,8 @@ void qdf_dp_trace_record_event(enum QDF_DP_TRACE_ID code, uint8_t vdev_id,
 qdf_export_symbol(qdf_dp_trace_record_event);
 
 
-void qdf_dp_display_proto_pkt(struct qdf_dp_trace_record_s *record,
-			      uint16_t index, uint8_t pdev_id, uint8_t info)
+void qdf_dp_display_proto_pkt_debug(struct qdf_dp_trace_record_s *record,
+				    uint16_t index, uint8_t pdev_id, uint8_t info)
 {
 	int loc;
 	char prepend_str[QDF_DP_TRACE_PREPEND_STR_SIZE];
@@ -1952,7 +1953,27 @@ void qdf_dp_display_proto_pkt(struct qdf_dp_trace_record_s *record,
 		      qdf_dp_dir_to_str(buf->dir),
 		      QDF_MAC_ADDR_ARRAY(buf->da.bytes));
 }
-qdf_export_symbol(qdf_dp_display_proto_pkt);
+qdf_export_symbol(qdf_dp_display_proto_pkt_debug);
+
+void qdf_dp_display_proto_pkt_always(struct qdf_dp_trace_record_s *record,
+			      uint16_t index, uint8_t pdev_id, uint8_t info)
+{
+	int loc;
+	char prepend_str[QDF_DP_TRACE_PREPEND_STR_SIZE];
+	struct qdf_dp_trace_proto_buf *buf =
+		(struct qdf_dp_trace_proto_buf *)record->data;
+
+	qdf_mem_zero(prepend_str, sizeof(prepend_str));
+	loc = qdf_dp_trace_fill_meta_str(prepend_str, sizeof(prepend_str),
+					 index, info, record);
+	qdf_info("%s [%d] [%s] SA: "QDF_MAC_ADDR_STR " %s DA: "
+		 QDF_MAC_ADDR_STR, prepend_str,
+		 buf->vdev_id, qdf_dp_subtype_to_str(buf->subtype),
+		 QDF_MAC_ADDR_ARRAY(buf->sa.bytes),
+		 qdf_dp_dir_to_str(buf->dir),
+		 QDF_MAC_ADDR_ARRAY(buf->da.bytes));
+}
+qdf_export_symbol(qdf_dp_display_proto_pkt_always);
 
 void qdf_dp_trace_proto_pkt(enum QDF_DP_TRACE_ID code, uint8_t vdev_id,
 		uint8_t *sa, uint8_t *da, enum qdf_proto_type type,
@@ -2870,6 +2891,7 @@ struct category_name_info g_qdf_category_name[MAX_SUPPORTED_CATEGORY] = {
 	[QDF_MODULE_ID_SM_ENGINE] = {"SM_ENG"},
 	[QDF_MODULE_ID_CMN_MLME] = {"CMN_MLME"},
 	[QDF_MODULE_ID_BSSCOLOR] = {"BSSCOLOR"},
+	[QDF_MODULE_ID_CFR] = {"CFR"},
 	[QDF_MODULE_ID_ANY] = {"ANY"},
 };
 qdf_export_symbol(g_qdf_category_name);
@@ -2908,13 +2930,14 @@ void qdf_trace_display(void)
 }
 qdf_export_symbol(qdf_trace_display);
 
-#ifdef CONFIG_MCL
-#define print_to_console(str)
-#else
+#ifdef QDF_TRACE_PRINT_ENABLE
 static inline void print_to_console(char *str_buffer)
 {
 	pr_err("%s\n", str_buffer);
 }
+#else
+
+#define print_to_console(str)
 #endif
 
 #ifdef MULTI_IF_NAME
@@ -3179,7 +3202,7 @@ static void process_qdf_dbg_arr_param(struct category_info *cinfo,
 	mod_val_str = qdf_dbg_arr[array_index];
 	mod_str = strsep(&mod_val_str, "=");
 	val_str = mod_val_str;
-	if (val_str == NULL) {
+	if (!val_str) {
 		pr_info("qdf_dbg_arr: %s not in the <mod>=<val> form\n",
 				mod_str);
 		return;
@@ -3323,6 +3346,7 @@ static void set_default_trace_levels(struct category_info *cinfo)
 		[QDF_MODULE_ID_SM_ENGINE] = QDF_TRACE_LEVEL_ERROR,
 		[QDF_MODULE_ID_CMN_MLME] = QDF_TRACE_LEVEL_INFO,
 		[QDF_MODULE_ID_BSSCOLOR] = QDF_TRACE_LEVEL_ERROR,
+		[QDF_MODULE_ID_CFR] = QDF_TRACE_LEVEL_ERROR,
 		[QDF_MODULE_ID_ANY] = QDF_TRACE_LEVEL_INFO,
 	};
 

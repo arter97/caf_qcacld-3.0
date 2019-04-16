@@ -42,7 +42,7 @@
 	 - REG_CH_TO_FREQ(reg_get_chan_enum(curchan))	\
 	 > REG_SBS_SEPARATION_THRESHOLD)
 
-#ifdef CONFIG_MCL_REGDB
+#ifdef CONFIG_REG_CLIENT
 /**
  * reg_chan_has_dfs_attribute() - check channel has dfs attribue or not
  * @ch: channel number.
@@ -56,21 +56,30 @@ bool reg_chan_has_dfs_attribute(struct wlan_objmgr_pdev *pdev, uint32_t ch);
 /**
  * reg_set_band() - Sets the band information for the PDEV
  * @pdev: The physical dev to set the band for
- * @band: The set band parameters to configure for the pysical device
+ * @band: The set band parameters to configure for the physical device
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS reg_set_band(struct wlan_objmgr_pdev *pdev, enum band_info band);
 
+/**
+ * reg_get_band() - Get the band information for the PDEV
+ * @pdev: The physical dev to get the band for
+ * @band: The band parameters of the physical device
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS reg_get_band(struct wlan_objmgr_pdev *pdev, enum band_info *band);
+
 #ifdef DISABLE_CHANNEL_LIST
 /**
- * reg_restore_cached_channels() - Cache the current state of the channles
+ * reg_restore_cached_channels() - Cache the current state of the channels
  * @pdev: The physical dev to cache the channels for
  */
 QDF_STATUS reg_restore_cached_channels(struct wlan_objmgr_pdev *pdev);
 
 /**
- * reg_cache_channel_state() - Cache the current state of the channles
+ * reg_cache_channel_state() - Cache the current state of the channels
  * @pdev: The physical dev to cache the channels for
  * @channel_list: List of the channels for which states needs to be cached
  * @num_channels: Number of channels in the list
@@ -385,7 +394,7 @@ bool reg_ignore_default_country(struct wlan_regulatory_psoc_priv_obj *soc_reg,
 }
 #endif
 
-#if defined(WLAN_FEATURE_DSRC) && defined(CONFIG_MCL_REGDB)
+#if defined(WLAN_FEATURE_DSRC) && defined(CONFIG_REG_CLIENT)
 /**
  * reg_is_dsrc_chan () - Checks the channel for DSRC or not
  * @chan: channel
@@ -411,7 +420,7 @@ reg_is_etsi13_srd_chan_allowed_master_mode(struct wlan_objmgr_pdev *pdev)
 {
 	return true;
 }
-#elif defined(CONFIG_MCL_REGDB)
+#elif defined(CONFIG_REG_CLIENT)
 static inline bool reg_is_dsrc_chan(struct wlan_objmgr_pdev *pdev,
 				    uint32_t chan)
 {
@@ -469,7 +478,7 @@ static inline bool reg_is_etsi13_srd_chan(struct wlan_objmgr_pdev *pdev,
 }
 #endif
 
-#if defined(DISABLE_CHANNEL_LIST) && defined(CONFIG_MCL_REGDB)
+#if defined(DISABLE_CHANNEL_LIST) && defined(CONFIG_REG_CLIENT)
 /**
  * set_disable_channel_state() - Set disable channel state flag
  * @pdev_priv_obj: Pointer to pdev object

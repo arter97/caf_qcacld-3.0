@@ -186,51 +186,51 @@ static void process_ieee_hdr(void *data)
 
 	if (dir == IEEE80211_FC1_DIR_TODS) {
 		frm_hdr.bssid_tail =
-			(wh->i_addr1[IEEE80211_ADDR_LEN - 2] << 8) | (wh->
+			(wh->i_addr1[QDF_MAC_ADDR_SIZE - 2] << 8) | (wh->
 								      i_addr1
-								      [IEEE80211_ADDR_LEN
+								      [QDF_MAC_ADDR_SIZE
 								       - 1]);
 		frm_hdr.sa_tail =
-			(wh->i_addr2[IEEE80211_ADDR_LEN - 2] << 8) | (wh->
+			(wh->i_addr2[QDF_MAC_ADDR_SIZE - 2] << 8) | (wh->
 								      i_addr2
-								      [IEEE80211_ADDR_LEN
+								      [QDF_MAC_ADDR_SIZE
 								       - 1]);
 		frm_hdr.da_tail =
-			(wh->i_addr3[IEEE80211_ADDR_LEN - 2] << 8) | (wh->
+			(wh->i_addr3[QDF_MAC_ADDR_SIZE - 2] << 8) | (wh->
 								      i_addr3
-								      [IEEE80211_ADDR_LEN
+								      [QDF_MAC_ADDR_SIZE
 								       - 1]);
 	} else if (dir == IEEE80211_FC1_DIR_FROMDS) {
 		frm_hdr.bssid_tail =
-			(wh->i_addr2[IEEE80211_ADDR_LEN - 2] << 8) | (wh->
+			(wh->i_addr2[QDF_MAC_ADDR_SIZE - 2] << 8) | (wh->
 								      i_addr2
-								      [IEEE80211_ADDR_LEN
+								      [QDF_MAC_ADDR_SIZE
 								       - 1]);
 		frm_hdr.sa_tail =
-			(wh->i_addr3[IEEE80211_ADDR_LEN - 2] << 8) | (wh->
+			(wh->i_addr3[QDF_MAC_ADDR_SIZE - 2] << 8) | (wh->
 								      i_addr3
-								      [IEEE80211_ADDR_LEN
+								      [QDF_MAC_ADDR_SIZE
 								       - 1]);
 		frm_hdr.da_tail =
-			(wh->i_addr1[IEEE80211_ADDR_LEN - 2] << 8) | (wh->
+			(wh->i_addr1[QDF_MAC_ADDR_SIZE - 2] << 8) | (wh->
 								      i_addr1
-								      [IEEE80211_ADDR_LEN
+								      [QDF_MAC_ADDR_SIZE
 								       - 1]);
 	} else {
 		frm_hdr.bssid_tail =
-			(wh->i_addr3[IEEE80211_ADDR_LEN - 2] << 8) | (wh->
+			(wh->i_addr3[QDF_MAC_ADDR_SIZE - 2] << 8) | (wh->
 								      i_addr3
-								      [IEEE80211_ADDR_LEN
+								      [QDF_MAC_ADDR_SIZE
 								       - 1]);
 		frm_hdr.sa_tail =
-			(wh->i_addr2[IEEE80211_ADDR_LEN - 2] << 8) | (wh->
+			(wh->i_addr2[QDF_MAC_ADDR_SIZE - 2] << 8) | (wh->
 								      i_addr2
-								      [IEEE80211_ADDR_LEN
+								      [QDF_MAC_ADDR_SIZE
 								       - 1]);
 		frm_hdr.da_tail =
-			(wh->i_addr1[IEEE80211_ADDR_LEN - 2] << 8) | (wh->
+			(wh->i_addr1[QDF_MAC_ADDR_SIZE - 2] << 8) | (wh->
 								      i_addr1
-								      [IEEE80211_ADDR_LEN
+								      [QDF_MAC_ADDR_SIZE
 								       - 1]);
 	}
 }
@@ -303,7 +303,7 @@ fill_ieee80211_hdr_data(struct cdp_pdev *pdev,
 
 		qdf_nbuf_peek_header(netbuf, &addr, &len);
 
-		if (len < (2 * IEEE80211_ADDR_LEN)) {
+		if (len < (2 * QDF_MAC_ADDR_SIZE)) {
 			qdf_print("TX frame does not have a valid address");
 			return;
 		}
@@ -315,15 +315,15 @@ fill_ieee80211_hdr_data(struct cdp_pdev *pdev,
 
 		vap_addr = wma_get_vdev_address_by_vdev_id(vdev_id);
 
-		frm_hdr.da_tail = (addr[IEEE80211_ADDR_LEN - 2] << 8) |
-				  (addr[IEEE80211_ADDR_LEN - 1]);
+		frm_hdr.da_tail = (addr[QDF_MAC_ADDR_SIZE - 2] << 8) |
+				  (addr[QDF_MAC_ADDR_SIZE - 1]);
 		frm_hdr.sa_tail =
-			(addr[2 * IEEE80211_ADDR_LEN - 2] << 8) |
-			(addr[2 * IEEE80211_ADDR_LEN - 1]);
+			(addr[2 * QDF_MAC_ADDR_SIZE - 2] << 8) |
+			(addr[2 * QDF_MAC_ADDR_SIZE - 1]);
 		if (vap_addr) {
 			frm_hdr.bssid_tail =
-				(vap_addr[IEEE80211_ADDR_LEN - 2] << 8) |
-				(vap_addr[IEEE80211_ADDR_LEN - 1]);
+				(vap_addr[QDF_MAC_ADDR_SIZE - 2] << 8) |
+				(vap_addr[QDF_MAC_ADDR_SIZE - 1]);
 		} else {
 			frm_hdr.bssid_tail = 0x0000;
 		}
@@ -1424,7 +1424,7 @@ int process_rx_desc_remote(void *pdev, void *data)
 	rxstat_log.rx_desc = (void *)pktlog_getbuf(pl_dev, pl_info,
 						  log_size, &pl_hdr);
 
-	if (rxstat_log.rx_desc == NULL) {
+	if (!rxstat_log.rx_desc) {
 		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_DEBUG,
 				"%s: Rx descriptor is NULL", __func__);
 		return -EFAULT;
@@ -1456,7 +1456,7 @@ process_pktlog_lite(void *context, void *log_data, uint16_t log_type)
 	log_size = pl_hdr.size;
 	rxstat_log.rx_desc = (void *)pktlog_getbuf(pl_dev, pl_info,
 						   log_size, &pl_hdr);
-	if (rxstat_log.rx_desc == NULL) {
+	if (!rxstat_log.rx_desc) {
 		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_DEBUG,
 			"%s: Rx descriptor is NULL", __func__);
 		return -EFAULT;

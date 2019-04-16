@@ -95,9 +95,10 @@ static void dp_rx_return_head_frag_desc(struct dp_peer *peer,
 	union dp_rx_desc_list_elem_t *head = NULL;
 	union dp_rx_desc_list_elem_t *tail = NULL;
 
+	pdev = peer->vdev->pdev;
+	soc = pdev->soc;
+
 	if (peer->rx_tid[tid].head_frag_desc) {
-		pdev = peer->vdev->pdev;
-		soc = pdev->soc;
 		dp_rxdma_srng = &pdev->rx_refill_buf_ring;
 		rx_desc_pool = &soc->rx_desc_buf[pdev->pdev_id];
 
@@ -105,6 +106,15 @@ static void dp_rx_return_head_frag_desc(struct dp_peer *peer,
 					    peer->rx_tid[tid].head_frag_desc);
 		dp_rx_buffers_replenish(soc, 0, dp_rxdma_srng, rx_desc_pool,
 					1, &head, &tail);
+	}
+
+	if (peer->rx_tid[tid].dst_ring_desc) {
+		if (dp_rx_link_desc_return(soc,
+					   peer->rx_tid[tid].dst_ring_desc,
+					   HAL_BM_ACTION_PUT_IN_IDLE_LIST) !=
+		    QDF_STATUS_SUCCESS)
+			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+				  "%s: Failed to return link desc", __func__);
 	}
 }
 
@@ -120,8 +130,6 @@ static void dp_rx_return_head_frag_desc(struct dp_peer *peer,
 void dp_rx_reorder_flush_frag(struct dp_peer *peer,
 			 unsigned int tid)
 {
-	struct dp_soc *soc;
-
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO_HIGH,
 		  FL("Flushing TID %d"), tid);
 
@@ -129,18 +137,6 @@ void dp_rx_reorder_flush_frag(struct dp_peer *peer,
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 					"%s: NULL peer", __func__);
 		return;
-	}
-
-	soc = peer->vdev->pdev->soc;
-
-	if (peer->rx_tid[tid].dst_ring_desc) {
-		if (dp_rx_link_desc_return(soc,
-					peer->rx_tid[tid].dst_ring_desc,
-					HAL_BM_ACTION_PUT_IN_IDLE_LIST) !=
-					QDF_STATUS_SUCCESS)
-			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-					"%s: Failed to return link desc",
-					__func__);
 	}
 
 	dp_rx_return_head_frag_desc(peer, tid);
@@ -359,7 +355,7 @@ static QDF_STATUS dp_rx_defrag_fraglist_insert(struct dp_peer *peer, unsigned ti
 			cur = frag;
 			*head_addr = frag; /* head pointer to be updated */
 		} else {
-			while ((cur_fragno > head_fragno) && cur != NULL) {
+			while ((cur_fragno > head_fragno) && cur) {
 				prev = cur;
 				cur = qdf_nbuf_next(cur);
 				rx_desc_info = qdf_nbuf_data(cur);
@@ -539,7 +535,7 @@ static uint16_t dp_rx_defrag_hdrsize(qdf_nbuf_t nbuf)
 	frm_ctrl_field = hal_rx_get_frame_ctrl_field(rx_tlv_hdr);
 
 	if (to_ds && fr_ds)
-		size += IEEE80211_ADDR_LEN;
+		size += QDF_MAC_ADDR_SIZE;
 
 	if (frm_ctrl_valid) {
 		fc = frm_ctrl_field;
@@ -574,32 +570,32 @@ static void dp_rx_defrag_michdr(const struct ieee80211_frame *wh0,
 	switch (wh->i_fc[1] & IEEE80211_FC1_DIR_MASK) {
 	case IEEE80211_FC1_DIR_NODS:
 		DP_RX_DEFRAG_IEEE80211_ADDR_COPY(hdr, wh->i_addr1); /* DA */
-		DP_RX_DEFRAG_IEEE80211_ADDR_COPY(hdr + IEEE80211_ADDR_LEN,
+		DP_RX_DEFRAG_IEEE80211_ADDR_COPY(hdr + QDF_MAC_ADDR_SIZE,
 					   wh->i_addr2);
 		break;
 	case IEEE80211_FC1_DIR_TODS:
 		DP_RX_DEFRAG_IEEE80211_ADDR_COPY(hdr, wh->i_addr3); /* DA */
-		DP_RX_DEFRAG_IEEE80211_ADDR_COPY(hdr + IEEE80211_ADDR_LEN,
+		DP_RX_DEFRAG_IEEE80211_ADDR_COPY(hdr + QDF_MAC_ADDR_SIZE,
 					   wh->i_addr2);
 		break;
 	case IEEE80211_FC1_DIR_FROMDS:
 		DP_RX_DEFRAG_IEEE80211_ADDR_COPY(hdr, wh->i_addr1); /* DA */
-		DP_RX_DEFRAG_IEEE80211_ADDR_COPY(hdr + IEEE80211_ADDR_LEN,
+		DP_RX_DEFRAG_IEEE80211_ADDR_COPY(hdr + QDF_MAC_ADDR_SIZE,
 					   wh->i_addr3);
 		break;
 	case IEEE80211_FC1_DIR_DSTODS:
 		DP_RX_DEFRAG_IEEE80211_ADDR_COPY(hdr, wh->i_addr3); /* DA */
-		DP_RX_DEFRAG_IEEE80211_ADDR_COPY(hdr + IEEE80211_ADDR_LEN,
+		DP_RX_DEFRAG_IEEE80211_ADDR_COPY(hdr + QDF_MAC_ADDR_SIZE,
 					   wh->i_addr4);
 		break;
 	}
 
 	/*
-	 * Bit 7 is IEEE80211_FC0_SUBTYPE_QOS for data frame, but
+	 * Bit 7 is QDF_IEEE80211_FC0_SUBTYPE_QOS for data frame, but
 	 * it could also be set for deauth, disassoc, action, etc. for
 	 * a mgt type frame. It comes into picture for MFP.
 	 */
-	if (wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_QOS) {
+	if (wh->i_fc[0] & QDF_IEEE80211_FC0_SUBTYPE_QOS) {
 		if ((wh->i_fc[1] & IEEE80211_FC1_DIR_MASK) ==
 				IEEE80211_FC1_DIR_DSTODS) {
 			const struct ieee80211_qosframe_addr4 *qwh =
@@ -674,7 +670,7 @@ static QDF_STATUS dp_rx_defrag_mic(const uint8_t *key, qdf_nbuf_t wbuf,
 			break;
 
 		wbuf = qdf_nbuf_next(wbuf);
-		if (wbuf == NULL)
+		if (!wbuf)
 			return QDF_STATUS_E_DEFRAG_ERROR;
 
 		if (space != 0) {
@@ -899,7 +895,7 @@ dp_rx_defrag_nwifi_to_8023(qdf_nbuf_t nbuf, uint16_t hdrsize)
 	union dp_align_mac_addr mac_addr;
 	uint8_t *rx_desc_info = qdf_mem_malloc(RX_PKT_TLVS_LEN);
 
-	if (rx_desc_info == NULL) {
+	if (!rx_desc_info) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 			"%s: Memory alloc failed ! ", __func__);
 		QDF_ASSERT(0);
@@ -928,42 +924,42 @@ dp_rx_defrag_nwifi_to_8023(qdf_nbuf_t nbuf, uint16_t hdrsize)
 		hal_rx_mpdu_get_addr1(rx_desc_info,
 			&mac_addr.raw[0]);
 		qdf_mem_copy(eth_hdr->dest_addr, &mac_addr.raw[0],
-			IEEE80211_ADDR_LEN);
+			QDF_MAC_ADDR_SIZE);
 		hal_rx_mpdu_get_addr2(rx_desc_info,
 			&mac_addr.raw[0]);
 		qdf_mem_copy(eth_hdr->src_addr, &mac_addr.raw[0],
-			IEEE80211_ADDR_LEN);
+			QDF_MAC_ADDR_SIZE);
 		break;
 	case IEEE80211_FC1_DIR_TODS:
 		hal_rx_mpdu_get_addr3(rx_desc_info,
 			&mac_addr.raw[0]);
 		qdf_mem_copy(eth_hdr->dest_addr, &mac_addr.raw[0],
-			IEEE80211_ADDR_LEN);
+			QDF_MAC_ADDR_SIZE);
 		hal_rx_mpdu_get_addr2(rx_desc_info,
 			&mac_addr.raw[0]);
 		qdf_mem_copy(eth_hdr->src_addr, &mac_addr.raw[0],
-			IEEE80211_ADDR_LEN);
+			QDF_MAC_ADDR_SIZE);
 		break;
 	case IEEE80211_FC1_DIR_FROMDS:
 		hal_rx_mpdu_get_addr1(rx_desc_info,
 			&mac_addr.raw[0]);
 		qdf_mem_copy(eth_hdr->dest_addr, &mac_addr.raw[0],
-			IEEE80211_ADDR_LEN);
+			QDF_MAC_ADDR_SIZE);
 		hal_rx_mpdu_get_addr3(rx_desc_info,
 			&mac_addr.raw[0]);
 		qdf_mem_copy(eth_hdr->src_addr, &mac_addr.raw[0],
-			IEEE80211_ADDR_LEN);
+			QDF_MAC_ADDR_SIZE);
 		break;
 
 	case IEEE80211_FC1_DIR_DSTODS:
 		hal_rx_mpdu_get_addr3(rx_desc_info,
 			&mac_addr.raw[0]);
 		qdf_mem_copy(eth_hdr->dest_addr, &mac_addr.raw[0],
-			IEEE80211_ADDR_LEN);
+			QDF_MAC_ADDR_SIZE);
 		hal_rx_mpdu_get_addr4(rx_desc_info,
 			&mac_addr.raw[0]);
 		qdf_mem_copy(eth_hdr->src_addr, &mac_addr.raw[0],
-			IEEE80211_ADDR_LEN);
+			QDF_MAC_ADDR_SIZE);
 		break;
 
 	default:
@@ -1345,7 +1341,7 @@ static QDF_STATUS dp_rx_defrag_save_info_from_ring_desc(void *ring_desc,
 	void *dst_ring_desc = qdf_mem_malloc(
 			sizeof(struct reo_destination_ring));
 
-	if (dst_ring_desc == NULL) {
+	if (!dst_ring_desc) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 			"%s: Memory alloc failed !", __func__);
 		QDF_ASSERT(0);
@@ -1405,11 +1401,7 @@ static QDF_STATUS dp_rx_defrag_store_fragment(struct dp_soc *soc,
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 			"Unknown peer, dropping the fragment");
 
-		qdf_nbuf_free(frag);
-		dp_rx_add_to_free_desc_list(head, tail, rx_desc);
-		*rx_bfs = 1;
-
-		goto end;
+		goto discard_frag;
 	}
 
 	pdev = peer->vdev->pdev;
@@ -1422,12 +1414,9 @@ static QDF_STATUS dp_rx_defrag_store_fragment(struct dp_soc *soc,
 	if (!mpdu_sequence_control_valid) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 			"Invalid MPDU seq control field, dropping MPDU");
-		qdf_nbuf_free(frag);
-		dp_rx_add_to_free_desc_list(head, tail, rx_desc);
-		*rx_bfs = 1;
 
 		qdf_assert(0);
-		goto end;
+		goto discard_frag;
 	}
 
 	mpdu_frame_control_valid =
@@ -1437,12 +1426,9 @@ static QDF_STATUS dp_rx_defrag_store_fragment(struct dp_soc *soc,
 	if (!mpdu_frame_control_valid) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 			"Invalid frame control field, dropping MPDU");
-		qdf_nbuf_free(frag);
-		dp_rx_add_to_free_desc_list(head, tail, rx_desc);
-		*rx_bfs = 1;
 
 		qdf_assert(0);
-		goto end;
+		goto discard_frag;
 	}
 
 	/* Current mpdu sequence */
@@ -1457,10 +1443,7 @@ static QDF_STATUS dp_rx_defrag_store_fragment(struct dp_soc *soc,
 	if (!rx_reorder_array_elem) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 			  "Rcvd Fragmented pkt before peer_tid is setup");
-		qdf_nbuf_free(frag);
-		dp_rx_add_to_free_desc_list(head, tail, rx_desc);
-		*rx_bfs = 1;
-		goto end;
+		goto discard_frag;
 	}
 
 	/*
@@ -1476,12 +1459,9 @@ static QDF_STATUS dp_rx_defrag_store_fragment(struct dp_soc *soc,
 		 */
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 			"Rcvd unfragmented pkt on REO Err srng, dropping");
-		qdf_nbuf_free(frag);
-		dp_rx_add_to_free_desc_list(head, tail, rx_desc);
-		*rx_bfs = 1;
 
 		qdf_assert(0);
-		goto end;
+		goto discard_frag;
 	}
 
 	/* Check if the fragment is for the same sequence or a different one */
@@ -1529,25 +1509,26 @@ static QDF_STATUS dp_rx_defrag_store_fragment(struct dp_soc *soc,
 	if ((fragno == 0) && (status == QDF_STATUS_SUCCESS) &&
 			(rx_reorder_array_elem->head == frag)) {
 
+		qdf_assert_always(ring_desc);
 		status = dp_rx_defrag_save_info_from_ring_desc(ring_desc,
 					rx_desc, peer, tid);
 
 		if (status != QDF_STATUS_SUCCESS) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 				"%s: Unable to store ring desc !", __func__);
-			goto end;
+			goto discard_frag;
 		}
 	} else {
 		dp_rx_add_to_free_desc_list(head, tail, rx_desc);
 		*rx_bfs = 1;
 
 		/* Return the non-head link desc */
-		if (dp_rx_link_desc_return(soc, ring_desc,
-					HAL_BM_ACTION_PUT_IN_IDLE_LIST) !=
-				QDF_STATUS_SUCCESS)
+		if (ring_desc &&
+		    dp_rx_link_desc_return(soc, ring_desc,
+					   HAL_BM_ACTION_PUT_IN_IDLE_LIST) !=
+		    QDF_STATUS_SUCCESS)
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-					"%s: Failed to return link desc",
-					__func__);
+				  "%s: Failed to return link desc", __func__);
 
 	}
 
@@ -1613,6 +1594,16 @@ static QDF_STATUS dp_rx_defrag_store_fragment(struct dp_soc *soc,
 
 	return QDF_STATUS_SUCCESS;
 
+discard_frag:
+	qdf_nbuf_free(frag);
+	dp_rx_add_to_free_desc_list(head, tail, rx_desc);
+	if (dp_rx_link_desc_return(soc, ring_desc,
+				   HAL_BM_ACTION_PUT_IN_IDLE_LIST) !=
+	    QDF_STATUS_SUCCESS)
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+			  "%s: Failed to return link desc", __func__);
+	*rx_bfs = 1;
+
 end:
 	if (peer)
 		dp_peer_unref_del_find_by_id(peer);
@@ -1641,30 +1632,21 @@ end:
  * Return: uint32_t: No. of elements processed
  */
 uint32_t dp_rx_frag_handle(struct dp_soc *soc, void *ring_desc,
-		struct hal_rx_mpdu_desc_info *mpdu_desc_info,
-		uint8_t *mac_id,
-		uint32_t quota)
+			   struct hal_rx_mpdu_desc_info *mpdu_desc_info,
+			   struct dp_rx_desc *rx_desc,
+			   uint8_t *mac_id,
+			   uint32_t quota)
 {
 	uint32_t rx_bufs_used = 0;
-	void *link_desc_va;
-	struct hal_buf_info buf_info;
-	struct hal_rx_msdu_list msdu_list; /* per MPDU list of MSDUs */
 	qdf_nbuf_t msdu = NULL;
 	uint32_t tid, msdu_len;
-	int idx, rx_bfs = 0;
+	int rx_bfs = 0;
 	struct dp_pdev *pdev;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	struct dp_rx_desc *rx_desc = NULL;
 
 	qdf_assert(soc);
 	qdf_assert(mpdu_desc_info);
-
-	/* Fragment from a valid peer */
-	hal_rx_reo_buf_paddr_get(ring_desc, &buf_info);
-
-	link_desc_va = dp_rx_cookie_2_link_desc_va(soc, &buf_info);
-
-	qdf_assert(link_desc_va);
+	qdf_assert(rx_desc);
 
 	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO_HIGH,
 		"Number of MSDUs to process, num_msdus: %d",
@@ -1677,82 +1659,39 @@ uint32_t dp_rx_frag_handle(struct dp_soc *soc, void *ring_desc,
 		return rx_bufs_used;
 	}
 
-	/* Get msdu_list for the given MPDU */
-	hal_rx_msdu_list_get(soc->hal_soc, link_desc_va, &msdu_list,
-			     &mpdu_desc_info->msdu_count);
+	/* all buffers in MSDU link belong to same pdev */
+	pdev = soc->pdev_list[rx_desc->pool_id];
+	*mac_id = rx_desc->pool_id;
 
-	/* Process all MSDUs in the current MPDU */
-	for (idx = 0; (idx < mpdu_desc_info->msdu_count); idx++) {
-		struct dp_rx_desc *rx_desc =
-			dp_rx_cookie_2_va_rxdma_buf(soc,
-				msdu_list.sw_cookie[idx]);
+	msdu = rx_desc->nbuf;
 
-		qdf_assert_always(rx_desc);
+	qdf_nbuf_unmap_single(soc->osdev, msdu,	QDF_DMA_BIDIRECTIONAL);
 
-		/* all buffers in MSDU link belong to same pdev */
-		pdev = soc->pdev_list[rx_desc->pool_id];
-		*mac_id = rx_desc->pool_id;
+	rx_desc->rx_buf_start = qdf_nbuf_data(msdu);
 
-		msdu = rx_desc->nbuf;
+	msdu_len = hal_rx_msdu_start_msdu_len_get(rx_desc->rx_buf_start);
 
-		qdf_nbuf_unmap_single(soc->osdev, msdu,
-				QDF_DMA_BIDIRECTIONAL);
+	qdf_nbuf_set_pktlen(msdu, (msdu_len + RX_PKT_TLVS_LEN));
+	qdf_nbuf_append_ext_list(msdu, NULL, 0);
 
-		rx_desc->rx_buf_start = qdf_nbuf_data(msdu);
+	tid = hal_rx_mpdu_start_tid_get(soc->hal_soc, rx_desc->rx_buf_start);
 
-		msdu_len = hal_rx_msdu_start_msdu_len_get(
-				rx_desc->rx_buf_start);
+	/* Process fragment-by-fragment */
+	status = dp_rx_defrag_store_fragment(soc, ring_desc,
+					     &pdev->free_list_head,
+					     &pdev->free_list_tail,
+					     mpdu_desc_info,
+					     tid, rx_desc, &rx_bfs);
 
-		qdf_nbuf_set_pktlen(msdu, (msdu_len + RX_PKT_TLVS_LEN));
-		qdf_nbuf_append_ext_list(msdu, NULL, 0);
+	if (rx_bfs)
+		rx_bufs_used++;
 
-		tid = hal_rx_mpdu_start_tid_get(soc->hal_soc,
-						rx_desc->rx_buf_start);
-
-		/* Process fragment-by-fragment */
-		status = dp_rx_defrag_store_fragment(soc, ring_desc,
-						     &pdev->free_list_head,
-						     &pdev->free_list_tail,
-						     mpdu_desc_info,
-						     tid, rx_desc, &rx_bfs);
-
-		if (rx_bfs)
-			rx_bufs_used++;
-
-		if (!QDF_IS_STATUS_SUCCESS(status)) {
-			QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-				"Rx Defrag err seq#:0x%x msdu_count:%d flags:%d",
-				mpdu_desc_info->mpdu_seq,
-				mpdu_desc_info->msdu_count,
-				mpdu_desc_info->mpdu_flags);
-
-			/* No point in processing rest of the fragments */
-			break;
-		}
-	}
-
-	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		/* drop any remaining buffers in current descriptor */
-		idx++;
-		for (; (idx < mpdu_desc_info->msdu_count); idx++) {
-			rx_desc =
-				dp_rx_cookie_2_va_rxdma_buf(soc,
-							    msdu_list.sw_cookie[idx]);
-			qdf_assert(rx_desc);
-			msdu = rx_desc->nbuf;
-			qdf_nbuf_unmap_single(soc->osdev, msdu,
-					      QDF_DMA_BIDIRECTIONAL);
-			qdf_nbuf_free(msdu);
-			dp_rx_add_to_free_desc_list(&pdev->free_list_head,
-						    &pdev->free_list_tail,
-						    rx_desc);
-			rx_bufs_used++;
-		}
-		if (dp_rx_link_desc_return(soc, ring_desc,
-					   HAL_BM_ACTION_PUT_IN_IDLE_LIST) !=
-					   QDF_STATUS_SUCCESS)
-			dp_err("Failed to return link desc");
-	}
+	if (!QDF_IS_STATUS_SUCCESS(status))
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
+			  "Rx Defrag err seq#:0x%x msdu_count:%d flags:%d",
+			  mpdu_desc_info->mpdu_seq,
+			  mpdu_desc_info->msdu_count,
+			  mpdu_desc_info->mpdu_flags);
 
 	return rx_bufs_used;
 }
@@ -1771,6 +1710,11 @@ QDF_STATUS dp_rx_defrag_add_last_frag(struct dp_soc *soc,
 
 	if (rx_reorder_array_elem->head &&
 	    rxseq != rx_tid->curr_seq_num) {
+		/* Drop stored fragments if out of sequence
+		 * fragment is received
+		 */
+		dp_rx_reorder_flush_frag(peer, tid);
+
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 			  "%s: No list found for TID %d Seq# %d",
 				__func__, tid, rxseq);
@@ -1833,8 +1777,7 @@ QDF_STATUS dp_rx_defrag_add_last_frag(struct dp_soc *soc,
 			__func__);
 	} else {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			  "%s: Frag seq reinjection failed",
-			__func__);
+			  "%s: Frag seq reinjection failed", __func__);
 		dp_rx_return_head_frag_desc(peer, tid);
 	}
 
