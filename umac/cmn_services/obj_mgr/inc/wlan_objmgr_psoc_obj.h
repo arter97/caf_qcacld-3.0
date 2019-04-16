@@ -1485,4 +1485,11 @@ wlan_psoc_get_lmac_if_txops(struct wlan_objmgr_psoc *psoc)
 {
 	return &((psoc->soc_cb.tx_ops));
 }
+
+struct wlan_objmgr_peer *wlan_objmgr_get_peer_by_mac_n_pdev(
+                struct wlan_objmgr_pdev *pdev,
+                struct wlan_objmgr_psoc *psoc,
+                uint8_t *macaddr,
+                wlan_objmgr_ref_dbgid dbg_id);
+
 #endif /* _WLAN_OBJMGR_PSOC_OBJ_H_*/

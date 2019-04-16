@@ -1384,6 +1384,49 @@ static struct wlan_objmgr_peer *wlan_obj_psoc_peerlist_get_peer_by_mac_n_bssid(
 	return NULL;
 }
 
+static struct wlan_objmgr_peer *wlan_obj_psoc_peerlist_get_peer_by_mac_n_pdev(
+					struct wlan_objmgr_pdev *pdev,
+					qdf_list_t *obj_list, uint8_t *macaddr,
+					wlan_objmgr_ref_dbgid dbg_id)
+{
+	struct wlan_objmgr_peer *peer;
+	struct wlan_objmgr_peer *peer_temp;
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_pdev *cur_pdev;
+	int pdev_id;
+	bool lock_released = false;
+
+	/* Iterate through hash list to get the peer */
+	peer = wlan_psoc_peer_list_peek_head(obj_list);
+	while (peer != NULL) {
+		wlan_peer_obj_lock(peer);
+		/* For peer, macaddr is key */
+		if (WLAN_ADDR_EQ(wlan_peer_get_macaddr(peer), macaddr)
+			== QDF_STATUS_SUCCESS) {
+			vdev = wlan_peer_get_vdev(peer);
+			cur_pdev = wlan_vdev_get_pdev(vdev);
+			pdev_id = wlan_objmgr_pdev_get_pdev_id(cur_pdev);
+			/* matching MAC addr + pdev id */
+			if (pdev_id == wlan_objmgr_pdev_get_pdev_id(pdev)) {
+				wlan_peer_obj_unlock(peer);
+				lock_released = true;
+				if (wlan_objmgr_peer_try_get_ref(peer, dbg_id)
+					== QDF_STATUS_SUCCESS) {
+					return peer;
+				}
+			}
+		}
+		if (!lock_released)
+			wlan_peer_obj_unlock(peer);
+		/* Move to next peer */
+		peer_temp = peer;
+		peer = wlan_peer_get_next_peer_of_psoc(obj_list, peer_temp);
+		lock_released = false;
+	}
+	/* Not found, return NULL */
+	return NULL;
+}
+
 static struct wlan_objmgr_peer
 		*wlan_obj_psoc_peerlist_get_peer_by_mac_n_bssid_no_state(
 					qdf_list_t *obj_list, uint8_t *macaddr,
@@ -1654,6 +1697,40 @@ struct wlan_objmgr_peer *wlan_objmgr_get_peer_by_mac_n_vdev(
 	return peer;
 }
 EXPORT_SYMBOL(wlan_objmgr_get_peer_by_mac_n_vdev);
+
+
+struct wlan_objmgr_peer *wlan_objmgr_get_peer_by_mac_n_pdev(
+				struct wlan_objmgr_pdev *pdev,
+				struct wlan_objmgr_psoc *psoc,
+				uint8_t *macaddr,
+				wlan_objmgr_ref_dbgid dbg_id)
+{
+	struct wlan_objmgr_psoc_objmgr *objmgr;
+	uint8_t hash_index;
+	struct wlan_objmgr_peer *peer = NULL;
+	struct wlan_peer_list *peer_list;
+
+	/* psoc lock should be taken before peer list lock */
+	wlan_psoc_obj_lock(psoc);
+	objmgr = &psoc->soc_objmgr;
+	/* List is empty, return NULL */
+	if (objmgr->wlan_peer_count == 0) {
+		wlan_psoc_obj_unlock(psoc);
+		return NULL;
+	}
+	/* reduce the search window, with hash key */
+	hash_index = WLAN_PEER_HASH(macaddr);
+	peer_list = &objmgr->peer_list;
+	qdf_spin_lock_bh(&peer_list->peer_list_lock);
+	/* Iterate through peer list, get peer */
+	peer = wlan_obj_psoc_peerlist_get_peer_by_mac_n_pdev(pdev,
+		&peer_list->peer_hash[hash_index], macaddr, dbg_id);
+	qdf_spin_unlock_bh(&peer_list->peer_list_lock);
+	wlan_psoc_obj_unlock(psoc);
+
+	return peer;
+}
+EXPORT_SYMBOL(wlan_objmgr_get_peer_by_mac_n_pdev);
 
 
 /**
