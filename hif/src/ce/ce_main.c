@@ -1969,6 +1969,8 @@ hif_send_head(struct hif_opaque_softc *hif_ctx,
 	if (pipe_info->num_sends_allowed < nfrags) {
 		qdf_spin_unlock_bh(&pipe_info->completion_freeq_lock);
 		ce_pkt_error_count_incr(hif_state, HIF_PIPE_NO_RESOURCE);
+printk("%s: %d ====QCOMDEBUG====\n",__FUNCTION__,__LINE__);
+//ol_ath_set_fw_hang(scn, 0);
 		return QDF_STATUS_E_RESOURCES;
 	}
 	pipe_info->num_sends_allowed -= nfrags;
