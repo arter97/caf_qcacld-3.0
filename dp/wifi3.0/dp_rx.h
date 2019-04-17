@@ -543,9 +543,10 @@ dp_rx_wds_srcport_learn(struct dp_soc *soc,
 }
 #endif
 
-uint8_t dp_rx_process_invalid_peer(struct dp_soc *soc, qdf_nbuf_t nbuf);
+uint8_t dp_rx_process_invalid_peer(struct dp_soc *soc, qdf_nbuf_t nbuf,
+				   uint8_t mac_id);
 void dp_rx_process_invalid_peer_wrapper(struct dp_soc *soc,
-		qdf_nbuf_t mpdu, bool mpdu_done);
+		qdf_nbuf_t mpdu, bool mpdu_done, uint8_t mac_id);
 void dp_rx_process_mic_error(struct dp_soc *soc, qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr);
 
 #define DP_RX_LIST_APPEND(head, tail, elem) \
@@ -878,5 +879,7 @@ dp_rx_nbuf_prepare(struct dp_soc *soc, struct dp_pdev *pdev);
 
 void dp_rx_dump_info_and_assert(struct dp_soc *soc, void *hal_ring,
 				void *ring_desc, struct dp_rx_desc *rx_desc);
+struct dp_vdev *dp_rx_nac_filter(struct dp_pdev *pdev,
+		uint8_t *rx_pkt_hdr);
 
 #endif /* _DP_RX_H */
