@@ -614,6 +614,8 @@ void dfs_process_ocac_complete(struct wlan_objmgr_pdev *pdev,
 		utils_dfs_cancel_precac_timer(pdev);
 		dfs_debug(NULL, WLAN_DEBUG_DFS_ALWAYS,
 			  "PreCAC timer abort, agile precac stopped");
+		/* current dfs object's agile precac frequency to be reset */
+		dfs->dfs_agile_precac_freq = 0;
 	} else if (ocac_status == OCAC_SUCCESS) {
 		/* STOP TIMER irrespective of status */
 		utils_dfs_cancel_precac_timer(pdev);
