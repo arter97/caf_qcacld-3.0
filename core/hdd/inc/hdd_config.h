@@ -1195,6 +1195,74 @@ struct dhcp_server {
 			0, \
 			"Enable/Disable unit test framework")
 
+/**
+ * enum host_log_level - Debug verbose level imposed by user
+ * @HOST_LOG_LEVEL_NONE: no trace will be logged.
+ * @HOST_LOG_LEVEL_FATAL: fatal error will be logged
+ * @HOST_LOG_LEVEL_ERROR: error(include level less than error) will be logged
+ * @HOST_LOG_LEVEL_WARN: warning(include level less than warning) will be logged
+ * @HOST_LOG_LEVEL_INFO: inform(include level less than inform) will be logged
+ * @HOST_LOG_LEVEL_DEBUG: debug(include level less than debug) will be logged
+ * @HOST_LOG_LEVEL_TRACE: trace(include level less than trace) will be logged
+ * @HOST_LOG_LEVEL_MAX: Max host log level
+ */
+enum host_log_level {
+	HOST_LOG_LEVEL_NONE = 0,
+	HOST_LOG_LEVEL_FATAL,
+	HOST_LOG_LEVEL_ERROR,
+	HOST_LOG_LEVEL_WARN,
+	HOST_LOG_LEVEL_INFO,
+	HOST_LOG_LEVEL_DEBUG,
+	HOST_LOG_LEVEL_TRACE,
+	HOST_LOG_LEVEL_MAX,
+};
+
+/*
+ * <ini>
+ * gHostModuleLoglevel - modulized host debug log level
+ * @Min: N/A
+ * @Max: N/A
+ * @Default: N/A
+ *
+ * This ini is used to set modulized host debug log level.
+ * WLAN host module log level input string format looks like below:
+ * gHostModuleLoglevel="<host Module ID>,<Log Level>,..."
+ * For example:
+ * gHostModuleLoglevel=51,1,52,2,53,3,54,4,55,5,56,6
+ * The above input string means:
+ * For WLAN host module ID 51 enable log level HOST_LOG_LEVEL_FATAL
+ * For WLAN host module ID 52 enable log level HOST_LOG_LEVEL_ERROR
+ * For WLAN host module ID 53 enable log level HOST_LOG_LEVEL_WARN
+ * For WLAN host module ID 54 enable log level HOST_LOG_LEVEL_INFO
+ * For WLAN host module ID 55 enable log level HOST_LOG_LEVEL_DEBUG
+ * For WLAN host module ID 55 enable log level HOST_LOG_LEVEL_TRACE
+ * For valid values of module ids check enum QDF_MODULE_ID and
+ * for valid values of log levels check below.
+ * HOST_LOG_LEVEL_NONE = 0, No trace will be logged
+ * HOST_LOG_LEVEL_FATAL = 1, fatal error log
+ * HOST_LOG_LEVEL_ERROR = 2, error(include level less than error) log
+ * HOST_LOG_LEVEL_WARN = 3, warning(include level less than warning) log
+ * HOST_LOG_LEVEL_INFO = 4, inform(include level less than inform) log
+ * HOST_LOG_LEVEL_DEBUG = 5, debug(include level less than debug) log
+ * HOST_LOG_LEVEL_TRACE = 6, trace(include level less than trace) log
+ *
+ * Related: None
+ *
+ * Supported Feature: Debugging
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+
+#define HOST_MODULE_LOG_LEVEL_STRING_MAX_LENGTH  (QDF_MODULE_ID_MAX * 6)
+#define CFG_ENABLE_HOST_MODULE_LOG_LEVEL CFG_INI_STRING( \
+	"gHostModuleLoglevel", \
+	0, \
+	HOST_MODULE_LOG_LEVEL_STRING_MAX_LENGTH, \
+	"", \
+	"Set modulized host debug log level")
+
 #define CFG_HDD_ALL \
 	CFG_ENABLE_PACKET_LOG_ALL \
 	CFG_ENABLE_RUNTIME_PM_ALL \
@@ -1229,5 +1297,6 @@ struct dhcp_server {
 	CFG(CFG_PRIVATE_WEXT_CONTROL) \
 	CFG(CFG_PROVISION_INTERFACE_POOL) \
 	CFG(CFG_TIMER_MULTIPLIER) \
-	CFG(CFG_HDD_DOT11_MODE)
+	CFG(CFG_HDD_DOT11_MODE) \
+	CFG(CFG_ENABLE_HOST_MODULE_LOG_LEVEL)
 #endif
