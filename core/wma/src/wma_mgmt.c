@@ -3573,106 +3573,16 @@ static bool wma_is_pkt_drop_candidate(tp_wma_handle wma_handle,
 				      uint8_t *peer_addr, uint8_t *bssid,
 				      uint8_t subtype)
 {
-	void *peer = NULL;
-	struct cdp_pdev *pdev_ctx;
-	uint8_t peer_id;
 	bool should_drop = false;
-	qdf_time_t *ptr;
-	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	uint8_t nan_addr[] = {0x50, 0x6F, 0x9A, 0x01, 0x00, 0x00};
 
 	/* Drop the beacons from NAN device */
-	if ((subtype == IEEE80211_FC0_SUBTYPE_BEACON) &&
+	if ((subtype == MGMT_SUBTYPE_BEACON) &&
 		(!qdf_mem_cmp(nan_addr, bssid, NAN_CLUSTER_ID_BYTES))) {
 			should_drop = true;
 			goto end;
 	}
-
-	/*
-	 * Currently this function handles only Disassoc,
-	 * Deauth and Assoc req frames. Return false for
-	 * all other frames.
-	 */
-	if (subtype != IEEE80211_FC0_SUBTYPE_DISASSOC &&
-	    subtype != IEEE80211_FC0_SUBTYPE_DEAUTH &&
-	    subtype != IEEE80211_FC0_SUBTYPE_ASSOC_REQ) {
-		should_drop = false;
-		goto end;
-	}
-
-	pdev_ctx = cds_get_context(QDF_MODULE_ID_TXRX);
-	if (!pdev_ctx) {
-		WMA_LOGE(FL("Failed to get the context"));
-		should_drop = true;
-		goto end;
-	}
-
-	peer = cdp_peer_get_ref_by_addr(soc, pdev_ctx, peer_addr, &peer_id,
-					PEER_DEBUG_ID_WMA_PKT_DROP);
-	if (!peer) {
-		if (IEEE80211_FC0_SUBTYPE_ASSOC_REQ != subtype) {
-			WMA_LOGI(
-			   FL("Received mgmt frame: %0x from unknow peer: %pM"),
-			   subtype, peer_addr);
-			should_drop = true;
-		}
-		goto end;
-	}
-
-	switch (subtype) {
-	case IEEE80211_FC0_SUBTYPE_ASSOC_REQ:
-		ptr = cdp_peer_last_assoc_received(soc, peer);
-		if (ptr == NULL) {
-			WMA_LOGE(FL("cdp_peer_last_assoc_received Failed"));
-			should_drop = true;
-			goto end;
-		} else if (*ptr > 0) {
-			if ((qdf_get_system_timestamp() - *ptr) <
-				WMA_MGMT_FRAME_DETECT_DOS_TIMER) {
-				    WMA_LOGI(FL("Dropping Assoc Req received"));
-				    should_drop = true;
-			}
-		}
-		*ptr = qdf_get_system_timestamp();
-		break;
-	case IEEE80211_FC0_SUBTYPE_DISASSOC:
-		ptr = cdp_peer_last_disassoc_received(soc, peer);
-		if (ptr == NULL) {
-			WMA_LOGE(FL("cdp_peer_last_disassoc_received Failed"));
-			should_drop = true;
-			goto end;
-		} else if (*ptr > 0) {
-			if ((qdf_get_system_timestamp() - *ptr) <
-				WMA_MGMT_FRAME_DETECT_DOS_TIMER) {
-				    WMA_LOGI(FL("Dropping DisAssoc received"));
-				    should_drop = true;
-			}
-		}
-		*ptr = qdf_get_system_timestamp();
-		break;
-	case IEEE80211_FC0_SUBTYPE_DEAUTH:
-		ptr = cdp_peer_last_deauth_received(soc, peer);
-		if (ptr == NULL) {
-			WMA_LOGE(FL("cdp_peer_last_deauth_received Failed"));
-			should_drop = true;
-			goto end;
-		} else if (*ptr > 0) {
-			if ((qdf_get_system_timestamp() - *ptr) <
-				WMA_MGMT_FRAME_DETECT_DOS_TIMER) {
-				    WMA_LOGI(FL("Dropping Deauth received"));
-				    should_drop = true;
-			}
-		}
-		*ptr = qdf_get_system_timestamp();
-		break;
-	default:
-		break;
-	}
-
 end:
-	if (peer)
-		cdp_peer_release_ref(soc, peer, PEER_DEBUG_ID_WMA_PKT_DROP);
-
 	return should_drop;
 }
 

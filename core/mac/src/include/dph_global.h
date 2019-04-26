@@ -246,9 +246,7 @@ typedef struct sDphHashNode {
 	uint16_t pmfSaQueryCurrentTransId;
 	uint16_t pmfSaQueryStartTransId;
 	TX_TIMER pmfSaQueryTimer;
-	unsigned long last_unprot_deauth_disassoc;
 	uint8_t proct_deauh_disassoc_cnt;
-	unsigned long last_assoc_received_time;
 #endif
 	uint8_t htLdpcCapable;
 	uint8_t vhtLdpcCapable;
@@ -260,6 +258,8 @@ typedef struct sDphHashNode {
 	/* key installed for this STA or not in the firmware */
 	uint8_t is_key_installed;
 	uint8_t is_disassoc_deauth_in_progress;
+	qdf_time_t last_assoc_received_time;
+	qdf_time_t last_disassoc_deauth_received_time;
 
 	uint8_t nss;
 	int8_t del_sta_ctx_rssi;
