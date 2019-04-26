@@ -128,7 +128,6 @@ void dp_tx_put_desc_flow_pool(struct dp_tx_desc_pool_s *pool,
 	pool->avail_desc++;
 }
 
-
 /**
  * dp_tx_desc_alloc() - Allocate a Software Tx Descriptor from given pool
  *
@@ -187,6 +186,9 @@ dp_tx_desc_free(struct dp_soc *soc, struct dp_tx_desc_s *tx_desc,
 	struct dp_tx_desc_pool_s *pool = &soc->tx_desc[desc_pool_id];
 
 	qdf_spin_lock_bh(&pool->flow_pool_lock);
+	tx_desc->vdev = NULL;
+	tx_desc->nbuf = NULL;
+	tx_desc->flags = 0;
 	dp_tx_put_desc_flow_pool(pool, tx_desc);
 	switch (pool->status) {
 	case FLOW_POOL_ACTIVE_PAUSED:
