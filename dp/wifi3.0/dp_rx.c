@@ -440,7 +440,7 @@ dp_rx_intrabss_fwd(struct dp_soc *soc,
 	struct dp_peer *da_peer;
 	struct dp_ast_entry *ast_entry;
 	qdf_nbuf_t nbuf_copy;
-	uint8_t tid = qdf_nbuf_get_priority(nbuf);
+	uint8_t tid = qdf_nbuf_get_tid_val(nbuf);
 	struct cdp_tid_rx_stats *tid_stats =
 		&ta_peer->vdev->pdev->stats.tid_stats.tid_rx_stats[tid];
 
@@ -1128,7 +1128,7 @@ void dp_rx_compute_delay(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
 {
 	int64_t current_ts = qdf_ktime_to_ms(qdf_ktime_get());
 	uint32_t to_stack = qdf_nbuf_get_timedelta_ms(nbuf);
-	uint8_t tid = qdf_nbuf_get_priority(nbuf);
+	uint8_t tid = qdf_nbuf_get_tid_val(nbuf);
 	uint32_t interframe_delay =
 		(uint32_t)(current_ts - vdev->prev_rx_deliver_tstamp);
 
@@ -1145,6 +1145,172 @@ void dp_rx_compute_delay(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
 			      CDP_DELAY_STATS_RX_INTERFRAME);
 	vdev->prev_rx_deliver_tstamp = current_ts;
 }
+
+/**
+ * dp_rx_drop_nbuf_list() - drop an nbuf list
+ * @pdev: dp pdev reference
+ * @buf_list: buffer list to be dropepd
+ *
+ * Return: int (number of bufs dropped)
+ */
+static inline int dp_rx_drop_nbuf_list(struct dp_pdev *pdev,
+				       qdf_nbuf_t buf_list)
+{
+	struct cdp_tid_rx_stats *stats = NULL;
+	uint8_t tid = 0;
+	int num_dropped = 0;
+	qdf_nbuf_t buf, next_buf;
+
+	buf = buf_list;
+	while (buf) {
+		next_buf = qdf_nbuf_queue_next(buf);
+		tid = qdf_nbuf_get_tid_val(buf);
+		stats = &pdev->stats.tid_stats.tid_rx_stats[tid];
+		stats->fail_cnt[INVALID_PEER_VDEV]++;
+		stats->delivered_to_stack--;
+		qdf_nbuf_free(buf);
+		buf = next_buf;
+		num_dropped++;
+	}
+
+	return num_dropped;
+}
+
+#ifdef PEER_CACHE_RX_PKTS
+/**
+ * dp_rx_flush_rx_cached() - flush cached rx frames
+ * @peer: peer
+ * @drop: flag to drop frames or forward to net stack
+ *
+ * Return: None
+ */
+void dp_rx_flush_rx_cached(struct dp_peer *peer, bool drop)
+{
+	struct dp_peer_cached_bufq *bufqi;
+	struct dp_rx_cached_buf *cache_buf = NULL;
+	ol_txrx_rx_fp data_rx = NULL;
+	int num_buff_elem;
+	QDF_STATUS status;
+
+	if (qdf_atomic_inc_return(&peer->flush_in_progress) > 1) {
+		qdf_atomic_dec(&peer->flush_in_progress);
+		return;
+	}
+
+	qdf_spin_lock_bh(&peer->peer_info_lock);
+	if (peer->state >= OL_TXRX_PEER_STATE_CONN && peer->vdev->osif_rx)
+		data_rx = peer->vdev->osif_rx;
+	else
+		drop = true;
+	qdf_spin_unlock_bh(&peer->peer_info_lock);
+
+	bufqi = &peer->bufq_info;
+
+	qdf_spin_lock_bh(&bufqi->bufq_lock);
+	if (qdf_list_empty(&bufqi->cached_bufq)) {
+		qdf_spin_unlock_bh(&bufqi->bufq_lock);
+		return;
+	}
+	qdf_list_remove_front(&bufqi->cached_bufq,
+			      (qdf_list_node_t **)&cache_buf);
+	while (cache_buf) {
+		num_buff_elem = QDF_NBUF_CB_RX_NUM_ELEMENTS_IN_LIST(
+								cache_buf->buf);
+		bufqi->entries -= num_buff_elem;
+		qdf_spin_unlock_bh(&bufqi->bufq_lock);
+		if (drop) {
+			bufqi->dropped = dp_rx_drop_nbuf_list(peer->vdev->pdev,
+							      cache_buf->buf);
+		} else {
+			/* Flush the cached frames to OSIF DEV */
+			status = data_rx(peer->vdev->osif_vdev, cache_buf->buf);
+			if (status != QDF_STATUS_SUCCESS)
+				bufqi->dropped = dp_rx_drop_nbuf_list(
+							peer->vdev->pdev,
+							cache_buf->buf);
+		}
+		qdf_mem_free(cache_buf);
+		cache_buf = NULL;
+		qdf_spin_lock_bh(&bufqi->bufq_lock);
+		qdf_list_remove_front(&bufqi->cached_bufq,
+				      (qdf_list_node_t **)&cache_buf);
+	}
+	qdf_spin_unlock_bh(&bufqi->bufq_lock);
+	qdf_atomic_dec(&peer->flush_in_progress);
+}
+
+/**
+ * dp_rx_enqueue_rx() - cache rx frames
+ * @peer: peer
+ * @rx_buf_list: cache buffer list
+ *
+ * Return: None
+ */
+static QDF_STATUS
+dp_rx_enqueue_rx(struct dp_peer *peer, qdf_nbuf_t rx_buf_list)
+{
+	struct dp_rx_cached_buf *cache_buf;
+	struct dp_peer_cached_bufq *bufqi = &peer->bufq_info;
+	int num_buff_elem;
+
+	QDF_TRACE_DEBUG_RL(QDF_MODULE_ID_TXRX, "bufq->curr %d bufq->drops %d",
+			   bufqi->entries, bufqi->dropped);
+
+	if (!peer->valid) {
+		bufqi->dropped = dp_rx_drop_nbuf_list(peer->vdev->pdev,
+						      rx_buf_list);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	qdf_spin_lock_bh(&bufqi->bufq_lock);
+	if (bufqi->entries >= bufqi->thresh) {
+		bufqi->dropped = dp_rx_drop_nbuf_list(peer->vdev->pdev,
+						      rx_buf_list);
+		qdf_spin_unlock_bh(&bufqi->bufq_lock);
+		return QDF_STATUS_E_RESOURCES;
+	}
+	qdf_spin_unlock_bh(&bufqi->bufq_lock);
+
+	num_buff_elem = QDF_NBUF_CB_RX_NUM_ELEMENTS_IN_LIST(rx_buf_list);
+
+	cache_buf = qdf_mem_malloc_atomic(sizeof(*cache_buf));
+	if (!cache_buf) {
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
+			  "Failed to allocate buf to cache rx frames");
+		bufqi->dropped = dp_rx_drop_nbuf_list(peer->vdev->pdev,
+						      rx_buf_list);
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	cache_buf->buf = rx_buf_list;
+
+	qdf_spin_lock_bh(&bufqi->bufq_lock);
+	qdf_list_insert_back(&bufqi->cached_bufq,
+			     &cache_buf->node);
+	bufqi->entries += num_buff_elem;
+	qdf_spin_unlock_bh(&bufqi->bufq_lock);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+bool dp_rx_is_peer_cache_bufq_supported(void)
+{
+	return true;
+}
+#else
+static inline
+bool dp_rx_is_peer_cache_bufq_supported(void)
+{
+	return false;
+}
+
+static inline QDF_STATUS
+dp_rx_enqueue_rx(struct dp_peer *peer, qdf_nbuf_t rx_buf_list)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 static inline void dp_rx_deliver_to_stack(struct dp_vdev *vdev,
 						struct dp_peer *peer,
@@ -1266,7 +1432,7 @@ static void dp_rx_msdu_stats_update(struct dp_soc *soc,
 
 	sgi = hal_rx_msdu_start_sgi_get(rx_tlv_hdr);
 	mcs = hal_rx_msdu_start_rate_mcs_get(rx_tlv_hdr);
-	tid = hal_rx_mpdu_start_tid_get(soc->hal_soc, rx_tlv_hdr);
+	tid = qdf_nbuf_get_tid_val(nbuf);
 	bw = hal_rx_msdu_start_bw_get(rx_tlv_hdr);
 	reception_type = hal_rx_msdu_start_reception_type_get(soc->hal_soc,
 							      rx_tlv_hdr);
@@ -1679,6 +1845,9 @@ uint32_t dp_rx_process(struct dp_intr *int_ctx, void *hal_ring,
 
 		QDF_NBUF_CB_RX_PKT_LEN(rx_desc->nbuf) =	msdu_desc_info.msdu_len;
 
+		qdf_nbuf_set_tid_val(rx_desc->nbuf,
+				     HAL_RX_REO_QUEUE_NUMBER_GET(ring_desc));
+
 		QDF_NBUF_CB_RX_CTX_ID(rx_desc->nbuf) = reo_ring_num;
 
 		DP_RX_LIST_APPEND(nbuf_head, nbuf_tail, rx_desc->nbuf);
@@ -1733,10 +1902,9 @@ done:
 	while (nbuf) {
 		next = nbuf->next;
 		rx_tlv_hdr = qdf_nbuf_data(nbuf);
-		/* Get TID from first msdu per MPDU, save to skb->priority */
+		/* Get TID from struct cb->tid_val, save to tid */
 		if (qdf_nbuf_is_rx_chfrag_start(nbuf))
-			tid = hal_rx_mpdu_start_tid_get(soc->hal_soc,
-							rx_tlv_hdr);
+			tid = qdf_nbuf_get_tid_val(nbuf);
 
 		/*
 		 * Check if DMA completed -- msdu_done is the last bit
