@@ -1443,10 +1443,39 @@ static inline void dp_rx_desc_nbuf_sanity_check(void *ring_desc,
 	qdf_assert_always((&hbi)->paddr ==
 			  qdf_nbuf_get_frag_paddr(rx_desc->nbuf, 0));
 }
+
+/**
+ * dp_rx_is_msdu_done_set - Add check to catch msdu_done DMA
+ * failures
+ *
+ * @soc: core txrx main context
+ * @rx_tlv_hdr: Rx TLV header start
+ *
+ * Return: NONE
+ */
+static inline bool dp_rx_is_msdu_done_set(struct dp_soc *soc,
+					  uint8_t *rx_tlv_hdr)
+{
+	if (qdf_unlikely(!hal_rx_attn_msdu_done_get(rx_tlv_hdr))) {
+		dp_err("MSDU DONE failure");
+		DP_STATS_INC(soc, rx.err.msdu_done_fail, 1);
+		hal_rx_dump_pkt_tlvs(hal_soc, rx_tlv_hdr, QDF_TRACE_LEVEL_INFO);
+		return false;
+	}
+	return true;
+}
+
 #else
 static inline void dp_rx_desc_nbuf_sanity_check(void *ring_desc,
 					   struct dp_rx_desc *rx_desc)
 {
+}
+
+
+static inline bool dp_rx_is_msdu_done_set(struct dp_soc *soc,
+					  uint8_t *rx_tlv_hdr)
+{
+	return true;
 }
 #endif
 
@@ -1716,11 +1745,7 @@ done:
 		rx_pdev = soc->pdev_list[rx_desc->pool_id];
 		dp_rx_save_tid_ts(nbuf, tid, rx_pdev->delay_stats_flag);
 		tid_stats = &rx_pdev->stats.tid_stats.tid_rx_stats[tid];
-		if (qdf_unlikely(!hal_rx_attn_msdu_done_get(rx_tlv_hdr))) {
-			dp_err("MSDU DONE failure");
-			DP_STATS_INC(soc, rx.err.msdu_done_fail, 1);
-			hal_rx_dump_pkt_tlvs(hal_soc, rx_tlv_hdr,
-					QDF_TRACE_LEVEL_INFO);
+		if (qdf_unlikely(!dp_rx_is_msdu_done_set(soc, rx_tlv_hdr))) {
 			tid_stats->fail_cnt[MSDU_DONE_FAILURE]++;
 			qdf_nbuf_free(nbuf);
 			qdf_assert(0);
