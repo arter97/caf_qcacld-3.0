@@ -1907,6 +1907,9 @@ done:
 
 		dp_set_rx_queue(nbuf, ring_id);
 
+		/* Update the protocol tag in SKB based on CCE metadata */
+		dp_rx_update_protocol_tag(soc, vdev, nbuf, rx_tlv_hdr, true);
+
 		dp_rx_msdu_stats_update(soc, nbuf, rx_tlv_hdr, peer, ring_id);
 
 		if (qdf_unlikely(vdev->mesh_vdev)) {
