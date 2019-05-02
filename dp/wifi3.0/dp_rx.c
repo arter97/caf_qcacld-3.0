@@ -1227,14 +1227,10 @@ static void dp_rx_msdu_stats_update(struct dp_soc *soc,
 				    uint8_t ring_id)
 {
 	bool is_ampdu, is_not_amsdu;
-	uint16_t peer_id;
 	uint32_t sgi, mcs, tid, nss, bw, reception_type, pkt_type;
 	struct dp_vdev *vdev = peer->vdev;
 	qdf_ether_header_t *eh;
 	uint16_t msdu_len = qdf_nbuf_len(nbuf);
-
-	peer_id = DP_PEER_METADATA_PEER_ID_GET(
-			       hal_rx_mpdu_peer_meta_data_get(rx_tlv_hdr));
 
 	is_not_amsdu = qdf_nbuf_is_rx_chfrag_start(nbuf) &
 			qdf_nbuf_is_rx_chfrag_end(nbuf);
@@ -1312,7 +1308,7 @@ static void dp_rx_msdu_stats_update(struct dp_soc *soc,
 			return;
 
 		dp_wdi_event_handler(WDI_EVENT_UPDATE_DP_STATS, vdev->pdev->soc,
-				     &peer->stats, peer_id,
+				     &peer->stats, peer->peer_ids[0],
 				     UPDATE_PEER_STATS,
 				     vdev->pdev->pdev_id);
 #endif
@@ -1904,8 +1900,6 @@ done:
 
 		if (soc->process_rx_status)
 			dp_rx_cksum_offload(vdev->pdev, nbuf, rx_tlv_hdr);
-
-		dp_set_rx_queue(nbuf, ring_id);
 
 		/* Update the protocol tag in SKB based on CCE metadata */
 		dp_rx_update_protocol_tag(soc, vdev, nbuf, rx_tlv_hdr,
