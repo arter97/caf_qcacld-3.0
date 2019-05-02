@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -271,6 +271,33 @@ static int pld_snoc_uevent(struct device *dev,
 	return 0;
 }
 
+/**
+ * pld_snoc_set_thermal_state() - Set thermal state for thermal mitigation
+ * @dev: device
+ * @thermal_state: Thermal state set by thermal subsystem
+ *
+ * This function will be called when thermal subsystem notifies platform
+ * driver about change in thermal state.
+ *
+ * Return: 0 for success
+ * Non zero failure code for errors
+ */
+static int pld_snoc_set_thermal_state(struct device *dev,
+				      unsigned long thermal_state)
+{
+	struct pld_context *pld_context;
+
+	pld_context = pld_get_global_context();
+	if (!pld_context)
+		return -EINVAL;
+
+	if (pld_context->ops->set_curr_therm_state)
+		return pld_context->ops->set_curr_therm_state(dev,
+							      thermal_state);
+
+	return -ENOTSUPP;
+}
+
 #ifdef MULTI_IF_NAME
 #define PLD_SNOC_OPS_NAME "pld_snoc_" MULTI_IF_NAME
 #else
@@ -289,6 +316,7 @@ struct icnss_driver_ops pld_snoc_ops = {
 	.suspend_noirq = pld_snoc_suspend_noirq,
 	.resume_noirq = pld_snoc_resume_noirq,
 	.uevent = pld_snoc_uevent,
+	.set_therm_state = pld_snoc_set_thermal_state,
 };
 
 /**
