@@ -195,7 +195,7 @@ QDF_STATUS dp_rx_buffers_replenish(struct dp_soc *dp_soc, uint32_t mac_id,
 		}
 
 		ret = qdf_nbuf_map_single(dp_soc->osdev, rx_netbuf,
-					  QDF_DMA_BIDIRECTIONAL);
+					  QDF_DMA_FROM_DEVICE);
 		if (qdf_unlikely(QDF_IS_STATUS_ERROR(ret))) {
 			qdf_nbuf_free(rx_netbuf);
 			DP_STATS_INC(dp_pdev, replenish.map_err, 1);
@@ -1635,7 +1635,7 @@ uint32_t dp_rx_process(struct dp_intr *int_ctx, void *hal_ring,
 		 * phyiscal address
 		 */
 		qdf_nbuf_unmap_single(soc->osdev, rx_desc->nbuf,
-					QDF_DMA_BIDIRECTIONAL);
+					QDF_DMA_FROM_DEVICE);
 		rx_desc->unmapped = 1;
 
 		core_id = smp_processor_id();
@@ -2120,7 +2120,7 @@ dp_rx_nbuf_prepare(struct dp_soc *soc, struct dp_pdev *pdev)
 		memset(buf, 0, RX_BUFFER_SIZE);
 
 		ret = qdf_nbuf_map_single(soc->osdev, nbuf,
-				    QDF_DMA_BIDIRECTIONAL);
+				    QDF_DMA_FROM_DEVICE);
 
 		/* nbuf map failed */
 		if (qdf_unlikely(QDF_IS_STATUS_ERROR(ret))) {
