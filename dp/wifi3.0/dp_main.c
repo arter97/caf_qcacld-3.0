@@ -4908,6 +4908,7 @@ static void *dp_peer_create_wifi3(struct cdp_vdev *vdev_handle,
 
 		dp_local_peer_id_alloc(pdev, peer);
 		DP_STATS_INIT(peer);
+		DP_STATS_UPD(peer, rx.avg_rssi, INVALID_RSSI);
 
 		return (void *)peer;
 	} else {
@@ -4998,6 +4999,7 @@ static void *dp_peer_create_wifi3(struct cdp_vdev *vdev_handle,
 
 	dp_local_peer_id_alloc(pdev, peer);
 	DP_STATS_INIT(peer);
+	DP_STATS_UPD(peer, rx.avg_rssi, INVALID_RSSI);
 
 	qdf_mem_copy(peer_cookie.mac_addr, peer->mac_addr.raw,
 		     QDF_MAC_ADDR_SIZE);
