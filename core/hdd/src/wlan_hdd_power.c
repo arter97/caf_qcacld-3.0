@@ -1558,6 +1558,29 @@ static void hdd_send_default_scan_ies(hdd_context_t *hdd_ctx)
 	}
 }
 
+void hdd_is_interface_down_during_ssr(hdd_context_t *hdd_ctx)
+{
+	hdd_adapter_t *adapter = NULL;
+	hdd_adapter_list_node_t *adapternode = NULL, *pnext = NULL;
+	QDF_STATUS status;
+
+	ENTER();
+
+	status = hdd_get_front_adapter(hdd_ctx, &adapternode);
+	while (NULL != adapternode && QDF_STATUS_SUCCESS == status) {
+		adapter = adapternode->pAdapter;
+		if (test_bit(DOWN_DURING_SSR, &adapter->event_flags)) {
+			clear_bit(DOWN_DURING_SSR, &adapter->event_flags);
+			hdd_stop_adapter(hdd_ctx, adapter, true);
+			clear_bit(DEVICE_IFACE_OPENED, &adapter->event_flags);
+		}
+		status = hdd_get_next_adapter(hdd_ctx, adapternode, &pnext);
+		adapternode = pnext;
+	}
+
+	EXIT();
+}
+
 /**
  * hdd_wlan_re_init() - HDD SSR re-init function
  *
@@ -1613,10 +1636,8 @@ QDF_STATUS hdd_wlan_re_init(void)
 	/* Restart all adapters */
 	hdd_start_all_adapters(pHddCtx);
 
-	pHddCtx->last_scan_reject_session_id = 0xFF;
-	pHddCtx->last_scan_reject_reason = 0;
-	pHddCtx->last_scan_reject_timestamp = 0;
-	pHddCtx->scan_reject_cnt = 0;
+	/* init the scan reject params */
+	hdd_init_scan_reject_params(pHddCtx);
 
 	hdd_set_roaming_in_progress(false);
 	complete(&pAdapter->roaming_comp_var);
@@ -1641,7 +1662,7 @@ err_re_init:
 success:
 	if (pHddCtx->config->sap_internal_restart)
 		hdd_ssr_restart_sap(pHddCtx);
-
+	hdd_is_interface_down_during_ssr(pHddCtx);
 	hdd_wlan_ssr_reinit_event();
 	return QDF_STATUS_SUCCESS;
 }
