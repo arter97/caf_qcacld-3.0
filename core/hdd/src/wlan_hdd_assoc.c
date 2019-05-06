@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017, 2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -236,6 +236,18 @@ bool hdd_is_connecting(hdd_station_ctx_t *hdd_sta_ctx)
 {
 	return hdd_sta_ctx->conn_info.connState ==
 		eConnectionState_Connecting;
+}
+
+/**
+ * hdd_is_disconnecting() - Function to check disconnection progress
+ * @hdd_sta_ctx:    pointer to global HDD Station context
+ *
+ * Return: true if disconnecting, false otherwise
+ */
+bool hdd_is_disconnecting(hdd_station_ctx_t *hdd_sta_ctx)
+{
+	return hdd_sta_ctx->conn_info.connState ==
+		eConnectionState_Disconnecting;
 }
 
 /**
@@ -1564,6 +1576,15 @@ static QDF_STATUS hdd_dis_connect_handler(hdd_adapter_t *pAdapter,
 		hdd_err("net_dev is released return");
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	if (!pHddCtx) {
+		hdd_err("HDD context is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/* Disable mitigation in FW if STA gets disconnected */
+	hdd_send_thermal_notification(pHddCtx, HDD_THERMAL_STATE_NORMAL);
+
 	/* notify apps that we can't pass traffic anymore */
 	hdd_info("Disabling queues");
 	wlan_hdd_netif_queue_control(pAdapter,
@@ -2502,6 +2523,7 @@ static QDF_STATUS hdd_association_completion_handler(hdd_adapter_t *pAdapter,
 	bool hddDisconInProgress = false;
 	unsigned long rc;
 	tSirResultCodes timeout_reason = 0;
+	uint16_t thermal_state = HDD_THERMAL_STATE_NORMAL;
 
 	if (!pHddCtx) {
 		hdd_err("HDD context is NULL");
@@ -2582,6 +2604,13 @@ static QDF_STATUS hdd_association_completion_handler(hdd_adapter_t *pAdapter,
 
 		/* Indicate 'connect' status to user space */
 		hdd_send_association_event(dev, pRoamInfo);
+
+		/* Send the thermal mitigation status to FW */
+		if (pHddCtx->is_thermal_system_registered &&
+		    !pld_get_thermal_state(pHddCtx->parent_dev, &thermal_state))
+			hdd_send_thermal_notification(pHddCtx,
+						      hdd_map_thermal_states(
+						      thermal_state));
 
 		if (cds_is_mcc_in_24G()) {
 			if (pHddCtx->miracast_value)

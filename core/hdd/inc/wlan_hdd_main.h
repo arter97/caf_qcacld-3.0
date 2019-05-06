@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -340,6 +340,8 @@
 #define WLAN_NUD_STATS_ARP_PKT_TYPE 1
 /* Assigned size of driver memory dump is 4096 bytes */
 #define DRIVER_MEM_DUMP_SIZE    4096
+/* Max number of states supported by the driver for thermal mitigation */
+#define HDD_THERMAL_MAX_STATE 2
 
 /*
  * @eHDD_DRV_OP_PROBE: Refers to .probe operation
@@ -1808,6 +1810,21 @@ enum hdd_sta_smps_param {
 };
 
 /**
+ * enum hdd_thermal_states - The various thermal states as supported by WLAN
+ * @HDD_THERMAL_STATE_NORMAL - The normal working state
+ * @HDD_THERMAL_STATE_MEDIUM - The intermediate state, WLAN must perform partial
+ *                             mitigation
+ * @HDD_THERMAL_STATE_HIGH - The highest state, WLAN must enter forced IMPS and
+ *                           will disconnect any active STA connection
+ */
+enum hdd_thermal_states {
+	HDD_THERMAL_STATE_NORMAL = 0,
+	HDD_THERMAL_STATE_MEDIUM = 1,
+	HDD_THERMAL_STATE_HIGH = 2,
+	HDD_THERMAL_STATE_INVAL = 0xFF,
+};
+
+/**
  * struct hdd_context_s
  * @adapter_nodes: an array of adapter nodes for keeping track of hdd adapters
  */
@@ -2114,6 +2131,7 @@ struct hdd_context_s {
 	/* mutex lock to block concurrent access */
 	struct mutex power_stats_lock;
 #endif
+	bool is_thermal_system_registered;
 };
 
 int hdd_validate_channel_and_bandwidth(hdd_adapter_t *adapter,

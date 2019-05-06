@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2017, 2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -152,6 +152,8 @@ enum cds_auto_pwr_detect_failure_mode_t {
  * @rps_enabled: RPS enabled in SAP mode
  * @ito_repeat_count: Indicates ito repeated count
  * @bandcapability: Configured band by user
+ * @thermal_sampling_time: Thermal throttling sampling time in ms
+ * @thermal_throt_dc: Thermal throttling duty cycle to be enforced
  * Structure for holding cds ini parameters.
  */
 
@@ -215,6 +217,10 @@ struct cds_config_info {
 	enum cds_auto_pwr_detect_failure_mode_t auto_power_save_fail_mode;
 	uint8_t ito_repeat_count;
 	uint8_t bandcapability;
+#ifdef FW_THERMAL_THROTTLE_SUPPORT
+	uint16_t thermal_sampling_time;
+	uint16_t thermal_throt_dc;
+#endif
 };
 
 #ifdef WLAN_FEATURE_FILS_SK

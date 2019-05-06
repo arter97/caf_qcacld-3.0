@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017, 2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -13686,6 +13686,51 @@ enum hw_filter_mode {
 #define CFG_ENABLE_UNIT_TEST_FRAMEWORK_MAX     (1)
 #define CFG_ENABLE_UINT_TEST_FRAMEWORK_DEFAULT (0)
 
+#ifdef FW_THERMAL_THROTTLE_SUPPORT
+/*
+ * thermal_sampling_time - Configure the thermal mitigation sampling time in ms.
+ *
+ * @Min: 10
+ * @Max: 100
+ * @Default: 100
+ *
+ * This ini will control the sampling time that the thermal mitigation in FW
+ * will consider while applying the duty cycle.
+ *
+ * Usage: External
+ *
+ * Supported features: Thermal Mitigation
+ *
+ * </ini>
+ */
+#define CFG_THERMAL_SAMPLING_TIME_NAME     "thermal_sampling_time"
+#define CFG_THERMAL_SAMPLING_TIME_MIN      (10)
+#define CFG_THERMAL_SAMPLING_TIME_MAX      (100)
+#define CFG_THERMAL_SAMPLING_TIME_DEFAULT  (100)
+
+/*
+ * thermal_throt_dc - Configure the thermal mitigation duty cycling percentage
+ *
+ * @Min: 0
+ * @Max: 100
+ * @Default: 50
+ *
+ * This ini will control the duty cycle that will be enforced by the firmware.
+ * If for example the duty cycle is 50 percent and the sampling time
+ * (thermal_sampling_time) is 100ms then the FW will constrain rx/tx for 50ms
+ * out of the 100ms.
+ *
+ * Usage: External
+ *
+ * Supported features: Thermal Mitigation
+ *
+ * </ini>
+ */
+#define CFG_THERMAL_THROT_DC_NAME     "thermal_throt_dc"
+#define CFG_THERMAL_THROT_DC_MIN      (10)
+#define CFG_THERMAL_THROT_DC_MAX      (100)
+#define CFG_THERMAL_THROT_DC_DEFAULT  (50)
+#endif
 
 /*---------------------------------------------------------------------------
    Type declarations
@@ -14568,6 +14613,10 @@ struct hdd_config {
 	bool gcmp_enabled;
 	bool is_unit_test_framework_enabled;
 	bool enable_ftopen;
+#ifdef FW_THERMAL_THROTTLE_SUPPORT
+	uint16_t thermal_sampling_time;
+	uint16_t thermal_throt_dc;
+#endif
 };
 
 #define VAR_OFFSET(_Struct, _Var) (offsetof(_Struct, _Var))

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -226,6 +226,14 @@ typedef struct hdd_ap_ctx_s hdd_ap_ctx_t;
  * Return: true if connecting, false otherwise
  */
 bool hdd_is_connecting(hdd_station_ctx_t *hdd_sta_ctx);
+
+/**
+ * hdd_is_disconnecting() - Function to check disconnection progress
+ * @hdd_sta_ctx:    pointer to global HDD Station context
+ *
+ * Return: true if disconnecting, false otherwise
+ */
+bool hdd_is_disconnecting(hdd_station_ctx_t *hdd_sta_ctx);
 
 /**
  * hdd_conn_is_connected() - Function to check connection status
