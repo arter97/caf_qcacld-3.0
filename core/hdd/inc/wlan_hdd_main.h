@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1062,6 +1062,8 @@ enum dhcp_nego_status {
  * MSB of rx_mc_bc_cnt indicates whether FW supports rx_mc_bc_cnt
  * feature or not, if first bit is 1 it indictes that FW supports this
  * feature, if it is 0 it indicates FW doesn't support this feature
+ * @support_mode: Max supported mode of a station currently
+ * connected to sap
  */
 typedef struct {
 	bool isUsed;
@@ -1107,6 +1109,7 @@ typedef struct {
 	uint16_t capability;
 	uint32_t rx_mc_bc_cnt;
 	uint32_t rx_retry_cnt;
+	uint8_t support_mode;
 } hdd_station_info_t;
 
 /**
@@ -2714,7 +2717,7 @@ static inline int hdd_process_pktlog_command(hdd_context_t *hdd_ctx,
 }
 #endif /* REMOVE_PKT_LOG */
 
-#ifdef FEATURE_SG
+#if defined(FEATURE_SG) && !defined(CONFIG_HL_SUPPORT)
 /**
  * hdd_set_sg_flags() - enable SG flag in the network device
  * @hdd_ctx: HDD context
