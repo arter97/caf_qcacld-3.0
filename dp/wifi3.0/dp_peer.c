@@ -461,14 +461,6 @@ int dp_peer_add_ast(struct dp_soc *soc,
 
 	qdf_spin_lock_bh(&soc->ast_lock);
 
-	/* fw supports only 2 times the max_peers ast entries */
-	if (soc->num_ast_entries >= soc->max_ast_index) {
-		qdf_spin_unlock_bh(&soc->ast_lock);
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  FL("Max ast entries reached"));
-		return ret;
-	}
-
 	/* If AST entry already exists , just return from here */
 	ast_entry = dp_peer_ast_hash_find(soc, mac_addr);
 
@@ -532,7 +524,6 @@ int dp_peer_add_ast(struct dp_soc *soc,
 	ast_entry->is_active = TRUE;
 	TAILQ_INSERT_TAIL(&peer->ast_entry_list, ast_entry, ase_list_elem);
 	DP_STATS_INC(soc, ast.added, 1);
-	soc->num_ast_entries++;
 	dp_peer_ast_hash_add(soc, ast_entry);
 	qdf_spin_unlock_bh(&soc->ast_lock);
 
@@ -575,7 +566,6 @@ void dp_peer_del_ast(struct dp_soc *soc, struct dp_ast_entry *ast_entry)
 		DP_STATS_INC(soc, ast.deleted, 1);
 		dp_peer_ast_hash_remove(soc, ast_entry);
 		qdf_mem_free(ast_entry);
-		soc->num_ast_entries--;
 	}
 }
 #else
@@ -603,7 +593,6 @@ void dp_peer_del_ast(struct dp_soc *soc, struct dp_ast_entry *ast_entry)
 	DP_STATS_INC(soc, ast.deleted, 1);
 	dp_peer_ast_hash_remove(soc, ast_entry);
 	qdf_mem_free(ast_entry);
-	soc->num_ast_entries--;
 }
 #endif
 
@@ -821,7 +810,6 @@ void dp_peer_ast_free_entry(struct dp_soc *soc,
 	DP_STATS_INC(soc, ast.deleted, 1);
 	dp_peer_ast_hash_remove(soc, ast_entry);
 	qdf_mem_free(ast_entry);
-	soc->num_ast_entries--;
 }
 #endif
 
@@ -1109,8 +1097,9 @@ dp_rx_peer_map_handler(void *soc_handle, uint16_t peer_id, uint16_t hw_peer_id,
 
 	peer = soc->peer_id_to_obj_map[peer_id];
 
-	if ((hw_peer_id < 0) || (hw_peer_id >= soc->max_ast_index)) {
-		qdf_print("invalid hw_peer_id: %d\n", hw_peer_id);
+	if ((hw_peer_id < 0) || (hw_peer_id > (WLAN_UMAC_PSOC_MAX_PEERS * 2))) {
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
+			"invalid hw_peer_id: %d", hw_peer_id);
 		qdf_assert_always(0);
 	}
 

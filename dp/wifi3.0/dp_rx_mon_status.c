@@ -85,7 +85,7 @@ dp_rx_populate_cdp_indication_ppdu(struct dp_pdev *pdev,
 	cdp_rx_ppdu->lsig_a = ppdu_info->rx_status.rate;
 
 	ast_index = ppdu_info->rx_status.ast_index;
-	if (ast_index >= soc->max_ast_index) {
+	if (ast_index >= (WLAN_UMAC_PSOC_MAX_PEERS * 2)) {
 		cdp_rx_ppdu->peer_id = HTT_INVALID_PEER;
 		return;
 	}

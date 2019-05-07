@@ -942,8 +942,6 @@ struct dp_soc {
 	} ipa_uc_rx_rsc;
 #endif
 	uint8_t enable_da;
-	uint32_t max_ast_index;
-	uint32_t num_ast_entries;
 };
 
 #ifdef IPA_OFFLOAD
