@@ -7276,7 +7276,7 @@ static QDF_STATUS dp_peer_map_attach_wifi3(struct cdp_soc_t  *soc_hdl,
 	while (soc->max_ast_index > val)
 		val <<= 1;
 
-	soc->max_ast_index = (val >> 1) + 1 + CFG_TGT_AST_SKID_LIMIT_QCA8074;
+	soc->max_ast_index = (val >> 1) + 1;
 	qdf_print ("%s max_peers %u, max_ast_index %u\n",
 		   __func__, max_peers, soc->max_ast_index);
 
