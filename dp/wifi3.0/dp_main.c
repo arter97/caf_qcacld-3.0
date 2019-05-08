@@ -5522,6 +5522,8 @@ dp_print_pdev_rx_mon_stats(struct dp_pdev *pdev)
 		       rx_mon_stats->dup_mon_linkdesc_cnt);
 	DP_PRINT_STATS("dup_mon_buf_cnt = %d",
 		       rx_mon_stats->dup_mon_buf_cnt);
+	DP_PRINT_STATS("dup_desc_inv_addr_cnt = %d",
+			   rx_mon_stats->dup_desc_inv_addr_cnt);
 }
 
 /**

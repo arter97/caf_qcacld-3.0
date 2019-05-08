@@ -213,6 +213,14 @@ dp_rx_mon_mpdu_pop(struct dp_soc *soc, uint32_t mac_id,
 			qdf_assert_always(rx_desc);
 			msdu = rx_desc->nbuf;
 
+			if (qdf_unlikely(msdu == NULL ||
+				msdu_list.paddr[i] != qdf_nbuf_get_frag_paddr(msdu, 0) ||
+				!rx_desc->in_use)) {
+				drop_mpdu = true;
+				dp_pdev->rx_mon_stats.dup_desc_inv_addr_cnt++;
+				continue;
+			}
+
 			if (rx_desc->unmapped == 0) {
 				qdf_nbuf_unmap_single(soc->osdev, msdu,
 						      QDF_DMA_FROM_DEVICE);
