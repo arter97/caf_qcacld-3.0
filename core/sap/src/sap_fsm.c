@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -999,6 +999,7 @@ QDF_STATUS sap_goto_channel_sel(struct sap_context *sap_context,
 		if (!vdev) {
 			QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
 				  FL("Invalid vdev objmgr"));
+			qdf_mem_free(req);
 			return QDF_STATUS_E_INVAL;
 		}
 
