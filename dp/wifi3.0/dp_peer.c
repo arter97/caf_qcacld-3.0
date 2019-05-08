@@ -537,7 +537,6 @@ int dp_peer_add_ast(struct dp_soc *soc,
 	DP_STATS_INC(soc, ast.added, 1);
 	soc->num_ast_entries++;
 	dp_peer_ast_hash_add(soc, ast_entry);
-	qdf_spin_unlock_bh(&soc->ast_lock);
 
 	if (ast_entry->type == CDP_TXRX_AST_TYPE_MEC)
 		qdf_mem_copy(next_node_mac, peer->vdev->mac_addr.raw, 6);
@@ -552,10 +551,13 @@ int dp_peer_add_ast(struct dp_soc *soc,
 				peer->vdev->osif_vdev,
 				mac_addr,
 				next_node_mac,
-				flags))
+				flags)) {
+			qdf_spin_unlock_bh(&soc->ast_lock);
 			return 0;
+		}
 	}
 
+	qdf_spin_unlock_bh(&soc->ast_lock);
 	return ret;
 }
 
