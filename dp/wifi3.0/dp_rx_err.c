@@ -1044,19 +1044,19 @@ dp_rx_err_process(struct dp_soc *soc, void *hal_ring, uint32_t quota)
 		link_desc_va = dp_rx_cookie_2_link_desc_va(soc, &hbi);
 		hal_rx_msdu_list_get(link_desc_va, &msdu_list, &num_msdus);
 
-		rx_desc = dp_rx_cookie_2_va_rxdma_buf(soc,
-						      msdu_list.sw_cookie[0]);
-		mac_id = rx_desc->pool_id;
-
 		if (qdf_unlikely((msdu_list.rbm[0] !=
 						HAL_RX_BUF_RBM_SW3_BM) &&
 				(msdu_list.rbm[0] !=
 					HAL_RX_BUF_RBM_WBM_IDLE_DESC_LIST))) {
 			/* TODO */
 			/* Call appropriate handler */
-			DP_STATS_INC(soc, rx.err.invalid_rbm, 1);
-			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-				FL("Invalid RBM %d"), rbm);
+			if (!wlan_cfg_get_dp_soc_nss_cfg(soc->wlan_cfg_ctx)) {
+				DP_STATS_INC(soc, rx.err.invalid_rbm, 1);
+				QDF_TRACE(QDF_MODULE_ID_DP,
+					  QDF_TRACE_LEVEL_ERROR,
+					  FL("Invalid RBM %d"),
+					     msdu_list.rbm[0]);
+			}
 
 			/* Return link descriptor through WBM ring (SW2WBM)*/
 			dp_rx_link_desc_return(soc, ring_desc,
@@ -1064,6 +1064,11 @@ dp_rx_err_process(struct dp_soc *soc, void *hal_ring, uint32_t quota)
 			continue;
 		}
 
+		rx_desc = dp_rx_cookie_2_va_rxdma_buf(soc,
+						      msdu_list.sw_cookie[0]);
+		qdf_assert_always(rx_desc);
+
+		mac_id = rx_desc->pool_id;
 
 		/* Get the MPDU DESC info */
 		hal_rx_mpdu_desc_info_get(ring_desc, &mpdu_desc_info);
