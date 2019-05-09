@@ -822,7 +822,8 @@ ol_tx_ll_fast(ol_txrx_vdev_handle vdev, qdf_nbuf_t msdu_list)
 					if (QDF_NBUF_CB_PADDR(msdu) == 0) {
 						qdf_device_t qdf_ctx;
 						qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
-						qdf_nbuf_unmap_single(qdf_ctx, msdu, QDF_DMA_TO_DEVICE);
+						if (qdf_ctx)
+							qdf_nbuf_unmap_single(qdf_ctx, msdu, QDF_DMA_TO_DEVICE);
 					}
 
 					/*
@@ -950,7 +951,8 @@ ol_tx_ll_fast(ol_txrx_vdev_handle vdev, qdf_nbuf_t msdu_list)
 				if (QDF_NBUF_CB_PADDR(msdu) == 0) {
 					qdf_device_t qdf_ctx;
 					qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
-					qdf_nbuf_unmap_single(qdf_ctx, msdu, QDF_DMA_TO_DEVICE);
+					if (qdf_ctx)
+						qdf_nbuf_unmap_single(qdf_ctx, msdu, QDF_DMA_TO_DEVICE);
 				}
 
 				/*
