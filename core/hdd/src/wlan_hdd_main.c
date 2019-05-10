@@ -7678,7 +7678,7 @@ static int hdd_update_cds_config(hdd_context_t *hdd_ctx)
 				hdd_ctx->config->IpaUcTxBufCount);
 		if (!hdd_ctx->config->IpaUcTxBufCount) {
 			hdd_err("Failed to round down IpaUcTxBufCount");
-			return -EINVAL;
+			goto exit;
 		}
 		hdd_warn("IpaUcTxBufCount rounded down to %d",
 			hdd_ctx->config->IpaUcTxBufCount);
@@ -7694,7 +7694,7 @@ static int hdd_update_cds_config(hdd_context_t *hdd_ctx)
 				hdd_ctx->config->IpaUcRxIndRingCount);
 		if (!hdd_ctx->config->IpaUcRxIndRingCount) {
 			hdd_err("Failed to round down IpaUcRxIndRingCount");
-			return -EINVAL;
+			goto exit;
 		}
 		hdd_info("IpaUcRxIndRingCount rounded down to %d",
 			hdd_ctx->config->IpaUcRxIndRingCount);
@@ -7731,6 +7731,10 @@ static int hdd_update_cds_config(hdd_context_t *hdd_ctx)
 	hdd_lpass_populate_cds_config(cds_cfg, hdd_ctx);
 	cds_init_ini_config(cds_cfg);
 	return 0;
+
+exit:
+	qdf_mem_free(cds_cfg);
+	return -EINVAL;
 }
 
 /**

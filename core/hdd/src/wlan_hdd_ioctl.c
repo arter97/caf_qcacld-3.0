@@ -5179,7 +5179,7 @@ static int drv_cmd_get_ibss_peer_info_all(hdd_adapter_t *adapter,
 		if (copy_to_user(priv_data->buf, extra, numOfBytestoPrint)) {
 			hdd_err("Copy into user data buffer failed ");
 			ret = -EFAULT;
-			goto exit;
+			goto mem_free;
 		}
 
 		priv_data->buf[numOfBytestoPrint] = '\0';
@@ -5192,7 +5192,7 @@ static int drv_cmd_get_ibss_peer_info_all(hdd_adapter_t *adapter,
 				    length - numOfBytestoPrint + 1)) {
 				hdd_err("Copy into user data buffer failed ");
 				ret = -EFAULT;
-				goto exit;
+				goto mem_free;
 			}
 			hdd_debug("%s", &priv_data->buf[numOfBytestoPrint]);
 		}
@@ -5208,6 +5208,8 @@ static int drv_cmd_get_ibss_peer_info_all(hdd_adapter_t *adapter,
 	}
 	ret = 0;
 
+mem_free:
+	qdf_mem_free(extra);
 exit:
 	return ret;
 }
