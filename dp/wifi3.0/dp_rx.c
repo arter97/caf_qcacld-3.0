@@ -1740,10 +1740,10 @@ dp_rx_process(struct dp_intr *int_ctx, void *hal_ring, uint32_t quota)
 			if ((qdf_nbuf_is_sa_valid(nbuf) &&
 			    (!hal_rx_msdu_end_sa_sw_peer_id_get(rx_tlv_hdr) ||
 			     (hal_rx_msdu_end_sa_idx_get(rx_tlv_hdr) >
-				(WLAN_UMAC_PSOC_MAX_PEERS *2)))) ||
+				wlan_cfg_get_max_ast_idx(soc->wlan_cfg_ctx)))) ||
 			    (qdf_nbuf_is_da_valid(nbuf) &&
 			     (hal_rx_msdu_end_da_idx_get(rx_tlv_hdr) >
-			      (WLAN_UMAC_PSOC_MAX_PEERS *2)))) {
+			      wlan_cfg_get_max_ast_idx(soc->wlan_cfg_ctx)))) {
 
 				qdf_nbuf_free(nbuf);
 				nbuf = next;
