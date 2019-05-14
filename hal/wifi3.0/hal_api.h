@@ -427,7 +427,7 @@ static inline int hal_srng_access_start_unlocked(void *hal_soc, void *hal_ring)
 						       qdf_mem_virt_to_phys
 						       (desc),
 						       QDF_DMA_FROM_DEVICE,
-						       srng->entry_size);
+						       (srng->entry_size << 2));
 				prefetch(desc);
 			}
 		}
@@ -486,7 +486,7 @@ static inline void *hal_srng_dst_get_next(void *hal_soc, void *hal_ring)
 			qdf_mem_dma_cache_sync(soc->qdf_dev,
 					       qdf_mem_virt_to_phys(desc_next),
 					       QDF_DMA_FROM_DEVICE,
-					       srng->entry_size);
+					       (srng->entry_size << 2));
 			prefetch(desc_next);
 		}
 
