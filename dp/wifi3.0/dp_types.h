@@ -1579,6 +1579,13 @@ struct dp_pdev {
 	struct dp_pdev_tx_capture tx_capture;
 	/* stats counter for tx ppdu processed */
 	uint64_t tx_ppdu_proc;
+
+	uint32_t *ppdu_tlv_buf; /* Buffer to hold HTT ppdu stats TLVs*/
+
+	/* nbuf queue to maintain rx ppdu status buffer
+	 * belonging to one ppdu
+	 */
+	qdf_nbuf_queue_t rx_ppdu_buf_q;
 };
 
 struct dp_peer;
