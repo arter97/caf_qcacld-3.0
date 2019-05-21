@@ -1498,6 +1498,12 @@ static inline void dp_process_htt_stat_msg(struct htt_stats_context *htt_stats,
 				else
 					dp_htt_stats_print_tag(tlv_type, tlv_start);
 
+				if (tlv_type == HTT_STATS_PEER_DETAILS_TAG ||
+				    tlv_type == HTT_STATS_PEER_STATS_CMN_TAG)
+					dp_peer_update_inactive_time(pdev,
+								     tlv_type,
+								     tlv_start);
+
 				msg_remain_len -= tlv_remain_len;
 
 				msg_word = (uint32_t *)
@@ -3400,5 +3406,38 @@ QDF_STATUS dp_h2t_cfg_stats_msg_send(struct dp_pdev *pdev,
 	SET_HTC_PACKET_NET_BUF_CONTEXT(&pkt->htc_pkt, msg);
 	DP_HTT_SEND_HTC_PKT(soc, pkt);
 	return 0;
+}
+
+void
+dp_peer_update_inactive_time(struct dp_pdev *pdev, uint32_t tag_type,
+			     uint32_t *tag_buf)
+{
+	switch (tag_type) {
+	case HTT_STATS_PEER_DETAILS_TAG:
+	{
+		htt_peer_details_tlv *dp_stats_buf =
+			(htt_peer_details_tlv *)tag_buf;
+		pdev->fw_stats_peer_id = dp_stats_buf->sw_peer_id;
+	}
+	break;
+
+	case HTT_STATS_PEER_STATS_CMN_TAG:
+	{
+		htt_peer_stats_cmn_tlv *dp_stats_buf =
+		(htt_peer_stats_cmn_tlv *)tag_buf;
+
+		struct dp_peer *peer = dp_peer_find_by_id(pdev->soc,
+				pdev->fw_stats_peer_id);
+
+		if (peer && !peer->bss_peer) {
+			peer->stats.tx.inactive_time =
+				dp_stats_buf->inactive_time;
+			qdf_event_set(&pdev->fw_peer_stats);
+		}
+	}
+	break;
+	default:
+		qdf_err("Invalid tag_type");
+	}
 }
 #endif

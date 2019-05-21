@@ -1252,6 +1252,9 @@ struct dp_pdev {
 
 	union dp_rx_desc_list_elem_t *free_list_head;
 	union dp_rx_desc_list_elem_t *free_list_tail;
+	/* Cached peer_id from htt_peer_details_tlv */
+	uint8_t fw_stats_peer_id;
+	qdf_event_t fw_peer_stats;
 };
 
 struct dp_peer;

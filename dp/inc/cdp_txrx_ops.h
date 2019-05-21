@@ -648,10 +648,13 @@ struct cdp_host_stats_ops {
 
 	void
 		(*get_fw_peer_stats)(struct cdp_pdev *pdev, uint8_t *addr,
-				uint32_t cap);
+				uint32_t cap, uint32_t copy_stats);
 	void
 		(*get_htt_stats)(struct cdp_pdev *pdev, void *data,
 				uint32_t data_len);
+	struct cdp_peer_stats*
+		(*txrx_get_peer_stats)(struct cdp_peer *peer);
+
 };
 
 struct cdp_wds_ops {

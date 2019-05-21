@@ -384,7 +384,8 @@ cdp_reset_lro_stats(ol_txrx_soc_handle soc, struct cdp_vdev *vdev)
 }
 
 static inline void cdp_get_dp_fw_peer_stats(ol_txrx_soc_handle soc,
-		struct cdp_pdev *pdev, uint8_t *mac, uint32_t caps)
+		struct cdp_pdev *pdev, uint8_t *mac, uint32_t caps,
+		uint32_t copy_stats)
 {
 	if (!soc || !soc->ops) {
 		QDF_TRACE(QDF_MODULE_ID_CDP, QDF_TRACE_LEVEL_DEBUG,
@@ -398,7 +399,7 @@ static inline void cdp_get_dp_fw_peer_stats(ol_txrx_soc_handle soc,
 		return;
 
 	soc->ops->host_stats_ops->get_fw_peer_stats
-			(pdev, mac, caps);
+			(pdev, mac, caps, copy_stats);
 }
 
 static inline void cdp_get_dp_htt_stats(ol_txrx_soc_handle soc,
@@ -410,6 +411,29 @@ static inline void cdp_get_dp_htt_stats(ol_txrx_soc_handle soc,
 		return soc->ops->host_stats_ops->get_htt_stats
 			(pdev, data, data_len);
 	return;
+}
+
+/**
+ * @brief Call to get peer stats
+ *
+ * @param peer - dp peer object
+ * @return - struct cdp_peer_stats
+ */
+static inline struct cdp_peer_stats *
+cdp_host_get_peer_stats(ol_txrx_soc_handle soc, struct cdp_peer *peer)
+{
+	if (!soc || !soc->ops) {
+		QDF_TRACE(QDF_MODULE_ID_CDP, QDF_TRACE_LEVEL_DEBUG,
+			  "%s: Invalid Instance", __func__);
+		QDF_BUG(0);
+		return NULL;
+	}
+
+	if (!soc->ops->host_stats_ops ||
+	    !soc->ops->host_stats_ops->txrx_get_peer_stats)
+		return NULL;
+
+	return soc->ops->host_stats_ops->txrx_get_peer_stats(peer);
 }
 
 /**

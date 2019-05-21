@@ -185,6 +185,8 @@ struct cdp_tx_stats {
 	uint32_t ru_tones;
 	/* RU location */
 	uint32_t ru_loc[MAX_RU_LOCATIONS];
+	/* STA inactive time */
+	uint32_t inactive_time;
 };
 
 /* Rx Level Stats */

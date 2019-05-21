@@ -2928,6 +2928,7 @@ static struct cdp_pdev *dp_pdev_attach_wifi3(struct cdp_soc_t *txrx_soc,
 	TAILQ_INIT(&pdev->ppdu_info_list);
 	pdev->tlv_count = 0;
 	pdev->list_depth = 0;
+	qdf_event_create(&pdev->fw_peer_stats);
 
 	return (struct cdp_pdev *)pdev;
 
@@ -6470,7 +6471,7 @@ dp_disable_enhanced_stats(struct cdp_pdev *pdev_handle)
  */
 static void
 dp_get_fw_peer_stats(struct cdp_pdev *pdev_handle, uint8_t *mac_addr,
-		uint32_t cap)
+		uint32_t cap, uint32_t is_wait)
 {
 	struct dp_pdev *pdev = (struct dp_pdev *)pdev_handle;
 	int i;
@@ -6494,10 +6495,20 @@ dp_get_fw_peer_stats(struct cdp_pdev *pdev_handle, uint8_t *mac_addr,
 	config_param3 |= (mac_addr[4] & 0x000000ff);
 	config_param3 |= ((mac_addr[5] << 8) & 0x0000ff00);
 
-	dp_h2t_ext_stats_msg_send(pdev, HTT_DBG_EXT_STATS_PEER_INFO,
-			config_param0, config_param1, config_param2,
-			config_param3, 0, 0);
-
+	if (is_wait) {
+		qdf_event_reset(&pdev->fw_peer_stats);
+		dp_h2t_ext_stats_msg_send(pdev, HTT_DBG_EXT_STATS_PEER_INFO,
+					  config_param0, config_param1,
+					  config_param2, config_param3,
+					  0, 1);
+		qdf_wait_single_event(&pdev->fw_peer_stats,
+				      DP_FW_PEER_STATS_CMP_TIMEOUT);
+	} else {
+		dp_h2t_ext_stats_msg_send(pdev, HTT_DBG_EXT_STATS_PEER_INFO,
+					  config_param0, config_param1,
+					  config_param2, config_param3,
+					  0, 0);
+	}
 }
 
 /* This struct definition will be removed from here
@@ -7272,6 +7283,21 @@ dp_soc_set_dp_txrx_handle(struct cdp_soc *soc_handle, void *txrx_handle)
 	soc->external_txrx_handle = txrx_handle;
 }
 
+/* dp_txrx_get_peer_stats - will return cdp_peer_stats
+ * @peer_handle: DP_PEER handle
+ *
+ * return : cdp_peer_stats pointer
+ */
+static struct cdp_peer_stats*
+		dp_txrx_get_peer_stats(struct cdp_peer *peer_handle)
+{
+	struct dp_peer *peer = (struct dp_peer *)peer_handle;
+
+	qdf_assert(peer);
+
+	return &peer->stats;
+}
+
 #ifdef FEATURE_AST
 static void dp_peer_teardown_wifi3(struct cdp_vdev *vdev_hdl, void *peer_hdl)
 {
@@ -7450,6 +7476,7 @@ static struct cdp_host_stats_ops dp_ops_host_stats = {
 	.txrx_enable_enhanced_stats = dp_enable_enhanced_stats,
 	.txrx_disable_enhanced_stats = dp_disable_enhanced_stats,
 	.txrx_stats_publish = dp_txrx_stats_publish,
+	.txrx_get_peer_stats = dp_txrx_get_peer_stats,
 	/* TODO */
 };
 
