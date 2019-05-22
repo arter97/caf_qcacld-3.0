@@ -2202,5 +2202,22 @@ static inline void target_psoc_get_version_info(
 	*bdf_minor =
 		psoc_info->info.service_ext2_param.bdf_reg_db_version_minor;
 }
+
+#ifdef WLAN_SUPPORT_TWT
+static inline void target_if_set_twt_ap_pdev_count
+		(struct tgt_info *info, struct target_psoc_info *tgt_hdl)
+{
+	if (!tgt_hdl)
+		return;
+
+	info->wlan_res_cfg.twt_ap_pdev_count =
+					target_psoc_get_num_radios(tgt_hdl);
+}
+#else
+static inline void target_if_set_twt_ap_pdev_count
+		(struct tgt_info *info, struct target_psoc_info *tgt_hdl)
+{
+}
+#endif /* WLAN_SUPPORT_TWT */
 #endif
 
