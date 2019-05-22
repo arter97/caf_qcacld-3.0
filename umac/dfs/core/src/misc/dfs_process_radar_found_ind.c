@@ -714,8 +714,8 @@ QDF_STATUS dfs_process_radar_ind(struct wlan_dfs *dfs,
 	uint8_t channels[NUM_CHANNELS_160MHZ];
 	uint8_t num_channels;
 	QDF_STATUS status;
-	uint32_t freq_center;
-	uint32_t radarfound_freq;
+	uint32_t freq_center = 0;
+	uint32_t radarfound_freq = 0;
 
 	if (!dfs->dfs_curchan) {
 		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS, "dfs->dfs_curchan is NULL");
