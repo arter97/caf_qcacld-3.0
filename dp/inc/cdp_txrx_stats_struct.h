@@ -111,7 +111,8 @@
 #ifdef CONFIG_MCL
 #define CDP_WDI_NUM_EVENTS WDI_NUM_EVENTS
 #else
-#define CDP_WDI_NUM_EVENTS 26
+/* The enum for WDI events has 27 elements */
+#define CDP_WDI_NUM_EVENTS 27
 #endif
 
 #define CDP_FCTL_RETRY 0x0800
