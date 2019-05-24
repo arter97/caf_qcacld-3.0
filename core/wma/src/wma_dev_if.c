@@ -4979,8 +4979,8 @@ void wma_delete_bss(tp_wma_handle wma, tpDeleteBssParams params)
 
 	while (ol_txrx_get_tx_pending(pdev) && max_wait_iterations) {
 		WMA_LOGW(FL("Waiting for outstanding packet to drain."));
-		qdf_wait_single_event(&wma->tx_queue_empty_event,
-				      WMA_TX_Q_RECHECK_TIMER_MAX_WAIT);
+		qdf_wait_for_event_completion(&wma->tx_queue_empty_event,
+					      WMA_TX_Q_RECHECK_TIMER_MAX_WAIT);
 		max_wait_iterations--;
 	}
 
