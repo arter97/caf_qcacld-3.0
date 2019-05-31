@@ -1983,6 +1983,40 @@ void cds_trigger_recovery(enum qdf_hang_reason reason)
 }
 
 /**
+ * cds_trigger_ssr() - trigger system recovery
+ * @source: trigger source
+ *
+ * Return: none
+ */
+void cds_trigger_ssr(const char *source)
+{
+	qdf_device_t qdf;
+
+	qdf = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
+	if (!qdf) {
+		cds_err("Qdf context is null");
+		return;
+	}
+
+	if (cds_is_driver_loading()) {
+		cds_err("Loading in progress; ignoring recovery trigger");
+		return;
+	}
+
+	if (cds_is_driver_unloading()) {
+		cds_err("Unloading in progress; ignoring recovery trigger");
+		return;
+	}
+
+	if (cds_is_driver_recovering()) {
+		cds_err("Recovery in progress; ignoring recovery trigger");
+		return;
+	}
+
+	pld_device_crashed(qdf->dev);
+}
+
+/**
  * cds_get_monotonic_boottime() - Get kernel boot time.
  *
  * Return: Time in microseconds
