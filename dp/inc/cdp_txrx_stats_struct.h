@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -1291,6 +1291,11 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_TWICE_ANTENNA_GAIN = 369,
 	OL_ATH_PARAM_HE_UL_RU_ALLOCATION = 370,
 	OL_ATH_PARAM_DFS_NOL_SUBCHANNEL_MARKING = 371,
+	OL_ATH_PARAM_ACS_CHAN_GRADE_ALGO = 411,
+	OL_ATH_PARAM_ACS_CHAN_EFFICIENCY_VAR = 412,
+	OL_ATH_PARAM_ACS_NEAR_RANGE_WEIGHTAGE = 413,
+	OL_ATH_PARAM_ACS_MID_RANGE_WEIGHTAGE = 414,
+	OL_ATH_PARAM_ACS_FAR_RANGE_WEIGHTAGE = 415,
 };
 
 /* Enumeration of PDEV Configuration parameter */
