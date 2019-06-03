@@ -1823,8 +1823,13 @@ static void cds_trigger_recovery_handler(const char *func, const uint32_t line)
 
 	if (!in_interrupt() && !irqs_disabled()) {
 		ret = pld_collect_rddm(qdf->dev);
-		if (ret < 0 && ret != -EOPNOTSUPP)
+		if (ret < 0 && ret != -EOPNOTSUPP) {
 			QDF_DEBUG_PANIC("Fail to collect FW ramdump %d", ret);
+		} else if (pld_get_bus_type(qdf->dev) == PLD_BUS_TYPE_USB) {
+			cds_err("pld_collect_rddm success for USB");
+			cds_set_recovery_in_progress(1);
+			return;
+		}
 	}
 
 	/* if *wlan* recovery is disabled, crash here for debugging */

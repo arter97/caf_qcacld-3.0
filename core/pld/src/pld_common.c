@@ -200,7 +200,7 @@ static struct dev_node *pld_get_dev_node(struct device *dev)
  *
  * Return: PLD bus type
  */
-static enum pld_bus_type pld_get_bus_type(struct device *dev)
+enum pld_bus_type pld_get_bus_type(struct device *dev)
 {
 	struct dev_node *dev_node = pld_get_dev_node(dev);
 
@@ -1754,13 +1754,16 @@ int pld_force_assert_target(struct device *dev)
 int pld_collect_rddm(struct device *dev)
 {
 	enum pld_bus_type type = pld_get_bus_type(dev);
+	struct device *ifdev;
 
 	switch (type) {
 	case PLD_BUS_TYPE_PCIE:
 		return pld_pcie_collect_rddm(dev);
+	case PLD_BUS_TYPE_USB:
+		ifdev = pld_get_if_dev(dev);
+		return pld_usb_collect_rddm(ifdev);
 	case PLD_BUS_TYPE_SNOC:
 	case PLD_BUS_TYPE_SDIO:
-	case PLD_BUS_TYPE_USB:
 		return 0;
 	default:
 		pr_err("Invalid device type %d\n", type);

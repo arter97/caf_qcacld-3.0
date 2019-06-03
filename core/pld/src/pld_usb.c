@@ -25,9 +25,6 @@
 #include <linux/platform_device.h>
 #include <linux/err.h>
 #include <linux/list.h>
-#ifdef CONFIG_PLD_USB_CNSS
-#include <net/cnss2.h>
-#endif
 #include "osif_psoc_sync.h"
 
 #define VENDOR_ATHR             0x0CF3
@@ -112,7 +109,6 @@ static void pld_usb_remove(struct usb_interface *interface)
 	pld_del_dev(pld_context, &pdev->dev);
 
 	atomic_set(&pld_usb_reg_done, false);
-
 	pr_info("%s: done!\n", __func__);
 
 out:

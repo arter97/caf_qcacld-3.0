@@ -692,6 +692,7 @@ int pld_idle_shutdown(struct device *dev,
 int pld_idle_restart(struct device *dev,
 		     int (*restart_cb)(struct device *dev));
 
+enum pld_bus_type pld_get_bus_type(struct device *dev);
 #if defined(CONFIG_WCNSS_MEM_PRE_ALLOC) && defined(FEATURE_SKB_PRE_ALLOC)
 
 /**
