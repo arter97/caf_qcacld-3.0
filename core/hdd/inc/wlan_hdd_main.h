@@ -116,6 +116,8 @@
 #define TDLS_INIT_DONE         (6)
 #define ACS_PENDING            (7)
 #define SOFTAP_INIT_DONE       (8)
+/* Interface went down during SSR*/
+#define DOWN_DURING_SSR        (9)
 
 /* HDD global event flags */
 #define ACS_IN_PROGRESS        (0)
@@ -2106,6 +2108,7 @@ struct hdd_context_s {
 	hdd_adapter_t *cap_tsf_context;
 #endif
 	struct sta_ap_intf_check_work_ctx *sta_ap_intf_check_work_info;
+	bool force_rsne_override;
 	qdf_wake_lock_t monitor_mode_wakelock;
 #ifdef WLAN_POWER_DEBUGFS
 	/* mutex lock to block concurrent access */

@@ -625,92 +625,6 @@ struct reg_table_entry g_registry_table[] = {
 		     CFG_VC_MODE_BITMAP_MIN,
 		     CFG_VC_MODE_BITMAP_MAX),
 
-
-/*
- * <ini>
- * gApAutoChannelSelection - Force ACS from ini
- * @Min: 0
- * @Max: 1
- * @Default: 0
- *
- * This ini is used to set to enable force acs from driver.
- * If enabled, channel/ hw config from hostapd is ignored.
- * Driver uses INI params dot11Mode, channel bonding mode and vht chan width
- * to derive ACS HW mode and operating BW.
- *
- * Non android platforms shall not use force ACS method and rely on hostapd
- * driven ACS method for concurrent SAP ACS configuration, OBSS etc.
- *
- * Related: Only applicable if gCoalesingInIBSS is 0
- *
- * Supported Feature: SAP
- *
- * Usage: Internal/External
- *
- * </ini>
- */
-	REG_VARIABLE(CFG_FORCE_SAP_ACS, WLAN_PARAM_Integer,
-		struct hdd_config, force_sap_acs,
-		VAR_FLAGS_DYNAMIC_CFG |
-		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-		CFG_FORCE_SAP_ACS_DEFAULT,
-		CFG_FORCE_SAP_ACS_MIN,
-		CFG_FORCE_SAP_ACS_MAX),
-
-/*
- * <ini>
- * gAPChannelSelectStartChannel - start channel for ACS
- * @Min: 0
- * @Max: 0xFF
- * @Default: 1
- *
- * This ini is used to set start channel for ACS.
- * ACS scan will choose channel between force_sap_acs_st_ch
- * and force_sap_acs_end_ch
- *
- * Related: Only applicable gAPChannelSelectEndChannel is set
- *
- * Supported Feature: SAP
- *
- * Usage: Internal/External
- *
- * </ini>
- */
-	REG_VARIABLE(CFG_FORCE_SAP_ACS_START_CH, WLAN_PARAM_Integer,
-		struct hdd_config, force_sap_acs_st_ch,
-		VAR_FLAGS_DYNAMIC_CFG |
-		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-		CFG_FORCE_SAP_ACS_START_CH_DEFAULT,
-		CFG_FORCE_SAP_ACS_START_CH_MIN,
-		CFG_FORCE_SAP_ACS_START_CH_MAX),
-
-/*
- * <ini>
- * gAPChannelSelectEndChannel - end channel for ACS
- * @Min: 0
- * @Max: 0xFF
- * @Default: 11
- *
- * This ini is used to set end channel for ACS.
- * ACS scan will choose channel between force_sap_acs_st_ch
- * and force_sap_acs_end_ch
- *
- * Related: Only applicable if gAPChannelSelectStartChannel is set
- *
- * Supported Feature: SAP
- *
- * Usage: Internal/External
- *
- * </ini>
- */
-	REG_VARIABLE(CFG_FORCE_SAP_ACS_END_CH, WLAN_PARAM_Integer,
-		struct hdd_config, force_sap_acs_end_ch,
-		VAR_FLAGS_DYNAMIC_CFG |
-		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
-		CFG_FORCE_SAP_ACS_END_CH_DEFAULT,
-		CFG_FORCE_SAP_ACS_END_CH_MIN,
-		CFG_FORCE_SAP_ACS_END_CH_MAX),
-
 	REG_VARIABLE(CFG_ENABLE_SAP_MANDATORY_CHAN_LIST, WLAN_PARAM_Integer,
 		struct hdd_config, enable_sap_mandatory_chan_list,
 		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -3933,6 +3847,12 @@ struct reg_table_entry g_registry_table[] = {
 		     CFG_STA_SAP_SCC_ON_DFS_CHAN_MIN,
 		     CFG_STA_SAP_SCC_ON_DFS_CHAN_MAX),
 
+	REG_VARIABLE(CFG_STA_SAP_SCC_ON_LTE_COEX_CHAN, WLAN_PARAM_HexInteger,
+		     struct hdd_config, sta_sap_scc_on_lte_coex_chan,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_STA_SAP_SCC_ON_LTE_COEX_CHAN_DEFAULT,
+		     CFG_STA_SAP_SCC_ON_LTE_COEX_CHAN_MIN,
+		     CFG_STA_SAP_SCC_ON_LTE_COEX_CHAN_MAX),
 
 #ifdef FEATURE_WLAN_SCAN_PNO
 	REG_VARIABLE(CFG_PNO_CHANNEL_PREDICTION_NAME, WLAN_PARAM_Integer,
@@ -5381,6 +5301,13 @@ struct reg_table_entry g_registry_table[] = {
 		     CFG_ENABLE_ESP_FEATURE_MIN,
 		     CFG_ENABLE_ESP_FEATURE_MAX),
 
+	REG_VARIABLE(CFG_FORCE_RSNE_OVERRIDE_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, force_rsne_override,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_FORCE_RSNE_OVERRIDE_DEFAULT,
+		     CFG_FORCE_RSNE_OVERRIDE_MIN,
+		     CFG_FORCE_RSNE_OVERRIDE_MAX),
+
 	REG_VARIABLE(CFG_ENABLE_GCMP_NAME, WLAN_PARAM_Integer,
 		     struct hdd_config, gcmp_enabled,
 		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
@@ -6321,12 +6248,6 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
 		  pHddCtx->config->apProtection);
 	hdd_debug("Name = [gEnableApOBSSProt] value = [%u]",
 		  pHddCtx->config->apOBSSProtEnabled);
-	hdd_debug("Name = [%s] value = [%u]", CFG_FORCE_SAP_ACS,
-		pHddCtx->config->force_sap_acs);
-	hdd_debug("Name = [%s] value = [%u]", CFG_FORCE_SAP_ACS_START_CH,
-		pHddCtx->config->force_sap_acs_st_ch);
-	hdd_debug("Name = [%s] value = [%u]", CFG_FORCE_SAP_ACS_END_CH,
-		pHddCtx->config->force_sap_acs_end_ch);
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE
 	hdd_debug("Name = [sap_channel_avoidance] value = [%u]",
 		  pHddCtx->config->sap_channel_avoidance);
@@ -6799,6 +6720,9 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
 	hdd_debug("Name = [%s] value = [%u]",
 		  CFG_STA_SAP_SCC_ON_DFS_CHAN,
 		  pHddCtx->config->sta_sap_scc_on_dfs_chan);
+	hdd_debug("Name = [%s] value = [%u]",
+		  CFG_STA_SAP_SCC_ON_LTE_COEX_CHAN,
+		  pHddCtx->config->sta_sap_scc_on_lte_coex_chan);
 #ifdef FEATURE_WLAN_SCAN_PNO
 	hdd_debug("Name = [%s] Value = [%u]",
 		   CFG_PNO_CHANNEL_PREDICTION_NAME,
@@ -7190,6 +7114,9 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
 		pHddCtx->config->chan_switch_hostapd_rate_enabled);
 	hdd_debug("Name = [%s] value = [0x%x]", CFG_VC_MODE_BITMAP,
 		pHddCtx->config->vc_mode_cfg_bitmap);
+	hdd_debug("Name = [%s] Value = [%u]",
+		CFG_FORCE_RSNE_OVERRIDE_NAME,
+		pHddCtx->config->force_rsne_override);
 	hdd_debug("Name = [%s] value = [%d]",
 		  CFG_ENABLE_GCMP_NAME,
 		  pHddCtx->config->gcmp_enabled);

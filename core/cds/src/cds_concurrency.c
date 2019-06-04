@@ -5192,7 +5192,8 @@ static QDF_STATUS cds_get_channel_list(enum cds_pcl_type pcl,
 	}
 
 	while ((chan_index < num_channels) &&
-		(chan_index_5 < QDF_MAX_NUM_CHAN)) {
+	       (chan_index_5 < QDF_MAX_NUM_CHAN) &&
+	       (chan_index < QDF_MAX_NUM_CHAN)) {
 		if ((true == skip_dfs_channel) &&
 		    CDS_IS_DFS_CH(channel_list[chan_index])) {
 			chan_index++;
@@ -5889,13 +5890,30 @@ bool cds_allow_sap_go_concurrency(enum cds_con_mode mode, uint8_t channel)
 
 	if ((mode == CDS_SAP_MODE || mode == CDS_P2P_GO_MODE) && (sap_cnt ||
 				go_cnt)) {
-		if (!wma_is_dbs_enable()) {
-			/* Don't allow second SAP/GO interface if DBS is not
-			 * supported */
-			cds_debug("DBS is not supported, don't allow second SAP interface");
+		if (wma_dual_beacon_on_single_mac_mcc_capable())
+			return true;
+		if (wma_dual_beacon_on_single_mac_scc_capable()) {
+			for (id = 0; id < MAX_NUMBER_OF_CONC_CONNECTIONS;
+				id++) {
+				if (conc_connection_list[id].in_use) {
+					con_mode =
+						conc_connection_list[id].mode;
+					con_chan =
+						conc_connection_list[id].chan;
+					if (((con_mode == CDS_SAP_MODE) ||
+					    (con_mode == CDS_P2P_GO_MODE)) &&
+						(channel != con_chan)) {
+						cds_debug("Scc is supported, but first SAP and second SAP are not in same channel, So don't allow second SAP interface");
+						return false;
+					}
+				}
+			}
+			return true;
+		}
+		if (!wma_is_hw_dbs_capable()) {
+			cds_debug("DBS is not supported, mcc and scc are not supported too, don't allow second SAP interface");
 			return false;
 		}
-
 		/* If DBS is supported then allow second SAP/GO session only if
 		 * the freq band of the second SAP/GO interface is different
 		 * than the first SAP/GO interface.
@@ -9979,6 +9997,13 @@ QDF_STATUS cds_valid_sap_conc_channel_check(uint8_t *con_ch, uint8_t sap_ch)
 {
 	uint8_t channel = *con_ch;
 	uint8_t temp_channel = 0;
+	hdd_context_t *hdd_ctx;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx) {
+		cds_err("HDD context is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
 	/*
 	 * if force SCC is set, Check if conc channel is DFS
 	 * or passive or part of LTE avoided channel list.
@@ -10002,7 +10027,8 @@ QDF_STATUS cds_valid_sap_conc_channel_check(uint8_t *con_ch, uint8_t sap_ch)
 	if (cds_valid_sta_channel_check(channel)) {
 		if (CDS_IS_DFS_CH(channel) ||
 			CDS_IS_PASSIVE_OR_DISABLE_CH(channel) ||
-			!cds_is_safe_channel(channel)) {
+			!(hdd_ctx->config->sta_sap_scc_on_lte_coex_chan ||
+			  cds_is_safe_channel(channel))) {
 			if (wma_is_hw_dbs_capable()) {
 				temp_channel =
 					cds_get_alternate_channel_for_sap();

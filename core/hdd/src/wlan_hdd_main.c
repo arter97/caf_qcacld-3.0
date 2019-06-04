@@ -206,6 +206,9 @@ static qdf_wake_lock_t wlan_wake_lock;
 #define WOW_MIN_PATTERN_SIZE 6
 #define WOW_MAX_PATTERN_SIZE 64
 
+#define IS_IDLE_STOP (!cds_is_driver_unloading() && \
+		      !cds_is_driver_recovering())
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 11, 0))
 static const struct wiphy_wowlan_support wowlan_support_reg_init = {
 	.flags = WIPHY_WOWLAN_ANY |
@@ -2346,7 +2349,8 @@ static int __hdd_open(struct net_device *dev)
 		goto err_hdd_hdd_init_deinit_lock;
 
 	set_bit(DEVICE_IFACE_OPENED, &adapter->event_flags);
-	hdd_info("%s interface up", dev->name);
+	hdd_info("%s interface up, event-flags: %lx ", dev->name,
+		 adapter->event_flags);
 
 	if (hdd_conn_is_connected(WLAN_HDD_GET_STATION_CTX_PTR(adapter))) {
 		hdd_info("Enabling Tx Queues");
@@ -2415,8 +2419,10 @@ static int __hdd_stop(struct net_device *dev)
 			 adapter->sessionId, adapter->device_mode));
 
 	ret = wlan_hdd_validate_context(hdd_ctx);
-	if (0 != ret)
+	if (0 != ret) {
+		set_bit(DOWN_DURING_SSR, &adapter->event_flags);
 		return ret;
+	}
 
 	/* Nothing to be done if the interface is not opened */
 	if (false == test_bit(DEVICE_IFACE_OPENED, &adapter->event_flags)) {
@@ -2428,9 +2434,9 @@ static int __hdd_stop(struct net_device *dev)
 	 * Disable TX on the interface, after this hard_start_xmit() will not
 	 * be called on that interface
 	 */
-	hdd_info("Disabling queues, adapter device mode: %s(%d)",
+	hdd_info("Disabling queues, adapter device mode: %s(%d), event-flags: %lx ",
 		 hdd_device_mode_to_string(adapter->device_mode),
-		 adapter->device_mode);
+		 adapter->device_mode, adapter->event_flags);
 
 	wlan_hdd_netif_queue_control(adapter,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
@@ -3374,6 +3380,35 @@ void hdd_cleanup_actionframe_no_wait(hdd_context_t *hdd_ctx,
 }
 
 /**
+ * hdd_cleanup_actionframe_all_adapters() - Clean up pending action frame
+ * @hdd_ctx: global hdd context
+ *
+ * This function cleans up pending action frame without waiting for
+ * ack on all adapters.
+ *
+ * Return: None
+ */
+static QDF_STATUS hdd_cleanup_actionframe_all_adapters(hdd_context_t *hdd_ctx)
+{
+	hdd_adapter_list_node_t *adapter_node = NULL, *next = NULL;
+	QDF_STATUS status;
+	hdd_adapter_t *adapter;
+
+	ENTER();
+
+	status = hdd_get_front_adapter(hdd_ctx, &adapter_node);
+	while (adapter_node && QDF_IS_STATUS_SUCCESS(status)) {
+		adapter = adapter_node->pAdapter;
+		hdd_cleanup_actionframe_no_wait(hdd_ctx, adapter);
+		status = hdd_get_next_adapter(hdd_ctx, adapter_node, &next);
+		adapter_node = next;
+	}
+
+	EXIT();
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * hdd_station_adapter_deinit() - De-initialize the station adapter
  * @hdd_ctx: global hdd context
  * @adapter: HDD adapter
@@ -4283,7 +4318,7 @@ QDF_STATUS hdd_stop_adapter(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 
 	if (!test_bit(SME_SESSION_OPENED, &adapter->event_flags)) {
 		hdd_err("session %d is not open %lu",
-			adapter->device_mode, adapter->event_flags);
+			adapter->sessionId, adapter->event_flags);
 		return -ENODEV;
 	}
 
@@ -4319,14 +4354,9 @@ QDF_STATUS hdd_stop_adapter(hdd_context_t *hdd_ctx, hdd_adapter_t *adapter,
 					hdd_ctx->hHal,
 					adapter->sessionId,
 					eCSR_DISCONNECT_REASON_IBSS_LEAVE);
-			else if (QDF_STA_MODE == adapter->device_mode) {
-				qdf_ret_status =
-					wlan_hdd_try_disconnect(adapter);
-				hdd_debug("Send disconnected event to userspace");
-				wlan_hdd_cfg80211_indicate_disconnect(
-					adapter->dev, true,
-					WLAN_REASON_UNSPECIFIED);
-			}
+			else if (QDF_STA_MODE == adapter->device_mode)
+				 wlan_hdd_disconnect(adapter,
+						eCSR_DISCONNECT_REASON_DEAUTH);
 			else
 				qdf_ret_status = sme_roam_disconnect(
 					hdd_ctx->hHal,
@@ -9987,6 +10017,7 @@ static int hdd_deconfigure_cds(hdd_context_t *hdd_ctx)
 }
 
 
+
 /**
  * hdd_wlan_stop_modules - Single driver state machine for stoping modules
  * @hdd_ctx: HDD context
@@ -10004,9 +10035,7 @@ int hdd_wlan_stop_modules(hdd_context_t *hdd_ctx, bool ftm_mode)
 	qdf_device_t qdf_ctx;
 	QDF_STATUS qdf_status;
 	int ret = 0;
-	bool is_unload_stop = cds_is_driver_unloading();
 	bool is_recover_stop = cds_is_driver_recovering();
-	bool is_idle_stop = !is_unload_stop && !is_recover_stop;
 	int active_threads;
 
 	ENTER();
@@ -10030,7 +10059,7 @@ int hdd_wlan_stop_modules(hdd_context_t *hdd_ctx, bool ftm_mode)
 
 		cds_print_external_threads();
 
-		if (is_idle_stop && !ftm_mode) {
+		if (IS_IDLE_STOP && !ftm_mode) {
 			mutex_unlock(&hdd_ctx->iface_change_lock);
 			qdf_sched_delayed_work(&hdd_ctx->iface_idle_work,
 				       hdd_ctx->config->iface_change_wait_time);
@@ -10114,7 +10143,7 @@ int hdd_wlan_stop_modules(hdd_context_t *hdd_ctx, bool ftm_mode)
 
 	ol_cds_free();
 
-	if (is_idle_stop) {
+	if (IS_IDLE_STOP && cds_is_target_ready()) {
 		ret = pld_power_off(qdf_ctx->dev);
 		if (ret)
 			hdd_err("CNSS power down failed put device into Low power mode:%d",
@@ -11959,6 +11988,7 @@ static void hdd_stop_present_mode(hdd_context_t *hdd_ctx,
 				      WIFI_POWER_EVENT_WAKELOCK_MONITOR_MODE);
 	case QDF_GLOBAL_MISSION_MODE:
 	case QDF_GLOBAL_FTM_MODE:
+		hdd_cleanup_actionframe_all_adapters(hdd_ctx);
 		hdd_abort_mac_scan_all_adapters(hdd_ctx);
 		hdd_cleanup_scan_queue(hdd_ctx, NULL);
 

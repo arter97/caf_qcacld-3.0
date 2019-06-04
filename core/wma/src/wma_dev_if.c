@@ -466,15 +466,6 @@ static void wma_vdev_detach_callback(void *ctx)
 			qdf_mem_free(req_msg);
 		}
 	}
-	if (iface->addBssStaContext)
-		qdf_mem_free(iface->addBssStaContext);
-
-
-	if (iface->staKeyParams)
-		qdf_mem_free(iface->staKeyParams);
-
-	if (iface->stats_rsp)
-		qdf_mem_free(iface->stats_rsp);
 
 	wma_vdev_deinit(iface);
 	qdf_mem_zero(iface, sizeof(*iface));
@@ -597,6 +588,7 @@ static QDF_STATUS wma_handle_vdev_detach(tp_wma_handle wma_handle,
 		WMA_LOGE("%s: Failed to fill vdev request for vdev_id %d",
 			 __func__, vdev_id);
 		status = QDF_STATUS_E_NOMEM;
+		iface->del_staself_req = NULL;
 		goto out;
 	}
 
@@ -622,11 +614,6 @@ out:
 	WMA_LOGE("Call txrx detach callback for vdev %d, generate_rsp %u",
 		vdev_id, generate_rsp);
 	wma_ol_txrx_vdev_detach(wma_handle, vdev_id);
-
-	if (iface->addBssStaContext)
-		qdf_mem_free(iface->addBssStaContext);
-	if (iface->staKeyParams)
-		qdf_mem_free(iface->staKeyParams);
 
 	wma_vdev_deinit(iface);
 	qdf_mem_zero(iface, sizeof(*iface));
@@ -654,6 +641,19 @@ QDF_STATUS wma_vdev_detach(tp_wma_handle wma_handle,
 	struct wma_txrx_node *iface = &wma_handle->interfaces[vdev_id];
 	struct wma_target_req *req_msg;
 
+	if (!iface->handle || (!cds_is_target_ready())) {
+		WMA_LOGE("handle of vdev_id %d is NULL vdev is already freed or target is not ready",
+			 vdev_id);
+		pdel_sta_self_req_param->status = status;
+		if (generateRsp) {
+			wma_send_del_sta_self_resp(pdel_sta_self_req_param);
+		} else {
+			qdf_mem_free(pdel_sta_self_req_param);
+			pdel_sta_self_req_param = NULL;
+		}
+		return status;
+	}
+
 	if (qdf_atomic_read(&iface->bss_status) == WMA_BSS_STATUS_STARTED) {
 		req_msg = wma_find_vdev_req(wma_handle, vdev_id,
 				WMA_TARGET_REQ_TYPE_VDEV_STOP, false);
@@ -668,19 +668,6 @@ QDF_STATUS wma_vdev_detach(tp_wma_handle wma_handle,
 		return status;
 	}
 	iface->is_del_sta_defered = false;
-
-	if (!iface->handle) {
-		WMA_LOGE("handle of vdev_id %d is NULL vdev is already freed",
-			 vdev_id);
-		pdel_sta_self_req_param->status = status;
-		if (generateRsp) {
-			wma_send_del_sta_self_resp(pdel_sta_self_req_param);
-		} else {
-			qdf_mem_free(pdel_sta_self_req_param);
-			pdel_sta_self_req_param = NULL;
-		}
-		return status;
-	}
 
 	if (iface->type == WMI_VDEV_TYPE_STA)
 		wma_pno_stop(wma_handle, vdev_id);
@@ -1022,7 +1009,6 @@ int wma_vdev_start_resp_handler(void *handle, uint8_t *cmd_param_info,
 			if (resp_event->pdev_id == WMI_PDEV_ID_SOC) {
 				WMA_LOGE("%s: soc level id received for mac id",
 					__func__);
-				QDF_BUG(0);
 				return -EINVAL;
 			}
 			wma->interfaces[resp_event->vdev_id].mac_id =
@@ -3412,12 +3398,8 @@ void wma_vdev_resp_timer(void *data)
 				WMA_DEL_STA_SELF_REQ);
 		} else {
 			wma_send_del_sta_self_resp(iface->del_staself_req);
+			iface->del_staself_req = NULL;
 		}
-
-		if (iface->addBssStaContext)
-			qdf_mem_free(iface->addBssStaContext);
-		if (iface->staKeyParams)
-			qdf_mem_free(iface->staKeyParams);
 
 		wma_vdev_deinit(iface);
 		qdf_mem_zero(iface, sizeof(*iface));

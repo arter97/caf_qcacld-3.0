@@ -1603,11 +1603,6 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 		return -EPERM;
 	}
 
-	if (hdd_ctx->config->force_sap_acs) {
-		hdd_err("Hostapd ACS rejected as Driver ACS enabled");
-		return -EPERM;
-	}
-
 	status = wlan_hdd_validate_context(hdd_ctx);
 	if (status)
 		return status;
@@ -5413,6 +5408,7 @@ wlan_hdd_wifi_config_policy[QCA_WLAN_VENDOR_ATTR_CONFIG_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_SCAN_ENABLE] = {.type = NLA_U8 },
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_TOTAL_BEACON_MISS_COUNT] = {
 			.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_RSN_IE] = {.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_GTX] = {.type = NLA_U8},
 };
 
@@ -6174,6 +6170,22 @@ __wlan_hdd_cfg80211_wifi_configuration_set(struct wiphy *wiphy,
 			hdd_err("set disable_fils failed");
 			ret_val = -EINVAL;
 		}
+	}
+
+	if (tb[QCA_WLAN_VENDOR_ATTR_CONFIG_RSN_IE] &&
+	    hdd_ctx->config->force_rsne_override) {
+		uint8_t force_rsne_override;
+
+		force_rsne_override =
+			nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_CONFIG_RSN_IE]);
+		if (force_rsne_override > 1) {
+			hdd_err("Invalid test_mode %d", force_rsne_override);
+			ret_val = -EINVAL;
+		}
+
+		hdd_ctx->force_rsne_override = force_rsne_override;
+		hdd_debug("force_rsne_override - %d",
+			   hdd_ctx->force_rsne_override);
 	}
 
 	if (tb[QCA_WLAN_VENDOR_ATTR_CONFIG_GTX]) {
@@ -10833,7 +10845,7 @@ qca_wlan_vendor_set_nud_stats[STATS_SET_MAX + 1] = {
 const struct nla_policy
 qca_wlan_vendor_set_connectivity_check_stats[CONNECTIVITY_STATS_SET_MAX + 1] = {
 	[STATS_PKT_INFO_TYPE] = {.type = NLA_U32 },
-	[STATS_DNS_DOMAIN_NAME] = {.type = NLA_BINARY,
+	[STATS_DNS_DOMAIN_NAME] = {.type = NLA_NUL_STRING,
 					.len = DNS_DOMAIN_NAME_MAX_LEN },
 	[STATS_SRC_PORT] = {.type = NLA_U32 },
 	[STATS_DEST_PORT] = {.type = NLA_U32 },
@@ -10873,10 +10885,16 @@ static inline uint8_t *hdd_dns_unmake_name_query(uint8_t *name)
  *
  * Return: Byte following constructed DNS name
  */
-static uint8_t *hdd_dns_make_name_query(const uint8_t *string, uint8_t *buf)
+static uint8_t *hdd_dns_make_name_query(const uint8_t *string,
+					uint8_t *buf, uint8_t len)
 {
 	uint8_t *length_byte = buf++;
 	uint8_t c;
+
+	if (string[len - 1]) {
+		hdd_debug("DNS name is not null terminated");
+		return NULL;
+	}
 
 	while ((c = *(string++))) {
 		if (c == '.') {
@@ -10966,8 +10984,12 @@ static int hdd_set_clear_connectivity_check_stats_info(
 					adapter->track_dns_domain_len =
 						nla_len(tb2[
 							STATS_DNS_DOMAIN_NAME]);
-					hdd_dns_make_name_query(domain_name,
-							adapter->dns_payload);
+					if (!hdd_dns_make_name_query(
+						domain_name,
+						adapter->dns_payload,
+						adapter->track_dns_domain_len))
+						adapter->track_dns_domain_len =
+							0;
 					/* DNStracking isn't supported in FW. */
 					arp_stats_params->pkt_type_bitmap &=
 						~CONNECTIVITY_CHECK_SET_DNS;
@@ -14778,6 +14800,7 @@ static int __wlan_hdd_change_station(struct wiphy *wiphy,
 	hdd_adapter_t *pAdapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	hdd_context_t *pHddCtx;
 	hdd_station_ctx_t *pHddStaCtx;
+	hdd_ap_ctx_t *hdd_ap_ctx;
 	struct qdf_mac_addr STAMacAddress;
 #ifdef FEATURE_WLAN_TDLS
 	tCsrStaParams StaParams = { 0 };
@@ -14815,20 +14838,23 @@ static int __wlan_hdd_change_station(struct wiphy *wiphy,
 	if ((pAdapter->device_mode == QDF_SAP_MODE) ||
 	    (pAdapter->device_mode == QDF_P2P_GO_MODE)) {
 		if (params->sta_flags_set & BIT(NL80211_STA_FLAG_AUTHORIZED)) {
-			status =
-				hdd_softap_change_sta_state(pAdapter,
-							    &STAMacAddress,
-							    OL_TXRX_PEER_STATE_AUTH);
-
-			if (status != QDF_STATUS_SUCCESS) {
-				hdd_debug("Not able to change TL state to AUTHENTICATED");
-				return -EINVAL;
+			hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(pAdapter);
+			/*
+			 * For Encrypted SAP session, this will be done as
+			 * part of eSAP_STA_SET_KEY_EVENT
+			 */
+			if (hdd_ap_ctx->ucEncryptType !=
+			    eCSR_ENCRYPT_TYPE_NONE) {
+				hdd_debug("Encrypt type %d, not setting peer authorized now",
+					  hdd_ap_ctx->ucEncryptType);
+				return 0;
 			}
-			status = wlan_hdd_send_sta_authorized_event(
-								pAdapter,
-								pHddCtx,
-								&STAMacAddress);
-			if (status != QDF_STATUS_SUCCESS) {
+
+			status = hdd_softap_set_peer_authorized(pAdapter,
+							&STAMacAddress);
+
+			if (QDF_IS_STATUS_ERROR(status)) {
+				hdd_debug("Failed to authorize peer");
 				return -EINVAL;
 			}
 		}
@@ -18123,20 +18149,18 @@ disconnected:
  * wlan_hdd_reassoc_bssid_hint() - Start reassociation if bssid is present
  * @adapter: Pointer to the HDD adapter
  * @req: Pointer to the structure cfg_connect_params receieved from user space
- * @status: out variable for status of reassoc request
  *
  * This function will start reassociation if prev_bssid is set and bssid/
  * bssid_hint, channel/channel_hint parameters are present in connect request.
  *
- * Return: true if connect was for ReAssociation, false otherwise
+ * Return: 0 if connect was for ReAssociation, non-zero error code otherwise
  */
 #if defined(CFG80211_CONNECT_PREV_BSSID) || \
 	(LINUX_VERSION_CODE >= KERNEL_VERSION(4, 7, 0))
-static bool wlan_hdd_reassoc_bssid_hint(hdd_adapter_t *adapter,
-					struct cfg80211_connect_params *req,
-					int *status)
+static int wlan_hdd_reassoc_bssid_hint(hdd_adapter_t *adapter,
+					struct cfg80211_connect_params *req)
 {
-	bool reassoc = false;
+	int status = -EINVAL;
 	const uint8_t *bssid = NULL;
 	uint16_t channel = 0;
 	hdd_wext_state_t *wext_state = WLAN_HDD_GET_WEXT_STATE_PTR(adapter);
@@ -18149,7 +18173,7 @@ static bool wlan_hdd_reassoc_bssid_hint(hdd_adapter_t *adapter,
 	if (CSR_IS_AUTH_TYPE_FILS(
 	   wext_state->roamProfile.AuthType.authType[0])) {
 		hdd_info("connection is FILS, dropping roaming..");
-		return reassoc;
+		return status;
 	}
 
 	if (req->channel)
@@ -18158,7 +18182,6 @@ static bool wlan_hdd_reassoc_bssid_hint(hdd_adapter_t *adapter,
 		channel = req->channel_hint->hw_value;
 
 	if (bssid && channel && req->prev_bssid) {
-		reassoc = true;
 		hdd_debug(FL("REASSOC Attempt on channel %d to "MAC_ADDRESS_STR),
 				channel, MAC_ADDR_ARRAY(bssid));
 		/*
@@ -18170,18 +18193,17 @@ static bool wlan_hdd_reassoc_bssid_hint(hdd_adapter_t *adapter,
 		qdf_mem_copy(wext_state->req_bssId.bytes, bssid,
 			     QDF_MAC_ADDR_SIZE);
 
-		*status = hdd_reassoc(adapter, bssid, channel,
+		status = hdd_reassoc(adapter, bssid, channel,
 				      CONNECT_CMD_USERSPACE);
-		hdd_debug("hdd_reassoc: status: %d", *status);
+		hdd_debug("hdd_reassoc: status: %d", status);
 	}
-	return reassoc;
+	return status;
 }
 #else
-static bool wlan_hdd_reassoc_bssid_hint(hdd_adapter_t *adapter,
-					struct cfg80211_connect_params *req,
-					int *status)
+static int wlan_hdd_reassoc_bssid_hint(hdd_adapter_t *adapter,
+					struct cfg80211_connect_params *req)
 {
-	return false;
+	return -EINVAL;
 }
 #endif
 
@@ -18307,8 +18329,14 @@ static int __wlan_hdd_cfg80211_connect(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	if (true == wlan_hdd_reassoc_bssid_hint(pAdapter, req, &status))
+	/*
+	 * Check if this is reassoc to same bssid, if reassoc is success, return
+	 */
+	status = wlan_hdd_reassoc_bssid_hint(pAdapter, req);
+	if (!status) {
+		hdd_set_roaming_in_progress(true);
 		return status;
+	}
 
 	/* Try disconnecting if already in connected state */
 	status = wlan_hdd_try_disconnect(pAdapter);
@@ -18394,20 +18422,21 @@ static int wlan_hdd_cfg80211_connect(struct wiphy *wiphy,
 
 int wlan_hdd_disconnect(hdd_adapter_t *pAdapter, u16 reason)
 {
-	int status, result = 0;
+	QDF_STATUS status;
+	int result = 0;
 	unsigned long rc;
-	hdd_station_ctx_t *pHddStaCtx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
-	hdd_context_t *pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
+	hdd_station_ctx_t *hdd_sta_ctx;
+	hdd_context_t *hdd_ctx;
 	eConnectionState prev_conn_state;
-	tHalHandle hal = WLAN_HDD_GET_HAL_CTX(pAdapter);
+	tHalHandle hal;
 	uint32_t wait_time = WLAN_WAIT_TIME_DISCONNECT;
 
 	ENTER();
 
-	status = wlan_hdd_validate_context(pHddCtx);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
+	hdd_ctx = WLAN_HDD_GET_CTX(pAdapter);
+	hal = WLAN_HDD_GET_HAL_CTX(pAdapter);
 
-	if (0 != status)
-		return status;
 	if (pAdapter->device_mode ==  QDF_STA_MODE) {
 		sme_indicate_disconnect_inprogress(hal, pAdapter->sessionId);
 		hdd_debug("Stop firmware roaming");
@@ -18419,7 +18448,7 @@ int wlan_hdd_disconnect(hdd_adapter_t *pAdapter, u16 reason)
 		 *
 		 */
 		INIT_COMPLETION(pAdapter->roaming_comp_var);
-		if (hdd_is_roaming_in_progress(pHddCtx)) {
+		if (hdd_is_roaming_in_progress(hdd_ctx)) {
 			rc = wait_for_completion_timeout(
 				&pAdapter->roaming_comp_var,
 				msecs_to_jiffies(WLAN_WAIT_TIME_STOP_ROAM));
@@ -18440,7 +18469,7 @@ int wlan_hdd_disconnect(hdd_adapter_t *pAdapter, u16 reason)
 		}
 	}
 
-	prev_conn_state = pHddStaCtx->conn_info.connState;
+	prev_conn_state = hdd_sta_ctx->conn_info.connState;
 	/*stop tx queues */
 	hdd_info("Disabling queues");
 	wlan_hdd_netif_queue_control(pAdapter,
@@ -18477,7 +18506,7 @@ int wlan_hdd_disconnect(hdd_adapter_t *pAdapter, u16 reason)
 		hdd_debug("Already disconnected or connect was in sme/roam pending list and removed by disconnect");
 	} else if (0 != status) {
 		hdd_err("csr_roam_disconnect failure, status: %d", (int)status);
-		pHddStaCtx->staDebugState = status;
+		hdd_sta_ctx->staDebugState = status;
 		result = -EINVAL;
 		goto disconnected;
 	}

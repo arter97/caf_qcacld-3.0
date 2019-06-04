@@ -2177,6 +2177,12 @@ static QDF_STATUS dfs_phyerr_offload_event_handler(void *handle,
 
 	qdf_spin_lock_bh(&ic->chan_lock);
 	chan = ic->ic_curchan;
+	if (chan == NULL) {
+		WMA_LOGE("%s: chan is NULL", __func__);
+		qdf_spin_unlock_bh(&ic->chan_lock);
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	if (ic->disable_phy_err_processing) {
 		WMA_LOGD("%s: radar indication done,drop phyerror event",
 			__func__);
@@ -11158,4 +11164,52 @@ int wma_rx_aggr_failure_event_handler(void *handle, u_int8_t *event_buf,
 	WMA_LOGD("%s: stats ext event Posted to SME", __func__);
 
 	return 0;
+}
+
+
+bool wma_dual_beacon_on_single_mac_scc_capable(void)
+{
+	tp_wma_handle wma_handle = NULL;
+
+	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+	if (NULL == wma_handle) {
+		WMA_LOGE("%s : Failed to get wma_handle", __func__);
+		return false;
+	}
+	if (WMI_SERVICE_EXT_IS_ENABLED(wma_handle->wmi_service_bitmap,
+		wma_handle->wmi_service_ext_bitmap,
+		WMI_SERVICE_DUAL_BEACON_ON_SINGLE_MAC_SCC_SUPPORT)) {
+		WMA_LOGD("Support dual beacon on same channel on single MAC");
+		return true;
+	}
+	if (WMI_SERVICE_EXT_IS_ENABLED(wma_handle->wmi_service_bitmap,
+		wma_handle->wmi_service_ext_bitmap,
+		WMI_SERVICE_DUAL_BEACON_ON_SINGLE_MAC_MCC_SUPPORT)) {
+		WMA_LOGD("Support dual beacon on both different and same channel on single MAC");
+		return true;
+	} else {
+		WMA_LOGD("Not support dual beacon on same channel on single MAC");
+		return false;
+	}
+}
+
+bool wma_dual_beacon_on_single_mac_mcc_capable(void)
+{
+	tp_wma_handle wma_handle = NULL;
+
+	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+	if (NULL == wma_handle) {
+		WMA_LOGE("%s : Failed to get wma_handle", __func__);
+		return false;
+	}
+
+	if (WMI_SERVICE_EXT_IS_ENABLED(wma_handle->wmi_service_bitmap,
+		wma_handle->wmi_service_ext_bitmap,
+		WMI_SERVICE_DUAL_BEACON_ON_SINGLE_MAC_MCC_SUPPORT)) {
+		WMA_LOGD("Support dual beacon on different channel on single MAC");
+		return true;
+	} else {
+		WMA_LOGD("Not support dual beacon on different channel on single MAC");
+		return false;
+	}
 }
