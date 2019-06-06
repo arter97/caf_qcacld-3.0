@@ -1821,7 +1821,8 @@ struct dp_peer {
 	uint8_t nawds_enabled:1,
 				bss_peer:1,
 				wapi:1,
-				wds_enabled:1;
+				wds_enabled:1,
+				sta_bss_peer:1;
 
 	/* MCL specific peer local id */
 	uint16_t local_id;
