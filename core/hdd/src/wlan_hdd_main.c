@@ -9788,6 +9788,7 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter)
 	return 0;
 }
 
+#if defined(QCA_LL_TX_FLOW_CONTROL_V2) || defined(QCA_LL_PDEV_TX_FLOW_CONTROL)
 /**
  * hdd_txrx_populate_cds_config() - Populate txrx cds configuration
  * @cds_cfg: CDS Configuration
@@ -9806,6 +9807,13 @@ static inline void hdd_txrx_populate_cds_config(struct cds_config_info
 	/* configuration for DP RX Threads */
 	cds_cfg->enable_dp_rx_threads = hdd_ctx->enable_dp_rx_threads;
 }
+#else
+static inline void hdd_txrx_populate_cds_config(struct cds_config_info
+						*cds_cfg,
+						struct hdd_context *hdd_ctx)
+{
+}
+#endif
 
 /**
  * hdd_update_cds_config() - API to update cds configuration parameters
@@ -14304,6 +14312,25 @@ void hdd_update_dp_config_rx_softirq_limits(struct hdd_context *hdd_ctx,
 }
 #endif /* WLAN_FEATURE_RX_SOFTIRQ_TIME_LIMIT */
 
+#if defined(QCA_LL_TX_FLOW_CONTROL_V2) || defined(QCA_LL_PDEV_TX_FLOW_CONTROL)
+static void
+hdd_update_dp_config_queue_threshold(struct hdd_context *hdd_ctx,
+				     struct cdp_config_params *params)
+{
+	params->tx_flow_stop_queue_threshold =
+			cfg_get(hdd_ctx->psoc, CFG_DP_TX_FLOW_STOP_QUEUE_TH);
+	params->tx_flow_start_queue_offset =
+			cfg_get(hdd_ctx->psoc,
+				CFG_DP_TX_FLOW_START_QUEUE_OFFSET);
+}
+#else
+static inline void
+hdd_update_dp_config_queue_threshold(struct hdd_context *hdd_ctx,
+				     struct cdp_config_params *params)
+{
+}
+#endif
+
 /**
  * hdd_update_dp_config() - Propagate config parameters to Lithium
  *                          datapath
@@ -14320,11 +14347,7 @@ static int hdd_update_dp_config(struct hdd_context *hdd_ctx)
 	soc = cds_get_context(QDF_MODULE_ID_SOC);
 	params.tso_enable = cfg_get(hdd_ctx->psoc, CFG_DP_TSO);
 	params.lro_enable = cfg_get(hdd_ctx->psoc, CFG_DP_LRO);
-	params.tx_flow_stop_queue_threshold =
-			cfg_get(hdd_ctx->psoc, CFG_DP_TX_FLOW_STOP_QUEUE_TH);
-	params.tx_flow_start_queue_offset =
-			cfg_get(hdd_ctx->psoc,
-				CFG_DP_TX_FLOW_START_QUEUE_OFFSET);
+	hdd_update_dp_config_queue_threshold(hdd_ctx, &params);
 	params.flow_steering_enable =
 		cfg_get(hdd_ctx->psoc, CFG_DP_FLOW_STEERING_ENABLED);
 	params.napi_enable = hdd_ctx->napi_enable;
