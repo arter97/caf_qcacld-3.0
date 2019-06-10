@@ -1247,7 +1247,7 @@ void *dp_find_peer_by_addr(struct cdp_pdev *dev, uint8_t *peer_mac_addr,
 	/* ref_cnt is incremented inside dp_peer_find_hash_find().
 	 * Decrement it here.
 	 */
-	qdf_atomic_dec(&peer->ref_cnt);
+	dp_peer_unref_delete(peer);
 
 	return peer;
 }
@@ -2457,7 +2457,7 @@ void *dp_find_peer_by_addr_and_vdev(struct cdp_pdev *pdev_handle,
 	/* ref_cnt is incremented inside dp_peer_find_hash_find().
 	 * Decrement it here.
 	 */
-	qdf_atomic_dec(&peer->ref_cnt);
+	dp_peer_unref_delete(peer);
 
 	return peer;
 }
@@ -2525,7 +2525,7 @@ QDF_STATUS dp_peer_state_update(struct cdp_pdev *pdev_handle, uint8_t *peer_mac,
 	/* ref_cnt is incremented inside dp_peer_find_hash_find().
 	 * Decrement it here.
 	 */
-	qdf_atomic_dec(&peer->ref_cnt);
+	dp_peer_unref_delete(peer);
 
 	return QDF_STATUS_SUCCESS;
 }

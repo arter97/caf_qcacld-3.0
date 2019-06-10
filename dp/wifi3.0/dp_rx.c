@@ -390,8 +390,10 @@ dp_rx_da_learn(struct dp_soc *soc,
 	if (qdf_unlikely(!qdf_nbuf_is_da_valid(nbuf) &&
 			 !qdf_nbuf_is_da_mcbc(nbuf))) {
 		/* find peer in table by da */
-		peer = dp_peer_find_hash_find(soc, qdf_nbuf_data(nbuf), 0, DP_VDEV_ALL);
+		peer = dp_peer_find_hash_find(soc, qdf_nbuf_data(nbuf), 0,
+					      DP_VDEV_ALL);
 		if (peer) {
+			dp_peer_unref_delete(peer);
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO_HIGH,
 				  "Found peer with DA %s, return without adding\n",
 				  ether_sprintf(qdf_nbuf_data(nbuf)));
