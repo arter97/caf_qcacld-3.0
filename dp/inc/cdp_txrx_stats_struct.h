@@ -398,6 +398,7 @@ struct cdp_pkt_type {
  * @ru_start: RU start index
  * @ru_tones: RU tones size
  * @ru_loc: RU location 26/ 52/ 106/ 242/ 484 counter
+ * @num_ppdu_cookie_valid : Number of comp received with valid ppdu cookie
  */
 struct cdp_tx_stats {
 	struct cdp_pkt_info comp_pkt;
@@ -483,6 +484,7 @@ struct cdp_tx_stats {
 	uint32_t ru_start;
 	uint32_t ru_tones;
 	uint32_t ru_loc[MAX_RU_LOCATIONS];
+	uint32_t num_ppdu_cookie_valid;
 };
 
 /* struct cdp_rx_stats - rx Level Stats
@@ -630,6 +632,7 @@ struct cdp_rx_stats {
  * @completion_fw: packets completions received from fw
  * @cce_classified:Number of packets classified by CCE
  * @cce_classified_raw:Number of raw packets classified by CCE
+ * @sniffer_rcvd: Number of packets received with ppdu cookie
  */
 struct cdp_tx_ingress_stats {
 	struct cdp_pkt_info rcvd;
@@ -693,6 +696,7 @@ struct cdp_tx_ingress_stats {
 
 	uint32_t cce_classified;
 	uint32_t cce_classified_raw;
+	struct cdp_pkt_info sniffer_rcvd;
 };
 
 /* struct cdp_vdev_stats - vdev stats structure
