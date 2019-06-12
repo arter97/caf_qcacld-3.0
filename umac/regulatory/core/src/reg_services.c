@@ -59,7 +59,8 @@ const struct bonded_channel bonded_chan_40mhz_list[] = {
 	{132, 136},
 	{140, 144},
 	{149, 153},
-	{157, 161}
+	{157, 161},
+	{165, 169}
 };
 
 const struct bonded_channel bonded_chan_80mhz_list[] = {
