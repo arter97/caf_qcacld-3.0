@@ -1375,6 +1375,7 @@ static void wlan_hdd_set_the_pld_uevent(struct pld_uevent_data *uevent)
 	switch (uevent->uevent) {
 	case PLD_FW_DOWN:
 	case PLD_RECOVERY:
+		cds_set_target_ready(false);
 		cds_set_recovery_in_progress(true);
 		break;
 	default:
