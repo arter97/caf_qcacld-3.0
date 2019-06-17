@@ -5463,6 +5463,10 @@ int hdd_set_csr_auth_type(struct hdd_adapter *adapter,
 				/* OWE case */
 				roam_profile->AuthType.authType[0] =
 					eCSR_AUTH_TYPE_OWE;
+			} else if (RSNAuthType == eCSR_AUTH_TYPE_SAE) {
+				/* SAE with open authentication case */
+				roam_profile->AuthType.authType[0] =
+					eCSR_AUTH_TYPE_SAE;
 			} else if ((RSNAuthType ==
 				  eCSR_AUTH_TYPE_SUITEB_EAP_SHA256) &&
 				  ((pWextState->
