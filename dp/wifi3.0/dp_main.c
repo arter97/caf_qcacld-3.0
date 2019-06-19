@@ -7488,6 +7488,9 @@ static inline void dp_print_peer_stats(struct dp_peer *peer)
 	uint32_t j;
 	char nss[DP_NSS_LENGTH];
 	char mu_group_id[DP_MU_GROUP_LENGTH];
+	struct dp_pdev *pdev;
+
+	pdev = peer->vdev->pdev;
 
 	DP_PRINT_STATS("Node Tx Stats:\n");
 	DP_PRINT_STATS("Total Packet Completions = %d",
@@ -7530,8 +7533,10 @@ static inline void dp_print_peer_stats(struct dp_peer *peer)
 			peer->stats.tx.last_ack_rssi);
 	DP_PRINT_STATS("Dropped At FW: Removed Pkts = %u",
 		       peer->stats.tx.dropped.fw_rem.num);
-	DP_PRINT_STATS("Dropped At FW: Removed bytes = %llu",
-		       peer->stats.tx.dropped.fw_rem.bytes);
+	if (pdev && !wlan_cfg_get_dp_pdev_nss_enabled(pdev->wlan_cfg_ctx)) {
+		DP_PRINT_STATS("Dropped At FW: Removed bytes = %llu",
+				peer->stats.tx.dropped.fw_rem.bytes);
+	}
 	DP_PRINT_STATS("Dropped At FW: Removed transmitted = %d",
 			peer->stats.tx.dropped.fw_rem_tx);
 	DP_PRINT_STATS("Dropped At FW: Removed Untransmitted = %d",
