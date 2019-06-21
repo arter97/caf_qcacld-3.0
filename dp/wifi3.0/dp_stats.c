@@ -646,6 +646,8 @@ static inline void dp_print_peer_stats_cmn_tlv(uint32_t *tag_buf)
 			dp_stats_buf->block_bitmap);
 	DP_TRACE_STATS(FATAL, "current_timestamp = %d\n",
 			dp_stats_buf->current_timestamp);
+	DP_TRACE_STATS(FATAL, "inactive_time = %d\n",
+			dp_stats_buf->inactive_time);
 }
 
 /*
