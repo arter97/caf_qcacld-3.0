@@ -1159,10 +1159,9 @@ static int hdd_resume_wlan(void)
 
 	/*loop through all adapters. Concurrency */
 	hdd_for_each_adapter(hdd_ctx, adapter) {
-		if (wlan_hdd_validate_session_id(adapter->session_id)) {
-			hdd_err("invalid session id: %d", adapter->session_id);
+		if (wlan_hdd_validate_session_id(adapter->session_id))
 			continue;
-		}
+
 		/* Disable supported OffLoads */
 		hdd_disable_host_offloads(adapter, pmo_apps_resume);
 
@@ -1694,10 +1693,8 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 	 * until CAC is done for a SoftAP which is in started state.
 	 */
 	hdd_for_each_adapter(hdd_ctx, adapter) {
-		if (wlan_hdd_validate_session_id(adapter->session_id)) {
-			hdd_err("invalid session id: %d", adapter->session_id);
+		if (wlan_hdd_validate_session_id(adapter->session_id))
 			continue;
-		}
 
 		if (QDF_SAP_MODE == adapter->device_mode) {
 			if (BSS_START ==
@@ -1913,10 +1910,8 @@ static int __wlan_hdd_cfg80211_set_power_mgmt(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	if (wlan_hdd_validate_session_id(adapter->session_id)) {
-		hdd_err("invalid session id: %d", adapter->session_id);
+	if (wlan_hdd_validate_session_id(adapter->session_id))
 		return -EINVAL;
-	}
 
 	MTRACE(qdf_trace(QDF_MODULE_ID_HDD,
 			 TRACE_CODE_HDD_CFG80211_SET_POWER_MGMT,
@@ -2098,10 +2093,9 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 	}
 
 	/* Validate adapter sessionId */
-	if (wlan_hdd_validate_session_id(adapter->session_id)) {
-		hdd_err("invalid session id: %d", adapter->session_id);
-		return -EINVAL;
-	}
+	status = wlan_hdd_validate_session_id(adapter->session_id);
+	if (status)
+		return status;
 
 	mutex_lock(&hdd_ctx->iface_change_lock);
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
@@ -2115,8 +2109,6 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 
 	if (sta_ctx->conn_info.connState != eConnectionState_Associated) {
 		hdd_debug("Not associated");
-		/*To keep GUI happy */
-		*dbm = 0;
 		return 0;
 	}
 

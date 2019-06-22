@@ -1963,6 +1963,17 @@ int hdd_validate_adapter(struct hdd_adapter *adapter);
  */
 int wlan_hdd_validate_context_in_loading(struct hdd_context *hdd_ctx);
 
+/**
+ * wlan_hdd_validate_session_id() - ensure the given session Id is valid
+ * @session_id: the session Id to validate
+ *
+ * Return: Errno
+ */
+#define wlan_hdd_validate_session_id(session_id) \
+	__wlan_hdd_validate_session_id(session_id, __func__)
+
+int __wlan_hdd_validate_session_id(uint8_t session_id, const char *func);
+
 bool hdd_is_valid_mac_address(const uint8_t *pMacAddr);
 QDF_STATUS hdd_issta_p2p_clientconnected(struct hdd_context *hdd_ctx);
 bool wlan_hdd_validate_modules_state(struct hdd_context *hdd_ctx);
@@ -2550,14 +2561,6 @@ hdd_wlan_nla_put_u64(struct sk_buff *skb, int attrtype, u64 value)
 	return nla_put_u64_64bit(skb, attrtype, value, NL80211_ATTR_PAD);
 }
 #endif
-
-static inline int wlan_hdd_validate_session_id(u8 session_id)
-{
-	if (session_id != HDD_SESSION_ID_INVALID)
-		return 0;
-
-	return -EINVAL;
-}
 
 bool hdd_is_roaming_in_progress(struct hdd_adapter *adapter);
 void hdd_set_roaming_in_progress(bool value);
