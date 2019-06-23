@@ -67,10 +67,12 @@ void dp_peer_tid_queue_cleanup(struct dp_peer *peer)
 	for (tid = 0; tid < DP_MAX_TIDS; tid++) {
 		tx_tid = &peer->tx_capture.tx_tid[tid];
 
+		qdf_spin_lock_bh(&tx_tid->tid_lock);
+		qdf_nbuf_queue_free(&tx_tid->msdu_comp_q);
+		qdf_spin_unlock_bh(&tx_tid->tid_lock);
+
 		/* spinlock destroy */
 		qdf_spinlock_destroy(&tx_tid->tid_lock);
-
-		qdf_nbuf_queue_free(&tx_tid->msdu_comp_q);
 		tx_tid->max_ppdu_id = 0;
 	}
 }
@@ -112,18 +114,32 @@ void dp_peer_update_80211_hdr(struct dp_vdev *vdev, struct dp_peer *peer)
  */
 void dp_deliver_mgmt_frm(struct dp_pdev *pdev, qdf_nbuf_t nbuf)
 {
+	struct cdp_tx_indication_info tx_capture_info;
+
 	if (pdev->tx_sniffer_enable || pdev->mcopy_mode) {
 		dp_wdi_event_handler(WDI_EVENT_TX_MGMT_CTRL, pdev->soc,
 				     nbuf, HTT_INVALID_PEER,
 				     WDI_NO_VAL, pdev->pdev_id);
 	} else if (pdev->tx_capture_enabled) {
-		if (pdev->mgmtctrl_frm_info.last_nbuf)
-			qdf_nbuf_free(pdev->mgmtctrl_frm_info.last_nbuf);
-
+		/* invoke WDI event handler here send mgmt pkt here */
 		/* pull ppdu_id from the packet */
 		qdf_nbuf_pull_head(nbuf, sizeof(uint32_t));
 
-		pdev->mgmtctrl_frm_info.last_nbuf = nbuf;
+		tx_capture_info.frame_payload = 1;
+		tx_capture_info.mpdu_nbuf = nbuf;
+
+		/*
+		 * send MPDU to osif layer
+		 * do we need to update mpdu_info before tranmit
+		 * get current mpdu_nbuf
+		 */
+		dp_wdi_event_handler(WDI_EVENT_TX_DATA, pdev->soc,
+				     &tx_capture_info, HTT_INVALID_PEER,
+				     WDI_NO_VAL, pdev->pdev_id);
+
+		if (tx_capture_info.mpdu_nbuf)
+			qdf_nbuf_free(tx_capture_info.mpdu_nbuf);
+
 	}
 }
 
@@ -256,12 +272,12 @@ dp_update_msdu_to_list(struct dp_soc *soc,
 		  ts->transmit_cnt);
 
 	/* lock here */
-	qdf_spin_lock(&tx_tid->tid_lock);
+	qdf_spin_lock_bh(&tx_tid->tid_lock);
 
 	/* add nbuf to tail queue per peer tid */
 	qdf_nbuf_queue_add(&tx_tid->msdu_comp_q, netbuf);
 
-	qdf_spin_unlock(&tx_tid->tid_lock);
+	qdf_spin_unlock_bh(&tx_tid->tid_lock);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -416,9 +432,9 @@ static void  dp_iterate_free_peer_msdu_q(void *pdev_hdl)
 				tx_tid = &peer->tx_capture.tx_tid[tid];
 
 				/* spinlock hold */
-				qdf_spin_lock(&tx_tid->tid_lock);
+				qdf_spin_lock_bh(&tx_tid->tid_lock);
 				qdf_nbuf_queue_free(&tx_tid->msdu_comp_q);
-				qdf_spin_unlock(&tx_tid->tid_lock);
+				qdf_spin_unlock_bh(&tx_tid->tid_lock);
 			}
 		}
 	}
@@ -800,6 +816,9 @@ uint32_t dp_tx_msdu_dequeue(struct dp_peer *peer, uint32_t ppdu_id,
 	if (qdf_nbuf_is_queue_empty(&tx_tid->msdu_comp_q))
 		return 0;
 
+	/* lock here */
+	qdf_spin_lock_bh(&tx_tid->tid_lock);
+
 	curr_msdu = qdf_nbuf_queue_first(&tx_tid->msdu_comp_q);
 
 	while (curr_msdu) {
@@ -819,14 +838,10 @@ uint32_t dp_tx_msdu_dequeue(struct dp_peer *peer, uint32_t ppdu_id,
 			if (wbm_tsf > start_tsf && wbm_tsf < end_tsf) {
 				/*packet found */
 			} else if (wbm_tsf < start_tsf) {
-				/* lock here */
-				qdf_spin_lock_bh(&tx_tid->tid_lock);
-
 				/* remove the aged packet */
 				nbuf = qdf_nbuf_queue_remove(
 						&tx_tid->msdu_comp_q);
 
-				qdf_spin_unlock_bh(&tx_tid->tid_lock);
 				qdf_nbuf_free(nbuf);
 
 				curr_msdu = qdf_nbuf_queue_first(
@@ -842,14 +857,9 @@ uint32_t dp_tx_msdu_dequeue(struct dp_peer *peer, uint32_t ppdu_id,
 			}
 
 			if (qdf_likely(!prev_msdu)) {
-				/* lock here */
-				qdf_spin_lock_bh(&tx_tid->tid_lock);
-
 				/* remove head */
 				curr_msdu = qdf_nbuf_queue_remove(
 						&tx_tid->msdu_comp_q);
-
-				qdf_spin_unlock_bh(&tx_tid->tid_lock);
 
 				/* add msdu to head queue */
 				qdf_nbuf_queue_add(head, curr_msdu);
@@ -858,9 +868,6 @@ uint32_t dp_tx_msdu_dequeue(struct dp_peer *peer, uint32_t ppdu_id,
 						&tx_tid->msdu_comp_q);
 				continue;
 			} else {
-				/* lock here */
-				qdf_spin_lock_bh(&tx_tid->tid_lock);
-
 				/* update prev_msdu next to current msdu next */
 				prev_msdu->next = curr_msdu->next;
 				/* set current msdu next as NULL */
@@ -868,8 +875,6 @@ uint32_t dp_tx_msdu_dequeue(struct dp_peer *peer, uint32_t ppdu_id,
 				/* decrement length */
 				((qdf_nbuf_queue_t *)(
 					&tx_tid->msdu_comp_q))->qlen--;
-
-				qdf_spin_unlock_bh(&tx_tid->tid_lock);
 
 				/* add msdu to head queue */
 				qdf_nbuf_queue_add(head, curr_msdu);
@@ -885,6 +890,8 @@ uint32_t dp_tx_msdu_dequeue(struct dp_peer *peer, uint32_t ppdu_id,
 
 	if (qdf_nbuf_queue_len(head) != num_msdu)
 		matched = 0;
+
+	qdf_spin_unlock_bh(&tx_tid->tid_lock);
 
 	return matched;
 }
@@ -1048,6 +1055,7 @@ QDF_STATUS dp_send_mpdu_info_to_stack(struct dp_pdev *pdev,
 {
 	uint32_t ppdu_id;
 	uint32_t desc_cnt;
+	qdf_nbuf_t tmp_nbuf;
 
 	for (desc_cnt = 0; desc_cnt < ppdu_desc_cnt; desc_cnt++) {
 		struct cdp_tx_completion_ppdu *ppdu_desc;
@@ -1065,12 +1073,22 @@ QDF_STATUS dp_send_mpdu_info_to_stack(struct dp_pdev *pdev,
 		if (!ppdu_desc)
 			continue;
 
+		if (qdf_nbuf_is_queue_empty(&ppdu_desc->mpdu_q)) {
+			tmp_nbuf = nbuf_ppdu_desc_list[desc_cnt];
+			nbuf_ppdu_desc_list[desc_cnt] = NULL;
+			qdf_nbuf_free(tmp_nbuf);
+			continue;
+		}
+
 		ppdu_id = ppdu_desc->ppdu_id;
 
 		if (ppdu_desc->frame_type == CDP_PPDU_FTYPE_CTRL) {
 			struct cdp_tx_indication_info tx_capture_info;
 			struct cdp_tx_indication_mpdu_info *mpdu_info;
 
+			qdf_mem_set(&tx_capture_info,
+				    sizeof(struct cdp_tx_indication_info),
+				    0);
 			mpdu_info = &tx_capture_info.mpdu_info;
 
 			mpdu_info->channel = ppdu_desc->channel;
@@ -1091,9 +1109,6 @@ QDF_STATUS dp_send_mpdu_info_to_stack(struct dp_pdev *pdev,
 			tx_capture_info.mpdu_info.channel_num =
 				pdev->operating_channel;
 
-			if (qdf_nbuf_is_queue_empty(&ppdu_desc->mpdu_q))
-				continue;
-
 			tx_capture_info.mpdu_nbuf =
 				qdf_nbuf_queue_remove(&ppdu_desc->mpdu_q);
 
@@ -1106,6 +1121,12 @@ QDF_STATUS dp_send_mpdu_info_to_stack(struct dp_pdev *pdev,
 					     &tx_capture_info, HTT_INVALID_PEER,
 					     WDI_NO_VAL, pdev->pdev_id);
 
+			if (tx_capture_info.mpdu_nbuf)
+				qdf_nbuf_free(tx_capture_info.mpdu_nbuf);
+
+			tmp_nbuf = nbuf_ppdu_desc_list[desc_cnt];
+			nbuf_ppdu_desc_list[desc_cnt] = NULL;
+			qdf_nbuf_free(tmp_nbuf);
 			continue;
 		}
 
@@ -1123,6 +1144,10 @@ QDF_STATUS dp_send_mpdu_info_to_stack(struct dp_pdev *pdev,
 		for (i = 0, k = 0; i < mpdu_tried; i++) {
 			struct cdp_tx_indication_info tx_capture_info;
 			struct cdp_tx_indication_mpdu_info *mpdu_info;
+
+			qdf_mem_set(&tx_capture_info,
+				    sizeof(struct cdp_tx_indication_info),
+				    0);
 
 			mpdu_info = &tx_capture_info.mpdu_info;
 
@@ -1190,10 +1215,16 @@ QDF_STATUS dp_send_mpdu_info_to_stack(struct dp_pdev *pdev,
 					     &tx_capture_info,
 					     HTT_INVALID_PEER,
 					     WDI_NO_VAL, pdev->pdev_id);
+
+			if (tx_capture_info.mpdu_nbuf)
+				qdf_nbuf_free(tx_capture_info.mpdu_nbuf);
+
 		}
 
 		qdf_nbuf_queue_free(&ppdu_desc->mpdu_q);
-		qdf_nbuf_free(nbuf_ppdu_desc_list[desc_cnt]);
+		tmp_nbuf = nbuf_ppdu_desc_list[desc_cnt];
+		nbuf_ppdu_desc_list[desc_cnt] = NULL;
+		qdf_nbuf_free(tmp_nbuf);
 	}
 
 	return QDF_STATUS_SUCCESS;
@@ -1224,6 +1255,7 @@ void dp_tx_ppdu_stats_process(void *context)
 	struct ppdu_info *sched_ppdu_list[SCHED_MAX_PPDU_CNT];
 	qdf_nbuf_t nbuf_ppdu_desc_list[SCHED_MAX_PPDU_CNT];
 	struct dp_pdev_tx_capture *ptr_tx_cap;
+	uint32_t tx_capture = pdev->tx_capture_enabled;
 
 	ptr_tx_cap = &pdev->tx_capture;
 
@@ -1294,7 +1326,7 @@ void dp_tx_ppdu_stats_process(void *context)
 				qdf_nbuf_data(nbuf);
 
 			/* send WDI event */
-			if (!pdev->tx_capture_enabled) {
+			if (!tx_capture) {
 				/**
 				 * Deliver PPDU stats only for valid (acked)
 				 * data frames if sniffer mode is not enabled.
@@ -1347,7 +1379,7 @@ void dp_tx_ppdu_stats_process(void *context)
 			 * if bss_peer no need to process further
 			 */
 			if (!peer->bss_peer &&
-			    pdev->tx_capture_enabled &&
+			    tx_capture &&
 			    (ppdu_desc->frame_type == CDP_PPDU_FTYPE_DATA) &&
 			    (!ppdu_desc->user[0].completion_status)) {
 				/* print the bit map */
@@ -1440,7 +1472,7 @@ dequeue_msdu_again:
 				qdf_nbuf_queue_first(&ppdu_desc->mpdu_q);
 			} else if (ppdu_desc->frame_type ==
 				   CDP_PPDU_FTYPE_CTRL &&
-				   pdev->tx_capture_enabled) {
+				   tx_capture) {
 				nbuf->next =
 				qdf_nbuf_queue_first(&ppdu_desc->mpdu_q);
 
@@ -1458,10 +1490,11 @@ dequeue_msdu_again:
 		 * At this point we have mpdu queued per ppdu_desc
 		 * based on packet capture flags send mpdu info to upper stack
 		 */
-		if (pdev->tx_capture_enabled)
+		if (ppdu_desc_cnt) {
 			dp_send_mpdu_info_to_stack(pdev,
 						   nbuf_ppdu_desc_list,
 						   ppdu_desc_cnt);
+		}
 	}
 }
 
@@ -1484,19 +1517,6 @@ void dp_ppdu_desc_deliver(struct dp_pdev *pdev,
 
 	ppdu_desc = (struct cdp_tx_completion_ppdu *)
 			qdf_nbuf_data(ppdu_info->nbuf);
-
-	/*
-	 * before schdeuling, for management frame
-	 * copy last mgmt nbuf to ppdu_desc
-	 */
-	if (ppdu_info->ppdu_id == pdev->mgmtctrl_frm_info.ppdu_id &&
-	    pdev->mgmtctrl_frm_info.last_nbuf) {
-		qdf_nbuf_queue_add(&ppdu_desc->mpdu_q,
-				   pdev->mgmtctrl_frm_info.last_nbuf);
-		pdev->mgmtctrl_frm_info.last_nbuf = NULL;
-		ppdu_desc->frame_type = CDP_PPDU_FTYPE_CTRL;
-		ppdu_desc->ppdu_id = ppdu_info->ppdu_id;
-	}
 
 	qdf_spin_lock_bh(&pdev->tx_capture.ppdu_stats_lock);
 	STAILQ_INSERT_TAIL(&pdev->tx_capture.ppdu_stats_queue,
