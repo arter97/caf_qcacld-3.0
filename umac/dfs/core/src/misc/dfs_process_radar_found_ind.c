@@ -746,11 +746,11 @@ QDF_STATUS dfs_process_radar_ind(struct wlan_dfs *dfs,
 		radarfound_freq = freq_center + radar_found->freq_offset;
 
 		if (radar_found->segment_id == SEG_ID_SECONDARY)
-			dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
+			dfs_info(dfs, WLAN_DEBUG_DFS,
 				 "Radar found on second segment.Radarfound Freq=%d MHz.Secondary Chan cfreq=%d MHz.",
 				 radarfound_freq, freq_center);
 		else
-			dfs_info(NULL, WLAN_DEBUG_DFS_ALWAYS,
+			dfs_info(NULL, WLAN_DEBUG_DFS,
 				 "Radar found on channel=%d, freq=%d MHz. Primary beaconning chan:%d, freq=%d MHz.",
 				 utils_dfs_freq_to_chan(radarfound_freq),
 				 radarfound_freq, dfs->dfs_curchan->dfs_ch_ieee,
