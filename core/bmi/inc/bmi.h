@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2017, 2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -62,6 +62,15 @@ struct ol_config_info {
 
 void ol_init_ini_config(struct ol_context *ol_ctx,
 			struct ol_config_info *cfg);
+/**
+ * ol_set_fw_crashed_cb() - set firmware crashed callback
+ * @ol_ctx: ol context
+ * @callback_fn: fw crashed callback function
+ *
+ * Return: None
+ */
+void ol_set_fw_crashed_cb(struct ol_context *ol_ctx,
+			  void (*callback_fn)(void));
 void bmi_cleanup(struct ol_context *scn);
 QDF_STATUS bmi_done(struct ol_context *ol_ctx);
 void bmi_target_ready(struct hif_opaque_softc *scn, void *cfg_ctx);
