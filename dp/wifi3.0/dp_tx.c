@@ -3496,9 +3496,6 @@ uint32_t dp_tx_comp_handler(struct dp_soc *soc, void *hal_srng, uint32_t quota)
 		pool_id = (tx_desc_id & DP_TX_DESC_ID_POOL_MASK) >>
 			DP_TX_DESC_ID_POOL_OS;
 
-		if (!dp_tx_is_desc_id_valid(soc, tx_desc_id))
-			continue;
-
 		/* Find Tx descriptor */
 		tx_desc = dp_tx_desc_find(soc, pool_id,
 				(tx_desc_id & DP_TX_DESC_ID_PAGE_MASK) >>
