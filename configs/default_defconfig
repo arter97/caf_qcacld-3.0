@@ -778,3 +778,8 @@ ifeq ($(CONFIG_CMN_VDEV_MLME_SM), y)
 #Enable STATE MACHINE HISTORY
 CONFIG_SM_ENG_HIST := n
 endif
+
+#Enable ROME single MSI
+ifeq ($(CONFIG_ROME_IF),pci)
+	CONFIG_FEATURE_SINGLE_MSI := n
+endif
