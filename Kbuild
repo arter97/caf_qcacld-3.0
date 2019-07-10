@@ -375,6 +375,11 @@ ifeq ($(CONFIG_ROME_IF),pci)
 	CONFIG_EXT_WOW := 1
 endif
 
+#Enable ROME single MSI
+ifeq ($(CONFIG_ROME_IF),pci)
+	CONFIG_FEATURE_SINGLE_MSI := 1
+endif
+
 #Set this to 1 to catch erroneous Target accesses during debug.
 CONFIG_ATH_PCIE_ACCESS_DEBUG := 0
 
@@ -2225,6 +2230,11 @@ endif
 #Enable GTK Offload
 ifeq ($(CONFIG_EXT_WOW), 1)
 CDEFINES += -DWLAN_FEATURE_EXTWOW_SUPPORT
+endif
+
+#Enable ROME single MSI
+ifeq ($(CONFIG_FEATURE_SINGLE_MSI), 1)
+CDEFINES += -DFEATURE_SINGLE_MSI
 endif
 
 #Mark it as SMP Kernel
