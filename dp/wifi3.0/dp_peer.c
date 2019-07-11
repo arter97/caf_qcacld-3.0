@@ -900,7 +900,13 @@ int dp_peer_update_ast(struct dp_soc *soc, struct dp_peer *peer,
 		  peer->vdev->vdev_id, flags, ast_entry->mac_addr.raw,
 		  peer->mac_addr.raw);
 
-	if (ast_entry->delete_in_progress)
+	/* Do not send AST update in below cases
+	 *  1) Ast entry delete has already triggered
+	 *  2) Peer delete is already triggered
+	 *  3) We did not get the HTT map for create event
+	 */
+	if (ast_entry->delete_in_progress || peer->delete_in_progress ||
+	    !ast_entry->is_mapped)
 		return ret;
 
 	if ((ast_entry->type == CDP_TXRX_AST_TYPE_STATIC) ||
@@ -2277,12 +2283,13 @@ static void dp_teardown_256_ba_sessions(struct dp_peer *peer)
 					delba_rcode = rx_tid->delba_rcode;
 
 					qdf_spin_unlock_bh(&rx_tid->tid_lock);
-					peer->vdev->pdev->soc->cdp_soc.ol_ops->send_delba(
-							peer->vdev->pdev->ctrl_pdev,
-							peer->ctrl_peer,
-							peer->mac_addr.raw,
-							tid, peer->vdev->ctrl_vdev,
-							delba_rcode);
+					if (peer->vdev->pdev->soc->cdp_soc.ol_ops->send_delba)
+						peer->vdev->pdev->soc->cdp_soc.ol_ops->send_delba(
+								peer->vdev->pdev->ctrl_pdev,
+								peer->ctrl_peer,
+								peer->mac_addr.raw,
+								tid, peer->vdev->ctrl_vdev,
+								delba_rcode);
 				} else {
 					qdf_spin_unlock_bh(&rx_tid->tid_lock);
 				}
@@ -2605,10 +2612,11 @@ int dp_delba_tx_completion_wifi3(void *peer_handle,
 			rx_tid->delba_tx_retry++;
 			rx_tid->delba_tx_status = 1;
 			qdf_spin_unlock_bh(&rx_tid->tid_lock);
-			peer->vdev->pdev->soc->cdp_soc.ol_ops->send_delba(
-				peer->vdev->pdev->ctrl_pdev, peer->ctrl_peer,
-				peer->mac_addr.raw, tid, peer->vdev->ctrl_vdev,
-				rx_tid->delba_rcode);
+			if (peer->vdev->pdev->soc->cdp_soc.ol_ops->send_delba)
+				peer->vdev->pdev->soc->cdp_soc.ol_ops->send_delba(
+					peer->vdev->pdev->ctrl_pdev, peer->ctrl_peer,
+					peer->mac_addr.raw, tid, peer->vdev->ctrl_vdev,
+					rx_tid->delba_rcode);
 		}
 		return QDF_STATUS_SUCCESS;
 	} else {
