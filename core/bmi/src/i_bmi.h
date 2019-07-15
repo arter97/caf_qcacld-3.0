@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2017, 2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -160,6 +160,7 @@ struct bmi_info {
  * @ramdump_work: Work for Ramdump collection
  * @fw_indication_work: Work for Fw inciation
  * @tgt_def: Target Defnition pointer
+ * @fw_crashed_cb: Callback for firmware crashed ind
  *
  * Structure to hold all ol BMI/Ramdump info
  */
@@ -174,6 +175,7 @@ struct ol_context {
 	struct targetdef_t {
 		struct targetdef_s *targetdef;
 	} tgt_def;
+	void (*fw_crashed_cb)(void);
 };
 
 #define GET_BMI_CONTEXT(ol_ctx) ((struct bmi_info *)ol_ctx)
