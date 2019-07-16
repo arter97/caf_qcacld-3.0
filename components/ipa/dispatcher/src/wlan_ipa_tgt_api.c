@@ -37,7 +37,7 @@ QDF_STATUS tgt_ipa_uc_offload_enable_disable(struct wlan_objmgr_pdev *pdev,
 	ipa_obj = ipa_pdev_get_priv_obj(pdev);
 	psoc = wlan_pdev_get_psoc(pdev);
 
-	if (ipa_obj->ipa_tx_op)
+	if (ipa_obj && ipa_obj->ipa_tx_op)
 		status = ipa_obj->ipa_tx_op(psoc, req);
 
 	IPA_EXIT();
