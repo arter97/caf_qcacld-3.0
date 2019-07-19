@@ -2546,8 +2546,10 @@ static inline void dp_tx_update_peer_stats(struct dp_peer *peer,
 	DP_STATS_INCC(peer, tx.dropped.fw_rem_tx, 1,
 			(ts->status == HAL_TX_TQM_RR_REM_CMD_TX));
 
-	if (!ts->status == HAL_TX_TQM_RR_FRAME_ACKED)
+	if (!ts->status == HAL_TX_TQM_RR_FRAME_ACKED) {
+		DP_STATS_INC(peer, tx.tx_failed, 1);
 		return;
+	}
 
 	DP_STATS_INCC(peer, tx.ofdma, 1, ts->ofdma);
 
