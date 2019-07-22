@@ -212,4 +212,17 @@ void
 dp_peer_update_inactive_time(struct dp_pdev *pdev, uint32_t tag_type,
 			     uint32_t *tag_buf);
 
+/**
+ * dp_peer_update_pkt_capture_params: Set Rx & Tx Capture flags for a peer
+ * @is_rx_pkt_cap_enable: enable/disable Rx packet capture in monitor mode
+ * @is_tx_pkt_cap_enable: enable/disable Tx packet capture in monitor mode
+ * @peer_mac: MAC address for which the above need to be enabled/disabled
+ *
+ * Return: Success if Rx & Tx capture is enabled for peer, false otherwise
+ */
+QDF_STATUS
+dp_peer_update_pkt_capture_params(struct cdp_pdev *pdev,
+				  bool is_rx_pkt_cap_enable,
+				  bool is_tx_pkt_cap_enable,
+				  uint8_t *peer_mac);
 #endif /* _DP_PEER_H_ */

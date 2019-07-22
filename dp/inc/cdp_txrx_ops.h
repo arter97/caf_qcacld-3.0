@@ -657,6 +657,12 @@ struct cdp_ctrl_ops {
 				uint16_t protocol_type);
 #endif /* WLAN_SUPPORT_RX_TAG_STATISTICS */
 #endif /* WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG */
+#if defined(WLAN_TX_PKT_CAPTURE_ENH) || defined(WLAN_RX_PKT_CAPTURE_ENH)
+	QDF_STATUS (*txrx_update_peer_pkt_capture_params)(
+			struct cdp_pdev *txrx_pdev_handle,
+			bool is_rx_pkt_cap_enable, bool is_tx_pkt_cap_enable,
+			uint8_t *peer_mac);
+#endif /* WLAN_TX_PKT_CAPTURE_ENH || WLAN_RX_PKT_CAPTURE_ENH */
 };
 
 struct cdp_me_ops {

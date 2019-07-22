@@ -1582,7 +1582,7 @@ struct dp_pdev {
 #endif /* WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG */
 
 	/* tx packet capture enhancement */
-	bool tx_capture_enabled;
+	enum cdp_tx_enh_capture_mode tx_capture_enabled;
 	struct dp_pdev_tx_capture tx_capture;
 	/* stats counter for tx ppdu processed */
 	uint64_t tx_ppdu_proc;
@@ -1836,11 +1836,13 @@ struct dp_peer {
 	u_int16_t peer_bs_inact; /* inactivity mark count */
 
 	/* NAWDS Flag and Bss Peer bit */
-	uint8_t nawds_enabled:1,
-				bss_peer:1,
-				wapi:1,
-				wds_enabled:1,
-				sta_bss_peer:1;
+	uint8_t nawds_enabled:1, /* NAWDS flag */
+		bss_peer:1, /* set for bss peer */
+		wapi:1,
+		wds_enabled:1,
+		sta_bss_peer:1,
+		tx_cap_enabled:1, /* Peer's tx-capture is enabled */
+		rx_cap_enabled:1; /* Peer's rx-capture is enabled */
 
 	/* MCL specific peer local id */
 	uint16_t local_id;
