@@ -1063,6 +1063,7 @@ struct wlan_mlme_chainmask {
  * @data_stall_recovery_fw_support: whether FW supports Data stall recovery.
  * @enable_change_channel_bandwidth: enable/disable change channel bw in mission
  * mode
+ * @disable_4way_hs_offload: enable/disable 4 way handshake offload to firmware
  */
 struct wlan_mlme_generic {
 	enum band_info band_capability;
@@ -1093,6 +1094,7 @@ struct wlan_mlme_generic {
 	bool enable_remove_time_stamp_sync_cmd;
 	bool data_stall_recovery_fw_support;
 	bool enable_change_channel_bandwidth;
+	bool disable_4way_hs_offload;
 };
 
 /*
@@ -2036,6 +2038,9 @@ struct wlan_mlme_mwc {
  * @country_code: country code
  * @country_code_len: country code length
  * @enable_11d_in_world_mode: Whether to enable 11d scan in world mode or not
+ * @avoid_acs_freq_list: List of the frequencies which need to be avoided
+ * during acs
+ * @avoid_acs_freq_list_num: Number of the frequencies to be avoided during acs
  */
 struct wlan_mlme_reg {
 	uint32_t self_gen_frm_pwr;
@@ -2049,6 +2054,10 @@ struct wlan_mlme_reg {
 	uint8_t country_code[CFG_COUNTRY_CODE_LEN + 1];
 	uint8_t country_code_len;
 	bool enable_11d_in_world_mode;
+#ifdef SAP_AVOID_ACS_FREQ_LIST
+	uint16_t avoid_acs_freq_list[CFG_VALID_CHANNEL_LIST_LEN];
+	uint8_t avoid_acs_freq_list_num;
+#endif
 };
 
 /**

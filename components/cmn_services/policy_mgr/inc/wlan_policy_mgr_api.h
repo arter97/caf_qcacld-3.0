@@ -65,6 +65,27 @@ typedef const enum policy_mgr_conc_next_action
 	 PM_FW_MODE_STA_P2P_BIT_POS)
 
 /**
+ * enum PM_AP_DFS_MASTER_MODE - AP dfs master mode
+ * @PM_STA_SAP_ON_DFS_DEFAULT - Disallow STA+SAP SCC on DFS channel
+ * @PM_STA_SAP_ON_DFS_MASTER_MODE_DISABLED - Allow STA+SAP SCC
+ *        on DFS channel with master mode disabled
+ * @PM_STA_SAP_ON_DFS_MASTER_MODE_FLEX - enhance
+ *        "PM_STA_SAP_ON_DFS_MASTER_MODE_DISABLED" with below requirement:
+ *	 a. Allow single SAP (GO) start on DFS channel.
+ *	 b. Allow CAC process on DFS channel in single SAP (GO) mode
+ *	 c. Allow DFS radar event process in single SAP (GO) mode
+ *	 d. Disallow CAC and radar event process in SAP (GO) + STA mode.
+ *
+ * This enum value will be used to set to INI g_sta_sap_scc_on_dfs_chan to
+ * config the sta+sap on dfs channel behaviour expected by user.
+ */
+enum PM_AP_DFS_MASTER_MODE {
+	PM_STA_SAP_ON_DFS_DEFAULT,
+	PM_STA_SAP_ON_DFS_MASTER_MODE_DISABLED,
+	PM_STA_SAP_ON_DFS_MASTER_MODE_FLEX,
+};
+
+/**
  * policy_mgr_get_allow_mcc_go_diff_bi() - to get information on whether GO
  *						can have diff BI than STA in MCC
  * @psoc: pointer to psoc
@@ -130,6 +151,33 @@ QDF_STATUS policy_mgr_get_force_1x1(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 policy_mgr_get_sta_sap_scc_on_dfs_chnl(struct wlan_objmgr_psoc *psoc,
 				       uint8_t *sta_sap_scc_on_dfs_chnl);
+
+/**
+ * policy_mgr_get_dfs_master_dynamic_enabled() - support dfs master or not
+ * on AP interafce when STA+SAP(GO) concurrency
+ * @psoc: pointer to psoc
+ * @vdev_id: sap vdev id
+ *
+ * This API is used to check AP dfs master functionality enabled or not when
+ * STA+SAP(GO) concurrency.
+ * If g_sta_sap_scc_on_dfs_chan is non-zero, the STA+SAP(GO) concurrency
+ * is allowed on DFS channel SCC and the SAP's DFS master functionality
+ * should be enable/disable according to:
+ * 1. g_sta_sap_scc_on_dfs_chan is 0: function return true - dfs master
+ *     capability enabled.
+ * 2. g_sta_sap_scc_on_dfs_chan is 1: function return false - dfs master
+ *     capability disabled.
+ * 3. g_sta_sap_scc_on_dfs_chan is 2: dfs master capability based on STA on
+ *     5G or not:
+ *      a. 5G STA active - return false
+ *      b. no 5G STA active -return true
+ *
+ * Return: true if dfs master functionality should be enabled.
+ */
+bool
+policy_mgr_get_dfs_master_dynamic_enabled(struct wlan_objmgr_psoc *psoc,
+					  uint8_t vdev_id);
+
 /**
  * policy_mgr_get_sta_sap_scc_lte_coex_chnl() - to find out if STA & SAP
  *						     SCC is allowed on LTE COEX
@@ -712,6 +760,25 @@ enum policy_mgr_two_connection_mode
 	policy_mgr_get_third_connection_pcl_table_index(
 		struct wlan_objmgr_psoc *psoc);
 
+#ifdef FEATURE_FOURTH_CONNECTION
+/**
+ * policy_mgr_get_fourth_connection_pcl_table_index() - provides the
+ * row index to fourthConnectionPclTable to get to the correct
+ * pcl
+ * @psoc: PSOC object information
+ *
+ * This function provides the row index to
+ * fourthConnectionPclTable. The index is derived based on
+ * current connection, band on which it is on & chain mask it is
+ * using, as obtained from pm_conc_connection_list.
+ *
+ * Return: table index
+ */
+enum policy_mgr_three_connection_mode
+	policy_mgr_get_fourth_connection_pcl_table_index(
+		struct wlan_objmgr_psoc *psoc);
+#endif
+
 /**
  * policy_mgr_incr_connection_count() - adds the new connection to
  * the current connections list
@@ -1175,6 +1242,7 @@ struct policy_mgr_sme_cbacks {
  * encryption type.
  * @hdd_is_chan_switch_in_progress: Check if in any adater channel switch is in
  * progress
+ * @wlan_hdd_set_sap_csa_reason: Set the sap csa reason in cases like NAN.
  */
 struct policy_mgr_hdd_cbacks {
 	void (*sap_restart_chan_switch_cb)(struct wlan_objmgr_psoc *psoc,
@@ -1191,6 +1259,8 @@ struct policy_mgr_hdd_cbacks {
 	enum QDF_OPMODE (*hdd_get_device_mode)(uint32_t session_id);
 	bool (*hdd_wapi_security_sta_exist)(void);
 	bool (*hdd_is_chan_switch_in_progress)(void);
+	void (*wlan_hdd_set_sap_csa_reason)(struct wlan_objmgr_psoc *psoc,
+					    uint8_t vdev_id, uint8_t reason);
 };
 
 
@@ -1796,29 +1866,19 @@ QDF_STATUS policy_mgr_set_hw_mode_on_channel_switch(
 		struct wlan_objmgr_psoc *psoc, uint8_t session_id);
 
 /**
- * policy_mgr_set_hw_mode_before_channel_switch() - Set hw mode
- * before channel switch, this is required if DBS mode is 2x2
- * @psoc: PSOC object information
- * @vdev_id: vdev id on which channel switch is required
- * @chan: New channel to which channel switch is requested
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS policy_mgr_set_hw_mode_before_channel_switch(
-		struct wlan_objmgr_psoc *psoc, uint8_t vdev_id, uint8_t chan);
-
-/**
- * policy_mgr_check_and_set_hw_mode_sta_channel_switch() - check if hw mode
- * change is required before channel switch for STA,
+ * policy_mgr_check_and_set_hw_mode_for_channel_switch() - check if hw mode
+ * change is required before channel switch for STA/SAP,
  * this is required if DBS mode is 2x2
  * @psoc: PSOC object information
  * @vdev_id: vdev id on which channel switch is required
  * @chan: New channel to which channel switch is requested
+ * @reason: reason for hw mode change
  *
  * Return: QDF_STATUS, success if HW mode change is required else Failure
  */
-QDF_STATUS policy_mgr_check_and_set_hw_mode_sta_channel_switch(
-		struct wlan_objmgr_psoc *psoc, uint8_t vdev_id, uint8_t chan);
+QDF_STATUS policy_mgr_check_and_set_hw_mode_for_channel_switch(
+		struct wlan_objmgr_psoc *psoc, uint8_t vdev_id, uint8_t chan,
+		enum policy_mgr_conn_update_reason reason);
 
 /**
  * policy_mgr_set_do_hw_mode_change_flag() - Set flag to indicate hw mode change
@@ -1946,6 +2006,18 @@ void policy_mgr_hw_mode_transition_cb(uint32_t old_hw_mode_index,
 bool policy_mgr_current_concurrency_is_mcc(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * policy_mgr_is_sap_p2pgo_on_dfs() - check if there is a P2PGO or SAP
+ * operating in a DFS channel
+ * @psoc: PSOC object information
+ * This routine is called to check if there is a P2PGO/SAP on DFS channel
+ *
+ * Return: True  - P2PGO/SAP present on DFS Channel
+ * False - Otherwise
+ */
+
+bool policy_mgr_is_sap_p2pgo_on_dfs(struct wlan_objmgr_psoc *psoc);
+
+/**
  * policy_mgr_register_sme_cb() - register SME callbacks
  * @psoc: PSOC object information
  * @sme_cbacks: function pointers from SME
@@ -2071,6 +2143,15 @@ bool policy_mgr_is_dbs_enable(struct wlan_objmgr_psoc *psoc);
  * Return: true if the HW is DBS capable
  */
 bool policy_mgr_is_hw_dbs_capable(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * policy_mgr_is_dbs_scan_allowed() - Check if DBS scan is allowed or not
+ * @psoc: PSOC object information
+ * Checks if the DBS scan can be performed or not
+ *
+ * Return: true if DBS scan is allowed.
+ */
+bool policy_mgr_is_dbs_scan_allowed(struct wlan_objmgr_psoc *psoc);
 
 /**
  * policy_mgr_is_hw_sbs_capable() - Check if HW is SBS capable
@@ -2736,6 +2817,16 @@ bool policy_mgr_is_sta_connected_2g(struct wlan_objmgr_psoc *psoc);
 void policy_mgr_trim_acs_channel_list(uint8_t *pcl, uint8_t pcl_count,
 				      uint8_t *org_ch_list,
 				      uint8_t *org_ch_list_count);
+
+/**
+ * policy_mgr_scan_trim_5g_chnls_for_dfs_ap() - check if sta scan should skip
+ * 5g channel when dfs ap is present.
+ *
+ * @psoc: pointer to soc
+ *
+ * Return: true if sta scan 5g chan should be skipped
+ */
+bool policy_mgr_scan_trim_5g_chnls_for_dfs_ap(struct wlan_objmgr_psoc *psoc);
 
 /**
  * policy_mgr_is_hwmode_set_for_given_chnl() - to check for given channel

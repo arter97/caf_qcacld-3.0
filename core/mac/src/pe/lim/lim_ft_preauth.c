@@ -190,7 +190,7 @@ int lim_process_ft_pre_auth_req(struct mac_context *mac_ctx,
 	 * Dont need to suspend if APs are in same channel and DUT
 	 * is not in MCC state
 	 */
-	if ((session->currentOperChannel !=
+	if ((wlan_reg_freq_to_chan(mac_ctx->pdev, session->curr_op_freq) !=
 	    session->ftPEContext.pFTPreAuthReq->preAuthchannelNum)
 	    || lim_is_in_mcc(mac_ctx)) {
 		/* Need to suspend link only if the channels are different */
@@ -450,8 +450,8 @@ void lim_handle_ft_pre_auth_rsp(struct mac_context *mac, QDF_STATUS status,
 			goto send_rsp;
 		}
 
-		sir_copy_mac_addr(ft_session->selfMacAddr,
-				  pe_session->selfMacAddr);
+		sir_copy_mac_addr(ft_session->self_mac_addr,
+				  pe_session->self_mac_addr);
 		sir_copy_mac_addr(ft_session->limReAssocbssId,
 				  pbssDescription->bssId);
 
@@ -484,7 +484,7 @@ void lim_handle_ft_pre_auth_rsp(struct mac_context *mac, QDF_STATUS status,
 		lim_print_mac_addr(mac, pe_session->limReAssocbssId, LOGD);
 	}
 send_rsp:
-	if ((pe_session->currentOperChannel !=
+	if ((wlan_reg_freq_to_chan(mac->pdev, pe_session->curr_op_freq) !=
 	     pe_session->ftPEContext.pFTPreAuthReq->preAuthchannelNum) ||
 	    lim_is_in_mcc(mac)) {
 		/* Need to move to the original AP channel */

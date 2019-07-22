@@ -352,13 +352,36 @@
 #ifdef WLAN_FEATURE_DP_BUS_BANDWIDTH
 /*
  * <ini>
+ * gBusBandwidthVeryHighThreshold - bus bandwidth very high threshold
+ *
+ * @Min: 0
+ * @Max: 4294967295UL
+ * @Default: 7000
+ *
+ * This ini specifies the bus bandwidth very high threshold
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_DP_BUS_BANDWIDTH_VERY_HIGH_THRESHOLD \
+		CFG_INI_UINT( \
+		"gBusBandwidthVeryHighThreshold", \
+		0, \
+		4294967295UL, \
+		7000, \
+		CFG_VALUE_OR_DEFAULT, \
+		"Bus bandwidth very high threshold")
+
+/*
+ * <ini>
  * gBusBandwidthHighThreshold - bus bandwidth high threshold
  *
  * @Min: 0
  * @Max: 4294967295UL
  * @Default: 2000
  *
- * This ini specifies thebus bandwidth high threshold
+ * This ini specifies the bus bandwidth high threshold
  *
  * Usage: Internal
  *
@@ -381,7 +404,7 @@
  * @Max: 4294967295UL
  * @Default: 500
  *
- * This ini specifies thebus bandwidth medium threshold
+ * This ini specifies the bus bandwidth medium threshold
  *
  * Usage: Internal
  *
@@ -404,7 +427,7 @@
  * @Max: 4294967295UL
  * @Default: 150
  *
- * This ini specifies thebus bandwidth low threshold
+ * This ini specifies the bus bandwidth low threshold
  *
  * Usage: Internal
  *
@@ -618,6 +641,135 @@
 		CFG_VALUE_OR_DEFAULT, \
 		"High Threshold inorder to trigger High Tx Tp")
 #endif /*WLAN_FEATURE_DP_BUS_BANDWIDTH*/
+
+#ifdef QCA_SUPPORT_TXRX_DRIVER_TCP_DEL_ACK
+/*
+ * <ini>
+ * gDriverDelAckHighThreshold - High Threshold inorder to trigger TCP
+ *                              delay ack feature in the host.
+ * @Min: 0
+ * @Max: 70000
+ * @Default: 300
+ *
+ * This ini specifies the threshold of RX packets transmitted
+ * over a period of 100 ms beyond which TCP delay ack can be enabled
+ * to improve TCP RX throughput requirement.
+ *
+ * Supported Feature: Tcp Delayed Ack in the host
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_DP_DRIVER_TCP_DELACK_HIGH_THRESHOLD \
+		CFG_INI_UINT( \
+		"gDriverDelAckHighThreshold", \
+		0, \
+		70000, \
+		300, \
+		CFG_VALUE_OR_DEFAULT, \
+		"TCP delack high threshold")
+
+/*
+ * <ini>
+ * gDriverDelAckLowThreshold - Low Threshold inorder to disable TCP
+ *                             delay ack feature in the host.
+ * @Min: 0
+ * @Max: 70000
+ * @Default: 100
+ *
+ * This ini is used to mention the Low Threshold inorder to disable TCP Del
+ * Ack feature in the host.
+ *
+ * Supported Feature: Tcp Delayed Ack in the host
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_DP_DRIVER_TCP_DELACK_LOW_THRESHOLD \
+		CFG_INI_UINT( \
+		"gDriverDelAckLowThreshold", \
+		0, \
+		70000, \
+		100, \
+		CFG_VALUE_OR_DEFAULT, \
+		"TCP delack low threshold")
+
+/*
+ * <ini>
+ * gDriverDelAckTimerValue - Timeout value (ms) to send out all TCP del
+ *                           ack frames
+ * @Min: 1
+ * @Max: 15
+ * @Default: 3
+ *
+ * This ini specifies the time out value to send out all pending TCP delay
+ * ACK frames.
+ *
+ * Supported Feature: Tcp Delayed Ack in the host
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_DP_DRIVER_TCP_DELACK_TIMER_VALUE \
+		CFG_INI_UINT( \
+		"gDriverDelAckTimerValue", \
+		1, \
+		15, \
+		3, \
+		CFG_VALUE_OR_DEFAULT, \
+		"Send out all TCP Del Acks if time out")
+
+/*
+ * <ini>
+ * gDriverDelAckPktCount - The maximum number of TCP delay ack frames
+ * @Min: 0
+ * @Max: 50
+ * @Default: 20
+ *
+ * This ini specifies the maximum number of TCP delayed ack frames.
+ *
+ * Supported Feature: Tcp Delayed Ack in the host
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_DP_DRIVER_TCP_DELACK_PKT_CNT \
+		CFG_INI_UINT( \
+		"gDriverDelAckPktCount", \
+		0, \
+		50, \
+		20, \
+		CFG_VALUE_OR_DEFAULT, \
+		"No of TCP Del ACK count")
+
+/*
+ * <ini>
+ * gDriverDelAckEnable - Control to enable Dynamic Configuration of Tcp
+ *                       Delayed Ack in the host.
+ * @Default: true
+ *
+ * This ini is used to enable Dynamic Configuration of Tcp Delayed Ack
+ * in the host.
+ *
+ * Related: gDriverDelAckHighThreshold, gDriverDelAckLowThreshold,
+ *          gDriverDelAckPktCount, gDriverDelAckTimerValue
+ *
+ * Supported Feature: Tcp Delayed Ack in the host
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_DP_DRIVER_TCP_DELACK_ENABLE \
+		CFG_INI_BOOL( \
+		"gDriverDelAckEnable", \
+		true, \
+		"Enable tcp del ack in the driver")
+#endif
 
 /*
  * <ini>
@@ -1049,6 +1201,7 @@
 
 #ifdef WLAN_FEATURE_DP_BUS_BANDWIDTH
 #define CFG_HDD_DP_BUS_BANDWIDTH \
+	CFG(CFG_DP_BUS_BANDWIDTH_VERY_HIGH_THRESHOLD) \
 	CFG(CFG_DP_BUS_BANDWIDTH_HIGH_THRESHOLD) \
 	CFG(CFG_DP_BUS_BANDWIDTH_MEDIUM_THRESHOLD) \
 	CFG(CFG_DP_BUS_BANDWIDTH_LOW_THRESHOLD) \
@@ -1062,6 +1215,17 @@
 	CFG(CFG_DP_TCP_TX_HIGH_TPUT_THRESHOLD)
 #else
 #define CFG_HDD_DP_BUS_BANDWIDTH
+#endif
+
+#ifdef QCA_SUPPORT_TXRX_DRIVER_TCP_DEL_ACK
+#define CFG_DP_DRIVER_TCP_DELACK \
+	CFG(CFG_DP_DRIVER_TCP_DELACK_HIGH_THRESHOLD) \
+	CFG(CFG_DP_DRIVER_TCP_DELACK_LOW_THRESHOLD) \
+	CFG(CFG_DP_DRIVER_TCP_DELACK_TIMER_VALUE) \
+	CFG(CFG_DP_DRIVER_TCP_DELACK_PKT_CNT) \
+	CFG(CFG_DP_DRIVER_TCP_DELACK_ENABLE)
+#else
+#define CFG_DP_DRIVER_TCP_DELACK
 #endif
 
 #define CFG_HDD_DP_ALL \
@@ -1083,6 +1247,7 @@
 	CFG(CFG_DP_HTC_WMI_CREDIT_CNT) \
 	CFG_DP_ENABLE_FASTPATH_ALL \
 	CFG_HDD_DP_BUS_BANDWIDTH \
+	CFG_DP_DRIVER_TCP_DELACK \
 	CFG_HDD_DP_LEGACY_TX_FLOW \
 	CFG_DP_ENABLE_NUD_TRACKING_ALL \
 	CFG_DP_CONFIG_DP_TRACE_ALL

@@ -245,6 +245,10 @@ ifeq ($(CONFIG_WLAN_BCN_RECV_FEATURE), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_bcn_recv.o
 endif
 
+ifeq ($(CONFIG_QCACLD_FEATURE_HW_CAPABILITY), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_hw_capability.o
+endif
+
 ###### OSIF_SYNC ########
 SYNC_DIR := os_if/sync
 SYNC_INC_DIR := $(SYNC_DIR)/inc
@@ -1038,6 +1042,7 @@ P2P_INC := -I$(WLAN_ROOT)/$(P2P_DISPATCHER_INC_DIR) \
 P2P_OBJS := $(P2P_DISPATCHER_OBJ_DIR)/wlan_p2p_ucfg_api.o \
 	    $(P2P_DISPATCHER_OBJ_DIR)/wlan_p2p_tgt_api.o \
 	    $(P2P_DISPATCHER_OBJ_DIR)/wlan_p2p_cfg.o \
+	    $(P2P_DISPATCHER_OBJ_DIR)/wlan_p2p_api.o \
 	    $(P2P_CORE_OBJ_DIR)/wlan_p2p_main.o \
 	    $(P2P_CORE_OBJ_DIR)/wlan_p2p_roc.o \
 	    $(P2P_CORE_OBJ_DIR)/wlan_p2p_off_chan_tx.o \
@@ -1101,6 +1106,8 @@ TARGET_IF_INC := -I$(WLAN_COMMON_INC)/target_if/core/inc \
 		 -I$(WLAN_COMMON_INC)/target_if/core/src \
 		 -I$(WLAN_COMMON_INC)/target_if/init_deinit/inc \
 		 -I$(WLAN_COMMON_INC)/target_if/regulatory/inc \
+		 -I$(WLAN_COMMON_INC)/target_if/mlme/vdev_mgr/inc \
+		 -I$(WLAN_COMMON_INC)/target_if/dispatcher/inc
 
 TARGET_IF_OBJ := $(TARGET_IF_DIR)/core/src/target_if_main.o \
 		$(TARGET_IF_DIR)/regulatory/src/target_if_reg.o \
@@ -1110,6 +1117,10 @@ TARGET_IF_OBJ := $(TARGET_IF_DIR)/core/src/target_if_main.o \
 		$(TARGET_IF_DIR)/init_deinit/src/init_deinit_lmac.o \
 		$(TARGET_IF_DIR)/init_deinit/src/init_event_handler.o \
 		$(TARGET_IF_DIR)/init_deinit/src/service_ready_util.o \
+
+ifeq ($(CONFIG_FEATURE_VDEV_RSP_WAKELOCK), y)
+TARGET_IF_OBJ += $(TARGET_IF_DIR)/mlme/vdev_mgr/src/target_if_vdev_mgr_wake_lock.o
+endif
 
 ########### GLOBAL_LMAC_IF ##########
 GLOBAL_LMAC_IF_DIR := $(WLAN_COMMON_ROOT)/global_lmac_if
@@ -1204,6 +1215,7 @@ endif
 
 ifeq ($(CONFIG_WMI_BCN_OFFLOAD), y)
 WMI_OBJS += $(WMI_OBJ_DIR)/wmi_unified_bcn_api.o
+WMI_OBJS += $(WMI_OBJ_DIR)/wmi_unified_bcn_tlv.o
 endif
 
 ########### FWLOG ###########
@@ -2028,6 +2040,7 @@ cppflags-$(CONFIG_CP_STATS) += -DQCA_SUPPORT_CP_STATS
 cppflags-$(CONFIG_FEATURE_INTEROP_ISSUES_AP) += -DWLAN_FEATURE_INTEROP_ISSUES_AP
 cppflags-$(CONFIG_FEATURE_MEMDUMP_ENABLE) += -DWLAN_FEATURE_MEMDUMP_ENABLE
 cppflags-$(CONFIG_FEATURE_FW_LOG_PARSING) += -DFEATURE_FW_LOG_PARSING
+cppflags-$(CONFIG_FEATURE_OEM_DATA) += -DFEATURE_OEM_DATA
 
 cppflags-$(CONFIG_PLD_SDIO_CNSS_FLAG) += -DCONFIG_PLD_SDIO_CNSS
 cppflags-$(CONFIG_PLD_PCIE_CNSS_FLAG) += -DCONFIG_PLD_PCIE_CNSS
@@ -2163,6 +2176,8 @@ cppflags-y += -DCONFIG_ATH_PROCFS_DIAG_SUPPORT
 cppflags-y += -DQCA_SUPPORT_OL_RX_REORDER_TIMEOUT
 cppflags-y += -DCONFIG_ATH_PCIE_MAX_PERF=0 -DCONFIG_ATH_PCIE_AWAKE_WHILE_DRIVER_LOAD=0 -DCONFIG_DISABLE_CDC_MAX_PERF_WAR=0
 endif
+
+cppflags-$(CONFIG_QCA_SUPPORT_TXRX_DRIVER_TCP_DEL_ACK) += -DQCA_SUPPORT_TXRX_DRIVER_TCP_DEL_ACK
 
 cppflags-$(CONFIG_WLAN_FEATURE_11W) += -DWLAN_FEATURE_11W
 
@@ -2346,6 +2361,8 @@ else
 cppflags-$(CONFIG_WLAN_OPEN_P2P_INTERFACE) += -DWLAN_OPEN_P2P_INTERFACE
 endif
 
+cppflags-$(CONFIG_WMI_BCN_OFFLOAD) += -DWLAN_WMI_BCN
+
 #Enable wbuff
 cppflags-$(CONFIG_WLAN_WBUFF) += -DWLAN_FEATURE_WBUFF
 
@@ -2494,6 +2511,7 @@ cppflags-$(CONFIG_DP_TRACE) += -DCONFIG_DP_TRACE
 cppflags-$(CONFIG_FEATURE_TSO) += -DFEATURE_TSO
 cppflags-$(CONFIG_TSO_DEBUG_LOG_ENABLE) += -DTSO_DEBUG_LOG_ENABLE
 cppflags-$(CONFIG_DP_LFR) += -DDP_LFR
+cppflags-$(CONFIG_DUP_RX_DESC_WAR) += -DDUP_RX_DESC_WAR
 cppflags-$(CONFIG_HTT_PADDR64) += -DHTT_PADDR64
 cppflags-$(CONFIG_WLAN_FEATURE_BMI) += -DWLAN_FEATURE_BMI
 cppflags-$(CONFIG_QCN7605_SUPPORT) += -DQCN7605_SUPPORT -DPLATFORM_GENOA
@@ -2505,7 +2523,7 @@ ccflags-$(CONFIG_HIF_PCI) += -DCE_SVC_CMN_INIT
 ccflags-$(CONFIG_HIF_SNOC) += -DCE_SVC_CMN_INIT
 
 ifeq ($(CONFIG_QCA6290_11AX), y)
-cppflags-y += -DQCA_WIFI_QCA6290_11AX
+cppflags-y += -DQCA_WIFI_QCA6290_11AX -DQCA_WIFI_QCA6290_11AX_MU_UL
 endif
 
 ifeq ($(CONFIG_LITHIUM), y)
@@ -2519,10 +2537,12 @@ cppflags-$(CONFIG_WLAN_FEATURE_11AX) += -DSUPPORT_11AX_D3
 cppflags-$(CONFIG_LITHIUM) += -DFEATURE_AST
 cppflags-$(CONFIG_LITHIUM) += -DPEER_PROTECTED_ACCESS
 cppflags-$(CONFIG_LITHIUM) += -DSERIALIZE_QUEUE_SETUP
+cppflags-$(CONFIG_LITHIUM) += -DDP_RX_PKT_NO_PEER_DELIVER
 cppflags-$(CONFIG_VERBOSE_DEBUG) += -DENABLE_VERBOSE_DEBUG
 cppflags-$(CONFIG_RX_DESC_DEBUG_CHECK) += -DRX_DESC_DEBUG_CHECK
 #Enable STATE MACHINE HISTORY
 cppflags-$(CONFIG_SM_ENG_HIST) += -DSM_ENG_HIST_ENABLE
+cppflags-$(CONFIG_FEATURE_VDEV_RSP_WAKELOCK) += -DFEATURE_VDEV_RSP_WAKELOCK
 
 # Vendor Commands
 cppflags-$(CONFIG_FEATURE_RSSI_MONITOR) += -DFEATURE_RSSI_MONITOR
@@ -2545,10 +2565,20 @@ cppflags-$(CONFIG_WMI_ROAM_SUPPORT) += -DWMI_ROAM_SUPPORT
 cppflags-$(CONFIG_WMI_CONCURRENCY_SUPPORT) += -DWMI_CONCURRENCY_SUPPORT
 cppflags-$(CONFIG_WMI_STA_SUPPORT) += -DWMI_STA_SUPPORT
 
+cppflags-y += -DWMI_MULTI_MAC_SVC
+
 # Dummy flag for WIN/MCL converged data path compilation
 cppflags-y += -DDP_PRINT_ENABLE=0
 cppflags-y += -DATH_SUPPORT_WRAP=0
 cppflags-y += -DQCA_HOST2FW_RXBUF_RING
+cppflags-y += -DDP_FLOW_CTL
+cppflags-y += -DDP_PEER_EXTENDED_API
+cppflags-y += -DDP_POWER_SAVE
+cppflags-y += -DDP_CON_MON
+cppflags-y += -DDP_MOB_DEFS
+cppflags-y += -DDP_PRINT_NO_CONSOLE
+cppflags-y += -DDP_INTR_POLL_BOTH
+cppflags-y += -DDP_INVALID_PEER_ASSERT
 #endof dummy flags
 
 ccflags-$(CONFIG_ENABLE_SIZE_OPTIMIZE) += -Os
@@ -2595,6 +2625,9 @@ cppflags-$(CONFIG_HOST_OPCLASS) += -DHOST_OPCLASS
 #Flag to enable/disable TARGET_11D_SCAN
 cppflags-$(CONFIG_TARGET_11D_SCAN) += -DTARGET_11D_SCAN
 
+#Flag to enable/disable avoid acs frequency list feature
+cppflags-$(CONFIG_SAP_AVOID_ACS_FREQ_LIST) += -DSAP_AVOID_ACS_FREQ_LIST
+
 #Flag to enable Dynamic Voltage WDCVS (Config Voltage Mode)
 cppflags-$(CONFIG_WLAN_DYNAMIC_CVM) += -DFEATURE_WLAN_DYNAMIC_CVM
 
@@ -2607,10 +2640,16 @@ cppflags-$(CONFIG_QCACLD_FEATURE_COEX_CONFIG) += -DFEATURE_COEX_CONFIG
 #Flag to enable MPTA helper feature
 cppflags-$(CONFIG_QCACLD_FEATURE_MPTA_HELPER) += -DFEATURE_MPTA_HELPER
 
+#Flag to enable get hw capability
+cppflags-$(CONFIG_QCACLD_FEATURE_HW_CAPABILITY) += -DFEATURE_HW_CAPABILITY
+
 cppflags-$(CONFIG_DATA_CE_SW_INDEX_NO_INLINE_UPDATE) += -DDATA_CE_SW_INDEX_NO_INLINE_UPDATE
 
 #Flag to enable Multi page memory allocation for RX descriptor pool
 cppflags-$(CONFIG_QCACLD_RX_DESC_MULTI_PAGE_ALLOC) += -DRX_DESC_MULTI_PAGE_ALLOC
+
+cppflags-$(CONFIG_WLAN_FEATURE_DP_EVENT_HISTORY) += -DWLAN_FEATURE_DP_EVENT_HISTORY
+cppflags-$(CONFIG_WLAN_DP_PER_RING_TYPE_CONFIG) += -DWLAN_DP_PER_RING_TYPE_CONFIG
 
 ifdef CONFIG_MAX_LOGS_PER_SEC
 ccflags-y += -DWLAN_MAX_LOGS_PER_SEC=$(CONFIG_MAX_LOGS_PER_SEC)
@@ -2690,6 +2729,29 @@ ccflags-y += -DWLAN_MAX_PDEVS=$(CONFIG_WLAN_MAX_PDEVS)
 CONFIG_WLAN_MAX_VDEVS ?= 5
 ccflags-y += -DWLAN_MAX_VDEVS=$(CONFIG_WLAN_MAX_VDEVS)
 
+#Maximum pending commands for a vdev is calculated in vdev create handler
+#by WLAN_SER_MAX_PENDING_CMDS/WLAN_SER_MAX_VDEVS. For SAP case, we will need
+#to accommodate 32 Pending commands to handle multiple STA sending
+#deauth/disassoc at the same time and for STA vdev,4 non scan pending commands
+#are supported. So calculate WLAN_SER_MAX_PENDING_COMMANDS based on the SAP
+#modes supported and no of STA vdev total non scan pending queue. Reserve
+#additional 3 pending commands for WLAN_SER_MAX_PENDING_CMDS_AP to account for
+#other commands like hardware mode change.
+
+ifdef CONFIG_SIR_SAP_MAX_NUM_PEERS
+CONFIG_WLAN_SER_MAX_PENDING_CMDS_AP ?=$(CONFIG_SIR_SAP_MAX_NUM_PEERS)
+else
+CONFIG_WLAN_SER_MAX_PENDING_CMDS_AP ?=32
+endif
+ccflags-y += -DWLAN_SER_MAX_PENDING_CMDS_AP=$(CONFIG_WLAN_SER_MAX_PENDING_CMDS_AP)+3
+
+CONFIG_WLAN_SER_MAX_PENDING_CMDS_STA ?= 4
+ccflags-y += -DWLAN_SER_MAX_PENDING_CMDS_STA=$(CONFIG_WLAN_SER_MAX_PENDING_CMDS_STA)
+
+CONFIG_WLAN_MAX_PENDING_CMDS ?= $(CONFIG_WLAN_SER_MAX_PENDING_CMDS_AP)*3+$(CONFIG_WLAN_SER_MAX_PENDING_CMDS_STA)*2
+
+ccflags-y += -DWLAN_SER_MAX_PENDING_CMDS=$(CONFIG_WLAN_MAX_PENDING_CMDS)
+
 CONFIG_WLAN_PDEV_MAX_VDEVS ?= $(CONFIG_WLAN_MAX_VDEVS)
 ccflags-y += -DWLAN_PDEV_MAX_VDEVS=$(CONFIG_WLAN_PDEV_MAX_VDEVS)
 
@@ -2729,7 +2791,9 @@ endif
 ifdef CONFIG_LOCK_STATS_ON
 ccflags-y += -DQDF_LOCK_STATS=1
 ccflags-y += -DQDF_LOCK_STATS_DESTROY_PRINT=0
+ifneq ($(CONFIG_ARCH_SDXPRAIRIE), y)
 ccflags-y += -DQDF_LOCK_STATS_BUG_ON=1
+endif
 ccflags-y += -DQDF_LOCK_STATS_LIST=1
 ccflags-y += -DQDF_LOCK_STATS_LIST_SIZE=256
 endif
@@ -2740,8 +2804,13 @@ endif
 
 cppflags-y += -DFEATURE_NBUFF_REPLENISH_TIMER
 cppflags-y += -DPEER_CACHE_RX_PKTS
+cppflags-y += -DPCIE_REG_WINDOW_LOCAL_NO_CACHE
 
 ccflags-$(CONFIG_HASTINGS_BT_WAR) += -DHASTINGS_BT_WAR
+
+cppflags-$(CONFIG_SLUB_DEBUG_ON) += -DHIF_CONFIG_SLUB_DEBUG_ON
+
+ccflags-$(CONFIG_FOURTH_CONNECTION) += -DFEATURE_FOURTH_CONNECTION
 
 KBUILD_CPPFLAGS += $(cppflags-y)
 

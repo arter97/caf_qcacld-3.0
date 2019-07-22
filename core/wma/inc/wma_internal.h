@@ -32,17 +32,10 @@
 
 #define WMA_2_4_GHZ_MAX_FREQ  3000
 
-/* pdev vdev and peer stats*/
-#define FW_PDEV_STATS_SET 0x1
-#define FW_VDEV_STATS_SET 0x2
-#define FW_PEER_STATS_SET 0x4
-#define FW_RSSI_PER_CHAIN_STATS_SET 0x8
-
 /*AR9888/AR6320  noise floor approx value
  * similar to the mentioned the WMA
  */
 #define WMA_TGT_NOISE_FLOOR_DBM (-96)
-#define WMA_TGT_MAX_SNR         (WMA_TGT_NOISE_FLOOR_DBM * (-1))
 #define WMA_INVALID_PER_CHAIN_SNR  (0x80)
 #define WMA_INVALID_PER_CHAIN_RSSI (0xFF)
 
@@ -691,7 +684,7 @@ uint32_t wma_get_bcn_rate_code(uint16_t rate);
 /*
  * wma_mgmt.c functions declarations
  */
-#ifdef CONFIG_WMI_BCN_OFFLOAD
+#ifdef WLAN_WMI_BCN
 int wma_beacon_swba_handler(void *handle, uint8_t *event, uint32_t len);
 #endif
 
@@ -1019,13 +1012,6 @@ int32_t wma_txrx_fw_stats_reset(tp_wma_handle wma_handle,
 int32_t wma_set_txrx_fw_stats_level(tp_wma_handle wma_handle,
 				    uint8_t vdev_id, uint32_t value);
 
-#ifdef QCA_SUPPORT_CP_STATS
-static inline void wma_get_stats_req(WMA_HANDLE handle,
-				struct sAniGetPEStatsReq *get_stats_param) {}
-#else
-void wma_get_stats_req(WMA_HANDLE handle,
-		       struct sAniGetPEStatsReq *get_stats_param);
-#endif
 /*
  * wma_features.c functions declarations
  */
@@ -1045,9 +1031,6 @@ QDF_STATUS wma_sar_register_event_handlers(WMA_HANDLE handle);
 void wma_process_link_status_req(tp_wma_handle wma,
 				 tAniGetLinkStatus *pGetLinkStatus);
 
-QDF_STATUS wma_get_peer_info(WMA_HANDLE handle,
-				struct sir_peer_info_req *peer_info_req);
-
 /**
  * wma_get_peer_info_ext() - get peer info
  * @handle: wma interface
@@ -1059,6 +1042,16 @@ QDF_STATUS wma_get_peer_info(WMA_HANDLE handle,
  */
 QDF_STATUS wma_get_peer_info_ext(WMA_HANDLE handle,
 				struct sir_peer_info_ext_req *peer_info_req);
+
+/**
+ * wma_get_isolation() - get antenna isolation
+ * @handle: wma interface
+ *
+ * This function will send WMI_COEX_GET_ANTENNA_ISOLATION_CMDID to FW
+ *
+ * Return: 0 on success, otherwise error value
+ */
+QDF_STATUS wma_get_isolation(tp_wma_handle wma);
 
 /**
  * wma_peer_info_event_handler() - Handler for WMI_PEER_STATS_INFO_EVENTID

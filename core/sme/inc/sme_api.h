@@ -44,15 +44,11 @@
 #include "wlan_serialization_legacy_api.h"
 #include <qca_vendor.h>
 #include "wmi_unified.h"
+#include "wmi_unified_param.h"
 
 /*--------------------------------------------------------------------------
   Preprocessor definitions and constants
   ------------------------------------------------------------------------*/
-
-#define SME_SUMMARY_STATS         (1 << eCsrSummaryStats)
-#define SME_GLOBAL_CLASSA_STATS   (1 << eCsrGlobalClassAStats)
-#define SME_GLOBAL_CLASSD_STATS   (1 << eCsrGlobalClassDStats)
-#define SME_PER_CHAIN_RSSI_STATS  (1 << csr_per_chain_rssi_stats)
 
 #define sme_alert(params...) QDF_TRACE_FATAL(QDF_MODULE_ID_SME, params)
 #define sme_err(params...) QDF_TRACE_ERROR(QDF_MODULE_ID_SME, params)
@@ -106,20 +102,27 @@
 #define SME_ACTIVE_LIST_CMD_TIMEOUT_VALUE (30*1000)
 #define SME_CMD_TIMEOUT_VALUE (SME_ACTIVE_LIST_CMD_TIMEOUT_VALUE + 1000)
 
-#define SME_CMD_VDEV_DISCONNECT_TIMEOUT (SIR_VDEV_STOP_REQUEST_TIMEOUT + 4000)
+/* Disconnect timeout = vdev stop + bss peer delete + 1 sec */
+#define SME_CMD_VDEV_DISCONNECT_TIMEOUT (SIR_VDEV_STOP_REQUEST_TIMEOUT + \
+					 SIR_DELETE_STA_TIMEOUT + 1000)
 #define SME_DISCONNECT_TIMEOUT (SME_CMD_VDEV_DISCONNECT_TIMEOUT + 1000)
 
+/* AP start timeout = vdev start + 4 sec */
 #define SME_CMD_VDEV_START_BSS_TIMEOUT (SIR_VDEV_START_REQUEST_TIMEOUT + 4000)
 #define SME_CMD_START_BSS_TIMEOUT (SME_CMD_VDEV_START_BSS_TIMEOUT + 1000)
 
-/* SME timeout for Start/Stop BSS commands is set to 6 secs */
-#define SME_START_STOP_BSS_CMD_TIMEOUT (SIR_VDEV_STOP_REQUEST_TIMEOUT + 4000)
-#define SME_CMD_STOP_BSS_TIMEOUT (SME_START_STOP_BSS_CMD_TIMEOUT + 4000)
+/* AP stop timeout = vdev stop + self peer delete + 1 sec */
+#define SME_CMD_STOP_BSS_CMD_TIMEOUT (SIR_VDEV_STOP_REQUEST_TIMEOUT + \
+				      SIR_DELETE_STA_TIMEOUT + 1000)
+#define SME_CMD_STOP_BSS_TIMEOUT (SME_CMD_STOP_BSS_CMD_TIMEOUT + 1000)
 
-#define SME_CMD_PEER_DISCONNECT_TIMEOUT (SIR_DELETE_STA_TIMEOUT + 2000)
-#define SME_PEER_DISCONNECT_TIMEOUT (SME_START_STOP_BSS_CMD_TIMEOUT + 1000)
+/* Peer disconenct timeout = peer delete + 1 sec */
+#define SME_CMD_PEER_DISCONNECT_TIMEOUT (SIR_DELETE_STA_TIMEOUT + 1000)
+#define SME_PEER_DISCONNECT_TIMEOUT (SME_CMD_PEER_DISCONNECT_TIMEOUT + 1000)
 
-#define SME_CMD_ROAM_CMD_TIMEOUT (SIR_VDEV_START_REQUEST_TIMEOUT + 4000)
+/* Roam cmds timeout = vdev start + peer assoc + 1 sec */
+#define SME_CMD_ROAM_CMD_TIMEOUT (SIR_VDEV_START_REQUEST_TIMEOUT + \
+				  SIR_PEER_ASSOC_TIMEOUT + 1000)
 #define SME_CMD_ADD_DEL_TS_TIMEOUT (4 * 1000)
 
 /*
@@ -586,16 +589,6 @@ QDF_STATUS sme_roam_get_wpa_rsn_rsp_ie(mac_handle_t mac_handle,
 
 QDF_STATUS sme_get_config_param(mac_handle_t mac_handle,
 				struct sme_config_params *pParam);
-#ifndef QCA_SUPPORT_CP_STATS
-QDF_STATUS sme_get_statistics(mac_handle_t mac_handle,
-		eCsrStatsRequesterType requesterId,
-		uint32_t statsMask, tCsrStatsCallback callback,
-		uint8_t staId, void *pContext, uint8_t sessionId);
-#endif
-QDF_STATUS sme_get_rssi(mac_handle_t mac_handle,
-		tCsrRssiCallback callback,
-		uint8_t staId, struct qdf_mac_addr bssId, int8_t lastRSSI,
-		void *pContext);
 QDF_STATUS sme_get_snr(mac_handle_t mac_handle,
 		tCsrSnrCallback callback,
 		uint8_t staId, struct qdf_mac_addr bssId, void *pContext);
@@ -679,9 +672,29 @@ QDF_STATUS sme_neighbor_report_request(mac_handle_t mac_handle,
 		 uint8_t sessionId,
 		tpRrmNeighborReq pRrmNeighborReq,
 		tpRrmNeighborRspCallbackInfo callbackInfo);
+
+#ifdef FEATURE_OEM_DATA
+/**
+ * sme_oem_data_cmd() - the wrapper to send oem data cmd to wma
+ * @mac_handle: Opaque handle to the global MAC context.
+ * @oem_data: the pointer of oem data
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_oem_data_cmd(mac_handle_t mac_handle,
+			    struct oem_data *oem_data);
+#endif
+
 #ifdef FEATURE_OEM_DATA_SUPPORT
-QDF_STATUS sme_oem_data_req(mac_handle_t mac_handle,
-			    struct oem_data_req *hdd_oem_req);
+/**
+ * sme_oem_req_cmd() - send oem request cmd to WMA
+ * @mac_handle: Opaque handle to the global MAC context
+ * @oem_req: OEM data request
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_oem_req_cmd(mac_handle_t mac_handle,
+			   struct oem_data_req *oem_req);
 QDF_STATUS sme_oem_update_capability(mac_handle_t mac_handle,
 				     struct sme_oem_capability *cap);
 QDF_STATUS sme_oem_get_capability(mac_handle_t mac_handle,
@@ -1577,6 +1590,8 @@ QDF_STATUS sme_update_mimo_power_save(mac_handle_t mac_handle,
  * beacons of the current connected AP
  * @mac_handle: Opaque handle to the global MAC context
  * @vdev_id: SME session id
+ * @nth_value: Beacon report period
+ * @do_not_resume: beacon reporting resume after a pause is completed
  *
  * This function remove beacon filter. It allow fw to send
  * all beacons from connected peer to driver.
@@ -1584,7 +1599,9 @@ QDF_STATUS sme_update_mimo_power_save(mac_handle_t mac_handle,
  * Return: QDF_STATUS enumeration
  */
 QDF_STATUS sme_handle_bcn_recv_start(mac_handle_t mac_handle,
-				     uint32_t vdev_id);
+				     uint32_t vdev_id,
+				     uint32_t nth_value,
+				     bool do_not_resume);
 
 /**
  * sme_is_beacon_report_started() - Check bcn recv started
@@ -1597,6 +1614,18 @@ QDF_STATUS sme_handle_bcn_recv_start(mac_handle_t mac_handle,
  */
 bool sme_is_beacon_report_started(mac_handle_t mac_handle,
 				  uint32_t session_id);
+
+/**
+ * sme_is_beacon_reporting_do_not_resume() - Check auto resume allowed or not
+ * @mac_handle: Opaque handle to the global MAC context
+ * @session_id: SME session id
+ *
+ * This function is to check auto resume of beacon reporting is allowed or not.
+ *
+ * Return: true on success
+ */
+bool sme_is_beacon_reporting_do_not_resume(mac_handle_t mac_handle,
+					   uint32_t session_id);
 
 /**
  * stop_beacon_report() - To stop beacon report
@@ -1614,6 +1643,13 @@ bool sme_is_beacon_report_started(mac_handle_t mac_handle,
 				  uint32_t session_id)
 {
 	return true;
+}
+
+static inline
+bool sme_is_beacon_reporting_do_not_resume(mac_handle_t mac_handle,
+					   uint32_t session_id)
+{
+	return false;
 }
 
 static inline
@@ -1705,6 +1741,16 @@ sme_apf_read_work_memory(mac_handle_t mac_handle,
 uint32_t sme_get_wni_dot11_mode(mac_handle_t mac_handle);
 QDF_STATUS sme_create_mon_session(mac_handle_t mac_handle, uint8_t *bssid,
 				  uint8_t vdev_id);
+
+/**
+ * sme_delete_mon_session() - post message to delete PE session for mon_mode
+ * operation
+ * @mac_handle: Opaque handle to the global MAC context
+ * @vdev_id: sme session id
+ *
+ * Return: QDF_STATUS_SUCCESS on success, non-zero error code on failure.
+ */
+QDF_STATUS sme_delete_mon_session(mac_handle_t mac_handle, uint8_t vdev_id);
 
 void sme_set_vdev_ies_per_band(mac_handle_t mac_handle, uint8_t vdev_id);
 void sme_set_pdev_ht_vht_ies(mac_handle_t mac_handle, bool enable2x2);
@@ -2040,15 +2086,6 @@ QDF_STATUS sme_roam_invoke_nud_fail(mac_handle_t mac_handle, uint8_t vdev_id)
 }
 
 #endif
-/**
- * sme_congestion_register_callback() - registers congestion callback
- * @mac_handle: Opaque handle to the global MAC context
- * @congestion_cb: congestion callback
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS sme_congestion_register_callback(mac_handle_t mac_handle,
-					    congestion_cb congestion_cb);
 
 /**
  * sme_register_tx_queue_cb(): Register tx queue callback
@@ -2220,23 +2257,6 @@ QDF_STATUS sme_set_smps_cfg(uint32_t vdev_id, uint32_t param_id,
 				uint32_t param_val);
 
 /**
- * sme_get_peer_info() - sme api to get peer info
- * @mac_handle: Opaque handle to the global MAC context
- * @req: peer info request struct send to wma
- * @context: context of callback function
- * @callbackfn: hdd callback function when receive response
- *
- * This function will send WMA_GET_PEER_INFO to WMA
- *
- * Return: QDF_STATUS_SUCCESS or non-zero on failure
- */
-QDF_STATUS sme_get_peer_info(mac_handle_t mac_handle,
-		struct sir_peer_info_req req,
-		void *context,
-		void (*callbackfn)(struct sir_peer_info_resp *param,
-			void *pcontext));
-
-/**
  * sme_get_peer_info_ext() - sme api to get peer ext info
  * @mac_handle: Opaque handle to the global MAC context
  * @req: peer ext info request struct send to wma
@@ -2270,6 +2290,20 @@ QDF_STATUS sme_get_chain_rssi(mac_handle_t mac_handle,
 			      struct get_chain_rssi_req_params *input,
 			      get_chain_rssi_callback callback,
 			      void *context);
+
+/**
+ * sme_get_isolation() - sme api to get antenna isolation
+ * @mac_handle: hal handle for getting global mac struct
+ * @context: context of callback function
+ * @callbackfn: hdd callback function when receive response
+ *
+ * This function will send WMA_GET_ISOLATION to WMA
+ *
+ * Return: QDF_STATUS_SUCCESS or non-zero on failure
+ */
+QDF_STATUS sme_get_isolation(mac_handle_t mac_handle,
+			     void *context,
+			     sme_get_isolation_cb callbackfn);
 
 #ifdef FEATURE_FW_STATE
 /**
@@ -3534,4 +3568,15 @@ QDF_STATUS sme_register_bcn_recv_pause_ind_cb(mac_handle_t mac_handle,
 }
 #endif
 
+/**
+ * sme_set_disconnect_ies() - set disconnect IEs
+ * @mac_handle: handle returned by mac_open
+ * @vdev_id: vdev id
+ * @ie_data: Disconnect IE data
+ * @ie_len: Disconnect IE length
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_set_disconnect_ies(mac_handle_t mac_handle, uint8_t vdev_id,
+				  uint8_t *ie_data, uint16_t ie_len);
 #endif /* #if !defined( __SME_API_H ) */

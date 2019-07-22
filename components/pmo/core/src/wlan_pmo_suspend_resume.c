@@ -424,12 +424,14 @@ void pmo_core_configure_dynamic_wake_events(struct wlan_objmgr_psoc *psoc)
 /**
  * pmo_core_psoc_configure_suspend(): configure suspend req events
  * @psoc: objmgr psoc
+ * @is_runtime_pm: indicate if it is used by runtime PM
  *
  * Responsibility of the caller to take the psoc reference.
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
-static QDF_STATUS pmo_core_psoc_configure_suspend(struct wlan_objmgr_psoc *psoc)
+static QDF_STATUS pmo_core_psoc_configure_suspend(struct wlan_objmgr_psoc *psoc,
+						  bool is_runtime_pm)
 {
 	struct pmo_psoc_priv_obj *psoc_ctx;
 
@@ -444,9 +446,18 @@ static QDF_STATUS pmo_core_psoc_configure_suspend(struct wlan_objmgr_psoc *psoc)
 		pmo_core_configure_dynamic_wake_events(psoc);
 		pmo_core_update_wow_enable(psoc_ctx, true);
 		pmo_core_update_wow_enable_cmd_sent(psoc_ctx, false);
+	} else {
+		pmo_debug("Non WOW PDEV Suspend");
+		pmo_core_update_wow_enable(psoc_ctx, false);
 	}
 
-	pmo_core_set_suspend_dtim(psoc);
+	/*
+	 * For runtime PM, since system is awake, DTIM related commands
+	 * do not have to be sent with WOW sequence. They can be sent
+	 * through other paths which will just trigger a runtime resume.
+	 */
+	if (!is_runtime_pm)
+		pmo_core_set_suspend_dtim(psoc);
 
 	/*
 	 * To handle race between hif_pci_suspend and unpause/pause tx handler.
@@ -480,7 +491,7 @@ QDF_STATUS pmo_core_psoc_user_space_suspend_req(struct wlan_objmgr_psoc *psoc,
 		goto dec_psoc_ref;
 	}
 
-	status = pmo_core_psoc_configure_suspend(psoc);
+	status = pmo_core_psoc_configure_suspend(psoc, false);
 	if (status != QDF_STATUS_SUCCESS)
 		pmo_err("Failed to configure suspend");
 
@@ -614,12 +625,14 @@ static inline void pmo_unpause_all_vdev(struct wlan_objmgr_psoc *psoc,
 /**
  * pmo_core_psoc_configure_resume(): configure events after bus resume
  * @psoc: objmgr psoc
+ * @is_runtime_pm: indicate if it is used by runtime PM
  *
  * Responsibility of the caller to take the psoc reference.
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
-static QDF_STATUS pmo_core_psoc_configure_resume(struct wlan_objmgr_psoc *psoc)
+static QDF_STATUS pmo_core_psoc_configure_resume(struct wlan_objmgr_psoc *psoc,
+						 bool is_runtime_pm)
 {
 	struct pmo_psoc_priv_obj *psoc_ctx;
 
@@ -627,7 +640,13 @@ static QDF_STATUS pmo_core_psoc_configure_resume(struct wlan_objmgr_psoc *psoc)
 
 	psoc_ctx = pmo_psoc_get_priv(psoc);
 
-	pmo_core_set_resume_dtim(psoc);
+	/*
+	 * For runtime PM, since system is awake, DTIM related commands
+	 * do not have to be sent with WOW sequence. They can be sent
+	 * through other paths which will just trigger a runtime resume.
+	 */
+	if (!is_runtime_pm)
+		pmo_core_set_resume_dtim(psoc);
 	pmo_core_update_wow_bus_suspend(psoc, psoc_ctx, false);
 	pmo_unpause_all_vdev(psoc, psoc_ctx);
 
@@ -656,7 +675,7 @@ QDF_STATUS pmo_core_psoc_user_space_resume_req(struct wlan_objmgr_psoc *psoc,
 		goto dec_psoc_ref;
 	}
 
-	status = pmo_core_psoc_configure_resume(psoc);
+	status = pmo_core_psoc_configure_resume(psoc, false);
 	if (status != QDF_STATUS_SUCCESS)
 		pmo_err("Failed to configure resume");
 
@@ -742,11 +761,15 @@ pmo_core_enable_wow_in_fw(struct wlan_objmgr_psoc *psoc,
 		psoc_ctx->wow.wow_state = pmo_wow_state_unified_d0;
 	}
 
-	if (qdf_is_drv_connected()) {
-		pmo_info("drv wow is enabled");
-		param.flags |= WMI_WOW_FLAG_ENABLE_DRV_PCIE_L1SS_SLEEP;
+	if (htc_can_suspend_link(pmo_core_psoc_get_htc_handle(psoc))) {
+		if (qdf_is_drv_connected()) {
+			pmo_info("drv wow is enabled");
+			param.flags |= WMI_WOW_FLAG_ENABLE_DRV_PCIE_L1SS_SLEEP;
+		} else {
+			pmo_info("non-drv wow is enabled");
+		}
 	} else {
-		pmo_info("non-drv wow is enabled");
+		pmo_info("Prevent link down, non-drv wow is enabled");
 	}
 
 	status = pmo_tgt_psoc_send_wow_enable_req(psoc, &param);
@@ -755,8 +778,7 @@ pmo_core_enable_wow_in_fw(struct wlan_objmgr_psoc *psoc,
 		goto out;
 	}
 
-	if (psoc_ctx->wow.wow_state != pmo_wow_state_legacy_d0)
-		pmo_tgt_update_target_suspend_flag(psoc, true);
+	pmo_tgt_update_target_suspend_flag(psoc, true);
 
 	status = qdf_wait_for_event_completion(&psoc_ctx->wow.target_suspend,
 					       PMO_TARGET_SUSPEND_TIMEOUT);
@@ -934,7 +956,7 @@ QDF_STATUS pmo_core_psoc_bus_runtime_suspend(struct wlan_objmgr_psoc *psoc,
 	if (status != QDF_STATUS_SUCCESS)
 		goto resume_htc;
 
-	status = pmo_core_psoc_configure_suspend(psoc);
+	status = pmo_core_psoc_configure_suspend(psoc, true);
 	if (status != QDF_STATUS_SUCCESS)
 		goto resume_htc;
 
@@ -970,7 +992,7 @@ pmo_bus_resume:
 
 pmo_resume_configure:
 	QDF_BUG(QDF_STATUS_SUCCESS ==
-		pmo_core_psoc_configure_resume(psoc));
+		pmo_core_psoc_configure_resume(psoc, true));
 
 resume_htc:
 	QDF_BUG(QDF_STATUS_SUCCESS ==
@@ -1046,7 +1068,7 @@ QDF_STATUS pmo_core_psoc_bus_runtime_resume(struct wlan_objmgr_psoc *psoc,
 	if (status != QDF_STATUS_SUCCESS)
 		goto fail;
 
-	status = pmo_core_psoc_configure_resume(psoc);
+	status = pmo_core_psoc_configure_resume(psoc, true);
 	if (status != QDF_STATUS_SUCCESS)
 		goto fail;
 
@@ -1144,7 +1166,6 @@ QDF_STATUS pmo_core_psoc_disable_wow_in_fw(struct wlan_objmgr_psoc *psoc,
 	if (ret != QDF_STATUS_SUCCESS)
 		goto out;
 
-	pmo_core_update_wow_enable(psoc_ctx, false);
 	pmo_core_update_wow_enable_cmd_sent(psoc_ctx, false);
 
 	/* To allow the tx pause/unpause events */

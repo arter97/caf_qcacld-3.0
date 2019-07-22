@@ -335,6 +335,7 @@ QDF_STATUS sap_init_ctx(struct sap_context *sap_ctx,
 		sap_ctx->SSIDList[0].ssidHidden;
 
 	sap_ctx->csr_roamProfile.BSSIDs.numOfBSSIDs = 1; /* This is true for now. */
+	sap_ctx->csa_reason = CSA_REASON_UNKNOWN;
 	sap_ctx->csr_roamProfile.BSSIDs.bssid = &sap_ctx->bssid;
 	sap_ctx->csr_roamProfile.csrPersona = mode;
 	qdf_mem_copy(sap_ctx->self_mac_addr, addr, QDF_MAC_ADDR_SIZE);
@@ -1329,6 +1330,40 @@ static inline void sap_start_csa_restart(struct mac_context *mac,
 }
 
 /**
+ * sap_get_csa_reason_str() - Get csa reason in string
+ * @reason: sap reason enum value
+ *
+ * Return: string reason
+ */
+#ifdef WLAN_DEBUG
+static char *sap_get_csa_reason_str(enum sap_csa_reason_code reason)
+{
+	switch (reason) {
+	case CSA_REASON_UNKNOWN:
+		return "UNKNOWN";
+	case CSA_REASON_STA_CONNECT_DFS_TO_NON_DFS:
+		return "STA_CONNECT_DFS_TO_NON_DFS";
+	case CSA_REASON_USER_INITIATED:
+		return "USER_INITIATED";
+	case CSA_REASON_PEER_ACTION_FRAME:
+		return "PEER_ACTION_FRAME";
+	case CSA_REASON_PRE_CAC_SUCCESS:
+		return "PRE_CAC_SUCCESS";
+	case CSA_REASON_CONCURRENT_STA_CHANGED_CHANNEL:
+		return "CONCURRENT_STA_CHANGED_CHANNEL";
+	case CSA_REASON_UNSAFE_CHANNEL:
+		return "UNSAFE_CHANNEL";
+	case CSA_REASON_LTE_COEX:
+		return "LTE_COEX";
+	case CSA_REASON_CONCURRENT_NAN_EVENT:
+		return "CONCURRENT_NAN_EVENT";
+	default:
+		return "UNKNOWN";
+	}
+}
+#endif
+
+/**
  * wlansap_set_channel_change_with_csa() - Set channel change with CSA
  * @sap_ctx: Pointer to SAP context
  * @targetChannel: Target channel
@@ -1350,7 +1385,7 @@ QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 	struct mac_context *mac;
 	mac_handle_t mac_handle;
 	bool valid;
-	QDF_STATUS status;
+	QDF_STATUS status, hw_mode_status;
 	bool sta_sap_scc_on_dfs_chan;
 
 	if (!sap_ctx) {
@@ -1373,10 +1408,12 @@ QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 		return QDF_STATUS_E_FAULT;
 	}
 	QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO,
-		"%s: sap chan:%d target:%d conn on 5GHz:%d",
+		"%s: sap chan:%d target:%d conn on 5GHz:%d, csa_reason:%s(%d)",
 		__func__, sap_ctx->channel, targetChannel,
 		policy_mgr_is_any_mode_active_on_band_along_with_session(
-			mac->psoc, sap_ctx->sessionId, POLICY_MGR_BAND_5));
+			mac->psoc, sap_ctx->sessionId, POLICY_MGR_BAND_5),
+			sap_get_csa_reason_str(sap_ctx->csa_reason),
+			sap_ctx->csa_reason);
 
 	sta_sap_scc_on_dfs_chan =
 		policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(mac->psoc);
@@ -1421,25 +1458,30 @@ QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 			if (status != QDF_STATUS_SUCCESS)
 				return status;
 
-			status = policy_mgr_set_hw_mode_before_channel_switch(
-						mac->psoc,
-						sap_ctx->sessionId,
-						targetChannel);
+			hw_mode_status =
+			  policy_mgr_check_and_set_hw_mode_for_channel_switch(
+				   mac->psoc, sap_ctx->sessionId, targetChannel,
+				   POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH);
+
 			/*
-			 * If status is QDF_STATUS_E_FAILURE that mean HW mode
-			 * change was required but set HW mode change failed.
+			 * If hw_mode_status is QDF_STATUS_E_FAILURE, mean HW
+			 * mode change was required but driver failed to set HW
+			 * mode so ignore CSA for the channel.
 			 */
-			if (status == QDF_STATUS_E_FAILURE) {
+			if (hw_mode_status == QDF_STATUS_E_FAILURE) {
 				QDF_TRACE(QDF_MODULE_ID_SAP,
 					  QDF_TRACE_LEVEL_ERROR,
 					  FL("HW change required but failed to set hw mode"));
-				return status;
+				return hw_mode_status;
 			}
 
 			status = policy_mgr_reset_chan_switch_complete_evt(
 								mac->psoc);
-			if (QDF_IS_STATUS_ERROR(status))
+			if (QDF_IS_STATUS_ERROR(status)) {
+				policy_mgr_check_n_start_opportunistic_timer(
+								mac->psoc);
 				return status;
+			}
 			/*
 			 * Copy the requested target channel
 			 * to sap context.
@@ -1494,6 +1536,26 @@ QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 			mac->sap.SapDfsInfo.cac_state =
 					eSAP_DFS_DO_NOT_SKIP_CAC;
 			sap_cac_reset_notify(mac_handle);
+
+			/*
+			 * If hw_mode_status is QDF_STATUS_SUCCESS mean HW mode
+			 * change was required and was successfully requested so
+			 * the channel switch will continue after HW mode change
+			 * completion.
+			 */
+			if (QDF_IS_STATUS_SUCCESS(hw_mode_status)) {
+				QDF_TRACE(QDF_MODULE_ID_SAP,
+					  QDF_TRACE_LEVEL_INFO,
+					  FL("Channel change will continue after HW mode change"));
+				return QDF_STATUS_SUCCESS;
+			}
+			/*
+			 * If hw_mode_status is QDF_STATUS_E_NOSUPPORT or
+			 * QDF_STATUS_E_ALREADY (not QDF_STATUS_E_FAILURE and
+			 * not QDF_STATUS_SUCCESS), mean DBS is not supported or
+			 * required HW mode is already set, So contunue with
+			 * CSA from here.
+			 */
 			sap_start_csa_restart(mac, sap_ctx);
 		} else {
 			QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
@@ -2025,6 +2087,24 @@ wlan_sap_set_channel_avoidance(mac_handle_t mac_handle,
 	return QDF_STATUS_SUCCESS;
 }
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
+
+QDF_STATUS
+wlan_sap_set_acs_with_more_param(mac_handle_t mac_handle,
+				 bool acs_with_more_param)
+{
+	struct mac_context *mac_ctx;
+
+	if (mac_handle) {
+		mac_ctx = MAC_CONTEXT(mac_handle);
+	} else {
+		QDF_TRACE(QDF_MODULE_ID_SAP,
+			  QDF_TRACE_LEVEL_ERROR,
+			  FL("mac_handle or mac_ctx pointer NULL"));
+		return QDF_STATUS_E_FAULT;
+	}
+	mac_ctx->sap.acs_with_more_param = acs_with_more_param;
+	return QDF_STATUS_SUCCESS;
+}
 
 QDF_STATUS
 wlansap_set_dfs_preferred_channel_location(mac_handle_t mac_handle)
@@ -2752,7 +2832,7 @@ QDF_STATUS wlansap_filter_ch_based_acs(struct sap_context *sap_ctx,
 	size_t ch_index;
 	size_t target_ch_cnt = 0;
 
-	if (!sap_ctx || !ch_list || !ch_cnt) {
+	if (!sap_ctx || !ch_list || !ch_cnt || !sap_ctx->acs_cfg->ch_list) {
 		sap_err("NULL parameters");
 		return QDF_STATUS_E_FAULT;
 	}

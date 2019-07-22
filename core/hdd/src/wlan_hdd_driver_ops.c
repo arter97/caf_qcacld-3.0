@@ -375,6 +375,16 @@ static int check_for_probe_defer(int ret)
 }
 #endif
 
+void hdd_soc_idle_restart_lock(void)
+{
+	hdd_prevent_suspend(WIFI_POWER_EVENT_WAKELOCK_DRIVER_IDLE_RESTART);
+}
+
+void hdd_soc_idle_restart_unlock(void)
+{
+	hdd_allow_suspend(WIFI_POWER_EVENT_WAKELOCK_DRIVER_IDLE_RESTART);
+}
+
 static void hdd_soc_load_lock(struct device *dev)
 {
 	hdd_prevent_suspend(WIFI_POWER_EVENT_WAKELOCK_DRIVER_INIT);
@@ -594,6 +604,8 @@ static void __hdd_soc_remove(struct device *dev)
 
 	if (hdd_get_conparam() == QDF_GLOBAL_EPPING_MODE) {
 		hdd_wlan_stop_modules(hdd_ctx, false);
+		hdd_bus_bandwidth_deinit(hdd_ctx);
+		qdf_nbuf_deinit_replenish_timer();
 	} else {
 		hdd_wlan_exit(hdd_ctx);
 	}

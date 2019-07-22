@@ -35,6 +35,17 @@
 #define fwol_info(params...) QDF_TRACE_INFO(QDF_MODULE_ID_FWOL, params)
 #define fwol_debug(params...) QDF_TRACE_DEBUG(QDF_MODULE_ID_FWOL, params)
 
+#define fwol_nofl_alert(params...) \
+	QDF_TRACE_FATAL_NO_FL(QDF_MODULE_ID_FWOL, params)
+#define fwol_nofl_err(params...) \
+	QDF_TRACE_ERROR_NO_FL(QDF_MODULE_ID_FWOL, params)
+#define fwol_nofl_warn(params...) \
+	QDF_TRACE_WARN_NO_FL(QDF_MODULE_ID_FWOL, params)
+#define fwol_nofl_info(params...) \
+	QDF_TRACE_INFO_NO_FL(QDF_MODULE_ID_FWOL, params)
+#define fwol_nofl_debug(params...) \
+	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_FWOL, params)
+
 /**
  * struct wlan_fwol_three_antenna_btc - Three antenna BTC config items
  * @btc_mode: Config BTC mode
@@ -49,6 +60,8 @@
  * @bt_interference_high_ll: Lower limit of high level BT interference
  * @bt_interference_high_ul: Upper limit of high level BT interference
  * @btc_mpta_helper_enable: Enable/Disable tri-radio MPTA helper
+ * @bt_sco_allow_wlan_2g_scan: Enable/Disble wlan 2g scan when
+ *                             BT SCO connection is on
  */
 struct wlan_fwol_coex_config {
 	uint8_t btc_mode;
@@ -65,6 +78,7 @@ struct wlan_fwol_coex_config {
 #ifdef FEATURE_MPTA_HELPER
 	bool    btc_mpta_helper_enable;
 #endif
+	bool bt_sco_allow_wlan_2g_scan;
 };
 
 #define FWOL_THERMAL_LEVEL_MAX 4

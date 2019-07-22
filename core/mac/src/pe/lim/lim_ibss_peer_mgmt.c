@@ -568,7 +568,8 @@ void ibss_bss_add(struct mac_context *mac, struct pe_session *pe_session)
 	mlmStartReq.txChannelWidthSet = pe_session->htRecommendedTxWidthSet;
 
 	/* reading the channel num from session Table */
-	mlmStartReq.channelNumber = pe_session->currentOperChannel;
+	mlmStartReq.channelNumber = wlan_reg_freq_to_chan(
+					mac->pdev, pe_session->curr_op_freq);
 
 	mlmStartReq.cbMode = pe_session->pLimStartBssReq->cbMode;
 
@@ -1248,7 +1249,8 @@ void lim_ibss_add_bss_rsp_when_coalescing(struct mac_context *mac, void *msg,
 
 	qdf_mem_zero((void *)&newBssInfo, sizeof(newBssInfo));
 	qdf_mem_copy(newBssInfo.bssId.bytes, pHdr->bssId, QDF_MAC_ADDR_SIZE);
-	newBssInfo.channelNumber = (tSirMacChanNum) pAddBss->currentOperChannel;
+	newBssInfo.freq = wlan_reg_chan_to_freq(mac->pdev,
+						pAddBss->currentOperChannel);
 	qdf_mem_copy((uint8_t *) &newBssInfo.ssId,
 		     (uint8_t *) &pBeacon->ssId, pBeacon->ssId.length + 1);
 
@@ -1305,7 +1307,7 @@ void lim_ibss_del_bss_rsp(struct mac_context *mac, void *msg, struct pe_session 
 	}
 
 	if (lim_set_link_state(mac, eSIR_LINK_IDLE_STATE, nullBssid,
-			       pe_session->selfMacAddr, NULL,
+			       pe_session->self_mac_addr, NULL,
 			       NULL) != QDF_STATUS_SUCCESS) {
 		pe_err("IBSS: DEL_BSS_RSP setLinkState failed");
 		rc = eSIR_SME_REFUSED;

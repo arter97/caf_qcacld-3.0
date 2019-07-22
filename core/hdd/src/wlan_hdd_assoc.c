@@ -1226,6 +1226,8 @@ hdd_send_new_ap_channel_info(struct net_device *dev,
 {
 	union iwreq_data wrqu;
 	struct bss_description *descriptor = roam_info->bss_desc;
+	mac_handle_t mac_hdl;
+	struct wlan_objmgr_pdev *pdev;
 
 	if (!descriptor) {
 		hdd_err("bss descriptor is null");
@@ -1235,10 +1237,20 @@ hdd_send_new_ap_channel_info(struct net_device *dev,
 	 * Send the Channel event, the supplicant needs this to generate
 	 * the Adjacent AP report.
 	 */
-	hdd_debug("Sending up an SIOCGIWFREQ, channelId: %d",
-		 descriptor->channelId);
+	hdd_debug("Sending up an SIOCGIWFREQ, channel freq: %d",
+		  descriptor->chan_freq);
 	memset(&wrqu, '\0', sizeof(wrqu));
-	wrqu.freq.m = descriptor->channelId;
+	mac_hdl = hdd_adapter_get_mac_handle(adapter);
+	if (!mac_hdl) {
+		hdd_err("MAC handle invalid, falling back!");
+		return;
+	}
+	pdev = MAC_CONTEXT(mac_hdl)->pdev;
+	if (!pdev) {
+		hdd_err("pdev invalid in MAC context, falling back!");
+		return;
+	}
+	wrqu.freq.m = wlan_reg_freq_to_chan(pdev, descriptor->chan_freq);
 	wrqu.freq.e = 0;
 	wrqu.freq.i = 0;
 	wireless_send_event(adapter->dev, SIOCGIWFREQ, &wrqu, NULL);
@@ -1709,6 +1721,7 @@ static QDF_STATUS hdd_dis_connect_handler(struct hdd_adapter *adapter,
 	uint8_t sta_id;
 	bool sendDisconInd = true;
 	mac_handle_t mac_handle;
+	struct wlan_ies disconnect_ies = {0};
 
 	if (!dev) {
 		hdd_err("net_dev is released return");
@@ -1771,6 +1784,12 @@ static QDF_STATUS hdd_dis_connect_handler(struct hdd_adapter *adapter,
 		 * by kernel
 		 */
 		if (sendDisconInd) {
+			if (roam_info && roam_info->disconnect_ies) {
+				disconnect_ies.data =
+					roam_info->disconnect_ies->data;
+				disconnect_ies.len =
+					roam_info->disconnect_ies->len;
+			}
 			/*
 			 * To avoid wpa_supplicant sending "HANGED" CMD
 			 * to ICS UI.
@@ -1782,12 +1801,15 @@ static QDF_STATUS hdd_dis_connect_handler(struct hdd_adapter *adapter,
 						roam_info->rxRssi);
 				wlan_hdd_cfg80211_indicate_disconnect(
 							dev, false,
-							roam_info->reasonCode);
+							roam_info->reasonCode,
+							disconnect_ies.data,
+							disconnect_ies.len);
 			} else {
 				wlan_hdd_cfg80211_indicate_disconnect(
 							dev, false,
-							WLAN_REASON_UNSPECIFIED
-							);
+							WLAN_REASON_UNSPECIFIED,
+							disconnect_ies.data,
+							disconnect_ies.len);
 			}
 
 			hdd_debug("sent disconnected event to nl80211, reason code %d",
@@ -1868,7 +1890,9 @@ static QDF_STATUS hdd_dis_connect_handler(struct hdd_adapter *adapter,
 		    eCSR_ROAM_RESULT_DISASSOC_IND == roam_result ||
 		    eCSR_ROAM_LOSTLINK == roam_status) {
 			wlan_hdd_cfg80211_unlink_bss(adapter,
-				sta_ctx->conn_info.bssid.bytes);
+				sta_ctx->conn_info.bssid.bytes,
+				sta_ctx->conn_info.ssid.SSID.ssId,
+				sta_ctx->conn_info.ssid.SSID.length);
 			sme_remove_bssid_from_scan_list(mac_handle,
 			sta_ctx->conn_info.bssid.bytes);
 		}
@@ -3367,10 +3391,24 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 					roam_info->status_code) ||
 		   (eSIR_SME_ASSOC_TIMEOUT_RESULT_CODE ==
 					roam_info->status_code)))) {
+			uint8_t *ssid;
+			uint8_t ssid_len;
+
+			if (roam_info && roam_info->pProfile &&
+			    roam_info->pProfile->SSIDs.SSIDList) {
+				ssid_len =
+					roam_info->pProfile->SSIDs.
+						SSIDList[0].SSID.length;
+				ssid = roam_info->pProfile->SSIDs.
+						SSIDList[0].SSID.ssId;
+			} else {
+				ssid_len = sta_ctx->conn_info.ssid.SSID.length;
+				ssid = sta_ctx->conn_info.ssid.SSID.ssId;
+			}
 			wlan_hdd_cfg80211_unlink_bss(adapter,
 				roam_info ?
 				roam_info->bssid.bytes :
-				sta_ctx->requested_bssid.bytes);
+				sta_ctx->requested_bssid.bytes, ssid, ssid_len);
 			sme_remove_bssid_from_scan_list(mac_handle,
 				roam_info ?
 				roam_info->bssid.bytes :
@@ -5611,9 +5649,9 @@ int hdd_set_csr_auth_type(struct hdd_adapter *adapter,
 
 	roam_profile = hdd_roam_profile(adapter);
 	roam_profile->AuthType.numEntries = 1;
-	hdd_debug("auth_type = %d rsn_auth_type %d wpa_versions %d",
+	hdd_debug("auth_type = %d rsn_auth_type %d wpa_versions %d key_mgmt : 0x%x",
 		  sta_ctx->conn_info.auth_type, rsn_auth_type,
-		  sta_ctx->wpa_versions);
+		  sta_ctx->wpa_versions, key_mgmt);
 
 	switch (sta_ctx->conn_info.auth_type) {
 	case eCSR_AUTH_TYPE_OPEN_SYSTEM:
@@ -5711,6 +5749,10 @@ int hdd_set_csr_auth_type(struct hdd_adapter *adapter,
 				/* OWE case */
 				roam_profile->AuthType.authType[0] =
 					eCSR_AUTH_TYPE_OWE;
+			} else if (rsn_auth_type == eCSR_AUTH_TYPE_SAE) {
+				/* SAE with open authentication case */
+				roam_profile->AuthType.authType[0] =
+					eCSR_AUTH_TYPE_SAE;
 			} else if ((rsn_auth_type ==
 				  eCSR_AUTH_TYPE_SUITEB_EAP_SHA256) &&
 				  ((key_mgmt & HDD_AUTH_KEY_MGMT_802_1X)

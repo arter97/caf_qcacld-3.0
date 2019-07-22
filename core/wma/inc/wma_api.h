@@ -249,9 +249,6 @@ static inline bool wma_is_p2p_lo_capable(void)
 }
 #endif
 bool wma_capability_enhanced_mcast_filter(void);
-#ifndef QCA_SUPPORT_CP_STATS
-QDF_STATUS wma_get_wakelock_stats(struct sir_wake_lock_stats *wake_lock_stats);
-#endif
 void wma_process_pdev_hw_mode_trans_ind(void *wma,
 	wmi_pdev_hw_mode_transition_event_fixed_param *fixed_param,
 	wmi_pdev_set_hw_mode_response_vdev_mac_entry *vdev_mac_entry,
@@ -452,7 +449,7 @@ bool wma_get_hidden_ssid_restart_in_progress(struct wma_txrx_node *iface);
 bool wma_get_channel_switch_in_progress(struct wma_txrx_node *iface);
 
 /**
- * wma_sta_mlme_vdev_start_continue - VDEV start response handling
+ * wma_sta_mlme_vdev_start_continue() - VDEV start response handling
  * @vdev_mlme_obj:  VDEV MLME comp object
  * @data_len: data size
  * @data: event data
@@ -466,7 +463,7 @@ QDF_STATUS wma_sta_mlme_vdev_start_continue(struct vdev_mlme_obj *vdev_mlme,
 					    uint16_t data_len, void *data);
 
 /**
- * wma_sta_mlme_vdev_roam_notify - VDEV roam notify handling
+ * wma_sta_mlme_vdev_roam_notify() - VDEV roam notify handling
  * @vdev_mlme_obj:  VDEV MLME comp object
  * @data_len: data size
  * @data: event data
@@ -480,7 +477,7 @@ QDF_STATUS wma_sta_mlme_vdev_roam_notify(struct vdev_mlme_obj *vdev_mlme,
 					 uint16_t data_len, void *data);
 
 /**
- * wma_ap_mlme_vdev_start_continue - VDEV start response handling
+ * wma_ap_mlme_vdev_start_continue() - VDEV start response handling
  * @vdev_mlme_obj:  VDEV MLME comp object
  * @data_len: data size
  * @data: event data
@@ -494,7 +491,7 @@ QDF_STATUS wma_ap_mlme_vdev_start_continue(struct vdev_mlme_obj *vdev_mlme,
 					   uint16_t data_len, void *data);
 
 /**
- * wma_sta_vdev_up_send - Send VDEV UP command
+ * wma_sta_vdev_up_send() - Send VDEV UP command
  * @vdev_mlme_obj:  VDEV MLME comp object
  * @data_len: data size
  * @data: event data
@@ -508,7 +505,7 @@ QDF_STATUS wma_sta_vdev_up_send(struct vdev_mlme_obj *vdev_mlme,
 				uint16_t data_len, void *data);
 
 /**
- * wma_mlme_vdev_stop_continue - VDEV stop response handling
+ * wma_mlme_vdev_stop_continue() - VDEV stop response handling
  * @vdev_mlme_obj:  VDEV MLME comp object
  * @data_len: data size
  * @data: event data
@@ -522,7 +519,7 @@ QDF_STATUS wma_mlme_vdev_stop_continue(struct vdev_mlme_obj *vdev_mlme,
 				       uint16_t data_len, void *data);
 
 /**
- * wma_ap_mlme_vdev_down_send - VDEV down operation
+ * wma_ap_mlme_vdev_down_send() - VDEV down operation
  * @vdev_mlme_obj:  VDEV MLME comp object
  * @data_len: data size
  * @data: event data
@@ -536,7 +533,7 @@ QDF_STATUS wma_ap_mlme_vdev_down_send(struct vdev_mlme_obj *vdev_mlme,
 				      uint16_t data_len, void *data);
 
 /**
- * wma_mlme_vdev_notify_down_complete - VDEV init state transition
+ * wma_mlme_vdev_notify_down_complete() - VDEV init state transition
  * notification
  * @vdev_mlme_obj:  VDEV MLME comp object
  * @data_len: data size
@@ -552,7 +549,7 @@ wma_mlme_vdev_notify_down_complete(struct vdev_mlme_obj *vdev_mlme,
 				   uint16_t data_len, void *data);
 
 /**
- * wma_ap_mlme_vdev_stop_start_send - handle vdev stop during start req
+ * wma_ap_mlme_vdev_stop_start_send() - handle vdev stop during start req
  * @vdev_mlme_obj:  VDEV MLME comp object
  * @type: restart req or start req
  * @data_len: data size
@@ -567,7 +564,7 @@ QDF_STATUS wma_ap_mlme_vdev_stop_start_send(struct vdev_mlme_obj *vdev_mlme,
 					    uint16_t data_len, void *data);
 
 /**
- * wma_sta_mlme_vdev_down_send - VDEV down operation
+ * wma_sta_mlme_vdev_down_send() - VDEV down operation
  * @vdev_mlme_obj:  VDEV MLME comp object
  * @data_len: data size
  * @data: event data
@@ -578,6 +575,62 @@ QDF_STATUS wma_ap_mlme_vdev_stop_start_send(struct vdev_mlme_obj *vdev_mlme,
  *         FAILURE, if it fails due to any
  */
 QDF_STATUS wma_sta_mlme_vdev_down_send(struct vdev_mlme_obj *vdev_mlme,
+				       uint16_t data_len, void *data);
+
+/**
+ * wma_mon_mlme_vdev_start_continue() - VDEV start response handling
+ * @vdev_mlme_obj:  VDEV MLME comp object
+ * @data_len: data size
+ * @data: event data
+ *
+ * API invokes VDEV start response actions
+ *
+ * Return: SUCCESS on successful completion of start response operation
+ *         FAILURE, if it fails due to any
+ */
+QDF_STATUS wma_mon_mlme_vdev_start_continue(struct vdev_mlme_obj *vdev_mlme,
+					    uint16_t data_len, void *data);
+
+/**
+ * wma_mon_mlme_vdev_up_send() - Send VDEV UP command
+ * @vdev_mlme_obj:  VDEV MLME comp object
+ * @data_len: data size
+ * @data: event data
+ *
+ * API invokes VDEV UP Command
+ *
+ * Return: SUCCESS on successful completion of start response operation
+ *         FAILURE, if it fails due to any
+ */
+QDF_STATUS wma_mon_mlme_vdev_up_send(struct vdev_mlme_obj *vdev_mlme,
+				     uint16_t data_len, void *data);
+
+/**
+ * wma_mon_mlme_vdev_stop_send() - VDEV stop operation
+ * @vdev_mlme_obj:  VDEV MLME comp object
+ * @data_len: data size
+ * @data: event data
+ *
+ * API invokes VDEV stop operation
+ *
+ * Return: SUCCESS on successful completion of VDEV stop operation
+ *         FAILURE, if it fails due to any
+ */
+QDF_STATUS wma_mon_mlme_vdev_stop_send(struct vdev_mlme_obj *vdev_mlme,
+				       uint16_t data_len, void *data);
+
+/**
+ * wma_mon_mlme_vdev_down_send() - VDEV down operation
+ * @vdev_mlme_obj:  VDEV MLME comp object
+ * @data_len: data size
+ * @data: event data
+ *
+ * API invokes VDEV down operation
+ *
+ * Return: SUCCESS on successful completion of VDEV down operation
+ *         FAILURE, if it fails due to any
+ */
+QDF_STATUS wma_mon_mlme_vdev_down_send(struct vdev_mlme_obj *vdev_mlme,
 				       uint16_t data_len, void *data);
 
 #ifdef FEATURE_WLM_STATS

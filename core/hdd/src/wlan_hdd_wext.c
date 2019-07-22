@@ -3174,7 +3174,6 @@ void hdd_wlan_get_stats(struct hdd_adapter *adapter, uint16_t *length,
  *
  * Return - length of written content, negative number on error
  */
-#ifdef QCA_SUPPORT_CP_STATS
 static int wlan_hdd_write_suspend_resume_stats(struct hdd_context *hdd_ctx,
 					       char *buffer, uint16_t max_len)
 {
@@ -3212,72 +3211,7 @@ static int wlan_hdd_write_suspend_resume_stats(struct hdd_context *hdd_ctx,
 
 	return ret;
 }
-#else
-static int wlan_hdd_write_suspend_resume_stats(struct hdd_context *hdd_ctx,
-					       char *buffer, uint16_t max_len)
-{
-	QDF_STATUS status;
-	struct suspend_resume_stats *sr_stats;
-	struct sir_wake_lock_stats wow_stats;
 
-	sr_stats = &hdd_ctx->suspend_resume_stats;
-
-	status = wma_get_wakelock_stats(&wow_stats);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("Failed to get WoW stats");
-		return qdf_status_to_os_return(status);
-	}
-
-	return scnprintf(buffer, max_len,
-			"\n"
-			"Suspends: %u\n"
-			"Resumes: %u\n"
-			"\n"
-			"Suspend Fail Reasons\n"
-			"\tIPA: %u\n"
-			"\tRadar: %u\n"
-			"\tRoam: %u\n"
-			"\tScan: %u\n"
-			"\tInitial Wakeup: %u\n"
-			"\n"
-			"WoW Wake Reasons\n"
-			"\tunicast: %u\n"
-			"\tbroadcast: %u\n"
-			"\tIPv4 multicast: %u\n"
-			"\tIPv6 multicast: %u\n"
-			"\tIPv6 multicast RA: %u\n"
-			"\tIPv6 multicast NS: %u\n"
-			"\tIPv6 multicast NA: %u\n"
-			"\tICMPv4: %u\n"
-			"\tICMPv6: %u\n"
-			"\tRSSI Breach: %u\n"
-			"\tLow RSSI: %u\n"
-			"\tG-Scan: %u\n"
-			"\tPNO Complete: %u\n"
-			"\tPNO Match: %u\n",
-			sr_stats->suspends,
-			sr_stats->resumes,
-			sr_stats->suspend_fail[SUSPEND_FAIL_IPA],
-			sr_stats->suspend_fail[SUSPEND_FAIL_RADAR],
-			sr_stats->suspend_fail[SUSPEND_FAIL_ROAM],
-			sr_stats->suspend_fail[SUSPEND_FAIL_SCAN],
-			sr_stats->suspend_fail[SUSPEND_FAIL_INITIAL_WAKEUP],
-			wow_stats.wow_ucast_wake_up_count,
-			wow_stats.wow_bcast_wake_up_count,
-			wow_stats.wow_ipv4_mcast_wake_up_count,
-			wow_stats.wow_ipv6_mcast_wake_up_count,
-			wow_stats.wow_ipv6_mcast_ra_stats,
-			wow_stats.wow_ipv6_mcast_ns_stats,
-			wow_stats.wow_ipv6_mcast_na_stats,
-			wow_stats.wow_icmpv4_count,
-			wow_stats.wow_icmpv6_count,
-			wow_stats.wow_rssi_breach_wake_up_count,
-			wow_stats.wow_low_rssi_wake_up_count,
-			wow_stats.wow_gscan_wake_up_count,
-			wow_stats.wow_pno_complete_wake_up_count,
-			wow_stats.wow_pno_match_wake_up_count);
-}
-#endif
 /**
  * hdd_wlan_list_fw_profile() - Get fw profiling points
  * @length:   Size of the data copied
@@ -4766,6 +4700,10 @@ static int hdd_we_set_11n_rate(struct hdd_adapter *adapter, int rate_code)
 {
 	uint8_t preamble = 0, nss = 0, rix = 0;
 	int errno;
+	QDF_STATUS status;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	enum wlan_phymode peer_phymode;
+	uint8_t *peer_mac = adapter->session.station.conn_info.bssid.bytes;
 
 	hdd_debug("Rate code %d", rate_code);
 
@@ -4775,6 +4713,18 @@ static int hdd_we_set_11n_rate(struct hdd_adapter *adapter, int rate_code)
 			preamble = WMI_RATE_PREAMBLE_HT;
 			nss = HT_RC_2_STREAMS(rate_code) - 1;
 		} else {
+			status = ucfg_mlme_get_peer_phymode(hdd_ctx->psoc,
+							    peer_mac,
+							    &peer_phymode);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				hdd_err("Failed to set rate");
+				return 0;
+			}
+			if (IS_WLAN_PHYMODE_HE(peer_phymode)) {
+				hdd_err("Do not set legacy rate %d in HE mode",
+					rate_code);
+				return 0;
+			}
 			nss = 0;
 			rix = RC_2_RATE_IDX(rate_code);
 			if (rate_code & 0x10) {
@@ -7163,50 +7113,10 @@ static int __iw_get_char_setnone(struct net_device *dev,
 
 	case WE_GET_CHANNEL_LIST:
 	{
-		QDF_STATUS status;
-		uint8_t i, len;
-		char *buf;
-		uint8_t ubuf[CFG_COUNTRY_CODE_LEN];
-		uint8_t ubuf_len = CFG_COUNTRY_CODE_LEN;
-		struct channel_list_info channel_list;
-
-		memset(&channel_list, 0, sizeof(channel_list));
-		status = iw_get_channel_list(dev, info, wrqu,
-						   (char *)&channel_list);
-		if (!QDF_IS_STATUS_SUCCESS(status)) {
-			hdd_err("GetChannelList Failed!!!");
+		if (0 !=
+		    iw_get_channel_list_with_cc(dev, mac_handle,
+						info, wrqu, extra))
 			return -EINVAL;
-		}
-		buf = extra;
-		/*
-		 * Maximum channels = CFG_VALID_CHANNEL_LIST_LEN.
-		 * Maximum buffer needed = 5 * number of channels.
-		 * Check ifsufficient buffer is available and then
-		 * proceed to fill the buffer.
-		 */
-		if (WE_MAX_STR_LEN <
-		    (5 * CFG_VALID_CHANNEL_LIST_LEN)) {
-			hdd_err("Insufficient Buffer to populate channel list");
-			return -EINVAL;
-		}
-		len = scnprintf(buf, WE_MAX_STR_LEN, "%u ",
-				channel_list.num_channels);
-		if (QDF_STATUS_SUCCESS == sme_get_country_code(mac_handle,
-							       ubuf,
-							       &ubuf_len)) {
-			/* Printing Country code in getChannelList */
-			for (i = 0; i < (ubuf_len - 1); i++)
-				len += scnprintf(buf + len,
-						WE_MAX_STR_LEN - len,
-						"%c", ubuf[i]);
-		}
-		for (i = 0; i < channel_list.num_channels; i++) {
-			len +=
-				scnprintf(buf + len, WE_MAX_STR_LEN - len,
-					  " %u", channel_list.channels[i]);
-		}
-		wrqu->data.length = strlen(extra) + 1;
-
 		break;
 	}
 #ifdef FEATURE_WLAN_TDLS
@@ -9090,113 +9000,10 @@ static int iw_set_packet_filter_params(struct net_device *dev,
 }
 #endif
 
-#ifdef QCA_SUPPORT_CP_STATS
 static int hdd_get_wlan_stats(struct hdd_adapter *adapter)
 {
 	return wlan_hdd_get_station_stats(adapter);
 }
-#else /* QCA_SUPPORT_CP_STATS */
-struct hdd_statistics_priv {
-	tCsrSummaryStatsInfo summary_stats;
-	tCsrGlobalClassAStatsInfo class_a_stats;
-	tCsrGlobalClassDStatsInfo class_d_stats;
-};
-
-/**
- * hdd_statistics_cb() - "Get statistics" callback function
- * @stats: statistics payload
- * @context: opaque context originally passed to SME.  HDD always passes
- *	a cookie for the request context
- *
- * Return: None
- */
-static void hdd_statistics_cb(void *stats, void *context)
-{
-	struct osif_request *request;
-	struct hdd_statistics_priv *priv;
-	tCsrSummaryStatsInfo *summary_stats;
-	tCsrGlobalClassAStatsInfo *class_a_stats;
-	tCsrGlobalClassDStatsInfo *class_d_stats;
-
-	request = osif_request_get(context);
-	if (!request) {
-		hdd_err("Obsolete request");
-		return;
-	}
-
-	priv = osif_request_priv(request);
-
-	summary_stats = (tCsrSummaryStatsInfo *)stats;
-	priv->summary_stats = *summary_stats;
-
-	class_a_stats = (tCsrGlobalClassAStatsInfo *)(summary_stats + 1);
-	priv->class_a_stats = *class_a_stats;
-
-	class_d_stats = (tCsrGlobalClassDStatsInfo *)(class_a_stats + 1);
-	priv->class_d_stats = *class_d_stats;
-
-	osif_request_complete(request);
-	osif_request_put(request);
-}
-
-static int hdd_get_wlan_stats(struct hdd_adapter *adapter)
-{
-	int ret = 0;
-	void *cookie;
-	QDF_STATUS status;
-	struct osif_request *request;
-	struct hdd_station_ctx *sta_ctx;
-	struct hdd_statistics_priv *priv;
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	static const struct osif_request_params params = {
-		.priv_size = sizeof(*priv),
-		.timeout_ms = WLAN_WAIT_TIME_STATS,
-	};
-
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-	request = osif_request_alloc(&params);
-	if (!request) {
-		hdd_warn("request allocation failed");
-		return -EINVAL;
-	}
-
-	cookie = osif_request_cookie(request);
-	status = sme_get_statistics(hdd_ctx->mac_handle, eCSR_HDD,
-				    SME_SUMMARY_STATS |
-				    SME_GLOBAL_CLASSA_STATS |
-				    SME_GLOBAL_CLASSD_STATS,
-				    hdd_statistics_cb,
-				    sta_ctx->conn_info.sta_id[0],
-				    cookie, adapter->vdev_id);
-
-	if (QDF_STATUS_SUCCESS != status) {
-		hdd_warn("Unable to retrieve SME statistics");
-		goto put_request;
-	}
-
-	/* request was sent -- wait for the response */
-	ret = osif_request_wait_for_response(request);
-	if (ret) {
-		hdd_err("Failed to wait for statistics, errno %d", ret);
-		goto put_request;
-	}
-
-	/* update the adapter cache with the fresh results */
-	priv = osif_request_priv(request);
-	adapter->hdd_stats.summary_stat = priv->summary_stats;
-	adapter->hdd_stats.class_a_stat = priv->class_a_stats;
-	adapter->hdd_stats.class_d_stat = priv->class_d_stats;
-
-put_request:
-	/*
-	 * either we never sent a request, we sent a request and
-	 * received a response or we sent a request and timed out.
-	 * regardless we are done with the request.
-	 */
-	osif_request_put(request);
-	return ret;
-}
-#endif /* QCA_SUPPORT_CP_STATS */
 
 static int __iw_get_statistics(struct net_device *dev,
 			       struct iw_request_info *info,

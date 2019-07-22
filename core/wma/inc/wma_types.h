@@ -186,9 +186,6 @@
 #define WMA_ENABLE_UAPSD_REQ            SIR_HAL_ENABLE_UAPSD_REQ
 #define WMA_DISABLE_UAPSD_REQ           SIR_HAL_DISABLE_UAPSD_REQ
 
-/* / PE <-> HAL statistics messages */
-#define WMA_GET_STATISTICS_REQ         SIR_HAL_GET_STATISTICS_REQ
-#define WMA_GET_STATISTICS_RSP         SIR_HAL_GET_STATISTICS_RSP
 #define WMA_SET_KEY_DONE               SIR_HAL_SET_KEY_DONE
 
 /* / PE <-> HAL BTC messages */
@@ -333,8 +330,9 @@
 #define WMA_DISASSOC_TX_COMP       SIR_HAL_DISASSOC_TX_COMP
 #define WMA_DEAUTH_TX_COMP         SIR_HAL_DEAUTH_TX_COMP
 
-#define WMA_GET_PEER_INFO          SIR_HAL_GET_PEER_INFO
 #define WMA_GET_PEER_INFO_EXT      SIR_HAL_GET_PEER_INFO_EXT
+
+#define WMA_GET_ISOLATION          SIR_HAL_GET_ISOLATION
 
 #define WMA_MODEM_POWER_STATE_IND SIR_HAL_MODEM_POWER_STATE_IND
 
@@ -728,7 +726,9 @@ QDF_STATUS wma_register_roaming_callbacks(
 			struct bss_description *bss_desc_ptr,
 			enum sir_roam_op_code reason),
 		QDF_STATUS (*pe_disconnect_cb) (struct mac_context *mac,
-						uint8_t vdev_id));
+			uint8_t vdev_id,
+			uint8_t *deauth_disassoc_frame,
+			uint16_t deauth_disassoc_frame_len));
 #else
 static inline QDF_STATUS wma_register_roaming_callbacks(
 		QDF_STATUS (*csr_roam_synch_cb)(struct mac_context *mac,
@@ -740,7 +740,9 @@ static inline QDF_STATUS wma_register_roaming_callbacks(
 			struct bss_description *bss_desc_ptr,
 			enum sir_roam_op_code reason),
 		QDF_STATUS (*pe_disconnect_cb) (struct mac_context *mac,
-						uint8_t vdev_id))
+			uint8_t vdev_id,
+			uint8_t *deauth_disassoc_frame,
+			uint16_t deauth_disassoc_frame_len))
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }

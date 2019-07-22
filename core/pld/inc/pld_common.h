@@ -61,15 +61,19 @@ enum pld_bus_type {
 /**
  * enum pld_bus_width_type - bus bandwidth
  * @PLD_BUS_WIDTH_NONE: don't vote for bus bandwidth
+ * @PLD_BUS_WIDTH_IDLE: vote for idle bandwidth
  * @PLD_BUS_WIDTH_LOW: vote for low bus bandwidth
  * @PLD_BUS_WIDTH_MEDIUM: vote for medium bus bandwidth
  * @PLD_BUS_WIDTH_HIGH: vote for high bus bandwidth
+ * @PLD_BUS_WIDTH_VERY_HIGH: vote for very high bus bandwidth
  */
 enum pld_bus_width_type {
 	PLD_BUS_WIDTH_NONE,
+	PLD_BUS_WIDTH_IDLE,
 	PLD_BUS_WIDTH_LOW,
 	PLD_BUS_WIDTH_MEDIUM,
-	PLD_BUS_WIDTH_HIGH
+	PLD_BUS_WIDTH_HIGH,
+	PLD_BUS_WIDTH_VERY_HIGH,
 };
 
 #define PLD_MAX_FILE_NAME NAME_MAX
@@ -393,7 +397,7 @@ int pld_register_driver(struct pld_driver_ops *ops);
 void pld_unregister_driver(void);
 
 int pld_wlan_enable(struct device *dev, struct pld_wlan_enable_cfg *config,
-		    enum pld_driver_mode mode, const char *host_version);
+		    enum pld_driver_mode mode);
 int pld_wlan_disable(struct device *dev, enum pld_driver_mode mode);
 int pld_set_fw_log_mode(struct device *dev, u8 fw_log_mode);
 void pld_get_default_fw_files(struct pld_fw_files *pfw_files);

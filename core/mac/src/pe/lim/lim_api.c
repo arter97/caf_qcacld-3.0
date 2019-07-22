@@ -1337,8 +1337,9 @@ void
 lim_received_hb_handler(struct mac_context *mac, uint8_t channelId,
 			struct pe_session *pe_session)
 {
-	if ((channelId == 0)
-	    || (channelId == pe_session->currentOperChannel))
+	if (channelId == 0 ||
+	    channelId == wlan_reg_freq_to_chan(mac->pdev,
+					       pe_session->curr_op_freq))
 		pe_session->LimRxedBeaconCntDuringHB++;
 
 	pe_session->pmmOffloadInfo.bcnmiss = false;
@@ -1476,7 +1477,8 @@ lim_handle_ibss_coalescing(struct mac_context *mac,
 	 */
 	if ((!pBeacon->capabilityInfo.ibss) ||
 	    lim_cmp_ssid(&pBeacon->ssId, pe_session) ||
-	    (pe_session->currentOperChannel != pBeacon->channelNumber))
+	    (wlan_reg_freq_to_chan(mac->pdev, pe_session->curr_op_freq)
+	     != pBeacon->channelNumber))
 		retCode = QDF_STATUS_E_INVAL;
 	else if (lim_ibss_enc_type_matched(pBeacon, pe_session) != true) {
 		pe_debug("peer privacy: %d peer wpa: %d peer rsn: %d self encType: %d",
@@ -1628,7 +1630,8 @@ lim_detect_change_in_ap_capabilities(struct mac_context *mac,
 	       SIR_MAC_GET_PRIVACY(pe_session->limCurrentBssCaps)) ||
 	      (SIR_MAC_GET_QOS(apNewCaps.capabilityInfo) !=
 	       SIR_MAC_GET_QOS(pe_session->limCurrentBssCaps)) ||
-	      ((newChannel != pe_session->currentOperChannel) &&
+	      ((newChannel != wlan_reg_freq_to_chan(
+				mac->pdev, pe_session->curr_op_freq)) &&
 		(newChannel != 0)) ||
 	      (false == security_caps_matched)
 	     ))) {
@@ -1643,12 +1646,14 @@ lim_detect_change_in_ap_capabilities(struct mac_context *mac,
 			pe_session->fWaitForProbeRsp = true;
 			pe_warn("AP capabilities are not matching, sending directed probe request");
 			status =
-				lim_send_probe_req_mgmt_frame(mac, &pe_session->ssId,
-					      pe_session->bssId,
-					      pe_session->currentOperChannel,
-					      pe_session->selfMacAddr,
-					      pe_session->dot11mode,
-					      NULL, NULL);
+				lim_send_probe_req_mgmt_frame(
+					mac, &pe_session->ssId,
+					pe_session->bssId,
+					wlan_reg_freq_to_chan(
+					mac->pdev, pe_session->curr_op_freq),
+					pe_session->self_mac_addr,
+					pe_session->dot11mode,
+					NULL, NULL);
 
 			if (QDF_STATUS_SUCCESS != status) {
 				pe_err("send ProbeReq failed");
@@ -1665,9 +1670,12 @@ lim_detect_change_in_ap_capabilities(struct mac_context *mac,
 
 		qdf_mem_copy(apNewCaps.bssId.bytes,
 			     pe_session->bssId, QDF_MAC_ADDR_SIZE);
-		if (newChannel != pe_session->currentOperChannel) {
+		if (newChannel != wlan_reg_freq_to_chan(
+				mac->pdev, pe_session->curr_op_freq)) {
 			pe_err("Channel Change from %d --> %d Ignoring beacon!",
-				pe_session->currentOperChannel, newChannel);
+				wlan_reg_freq_to_chan(
+					mac->pdev, pe_session->curr_op_freq),
+					newChannel);
 			return;
 		}
 
@@ -1685,8 +1693,7 @@ lim_detect_change_in_ap_capabilities(struct mac_context *mac,
 			 (pBeacon->rsnPresent || pBeacon->wpaPresent)) {
 			pe_err("BSS Caps (Privacy) bit 0 in beacon, but WPA or RSN IE present, Ignore Beacon!");
 			return;
-		} else
-			apNewCaps.channelId = pe_session->currentOperChannel;
+		}
 		qdf_mem_copy((uint8_t *) &apNewCaps.ssId,
 			     (uint8_t *) &pBeacon->ssId,
 			     pBeacon->ssId.length + 1);
@@ -2170,8 +2177,15 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 	bss_desc_ptr->scansystimensec = qdf_get_monotonic_boottime_ns();
 	if (parsed_frm_ptr->dsParamsPresent) {
 		bss_desc_ptr->channelId = parsed_frm_ptr->channelNumber;
+		bss_desc_ptr->chan_freq =
+			wlan_reg_chan_to_freq(mac->pdev,
+					      parsed_frm_ptr->channelNumber);
 	} else if (parsed_frm_ptr->HTInfo.present) {
 		bss_desc_ptr->channelId = parsed_frm_ptr->HTInfo.primaryChannel;
+		bss_desc_ptr->chan_freq =
+			wlan_reg_chan_to_freq(mac->pdev,
+					      parsed_frm_ptr->HTInfo.
+					      primaryChannel);
 	} else {
 		/*
 		 * If DS Params or HTIE is not present in the probe resp or
@@ -2179,12 +2193,16 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 		 * to fill the channel in the BSS descriptor.*/
 		bss_desc_ptr->channelId =
 			cds_freq_to_chan(roam_synch_ind_ptr->chan_freq);
+		bss_desc_ptr->chan_freq = roam_synch_ind_ptr->chan_freq;
 	}
-	bss_desc_ptr->channelIdSelf = bss_desc_ptr->channelId;
+	bss_desc_ptr->freq_self = bss_desc_ptr->chan_freq;
 
-	bss_desc_ptr->nwType = lim_get_nw_type(mac, bss_desc_ptr->channelId,
-					       SIR_MAC_MGMT_FRAME,
-					       parsed_frm_ptr);
+	bss_desc_ptr->nwType = lim_get_nw_type(
+			mac,
+			wlan_reg_freq_to_chan(mac->pdev,
+					      bss_desc_ptr->chan_freq),
+			SIR_MAC_MGMT_FRAME,
+			parsed_frm_ptr);
 
 	bss_desc_ptr->sinr = 0;
 	bss_desc_ptr->beaconInterval = parsed_frm_ptr->beaconInterval;
@@ -2207,7 +2225,8 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 	pe_debug("LFR3: BssDescr Info:");
 	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
 			bss_desc_ptr->bssId, sizeof(tSirMacAddr));
-	pe_debug("chan: %d rssi: %d ie_len %d", bss_desc_ptr->channelId,
+	pe_debug("chan: %d rssi: %d ie_len %d",
+		 bss_desc_ptr->chan_freq,
 		 bss_desc_ptr->rssi, ie_len);
 	if (ie_len) {
 		qdf_mem_copy(&bss_desc_ptr->ieFields,
@@ -2261,7 +2280,9 @@ lim_copy_and_free_hlp_data_from_session(struct pe_session *session_ptr,
 #endif
 
 QDF_STATUS
-pe_disconnect_callback(struct mac_context *mac, uint8_t vdev_id)
+pe_disconnect_callback(struct mac_context *mac, uint8_t vdev_id,
+		       uint8_t *deauth_disassoc_frame,
+		       uint16_t deauth_disassoc_frame_len)
 {
 	struct pe_session *session;
 
@@ -2271,6 +2292,8 @@ pe_disconnect_callback(struct mac_context *mac, uint8_t vdev_id)
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	lim_extract_ies_from_deauth_disassoc(session, deauth_disassoc_frame,
+					     deauth_disassoc_frame_len);
 	lim_tear_down_link_with_ap(mac, vdev_id,
 				   eSIR_MAC_UNSPEC_FAILURE_REASON);
 
@@ -2370,24 +2393,16 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	/* Update the beacon/probe filter in mac_ctx */
 	lim_set_bcn_probe_filter(mac_ctx, ft_session_ptr, NULL, 0);
 
-	sir_copy_mac_addr(ft_session_ptr->selfMacAddr,
-			  session_ptr->selfMacAddr);
+	sir_copy_mac_addr(ft_session_ptr->self_mac_addr,
+			  session_ptr->self_mac_addr);
 	sir_copy_mac_addr(roam_sync_ind_ptr->self_mac.bytes,
-			session_ptr->selfMacAddr);
+			session_ptr->self_mac_addr);
 	sir_copy_mac_addr(ft_session_ptr->limReAssocbssId, bss_desc->bssId);
 	session_ptr->bRoamSynchInProgress = true;
 	ft_session_ptr->bRoamSynchInProgress = true;
 	ft_session_ptr->limSystemRole = eLIM_STA_ROLE;
 	sir_copy_mac_addr(session_ptr->limReAssocbssId, bss_desc->bssId);
 	ft_session_ptr->csaOffloadEnable = session_ptr->csaOffloadEnable;
-
-	/* Assign default configured nss value in the new session */
-	if (IS_5G_CH(ft_session_ptr->currentOperChannel))
-		ft_session_ptr->vdev_nss = mac_ctx->vdev_type_nss_5g.sta;
-	else
-		ft_session_ptr->vdev_nss = mac_ctx->vdev_type_nss_2g.sta;
-
-	ft_session_ptr->nss = ft_session_ptr->vdev_nss;
 
 	/* Next routine will update nss and vdev_nss with AP's capabilities */
 	lim_fill_ft_session(mac_ctx, bss_desc, ft_session_ptr, session_ptr);
@@ -2744,6 +2759,17 @@ void lim_mon_init_session(struct mac_context *mac_ptr,
 		return;
 	}
 	psession_entry->vhtCapability = 1;
+}
+
+void lim_mon_deinit_session(struct mac_context *mac_ptr,
+			    struct sir_delete_session *msg)
+{
+	struct pe_session *session;
+
+	session = pe_find_session_by_session_id(mac_ptr, msg->vdev_id);
+
+	if (session && session->bssType == eSIR_MONITOR_MODE)
+		pe_delete_session(mac_ptr, session);
 }
 
 /**

@@ -1723,6 +1723,9 @@ ol_txrx_vdev_attach(struct cdp_pdev *ppdev,
 	vdev->ll_pause.max_q_depth =
 		ol_tx_cfg_max_tx_queue_depth_ll(vdev->pdev->ctrl_pdev);
 	qdf_status = qdf_event_create(&vdev->wait_delete_comp);
+
+	ol_txrx_vdev_init_tcp_del_ack(vdev);
+
 	/* add this vdev into the pdev's list */
 	TAILQ_INSERT_TAIL(&pdev->vdev_list, vdev, vdev_list_elem);
 	if (QDF_GLOBAL_MONITOR_MODE == cds_get_conparam())
@@ -5455,6 +5458,11 @@ static uint32_t ol_txrx_get_cfg(void *soc, enum cdp_dp_cfg cfg)
 	ol_txrx_pdev_handle pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 	uint32_t value = 0;
 
+	if (!pdev) {
+		qdf_print("pdev is NULL");
+		return 0;
+	}
+
 	cfg_ctx = (struct txrx_pdev_cfg_t *)(pdev->ctrl_pdev);
 	switch (cfg) {
 	case cfg_dp_enable_data_stall:
@@ -5636,7 +5644,11 @@ static struct cdp_misc_ops ol_ops_misc = {
 	.pkt_log_init = htt_pkt_log_init,
 	.pkt_log_con_service = ol_txrx_pkt_log_con_service,
 	.register_pktdump_cb = ol_register_packetdump_callback,
-	.unregister_pktdump_cb = ol_deregister_packetdump_callback
+	.unregister_pktdump_cb = ol_deregister_packetdump_callback,
+#ifdef QCA_SUPPORT_TXRX_DRIVER_TCP_DEL_ACK
+	.pdev_reset_driver_del_ack = ol_tx_pdev_reset_driver_del_ack,
+	.vdev_set_driver_del_ack_enable = ol_tx_vdev_set_driver_del_ack_enable
+#endif
 };
 
 static struct cdp_flowctl_ops ol_ops_flowctl = {
@@ -5803,7 +5815,7 @@ static struct cdp_me_ops ol_ops_me = {
 };
 
 static struct cdp_mon_ops ol_ops_mon = {
-	/* EMPTY FOR MCL */
+	.txrx_monitor_record_channel = ol_htt_mon_note_chan,
 };
 
 static struct cdp_host_stats_ops ol_ops_host_stats = {

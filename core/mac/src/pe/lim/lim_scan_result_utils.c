@@ -69,8 +69,8 @@ lim_collect_bss_description(struct mac_context *mac,
 	uint8_t *pBody;
 	uint32_t ieLen = 0;
 	tpSirMacMgmtHdr pHdr;
-	uint8_t channelNum;
-	uint8_t rxChannel;
+	uint8_t channel_num;
+	uint8_t rx_channel;
 	uint8_t rfBand = 0;
 
 	pHdr = WMA_GET_RX_MAC_HEADER(pRxPacketInfo);
@@ -82,7 +82,7 @@ lim_collect_bss_description(struct mac_context *mac,
 	}
 	ieLen =
 		WMA_GET_RX_PAYLOAD_LEN(pRxPacketInfo) - SIR_MAC_B_PR_SSID_OFFSET;
-	rxChannel = WMA_GET_RX_CH(pRxPacketInfo);
+	rx_channel = WMA_GET_RX_CH(pRxPacketInfo);
 	pBody = WMA_GET_RX_MPDU_DATA(pRxPacketInfo);
 	rfBand = WMA_GET_RX_RFBAND(pRxPacketInfo);
 
@@ -132,15 +132,16 @@ lim_collect_bss_description(struct mac_context *mac,
 	 * This fix will work for 5Ghz 11n devices, but for 11a devices, we have to rely on RXP routing flag to get the correct channel.
 	 * So The problem of incorrect channel reporting in 5Ghz will still remain for 11a devices.
 	 */
-	pBssDescr->channelId = lim_get_channel_from_beacon(mac, pBPR);
+	channel_num = lim_get_channel_from_beacon(mac, pBPR);
+	pBssDescr->channelId = channel_num;
+	pBssDescr->chan_freq = wlan_reg_chan_to_freq(mac->pdev, channel_num);
 
-	pBssDescr->channelIdSelf = pBssDescr->channelId;
-	pBssDescr->rx_channel = rxChannel;
+	pBssDescr->freq_self = pBssDescr->chan_freq;
+	pBssDescr->rx_freq = wlan_reg_chan_to_freq(mac->pdev, rx_channel);
 
 	/* set the network type in bss description */
-	channelNum = pBssDescr->channelId;
 	pBssDescr->nwType =
-		lim_get_nw_type(mac, channelNum, SIR_MAC_MGMT_FRAME, pBPR);
+		lim_get_nw_type(mac, channel_num, SIR_MAC_MGMT_FRAME, pBPR);
 
 	/* Copy RSSI & SINR from BD */
 	pBssDescr->rssi = (int8_t) WMA_GET_RX_RSSI_NORMALIZED(pRxPacketInfo);

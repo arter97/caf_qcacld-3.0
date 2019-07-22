@@ -44,6 +44,7 @@
 #include <cdp_txrx_handle.h>
 #include <wlan_policy_mgr_api.h>
 #include "wma_api.h"
+#include "wmi_unified_param.h"
 
 /* Platform specific configuration for max. no. of fragments */
 #define QCA_OL_11AC_TX_MAX_FRAGS            2
@@ -198,12 +199,6 @@
 
 
 #define WMA_VDEV_SET_KEY_WAKELOCK_TIMEOUT	WAKELOCK_DURATION_RECOMMENDED
-
-#define WMA_TGT_INVALID_SNR (0)
-#define WMA_TGT_IS_VALID_RSSI(x)  ((x) != 0xFF)
-
-#define WMA_TGT_IS_VALID_SNR(x)  ((x) >= 0 && (x) < WMA_TGT_MAX_SNR)
-#define WMA_TGT_IS_INVALID_SNR(x) (!WMA_TGT_IS_VALID_SNR(x))
 
 #define WMA_TX_Q_RECHECK_TIMER_WAIT      2      /* 2 ms */
 #define WMA_MAX_NUM_ARGS 8
@@ -389,6 +384,19 @@
 #define WMA_HW_MODE_SBS_MODE_GET(hw_mode)                       \
 	((hw_mode & WMA_HW_MODE_SBS_MODE_MASK) >>               \
 		WMA_HW_MODE_SBS_MODE_BITPOS)
+
+/*
+ * Extract 2G or 5G tx/rx chainmask
+ * format of txrx_chainmask (from wmi_service_ready_event_fixed_param):
+ *    [7:0]   - 2G band tx chain mask
+ *    [15:8]  - 2G band rx chain mask
+ *    [23:16] - 5G band tx chain mask
+ *    [31:24] - 5G band rx chain mask
+ */
+#define EXTRACT_TX_CHAIN_MASK_2G(chainmask) ((chainmask) & 0xFF)
+#define EXTRACT_RX_CHAIN_MASK_2G(chainmask) (((chainmask) >> 8) & 0xFF)
+#define EXTRACT_TX_CHAIN_MASK_5G(chainmask) (((chainmask) >> 16) & 0xFF)
+#define EXTRACT_RX_CHAIN_MASK_5G(chainmask) (((chainmask) >> 24) & 0xFF)
 
 /*
  * PROBE_REQ_TX_DELAY
@@ -722,7 +730,6 @@ struct roam_synch_frame_ind {
  * @key: GTK key
  * @uapsd_cached_val: uapsd cached value
  * @stats_rsp: stats response
- * @fw_stats_set: fw stats value
  * @del_staself_req: delete sta self request
  * @bss_status: bss status
  * @rate_flags: rate flags
@@ -746,7 +753,6 @@ struct roam_synch_frame_ind {
  * @wep_default_key_idx: wep default index for group key
  * @arp_offload_req: cached arp offload request
  * @ns_offload_req: cached ns offload request
- * @wow_stats: stat counters for WoW related events
  * @rcpi_req: rcpi request
  * @in_bmps: Whether bmps for this interface has been enabled
  * @vdev_start_wakelock: wakelock to protect vdev start op with firmware
@@ -789,8 +795,6 @@ struct wma_txrx_node {
 	wma_igtk_key_t key;
 #endif /* WLAN_FEATURE_11W */
 	uint32_t uapsd_cached_val;
-	tAniGetPEStatsRsp *stats_rsp;
-	uint8_t fw_stats_set;
 	void *del_staself_req;
 	bool is_del_sta_defered;
 	qdf_atomic_t bss_status;
@@ -816,9 +820,6 @@ struct wma_txrx_node {
 	bool roaming_in_progress;
 	int32_t roam_synch_delay;
 	uint8_t wep_default_key_idx;
-#ifndef QCA_SUPPORT_CP_STATS
-	struct sir_vdev_wow_stats wow_stats;
-#endif
 	struct sme_rcpi_req *rcpi_req;
 	bool in_bmps;
 	struct beacon_filter_param beacon_filter;
@@ -948,7 +949,6 @@ struct wma_wlm_stats_data {
  * @pGetRssiReq: get RSSI request
  * @get_one_peer_info: When a "get peer info" request is active, is
  *   the request for a single peer?
- * @get_sta_peer_info: Is a "get peer info" request active?
  * @peer_macaddr: When @get_one_peer_info is true, the peer's mac address
  * @thermal_mgmt_info: Thermal mitigation related info
  * @enable_mc_list: To Check if Multicast list filtering is enabled in FW
@@ -985,10 +985,6 @@ struct wma_wlm_stats_data {
  * @old_hw_mode_index: Previous configured HW mode index
  * @new_hw_mode_index: Current configured HW mode index
  * @peer_authorized_cb: peer authorized hdd callback
- * @wow_unspecified_wake_count: Number of wake events which did not
- *   correspond to known wake events. Note that known wake events are
- *   tracked on a per-vdev basis via the struct sir_vdev_wow_stats
- *   wow_stats in struct wma_txrx_node
  * @ocb_config_req: OCB request context
  * @self_gen_frm_pwr: Self-generated frame power
  * @tx_chain_mask_cck: Is the CCK tx chain mask enabled
@@ -1082,7 +1078,6 @@ typedef struct {
 	uint8_t powersave_mode;
 	void *pGetRssiReq;
 	bool get_one_peer_info;
-	bool get_sta_peer_info;
 	struct qdf_mac_addr peer_macaddr;
 	t_thermal_mgmt thermal_mgmt_info;
 	bool enable_mc_list;
@@ -1120,7 +1115,6 @@ typedef struct {
 	uint32_t old_hw_mode_index;
 	uint32_t new_hw_mode_index;
 	wma_peer_authorized_fp peer_authorized_cb;
-	uint32_t wow_unspecified_wake_count;
 	struct sir_ocb_config *ocb_config_req;
 	uint16_t self_gen_frm_pwr;
 	bool tx_chain_mask_cck;
@@ -1135,7 +1129,9 @@ typedef struct {
 		struct bss_description *bss_desc_ptr,
 		enum sir_roam_op_code reason);
 	QDF_STATUS (*pe_disconnect_cb) (struct mac_context *mac,
-					uint8_t vdev_id);
+					uint8_t vdev_id,
+					uint8_t *deauth_disassoc_frame,
+					uint16_t deauth_disassoc_frame_len);
 	qdf_wake_lock_t wmi_cmd_rsp_wake_lock;
 	qdf_runtime_lock_t wmi_cmd_rsp_runtime_lock;
 	qdf_runtime_lock_t sap_prevent_runtime_pm_lock;
@@ -1642,9 +1638,6 @@ QDF_STATUS wma_trigger_uapsd_params(tp_wma_handle wma_handle, uint32_t vdev_id,
 				    tp_wma_trigger_uapsd_params
 				    trigger_uapsd_params);
 
-/* added to get average snr for both data and beacon */
-QDF_STATUS wma_send_snr_request(tp_wma_handle wma_handle, void *pGetRssiReq);
-
 void wma_send_flush_logs_to_fw(tp_wma_handle wma_handle);
 void wma_log_completion_timeout(void *data);
 
@@ -1889,8 +1882,27 @@ WLAN_PHY_MODE wma_chan_phy_mode(uint8_t chan, enum phy_ch_width chan_width,
 				uint8_t dot11_mode);
 
 #ifdef FEATURE_OEM_DATA_SUPPORT
-QDF_STATUS wma_start_oem_data_req(tp_wma_handle wma_handle,
-				  struct oem_data_req *oem_req);
+/**
+ * wma_start_oem_req_cmd() - send oem request command to fw
+ * @wma_handle: wma handle
+ * @oem_data_req: the pointer of oem req buf
+ *
+ * Return: QDF status
+ */
+QDF_STATUS wma_start_oem_req_cmd(tp_wma_handle wma_handle,
+				 struct oem_data_req *oem_data_req);
+#endif
+
+#ifdef FEATURE_OEM_DATA
+/**
+ * wma_start_oem_data_cmd() - send oem data command to fw
+ * @wma_handle: wma handle
+ * @oem_data: the pointer of oem data buf
+ *
+ * Return: QDF status
+ */
+QDF_STATUS wma_start_oem_data_cmd(tp_wma_handle wma_handle,
+				  struct oem_data *oem_data);
 #endif
 
 QDF_STATUS wma_enable_disable_caevent_ind(tp_wma_handle wma_handle,

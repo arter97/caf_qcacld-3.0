@@ -387,7 +387,8 @@ static void csr_scan_add_result(struct mac_context *mac_ctx,
 		frm_type = MGMT_PROBE_RESP;
 
 	rx_param.pdev_id = 0;
-	rx_param.channel = bss_desc->channelId;
+	rx_param.channel = wlan_reg_freq_to_chan(mac_ctx->pdev,
+						 bss_desc->chan_freq);
 	rx_param.rssi = bss_desc->rssi;
 	rx_param.tsf_delta = bss_desc->tsf_delta;
 
@@ -1365,7 +1366,7 @@ QDF_STATUS csr_scan_for_ssid(struct mac_context *mac_ctx, uint32_t session_id,
 
 	vdev = wlan_objmgr_get_vdev_by_macaddr_from_psoc(mac_ctx->psoc,
 				pdev_id,
-				session->selfMacAddr.bytes,
+				session->self_mac_addr.bytes,
 				WLAN_LEGACY_SME_ID);
 	ucfg_scan_init_default_params(vdev, req);
 	req->scan_req.scan_id = scan_id;
@@ -1776,7 +1777,7 @@ QDF_STATUS csr_scan_create_entry_in_scan_cache(struct mac_context *mac,
 		return QDF_STATUS_E_FAILURE;
 	}
 	pNewBssDescriptor = qdf_mem_malloc(size);
-	if (pNewBssDescriptor)
+	if (!pNewBssDescriptor)
 		return QDF_STATUS_E_FAILURE;
 
 	qdf_mem_copy(pNewBssDescriptor, pSession->pConnectBssDesc, size);
@@ -1784,6 +1785,8 @@ QDF_STATUS csr_scan_create_entry_in_scan_cache(struct mac_context *mac,
 	qdf_mem_copy(pNewBssDescriptor->bssId, bssid.bytes,
 			sizeof(tSirMacAddr));
 	pNewBssDescriptor->channelId = channel;
+	pNewBssDescriptor->chan_freq = wlan_reg_chan_to_freq(mac->pdev,
+							     channel);
 	if (!csr_scan_append_bss_description(mac, pNewBssDescriptor)) {
 		sme_err("csr_scan_append_bss_description failed");
 		status = QDF_STATUS_E_FAILURE;
@@ -1973,35 +1976,23 @@ csr_get_channel_for_hw_mode_change(struct mac_context *mac_ctx,
 		scan_result = GET_BASE_ADDR(next_element,
 					    struct tag_csrscan_result,
 					    Link);
+		channel_id = wlan_reg_freq_to_chan(
+				mac_ctx->pdev,
+				scan_result->Result.BssDescriptor.chan_freq);
 		if (policy_mgr_is_hw_dbs_2x2_capable(mac_ctx->psoc)) {
-			if (WLAN_REG_IS_24GHZ_CH
-				(scan_result->Result.BssDescriptor.channelId)) {
-				channel_id =
-					scan_result->
-					Result.BssDescriptor.channelId;
+			if (WLAN_REG_IS_24GHZ_CH(channel_id))
 				break;
-			}
 		} else {
-			if (WLAN_REG_IS_24GHZ_CH
-				(scan_result->Result.BssDescriptor.channelId) &&
+			if (WLAN_REG_IS_24GHZ_CH(channel_id) &&
 			    policy_mgr_is_any_mode_active_on_band_along_with_session
 				(mac_ctx->psoc,
-				 session_id, POLICY_MGR_BAND_5)) {
-				channel_id =
-					scan_result->
-					Result.BssDescriptor.channelId;
+				 session_id, POLICY_MGR_BAND_5))
 				break;
-			}
-			if (WLAN_REG_IS_5GHZ_CH
-				(scan_result->Result.BssDescriptor.channelId) &&
+			if (WLAN_REG_IS_5GHZ_CH(channel_id) &&
 			    policy_mgr_is_any_mode_active_on_band_along_with_session
 				(mac_ctx->psoc,
-				 session_id, POLICY_MGR_BAND_24)) {
-				channel_id =
-					scan_result->
-					Result.BssDescriptor.channelId;
+				 session_id, POLICY_MGR_BAND_24))
 				break;
-			}
 		}
 		next_element = csr_ll_next(&bss_list->List, next_element,
 					   LL_ACCESS_NOLOCK);
@@ -2640,11 +2631,15 @@ static QDF_STATUS csr_fill_bss_from_scan_entry(struct mac_context *mac_ctx,
 	/* channelId what peer sent in beacon/probersp. */
 	bss_desc->channelId =
 		scan_entry->channel.chan_idx;
+	bss_desc->chan_freq =
+		wlan_reg_chan_to_freq(mac_ctx->pdev,
+				      scan_entry->channel.chan_idx);
 	/* channelId on which we are parked at. */
 	/* used only in scan case. */
-	bss_desc->channelIdSelf =
-		scan_entry->channel.chan_idx;
-	bss_desc->rx_channel = bss_desc->channelIdSelf;
+	bss_desc->freq_self =
+		wlan_reg_chan_to_freq(mac_ctx->pdev,
+				      scan_entry->channel.chan_idx);
+	bss_desc->rx_freq = bss_desc->freq_self;
 	bss_desc->received_time =
 		scan_entry->scan_entry_time;
 	bss_desc->startTSF[0] =

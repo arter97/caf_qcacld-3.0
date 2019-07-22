@@ -159,8 +159,13 @@ struct hdd_config {
 	uint32_t rx_hp_oos_update_limit;
 	uint64_t rx_softirq_max_yield_duration_ns;
 #ifdef WLAN_FEATURE_DP_BUS_BANDWIDTH
+	/* bandwidth threshold for very high bandwidth */
+	uint32_t bus_bw_very_high_threshold;
+	/* bandwidth threshold for high bandwidth */
 	uint32_t bus_bw_high_threshold;
+	/* bandwidth threshold for medium bandwidth */
 	uint32_t bus_bw_medium_threshold;
+	/* bandwidth threshold for low bandwidth */
 	uint32_t bus_bw_low_threshold;
 	uint32_t bus_bw_compute_interval;
 	uint32_t enable_tcp_delack;
@@ -172,6 +177,14 @@ struct hdd_config {
 	uint32_t tcp_delack_timer_count;
 	bool     enable_tcp_param_update;
 #endif /*WLAN_FEATURE_DP_BUS_BANDWIDTH*/
+
+#ifdef QCA_SUPPORT_TXRX_DRIVER_TCP_DEL_ACK
+	bool del_ack_enable;
+	uint32_t del_ack_threshold_high;
+	uint32_t del_ack_threshold_low;
+	uint16_t del_ack_timer_value;
+	uint16_t del_ack_pkt_count;
+#endif
 
 #ifdef QCA_LL_LEGACY_TX_FLOW_CONTROL
 	uint32_t tx_flow_low_watermark;

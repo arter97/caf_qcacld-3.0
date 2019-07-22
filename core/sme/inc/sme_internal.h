@@ -226,15 +226,6 @@ typedef void (*bt_activity_info_cb)(hdd_handle_t hdd_handle,
 				    uint32_t bt_activity);
 
 /**
- * typedef congestion_cb - congestion callback function
- * @hdd_handle: HDD handle registered with SME
- * @congestion: Current congestion value
- * @vdev_id: ID of the vdev for which congestion is being reported
- */
-typedef void (*congestion_cb)(hdd_handle_t hdd_handle, uint32_t congestion,
-			      uint32_t vdev_id);
-
-/**
  * typedef rso_cmd_status_cb - RSO command status  callback function
  * @hdd_handle: HDD handle registered with SME
  * @rso_status: Status of the operation
@@ -277,6 +268,15 @@ typedef void (*beacon_pause_cb)(hdd_handle_t hdd_handle,
 				enum scan_event_type type,
 				bool is_disconnected);
 
+/**
+ * typedef sme_get_isolation_cb - get isolation callback fun
+ * @param: isolation result reported by firmware
+ * @pcontext: Opaque context that the client can use to associate the
+ *    callback with the request
+ */
+typedef void (*sme_get_isolation_cb)(struct sir_isolation_resp *param,
+				     void *pcontext);
+
 #ifdef WLAN_FEATURE_MOTION_DETECTION
 typedef QDF_STATUS (*md_host_evt_cb)(void *hdd_ctx, struct sir_md_evt *event);
 #endif /* WLAN_FEATURE_MOTION_DETECTION */
@@ -317,14 +317,13 @@ struct sme_context {
 	/* linkspeed callback */
 	sme_link_speed_cb link_speed_cb;
 	void *link_speed_context;
-	/* get peer info callback */
-	void (*pget_peer_info_ind_cb)(struct sir_peer_info_resp *param,
-		void *pcontext);
-	void *pget_peer_info_cb_context;
+
 	/* get extended peer info callback */
 	void (*pget_peer_info_ext_ind_cb)(struct sir_peer_info_ext_resp *param,
 		void *pcontext);
 	void *pget_peer_info_ext_cb_context;
+	sme_get_isolation_cb get_isolation_cb;
+	void *get_isolation_cb_context;
 #ifdef FEATURE_WLAN_EXTSCAN
 	ext_scan_ind_cb ext_scan_ind_cb;
 #endif /* FEATURE_WLAN_EXTSCAN */
@@ -353,7 +352,6 @@ struct sme_context {
 	bool (*get_connection_info_cb)(uint8_t *session_id,
 			enum scan_reject_states *reason);
 	rso_cmd_status_cb rso_cmd_status_cb;
-	congestion_cb congestion_cb;
 	pwr_save_fail_cb chip_power_save_fail_cb;
 	bt_activity_info_cb bt_activity_info_cb;
 	void *get_arp_stats_context;

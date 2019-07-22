@@ -77,7 +77,6 @@
  */
 #define WMA_SET_VDEV_IE_SOURCE_HOST 0x0
 
-
 #if defined(FEATURE_WLAN_DIAG_SUPPORT)
 /**
  * qdf_wma_wow_wakeup_stats_event()- send wow wakeup stats
@@ -87,7 +86,6 @@
  *
  * Return: void.
  */
-#ifdef QCA_SUPPORT_CP_STATS
 static inline void qdf_wma_wow_wakeup_stats_event(tp_wma_handle wma)
 {
 	QDF_STATUS status;
@@ -121,52 +119,6 @@ static inline void qdf_wma_wow_wakeup_stats_event(tp_wma_handle wma)
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wow_stats, EVENT_WLAN_POWERSAVE_WOW_STATS);
 }
-#else /* QCA_SUPPORT_CP_STATS*/
-static inline void qdf_wma_wow_wakeup_stats_event(tp_wma_handle wma)
-{
-	QDF_STATUS status;
-	struct sir_wake_lock_stats stats;
-
-	WLAN_HOST_DIAG_EVENT_DEF(WowStats,
-	struct host_event_wlan_powersave_wow_stats);
-
-	status = wma_get_wakelock_stats(&stats);
-	if (QDF_IS_STATUS_ERROR(status))
-		return;
-	qdf_mem_zero(&WowStats, sizeof(WowStats));
-
-	WowStats.wow_bcast_wake_up_count =
-		stats.wow_bcast_wake_up_count;
-	WowStats.wow_ipv4_mcast_wake_up_count =
-		stats.wow_ipv4_mcast_wake_up_count;
-	WowStats.wow_ipv6_mcast_wake_up_count =
-		stats.wow_ipv6_mcast_wake_up_count;
-	WowStats.wow_ipv6_mcast_ra_stats =
-		stats.wow_ipv6_mcast_ra_stats;
-	WowStats.wow_ipv6_mcast_ns_stats =
-		stats.wow_ipv6_mcast_ns_stats;
-	WowStats.wow_ipv6_mcast_na_stats =
-		stats.wow_ipv6_mcast_na_stats;
-	WowStats.wow_pno_match_wake_up_count =
-		stats.wow_pno_match_wake_up_count;
-	WowStats.wow_pno_complete_wake_up_count =
-		stats.wow_pno_complete_wake_up_count;
-	WowStats.wow_gscan_wake_up_count =
-		stats.wow_gscan_wake_up_count;
-	WowStats.wow_low_rssi_wake_up_count =
-		stats.wow_low_rssi_wake_up_count;
-	WowStats.wow_rssi_breach_wake_up_count =
-		stats.wow_rssi_breach_wake_up_count;
-	WowStats.wow_icmpv4_count =
-		stats.wow_icmpv4_count;
-	WowStats.wow_icmpv6_count =
-		stats.wow_icmpv6_count;
-	WowStats.wow_oem_response_wake_up_count =
-		stats.wow_oem_response_wake_up_count;
-
-	WLAN_HOST_DIAG_EVENT_REPORT(&WowStats, EVENT_WLAN_POWERSAVE_WOW_STATS);
-}
-#endif /* QCA_SUPPORT_CP_STATS */
 #else
 static inline void qdf_wma_wow_wakeup_stats_event(tp_wma_handle wma)
 {
@@ -238,49 +190,6 @@ static inline int wma_nan_rsp_handler_callback(void *handle, uint8_t *event,
 	return 0;
 }
 #endif
-
-/**
- * wma_send_snr_request() - send request to fw to get RSSI stats
- * @wma_handle: wma handle
- * @pGetRssiReq: get RSSI request
- *
- * Return: QDF status
- */
-QDF_STATUS wma_send_snr_request(tp_wma_handle wma_handle,
-				void *pGetRssiReq)
-{
-	tAniGetRssiReq *pRssiBkUp = NULL;
-
-	/* command is in progress */
-	if (wma_handle->pGetRssiReq)
-		return QDF_STATUS_SUCCESS;
-
-	/* create a copy of csrRssiCallback to send rssi value
-	 * after wmi event
-	 */
-	if (pGetRssiReq) {
-		pRssiBkUp = qdf_mem_malloc(sizeof(tAniGetRssiReq));
-		if (!pRssiBkUp) {
-			wma_handle->pGetRssiReq = NULL;
-			return QDF_STATUS_E_NOMEM;
-		}
-		pRssiBkUp->sessionId =
-			((tAniGetRssiReq *) pGetRssiReq)->sessionId;
-		pRssiBkUp->rssiCallback =
-			((tAniGetRssiReq *) pGetRssiReq)->rssiCallback;
-		pRssiBkUp->pDevContext =
-			((tAniGetRssiReq *) pGetRssiReq)->pDevContext;
-		wma_handle->pGetRssiReq = (void *)pRssiBkUp;
-	}
-
-	if (wmi_unified_snr_request_cmd(wma_handle->wmi_handle)) {
-		WMA_LOGE("Failed to send host stats request to fw");
-		qdf_mem_free(pRssiBkUp);
-		wma_handle->pGetRssiReq = NULL;
-		return QDF_STATUS_E_FAILURE;
-	}
-	return QDF_STATUS_SUCCESS;
-}
 
 /**
  * wma_get_snr() - get RSSI from fw
@@ -800,51 +709,6 @@ QDF_STATUS wma_get_link_speed(WMA_HANDLE handle,
 	return QDF_STATUS_SUCCESS;
 }
 
-QDF_STATUS wma_get_peer_info(WMA_HANDLE handle,
-				struct sir_peer_info_req *peer_info_req)
-{
-	tp_wma_handle wma_handle = (tp_wma_handle)handle;
-	wmi_request_stats_cmd_fixed_param *cmd;
-	wmi_buf_t  wmi_buf;
-	uint32_t  len;
-	uint8_t *buf_ptr;
-
-	if (!wma_handle || !wma_handle->wmi_handle) {
-		WMA_LOGE("%s: WMA is closed, can not issue get rssi",
-			__func__);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	len  = sizeof(wmi_request_stats_cmd_fixed_param);
-	wmi_buf = wmi_buf_alloc(wma_handle->wmi_handle, len);
-	if (!wmi_buf)
-		return QDF_STATUS_E_NOMEM;
-
-	buf_ptr = (uint8_t *)wmi_buf_data(wmi_buf);
-
-	cmd = (wmi_request_stats_cmd_fixed_param *)buf_ptr;
-	WMITLV_SET_HDR(&cmd->tlv_header,
-		WMITLV_TAG_STRUC_wmi_request_stats_cmd_fixed_param,
-		WMITLV_GET_STRUCT_TLVLEN(wmi_request_stats_cmd_fixed_param));
-
-	cmd->stats_id = WMI_REQUEST_PEER_STAT;
-	cmd->vdev_id = peer_info_req->sessionid;
-	WMI_CHAR_ARRAY_TO_MAC_ADDR(peer_info_req->peer_macaddr.bytes,
-				   &cmd->peer_macaddr);
-	wma_handle->get_sta_peer_info = true;
-
-	if (wmi_unified_cmd_send(wma_handle->wmi_handle, wmi_buf, len,
-				WMI_REQUEST_STATS_CMDID)) {
-		wmi_buf_free(wmi_buf);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	qdf_mem_copy(&(wma_handle->peer_macaddr),
-					&(peer_info_req->peer_macaddr),
-					QDF_MAC_ADDR_SIZE);
-	return QDF_STATUS_SUCCESS;
-}
-
 QDF_STATUS wma_get_peer_info_ext(WMA_HANDLE handle,
 				struct sir_peer_info_ext_req *peer_info_req)
 {
@@ -897,6 +761,46 @@ QDF_STATUS wma_get_peer_info_ext(WMA_HANDLE handle,
 	qdf_mem_copy(&(wma_handle->peer_macaddr),
 					&(peer_info_req->peer_macaddr),
 					QDF_MAC_ADDR_SIZE);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wma_get_isolation(tp_wma_handle wma)
+{
+	wmi_coex_get_antenna_isolation_cmd_fixed_param *cmd;
+	wmi_buf_t wmi_buf;
+	uint32_t  len;
+	uint8_t *buf_ptr;
+
+	WMA_LOGD("%s: get isolation", __func__);
+
+	if (!wma || !wma->wmi_handle) {
+		WMA_LOGE("%s: WMA is closed, can not issue get isolation",
+			 __func__);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	len  = sizeof(wmi_coex_get_antenna_isolation_cmd_fixed_param);
+	wmi_buf = wmi_buf_alloc(wma->wmi_handle, len);
+	if (!wmi_buf) {
+		WMA_LOGE("%s: wmi_buf_alloc failed", __func__);
+		return QDF_STATUS_E_NOMEM;
+	}
+	buf_ptr = (uint8_t *)wmi_buf_data(wmi_buf);
+
+	cmd = (wmi_coex_get_antenna_isolation_cmd_fixed_param *)buf_ptr;
+	WMITLV_SET_HDR(
+	&cmd->tlv_header,
+	WMITLV_TAG_STRUC_wmi_coex_get_antenna_isolation_cmd_fixed_param,
+	WMITLV_GET_STRUCT_TLVLEN(
+	wmi_coex_get_antenna_isolation_cmd_fixed_param));
+
+	if (wmi_unified_cmd_send(wma->wmi_handle, wmi_buf, len,
+				 WMI_COEX_GET_ANTENNA_ISOLATION_CMDID)) {
+		WMA_LOGE("Failed to get isolation request from fw");
+		wmi_buf_free(wmi_buf);
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1355,17 +1259,10 @@ int wma_oem_data_response_handler(void *handle,
 	return 0;
 }
 
-/**
- * wma_start_oem_data_req() - start OEM data request to target
- * @wma_handle: wma handle
- * @oem_data_req: start request params
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS wma_start_oem_data_req(tp_wma_handle wma_handle,
-			    struct oem_data_req *oem_data_req)
+QDF_STATUS wma_start_oem_req_cmd(tp_wma_handle wma_handle,
+				 struct oem_data_req *oem_data_req)
 {
-	int ret = 0;
+	QDF_STATUS ret;
 
 	WMA_LOGD(FL("Send OEM Data Request to target"));
 
@@ -1380,9 +1277,10 @@ QDF_STATUS wma_start_oem_data_req(tp_wma_handle wma_handle,
 		return QDF_STATUS_E_INVAL;
 	}
 
+	/* legacy api, for oem data request case */
 	ret = wmi_unified_start_oem_data_cmd(wma_handle->wmi_handle,
-				   oem_data_req->data_len,
-				   oem_data_req->data);
+					     oem_data_req->data_len,
+					     oem_data_req->data);
 
 	if (!QDF_IS_STATUS_SUCCESS(ret))
 		WMA_LOGE(FL("wmi cmd send failed"));
@@ -1391,7 +1289,35 @@ QDF_STATUS wma_start_oem_data_req(tp_wma_handle wma_handle,
 }
 #endif /* FEATURE_OEM_DATA_SUPPORT */
 
-#if !defined(REMOVE_PKT_LOG)
+#ifdef FEATURE_OEM_DATA
+QDF_STATUS wma_start_oem_data_cmd(tp_wma_handle wma_handle,
+				  struct oem_data *oem_data)
+{
+	QDF_STATUS ret;
+
+	wma_debug("Send OEM Data to target");
+
+	if (!oem_data || !oem_data->data) {
+		wma_err("oem_data is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!wma_handle || !wma_handle->wmi_handle) {
+		wma_err("WMA - closed");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/* common api, for oem data command case */
+	ret = wmi_unified_start_oemv2_data_cmd(wma_handle->wmi_handle,
+					       oem_data);
+	if (!QDF_IS_STATUS_SUCCESS(ret))
+		wma_err("call start wmi cmd failed");
+
+	return ret;
+}
+#endif
+
+#if !defined(REMOVE_PKT_LOG) && defined(FEATURE_PKTLOG)
 /**
  * wma_pktlog_wmi_send_cmd() - send pktlog enable/disable command to target
  * @handle: wma handle
@@ -1413,7 +1339,7 @@ QDF_STATUS wma_pktlog_wmi_send_cmd(WMA_HANDLE handle,
 
 	return QDF_STATUS_SUCCESS;
 }
-#endif /* REMOVE_PKT_LOG */
+#endif /* !REMOVE_PKT_LOG && FEATURE_PKTLOG */
 
 /**
  * wma_wow_wake_reason_str() -  Converts wow wakeup reason code to text format
@@ -1534,12 +1460,13 @@ static const uint8_t *wma_wow_wake_reason_str(A_INT32 wake_reason)
 	case WOW_REASON_WLAN_BL:
 		return "MOTION_DETECT_BASELINE";
 #endif /* WLAN_FEATURE_MOTION_DETECTION */
+	case WOW_REASON_PAGE_FAULT:
+		return "PAGE_FAULT";
 	default:
 		return "unknown";
 	}
 }
 
-#ifdef QCA_SUPPORT_CP_STATS
 static bool wma_wow_reason_has_stats(enum wake_reason_e reason)
 {
 	switch (reason) {
@@ -1635,124 +1562,6 @@ static void wma_print_wow_stats(t_wma_handle *wma,
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
 	wma_wow_stats_display(&stats);
 }
-#else
-/**
- * wma_wow_stats_display() - display wow wake up stats
- * @stats: per vdev stats counters
- *
- * Return: none
- */
-static void wma_wow_stats_display(struct sir_vdev_wow_stats *stats)
-{
-	WMA_LOGA("uc %d bc %d v4_mc %d v6_mc %d ra %d ns %d na %d pno_match %d pno_complete %d gscan %d low_rssi %d rssi_breach %d icmp %d icmpv6 %d oem %d",
-		stats->ucast,
-		stats->bcast,
-		stats->ipv4_mcast,
-		stats->ipv6_mcast,
-		stats->ipv6_mcast_ra,
-		stats->ipv6_mcast_ns,
-		stats->ipv6_mcast_na,
-		stats->pno_match,
-		stats->pno_complete,
-		stats->gscan,
-		stats->low_rssi,
-		stats->rssi_breach,
-		stats->icmpv4,
-		stats->icmpv6,
-		stats->oem_response);
-}
-
-static void wma_print_wow_stats(t_wma_handle *wma,
-				WOW_EVENT_INFO_fixed_param *wake_info)
-{
-	struct sir_vdev_wow_stats *stats;
-
-	switch (wake_info->wake_reason) {
-	case WOW_REASON_BPF_ALLOW:
-	case WOW_REASON_PATTERN_MATCH_FOUND:
-	case WOW_REASON_PACKET_FILTER_MATCH:
-	case WOW_REASON_RA_MATCH:
-	case WOW_REASON_NLOD:
-	case WOW_REASON_NLO_SCAN_COMPLETE:
-	case WOW_REASON_LOW_RSSI:
-	case WOW_REASON_EXTSCAN:
-	case WOW_REASON_RSSI_BREACH_EVENT:
-	case WOW_REASON_OEM_RESPONSE_EVENT:
-	case WOW_REASON_CHIP_POWER_FAILURE_DETECT:
-	case WOW_REASON_11D_SCAN:
-		break;
-#ifdef WLAN_FEATURE_MOTION_DETECTION
-	case WOW_REASON_WLAN_MD:
-	case WOW_REASON_WLAN_BL:
-		break;
-#endif /* WLAN_FEATURE_MOTION_DETECTION */
-	default:
-		return;
-	}
-
-	stats = &wma->interfaces[wake_info->vdev_id].wow_stats;
-	wma_wow_stats_display(stats);
-}
-
-/**
- * wma_inc_wow_stats() - maintain wow pattern match wake up stats
- * @wma: wma handle, containing the stats counters
- * @wake_info: the wake event information
- *
- * Return: none
- */
-static void wma_inc_wow_stats(t_wma_handle *wma,
-			      WOW_EVENT_INFO_fixed_param *wake_info)
-{
-	struct sir_vdev_wow_stats *stats;
-
-	if (wake_info->wake_reason == WOW_REASON_UNSPECIFIED) {
-		wma->wow_unspecified_wake_count++;
-		return;
-	}
-
-	stats = &wma->interfaces[wake_info->vdev_id].wow_stats;
-	switch (wake_info->wake_reason) {
-	case WOW_REASON_RA_MATCH:
-		stats->ipv6_mcast++;
-		stats->ipv6_mcast_ra++;
-		stats->icmpv6++;
-		break;
-	case WOW_REASON_NLOD:
-		stats->pno_match++;
-		break;
-	case WOW_REASON_NLO_SCAN_COMPLETE:
-		stats->pno_complete++;
-		break;
-	case WOW_REASON_LOW_RSSI:
-		stats->low_rssi++;
-		break;
-	case WOW_REASON_EXTSCAN:
-		stats->gscan++;
-		break;
-	case WOW_REASON_RSSI_BREACH_EVENT:
-		stats->rssi_breach++;
-		break;
-	case WOW_REASON_OEM_RESPONSE_EVENT:
-		stats->oem_response++;
-		break;
-	case WOW_REASON_11D_SCAN:
-		stats->scan_11d++;
-		break;
-	case WOW_REASON_CHIP_POWER_FAILURE_DETECT:
-		stats->pwr_save_fail_detected++;
-		break;
-#ifdef WLAN_FEATURE_MOTION_DETECTION
-	case WOW_REASON_WLAN_MD:
-		stats->motion_detect++;
-		break;
-	case WOW_REASON_WLAN_BL:
-		stats->motion_detect_bl++;
-		break;
-#endif /* WLAN_FEATURE_MOTION_DETECTION */
-	}
-}
-#endif
 
 #ifdef FEATURE_WLAN_EXTSCAN
 /**
@@ -2217,7 +2026,6 @@ static void wma_log_pkt_tcpv6(uint8_t *data, uint32_t length)
 	WMA_LOGD("TCP_seq_num: %u", qdf_cpu_to_be16(seq_num));
 }
 
-#ifdef QCA_SUPPORT_CP_STATS
 static void wma_wow_inc_wake_lock_stats_by_dst_addr(t_wma_handle *wma,
 						    uint8_t vdev_id,
 						    uint8_t *dest_mac)
@@ -2234,68 +2042,6 @@ static void wma_wow_inc_wake_lock_stats_by_protocol(t_wma_handle *wma,
 							 vdev_id,
 							 proto_subtype);
 }
-#else
-static void wma_wow_inc_wake_lock_stats_by_dst_addr(t_wma_handle *wma,
-						    uint8_t vdev_id,
-						    uint8_t *dest_mac)
-{
-	struct wma_txrx_node *vdev;
-	struct sir_vdev_wow_stats *stats;
-
-	vdev = &wma->interfaces[vdev_id];
-	stats = &vdev->wow_stats;
-
-	switch (*dest_mac) {
-	case QDF_BCAST_MAC_ADDR:
-		stats->bcast++;
-		break;
-	case QDF_MCAST_IPV4_MAC_ADDR:
-		stats->ipv4_mcast++;
-		break;
-	case QDF_MCAST_IPV6_MAC_ADDR:
-		stats->ipv6_mcast++;
-		break;
-	default:
-		stats->ucast++;
-		break;
-	}
-}
-
-static void wma_wow_inc_wake_lock_stats_by_protocol(t_wma_handle *wma,
-			uint8_t vdev_id, enum qdf_proto_subtype proto_subtype)
-{
-	struct wma_txrx_node *vdev;
-	struct sir_vdev_wow_stats *stats;
-
-	vdev = &wma->interfaces[vdev_id];
-	stats = &vdev->wow_stats;
-
-	switch (proto_subtype) {
-	case QDF_PROTO_ICMP_RES:
-		stats->icmpv4++;
-		break;
-	case QDF_PROTO_ICMPV6_REQ:
-	case QDF_PROTO_ICMPV6_RES:
-	case QDF_PROTO_ICMPV6_RS:
-		stats->icmpv6++;
-		break;
-	case QDF_PROTO_ICMPV6_RA:
-		stats->icmpv6++;
-		stats->ipv6_mcast_ra++;
-		break;
-	case QDF_PROTO_ICMPV6_NS:
-		stats->icmpv6++;
-		stats->ipv6_mcast_ns++;
-		break;
-	case QDF_PROTO_ICMPV6_NA:
-		stats->icmpv6++;
-		stats->ipv6_mcast_na++;
-		break;
-	default:
-		break;
-	}
-}
-#endif
 
 /**
  * wma_wow_parse_data_pkt() - API to parse data buffer for data
@@ -2834,6 +2580,13 @@ static int wma_wake_event_piggybacked(
 	return errno;
 }
 
+static void wma_debug_assert_page_fault_wakeup(uint32_t reason)
+{
+	/* During DRV if page fault wake up then assert */
+	if ((WOW_REASON_PAGE_FAULT == reason) && (qdf_is_drv_connected()))
+		QDF_DEBUG_PANIC("Unexpected page fault wake up detected during DRV wow");
+}
+
 static void wma_wake_event_log_reason(t_wma_handle *wma,
 				      WOW_EVENT_INFO_fixed_param *wake_info)
 {
@@ -2847,6 +2600,7 @@ static void wma_wake_event_log_reason(t_wma_handle *wma,
 			 wake_info->wake_reason,
 			 wake_info->vdev_id,
 			 wma_vdev_type_str(vdev->type));
+		wma_debug_assert_page_fault_wakeup(wake_info->wake_reason);
 	} else if (!wmi_get_runtime_pm_inprogress(wma->wmi_handle)) {
 		WMA_LOGA("Non-WLAN triggered wakeup: %s (%d)",
 			 wma_wow_wake_reason_str(wake_info->wake_reason),
@@ -4768,66 +4522,6 @@ QDF_STATUS wma_set_sw_retry_threshold(uint8_t vdev_id, uint32_t retry,
 
 	return QDF_STATUS_SUCCESS;
 }
-#ifndef QCA_SUPPORT_CP_STATS
-/**
- * wma_get_wakelock_stats() - Populates wake lock stats
- * @stats: non-null wakelock structure to populate
- *
- * This function collects wake lock stats
- *
- * Return: QDF_STATUS_SUCCESS on success, error value otherwise
- */
-QDF_STATUS wma_get_wakelock_stats(struct sir_wake_lock_stats *stats)
-{
-	t_wma_handle *wma;
-	struct sir_vdev_wow_stats *vstats;
-	int i;
-
-	if (!stats) {
-		WMA_LOGE("%s: invalid stats pointer", __func__);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	wma = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma) {
-		WMA_LOGE("%s: invalid WMA context", __func__);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	/* ensure counters are zeroed */
-	qdf_mem_zero(stats, sizeof(*stats));
-
-	/* populate global level stats */
-	stats->wow_unspecified_wake_up_count = wma->wow_unspecified_wake_count;
-
-	/* populate vdev level stats */
-	for (i = 0; i < wma->max_bssid; ++i) {
-		if (!wma->interfaces[i].handle)
-			continue;
-
-		vstats = &wma->interfaces[i].wow_stats;
-
-		stats->wow_ucast_wake_up_count += vstats->ucast;
-		stats->wow_bcast_wake_up_count += vstats->bcast;
-		stats->wow_ipv4_mcast_wake_up_count += vstats->ipv4_mcast;
-		stats->wow_ipv6_mcast_wake_up_count += vstats->ipv6_mcast;
-		stats->wow_ipv6_mcast_ra_stats += vstats->ipv6_mcast_ra;
-		stats->wow_ipv6_mcast_ns_stats += vstats->ipv6_mcast_ns;
-		stats->wow_ipv6_mcast_na_stats += vstats->ipv6_mcast_na;
-		stats->wow_icmpv4_count += vstats->icmpv4;
-		stats->wow_icmpv6_count += vstats->icmpv6;
-		stats->wow_rssi_breach_wake_up_count += vstats->rssi_breach;
-		stats->wow_low_rssi_wake_up_count += vstats->low_rssi;
-		stats->wow_gscan_wake_up_count += vstats->gscan;
-		stats->wow_pno_complete_wake_up_count += vstats->pno_complete;
-		stats->wow_pno_match_wake_up_count += vstats->pno_match;
-		stats->wow_oem_response_wake_up_count += vstats->oem_response;
-	}
-
-	return QDF_STATUS_SUCCESS;
-}
-#endif
-
 /**
  * wma_process_fw_test_cmd() - send unit test command to fw.
  * @handle: wma handle

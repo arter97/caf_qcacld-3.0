@@ -131,15 +131,23 @@ enum eLimDisassocTrigger {
 	eLIM_DUPLICATE_ENTRY
 };
 
-/* Reason code to determine the channel change context while sending
- * WMA_CHNL_SWITCH_REQ message to HAL
+/**
+ * enum eChannelChangeReasonCodes - Reason code to determine the channel change
+ * reason
+ * @LIM_SWITCH_CHANNEL_REASSOC: channel switch to reassoc
+ * @LIM_SWITCH_CHANNEL_JOIN: switch for connect req
+ * @LIM_SWITCH_CHANNEL_OPERATION: Generic change channel for STA
+ * @LIM_SWITCH_CHANNEL_SAP_DFS: SAP channel change req
+ * @LIM_SWITCH_CHANNEL_HT_WIDTH: HT channel width change reg
+ * @LIM_SWITCH_CHANNEL_MONITOR: Monitor mode channel change req
  */
 enum eChannelChangeReasonCodes {
 	LIM_SWITCH_CHANNEL_REASSOC,
 	LIM_SWITCH_CHANNEL_JOIN,
-	LIM_SWITCH_CHANNEL_OPERATION,   /* Generic change channel */
-	LIM_SWITCH_CHANNEL_SAP_DFS,     /* DFS channel change */
-	LIM_SWITCH_CHANNEL_HT_WIDTH     /* HT channel width change */
+	LIM_SWITCH_CHANNEL_OPERATION,
+	LIM_SWITCH_CHANNEL_SAP_DFS,
+	LIM_SWITCH_CHANNEL_HT_WIDTH,
+	LIM_SWITCH_CHANNEL_MONITOR,
 };
 
 typedef struct sLimMlmStartReq {
@@ -732,7 +740,16 @@ void lim_process_mlm_set_bss_key_rsp(struct mac_context *mac,
 void lim_process_switch_channel_rsp(struct mac_context *mac, void *);
 
 QDF_STATUS lim_sta_send_down_link(join_params *param);
+
+#ifdef WLAN_FEATURE_HOST_ROAM
 QDF_STATUS lim_sta_reassoc_error_handler(struct reassoc_params *param);
+#else
+static inline
+QDF_STATUS lim_sta_reassoc_error_handler(struct reassoc_params *param)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
 
 #ifdef WLAN_FEATURE_11W
 /* 11w send SA query request action frame */
@@ -1161,6 +1178,7 @@ void lim_process_assoc_cleanup(struct mac_context *mac_ctx,
  * @pmf_connection: flag indicating pmf connection
  * @assoc_req_copied: boolean to indicate if assoc req was copied to tmp above
  * @dup_entry: flag indicating if duplicate entry found
+ * @force_1x1: flag to indicate if the STA nss needs to be downgraded to 1x1
  *
  * Return: void
  */
@@ -1172,5 +1190,5 @@ bool lim_send_assoc_ind_to_sme(struct mac_context *mac_ctx,
 			       enum ani_akm_type akm_type,
 			       bool pmf_connection,
 			       bool *assoc_req_copied,
-			       bool dup_entry);
+			       bool dup_entry, bool force_1x1);
 #endif /* __LIM_TYPES_H */

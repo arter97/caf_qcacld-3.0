@@ -35,6 +35,7 @@
 
 #include "sir_types.h"
 #include "wlan_mlme_public_struct.h"
+#include "csr_host_scan_roam.h"
 
 #define CSR_NUM_RSSI_CAT        15
 #define CSR_ROAM_SCAN_CHANNEL_SWITCH_TIME        3
@@ -179,14 +180,6 @@ enum csr_roam_wmstatus_changetypes {
 	eCsrDeauthenticated
 };
 
-enum csr_roam_stats_classtypes {
-	eCsrSummaryStats = 0,
-	eCsrGlobalClassAStats,
-	eCsrGlobalClassDStats,
-	csr_per_chain_rssi_stats,
-	eCsrMaxStats
-};
-
 enum csr_diagwlan_status_eventsubtype {
 	eCSR_WLAN_STATUS_CONNECT = 0,
 	eCSR_WLAN_STATUS_DISCONNECT
@@ -322,7 +315,7 @@ struct wmstatus_changecmd {
 
 struct delstafor_sessionCmd {
 	/* Session self mac addr */
-	tSirMacAddr selfMacAddr;
+	tSirMacAddr self_mac_addr;
 	csr_session_close_cb session_close_cb;
 	void *context;
 };
@@ -478,36 +471,6 @@ struct csr_roam_connectedinfo {
 	uint8_t staId;
 };
 
-#ifndef QCA_SUPPORT_CP_STATS
-struct csr_pestats_reqinfo {
-	tListElem link;         /* list links */
-	uint32_t statsMask;
-	bool rspPending;
-	uint8_t staId;
-	uint8_t numClient;
-	struct mac_context *mac;
-	uint8_t sessionId;
-};
-
-struct csr_statsclient_reqinfo {
-	tListElem link;         /* list links */
-	eCsrStatsRequesterType requesterId;
-	tCsrStatsCallback callback;
-	void *pContext;
-	uint32_t statsMask;
-	struct csr_pestats_reqinfo *pPeStaEntry;
-	uint8_t staId;
-	qdf_mc_timer_t timer;
-	bool timerExpired;
-	struct mac_context *mac;    /* TODO: Confirm this change BTAMP */
-	uint8_t sessionId;
-};
-
-struct csr_tlstats_reqinfo {
-	uint8_t numClient;
-};
-#endif /* QCA_SUPPORT_CP_STATS */
-
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 enum csr_roamoffload_authstatus {
 	/* reassociation is done but couldn't finish security handshake */
@@ -567,6 +530,7 @@ struct csr_disconnect_stats {
  * struct csr_roam_session - CSR per-vdev context
  * @vdev_id: ID of the vdev for which this entry is applicable
  * @is_bcn_recv_start: Allow to process bcn recv indication
+ * @beacon_report_do_not_resume: Do not resume the beacon reporting after scan
  */
 struct csr_roam_session {
 	union {
@@ -576,7 +540,7 @@ struct csr_roam_session {
 	bool sessionActive;     /* true if it is used */
 
 	/* For BT-AMP station, this serve as BSSID for self-BSS. */
-	struct qdf_mac_addr selfMacAddr;
+	struct qdf_mac_addr self_mac_addr;
 
 	csr_session_open_cb  session_open_cb;
 	csr_session_close_cb session_close_cb;
@@ -642,6 +606,7 @@ struct csr_roam_session {
 	qdf_mc_timer_t hTimerRoaming;
 #ifdef WLAN_BCN_RECV_FEATURE
 	bool is_bcn_recv_start;
+	bool beacon_report_do_not_resume;
 #endif
 	/* the roamResult that is used when the roaming timer fires */
 	eCsrRoamResult roamResult;
@@ -713,15 +678,6 @@ struct csr_roamstruct {
 	uint32_t numValidChannels;       /* total number of channels in CFG */
 	int32_t sPendingCommands;
 	qdf_mc_timer_t hTimerWaitForKey; /* support timeout for WaitForKey */
-#ifndef QCA_SUPPORT_CP_STATS
-	tCsrSummaryStatsInfo summaryStatsInfo;
-	tCsrGlobalClassAStatsInfo classAStatsInfo;
-	tCsrGlobalClassDStatsInfo classDStatsInfo;
-	struct csr_per_chain_rssi_stats_info  per_chain_rssi_stats;
-	tDblLinkList statsClientReqList;
-	tDblLinkList peStatsReqList;
-	struct csr_tlstats_reqinfo tlStatsReqInfo;
-#endif
 	struct csr_timer_info WaitForKeyTimerInfo;
 	struct csr_roam_session *roamSession;
 	tCsrNeighborRoamControlInfo neighborRoamInfo[WLAN_MAX_VDEVS];
@@ -941,13 +897,6 @@ bool csr_is_valid_mc_concurrent_session(struct mac_context *mac,
 					struct bss_description *bss_desc);
 bool csr_is_conn_state_connected_infra_ap(struct mac_context *mac,
 		uint32_t sessionId);
-QDF_STATUS csr_get_statistics(struct mac_context *mac,
-		eCsrStatsRequesterType requesterId,
-		uint32_t statsMask, tCsrStatsCallback callback,
-		uint8_t staId, void *pContext, uint8_t sessionId);
-QDF_STATUS csr_get_rssi(struct mac_context *mac, tCsrRssiCallback callback,
-		uint8_t staId, struct qdf_mac_addr bssId, int8_t lastRSSI,
-		void *pContext);
 QDF_STATUS csr_get_snr(struct mac_context *mac, tCsrSnrCallback callback,
 		uint8_t staId, struct qdf_mac_addr bssId, void *pContext);
 QDF_STATUS csr_get_config_param(struct mac_context *mac,
@@ -1177,12 +1126,6 @@ void csr_roam_substate_change(
 			struct mac_context *mac, enum csr_roam_substate
 					NewSubstate, uint32_t sessionId);
 
-void csr_neighbor_roam_process_scan_results(
-		struct mac_context *mac_ctx,
-		uint8_t sessionid, tScanResultHandle *scan_results_list);
-
-void csr_neighbor_roam_trigger_handoff(struct mac_context *mac_ctx,
-					uint8_t session_id);
 bool csr_is_ndi_started(struct mac_context *mac_ctx, uint32_t session_id);
 
 QDF_STATUS csr_roam_update_config(

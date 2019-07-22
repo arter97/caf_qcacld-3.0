@@ -286,18 +286,18 @@ static void lim_handle_join_rsp_status(struct mac_context *mac_ctx,
 			ht_profile->apChanWidth = session_entry->ch_width;
 		}
 #endif
-		pe_debug("pLimJoinReq:%pK, pLimReAssocReq:%pK",
-			session_entry->pLimJoinReq,
-			session_entry->pLimReAssocReq);
+		pe_debug("lim_join_req:%pK, pLimReAssocReq:%pK",
+			 session_entry->lim_join_req,
+			 session_entry->pLimReAssocReq);
 
-		if (session_entry->pLimJoinReq)
-			join_reassoc_req = session_entry->pLimJoinReq;
+		if (session_entry->lim_join_req)
+			join_reassoc_req = session_entry->lim_join_req;
 
 		if (session_entry->pLimReAssocReq)
 			join_reassoc_req = session_entry->pLimReAssocReq;
 
 		if (!join_reassoc_req) {
-			pe_err("both  pLimJoinReq and pLimReAssocReq NULL");
+			pe_err("both  lim_join_req and pLimReAssocReq NULL");
 			return;
 		}
 
@@ -549,6 +549,10 @@ void lim_send_sme_start_bss_rsp(struct mac_context *mac,
 
 			pSirSmeRsp->bssDescription.channelId =
 				pe_session->currentOperChannel;
+			pSirSmeRsp->bssDescription.chan_freq =
+				wlan_reg_chan_to_freq(mac->pdev,
+						      pe_session->
+						      currentOperChannel);
 
 		if (!LIM_IS_NDI_ROLE(pe_session)) {
 			curLen = pe_session->schBeaconOffsetBegin - ieOffset;
@@ -1344,66 +1348,6 @@ lim_send_sme_delts_ind(struct mac_context *mac, struct delts_req_info *delts,
 
 	lim_sys_process_mmh_msg_api(mac, &mmhMsg);
 }
-
-#ifndef QCA_SUPPORT_CP_STATS
-/**
- * lim_send_sme_pe_statistics_rsp()
- *
- ***FUNCTION:
- * This function is called to send 802.11 statistics response to HDD.
- * This function posts the result back to HDD. This is a response to
- * HDD's request for statistics.
- *
- ***PARAMS:
- *
- ***LOGIC:
- *
- ***ASSUMPTIONS:
- * NA
- *
- ***NOTE:
- * NA
- *
- * @param mac         Pointer to Global MAC structure
- * @param p80211Stats  Statistics sent in response
- * @param resultCode   TODO:
- *
- *
- * @return none
- */
-
-void
-lim_send_sme_pe_statistics_rsp(struct mac_context *mac, uint16_t msgType, void *stats)
-{
-	struct scheduler_msg mmhMsg = {0};
-	uint8_t sessionId;
-	tAniGetPEStatsRsp *pPeStats = (tAniGetPEStatsRsp *) stats;
-	struct pe_session *pPeSessionEntry;
-
-	/* Get the Session Id based on Sta Id */
-	pPeSessionEntry =
-		pe_find_session_by_sta_id(mac, pPeStats->staId, &sessionId);
-
-	/* Fill the Session Id */
-	if (pPeSessionEntry) {
-		/* Fill the Session Id */
-		pPeStats->sessionId = pPeSessionEntry->smeSessionId;
-	}
-
-	pPeStats->msgType = eWNI_SME_GET_STATISTICS_RSP;
-
-	/* msgType should be WMA_GET_STATISTICS_RSP */
-	mmhMsg.type = eWNI_SME_GET_STATISTICS_RSP;
-
-	mmhMsg.bodyptr = stats;
-	mmhMsg.bodyval = 0;
-	MTRACE(mac_trace(mac, TRACE_CODE_TX_SME_MSG, NO_SESSION, mmhMsg.type));
-	lim_sys_process_mmh_msg_api(mac, &mmhMsg);
-
-	return;
-
-} /*** end lim_send_sme_pe_statistics_rsp() ***/
-#endif
 
 #ifdef FEATURE_WLAN_ESE
 /**

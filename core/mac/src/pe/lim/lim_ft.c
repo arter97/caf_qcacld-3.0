@@ -36,14 +36,9 @@
 #include <lim_assoc_utils.h>
 #include <lim_session.h>
 #include <lim_admit_control.h>
+#include <lim_security_utils.h>
 #include "wmm_apsd.h"
 #include "wma.h"
-
-extern void lim_send_set_sta_key_req(struct mac_context *mac,
-				     tLimMlmSetKeysReq * pMlmSetKeysReq,
-				     uint16_t staIdx,
-				     uint8_t defWEPIdx,
-				     struct pe_session *pe_session, bool sendRsp);
 
 /*--------------------------------------------------------------------------
    Initialize the FT variables.
@@ -155,8 +150,8 @@ void lim_ft_prepare_add_bss_req(struct mac_context *mac,
 	qdf_mem_copy(pAddBssParams->bssId, bssDescription->bssId,
 		     sizeof(tSirMacAddr));
 
-	/* Fill in tAddBssParams selfMacAddr */
-	qdf_mem_copy(pAddBssParams->selfMacAddr, ft_session->selfMacAddr,
+	/* Fill in tAddBssParams self_mac_addr */
+	qdf_mem_copy(pAddBssParams->self_mac_addr, ft_session->self_mac_addr,
 		     sizeof(tSirMacAddr));
 
 	pAddBssParams->bssType = ft_session->bssType;
@@ -472,6 +467,7 @@ void lim_ft_prepare_add_bss_req(struct mac_context *mac,
  * @mac_ctx: pointer to mac ctx
  * @ft_session: FT session
  * @pe_session: PE session
+ * @bcn: AP beacon pointer
  *
  * This API fills FT session's dot11mode either from pe session or
  * from CFG depending on the condition.
@@ -480,7 +476,8 @@ void lim_ft_prepare_add_bss_req(struct mac_context *mac,
  */
 static void lim_fill_dot11mode(struct mac_context *mac_ctx,
 			       struct pe_session *ft_session,
-			       struct pe_session *pe_session)
+			       struct pe_session *pe_session,
+			       tSchBeaconStruct *bcn)
 {
 	uint32_t self_dot11_mode;
 
@@ -488,10 +485,39 @@ static void lim_fill_dot11mode(struct mac_context *mac_ctx,
 	    !csr_is_roam_offload_enabled(mac_ctx)) {
 		ft_session->dot11mode =
 			pe_session->ftPEContext.pFTPreAuthReq->dot11mode;
-	} else {
-		self_dot11_mode = mac_ctx->mlme_cfg->dot11_mode.dot11_mode;
-		pe_debug("selfDot11Mode: %d", self_dot11_mode);
-		ft_session->dot11mode = self_dot11_mode;
+		return;
+	}
+	self_dot11_mode = mac_ctx->mlme_cfg->dot11_mode.dot11_mode;
+	pe_debug("selfDot11Mode: %d", self_dot11_mode);
+	if (ft_session->limRFBand == BAND_2G)
+		ft_session->dot11mode = MLME_DOT11_MODE_11G;
+	else
+		ft_session->dot11mode = MLME_DOT11_MODE_11A;
+	switch (self_dot11_mode) {
+	case MLME_DOT11_MODE_11AX:
+	case MLME_DOT11_MODE_11AX_ONLY:
+		if (bcn->he_cap.present)
+			ft_session->dot11mode = MLME_DOT11_MODE_11AX;
+		else if (bcn->VHTCaps.present)
+			ft_session->dot11mode = MLME_DOT11_MODE_11AC;
+		else if (bcn->HTCaps.present)
+			ft_session->dot11mode = MLME_DOT11_MODE_11N;
+		break;
+	case MLME_DOT11_MODE_11AC:
+	case MLME_DOT11_MODE_11AC_ONLY:
+		if (bcn->VHTCaps.present)
+			ft_session->dot11mode = MLME_DOT11_MODE_11AC;
+		else if (bcn->HTCaps.present)
+			ft_session->dot11mode = MLME_DOT11_MODE_11N;
+		break;
+	case MLME_DOT11_MODE_11N:
+	case MLME_DOT11_MODE_11N_ONLY:
+		if (bcn->HTCaps.present)
+			ft_session->dot11mode = MLME_DOT11_MODE_11N;
+
+		break;
+	default:
+		break;
 	}
 }
 #elif defined(WLAN_FEATURE_HOST_ROAM)
@@ -500,13 +526,16 @@ static void lim_fill_dot11mode(struct mac_context *mac_ctx,
  * @mac_ctx: pointer to mac ctx
  * @ft_session: FT session
  * @pe_session: PE session
+ * @bcn: AP beacon pointer
  *
  * This API fills FT session's dot11mode either from pe session.
  *
  * Return: none
  */
 static void lim_fill_dot11mode(struct mac_context *mac_ctx,
-			struct pe_session *ft_session, struct pe_session *pe_session)
+			       struct pe_session *ft_session,
+			       struct pe_session *pe_session,
+			       tSchBeaconStruct *bcn)
 {
 	ft_session->dot11mode =
 			pe_session->ftPEContext.pFTPreAuthReq->dot11mode;
@@ -544,7 +573,7 @@ void lim_fill_ft_session(struct mac_context *mac,
 	ft_session->connected_akm = pe_session->connected_akm;
 
 	/* Fields to be filled later */
-	ft_session->pLimJoinReq = NULL;
+	ft_session->lim_join_req = NULL;
 	ft_session->smeSessionId = pe_session->smeSessionId;
 
 	lim_extract_ap_capabilities(mac, (uint8_t *) pbssDescription->ieFields,
@@ -566,7 +595,16 @@ void lim_fill_ft_session(struct mac_context *mac,
 	ft_session->ssId.length = pBeaconStruct->ssId.length;
 	qdf_mem_copy(ft_session->ssId.ssId, pBeaconStruct->ssId.ssId,
 		     ft_session->ssId.length);
-	lim_fill_dot11mode(mac, ft_session, pe_session);
+	/* Copy The channel Id to the session Table */
+	ft_session->limReassocChannelId = pbssDescription->channelId;
+	ft_session->curr_op_freq = pbssDescription->chan_freq;
+	ft_session->currentOperChannel =
+		wlan_reg_freq_to_chan(mac->pdev, ft_session->curr_op_freq);
+
+	ft_session->limRFBand = lim_get_rf_band(wlan_reg_freq_to_chan(
+					mac->pdev, ft_session->curr_op_freq));
+
+	lim_fill_dot11mode(mac, ft_session, pe_session, pBeaconStruct);
 
 	pe_debug("dot11mode: %d", ft_session->dot11mode);
 	ft_session->vhtCapability =
@@ -576,12 +614,13 @@ void lim_fill_ft_session(struct mac_context *mac,
 		(IS_DOT11_MODE_HT(ft_session->dot11mode)
 		 && pBeaconStruct->HTCaps.present);
 
-	/* Copy The channel Id to the session Table */
-	ft_session->limReassocChannelId = pbssDescription->channelId;
-	ft_session->currentOperChannel = pbssDescription->channelId;
+	/* Assign default configured nss value in the new session */
+	if (wlan_reg_is_5ghz_ch_freq(ft_session->curr_op_freq))
+		ft_session->vdev_nss = mac->vdev_type_nss_5g.sta;
+	else
+		ft_session->vdev_nss = mac->vdev_type_nss_2g.sta;
 
-	ft_session->limRFBand = lim_get_rf_band(
-				ft_session->currentOperChannel);
+	ft_session->nss = ft_session ->vdev_nss;
 
 	if (ft_session->limRFBand == BAND_2G) {
 		cbEnabledMode = mac->roam.configParam.channelBondingMode24GHz;
@@ -629,8 +668,8 @@ void lim_fill_ft_session(struct mac_context *mac,
 		ft_session->ch_center_freq_seg1 = 0;
 	}
 
-	sir_copy_mac_addr(ft_session->selfMacAddr,
-			  pe_session->selfMacAddr);
+	sir_copy_mac_addr(ft_session->self_mac_addr,
+			  pe_session->self_mac_addr);
 	sir_copy_mac_addr(ft_session->limReAssocbssId,
 			  pbssDescription->bssId);
 	sir_copy_mac_addr(ft_session->prev_ap_bssid, pe_session->bssId);
@@ -658,9 +697,9 @@ void lim_fill_ft_session(struct mac_context *mac,
 		ft_session->shortSlotTimeSupported = true;
 	}
 
-	regMax = lim_get_regulatory_max_transmit_power(mac,
-						       ft_session->
-						       currentOperChannel);
+	regMax = lim_get_regulatory_max_transmit_power(
+		mac, wlan_reg_freq_to_chan(mac->pdev,
+					   ft_session->curr_op_freq));
 	localPowerConstraint = regMax;
 	lim_extract_ap_capability(mac, (uint8_t *) pbssDescription->ieFields,
 		lim_get_ielen_from_bss_description(pbssDescription),
@@ -686,9 +725,7 @@ void lim_fill_ft_session(struct mac_context *mac,
 	tx_pwr_attr.reg_max = regMax;
 	tx_pwr_attr.ap_tx_power = localPowerConstraint;
 	tx_pwr_attr.ini_tx_power = mac->mlme_cfg->power.max_tx_power;
-	tx_pwr_attr.frequency =
-		wlan_reg_get_channel_freq(mac->pdev,
-					  ft_session->currentOperChannel);
+	tx_pwr_attr.frequency = ft_session->curr_op_freq;
 
 #ifdef FEATURE_WLAN_ESE
 	ft_session->maxTxPower = lim_get_max_tx_power(mac, &tx_pwr_attr);

@@ -222,8 +222,8 @@ static uint8_t sap_random_channel_sel(struct sap_context *sap_ctx)
 	ch_params->ch_width = ch_wd;
 	if (sap_ctx->acs_cfg) {
 		acs_info.acs_mode = sap_ctx->acs_cfg->acs_mode;
-		acs_info.start_ch = sap_ctx->acs_cfg->start_ch;
-		acs_info.end_ch = sap_ctx->acs_cfg->end_ch;
+		acs_info.channel_list = sap_ctx->acs_cfg->ch_list;
+		acs_info.num_of_channel = sap_ctx->acs_cfg->ch_list_count;
 	} else {
 		acs_info.acs_mode = false;
 	}
@@ -232,9 +232,15 @@ static uint8_t sap_random_channel_sel(struct sap_context *sap_ctx)
 		flag |= DFS_RANDOM_CH_FLAG_NO_DFS_CH;
 	if (mac_ctx->mlme_cfg->dfs_cfg.dfs_disable_japan_w53)
 		flag |= DFS_RANDOM_CH_FLAG_NO_JAPAN_W53_CH;
+	if (mac_ctx->sap.SapDfsInfo.sap_operating_chan_preferred_location
+	    == 1)
+		flag |= DFS_RANDOM_CH_FLAG_NO_UPEER_5G_CH;
+	else if (mac_ctx->sap.SapDfsInfo.
+		 sap_operating_chan_preferred_location == 2)
+		flag |= DFS_RANDOM_CH_FLAG_NO_LOWER_5G_CH;
 
-	if (QDF_IS_STATUS_ERROR(utils_dfs_get_random_channel(
-	    pdev, flag, ch_params, &hw_mode, &ch, &acs_info))) {
+	if (QDF_IS_STATUS_ERROR(utils_dfs_get_vdev_random_channel(
+	    pdev, sap_ctx->vdev, flag, ch_params, &hw_mode, &ch, &acs_info))) {
 		/* No available channel found */
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
 			  FL("No available channel found!!!"));
@@ -1887,6 +1893,44 @@ QDF_STATUS sap_signal_hdd_event(struct sap_context *sap_ctx,
 
 }
 
+bool sap_is_dfs_cac_wait_state(struct sap_context *sap_ctx)
+{
+	struct wlan_objmgr_vdev *vdev;
+	QDF_STATUS status;
+	struct mac_context *mac_ctx;
+	mac_handle_t mac_handle;
+
+	if (!sap_ctx) {
+		sap_err("Invalid sap context");
+		return false;
+	}
+
+	mac_handle = cds_get_context(QDF_MODULE_ID_SME);
+	if (!mac_handle) {
+		sap_err("invalid mac_handle");
+		return false;
+	}
+
+	mac_ctx = MAC_CONTEXT(mac_handle);
+	if (!mac_ctx) {
+		sap_err("Invalid MAC context");
+		return false;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
+						    sap_ctx->sessionId,
+						    WLAN_DFS_ID);
+	if (!vdev) {
+		sap_err("vdev is NULL for vdev_id: %u", sap_ctx->sessionId);
+		return false;
+	}
+
+	status = wlan_vdev_is_dfs_cac_wait(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_DFS_ID);
+
+	return QDF_IS_STATUS_SUCCESS(status);
+}
+
 /**
  * sap_find_cac_wait_session() - Get context of a SAP session in CAC wait state
  * @handle: Global MAC handle
@@ -2252,6 +2296,10 @@ static QDF_STATUS sap_goto_starting(struct sap_context *sap_ctx,
 		&sap_ctx->csr_roamProfile.operationChannel;
 	sap_ctx->csr_roamProfile.operationChannel =
 		(uint8_t)sap_ctx->channel;
+	sap_ctx->csr_roamProfile.op_freq =
+			wlan_reg_chan_to_freq(mac_ctx->pdev,
+					      (uint8_t)sap_ctx->channel);
+
 	sap_ctx->csr_roamProfile.ch_params.ch_width =
 				sap_ctx->ch_params.ch_width;
 	sap_ctx->csr_roamProfile.ch_params.center_freq_seg0 =
@@ -2578,7 +2626,10 @@ static QDF_STATUS sap_fsm_state_starting(struct sap_context *sap_ctx,
 			if ((false == sap_dfs_info->ignore_cac) &&
 			    (eSAP_DFS_DO_NOT_SKIP_CAC ==
 			    sap_dfs_info->cac_state) &&
-			    !sap_ctx->pre_cac_complete) {
+			    !sap_ctx->pre_cac_complete &&
+			    policy_mgr_get_dfs_master_dynamic_enabled(
+					mac_ctx->psoc,
+					sap_ctx->sessionId)) {
 				QDF_TRACE(QDF_MODULE_ID_SAP,
 					  QDF_TRACE_LEVEL_INFO_HIGH,
 					  FL("start cac timer"));

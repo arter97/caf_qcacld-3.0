@@ -48,6 +48,7 @@ struct mac_context;
 #include "wlan_policy_mgr_api.h"
 #include "wlan_tdls_public_structs.h"
 #include "qca_vendor.h"
+#include "wlan_cp_stats_mc_defs.h"
 
 #define OFFSET_OF(structType, fldName)   (&((structType *)0)->fldName)
 
@@ -76,10 +77,10 @@ typedef uint8_t tSirVersionString[SIR_VERSION_STRING_LEN];
 
 
 /* FW response timeout values in milli seconds */
-#define SIR_PEER_ASSOC_TIMEOUT (2000) /* 1 seconds */
-#define SIR_DELETE_STA_TIMEOUT (2000) /* 2 seconds */
+#define SIR_PEER_ASSOC_TIMEOUT (4000) /* 4 seconds */
+#define SIR_DELETE_STA_TIMEOUT (4000) /* 4 seconds */
 #define SIR_VDEV_START_REQUEST_TIMEOUT   (6000)
-#define SIR_VDEV_STOP_REQUEST_TIMEOUT    (2000)
+#define SIR_VDEV_STOP_REQUEST_TIMEOUT    (4000)
 #define SIR_VDEV_PLCY_MGR_TIMEOUT        (2000)
 
 /* This should not be greater than MAX_NUMBER_OF_CONC_CONNECTIONS */
@@ -376,7 +377,9 @@ struct sme_ready_req {
 	QDF_STATUS (*sme_msg_cb)(struct mac_context *mac,
 				 struct scheduler_msg *msg);
 	QDF_STATUS (*pe_disconnect_cb) (struct mac_context *mac,
-					uint8_t vdev_id);
+					uint8_t vdev_id,
+					uint8_t *deauth_disassoc_frame,
+					uint16_t deauth_disassoc_frame_len);
 };
 
 /**
@@ -657,9 +660,10 @@ struct bss_description {
 	int8_t sinr;
 	/* channelId what peer sent in beacon/probersp. */
 	uint8_t channelId;
+	uint32_t chan_freq;
 	/* channelId on which we are parked at. */
 	/* used only in scan case. */
-	uint8_t channelIdSelf;
+	uint32_t freq_self;
 	uint8_t sSirBssDescriptionRsvd[3];
 	/* Based on system time, not a relative time. */
 	uint64_t received_time;
@@ -677,7 +681,7 @@ struct bss_description {
 	/* whether it is from a probe rsp */
 	uint8_t fProbeRsp;
 	/* Actual channel the beacon/probe response was received on */
-	uint8_t rx_channel;
+	uint32_t rx_freq;
 	tSirMacSeqCtl seq_ctrl;
 	uint32_t WscIeLen;
 	uint8_t WscIeProbeRsp[WSCIE_PROBE_RSP_LEN];
@@ -884,7 +888,7 @@ struct join_req {
 	uint16_t length;
 	uint8_t sessionId;
 	tSirMacSSid ssId;
-	tSirMacAddr selfMacAddr;        /* self Mac address */
+	tSirMacAddr self_mac_addr;        /* self Mac address */
 	enum bss_type bsstype;    /* add new type for BT-AMP STA and AP Modules */
 	uint8_t dot11mode;      /* to support BT-AMP */
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
@@ -1154,7 +1158,7 @@ typedef enum eSirSmeStatusChangeCode {
 
 struct new_bss_info {
 	struct qdf_mac_addr bssId;
-	uint8_t channelNumber;
+	uint32_t freq;
 	uint8_t reserved;
 	tSirMacSSid ssId;
 };
@@ -1162,8 +1166,6 @@ struct new_bss_info {
 struct ap_new_caps {
 	uint16_t capabilityInfo;
 	struct qdf_mac_addr bssId;
-	uint8_t channelId;
-	uint8_t reserved[3];
 	tSirMacSSid ssId;
 };
 
@@ -1204,7 +1206,7 @@ struct wm_status_change_ntf {
 		uint16_t disassocReasonCode;
 		/* none for eSIR_SME_LOST_LINK_WITH_PEER */
 		/* eSIR_SME_CHANNEL_SWITCH */
-		uint8_t newChannelId;
+		uint32_t new_freq;
 		/* eSIR_SME_JOINED_NEW_BSS */
 		struct new_bss_info newBssInfo;
 		/* none for eSIR_SME_LEAVING_BSS */
@@ -1337,7 +1339,7 @@ struct switch_channel_ind {
 	uint16_t messageType;   /* eWNI_SME_SWITCH_CHL_IND */
 	uint16_t length;
 	uint8_t sessionId;
-	uint16_t newChannelId;
+	uint32_t freq;
 	struct ch_params chan_params;
 	struct qdf_mac_addr bssid;      /* BSSID */
 	QDF_STATUS status;
@@ -1381,58 +1383,6 @@ struct set_context_rsp {
 	struct qdf_mac_addr peer_macaddr;
 };
 
-/*******************PE Statistics*************************/
-
-/*
- * tpAniGetPEStatsReq is tied to
- * for SME ==> PE eWNI_SME_GET_STATISTICS_REQ msgId  and
- * for PE ==> HAL SIR_HAL_GET_STATISTICS_REQ msgId
- */
-typedef struct sAniGetPEStatsReq {
-	/* Common for all types are requests */
-	uint16_t msgType;       /* message type is same as the request type */
-	uint16_t msgLen;        /* length of the entire request */
-	uint32_t staId;         /* Per STA stats request must contain valid */
-	/* categories of stats requested. look at ePEStatsMask */
-	uint32_t statsMask;
-	uint8_t sessionId;
-} tAniGetPEStatsReq, *tpAniGetPEStatsReq;
-
-/*
- * tpAniGetPEStatsRsp is tied to
- * for PE ==> SME eWNI_SME_GET_STATISTICS_RSP msgId  and
- * for HAL ==> PE SIR_HAL_GET_STATISTICS_RSP msgId
- */
-typedef struct sAniGetPEStatsRsp {
-	/* Common for all types are responses */
-	uint16_t msgType;       /* message type is same as the request type */
-	/* length of the entire request, includes the pStatsBuf length too */
-	uint16_t msgLen;
-	uint8_t sessionId;
-	uint32_t rc;            /* success/failure */
-	uint32_t staId;         /* Per STA stats request must contain valid */
-	/* categories of stats requested. look at ePEStatsMask */
-	uint32_t statsMask;
-	/* void                  *pStatsBuf; */
-	/*
-	 * The Stats buffer starts here and can be an aggregate of more than one
-	 * statistics structure depending on statsMask. The void pointer
-	 * "pStatsBuf" is commented out intentionally and the src code that uses
-	 * this structure should take that into account.
-	 */
-} tAniGetPEStatsRsp, *tpAniGetPEStatsRsp;
-
-typedef struct sAniGetRssiReq {
-	/* Common for all types are requests */
-	uint16_t msgType;       /* message type is same as the request type */
-	uint16_t msgLen;        /* length of the entire request */
-	uint8_t sessionId;
-	uint8_t staId;
-	int8_t lastRSSI;        /* in case of error, return last RSSI */
-	void *rssiCallback;
-	void *pDevContext;      /* device context */
-} tAniGetRssiReq, *tpAniGetRssiReq;
-
 typedef struct sAniGetSnrReq {
 	/* Common for all types are requests */
 	uint16_t msgType;       /* message type is same as the request type */
@@ -1474,29 +1424,7 @@ typedef struct sAniTXFailMonitorInd {
 	void *txFailIndCallback;
 } tAniTXFailMonitorInd, *tpAniTXFailMonitorInd;
 
-#ifndef QCA_SUPPORT_CP_STATS
-/**
- * enum tx_rate_info - tx_rate flags
- * @TX_RATE_LEGACY: Legacy rates
- * @TX_RATE_HT20: HT20 rates
- * @TX_RATE_HT40: HT40 rates
- * @TX_RATE_SGI: Rate with Short guard interval
- * @TX_RATE_LGI: Rate with Long guard interval
- * @TX_RATE_VHT20: VHT 20 rates
- * @TX_RATE_VHT40: VHT 40 rates
- * @TX_RATE_VHT80: VHT 80 rates
- */
-enum tx_rate_info {
-	TX_RATE_LEGACY = 0x1,
-	TX_RATE_HT20 = 0x2,
-	TX_RATE_HT40 = 0x4,
-	TX_RATE_SGI = 0x8,
-	TX_RATE_LGI = 0x10,
-	TX_RATE_VHT20 = 0x20,
-	TX_RATE_VHT40 = 0x40,
-	TX_RATE_VHT80 = 0x80
-};
-#endif
+
 /**********************PE Statistics end*************************/
 
 typedef struct sSirP2PNoaAttr {
@@ -1891,6 +1819,18 @@ struct sir_create_session {
 	uint16_t msg_len;
 	uint8_t vdev_id;
 	struct qdf_mac_addr bss_id;
+};
+
+/**
+ * struct sir_delete_session - Used for deleting session in monitor mode
+ * @type: SME host message type.
+ * @msg_len: Length of the message.
+ * @vdev_id: vdev id.
+ */
+struct sir_delete_session {
+	uint16_t type;
+	uint16_t msg_len;
+	uint8_t vdev_id;
 };
 
 /* Beacon Interval */
@@ -2551,14 +2491,14 @@ typedef struct sSirScanOffloadEvent {
 
 /**
  * struct sSirUpdateChanParam - channel parameters
- * @chanId: ID of the channel
+ * @freq: Frequency of the channel
  * @pwr: power level
  * @dfsSet: is dfs supported or not
  * @half_rate: is the channel operating at 10MHz
  * @quarter_rate: is the channel operating at 5MHz
  */
 typedef struct sSirUpdateChanParam {
-	uint8_t chanId;
+	uint32_t freq;
 	uint8_t pwr;
 	bool dfsSet;
 	bool half_rate;
@@ -2570,6 +2510,7 @@ typedef struct sSirUpdateChan {
 	uint8_t ht_en;
 	uint8_t vht_en;
 	uint8_t vht_24_en;
+	bool he_en;
 	tSirUpdateChanParam chanParam[1];
 } tSirUpdateChanList, *tpSirUpdateChanList;
 
@@ -2589,46 +2530,6 @@ struct link_speed_info {
 	/* MAC Address for the peer */
 	struct qdf_mac_addr peer_macaddr;
 	uint32_t estLinkSpeed;  /* Linkspeed from firmware */
-};
-
-/**
- * struct sir_peer_info_req - peer info request struct
- * @peer_macaddr: MAC address
- * @sessionid: vdev id
- *
- * peer info request message's struct
- */
-struct sir_peer_info_req {
-	struct qdf_mac_addr peer_macaddr;
-	uint8_t sessionid;
-};
-
-/**
- * struct sir_peer_info - peer information struct
- * @peer_macaddr: MAC address
- * @rssi: rssi
- * @tx_rate: last tx rate
- * @rx_rate: last rx rate
- *
- * a station's information
- */
-struct sir_peer_info {
-	struct qdf_mac_addr peer_macaddr;
-	int8_t rssi;
-	uint32_t tx_rate;
-	uint32_t rx_rate;
-};
-
-/**
- * struct sir_peer_info_resp - all peers information struct
- * @count: peer's number
- * @info: peer information
- *
- * all station's information
- */
-struct sir_peer_info_resp {
-	uint8_t count;
-	struct sir_peer_info info[0];
 };
 
 /**
@@ -2692,17 +2593,6 @@ struct sir_peer_info_ext_resp {
 
 /**
  * @sta_num: number of peer station which has valid info
- * @info: peer information
- *
- * all SAP peer station's information retrieved
- */
-struct sir_peer_sta_info {
-	uint8_t sta_num;
-	struct sir_peer_info info[MAX_PEER_STA];
-};
-
-/**
- * @sta_num: number of peer station which has valid info
  * @info: peer extended information
  *
  * all SAP peer station's extended information retrieved
@@ -2710,6 +2600,20 @@ struct sir_peer_sta_info {
 struct sir_peer_sta_ext_info {
 	uint8_t sta_num;
 	struct sir_peer_info_ext info[MAX_PEER_STA];
+};
+
+/**
+ * struct sir_isolation_resp - isolation info related structure
+ * @isolation_chain0: isolation value for chain 0
+ * @isolation_chain1: isolation value for chain 1
+ * @isolation_chain2: isolation value for chain 2
+ * @isolation_chain3: isolation value for chain 3
+ */
+struct sir_isolation_resp {
+	uint32_t isolation_chain0:8,
+		 isolation_chain1:8,
+		 isolation_chain2:8,
+		 isolation_chain3:8;
 };
 
 typedef struct sSirAddPeriodicTxPtrn {
@@ -4710,93 +4614,6 @@ struct sir_apf_get_offload {
 	uint32_t max_apf_filters;
 	uint32_t max_bytes_for_apf_inst;
 };
-
-#ifndef QCA_SUPPORT_CP_STATS
-/**
- * struct sir_wake_lock_stats - wake lock stats structure
- * @wow_unspecified_wake_up_count: number of non-wow related wake ups
- * @wow_ucast_wake_up_count: Unicast wakeup count
- * @wow_bcast_wake_up_count: Broadcast wakeup count
- * @wow_ipv4_mcast_wake_up_count: ipv4 multicast wakeup count
- * @wow_ipv6_mcast_wake_up_count: ipv6 multicast wakeup count
- * @wow_ipv6_mcast_ra_stats: ipv6 multicast ra stats
- * @wow_ipv6_mcast_ns_stats: ipv6 multicast ns stats
- * @wow_ipv6_mcast_na_stats: ipv6 multicast na stats
- * @wow_icmpv4_count: ipv4 icmp packet count
- * @wow_icmpv6_count: ipv6 icmp packet count
- * @wow_rssi_breach_wake_up_count: rssi breach wakeup count
- * @wow_low_rssi_wake_up_count: low rssi wakeup count
- * @wow_gscan_wake_up_count: gscan wakeup count
- * @wow_pno_complete_wake_up_count: pno complete wakeup count
- * @wow_pno_match_wake_up_count: pno match wakeup count
- * @wow_oem_response_wake_up_count: oem response wakeup count
- * @pwr_save_fail_detected: pwr save fail detected wakeup count
- */
-struct sir_wake_lock_stats {
-	uint32_t wow_unspecified_wake_up_count;
-	uint32_t wow_ucast_wake_up_count;
-	uint32_t wow_bcast_wake_up_count;
-	uint32_t wow_ipv4_mcast_wake_up_count;
-	uint32_t wow_ipv6_mcast_wake_up_count;
-	uint32_t wow_ipv6_mcast_ra_stats;
-	uint32_t wow_ipv6_mcast_ns_stats;
-	uint32_t wow_ipv6_mcast_na_stats;
-	uint32_t wow_icmpv4_count;
-	uint32_t wow_icmpv6_count;
-	uint32_t wow_rssi_breach_wake_up_count;
-	uint32_t wow_low_rssi_wake_up_count;
-	uint32_t wow_gscan_wake_up_count;
-	uint32_t wow_pno_complete_wake_up_count;
-	uint32_t wow_pno_match_wake_up_count;
-	uint32_t wow_oem_response_wake_up_count;
-	uint32_t pwr_save_fail_detected;
-};
-
-/**
- * struct sir_vdev_wow_stats - container for per vdev wow related stat counters
- * @ucast: Unicast wakeup count
- * @bcast: Broadcast wakeup count
- * @ipv4_mcast: ipv4 multicast wakeup count
- * @ipv6_mcast: ipv6 multicast wakeup count
- * @ipv6_mcast_ra: ipv6 multicast ra stats
- * @ipv6_mcast_ns: ipv6 multicast ns stats
- * @ipv6_mcast_na: ipv6 multicast na stats
- * @icmpv4: ipv4 icmp packet count
- * @icmpv6: ipv6 icmp packet count
- * @rssi_breach: rssi breach wakeup count
- * @low_rssi: low rssi wakeup count
- * @gscan: gscan wakeup count
- * @pno_complete: pno complete wakeup count
- * @pno_match: pno match wakeup count
- * @oem_response: oem response wakeup count
- * @scan_11d: 11d scan wakeup count
- * @motion_detect: motion detection wakeup count
- * @motion_detect_bl: motion detection baselining wakeup count
- */
-struct sir_vdev_wow_stats {
-	uint32_t ucast;
-	uint32_t bcast;
-	uint32_t ipv4_mcast;
-	uint32_t ipv6_mcast;
-	uint32_t ipv6_mcast_ra;
-	uint32_t ipv6_mcast_ns;
-	uint32_t ipv6_mcast_na;
-	uint32_t icmpv4;
-	uint32_t icmpv6;
-	uint32_t rssi_breach;
-	uint32_t low_rssi;
-	uint32_t gscan;
-	uint32_t pno_complete;
-	uint32_t pno_match;
-	uint32_t oem_response;
-	uint32_t pwr_save_fail_detected;
-	uint32_t scan_11d;
-#ifdef WLAN_FEATURE_MOTION_DETECTION
-	uint32_t motion_detect;
-	uint32_t motion_detect_bl;
-#endif /* WLAN_FEATURE_MOTION_DETECTION */
-};
-#endif
 
 #ifdef WLAN_FEATURE_NAN
 #define IFACE_NAME_SIZE 64

@@ -387,11 +387,14 @@ void wlan_hdd_rso_cmd_status_cb(hdd_handle_t hdd_handle,
  * interface that BSS might have been lost.
  * @adapter: adapter
  * @bssid: bssid which might have been lost
+ * @ssid: SSID
+ * @ssid_len: length of the SSID
  *
  * Return: void
  */
 void wlan_hdd_cfg80211_unlink_bss(struct hdd_adapter *adapter,
-				  tSirMacAddr bssid);
+				  tSirMacAddr bssid, uint8_t *ssid,
+				  uint8_t ssid_len);
 
 void wlan_hdd_cfg80211_acs_ch_select_evt(struct hdd_adapter *adapter);
 
@@ -445,20 +448,26 @@ int wlan_hdd_try_disconnect(struct hdd_adapter *adapter);
 
 #if defined(CFG80211_DISCONNECTED_V2) || \
 (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 2, 0))
-static inline void wlan_hdd_cfg80211_indicate_disconnect(struct net_device *dev,
-							bool locally_generated,
-							int reason)
+static inline void
+wlan_hdd_cfg80211_indicate_disconnect(struct net_device *dev,
+				      bool locally_generated,
+				      int reason,
+				      uint8_t *disconnect_ies,
+				      uint16_t disconnect_ies_len)
 {
-	cfg80211_disconnected(dev, reason, NULL, 0,
-				locally_generated, GFP_KERNEL);
+	cfg80211_disconnected(dev, reason, disconnect_ies, disconnect_ies_len,
+			      locally_generated, GFP_KERNEL);
 }
 #else
-static inline void wlan_hdd_cfg80211_indicate_disconnect(struct net_device *dev,
-							bool locally_generated,
-							int reason)
+static inline void
+wlan_hdd_cfg80211_indicate_disconnect(struct net_device *dev,
+				      bool locally_generated,
+				      int reason,
+				      uint8_t *disconnect_ies,
+				      uint16_t disconnect_ies_len)
 {
-	cfg80211_disconnected(dev, reason, NULL, 0,
-				GFP_KERNEL);
+	cfg80211_disconnected(dev, reason, disconnect_ies, disconnect_ies_len,
+			      GFP_KERNEL);
 }
 #endif
 
@@ -545,17 +554,6 @@ int wlan_hdd_try_disconnect(struct hdd_adapter *adapter);
  * Return: 0 for success, non-zero for failure
  */
 int wlan_hdd_disconnect(struct hdd_adapter *adapter, u16 reason);
-
-/**
- * hdd_update_cca_info_cb() - stores congestion value in station context
- * @hdd_handle: HDD handle
- * @congestion: congestion
- * @vdev_id: vdev id
- *
- * Return: None
- */
-void hdd_update_cca_info_cb(hdd_handle_t hdd_handle, uint32_t congestion,
-			    uint32_t vdev_id);
 
 /**
  * wlan_hdd_get_adjacent_chan(): Gets next/previous channel

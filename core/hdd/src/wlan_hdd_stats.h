@@ -399,20 +399,6 @@ int wlan_hdd_get_linkspeed_for_peermac(struct hdd_adapter *adapter,
 int wlan_hdd_get_link_speed(struct hdd_adapter *adapter, uint32_t *link_speed);
 
 /**
- * wlan_hdd_get_peer_rssi() - get station's rssi
- * @adapter: hostapd interface
- * @macaddress: peer sta mac address or ff:ff:ff:ff:ff:ff to query all peer
- * @peer_sta_info: output pointer which will fill by peer sta info
- *
- * This function will call sme_get_peer_info to get rssi
- *
- * Return: 0 on success, otherwise error value
- */
-int wlan_hdd_get_peer_rssi(struct hdd_adapter *adapter,
-			   struct qdf_mac_addr *macaddress,
-			   struct sir_peer_sta_info *peer_sta_info);
-
-/**
  * wlan_hdd_get_peer_info() - get peer info
  * @adapter: hostapd interface
  * @macaddress: request peer mac address
@@ -425,17 +411,6 @@ int wlan_hdd_get_peer_rssi(struct hdd_adapter *adapter,
 int wlan_hdd_get_peer_info(struct hdd_adapter *adapter,
 			   struct qdf_mac_addr macaddress,
 			   struct sir_peer_info_ext *peer_info_ext);
-
-#ifndef QCA_SUPPORT_CP_STATS
-/**
- * wlan_hdd_get_class_astats() - Get Class A statistics
- * @adapter: adapter for which statistics are desired
- *
- * Return: QDF_STATUS_SUCCESS if adapter's Class A statistics were updated
- */
-QDF_STATUS wlan_hdd_get_class_astats(struct hdd_adapter *adapter);
-#endif
-
 /**
  * wlan_hdd_get_station_stats() - Get station statistics
  * @adapter: adapter for which statistics are desired

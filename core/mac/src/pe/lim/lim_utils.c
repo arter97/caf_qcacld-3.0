@@ -2187,7 +2187,9 @@ void lim_switch_channel_cback(struct mac_context *mac, QDF_STATUS status,
 	struct scheduler_msg mmhMsg = { 0 };
 	struct switch_channel_ind *pSirSmeSwitchChInd;
 
-	pe_session->currentOperChannel = pe_session->currentReqChannel;
+	pe_session->curr_op_freq = pe_session->curr_req_chan_freq;
+	pe_session->currentOperChannel = wlan_reg_freq_to_chan(
+				mac->pdev, pe_session->curr_op_freq);
 
 	/* We need to restore pre-channelSwitch state on the STA */
 	if (lim_restore_pre_channel_switch_state(mac, pe_session) !=
@@ -2203,8 +2205,10 @@ void lim_switch_channel_cback(struct mac_context *mac, QDF_STATUS status,
 
 	pSirSmeSwitchChInd->messageType = eWNI_SME_SWITCH_CHL_IND;
 	pSirSmeSwitchChInd->length = sizeof(*pSirSmeSwitchChInd);
-	pSirSmeSwitchChInd->newChannelId =
-		pe_session->gLimChannelSwitch.primaryChannel;
+	pSirSmeSwitchChInd->freq =
+		wlan_reg_chan_to_freq(mac->pdev,
+				      pe_session->
+				      gLimChannelSwitch.primaryChannel);
 	pSirSmeSwitchChInd->sessionId = pe_session->smeSessionId;
 	pSirSmeSwitchChInd->chan_params.ch_width =
 			pe_session->gLimChannelSwitch.ch_width;
@@ -2217,9 +2221,9 @@ void lim_switch_channel_cback(struct mac_context *mac, QDF_STATUS status,
 
 	pSirSmeSwitchChInd->status = status;
 	pe_debug(
-		"session: %d chan: %d width: %d sec offset: %d seg0: %d seg1: %d status %d",
+		"session: %d freq: %d width: %d sec offset: %d seg0: %d seg1: %d status %d",
 		pSirSmeSwitchChInd->sessionId,
-		pSirSmeSwitchChInd->newChannelId,
+		pSirSmeSwitchChInd->freq,
 		pSirSmeSwitchChInd->chan_params.ch_width,
 		pSirSmeSwitchChInd->chan_params.sec_ch_offset,
 		pSirSmeSwitchChInd->chan_params.center_freq_seg0,
@@ -2249,24 +2253,25 @@ void lim_switch_channel_cback(struct mac_context *mac, QDF_STATUS status,
  *
  ***NOTE:
  * @param  mac        Pointer to Global MAC structure
- * @param  newChannel  new chnannel ID
+ * @param  new_channel  new chnannel ID
  * @return NONE
  */
-void lim_switch_primary_channel(struct mac_context *mac, uint8_t newChannel,
+void lim_switch_primary_channel(struct mac_context *mac, uint8_t new_channel,
 				struct pe_session *pe_session)
 {
 	pe_debug("old chnl: %d --> new chnl: %d",
-		       pe_session->currentOperChannel, newChannel);
+		       pe_session->currentOperChannel, new_channel);
 
-	pe_session->currentReqChannel = newChannel;
-	pe_session->limRFBand = lim_get_rf_band(newChannel);
+	pe_session->curr_req_chan_freq = wlan_reg_chan_to_freq(mac->pdev,
+							       new_channel);
+	pe_session->limRFBand = lim_get_rf_band(new_channel);
 
 	pe_session->channelChangeReasonCode = LIM_SWITCH_CHANNEL_OPERATION;
 
 	mac->lim.gpchangeChannelCallback = lim_switch_channel_cback;
 	mac->lim.gpchangeChannelData = NULL;
 
-	lim_send_switch_chnl_params(mac, newChannel, 0, 0, CH_WIDTH_20MHZ,
+	lim_send_switch_chnl_params(mac, new_channel, 0, 0, CH_WIDTH_20MHZ,
 				    pe_session->maxTxPower,
 				    pe_session->peSessionId, false, 0, 0);
 	return;
@@ -2284,7 +2289,7 @@ void lim_switch_primary_channel(struct mac_context *mac, uint8_t newChannel,
  *
  ***NOTE:
  * @param  mac        Pointer to Global MAC structure
- * @param  newChannel  New chnannel ID (or current channel ID)
+ * @param  new_channel  New chnannel ID (or current channel ID)
  * @param  subband     CB secondary info:
  *                       - eANI_CB_SECONDARY_NONE
  *                       - eANI_CB_SECONDARY_UP
@@ -2293,30 +2298,34 @@ void lim_switch_primary_channel(struct mac_context *mac, uint8_t newChannel,
  */
 void lim_switch_primary_secondary_channel(struct mac_context *mac,
 					struct pe_session *pe_session,
-					uint8_t newChannel,
+					uint8_t new_channel,
 					uint8_t ch_center_freq_seg0,
 					uint8_t ch_center_freq_seg1,
 					enum phy_ch_width ch_width)
 {
 
 	/* Assign the callback to resume TX once channel is changed. */
-	pe_session->currentReqChannel = newChannel;
-	pe_session->limRFBand = lim_get_rf_band(newChannel);
+	pe_session->curr_req_chan_freq = wlan_reg_chan_to_freq(mac->pdev,
+							       new_channel);
+	pe_session->limRFBand = lim_get_rf_band(new_channel);
 	pe_session->channelChangeReasonCode = LIM_SWITCH_CHANNEL_OPERATION;
 	mac->lim.gpchangeChannelCallback = lim_switch_channel_cback;
 	mac->lim.gpchangeChannelData = NULL;
 
-	lim_send_switch_chnl_params(mac, newChannel, ch_center_freq_seg0,
+	lim_send_switch_chnl_params(mac, new_channel, ch_center_freq_seg0,
 					ch_center_freq_seg1, ch_width,
 					pe_session->maxTxPower,
 					pe_session->peSessionId,
 					false, 0, 0);
 
 	/* Store the new primary and secondary channel in session entries if different */
-	if (pe_session->currentOperChannel != newChannel) {
+	if (pe_session->currentOperChannel != new_channel) {
 		pe_warn("switch old chnl: %d --> new chnl: %d",
-			pe_session->currentOperChannel, newChannel);
-		pe_session->currentOperChannel = newChannel;
+			pe_session->currentOperChannel, new_channel);
+		pe_session->curr_op_freq = wlan_reg_chan_to_freq(
+					mac->pdev, new_channel);
+		pe_session->currentOperChannel = wlan_reg_freq_to_chan(
+					mac->pdev, pe_session->curr_op_freq);
 	}
 	if (pe_session->htSecondaryChannelOffset !=
 			pe_session->gLimChannelSwitch.sec_ch_offset) {
@@ -4927,7 +4936,7 @@ static void lim_diag_fill_mgmt_event_report(struct mac_context *mac_ctx,
 	qdf_mem_zero(mgmt_event, sizeof(*mgmt_event));
 	mgmt_event->mgmt_type = mac_hdr->fc.type;
 	mgmt_event->mgmt_subtype = mac_hdr->fc.subType;
-	qdf_mem_copy(mgmt_event->self_mac_addr, session->selfMacAddr,
+	qdf_mem_copy(mgmt_event->self_mac_addr, session->self_mac_addr,
 		     QDF_MAC_ADDR_SIZE);
 	qdf_mem_copy(mgmt_event->bssid, session->bssId,
 		     QDF_MAC_ADDR_SIZE);
@@ -5492,7 +5501,7 @@ bool lim_validate_received_frame_a1_addr(struct mac_context *mac_ctx,
 		/* just for fail safe, don't handle MC/BC a1 in this routine */
 		return true;
 	}
-	if (qdf_mem_cmp(a1, session->selfMacAddr, 6)) {
+	if (qdf_mem_cmp(a1, session->self_mac_addr, 6)) {
 		pe_err("Invalid A1 address in received frame");
 		return false;
 	}
@@ -7504,8 +7513,8 @@ struct csr_roam_session *lim_get_session_by_macaddr(struct mac_context *mac_ctx,
 		session = CSR_GET_SESSION(mac_ctx, i);
 		if (!session)
 			continue;
-		else if (!qdf_mem_cmp(&session->selfMacAddr,
-			 self_mac, sizeof(tSirMacAddr))) {
+		else if (!qdf_mem_cmp(&session->self_mac_addr,
+				      self_mac, sizeof(tSirMacAddr))) {
 
 			QDF_TRACE(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_INFO,
 				  FL("session %d exists with mac address "
@@ -7835,6 +7844,15 @@ QDF_STATUS lim_sta_mlme_vdev_restart_send(struct vdev_mlme_obj *vdev_mlme,
 		case LIM_SWITCH_CHANNEL_HT_WIDTH:
 			lim_ht_switch_chnl_params(session);
 			break;
+		case LIM_SWITCH_CHANNEL_REASSOC:
+			lim_set_channel(session->mac_ctx,
+					session->limReassocChannelId,
+					session->ch_center_freq_seg0,
+					session->ch_center_freq_seg1,
+					session->ch_width,
+					session->maxTxPower,
+					session->peSessionId, 0, 0);
+			break;
 		default:
 			break;
 		}
@@ -8084,6 +8102,35 @@ QDF_STATUS lim_ap_mlme_vdev_start_req_failed(struct vdev_mlme_obj *vdev_mlme,
 	}
 
 	lim_process_mlm_start_cnf(mac_ctx, data);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS lim_mon_mlme_vdev_start_send(struct vdev_mlme_obj *vdev_mlme,
+					uint16_t data_len, void *data)
+{
+	struct mac_context *mac_ctx;
+	struct pe_session *session = (struct pe_session *)data;
+
+	if (!data) {
+		pe_err("data is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	mac_ctx = session->mac_ctx;
+	if (!mac_ctx) {
+		pe_err("mac_ctx is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	lim_set_channel(mac_ctx, session->currentOperChannel,
+			session->ch_center_freq_seg0,
+			session->ch_center_freq_seg1,
+			session->ch_width,
+			session->maxTxPower,
+			session->peSessionId,
+			session->cac_duration_ms,
+			session->dfs_regdomain);
 
 	return QDF_STATUS_SUCCESS;
 }

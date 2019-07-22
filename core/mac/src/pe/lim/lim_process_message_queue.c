@@ -118,6 +118,7 @@ static void lim_process_sae_msg_ap(struct mac_context *mac,
 {
 	struct tLimPreAuthNode *sta_pre_auth_ctx;
 	struct lim_assoc_data *assoc_req;
+	bool assoc_ind_sent;
 
 	/* Extract pre-auth context for the STA and move limMlmState
 	 * of preauth node to eLIM_MLM_AUTHENTICATED_STATE
@@ -161,14 +162,16 @@ static void lim_process_sae_msg_ap(struct mac_context *mac,
 
 		assoc_req->present = false;
 		pe_debug("Assoc req cached; handle it");
-		if (lim_send_assoc_ind_to_sme(mac, session,
-					      assoc_req->sub_type,
-					      &assoc_req->hdr,
-					      assoc_req->assoc_req,
-					      ANI_AKM_TYPE_SAE,
-					      assoc_req->pmf_connection,
-					      &assoc_req_copied,
-					      assoc_req->dup_entry) == false)
+		assoc_ind_sent =
+			lim_send_assoc_ind_to_sme(mac, session,
+						  assoc_req->sub_type,
+						  &assoc_req->hdr,
+						  assoc_req->assoc_req,
+						  ANI_AKM_TYPE_SAE,
+						  assoc_req->pmf_connection,
+						  &assoc_req_copied,
+						  assoc_req->dup_entry, false);
+		if (!assoc_ind_sent)
 			lim_process_assoc_cleanup(mac, session,
 						  assoc_req->assoc_req,
 						  assoc_req->sta_ds,
@@ -1719,7 +1722,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 	case eWNI_SME_FT_PRE_AUTH_REQ:
 	case eWNI_SME_FT_AGGR_QOS_REQ:
 	case eWNI_SME_REGISTER_MGMT_FRAME_REQ:
-	case eWNI_SME_GET_STATISTICS_REQ:
 #ifdef FEATURE_WLAN_ESE
 	case eWNI_SME_GET_TSM_STATS_REQ:
 #endif  /* FEATURE_WLAN_ESE */
@@ -1743,6 +1745,11 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 		break;
 	case eWNI_SME_MON_INIT_SESSION:
 		lim_mon_init_session(mac_ctx, msg->bodyptr);
+		qdf_mem_free(msg->bodyptr);
+		msg->bodyptr = NULL;
+		break;
+	case eWNI_SME_MON_DEINIT_SESSION:
+		lim_mon_deinit_session(mac_ctx, msg->bodyptr);
 		qdf_mem_free(msg->bodyptr);
 		msg->bodyptr = NULL;
 		break;
@@ -1872,10 +1879,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 	case WMA_SET_STAKEY_RSP:
 		lim_process_mlm_set_sta_key_rsp(mac_ctx, msg);
 		break;
-	case WMA_GET_STATISTICS_RSP:
-		lim_send_sme_pe_statistics_rsp(mac_ctx, msg->type,
-					     (void *)msg->bodyptr);
-		break;
 	case WMA_SET_MIMOPS_RSP:
 	case WMA_SET_TX_POWER_RSP:
 		qdf_mem_free((void *)msg->bodyptr);
@@ -1964,8 +1967,10 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 			 *    restart, in such a case, beacon params will be
 			 *    reset and thus will not contain Q2Q IE, by default
 			 */
-			if (wlan_reg_get_channel_state(mac_ctx->pdev,
-					session_entry->currentOperChannel)
+			if (wlan_reg_get_channel_state(
+				mac_ctx->pdev,
+				wlan_reg_freq_to_chan(
+				mac_ctx->pdev, session_entry->curr_op_freq))
 					!= CHANNEL_STATE_DFS) {
 				beacon_params.bss_idx = session_entry->bss_idx;
 				beacon_params.beaconInterval =

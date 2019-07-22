@@ -83,9 +83,10 @@ void lim_stop_tx_and_switch_channel(struct mac_context *mac, uint8_t sessionId)
 		       pe_session->gLimChannelSwitch.switchMode);
 
 	mac->lim.limTimers.gLimChannelSwitchTimer.sessionId = sessionId;
-	status = policy_mgr_check_and_set_hw_mode_sta_channel_switch(mac->psoc,
+	status = policy_mgr_check_and_set_hw_mode_for_channel_switch(mac->psoc,
 				pe_session->smeSessionId,
-				pe_session->gLimChannelSwitch.primaryChannel);
+				pe_session->gLimChannelSwitch.primaryChannel,
+				POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH_STA);
 
 	/*
 	 * If status is QDF_STATUS_E_FAILURE, mean HW mode change was required
@@ -332,6 +333,7 @@ lim_process_ext_channel_switch_action_frame(struct mac_context *mac_ctx,
 	uint32_t                frame_len;
 	uint32_t                status;
 	uint8_t                 target_channel;
+	uint32_t                target_freq;
 
 	hdr = WMA_GET_RX_MAC_HEADER(rx_packet_info);
 	body = WMA_GET_RX_MPDU_DATA(rx_packet_info);
@@ -360,7 +362,7 @@ lim_process_ext_channel_switch_action_frame(struct mac_context *mac_ctx,
 
 	target_channel =
 	 ext_channel_switch_frame->ext_chan_switch_ann_action.new_channel;
-
+	target_freq = wlan_reg_chan_to_freq(mac_ctx->pdev, target_channel);
 	/* Free ext_channel_switch_frame here as its no longer needed */
 	qdf_mem_free(ext_channel_switch_frame);
 	/*
@@ -368,13 +370,13 @@ lim_process_ext_channel_switch_action_frame(struct mac_context *mac_ctx,
 	 * channel and if is valid in the current regulatory domain,
 	 * and no concurrent session is running.
 	 */
-	if (!((session_entry->currentOperChannel != target_channel) &&
-		((wlan_reg_get_channel_state(mac_ctx->pdev, target_channel) ==
+	if (!(session_entry->curr_op_freq != target_freq &&
+	      ((wlan_reg_get_channel_state(mac_ctx->pdev, target_channel) ==
 		  CHANNEL_STATE_ENABLE) ||
-		 (wlan_reg_get_channel_state(mac_ctx->pdev, target_channel) ==
+	       (wlan_reg_get_channel_state(mac_ctx->pdev, target_channel) ==
 		  CHANNEL_STATE_DFS &&
-		  !policy_mgr_concurrent_open_sessions_running(
-			  mac_ctx->psoc))))) {
+		!policy_mgr_concurrent_open_sessions_running(
+			mac_ctx->psoc))))) {
 		pe_err("Channel: %d is not valid", target_channel);
 		return;
 	}
@@ -468,7 +470,7 @@ static void __lim_process_operating_mode_action_frame(struct mac_context *mac_ct
 		goto end;
 	}
 
-	if (CHAN_ENUM_14 >= session->currentOperChannel)
+	if (wlan_reg_is_24ghz_ch_freq(session->curr_op_freq))
 		cb_mode = mac_ctx->roam.configParam.channelBondingMode24GHz;
 	else
 		cb_mode = mac_ctx->roam.configParam.channelBondingMode5GHz;
@@ -1926,11 +1928,11 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 		pe_debug("WNM Action category: %d action: %d",
 			action_hdr->category, action_hdr->actionID);
 		switch (action_hdr->actionID) {
-		case SIR_MAC_WNM_BSS_TM_QUERY:
-		case SIR_MAC_WNM_BSS_TM_REQUEST:
-		case SIR_MAC_WNM_BSS_TM_RESPONSE:
-		case SIR_MAC_WNM_NOTIF_REQUEST:
-		case SIR_MAC_WNM_NOTIF_RESPONSE:
+		case WNM_BSS_TM_QUERY:
+		case WNM_BSS_TM_REQUEST:
+		case WNM_BSS_TM_RESPONSE:
+		case WNM_NOTIF_REQUEST:
+		case WNM_NOTIF_RESPONSE:
 			rssi = WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info);
 			mac_hdr = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
 			/* Forward to the SME to HDD to wpa_supplicant */
@@ -2009,7 +2011,7 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 
 		/* Check if it is a vendor specific action frame. */
 		if (LIM_IS_STA_ROLE(session) &&
-		    (!qdf_mem_cmp(session->selfMacAddr,
+		    (!qdf_mem_cmp(session->self_mac_addr,
 					&mac_hdr->da[0], sizeof(tSirMacAddr)))
 		    && IS_WES_MODE_ENABLED(mac_ctx)
 		    && !qdf_mem_cmp(vendor_specific->Oui, oui, 3)) {
@@ -2103,14 +2105,14 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 		pe_debug("SA Query Action category: %d action: %d",
 			action_hdr->category, action_hdr->actionID);
 		switch (action_hdr->actionID) {
-		case SIR_MAC_SA_QUERY_REQ:
+		case SA_QUERY_REQUEST:
 			/**11w SA query request action frame received**/
 			/* Respond directly to the incoming request in LIM */
 			__lim_process_sa_query_request_action_frame(mac_ctx,
 						(uint8_t *)rx_pkt_info,
 						session);
 			break;
-		case SIR_MAC_SA_QUERY_RSP:
+		case SA_QUERY_RESPONSE:
 			/**11w SA query response action frame received**/
 			/* Handle based on the current SA Query state */
 			__lim_process_sa_query_response_action_frame(mac_ctx,
@@ -2181,7 +2183,7 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 		break;
 	case ACTION_CATEGORY_BACK:
 		pe_debug("Rcvd Block Ack for %pM; action: %d",
-			session->selfMacAddr, action_hdr->actionID);
+			session->self_mac_addr, action_hdr->actionID);
 		switch (action_hdr->actionID) {
 		case ADDBA_REQUEST:
 			lim_process_addba_req(mac_ctx, rx_pkt_info, session);

@@ -2020,13 +2020,21 @@ static int __wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
 {
 	struct hdd_context *hdd_ctx = (struct hdd_context *) wiphy_priv(wiphy);
 	mac_handle_t mac_handle;
+	struct hdd_adapter *adapter;
 	struct qdf_mac_addr bssid = QDF_MAC_ADDR_BCAST_INIT;
-	struct qdf_mac_addr selfMac = QDF_MAC_ADDR_BCAST_INIT;
+	struct qdf_mac_addr selfmac;
 	QDF_STATUS status;
 	int errno;
 	int dbm;
 
 	hdd_enter();
+
+	if (!wdev) {
+		hdd_err("wdev is null, set tx power failed");
+		return -EIO;
+	}
+
+	adapter = WLAN_HDD_GET_PRIV_PTR(wdev->netdev);
 
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
 		hdd_err("Command not allowed in FTM mode");
@@ -2040,6 +2048,23 @@ static int __wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
 	errno = wlan_hdd_validate_context(hdd_ctx);
 	if (errno)
 		return errno;
+
+	if (wlan_hdd_validate_vdev_id(adapter->vdev_id))
+		return -EINVAL;
+
+	if (adapter->device_mode == QDF_SAP_MODE ||
+	    adapter->device_mode == QDF_P2P_GO_MODE) {
+		qdf_copy_macaddr(&bssid, &adapter->mac_addr);
+	} else {
+		struct hdd_station_ctx *sta_ctx =
+			WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+
+		if (eConnectionState_Associated ==
+		    sta_ctx->conn_info.conn_state)
+			qdf_copy_macaddr(&bssid, &sta_ctx->conn_info.bssid);
+	}
+
+	qdf_copy_macaddr(&selfmac, &adapter->mac_addr);
 
 	mac_handle = hdd_ctx->mac_handle;
 
@@ -2068,7 +2093,7 @@ static int __wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
 	/* Fall through */
 	case NL80211_TX_POWER_LIMITED:
 	/* Limit TX power by the mBm parameter */
-		status = sme_set_max_tx_power(mac_handle, bssid, selfMac, dbm);
+		status = sme_set_max_tx_power(mac_handle, bssid, selfmac, dbm);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			hdd_err("Setting maximum tx power failed, %d", status);
 			return -EIO;
@@ -2107,18 +2132,11 @@ int wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
 	return errno;
 }
 
-#ifdef QCA_SUPPORT_CP_STATS
 static void wlan_hdd_get_tx_power(struct hdd_adapter *adapter, int *dbm)
 {
 	wlan_cfg80211_mc_cp_stats_get_tx_power(adapter->vdev, dbm);
 }
-#else
-static void wlan_hdd_get_tx_power(struct hdd_adapter *adapter, int *dbm)
-{
-	wlan_hdd_get_class_astats(adapter);
-	*dbm = adapter->hdd_stats.class_a_stat.max_pwr;
-}
-#endif
+
 /**
  * __wlan_hdd_cfg80211_get_txpower() - get TX power
  * @wiphy: Pointer to wiphy
@@ -2136,7 +2154,6 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 	struct net_device *ndev = wdev->netdev;
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(ndev);
 	int status;
-	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 
 	hdd_enter_dev(ndev);
 
@@ -2156,20 +2173,27 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 	if (status)
 		return status;
 
-	if (sta_ctx->hdd_reassoc_scenario) {
-		hdd_debug("Roaming is in progress, rej this req");
-		return -EINVAL;
+	if (adapter->device_mode == QDF_STA_MODE ||
+	    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
+		struct hdd_station_ctx *sta_ctx;
+
+		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+		if (sta_ctx->hdd_reassoc_scenario) {
+			hdd_debug("Roaming is in progress, rej this req");
+			return -EINVAL;
+		}
+
+		if (sta_ctx->conn_info.conn_state !=
+		    eConnectionState_Associated) {
+			hdd_debug("Not associated");
+			return 0;
+		}
 	}
 
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
 		hdd_debug("Driver Module not enabled return success");
 		/* Send cached data to upperlayer*/
 		*dbm = adapter->hdd_stats.class_a_stat.max_pwr;
-		return 0;
-	}
-
-	if (sta_ctx->conn_info.conn_state != eConnectionState_Associated) {
-		hdd_debug("Not associated");
 		return 0;
 	}
 

@@ -87,7 +87,7 @@ struct reassoc_params {
 #define TIME_BEACON_NOT_UPDATED 30000
 #define BSS_COLOR_SWITCH_COUNTDOWN 5
 #define OBSS_COLOR_COLLISION_DETECTION_STA_PERIOD_MS 10000
-#define OBSS_COLOR_COLLISION_DETECTION_AP_PERIOD_MS 5000
+#define OBSS_COLOR_COLLISION_DETECTION_AP_PERIOD_MS 60000
 #define OBSS_COLOR_COLLISION_SCAN_PERIOD_MS 200
 #define OBSS_COLOR_COLLISION_FREE_SLOT_EXPIRY_MS 50000
 struct bss_color_info {
@@ -144,10 +144,10 @@ struct pe_session {
 	};
 	struct wlan_objmgr_vdev *vdev;
 
-	/* In AP role: BSSID and selfMacAddr will be the same. */
+	/* In AP role: BSSID and self_mac_addr will be the same. */
 	/* In STA role: they will be different */
 	tSirMacAddr bssId;
-	tSirMacAddr selfMacAddr;
+	tSirMacAddr self_mac_addr;
 	tSirMacSSid ssId;
 	uint8_t bss_idx;
 	uint8_t valid;
@@ -160,7 +160,7 @@ struct pe_session {
 	uint8_t operMode;       /* AP - 0; STA - 1 ; */
 	tSirNwType nwType;
 	struct start_bss_req *pLimStartBssReq; /* handle to start bss req */
-	struct join_req *pLimJoinReq;    /* handle to sme join req */
+	struct join_req *lim_join_req;    /* handle to sme join req */
 	struct join_req *pLimReAssocReq; /* handle to sme reassoc req */
 	tpLimMlmJoinReq pLimMlmJoinReq; /* handle to MLM join Req */
 	void *pLimMlmReassocRetryReq;   /* keep reasoc req for retry */
@@ -217,8 +217,9 @@ struct pe_session {
 	tSirMacRateSet rateSet;
 	tSirMacRateSet extRateSet;
 	tSirMacHTOperatingMode htOperMode;
+	uint32_t curr_op_freq;
 	uint8_t currentOperChannel;
-	uint8_t currentReqChannel;
+	uint32_t curr_req_chan_freq;
 	uint8_t LimRxedBeaconCntDuringHB;
 
 	/* Time stamp of the last beacon received from the BSS to which STA is connected. */

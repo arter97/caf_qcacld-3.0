@@ -2214,4 +2214,26 @@ wlan_mlme_get_wps_uuid(struct wlan_mlme_wps_params *wps_params, uint8_t *data);
 QDF_STATUS
 wlan_mlme_get_self_gen_frm_pwr(struct wlan_objmgr_psoc *psoc,
 			       uint32_t *value);
+
+/*
+ * wlan_mlme_get_4way_hs_offload() - get 4-way hs offload to fw cfg
+ * @psoc: pointer to psoc object
+ * @val:  Pointer to the value which will be filled for the caller
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_get_4way_hs_offload(struct wlan_objmgr_psoc *psoc, bool *value);
+
+/**
+ * mlme_get_peer_phymode() - get phymode of peer
+ * @psoc: pointer to psoc object
+ * @mac:  Pointer to the mac addr of the peer
+ * @peer_phymode: phymode
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+mlme_get_peer_phymode(struct wlan_objmgr_psoc *psoc, uint8_t *mac,
+		      enum wlan_phymode *peer_phymode);
 #endif /* _WLAN_MLME_API_H_ */

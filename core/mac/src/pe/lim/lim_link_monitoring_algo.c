@@ -503,7 +503,8 @@ void lim_handle_heart_beat_failure(struct mac_context *mac_ctx,
 		 * DFS channel then only send the probe request otherwise tear
 		 * down the link
 		 */
-		curr_chan = session->currentOperChannel;
+		curr_chan = wlan_reg_freq_to_chan(
+					mac_ctx->pdev, session->curr_op_freq);
 		if (!lim_isconnected_on_dfs_channel(mac_ctx, curr_chan)) {
 			/* Detected continuous Beacon Misses */
 			session->LimHBFailureStatus = true;
@@ -517,19 +518,19 @@ void lim_handle_heart_beat_failure(struct mac_context *mac_ctx,
 			 */
 			pe_debug("HB missed from AP. Sending Probe Req");
 			/* for searching AP, we don't include any more IE */
-			if (session->pLimJoinReq) {
-				scan_ie = &session->pLimJoinReq->addIEScan;
+			if (session->lim_join_req) {
+				scan_ie = &session->lim_join_req->addIEScan;
 				lim_send_probe_req_mgmt_frame(mac_ctx,
 					&session->ssId,
 					session->bssId, curr_chan,
-					session->selfMacAddr,
+					session->self_mac_addr,
 					session->dot11mode,
 					&scan_ie->length, scan_ie->addIEdata);
 			} else {
 				lim_send_probe_req_mgmt_frame(mac_ctx,
 					&session->ssId,
 					session->bssId, curr_chan,
-					session->selfMacAddr,
+					session->self_mac_addr,
 					session->dot11mode, NULL, NULL);
 			}
 		} else {

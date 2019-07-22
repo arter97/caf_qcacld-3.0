@@ -682,13 +682,6 @@ typedef enum {
 
 } eCsrRoamWmmUserModeType;
 
-typedef enum {
-	eCSR_REQUESTER_MIN = 0,
-	eCSR_DIAG,
-	eCSR_UMA_GAN,
-	eCSR_HDD
-} eCsrStatsRequesterType;
-
 typedef struct tagPmkidCandidateInfo {
 	struct qdf_mac_addr BSSID;
 	bool preAuthSupported;
@@ -769,6 +762,7 @@ struct csr_roam_profile {
 	tCsrKeys Keys;
 	tCsrChannelInfo ChannelInfo;
 	uint8_t operationChannel;
+	uint32_t op_freq;
 	struct ch_params ch_params;
 	/* If this is 0, SME will fill in for caller. */
 	uint16_t beaconInterval;
@@ -1186,6 +1180,7 @@ struct csr_roam_info {
 #endif
 	struct assoc_ind *owe_pending_assoc_ind;
 	uint16_t roam_reason;
+	struct wlan_ies *disconnect_ies;
 };
 
 typedef struct sSirSmeAssocIndToUpperLayerCnf {
@@ -1426,8 +1421,6 @@ QDF_STATUS csr_set_channels(struct mac_context *mac,
 const char *get_e_roam_cmd_status_str(eRoamCmdStatus val);
 const char *get_e_csr_roam_result_str(eCsrRoamResult val);
 const char *csr_phy_mode_str(eCsrPhyMode phy_mode);
-typedef void (*tCsrStatsCallback)(void *stats, void *pContext);
-typedef void (*tCsrRssiCallback)(int8_t rssi, uint32_t staId, void *pContext);
 
 #ifdef FEATURE_WLAN_ESE
 typedef void (*tCsrTsmStatsCallback)(tAniTrafStrmMetrics tsmMetrics,

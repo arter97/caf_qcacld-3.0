@@ -248,13 +248,6 @@ csr_roam_save_connected_information(struct mac_context *mac,
 void csr_roam_check_for_link_status_change(struct mac_context *mac,
 					tSirSmeRsp *pSirMsg);
 
-#ifndef QCA_SUPPORT_CP_STATS
-void csr_roam_stats_rsp_processor(struct mac_context *mac, tSirSmeRsp *pSirMsg);
-#else
-static inline void csr_roam_stats_rsp_processor(struct mac_context *mac,
-						tSirSmeRsp *pSirMsg) {}
-#endif /* QCA_SUPPORT_CP_STATS */
-
 QDF_STATUS csr_roam_issue_start_bss(struct mac_context *mac, uint32_t sessionId,
 				    struct csr_roamstart_bssparams *pParam,
 				    struct csr_roam_profile *pProfile,
@@ -968,9 +961,16 @@ bool csr_is_pmkid_found_for_peer(struct mac_context *mac,
 #ifdef WLAN_FEATURE_11AX
 void csr_update_session_he_cap(struct mac_context *mac_ctx,
 			struct csr_roam_session *session);
+void csr_init_session_twt_cap(struct csr_roam_session *session,
+			      uint32_t type_of_persona);
 #else
 static inline void csr_update_session_he_cap(struct mac_context *mac_ctx,
 			struct csr_roam_session *session)
+{
+}
+
+static inline void csr_init_session_twt_cap(struct csr_roam_session *session,
+					    uint32_t type_of_persona)
 {
 }
 #endif
