@@ -949,8 +949,13 @@ QDF_STATUS dp_rx_mon_deliver(struct dp_soc *soc, uint32_t mac_id,
 		pdev->ppdu_info.rx_status.chan_noise_floor =
 			pdev->chan_noise_floor;
 
-		qdf_nbuf_update_radiotap(&(pdev->ppdu_info.rx_status),
-			mon_mpdu, sizeof(struct rx_pkt_tlvs));
+		if (!qdf_nbuf_update_radiotap(&pdev->ppdu_info.rx_status,
+					      mon_mpdu,
+					      qdf_nbuf_headroom(mon_mpdu))) {
+			DP_STATS_INC(pdev, dropped.mon_radiotap_update_err, 1);
+			goto mon_deliver_fail;
+		}
+
 		pdev->monitor_vdev->osif_rx_mon(pdev->monitor_vdev->osif_vdev,
 						mon_mpdu,
 						&pdev->ppdu_info.rx_status);
@@ -1015,8 +1020,12 @@ QDF_STATUS dp_rx_mon_deliver_non_std(struct dp_soc *soc,
 		pdev->ppdu_info.com_info.ppdu_id;
 
 	/* Apply the radio header to this dummy skb */
-	qdf_nbuf_update_radiotap(&pdev->ppdu_info.rx_status,
-				 dummy_msdu, MAX_MONITOR_HEADER);
+	if (!qdf_nbuf_update_radiotap(&pdev->ppdu_info.rx_status, dummy_msdu,
+				      qdf_nbuf_headroom(dummy_msdu))) {
+		DP_STATS_INC(pdev, dropped.mon_radiotap_update_err, 1);
+		qdf_nbuf_free(dummy_msdu);
+		goto mon_deliver_non_std_fail;
+	}
 
 	/* deliver to the user layer application */
 	osif_rx_mon(pdev->monitor_vdev->osif_vdev,
