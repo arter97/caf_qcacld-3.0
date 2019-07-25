@@ -2652,4 +2652,18 @@ static inline int dfs_is_disable_radar_marking_set(struct wlan_dfs *dfs,
 #if defined(WLAN_DFS_FULL_OFFLOAD) && defined(QCA_DFS_NOL_OFFLOAD)
 bool dfs_get_disable_radar_marking(struct wlan_dfs *dfs);
 #endif
+
+/**
+ * dfs_skip_cac_after_vdev_restart() - Skip CAC if new channel is same
+ * as old channel after vdev restart.
+ * @dfs: Pointer to wlan_dfs structure.
+ */
+#ifdef QCA_SKIP_CAC_AFTER_RESTART
+bool dfs_skip_cac_after_vdev_restart(struct wlan_dfs *dfs);
+#else
+static inline bool dfs_skip_cac_after_vdev_restart(struct wlan_dfs *dfs)
+{
+	return true;
+}
+#endif
 #endif  /* _DFS_H_ */
