@@ -302,9 +302,11 @@ static QDF_STATUS sme_ese_send_beacon_req_scan_results(
 	if (result_arr)
 		cur_result = result_arr[bss_counter];
 
-	qdf_mem_zero(&bcn_rpt_rsp, sizeof(tSirEseBcnReportRsp));
 	do {
 		cur_meas_req = NULL;
+		/* memset bcn_rpt_rsp for each iteration */
+		qdf_mem_zero(&bcn_rpt_rsp, sizeof(bcn_rpt_rsp));
+
 		for (i = 0; i < rrm_ctx->eseBcnReqInfo.numBcnReqIe; i++) {
 			if (rrm_ctx->eseBcnReqInfo.bcnReq[i].channel ==
 				channel) {
@@ -363,7 +365,9 @@ static QDF_STATUS sme_ese_send_beacon_req_scan_results(
 			bcn_report->numBss++;
 			if (++j >= SIR_BCN_REPORT_MAX_BSS_DESC)
 				break;
-			cur_result = result_arr[j];
+			if ((bss_counter + j) >= bss_count)
+				break;
+			cur_result = result_arr[bss_counter + j];
 		}
 
 		bss_counter += j;
