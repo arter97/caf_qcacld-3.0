@@ -167,11 +167,6 @@ static void ol_tx_do_pdev_flow_control_pause(struct ol_txrx_pdev_t *pdev)
 	}
 }
 
-static inline void
-ol_tx_do_pdev_flow_control_unpause(struct ol_txrx_pdev_t *pdev)
-{
-}
-#endif
 /**
  * ol_tx_do_pdev_flow_control_unpause - unpause queues when start_th restored.
  * @pdev: pdev handle
