@@ -325,18 +325,19 @@ dp_rx_get_fcs_ok_msdu(struct dp_pdev *pdev,
 {
 	uint16_t mpdu_fcs_ok;
 	qdf_nbuf_t status_nbuf = NULL;
-	unsigned long int fcs_ok_bitmap;
-
-	/* If fcs_ok_bitmap is zero, no need to procees further */
-	if (qdf_unlikely(!ppdu_info->com_info.mpdu_fcs_ok_bitmap))
-		return NULL;
+	unsigned long *fcs_ok_bitmap;
 
 	/* Obtain fcs_ok passed index from bitmap
 	 * this index is used to get fcs passed first msdu payload
 	 */
 
-	fcs_ok_bitmap = ppdu_info->com_info.mpdu_fcs_ok_bitmap;
-	mpdu_fcs_ok = qdf_find_first_bit(&fcs_ok_bitmap, HAL_RX_MAX_MPDU);
+	fcs_ok_bitmap =
+		(unsigned long *)&ppdu_info->com_info.mpdu_fcs_ok_bitmap[0];
+	mpdu_fcs_ok = qdf_find_first_bit(fcs_ok_bitmap,
+					 HAL_RX_MAX_MPDU);
+
+	if (mpdu_fcs_ok >= HAL_RX_MAX_MPDU)
+		goto end;
 
 	/* Get status buffer by indexing mpdu_fcs_ok index
 	 * containing first msdu payload with fcs passed
@@ -348,6 +349,7 @@ dp_rx_get_fcs_ok_msdu(struct dp_pdev *pdev,
 	 */
 	qdf_nbuf_ref(status_nbuf);
 
+end:
 	/* Free the ppdu status buffer queue */
 	qdf_nbuf_queue_free(&pdev->rx_ppdu_buf_q);
 
