@@ -3417,6 +3417,7 @@ err_event_init:
 
 err_scn_context:
 	qdf_mem_free(((p_cds_contextType) cds_context)->cfg_ctx);
+	((p_cds_contextType) cds_context)->cfg_ctx = NULL;
 	OS_FREE(wmi_handle);
 
 err_wma_handle:
@@ -4419,6 +4420,7 @@ QDF_STATUS wma_wmi_service_close(void)
 	cds_free_context(QDF_MODULE_ID_WMA, wma_handle);
 
 	qdf_mem_free(((p_cds_contextType) cds_ctx)->cfg_ctx);
+	((p_cds_contextType) cds_ctx)->cfg_ctx = NULL;
 	WMA_LOGD("%s: Exit", __func__);
 	return QDF_STATUS_SUCCESS;
 }
