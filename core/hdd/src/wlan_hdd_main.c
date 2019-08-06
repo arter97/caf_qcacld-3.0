@@ -2965,8 +2965,13 @@ hif_close:
 	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
 	hdd_hif_close(hdd_ctx, hif_ctx);
 power_down:
-	if (!reinit && !unint)
-		pld_power_off(qdf_dev->dev);
+	if (!reinit && !unint) {
+		pld_cnss_lock();
+		if (!cds_is_driver_recovering()) {
+			pld_power_off(qdf_dev->dev);
+		}
+		pld_cnss_unlock();
+	}
 release_lock:
 	hdd_ctx->start_modules_in_progress = false;
 	mutex_unlock(&hdd_ctx->iface_change_lock);
