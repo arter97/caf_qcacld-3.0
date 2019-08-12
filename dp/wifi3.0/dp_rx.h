@@ -460,7 +460,8 @@ void dp_rx_pdev_detach(struct dp_pdev *pdev);
 
 
 uint32_t
-dp_rx_process(struct dp_intr *int_ctx, void *hal_ring, uint8_t reo_ring_num,
+dp_rx_process(struct dp_intr *int_ctx, hal_ring_handle_t hal_ring_hdl,
+	      uint8_t reo_ring_num,
 	      uint32_t quota);
 
 /**
@@ -476,7 +477,7 @@ dp_rx_process(struct dp_intr *int_ctx, void *hal_ring, uint8_t reo_ring_num,
  * Return: uint32_t: No. of elements processed
  */
 uint32_t dp_rx_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
-			   void *hal_ring, uint32_t quota);
+			   hal_ring_handle_t hal_ring_hdl, uint32_t quota);
 
 /**
  * dp_rx_wbm_err_process() - Processes error frames routed to WBM release ring
@@ -492,7 +493,7 @@ uint32_t dp_rx_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
  */
 uint32_t
 dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
-		      void *hal_ring, uint32_t quota);
+		      hal_ring_handle_t hal_ring_hdl, uint32_t quota);
 
 /**
  * dp_rx_sg_create() - create a frag_list for MSDUs which are spread across
@@ -1103,6 +1104,24 @@ QDF_STATUS dp_rx_buffers_replenish(struct dp_soc *dp_soc, uint32_t mac_id,
 				 union dp_rx_desc_list_elem_t **desc_list,
 				 union dp_rx_desc_list_elem_t **tail);
 
+/*
+ * dp_pdev_rx_buffers_attach() - replenish rxdma ring with rx nbufs
+ *                               called during dp rx initialization
+ *
+ * @soc: core txrx main context
+ * @mac_id: mac_id which is one of 3 mac_ids
+ * @dp_rxdma_srng: dp rxdma circular ring
+ * @rx_desc_pool: Pointer to free Rx descriptor pool
+ * @num_req_buffers: number of buffer to be replenished
+ *
+ * Return: return success or failure
+ */
+QDF_STATUS
+dp_pdev_rx_buffers_attach(struct dp_soc *dp_soc, uint32_t mac_id,
+			  struct dp_srng *dp_rxdma_srng,
+			  struct rx_desc_pool *rx_desc_pool,
+			  uint32_t num_req_buffers);
+
 /**
  * dp_rx_link_desc_return() - Return a MPDU link descriptor to HW
  *			      (WBM), following error handling
@@ -1111,14 +1130,13 @@ QDF_STATUS dp_rx_buffers_replenish(struct dp_soc *dp_soc, uint32_t mac_id,
  * @buf_addr_info: opaque pointer to the REO error ring descriptor
  * @buf_addr_info: void pointer to the buffer_addr_info
  * @bm_action: put to idle_list or release to msdu_list
- * Return: QDF_STATUS
+ *
+ * Return: QDF_STATUS_E_FAILURE for failure else QDF_STATUS_SUCCESS
  */
 QDF_STATUS
-dp_rx_link_desc_return(struct dp_soc *soc, void *ring_desc, uint8_t bm_action);
+dp_rx_link_desc_return(struct dp_soc *soc, hal_ring_desc_t ring_desc,
+		       uint8_t bm_action);
 
-QDF_STATUS
-dp_rx_link_desc_buf_return(struct dp_soc *soc, struct dp_srng *dp_rxdma_srng,
-				void *buf_addr_info, uint8_t bm_action);
 /**
  * dp_rx_link_desc_return_by_addr - Return a MPDU link descriptor to
  *					(WBM) by address
@@ -1126,11 +1144,12 @@ dp_rx_link_desc_buf_return(struct dp_soc *soc, struct dp_srng *dp_rxdma_srng,
  * @soc: core DP main context
  * @link_desc_addr: link descriptor addr
  *
- * Return: QDF_STATUS
+ * Return: QDF_STATUS_E_FAILURE for failure else QDF_STATUS_SUCCESS
  */
 QDF_STATUS
-dp_rx_link_desc_return_by_addr(struct dp_soc *soc, void *link_desc_addr,
-					uint8_t bm_action);
+dp_rx_link_desc_return_by_addr(struct dp_soc *soc,
+			       hal_link_desc_t link_desc_addr,
+			       uint8_t bm_action);
 
 /**
  * dp_rxdma_err_process() - RxDMA error processing functionality
@@ -1166,8 +1185,10 @@ dp_rx_nbuf_prepare(struct dp_soc *soc, struct dp_pdev *pdev);
  *
  * Return: void
  */
-void dp_rx_dump_info_and_assert(struct dp_soc *soc, void *hal_ring,
-				void *ring_desc, struct dp_rx_desc *rx_desc);
+void dp_rx_dump_info_and_assert(struct dp_soc *soc,
+				hal_ring_handle_t hal_ring_hdl,
+				hal_ring_desc_t ring_desc,
+				struct dp_rx_desc *rx_desc);
 
 void dp_rx_compute_delay(struct dp_vdev *vdev, qdf_nbuf_t nbuf);
 #ifdef RX_DESC_DEBUG_CHECK
@@ -1234,4 +1255,16 @@ static inline void dp_rx_flush_rx_cached(struct dp_peer *peer, bool drop)
 {
 }
 #endif
+
+#ifndef QCA_MULTIPASS_SUPPORT
+static inline
+bool dp_rx_multipass_process(struct dp_peer *peer, qdf_nbuf_t nbuf, uint8_t tid)
+{
+	return false;
+}
+#else
+bool dp_rx_multipass_process(struct dp_peer *peer, qdf_nbuf_t nbuf,
+			     uint8_t tid);
+#endif
+
 #endif /* _DP_RX_H */

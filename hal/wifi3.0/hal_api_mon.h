@@ -155,6 +155,23 @@
 /* Max MPDUs per status buffer */
 #define HAL_RX_MAX_MPDU 64
 
+/* Max pilot count */
+#define HAL_RX_MAX_SU_EVM_COUNT 32
+
+/*
+ * Struct hal_rx_su_evm_info - SU evm info
+ * @number_of_symbols: number of symbols
+ * @nss_count:         nss count
+ * @pilot_count:       pilot count
+ * @pilot_evm:         Array of pilot evm values
+ */
+struct hal_rx_su_evm_info {
+	uint32_t number_of_symbols;
+	uint8_t  nss_count;
+	uint8_t  pilot_count;
+	uint32_t pilot_evm[HAL_RX_MAX_SU_EVM_COUNT];
+};
+
 enum {
 	DP_PPDU_STATUS_START,
 	DP_PPDU_STATUS_DONE,
@@ -260,10 +277,10 @@ uint32_t HAL_RX_HW_DESC_GET_PPDUID_GET(void *hw_desc_addr)
  * Return: void
  */
 static inline
-void hal_rx_reo_ent_buf_paddr_get(void *rx_desc,
-	struct hal_buf_info *buf_info,
-	void **pp_buf_addr_info,
-	uint32_t *msdu_cnt
+void hal_rx_reo_ent_buf_paddr_get(hal_rxdma_desc_t rx_desc,
+				  struct hal_buf_info *buf_info,
+				  void **pp_buf_addr_info,
+				  uint32_t *msdu_cnt
 )
 {
 	struct reo_entrance_ring *reo_ent_ring =
@@ -328,8 +345,10 @@ void hal_rx_mon_next_link_desc_get(void *rx_msdu_link_desc,
  * Return: void
  */
 
-static inline void hal_rx_mon_msdu_link_desc_set(struct hal_soc *soc,
-			void *src_srng_desc, void *buf_addr_info)
+static inline
+void hal_rx_mon_msdu_link_desc_set(hal_soc_handle_t hal_soc_hdl,
+				   void *src_srng_desc,
+				   void *buf_addr_info)
 {
 	struct buffer_addr_info *wbm_srng_buffer_addr_info =
 			(struct buffer_addr_info *)src_srng_desc;
@@ -405,6 +424,7 @@ struct hal_rx_ppdu_common_info {
 	uint64_t mpdu_fcs_ok_bitmap;
 	uint32_t last_ppdu_id;
 	uint32_t mpdu_cnt;
+	uint8_t num_users;
 };
 
 /**
@@ -463,6 +483,8 @@ struct hal_rx_ppdu_info {
 	struct hal_rx_ppdu_msdu_info rx_msdu_info[HAL_MAX_UL_MU_USERS];
 	/* first msdu payload for all mpdus in ppdu */
 	struct hal_rx_msdu_payload_info ppdu_msdu_info[HAL_RX_MAX_MPDU];
+	/* evm info */
+	struct hal_rx_su_evm_info evm_info;
 };
 
 static inline uint32_t
@@ -518,16 +540,20 @@ static inline void hal_rx_proc_phyrx_other_receive_info_tlv(struct hal_soc *hal_
  */
 static inline uint32_t
 hal_rx_status_get_tlv_info(void *rx_tlv_hdr, void *ppdu_info,
-			   struct hal_soc *hal_soc,
+			   hal_soc_handle_t hal_soc_hdl,
 			   qdf_nbuf_t nbuf)
 {
-	return hal_soc->ops->hal_rx_status_get_tlv_info(rx_tlv_hdr,
-							ppdu_info, hal_soc,
-							nbuf);
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
+	return hal_soc->ops->hal_rx_status_get_tlv_info(
+						rx_tlv_hdr,
+						ppdu_info,
+						hal_soc_hdl,
+						nbuf);
 }
 
 static inline
-uint32_t hal_get_rx_status_done_tlv_size(void *hal_soc)
+uint32_t hal_get_rx_status_done_tlv_size(hal_soc_handle_t hal_soc_hdl)
 {
 	return HAL_RX_TLV32_HDR_SIZE;
 }

@@ -185,10 +185,10 @@ QDF_STATUS dp_tso_soc_detach(void *txrx_soc);
 QDF_STATUS dp_tx_pdev_detach(struct dp_pdev *pdev);
 QDF_STATUS dp_tx_pdev_attach(struct dp_pdev *pdev);
 
-qdf_nbuf_t dp_tx_send(void *data_vdev, qdf_nbuf_t nbuf);
-qdf_nbuf_t dp_tx_send_exception(void *data_vdev, qdf_nbuf_t nbuf,
+qdf_nbuf_t dp_tx_send(struct cdp_vdev *data_vdev, qdf_nbuf_t nbuf);
+qdf_nbuf_t dp_tx_send_exception(struct cdp_vdev *data_vdev, qdf_nbuf_t nbuf,
 				struct cdp_tx_exception_metadata *tx_exc);
-qdf_nbuf_t dp_tx_send_mesh(void *data_vdev, qdf_nbuf_t nbuf);
+qdf_nbuf_t dp_tx_send_mesh(struct cdp_vdev *data_vdev, qdf_nbuf_t nbuf);
 
 #if QDF_LOCK_STATS
 noinline qdf_nbuf_t
@@ -218,7 +218,8 @@ qdf_nbuf_t dp_tx_non_std(struct cdp_vdev *vdev_handle,
  * Return: Number of TX completions processed
  */
 uint32_t dp_tx_comp_handler(struct dp_intr *int_ctx, struct dp_soc *soc,
-			    void *hal_srng, uint8_t ring_id, uint32_t quota);
+			    hal_ring_handle_t hal_srng, uint8_t ring_id,
+			    uint32_t quota);
 
 QDF_STATUS
 dp_tx_prepare_send_me(struct dp_vdev *vdev, qdf_nbuf_t nbuf);
@@ -236,6 +237,29 @@ static inline void dp_tx_me_exit(struct dp_pdev *pdev)
 	return;
 }
 #endif
+
+#ifndef QCA_MULTIPASS_SUPPORT
+static inline
+bool dp_tx_multipass_process(struct dp_soc *soc, struct dp_vdev *vdev,
+			     qdf_nbuf_t nbuf,
+			     struct dp_tx_msdu_info_s *msdu_info)
+{
+	return true;
+}
+
+static inline
+void dp_tx_vdev_multipass_deinit(struct dp_vdev *vdev)
+{
+}
+
+#else
+bool dp_tx_multipass_process(struct dp_soc *soc, struct dp_vdev *vdev,
+			     qdf_nbuf_t nbuf,
+			     struct dp_tx_msdu_info_s *msdu_info);
+
+void dp_tx_vdev_multipass_deinit(struct dp_vdev *vdev);
+#endif
+
 /**
  * dp_tx_get_queue() - Returns Tx queue IDs to be used for this Tx frame
  * @vdev: DP Virtual device handle
@@ -293,7 +317,7 @@ void  dp_send_completion_to_stack(struct dp_soc *soc,  struct dp_pdev *pdev,
 		qdf_nbuf_t netbuf);
 #endif
 
-void  dp_iterate_update_peer_list(void *pdev_hdl);
+void  dp_iterate_update_peer_list(struct cdp_pdev *pdev_hdl);
 
 #ifdef ATH_TX_PRI_OVERRIDE
 #define DP_TX_TID_OVERRIDE(_msdu_info, _nbuf) \

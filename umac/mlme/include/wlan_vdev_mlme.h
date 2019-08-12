@@ -23,6 +23,7 @@
 #include <wlan_vdev_mgr_tgt_if_rx_defs.h>
 #include <wlan_objmgr_vdev_obj.h>
 #include <wlan_vdev_mlme_api.h>
+#include <wlan_ext_mlme_obj_types.h>
 
 struct vdev_mlme_obj;
 
@@ -34,6 +35,9 @@ struct vdev_mlme_obj;
 #define WLAN_VDEV_MLME_TYPE_STA  0x2
 #define WLAN_VDEV_MLME_TYPE_IBSS 0x3
 #define WLAN_VDEV_MLME_TYPE_MONITOR 0x4
+#define WLAN_VDEV_MLME_TYPE_NAN 0x5
+#define WLAN_VDEV_MLME_TYPE_OCB 0x6
+#define WLAN_VDEV_MLME_TYPE_NDI 0x7
 
 /* values for vdev_subtype */
 #define WLAN_VDEV_MLME_SUBTYPE_P2P_DEVICE 0x1
@@ -41,6 +45,16 @@ struct vdev_mlme_obj;
 #define WLAN_VDEV_MLME_SUBTYPE_P2P_GO 0x3
 #define WLAN_VDEV_MLME_SUBTYPE_PROXY_STA 0x4
 #define WLAN_VDEV_MLME_SUBTYPE_MESH 0x5
+
+/* new subtype for 11S mesh is required as 11S functionality differs
+ * in many ways from proprietary mesh
+ * 11S uses 6-addr frame format and supports peering between mesh
+ * stations and dynamic best path selection between mesh stations.
+ * While in proprietary mesh, neighboring mesh station MAC is manually
+ * added to AST table for traffic flow between mesh stations
+ */
+#define WLAN_VDEV_MLME_SUBTYPE_MESH_11S   0x6
+#define WLAN_VDEV_MLME_SUBTYPE_SMART_MONITOR 0x7
 
 /* vdev control flags (per bits) */
 #define WLAN_VDEV_MLME_FLAGS_NON_MBSSID_AP      0x00000001
@@ -555,7 +569,7 @@ struct vdev_mlme_obj {
 	struct wlan_sm *sm_hdl;
 	struct wlan_objmgr_vdev *vdev;
 	struct vdev_mlme_ops *ops;
-	void *ext_vdev_ptr;
+	mlme_vdev_ext_t *ext_vdev_ptr;
 	struct vdev_response_timer vdev_rt;
 #ifdef FEATURE_VDEV_RSP_WAKELOCK
 	struct vdev_mlme_wakelock vdev_wakelock;

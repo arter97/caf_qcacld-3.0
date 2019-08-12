@@ -28,7 +28,7 @@
 #include "qdf_nbuf.h"
 #include "qdf_net_types.h"
 #include <wlan_cfg.h>
-#ifdef MESH_MODE_SUPPORT
+#if defined(MESH_MODE_SUPPORT) || defined(FEATURE_PERPKT_INFO)
 #include "if_meta_hdr.h"
 #endif
 #include "enet.h"
@@ -65,6 +65,89 @@ static const uint8_t sec_type_map[MAX_CDP_SEC_TYPE] = {
 					HAL_TX_ENCRYPT_TYPE_AES_GCMP_128,
 					HAL_TX_ENCRYPT_TYPE_AES_GCMP_256,
 					HAL_TX_ENCRYPT_TYPE_WAPI_GCM_SM4};
+
+#ifdef QCA_TX_LIMIT_CHECK
+/**
+ * dp_tx_limit_check - Check if allocated tx descriptors reached
+ * soc max limit and pdev max limit
+ * @vdev: DP vdev handle
+ *
+ * Return: true if allocated tx descriptors reached max configured value, else
+ * false
+ */
+static inline bool
+dp_tx_limit_check(struct dp_vdev *vdev)
+{
+	struct dp_pdev *pdev = vdev->pdev;
+	struct dp_soc *soc = pdev->soc;
+
+	if (qdf_atomic_read(&soc->num_tx_outstanding) >=
+			soc->num_tx_allowed) {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
+			  "%s: queued packets are more than max tx, drop the frame",
+			  __func__);
+		DP_STATS_INC(vdev, tx_i.dropped.desc_na.num, 1);
+		return true;
+	}
+
+	if (qdf_atomic_read(&pdev->num_tx_outstanding) >=
+			pdev->num_tx_allowed) {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
+			  "%s: queued packets are more than max tx, drop the frame",
+			  __func__);
+		DP_STATS_INC(vdev, tx_i.dropped.desc_na.num, 1);
+		return true;
+	}
+	return false;
+}
+
+/**
+ * dp_tx_outstanding_inc - Increment outstanding tx desc values on pdev and soc
+ * @vdev: DP pdev handle
+ *
+ * Return: void
+ */
+static inline void
+dp_tx_outstanding_inc(struct dp_pdev *pdev)
+{
+	struct dp_soc *soc = pdev->soc;
+
+	qdf_atomic_inc(&pdev->num_tx_outstanding);
+	qdf_atomic_inc(&soc->num_tx_outstanding);
+}
+
+/**
+ * dp_tx_outstanding__dec - Decrement outstanding tx desc values on pdev and soc
+ * @vdev: DP pdev handle
+ *
+ * Return: void
+ */
+static inline void
+dp_tx_outstanding_dec(struct dp_pdev *pdev)
+{
+	struct dp_soc *soc = pdev->soc;
+
+	qdf_atomic_dec(&pdev->num_tx_outstanding);
+	qdf_atomic_dec(&soc->num_tx_outstanding);
+}
+
+#else //QCA_TX_LIMIT_CHECK
+static inline bool
+dp_tx_limit_check(struct dp_vdev *vdev)
+{
+	return false;
+}
+
+static inline void
+dp_tx_outstanding_inc(struct dp_pdev *pdev)
+{
+}
+
+static inline void
+dp_tx_outstanding_dec(struct dp_pdev *pdev)
+{
+}
+#endif //QCA_TX_LIMIT_CHECK
 
 #if defined(FEATURE_TSO)
 /**
@@ -184,7 +267,7 @@ dp_tx_desc_release(struct dp_tx_desc_s *tx_desc, uint8_t desc_pool_id)
 	if (tx_desc->flags & DP_TX_DESC_FLAG_ME)
 		dp_tx_me_free_buf(tx_desc->pdev, tx_desc->me_buffer);
 
-	qdf_atomic_dec(&pdev->num_tx_outstanding);
+	dp_tx_outstanding_dec(pdev);
 
 	if (tx_desc->flags & DP_TX_DESC_FLAG_TO_FW)
 		qdf_atomic_dec(&pdev->num_tx_exception);
@@ -221,7 +304,7 @@ dp_tx_desc_release(struct dp_tx_desc_s *tx_desc, uint8_t desc_pool_id)
  *
  */
 static uint8_t dp_tx_prepare_htt_metadata(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
-		struct dp_tx_msdu_info_s *msdu_info)
+					  struct dp_tx_msdu_info_s *msdu_info)
 {
 	uint32_t *meta_data = msdu_info->meta_data;
 	struct htt_tx_msdu_desc_ext2_t *desc_ext =
@@ -240,12 +323,26 @@ static uint8_t dp_tx_prepare_htt_metadata(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 	htt_desc_size = sizeof(struct htt_tx_msdu_desc_ext2_t);
 	htt_desc_size_aligned = (htt_desc_size + 7) & ~0x7;
 
-	if (vdev->mesh_vdev || msdu_info->is_tx_sniffer) {
+	if (vdev->mesh_vdev || msdu_info->is_tx_sniffer ||
+	    HTT_TX_MSDU_EXT2_DESC_FLAG_VALID_KEY_FLAGS_GET(msdu_info->
+							   meta_data[0])) {
 		if (qdf_unlikely(qdf_nbuf_headroom(nbuf) <
-					htt_desc_size_aligned)) {
-			DP_STATS_INC(vdev,
-				     tx_i.dropped.headroom_insufficient, 1);
-			return 0;
+				 htt_desc_size_aligned)) {
+			nbuf = qdf_nbuf_realloc_headroom(nbuf,
+							 htt_desc_size_aligned);
+			if (!nbuf) {
+				/*
+				 * qdf_nbuf_realloc_headroom won't do skb_clone
+				 * as skb_realloc_headroom does. so, no free is
+				 * needed here.
+				 */
+				DP_STATS_INC(vdev,
+					     tx_i.dropped.headroom_insufficient,
+					     1);
+				qdf_print(" %s[%d] skb_realloc_headroom failed",
+					  __func__, __LINE__);
+				return 0;
+			}
 		}
 		/* Fill and add HTT metaheader */
 		hdr = qdf_nbuf_push_head(nbuf, htt_desc_size_aligned);
@@ -299,6 +396,9 @@ static void dp_tx_prepare_tso_ext_desc(struct qdf_tso_seg_t *tso_seg,
 	for (num_frag = 0; num_frag < tso_seg->num_frags; num_frag++) {
 		uint32_t lo = 0;
 		uint32_t hi = 0;
+
+		qdf_assert_always((tso_seg->tso_frags[num_frag].paddr) &&
+				  (tso_seg->tso_frags[num_frag].length));
 
 		qdf_dmaaddr_to_32s(
 			tso_seg->tso_frags[num_frag].paddr, &lo, &hi);
@@ -612,39 +712,6 @@ static void dp_tx_trace_pkt(qdf_nbuf_t skb, uint16_t msdu_id,
 				      msdu_id, QDF_TX));
 }
 
-#ifdef QCA_512M_CONFIG
-/**
- * dp_tx_pdev_pflow_control - Check if allocated tx descriptors reached max
- * tx descriptor configured value
- * @vdev: DP vdev handle
- *
- * Return: true if allocated tx descriptors reached max configured value, else
- * false.
- */
-static inline bool
-dp_tx_pdev_pflow_control(struct dp_vdev *vdev)
-{
-	struct dp_pdev *pdev = vdev->pdev;
-
-	if (qdf_atomic_read(&pdev->num_tx_outstanding) >=
-			pdev->num_tx_allowed) {
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
-			  "%s: queued packets are more than max tx, drop the frame",
-			  __func__);
-		DP_STATS_INC(vdev, tx_i.dropped.desc_na.num, 1);
-		return true;
-	}
-
-	return false;
-}
-#else
-static inline bool
-dp_tx_pdev_pflow_control(struct dp_vdev *vdev)
-{
-	return false;
-}
-#endif
-
 /**
  * dp_tx_desc_prepare_single - Allocate and prepare Tx descriptor
  * @vdev: DP vdev handle
@@ -671,7 +738,7 @@ struct dp_tx_desc_s *dp_tx_prepare_desc_single(struct dp_vdev *vdev,
 	struct dp_pdev *pdev = vdev->pdev;
 	struct dp_soc *soc = pdev->soc;
 
-	if (dp_tx_pdev_pflow_control(vdev))
+	if (dp_tx_limit_check(vdev))
 		return NULL;
 
 	/* Allocate software Tx descriptor */
@@ -681,8 +748,7 @@ struct dp_tx_desc_s *dp_tx_prepare_desc_single(struct dp_vdev *vdev,
 		return NULL;
 	}
 
-	/* Flow control/Congestion Control counters */
-	qdf_atomic_inc(&pdev->num_tx_outstanding);
+	dp_tx_outstanding_inc(pdev);
 
 	/* Initialize the SW tx descriptor */
 	tx_desc->nbuf = nbuf;
@@ -696,6 +762,11 @@ struct dp_tx_desc_s *dp_tx_prepare_desc_single(struct dp_vdev *vdev,
 	tx_desc->pkt_offset = 0;
 
 	dp_tx_trace_pkt(nbuf, tx_desc->id, vdev->vdev_id);
+
+	if (qdf_unlikely(vdev->multipass_en)) {
+		if (!dp_tx_multipass_process(soc, vdev, nbuf, msdu_info))
+			goto failure;
+	}
 
 	/*
 	 * For special modes (vdev_type == ocb or mesh), data frames should be
@@ -812,7 +883,7 @@ static struct dp_tx_desc_s *dp_tx_prepare_desc(struct dp_vdev *vdev,
 	struct dp_pdev *pdev = vdev->pdev;
 	struct dp_soc *soc = pdev->soc;
 
-	if (dp_tx_pdev_pflow_control(vdev))
+	if (dp_tx_limit_check(vdev))
 		return NULL;
 
 	/* Allocate software Tx descriptor */
@@ -822,8 +893,7 @@ static struct dp_tx_desc_s *dp_tx_prepare_desc(struct dp_vdev *vdev,
 		return NULL;
 	}
 
-	/* Flow control/Congestion Control counters */
-	qdf_atomic_inc(&pdev->num_tx_outstanding);
+	dp_tx_outstanding_inc(pdev);
 
 	/* Initialize the SW tx descriptor */
 	tx_desc->nbuf = nbuf;
@@ -1000,7 +1070,7 @@ static QDF_STATUS dp_tx_hw_enqueue(struct dp_soc *soc, struct dp_vdev *vdev,
 
 	/* Return Buffer Manager ID */
 	uint8_t bm_id = ring_id;
-	void *hal_srng = soc->tcl_data_ring[ring_id].hal_srng;
+	hal_ring_handle_t hal_ring_hdl = soc->tcl_data_ring[ring_id].hal_srng;
 
 	hal_tx_desc_cached = (void *) cached_desc;
 	qdf_mem_zero(hal_tx_desc_cached, HAL_TX_DESC_LEN_BYTES);
@@ -1014,6 +1084,8 @@ static QDF_STATUS dp_tx_hw_enqueue(struct dp_soc *soc, struct dp_vdev *vdev,
 		type = HAL_TX_BUF_TYPE_BUFFER;
 		dma_addr = qdf_nbuf_mapped_paddr_get(tx_desc->nbuf);
 	}
+
+	qdf_assert_always(dma_addr);
 
 	hal_tx_desc_set_fw_metadata(hal_tx_desc_cached, fw_metadata);
 	hal_tx_desc_set_buf_addr(hal_tx_desc_cached,
@@ -1064,7 +1136,7 @@ static QDF_STATUS dp_tx_hw_enqueue(struct dp_soc *soc, struct dp_vdev *vdev,
 
 	tx_desc->timestamp = qdf_ktime_to_ms(qdf_ktime_get());
 	/* Sync cached descriptor with HW */
-	hal_tx_desc = hal_srng_src_get_next(soc->hal_soc, hal_srng);
+	hal_tx_desc = hal_srng_src_get_next(soc->hal_soc, hal_ring_hdl);
 
 	if (!hal_tx_desc) {
 		dp_verbose_debug("TCL ring full ring_id:%d", ring_id);
@@ -1422,7 +1494,8 @@ static qdf_nbuf_t dp_tx_send_msdu_single(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 	struct dp_tx_desc_s *tx_desc;
 	QDF_STATUS status;
 	struct dp_tx_queue *tx_q = &(msdu_info->tx_queue);
-	void *hal_srng = soc->tcl_data_ring[tx_q->ring_id].hal_srng;
+	hal_ring_handle_t hal_ring_hdl =
+				soc->tcl_data_ring[tx_q->ring_id].hal_srng;
 	uint16_t htt_tcl_metadata = 0;
 	uint8_t tid = msdu_info->tid;
 	struct cdp_tid_tx_stats *tid_stats = NULL;
@@ -1450,10 +1523,10 @@ static qdf_nbuf_t dp_tx_send_msdu_single(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 
 	dp_tx_update_tdls_flags(tx_desc);
 
-	if (qdf_unlikely(hal_srng_access_start(soc->hal_soc, hal_srng))) {
+	if (qdf_unlikely(hal_srng_access_start(soc->hal_soc, hal_ring_hdl))) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 				"%s %d : HAL RING Access Failed -- %pK",
-				__func__, __LINE__, hal_srng);
+				__func__, __LINE__, hal_ring_hdl);
 		dp_tx_get_tid(vdev, nbuf, msdu_info);
 		tid_stats = &pdev->stats.tid_stats.
 			    tid_tx_stats[tx_q->ring_id][tid];
@@ -1501,10 +1574,10 @@ static qdf_nbuf_t dp_tx_send_msdu_single(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 
 fail_return:
 	if (hif_pm_runtime_get(soc->hif_handle) == 0) {
-		hal_srng_access_end(soc->hal_soc, hal_srng);
+		hal_srng_access_end(soc->hal_soc, hal_ring_hdl);
 		hif_pm_runtime_put(soc->hif_handle);
 	} else {
-		hal_srng_access_end_reap(soc->hal_soc, hal_srng);
+		hal_srng_access_end_reap(soc->hal_soc, hal_ring_hdl);
 	}
 
 	return nbuf;
@@ -1536,13 +1609,14 @@ qdf_nbuf_t dp_tx_send_msdu_multiple(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 	QDF_STATUS status;
 	uint16_t htt_tcl_metadata = 0;
 	struct dp_tx_queue *tx_q = &msdu_info->tx_queue;
-	void *hal_srng = soc->tcl_data_ring[tx_q->ring_id].hal_srng;
+	hal_ring_handle_t hal_ring_hdl =
+				soc->tcl_data_ring[tx_q->ring_id].hal_srng;
 	struct cdp_tid_tx_stats *tid_stats = NULL;
 
-	if (qdf_unlikely(hal_srng_access_start(soc->hal_soc, hal_srng))) {
+	if (qdf_unlikely(hal_srng_access_start(soc->hal_soc, hal_ring_hdl))) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 				"%s %d : HAL RING Access Failed -- %pK",
-				__func__, __LINE__, hal_srng);
+				__func__, __LINE__, hal_ring_hdl);
 		dp_tx_get_tid(vdev, nbuf, msdu_info);
 		tid_stats = &pdev->stats.tid_stats.
 			    tid_tx_stats[tx_q->ring_id][msdu_info->tid];
@@ -1670,10 +1744,10 @@ qdf_nbuf_t dp_tx_send_msdu_multiple(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 
 done:
 	if (hif_pm_runtime_get(soc->hif_handle) == 0) {
-		hal_srng_access_end(soc->hal_soc, hal_srng);
+		hal_srng_access_end(soc->hal_soc, hal_ring_hdl);
 		hif_pm_runtime_put(soc->hif_handle);
 	} else {
-		hal_srng_access_end_reap(soc->hal_soc, hal_srng);
+		hal_srng_access_end_reap(soc->hal_soc, hal_ring_hdl);
 	}
 
 	return nbuf;
@@ -1910,8 +1984,9 @@ static bool dp_check_exc_metadata(struct cdp_tx_exception_metadata *tx_exc)
  * Return: NULL on success,
  *         nbuf when it fails to send
  */
-qdf_nbuf_t dp_tx_send_exception(void *vap_dev, qdf_nbuf_t nbuf,
-		struct cdp_tx_exception_metadata *tx_exc_metadata)
+qdf_nbuf_t
+dp_tx_send_exception(struct cdp_vdev *vap_dev, qdf_nbuf_t nbuf,
+		     struct cdp_tx_exception_metadata *tx_exc_metadata)
 {
 	qdf_ether_header_t *eh = NULL;
 	struct dp_vdev *vdev = (struct dp_vdev *) vap_dev;
@@ -2016,7 +2091,7 @@ fail:
  *         nbuf when it fails to send
  */
 #ifdef MESH_MODE_SUPPORT
-qdf_nbuf_t dp_tx_send_mesh(void *vap_dev, qdf_nbuf_t nbuf)
+qdf_nbuf_t dp_tx_send_mesh(struct cdp_vdev *vap_dev, qdf_nbuf_t nbuf)
 {
 	struct meta_hdr_s *mhdr;
 	qdf_nbuf_t nbuf_mesh = NULL;
@@ -2075,7 +2150,7 @@ qdf_nbuf_t dp_tx_send_mesh(void *vap_dev, qdf_nbuf_t nbuf)
 
 #else
 
-qdf_nbuf_t dp_tx_send_mesh(void *vap_dev, qdf_nbuf_t nbuf)
+qdf_nbuf_t dp_tx_send_mesh(struct cdp_vdev *vap_dev, qdf_nbuf_t nbuf)
 {
 	return dp_tx_send(vap_dev, nbuf);
 }
@@ -2094,7 +2169,7 @@ qdf_nbuf_t dp_tx_send_mesh(void *vap_dev, qdf_nbuf_t nbuf)
  * Return: NULL on success,
  *         nbuf when it fails to send
  */
-qdf_nbuf_t dp_tx_send(void *vap_dev, qdf_nbuf_t nbuf)
+qdf_nbuf_t dp_tx_send(struct cdp_vdev *vap_dev, qdf_nbuf_t nbuf)
 {
 	qdf_ether_header_t *eh = NULL;
 	struct dp_tx_msdu_info_s msdu_info;
@@ -3311,7 +3386,8 @@ static inline bool dp_tx_comp_enable_eol_data_check(struct dp_soc *soc)
 #endif
 
 uint32_t dp_tx_comp_handler(struct dp_intr *int_ctx, struct dp_soc *soc,
-			    void *hal_srng, uint8_t ring_id, uint32_t quota)
+			    hal_ring_handle_t hal_ring_hdl, uint8_t ring_id,
+			    uint32_t quota)
 {
 	void *tx_comp_hal_desc;
 	uint8_t buffer_src;
@@ -3330,16 +3406,16 @@ more_data:
 	/* Re-initialize local variables to be re-used */
 		head_desc = NULL;
 		tail_desc = NULL;
-	if (qdf_unlikely(dp_srng_access_start(int_ctx, soc, hal_srng))) {
+	if (qdf_unlikely(dp_srng_access_start(int_ctx, soc, hal_ring_hdl))) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 				"%s %d : HAL RING Access Failed -- %pK",
-				__func__, __LINE__, hal_srng);
+				__func__, __LINE__, hal_ring_hdl);
 		return 0;
 	}
 
 	/* Find head descriptor from completion ring */
 	while (qdf_likely(tx_comp_hal_desc =
-			hal_srng_dst_get_next(soc->hal_soc, hal_srng))) {
+			hal_srng_dst_get_next(soc->hal_soc, hal_ring_hdl))) {
 
 		buffer_src = hal_tx_comp_get_buffer_source(tx_comp_hal_desc);
 
@@ -3449,7 +3525,7 @@ more_data:
 			break;
 	}
 
-	dp_srng_access_end(int_ctx, soc, hal_srng);
+	dp_srng_access_end(int_ctx, soc, hal_ring_hdl);
 
 	/* Process the reaped descriptors */
 	if (head_desc)
@@ -3457,7 +3533,8 @@ more_data:
 
 	if (dp_tx_comp_enable_eol_data_check(soc)) {
 		if (!force_break &&
-		    hal_srng_dst_peek_sync_locked(soc, hal_srng)) {
+		    hal_srng_dst_peek_sync_locked(soc->hal_soc,
+						  hal_ring_hdl)) {
 			DP_STATS_INC(soc, tx.hp_oos2, 1);
 			if (!hif_exec_should_yield(soc->hif_handle,
 						   int_ctx->dp_intr_id))
@@ -3752,6 +3829,7 @@ QDF_STATUS dp_tx_vdev_detach(struct dp_vdev *vdev)
 
 	/* Reset TX desc associated to this Vdev as NULL */
 	dp_tx_desc_flush(pdev, vdev, false);
+	dp_tx_vdev_multipass_deinit(vdev);
 
 	return QDF_STATUS_SUCCESS;
 }

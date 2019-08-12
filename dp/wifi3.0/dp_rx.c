@@ -46,8 +46,10 @@ static inline bool dp_rx_check_ap_bridge(struct dp_vdev *vdev)
 }
 
 #ifdef DUP_RX_DESC_WAR
-void dp_rx_dump_info_and_assert(struct dp_soc *soc, void *hal_ring,
-				void *ring_desc, struct dp_rx_desc *rx_desc)
+void dp_rx_dump_info_and_assert(struct dp_soc *soc,
+				hal_ring_handle_t hal_ring,
+				hal_ring_desc_t ring_desc,
+				struct dp_rx_desc *rx_desc)
 {
 	void *hal_soc = soc->hal_soc;
 
@@ -55,14 +57,16 @@ void dp_rx_dump_info_and_assert(struct dp_soc *soc, void *hal_ring,
 	dp_rx_desc_dump(rx_desc);
 }
 #else
-void dp_rx_dump_info_and_assert(struct dp_soc *soc, void *hal_ring,
-				void *ring_desc, struct dp_rx_desc *rx_desc)
+void dp_rx_dump_info_and_assert(struct dp_soc *soc,
+				hal_ring_handle_t hal_ring_hdl,
+				hal_ring_desc_t ring_desc,
+				struct dp_rx_desc *rx_desc)
 {
-	void *hal_soc = soc->hal_soc;
+	hal_soc_handle_t hal_soc = soc->hal_soc;
 
 	dp_rx_desc_dump(rx_desc);
-	hal_srng_dump_ring_desc(hal_soc, hal_ring, ring_desc);
-	hal_srng_dump_ring(hal_soc, hal_ring);
+	hal_srng_dump_ring_desc(hal_soc, hal_ring_hdl, ring_desc);
+	hal_srng_dump_ring(hal_soc, hal_ring_hdl);
 	qdf_assert_always(0);
 }
 #endif
@@ -444,7 +448,8 @@ dp_rx_intrabss_fwd(struct dp_soc *soc,
 				}
 			}
 
-			if (!dp_tx_send(ta_peer->vdev, nbuf)) {
+			if (!dp_tx_send(dp_vdev_to_cdp_vdev(ta_peer->vdev),
+					nbuf)) {
 				DP_STATS_INC_PKT(ta_peer, rx.intra_bss.pkts, 1,
 						 len);
 				return true;
@@ -473,7 +478,7 @@ dp_rx_intrabss_fwd(struct dp_soc *soc,
 		len = QDF_NBUF_CB_RX_PKT_LEN(nbuf);
 		memset(nbuf_copy->cb, 0x0, sizeof(nbuf_copy->cb));
 
-		if (dp_tx_send(ta_peer->vdev, nbuf_copy)) {
+		if (dp_tx_send(dp_vdev_to_cdp_vdev(ta_peer->vdev), nbuf_copy)) {
 			DP_STATS_INC_PKT(ta_peer, rx.intra_bss.fail, 1, len);
 			tid_stats->fail_cnt[INTRABSS_DROP]++;
 			qdf_nbuf_free(nbuf_copy);
@@ -1425,7 +1430,7 @@ static void dp_rx_msdu_stats_update(struct dp_soc *soc,
 }
 
 static inline bool is_sa_da_idx_valid(struct dp_soc *soc,
-				      void *rx_tlv_hdr,
+				      uint8_t *rx_tlv_hdr,
 				      qdf_nbuf_t nbuf)
 {
 	if ((qdf_nbuf_is_sa_valid(nbuf) &&
@@ -1459,8 +1464,9 @@ int dp_wds_rx_policy_check(uint8_t *rx_tlv_hdr,
  *
  * Return: NONE
  */
-static inline void dp_rx_desc_nbuf_sanity_check(void *ring_desc,
-					   struct dp_rx_desc *rx_desc)
+static inline
+void dp_rx_desc_nbuf_sanity_check(hal_ring_desc_t ring_desc,
+				  struct dp_rx_desc *rx_desc)
 {
 	struct hal_buf_info hbi;
 
@@ -1470,8 +1476,9 @@ static inline void dp_rx_desc_nbuf_sanity_check(void *ring_desc,
 			  qdf_nbuf_get_frag_paddr(rx_desc->nbuf, 0));
 }
 #else
-static inline void dp_rx_desc_nbuf_sanity_check(void *ring_desc,
-					   struct dp_rx_desc *rx_desc)
+static inline
+void dp_rx_desc_nbuf_sanity_check(hal_ring_desc_t ring_desc,
+				  struct dp_rx_desc *rx_desc)
 {
 }
 #endif
@@ -1614,11 +1621,11 @@ void dp_rx_deliver_to_stack_no_peer(struct dp_soc *soc, qdf_nbuf_t nbuf)
  *
  * Return: uint32_t: No. of elements processed
  */
-uint32_t dp_rx_process(struct dp_intr *int_ctx, void *hal_ring,
+uint32_t dp_rx_process(struct dp_intr *int_ctx, hal_ring_handle_t hal_ring_hdl,
 		       uint8_t reo_ring_num, uint32_t quota)
 {
-	void *hal_soc;
-	void *ring_desc;
+	hal_ring_desc_t ring_desc;
+	hal_soc_handle_t hal_soc;
 	struct dp_rx_desc *rx_desc = NULL;
 	qdf_nbuf_t nbuf, next;
 	union dp_rx_desc_list_elem_t *head[MAX_PDEV_CNT];
@@ -1658,7 +1665,7 @@ uint32_t dp_rx_process(struct dp_intr *int_ctx, void *hal_ring,
 
 	DP_HIST_INIT();
 
-	qdf_assert_always(soc && hal_ring);
+	qdf_assert_always(soc && hal_ring_hdl);
 	hal_soc = soc->hal_soc;
 	qdf_assert_always(hal_soc);
 
@@ -1682,7 +1689,7 @@ more_data:
 	qdf_mem_zero(head, sizeof(head));
 	qdf_mem_zero(tail, sizeof(tail));
 
-	if (qdf_unlikely(dp_srng_access_start(int_ctx, soc, hal_ring))) {
+	if (qdf_unlikely(dp_srng_access_start(int_ctx, soc, hal_ring_hdl))) {
 
 		/*
 		 * Need API to convert from hal_ring pointer to
@@ -1690,7 +1697,7 @@ more_data:
 		 */
 		DP_STATS_INC(soc, rx.err.hal_ring_access_fail, 1);
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			FL("HAL RING Access Failed -- %pK"), hal_ring);
+			FL("HAL RING Access Failed -- %pK"), hal_ring_hdl);
 		goto done;
 	}
 
@@ -1700,14 +1707,15 @@ more_data:
 	 * Process the received pkts in a different per vdev loop.
 	 */
 	while (qdf_likely(quota &&
-			  (ring_desc = hal_srng_dst_peek(hal_soc, hal_ring)))) {
+			  (ring_desc = hal_srng_dst_peek(hal_soc,
+							 hal_ring_hdl)))) {
 
 		error = HAL_RX_ERROR_STATUS_GET(ring_desc);
-		ring_id = hal_srng_ring_id_get(hal_ring);
+		ring_id = hal_srng_ring_id_get(hal_ring_hdl);
 
 		if (qdf_unlikely(error == HAL_REO_ERROR_DETECTED)) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			FL("HAL RING 0x%pK:error %d"), hal_ring, error);
+			FL("HAL RING 0x%pK:error %d"), hal_ring_hdl, error);
 			DP_STATS_INC(soc, rx.err.hal_reo_error[ring_id], 1);
 			/* Don't know how to deal with this -- assert */
 			qdf_assert(0);
@@ -1728,18 +1736,18 @@ more_data:
 		if (qdf_unlikely(!rx_desc->in_use)) {
 			DP_STATS_INC(soc, rx.err.hal_reo_dest_dup, 1);
 			dp_info_rl("Reaping rx_desc not in use!");
-			dp_rx_dump_info_and_assert(soc, hal_ring,
+			dp_rx_dump_info_and_assert(soc, hal_ring_hdl,
 						   ring_desc, rx_desc);
 			/* ignore duplicate RX desc and continue to process */
 			/* Pop out the descriptor */
-			hal_srng_dst_get_next(hal_soc, hal_ring);
+			hal_srng_dst_get_next(hal_soc, hal_ring_hdl);
 			continue;
 		}
 
 		if (qdf_unlikely(!dp_rx_desc_check_magic(rx_desc))) {
 			dp_err("Invalid rx_desc cookie=%d", rx_buf_cookie);
 			DP_STATS_INC(soc, rx.err.rx_desc_invalid_magic, 1);
-			dp_rx_dump_info_and_assert(soc, hal_ring,
+			dp_rx_dump_info_and_assert(soc, hal_ring_hdl,
 						   ring_desc, rx_desc);
 		}
 
@@ -1772,7 +1780,8 @@ more_data:
 				is_prev_msdu_last = false;
 				/* Get number of entries available in HW ring */
 				num_entries_avail =
-				hal_srng_dst_num_valid(hal_soc, hal_ring, 1);
+				hal_srng_dst_num_valid(hal_soc,
+						       hal_ring_hdl, 1);
 
 				/* For new MPDU check if we can read complete
 				 * MPDU by comparing the number of buffers
@@ -1792,7 +1801,7 @@ more_data:
 		}
 
 		/* Pop out the descriptor*/
-		hal_srng_dst_get_next(hal_soc, hal_ring);
+		hal_srng_dst_get_next(hal_soc, hal_ring_hdl);
 
 		rx_bufs_reaped[rx_desc->pool_id]++;
 		peer_mdata = mpdu_desc_info.peer_meta_data;
@@ -1851,7 +1860,7 @@ more_data:
 			break;
 	}
 done:
-	dp_srng_access_end(int_ctx, soc, hal_ring);
+	dp_srng_access_end(int_ctx, soc, hal_ring_hdl);
 
 	if (nbuf_tail)
 		QDF_NBUF_CB_RX_FLUSH_IND(nbuf_tail) = 1;
@@ -1917,6 +1926,7 @@ done:
 		if (qdf_likely(peer)) {
 			vdev = peer->vdev;
 		} else {
+			nbuf->next = NULL;
 			dp_rx_deliver_to_stack_no_peer(soc, nbuf);
 			nbuf = next;
 			continue;
@@ -2013,6 +2023,13 @@ done:
 			qdf_nbuf_pull_head(nbuf,
 					   RX_PKT_TLVS_LEN +
 					   l2_hdr_offset);
+		}
+
+		/*
+		 * process frame for mulitpass phrase processing
+		 */
+		if (qdf_unlikely(vdev->multipass_en)) {
+			dp_rx_multipass_process(peer, nbuf, tid);
 		}
 
 		if (!dp_wds_rx_policy_check(rx_tlv_hdr, vdev, peer)) {
@@ -2129,7 +2146,8 @@ done:
 
 	if (dp_rx_enable_eol_data_check(soc)) {
 		if (quota &&
-		    hal_srng_dst_peek_sync_locked(soc, hal_ring)) {
+		    hal_srng_dst_peek_sync_locked(soc->hal_soc,
+						  hal_ring_hdl)) {
 			DP_STATS_INC(soc, rx.hp_oos2, 1);
 			if (!hif_exec_should_yield(scn, intr_id))
 				goto more_data;
@@ -2210,14 +2228,14 @@ dp_pdev_nbuf_alloc_and_map(struct dp_soc *dp_soc, qdf_nbuf_t *nbuf,
 	return QDF_STATUS_SUCCESS;
 }
 
-static QDF_STATUS
+QDF_STATUS
 dp_pdev_rx_buffers_attach(struct dp_soc *dp_soc, uint32_t mac_id,
 			  struct dp_srng *dp_rxdma_srng,
 			  struct rx_desc_pool *rx_desc_pool,
 			  uint32_t num_req_buffers)
 {
 	struct dp_pdev *dp_pdev = dp_get_pdev_for_mac_id(dp_soc, mac_id);
-	void *rxdma_srng = dp_rxdma_srng->hal_srng;
+	hal_ring_handle_t rxdma_srng = dp_rxdma_srng->hal_srng;
 	union dp_rx_desc_list_elem_t *next;
 	void *rxdma_ring_entry;
 	qdf_dma_addr_t paddr;

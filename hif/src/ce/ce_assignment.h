@@ -64,6 +64,7 @@ static void hif_target_dump_access_log(void);
 /* Maximum number of Copy Engine's supported */
 #define CE_HTT_H2T_MSG_SRC_NENTRIES 2048
 #define CE_HTT_H2T_MSG_SRC_NENTRIES_AR900B 4096
+#define CE_HTT_H2T_MSG_SRC_NENTRIES_QCN7605 4096
 
 #define EPPING_CE_FLAGS_POLL \
 	(CE_ATTR_DISABLE_INTR|CE_ATTR_ENABLE_POLL|CE_ATTR_FLAGS)
@@ -85,7 +86,7 @@ static struct CE_attr host_ce_config_wlan_qcn7605[] = {
 	{ /* CE3 */ CE_ATTR_FLAGS, 0, 0, 2048, 512, NULL,},
 	/* host->target HTT */
 	{ /* CE4 */ (CE_ATTR_FLAGS | CE_ATTR_DISABLE_INTR), 0,
-		CE_HTT_H2T_MSG_SRC_NENTRIES, 256, 0, NULL,},
+		CE_HTT_H2T_MSG_SRC_NENTRIES_QCN7605, 256, 0, NULL,},
 #ifdef IPA_OFFLOAD
 	/* ipa_uc->target HTC control */
 	{ /* CE5 */ (CE_ATTR_FLAGS | CE_ATTR_DISABLE_INTR), 0,
@@ -676,7 +677,11 @@ static struct CE_attr host_ce_config_wlan_qca8074[] = {
 	{ /* CE4 */ (CE_ATTR_FLAGS | CE_ATTR_DISABLE_INTR), 0,
 		CE_HTT_H2T_MSG_SRC_NENTRIES, 256, 0, NULL,},
 	/* target -> host PKTLOG */
+#ifdef REMOVE_PKT_LOG
+	{ /* CE5 */ 0, 0, 0, 0, 0, NULL,},
+#else
 	{ /* CE5 */ CE_ATTR_FLAGS, 0, 0, 2048, 512, NULL,},
+#endif
 	/* Target autonomous HIF_memcpy */
 	{ /* CE6 */ CE_ATTR_FLAGS | CE_ATTR_DISABLE_INTR, 0, 0,
 		0, 0, NULL,},
@@ -710,7 +715,11 @@ static struct CE_pipe_config target_ce_config_wlan_qca8074[] = {
 		(CE_ATTR_FLAGS | CE_ATTR_DISABLE_INTR), 0,},
 	/* NB: 50% of src nentries, since tx has 2 frags */
 	/* Target -> host PKTLOG */
+#ifdef REMOVE_PKT_LOG
+	{ /* CE5 */ 5, PIPEDIR_NONE,  0, 0, 0, 0,},
+#else
 	{ /* CE5 */ 5, PIPEDIR_IN,  32, 2048, 0, 0,},
+#endif
 	/* Reserved for target autonomous HIF_memcpy */
 	{ /* CE6 */ 6, PIPEDIR_INOUT, 32, 65535, 64, 0,},
 	/* CE7 used only by Host */
@@ -738,7 +747,11 @@ static struct CE_attr host_ce_config_wlan_qca8074_pci[] = {
 	{ /* CE4 */ (CE_ATTR_FLAGS | CE_ATTR_DISABLE_INTR), 0,
 		CE_HTT_H2T_MSG_SRC_NENTRIES, 256, 0, NULL,},
 	/* target -> host PKTLOG */
+#ifdef REMOVE_PKT_LOG
+	{ /* CE5 */ 0, 0, 0, 0, 0, NULL,},
+#else
 	{ /* CE5 */ EPPING_CE_FLAGS_POLL, 0, 0, 2048, 512, NULL,},
+#endif
 	/* Target autonomous HIF_memcpy */
 	{ /* CE6 */ CE_ATTR_FLAGS, 0, 0, 0, 0, NULL,},
 	/* host->target WMI (mac1) */

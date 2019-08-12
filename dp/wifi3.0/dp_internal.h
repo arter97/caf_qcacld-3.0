@@ -816,8 +816,9 @@ extern int dp_delba_process_wifi3(void *peer_handle,
  */
 int dp_delba_tx_completion_wifi3(void *peer_handle, uint8_t tid,
 				  int status);
-extern int dp_rx_tid_setup_wifi3(struct dp_peer *peer, int tid,
-	uint32_t ba_window_size, uint32_t start_seq);
+extern QDF_STATUS dp_rx_tid_setup_wifi3(struct dp_peer *peer, int tid,
+					uint32_t ba_window_size,
+					uint32_t start_seq);
 
 extern QDF_STATUS dp_reo_send_cmd(struct dp_soc *soc,
 	enum hal_reo_cmd_type type, struct hal_reo_cmd_params *params,
@@ -856,10 +857,6 @@ void dp_set_pn_check_wifi3(struct cdp_vdev *vdev_handle,
 void *dp_get_pdev_for_mac_id(struct dp_soc *soc, uint32_t mac_id);
 void dp_set_michael_key(struct cdp_peer *peer_handle,
 			bool is_unicast, uint32_t *key);
-#ifdef QCA_ENH_V3_STATS_SUPPORT
-uint32_t dp_pdev_tid_stats_display(void *pdev_handle,
-			enum _ol_ath_param_t param, uint32_t value, void *buff);
-#endif
 
 /**
  * dp_check_pdev_exists() - Validate pdev before use
@@ -1100,9 +1097,9 @@ int dp_wdi_event_sub(struct cdp_pdev *txrx_pdev_handle,
 	void *event_cb_sub_handle,
 	uint32_t event);
 
-void dp_wdi_event_handler(enum WDI_EVENT event, void *soc,
-		void *data, u_int16_t peer_id,
-		int status, u_int8_t pdev_id);
+void dp_wdi_event_handler(enum WDI_EVENT event, struct dp_soc *soc,
+			  void *data, u_int16_t peer_id,
+			  int status, u_int8_t pdev_id);
 
 int dp_wdi_event_attach(struct dp_pdev *txrx_pdev);
 int dp_wdi_event_detach(struct dp_pdev *txrx_pdev);
@@ -1111,11 +1108,13 @@ int dp_set_pktlog_wifi3(struct dp_pdev *pdev, uint32_t event,
 void *dp_get_pldev(struct cdp_pdev *txrx_pdev);
 void dp_pkt_log_init(struct cdp_pdev *ppdev, void *scn);
 
-static inline void dp_hif_update_pipe_callback(void *soc, void *cb_context,
-	QDF_STATUS (*callback)(void *, qdf_nbuf_t, uint8_t), uint8_t pipe_id)
+static inline void
+dp_hif_update_pipe_callback(struct dp_soc *dp_soc,
+			    void *cb_context,
+			    QDF_STATUS (*callback)(void *, qdf_nbuf_t, uint8_t),
+			    uint8_t pipe_id)
 {
 	struct hif_msg_callbacks hif_pipe_callbacks;
-	struct dp_soc *dp_soc = (struct dp_soc *)soc;
 
 	/* TODO: Temporary change to bypass HTC connection for this new
 	 * HIF pipe, which will be used for packet log and other high-
@@ -1145,9 +1144,11 @@ static inline int dp_wdi_event_sub(struct cdp_pdev *txrx_pdev_handle,
 	return 0;
 }
 
-static inline void dp_wdi_event_handler(enum WDI_EVENT event, void *soc,
-		void *data, u_int16_t peer_id,
-		int status, u_int8_t pdev_id)
+static inline
+void dp_wdi_event_handler(enum WDI_EVENT event,
+			  struct dp_soc *soc,
+			  void *data, u_int16_t peer_id,
+			  int status, u_int8_t pdev_id)
 {
 }
 
@@ -1171,8 +1172,11 @@ static inline QDF_STATUS dp_h2t_cfg_stats_msg_send(struct dp_pdev *pdev,
 {
 	return 0;
 }
-static inline void dp_hif_update_pipe_callback(void *soc, void *cb_context,
-	QDF_STATUS (*callback)(void *, qdf_nbuf_t, uint8_t), uint8_t pipe_id)
+
+static inline void
+dp_hif_update_pipe_callback(struct dp_soc *dp_soc, void *cb_context,
+			    QDF_STATUS (*callback)(void *, qdf_nbuf_t, uint8_t),
+			    uint8_t pipe_id)
 {
 }
 
@@ -1216,7 +1220,7 @@ static inline void dp_peer_unref_del_find_by_id(struct dp_peer *peer)
  * Return: 0 on success; error on failure
  */
 int dp_srng_access_start(struct dp_intr *int_ctx, struct dp_soc *dp_soc,
-			 void *hal_ring);
+			 hal_ring_handle_t hal_ring_hdl);
 
 /**
  * dp_srng_access_end() - Wrapper function to log access end of a hal ring
@@ -1227,24 +1231,26 @@ int dp_srng_access_start(struct dp_intr *int_ctx, struct dp_soc *dp_soc,
  * Return: void
  */
 void dp_srng_access_end(struct dp_intr *int_ctx, struct dp_soc *dp_soc,
-			void *hal_ring);
+			hal_ring_handle_t hal_ring_hdl);
 
 #else
 
 static inline int dp_srng_access_start(struct dp_intr *int_ctx,
-				       struct dp_soc *dp_soc, void *hal_ring)
+				       struct dp_soc *dp_soc,
+				       hal_ring_handle_t hal_ring_hdl)
 {
-	void *hal_soc = dp_soc->hal_soc;
+	hal_soc_handle_t hal_soc = dp_soc->hal_soc;
 
-	return hal_srng_access_start(hal_soc, hal_ring);
+	return hal_srng_access_start(hal_soc, hal_ring_hdl);
 }
 
 static inline void dp_srng_access_end(struct dp_intr *int_ctx,
-				      struct dp_soc *dp_soc, void *hal_ring)
+				      struct dp_soc *dp_soc,
+				      hal_ring_handle_t hal_ring_hdl)
 {
-	void *hal_soc = dp_soc->hal_soc;
+	hal_soc_handle_t hal_soc = dp_soc->hal_soc;
 
-	return hal_srng_access_end(hal_soc, hal_ring);
+	return hal_srng_access_end(hal_soc, hal_ring_hdl);
 }
 #endif /* WLAN_FEATURE_DP_EVENT_HISTORY */
 
@@ -1318,4 +1324,52 @@ QDF_STATUS dp_tx_add_to_comp_queue(struct dp_soc *soc,
 }
 #endif
 
+/**
+ * dp_vdev_to_cdp_vdev() - typecast dp vdev to cdp vdev
+ * @vdev: DP vdev handle
+ *
+ * Return: struct cdp_vdev pointer
+ */
+static inline
+struct cdp_vdev *dp_vdev_to_cdp_vdev(struct dp_vdev *vdev)
+{
+	return (struct cdp_vdev *)vdev;
+}
+
+/**
+ * dp_pdev_to_cdp_pdev() - typecast dp pdev to cdp pdev
+ * @pdev: DP pdev handle
+ *
+ * Return: struct cdp_pdev pointer
+ */
+static inline
+struct cdp_pdev *dp_pdev_to_cdp_pdev(struct dp_pdev *pdev)
+{
+	return (struct cdp_pdev *)pdev;
+}
+
+/**
+ * dp_soc_to_cdp_soc() - typecast dp psoc to cdp psoc
+ * @psoc: DP psoc handle
+ *
+ * Return: struct cdp_soc pointer
+ */
+static inline
+struct cdp_soc *dp_soc_to_cdp_soc(struct dp_soc *psoc)
+{
+	return (struct cdp_soc *)psoc;
+}
+
+/**
+ * dp_soc_to_cdp_soc_t() - typecast dp psoc to
+ * ol txrx soc handle
+ * @psoc: DP psoc handle
+ *
+ * Return: struct cdp_soc_t pointer
+ */
+static inline
+struct cdp_soc_t *dp_soc_to_cdp_soc_t(struct dp_soc *psoc)
+{
+	return (struct cdp_soc_t *)psoc;
+}
 #endif /* #ifndef _DP_INTERNAL_H_ */

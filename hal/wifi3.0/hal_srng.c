@@ -80,16 +80,15 @@ static struct hal_srng *hal_get_srng(struct hal_soc *hal, int ring_id)
 
 #define HP_OFFSET_IN_REG_START 1
 #define OFFSET_FROM_HP_TO_TP 4
-static void hal_update_srng_hp_tp_address(void *hal_soc,
+static void hal_update_srng_hp_tp_address(struct hal_soc *hal_soc,
 					  int shadow_config_index,
 					  int ring_type,
 					  int ring_num)
 {
 	struct hal_srng *srng;
-	struct hal_soc *hal = (struct hal_soc *)hal_soc;
 	int ring_id;
 	struct hal_hw_srng_config *ring_config =
-		HAL_SRNG_CONFIG(hal, ring_type);
+		HAL_SRNG_CONFIG(hal_soc, ring_type);
 
 	ring_id = hal_get_srng_ring_id(hal_soc, ring_type, ring_num, 0);
 	if (ring_id < 0)
@@ -99,16 +98,16 @@ static void hal_update_srng_hp_tp_address(void *hal_soc,
 
 	if (ring_config->ring_dir == HAL_SRNG_DST_RING) {
 		srng->u.dst_ring.tp_addr = SHADOW_REGISTER(shadow_config_index)
-			+ hal->dev_base_addr;
+			+ hal_soc->dev_base_addr;
 		hal_debug("tp_addr=%pK dev base addr %pK index %u",
-			  srng->u.dst_ring.tp_addr, hal->dev_base_addr,
+			  srng->u.dst_ring.tp_addr, hal_soc->dev_base_addr,
 			  shadow_config_index);
 	} else {
 		srng->u.src_ring.hp_addr = SHADOW_REGISTER(shadow_config_index)
-			+ hal->dev_base_addr;
+			+ hal_soc->dev_base_addr;
 		hal_debug("hp_addr=%pK dev base addr %pK index %u",
 			  srng->u.src_ring.hp_addr,
-			  hal->dev_base_addr, shadow_config_index);
+			  hal_soc->dev_base_addr, shadow_config_index);
 	}
 
 }
@@ -266,10 +265,11 @@ static void hal_target_based_configure(struct hal_soc *hal)
 	}
 }
 
-uint32_t hal_get_target_type(struct hal_soc *hal)
+uint32_t hal_get_target_type(hal_soc_handle_t hal_soc_hdl)
 {
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
 	struct hif_target_info *tgt_info =
-		hif_get_target_info_handle(hal->hif_handle);
+		hif_get_target_info_handle(hal_soc->hif_handle);
 
 	return tgt_info->target_type;
 }
@@ -288,7 +288,7 @@ qdf_export_symbol(hal_get_target_type);
  * copy engines). DP layer will get hal_soc handle using hif_get_hal_handle()
  *
  */
-void *hal_attach(void *hif_handle, qdf_device_t qdf_dev)
+void *hal_attach(struct hif_opaque_softc *hif_handle, qdf_device_t qdf_dev)
 {
 	struct hal_soc *hal;
 	int i;
@@ -300,7 +300,7 @@ void *hal_attach(void *hif_handle, qdf_device_t qdf_dev)
 			"%s: hal_soc allocation failed", __func__);
 		goto fail0;
 	}
-	qdf_minidump_log((void *)hal, sizeof(*hal), "hal_soc");
+	qdf_minidump_log(hal, sizeof(*hal), "hal_soc");
 	hal->hif_handle = hif_handle;
 	hal->dev_base_addr = hif_get_dev_ba(hif_handle);
 	hal->qdf_dev = qdf_dev;
@@ -336,7 +336,7 @@ void *hal_attach(void *hif_handle, qdf_device_t qdf_dev)
 
 	qdf_spinlock_create(&hal->register_access_lock);
 	hal->register_window = 0;
-	hal->target_type = hal_get_target_type(hal);
+	hal->target_type = hal_get_target_type(hal_soc_to_hal_soc_handle(hal));
 
 	hal_target_based_configure(hal);
 
@@ -359,15 +359,16 @@ qdf_export_symbol(hal_attach);
  * @hal_soc: Opaque HAL SOC handle
  * @mem: pointer to structure to be updated with hal mem info
  */
-void hal_get_meminfo(void *hal_soc, struct hal_mem_info *mem )
+void hal_get_meminfo(hal_soc_handle_t hal_soc_hdl, struct hal_mem_info *mem)
 {
-	struct hal_soc *hal = (struct hal_soc *)hal_soc;
+	struct hal_soc *hal = (struct hal_soc *)hal_soc_hdl;
 	mem->dev_base_addr = (void *)hal->dev_base_addr;
         mem->shadow_rdptr_mem_vaddr = (void *)hal->shadow_rdptr_mem_vaddr;
 	mem->shadow_wrptr_mem_vaddr = (void *)hal->shadow_wrptr_mem_vaddr;
         mem->shadow_rdptr_mem_paddr = (void *)hal->shadow_rdptr_mem_paddr;
 	mem->shadow_wrptr_mem_paddr = (void *)hal->shadow_wrptr_mem_paddr;
-	hif_read_phy_mem_base(hal->hif_handle, (qdf_dma_addr_t *)&mem->dev_base_paddr);
+	hif_read_phy_mem_base((void *)hal->hif_handle,
+			      (qdf_dma_addr_t *)&mem->dev_base_paddr);
 	return;
 }
 qdf_export_symbol(hal_get_meminfo);
@@ -393,6 +394,7 @@ extern void hal_detach(void *hal_soc)
 	qdf_mem_free_consistent(hal->qdf_dev, hal->qdf_dev->dev,
 		sizeof(*(hal->shadow_wrptr_mem_vaddr)) * HAL_MAX_LMAC_RINGS,
 		hal->shadow_wrptr_mem_vaddr, hal->shadow_wrptr_mem_paddr, 0);
+	qdf_minidump_remove(hal);
 	qdf_mem_free(hal);
 
 	return;
@@ -434,10 +436,12 @@ static inline void hal_ce_dst_setup(struct hal_soc *hal, struct hal_srng *srng,
  * @ix2: pointer to store IX2 reg value
  * @ix3: pointer to store IX3 reg value
  */
-void hal_reo_read_write_ctrl_ix(struct hal_soc *hal, bool read, uint32_t *ix0,
-				uint32_t *ix1, uint32_t *ix2, uint32_t *ix3)
+void hal_reo_read_write_ctrl_ix(hal_soc_handle_t hal_soc_hdl, bool read,
+				uint32_t *ix0, uint32_t *ix1,
+				uint32_t *ix2, uint32_t *ix3)
 {
 	uint32_t reg_offset;
+	struct hal_soc *hal = (struct hal_soc *)hal_soc_hdl;
 
 	if (read) {
 		if (ix0) {
@@ -723,9 +727,9 @@ qdf_export_symbol(hal_srng_setup);
  * @hal_soc: Opaque HAL SOC handle
  * @hal_srng: Opaque HAL SRNG pointer
  */
-void hal_srng_cleanup(void *hal_soc, void *hal_srng)
+void hal_srng_cleanup(void *hal_soc, hal_ring_handle_t hal_ring_hdl)
 {
-	struct hal_srng *srng = (struct hal_srng *)hal_srng;
+	struct hal_srng *srng = (struct hal_srng *)hal_ring_hdl;
 	SRNG_LOCK_DESTROY(&srng->lock);
 	srng->initialized = 0;
 }
@@ -802,10 +806,11 @@ void hal_srng_dump(struct hal_srng *srng)
  * @hal_ring: Ring pointer (Source or Destination ring)
  * @ring_params: SRNG parameters will be returned through this structure
  */
-extern void hal_get_srng_params(void *hal_soc, void *hal_ring,
-	struct hal_srng_params *ring_params)
+extern void hal_get_srng_params(hal_soc_handle_t hal_soc_hdl,
+				hal_ring_handle_t hal_ring_hdl,
+				struct hal_srng_params *ring_params)
 {
-	struct hal_srng *srng = (struct hal_srng *)hal_ring;
+	struct hal_srng *srng = (struct hal_srng *)hal_ring_hdl;
 	int i =0;
 	ring_params->ring_id = srng->ring_id;
 	ring_params->ring_dir = srng->ring_dir;

@@ -90,16 +90,16 @@ dp_peer_find_by_id(struct dp_soc *soc,
 #endif /* PEER_LOCK_REF_PROTECT */
 
 void dp_print_ast_stats(struct dp_soc *soc);
-void dp_rx_peer_map_handler(void *soc_handle, uint16_t peer_id,
+void dp_rx_peer_map_handler(struct dp_soc *soc, uint16_t peer_id,
 			    uint16_t hw_peer_id, uint8_t vdev_id,
 			    uint8_t *peer_mac_addr, uint16_t ast_hash,
 			    uint8_t is_wds);
-void dp_rx_peer_unmap_handler(void *soc_handle, uint16_t peer_id,
+void dp_rx_peer_unmap_handler(struct dp_soc *soc, uint16_t peer_id,
 			      uint8_t vdev_id, uint8_t *peer_mac_addr,
 			      uint8_t is_wds);
-void dp_rx_sec_ind_handler(void *soc_handle, uint16_t peer_id,
-	enum cdp_sec_type sec_type, int is_unicast,
-	u_int32_t *michael_key, u_int32_t *rx_pn);
+void dp_rx_sec_ind_handler(struct dp_soc *soc, uint16_t peer_id,
+			   enum cdp_sec_type sec_type, int is_unicast,
+			   u_int32_t *michael_key, u_int32_t *rx_pn);
 uint8_t dp_get_peer_mac_addr_frm_id(struct cdp_soc_t *soc_handle,
 		uint16_t peer_id, uint8_t *peer_mac);
 
@@ -140,8 +140,8 @@ void dp_peer_ast_set_type(struct dp_soc *soc,
 void dp_peer_ast_send_wds_del(struct dp_soc *soc,
 			      struct dp_ast_entry *ast_entry);
 
-void dp_peer_free_hmwds_cb(void *ctrl_psoc,
-			   void *dp_soc,
+void dp_peer_free_hmwds_cb(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
+			   struct cdp_soc *dp_soc,
 			   void *cookie,
 			   enum cdp_ast_free_status status);
 
@@ -211,5 +211,67 @@ bool dp_peer_find_by_id_valid(struct dp_soc *soc, uint16_t peer_id);
 void
 dp_peer_update_inactive_time(struct dp_pdev *pdev, uint32_t tag_type,
 			     uint32_t *tag_buf);
+
+#ifndef QCA_MULTIPASS_SUPPORT
+/**
+ * dp_peer_set_vlan_id: set vlan_id for this peer
+ * @cdp_soc: soc handle
+ * @peer_mac: mac address
+ * @vlan_id: vlan id for peer
+ *
+ * return: void
+ */
+static inline
+void dp_peer_set_vlan_id(struct cdp_soc_t *cdp_soc,
+			 struct cdp_vdev *vdev_handle, uint8_t *peer_mac,
+			 uint16_t vlan_id)
+{
+}
+
+/**
+ * dp_set_vlan_groupkey: set vlan map for vdev
+ * @vdev_handle: pointer to vdev
+ * @vlan_id: vlan_id
+ * @group_key: group key for vlan
+ *
+ * return: set success/failure
+ */
+static inline
+QDF_STATUS dp_set_vlan_groupkey(struct cdp_vdev *vdev_handle,
+				uint16_t vlan_id, uint16_t group_key)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * dp_peer_multipass_list_init: initialize multipass peer list
+ * @vdev: pointer to vdev
+ *
+ * return: void
+ */
+static inline
+void dp_peer_multipass_list_init(struct dp_vdev *vdev)
+{
+}
+
+/**
+ * dp_peer_multipass_list_remove: remove peer from special peer list
+ * @peer: peer handle
+ *
+ * return: void
+ */
+static inline
+void dp_peer_multipass_list_remove(struct dp_peer *peer)
+{
+}
+#else
+void dp_peer_set_vlan_id(struct cdp_soc_t *cdp_soc,
+			 struct cdp_vdev *vdev_handle, uint8_t *peer_mac,
+			 uint16_t vlan_id);
+QDF_STATUS dp_set_vlan_groupkey(struct cdp_vdev *vdev_handle,
+				uint16_t vlan_id, uint16_t group_key);
+void dp_peer_multipass_list_init(struct dp_vdev *vdev);
+void dp_peer_multipass_list_remove(struct dp_peer *peer);
+#endif
 
 #endif /* _DP_PEER_H_ */

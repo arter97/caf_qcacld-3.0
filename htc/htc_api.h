@@ -38,7 +38,13 @@ extern "C" {
 
 #define HTC_HTT_TRANSFER_HDRSIZE 24
 
-typedef void *HTC_HANDLE;
+/*
+ * NOTE WELL: struct opaque_htc_handle is not defined anywhere. This
+ * reference is used to help ensure that a HTC_HANDLE is never used
+ * where a different handle type is expected
+ */
+struct opaque_htc_handle;
+typedef struct opaque_htc_handle *HTC_HANDLE;
 
 typedef uint16_t HTC_SERVICE_ID;
 
@@ -118,6 +124,10 @@ typedef HTC_PACKET *(*HTC_EP_RECV_ALLOC)(void *,
 					 HTC_ENDPOINT_ID Endpoint,
 					 int Length);
 
+/* Optional per service connection callback to log packet information.
+ */
+typedef void (*HTC_EP_LOG_PKT)(void *, HTC_PACKET *);
+
 enum htc_send_full_action {
 	/* packet that overflowed should be kept in the queue */
 	HTC_SEND_FULL_KEEP = 0,
@@ -177,6 +187,8 @@ struct htc_ep_callbacks {
 	 * are empty
 	 */
 	int RecvRefillWaterMark;
+	/* OPTIONAL callback to log packet information */
+	HTC_EP_LOG_PKT ep_log_pkt;
 };
 
 /* service connection information */
@@ -691,7 +703,7 @@ struct ol_ath_htc_stats *ieee80211_ioctl_get_htc_stats(HTC_HANDLE
  *
  * Return: htc_handle tx queue depth
  */
-int htc_get_tx_queue_depth(HTC_HANDLE *htc_handle, HTC_ENDPOINT_ID endpoint_id);
+int htc_get_tx_queue_depth(HTC_HANDLE htc_handle, HTC_ENDPOINT_ID endpoint_id);
 
 #ifdef WLAN_FEATURE_FASTPATH
 void htc_ctrl_msg_cmpl(HTC_HANDLE htc_pdev, HTC_ENDPOINT_ID htc_ep_id);

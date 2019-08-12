@@ -317,6 +317,7 @@ struct mon_rx_status {
 	uint8_t ltf_size;
 	uint8_t rxpcu_filter_pass;
 	int8_t rssi_chain[8][8];
+	uint32_t rx_antenna;
 };
 
 /**
@@ -334,6 +335,8 @@ struct mon_rx_user_status {
 		 ofdma_info_valid:1,
 		 dl_ofdma_ru_start_index:7,
 		 dl_ofdma_ru_width:7;
+	uint32_t ul_ofdma_user_v0_word0;
+	uint32_t ul_ofdma_user_v0_word1;
 };
 
 /**

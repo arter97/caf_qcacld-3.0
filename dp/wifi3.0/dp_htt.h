@@ -114,9 +114,9 @@ struct dp_htt_htc_pkt_union {
 };
 
 struct htt_soc {
-	void *ctrl_psoc;
-	void *dp_soc;
-	void *hal_soc;
+	struct cdp_ctrl_objmgr_psoc *ctrl_psoc;
+	struct dp_soc *dp_soc;
+	hal_soc_handle_t hal_soc;
 	/* htt_logger handle */
 	struct htt_logger *htt_logger_handle;
 	HTC_HANDLE htc_soc;
@@ -218,8 +218,36 @@ struct htt_rx_ring_tlv_filter {
  * Return: HTT handle on success; NULL on failure
  */
 void *
-htt_soc_initialize(void *htt_soc, void *ctrl_psoc, HTC_HANDLE htc_soc,
-		   void *hal_soc, qdf_device_t osdev);
+htt_soc_initialize(struct htt_soc *htt_soc,
+		   struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
+		   HTC_HANDLE htc_soc,
+		   hal_soc_handle_t hal_soc_hdl, qdf_device_t osdev);
+
+/*
+ * htt_soc_attach() - attach DP and HTT SOC
+ * @soc: DP SOC handle
+ * @htc_hdl: HTC handle
+ *
+ * Return: htt_soc handle on Success, NULL on Failure
+ */
+struct htt_soc *htt_soc_attach(struct dp_soc *soc, HTC_HANDLE htc_hdl);
+
+/*
+ * htt_set_htc_handle_() - set HTC handle
+ * @htt_hdl: HTT handle/SOC
+ * @htc_soc: HTC handle
+ *
+ * Return: None
+ */
+void htt_set_htc_handle(struct htt_soc *htt_hdl, HTC_HANDLE htc_soc);
+
+/*
+ * htt_get_htc_handle_() - set HTC handle
+ * @htt_hdl: HTT handle/SOC
+ *
+ * Return: HTC_HANDLE
+ */
+HTC_HANDLE htt_get_htc_handle(struct htt_soc *htt_hdl);
 
 /*
  * htt_soc_htc_dealloc() - HTC memory de-alloc
@@ -238,12 +266,13 @@ void htt_soc_htc_dealloc(struct htt_soc *htt_handle);
  */
 QDF_STATUS htt_soc_htc_prealloc(struct htt_soc *htt_soc);
 
-void htt_soc_detach(void *soc);
+void htt_soc_detach(struct htt_soc *soc);
 
-int htt_srng_setup(void *htt_soc, int pdev_id, void *hal_srng,
-	int hal_ring_type);
+int htt_srng_setup(struct htt_soc *htt_soc, int pdev_id,
+		   hal_ring_handle_t hal_ring_hdl,
+		   int hal_ring_type);
 
-int htt_soc_attach_target(void *htt_soc);
+int htt_soc_attach_target(struct htt_soc *htt_soc);
 
 /*
  * htt_h2t_rx_ring_cfg() - Send SRNG packet and TLV filter
@@ -257,9 +286,10 @@ int htt_soc_attach_target(void *htt_soc);
  *
  * Return: 0 on success; error code on failure
  */
-int htt_h2t_rx_ring_cfg(void *htt_soc, int pdev_id, void *hal_srng,
-	int hal_ring_type, int ring_buf_size,
-	struct htt_rx_ring_tlv_filter *htt_tlv_filter);
+int htt_h2t_rx_ring_cfg(struct htt_soc *htt_soc, int pdev_id,
+			hal_ring_handle_t hal_ring_hdl,
+			int hal_ring_type, int ring_buf_size,
+			struct htt_rx_ring_tlv_filter *htt_tlv_filter);
 
 /*
  * htt_t2h_stats_handler() - target to host stats work handler

@@ -60,6 +60,7 @@
 #ifdef WMI_AP_SUPPORT
 #include "wmi_unified_ap_api.h"
 #endif
+#include <wmi_unified_vdev_api.h>
 
 /* HTC service ids for WMI for multi-radio */
 static const uint32_t multi_svc_ids[] = {WMI_CONTROL_SVC,
@@ -305,6 +306,8 @@ static const uint32_t pdev_param_tlv[] = {
 				WMI_PDEV_PARAM_EQUAL_RU_ALLOCATION_ENABLE,
 	[wmi_pdev_param_per_peer_prd_cfr_enable] =
 			WMI_PDEV_PARAM_PER_PEER_PERIODIC_CFR_ENABLE,
+	[wmi_pdev_param_nav_override_config] =
+			WMI_PDEV_PARAM_NAV_OVERRIDE_CONFIG,
 	[wmi_pdev_param_set_mgmt_ttl] = WMI_PDEV_PARAM_SET_MGMT_TTL,
 	[wmi_pdev_param_set_prb_rsp_ttl] =
 			WMI_PDEV_PARAM_SET_PROBE_RESP_TTL,
@@ -314,6 +317,8 @@ static const uint32_t pdev_param_tlv[] = {
 			WMI_PDEV_PARAM_SET_TBTT_CTRL,
 	[wmi_pdev_param_set_cmd_obss_pd_threshold] =
 			WMI_PDEV_PARAM_SET_CMD_OBSS_PD_THRESHOLD,
+	[wmi_pdev_param_set_cmd_obss_pd_per_ac] =
+			WMI_PDEV_PARAM_SET_CMD_OBSS_PD_PER_AC,
 };
 
 /**
@@ -539,15 +544,6 @@ static void wmi_tlv_pdev_id_conversion_enable(wmi_unified_t wmi_handle)
  *
  * Return: None
  */
-#ifdef CONFIG_MCL
-static inline void copy_vdev_create_pdev_id(
-		struct wmi_unified *wmi_handle,
-		wmi_vdev_create_cmd_fixed_param * cmd,
-		struct vdev_create_params *param)
-{
-	cmd->pdev_id = WMI_PDEV_ID_SOC;
-}
-#else
 static inline void copy_vdev_create_pdev_id(
 		struct wmi_unified *wmi_handle,
 		wmi_vdev_create_cmd_fixed_param * cmd,
@@ -556,7 +552,6 @@ static inline void copy_vdev_create_pdev_id(
 	cmd->pdev_id = wmi_handle->ops->convert_pdev_id_host_to_target(
 							param->pdev_id);
 }
-#endif
 
 void wmi_mtrace(uint32_t message_id, uint16_t vdev_id, uint32_t data)
 {
@@ -6509,9 +6504,14 @@ void wmi_copy_resource_config(wmi_resource_config *resource_cfg,
 		WMI_RSRC_CFG_FLAG_TX_COMPLETION_TX_TSF64_ENABLE_SET(
 						resource_cfg->flag1, 1);
 
+	if (tgt_res_cfg->three_way_coex_config_legacy_en)
+		WMI_RSRC_CFG_FLAG_THREE_WAY_COEX_CONFIG_LEGACY_SUPPORT_SET(
+						resource_cfg->flag1, 1);
+
 	wmi_copy_twt_resource_config(resource_cfg, tgt_res_cfg);
 	resource_cfg->peer_map_unmap_v2_support =
 		tgt_res_cfg->peer_map_unmap_v2;
+	resource_cfg->smart_ant_cap = tgt_res_cfg->smart_ant_cap;
 }
 
 /* copy_hw_mode_id_in_init_cmd() - Helper routine to copy hw_mode in init cmd
@@ -9308,24 +9308,46 @@ static QDF_STATUS extract_pdev_utf_event_tlv(wmi_unified_t wmi_handle,
 }
 
 #ifdef WLAN_SUPPORT_RF_CHARACTERIZATION
+static QDF_STATUS extract_num_rf_characterization_entries_tlv(wmi_unified_t wmi_handle,
+	uint8_t *event,
+	uint32_t *num_rf_characterization_entries)
+{
+	WMI_CHAN_RF_CHARACTERIZATION_INFO_EVENTID_param_tlvs *param_buf;
+
+	param_buf = (WMI_CHAN_RF_CHARACTERIZATION_INFO_EVENTID_param_tlvs *)event;
+	if (!param_buf)
+		return QDF_STATUS_E_INVAL;
+
+	*num_rf_characterization_entries =
+			param_buf->num_wmi_chan_rf_characterization_info;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static QDF_STATUS extract_rf_characterization_entries_tlv(wmi_unified_t wmi_handle,
 	uint8_t *event,
-	struct wlan_psoc_host_rf_characterization_entry *rf_characterization_entries)
+	uint32_t num_rf_characterization_entries,
+	struct wmi_host_rf_characterization_event_param *rf_characterization_entries)
 {
-	WMI_SERVICE_READY_EXT_EVENTID_param_tlvs *param_buf;
+	WMI_CHAN_RF_CHARACTERIZATION_INFO_EVENTID_param_tlvs *param_buf;
 	WMI_CHAN_RF_CHARACTERIZATION_INFO *wmi_rf_characterization_entry;
 	uint8_t ix;
 
-	param_buf = (WMI_SERVICE_READY_EXT_EVENTID_param_tlvs *)event;
+	param_buf = (WMI_CHAN_RF_CHARACTERIZATION_INFO_EVENTID_param_tlvs *)event;
 	if (!param_buf)
 		return QDF_STATUS_E_INVAL;
 
 	wmi_rf_characterization_entry =
-				param_buf->wmi_chan_rf_characterization_info;
+			param_buf->wmi_chan_rf_characterization_info;
 	if (!wmi_rf_characterization_entry)
 		return QDF_STATUS_E_INVAL;
 
-	for (ix = 0; ix < param_buf->num_wmi_chan_rf_characterization_info; ix++) {
+	/*
+	 * Using num_wmi_chan_rf_characterization instead of param_buf value
+	 * since memory for rf_characterization_entries was allocated using
+	 * the former.
+	 */
+	for (ix = 0; ix < num_rf_characterization_entries; ix++) {
 		rf_characterization_entries[ix].freq =
 				WMI_CHAN_RF_CHARACTERIZATION_FREQ_GET(
 					&wmi_rf_characterization_entry[ix]);
@@ -9454,22 +9476,6 @@ static QDF_STATUS extract_chainmask_tables_tlv(wmi_unified_t wmi_handle,
 	return QDF_STATUS_SUCCESS;
 }
 
-#ifdef WLAN_SUPPORT_RF_CHARACTERIZATION
-static void populate_num_rf_characterization_entries(
-			struct wlan_psoc_host_service_ext_param *param,
-			WMI_SERVICE_READY_EXT_EVENTID_param_tlvs *param_buf)
-{
-	param->num_rf_characterization_entries =
-			param_buf->num_wmi_chan_rf_characterization_info;
-}
-#else
-static void populate_num_rf_characterization_entries(
-			struct wlan_psoc_host_service_ext_param *param,
-			WMI_SERVICE_READY_EXT_EVENTID_param_tlvs *param_buf)
-{
-}
-#endif
-
 /**
  * extract_service_ready_ext_tlv() - extract basic extended service ready params
  * from event
@@ -9508,7 +9514,6 @@ static QDF_STATUS extract_service_ready_ext_tlv(wmi_unified_t wmi_handle,
 	param->num_dbr_ring_caps = param_buf->num_dma_ring_caps;
 	param->num_bin_scaling_params = param_buf->num_wmi_bin_scaling_params;
 	param->max_bssid_indicator = ev->max_bssid_indicator;
-	populate_num_rf_characterization_entries(param, param_buf);
 	qdf_mem_copy(&param->ppet, &ev->ppet, sizeof(param->ppet));
 
 	hw_caps = param_buf->soc_hw_mode_caps;
@@ -11871,6 +11876,8 @@ struct wmi_ops tlv_ops =  {
 	.extract_reg_chan_list_update_event =
 		extract_reg_chan_list_update_event_tlv,
 #ifdef WLAN_SUPPORT_RF_CHARACTERIZATION
+	.extract_num_rf_characterization_entries =
+		extract_num_rf_characterization_entries_tlv,
 	.extract_rf_characterization_entries =
 		extract_rf_characterization_entries_tlv,
 #endif
@@ -11937,6 +11944,9 @@ struct wmi_ops tlv_ops =  {
 #endif /* WIFI_POS_CONVERGED */
 #ifdef WLAN_MWS_INFO_DEBUGFS
 	.send_mws_coex_status_req_cmd = send_mws_coex_status_req_cmd_tlv,
+#endif
+#ifdef TGT_IF_VDEV_MGR_CONV
+	.extract_vdev_delete_resp = extract_vdev_delete_resp_tlv,
 #endif
 };
 
@@ -12271,6 +12281,10 @@ static void populate_tlv_events_id(uint32_t *event_ids)
 #endif
 	event_ids[wmi_coex_report_antenna_isolation_event_id] =
 				WMI_COEX_REPORT_ANTENNA_ISOLATION_EVENTID;
+	event_ids[wmi_peer_ratecode_list_event_id] =
+				WMI_PEER_RATECODE_LIST_EVENTID;
+	event_ids[wmi_chan_rf_characterization_info_event_id] =
+				WMI_CHAN_RF_CHARACTERIZATION_INFO_EVENTID;
 }
 
 /**
@@ -12383,13 +12397,13 @@ static void populate_tlv_service(uint32_t *wmi_service)
 	wmi_service[wmi_service_mawc] = WMI_SERVICE_MAWC;
 	wmi_service[wmi_service_multiple_vdev_restart] =
 			WMI_SERVICE_MULTIPLE_VDEV_RESTART;
+	wmi_service[wmi_service_smart_antenna_sw_support] =
+				WMI_SERVICE_SMART_ANTENNA_SW_SUPPORT;
+	wmi_service[wmi_service_smart_antenna_hw_support] =
+				WMI_SERVICE_SMART_ANTENNA_HW_SUPPORT;
 
 	wmi_service[wmi_service_roam_offload] = WMI_SERVICE_UNAVAILABLE;
 	wmi_service[wmi_service_ratectrl] = WMI_SERVICE_UNAVAILABLE;
-	wmi_service[wmi_service_smart_antenna_sw_support] =
-				WMI_SERVICE_UNAVAILABLE;
-	wmi_service[wmi_service_smart_antenna_hw_support] =
-				WMI_SERVICE_UNAVAILABLE;
 	wmi_service[wmi_service_enhanced_proxy_sta] = WMI_SERVICE_UNAVAILABLE;
 	wmi_service[wmi_service_tt] = WMI_SERVICE_THERM_THROT;
 	wmi_service[wmi_service_atf] = WMI_SERVICE_ATF;
@@ -12536,6 +12550,8 @@ static void populate_tlv_service(uint32_t *wmi_service)
 			WMI_SERVICE_DSM_ROAM_FILTER;
 	wmi_service[wmi_service_vdev_delete_all_peer] =
 			WMI_SERVICE_DELETE_ALL_PEER_SUPPORT;
+	wmi_service[wmi_service_three_way_coex_config_legacy] =
+			WMI_SERVICE_THREE_WAY_COEX_CONFIG_LEGACY;
 }
 
 /**

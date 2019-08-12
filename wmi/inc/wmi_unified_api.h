@@ -337,14 +337,15 @@ wmi_unified_unregister_event_handler(wmi_unified_t wmi_handle,
 					 wmi_conv_event_id event_id);
 
 /**
- * request wmi to connet its htc service.
- *  @param wmi_handle      : handle to WMI.
- *  @param htc_handle      : handle to HTC.
- *  @return void
+ * wmi_unified_connect_htc_service() -  WMI API to get connect to HTC service
+ * @wmi_handle: handle to WMI.
+ * @htc_handle: handle to HTC.
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAULT for failure
  */
 QDF_STATUS
 wmi_unified_connect_htc_service(struct wmi_unified *wmi_handle,
-				void *htc_handle);
+				HTC_HANDLE htc_handle);
 
 /*
  * WMI API to verify the host has enough credits to suspend
@@ -2968,17 +2969,32 @@ QDF_STATUS wmi_extract_pdev_qvit_event(wmi_unified_t wmi_handle,
 
 #ifdef WLAN_SUPPORT_RF_CHARACTERIZATION
 /**
- * wmi_extract_rf_characterziation_entries - Extract RF characterization metrics
- * received through extended service ready event.
+ * wmi_extract_num_rf_characterziation_entries - Extract number of RF
+ * characterization metrics received from the RF characterization event.
  * @wmi_hdl: WMI handle
  * @evt_buf: Event buffer
+ * @num_rf_characterization_entries: Number of RF characterization metrics
+ *
+ * Return: QDF status of operation
+ */
+QDF_STATUS wmi_extract_num_rf_characterization_entries(wmi_unified_t wmi_hdl,
+				uint8_t *evt_buf,
+				uint32_t *num_rf_characterization_entries);
+
+/**
+ * wmi_extract_rf_characterziation_entries - Extract RF characterization metrics
+ * received from the RF characterization event.
+ * @wmi_hdl: WMI handle
+ * @evt_buf: Event buffer
+ * @num_rf_characterization_entries: Number of RF characterization metrics
  * @rf_characterization_entries: Pointer to RF characterization metrics
  *
  * Return: QDF status of operation
  */
 QDF_STATUS wmi_extract_rf_characterization_entries(wmi_unified_t wmi_hdl,
 	uint8_t *evt_buf,
-	struct wlan_psoc_host_rf_characterization_entry *rf_characterization_entries);
+	uint32_t num_rf_characterization_entries,
+	struct wmi_host_rf_characterization_event_param *rf_characterization_entries);
 #endif
 
 /*

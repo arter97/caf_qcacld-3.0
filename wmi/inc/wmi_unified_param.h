@@ -4860,6 +4860,7 @@ typedef enum {
 	wmi_pdev_interop_issues_ap_event_id,
 #endif
 	wmi_coex_report_antenna_isolation_event_id,
+	wmi_chan_rf_characterization_info_event_id,
 	wmi_events_max,
 } wmi_conv_event_id;
 
@@ -5022,6 +5023,7 @@ typedef enum {
 	wmi_pdev_param_set_mu_ppdu_duration,
 	wmi_pdev_param_set_tbtt_ctrl,
 	wmi_pdev_param_set_cmd_obss_pd_threshold,
+	wmi_pdev_param_set_cmd_obss_pd_per_ac,
 	wmi_pdev_param_max,
 } wmi_conv_pdev_params_id;
 
@@ -5347,6 +5349,7 @@ typedef enum {
 	wmi_service_data_stall_recovery_support,
 	wmi_service_tx_compl_tsf64,
 	wmi_service_vdev_delete_all_peer,
+	wmi_service_three_way_coex_config_legacy,
 	wmi_services_max,
 } wmi_conv_service_ids;
 #define WMI_SERVICE_UNAVAILABLE 0xFFFF
@@ -5468,6 +5471,7 @@ struct wmi_host_fw_abi_ver {
  * @twt_ap_sta_count: Max no of STA with which TWT sessions can be formed
  *                    by the AP
  * @max_bssid_indicator: max number of MBSS VAPs
+ * @three_way_coex_config_legacy_en: enable three way coex legacy feature
  */
 typedef struct {
 	uint32_t num_vdevs;
@@ -5550,6 +5554,7 @@ typedef struct {
 	uint32_t eapol_minrate_set:1,
 		 eapol_minrate_ac_set:2;
 	bool tstamp64_en;
+	bool three_way_coex_config_legacy_en;
 } target_resource_config;
 
 /**
@@ -7165,6 +7170,18 @@ struct wmi_host_vdev_peer_delete_all_response_event {
 struct wmi_host_dcs_interference_param {
 	uint32_t interference_type;
 	uint32_t pdev_id;
+};
+
+/**
+ * struct wmi_host_rf_characterization_event_param - rf characterization table
+ * @freq: center frequency of primary channel (in MHz)
+ * @bw: bandwidth of primary channel (in MHz)
+ * @chan_metric: primary channel-specific metric
+ */
+struct wmi_host_rf_characterization_event_param {
+	uint16_t freq;
+	wmi_host_channel_width bw;
+	uint8_t chan_metric;
 };
 
 /*

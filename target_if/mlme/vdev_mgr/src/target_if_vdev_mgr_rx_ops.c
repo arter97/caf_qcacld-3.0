@@ -31,6 +31,7 @@
 #include <target_if.h>
 #include <qdf_platform.h>
 #include <wlan_vdev_mlme_main.h>
+#include <wmi_unified_vdev_api.h>
 
 void target_if_vdev_mgr_rsp_timer_mgmt_cb(void *arg)
 {
@@ -45,6 +46,7 @@ void target_if_vdev_mgr_rsp_timer_mgmt_cb(void *arg)
 	struct vdev_delete_response del_rsp = {0};
 	struct peer_delete_all_response peer_del_all_rsp = {0};
 	uint8_t vdev_id;
+	uint16_t rsp_pos = RESPONSE_BIT_MAX;
 
 	vdev_id = wlan_vdev_get_id(vdev);
 	mlme_debug("Response timer expired for VDEV %d", vdev_id);
@@ -77,10 +79,13 @@ void target_if_vdev_mgr_rsp_timer_mgmt_cb(void *arg)
 	    qdf_is_fw_down()) {
 		/* this ensures stop timer will not be done in target_if */
 		vdev_rsp->timer_status = QDF_STATUS_E_TIMEOUT;
-		if (qdf_atomic_test_bit(START_RESPONSE_BIT,
-					&vdev_rsp->rsp_status) ||
-		    qdf_atomic_test_bit(RESTART_RESPONSE_BIT,
-					&vdev_rsp->rsp_status)) {
+	}
+
+	if (qdf_atomic_test_bit(START_RESPONSE_BIT,
+				&vdev_rsp->rsp_status) ||
+	    qdf_atomic_test_bit(RESTART_RESPONSE_BIT,
+				&vdev_rsp->rsp_status)) {
+		if (vdev_rsp->timer_status == QDF_STATUS_E_TIMEOUT) {
 			start_rsp.vdev_id = wlan_vdev_get_id(vdev);
 			start_rsp.status = WLAN_MLME_HOST_VDEV_START_TIMEOUT;
 			if (qdf_atomic_test_bit(START_RESPONSE_BIT,
@@ -92,39 +97,57 @@ void target_if_vdev_mgr_rsp_timer_mgmt_cb(void *arg)
 					WMI_HOST_VDEV_RESTART_RESP_EVENT;
 
 			rx_ops->vdev_mgr_start_response(psoc, &start_rsp);
+		} else {
+			if (qdf_atomic_test_bit(START_RESPONSE_BIT,
+						&vdev_rsp->rsp_status))
+				rsp_pos = START_RESPONSE_BIT;
+			else
+				rsp_pos = RESTART_RESPONSE_BIT;
 		}
-
-		if (qdf_atomic_test_bit(STOP_RESPONSE_BIT,
-					&vdev_rsp->rsp_status)) {
+	} else if (qdf_atomic_test_bit(STOP_RESPONSE_BIT,
+				       &vdev_rsp->rsp_status)) {
+		if (vdev_rsp->timer_status == QDF_STATUS_E_TIMEOUT) {
 			stop_rsp.vdev_id = wlan_vdev_get_id(vdev);
 			rx_ops->vdev_mgr_stop_response(psoc, &stop_rsp);
+		} else {
+			rsp_pos = STOP_RESPONSE_BIT;
 		}
-
-		if (qdf_atomic_test_bit(DELETE_RESPONSE_BIT,
-					&vdev_rsp->rsp_status)) {
+	} else if (qdf_atomic_test_bit(DELETE_RESPONSE_BIT,
+				       &vdev_rsp->rsp_status)) {
+		if (vdev_rsp->timer_status == QDF_STATUS_E_TIMEOUT) {
 			del_rsp.vdev_id = wlan_vdev_get_id(vdev);
 			rx_ops->vdev_mgr_delete_response(psoc, &del_rsp);
+		} else {
+			rsp_pos = DELETE_RESPONSE_BIT;
 		}
 
-		if (qdf_atomic_test_bit(PEER_DELETE_ALL_RESPONSE_BIT,
-					&vdev_rsp->rsp_status)) {
+	} else if (qdf_atomic_test_bit(PEER_DELETE_ALL_RESPONSE_BIT,
+				&vdev_rsp->rsp_status)) {
+		if (vdev_rsp->timer_status == QDF_STATUS_E_TIMEOUT) {
 			peer_del_all_rsp.vdev_id = wlan_vdev_get_id(vdev);
 			rx_ops->vdev_mgr_peer_delete_all_response(
-							psoc,
-							&peer_del_all_rsp);
+					psoc,
+					&peer_del_all_rsp);
+		} else {
+			rsp_pos = PEER_DELETE_ALL_RESPONSE_BIT;
 		}
-
+	} else {
+		mlme_err("PSOC_%d VDEV_%d: Unknown error",
+			 wlan_psoc_get_id(psoc), vdev_id);
 		return;
 	}
 
+	if (vdev_rsp->timer_status == QDF_STATUS_E_TIMEOUT)
+		return;
+
 	if (target_if_vdev_mgr_is_panic_on_bug()) {
-		QDF_DEBUG_PANIC("PSOC_%d VDEV_%d: Panic on bug, rsp status:%d",
+		QDF_DEBUG_PANIC("PSOC_%d VDEV_%d: Panic, %s response timeout",
 				wlan_psoc_get_id(psoc),
-				vdev_id, vdev_rsp->rsp_status);
+				vdev_id, string_from_rsp_bit(rsp_pos));
 	} else {
-		mlme_err("PSOC_%d VDEV_%d: Trigger Self recovery, rsp status%d",
+		mlme_err("PSOC_%d VDEV_%d: Self recovery, %s response timeout",
 			 wlan_psoc_get_id(psoc),
-			 vdev_id, vdev_rsp->rsp_status);
+			 vdev_id, string_from_rsp_bit(rsp_pos));
 		wmi_handle = target_if_vdev_mgr_wmi_handle_get(vdev);
 
 		qdf_mem_set(&param, sizeof(param), 0);
@@ -300,7 +323,7 @@ release_vdev_target_if_ref:
 	return qdf_status_to_os_return(status);
 }
 
-static int target_if_vdev_mgr_delete_response_handler(
+int target_if_vdev_mgr_delete_response_handler(
 						ol_scn_t scn,
 						uint8_t *data,
 						uint32_t datalen)
@@ -460,10 +483,10 @@ release_vdev_target_if_ref:
 	return qdf_status_to_os_return(status);
 }
 
-static int target_if_vdev_mgr_offload_bcn_tx_status_handler(
-							ol_scn_t scn,
-							uint8_t *data,
-							uint32_t datalen)
+int target_if_vdev_mgr_offload_bcn_tx_status_handler(
+					ol_scn_t scn,
+					uint8_t *data,
+					uint32_t datalen)
 {
 	QDF_STATUS status;
 	struct wlan_objmgr_psoc *psoc;
@@ -506,9 +529,8 @@ static int target_if_vdev_mgr_offload_bcn_tx_status_handler(
 	return qdf_status_to_os_return(status);
 }
 
-static int target_if_vdev_mgr_tbttoffset_update_handler(
-						ol_scn_t scn,
-						uint8_t *data,
+int target_if_vdev_mgr_tbttoffset_update_handler(
+						ol_scn_t scn, uint8_t *data,
 						uint32_t datalen)
 {
 	QDF_STATUS status;
@@ -550,7 +572,7 @@ static int target_if_vdev_mgr_tbttoffset_update_handler(
 	return qdf_status_to_os_return(status);
 }
 
-static int target_if_vdev_mgr_ext_tbttoffset_update_handler(
+int target_if_vdev_mgr_ext_tbttoffset_update_handler(
 						ol_scn_t scn,
 						uint8_t *data,
 						uint32_t datalen)

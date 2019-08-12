@@ -90,18 +90,21 @@ QDF_STATUS wlan_cp_stats_peer_cs_init(struct peer_cp_stats *peer_cs)
 	if (!peer_mc_stats)
 		return QDF_STATUS_E_NOMEM;
 
-	peer_cs->peer_adv_stats = qdf_mem_malloc(sizeof
-						 (struct peer_adv_mc_cp_stats));
-	if (!peer_cs->peer_adv_stats) {
+	peer_mc_stats->adv_stats =
+			qdf_mem_malloc(sizeof(struct peer_adv_mc_cp_stats));
+
+	if (!peer_mc_stats->adv_stats) {
 		qdf_mem_free(peer_mc_stats);
+		peer_mc_stats = NULL;
 		return QDF_STATUS_E_NOMEM;
 	}
 
 	peer_mc_stats->extd_stats =
 			qdf_mem_malloc(sizeof(struct peer_extd_stats));
+
 	if (!peer_mc_stats->extd_stats) {
-		qdf_mem_free(peer_cs->peer_adv_stats);
-		peer_cs->peer_adv_stats = NULL;
+		qdf_mem_free(peer_mc_stats->adv_stats);
+		peer_mc_stats->adv_stats = NULL;
 		qdf_mem_free(peer_mc_stats);
 		peer_mc_stats = NULL;
 		return QDF_STATUS_E_NOMEM;
@@ -115,8 +118,8 @@ QDF_STATUS wlan_cp_stats_peer_cs_deinit(struct peer_cp_stats *peer_cs)
 {
 	struct peer_mc_cp_stats *peer_mc_stats = peer_cs->peer_stats;
 
-	qdf_mem_free(peer_cs->peer_adv_stats);
-	peer_cs->peer_adv_stats = NULL;
+	qdf_mem_free(peer_mc_stats->adv_stats);
+	peer_mc_stats->adv_stats = NULL;
 	qdf_mem_free(peer_mc_stats->extd_stats);
 	peer_mc_stats->extd_stats = NULL;
 	qdf_mem_free(peer_cs->peer_stats);
@@ -153,6 +156,7 @@ QDF_STATUS ucfg_mc_cp_stats_inc_wake_lock_stats_by_protocol(
 	vdev_mc_stats = vdev_cp_stats_priv->vdev_stats;
 	stats = &vdev_mc_stats->wow_stats;
 	switch (protocol) {
+	case QDF_PROTO_ICMP_REQ:
 	case QDF_PROTO_ICMP_RES:
 		stats->icmpv4_count++;
 		break;
@@ -635,6 +639,21 @@ QDF_STATUS ucfg_mc_cp_stats_set_rate_flags(struct wlan_objmgr_vdev *vdev,
 	wlan_cp_stats_vdev_obj_unlock(vdev_cp_stats_priv);
 
 	return QDF_STATUS_SUCCESS;
+}
+
+void ucfg_mc_cp_stats_register_lost_link_info_cb(
+			struct wlan_objmgr_psoc *psoc,
+			void (*lost_link_cp_stats_info_cb)(void *stats_ev))
+{
+	struct psoc_cp_stats *psoc_cp_stats_priv;
+
+	psoc_cp_stats_priv = wlan_cp_stats_get_psoc_stats_obj(psoc);
+	if (!psoc_cp_stats_priv) {
+		cp_stats_err("psoc cp stats object is null");
+		return;
+	}
+
+	psoc_cp_stats_priv->legacy_stats_cb = lost_link_cp_stats_info_cb;
 }
 
 #ifdef WLAN_POWER_MANAGEMENT_OFFLOAD

@@ -580,10 +580,10 @@ static int htt_h2t_ver_req_msg(struct htt_soc *soc)
  *
  * Return: 0 on success; error code on failure
  */
-int htt_srng_setup(void *htt_soc, int mac_id, void *hal_srng,
-	int hal_ring_type)
+int htt_srng_setup(struct htt_soc *soc, int mac_id,
+		   hal_ring_handle_t hal_ring_hdl,
+		   int hal_ring_type)
 {
-	struct htt_soc *soc = (struct htt_soc *)htt_soc;
 	struct dp_htt_htc_pkt *pkt;
 	qdf_nbuf_t htt_msg;
 	uint32_t *msg_word;
@@ -604,9 +604,9 @@ int htt_srng_setup(void *htt_soc, int mac_id, void *hal_srng,
 	if (!htt_msg)
 		goto fail0;
 
-	hal_get_srng_params(soc->hal_soc, hal_srng, &srng_params);
-	hp_addr = hal_srng_get_hp_addr(soc->hal_soc, hal_srng);
-	tp_addr = hal_srng_get_tp_addr(soc->hal_soc, hal_srng);
+	hal_get_srng_params(soc->hal_soc, hal_ring_hdl, &srng_params);
+	hp_addr = hal_srng_get_hp_addr(soc->hal_soc, hal_ring_hdl);
+	tp_addr = hal_srng_get_tp_addr(soc->hal_soc, hal_ring_hdl);
 
 	switch (hal_ring_type) {
 	case RXDMA_BUF:
@@ -846,9 +846,10 @@ fail0:
  * @htt_tlv_filter:	Rx SRNG TLV and filter setting
  * Return: 0 on success; error code on failure
  */
-int htt_h2t_rx_ring_cfg(void *htt_soc, int pdev_id, void *hal_srng,
-	int hal_ring_type, int ring_buf_size,
-	struct htt_rx_ring_tlv_filter *htt_tlv_filter)
+int htt_h2t_rx_ring_cfg(struct htt_soc *htt_soc, int pdev_id,
+			hal_ring_handle_t hal_ring_hdl,
+			int hal_ring_type, int ring_buf_size,
+			struct htt_rx_ring_tlv_filter *htt_tlv_filter)
 {
 	struct htt_soc *soc = (struct htt_soc *)htt_soc;
 	struct dp_htt_htc_pkt *pkt;
@@ -866,7 +867,7 @@ int htt_h2t_rx_ring_cfg(void *htt_soc, int pdev_id, void *hal_srng,
 	if (!htt_msg)
 		goto fail0;
 
-	hal_get_srng_params(soc->hal_soc, hal_srng, &srng_params);
+	hal_get_srng_params(soc->hal_soc, hal_ring_hdl, &srng_params);
 
 	switch (hal_ring_type) {
 	case RXDMA_BUF:
@@ -1844,6 +1845,7 @@ static void dp_process_ppdu_stats_common_tlv(struct dp_pdev *pdev,
 		uint32_t *tag_buf, struct ppdu_info *ppdu_info)
 {
 	uint16_t frame_type;
+	uint16_t frame_ctrl;
 	uint16_t freq;
 	struct dp_soc *soc = NULL;
 	struct cdp_tx_completion_ppdu *ppdu_desc = NULL;
@@ -1858,6 +1860,8 @@ static void dp_process_ppdu_stats_common_tlv(struct dp_pdev *pdev,
 	tag_buf++;
 	frame_type = HTT_PPDU_STATS_COMMON_TLV_FRM_TYPE_GET(*tag_buf);
 
+	frame_ctrl = ppdu_desc->frame_ctrl;
+
 	switch (frame_type) {
 	case HTT_STATS_FTYPE_TIDQ_DATA_SU:
 	case HTT_STATS_FTYPE_TIDQ_DATA_MU:
@@ -1865,7 +1869,7 @@ static void dp_process_ppdu_stats_common_tlv(struct dp_pdev *pdev,
 		 * for management packet, frame type come as DATA_SU
 		 * need to check frame_ctrl before setting frame_type
 		 */
-		if (HTT_GET_FRAME_CTRL_TYPE(frame_type) <= FRAME_CTRL_TYPE_CTRL)
+		if (HTT_GET_FRAME_CTRL_TYPE(frame_ctrl) <= FRAME_CTRL_TYPE_CTRL)
 			ppdu_desc->frame_type = CDP_PPDU_FTYPE_CTRL;
 		else
 			ppdu_desc->frame_type = CDP_PPDU_FTYPE_DATA;
@@ -3120,13 +3124,38 @@ error:
  *
  * Return: 0 on success; error code on failure
  */
-int htt_soc_attach_target(void *htt_soc)
+int htt_soc_attach_target(struct htt_soc *htt_soc)
 {
 	struct htt_soc *soc = (struct htt_soc *)htt_soc;
 
 	return htt_h2t_ver_req_msg(soc);
 }
 
+void htt_set_htc_handle(struct htt_soc *htt_soc, HTC_HANDLE htc_soc)
+{
+	htt_soc->htc_soc = htc_soc;
+}
+
+HTC_HANDLE htt_get_htc_handle(struct htt_soc *htt_soc)
+{
+	return htt_soc->htc_soc;
+}
+
+struct htt_soc *htt_soc_attach(struct dp_soc *soc, HTC_HANDLE htc_handle)
+{
+	struct htt_soc *htt_soc = NULL;
+
+	htt_soc = qdf_mem_malloc(sizeof(*htt_soc));
+	if (!htt_soc) {
+		dp_err("HTT attach failed");
+		return NULL;
+	}
+	htt_soc->dp_soc = soc;
+	htt_soc->htc_soc = htc_handle;
+	HTT_TX_MUTEX_INIT(&htt_soc->htt_tx_mutex);
+
+	return htt_soc;
+}
 
 #if defined(WDI_EVENT_ENABLE) && !defined(REMOVE_PKT_LOG)
 /*
@@ -3552,15 +3581,17 @@ htt_htc_soc_attach(struct htt_soc *soc)
  * Return: HTT handle on success; NULL on failure
  */
 void *
-htt_soc_initialize(void *htt_soc, void *ctrl_psoc, HTC_HANDLE htc_soc,
-		   void *hal_soc, qdf_device_t osdev)
+htt_soc_initialize(struct htt_soc *htt_soc,
+		   struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
+		   HTC_HANDLE htc_soc,
+		   hal_soc_handle_t hal_soc_hdl, qdf_device_t osdev)
 {
 	struct htt_soc *soc = (struct htt_soc *)htt_soc;
 
 	soc->osdev = osdev;
 	soc->ctrl_psoc = ctrl_psoc;
 	soc->htc_soc = htc_soc;
-	soc->hal_soc = hal_soc;
+	soc->hal_soc = hal_soc_hdl;
 
 	if (htt_htc_soc_attach(soc))
 		goto fail2;
@@ -3589,8 +3620,6 @@ QDF_STATUS htt_soc_htc_prealloc(struct htt_soc *soc)
 {
 	int i;
 
-	HTT_TX_MUTEX_INIT(&soc->htt_tx_mutex);
-
 	soc->htt_htc_pkt_freelist = NULL;
 	/* pre-allocate some HTC_PACKET objects */
 	for (i = 0; i < HTT_HTC_PKT_POOL_INIT_SIZE; i++) {
@@ -3608,7 +3637,7 @@ QDF_STATUS htt_soc_htc_prealloc(struct htt_soc *soc)
  * htt_soc_detach() - Free SOC level HTT handle
  * @htt_hdl: HTT SOC handle
  */
-void htt_soc_detach(void *htt_hdl)
+void htt_soc_detach(struct htt_soc *htt_hdl)
 {
 	struct htt_soc *htt_handle = (struct htt_soc *)htt_hdl;
 
@@ -3736,7 +3765,8 @@ QDF_STATUS dp_h2t_ext_stats_msg_send(struct dp_pdev *pdev,
 			dp_htt_h2t_send_complete_free_netbuf,
 			qdf_nbuf_data(msg), qdf_nbuf_len(msg),
 			soc->htc_endpoint,
-			1); /* tag - not relevant here */
+			/* tag for FW response msg not guaranteed */
+			HTC_TX_PACKET_TAG_RUNTIME_PUT);
 
 	SET_HTC_PACKET_NET_BUF_CONTEXT(&pkt->htc_pkt, msg);
 	DP_HTT_SEND_HTC_PKT(soc, pkt, HTT_H2T_MSG_TYPE_EXT_STATS_REQ,

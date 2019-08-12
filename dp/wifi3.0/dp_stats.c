@@ -2947,7 +2947,7 @@ static inline void dp_print_rx_pdev_rate_stats_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->rssi_data);
 	DP_PRINT_STATS("rssi_comb = %u",
 		       dp_stats_buf->rssi_comb);
-	DP_PRINT_STATS("rx_in_dbm = %u",
+	DP_PRINT_STATS("rssi_in_dbm = %d",
 		       dp_stats_buf->rssi_in_dbm);
 	DP_PRINT_STATS("rx_11ax_su_ext = %u",
 		       dp_stats_buf->rx_11ax_su_ext);
@@ -4481,6 +4481,16 @@ void dp_print_soc_cfg_params(struct dp_soc *soc)
 		       soc_cfg_ctx->reo_status_ring);
 	DP_PRINT_STATS("RXDMA refill ring: %u ",
 		       soc_cfg_ctx->rxdma_refill_ring);
+	DP_PRINT_STATS("TX_desc limit_0: %u ",
+		       soc_cfg_ctx->tx_desc_limit_0);
+	DP_PRINT_STATS("TX_desc limit_1: %u ",
+		       soc_cfg_ctx->tx_desc_limit_1);
+	DP_PRINT_STATS("TX_desc limit_2: %u ",
+		       soc_cfg_ctx->tx_desc_limit_2);
+	DP_PRINT_STATS("TX device limit: %u ",
+		       soc_cfg_ctx->tx_device_limit);
+	DP_PRINT_STATS("TX sw internode queue: %u ",
+		       soc_cfg_ctx->tx_sw_internode_queue);
 	DP_PRINT_STATS("RXDMA err dst ring: %u ",
 		       soc_cfg_ctx->rxdma_err_dst_ring);
 }
@@ -4587,6 +4597,9 @@ dp_print_ring_stats(struct dp_pdev *pdev)
 	uint32_t i;
 	int mac_id;
 
+	if (hif_pm_runtime_get_sync(pdev->soc->hif_handle))
+		return;
+
 	dp_print_ring_stat_from_hal(pdev->soc,
 				    &pdev->soc->reo_exception_ring,
 				    REO_EXCEPTION);
@@ -4645,6 +4658,8 @@ dp_print_ring_stats(struct dp_pdev *pdev)
 		dp_print_ring_stat_from_hal(pdev->soc,
 					    &pdev->rxdma_err_dst_ring[i],
 					    RXDMA_DST);
+
+	hif_pm_runtime_put(pdev->soc->hif_handle);
 }
 
 /**

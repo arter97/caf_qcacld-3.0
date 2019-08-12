@@ -35,7 +35,7 @@
 #define DP_TX_NAPI_BUDGET_DIV_MASK 0
 
 /* PPDU Stats Configuration - Configure bitmask for enabling tx ppdu tlv's */
-#define DP_PPDU_TXLITE_STATS_BITMASK_CFG 0x1FFF
+#define DP_PPDU_TXLITE_STATS_BITMASK_CFG 0x3FFF
 
 #define NUM_RXDMA_RINGS_PER_PDEV 2
 #else
@@ -147,6 +147,11 @@ struct wlan_srng_cfg {
  * @enable_data_stall_detection: flag to enable data stall detection
  * @disable_intra_bss_fwd: flag to disable intra bss forwarding
  * @rxdma1_enable: flag to indicate if rxdma1 is enabled
+ * @tx_desc_limit_0: tx_desc limit for 5G H
+ * @tx_desc_limit_1: tx_desc limit for 2G
+ * @tx_desc_limit_2: tx_desc limit for 5G L
+ * @tx_device_limit: tx device limit
+ * @tx_sw_internode_queue: tx sw internode queue
  * @tx_comp_loop_pkt_limit: Max # of packets to be processed in 1 tx comp loop
  * @rx_reap_loop_pkt_limit: Max # of packets to be processed in 1 rx reap loop
  * @rx_hp_oos_update_limit: Max # of HP OOS (out of sync) updates
@@ -228,6 +233,11 @@ struct wlan_cfg_dp_soc_ctxt {
 	bool disable_intra_bss_fwd;
 	bool rxdma1_enable;
 	int max_ast_idx;
+	int tx_desc_limit_0;
+	int tx_desc_limit_1;
+	int tx_desc_limit_2;
+	int tx_device_limit;
+	int tx_sw_internode_queue;
 #ifdef WLAN_FEATURE_RX_SOFTIRQ_TIME_LIMIT
 	uint32_t tx_comp_loop_pkt_limit;
 	uint32_t rx_reap_loop_pkt_limit;
@@ -265,7 +275,8 @@ struct wlan_cfg_dp_pdev_ctxt {
  *
  * Return: Handle to configuration context
  */
-struct wlan_cfg_dp_soc_ctxt *wlan_cfg_soc_attach(void *ctrl_obj);
+struct wlan_cfg_dp_soc_ctxt *
+wlan_cfg_soc_attach(struct cdp_ctrl_objmgr_psoc *ctrl_obj);
 
 /**
  * wlan_cfg_soc_detach() - Detach soc configuration handle
@@ -287,7 +298,8 @@ void wlan_cfg_soc_detach(struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx);
  *
  * Return: Handle to configuration context
  */
-struct wlan_cfg_dp_pdev_ctxt *wlan_cfg_pdev_attach(void *ctrl_obj);
+struct wlan_cfg_dp_pdev_ctxt *
+wlan_cfg_pdev_attach(struct cdp_ctrl_objmgr_psoc *ctrl_obj);
 
 /**
  * wlan_cfg_pdev_detach() Detach and free pdev configuration handle
@@ -988,6 +1000,51 @@ wlan_cfg_get_dp_soc_reo_cmd_ring_size(struct wlan_cfg_dp_soc_ctxt *cfg);
  */
 int
 wlan_cfg_get_dp_soc_reo_status_ring_size(struct wlan_cfg_dp_soc_ctxt *cfg);
+
+/*
+ * wlan_cfg_get_dp_soc_tx_desc_limit_0 - Get tx desc limit for 5G H
+ * @wlan_cfg_soc_ctx
+ *
+ * Return: tx desc limit for 5G H
+ */
+int
+wlan_cfg_get_dp_soc_tx_desc_limit_0(struct wlan_cfg_dp_soc_ctxt *cfg);
+
+/*
+ * wlan_cfg_get_dp_soc_tx_desc_limit_1 - Get tx desc limit for 2G
+ * @wlan_cfg_soc_ctx
+ *
+ * Return: tx desc limit for 2G
+ */
+int
+wlan_cfg_get_dp_soc_tx_desc_limit_1(struct wlan_cfg_dp_soc_ctxt *cfg);
+
+/*
+ * wlan_cfg_get_dp_soc_tx_desc_limit_2 - Get tx desc limit for 5G L
+ * @wlan_cfg_soc_ctx
+ *
+ * Return: tx desc limit for 5G L
+ */
+int
+wlan_cfg_get_dp_soc_tx_desc_limit_2(struct wlan_cfg_dp_soc_ctxt *cfg);
+
+/*
+ * wlan_cfg_get_dp_soc_tx_device_limit - Get tx device limit
+ * @wlan_cfg_soc_ctx
+ *
+ * Return: tx device limit
+ */
+int
+wlan_cfg_get_dp_soc_tx_device_limit(struct wlan_cfg_dp_soc_ctxt *cfg);
+
+/*
+ * wlan_cfg_get_dp_soc_tx_sw_internode_queue - Get tx sw internode queue
+ * @wlan_cfg_soc_ctx
+ *
+ * Return: tx sw internode queue
+ */
+int
+wlan_cfg_get_dp_soc_tx_sw_internode_queue(struct wlan_cfg_dp_soc_ctxt *cfg);
 
 /*
  * wlan_cfg_get_dp_soc_rxdma_refill_ring_size - Get rxdma refill ring size

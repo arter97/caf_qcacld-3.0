@@ -284,7 +284,8 @@ void wlan_set_srng_cfg(struct wlan_srng_cfg **wlan_cfg)
  * @psoc - Object manager psoc
  * Return: wlan_cfg_ctx - Handle to Configuration context
  */
-struct wlan_cfg_dp_soc_ctxt *wlan_cfg_soc_attach(void *psoc)
+struct wlan_cfg_dp_soc_ctxt *
+wlan_cfg_soc_attach(struct cdp_ctrl_objmgr_psoc *psoc)
 {
 	int i = 0;
 
@@ -399,6 +400,16 @@ struct wlan_cfg_dp_soc_ctxt *wlan_cfg_soc_attach(void *psoc)
 						CFG_DP_REO_STATUS_RING);
 	wlan_cfg_ctx->rxdma_refill_ring = cfg_get(psoc,
 						  CFG_DP_RXDMA_REFILL_RING);
+	wlan_cfg_ctx->tx_desc_limit_0 = cfg_get(psoc,
+						CFG_DP_TX_DESC_LIMIT_0);
+	wlan_cfg_ctx->tx_desc_limit_1 = cfg_get(psoc,
+						CFG_DP_TX_DESC_LIMIT_1);
+	wlan_cfg_ctx->tx_desc_limit_2 = cfg_get(psoc,
+						CFG_DP_TX_DESC_LIMIT_2);
+	wlan_cfg_ctx->tx_device_limit = cfg_get(psoc,
+						CFG_DP_TX_DEVICE_LIMIT);
+	wlan_cfg_ctx->tx_sw_internode_queue = cfg_get(psoc,
+						CFG_DP_TX_SW_INTERNODE_QUEUE);
 	wlan_cfg_ctx->rxdma_err_dst_ring = cfg_get(psoc,
 						   CFG_DP_RXDMA_ERR_DST_RING);
 	wlan_cfg_ctx->enable_data_stall_detection =
@@ -418,7 +429,8 @@ void wlan_cfg_soc_detach(struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx)
 	qdf_mem_free(wlan_cfg_ctx);
 }
 
-struct wlan_cfg_dp_pdev_ctxt *wlan_cfg_pdev_attach(void *psoc)
+struct wlan_cfg_dp_pdev_ctxt *
+wlan_cfg_pdev_attach(struct cdp_ctrl_objmgr_psoc *psoc)
 {
 	struct wlan_cfg_dp_pdev_ctxt *wlan_cfg_ctx =
 		qdf_mem_malloc(sizeof(struct wlan_cfg_dp_pdev_ctxt));
@@ -928,6 +940,36 @@ int
 wlan_cfg_get_dp_soc_rxdma_refill_ring_size(struct wlan_cfg_dp_soc_ctxt *cfg)
 {
 	return cfg->rxdma_refill_ring;
+}
+
+int
+wlan_cfg_get_dp_soc_tx_desc_limit_0(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return cfg->tx_desc_limit_0;
+}
+
+int
+wlan_cfg_get_dp_soc_tx_desc_limit_1(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return cfg->tx_desc_limit_1;
+}
+
+int
+wlan_cfg_get_dp_soc_tx_desc_limit_2(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return cfg->tx_desc_limit_2;
+}
+
+int
+wlan_cfg_get_dp_soc_tx_device_limit(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return cfg->tx_device_limit;
+}
+
+int
+wlan_cfg_get_dp_soc_tx_sw_internode_queue(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return cfg->tx_sw_internode_queue;
 }
 
 int

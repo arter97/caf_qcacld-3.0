@@ -40,6 +40,9 @@
 #define RX_BUFFER_SIZE			2048
 #endif
 
+/* HAL_RX_NON_QOS_TID = NON_QOS_TID which is 16 */
+#define HAL_RX_NON_QOS_TID 16
+
 enum {
 	HAL_HW_RX_DECAP_FORMAT_RAW = 0,
 	HAL_HW_RX_DECAP_FORMAT_NWIFI,
@@ -1250,6 +1253,80 @@ hal_rx_mpdu_start_mpdu_qos_control_valid_get(uint8_t *buf)
 	return qos_control_valid;
 }
 
+/**
+ * enum hal_rx_mpdu_info_sw_frame_group_id_type: Enum for group id in MPDU_INFO
+ *
+ * @ HAL_MPDU_SW_FRAME_GROUP_NDP_FRAME: NDP frame
+ * @ HAL_MPDU_SW_FRAME_GROUP_MULTICAST_DATA: multicast data frame
+ * @ HAL_MPDU_SW_FRAME_GROUP_UNICAST_DATA: unicast data frame
+ * @ HAL_MPDU_SW_FRAME_GROUP_NULL_DATA: NULL data frame
+ * @ HAL_MPDU_SW_FRAME_GROUP_MGMT: management frame
+ * @ HAL_MPDU_SW_FRAME_GROUP_CTRL: control frame
+ * @ HAL_MPDU_SW_FRAME_GROUP_UNSUPPORTED: unsupported
+ * @ HAL_MPDU_SW_FRAME_GROUP_MAX: max limit
+ */
+enum hal_rx_mpdu_info_sw_frame_group_id_type {
+	HAL_MPDU_SW_FRAME_GROUP_NDP_FRAME = 0,
+	HAL_MPDU_SW_FRAME_GROUP_MULTICAST_DATA,
+	HAL_MPDU_SW_FRAME_GROUP_UNICAST_DATA,
+	HAL_MPDU_SW_FRAME_GROUP_NULL_DATA,
+	HAL_MPDU_SW_FRAME_GROUP_MGMT,
+	HAL_MPDU_SW_FRAME_GROUP_CTRL = 20,
+	HAL_MPDU_SW_FRAME_GROUP_UNSUPPORTED = 36,
+	HAL_MPDU_SW_FRAME_GROUP_MAX = 37,
+};
+
+/**
+ * hal_rx_is_unicast: check packet is unicast frame or not.
+ *
+ * @ buf: pointer to rx pkt TLV.
+ *
+ * Return: true on unicast.
+ */
+static inline bool
+hal_rx_is_unicast(uint8_t *buf)
+{
+	struct rx_pkt_tlvs *pkt_tlvs = (struct rx_pkt_tlvs *)buf;
+	struct rx_mpdu_start *mpdu_start =
+		&pkt_tlvs->mpdu_start_tlv.rx_mpdu_start;
+	uint32_t grp_id;
+	uint8_t *rx_mpdu_info = (uint8_t *)&mpdu_start->rx_mpdu_info_details;
+
+	grp_id = (_HAL_MS((*_OFFSET_TO_WORD_PTR((rx_mpdu_info),
+			   RX_MPDU_INFO_0_SW_FRAME_GROUP_ID_OFFSET)),
+			  RX_MPDU_INFO_0_SW_FRAME_GROUP_ID_MASK,
+			  RX_MPDU_INFO_0_SW_FRAME_GROUP_ID_LSB));
+
+	return (HAL_MPDU_SW_FRAME_GROUP_UNICAST_DATA == grp_id) ? true : false;
+}
+
+/**
+ * hal_rx_tid_get: get tid based on qos control valid.
+ *
+ * @ buf: pointer to rx pkt TLV.
+ *
+ * Return: tid
+ */
+static inline uint32_t
+hal_rx_tid_get(hal_soc_handle_t hal_soc_hdl, uint8_t *buf)
+{
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+	struct rx_pkt_tlvs *pkt_tlvs = (struct rx_pkt_tlvs *)buf;
+	struct rx_mpdu_start *mpdu_start =
+	&pkt_tlvs->mpdu_start_tlv.rx_mpdu_start;
+	uint8_t *rx_mpdu_info = (uint8_t *)&mpdu_start->rx_mpdu_info_details;
+	uint8_t qos_control_valid =
+		(_HAL_MS((*_OFFSET_TO_WORD_PTR((rx_mpdu_info),
+			  RX_MPDU_INFO_2_MPDU_QOS_CONTROL_VALID_OFFSET)),
+			 RX_MPDU_INFO_2_MPDU_QOS_CONTROL_VALID_MASK,
+			 RX_MPDU_INFO_2_MPDU_QOS_CONTROL_VALID_LSB));
+
+	if (qos_control_valid)
+		return hal_soc->ops->hal_rx_mpdu_start_tid_get(buf);
+
+	return HAL_RX_NON_QOS_TID;
+}
+
 
 /*
  * Get SW peer id from RX_MPDU_START
@@ -1739,8 +1816,10 @@ QDF_STATUS hal_rx_mpdu_get_addr4(uint8_t *buf, uint8_t *mac_addr)
  * Return: da index
  */
 static inline uint16_t
-hal_rx_msdu_end_da_idx_get(struct hal_soc *hal_soc, uint8_t *buf)
+hal_rx_msdu_end_da_idx_get(hal_soc_handle_t hal_soc_hdl, uint8_t *buf)
 {
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
 	return hal_soc->ops->hal_rx_msdu_end_da_idx_get(buf);
 }
 
@@ -1952,10 +2031,10 @@ struct hal_buf_info {
  * Return - Pointer to rx_msdu_details structure
  *
  */
-static inline void *hal_rx_link_desc_msdu0_ptr(void *msdu_link_ptr, void *hal)
+static inline
+void *hal_rx_link_desc_msdu0_ptr(void *msdu_link_ptr,
+				 struct hal_soc *hal_soc)
 {
-	struct hal_soc *hal_soc = (struct hal_soc *)hal;
-
 	return hal_soc->ops->hal_rx_link_desc_msdu0_ptr(msdu_link_ptr);
 }
 
@@ -1966,10 +2045,10 @@ static inline void *hal_rx_link_desc_msdu0_ptr(void *msdu_link_ptr, void *hal)
  * Return - Pointer to rx_msdu_desc_info structure.
  *
  */
-static inline void *hal_rx_msdu_desc_info_get_ptr(void *msdu_details_ptr, void *hal)
+static inline
+void *hal_rx_msdu_desc_info_get_ptr(void *msdu_details_ptr,
+				    struct hal_soc *hal_soc)
 {
-	struct hal_soc *hal_soc = (struct hal_soc *)hal;
-
 	return hal_soc->ops->hal_rx_msdu_desc_info_get_ptr(msdu_details_ptr);
 }
 
@@ -1991,11 +2070,12 @@ static inline void *hal_rx_msdu_desc_info_get_ptr(void *msdu_details_ptr, void *
  *
  * Return: void
  */
-static inline void hal_rx_msdu_list_get(struct hal_soc *hal_soc,
+static inline void hal_rx_msdu_list_get(hal_soc_handle_t hal_soc_hdl,
 					void *msdu_link_desc,
 					struct hal_rx_msdu_list *msdu_list,
 					uint16_t *num_msdus)
 {
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
 	struct rx_msdu_details *msdu_details;
 	struct rx_msdu_desc_info *msdu_desc_info;
 	struct rx_msdu_link *msdu_link = (struct rx_msdu_link *)msdu_link_desc;
@@ -2058,8 +2138,9 @@ static inline void hal_rx_msdu_list_get(struct hal_soc *hal_soc,
  * Return: dst_ind (REO destination ring ID)
  */
 static inline uint32_t
-hal_rx_msdu_reo_dst_ind_get(struct hal_soc *hal_soc, void *msdu_link_desc)
+hal_rx_msdu_reo_dst_ind_get(hal_soc_handle_t hal_soc_hdl, void *msdu_link_desc)
 {
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
 	struct rx_msdu_details *msdu_details;
 	struct rx_msdu_desc_info *msdu_desc_info;
 	struct rx_msdu_link *msdu_link = (struct rx_msdu_link *)msdu_link_desc;
@@ -2083,8 +2164,9 @@ hal_rx_msdu_reo_dst_ind_get(struct hal_soc *hal_soc, void *msdu_link_desc)
  * @ buf_info: structure to return the buffer information
  * Return: void
  */
-static inline void hal_rx_reo_buf_paddr_get(void *rx_desc,
-	 struct hal_buf_info *buf_info)
+static inline
+void hal_rx_reo_buf_paddr_get(hal_ring_desc_t rx_desc,
+			      struct hal_buf_info *buf_info)
 {
 	struct reo_destination_ring *reo_ring =
 		 (struct reo_destination_ring *)rx_desc;
@@ -2265,7 +2347,7 @@ enum hal_rx_wbm_buf_type {
  *
  * Return: true: error caused by PN check, false: other error
  */
-static inline bool hal_rx_reo_is_pn_error(void *rx_desc)
+static inline bool hal_rx_reo_is_pn_error(hal_ring_desc_t rx_desc)
 {
 	struct reo_destination_ring *reo_desc =
 			(struct reo_destination_ring *)rx_desc;
@@ -2285,7 +2367,7 @@ static inline bool hal_rx_reo_is_pn_error(void *rx_desc)
  *
  * Return: true: error caused by 2K jump, false: other error
  */
-static inline bool hal_rx_reo_is_2k_jump(void *rx_desc)
+static inline bool hal_rx_reo_is_2k_jump(hal_ring_desc_t rx_desc)
 {
 	struct reo_destination_ring *reo_desc =
 			(struct reo_destination_ring *)rx_desc;
@@ -2300,7 +2382,7 @@ static inline bool hal_rx_reo_is_2k_jump(void *rx_desc)
 /**
  * hal_rx_msdu_link_desc_set: Retrieves MSDU Link Descriptor to WBM
  *
- * @ soc		: HAL version of the SOC pointer
+ * @ hal_soc_hdl	: HAL version of the SOC pointer
  * @ src_srng_desc	: void pointer to the WBM Release Ring descriptor
  * @ buf_addr_info	: void pointer to the buffer_addr_info
  * @ bm_action		: put in IDLE list or release to MSDU_LIST
@@ -2308,9 +2390,11 @@ static inline bool hal_rx_reo_is_2k_jump(void *rx_desc)
  * Return: void
  */
 /* look at implementation at dp_hw_link_desc_pool_setup()*/
-static inline void hal_rx_msdu_link_desc_set(struct hal_soc *soc,
-			void *src_srng_desc, void *buf_addr_info,
-			uint8_t bm_action)
+static inline
+void hal_rx_msdu_link_desc_set(hal_soc_handle_t hal_soc_hdl,
+			       void *src_srng_desc,
+			       hal_link_desc_t buf_addr_info,
+			       uint8_t bm_action)
 {
 	struct wbm_release_ring *wbm_rel_srng =
 			(struct wbm_release_ring *)src_srng_desc;
@@ -2350,7 +2434,8 @@ static inline void hal_rx_msdu_link_desc_reinject(struct hal_soc *soc,
  *			     (Assumption -- BUFFER_ADDR_INFO is the
  *			     first field in the descriptor structure)
  */
-#define HAL_RX_BUF_ADDR_INFO_GET(ring_desc)	((void *)(ring_desc))
+#define HAL_RX_BUF_ADDR_INFO_GET(ring_desc)	\
+			((hal_link_desc_t)(ring_desc))
 
 #define HAL_RX_REO_BUF_ADDR_INFO_GET HAL_RX_BUF_ADDR_INFO_GET
 
@@ -2365,7 +2450,7 @@ static inline void hal_rx_msdu_link_desc_reinject(struct hal_soc *soc,
  * Return: uint8_t (value of the return_buffer_manager)
  */
 static inline
-uint8_t hal_rx_ret_buf_manager_get(void *ring_desc)
+uint8_t hal_rx_ret_buf_manager_get(hal_ring_desc_t ring_desc)
 {
 	/*
 	 * The following macro takes buf_addr_info as argument,
@@ -2657,9 +2742,9 @@ static inline void hal_rx_dump_pkt_hdr_tlv(struct rx_pkt_tlvs *pkt_tlvs,
  *
  * Return: ring_id
  */
-static inline uint8_t hal_srng_ring_id_get(void *hal_ring)
+static inline uint8_t hal_srng_ring_id_get(hal_ring_handle_t hal_ring_hdl)
 {
-	return ((struct hal_srng *)hal_ring)->ring_id;
+	return ((struct hal_srng *)hal_ring_hdl)->ring_id;
 }
 
 /* Rx MSDU link pointer info */
@@ -3002,9 +3087,10 @@ int hal_rx_chain_msdu_links(struct hal_soc *hal_soc, qdf_nbuf_t msdu,
  * Returns: None
  */
 static inline
-void hal_rx_defrag_update_src_ring_desc(void *ring_desc,
-	void *saved_mpdu_desc_info,
-	struct hal_rx_msdu_link_ptr_info *saved_msdu_link_ptr)
+void hal_rx_defrag_update_src_ring_desc(
+		hal_ring_desc_t ring_desc,
+		void *saved_mpdu_desc_info,
+		struct hal_rx_msdu_link_ptr_info *saved_msdu_link_ptr)
 {
 	struct reo_entrance_ring *reo_ent_ring;
 	struct rx_mpdu_desc_info *reo_ring_mpdu_desc_info;
@@ -3077,7 +3163,7 @@ uint16_t hal_rx_get_desc_len(void)
  * Returns: value of rxdma_push_reason
  */
 static inline
-uint8_t hal_rx_reo_ent_rxdma_push_reason_get(void *reo_ent_desc)
+uint8_t hal_rx_reo_ent_rxdma_push_reason_get(hal_rxdma_desc_t reo_ent_desc)
 {
 	return _HAL_MS((*_OFFSET_TO_WORD_PTR(reo_ent_desc,
 		REO_ENTRANCE_RING_6_RXDMA_PUSH_REASON_OFFSET)),
@@ -3092,7 +3178,7 @@ uint8_t hal_rx_reo_ent_rxdma_push_reason_get(void *reo_ent_desc)
  * Return: value of rxdma_error_code
  */
 static inline
-uint8_t hal_rx_reo_ent_rxdma_error_code_get(void *reo_ent_desc)
+uint8_t hal_rx_reo_ent_rxdma_error_code_get(hal_rxdma_desc_t reo_ent_desc)
 {
 	return _HAL_MS((*_OFFSET_TO_WORD_PTR(reo_ent_desc,
 		REO_ENTRANCE_RING_6_RXDMA_ERROR_CODE_OFFSET)),
@@ -3109,8 +3195,10 @@ uint8_t hal_rx_reo_ent_rxdma_error_code_get(void *reo_ent_desc)
  */
 static inline void hal_rx_wbm_err_info_get(void *wbm_desc,
 				struct hal_wbm_err_desc_info *wbm_er_info,
-				struct hal_soc *hal_soc)
+				hal_soc_handle_t hal_soc_hdl)
 {
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
 	hal_soc->ops->hal_rx_wbm_err_info_get(wbm_desc, (void *)wbm_er_info);
 }
 
@@ -3161,10 +3249,13 @@ static inline void hal_rx_wbm_err_info_get_from_tlv(uint8_t *buf,
  *
  * Return: void
  */
-static inline void hal_rx_mon_hw_desc_get_mpdu_status(struct hal_soc *hal_soc,
-						      void *hw_desc_addr,
-						      struct mon_rx_status *rs)
+static inline
+void hal_rx_mon_hw_desc_get_mpdu_status(hal_soc_handle_t hal_soc_hdl,
+					void *hw_desc_addr,
+					struct mon_rx_status *rs)
 {
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
 	hal_soc->ops->hal_rx_mon_hw_desc_get_mpdu_status(hw_desc_addr, rs);
 }
 
@@ -3188,9 +3279,11 @@ static inline uint8_t hal_rx_get_tlv(struct hal_soc *hal_soc, void *rx_tlv)
  * @buf: pointer to the start of RX PKT TLV header
  * Return: uint32_t(nss)
  */
-static inline uint32_t hal_rx_msdu_start_nss_get(struct hal_soc *hal_soc,
-						 uint8_t *buf)
+static inline
+uint32_t hal_rx_msdu_start_nss_get(hal_soc_handle_t hal_soc_hdl, uint8_t *buf)
 {
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
 	return hal_soc->ops->hal_rx_msdu_start_nss_get(buf);
 }
 
@@ -3217,9 +3310,11 @@ static inline void hal_rx_dump_msdu_start_tlv(struct hal_soc *hal_soc,
  *
  *
  */
-static inline uint32_t hal_rx_mpdu_start_tid_get(struct hal_soc *hal_soc,
+static inline uint32_t hal_rx_mpdu_start_tid_get(hal_soc_handle_t hal_soc_hdl,
 						 uint8_t *buf)
 {
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
 	return hal_soc->ops->hal_rx_mpdu_start_tid_get(buf);
 }
 
@@ -3231,9 +3326,11 @@ static inline uint32_t hal_rx_mpdu_start_tid_get(struct hal_soc *hal_soc,
  * Return: uint32_t(reception_type)
  */
 static inline
-uint32_t hal_rx_msdu_start_reception_type_get(struct hal_soc *hal_soc,
+uint32_t hal_rx_msdu_start_reception_type_get(hal_soc_handle_t hal_soc_hdl,
 					      uint8_t *buf)
 {
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
 	return hal_soc->ops->hal_rx_msdu_start_reception_type_get(buf);
 }
 
@@ -3245,7 +3342,7 @@ uint32_t hal_rx_msdu_start_reception_type_get(struct hal_soc *hal_soc,
  *
  * Return: void
  */
-static inline void hal_rx_dump_pkt_tlvs(struct hal_soc *hal_soc,
+static inline void hal_rx_dump_pkt_tlvs(hal_soc_handle_t hal_soc_hdl,
 					uint8_t *buf, uint8_t dbg_level)
 {
 	struct rx_pkt_tlvs *pkt_tlvs = (struct rx_pkt_tlvs *)buf;
@@ -3256,6 +3353,7 @@ static inline void hal_rx_dump_pkt_tlvs(struct hal_soc *hal_soc,
 				&pkt_tlvs->msdu_start_tlv.rx_msdu_start;
 	struct rx_mpdu_end *mpdu_end = &pkt_tlvs->mpdu_end_tlv.rx_mpdu_end;
 	struct rx_msdu_end *msdu_end = &pkt_tlvs->msdu_end_tlv.rx_msdu_end;
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
 
 	hal_rx_dump_rx_attention_tlv(rx_attn, dbg_level);
 	hal_rx_dump_mpdu_start_tlv(mpdu_start, dbg_level, hal_soc);
@@ -3275,11 +3373,10 @@ static inline void hal_rx_dump_pkt_tlvs(struct hal_soc *hal_soc,
  * Return - none.
  *
  */
-static inline void hal_reo_status_get_header(uint32_t *d, int b,
-						void *h, void *hal)
+static inline
+void hal_reo_status_get_header(uint32_t *d, int b,
+			       void *h, struct hal_soc *hal_soc)
 {
-	struct hal_soc *hal_soc = (struct hal_soc *)hal;
-
 	hal_soc->ops->hal_reo_status_get_header(d, b, h);
 }
 

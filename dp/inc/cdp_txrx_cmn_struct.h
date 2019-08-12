@@ -358,8 +358,8 @@ enum cdp_ast_free_status {
  * @cookie: cookie
  * @cdp_ast_free_status: ast free status
  */
-typedef void (*txrx_ast_free_cb)(void *ctrl_soc,
-				 void *cdp_soc,
+typedef void (*txrx_ast_free_cb)(struct cdp_ctrl_objmgr_psoc *ctrl_soc,
+				 struct cdp_soc *cdp_soc,
 				 void *cookie,
 				 enum cdp_ast_free_status);
 
@@ -601,7 +601,7 @@ typedef void
  * @data_vdev - handle to the virtual device object
  * @msdu_list - list of network buffers
  */
-typedef qdf_nbuf_t (*ol_txrx_tx_fp)(void *data_vdev,
+typedef qdf_nbuf_t (*ol_txrx_tx_fp)(struct cdp_vdev *data_vdev,
 				    qdf_nbuf_t msdu_list);
 
 /**
@@ -610,7 +610,7 @@ typedef qdf_nbuf_t (*ol_txrx_tx_fp)(void *data_vdev,
  * @msdu_list - list of network buffers
  * @tx_exc_metadata - structure that holds parameters to exception path
  */
-typedef qdf_nbuf_t (*ol_txrx_tx_exc_fp)(void *data_vdev,
+typedef qdf_nbuf_t (*ol_txrx_tx_exc_fp)(struct cdp_vdev *data_vdev,
 					qdf_nbuf_t msdu_list,
 					struct cdp_tx_exception_metadata
 						*tx_exc_metadata);
@@ -936,7 +936,8 @@ enum cdp_vdev_param_type {
 	CDP_CFG_WDS_AGING_TIMER,
 	CDP_ENABLE_AP_BRIDGE,
 	CDP_ENABLE_CIPHER,
-	CDP_ENABLE_QWRAP_ISOLATION
+	CDP_ENABLE_QWRAP_ISOLATION,
+	CDP_UPDATE_MULTIPASS
 };
 
 #define TXRX_FW_STATS_TXSTATS                     1
@@ -1198,6 +1199,11 @@ struct cdp_tx_sojourn_stats {
  * @cookie: cookie to used by upper layer
  * @is_ppdu_cookie_valid : Indicates that ppdu_cookie is valid
  * @ppdu_cookie: 16-bit ppdu_cookie
+ * @sa_is_training: smart antenna training packets indication
+ * @rssi_chain: rssi chain per bandwidth
+ * @sa_tx_antenna: antenna in which packet is transmitted
+ * @sa_max_rates: smart antenna tx feedback info max rates
+ * @sa_goodput: smart antenna tx feedback info goodput
  */
 struct cdp_tx_completion_ppdu_user {
 	uint32_t completion_status:8,
@@ -1256,6 +1262,11 @@ struct cdp_tx_completion_ppdu_user {
 	struct cdp_stats_cookie *cookie;
 	uint8_t is_ppdu_cookie_valid;
 	uint16_t ppdu_cookie;
+	uint8_t sa_is_training;
+	uint32_t rssi_chain[CDP_RSSI_CHAIN_LEN];
+	uint32_t sa_tx_antenna;
+	uint32_t sa_max_rates;
+	uint32_t sa_goodput;
 };
 
 /**
@@ -1386,6 +1397,8 @@ struct cdp_tx_completion_ppdu {
  * @tx_dropped: Tx dropped is same as tx errors as above
  * @rx_packets: Rx total packets transmitted
  * @rx_bytes  : Rx total bytes transmitted
+ * @rx_errors : Rx erros
+ * @rx_dropped: Rx dropped stats
  */
 struct cdp_dev_stats {
 	uint32_t tx_packets;
@@ -1394,6 +1407,8 @@ struct cdp_dev_stats {
 	uint32_t tx_dropped;
 	uint32_t rx_packets;
 	uint32_t rx_bytes;
+	uint32_t rx_errors;
+	uint32_t rx_dropped;
 };
 
 /**
@@ -1550,6 +1565,8 @@ struct cdp_rx_indication_ppdu {
 	uint16_t frame_ctrl;
 	int8_t rssi_chain[SS_COUNT][MAX_BW];
 	struct cdp_stats_cookie *cookie;
+	struct cdp_rx_su_evm_info evm_info;
+	uint32_t rx_antenna;
 };
 
 /**

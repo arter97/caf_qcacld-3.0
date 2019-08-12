@@ -71,7 +71,7 @@ void htc_dump_counter_info(HTC_HANDLE HTCHandle)
 			 __func__, target->ce_send_cnt, target->TX_comp_cnt));
 }
 
-int htc_get_tx_queue_depth(HTC_HANDLE *htc_handle, HTC_ENDPOINT_ID endpoint_id)
+int htc_get_tx_queue_depth(HTC_HANDLE htc_handle, HTC_ENDPOINT_ID endpoint_id)
 {
 	HTC_TARGET *target = GET_HTC_TARGET_FROM_HANDLE(htc_handle);
 	HTC_ENDPOINT *endpoint = &target->endpoint[endpoint_id];
@@ -136,6 +136,34 @@ static void send_packet_completion(HTC_TARGET *target, HTC_PACKET *pPacket)
 
 
 }
+
+#ifdef FEATURE_RUNTIME_PM
+/**
+ * log_packet_info() - Log HTC packet information
+ *
+ * @target: handle of HTC context
+ * @pPacket: handle of HTC packet
+ *
+ * Return: None
+ */
+static void log_packet_info(HTC_TARGET *target, HTC_PACKET *pPacket)
+{
+	HTC_ENDPOINT *pEndpoint = &target->endpoint[pPacket->Endpoint];
+	HTC_EP_LOG_PKT ep_log_pkt;
+	qdf_nbuf_t netbuf = GET_HTC_PACKET_NET_BUF_CONTEXT(pPacket);
+
+	ep_log_pkt = pEndpoint->EpCallBacks.ep_log_pkt;
+	if (ep_log_pkt) {
+		qdf_nbuf_pull_head(netbuf, sizeof(HTC_FRAME_HDR));
+		ep_log_pkt(pEndpoint->EpCallBacks.pContext, pPacket);
+		qdf_nbuf_push_head(netbuf, sizeof(HTC_FRAME_HDR));
+	}
+}
+#else
+static void log_packet_info(HTC_TARGET *target, HTC_PACKET *pPacket)
+{
+}
+#endif
 
 void htc_send_complete_check_cleanup(void *context)
 {
@@ -782,6 +810,7 @@ static void get_htc_send_packets_credit_based(HTC_TARGET *target,
 	HTC_PACKET_QUEUE *tx_queue;
 	HTC_PACKET_QUEUE pm_queue;
 	bool do_pm_get = false;
+	int ret;
 
 	/*** NOTE : the TX lock is held when this function is called ***/
 	AR_DEBUG_PRINTF(ATH_DEBUG_SEND,
@@ -798,10 +827,19 @@ static void get_htc_send_packets_credit_based(HTC_TARGET *target,
 
 	/* loop until we can grab as many packets out of the queue as we can */
 	while (true) {
-		if (do_pm_get && hif_pm_runtime_get(target->hif_dev)) {
-			/* bus suspended, runtime resume issued */
-			QDF_ASSERT(HTC_PACKET_QUEUE_DEPTH(pQueue) == 0);
-			break;
+		if (do_pm_get) {
+			ret = hif_pm_runtime_get(target->hif_dev);
+			if (ret) {
+				/* bus suspended, runtime resume issued */
+				QDF_ASSERT(HTC_PACKET_QUEUE_DEPTH(pQueue) == 0);
+				if (ret == -EAGAIN) {
+					pPacket = htc_get_pkt_at_head(tx_queue);
+					if (!pPacket)
+						break;
+					log_packet_info(target, pPacket);
+				}
+				break;
+			}
 		}
 
 		sendFlags = 0;
@@ -912,6 +950,7 @@ static void get_htc_send_packets(HTC_TARGET *target,
 	HTC_PACKET_QUEUE *tx_queue;
 	HTC_PACKET_QUEUE pm_queue;
 	bool do_pm_get = false;
+	int ret;
 
 	/*** NOTE : the TX lock is held when this function is called ***/
 	AR_DEBUG_PRINTF(ATH_DEBUG_SEND,
@@ -930,10 +969,19 @@ static void get_htc_send_packets(HTC_TARGET *target,
 	while (Resources > 0) {
 		int num_frags;
 
-		if (do_pm_get && hif_pm_runtime_get(target->hif_dev)) {
-			/* bus suspended, runtime resume issued */
-			QDF_ASSERT(HTC_PACKET_QUEUE_DEPTH(pQueue) == 0);
-			break;
+		if (do_pm_get) {
+			ret = hif_pm_runtime_get(target->hif_dev);
+			if (ret) {
+				/* bus suspended, runtime resume issued */
+				QDF_ASSERT(HTC_PACKET_QUEUE_DEPTH(pQueue) == 0);
+				if (ret == -EAGAIN) {
+					pPacket = htc_get_pkt_at_head(tx_queue);
+					if (!pPacket)
+						break;
+					log_packet_info(target, pPacket);
+				}
+				break;
+			}
 		}
 
 		pPacket = htc_packet_dequeue(tx_queue);
@@ -2263,7 +2311,7 @@ void htc_process_credit_rpt(HTC_TARGET *target, HTC_CREDIT_REPORT *pRpt,
 			htc_try_send(target, pEndpoint, NULL);
 #else
 			if (pEndpoint->service_id == HTT_DATA_MSG_SVC)
-				htc_send_data_pkt(target, NULL, 0);
+				htc_send_data_pkt((HTC_HANDLE)target, NULL, 0);
 			else
 				htc_try_send(target, pEndpoint, NULL);
 #endif

@@ -64,14 +64,6 @@
 #define targetif_nofl_debug(params...) \
 	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_TARGET_IF, params)
 
-#ifdef CONFIG_MCL
-#define TARGET_TYPE_AR900B    9  /* Beeliner */
-#define TARGET_TYPE_QCA9984   15 /* cascade */
-#define TARGET_TYPE_IPQ4019   16 /* dakota */
-#define TARGET_TYPE_QCA9888   17 /* besra */
-#define TARGET_TYPE_AR9888    7  /* Peregrine */
-#endif
-
 typedef struct wlan_objmgr_psoc *(*get_psoc_handle_callback)(
 			void *scn_handle);
 
@@ -118,8 +110,6 @@ struct host_fw_ver {
 };
 
 struct common_dbglog_handle;
-struct common_hif_handle;
-struct common_htc_handle;
 struct common_accelerator_handle;
 
 /**
@@ -132,8 +122,8 @@ struct common_accelerator_handle;
  * @dbglog_hdl: Debug log handle
  */
 struct comp_hdls {
-	struct common_hif_handle *hif_hdl;
-	struct common_htc_handle *htc_hdl;
+	struct hif_opaque_softc *hif_hdl;
+	HTC_HANDLE htc_hdl;
 	struct wmi_unified *wmi_hdl;
 	struct common_accelerator_handle *accelerator_hdl;
 	struct common_dbglog_handle *dbglog_hdl;
@@ -884,7 +874,7 @@ static inline uint32_t target_psoc_get_num_mem_chunks
  */
 static inline void target_psoc_set_hif_hdl
 		(struct target_psoc_info *psoc_info,
-		 struct common_hif_handle *hif_hdl)
+		 struct hif_opaque_softc *hif_hdl)
 {
 	if (!psoc_info)
 		return;
@@ -900,7 +890,7 @@ static inline void target_psoc_set_hif_hdl
  *
  * Return: hif_hdl
  */
-static inline struct common_hif_handle *target_psoc_get_hif_hdl
+static inline struct hif_opaque_softc *target_psoc_get_hif_hdl
 		(struct target_psoc_info *psoc_info)
 {
 	if (!psoc_info)
@@ -918,9 +908,9 @@ static inline struct common_hif_handle *target_psoc_get_hif_hdl
  *
  * Return: void
  */
-static inline void target_psoc_set_htc_hdl
-		(struct target_psoc_info *psoc_info,
-		 struct common_htc_handle *htc_hdl)
+static inline void target_psoc_set_htc_hdl(
+		struct target_psoc_info *psoc_info,
+		HTC_HANDLE htc_hdl)
 {
 	if (!psoc_info)
 		return;
@@ -936,7 +926,7 @@ static inline void target_psoc_set_htc_hdl
  *
  * Return: htc_hdl
  */
-static inline struct common_htc_handle *target_psoc_get_htc_hdl
+static inline HTC_HANDLE target_psoc_get_htc_hdl
 		(struct target_psoc_info *psoc_info)
 {
 	if (!psoc_info)

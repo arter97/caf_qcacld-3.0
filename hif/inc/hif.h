@@ -465,8 +465,8 @@ enum hif_disable_type {
  * enum hif_device_config_opcode: configure mode
  *
  * @HIF_DEVICE_POWER_STATE: device power state
- * @HIF_DEVICE_GET_MBOX_BLOCK_SIZE: get mbox block size
- * @HIF_DEVICE_GET_MBOX_ADDR: get mbox block address
+ * @HIF_DEVICE_GET_BLOCK_SIZE: get block size
+ * @HIF_DEVICE_GET_ADDR: get block address
  * @HIF_DEVICE_GET_PENDING_EVENTS_FUNC: get pending events functions
  * @HIF_DEVICE_GET_IRQ_PROC_MODE: get irq proc mode
  * @HIF_DEVICE_GET_RECV_EVENT_MASK_UNMASK_FUNC: receive event function
@@ -844,6 +844,7 @@ void hif_clear_stats(struct hif_opaque_softc *hif_ctx);
 #ifdef FEATURE_RUNTIME_PM
 struct hif_pm_runtime_lock;
 void hif_fastpath_resume(struct hif_opaque_softc *hif_ctx);
+int hif_pm_runtime_get_sync(struct hif_opaque_softc *hif_ctx);
 int hif_pm_runtime_request_resume(struct hif_opaque_softc *hif_ctx);
 int hif_pm_runtime_get(struct hif_opaque_softc *hif_ctx);
 void hif_pm_runtime_get_noresume(struct hif_opaque_softc *hif_ctx);
@@ -867,6 +868,8 @@ struct hif_pm_runtime_lock {
 	const char *name;
 };
 static inline void hif_fastpath_resume(struct hif_opaque_softc *hif_ctx) {}
+static inline int hif_pm_runtime_get_sync(struct hif_opaque_softc *hif_ctx)
+{ return 0; }
 static inline int
 hif_pm_runtime_request_resume(struct hif_opaque_softc *hif_ctx)
 { return 0; }
@@ -1191,4 +1194,17 @@ uint8_t *hif_log_dump_ce(struct hif_softc *scn, uint8_t *buf_cur,
 			 uint8_t *buf_init, uint32_t buf_sz,
 			 uint32_t ce, uint32_t skb_sz);
 #endif /* OL_ATH_SMART_LOGGING */
+
+/*
+ * hif_softc_to_hif_opaque_softc - API to convert hif_softc handle
+ * to hif_opaque_softc handle
+ * @hif_handle - hif_softc type
+ *
+ * Return: hif_opaque_softc type
+ */
+static inline struct hif_opaque_softc *
+hif_softc_to_hif_opaque_softc(struct hif_softc *hif_handle)
+{
+	return (struct hif_opaque_softc *)hif_handle;
+}
 #endif /* _HIF_H_ */

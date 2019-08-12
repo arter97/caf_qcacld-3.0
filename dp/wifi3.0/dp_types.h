@@ -474,7 +474,7 @@ struct dp_txrx_pool_stats {
 };
 
 struct dp_srng {
-	void *hal_srng;
+	hal_ring_handle_t hal_srng;
 	void *base_vaddr_unaligned;
 	qdf_dma_addr_t base_paddr_unaligned;
 	uint32_t alloc_size;
@@ -545,7 +545,7 @@ struct dp_rx_tid {
 	TAILQ_ENTRY(dp_rx_tid) defrag_waitlist_elem;
 
 	/* Store dst desc for reinjection */
-	void *dst_ring_desc;
+	hal_ring_desc_t dst_ring_desc;
 	struct dp_rx_desc *head_frag_desc;
 
 	/* rx_tid lock */
@@ -829,7 +829,7 @@ struct dp_soc {
 	struct cdp_soc_t cdp_soc;
 
 	/* SoC Obj */
-	void *ctrl_psoc;
+	struct cdp_ctrl_objmgr_psoc *ctrl_psoc;
 
 	/* OS device abstraction */
 	qdf_device_t osdev;
@@ -838,7 +838,7 @@ struct dp_soc {
 	struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx;
 
 	/* HTT handle for host-fw interaction */
-	void *htt_handle;
+	struct htt_soc *htt_handle;
 
 	/* Commint init done */
 	qdf_atomic_t cmn_init_done;
@@ -862,7 +862,7 @@ struct dp_soc {
 	uint8_t num_hw_dscp_tid_map;
 
 	/* HAL SOC handle */
-	void *hal_soc;
+	hal_soc_handle_t hal_soc;
 
 	/* Device ID coming from Bus sub-system */
 	uint32_t device_id;
@@ -1124,6 +1124,10 @@ struct dp_soc {
 	uint8_t tidmap_prty;
 	/* Pointer to global per ring type specific configuration table */
 	struct wlan_srng_cfg *wlan_srng_cfg;
+	/* Num Tx outstanding on device */
+	qdf_atomic_t num_tx_outstanding;
+	/* Num Tx allowed */
+	uint32_t num_tx_allowed;
 };
 
 #ifdef IPA_OFFLOAD
@@ -1575,7 +1579,7 @@ struct dp_pdev {
 	 */
 	uint8_t is_primary;
 	/* Context of cal client timer */
-	void *cal_client_ctx;
+	struct cdp_cal_client *cal_client_ctx;
 	struct cdp_tx_sojourn_stats sojourn_stats;
 	qdf_nbuf_t sojourn_buf;
 
@@ -1813,6 +1817,15 @@ struct dp_vdev {
 	uint8_t tidmap_prty;
 	/* Self Peer in STA mode */
 	struct dp_peer *vap_self_peer;
+
+	bool multipass_en;
+#ifdef QCA_MULTIPASS_SUPPORT
+	uint16_t *iv_vlan_map;
+
+	/* dp_peer special list */
+	TAILQ_HEAD(, dp_peer) mpass_peer_list;
+	DP_MUTEX_TYPE mpass_peer_mutex;
+#endif
 };
 
 
@@ -1890,21 +1903,13 @@ struct dp_peer {
 	void (*rx_opt_proc)(struct dp_vdev *vdev, struct dp_peer *peer,
 		unsigned tid, qdf_nbuf_t msdu_list);
 
-	/* set when node is authorized */
-	uint8_t authorize:1;
-
-	u_int8_t nac;
-
-	/* Band steering: Set when node is inactive */
-	uint8_t peer_bs_inact_flag:1;
-	u_int16_t peer_bs_inact; /* inactivity mark count */
-
 	/* NAWDS Flag and Bss Peer bit */
-	uint8_t nawds_enabled:1,
-		bss_peer:1,
-		wapi:1,
-		wds_enabled:1,
-		valid:1;
+	uint8_t nawds_enabled:1, /* NAWDS flag */
+		bss_peer:1, /* set for bss peer */
+		wds_enabled:1, /* WDS peer */
+		authorize:1, /* Set when authorized */
+		nac:1, /* NAC Peer*/
+		valid:1; /* valid bit */
 
 	/* MCL specific peer local id */
 	uint16_t local_id;
@@ -1943,6 +1948,13 @@ struct dp_peer {
 	struct cdp_peer_rate_stats_ctx *wlanstats_ctx;
 	/* average sojourn time */
 	qdf_ewma_tx_lag avg_sojourn_msdu[CDP_DATA_TID_MAX];
+
+#ifdef QCA_MULTIPASS_SUPPORT
+	/* node in the special peer list element */
+	TAILQ_ENTRY(dp_peer) mpass_peer_list_elem;
+	/* vlan id for key */
+	uint16_t vlan_id;
+#endif
 
 #ifdef PEER_CACHE_RX_PKTS
 	qdf_atomic_t flush_in_progress;

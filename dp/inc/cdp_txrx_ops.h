@@ -44,6 +44,8 @@
 #define CDP_PEER_DELETE_NO_SPECIAL             0
 #define CDP_PEER_DO_NOT_START_UNMAP_TIMER      1
 
+struct hif_opaque_softc;
+
 /* same as ieee80211_nac_param */
 enum cdp_nac_param_cmd {
 	/* IEEE80211_NAC_PARAM_ADD */
@@ -318,7 +320,9 @@ struct cdp_cmn_ops {
 	 *
 	 * Return: None
 	 */
-	void *(*txrx_soc_init)(void *soc, void *ctrl_psoc, void *hif_handle,
+	void *(*txrx_soc_init)(void *soc,
+			       struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
+			       struct hif_opaque_softc *hif_handle,
 			       HTC_HANDLE htc_handle, qdf_device_t qdf_osdev,
 			       struct ol_if_ops *ol_ops, uint16_t device_id);
 
@@ -462,6 +466,10 @@ struct cdp_cmn_ops {
 	QDF_STATUS (*set_vdev_tidmap_prty)(struct cdp_vdev *vdev, uint8_t prty);
 	QDF_STATUS (*set_vdev_tidmap_tbl_id)(struct cdp_vdev *vdev,
 					     uint8_t mapid);
+#ifdef QCA_MULTIPASS_SUPPORT
+	QDF_STATUS (*set_vlan_groupkey)(struct cdp_vdev *vdev_handle,
+					uint16_t vlan_id, uint16_t group_key);
+#endif
 };
 
 struct cdp_ctrl_ops {
@@ -660,6 +668,11 @@ struct cdp_ctrl_ops {
 				uint16_t protocol_type);
 #endif /* WLAN_SUPPORT_RX_TAG_STATISTICS */
 #endif /* WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG */
+#ifdef QCA_MULTIPASS_SUPPORT
+	void (*txrx_peer_set_vlan_id)(ol_txrx_soc_handle soc,
+				      struct cdp_vdev *vdev, uint8_t *peer_mac,
+				      uint16_t vlan_id);
+#endif
 };
 
 struct cdp_me_ops {
@@ -925,14 +938,17 @@ struct ol_if_ops {
 #else
 	uint8_t (*rx_invalid_peer)(uint8_t vdev_id, void *wh);
 #endif
-	int  (*peer_map_event)(void *ol_soc_handle, uint16_t peer_id, uint16_t hw_peer_id,
-			uint8_t vdev_id, uint8_t *peer_mac_addr,
-			enum cdp_txrx_ast_entry_type peer_type,
-			uint32_t tx_ast_hashidx);
-	int (*peer_unmap_event)(void *ol_soc_handle, uint16_t peer_id,
+	int  (*peer_map_event)(struct cdp_ctrl_objmgr_psoc *ol_soc_handle,
+			       uint16_t peer_id, uint16_t hw_peer_id,
+			       uint8_t vdev_id, uint8_t *peer_mac_addr,
+			       enum cdp_txrx_ast_entry_type peer_type,
+			       uint32_t tx_ast_hashidx);
+	int (*peer_unmap_event)(struct cdp_ctrl_objmgr_psoc *ol_soc_handle,
+				uint16_t peer_id,
 				uint8_t vdev_id);
 
-	int (*get_dp_cfg_param)(void *ol_soc_handle, enum cdp_cfg_param_type param_num);
+	int (*get_dp_cfg_param)(struct cdp_ctrl_objmgr_psoc *ol_soc_handle,
+				enum cdp_cfg_param_type param_num);
 
 	void (*rx_mic_error)(void *ol_soc_handle,
 			     struct cdp_rx_mic_err_info *info);

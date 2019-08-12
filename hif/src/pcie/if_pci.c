@@ -2807,7 +2807,6 @@ void hif_process_runtime_suspend_success(struct hif_opaque_softc *hif_ctx)
 	struct hif_softc *scn = HIF_GET_SOFTC(hif_ctx);
 
 	hif_runtime_pm_set_state_suspended(scn);
-	hif_pm_runtime_set_monitor_wake_intr(hif_ctx, 1);
 	hif_log_runtime_suspend_success(scn);
 }
 
@@ -2854,24 +2853,16 @@ int hif_runtime_suspend(struct hif_opaque_softc *hif_ctx)
 		return errno;
 	}
 
-	errno = hif_apps_irqs_disable(hif_ctx);
-	if (errno) {
-		HIF_ERROR("%s: failed disable irqs: %d", __func__, errno);
-		goto bus_resume;
-	}
+	hif_pm_runtime_set_monitor_wake_intr(hif_ctx, 1);
 
 	errno = hif_bus_suspend_noirq(hif_ctx);
 	if (errno) {
 		HIF_ERROR("%s: failed bus suspend noirq: %d", __func__, errno);
-		goto irqs_enable;
+		hif_pm_runtime_set_monitor_wake_intr(hif_ctx, 0);
+		goto bus_resume;
 	}
 
-	/* link should always be down; skip enable wake irq */
-
 	return 0;
-
-irqs_enable:
-	QDF_BUG(!hif_apps_irqs_enable(hif_ctx));
 
 bus_resume:
 	QDF_BUG(!hif_bus_resume(hif_ctx));
@@ -2918,10 +2909,7 @@ void hif_fastpath_resume(struct hif_opaque_softc *hif_ctx)
  */
 int hif_runtime_resume(struct hif_opaque_softc *hif_ctx)
 {
-	/* link should always be down; skip disable wake irq */
-
 	QDF_BUG(!hif_bus_resume_noirq(hif_ctx));
-	QDF_BUG(!hif_apps_irqs_enable(hif_ctx));
 	QDF_BUG(!hif_bus_resume(hif_ctx));
 	return 0;
 }
@@ -3879,12 +3867,60 @@ void hif_pci_irq_disable(struct hif_softc *scn, int ce_id)
 }
 
 #ifdef FEATURE_RUNTIME_PM
-int hif_pm_runtime_request_resume(struct hif_opaque_softc *hif_ctx)
+/**
+ * hif_pm_runtime_get_sync() - do a get opperation with sync resume
+ *
+ * A get opperation will prevent a runtime suspend until a corresponding
+ * put is done. Unlike hif_pm_runtime_get(), this API will do a sync
+ * resume instead of requesting a resume if it is runtime PM suspended
+ * so it can only be called in non-atomic context.
+ *
+ * @hif_ctx: pointer of HIF context
+ *
+ * Return: 0 if it is runtime PM resumed otherwise an error code.
+ */
+int hif_pm_runtime_get_sync(struct hif_opaque_softc *hif_ctx)
 {
 	struct hif_pci_softc *sc = HIF_GET_PCI_SOFTC(hif_ctx);
+	int ret;
 
 	if (!sc)
 		return -EINVAL;
+
+	sc->pm_stats.runtime_get++;
+	ret = pm_runtime_get_sync(sc->dev);
+
+	/* Get can return 1 if the device is already active, just return
+	 * success in that case.
+	 */
+	if (ret > 0)
+		ret = 0;
+
+	if (ret) {
+		sc->pm_stats.runtime_get_err++;
+		HIF_ERROR("Runtime PM Get Sync error in pm_state: %d, ret: %d",
+			  qdf_atomic_read(&sc->pm_state), ret);
+		hif_pm_runtime_put(hif_ctx);
+	}
+
+	return ret;
+}
+
+int hif_pm_runtime_request_resume(struct hif_opaque_softc *hif_ctx)
+{
+	struct hif_pci_softc *sc = HIF_GET_PCI_SOFTC(hif_ctx);
+	int pm_state;
+
+	if (!sc)
+		return -EINVAL;
+
+	pm_state = qdf_atomic_read(&sc->pm_state);
+	if (pm_state == HIF_PM_RUNTIME_STATE_SUSPENDED)
+		HIF_INFO("Runtime PM resume is requested by %ps",
+			 (void *)_RET_IP_);
+
+	sc->pm_stats.request_resume++;
+	sc->pm_stats.last_resume_caller = (void *)_RET_IP_;
 
 	return hif_pm_request_resume(sc->dev);
 }
@@ -3964,11 +4000,19 @@ int hif_pm_runtime_get(struct hif_opaque_softc *hif_ctx)
 		return ret;
 	}
 
+	if (pm_state == HIF_PM_RUNTIME_STATE_SUSPENDED) {
+		HIF_INFO("Runtime PM resume is requested by %ps",
+			 (void *)_RET_IP_);
+		ret = -EAGAIN;
+	} else {
+		ret = -EBUSY;
+	}
+
 	sc->pm_stats.request_resume++;
 	sc->pm_stats.last_resume_caller = (void *)_RET_IP_;
-	ret = hif_pm_request_resume(sc->dev);
+	hif_pm_request_resume(sc->dev);
 
-	return -EAGAIN;
+	return ret;
 }
 
 /**

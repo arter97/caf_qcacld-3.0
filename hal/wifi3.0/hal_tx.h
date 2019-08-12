@@ -786,9 +786,11 @@ static inline uint32_t hal_tx_comp_get_buffer_type(void *hal_desc)
  *
  * Return: buffer type
  */
-static inline uint8_t hal_tx_comp_get_release_reason(void *hal_desc, void *hal)
+static inline
+uint8_t hal_tx_comp_get_release_reason(void *hal_desc,
+				       hal_soc_handle_t hal_soc_hdl)
 {
-	struct hal_soc *hal_soc = hal;
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
 
 	return hal_soc->ops->hal_tx_comp_get_release_reason(hal_desc);
 }
@@ -858,19 +860,20 @@ static inline void hal_tx_comp_get_htt_desc(void *hw_desc, uint8_t *htt_desc)
 
 /**
  * hal_tx_init_data_ring() - Initialize all the TCL Descriptors in SRNG
- * @hal_soc: Handle to HAL SoC structure
+ * @hal_soc_hdl: Handle to HAL SoC structure
  * @hal_srng: Handle to HAL SRNG structure
  *
  * Return: none
  */
-static inline void hal_tx_init_data_ring(void *hal_soc, void *hal_srng)
+static inline void hal_tx_init_data_ring(hal_soc_handle_t hal_soc_hdl,
+					 hal_ring_handle_t hal_ring_hdl)
 {
 	uint8_t *desc_addr;
 	struct hal_srng_params srng_params;
 	uint32_t desc_size;
 	uint32_t num_desc;
 
-	hal_get_srng_params(hal_soc, hal_srng, &srng_params);
+	hal_get_srng_params(hal_soc_hdl, hal_ring_hdl, &srng_params);
 
 	desc_addr = (uint8_t *)srng_params.ring_base_vaddr;
 	desc_size = sizeof(struct tcl_data_cmd);
@@ -892,9 +895,12 @@ static inline void hal_tx_init_data_ring(void *hal_soc, void *hal_srng)
  *
  * Return: void
  */
-static inline void hal_tx_desc_set_dscp_tid_table_id(struct hal_soc *hal_soc,
-						     void *desc, uint8_t id)
+static inline
+void hal_tx_desc_set_dscp_tid_table_id(hal_soc_handle_t hal_soc_hdl,
+				       void *desc, uint8_t id)
 {
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
 	hal_soc->ops->hal_tx_desc_set_dscp_tid_table_id(desc, id);
 }
 
@@ -907,9 +913,11 @@ static inline void hal_tx_desc_set_dscp_tid_table_id(struct hal_soc *hal_soc,
  *
  * Return: void
  */
-static inline void hal_tx_set_dscp_tid_map(struct hal_soc *hal_soc,
+static inline void hal_tx_set_dscp_tid_map(hal_soc_handle_t hal_soc_hdl,
 					   uint8_t *map, uint8_t id)
 {
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
 	hal_soc->ops->hal_tx_set_dscp_tid_map(hal_soc, map, id);
 }
 
@@ -923,9 +931,12 @@ static inline void hal_tx_set_dscp_tid_map(struct hal_soc *hal_soc,
  *
  * Return: void
  */
-static inline void hal_tx_update_dscp_tid(struct hal_soc *hal_soc, uint8_t tid,
-					  uint8_t id, uint8_t dscp)
+static inline
+void hal_tx_update_dscp_tid(hal_soc_handle_t hal_soc_hdl, uint8_t tid,
+			    uint8_t id, uint8_t dscp)
 {
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
 	hal_soc->ops->hal_tx_update_dscp_tid(hal_soc, tid, id, dscp);
 }
 
@@ -940,9 +951,11 @@ static inline void hal_tx_update_dscp_tid(struct hal_soc *hal_soc, uint8_t tid,
  *
  * Return: void
  */
-static inline void hal_tx_desc_set_lmac_id(struct hal_soc *hal_soc,
+static inline void hal_tx_desc_set_lmac_id(hal_soc_handle_t hal_soc_hdl,
 					   void *desc, uint8_t lmac_id)
 {
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
 	hal_soc->ops->hal_tx_desc_set_lmac_id(desc, lmac_id);
 }
 
@@ -956,9 +969,11 @@ static inline void hal_tx_desc_set_lmac_id(struct hal_soc *hal_soc,
  *
  * Return: void
  */
-static inline void hal_tx_desc_set_search_type(struct hal_soc *hal_soc,
+static inline void hal_tx_desc_set_search_type(hal_soc_handle_t hal_soc_hdl,
 					       void *desc, uint8_t search_type)
 {
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
 	hal_soc->ops->hal_tx_desc_set_search_type(desc, search_type);
 }
 
@@ -971,10 +986,12 @@ static inline void hal_tx_desc_set_search_type(struct hal_soc *hal_soc,
  *
  * Return: void
  */
-static inline void hal_tx_desc_set_search_index(struct hal_soc *hal_soc,
+static inline void hal_tx_desc_set_search_index(hal_soc_handle_t hal_soc_hdl,
 						void *desc,
 						uint32_t search_index)
 {
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
 	hal_soc->ops->hal_tx_desc_set_search_index(desc, search_index);
 }
 
@@ -987,11 +1004,12 @@ static inline void hal_tx_desc_set_search_index(struct hal_soc *hal_soc,
  *
  * Return: none
  */
-static inline void hal_tx_comp_get_status(void *desc, void *ts, void *hal)
+static inline void hal_tx_comp_get_status(void *desc, void *ts,
+					  hal_soc_handle_t hal_soc_hdl)
 {
-	struct hal_soc *hal_soc = hal;
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
 
-	hal_soc->ops->hal_tx_comp_get_status(desc, ts, hal);
+	hal_soc->ops->hal_tx_comp_get_status(desc, ts, hal_soc);
 }
 
 
@@ -1006,10 +1024,12 @@ static inline void hal_tx_comp_get_status(void *desc, void *ts, void *hal)
  *
  * Return: void
  */
-static inline void hal_tx_desc_set_buf_addr(void *desc, dma_addr_t paddr,
-		uint8_t pool_id, uint32_t desc_id, uint8_t type, void *hal)
+static inline
+void hal_tx_desc_set_buf_addr(void *desc, dma_addr_t paddr,
+			      uint8_t pool_id, uint32_t desc_id,
+			      uint8_t type, hal_soc_handle_t hal_soc_hdl)
 {
-	struct hal_soc *hal_soc = hal;
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
 
 	hal_soc->ops->hal_tx_desc_set_buf_addr(desc, paddr, pool_id,
 						desc_id, type);
@@ -1024,9 +1044,11 @@ static inline void hal_tx_desc_set_buf_addr(void *desc, dma_addr_t paddr,
  *
  * Return: void
  */
-static inline void hal_tx_set_pcp_tid_map_default(struct hal_soc *hal_soc,
+static inline void hal_tx_set_pcp_tid_map_default(hal_soc_handle_t hal_soc_hdl,
 						  uint8_t *map)
 {
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
 	hal_soc->ops->hal_tx_set_pcp_tid_map(hal_soc, map);
 }
 
@@ -1039,9 +1061,11 @@ static inline void hal_tx_set_pcp_tid_map_default(struct hal_soc *hal_soc,
  *
  * Return: void
  */
-static inline void hal_tx_update_pcp_tid_map(struct hal_soc *hal_soc,
+static inline void hal_tx_update_pcp_tid_map(hal_soc_handle_t hal_soc_hdl,
 					     uint8_t pcp, uint8_t tid)
 {
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
 	hal_soc->ops->hal_tx_update_pcp_tid_map(hal_soc, tid, tid);
 }
 
@@ -1053,8 +1077,11 @@ static inline void hal_tx_update_pcp_tid_map(struct hal_soc *hal_soc,
  *
  * Return: void
  */
-static inline void hal_tx_set_tidmap_prty(struct hal_soc *hal_soc, uint8_t val)
+static inline
+void hal_tx_set_tidmap_prty(hal_soc_handle_t hal_soc_hdl, uint8_t val)
 {
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
 	hal_soc->ops->hal_tx_set_tidmap_prty(hal_soc, val);
 }
 #endif /* HAL_TX_H */

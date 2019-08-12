@@ -1031,8 +1031,13 @@ struct dfs_event_log {
  * @dfs_nol_ie_bitmap:               The bitmap of radar affected subchannels
  *                                   in the current channel list
  *                                   to be sent in NOL IE with RCSA.
- * @dfs_is_rcsa_ie_sent              To send or to not send RCSA IE.
- * @dfs_is_nol_ie_sent               To send or to not send NOL IE.
+ * @dfs_is_rcsa_ie_sent:             To send or to not send RCSA IE.
+ * @dfs_is_nol_ie_sent:              To send or to not send NOL IE.
+ * @dfs_allow_hw_pulses:             Allow/Block HW pulses. When synthetic
+ *                                   pulses are injected, the HW pulses should
+ *                                   be blocked and this variable should be
+ *                                   false so that HW pulses and synthetic
+ *                                   pulses do not get mixed up.
  */
 struct wlan_dfs {
 	uint32_t       dfs_debug_mask;
@@ -1174,6 +1179,9 @@ struct wlan_dfs {
 	bool           dfs_is_rcsa_ie_sent;
 	bool           dfs_is_nol_ie_sent;
 	bool           dfs_agile_precac_enable;
+#if defined(WLAN_DFS_PARTIAL_OFFLOAD) && defined(WLAN_DFS_SYNTHETIC_RADAR)
+	bool           dfs_allow_hw_pulses;
+#endif
 };
 
 #if defined(QCA_SUPPORT_AGILE_DFS) || defined(ATH_SUPPORT_ZERO_CAC_DFS)
@@ -2647,4 +2655,18 @@ static inline int dfs_is_disable_radar_marking_set(struct wlan_dfs *dfs,
 #if defined(WLAN_DFS_FULL_OFFLOAD) && defined(QCA_DFS_NOL_OFFLOAD)
 bool dfs_get_disable_radar_marking(struct wlan_dfs *dfs);
 #endif
+
+/**
+ * dfs_reset_agile_config() - Reset the ADFS config variables.
+ * @dfs: Pointer to dfs_soc_priv_obj.
+ */
+#ifdef QCA_SUPPORT_AGILE_DFS
+void dfs_reset_agile_config(struct dfs_soc_priv_obj *dfs_soc);
+#endif
+
+/**
+ * dfs_reinit_timers() - Reinit timers in DFS.
+ * @dfs: Pointer to wlan_dfs.
+ */
+int dfs_reinit_timers(struct wlan_dfs *dfs);
 #endif  /* _DFS_H_ */

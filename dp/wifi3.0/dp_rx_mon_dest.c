@@ -58,8 +58,8 @@ dp_rx_mon_link_desc_return(struct dp_pdev *dp_pdev,
 	void *buf_addr_info, int mac_id)
 {
 	struct dp_srng *dp_srng;
-	void *hal_srng;
-	void *hal_soc;
+	hal_ring_handle_t hal_ring_hdl;
+	hal_soc_handle_t hal_soc;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	void *src_srng_desc;
 	int mac_for_pdev = dp_get_mac_id_for_mac(dp_pdev->soc, mac_id);
@@ -67,11 +67,11 @@ dp_rx_mon_link_desc_return(struct dp_pdev *dp_pdev,
 	hal_soc = dp_pdev->soc->hal_soc;
 
 	dp_srng = &dp_pdev->rxdma_mon_desc_ring[mac_for_pdev];
-	hal_srng = dp_srng->hal_srng;
+	hal_ring_hdl = dp_srng->hal_srng;
 
-	qdf_assert(hal_srng);
+	qdf_assert(hal_ring_hdl);
 
-	if (qdf_unlikely(hal_srng_access_start(hal_soc, hal_srng))) {
+	if (qdf_unlikely(hal_srng_access_start(hal_soc, hal_ring_hdl))) {
 
 		/* TODO */
 		/*
@@ -81,11 +81,11 @@ dp_rx_mon_link_desc_return(struct dp_pdev *dp_pdev,
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 			"%s %d : \
 			HAL RING Access For WBM Release SRNG Failed -- %pK",
-			__func__, __LINE__, hal_srng);
+			__func__, __LINE__, hal_ring_hdl);
 		goto done;
 	}
 
-	src_srng_desc = hal_srng_src_get_next(hal_soc, hal_srng);
+	src_srng_desc = hal_srng_src_get_next(hal_soc, hal_ring_hdl);
 
 	if (qdf_likely(src_srng_desc)) {
 		/* Return link descriptor through WBM ring (SW2WBM)*/
@@ -98,7 +98,7 @@ dp_rx_mon_link_desc_return(struct dp_pdev *dp_pdev,
 			__func__, __LINE__);
 	}
 done:
-	hal_srng_access_end(hal_soc, hal_srng);
+	hal_srng_access_end(hal_soc, hal_ring_hdl);
 	return status;
 }
 
@@ -255,7 +255,7 @@ struct dp_rx_desc *dp_rx_get_mon_desc(struct dp_soc *soc,
  */
 static inline uint32_t
 dp_rx_mon_mpdu_pop(struct dp_soc *soc, uint32_t mac_id,
-	void *rxdma_dst_ring_desc, qdf_nbuf_t *head_msdu,
+	hal_rxdma_desc_t rxdma_dst_ring_desc, qdf_nbuf_t *head_msdu,
 	qdf_nbuf_t *tail_msdu, uint32_t *npackets, uint32_t *ppdu_id,
 	union dp_rx_desc_list_elem_t **head,
 	union dp_rx_desc_list_elem_t **tail)
@@ -1076,8 +1076,8 @@ void dp_rx_mon_dest_process(struct dp_soc *soc, uint32_t mac_id, uint32_t quota)
 {
 	struct dp_pdev *pdev = dp_get_pdev_for_mac_id(soc, mac_id);
 	uint8_t pdev_id;
-	void *hal_soc;
-	void *rxdma_dst_ring_desc;
+	hal_rxdma_desc_t rxdma_dst_ring_desc;
+	hal_soc_handle_t hal_soc;
 	void *mon_dst_srng;
 	union dp_rx_desc_list_elem_t *head = NULL;
 	union dp_rx_desc_list_elem_t *tail = NULL;
@@ -1196,18 +1196,17 @@ void dp_rx_mon_dest_process(struct dp_soc *soc, uint32_t mac_id, uint32_t quota)
  *
  * Return: QDF_STATUS
  */
+#define MON_BUF_MIN_ALLOC_ENTRIES 128
 static QDF_STATUS
 dp_rx_pdev_mon_buf_attach(struct dp_pdev *pdev, int mac_id) {
 	uint8_t pdev_id = pdev->pdev_id;
 	struct dp_soc *soc = pdev->soc;
-	union dp_rx_desc_list_elem_t *desc_list = NULL;
-	union dp_rx_desc_list_elem_t *tail = NULL;
 	struct dp_srng *mon_buf_ring;
 	uint32_t num_entries;
 	struct rx_desc_pool *rx_desc_pool;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint8_t mac_for_pdev = dp_get_mac_id_for_mac(soc, mac_id);
-	uint32_t rx_desc_pool_size;
+	uint32_t rx_desc_pool_size, replenish_size;
 
 	mon_buf_ring = &pdev->rxdma_mon_buf_ring[mac_for_pdev];
 
@@ -1226,9 +1225,10 @@ dp_rx_pdev_mon_buf_attach(struct dp_pdev *pdev, int mac_id) {
 
 	rx_desc_pool->owner = HAL_RX_BUF_RBM_SW3_BM;
 
-	status = dp_rx_buffers_replenish(soc, mac_id, mon_buf_ring,
-					 rx_desc_pool, num_entries,
-					 &desc_list, &tail);
+	replenish_size = (num_entries < MON_BUF_MIN_ALLOC_ENTRIES) ?
+			  num_entries : MON_BUF_MIN_ALLOC_ENTRIES;
+	status = dp_pdev_rx_buffers_attach(soc, mac_id, mon_buf_ring,
+					   rx_desc_pool, replenish_size);
 
 	return status;
 }
@@ -1498,6 +1498,38 @@ void dp_mon_link_desc_pool_cleanup(struct dp_soc *soc, uint32_t mac_id)
 		}
 	}
 }
+
+/**
+ * dp_mon_buf_delayed_replenish() - Helper routine to replenish monitor dest buf
+ * @pdev: DP pdev object
+ *
+ * Return: None
+ */
+void dp_mon_buf_delayed_replenish(struct dp_pdev *pdev)
+{
+	struct dp_soc *soc;
+	uint32_t mac_for_pdev;
+	union dp_rx_desc_list_elem_t *tail = NULL;
+	union dp_rx_desc_list_elem_t *desc_list = NULL;
+	uint32_t num_entries;
+	uint32_t mac_id;
+
+	soc = pdev->soc;
+	num_entries = wlan_cfg_get_dma_mon_buf_ring_size(pdev->wlan_cfg_ctx);
+
+	for (mac_id = 0; mac_id < NUM_RXDMA_RINGS_PER_PDEV; mac_id++) {
+		mac_for_pdev = dp_get_mac_id_for_pdev(mac_id,
+						      pdev->pdev_id);
+
+		dp_rx_buffers_replenish(soc, mac_for_pdev,
+					dp_rxdma_get_mon_buf_ring(pdev,
+								  mac_for_pdev),
+					dp_rx_get_mon_desc_pool(soc,
+								mac_for_pdev,
+								pdev->pdev_id),
+					num_entries, &desc_list, &tail);
+	}
+}
 #else
 static
 QDF_STATUS dp_mon_link_desc_pool_setup(struct dp_soc *soc, uint32_t mac_id)
@@ -1521,6 +1553,9 @@ dp_rx_pdev_mon_buf_detach(struct dp_pdev *pdev, int mac_id)
 {
 	return QDF_STATUS_SUCCESS;
 }
+
+void dp_mon_buf_delayed_replenish(struct dp_pdev *pdev)
+{}
 #endif
 
 /**

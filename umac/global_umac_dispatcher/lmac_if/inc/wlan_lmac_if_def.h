@@ -519,23 +519,36 @@ struct wmi_spectral_cmd_ops;
 struct wlan_lmac_if_sptrl_tx_ops {
 	void *(*sptrlto_pdev_spectral_init)(struct wlan_objmgr_pdev *pdev);
 	void (*sptrlto_pdev_spectral_deinit)(struct wlan_objmgr_pdev *pdev);
-	int (*sptrlto_set_spectral_config)(struct wlan_objmgr_pdev *pdev,
-					   const u_int32_t threshtype,
-					   const u_int32_t value);
-	void (*sptrlto_get_spectral_config)(struct wlan_objmgr_pdev *pdev,
-					    struct spectral_config *sptrl_config
-					    );
-	int (*sptrlto_start_spectral_scan)(struct wlan_objmgr_pdev *pdev);
-	void (*sptrlto_stop_spectral_scan)(struct wlan_objmgr_pdev *pdev);
-	bool (*sptrlto_is_spectral_active)(struct wlan_objmgr_pdev *pdev);
-	bool (*sptrlto_is_spectral_enabled)(struct wlan_objmgr_pdev *pdev);
-	int (*sptrlto_set_debug_level)(struct wlan_objmgr_pdev *pdev,
-				       u_int32_t debug_level);
+	QDF_STATUS (*sptrlto_set_spectral_config)
+					(struct wlan_objmgr_pdev *pdev,
+					 const u_int32_t threshtype,
+					 const u_int32_t value,
+					 const enum spectral_scan_mode smode,
+					 enum spectral_cp_error_code *err);
+	QDF_STATUS (*sptrlto_get_spectral_config)
+					(struct wlan_objmgr_pdev *pdev,
+					 struct spectral_config *sptrl_config,
+					 enum spectral_scan_mode smode);
+	QDF_STATUS (*sptrlto_start_spectral_scan)
+					(struct wlan_objmgr_pdev *pdev,
+					 const enum spectral_scan_mode smode,
+					 enum spectral_cp_error_code *err);
+	QDF_STATUS (*sptrlto_stop_spectral_scan)
+					(struct wlan_objmgr_pdev *pdev,
+					 const enum spectral_scan_mode smode);
+	bool (*sptrlto_is_spectral_active)(struct wlan_objmgr_pdev *pdev,
+					   const enum spectral_scan_mode smode);
+	bool (*sptrlto_is_spectral_enabled)(struct wlan_objmgr_pdev *pdev,
+					    enum spectral_scan_mode smode);
+	QDF_STATUS (*sptrlto_set_debug_level)(struct wlan_objmgr_pdev *pdev,
+					      u_int32_t debug_level);
 	u_int32_t (*sptrlto_get_debug_level)(struct wlan_objmgr_pdev *pdev);
-	void (*sptrlto_get_spectral_capinfo)(struct wlan_objmgr_pdev *pdev,
-					     void *outdata);
-	void (*sptrlto_get_spectral_diagstats)(struct wlan_objmgr_pdev *pdev,
-					       void *outdata);
+	QDF_STATUS (*sptrlto_get_spectral_capinfo)
+						(struct wlan_objmgr_pdev *pdev,
+						 struct spectral_caps *scaps);
+	QDF_STATUS (*sptrlto_get_spectral_diagstats)
+					(struct wlan_objmgr_pdev *pdev,
+					 struct spectral_diag_stats *stats);
 	void (*sptrlto_register_wmi_spectral_cmd_ops)(
 		struct wlan_objmgr_pdev *pdev,
 		struct wmi_spectral_cmd_ops *cmd_ops);
@@ -559,7 +572,7 @@ struct wlan_lmac_if_sptrl_tx_ops {
  * @wifi_pos_deregister_events: function pointer to deregister wifi_pos events
  */
 struct wlan_lmac_if_wifi_pos_tx_ops {
-	QDF_STATUS (*data_req_tx)(struct wlan_objmgr_psoc *psoc,
+	QDF_STATUS (*data_req_tx)(struct wlan_objmgr_pdev *pdev,
 				  struct oem_data_req *req);
 	QDF_STATUS (*wifi_pos_register_events)(struct wlan_objmgr_psoc *psoc);
 	QDF_STATUS (*wifi_pos_deregister_events)(struct wlan_objmgr_psoc *psoc);
@@ -755,8 +768,9 @@ struct wlan_lmac_if_dfs_tx_ops {
 	QDF_STATUS (*dfs_process_emulate_bang_radar_cmd)(
 			struct wlan_objmgr_pdev *pdev,
 			struct dfs_emulate_bang_radar_test_cmd *dfs_unit_test);
-	QDF_STATUS (*dfs_agile_ch_cfg_cmd)(struct wlan_objmgr_pdev *pdev,
-					   uint8_t *ch_freq);
+	QDF_STATUS (*dfs_agile_ch_cfg_cmd)(
+			struct wlan_objmgr_pdev *pdev,
+			struct dfs_agile_cac_params *adfs_params);
 	QDF_STATUS (*dfs_ocac_abort_cmd)(struct wlan_objmgr_pdev *pdev);
 	QDF_STATUS (*dfs_is_pdev_5ghz)(struct wlan_objmgr_pdev *pdev,
 			bool *is_5ghz);
@@ -968,6 +982,8 @@ struct wlan_lmac_if_reg_rx_ops {
 			struct cur_regdmn_info *cur_regdmn);
 	QDF_STATUS (*reg_enable_dfs_channels)(struct wlan_objmgr_pdev *pdev,
 					      bool dfs_enable);
+	QDF_STATUS (*reg_modify_pdev_chan_range)(struct
+						 wlan_objmgr_pdev *pdev);
 };
 
 #ifdef CONVERGED_P2P_ENABLE
@@ -1239,8 +1255,10 @@ struct wlan_lmac_if_wifi_pos_rx_ops {
  * @dfs_dfs_cac_complete_ind:         Process cac complete indication.
  * @dfs_agile_precac_start:           Initiate Agile PreCAC run.
  * @dfs_set_agile_precac_state:       Set agile precac state.
+ * @dfs_reset_adfs_config:            Reset agile dfs variables.
  * @dfs_dfs_ocac_complete_ind:        Process offchan cac complete indication.
  * @dfs_stop:                         Clear dfs timers.
+ * @dfs_reinit_timers:                Reinitialize DFS timers.
  * @dfs_enable_stadfs:                Enable/Disable STADFS capability.
  * @dfs_is_stadfs_enabled:            Get STADFS capability value.
  * @dfs_process_phyerr_filter_offload:Process radar event.
@@ -1253,6 +1271,9 @@ struct wlan_lmac_if_wifi_pos_rx_ops {
  *                                    timeout.
  * @dfs_reset_spoof_test:             Checks if radar detection is enabled.
  * @dfs_is_disable_radar_marking_set: Check if dis_radar_marking param is set.
+ * @dfs_allow_hw_pulses:              Set or unset dfs_allow_hw_pulses which
+ *                                    allow or disallow HW pulses.
+ * @dfs_is_hw_pulses_allowed:         Check if HW pulses are allowed or not.
  */
 struct wlan_lmac_if_dfs_rx_ops {
 	QDF_STATUS (*dfs_get_radars)(struct wlan_objmgr_pdev *pdev);
@@ -1291,6 +1312,7 @@ struct wlan_lmac_if_dfs_rx_ops {
 	QDF_STATUS (*dfs_agile_precac_start)(struct wlan_objmgr_pdev *pdev);
 	QDF_STATUS (*dfs_set_agile_precac_state)(struct wlan_objmgr_pdev *pdev,
 						 int agile_precac_state);
+	QDF_STATUS (*dfs_reset_adfs_config)(struct wlan_objmgr_psoc *psoc);
 	QDF_STATUS
 	(*dfs_dfs_ocac_complete_ind)(struct wlan_objmgr_pdev *pdev,
 				     struct vdev_adfs_complete_status *ocac_st);
@@ -1331,6 +1353,7 @@ struct wlan_lmac_if_dfs_rx_ops {
 			uint32_t vdev_id);
 #endif
 	QDF_STATUS (*dfs_stop)(struct wlan_objmgr_pdev *pdev);
+	QDF_STATUS (*dfs_reinit_timers)(struct wlan_objmgr_pdev *pdev);
 	void (*dfs_enable_stadfs)(struct wlan_objmgr_pdev *pdev, bool val);
 	bool (*dfs_is_stadfs_enabled)(struct wlan_objmgr_pdev *pdev);
 	QDF_STATUS (*dfs_process_phyerr_filter_offload)(
@@ -1361,6 +1384,9 @@ struct wlan_lmac_if_dfs_rx_ops {
 			bool value);
 	QDF_STATUS (*dfs_is_bw_reduction_needed)(struct wlan_objmgr_pdev *pdev,
 			bool *bw_reduce);
+	void (*dfs_allow_hw_pulses)(struct wlan_objmgr_pdev *pdev,
+				    bool allow_hw_pulses);
+	bool (*dfs_is_hw_pulses_allowed)(struct wlan_objmgr_pdev *pdev);
 };
 
 /**
