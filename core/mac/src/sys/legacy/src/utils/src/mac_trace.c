@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2017, 2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -649,7 +649,7 @@ uint8_t *mac_trace_get_wma_msg_string(uint16_t wma_msg)
 #ifdef WLAN_FEATURE_11W
 		CASE_RETURN_STRING(WMA_EXCLUDE_UNENCRYPTED_IND);
 #endif
-		CASE_RETURN_STRING(WMA_WOWL_ENTER_RSP);
+		CASE_RETURN_STRING(WMA_ROAM_SYNC_TIMEOUT);
 		CASE_RETURN_STRING(WMA_WOWL_EXIT_RSP);
 		CASE_RETURN_STRING(WMA_SET_MAX_TX_POWER_RSP);
 		CASE_RETURN_STRING(WMA_SET_DTIM_PERIOD);
