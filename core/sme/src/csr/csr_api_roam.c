@@ -12668,9 +12668,9 @@ void csr_roam_wait_for_key_time_out_handler(void *pv)
 		sme_debug("SME pre-auth state timeout");
 
 		/* Change the substate so command queue is unblocked. */
-		if (CSR_ROAM_SESSION_MAX > pInfo->sessionId) {
+		if (CSR_ROAM_SESSION_MAX > pInfo->vdev_id) {
 			csr_roam_substate_change(pMac, eCSR_ROAM_SUBSTATE_NONE,
-						 pInfo->sessionId);
+						 pInfo->vdev_id);
 		}
 
 		if (csr_is_conn_state_connected_infra(pMac, pInfo->vdev_id)) {
