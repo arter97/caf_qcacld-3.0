@@ -405,7 +405,8 @@ static void lim_process_sae_auth_frame(struct mac_context *mac_ctx,
 
 	lim_send_sme_mgmt_frame_ind(mac_ctx, mac_hdr->fc.subType,
 				    (uint8_t *)mac_hdr,
-				    frame_len + sizeof(tSirMacMgmtHdr), 0,
+				    frame_len + sizeof(tSirMacMgmtHdr),
+				    pe_session->smeSessionId,
 				    WMA_GET_RX_CH(rx_pkt_info), pe_session,
 				    WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info),
 				    rx_flags);
