@@ -4058,6 +4058,21 @@ QDF_STATUS wmi_extract_dbr_ring_cap_service_ready_ext(
 	return QDF_STATUS_E_FAILURE;
 }
 
+QDF_STATUS wmi_extract_dbr_ring_cap_service_ready_ext2(
+			void *wmi_hdl,
+			uint8_t *evt_buf, uint8_t idx,
+			struct wlan_psoc_host_dbr_ring_caps *param)
+{
+	wmi_unified_t wmi_handle = (wmi_unified_t) wmi_hdl;
+
+	if (wmi_handle->ops->extract_dbr_ring_cap_service_ready_ext2)
+		return wmi_handle->ops->extract_dbr_ring_cap_service_ready_ext2(
+				wmi_handle,
+				evt_buf, idx, param);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
 QDF_STATUS wmi_extract_spectral_scaling_params_service_ready_ext(
 			void *wmi_hdl,
 			uint8_t *evt_buf, uint8_t idx,
