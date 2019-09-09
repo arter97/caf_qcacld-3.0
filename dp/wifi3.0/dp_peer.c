@@ -580,29 +580,47 @@ int dp_peer_add_ast(struct dp_soc *soc,
 			uint32_t flags)
 {
 	struct dp_ast_entry *ast_entry = NULL;
-	struct dp_vdev *vdev = NULL;
+	struct dp_vdev *vdev = NULL, *tmp_vdev = NULL;
 	struct dp_pdev *pdev = NULL;
 	uint8_t next_node_mac[6];
 	int  ret = -1;
 	txrx_ast_free_cb cb = NULL;
 	void *cookie = NULL;
-
-	qdf_spin_lock_bh(&soc->ast_lock);
-	if (peer->delete_in_progress) {
-		qdf_spin_unlock_bh(&soc->ast_lock);
-		return ret;
-	}
+	struct dp_peer *tmp_peer = NULL;
+	bool is_peer_found = false;
 
 	vdev = peer->vdev;
 	if (!vdev) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 			  FL("Peers vdev is NULL"));
 		QDF_ASSERT(0);
-		qdf_spin_unlock_bh(&soc->ast_lock);
 		return ret;
 	}
 
 	pdev = vdev->pdev;
+
+	tmp_peer = dp_peer_find_hash_find(soc, mac_addr, 0,
+					  DP_VDEV_ALL);
+	if (tmp_peer) {
+		tmp_vdev = tmp_peer->vdev;
+		if (!tmp_vdev) {
+			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+				  FL("Peers vdev is NULL"));
+			QDF_ASSERT(0);
+			dp_peer_unref_delete(tmp_peer);
+			return ret;
+		}
+		if (tmp_vdev->pdev->pdev_id == pdev->pdev_id)
+			is_peer_found = true;
+
+		dp_peer_unref_delete(tmp_peer);
+	}
+
+	qdf_spin_lock_bh(&soc->ast_lock);
+	if (peer->delete_in_progress) {
+		qdf_spin_unlock_bh(&soc->ast_lock);
+		return ret;
+	}
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
 		  "%s: pdevid: %u vdev: %u  ast_entry->type: %d flags: 0x%x peer_mac: %pM peer: %pK mac %pM",
@@ -634,6 +652,17 @@ int dp_peer_add_ast(struct dp_soc *soc,
 
 			qdf_spin_unlock_bh(&soc->ast_lock);
 			return 0;
+		}
+		if (is_peer_found) {
+			/* During WDS to static roaming, peer is added
+			 * to the list before static AST entry create.
+			 * So, allow AST entry for STATIC type
+			 * even if peer is present
+			 */
+			if (type != CDP_TXRX_AST_TYPE_STATIC) {
+				qdf_spin_unlock_bh(&soc->ast_lock);
+				return 0;
+			}
 		}
 	} else {
 		/* For HWMWDS_SEC entries can be added for same mac address
