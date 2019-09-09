@@ -2013,9 +2013,13 @@ void cds_trigger_ssr(const char *source)
 		return;
 	}
 
-	pld_cnss_lock();
-	cds_set_recovery_in_progress(true);
-	pld_cnss_unlock();
+	if (in_interrupt() || irqs_disabled() || in_atomic()) {
+		cds_set_recovery_in_progress(true);
+	} else {
+		pld_cnss_lock();
+		cds_set_recovery_in_progress(true);
+		pld_cnss_unlock();
+	}
 
 	pld_device_crashed(qdf->dev);
 }
