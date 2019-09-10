@@ -766,12 +766,14 @@ static QDF_STATUS wma_handle_vdev_detach(tp_wma_handle wma_handle,
 	status = wmi_unified_vdev_delete_send(wma_handle->wmi_handle, vdev_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		WMA_LOGE("Unable to remove an interface");
+		wma_cdp_vdev_detach(soc, wma_handle, vdev_id);
 		goto out;
 	}
 
 	WMA_LOGD("vdev_id:%hu vdev_hdl:%pK", vdev_id, iface->handle);
 	if (!generate_rsp) {
 		WMA_LOGE("Call txrx detach w/o callback for vdev %d", vdev_id);
+		wma_cdp_vdev_detach(soc, wma_handle, vdev_id);
 		goto out;
 	}
 
@@ -782,6 +784,7 @@ static QDF_STATUS wma_handle_vdev_detach(tp_wma_handle wma_handle,
 		WMA_LOGE("%s: Failed to fill vdev request for vdev_id %d",
 			 __func__, vdev_id);
 		status = QDF_STATUS_E_NOMEM;
+		wma_cdp_vdev_detach(soc, wma_handle, vdev_id);
 		iface->del_staself_req = NULL;
 		goto out;
 	}
@@ -808,7 +811,6 @@ out:
 	WMA_LOGE("Call txrx detach callback for vdev %d, generate_rsp %u",
 		vdev_id, generate_rsp);
 	wma_release_vdev_ref(iface);
-	wma_cdp_vdev_detach(soc, wma_handle, vdev_id);
 
 	wma_vdev_deinit(iface);
 	qdf_mem_zero(iface, sizeof(*iface));
