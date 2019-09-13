@@ -1104,6 +1104,7 @@ struct wlan_mlme_chainmask {
  * @data_stall_recovery_fw_support: whether FW supports Data stall recovery.
  * @enable_change_channel_bandwidth: enable/disable change channel bw in mission
  * mode
+ * @as_enabled: antenna sharing enabled or not (FW capability)
  */
 struct wlan_mlme_generic {
 	enum band_info band_capability;
@@ -1134,6 +1135,7 @@ struct wlan_mlme_generic {
 	bool enable_remove_time_stamp_sync_cmd;
 	bool data_stall_recovery_fw_support;
 	bool enable_change_channel_bandwidth;
+	bool as_enabled;
 };
 
 /*
