@@ -818,6 +818,29 @@ static inline void hal_tx_comp_desc_sync(void *hw_desc,
 }
 
 /**
+ * hal_dump_comp_desc() - dump tx completion descriptor
+ * @hal_desc: hardware descriptor pointer
+ *
+ * This function will print tx completion descriptor
+ *
+ * Return: none
+ */
+static inline void hal_dump_comp_desc(void *hw_desc)
+{
+	struct hal_tx_desc_comp_s *comp =
+				(struct hal_tx_desc_comp_s *)hw_desc;
+	uint32_t i;
+
+	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_FATAL,
+		  "Current tx completion descriptor is");
+
+	for (i = 0; i < HAL_TX_COMPLETION_DESC_LEN_DWORDS; i++) {
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_FATAL,
+			  "DWORD[i] = 0x%x", comp->desc[i]);
+	}
+}
+
+/**
  * hal_tx_comp_get_htt_desc() - Read the HTT portion of WBM Descriptor
  * @hal_desc: Hardware (WBM) descriptor pointer
  * @htt_desc: Software HTT descriptor pointer
@@ -1053,5 +1076,23 @@ static inline void hal_tx_update_pcp_tid_map(struct hal_soc *hal_soc,
 static inline void hal_tx_set_tidmap_prty(struct hal_soc *hal_soc, uint8_t val)
 {
 	hal_soc->ops->hal_tx_set_tidmap_prty(hal_soc, val);
+}
+
+/**
+ * hal_get_wbm_internal_error() - wbm internal error
+ * @hal_desc: completion ring descriptor pointer
+ *
+ * This function will return the type of pointer - buffer or descriptor
+ *
+ * Return: buffer type
+ */
+static inline uint8_t hal_get_wbm_internal_error(void *hal_desc)
+{
+	uint32_t comp_desc =
+		*(uint32_t *)(((uint8_t *)hal_desc) +
+			      WBM_RELEASE_RING_2_WBM_INTERNAL_ERROR_OFFSET);
+
+	return (comp_desc & WBM_RELEASE_RING_2_WBM_INTERNAL_ERROR_MASK) >>
+		WBM_RELEASE_RING_2_WBM_INTERNAL_ERROR_LSB;
 }
 #endif /* HAL_TX_H */
