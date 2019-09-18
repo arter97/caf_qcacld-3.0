@@ -1415,11 +1415,6 @@ QDF_STATUS wma_create_peer(tp_wma_handle wma, ol_txrx_pdev_handle pdev,
 	struct peer_create_params param = {0};
 	uint8_t *mac_addr_raw;
 
-	if (!cds_is_target_ready()) {
-		WMA_LOGE(FL("target not ready, drop the request"));
-		return QDF_STATUS_E_BUSY;
-	}
-
 	if (++wma->interfaces[vdev_id].peer_count >
 	    wma->wlan_resource_config.num_peers) {
 		WMA_LOGE("%s, the peer count exceeds the limit %d", __func__,
@@ -3396,9 +3391,22 @@ void wma_vdev_resp_timer(void *data)
 		if (wma_crash_on_fw_timeout(wma->fw_timeout_crash) == true) {
 			wma_trigger_recovery_assert_on_fw_timeout(
 				WMA_DEL_STA_SELF_REQ);
+		} else if (!cds_is_driver_unloading() &&
+			   (cds_is_fw_down() || cds_is_driver_recovering())) {
+			qdf_mem_free(iface->del_staself_req);
+			iface->del_staself_req = NULL;
 		} else {
 			wma_send_del_sta_self_resp(iface->del_staself_req);
-			iface->del_staself_req = NULL;
+		}
+
+		if (iface->addBssStaContext) {
+			qdf_mem_free(iface->addBssStaContext);
+			iface->addBssStaContext = NULL;
+		}
+
+		if (iface->staKeyParams) {
+			qdf_mem_free(iface->staKeyParams);
+			iface->staKeyParams = NULL;
 		}
 
 		wma_vdev_deinit(iface);
