@@ -1519,6 +1519,7 @@ dp_rx_peer_map_handler(void *soc_handle, uint16_t peer_id,
 			if (peer->vdev->opmode == wlan_op_mode_sta) {
 				peer->vdev->bss_ast_hash = ast_hash;
 				peer->sta_bss_peer = 1;
+				peer->vdev->bss_ast_idx = hw_peer_id;
 			}
 
 			/* Add ast entry incase self ast entry is
