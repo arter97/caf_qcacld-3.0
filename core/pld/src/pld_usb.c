@@ -28,7 +28,7 @@
 #ifdef CONFIG_PLD_USB_CNSS
 #include <net/cnss2.h>
 #endif
-
+#include "osif_psoc_sync.h"
 
 #define VENDOR_ATHR             0x0CF3
 static struct usb_device_id pld_usb_id_table[] = {
@@ -87,15 +87,24 @@ static void pld_usb_remove(struct usb_interface *interface)
 {
 	struct usb_device *pdev = interface_to_usbdev(interface);
 	struct pld_context *pld_context;
+	int errno;
+	struct osif_psoc_sync *psoc_sync;
+
+	errno = osif_psoc_sync_trans_start_wait(&pdev->dev, &psoc_sync);
+	if (errno)
+		return;
+
+	osif_psoc_sync_unregister(&pdev->dev);
+	osif_psoc_sync_wait_for_ops(psoc_sync);
 
 	pld_context = pld_get_global_context();
 
 	if (!pld_context)
-		return;
+		goto out;
 
 	if (atomic_read(&pld_usb_reg_done) != true) {
 		pr_info("%s: already de-registered!\n", __func__);
-		return;
+		goto out;
 	}
 
 	pld_context->ops->remove(&pdev->dev, PLD_BUS_TYPE_USB);
@@ -103,7 +112,12 @@ static void pld_usb_remove(struct usb_interface *interface)
 	pld_del_dev(pld_context, &pdev->dev);
 
 	atomic_set(&pld_usb_reg_done, false);
+
 	pr_info("%s: done!\n", __func__);
+
+out:
+	osif_psoc_sync_trans_stop(psoc_sync);
+	osif_psoc_sync_destroy(psoc_sync);
 }
 
 /**
