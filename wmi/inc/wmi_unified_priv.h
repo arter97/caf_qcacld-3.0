@@ -1650,9 +1650,15 @@ QDF_STATUS (*send_peer_rx_reorder_queue_setup_cmd)(wmi_unified_t wmi_handle,
 QDF_STATUS (*send_peer_rx_reorder_queue_remove_cmd)(wmi_unified_t wmi_handle,
 		struct rx_reorder_queue_remove_params *param);
 
-QDF_STATUS (*extract_service_ready_ext)(wmi_unified_t wmi_handle,
+QDF_STATUS (*extract_service_ready_ext)(
+			wmi_unified_t wmi_handle,
 			uint8_t *evt_buf,
 			struct wlan_psoc_host_service_ext_param *param);
+
+QDF_STATUS (*extract_service_ready_ext2)(
+			wmi_unified_t wmi_handle,
+			uint8_t *evt_buf,
+			struct wlan_psoc_host_service_ext2_param *param);
 
 QDF_STATUS (*extract_hw_mode_cap_service_ready_ext)(
 			wmi_unified_t wmi_handle,
@@ -1984,6 +1990,9 @@ QDF_STATUS (*send_vdev_pcp_tid_map_cmd)(wmi_unified_t wmi_handle,
 					struct vap_pcp_tid_map_params *param);
 QDF_STATUS (*send_vdev_tidmap_prec_cmd)(wmi_unified_t wmi_handle,
 					struct vap_tidmap_prec_params *param);
+QDF_STATUS (*send_peer_ft_roam_cmd)(wmi_unified_t wmi_handle,
+				    uint8_t peer_addr[QDF_MAC_ADDR_SIZE],
+				    uint8_t vdev_id);
 #endif
 QDF_STATUS (*send_mws_coex_status_req_cmd)(wmi_unified_t wmi_handle,
 					   uint32_t vdev_id, uint32_t cmd_id);
