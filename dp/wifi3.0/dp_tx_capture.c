@@ -629,7 +629,8 @@ static uint32_t dp_tx_update_80211_hdr(struct dp_pdev *pdev,
 	}
 
 	mpdu_buf_len = sizeof(struct ieee80211_frame) + LLC_SNAP_HDR_LEN;
-	mpdu_buf_len += sizeof(struct ieee80211_qoscntl);
+	if (qdf_likely(ppdu_desc->user[0].tid != DP_NON_QOS_TID))
+		mpdu_buf_len += sizeof(struct ieee80211_qoscntl);
 
 	nbuf->protocol = qdf_htons(ETH_P_802_2);
 
@@ -646,9 +647,11 @@ static uint32_t dp_tx_update_80211_hdr(struct dp_pdev *pdev,
 	ptr_hdr = ptr_hdr + (sizeof(struct ieee80211_frame));
 
 	/* update qoscntl header */
-	qdf_mem_copy(ptr_hdr, ptr_qoscntl, sizeof(struct ieee80211_qoscntl));
-
-	ptr_hdr = ptr_hdr + sizeof(struct ieee80211_qoscntl);
+	if (qdf_likely(ppdu_desc->user[0].tid != DP_NON_QOS_TID)) {
+		qdf_mem_copy(ptr_hdr, ptr_qoscntl,
+			     sizeof(struct ieee80211_qoscntl));
+		ptr_hdr = ptr_hdr + sizeof(struct ieee80211_qoscntl);
+	}
 
 	/* update LLC */
 	*ptr_hdr =  LLC_SNAP_LSAP;
@@ -1217,7 +1220,13 @@ QDF_STATUS dp_send_mpdu_info_to_stack(struct dp_pdev *pdev,
 			/* missed seq number */
 			seq_no = ppdu_desc->user[0].start_seq + i;
 
-			if (!(ppdu_desc->user[0].failed_bitmap[k] & 1 << i)) {
+			/* Fill failed MPDUs in AMPDU if they're available in
+			 * subsequent PPDUs in current burst schedule. This
+			 * is not applicable for non-QoS TIDs (no AMPDUs)
+			 */
+			if (qdf_likely(ppdu_desc->user[0].tid !=
+			    DP_NON_QOS_TID) &&
+			    !(ppdu_desc->user[0].failed_bitmap[k] & (1 << i))) {
 				QDF_TRACE(QDF_MODULE_ID_TX_CAPTURE,
 					  QDF_TRACE_LEVEL_ERROR,
 					  "%s: finding missing seq no: %d in other ppdu list cnt[%d]",
@@ -1502,9 +1511,18 @@ void dp_tx_ppdu_stats_process(void *context)
 					qdf_nbuf_free(nbuf);
 					continue;
 				}
-dequeue_msdu_again:
 
-				tid = ppdu_desc->user[0].tid;
+				/* Non-QOS frames are being indicated with TID 0
+				 * in WBM completion path, an hence we should
+				 * TID 0 to reap MSDUs from completion path
+				 */
+				if (qdf_unlikely(ppdu_desc->user[0].tid ==
+				    DP_NON_QOS_TID))
+					tid = 0;
+				else
+					tid = ppdu_desc->user[0].tid;
+
+dequeue_msdu_again:
 				num_msdu = ppdu_desc->user[0].num_msdu;
 				start_tsf = ppdu_desc->ppdu_start_timestamp;
 				end_tsf = ppdu_desc->ppdu_end_timestamp;
