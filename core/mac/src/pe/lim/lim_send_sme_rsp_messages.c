@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017, 2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -1975,8 +1975,8 @@ void lim_send_sme_pe_ese_tsm_rsp(tpAniSirGlobal pMac,
 	tpPESession pPeSessionEntry = NULL;
 
 	/* Get the Session Id based on Sta Id */
-	pPeSessionEntry =
-		pe_find_session_by_sta_id(pMac, pPeStats->staId, &sessionId);
+	pPeSessionEntry = pe_find_session_by_bssid(pMac, pPeStats->bssid.bytes,
+						   &sessionId);
 
 	/* Fill the Session Id */
 	if (NULL != pPeSessionEntry) {
