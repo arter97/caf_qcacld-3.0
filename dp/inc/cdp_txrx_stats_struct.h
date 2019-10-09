@@ -1842,6 +1842,10 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_SET_CMD_OBSS_PD_THRESHOLD = 416,
 	/* Enable/disable AP OBSS_PD_THRESHOLD */
 	OL_ATH_PARAM_SET_CMD_OBSS_PD_THRESHOLD_ENABLE = 421,
+#if DBDC_REPEATER_SUPPORT
+	/* same ssid feature global disable */
+	OL_ATH_PARAM_SAME_SSID_DISABLE = 422,
+#endif
 };
 
 /* Enumeration of PDEV Configuration parameter */
