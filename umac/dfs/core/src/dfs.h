@@ -984,6 +984,7 @@ struct dfs_event_log {
  * @dfs_precac_list:                 PreCAC list (contains individual trees).
  * @dfs_precac_chwidth:              PreCAC channel width enum.
  * @dfs_curchan:                     DFS current channel.
+ * @dfs_prevchan:                    DFS previous channel.
  * @dfs_cac_started_chan:            CAC started channel.
  * @dfs_pdev_obj:                    DFS pdev object.
  * @dfs_is_offload_enabled:          Set if DFS offload enabled.
@@ -1144,6 +1145,7 @@ struct wlan_dfs {
 #endif
 
 	struct dfs_channel *dfs_curchan;
+	struct dfs_channel *dfs_prevchan;
 	struct dfs_channel dfs_cac_started_chan;
 	struct wlan_objmgr_pdev *dfs_pdev_obj;
 	struct dfs_soc_priv_obj *dfs_soc_obj;
@@ -2648,4 +2650,12 @@ void dfs_reset_agile_config(struct dfs_soc_priv_obj *dfs_soc);
  * @dfs: Pointer to wlan_dfs.
  */
 int dfs_reinit_timers(struct wlan_dfs *dfs);
+
+/**
+ * dfs_reset_dfs_prevchan() - Reset DFS previous channel structure.
+ * @dfs: Pointer to wlan_dfs object.
+ *
+ * Return: None.
+ */
+void dfs_reset_dfs_prevchan(struct wlan_dfs *dfs);
 #endif  /* _DFS_H_ */
