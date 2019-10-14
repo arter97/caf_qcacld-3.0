@@ -86,7 +86,7 @@ static void lim_process_sae_msg_sta(struct mac_context *mac,
 		/* SAE authentication is completed.
 		 * Restore from auth state
 		 */
-		if (tx_timer_running(&mac->lim.limTimers.sae_auth_timer))
+		if (tx_timer_running(&mac->lim.lim_timers.sae_auth_timer))
 			lim_deactivate_and_change_timer(mac,
 							eLIM_AUTH_SAE_TIMER);
 		/* success */
@@ -199,8 +199,7 @@ static void lim_process_sae_msg(struct mac_context *mac, struct sir_sae_msg *bod
 		return;
 	}
 
-	session = pe_find_session_by_sme_session_id(mac,
-				sae_msg->session_id);
+	session = pe_find_session_by_vdev_id(mac, sae_msg->vdev_id);
 	if (!session) {
 		pe_err("SAE:Unable to find session");
 		return;
@@ -420,9 +419,8 @@ static void lim_process_set_default_scan_ie_request(struct mac_context *mac_ctx,
 	if (!local_ie_buf)
 		return;
 
-	pe_session = pe_find_session_by_sme_session_id(mac_ctx,
-
-			set_ie_params->session_id);
+	pe_session = pe_find_session_by_vdev_id(mac_ctx,
+						set_ie_params->vdev_id);
 	if (lim_update_ext_cap_ie(mac_ctx,
 			(uint8_t *)set_ie_params->ie_data,
 			local_ie_buf, &local_ie_len, pe_session)) {
@@ -434,7 +432,7 @@ static void lim_process_set_default_scan_ie_request(struct mac_context *mac_ctx,
 	if (!wma_ie_params)
 		goto scan_ie_send_fail;
 
-	wma_ie_params->vdev_id = set_ie_params->session_id;
+	wma_ie_params->vdev_id = set_ie_params->vdev_id;
 	wma_ie_params->ie_id = DEFAULT_SCAN_IE_ID;
 	wma_ie_params->length = local_ie_len;
 	wma_ie_params->data = (uint8_t *)(wma_ie_params)
@@ -551,8 +549,7 @@ static bool def_msg_decision(struct mac_context *mac_ctx,
 				mgmt_pkt_defer = false;
 		}
 
-		if ((lim_msg->type != WMA_ADD_BSS_RSP) &&
-		    (lim_msg->type != WMA_DELETE_BSS_RSP) &&
+		if ((lim_msg->type != WMA_DELETE_BSS_RSP) &&
 		    (lim_msg->type != WMA_DELETE_BSS_HO_FAIL_RSP) &&
 		    (lim_msg->type != WMA_ADD_STA_RSP) &&
 		    (lim_msg->type != WMA_DELETE_STA_RSP) &&
@@ -1630,7 +1627,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 	uint8_t i;
 	struct pe_session *session_entry = NULL;
 	uint8_t defer_msg = false;
-	tLinkStateParams *link_state_param;
 	uint16_t pkt_len = 0;
 	cds_pkt_t *body_ptr = NULL;
 	QDF_STATUS qdf_status;
@@ -1920,9 +1916,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 	case SIR_LIM_UPDATE_OLBC_CACHEL_TIMEOUT:
 		lim_handle_update_olbc_cache(mac_ctx);
 		break;
-	case WMA_ADD_BSS_RSP:
-		lim_process_mlm_add_bss_rsp(mac_ctx, msg);
-		break;
 	case WMA_ADD_STA_RSP:
 		lim_process_add_sta_rsp(mac_ctx, msg);
 		break;
@@ -1967,24 +1960,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 	case WMA_AGGR_QOS_RSP:
 		lim_process_ft_aggr_qos_rsp(mac_ctx, msg);
 		break;
-	case WMA_SET_LINK_STATE_RSP:
-		link_state_param = (tLinkStateParams *) msg->bodyptr;
-		session_entry = link_state_param->session;
-		if (link_state_param->ft
-#if defined WLAN_FEATURE_ROAM_OFFLOAD
-			&& !session_entry->bRoamSynchInProgress
-#endif
-		)
-			lim_send_reassoc_req_with_ft_ies_mgmt_frame(mac_ctx,
-				session_entry->pLimMlmReassocReq,
-				session_entry);
-		if (link_state_param->callback)
-			link_state_param->callback(mac_ctx,
-				link_state_param->callbackArg,
-				link_state_param->status);
-		qdf_mem_free((void *)(msg->bodyptr));
-		msg->bodyptr = NULL;
-		break;
 	case WMA_RX_CHN_STATUS_EVENT:
 		lim_process_rx_channel_status_event(mac_ctx, msg->bodyptr);
 		break;
@@ -2013,8 +1988,8 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 		beacon_params.paramChangeBitmap = 0;
 		for (i = 0; i < mac_ctx->lim.maxBssId; i++) {
 			vdev_id = ((uint8_t *)msg->bodyptr)[i];
-			session_entry = pe_find_session_by_sme_session_id(
-				mac_ctx, vdev_id);
+			session_entry = pe_find_session_by_vdev_id(mac_ctx,
+								   vdev_id);
 			if (!session_entry)
 				continue;
 			session_entry->sap_advertise_avoid_ch_ie =
@@ -2036,7 +2011,7 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 				wlan_reg_freq_to_chan(
 				mac_ctx->pdev, session_entry->curr_op_freq))
 					!= CHANNEL_STATE_DFS) {
-				beacon_params.bss_idx = session_entry->bss_idx;
+				beacon_params.bss_idx = session_entry->vdev_id;
 				beacon_params.beaconInterval =
 					session_entry->beaconParams.beaconInterval;
 				beacon_params.paramChangeBitmap |=

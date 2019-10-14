@@ -119,7 +119,6 @@
 #define WMA_DELETE_STA_REQ             SIR_HAL_DELETE_STA_REQ
 #define WMA_DELETE_STA_RSP             SIR_HAL_DELETE_STA_RSP
 #define WMA_ADD_BSS_REQ                SIR_HAL_ADD_BSS_REQ
-#define WMA_ADD_BSS_RSP                SIR_HAL_ADD_BSS_RSP
 #define WMA_DELETE_BSS_REQ             SIR_HAL_DELETE_BSS_REQ
 #define WMA_DELETE_BSS_HO_FAIL_REQ     SIR_HAL_DELETE_BSS_HO_FAIL_REQ
 #define WMA_DELETE_BSS_RSP             SIR_HAL_DELETE_BSS_RSP
@@ -154,7 +153,6 @@
 #define WMA_IBSS_STA_ADD               SIR_HAL_IBSS_STA_ADD
 #define WMA_TIMER_ADJUST_ADAPTIVE_THRESHOLD_IND SIR_HAL_TIMER_ADJUST_ADAPTIVE_THRESHOLD_IND
 #define WMA_SET_LINK_STATE             SIR_HAL_SET_LINK_STATE
-#define WMA_SET_LINK_STATE_RSP         SIR_HAL_SET_LINK_STATE_RSP
 #define WMA_SET_STA_BCASTKEY_REQ       SIR_HAL_SET_STA_BCASTKEY_REQ
 #define WMA_SET_STA_BCASTKEY_RSP       SIR_HAL_SET_STA_BCASTKEY_RSP
 #define WMA_ADD_TS_RSP                 SIR_HAL_ADD_TS_RSP
@@ -455,6 +453,8 @@
 #endif
 #define WMA_SET_ROAM_TRIGGERS                SIR_HAL_SET_ROAM_TRIGGERS
 
+#define WMA_ROAM_INIT_PARAM                  SIR_HAL_INIT_ROAM_OFFLOAD_PARAM
+
 /* Bit 6 will be used to control BD rate for Management frames */
 #define HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME 0x40
 
@@ -649,7 +649,14 @@ QDF_STATUS
 wma_ds_peek_rx_packet_info
 	(cds_pkt_t *vosDataBuff, void **ppRxHeader, bool bSwap);
 
-
+/**
+ * wma_tx_abort() - abort tx
+ * @vdev_id: vdev id
+ *
+ * In case of deauth host abort transmitting packet.
+ *
+ * Return: none
+ */
 void wma_tx_abort(uint8_t vdev_id);
 
 /**

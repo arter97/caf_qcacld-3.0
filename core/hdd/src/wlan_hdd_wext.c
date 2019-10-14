@@ -3328,6 +3328,7 @@ int hdd_wlan_dump_stats(struct hdd_adapter *adapter, int value)
 	return ret;
 }
 
+#ifdef QCA_IBSS_SUPPORT
 /**
  * hdd_wlan_get_ibss_peer_info() - Print IBSS peer information
  * @adapter: Adapter upon which the IBSS client is active
@@ -3432,6 +3433,37 @@ static QDF_STATUS hdd_wlan_get_ibss_peer_info_all(struct hdd_adapter *adapter)
 
 	return status;
 }
+#else
+/**
+ * hdd_wlan_get_ibss_peer_info() - Print IBSS peer information
+ * @adapter: Adapter upon which the IBSS client is active
+ * @sta_id: Station index of the IBSS peer
+ *
+ * This function is dummy
+ *
+ * Return: QDF_STATUS_STATUS
+ */
+static inline QDF_STATUS
+hdd_wlan_get_ibss_peer_info(struct hdd_adapter *adapter,
+			    uint8_t sta_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * hdd_wlan_get_ibss_peer_info_all() - Print all IBSS peers
+ * @adapter: Adapter upon which the IBSS clients are active
+ *
+ * This function is dummy
+ *
+ * Return: QDF_STATUS_STATUS
+ */
+static inline QDF_STATUS
+hdd_wlan_get_ibss_peer_info_all(struct hdd_adapter *adapter)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 /**
  * hdd_get_ldpc() - Get adapter LDPC
@@ -4619,7 +4651,7 @@ static int hdd_we_set_nss(struct hdd_adapter *adapter, int nss)
 	return qdf_status_to_os_return(status);
 }
 
-static int hdd_we_set_short_gi(struct hdd_adapter *adapter, int sgi)
+int hdd_we_set_short_gi(struct hdd_adapter *adapter, int sgi)
 {
 	mac_handle_t mac_handle = adapter->hdd_ctx->mac_handle;
 	int errno;
@@ -9271,7 +9303,7 @@ static int __iw_set_pno(struct net_device *dev,
 
 	vdev = wlan_objmgr_get_vdev_by_macaddr_from_pdev(hdd_ctx->pdev,
 							 dev->dev_addr,
-							 WLAN_LEGACY_MAC_ID);
+							 WLAN_OSIF_ID);
 	if (!vdev) {
 		hdd_err("vdev object is NULL");
 		return -EIO;
@@ -9282,7 +9314,8 @@ static int __iw_set_pno(struct net_device *dev,
 	data = qdf_mem_malloc(len);
 	if (!data) {
 		hdd_err("fail to allocate memory %zu", len);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto exit;
 	}
 	qdf_mem_copy(data, extra, (len-1));
 	ptr = data;
@@ -9481,7 +9514,7 @@ static int __iw_set_pno(struct net_device *dev,
 	}
 
 exit:
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_ID);
 
 	qdf_mem_free(data);
 	return ret;

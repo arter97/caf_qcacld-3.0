@@ -629,8 +629,7 @@ static bool is_mgmt_protected(uint32_t vdev_id,
 	if (!mac_ctx)
 		return false;
 
-	session = pe_find_session_by_sme_session_id(mac_ctx,
-						    vdev_id);
+	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
 	if (!session) {
 		/* couldn't find session */
 		pe_err("Session not found for vdev_id: %d", vdev_id);
@@ -761,9 +760,9 @@ QDF_STATUS pe_open(struct mac_context *mac, struct cds_config_info *cds_cfg)
 		return QDF_STATUS_E_NOMEM;
 	}
 
-	mac->lim.limTimers.gpLimCnfWaitTimer =
+	mac->lim.lim_timers.gpLimCnfWaitTimer =
 		qdf_mem_malloc(sizeof(TX_TIMER) * (mac->lim.maxStation + 1));
-	if (!mac->lim.limTimers.gpLimCnfWaitTimer) {
+	if (!mac->lim.lim_timers.gpLimCnfWaitTimer) {
 		status = QDF_STATUS_E_NOMEM;
 		goto pe_open_timer_fail;
 	}
@@ -806,8 +805,8 @@ pe_open_lock_fail:
 	qdf_mem_free(mac->lim.gpSession);
 	mac->lim.gpSession = NULL;
 pe_open_psession_fail:
-	qdf_mem_free(mac->lim.limTimers.gpLimCnfWaitTimer);
-	mac->lim.limTimers.gpLimCnfWaitTimer = NULL;
+	qdf_mem_free(mac->lim.lim_timers.gpLimCnfWaitTimer);
+	mac->lim.lim_timers.gpLimCnfWaitTimer = NULL;
 pe_open_timer_fail:
 	pe_free_dph_node_array_buffer();
 
@@ -841,8 +840,8 @@ QDF_STATUS pe_close(struct mac_context *mac)
 		if (mac->lim.gpSession[i].valid == true)
 			pe_delete_session(mac, &mac->lim.gpSession[i]);
 	}
-	qdf_mem_free(mac->lim.limTimers.gpLimCnfWaitTimer);
-	mac->lim.limTimers.gpLimCnfWaitTimer = NULL;
+	qdf_mem_free(mac->lim.lim_timers.gpLimCnfWaitTimer);
+	mac->lim.lim_timers.gpLimCnfWaitTimer = NULL;
 
 	qdf_mem_free(mac->lim.gpSession);
 	mac->lim.gpSession = NULL;
@@ -896,10 +895,6 @@ void pe_stop(struct mac_context *mac)
 static void pe_free_nested_messages(struct scheduler_msg *msg)
 {
 	switch (msg->type) {
-	case WMA_SET_LINK_STATE_RSP:
-		pe_debug("WMA_SET_LINK_STATE_RSP");
-		qdf_mem_free(((tpLinkStateParams) msg->bodyptr)->callbackArg);
-		break;
 	default:
 		break;
 	}
@@ -1823,7 +1818,7 @@ void lim_ps_offload_handle_missed_beacon_ind(struct mac_context *mac,
 {
 	struct missed_beacon_ind *missed_beacon_ind = msg->bodyptr;
 	struct pe_session *pe_session =
-		pe_find_session_by_bss_idx(mac, missed_beacon_ind->bss_idx);
+		pe_find_session_by_vdev_id(mac, missed_beacon_ind->bss_idx);
 
 	if (!pe_session) {
 		pe_err("session does not exist for given BSSId");
@@ -2284,7 +2279,7 @@ pe_disconnect_callback(struct mac_context *mac, uint8_t vdev_id,
 {
 	struct pe_session *session;
 
-	session = pe_find_session_by_sme_session_id(mac, vdev_id);
+	session = pe_find_session_by_vdev_id(mac, vdev_id);
 	if (!session) {
 		pe_err("LFR3: Vdev %d doesn't exist", vdev_id);
 		return QDF_STATUS_E_FAILURE;
@@ -2317,7 +2312,7 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 		pe_err("LFR3:roam_sync_ind_ptr is NULL");
 		return status;
 	}
-	session_ptr = pe_find_session_by_sme_session_id(mac_ctx,
+	session_ptr = pe_find_session_by_vdev_id(mac_ctx,
 				roam_sync_ind_ptr->roamed_vdev_id);
 	if (!session_ptr) {
 		pe_err("LFR3:Unable to find session");
@@ -2406,7 +2401,7 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	lim_fill_ft_session(mac_ctx, bss_desc, ft_session_ptr, session_ptr);
 
 	/* Next routine may update nss based on dot11Mode */
-	lim_ft_prepare_add_bss_req(mac_ctx, false, ft_session_ptr, bss_desc);
+	lim_ft_prepare_add_bss_req(mac_ctx, ft_session_ptr, bss_desc);
 	if (session_ptr->is11Rconnection) {
 		ft_session_ptr->is11Rconnection = session_ptr->is11Rconnection;
 		if (session_ptr->fils_info &&
@@ -2447,13 +2442,7 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 		return status;
 	}
 
-	add_bss_params->bss_idx = roam_sync_ind_ptr->roamed_vdev_id;
-	ft_session_ptr->bss_idx = (uint8_t)add_bss_params->bss_idx;
-
-	curr_sta_ds->bssId = add_bss_params->bss_idx;
 	curr_sta_ds->staIndex = add_bss_params->staContext.staIdx;
-	rrm_cache_mgmt_tx_power(mac_ctx, add_bss_params->txMgmtPower,
-				ft_session_ptr);
 	mac_ctx->roam.reassocRespLen = roam_sync_ind_ptr->reassocRespLength;
 	mac_ctx->roam.pReassocResp =
 		qdf_mem_malloc(mac_ctx->roam.reassocRespLen);

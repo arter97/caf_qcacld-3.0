@@ -125,30 +125,21 @@ struct sAniProbeRspStruct {
  * @assocId: associd
  * @staType: 0 - Self, 1 other/remote, 2 - bssid
  * @staMac: MAC Address of STA
- * @shortPreambleSupported: is short preamble supported or not
  * @listenInterval: Listen interval
  * @wmmEnabled: Support for 11e/WMM
  * @uAPSD: U-APSD Flags: 1b per AC
  * @maxSPLen: Max SP Length
  * @htCapable: 11n HT capable STA
- * @greenFieldCapable: 11n Green Field preamble support
  * @txChannelWidthSet: TX Width Set: 0 - 20 MHz only, 1 - 20/40 MHz
  * @mimoPS: MIMO Power Save
- * @rifsMode: RIFS mode: 0 - NA, 1 - Allowed
- * @lsigTxopProtection: L-SIG TXOP Protection mechanism
- * @us32MaxAmpduDuration: in units of 32 us
- * @maxAmpduSize:  0 : 8k , 1 : 16k, 2 : 32k, 3 : 64k
  * @maxAmpduDensity: 3 : 0~7 : 2^(11nAMPDUdensity -4)
  * @maxAmsduSize: 1 : 3839 bytes, 0 : 7935 bytes
- * @fDsssCckMode40Mhz: DSSS CCK supported 40MHz
  * @fShortGI40Mhz: short GI support for 40Mhz packets
  * @fShortGI20Mhz: short GI support for 20Mhz packets
  * @supportedRates: legacy supported rates
  * @status: QDF status
  * @staIdx: station index
- * @bss_idx: BSSID of BSS to which the station is associated
  * @updateSta: pdate the existing STA entry, if this flag is set
- * @respReqd: A flag to indicate to HAL if the response message is required
  * @rmfEnabled: Robust Management Frame (RMF) enabled/disabled
  * @encryptType: The unicast encryption type in the association
  * @sessionId: PE session id
@@ -160,7 +151,6 @@ struct sAniProbeRspStruct {
  * @vhtTxBFCapable: txbf capable or not
  * @vhtTxMUBformeeCapable: Bformee capable or not
  * @enableVhtpAid: enable VHT AID
- * @enableVhtGid: enable VHT GID
  * @enableAmpduPs: AMPDU power save
  * @enableHtSmps: enable HT SMPS
  * @htSmpsconfig: HT SMPS config
@@ -178,8 +168,6 @@ struct sAniProbeRspStruct {
  * @peerAtimWindowLength: peer ATIM Window length
  * @nss: Return the number of spatial streams supported
  * @stbc_capable: stbc capable
- * @max_amsdu_num: Maximum number of MSDUs in a tx aggregate frame
- * @mbssid_info: Multiple bssid information
  * @no_ptk_4_way: Do not need 4-way handshake
  *
  * This structure contains parameter required for
@@ -193,39 +181,22 @@ typedef struct {
 	 * This may or may not be required in production driver.
 	 */
 	uint8_t staType;
-	uint8_t shortPreambleSupported;
 	tSirMacAddr staMac;
 	uint16_t listenInterval;
 	uint8_t wmmEnabled;
 	uint8_t uAPSD;
 	uint8_t maxSPLen;
 	uint8_t htCapable;
-	/* 11n Green Field preamble support
-	 * 0 - Not supported, 1 - Supported
-	 * Add it to RA related fields of sta entry in HAL
-	 */
-	uint8_t greenFieldCapable;
 	uint8_t ch_width;
-
 	tSirMacHTMIMOPowerSaveState mimoPS;
-	uint8_t rifsMode;
-	/* L-SIG TXOP Protection mechanism
-	 * 0 - No Support, 1 - Supported
-	 * SG - there is global field.
-	 */
-	uint8_t lsigTxopProtection;
-	uint8_t us32MaxAmpduDuration;
 	uint8_t maxAmpduSize;
 	uint8_t maxAmpduDensity;
-	uint8_t maxAmsduSize;
-
 	/* 11n Parameters */
 	/* HT STA should set it to 1 if it is enabled in BSS
 	 * HT STA should set it to 0 if AP does not support it.
 	 * This indication is sent to HAL and HAL uses this flag
 	 * to pickup up appropriate 40Mhz rates.
 	 */
-	uint8_t fDsssCckMode40Mhz;
 	uint8_t fShortGI40Mhz;
 	uint8_t fShortGI20Mhz;
 	struct supported_rates supportedRates;
@@ -239,15 +210,7 @@ typedef struct {
 	 * QDF_STATUS_SUCCESS
 	 */
 	uint8_t staIdx;
-	/* BSSID of BSS to which the station is associated.
-	 * This should be filled back in by HAL, and sent back to LIM as part of
-	 * the response message, so LIM can cache it in the station entry of
-	 * hash table. When station is deleted, LIM will make use of this
-	 * bss_idx to delete BSS from hal tables and from softmac.
-	 */
-	uint8_t bss_idx;
 	uint8_t updateSta;
-	uint8_t respReqd;
 	uint8_t rmfEnabled;
 	uint32_t encryptType;
 	uint8_t sessionId;
@@ -259,7 +222,6 @@ typedef struct {
 	uint8_t enable_su_tx_bformer;
 	uint8_t vhtTxMUBformeeCapable;
 	uint8_t enableVhtpAid;
-	uint8_t enableVhtGid;
 	uint8_t enableAmpduPs;
 	uint8_t enableHtSmps;
 	uint8_t htSmpsconfig;
@@ -278,14 +240,12 @@ typedef struct {
 	uint32_t peerAtimWindowLength;
 	uint8_t nonRoamReassoc;
 	uint32_t nss;
-	struct scan_mbssid_info mbssid_info;
 #ifdef WLAN_FEATURE_11AX
 	bool he_capable;
 	tDot11fIEhe_cap he_config;
 	tDot11fIEhe_op he_op;
 #endif
 	uint8_t stbc_capable;
-	uint8_t max_amsdu_num;
 #ifdef WLAN_SUPPORT_TWT
 	uint8_t twt_requestor;
 	uint8_t twt_responder;
@@ -325,7 +285,6 @@ typedef struct {
  * @smesessionId: sme session id
  * @peerMacAddr: peer mac address
  * @status: status
- * @sessionId: session id
  * @sendRsp: send response
  * @macaddr: MAC address of the peer
  *
@@ -340,10 +299,9 @@ typedef struct {
 	uint8_t defWEPIdx;
 	tSirKeys key[SIR_MAC_MAX_NUM_OF_DEFAULT_KEYS];
 	uint8_t singleTidRc;
-	uint8_t smesessionId;
+	uint8_t vdev_id;
 	struct qdf_mac_addr peer_macaddr;
 	QDF_STATUS status;
-	uint8_t sessionId;
 	uint8_t sendRsp;
 	struct qdf_mac_addr macaddr;
 } tSetStaKeyParams, *tpSetStaKeyParams;
@@ -352,7 +310,7 @@ typedef struct {
  * struct sLimMlmSetKeysReq - set key request parameters
  * @peerMacAddr: peer mac address
  * @sessionId: PE session id
- * @smesessionId: SME session id
+ * @vdev_id: vdev id
  * @aid: association id
  * @edType: Encryption/Decryption type
  * @numKeys: number of keys
@@ -361,7 +319,7 @@ typedef struct {
 typedef struct sLimMlmSetKeysReq {
 	struct qdf_mac_addr peer_macaddr;
 	uint8_t sessionId;      /* Added For BT-AMP Support */
-	uint8_t smesessionId;   /* Added for drivers based on wmi interface */
+	uint8_t vdev_id;   /* Added for drivers based on wmi interface */
 	uint16_t aid;
 	tAniEdType edType;      /* Encryption/Decryption type */
 	uint8_t numKeys;
@@ -371,131 +329,64 @@ typedef struct sLimMlmSetKeysReq {
 /**
  * struct struct bss_params - parameters required for add bss params
  * @bssId: MAC Address/BSSID
- * @self_mac_addr: Self Mac Address
- * @bssType: BSS type
- * @operMode: AP - 0; STA - 1;
  * @nwType: network type
  * @shortSlotTimeSupported: is short slot time supported or not
- * @llaCoexist: is 11a coexist or not
  * @llbCoexist: 11b coexist supported or not
- * @llgCoexist: 11g coexist supported or not
- * @ht20Coexist: HT20 coexist supported or not
- * @fLsigTXOPProtectionFullSupport: TXOP protection supported or not
- * @fRIFSMode: RIFS is supported or not
  * @beaconInterval: beacon interval
  * @dtimPeriod: DTIM period
- * @cfParamSet: CF Param Set
- * @rateSet: MAC Rate Set
  * @htCapable: Enable/Disable HT capabilities
- * @obssProtEnabled: Enable/Disable OBSS protection
  * @rmfEnabled: RMF enabled/disabled
- * @htOperMode: HT Operating Mode
- * @HT Operating Mode: Dual CTS Protection: 0 - Unused, 1 - Used
- * @txChannelWidthSet: TX Width Set: 0 - 20 MHz only, 1 - 20/40 MHz
- * @op_chan_freq: Current Operating frequency
  * @staContext: sta context
- * @status: status
- * @bss_idx: BSS index allocated by HAL
  * @updateBss: update the existing BSS entry, if this flag is set
- * @ssId: Add BSSID info for rxp filter
- * @respReqd: send the response message to LIM only when this flag is set
- * @sessionId: PE session id
- * @txMgmtPower: tx power used for mgmt frames
  * @maxTxPower: max power to be used after applying the power constraint
  * @extSetStaKeyParamValid: Ext Bss Config Msg if set
  * @extSetStaKeyParam: SetStaKeyParams for ext bss msg
- * @bHiddenSSIDEn: To Enable Hidden ssid.
- * @bProxyProbeRespEn: To Enable Disable FW Proxy Probe Resp
- * @halPersona: Persona for the BSS can be STA,AP,GO,CLIENT value
  * @bSpectrumMgtEnabled: Spectrum Management Capability, 1:Enabled, 0:Disabled.
  * @vhtCapable: VHT capablity
- * @vhtTxChannelWidthSet: VHT tx channel width
- * @chan_freq_seg0: center freq seq 0
- * @chan_freq_seg1: center freq seq 1
- * @reassocReq: Set only during roaming reassociation
- * @chainMask: chain mask
- * @smpsMode: SMPS mode
- * @dot11_mode: 802.11 mode
- * @he_capable: HE Capability
- * @cac_duration_ms: cac duration in milliseconds
- * @dfs_regdomain: dfs region
+ * @ch_width: VHT tx channel width
  * @no_ptk_4_way: Do not need 4-way handshake
  */
 struct bss_params {
 	tSirMacAddr bssId;
-	tSirMacAddr self_mac_addr;
-	enum bss_type bssType;
-	uint8_t operMode;
 	tSirNwType nwType;
 	uint8_t shortSlotTimeSupported;
-	uint8_t llaCoexist;
 	uint8_t llbCoexist;
-	uint8_t llgCoexist;
-	uint8_t ht20Coexist;
-	uint8_t llnNonGFCoexist;
-	uint8_t fLsigTXOPProtectionFullSupport;
-	uint8_t fRIFSMode;
 	tSirMacBeaconInterval beaconInterval;
 	uint8_t dtimPeriod;
-	tSirMacCfParamSet cfParamSet;
-	tSirMacRateSet rateSet;
 	uint8_t htCapable;
-	uint8_t obssProtEnabled;
 	uint8_t rmfEnabled;
-	tSirMacHTOperatingMode htOperMode;
-	uint8_t dualCTSProtection;
-	uint8_t txChannelWidthSet;
-	uint32_t op_chan_freq;
 	tAddStaParams staContext;
-	QDF_STATUS status;
-	uint16_t bss_idx;
 	/* HAL should update the existing BSS entry, if this flag is set.
 	 * PE will set this flag in case of reassoc, where we want to resue the
 	 * the old bssID and still return success.
 	 */
 	uint8_t updateBss;
-	tSirMacSSid ssId;
-	uint8_t respReqd;
-	uint8_t sessionId;
-	int8_t txMgmtPower;
 	int8_t maxTxPower;
 
 	uint8_t extSetStaKeyParamValid;
 	tSetStaKeyParams extSetStaKeyParam;
-
-	uint8_t bHiddenSSIDEn;
-	uint8_t bProxyProbeRespEn;
-	uint8_t halPersona;
 	uint8_t bSpectrumMgtEnabled;
 	uint8_t vhtCapable;
 	enum phy_ch_width ch_width;
-	uint32_t chan_freq_seg0;
-	uint32_t chan_freq_seg1;
-	uint8_t reassocReq;     /* Set only during roaming reassociation */
-	uint16_t chainMask;
-	uint16_t smpsMode;
-	uint8_t dot11_mode;
 	uint8_t nonRoamReassoc;
-	uint8_t wps_state;
-	uint8_t nss;
-	uint8_t nss_2g;
-	uint8_t nss_5g;
-	uint16_t beacon_tx_rate;
-	uint32_t tx_aggregation_size;
-	uint32_t tx_aggregation_size_be;
-	uint32_t tx_aggregation_size_bk;
-	uint32_t tx_aggregation_size_vi;
-	uint32_t tx_aggregation_size_vo;
-	uint32_t rx_aggregation_size;
 #ifdef WLAN_FEATURE_11AX
-	bool he_capable;
-	tDot11fIEhe_cap he_config;
-	tDot11fIEhe_op he_op;
 	uint32_t he_sta_obsspd;
 #endif
-	uint32_t cac_duration_ms;
-	uint32_t dfs_regdomain;
 	bool no_ptk_4_way;
+};
+
+/**
+ * struct add_bss_rsp - params required for add bss response
+ * @vdev_id: vdev_id
+ * @status: QDF status
+ * @chain_mask: chain mask vdev start resp
+ * @smps_mode: smps mode in vdev start resp
+ */
+struct add_bss_rsp {
+	uint8_t vdev_id;
+	QDF_STATUS status;
+	uint32_t chain_mask;
+	uint8_t smps_mode;
 };
 
 /**
@@ -612,25 +503,21 @@ typedef struct sSendProbeRespParams {
 
 /**
  * struct tSetBssKeyParams - BSS key parameters
- * @bss_idx: BSSID index
  * @encType: encryption Type
  * @numKeys: number of keys
  * @key: key data
  * @singleTidRc: 1=Single TID based Replay Count, 0=Per TID based RC
- * @smesessionId: sme session id
+ * @vdev_id: vdev id id
  * @status: return status of command
- * @sessionId: PE session id
  * @macaddr: MAC address of the peer
  */
 typedef struct {
-	uint8_t bss_idx;
 	tAniEdType encType;
 	uint8_t numKeys;
 	tSirKeys key[SIR_MAC_MAX_NUM_OF_DEFAULT_KEYS];
 	uint8_t singleTidRc;
-	uint8_t smesessionId;
+	uint8_t vdev_id;
 	QDF_STATUS status;
-	uint8_t sessionId;
 	struct qdf_mac_addr macaddr;
 } tSetBssKeyParams, *tpSetBssKeyParams;
 
@@ -724,79 +611,8 @@ typedef struct {
 } tUpdateUserPos, *tpUpdateUserPos;
 
 /**
- * struct tSwitchChannelParams - switch channel request parameter
- * @channelNumber: channel number
- * @localPowerConstraint: local power constraint
- * @secondaryChannelOffset: scondary channel offset
- * @peSessionId: PE session id
- * @txMgmtPower: TX mgmt power
- * @maxTxPower: max tx power
- * @selfStaMacAddr: self mac address
- * @bssId: bssid
- * @status: QDF status
- * @chainMask: chanin mask
- * @smpsMode: SMPS mode
- * @isDfsChannel: is DFS channel
- * @vhtCapable: VHT capable
- * @dot11_mode: 802.11 mode
- * @cac_duration_ms: cac duration in milliseconds
- * @dfs_regdomain: dfs region
- * @reduced_beacon_interval: reduced beacon interval value
- * @ssid_hidden: the sap ssid is hidden
- * @ssid: sap ssid
- */
-typedef struct {
-	uint8_t channelNumber;
-	uint8_t peSessionId;
-	int8_t maxTxPower;
-	tSirMacAddr selfStaMacAddr;
-	QDF_STATUS status;
-	uint8_t isDfsChannel;
-	uint8_t vhtCapable;
-	enum phy_ch_width ch_width;
-	uint8_t ch_center_freq_seg0;
-	uint8_t ch_center_freq_seg1;
-	uint8_t dot11_mode;
-
-	uint8_t restart_on_chan_switch;
-	uint8_t nss;
-#ifdef WLAN_FEATURE_11AX
-	bool he_capable;
-#endif
-	uint32_t cac_duration_ms;
-	uint32_t dfs_regdomain;
-	uint16_t reduced_beacon_interval;
-	uint8_t ssid_hidden;
-	tSirMacSSid ssid;
-} tSwitchChannelParams, *tpSwitchChannelParams;
-
-typedef void (*tpSetLinkStateCallback)(struct mac_context *mac, void *msgParam,
-		bool status);
-
-/**
- * struct tLinkStateParams - link state parameters
- * @bssid: BSSID
- * @self_mac_addr: self mac address
- * @state: link state
- * @callback: callback function pointer
- * @callbackArg: callback argument
- * @session: session context
- */
-typedef struct sLinkStateParams {
-	/* SIR_HAL_SET_LINK_STATE */
-	tSirMacAddr bssid;
-	tSirMacAddr self_mac_addr;
-	tSirLinkState state;
-	tpSetLinkStateCallback callback;
-	void *callbackArg;
-	int ft;
-	void *session;
-	bool status;
-} tLinkStateParams, *tpLinkStateParams;
-
-/**
  * struct tEdcaParams - EDCA parameters
- * @bss_idx: BSSID index
+ * @vdev_id: vdev id
  * @acbe: best effort access category
  * @acbk: Background access category
  * @acvi: video access category
@@ -804,7 +620,7 @@ typedef struct sLinkStateParams {
  * @mu_edca_params: flag to indicate MU EDCA
  */
 typedef struct {
-	uint16_t bss_idx;
+	uint16_t vdev_id;
 	tSirMacEdcaParamRecord acbe;
 	tSirMacEdcaParamRecord acbk;
 	tSirMacEdcaParamRecord acvi;

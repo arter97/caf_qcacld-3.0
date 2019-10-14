@@ -33,7 +33,6 @@
 #include "lim_security_utils.h"
 #include "lim_prop_exts_utils.h"
 #include "dot11f.h"
-#include "lim_sta_hash_api.h"
 #include "sch_api.h"
 #include "lim_send_messages.h"
 #include "lim_assoc_utils.h"
@@ -1012,24 +1011,135 @@ lim_send_addts_req_action_frame(struct mac_context *mac,
 } /* End lim_send_addts_req_action_frame. */
 
 /**
- * lim_send_assoc_rsp_mgmt_frame() - Send assoc response
- * @mac_ctx: Handle for mac context
- * @status_code: Status code for assoc response frame
- * @aid: Association ID
- * @peer_addr: Mac address of requesting peer
- * @subtype: Assoc/Reassoc
- * @sta: Pointer to station node
- * @pe_session: PE session id.
+ * lim_assoc_rsp_tx_complete() - Confirmation for assoc rsp OTA
+ * @context: pointer to global mac
+ * @buf: buffer which is nothing but entire assoc rsp frame
+ * @tx_complete : Sent status
+ * @params; tx completion params
  *
- * Builds and sends association response frame to the requesting peer.
- *
- * Return: void
+ * Return: This returns QDF_STATUS
  */
+static QDF_STATUS lim_assoc_rsp_tx_complete(
+					void *context,
+					qdf_nbuf_t buf,
+					uint32_t tx_complete,
+					void *params)
+{
+	struct mac_context *mac_ctx = (struct mac_context *)context;
+	tSirMacMgmtHdr *mac_hdr;
+	struct pe_session *session_entry;
+	uint8_t session_id;
+	tpLimMlmAssocInd lim_assoc_ind;
+	tpDphHashNode sta_ds;
+	uint16_t aid;
+	uint8_t *data;
+	struct assoc_ind *sme_assoc_ind;
+	struct scheduler_msg msg;
+	tpSirAssocReq assoc_req;
+
+	if (!buf) {
+		pe_err("Assoc rsp frame buffer is NULL");
+		goto null_buf;
+	}
+
+	data = qdf_nbuf_data(buf);
+
+	if (!data) {
+		pe_err("Assoc rsp frame is NULL");
+		goto end;
+	}
+
+	mac_hdr = (tSirMacMgmtHdr *)data;
+
+	session_entry = pe_find_session_by_bssid(
+				mac_ctx, mac_hdr->sa,
+				&session_id);
+	if (!session_entry) {
+		pe_err("session entry is NULL");
+		goto end;
+	}
+
+	sta_ds = dph_lookup_hash_entry(mac_ctx,
+				       (uint8_t *)mac_hdr->da, &aid,
+				       &session_entry->dph.dphHashTable);
+	if (!sta_ds) {
+		pe_err("sta_ds is NULL");
+		goto end;
+	}
+
+	/* Get a copy of the already parsed Assoc Request */
+	assoc_req =
+		(tpSirAssocReq)session_entry->parsedAssocReq[sta_ds->assocId];
+
+	if (!assoc_req) {
+		pe_err("assoc req for assoc_id:%d is NULL", sta_ds->assocId);
+		goto end;
+	}
+
+	lim_assoc_ind = qdf_mem_malloc(sizeof(tLimMlmAssocInd));
+	if (!lim_assoc_ind) {
+		pe_err("lim assoc ind is NULL");
+		goto free_assoc_req;
+	}
+	if (!lim_fill_lim_assoc_ind_params(lim_assoc_ind, mac_ctx,
+					   sta_ds, session_entry)) {
+		pe_err("lim assoc ind fill error");
+		goto lim_assoc_ind;
+	}
+
+	sme_assoc_ind = qdf_mem_malloc(sizeof(struct assoc_ind));
+	if (!sme_assoc_ind) {
+		pe_err("sme assoc ind is NULL");
+		goto lim_assoc_ind;
+	}
+	sme_assoc_ind->messageType = eWNI_SME_ASSOC_IND_UPPER_LAYER;
+	lim_fill_sme_assoc_ind_params(
+				mac_ctx, lim_assoc_ind,
+				sme_assoc_ind,
+				session_entry);
+
+	qdf_mem_zero(&msg, sizeof(struct scheduler_msg));
+	msg.type = eWNI_SME_ASSOC_IND_UPPER_LAYER;
+	msg.bodyptr = sme_assoc_ind;
+	msg.bodyval = 0;
+	sme_assoc_ind->staId = sta_ds->staIndex;
+	sme_assoc_ind->reassocReq = sta_ds->mlmStaContext.subType;
+	sme_assoc_ind->timingMeasCap = sta_ds->timingMeasCap;
+
+	mac_ctx->lim.sme_msg_callback(mac_ctx, &msg);
+
+	qdf_mem_free(lim_assoc_ind);
+	if (assoc_req->assocReqFrame) {
+		qdf_mem_free(assoc_req->assocReqFrame);
+		assoc_req->assocReqFrame = NULL;
+	}
+	qdf_mem_free(session_entry->parsedAssocReq[sta_ds->assocId]);
+	session_entry->parsedAssocReq[sta_ds->assocId] = NULL;
+	qdf_nbuf_free(buf);
+
+	return QDF_STATUS_SUCCESS;
+
+lim_assoc_ind:
+	qdf_mem_free(lim_assoc_ind);
+free_assoc_req:
+	if (assoc_req->assocReqFrame) {
+		qdf_mem_free(assoc_req->assocReqFrame);
+		assoc_req->assocReqFrame = NULL;
+	}
+	qdf_mem_free(session_entry->parsedAssocReq[sta_ds->assocId]);
+	session_entry->parsedAssocReq[sta_ds->assocId] = NULL;
+end:
+	qdf_nbuf_free(buf);
+null_buf:
+	return QDF_STATUS_E_FAILURE;
+}
 
 void
-lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
+lim_send_assoc_rsp_mgmt_frame(
+	struct mac_context *mac_ctx,
 	uint16_t status_code, uint16_t aid, tSirMacAddr peer_addr,
-	uint8_t subtype, tpDphHashNode sta, struct pe_session *pe_session)
+	uint8_t subtype, tpDphHashNode sta, struct pe_session *pe_session,
+	bool tx_complete)
 {
 	static tDot11fAssocResponse frm;
 	uint8_t *frame;
@@ -1203,6 +1313,8 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 						&frm.he_cap);
 			populate_dot11f_he_operation(mac_ctx, pe_session,
 						     &frm.he_op);
+			populate_dot11f_he_6ghz_cap(mac_ctx, pe_session,
+						    &frm.he_6ghz_band_cap);
 		}
 #ifdef WLAN_FEATURE_11W
 		if (eSIR_MAC_TRY_AGAIN_LATER == status_code) {
@@ -1242,7 +1354,7 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	 */
 	populate_dot11f_capabilities(mac_ctx, &frm.Capabilities, pe_session);
 
-	beacon_params.bss_idx = pe_session->bss_idx;
+	beacon_params.bss_idx = pe_session->vdev_id;
 
 	/* Send message to HAL about beacon parameter change. */
 	if ((false == mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running)
@@ -1370,7 +1482,17 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	lim_diag_mgmt_tx_event_report(mac_ctx, mac_hdr,
 				      pe_session, QDF_STATUS_SUCCESS, status_code);
 	/* Queue Association Response frame in high priority WQ */
-	qdf_status = wma_tx_frame(mac_ctx, packet, (uint16_t) bytes,
+	if (tx_complete)
+		qdf_status = wma_tx_frameWithTxComplete(
+				mac_ctx, packet, (uint16_t)bytes,
+				TXRX_FRM_802_11_MGMT,
+				ANI_TXDIR_TODS,
+				7, lim_tx_complete, frame,
+				lim_assoc_rsp_tx_complete, tx_flag,
+				sme_session, false, 0, RATEID_DEFAULT);
+	else
+		qdf_status = wma_tx_frame(
+				mac_ctx, packet, (uint16_t)bytes,
 				TXRX_FRM_802_11_MGMT,
 				ANI_TXDIR_TODS,
 				7, lim_tx_complete, frame, tx_flag,
@@ -1689,6 +1811,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	enum rateid min_rid = RATEID_DEFAULT;
 	uint8_t *mbo_ie = NULL, *adaptive_11r_ie = NULL, *vendor_ies = NULL;
 	uint8_t mbo_ie_len = 0, adaptive_11r_ie_len = 0;
+	struct wlan_objmgr_peer *peer;
 
 	if (!pe_session) {
 		pe_err("pe_session is NULL");
@@ -2029,6 +2152,18 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		/* Include the EID and length fields */
 		mbo_ie_len = mbo_ie[1] + 2;
 		pe_debug("Stripped MBO IE of length %d", mbo_ie_len);
+
+		peer = wlan_objmgr_get_peer_by_mac(mac_ctx->psoc,
+						   mlm_assoc_req->peerMacAddr,
+						   WLAN_MBO_ID);
+		if (peer && !mlme_get_peer_pmf_status(peer)) {
+			pe_debug("Peer doesn't support PMF, Don't add MBO IE");
+			qdf_mem_free(mbo_ie);
+			mbo_ie = NULL;
+			mbo_ie_len = 0;
+		}
+		if (peer)
+			wlan_objmgr_peer_release_ref(peer, WLAN_MBO_ID);
 	}
 
 	/*
@@ -2693,7 +2828,7 @@ QDF_STATUS lim_send_deauth_cnf(struct mac_context *mac_ctx)
 	deauth_req = mac_ctx->lim.limDisassocDeauthCnfReq.pMlmDeauthReq;
 	if (deauth_req) {
 		if (tx_timer_running(
-			&mac_ctx->lim.limTimers.gLimDeauthAckTimer))
+			&mac_ctx->lim.lim_timers.gLimDeauthAckTimer))
 			lim_deactivate_and_change_timer(mac_ctx,
 							eLIM_DEAUTH_ACK_TIMER);
 
@@ -2799,7 +2934,7 @@ QDF_STATUS lim_send_disassoc_cnf(struct mac_context *mac_ctx)
 	disassoc_req = mac_ctx->lim.limDisassocDeauthCnfReq.pMlmDisassocReq;
 	if (disassoc_req) {
 		if (tx_timer_running(
-			&mac_ctx->lim.limTimers.gLimDisassocAckTimer))
+			&mac_ctx->lim.lim_timers.gLimDisassocAckTimer))
 			lim_deactivate_and_change_timer(mac_ctx,
 				eLIM_DISASSOC_ACK_TIMER);
 
@@ -3109,12 +3244,12 @@ lim_send_disassoc_mgmt_frame(struct mac_context *mac,
 		val = SYS_MS_TO_TICKS(LIM_DISASSOC_DEAUTH_ACK_TIMEOUT);
 
 		if (tx_timer_change
-			    (&mac->lim.limTimers.gLimDisassocAckTimer, val, 0)
+			    (&mac->lim.lim_timers.gLimDisassocAckTimer, val, 0)
 		    != TX_SUCCESS) {
 			pe_err("Unable to change Disassoc ack Timer val");
 			return;
 		} else if (TX_SUCCESS !=
-			   tx_timer_activate(&mac->lim.limTimers.
+			   tx_timer_activate(&mac->lim.lim_timers.
 					     gLimDisassocAckTimer)) {
 			pe_err("Unable to activate Disassoc ack Timer");
 			lim_deactivate_and_change_timer(mac,
@@ -3314,12 +3449,12 @@ lim_send_deauth_mgmt_frame(struct mac_context *mac,
 		val = SYS_MS_TO_TICKS(LIM_DISASSOC_DEAUTH_ACK_TIMEOUT);
 
 		if (tx_timer_change
-			    (&mac->lim.limTimers.gLimDeauthAckTimer, val, 0)
+			    (&mac->lim.lim_timers.gLimDeauthAckTimer, val, 0)
 		    != TX_SUCCESS) {
 			pe_err("Unable to change Deauth ack Timer val");
 			return;
 		} else if (TX_SUCCESS !=
-			   tx_timer_activate(&mac->lim.limTimers.
+			   tx_timer_activate(&mac->lim.lim_timers.
 					     gLimDeauthAckTimer)) {
 			pe_err("Unable to activate Deauth ack Timer");
 			lim_deactivate_and_change_timer(mac,
@@ -4156,23 +4291,6 @@ returnAfterError:
 	return status_code;
 } /* End lim_send_neighbor_report_request_frame. */
 
-/**
- * \brief Send a Link Report Action frame
- *
- *
- * \param mac Pointer to the global MAC structure
- *
- * \param pLinkReport Address of a tSirMacLinkReport
- *
- * \param peer mac address of peer station.
- *
- * \param pe_session address of session entry.
- *
- * \return QDF_STATUS_SUCCESS on success, QDF_STATUS_E_FAILURE else
- *
- *
- */
-
 QDF_STATUS
 lim_send_link_report_action_frame(struct mac_context *mac,
 				  tpSirMacLinkReport pLinkReport,
@@ -4186,13 +4304,14 @@ lim_send_link_report_action_frame(struct mac_context *mac,
 	void *pPacket;
 	QDF_STATUS qdf_status;
 	uint8_t txFlag = 0;
-	uint8_t smeSessionId = 0;
+	uint8_t vdev_id = 0;
 
 	if (!pe_session) {
-		pe_err("(!psession) in Request to send Link Report action frame");
+		pe_err("RRM: Send link report: NULL PE session");
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	vdev_id = pe_session->vdev_id;
 	qdf_mem_zero((uint8_t *) &frm, sizeof(frm));
 
 	frm.Category.category = ACTION_CATEGORY_RRM;
@@ -4267,8 +4386,7 @@ lim_send_link_report_action_frame(struct mac_context *mac,
 			nStatus);
 	}
 
-	pe_warn("Sending a Link Report to");
-	lim_print_mac_addr(mac, peer, LOGW);
+	pe_warn("RRM: Sending Link Report to %pM on vdev[%d]", peer, vdev_id);
 
 	if (wlan_reg_is_5ghz_ch_freq(pe_session->curr_op_freq) ||
 	    pe_session->opmode == QDF_P2P_CLIENT_MODE ||
@@ -4283,7 +4401,7 @@ lim_send_link_report_action_frame(struct mac_context *mac,
 				TXRX_FRM_802_11_MGMT,
 				ANI_TXDIR_TODS,
 				7, lim_tx_complete, pFrame, txFlag,
-				smeSessionId, 0, RATEID_DEFAULT);
+				vdev_id, 0, RATEID_DEFAULT);
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 			 pe_session->peSessionId, qdf_status));
 	if (QDF_STATUS_SUCCESS != qdf_status) {
@@ -4831,7 +4949,8 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 
 	/* disable 11n RX AMSDU */
 	if (mac_ctx->is_usr_cfg_amsdu_enabled &&
-	    !IS_PE_SESSION_11N_MODE(session))
+	    !IS_PE_SESSION_11N_MODE(session) &&
+	    !WLAN_REG_IS_24GHZ_CH_FREQ(session->curr_op_freq))
 		frm.addba_param_set.amsdu_supp = amsdu_support;
 	else
 		frm.addba_param_set.amsdu_supp = 0;
@@ -4955,17 +5074,17 @@ static void lim_tx_mgmt_frame(struct mac_context *mac_ctx,
 {
 	tpSirMacFrameCtl fc = (tpSirMacFrameCtl) mb_msg->data;
 	QDF_STATUS qdf_status;
-	uint8_t sme_session_id = 0;
+	uint8_t vdev_id = 0;
 	struct pe_session *session;
 	uint16_t auth_ack_status;
 	enum rateid min_rid = RATEID_DEFAULT;
 
-	sme_session_id = mb_msg->session_id;
-	session = pe_find_session_by_sme_session_id(mac_ctx, sme_session_id);
+	vdev_id = mb_msg->session_id;
+	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
 	if (!session) {
 		cds_packet_free((void *)packet);
-		pe_err("session not found for given sme session %d",
-		       sme_session_id);
+		pe_err("session not found for given vdev_id %d",
+		       vdev_id);
 		return;
 	}
 
@@ -4980,7 +5099,7 @@ static void lim_tx_mgmt_frame(struct mac_context *mac_ctx,
 					 TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS,
 					 7, lim_tx_complete, frame,
 					 lim_auth_tx_complete_cnf,
-					 0, sme_session_id, false, 0, min_rid);
+					 0, vdev_id, false, 0, min_rid);
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 		session->peSessionId, qdf_status));
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {

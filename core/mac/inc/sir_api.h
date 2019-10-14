@@ -148,6 +148,7 @@ struct scheduler_msg;
  * @SIR_ROAMING_ABORT: Firmware aborted roaming operation, still connected.
  * @SIR_ROAM_SYNCH_COMPLETE: Roam sync propagation is complete.
  * @SIR_ROAMING_INVOKE_FAIL: Firmware roaming failed.
+ * @SIR_ROAMING_DEAUTH: Firmware indicates deauth.
  */
 enum sir_roam_op_code {
 	SIR_ROAM_SYNCH_PROPAGATION = 1,
@@ -157,6 +158,7 @@ enum sir_roam_op_code {
 	SIR_ROAM_SYNCH_COMPLETE,
 	SIR_ROAM_SYNCH_NAPI_OFF,
 	SIR_ROAMING_INVOKE_FAIL,
+	SIR_ROAMING_DEAUTH,
 };
 /**
  * Module ID definitions.
@@ -580,7 +582,7 @@ struct start_bss_req {
 #endif
 	enum bss_type bssType;
 	tSirMacSSid ssId;
-	uint8_t channelId;
+	uint32_t oper_ch_freq;
 	ePhyChanBondState cbMode;
 	uint8_t vht_channel_width;
 	uint8_t center_freq_seg0;
@@ -876,7 +878,7 @@ typedef struct sEsePEContext {
 struct join_req {
 	uint16_t messageType;   /* eWNI_SME_JOIN_REQ */
 	uint16_t length;
-	uint8_t sessionId;
+	uint8_t vdev_id;
 	tSirMacSSid ssId;
 	tSirMacAddr self_mac_addr;        /* self Mac address */
 	enum bss_type bsstype;    /* add new type for BT-AMP STA and AP Modules */
@@ -1030,7 +1032,6 @@ struct join_rsp {
 };
 
 struct oem_channel_info {
-	uint8_t chan_id;
 	uint32_t mhz;
 	uint32_t band_center_freq1;
 	uint32_t band_center_freq2;
@@ -1106,6 +1107,7 @@ struct assoc_ind {
 	const uint8_t *owe_ie;
 	uint32_t owe_ie_len;
 	uint16_t owe_status;
+	bool need_assoc_rsp_tx_cb;
 };
 
 /**
@@ -1130,6 +1132,7 @@ struct assoc_cnf {
 	enum mac_status_code mac_status_code;
 	uint8_t *owe_ie;
 	uint32_t owe_ie_len;
+	bool need_assoc_rsp_tx_cb;
 };
 
 /* / Enum definition for  Wireless medium status change codes */
@@ -1357,7 +1360,7 @@ struct missed_beacon_ind {
 struct set_context_req {
 	uint16_t messageType;   /* eWNI_SME_SET_CONTEXT_REQ */
 	uint16_t length;
-	uint8_t sessionId;      /* Session ID */
+	uint8_t vdev_id;      /* vdev ID */
 	struct qdf_mac_addr peer_macaddr;
 	struct qdf_mac_addr bssid;      /* BSSID */
 	tSirKeyMaterial keyMaterial;
@@ -1752,7 +1755,7 @@ typedef struct sSirAPWPSIEs {
 struct update_config {
 	uint16_t messageType;   /* eWNI_SME_UPDATE_CONFIG */
 	uint16_t length;
-	uint8_t sme_session_id;
+	uint8_t vdev_id;
 	uint16_t capab;
 	uint32_t value;
 };
@@ -1771,14 +1774,14 @@ enum sir_update_session_param_type {
  * struct sir_update_session_param
  * @message_type: SME message type
  * @length: size of struct sir_update_session_param
- * @session_id: Session ID
+ * @vdev_id: vdev ID
  * @param_type: parameter to be updated
  * @param_val: Parameter value to update
  */
 struct sir_update_session_param {
 	uint16_t message_type;
 	uint16_t length;
-	uint8_t session_id;
+	uint8_t vdev_id;
 	uint32_t param_type;
 	uint32_t param_val;
 };
@@ -1787,13 +1790,13 @@ struct sir_update_session_param {
  * struct sir_set_he_bss_color
  * @message_type: SME message type
  * @length: size of struct sir_set_he_bss_color
- * @session_id: Session ID
+ * @vdev_id: vdev ID
  * @bss_color: bss color value
  */
 struct sir_set_he_bss_color {
 	uint16_t message_type;
 	uint16_t length;
-	uint8_t session_id;
+	uint8_t vdev_id;
 	uint8_t bss_color;
 };
 
@@ -2149,6 +2152,16 @@ struct mawc_params {
 	int8_t mawc_roam_ap_rssi_threshold;
 	uint8_t mawc_roam_rssi_high_adjust;
 	uint8_t mawc_roam_rssi_low_adjust;
+};
+
+/**
+ * struct roam_init_params - Firmware roam module initialization parameters
+ * @vdev_id: vdev for which the roaming has to be enabled/disabled
+ * @enable:  flag to init/deinit roam module
+ */
+struct roam_init_params {
+	uint8_t vdev_id;
+	uint8_t enable;
 };
 
 /**
@@ -2744,7 +2757,7 @@ typedef struct sSirChanChangeRequest {
 
 typedef struct sSirChanChangeResponse {
 	uint8_t sessionId;
-	uint8_t newChannelNumber;
+	uint8_t new_op_freq;
 	uint8_t channelChangeStatus;
 } tSirChanChangeResponse, *tpSirChanChangeResponse;
 
@@ -2972,6 +2985,29 @@ struct sir_wisa_params {
 	uint8_t vdev_id;
 };
 
+/**
+ * typedef enum wifi_scan_flags - wifi scan flags
+ * @WIFI_SCAN_FLAG_INTERRUPTED: Indicates that scan results are not complete
+ *				because probes were not sent on some channels
+ */
+typedef enum {
+	WIFI_SCAN_FLAG_INTERRUPTED = 1,
+} wifi_scan_flags;
+
+typedef enum {
+	WIFI_BAND_UNSPECIFIED,
+	WIFI_BAND_BG = 1,       /* 2.4 GHz */
+	WIFI_BAND_A = 2,        /* 5 GHz without DFS */
+	WIFI_BAND_ABG = 3,      /* 2.4 GHz + 5 GHz; no DFS */
+	WIFI_BAND_A_DFS_ONLY = 4,       /* 5 GHz DFS only */
+	/* 5 is reserved */
+	WIFI_BAND_A_WITH_DFS = 6,       /* 5 GHz with DFS */
+	WIFI_BAND_ABG_WITH_DFS = 7,     /* 2.4 GHz + 5 GHz with DFS */
+
+	/* Keep it last */
+	WIFI_BAND_MAX
+} tWifiBand;
+
 #ifdef FEATURE_WLAN_EXTSCAN
 
 #define WLAN_EXTSCAN_MAX_CHANNELS                 36
@@ -3003,29 +3039,6 @@ typedef enum {
 	/* Keep this last */
 	eSIR_EXTSCAN_CALLBACK_TYPE_MAX,
 } tSirExtScanCallbackType;
-
-/**
- * typedef enum wifi_scan_flags - wifi scan flags
- * @WIFI_SCAN_FLAG_INTERRUPTED: Indicates that scan results are not complete
- *				because probes were not sent on some channels
- */
-typedef enum {
-	WIFI_SCAN_FLAG_INTERRUPTED = 1,
-} wifi_scan_flags;
-
-typedef enum {
-	WIFI_BAND_UNSPECIFIED,
-	WIFI_BAND_BG = 1,       /* 2.4 GHz */
-	WIFI_BAND_A = 2,        /* 5 GHz without DFS */
-	WIFI_BAND_ABG = 3,      /* 2.4 GHz + 5 GHz; no DFS */
-	WIFI_BAND_A_DFS_ONLY = 4,       /* 5 GHz DFS only */
-	/* 5 is reserved */
-	WIFI_BAND_A_WITH_DFS = 6,       /* 5 GHz with DFS */
-	WIFI_BAND_ABG_WITH_DFS = 7,     /* 2.4 GHz + 5 GHz with DFS */
-
-	/* Keep it last */
-	WIFI_BAND_MAX
-} tWifiBand;
 
 /**
  * enum wifi_extscan_event_type - extscan event type
@@ -4269,14 +4282,14 @@ struct chip_pwr_save_fail_detected_params {
  * struct hdd_default_scan_ie - HDD default scan IE structure
  * @message_type: message type to be set with eWNI_SME_DEFAULT_SCAN_IE
  * @length: length of the struct hdd_default_scan_ie
- * @session_id: Session Id
+ * @vdev_id: vdev_id
  * @ie_len: Default scan IE length
  * @ie_data: Pointer to default scan IE data
  */
 struct hdd_default_scan_ie {
 	uint16_t message_type;
 	uint16_t length;
-	uint16_t session_id;
+	uint16_t vdev_id;
 	uint16_t ie_len;
 	uint8_t ie_data[MAX_DEFAULT_SCAN_IE_LEN];
 };
@@ -4399,13 +4412,13 @@ enum powersave_qpower_mode {
  * @message_type: message id
  * @length: msg length
  * @new_channel: new channel
- * @session_id: session id
+ * @vdev_id: vdev id
  */
 struct sir_sme_ext_cng_chan_req {
 	uint16_t  message_type; /* eWNI_SME_EXT_CHANGE_CHANNEL */
 	uint16_t  length;
 	uint32_t  new_channel;
-	uint8_t   session_id;
+	uint8_t   vdev_id;
 };
 
 /**
@@ -5105,7 +5118,7 @@ struct sir_mac_pwr_dbg_cmd {
  * struct sme_send_disassoc_frm_req - send disassoc request frame
  * @msg_type: message type
  * @length: length of message
- * @session_id: session id
+ * @vdev_id: vdev id
  * @peer_mac: peer mac address
  * @reason: reason for disassoc
  * @wait_for_ack: wait for acknowledgment
@@ -5113,7 +5126,7 @@ struct sir_mac_pwr_dbg_cmd {
  struct sme_send_disassoc_frm_req {
 	uint16_t msg_type;
 	uint16_t length;
-	uint8_t session_id;
+	uint8_t vdev_id;
 	uint8_t peer_mac[6];
 	uint16_t reason;
 	uint8_t wait_for_ack;
@@ -5124,14 +5137,14 @@ struct sir_mac_pwr_dbg_cmd {
  * policy
  * @msg_type: message id
  * @msg_len: message length
- * @sme_session_id: sme session id
+ * @vdev_id: vdev id
  * @ie: vendor ie
  * @access_policy: access policy for vendor ie
  */
 struct sme_update_access_policy_vendor_ie {
 	uint16_t msg_type;
 	uint16_t length;
-	uint32_t sme_session_id;
+	uint32_t vdev_id;
 	uint8_t ie[WLAN_MAX_IE_LEN + 2];
 	uint8_t access_policy;
 };
@@ -5513,6 +5526,7 @@ struct sme_rcpi_req {
  * @REASSOC_IN_PROGRESS: reassociation is in progress
  * @EAPOL_IN_PROGRESS: STA/P2P-CLI is in middle of EAPOL/WPS exchange
  * @SAP_EAPOL_IN_PROGRESS: SAP/P2P-GO is in middle of EAPOL/WPS exchange
+ * @SAP_CONNECTION_IN_PROGRESS: SAP/P2P-GO is in middle of connection.
  */
 enum scan_reject_states {
 	SCAN_REJECT_DEFAULT = 0,
@@ -5520,6 +5534,7 @@ enum scan_reject_states {
 	REASSOC_IN_PROGRESS,
 	EAPOL_IN_PROGRESS,
 	SAP_EAPOL_IN_PROGRESS,
+	SAP_CONNECTION_IN_PROGRESS,
 };
 
 /**
@@ -5649,14 +5664,14 @@ struct sir_sae_info {
  * struct sir_sae_msg - SAE msg used for message posting
  * @message_type: message type
  * @length: message length
- * @session_id: SME session id
+ * @vdev_id: vdev id
  * @sae_status: SAE status, 0: Success, Non-zero: Failure.
  * @peer_mac_addr: peer MAC address
  */
 struct sir_sae_msg {
 	uint16_t message_type;
 	uint16_t length;
-	uint16_t session_id;
+	uint16_t vdev_id;
 	uint8_t sae_status;
 	tSirMacAddr peer_mac_addr;
 };

@@ -1665,9 +1665,6 @@ static void wma_discard_fw_event(struct scheduler_msg *msg)
 		qdf_nbuf_free(((wma_process_fw_event_params *)msg->bodyptr)
 				->evt_buf);
 		break;
-	case WMA_SET_LINK_STATE:
-		qdf_mem_free(((tpLinkStateParams) msg->bodyptr)->callbackArg);
-		break;
 	}
 
 	qdf_mem_free(msg->bodyptr);
@@ -1910,38 +1907,6 @@ static uint8_t wma_init_max_no_of_peers(tp_wma_handle wma_handle,
 }
 
 /**
- * wma_cleanup_vdev_resp_queue() - cleanup vdev response queue
- * @wma: wma handle
- *
- * Return: none
- */
-static void wma_cleanup_vdev_resp_queue(tp_wma_handle wma)
-{
-	struct wma_target_req *req_msg = NULL;
-	qdf_list_node_t *node1 = NULL;
-
-	qdf_spin_lock_bh(&wma->vdev_respq_lock);
-	if (!qdf_list_size(&wma->vdev_resp_queue)) {
-		qdf_spin_unlock_bh(&wma->vdev_respq_lock);
-		WMA_LOGD(FL("request queue maybe empty"));
-		return;
-	}
-
-	WMA_LOGD(FL("Cleaning up vdev resp queue"));
-
-	/* peek front, and then cleanup it in wma_vdev_resp_timer */
-	while (qdf_list_peek_front(&wma->vdev_resp_queue, &node1) ==
-				   QDF_STATUS_SUCCESS) {
-		req_msg = qdf_container_of(node1, struct wma_target_req, node);
-		qdf_spin_unlock_bh(&wma->vdev_respq_lock);
-		qdf_mc_timer_stop(&req_msg->event_timeout);
-		wma_vdev_resp_timer(req_msg);
-		qdf_spin_lock_bh(&wma->vdev_respq_lock);
-	}
-	qdf_spin_unlock_bh(&wma->vdev_respq_lock);
-}
-
-/**
  * wma_cleanup_hold_req() - cleanup hold request queue
  * @wma: wma handle
  *
@@ -1982,14 +1947,33 @@ static void wma_cleanup_hold_req(tp_wma_handle wma)
 static QDF_STATUS
 wma_cleanup_vdev_resp_and_hold_req(struct scheduler_msg *msg)
 {
+	tp_wma_handle wma;
+
 	if (!msg || !msg->bodyptr) {
 		WMA_LOGE(FL("msg or body pointer is NULL"));
 		return QDF_STATUS_E_INVAL;
 	}
 
-	wma_cleanup_vdev_resp_queue(msg->bodyptr);
-	wma_cleanup_hold_req(msg->bodyptr);
+	wma = msg->bodyptr;
+	target_if_flush_vdev_timers(wma->pdev);
+	wma_cleanup_hold_req(wma);
 
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * wma_cleanup_vdev_resp_and_hold_req_flush_cb() - flush cb for the msg to clean
+ * up vdev resp and hold req
+ * @msg :scheduler msg
+ *
+ * As passed msg->bodyptr is wma in this case this is dummy flush cb so that
+ * driver doesnt try to free msg->bodyptr when this msg is flushed.
+ *
+ * Return: QDF_STATUS
+ */
+static inline QDF_STATUS
+wma_cleanup_vdev_resp_and_hold_req_flush_cb(struct scheduler_msg *msg)
+{
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -2014,8 +1998,9 @@ static void wma_shutdown_notifier_cb(void *priv)
 	ucfg_pmo_psoc_wakeup_host_event_received(wma_handle->psoc);
 	wmi_stop(wma_handle->wmi_handle);
 
-	msg.bodyptr = priv;
+	msg.bodyptr = wma_handle;
 	msg.callback = wma_cleanup_vdev_resp_and_hold_req;
+	msg.flush_callback = wma_cleanup_vdev_resp_and_hold_req_flush_cb;
 	status = scheduler_post_message(QDF_MODULE_ID_WMA,
 					QDF_MODULE_ID_WMA,
 					QDF_MODULE_ID_TARGET_IF, &msg);
@@ -2042,6 +2027,8 @@ static void wma_state_info_dump(char **buf_ptr, uint16_t *size)
 	struct wma_txrx_node *iface;
 	struct wake_lock_stats stats;
 	struct wlan_objmgr_vdev *vdev;
+	uint32_t rate_flag;
+	QDF_STATUS status;
 
 	wma = cds_get_context(QDF_MODULE_ID_WMA);
 	if (!wma) {
@@ -2053,7 +2040,15 @@ static void wma_state_info_dump(char **buf_ptr, uint16_t *size)
 
 	for (vdev_id = 0; vdev_id < wma->max_bssid; vdev_id++) {
 		iface = &wma->interfaces[vdev_id];
-		if (!iface->handle)
+		vdev = iface->vdev;
+		if (!vdev)
+			continue;
+
+		if (!wlan_vdev_get_dp_handle(iface->vdev))
+			continue;
+
+		status = wma_get_vdev_rate_flag(iface->vdev, &rate_flag);
+		if (QDF_IS_STATUS_ERROR(status))
 			continue;
 
 		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma->psoc,
@@ -2082,8 +2077,6 @@ static void wma_state_info_dump(char **buf_ptr, uint16_t *size)
 			"\toem_response %u\n"
 			"dtimPeriod %d\n"
 			"chanmode %d\n"
-			"vht_capable %d\n"
-			"ht_capable %d\n"
 			"chan_width %d\n"
 			"vdev_active %d\n"
 			"vdev_up %d\n"
@@ -2093,9 +2086,7 @@ static void wma_state_info_dump(char **buf_ptr, uint16_t *size)
 			"tx_power %d\n"
 			"max_tx_power %d\n"
 			"nwType %d\n"
-			"tx_streams %d\n"
-			"rx_streams %d\n"
-			"chain_mask %d",
+			"tx_streams %d",
 			vdev_id,
 			stats.pno_match_wake_up_count,
 			stats.pno_complete_wake_up_count,
@@ -2114,20 +2105,16 @@ static void wma_state_info_dump(char **buf_ptr, uint16_t *size)
 			stats.oem_response_wake_up_count,
 			iface->dtimPeriod,
 			iface->chanmode,
-			iface->vht_capable,
-			iface->ht_capable,
 			iface->chan_width,
 			iface->vdev_active,
 			wma_is_vdev_up(vdev_id),
 			iface->aid,
-			iface->rate_flags,
+			rate_flag,
 			iface->nss,
 			iface->tx_power,
 			iface->max_tx_power,
 			iface->nwType,
-			iface->tx_streams,
-			iface->rx_streams,
-			iface->chain_mask);
+			iface->tx_streams);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
 	}
 
@@ -2862,8 +2849,6 @@ static int wma_unified_phyerr_rx_event_handler(void *handle,
 
 void wma_vdev_init(struct wma_txrx_node *vdev)
 {
-	qdf_wake_lock_create(&vdev->vdev_start_wakelock, "vdev_start");
-	qdf_runtime_lock_init(&vdev->vdev_start_runtime_wakelock);
 	qdf_wake_lock_create(&vdev->vdev_set_key_wakelock, "vdev_set_key");
 	qdf_runtime_lock_init(&vdev->vdev_set_key_runtime_wakelock);
 	vdev->is_waiting_for_key = false;
@@ -2889,11 +2874,6 @@ void wma_vdev_deinit(struct wma_txrx_node *vdev)
 		qdf_nbuf_free(bcn->buf);
 		qdf_mem_free(bcn);
 		vdev->beacon = NULL;
-	}
-
-	if (vdev->handle) {
-		qdf_mem_free(vdev->handle);
-		vdev->handle = NULL;
 	}
 
 	if (vdev->addBssStaContext) {
@@ -2946,8 +2926,6 @@ void wma_vdev_deinit(struct wma_txrx_node *vdev)
 
 	qdf_runtime_lock_deinit(&vdev->vdev_set_key_runtime_wakelock);
 	qdf_wake_lock_destroy(&vdev->vdev_set_key_wakelock);
-	qdf_runtime_lock_deinit(&vdev->vdev_start_runtime_wakelock);
-	qdf_wake_lock_destroy(&vdev->vdev_start_wakelock);
 	vdev->is_waiting_for_key = false;
 }
 
@@ -3387,9 +3365,6 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 		goto err_event_init;
 	}
 
-	qdf_list_create(&wma_handle->vdev_resp_queue,
-		      MAX_ENTRY_VDEV_RESP_QUEUE);
-	qdf_spinlock_create(&wma_handle->vdev_respq_lock);
 	qdf_list_create(&wma_handle->wma_hold_req_queue,
 		      MAX_ENTRY_HOLD_REQ_QUEUE);
 	qdf_spinlock_create(&wma_handle->wma_hold_req_q_lock);
@@ -3668,7 +3643,6 @@ err_dbglog_init:
 	qdf_wake_lock_destroy(&wma_handle->wmi_cmd_rsp_wake_lock);
 	qdf_runtime_lock_deinit(&wma_handle->sap_prevent_runtime_pm_lock);
 	qdf_runtime_lock_deinit(&wma_handle->wmi_cmd_rsp_runtime_lock);
-	qdf_spinlock_destroy(&wma_handle->vdev_respq_lock);
 	qdf_spinlock_destroy(&wma_handle->wma_hold_req_q_lock);
 err_event_init:
 	wmi_unified_unregister_event_handler(wma_handle->wmi_handle,
@@ -4519,6 +4493,7 @@ QDF_STATUS wma_stop(void)
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
 	int i;
 	struct mac_context *mac = NULL;
+	struct wlan_objmgr_vdev *vdev;
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
 	WMA_LOGD("%s: Enter", __func__);
@@ -4556,12 +4531,14 @@ QDF_STATUS wma_stop(void)
 		WMA_LOGE("Failed to destroy the log completion timer");
 	/* clean up ll-queue for all vdev */
 	for (i = 0; i < wma_handle->max_bssid; i++) {
-		if (wma_handle->interfaces[i].handle &&
-				wma_is_vdev_up(i)) {
-			cdp_fc_vdev_flush(
-				cds_get_context(QDF_MODULE_ID_SOC),
-				wma_handle->
-				interfaces[i].handle);
+		vdev = wma_handle->interfaces[i].vdev;
+		if (!vdev)
+			continue;
+		if (wlan_vdev_get_dp_handle(vdev) && wma_is_vdev_up(i)) {
+			cdp_fc_vdev_flush
+			(cds_get_context(QDF_MODULE_ID_SOC),
+			 wlan_vdev_get_dp_handle
+				(wma_handle->interfaces[i].vdev));
 		}
 	}
 
@@ -4742,12 +4719,10 @@ QDF_STATUS wma_close(void)
 	qdf_event_destroy(&wma_handle->recovery_event);
 	qdf_event_destroy(&wma_handle->tx_frm_download_comp_event);
 	qdf_event_destroy(&wma_handle->tx_queue_empty_event);
-	wma_cleanup_vdev_resp_queue(wma_handle);
 	wma_cleanup_hold_req(wma_handle);
 	qdf_wake_lock_destroy(&wma_handle->wmi_cmd_rsp_wake_lock);
 	qdf_runtime_lock_deinit(&wma_handle->sap_prevent_runtime_pm_lock);
 	qdf_runtime_lock_deinit(&wma_handle->wmi_cmd_rsp_runtime_lock);
-	qdf_spinlock_destroy(&wma_handle->vdev_respq_lock);
 	qdf_spinlock_destroy(&wma_handle->wma_hold_req_q_lock);
 
 	if (wma_handle->pGetRssiReq) {
@@ -8497,17 +8472,6 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 					(tSirUpdateChanList *) msg->bodyptr);
 		qdf_mem_free(msg->bodyptr);
 		break;
-	case WMA_SET_LINK_STATE:
-		wma_set_linkstate(wma_handle, (tpLinkStateParams) msg->bodyptr);
-		break;
-	case WMA_CHNL_SWITCH_REQ:
-		wma_set_channel(wma_handle,
-				(tpSwitchChannelParams) msg->bodyptr);
-		qdf_mem_free(msg->bodyptr);
-		break;
-	case WMA_ADD_BSS_REQ:
-		wma_add_bss(wma_handle, (struct bss_params *) msg->bodyptr);
-		break;
 	case WMA_ADD_STA_REQ:
 		wma_add_sta(wma_handle, (tpAddStaParams) msg->bodyptr);
 		break;
@@ -9165,6 +9129,10 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 		wma_set_roam_triggers(wma_handle, msg->bodyptr);
 		qdf_mem_free(msg->bodyptr);
 		break;
+	case WMA_ROAM_INIT_PARAM:
+		wma_update_roam_offload_flag(wma_handle, msg->bodyptr);
+		qdf_mem_free(msg->bodyptr);
+		break;
 	default:
 		WMA_LOGD("Unhandled WMA message of type %d", msg->type);
 		if (msg->bodyptr)
@@ -9260,7 +9228,8 @@ QDF_STATUS wma_send_pdev_set_pcl_cmd(tp_wma_handle wma_handle,
 
 	for (i = 0; i < wma_handle->saved_chan.num_channels; i++) {
 		msg->chan_weights.saved_chan_list[i] =
-			wma_handle->saved_chan.channel_list[i];
+		  wlan_reg_freq_to_chan(wma_handle->pdev,
+					wma_handle->saved_chan.ch_freq_list[i]);
 	}
 
 	msg->chan_weights.saved_num_chan = wma_handle->saved_chan.num_channels;
@@ -9612,3 +9581,32 @@ QDF_STATUS wma_config_bmiss_bcnt_params(uint32_t vdev_id, uint32_t first_cnt,
 	return status;
 }
 
+QDF_STATUS wma_get_rx_chainmask(uint8_t pdev_id, uint32_t *chainmask_2g,
+				uint32_t *chainmask_5g)
+{
+	struct wlan_psoc_host_mac_phy_caps *mac_phy_cap;
+	uint8_t total_mac_phy_cnt;
+	struct target_psoc_info *tgt_hdl;
+	tp_wma_handle wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+
+	tgt_hdl = wlan_psoc_get_tgt_if_handle(wma_handle->psoc);
+	if (!tgt_hdl) {
+		WMA_LOGE("%s: target psoc info is NULL", __func__);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	total_mac_phy_cnt = target_psoc_get_total_mac_phy_cnt(tgt_hdl);
+	if (total_mac_phy_cnt <= pdev_id) {
+		WMA_LOGE("%s: mac phy cnt %d, pdev id %d", __func__,
+			 total_mac_phy_cnt, pdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mac_phy_cap = target_psoc_get_mac_phy_cap(tgt_hdl);
+	*chainmask_2g = mac_phy_cap[pdev_id].rx_chain_mask_2G;
+	*chainmask_5g = mac_phy_cap[pdev_id].rx_chain_mask_5G;
+	WMA_LOGD("%s, pdev id: %d, rx chainmask 2g:%d, rx chainmask 5g:%d",
+		 __func__, pdev_id, *chainmask_2g, *chainmask_5g);
+
+	return QDF_STATUS_SUCCESS;
+}

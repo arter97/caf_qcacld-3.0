@@ -38,8 +38,6 @@
 
 #include "lim_utils.h"
 #include "lim_send_messages.h"
-#include "lim_sta_hash_api.h"
-
 #include "rrm_api.h"
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
@@ -319,14 +317,11 @@ static tSirMacHTChannelWidth get_operating_channel_width(tpDphHashNode stads)
 }
 
 /*
- * sch_bcn_process_sta() - Process the received beacon frame for sta,
- * bt_amp_sta
- *
+ * sch_bcn_process_sta() - Process the received beacon frame for sta
  * @mac_ctx:        mac_ctx
  * @bcn:            beacon struct
  * @rx_pkt_info:    received packet info
  * @session:        pe session pointer
- * @bss_idx:         bss index
  * @beaconParams:   update beacon params
  * @sendProbeReq:   out flag to indicate if probe rsp is to be sent
  * @pMh:            mac header
@@ -339,7 +334,7 @@ static bool
 sch_bcn_process_sta(struct mac_context *mac_ctx,
 			       tpSchBeaconStruct bcn,
 			       uint8_t *rx_pkt_info,
-			       struct pe_session *session, uint8_t *bss_idx,
+			       struct pe_session *session,
 			       tUpdateBeaconParams *beaconParams,
 			       uint8_t *sendProbeReq, tpSirMacMgmtHdr pMh)
 {
@@ -375,11 +370,7 @@ sch_bcn_process_sta(struct mac_context *mac_ctx,
 	}
 
 	lim_detect_change_in_ap_capabilities(mac_ctx, bcn, session);
-	if (lim_get_sta_hash_bssidx(mac_ctx, DPH_STA_HASH_INDEX_PEER, bss_idx,
-				    session) != QDF_STATUS_SUCCESS)
-		return false;
-
-	beaconParams->bss_idx = *bss_idx;
+	beaconParams->bss_idx = session->vdev_id;
 	qdf_mem_copy((uint8_t *) &session->lastBeaconTimeStamp,
 			(uint8_t *) bcn->timeStamp, sizeof(uint64_t));
 	session->currentBssBeaconCnt++;
@@ -452,7 +443,7 @@ sch_bcn_process_sta(struct mac_context *mac_ctx,
 					session->gLimEdcaParams, session);
 				lim_send_edca_params(mac_ctx,
 					session->gLimEdcaParamsActive,
-					sta->bssId, false);
+					session->vdev_id, false);
 			} else {
 				pe_err("Self Entry missing in Hash Table");
 			}
@@ -701,13 +692,11 @@ sch_bcn_update_opmode_change(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 
 /*
  * sch_bcn_process_sta_ibss() - Process the received beacon frame
- * for sta, bt_amp_sta and ibss
- *
+ * for sta and ibss
  * @mac_ctx:        mac_ctx
  * @bcn:            beacon struct
  * @rx_pkt_info:    received packet info
  * @session:        pe session pointer
- * @bss_idx:         bss index
  * @beaconParams:   update beacon params
  * @sendProbeReq:   out flag to indicate if probe rsp is to be sent
  * @pMh:            mac header
@@ -721,7 +710,6 @@ sch_bcn_process_sta_ibss(struct mac_context *mac_ctx,
 				    tpSchBeaconStruct bcn,
 				    uint8_t *rx_pkt_info,
 				    struct pe_session *session,
-				    uint8_t *bss_idx,
 				    tUpdateBeaconParams *beaconParams,
 				    uint8_t *sendProbeReq, tpSirMacMgmtHdr pMh)
 {
@@ -818,7 +806,6 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 					     uint8_t *rx_pkt_info,
 					     struct pe_session *session)
 {
-	uint8_t bss_idx = 0;
 	tUpdateBeaconParams beaconParams;
 	uint8_t sendProbeReq = false;
 	tpSirMacMgmtHdr pMh = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
@@ -831,9 +818,9 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 	if (LIM_IS_IBSS_ROLE(session)) {
 		lim_handle_ibss_coalescing(mac_ctx, bcn, rx_pkt_info, session);
 	} else if (LIM_IS_STA_ROLE(session)) {
-		if (false == sch_bcn_process_sta(mac_ctx, bcn,
-				rx_pkt_info, session, &bss_idx,
-				&beaconParams, &sendProbeReq, pMh))
+		if (false == sch_bcn_process_sta(mac_ctx, bcn, rx_pkt_info,
+						 session, &beaconParams,
+						 &sendProbeReq, pMh))
 			return;
 	}
 
@@ -845,7 +832,7 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 	   bcn->VHTOperation.present)) && session->htCapability &&
 	   bcn->HTInfo.present && !LIM_IS_IBSS_ROLE(session))
 		lim_update_sta_run_time_ht_switch_chnl_params(mac_ctx,
-						&bcn->HTInfo, bss_idx, session);
+						&bcn->HTInfo, session);
 
 	if ((LIM_IS_STA_ROLE(session) && !wma_is_csa_offload_enabled())
 	    || LIM_IS_IBSS_ROLE(session)) {
@@ -870,7 +857,7 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 	if (LIM_IS_STA_ROLE(session)
 	    || LIM_IS_IBSS_ROLE(session))
 		sch_bcn_process_sta_ibss(mac_ctx, bcn,
-					rx_pkt_info, session, &bss_idx,
+					rx_pkt_info, session,
 					&beaconParams, &sendProbeReq, pMh);
 	/* Obtain the Max Tx power for the current regulatory  */
 	regMax = lim_get_regulatory_max_transmit_power(
@@ -1066,7 +1053,7 @@ void sch_beacon_process_for_ap(struct mac_context *mac_ctx,
 	qdf_mem_zero(&bcn_prm, sizeof(tUpdateBeaconParams));
 	bcn_prm.paramChangeBitmap = 0;
 
-	bcn_prm.bss_idx = ap_session->bss_idx;
+	bcn_prm.bss_idx = ap_session->vdev_id;
 
 	if (!ap_session->is_session_obss_color_collision_det_enabled)
 		sch_check_bss_color_ie(mac_ctx, ap_session,
@@ -1580,8 +1567,7 @@ QDF_STATUS lim_process_obss_detection_ind(struct mac_context *mac_ctx,
 		 obss_detection->matched_detection_masks,
 		 QDF_MAC_ADDR_ARRAY(obss_detection->matched_bssid_addr));
 
-	session = pe_find_session_by_sme_session_id(mac_ctx,
-						    obss_detection->vdev_id);
+	session = pe_find_session_by_vdev_id(mac_ctx, obss_detection->vdev_id);
 	if (!session) {
 		pe_err("Failed to get session for id %d",
 		       obss_detection->vdev_id);

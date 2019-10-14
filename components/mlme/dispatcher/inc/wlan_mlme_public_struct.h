@@ -60,6 +60,8 @@
 #define MAX_VENDOR_IES_LEN 1532
 
 #define CFG_VALID_CHANNEL_LIST_STRING_LEN (CFG_VALID_CHANNEL_LIST_LEN * 4)
+
+#define DEFAULT_ROAM_TRIGGER_BITMAP 0xFFFFFFFF
 /**
  * struct mlme_cfg_str - generic structure for all mlme CFG string items
  *
@@ -258,6 +260,42 @@ enum mlme_ts_info_ack_policy {
 	TS_INFO_ACK_POLICY_NORMAL_ACK = 0,
 	TS_INFO_ACK_POLICY_HT_IMMEDIATE_BLOCK_ACK = 1,
 };
+
+#if defined(WLAN_FEATURE_HOST_ROAM) || defined(WLAN_FEATURE_ROAM_OFFLOAD)
+/**
+ * enum roam_control_requestor - Driver disabled roaming requestor that will
+ *  request the roam module to disable roaming based on the mlme operation
+ * @RSO_INVALID_REQUESTOR: invalid requestor
+ * @RSO_START_BSS: disable roaming temporarily due to start bss
+ * @RSO_CHANNEL_SWITCH: disable roaming due to STA channel switch
+ * @RSO_CONNECT_START: disable roaming temporarily due to connect
+ * @RSO_SAP_CHANNEL_CHANGE: disable roaming due to SAP channel change
+ */
+enum roam_control_requestor {
+	RSO_INVALID_REQUESTOR,
+	RSO_START_BSS          = BIT(0),
+	RSO_CHANNEL_SWITCH     = BIT(1),
+	RSO_CONNECT_START      = BIT(2),
+	RSO_SAP_CHANNEL_CHANGE = BIT(3),
+};
+
+/**
+ * enum roam_offload_state - Roaming module state for each STA vdev.
+ * @ROAM_DEINIT: Roaming module is not initialized at the
+ *  firmware.
+ * @ROAM_INIT: Roaming module initialized at the firmware.
+ * @ROAM_RSO_STARTED: RSO started, firmware can roam to different AP.
+ * @ROAM_RSO_STOPPED: RSO stopped - roaming module is initialized at firmware,
+ *  but firmware cannot do roaming due to supplicant disabled roaming/driver
+ * disabled roaming.
+ */
+enum roam_offload_state {
+	ROAM_DEINIT,
+	ROAM_INIT,
+	ROAM_RSO_STARTED,
+	ROAM_RSO_STOPPED
+};
+#endif
 
 /**
  * struct mlme_edca_params - EDCA pramaters related config items
@@ -664,6 +702,7 @@ struct wlan_mlme_cfg_sap {
  * @dfs_prefer_non_dfs: perefer non dfs channel after radar
  * @dfs_disable_japan_w53: Disable W53 channels
  * @sap_tx_leakage_threshold: sap tx leakage threshold
+ * @dfs_pri_multiplier: dfs_pri_multiplier for handle missing pulses
  */
 struct wlan_mlme_dfs_cfg {
 	bool dfs_master_capable;
@@ -674,6 +713,7 @@ struct wlan_mlme_dfs_cfg {
 	bool dfs_prefer_non_dfs;
 	bool dfs_disable_japan_w53;
 	uint32_t sap_tx_leakage_threshold;
+	uint32_t dfs_pri_multiplier;
 };
 
 /**
@@ -1067,6 +1107,7 @@ struct wlan_mlme_chainmask {
  * @enable_change_channel_bandwidth: enable/disable change channel bw in mission
  * mode
  * @disable_4way_hs_offload: enable/disable 4 way handshake offload to firmware
+ * @as_enabled: antenna sharing enabled or not (FW capability)
  */
 struct wlan_mlme_generic {
 	enum band_info band_capability;
@@ -1098,6 +1139,7 @@ struct wlan_mlme_generic {
 	bool data_stall_recovery_fw_support;
 	bool enable_change_channel_bandwidth;
 	bool disable_4way_hs_offload;
+	bool as_enabled;
 };
 
 /*
@@ -1484,7 +1526,7 @@ struct wlan_mlme_lfr_cfg {
 	uint32_t max_num_pre_auth;
 	uint32_t roam_preauth_retry_count;
 	uint32_t roam_preauth_no_ack_timeout;
-	uint32_t roam_rssi_diff;
+	uint8_t roam_rssi_diff;
 	bool roam_scan_offload_enabled;
 	uint32_t neighbor_scan_timer_period;
 	uint32_t neighbor_scan_min_timer_period;
@@ -2057,7 +2099,7 @@ struct wlan_mlme_reg {
 	bool indoor_channel_support;
 	uint32_t scan_11d_interval;
 	uint32_t valid_channel_freq_list[CFG_VALID_CHANNEL_LIST_LEN];
-	uint8_t valid_channel_list_num;
+	uint32_t valid_channel_list_num;
 	uint8_t country_code[CFG_COUNTRY_CODE_LEN + 1];
 	uint8_t country_code_len;
 	bool enable_11d_in_world_mode;

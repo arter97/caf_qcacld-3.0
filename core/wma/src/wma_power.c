@@ -126,13 +126,6 @@ QDF_STATUS wma_unified_set_sta_ps_param(wmi_unified_t wmi_handle,
 }
 
 #ifdef QCA_IBSS_SUPPORT
-/**
- * wma_set_ibss_pwrsave_params() - set ibss power save parameter to fw
- * @wma: wma handle
- * @vdev_id: vdev id
- *
- * Return: 0 for success or error code.
- */
 QDF_STATUS
 wma_set_ibss_pwrsave_params(tp_wma_handle wma, uint8_t vdev_id)
 {
@@ -721,13 +714,6 @@ static enum powersave_qpower_mode wma_get_qpower_config(tp_wma_handle wma)
 	}
 }
 
-/**
- * wma_enable_sta_ps_mode() - enable sta powersave params in fw
- * @wma: wma handle
- * @ps_req: power save request
- *
- * Return: none
- */
 void wma_enable_sta_ps_mode(tp_wma_handle wma, tpEnablePsParams ps_req)
 {
 	uint32_t vdev_id = ps_req->sessionid;
@@ -735,7 +721,7 @@ void wma_enable_sta_ps_mode(tp_wma_handle wma, tpEnablePsParams ps_req)
 	enum powersave_qpower_mode qpower_config = wma_get_qpower_config(wma);
 	struct wma_txrx_node *iface = &wma->interfaces[vdev_id];
 
-	if (!iface->handle) {
+	if (!wlan_vdev_get_dp_handle(iface->vdev)) {
 		WMA_LOGE("vdev id %d is not active", vdev_id);
 		return;
 	}
@@ -870,13 +856,6 @@ QDF_STATUS wma_set_qpower_config(uint8_t vdev_id, uint8_t qpower)
 					    wma_get_qpower_config(wma));
 }
 
-/**
- * wma_enable_uapsd_mode() - enable uapsd mode in fw
- * @wma: wma handle
- * @ps_req: power save request
- *
- * Return: none
- */
 void wma_enable_uapsd_mode(tp_wma_handle wma, tpEnableUapsdParams ps_req)
 {
 	QDF_STATUS ret;
@@ -885,7 +864,7 @@ void wma_enable_uapsd_mode(tp_wma_handle wma, tpEnableUapsdParams ps_req)
 	enum powersave_qpower_mode qpower_config = wma_get_qpower_config(wma);
 	struct wma_txrx_node *iface = &wma->interfaces[vdev_id];
 
-	if (!iface->handle) {
+	if (!wlan_vdev_get_dp_handle(iface->vdev)) {
 		WMA_LOGE("vdev id %d is not active", vdev_id);
 		return;
 	}
@@ -1000,26 +979,12 @@ static QDF_STATUS wma_set_sta_uapsd_auto_trig_cmd(wmi_unified_t wmi_handle,
 	return ret;
 }
 
-/**
- * wma_trigger_uapsd_params() - set trigger uapsd parameter
- * @wmi_handle: wma handle
- * @vdev_id: vdev id
- * @trigger_uapsd_params: trigger uapsd parameters
- *
- * This function sets the trigger uapsd
- * params such as service interval, delay
- * interval and suspend interval which
- * will be used by the firmware to send
- * trigger frames periodically when there
- * is no traffic on the transmit side.
- *
- * Return: QDF_STATUS_SUCCESS for success or error code.
- */
 QDF_STATUS wma_trigger_uapsd_params(tp_wma_handle wma_handle, uint32_t vdev_id,
 				    tp_wma_trigger_uapsd_params
 				    trigger_uapsd_params)
 {
 	QDF_STATUS ret;
+	uint8_t *bssid;
 	struct sta_uapsd_params uapsd_trigger_param;
 
 	WMA_LOGD("Trigger uapsd params vdev id %d", vdev_id);
@@ -1048,8 +1013,14 @@ QDF_STATUS wma_trigger_uapsd_params(tp_wma_handle wma_handle, uint32_t vdev_id,
 	uapsd_trigger_param.delay_interval =
 		trigger_uapsd_params->delay_interval;
 
+	bssid = wma_get_vdev_bssid(wma_handle->interfaces[vdev_id].vdev);
+	if (!bssid) {
+		WMA_LOGE("%s: Failed to get bssid for vdev_%d",
+			 __func__, vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
 	ret = wma_set_sta_uapsd_auto_trig_cmd(wma_handle->wmi_handle,
-			vdev_id, wma_handle->interfaces[vdev_id].bssid,
+			vdev_id, bssid,
 			&uapsd_trigger_param, 1);
 	if (QDF_IS_STATUS_ERROR(ret)) {
 		WMA_LOGE("Fail to send uapsd param cmd for vdevid %d ret = %d",
@@ -1060,18 +1031,11 @@ QDF_STATUS wma_trigger_uapsd_params(tp_wma_handle wma_handle, uint32_t vdev_id,
 	return ret;
 }
 
-/**
- * wma_disable_uapsd_per_ac() - disable uapsd per ac
- * @wmi_handle: wma handle
- * @vdev_id: vdev id
- * @ac: access category
- *
- * Return: QDF_STATUS_SUCCESS for success or error code.
- */
 QDF_STATUS wma_disable_uapsd_per_ac(tp_wma_handle wma_handle,
 				    uint32_t vdev_id, enum uapsd_ac ac)
 {
 	QDF_STATUS ret;
+	uint8_t *bssid;
 	struct wma_txrx_node *iface = &wma_handle->interfaces[vdev_id];
 	struct sta_uapsd_params uapsd_trigger_param;
 	enum uapsd_up user_priority;
@@ -1118,8 +1082,14 @@ QDF_STATUS wma_disable_uapsd_per_ac(tp_wma_handle wma_handle,
 	uapsd_trigger_param.suspend_interval = 0;
 	uapsd_trigger_param.delay_interval = 0;
 
+	bssid = wma_get_vdev_bssid(wma_handle->interfaces[vdev_id].vdev);
+	if (!bssid) {
+		WMA_LOGE("%s: Failed to get bssid for vdev_%d",
+			 __func__, vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
 	ret = wma_set_sta_uapsd_auto_trig_cmd(wma_handle->wmi_handle,
-		vdev_id, wma_handle->interfaces[vdev_id].bssid,
+		vdev_id, bssid,
 		&uapsd_trigger_param, 1);
 	if (QDF_IS_STATUS_ERROR(ret)) {
 		WMA_LOGE("Fail to send auto trig cmd for vdevid %d ret = %d",

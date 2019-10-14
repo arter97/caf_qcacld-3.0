@@ -1804,7 +1804,8 @@ void lim_handle_csa_offload_msg(struct mac_context *mac_ctx,
 	if (mac_ctx->lim.stop_roaming_callback)
 		mac_ctx->lim.stop_roaming_callback(mac_ctx,
 						   session_entry->smeSessionId,
-						   ecsr_driver_disabled);
+						   REASON_DRIVER_DISABLED,
+						   RSO_CHANNEL_SWITCH);
 
 	lim_prepare_for11h_channel_switch(mac_ctx, session_entry);
 
@@ -1835,7 +1836,7 @@ void lim_handle_delete_bss_rsp(struct mac_context *mac,
 	struct pe_session *pe_session;
 
 	pe_session =
-		pe_find_session_by_sme_session_id(mac, del_bss_rsp->vdev_id);
+		pe_find_session_by_vdev_id(mac, del_bss_rsp->vdev_id);
 	if (!pe_session) {
 		pe_err("Session Does not exist for vdev id: %d",
 		       del_bss_rsp->vdev_id);
@@ -1931,7 +1932,7 @@ lim_send_sme_ap_channel_switch_resp(struct mac_context *mac,
 				    struct vdev_start_response *rsp)
 {
 	struct scheduler_msg mmhMsg = {0};
-	tpSwitchChannelParams pSmeSwithChnlParams;
+	struct sSirChanChangeResponse *chan_change_rsp;
 	uint8_t channelId;
 	bool is_ch_dfs = false;
 	enum phy_ch_width ch_width;
@@ -1940,30 +1941,27 @@ lim_send_sme_ap_channel_switch_resp(struct mac_context *mac,
 	qdf_runtime_pm_allow_suspend(&pe_session->ap_ecsa_runtime_lock);
 	qdf_wake_lock_release(&pe_session->ap_ecsa_wakelock, 0);
 
-	pSmeSwithChnlParams = qdf_mem_malloc(sizeof(tSwitchChannelParams));
-	if (!pSmeSwithChnlParams)
+	chan_change_rsp =
+		qdf_mem_malloc(sizeof(struct sSirChanChangeResponse));
+	if (!chan_change_rsp)
 		return;
 
-
-	channelId = wlan_reg_freq_to_chan(mac->pdev, pe_session->curr_op_freq);
-	pSmeSwithChnlParams->channelNumber = channelId;
-	pSmeSwithChnlParams->status = rsp->status;
-	ch_width = pSmeSwithChnlParams->ch_width;
-	ch_center_freq_seg1 = pSmeSwithChnlParams->ch_center_freq_seg1;
-
+	chan_change_rsp->new_op_freq = pe_session->curr_op_freq;
+	chan_change_rsp->channelChangeStatus = rsp->status;
 	/*
 	 * Pass the sme sessionID to SME instead
 	 * PE session ID.
 	 */
-	pSmeSwithChnlParams->peSessionId = rsp->vdev_id;
+	chan_change_rsp->sessionId = rsp->vdev_id;
 
 	mmhMsg.type = eWNI_SME_CHANNEL_CHANGE_RSP;
-	mmhMsg.bodyptr = (void *)pSmeSwithChnlParams;
+	mmhMsg.bodyptr = (void *)chan_change_rsp;
 	mmhMsg.bodyval = 0;
 	lim_sys_process_mmh_msg_api(mac, &mmhMsg);
 
 	if (QDF_IS_STATUS_ERROR(rsp->status)) {
-		pe_err("failed to change sap channel to %u", channelId);
+		pe_err("failed to change sap freq to %u",
+		       pe_session->curr_op_freq);
 		return;
 	}
 
@@ -1973,7 +1971,9 @@ lim_send_sme_ap_channel_switch_resp(struct mac_context *mac,
 	 * channel, PE will receive an explicit request from
 	 * upper layers to start the beacon transmission .
 	 */
-
+	ch_width = pe_session->ch_width;
+	ch_center_freq_seg1 = pe_session->ch_center_freq_seg1;
+	channelId = wlan_reg_freq_to_chan(mac->pdev, pe_session->curr_op_freq);
 	if (ch_width == CH_WIDTH_160MHZ) {
 		is_ch_dfs = true;
 	} else if (ch_width == CH_WIDTH_80P80MHZ) {
@@ -2079,7 +2079,7 @@ lim_process_beacon_tx_success_ind(struct mac_context *mac_ctx, uint16_t msgType,
 	tpSirFirstBeaconTxCompleteInd bcn_ind =
 		(tSirFirstBeaconTxCompleteInd *) event;
 
-	session = pe_find_session_by_bss_idx(mac_ctx, bcn_ind->bss_idx);
+	session = pe_find_session_by_vdev_id(mac_ctx, bcn_ind->bss_idx);
 	if (!session) {
 		pe_err("Session Does not exist for given session id");
 		return;
