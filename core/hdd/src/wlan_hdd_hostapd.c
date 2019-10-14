@@ -1461,7 +1461,7 @@ static void hdd_fill_station_info(struct hdd_adapter *adapter,
 
 	qdf_mem_copy(&stainfo->capability, &event->capability_info,
 		     sizeof(uint16_t));
-	stainfo->freq = cds_chan_to_freq(event->chan_info.chan_id);
+	stainfo->freq = event->chan_info.mhz;
 	stainfo->sta_type = event->staType;
 	stainfo->dot11_mode =
 		hdd_convert_dot11mode_from_phymode(event->chan_info.info);
@@ -1635,7 +1635,7 @@ hdd_hostapd_apply_action_oui(struct hdd_context *hdd_ctx,
 	if (ch_width != eHT_CHANNEL_WIDTH_20MHZ)
 		return;
 
-	freq = cds_chan_to_freq(event->chan_info.chan_id);
+	freq = event->chan_info.mhz;
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(freq))
 		attr.enable_2g = true;
 	else if (WLAN_REG_IS_5GHZ_CH_FREQ(freq))
@@ -2613,7 +2613,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		 */
 		qdf_atomic_set(&adapter->ch_switch_in_progress, 0);
 		policy_mgr_set_chan_switch_complete_evt(hdd_ctx->psoc);
-		wlan_hdd_enable_roaming(adapter);
+		wlan_hdd_enable_roaming(adapter,
+					RSO_SAP_CHANNEL_CHANGE);
 
 		/* Check any other sap need restart */
 		if (ap_ctx->sap_context->csa_reason ==
@@ -2990,7 +2991,7 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_channel,
 		return -EINVAL;
 	}
 	/* Disable Roaming on all adapters before doing channel change */
-	wlan_hdd_disable_roaming(adapter);
+	wlan_hdd_disable_roaming(adapter, RSO_SAP_CHANNEL_CHANGE);
 
 	/*
 	 * Post the Channel Change request to SAP.
@@ -2999,7 +3000,7 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_channel,
 	vdev = hdd_objmgr_get_vdev(adapter);
 	if (!vdev) {
 		qdf_atomic_set(&adapter->ch_switch_in_progress, 0);
-		wlan_hdd_enable_roaming(adapter);
+		wlan_hdd_enable_roaming(adapter, RSO_SAP_CHANNEL_CHANGE);
 		return -EINVAL;
 	}
 	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE)
@@ -3026,7 +3027,8 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_channel,
 		 * If Posting of the Channel Change request fails
 		 * enable roaming on all adapters
 		 */
-		wlan_hdd_enable_roaming(adapter);
+		wlan_hdd_enable_roaming(adapter,
+					RSO_SAP_CHANNEL_CHANGE);
 
 		ret = -EINVAL;
 	}
@@ -3641,39 +3643,31 @@ int wlan_hdd_set_channel(struct wiphy *wiphy,
 
 	mac_handle = hdd_ctx->mac_handle;
 
-	/*
-	 * Do freq to chan conversion
-	 * TODO: for 11a
-	 */
+	/* Check freq range */
+	if ((wlan_reg_min_chan_freq() >
+	     chandef->chan->center_freq) ||
+	    (wlan_reg_max_chan_freq() < chandef->chan->center_freq)) {
+		hdd_err("channel: %d is outside valid freq range",
+			chandef->chan->center_freq);
+		return -EINVAL;
+	}
 
 	channel = ieee80211_frequency_to_channel(chandef->chan->center_freq);
 
 	if (NL80211_CHAN_WIDTH_80P80 == chandef->width ||
 	    NL80211_CHAN_WIDTH_160 == chandef->width) {
+		if ((wlan_reg_min_chan_freq() > chandef->center_freq2) ||
+		    (wlan_reg_max_chan_freq() < chandef->center_freq2)) {
+			hdd_err("center_freq2: %d is outside valid freq range",
+				chandef->center_freq2);
+			return -EINVAL;
+		}
+
 		if (chandef->center_freq2)
 			channel_seg2 = ieee80211_frequency_to_channel(
-					chandef->center_freq2);
+				chandef->center_freq2);
 		else
 			hdd_err("Invalid center_freq2");
-	}
-
-	/* Check freq range */
-	if ((WNI_CFG_CURRENT_CHANNEL_STAMIN > channel) ||
-	    (WNI_CFG_CURRENT_CHANNEL_STAMAX < channel)) {
-		hdd_err("Channel: %d is outside valid range from %d to %d",
-		       channel, WNI_CFG_CURRENT_CHANNEL_STAMIN,
-		       WNI_CFG_CURRENT_CHANNEL_STAMAX);
-		return -EINVAL;
-	}
-
-	/* Check freq range */
-
-	if ((WNI_CFG_CURRENT_CHANNEL_STAMIN > channel_seg2) ||
-	    (WNI_CFG_CURRENT_CHANNEL_STAMAX < channel_seg2)) {
-		hdd_err("Channel: %d is outside valid range from %d to %d",
-		       channel_seg2, WNI_CFG_CURRENT_CHANNEL_STAMIN,
-		       WNI_CFG_CURRENT_CHANNEL_STAMAX);
-		return -EINVAL;
 	}
 
 	num_ch = CFG_VALID_CHANNEL_LIST_LEN;
@@ -5039,7 +5033,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 	}
 
 	/* Disable Roaming on all adapters before starting bss */
-	wlan_hdd_disable_roaming(adapter);
+	wlan_hdd_disable_roaming(adapter, RSO_START_BSS);
 
 	sme_config = qdf_mem_malloc(sizeof(*sme_config));
 	if (!sme_config) {
@@ -5665,7 +5659,7 @@ error:
 
 free:
 	/* Enable Roaming after start bss in case of failure/success */
-	wlan_hdd_enable_roaming(adapter);
+	wlan_hdd_enable_roaming(adapter, RSO_START_BSS);
 	qdf_mem_free(sme_config);
 	return ret;
 }

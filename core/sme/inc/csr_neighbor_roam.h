@@ -66,6 +66,12 @@ typedef struct sCsrNeighborRoamCfgParams {
 	tCsrChannelInfo pref_chan_info;
 	uint32_t full_roam_scan_period;
 	bool enable_scoring_for_roam;
+	uint8_t roam_rssi_diff;
+	uint16_t roam_scan_home_away_time;
+	uint8_t roam_scan_n_probes;
+	uint32_t roam_scan_inactivity_time;
+	uint32_t roam_inactive_data_packet_count;
+	uint32_t roam_scan_period_after_inactivity;
 } tCsrNeighborRoamCfgParams, *tpCsrNeighborRoamCfgParams;
 
 #define CSR_NEIGHBOR_ROAM_INVALID_CHANNEL_INDEX    255
@@ -147,7 +153,6 @@ typedef struct sCsrNeighborRoamControlInfo {
 	uint8_t currentRoamBmissFinalBcnt;
 	uint8_t currentRoamBeaconRssiWeight;
 	uint8_t last_sent_cmd;
-	bool b_roam_scan_offload_started;
 	struct scan_result_list *scan_res_lfr2_roam_ap;
 	bool roam_control_enable;
 } tCsrNeighborRoamControlInfo, *tpCsrNeighborRoamControlInfo;
@@ -257,13 +262,91 @@ void csr_roam_reset_roam_params(struct mac_context *mac_ptr);
 #define REASON_DRIVER_ENABLED                       43
 #define REASON_ROAM_FULL_SCAN_PERIOD_CHANGED        44
 #define REASON_SCORING_CRITERIA_CHANGED             45
+#define REASON_SUPPLICANT_INIT_ROAMING              46
+#define REASON_SUPPLICANT_DE_INIT_ROAMING           47
+#define REASON_DRIVER_DISABLED                      48
+#define REASON_ROAM_CONTROL_CONFIG_RESTORED         49
+#define REASON_ROAM_CONTROL_CONFIG_ENABLED          50
 
 #if defined(WLAN_FEATURE_HOST_ROAM) || defined(WLAN_FEATURE_ROAM_OFFLOAD)
 QDF_STATUS csr_roam_offload_scan(struct mac_context *mac, uint8_t sessionId,
 		uint8_t command, uint8_t reason);
+
+/**
+ * csr_post_roam_state_change() - Post roam state change to roam state machine
+ * @mac: mac context
+ * @vdev_id: vdev id
+ * @state: roam state to be set for the requested vdev id
+ * @reason: reason for changing roam state for the requested vdev id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS csr_post_roam_state_change(struct mac_context *mac, uint8_t vdev_id,
+				      enum roam_offload_state state,
+				      uint8_t reason);
+
+/**
+ * csr_post_rso_stop() - Post RSO stop message to WMA
+ * @mac: mac context
+ * @vdev_id: vdev id
+ * @reason: reason for requesting RSO stop
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+csr_post_rso_stop(struct mac_context *mac, uint8_t vdev_id, uint16_t reason);
+
+/**
+ * csr_enable_roaming_on_connected_sta() - Enable roaming on other connected
+ *  sta vdev
+ * @mac: mac context
+ * @vdev_id: vdev id on which roaming should not be enabled
+ * @reason: reason for enabling roaming on connected sta vdev
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+csr_enable_roaming_on_connected_sta(struct mac_context *mac, uint8_t vdev_id);
+
+/**
+ * csr_roam_update_cfg() - Process RSO update cfg request
+ * @mac: mac context
+ * @vdev_id: vdev id
+ * @reason: reason for requesting RSO update cfg
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+csr_roam_update_cfg(struct mac_context *mac, uint8_t vdev_id, uint8_t reason);
 #else
 static inline QDF_STATUS csr_roam_offload_scan(struct mac_context *mac,
 		uint8_t sessionId, uint8_t command, uint8_t reason)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+QDF_STATUS csr_post_roam_state_change(struct mac_context *mac, uint8_t vdev_id,
+				      enum roam_offload_state state,
+				      uint8_t reason)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+csr_post_rso_stop(struct mac_context *mac, uint8_t vdev_id, uint16_t reason)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+csr_enable_roaming_on_connected_sta(struct mac_context *mac, uint8_t vdev_id)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+csr_roam_update_cfg(struct mac_context *mac, uint8_t vdev_id, uint8_t reason)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }

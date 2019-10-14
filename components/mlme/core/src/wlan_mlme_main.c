@@ -940,6 +940,8 @@ static void mlme_init_dfs_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_DISABLE_DFS_JAPAN_W53);
 	dfs_cfg->sap_tx_leakage_threshold =
 		cfg_get(psoc, CFG_SAP_TX_LEAKAGE_THRESHOLD);
+	dfs_cfg->dfs_pri_multiplier =
+		cfg_get(psoc, CFG_DFS_RADAR_PRI_MULTIPLIER);
 }
 
 static void mlme_init_feature_flag_in_cfg(
@@ -1503,6 +1505,17 @@ mlme_init_bss_load_trigger_params(struct wlan_objmgr_psoc *psoc,
 			cfg_get(psoc, CFG_BSS_LOAD_TRIG_2G_RSSI_THRES);
 }
 
+void mlme_reinit_control_config_lfr_params(struct wlan_objmgr_psoc *psoc,
+					   struct wlan_mlme_lfr_cfg *lfr)
+{
+	/* Restore the params set through SETDFSSCANMODE */
+	lfr->roaming_dfs_channel =
+		cfg_get(psoc, CFG_LFR_ROAMING_DFS_CHANNEL);
+
+	/* Restore the params set through SETWESMODE */
+	lfr->wes_mode_enabled = cfg_get(psoc, CFG_LFR_ENABLE_WES_MODE);
+}
+
 static void mlme_init_lfr_cfg(struct wlan_objmgr_psoc *psoc,
 			      struct wlan_mlme_lfr_cfg *lfr)
 {
@@ -1697,17 +1710,17 @@ static void mlme_init_power_cfg(struct wlan_objmgr_psoc *psoc,
 	power->tx_power_2g = cfg_get(psoc, CFG_SET_TXPOWER_LIMIT2G);
 	power->tx_power_5g = cfg_get(psoc, CFG_SET_TXPOWER_LIMIT5G);
 
-	power->max_tx_power_24.max_len = CFG_MAX_TX_POWER_2_4_LEN;
+	power->max_tx_power_24_chan.max_len = CFG_MAX_TX_POWER_2_4_LEN;
 	qdf_uint8_array_parse(cfg_default(CFG_MAX_TX_POWER_2_4),
-			      power->max_tx_power_24.data,
-			      sizeof(power->max_tx_power_24.data),
-			      &power->max_tx_power_24.len);
+			      power->max_tx_power_24_chan.data,
+			      sizeof(power->max_tx_power_24_chan.data),
+			      &power->max_tx_power_24_chan.len);
 
-	power->max_tx_power_5.max_len = CFG_MAX_TX_POWER_5_LEN;
+	power->max_tx_power_5_chan.max_len = CFG_MAX_TX_POWER_5_LEN;
 	qdf_uint8_array_parse(cfg_default(CFG_MAX_TX_POWER_5),
-			      power->max_tx_power_5.data,
-			      sizeof(power->max_tx_power_5.data),
-			      &power->max_tx_power_5.len);
+			      power->max_tx_power_5_chan.data,
+			      sizeof(power->max_tx_power_5_chan.data),
+			      &power->max_tx_power_5_chan.len);
 
 	power->power_usage.max_len = CFG_POWER_USAGE_MAX_LEN;
 	power->power_usage.len = CFG_POWER_USAGE_MAX_LEN;
@@ -1725,6 +1738,8 @@ static void mlme_init_scoring_cfg(struct wlan_objmgr_psoc *psoc,
 {
 	uint32_t total_weight;
 
+	scoring_cfg->vendor_roam_score_algorithm =
+		cfg_get(psoc, CFG_VENDOR_ROAM_SCORE_ALGORITHM);
 	scoring_cfg->enable_scoring_for_roam =
 		cfg_get(psoc, CFG_ENABLE_SCORING_FOR_ROAM);
 	scoring_cfg->weight_cfg.rssi_weightage =

@@ -385,51 +385,79 @@ QDF_STATUS
 populate_dot11f_country(struct mac_context *mac,
 			tDot11fIECountry *pDot11f, struct pe_session *pe_session)
 {
-	uint32_t len;
+	uint32_t len, j = 0;
 	enum band_info rfBand;
 	uint8_t temp[CFG_MAX_STR_LEN], code[3];
+	tSirMacChanInfo *max_tx_power_data;
+	uint32_t rem_length = 0, copied_length = 0;
 
-	if (pe_session->lim11dEnabled) {
-		lim_get_rf_band_new(mac, &rfBand, pe_session);
-		if (rfBand == BAND_5G) {
-			len = mac->mlme_cfg->power.max_tx_power_5.len;
-			qdf_mem_copy(temp,
-				     mac->mlme_cfg->power.max_tx_power_5.data,
-				     len);
-		} else {
-			len = mac->mlme_cfg->power.max_tx_power_24.len;
-			qdf_mem_copy(temp,
-				     mac->mlme_cfg->power.max_tx_power_24.data,
-				     len);
+	if (!pe_session->lim11dEnabled)
+		return QDF_STATUS_SUCCESS;
+
+	lim_get_rf_band_new(mac, &rfBand, pe_session);
+	if (rfBand == BAND_5G) {
+		len = mac->mlme_cfg->power.max_tx_power_5.len;
+		max_tx_power_data =
+		(tSirMacChanInfo *)mac->mlme_cfg->power.max_tx_power_5.data;
+		rem_length = len;
+		while (rem_length >= (sizeof(tSirMacChanInfo))) {
+			temp[copied_length++] =
+				(uint8_t)wlan_reg_freq_to_chan(
+					mac->pdev,
+					max_tx_power_data[j].first_freq);
+			temp[copied_length++] =
+					max_tx_power_data[j].numChannels;
+			temp[copied_length++] =
+					max_tx_power_data[j].maxTxPower;
+			j++;
+			rem_length -= (sizeof(tSirMacChanInfo));
 		}
-
-		if (3 > len) {
-			/* no limit on tx power, cannot include the IE because at least */
-			/* one (channel,num,tx power) must be present */
-			return QDF_STATUS_SUCCESS;
+	} else {
+		len = mac->mlme_cfg->power.max_tx_power_24.len;
+		max_tx_power_data =
+		(tSirMacChanInfo *)mac->mlme_cfg->power.max_tx_power_24.data;
+		rem_length = len;
+		while (rem_length >= (sizeof(tSirMacChanInfo))) {
+			temp[copied_length++] =
+				(uint8_t)wlan_reg_freq_to_chan(
+					mac->pdev,
+					max_tx_power_data[j].first_freq);
+			temp[copied_length++] =
+				max_tx_power_data[j].numChannels;
+			temp[copied_length++] =
+				max_tx_power_data[j].maxTxPower;
+			j++;
+			rem_length -= (sizeof(tSirMacChanInfo));
 		}
-
-		wlan_reg_read_current_country(mac->psoc, code);
-
-		qdf_mem_copy(pDot11f->country, code, 2);
-
-		/* a wi-fi agile multiband AP shall include a country */
-		/* element in all beacon and probe response frames */
-		/* where the last octet of country string field is */
-		/* set to 0x04 */
-		if (mac->mlme_cfg->oce.oce_sap_enabled)
-			pDot11f->country[2] = 0x04;
-
-		if (len > MAX_SIZE_OF_TRIPLETS_IN_COUNTRY_IE) {
-			pe_err("len:%d is out of bounds, resetting", len);
-			len = MAX_SIZE_OF_TRIPLETS_IN_COUNTRY_IE;
-		}
-
-		pDot11f->num_triplets = (uint8_t) (len / 3);
-		qdf_mem_copy((uint8_t *) pDot11f->triplets, temp, len);
-
-		pDot11f->present = 1;
 	}
+
+	if (sizeof(tSirMacChanInfo) > len) {
+		/* no limit on tx power, cannot include the IE because at */
+		/* atleast one (channel,num,tx power) must be present */
+		return QDF_STATUS_SUCCESS;
+	}
+
+	wlan_reg_read_current_country(mac->psoc, code);
+
+	qdf_mem_copy(pDot11f->country, code, 2);
+
+	/* a wi-fi agile multiband AP shall include a country */
+	/* element in all beacon and probe response frames */
+	/* where the last octet of country string field is */
+	/* set to 0x04 */
+	if (mac->mlme_cfg->oce.oce_sap_enabled)
+		pDot11f->country[2] = 0x04;
+
+	if (copied_length > MAX_SIZE_OF_TRIPLETS_IN_COUNTRY_IE) {
+		pe_err("len:%d is out of bounds, resetting", len);
+		copied_length = MAX_SIZE_OF_TRIPLETS_IN_COUNTRY_IE;
+	}
+
+	pDot11f->num_triplets = (uint8_t)(copied_length / 3);
+
+	qdf_mem_copy((uint8_t *)pDot11f->triplets, temp, copied_length);
+
+	pDot11f->present = 1;
 
 	return QDF_STATUS_SUCCESS;
 } /* End populate_dot11f_country. */
@@ -847,10 +875,10 @@ static void lim_log_vht_operation(struct mac_context *mac,
 {
 #ifdef DUMP_MGMT_CNTNTS
 	pe_debug("chanWidth: %d", pDot11f->chanWidth);
-	pe_debug("chanCenterFreqSeg1: %d",
-		pDot11f->chanCenterFreqSeg1);
-	pe_debug("chanCenterFreqSeg2: %d",
-		pDot11f->chanCenterFreqSeg2);
+	pe_debug("chan_center_freq_seg0: %d",
+		 pDot11f->chan_center_freq_seg0);
+	pe_debug("chan_center_freq_seg1: %d",
+		 pDot11f->chan_center_freq_seg1);
 	pe_debug("basicMCSSet: %d", pDot11f->basicMCSSet);
 #endif /* DUMP_MGMT_CNTNTS */
 }
@@ -966,6 +994,8 @@ populate_dot11f_vht_caps(struct mac_context *mac,
 		pDot11f->rxAntPattern = pe_session->vht_config.rx_antpattern;
 
 		pDot11f->txAntPattern = pe_session->vht_config.tx_antpattern;
+		pDot11f->extended_nss_bw_supp =
+			pe_session->vht_config.extended_nss_bw_supp;
 
 		pDot11f->maxAMPDULenExp =
 				pe_session->vht_config.max_ampdu_lenexp;
@@ -1019,12 +1049,17 @@ populate_dot11f_vht_caps(struct mac_context *mac,
 		nCfgValue = vht_cap_info->link_adap_cap;
 		pDot11f->vhtLinkAdaptCap = (nCfgValue & 0x0003);
 
+		pDot11f->extended_nss_bw_supp =
+			vht_cap_info->extended_nss_bw_supp;
 	}
+
+	pDot11f->max_nsts_total = vht_cap_info->max_nsts_total;
+	pDot11f->vht_extended_nss_bw_cap =
+		vht_cap_info->vht_extended_nss_bw_cap;
 
 	nCfgValue = vht_cap_info->mu_bformer;
 	pDot11f->muBeamformerCap = (nCfgValue & 0x0001);
 
-	pDot11f->reserved1 = 0;
 
 	nCfgValue = vht_cap_info->rx_mcs_map;
 	pDot11f->rxMCSMap = (nCfgValue & 0x0000FFFF);
@@ -1032,15 +1067,12 @@ populate_dot11f_vht_caps(struct mac_context *mac,
 	nCfgValue = vht_cap_info->rx_supp_data_rate;
 	pDot11f->rxHighSupDataRate = (nCfgValue & 0x00001FFF);
 
-	pDot11f->reserved2 = 0;
-
 	nCfgValue = vht_cap_info->tx_mcs_map;
 	pDot11f->txMCSMap = (nCfgValue & 0x0000FFFF);
 
 	nCfgValue = vht_cap_info->tx_supp_data_rate;
 	pDot11f->txSupDataRate = (nCfgValue & 0x00001FFF);
 
-	pDot11f->reserved3 = 0;
 	if (pe_session) {
 		if (pe_session->nss == NSS_1x1_MODE) {
 			pDot11f->txMCSMap |= DISABLE_NSS2_MCS;
@@ -1086,18 +1118,18 @@ populate_dot11f_vht_operation(struct mac_context *mac,
 
 	if (pe_session->ch_width > CH_WIDTH_40MHZ) {
 		pDot11f->chanWidth = 1;
-		pDot11f->chanCenterFreqSeg1 =
+		pDot11f->chan_center_freq_seg0 =
 			pe_session->ch_center_freq_seg0;
 		if (pe_session->ch_width == CH_WIDTH_80P80MHZ ||
 				pe_session->ch_width == CH_WIDTH_160MHZ)
-			pDot11f->chanCenterFreqSeg2 =
+			pDot11f->chan_center_freq_seg1 =
 				pe_session->ch_center_freq_seg1;
 		else
-			pDot11f->chanCenterFreqSeg2 = 0;
+			pDot11f->chan_center_freq_seg1 = 0;
 	} else {
 		pDot11f->chanWidth = 0;
-		pDot11f->chanCenterFreqSeg1 = 0;
-		pDot11f->chanCenterFreqSeg2 = 0;
+		pDot11f->chan_center_freq_seg0 = 0;
+		pDot11f->chan_center_freq_seg1 = 0;
 	}
 
 	pDot11f->basicMCSSet =
@@ -5882,8 +5914,10 @@ QDF_STATUS
 populate_dot11f_timing_advert_frame(struct mac_context *mac_ctx,
 				    tDot11fTimingAdvertisementFrame *frame)
 {
-	uint32_t val, len;
+	uint32_t val, len, j = 0;
 	uint8_t temp[CFG_MAX_STR_LEN], code[3];
+	tSirMacChanInfo *max_tx_power_data;
+	int32_t rem_length = 0, copied_length = 0;
 
 	/* Capabilities */
 	val = mac_ctx->mlme_cfg->wep_params.is_privacy_enabled;
@@ -5910,14 +5944,28 @@ populate_dot11f_timing_advert_frame(struct mac_context *mac_ctx,
 
 	/* Country */
 	len = mac_ctx->mlme_cfg->power.max_tx_power_5.len;
-	qdf_mem_copy(temp, mac_ctx->mlme_cfg->power.max_tx_power_5.data, len);
+	max_tx_power_data =
+		(tSirMacChanInfo *)mac_ctx->mlme_cfg->power.max_tx_power_5.data;
+	rem_length = len;
+	while (rem_length >= (sizeof(tSirMacChanInfo))) {
+		temp[copied_length++] =
+			(uint8_t)wlan_reg_freq_to_chan(
+					mac_ctx->pdev,
+					max_tx_power_data[j].first_freq);
+
+		temp[copied_length++] = max_tx_power_data[j].numChannels;
+		temp[copied_length++] = max_tx_power_data[j].maxTxPower;
+		j++;
+		rem_length -= (sizeof(tSirMacChanInfo));
+	}
+
 	wlan_reg_read_current_country(mac_ctx->psoc, code);
 	qdf_mem_copy(&frame->Country, code, 2);
-	if (len > MAX_SIZE_OF_TRIPLETS_IN_COUNTRY_IE)
-		len = MAX_SIZE_OF_TRIPLETS_IN_COUNTRY_IE;
+	if (copied_length > MAX_SIZE_OF_TRIPLETS_IN_COUNTRY_IE)
+		copied_length = MAX_SIZE_OF_TRIPLETS_IN_COUNTRY_IE;
 
-	frame->Country.num_triplets = (uint8_t)(len / 3);
-	qdf_mem_copy((uint8_t *)&frame->Country.triplets, temp, len);
+	frame->Country.num_triplets = (uint8_t)(copied_length / 3);
+	qdf_mem_copy((uint8_t *)&frame->Country.triplets, temp, copied_length);
 	frame->Country.present = 1;
 
 	/* PowerConstraints */

@@ -640,21 +640,9 @@ void lim_process_mlm_assoc_cnf(struct mac_context *mac_ctx,
 	}
 }
 
-/**
- * lim_fill_assoc_ind_params() - Initialize association indication
- * mac_ctx: Pointer to Global MAC structure
- * assoc_ind: PE association indication structure
- * sme_assoc_ind: SME association indication
- * session_entry: PE session entry
- *
- * This function is called to initialzie the association
- * indication strucutre to process association indication.
- *
- * Return: None
- */
-
-static void
-lim_fill_assoc_ind_params(struct mac_context *mac_ctx,
+void
+lim_fill_sme_assoc_ind_params(
+	struct mac_context *mac_ctx,
 	tpLimMlmAssocInd assoc_ind, struct assoc_ind *sme_assoc_ind,
 	struct pe_session *session_entry)
 {
@@ -775,9 +763,9 @@ void lim_process_mlm_assoc_ind(struct mac_context *mac, uint32_t *msg_buf)
 	}
 
 	pSirSmeAssocInd->messageType = eWNI_SME_ASSOC_IND;
-	lim_fill_assoc_ind_params(mac, (tpLimMlmAssocInd) msg_buf,
-				  pSirSmeAssocInd,
-				  pe_session);
+	lim_fill_sme_assoc_ind_params(mac, (tpLimMlmAssocInd)msg_buf,
+				      pSirSmeAssocInd,
+				      pe_session);
 	msg.type = eWNI_SME_ASSOC_IND;
 	msg.bodyptr = pSirSmeAssocInd;
 	msg.bodyval = 0;
@@ -1198,7 +1186,7 @@ void lim_join_result_callback(struct mac_context *mac,
 {
 	struct pe_session *session;
 
-	session = pe_find_session_by_sme_session_id(mac, vdev_id);
+	session = pe_find_session_by_vdev_id(mac, vdev_id);
 	if (!session) {
 		return;
 	}
@@ -1955,8 +1943,7 @@ static void lim_process_ap_mlm_add_bss_rsp(struct mac_context *mac,
 		return;
 	}
 	/* TBD: free the memory before returning, do it for all places where lookup fails. */
-	pe_session = pe_find_session_by_sme_session_id(mac,
-						       add_bss_rsp->vdev_id);
+	pe_session = pe_find_session_by_vdev_id(mac, add_bss_rsp->vdev_id);
 	if (!pe_session) {
 		pe_err("session does not exist for vdev_id %d",
 		       add_bss_rsp->vdev_id);
@@ -2012,7 +1999,7 @@ static void lim_process_ap_mlm_add_bss_rsp(struct mac_context *mac,
 
 		/* Start OLBC timer */
 		if (tx_timer_activate
-			    (&mac->lim.limTimers.gLimUpdateOlbcCacheTimer) !=
+			    (&mac->lim.lim_timers.gLimUpdateOlbcCacheTimer) !=
 		    TX_SUCCESS) {
 			pe_err("tx_timer_activate failed");
 		}
@@ -2039,6 +2026,15 @@ static void lim_process_ap_mlm_add_bss_rsp(struct mac_context *mac,
 	lim_send_start_bss_confirm(mac, &mlmStartCnf);
 }
 
+#ifdef QCA_IBSS_SUPPORT
+/*
+ * lim_process_ibss_mlm_add_bss_rsp: API to process add bss response
+ * in IBSS role
+ * @session_entry: pe session entry
+ * @auth_mode: auth mode needs to be updated
+ *
+ * Return: None
+ */
 static void
 lim_process_ibss_mlm_add_bss_rsp(struct mac_context *mac,
 				 struct add_bss_rsp *add_bss_rsp,
@@ -2093,6 +2089,14 @@ lim_process_ibss_mlm_add_bss_rsp(struct mac_context *mac,
 	mlmStartCnf.sessionId = pe_session->peSessionId;
 	lim_send_start_bss_confirm(mac, &mlmStartCnf);
 }
+#else
+static inline void
+lim_process_ibss_mlm_add_bss_rsp(struct mac_context *mac,
+				 struct add_bss_rsp *add_bss_rsp,
+				 struct pe_session *pe_session)
+{
+}
+#endif
 
 #ifdef WLAN_FEATURE_FILS_SK
 /*
@@ -2142,7 +2146,6 @@ void lim_process_sta_add_bss_rsp_pre_assoc(struct mac_context *mac_ctx,
 				add_bss_params->staContext.staMac, LOGE);
 			goto joinFailure;
 		}
-		session_entry->vdev_id = add_bss_params->vdev_id;
 		/* Success, handle below */
 		/* STA Index(genr by HAL) for the BSS entry is stored here */
 		sta->staIndex = add_bss_params->staContext.staIdx;
@@ -2331,8 +2334,8 @@ void lim_handle_add_bss_rsp(struct mac_context *mac_ctx,
 	 */
 	SET_LIM_PROCESS_DEFD_MESGS(mac_ctx, true);
 	/* Validate SME/LIM/MLME state */
-	session_entry = pe_find_session_by_sme_session_id(mac_ctx,
-							  add_bss_rsp->vdev_id);
+	session_entry = pe_find_session_by_vdev_id(mac_ctx,
+						   add_bss_rsp->vdev_id);
 	if (!session_entry) {
 		pe_err("vdev id:%d Session Doesn't exist",
 		       add_bss_rsp->vdev_id);
@@ -2392,7 +2395,7 @@ void lim_process_mlm_update_hidden_ssid_rsp(struct mac_context *mac_ctx,
 
 	pe_debug("hidden ssid resp for vdev_id:%d ", vdev_id);
 
-	session_entry = pe_find_session_by_sme_session_id(mac_ctx, vdev_id);
+	session_entry = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
 	if (!session_entry) {
 		pe_err("vdev_id:%d Session Doesn't exist",
 		       vdev_id);
@@ -2448,7 +2451,7 @@ void lim_process_mlm_set_sta_key_rsp(struct mac_context *mac_ctx,
 	uint8_t resp_reqd = 1;
 	struct sLimMlmSetKeysCnf mlm_set_key_cnf;
 	uint8_t session_id = 0;
-	uint8_t sme_session_id;
+	uint8_t vdev_id;
 	struct pe_session *session_entry;
 	uint16_t key_len;
 	uint16_t result_status;
@@ -2461,9 +2464,8 @@ void lim_process_mlm_set_sta_key_rsp(struct mac_context *mac_ctx,
 		return;
 	}
 	set_key_params = msg->bodyptr;
-	sme_session_id = set_key_params->smesessionId;
-	session_entry = pe_find_session_by_sme_session_id(mac_ctx,
-							  sme_session_id);
+	vdev_id = set_key_params->vdev_id;
+	session_entry = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
 	if (!session_entry) {
 		pe_err("session does not exist for given session_id");
 		qdf_mem_zero(msg->bodyptr, sizeof(*set_key_params));
@@ -2472,12 +2474,11 @@ void lim_process_mlm_set_sta_key_rsp(struct mac_context *mac_ctx,
 		lim_send_sme_set_context_rsp(mac_ctx,
 					     mlm_set_key_cnf.peer_macaddr,
 					     0, eSIR_SME_INVALID_SESSION, NULL,
-					     sme_session_id);
+					     vdev_id);
 		return;
 	}
 	session_id = session_entry->peSessionId;
-	pe_debug("PE session ID %d, SME session id %d", session_id,
-		 sme_session_id);
+	pe_debug("PE session ID %d, vdev_id %d", session_id, vdev_id);
 	result_status = set_key_params->status;
 	if (!lim_is_set_key_req_converged()) {
 		if (eLIM_MLM_WT_SET_STA_KEY_STATE !=
@@ -2548,7 +2549,7 @@ void lim_process_mlm_set_bss_key_rsp(struct mac_context *mac_ctx,
 	struct sLimMlmSetKeysCnf set_key_cnf;
 	uint16_t result_status;
 	uint8_t session_id = 0;
-	uint8_t sme_session_id;
+	uint8_t vdev_id;
 	struct pe_session *session_entry;
 	tpLimMlmSetKeysReq set_key_req;
 	uint16_t key_len;
@@ -2559,23 +2560,20 @@ void lim_process_mlm_set_bss_key_rsp(struct mac_context *mac_ctx,
 		pe_err("msg bodyptr is null");
 		return;
 	}
-	sme_session_id = ((tpSetBssKeyParams) msg->bodyptr)->smesessionId;
-	session_entry = pe_find_session_by_sme_session_id(mac_ctx,
-							  sme_session_id);
+	vdev_id = ((tpSetBssKeyParams) msg->bodyptr)->vdev_id;
+	session_entry = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
 	if (!session_entry) {
-		pe_err("session does not exist for given sessionId [%d]",
-			session_id);
+		pe_err("session does not exist for vdev_id %d", vdev_id);
 		qdf_mem_zero(msg->bodyptr, sizeof(tSetBssKeyParams));
 		qdf_mem_free(msg->bodyptr);
 		msg->bodyptr = NULL;
 		lim_send_sme_set_context_rsp(mac_ctx, set_key_cnf.peer_macaddr,
 					     0, eSIR_SME_INVALID_SESSION, NULL,
-					     sme_session_id);
+					     vdev_id);
 		return;
 	}
 	session_id = session_entry->peSessionId;
-	pe_debug("PE session ID %d, SME session id %d", session_id,
-		 sme_session_id);
+	pe_debug("PE session ID %d, SME vdev_id %d", session_id, vdev_id);
 	if (eLIM_MLM_WT_SET_BSS_KEY_STATE == session_entry->limMlmState) {
 		result_status =
 			(uint16_t)(((tpSetBssKeyParams)msg->bodyptr)->status);
@@ -2692,7 +2690,7 @@ static void lim_process_switch_channel_re_assoc_req(struct mac_context *mac,
 	MTRACE(mac_trace
 		       (mac, TRACE_CODE_TIMER_ACTIVATE, pe_session->peSessionId,
 		       eLIM_REASSOC_FAIL_TIMER));
-	if (tx_timer_activate(&mac->lim.limTimers.gLimReassocFailureTimer)
+	if (tx_timer_activate(&mac->lim.lim_timers.gLimReassocFailureTimer)
 	    != TX_SUCCESS) {
 		pe_err("could not start Reassociation failure timer");
 		/* Return Reassoc confirm with */
@@ -2825,7 +2823,7 @@ static void lim_process_switch_channel_join_req(
 		eLIM_PERIODIC_JOIN_PROBE_REQ_TIMER);
 
 	/* assign appropriate sessionId to the timer object */
-	mac_ctx->lim.limTimers.gLimPeriodicJoinProbeReqTimer.sessionId =
+	mac_ctx->lim.lim_timers.gLimPeriodicJoinProbeReqTimer.sessionId =
 		session_entry->peSessionId;
 	pe_debug("Sessionid: %d Send Probe req on channel freq %d ssid:%.*s "
 		"BSSID: " QDF_MAC_ADDR_STR, session_entry->peSessionId,
@@ -2840,7 +2838,7 @@ static void lim_process_switch_channel_join_req(
 	 */
 	MTRACE(mac_trace(mac_ctx, TRACE_CODE_TIMER_ACTIVATE,
 		session_entry->peSessionId, eLIM_JOIN_FAIL_TIMER));
-	if (tx_timer_activate(&mac_ctx->lim.limTimers.gLimJoinFailureTimer) !=
+	if (tx_timer_activate(&mac_ctx->lim.lim_timers.gLimJoinFailureTimer) !=
 		TX_SUCCESS) {
 		pe_err("couldn't activate Join failure timer");
 		session_entry->limMlmState = session_entry->limPrevMlmState;
@@ -2863,7 +2861,7 @@ static void lim_process_switch_channel_join_req(
 	if (session_entry->opmode == QDF_P2P_CLIENT_MODE) {
 		/* Activate Join Periodic Probe Req timer */
 		if (tx_timer_activate
-			(&mac_ctx->lim.limTimers.gLimPeriodicJoinProbeReqTimer)
+			(&mac_ctx->lim.lim_timers.gLimPeriodicJoinProbeReqTimer)
 			!= TX_SUCCESS) {
 			pe_err("Periodic JoinReq timer activate failed");
 			goto error;
@@ -2939,7 +2937,7 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 	SET_LIM_PROCESS_DEFD_MESGS(mac, true);
 	status = rsp->status;
 
-	pe_session = pe_find_session_by_sme_session_id(mac, rsp->vdev_id);
+	pe_session = pe_find_session_by_vdev_id(mac, rsp->vdev_id);
 	if (!pe_session) {
 		pe_err("session does not exist for given sessionId");
 		return;

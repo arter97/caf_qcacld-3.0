@@ -743,6 +743,8 @@ static void wma_cp_stats_set_rate_flag(tp_wma_handle wma, uint8_t vdev_id)
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_objmgr_psoc *psoc = wma->psoc;
 	struct wma_txrx_node *iface = &wma->interfaces[vdev_id];
+	uint32_t rate_flag;
+	QDF_STATUS status;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_LEGACY_WMA_ID);
@@ -752,49 +754,58 @@ static void wma_cp_stats_set_rate_flag(tp_wma_handle wma, uint8_t vdev_id)
 		return;
 	}
 
-	ucfg_mc_cp_stats_set_rate_flags(vdev, iface->rate_flags);
+	status = wma_get_vdev_rate_flag(iface->vdev, &rate_flag);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		WMA_LOGE("%s, vdev not found for id: %d", __func__,
+			 vdev_id);
+		return;
+	}
+	ucfg_mc_cp_stats_set_rate_flags(vdev, rate_flag);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
 }
 
-/**
- * wma_set_bss_rate_flags() - set rate flags based on BSS capability
- * @iface: txrx_node ctx
- * @add_bss: add_bss params
- *
- * Return: none
- */
 void wma_set_bss_rate_flags(tp_wma_handle wma, uint8_t vdev_id,
 			    struct bss_params *add_bss)
 {
 	struct wma_txrx_node *iface = &wma->interfaces[vdev_id];
+	struct vdev_mlme_obj *vdev_mlme;
+	uint32_t *rate_flags;
 
-	iface->rate_flags = 0;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(iface->vdev);
+	if (!vdev_mlme) {
+		WMA_LOGE("%s: Failed to get mlme obj for vdev_%d",
+			 __func__, vdev_id);
+		return;
+	}
+	rate_flags = &vdev_mlme->mgmt.rate_info.rate_flags;
+	*rate_flags = 0;
 	if (add_bss->vhtCapable) {
 		if (add_bss->ch_width == CH_WIDTH_80P80MHZ)
-			iface->rate_flags |= TX_RATE_VHT80;
+			*rate_flags |= TX_RATE_VHT80;
 		if (add_bss->ch_width == CH_WIDTH_160MHZ)
-			iface->rate_flags |= TX_RATE_VHT80;
+			*rate_flags |= TX_RATE_VHT80;
 		if (add_bss->ch_width == CH_WIDTH_80MHZ)
-			iface->rate_flags |= TX_RATE_VHT80;
+			*rate_flags |= TX_RATE_VHT80;
 		else if (add_bss->ch_width)
-			iface->rate_flags |= TX_RATE_VHT40;
+			*rate_flags |= TX_RATE_VHT40;
 		else
-			iface->rate_flags |= TX_RATE_VHT20;
+			*rate_flags |= TX_RATE_VHT20;
 	}
 	/* avoid to conflict with htCapable flag */
 	else if (add_bss->htCapable) {
 		if (add_bss->ch_width)
-			iface->rate_flags |= TX_RATE_HT40;
+			*rate_flags |= TX_RATE_HT40;
 		else
-			iface->rate_flags |= TX_RATE_HT20;
+			*rate_flags |= TX_RATE_HT20;
 	}
 
 	if (add_bss->staContext.fShortGI20Mhz ||
 	    add_bss->staContext.fShortGI40Mhz)
-		iface->rate_flags |= TX_RATE_SGI;
+		*rate_flags |= TX_RATE_SGI;
 
 	if (!add_bss->htCapable && !add_bss->vhtCapable)
-		iface->rate_flags = TX_RATE_LEGACY;
+		*rate_flags = TX_RATE_LEGACY;
 
 	wma_cp_stats_set_rate_flag(wma, vdev_id);
 }
@@ -1168,16 +1179,6 @@ QDF_STATUS wma_set_mcc_channel_time_quota(tp_wma_handle wma,
 						chan2_freq);
 }
 
-/**
- * wma_process_rate_update_indate() - rate update indication
- * @wma: wma handle
- * @pRateUpdateParams: Rate update params
- *
- * This function update rate & short GI interval to fw based on params
- * send by SME.
- *
- * Return: QDF status
- */
 QDF_STATUS wma_process_rate_update_indicate(tp_wma_handle wma,
 					    tSirRateUpdateInd *
 					    pRateUpdateParams)
@@ -1188,7 +1189,7 @@ QDF_STATUS wma_process_rate_update_indicate(tp_wma_handle wma,
 	int32_t mbpsx10_rate = -1;
 	uint32_t paramId;
 	uint8_t rate = 0;
-	uint32_t short_gi;
+	uint32_t short_gi, rate_flag;
 	struct wma_txrx_node *intr = wma->interfaces;
 	QDF_STATUS status;
 
@@ -1202,9 +1203,17 @@ QDF_STATUS wma_process_rate_update_indicate(tp_wma_handle wma,
 		return QDF_STATUS_E_INVAL;
 	}
 	short_gi = intr[vdev_id].config.shortgi;
+
+	status = wma_get_vdev_rate_flag(intr[vdev_id].vdev, &rate_flag);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		WMA_LOGE("%s: Failed to get rate_flag for VDEV_%d",
+			 __func__, vdev_id);
+		qdf_mem_free(pRateUpdateParams);
+		return QDF_STATUS_E_INVAL;
+	}
+
 	if (short_gi == 0)
-		short_gi = (intr[vdev_id].rate_flags & TX_RATE_SGI) ?
-								 true : false;
+		short_gi = (rate_flag & TX_RATE_SGI) ? true : false;
 	/* first check if reliable TX mcast rate is used. If not check the bcast
 	 * Then is mcast. Mcast rate is saved in mcastDataRate24GHz
 	 */
@@ -1229,7 +1238,7 @@ QDF_STATUS wma_process_rate_update_indicate(tp_wma_handle wma,
 		 pRateUpdateParams->dev_mode);
 	WMA_LOGE("%s: mac = %pM, config.shortgi = %d, rate_flags = 0x%x",
 		 __func__, pRateUpdateParams->bssid.bytes,
-		 intr[vdev_id].config.shortgi, intr[vdev_id].rate_flags);
+		 intr[vdev_id].config.shortgi, rate_flag);
 	ret = wma_encode_mc_rate(short_gi, intr[vdev_id].config.chwidth,
 				 intr[vdev_id].chanmode, intr[vdev_id].mhz,
 				 mbpsx10_rate, pRateUpdateParams->nss, &rate);
@@ -1397,17 +1406,6 @@ QDF_STATUS wma_tx_detach(tp_wma_handle wma_handle)
 #if defined(QCA_LL_LEGACY_TX_FLOW_CONTROL) || \
 	defined(QCA_LL_TX_FLOW_CONTROL_V2) || defined(CONFIG_HL_SUPPORT)
 
-/**
- * wma_mcc_vdev_tx_pause_evt_handler() - pause event handler
- * @handle: wma handle
- * @event: event buffer
- * @len: data length
- *
- * This function handle pause event from fw and pause/unpause
- * vdev.
- *
- * Return: 0 for success or error code.
- */
 int wma_mcc_vdev_tx_pause_evt_handler(void *handle, uint8_t *event,
 				      uint32_t len)
 {
@@ -1416,6 +1414,7 @@ int wma_mcc_vdev_tx_pause_evt_handler(void *handle, uint8_t *event,
 	wmi_tx_pause_event_fixed_param *wmi_event;
 	uint8_t vdev_id;
 	A_UINT32 vdev_map;
+	struct cdp_vdev *dp_handle;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 
 	param_buf = (WMI_TX_PAUSE_EVENTID_param_tlvs *) event;
@@ -1445,7 +1444,16 @@ int wma_mcc_vdev_tx_pause_evt_handler(void *handle, uint8_t *event,
 		if (!(vdev_map & 0x1)) {
 			/* No Vdev */
 		} else {
-			if (!wma->interfaces[vdev_id].handle) {
+			if (!wma->interfaces[vdev_id].vdev) {
+				WMA_LOGE("%s: vdev is NULL for %d", __func__,
+					 vdev_id);
+				/* Test Next VDEV */
+				vdev_map >>= 1;
+				continue;
+			}
+			dp_handle = wlan_vdev_get_dp_handle
+					(wma->interfaces[vdev_id].vdev);
+			if (!dp_handle) {
 				WMA_LOGE("%s: invalid vdev ID %d", __func__,
 					 vdev_id);
 				/* Test Next VDEV */
@@ -1461,8 +1469,7 @@ int wma_mcc_vdev_tx_pause_evt_handler(void *handle, uint8_t *event,
 				 */
 				if (!wma_vdev_get_pause_bitmap(vdev_id))
 					cdp_fc_vdev_pause(soc,
-						wma->
-						interfaces[vdev_id].handle,
+						dp_handle,
 						OL_TXQ_PAUSE_REASON_FW);
 				wma_vdev_set_pause_bit(vdev_id,
 					wmi_event->pause_type);
@@ -1480,8 +1487,7 @@ int wma_mcc_vdev_tx_pause_evt_handler(void *handle, uint8_t *event,
 						 * UNPAUSE VDEV
 						 */
 						cdp_fc_vdev_unpause(soc,
-							wma->interfaces[vdev_id]
-							.handle,
+							dp_handle,
 							OL_TXQ_PAUSE_REASON_FW);
 					}
 				}
@@ -2387,8 +2393,13 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 		return QDF_STATUS_E_FAILURE;
 	}
 	iface = &wma_handle->interfaces[vdev_id];
+	if (!iface->vdev) {
+		WMA_LOGE("iface->vdev is NULL");
+		cds_packet_free((void *)tx_frame);
+		return QDF_STATUS_E_FAILURE;
+	}
 	/* Get the vdev handle from vdev id */
-	txrx_vdev = wma_handle->interfaces[vdev_id].handle;
+	txrx_vdev = wlan_vdev_get_dp_handle(iface->vdev);
 
 	if (!txrx_vdev) {
 		WMA_LOGE("TxRx Vdev Handle is NULL");
@@ -2945,6 +2956,7 @@ void ol_rx_err(void *pdev, uint8_t vdev_id,
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
 	struct mic_failure_ind *mic_err_ind;
 	qdf_ether_header_t *eth_hdr;
+	uint8_t *bssid;
 	struct scheduler_msg cds_msg = {0};
 
 	if (!wma)
@@ -2963,8 +2975,15 @@ void ol_rx_err(void *pdev, uint8_t vdev_id,
 	mic_err_ind->messageType = eWNI_SME_MIC_FAILURE_IND;
 	mic_err_ind->length = sizeof(*mic_err_ind);
 	mic_err_ind->sessionId = vdev_id;
+	bssid = wma_get_vdev_bssid(wma->interfaces[vdev_id].vdev);
+	if (!bssid) {
+		WMA_LOGE("%s: Failed to get bssid for vdev_%d",
+			 __func__, vdev_id);
+		qdf_mem_free((void *)mic_err_ind);
+		return;
+	}
 	qdf_copy_macaddr(&mic_err_ind->bssId,
-		     (struct qdf_mac_addr *) &wma->interfaces[vdev_id].bssid);
+		     (struct qdf_mac_addr *)bssid);
 	qdf_mem_copy(mic_err_ind->info.taMacAddr,
 		     (struct qdf_mac_addr *) peer_mac_addr,
 			sizeof(tSirMacAddr));
@@ -2994,20 +3013,14 @@ void ol_rx_err(void *pdev, uint8_t vdev_id,
 	}
 }
 
-/**
- * wma_tx_abort() - abort tx
- * @vdev_id: vdev id
- *
- * In case of deauth host abort transmitting packet.
- *
- * Return: none
- */
 void wma_tx_abort(uint8_t vdev_id)
 {
 #define PEER_ALL_TID_BITMASK 0xffffffff
 	tp_wma_handle wma;
 	uint32_t peer_tid_bitmap = PEER_ALL_TID_BITMASK;
 	struct wma_txrx_node *iface;
+	uint8_t *bssid;
+	struct cdp_vdev *handle;
 	struct peer_flush_params param = {0};
 
 	wma = cds_get_context(QDF_MODULE_ID_WMA);
@@ -3015,22 +3028,33 @@ void wma_tx_abort(uint8_t vdev_id)
 		return;
 
 	iface = &wma->interfaces[vdev_id];
-	if (!iface->handle) {
-		WMA_LOGE("%s: Failed to get iface handle: %pK",
-			 __func__, iface->handle);
+	if (!iface->vdev) {
+		WMA_LOGE("%s: iface->vdev is NULL", __func__);
 		return;
 	}
-	WMA_LOGD("%s: vdevid %d bssid %pM", __func__, vdev_id, iface->bssid);
+	handle = wlan_vdev_get_dp_handle(iface->vdev);
+	if (!handle) {
+		WMA_LOGE("%s: Failed to get dp handle", __func__);
+		return;
+	}
+	bssid = wma_get_vdev_bssid(iface->vdev);
+	if (!bssid) {
+		WMA_LOGE("%s: Failed to get bssid for vdev_%d",
+			 __func__, vdev_id);
+		return;
+	}
+
+	WMA_LOGD("%s: vdevid %d bssid %pM", __func__, vdev_id, bssid);
 	wma_vdev_set_pause_bit(vdev_id, PAUSE_TYPE_HOST);
 	cdp_fc_vdev_pause(cds_get_context(QDF_MODULE_ID_SOC),
-			iface->handle,
+			handle,
 			OL_TXQ_PAUSE_REASON_TX_ABORT);
 
 	/* Flush all TIDs except MGMT TID for this peer in Target */
 	peer_tid_bitmap &= ~(0x1 << WMI_MGMT_TID);
 	param.peer_tid_bitmap = peer_tid_bitmap;
 	param.vdev_id = vdev_id;
-	wmi_unified_peer_flush_tids_send(wma->wmi_handle, iface->bssid,
+	wmi_unified_peer_flush_tids_send(wma->wmi_handle, bssid,
 					 &param);
 }
 

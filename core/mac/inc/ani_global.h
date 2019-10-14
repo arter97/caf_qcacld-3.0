@@ -306,7 +306,7 @@ typedef struct {
 typedef struct sAniSirLim {
 	/* ////////////////////////////////////     TIMER RELATED START /////////////////////////////////////////// */
 
-	tLimTimers limTimers;
+	tLimTimers lim_timers;
 	/* / Flag to track if LIM timers are created or not */
 	uint32_t gLimTimersCreated;
 
@@ -661,7 +661,8 @@ typedef struct sAniSirLim {
 	QDF_STATUS(*sme_msg_callback)
 		(struct mac_context *mac, struct scheduler_msg *msg);
 	QDF_STATUS(*stop_roaming_callback)
-		(struct mac_context *mac, uint8_t session_id, uint8_t reason);
+		(struct mac_context *mac, uint8_t session_id, uint8_t reason,
+		 uint32_t requestor);
 	uint8_t retry_packet_cnt;
 	uint8_t beacon_probe_rsp_cnt_per_scan;
 	wlan_scan_requester req_id;

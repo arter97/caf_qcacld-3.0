@@ -1947,12 +1947,16 @@ static void wma_cleanup_hold_req(tp_wma_handle wma)
 static QDF_STATUS
 wma_cleanup_vdev_resp_and_hold_req(struct scheduler_msg *msg)
 {
+	tp_wma_handle wma;
+
 	if (!msg || !msg->bodyptr) {
 		WMA_LOGE(FL("msg or body pointer is NULL"));
 		return QDF_STATUS_E_INVAL;
 	}
 
-	wma_cleanup_hold_req(msg->bodyptr);
+	wma = msg->bodyptr;
+	target_if_flush_vdev_timers(wma->pdev);
+	wma_cleanup_hold_req(wma);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2023,6 +2027,8 @@ static void wma_state_info_dump(char **buf_ptr, uint16_t *size)
 	struct wma_txrx_node *iface;
 	struct wake_lock_stats stats;
 	struct wlan_objmgr_vdev *vdev;
+	uint32_t rate_flag;
+	QDF_STATUS status;
 
 	wma = cds_get_context(QDF_MODULE_ID_WMA);
 	if (!wma) {
@@ -2034,7 +2040,15 @@ static void wma_state_info_dump(char **buf_ptr, uint16_t *size)
 
 	for (vdev_id = 0; vdev_id < wma->max_bssid; vdev_id++) {
 		iface = &wma->interfaces[vdev_id];
-		if (!iface->handle)
+		vdev = iface->vdev;
+		if (!vdev)
+			continue;
+
+		if (!wlan_vdev_get_dp_handle(iface->vdev))
+			continue;
+
+		status = wma_get_vdev_rate_flag(iface->vdev, &rate_flag);
+		if (QDF_IS_STATUS_ERROR(status))
 			continue;
 
 		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma->psoc,
@@ -2095,7 +2109,7 @@ static void wma_state_info_dump(char **buf_ptr, uint16_t *size)
 			iface->vdev_active,
 			wma_is_vdev_up(vdev_id),
 			iface->aid,
-			iface->rate_flags,
+			rate_flag,
 			iface->nss,
 			iface->tx_power,
 			iface->max_tx_power,
@@ -2862,11 +2876,6 @@ void wma_vdev_deinit(struct wma_txrx_node *vdev)
 		vdev->beacon = NULL;
 	}
 
-	if (vdev->handle) {
-		qdf_mem_free(vdev->handle);
-		vdev->handle = NULL;
-	}
-
 	if (vdev->addBssStaContext) {
 		qdf_mem_free(vdev->addBssStaContext);
 		vdev->addBssStaContext = NULL;
@@ -3621,6 +3630,10 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 	wmi_unified_register_event_handler(wma_handle->wmi_handle,
 					   wmi_twt_enable_complete_event_id,
 					   wma_twt_en_complete_event_handler,
+					   WMA_RX_SERIALIZER_CTX);
+	wmi_unified_register_event_handler(wma_handle->wmi_handle,
+					   wmi_twt_disable_complete_event_id,
+					   wma_twt_disable_comp_event_handler,
 					   WMA_RX_SERIALIZER_CTX);
 #endif
 
@@ -4484,6 +4497,7 @@ QDF_STATUS wma_stop(void)
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
 	int i;
 	struct mac_context *mac = NULL;
+	struct wlan_objmgr_vdev *vdev;
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
 	WMA_LOGD("%s: Enter", __func__);
@@ -4521,12 +4535,14 @@ QDF_STATUS wma_stop(void)
 		WMA_LOGE("Failed to destroy the log completion timer");
 	/* clean up ll-queue for all vdev */
 	for (i = 0; i < wma_handle->max_bssid; i++) {
-		if (wma_handle->interfaces[i].handle &&
-				wma_is_vdev_up(i)) {
-			cdp_fc_vdev_flush(
-				cds_get_context(QDF_MODULE_ID_SOC),
-				wma_handle->
-				interfaces[i].handle);
+		vdev = wma_handle->interfaces[i].vdev;
+		if (!vdev)
+			continue;
+		if (wlan_vdev_get_dp_handle(vdev) && wma_is_vdev_up(i)) {
+			cdp_fc_vdev_flush
+			(cds_get_context(QDF_MODULE_ID_SOC),
+			 wlan_vdev_get_dp_handle
+				(wma_handle->interfaces[i].vdev));
 		}
 	}
 
@@ -4588,12 +4604,8 @@ QDF_STATUS wma_wmi_service_close(void)
 	wmi_unified_detach(wma_handle->wmi_handle);
 	wma_handle->wmi_handle = NULL;
 
-	for (i = 0; i < wma_handle->max_bssid; i++) {
-		/* Release peer and vdev ref hold by wma if not already done */
-		wma_release_vdev_and_peer_ref(wma_handle,
-					      &wma_handle->interfaces[i]);
+	for (i = 0; i < wma_handle->max_bssid; i++)
 		wma_vdev_deinit(&wma_handle->interfaces[i]);
-	}
 
 	qdf_mem_free(wma_handle->interfaces);
 
@@ -8460,10 +8472,6 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 					(tSirUpdateChanList *) msg->bodyptr);
 		qdf_mem_free(msg->bodyptr);
 		break;
-	case WMA_ADD_BSS_REQ:
-		wma_add_bss(wma_handle, (struct bss_params *) msg->bodyptr);
-		qdf_mem_free(msg->bodyptr);
-		break;
 	case WMA_ADD_STA_REQ:
 		wma_add_sta(wma_handle, (tpAddStaParams) msg->bodyptr);
 		break;
@@ -9121,6 +9129,10 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 		wma_set_roam_triggers(wma_handle, msg->bodyptr);
 		qdf_mem_free(msg->bodyptr);
 		break;
+	case WMA_ROAM_INIT_PARAM:
+		wma_update_roam_offload_flag(wma_handle, msg->bodyptr);
+		qdf_mem_free(msg->bodyptr);
+		break;
 	default:
 		WMA_LOGD("Unhandled WMA message of type %d", msg->type);
 		if (msg->bodyptr)
@@ -9575,7 +9587,12 @@ QDF_STATUS wma_get_rx_chainmask(uint8_t pdev_id, uint32_t *chainmask_2g,
 	struct wlan_psoc_host_mac_phy_caps *mac_phy_cap;
 	uint8_t total_mac_phy_cnt;
 	struct target_psoc_info *tgt_hdl;
+
 	tp_wma_handle wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+	if (!wma_handle) {
+		wma_err("wma_handle is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
 
 	tgt_hdl = wlan_psoc_get_tgt_if_handle(wma_handle->psoc);
 	if (!tgt_hdl) {

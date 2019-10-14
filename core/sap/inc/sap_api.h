@@ -632,14 +632,6 @@ typedef struct tagSapStruct {
 	bool enable_dfs_phy_error_logs;
 } tSapStruct, *tpSapStruct;
 
-#ifdef FEATURE_WLAN_CH_AVOID
-/* Store channel safety information */
-typedef struct {
-	uint16_t channelNumber;
-	bool isSafe;
-} sapSafeChannelType;
-#endif /* FEATURE_WLAN_CH_AVOID */
-
 /**
  * struct sap_context - per-BSS Context for SAP
  *
@@ -1273,6 +1265,20 @@ static inline QDF_STATUS wlansap_set_dfs_nol(struct sap_context *sap_ctx,
 			       eSapDfsNolType conf)
 {
 	return QDF_STATUS_SUCCESS;
+}
+#endif
+
+/**
+ * wlan_sap_set_dfs_pri_multiplier() - Set dfs_pri_multiplier
+ * @mac_handle: Opaque handle to the global MAC context
+ *
+ * Return: none
+ */
+#ifdef DFS_PRI_MULTIPLIER
+void wlan_sap_set_dfs_pri_multiplier(mac_handle_t mac_handle);
+#else
+static inline void wlan_sap_set_dfs_pri_multiplier(mac_handle_t mac_handle)
+{
 }
 #endif
 

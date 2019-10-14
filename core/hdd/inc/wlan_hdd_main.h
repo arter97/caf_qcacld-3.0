@@ -47,6 +47,9 @@
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>
 #include <net/cfg80211.h>
+#ifdef CLD_PM_QOS
+#include <linux/pm_qos.h>
+#endif
 #include <linux/ieee80211.h>
 #include <qdf_delayed_work.h>
 #include <qdf_list.h>
@@ -166,6 +169,11 @@ static inline bool in_compat_syscall(void) { return is_compat_task(); }
 #define HDD_NL80211_BAND_2GHZ   IEEE80211_BAND_2GHZ
 #define HDD_NL80211_BAND_5GHZ   IEEE80211_BAND_5GHZ
 #define HDD_NUM_NL80211_BANDS   ((enum nl80211_band)IEEE80211_NUM_BANDS)
+#endif
+
+#if defined(CONFIG_BAND_6GHZ) && (defined(CFG80211_6GHZ_BAND_SUPPORTED) || \
+	(KERNEL_VERSION(5, 4, 0) <= LINUX_VERSION_CODE))
+#define HDD_NL80211_BAND_6GHZ   NL80211_BAND_6GHZ
 #endif
 
 #define TSF_GPIO_PIN_INVALID 255
@@ -417,6 +425,8 @@ enum hdd_auth_key_mgmt {
  * @next_tx_level:	pld_bus_width_type voting level (high or low)
  *			determined on the basis of tx packets received in the
  *			last 100ms interval
+ * @is_rx_pm_qos_high	Capture rx_pm_qos voting
+ * @is_tx_pm_qos_high	Capture tx_pm_qos voting
  * @qtime		timestamp when the record is added
  *
  * The structure keeps track of throughput requirements of wlan driver.
@@ -429,6 +439,8 @@ struct hdd_tx_rx_histogram {
 	uint32_t next_vote_level;
 	uint32_t next_rx_level;
 	uint32_t next_tx_level;
+	bool is_rx_pm_qos_high;
+	bool is_tx_pm_qos_high;
 	uint64_t qtime;
 };
 
@@ -1753,6 +1765,10 @@ struct hdd_context {
 	int cur_rx_level;
 	uint64_t prev_no_rx_offload_pkts;
 	uint64_t prev_rx_offload_pkts;
+	/* Count of non TSO packets in previous bus bw delta time */
+	uint64_t prev_no_tx_offload_pkts;
+	/* Count of TSO packets in previous bus bw delta time */
+	uint64_t prev_tx_offload_pkts;
 	int cur_tx_level;
 	uint64_t prev_tx;
 	qdf_atomic_t low_tput_gro_enable;
@@ -1850,6 +1866,7 @@ struct hdd_context {
 	uint32_t rx_high_ind_cnt;
 	/* For Rx thread non GRO/LRO packet accounting */
 	uint64_t no_rx_offload_pkt_cnt;
+	uint64_t no_tx_offload_pkt_cnt;
 	/* Current number of TX X RX chains being used */
 	enum antenna_mode current_antenna_mode;
 
@@ -1936,6 +1953,7 @@ struct hdd_context {
 	struct board_info hw_bd_info;
 #ifdef WLAN_SUPPORT_TWT
 	enum twt_status twt_state;
+	qdf_event_t twt_disable_comp_evt;
 #endif
 #ifdef FEATURE_WLAN_APF
 	uint32_t apf_version;
@@ -1961,6 +1979,9 @@ struct hdd_context {
 
 	qdf_time_t runtime_resume_start_time_stamp;
 	qdf_time_t runtime_suspend_done_time_stamp;
+#ifdef CLD_PM_QOS
+	struct pm_qos_request pm_qos_req;
+#endif
 };
 
 /**
@@ -2722,24 +2743,28 @@ hdd_store_nss_chains_cfg_in_vdev(struct hdd_adapter *adapter);
 /**
  * wlan_hdd_disable_roaming() - disable roaming on all STAs except the input one
  * @cur_adapter: Current HDD adapter passed from caller
+ * @mlme_operation_requestor: roam disable requestor
  *
  * This function loops through all adapters and disables roaming on each STA
  * mode adapter except the current adapter passed from the caller
  *
  * Return: None
  */
-void wlan_hdd_disable_roaming(struct hdd_adapter *cur_adapter);
+void wlan_hdd_disable_roaming(struct hdd_adapter *cur_adapter,
+			      uint32_t mlme_operation_requestor);
 
 /**
  * wlan_hdd_enable_roaming() - enable roaming on all STAs except the input one
  * @cur_adapter: Current HDD adapter passed from caller
+ * @mlme_operation_requestor: roam disable requestor
  *
  * This function loops through all adapters and enables roaming on each STA
  * mode adapter except the current adapter passed from the caller
  *
  * Return: None
  */
-void wlan_hdd_enable_roaming(struct hdd_adapter *cur_adapter);
+void wlan_hdd_enable_roaming(struct hdd_adapter *cur_adapter,
+			     uint32_t mlme_operation_requestor);
 
 QDF_STATUS hdd_post_cds_enable_config(struct hdd_context *hdd_ctx);
 
@@ -2927,6 +2952,26 @@ static inline void hdd_set_tso_flags(struct hdd_context *hdd_ctx,
 }
 #endif /* FEATURE_TSO */
 
+/**
+ * wlan_hdd_get_host_log_nl_proto() - Get host log netlink protocol
+ * @hdd_ctx: HDD context
+ *
+ * This function returns with host log netlink protocol settings
+ *
+ * Return: none
+ */
+#ifdef WLAN_LOGGING_SOCK_SVC_ENABLE
+static inline int wlan_hdd_get_host_log_nl_proto(struct hdd_context *hdd_ctx)
+{
+	return hdd_ctx->config->host_log_custom_nl_proto;
+}
+#else
+static inline int wlan_hdd_get_host_log_nl_proto(struct hdd_context *hdd_ctx)
+{
+	return NETLINK_USERSOCK;
+}
+#endif
+
 #ifdef CONFIG_CNSS_LOGGER
 /**
  * wlan_hdd_nl_init() - wrapper function to CNSS_LOGGER case
@@ -2945,7 +2990,7 @@ static inline int wlan_hdd_nl_init(struct hdd_context *hdd_ctx)
 {
 	int proto;
 
-	proto = hdd_ctx->config->host_log_custom_nl_proto;
+	proto = wlan_hdd_get_host_log_nl_proto(hdd_ctx);
 	hdd_ctx->radio_index = nl_srv_init(hdd_ctx->wiphy, proto);
 
 	/* radio_index is assigned from 0, so only >=0 will be valid index  */
@@ -2968,7 +3013,7 @@ static inline int wlan_hdd_nl_init(struct hdd_context *hdd_ctx)
 {
 	int proto;
 
-	proto = hdd_ctx->config->host_log_custom_nl_proto;
+	proto = wlan_hdd_get_host_log_nl_proto(hdd_ctx);
 	return nl_srv_init(hdd_ctx->wiphy, proto);
 }
 #endif
@@ -3275,7 +3320,6 @@ static inline void hdd_send_peer_status_ind_to_app(
 		return;
 	}
 
-	ch_info.chan_id = chan_info->chan_id;
 	ch_info.mhz = chan_info->mhz;
 	ch_info.band_center_freq1 = chan_info->band_center_freq1;
 	ch_info.band_center_freq2 = chan_info->band_center_freq2;

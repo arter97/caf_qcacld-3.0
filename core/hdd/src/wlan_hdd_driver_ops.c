@@ -673,21 +673,7 @@ static void __hdd_soc_remove(struct device *dev)
  */
 static void hdd_soc_remove(struct device *dev)
 {
-	struct osif_psoc_sync *psoc_sync;
-	int errno;
-
-	/* by design, this will fail to lookup if we never probed the SoC */
-	errno = osif_psoc_sync_trans_start_wait(dev, &psoc_sync);
-	if (errno)
-		return;
-
-	osif_psoc_sync_unregister(dev);
-	osif_psoc_sync_wait_for_ops(psoc_sync);
-
 	__hdd_soc_remove(dev);
-
-	osif_psoc_sync_trans_stop(psoc_sync);
-	osif_psoc_sync_destroy(psoc_sync);
 }
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
@@ -1365,6 +1351,11 @@ static int wlan_hdd_runtime_suspend(struct device *dev)
 		hdd_debug("Runtime suspend done result: %d total cxpc up time %lu microseconds",
 			  err, delta);
 
+	if (status == QDF_STATUS_SUCCESS)
+		hdd_bus_bw_compute_timer_stop(hdd_ctx);
+
+	hdd_debug("Runtime suspend done result: %d", err);
+
 	return err;
 }
 
@@ -1419,8 +1410,12 @@ static int wlan_hdd_runtime_resume(struct device *dev)
 
 	status = ucfg_pmo_psoc_bus_runtime_resume(hdd_ctx->psoc,
 						  hdd_pld_runtime_resume_cb);
-	if (status != QDF_STATUS_SUCCESS)
+	if (status != QDF_STATUS_SUCCESS) {
 		hdd_err("PMO Runtime resume failed: %d", status);
+	} else {
+		if (policy_mgr_get_connection_count(hdd_ctx->psoc))
+			hdd_bus_bw_compute_timer_start(hdd_ctx);
+	}
 
 	hdd_debug("Runtime resume done");
 

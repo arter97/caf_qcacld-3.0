@@ -22,6 +22,8 @@ ifeq ($(CONFIG_CNSS_QCA6390), y)
 	CONFIG_SCALE_INCLUDES := y
 	CONFIG_HASTINGS_BT_WAR := y
 	CONFIG_WDI3_IPA_OVER_GSI :=y
+	CONFIG_DIRECT_BUF_RX_ENABLE := y
+	CONFIG_WMI_DBR_SUPPORT := y
 endif
 
 ifeq ($(CONFIG_CLD_HL_SDIO_CORE), y)
@@ -106,6 +108,8 @@ ifeq ($(CONFIG_ARCH_QCS40X), y)
 	CONFIG_RX_PERFORMANCE := y
 	CONFIG_TGT_NUM_MSDU_DESC := 900
 	CONFIG_MULTI_IF_LOG := y
+	CONFIG_DFS_PRI_MULTIPLIER := y
+	CONFIG_DFS_OVERRIDE_RF_THRESHOLD := y
 endif
 CONFIG_WLAN_FEATURE_MBSSID := y
 
@@ -386,6 +390,7 @@ CONFIG_HTT_PADDR64 := y
 CONFIG_RX_OL := y
 CONFIG_TX_TID_OVERRIDE := y
 CONFIG_DP_TXRX_SOC_ATTACH := y
+CONFIG_WLAN_CLD_PM_QOS := y
 endif
 
 # As per target team, build is done as follows:
@@ -542,6 +547,10 @@ endif
 ifeq ($(CONFIG_ROME_IF), snoc)
 CONFIG_PKTLOG_LEGACY := y
 endif
+endif
+
+ifeq ($(CONFIG_LITHIUM), y)
+CONFIG_PKTLOG_LEGACY := n
 endif
 
 #Enable WDI Event support
@@ -840,9 +849,13 @@ endif
 ifeq ($(CONFIG_LITHIUM), y)
 	ifeq ($(CONFIG_SLUB_DEBUG_ON), y)
 		CONFIG_WLAN_FEATURE_DP_EVENT_HISTORY := y
+		CONFIG_HIF_CE_DEBUG_DATA_BUF := y
 	endif
 	CONFIG_WLAN_DP_PER_RING_TYPE_CONFIG := y
+	#Enable WMI TX/RX over QMI
+	CONFIG_WMI_SEND_RECV_QMI := y
 endif
+
 #Flag to enable hdd memory dump feature
 CONFIG_FEATURE_MEMDUMP_ENABLE := y
 
@@ -904,6 +917,14 @@ CONFIG_SM_ENG_HIST := n
 
 #Enable OEM DATA feature
 CONFIG_FEATURE_OEM_DATA := y
+
+#Enable FW Offload
+CONFIG_WLAN_FW_OFFLOAD := y
+
+#Enable eLNA bypass feature
+ifeq ($(CONFIG_WLAN_FW_OFFLOAD), y)
+CONFIG_WLAN_FEATURE_ELNA := y
+endif
 
 ifeq (y,$(findstring y,$(CONFIG_ARCH_MSM) $(CONFIG_ARCH_QCOM)))
 CONFIG_WLAN_FEATURE_DP_BUS_BANDWIDTH := y

@@ -453,6 +453,8 @@
 #endif
 #define WMA_SET_ROAM_TRIGGERS                SIR_HAL_SET_ROAM_TRIGGERS
 
+#define WMA_ROAM_INIT_PARAM                  SIR_HAL_INIT_ROAM_OFFLOAD_PARAM
+
 /* Bit 6 will be used to control BD rate for Management frames */
 #define HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME 0x40
 
@@ -647,7 +649,14 @@ QDF_STATUS
 wma_ds_peek_rx_packet_info
 	(cds_pkt_t *vosDataBuff, void **ppRxHeader, bool bSwap);
 
-
+/**
+ * wma_tx_abort() - abort tx
+ * @vdev_id: vdev id
+ *
+ * In case of deauth host abort transmitting packet.
+ *
+ * Return: none
+ */
 void wma_tx_abort(uint8_t vdev_id);
 
 /**

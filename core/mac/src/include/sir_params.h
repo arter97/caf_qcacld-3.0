@@ -174,12 +174,12 @@ struct sir_mgmt_msg {
 /**
  * struct sir_cfg_action_frm_tb_ppdu - cfg to set action frame in he tb ppdu
  * @type: Message type
- * @session_id: session id
+ * @vdev_id: vdev id
  * @cfg: enable/disable cfg
  */
 struct sir_cfg_action_frm_tb_ppdu {
 	uint16_t type;
-	uint8_t session_id;
+	uint8_t vdev_id;
 	uint8_t cfg;
 };
 
@@ -606,8 +606,10 @@ struct sir_cfg_action_frm_tb_ppdu {
 
 #define SIR_HAL_HIDDEN_SSID_RESTART_RSP     (SIR_HAL_ITC_MSG_TYPES_BEGIN + 379)
 
+#define SIR_HAL_INIT_ROAM_OFFLOAD_PARAM     (SIR_HAL_ITC_MSG_TYPES_BEGIN + 380)
+
 /*
- * Unused SIR_HAL_ITC_MSG_TYPES_BEGIN + 380 to
+ * Unused SIR_HAL_ITC_MSG_TYPES_BEGIN + 381 to
  * SIR_HAL_ITC_MSG_TYPES_BEGIN + 386
  */
 #define SIR_HAL_GET_PEER_INFO_EXT           (SIR_HAL_ITC_MSG_TYPES_BEGIN + 387)

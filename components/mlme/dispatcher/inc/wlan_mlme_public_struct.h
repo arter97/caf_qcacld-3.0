@@ -54,7 +54,7 @@
 #define CFG_STR_DATA_LEN     17
 #define CFG_EDCA_DATA_LEN    17
 #define CFG_MAX_TX_POWER_2_4_LEN    128
-#define CFG_MAX_TX_POWER_5_LEN      128
+#define CFG_MAX_TX_POWER_5_LEN      256
 #define CFG_POWER_USAGE_MAX_LEN      4
 #define CFG_MAX_STR_LEN       256
 #define MAX_VENDOR_IES_LEN 1532
@@ -702,6 +702,7 @@ struct wlan_mlme_cfg_sap {
  * @dfs_prefer_non_dfs: perefer non dfs channel after radar
  * @dfs_disable_japan_w53: Disable W53 channels
  * @sap_tx_leakage_threshold: sap tx leakage threshold
+ * @dfs_pri_multiplier: dfs_pri_multiplier for handle missing pulses
  */
 struct wlan_mlme_dfs_cfg {
 	bool dfs_master_capable;
@@ -712,6 +713,7 @@ struct wlan_mlme_dfs_cfg {
 	bool dfs_prefer_non_dfs;
 	bool dfs_disable_japan_w53;
 	uint32_t sap_tx_leakage_threshold;
+	uint32_t dfs_pri_multiplier;
 };
 
 /**
@@ -839,6 +841,9 @@ struct mlme_vht_capabilities_info {
 	uint8_t as_cap;
 	bool disable_ldpc_with_txbf_ap;
 	bool vht_mcs_10_11_supp;
+	uint8_t extended_nss_bw_supp;
+	uint8_t vht_extended_nss_bw_cap;
+	uint8_t max_nsts_total;
 };
 
 /**
@@ -1105,6 +1110,7 @@ struct wlan_mlme_chainmask {
  * @enable_change_channel_bandwidth: enable/disable change channel bw in mission
  * mode
  * @disable_4way_hs_offload: enable/disable 4 way handshake offload to firmware
+ * @as_enabled: antenna sharing enabled or not (FW capability)
  */
 struct wlan_mlme_generic {
 	enum band_info band_capability;
@@ -1136,6 +1142,7 @@ struct wlan_mlme_generic {
 	bool data_stall_recovery_fw_support;
 	bool enable_change_channel_bandwidth;
 	bool disable_4way_hs_offload;
+	bool as_enabled;
 };
 
 /*
@@ -1522,7 +1529,7 @@ struct wlan_mlme_lfr_cfg {
 	uint32_t max_num_pre_auth;
 	uint32_t roam_preauth_retry_count;
 	uint32_t roam_preauth_no_ack_timeout;
-	uint32_t roam_rssi_diff;
+	uint8_t roam_rssi_diff;
 	bool roam_scan_offload_enabled;
 	uint32_t neighbor_scan_timer_period;
 	uint32_t neighbor_scan_min_timer_period;
@@ -1819,6 +1826,7 @@ struct wlan_mlme_per_slot_scoring {
  * @roam_trigger_bitmap: bitmap for various roam triggers
  * @roam_score_delta: percentage delta in roam score
  * @apsd_enabled: Enable automatic power save delivery
+ * @vendor_roam_score_algorithm: Preferred vendor roam score algorithm
  */
 struct wlan_mlme_scoring_cfg {
 	bool enable_scoring_for_roam;
@@ -1832,6 +1840,7 @@ struct wlan_mlme_scoring_cfg {
 	uint32_t roam_trigger_bitmap;
 	uint32_t roam_score_delta;
 	bool apsd_enabled;
+	uint32_t vendor_roam_score_algorithm;
 };
 
 /* struct wlan_mlme_threshold - Threshold related config items
@@ -1878,8 +1887,18 @@ struct mlme_power_usage {
 
 /*
  * struct wlan_mlme_power - power related config items
- * @max_tx_power_24: max power Tx for 2.4 ghz
- * @max_tx_power_5: max power Tx for 5 ghz
+ * @max_tx_power_24: max power Tx for 2.4 ghz, this is based on frequencies
+ * @max_tx_power_5: max power Tx for 5 ghz, this is based on frequencies
+ * @max_tx_power_24_chan: max power Tx for 2.4 ghz, this is based on channel
+ * numbers, this is added to parse the ini values to maintain the backward
+ * compatibility, these channel numbers are converted to frequencies and copied
+ * to max_tx_power_24 structure, once this conversion is done this structure
+ * should not be used.
+ * @max_tx_power_5_chan: max power Tx for 5 ghz, this is based on channel
+ * numbers, this is added to parse the ini values to maintain the backward
+ * compatibility, these channel numbers are converted to frequencies and copied
+ * to max_tx_power_24 structure, once this conversion is done this structure
+ * should not be used.
  * @power_usage: power usage mode, min, max, mod
  * @tx_power_2g: limit tx power in 2.4 ghz
  * @tx_power_5g: limit tx power in 5 ghz
@@ -1890,6 +1909,8 @@ struct mlme_power_usage {
 struct wlan_mlme_power {
 	struct mlme_max_tx_power_24 max_tx_power_24;
 	struct mlme_max_tx_power_5 max_tx_power_5;
+	struct mlme_max_tx_power_24 max_tx_power_24_chan;
+	struct mlme_max_tx_power_5 max_tx_power_5_chan;
 	struct mlme_power_usage power_usage;
 	uint8_t tx_power_2g;
 	uint8_t tx_power_5g;

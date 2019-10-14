@@ -187,7 +187,7 @@ typedef struct {
 	uint8_t uAPSD;
 	uint8_t maxSPLen;
 	uint8_t htCapable;
-	uint8_t ch_width;
+	enum phy_ch_width ch_width;
 	tSirMacHTMIMOPowerSaveState mimoPS;
 	uint8_t maxAmpduSize;
 	uint8_t maxAmpduDensity;
@@ -218,6 +218,9 @@ typedef struct {
 	uint8_t csaOffloadEnable;
 	uint8_t vhtCapable;
 	uint8_t vhtSupportedRxNss;
+	uint8_t vht_160mhz_nss;
+	uint8_t vht_80p80mhz_nss;
+	uint8_t vht_extended_nss_bw_cap;
 	uint8_t vhtTxBFCapable;
 	uint8_t enable_su_tx_bformer;
 	uint8_t vhtTxMUBformeeCapable;
@@ -285,7 +288,6 @@ typedef struct {
  * @smesessionId: sme session id
  * @peerMacAddr: peer mac address
  * @status: status
- * @sessionId: session id
  * @sendRsp: send response
  * @macaddr: MAC address of the peer
  *
@@ -300,10 +302,9 @@ typedef struct {
 	uint8_t defWEPIdx;
 	tSirKeys key[SIR_MAC_MAX_NUM_OF_DEFAULT_KEYS];
 	uint8_t singleTidRc;
-	uint8_t smesessionId;
+	uint8_t vdev_id;
 	struct qdf_mac_addr peer_macaddr;
 	QDF_STATUS status;
-	uint8_t sessionId;
 	uint8_t sendRsp;
 	struct qdf_mac_addr macaddr;
 } tSetStaKeyParams, *tpSetStaKeyParams;
@@ -312,7 +313,7 @@ typedef struct {
  * struct sLimMlmSetKeysReq - set key request parameters
  * @peerMacAddr: peer mac address
  * @sessionId: PE session id
- * @smesessionId: SME session id
+ * @vdev_id: vdev id
  * @aid: association id
  * @edType: Encryption/Decryption type
  * @numKeys: number of keys
@@ -321,7 +322,7 @@ typedef struct {
 typedef struct sLimMlmSetKeysReq {
 	struct qdf_mac_addr peer_macaddr;
 	uint8_t sessionId;      /* Added For BT-AMP Support */
-	uint8_t smesessionId;   /* Added for drivers based on wmi interface */
+	uint8_t vdev_id;   /* Added for drivers based on wmi interface */
 	uint16_t aid;
 	tAniEdType edType;      /* Encryption/Decryption type */
 	uint8_t numKeys;
@@ -331,7 +332,6 @@ typedef struct sLimMlmSetKeysReq {
 /**
  * struct struct bss_params - parameters required for add bss params
  * @bssId: MAC Address/BSSID
- * @self_mac_addr: Self Mac Address
  * @nwType: network type
  * @shortSlotTimeSupported: is short slot time supported or not
  * @llbCoexist: 11b coexist supported or not
@@ -339,31 +339,18 @@ typedef struct sLimMlmSetKeysReq {
  * @dtimPeriod: DTIM period
  * @htCapable: Enable/Disable HT capabilities
  * @rmfEnabled: RMF enabled/disabled
- * @op_chan_freq: Current Operating frequency
  * @staContext: sta context
- * @vdev_id: vdev id
  * @updateBss: update the existing BSS entry, if this flag is set
- * @ssId: Add BSSID info for rxp filter
- * @txMgmtPower: tx power used for mgmt frames
  * @maxTxPower: max power to be used after applying the power constraint
  * @extSetStaKeyParamValid: Ext Bss Config Msg if set
  * @extSetStaKeyParam: SetStaKeyParams for ext bss msg
- * @bHiddenSSIDEn: To Enable Hidden ssid.
- * @halPersona: Persona for the BSS can be STA,AP,GO,CLIENT value
  * @bSpectrumMgtEnabled: Spectrum Management Capability, 1:Enabled, 0:Disabled.
  * @vhtCapable: VHT capablity
- * @vhtTxChannelWidthSet: VHT tx channel width
- * @chan_freq_seg0: center freq seq 0
- * @chan_freq_seg1: center freq seq 1
- * @dot11_mode: 802.11 mode
- * @he_capable: HE Capability
- * @cac_duration_ms: cac duration in milliseconds
- * @dfs_regdomain: dfs region
+ * @ch_width: VHT tx channel width
  * @no_ptk_4_way: Do not need 4-way handshake
  */
 struct bss_params {
 	tSirMacAddr bssId;
-	tSirMacAddr self_mac_addr;
 	tSirNwType nwType;
 	uint8_t shortSlotTimeSupported;
 	uint8_t llbCoexist;
@@ -371,39 +358,23 @@ struct bss_params {
 	uint8_t dtimPeriod;
 	uint8_t htCapable;
 	uint8_t rmfEnabled;
-	uint32_t op_chan_freq;
 	tAddStaParams staContext;
-	uint8_t vdev_id;
 	/* HAL should update the existing BSS entry, if this flag is set.
 	 * PE will set this flag in case of reassoc, where we want to resue the
 	 * the old bssID and still return success.
 	 */
 	uint8_t updateBss;
-	tSirMacSSid ssId;
 	int8_t maxTxPower;
 
 	uint8_t extSetStaKeyParamValid;
 	tSetStaKeyParams extSetStaKeyParam;
-
-	uint8_t bHiddenSSIDEn;
-	uint8_t halPersona;
 	uint8_t bSpectrumMgtEnabled;
 	uint8_t vhtCapable;
 	enum phy_ch_width ch_width;
-	uint32_t chan_freq_seg0;
-	uint32_t chan_freq_seg1;
-	uint8_t dot11_mode;
 	uint8_t nonRoamReassoc;
-	uint8_t wps_state;
-	uint8_t nss;
-	uint16_t beacon_tx_rate;
 #ifdef WLAN_FEATURE_11AX
-	bool he_capable;
-	tDot11fIEhe_op he_op;
 	uint32_t he_sta_obsspd;
 #endif
-	uint32_t cac_duration_ms;
-	uint32_t dfs_regdomain;
 	bool no_ptk_4_way;
 };
 
@@ -535,25 +506,21 @@ typedef struct sSendProbeRespParams {
 
 /**
  * struct tSetBssKeyParams - BSS key parameters
- * @bss_idx: BSSID index
  * @encType: encryption Type
  * @numKeys: number of keys
  * @key: key data
  * @singleTidRc: 1=Single TID based Replay Count, 0=Per TID based RC
- * @smesessionId: sme session id
+ * @vdev_id: vdev id id
  * @status: return status of command
- * @sessionId: PE session id
  * @macaddr: MAC address of the peer
  */
 typedef struct {
-	uint8_t bss_idx;
 	tAniEdType encType;
 	uint8_t numKeys;
 	tSirKeys key[SIR_MAC_MAX_NUM_OF_DEFAULT_KEYS];
 	uint8_t singleTidRc;
-	uint8_t smesessionId;
+	uint8_t vdev_id;
 	QDF_STATUS status;
-	uint8_t sessionId;
 	struct qdf_mac_addr macaddr;
 } tSetBssKeyParams, *tpSetBssKeyParams;
 

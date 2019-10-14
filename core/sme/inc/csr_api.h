@@ -818,8 +818,6 @@ struct csr_roam_profile {
 	bool force_24ghz_in_ht20;
 	uint32_t cac_duration_ms;
 	uint32_t dfs_regdomain;
-	bool supplicant_disabled_roaming;
-	bool driver_disabled_roaming;
 #ifdef WLAN_FEATURE_FILS_SK
 	uint8_t *hlp_ie;
 	uint32_t hlp_ie_len;
@@ -1514,4 +1512,16 @@ void csr_clear_channel_status(struct mac_context *mac);
  */
 QDF_STATUS csr_update_owe_info(struct mac_context *mac,
 			       struct assoc_ind *assoc_ind);
+
+/**
+ * csr_send_roam_offload_init_msg() - Send roam enable/disable flag to fw
+ * @mac: mac context
+ * @vdev_id: vdev id
+ * @enable: enable/disable roam flag
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+csr_send_roam_offload_init_msg(struct mac_context *mac, uint32_t vdev_id,
+			       bool enable);
 #endif

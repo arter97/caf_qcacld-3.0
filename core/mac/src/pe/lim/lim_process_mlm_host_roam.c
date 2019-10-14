@@ -123,7 +123,7 @@ void lim_process_mlm_reassoc_req(struct mac_context *mac_ctx,
 		goto end;
 	}
 	/* assign the sessionId to the timer object */
-	mac_ctx->lim.limTimers.gLimReassocFailureTimer.sessionId =
+	mac_ctx->lim.lim_timers.gLimReassocFailureTimer.sessionId =
 		reassoc_req->sessionId;
 	session->limPrevMlmState = session->limMlmState;
 	session->limMlmState = eLIM_MLM_WT_REASSOC_RSP_STATE;
@@ -407,14 +407,14 @@ void lim_process_sta_mlm_add_bss_rsp_ft(struct mac_context *mac,
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 	if (pe_session->bRoamSynchInProgress != true) {
 #endif
-		mac->lim.limTimers.gLimReassocFailureTimer.sessionId =
+		mac->lim.lim_timers.gLimReassocFailureTimer.sessionId =
 			pe_session->peSessionId;
 		/* / Start reassociation failure timer */
 		MTRACE(mac_trace
 			(mac, TRACE_CODE_TIMER_ACTIVATE,
 			 pe_session->peSessionId, eLIM_REASSOC_FAIL_TIMER));
 		if (tx_timer_activate
-			(&mac->lim.limTimers.gLimReassocFailureTimer)
+			(&mac->lim.lim_timers.gLimReassocFailureTimer)
 			!= TX_SUCCESS) {
 			/* / Could not start reassoc failure timer. */
 			/* Log error */
@@ -485,7 +485,7 @@ void lim_process_sta_mlm_add_bss_rsp_ft(struct mac_context *mac,
 	pAddStaParams->updateSta = false;
 
 	lim_populate_peer_rate_set(mac, &pAddStaParams->supportedRates, NULL,
-				   false, pe_session, NULL, NULL);
+				   false, pe_session, NULL, NULL, NULL);
 
 	if (pe_session->htCapability) {
 		pAddStaParams->htCapable = pe_session->htCapability;
@@ -556,6 +556,8 @@ void lim_process_mlm_ft_reassoc_req(struct mac_context *mac,
 	uint32_t val;
 	QDF_STATUS status;
 	uint32_t teleBcnEn = 0;
+	struct wlan_objmgr_vdev *vdev;
+	struct vdev_mlme_obj *mlme_obj;
 
 	if (!reassoc_req) {
 		pe_err("reassoc_req is NULL");
@@ -624,15 +626,37 @@ void lim_process_mlm_ft_reassoc_req(struct mac_context *mac,
 	}
 
 	reassoc_req->listenInterval = (uint16_t) val;
+
+	vdev = session->vdev;
+	if (!vdev) {
+		pe_err("vdev is NULL");
+		qdf_mem_free(reassoc_req);
+		return;
+	}
+	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!mlme_obj) {
+		pe_err("vdev component object is NULL");
+		return;
+	}
+
+	status = lim_pre_vdev_start(mac, mlme_obj, session);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		qdf_mem_free(reassoc_req);
+		return;
+	}
+	qdf_mem_copy(mlme_obj->mgmt.generic.bssid, session->bssId,
+		     QDF_MAC_ADDR_SIZE);
+
 	session->pLimMlmReassocReq = reassoc_req;
 	/* we need to defer the message until we get response back from HAL */
 	SET_LIM_PROCESS_DEFD_MESGS(mac, false);
-
-	status = wma_add_bss_lfr2_vdev_start(session->ftPEContext.pAddBssReq);
+	status = wma_add_bss_lfr2_vdev_start(session->vdev,
+					     session->ftPEContext.pAddBssReq);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		SET_LIM_PROCESS_DEFD_MESGS(mac, true);
-		pe_err("wma_add_bss_lfr2_vdev_start, reason: %X",
-		       status);
+		pe_err("wma_add_bss_lfr2_vdev_start, reason: %X", status);
+		session->pLimMlmReassocReq = NULL;
+		qdf_mem_free(reassoc_req);
 	}
 	qdf_mem_free(session->ftPEContext.pAddBssReq);
 

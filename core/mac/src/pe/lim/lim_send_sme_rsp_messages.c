@@ -1397,6 +1397,7 @@ void lim_send_sme_pe_ese_tsm_rsp(struct mac_context *mac,
 
 #endif /* FEATURE_WLAN_ESE */
 
+#ifdef QCA_IBSS_SUPPORT
 void
 lim_send_sme_ibss_peer_ind(struct mac_context *mac,
 			   tSirMacAddr peerMacAddr,
@@ -1430,6 +1431,7 @@ lim_send_sme_ibss_peer_ind(struct mac_context *mac,
 	lim_sys_process_mmh_msg_api(mac, &mmhMsg);
 
 }
+#endif
 
 /**
  * lim_process_csa_wbw_ie() - Process CSA Wide BW IE
@@ -1804,7 +1806,8 @@ void lim_handle_csa_offload_msg(struct mac_context *mac_ctx,
 	if (mac_ctx->lim.stop_roaming_callback)
 		mac_ctx->lim.stop_roaming_callback(mac_ctx,
 						   session_entry->smeSessionId,
-						   ecsr_driver_disabled);
+						   REASON_DRIVER_DISABLED,
+						   RSO_CHANNEL_SWITCH);
 
 	lim_prepare_for11h_channel_switch(mac_ctx, session_entry);
 
@@ -1835,7 +1838,7 @@ void lim_handle_delete_bss_rsp(struct mac_context *mac,
 	struct pe_session *pe_session;
 
 	pe_session =
-		pe_find_session_by_sme_session_id(mac, del_bss_rsp->vdev_id);
+		pe_find_session_by_vdev_id(mac, del_bss_rsp->vdev_id);
 	if (!pe_session) {
 		pe_err("Session Does not exist for vdev id: %d",
 		       del_bss_rsp->vdev_id);
