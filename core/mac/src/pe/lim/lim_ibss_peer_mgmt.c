@@ -22,7 +22,6 @@
 #include "wni_cfg.h"
 #include "lim_utils.h"
 #include "lim_assoc_utils.h"
-#include "lim_sta_hash_api.h"
 #include "sch_api.h"             /* sch_set_fixed_beacon_fields for IBSS coalesce */
 #include "lim_security_utils.h"
 #include "lim_send_messages.h"
@@ -568,8 +567,7 @@ void ibss_bss_add(struct mac_context *mac, struct pe_session *pe_session)
 	mlmStartReq.txChannelWidthSet = pe_session->htRecommendedTxWidthSet;
 
 	/* reading the channel num from session Table */
-	mlmStartReq.channelNumber = wlan_reg_freq_to_chan(
-					mac->pdev, pe_session->curr_op_freq);
+	mlmStartReq.oper_ch_freq = pe_session->curr_op_freq;
 
 	mlmStartReq.cbMode = pe_session->pLimStartBssReq->cbMode;
 
@@ -603,9 +601,9 @@ void ibss_bss_delete(struct mac_context *mac_ctx, struct pe_session *session)
 			session->limMlmState);
 		return;
 	}
-	status = lim_del_bss(mac_ctx, NULL, session->bss_idx, session);
+	status = lim_del_bss(mac_ctx, NULL, session->vdev_id, session);
 	if (QDF_IS_STATUS_ERROR(status))
-		pe_err("delBss failed for bss: %d", session->bss_idx);
+		pe_err("delBss failed for bss: %d", session->vdev_id);
 }
 
 /**
@@ -865,51 +863,10 @@ lim_ibss_decide_protection(struct mac_context *mac, tpDphHashNode sta,
 	return;
 }
 
-/**
- * lim_ibss_peer_find()
- *
- ***FUNCTION:
- * This function is called while adding a context at
- * DPH & Polaris for a peer in IBSS.
- * If peer is found in the list, capabilities from the
- * returned BSS description are used at DPH node & Polaris.
- *
- ***LOGIC:
- *
- ***ASSUMPTIONS:
- *
- ***NOTE:
- *
- * @param  macAddr - MAC address of the peer
- *
- * @return Pointer to peer node if found, else NULL
- */
 tLimIbssPeerNode *lim_ibss_peer_find(struct mac_context *mac, tSirMacAddr macAddr)
 {
 	return ibss_peer_find(mac, macAddr);
 }
-
-/**
- * lim_ibss_sta_add()
- *
- ***FUNCTION:
- * This function is called to add an STA context in IBSS role
- * whenever a data frame is received from/for a STA that failed
- * hash lookup at DPH.
- *
- ***LOGIC:
- *
- ***ASSUMPTIONS:
- * NA
- *
- ***NOTE:
- * NA
- *
- * @param  mac       Pointer to Global MAC structure
- * @param  peerAdddr  MAC address of the peer being added
- * @return retCode    Indicates success or failure return code
- * @return
- */
 
 QDF_STATUS
 lim_ibss_sta_add(struct mac_context *mac, void *pBody, struct pe_session *pe_session)
@@ -966,7 +923,7 @@ lim_ibss_sta_add(struct mac_context *mac, void *pBody, struct pe_session *pe_ses
 					sch_set_fixed_beacon_fields(mac,
 								    pe_session);
 					beaconParams.bss_idx =
-						pe_session->bss_idx;
+						pe_session->vdev_id;
 					lim_send_beacon_params(mac, &beaconParams,
 							       pe_session);
 				}
@@ -1187,7 +1144,6 @@ lim_ibss_add_sta_rsp(struct mac_context *mac, void *msg, struct pe_session *pe_s
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	sta->bssId = pAddStaParams->bss_idx;
 	sta->staIndex = pAddStaParams->staIdx;
 	sta->valid = 1;
 	sta->mlmStaContext.mlmState = eLIM_MLM_LINK_ESTABLISHED_STATE;
@@ -1227,7 +1183,7 @@ void lim_ibss_del_bss_rsp_when_coalescing(struct mac_context *mac,
 }
 
 void lim_ibss_add_bss_rsp_when_coalescing(struct mac_context *mac,
-					  struct bss_params *bss_param,
+					  uint32_t op_chan_freq,
 					  struct pe_session *pe_session)
 {
 	uint8_t infoLen;
@@ -1245,7 +1201,7 @@ void lim_ibss_add_bss_rsp_when_coalescing(struct mac_context *mac,
 
 	qdf_mem_zero((void *)&newBssInfo, sizeof(newBssInfo));
 	qdf_mem_copy(newBssInfo.bssId.bytes, pHdr->bssId, QDF_MAC_ADDR_SIZE);
-	newBssInfo.freq = bss_param->op_chan_freq;
+	newBssInfo.freq = op_chan_freq;
 	qdf_mem_copy((uint8_t *) &newBssInfo.ssId,
 		     (uint8_t *) &pBeacon->ssId, pBeacon->ssId.length + 1);
 
@@ -1276,8 +1232,7 @@ void lim_ibss_del_bss_rsp(struct mac_context *mac,
 		goto end;
 	}
 
-	pe_session = pe_find_session_by_sme_session_id(mac,
-						       vdev_stop_rsp->vdev_id);
+	pe_session = pe_find_session_by_vdev_id(mac, vdev_stop_rsp->vdev_id);
 	if (!pe_session) {
 		pe_err("Session Does not exist for given sessionID");
 		goto end;
@@ -1343,26 +1298,6 @@ static void lim_ibss_bss_delete(struct mac_context *mac,
 	if (QDF_IS_STATUS_ERROR(status))
 		pe_err("Deliver WLAN_VDEV_SM_EV_DOWN failed");
 }
-
-/**
- * lim_ibss_coalesce()
- *
- ***FUNCTION:
- * This function is called upon receiving Beacon/Probe Response
- * while operating in IBSS mode.
- *
- ***LOGIC:
- *
- ***ASSUMPTIONS:
- *
- ***NOTE:
- *
- * @param  mac    - Pointer to Global MAC structure
- * @param  pBeacon - Parsed Beacon Frame structure
- * @param  pBD     - Pointer to received BD
- *
- * @return Status whether to process or ignore received Beacon Frame
- */
 
 QDF_STATUS
 lim_ibss_coalesce(struct mac_context *mac,
@@ -1501,7 +1436,7 @@ lim_ibss_coalesce(struct mac_context *mac,
 		if (beaconParams.paramChangeBitmap) {
 			pe_err("beaconParams.paramChangeBitmap=1 ---> Update Beacon Params");
 			sch_set_fixed_beacon_fields(mac, pe_session);
-			beaconParams.bss_idx = pe_session->bss_idx;
+			beaconParams.bss_idx = pe_session->vdev_id;
 			lim_send_beacon_params(mac, &beaconParams, pe_session);
 		}
 	} else
@@ -1524,16 +1459,6 @@ lim_ibss_coalesce(struct mac_context *mac,
 	return QDF_STATUS_SUCCESS;
 } /*** end lim_handle_ibs_scoalescing() ***/
 
-/**
- * lim_ibss_heart_beat_handle() - handle IBSS hearbeat failure
- *
- * @mac_ctx: global mac context
- * @session: PE session entry
- *
- * Hanlde IBSS hearbeat failure.
- *
- * Return: None.
- */
 void lim_ibss_heart_beat_handle(struct mac_context *mac_ctx, struct pe_session *session)
 {
 	tLimIbssPeerNode *tempnode, *prevnode;
@@ -1649,18 +1574,6 @@ void lim_ibss_heart_beat_handle(struct mac_context *mac_ctx, struct pe_session *
 	}
 }
 
-/**
- * lim_ibss_decide_protection_on_delete() - decides protection related info.
- *
- * @mac_ctx: global mac context
- * @stads: station hash node
- * @bcn_param: beacon parameters
- * @session: PE session entry
- *
- * Decides all the protection related information.
- *
- * Return: None
- */
 void lim_ibss_decide_protection_on_delete(struct mac_context *mac_ctx,
 					  tpDphHashNode stads,
 					  tpUpdateBeaconParams bcn_param,

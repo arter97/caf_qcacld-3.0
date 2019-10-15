@@ -80,11 +80,13 @@ enum nan_disc_state {
  * @enable: NAN feature enable
  * @dp_enable: NAN Datapath feature enable
  * @ndi_mac_randomize: Randomize NAN datapath interface MAC
+ * @ndp_inactivity_timeout: NDP inactivity timeout
  */
 struct nan_cfg_params {
 	bool enable;
 	bool dp_enable;
 	bool ndi_mac_randomize;
+	uint16_t ndp_inactivity_timeout;
 };
 
 /**
@@ -241,6 +243,14 @@ enum nan_disc_state nan_get_discovery_state(struct wlan_objmgr_psoc *psoc);
  * Return: True if NAN Enable is allowed on given channel, False otherwise
  */
 bool nan_is_enable_allowed(struct wlan_objmgr_psoc *psoc, uint8_t nan_chan);
+
+/*
+ * nan_is_disc_active: Queries whether NAN Discovery is active
+ * @psoc: PSOC object
+ *
+ * Return: True if NAN Disc is active, False otherwise
+ */
+bool nan_is_disc_active(struct wlan_objmgr_psoc *psoc);
 
 /*
  * nan_get_connection_info: Gets connection info of the NAN Discovery interface

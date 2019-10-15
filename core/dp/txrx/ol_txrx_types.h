@@ -687,6 +687,11 @@ struct ol_txrx_pdev_t {
 	qdf_atomic_t target_tx_credit;
 	qdf_atomic_t orig_target_tx_credit;
 
+	/*
+	 * needed for SDIO HL, Genoa Adma
+	 */
+	qdf_atomic_t pad_reserve_tx_credit;
+
 	struct {
 		uint16_t pool_size;
 		struct ol_txrx_fw_stats_desc_elem_t *pool;
@@ -1074,6 +1079,8 @@ struct ol_txrx_pdev_t {
 	uint8_t peer_id_unmap_ref_cnt;
 	bool enable_peer_unmap_conf_support;
 	bool enable_tx_compl_tsf64;
+	uint64_t last_host_time;
+	uint64_t last_tsf64_time;
 };
 
 #define OL_TX_HL_DEL_ACK_HASH_SIZE    256
@@ -1204,6 +1211,7 @@ struct ol_txrx_vdev_t {
 	uint32_t num_filters;
 
 	enum wlan_op_mode opmode;
+	enum wlan_op_subtype subtype;
 
 #ifdef QCA_IBSS_SUPPORT
 	/* ibss mode related */

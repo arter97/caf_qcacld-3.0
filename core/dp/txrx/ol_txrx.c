@@ -743,6 +743,8 @@ ol_txrx_pdev_attach(ol_txrx_soc_handle soc,
 	/* initialize the counter of the target's tx buffer availability */
 	qdf_atomic_init(&pdev->target_tx_credit);
 	qdf_atomic_init(&pdev->orig_target_tx_credit);
+	qdf_atomic_init(&pdev->pad_reserve_tx_credit);
+	qdf_atomic_add(1, &pdev->pad_reserve_tx_credit);
 
 	if (ol_cfg_is_high_latency(cfg_pdev)) {
 		qdf_spinlock_create(&pdev->tx_queue_spinlock);
@@ -1650,13 +1652,15 @@ ol_txrx_vdev_per_vdev_tx_desc_init(struct ol_txrx_vdev_t *vdev)
  * @vdev_id - the ID used to identify the virtual device to the target
  * @op_mode - whether this virtual device is operating as an AP,
  * an IBSS, or a STA
+ * @subtype:  Subtype of the operating vdev
  *
  * Return: success: handle to new data vdev object, failure: NULL
  */
 static struct cdp_vdev *
 ol_txrx_vdev_attach(struct cdp_pdev *ppdev,
 		    uint8_t *vdev_mac_addr,
-		    uint8_t vdev_id, enum wlan_op_mode op_mode)
+		    uint8_t vdev_id, enum wlan_op_mode op_mode,
+		    enum wlan_op_subtype subtype)
 {
 	struct ol_txrx_pdev_t  *pdev = (struct ol_txrx_pdev_t *)ppdev;
 	struct ol_txrx_vdev_t *vdev;
@@ -1674,6 +1678,7 @@ ol_txrx_vdev_attach(struct cdp_pdev *ppdev,
 	vdev->pdev = pdev;
 	vdev->vdev_id = vdev_id;
 	vdev->opmode = op_mode;
+	vdev->subtype = subtype;
 
 	vdev->delete.pending = 0;
 	vdev->safemode = 0;
@@ -3189,14 +3194,8 @@ void peer_unmap_timer_handler(void *data)
 	ol_txrx_err("peer %pK ("QDF_MAC_ADDR_STR")",
 		    peer,
 		    QDF_MAC_ADDR_ARRAY(peer->mac_addr.raw));
-	if (cds_is_self_recovery_enabled()) {
-		if (!cds_is_driver_recovering() && !cds_is_fw_down())
-			cds_trigger_recovery(QDF_PEER_UNMAP_TIMEDOUT);
-		else
-			ol_txrx_err("Recovery is in progress, ignore!");
-	} else {
-		QDF_BUG(0);
-	}
+
+	cds_trigger_recovery(QDF_PEER_UNMAP_TIMEDOUT);
 }
 
 
@@ -4414,7 +4413,10 @@ ol_txrx_display_stats(void *soc, uint16_t value,
 		ol_txrx_stats_display_tso(pdev);
 		break;
 	case CDP_DUMP_TX_FLOW_POOL_INFO:
-		ol_tx_dump_flow_pool_info((void *)pdev);
+		if (verb_level == QDF_STATS_VERBOSITY_LEVEL_LOW)
+			ol_tx_dump_flow_pool_info_compact((void *)pdev);
+		else
+			ol_tx_dump_flow_pool_info((void *)pdev);
 		break;
 	case CDP_TXRX_DESC_STATS:
 		qdf_nbuf_tx_desc_count_display();

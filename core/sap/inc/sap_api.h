@@ -476,8 +476,8 @@ struct sap_config {
 	bool ieee80211d;      /* Specify if 11D is enabled or disabled */
 	struct qdf_mac_addr deny_mac[MAX_ACL_MAC_ADDRESS];  /* MAC filtering */
 	struct qdf_mac_addr self_macaddr;       /* self macaddress or BSSID */
-	uint8_t channel;          /* Operation channel */
-	uint8_t sec_ch;
+	uint32_t chan_freq;          /* Operation channel frequency */
+	uint32_t sec_ch_freq;
 	struct ch_params ch_params;
 	uint32_t ch_width_orig;
 	uint8_t max_num_sta;      /* maximum number of STAs in station table */
@@ -631,14 +631,6 @@ typedef struct tagSapStruct {
 	bool acs_with_more_param;
 	bool enable_dfs_phy_error_logs;
 } tSapStruct, *tpSapStruct;
-
-#ifdef FEATURE_WLAN_CH_AVOID
-/* Store channel safety information */
-typedef struct {
-	uint16_t channelNumber;
-	bool isSafe;
-} sapSafeChannelType;
-#endif /* FEATURE_WLAN_CH_AVOID */
 
 /**
  * struct sap_context - per-BSS Context for SAP
@@ -1062,8 +1054,8 @@ QDF_STATUS wlansap_channel_change_request(struct sap_context *sap_ctx,
 /**
  * wlansap_get_sec_channel() - get the secondary sap channel
  * @sec_ch_offset: secondary channel offset.
- * @op_channel: Operating sap channel.
- * @sec_channel: channel to be filled.
+ * @op_chan_freq: Operating sap channel frequency.
+ * @sec_chan_freq: channel frequency to be filled.
  *
  * This API will get the secondary sap channel from the offset, and
  * operating channel.
@@ -1072,8 +1064,8 @@ QDF_STATUS wlansap_channel_change_request(struct sap_context *sap_ctx,
  *
  */
 void wlansap_get_sec_channel(uint8_t sec_ch_offset,
-			     uint8_t op_channel,
-			     uint8_t *sec_channel);
+			     uint32_t op_chan_freq,
+			     uint32_t *sec_chan_freq);
 
 /**
  * wlansap_start_beacon_req() - Send Start Beaconing Request
@@ -1277,6 +1269,20 @@ static inline QDF_STATUS wlansap_set_dfs_nol(struct sap_context *sap_ctx,
 #endif
 
 /**
+ * wlan_sap_set_dfs_pri_multiplier() - Set dfs_pri_multiplier
+ * @mac_handle: Opaque handle to the global MAC context
+ *
+ * Return: none
+ */
+#ifdef DFS_PRI_MULTIPLIER
+void wlan_sap_set_dfs_pri_multiplier(mac_handle_t mac_handle);
+#else
+static inline void wlan_sap_set_dfs_pri_multiplier(mac_handle_t mac_handle)
+{
+}
+#endif
+
+/**
  * wlan_sap_set_vendor_acs() - Set vendor specific acs in sap context
  * @sap_context: SAP context
  * @is_vendor_acs: if vendor specific acs is enabled
@@ -1331,7 +1337,7 @@ QDF_STATUS wlansap_acs_chselect(struct sap_context *sap_context,
  *
  * Return: None
  */
-void sap_undo_acs(struct sap_context *sap_context);
+void sap_undo_acs(struct sap_context *sap_context, struct sap_config *sap_cfg);
 
 /**
  * wlansap_get_chan_width() - get sap channel width.

@@ -527,14 +527,14 @@ static __iw_softap_setparam(struct net_device *dev,
 		 * Disable Roaming on all adapters before start of
 		 * start of Hidden ssid connection
 		 */
-		wlan_hdd_disable_roaming(adapter);
+		wlan_hdd_disable_roaming(adapter, RSO_START_BSS);
 
 		status = sme_update_session_param(mac_handle,
 				adapter->vdev_id,
 				SIR_PARAM_SSID_HIDDEN, set_value);
 		if (QDF_STATUS_SUCCESS != status) {
 			hdd_err("QCSAP_PARAM_HIDE_SSID failed");
-			wlan_hdd_enable_roaming(adapter);
+			wlan_hdd_enable_roaming(adapter, RSO_START_BSS);
 			return -EIO;
 		}
 		break;
@@ -752,8 +752,8 @@ static __iw_softap_setparam(struct net_device *dev,
 
 		if (config->SapHw_mode != eCSR_DOT11_MODE_11ac &&
 		    config->SapHw_mode != eCSR_DOT11_MODE_11ac_ONLY) {
-			hdd_err("SET_VHT_RATE error: SapHw_mode= 0x%x, ch: %d",
-			       config->SapHw_mode, config->channel);
+			hdd_err("SET_VHT_RATE: SapHw_mode= 0x%x, ch_freq: %d",
+			       config->SapHw_mode, config->chan_freq);
 			ret = -EIO;
 			break;
 		}
@@ -777,16 +777,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	case QCASAP_SHORT_GI:
 	{
 		hdd_debug("QCASAP_SET_SHORT_GI val %d", set_value);
-		/*
-		 * wma_cli_set_command should be called instead of
-		 * sme_update_ht_config since SGI is used for HT/HE.
-		 * This should be refactored.
-		 *
-		 * SGI is same for 20MHZ and 40MHZ.
-		 */
-		ret = sme_update_ht_config(mac_handle, adapter->vdev_id,
-					   WNI_CFG_HT_CAP_INFO_SHORT_GI_20MHZ,
-					   set_value);
+		ret = hdd_we_set_short_gi(adapter, set_value);
 		if (ret)
 			hdd_err("Failed to set ShortGI value ret: %d", ret);
 		break;
@@ -1995,7 +1986,7 @@ static int iw_get_channel_list(struct net_device *dev,
 {
 	uint32_t num_channels = 0;
 	uint8_t i = 0;
-	uint8_t band_start_channel = CHAN_ENUM_1;
+	uint8_t band_start_channel = MIN_24GHZ_CHANNEL;
 	uint8_t band_end_channel = MAX_5GHZ_CHANNEL;
 	struct hdd_adapter *hostapd_adapter = (netdev_priv(dev));
 	struct channel_list_info *channel_list =
@@ -2023,10 +2014,10 @@ static int iw_get_channel_list(struct net_device *dev,
 	}
 
 	if (BAND_2G == cur_band) {
-		band_start_channel = CHAN_ENUM_1;
-		band_end_channel = CHAN_ENUM_14;
+		band_start_channel = MIN_24GHZ_CHANNEL;
+		band_end_channel = MAX_24GHZ_CHANNEL;
 	} else if (BAND_5G == cur_band) {
-		band_start_channel = CHAN_ENUM_36;
+		band_start_channel = MIN_5GHZ_CHANNEL;
 		band_end_channel = MAX_5GHZ_CHANNEL;
 	}
 

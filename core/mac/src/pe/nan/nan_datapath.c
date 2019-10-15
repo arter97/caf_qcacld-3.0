@@ -56,8 +56,7 @@ static QDF_STATUS lim_add_ndi_peer(struct mac_context *mac_ctx,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	session = pe_find_session_by_sme_session_id(mac_ctx,
-						vdev_id);
+	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
 	if (!session) {
 		/* couldn't find session */
 		pe_err("Session not found for vdev_id: %d", vdev_id);
@@ -139,7 +138,7 @@ static void lim_ndp_delete_peer_by_addr(struct mac_context *mac_ctx, uint8_t vde
 	pe_info("deleting peer: "QDF_MAC_ADDR_STR" confirm rejected",
 		QDF_MAC_ADDR_ARRAY(peer_ndi_mac_addr.bytes));
 
-	session = pe_find_session_by_sme_session_id(mac_ctx, vdev_id);
+	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
 	if (!session || (session->bssType != eSIR_NDI_MODE)) {
 		pe_err("PE session is NULL or non-NDI for sme session %d",
 			vdev_id);
@@ -209,8 +208,8 @@ static void lim_ndp_delete_peers(struct mac_context *mac_ctx,
 		if (ndp_map[i].num_active_ndp_sessions > 0)
 			continue;
 
-		session = pe_find_session_by_sme_session_id(mac_ctx,
-						ndp_map[i].vdev_id);
+		session = pe_find_session_by_vdev_id(mac_ctx,
+						     ndp_map[i].vdev_id);
 		if (!session || (session->bssType != eSIR_NDI_MODE)) {
 			pe_err("PE session is NULL or non-NDI for sme session %d",
 				ndp_map[i].vdev_id);
@@ -338,26 +337,27 @@ skip_event:
 }
 
 void lim_process_ndi_mlm_add_bss_rsp(struct mac_context *mac_ctx,
-				     struct bss_params *add_bss_params,
+				     struct add_bss_rsp *add_bss_rsp,
 				     struct pe_session *session_entry)
 {
 	tLimMlmStartCnf mlm_start_cnf;
 
-	if (!add_bss_params) {
-		pe_err("Invalid body pointer in message");
+	if (!add_bss_rsp) {
+		pe_err("add_bss_rsp is NULL");
 		return;
 	}
-	pe_debug("Status %d", add_bss_params->status);
-	if (QDF_STATUS_SUCCESS == add_bss_params->status) {
+	pe_debug("Status %d", add_bss_rsp->status);
+	if (QDF_IS_STATUS_SUCCESS(add_bss_rsp->status)) {
 		pe_debug("WDA_ADD_BSS_RSP returned QDF_STATUS_SUCCESS");
 		session_entry->limMlmState = eLIM_MLM_BSS_STARTED_STATE;
 		MTRACE(mac_trace(mac_ctx, TRACE_CODE_MLM_STATE,
 			session_entry->peSessionId,
 			session_entry->limMlmState));
-		session_entry->bss_idx = (uint8_t)add_bss_params->bss_idx;
+		session_entry->vdev_id = add_bss_rsp->vdev_id;
 		session_entry->limSystemRole = eLIM_NDI_ROLE;
 		session_entry->statypeForBss = STA_ENTRY_SELF;
-		session_entry->staId = add_bss_params->staContext.staIdx;
+		session_entry->staId =
+			wma_peer_get_peet_id(session_entry->self_mac_addr);
 		/* Apply previously set configuration at HW */
 		lim_apply_configuration(mac_ctx, session_entry);
 		mlm_start_cnf.resultCode = eSIR_SME_SUCCESS;
@@ -366,7 +366,7 @@ void lim_process_ndi_mlm_add_bss_rsp(struct mac_context *mac_ctx,
 		lim_init_peer_idxpool(mac_ctx, session_entry);
 	} else {
 		pe_err("WDA_ADD_BSS_REQ failed with status %d",
-			add_bss_params->status);
+			add_bss_rsp->status);
 		mlm_start_cnf.resultCode = eSIR_SME_HAL_SEND_MESSAGE_FAIL;
 	}
 	mlm_start_cnf.sessionId = session_entry->peSessionId;
@@ -385,8 +385,7 @@ void lim_ndi_del_bss_rsp(struct mac_context * mac_ctx,
 		rc = eSIR_SME_STOP_BSS_FAILURE;
 		goto end;
 	}
-	session_entry =
-		pe_find_session_by_sme_session_id(mac_ctx, del_bss->vdev_id);
+	session_entry = pe_find_session_by_vdev_id(mac_ctx, del_bss->vdev_id);
 	if (!session_entry) {
 		pe_err("Session Does not exist for given sessionID");
 		goto end;
@@ -492,7 +491,6 @@ void lim_ndp_add_sta_rsp(struct mac_context *mac_ctx, struct pe_session *session
 		qdf_mem_free(add_sta_rsp);
 		return;
 	}
-	sta_ds->bssId = add_sta_rsp->bss_idx;
 	sta_ds->staIndex = add_sta_rsp->staIdx;
 	sta_ds->valid = 1;
 	sta_ds->mlmStaContext.mlmState = eLIM_MLM_LINK_ESTABLISHED_STATE;

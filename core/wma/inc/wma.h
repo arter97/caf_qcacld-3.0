@@ -172,8 +172,6 @@
 #define WMA_BSS_STATUS_STARTED 0x1
 #define WMA_BSS_STATUS_STOPPED 0x2
 
-#define WMA_TARGET_REQ_TYPE_VDEV_START 0x1
-
 #define WMA_PEER_ASSOC_CNF_START 0x01
 #define WMA_PEER_ASSOC_TIMEOUT SIR_PEER_ASSOC_TIMEOUT
 
@@ -188,7 +186,6 @@
 #define WMA_PDEV_MAC_CFG_RESP 0x07
 
 /* FW response timeout values in milli seconds */
-#define WMA_VDEV_START_REQUEST_TIMEOUT   START_RESPONSE_TIMER
 #define WMA_VDEV_PLCY_MGR_TIMEOUT        SIR_VDEV_PLCY_MGR_TIMEOUT
 #define WMA_VDEV_HW_MODE_REQUEST_TIMEOUT WMA_VDEV_PLCY_MGR_TIMEOUT
 #define WMA_VDEV_DUAL_MAC_CFG_TIMEOUT    WMA_VDEV_PLCY_MGR_TIMEOUT
@@ -679,9 +676,6 @@ struct roam_synch_frame_ind {
 /**
  * struct wma_txrx_node - txrx node
  * @vdev: pointer to vdev object
- * @addr: mac address
- * @bssid: bssid
- * @handle: wma handle
  * @beacon: beacon info
  * @config: per vdev config parameters
  * @scan_info: scan info
@@ -695,8 +689,6 @@ struct roam_synch_frame_ind {
  * @shortSlotTimeSupported: is short slot time supported or not
  * @dtimPeriod: DTIM period
  * @chanmode: channel mode
- * @vht_capable: VHT capablity flag
- * @ht_capable: HT capablity flag
  * @mhz: channel frequency in KHz
  * @chan_width: channel bandwidth
  * @vdev_up: is vdev up or not
@@ -709,7 +701,6 @@ struct roam_synch_frame_ind {
  * @stats_rsp: stats response
  * @del_staself_req: delete sta self request
  * @bss_status: bss status
- * @rate_flags: rate flags
  * @nss: nss value
  * @is_channel_switch: is channel switch
  * @pause_bitmap: pause bitmap
@@ -724,29 +715,21 @@ struct roam_synch_frame_ind {
  * @psnr_req: snr request
  * @delay_before_vdev_stop: delay
  * @tx_streams: number of tx streams can be used by the vdev
- * @rx_streams: number of rx streams can be used by the vdev
- * @chain_mask: chain mask can be used by the vdev
  * @mac_id: the mac on which vdev is on
  * @wep_default_key_idx: wep default index for group key
  * @arp_offload_req: cached arp offload request
  * @ns_offload_req: cached ns offload request
  * @rcpi_req: rcpi request
  * @in_bmps: Whether bmps for this interface has been enabled
- * @vdev_start_wakelock: wakelock to protect vdev start op with firmware
  * @vdev_set_key_wakelock: wakelock to protect vdev set key op with firmware
- * @vdev_start_runtime_wakelock: runtime pm wakelock for vdev start
  * @vdev_set_key_runtime_wakelock: runtime pm wakelock for set key
- * @channel: channel
- * @roam_offload_enabled: is roam offload enable/disable
+ * @ch_freq: channel frequency
  * @roam_scan_stats_req: cached roam scan stats request
  *
  * It stores parameters per vdev in wma.
  */
 struct wma_txrx_node {
 	struct wlan_objmgr_vdev *vdev;
-	uint8_t addr[QDF_MAC_ADDR_SIZE];
-	uint8_t bssid[QDF_MAC_ADDR_SIZE];
-	struct cdp_vdev *handle;
 	struct beacon_info *beacon;
 	vdev_cli_config_t config;
 	uint32_t type;
@@ -758,14 +741,12 @@ struct wma_txrx_node {
 	uint8_t llbCoexist;
 	uint8_t shortSlotTimeSupported;
 	uint8_t dtimPeriod;
-	WMI_HOST_WLAN_PHY_MODE chanmode;
-	uint8_t vht_capable;
-	uint8_t ht_capable;
+	uint32_t chanmode;
 	A_UINT32 mhz;
 	enum phy_ch_width chan_width;
 	bool vdev_active;
 	uint64_t tsfadjust;
-	void *addBssStaContext;
+	tAddStaParams *addBssStaContext;
 	uint8_t aid;
 	uint8_t rmfEnabled;
 #ifdef WLAN_FEATURE_11W
@@ -775,13 +756,12 @@ struct wma_txrx_node {
 	void *del_staself_req;
 	bool is_del_sta_defered;
 	qdf_atomic_t bss_status;
-	uint8_t rate_flags;
 	uint8_t nss;
 	uint16_t pause_bitmap;
 	int8_t tx_power;
 	int8_t max_tx_power;
 	uint32_t nwType;
-	void *staKeyParams;
+	tSetStaKeyParams *staKeyParams;
 	uint32_t peer_count;
 	bool roam_synch_in_progress;
 	void *plink_status_req;
@@ -791,8 +771,6 @@ struct wma_txrx_node {
 	bool extscan_in_progress;
 #endif
 	uint32_t tx_streams;
-	uint32_t rx_streams;
-	uint32_t chain_mask;
 	uint32_t mac_id;
 	bool roaming_in_progress;
 	int32_t roam_synch_delay;
@@ -801,14 +779,11 @@ struct wma_txrx_node {
 	bool in_bmps;
 	struct beacon_filter_param beacon_filter;
 	bool beacon_filter_enabled;
-	qdf_wake_lock_t vdev_start_wakelock;
 	qdf_wake_lock_t vdev_set_key_wakelock;
-	qdf_runtime_lock_t vdev_start_runtime_wakelock;
 	qdf_runtime_lock_t vdev_set_key_runtime_wakelock;
 	struct roam_synch_frame_ind roam_synch_frame_ind;
 	bool is_waiting_for_key;
-	bool roam_offload_enabled;
-	uint8_t channel;
+	uint32_t ch_freq;
 	struct sir_roam_scan_stats *roam_scan_stats_req;
 };
 
@@ -857,13 +832,13 @@ struct wma_ini_config {
 };
 
 /**
- * struct wmi_valid_channels - Channel details part of WMI_SCAN_CHAN_LIST_CMDID
+ * struct wma_valid_channels - Channel details part of WMI_SCAN_CHAN_LIST_CMDID
  * @num_channels: Number of channels
- * @channel_list: Channel list
+ * @ch_freq_list: Channel Frequency list
  */
 struct wma_valid_channels {
 	uint8_t num_channels;
-	uint8_t channel_list[MAX_NUM_CHAN];
+	uint32_t ch_freq_list[MAX_NUM_CHAN];
 };
 
 #ifdef FEATURE_WLM_STATS
@@ -916,8 +891,6 @@ struct wma_wlm_stats_data {
  * @scan_id: scan id
  * @interfaces: txrx nodes(per vdev)
  * @pdevconfig: pdev related configrations
- * @vdev_resp_queue: vdev response queue
- * @vdev_respq_lock: vdev response queue lock
  * @wma_hold_req_queue: Queue use to serialize requests to firmware
  * @wma_hold_req_q_lock: Mutex for @wma_hold_req_queue
  * @vht_supp_mcs: VHT supported MCS
@@ -1048,8 +1021,6 @@ typedef struct {
 	uint32_t scan_id;
 	struct wma_txrx_node *interfaces;
 	pdev_cli_config_t pdevconfig;
-	qdf_list_t vdev_resp_queue;
-	qdf_spinlock_t vdev_respq_lock;
 	qdf_list_t wma_hold_req_queue;
 	qdf_spinlock_t wma_hold_req_q_lock;
 	uint32_t vht_supp_mcs;
@@ -1220,66 +1191,6 @@ struct wma_target_req {
 	uint32_t msg_type;
 	uint8_t vdev_id;
 	uint8_t type;
-};
-
-/**
- * struct wma_vdev_start_req - vdev start request parameters
- * @beacon_intval: beacon interval
- * @dtim_period: dtim period
- * @max_txpow: max tx power
- * @chan_offset: channel offset
- * @is_dfs: is dfs supported or not
- * @vdev_id: vdev id
- * @op_chan_freq: operating frequency
- * @oper_mode: operating mode
- * @ssid: ssid
- * @hidden_ssid: hidden ssid
- * @pmf_enabled: is pmf enabled or not
- * @vht_capable: VHT capabality
- * @chan_freq_seg0: center freq seq 0
- * @chan_freq_seg1: center freq seq 1
- * @ht_capable: HT capabality
- * @dot11_mode: 802.11 mode
- * @is_half_rate: is the channel operating at 10MHz
- * @is_quarter_rate: is the channel operating at 5MHz
- * @preferred_tx_streams: policy manager indicates the preferred
- *			number of transmit streams
- * @preferred_rx_streams: policy manager indicates the preferred
- *			number of receive streams
- * @beacon_tx_rate: beacon tx rate
- * @he_capable: HE capability
- * @he_ops: HE operation
- * @cac_duration_ms: cac duration in milliseconds
- * @dfs_regdomain: dfs region
- */
-struct wma_vdev_start_req {
-	uint32_t beacon_intval;
-	uint32_t dtim_period;
-	int32_t max_txpow;
-	enum phy_ch_width chan_width;
-	bool is_dfs;
-	uint8_t vdev_id;
-	uint32_t op_chan_freq;
-	uint8_t oper_mode;
-	tSirMacSSid ssid;
-	uint8_t hidden_ssid;
-	uint8_t pmf_enabled;
-	uint8_t vht_capable;
-	uint32_t chan_freq_seg0;
-	uint32_t chan_freq_seg1;
-	uint8_t ht_capable;
-	uint8_t dot11_mode;
-	bool is_half_rate;
-	bool is_quarter_rate;
-	uint32_t preferred_tx_streams;
-	uint32_t preferred_rx_streams;
-	uint16_t beacon_tx_rate;
-#ifdef WLAN_FEATURE_11AX
-	bool he_capable;
-	uint32_t he_ops;
-#endif
-	uint32_t cac_duration_ms;
-	uint32_t dfs_regdomain;
 };
 
 /**
@@ -1547,6 +1458,14 @@ enum uapsd_ac {
 	UAPSD_VO
 };
 
+/**
+ * wma_disable_uapsd_per_ac() - disable uapsd per ac
+ * @wmi_handle: wma handle
+ * @vdev_id: vdev id
+ * @ac: access category
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code.
+ */
 QDF_STATUS wma_disable_uapsd_per_ac(tp_wma_handle wma_handle,
 				    uint32_t vdev_id, enum uapsd_ac ac);
 
@@ -1577,7 +1496,7 @@ enum uapsd_up {
  * struct wma_roam_invoke_cmd - roam invoke command
  * @vdev_id: vdev id
  * @bssid: mac address
- * @channel: channel
+ * @ch_freq: channel frequency
  * @frame_len: frame length, includs mac header, fixed params and ies
  * @frame_buf: buffer contaning probe response or beacon
  * @is_same_bssid: flag to indicate if roaming is requested for same bssid
@@ -1586,7 +1505,7 @@ enum uapsd_up {
 struct wma_roam_invoke_cmd {
 	uint32_t vdev_id;
 	uint8_t bssid[QDF_MAC_ADDR_SIZE];
-	uint32_t channel;
+	uint32_t ch_freq;
 	uint32_t frame_len;
 	uint8_t *frame_buf;
 	uint8_t is_same_bssid;
@@ -1619,6 +1538,21 @@ A_UINT32 e_csr_auth_type_to_rsn_authmode(enum csr_akm_type authtype,
 					 eCsrEncryptionType encr);
 A_UINT32 e_csr_encryption_type_to_rsn_cipherset(eCsrEncryptionType encr);
 
+/**
+ * wma_trigger_uapsd_params() - set trigger uapsd parameter
+ * @wmi_handle: wma handle
+ * @vdev_id: vdev id
+ * @trigger_uapsd_params: trigger uapsd parameters
+ *
+ * This function sets the trigger uapsd
+ * params such as service interval, delay
+ * interval and suspend interval which
+ * will be used by the firmware to send
+ * trigger frames periodically when there
+ * is no traffic on the transmit side.
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code.
+ */
 QDF_STATUS wma_trigger_uapsd_params(tp_wma_handle wma_handle, uint32_t vdev_id,
 				    tp_wma_trigger_uapsd_params
 				    trigger_uapsd_params);
@@ -1659,20 +1593,10 @@ QDF_STATUS wma_send_pdev_set_dual_mac_config(tp_wma_handle wma_handle,
 QDF_STATUS wma_send_pdev_set_antenna_mode(tp_wma_handle wma_handle,
 		struct sir_antenna_mode_param *msg);
 
-struct wma_target_req *wma_fill_vdev_req(tp_wma_handle wma,
-					 uint8_t vdev_id,
-					 uint32_t msg_type, uint8_t type,
-					 void *params, uint32_t timeout);
 struct wma_target_req *wma_fill_hold_req(tp_wma_handle wma,
 				    uint8_t vdev_id, uint32_t msg_type,
 				    uint8_t type, void *params,
 				    uint32_t timeout);
-
-QDF_STATUS wma_vdev_start(tp_wma_handle wma,
-			  struct wma_vdev_start_req *req, bool isRestart);
-
-void wma_remove_vdev_req(tp_wma_handle wma, uint8_t vdev_id,
-				uint8_t type);
 
 int wma_mgmt_tx_completion_handler(void *handle, uint8_t *cmpl_event_params,
 				   uint32_t len);
@@ -1967,15 +1891,13 @@ void wma_vdev_update_pause_bitmap(uint8_t vdev_id, uint16_t value)
 
 	iface = &wma->interfaces[vdev_id];
 
-	if (!iface) {
-		WMA_LOGE("%s: Failed to get iface: NULL",
-			 __func__);
+	if (!iface || !iface->vdev) {
+		WMA_LOGE("%s: Vdev is NULL", __func__);
 		return;
 	}
 
-	if (!iface->handle) {
-		WMA_LOGE("%s: Failed to get iface handle: NULL",
-			 __func__);
+	if (!wlan_vdev_get_dp_handle(iface->vdev)) {
+		WMA_LOGE("%s: Failed to get dp handle", __func__);
 		return;
 	}
 
@@ -2001,15 +1923,13 @@ uint16_t wma_vdev_get_pause_bitmap(uint8_t vdev_id)
 
 	iface = &wma->interfaces[vdev_id];
 
-	if (!iface) {
-		WMA_LOGE("%s: Failed to get iface: NULL",
-			 __func__);
+	if (!iface || !iface->vdev) {
+		WMA_LOGE("%s: Vdev is NULL", __func__);
 		return 0;
 	}
 
-	if (!iface->handle) {
-		WMA_LOGE("%s: Failed to get iface handle: NULL",
-			 __func__);
+	if (!wlan_vdev_get_dp_handle(iface->vdev)) {
+		WMA_LOGE("%s: Failed to get dp handle", __func__);
 		return 0;
 	}
 
@@ -2038,13 +1958,12 @@ struct cdp_vdev *wma_vdev_get_vdev_dp_handle(uint8_t vdev_id)
 
 	iface = &wma->interfaces[vdev_id];
 
-	if (!iface) {
-		WMA_LOGE("%s: Failed to get iface: NULL",
-			 __func__);
+	if (!iface || !iface->vdev) {
+		WMA_LOGE("%s: Vdev is NULL", __func__);
 		return NULL;
 	}
 
-	return iface->handle;
+	return wlan_vdev_get_dp_handle(iface->vdev);
 }
 
 /**
@@ -2065,15 +1984,13 @@ static inline bool wma_vdev_is_device_in_low_pwr_mode(uint8_t vdev_id)
 
 	iface = &wma->interfaces[vdev_id];
 
-	if (!iface) {
-		WMA_LOGE("%s: Failed to get iface: NULL",
-			 __func__);
+	if (!iface || !iface->vdev) {
+		WMA_LOGE("%s: Vdev is NULL", __func__);
 		return 0;
 	}
 
-	if (!iface->handle) {
-		WMA_LOGE("%s: Failed to get iface handle:NULL",
-			 __func__);
+	if (!wlan_vdev_get_dp_handle(iface->vdev)) {
+		WMA_LOGE("%s: Failed to get dp handle", __func__);
 		return 0;
 	}
 
@@ -2103,7 +2020,7 @@ QDF_STATUS wma_vdev_get_dtim_period(uint8_t vdev_id, uint8_t *value)
 
 	iface = &wma->interfaces[vdev_id];
 
-	if (!iface || !iface->handle)
+	if (!iface || !iface->vdev || !wlan_vdev_get_dp_handle(iface->vdev))
 		return QDF_STATUS_E_FAILURE;
 
 	*value = iface->dtimPeriod;
@@ -2133,10 +2050,40 @@ QDF_STATUS wma_vdev_get_beacon_interval(uint8_t  vdev_id, uint16_t *value)
 
 	iface = &wma->interfaces[vdev_id];
 
-	if (!iface || !iface->handle)
+	if (!iface || !iface->vdev || !wlan_vdev_get_dp_handle(iface->vdev))
 		return QDF_STATUS_E_FAILURE;
 
 	*value = iface->beaconInterval;
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * wma_get_vdev_rate_flag - Get beacon rate flag from mlme
+ * @vdev_id: vdev index number
+ * @rate_flag: pointer to the value to fill out
+ *
+ * Note caller must verify return status before using value
+ *
+ * Return: QDF_STATUS_SUCCESS when fetched a valid value from mlme else
+ * QDF_STATUS_E_FAILURE
+ */
+static inline QDF_STATUS
+wma_get_vdev_rate_flag(struct wlan_objmgr_vdev *vdev, uint32_t *rate_flag)
+{
+	struct vdev_mlme_obj *mlme_obj;
+
+	if (!vdev) {
+		WMA_LOGE("%s vdev is NULL", __func__);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!mlme_obj) {
+		WMA_LOGE("%s Failed to get mlme_obj", __func__);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	*rate_flag = mlme_obj->mgmt.rate_info.rate_flags;
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -2160,15 +2107,13 @@ void wma_vdev_set_pause_bit(uint8_t vdev_id, wmi_tx_pause_type bit_pos)
 
 	iface = &wma->interfaces[vdev_id];
 
-	if (!iface) {
-		WMA_LOGE("%s: Failed to get iface: NULL",
-			 __func__);
+	if (!iface || !iface->vdev) {
+		WMA_LOGE("%s: Vdev is NULL", __func__);
 		return;
 	}
 
-	if (!iface->handle) {
-		WMA_LOGE("%s: Failed to get iface handle: NULL",
-			 __func__);
+	if (!wlan_vdev_get_dp_handle(iface->vdev)) {
+		WMA_LOGE("%s: Failed to get dp handle", __func__);
 		return;
 	}
 
@@ -2195,15 +2140,13 @@ void wma_vdev_clear_pause_bit(uint8_t vdev_id, wmi_tx_pause_type bit_pos)
 
 	iface = &wma->interfaces[vdev_id];
 
-	if (!iface) {
-		WMA_LOGE("%s: Failed to get iface: NULL",
-			 __func__);
+	if (!iface || !iface->vdev) {
+		WMA_LOGE("%s: Vdev is NULL", __func__);
 		return;
 	}
 
-	if (!iface->handle) {
-		WMA_LOGE("%s: Failed to get iface handle: NULL",
-			 __func__);
+	if (!wlan_vdev_get_dp_handle(iface->vdev)) {
+		WMA_LOGE("%s: Failed to get dp handle", __func__);
 		return;
 	}
 
@@ -2571,5 +2514,148 @@ QDF_STATUS wma_add_bss_peer_sta(uint8_t *self_mac, uint8_t *bssid,
  * Return: 0 on success, else error on failure
  */
 QDF_STATUS wma_send_vdev_stop(uint8_t vdev_id);
+
+/**
+ * wma_pre_assoc_req() - wma pre assoc req when sta connect
+ * @add_bss: add bss param
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wma_pre_assoc_req(struct bss_params *add_bss);
+
+/**
+ * wma_add_bss_lfr3() - add bss during LFR3 offload roaming
+ * @wma: wma handler
+ * @add_bss: add bss param
+ *
+ * Return: None
+ */
+void wma_add_bss_lfr3(tp_wma_handle wma, struct bss_params *add_bss);
+
+uint8_t wma_peer_get_peet_id(uint8_t *mac);
+
+#ifdef WLAN_FEATURE_HOST_ROAM
+/**
+ * wma_add_bss_lfr2_vdev_start() - add bss and start vdev during host roaming
+ * @vdev: vdev in object manager
+ * @add_bss: add bss param
+ *
+ * Return: None
+ */
+QDF_STATUS wma_add_bss_lfr2_vdev_start(struct wlan_objmgr_vdev *vdev,
+				       struct bss_params *add_bss);
+#endif
+
+/**
+ * wma_send_peer_assoc_req() - wma send peer assoc req when sta connect
+ * @add_bss: add bss param
+ *
+ * Return: None
+ */
+QDF_STATUS wma_send_peer_assoc_req(struct bss_params *add_bss);
+
+/**
+ * wma_get_rx_chainmask() - API to get rx chainmask from mac phy capability
+ * @pdev_id: pdev id
+ * @chainmask_2g: pointer to return 2g chainmask
+ * @chainmask_5g: pointer to return 5g chainmask
+ *
+ * API to get rx chainmask from mac phy capability directly.
+ *
+ * Return: QDF_STATUS_SUCCESS or non-zero on failure
+ */
+QDF_STATUS wma_get_rx_chainmask(uint8_t pdev_id, uint32_t *chainmask_2g,
+				uint32_t *chainmask_5g);
+
+/**
+ * wma_handle_channel_switch_resp() - handle channel switch resp
+ * @wma: wma handle
+ * @rsp: response for channel switch
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wma_handle_channel_switch_resp(tp_wma_handle wma,
+					  struct vdev_start_response *rsp);
+
+/**
+ * wma_pre_chan_switch_setup() - handler before channel switch vdev start
+ * @vdev_id: vdev id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wma_pre_chan_switch_setup(uint8_t vdev_id);
+
+/**
+ * wma_post_chan_switch_setup() - handler after channel switch vdev start
+ * @vdev_id: vdev id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wma_post_chan_switch_setup(uint8_t vdev_id);
+
+/**
+ * wma_vdev_pre_start() - prepare vdev start
+ * @vdev_id: vdev id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wma_vdev_pre_start(uint8_t vdev_id, bool restart);
+
+/**
+ * wma_remove_bss_peer_on_vdev_start_failure() - remove the bss peers in case of
+ * vdev start request failure
+ * @wma: wma handle.
+ * @vdev_id: vdev id
+ *
+ * This API deletes the BSS peer created during ADD BSS in case of ADD BSS
+ * request sent to the FW fails.
+ *
+ * Return: None;
+ */
+void wma_remove_bss_peer_on_vdev_start_failure(tp_wma_handle wma,
+					       uint8_t vdev_id);
+
+/**
+ * wma_send_add_bss_resp() - send add bss failure
+ * @wma: wma handle.
+ * @vdev_id: vdev id
+ * @status: status
+ *
+ * Return: None
+ */
+void wma_send_add_bss_resp(tp_wma_handle wma, uint8_t vdev_id,
+			   QDF_STATUS status);
+
+/**
+ * wma_post_vdev_start_setup() - wma post vdev start handler
+ * @wma: wma handle.
+ * @vdev_id: vdev id
+ *
+ * Return: Success or Failure status
+ */
+QDF_STATUS wma_post_vdev_start_setup(uint8_t vdev_id);
+
+/**
+ * wma_pre_vdev_start_setup() - wma pre vdev start handler
+ * @wma: wma handle.
+ * @vdev_id: vdev id
+ * @addbss_param: bss param
+ *
+ * Return: Success or Failure status
+ */
+QDF_STATUS wma_pre_vdev_start_setup(uint8_t vdev_id,
+				    struct bss_params *add_bss);
+
+/**
+ * wma_release_pending_vdev_refs() - release vdev ref taken by interface txrx
+ * node and delete all the peers attached to this vdev.
+ *
+ * This API loop and release vdev ref taken by all iface and all the peers
+ * attached to the vdev, this need to be called on recovery to flush vdev
+ * and peer.
+ *
+ * Return: void.
+ */
+void wma_release_pending_vdev_refs(void);
 
 #endif

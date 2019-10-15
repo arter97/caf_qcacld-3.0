@@ -102,6 +102,17 @@ QDF_STATUS ucfg_mlme_global_init(void);
 QDF_STATUS ucfg_mlme_global_deinit(void);
 
 /**
+ * ucfg_mlme_cfg_chan_to_freq() - convert channel numbers to frequencies
+ * @pdev: pointer to pdev object
+ *
+ * convert the channels numbers received as part of cfg items to
+ * frequencies.
+ *
+ * Return: None
+ */
+void ucfg_mlme_cfg_chan_to_freq(struct wlan_objmgr_pdev *pdev);
+
+/**
  * wlan_mlme_get_power_usage() - Get the power usage info
  * @psoc: pointer to psoc object
  *
@@ -750,6 +761,28 @@ ucfg_mlme_get_sap_tx_leakage_threshold(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 ucfg_mlme_set_sap_tx_leakage_threshold(struct wlan_objmgr_psoc *psoc,
 				       uint32_t sap_tx_leakage_threshold);
+
+/*
+ * ucfg_mlme_get_dfs_pri_multiplier() - Get dfs pri multiplier
+ * @psoc: pointer to psoc object
+ * @dfs_pri_multiplier: Pointer to the value which will be filled
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+ucfg_mlme_get_dfs_pri_multiplier(struct wlan_objmgr_psoc *psoc,
+				 uint32_t *dfs_pri_multiplier);
+
+/*
+ * ucfg_mlme_set_dfs_pri_multiplier() - Set dfs pri multiplier
+ * @psoc: pointer to psoc object
+ * @dfs_pri_multiplier: Value that needs to be set.
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+ucfg_mlme_set_dfs_pri_multiplier(struct wlan_objmgr_psoc *psoc,
+				 uint32_t dfs_pri_multiplier);
 
 /*
  * ucfg_mlme_get_dfs_filter_offload() - Get the dfs filter offload
@@ -3887,4 +3920,19 @@ bool ucfg_mlme_validate_full_roam_scan_period(uint32_t full_roam_scan_period);
  * Return: True if roam_scan_period is in expected range, false otherwise.
  */
 bool ucfg_mlme_validate_scan_period(uint32_t roam_scan_period);
+/**
+ * ucfg_mlme_get_ignore_fw_reg_offload_ind() - Get the
+ * ignore_fw_reg_offload_ind ini
+ * @psoc: pointer to psoc object
+ * @disabled: output pointer to hold user config
+ *
+ * Return: QDF Status
+ */
+static inline QDF_STATUS
+ucfg_mlme_get_ignore_fw_reg_offload_ind(struct wlan_objmgr_psoc *psoc,
+					bool *disabled)
+{
+	return wlan_mlme_get_ignore_fw_reg_offload_ind(psoc, disabled);
+}
+
 #endif /* _WLAN_MLME_UCFG_API_H_ */

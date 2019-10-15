@@ -1550,13 +1550,24 @@ int wlan_hdd_cfg80211_ll_stats_get(struct wiphy *wiphy,
 {
 	struct osif_vdev_sync *vdev_sync;
 	int errno;
+	qdf_device_t qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
+
+	if (!qdf_ctx)
+		return -EINVAL;
 
 	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
 	if (errno)
 		return errno;
 
+	errno = pld_qmi_send_get(qdf_ctx->dev);
+	if (errno)
+		goto end;
+
 	errno = __wlan_hdd_cfg80211_ll_stats_get(wiphy, wdev, data, data_len);
 
+	pld_qmi_send_put(qdf_ctx->dev);
+
+end:
 	osif_vdev_sync_op_stop(vdev_sync);
 
 	return errno;
@@ -4672,16 +4683,24 @@ static int _wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 					  const uint8_t *mac,
 					  struct station_info *sinfo)
 {
-	void *hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	qdf_device_t qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
 	int errno;
 
-	errno = hif_pm_runtime_get_sync(hif_ctx);
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno)
+		return errno;
+
+	if (!qdf_ctx)
+		return -EINVAL;
+
+	errno = pld_qmi_send_get(qdf_ctx->dev);
 	if (errno)
 		return errno;
 
 	errno = __wlan_hdd_cfg80211_get_station(wiphy, dev, mac, sinfo);
 
-	hif_pm_runtime_put_sync_suspend(hif_ctx);
+	pld_qmi_send_put(qdf_ctx->dev);
 
 	return errno;
 }

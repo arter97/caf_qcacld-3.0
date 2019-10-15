@@ -542,6 +542,33 @@ static void hdd_disable_hw_filter(struct hdd_adapter *adapter)
 	hdd_exit();
 }
 
+static void hdd_enable_action_frame_patterns(struct hdd_adapter *adapter)
+{
+	QDF_STATUS status;
+
+	hdd_enter();
+
+	status = ucfg_pmo_enable_action_frame_patterns(adapter->vdev,
+						       QDF_SYSTEM_SUSPEND);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_info("Failed to enable action frame patterns");
+
+	hdd_exit();
+}
+
+static void hdd_disable_action_frame_patterns(struct hdd_adapter *adapter)
+{
+	QDF_STATUS status;
+
+	hdd_enter();
+
+	status = ucfg_pmo_disable_action_frame_patterns(adapter->vdev);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_info("Failed to disable action frame patterns");
+
+	hdd_exit();
+}
+
 void hdd_enable_host_offloads(struct hdd_adapter *adapter,
 	enum pmo_offload_trigger trigger)
 {
@@ -564,6 +591,7 @@ void hdd_enable_host_offloads(struct hdd_adapter *adapter,
 	hdd_enable_ns_offload(adapter, trigger);
 	hdd_enable_mc_addr_filtering(adapter, trigger);
 	hdd_enable_hw_filter(adapter);
+	hdd_enable_action_frame_patterns(adapter);
 out:
 	hdd_exit();
 
@@ -591,6 +619,7 @@ void hdd_disable_host_offloads(struct hdd_adapter *adapter,
 	hdd_disable_ns_offload(adapter, trigger);
 	hdd_disable_mc_addr_filtering(adapter, trigger);
 	hdd_disable_hw_filter(adapter);
+	hdd_disable_action_frame_patterns(adapter);
 out:
 	hdd_exit();
 
@@ -1235,6 +1264,7 @@ QDF_STATUS hdd_wlan_shutdown(void)
 	}
 
 	hdd_bus_bw_compute_timer_stop(hdd_ctx);
+	hdd_set_connection_in_progress(false);
 	policy_mgr_clear_concurrent_session_count(hdd_ctx->psoc);
 
 	hdd_debug("Invoking packetdump deregistration API");
@@ -1248,6 +1278,8 @@ QDF_STATUS hdd_wlan_shutdown(void)
 	}
 
 	wlan_hdd_rx_thread_resume(hdd_ctx);
+
+	dp_txrx_resume(cds_get_context(QDF_MODULE_ID_SOC));
 
 	/*
 	 * After SSR, FW clear its txrx stats. In host,
@@ -1753,7 +1785,7 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 		return rc;
 
 	if (hdd_ctx->config->is_wow_disabled) {
-		hdd_err("wow is disabled");
+		hdd_info_rl("wow is disabled");
 		return -EINVAL;
 	}
 
@@ -1805,23 +1837,15 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 	ucfg_p2p_cleanup_tx_by_psoc(hdd_ctx->psoc);
 	ucfg_p2p_cleanup_roc_by_psoc(hdd_ctx->psoc);
 
-	/* Stop ongoing scan on each interface */
-	hdd_for_each_adapter(hdd_ctx, adapter) {
-		if (sme_neighbor_middle_of_roaming(mac_handle,
-		    adapter->vdev_id) ||
-		    hdd_is_roaming_in_progress(hdd_ctx)) {
-			hdd_err("Roaming in progress, do not allow suspend");
-			wlan_hdd_inc_suspend_stats(hdd_ctx,
-						   SUSPEND_FAIL_ROAM);
-			return -EAGAIN;
-		}
-
-		wlan_abort_scan(hdd_ctx->pdev, INVAL_PDEV_ID,
-				adapter->vdev_id, INVALID_SCAN_ID, false);
+	if (hdd_is_connection_in_progress(NULL, NULL)) {
+		hdd_err_rl("Connection is in progress, rejecting suspend");
+		return -EINVAL;
 	}
 
-	/* flush any pending powersave timers */
+	/* abort ongoing scan and flush any pending powersave timers */
 	hdd_for_each_adapter(hdd_ctx, adapter) {
+		wlan_abort_scan(hdd_ctx->pdev, INVAL_PDEV_ID,
+				adapter->vdev_id, INVALID_SCAN_ID, false);
 		if (wlan_hdd_validate_vdev_id(adapter->vdev_id))
 			continue;
 

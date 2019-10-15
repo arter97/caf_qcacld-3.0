@@ -34,6 +34,8 @@
 #include "host_diag_core_log.h"
 #endif /* FEATURE_WLAN_DIAG_SUPPORT */
 #include "lim_utils.h"
+#include "wma.h"
+#include "../../core/src/vdev_mgr_ops.h"
 
 /**
  * lim_send_beacon_params() - updates bcn params to WMA
@@ -86,147 +88,65 @@ QDF_STATUS lim_send_beacon_params(struct mac_context *mac,
 	return retCode;
 }
 
-/**
- * lim_send_switch_chnl_params()
- *
- ***FUNCTION:
- * This function is called to send Channel Switch Indication to WMA
- *
- ***LOGIC:
- *
- ***ASSUMPTIONS:
- * NA
- *
- ***NOTE:
- * NA
- *
- * @param mac  pointer to Global Mac structure.
- * @param chnlNumber New Channel Number to be switched to.
- * @param ch_width an enum for channel width.
- * @param localPowerConstraint 11h local power constraint value
- *
- * @return success if message send is ok, else false.
- */
 QDF_STATUS lim_send_switch_chnl_params(struct mac_context *mac,
-					  uint8_t chnlNumber,
-					  uint8_t ch_center_freq_seg0,
-					  uint8_t ch_center_freq_seg1,
-					  enum phy_ch_width ch_width,
-					  int8_t maxTxPower,
-					  uint8_t peSessionId,
-					  uint8_t is_restart,
-					  uint32_t cac_duration_ms,
-					  uint32_t dfs_regdomain)
+				       struct pe_session *session)
 {
-	tpSwitchChannelParams pChnlParams = NULL;
-	struct scheduler_msg msgQ = {0};
-	struct pe_session *pe_session;
+	struct vdev_mlme_obj *mlme_obj;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct vdev_start_response rsp = {0};
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
 
-	pe_session = pe_find_session_by_session_id(mac, peSessionId);
-	if (!pe_session) {
-		pe_err("Unable to get Session for session Id %d",
-				peSessionId);
+	if (!session) {
+		pe_err("session is NULL");
 		return QDF_STATUS_E_FAILURE;
 	}
-	pChnlParams = qdf_mem_malloc(sizeof(tSwitchChannelParams));
-	if (!pChnlParams)
-		return QDF_STATUS_E_NOMEM;
-	pChnlParams->channelNumber = chnlNumber;
-	pChnlParams->ch_center_freq_seg0 = ch_center_freq_seg0;
-	pChnlParams->ch_center_freq_seg1 = ch_center_freq_seg1;
-	pChnlParams->ch_width = ch_width;
-	qdf_mem_copy(pChnlParams->selfStaMacAddr, pe_session->self_mac_addr,
-		     sizeof(tSirMacAddr));
-	pChnlParams->maxTxPower = maxTxPower;
-	pChnlParams->peSessionId = peSessionId;
-	pChnlParams->vhtCapable = pe_session->vhtCapability;
-	if (lim_is_session_he_capable(pe_session))
-		lim_update_chan_he_capable(mac, pChnlParams);
-	pChnlParams->dot11_mode = pe_session->dot11mode;
-	pChnlParams->nss = pe_session->nss;
-	pe_debug("dot11mode: %d, vht_capable: %d nss value: %d",
-		pChnlParams->dot11_mode, pChnlParams->vhtCapable,
-		pChnlParams->nss);
-
-	/*Set DFS flag for DFS channel */
-	if (ch_width == CH_WIDTH_160MHZ) {
-		pChnlParams->isDfsChannel = true;
-	} else if (ch_width == CH_WIDTH_80P80MHZ) {
-		pChnlParams->isDfsChannel = false;
-		if (wlan_reg_get_channel_state(mac->pdev, chnlNumber) ==
-				CHANNEL_STATE_DFS ||
-		    wlan_reg_get_channel_state(mac->pdev,
-			    pChnlParams->ch_center_freq_seg1 -
-				SIR_80MHZ_START_CENTER_CH_DIFF) ==
-							CHANNEL_STATE_DFS)
-			pChnlParams->isDfsChannel = true;
-	} else {
-		if (wlan_reg_get_channel_state(mac->pdev, chnlNumber) ==
-				CHANNEL_STATE_DFS)
-			pChnlParams->isDfsChannel = true;
-		else
-			pChnlParams->isDfsChannel = false;
+	if (!session->vdev) {
+		pe_err("vdev is NULL");
+		return QDF_STATUS_E_FAILURE;
 	}
+	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(session->vdev);
+	if (!mlme_obj) {
+		pe_err("vdev component object is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+	status = lim_pre_vdev_start(mac, mlme_obj, session);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto send_resp;
 
-	pChnlParams->restart_on_chan_switch = is_restart;
-	pChnlParams->cac_duration_ms = cac_duration_ms;
-	pChnlParams->dfs_regdomain = dfs_regdomain;
-	pChnlParams->reduced_beacon_interval =
-		mac->sap.SapDfsInfo.reduced_beacon_interval;
-
-	pChnlParams->ssid_hidden = pe_session->ssidHidden;
-	pChnlParams->ssid = pe_session->ssId;
-	if (cds_is_5_mhz_enabled())
-		pChnlParams->ch_width = CH_WIDTH_5MHZ;
-	else if (cds_is_10_mhz_enabled())
-		pChnlParams->ch_width = CH_WIDTH_10MHZ;
+	session->ch_switch_in_progress = true;
 
 	/* we need to defer the message until we
 	 * get the response back from WMA
 	 */
 	SET_LIM_PROCESS_DEFD_MESGS(mac, false);
-	msgQ.type = WMA_CHNL_SWITCH_REQ;
-	msgQ.reserved = 0;
-	msgQ.bodyptr = pChnlParams;
-	msgQ.bodyval = 0;
-	pe_debug("Sending CH_SWITCH_REQ, ch_width %d, ch_num %d, maxTxPower %d",
-		       pChnlParams->ch_width,
-		       pChnlParams->channelNumber, pChnlParams->maxTxPower);
-	MTRACE(mac_trace_msg_tx(mac, peSessionId, msgQ.type));
-	if (QDF_STATUS_SUCCESS != wma_post_ctrl_msg(mac, &msgQ)) {
-		qdf_mem_free(pChnlParams);
-		pe_err("Posting  CH_SWITCH_REQ to WMA failed");
-		return QDF_STATUS_E_FAILURE;
+
+	status = wma_pre_chan_switch_setup(session->vdev_id);
+	if (status != QDF_STATUS_SUCCESS) {
+		pe_err("failed status = %d", status);
+		goto send_resp;
 	}
-	pe_session->ch_switch_in_progress = true;
+	status = vdev_mgr_start_send(mlme_obj,
+				mlme_is_chan_switch_in_progress(session->vdev));
+	if (status != QDF_STATUS_SUCCESS) {
+		pe_err("failed status = %d", status);
+		goto send_resp;
+	}
+	wma_post_chan_switch_setup(session->vdev_id);
+
+	return QDF_STATUS_SUCCESS;
+send_resp:
+	pe_err("switch channel rsp, status = 0x%x", status);
+	rsp.status = status;
+	rsp.vdev_id = session->vdev_id;
+
+	wma_handle_channel_switch_resp(wma, &rsp);
 
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * lim_send_edca_params()
- *
- ***FUNCTION:
- * This function is called to send dynamically changing EDCA Parameters to WMA.
- *
- ***LOGIC:
- *
- ***ASSUMPTIONS:
- * NA
- *
- ***NOTE:
- * NA
- *
- * @param mac  pointer to Global Mac structure.
- * @param tpUpdatedEdcaParams pointer to the structure which contains
- *                                       dynamically changing EDCA parameters.
- * @param highPerformance  If the peer is Airgo (taurus) then switch to highPerformance is true.
- *
- * @return success if message send is ok, else false.
- */
 QDF_STATUS lim_send_edca_params(struct mac_context *mac,
-				   tSirMacEdcaParamRecord *pUpdatedEdcaParams,
-				   uint16_t bss_idx, bool mu_edca)
+				tSirMacEdcaParamRecord *pUpdatedEdcaParams,
+				uint16_t vdev_id, bool mu_edca)
 {
 	tEdcaParams *pEdcaParams = NULL;
 	QDF_STATUS retCode = QDF_STATUS_SUCCESS;
@@ -235,7 +155,7 @@ QDF_STATUS lim_send_edca_params(struct mac_context *mac,
 	pEdcaParams = qdf_mem_malloc(sizeof(tEdcaParams));
 	if (!pEdcaParams)
 		return QDF_STATUS_E_NOMEM;
-	pEdcaParams->bss_idx = bss_idx;
+	pEdcaParams->vdev_id = vdev_id;
 	pEdcaParams->acbe = pUpdatedEdcaParams[QCA_WLAN_AC_BE];
 	pEdcaParams->acbk = pUpdatedEdcaParams[QCA_WLAN_AC_BK];
 	pEdcaParams->acvi = pUpdatedEdcaParams[QCA_WLAN_AC_VI];
@@ -352,49 +272,6 @@ void lim_set_active_edca_params(struct mac_context *mac_ctx,
 #endif /* FEATURE_WLAN_DIAG_SUPPORT */
 
 	return;
-}
-
-/** ---------------------------------------------------------
-   \fn      lim_set_link_state
-   \brief   LIM sends a message to WMA to set the link state
-   \param   struct mac_context * mac
-   \param   tSirLinkState      state
-   \return  None
-   -----------------------------------------------------------*/
-QDF_STATUS lim_set_link_state(struct mac_context *mac, tSirLinkState state,
-				 tSirMacAddr bssId, tSirMacAddr self_mac_addr,
-				 tpSetLinkStateCallback callback,
-				 void *callbackArg)
-{
-	struct scheduler_msg msgQ = {0};
-	QDF_STATUS retCode;
-	tpLinkStateParams pLinkStateParams = NULL;
-	/* Allocate memory. */
-	pLinkStateParams = qdf_mem_malloc(sizeof(tLinkStateParams));
-	if (!pLinkStateParams)
-		return QDF_STATUS_E_NOMEM;
-	pLinkStateParams->state = state;
-	pLinkStateParams->callback = callback;
-	pLinkStateParams->callbackArg = callbackArg;
-
-	/* Copy Mac address */
-	sir_copy_mac_addr(pLinkStateParams->bssid, bssId);
-	sir_copy_mac_addr(pLinkStateParams->self_mac_addr, self_mac_addr);
-
-	msgQ.type = WMA_SET_LINK_STATE;
-	msgQ.reserved = 0;
-	msgQ.bodyptr = pLinkStateParams;
-	msgQ.bodyval = 0;
-
-	MTRACE(mac_trace_msg_tx(mac, NO_SESSION, msgQ.type));
-
-	retCode = (uint32_t) wma_post_ctrl_msg(mac, &msgQ);
-	if (retCode != QDF_STATUS_SUCCESS) {
-		qdf_mem_free(pLinkStateParams);
-		pe_err("Posting link state %d failed, reason = %x", state,
-			retCode);
-	}
-	return retCode;
 }
 
 QDF_STATUS lim_send_mode_update(struct mac_context *mac,
@@ -605,7 +482,7 @@ QDF_STATUS lim_send_ht40_obss_scanind(struct mac_context *mac_ctx,
 		return QDF_STATUS_E_FAILURE;
 	QDF_TRACE(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_ERROR,
 		"OBSS Scan Indication bss_idx- %d staId %d",
-		session->bss_idx, session->staId);
+		session->vdev_id, session->staId);
 
 	ht40_obss_scanind->cmd = HT40_OBSS_SCAN_PARAM_START;
 	ht40_obss_scanind->scan_type = eSIR_ACTIVE_SCAN;
@@ -650,7 +527,7 @@ QDF_STATUS lim_send_ht40_obss_scanind(struct mac_context *mac_ctx,
 	ht40_obss_scanind->channel_count = channel24gnum;
 	/* FW API requests BSS IDX */
 	ht40_obss_scanind->self_sta_idx = session->staId;
-	ht40_obss_scanind->bss_id = session->bss_idx;
+	ht40_obss_scanind->bss_id = session->vdev_id;
 	ht40_obss_scanind->fortymhz_intolerent = 0;
 	ht40_obss_scanind->iefield_len = 0;
 	msg.type = WMA_HT40_OBSS_SCAN_IND;

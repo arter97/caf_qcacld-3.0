@@ -62,7 +62,8 @@ QDF_STATUS lim_populate_peer_rate_set(struct mac_context *mac,
 				      uint8_t basicOnly,
 				      struct pe_session *pe_session,
 				      tDot11fIEVHTCaps *pVHTCaps,
-				      tDot11fIEhe_cap *he_caps);
+				      tDot11fIEhe_cap *he_caps,
+				      struct sDphHashNode *sta_ds);
 
 /**
  * lim_populate_own_rate_set() - comprises the basic and extended rates read
@@ -168,7 +169,8 @@ static inline bool lim_is_roam_synch_in_progress(struct pe_session *pe_session)
 
 void
 lim_send_del_sta_cnf(struct mac_context *mac, struct qdf_mac_addr sta_dsaddr,
-		     uint16_t staDsAssocId, tLimMlmStaContext mlmStaContext,
+		     uint16_t staDsAssocId,
+		     struct lim_sta_context mlmStaContext,
 		     tSirResultCodes status_code,
 		     struct pe_session *pe_session);
 
@@ -202,12 +204,35 @@ void lim_sta_add_bss_update_ht_parameter(uint32_t bss_chan_freq,
 					 bool chan_width_support,
 					 struct bss_params *add_bss);
 
-QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp,
-				   tpSchBeaconStruct pBeaconStruct,
-				   struct bss_description *bssDescription,
-				   uint8_t updateEntry, struct pe_session *pe_session);
-QDF_STATUS lim_sta_send_add_bss_pre_assoc(struct mac_context *mac, uint8_t updateEntry,
-					     struct pe_session *pe_session);
+/**
+ * lim_sta_send_add_bss() - add bss and send peer assoc after receive assoc
+ * rsp in sta mode
+ *.@mac: pointer to Global MAC structure
+ * @pAssocRsp: contains the structured assoc/reassoc Response got from AP
+ * @beaconstruct: the ProbeRsp/Beacon structured details
+ * @bssDescription: bss description passed to PE from the SME
+ * @updateEntry: bool flag of whether update bss and sta
+ * @pe_session: pointer to pe session
+ *
+ * Return: none
+ */
+QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
+				tpSirAssocRsp pAssocRsp,
+				tpSchBeaconStruct pBeaconStruct,
+				struct bss_description *bssDescription,
+				uint8_t updateEntry,
+				struct pe_session *pe_session);
+
+/**
+ * lim_sta_send_add_bss_pre_assoc() - add bss after channel switch and before
+ * associate req in sta mode
+ *.@mac: pointer to Global MAC structure
+ * @pe_session: pointer to pe session
+ *
+ * Return: none
+ */
+QDF_STATUS lim_sta_send_add_bss_pre_assoc(struct mac_context *mac,
+					  struct pe_session *pe_session);
 
 void lim_prepare_and_send_del_sta_cnf(struct mac_context *mac,
 				      tpDphHashNode sta,
@@ -287,6 +312,7 @@ void lim_send_sme_tsm_ie_ind(struct mac_context *mac,
  * @peer_vht_caps: pointer to peer vht capabilities
  * @session_entry: pe session entry
  * @nss: number of spatial streams
+ * @sta_ds: pointer to peer sta data structure
  *
  * Populates vht mcs rate set based on peer and self capabilities
  *
@@ -296,7 +322,8 @@ QDF_STATUS lim_populate_vht_mcs_set(struct mac_context *mac_ctx,
 				    struct supported_rates *rates,
 				    tDot11fIEVHTCaps *peer_vht_caps,
 				    struct pe_session *session_entry,
-				    uint8_t nss);
+				    uint8_t nss,
+				    struct sDphHashNode *sta_ds);
 
 /**
  * lim_extract_ies_from_deauth_disassoc() - Extract IEs from deauth/disassoc
