@@ -985,7 +985,7 @@ typedef struct sSirMacRateSet {
 
 typedef struct sSirMacSSid {
 	uint8_t length;
-	uint8_t ssId[SIR_MAC_MAX_SSID_LENGTH];
+	uint8_t ssId[SIR_MAC_MAX_SSID_LENGTH + 1];
 } qdf_packed tSirMacSSid;
 
 typedef struct sSirMacWpaInfo {
