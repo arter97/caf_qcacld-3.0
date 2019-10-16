@@ -1273,6 +1273,7 @@ struct ppdu_info {
  * @last_msdu          - last msdu indication
  * @msdu_part_of_amsdu - msdu part of amsdu
  * @transmit_cnt       - retried count
+ * @status             - transmit status
  * @tsf                - timestamp which it transmitted
  */
 struct msdu_completion_info {
@@ -1283,6 +1284,7 @@ struct msdu_completion_info {
 		last_msdu:1,
 		msdu_part_of_amsdu:1;
 	uint8_t transmit_cnt;
+	uint8_t status;
 	uint32_t tsf;
 };
 
