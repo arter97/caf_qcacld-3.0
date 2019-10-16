@@ -872,6 +872,9 @@ typedef struct {
  * @isDfsChannel: is DFS channel
  * @vhtCapable: VHT capable
  * @dot11_mode: 802.11 mode
+ * @reduced_beacon_interval: reduced beacon interval value
+ * @ssid_hidden: the sap ssid is hidden
+ * @ssid: sap ssid
  */
 typedef struct {
 	uint8_t channelNumber;
@@ -904,6 +907,8 @@ typedef struct {
 	uint8_t nss;
 	bool rx_ldpc;
 	uint16_t reduced_beacon_interval;
+	uint8_t ssid_hidden;
+	tSirMacSSid ssid;
 } tSwitchChannelParams, *tpSwitchChannelParams;
 
 typedef void (*tpSetLinkStateCallback)(tpAniSirGlobal pMac, void *msgParam,
@@ -1460,5 +1465,15 @@ typedef struct sNanRequest {
 	uint8_t request_data[];
 } tNanRequest, *tpNanRequest;
 #endif /* WLAN_FEATURE_NAN */
+
+/*
+ * struct roam_pmkid_req_event - Pmkid event with entries destination structure
+ * @num_entries: total entries sent over the event
+ * @ap_bssid: bssid list
+ */
+struct roam_pmkid_req_event {
+	uint32_t num_entries;
+	struct qdf_mac_addr ap_bssid[];
+};
 
 #endif /* _HALMSGAPI_H_ */
