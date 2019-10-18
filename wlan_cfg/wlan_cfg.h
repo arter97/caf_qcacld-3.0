@@ -81,6 +81,7 @@
 #define MAX_NUM_PEER_ID_PER_PEER 8
 #define DP_MAX_TIDS 17
 #define DP_NON_QOS_TID 16
+#define DP_NULL_DATA_TID 17
 
 struct wlan_cfg_dp_pdev_ctxt;
 
