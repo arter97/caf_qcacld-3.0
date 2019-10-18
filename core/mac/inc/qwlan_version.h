@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -32,9 +32,9 @@
 #define QWLAN_VERSION_MAJOR            5
 #define QWLAN_VERSION_MINOR            2
 #define QWLAN_VERSION_PATCH            0
-#define QWLAN_VERSION_EXTRA            ""
+#define QWLAN_VERSION_EXTRA            "A"
 #define QWLAN_VERSION_BUILD            130
 
-#define QWLAN_VERSIONSTR               "5.2.0.130"
+#define QWLAN_VERSIONSTR               "5.2.0.130A"
 
 #endif /* QWLAN_VERSION_H */
