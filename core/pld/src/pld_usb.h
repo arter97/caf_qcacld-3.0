@@ -18,6 +18,9 @@
 #ifndef __PLD_USB_H__
 #define __PLD_USB_H__
 
+#ifdef CONFIG_PLD_USB_CNSS
+#include <net/cnss2.h>
+#endif
 #include "pld_common.h"
 
 #ifdef HIF_USB
@@ -27,6 +30,10 @@ int pld_usb_get_ce_id(int irq);
 int pld_usb_wlan_enable(struct device *dev, struct pld_wlan_enable_cfg *config,
 			enum pld_driver_mode mode, const char *host_version);
 int pld_usb_is_fw_down(struct device *dev);
+static inline int pld_usb_collect_rddm(struct device *dev)
+{
+	return cnss_force_collect_rddm(dev);
+}
 
 #else
 static inline int pld_usb_register_driver(void)
@@ -50,6 +57,10 @@ static inline int pld_usb_is_fw_down(struct device *dev)
 	return  0;
 }
 
+static inline int pld_usb_collect_rddm(struct device *dev)
+{
+	return 0;
+}
 #endif
 
 static inline int
