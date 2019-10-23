@@ -1572,7 +1572,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	int ret;
 	tDot11fAssocRequest *frm;
 	uint16_t caps;
-	uint8_t *frame;
+	uint8_t *frame, *rsnx_ie = NULL;
 	QDF_STATUS sir_status;
 	tLimMlmAssocCnf assoc_cnf;
 	uint32_t bytes = 0, payload, status;
@@ -1598,6 +1598,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	enum rateid min_rid = RATEID_DEFAULT;
 	uint8_t *mbo_ie = NULL;
 	uint8_t mbo_ie_len = 0;
+	uint8_t rsnx_ie_len = 0;
 
 	if (!pe_session) {
 		pe_err("pe_session is NULL");
@@ -1904,6 +1905,25 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		aes_block_size_len = AES_BLOCK_SIZE;
 	}
 
+	/* RSNX IE for SAE PWE derivation based on H2E */
+	if (wlan_get_ie_ptr_from_eid(WLAN_ELEMID_RSNXE, add_ie, add_ie_len)) {
+		rsnx_ie = qdf_mem_malloc(WLAN_MAX_IE_LEN + 2);
+		if (!rsnx_ie)
+			goto end;
+
+		qdf_status = lim_strip_ie(mac_ctx, add_ie, &add_ie_len,
+					  WLAN_ELEMID_RSNXE, ONE_BYTE,
+					  NULL, 0, rsnx_ie, WLAN_MAX_IE_LEN);
+		if (QDF_IS_STATUS_ERROR(qdf_status)) {
+			pe_err("Failed to strip Vendor IEs");
+			goto end;
+		}
+		rsnx_ie_len = rsnx_ie[1] + 2;
+		pe_debug("RSNX_IE added to association request");
+		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
+				   rsnx_ie, rsnx_ie_len);
+	}
+
 	/*
 	 * MBO IE needs to be appendded at the end of the assoc request
 	 * frame and is not parsed and unpacked by the frame parser
@@ -1958,8 +1978,9 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 			status);
 	}
 
-	bytes = payload + sizeof(tSirMacMgmtHdr) +
-			aes_block_size_len + mbo_ie_len;
+	bytes = payload + sizeof(tSirMacMgmtHdr) + aes_block_size_len +
+		rsnx_ie_len + mbo_ie_len;
+
 
 	qdf_status = cds_packet_alloc((uint16_t) bytes, (void **)&frame,
 				(void **)&packet);
@@ -1997,6 +2018,12 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		goto end;
 	} else if (DOT11F_WARNED(status)) {
 		pe_warn("Assoc request pack warning (0x%08x)", status);
+	}
+
+	if (rsnx_ie && rsnx_ie_len) {
+		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
+			     rsnx_ie, rsnx_ie_len);
+		payload = payload + rsnx_ie_len;
 	}
 
 	/* Copy the MBO IE to the end of the frame */
@@ -2073,6 +2100,8 @@ free_mbo_ie:
 		qdf_mem_free(mbo_ie);
 
 end:
+	qdf_mem_free(rsnx_ie);
+
 	/* Free up buffer allocated for mlm_assoc_req */
 	qdf_mem_free(mlm_assoc_req);
 	mlm_assoc_req = NULL;
