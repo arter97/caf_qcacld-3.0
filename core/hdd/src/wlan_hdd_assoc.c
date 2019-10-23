@@ -5217,7 +5217,11 @@ hdd_sme_roam_callback(void *pContext, tCsrRoamInfo *pRoamInfo, uint32_t roamId,
 		complete(&pAdapter->roaming_comp_var);
 		schedule_delayed_work(&pHddCtx->roc_req_work, 0);
 		break;
-
+	case eCSR_ROAM_FIPS_PMK_REQUEST:
+		/* notify the supplicant of a new candidate */
+		qdf_ret_status = wlan_hdd_cfg80211_pmksa_candidate_notify(
+					pAdapter, pRoamInfo, 1, false);
+		break;
 	default:
 		break;
 	}
