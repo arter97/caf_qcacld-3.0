@@ -1658,6 +1658,8 @@ qdf_nbuf_t dp_tx_send_msdu_multiple(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 				dp_tx_me_free_buf(pdev,
 					(void *)(msdu_info->u.sg_info
 						.curr_seg->frags[0].vaddr));
+				i++;
+				continue;
 			}
 			goto done;
 		}
@@ -1693,6 +1695,10 @@ qdf_nbuf_t dp_tx_send_msdu_multiple(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 			tid_stats->swdrop_cnt[TX_HW_ENQUEUE]++;
 
 			dp_tx_desc_release(tx_desc, tx_q->desc_pool_id);
+			if (msdu_info->frm_type == dp_tx_frm_me) {
+				i++;
+				continue;
+			}
 			goto done;
 		}
 
@@ -3462,7 +3468,16 @@ more_data:
 				QDF_TRACE(QDF_MODULE_ID_DP,
 					  QDF_TRACE_LEVEL_ERROR,
 					  "Tx comp wbm_internal_error!!!\n");
-				DP_STATS_INC(soc, tx.wbm_internal_error, 1);
+				DP_STATS_INC(soc, tx.wbm_internal_error[WBM_INT_ERROR_ALL], 1);
+
+				if (HAL_TX_COMP_RELEASE_SOURCE_REO ==
+								buffer_src)
+					dp_handle_wbm_internal_error(
+						soc,
+						tx_comp_hal_desc,
+						hal_tx_comp_get_buffer_type(
+							tx_comp_hal_desc));
+
 				continue;
 			} else {
 				qdf_assert_always(0);
