@@ -8738,7 +8738,8 @@ static void csr_roam_join_rsp_processor(struct mac_context *mac,
 	 * bss fail and supplicant issues connect request back to the same
 	 * AP.
 	 */
-	if (reason_code == eSIR_MAC_INVALID_PMKID) {
+	if ((reason_code == eSIR_MAC_INVALID_PMKID) ||
+	    (reason_code == eSIR_MAC_INVALID_IE_STATUS)) {
 		sme_warn("Assoc reject from BSSID:%pM due to invalid PMKID",
 			 session_ptr->joinFailStatusCode.bssId);
 		qdf_mem_copy(&pmksa_entry.BSSID.bytes,
