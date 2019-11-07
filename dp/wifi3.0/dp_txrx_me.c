@@ -304,6 +304,16 @@ dp_tx_me_send_convert_ucast(struct cdp_vdev *vdev_handle, qdf_nbuf_t nbuf,
 			continue;
 
 		/*
+		 * When multicast packets come from intrabss path and
+		 * undergoe unicast conversion, avoid unicast packet
+		 * being sent to originating STA
+		 */
+		if (qdf_nbuf_get_tx_ftype(nbuf) == CB_FTYPE_INTRABSS_FWD) {
+			if (dp_tx_frame_is_drop(vdev, dstmac, srcmac))
+				continue;
+		}
+
+		/*
 		 * optimize to avoid malloc in per-packet path
 		 * For eg. seg_pool can be made part of vdev structure
 		 */
