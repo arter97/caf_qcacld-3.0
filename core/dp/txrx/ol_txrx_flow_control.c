@@ -1253,10 +1253,11 @@ ol_txrx_map_to_netif_reason_type(uint32_t reason)
  * ol_txrx_vdev_pause() - pause vdev network queues
  * @vdev: vdev handle
  * @reason: network queue pause reason
- *
+ * @pause_type: type of pause
  * Return: none
  */
-void ol_txrx_vdev_pause(struct cdp_vdev *pvdev, uint32_t reason)
+void ol_txrx_vdev_pause(struct cdp_vdev *pvdev, uint32_t reason,
+			uint32_t pause_type)
 {
 	struct ol_txrx_vdev_t *vdev = (struct ol_txrx_vdev_t *)pvdev;
 	struct ol_txrx_pdev_t *pdev = vdev->pdev;
@@ -1281,7 +1282,8 @@ void ol_txrx_vdev_pause(struct cdp_vdev *pvdev, uint32_t reason)
  *
  * Return: none
  */
-void ol_txrx_vdev_unpause(struct cdp_vdev *pvdev, uint32_t reason)
+void ol_txrx_vdev_unpause(struct cdp_vdev *pvdev, uint32_t reason,
+			  uint32_t pause_type)
 {
 	struct ol_txrx_vdev_t *vdev = (struct ol_txrx_vdev_t *)pvdev;
 	struct ol_txrx_pdev_t *pdev = vdev->pdev;
@@ -1312,7 +1314,7 @@ void ol_txrx_pdev_pause(struct ol_txrx_pdev_t *pdev, uint32_t reason)
 	struct ol_txrx_vdev_t *vdev = NULL, *tmp;
 
 	TAILQ_FOREACH_SAFE(vdev, &pdev->vdev_list, vdev_list_elem, tmp) {
-		ol_txrx_vdev_pause((struct cdp_vdev *)vdev, reason);
+		ol_txrx_vdev_pause((struct cdp_vdev *)vdev, reason, 0);
 	}
 }
 
@@ -1328,6 +1330,6 @@ void ol_txrx_pdev_unpause(struct ol_txrx_pdev_t *pdev, uint32_t reason)
 	struct ol_txrx_vdev_t *vdev = NULL, *tmp;
 
 	TAILQ_FOREACH_SAFE(vdev, &pdev->vdev_list, vdev_list_elem, tmp) {
-		ol_txrx_vdev_unpause((struct cdp_vdev *)vdev, reason);
+		ol_txrx_vdev_unpause((struct cdp_vdev *)vdev, reason, 0);
 	}
 }

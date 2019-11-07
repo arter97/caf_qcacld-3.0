@@ -2045,6 +2045,8 @@ QDF_STATUS wma_create_peer(tp_wma_handle wma, struct cdp_pdev *pdev,
 		 wma->interfaces[vdev_id].peer_count);
 
 	wlan_peer_set_dp_handle(obj_peer, peer);
+	if (peer_type == WMI_PEER_TYPE_TDLS)
+		cdp_peer_set_peer_as_tdls(dp_soc, peer, true);
 
 	if (roam_synch_in_progress) {
 		WMA_LOGD("%s: LFR3: Created peer %pK with peer_addr %pM vdev_id %d, peer_count - %d",
@@ -2336,7 +2338,7 @@ void wma_send_del_bss_response(tp_wma_handle wma, struct wma_target_req *req)
 	WMA_LOGD("%s, vdev_id: %d, un-pausing tx_ll_queue for VDEV_STOP rsp",
 		 __func__, vdev_id);
 	cdp_fc_vdev_unpause(soc, iface->handle,
-		OL_TXQ_PAUSE_REASON_VDEV_STOP);
+			    OL_TXQ_PAUSE_REASON_VDEV_STOP, 0);
 	wma_vdev_clear_pause_bit(vdev_id, PAUSE_TYPE_HOST);
 	qdf_atomic_set(&iface->bss_status, WMA_BSS_STATUS_STOPPED);
 	WMA_LOGD("%s: (type %d subtype %d) BSS is stopped",
@@ -3401,8 +3403,8 @@ QDF_STATUS wma_vdev_start(tp_wma_handle wma,
 		WMA_LOGD("%s, vdev_id: %d, unpausing tx_ll_queue at VDEV_START",
 			 __func__, params.vdev_id);
 		cdp_fc_vdev_unpause(cds_get_context(QDF_MODULE_ID_SOC),
-			wma->interfaces[params.vdev_id].handle,
-			0xffffffff);
+				    wma->interfaces[params.vdev_id].handle,
+				    0xffffffff, 0);
 		wma_vdev_update_pause_bitmap(params.vdev_id, 0);
 	}
 
@@ -4059,7 +4061,7 @@ void wma_vdev_resp_timer(void *data)
 		WMA_LOGD("%s, vdev_id: %d, un-pausing tx_ll_queue for WDA_DELETE_BSS_REQ timeout",
 			 __func__, tgt_req->vdev_id);
 		cdp_fc_vdev_unpause(soc, iface->handle,
-				     OL_TXQ_PAUSE_REASON_VDEV_STOP);
+				    OL_TXQ_PAUSE_REASON_VDEV_STOP, 0);
 		wma_vdev_clear_pause_bit(tgt_req->vdev_id, PAUSE_TYPE_HOST);
 		qdf_atomic_set(&iface->bss_status, WMA_BSS_STATUS_STOPPED);
 		WMA_LOGD("%s: (type %d subtype %d) BSS is stopped",
@@ -4754,7 +4756,8 @@ static void wma_add_bss_sta_mode(tp_wma_handle wma, tpAddBssParams add_bss)
 				goto peer_cleanup;
 			}
 			cdp_fc_vdev_pause(soc, vdev,
-				   OL_TXQ_PAUSE_REASON_PEER_UNAUTHORIZED);
+					  OL_TXQ_PAUSE_REASON_PEER_UNAUTHORIZED,
+					  0);
 #endif
 			/* ADD_BSS_RESP will be deferred to completion of
 			 * VDEV_START
@@ -4792,7 +4795,8 @@ static void wma_add_bss_sta_mode(tp_wma_handle wma, tpAddBssParams add_bss)
 				goto peer_cleanup;
 			}
 			cdp_fc_vdev_pause(soc, vdev,
-					OL_TXQ_PAUSE_REASON_PEER_UNAUTHORIZED);
+					  OL_TXQ_PAUSE_REASON_PEER_UNAUTHORIZED,
+					  0);
 #endif
 		}
 
@@ -6044,14 +6048,13 @@ void wma_delete_bss_ho_fail(tp_wma_handle wma, tpDeleteBssParams params)
 	WMA_LOGD("%s, vdev_id: %d, pausing tx_ll_queue for VDEV_STOP (del_bss)",
 		 __func__, params->smesessionId);
 	cdp_fc_vdev_pause(soc, iface->handle,
-			   OL_TXQ_PAUSE_REASON_VDEV_STOP);
+			  OL_TXQ_PAUSE_REASON_VDEV_STOP, 0);
 	wma_vdev_set_pause_bit(params->smesessionId, PAUSE_TYPE_HOST);
-
 	cdp_fc_vdev_flush(soc, iface->handle);
 	WMA_LOGD("%s, vdev_id: %d, un-pausing tx_ll_queue for VDEV_STOP rsp",
-			__func__, params->smesessionId);
+		 __func__, params->smesessionId);
 	cdp_fc_vdev_unpause(soc, iface->handle,
-			OL_TXQ_PAUSE_REASON_VDEV_STOP);
+			    OL_TXQ_PAUSE_REASON_VDEV_STOP, 0);
 	wma_vdev_clear_pause_bit(params->smesessionId, PAUSE_TYPE_HOST);
 	qdf_atomic_set(&iface->bss_status, WMA_BSS_STATUS_STOPPED);
 	WMA_LOGD("%s: (type %d subtype %d) BSS is stopped",
@@ -6242,8 +6245,9 @@ void wma_delete_bss(tp_wma_handle wma, tpDeleteBssParams params)
 		 __func__, params->smesessionId);
 	wma_vdev_set_pause_bit(params->smesessionId, PAUSE_TYPE_HOST);
 	cdp_fc_vdev_pause(soc,
-		wma->interfaces[params->smesessionId].handle,
-		OL_TXQ_PAUSE_REASON_VDEV_STOP);
+			  wma->interfaces[params->smesessionId].handle,
+			  OL_TXQ_PAUSE_REASON_VDEV_STOP,
+			  0);
 
 	if (wma_send_vdev_stop_to_fw(wma, params->smesessionId)) {
 		WMA_LOGE("%s: %d Failed to send vdev stop", __func__, __LINE__);

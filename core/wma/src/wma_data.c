@@ -1234,7 +1234,7 @@ void wma_set_linkstate(tp_wma_handle wma, tpLinkStateParams params)
 			 __func__, vdev_id);
 		cdp_fc_vdev_pause(soc,
 			wma->interfaces[vdev_id].handle,
-			OL_TXQ_PAUSE_REASON_VDEV_STOP);
+			OL_TXQ_PAUSE_REASON_VDEV_STOP, 0);
 		msg = wma_fill_vdev_req(wma, vdev_id,
 				WMA_SET_LINK_STATE,
 				WMA_TARGET_REQ_TYPE_VDEV_STOP, params,
@@ -1497,6 +1497,70 @@ QDF_STATUS wma_tx_detach(tp_wma_handle wma_handle)
 #if defined(QCA_LL_LEGACY_TX_FLOW_CONTROL) || \
 	defined(QCA_LL_TX_FLOW_CONTROL_V2) || defined(CONFIG_HL_SUPPORT)
 
+static void wma_process_vdev_tx_pause_evt(void *soc,
+					  tp_wma_handle wma,
+					  wmi_tx_pause_event_fixed_param *wmi_event,
+					  uint8_t vdev_id)
+{
+	struct cdp_vdev *vdev = wma->interfaces[vdev_id].handle;
+	/* PAUSE action, add bitmap */
+	if (ACTION_PAUSE == wmi_event->action) {
+#ifdef CONFIG_HL_SUPPORT
+		/* Exclude TDLS_OFFCHAN_CHOP from vdev based pauses */
+		if (wmi_event->pause_type == PAUSE_TYPE_CHOP_TDLS_OFFCHAN) {
+			cdp_fc_vdev_pause(soc,
+					  vdev,
+					  OL_TXQ_PAUSE_REASON_FW,
+					  wmi_event->pause_type);
+		} else {
+#endif
+			/*
+			 * Now only support per-dev pause so it is not
+			 * necessary to pause a paused queue again.
+			 */
+			if (!wma_vdev_get_pause_bitmap(vdev_id))
+				cdp_fc_vdev_pause(soc,
+						  vdev,
+						  OL_TXQ_PAUSE_REASON_FW,
+						  wmi_event->pause_type);
+
+			wma_vdev_set_pause_bit(vdev_id,
+					       wmi_event->pause_type);
+		}
+	}
+	/* UNPAUSE action, clean bitmap */
+	else if (ACTION_UNPAUSE == wmi_event->action) {
+#ifdef CONFIG_HL_SUPPORT
+		/* Exclude TDLS_OFFCHAN_CHOP from vdev based pauses */
+		if (wmi_event->pause_type == PAUSE_TYPE_CHOP_TDLS_OFFCHAN) {
+			cdp_fc_vdev_unpause(soc,
+					    vdev,
+					    OL_TXQ_PAUSE_REASON_FW,
+					    wmi_event->pause_type);
+		} else {
+#endif
+			/* Handle unpause only if already paused */
+			if (wma_vdev_get_pause_bitmap(vdev_id)) {
+				wma_vdev_clear_pause_bit(vdev_id,
+							 wmi_event->pause_type);
+
+				if (!wma->interfaces[vdev_id].
+						pause_bitmap) {
+					/* PAUSE BIT MAP is cleared
+					 * UNPAUSE VDEV
+					 */
+					cdp_fc_vdev_unpause(soc,
+							    vdev,
+							    OL_TXQ_PAUSE_REASON_FW,
+							    wmi_event->pause_type);
+				}
+			}
+		}
+	} else {
+		WMA_LOGE("Not Valid Action Type %d", wmi_event->action);
+	}
+}
+
 /**
  * wma_mcc_vdev_tx_pause_evt_handler() - pause event handler
  * @handle: wma handle
@@ -1553,42 +1617,9 @@ int wma_mcc_vdev_tx_pause_evt_handler(void *handle, uint8_t *event,
 				continue;
 			}
 
-			/* PAUSE action, add bitmap */
-			if (ACTION_PAUSE == wmi_event->action) {
-				/*
-				 * Now only support per-dev pause so it is not
-				 * necessary to pause a paused queue again.
-				 */
-				if (!wma_vdev_get_pause_bitmap(vdev_id))
-					cdp_fc_vdev_pause(soc,
-						wma->
-						interfaces[vdev_id].handle,
-						OL_TXQ_PAUSE_REASON_FW);
-				wma_vdev_set_pause_bit(vdev_id,
-					wmi_event->pause_type);
-			}
-			/* UNPAUSE action, clean bitmap */
-			else if (ACTION_UNPAUSE == wmi_event->action) {
-				/* Handle unpause only if already paused */
-				if (wma_vdev_get_pause_bitmap(vdev_id)) {
-					wma_vdev_clear_pause_bit(vdev_id,
-						wmi_event->pause_type);
-
-					if (!wma->interfaces[vdev_id].
-					    pause_bitmap) {
-						/* PAUSE BIT MAP is cleared
-						 * UNPAUSE VDEV
-						 */
-						cdp_fc_vdev_unpause(soc,
-							wma->interfaces[vdev_id]
-							.handle,
-							OL_TXQ_PAUSE_REASON_FW);
-					}
-				}
-			} else {
-				WMA_LOGE("Not Valid Action Type %d",
-					 wmi_event->action);
-			}
+			wma_process_vdev_tx_pause_evt(soc, wma,
+						      wmi_event,
+						      vdev_id);
 
 			WMA_LOGD
 				("vdev_id %d, pause_map 0x%x, pause type %d, action %d",
@@ -3132,7 +3163,7 @@ void wma_tx_abort(uint8_t vdev_id)
 	wma_vdev_set_pause_bit(vdev_id, PAUSE_TYPE_HOST);
 	cdp_fc_vdev_pause(cds_get_context(QDF_MODULE_ID_SOC),
 			iface->handle,
-			OL_TXQ_PAUSE_REASON_TX_ABORT);
+			OL_TXQ_PAUSE_REASON_TX_ABORT, 0);
 
 	/* Flush all TIDs except MGMT TID for this peer in Target */
 	peer_tid_bitmap &= ~(0x1 << WMI_MGMT_TID);

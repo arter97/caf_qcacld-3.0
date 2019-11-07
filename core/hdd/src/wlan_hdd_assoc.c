@@ -2048,7 +2048,8 @@ QDF_STATUS hdd_change_peer_state(struct hdd_adapter *adapter,
 
 			vdev = (void *)cdp_peer_get_vdev(soc, peer);
 			cdp_fc_vdev_unpause(soc, (struct cdp_vdev *)vdev,
-					OL_TXQ_PAUSE_REASON_PEER_UNAUTHORIZED);
+					    OL_TXQ_PAUSE_REASON_PEER_UNAUTHORIZED,
+					    0);
 #endif
 		}
 	}
