@@ -2628,8 +2628,12 @@ static void policy_mgr_nss_update_cb(struct wlan_objmgr_psoc *psoc,
 	policy_mgr_debug("nss update successful for vdev:%d ori %d reason %d",
 			 vdev_id, original_vdev_id, reason);
 	if (PM_NOP != next_action)
-		policy_mgr_next_actions(psoc, original_vdev_id, next_action,
-					reason);
+		if (reason == POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH)
+			policy_mgr_next_actions(psoc, vdev_id, next_action,
+						reason);
+		else
+			policy_mgr_next_actions(psoc, original_vdev_id,
+						next_action, reason);
 	else {
 		policy_mgr_debug("No action needed right now");
 		ret = policy_mgr_set_opportunistic_update(psoc);
