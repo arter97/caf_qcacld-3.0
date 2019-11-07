@@ -58,7 +58,6 @@
 #include "lim_utils.h"
 #include "lim_security_utils.h"
 #include "dot11f.h"
-#include "lim_sta_hash_api.h"
 #include "sch_api.h"
 #include "lim_send_messages.h"
 #include "utils_parser.h"
@@ -2186,7 +2185,8 @@ lim_tdls_populate_dot11f_vht_caps(struct mac_context *mac,
 		uVHTCapabilityInfo.vhtCapInfo.vhtLinkAdaptCap;
 	pDot11f->rxAntPattern = uVHTCapabilityInfo.vhtCapInfo.rxAntPattern;
 	pDot11f->txAntPattern = uVHTCapabilityInfo.vhtCapInfo.txAntPattern;
-	pDot11f->reserved1 = uVHTCapabilityInfo.vhtCapInfo.reserved1;
+	pDot11f->extended_nss_bw_supp =
+		uVHTCapabilityInfo.vhtCapInfo.extended_nss_bw_supp;
 
 	pDot11f->rxMCSMap = add_sta_req->vht_cap.supp_mcs.rx_mcs_map;
 
@@ -2194,6 +2194,8 @@ lim_tdls_populate_dot11f_vht_caps(struct mac_context *mac,
 	uVHTSupDataRateInfo.nCfgValue16 = nCfgValue & 0xffff;
 	pDot11f->rxHighSupDataRate =
 		uVHTSupDataRateInfo.vhtRxsupDataRateInfo.rxSupDataRate;
+	pDot11f->max_nsts_total =
+		uVHTSupDataRateInfo.vhtRxsupDataRateInfo.max_nsts_total;
 
 	pDot11f->txMCSMap = add_sta_req->vht_cap.supp_mcs.tx_mcs_map;
 
@@ -2202,7 +2204,8 @@ lim_tdls_populate_dot11f_vht_caps(struct mac_context *mac,
 	pDot11f->txSupDataRate =
 		uVHTSupDataRateInfo.vhtTxSupDataRateInfo.txSupDataRate;
 
-	pDot11f->reserved3 = uVHTSupDataRateInfo.vhtTxSupDataRateInfo.reserved;
+	pDot11f->vht_extended_nss_bw_cap =
+	uVHTSupDataRateInfo.vhtTxSupDataRateInfo.vht_extended_nss_bw_cap;
 
 	lim_log_vht_cap(mac, pDot11f);
 
@@ -2397,7 +2400,7 @@ lim_tdls_populate_matching_rate_set(struct mac_context *mac_ctx,
 		}
 	}
 	lim_populate_vht_mcs_set(mac_ctx, &stads->supportedRates, vht_caps,
-				 session_entry, nss);
+				 session_entry, nss, NULL);
 	/**
 	 * Set the erpEnabled bit if the phy is in G mode and at least
 	 * one A rate is supported
@@ -2428,6 +2431,7 @@ static void lim_tdls_update_hash_node_info(struct mac_context *mac,
 	} else if (add_sta_req->tdls_oper == TDLS_OPER_UPDATE) {
 		lim_tdls_populate_dot11f_ht_caps(mac, NULL,
 						 add_sta_req, &htCap);
+		sta->rmfEnabled = add_sta_req->is_pmf;
 	}
 	htCaps = &htCap;
 	if (htCaps->present) {
@@ -2645,9 +2649,8 @@ static QDF_STATUS lim_tdls_del_sta(struct mac_context *mac,
 		pe_debug("DEL STA peer MAC: "QDF_MAC_ADDR_STR,
 			 QDF_MAC_ADDR_ARRAY(sta->staAddr));
 
-		pe_debug("STA type: %x, sta idx: %x resp_reqd: %d",
+		pe_debug("STA type: %x, resp_reqd: %d",
 			 sta->staType,
-			 sta->staIndex,
 			 resp_reqd);
 
 		status = lim_del_sta(mac, sta, resp_reqd, pe_session);
@@ -2680,9 +2683,7 @@ static QDF_STATUS lim_send_sme_tdls_add_sta_rsp(struct mac_context *mac,
 
 	add_sta_rsp->session_id = sessionId;
 	add_sta_rsp->status_code = status;
-	if (sta) {
-		add_sta_rsp->sta_id = sta->staIndex;
-	}
+
 	if (peerMac) {
 		qdf_mem_copy(add_sta_rsp->peermac.bytes,
 			     (uint8_t *) peerMac, QDF_MAC_ADDR_SIZE);
@@ -2719,8 +2720,7 @@ QDF_STATUS lim_process_tdls_add_sta_rsp(struct mac_context *mac, void *msg,
 	uint16_t aid = 0;
 
 	SET_LIM_PROCESS_DEFD_MESGS(mac, true);
-	pe_debug("staIdx: %d, staMac: "QDF_MAC_ADDR_STR,
-	       pAddStaParams->staIdx,
+	pe_debug("staMac: "QDF_MAC_ADDR_STR,
 	       QDF_MAC_ADDR_ARRAY(pAddStaParams->staMac));
 
 	if (pAddStaParams->status != QDF_STATUS_SUCCESS) {
@@ -2738,8 +2738,6 @@ QDF_STATUS lim_process_tdls_add_sta_rsp(struct mac_context *mac, void *msg,
 		goto add_sta_error;
 	}
 
-	sta->bssId = pAddStaParams->bss_idx;
-	sta->staIndex = pAddStaParams->staIdx;
 	sta->mlmStaContext.mlmState = eLIM_MLM_LINK_ESTABLISHED_STATE;
 	sta->valid = 1;
 add_sta_error:
@@ -2945,10 +2943,6 @@ static QDF_STATUS lim_send_sme_tdls_del_sta_rsp(struct mac_context *mac,
 
 	del_sta_rsp->session_id = sessionId;
 	del_sta_rsp->status_code = status;
-	if (sta) {
-		del_sta_rsp->sta_id = sta->staIndex;
-	} else
-		del_sta_rsp->sta_id = STA_INVALID_IDX;
 
 	qdf_copy_macaddr(&del_sta_rsp->peermac, &peerMac);
 

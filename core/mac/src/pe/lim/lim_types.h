@@ -157,7 +157,7 @@ typedef struct sLimMlmStartReq {
 	tSirMacBeaconInterval beaconPeriod;
 	uint8_t dtimPeriod;
 	tSirMacCfParamSet cfParamSet;
-	tSirMacChanNum channelNumber;
+	uint32_t oper_ch_freq;
 	ePhyChanBondState cbMode;
 	tSirMacRateSet rateSet;
 	uint8_t sessionId;      /* Added For BT-AMP Support */
@@ -404,6 +404,37 @@ QDF_STATUS lim_process_auth_frame_no_session(struct mac_context *mac,
 					     uint8_t *bd, void *body);
 
 void lim_process_assoc_req_frame(struct mac_context *, uint8_t *, uint8_t, struct pe_session *);
+
+/**
+ * lim_fill_lim_assoc_ind_params() - Initialize lim association indication
+ * @assoc_ind: PE association indication structure
+ * @mac_ctx: Pointer to Global MAC structure
+ * @sta_ds: station dph entry
+ * @session_entry: PE session entry
+ *
+ * Return: true if lim assoc ind filled successfully
+ */
+bool lim_fill_lim_assoc_ind_params(
+		tpLimMlmAssocInd assoc_ind,
+		struct mac_context *mac_ctx,
+		tpDphHashNode sta_ds,
+		struct pe_session *session_entry);
+
+/**
+ * lim_fill_sme_assoc_ind_params() - Initialize association indication
+ * @mac_ctx: Pointer to Global MAC structure
+ * @assoc_ind: PE association indication structure
+ * @sme_assoc_ind: SME association indication
+ * @session_entry: PE session entry
+ * @assoc_req_alloc: malloc memory for assoc_req or not
+ *
+ * Return: None
+ */
+void
+lim_fill_sme_assoc_ind_params(
+	struct mac_context *mac_ctx,
+	tpLimMlmAssocInd assoc_ind, struct assoc_ind *sme_assoc_ind,
+	struct pe_session *session_entry, bool assoc_req_alloc);
 void lim_send_mlm_assoc_ind(struct mac_context *mac, tpDphHashNode sta,
 			    struct pe_session *pe_session);
 
@@ -565,8 +596,27 @@ void lim_send_delts_req_action_frame(struct mac_context *mac, tSirMacAddr peer,
 void lim_send_addts_req_action_frame(struct mac_context *mac, tSirMacAddr peerMacAddr,
 				     tSirAddtsReqInfo *addts, struct pe_session *);
 
-void lim_send_assoc_rsp_mgmt_frame(struct mac_context *, uint16_t, uint16_t, tSirMacAddr,
-				   uint8_t, tpDphHashNode pSta, struct pe_session *);
+/**
+ * lim_send_assoc_rsp_mgmt_frame() - Send assoc response
+ * @mac_ctx: Handle for mac context
+ * @status_code: Status code for assoc response frame
+ * @aid: Association ID
+ * @peer_addr: Mac address of requesting peer
+ * @subtype: Assoc/Reassoc
+ * @sta: Pointer to station node
+ * @pe_session: PE session id.
+ * @tx_complete: Need tx complete callback or not
+ *
+ * Builds and sends association response frame to the requesting peer.
+ *
+ * Return: void
+ */
+void
+lim_send_assoc_rsp_mgmt_frame(
+	struct mac_context *mac_ctx,
+	uint16_t status_code, uint16_t aid, tSirMacAddr peer_addr,
+	uint8_t subtype, tpDphHashNode sta, struct pe_session *pe_session,
+	bool tx_complete);
 
 void lim_send_disassoc_mgmt_frame(struct mac_context *, uint16_t, tSirMacAddr,
 				  struct pe_session *, bool waitForAck);
@@ -600,8 +650,23 @@ QDF_STATUS lim_p2p_oper_chan_change_confirm_action_frame(
 QDF_STATUS lim_send_neighbor_report_request_frame(struct mac_context *,
 						     tpSirMacNeighborReportReq,
 						     tSirMacAddr, struct pe_session *);
-QDF_STATUS lim_send_link_report_action_frame(struct mac_context *, tpSirMacLinkReport,
-						tSirMacAddr, struct pe_session *);
+
+/**
+ * lim_send_link_report_action_frame() - Send link measurement report action
+ * frame in response for a link measurement request received.
+ * @mac: Pointer to Mac context
+ * @link_report: Pointer to the sSirMacLinkReport struct
+ * @peer: BSSID of the peer
+ * @pe_session: Pointer to the pe_session
+ *
+ * Return: QDF_STATUS
+ *
+ */
+QDF_STATUS
+lim_send_link_report_action_frame(struct mac_context *mac,
+				  tpSirMacLinkReport link_report,
+				  tSirMacAddr peer,
+				  struct pe_session *pe_session);
 
 /**
  * lim_send_radio_measure_report_action_frame - Send RRM report action frame
@@ -713,14 +778,6 @@ void lim_tear_down_link_with_ap(struct mac_context *, uint8_t, tSirMacReasonCode
 /* / Function that defers the messages received */
 uint32_t lim_defer_msg(struct mac_context *, struct scheduler_msg *);
 
-/* / Function that Switches the Channel and sets the CB Mode */
-void lim_set_channel(struct mac_context *mac, uint8_t channel,
-		uint8_t ch_center_freq_seg0, uint8_t ch_center_freq_seg1,
-		enum phy_ch_width ch_width, int8_t maxTxPower,
-		uint8_t peSessionId, uint32_t cac_duration_ms,
-		uint32_t dfs_regdomain);
-
-
 #ifdef ANI_SUPPORT_11H
 /* / Function that sends Measurement Report action frame */
 QDF_STATUS lim_send_meas_report_frame(struct mac_context *, tpSirMacMeasReqActionFrame,
@@ -732,30 +789,17 @@ QDF_STATUS lim_send_tpc_report_frame(struct mac_context *, tpSirMacTpcReqActionF
 #endif
 
 /**
- * lim_process_mlm_add_bss_rsp() - Processes ADD BSS Response
- * @mac_ctx: Pointer to Global MAC structure
- * @msg: The MsgQ header, which contains the response buffer
- *
- * This function is called to process a WMA_ADD_BSS_RSP from HAL.
- * Upon receipt of this message from HAL.
- *
- * Return None
- */
-void lim_process_mlm_add_bss_rsp(struct mac_context *mac,
-				 struct scheduler_msg *limMsgQ);
-
-/**
- * lim_handle_mlm_add_bss_rsp() - Handle add bss response
+ * lim_handle_add_bss_rsp() - Handle add bss response
  * @mac_ctx: mac context
- * @add_bss_param: add bss parameters
+ * @add_bss_rsp: add bss rsp
  *
- * This function is called to handle all types of add bss rsp from HAL.
- * It will free memory of add_bss_param in the end after rsp is handled.
+ * This function is called to handle all types of add bss rsp
+ * It will free memory of add_bss_rsp in the end after rsp is handled.
  *
  * Return: None
  */
-void lim_handle_mlm_add_bss_rsp(struct mac_context *mac_ctx,
-				struct bss_params *add_bss_param);
+void lim_handle_add_bss_rsp(struct mac_context *mac_ctx,
+			    struct add_bss_rsp *add_bss_rsp);
 
 void lim_process_mlm_add_sta_rsp(struct mac_context *mac,
 				struct scheduler_msg *limMsgQt,
@@ -1274,4 +1318,21 @@ bool lim_send_assoc_ind_to_sme(struct mac_context *mac_ctx,
 			       bool pmf_connection,
 			       bool *assoc_req_copied,
 			       bool dup_entry, bool force_1x1);
+
+/**
+ * lim_process_sta_add_bss_rsp_pre_assoc - Processes handoff request
+ * @mac_ctx:  Pointer to mac context
+ * @pAddBssParams: Bss params including rsp data
+ * @session_entry: PE session handle
+ * @status: Qdf status
+ *
+ * This function is called to process a WMA_ADD_BSS_RSP from HAL.
+ * Upon receipt of this message from HAL if the state is pre assoc.
+ *
+ * Return: Null
+ */
+void lim_process_sta_add_bss_rsp_pre_assoc(struct mac_context *mac_ctx,
+					   struct bss_params *add_bss_params,
+					   struct pe_session *session_entry,
+					   QDF_STATUS status);
 #endif /* __LIM_TYPES_H */

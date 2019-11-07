@@ -118,52 +118,6 @@
 #define ACS_WEIGHT_SOFTAP_TX_POWER_THROUGHPUT_CFG(weights) \
 	(((weights) & 0xf00000) >> 20)
 
-#ifdef FEATURE_WLAN_CH_AVOID
-sapSafeChannelType safe_channels[NUM_CHANNELS] = {
-	{1, true},
-	{2, true},
-	{3, true},
-	{4, true},
-	{5, true},
-	{6, true},
-	{7, true},
-	{8, true},
-	{9, true},
-	{10, true},
-	{11, true},
-	{12, true},
-	{13, true},
-	{14, true},
-	{36, true},
-	{40, true},
-	{44, true},
-	{48, true},
-	{52, true},
-	{56, true},
-	{60, true},
-	{64, true},
-	{100, true},
-	{104, true},
-	{108, true},
-	{112, true},
-	{116, true},
-	{120, true},
-	{124, true},
-	{128, true},
-	{132, true},
-	{136, true},
-	{140, true},
-	{144, true},
-	{149, true},
-	{153, true},
-	{157, true},
-	{161, true},
-	{165, true},
-	{169, true},
-	{173, true},
-};
-#endif
-
 typedef struct {
 	uint16_t chStartNum;
 	uint32_t weight;
@@ -399,93 +353,6 @@ static void sap_process_avoid_ie(mac_handle_t mac_handle,
 }
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
 
-#ifdef FEATURE_WLAN_CH_AVOID
-/*==========================================================================
-   FUNCTION    sap_update_unsafe_channel_list
-
-   DESCRIPTION
-    Function  Undate unsafe channel list table
-
-   DEPENDENCIES
-    NA.
-
-   IN
-    SapContext pointer
-
-   RETURN VALUE
-    NULL
-   ============================================================================*/
-static void sap_update_unsafe_channel_list(mac_handle_t mac_handle,
-					   struct sap_context *sap_ctx)
-{
-	uint16_t i, j;
-	uint16_t unsafe_channel_list[NUM_CHANNELS];
-	uint16_t unsafe_channel_count = 0;
-	struct mac_context *mac_ctx = NULL;
-
-	qdf_device_t qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
-
-	if (!qdf_ctx) {
-		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_FATAL,
-			  "qdf_ctx is NULL");
-		return;
-	}
-	mac_ctx = MAC_CONTEXT(mac_handle);
-
-	/* Flush, default set all channel safe */
-	for (i = 0; i < NUM_CHANNELS; i++) {
-		safe_channels[i].isSafe = true;
-	}
-
-	/* Try to find unsafe channel */
-#if defined(FEATURE_WLAN_STA_AP_MODE_DFS_DISABLE)
-	for (i = 0; i < NUM_CHANNELS; i++) {
-		if (sap_ctx->dfs_ch_disable == true) {
-			if (wlan_reg_is_dfs_ch(mac_ctx->pdev,
-					safe_channels[i].channelNumber)) {
-				safe_channels[i].isSafe = false;
-				QDF_TRACE(QDF_MODULE_ID_SAP,
-					QDF_TRACE_LEVEL_INFO_HIGH,
-					"%s: DFS Ch %d is not safe in"
-					" Concurrent mode",
-					__func__,
-					safe_channels[i].channelNumber);
-			}
-		}
-	}
-#endif
-	pld_get_wlan_unsafe_channel(qdf_ctx->dev,
-				    unsafe_channel_list,
-				     &unsafe_channel_count,
-				     sizeof(unsafe_channel_list));
-
-	unsafe_channel_count = QDF_MIN(unsafe_channel_count,
-				       (uint16_t)NUM_CHANNELS);
-
-	for (i = 0; i < unsafe_channel_count; i++) {
-		for (j = 0; j < NUM_CHANNELS; j++) {
-			if (safe_channels[j].channelNumber ==
-			    unsafe_channel_list[i]) {
-				/* Found unsafe channel, update it */
-				safe_channels[j].isSafe = false;
-				QDF_TRACE(QDF_MODULE_ID_SAP,
-					  QDF_TRACE_LEVEL_ERROR,
-					  FL("CH %d is not safe"),
-					  unsafe_channel_list[i]);
-				break;
-			}
-		}
-	}
-
-	return;
-}
-#else
-static void sap_update_unsafe_channel_list(mac_handle_t mac_handle,
-					   struct sap_context *sap_ctx)
-{
-}
-#endif /* FEATURE_WLAN_CH_AVOID */
-
 /**
  * sap_channel_in_acs_channel_list() - check if channel in acs channel list
  * @channel_num: channel to check
@@ -549,7 +416,7 @@ uint8_t sap_select_preferred_channel_from_channel_list(uint8_t best_chnl,
 	 * If Channel List is not Configured don't do anything
 	 * Else return the Best Channel from the Channel List
 	 */
-	if ((!sap_ctx->acs_cfg->ch_list) ||
+	if ((!sap_ctx->acs_cfg->freq_list) ||
 		(!spectinfo_param) ||
 		(0 == sap_ctx->acs_cfg->ch_list_count))
 		return best_chnl;
@@ -559,9 +426,11 @@ uint8_t sap_select_preferred_channel_from_channel_list(uint8_t best_chnl,
 
 	/* Select the best channel from allowed list */
 	for (i = 0; i < sap_ctx->acs_cfg->ch_list_count; i++) {
-		if ((sap_ctx->acs_cfg->ch_list[i] == best_chnl) &&
-			!(wlan_reg_is_dfs_ch(mac_ctx->pdev, best_chnl) &&
-			policy_mgr_disallow_mcc(mac_ctx->psoc, best_chnl))) {
+		if ((sap_ctx->acs_cfg->freq_list[i] ==
+		     wlan_reg_chan_to_freq(mac_ctx->pdev, best_chnl)) &&
+		    !(wlan_reg_is_dfs_ch(mac_ctx->pdev, best_chnl) &&
+		    policy_mgr_disallow_mcc(
+		    mac_ctx->psoc, wlan_chan_to_freq(best_chnl)))) {
 			QDF_TRACE(QDF_MODULE_ID_SAP,
 				QDF_TRACE_LEVEL_INFO,
 				"Best channel so far is: %d",
@@ -593,9 +462,6 @@ static bool sap_chan_sel_init(mac_handle_t mac_handle,
 	uint16_t channelnum = 0;
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
 	bool chSafe = true;
-#ifdef FEATURE_WLAN_CH_AVOID
-	uint16_t i;
-#endif
 	bool include_dfs_ch = true;
 	uint8_t chan_num;
 	bool sta_sap_scc_on_dfs_chan =
@@ -666,19 +532,9 @@ static bool sap_chan_sel_init(mac_handle_t mac_handle,
 			}
 		}
 
-#ifdef FEATURE_WLAN_CH_AVOID
-		for (i = 0; i < NUM_CHANNELS; i++) {
-			if ((safe_channels[i].channelNumber == channel) &&
-			    (false == safe_channels[i].isSafe)) {
-				QDF_TRACE(QDF_MODULE_ID_SAP,
-					  QDF_TRACE_LEVEL_INFO_HIGH,
-					  "In %s, Ch %d is not safe", __func__,
-					  channel);
-				chSafe = false;
-				break;
-			}
-		}
-#endif /* FEATURE_WLAN_CH_AVOID */
+		if (!policy_mgr_is_safe_channel(mac->psoc,
+						wlan_chan_to_freq(channel)))
+			chSafe = false;
 
 		/* OFDM rates are not supported on channel 14 */
 		if (channel == 14 &&
@@ -1170,9 +1026,9 @@ static void sap_upd_chan_spec_params(tSirProbeRespBeacon *pBeaconStruct,
 		*vhtSupport = pBeaconStruct->VHTOperation.present;
 		if (pBeaconStruct->VHTOperation.chanWidth) {
 			*centerFreq =
-				pBeaconStruct->VHTOperation.chanCenterFreqSeg1;
+			pBeaconStruct->VHTOperation.chan_center_freq_seg0;
 			*centerFreq_2 =
-				pBeaconStruct->VHTOperation.chanCenterFreqSeg2;
+			pBeaconStruct->VHTOperation.chan_center_freq_seg1;
 			 /*
 			  * LHS follows tSirMacHTChannelWidth, while RHS follows
 			  * WNI_CFG_VHT_CHANNEL_WIDTH_X format hence following
@@ -1499,12 +1355,12 @@ static void sap_interference_rssi_count(tSapSpectChInfo *spect_ch,
  *   true:    channel is in PCL,
  *   false:   channel is not in PCL
  */
-static bool ch_in_pcl(struct sap_context *sap_ctx, uint8_t channel)
+static bool ch_in_pcl(struct sap_context *sap_ctx, uint32_t ch_freq)
 {
 	uint32_t i;
 
 	for (i = 0; i < sap_ctx->acs_cfg->pcl_ch_count; i++) {
-		if (channel == sap_ctx->acs_cfg->pcl_channels[i])
+		if (ch_freq == sap_ctx->acs_cfg->pcl_chan_freq[i])
 			return true;
 	}
 
@@ -1546,6 +1402,14 @@ static void sap_compute_spect_weight(tSapChSelSpectInfo *pSpectInfoParams,
 		pSpectInfoParams->numSpectChans;
 	qdf_list_node_t *cur_lst = NULL, *next_lst = NULL;
 	struct scan_cache_node *cur_node = NULL;
+	uint32_t normalized_weight;
+	uint8_t normalize_factor;
+	uint32_t chan_freq;
+	struct acs_weight *weight_list =
+				mac->mlme_cfg->acs.normalize_weight_chan;
+	struct acs_weight_range *range_list =
+				mac->mlme_cfg->acs.normalize_weight_range;
+	bool freq_present_in_list = false;
 
 	bcn_struct = qdf_mem_malloc(sizeof(tSirProbeRespBeacon));
 	if (!bcn_struct)
@@ -1592,8 +1456,10 @@ static void sap_compute_spect_weight(tSapChSelSpectInfo *pSpectInfoParams,
 		for (chn_num = 0; chn_num < pSpectInfoParams->numSpectChans;
 		     chn_num++) {
 
-			channel_id =
-				util_scan_entry_channel_num(cur_node->entry);
+			channel_id = wlan_reg_freq_to_chan(
+					mac->pdev,
+					util_scan_entry_channel_frequency(
+							cur_node->entry));
 
 			if (pSpectCh && (channel_id == pSpectCh->chNum)) {
 				if (pSpectCh->rssiAgr <
@@ -1681,7 +1547,8 @@ static void sap_compute_spect_weight(tSapChSelSpectInfo *pSpectInfoParams,
 		 */
 
 		rssi = (int8_t) pSpectCh->rssiAgr;
-		if (ch_in_pcl(sap_ctx, pSpectCh->chNum))
+		if (ch_in_pcl(sap_ctx, wlan_reg_chan_to_freq(mac->pdev,
+							     pSpectCh->chNum)))
 			rssi -= PCL_RSSI_DISCOUNT;
 
 		if (rssi < SOFTAP_MIN_RSSI)
@@ -1723,6 +1590,44 @@ static void sap_compute_spect_weight(tSapChSelSpectInfo *pSpectInfoParams,
 			pSpectCh->rssiAgr = SOFTAP_MIN_RSSI;
 			rssi = SOFTAP_MIN_RSSI;
 			pSpectCh->bssCount = SOFTAP_MIN_COUNT;
+		}
+
+		chan_freq = wlan_reg_chan_to_freq(mac->pdev, pSpectCh->chNum);
+
+		/* Check if the freq is present in range list */
+		for (i = 0; i < mac->mlme_cfg->acs.num_weight_range; i++) {
+			if (chan_freq >= range_list[i].start_freq &&
+			    chan_freq <= range_list[i].end_freq) {
+				normalize_factor =
+					range_list[i].normalize_weight;
+				sap_debug("Range list, freq %d normalize weight factor %d",
+					  chan_freq, normalize_factor);
+				freq_present_in_list = true;
+			}
+		}
+
+		/* Check if user wants a special factor for this freq */
+
+		for (i = 0; i < mac->mlme_cfg->acs.normalize_weight_num_chan;
+		     i++) {
+			if (chan_freq == weight_list[i].chan_freq) {
+				normalize_factor =
+					weight_list[i].normalize_weight;
+				sap_debug("freq %d normalize weight factor %d",
+					  chan_freq, normalize_factor);
+				freq_present_in_list = true;
+			}
+		}
+
+		if (freq_present_in_list) {
+			normalized_weight =
+				((SAP_ACS_WEIGHT_MAX - pSpectCh->weight) *
+				(100 - normalize_factor)) / 100;
+			sap_debug("freq %d old weight %d new weight %d",
+				  chan_freq, pSpectCh->weight,
+				  pSpectCh->weight + normalized_weight);
+			pSpectCh->weight += normalized_weight;
+			freq_present_in_list = false;
 		}
 
 		if (pSpectCh->weight > SAP_ACS_WEIGHT_MAX)
@@ -1975,8 +1880,8 @@ static void sap_sort_chl_weight_ht80(tSapChSelSpectInfo *pSpectInfoParams)
 	 */
 	pSpectInfo = pSpectInfoParams->pSpectCh;
 	for (j = 0; j < pSpectInfoParams->numSpectChans; j++) {
-		if ((pSpectInfo[j].chNum >= WLAN_REG_CH_NUM(CHAN_ENUM_1) &&
-		     pSpectInfo[j].chNum <= WLAN_REG_CH_NUM(CHAN_ENUM_14)) ||
+		if ((pSpectInfo[j].chNum >= WLAN_REG_CH_NUM(CHAN_ENUM_2412) &&
+		     pSpectInfo[j].chNum <= WLAN_REG_CH_NUM(CHAN_ENUM_2484)) ||
 		    (pSpectInfo[j].chNum >= CHANNEL_165))
 			pSpectInfo[j].weight = SAP_ACS_WEIGHT_MAX * 4;
 	}
@@ -2120,10 +2025,10 @@ static void sap_sort_chl_weight_vht160(tSapChSelSpectInfo *pSpectInfoParams)
 	 */
 	pSpectInfo = pSpectInfoParams->pSpectCh;
 	for (j = 0; j < pSpectInfoParams->numSpectChans; j++) {
-		if ((pSpectInfo[j].chNum >= WLAN_REG_CH_NUM(CHAN_ENUM_1) &&
-		     pSpectInfo[j].chNum <= WLAN_REG_CH_NUM(CHAN_ENUM_14)) ||
-		    (pSpectInfo[j].chNum >= WLAN_REG_CH_NUM(CHAN_ENUM_132) &&
-		     pSpectInfo[j].chNum <= WLAN_REG_CH_NUM(CHAN_ENUM_173)))
+		if ((pSpectInfo[j].chNum >= WLAN_REG_CH_NUM(CHAN_ENUM_2412) &&
+		     pSpectInfo[j].chNum <= WLAN_REG_CH_NUM(CHAN_ENUM_2484)) ||
+		    (pSpectInfo[j].chNum >= WLAN_REG_CH_NUM(CHAN_ENUM_5660) &&
+		     pSpectInfo[j].chNum <= WLAN_REG_CH_NUM(CHAN_ENUM_5865)))
 			pSpectInfo[j].weight = SAP_ACS_WEIGHT_MAX * 8;
 	}
 
@@ -2158,8 +2063,8 @@ static void sap_allocate_max_weight_ht40_24_g(
 	 */
 	spect_info = spect_info_params->pSpectCh;
 	for (j = 0; j < spect_info_params->numSpectChans; j++) {
-		if ((spect_info[j].chNum >= WLAN_REG_CH_NUM(CHAN_ENUM_1) &&
-		     spect_info[j].chNum <= WLAN_REG_CH_NUM(CHAN_ENUM_14)))
+		if ((spect_info[j].chNum >= WLAN_REG_CH_NUM(CHAN_ENUM_2412) &&
+		     spect_info[j].chNum <= WLAN_REG_CH_NUM(CHAN_ENUM_2484)))
 			spect_info[j].weight = SAP_ACS_WEIGHT_MAX * 2;
 	}
 }
@@ -2183,8 +2088,8 @@ static void sap_allocate_max_weight_ht40_5_g(
 	 */
 	spect_info = spect_info_params->pSpectCh;
 	for (j = 0; j < spect_info_params->numSpectChans; j++) {
-		if ((spect_info[j].chNum >= WLAN_REG_CH_NUM(CHAN_ENUM_36) &&
-		     spect_info[j].chNum <= WLAN_REG_CH_NUM(CHAN_ENUM_173)))
+		if ((spect_info[j].chNum >= WLAN_REG_CH_NUM(CHAN_ENUM_5180) &&
+		     spect_info[j].chNum <= WLAN_REG_CH_NUM(CHAN_ENUM_5865)))
 			spect_info[j].weight = SAP_ACS_WEIGHT_MAX * 2;
 	}
 }
@@ -2539,7 +2444,7 @@ static bool sap_is_ch_non_overlap(struct sap_context *sap_ctx, uint16_t ch)
 	return false;
 }
 
-uint8_t sap_select_channel(mac_handle_t mac_handle,
+uint32_t sap_select_channel(mac_handle_t mac_handle,
 			   struct sap_context *sap_ctx,
 			   qdf_list_t *scan_list)
 {
@@ -2561,8 +2466,6 @@ uint8_t sap_select_channel(mac_handle_t mac_handle,
 	QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_HIGH,
 		  "In %s, Running SAP Ch Select", __func__);
 
-	sap_update_unsafe_channel_list(mac_handle, sap_ctx);
-
 	/*
 	 * If ACS weight is not enabled on noise_floor/channel_free/tx_power,
 	 * then skip acs process if no bss found.
@@ -2572,11 +2475,7 @@ uint8_t sap_select_channel(mac_handle_t mac_handle,
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_HIGH,
 			  FL("No external AP present"));
 
-#ifndef SOFTAP_CHANNEL_RANGE
-		return SAP_CHANNEL_NOT_SELECTED;
-#else
 		return sap_select_default_oper_chan(sap_ctx->acs_cfg);
-#endif
 	}
 
 	/* Initialize the structure pointed by spect_info */
@@ -2656,9 +2555,10 @@ uint8_t sap_select_channel(mac_handle_t mac_handle,
 		}
 
 		if (wlan_reg_is_dfs_ch(mac_ctx->pdev,
-				spect_info->pSpectCh[count].chNum) &&
-			policy_mgr_disallow_mcc(mac_ctx->psoc,
-				spect_info->pSpectCh[count].chNum)) {
+		    spect_info->pSpectCh[count].chNum) &&
+		    policy_mgr_disallow_mcc(
+		    mac_ctx->psoc, wlan_chan_to_freq(
+		    spect_info->pSpectCh[count].chNum))) {
 			QDF_TRACE(QDF_MODULE_ID_SAP,
 				QDF_TRACE_LEVEL_INFO_HIGH,
 				"No DFS MCC");
@@ -2749,7 +2649,8 @@ uint8_t sap_select_channel(mac_handle_t mac_handle,
 	} else if (best_ch_num == 14) {
 		sap_ctx->acs_cfg->ht_sec_ch = 0;
 	}
-	sap_ctx->secondary_ch = sap_ctx->acs_cfg->ht_sec_ch;
+	sap_ctx->sec_ch_freq = wlan_reg_chan_to_freq(
+				mac_ctx->pdev, sap_ctx->acs_cfg->ht_sec_ch);
 
 sap_ch_sel_end:
 	/* Free all the allocated memory */
@@ -2759,8 +2660,5 @@ sap_ch_sel_end:
 		  FL("Running SAP Ch select Completed, Ch=%d"), best_ch_num);
 	host_log_acs_best_chan(best_ch_num, best_ch_weight);
 
-	if (best_ch_num > 0 && best_ch_num <= 252)
-		return best_ch_num;
-	else
-		return SAP_CHANNEL_NOT_SELECTED;
+	return wlan_reg_chan_to_freq(mac_ctx->pdev, best_ch_num);
 }

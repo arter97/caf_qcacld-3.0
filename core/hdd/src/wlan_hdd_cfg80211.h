@@ -132,7 +132,6 @@ struct hdd_context;
 
 #define HDD_SET_BIT(__param, __val)    ((__param) |= (1 << (__val)))
 
-#define MAX_CHANNEL (NUM_24GHZ_CHANNELS + NUM_5GHZ_CHANNELS)
 #define MAX_SCAN_SSID 10
 
 #define IS_CHANNEL_VALID(channel) ((channel >= 0 && channel < 15) \
@@ -317,9 +316,9 @@ void hdd_reg_notifier(struct wiphy *wiphy,
 				 struct regulatory_request *request);
 
 QDF_STATUS wlan_hdd_validate_operation_channel(struct hdd_adapter *adapter,
-					       int channel);
+					       uint32_t ch_freq);
 
-void hdd_select_cbmode(struct hdd_adapter *adapter, uint8_t op_chan,
+void hdd_select_cbmode(struct hdd_adapter *adapter, uint32_t oper_freq,
 		       struct ch_params *ch_params);
 
 /**

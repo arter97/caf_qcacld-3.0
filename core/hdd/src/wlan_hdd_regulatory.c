@@ -659,7 +659,7 @@ void hdd_update_indoor_channel(struct hdd_context *hdd_ctx,
 {
 	int band_num;
 	int chan_num;
-	enum channel_enum chan_enum = CHAN_ENUM_1;
+	enum channel_enum chan_enum = CHAN_ENUM_2412;
 	struct ieee80211_channel *wiphy_chan, *wiphy_chan_144 = NULL;
 	struct regulatory_channel *cds_chan;
 	uint8_t band_capability;
@@ -682,7 +682,7 @@ void hdd_update_indoor_channel(struct hdd_context *hdd_ctx,
 			wiphy_chan =
 				&(wiphy->bands[band_num]->channels[chan_num]);
 			cds_chan = &(reg_channels[chan_enum]);
-			if (chan_enum == CHAN_ENUM_144)
+			if (chan_enum == CHAN_ENUM_5720)
 				wiphy_chan_144 = wiphy_chan;
 
 			chan_enum++;
@@ -1153,6 +1153,7 @@ void hdd_ch_avoid_ind(struct hdd_context *hdd_ctxt,
 {
 	uint16_t *local_unsafe_list;
 	uint16_t local_unsafe_list_count;
+	uint8_t i;
 
 	/* Basic sanity */
 	if (!hdd_ctxt) {
@@ -1177,10 +1178,12 @@ void hdd_ch_avoid_ind(struct hdd_context *hdd_ctxt,
 	qdf_mem_zero(hdd_ctxt->unsafe_channel_list,
 					sizeof(hdd_ctxt->unsafe_channel_list));
 
-	hdd_ctxt->unsafe_channel_count = unsafe_chan_list->ch_cnt;
+	hdd_ctxt->unsafe_channel_count = unsafe_chan_list->chan_cnt;
 
-	qdf_mem_copy(hdd_ctxt->unsafe_channel_list, unsafe_chan_list->ch_list,
-					sizeof(hdd_ctxt->unsafe_channel_list));
+	for (i = 0; i < unsafe_chan_list->chan_cnt; i++) {
+		hdd_ctxt->unsafe_channel_list[i] =
+			wlan_reg_freq_to_chan(hdd_ctxt->pdev, unsafe_chan_list->chan_freq_list[i]);
+	}
 	hdd_debug("number of unsafe channels is %d ",
 	       hdd_ctxt->unsafe_channel_count);
 
@@ -1265,6 +1268,26 @@ static enum nl80211_dfs_regions dfs_reg_to_nl80211_dfs_regions(
 	}
 }
 
+/**
+ * hdd_set_dfs_pri_multiplier() - Set dfs_pri_multiplier for ETSI region
+ * @dfs_region: DFS region
+ *
+ * Return: none
+ */
+#ifdef DFS_PRI_MULTIPLIER
+static void hdd_set_dfs_pri_multiplier(struct hdd_context *hdd_ctx,
+				       enum dfs_reg dfs_region)
+{
+	if (dfs_region == DFS_ETSI_REGION)
+		wlan_sap_set_dfs_pri_multiplier(hdd_ctx->mac_handle);
+}
+#else
+static inline void hdd_set_dfs_pri_multiplier(struct hdd_context *hdd_ctx,
+					      enum dfs_reg dfs_region)
+{
+}
+#endif
+
 void hdd_send_wiphy_regd_sync_event(struct hdd_context *hdd_ctx)
 {
 	struct ieee80211_regdomain *regd;
@@ -1302,6 +1325,9 @@ void hdd_send_wiphy_regd_sync_event(struct hdd_context *hdd_ctx)
 	qdf_mem_copy(regd->alpha2, reg_rules->alpha2, REG_ALPHA2_LEN + 1);
 	regd->dfs_region =
 		dfs_reg_to_nl80211_dfs_regions(reg_rules->dfs_region);
+
+	hdd_set_dfs_pri_multiplier(hdd_ctx, reg_rules->dfs_region);
+
 	regd_rules = regd->reg_rules;
 	hdd_debug("Regulatory Domain %s", regd->alpha2);
 	hdd_debug("start freq\tend freq\t@ max_bw\tant_gain\tpwr\tflags");
@@ -1334,6 +1360,60 @@ void hdd_send_wiphy_regd_sync_event(struct hdd_context *hdd_ctx)
 }
 #endif
 
+#if defined(CONFIG_BAND_6GHZ) && (defined(CFG80211_6GHZ_BAND_SUPPORTED) || \
+	(KERNEL_VERSION(5, 4, 0) <= LINUX_VERSION_CODE))
+static void
+fill_wiphy_6ghz_band_channels(struct wiphy *wiphy,
+			      struct regulatory_channel *chan_list)
+{
+	fill_wiphy_band_channels(wiphy, chan_list, NL80211_BAND_6GHZ);
+}
+#else
+static void
+fill_wiphy_6ghz_band_channels(struct wiphy *wiphy,
+			      struct regulatory_channel *chan_list)
+{
+}
+#endif
+
+#define HDD_MAX_CHAN_INFO_LOG 192
+
+/**
+ * hdd_regulatory_chanlist_dump() - Dump regulatory channel list info
+ * @chan_list: regulatory channel list
+ *
+ * Return: void
+ */
+static void hdd_regulatory_chanlist_dump(struct regulatory_channel *chan_list)
+{
+	uint32_t i;
+	uint8_t info[HDD_MAX_CHAN_INFO_LOG];
+	int len = 0;
+	struct regulatory_channel *chan;
+	uint32_t count = 0;
+	int ret;
+
+	hdd_debug("start (freq MHz, tx power dBm):");
+	for (i = 0; i < NUM_CHANNELS; i++) {
+		chan = &chan_list[i];
+		if ((chan->chan_flags & REGULATORY_CHAN_DISABLED))
+			continue;
+		count++;
+		ret = scnprintf(info + len, sizeof(info) - len, "%d %d ",
+				chan->center_freq, chan->tx_power);
+		if (ret <= 0)
+			break;
+		len += ret;
+		if (len >= (sizeof(info) - 20)) {
+			hdd_debug("%s", info);
+			len = 0;
+		}
+	}
+	if (len > 0)
+		hdd_debug("%s", info);
+	hdd_debug("end total_count %d", count);
+}
+
 static void hdd_regulatory_dyn_cbk(struct wlan_objmgr_psoc *psoc,
 				   struct wlan_objmgr_pdev *pdev,
 				   struct regulatory_channel *chan_list,
@@ -1351,10 +1431,11 @@ static void hdd_regulatory_dyn_cbk(struct wlan_objmgr_psoc *psoc,
 	hdd_ctx = wiphy_priv(wiphy);
 
 	hdd_debug("process channel list update from regulatory");
+	hdd_regulatory_chanlist_dump(chan_list);
 
 	fill_wiphy_band_channels(wiphy, chan_list, NL80211_BAND_2GHZ);
 	fill_wiphy_band_channels(wiphy, chan_list, NL80211_BAND_5GHZ);
-
+	fill_wiphy_6ghz_band_channels(wiphy, chan_list);
 	cc_src = ucfg_reg_get_cc_and_src(hdd_ctx->psoc, alpha2);
 	qdf_mem_copy(hdd_ctx->reg.alpha2, alpha2, REG_ALPHA2_LEN + 1);
 	sme_set_cc_src(hdd_ctx->mac_handle, cc_src);
@@ -1381,9 +1462,14 @@ int hdd_regulatory_init(struct hdd_context *hdd_ctx, struct wiphy *wiphy)
 {
 	bool offload_enabled;
 	struct reg_config_vars config_vars;
-	struct regulatory_channel cur_chan_list[NUM_CHANNELS];
+	struct regulatory_channel *cur_chan_list;
 	enum country_src cc_src;
 	uint8_t alpha2[REG_ALPHA2_LEN + 1];
+
+	cur_chan_list = qdf_mem_malloc(sizeof(*cur_chan_list) * NUM_CHANNELS);
+	if (!cur_chan_list) {
+		return -ENOMEM;
+	}
 
 	reg_program_config_vars(hdd_ctx, &config_vars);
 	ucfg_reg_register_chan_change_callback(hdd_ctx->psoc,
@@ -1412,7 +1498,7 @@ int hdd_regulatory_init(struct hdd_context *hdd_ctx, struct wiphy *wiphy)
 					 NL80211_BAND_2GHZ);
 		fill_wiphy_band_channels(wiphy, cur_chan_list,
 					 NL80211_BAND_5GHZ);
-
+		fill_wiphy_6ghz_band_channels(wiphy, cur_chan_list);
 		cc_src = ucfg_reg_get_cc_and_src(hdd_ctx->psoc, alpha2);
 		qdf_mem_copy(hdd_ctx->reg.alpha2, alpha2, REG_ALPHA2_LEN + 1);
 		sme_set_cc_src(hdd_ctx->mac_handle, cc_src);
@@ -1420,6 +1506,7 @@ int hdd_regulatory_init(struct hdd_context *hdd_ctx, struct wiphy *wiphy)
 		hdd_ctx->reg_offload = false;
 	}
 
+	qdf_mem_free(cur_chan_list);
 	return 0;
 }
 
@@ -1447,3 +1534,20 @@ int hdd_regulatory_init(struct hdd_context *hdd_ctx, struct wiphy *wiphy)
 	return 0;
 }
 #endif
+
+void hdd_update_regdb_offload_config(struct hdd_context *hdd_ctx)
+{
+	QDF_STATUS status;
+	bool ignore_fw_reg_offload_ind = false;
+
+	status = ucfg_mlme_get_ignore_fw_reg_offload_ind(
+						hdd_ctx->psoc,
+						&ignore_fw_reg_offload_ind);
+	if (!ignore_fw_reg_offload_ind) {
+		hdd_debug("regdb offload is based on firmware capability");
+		return;
+	}
+
+	hdd_debug("Ignore regdb offload Indication from FW");
+	ucfg_set_ignore_fw_reg_offload_ind(hdd_ctx->psoc);
+}

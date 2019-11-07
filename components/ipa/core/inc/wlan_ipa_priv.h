@@ -74,6 +74,8 @@
 
 #define IPA_WLAN_RX_SOFTIRQ_THRESH 32
 
+#define WLAN_IPA_UC_BW_MONITOR_LEVEL        3
+
 /**
  * enum - IPA UC operation message
  *
@@ -143,6 +145,18 @@ enum wlan_ipa_forward_type {
 };
 
 /**
+ * enum wlan_ipa_bw_level -ipa bandwidth level
+ * @WLAN_IPA_BW_LEVEL_LOW: vote for low bandwidth
+ * @WLAN_IPA_BW_LEVEL_MEDIUM: vote for medium bandwidth
+ * @WLAN_IPA_BW_LEVEL_HIGH: vote for high bandwidth
+ */
+enum wlan_ipa_bw_level {
+	WLAN_IPA_BW_LEVEL_LOW,
+	WLAN_IPA_BW_LEVEL_MEDIUM,
+	WLAN_IPA_BW_LEVEL_HIGH,
+};
+
+/**
  * struct llc_snap_hdr - LLC snap header
  * @dsap: Destination service access point
  * @ssap: Source service access point
@@ -172,7 +186,8 @@ struct wlan_ipa_tx_hdr {
  * @reserved1: Reserved not used
  * @reserved2: Reserved not used
  */
-#if defined(QCA_WIFI_QCA6290) || defined(QCA_WIFI_QCA6390)
+#if defined(QCA_WIFI_QCA6290) || defined(QCA_WIFI_QCA6390) || \
+	defined(QCA_WIFI_QCA6490)
 struct frag_header {
 	uint8_t reserved[0];
 };
@@ -197,7 +212,8 @@ struct frag_header {
  * @reserved: Reserved not used
  */
 
-#if defined(QCA_WIFI_QCA6290) || defined(QCA_WIFI_QCA6390)
+#if defined(QCA_WIFI_QCA6290) || defined(QCA_WIFI_QCA6390) || \
+	defined(QCA_WIFI_QCA6490)
 struct ipa_header {
 	uint8_t reserved[0];
 };
@@ -662,6 +678,8 @@ struct wlan_ipa_priv {
 
 	uint32_t wdi_version;
 	bool is_smmu_enabled;	/* IPA caps returned from ipa_wdi_init */
+	qdf_atomic_t stats_quota;
+	uint8_t curr_bw_level;
 };
 
 #define WLAN_IPA_WLAN_FRAG_HEADER        sizeof(struct frag_header)

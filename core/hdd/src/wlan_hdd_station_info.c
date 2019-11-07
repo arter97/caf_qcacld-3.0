@@ -34,6 +34,7 @@
 #include <wlan_hdd_hostapd.h>
 #include <wlan_hdd_station_info.h>
 #include "wlan_mlme_ucfg_api.h"
+#include "wlan_hdd_sta_info.h"
 
 /*
  * define short names for the global vendor params
@@ -371,7 +372,8 @@ static void hdd_get_max_tx_bitrate(struct hdd_context *hdd_ctx,
 				   struct hdd_adapter *adapter)
 {
 	struct station_info sinfo;
-	uint8_t tx_rate_flags, tx_mcs_index, tx_nss = 1;
+	enum tx_rate_info tx_rate_flags;
+	uint8_t tx_mcs_index, tx_nss = 1;
 	uint16_t my_tx_rate;
 	struct hdd_station_ctx *hdd_sta_ctx;
 
@@ -995,12 +997,13 @@ static int hdd_get_cached_station_remote(struct hdd_context *hdd_ctx,
 					 struct hdd_adapter *adapter,
 					 struct qdf_mac_addr mac_addr)
 {
-	struct hdd_station_info *stainfo = hdd_get_stainfo(
-						adapter->cache_sta_info,
-						mac_addr);
+	struct hdd_station_info *stainfo;
 	struct sk_buff *skb = NULL;
 	uint32_t nl_buf_len = NLMSG_HDRLEN;
 	uint8_t channel_width;
+
+	stainfo = hdd_get_sta_info_by_mac(&adapter->cache_sta_info_list,
+					   mac_addr.bytes);
 
 	if (!stainfo) {
 		hdd_err("peer " QDF_MAC_ADDR_STR " not found",
@@ -1080,7 +1083,8 @@ static int hdd_get_cached_station_remote(struct hdd_context *hdd_ctx,
 		}
 	}
 
-	qdf_mem_zero(stainfo, sizeof(*stainfo));
+	hdd_sta_info_detach(&adapter->cache_sta_info_list, stainfo);
+	qdf_atomic_dec(&adapter->cache_sta_count);
 
 	return cfg80211_vendor_cmd_reply(skb);
 fail:
@@ -1225,10 +1229,11 @@ static int hdd_get_station_remote(struct hdd_context *hdd_ctx,
 				  struct hdd_adapter *adapter,
 				  struct qdf_mac_addr mac_addr)
 {
-	struct hdd_station_info *stainfo = hdd_get_stainfo(adapter->sta_info,
-							   mac_addr);
 	int status = 0;
 	bool is_associated = false;
+	struct hdd_station_info *stainfo =
+			hdd_get_sta_info_by_mac(&adapter->sta_info_list,
+						mac_addr.bytes);
 
 	if (!stainfo) {
 		status = hdd_get_cached_station_remote(hdd_ctx, adapter,

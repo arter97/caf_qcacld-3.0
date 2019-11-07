@@ -193,6 +193,23 @@ static bool cds_is_drv_connected(void)
 	return ((ret > 0) ? true : false);
 }
 
+static QDF_STATUS cds_wmi_send_recv_qmi(void *buf, uint32_t len, void * cb_ctx,
+					qdf_wmi_recv_qmi_cb wmi_rx_cb)
+{
+	qdf_device_t qdf_ctx;
+
+	qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
+	if (!qdf_ctx) {
+		cds_err("cds context is invalid");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (pld_qmi_send(qdf_ctx->dev, 0, buf, len, cb_ctx, wmi_rx_cb))
+		return QDF_STATUS_E_INVAL;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS cds_init(void)
 {
 	QDF_STATUS status;
@@ -213,6 +230,7 @@ QDF_STATUS cds_init(void)
 	qdf_register_fw_down_callback(cds_is_fw_down);
 	qdf_register_recovering_state_query_callback(cds_is_driver_recovering);
 	qdf_register_drv_connected_callback(cds_is_drv_connected);
+	qdf_register_wmi_send_recv_qmi_callback(cds_wmi_send_recv_qmi);
 
 	return QDF_STATUS_SUCCESS;
 
@@ -237,6 +255,7 @@ void cds_deinit(void)
 	qdf_register_recovering_state_query_callback(NULL);
 	qdf_register_fw_down_callback(NULL);
 	qdf_register_self_recovery_callback(NULL);
+	qdf_register_wmi_send_recv_qmi_callback(NULL);
 
 	gp_cds_context->qdf_ctx = NULL;
 	qdf_mem_zero(&g_qdf_ctx, sizeof(g_qdf_ctx));
@@ -653,14 +672,16 @@ QDF_STATUS cds_open(struct wlan_objmgr_psoc *psoc)
 		goto err_wma_close;
 	}
 
-	cds_debug("target_type %d 8074:%d 6290:%d 6390: %d",
+	cds_debug("target_type %d 8074:%d 6290:%d 6390: %d 6490: %d",
 		  hdd_ctx->target_type,
 		  TARGET_TYPE_QCA8074,
 		  TARGET_TYPE_QCA6290,
-		  TARGET_TYPE_QCA6390);
+		  TARGET_TYPE_QCA6390,
+		  TARGET_TYPE_QCA6490);
 
 	if (TARGET_TYPE_QCA6290 == hdd_ctx->target_type ||
-	    TARGET_TYPE_QCA6390 == hdd_ctx->target_type)
+	    TARGET_TYPE_QCA6390 == hdd_ctx->target_type ||
+	    TARGET_TYPE_QCA6490 == hdd_ctx->target_type)
 		gp_cds_context->dp_soc = cdp_soc_attach(LITHIUM_DP,
 			gp_cds_context->hif_context, psoc,
 			gp_cds_context->htc_ctx, gp_cds_context->qdf_ctx,
@@ -766,12 +787,6 @@ QDF_STATUS cds_dp_open(struct wlan_objmgr_psoc *psoc)
 	QDF_STATUS qdf_status;
 	struct dp_txrx_config dp_config;
 
-	if (cdp_txrx_intr_attach(gp_cds_context->dp_soc)
-				!= QDF_STATUS_SUCCESS) {
-		cds_alert("Failed to attach interrupts");
-		goto close;
-	}
-
 	cds_set_context(QDF_MODULE_ID_TXRX,
 		cdp_pdev_attach(cds_get_context(QDF_MODULE_ID_SOC),
 			(struct cdp_ctrl_objmgr_pdev *)gp_cds_context->cfg_ctx,
@@ -781,7 +796,13 @@ QDF_STATUS cds_dp_open(struct wlan_objmgr_psoc *psoc)
 		/* Critical Error ...  Cannot proceed further */
 		cds_alert("Failed to open TXRX");
 		QDF_ASSERT(0);
-		goto intr_close;
+		goto close;
+	}
+
+	if (cdp_txrx_intr_attach(gp_cds_context->dp_soc)
+				!= QDF_STATUS_SUCCESS) {
+		cds_alert("Failed to attach interrupts");
+		goto pdev_detach;
 	}
 
 	dp_config.enable_rx_threads =
@@ -789,11 +810,11 @@ QDF_STATUS cds_dp_open(struct wlan_objmgr_psoc *psoc)
 		false : gp_cds_context->cds_cfg->enable_dp_rx_threads;
 
 	qdf_status = dp_txrx_init(cds_get_context(QDF_MODULE_ID_SOC),
-				  cds_get_context(QDF_MODULE_ID_TXRX),
+				  WMI_PDEV_ID_SOC,
 				  &dp_config);
 
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status))
-		goto pdev_detach;
+		goto intr_close;
 
 	ucfg_pmo_psoc_set_txrx_handle(psoc, gp_cds_context->pdev_txrx_ctx);
 	ucfg_ocb_set_txrx_handle(psoc, gp_cds_context->pdev_txrx_ctx);
@@ -802,11 +823,13 @@ QDF_STATUS cds_dp_open(struct wlan_objmgr_psoc *psoc)
 
 	return 0;
 
+intr_close:
+	cdp_txrx_intr_detach(gp_cds_context->dp_soc);
+
 pdev_detach:
 	cdp_pdev_detach(gp_cds_context->dp_soc,
 			cds_get_context(QDF_MODULE_ID_TXRX), false);
-intr_close:
-	cdp_txrx_intr_detach(gp_cds_context->dp_soc);
+
 close:
 	return QDF_STATUS_E_FAILURE;
 }
@@ -896,6 +919,7 @@ stop_wmi:
 	}
 	htc_stop(gp_cds_context->htc_ctx);
 
+	wma_wmi_work_close();
 exit_with_status:
 	return status;
 }
@@ -1185,6 +1209,11 @@ QDF_STATUS cds_close(struct wlan_objmgr_psoc *psoc)
 	}
 
 	gp_cds_context->mac_context = NULL;
+	/*
+	 * Call this before cdp soc detatch as it used the cdp soc to free the
+	 * cdp vdev if any.
+	 */
+	wma_release_pending_vdev_refs();
 
 	cdp_soc_detach(gp_cds_context->dp_soc);
 	gp_cds_context->dp_soc = NULL;

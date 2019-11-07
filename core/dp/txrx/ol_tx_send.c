@@ -259,11 +259,12 @@ ol_tx_send_nonstd(struct ol_txrx_pdev_t *pdev,
 	}
 }
 
-static inline void
+static inline bool
 ol_tx_download_done_base(struct ol_txrx_pdev_t *pdev,
 			 A_STATUS status, qdf_nbuf_t msdu, uint16_t msdu_id)
 {
 	struct ol_tx_desc_t *tx_desc;
+	bool is_frame_freed = false;
 
 	tx_desc = ol_tx_desc_find(pdev, msdu_id);
 	qdf_assert(tx_desc);
@@ -286,6 +287,7 @@ ol_tx_download_done_base(struct ol_txrx_pdev_t *pdev,
 		ol_tx_target_credit_incr(pdev, msdu);
 		ol_tx_desc_frame_free_nonstd(pdev, tx_desc,
 					     1 /* download err */);
+		is_frame_freed = true;
 	} else {
 		if (OL_TX_DESC_NO_REFS(tx_desc)) {
 			/*
@@ -296,8 +298,10 @@ ol_tx_download_done_base(struct ol_txrx_pdev_t *pdev,
 			ol_tx_desc_frame_free_nonstd(pdev, tx_desc,
 						     tx_desc->status !=
 						     htt_tx_status_ok);
+			is_frame_freed = true;
 		}
 	}
+	return is_frame_freed;
 }
 
 void
@@ -324,6 +328,7 @@ ol_tx_download_done_hl_free(void *txrx_pdev,
 {
 	struct ol_txrx_pdev_t *pdev = txrx_pdev;
 	struct ol_tx_desc_t *tx_desc;
+	bool is_frame_freed;
 
 	tx_desc = ol_tx_desc_find(pdev, msdu_id);
 	qdf_assert(tx_desc);
@@ -335,13 +340,12 @@ ol_tx_download_done_hl_free(void *txrx_pdev,
 				 sizeof(qdf_nbuf_data(msdu)), tx_desc->id,
 				 status));
 
-	ol_tx_download_done_base(pdev, status, msdu, msdu_id);
+	is_frame_freed = ol_tx_download_done_base(pdev, status, msdu, msdu_id);
 
 	/*
-	 * Incase of error return from here since netbuf and tx_desc would
-	 * have been freed in ol_tx_download_done_base().
+	 * if frame is freed in ol_tx_download_done_base then return.
 	 */
-	if (status != A_OK) {
+	if (is_frame_freed) {
 		qdf_atomic_add(1, &pdev->tx_queue.rsrc_cnt);
 		return;
 	}
@@ -1613,8 +1617,15 @@ ol_tx_delay_compute(struct ol_txrx_pdev_t *pdev,
 #ifdef WLAN_FEATURE_TSF_PLUS
 void ol_register_timestamp_callback(tp_ol_timestamp_cb ol_tx_timestamp_cb)
 {
-	ol_txrx_pdev_handle pdev = cds_get_context(QDF_MODULE_ID_TXRX);
+	struct ol_txrx_soc_t *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	ol_txrx_pdev_handle pdev;
 
+	if (qdf_unlikely(!soc)) {
+		ol_txrx_err("soc is NULL");
+		return;
+	}
+
+	pdev = ol_txrx_get_pdev_from_pdev_id(soc, OL_TXRX_PDEV_ID);
 	if (!pdev) {
 		ol_txrx_err("pdev is NULL");
 		return;
@@ -1624,8 +1635,10 @@ void ol_register_timestamp_callback(tp_ol_timestamp_cb ol_tx_timestamp_cb)
 
 void ol_deregister_timestamp_callback(void)
 {
-	ol_txrx_pdev_handle pdev = cds_get_context(QDF_MODULE_ID_TXRX);
+	struct ol_txrx_soc_t *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	ol_txrx_pdev_handle pdev;
 
+	pdev = ol_txrx_get_pdev_from_pdev_id(soc, OL_TXRX_PDEV_ID);
 	if (!pdev) {
 		ol_txrx_err("pdev is NULL");
 		return;

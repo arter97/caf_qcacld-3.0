@@ -529,30 +529,22 @@ QDF_STATUS wma_process_dhcp_ind(WMA_HANDLE handle,
 					    &peer_set_param_fp);
 }
 
-/**
- * wma_chan_phy__mode() - get WLAN_PHY_MODE for channel
- * @freq: operating frequency of connection
- * @chan_width: maximum channel width possible
- * @dot11_mode: maximum phy_mode possible
- *
- * Return: return WLAN_PHY_MODE
- */
-WLAN_PHY_MODE wma_chan_phy_mode(uint32_t freq, enum phy_ch_width chan_width,
-				uint8_t dot11_mode)
+enum wlan_phymode wma_chan_phy_mode(uint32_t freq, enum phy_ch_width chan_width,
+				    uint8_t dot11_mode)
 {
-	WLAN_PHY_MODE phymode = MODE_UNKNOWN;
+	enum wlan_phymode phymode = WLAN_PHYMODE_AUTO;
 	uint16_t bw_val = wlan_reg_get_bw_value(chan_width);
 	t_wma_handle *wma = cds_get_context(QDF_MODULE_ID_WMA);
 	uint16_t chan;
 
 	if (!wma) {
 		WMA_LOGE("%s : wma_handle is NULL", __func__);
-		return MODE_UNKNOWN;
+		return WLAN_PHYMODE_AUTO;
 	}
 
 	if (chan_width >= CH_WIDTH_INVALID) {
 		WMA_LOGE("%s : Invalid channel width", __func__);
-		return MODE_UNKNOWN;
+		return WLAN_PHYMODE_AUTO;
 	}
 
 	chan = wlan_reg_freq_to_chan(wma->pdev, freq);
@@ -565,49 +557,49 @@ WLAN_PHY_MODE wma_chan_phy_mode(uint32_t freq, enum phy_ch_width chan_width,
 		     (MLME_DOT11_MODE_ALL == dot11_mode) ||
 		     (MLME_DOT11_MODE_11AC == dot11_mode) ||
 		     (MLME_DOT11_MODE_11AX == dot11_mode)))
-			phymode = MODE_11G;
+			phymode = WLAN_PHYMODE_11G;
 		else {
 			switch (dot11_mode) {
 			case MLME_DOT11_MODE_11B:
 				if ((bw_val == 20) || (bw_val == 40))
-					phymode = MODE_11B;
+					phymode = WLAN_PHYMODE_11B;
 				break;
 			case MLME_DOT11_MODE_11G:
 				if ((bw_val == 20) || (bw_val == 40))
-					phymode = MODE_11G;
+					phymode = WLAN_PHYMODE_11G;
 				break;
 			case MLME_DOT11_MODE_11G_ONLY:
 				if ((bw_val == 20) || (bw_val == 40))
-					phymode = MODE_11GONLY;
+					phymode = WLAN_PHYMODE_11G_ONLY;
 				break;
 			case MLME_DOT11_MODE_11N:
 			case MLME_DOT11_MODE_11N_ONLY:
 				if (bw_val == 20)
-					phymode = MODE_11NG_HT20;
+					phymode = WLAN_PHYMODE_11NG_HT20;
 				else if (bw_val == 40)
-					phymode = MODE_11NG_HT40;
+					phymode = WLAN_PHYMODE_11NG_HT40;
 				break;
 			case MLME_DOT11_MODE_ALL:
 			case MLME_DOT11_MODE_11AC:
 			case MLME_DOT11_MODE_11AC_ONLY:
 				if (bw_val == 20)
-					phymode = MODE_11AC_VHT20_2G;
+					phymode = WLAN_PHYMODE_11AC_VHT20_2G;
 				else if (bw_val == 40)
-					phymode = MODE_11AC_VHT40_2G;
+					phymode = WLAN_PHYMODE_11AC_VHT40_2G;
 				break;
 			case MLME_DOT11_MODE_11AX:
 			case MLME_DOT11_MODE_11AX_ONLY:
 				if (20 == bw_val)
-					phymode = MODE_11AX_HE20_2G;
+					phymode = WLAN_PHYMODE_11AXG_HE20;
 				else if (40 == bw_val)
-					phymode = MODE_11AX_HE40_2G;
+					phymode = WLAN_PHYMODE_11AXG_HE40;
 				break;
 			default:
 				break;
 			}
 		}
 	} else if (wlan_reg_is_dsrc_chan(wma->pdev, chan))
-		phymode = MODE_11A;
+		phymode = WLAN_PHYMODE_11A;
 	else {
 		if (((CH_WIDTH_5MHZ == chan_width) ||
 		     (CH_WIDTH_10MHZ == chan_width)) &&
@@ -616,46 +608,46 @@ WLAN_PHY_MODE wma_chan_phy_mode(uint32_t freq, enum phy_ch_width chan_width,
 		     (MLME_DOT11_MODE_ALL == dot11_mode) ||
 		     (MLME_DOT11_MODE_11AC == dot11_mode) ||
 		     (MLME_DOT11_MODE_11AX == dot11_mode)))
-			phymode = MODE_11A;
+			phymode = WLAN_PHYMODE_11A;
 		else {
 			switch (dot11_mode) {
 			case MLME_DOT11_MODE_11A:
 				if (0 < bw_val)
-					phymode = MODE_11A;
+					phymode = WLAN_PHYMODE_11A;
 				break;
 			case MLME_DOT11_MODE_11N:
 			case MLME_DOT11_MODE_11N_ONLY:
 				if (bw_val == 20)
-					phymode = MODE_11NA_HT20;
+					phymode = WLAN_PHYMODE_11NA_HT20;
 				else if (40 <= bw_val)
-					phymode = MODE_11NA_HT40;
+					phymode = WLAN_PHYMODE_11NA_HT40;
 				break;
 			case MLME_DOT11_MODE_ALL:
 			case MLME_DOT11_MODE_11AC:
 			case MLME_DOT11_MODE_11AC_ONLY:
 				if (bw_val == 20)
-					phymode = MODE_11AC_VHT20;
+					phymode = WLAN_PHYMODE_11AC_VHT20;
 				else if (bw_val == 40)
-					phymode = MODE_11AC_VHT40;
+					phymode = WLAN_PHYMODE_11AC_VHT40;
 				else if (bw_val == 80)
-					phymode = MODE_11AC_VHT80;
+					phymode = WLAN_PHYMODE_11AC_VHT80;
 				else if (chan_width == CH_WIDTH_160MHZ)
-					phymode = MODE_11AC_VHT160;
+					phymode = WLAN_PHYMODE_11AC_VHT160;
 				else if (chan_width == CH_WIDTH_80P80MHZ)
-					phymode = MODE_11AC_VHT80_80;
+					phymode = WLAN_PHYMODE_11AC_VHT80_80;
 				break;
 			case MLME_DOT11_MODE_11AX:
 			case MLME_DOT11_MODE_11AX_ONLY:
 				if (20 == bw_val)
-					phymode = MODE_11AX_HE20;
+					phymode = WLAN_PHYMODE_11AXA_HE20;
 				else if (40 == bw_val)
-					phymode = MODE_11AX_HE40;
+					phymode = WLAN_PHYMODE_11AXA_HE40;
 				else if (80 == bw_val)
-					phymode = MODE_11AX_HE80;
+					phymode = WLAN_PHYMODE_11AXA_HE80;
 				else if (CH_WIDTH_160MHZ == chan_width)
-					phymode = MODE_11AX_HE160;
+					phymode = WLAN_PHYMODE_11AXA_HE160;
 				else if (CH_WIDTH_80P80MHZ == chan_width)
-					phymode = MODE_11AX_HE80_80;
+					phymode = WLAN_PHYMODE_11AXA_HE80_80;
 				break;
 			default:
 				break;
@@ -666,7 +658,7 @@ WLAN_PHY_MODE wma_chan_phy_mode(uint32_t freq, enum phy_ch_width chan_width,
 	WMA_LOGD("%s: phymode %d freq %d ch_width %d dot11_mode %d",
 		 __func__, phymode, freq, chan_width, dot11_mode);
 
-	QDF_ASSERT(MODE_UNKNOWN != phymode);
+	QDF_ASSERT(phymode != WLAN_PHYMODE_AUTO);
 	return phymode;
 }
 
@@ -1403,6 +1395,8 @@ static const uint8_t *wma_wow_wake_reason_str(A_INT32 wake_reason)
 		return "IOAC_TIMER_EVENT";
 	case WOW_REASON_ROAM_HO:
 		return "ROAM_HO";
+	case WOW_REASON_ROAM_PREAUTH_START:
+		return "ROAM_PREAUTH_START_EVENT";
 	case WOW_REASON_DFS_PHYERR_RADADR_EVENT:
 		return "DFS_PHYERR_RADADR_EVENT";
 	case WOW_REASON_BEACON_RECV:
@@ -1675,6 +1669,9 @@ static int wow_get_wmi_eventid(int32_t reason, uint32_t tag)
 		break;
 	case WOW_REASON_11D_SCAN:
 		event_id = WMI_11D_NEW_COUNTRY_EVENTID;
+		break;
+	case WOW_ROAM_PREAUTH_START_EVENT:
+		event_id = WMI_ROAM_PREAUTH_STATUS_CMDID;
 		break;
 	default:
 		WMA_LOGD(FL("No Event Id for WOW reason %s(%d)"),
@@ -2252,6 +2249,9 @@ static void wma_acquire_wow_wakelock(t_wma_handle *wma, int wake_reason)
 		wl = &wma->roam_ho_wl;
 		ms = WMA_ROAM_HO_WAKE_LOCK_DURATION;
 		break;
+	case WOW_REASON_ROAM_PREAUTH_START:
+		wl = &wma->roam_preauth_wl;
+		ms = WMA_ROAM_PREAUTH_WAKE_LOCK_DURATION;
 	default:
 		return;
 	}
@@ -2430,7 +2430,19 @@ static int wma_wake_event_piggybacked(
 	}
 
 	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
-	bssid = wma->interfaces[event_param->fixed_param->vdev_id].bssid;
+	if (!pdev) {
+		WMA_LOGE("Invalid pdev");
+		return -EINVAL;
+	}
+
+	bssid = wma_get_vdev_bssid
+		(wma->interfaces[event_param->fixed_param->vdev_id].vdev);
+	if (!bssid) {
+		WMA_LOGE("%s: Failed to get bssid for vdev_%d",
+			 __func__, event_param->fixed_param->vdev_id);
+		return 0;
+	}
+
 	peer = cdp_peer_find_by_addr(soc, pdev, bssid, &peer_id);
 	wake_reason = event_param->fixed_param->wake_reason;
 
@@ -2561,7 +2573,6 @@ static int wma_wake_event_piggybacked(
 
 		del_sta_ctx->is_tdls = false;
 		del_sta_ctx->vdev_id = event_param->fixed_param->vdev_id;
-		del_sta_ctx->staId = peer_id;
 		qdf_mem_copy(del_sta_ctx->addr2, bssid, QDF_MAC_ADDR_SIZE);
 		qdf_mem_copy(del_sta_ctx->bssId, bssid, QDF_MAC_ADDR_SIZE);
 		del_sta_ctx->reasonCode = HAL_DEL_STA_REASON_CODE_KEEP_ALIVE;
@@ -2974,11 +2985,12 @@ QDF_STATUS wma_process_get_peer_info_req
 	uint16_t len;
 	wmi_buf_t buf;
 	int32_t vdev_id;
+	/* Will be removed in cleanup */
+	uint8_t sta_id;
 	struct cdp_pdev *pdev;
 	void *peer;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	uint8_t peer_mac[QDF_MAC_ADDR_SIZE];
-	uint8_t *peer_mac_raw;
 	wmi_peer_info_req_cmd_fixed_param *p_get_peer_info_cmd;
 	uint8_t bcast_mac[QDF_MAC_ADDR_SIZE] = { 0xff, 0xff, 0xff,
 						  0xff, 0xff, 0xff };
@@ -3001,30 +3013,23 @@ QDF_STATUS wma_process_get_peer_info_req
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if (0xFF == pReq->staIdx) {
+	if (qdf_is_macaddr_broadcast(&pReq->peer_mac)) {
 		/*get info for all peers */
 		qdf_mem_copy(peer_mac, bcast_mac, QDF_MAC_ADDR_SIZE);
 	} else {
 		/*get info for a single peer */
-		peer = cdp_peer_find_by_local_id(soc,
-				pdev, pReq->staIdx);
+		peer = cdp_peer_find_by_addr(soc, pdev,
+					     pReq->peer_mac.bytes, &sta_id);
 		if (!peer) {
-			WMA_LOGE("%s: Failed to get peer handle using peer id %d",
-				__func__, pReq->staIdx);
-			return QDF_STATUS_E_FAILURE;
-		}
-		peer_mac_raw = cdp_peer_get_peer_mac_addr(soc, peer);
-		if (!peer_mac_raw) {
-			WMA_LOGE("peer_mac_raw is NULL");
+			WMA_LOGE("%s: Failed to get peer handle using peer "
+				 QDF_MAC_ADDR_STR, __func__,
+				 QDF_MAC_ADDR_ARRAY(pReq->peer_mac.bytes));
 			return QDF_STATUS_E_FAILURE;
 		}
 
-		WMA_LOGE("%s: staIdx %d peer mac: 0x%2x:0x%2x:0x%2x:0x%2x:0x%2x:0x%2x",
-			__func__, pReq->staIdx, peer_mac_raw[0],
-			peer_mac_raw[1], peer_mac_raw[2],
-			peer_mac_raw[3], peer_mac_raw[4],
-			peer_mac_raw[5]);
-		qdf_mem_copy(peer_mac, peer_mac_raw, QDF_MAC_ADDR_SIZE);
+		WMA_LOGE("%s: peer mac: " QDF_MAC_ADDR_STR, __func__,
+			 QDF_MAC_ADDR_ARRAY(pReq->peer_mac.bytes));
+		qdf_mem_copy(peer_mac, pReq->peer_mac.bytes, QDF_MAC_ADDR_SIZE);
 	}
 
 	len = sizeof(wmi_peer_info_req_cmd_fixed_param);
@@ -5253,7 +5258,7 @@ int wma_vdev_obss_detection_info_handler(void *handle, uint8_t *event,
 }
 
 #ifdef CRYPTO_SET_KEY_CONVERGED
-static void wma_send_set_key_rsp(uint8_t session_id, bool pairwise,
+static void wma_send_set_key_rsp(uint8_t vdev_id, bool pairwise,
 				 uint8_t key_index)
 {
 	tSetStaKeyParams *key_info_uc;
@@ -5268,7 +5273,7 @@ static void wma_send_set_key_rsp(uint8_t session_id, bool pairwise,
 		return;
 	}
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma->psoc,
-						    session_id,
+						    vdev_id,
 						    WLAN_LEGACY_WMA_ID);
 	if (!vdev) {
 		wma_err("VDEV object not found");
@@ -5286,8 +5291,7 @@ static void wma_send_set_key_rsp(uint8_t session_id, bool pairwise,
 		key_info_uc = qdf_mem_malloc(sizeof(*key_info_uc));
 		if (!key_info_uc)
 			return;
-		key_info_uc->sessionId = session_id;
-		key_info_uc->smesessionId = session_id;
+		key_info_uc->vdev_id = vdev_id;
 		key_info_uc->status = QDF_STATUS_SUCCESS;
 		key_info_uc->key[0].keyLength = crypto_key->keylen;
 		qdf_mem_copy(&key_info_uc->macaddr, &crypto_key->macaddr,
@@ -5298,8 +5302,7 @@ static void wma_send_set_key_rsp(uint8_t session_id, bool pairwise,
 		key_info_mc = qdf_mem_malloc(sizeof(*key_info_mc));
 		if (!key_info_mc)
 			return;
-		key_info_mc->sessionId = session_id;
-		key_info_mc->smesessionId = session_id;
+		key_info_mc->vdev_id = vdev_id;
 		key_info_mc->status = QDF_STATUS_SUCCESS;
 		key_info_mc->key[0].keyLength = crypto_key->keylen;
 		qdf_mem_copy(&key_info_mc->macaddr, &bcast_mac,

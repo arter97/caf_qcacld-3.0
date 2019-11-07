@@ -2398,26 +2398,27 @@ IE VHTCaps (EID_VHT_CAPABILITIES)
         vhtLinkAdaptCap:          2;
         rxAntPattern:             1;
         txAntPattern:             1;
-        reserved1:                2;
+        extended_nss_bw_supp:     2;
     }
     rxMCSMap,                     2;
     {
          rxHighSupDataRate:       13;
-         reserved2:               3;
+         max_nsts_total:          3;
     }
     txMCSMap,                     2;
     {
         txSupDataRate:            13;
-        reserved3:                3;
+        vht_extended_nss_bw_cap:  1;
+        reserved:                 2;
     }
 }
 
 IE VHTOperation (EID_VHT_OPERATION_ELEMENT)
 {
-    chanWidth,           1;
-    chanCenterFreqSeg1,  1;
-    chanCenterFreqSeg2,  1;
-    basicMCSSet,         2;
+    chanWidth,             1;
+    chan_center_freq_seg0, 1;
+    chan_center_freq_seg1, 1;
+    basicMCSSet,           2;
 }
 
 IE VHTExtBssLoad (EID_VHT_EXT_BSS_LOAD)
@@ -2550,7 +2551,8 @@ IE HTInfo (EID_HT_INFO)
         nonGFDevicesPresent: 1;
         transmitBurstLimit: 1;
         obssNonHTStaPresent:1;
-        reserved:           11;
+        chan_center_freq_seg2:8;
+        reserved:           3;
     }
 
 
@@ -2577,10 +2579,11 @@ IE HTInfo (EID_HT_INFO)
 IE OperatingMode (EID_OPERATING_MODE)
 {
     { //Operating Mode field
-        chanWidth:    2;
-        reserved:     2;
-        rxNSS:        3;
-        rxNSSType:    1;
+        chanWidth:          2;
+        vht_160_80p80_supp: 1;
+        no_ldpc:            1;
+        rxNSS:              3;
+        rxNSSType:          1;
     }
 }
 
@@ -2612,18 +2615,18 @@ IE TimeAdvertisement (EID_TIME_ADVERTISEMENT)   // 8.4.2.63
     time_error[5];
 }
 
-const QCOM_VERSION_ATTR_ID = 1;
-const QCOM_VHT_MCS_10_11_ATTR_ID = 2;
+const QTI_VERSION_ATTR_ID = 1;
+const QTI_VHT_MCS_10_11_ATTR_ID = 2;
 
 IE qcn_ie (EID_VENDOR_SPECIFIC) OUI ( 0x8C, 0xFD, 0xF0, 0x01 )
 {
-   OPTIE IE version_attr (QCOM_VERSION_ATTR_ID)
+   OPTIE IE version_attr (QTI_VERSION_ATTR_ID)
    {
       version, 1;
       sub_version, 1;
    }
 
-   OPTIE IE vht_mcs11_attr (QCOM_VHT_MCS_10_11_ATTR_ID)
+   OPTIE IE vht_mcs11_attr (QTI_VHT_MCS_10_11_ATTR_ID)
    {
       vht_mcs_10_11_supp, 1;
    }
@@ -2988,7 +2991,8 @@ IE he_op (EID_EXTN_ID_ELEMENT) OUI (0x24)
     }
     {
         er_su_disable: 1;
-        reserved2: 7;
+	oper_info_6g_present: 1;
+        reserved2: 6;
     }
     {
         bss_color:6;
@@ -3012,6 +3016,35 @@ IE he_op (EID_EXTN_ID_ELEMENT) OUI (0x24)
             data, 1;
         }
     };
+    OPTIONAL UNION oper_info_6g (DISCRIMINATOR oper_info_6g_present)
+    {
+        info (oper_info_6g_present IS 1)
+        {
+            primary_ch, 1;
+            { // control
+                ch_width: 2;
+                dup_bcon: 1;
+                reserved: 5;
+            }
+            center_freq_seg0, 1;
+            center_freq_seg1, 1;
+            min_rate, 1;
+        }
+    };
+}
+
+IE he_6ghz_band_cap (EID_EXTN_ID_ELEMENT) OUI (0x3B)
+{
+    { // capabilities_information
+        min_mpdu_start_spacing :3;
+        max_ampdu_len_exp: 3;
+        max_mpdu_len: 3;
+        sm_pow_save: 2;
+        rd_responder: 1;
+        rx_ant_pattern_consistency: 1;
+        tx_ant_pattern_consistency: 1;
+        reserved: 2;
+    }
 }
 
 IE mu_edca_param_set (EID_EXTN_ID_ELEMENT) OUI (0x26)
@@ -3480,6 +3513,7 @@ FRAME Beacon                              // C.f. Sec. 7.2.3.1
     OPTIE  qcn_ie;
     OPTIE  he_cap;
     OPTIE  he_op;
+    OPTIE  he_6ghz_band_cap;
     OPTIE  bss_color_change;
     OPTIE  mu_edca_param_set;
     OPTIE  esp_information;
@@ -3576,6 +3610,7 @@ FRAME Beacon2
     OPTIE  qcn_ie;
     OPTIE  he_cap;
     OPTIE  he_op;
+    OPTIE  he_6ghz_band_cap;
     OPTIE  bss_color_change;
     OPTIE  mu_edca_param_set;
     OPTIE  esp_information;
@@ -3648,6 +3683,7 @@ FRAME BeaconIEs
     OPTIE  qcn_ie;
     OPTIE  he_cap;
     OPTIE  he_op;
+    OPTIE  he_6ghz_band_cap;
     OPTIE  bss_color_change;
     OPTIE  mu_edca_param_set;
     OPTIE  esp_information;
@@ -3699,6 +3735,7 @@ FRAME AssocRequest                        // 7.2.3.4
     OPTIE  hs20vendor_ie;
     OPTIE  qcn_ie;
     OPTIE  he_cap;
+    OPTIE  he_6ghz_band_cap;
     OPTIE  osen_ie;
     OPTIE roaming_consortium_sel;
 } // End frame AssocRequest.
@@ -3744,6 +3781,7 @@ FRAME AssocResponse                       // 7.2.3.5
     OPTIE  qcn_ie;
     OPTIE  he_cap;
     OPTIE  he_op;
+    OPTIE  he_6ghz_band_cap;
     OPTIE  bss_color_change;
     OPTIE  mu_edca_param_set;
     OPTIE  MBO_IE;
@@ -3786,6 +3824,7 @@ FRAME ReAssocRequest                      // 7.2.3.6
     OPTIE  vendor_vht_ie;
     OPTIE  hs20vendor_ie;
     OPTIE  he_cap;
+    OPTIE  he_6ghz_band_cap;
 } // End frame ReAssocRequest.
 
 FRAME ReAssocResponse                     // 7.2.3.7
@@ -3823,6 +3862,7 @@ FRAME ReAssocResponse                     // 7.2.3.7
     OPTIE  vendor_vht_ie;
     OPTIE  he_cap;
     OPTIE  he_op;
+    OPTIE  he_6ghz_band_cap;
     OPTIE  bss_color_change;
     OPTIE  mu_edca_param_set;
     OPTIE  MBO_IE;
@@ -3843,6 +3883,7 @@ FRAME ProbeRequest                        // 7.2.3.8
     OPTIE  ExtCap;
     OPTIE  qcn_ie;
     OPTIE  he_cap;
+    OPTIE  he_6ghz_band_cap;
 } // End frame ProbeRequest.
 
 FRAME ProbeResponse                       // 7.2.3.9
@@ -3905,6 +3946,7 @@ FRAME ProbeResponse                       // 7.2.3.9
     OPTIE  qcn_ie;
     OPTIE  he_cap;
     OPTIE  he_op;
+    OPTIE  he_6ghz_band_cap;
     OPTIE  bss_color_change;
     OPTIE  mu_edca_param_set;
     OPTIE  esp_information;

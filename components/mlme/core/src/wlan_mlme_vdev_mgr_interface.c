@@ -24,6 +24,8 @@
 #include "wma_api.h"
 #include "lim_types.h"
 #include <include/wlan_mlme_cmn.h>
+#include <../../core/src/vdev_mgr_ops.h>
+#include "wlan_psoc_mlme_api.h"
 
 static struct vdev_mlme_ops sta_mlme_ops;
 static struct vdev_mlme_ops ap_mlme_ops;
@@ -740,51 +742,6 @@ enum vdev_assoc_type  mlme_get_assoc_type(struct wlan_objmgr_vdev *vdev)
 	return mlme_priv->assoc_type;
 }
 
-QDF_STATUS mlme_set_bss_params(struct wlan_objmgr_vdev *vdev,
-			       struct bss_params *bss_params)
-{
-	struct mlme_legacy_priv *mlme_priv;
-
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv) {
-		mlme_legacy_err("vdev legacy private object is NULL");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	qdf_mem_free(mlme_priv->bss_params);
-	mlme_priv->bss_params = bss_params;
-
-	return QDF_STATUS_SUCCESS;
-}
-
-struct bss_params *mlme_get_bss_params(struct wlan_objmgr_vdev *vdev)
-{
-	struct mlme_legacy_priv *mlme_priv;
-	struct bss_params *bss_params;
-
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv) {
-		mlme_legacy_err("vdev legacy private object is NULL");
-		return NULL;
-	}
-	bss_params = mlme_priv->bss_params;
-	mlme_priv->bss_params = NULL;
-
-	return bss_params;
-}
-
-void mlme_clear_bss_params(struct wlan_objmgr_vdev *vdev)
-{
-	struct mlme_legacy_priv *mlme_priv;
-
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv) {
-		mlme_legacy_err("vdev legacy private object is NULL");
-		return;
-	}
-	mlme_priv->bss_params = NULL;
-}
-
 QDF_STATUS
 mlme_set_vdev_start_failed(struct wlan_objmgr_vdev *vdev, bool val)
 {
@@ -915,8 +872,6 @@ QDF_STATUS vdevmgr_mlme_ext_hdl_destroy(struct vdev_mlme_obj *vdev_mlme)
 
 	mlme_free_self_disconnect_ies(vdev_mlme->vdev);
 	mlme_free_peer_disconnect_ies(vdev_mlme->vdev);
-	qdf_mem_free(vdev_mlme->ext_vdev_ptr->bss_params);
-	vdev_mlme->ext_vdev_ptr->bss_params = NULL;
 	qdf_mem_free(vdev_mlme->ext_vdev_ptr);
 	vdev_mlme->ext_vdev_ptr = NULL;
 
@@ -1094,6 +1049,47 @@ vdevmgr_vdev_stop_rsp_handle(struct vdev_mlme_obj *vdev_mlme,
 }
 
 /**
+ * psoc_mlme_ext_hdl_create() - Create mlme legacy priv object
+ * @psoc_mlme: psoc mlme object
+ *
+ * Return: QDF_STATUS
+ */
+static
+QDF_STATUS psoc_mlme_ext_hdl_create(struct psoc_mlme_obj *psoc_mlme)
+{
+	psoc_mlme->ext_psoc_ptr =
+		qdf_mem_malloc(sizeof(struct wlan_mlme_psoc_ext_obj));
+	if (!psoc_mlme->ext_psoc_ptr) {
+		mlme_legacy_err("Failed to allocate memory");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * psoc_mlme_ext_hdl_destroy() - Destroy mlme legacy priv object
+ * @psoc_mlme: psoc mlme object
+ *
+ * Return: QDF_STATUS
+ */
+static
+QDF_STATUS psoc_mlme_ext_hdl_destroy(struct psoc_mlme_obj *psoc_mlme)
+{
+	if (!psoc_mlme) {
+		mlme_err("PSOC MLME is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (psoc_mlme->ext_psoc_ptr) {
+		qdf_mem_free(psoc_mlme->ext_psoc_ptr);
+		psoc_mlme->ext_psoc_ptr = NULL;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * vdevmgr_vdev_delete_rsp_handle() - callback to handle vdev delete response
  * @vdev_mlme: vdev mlme object
  * @rsp: pointer to vdev delete response
@@ -1113,6 +1109,35 @@ vdevmgr_vdev_start_rsp_handle(struct vdev_mlme_obj *vdev_mlme,
 			  vdev_mlme->vdev->vdev_objmgr.vdev_id);
 	status =  wma_vdev_start_resp_handler(vdev_mlme, rsp);
 
+	return status;
+}
+
+QDF_STATUS mlme_vdev_create_send(struct wlan_objmgr_vdev *vdev)
+{
+	struct vdev_mlme_obj *vdev_mlme = NULL;
+	QDF_STATUS status;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme) {
+		mlme_err("Failed to get vdev mlme obj for vdev id %d",
+			 wlan_vdev_get_id(vdev));
+		status = QDF_STATUS_E_INVAL;
+		goto return_status;
+	}
+
+	status = vdev_mgr_create_send(vdev_mlme);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_err("Failed to create vdev for vdev id %d",
+			 wlan_vdev_get_id(vdev));
+		goto return_status;
+	}
+
+	status = wma_post_vdev_create_setup(vdev);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		vdev_mgr_delete_send(vdev_mlme);
+
+return_status:
 	return status;
 }
 
@@ -1226,13 +1251,19 @@ static struct vdev_mlme_ops mon_mlme_ops = {
 };
 
 /**
- * struct mlme_ext_ops - VDEV MLME legacy global callbacks structure
+ * struct mlme_ext_ops - MLME legacy global callbacks structure
+ * @mlme_psoc_ext_hdl_create:           callback to invoke creation of legacy
+ *                                      psoc object
+ * @mlme_psoc_ext_hdl_destroy:          callback to invoke destroy of legacy
+ *                                      psoc object
  * @mlme_vdev_ext_hdl_create:           callback to invoke creation of legacy
  *                                      vdev object
  * @mlme_vdev_ext_hdl_destroy:          callback to invoke destroy of legacy
  *                                      vdev object
  */
 static struct mlme_ext_ops ext_ops = {
+	.mlme_psoc_ext_hdl_create = psoc_mlme_ext_hdl_create,
+	.mlme_psoc_ext_hdl_destroy = psoc_mlme_ext_hdl_destroy,
 	.mlme_vdev_ext_hdl_create = vdevmgr_mlme_ext_hdl_create,
 	.mlme_vdev_ext_hdl_destroy = vdevmgr_mlme_ext_hdl_destroy,
 };

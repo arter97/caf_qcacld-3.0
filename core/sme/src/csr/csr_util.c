@@ -583,20 +583,6 @@ static bool csr_is_conn_state(struct mac_context *mac_ctx, uint32_t session_id,
 	return mac_ctx->roam.roamSession[session_id].connectState == state;
 }
 
-bool csr_is_conn_state_connected_ibss(struct mac_context *mac_ctx,
-				      uint32_t session_id)
-{
-	return csr_is_conn_state(mac_ctx, session_id,
-				 eCSR_ASSOC_STATE_TYPE_IBSS_CONNECTED);
-}
-
-bool csr_is_conn_state_disconnected_ibss(struct mac_context *mac_ctx,
-					 uint32_t session_id)
-{
-	return csr_is_conn_state(mac_ctx, session_id,
-				 eCSR_ASSOC_STATE_TYPE_IBSS_DISCONNECTED);
-}
-
 bool csr_is_conn_state_connected_infra(struct mac_context *mac_ctx,
 				       uint32_t session_id)
 {
@@ -616,11 +602,53 @@ bool csr_is_conn_state_infra(struct mac_context *mac, uint32_t sessionId)
 	return csr_is_conn_state_connected_infra(mac, sessionId);
 }
 
+static tSirMacCapabilityInfo csr_get_bss_capabilities(struct bss_description *
+						      pSirBssDesc)
+{
+	tSirMacCapabilityInfo dot11Caps;
+
+	/* tSirMacCapabilityInfo is 16-bit */
+	qdf_get_u16((uint8_t *) &pSirBssDesc->capabilityInfo,
+		    (uint16_t *) &dot11Caps);
+
+	return dot11Caps;
+}
+
+#ifdef QCA_IBSS_SUPPORT
+bool csr_is_conn_state_connected_ibss(struct mac_context *mac_ctx,
+				      uint32_t session_id)
+{
+	return csr_is_conn_state(mac_ctx, session_id,
+				 eCSR_ASSOC_STATE_TYPE_IBSS_CONNECTED);
+}
+
+bool csr_is_conn_state_disconnected_ibss(struct mac_context *mac_ctx,
+					 uint32_t session_id)
+{
+	return csr_is_conn_state(mac_ctx, session_id,
+				 eCSR_ASSOC_STATE_TYPE_IBSS_DISCONNECTED);
+}
+
 bool csr_is_conn_state_ibss(struct mac_context *mac, uint32_t sessionId)
 {
 	return csr_is_conn_state_connected_ibss(mac, sessionId) ||
 	       csr_is_conn_state_disconnected_ibss(mac, sessionId);
 }
+
+bool csr_is_bss_type_ibss(eCsrRoamBssType bssType)
+{
+	return (bool)
+		(eCSR_BSS_TYPE_START_IBSS == bssType
+		 || eCSR_BSS_TYPE_IBSS == bssType);
+}
+
+bool csr_is_ibss_bss_desc(struct bss_description *pSirBssDesc)
+{
+	tSirMacCapabilityInfo dot11Caps = csr_get_bss_capabilities(pSirBssDesc);
+
+	return (bool) dot11Caps.ibss;
+}
+#endif
 
 bool csr_is_conn_state_connected_wds(struct mac_context *mac_ctx,
 				     uint32_t session_id)
@@ -679,19 +707,20 @@ bool csr_is_any_session_in_connect_state(struct mac_context *mac)
 	return false;
 }
 
-uint8_t csr_get_infra_operation_channel(struct mac_context *mac, uint8_t sessionId)
+uint32_t csr_get_infra_operation_chan_freq(
+	struct mac_context *mac, uint8_t vdev_id)
 {
-	uint8_t channel;
+	uint32_t chan_freq = 0;
+	struct csr_roam_session *session;
 
-	if (CSR_IS_SESSION_VALID(mac, sessionId)) {
-		channel = wlan_reg_freq_to_chan(
-				mac->pdev,
-				mac->roam.roamSession[sessionId].
-				connectedProfile.op_freq);
-	} else {
-		channel = 0;
-	}
-	return channel;
+	session = CSR_GET_SESSION(mac, vdev_id);
+	if (!session)
+		return chan_freq;
+
+	if (CSR_IS_SESSION_VALID(mac, vdev_id))
+		chan_freq = session->connectedProfile.op_freq;
+
+	return chan_freq;
 }
 
 bool csr_is_session_client_and_connected(struct mac_context *mac, uint8_t sessionId)
@@ -741,7 +770,7 @@ uint8_t csr_get_concurrent_operation_channel(struct mac_context *mac_ctx)
 	return 0;
 }
 
-uint8_t csr_get_beaconing_concurrent_channel(struct mac_context *mac_ctx,
+uint32_t csr_get_beaconing_concurrent_channel(struct mac_context *mac_ctx,
 					     uint8_t vdev_id_to_skip)
 {
 	struct csr_roam_session *session = NULL;
@@ -761,9 +790,7 @@ uint8_t csr_get_beaconing_concurrent_channel(struct mac_context *mac_ctx,
 		     (persona == QDF_SAP_MODE)) &&
 		     (session->connectState !=
 		      eCSR_ASSOC_STATE_TYPE_NOT_CONNECTED))
-			return wlan_reg_freq_to_chan(
-					mac_ctx->pdev,
-					session->connectedProfile.op_freq);
+			return session->connectedProfile.op_freq;
 	}
 
 	return 0;
@@ -1000,6 +1027,7 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 	uint16_t sap_cfreq = 0;
 	uint16_t sap_lfreq, sap_hfreq, intf_lfreq, intf_hfreq, sap_cch = 0;
 	QDF_STATUS status;
+	uint32_t intf_ch_freq;
 
 	sme_debug("sap_ch: %d sap_phymode: %d", sap_ch, sap_phymode);
 
@@ -1099,22 +1127,23 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 			    QDF_MCC_TO_SCC_WITH_PREFERRED_BAND)
 				intf_ch = 0;
 		} else if (cc_switch_mode ==
-			QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL) {
-			status =
-				policy_mgr_get_sap_mandatory_channel(
-				mac_ctx->psoc,
-				&intf_ch);
+			   QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL) {
+			status = policy_mgr_get_sap_mandatory_channel(
+					mac_ctx->psoc,
+					&intf_ch_freq);
 			if (QDF_IS_STATUS_ERROR(status))
 				sme_err("no mandatory channel");
+			intf_ch = wlan_freq_to_chan(intf_ch_freq);
 		}
 	} else if ((intf_ch == sap_ch) && (cc_switch_mode ==
 				QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL)) {
 		if (cds_chan_to_band(intf_ch) == CDS_BAND_2GHZ) {
 			status =
 				policy_mgr_get_sap_mandatory_channel(
-					mac_ctx->psoc, &intf_ch);
+					mac_ctx->psoc, &intf_ch_freq);
 			if (QDF_IS_STATUS_ERROR(status))
 				sme_err("no mandatory channel");
+			intf_ch = wlan_freq_to_chan(intf_ch_freq);
 		}
 	}
 
@@ -1239,24 +1268,11 @@ bool csr_is_valid_mc_concurrent_session(struct mac_context *mac_ctx,
 		return false;
 	if (QDF_STATUS_SUCCESS == csr_validate_mcc_beacon_interval(
 				mac_ctx,
-				wlan_reg_freq_to_chan(mac_ctx->pdev,
-						      bss_descr->chan_freq),
+				bss_descr->chan_freq,
 				&bss_descr->beaconInterval, session_id,
 				pSession->pCurRoamProfile->csrPersona))
 		return true;
 	return false;
-}
-
-static tSirMacCapabilityInfo csr_get_bss_capabilities(struct bss_description *
-						      pSirBssDesc)
-{
-	tSirMacCapabilityInfo dot11Caps;
-
-	/* tSirMacCapabilityInfo is 16-bit */
-	qdf_get_u16((uint8_t *) &pSirBssDesc->capabilityInfo,
-		    (uint16_t *) &dot11Caps);
-
-	return dot11Caps;
 }
 
 bool csr_is_infra_bss_desc(struct bss_description *pSirBssDesc)
@@ -1264,13 +1280,6 @@ bool csr_is_infra_bss_desc(struct bss_description *pSirBssDesc)
 	tSirMacCapabilityInfo dot11Caps = csr_get_bss_capabilities(pSirBssDesc);
 
 	return (bool) dot11Caps.ess;
-}
-
-bool csr_is_ibss_bss_desc(struct bss_description *pSirBssDesc)
-{
-	tSirMacCapabilityInfo dot11Caps = csr_get_bss_capabilities(pSirBssDesc);
-
-	return (bool) dot11Caps.ibss;
 }
 
 static bool csr_is_qos_bss_desc(struct bss_description *pSirBssDesc)
@@ -1677,7 +1686,14 @@ QDF_STATUS csr_get_phy_mode_from_bss(struct mac_context *mac,
 				phyMode = eCSR_DOT11_MODE_11ac;
 			if (pIes->he_cap.present)
 				phyMode = eCSR_DOT11_MODE_11ax;
+		} else if (WLAN_REG_IS_6GHZ_CHAN_FREQ(
+					pBSSDescription->chan_freq)) {
+			if (pIes->he_cap.present)
+				phyMode = eCSR_DOT11_MODE_11ax;
+			else
+				sme_debug("Warning - 6Ghz AP no he cap");
 		}
+
 		*pPhyMode = phyMode;
 	}
 
@@ -2291,7 +2307,7 @@ static uint16_t csr_calculate_mcc_beacon_interval(struct mac_context *mac,
  * Return: bool
  */
 static bool csr_validate_p2pcli_bcn_intrvl(struct mac_context *mac_ctx,
-		uint8_t chnl_id, uint16_t *bcn_interval, uint32_t session_id,
+		uint32_t ch_freq, uint16_t *bcn_interval, uint32_t session_id,
 		QDF_STATUS *status)
 {
 	struct csr_roam_session *roamsession;
@@ -2304,10 +2320,8 @@ static bool csr_validate_p2pcli_bcn_intrvl(struct mac_context *mac_ctx,
 		sme_debug("Ignore Beacon Interval Validation...");
 	} else if (roamsession->bssParams.bssPersona == QDF_P2P_GO_MODE) {
 		/* Check for P2P go scenario */
-		if ((roamsession->bssParams.operation_chan_freq !=
-		     wlan_reg_chan_to_freq(mac_ctx->pdev, chnl_id))
-			&& (roamsession->bssParams.beaconInterval !=
-				*bcn_interval)) {
+		if (roamsession->bssParams.operation_chan_freq != ch_freq &&
+		    roamsession->bssParams.beaconInterval != *bcn_interval) {
 			sme_err("BcnIntrvl is diff can't connect to P2P_GO network");
 			*status = QDF_STATUS_E_FAILURE;
 			return true;
@@ -2330,7 +2344,7 @@ static bool csr_validate_p2pcli_bcn_intrvl(struct mac_context *mac_ctx,
  * Return: bool
  */
 static bool csr_validate_p2pgo_bcn_intrvl(struct mac_context *mac_ctx,
-		uint8_t chnl_id, uint16_t *bcn_interval,
+		uint32_t ch_freq, uint16_t *bcn_interval,
 		uint32_t session_id, QDF_STATUS *status)
 {
 	struct csr_roam_session *roamsession;
@@ -2352,10 +2366,8 @@ static bool csr_validate_p2pgo_bcn_intrvl(struct mac_context *mac_ctx,
 			return false;
 
 		if (csr_is_conn_state_connected_infra(mac_ctx, session_id) &&
-			(wlan_reg_freq_to_chan(
-				mac_ctx->pdev,
-				conn_profile->op_freq) != chnl_id) &&
-			(conn_profile->beaconInterval != *bcn_interval)) {
+		    conn_profile->op_freq != ch_freq &&
+		    conn_profile->beaconInterval != *bcn_interval) {
 			/*
 			 * Updated beaconInterval should be used only when
 			 * we are starting a new BSS not incase of
@@ -2396,7 +2408,7 @@ static bool csr_validate_p2pgo_bcn_intrvl(struct mac_context *mac_ctx,
  * Return: bool
  */
 static bool csr_validate_sta_bcn_intrvl(struct mac_context *mac_ctx,
-			uint8_t chnl_id, uint16_t *bcn_interval,
+			uint32_t ch_freq, uint16_t *bcn_interval,
 			uint32_t session_id, QDF_STATUS *status)
 {
 	struct csr_roam_session *roamsession;
@@ -2413,9 +2425,8 @@ static bool csr_validate_sta_bcn_intrvl(struct mac_context *mac_ctx,
 		sme_debug("Bcn Intrvl validation not require for STA/CLIENT");
 		return false;
 	}
-	if ((roamsession->bssParams.bssPersona == QDF_SAP_MODE) &&
-		   (roamsession->bssParams.operation_chan_freq !=
-		    wlan_reg_chan_to_freq(mac_ctx->pdev, chnl_id))) {
+	if (roamsession->bssParams.bssPersona == QDF_SAP_MODE &&
+	    roamsession->bssParams.operation_chan_freq != ch_freq) {
 		/*
 		 * IF SAP has started and STA wants to connect
 		 * on different channel MCC should
@@ -2432,10 +2443,9 @@ static bool csr_validate_sta_bcn_intrvl(struct mac_context *mac_ctx,
 	 * beacon interval,
 	 * change the BI of the P2P-GO
 	 */
-	if ((roamsession->bssParams.bssPersona == QDF_P2P_GO_MODE) &&
-		(roamsession->bssParams.operation_chan_freq !=
-		 wlan_reg_chan_to_freq(mac_ctx->pdev, chnl_id)) &&
-		(roamsession->bssParams.beaconInterval != *bcn_interval)) {
+	if (roamsession->bssParams.bssPersona == QDF_P2P_GO_MODE &&
+	    roamsession->bssParams.operation_chan_freq != ch_freq &&
+	    roamsession->bssParams.beaconInterval != *bcn_interval) {
 		/* if GO in MCC support diff beacon interval, return success */
 		if (cfg_param->fAllowMCCGODiffBI == 0x01) {
 			*status = QDF_STATUS_SUCCESS;
@@ -2496,7 +2506,7 @@ static bool csr_validate_sta_bcn_intrvl(struct mac_context *mac_ctx,
 }
 
 QDF_STATUS csr_validate_mcc_beacon_interval(struct mac_context *mac_ctx,
-					    uint8_t chnl_id,
+					    uint32_t ch_freq,
 					    uint16_t *bcn_interval,
 					    uint32_t cur_session_id,
 					    enum QDF_OPMODE cur_bss_persona)
@@ -2518,15 +2528,16 @@ QDF_STATUS csr_validate_mcc_beacon_interval(struct mac_context *mac_ctx,
 
 		switch (cur_bss_persona) {
 		case QDF_STA_MODE:
-			is_done = csr_validate_sta_bcn_intrvl(mac_ctx, chnl_id,
-					bcn_interval, session_id, &status);
+			is_done = csr_validate_sta_bcn_intrvl(
+						mac_ctx, ch_freq, bcn_interval,
+						session_id, &status);
 			if (true == is_done)
 				return status;
 			break;
 
 		case QDF_P2P_CLIENT_MODE:
 			is_done = csr_validate_p2pcli_bcn_intrvl(mac_ctx,
-					chnl_id, bcn_interval, session_id,
+					ch_freq, bcn_interval, session_id,
 					&status);
 			if (true == is_done)
 				return status;
@@ -2538,7 +2549,7 @@ QDF_STATUS csr_validate_mcc_beacon_interval(struct mac_context *mac_ctx,
 
 		case QDF_P2P_GO_MODE:
 			is_done = csr_validate_p2pgo_bcn_intrvl(mac_ctx,
-					chnl_id, bcn_interval,
+					ch_freq, bcn_interval,
 					session_id, &status);
 			if (true == is_done)
 				return status;
@@ -5606,13 +5617,6 @@ bool csr_is_bssid_match(struct qdf_mac_addr *pProfBssid,
 	return fMatch;
 }
 
-bool csr_is_bss_type_ibss(eCsrRoamBssType bssType)
-{
-	return (bool)
-		(eCSR_BSS_TYPE_START_IBSS == bssType
-		 || eCSR_BSS_TYPE_IBSS == bssType);
-}
-
 /**
  * csr_is_aggregate_rate_supported() - to check if aggregate rate is supported
  * @mac_ctx: pointer to mac context
@@ -5944,23 +5948,6 @@ void csr_release_profile(struct mac_context *mac, struct csr_roam_profile *pProf
 		}
 		csr_free_fils_profile_info(pProfile);
 		qdf_mem_zero(pProfile, sizeof(struct csr_roam_profile));
-	}
-}
-
-void csr_free_scan_filter(struct mac_context *mac, tCsrScanResultFilter
-						*pScanFilter)
-{
-	if (pScanFilter->BSSIDs.bssid) {
-		qdf_mem_free(pScanFilter->BSSIDs.bssid);
-		pScanFilter->BSSIDs.bssid = NULL;
-	}
-	if (pScanFilter->ChannelInfo.freq_list) {
-		qdf_mem_free(pScanFilter->ChannelInfo.freq_list);
-		pScanFilter->ChannelInfo.freq_list = NULL;
-	}
-	if (pScanFilter->SSIDs.SSIDList) {
-		qdf_mem_free(pScanFilter->SSIDs.SSIDList);
-		pScanFilter->SSIDs.SSIDList = NULL;
 	}
 }
 
@@ -6388,16 +6375,18 @@ bool csr_is_ndi_started(struct mac_context *mac_ctx, uint32_t session_id)
 	return eCSR_CONNECT_STATE_TYPE_NDI_STARTED == session->connectState;
 }
 
-bool csr_is_mcc_channel(struct mac_context *mac_ctx, uint8_t channel)
+bool csr_is_mcc_channel(struct mac_context *mac_ctx, uint32_t chan_freq)
 {
 	struct csr_roam_session *session;
 	enum QDF_OPMODE oper_mode;
-	uint8_t oper_channel = 0;
+	uint32_t oper_chan_freq = 0;
 	uint8_t session_id;
+	bool hw_dbs_capable, same_band_freqs;
 
-	if (channel == 0)
+	if (chan_freq == 0)
 		return false;
 
+	hw_dbs_capable = policy_mgr_is_hw_dbs_capable(mac_ctx->psoc);
 	for (session_id = 0; session_id < WLAN_MAX_VDEVS; session_id++) {
 		if (CSR_IS_SESSION_VALID(mac_ctx, session_id)) {
 			session = CSR_GET_SESSION(mac_ctx, session_id);
@@ -6412,15 +6401,14 @@ bool csr_is_mcc_channel(struct mac_context *mac_ctx, uint8_t channel)
 			    (oper_mode == QDF_SAP_MODE))
 			    && (session->connectState !=
 			    eCSR_ASSOC_STATE_TYPE_NOT_CONNECTED)))
-				oper_channel =
-				wlan_reg_freq_to_chan(
-					mac_ctx->pdev,
-					session->connectedProfile.op_freq);
+				oper_chan_freq =
+					session->connectedProfile.op_freq;
 
-			if (oper_channel && channel != oper_channel &&
-			    (!policy_mgr_is_hw_dbs_capable(mac_ctx->psoc) ||
-			    WLAN_REG_IS_SAME_BAND_CHANNELS(channel,
-						 oper_channel)))
+			same_band_freqs = WLAN_REG_IS_SAME_BAND_FREQS(
+				chan_freq, oper_chan_freq);
+
+			if (oper_chan_freq && chan_freq != oper_chan_freq &&
+			    (!hw_dbs_capable || same_band_freqs))
 				return true;
 		}
 	}

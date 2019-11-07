@@ -63,6 +63,8 @@
 #include "cfg_ucfg_api.h"
 #include "target_type.h"
 #include "wlan_hdd_object_manager.h"
+#include "nan_public_structs.h"
+#include "nan_ucfg_api.h"
 
 #if defined(QCA_LL_TX_FLOW_CONTROL_V2) || defined(QCA_LL_PDEV_TX_FLOW_CONTROL)
 /*
@@ -125,6 +127,7 @@ void hdd_tx_resume_timer_expired_handler(void *adapter_context)
 {
 	struct hdd_adapter *adapter = (struct hdd_adapter *)adapter_context;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	u32 p_qpaused;
 	u32 np_qpaused;
 
@@ -133,6 +136,10 @@ void hdd_tx_resume_timer_expired_handler(void *adapter_context)
 		return;
 	}
 
+	cdp_display_stats(soc, CDP_DUMP_TX_FLOW_POOL_INFO,
+			  QDF_STATS_VERBOSITY_LEVEL_LOW);
+	wlan_hdd_display_netif_queue_history(hdd_ctx,
+					     QDF_STATS_VERBOSITY_LEVEL_LOW);
 	hdd_debug("Enabling queues");
 	spin_lock_bh(&adapter->pause_map_lock);
 	p_qpaused = adapter->pause_map & BIT(WLAN_DATA_FLOW_CONTROL_PRIORITY);
@@ -351,6 +358,7 @@ void hdd_get_tx_resource(struct hdd_adapter *adapter,
 {
 	if (false ==
 	    cdp_fc_get_tx_resource(cds_get_context(QDF_MODULE_ID_SOC),
+				   cds_get_context(QDF_MODULE_ID_TXRX),
 				   *mac_addr,
 				   adapter->tx_flow_low_watermark,
 				   adapter->tx_flow_hi_watermark_offset)) {
@@ -496,50 +504,6 @@ void wlan_hdd_classify_pkt(struct sk_buff *skb)
 }
 
 /**
- * hdd_get_transmit_sta_id() - function to retrieve station id to be used for
- * sending traffic towards a particular destination address. The destination
- * address can be unicast, multicast or broadcast
- *
- * @adapter: Handle to adapter context
- * @dst_addr: Destination address
- * @station_id: station id
- *
- * Returns: None
- */
-static void hdd_get_transmit_sta_id(struct hdd_adapter *adapter,
-			struct sk_buff *skb, uint8_t *station_id)
-{
-	bool mcbc_addr = false;
-	QDF_STATUS status;
-	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-	struct qdf_mac_addr *dst_addr = NULL;
-
-	dst_addr = (struct qdf_mac_addr *)skb->data;
-	status = hdd_get_peer_sta_id(sta_ctx, dst_addr, station_id);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		if (QDF_NBUF_CB_GET_IS_BCAST(skb) ||
-				QDF_NBUF_CB_GET_IS_MCAST(skb)) {
-			hdd_debug("Received MC/BC packet for transmission");
-			mcbc_addr = true;
-		}
-	}
-
-	if (adapter->device_mode == QDF_IBSS_MODE ||
-		adapter->device_mode == QDF_NDI_MODE) {
-		/*
-		 * This check is necessary to make sure station id is not
-		 * overwritten for UC traffic in IBSS or NDI mode
-		 */
-		if (mcbc_addr)
-			*station_id = sta_ctx->broadcast_sta_id;
-	} else {
-		/* For the rest, traffic is directed to AP/P2P GO */
-		if (eConnectionState_Associated == sta_ctx->conn_info.conn_state)
-			*station_id = sta_ctx->conn_info.sta_id[0];
-	}
-}
-
-/**
  * hdd_clear_tx_rx_connectivity_stats() - clear connectivity stats
  * @hdd_ctx: pointer to HDD Station Context
  *
@@ -595,20 +559,24 @@ void hdd_reset_all_adapters_connectivity_stats(struct hdd_context *hdd_ctx)
  *
  * Return: true if Tx is allowed and false otherwise.
  */
-static inline bool hdd_is_tx_allowed(struct sk_buff *skb, uint8_t peer_id)
+static inline bool hdd_is_tx_allowed(struct sk_buff *skb, uint8_t *peer_mac)
 {
 	enum ol_txrx_peer_state peer_state;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	void *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 	void *peer;
+	/* Will be removed in Phase 3 cleanup */
+	uint8_t peer_id;
 
 	QDF_BUG(soc);
 	QDF_BUG(pdev);
 
-	peer = cdp_peer_find_by_local_id(soc, pdev, peer_id);
+	peer = cdp_peer_find_by_addr(soc, pdev, peer_mac, &peer_id);
 
 	if (!peer) {
-		hdd_err_rl("Unable to find peer entry for sta_id: %d", peer_id);
+		hdd_err_rl("Unable to find peer entry for sta: "
+			   QDF_MAC_ADDR_STR,
+			   QDF_MAC_ADDR_ARRAY(peer_mac));
 		return false;
 	}
 
@@ -888,6 +856,64 @@ void hdd_tx_rx_collect_connectivity_stats_info(struct sk_buff *skb,
 }
 
 /**
+ * hdd_is_xmit_allowed_on_ndi() - Verify if xmit is allowed on NDI
+ * @adapter: The adapter structure
+ *
+ * Return: True if xmit is allowed on NDI and false otherwise
+ */
+static bool hdd_is_xmit_allowed_on_ndi(struct hdd_adapter *adapter)
+{
+	enum nan_datapath_state state;
+
+	state = ucfg_nan_get_ndi_state(adapter->vdev);
+	return (state == NAN_DATA_NDI_CREATED_STATE ||
+		state == NAN_DATA_CONNECTED_STATE ||
+		state == NAN_DATA_CONNECTING_STATE ||
+		state == NAN_DATA_PEER_CREATE_STATE);
+}
+
+/**
+ * hdd_get_transmit_mac_addr() - Get the mac address to validate the xmit
+ * @adapter: The adapter structure
+ * @skb: The network buffer
+ * @mac_addr_tx_allowed: The mac address to be filled
+ *
+ * Return: None
+ */
+static
+void hdd_get_transmit_mac_addr(struct hdd_adapter *adapter, struct sk_buff *skb,
+			       struct qdf_mac_addr *mac_addr_tx_allowed)
+{
+	struct hdd_station_ctx *sta_ctx = &adapter->session.station;
+	bool is_mc_bc_addr = false;
+
+	if (QDF_NBUF_CB_GET_IS_BCAST(skb) || QDF_NBUF_CB_GET_IS_MCAST(skb))
+		is_mc_bc_addr = true;
+
+	if (adapter->device_mode == QDF_IBSS_MODE) {
+		if (is_mc_bc_addr)
+			qdf_copy_macaddr(mac_addr_tx_allowed,
+					 &adapter->mac_addr);
+		else
+			qdf_copy_macaddr(mac_addr_tx_allowed,
+					 (struct qdf_mac_addr *)skb->data);
+	} else if (adapter->device_mode == QDF_NDI_MODE &&
+		   hdd_is_xmit_allowed_on_ndi(adapter)) {
+		if (is_mc_bc_addr)
+			qdf_copy_macaddr(mac_addr_tx_allowed,
+					 &adapter->mac_addr);
+		else
+			qdf_copy_macaddr(mac_addr_tx_allowed,
+					 (struct qdf_mac_addr *)skb->data);
+	} else {
+		if (sta_ctx->conn_info.conn_state ==
+		    eConnectionState_Associated)
+			qdf_copy_macaddr(mac_addr_tx_allowed,
+					 &sta_ctx->conn_info.bssid);
+	}
+}
+
+/**
  * __hdd_hard_start_xmit() - Transmit a frame
  * @skb: pointer to OS packet (sk_buff)
  * @dev: pointer to network device
@@ -908,12 +934,13 @@ static void __hdd_hard_start_xmit(struct sk_buff *skb,
 	enum sme_qos_wmmuptype up;
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	bool granted;
-	uint8_t STAId;
 	struct hdd_station_ctx *sta_ctx = &adapter->session.station;
 	struct qdf_mac_addr *mac_addr;
+	struct qdf_mac_addr mac_addr_tx_allowed = QDF_MAC_ADDR_ZERO_INIT;
 	uint8_t pkt_type = 0;
 	bool is_arp = false;
 	struct wlan_objmgr_vdev *vdev;
+	struct hdd_context *hdd_ctx;
 
 #ifdef QCA_WIFI_FTM
 	if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE) {
@@ -933,6 +960,13 @@ static void __hdd_hard_start_xmit(struct sk_buff *skb,
 		goto drop_pkt;
 	}
 
+	hdd_ctx = adapter->hdd_ctx;
+	if (wlan_hdd_validate_context(hdd_ctx)) {
+		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_INFO_HIGH,
+			  "Invalid HDD context");
+		goto drop_pkt;
+	}
+
 	wlan_hdd_classify_pkt(skb);
 	if (QDF_NBUF_CB_GET_PACKET_TYPE(skb) == QDF_NBUF_CB_PACKET_TYPE_ARP) {
 		is_arp = true;
@@ -949,18 +983,10 @@ static void __hdd_hard_start_xmit(struct sk_buff *skb,
 		hdd_tx_rx_collect_connectivity_stats_info(skb, adapter,
 						PKT_TYPE_REQ, &pkt_type);
 
-	if (cds_is_driver_recovering()) {
-		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_WARN,
-			"Recovery in progress, dropping the packet");
-		goto drop_pkt;
-	}
-
-	STAId = HDD_WLAN_INVALID_STA_ID;
-
-	hdd_get_transmit_sta_id(adapter, skb, &STAId);
-	if (STAId >= WLAN_MAX_STA_COUNT) {
+	hdd_get_transmit_mac_addr(adapter, skb, &mac_addr_tx_allowed);
+	if (qdf_is_macaddr_zero(&mac_addr_tx_allowed)) {
 		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_INFO_HIGH,
-			  "Invalid station id, transmit operation suspended");
+			  "tx not allowed, transmit operation suspended");
 		goto drop_pkt;
 	}
 
@@ -1066,10 +1092,12 @@ static void __hdd_hard_start_xmit(struct sk_buff *skb,
 		hdd_objmgr_put_vdev(vdev);
 	}
 
-	if (qdf_nbuf_is_tso(skb))
+	if (qdf_nbuf_is_tso(skb)) {
 		adapter->stats.tx_packets += qdf_nbuf_get_tso_num_seg(skb);
-	else
+	} else {
 		++adapter->stats.tx_packets;
+		hdd_ctx->no_tx_offload_pkt_cnt++;
+	}
 
 	hdd_event_eapol_log(skb, QDF_TX);
 	QDF_NBUF_CB_TX_PACKET_TRACK(skb) = QDF_NBUF_TX_PKT_DATA_TRACK;
@@ -1082,9 +1110,12 @@ static void __hdd_hard_start_xmit(struct sk_buff *skb,
 			sizeof(qdf_nbuf_data(skb)),
 			QDF_TX));
 
-	if (!hdd_is_tx_allowed(skb, STAId)) {
-		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_INFO_HIGH,
-			  FL("Tx not allowed for sta_id: %d"), STAId);
+	if (!hdd_is_tx_allowed(skb, mac_addr_tx_allowed.bytes)) {
+		QDF_TRACE(QDF_MODULE_ID_HDD_DATA,
+			  QDF_TRACE_LEVEL_INFO_HIGH,
+			  FL("Tx not allowed for sta: "
+			  QDF_MAC_ADDR_STR), QDF_MAC_ADDR_ARRAY(
+			  mac_addr_tx_allowed.bytes));
 		++adapter->hdd_stats.tx_rx_stats.tx_dropped_ac[ac];
 		goto drop_pkt_and_release_skb;
 	}
@@ -1113,8 +1144,9 @@ static void __hdd_hard_start_xmit(struct sk_buff *skb,
 	if (adapter->tx_fn(adapter->txrx_vdev,
 		 (qdf_nbuf_t)skb) != NULL) {
 		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_INFO_HIGH,
-			  "%s: Failed to send packet to txrx for sta_id: %d",
-			  __func__, STAId);
+			  "%s: Failed to send packet to txrx for sta_id: "
+			  QDF_MAC_ADDR_STR,
+			  __func__, QDF_MAC_ADDR_ARRAY(mac_addr->bytes));
 		++adapter->hdd_stats.tx_rx_stats.tx_dropped_ac[ac];
 		goto drop_pkt_and_release_skb;
 	}
@@ -1172,23 +1204,6 @@ netdev_tx_t hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *net_dev)
 	return NETDEV_TX_OK;
 }
 
-QDF_STATUS hdd_get_peer_sta_id(struct hdd_station_ctx *sta_ctx,
-			       struct qdf_mac_addr *mac_address,
-			       uint8_t *sta_id)
-{
-	uint8_t idx;
-
-	for (idx = 0; idx < MAX_PEERS; idx++) {
-		if (!qdf_mem_cmp(&sta_ctx->conn_info.peer_macaddr[idx],
-				 mac_address, QDF_MAC_ADDR_SIZE)) {
-			*sta_id = sta_ctx->conn_info.sta_id[idx];
-			return QDF_STATUS_SUCCESS;
-		}
-	}
-
-	return QDF_STATUS_E_FAILURE;
-}
-
 /**
  * __hdd_tx_timeout() - TX timeout handler
  * @dev: pointer to network device
@@ -1229,11 +1244,11 @@ static void __hdd_tx_timeout(struct net_device *dev)
 
 	for (i = 0; i < NUM_TX_QUEUES; i++) {
 		txq = netdev_get_tx_queue(dev, i);
-		hdd_info("Queue: %d status: %d txq->trans_start: %lu",
-			 i, netif_tx_queue_stopped(txq), txq->trans_start);
+		hdd_debug("Queue: %d status: %d txq->trans_start: %lu",
+			  i, netif_tx_queue_stopped(txq), txq->trans_start);
 	}
 
-	hdd_info("carrier state: %d", netif_carrier_ok(dev));
+	hdd_debug("carrier state: %d", netif_carrier_ok(dev));
 
 	wlan_hdd_display_netif_queue_history(hdd_ctx,
 					     QDF_STATS_VERBOSITY_LEVEL_HIGH);
@@ -1798,7 +1813,8 @@ int hdd_rx_ol_init(struct hdd_context *hdd_ctx)
 	bool lithium_based_target = false;
 
 	if (hdd_ctx->target_type == TARGET_TYPE_QCA6290 ||
-	    hdd_ctx->target_type == TARGET_TYPE_QCA6390)
+	    hdd_ctx->target_type == TARGET_TYPE_QCA6390 ||
+	    hdd_ctx->target_type == TARGET_TYPE_QCA6490)
 		lithium_based_target = true;
 
 	hdd_resolve_rx_ol_mode(hdd_ctx);
@@ -1909,10 +1925,26 @@ QDF_STATUS hdd_rx_thread_gro_flush_ind_cbk(void *adapter, int rx_ctx_id)
 QDF_STATUS hdd_rx_pkt_thread_enqueue_cbk(void *adapter,
 					 qdf_nbuf_t nbuf_list)
 {
+	struct hdd_adapter *hdd_adapter;
+	uint8_t vdev_id;
+	qdf_nbuf_t head_ptr;
+
 	if (qdf_unlikely(!adapter || !nbuf_list)) {
 		hdd_err("Null params being passed");
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	hdd_adapter = (struct hdd_adapter *)adapter;
+	if (hdd_validate_adapter(hdd_adapter))
+		return QDF_STATUS_E_FAILURE;
+
+	vdev_id = hdd_adapter->vdev_id;
+	head_ptr = nbuf_list;
+	while (head_ptr) {
+		qdf_nbuf_cb_update_vdev_id(head_ptr, vdev_id);
+		head_ptr = qdf_nbuf_next(head_ptr);
+	}
+
 	return dp_rx_enqueue_pkt(cds_get_context(QDF_MODULE_ID_SOC), nbuf_list);
 }
 
@@ -2650,6 +2682,7 @@ int hdd_set_mon_rx_cb(struct net_device *dev)
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	void *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 
+	WLAN_ADDR_COPY(sta_desc.peer_addr.bytes, adapter->mac_addr.bytes);
 	qdf_mem_zero(&txrx_ops, sizeof(txrx_ops));
 	txrx_ops.rx.rx = hdd_mon_rx_packet_cbk;
 	hdd_monitor_set_rx_monitor_cb(&txrx_ops, hdd_rx_monitor_callback);
@@ -2843,6 +2876,7 @@ void hdd_reset_tcp_delack(struct hdd_context *hdd_ctx)
  *
  * Return: True if vote level is high
  */
+#ifdef RX_PERFORMANCE
 bool hdd_is_current_high_throughput(struct hdd_context *hdd_ctx)
 {
 	if (hdd_ctx->cur_vote_level < PLD_BUS_WIDTH_MEDIUM)
@@ -2850,6 +2884,7 @@ bool hdd_is_current_high_throughput(struct hdd_context *hdd_ctx)
 	else
 		return true;
 }
+#endif
 #endif
 
 #ifdef QCA_LL_LEGACY_TX_FLOW_CONTROL
@@ -3087,4 +3122,25 @@ void hdd_dp_cfg_update(struct wlan_objmgr_psoc *psoc,
 	config->cfg_wmi_credit_cnt = cfg_get(psoc, CFG_DP_HTC_WMI_CREDIT_CNT);
 	hdd_dp_dp_trace_cfg_update(config, psoc);
 	hdd_dp_nud_tracking_cfg_update(config, psoc);
+}
+
+bool wlan_hdd_rx_rpm_mark_last_busy(struct hdd_context *hdd_ctx,
+				    void *hif_ctx)
+{
+	uint64_t duration_us, dp_rx_busy_us, current_us;
+	uint32_t rpm_delay_ms;
+
+	if (!hif_pm_runtime_is_dp_rx_busy(hif_ctx))
+		return false;
+
+	dp_rx_busy_us = hif_pm_runtime_get_dp_rx_busy_mark(hif_ctx);
+	current_us = qdf_get_log_timestamp_usecs();
+	duration_us = (unsigned long)((ULONG_MAX - dp_rx_busy_us) +
+				      current_us + 1);
+	rpm_delay_ms = ucfg_pmo_get_runtime_pm_delay(hdd_ctx->psoc);
+
+	if ((duration_us / 1000) < rpm_delay_ms)
+		return true;
+	else
+		return false;
 }

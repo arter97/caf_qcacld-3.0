@@ -206,7 +206,7 @@ struct bss_config_param {
 	eCsrMediaAccessType qosType;
 	tSirMacSSid SSID;
 	enum csr_cfgdot11mode uCfgDot11Mode;
-	enum band_info band;
+	enum reg_wifi_band band;
 	tAniAuthType authType;
 	eCsrEncryptionType encType;
 	uint32_t uShortSlotTime;
@@ -346,8 +346,8 @@ struct csr_config {
 	bool mcc_rts_cts_prot_enable;
 	bool mcc_bcast_prob_resp_enable;
 	uint8_t fAllowMCCGODiffBI;
-	uint8_t AdHocChannel24;
-	uint8_t AdHocChannel5G;
+	uint32_t ad_hoc_ch_freq_2g;
+	uint32_t ad_hoc_ch_freq_5g;
 	/* each RSSI category has one value */
 	uint32_t BssPreferValue[CSR_NUM_RSSI_CAT];
 	int RSSICat[CSR_NUM_RSSI_CAT];
@@ -542,7 +542,6 @@ struct csr_roam_session {
 	/* For BT-AMP station, this serve as BSSID for self-BSS. */
 	struct qdf_mac_addr self_mac_addr;
 
-	csr_session_open_cb  session_open_cb;
 	csr_session_close_cb session_close_cb;
 	csr_roam_complete_cb callback;
 	void *pContext;
@@ -557,11 +556,6 @@ struct csr_roam_session {
 	uint16_t curr_cache_idx; /* the index in pmkidcache to write next to */
 	tPmkidCacheInfo PmkidCacheInfo[CSR_MAX_PMKID_ALLOWED];
 	uint8_t cJoinAttemps;
-	/*
-	 * This may or may not have the up-to-date valid channel list. It is
-	 * used to get CFG_VALID_CHANNEL_LIST and not alloc memory all time
-	 */
-	tSirMacChanNum validChannelList[CFG_VALID_CHANNEL_LIST_LEN];
 	int32_t sPendingCommands;   /* 0 means CSR is ok to low power */
 #ifdef FEATURE_WLAN_WAPI
 	uint16_t NumBkidCache;
@@ -623,7 +617,6 @@ struct csr_roam_session {
 	bool isPrevApInfoValid;
 	tSirMacSSid prevApSSID;
 	struct qdf_mac_addr prevApBssid;
-	uint8_t prevOpChannel;
 	uint16_t clientDissSecs;
 	uint32_t roamTS1;
 	tCsrEseCckmIe suppCckmIeInfo;
@@ -674,7 +667,7 @@ struct csr_roamstruct {
 	 * This may or may not have the up-to-date valid channel list. It is
 	 * used to get CFG_VALID_CHANNEL_LIST and not alloc mem all time
 	 */
-	tSirMacChanNum validChannelList[CFG_VALID_CHANNEL_LIST_LEN];
+	uint32_t valid_ch_freq_list[CFG_VALID_CHANNEL_LIST_LEN];
 	uint32_t numValidChannels;       /* total number of channels in CFG */
 	int32_t sPendingCommands;
 	qdf_mc_timer_t hTimerWaitForKey; /* support timeout for WaitForKey */
@@ -827,8 +820,7 @@ struct csr_roamstruct {
 #define CSR_IS_OPERATING_BG_BAND(mac) \
 	(CSR_IS_OPEARTING_DUAL_BAND((mac)) || \
 		CSR_IS_RADIO_BG_ONLY((mac)) || CSR_IS_24_BAND_ONLY((mac)))
-#define CSR_GET_BAND(ch_num) \
-	((WLAN_REG_IS_24GHZ_CH(ch_num)) ? BAND_2G : BAND_5G)
+
 #define CSR_IS_ROAMING(pSession) \
 	((CSR_IS_LOSTLINK_ROAMING((pSession)->roamingReason)) || \
 		(eCsrDynamicRoaming == (pSession)->roamingReason)  ||	\
@@ -860,17 +852,66 @@ void csr_set_global_cfgs(struct mac_context *mac);
 void csr_set_default_dot11_mode(struct mac_context *mac);
 bool csr_is_conn_state_disconnected(struct mac_context *mac,
 						   uint32_t sessionId);
-bool csr_is_conn_state_connected_ibss(struct mac_context *mac,
-						      uint32_t sessionId);
-bool csr_is_conn_state_disconnected_ibss(struct mac_context *mac,
-							   uint32_t sessionId);
 bool csr_is_conn_state_connected_infra(struct mac_context *mac,
 							uint32_t sessionId);
 bool csr_is_conn_state_connected(struct mac_context *mac,
 					       uint32_t sessionId);
 bool csr_is_conn_state_infra(struct mac_context *mac,
 					uint32_t sessionId);
+
+#ifdef QCA_IBSS_SUPPORT
+/**
+ * csr_is_conn_state_ibss() - get the connection state for ibss session
+ * @mac_ctx:  pointer to global mac structure
+ * @sessionId: session id
+ *
+ *
+ * Return: true if IBSS connected/disconnected state, else flase
+ */
 bool csr_is_conn_state_ibss(struct mac_context *mac, uint32_t sessionId);
+
+/**
+ * csr_is_conn_state_connected_ibss() - get the connected state for ibss
+ * @mac_ctx:  pointer to global mac structure
+ * @sessionId: session id
+ *
+ *
+ * Return: true if IBSS connected state, else false
+ */
+bool csr_is_conn_state_connected_ibss(struct mac_context *mac,
+				      uint32_t sessionId);
+
+/**
+ * csr_is_conn_state_connected_ibss() - get the connected state for ibss
+ * @mac_ctx:  pointer to global mac structure
+ * @sessionId: session id
+ *
+ *
+ * Return: true if IBSS disconnected state, else false
+ */
+bool csr_is_conn_state_disconnected_ibss(struct mac_context *mac,
+					 uint32_t sessionId);
+#else
+static inline bool
+csr_is_conn_state_ibss(struct mac_context *mac, uint32_t sessionId)
+{
+	return false;
+}
+
+static inline bool
+csr_is_conn_state_connected_ibss(struct mac_context *mac, uint32_t sessionId)
+{
+	return false;
+}
+
+static inline bool
+csr_is_conn_state_disconnected_ibss(struct mac_context *mac,
+				    uint32_t sessionId)
+{
+	return false;
+}
+#endif
+
 bool csr_is_conn_state_wds(struct mac_context *mac, uint32_t sessionId);
 bool csr_is_conn_state_connected_wds(struct mac_context *mac,
 						    uint32_t sessionId);
@@ -921,8 +962,18 @@ uint8_t csr_construct_wapi_ie(struct mac_context *mac, uint32_t sessionId,
 void csr_set_cfg_privacy(struct mac_context *mac,
 			 struct csr_roam_profile *pProfile,
 			 bool fPrivacy);
-uint8_t csr_get_infra_operation_channel(struct mac_context *mac,
-							uint8_t sessionId);
+
+/**
+ * csr_get_infra_operation_chan_freq() - get operating chan freq of
+ * given vdev id
+ * @mac_ctx: Pointer to mac context
+ * @vdev_id: vdev id
+ *
+ * Return: chan freq of given vdev id
+ */
+uint32_t csr_get_infra_operation_chan_freq(
+	struct mac_context *mac, uint8_t vdev_id);
+
 bool csr_is_session_client_and_connected(struct mac_context *mac,
 		uint8_t sessionId);
 /**
@@ -939,7 +990,7 @@ uint8_t csr_get_concurrent_operation_channel(struct mac_context *mac_ctx);
 
 /**
  * csr_get_beaconing_concurrent_channel() - To get concurrent operating channel
- * of beaconing interface
+ * frequency of beaconing interface
  * @mac_ctx: Pointer to mac context
  * @vdev_id_to_skip: channel of which vdev id to skip
  *
@@ -947,10 +998,10 @@ uint8_t csr_get_concurrent_operation_channel(struct mac_context *mac_ctx);
  * and will skip the channel of vdev_id_to_skip.
  * If other no reqested mode is active it will return 0
  *
- * Return: uint8_t
+ * Return: uint32_t
  */
-uint8_t csr_get_beaconing_concurrent_channel(struct mac_context *mac_ctx,
-						 uint8_t vdev_id_to_skip);
+uint32_t csr_get_beaconing_concurrent_channel(struct mac_context *mac_ctx,
+					      uint8_t vdev_id_to_skip);
 
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 uint16_t csr_check_concurrent_channel_overlap(
@@ -1012,7 +1063,7 @@ QDF_STATUS csr_roam_start_beacon_req(struct mac_context *mac,
 
 QDF_STATUS csr_roam_send_chan_sw_ie_request(struct mac_context *mac,
 					    struct qdf_mac_addr bssid,
-					    uint8_t targetChannel,
+					    uint32_t target_chan_freq,
 					    uint8_t csaIeReqd,
 					    struct ch_params *ch_params);
 QDF_STATUS csr_roam_modify_add_ies(struct mac_context *mac,
@@ -1132,9 +1183,9 @@ QDF_STATUS csr_roam_update_config(
 /**
  * csr_is_mcc_channel() - check if using the channel results into MCC
  * @mac_ctx: pointer to global MAC context
- * @channel : channel number to check for MCC scenario
+ * @chan_freq: channel frequency to check for MCC scenario
  *
  * Return : true if channel causes MCC, else false
  */
-bool csr_is_mcc_channel(struct mac_context *mac_ctx, uint8_t channel);
+bool csr_is_mcc_channel(struct mac_context *mac_ctx, uint32_t chan_freq);
 #endif

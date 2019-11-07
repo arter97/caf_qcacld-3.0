@@ -417,9 +417,8 @@ static int __tdls_get_all_peers_from_list(
 			if (buf_len < 32 + 1)
 				break;
 			len = qdf_scnprintf(buf, buf_len,
-				QDF_MAC_ADDR_STR "%3d%4s%3s%5d\n",
+				QDF_MAC_ADDR_STR "%4s%3s%5d\n",
 				QDF_MAC_ADDR_ARRAY(curr_peer->peer_mac.bytes),
-				curr_peer->sta_id,
 				(curr_peer->tdls_support ==
 				 TDLS_CAP_SUPPORTED) ? "Y" : "N",
 				TDLS_IS_LINK_CONNECTED(curr_peer) ? "Y" :
@@ -489,16 +488,10 @@ static QDF_STATUS tdls_process_reset_all_peers(struct wlan_objmgr_vdev *vdev)
 		return status;
 	}
 
-	if (!tdls_soc->connected_peer_count) {
-		tdls_debug("No tdls connected peers");
-		return status;
-	}
-
 	reset_session_id = tdls_vdev->session_id;
 	for (staidx = 0; staidx < tdls_soc->max_num_tdls_sta;
 							staidx++) {
-		if (tdls_soc->tdls_conn_info[staidx].sta_id
-						== INVALID_TDLS_PEER_ID)
+		if (!tdls_soc->tdls_conn_info[staidx].valid_entry)
 			continue;
 		if (tdls_soc->tdls_conn_info[staidx].session_id !=
 		    reset_session_id)
@@ -511,8 +504,8 @@ static QDF_STATUS tdls_process_reset_all_peers(struct wlan_objmgr_vdev *vdev)
 		if (!curr_peer)
 			continue;
 
-		tdls_notice("indicate TDLS teardown (staId %d)",
-			    curr_peer->sta_id);
+		tdls_notice("indicate TDLS teardown %pM",
+			    curr_peer->peer_mac.bytes);
 
 		/* Indicate teardown to supplicant */
 		tdls_indicate_teardown(tdls_vdev,
@@ -527,7 +520,7 @@ static QDF_STATUS tdls_process_reset_all_peers(struct wlan_objmgr_vdev *vdev)
 					wlan_vdev_get_id(vdev),
 					&curr_peer->peer_mac);
 		tdls_decrement_peer_count(tdls_soc);
-		tdls_soc->tdls_conn_info[staidx].sta_id = INVALID_TDLS_PEER_ID;
+		tdls_soc->tdls_conn_info[staidx].valid_entry = false;
 		tdls_soc->tdls_conn_info[staidx].session_id = 255;
 		tdls_soc->tdls_conn_info[staidx].index =
 					INVALID_TDLS_PEER_INDEX;
@@ -993,7 +986,11 @@ tdls_process_decrement_active_session(struct wlan_objmgr_psoc *psoc)
 	tdls_debug("Enter");
 	if (!psoc)
 		return QDF_STATUS_E_NULL_VALUE;
-
+	if(!policy_mgr_is_hw_dbs_2x2_capable(psoc) &&
+	   policy_mgr_is_current_hwmode_dbs(psoc)) {
+		tdls_err("Current HW mode is 1*1 DBS. Wait for Opportunistic timer to expire to enable TDLS in FW");
+		return QDF_STATUS_SUCCESS;
+	}
 	tdls_obj_vdev = tdls_get_vdev(psoc, WLAN_TDLS_NB_ID);
 	if (tdls_obj_vdev) {
 		tdls_debug("Enable TDLS in FW and host as only one active sta/p2p_cli interface is present");

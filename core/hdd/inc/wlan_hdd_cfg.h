@@ -138,6 +138,7 @@ struct hdd_config {
 	/* WLAN Logging */
 	bool wlan_logging_enable;
 	bool wlan_logging_to_console;
+	uint8_t host_log_custom_nl_proto;
 #endif /* WLAN_LOGGING_SOCK_SVC_ENABLE */
 
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
@@ -206,7 +207,7 @@ struct hdd_config {
 #ifdef WLAN_NUD_TRACKING
 	uint8_t enable_nud_tracking;
 #endif
-	uint8_t operating_channel;
+	uint32_t operating_chan_freq;
 	uint8_t num_vdevs;
 	uint8_t enable_concurrent_sta[CFG_CONCURRENT_IFACE_MAX_LEN];
 	uint8_t dbs_scan_selection[CFG_DBS_SCAN_PARAM_LENGTH];

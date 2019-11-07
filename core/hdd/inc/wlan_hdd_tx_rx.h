@@ -169,18 +169,6 @@ void hdd_disable_rx_ol_in_concurrency(bool disable);
 void hdd_disable_rx_ol_for_low_tput(struct hdd_context *hdd_ctx, bool disable);
 
 /**
- * hdd_get_peer_sta_id() - Get the StationID using the Peer Mac address
- * @sta_ctx: pointer to HDD Station Context
- * @mac_address: pointer to Peer Mac address
- * @sta_id: pointer to returned Station Index
- *
- * Return: QDF_STATUS_SUCCESS/QDF_STATUS_E_FAILURE
- */
-QDF_STATUS hdd_get_peer_sta_id(struct hdd_station_ctx *sta_ctx,
-			       struct qdf_mac_addr *mac_address,
-			       uint8_t *sta_id);
-
-/**
  * hdd_reset_all_adapters_connectivity_stats() - reset connectivity stats
  * @hdd_ctx: pointer to HDD Station Context
  *
@@ -331,7 +319,14 @@ void wlan_hdd_classify_pkt(struct sk_buff *skb);
 
 #ifdef WLAN_FEATURE_DP_BUS_BANDWIDTH
 void hdd_reset_tcp_delack(struct hdd_context *hdd_ctx);
+#ifdef RX_PERFORMANCE
 bool hdd_is_current_high_throughput(struct hdd_context *hdd_ctx);
+#else
+static inline bool hdd_is_current_high_throughput(struct hdd_context *hdd_ctx)
+{
+	return false;
+}
+#endif
 #define HDD_MSM_CFG(msm_cfg)	msm_cfg
 #else
 static inline void hdd_reset_tcp_delack(struct hdd_context *hdd_ctx) {}
@@ -442,4 +437,14 @@ void hdd_print_netdev_txq_status(struct net_device *dev);
 uint32_t
 wlan_hdd_dump_queue_history_state(struct hdd_netif_queue_history *q_hist,
 				  char *buf, uint32_t size);
+
+/**
+ * wlan_hdd_rx_rpm_mark_last_busy() - Check if dp rx marked last busy
+ * @hdd_ctx: Pointer to hdd context
+ * @hif_ctx: Pointer to hif context
+ *
+ * Return: dp mark last busy less than runtime delay value
+ */
+bool wlan_hdd_rx_rpm_mark_last_busy(struct hdd_context *hdd_ctx,
+				    void *hif_ctx);
 #endif /* end #if !defined(WLAN_HDD_TX_RX_H) */

@@ -35,95 +35,6 @@
 #include <cdp_txrx_handle.h>
 
 /**
- * wma_add_bss_ndi_mode() - Process BSS creation request while adding NaN
- * Data interface
- * @wma: wma handle
- * @add_bss: Parameters for ADD_BSS command
- *
- * Sends VDEV_START command to firmware
- * Return: None
- */
-void wma_add_bss_ndi_mode(tp_wma_handle wma, struct bss_params *add_bss)
-{
-	struct cdp_pdev *pdev;
-	struct cdp_vdev *vdev;
-	struct wma_vdev_start_req req;
-	void *peer = NULL;
-	struct wlan_objmgr_vdev *vdev_obj;
-	uint8_t vdev_id, peer_id;
-	QDF_STATUS status;
-	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
-
-	WMA_LOGD("%s: enter", __func__);
-	vdev = wma_find_vdev_by_addr(wma, add_bss->bssId, &vdev_id);
-	if (!vdev) {
-		WMA_LOGE("%s: Failed to find vdev", __func__);
-		goto send_fail_resp;
-	}
-	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
-
-	if (!pdev) {
-		WMA_LOGE("%s: Failed to get pdev", __func__);
-		goto send_fail_resp;
-	}
-
-	wma_set_bss_rate_flags(wma, vdev_id, add_bss);
-
-	status = wma_create_peer(wma, pdev, vdev, add_bss->self_mac_addr,
-				 WMI_PEER_TYPE_DEFAULT, vdev_id, false);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		WMA_LOGE("%s: Failed to create peer", __func__);
-		goto send_fail_resp;
-	}
-
-	peer = cdp_peer_find_by_addr(soc, pdev, add_bss->self_mac_addr,
-				     &peer_id);
-	if (!peer) {
-		WMA_LOGE("%s Failed to find peer %pM", __func__,
-			 add_bss->self_mac_addr);
-		goto send_fail_resp;
-	}
-
-	vdev_obj = wma->interfaces[vdev_id].vdev;
-	if (!vdev_obj) {
-		wma_err("vdev not found for id: %d", vdev_id);
-		goto send_fail_resp;
-	}
-	mlme_set_bss_params(vdev_obj, add_bss);
-
-	add_bss->staContext.staIdx = cdp_peer_get_local_peer_id(soc, peer);
-
-	/*
-	 * beacon_intval, dtim_period, hidden_ssid, is_dfs, ssid
-	 * will be ignored for NDI device.
-	 */
-	qdf_mem_zero(&req, sizeof(req));
-	req.vdev_id = vdev_id;
-	req.op_chan_freq = add_bss->op_chan_freq;
-	req.chan_freq_seg0 = add_bss->chan_freq_seg0;
-	req.chan_freq_seg1 = add_bss->chan_freq_seg1;
-	req.vht_capable = add_bss->vhtCapable;
-	req.max_txpow = add_bss->maxTxPower;
-	req.oper_mode = add_bss->operMode;
-
-	status = wma_vdev_start(wma, &req, false);
-	if (status != QDF_STATUS_SUCCESS) {
-		mlme_clear_bss_params(vdev_obj);
-		goto send_fail_resp;
-	}
-
-	/* Initialize protection mode to no protection */
-	wma_vdev_set_param(wma->wmi_handle, vdev_id,
-		WMI_VDEV_PARAM_PROTECTION_MODE, IEEE80211_PROT_NONE);
-
-	return;
-
-send_fail_resp:
-	add_bss->status = QDF_STATUS_E_FAILURE;
-	wma_send_msg_high_priority(wma, WMA_ADD_BSS_RSP, (void *)add_bss, 0);
-}
-
-/**
  * wma_add_sta_ndi_mode() - Process ADD_STA for NaN Data path
  * @wma: wma handle
  * @add_sta: Parameters of ADD_STA command
@@ -213,7 +124,6 @@ void wma_add_sta_ndi_mode(tp_wma_handle wma, tpAddStaParams add_sta)
 	WMA_LOGD(FL("Moving peer %pM to state %d"), add_sta->staMac, state);
 	cdp_peer_state_update(soc, pdev, add_sta->staMac, state);
 
-	add_sta->staIdx = cdp_peer_get_local_peer_id(soc, peer);
 	add_sta->nss    = iface->nss;
 	add_sta->status = QDF_STATUS_SUCCESS;
 send_rsp:
@@ -237,6 +147,8 @@ void wma_delete_sta_req_ndi_mode(tp_wma_handle wma,
 	struct cdp_pdev *pdev;
 	void *peer;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	/* Will be removed as a part of cleanup */
+	uint8_t sta_id;
 
 	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 	if (!pdev) {
@@ -245,11 +157,12 @@ void wma_delete_sta_req_ndi_mode(tp_wma_handle wma,
 		goto send_del_rsp;
 	}
 
-	peer = cdp_peer_find_by_local_id(cds_get_context(QDF_MODULE_ID_SOC),
-			pdev, del_sta->staIdx);
+	peer = cdp_peer_find_by_addr(cds_get_context(QDF_MODULE_ID_SOC),
+				     pdev, del_sta->staMac, &sta_id);
 	if (!peer) {
-		WMA_LOGE(FL("Failed to get peer handle using peer id %d"),
-			 del_sta->staIdx);
+		WMA_LOGE(FL("Failed to get peer handle using peer mac "
+			 QDF_MAC_ADDR_STR),
+			 QDF_MAC_ADDR_ARRAY(del_sta->staMac));
 		del_sta->status = QDF_STATUS_E_FAILURE;
 		goto send_del_rsp;
 	}

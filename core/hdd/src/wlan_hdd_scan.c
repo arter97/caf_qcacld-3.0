@@ -454,7 +454,7 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 	int status;
 	struct hdd_scan_info *scan_info = NULL;
 	struct hdd_adapter *con_sap_adapter;
-	uint16_t con_dfs_ch;
+	uint32_t con_dfs_ch_freq;
 	uint8_t curr_vdev_id;
 	enum scan_reject_states curr_reason;
 	static uint32_t scan_ebusy_cnt;
@@ -534,14 +534,15 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 	/* Block All Scan during DFS operation and send null scan result */
 	con_sap_adapter = hdd_get_con_sap_adapter(adapter, true);
 	if (con_sap_adapter) {
-		con_dfs_ch = con_sap_adapter->session.ap.sap_config.channel;
-		if (con_dfs_ch == AUTO_CHANNEL_SELECT)
-			con_dfs_ch =
-				con_sap_adapter->session.ap.operating_channel;
+		con_dfs_ch_freq =
+			con_sap_adapter->session.ap.sap_config.chan_freq;
+		if (con_dfs_ch_freq == AUTO_CHANNEL_SELECT)
+			con_dfs_ch_freq =
+				con_sap_adapter->session.ap.operating_chan_freq;
 
 		if (!policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc) &&
-			wlan_reg_is_dfs_ch(hdd_ctx->pdev, con_dfs_ch) &&
-			!policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(
+		    wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, con_dfs_ch_freq) &&
+		    !policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(
 			hdd_ctx->psoc)) {
 			/* Provide empty scan result during DFS operation since
 			 * scanning not supported during DFS. Reason is
@@ -994,7 +995,7 @@ static int __wlan_hdd_cfg80211_vendor_scan(struct wiphy *wiphy,
 				n_channels += wiphy->bands[band]->n_channels;
 	}
 
-	if (MAX_CHANNEL < n_channels) {
+	if (n_channels > NUM_CHANNELS) {
 		hdd_err("Exceed max number of channels: %d", n_channels);
 		return -EINVAL;
 	}

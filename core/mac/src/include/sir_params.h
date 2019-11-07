@@ -137,11 +137,6 @@ enum cap_bitmap {
 	/* MAX_FEATURE_SUPPORTED = 32 */
 };
 
-typedef enum eSriLinkState {
-	eSIR_LINK_IDLE_STATE = 0,
-	eSIR_LINK_PREASSOC_STATE = 1,
-} tSirLinkState;
-
 /* / Mailbox Message Structure Define */
 typedef struct sSirMbMsg {
 	uint16_t type;
@@ -179,12 +174,12 @@ struct sir_mgmt_msg {
 /**
  * struct sir_cfg_action_frm_tb_ppdu - cfg to set action frame in he tb ppdu
  * @type: Message type
- * @session_id: session id
+ * @vdev_id: vdev id
  * @cfg: enable/disable cfg
  */
 struct sir_cfg_action_frm_tb_ppdu {
 	uint16_t type;
-	uint8_t session_id;
+	uint8_t vdev_id;
 	uint8_t cfg;
 };
 
@@ -218,7 +213,6 @@ struct sir_cfg_action_frm_tb_ppdu {
 #define SIR_HAL_DELETE_STA_REQ             (SIR_HAL_ITC_MSG_TYPES_BEGIN + 3)
 #define SIR_HAL_DELETE_STA_RSP             (SIR_HAL_ITC_MSG_TYPES_BEGIN + 4)
 #define SIR_HAL_ADD_BSS_REQ                (SIR_HAL_ITC_MSG_TYPES_BEGIN + 5)
-#define SIR_HAL_ADD_BSS_RSP                (SIR_HAL_ITC_MSG_TYPES_BEGIN + 6)
 #define SIR_HAL_DELETE_BSS_REQ             (SIR_HAL_ITC_MSG_TYPES_BEGIN + 7)
 #define SIR_HAL_DELETE_BSS_RSP             (SIR_HAL_ITC_MSG_TYPES_BEGIN + 8)
 /*
@@ -309,8 +303,6 @@ struct sir_cfg_action_frm_tb_ppdu {
 /* (SIR_HAL_ITC_MSG_TYPES_BEGIN + 111) is unused */
 #define SIR_HAL_P2P_NOA_ATTR_IND           (SIR_HAL_ITC_MSG_TYPES_BEGIN + 112)
 /* (SIR_HAL_ITC_MSG_TYPES_BEGIN + 113) is unused */
-
-#define SIR_HAL_SET_LINK_STATE_RSP         (SIR_HAL_ITC_MSG_TYPES_BEGIN + 114)
 
 #define SIR_HAL_WLAN_SUSPEND_IND           (SIR_HAL_ITC_MSG_TYPES_BEGIN + 115)
 #define SIR_HAL_WLAN_RESUME_REQ            (SIR_HAL_ITC_MSG_TYPES_BEGIN + 116)
@@ -614,8 +606,10 @@ struct sir_cfg_action_frm_tb_ppdu {
 
 #define SIR_HAL_HIDDEN_SSID_RESTART_RSP     (SIR_HAL_ITC_MSG_TYPES_BEGIN + 379)
 
+#define SIR_HAL_INIT_ROAM_OFFLOAD_PARAM     (SIR_HAL_ITC_MSG_TYPES_BEGIN + 380)
+
 /*
- * Unused SIR_HAL_ITC_MSG_TYPES_BEGIN + 380 to
+ * Unused SIR_HAL_ITC_MSG_TYPES_BEGIN + 381 to
  * SIR_HAL_ITC_MSG_TYPES_BEGIN + 386
  */
 #define SIR_HAL_GET_PEER_INFO_EXT           (SIR_HAL_ITC_MSG_TYPES_BEGIN + 387)

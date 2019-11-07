@@ -276,12 +276,21 @@ bool ucfg_is_nan_sap_supported(struct wlan_objmgr_psoc *psoc);
  * ucfg_is_nan_enable_allowed() - ucfg API to query if NAN Discovery is
  * allowed
  * @psoc: pointer to psoc object
- * @nan_chan: NAN Discovery primary social channel
+ * @nan_ch_freq: NAN Discovery primary social channel
  *
  * Return: True if NAN Discovery enable is allowed, False otherwise
  */
 bool ucfg_is_nan_enable_allowed(struct wlan_objmgr_psoc *psoc,
-				uint8_t nan_chan);
+				uint32_t nan_ch_freq);
+
+/**
+ * ucfg_is_nan_disc_active() - ucfg API to query if NAN Discovery is
+ * active
+ * @psoc: pointer to psoc object
+ *
+ * Return: True if NAN Discovery is active, False otherwise
+ */
+bool ucfg_is_nan_disc_active(struct wlan_objmgr_psoc *psoc);
 
 /**
  * ucfg_nan_set_tgt_caps: ucfg API to set the NAN capabilities of the Target
@@ -314,11 +323,22 @@ int ucfg_nan_register_wma_callbacks(struct wlan_objmgr_psoc *psoc,
  * ucfg_nan_check_and_disable_unsupported_ndi: ucfg API to check if NAN Datapath
  * is active on multiple NDI's and disable the unsupported concurrencies.
  * @psoc: pointer to psoc object
+ * @force: When set forces NDI disable
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
-ucfg_nan_check_and_disable_unsupported_ndi(struct wlan_objmgr_psoc *psoc);
+ucfg_nan_check_and_disable_unsupported_ndi(struct wlan_objmgr_psoc *psoc,
+					   bool force);
+
+/**
+ * ucfg_ndi_remove_entry_from_policy_mgr() - API to remove NDI entry from
+ *	policy manager.
+ * @vdev: vdev pointer for NDI interface
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_ndi_remove_entry_from_policy_mgr(struct wlan_objmgr_vdev *vdev);
 
 #else /* WLAN_FEATURE_NAN */
 
@@ -333,7 +353,8 @@ static inline void ucfg_nan_disable_concurrency(struct wlan_objmgr_psoc *psoc)
 }
 
 static inline QDF_STATUS
-ucfg_nan_check_and_disable_unsupported_ndi(struct wlan_objmgr_psoc *psoc)
+ucfg_nan_check_and_disable_unsupported_ndi(struct wlan_objmgr_psoc *psoc,
+					   bool force)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -345,6 +366,17 @@ static inline QDF_STATUS ucfg_nan_psoc_open(struct wlan_objmgr_psoc *psoc)
 
 static inline void ucfg_nan_psoc_close(struct wlan_objmgr_psoc *psoc)
 {
+}
+
+static inline bool ucfg_is_nan_disc_active(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline
+enum nan_datapath_state ucfg_nan_get_ndi_state(struct wlan_objmgr_vdev *vdev)
+{
+	return NAN_DATA_INVALID_STATE;
 }
 
 #endif /* WLAN_FEATURE_NAN */

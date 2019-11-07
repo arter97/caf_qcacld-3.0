@@ -129,11 +129,11 @@ void ol_txrx_vdev_flush(struct cdp_vdev *pvdev)
 		qdf_nbuf_t next =
 			qdf_nbuf_next(vdev->ll_pause.txq.head);
 		qdf_nbuf_set_next(vdev->ll_pause.txq.head, NULL);
-		if (QDF_NBUF_CB_PADDR(vdev->ll_pause.txq.head) &&
-		    !qdf_nbuf_ipa_owned_get(vdev->ll_pause.txq.head)) {
-			qdf_nbuf_unmap(vdev->pdev->osdev,
-				       vdev->ll_pause.txq.head,
-				       QDF_DMA_TO_DEVICE);
+		if (QDF_NBUF_CB_PADDR(vdev->ll_pause.txq.head)) {
+			if (!qdf_nbuf_ipa_owned_get(vdev->ll_pause.txq.head))
+				qdf_nbuf_unmap(vdev->pdev->osdev,
+					       vdev->ll_pause.txq.head,
+					       QDF_DMA_TO_DEVICE);
 		}
 		qdf_nbuf_tx_free(vdev->ll_pause.txq.head,
 				 QDF_NBUF_PKT_ERROR);
@@ -427,42 +427,6 @@ void ol_tx_vdev_ll_pause_queue_send(void *context)
 	    pdev->tx_throttle.current_throttle_phase == THROTTLE_PHASE_OFF)
 		return;
 	ol_tx_vdev_ll_pause_queue_send_base(vdev);
-}
-
-/**
- * ol_txrx_get_vdev_from_sta_id() - get vdev from sta_id
- * @sta_id: sta_id
- *
- * Return: vdev handle
- *            NULL if not found.
- */
-static ol_txrx_vdev_handle ol_txrx_get_vdev_from_sta_id(uint8_t sta_id)
-{
-	struct ol_txrx_peer_t *peer = NULL;
-	ol_txrx_pdev_handle pdev = NULL;
-
-	if (sta_id >= WLAN_MAX_STA_COUNT) {
-		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			  "Invalid sta id passed");
-		return NULL;
-	}
-
-	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
-	if (!pdev) {
-		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			  "PDEV not found for sta_id [%d]", sta_id);
-		return NULL;
-	}
-
-	peer = ol_txrx_peer_find_by_local_id((struct cdp_pdev *)pdev, sta_id);
-
-	if (!peer) {
-		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO_HIGH,
-			  "PEER [%d] not found", sta_id);
-		return NULL;
-	}
-
-	return peer->vdev;
 }
 
 /**

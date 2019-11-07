@@ -228,7 +228,7 @@ static void pe_reset_protection_callback(void *ptr)
 		pe_debug("protection changed, update beacon template");
 		/* update beacon fix params and send update to FW */
 		qdf_mem_zero(&beacon_params, sizeof(tUpdateBeaconParams));
-		beacon_params.bss_idx = pe_session_entry->bss_idx;
+		beacon_params.bss_idx = pe_session_entry->vdev_id;
 		beacon_params.fShortPreamble =
 				pe_session_entry->beaconParams.fShortPreamble;
 		beacon_params.beaconInterval =
@@ -737,28 +737,19 @@ struct pe_session *pe_find_session_by_bssid(struct mac_context *mac, uint8_t *bs
 
 }
 
-/**
- * pe_find_session_by_bss_idx() - looks up the PE session given the bss_idx.
- *
- * This function returns the session context  if the session
- * corresponding to the given bss_idx is found in the PE session table.
- * @mac:             pointer to global adapter context
- * @bss_idx:         bss index of the session
- *
- * Return: pointer to the session context or NULL if session is not found.
- */
-struct pe_session *pe_find_session_by_bss_idx(struct mac_context *mac,
-					      uint8_t bss_idx)
+struct pe_session *pe_find_session_by_vdev_id(struct mac_context *mac,
+					      uint8_t vdev_id)
 {
 	uint8_t i;
 
 	for (i = 0; i < mac->lim.maxBssId; i++) {
 		/* If BSSID matches return corresponding tables address */
 		if ((mac->lim.gpSession[i].valid) &&
-		    (mac->lim.gpSession[i].bss_idx == bss_idx))
+		    (mac->lim.gpSession[i].vdev_id == vdev_id))
 			return &mac->lim.gpSession[i];
 	}
-	pe_debug("Session lookup fails for bss_idx: %d", bss_idx);
+	pe_debug("Session lookup fails for vdev_id: %d", vdev_id);
+
 	return NULL;
 }
 
@@ -790,45 +781,6 @@ struct pe_session *pe_find_session_by_session_id(struct mac_context *mac,
 }
 
 /**
- * pe_find_session_by_sta_id() - looks up the PE session given staid.
- * @mac_ctx:       pointer to global adapter context
- * @staid:         StaId of the session
- * @session_id:    session ID is returned here, if session is found.
- *
- * This function returns the session context and the session ID if the session
- * corresponding to the given StaId is found in the PE session table.
- *
- * Return: session pointer
- */
-struct pe_session *
-pe_find_session_by_sta_id(struct mac_context *mac_ctx,
-			  uint8_t staid,
-			  uint8_t *session_id)
-{
-	uint8_t i, j;
-	struct pe_session *session_ptr;
-	struct dph_hash_table *dph_ptr;
-
-	for (i = 0; i < mac_ctx->lim.maxBssId; i++) {
-		if (!mac_ctx->lim.gpSession[i].valid)
-			continue;
-		session_ptr = &mac_ctx->lim.gpSession[i];
-		dph_ptr = &session_ptr->dph.dphHashTable;
-		for (j = 0; j < dph_ptr->size; j++) {
-			if (dph_ptr->pDphNodeArray[j].valid
-			    && dph_ptr->pDphNodeArray[j].added
-			    && staid == dph_ptr->pDphNodeArray[j].staIndex) {
-				*session_id = i;
-				return session_ptr;
-			}
-		}
-	}
-
-	pe_debug("Session lookup fails for StaId: %d", staid);
-	return NULL;
-}
-
-/**
  * pe_delete_session() - deletes the PE session given the session ID.
  * @mac_ctx: pointer to global adapter context
  * @session: session to be deleted.
@@ -849,9 +801,9 @@ void pe_delete_session(struct mac_context *mac_ctx, struct pe_session *session)
 		return;
 	}
 
-	pe_debug("Trying to delete PE session: %d Opmode: %d BssIdx: %d BSSID: "QDF_MAC_ADDR_STR,
+	pe_debug("Trying to delete PE session: %d Opmode: %d vdev_id: %d BSSID: "QDF_MAC_ADDR_STR,
 		session->peSessionId, session->operMode,
-		session->bss_idx,
+		session->vdev_id,
 		QDF_MAC_ADDR_ARRAY(session->bssId));
 
 	lim_reset_bcn_probe_filter(mac_ctx, session);
@@ -869,7 +821,7 @@ void pe_delete_session(struct mac_context *mac_ctx, struct pe_session *session)
 	}
 
 	for (n = 0; n < (mac_ctx->lim.maxStation + 1); n++) {
-		timer_ptr = &mac_ctx->lim.limTimers.gpLimCnfWaitTimer[n];
+		timer_ptr = &mac_ctx->lim.lim_timers.gpLimCnfWaitTimer[n];
 		if (session->peSessionId == timer_ptr->sessionId)
 			if (true == tx_timer_running(timer_ptr))
 				tx_timer_deactivate(timer_ptr);
@@ -931,9 +883,9 @@ void pe_delete_session(struct mac_context *mac_ctx, struct pe_session *session)
 		session->bcnLen = 0;
 	}
 
-	if (session->assocReq) {
-		qdf_mem_free(session->assocReq);
-		session->assocReq = NULL;
+	if (session->assoc_req) {
+		qdf_mem_free(session->assoc_req);
+		session->assoc_req = NULL;
 		session->assocReqLen = 0;
 	}
 
@@ -1066,31 +1018,6 @@ struct pe_session *pe_find_session_by_peer_sta(struct mac_context *mac, uint8_t 
 
 	pe_debug("Session lookup fails for Peer StaId:");
 	lim_print_mac_addr(mac, sa, LOGD);
-	return NULL;
-}
-
-/**
- * pe_find_session_by_sme_session_id() - looks up the PE session for given sme
- * session id
- * @mac_ctx:          pointer to global adapter context
- * @sme_session_id:   sme session id
- *
- * looks up the PE session for given sme session id
- *
- * Return: pe session entry for given sme session if found else NULL
- */
-struct pe_session *pe_find_session_by_sme_session_id(struct mac_context *mac_ctx,
-					      uint8_t sme_session_id)
-{
-	uint8_t i;
-
-	for (i = 0; i < mac_ctx->lim.maxBssId; i++) {
-		if ((mac_ctx->lim.gpSession[i].valid) &&
-		     (mac_ctx->lim.gpSession[i].smeSessionId ==
-			sme_session_id)) {
-			return &mac_ctx->lim.gpSession[i];
-		}
-	}
 	return NULL;
 }
 

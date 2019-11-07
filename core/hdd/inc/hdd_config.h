@@ -188,7 +188,7 @@ enum hdd_dot11_mode {
 			CFG_VALUE_OR_DEFAULT, \
 			"Timer Multiplier")
 
-#define CFG_BUG_ON_REINIT_FAILURE_DEFAULT 1
+#define CFG_BUG_ON_REINIT_FAILURE_DEFAULT 0
 /*
  * <ini>
  * g_bug_on_reinit_failure  - Enable/Disable bug on reinit
@@ -277,6 +277,66 @@ enum hdd_dot11_mode {
 
 /*
  * <ini>
+ * host_log_custom_nl_proto - Host log netlink protocol
+ * @Min: 0
+ * @Max: 32
+ * @Default: 2
+ *
+ * This ini is used to set host log netlink protocol. The default
+ * value is 2 (NETLINK_USERSOCK), customer should avoid selecting the
+ * netlink protocol that already used on their platform by other
+ * applications or services. By choosing the non-default value(2),
+ * Customer need to change the netlink protocol of application receive
+ * tool(cnss_diag) accordingly. Available values could be:
+ *
+ * host_log_custom_nl_proto = 0 -	NETLINK_ROUTE, Routing/device hook
+ * host_log_custom_nl_proto = 1 -	NETLINK_UNUSED, Unused number
+ * host_log_custom_nl_proto = 2 -	NETLINK_USERSOCK, Reserved for user
+ *					mode socket protocols
+ * host_log_custom_nl_proto = 3 -	NETLINK_FIREWALL, Unused number,
+ *					formerly ip_queue
+ * host_log_custom_nl_proto = 4 -	NETLINK_SOCK_DIAG, socket monitoring
+ * host_log_custom_nl_proto = 5 -	NETLINK_NFLOG, netfilter/iptables ULOG
+ * host_log_custom_nl_proto = 6 -	NETLINK_XFRM, ipsec
+ * host_log_custom_nl_proto = 7 -	NETLINK_SELINUX, SELinux event
+ *					notifications
+ * host_log_custom_nl_proto = 8 -	NETLINK_ISCSI, Open-iSCSI
+ * host_log_custom_nl_proto = 9 -	NETLINK_AUDIT, auditing
+ * host_log_custom_nl_proto = 10 -	NETLINK_FIB_LOOKUP
+ * host_log_custom_nl_proto = 11 -	NETLINK_CONNECTOR
+ * host_log_custom_nl_proto = 12 -	NETLINK_NETFILTER, netfilter subsystem
+ * host_log_custom_nl_proto = 13 -	NETLINK_IP6_FW
+ * host_log_custom_nl_proto = 14 -	NETLINK_DNRTMSG, DECnet routing messages
+ * host_log_custom_nl_proto = 15 -	NETLINK_KOBJECT_UEVENT, Kernel
+ *					messages to userspace
+ * host_log_custom_nl_proto = 16 -	NETLINK_GENERIC, leave room for
+ *					NETLINK_DM (DM Events)
+ * host_log_custom_nl_proto = 18 -	NETLINK_SCSITRANSPORT, SCSI Transports
+ * host_log_custom_nl_proto = 19 -	NETLINK_ECRYPTFS
+ * host_log_custom_nl_proto = 20 -	NETLINK_RDMA
+ * host_log_custom_nl_proto = 21 -	NETLINK_CRYPTO, Crypto layer
+ * host_log_custom_nl_proto = 22 -	NETLINK_SMC, SMC monitoring
+ *
+ * The max value is: MAX_LINKS which is 32
+ *
+ * Related: None
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+#define CFG_HOST_LOG_CUSTOM_NETLINK_PROTO CFG_INI_UINT( \
+	"host_log_custom_nl_proto", \
+	0, \
+	32, \
+	2, \
+	CFG_VALUE_OR_DEFAULT, \
+	"host log custom netlink protocol")
+
+/*
+ * <ini>
  * wlanLoggingToConsole - Wlan logging to console
  * @Min: 0
  * @Max: 1
@@ -291,7 +351,8 @@ enum hdd_dot11_mode {
 
 #define CFG_WLAN_LOGGING_SUPPORT_ALL \
 	CFG(CFG_WLAN_LOGGING_SUPPORT) \
-	CFG(CFG_WLAN_LOGGING_CONSOLE_SUPPORT)
+	CFG(CFG_WLAN_LOGGING_CONSOLE_SUPPORT) \
+	CFG(CFG_HOST_LOG_CUSTOM_NETLINK_PROTO)
 #else
 #define CFG_WLAN_LOGGING_SUPPORT_ALL
 #endif
@@ -493,12 +554,12 @@ enum hdd_dot11_mode {
 
 /*
  * <ini>
- * gOperatingChannel- Default STA operating channel
+ * def_sta_operating_freq - Default STA operating Freq
  * @Min: 0
- * @Max: 14
- * @Default: 1
+ * @Max: 2484
+ * @Default: 2412
  *
- * This ini is used to specify the default operating channel of a STA during
+ * This ini is used to specify the default operating frequency of a STA during
  * initialization.
  *
  * Related: None
@@ -509,14 +570,13 @@ enum hdd_dot11_mode {
  *
  * </ini>
  */
-#define CFG_OPERATING_CHANNEL CFG_INI_UINT( \
-			"gOperatingChannel", \
+#define CFG_OPERATING_FREQUENCY CFG_INI_UINT( \
+			"def_sta_operating_freq", \
 			0, \
-			14, \
-			1, \
+			2484, \
+			2412, \
 			CFG_VALUE_OR_DEFAULT, \
-			"Default Operating Channel")
-
+			"Default STA Operating Frequency")
 #ifdef DHCP_SERVER_OFFLOAD
 #define IPADDR_NUM_ENTRIES     (4)
 #define IPADDR_STRING_LENGTH   (16)
@@ -1109,7 +1169,42 @@ struct dhcp_server {
 	"FFFFFF 00 2A F85971000000 E0 50 FFFFFF 00 2A 14ABC5000000 E0 50", \
 	"Used to specify action OUIs to disable aggressive TX")
 
- /* End of action oui inis */
+/*
+ * <ini>
+ * gActionOUIDisableAggressiveEDCA - Used to specify action OUIs to control
+ * EDCA configuration when join the candidate AP
+ *
+ * @Default: NULL
+ * Note: User should strictly add new action OUIs at the end of this
+ * default value.
+ *
+ * This ini is used to specify AP OUIs. The station's EDCA should follow the
+ * APs' when connecting to those AP, even if the gEnableEdcaParams is set.
+ * For example, it follows the AP's EDCA whose OUI is 0050F2 with the
+ * following setting:
+ *     gActionOUIDisableAggressiveEDCA=0050F2 00 01
+ *          Explain: 0050F2: OUI
+ *                   00: data length is 0
+ *                   01: info mask, only OUI present in Info mask
+ * Refer to gEnableActionOUI for more detail about the format.
+ *
+ * Related: gEnableEdcaParams, gEnableActionOUI
+ *
+ * Supported Feature: Action OUIs
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ACTION_OUI_DISABLE_AGGRESSIVE_EDCA CFG_INI_STRING( \
+	"gActionOUIDisableAggressiveEDCA", \
+	0, \
+	ACTION_OUI_MAX_STR_LEN, \
+	"", \
+	"Used to specify action OUIs to control edca configuration")
+
+/* End of action oui inis */
+
 #ifdef ENABLE_MTRACE_LOG
 /*
  * <ini>
@@ -1391,6 +1486,7 @@ enum host_log_level {
 	CFG(CFG_ACTION_OUI_ITO_EXTENSION) \
 	CFG(CFG_ACTION_OUI_DISABLE_AGGRESSIVE_TX) \
 	CFG(CFG_ACTION_OUI_FORCE_MAX_NSS) \
+	CFG(CFG_ACTION_OUI_DISABLE_AGGRESSIVE_EDCA) \
 	CFG(CFG_ACTION_OUI_SWITCH_TO_11N_MODE) \
 	CFG(CFG_ADVERTISE_CONCURRENT_OPERATION) \
 	CFG(CFG_BUG_ON_REINIT_FAILURE) \
@@ -1409,7 +1505,7 @@ enum host_log_level {
 	CFG(CFG_INFORM_BSS_RSSI_RAW) \
 	CFG(CFG_MULTICAST_HOST_FW_MSGS) \
 	CFG(CFG_NUM_VDEV_ENABLE) \
-	CFG(CFG_OPERATING_CHANNEL) \
+	CFG(CFG_OPERATING_FREQUENCY) \
 	CFG(CFG_PRIVATE_WEXT_CONTROL) \
 	CFG(CFG_PROVISION_INTERFACE_POOL) \
 	CFG(CFG_TIMER_MULTIPLIER) \

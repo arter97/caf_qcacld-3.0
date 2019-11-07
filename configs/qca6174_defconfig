@@ -68,11 +68,11 @@ ifeq ($(CONFIG_ARCH_QCS405), y)
 	CONFIG_WLAN_SYNC_TSF_PLUS_NOIRQ := y
 endif
 
-#Flag to enable Legacy Fast Roaming2(LFR2)
-CONFIG_QCACLD_WLAN_LFR2 := y
 #Flag to enable Legacy Fast Roaming3(LFR3)
-ifneq ($(CONFIG_ARCH_SDX20), y)
-CONFIG_QCACLD_WLAN_LFR3 := y
+ifeq (y,$(findstring y,$(CONFIG_HELIUMPLUS) $(CONFIG_LITHIUM)))
+	CONFIG_QCACLD_WLAN_LFR3 := y
+else
+	CONFIG_QCACLD_WLAN_LFR2 := y
 endif
 
 ifneq ($(CONFIG_MOBILE_ROUTER), y)
@@ -229,7 +229,7 @@ else
 CONFIG_LL_DP_SUPPORT := y
 endif
 
-ifeq ($(CONFIG_HIF_PCI), y)
+ifeq ($(CONFIG_ROME_IF),pci)
 ifneq ($(CONFIG_WLAN_TX_FLOW_CONTROL_V2), y)
 ifneq ($(CONFIG_LITHIUM), y)
 CONFIG_WLAN_TX_FLOW_CONTROL_LEGACY := y
@@ -252,9 +252,13 @@ CONFIG_ADRASTEA_SHADOW_REGISTERS := y
 endif
 endif
 
+# Enable fw stats version 2
+ifeq (y,$(findstring y,$(CONFIG_HELIUMPLUS) $(CONFIG_LITHIUM)))
+CONFIG_AR900B := y
+endif
+
 # NOTE: CONFIG_64BIT_PADDR requires CONFIG_HELIUMPLUS
 ifeq ($(CONFIG_HELIUMPLUS), y)
-CONFIG_AR900B := y
 
 ifeq ($(CONFIG_64BIT_PADDR), y)
 CONFIG_HTT_PADDR64 := y
@@ -422,6 +426,10 @@ else
 CONFIG_WDI_EVENT_ENABLE := y
 endif
 
+ifeq ($(CONFIG_REMOVE_PKT_LOG), n)
+CONFIG_PKTLOG_LEGACY := y
+endif
+
 #Endianness selection
 CONFIG_LITTLE_ENDIAN := y
 
@@ -583,7 +591,6 @@ CONFIG_WMI_BCN_OFFLOAD := y
 CONFIG_160MHZ_SUPPORT := y
 CONFIG_MCL := y
 CONFIG_REG_CLIENT := y
-CONFIG_LEGACY_CHAN_ENUM := y
 CONFIG_WLAN_PMO_ENABLE := y
 CONFIG_CONVERGED_P2P_ENABLE := y
 CONFIG_WLAN_POLICY_MGR_ENABLE := y
@@ -702,10 +709,16 @@ endif
 CONFIG_SM_ENG_HIST := n
 
 #Enable Beacon Reception Stats
+ifeq ($(CONFIG_WLAN_SYSFS), y)
 CONFIG_FEATURE_BECN_STATS := y
+endif
 
 ifeq (y,$(findstring y,$(CONFIG_ARCH_MSM) $(CONFIG_ARCH_QCOM)))
 CONFIG_WLAN_FEATURE_DP_BUS_BANDWIDTH := y
 endif
 
 CONFIG_SAP_DHCP_FW_IND := y
+
+#Enable FW Offload
+CONFIG_WLAN_FW_OFFLOAD := y
+

@@ -199,7 +199,7 @@ static inline void wlansap_send_acs_success_event(struct sap_context *sap_ctx,
 }
 #endif
 
-static uint8_t
+static uint32_t
 wlansap_calculate_chan_from_scan_result(mac_handle_t mac_handle,
 					struct sap_context *sap_ctx,
 					uint32_t scan_id)
@@ -207,7 +207,7 @@ wlansap_calculate_chan_from_scan_result(mac_handle_t mac_handle,
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 	qdf_list_t *list = NULL;
 	struct scan_filter *filter;
-	uint8_t oper_channel = SAP_CHANNEL_NOT_SELECTED;
+	uint32_t oper_channel = SAP_CHANNEL_NOT_SELECTED;
 
 	filter = qdf_mem_malloc(sizeof(*filter));
 
@@ -232,24 +232,79 @@ wlansap_calculate_chan_from_scan_result(mac_handle_t mac_handle,
 	return oper_channel;
 }
 
+static void
+wlansap_filter_unsafe_ch(struct wlan_objmgr_psoc *psoc,
+			 struct sap_context *sap_ctx)
+{
+	uint16_t i;
+	uint16_t num_safe_ch = 0;
+
+	/*
+	 * There are two channel list, one acs cfg channel list, and one
+	 * sap_ctx->freq_list, the unsafe channels for acs cfg is updated here
+	 * and the sap_ctx->freq list would be handled in sap_chan_sel_init
+	 * which would consider more params other than unsafe channels.
+	 * So the two lists now would be in sync. But in case the ACS weight
+	 * calculation does not get through due to no scan result or no chan
+	 * selected, or any other reason, the default channel is chosen which
+	 * would contain the channels in acs cfg. Now since the scan takes time
+	 * there could be channels present in acs cfg that could become unsafe
+	 * in the mean time, so it is better to filter out those channels from
+	 * the acs channel list before chosing one of them as a default channel
+	 */
+	for (i = 0; i < sap_ctx->acs_cfg->ch_list_count; i++) {
+		if (!policy_mgr_is_safe_channel(
+				psoc, sap_ctx->acs_cfg->freq_list[i])) {
+			sap_debug("unsafe freq %d removed from acs list",
+				  sap_ctx->acs_cfg->freq_list[i]);
+			continue;
+		}
+		/* Add only safe channels to the acs cfg ch list */
+		sap_ctx->acs_cfg->freq_list[num_safe_ch++] =
+						sap_ctx->acs_cfg->freq_list[i];
+	}
+
+	sap_debug("Updated ACS ch list len %d", num_safe_ch);
+	sap_ctx->acs_cfg->ch_list_count = num_safe_ch;
+
+	for (i = 0; i < num_safe_ch; i++)
+		sap_debug("Safe freq %d", sap_ctx->acs_cfg->freq_list[i]);
+}
+
 QDF_STATUS wlansap_pre_start_bss_acs_scan_callback(mac_handle_t mac_handle,
 						   struct sap_context *sap_ctx,
 						   uint8_t sessionid,
 						   uint32_t scanid,
 						   eCsrScanStatus scan_status)
 {
-	uint8_t oper_channel = SAP_CHANNEL_NOT_SELECTED;
+	uint32_t oper_channel = SAP_CHANNEL_NOT_SELECTED;
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 
 	host_log_acs_scan_done(acs_scan_done_status_str(scan_status),
 			  sessionid, scanid);
+
+	/* This has to be done before the ACS selects default channel */
+	wlansap_filter_unsafe_ch(mac_ctx->psoc, sap_ctx);
+
+	if (!sap_ctx->acs_cfg->ch_list_count) {
+		sap_err("No channel left for SAP operation, hotspot fail");
+		sap_ctx->chan_freq = SAP_CHANNEL_NOT_SELECTED;
+		sap_ctx->acs_cfg->pri_ch = SAP_CHANNEL_NOT_SELECTED;
+		sap_config_acs_result(mac_handle, sap_ctx, 0);
+		sap_ctx->sap_state = eSAP_ACS_CHANNEL_SELECTED;
+		sap_ctx->sap_status = eSAP_START_BSS_CHANNEL_NOT_SELECTED;
+		goto close_session;
+
+	}
 	if (eCSR_SCAN_SUCCESS != scan_status) {
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
 			FL("CSR scan_status = eCSR_SCAN_ABORT/FAILURE (%d), choose default channel"),
 			scan_status);
 		oper_channel =
 			sap_select_default_oper_chan(sap_ctx->acs_cfg);
-		sap_ctx->channel = oper_channel;
-		sap_ctx->acs_cfg->pri_ch = oper_channel;
+		sap_ctx->chan_freq = oper_channel;
+		sap_ctx->acs_cfg->pri_ch =
+			wlan_reg_freq_to_chan(mac_ctx->pdev, oper_channel);
 		sap_config_acs_result(mac_handle, sap_ctx,
 				      sap_ctx->acs_cfg->ht_sec_ch);
 		sap_ctx->sap_state = eSAP_ACS_CHANNEL_SELECTED;
@@ -265,19 +320,16 @@ QDF_STATUS wlansap_pre_start_bss_acs_scan_callback(mac_handle_t mac_handle,
 	if (oper_channel == SAP_CHANNEL_NOT_SELECTED) {
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO,
 			  FL("No suitable channel, so select default channel"));
-		sap_ctx->channel =
-			sap_select_default_oper_chan(sap_ctx->acs_cfg);
-		sap_ctx->acs_cfg->pri_ch = sap_ctx->channel;
-	} else {
-		/* Valid Channel Found from scan results. */
-		sap_ctx->acs_cfg->pri_ch = oper_channel;
-		sap_ctx->channel = oper_channel;
+		oper_channel = sap_select_default_oper_chan(sap_ctx->acs_cfg);
 	}
-	sap_config_acs_result(mac_handle, sap_ctx,
-			sap_ctx->acs_cfg->ht_sec_ch);
+
+	sap_ctx->chan_freq = oper_channel;
+	sap_ctx->acs_cfg->pri_ch = wlan_reg_freq_to_chan(mac_ctx->pdev,
+							 oper_channel);
+	sap_config_acs_result(mac_handle, sap_ctx, sap_ctx->acs_cfg->ht_sec_ch);
 
 	QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_HIGH,
-		  FL("Channel selected = %d"), sap_ctx->channel);
+		  FL("Channel freq selected = %d"), sap_ctx->chan_freq);
 	sap_ctx->sap_state = eSAP_ACS_CHANNEL_SELECTED;
 	sap_ctx->sap_status = eSAP_STATUS_SUCCESS;
 close_session:
@@ -318,14 +370,15 @@ wlansap_roam_process_ch_change_success(struct mac_context *mac_ctx,
 	struct sap_sm_event sap_event;
 	QDF_STATUS qdf_status;
 	bool is_ch_dfs = false;
+	uint32_t target_chan_freq;
 	/*
 	 * Channel change is successful. If the new channel is a DFS channel,
 	 * then we will to perform channel availability check for 60 seconds
 	 */
 	QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_MED,
-		  FL("sapdfs: changing target channel to [%d] state %d"),
-		  mac_ctx->sap.SapDfsInfo.target_channel, sap_ctx->fsm_state);
-	sap_ctx->channel = mac_ctx->sap.SapDfsInfo.target_channel;
+		  FL("sapdfs: changing target channel freq to [%d] state %d"),
+		  mac_ctx->sap.SapDfsInfo.target_chan_freq, sap_ctx->fsm_state);
+	target_chan_freq = mac_ctx->sap.SapDfsInfo.target_chan_freq;
 
 	/* If SAP is not in starting or started state don't proceed further */
 	if (sap_ctx->fsm_state == SAP_INIT ||
@@ -339,21 +392,20 @@ wlansap_roam_process_ch_change_success(struct mac_context *mac_ctx,
 	if (sap_ctx->ch_params.ch_width == CH_WIDTH_160MHZ) {
 		is_ch_dfs = true;
 	} else if (sap_ctx->ch_params.ch_width == CH_WIDTH_80P80MHZ) {
-		if (wlan_reg_get_channel_state(mac_ctx->pdev,
-					sap_ctx->channel) ==
-						CHANNEL_STATE_DFS ||
+		if (wlan_reg_get_channel_state_for_freq(mac_ctx->pdev, target_chan_freq) ==
+		    CHANNEL_STATE_DFS ||
 		    wlan_reg_get_channel_state(mac_ctx->pdev,
 			    sap_ctx->ch_params.center_freq_seg1 -
 					  SIR_80MHZ_START_CENTER_CH_DIFF) ==
 							CHANNEL_STATE_DFS)
 			is_ch_dfs = true;
 	} else {
-		if (wlan_reg_get_channel_state(mac_ctx->pdev,
-					sap_ctx->channel) ==
-						CHANNEL_STATE_DFS)
+		if (wlan_reg_get_channel_state_for_freq(mac_ctx->pdev, target_chan_freq) ==
+		    CHANNEL_STATE_DFS)
 			is_ch_dfs = true;
 	}
 
+	sap_ctx->chan_freq = target_chan_freq;
 	/* check if currently selected channel is a DFS channel */
 	if (is_ch_dfs && sap_ctx->pre_cac_complete) {
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_MED, FL(
@@ -481,9 +533,9 @@ wlansap_roam_process_dfs_chansw_update(mac_handle_t mac_handle,
 	 * should continue to operate in the same mode as it is operating
 	 * currently. For e.g. 20/40/80 MHz operation
 	 */
-	if (mac_ctx->sap.SapDfsInfo.target_channel)
-		wlan_reg_set_channel_params(mac_ctx->pdev,
-				mac_ctx->sap.SapDfsInfo.target_channel,
+	if (mac_ctx->sap.SapDfsInfo.target_chan_freq)
+		wlan_reg_set_channel_params_for_freq(mac_ctx->pdev,
+				mac_ctx->sap.SapDfsInfo.target_chan_freq,
 				0, &sap_ctx->ch_params);
 
 	/*
@@ -518,7 +570,7 @@ wlansap_roam_process_dfs_chansw_update(mac_handle_t mac_handle,
 		 * change the channel
 		 */
 		qdf_status = wlansap_channel_change_request(sap_ctx,
-			mac_ctx->sap.SapDfsInfo.target_channel);
+			mac_ctx->sap.SapDfsInfo.target_chan_freq);
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
 			*ret_status = QDF_STATUS_E_FAILURE;
 		return;
@@ -568,7 +620,7 @@ wlansap_roam_process_dfs_chansw_update(mac_handle_t mac_handle,
 		 * change the channel
 		 */
 		qdf_status = wlansap_channel_change_request(sap_context,
-				mac_ctx->sap.SapDfsInfo.target_channel);
+				mac_ctx->sap.SapDfsInfo.target_chan_freq);
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 			QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
 				  FL("post chnl chng req failed, sap[%pK]"),
@@ -740,15 +792,15 @@ static void wlansap_update_vendor_acs_chan(struct mac_context *mac_ctx,
 		return;
 	}
 
-	mac_ctx->sap.SapDfsInfo.target_channel =
-				sap_ctx->dfs_vendor_channel;
+	mac_ctx->sap.SapDfsInfo.target_chan_freq =
+				wlan_reg_chan_to_freq(mac_ctx->pdev, sap_ctx->dfs_vendor_channel);
 
 	mac_ctx->sap.SapDfsInfo.new_chanWidth =
 				sap_ctx->dfs_vendor_chan_bw;
 	mac_ctx->sap.SapDfsInfo.new_ch_params.ch_width =
 				sap_ctx->dfs_vendor_chan_bw;
 
-	if (mac_ctx->sap.SapDfsInfo.target_channel != 0) {
+	if (mac_ctx->sap.SapDfsInfo.target_chan_freq != 0) {
 		mac_ctx->sap.SapDfsInfo.cac_state =
 			eSAP_DFS_DO_NOT_SKIP_CAC;
 		sap_cac_reset_notify(MAC_HANDLE(mac_ctx));
@@ -889,8 +941,8 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 
 	case eCSR_ROAM_DFS_RADAR_IND:
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_DEBUG,
-			  "Received Radar Indication on sap ch %d, session %d",
-			  sap_ctx->channel, sap_ctx->sessionId);
+			  "Rcvd Radar Indication on sap ch freq %d, session %d",
+			  sap_ctx->chan_freq, sap_ctx->sessionId);
 
 		if (!policy_mgr_get_dfs_master_dynamic_enabled(
 				mac_ctx->psoc, sap_ctx->sessionId)) {
@@ -910,11 +962,12 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 		}
 
 		if (!sap_chan_bond_dfs_sub_chan(
-			sap_ctx, sap_ctx->channel,
+			sap_ctx, wlan_reg_freq_to_chan(mac_ctx->pdev,
+						       sap_ctx->chan_freq),
 			PHY_CHANNEL_BONDING_STATE_MAX))  {
 			QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_DEBUG,
-				  "Ignore Radar event for sap ch %d",
-				  sap_ctx->channel);
+				  "Ignore Radar event for sap ch freq%d",
+				  sap_ctx->chan_freq);
 			goto EXIT;
 		}
 
@@ -940,22 +993,22 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 			  FL("sapdfs: Indicate eSAP_DFS_RADAR_DETECT to HDD"));
 		sap_signal_hdd_event(sap_ctx, NULL, eSAP_DFS_RADAR_DETECT,
 				     (void *) eSAP_STATUS_SUCCESS);
-		mac_ctx->sap.SapDfsInfo.target_channel =
-			sap_indicate_radar(sap_ctx);
+		mac_ctx->sap.SapDfsInfo.target_chan_freq =
+			wlan_reg_chan_to_freq(mac_ctx->pdev, sap_indicate_radar(sap_ctx));
 		/* if there is an assigned next channel hopping */
-		if (0 < mac_ctx->sap.SapDfsInfo.user_provided_target_channel) {
-			mac_ctx->sap.SapDfsInfo.target_channel =
-			   mac_ctx->sap.SapDfsInfo.user_provided_target_channel;
-			mac_ctx->sap.SapDfsInfo.user_provided_target_channel =
+		if (0 < mac_ctx->sap.SapDfsInfo.user_provided_target_chan_freq) {
+			mac_ctx->sap.SapDfsInfo.target_chan_freq =
+			   mac_ctx->sap.SapDfsInfo.user_provided_target_chan_freq;
+			mac_ctx->sap.SapDfsInfo.user_provided_target_chan_freq =
 			   0;
 		}
 		/* if external acs enabled */
 		if (sap_ctx->vendor_acs_dfs_lte_enabled &&
-		    !mac_ctx->sap.SapDfsInfo.target_channel) {
+		    !mac_ctx->sap.SapDfsInfo.target_chan_freq) {
 			/* Return from here, processing will be done later */
 			goto EXIT;
 		}
-		if (mac_ctx->sap.SapDfsInfo.target_channel != 0) {
+		if (mac_ctx->sap.SapDfsInfo.target_chan_freq != 0) {
 			mac_ctx->sap.SapDfsInfo.cac_state =
 				eSAP_DFS_DO_NOT_SKIP_CAC;
 			sap_cac_reset_notify(mac_handle);
@@ -1223,10 +1276,16 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 		wlansap_roam_process_ch_change_success(mac_ctx, sap_ctx,
 						csr_roam_info, &qdf_ret_status);
 
-		qdf_ret_status =
-			sap_signal_hdd_event(sap_ctx, csr_roam_info,
-					     eSAP_CHANNEL_CHANGE_RESP,
-					     (void *)QDF_STATUS_SUCCESS);
+		if (QDF_IS_STATUS_ERROR(qdf_ret_status))
+			qdf_ret_status =
+				sap_signal_hdd_event(sap_ctx, csr_roam_info,
+						     eSAP_CHANNEL_CHANGE_RESP,
+						   (void *)eSAP_STATUS_FAILURE);
+		else
+			qdf_ret_status =
+				sap_signal_hdd_event(sap_ctx, csr_roam_info,
+						     eSAP_CHANNEL_CHANGE_RESP,
+						   (void *)QDF_STATUS_SUCCESS);
 		break;
 	case eCSR_ROAM_RESULT_CHANNEL_CHANGE_FAILURE:
 		/* This is much more serious issue, we have to vacate the
@@ -1267,6 +1326,7 @@ void sap_scan_event_callback(struct wlan_objmgr_vdev *vdev,
 	eCsrScanStatus scan_status = eCSR_SCAN_FAILURE;
 	mac_handle_t mac_handle;
 	QDF_STATUS status;
+	struct qdf_op_sync *op_sync;
 
 	/*
 	 * It may happen that the SAP was deleted before the scan
@@ -1301,7 +1361,11 @@ void sap_scan_event_callback(struct wlan_objmgr_vdev *vdev,
 	if (success)
 		scan_status = eCSR_SCAN_SUCCESS;
 
+	if (qdf_op_protect(&op_sync))
+		return;
+
 	wlansap_pre_start_bss_acs_scan_callback(mac_handle,
 						arg, session_id,
 						scan_id, scan_status);
+	qdf_op_unprotect(op_sync);
 }

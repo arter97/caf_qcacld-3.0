@@ -193,7 +193,7 @@ void lim_update_short_slot_time(struct mac_context *mac, tSirMacAddr peerMacAddr
  * @frame_len: Length og mgmt frame
  * @session_id: session id
  * @psession_entry: PE Session Entry
- * @rx_channel: Channel of where packet is received
+ * @rx_freq: Frequency on which packet is received
  * @rx_rssi: rssi value
  * @rx_flags: RXMGMT flags to be set for the frame. Defined in enum rxmgmt_flags
  *
@@ -204,7 +204,7 @@ void lim_update_short_slot_time(struct mac_context *mac, tSirMacAddr peerMacAddr
 */
 void lim_send_sme_mgmt_frame_ind(struct mac_context *mac_ctx, uint8_t frame_type,
 				 uint8_t *frame, uint32_t frame_len,
-				 uint16_t session_id, uint32_t rx_channel,
+				 uint16_t session_id, uint32_t rx_freq,
 				 struct pe_session *psession_entry,
 				 int8_t rx_rssi, enum rxmgmt_flags rx_flags);
 
@@ -280,10 +280,19 @@ void lim_decide_sta_protection(struct mac_context *mac,
 void lim_decide_sta_protection_on_assoc(struct mac_context *mac,
 		tpSchBeaconStruct pBeaconStruct,
 		struct pe_session *pe_session);
+
+/**
+ * lim_update_sta_run_time_ht_switch_chnl_params() - Process change in HT
+ * bandwidth
+ * @mac: pointer to Global MAC structure
+ * @pHTInfo: ht info IE
+ * @pe_session: pe session
+ *
+ * Return: none
+ */
 void lim_update_sta_run_time_ht_switch_chnl_params(struct mac_context *mac,
-		tDot11fIEHTInfo *pHTInfo,
-		uint8_t bss_idx,
-		struct pe_session *pe_session);
+						 tDot11fIEHTInfo *pHTInfo,
+						 struct pe_session *pe_session);
 /* Print MAC address utility function */
 void lim_print_mac_addr(struct mac_context *, tSirMacAddr, uint8_t);
 
@@ -365,18 +374,6 @@ lim_assoc_rej_get_remaining_delta(struct sir_rssi_disallow_lst *node);
  */
 QDF_STATUS
 lim_rem_blacklist_entry_with_lowest_delta(qdf_list_t *list);
-
-/**
- * lim_get_session_by_macaddr() - api to find session based on MAC
- * @mac_ctx: Pointer to global mac structure.
- * @self_mac: MAC address.
- *
- * This function is used to get session for given MAC address.
- *
- * Return: session pointer if exists, NULL otherwise.
- */
-struct csr_roam_session *lim_get_session_by_macaddr(struct mac_context *mac_ctx,
-		tSirMacAddr self_mac);
 
 static inline enum band_info lim_get_rf_band(uint8_t channel)
 {
@@ -486,7 +483,6 @@ static inline uint32_t utils_power_xy(uint16_t base, uint16_t power)
 }
 
 QDF_STATUS lim_post_sm_state_update(struct mac_context *mac,
-		uint16_t StaIdx,
 		tSirMacHTMIMOPowerSaveState MIMOPSState,
 		uint8_t *pPeerStaMac, uint8_t sessionId);
 
@@ -549,7 +545,30 @@ void lim_process_ap_mlm_del_sta_rsp(struct mac_context *mac,
 		struct scheduler_msg *limMsgQ,
 		struct pe_session *pe_session);
 
+#ifdef QCA_IBSS_SUPPORT
+/**
+ * lim_is_ibss_session_active() - API to check IBSS session active
+ * @mac: Pointer to Global MAC structure
+ *
+ * Return: Pointer to active IBSS pe_session else NULL
+ */
 struct pe_session *lim_is_ibss_session_active(struct mac_context *mac);
+#else
+/**
+ * lim_is_ibss_session_active() - API to check IBSS session active
+ * @mac: Pointer to Global MAC structure
+ *
+ * This function is dummy.
+ *
+ * Return: NULL
+ */
+static inline
+struct pe_session *lim_is_ibss_session_active(struct mac_context *mac)
+{
+	return NULL;
+}
+#endif
+
 struct pe_session *lim_is_ap_session_active(struct mac_context *mac);
 void lim_handle_heart_beat_failure_timeout(struct mac_context *mac);
 
@@ -575,17 +594,16 @@ uint32_t lim_get_max_rate_flags(struct mac_context *mac_ctx,
 
 bool lim_check_vht_op_mode_change(struct mac_context *mac,
 		struct pe_session *pe_session,
-		uint8_t chanWidth, uint8_t staId,
+		uint8_t chanWidth,
 		uint8_t *peerMac);
 #ifdef WLAN_FEATURE_11AX_BSS_COLOR
 bool lim_send_he_ie_update(struct mac_context *mac_ctx, struct pe_session *pe_session);
 #endif
 bool lim_set_nss_change(struct mac_context *mac, struct pe_session *pe_session,
-		uint8_t rxNss, uint8_t staId, uint8_t *peerMac);
+		uint8_t rxNss, uint8_t *peerMac);
 bool lim_check_membership_user_position(struct mac_context *mac,
 		struct pe_session *pe_session,
-		uint32_t membership, uint32_t userPosition,
-		uint8_t staId);
+		uint32_t membership, uint32_t userPosition);
 
 /**
  * enum ack_status - Indicate TX status of ASSOC/AUTH
@@ -788,7 +806,7 @@ QDF_STATUS lim_send_ies_per_band(struct mac_context *mac_ctx,
 /**
  * lim_send_action_frm_tb_ppdu_cfg() - sets action frame in TB PPDU cfg to FW
  * @mac_ctx: global MAC context
- * @session_id: SME session id
+ * @vdev_id: vdev id
  * @cfg: config setting
  *
  * Preapres the vendor action frame and send action frame in HE TB PPDU
@@ -797,7 +815,7 @@ QDF_STATUS lim_send_ies_per_band(struct mac_context *mac_ctx,
  * Return: QDF_STATUS
  */
 QDF_STATUS lim_send_action_frm_tb_ppdu_cfg(struct mac_context *mac_ctx,
-					   uint32_t session_id,
+					   uint32_t vdev_id,
 					   uint8_t cfg);
 
 void lim_update_extcap_struct(struct mac_context *mac_ctx, uint8_t *buf,
@@ -1003,6 +1021,18 @@ void lim_copy_join_req_he_cap(struct pe_session *session,
 			      struct join_req *sme_join_req);
 
 /**
+ * lim_log_he_6g_cap() - Print HE 6G cap IE
+ * @mac: pointer to MAC context
+ * @he_6g_cap: pointer to HE 6G cap IE
+ *
+ * Print HE 6G caps stored as dot11f structure
+ *
+ * Return: None
+ */
+void lim_log_he_6g_cap(struct mac_context *mac,
+		       tDot11fIEhe_6ghz_band_cap *he_6g_cap);
+
+/**
  * lim_log_he_op() - Print HE Operation
  * @mac: pointer to MAC context
  * @he_op: pointer to HE Operation
@@ -1064,14 +1094,14 @@ void lim_update_usr_he_cap(struct mac_context *mac_ctx, struct pe_session *sessi
 /**
  * lim_decide_he_op() - Determine HE operation elements
  * @mac_ctx: global mac context
- * @he_ops: pointer to HE operation IE
+ * @he_ops: mlme he ops
  * @session: PE session entry
  *
  * Parse the HE Operation IE and populate the fields to be
  * sent to FW as part of add bss.
  */
-void lim_decide_he_op(struct mac_context *mac_ctx, struct bss_params *add_bss,
-		struct pe_session *session);
+void lim_decide_he_op(struct mac_context *mac_ctx, uint32_t *mlme_he_ops,
+		      struct pe_session *session);
 
 /**
  * lim_update_sta_he_capable(): Update he_capable in add sta params
@@ -1108,13 +1138,14 @@ static inline bool lim_is_sta_he_capable(tpDphHashNode sta_ds)
 }
 
 /**
- * lim_update_bss_he_capable(): Update he_capable in add BSS params
+ * lim_update_bss_he_capable() - Update he_capable in add BSS params
  * @mac: pointer to MAC context
  * @add_bss: pointer to add BSS params
  *
  * Return: None
  */
-void lim_update_bss_he_capable(struct mac_context *mac, struct bss_params *add_bss);
+void lim_update_bss_he_capable(struct mac_context *mac,
+			       struct bss_params *add_bss);
 
 /**
  * lim_update_stads_he_capable() - Update he_capable in sta ds context
@@ -1133,15 +1164,6 @@ void lim_update_stads_he_capable(tpDphHashNode sta_ds, tpSirAssocReq assoc_req);
  * Return: None
  */
 void lim_update_session_he_capable(struct mac_context *mac, struct pe_session *session);
-
-/**
- * lim_update_chan_he_capable(): Update he_capable in chan switch params
- * @mac: pointer to MAC context
- * @chan: pointer to channel switch params
- *
- * Return: None
- */
-void lim_update_chan_he_capable(struct mac_context *mac, tpSwitchChannelParams chan);
 
 /**
  * lim_set_he_caps() - update HE caps to be sent to FW as part of scan IE
@@ -1232,7 +1254,7 @@ static inline void lim_update_usr_he_cap(struct mac_context *mac_ctx,
 }
 
 static inline void lim_decide_he_op(struct mac_context *mac_ctx,
-			struct bss_params *add_bss, struct pe_session *session)
+			uint32_t *mlme_he_ops, struct pe_session *session)
 {
 }
 
@@ -1279,7 +1301,7 @@ static inline bool lim_is_sta_he_capable(tpDphHashNode sta_ds)
 }
 
 static inline void lim_update_bss_he_capable(struct mac_context *mac,
-			struct bss_params *add_bss)
+					     struct bss_params *add_bss)
 {
 }
 
@@ -1290,11 +1312,6 @@ static inline void lim_update_stads_he_capable(tpDphHashNode sta_ds,
 
 static inline void lim_update_session_he_capable(struct mac_context *mac,
 			struct pe_session *session)
-{
-}
-
-static inline void lim_update_chan_he_capable(struct mac_context *mac,
-		tpSwitchChannelParams chan)
 {
 }
 
@@ -1792,5 +1809,27 @@ void lim_flush_bssid(struct mac_context *mac_ctx, uint8_t *bssid);
  * Return: true if akm is sha384 based kdf or false
  */
 bool lim_is_sha384_akm(enum ani_akm_type akm);
+
+
+/**
+ * lim_pre_vdev_start() - set set vdev params from session
+ * @mac: pointer to mac context
+ * @mlme_obj: vdev mlme obj
+ * @session: pointer to pe session
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS lim_pre_vdev_start(struct mac_context *mac,
+			      struct vdev_mlme_obj *mlme_obj,
+			      struct pe_session *session);
+
+/**
+ * lim_set_ch_phy_mode() - set channel phy mode
+ * @vdev: pointer to vdev
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+lim_set_ch_phy_mode(struct wlan_objmgr_vdev *vdev, uint8_t dot11mode);
 
 #endif /* __LIM_UTILS_H */

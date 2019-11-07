@@ -123,6 +123,91 @@ static struct index_vht_data_rate_type vht_mcs_nss2[] = {
 	{9,  {1730, 1920}, {3600, 4000}, {7800, 8667} }
 };
 
+#ifdef WLAN_FEATURE_11AX
+/* MCS Based HE rate table */
+/* MCS parameters with Nss = 1*/
+static struct index_he_data_rate_type he_mcs_nss1[] = {
+/* MCS,  {dcm0:0.8/1.6/3.2}, {dcm1:0.8/1.6/3.2} */
+	{0,  {{86,   81,   73  }, {43,   40,  36 } }, /* HE20 */
+	     {{172,  163,  146 }, {86,   81,  73 } }, /* HE40 */
+	     {{360,  340,  306 }, {180,  170, 153} } }, /* HE80 */
+	{1,  {{172,  163,  146 }, {86,   81,  73 } },
+	     {{344,  325,  293 }, {172,  163, 146} },
+	     {{721,  681,  613 }, {360,  340, 306} } },
+	{2,  {{258,  244,  219 }, {0} },
+	     {{516,  488,  439 }, {0} },
+	     {{1081, 1021, 919 }, {0} } },
+	{3,  {{344,  325,  293 }, {172,  163, 146} },
+	     {{688,  650,  585 }, {344,  325, 293} },
+	     {{1441, 1361, 1225}, {721,  681, 613} } },
+	{4,  {{516,  488,  439 }, {258,  244, 219} },
+	     {{1032, 975,  878 }, {516,  488, 439} },
+	     {{2162, 2042, 1838}, {1081, 1021, 919} } },
+	{5,  {{688,  650,  585 }, {0} },
+	     {{1376, 1300, 1170}, {0} },
+	     {{2882, 2722, 2450}, {0} } },
+	{6,  {{774,  731,  658 }, {0} },
+	     {{1549, 1463, 1316}, {0} },
+	     {{3243, 3063, 2756}, {0} } },
+	{7,  {{860,  813,  731 }, {0} },
+	     {{1721, 1625, 1463}, {0} },
+	     {{3603, 3403, 3063}, {0} } },
+	{8,  {{1032, 975,  878 }, {0} },
+	     {{2065, 1950, 1755}, {0} },
+	     {{4324, 4083, 3675}, {0} } },
+	{9,  {{1147, 1083, 975 }, {0} },
+	     {{2294, 2167, 1950}, {0} },
+	     {{4804, 4537, 4083}, {0} } },
+	{10, {{1290, 1219, 1097}, {0} },
+	     {{2581, 2438, 2194}, {0} },
+	     {{5404, 5104, 4594}, {0} } },
+	{11, {{1434, 1354, 1219}, {0} },
+	     {{2868, 2708, 2438}, {0} },
+	     {{6004, 5671, 5104}, {0} } }
+};
+
+/*MCS parameters with Nss = 2*/
+static struct index_he_data_rate_type he_mcs_nss2[] = {
+/* MCS,  {dcm0:0.8/1.6/3.2}, {dcm1:0.8/1.6/3.2} */
+	{0,  {{172,   163,   146 }, {86,   81,   73 } }, /* HE20 */
+	     {{344,   325,   293 }, {172,  163,  146} }, /* HE40 */
+	     {{721,   681,   613 }, {360,  340,  306} } }, /* HE80 */
+	{1,  {{344,   325,   293 }, {172,  163,  146} },
+	     {{688,   650,   585 }, {344,  325,  293} },
+	     {{1441,  1361,  1225}, {721,  681,  613} } },
+	{2,  {{516,   488,   439 }, {0} },
+	     {{1032,  975,   878 }, {0} },
+	     {{2162,  2042,  1838}, {0} } },
+	{3,  {{688,   650,   585 }, {344,  325,  293 } },
+	     {{1376,  1300,  1170}, {688,  650,  585  } },
+	     {{2882,  2722,  2450}, {1441, 1361, 1225} } },
+	{4,  {{1032,  975,   878 }, {516,  488,  439 } },
+	     {{2065,  1950,  1755}, {1032, 975,  878 } },
+	     {{4324,  4083,  3675}, {2162, 2042, 1838} } },
+	{5,  {{1376,  1300,  1170}, {0} },
+	     {{2753,  2600,  2340}, {0} },
+	     {{5765,  5444,  4900}, {0} } },
+	{6,  {{1549,  1463,  1316}, {0} },
+	     {{3097,  2925,  2633}, {0} },
+	     {{6485,  6125,  5513}, {0} } },
+	{7,  {{1721,  1625,  1463}, {0} },
+	     {{3441,  3250,  2925}, {0} },
+	     {{7206,  6806,  6125}, {0} } },
+	{8,  {{2065,  1950,  1755}, {0} },
+	     {{4129,  3900,  3510}, {0} },
+	     {{8647,  8167,  7350}, {0} } },
+	{9,  {{2294,  2167,  1950}, {0} },
+	     {{4588,  4333,  3900}, {0} },
+	     {{9607,  9074,  8166}, {0} } },
+	{10, {{2581,  2438,  2194}, {0} },
+	     {{5162,  4875,  4388}, {0} },
+	     {{10809, 10208, 9188}, {0} } },
+	{11, {{2868,  2708,  2438}, {0} },
+	     {{5735,  5417,  4875}, {0} },
+	     {{12010, 11343, 10208}, {0} } }
+};
+#endif
+
 #ifdef BIG_ENDIAN_HOST
 
 /* ############# function definitions ############ */
@@ -151,90 +236,233 @@ void wma_swap_bytes(void *pv, uint32_t n)
 
 /**
  * wma_mcs_rate_match() - find the match mcs rate
- * @match_rate:	the rate to look up
- * @is_sgi:	return if the SGI rate is found
- * @nss:	the nss in use
- * @nss1_rate:	the nss1 rate
- * @nss1_srate:	the nss1 SGI rate
- * @nss2_rate:	the nss2 rate
- * @nss2_srate:	the nss2 SGI rate
+ * @raw_rate: the rate to look up
+ * @is_he: if it is he rate
+ * @nss1_rate: the nss1 rate
+ * @nss2_rate: the nss2 rate
+ * @nss: the nss in use
+ * @guard_interval: to get guard interval from rate
  *
  * This is a helper function to find the match of the tx_rate
- * in terms of the nss1/nss2 rate with non-SGI/SGI.
+ * and return nss/guard interval.
  *
  * Return: the found rate or 0 otherwise
  */
-static inline uint16_t wma_mcs_rate_match(uint16_t match_rate, bool *is_sgi,
-					  uint8_t *nss, uint16_t nss1_rate,
-					  uint16_t nss1_srate,
-					  uint16_t nss2_rate,
-					  uint16_t nss2_srate)
+static inline uint16_t wma_mcs_rate_match(uint16_t raw_rate,
+					  bool is_he,
+					  uint16_t *nss1_rate,
+					  uint16_t *nss2_rate,
+					  uint8_t *nss,
+					  enum txrate_gi *guard_interval)
 {
-	WMA_LOGD("%s match_rate: %d, %d %d %d %d",
-		__func__, match_rate, nss1_rate, nss1_srate, nss2_rate,
-		nss2_srate);
+	uint8_t gi_index;
+	uint8_t gi_index_max = 2;
+	uint16_t ret_rate = 0;
 
-	if (match_rate == nss1_rate) {
-		*nss = 1;
-		return nss1_rate;
-	} else if (match_rate == nss1_srate) {
-		*is_sgi = true;
-		*nss = 1;
-		return nss1_srate;
-	} else if (*nss == 2 && match_rate == nss2_rate)
-		return nss2_rate;
-	else if (*nss == 2 && match_rate == nss2_srate) {
-		*is_sgi = true;
-		return nss2_srate;
-	} else
-		return 0;
+	WMA_LOGD("%s raw_rate: %u, %u %u %u %u",
+		 __func__, raw_rate, nss1_rate[0],
+		 nss1_rate[1], nss2_rate[0], nss2_rate[1]);
+	if (is_he)
+		WMA_LOGD("%s : is_he %u,  %u, %u",
+			 __func__, is_he, nss1_rate[2], nss2_rate[2]);
+
+	if (is_he)
+		gi_index_max = 3;
+
+	for (gi_index = 0; gi_index < gi_index_max; gi_index++) {
+		if (raw_rate == nss1_rate[gi_index]) {
+			*nss = 1;
+			ret_rate = nss1_rate[gi_index];
+			break;
+		}
+		if (*nss == 2 && raw_rate == nss2_rate[gi_index]) {
+			ret_rate = nss2_rate[gi_index];
+			break;
+		}
+	}
+
+	if (ret_rate) {
+		if (gi_index == 1)
+			*guard_interval =
+				is_he ? TXRATE_GI_1_6_US : TXRATE_GI_0_4_US;
+		else if (is_he && gi_index == 2)
+			*guard_interval = TXRATE_GI_3_2_US;
+		else
+			*guard_interval = TXRATE_GI_0_8_US;
+	}
+
+	WMA_LOGD("%s ret_rate: %u, guard interval %u nss %u",
+		 __func__, ret_rate, *guard_interval, *nss);
+
+	return ret_rate;
 }
 
-uint8_t wma_get_mcs_idx(uint16_t max_rate, uint8_t rate_flags,
-			uint8_t *nss, uint8_t *mcs_rate_flag)
+#ifdef WLAN_FEATURE_11AX
+/**
+ * wma_get_mcs_idx() - get mcs index
+ * @raw_rate: raw rate from fw
+ * @rate_flags: rate flags
+ * @nss: nss
+ * @dcm: dcm
+ * @guard_interval: guard interval
+ * @mcs_rate_flag: mcs rate flags
+ * @p_index: index for matched rate
+ *
+ *  Return: return match rate if found, else 0
+ */
+static uint16_t wma_match_he_rate(uint16_t raw_rate,
+				  enum tx_rate_info rate_flags,
+				  uint8_t *nss, uint8_t *dcm,
+				  enum txrate_gi *guard_interval,
+				  enum tx_rate_info *mcs_rate_flag,
+				  uint8_t *p_index)
+{
+	uint8_t index = 0;
+	uint8_t dcm_index_max = 1;
+	uint8_t dcm_index = 0;
+	uint16_t match_rate = 0;
+	uint16_t *nss1_rate;
+	uint16_t *nss2_rate;
+
+	*p_index = 0;
+	if (!(rate_flags & (TX_RATE_HE80 | TX_RATE_HE40 |
+		TX_RATE_HE20)))
+		return 0;
+
+	for (index = 0; index < MAX_HE_MCS_IDX; index++) {
+		dcm_index_max = IS_MCS_HAS_DCM_RATE(index) ? 2 : 1;
+
+		for (dcm_index = 0; dcm_index < dcm_index_max;
+			 dcm_index++) {
+			if (rate_flags & TX_RATE_HE80) {
+				nss1_rate = &he_mcs_nss1[index].
+					supported_he80_rate[dcm_index][0];
+				nss2_rate = &he_mcs_nss2[index].
+					supported_he80_rate[dcm_index][0];
+				/* check for he80 nss1/2 rate set */
+				match_rate = wma_mcs_rate_match(raw_rate, 1,
+								nss1_rate,
+								nss2_rate,
+								nss,
+								guard_interval);
+				if (match_rate)
+					goto rate_found;
+			}
+
+			if (rate_flags & (TX_RATE_HE40 | TX_RATE_HE80)) {
+				nss1_rate = &he_mcs_nss1[index].
+					supported_he40_rate[dcm_index][0];
+				nss2_rate = &he_mcs_nss2[index].
+					supported_he40_rate[dcm_index][0];
+				/* check for he40 nss1/2 rate set */
+				match_rate = wma_mcs_rate_match(raw_rate, 1,
+								nss1_rate,
+								nss2_rate,
+								nss,
+								guard_interval);
+
+				if (match_rate) {
+					*mcs_rate_flag &= ~TX_RATE_HE80;
+					goto rate_found;
+				}
+			}
+
+			if (rate_flags & (TX_RATE_HE80 | TX_RATE_HE40 |
+				TX_RATE_HE20)) {
+				nss1_rate = &he_mcs_nss1[index].
+					supported_he20_rate[dcm_index][0];
+				nss2_rate = &he_mcs_nss2[index].
+					supported_he20_rate[dcm_index][0];
+				/* check for he20 nss1/2 rate set */
+				match_rate = wma_mcs_rate_match(raw_rate, 1,
+								nss1_rate,
+								nss2_rate,
+								nss,
+								guard_interval);
+
+				if (match_rate) {
+					*mcs_rate_flag &= TX_RATE_HE20;
+					goto rate_found;
+				}
+			}
+		}
+	}
+
+rate_found:
+	if (match_rate) {
+		if (dcm_index == 1)
+			*dcm = 1;
+		*p_index = index;
+	}
+	return match_rate;
+}
+#else
+static uint16_t wma_match_he_rate(uint16_t raw_rate,
+				  enum tx_rate_info rate_flags,
+				  uint8_t *nss, uint8_t *dcm,
+				  enum txrate_gi *guard_interval,
+				  enum tx_rate_info *mcs_rate_flag,
+				  uint8_t *p_index)
+{
+		return 0;
+}
+#endif
+
+uint8_t wma_get_mcs_idx(uint16_t raw_rate, enum tx_rate_info rate_flags,
+			uint8_t *nss, uint8_t *dcm,
+			enum txrate_gi *guard_interval,
+			enum tx_rate_info *mcs_rate_flag)
 {
 	uint8_t  index = 0;
 	uint16_t match_rate = 0;
-	bool is_sgi = false;
+	uint16_t *nss1_rate;
+	uint16_t *nss2_rate;
 
-	WMA_LOGD("%s rate:%d rate_flgs: 0x%x, nss: %d",
-		 __func__, max_rate, rate_flags, *nss);
+	WMA_LOGD("%s enter:  raw_rate:%d rate_flgs: 0x%x, nss: %d",
+		 __func__, raw_rate, rate_flags, *nss);
 
 	*mcs_rate_flag = rate_flags;
-	*mcs_rate_flag &= ~TX_RATE_SGI;
+
+	match_rate = wma_match_he_rate(raw_rate, rate_flags,
+				       nss, dcm, guard_interval,
+				       mcs_rate_flag, &index);
+	if (match_rate)
+		goto rate_found;
+
 	for (index = 0; index < MAX_VHT_MCS_IDX; index++) {
 		if (rate_flags & TX_RATE_VHT80) {
+			nss1_rate = &vht_mcs_nss1[index].ht80_rate[0];
+			nss2_rate = &vht_mcs_nss2[index].ht80_rate[0];
 			/* check for vht80 nss1/2 rate set */
-			match_rate = wma_mcs_rate_match(max_rate, &is_sgi, nss,
-					vht_mcs_nss1[index].ht80_rate[0],
-					vht_mcs_nss1[index].ht80_rate[1],
-					vht_mcs_nss2[index].ht80_rate[0],
-					vht_mcs_nss2[index].ht80_rate[1]);
+			match_rate = wma_mcs_rate_match(raw_rate, 0,
+							nss1_rate,
+							nss2_rate,
+							nss, guard_interval);
 			if (match_rate)
 				goto rate_found;
 		}
-		if ((rate_flags & TX_RATE_VHT40) |
-		    (rate_flags & TX_RATE_VHT80)) {
+		if (rate_flags & (TX_RATE_VHT40 | TX_RATE_VHT80)) {
+			nss1_rate = &vht_mcs_nss1[index].ht40_rate[0];
+			nss2_rate = &vht_mcs_nss2[index].ht40_rate[0];
 			/* check for vht40 nss1/2 rate set */
-			match_rate = wma_mcs_rate_match(max_rate, &is_sgi, nss,
-					vht_mcs_nss1[index].ht40_rate[0],
-					vht_mcs_nss1[index].ht40_rate[1],
-					vht_mcs_nss2[index].ht40_rate[0],
-					vht_mcs_nss2[index].ht40_rate[1]);
+			match_rate = wma_mcs_rate_match(raw_rate, 0,
+							nss1_rate,
+							nss2_rate,
+							nss, guard_interval);
 			if (match_rate) {
 				*mcs_rate_flag &= ~TX_RATE_VHT80;
 				goto rate_found;
 			}
 		}
-		if ((rate_flags & TX_RATE_VHT20) |
-		    (rate_flags & TX_RATE_VHT40) |
-		    (rate_flags & TX_RATE_VHT80)) {
+		if (rate_flags & (TX_RATE_VHT20 | TX_RATE_VHT40 |
+			TX_RATE_VHT80)) {
+			nss1_rate = &vht_mcs_nss1[index].ht20_rate[0];
+			nss2_rate = &vht_mcs_nss2[index].ht20_rate[0];
 			/* check for vht20 nss1/2 rate set */
-			match_rate = wma_mcs_rate_match(max_rate, &is_sgi, nss,
-					vht_mcs_nss1[index].ht20_rate[0],
-					vht_mcs_nss1[index].ht20_rate[1],
-					vht_mcs_nss2[index].ht20_rate[0],
-					vht_mcs_nss2[index].ht20_rate[1]);
+			match_rate = wma_mcs_rate_match(raw_rate, 0,
+							nss1_rate,
+							nss2_rate,
+							nss, guard_interval);
 			if (match_rate) {
 				*mcs_rate_flag &= ~(TX_RATE_VHT80 |
 						TX_RATE_VHT40);
@@ -244,12 +472,13 @@ uint8_t wma_get_mcs_idx(uint16_t max_rate, uint8_t rate_flags,
 	}
 	for (index = 0; index < MAX_HT_MCS_IDX; index++) {
 		if (rate_flags & TX_RATE_HT40) {
+			nss1_rate = &mcs_nss1[index].ht40_rate[0];
+			nss2_rate = &mcs_nss2[index].ht40_rate[0];
 			/* check for ht40 nss1/2 rate set */
-			match_rate = wma_mcs_rate_match(max_rate, &is_sgi, nss,
-					mcs_nss1[index].ht40_rate[0],
-					mcs_nss1[index].ht40_rate[1],
-					mcs_nss2[index].ht40_rate[0],
-					mcs_nss2[index].ht40_rate[1]);
+			match_rate = wma_mcs_rate_match(raw_rate, 0,
+							nss1_rate,
+							nss2_rate,
+							nss, guard_interval);
 			if (match_rate) {
 				*mcs_rate_flag = TX_RATE_HT40;
 				if (*nss == 2)
@@ -257,14 +486,14 @@ uint8_t wma_get_mcs_idx(uint16_t max_rate, uint8_t rate_flags,
 				goto rate_found;
 			}
 		}
-		if ((rate_flags & TX_RATE_HT20) ||
-			(rate_flags & TX_RATE_HT40)) {
+		if (rate_flags & (TX_RATE_HT20 | TX_RATE_HT40)) {
+			nss1_rate = &mcs_nss1[index].ht20_rate[0];
+			nss2_rate = &mcs_nss2[index].ht20_rate[0];
 			/* check for ht20 nss1/2 rate set */
-			match_rate = wma_mcs_rate_match(max_rate, &is_sgi, nss,
-					mcs_nss1[index].ht20_rate[0],
-					mcs_nss1[index].ht20_rate[1],
-					mcs_nss2[index].ht20_rate[0],
-					mcs_nss2[index].ht20_rate[1]);
+			match_rate = wma_mcs_rate_match(raw_rate, 0,
+							nss1_rate,
+							nss2_rate,
+							nss, guard_interval);
 			if (match_rate) {
 				*mcs_rate_flag = TX_RATE_HT20;
 				if (*nss == 2)
@@ -275,12 +504,17 @@ uint8_t wma_get_mcs_idx(uint16_t max_rate, uint8_t rate_flags,
 	}
 
 rate_found:
-	/* set SGI flag only if this is SGI rate */
-	if (match_rate && is_sgi == true)
-		*mcs_rate_flag |= TX_RATE_SGI;
 
-	WMA_LOGD("%s - match_rate: %d index: %d rate_flag: 0x%x is_sgi: %d",
-		 __func__, match_rate, index, *mcs_rate_flag, is_sgi);
+	/* set SGI flag only if this is SGI rate */
+	if (match_rate && *guard_interval == TXRATE_GI_0_4_US)
+		*mcs_rate_flag |= TX_RATE_SGI;
+	else
+		*mcs_rate_flag &= ~TX_RATE_SGI;
+
+	WMA_LOGD("%s exit: match_rate %d index: %d"
+		 " mcs_rate_flag: 0x%x nss %d guard interval %d",
+		 __func__, match_rate, index, *mcs_rate_flag,
+		 *nss, *guard_interval);
 
 	return match_rate ? index : INVALID_MCS_IDX;
 }
@@ -1973,27 +2207,28 @@ void wma_register_ll_stats_event_handler(tp_wma_handle wma_handle)
 
 }
 
-
-/**
- * wma_process_ll_stats_clear_req() - clear link layer stats
- * @wma: wma handle
- * @clearReq: ll stats clear request command params
- *
- * Return: QDF_STATUS_SUCCESS for success or error code
- */
 QDF_STATUS wma_process_ll_stats_clear_req(tp_wma_handle wma,
 				 const tpSirLLStatsClearReq clearReq)
 {
+	uint8_t *addr;
 	struct ll_stats_clear_params cmd = {0};
 	int ret;
+	struct wlan_objmgr_vdev *vdev;
 
 	if (!clearReq || !wma) {
 		WMA_LOGE("%s: input pointer is NULL", __func__);
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if (!wma->interfaces[clearReq->staId].handle) {
-		WMA_LOGE("%s: vdev_id %d handle is NULL",
+	vdev = wma->interfaces[clearReq->staId].vdev;
+	if (!vdev) {
+		WMA_LOGE("%s: vdev is NULL for vdev_%d",
+			 __func__, clearReq->staId);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!wlan_vdev_get_dp_handle(vdev)) {
+		WMA_LOGE("%s: vdev_id %d dp handle is NULL",
 			 __func__, clearReq->staId);
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -2001,9 +2236,20 @@ QDF_STATUS wma_process_ll_stats_clear_req(tp_wma_handle wma,
 	cmd.stop_req = clearReq->stopReq;
 	cmd.vdev_id = clearReq->staId;
 	cmd.stats_clear_mask = clearReq->statsClearReqMask;
-	qdf_mem_copy(cmd.peer_macaddr.bytes,
-		     wma->interfaces[clearReq->staId].addr,
-		     QDF_MAC_ADDR_SIZE);
+
+	vdev = wma->interfaces[clearReq->staId].vdev;
+	if (!vdev) {
+		WMA_LOGE("%s: Failed to get vdev for vdev_%d",
+			 __func__, clearReq->staId);
+		return QDF_STATUS_E_FAILURE;
+	}
+	addr = wlan_vdev_mlme_get_macaddr(vdev);
+	if (!addr) {
+		WMA_LOGE("%s: Failed to get macaddr for vdev_%d",
+			 __func__, clearReq->staId);
+		return QDF_STATUS_E_FAILURE;
+	}
+	qdf_mem_copy(cmd.peer_macaddr.bytes, addr, QDF_MAC_ADDR_SIZE);
 	ret = wmi_unified_process_ll_stats_clear_cmd(wma->wmi_handle, &cmd);
 	if (ret) {
 		WMA_LOGE("%s: Failed to send clear link stats req", __func__);
@@ -2045,16 +2291,11 @@ QDF_STATUS wma_process_ll_stats_set_req(tp_wma_handle wma,
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * wma_process_ll_stats_get_req() - link layer stats get request
- * @wma:wma handle
- * @getReq:ll stats get request command params
- *
- * Return: QDF_STATUS_SUCCESS for success or error code
- */
 QDF_STATUS wma_process_ll_stats_get_req(tp_wma_handle wma,
 				 const tpSirLLStatsGetReq getReq)
 {
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t *addr;
 	struct ll_stats_get_params cmd = {0};
 	int ret;
 
@@ -2072,10 +2313,20 @@ QDF_STATUS wma_process_ll_stats_get_req(tp_wma_handle wma,
 	cmd.req_id = getReq->reqId;
 	cmd.param_id_mask = getReq->paramIdMask;
 	cmd.vdev_id = getReq->staId;
-	qdf_mem_copy(cmd.peer_macaddr.bytes,
-		     wma->interfaces[getReq->staId].addr,
-		     QDF_MAC_ADDR_SIZE);
 
+	vdev = wma->interfaces[getReq->staId].vdev;
+	if (!vdev) {
+		WMA_LOGE("%s: Failed to get vdev for vdev_%d",
+			 __func__, getReq->staId);
+		return QDF_STATUS_E_FAILURE;
+	}
+	addr = wlan_vdev_mlme_get_macaddr(vdev);
+	if (!addr) {
+		WMA_LOGE("%s: Failed to get macaddr for vdev_%d",
+			 __func__, getReq->staId);
+		return QDF_STATUS_E_FAILURE;
+	}
+	qdf_mem_copy(cmd.peer_macaddr.bytes, addr, QDF_MAC_ADDR_SIZE);
 	ret = wmi_unified_process_ll_stats_get_cmd(wma->wmi_handle, &cmd);
 	if (ret) {
 		WMA_LOGE("%s: Failed to send get link stats request", __func__);
@@ -2097,6 +2348,7 @@ int wma_unified_link_iface_stats_event_handler(void *handle,
 					       uint8_t *cmd_param_info,
 					       uint32_t len)
 {
+	tp_wma_handle wma_handle = (tp_wma_handle)handle;
 	WMI_IFACE_LINK_STATS_EVENTID_param_tlvs *param_tlvs;
 	wmi_iface_link_stats_event_fixed_param *fixed_param;
 	wmi_iface_link_stats *link_stats, *iface_link_stats;
@@ -2108,6 +2360,7 @@ int wma_unified_link_iface_stats_event_handler(void *handle,
 	size_t link_stats_size, ac_stats_size, iface_info_size;
 	size_t link_stats_results_size, offload_stats_size;
 	size_t total_ac_size, total_offload_size;
+	bool db2dbm_enabled;
 
 	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
 
@@ -2200,6 +2453,17 @@ int wma_unified_link_iface_stats_event_handler(void *handle,
 
 	iface_link_stats = &iface_stat->link_stats;
 	*iface_link_stats = *link_stats;
+	db2dbm_enabled = wmi_service_enabled(wma_handle->wmi_handle,
+					     wmi_service_hw_db2dbm_support);
+	if (!db2dbm_enabled) {
+		/* FW doesn't indicate support for HW db2dbm conversion */
+		iface_link_stats->rssi_mgmt += WMA_TGT_NOISE_FLOOR_DBM;
+		iface_link_stats->rssi_data += WMA_TGT_NOISE_FLOOR_DBM;
+		iface_link_stats->rssi_ack += WMA_TGT_NOISE_FLOOR_DBM;
+	}
+	WMA_LOGD("db2dbm: %d, rssi_mgmt: %d, rssi_data: %d, rssi_ack: %d",
+		 db2dbm_enabled, iface_link_stats->rssi_mgmt,
+		 iface_link_stats->rssi_data, iface_link_stats->rssi_ack);
 
 	/* Copy roaming state */
 	iface_stat->info.roaming = link_stats->roam_state;
@@ -2416,14 +2680,6 @@ void wma_post_link_status(tAniGetLinkStatus *pGetLinkStatus,
 	}
 }
 
-/**
- * wma_link_status_event_handler() - link status event handler
- * @handle: wma handle
- * @cmd_param_info: data from event
- * @len: length
- *
- * Return: 0 for success or error code
- */
 int wma_link_status_event_handler(void *handle, uint8_t *cmd_param_info,
 				  uint32_t len)
 {
@@ -2433,7 +2689,8 @@ int wma_link_status_event_handler(void *handle, uint8_t *cmd_param_info,
 	wmi_vdev_rate_ht_info *ht_info;
 	struct wma_txrx_node *intr = wma->interfaces;
 	uint8_t link_status = LINK_STATUS_LEGACY;
-	uint32_t i;
+	uint32_t i, rate_flag;
+	QDF_STATUS status;
 
 	param_buf =
 	      (WMI_UPDATE_VDEV_RATE_STATS_EVENTID_param_tlvs *) cmd_param_info;
@@ -2456,6 +2713,13 @@ int wma_link_status_event_handler(void *handle, uint8_t *cmd_param_info,
 			param_buf->num_ht_info);
 		return -EINVAL;
 	}
+
+	status = wma_get_vdev_rate_flag(intr[ht_info->vdevid].vdev, &rate_flag);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		WMA_LOGE("%s: Failed to get rate flag",	__func__);
+		return -EINVAL;
+	}
+
 	for (i = 0; (i < event->num_vdev_stats) && ht_info; i++) {
 		WMA_LOGD("%s vdevId:%d  tx_nss:%d rx_nss:%d tx_preamble:%d rx_preamble:%d",
 			__func__, ht_info->vdevid, ht_info->tx_nss,
@@ -2473,7 +2737,7 @@ int wma_link_status_event_handler(void *handle, uint8_t *cmd_param_info,
 			if (intr[ht_info->vdevid].nss == 2)
 				link_status |= LINK_SUPPORT_MIMO;
 
-			if (intr[ht_info->vdevid].rate_flags &
+			if (rate_flag &
 				(TX_RATE_VHT20 | TX_RATE_VHT40 |
 				TX_RATE_VHT80))
 				link_status |= LINK_SUPPORT_VHT;
@@ -2842,22 +3106,12 @@ int wma_unified_debug_print_event_handler(void *handle, uint8_t *datap,
 #endif /* BIG_ENDIAN_HOST */
 }
 
-/**
- * wma_peer_phymode() - get phymode
- * @nw_type: nw type
- * @sta_type: sta type
- * @is_ht: is ht supported
- * @ch_width: supported channel width
- * @is_vht: is vht supported
- * @is_he: is HE supported
- *
- * Return: WLAN_PHY_MODE
- */
-WLAN_PHY_MODE wma_peer_phymode(tSirNwType nw_type, uint8_t sta_type,
-			       uint8_t is_ht, uint8_t ch_width,
-			       uint8_t is_vht, bool is_he)
+enum wlan_phymode
+wma_peer_phymode(tSirNwType nw_type, uint8_t sta_type,
+		 uint8_t is_ht, uint8_t ch_width,
+		 uint8_t is_vht, bool is_he)
 {
-	WLAN_PHY_MODE phymode = MODE_UNKNOWN;
+	enum wlan_phymode phymode = WLAN_PHYMODE_AUTO;
 
 	switch (nw_type) {
 	case eSIR_11B_NW_TYPE:
@@ -2865,65 +3119,71 @@ WLAN_PHY_MODE wma_peer_phymode(tSirNwType nw_type, uint8_t sta_type,
 	if (STA_ENTRY_TDLS_PEER == sta_type) {
 		if (is_vht) {
 			if (CH_WIDTH_80MHZ == ch_width)
-				phymode = MODE_11AC_VHT80;
+				phymode = WLAN_PHYMODE_11AC_VHT80;
 			else
 				phymode = (CH_WIDTH_40MHZ == ch_width) ?
-					  MODE_11AC_VHT40 :
-					  MODE_11AC_VHT20;
+					  WLAN_PHYMODE_11AC_VHT40 :
+					  WLAN_PHYMODE_11AC_VHT20;
 		} else if (is_ht) {
 			phymode = (CH_WIDTH_40MHZ == ch_width) ?
-				  MODE_11NG_HT40 : MODE_11NG_HT20;
+				   WLAN_PHYMODE_11NG_HT40 :
+				   WLAN_PHYMODE_11NG_HT20;
 		} else
-			phymode = MODE_11B;
+			phymode = WLAN_PHYMODE_11B;
 	} else
 #endif /* FEATURE_WLAN_TDLS */
 	{
-		phymode = MODE_11B;
+		phymode = WLAN_PHYMODE_11B;
 		if (is_ht || is_vht || is_he)
 			WMA_LOGE("HT/VHT is enabled with 11B NW type");
 	}
 		break;
 	case eSIR_11G_NW_TYPE:
 		if (!(is_ht || is_vht || is_he)) {
-			phymode = MODE_11G;
+			phymode = WLAN_PHYMODE_11G;
 			break;
 		}
 		if (CH_WIDTH_40MHZ < ch_width)
 			WMA_LOGE("80/160 MHz BW sent in 11G, configured 40MHz");
 		if (ch_width)
-			phymode = (is_he) ? MODE_11AX_HE40_2G : (is_vht) ?
-					MODE_11AC_VHT40_2G : MODE_11NG_HT40;
+			phymode = (is_he) ? WLAN_PHYMODE_11AXG_HE40 : (is_vht) ?
+					WLAN_PHYMODE_11AC_VHT40_2G :
+					WLAN_PHYMODE_11NG_HT40;
 		else
-			phymode = (is_he) ? MODE_11AX_HE20_2G : (is_vht) ?
-					MODE_11AC_VHT20_2G : MODE_11NG_HT20;
+			phymode = (is_he) ? WLAN_PHYMODE_11AXG_HE20 : (is_vht) ?
+					WLAN_PHYMODE_11AC_VHT20_2G :
+					WLAN_PHYMODE_11NG_HT20;
 		break;
 	case eSIR_11A_NW_TYPE:
 		if (!(is_ht || is_vht || is_he)) {
-			phymode = MODE_11A;
+			phymode = WLAN_PHYMODE_11A;
 			break;
 		}
 		if (is_he) {
 			if (ch_width == CH_WIDTH_160MHZ)
-				phymode = MODE_11AX_HE160;
+				phymode = WLAN_PHYMODE_11AXA_HE160;
 			else if (ch_width == CH_WIDTH_80P80MHZ)
-				phymode = MODE_11AX_HE80_80;
+				phymode = WLAN_PHYMODE_11AXA_HE80_80;
 			else if (ch_width == CH_WIDTH_80MHZ)
-				phymode = MODE_11AX_HE80;
+				phymode = WLAN_PHYMODE_11AXA_HE80;
 			else
 				phymode = (ch_width) ?
-					  MODE_11AX_HE40 : MODE_11AX_HE20;
+					  WLAN_PHYMODE_11AXA_HE40 :
+					  WLAN_PHYMODE_11AXA_HE20;
 		} else if (is_vht) {
 			if (ch_width == CH_WIDTH_160MHZ)
-				phymode = MODE_11AC_VHT160;
+				phymode = WLAN_PHYMODE_11AC_VHT160;
 			else if (ch_width == CH_WIDTH_80P80MHZ)
-				phymode = MODE_11AC_VHT80_80;
+				phymode = WLAN_PHYMODE_11AC_VHT80_80;
 			else if (ch_width == CH_WIDTH_80MHZ)
-				phymode = MODE_11AC_VHT80;
+				phymode = WLAN_PHYMODE_11AC_VHT80;
 			else
 				phymode = (ch_width) ?
-					  MODE_11AC_VHT40 : MODE_11AC_VHT20;
+					  WLAN_PHYMODE_11AC_VHT40 :
+					  WLAN_PHYMODE_11AC_VHT20;
 		} else
-			phymode = (ch_width) ? MODE_11NA_HT40 : MODE_11NA_HT20;
+			phymode = (ch_width) ? WLAN_PHYMODE_11NA_HT40 :
+						WLAN_PHYMODE_11NA_HT20;
 		break;
 	default:
 		WMA_LOGE("%s: Invalid nw type %d", __func__, nw_type);
@@ -3117,15 +3377,10 @@ void *wma_get_beacon_buffer_by_vdev_id(uint8_t vdev_id, uint32_t *buffer_size)
 	return buf;
 }
 
-/**
- * wma_get_vdev_address_by_vdev_id() - lookup MAC address from vdev ID
- * @vdev_id: vdev id
- *
- * Return: mac address
- */
 uint8_t *wma_get_vdev_address_by_vdev_id(uint8_t vdev_id)
 {
 	tp_wma_handle wma;
+	struct wlan_objmgr_vdev *vdev;
 
 	wma = cds_get_context(QDF_MODULE_ID_WMA);
 	if (!wma) {
@@ -3137,8 +3392,12 @@ uint8_t *wma_get_vdev_address_by_vdev_id(uint8_t vdev_id)
 		WMA_LOGE("%s: Invalid vdev_id %u", __func__, vdev_id);
 		return NULL;
 	}
-
-	return wma->interfaces[vdev_id].addr;
+	vdev = wma->interfaces[vdev_id].vdev;
+	if (!vdev) {
+		WMA_LOGE("%s: Invalid vdev for vdev_id %u", __func__, vdev_id);
+		return NULL;
+	}
+	return wlan_vdev_mlme_get_macaddr(vdev);
 }
 
 QDF_STATUS wma_get_connection_info(uint8_t vdev_id,
@@ -3250,22 +3509,17 @@ void wma_update_intf_hw_mode_params(uint32_t vdev_id, uint32_t mac_id,
 		return;
 	}
 	wma->interfaces[vdev_id].mac_id = mac_id;
-	if (mac_id == 0) {
+	if (mac_id == 0)
 		wma->interfaces[vdev_id].tx_streams =
 			hw_mode.mac0_tx_ss;
-		wma->interfaces[vdev_id].rx_streams =
-			hw_mode.mac0_rx_ss;
-	} else {
+	else
 		wma->interfaces[vdev_id].tx_streams =
 			hw_mode.mac1_tx_ss;
-		wma->interfaces[vdev_id].rx_streams =
-			hw_mode.mac1_tx_ss;
-	}
-	WMA_LOGD("%s: vdev %d, update tx ss:%d rx ss:%d mac %d hw_mode_id %d",
+
+	WMA_LOGD("%s: vdev %d, update tx ss:%d mac %d hw_mode_id %d",
 		 __func__,
 		 vdev_id,
 		 wma->interfaces[vdev_id].tx_streams,
-		 wma->interfaces[vdev_id].rx_streams,
 		 mac_id,
 		 cfgd_hw_mode_index);
 }
@@ -3601,107 +3855,40 @@ static void wma_set_roam_offload_flag(tp_wma_handle wma, uint8_t vdev_id,
 			flag |= WMI_VDEV_PARAM_SKIP_ROAM_EAPOL_4WAY_HANDSHAKE;
 	}
 
-	WMA_LOGD("%s: vdev_id:%d, is_set:%d, flag:%d, roam_offload_enabled:%d",
-		 __func__, vdev_id, is_set, flag,
-		  wma->interfaces[vdev_id].roam_offload_enabled);
+	WMA_LOGD("%s: vdev_id:%d, is_set:%d, flag:%d",
+		 __func__, vdev_id, is_set, flag);
 
 	status = wma_vdev_set_param(wma->wmi_handle, vdev_id,
 				    WMI_VDEV_PARAM_ROAM_FW_OFFLOAD, flag);
 	if (QDF_IS_STATUS_ERROR(status))
 		WMA_LOGE("Failed to set WMI_VDEV_PARAM_ROAM_FW_OFFLOAD");
-	else
-		wma->interfaces[vdev_id].roam_offload_enabled = is_set;
 }
 
-/**
- * wma_update_roam_offload_flag() -  update roam offload flag to fw
- * @wma:     wma handle
- * @vdev_id: vdev id
- * @is_connected: connected or disconnected
- *
- * Return: none
- */
-static void wma_update_roam_offload_flag(tp_wma_handle wma, uint8_t vdev_id,
-					 bool is_connected)
+void wma_update_roam_offload_flag(void *handle,
+				  struct roam_init_params *params)
 {
+	tp_wma_handle wma = handle;
 	struct wma_txrx_node *iface;
-	uint8_t id;
-	uint8_t roam_offload_vdev_id = WMA_INVALID_VDEV_ID;
-	uint32_t list[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	uint8_t count;
 
 	WMA_LOGD("%s: vdev_id:%d, is_connected:%d", __func__,
-		 vdev_id, is_connected);
+		 params->vdev_id, params->enable);
 
-	iface = &wma->interfaces[vdev_id];
+	if (!wma_is_vdev_valid(params->vdev_id)) {
+		WMA_LOGE("%s: vdev_id: %d is not active", __func__,
+			 params->vdev_id);
+		return;
+	}
+
+	iface = &wma->interfaces[params->vdev_id];
 
 	if ((iface->type != WMI_VDEV_TYPE_STA) ||
 	    (iface->sub_type != 0)) {
 		WMA_LOGE("%s: this isn't a STA: %d",
-			 __func__, vdev_id);
+			 __func__, params->vdev_id);
 		return;
 	}
 
-	if (iface->roaming_in_progress || iface->roam_synch_in_progress) {
-		WMA_LOGE("%s: roaming in progress: %d",
-			 __func__, vdev_id);
-		return;
-	}
-
-	for (id = 0; id < wma->max_bssid; id++) {
-		if (wma->interfaces[id].roam_offload_enabled)
-			roam_offload_vdev_id = id;
-	}
-
-	/*
-	 * If sta connected, and no connected sta interface exist, then set
-	 * set roam offload flag to this sta interface
-	 */
-	if (is_connected && (roam_offload_vdev_id == WMA_INVALID_VDEV_ID))
-		wma_set_roam_offload_flag(wma, vdev_id, true);
-
-	if (!is_connected && roam_offload_vdev_id == vdev_id) {
-		/* If sta disconnected and roam offload enaled on this
-		 * interface, then clear roam offload flag
-		 */
-		wma_set_roam_offload_flag(wma, vdev_id, false);
-
-		count = policy_mgr_mode_specific_connection_count(
-				wma->psoc, PM_STA_MODE, list);
-		WMA_LOGD("%s: valid sta count:%d", __func__, count);
-		/*
-		 * If there is multi sta connection before this disconnection,
-		 * then set roam offload flag to other connected sta inferface.
-		 */
-		if (count > 1) {
-			for (id = 0; id < count; id++) {
-				if (list[id] != vdev_id)
-					wma_set_roam_offload_flag(wma, list[id],
-								  true);
-			}
-		}
-	}
-}
-
-QDF_STATUS wma_send_vdev_up_to_fw(t_wma_handle *wma,
-				  struct vdev_up_params *params,
-				  uint8_t bssid[QDF_MAC_ADDR_SIZE])
-{
-	QDF_STATUS status;
-	struct wma_txrx_node *vdev;
-
-	if (!wma_is_vdev_valid(params->vdev_id)) {
-		WMA_LOGE("%s: Invalid vdev id:%d", __func__, params->vdev_id);
-		return QDF_STATUS_E_FAILURE;
-	}
-	wma_update_roam_offload_flag(wma, params->vdev_id, true);
-	vdev = &wma->interfaces[params->vdev_id];
-
-	status = wmi_unified_vdev_up_send(wma->wmi_handle, bssid, params);
-	qdf_runtime_pm_allow_suspend(&vdev->vdev_start_runtime_wakelock);
-	wma_release_wakelock(&vdev->vdev_start_wakelock);
-
-	return status;
+	wma_set_roam_offload_flag(wma, params->vdev_id, params->enable);
 }
 
 QDF_STATUS wma_send_vdev_down_to_fw(t_wma_handle *wma, uint8_t vdev_id)
@@ -3721,11 +3908,9 @@ QDF_STATUS wma_send_vdev_down_to_fw(t_wma_handle *wma, uint8_t vdev_id)
 		return status;
 	}
 
-	wma_update_roam_offload_flag(wma, vdev_id, false);
 	wma->interfaces[vdev_id].roaming_in_progress = false;
 
 	status = vdev_mgr_down_send(vdev_mlme);
-	qdf_runtime_pm_allow_suspend(&iface->vdev_start_runtime_wakelock);
 
 	return status;
 }
@@ -3946,15 +4131,26 @@ QDF_STATUS wma_get_roam_scan_stats(WMA_HANDLE handle,
 	return QDF_STATUS_SUCCESS;
 }
 
-void wma_remove_peer_on_add_bss_failure(struct bss_params *add_bss_params)
+void wma_remove_bss_peer_on_vdev_start_failure(tp_wma_handle wma,
+					       uint8_t vdev_id)
 {
-	tp_wma_handle wma;
 	struct cdp_pdev *pdev;
 	void *peer = NULL;
 	uint8_t peer_id;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	QDF_STATUS status;
+	struct qdf_mac_addr bss_peer;
+	struct wma_txrx_node *iface;
 
-	WMA_LOGE("%s: ADD BSS failure %d", __func__, add_bss_params->status);
+	iface = &wma->interfaces[vdev_id];
+
+	status = mlme_get_vdev_bss_peer_mac_addr(iface->vdev, &bss_peer);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		WMA_LOGE("%s: Failed to get bssid", __func__);
+		return;
+	}
+
+	WMA_LOGE("%s: ADD BSS failure for vdev %d", __func__, vdev_id);
 
 	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 	if (!pdev) {
@@ -3962,54 +4158,38 @@ void wma_remove_peer_on_add_bss_failure(struct bss_params *add_bss_params)
 		return;
 	}
 
-	peer = cdp_peer_find_by_addr(soc, pdev, add_bss_params->bssId,
+	peer = cdp_peer_find_by_addr(soc, pdev, bss_peer.bytes,
 				     &peer_id);
 	if (!peer) {
 		WMA_LOGE("%s Failed to find peer %pM",
-			 __func__, add_bss_params->bssId);
+			 __func__, bss_peer.bytes);
 		return;
 	}
 
-	wma = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma) {
-		WMA_LOGE("%s wma handle is NULL", __func__);
-		return;
-	}
-	wma_remove_peer(wma, add_bss_params->bssId, add_bss_params->bss_idx,
-			peer, false);
+	wma_remove_peer(wma, bss_peer.bytes, vdev_id, peer, false);
 }
 
 QDF_STATUS wma_sta_vdev_up_send(struct vdev_mlme_obj *vdev_mlme,
 				uint16_t data_len, void *data)
 {
-	struct vdev_up_params param;
 	uint8_t vdev_id;
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
 	QDF_STATUS status;
 	struct wma_txrx_node *iface;
-	struct vdev_mlme_mbss_11ax mbss_11ax = {0};
 
 	if (!wma) {
 		WMA_LOGE("%s wma handle is NULL", __func__);
 		return QDF_STATUS_E_INVAL;
 	}
 	vdev_id = wlan_vdev_get_id(vdev_mlme->vdev);
-	param.vdev_id = vdev_id;
 	iface = &wma->interfaces[vdev_id];
-	param.assoc_id = iface->aid;
+	vdev_mlme->proto.sta.assoc_id = iface->aid;
 
-	mlme_get_mbssid_info(vdev_mlme->vdev, &mbss_11ax);
-	param.profile_idx = mbss_11ax.profile_idx;
-	param.profile_num = mbss_11ax.profile_num;
-	qdf_mem_copy(param.trans_bssid,
-		     mbss_11ax.trans_bssid,
-		     QDF_MAC_ADDR_SIZE);
-
-	status = wma_send_vdev_up_to_fw(wma, &param, iface->bssid);
+	status = vdev_mgr_up_send(vdev_mlme);
 
 	if (QDF_IS_STATUS_ERROR(status)) {
-		WMA_LOGE("%s: Failed to send vdev up cmd: vdev %d bssid %pM",
-			 __func__, vdev_id, iface->bssid);
+		WMA_LOGE("%s: Failed to send vdev up cmd: vdev %d",
+			 __func__, vdev_id);
 		policy_mgr_set_do_hw_mode_change_flag(
 			wma->psoc, false);
 		status = QDF_STATUS_E_FAILURE;
@@ -4041,11 +4221,11 @@ bool wma_get_channel_switch_in_progress(struct wma_txrx_node *iface)
 }
 
 static QDF_STATUS wma_vdev_send_start_resp(tp_wma_handle wma,
-					   struct bss_params *add_bss)
+					  struct add_bss_rsp *add_bss_rsp)
 {
 	WMA_LOGD(FL("Sending add bss rsp to umac(vdev %d status %d)"),
-		 add_bss->bss_idx, add_bss->status);
-	lim_handle_mlm_add_bss_rsp(wma->mac_context, add_bss);
+		 add_bss_rsp->vdev_id, add_bss_rsp->status);
+	lim_handle_add_bss_rsp(wma->mac_context, add_bss_rsp);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -4069,8 +4249,7 @@ QDF_STATUS wma_sta_mlme_vdev_start_continue(struct vdev_mlme_obj *vdev_mlme,
 		lim_process_switch_channel_rsp(wma->mac_context, data);
 		break;
 	case VDEV_FT_REASSOC:
-		wma_send_msg_high_priority(wma, WMA_ADD_BSS_RSP,
-					   data, 0);
+		lim_handle_add_bss_rsp(wma->mac_context, data);
 		break;
 	default:
 		WMA_LOGE(FL("assoc_type %d is invalid"), assoc_type);
@@ -4124,7 +4303,7 @@ QDF_STATUS wma_ap_mlme_vdev_start_continue(struct vdev_mlme_obj *vdev_mlme,
 						       vdev_id);
 		ap_mlme_set_hidden_ssid_restart_in_progress(vdev, false);
 	} else {
-		status = wma_vdev_send_start_resp(wma, (struct bss_params *)data);
+		status = wma_vdev_send_start_resp(wma, data);
 	}
 
 	return status;
@@ -4161,12 +4340,15 @@ wma_mlme_vdev_notify_down_complete(struct vdev_mlme_obj *vdev_mlme,
 	uint32_t vdev_stop_type;
 	struct del_bss_resp *resp = (struct del_bss_resp *)data;
 
-	if (mlme_is_connection_fail(vdev_mlme->vdev)) {
+	if (mlme_is_connection_fail(vdev_mlme->vdev) ||
+	    mlme_get_vdev_start_failed(vdev_mlme->vdev)) {
 		WMA_LOGD("%s Vdev start req failed, no action required",
 			 __func__);
 		mlme_set_connection_fail(vdev_mlme->vdev, false);
+		mlme_set_vdev_start_failed(vdev_mlme->vdev, false);
 		return QDF_STATUS_SUCCESS;
 	}
+
 	wma = cds_get_context(QDF_MODULE_ID_WMA);
 	if (!wma) {
 		WMA_LOGE("%s wma handle is NULL", __func__);
@@ -4189,17 +4371,12 @@ wma_mlme_vdev_notify_down_complete(struct vdev_mlme_obj *vdev_mlme,
 		return QDF_STATUS_SUCCESS;
 	}
 
-	if (!mlme_get_vdev_start_failed(vdev_mlme->vdev)) {
-		if (vdev_stop_type == WMA_SET_LINK_STATE) {
-			lim_join_result_callback(
-					wma->mac_context,
-					wlan_vdev_get_id(vdev_mlme->vdev));
-		} else {
-			wma_send_del_bss_response(wma, resp);
-			return QDF_STATUS_SUCCESS;
-		}
+	if (vdev_stop_type == WMA_SET_LINK_STATE) {
+		lim_join_result_callback(wma->mac_context,
+					 wlan_vdev_get_id(vdev_mlme->vdev));
 	} else {
-		mlme_set_vdev_start_failed(vdev_mlme->vdev, false);
+		wma_send_del_bss_response(wma, resp);
+		return QDF_STATUS_SUCCESS;
 	}
 
 end:
@@ -4213,7 +4390,7 @@ QDF_STATUS wma_ap_mlme_vdev_stop_start_send(struct vdev_mlme_obj *vdev_mlme,
 					    uint16_t data_len, void *data)
 {
 	tp_wma_handle wma;
-	struct bss_params *bss_params = (struct bss_params *)data;
+	struct add_bss_rsp *add_bss_rsp = data;
 
 	wma = cds_get_context(QDF_MODULE_ID_WMA);
 	if (!wma) {
@@ -4221,13 +4398,13 @@ QDF_STATUS wma_ap_mlme_vdev_stop_start_send(struct vdev_mlme_obj *vdev_mlme,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	if (wma_send_vdev_stop_to_fw(wma, bss_params->bss_idx))
+	if (wma_send_vdev_stop_to_fw(wma, add_bss_rsp->vdev_id))
 		WMA_LOGE(FL("Failed to send vdev stop for vdev id %d"),
-			 bss_params->bss_idx);
+			 add_bss_rsp->vdev_id);
 
-	wma_remove_peer_on_add_bss_failure(bss_params);
+	wma_remove_bss_peer_on_vdev_start_failure(wma, add_bss_rsp->vdev_id);
 
-	return wma_vdev_send_start_resp(wma, bss_params);
+	return wma_vdev_send_start_resp(wma, add_bss_rsp);
 }
 
 QDF_STATUS wma_mon_mlme_vdev_start_continue(struct vdev_mlme_obj *vdev_mlme,
@@ -4251,7 +4428,6 @@ QDF_STATUS wma_mon_mlme_vdev_start_continue(struct vdev_mlme_obj *vdev_mlme,
 QDF_STATUS wma_mon_mlme_vdev_up_send(struct vdev_mlme_obj *vdev_mlme,
 				     uint16_t data_len, void *data)
 {
-	struct vdev_up_params param;
 	uint8_t vdev_id;
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
 	QDF_STATUS status;
@@ -4262,14 +4438,13 @@ QDF_STATUS wma_mon_mlme_vdev_up_send(struct vdev_mlme_obj *vdev_mlme,
 		return QDF_STATUS_E_INVAL;
 	}
 	vdev_id = wlan_vdev_get_id(vdev_mlme->vdev);
-	param.vdev_id = vdev_id;
 	iface = &wma->interfaces[vdev_id];
+	vdev_mlme->proto.sta.assoc_id = 0;
 
-	status = wma_send_vdev_up_to_fw(wma, &param, iface->bssid);
-
+	status = vdev_mgr_up_send(vdev_mlme);
 	if (QDF_IS_STATUS_ERROR(status))
-		WMA_LOGE("%s: Failed to send vdev up cmd: vdev %d bssid %pM",
-			 __func__, vdev_id, iface->bssid);
+		WMA_LOGE("%s: Failed to send vdev up cmd: vdev %d",
+			 __func__, vdev_id);
 
 	return status;
 }

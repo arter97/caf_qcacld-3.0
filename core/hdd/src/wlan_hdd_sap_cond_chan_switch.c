@@ -100,8 +100,8 @@ static int wlan_hdd_validate_and_get_pre_cac_ch(struct hdd_context *hdd_ctx,
 	QDF_STATUS status;
 	uint32_t weight_len = 0;
 	uint32_t len = CFG_VALID_CHANNEL_LIST_LEN;
-	uint8_t channel_list[QDF_MAX_NUM_CHAN] = {0};
-	uint8_t pcl_weights[QDF_MAX_NUM_CHAN] = {0};
+	uint32_t freq_list[NUM_CHANNELS] = {0};
+	uint8_t pcl_weights[NUM_CHANNELS] = {0};
 	mac_handle_t mac_handle;
 
 	if (channel == 0) {
@@ -113,19 +113,20 @@ static int wlan_hdd_validate_and_get_pre_cac_ch(struct hdd_context *hdd_ctx,
 		 * first channel from the valid channel list.
 		 */
 		status = policy_mgr_get_valid_chans(hdd_ctx->psoc,
-						    channel_list, &len);
+						    freq_list, &len);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			hdd_err("Failed to get channel list");
 			return -EINVAL;
 		}
 		policy_mgr_update_with_safe_channel_list(hdd_ctx->psoc,
-							 channel_list, &len,
+							 freq_list, &len,
 							 pcl_weights,
 							 weight_len);
 		for (i = 0; i < len; i++) {
-			if (wlan_reg_is_dfs_ch(hdd_ctx->pdev,
-					       channel_list[i])) {
-				*pre_cac_chan = channel_list[i];
+			if (wlan_reg_is_dfs_for_freq(hdd_ctx->pdev,
+						     freq_list[i])) {
+				*pre_cac_chan =
+					wlan_freq_to_chan(freq_list[i]);
 				break;
 			}
 		}
@@ -203,16 +204,16 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 		return -EINVAL;
 	}
 
-	if (wlan_reg_is_dfs_ch(hdd_ctx->pdev,
-			       hdd_ap_ctx->operating_channel)) {
+	if (wlan_reg_is_dfs_for_freq(hdd_ctx->pdev,
+				     hdd_ap_ctx->operating_chan_freq)) {
 		hdd_err("SAP is already on DFS channel:%d",
-			hdd_ap_ctx->operating_channel);
+			hdd_ap_ctx->operating_chan_freq);
 		return -EINVAL;
 	}
 
-	if (!WLAN_REG_IS_24GHZ_CH(hdd_ap_ctx->operating_channel)) {
+	if (!WLAN_REG_IS_24GHZ_CH_FREQ(hdd_ap_ctx->operating_chan_freq)) {
 		hdd_err("pre CAC alllowed only when SAP is in 2.4GHz:%d",
-			hdd_ap_ctx->operating_channel);
+			hdd_ap_ctx->operating_chan_freq);
 		return -EINVAL;
 	}
 
@@ -299,8 +300,8 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 		channel_type = NL80211_CHAN_HT20;
 		break;
 	case CH_WIDTH_40MHZ:
-		if (ap_adapter->session.ap.sap_config.sec_ch >
-				ap_adapter->session.ap.sap_config.channel)
+		if (ap_adapter->session.ap.sap_config.sec_ch_freq >
+				ap_adapter->session.ap.sap_config.chan_freq)
 			channel_type = NL80211_CHAN_HT40PLUS;
 		else
 			channel_type = NL80211_CHAN_HT40MINUS;
@@ -330,10 +331,9 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 	 * connection update should result in DBS mode
 	 */
 	status = policy_mgr_update_and_wait_for_connection_update(
-					hdd_ctx->psoc,
-					ap_adapter->vdev_id,
-					pre_cac_chan,
-					POLICY_MGR_UPDATE_REASON_PRE_CAC);
+			hdd_ctx->psoc, ap_adapter->vdev_id,
+			wlan_chan_to_freq(pre_cac_chan),
+			POLICY_MGR_UPDATE_REASON_PRE_CAC);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("error in moving to DBS mode");
 		goto stop_close_pre_cac_adapter;
@@ -364,8 +364,11 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 		goto stop_close_pre_cac_adapter;
 	}
 
-	ret = wlan_hdd_set_chan_before_pre_cac(ap_adapter,
-					       hdd_ap_ctx->operating_channel);
+	ret = wlan_hdd_set_chan_before_pre_cac(
+			ap_adapter,
+			wlan_reg_freq_to_chan(
+			hdd_ctx->pdev,
+			hdd_ap_ctx->operating_chan_freq));
 	if (ret != 0) {
 		hdd_err("failed to set channel before pre cac");
 		goto stop_close_pre_cac_adapter;

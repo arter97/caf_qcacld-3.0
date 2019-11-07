@@ -36,10 +36,10 @@
 #define mlme_legacy_debug(params...) QDF_TRACE_DEBUG(QDF_MODULE_ID_MLME, params)
 
 /**
- * struct wlan_mlme_psoc_obj -MLME psoc priv object
+ * struct wlan_mlme_psoc_ext_obj -MLME ext psoc priv object
  * @cfg:     cfg items
  */
-struct wlan_mlme_psoc_obj {
+struct wlan_mlme_psoc_ext_obj {
 	struct wlan_mlme_cfg cfg;
 };
 
@@ -56,9 +56,11 @@ struct wlan_ies {
 /**
  * struct peer_mlme_priv_obj - peer MLME component object
  * @ucast_key_cipher: unicast crypto type.
+ * @is_pmf_enabled: True if PMF is enabled
  */
 struct peer_mlme_priv_obj {
 	uint32_t ucast_key_cipher;
+	bool is_pmf_enabled;
 };
 
 /**
@@ -74,6 +76,41 @@ enum vdev_assoc_type {
 };
 
 /**
+ * wlan_mlme_roam_state_info - Structure containing roaming
+ * state related details
+ * @state: Roaming module state.
+ * @mlme_operations_bitmap: Bitmap containing what mlme operations are in
+ *  progress where roaming should not be allowed.
+ */
+struct wlan_mlme_roam_state_info {
+	enum roam_offload_state state;
+	uint8_t mlme_operations_bitmap;
+};
+
+/**
+ * struct wlan_mlme_roaming_config - Roaming configurations structure
+ * @roam_trigger_bitmap: Master bitmap of roaming triggers. If the bitmap is
+ *  zero, roaming module will be deinitialized at firmware for this vdev.
+ * @supplicant_disabled_roaming: Enable/disable roam scan in firmware; will be
+ *  used by supplicant to do roam invoke after disabling roam scan in firmware
+ */
+struct wlan_mlme_roaming_config {
+	uint32_t roam_trigger_bitmap;
+	bool supplicant_disabled_roaming;
+};
+
+/**
+ * struct wlan_mlme_roam - Roam structure containing roam state and
+ *  roam config info
+ * @roam_sm: Structure containing roaming state related details
+ * @roam_config: Roaming configurations structure
+ */
+struct wlan_mlme_roam {
+	struct wlan_mlme_roam_state_info roam_sm;
+	struct wlan_mlme_roaming_config roam_cfg;
+};
+
+/**
  * struct mlme_legacy_priv - VDEV MLME legacy priv object
  * @chan_switch_in_progress: flag to indicate that channel switch is in progress
  * @hidden_ssid_restart_in_progress: flag to indicate hidden ssid restart is
@@ -81,6 +118,7 @@ enum vdev_assoc_type {
  * @vdev_start_failed: flag to indicate that vdev start failed.
  * @connection_fail: flag to indicate connection failed
  * @cac_required_for_new_channel: if CAC is required for new channel
+ * @follow_ap_edca: if true, it is forced to follow the AP's edca.
  * @assoc_type: vdev associate/reassociate type
  * @dynamic_cfg: current configuration of nss, chains for vdev.
  * @ini_cfg: Max configuration of nss, chains supported for vdev.
@@ -91,7 +129,7 @@ enum vdev_assoc_type {
  * @peer_disconnect_ies: Disconnect IEs received in deauth/disassoc frames
  *			 from peer
  * @vdev_stop_type: vdev stop type request
- * @bss_params: Bss params to be used in add bss resp handler
+ * @roam_off_state: Roam offload state
  */
 struct mlme_legacy_priv {
 	bool chan_switch_in_progress;
@@ -99,6 +137,7 @@ struct mlme_legacy_priv {
 	bool vdev_start_failed;
 	bool connection_fail;
 	bool cac_required_for_new_channel;
+	bool follow_ap_edca;
 	enum vdev_assoc_type assoc_type;
 	struct wlan_mlme_nss_chains dynamic_cfg;
 	struct wlan_mlme_nss_chains ini_cfg;
@@ -107,7 +146,7 @@ struct mlme_legacy_priv {
 	struct wlan_ies self_disconnect_ies;
 	struct wlan_ies peer_disconnect_ies;
 	uint32_t vdev_stop_type;
-	struct bss_params *bss_params;
+	struct wlan_mlme_roam mlme_roam;
 };
 
 #ifndef CRYPTO_SET_KEY_CONVERGED
@@ -232,32 +271,6 @@ struct mlme_roam_after_data_stall *
 mlme_get_roam_invoke_params(struct wlan_objmgr_vdev *vdev);
 
 /**
- * mlme_psoc_object_created_notification(): mlme psoc create handler
- * @psoc: psoc which is going to created by objmgr
- * @arg: argument for vdev create handler
- *
- * Register this api with objmgr to detect psoc is created
- *
- * Return: QDF_STATUS status in case of success else return error
- */
-QDF_STATUS
-mlme_psoc_object_created_notification(struct wlan_objmgr_psoc *psoc,
-				      void *arg);
-
-/**
- * mlme_psoc_object_destroyed_notification(): mlme psoc delete handler
- * @psoc: psoc which is going to delete by objmgr
- * @arg: argument for vdev delete handler
- *
- * Register this api with objmgr to detect psoc is deleted
- *
- * Return: QDF_STATUS status in case of success else return error
- */
-QDF_STATUS
-mlme_psoc_object_destroyed_notification(struct wlan_objmgr_psoc *psoc,
-					void *arg);
-
-/**
  * mlme_cfg_on_psoc_enable() - Populate MLME structure from CFG and INI
  * @psoc: pointer to the psoc object
  *
@@ -268,17 +281,19 @@ mlme_psoc_object_destroyed_notification(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS mlme_cfg_on_psoc_enable(struct wlan_objmgr_psoc *psoc);
 
 /**
- * mlme_get_psoc_obj() - Get MLME object from psoc
+ * mlme_get_psoc_ext_obj() - Get MLME object from psoc
  * @psoc: pointer to the psoc object
  *
  * Get the MLME object pointer from the psoc
  *
  * Return: pointer to MLME object
  */
-#define mlme_get_psoc_obj(psoc) mlme_get_psoc_obj_fl(psoc, __func__, __LINE__)
-struct wlan_mlme_psoc_obj *mlme_get_psoc_obj_fl(struct wlan_objmgr_psoc *psoc,
-						const char *func,
-						uint32_t line);
+#define mlme_get_psoc_ext_obj(psoc) \
+			mlme_get_psoc_ext_obj_fl(psoc, __func__, __LINE__)
+struct wlan_mlme_psoc_ext_obj *mlme_get_psoc_ext_obj_fl(struct wlan_objmgr_psoc
+							*psoc,
+							const char *func,
+							uint32_t line);
 
 /**
  * mlme_init_ibss_cfg() - Init IBSS config data structure with default CFG value
@@ -335,10 +350,174 @@ void mlme_set_peer_disconnect_ies(struct wlan_objmgr_vdev *vdev,
 void mlme_free_peer_disconnect_ies(struct wlan_objmgr_vdev *vdev);
 
 /**
+ * mlme_set_follow_ap_edca_flag() - Set follow ap's edca flag
+ * @vdev: vdev pointer
+ * @flag: carries if following ap's edca is true or not.
+ *
+ * Return: None
+ */
+void mlme_set_follow_ap_edca_flag(struct wlan_objmgr_vdev *vdev, bool flag);
+
+/**
+ * mlme_get_follow_ap_edca_flag() - Get follow ap's edca flag
+ * @vdev: vdev pointer
+ *
+ * Return: value of follow_ap_edca
+ */
+bool mlme_get_follow_ap_edca_flag(struct wlan_objmgr_vdev *vdev);
+
+/**
  * mlme_get_peer_disconnect_ies() - Get diconnect IEs from vdev object
  * @vdev: vdev pointer
  *
  * Return: Returns a pointer to the peer disconnect IEs present in vdev object
  */
 struct wlan_ies *mlme_get_peer_disconnect_ies(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * mlme_set_peer_pmf_status() - set pmf status of peer
+ * @peer: PEER object
+ * @is_pmf_enabled: Carries if PMF is enabled or not
+ *
+ * is_pmf_enabled will be set to true if PMF is enabled by peer
+ *
+ * Return: void
+ */
+void mlme_set_peer_pmf_status(struct wlan_objmgr_peer *peer,
+			      bool is_pmf_enabled);
+/**
+ * mlme_get_peer_pmf_status() - get if peer is of pmf capable
+ * @peer: PEER object
+ *
+ * Return: Value of is_pmf_enabled; True if PMF is enabled by peer
+ */
+bool mlme_get_peer_pmf_status(struct wlan_objmgr_peer *peer);
+
+#if defined(WLAN_FEATURE_HOST_ROAM) || defined(WLAN_FEATURE_ROAM_OFFLOAD)
+/**
+ * mlme_get_supplicant_disabled_roaming() - Get supplicant disabled roaming
+ *  value for a given vdev.
+ * @psoc: PSOC pointer
+ * @vdev_id: Vdev for which the supplicant disabled roaming value is being
+ *  requested
+ *
+ * Return: True if supplicant disabled roaming else false
+ */
+bool
+mlme_get_supplicant_disabled_roaming(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id);
+
+/**
+ * mlme_set_supplicant_disabled_roaming - Set the supplicant disabled
+ *  roaming flag.
+ * @psoc: PSOC pointer
+ * @vdev_id: Vdev for which the supplicant disabled roaming needs to
+ *  be set
+ * @val: value true is to disable RSO and false to enable RSO
+ *
+ * Return: None
+ */
+void mlme_set_supplicant_disabled_roaming(struct wlan_objmgr_psoc *psoc,
+					  uint8_t vdev_id, bool val);
+
+/**
+ * mlme_get_roam_trigger_bitmap() - Get roaming trigger bitmap value for a given
+ *  vdev.
+ * @psoc: PSOC pointer
+ * @vdev_id: Vdev for which the roam trigger bitmap is being requested
+ *
+ * Return: roaming trigger bitmap
+ */
+uint32_t
+mlme_get_roam_trigger_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
+
+/**
+ * mlme_set_roam_trigger_bitmap() - Set the roaming trigger bitmap value for
+ *  the given vdev. If the bitmap is zero then roaming is completely disabled
+ *  on the vdev which means roam structure in firmware is not allocated and no
+ *  RSO start/stop commands can be sent
+ * @psoc: PSOC pointer
+ * @vdev_id: Vdev for which the roam trigger bitmap is to be set
+ * @val: bitmap value to set
+ *
+ * Return: None
+ */
+void mlme_set_roam_trigger_bitmap(struct wlan_objmgr_psoc *psoc,
+				  uint8_t vdev_id, uint32_t val);
+
+/**
+ * mlme_get_roam_state() - Get roam state from vdev object
+ * @psoc: psoc pointer
+ * @vdev_id: vdev id
+ *
+ * Return: Returns roam offload state
+ */
+enum roam_offload_state
+mlme_get_roam_state(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
+
+/**
+ * mlme_set_roam_state() - Set roam state in vdev object
+ * @psoc: psoc pointer
+ * @vdev_id: vdev id
+ * @val: roam offload state
+ *
+ * Return: None
+ */
+void mlme_set_roam_state(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			 enum roam_offload_state val);
+
+/**
+ * mlme_get_operations_bitmap() - Get the mlme operations bitmap which
+ *  contains the bitmap of mlme operations which have disabled roaming
+ *  temporarily
+ * @psoc: PSOC pointer
+ * @vdev_id: vdev for which the mlme operation bitmap is requested
+ *
+ * Return: bitmap value
+ */
+uint8_t
+mlme_get_operations_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
+
+/**
+ * mlme_set_operations_bitmap() - Set the mlme operations bitmap which
+ *  indicates what mlme operations are in progress
+ * @psoc: PSOC pointer
+ * @vdev_id: vdev for which the mlme operation bitmap is requested
+ * @reqs: RSO stop requestor
+ * @clear: clear bit if true else set bit
+ *
+ * Return: bitmap value
+ */
+void
+mlme_set_operations_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			   enum roam_control_requestor reqs, bool clear);
+
+#define MLME_IS_ROAM_STATE_RSO_STARTED(psoc, vdev_id) \
+	(mlme_get_roam_state(psoc, vdev_id) == ROAM_RSO_STARTED)
+
+#define MLME_IS_ROAM_STATE_DEINIT(psoc, vdev_id) \
+	(mlme_get_roam_state(psoc, vdev_id) == ROAM_DEINIT)
+
+#define MLME_IS_ROAM_STATE_INIT(psoc, vdev_id) \
+	(mlme_get_roam_state(psoc, vdev_id) == ROAM_INIT)
+
+#define MLME_IS_ROAM_STATE_STOPPED(psoc, vdev_id) \
+	(mlme_get_roam_state(psoc, vdev_id) == ROAM_RSO_STOPPED)
+
+#define MLME_IS_ROAM_INITIALIZED(psoc, vdev_id) \
+	(mlme_get_roam_state(psoc, vdev_id) >= ROAM_INIT)
+#endif
+
+/**
+ * mlme_reinit_control_config_lfr_params() - Reinitialize roam control config
+ * @psoc: PSOC pointer
+ * @lfr: Pointer of an lfr_cfg buffer to fill.
+ *
+ * Reinitialize/restore the param related control roam config lfr params with
+ * default values of corresponding ini params.
+ *
+ * Return: None
+ */
+void mlme_reinit_control_config_lfr_params(struct wlan_objmgr_psoc *psoc,
+					   struct wlan_mlme_lfr_cfg *lfr);
 #endif
