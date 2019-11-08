@@ -1770,6 +1770,7 @@ static bool dfs_is_precac_on_weather_channel(struct wlan_dfs *dfs,
 	return FIND_IF_OVERLAP_WITH_WEATHER_RANGE(first_subch, last_subch);
 }
 
+#define EXTRA_TIME_IN_MS 2000
 void dfs_start_agile_precac_timer(struct wlan_dfs *dfs,
 				  uint8_t ocac_status,
 				  struct dfs_agile_cac_params *adfs_param)
@@ -1804,9 +1805,14 @@ void dfs_start_agile_precac_timer(struct wlan_dfs *dfs,
 
 	dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
 		 "precactimeout = %d ms", (min_precac_timeout));
-	qdf_timer_mod(&dfs_soc_obj->dfs_precac_timer, min_precac_timeout);
+	/* Add the preCAC timeout in the params to be sent to FW. */
 	adfs_param->min_precac_timeout = min_precac_timeout;
 	adfs_param->max_precac_timeout = max_precac_timeout;
+	/* Increase the preCAC timeout in HOST by 2 seconds to avoid
+	 * FW OCAC completion event and HOST timer firing at same time. */
+	if (min_precac_timeout)
+		min_precac_timeout += EXTRA_TIME_IN_MS;
+	qdf_timer_mod(&dfs_soc_obj->dfs_precac_timer, min_precac_timeout);
 }
 #endif
 
