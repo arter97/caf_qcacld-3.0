@@ -24,6 +24,9 @@
 #include "dp_types.h"
 #include "hal_api_mon.h"
 
+#define HAL_RX_GET_SW_FRAME_GROUP_ID(rx_mpdu_start)	\
+	HAL_RX_GET(rx_mpdu_start, RX_MPDU_INFO_0, SW_FRAME_GROUP_ID)
+
 /*
  * hal_rx_msdu_start_nss_get_8074(): API to get the NSS
  * Interval from rx_msdu_start
