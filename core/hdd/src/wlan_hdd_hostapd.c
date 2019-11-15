@@ -2252,6 +2252,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 				adapter->stats.tx_packets;
 			adapter->prev_rx_packets =
 				adapter->stats.rx_packets;
+			adapter->prev_tx_bytes =
+				adapter->stats.tx_bytes;
 
 			cdp_get_intra_bss_fwd_pkts_count(
 				cds_get_context(QDF_MODULE_ID_SOC),
@@ -2429,6 +2431,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 			spin_lock_bh(&hdd_ctx->bus_bw_lock);
 			adapter->prev_tx_packets = 0;
 			adapter->prev_rx_packets = 0;
+			adapter->prev_tx_bytes = 0;
 			adapter->prev_fwd_tx_packets = 0;
 			adapter->prev_fwd_rx_packets = 0;
 			spin_unlock_bh(&hdd_ctx->bus_bw_lock);
