@@ -302,13 +302,14 @@ QDF_STATUS hdd_cfg80211_get_ibss_peer_info_all(struct hdd_adapter *adapter)
 {
 	QDF_STATUS status;
 	unsigned long rc;
+	struct qdf_mac_addr bcast = QDF_MAC_ADDR_BCAST_INIT;
 
 	INIT_COMPLETION(adapter->ibss_peer_info_comp);
 
 	status = sme_request_ibss_peer_info(adapter->hdd_ctx->mac_handle,
 					    adapter,
 					    hdd_get_ibss_peer_info_cb,
-					    true, 0xFF);
+					    true, bcast.bytes);
 
 	if (QDF_STATUS_SUCCESS == status) {
 		rc = wait_for_completion_timeout
@@ -337,7 +338,7 @@ QDF_STATUS hdd_cfg80211_get_ibss_peer_info_all(struct hdd_adapter *adapter)
  * Return: 0 for success non-zero for failure
  */
 static QDF_STATUS
-hdd_cfg80211_get_ibss_peer_info(struct hdd_adapter *adapter, uint8_t sta_id)
+hdd_cfg80211_get_ibss_peer_info(struct hdd_adapter *adapter, uint8_t *mac_addr)
 {
 	unsigned long rc;
 	QDF_STATUS status;
@@ -347,7 +348,7 @@ hdd_cfg80211_get_ibss_peer_info(struct hdd_adapter *adapter, uint8_t sta_id)
 	status = sme_request_ibss_peer_info(adapter->hdd_ctx->mac_handle,
 					    adapter,
 					    hdd_get_ibss_peer_info_cb,
-					    false, sta_id);
+					    false, mac_addr);
 
 	if (QDF_STATUS_SUCCESS == status) {
 		rc = wait_for_completion_timeout(
@@ -832,7 +833,6 @@ static int drv_cmd_get_ibss_peer_info(struct hdd_adapter *adapter,
 	struct hdd_station_ctx *sta_ctx = NULL;
 	char extra[128] = { 0 };
 	uint32_t length = 0;
-	uint8_t sta_id = 0;
 	struct qdf_mac_addr peer_macaddr;
 
 	if (QDF_IBSS_MODE != adapter->device_mode) {
@@ -862,17 +862,8 @@ static int drv_cmd_get_ibss_peer_info(struct hdd_adapter *adapter,
 		goto exit;
 	}
 
-	/* Get station index for the peer mac address and sanitize it */
-	hdd_get_peer_sta_id(sta_ctx, &peer_macaddr, &sta_id);
-
-	if (sta_id > MAX_PEERS) {
-		hdd_err("Invalid StaIdx %d returned", sta_id);
-		ret = -EINVAL;
-		goto exit;
-	}
-
 	/* Handle the command */
-	status = hdd_cfg80211_get_ibss_peer_info(adapter, sta_id);
+	status = hdd_cfg80211_get_ibss_peer_info(adapter, peer_macaddr.bytes);
 	if (QDF_STATUS_SUCCESS == status) {
 		uint32_t tx_rate =
 			sta_ctx->ibss_peer_info.peerInfoParams[0].txRate;
@@ -1306,7 +1297,7 @@ static int hdd_parse_reassoc_command_v1_data(const uint8_t *command,
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 QDF_STATUS hdd_wma_send_fastreassoc_cmd(struct hdd_adapter *adapter,
 					const tSirMacAddr bssid,
-					int channel)
+					uint32_t ch_freq)
 {
 	struct hdd_station_ctx *hdd_sta_ctx =
 			WLAN_HDD_GET_STATION_CTX_PTR(adapter);
@@ -1317,24 +1308,13 @@ QDF_STATUS hdd_wma_send_fastreassoc_cmd(struct hdd_adapter *adapter,
 	qdf_mem_copy(connected_bssid, hdd_sta_ctx->conn_info.bssid.bytes,
 		     ETH_ALEN);
 	return sme_fast_reassoc(adapter->hdd_ctx->mac_handle,
-				roam_profile, bssid, channel,
+				roam_profile, bssid, ch_freq,
 				adapter->vdev_id, connected_bssid);
 }
 #endif
 
-/**
- * hdd_reassoc() - perform a userspace-directed reassoc
- * @adapter:    Adapter upon which the command was received
- * @bssid:      BSSID with which to reassociate
- * @channel:    channel upon which to reassociate
- * @src:        The source for the trigger of this action
- *
- * This function performs a userspace-directed reassoc operation
- *
- * Return: 0 for success non-zero for failure
- */
 int hdd_reassoc(struct hdd_adapter *adapter, const uint8_t *bssid,
-		uint8_t channel, const handoff_src src)
+		uint32_t ch_freq, const handoff_src src)
 {
 	struct hdd_station_ctx *sta_ctx;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
@@ -1377,24 +1357,21 @@ int hdd_reassoc(struct hdd_adapter *adapter, const uint8_t *bssid,
 	 * use the current connections's channel.
 	 */
 	if (!memcmp(bssid, sta_ctx->conn_info.bssid.bytes,
-			QDF_MAC_ADDR_SIZE)) {
+		    QDF_MAC_ADDR_SIZE)) {
 		hdd_warn("Reassoc BSSID is same as currently associated AP bssid");
-		channel = wlan_reg_freq_to_chan(hdd_ctx->pdev,
-						sta_ctx->conn_info.chan_freq);
+		ch_freq = sta_ctx->conn_info.chan_freq;
 	}
 
-	/* Check channel number is a valid channel number */
 	if (QDF_STATUS_SUCCESS !=
-	    wlan_hdd_validate_operation_channel(adapter, channel)) {
-		hdd_err("Invalid Channel: %d", channel);
+	    wlan_hdd_validate_operation_channel(adapter, ch_freq)) {
+		hdd_err("Invalid Ch freq: %d", ch_freq);
 		ret = -EINVAL;
 		goto exit;
 	}
 
 	/* Proceed with reassoc */
 	if (roaming_offload_enabled(hdd_ctx)) {
-		status = hdd_wma_send_fastreassoc_cmd(adapter,
-						 bssid, (int)channel);
+		status = hdd_wma_send_fastreassoc_cmd(adapter, bssid, ch_freq);
 		if (status != QDF_STATUS_SUCCESS) {
 			hdd_err("Failed to send fast reassoc cmd");
 			ret = -EINVAL;
@@ -1402,7 +1379,7 @@ int hdd_reassoc(struct hdd_adapter *adapter, const uint8_t *bssid,
 	} else {
 		tCsrHandoffRequest handoff;
 
-		handoff.ch_freq = wlan_reg_chan_to_freq(hdd_ctx->pdev, channel);
+		handoff.ch_freq = ch_freq;
 		handoff.src = src;
 		qdf_mem_copy(handoff.bssid.bytes, bssid, QDF_MAC_ADDR_SIZE);
 		sme_handoff_request(hdd_ctx->mac_handle, adapter->vdev_id,
@@ -1439,7 +1416,8 @@ static int hdd_parse_reassoc_v1(struct hdd_adapter *adapter, const char *command
 	if (ret)
 		hdd_err("Failed to parse reassoc command data");
 	else
-		ret = hdd_reassoc(adapter, bssid, channel, REASSOC);
+		ret = hdd_reassoc(adapter, bssid,
+				  wlan_chan_to_freq(channel), REASSOC);
 
 	return ret;
 }
@@ -1477,7 +1455,8 @@ static int hdd_parse_reassoc_v2(struct hdd_adapter *adapter,
 		hdd_err("MAC address parsing failed");
 		ret = -EINVAL;
 	} else {
-		ret = hdd_reassoc(adapter, bssid, params.channel, REASSOC);
+		ret = hdd_reassoc(adapter, bssid,
+				  wlan_chan_to_freq(params.channel), REASSOC);
 	}
 	return ret;
 }
@@ -1829,8 +1808,9 @@ hdd_parse_sendactionframe(struct hdd_adapter *adapter, const char *command,
 
 /**
  * hdd_parse_channellist() - HDD Parse channel list
+ * @hdd_ctx: hdd context
  * @command: Pointer to input channel list
- * @channel_list: Pointer to local output array to record
+ * @channel_freq_list: Pointer to local output array to record
  *                channel list
  * @num_channels: Pointer to number of roam scan channels
  *
@@ -1847,7 +1827,9 @@ hdd_parse_sendactionframe(struct hdd_adapter *adapter, const char *command,
  * Return: 0 for success non-zero for failure
  */
 static int
-hdd_parse_channellist(const uint8_t *command, uint8_t *channel_list,
+hdd_parse_channellist(struct hdd_context *hdd_ctx,
+		      const uint8_t *command,
+		      uint32_t *channel_freq_list,
 		      uint8_t *num_channels)
 {
 	const uint8_t *in_ptr = command;
@@ -1928,10 +1910,11 @@ hdd_parse_channellist(const uint8_t *command, uint8_t *channel_list,
 		    (temp_int > WNI_CFG_CURRENT_CHANNEL_STAMAX)) {
 			return -EINVAL;
 		}
-		channel_list[j] = temp_int;
+		channel_freq_list[j] =
+			wlan_reg_chan_to_freq(hdd_ctx->pdev, temp_int);
 
 		hdd_debug("Channel %d added to preferred channel list",
-			  channel_list[j]);
+			  channel_freq_list[j]);
 	}
 
 	return 0;
@@ -1958,14 +1941,21 @@ static int
 hdd_parse_set_roam_scan_channels_v1(struct hdd_adapter *adapter,
 				    const char *command)
 {
-	uint8_t channel_list[CFG_VALID_CHANNEL_LIST_LEN] = { 0 };
+	uint32_t channel_freq_list[CFG_VALID_CHANNEL_LIST_LEN] = { 0 };
 	uint8_t num_chan = 0;
 	QDF_STATUS status;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	int ret;
 	mac_handle_t mac_handle;
 
-	ret = hdd_parse_channellist(command, channel_list, &num_chan);
+	if (!hdd_ctx) {
+		hdd_err("invalid hdd ctx");
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	ret = hdd_parse_channellist(hdd_ctx, command, channel_freq_list,
+				    &num_chan);
 	if (ret) {
 		hdd_err("Failed to parse channel list information");
 		goto exit;
@@ -1983,7 +1973,8 @@ hdd_parse_set_roam_scan_channels_v1(struct hdd_adapter *adapter,
 	}
 
 	mac_handle = hdd_ctx->mac_handle;
-	if (!sme_validate_channel_list(mac_handle, channel_list, num_chan)) {
+	if (!sme_validate_channel_list(mac_handle,
+				       channel_freq_list, num_chan)) {
 		hdd_err("List contains invalid channel(s)");
 		ret = -EINVAL;
 		goto exit;
@@ -1991,7 +1982,8 @@ hdd_parse_set_roam_scan_channels_v1(struct hdd_adapter *adapter,
 
 	status = sme_change_roam_scan_channel_list(mac_handle,
 						   adapter->vdev_id,
-						   channel_list, num_chan);
+						   channel_freq_list,
+						   num_chan);
 	if (QDF_STATUS_SUCCESS != status) {
 		hdd_err("Failed to update channel list information");
 		ret = -EINVAL;
@@ -2024,7 +2016,7 @@ hdd_parse_set_roam_scan_channels_v2(struct hdd_adapter *adapter,
 				    const char *command)
 {
 	const uint8_t *value;
-	uint8_t channel_list[CFG_VALID_CHANNEL_LIST_LEN] = { 0 };
+	uint32_t channel_freq_list[CFG_VALID_CHANNEL_LIST_LEN] = { 0 };
 	uint8_t channel;
 	uint8_t num_chan;
 	int i;
@@ -2064,11 +2056,13 @@ hdd_parse_set_roam_scan_channels_v2(struct hdd_adapter *adapter,
 			ret = -EINVAL;
 			goto exit;
 		}
-		channel_list[i] = channel;
+		channel_freq_list[i] = wlan_reg_chan_to_freq(hdd_ctx->pdev,
+							     channel);
 	}
 
 	mac_handle = hdd_ctx->mac_handle;
-	if (!sme_validate_channel_list(mac_handle, channel_list, num_chan)) {
+	if (!sme_validate_channel_list(mac_handle, channel_freq_list,
+				       num_chan)) {
 		hdd_err("List contains invalid channel(s)");
 		ret = -EINVAL;
 		goto exit;
@@ -2076,7 +2070,7 @@ hdd_parse_set_roam_scan_channels_v2(struct hdd_adapter *adapter,
 
 	status = sme_change_roam_scan_channel_list(mac_handle,
 						   adapter->vdev_id,
-						   channel_list, num_chan);
+						   channel_freq_list, num_chan);
 	if (QDF_STATUS_SUCCESS != status) {
 		hdd_err("Failed to update channel list information");
 		ret = -EINVAL;
@@ -2405,8 +2399,9 @@ static QDF_STATUS hdd_parse_plm_cmd(uint8_t *command,
 			    content > WNI_CFG_CURRENT_CHANNEL_STAMAX)
 				return QDF_STATUS_E_FAILURE;
 
-			req->plm_ch_list[count] = content;
-			hdd_debug(" ch- %d", req->plm_ch_list[count]);
+			req->plm_ch_freq_list[count] =
+				cds_chan_to_freq(content);
+			hdd_debug(" ch-freq- %d", req->plm_ch_freq_list[count]);
 		}
 	}
 	/* If PLM START */
@@ -3983,15 +3978,16 @@ static int drv_cmd_get_roam_scan_channels(struct hdd_adapter *adapter,
 					  struct hdd_priv_data *priv_data)
 {
 	int ret = 0;
-	uint8_t channel_list[CFG_VALID_CHANNEL_LIST_LEN] = { 0 };
+	uint32_t freq_list[CFG_VALID_CHANNEL_LIST_LEN] = { 0 };
 	uint8_t num_channels = 0;
 	uint8_t j = 0;
 	char extra[128] = { 0 };
 	int len;
+	uint8_t chan;
 
 	if (QDF_STATUS_SUCCESS !=
 		sme_get_roam_scan_channel_list(hdd_ctx->mac_handle,
-					       channel_list,
+					       freq_list,
 					       &num_channels,
 					       adapter->vdev_id)) {
 		hdd_err("failed to get roam scan channel list");
@@ -4010,10 +4006,11 @@ static int drv_cmd_get_roam_scan_channels(struct hdd_adapter *adapter,
 	 */
 	len = scnprintf(extra, sizeof(extra), "%s %d", command,
 			num_channels);
-	for (j = 0; (j < num_channels) && len <= sizeof(extra); j++)
+	for (j = 0; (j < num_channels) && len <= sizeof(extra); j++) {
+		chan = wlan_reg_freq_to_chan(hdd_ctx->pdev, freq_list[j]);
 		len += scnprintf(extra + len, sizeof(extra) - len,
-				 " %d", channel_list[j]);
-
+				 " %d", chan);
+	}
 	len = QDF_MIN(priv_data->total_len, len + 1);
 	if (copy_to_user(priv_data->buf, &extra, len)) {
 		hdd_err("failed to copy data to user buffer");
@@ -5541,12 +5538,19 @@ static int drv_cmd_set_ccx_roam_scan_channels(struct hdd_adapter *adapter,
 {
 	int ret = 0;
 	uint8_t *value = command;
-	uint8_t channel_list[CFG_VALID_CHANNEL_LIST_LEN] = { 0 };
+	uint32_t channel_freq_list[CFG_VALID_CHANNEL_LIST_LEN] = { 0 };
 	uint8_t num_channels = 0;
 	QDF_STATUS status;
 	mac_handle_t mac_handle;
 
-	ret = hdd_parse_channellist(value, channel_list, &num_channels);
+	if (!hdd_ctx) {
+		hdd_err("invalid hdd ctx");
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	ret = hdd_parse_channellist(hdd_ctx, value, channel_freq_list,
+				    &num_channels);
 	if (ret) {
 		hdd_err("Failed to parse channel list information");
 		goto exit;
@@ -5560,7 +5564,7 @@ static int drv_cmd_set_ccx_roam_scan_channels(struct hdd_adapter *adapter,
 	}
 
 	mac_handle = hdd_ctx->mac_handle;
-	if (!sme_validate_channel_list(mac_handle, channel_list,
+	if (!sme_validate_channel_list(mac_handle, channel_freq_list,
 				       num_channels)) {
 		hdd_err("List contains invalid channel(s)");
 		ret = -EINVAL;
@@ -5569,7 +5573,7 @@ static int drv_cmd_set_ccx_roam_scan_channels(struct hdd_adapter *adapter,
 
 	status = sme_set_ese_roam_scan_channel_list(mac_handle,
 						    adapter->vdev_id,
-						    channel_list,
+						    channel_freq_list,
 						    num_channels);
 	if (QDF_STATUS_SUCCESS != status) {
 		hdd_err("Failed to update channel list information");
@@ -7244,6 +7248,7 @@ static void disconnect_sta_and_stop_sap(struct hdd_context *hdd_ctx)
 {
 	struct hdd_adapter *adapter, *next = NULL;
 	QDF_STATUS status;
+	uint8_t ap_ch;
 
 	if (!hdd_ctx)
 		return;
@@ -7253,10 +7258,13 @@ static void disconnect_sta_and_stop_sap(struct hdd_context *hdd_ctx)
 	status = hdd_get_front_adapter(hdd_ctx, &adapter);
 	while (adapter && (status == QDF_STATUS_SUCCESS)) {
 		if (!hdd_validate_adapter(adapter) &&
-		    (adapter->device_mode == QDF_SAP_MODE) &&
-		    (check_disable_channels(hdd_ctx,
-		     adapter->session.ap.operating_channel)))
-			wlan_hdd_stop_sap(adapter);
+		    adapter->device_mode == QDF_SAP_MODE) {
+			ap_ch = wlan_reg_freq_to_chan(
+				hdd_ctx->pdev,
+				adapter->session.ap.operating_chan_freq);
+			if (check_disable_channels(hdd_ctx, ap_ch))
+				wlan_hdd_stop_sap(adapter);
+		}
 
 		status = hdd_get_next_adapter(hdd_ctx, adapter, &next);
 		adapter = next;

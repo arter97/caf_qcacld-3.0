@@ -2301,21 +2301,7 @@ lim_add_sta(struct mac_context *mac_ctx,
 	pe_debug("Assoc ID: %d wmmEnabled: %d listenInterval: %d",
 		 add_sta_params->assocId, add_sta_params->wmmEnabled,
 		 add_sta_params->listenInterval);
-	/* This will indicate HAL to "allocate" a new STA index */
-#ifdef FEATURE_WLAN_TDLS
-	/*
-	 * As there is corner case in-between add_sta and change_sta,if del_sta
-	 * for other staIdx happened, firmware return wrong staIdx
-	 * (recently removed staIdx). Until we get a confirmation from the
-	 * firmware team it is now return correct staIdx for same sta_mac_addr
-	 * for update case, we want to get around it by passing valid staIdx
-	 * given by add_sta time.
-	 */
-	if ((STA_ENTRY_TDLS_PEER == sta_ds->staType) && (true == update_entry))
-		add_sta_params->staIdx = sta_ds->staIndex;
-	else
-#endif
-	add_sta_params->staIdx = STA_INVALID_IDX;
+
 	add_sta_params->staType = sta_ds->staType;
 
 	add_sta_params->updateSta = update_entry;
@@ -2342,9 +2328,10 @@ lim_add_sta(struct mac_context *mac_ctx,
 		add_sta_params->vhtCapable = session_entry->vhtCapability;
 	}
 
-	pe_debug("StaIdx: %d updateSta: %d htcapable: %d vhtCapable: %d",
-		add_sta_params->staIdx, add_sta_params->updateSta,
-		add_sta_params->htCapable, add_sta_params->vhtCapable);
+	pe_debug("updateSta: %d htcapable: %d vhtCapable: %d sta mac"
+		 QDF_MAC_ADDR_STR, add_sta_params->updateSta,
+		 add_sta_params->htCapable, add_sta_params->vhtCapable,
+		 QDF_MAC_ADDR_ARRAY(add_sta_params->staMac));
 
 	/*
 	 * If HT client is connected to SAP DUT and self cap is NSS = 2 then
@@ -2714,26 +2701,6 @@ lim_del_sta(struct mac_context *mac,
 				0, VDEV_CMD);
 		}
 	}
-	/* */
-	/* DPH contains the STA index only for "peer" STA entries. */
-	/* LIM global contains "self" STA index */
-	/* Thus, */
-	/*    if( STA role ) */
-	/*      get STA index from LIM global */
-	/*    else */
-	/*      get STA index from DPH */
-	/* */
-
-#ifdef FEATURE_WLAN_TDLS
-	if (LIM_IS_STA_ROLE(pe_session) &&
-	    (sta->staType != STA_ENTRY_TDLS_PEER))
-#else
-	if (LIM_IS_STA_ROLE(pe_session))
-#endif
-		pDelStaParams->staIdx = pe_session->staId;
-
-	else
-		pDelStaParams->staIdx = sta->staIndex;
 
 	pDelStaParams->assocId = sta->assocId;
 	sta->valid = 0;
@@ -2841,7 +2808,7 @@ static void lim_set_mbssid_info(struct pe_session *pe_session)
  */
 
 QDF_STATUS
-lim_add_sta_self(struct mac_context *mac, uint16_t staIdx, uint8_t updateSta,
+lim_add_sta_self(struct mac_context *mac, uint8_t updateSta,
 		 struct pe_session *pe_session)
 {
 	tpAddStaParams pAddStaParams = NULL;
@@ -2888,8 +2855,6 @@ lim_add_sta_self(struct mac_context *mac, uint16_t staIdx, uint8_t updateSta,
 
 	pAddStaParams->maxTxPower = pe_session->maxTxPower;
 
-	/* This will indicate HAL to "allocate" a new STA index */
-	pAddStaParams->staIdx = staIdx;
 	pAddStaParams->updateSta = updateSta;
 
 	lim_set_mbssid_info(pe_session);
@@ -2965,8 +2930,8 @@ lim_add_sta_self(struct mac_context *mac, uint16_t staIdx, uint8_t updateSta,
 	if (QDF_P2P_CLIENT_MODE == pe_session->opmode)
 		pAddStaParams->p2pCapableSta = 1;
 
-	pe_debug(" StaIdx: %d updateSta = %d htcapable = %d ",
-		pAddStaParams->staIdx, pAddStaParams->updateSta,
+	pe_debug("updateSta = %d htcapable = %d ",
+		pAddStaParams->updateSta,
 		pAddStaParams->htCapable);
 
 	pe_debug("htLdpcCapable: %d vhtLdpcCapable: %d "
@@ -3106,7 +3071,8 @@ lim_delete_dph_hash_entry(struct mac_context *mac_ctx, tSirMacAddr sta_addr,
 		return;
 	}
 
-	pe_debug("Deleting DPH Hash entry for STAID: %X", sta_id);
+	pe_debug("Deleting DPH Hash entry sta mac " QDF_MAC_ADDR_STR,
+		 QDF_MAC_ADDR_ARRAY(sta_addr));
 	/*
 	 * update the station count and perform associated actions
 	 * do this before deleting the dph hash entry
@@ -3155,8 +3121,9 @@ lim_delete_dph_hash_entry(struct mac_context *mac_ctx, tSirMacAddr sta_addr,
 
 #ifdef WLAN_FEATURE_11W
 		if (sta_ds->rmfEnabled) {
-			pe_debug("delete pmf timer sta-idx:%d assoc-id:%d",
-				 sta_ds->staIndex, sta_ds->assocId);
+			pe_debug("delete pmf timer assoc-id:%d sta mac "
+				 QDF_MAC_ADDR_STR, sta_ds->assocId,
+				 QDF_MAC_ADDR_ARRAY(sta_ds->staAddr));
 			tx_timer_delete(&sta_ds->pmfSaQueryTimer);
 		}
 #endif
@@ -4125,8 +4092,10 @@ QDF_STATUS lim_sta_send_add_bss_pre_assoc(struct mac_context *mac,
 	}
 
 	if (lim_is_session_he_capable(pe_session) &&
-	    pBeaconStruct->he_cap.present)
+	    pBeaconStruct->he_cap.present) {
+		lim_update_bss_he_capable(mac, pAddBssParams);
 		lim_add_bss_he_cfg(pAddBssParams, pe_session);
+	}
 	pe_debug("vhtCapable %d ch_width %d", pAddBssParams->vhtCapable,
 		 pAddBssParams->ch_width);
 	/*

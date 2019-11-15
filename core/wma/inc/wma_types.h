@@ -57,8 +57,8 @@
 
 #define WMA_GET_RX_UNKNOWN_UCAST(pRxMeta) 0
 
-#define WMA_GET_RX_CH(pRxMeta) \
-	(((t_packetmeta *)pRxMeta)->channel)
+#define WMA_GET_RX_FREQ(pRxMeta) \
+	(((t_packetmeta *)pRxMeta)->frequency)
 
 #define WMA_GET_RX_FT_DONE(pRxMeta) 0
 
@@ -378,9 +378,6 @@
 #ifdef WLAN_FEATURE_GPIO_LED_FLASHING
 #define WMA_LED_FLASHING_REQ   SIR_HAL_LED_FLASHING_REQ
 #endif
-
-/* Message posted by wmi when wmi event is received from FW */
-#define WMA_PROCESS_FW_EVENT		     SIR_HAL_PROCESS_FW_EVENT
 
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE
 #define WMA_UPDATE_Q2Q_IE_IND                 SIR_HAL_UPDATE_Q2Q_IE_IND

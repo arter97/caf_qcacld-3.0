@@ -140,7 +140,8 @@ int wma_cli_set2_command(int vdev_id, int param_id, int sval1,
  *
  * Return: None
  */
-void wma_get_phy_mode_cb(uint8_t chan, uint32_t chan_width, uint32_t *phy_mode);
+void wma_get_phy_mode_cb(uint8_t chan, uint32_t chan_width,
+			 enum wlan_phymode  *phy_mode);
 
 QDF_STATUS wma_set_htconfig(uint8_t vdev_id, uint16_t ht_capab, int value);
 
@@ -181,7 +182,7 @@ void wma_update_intf_hw_mode_params(uint32_t vdev_id, uint32_t mac_id,
 void wma_set_dbs_capability_ut(uint32_t dbs);
 QDF_STATUS wma_get_caps_for_phyidx_hwmode(struct wma_caps_per_phy *caps_per_phy,
 		enum hw_mode_dbs_capab hw_mode, enum cds_band_type band);
-bool wma_is_rx_ldpc_supported_for_channel(uint32_t channel);
+bool wma_is_rx_ldpc_supported_for_channel(uint32_t ch_freq);
 
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS
 int wma_unified_radio_tx_mem_free(void *handle);
@@ -449,15 +450,19 @@ void wma_wmi_stop(void);
 
 /**
  * wma_get_mcs_idx() - get mcs index
- * @max_rate: max rate
+ * @raw_rate: raw rate from fw
  * @rate_flags: rate flags
  * @nss: nss
+ * @dcm: dcm
+ * @guard_interval: guard interval
  * @mcs_rate_flag: mcs rate flags
  *
  *  Return: mcs index
  */
-uint8_t wma_get_mcs_idx(uint16_t max_rate, uint8_t rate_flags,
-			uint8_t *nss, uint8_t *mcs_rate_flag);
+uint8_t wma_get_mcs_idx(uint16_t raw_rate, enum tx_rate_info rate_flags,
+			uint8_t *nss, uint8_t *dcm,
+			enum txrate_gi *guard_interval,
+			enum tx_rate_info *mcs_rate_flag);
 
 /**
  * wma_get_hidden_ssid_restart_in_progress() - check if hidden ssid restart is
@@ -757,4 +762,15 @@ int wma_wlm_stats_rsp(void *wma_ctx, uint8_t *event, uint32_t len);
  */
 void wma_update_roam_offload_flag(void *handle,
 				  struct roam_init_params *params);
+
+/**
+ * wma_self_peer_create() - create self peer in objmgr
+ * @vdev_mlme: vdev mlme component private object
+ *
+ * Create the self peer in firmware for beaconing vdev's and create then
+ * object manager self-peer for the vdev.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wma_vdev_self_peer_create(struct vdev_mlme_obj *vdev_mlme);
 #endif /* WMA_API_H */

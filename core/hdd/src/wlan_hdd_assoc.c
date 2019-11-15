@@ -69,6 +69,7 @@
 #include <wlan_cfg80211_crypto.h>
 #include <wlan_crypto_global_api.h>
 #include "wlan_blm_ucfg_api.h"
+#include "wlan_hdd_sta_info.h"
 
 /* These are needed to recognize WPA and RSN suite types */
 #define HDD_WPA_OUI_SIZE 4
@@ -969,17 +970,6 @@ hdd_conn_save_connect_info(struct hdd_adapter *adapter,
 			qdf_copy_macaddr(&sta_ctx->conn_info.bssid,
 					 &roam_info->bssid);
 
-			/*
-			 * Save the Station ID for this station from
-			 * the 'Roam Info'. For IBSS mode, sta_id is
-			 * assigned in NEW_PEER_IND. For reassoc, the
-			 * sta_id doesn't change and it may be invalid
-			 * in this structure so no change here.
-			 */
-			if (!roam_info->fReassocReq) {
-				sta_ctx->conn_info.sta_id[0] =
-					roam_info->staId;
-			}
 		} else if (eCSR_BSS_TYPE_IBSS == bss_type) {
 			qdf_copy_macaddr(&sta_ctx->conn_info.bssid,
 					 &roam_info->bssid);
@@ -1379,8 +1369,8 @@ static void hdd_send_association_event(struct net_device *dev,
 
 		ucfg_p2p_status_connect(adapter->vdev);
 
-		hdd_info("wlan: " QDF_MAC_ADDR_STR " connected to "
-			QDF_MAC_ADDR_STR "\n",
+		hdd_info("%s(vdevid-%d): " QDF_MAC_ADDR_STR " connected to "
+			QDF_MAC_ADDR_STR, dev->name, adapter->vdev_id,
 			QDF_MAC_ADDR_ARRAY(adapter->mac_addr.bytes),
 			QDF_MAC_ADDR_ARRAY(wrqu.ap_addr.sa_data));
 		hdd_send_update_beacon_ies_event(adapter, roam_info);
@@ -1450,10 +1440,12 @@ static void hdd_send_association_event(struct net_device *dev,
 				adapter->vdev_id);
 		memcpy(wrqu.ap_addr.sa_data, sta_ctx->conn_info.bssid.bytes,
 				ETH_ALEN);
-		hdd_debug("wlan: new IBSS peer connection to BSSID " QDF_MAC_ADDR_STR,
-			QDF_MAC_ADDR_ARRAY(sta_ctx->conn_info.bssid.bytes));
+		hdd_debug("%s(vdevid-%d): new IBSS peer connection to BSSID " QDF_MAC_ADDR_STR,
+			  dev->name, adapter->vdev_id,
+			  QDF_MAC_ADDR_ARRAY(sta_ctx->conn_info.bssid.bytes));
 	} else {                /* Not Associated */
-		hdd_debug("wlan: disconnected");
+		hdd_info("%s(vdevid-%d): disconnected", dev->name,
+			 adapter->vdev_id);
 		memset(wrqu.ap_addr.sa_data, '\0', ETH_ALEN);
 		policy_mgr_decr_session_set_pcl(hdd_ctx->psoc,
 				adapter->device_mode, adapter->vdev_id);
@@ -1519,8 +1511,7 @@ static void hdd_send_association_event(struct net_device *dev,
  */
 static void hdd_conn_remove_connect_info(struct hdd_station_ctx *sta_ctx)
 {
-	/* Remove sta_id, bssid and peer_macaddr */
-	sta_ctx->conn_info.sta_id[0] = HDD_WLAN_INVALID_STA_ID;
+	/* Remove bssid and peer_macaddr */
 	qdf_mem_zero(&sta_ctx->conn_info.bssid, QDF_MAC_ADDR_SIZE);
 	qdf_mem_zero(&sta_ctx->conn_info.peer_macaddr[0],
 		     QDF_MAC_ADDR_SIZE);
@@ -1701,7 +1692,6 @@ static QDF_STATUS hdd_dis_connect_handler(struct hdd_adapter *adapter,
 	struct net_device *dev = adapter->dev;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-	uint8_t sta_id;
 	bool sendDisconInd = true;
 	mac_handle_t mac_handle;
 	struct wlan_ies disconnect_ies = {0};
@@ -1717,7 +1707,7 @@ static QDF_STATUS hdd_dis_connect_handler(struct hdd_adapter *adapter,
 				     WLAN_CONTROL_PATH);
 
 	if (ucfg_ipa_is_enabled() &&
-	    (sta_ctx->conn_info.sta_id[0] != HDD_WLAN_INVALID_STA_ID))
+	    (hdd_is_valid_mac_address(sta_ctx->conn_info.bssid.bytes)))
 		ucfg_ipa_wlan_evt(hdd_ctx->pdev, adapter->dev,
 				  adapter->device_mode,
 				  adapter->vdev_id,
@@ -1822,40 +1812,45 @@ static QDF_STATUS hdd_dis_connect_handler(struct hdd_adapter *adapter,
 	if (eCSR_ROAM_IBSS_LEAVE == roam_status) {
 		uint8_t i;
 
-		sta_id = sta_ctx->broadcast_sta_id;
 		vstatus = hdd_roam_deregister_sta(adapter,
 						  sta_ctx->conn_info.bssid);
 		if (!QDF_IS_STATUS_SUCCESS(vstatus)) {
-			hdd_err("hdd_roam_deregister_sta() failed for staID %d Status: %d [0x%x]",
-					sta_id, status, status);
+			hdd_err("hdd_roam_deregister_sta() failed for sta"
+				QDF_MAC_ADDR_STR " Status: %d [0x%x]",
+				QDF_MAC_ADDR_ARRAY(
+				sta_ctx->conn_info.bssid.bytes),
+				status, status);
 			status = QDF_STATUS_E_FAILURE;
 		}
+
 		/* Clear all the peer sta register with TL. */
 		for (i = 0; i < MAX_PEERS; i++) {
-			if (HDD_WLAN_INVALID_STA_ID ==
-				sta_ctx->conn_info.sta_id[i])
+			struct qdf_mac_addr mac_addr =
+				sta_ctx->conn_info.peer_macaddr[i];
+
+			if (!hdd_is_valid_mac_address(mac_addr.bytes))
 				continue;
-			sta_id = sta_ctx->conn_info.sta_id[i];
-			hdd_debug("Deregister StaID %d", sta_id);
-			vstatus = hdd_roam_deregister_sta(
-					adapter,
-					sta_ctx->conn_info.peer_macaddr[i]);
+
+			hdd_debug("Deregister Sta " QDF_MAC_ADDR_STR,
+				  QDF_MAC_ADDR_ARRAY(mac_addr.bytes));
+
+			vstatus = hdd_roam_deregister_sta(adapter, mac_addr);
+
 			if (!QDF_IS_STATUS_SUCCESS(vstatus)) {
-				hdd_err("hdd_roam_deregister_sta() failed to for staID %d Status: %d [0x%x]",
-					sta_id, status, status);
+				hdd_err("hdd_roam_deregister_sta() failed sta "
+					QDF_MAC_ADDR_STR " Status: %d [0x%x]",
+					QDF_MAC_ADDR_ARRAY(mac_addr.bytes),
+					status, status);
 				status = QDF_STATUS_E_FAILURE;
 			}
-			/* set the sta_id and peer mac as 0, all other
-			 * reset are done in hdd_connRemoveConnectInfo.
+			/* set the peer mac as 0, all other
+			 * reset are done in hdd_conn_remove_connect_info.
 			 */
-			sta_ctx->conn_info.sta_id[i] =
-						HDD_WLAN_INVALID_STA_ID;
 			qdf_mem_zero(&sta_ctx->conn_info.peer_macaddr[i],
 				sizeof(struct qdf_mac_addr));
 
 		}
 	} else {
-		sta_id = sta_ctx->conn_info.sta_id[0];
 		hdd_debug("roam_result: %d", roam_result);
 
 		/* clear scan cache for Link Lost */
@@ -1935,47 +1930,53 @@ static void hdd_set_peer_authorized_event(uint32_t vdev_id)
 	complete(&adapter->sta_authorized_event);
 }
 
-/**
- * hdd_change_peer_state() - change peer state
- * @adapter: HDD adapter
- * @sta_state: peer state
- * @roam_synch_in_progress: roam synch in progress
- *
- * Return: QDF status
- */
+#if defined(QCA_LL_LEGACY_TX_FLOW_CONTROL) || defined(QCA_LL_TX_FLOW_CONTROL_V2)
+static inline
+void hdd_set_unpause_queue(void *soc, struct hdd_adapter *adapter, void *peer)
+{
+	void *vdev;
+	unsigned long rc;
+	/* wait for event from firmware to set the event */
+	rc = wait_for_completion_timeout(
+			&adapter->sta_authorized_event,
+			msecs_to_jiffies(HDD_PEER_AUTHORIZE_WAIT));
+	if (!rc)
+		hdd_debug("timeout waiting for sta_authorized_event");
+
+	vdev = (void *)cdp_peer_get_vdev(soc, peer);
+	cdp_fc_vdev_unpause(soc, (struct cdp_vdev *)vdev,
+			    OL_TXQ_PAUSE_REASON_PEER_UNAUTHORIZED,
+			    0);
+}
+#else
+static inline
+void hdd_set_unpause_queue(void *soc, struct hdd_adapter *adapter, void *peer)
+{ }
+#endif
+
 QDF_STATUS hdd_change_peer_state(struct hdd_adapter *adapter,
-				 uint8_t sta_id,
+				 uint8_t *peer_mac,
 				 enum ol_txrx_peer_state sta_state,
 				 bool roam_synch_in_progress)
 {
 	QDF_STATUS err;
-	uint8_t *peer_mac_addr;
 	void *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	void *peer;
+	/* Will be removed as a part of clean up */
+	uint8_t sta_id;
 
 	if (!pdev) {
 		hdd_err("Failed to get txrx context");
 		return QDF_STATUS_E_FAULT;
 	}
 
-	if (sta_id >= WLAN_MAX_STA_COUNT) {
-		hdd_err("Invalid sta id: %d", sta_id);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	peer = cdp_peer_find_by_local_id(soc,
-			(struct cdp_pdev *)pdev, sta_id);
+	peer = cdp_peer_find_by_addr(soc, (struct cdp_pdev *)pdev,
+				     peer_mac, &sta_id);
 	if (!peer)
 		return QDF_STATUS_E_FAULT;
 
-	peer_mac_addr = cdp_peer_get_peer_mac_addr(soc, peer);
-	if (!peer_mac_addr) {
-		hdd_err("peer mac addr is NULL");
-		return QDF_STATUS_E_FAULT;
-	}
-
-	err = cdp_peer_state_update(soc, pdev, peer_mac_addr, sta_state);
+	err = cdp_peer_state_update(soc, pdev, peer_mac, sta_state);
 	if (err != QDF_STATUS_SUCCESS) {
 		hdd_err("peer state update failed");
 		return QDF_STATUS_E_FAULT;
@@ -1994,7 +1995,8 @@ QDF_STATUS hdd_change_peer_state(struct hdd_adapter *adapter,
 		INIT_COMPLETION(adapter->sta_authorized_event);
 #endif
 
-		err = sme_set_peer_authorized(peer_mac_addr,
+		err = sme_set_peer_authorized(
+				peer_mac,
 				hdd_set_peer_authorized_event,
 				adapter->vdev_id);
 		if (err != QDF_STATUS_SUCCESS) {
@@ -2004,21 +2006,7 @@ QDF_STATUS hdd_change_peer_state(struct hdd_adapter *adapter,
 
 		if (adapter->device_mode == QDF_STA_MODE ||
 		    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
-#if defined(QCA_LL_LEGACY_TX_FLOW_CONTROL) || defined(QCA_LL_TX_FLOW_CONTROL_V2)
-			void *vdev;
-			unsigned long rc;
-
-			/* wait for event from firmware to set the event */
-			rc = wait_for_completion_timeout(
-				&adapter->sta_authorized_event,
-				msecs_to_jiffies(HDD_PEER_AUTHORIZE_WAIT));
-			if (!rc)
-				hdd_debug("timeout waiting for sta_authorized_event");
-
-			vdev = (void *)cdp_peer_get_vdev(soc, peer);
-			cdp_fc_vdev_unpause(soc, (struct cdp_vdev *)vdev,
-					OL_TXQ_PAUSE_REASON_PEER_UNAUTHORIZED);
-#endif
+			hdd_set_unpause_queue(soc, adapter, peer);
 		}
 	}
 	return QDF_STATUS_SUCCESS;
@@ -2062,6 +2050,32 @@ QDF_STATUS hdd_update_dp_vdev_flags(void *cbk_data,
 }
 
 /**
+ * hdd_conn_change_peer_state() - Change the state of the peer
+ * @adapter: pointer to adapter
+ * @roam_info: pointer to roam info
+ * @mac_addr: peer mac address
+ *
+ * Return: QDF_STATUS enumeration
+ */
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+static QDF_STATUS hdd_conn_change_peer_state(struct hdd_adapter *adapter,
+					     struct csr_roam_info *roam_info,
+					     uint8_t *mac_addr)
+{
+	return hdd_change_peer_state(adapter, mac_addr, OL_TXRX_PEER_STATE_AUTH,
+				     roam_info->roamSynchInProgress);
+}
+#else
+static QDF_STATUS hdd_conn_change_peer_state(struct hdd_adapter *adapter,
+					     struct csr_roam_info *roam_info,
+					     uint8_t *mac_addr)
+{
+	return hdd_change_peer_state(adapter, mac_addr, OL_TXRX_PEER_STATE_AUTH,
+				     false);
+}
+#endif
+
+/**
  * hdd_roam_register_sta() - register station
  * @adapter: pointer to adapter
  * @roam_info: pointer to roam info
@@ -2072,12 +2086,10 @@ QDF_STATUS hdd_update_dp_vdev_flags(void *cbk_data,
  */
 QDF_STATUS hdd_roam_register_sta(struct hdd_adapter *adapter,
 					struct csr_roam_info *roam_info,
-					uint8_t sta_id,
 					struct bss_description *bss_desc)
 {
 	QDF_STATUS qdf_status = QDF_STATUS_E_FAILURE;
 	struct ol_txrx_desc_type txrx_desc = {0};
-	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 	struct ol_txrx_ops txrx_ops;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	void *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
@@ -2086,7 +2098,6 @@ QDF_STATUS hdd_roam_register_sta(struct hdd_adapter *adapter,
 		return QDF_STATUS_E_FAILURE;
 
 	/* Get the Station ID from the one saved during the association */
-	txrx_desc.sta_id = sta_id;
 	if (!QDF_IS_ADDR_BROADCAST(roam_info->bssid.bytes))
 		WLAN_ADDR_COPY(txrx_desc.peer_addr.bytes,
 			       roam_info->bssid.bytes);
@@ -2115,10 +2126,12 @@ QDF_STATUS hdd_roam_register_sta(struct hdd_adapter *adapter,
 	if (adapter->hdd_ctx->enable_dp_rx_threads) {
 		txrx_ops.rx.rx = hdd_rx_pkt_thread_enqueue_cbk;
 		txrx_ops.rx.rx_stack = hdd_rx_packet_cbk;
+		txrx_ops.rx.rx_flush = hdd_rx_flush_packet_cbk;
 		txrx_ops.rx.rx_gro_flush = hdd_rx_thread_gro_flush_ind_cbk;
 	} else {
 		txrx_ops.rx.rx = hdd_rx_packet_cbk;
 		txrx_ops.rx.rx_stack = NULL;
+		txrx_ops.rx.rx_flush = NULL;
 	}
 
 	txrx_ops.rx.stats_rx = hdd_tx_rx_collect_connectivity_stats_info;
@@ -2153,30 +2166,21 @@ QDF_STATUS hdd_roam_register_sta(struct hdd_adapter *adapter,
 		 * Connections that do not need Upper layer auth, transition
 		 * TLSHIM directly to 'Authenticated' state
 		 */
-		qdf_status =
-			hdd_change_peer_state(adapter, txrx_desc.sta_id,
-						OL_TXRX_PEER_STATE_AUTH,
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
-						roam_info->roamSynchInProgress
-#else
-						false
-#endif
-						);
+		qdf_status = hdd_conn_change_peer_state(
+						adapter, roam_info,
+						txrx_desc.peer_addr.bytes);
 
 		hdd_conn_set_authenticated(adapter, true);
 		hdd_objmgr_set_peer_mlme_auth_state(adapter->vdev, true);
 	} else {
-		hdd_debug("ULA auth StaId= %d. Changing TL state to CONNECTED at Join time",
-			 sta_ctx->conn_info.sta_id[0]);
-		qdf_status =
-			hdd_change_peer_state(adapter, txrx_desc.sta_id,
-						OL_TXRX_PEER_STATE_CONN,
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
-						roam_info->roamSynchInProgress
-#else
-						false
-#endif
-						);
+		hdd_debug("ULA auth Sta: " QDF_MAC_ADDR_STR
+			  " Changing TL state to CONNECTED at Join time",
+			  QDF_MAC_ADDR_ARRAY(txrx_desc.peer_addr.bytes));
+
+		qdf_status = hdd_conn_change_peer_state(
+						adapter, roam_info,
+						txrx_desc.peer_addr.bytes);
+
 		hdd_conn_set_authenticated(adapter, false);
 		hdd_objmgr_set_peer_mlme_auth_state(adapter->vdev, false);
 	}
@@ -2448,38 +2452,6 @@ bool hdd_is_roam_sync_in_progress(struct csr_roam_info *roaminfo)
 
 #ifdef QCA_IBSS_SUPPORT
 /**
- * hdd_get_ibss_peer_sta_id() - get sta id for IBSS peer
- * @hddstactx: pointer to HDD sta context
- * @roaminfo: pointer to roaminfo structure
- *
- * This function returns sta_id for IBSS peer. If peer is broadcast
- * MAC address return self sta_id(0) else find the peer sta id of
- * the peer.
- *
- * Return: sta_id (HDD_WLAN_INVALID_STA_ID if peer not found).
- */
-static uint8_t hdd_get_ibss_peer_sta_id(struct hdd_station_ctx *hddstactx,
-					struct csr_roam_info *roaminfo)
-{
-	uint8_t sta_id = HDD_WLAN_INVALID_STA_ID;
-	QDF_STATUS status;
-
-	if (qdf_is_macaddr_broadcast(&roaminfo->peerMac)) {
-		sta_id = 0;
-	} else {
-		status = hdd_get_peer_sta_id(hddstactx,
-				&roaminfo->peerMac, &sta_id);
-		if (status != QDF_STATUS_SUCCESS) {
-			hdd_err("Unable to find station ID for "
-				QDF_MAC_ADDR_STR,
-				QDF_MAC_ADDR_ARRAY(roaminfo->peerMac.bytes));
-		}
-	}
-
-	return sta_id;
-}
-
-/**
  * hdd_roam_ibss_indication_handler() - update the status of the IBSS
  * @adapter: pointer to adapter
  * @roam_info: pointer to roam info
@@ -2510,9 +2482,6 @@ static void hdd_roam_ibss_indication_handler(struct hdd_adapter *adapter,
 	case eCSR_ROAM_RESULT_IBSS_JOIN_SUCCESS:
 	case eCSR_ROAM_RESULT_IBSS_COALESCED:
 	{
-		struct hdd_station_ctx *hdd_sta_ctx =
-			WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-
 		if (!roam_info) {
 			QDF_ASSERT(0);
 			return;
@@ -2528,11 +2497,7 @@ static void hdd_roam_ibss_indication_handler(struct hdd_adapter *adapter,
 		hdd_wmm_connect(adapter, roam_info,
 				eCSR_BSS_TYPE_IBSS);
 
-		hdd_sta_ctx->broadcast_sta_id = roam_info->staId;
-
-		hdd_roam_register_sta(adapter, roam_info,
-				      roam_info->staId,
-				      roam_info->bss_desc);
+		hdd_roam_register_sta(adapter, roam_info, roam_info->bss_desc);
 
 		if (roam_info->bss_desc) {
 			struct cfg80211_bss *bss;
@@ -2694,8 +2659,8 @@ static int hdd_change_sta_state_authenticated(struct hdd_adapter *adapter,
 						 struct csr_roam_info *roaminfo)
 {
 	QDF_STATUS status;
+	uint8_t *mac_addr;
 	uint32_t timeout, auto_bmps_timer_val;
-	uint8_t sta_id = HDD_WLAN_INVALID_STA_ID;
 	struct hdd_station_ctx *hddstactx =
 		WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
@@ -2707,17 +2672,19 @@ static int hdd_change_sta_state_authenticated(struct hdd_adapter *adapter,
 		(auto_bmps_timer_val * 1000);
 
 	if (QDF_IBSS_MODE == adapter->device_mode)
-		sta_id = hdd_get_ibss_peer_sta_id(hddstactx, roaminfo);
+		mac_addr = roaminfo->peerMac.bytes;
 	else
-		sta_id = hddstactx->conn_info.sta_id[0];
+		mac_addr = hddstactx->conn_info.bssid.bytes;
 
-	hdd_debug("Changing Peer state to AUTHENTICATED for StaId = %d",
-		  sta_id);
+	hdd_debug("Changing Peer state to AUTHENTICATED for Sta = "
+		  QDF_MAC_ADDR_STR, QDF_MAC_ADDR_ARRAY(mac_addr));
 
 	/* Connections that do not need Upper layer authentication,
 	 * transition TL to 'Authenticated' state after the keys are set
 	 */
-	status = hdd_change_peer_state(adapter, sta_id, OL_TXRX_PEER_STATE_AUTH,
+
+	status = hdd_change_peer_state(adapter, mac_addr,
+				       OL_TXRX_PEER_STATE_AUTH,
 				       hdd_is_roam_sync_in_progress(roaminfo));
 	hdd_conn_set_authenticated(adapter, true);
 	hdd_objmgr_set_peer_mlme_auth_state(adapter->vdev, true);
@@ -2940,7 +2907,7 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 	QDF_STATUS qdf_status = QDF_STATUS_E_FAILURE;
-	uint8_t reqRsnIe[DOT11F_IE_RSN_MAX_LEN];
+	uint8_t *reqRsnIe;
 	uint32_t reqRsnLength = DOT11F_IE_RSN_MAX_LEN, ie_len;
 	int ft_carrier_on = false;
 	bool hddDisconInProgress = false;
@@ -3101,8 +3068,9 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 					      sta_ctx->conn_info.chan_freq);
 
 		hdd_debug("check if STA chan ok for DNBS");
-		if (policy_mgr_is_chan_ok_for_dnbs(hdd_ctx->psoc,
-					conn_info_channel,
+		if (policy_mgr_is_chan_ok_for_dnbs(
+					hdd_ctx->psoc,
+					wlan_chan_to_freq(conn_info_channel),
 					&ok)) {
 			hdd_err("Unable to check DNBS eligibility for chan(freq):%u",
 				sta_ctx->conn_info.chan_freq);
@@ -3130,6 +3098,11 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 			QDF_TRACE_DEFAULT_PDEV_ID,
 			QDF_PROTO_TYPE_MGMT, QDF_PROTO_MGMT_ASSOC));
 
+		reqRsnIe = qdf_mem_malloc(sizeof(uint8_t) *
+					  DOT11F_IE_RSN_MAX_LEN);
+		if (!reqRsnIe)
+			return QDF_STATUS_E_NOMEM;
+
 		/*
 		 * For reassoc, the station is already registered, all we need
 		 * is to change the state of the STA in TL.
@@ -3143,8 +3116,15 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 			u8 *assoc_req = NULL;
 			unsigned int assoc_req_len = 0;
 			struct ieee80211_channel *chan;
-			uint8_t rsp_rsn_ie[DOT11F_IE_RSN_MAX_LEN];
 			uint32_t rsp_rsn_lemgth = DOT11F_IE_RSN_MAX_LEN;
+			uint8_t *rsp_rsn_ie =
+				qdf_mem_malloc(sizeof(uint8_t) *
+					       DOT11F_IE_RSN_MAX_LEN);
+			if (!rsp_rsn_ie) {
+				qdf_mem_free(reqRsnIe);
+				return QDF_STATUS_E_NOMEM;
+			}
+
 
 			/* add bss_id to cfg80211 data base */
 			bss =
@@ -3171,6 +3151,8 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 					   adapter->vdev_id,
 					   eCSR_DISCONNECT_REASON_UNSPECIFIED);
 				}
+				qdf_mem_free(reqRsnIe);
+				qdf_mem_free(rsp_rsn_ie);
 				return QDF_STATUS_E_FAILURE;
 			}
 
@@ -3359,6 +3341,7 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 				 * wpa supplicant expecting WPA/RSN IE in
 				 * connect result.
 				 */
+
 				sme_roam_get_wpa_rsn_req_ie(mac_handle,
 							    adapter->vdev_id,
 							    &reqRsnLength,
@@ -3415,7 +3398,6 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 				 */
 				qdf_status = hdd_roam_register_sta(adapter,
 						roam_info,
-						sta_ctx->conn_info.sta_id[0],
 						roam_info->bss_desc);
 				hdd_debug("Enabling queues");
 				wlan_hdd_netif_queue_control(adapter,
@@ -3423,6 +3405,7 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 						WLAN_CONTROL_PATH);
 
 			}
+			qdf_mem_free(rsp_rsn_ie);
 		} else {
 			/*
 			 * wpa supplicant expecting WPA/RSN IE in connect result
@@ -3443,7 +3426,7 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 			if (roam_info->fAuthRequired) {
 				qdf_status =
 					hdd_change_peer_state(adapter,
-						sta_ctx->conn_info.sta_id[0],
+						roam_info->bssid.bytes,
 						OL_TXRX_PEER_STATE_CONN,
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 						roam_info->roamSynchInProgress
@@ -3456,11 +3439,13 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 							adapter->vdev,
 							false);
 			} else {
-				hdd_debug("sta_id: %d Changing TL state to AUTHENTICATED",
-					  sta_ctx->conn_info.sta_id[0]);
+				hdd_debug("sta: " QDF_MAC_ADDR_STR
+					  "Changing TL state to AUTHENTICATED",
+					  QDF_MAC_ADDR_ARRAY(
+					  roam_info->bssid.bytes));
 				qdf_status =
 					hdd_change_peer_state(adapter,
-						sta_ctx->conn_info.sta_id[0],
+						roam_info->bssid.bytes,
 						OL_TXRX_PEER_STATE_AUTH,
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 						roam_info->roamSynchInProgress
@@ -3493,6 +3478,7 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 						   WLAN_WAKE_ALL_NETIF_QUEUE,
 						   WLAN_CONTROL_PATH);
 		}
+		qdf_mem_free(reqRsnIe);
 
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 			hdd_err("STA register with TL failed status: %d [%08X]",
@@ -3518,13 +3504,15 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 			qdf_copy_macaddr(&roam_info->bssid,
 					 &sta_ctx->requested_bssid);
 		if (roam_info)
-			hdd_err("wlan: connection failed with " QDF_MAC_ADDR_STR
-				 " result: %d and Status: %d",
+			hdd_err("%s(vdevid-%d): connection failed with " QDF_MAC_ADDR_STR
+				 " result: %d and Status: %d", dev->name,
+				 adapter->vdev_id,
 				 QDF_MAC_ADDR_ARRAY(roam_info->bssid.bytes),
 				 roam_result, roam_status);
 		else
-			hdd_err("wlan: connection failed with " QDF_MAC_ADDR_STR
-				 " result: %d and Status: %d",
+			hdd_err("%s(vdevid-%d): connection failed with " QDF_MAC_ADDR_STR
+				 " result: %d and Status: %d", dev->name,
+				 adapter->vdev_id,
 				 QDF_MAC_ADDR_ARRAY(sta_ctx->requested_bssid.bytes),
 				 roam_result, roam_status);
 
@@ -3693,7 +3681,19 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 		 * waiting on disconnect_comp_var so unblock anyone waiting for
 		 * disconnect to complete.
 		 */
-		if ((roam_result == eCSR_ROAM_RESULT_SCAN_FOR_SSID_FAILURE) &&
+		/*
+		 * Also add eCSR_ROAM_ASSOCIATION_FAILURE and
+		 * eCSR_ROAM_CANCELLED here to handle the following scenarios:
+		 *
+		 * 1. Connection is in progress, but completes with failure
+		 *    before we check the CSR state.
+		 * 2. Connection is in progress. But the connect command is in
+		 *    pending queue and is removed from pending queue as part
+		 *    of csr_roam_disconnect.
+		 */
+		if ((roam_result == eCSR_ROAM_RESULT_SCAN_FOR_SSID_FAILURE ||
+		     roam_status == eCSR_ROAM_ASSOCIATION_FAILURE ||
+		     roam_status == eCSR_ROAM_CANCELLED) &&
 		    hddDisconInProgress)
 			complete(&adapter->disconnect_comp_var);
 	}
@@ -3712,16 +3712,16 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 
  * Return: true if success, false otherwise
  */
-bool hdd_save_peer(struct hdd_station_ctx *sta_ctx, uint8_t sta_id,
+bool hdd_save_peer(struct hdd_station_ctx *sta_ctx,
 		   struct qdf_mac_addr *peer_mac_addr)
 {
 	int idx;
 
 	for (idx = 0; idx < SIR_MAX_NUM_STA_IN_IBSS; idx++) {
-		if (HDD_WLAN_INVALID_STA_ID == sta_ctx->conn_info.sta_id[idx]) {
-			hdd_debug("adding peer: %pM, sta_id: %d, at idx: %d",
-				 peer_mac_addr, sta_id, idx);
-			sta_ctx->conn_info.sta_id[idx] = sta_id;
+		if (hdd_is_valid_mac_address(
+		    sta_ctx->conn_info.peer_macaddr[idx].bytes)) {
+			hdd_debug("adding peer: %pM at idx: %d",
+				  peer_mac_addr, idx);
 			qdf_copy_macaddr(
 				&sta_ctx->conn_info.peer_macaddr[idx],
 				peer_mac_addr);
@@ -3729,25 +3729,6 @@ bool hdd_save_peer(struct hdd_station_ctx *sta_ctx, uint8_t sta_id,
 		}
 	}
 	return false;
-}
-
-/**
- * hdd_delete_peer() - removes peer from hdd station context peer table
- * @sta_ctx: pointer to hdd station context
- * @sta_id: station ID
- *
- * Return: None
- */
-void hdd_delete_peer(struct hdd_station_ctx *sta_ctx, uint8_t sta_id)
-{
-	int i;
-
-	for (i = 0; i < SIR_MAX_NUM_STA_IN_IBSS; i++) {
-		if (sta_id == sta_ctx->conn_info.sta_id[i]) {
-			sta_ctx->conn_info.sta_id[i] = HDD_WLAN_INVALID_STA_ID;
-			return;
-		}
-	}
 }
 
 /**
@@ -3760,7 +3741,7 @@ void hdd_delete_peer(struct hdd_station_ctx *sta_ctx, uint8_t sta_id)
  *	false otherwise.
  */
 static bool roam_remove_ibss_station(struct hdd_adapter *adapter,
-				     uint8_t sta_id)
+				     uint8_t *mac_addr)
 {
 	bool successful = false;
 	int idx = 0;
@@ -3770,12 +3751,9 @@ static bool roam_remove_ibss_station(struct hdd_adapter *adapter,
 	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 
 	for (idx = 0; idx < MAX_PEERS; idx++) {
-		if (sta_id == sta_ctx->conn_info.sta_id[idx]) {
-			sta_ctx->conn_info.sta_id[idx] =
-						HDD_WLAN_INVALID_STA_ID;
-
-			qdf_zero_macaddr(&sta_ctx->conn_info.
-					 peer_macaddr[idx]);
+		if (WLAN_ADDR_EQ(mac_addr,
+				 sta_ctx->conn_info.peer_macaddr[idx].bytes)) {
+			qdf_zero_macaddr(&sta_ctx->conn_info.peer_macaddr[idx]);
 
 			successful = true;
 
@@ -3787,13 +3765,11 @@ static bool roam_remove_ibss_station(struct hdd_adapter *adapter,
 
 			empty_slots++;
 		} else {
-			if (sta_ctx->conn_info.sta_id[idx] !=
-					HDD_WLAN_INVALID_STA_ID) {
+			if (hdd_is_valid_mac_address(
+			    sta_ctx->conn_info.peer_macaddr[idx].bytes))
 				valid_idx = idx;
-			} else {
-				/* Found an empty slot */
+			else
 				empty_slots++;
-			}
 		}
 	}
 
@@ -3806,17 +3782,13 @@ static bool roam_remove_ibss_station(struct hdd_adapter *adapter,
 	/* Find next active sta_id, to have a valid sta trigger for TL. */
 	if (successful) {
 		if (del_idx == 0) {
-			if (sta_ctx->conn_info.sta_id[valid_idx] !=
-					HDD_WLAN_INVALID_STA_ID) {
-				sta_ctx->conn_info.sta_id[0] =
-					sta_ctx->conn_info.sta_id[valid_idx];
+			if (hdd_is_valid_mac_address(
+			    sta_ctx->conn_info.peer_macaddr[idx].bytes)) {
 				qdf_copy_macaddr(&sta_ctx->conn_info.
 						 peer_macaddr[0],
 						 &sta_ctx->conn_info.
 						 peer_macaddr[valid_idx]);
 
-				sta_ctx->conn_info.sta_id[valid_idx] =
-							HDD_WLAN_INVALID_STA_ID;
 				qdf_zero_macaddr(&sta_ctx->conn_info.
 						 peer_macaddr[valid_idx]);
 			}
@@ -3970,7 +3942,6 @@ roam_roam_connect_status_update_handler(struct hdd_adapter *adapter,
 
 		if (!hdd_save_peer
 			    (WLAN_HDD_GET_STATION_CTX_PTR(adapter),
-			    roam_info->staId,
 			    &roam_info->peerMac)) {
 			hdd_warn("Max reached: Can't register new IBSS peer");
 			break;
@@ -3982,7 +3953,6 @@ roam_roam_connect_status_update_handler(struct hdd_adapter *adapter,
 		/* Register the Station with datapath for the new peer. */
 		qdf_status = hdd_roam_register_sta(adapter,
 						   roam_info,
-						   roam_info->staId,
 						   roam_info->bss_desc);
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 			hdd_err("Cannot register STA for IBSS. qdf_status: %d [%08X]",
@@ -4041,7 +4011,8 @@ roam_roam_connect_status_update_handler(struct hdd_adapter *adapter,
 		struct hdd_station_ctx *sta_ctx =
 			WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 
-		if (!roam_remove_ibss_station(adapter, roam_info->staId))
+		if (!roam_remove_ibss_station(adapter,
+					      roam_info->peerMac.bytes))
 			hdd_warn("IBSS peer departed by cannot find peer in our registration table with TL");
 
 		hdd_debug("IBSS Peer Departed from SME "
@@ -4085,8 +4056,7 @@ roam_roam_connect_status_update_handler(struct hdd_adapter *adapter,
 
 #ifdef FEATURE_WLAN_TDLS
 QDF_STATUS hdd_roam_register_tdlssta(struct hdd_adapter *adapter,
-				     const uint8_t *peerMac, uint16_t sta_id,
-				     uint8_t qos)
+				     const uint8_t *peerMac, uint8_t qos)
 {
 	QDF_STATUS qdf_status = QDF_STATUS_E_FAILURE;
 	struct ol_txrx_desc_type txrx_desc = { 0 };
@@ -4109,10 +4079,12 @@ QDF_STATUS hdd_roam_register_tdlssta(struct hdd_adapter *adapter,
 	if (adapter->hdd_ctx->enable_dp_rx_threads) {
 		txrx_ops.rx.rx = hdd_rx_pkt_thread_enqueue_cbk;
 		txrx_ops.rx.rx_stack = hdd_rx_packet_cbk;
+		txrx_ops.rx.rx_flush = hdd_rx_flush_packet_cbk;
 		txrx_ops.rx.rx_gro_flush = hdd_rx_thread_gro_flush_ind_cbk;
 	} else {
 		txrx_ops.rx.rx = hdd_rx_packet_cbk;
 		txrx_ops.rx.rx_stack = NULL;
+		txrx_ops.rx.rx_flush = NULL;
 	}
 	txrx_vdev = cdp_get_vdev_from_vdev_id(soc,
 					      (struct cdp_pdev *)pdev,

@@ -513,7 +513,7 @@ void lim_fill_ft_session(struct mac_context *mac,
 	/* Copy The channel Id to the session Table */
 	bss_chan_id =
 		wlan_reg_freq_to_chan(mac->pdev, pbssDescription->chan_freq);
-	ft_session->limReassocChannelId = bss_chan_id;
+	ft_session->lim_reassoc_chan_freq = pbssDescription->chan_freq;
 	ft_session->curr_op_freq = pbssDescription->chan_freq;
 	ft_session->limRFBand = lim_get_rf_band(wlan_reg_freq_to_chan(
 					mac->pdev, ft_session->curr_op_freq));
@@ -741,7 +741,7 @@ bool lim_process_ft_update_key(struct mac_context *mac, uint32_t *msg_buf)
 
 		if (!pe_session->ftPEContext.pAddStaReq) {
 			pe_err("pAddStaReq is NULL");
-			lim_send_set_sta_key_req(mac, pMlmSetKeysReq, 0, 0,
+			lim_send_set_sta_key_req(mac, pMlmSetKeysReq, 0,
 						 pe_session, false);
 			pe_session->ftPEContext.PreAuthKeyInfo.
 			extSetStaKeyParamValid = false;
@@ -762,8 +762,6 @@ bool lim_process_ft_update_key(struct mac_context *mac, uint32_t *msg_buf)
 		pe_debug("Key valid: %d keyLength: %d",
 			pAddBssParams->extSetStaKeyParamValid,
 			pAddBssParams->extSetStaKeyParam.key[0].keyLength);
-
-		pAddBssParams->extSetStaKeyParam.staIdx = 0;
 
 		pe_debug("BSSID: " QDF_MAC_ADDR_STR,
 			       QDF_MAC_ADDR_ARRAY(pKeyInfo->bssid.bytes));
@@ -847,18 +845,20 @@ void lim_process_ft_aggr_qos_rsp(struct mac_context *mac,
 		if ((((1 << i) & pAggrQosRspMsg->tspecIdx)) &&
 		    (pAggrQosRspMsg->status[i] != QDF_STATUS_SUCCESS)) {
 			sir_copy_mac_addr(peerMacAddr, pe_session->bssId);
-			addTsParam.sta_idx = pAggrQosRspMsg->staIdx;
 			addTsParam.pe_session_id = pAggrQosRspMsg->sessionId;
 			addTsParam.tspec = pAggrQosRspMsg->tspec[i];
 			addTsParam.tspec_idx = pAggrQosRspMsg->tspecIdx;
-			lim_send_delts_req_action_frame(mac, peerMacAddr, rspReqd,
+			lim_send_delts_req_action_frame(mac, peerMacAddr,
+							rspReqd,
 							&addTsParam.tspec.tsinfo,
 							&addTsParam.tspec,
 							pe_session);
 			pSta =
-				dph_lookup_assoc_id(mac, addTsParam.sta_idx,
-						    &assocId,
-						    &pe_session->dph.dphHashTable);
+				dph_lookup_hash_entry(mac, peerMacAddr,
+						      &assocId,
+						      &pe_session->
+						      dph.dphHashTable);
+
 			if (pSta) {
 				lim_admit_control_delete_ts(mac, assocId,
 							    &addTsParam.tspec.
@@ -919,7 +919,6 @@ QDF_STATUS lim_process_ft_aggr_qos_req(struct mac_context *mac,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	pAggrAddTsParam->staIdx = pe_session->staId;
 	/* Fill in the sessionId specific to PE */
 	pAggrAddTsParam->sessionId = sessionId;
 	pAggrAddTsParam->tspecIdx = aggrQosReq->aggrInfo.tspecIdx;
