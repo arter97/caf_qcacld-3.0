@@ -323,145 +323,100 @@ static void csr_neighbor_roam_reset_init_state_control_info(struct mac_context *
 	csr_neighbor_roam_reset_report_scan_state_control_info(mac, sessionId);
 }
 
-/**
- * csr_neighbor_roam_prepare_scan_profile_filter()
- *
- * @mac_ctx: Pointer to Global MAC structure
- * @session_id: Session ID
- * @scan_filter: Populated scan filter based on the connected profile
- *
- * This function creates a scan filter based on the currently
- * connected profile. Based on this filter, scan results are obtained
- *
- * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_FAILURE otherwise
- */
-QDF_STATUS
-csr_neighbor_roam_prepare_scan_profile_filter(struct mac_context *mac,
-					      tCsrScanResultFilter *pScanFilter,
-					      uint8_t sessionId)
+#ifdef WLAN_FEATURE_11W
+static void
+csr_update_pmf_cap_from_connected_profile(tCsrRoamConnectedProfile *profile,
+					  struct scan_filter *filter)
 {
-	tpCsrNeighborRoamControlInfo nbr_roam_info =
-		&mac->roam.neighborRoamInfo[sessionId];
-	tCsrRoamConnectedProfile *pCurProfile =
-		&mac->roam.roamSession[sessionId].connectedProfile;
-	uint8_t i = 0;
-	struct roam_ext_params *roam_params;
-	uint8_t num_ch = 0;
+	if (profile->MFPCapable || profile->MFPEnabled)
+		filter->pmf_cap = WLAN_PMF_CAPABLE;
+	if (profile->MFPRequired)
+		filter->pmf_cap = WLAN_PMF_REQUIRED;
+}
+#else
+static inline void
+csr_update_pmf_cap_from_connected_profile(tCsrRoamConnectedProfile *profile,
+					  struct scan_filter *filter)
+{}
+#endif
 
-	QDF_ASSERT(pScanFilter);
-	if (!pScanFilter)
+QDF_STATUS
+csr_neighbor_roam_get_scan_filter_from_profile(struct mac_context *mac,
+					       struct scan_filter *filter,
+					       uint8_t vdev_id)
+{
+	tpCsrNeighborRoamControlInfo nbr_roam_info;
+	tCsrRoamConnectedProfile *profile;
+	struct roam_ext_params *roam_params;
+	tCsrChannelInfo *chan_info;
+	uint8_t num_ch = 0;
+	enum QDF_OPMODE opmode = QDF_STA_MODE;
+
+	if (!filter)
+		return QDF_STATUS_E_FAILURE;
+	if (!CSR_IS_SESSION_VALID(mac, vdev_id))
 		return QDF_STATUS_E_FAILURE;
 
-	qdf_mem_zero(pScanFilter, sizeof(tCsrScanResultFilter));
+	qdf_mem_zero(filter, sizeof(*filter));
+	nbr_roam_info = &mac->roam.neighborRoamInfo[vdev_id];
+	profile = &mac->roam.roamSession[vdev_id].connectedProfile;
 	roam_params = &mac->roam.configParam.roam_params;
-	/* We dont want to set BSSID based Filter */
-	pScanFilter->BSSIDs.numOfBSSIDs = 0;
-	pScanFilter->scan_filter_for_roam = 1;
+
 	/* only for HDD requested handoff fill in the BSSID in the filter */
 	if (nbr_roam_info->uOsRequestedHandoff) {
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
-			FL("OS Requested Handoff"));
-		pScanFilter->BSSIDs.numOfBSSIDs = 1;
-		pScanFilter->BSSIDs.bssid =
-			qdf_mem_malloc(sizeof(tSirMacAddr) *
-				       pScanFilter->BSSIDs.numOfBSSIDs);
-		if (!pScanFilter->BSSIDs.bssid)
-			return QDF_STATUS_E_NOMEM;
-
-		/* Populate the BSSID from handoff info received from HDD */
-		for (i = 0; i < pScanFilter->BSSIDs.numOfBSSIDs; i++) {
-			qdf_copy_macaddr(&pScanFilter->BSSIDs.bssid[i],
-				 &nbr_roam_info->handoffReqInfo.bssid);
-		}
+		sme_debug("OS Requested Handoff");
+		filter->num_of_bssid = 1;
+		qdf_mem_copy(filter->bssid_list[0].bytes,
+			     &nbr_roam_info->handoffReqInfo.bssid.bytes,
+			     QDF_MAC_ADDR_SIZE);
 	}
-	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
-		FL("No of Allowed SSID List:%d"),
-		roam_params->num_ssid_allowed_list);
+	sme_debug("No of Allowed SSID List:%d",
+		  roam_params->num_ssid_allowed_list);
+
 	if (roam_params->num_ssid_allowed_list) {
-		pScanFilter->SSIDs.numOfSSIDs =
-			roam_params->num_ssid_allowed_list;
-		pScanFilter->SSIDs.SSIDList =
-			qdf_mem_malloc(sizeof(tCsrSSIDInfo) *
-				pScanFilter->SSIDs.numOfSSIDs);
-		if (!pScanFilter->SSIDs.SSIDList) {
-			qdf_mem_free(pScanFilter->BSSIDs.bssid);
-			pScanFilter->BSSIDs.bssid = NULL;
-			return QDF_STATUS_E_NOMEM;
-		}
-
-		for (i = 0; i < roam_params->num_ssid_allowed_list; i++) {
-			pScanFilter->SSIDs.SSIDList[i].handoffPermitted = 1;
-			pScanFilter->SSIDs.SSIDList[i].ssidHidden = 0;
-			qdf_mem_copy((void *)
-				pScanFilter->SSIDs.SSIDList[i].SSID.ssId,
-				roam_params->ssid_allowed_list[i].ssId,
-				roam_params->ssid_allowed_list[i].length);
-			pScanFilter->SSIDs.SSIDList[i].SSID.length =
-				roam_params->ssid_allowed_list[i].length;
-		}
+		csr_copy_ssids_from_roam_params(roam_params, filter);
 	} else {
-		/* Populate all the information from the connected profile */
-		pScanFilter->SSIDs.numOfSSIDs = 1;
-		pScanFilter->SSIDs.SSIDList =
-			qdf_mem_malloc(sizeof(tCsrSSIDInfo));
-		if (!pScanFilter->SSIDs.SSIDList) {
-			qdf_mem_free(pScanFilter->BSSIDs.bssid);
-			pScanFilter->BSSIDs.bssid = NULL;
-			return QDF_STATUS_E_NOMEM;
-		}
+		filter->num_of_ssid = 1;
 
-		pScanFilter->SSIDs.SSIDList->handoffPermitted = 1;
-		pScanFilter->SSIDs.SSIDList->ssidHidden = 0;
-		pScanFilter->SSIDs.SSIDList->SSID.length =
-			pCurProfile->SSID.length;
-		qdf_mem_copy((void *)pScanFilter->SSIDs.SSIDList->SSID.ssId,
-			(void *)pCurProfile->SSID.ssId,
-			pCurProfile->SSID.length);
+		filter->ssid_list[0].length = profile->SSID.length;
+		if (filter->ssid_list[0].length > WLAN_SSID_MAX_LEN)
+			filter->ssid_list[0].length = WLAN_SSID_MAX_LEN;
+		qdf_mem_copy(filter->ssid_list[0].ssid,
+			     profile->SSID.ssId,
+			     filter->ssid_list[0].length);
 
 		sme_debug("Filtering for SSID %.*s,length of SSID = %u",
-			pScanFilter->SSIDs.SSIDList->SSID.length,
-			pScanFilter->SSIDs.SSIDList->SSID.ssId,
-			pScanFilter->SSIDs.SSIDList->SSID.length);
+			  filter->ssid_list[0].length,
+			  filter->ssid_list[0].ssid,
+			  filter->ssid_list[0].length);
 	}
-	pScanFilter->authType.numEntries = 1;
-	pScanFilter->authType.authType[0] = pCurProfile->AuthType;
 
-	pScanFilter->EncryptionType.numEntries = 1;     /* This must be 1 */
-	pScanFilter->EncryptionType.encryptionType[0] =
-		pCurProfile->EncryptionType;
+	filter->num_of_auth = 1;
+	filter->auth_type[0] = csr_covert_auth_type_new(profile->AuthType);
+	filter->num_of_enc_type = 1;
+	filter->enc_type[0] =
+		csr_covert_enc_type_new(profile->EncryptionType);
+	filter->num_of_mc_enc_type = 1;
+	filter->mc_enc_type[0] =
+		csr_covert_enc_type_new(profile->mcEncryptionType);
 
-	pScanFilter->mcEncryptionType.numEntries = 1;
-	pScanFilter->mcEncryptionType.encryptionType[0] =
-		pCurProfile->mcEncryptionType;
+	if (profile->BSSType == eCSR_BSS_TYPE_INFRASTRUCTURE)
+		filter->bss_type = WLAN_TYPE_BSS;
+	else if (profile->BSSType == eCSR_BSS_TYPE_IBSS ||
+		 profile->BSSType == eCSR_BSS_TYPE_START_IBSS)
+		filter->bss_type = WLAN_TYPE_IBSS;
+	else
+		filter->bss_type = WLAN_TYPE_ANY;
 
-	pScanFilter->BSSType = pCurProfile->BSSType;
-
-	num_ch =
-	    nbr_roam_info->roamChannelInfo.currentChannelListInfo.numOfChannels;
+	chan_info = &nbr_roam_info->roamChannelInfo.currentChannelListInfo;
+	num_ch = chan_info->numOfChannels;
 	if (num_ch) {
-		/*
-		 * We are intrested only in the scan results on channels we
-		 * scanned
-		 */
-		pScanFilter->ChannelInfo.numOfChannels = num_ch;
-		pScanFilter->ChannelInfo.freq_list =
-			qdf_mem_malloc(num_ch * sizeof(uint32_t));
-		if (!pScanFilter->ChannelInfo.freq_list) {
-			pScanFilter->ChannelInfo.numOfChannels = 0;
-			qdf_mem_free(pScanFilter->BSSIDs.bssid);
-			pScanFilter->BSSIDs.bssid = NULL;
-			qdf_mem_free(pScanFilter->SSIDs.SSIDList);
-			pScanFilter->SSIDs.SSIDList = NULL;
-			return QDF_STATUS_E_NOMEM;
-		}
-		for (i = 0; i < pScanFilter->ChannelInfo.numOfChannels; i++) {
-			pScanFilter->ChannelInfo.freq_list[i] =
-				nbr_roam_info->roamChannelInfo.
-				currentChannelListInfo.freq_list[i];
-		}
-	} else {
-		pScanFilter->ChannelInfo.numOfChannels = 0;
-		pScanFilter->ChannelInfo.freq_list = NULL;
+		filter->num_of_channels = num_ch;
+		if (filter->num_of_channels > QDF_MAX_NUM_CHAN)
+			filter->num_of_channels = QDF_MAX_NUM_CHAN;
+		sme_freq_to_chan_list(mac->pdev, filter->channel_list,
+				      chan_info->freq_list,
+				      filter->num_of_channels);
 	}
 
 	if (nbr_roam_info->is11rAssoc)
@@ -469,13 +424,12 @@ csr_neighbor_roam_prepare_scan_profile_filter(struct mac_context *mac,
 		 * MDIE should be added as a part of profile. This should be
 		 * added as a part of filter as well
 		 */
-		pScanFilter->mdid = pCurProfile->mdid;
+		filter->mobility_domain = profile->mdid.mobility_domain;
 
-#ifdef WLAN_FEATURE_11W
-	pScanFilter->MFPEnabled = pCurProfile->MFPEnabled;
-	pScanFilter->MFPRequired = pCurProfile->MFPRequired;
-	pScanFilter->MFPCapable = pCurProfile->MFPCapable;
-#endif
+	csr_update_pmf_cap_from_connected_profile(profile, filter);
+
+	csr_update_connect_n_roam_cmn_filter(mac, filter, opmode);
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -497,9 +451,9 @@ enum band_info csr_get_rf_band(uint8_t channel)
  *
  * @mac_ctx: Pointer to Global MAC structure
  * @session_id: Session ID
- * @input_ch_list: The input channel list
+ * @input_chan_freq_list: The input channel list
  * @input_num_of_ch: The number of channels in input channel list
- * @output_ch_list: The output channel list
+ * @out_chan_freq_list: The output channel list
  * @output_num_of_ch: The number of channels in output channel list
  * @merged_output_num_of_ch: The final number of channels in the
  *				output channel list.
@@ -512,22 +466,22 @@ enum band_info csr_get_rf_band(uint8_t channel)
 QDF_STATUS csr_neighbor_roam_channels_filter_by_current_band(struct mac_context *
 						mac,
 						uint8_t sessionId,
-						uint8_t *pInputChannelList,
+						uint32_t *input_chan_freq_list,
 						uint8_t inputNumOfChannels,
-						uint8_t *pOutputChannelList,
+						uint32_t *out_chan_freq_list,
 						uint8_t *
 						pMergedOutputNumOfChannels)
 {
 	uint8_t i = 0;
 	uint8_t numChannels = 0;
-	uint8_t currAPoperationChannel =
-		mac->roam.neighborRoamInfo[sessionId].currAPoperationChannel;
+	uint32_t curr_ap_op_chan_freq =
+		mac->roam.neighborRoamInfo[sessionId].curr_ap_op_chan_freq;
 	/* Check for NULL pointer */
-	if (!pInputChannelList)
+	if (!input_chan_freq_list)
 		return QDF_STATUS_E_INVAL;
 
 	/* Check for NULL pointer */
-	if (!pOutputChannelList)
+	if (!out_chan_freq_list)
 		return QDF_STATUS_E_INVAL;
 
 	if (inputNumOfChannels > CFG_VALID_CHANNEL_LIST_LEN) {
@@ -537,9 +491,11 @@ QDF_STATUS csr_neighbor_roam_channels_filter_by_current_band(struct mac_context 
 		return QDF_STATUS_E_INVAL;
 	}
 	for (i = 0; i < inputNumOfChannels; i++) {
-		if (csr_get_rf_band(currAPoperationChannel) ==
-		    csr_get_rf_band(pInputChannelList[i])) {
-			pOutputChannelList[numChannels] = pInputChannelList[i];
+		if (WLAN_REG_IS_SAME_BAND_FREQS(
+				curr_ap_op_chan_freq,
+				input_chan_freq_list[i])) {
+			out_chan_freq_list[numChannels] =
+				input_chan_freq_list[i];
 			numChannels++;
 		}
 	}
@@ -557,7 +513,7 @@ QDF_STATUS csr_neighbor_roam_channels_filter_by_current_band(struct mac_context 
  * @pinput_chan_freq_list: The additional channels to merge in
  *          to the "merged" channels list.
  * @input_num_of_ch: The number of additional channels.
- * @output_ch_list: The place to put the "merged" channel list.
+ * @out_chan_freq_list: The place to put the "merged" channel list.
  * @output_num_of_ch: The original number of channels in the
  *			"merged" channels list.
  * @merged_output_num_of_ch: The final number of channels in the
@@ -573,7 +529,7 @@ QDF_STATUS csr_neighbor_roam_channels_filter_by_current_band(struct mac_context 
 QDF_STATUS csr_neighbor_roam_merge_channel_lists(struct mac_context *mac,
 						 uint32_t *pinput_chan_freq_list,
 						 uint8_t inputNumOfChannels,
-						 uint8_t *pOutputChannelList,
+						 uint32_t *out_chan_freq_list,
 						 uint8_t outputNumOfChannels,
 						 uint8_t *
 						 pMergedOutputNumOfChannels)
@@ -587,7 +543,7 @@ QDF_STATUS csr_neighbor_roam_merge_channel_lists(struct mac_context *mac,
 		return QDF_STATUS_E_INVAL;
 
 	/* Check for NULL pointer */
-	if (!pOutputChannelList)
+	if (!out_chan_freq_list)
 		return QDF_STATUS_E_INVAL;
 
 	if (inputNumOfChannels > CFG_VALID_CHANNEL_LIST_LEN) {
@@ -607,8 +563,8 @@ QDF_STATUS csr_neighbor_roam_merge_channel_lists(struct mac_context *mac,
 	 */
 	for (i = 0; i < inputNumOfChannels; i++) {
 		for (j = 0; j < outputNumOfChannels; j++) {
-			if (wlan_reg_freq_to_chan(mac->pdev, pinput_chan_freq_list[i])
-				== pOutputChannelList[j])
+			if (pinput_chan_freq_list[i]
+				== out_chan_freq_list[j])
 				break;
 		}
 		if (j == outputNumOfChannels) {
@@ -617,8 +573,8 @@ QDF_STATUS csr_neighbor_roam_merge_channel_lists(struct mac_context *mac,
 					  QDF_TRACE_LEVEL_DEBUG,
 					  "%s: [INFOLOG] Adding extra %d to Neighbor channel list",
 					  __func__, pinput_chan_freq_list[i]);
-				pOutputChannelList[numChannels] =
-					wlan_reg_freq_to_chan(mac->pdev, pinput_chan_freq_list[i]);
+				out_chan_freq_list[numChannels] =
+					pinput_chan_freq_list[i];
 				numChannels++;
 			}
 		}
@@ -950,8 +906,6 @@ static void csr_neighbor_roam_info_ctx_init(struct mac_context *mac,
 		&mac->roam.neighborRoamInfo[session_id];
 	struct csr_roam_session *session = &mac->roam.roamSession[session_id];
 	int init_ft_flag = false;
-	bool supplicant_disabled_roaming;
-	uint8_t reason;
 
 	csr_init_occupied_channels_list(mac, session_id);
 	csr_neighbor_roam_state_transition(mac,
@@ -959,9 +913,8 @@ static void csr_neighbor_roam_info_ctx_init(struct mac_context *mac,
 
 	qdf_copy_macaddr(&ngbr_roam_info->currAPbssid,
 			&session->connectedProfile.bssid);
-	ngbr_roam_info->currAPoperationChannel =
-		wlan_reg_freq_to_chan(mac->pdev,
-				      session->connectedProfile.op_freq);
+	ngbr_roam_info->curr_ap_op_chan_freq =
+				      session->connectedProfile.op_freq;
 	ngbr_roam_info->currentNeighborLookupThreshold =
 		ngbr_roam_info->cfgParams.neighborLookupThreshold;
 	ngbr_roam_info->currentOpportunisticThresholdDiff =
@@ -1041,26 +994,10 @@ static void csr_neighbor_roam_info_ctx_init(struct mac_context *mac,
 		} else
 #endif
 		{
-			/*
-			 * If supplicant disabled roaming, driver does not send
-			 * RSO cmd to fw. This causes roam invoke to fail in FW
-			 * since RSO start never happened at least once to
-			 * configure roaming engine in FW.
-			 */
 			csr_post_roam_state_change(mac, session_id,
 						   ROAM_RSO_STARTED,
 						   REASON_CTX_INIT);
 
-			supplicant_disabled_roaming =
-				mlme_get_supplicant_disabled_roaming(
-						mac->psoc, session_id);
-			if (supplicant_disabled_roaming) {
-				reason = REASON_SUPPLICANT_DISABLED_ROAMING;
-				sme_debug("ROAM: Supplicant has disabled roaming");
-				csr_post_roam_state_change(mac, session_id,
-							   ROAM_RSO_STOPPED,
-							   reason);
-			}
 		}
 	}
 }
@@ -1256,6 +1193,10 @@ QDF_STATUS csr_neighbor_roam_init(struct mac_context *mac, uint8_t sessionId)
 		mac->mlme_cfg->lfr.roam_full_scan_period;
 	pNeighborRoamInfo->cfgParams.enable_scoring_for_roam =
 		mac->mlme_cfg->scoring.enable_scoring_for_roam;
+	pNeighborRoamInfo->cfgParams.roam_scan_n_probes =
+		mac->mlme_cfg->lfr.roam_scan_n_probes;
+	pNeighborRoamInfo->cfgParams.roam_scan_home_away_time =
+		mac->mlme_cfg->lfr.roam_scan_home_away_time;
 	pNeighborRoamInfo->cfgParams.roam_scan_inactivity_time =
 		mac->mlme_cfg->lfr.roam_scan_inactivity_time;
 	pNeighborRoamInfo->cfgParams.roam_inactive_data_packet_count =
@@ -1466,7 +1407,7 @@ static QDF_STATUS csr_neighbor_roam_process_handoff_req(
 	uint8_t i = 0;
 	uint8_t roam_now = 0;
 	uint8_t roamable_ap_count = 0;
-	tCsrScanResultFilter    scan_filter;
+	struct scan_filter *scan_filter;
 	tScanResultHandle       scan_result;
 
 	if (!session) {
@@ -1526,17 +1467,22 @@ static QDF_STATUS csr_neighbor_roam_process_handoff_req(
 	 */
 	if (roam_ctrl_info->handoffReqInfo.src == CONNECT_CMD_USERSPACE) {
 		sme_debug("Connect cmd with bssid within same ESS");
-		status = csr_neighbor_roam_prepare_scan_profile_filter(mac_ctx,
-								&scan_filter,
+		scan_filter = qdf_mem_malloc(sizeof(*scan_filter));
+		if (!scan_filter) {
+			status = QDF_STATUS_E_NOMEM;
+			goto end;
+		}
+		status = csr_neighbor_roam_get_scan_filter_from_profile(mac_ctx,
+								scan_filter,
 								session_id);
 		sme_debug("Filter creation status: %d", status);
-		status = csr_scan_get_result(mac_ctx, &scan_filter,
+		status = csr_scan_get_result(mac_ctx, scan_filter,
 					     &scan_result);
+		qdf_mem_free(scan_filter);
 		csr_neighbor_roam_process_scan_results(mac_ctx, session_id,
 							&scan_result);
 		roamable_ap_count = csr_ll_count(
 					&roam_ctrl_info->roamableAPList);
-		csr_free_scan_filter(mac_ctx, &scan_filter);
 		sme_debug("roam_now=%d, roamable_ap_count=%d",
 			roam_now, roamable_ap_count);
 	}
@@ -1652,8 +1598,7 @@ QDF_STATUS csr_neighbor_roam_handoff_req_hdlr(
 		sme_err("Received req has same BSSID as current AP!!");
 		return QDF_STATUS_E_FAILURE;
 	}
-	roam_ctrl_info->handoffReqInfo.ch_freq =
-		wlan_reg_chan_to_freq(mac_ctx->pdev, handoff_req->channel);
+	roam_ctrl_info->handoffReqInfo.ch_freq = handoff_req->ch_freq;
 	roam_ctrl_info->handoffReqInfo.src =
 		handoff_req->handoff_src;
 	qdf_mem_copy(&roam_ctrl_info->handoffReqInfo.bssid.bytes,

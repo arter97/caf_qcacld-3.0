@@ -89,6 +89,19 @@ QDF_STATUS hdd_init_tx_rx(struct hdd_adapter *adapter);
 QDF_STATUS hdd_deinit_tx_rx(struct hdd_adapter *adapter);
 
 /**
+ * hdd_rx_flush_packet_cbk() - flush rx packet handler
+ * @adapter_context: pointer to HDD adapter context
+ * @vdev_id: vdev_id of the packets to be flushed
+ *
+ * Flush rx packet callback registered with data path. DP will call this to
+ * notify HDD when packets for a particular vdev is to be flushed out.
+ *
+ * Return: QDF_STATUS_E_FAILURE if any errors encountered,
+ *	   QDF_STATUS_SUCCESS otherwise
+ */
+QDF_STATUS hdd_rx_flush_packet_cbk(void *adapter_context, uint8_t vdev_id);
+
+/**
  * hdd_rx_packet_cbk() - Receive packet handler
  * @adapter_context: pointer to HDD adapter context
  * @rxBuf: pointer to rx qdf_nbuf
@@ -167,18 +180,6 @@ void hdd_disable_rx_ol_in_concurrency(bool disable);
  * Return: none
  */
 void hdd_disable_rx_ol_for_low_tput(struct hdd_context *hdd_ctx, bool disable);
-
-/**
- * hdd_get_peer_sta_id() - Get the StationID using the Peer Mac address
- * @sta_ctx: pointer to HDD Station Context
- * @mac_address: pointer to Peer Mac address
- * @sta_id: pointer to returned Station Index
- *
- * Return: QDF_STATUS_SUCCESS/QDF_STATUS_E_FAILURE
- */
-QDF_STATUS hdd_get_peer_sta_id(struct hdd_station_ctx *sta_ctx,
-			       struct qdf_mac_addr *mac_address,
-			       uint8_t *sta_id);
 
 /**
  * hdd_reset_all_adapters_connectivity_stats() - reset connectivity stats

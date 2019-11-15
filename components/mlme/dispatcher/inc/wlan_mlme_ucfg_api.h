@@ -1421,7 +1421,7 @@ QDF_STATUS ucfg_mlme_set_sap_get_peer_info(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * ucfg_mlme_is_sap_bcast_deauth_enabled() - get the sap bcast deauth
+ * ucfg_mlme_get_sap_bcast_deauth_enabled() - get the sap bcast deauth
  *                                           enabled value
  * @psoc: pointer to psoc object
  * @value: Value that needs to be get from the caller
@@ -1431,10 +1431,10 @@ QDF_STATUS ucfg_mlme_set_sap_get_peer_info(struct wlan_objmgr_psoc *psoc,
  * Return: QDF Status
  */
 static inline QDF_STATUS
-ucfg_mlme_is_sap_bcast_deauth_enabled(struct wlan_objmgr_psoc *psoc,
-				      bool *value)
+ucfg_mlme_get_sap_bcast_deauth_enabled(struct wlan_objmgr_psoc *psoc,
+				       bool *value)
 {
-	return wlan_mlme_is_sap_bcast_deauth_enabled(psoc, value);
+	return wlan_mlme_get_sap_bcast_deauth_enabled(psoc, value);
 }
 
 /**
@@ -2607,19 +2607,6 @@ static inline QDF_STATUS
 ucfg_mlme_set_11d_enabled(struct wlan_objmgr_psoc *psoc, bool value)
 {
 	return wlan_mlme_set_11d_enabled(psoc, value);
-}
-
-/**
- * ucfg_mlme_is_change_channel_bandwidth_enabled() - ucfg api to get the
- * enable_change_channel_bandwidth flag
- * @psoc: psoc context
- *
- * Return: true if enabled
- */
-static inline bool
-ucfg_mlme_is_change_channel_bandwidth_enabled(struct wlan_objmgr_psoc *psoc)
-{
-	return wlan_mlme_is_change_channel_bandwidth_enabled(psoc);
 }
 
 /**
@@ -3920,4 +3907,19 @@ bool ucfg_mlme_validate_full_roam_scan_period(uint32_t full_roam_scan_period);
  * Return: True if roam_scan_period is in expected range, false otherwise.
  */
 bool ucfg_mlme_validate_scan_period(uint32_t roam_scan_period);
+/**
+ * ucfg_mlme_get_ignore_fw_reg_offload_ind() - Get the
+ * ignore_fw_reg_offload_ind ini
+ * @psoc: pointer to psoc object
+ * @disabled: output pointer to hold user config
+ *
+ * Return: QDF Status
+ */
+static inline QDF_STATUS
+ucfg_mlme_get_ignore_fw_reg_offload_ind(struct wlan_objmgr_psoc *psoc,
+					bool *disabled)
+{
+	return wlan_mlme_get_ignore_fw_reg_offload_ind(psoc, disabled);
+}
+
 #endif /* _WLAN_MLME_UCFG_API_H_ */

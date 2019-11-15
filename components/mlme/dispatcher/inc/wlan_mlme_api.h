@@ -555,7 +555,7 @@ QDF_STATUS wlan_mlme_set_sap_get_peer_info(struct wlan_objmgr_psoc *psoc,
 					   bool value);
 
 /**
- * wlan_mlme_is_sap_bcast_deauth_enabled() - get the enable/disable value
+ * wlan_mlme_get_sap_bcast_deauth_enabled() - get the enable/disable value
  *                                           for broadcast deauth in sap
  * @psoc: pointer to psoc object
  * @value: Value that needs to get from the caller
@@ -563,8 +563,8 @@ QDF_STATUS wlan_mlme_set_sap_get_peer_info(struct wlan_objmgr_psoc *psoc,
  * Return: QDF Status
  */
 QDF_STATUS
-wlan_mlme_is_sap_bcast_deauth_enabled(struct wlan_objmgr_psoc *psoc,
-				      bool *value);
+wlan_mlme_get_sap_bcast_deauth_enabled(struct wlan_objmgr_psoc *psoc,
+				       bool *value);
 
 /**
  * wlan_mlme_get_sap_allow_all_channels() - get the value of sap allow all
@@ -2037,16 +2037,6 @@ QDF_STATUS
 wlan_mlme_set_11d_enabled(struct wlan_objmgr_psoc *psoc, bool value);
 
 /**
- * wlan_mlme_is_change_channel_bandwidth_enabled() - get the
- * enable_change_channel_bandwidth flag
- * @psoc: psoc context
- *
- * Return: true if enabled
- */
-bool
-wlan_mlme_is_change_channel_bandwidth_enabled(struct wlan_objmgr_psoc *psoc);
-
-/**
  * wlan_mlme_get_sta_miracast_mcc_rest_time() - Get STA/MIRACAST MCC rest time
  *
  * @psoc: pointer to psoc object
@@ -2257,4 +2247,15 @@ mlme_get_peer_phymode(struct wlan_objmgr_psoc *psoc, uint8_t *mac,
  */
 QDF_STATUS mlme_set_tgt_wpa3_roam_cap(struct wlan_objmgr_psoc *psoc,
 				      uint32_t akm_bitmap);
+/**
+ * wlan_mlme_get_ignore_fw_reg_offload_ind() - Get the
+ * ignore_fw_reg_offload_ind ini
+ * @psoc: pointer to psoc object
+ * @disabled: output pointer to hold user config
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_get_ignore_fw_reg_offload_ind(struct wlan_objmgr_psoc *psoc,
+					bool *disabled);
 #endif /* _WLAN_MLME_API_H_ */

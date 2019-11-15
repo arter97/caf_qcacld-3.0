@@ -203,15 +203,15 @@ static void lim_handle_join_rsp_status(struct mac_context *mac_ctx,
 			sme_join_rsp->beaconLength);
 	}
 
-	if (session_entry->assocReq) {
+	if (session_entry->assoc_req) {
 		sme_join_rsp->assocReqLength =
 			session_entry->assocReqLen;
 		qdf_mem_copy(sme_join_rsp->frames +
 			     sme_join_rsp->beaconLength,
-			     session_entry->assocReq,
+			     session_entry->assoc_req,
 			     sme_join_rsp->assocReqLength);
-		qdf_mem_free(session_entry->assocReq);
-		session_entry->assocReq = NULL;
+		qdf_mem_free(session_entry->assoc_req);
+		session_entry->assoc_req = NULL;
 		session_entry->assocReqLen = 0;
 		pe_debug("AssocReq: %d",
 			sme_join_rsp->assocReqLength);
@@ -325,9 +325,9 @@ static void lim_handle_join_rsp_status(struct mac_context *mac_ctx,
 			session_entry->beacon = NULL;
 			session_entry->bcnLen = 0;
 		}
-		if (session_entry->assocReq) {
-			qdf_mem_free(session_entry->assocReq);
-			session_entry->assocReq = NULL;
+		if (session_entry->assoc_req) {
+			qdf_mem_free(session_entry->assoc_req);
+			session_entry->assoc_req = NULL;
 			session_entry->assocReqLen = 0;
 		}
 		if (session_entry->assocRsp) {
@@ -443,8 +443,6 @@ void lim_send_sme_join_reassoc_rsp(struct mac_context *mac_ctx,
 			if (!sta_ds) {
 				pe_err("Get Self Sta Entry fail");
 			} else {
-				/* Pass the peer's staId */
-				sme_join_rsp->staId = sta_ds->staIndex;
 				sme_join_rsp->timingMeasCap =
 					sta_ds->timingMeasCap;
 #ifdef FEATURE_WLAN_TDLS
@@ -598,8 +596,6 @@ void lim_send_sme_start_bss_rsp(struct mac_context *mac,
 	pSirSmeRsp->length = size;
 	pSirSmeRsp->sessionId = smesessionId;
 	pSirSmeRsp->status_code = resultCode;
-	if (pe_session)
-		pSirSmeRsp->staId = pe_session->staId;       /* else it will be always zero smeRsp StaID = 0 */
 
 	mmhMsg.type = msgType;
 	mmhMsg.bodyptr = pSirSmeRsp;
@@ -815,8 +811,6 @@ lim_send_sme_disassoc_ind(struct mac_context *mac, tpDphHashNode sta,
 	qdf_mem_copy(pSirSmeDisassocInd->peer_macaddr.bytes, sta->staAddr,
 		     QDF_MAC_ADDR_SIZE);
 
-	pSirSmeDisassocInd->staId = sta->staIndex;
-
 	mmhMsg.type = eWNI_SME_DISASSOC_IND;
 	mmhMsg.bodyptr = pSirSmeDisassocInd;
 	mmhMsg.bodyval = 0;
@@ -875,7 +869,6 @@ lim_send_sme_deauth_ind(struct mac_context *mac, tpDphHashNode sta,
 		     QDF_MAC_ADDR_SIZE);
 	pSirSmeDeauthInd->reasonCode = sta->mlmStaContext.disassocReason;
 
-	pSirSmeDeauthInd->staId = sta->staIndex;
 	if (eSIR_MAC_PEER_STA_REQ_LEAVING_BSS_REASON ==
 		sta->mlmStaContext.disassocReason)
 		pSirSmeDeauthInd->rssi = sta->del_sta_ctx_rssi;
@@ -1401,7 +1394,6 @@ void lim_send_sme_pe_ese_tsm_rsp(struct mac_context *mac,
 void
 lim_send_sme_ibss_peer_ind(struct mac_context *mac,
 			   tSirMacAddr peerMacAddr,
-			   uint16_t staIndex,
 			   uint8_t *beacon,
 			   uint16_t beaconLen, uint16_t msgType, uint8_t sessionId)
 {
@@ -1414,7 +1406,6 @@ lim_send_sme_ibss_peer_ind(struct mac_context *mac,
 
 	qdf_mem_copy((uint8_t *) pNewPeerInd->peer_addr.bytes,
 		     peerMacAddr, QDF_MAC_ADDR_SIZE);
-	pNewPeerInd->staId = staIndex;
 	pNewPeerInd->mesgLen = sizeof(tSmeIbssPeerInd) + beaconLen;
 	pNewPeerInd->mesgType = msgType;
 	pNewPeerInd->sessionId = sessionId;

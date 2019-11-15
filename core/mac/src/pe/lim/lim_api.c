@@ -636,24 +636,18 @@ static bool is_mgmt_protected(uint32_t vdev_id,
 		return false;
 	}
 
-	if (LIM_IS_AP_ROLE(session)) {
-		sta_ds = dph_lookup_hash_entry(mac_ctx,
-					       (uint8_t *)peer_mac_addr, &aid,
-					       &session->dph.dphHashTable);
-		if (sta_ds) {
-			/* rmfenabled will be set at the time of addbss.
-			 * but sometimes EAP auth fails and keys are not
-			 * installed then if we send any management frame
-			 * like deauth/disassoc with this bit set then
-			 * firmware crashes. so check for keys are
-			 * installed or not also before setting the bit
-			 */
-			if (sta_ds->rmfEnabled && sta_ds->is_key_installed)
-				protected = true;
-		}
-	} else if (session->limRmfEnabled &&
-		   session->is_key_installed) {
-		protected = true;
+	sta_ds = dph_lookup_hash_entry(mac_ctx, (uint8_t *)peer_mac_addr, &aid,
+				       &session->dph.dphHashTable);
+	if (sta_ds) {
+		/* rmfenabled will be set at the time of addbss.
+		 * but sometimes EAP auth fails and keys are not
+		 * installed then if we send any management frame
+		 * like deauth/disassoc with this bit set then
+		 * firmware crashes. so check for keys are
+		 * installed or not also before setting the bit
+		 */
+		if (sta_ds->rmfEnabled && sta_ds->is_key_installed)
+			protected = true;
 	}
 
 	return protected;
@@ -1318,26 +1312,11 @@ void pe_register_callbacks_with_wma(struct mac_context *mac,
 		pe_err("Registering roaming callbacks with WMA failed");
 }
 
-/**
- *\brief lim_received_hb_handler()
- *
- * This function is called by sch_beacon_process() upon
- * receiving a Beacon on STA. This also gets called upon
- * receiving Probe Response after heat beat failure is
- * detected.
- *
- * param mac - global mac structure
- * param channel - channel number indicated in Beacon, Probe Response
- * return - none
- */
-
 void
-lim_received_hb_handler(struct mac_context *mac, uint8_t channelId,
+lim_received_hb_handler(struct mac_context *mac, uint32_t chan_freq,
 			struct pe_session *pe_session)
 {
-	if (channelId == 0 ||
-	    channelId == wlan_reg_freq_to_chan(mac->pdev,
-					       pe_session->curr_op_freq))
+	if (chan_freq == 0 || chan_freq == pe_session->curr_op_freq)
 		pe_session->LimRxedBeaconCntDuringHB++;
 
 	pe_session->pmmOffloadInfo.bcnmiss = false;
@@ -1448,8 +1427,7 @@ lim_handle_ibss_coalescing(struct mac_context *mac,
 	 */
 	if ((!pBeacon->capabilityInfo.ibss) ||
 	    lim_cmp_ssid(&pBeacon->ssId, pe_session) ||
-	    (wlan_reg_freq_to_chan(mac->pdev, pe_session->curr_op_freq)
-	     != pBeacon->channelNumber))
+	    (pe_session->curr_op_freq != pBeacon->chan_freq))
 		retCode = QDF_STATUS_E_INVAL;
 	else if (lim_ibss_enc_type_matched(pBeacon, pe_session) != true) {
 		pe_debug("peer privacy: %d peer wpa: %d peer rsn: %d self encType: %d",
@@ -1583,13 +1561,13 @@ lim_detect_change_in_ap_capabilities(struct mac_context *mac,
 {
 	uint8_t len;
 	struct ap_new_caps apNewCaps;
-	uint8_t newChannel;
+	uint32_t new_chan_freq;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	bool security_caps_matched = true;
 
 	apNewCaps.capabilityInfo =
 		lim_get_u16((uint8_t *) &pBeacon->capabilityInfo);
-	newChannel = (uint8_t) pBeacon->channelNumber;
+	new_chan_freq = pBeacon->chan_freq;
 
 	security_caps_matched = lim_enc_type_matched(mac, pBeacon,
 						     pe_session);
@@ -1602,9 +1580,8 @@ lim_detect_change_in_ap_capabilities(struct mac_context *mac,
 	       SIR_MAC_GET_PRIVACY(pe_session->limCurrentBssCaps)) ||
 	      (SIR_MAC_GET_QOS(apNewCaps.capabilityInfo) !=
 	       SIR_MAC_GET_QOS(pe_session->limCurrentBssCaps)) ||
-	      ((newChannel != wlan_reg_freq_to_chan(
-				mac->pdev, pe_session->curr_op_freq)) &&
-		(newChannel != 0)) ||
+	      ((new_chan_freq != pe_session->curr_op_freq) &&
+		(new_chan_freq != 0)) ||
 	      (false == security_caps_matched)
 	     ))) {
 		if (false == pe_session->fWaitForProbeRsp) {
@@ -1642,12 +1619,9 @@ lim_detect_change_in_ap_capabilities(struct mac_context *mac,
 
 		qdf_mem_copy(apNewCaps.bssId.bytes,
 			     pe_session->bssId, QDF_MAC_ADDR_SIZE);
-		if (newChannel != wlan_reg_freq_to_chan(
-				mac->pdev, pe_session->curr_op_freq)) {
-			pe_err("Channel Change from %d --> %d Ignoring beacon!",
-				wlan_reg_freq_to_chan(
-					mac->pdev, pe_session->curr_op_freq),
-					newChannel);
+		if (new_chan_freq != pe_session->curr_op_freq) {
+			pe_err("Channel freq Change from %d --> %d Ignoring beacon!",
+			       pe_session->curr_op_freq, new_chan_freq);
 			return;
 		}
 
@@ -1895,7 +1869,7 @@ lim_roam_gen_mbssid_beacon(struct mac_context *mac,
 	bcn_prb_ptr = (uint8_t *)roam_ind +
 				roam_ind->beaconProbeRespOffset;
 
-	rx_param.channel = wlan_freq_to_chan(roam_ind->chan_freq);
+	rx_param.chan_freq = roam_ind->chan_freq;
 	rx_param.pdev_id = wlan_objmgr_pdev_get_pdev_id(mac->pdev);
 	rx_param.rssi = roam_ind->rssi;
 
@@ -2147,10 +2121,12 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 	bss_desc_ptr->fProbeRsp = !roam_synch_ind_ptr->isBeacon;
 	/* Copy Timestamp */
 	bss_desc_ptr->scansystimensec = qdf_get_monotonic_boottime_ns();
-	if (parsed_frm_ptr->dsParamsPresent) {
-		bss_desc_ptr->chan_freq =
-			wlan_reg_chan_to_freq(mac->pdev,
-					      parsed_frm_ptr->channelNumber);
+	if (parsed_frm_ptr->he_op.oper_info_6g_present) {
+		bss_desc_ptr->chan_freq = wlan_reg_chan_band_to_freq(mac->pdev,
+						parsed_frm_ptr->he_op.oper_info_6g.info.primary_ch,
+						BIT(REG_BAND_6G));
+	} else if (parsed_frm_ptr->dsParamsPresent) {
+		bss_desc_ptr->chan_freq = parsed_frm_ptr->chan_freq;
 	} else if (parsed_frm_ptr->HTInfo.present) {
 		bss_desc_ptr->chan_freq =
 			wlan_reg_chan_to_freq(mac->pdev,
@@ -2166,8 +2142,7 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 
 	bss_desc_ptr->nwType = lim_get_nw_type(
 			mac,
-			wlan_reg_freq_to_chan(mac->pdev,
-					      bss_desc_ptr->chan_freq),
+			bss_desc_ptr->chan_freq,
 			SIR_MAC_MGMT_FRAME,
 			parsed_frm_ptr);
 
@@ -2416,7 +2391,6 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 		return status;
 	}
 
-	curr_sta_ds->staIndex = add_bss_params->staContext.staIdx;
 	mac_ctx->roam.reassocRespLen = roam_sync_ind_ptr->reassocRespLength;
 	mac_ctx->roam.pReassocResp =
 		qdf_mem_malloc(mac_ctx->roam.reassocRespLen);
@@ -2492,7 +2466,6 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 
 	roam_sync_ind_ptr->join_rsp->vht_channel_width =
 					ft_session_ptr->ch_width;
-	roam_sync_ind_ptr->join_rsp->staId = curr_sta_ds->staIndex;
 	roam_sync_ind_ptr->join_rsp->timingMeasCap = curr_sta_ds->timingMeasCap;
 	roam_sync_ind_ptr->join_rsp->nss = curr_sta_ds->nss;
 	roam_sync_ind_ptr->join_rsp->max_rate_flags =

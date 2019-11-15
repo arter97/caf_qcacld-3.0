@@ -36,10 +36,10 @@
 #define mlme_legacy_debug(params...) QDF_TRACE_DEBUG(QDF_MODULE_ID_MLME, params)
 
 /**
- * struct wlan_mlme_psoc_obj -MLME psoc priv object
+ * struct wlan_mlme_psoc_ext_obj -MLME ext psoc priv object
  * @cfg:     cfg items
  */
-struct wlan_mlme_psoc_obj {
+struct wlan_mlme_psoc_ext_obj {
 	struct wlan_mlme_cfg cfg;
 };
 
@@ -118,6 +118,7 @@ struct wlan_mlme_roam {
  * @vdev_start_failed: flag to indicate that vdev start failed.
  * @connection_fail: flag to indicate connection failed
  * @cac_required_for_new_channel: if CAC is required for new channel
+ * @follow_ap_edca: if true, it is forced to follow the AP's edca.
  * @assoc_type: vdev associate/reassociate type
  * @dynamic_cfg: current configuration of nss, chains for vdev.
  * @ini_cfg: Max configuration of nss, chains supported for vdev.
@@ -136,6 +137,7 @@ struct mlme_legacy_priv {
 	bool vdev_start_failed;
 	bool connection_fail;
 	bool cac_required_for_new_channel;
+	bool follow_ap_edca;
 	enum vdev_assoc_type assoc_type;
 	struct wlan_mlme_nss_chains dynamic_cfg;
 	struct wlan_mlme_nss_chains ini_cfg;
@@ -269,32 +271,6 @@ struct mlme_roam_after_data_stall *
 mlme_get_roam_invoke_params(struct wlan_objmgr_vdev *vdev);
 
 /**
- * mlme_psoc_object_created_notification(): mlme psoc create handler
- * @psoc: psoc which is going to created by objmgr
- * @arg: argument for vdev create handler
- *
- * Register this api with objmgr to detect psoc is created
- *
- * Return: QDF_STATUS status in case of success else return error
- */
-QDF_STATUS
-mlme_psoc_object_created_notification(struct wlan_objmgr_psoc *psoc,
-				      void *arg);
-
-/**
- * mlme_psoc_object_destroyed_notification(): mlme psoc delete handler
- * @psoc: psoc which is going to delete by objmgr
- * @arg: argument for vdev delete handler
- *
- * Register this api with objmgr to detect psoc is deleted
- *
- * Return: QDF_STATUS status in case of success else return error
- */
-QDF_STATUS
-mlme_psoc_object_destroyed_notification(struct wlan_objmgr_psoc *psoc,
-					void *arg);
-
-/**
  * mlme_cfg_on_psoc_enable() - Populate MLME structure from CFG and INI
  * @psoc: pointer to the psoc object
  *
@@ -305,17 +281,19 @@ mlme_psoc_object_destroyed_notification(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS mlme_cfg_on_psoc_enable(struct wlan_objmgr_psoc *psoc);
 
 /**
- * mlme_get_psoc_obj() - Get MLME object from psoc
+ * mlme_get_psoc_ext_obj() - Get MLME object from psoc
  * @psoc: pointer to the psoc object
  *
  * Get the MLME object pointer from the psoc
  *
  * Return: pointer to MLME object
  */
-#define mlme_get_psoc_obj(psoc) mlme_get_psoc_obj_fl(psoc, __func__, __LINE__)
-struct wlan_mlme_psoc_obj *mlme_get_psoc_obj_fl(struct wlan_objmgr_psoc *psoc,
-						const char *func,
-						uint32_t line);
+#define mlme_get_psoc_ext_obj(psoc) \
+			mlme_get_psoc_ext_obj_fl(psoc, __func__, __LINE__)
+struct wlan_mlme_psoc_ext_obj *mlme_get_psoc_ext_obj_fl(struct wlan_objmgr_psoc
+							*psoc,
+							const char *func,
+							uint32_t line);
 
 /**
  * mlme_init_ibss_cfg() - Init IBSS config data structure with default CFG value
@@ -370,6 +348,23 @@ void mlme_set_peer_disconnect_ies(struct wlan_objmgr_vdev *vdev,
  * Return: None
  */
 void mlme_free_peer_disconnect_ies(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * mlme_set_follow_ap_edca_flag() - Set follow ap's edca flag
+ * @vdev: vdev pointer
+ * @flag: carries if following ap's edca is true or not.
+ *
+ * Return: None
+ */
+void mlme_set_follow_ap_edca_flag(struct wlan_objmgr_vdev *vdev, bool flag);
+
+/**
+ * mlme_get_follow_ap_edca_flag() - Get follow ap's edca flag
+ * @vdev: vdev pointer
+ *
+ * Return: value of follow_ap_edca
+ */
+bool mlme_get_follow_ap_edca_flag(struct wlan_objmgr_vdev *vdev);
 
 /**
  * mlme_get_peer_disconnect_ies() - Get diconnect IEs from vdev object

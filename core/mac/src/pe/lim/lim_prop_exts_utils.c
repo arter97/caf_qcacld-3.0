@@ -150,12 +150,50 @@ static void lim_check_he_ldpc_cap(struct pe_session *session,
 		}
 	}
 }
+
+static void lim_update_he_bw_cap_mcs(struct pe_session *session)
+{
+	if (!session->he_capable)
+		return;
+
+	if (session->ch_width <= CH_WIDTH_80MHZ) {
+		*(uint16_t *)session->he_config.rx_he_mcs_map_160 =
+							HE_MCS_ALL_DISABLED;
+		*(uint16_t *)session->he_config.tx_he_mcs_map_160 =
+							HE_MCS_ALL_DISABLED;
+		*(uint16_t *)session->he_config.rx_he_mcs_map_80_80 =
+							HE_MCS_ALL_DISABLED;
+		*(uint16_t *)session->he_config.tx_he_mcs_map_80_80 =
+							HE_MCS_ALL_DISABLED;
+	} else if (session->ch_width == CH_WIDTH_160MHZ) {
+		*(uint16_t *)session->he_config.rx_he_mcs_map_80_80 =
+							HE_MCS_ALL_DISABLED;
+		*(uint16_t *)session->he_config.tx_he_mcs_map_80_80 =
+							HE_MCS_ALL_DISABLED;
+	}
+	/* Reset the > 20MHz caps for 20MHz connection */
+	if (session->ch_width == CH_WIDTH_20MHZ) {
+		session->he_config.chan_width_0 = 0;
+		session->he_config.chan_width_1 = 0;
+		session->he_config.chan_width_2 = 0;
+		session->he_config.chan_width_3 = 0;
+		session->he_config.chan_width_4 = 0;
+		session->he_config.chan_width_5 = 0;
+		session->he_config.chan_width_6 = 0;
+		session->he_config.he_ppdu_20_in_40Mhz_2G = 0;
+		session->he_config.he_ppdu_20_in_160_80p80Mhz = 0;
+		session->he_config.he_ppdu_80_in_160_80p80Mhz = 0;
+	}
+}
 #else
 static inline void lim_extract_he_op(struct pe_session *session,
 		tSirProbeRespBeacon *beacon_struct)
 {}
 static void lim_check_he_ldpc_cap(struct pe_session *session,
 		tSirProbeRespBeacon *beacon_struct)
+{}
+
+static void lim_update_he_bw_cap_mcs(struct pe_session *session)
 {}
 #endif
 
@@ -229,6 +267,7 @@ void lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 	struct s_ext_cap *ext_cap;
 	uint8_t chan_center_freq_seg1;
 	tDot11fIEVHTCaps *vht_caps;
+	uint8_t channel = 0;
 
 	beacon_struct = qdf_mem_malloc(sizeof(tSirProbeRespBeacon));
 	if (!beacon_struct)
@@ -349,6 +388,8 @@ void lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 		 */
 		session->ch_center_freq_seg0 = vht_op->chan_center_freq_seg0;
 		session->ch_center_freq_seg1 = chan_center_freq_seg1;
+		channel = wlan_reg_freq_to_chan(mac_ctx->pdev,
+						beacon_struct->chan_freq);
 		if (vht_ch_wd == WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ) {
 			/* DUT or AP supports only 160MHz */
 			if (ap_bcon_ch_width ==
@@ -358,8 +399,7 @@ void lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 					session->ch_center_freq_seg1 =
 						vht_op->chan_center_freq_seg0;
 					session->ch_center_freq_seg0 =
-						lim_get_80Mhz_center_channel(
-						beacon_struct->channelNumber);
+						lim_get_80Mhz_center_channel(channel);
 				}
 			} else {
 				/* DUT supports only 160MHz and AP is
@@ -375,8 +415,7 @@ void lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 					!new_ch_width_dfn)
 				/* AP is in 160MHz mode */
 				session->ch_center_freq_seg0 =
-					lim_get_80Mhz_center_channel(
-						beacon_struct->channelNumber);
+					lim_get_80Mhz_center_channel(channel);
 			else
 				session->ch_center_freq_seg1 = 0;
 		}
@@ -406,6 +445,7 @@ void lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 	}
 	lim_check_he_ldpc_cap(session, beacon_struct);
 	lim_extract_he_op(session, beacon_struct);
+	lim_update_he_bw_cap_mcs(session);
 	/* Extract the UAPSD flag from WMM Parameter element */
 	if (beacon_struct->wmeEdcaPresent)
 		*uapsd = beacon_struct->edcaParams.qosInfo.uapsd;

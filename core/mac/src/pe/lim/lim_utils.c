@@ -4226,7 +4226,7 @@ lim_validate_delts_req(struct mac_context *mac_ctx, tpSirDeltsReq delts_req,
 	} else if (tsinfo->traffic.accessPolicy == SIR_MAC_ACCESSPOLICY_EDCA) {
 		/* send message to HAL to delete TS */
 		if (QDF_STATUS_SUCCESS !=
-			lim_send_hal_msg_del_ts(mac_ctx, sta->staIndex,
+			lim_send_hal_msg_del_ts(mac_ctx,
 						tspec_idx, delts_req->req,
 						session->peSessionId,
 						session->bssId)) {
@@ -4257,7 +4257,7 @@ lim_validate_delts_req(struct mac_context *mac_ctx, tpSirDeltsReq delts_req,
  */
 QDF_STATUS
 lim_post_sm_state_update(struct mac_context *mac,
-			 uint16_t staIdx, tSirMacHTMIMOPowerSaveState state,
+			 tSirMacHTMIMOPowerSaveState state,
 			 uint8_t *pPeerStaMac, uint8_t sessionId)
 {
 	QDF_STATUS retCode = QDF_STATUS_SUCCESS;
@@ -4273,7 +4273,6 @@ lim_post_sm_state_update(struct mac_context *mac,
 		return QDF_STATUS_E_NOMEM;
 
 	pMIMO_PSParams->htMIMOPSState = state;
-	pMIMO_PSParams->staIdx = staIdx;
 	pMIMO_PSParams->fsendRsp = true;
 	pMIMO_PSParams->sessionId = sessionId;
 	qdf_mem_copy(pMIMO_PSParams->peerMac, pPeerStaMac, sizeof(tSirMacAddr));
@@ -4408,7 +4407,8 @@ bool lim_is_channel_valid_for_channel_switch(struct mac_context *mac, uint8_t ch
 	uint8_t index;
 	bool ok = false;
 
-	if (policy_mgr_is_chan_ok_for_dnbs(mac->psoc, channel, &ok)) {
+	if (policy_mgr_is_chan_ok_for_dnbs(mac->psoc,
+					   wlan_chan_to_freq(channel), &ok)) {
 		pe_err("policy_mgr_is_chan_ok_for_dnbs() returned error");
 		return false;
 	}
@@ -4423,8 +4423,8 @@ bool lim_is_channel_valid_for_channel_switch(struct mac_context *mac, uint8_t ch
 		    wlan_reg_chan_to_freq(mac->pdev, channel))
 			continue;
 
-		ok = policy_mgr_is_valid_for_channel_switch(mac->psoc,
-							    channel);
+		ok = policy_mgr_is_valid_for_channel_switch(
+				mac->psoc, wlan_chan_to_freq(channel));
 		return ok;
 	}
 
@@ -4497,30 +4497,20 @@ lim_prepare_for11h_channel_switch(struct mac_context *mac, struct pe_session *pe
 	lim_stop_tx_and_switch_channel(mac, pe_session->peSessionId);
 }
 
-/**----------------------------------------------------
-   \fn        lim_get_nw_type
-
-   \brief    Get type of the network from data packet or beacon
-   \param mac
-   \param channelNum - Channel number
-   \param type - Type of packet.
-   \param pBeacon - Pointer to beacon or probe response
-
-   \return Network type a/b/g.
-   -----------------------------------------------------*/
-tSirNwType lim_get_nw_type(struct mac_context *mac, uint8_t channelNum, uint32_t type,
+tSirNwType lim_get_nw_type(struct mac_context *mac, uint32_t chan_freq, uint32_t type,
 			   tpSchBeaconStruct pBeacon)
 {
 	tSirNwType nwType = eSIR_11B_NW_TYPE;
 
+	/* Logic to be cleaned up for 11AC & 11AX */
 	if (type == SIR_MAC_DATA_FRAME) {
-		if ((channelNum > 0) && (channelNum < 15)) {
+		if (WLAN_REG_IS_24GHZ_CH_FREQ(chan_freq)) {
 			nwType = eSIR_11G_NW_TYPE;
 		} else {
 			nwType = eSIR_11A_NW_TYPE;
 		}
 	} else {
-		if ((channelNum > 0) && (channelNum < 15)) {
+		if (WLAN_REG_IS_24GHZ_CH_FREQ(chan_freq)) {
 			int i;
 			/* 11b or 11g packet */
 			/* 11g iff extended Rate IE is present or */
@@ -4546,26 +4536,23 @@ tSirNwType lim_get_nw_type(struct mac_context *mac, uint8_t channelNum, uint32_t
 	return nwType;
 }
 
-/**---------------------------------------------------------
-   \fn        lim_get_channel_from_beacon
-   \brief    To extract channel number from beacon
-
-   \param mac
-   \param pBeacon - Pointer to beacon or probe rsp
-   \return channel number
-   -----------------------------------------------------------*/
-uint8_t lim_get_channel_from_beacon(struct mac_context *mac, tpSchBeaconStruct pBeacon)
+uint32_t lim_get_channel_from_beacon(struct mac_context *mac, tpSchBeaconStruct pBeacon)
 {
-	uint8_t channelNum = 0;
+	uint8_t chan_freq = 0;
 
-	if (pBeacon->dsParamsPresent)
-		channelNum = pBeacon->channelNumber;
+	if (pBeacon->he_op.oper_info_6g_present)
+		chan_freq = wlan_reg_chan_band_to_freq(mac->pdev,
+						   pBeacon->he_op.oper_info_6g.info.primary_ch,
+						   BIT(REG_BAND_6G));
+	else if (pBeacon->dsParamsPresent)
+		chan_freq = pBeacon->chan_freq;
 	else if (pBeacon->HTInfo.present)
-		channelNum = pBeacon->HTInfo.primaryChannel;
+		chan_freq = wlan_reg_legacy_chan_to_freq(mac->pdev,
+							 pBeacon->HTInfo.primaryChannel);
 	else
-		channelNum = pBeacon->channelNumber;
+		chan_freq = pBeacon->chan_freq;
 
-	return channelNum;
+	return chan_freq;
 }
 
 void lim_set_tspec_uapsd_mask_per_session(struct mac_context *mac,
@@ -5154,14 +5141,13 @@ void lim_pmf_sa_query_timer_handler(void *pMacGlobal, uint32_t param)
 }
 #endif
 
-bool lim_check_vht_op_mode_change(struct mac_context *mac, struct pe_session *pe_session,
-				  uint8_t chanWidth, uint8_t staId,
-				  uint8_t *peerMac)
+bool lim_check_vht_op_mode_change(struct mac_context *mac,
+				  struct pe_session *pe_session,
+				  uint8_t chanWidth, uint8_t *peerMac)
 {
 	tUpdateVHTOpMode tempParam;
 
 	tempParam.opMode = chanWidth;
-	tempParam.staId = staId;
 	tempParam.smesessionId = pe_session->smeSessionId;
 	qdf_mem_copy(tempParam.peer_mac, peerMac, sizeof(tSirMacAddr));
 
@@ -5186,7 +5172,7 @@ bool lim_send_he_ie_update(struct mac_context *mac_ctx, struct pe_session *pe_se
 #endif
 
 bool lim_set_nss_change(struct mac_context *mac, struct pe_session *pe_session,
-			uint8_t rxNss, uint8_t staId, uint8_t *peerMac)
+			uint8_t rxNss, uint8_t *peerMac)
 {
 	tUpdateRxNss tempParam;
 
@@ -5196,7 +5182,6 @@ bool lim_set_nss_change(struct mac_context *mac, struct pe_session *pe_session,
 	}
 
 	tempParam.rxNss = rxNss;
-	tempParam.staId = staId;
 	tempParam.smesessionId = pe_session->smeSessionId;
 	qdf_mem_copy(tempParam.peer_mac, peerMac, sizeof(tSirMacAddr));
 
@@ -5207,14 +5192,13 @@ bool lim_set_nss_change(struct mac_context *mac, struct pe_session *pe_session,
 
 bool lim_check_membership_user_position(struct mac_context *mac,
 					struct pe_session *pe_session,
-					uint32_t membership, uint32_t userPosition,
-					uint8_t staId)
+					uint32_t membership,
+					uint32_t userPosition)
 {
 	tUpdateMembership tempParamMembership;
 	tUpdateUserPos tempParamUserPosition;
 
 	tempParamMembership.membership = membership;
-	tempParamMembership.staId = staId;
 	tempParamMembership.smesessionId = pe_session->smeSessionId;
 	qdf_mem_copy(tempParamMembership.peer_mac, pe_session->bssId,
 		     sizeof(tSirMacAddr));
@@ -5222,7 +5206,6 @@ bool lim_check_membership_user_position(struct mac_context *mac,
 	lim_set_membership(mac, &tempParamMembership, pe_session);
 
 	tempParamUserPosition.userPos = userPosition;
-	tempParamUserPosition.staId = staId;
 	tempParamUserPosition.smesessionId = pe_session->smeSessionId;
 	qdf_mem_copy(tempParamUserPosition.peer_mac, pe_session->bssId,
 		     sizeof(tSirMacAddr));
@@ -5297,24 +5280,18 @@ lim_set_protected_bit(struct mac_context *mac,
 	uint16_t aid;
 	tpDphHashNode sta;
 
-	if (LIM_IS_AP_ROLE(pe_session)) {
-
-		sta = dph_lookup_hash_entry(mac, peer, &aid,
-					       &pe_session->dph.dphHashTable);
-		if (sta) {
-			/* rmfenabled will be set at the time of addbss.
-			 * but sometimes EAP auth fails and keys are not
-			 * installed then if we send any management frame
-			 * like deauth/disassoc with this bit set then
-			 * firmware crashes. so check for keys are
-			 * installed or not also before setting the bit
-			 */
-			if (sta->rmfEnabled && sta->is_key_installed)
-				pMacHdr->fc.wep = 1;
-		}
-	} else if (pe_session->limRmfEnabled &&
-			pe_session->is_key_installed) {
-		pMacHdr->fc.wep = 1;
+	sta = dph_lookup_hash_entry(mac, peer, &aid,
+				    &pe_session->dph.dphHashTable);
+	if (sta) {
+		/* rmfenabled will be set at the time of addbss.
+		 * but sometimes EAP auth fails and keys are not
+		 * installed then if we send any management frame
+		 * like deauth/disassoc with this bit set then
+		 * firmware crashes. so check for keys are
+		 * installed or not also before setting the bit
+		 */
+		if (sta->rmfEnabled && sta->is_key_installed)
+			pMacHdr->fc.wep = 1;
 	}
 } /*** end lim_set_protected_bit() ***/
 #endif
@@ -5607,10 +5584,11 @@ static QDF_STATUS lim_send_ie(struct mac_context *mac_ctx, uint32_t sme_session_
  *
  * Return: true if enabled and false otherwise
  */
-static inline bool lim_get_rx_ldpc(struct mac_context *mac_ctx, enum channel_enum ch)
+static inline bool lim_get_rx_ldpc(struct mac_context *mac_ctx,
+				   enum channel_enum ch)
 {
 	if (mac_ctx->mlme_cfg->ht_caps.ht_cap_info.adv_coding_cap &&
-	    wma_is_rx_ldpc_supported_for_channel(WLAN_REG_CH_NUM(ch)))
+	    wma_is_rx_ldpc_supported_for_channel(wlan_reg_ch_to_freq(ch)))
 		return true;
 	else
 		return false;
@@ -6010,13 +5988,15 @@ void lim_del_pmf_sa_query_timer(struct mac_context *mac_ctx, struct pe_session *
 		if (!sta_ds)
 			continue;
 		if (!sta_ds->rmfEnabled) {
-			pe_debug("no PMF timer for sta-idx:%d assoc-id:%d",
-				 sta_ds->staIndex, sta_ds->assocId);
+			pe_debug("no PMF timer for assoc-id:%d sta mac"
+				 QDF_MAC_ADDR_STR, sta_ds->assocId,
+				 QDF_MAC_ADDR_ARRAY(sta_ds->staAddr));
 			continue;
 		}
 
-		pe_debug("Deleting pmfSaQueryTimer for sta-idx:%d assoc-id:%d",
-			sta_ds->staIndex, sta_ds->assocId);
+		pe_debug("Deleting pmfSaQueryTimer for assoc-id:%d sta mac"
+			 QDF_MAC_ADDR_STR, sta_ds->assocId,
+			 QDF_MAC_ADDR_ARRAY(sta_ds->staAddr));
 		tx_timer_deactivate(&sta_ds->pmfSaQueryTimer);
 		tx_timer_delete(&sta_ds->pmfSaQueryTimer);
 	}
@@ -6724,6 +6704,7 @@ void lim_add_bss_he_cap(struct bss_params *add_bss, tpSirAssocRsp assoc_rsp)
 
 	he_cap = &assoc_rsp->he_cap;
 	he_op = &assoc_rsp->he_op;
+	add_bss->he_capable = he_cap->present;
 	if (he_cap)
 		qdf_mem_copy(&add_bss->staContext.he_config,
 			     he_cap, sizeof(*he_cap));
@@ -6856,30 +6837,6 @@ void lim_copy_join_req_he_cap(struct pe_session *session,
 {
 	qdf_mem_copy(&(session->he_config), &(sme_join_req->he_config),
 		     sizeof(session->he_config));
-
-	if (session->ch_width <= CH_WIDTH_80MHZ) {
-		*(uint16_t *)session->he_config.rx_he_mcs_map_160 =
-							HE_MCS_ALL_DISABLED;
-		*(uint16_t *)session->he_config.tx_he_mcs_map_160 =
-							HE_MCS_ALL_DISABLED;
-		*(uint16_t *)session->he_config.rx_he_mcs_map_80_80 =
-							HE_MCS_ALL_DISABLED;
-		*(uint16_t *)session->he_config.tx_he_mcs_map_80_80 =
-							HE_MCS_ALL_DISABLED;
-	}
-	/* Reset the > 20MHz caps for 20MHz connection */
-	if (session->ch_width == CH_WIDTH_20MHZ) {
-		session->he_config.chan_width_0 = 0;
-		session->he_config.chan_width_1 = 0;
-		session->he_config.chan_width_2 = 0;
-		session->he_config.chan_width_3 = 0;
-		session->he_config.chan_width_4 = 0;
-		session->he_config.chan_width_5 = 0;
-		session->he_config.chan_width_6 = 0;
-		session->he_config.he_ppdu_20_in_40Mhz_2G = 0;
-		session->he_config.he_ppdu_20_in_160_80p80Mhz = 0;
-		session->he_config.he_ppdu_80_in_160_80p80Mhz = 0;
-	}
 }
 
 void lim_log_he_cap(struct mac_context *mac, tDot11fIEhe_cap *he_cap)
@@ -7063,7 +7020,8 @@ void lim_log_he_cap(struct mac_context *mac, tDot11fIEhe_cap *he_cap)
 		&he_cap->ppet, HE_MAX_PPET_SIZE);
 }
 
-void lim_log_he_op(struct mac_context *mac, tDot11fIEhe_op *he_ops)
+void lim_log_he_op(struct mac_context *mac, tDot11fIEhe_op *he_ops,
+		   struct pe_session *session)
 {
 	pe_debug("bss_color: %0x, default_pe_duration: %0x, twt_required: %0x, txop_rts_threshold: %0x, vht_oper_present: %0x",
 		 he_ops->bss_color, he_ops->default_pe,
@@ -7076,23 +7034,26 @@ void lim_log_he_op(struct mac_context *mac, tDot11fIEhe_op *he_ops)
 	pe_debug("he basic mcs nss: 0x%04x",
 		*((uint16_t *)he_ops->basic_mcs_nss));
 
-	if (!he_ops->vht_oper_present)
-		pe_debug("VHT Info not present in HE Operation");
-	else
-		pe_debug("VHT Info: chan_width: %d, center_freq0: %d, center_freq1: %d",
-			 he_ops->vht_oper.info.chan_width,
-			 he_ops->vht_oper.info.center_freq_seg0,
-			 he_ops->vht_oper.info.center_freq_seg1);
+	if (!session->he_6ghz_band) {
+		if (!he_ops->vht_oper_present)
+			pe_debug("VHT Info not present in HE Operation");
+		else
+			pe_debug("VHT Info: ch_bw %d cntr_freq0 %d cntr_freq1 %d",
+				 he_ops->vht_oper.info.chan_width,
+				 he_ops->vht_oper.info.center_freq_seg0,
+				 he_ops->vht_oper.info.center_freq_seg1);
+	} else {
+		if (!he_ops->oper_info_6g_present)
+			pe_debug("6G op_info not present in HE Operation");
+		else
+			pe_debug("6G_op_info:ch_bw %d cntr_freq0 %d cntr_freq1 %d dup_bcon %d, min_rate %d",
+				 he_ops->oper_info_6g.info.ch_width,
+				 he_ops->oper_info_6g.info.center_freq_seg0,
+				 he_ops->oper_info_6g.info.center_freq_seg1,
+				 he_ops->oper_info_6g.info.dup_bcon,
+				 he_ops->oper_info_6g.info.min_rate);
+	}
 
-	if (!he_ops->oper_info_6g_present)
-		pe_err("6G op_info not present in HE Operation");
-	else
-		pe_err("6G_oper_info: chan_width: %d, center_freq0: %d, center_freq1: %d dup_bcon %d, min_rate %d",
-			he_ops->oper_info_6g.info.ch_width,
-			he_ops->oper_info_6g.info.center_freq_seg0,
-			he_ops->oper_info_6g.info.center_freq_seg1,
-			he_ops->oper_info_6g.info.dup_bcon,
-			he_ops->oper_info_6g.info.min_rate);
 }
 
 void lim_log_he_6g_cap(struct mac_context *mac,
@@ -7129,6 +7090,13 @@ void lim_update_sta_he_capable(struct mac_context *mac,
 		add_sta_params->he_capable = session_entry->he_capable;
 
 	pe_debug("he_capable: %d", add_sta_params->he_capable);
+}
+
+void lim_update_bss_he_capable(struct mac_context *mac,
+			       struct bss_params *add_bss)
+{
+	add_bss->he_capable = true;
+	pe_debug("he_capable: %d", add_bss->he_capable);
 }
 
 void lim_update_stads_he_capable(tpDphHashNode sta_ds, tpSirAssocReq assoc_req)
@@ -7530,37 +7498,6 @@ void lim_decrement_pending_mgmt_count(struct mac_context *mac_ctx)
 	qdf_spin_unlock(&mac_ctx->sys.bbt_mgmt_lock);
 }
 
-struct csr_roam_session *lim_get_session_by_macaddr(struct mac_context *mac_ctx,
-		tSirMacAddr self_mac)
-{
-	int i = 0;
-	struct csr_roam_session *session;
-
-	if (!mac_ctx || !self_mac) {
-		QDF_TRACE(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_ERROR,
-			  FL("Invalid arguments"));
-		return NULL;
-	}
-
-	for (i = 0; i < mac_ctx->sme.max_intf_count; i++) {
-		session = CSR_GET_SESSION(mac_ctx, i);
-		if (!session)
-			continue;
-		else if (!qdf_mem_cmp(&session->self_mac_addr,
-				      self_mac, sizeof(tSirMacAddr))) {
-
-			QDF_TRACE(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_INFO,
-				  FL("session %d exists with mac address "
-				  QDF_MAC_ADDR_STR), session->sessionId,
-				  QDF_MAC_ADDR_ARRAY(self_mac));
-
-			return session;
-		}
-	}
-
-	return NULL;
-}
-
 bool lim_check_if_vendor_oui_match(struct mac_context *mac_ctx,
 					uint8_t *oui, uint8_t oui_len,
 			       uint8_t *ie, uint8_t ie_len)
@@ -7679,7 +7616,7 @@ enum rateid lim_get_min_session_txrate(struct pe_session *session)
 
 void lim_send_sme_mgmt_frame_ind(struct mac_context *mac_ctx, uint8_t frame_type,
 				 uint8_t *frame, uint32_t frame_len,
-				 uint16_t session_id, uint32_t rx_channel,
+				 uint16_t session_id, uint32_t rx_freq,
 				 struct pe_session *psession_entry,
 				 int8_t rx_rssi, enum rxmgmt_flags rx_flags)
 {
@@ -7703,7 +7640,7 @@ void lim_send_sme_mgmt_frame_ind(struct mac_context *mac_ctx, uint8_t frame_type
 	sme_mgmt_frame->sessionId = session_id;
 	sme_mgmt_frame->frameType = frame_type;
 	sme_mgmt_frame->rxRssi = rx_rssi;
-	sme_mgmt_frame->rxChan = rx_channel;
+	sme_mgmt_frame->rx_freq = rx_freq;
 	sme_mgmt_frame->rx_flags = rx_flags;
 
 	qdf_mem_zero(sme_mgmt_frame->frameBuf, frame_len);
@@ -7971,6 +7908,13 @@ void lim_send_beacon(struct mac_context *mac_ctx, struct pe_session *session)
 		wlan_vdev_mlme_sm_deliver_evt(session->vdev,
 					      WLAN_VDEV_SM_EV_DFS_CAC_COMPLETED,
 					      sizeof(*session), session);
+	else if (mac_ctx->mlme_cfg->dfs_cfg.dfs_disable_channel_switch &&
+		 (wlan_vdev_mlme_get_substate(session->vdev) ==
+		  WLAN_VDEV_SS_SUSPEND_CSA_RESTART))
+		wlan_vdev_mlme_sm_deliver_evt(
+					session->vdev,
+					WLAN_VDEV_SM_EV_CHAN_SWITCH_DISABLED,
+					sizeof(*session), session);
 	else
 		wlan_vdev_mlme_sm_deliver_evt(session->vdev,
 					      WLAN_VDEV_SM_EV_START_SUCCESS,
@@ -8069,6 +8013,10 @@ QDF_STATUS lim_ap_mlme_vdev_update_beacon(struct vdev_mlme_obj *vdev_mlme,
 
 	if (op == BEACON_INIT)
 		lim_send_beacon_ind(session->mac_ctx, session, REASON_DEFAULT);
+	else if (op == BEACON_UPDATE)
+		lim_send_beacon_ind(session->mac_ctx,
+				    session,
+				    REASON_CONFIG_UPDATE);
 	else if (op == BEACON_CSA)
 		lim_send_csa_restart_resp(session->mac_ctx, session);
 
@@ -8122,6 +8070,7 @@ QDF_STATUS lim_ap_mlme_vdev_stop_send(struct vdev_mlme_obj *vdev_mlme,
 {
 	struct pe_session *session = (struct pe_session *)data;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint32_t ap_dfs_ch_freq;
 
 	if (!data) {
 		pe_err("data is NULL");
@@ -8129,10 +8078,15 @@ QDF_STATUS lim_ap_mlme_vdev_stop_send(struct vdev_mlme_obj *vdev_mlme,
 	}
 
 	if (LIM_IS_IBSS_ROLE(session) &&
-	    session->mac_ctx->lim.gLimIbssCoalescingHappened)
+	    session->mac_ctx->lim.gLimIbssCoalescingHappened) {
 		ibss_bss_delete(session->mac_ctx, session);
-	else
+	} else {
+		if (!policy_mgr_is_dfs_beaconing_present_except_vdev(
+		    session->mac_ctx->psoc, &ap_dfs_ch_freq, session->vdev_id))
+			tgt_dfs_radar_enable(
+				session->mac_ctx->pdev, 0, 0, false);
 		status =  lim_send_vdev_stop(session);
+	}
 
 	return status;
 }
@@ -8441,6 +8395,8 @@ QDF_STATUS lim_set_ch_phy_mode(struct wlan_objmgr_vdev *vdev, uint8_t dot11mode)
 	enum phy_ch_width ch_width;
 	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
 	uint16_t bw_val;
+	enum reg_wifi_band band;
+	uint8_t band_mask;
 
 	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(vdev);
 	if (!mlme_obj) {
@@ -8453,12 +8409,16 @@ QDF_STATUS lim_set_ch_phy_mode(struct wlan_objmgr_vdev *vdev, uint8_t dot11mode)
 	 * will be updated from ch_freq_seg1.
 	 */
 	des_chan->ch_cfreq1 = des_chan->ch_freq;
+	band = wlan_reg_freq_to_band(des_chan->ch_freq);
+	band_mask = 1 << band;
 	ch_width = des_chan->ch_width;
 	bw_val = wlan_reg_get_bw_value(ch_width);
 	if (bw_val > 20) {
 		if (des_chan->ch_freq_seg1) {
 			des_chan->ch_cfreq1 =
-				wlan_chan_to_freq(des_chan->ch_freq_seg1);
+			wlan_reg_chan_band_to_freq(mac_ctx->pdev,
+						   des_chan->ch_freq_seg1,
+						   band_mask);
 		} else {
 			pe_err("Invalid cntr_freq for bw %d, drop to 20",
 			       bw_val);
@@ -8478,7 +8438,9 @@ QDF_STATUS lim_set_ch_phy_mode(struct wlan_objmgr_vdev *vdev, uint8_t dot11mode)
 	if (bw_val > 80) {
 		if (des_chan->ch_freq_seg2) {
 			des_chan->ch_cfreq2 =
-				wlan_chan_to_freq(des_chan->ch_freq_seg2);
+			wlan_reg_chan_band_to_freq(mac_ctx->pdev,
+						   des_chan->ch_freq_seg2,
+						   band_mask);
 		} else {
 			pe_err("Invalid cntr_freq for bw %d, drop to 80",
 			       bw_val);
@@ -8543,7 +8505,8 @@ QDF_STATUS lim_set_ch_phy_mode(struct wlan_objmgr_vdev *vdev, uint8_t dot11mode)
 		pe_err("Invalid center freq2 for 160MHz");
 		return QDF_STATUS_E_FAILURE;
 	}
-	mlme_obj->mgmt.generic.phy_mode = chan_mode;
+	/* Till conversion is not done in WMI we need to fill fw phy mode */
+	mlme_obj->mgmt.generic.phy_mode = wma_host_to_fw_phymode(chan_mode);
 	des_chan->ch_phymode = chan_mode;
 
 	return QDF_STATUS_SUCCESS;
