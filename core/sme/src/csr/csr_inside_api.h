@@ -44,13 +44,14 @@
 #define CSR_ACTIVE_SCAN_LIST_CMD_TIMEOUT (1000*30)
 #endif
 /* ***************************************************************************
- * The MAX BSSID Count should be lower than the command timeout value and it
- * can be of a fraction of 1/3 to 1/2 of the total command timeout value.
+ * The MAX BSSID Count should be lower than the command timeout value.
+ * As in some case auth timeout can take upto 5 sec (in case of SAE auth) try
+ * (command timeout/5000 - 1) candidates.
  * ***************************************************************************/
-#define CSR_MAX_BSSID_COUNT     (SME_ACTIVE_LIST_CMD_TIMEOUT_VALUE/3000) - 2
+#define CSR_MAX_BSSID_COUNT     (SME_ACTIVE_LIST_CMD_TIMEOUT_VALUE/5000) - 1
 #define CSR_CUSTOM_CONC_GO_BI    100
 extern uint8_t csr_wpa_oui[][CSR_WPA_OUI_SIZE];
-bool csr_is_supported_channel(struct mac_context *mac, uint8_t channelId);
+bool csr_is_supported_channel(struct mac_context *mac, uint32_t chan_freq);
 
 enum csr_scancomplete_nextcommand {
 	eCsrNextScanNothing,
@@ -238,17 +239,6 @@ csr_roam_save_connected_information(struct mac_context *mac,
 void csr_roam_check_for_link_status_change(struct mac_context *mac,
 					tSirSmeRsp *pSirMsg);
 
-/**
- * csr_vdev_create_resp() - Vdev create response handler
- * @mac_ctx: global mac context
- * @pMsg: pointer to response data
- *
- * This API handles vdev create response.
- *
- * Return: QDF_STATUS_SUCCESS or QDF_STATUS_E_FAILURE
- */
-QDF_STATUS csr_vdev_create_resp(struct mac_context *mac, uint8_t *pmsg);
-
 QDF_STATUS csr_roam_issue_start_bss(struct mac_context *mac, uint32_t sessionId,
 				    struct csr_roamstart_bssparams *pParam,
 				    struct csr_roam_profile *pProfile,
@@ -322,25 +312,21 @@ bool csr_roam_is_channel_valid(struct mac_context *mac, uint8_t ch_freq);
  */
 bool csr_roam_is_chan_freq_valid(struct mac_context *mac, uint32_t freq);
 
-/* pNumChan is a caller allocated space with the sizeof pChannels */
-QDF_STATUS csr_get_cfg_valid_channels(struct mac_context *mac,
-				      uint32_t *ch_freq_list,
-				      uint32_t *num_ch_freq);
 /**
- * csr_get_cfg_valid_freqs() - Get valid channel frequency list
+ * csr_get_cfg_valid_channels() - Get valid channel frequency list
  * @mac: mac context
- * @freq_list: valid channel frequencies
- * @num_of_freq: valid channel nummber
+ * @ch_freq_list: valid channel frequencies
+ * @num_ch_freq: valid channel nummber
  *
  * This function returns the valid channel frequencies.
  *
  * Return: QDF_STATUS_SUCCESS for success.
  */
-QDF_STATUS csr_get_cfg_valid_freqs(struct mac_context *mac,
-				   uint32_t *freq_list,
-				   uint32_t *num_of_freq);
+QDF_STATUS csr_get_cfg_valid_channels(struct mac_context *mac,
+				      uint32_t *ch_freq_list,
+				      uint32_t *num_ch_freq);
 
-int8_t csr_get_cfg_max_tx_power(struct mac_context *mac, uint8_t channel);
+int8_t csr_get_cfg_max_tx_power(struct mac_context *mac, uint32_t ch_freq);
 
 /* To free the last roaming profile */
 void csr_free_roam_profile(struct mac_context *mac, uint32_t sessionId);
@@ -1104,10 +1090,10 @@ static inline void csr_init_session_twt_cap(struct csr_roam_session *session,
  * This function is written to find out for any bss from scan
  * handle a HW mode change to DBS will be needed or not.
  *
- * Return: AP channel for which DBS HW mode will be needed. 0
+ * Return: AP channel freq for which DBS HW mode will be needed. 0
  * means no HW mode change is needed.
  */
-uint8_t
+uint32_t
 csr_get_channel_for_hw_mode_change(struct mac_context *mac_ctx,
 				   tScanResultHandle result_handle,
 				   uint32_t session_id);
@@ -1127,10 +1113,10 @@ csr_get_channel_for_hw_mode_change(struct mac_context *mac_ctx,
  * If there is no candidate AP which requires DBS, this function will return
  * the first Candidate AP's chan.
  *
- * Return: AP channel for which HW mode change will be needed. 0
+ * Return: AP channel freq for which HW mode change will be needed. 0
  * means no candidate AP to connect.
  */
-uint8_t
+uint32_t
 csr_scan_get_channel_for_hw_mode_change(
 	struct mac_context *mac_ctx, uint32_t session_id,
 	struct csr_roam_profile *profile);

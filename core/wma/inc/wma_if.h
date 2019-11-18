@@ -206,10 +206,6 @@ typedef struct {
 	 */
 	/* The return status of SIR_HAL_ADD_STA_REQ is reported here */
 	QDF_STATUS status;
-	/* Station index; valid only when 'status' field value is
-	 * QDF_STATUS_SUCCESS
-	 */
-	uint8_t staIdx;
 	uint8_t updateSta;
 	uint8_t rmfEnabled;
 	uint32_t encryptType;
@@ -297,7 +293,6 @@ typedef struct {
  * a new key descriptor is created based on the key field.
  */
 typedef struct {
-	uint16_t staIdx;
 	tAniEdType encType;
 	uint8_t defWEPIdx;
 	tSirKeys key[SIR_MAC_MAX_NUM_OF_DEFAULT_KEYS];
@@ -347,6 +342,7 @@ typedef struct sLimMlmSetKeysReq {
  * @bSpectrumMgtEnabled: Spectrum Management Capability, 1:Enabled, 0:Disabled.
  * @vhtCapable: VHT capablity
  * @ch_width: VHT tx channel width
+ * @he_capable: HE Capability
  * @no_ptk_4_way: Do not need 4-way handshake
  */
 struct bss_params {
@@ -373,6 +369,7 @@ struct bss_params {
 	enum phy_ch_width ch_width;
 	uint8_t nonRoamReassoc;
 #ifdef WLAN_FEATURE_11AX
+	bool he_capable;
 	uint32_t he_sta_obsspd;
 #endif
 	bool no_ptk_4_way;
@@ -420,7 +417,6 @@ typedef enum eSmpsModeValue {
 /**
  * struct tDeleteStaContext - params required for delete sta request
  * @assocId: association id
- * @staId: station id
  * @bssId: mac address
  * @addr2: mac address
  * @reasonCode: reason code
@@ -430,7 +426,6 @@ typedef struct {
 	bool is_tdls;
 	uint8_t vdev_id;
 	uint16_t assocId;
-	uint16_t staId;
 	tSirMacAddr bssId;
 	tSirMacAddr addr2;
 	uint16_t reasonCode;
@@ -566,7 +561,6 @@ typedef struct {
  */
 typedef struct {
 	uint16_t opMode;
-	uint16_t staId;
 	uint16_t smesessionId;
 	tSirMacAddr peer_mac;
 } tUpdateVHTOpMode, *tpUpdateVHTOpMode;
@@ -580,7 +574,6 @@ typedef struct {
  */
 typedef struct {
 	uint16_t rxNss;
-	uint16_t staId;
 	uint16_t smesessionId;
 	tSirMacAddr peer_mac;
 } tUpdateRxNss, *tpUpdateRxNss;
@@ -594,7 +587,6 @@ typedef struct {
  */
 typedef struct {
 	uint32_t membership;
-	uint16_t staId;
 	uint16_t smesessionId;
 	tSirMacAddr peer_mac;
 } tUpdateMembership, *tpUpdateMembership;
@@ -608,7 +600,6 @@ typedef struct {
  */
 typedef struct {
 	uint32_t userPos;
-	uint16_t staId;
 	uint16_t smesessionId;
 	tSirMacAddr peer_mac;
 } tUpdateUserPos, *tpUpdateUserPos;
@@ -633,7 +624,6 @@ typedef struct {
 
 /**
  * struct tSetMIMOPS - MIMO power save related parameters
- * @staIdx: station index
  * @htMIMOPSState: MIMO Power Save State
  * @status: response status
  * @fsendRsp: send response flag
@@ -641,7 +631,6 @@ typedef struct {
  * @sessionId: session id
  */
 typedef struct sSet_MIMOPS {
-	uint16_t staIdx;
 	tSirMacHTMIMOPowerSaveState htMIMOPSState;
 	QDF_STATUS status;
 	uint8_t fsendRsp;

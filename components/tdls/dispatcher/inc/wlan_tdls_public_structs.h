@@ -86,11 +86,7 @@
 #define TDLS_TEARDOWN_PEER_UNREACHABLE   25
 #define TDLS_TEARDOWN_PEER_UNSPEC_REASON 26
 
-#define INVALID_TDLS_PEER_ID 0xFF
 #define INVALID_TDLS_PEER_INDEX 0xFF
-
-#define TDLS_STA_INDEX_CHECK(sta_id) \
-	(((sta_id) >= 0) && ((sta_id) < 0xFF))
 
 /**
  * enum tdls_add_oper - add peer type
@@ -545,7 +541,7 @@ struct tdls_tx_cnf {
 /**
  * struct tdls_rx_mgmt_frame - rx mgmt frame structure
  * @frame_len: frame length
- * @rx_chan: rx channel
+ * @rx_freq: rx freq
  * @vdev_id: vdev id
  * @frm_type: frame type
  * @rx_rssi: rx rssi
@@ -553,7 +549,7 @@ struct tdls_tx_cnf {
  */
 struct tdls_rx_mgmt_frame {
 	uint32_t frame_len;
-	uint32_t rx_chan;
+	uint32_t rx_freq;
 	uint32_t vdev_id;
 	uint32_t frm_type;
 	uint32_t rx_rssi;
@@ -599,7 +595,6 @@ typedef void (*tdls_evt_callback) (void *data,
 typedef QDF_STATUS (*tdls_register_peer_callback)(void *userdata,
 						  uint32_t vdev_id,
 						  const uint8_t *mac,
-						  uint16_t stat_id,
 						  uint8_t qos);
 
 /* This callback is used to deregister TDLS peer from the datapath */
@@ -774,6 +769,7 @@ struct tdls_update_peer_params {
 	uint8_t supported_oper_classes_len;
 	uint8_t supported_oper_classes[WLAN_MAX_SUPP_OPER_CLASSES];
 	bool is_qos_wmm_sta;
+	bool is_pmf;
 };
 
 struct tdls_update_peer_request {
@@ -1212,7 +1208,6 @@ struct tdls_mgmt_tx_completion_ind {
  * @status_code: status code as tSirResultCodes
  * @peermac: MAC address of the TDLS peer
  * @session_id: session id
- * @sta_id: sta id
  * @sta_type: sta type
  * @tdls_oper: add peer type
  * @psoc: soc object
@@ -1221,7 +1216,6 @@ struct tdls_add_sta_rsp {
 	QDF_STATUS status_code;
 	struct qdf_mac_addr peermac;
 	uint8_t session_id;
-	uint16_t sta_id;
 	uint16_t sta_type;
 	enum tdls_add_oper tdls_oper;
 	struct wlan_objmgr_psoc *psoc;
@@ -1232,14 +1226,12 @@ struct tdls_add_sta_rsp {
  * @session_id: session id
  * @status_code: status code as tSirResultCodes
  * @peermac: MAC address of the TDLS peer
- * @sta_id: sta id
  * @psoc: soc object
  */
 struct tdls_del_sta_rsp {
 	uint8_t session_id;
 	QDF_STATUS status_code;
 	struct qdf_mac_addr peermac;
-	uint16_t sta_id;
 	struct wlan_objmgr_psoc *psoc;
 };
 
@@ -1311,6 +1303,7 @@ struct tdls_add_sta_req {
 	struct vhtcap vht_cap;
 	uint8_t uapsd_queues;
 	uint8_t max_sp;
+	bool is_pmf;
 };
 
 /**

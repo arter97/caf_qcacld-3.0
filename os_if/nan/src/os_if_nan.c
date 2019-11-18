@@ -1015,7 +1015,8 @@ static int os_if_nan_process_ndp_end_req(struct wlan_objmgr_psoc *psoc,
 }
 
 int os_if_nan_process_ndp_cmd(struct wlan_objmgr_psoc *psoc,
-			      const void *data, int data_len)
+			      const void *data, int data_len,
+			      bool is_ndp_allowed)
 {
 	uint32_t ndp_cmd_type;
 	uint16_t transaction_id;
@@ -1058,10 +1059,22 @@ int os_if_nan_process_ndp_cmd(struct wlan_objmgr_psoc *psoc,
 	case QCA_WLAN_VENDOR_ATTR_NDP_INTERFACE_DELETE:
 		return os_if_nan_process_ndi_delete(psoc, tb);
 	case QCA_WLAN_VENDOR_ATTR_NDP_INITIATOR_REQUEST:
+		if (!is_ndp_allowed) {
+			osif_err("Unsupported concurrency for NAN datapath");
+			return -EOPNOTSUPP;
+		}
 		return os_if_nan_process_ndp_initiator_req(psoc, tb);
 	case QCA_WLAN_VENDOR_ATTR_NDP_RESPONDER_REQUEST:
+		if (!is_ndp_allowed) {
+			osif_err("Unsupported concurrency for NAN datapath");
+			return -EOPNOTSUPP;
+		}
 		return os_if_nan_process_ndp_responder_req(psoc, tb);
 	case QCA_WLAN_VENDOR_ATTR_NDP_END_REQUEST:
+		if (!is_ndp_allowed) {
+			osif_err("Unsupported concurrency for NAN datapath");
+			return -EOPNOTSUPP;
+		}
 		return os_if_nan_process_ndp_end_req(psoc, tb);
 	default:
 		osif_err("Unrecognized NDP vendor cmd %d", ndp_cmd_type);
@@ -1777,6 +1790,7 @@ static void os_if_ndp_end_ind_handler(struct wlan_objmgr_vdev *vdev,
 				data_len, QCA_NL80211_VENDOR_SUBCMD_NDP_INDEX,
 				GFP_ATOMIC);
 	if (!vendor_event) {
+		qdf_mem_free(ndp_instance_array);
 		osif_err("cfg80211_vendor_event_alloc failed");
 		return;
 	}
@@ -2618,7 +2632,6 @@ static int os_if_process_nan_enable_req(struct wlan_objmgr_psoc *psoc,
 					struct nlattr **tb)
 {
 	uint32_t chan_freq_2g, chan_freq_5g = 0;
-	uint8_t nan_chan_2g;
 	uint32_t buf_len;
 	QDF_STATUS status;
 	struct nan_enable_req *nan_req;
@@ -2635,10 +2648,9 @@ static int os_if_process_nan_enable_req(struct wlan_objmgr_psoc *psoc,
 			nla_get_u32(tb[
 				QCA_WLAN_VENDOR_ATTR_NAN_DISC_5GHZ_BAND_FREQ]);
 
-	nan_chan_2g = wlan_freq_to_chan(chan_freq_2g);
-	if (!ucfg_is_nan_enable_allowed(psoc, nan_chan_2g)) {
+	if (!ucfg_is_nan_enable_allowed(psoc, chan_freq_2g)) {
 		osif_err("NAN Enable not allowed at this moment for channel %d",
-			 nan_chan_2g);
+			 chan_freq_2g);
 		return -EINVAL;
 	}
 
@@ -2650,17 +2662,17 @@ static int os_if_process_nan_enable_req(struct wlan_objmgr_psoc *psoc,
 		osif_err("Request allocation failure");
 		return -ENOMEM;
 	}
-	nan_req->social_chan_2g = wlan_freq_to_chan(chan_freq_2g);
+	nan_req->social_chan_2g_freq = chan_freq_2g;
 	if (chan_freq_5g)
-		nan_req->social_chan_5g = wlan_freq_to_chan(chan_freq_5g);
+		nan_req->social_chan_5g_freq = chan_freq_5g;
 	nan_req->psoc = psoc;
 	nan_req->params.request_data_len = buf_len;
 
 	nla_memcpy(nan_req->params.request_data,
 		   tb[QCA_WLAN_VENDOR_ATTR_NAN_CMD_DATA], buf_len);
 
-	osif_debug("Sending NAN Enable Req. NAN Ch: %d %d",
-		   nan_req->social_chan_2g, nan_req->social_chan_5g);
+	osif_debug("Sending NAN Enable Req. NAN Ch Freq: %d %d",
+		   nan_req->social_chan_2g_freq, nan_req->social_chan_5g_freq);
 	status = ucfg_nan_discovery_req(nan_req, NAN_ENABLE_REQ);
 
 	if (QDF_IS_STATUS_SUCCESS(status))

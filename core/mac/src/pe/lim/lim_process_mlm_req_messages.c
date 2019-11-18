@@ -914,7 +914,7 @@ static void lim_process_mlm_assoc_req(struct mac_context *mac_ctx, uint32_t *msg
 end:
 	/* Update PE session Id */
 	mlm_assoc_cnf.sessionId = mlm_assoc_req->sessionId;
-	/* Free up buffer allocated for assocReq */
+	/* Free up buffer allocated for assoc_req */
 	qdf_mem_free(mlm_assoc_req);
 	lim_post_sme_message(mac_ctx, LIM_MLM_ASSOC_CNF,
 			     (uint32_t *) &mlm_assoc_cnf);
@@ -1573,7 +1573,6 @@ static void
 lim_process_mlm_set_keys_req(struct mac_context *mac_ctx, uint32_t *msg_buf)
 {
 	uint16_t aid;
-	uint16_t sta_idx = 0;
 	uint32_t default_key_id = 0;
 	struct qdf_mac_addr curr_bssid;
 	tpDphHashNode sta_ds;
@@ -1671,7 +1670,6 @@ lim_process_mlm_set_keys_req(struct mac_context *mac_ctx, uint32_t *msg_buf)
 		case eSIR_ED_AES_GMAC_128:
 		case eSIR_ED_AES_GMAC_256:
 #endif
-			sta_idx = session->staId;
 			break;
 		default:
 			break;
@@ -1701,8 +1699,6 @@ lim_process_mlm_set_keys_req(struct mac_context *mac_ctx, uint32_t *msg_buf)
 			mlm_set_keys_cnf.resultCode =
 				eSIR_SME_INVALID_PARAMETERS;
 			goto end;
-		} else {
-			sta_idx = sta_ds->staIndex;
 		}
 	}
 
@@ -1727,8 +1723,9 @@ lim_process_mlm_set_keys_req(struct mac_context *mac_ctx, uint32_t *msg_buf)
 	} else {
 		default_key_id = 0;
 	}
-	pe_debug("Trying to set keys for STA Index [%d], using default_key_id [%d]",
-		sta_idx, default_key_id);
+	pe_debug("Trying to set keys using default_key_id [%d] sta mac "
+		 QDF_MAC_ADDR_STR, default_key_id,
+		 QDF_MAC_ADDR_ARRAY(mlm_set_keys_req->peer_macaddr.bytes));
 
 	if (qdf_is_macaddr_broadcast(&mlm_set_keys_req->peer_macaddr)) {
 		session->limPrevMlmState = session->limMlmState;
@@ -1746,7 +1743,7 @@ lim_process_mlm_set_keys_req(struct mac_context *mac_ctx, uint32_t *msg_buf)
 		 * Package WMA_SET_STAKEY_REQ / WMA_SET_STA_BCASTKEY_REQ message
 		 * parameters
 		 */
-		lim_send_set_sta_key_req(mac_ctx, mlm_set_keys_req, sta_idx,
+		lim_send_set_sta_key_req(mac_ctx, mlm_set_keys_req,
 					 (uint8_t) default_key_id, session,
 					 true);
 		return;
@@ -1865,49 +1862,53 @@ static void lim_process_periodic_join_probe_req_timer(struct mac_context *mac_ct
 }
 
 /**
- * lim_process_auth_retry_timer()- function to Retry Auth
+ * lim_process_auth_retry_timer()- function to Retry Auth when auth timeout
+ * occurs
  * @mac_ctx:pointer to global mac
  *
  * Return: void
  */
-
 static void lim_process_auth_retry_timer(struct mac_context *mac_ctx)
 {
-	struct pe_session * session_entry;
+	struct pe_session *session_entry;
+	tAniAuthType auth_type;
+	tLimTimers *lim_timers = &mac_ctx->lim.lim_timers;
+	uint16_t vdev_id =
+		lim_timers->g_lim_periodic_auth_retry_timer.sessionId;
 
-	session_entry =
-	  pe_find_session_by_session_id(mac_ctx,
-	  mac_ctx->lim.lim_timers.g_lim_periodic_auth_retry_timer.sessionId);
+	session_entry = pe_find_session_by_session_id(mac_ctx, vdev_id);
 	if (!session_entry) {
-		pe_err("session does not exist for given SessionId: %d",
-		  mac_ctx->lim.lim_timers.
-			g_lim_periodic_auth_retry_timer.sessionId);
+		pe_err("session does not exist for vdev_id: %d", vdev_id);
 		return;
 	}
 
 	if (tx_timer_running(&mac_ctx->lim.lim_timers.gLimAuthFailureTimer) &&
-			     (session_entry->limMlmState ==
-			      eLIM_MLM_WT_AUTH_FRAME2_STATE) &&
-			     (LIM_AUTH_ACK_RCD_SUCCESS !=
-			      mac_ctx->auth_ack_status)) {
+	    (session_entry->limMlmState == eLIM_MLM_WT_AUTH_FRAME2_STATE) &&
+	     (LIM_AUTH_ACK_RCD_SUCCESS != mac_ctx->auth_ack_status)) {
 		tSirMacAuthFrameBody    auth_frame;
 
 		/*
 		 * Send the auth retry only in case we have received ack failure
 		 * else just restart the retry timer.
 		 */
-		if (LIM_AUTH_ACK_RCD_FAILURE == mac_ctx->auth_ack_status) {
+		if (LIM_AUTH_ACK_RCD_FAILURE == mac_ctx->auth_ack_status &&
+		    mac_ctx->lim.gpLimMlmAuthReq) {
+			auth_type = mac_ctx->lim.gpLimMlmAuthReq->authType;
+
 			/* Prepare & send Authentication frame */
-			auth_frame.authAlgoNumber =
-			    (uint8_t) mac_ctx->lim.gpLimMlmAuthReq->authType;
+			if (session_entry->sae_pmk_cached &&
+			    auth_type == eSIR_AUTH_TYPE_SAE)
+				auth_frame.authAlgoNumber = eSIR_OPEN_SYSTEM;
+			else
+				auth_frame.authAlgoNumber = (uint8_t)auth_type;
+
 			auth_frame.authTransactionSeqNumber =
 						SIR_MAC_AUTH_FRAME_1;
 			auth_frame.authStatusCode = 0;
 			pe_debug("Retry Auth");
 			mac_ctx->auth_ack_status = LIM_AUTH_ACK_NOT_RCD;
 			lim_increase_fils_sequence_number(session_entry);
-			lim_send_auth_mgmt_frame(mac_ctx,
-				&auth_frame,
+			lim_send_auth_mgmt_frame(mac_ctx, &auth_frame,
 				mac_ctx->lim.gpLimMlmAuthReq->peerMacAddr,
 				LIM_NO_WEP_IN_FC, session_entry);
 		}

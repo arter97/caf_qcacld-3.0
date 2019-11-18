@@ -211,8 +211,10 @@ static void hdd_deinit_cds_hif_context(void)
 static enum qdf_bus_type to_bus_type(enum pld_bus_type bus_type)
 {
 	switch (bus_type) {
+	case PLD_BUS_TYPE_PCIE_FW_SIM:
 	case PLD_BUS_TYPE_PCIE:
 		return QDF_BUS_TYPE_PCI;
+	case PLD_BUS_TYPE_SNOC_FW_SIM:
 	case PLD_BUS_TYPE_SNOC:
 		return QDF_BUS_TYPE_SNOC;
 	case PLD_BUS_TYPE_SDIO:
@@ -707,7 +709,7 @@ static void hdd_send_hang_reason(void)
 	enum qdf_hang_reason reason = QDF_REASON_UNSPECIFIED;
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 
-	if (wlan_hdd_validate_context(hdd_ctx))
+	if (!hdd_ctx)
 		return;
 
 	cds_get_recovery_reason(&reason);
@@ -1006,6 +1008,12 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params)
 	if (err) {
 		hdd_err("Failed cdp bus suspend: %d", err);
 		return err;
+	}
+
+	if (ucfg_ipa_is_tx_pending(hdd_ctx->pdev)) {
+		hdd_err("failed due to pending IPA TX comps");
+		err = -EBUSY;
+		goto resume_cdp;
 	}
 
 	err = hif_bus_early_suspend(hif_ctx);

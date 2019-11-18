@@ -206,7 +206,7 @@ struct bss_config_param {
 	eCsrMediaAccessType qosType;
 	tSirMacSSid SSID;
 	enum csr_cfgdot11mode uCfgDot11Mode;
-	enum band_info band;
+	enum reg_wifi_band band;
 	tAniAuthType authType;
 	eCsrEncryptionType encType;
 	uint32_t uShortSlotTime;
@@ -542,7 +542,6 @@ struct csr_roam_session {
 	/* For BT-AMP station, this serve as BSSID for self-BSS. */
 	struct qdf_mac_addr self_mac_addr;
 
-	csr_session_open_cb  session_open_cb;
 	csr_session_close_cb session_close_cb;
 	csr_roam_complete_cb callback;
 	void *pContext;
@@ -822,9 +821,6 @@ struct csr_roamstruct {
 	(CSR_IS_OPEARTING_DUAL_BAND((mac)) || \
 		CSR_IS_RADIO_BG_ONLY((mac)) || CSR_IS_24_BAND_ONLY((mac)))
 
-#define CSR_GET_BAND(ch_freq) \
-		((wlan_reg_is_24ghz_ch_freq((ch_freq))) ? BAND_2G : BAND_5G)
-
 #define CSR_IS_ROAMING(pSession) \
 	((CSR_IS_LOSTLINK_ROAMING((pSession)->roamingReason)) || \
 		(eCsrDynamicRoaming == (pSession)->roamingReason)  ||	\
@@ -966,8 +962,18 @@ uint8_t csr_construct_wapi_ie(struct mac_context *mac, uint32_t sessionId,
 void csr_set_cfg_privacy(struct mac_context *mac,
 			 struct csr_roam_profile *pProfile,
 			 bool fPrivacy);
-uint8_t csr_get_infra_operation_channel(struct mac_context *mac,
-							uint8_t sessionId);
+
+/**
+ * csr_get_infra_operation_chan_freq() - get operating chan freq of
+ * given vdev id
+ * @mac_ctx: Pointer to mac context
+ * @vdev_id: vdev id
+ *
+ * Return: chan freq of given vdev id
+ */
+uint32_t csr_get_infra_operation_chan_freq(
+	struct mac_context *mac, uint8_t vdev_id);
+
 bool csr_is_session_client_and_connected(struct mac_context *mac,
 		uint8_t sessionId);
 /**
@@ -1057,7 +1063,7 @@ QDF_STATUS csr_roam_start_beacon_req(struct mac_context *mac,
 
 QDF_STATUS csr_roam_send_chan_sw_ie_request(struct mac_context *mac,
 					    struct qdf_mac_addr bssid,
-					    uint8_t targetChannel,
+					    uint32_t target_chan_freq,
 					    uint8_t csaIeReqd,
 					    struct ch_params *ch_params);
 QDF_STATUS csr_roam_modify_add_ies(struct mac_context *mac,
@@ -1097,7 +1103,6 @@ static inline void csr_roaming_report_diag_event(
 {}
 #endif
 
-bool csr_find_session_by_bssid(struct mac_context *mac_ctx, uint8_t *bssid);
 QDF_STATUS csr_get_channels_and_power(struct mac_context *mac);
 
 bool csr_nonscan_active_ll_is_list_empty(
@@ -1177,9 +1182,9 @@ QDF_STATUS csr_roam_update_config(
 /**
  * csr_is_mcc_channel() - check if using the channel results into MCC
  * @mac_ctx: pointer to global MAC context
- * @channel : channel number to check for MCC scenario
+ * @chan_freq: channel frequency to check for MCC scenario
  *
  * Return : true if channel causes MCC, else false
  */
-bool csr_is_mcc_channel(struct mac_context *mac_ctx, uint8_t channel);
+bool csr_is_mcc_channel(struct mac_context *mac_ctx, uint32_t chan_freq);
 #endif

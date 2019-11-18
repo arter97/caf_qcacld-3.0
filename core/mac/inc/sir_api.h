@@ -1587,7 +1587,6 @@ typedef struct sSmeIbssPeerInd {
 	uint8_t sessionId;
 
 	struct qdf_mac_addr peer_addr;
-	uint16_t staId;
 
 	/* Beacon will be appended for new Peer indication. */
 } tSmeIbssPeerInd, *tpSmeIbssPeerInd;
@@ -1926,7 +1925,7 @@ enum rxmgmt_flags {
 
 typedef struct sSirSmeMgmtFrameInd {
 	uint16_t frame_len;
-	uint32_t rxChan;
+	uint32_t rx_freq;
 	uint8_t sessionId;
 	uint8_t frameType;
 	int8_t rxRssi;
@@ -2464,7 +2463,7 @@ typedef struct sAniHandoffReq {
 	uint16_t msgLen;        /* length of the entire request */
 	uint8_t sessionId;
 	uint8_t bssid[QDF_MAC_ADDR_SIZE];
-	uint8_t channel;
+	uint32_t ch_freq;
 	uint8_t handoff_src;
 } tAniHandoffReq, *tpAniHandoffReq;
 
@@ -2649,7 +2648,7 @@ typedef struct sSirDelPeriodicTxPtrn {
 *--------------------------------------------------------------------------*/
 typedef struct {
 	bool allPeerInfoReqd;   /* If set, all IBSS peers stats are reported */
-	uint8_t staIdx;         /* If allPeerInfoReqd is not set, only stats */
+	struct qdf_mac_addr peer_mac;
 	/* of peer with staIdx is reported */
 } tSirIbssGetPeerInfoReqParams, *tpSirIbssGetPeerInfoReqParams;
 
@@ -2743,7 +2742,7 @@ typedef struct sSirSmeDfsEventInd {
 typedef struct sSirChanChangeRequest {
 	uint16_t messageType;
 	uint16_t messageLen;
-	uint8_t targetChannel;
+	uint32_t target_chan_freq;
 	uint8_t sec_ch_offset;
 	enum phy_ch_width ch_width;
 	uint8_t center_freq_seg_0;
@@ -2831,7 +2830,7 @@ typedef struct sSirUpdateIEsInd {
 typedef struct sSirDfsCsaIeRequest {
 	uint16_t msgType;
 	uint16_t msgLen;
-	uint8_t targetChannel;
+	uint32_t target_chan_freq;
 	uint8_t csaIeRequired;
 	uint8_t bssid[QDF_MAC_ADDR_SIZE];
 	struct ch_params ch_params;
@@ -4351,12 +4350,14 @@ struct cfg_action_frm_tb_ppdu {
  * @msgType: nss update msg type
  * @msgLen: length of the msg
  * @new_nss: new spatial stream value
+ * @ch_width: channel width - optional
  * @vdev_id: session id
  */
 struct sir_nss_update_request {
 	uint16_t msgType;
 	uint16_t msgLen;
 	uint8_t  new_nss;
+	uint8_t ch_width;
 	uint32_t vdev_id;
 };
 
@@ -5681,22 +5682,36 @@ struct sir_sae_msg {
 /**
  * struct set_pcl_req - Request message to set the PCL
  * @chan_weights: PCL channel weights
- * @band: Supported band
+ * @band_mask: Supported band mask
  */
 struct set_pcl_req {
 	struct wmi_pcl_chan_weights chan_weights;
-	enum band_info band;
+	uint32_t band_mask;
 };
 
+#ifdef WLAN_FEATURE_MOTION_DETECTION
 /**
  * struct sir_md_evt - motion detection event status
  * @vdev_id: vdev id
  * @status: md event status
  */
-#ifdef WLAN_FEATURE_MOTION_DETECTION
 struct sir_md_evt {
 	uint8_t vdev_id;
 	uint32_t status;
+};
+
+/**
+ * struct sir_md_bl_evt - motion detection baseline event values
+ * @vdev_id: vdev id
+ * @bl_baseline_value: baseline correlation value calculated during baselining
+ * @bl_max_corr_reserved: max corr value obtained during baselining phase in %
+ * @bl_min_corr_reserved: min corr value obtained during baselining phase in %
+ */
+struct sir_md_bl_evt {
+	uint8_t vdev_id;
+	uint32_t bl_baseline_value;
+	uint32_t bl_max_corr_reserved;
+	uint32_t bl_min_corr_reserved;
 };
 #endif /* WLAN_FEATURE_MOTION_DETECTION */
 

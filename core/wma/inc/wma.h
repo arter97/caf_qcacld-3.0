@@ -90,6 +90,7 @@
 #define wma_warn(params...) QDF_TRACE_WARN(QDF_MODULE_ID_WMA, params)
 #define wma_info(params...) QDF_TRACE_INFO(QDF_MODULE_ID_WMA, params)
 #define wma_debug(params...) QDF_TRACE_DEBUG(QDF_MODULE_ID_WMA, params)
+#define wma_debug_rl(params...) QDF_TRACE_DEBUG_RL(QDF_MODULE_ID_WMA, params)
 #define wma_err_rl(params...) QDF_TRACE_ERROR_RL(QDF_MODULE_ID_WMA, params)
 
 #define wma_nofl_alert(params...) \
@@ -224,6 +225,8 @@
 #define WMA_DEAUTH_RECV_WAKE_LOCK_DURATION      WAKELOCK_DURATION_RECOMMENDED
 #define WMA_DISASSOC_RECV_WAKE_LOCK_DURATION    WAKELOCK_DURATION_RECOMMENDED
 #define WMA_ROAM_HO_WAKE_LOCK_DURATION          (500)          /* in msec */
+#define WMA_ROAM_PREAUTH_WAKE_LOCK_DURATION     (2 * 1000)
+
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
 #define WMA_AUTO_SHUTDOWN_WAKE_LOCK_DURATION    WAKELOCK_DURATION_RECOMMENDED
 #endif
@@ -418,9 +421,9 @@ typedef void (*txFailIndCallback)(uint8_t *peer_mac, uint8_t seqNo);
  *
  */
 enum wma_rx_exec_ctx {
-	WMA_RX_WORK_CTX,
-	WMA_RX_TASKLET_CTX,
-	WMA_RX_SERIALIZER_CTX
+	WMA_RX_WORK_CTX = WMI_RX_WORK_CTX,
+	WMA_RX_TASKLET_CTX = WMI_RX_TASKLET_CTX,
+	WMA_RX_SERIALIZER_CTX = WMI_RX_SERIALIZER_CTX,
 };
 
 /**
@@ -672,6 +675,16 @@ struct roam_synch_frame_ind {
 	uint8_t *reassoc_rsp;
 };
 
+/* Max number of invalid peer entries */
+#define INVALID_PEER_MAX_NUM 5
+
+/**
+ * struct wma_invalid_peer_params - stores invalid peer entries
+ * @rx_macaddr: store mac addr of invalid peer
+ */
+struct wma_invalid_peer_params {
+	uint8_t rx_macaddr[QDF_MAC_ADDR_SIZE];
+};
 
 /**
  * struct wma_txrx_node - txrx node
@@ -688,7 +701,6 @@ struct roam_synch_frame_ind {
  * @llbCoexist: 11b coexist
  * @shortSlotTimeSupported: is short slot time supported or not
  * @dtimPeriod: DTIM period
- * @chanmode: channel mode
  * @mhz: channel frequency in KHz
  * @chan_width: channel bandwidth
  * @vdev_up: is vdev up or not
@@ -704,8 +716,6 @@ struct roam_synch_frame_ind {
  * @nss: nss value
  * @is_channel_switch: is channel switch
  * @pause_bitmap: pause bitmap
- * @tx_power: tx power in dbm
- * @max_tx_power: max tx power in dbm
  * @nwType: network type (802.11a/b/g/n/ac)
  * @staKeyParams: sta key parameters
  * @ps_enabled: is powersave enable/disable
@@ -725,7 +735,8 @@ struct roam_synch_frame_ind {
  * @vdev_set_key_runtime_wakelock: runtime pm wakelock for set key
  * @ch_freq: channel frequency
  * @roam_scan_stats_req: cached roam scan stats request
- *
+ * @wma_invalid_peer_params: structure storing invalid peer params
+ * @invalid_peer_idx: invalid peer index
  * It stores parameters per vdev in wma.
  */
 struct wma_txrx_node {
@@ -741,7 +752,6 @@ struct wma_txrx_node {
 	uint8_t llbCoexist;
 	uint8_t shortSlotTimeSupported;
 	uint8_t dtimPeriod;
-	uint32_t chanmode;
 	A_UINT32 mhz;
 	enum phy_ch_width chan_width;
 	bool vdev_active;
@@ -756,10 +766,9 @@ struct wma_txrx_node {
 	void *del_staself_req;
 	bool is_del_sta_defered;
 	qdf_atomic_t bss_status;
+	enum tx_rate_info rate_flags;
 	uint8_t nss;
 	uint16_t pause_bitmap;
-	int8_t tx_power;
-	int8_t max_tx_power;
 	uint32_t nwType;
 	tSetStaKeyParams *staKeyParams;
 	uint32_t peer_count;
@@ -785,6 +794,8 @@ struct wma_txrx_node {
 	bool is_waiting_for_key;
 	uint32_t ch_freq;
 	struct sir_roam_scan_stats *roam_scan_stats_req;
+	struct wma_invalid_peer_params invalid_peers[INVALID_PEER_MAX_NUM];
+	uint8_t invalid_peer_idx;
 };
 
 /**
@@ -979,8 +990,6 @@ struct wma_wlm_stats_data {
  * @dynamic_nss_chains_update: per vdev nss, chains update
  * @ito_repeat_count: Indicates ito repeated count
  * @wma_fw_time_sync_timer: timer used for firmware time sync
- * @critical_events_in_flight: number of suspend-preventing events
- *   in flight
  * * @fw_therm_throt_support: FW Supports thermal throttling?
  *
  * This structure is the global wma context.  It contains global wma
@@ -1046,6 +1055,7 @@ typedef struct {
 	qdf_wake_lock_t wow_ap_assoc_lost_wl;
 	qdf_wake_lock_t wow_auto_shutdown_wl;
 	qdf_wake_lock_t roam_ho_wl;
+	qdf_wake_lock_t roam_preauth_wl;
 	int wow_nack;
 	qdf_atomic_t is_wow_bus_suspended;
 	bool suitable_ap_hb_failure;
@@ -1114,7 +1124,6 @@ typedef struct {
 	bool dynamic_nss_chains_support;
 	uint8_t  ito_repeat_count;
 	qdf_mc_timer_t wma_fw_time_sync_timer;
-	qdf_atomic_t critical_events_in_flight;
 	bool fw_therm_throt_support;
 	bool enable_tx_compl_tsf64;
 } t_wma_handle, *tp_wma_handle;
@@ -1512,28 +1521,6 @@ struct wma_roam_invoke_cmd {
 	bool forced_roaming;
 };
 
-/**
- * struct wma_process_fw_event_params - fw event parameters
- * @wmi_handle: wmi handle
- * @evt_buf: event buffer
- */
-typedef struct {
-	void *wmi_handle;
-	void *evt_buf;
-} wma_process_fw_event_params;
-
-/**
- * wma_process_fw_event_handler() - common event handler to serialize
- *                                  event processing through mc_thread
- * @scn_handle: scn handle
- * @ev: event buffer
- * @rx_ctx: rx execution context
- *
- * Return: 0 on success, errno on failure
- */
-int wma_process_fw_event_handler(ol_scn_t scn_handle, void *ev,
-				 uint8_t rx_ctx);
-
 A_UINT32 e_csr_auth_type_to_rsn_authmode(enum csr_akm_type authtype,
 					 eCsrEncryptionType encr);
 A_UINT32 e_csr_encryption_type_to_rsn_cipherset(eCsrEncryptionType encr);
@@ -1770,8 +1757,36 @@ QDF_STATUS wma_get_cca_stats(tp_wma_handle wma_handle,
 				uint8_t vdev_id);
 
 struct wma_ini_config *wma_get_ini_handle(tp_wma_handle wma_handle);
-WLAN_PHY_MODE wma_chan_phy_mode(uint32_t freq, enum phy_ch_width chan_width,
-				uint8_t dot11_mode);
+
+/**
+ * wma_chan_phy__mode() - get host phymode for channel
+ * @freq: channel freq
+ * @chan_width: maximum channel width possible
+ * @dot11_mode: maximum phy_mode possible
+ *
+ * Return: return host phymode
+ */
+enum wlan_phymode wma_chan_phy_mode(uint32_t freq, enum phy_ch_width chan_width,
+				    uint8_t dot11_mode);
+
+/**
+ * wma_host_to_fw_phymode() - convert host to fw phymode
+ * @host_phymode: phymode to convert
+ *
+ * Return: one of the values defined in enum WMI_HOST_WLAN_PHY_MODE;
+ *         or WMI_HOST_MODE_UNKNOWN if the conversion fails
+ */
+WMI_HOST_WLAN_PHY_MODE wma_host_to_fw_phymode(enum wlan_phymode host_phymode);
+
+/**
+ * wma_fw_to_host_phymode() - convert fw to host phymode
+ * @phymode: phymode to convert
+ *
+ * Return: one of the values defined in enum wlan_phymode;
+ *         or WLAN_PHYMODE_AUTO if the conversion fails
+ */
+enum wlan_phymode wma_fw_to_host_phymode(WMI_HOST_WLAN_PHY_MODE phymode);
+
 
 #ifdef FEATURE_OEM_DATA_SUPPORT
 /**
@@ -2406,7 +2421,16 @@ void wma_check_and_set_wake_timer(uint32_t time);
 #endif
 
 /**
- * wma_rx_invalid_peer_ind(): the callback for DP to notify WMA layer
+ * wma_delete_invalid_peer_entries() - Delete invalid peer entries stored
+ * @vdev_id: virtual interface id
+ * @peer_mac_addr: Peer MAC address
+ *
+ * Removes the invalid peer mac entry from wma node
+ */
+void wma_delete_invalid_peer_entries(uint8_t vdev_id, uint8_t *peer_mac_addr);
+
+/**
+ * wma_rx_invalid_peer_ind() - the callback for DP to notify WMA layer
  * invalid peer data is received, this function will send message to
  * lim module.
  * @vdev_id: virtual device ID

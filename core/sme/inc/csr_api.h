@@ -573,8 +573,9 @@ typedef enum {
  * For both 11a and 11g mode.
  */
 #define CSR_CB_CHANNEL_GAP 4
-#define CSR_CB_CENTER_CHANNEL_OFFSET    2
-#define CSR_SEC_CHANNEL_OFFSET    4
+/* Considering 5 MHz Channel BW */
+#define CSR_CB_CENTER_CHANNEL_OFFSET    10
+#define CSR_SEC_CHANNEL_OFFSET    20
 
 
 /* WEP keysize (in bits) */
@@ -1196,10 +1197,14 @@ typedef struct tagCsrGlobalClassAStatsInfo {
 	/* mcs index for HT20 and HT40 rates */
 	uint32_t tx_mcs_index;
 	uint32_t rx_mcs_index;
-	uint32_t tx_mcs_rate_flags;
-	uint32_t rx_mcs_rate_flags;
+	enum tx_rate_info tx_mcs_rate_flags;
+	enum tx_rate_info rx_mcs_rate_flags;
+	uint8_t  tx_dcm;
+	uint8_t  rx_dcm;
+	enum txrate_gi  tx_gi;
+	enum txrate_gi  rx_gi;
 	/* to diff between HT20 & HT40 rates;short & long guard interval */
-	uint32_t tx_rx_rate_flags;
+	enum tx_rate_info tx_rx_rate_flags;
 
 } tCsrGlobalClassAStatsInfo;
 
