@@ -107,7 +107,9 @@ void hdd_ipa_set_tx_flow_info(void)
 			if (hostapd_state->bss_state == BSS_START
 			    && hostapd_state->qdf_status ==
 			    QDF_STATUS_SUCCESS) {
-				p2pChannel = hdd_ap_ctx->operating_channel;
+				p2pChannel = wlan_reg_freq_to_chan(
+					hdd_ctx->pdev,
+					hdd_ap_ctx->operating_chan_freq);
 				qdf_copy_macaddr(&p2pBssid,
 						 &adapter->mac_addr);
 #ifdef QCA_LL_LEGACY_TX_FLOW_CONTROL
@@ -122,7 +124,9 @@ void hdd_ipa_set_tx_flow_info(void)
 			if (hostapd_state->bss_state == BSS_START
 			    && hostapd_state->qdf_status ==
 			    QDF_STATUS_SUCCESS) {
-				apChannel = hdd_ap_ctx->operating_channel;
+				apChannel = wlan_reg_freq_to_chan(
+					hdd_ctx->pdev,
+					hdd_ap_ctx->operating_chan_freq);
 				qdf_copy_macaddr(&apBssid,
 						&adapter->mac_addr);
 #ifdef QCA_LL_LEGACY_TX_FLOW_CONTROL
@@ -213,7 +217,7 @@ void hdd_ipa_set_tx_flow_info(void)
 					preAdapterContext->
 					tx_flow_hi_watermark_offset = 0;
 					cdp_fc_ll_set_tx_pause_q_depth(soc,
-						preAdapterContext->session_id,
+						preAdapterContext->vdev_id,
 						hdd_ctx->config->
 						tx_hbw_flow_max_queue_depth);
 					hdd_info("SCC: MODE %s(%d), CH %d, LWM %d, HWM %d, TXQDEP %d",
@@ -262,7 +266,7 @@ void hdd_ipa_set_tx_flow_info(void)
 						hdd_ctx->config->
 						tx_hbw_flow_hi_watermark_offset;
 					cdp_fc_ll_set_tx_pause_q_depth(soc,
-						adapter5->session_id,
+						adapter5->vdev_id,
 						hdd_ctx->config->
 						tx_hbw_flow_max_queue_depth);
 					hdd_info("MCC: MODE %s(%d), CH %d, LWM %d, HWM %d, TXQDEP %d",
@@ -290,7 +294,7 @@ void hdd_ipa_set_tx_flow_info(void)
 						hdd_ctx->config->
 						tx_lbw_flow_hi_watermark_offset;
 					cdp_fc_ll_set_tx_pause_q_depth(soc,
-						adapter2_4->session_id,
+						adapter2_4->vdev_id,
 						hdd_ctx->config->
 						tx_lbw_flow_max_queue_depth);
 					hdd_info("MCC: MODE %s(%d), CH %d, LWM %d, HWM %d, TXQDEP %d",

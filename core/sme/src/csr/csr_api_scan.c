@@ -337,7 +337,7 @@ QDF_STATUS csr_scan_result_purge(struct mac_context *mac,
 
 /* Add the channel to the occupiedChannels array */
 static void csr_add_to_occupied_channels(struct mac_context *mac,
-					 uint8_t ch,
+					 uint32_t ch_freq,
 					 uint8_t sessionId,
 					 struct csr_channel *occupied_ch,
 					 bool is_init_list)
@@ -350,15 +350,15 @@ static void csr_add_to_occupied_channels(struct mac_context *mac,
 		mac->scan.roam_candidate_count[sessionId]++;
 
 	if (csr_is_channel_present_in_list(occupied_ch_lst,
-					   num_occupied_ch, wlan_reg_chan_to_freq(mac->pdev, ch)))
+					   num_occupied_ch, ch_freq))
 		return;
 
 	status = csr_add_to_channel_list_front(occupied_ch_lst,
-					       num_occupied_ch, wlan_reg_chan_to_freq(mac->pdev, ch));
+					       num_occupied_ch, ch_freq);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 		occupied_ch->numChannels++;
-		sme_debug("Added channel %d to the list (count=%d)",
-			ch, occupied_ch->numChannels);
+		sme_debug("Added channel freq %d to the list (count=%d)",
+			  ch_freq, occupied_ch->numChannels);
 		if (occupied_ch->numChannels >
 		    CSR_BG_SCAN_OCCUPIED_CHANNEL_LIST_LEN)
 			occupied_ch->numChannels =
@@ -390,8 +390,7 @@ static void csr_scan_add_result(struct mac_context *mac_ctx,
 		frm_type = MGMT_PROBE_RESP;
 
 	rx_param.pdev_id = 0;
-	rx_param.channel = wlan_reg_freq_to_chan(mac_ctx->pdev,
-						 bss_desc->chan_freq);
+	rx_param.chan_freq = bss_desc->chan_freq;
 	rx_param.rssi = bss_desc->rssi;
 	rx_param.tsf_delta = bss_desc->tsf_delta;
 
@@ -850,14 +849,13 @@ void csr_save_channel_power_for_band(struct mac_context *mac, bool fill_5f)
 	qdf_mem_free(ch_info_start);
 }
 
-bool csr_is_supported_channel(struct mac_context *mac, uint8_t channelId)
+bool csr_is_supported_channel(struct mac_context *mac, uint32_t chan_freq)
 {
 	bool fRet = false;
 	uint32_t i;
 
 	for (i = 0; i < mac->scan.base_channels.numChannels; i++) {
-		if (wlan_reg_chan_to_freq(mac->pdev, channelId) ==
-		    mac->scan.base_channels.channel_freq_list[i]) {
+		if (chan_freq == mac->scan.base_channels.channel_freq_list[i]) {
 			fRet = true;
 			break;
 		}
@@ -941,10 +939,10 @@ static enum csr_scancomplete_nextcommand
 csr_scan_get_next_command_state(struct mac_context *mac_ctx,
 				uint32_t session_id,
 				eCsrScanStatus scan_status,
-				uint8_t *chan)
+				uint32_t *chan_freq)
 {
 	enum csr_scancomplete_nextcommand NextCommand = eCsrNextScanNothing;
-	int8_t channel;
+	uint32_t chan_freq_ret;
 	struct csr_roam_session *session;
 
 	if (!CSR_IS_SESSION_VALID(mac_ctx, session_id)) {
@@ -955,17 +953,17 @@ csr_scan_get_next_command_state(struct mac_context *mac_ctx,
 	switch (session->scan_info.scan_reason) {
 	case eCsrScanForSsid:
 		sme_debug("Resp for Scan For Ssid");
-		channel = csr_scan_get_channel_for_hw_mode_change(
+		chan_freq_ret = csr_scan_get_channel_for_hw_mode_change(
 				mac_ctx,
 				session_id,
 				session->scan_info.profile);
-		if ((!channel) && scan_status) {
+		if ((!chan_freq_ret) && scan_status) {
 			NextCommand = eCsrNexteScanForSsidFailure;
 			sme_err("next Scan For Ssid Failure %d %d",
-				channel, scan_status);
+				chan_freq_ret, scan_status);
 		} else {
 			NextCommand = eCsrNextCheckAllowConc;
-			*chan = channel;
+			*chan_freq = chan_freq_ret;
 			sme_debug("next CheckAllowConc");
 		}
 		break;
@@ -1157,7 +1155,7 @@ error:
 static void csr_handle_nxt_cmd(struct mac_context *mac_ctx,
 			       enum csr_scancomplete_nextcommand nxt_cmd,
 			       uint32_t session_id,
-			       uint8_t chan)
+			       uint32_t chan_freq)
 {
 	QDF_STATUS status, ret;
 	struct csr_roam_session *session;
@@ -1171,11 +1169,11 @@ static void csr_handle_nxt_cmd(struct mac_context *mac_ctx,
 		csr_scan_handle_search_for_ssid_failure(mac_ctx, session_id);
 		break;
 	case eCsrNextCheckAllowConc:
-		ret = policy_mgr_current_connections_update(mac_ctx->psoc,
-					session_id, chan,
-					POLICY_MGR_UPDATE_REASON_HIDDEN_STA);
-		sme_debug("chan: %d session: %d status: %d",
-					chan, session_id, ret);
+		ret = policy_mgr_current_connections_update(
+				mac_ctx->psoc, session_id, chan_freq,
+				POLICY_MGR_UPDATE_REASON_HIDDEN_STA);
+		sme_debug("channel freq: %d session: %d status: %d",
+			  chan_freq, session_id, ret);
 
 		status = csr_save_profile(mac_ctx, session_id);
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
@@ -1185,7 +1183,7 @@ static void csr_handle_nxt_cmd(struct mac_context *mac_ctx,
 		}
 
 		if (QDF_STATUS_E_FAILURE == ret) {
-			sme_err("conn update fail %d", chan);
+			sme_err("conn update fail %d", chan_freq);
 			csr_scan_handle_search_for_ssid_failure(mac_ctx,
 								session_id);
 		} else if ((QDF_STATUS_E_NOSUPPORT == ret) ||
@@ -1214,7 +1212,8 @@ void csr_scan_callback(struct wlan_objmgr_vdev *vdev,
 	struct mac_context *mac_ctx;
 	struct csr_roam_session *session;
 	uint32_t session_id = 0;
-	uint8_t chan = 0;
+	uint32_t chan_freq = 0;
+	QDF_STATUS status;
 	bool success = false;
 
 	mac_ctx = (struct mac_context *)arg;
@@ -1229,10 +1228,16 @@ void csr_scan_callback(struct wlan_objmgr_vdev *vdev,
 		scan_status = eCSR_SCAN_SUCCESS;
 
 	session_id = wlan_vdev_get_id(vdev);
+	status = sme_acquire_global_lock(&mac_ctx->sme);
+	if (QDF_IS_STATUS_ERROR(status))
+		return;
+
 	if (!CSR_IS_SESSION_VALID(mac_ctx, session_id)) {
 		sme_err("session %d is invalid", session_id);
+		sme_release_global_lock(&mac_ctx->sme);
 		return;
 	}
+
 	session = CSR_GET_SESSION(mac_ctx, session_id);
 
 	sme_debug("Scan Completion: status %d session %d scan_id %d",
@@ -1242,6 +1247,7 @@ void csr_scan_callback(struct wlan_objmgr_vdev *vdev,
 	if (session->scan_info.scan_id != event->scan_id) {
 		sme_debug("Scan Completion on wrong scan_id %d, expected %d",
 			session->scan_info.scan_id, event->scan_id);
+		sme_release_global_lock(&mac_ctx->sme);
 		return;
 	}
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_CSR
@@ -1249,10 +1255,12 @@ void csr_scan_callback(struct wlan_objmgr_vdev *vdev,
 #endif
 	NextCommand = csr_scan_get_next_command_state(mac_ctx,
 					session_id, scan_status,
-					&chan);
+					&chan_freq);
 	/* We reuse the command here instead reissue a new command */
 	csr_handle_nxt_cmd(mac_ctx, NextCommand,
-			   session_id, chan);
+			   session_id, chan_freq);
+
+	sme_release_global_lock(&mac_ctx->sme);
 }
 
 tCsrScanResultInfo *csr_scan_result_get_first(struct mac_context *mac,
@@ -1936,7 +1944,7 @@ csr_get_bssdescr_from_scan_handle(tScanResultHandle result_handle,
 	return bss_descr;
 }
 
-uint8_t
+uint32_t
 csr_get_channel_for_hw_mode_change(struct mac_context *mac_ctx,
 				   tScanResultHandle result_handle,
 				   uint32_t session_id)
@@ -1945,7 +1953,7 @@ csr_get_channel_for_hw_mode_change(struct mac_context *mac_ctx,
 	struct tag_csrscan_result *scan_result = NULL;
 	struct scan_result_list *bss_list =
 				(struct scan_result_list *)result_handle;
-	uint8_t channel_id = 0;
+	uint32_t ch_freq = 0;
 
 	if (!bss_list) {
 		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
@@ -1991,19 +1999,17 @@ csr_get_channel_for_hw_mode_change(struct mac_context *mac_ctx,
 		scan_result = GET_BASE_ADDR(next_element,
 					    struct tag_csrscan_result,
 					    Link);
-		channel_id = wlan_reg_freq_to_chan(
-				mac_ctx->pdev,
-				scan_result->Result.BssDescriptor.chan_freq);
+		ch_freq = scan_result->Result.BssDescriptor.chan_freq;
 		if (policy_mgr_is_hw_dbs_2x2_capable(mac_ctx->psoc)) {
-			if (WLAN_REG_IS_24GHZ_CH(channel_id))
+			if (WLAN_REG_IS_24GHZ_CH_FREQ(ch_freq))
 				break;
 		} else {
-			if (WLAN_REG_IS_24GHZ_CH(channel_id) &&
+			if (WLAN_REG_IS_24GHZ_CH_FREQ(ch_freq) &&
 			    policy_mgr_is_any_mode_active_on_band_along_with_session
 				(mac_ctx->psoc,
 				 session_id, POLICY_MGR_BAND_5))
 				break;
-			if (WLAN_REG_IS_5GHZ_CH(channel_id) &&
+			if (WLAN_REG_IS_5GHZ_CH_FREQ(ch_freq) &&
 			    policy_mgr_is_any_mode_active_on_band_along_with_session
 				(mac_ctx->psoc,
 				 session_id, POLICY_MGR_BAND_24))
@@ -2013,46 +2019,46 @@ csr_get_channel_for_hw_mode_change(struct mac_context *mac_ctx,
 					   LL_ACCESS_NOLOCK);
 	}
 end:
-	return channel_id;
+	return ch_freq;
 }
 
-uint8_t
+uint32_t
 csr_scan_get_channel_for_hw_mode_change(struct mac_context *mac_ctx,
 					uint32_t session_id,
 					struct csr_roam_profile *profile)
 {
 	tScanResultHandle result_handle = NULL;
 	QDF_STATUS status;
-	uint8_t first_ap_ch = 0;
-	uint8_t candidate_chan;
+	uint32_t first_ap_ch_freq = 0, candidate_ch_freq;
 
 	status = sme_get_ap_channel_from_scan_cache(profile, &result_handle,
-						    &first_ap_ch);
-	if (status != QDF_STATUS_SUCCESS || !result_handle || !first_ap_ch) {
+						    &first_ap_ch_freq);
+	if (status != QDF_STATUS_SUCCESS || !result_handle ||
+	    !first_ap_ch_freq) {
 		if (result_handle)
 			sme_scan_result_purge(result_handle);
 		sme_err("fail get scan result: status %d first ap ch %d",
-			status, first_ap_ch);
+			status, first_ap_ch_freq);
 		return 0;
 	}
-	if (!policy_mgr_check_for_session_conc(mac_ctx->psoc, session_id,
-					       first_ap_ch)) {
+	if (!policy_mgr_check_for_session_conc(
+	    mac_ctx->psoc, session_id, first_ap_ch_freq)) {
 		sme_scan_result_purge(result_handle);
 		sme_err("Conc not allowed for the session %d ch %d",
-			session_id, first_ap_ch);
+			session_id, first_ap_ch_freq);
 		return 0;
 	}
 
-	candidate_chan = csr_get_channel_for_hw_mode_change(mac_ctx,
-							    result_handle,
-							    session_id);
+	candidate_ch_freq = csr_get_channel_for_hw_mode_change(mac_ctx,
+							       result_handle,
+							       session_id);
 	sme_scan_result_purge(result_handle);
-	if (!candidate_chan)
-		candidate_chan = first_ap_ch;
+	if (!candidate_ch_freq)
+		candidate_ch_freq = first_ap_ch_freq;
 	sme_debug("session %d hw mode check candidate_chan %d", session_id,
-		  candidate_chan);
+		  candidate_ch_freq);
 
-	return candidate_chan;
+	return candidate_ch_freq;
 }
 
 enum wlan_auth_type csr_covert_auth_type_new(enum csr_akm_type auth)
@@ -2355,12 +2361,15 @@ static QDF_STATUS csr_fill_bss_from_scan_entry(struct mac_context *mac_ctx,
 	enum channel_state ap_channel_state;
 
 	ap_channel_state =
-		wlan_reg_get_channel_state(mac_ctx->pdev,
-					   scan_entry->channel.chan_idx);
+		wlan_reg_get_channel_state(
+				mac_ctx->pdev,
+				wlan_reg_freq_to_chan(
+					mac_ctx->pdev,
+					scan_entry->channel.chan_freq));
 	if (ap_channel_state == CHANNEL_STATE_DISABLE ||
 	    ap_channel_state == CHANNEL_STATE_INVALID) {
 		sme_err("BSS %pM channel %d invalid, not populating this BSSID",
-			scan_entry->bssid.bytes, scan_entry->channel.chan_idx);
+			scan_entry->bssid.bytes, scan_entry->channel.chan_freq);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -2408,7 +2417,7 @@ static QDF_STATUS csr_fill_bss_from_scan_entry(struct mac_context *mac_ctx,
 	bss_desc->beaconInterval = scan_entry->bcn_int;
 	bss_desc->capabilityInfo = scan_entry->cap_info.value;
 
-	if (WLAN_REG_IS_5GHZ_CH(scan_entry->channel.chan_idx))
+	if (WLAN_REG_IS_5GHZ_CH_FREQ(scan_entry->channel.chan_freq))
 		bss_desc->nwType = eSIR_11A_NW_TYPE;
 	else if (scan_entry->phy_mode == WLAN_PHYMODE_11B)
 		bss_desc->nwType = eSIR_11B_NW_TYPE;
@@ -2419,9 +2428,7 @@ static QDF_STATUS csr_fill_bss_from_scan_entry(struct mac_context *mac_ctx,
 	bss_desc->rssi_raw = scan_entry->rssi_raw;
 
 	/* channel frequency what peer sent in beacon/probersp. */
-	bss_desc->chan_freq =
-		wlan_reg_chan_to_freq(mac_ctx->pdev,
-				      scan_entry->channel.chan_idx);
+	bss_desc->chan_freq = scan_entry->channel.chan_freq;
 	bss_desc->received_time =
 		scan_entry->scan_entry_time;
 	bss_desc->startTSF[0] =
@@ -2728,7 +2735,6 @@ void csr_init_occupied_channels_list(struct mac_context *mac_ctx,
 	tpCsrNeighborRoamControlInfo neighbor_roam_info =
 		&mac_ctx->roam.neighborRoamInfo[sessionId];
 	tCsrRoamConnectedProfile *profile = NULL;
-	uint8_t ch;
 
 	if (!(mac_ctx && mac_ctx->roam.roamSession &&
 	      CSR_IS_SESSION_VALID(mac_ctx, sessionId))) {
@@ -2789,7 +2795,7 @@ void csr_init_occupied_channels_list(struct mac_context *mac_ctx,
 
 	csr_add_to_occupied_channels(
 			mac_ctx,
-			wlan_reg_freq_to_chan(mac_ctx->pdev, profile->op_freq),
+			profile->op_freq,
 			sessionId,
 			&mac_ctx->scan.occupiedChannels[sessionId],
 			true);
@@ -2809,9 +2815,8 @@ void csr_init_occupied_channels_list(struct mac_context *mac_ctx,
 	while (cur_lst) {
 		cur_node = qdf_container_of(cur_lst, struct scan_cache_node,
 					    node);
-		ch = cur_node->entry->channel.chan_idx;
 		csr_add_to_occupied_channels(
-				mac_ctx, ch,
+				mac_ctx, cur_node->entry->channel.chan_freq,
 				sessionId,
 				&mac_ctx->scan.occupiedChannels[sessionId],
 				true);

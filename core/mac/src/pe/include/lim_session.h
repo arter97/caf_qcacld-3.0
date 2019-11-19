@@ -192,7 +192,7 @@ struct pe_session {
 
 	/* Parameters  For Reassociation */
 	tSirMacAddr limReAssocbssId;
-	tSirMacChanNum limReassocChannelId;
+	uint32_t lim_reassoc_chan_freq;
 	/* CB paramaters required/duplicated for Reassoc since re-assoc mantains its own params in lim */
 	uint8_t reAssocHtSupportedChannelWidthSet;
 	uint8_t reAssocHtRecommendedTxWidthSet;
@@ -206,12 +206,6 @@ struct pe_session {
 
 	/** BSS Table parameters **/
 
-	/*
-	 * staId:  Start BSS: this is the  Sta Id for the BSS.
-	 * Join: this is the selfStaId
-	 * In both cases above, the peer STA ID wll be stored in dph hash table.
-	 */
-	uint16_t staId;
 	uint16_t statypeForBss; /* to know session is for PEER or SELF */
 	uint8_t shortSlotTimeSupported;
 	uint8_t dtimPeriod;
@@ -232,7 +226,7 @@ struct pe_session {
 	uint8_t *beacon;        /* Used to store last beacon / probe response before assoc. */
 
 	uint32_t assocReqLen;
-	uint8_t *assocReq;      /* Used to store association request frame sent out while associating. */
+	uint8_t *assoc_req;      /* Used to store association request frame */
 
 	uint32_t assocRspLen;
 	uint8_t *assocRsp;      /* Used to store association response received while associating */
@@ -690,21 +684,6 @@ struct pe_session *pe_find_session_by_peer_sta(struct mac_context *mac, uint8_t 
  */
 struct pe_session *pe_find_session_by_session_id(struct mac_context *mac,
 					  uint8_t sessionId);
-
-/**
- * pe_find_session_by_bssid() - looks up the PE session given staid.
- *
- * @mac:          pointer to global adapter context
- * @staid:         StaId of the session
- * @sessionId:     session ID is returned here, if session is found.
- *
- * This function returns the session context and the session ID if the session
- * corresponding to the given StaId is found in the PE session table.
- *
- * Return: pointer to the session context or NULL if session is not found.
- */
-struct pe_session *pe_find_session_by_sta_id(struct mac_context *mac, uint8_t staid,
-				      uint8_t *sessionId);
 
 /**
  * pe_delete_session() - deletes the PE session given the session ID.

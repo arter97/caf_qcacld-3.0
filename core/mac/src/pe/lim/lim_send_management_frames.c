@@ -315,6 +315,8 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 
 	pe_debug("Populate HE IEs");
 	populate_dot11f_he_caps(mac_ctx, pesession, &pr.he_cap);
+	populate_dot11f_he_6ghz_cap(mac_ctx, pesession,
+				    &pr.he_6ghz_band_cap);
 
 	if (addn_ielen && additional_ie) {
 		qdf_mem_zero((uint8_t *)&extracted_ext_cap,
@@ -627,6 +629,8 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 					&frm->he_cap);
 		populate_dot11f_he_operation(mac_ctx, pe_session,
 					     &frm->he_op);
+		populate_dot11f_he_6ghz_cap(mac_ctx, pe_session,
+					    &frm->he_6ghz_band_cap);
 	}
 
 	populate_dot11f_ext_cap(mac_ctx, is_vht_enabled, &frm->ExtCap,
@@ -1096,17 +1100,16 @@ static QDF_STATUS lim_assoc_rsp_tx_complete(
 	lim_fill_sme_assoc_ind_params(
 				mac_ctx, lim_assoc_ind,
 				sme_assoc_ind,
-				session_entry);
+				session_entry, true);
 
 	qdf_mem_zero(&msg, sizeof(struct scheduler_msg));
 	msg.type = eWNI_SME_ASSOC_IND_UPPER_LAYER;
 	msg.bodyptr = sme_assoc_ind;
 	msg.bodyval = 0;
-	sme_assoc_ind->staId = sta_ds->staIndex;
 	sme_assoc_ind->reassocReq = sta_ds->mlmStaContext.subType;
 	sme_assoc_ind->timingMeasCap = sta_ds->timingMeasCap;
-
-	mac_ctx->lim.sme_msg_callback(mac_ctx, &msg);
+	MTRACE(mac_trace_msg_tx(mac_ctx, session_entry->peSessionId, msg.type));
+	lim_sys_process_mmh_msg_api(mac_ctx, &msg);
 
 	qdf_mem_free(lim_assoc_ind);
 	if (assoc_req->assocReqFrame) {
@@ -1206,7 +1209,7 @@ lim_send_assoc_rsp_mgmt_frame(
 		assoc_req = (tpSirAssocReq)
 			pe_session->parsedAssocReq[sta->assocId];
 		/*
-		 * populate P2P IE in AssocRsp when assocReq from the peer
+		 * populate P2P IE in AssocRsp when assoc_req from the peer
 		 * includes P2P IE
 		 */
 		if (assoc_req && assoc_req->addIEPresent)
@@ -2033,9 +2036,13 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		pe_debug("Populate HE IEs");
 		populate_dot11f_he_caps(mac_ctx, pe_session,
 					&frm->he_cap);
+		populate_dot11f_he_6ghz_cap(mac_ctx, pe_session,
+					    &frm->he_6ghz_band_cap);
 	} else if (pe_session->he_with_wep_tkip) {
 		pe_debug("Populate HE IEs in Assoc Request with WEP/TKIP");
 		populate_dot11f_he_caps(mac_ctx, NULL, &frm->he_cap);
+		populate_dot11f_he_6ghz_cap(mac_ctx, pe_session,
+					    &frm->he_6ghz_band_cap);
 	}
 
 	if (pe_session->lim_join_req->is11Rconnection) {
@@ -2284,9 +2291,9 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		     adaptive_11r_ie, adaptive_11r_ie_len);
 	payload = payload + adaptive_11r_ie_len;
 
-	if (pe_session->assocReq) {
-		qdf_mem_free(pe_session->assocReq);
-		pe_session->assocReq = NULL;
+	if (pe_session->assoc_req) {
+		qdf_mem_free(pe_session->assoc_req);
+		pe_session->assoc_req = NULL;
 		pe_session->assocReqLen = 0;
 	}
 
@@ -2299,13 +2306,13 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		}
 	}
 
-	pe_session->assocReq = qdf_mem_malloc(payload);
-	if (pe_session->assocReq) {
+	pe_session->assoc_req = qdf_mem_malloc(payload);
+	if (pe_session->assoc_req) {
 		/*
 		 * Store the Assoc request. This is sent to csr/hdd in
 		 * join cnf response.
 		 */
-		qdf_mem_copy(pe_session->assocReq,
+		qdf_mem_copy(pe_session->assoc_req,
 			     frame + sizeof(tSirMacMgmtHdr), payload);
 		pe_session->assocReqLen = payload;
 	}
@@ -4851,17 +4858,15 @@ returnAfterError:
 } /* End lim_send_sa_query_response_frame */
 #endif
 
-#if defined(QCA_WIFI_QCA6290) || defined(QCA_WIFI_QCA6390)
+#if defined(QCA_WIFI_QCA6290) || defined(QCA_WIFI_QCA6390) || \
+	defined(QCA_WIFI_QCA6490)
 #ifdef WLAN_FEATURE_11AX
-#define IS_PE_SESSION_11N_MODE(_session) \
-	((_session)->htCapability && !(_session)->vhtCapability && \
-	 !(_session)->he_capable)
+#define IS_PE_SESSION_HE_MODE(_session) ((_session)->he_capable)
 #else
-#define IS_PE_SESSION_11N_MODE(_session) \
-	((_session)->htCapability && !(_session)->vhtCapability)
+#define IS_PE_SESSION_HE_MODE(_session) false
 #endif /* WLAN_FEATURE_11AX */
 #else
-#define IS_PE_SESSION_11N_MODE(_session) false
+#define IS_PE_SESSION_HE_MODE(_session) false
 #endif
 
 /**
@@ -4959,10 +4964,11 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 		session->active_ba_64_session = true;
 	}
 
-	/* disable 11n RX AMSDU */
+	/* Enable RX AMSDU only in HE mode if supported */
 	if (mac_ctx->is_usr_cfg_amsdu_enabled &&
-	    !IS_PE_SESSION_11N_MODE(session) &&
-	    !WLAN_REG_IS_24GHZ_CH_FREQ(session->curr_op_freq))
+	    ((IS_PE_SESSION_HE_MODE(session) &&
+	      WLAN_REG_IS_24GHZ_CH_FREQ(session->curr_op_freq)) ||
+	     WLAN_REG_IS_5GHZ_CH_FREQ(session->curr_op_freq)))
 		frm.addba_param_set.amsdu_supp = amsdu_support;
 	else
 		frm.addba_param_set.amsdu_supp = 0;

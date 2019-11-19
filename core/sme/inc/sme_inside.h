@@ -61,6 +61,7 @@ typedef struct sGenericQosCmd {
 /**
  * struct s_nss_update_cmd - Format of nss update request
  * @new_nss: new nss value
+ * @ch_width: new channel width - optional
  * @session_id: Session ID
  * @set_hw_mode_cb: HDD nss update callback
  * @context: Adapter context
@@ -70,6 +71,7 @@ typedef struct sGenericQosCmd {
  */
 struct s_nss_update_cmd {
 	uint32_t new_nss;
+	uint32_t ch_width;
 	uint32_t session_id;
 	void *nss_update_cb;
 	void *context;
@@ -158,7 +160,7 @@ void csr_reinit_wm_status_change_cmd(struct mac_context *mac,
 				     tSmeCmd *pCommand);
 QDF_STATUS csr_roam_send_set_key_cmd(struct mac_context *mac_ctx,
 		uint32_t session_id, struct setkey_cmd *set_key_cmd);
-QDF_STATUS csr_is_valid_channel(struct mac_context *mac, uint8_t chnNum);
+QDF_STATUS csr_is_valid_channel(struct mac_context *mac, uint32_t freq);
 
 QDF_STATUS sme_acquire_global_lock(struct sme_context *sme);
 QDF_STATUS sme_release_global_lock(struct sme_context *sme);
@@ -178,20 +180,20 @@ void csr_flush_cfg_bg_scan_roam_channel_list(tCsrChannelInfo *channel_info);
  * csr_create_bg_scan_roam_channel_list() - Create roam scan chan list
  * @mac: global mac context
  * @channel_info: Channel list to be populated for roam scan
- * @chan_list: Channel list to be populated from
+ * @chan_freq_list: Channel list to be populated from
  * @num_chan: Number of channels
  *
  * Return: QDF_STATUS_SUCCESS or QDF_STATUS_E_FAILURE
  */
 QDF_STATUS csr_create_bg_scan_roam_channel_list(struct mac_context *mac,
 						tCsrChannelInfo *channel_info,
-						const uint8_t *chan_list,
+						const uint32_t *chan_freq_list,
 						const uint8_t num_chan);
 
 #ifdef FEATURE_WLAN_ESE
 QDF_STATUS csr_create_roam_scan_channel_list(struct mac_context *mac,
 		uint8_t sessionId,
-		uint8_t *pChannelList,
+		uint32_t *chan_freq_list,
 		uint8_t numChannels,
 		const enum band_info band);
 #endif

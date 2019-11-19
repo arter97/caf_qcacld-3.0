@@ -112,6 +112,8 @@
 #include "qdf_periodic_work.h"
 #endif
 
+#include "wlan_hdd_sta_info.h"
+
 /*
  * Preprocessor definitions and constants
  */
@@ -194,6 +196,8 @@ static inline bool in_compat_syscall(void) { return is_compat_task(); }
 #else
 #define NUM_CPUS 1
 #endif
+
+#define ACS_COMPLETE_TIMEOUT 3000
 
 #define HDD_PSOC_IDLE_SHUTDOWN_SUSPEND_DELAY (1000)
 /**
@@ -811,7 +815,7 @@ struct hdd_rate_info {
 	uint8_t mode;
 	uint8_t nss;
 	uint8_t mcs;
-	uint8_t rate_flags;
+	enum tx_rate_info rate_flags;
 };
 
 /**
@@ -881,135 +885,6 @@ struct hdd_fw_txrx_stats {
 };
 
 /**
- * struct dhcp_phase - Per Peer DHCP Phases
- * @DHCP_PHASE_ACK: upon receiving DHCP_ACK/NAK message in REQUEST phase or
- *         DHCP_DELINE message in OFFER phase
- * @DHCP_PHASE_DISCOVER: upon receiving DHCP_DISCOVER message in ACK phase
- * @DHCP_PHASE_OFFER: upon receiving DHCP_OFFER message in DISCOVER phase
- * @DHCP_PHASE_REQUEST: upon receiving DHCP_REQUEST message in OFFER phase or
- *         ACK phase (Renewal process)
- */
-enum dhcp_phase {
-	DHCP_PHASE_ACK,
-	DHCP_PHASE_DISCOVER,
-	DHCP_PHASE_OFFER,
-	DHCP_PHASE_REQUEST
-};
-
-/**
- * struct dhcp_nego_status - Per Peer DHCP Negotiation Status
- * @DHCP_NEGO_STOP: when the peer is in ACK phase or client disassociated
- * @DHCP_NEGO_IN_PROGRESS: when the peer is in DISCOVER or REQUEST
- *         (Renewal process) phase
- */
-enum dhcp_nego_status {
-	DHCP_NEGO_STOP,
-	DHCP_NEGO_IN_PROGRESS
-};
-
-/**
- * struct hdd_station_info - Per station structure kept in HDD for
- *                                     multiple station support for SoftAP
- * @in_use: Is the station entry in use?
- * @sta_id: Station ID reported back from HAL (through SAP).
- *           Broadcast uses station ID zero by default.
- * @sta_type: Type of station i.e. p2p client or infrastructure station
- * @sta_mac: MAC address of the station
- * @peer_state: Current Station state so HDD knows how to deal with packet
- *              queue. Most recent states used to change TLSHIM STA state.
- * @is_qos_enabled: Track QoS status of station
- * @is_deauth_in_progress: The station entry for which Deauth is in progress
- * @nss: Number of spatial streams supported
- * @rate_flags: Rate Flags for this connection
- * @ecsa_capable: Extended CSA capabilities
- * @max_phy_rate: Calcuated maximum phy rate based on mode, nss, mcs etc.
- * @tx_packets: Packets send to current station
- * @tx_bytes: Bytes send to current station
- * @rx_packets: Packets received from current station
- * @rx_bytes: Bytes received from current station
- * @last_tx_rx_ts: Last tx/rx timestamp with current station
- * @assoc_ts: Current station association timestamp
- * @tx_rate: Tx rate with current station reported from F/W
- * @rx_rate: Rx rate with current station reported from F/W
- * @ampdu: Ampdu enable or not of the station
- * @sgi_enable: Short GI enable or not of the station
- * @tx_stbc: Tx Space-time block coding enable/disable
- * @rx_stbc: Rx Space-time block coding enable/disable
- * @ch_width: Channel Width of the connection
- * @mode: Mode of the connection
- * @max_supp_idx: Max supported rate index of the station
- * @max_ext_idx: Max extended supported rate index of the station
- * @max_mcs_idx: Max supported mcs index of the station
- * @rx_mcs_map: VHT Rx mcs map
- * @tx_mcs_map: VHT Tx mcs map
- * @freq : Frequency of the current station
- * @dot11_mode: 802.11 Mode of the connection
- * @ht_present: HT caps present or not in the current station
- * @vht_present: VHT caps present or not in the current station
- * @ht_caps: HT capabilities of current station
- * @vht_caps: VHT capabilities of current station
- * @reason_code: Disconnection reason code for current station
- * @rssi: RSSI of the current station reported from F/W
- * @capability: Capability information of current station
- * @support_mode: Max supported mode of a station currently
- * connected to sap
- * @rx_retry_cnt: Number of rx retries received from current station
- *                Currently this feature is not supported from FW
- * @rx_mc_bc_cnt: Multicast broadcast packet count received from
- *                current station
- * MSB of rx_mc_bc_cnt indicates whether FW supports rx_mc_bc_cnt
- * feature or not, if first bit is 1 it indicates that FW supports this
- * feature, if it is 0 it indicates FW doesn't support this feature
- */
-struct hdd_station_info {
-	bool in_use;
-	uint8_t sta_id;
-	eStationType sta_type;
-	struct qdf_mac_addr sta_mac;
-	enum ol_txrx_peer_state peer_state;
-	bool is_qos_enabled;
-	bool is_deauth_in_progress;
-	uint8_t   nss;
-	uint32_t  rate_flags;
-	uint8_t   ecsa_capable;
-	uint32_t max_phy_rate;
-	uint32_t tx_packets;
-	uint64_t tx_bytes;
-	uint32_t rx_packets;
-	uint64_t rx_bytes;
-	qdf_time_t last_tx_rx_ts;
-	qdf_time_t assoc_ts;
-	qdf_time_t disassoc_ts;
-	uint32_t tx_rate;
-	uint32_t rx_rate;
-	bool ampdu;
-	bool sgi_enable;
-	bool tx_stbc;
-	bool rx_stbc;
-	tSirMacHTChannelWidth ch_width;
-	uint8_t mode;
-	uint8_t max_supp_idx;
-	uint8_t max_ext_idx;
-	uint8_t max_mcs_idx;
-	uint8_t rx_mcs_map;
-	uint8_t tx_mcs_map;
-	uint32_t freq;
-	uint8_t dot11_mode;
-	bool ht_present;
-	bool vht_present;
-	struct ieee80211_ht_cap ht_caps;
-	struct ieee80211_vht_cap vht_caps;
-	uint32_t reason_code;
-	int8_t rssi;
-	enum dhcp_phase dhcp_phase;
-	enum dhcp_nego_status dhcp_nego_status;
-	uint16_t capability;
-	uint8_t support_mode;
-	uint32_t rx_retry_cnt;
-	uint32_t rx_mc_bc_cnt;
-};
-
-/**
  * struct hdd_ap_ctx - SAP/P2PGO specific information
  * @hostapd_state: state control information
  * @dfs_cac_block_tx: Is data tramsmission blocked due to DFS CAC?
@@ -1023,7 +898,7 @@ struct hdd_station_info {
  * @wep_def_key_idx: WEP default key index
  * @sap_context: Pointer to context maintained by SAP (opaque to HDD)
  * @sap_config: SAP configuration
- * @operating_channel: channel upon which the SAP is operating
+ * @operating_chan_freq: channel upon which the SAP is operating
  * @beacon: Beacon information
  * @vendor_acs_timer: Timer for ACS
  * @vendor_acs_timer_initialized: Is @vendor_acs_timer initialized?
@@ -1043,7 +918,7 @@ struct hdd_ap_ctx {
 	uint8_t wep_def_key_idx;
 	struct sap_context *sap_context;
 	struct sap_config sap_config;
-	uint8_t operating_channel;
+	uint32_t operating_chan_freq;
 	struct hdd_beacon_data *beacon;
 	qdf_mc_timer_t vendor_acs_timer;
 	bool vendor_acs_timer_initialized;
@@ -1169,7 +1044,9 @@ struct hdd_context;
  * @event_flags: a bitmap of hdd_adapter_flags
  * @mic_work: mic work information
  * @gpio_tsf_sync_work: work to sync send TSF CAP WMI command
- *
+ * @cache_sta_count: number of currently cached stations
+ * @acs_complete_event: acs complete event
+ * @latency_level: 0 - normal, 1 - moderate, 2 - low, 3 - ultralow
  */
 struct hdd_adapter {
 	/* Magic cookie for adapter sanity verification.  Note that this
@@ -1264,10 +1141,15 @@ struct hdd_adapter {
 
 	/** Multiple station supports */
 	/** Per-station structure */
-	spinlock_t sta_info_lock;        /* To protect access to station Info */
+
+	/* TODO: Will be removed as a part of next phase of clean up */
 	struct hdd_station_info sta_info[WLAN_MAX_STA_COUNT];
 	struct hdd_station_info cache_sta_info[WLAN_MAX_STA_COUNT];
 
+	/* TODO: _list from name will be removed after clean up */
+	struct hdd_sta_info_obj sta_info_list;
+	struct hdd_sta_info_obj cache_sta_info_list;
+	qdf_atomic_t cache_sta_count;
 
 #ifdef FEATURE_WLAN_WAPI
 	struct hdd_wapi_info wapi_info;
@@ -1289,6 +1171,7 @@ struct hdd_adapter {
 	} session;
 
 	qdf_atomic_t ch_switch_in_progress;
+	qdf_event_t acs_complete_event;
 
 #ifdef WLAN_FEATURE_TSF
 	/* tsf value received from firmware */
@@ -1408,6 +1291,7 @@ struct hdd_adapter {
 	uint32_t track_dest_ipv4;
 	uint32_t mon_chan_freq;
 	uint32_t mon_bandwidth;
+	uint16_t latency_level;
 
 	/* rcpi information */
 	struct rcpi_info rcpi;
@@ -1422,6 +1306,9 @@ struct hdd_adapter {
 
 #ifdef WLAN_FEATURE_MOTION_DETECTION
 	bool motion_detection_mode;
+	bool motion_det_cfg;
+	bool motion_det_in_progress;
+	uint32_t motion_det_baseline_value;
 #endif /* WLAN_FEATURE_MOTION_DETECTION */
 };
 
@@ -1989,15 +1876,11 @@ struct hdd_context {
 
 /**
  * struct hdd_vendor_acs_chan_params - vendor acs channel parameters
- * @channel_count: channel count
- * @channel_list: pointer to channel list
  * @pcl_count: pcl list count
  * @vendor_pcl_list: pointer to pcl list
  * @vendor_weight_list: pointer to pcl weight list
  */
 struct hdd_vendor_acs_chan_params {
-	uint32_t channel_count;
-	uint8_t *channel_list;
 	uint32_t pcl_count;
 	uint8_t *vendor_pcl_list;
 	uint8_t *vendor_weight_list;
@@ -2067,22 +1950,92 @@ int hdd_validate_channel_and_bandwidth(struct hdd_adapter *adapter,
 				uint32_t chan_number,
 				enum phy_ch_width chan_bw);
 
+/**
+ * hdd_get_front_adapter() - Get the first adapter from the adapter list
+ * @hdd_ctx: pointer to the HDD context
+ * @current_adapter: pointer to the current adapter
+ * @out_adapter: double pointer to pass the next adapter
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS hdd_get_front_adapter(struct hdd_context *hdd_ctx,
 				 struct hdd_adapter **out_adapter);
 
+/**
+ * hdd_get_next_adapter() - Get the next adapter from the adapter list
+ * @hdd_ctx: pointer to the HDD context
+ * @current_adapter: pointer to the current adapter
+ * @out_adapter: double pointer to pass the next adapter
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS hdd_get_next_adapter(struct hdd_context *hdd_ctx,
 				struct hdd_adapter *current_adapter,
 				struct hdd_adapter **out_adapter);
 
+/**
+ * hdd_get_front_adapter_no_lock() - Get the first adapter from the adapter list
+ * This API doesnot use any lock in it's implementation. It is the caller's
+ * directive to ensure concurrency safety.
+ * @hdd_ctx: pointer to the HDD context
+ * @out_adapter: double pointer to pass the next adapter
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_get_front_adapter_no_lock(struct hdd_context *hdd_ctx,
+					 struct hdd_adapter **out_adapter);
+
+/**
+ * hdd_get_next_adapter_no_lock() - Get the next adapter from the adapter list
+ * This API doesnot use any lock in it's implementation. It is the caller's
+ * directive to ensure concurrency safety.
+ * @hdd_ctx: pointer to the HDD context
+ * @current_adapter: pointer to the current adapter
+ * @out_adapter: double pointer to pass the next adapter
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_get_next_adapter_no_lock(struct hdd_context *hdd_ctx,
+					struct hdd_adapter *current_adapter,
+					struct hdd_adapter **out_adapter);
+
+/**
+ * hdd_remove_adapter() - Remove the adapter from the adapter list
+ * @hdd_ctx: pointer to the HDD context
+ * @adapter: pointer to the adapter to be removed
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS hdd_remove_adapter(struct hdd_context *hdd_ctx,
 			      struct hdd_adapter *adapter);
 
+/**
+ * hdd_remove_front_adapter() - Remove the first adapter from the adapter list
+ * @hdd_ctx: pointer to the HDD context
+ * @out_adapter: pointer to the adapter to be removed
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS hdd_remove_front_adapter(struct hdd_context *hdd_ctx,
 				    struct hdd_adapter **out_adapter);
 
+/**
+ * hdd_add_adapter_back() - Add an adapter to the adapter list
+ * @hdd_ctx: pointer to the HDD context
+ * @adapter: pointer to the adapter to be added
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS hdd_add_adapter_back(struct hdd_context *hdd_ctx,
 				struct hdd_adapter *adapter);
 
+/**
+ * hdd_add_adapter_front() - Add an adapter to the head of the adapter list
+ * @hdd_ctx: pointer to the HDD context
+ * @adapter: pointer to the adapter to be added
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS hdd_add_adapter_front(struct hdd_context *hdd_ctx,
 				 struct hdd_adapter *adapter);
 
@@ -2095,6 +2048,76 @@ QDF_STATUS hdd_add_adapter_front(struct hdd_context *hdd_ctx,
 	for (hdd_get_front_adapter(hdd_ctx, &adapter); \
 	     adapter; \
 	     hdd_get_next_adapter(hdd_ctx, adapter, &adapter))
+
+/**
+ * __hdd_take_ref_and_fetch_front_adapter - Helper macro to lock, fetch front
+ * adapter, take ref and unlock.
+ * @hdd_ctx: the global HDD context
+ * @adapter: an hdd_adapter pointer to use as a cursor
+ */
+#define __hdd_take_ref_and_fetch_front_adapter(hdd_ctx, adapter) \
+	qdf_spin_lock_bh(&hdd_ctx->hdd_adapter_lock), \
+	hdd_get_front_adapter_no_lock(hdd_ctx, &adapter), \
+	(adapter) ? dev_hold(adapter->dev) : (false), \
+	qdf_spin_unlock_bh(&hdd_ctx->hdd_adapter_lock)
+
+/**
+ * __hdd_take_ref_and_fetch_next_adapter - Helper macro to lock, fetch next
+ * adapter, take ref and unlock.
+ * @hdd_ctx: the global HDD context
+ * @adapter: an hdd_adapter pointer to use as a cursor
+ */
+#define __hdd_take_ref_and_fetch_next_adapter(hdd_ctx, adapter) \
+	qdf_spin_lock_bh(&hdd_ctx->hdd_adapter_lock), \
+	hdd_get_next_adapter_no_lock(hdd_ctx, adapter, &adapter), \
+	(adapter) ? dev_hold(adapter->dev) : (false), \
+	qdf_spin_unlock_bh(&hdd_ctx->hdd_adapter_lock)
+
+/**
+ * __hdd_is_adapter_valid - Helper macro to return true/false for valid adapter.
+ * @adapter: an hdd_adapter pointer to use as a cursor
+ */
+#define __hdd_is_adapter_valid(_adapter) !!_adapter
+
+/**
+ * hdd_for_each_adapter_dev_held - Adapter iterator with dev_hold called
+ * @hdd_ctx: the global HDD context
+ * @adapter: an hdd_adapter pointer to use as a cursor
+ *
+ * This iterator will take the reference of the netdev associated with the
+ * given adapter so as to prevent it from being removed in other context.
+ * If the control goes inside the loop body then the dev_hold has been invoked.
+ *
+ *                           ***** NOTE *****
+ * Before the end of each iteration, dev_put(adapter->dev) must be
+ * called. Not calling this will keep hold of a reference, thus preventing
+ * unregister of the netdevice.
+ *
+ * Usage example:
+ *                 hdd_for_each_adapter_dev_held(hdd_ctx, adapter) {
+ *                         <work involving adapter>
+ *                         <some more work>
+ *                         dev_put(adapter->dev)
+ *                 }
+ */
+#define hdd_for_each_adapter_dev_held(hdd_ctx, adapter) \
+	for (__hdd_take_ref_and_fetch_front_adapter(hdd_ctx, adapter); \
+	     __hdd_is_adapter_valid(adapter); \
+	     __hdd_take_ref_and_fetch_next_adapter(hdd_ctx, adapter))
+
+/**
+ * wlan_hdd_get_adapter_by_vdev_id_from_objmgr() - Fetch adapter from objmgr
+ * using vdev_id.
+ * @hdd_ctx: the global HDD context
+ * @adapter: an hdd_adapter double pointer to store the address of the adapter
+ * @vdev: the vdev whose corresponding adapter has to be fetched
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_hdd_get_adapter_by_vdev_id_from_objmgr(struct hdd_context *hdd_ctx,
+					    struct hdd_adapter **adapter,
+					    struct wlan_objmgr_vdev *vdev);
 
 struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 				     uint8_t session_type,
@@ -3024,8 +3047,20 @@ QDF_STATUS hdd_sme_open_session_callback(uint8_t vdev_id,
 					 QDF_STATUS qdf_status);
 QDF_STATUS hdd_sme_close_session_callback(uint8_t vdev_id);
 
+/**
+ * hdd_reassoc() - perform a userspace-directed reassoc
+ * @adapter:    Adapter upon which the command was received
+ * @bssid:      BSSID with which to reassociate
+ * @ch_freq:    channel upon which to reassociate
+ * @src:        The source for the trigger of this action
+ *
+ * This function performs a userspace-directed reassoc operation
+ *
+ * Return: 0 for success non-zero for failure
+ */
 int hdd_reassoc(struct hdd_adapter *adapter, const uint8_t *bssid,
-		uint8_t channel, const handoff_src src);
+		uint32_t ch_freq, const handoff_src src);
+
 int hdd_register_cb(struct hdd_context *hdd_ctx);
 void hdd_deregister_cb(struct hdd_context *hdd_ctx);
 int hdd_start_station_adapter(struct hdd_adapter *adapter);
@@ -3865,6 +3900,18 @@ void wlan_hdd_send_tcp_param_update_event(struct hdd_context *hdd_ctx,
  * QDF_STATUS_E_FAILURE on failure
  */
 QDF_STATUS hdd_md_host_evt_cb(void *ctx, struct sir_md_evt *event);
+
+/**
+ * hdd_md_bl_evt_cb - Callback for Motion Detection Baseline Event
+ * @ctx: HDD context
+ * @sir_md_bl_evt: motion detect baseline event
+ *
+ * Callback for Motion Detection Baseline Event
+ *
+ * Return: QDF_STATUS QDF_STATUS_SUCCESS on Success and
+ * QDF_STATUS_E_FAILURE on failure
+ */
+QDF_STATUS hdd_md_bl_evt_cb(void *ctx, struct sir_md_bl_evt *event);
 #endif /* WLAN_FEATURE_MOTION_DETECTION */
 
 /**

@@ -1350,8 +1350,8 @@ static bool lim_process_assoc_req_sta_ctx(struct mac_context *mac_ctx,
 		}
 
 		*update_ctx = true;
-		if (dph_init_sta_state(mac_ctx, hdr->sa, peer_idx, true,
-			&session->dph.dphHashTable) == NULL) {
+		if (dph_init_sta_state(mac_ctx, hdr->sa, peer_idx,
+				       &session->dph.dphHashTable) == NULL) {
 			pe_err("could not Init STAid: %d", peer_idx);
 			return false;
 		}
@@ -1781,8 +1781,8 @@ static bool lim_update_sta_ds(struct mac_context *mac_ctx, tpSirMacMgmtHdr hdr,
 		return false;
 	}
 	if (sta_ds->rmfEnabled)
-	    pe_debug("Created pmf timer sta-idx:%d assoc-id:%d",
-		     sta_ds->staIndex, sta_ds->assocId);
+	    pe_debug("Created pmf timer assoc-id:%d sta mac" QDF_MAC_ADDR_STR,
+		     sta_ds->assocId, QDF_MAC_ADDR_ARRAY(sta_ds->staAddr));
 #endif
 
 	if (assoc_req->ExtCap.present) {
@@ -1862,8 +1862,9 @@ static bool lim_update_sta_ctx(struct mac_context *mac_ctx, struct pe_session *s
 				eLIM_MLM_WT_ASSOC_DEL_STA_RSP_STATE;
 			if (lim_del_sta(mac_ctx, sta_ds, true, session)
 					!= QDF_STATUS_SUCCESS) {
-				pe_err("Couldn't DEL STA, assocId: %d staId: %d",
-					sta_ds->assocId, sta_ds->staIndex);
+				pe_err("Couldn't DEL STA, assocId: %d sta mac"
+				       QDF_MAC_ADDR_STR, sta_ds->assocId,
+				       QDF_MAC_ADDR_ARRAY(sta_ds->staAddr));
 				lim_reject_association(mac_ctx, sta_ds->staAddr,
 					sta_ds->mlmStaContext.subType, true,
 					sta_ds->mlmStaContext.authType,
@@ -2112,7 +2113,7 @@ send_ind_to_sme:
 		 * Update in the HAL Sta Table for the Update of the Protection
 		 * Mode
 		 */
-		lim_post_sm_state_update(mac_ctx, sta_ds->staIndex,
+		lim_post_sm_state_update(mac_ctx,
 					 sta_ds->htMIMOPSState, sta_ds->staAddr,
 					 session->smeSessionId);
 	}

@@ -22,7 +22,7 @@
 #include <qdf_nbuf.h>           /* qdf_nbuf_t */
 #include <qdf_net_types.h>      /* QDF_NBUF_TX_EXT_TID_INVALID */
 
-#include <cds_queue.h>          /* TAILQ */
+#include "queue.h"          /* TAILQ */
 #ifdef QCA_COMPUTE_TX_DELAY
 #include <enet.h>               /* ethernet_hdr_t, etc. */
 #include <ipv6_defs.h>          /* ipv6_traffic_class */
@@ -55,6 +55,17 @@
 #include <cdp_txrx_handle.h>
 #include <wlan_reg_services_api.h>
 #include "qdf_hrtimer.h"
+
+/* High/Low tx resource count in percentage */
+/* Set default high threashold to 15% */
+#ifndef TX_RESOURCE_HIGH_TH_IN_PER
+#define TX_RESOURCE_HIGH_TH_IN_PER 15
+#endif
+
+/* Set default low threshold to 5% */
+#ifndef TX_RESOURCE_LOW_TH_IN_PER
+#define TX_RESOURCE_LOW_TH_IN_PER 5
+#endif
 
 #ifdef QCA_HL_NETDEV_FLOW_CONTROL
 static u16 ol_txrx_tx_desc_alloc_table[TXRX_FC_MAX] = {
@@ -228,56 +239,14 @@ struct ol_tx_desc_t *ol_tx_hl_desc_alloc(struct ol_txrx_pdev_t *pdev,
 }
 #endif
 
-#ifdef QCA_HL_NETDEV_FLOW_CONTROL
-/**
- * ol_txrx_rsrc_threshold_lo() - set threshold low - when to start tx desc
- *				 margin replenishment
- * @desc_pool_size: tx desc pool size
- *
- * Return: threshold low
- */
 static inline uint16_t
 ol_txrx_rsrc_threshold_lo(int desc_pool_size)
 {
 	int threshold_low;
 
-	/*
-	 * 5% margin of unallocated desc is too much for per
-	 * vdev mechanism.
-	 * Define the value separately.
-	 */
-	threshold_low = TXRX_HL_TX_FLOW_CTRL_MGMT_RESERVED;
-
-	return threshold_low;
-}
-
-/**
- * ol_txrx_rsrc_threshold_hi() - set threshold high - where to stop
- *				 during tx desc margin replenishment
- * @desc_pool_size: tx desc pool size
- *
- * Return: threshold high
- */
-static inline uint16_t
-ol_txrx_rsrc_threshold_hi(int desc_pool_size)
-{
-	int threshold_high;
-	/* when freeing up descriptors,
-	 * keep going until there's a 7.5% margin
-	 */
-	threshold_high = ((15 * desc_pool_size) / 100) / 2;
-
-	return threshold_high;
-}
-
-#else
-
-static inline uint16_t
-ol_txrx_rsrc_threshold_lo(int desc_pool_size)
-{
-	int threshold_low;
 	/* always maintain a 5% margin of unallocated descriptors */
-	threshold_low = (5 * desc_pool_size) / 100;
+	threshold_low = ((TX_RESOURCE_LOW_TH_IN_PER) *
+			 desc_pool_size) / 100;
 
 	return threshold_low;
 }
@@ -289,11 +258,11 @@ ol_txrx_rsrc_threshold_hi(int desc_pool_size)
 	/* when freeing up descriptors, keep going until
 	 * there's a 15% margin
 	 */
-	threshold_high = (15 * desc_pool_size) / 100;
+	threshold_high = ((TX_RESOURCE_HIGH_TH_IN_PER) *
+			  desc_pool_size) / 100;
 
 	return threshold_high;
 }
-#endif
 
 void ol_tx_init_pdev(ol_txrx_pdev_handle pdev)
 {
@@ -794,6 +763,7 @@ void ol_tx_hl_send_all_tcp_ack(struct ol_txrx_vdev_t *vdev)
 	int i;
 	struct tcp_stream_node *tcp_node_list;
 	struct tcp_stream_node *temp;
+	struct ol_txrx_pdev_t *pdev = vdev->pdev;
 
 	for (i = 0; i < OL_TX_HL_DEL_ACK_HASH_SIZE; i++) {
 		tcp_node_list = NULL;
@@ -985,6 +955,7 @@ void ol_tx_hl_find_and_send_tcp_stream(struct ol_txrx_vdev_t *vdev,
 {
 	uint8_t no_of_entries;
 	struct tcp_stream_node *node_to_be_remove = NULL;
+	struct ol_txrx_pdev_t *pdev = vdev->pdev;
 
 	/* remove tcp node from hash */
 	qdf_spin_lock_bh(&vdev->tcp_ack_hash.node[info->stream_id].
@@ -1159,6 +1130,7 @@ void ol_tx_hl_find_and_replace_tcp_ack(struct ol_txrx_vdev_t *vdev,
 	uint8_t no_of_entries;
 	struct tcp_stream_node *node_to_be_remove = NULL;
 	bool is_found = false, start_timer = false;
+	struct ol_txrx_pdev_t *pdev = vdev->pdev;
 
 	/* replace ack if required or send packets */
 	qdf_spin_lock_bh(&vdev->tcp_ack_hash.node[info->stream_id].
@@ -1520,8 +1492,11 @@ ol_txrx_add_last_real_peer(struct cdp_pdev *ppdev,
 
 	qdf_spin_lock_bh(&pdev->last_real_peer_mutex);
 	if (!vdev->last_real_peer && peer &&
-	    (peer->peer_ids[0] != HTT_INVALID_PEER_ID))
+	    (peer->peer_ids[0] != HTT_INVALID_PEER_ID)) {
 		vdev->last_real_peer = peer;
+		qdf_mem_zero(vdev->hl_tdls_ap_mac_addr.raw,
+			     QDF_MAC_ADDR_SIZE);
+	}
 	qdf_spin_unlock_bh(&pdev->last_real_peer_mutex);
 }
 
@@ -1565,9 +1540,49 @@ void ol_txrx_update_last_real_peer(struct cdp_pdev *ppdev, void *pvdev,
 
 	qdf_spin_lock_bh(&pdev->last_real_peer_mutex);
 	if (!vdev->last_real_peer && peer &&
-	    (peer->peer_ids[0] != HTT_INVALID_PEER_ID))
+	    (peer->peer_ids[0] != HTT_INVALID_PEER_ID)) {
 		vdev->last_real_peer = peer;
+		qdf_mem_zero(vdev->hl_tdls_ap_mac_addr.raw,
+			     QDF_MAC_ADDR_SIZE);
+	}
 	qdf_spin_unlock_bh(&pdev->last_real_peer_mutex);
+}
+
+/**
+ * ol_txrx_set_peer_as_tdls_peer() - mark peer as tdls peer
+ * @ppeer: cdp peer
+ * @value: false/true
+ *
+ * Return: None
+ */
+void ol_txrx_set_peer_as_tdls_peer(void *ppeer, bool val)
+{
+	ol_txrx_peer_handle peer = ppeer;
+
+	ol_txrx_info_high("peer %pK, peer->ref_cnt %d",
+			  peer, qdf_atomic_read(&peer->ref_cnt));
+
+	/* Mark peer as tdls */
+	peer->is_tdls_peer = val;
+}
+
+/**
+ * ol_txrx_set_tdls_offchan_enabled() - set tdls offchan enabled
+ * @ppeer: cdp peer
+ * @value: false/true
+ *
+ * Return: None
+ */
+void ol_txrx_set_tdls_offchan_enabled(void *ppeer, bool val)
+{
+	ol_txrx_peer_handle peer = ppeer;
+
+	ol_txrx_info_high("peer %pK, peer->ref_cnt %d",
+			  peer, qdf_atomic_read(&peer->ref_cnt));
+
+	/* Set TDLS Offchan operation enable/disable */
+	if (peer->is_tdls_peer)
+		peer->tdls_offchan_enabled = val;
 }
 #endif
 
@@ -1907,17 +1922,12 @@ int ol_txrx_distribute_group_credits(struct ol_txrx_pdev_t *pdev,
 	*/
 
 #ifdef QCA_HL_NETDEV_FLOW_CONTROL
-/**
- * ol_txrx_register_hl_flow_control() -register hl netdev flow control callback
- * @vdev_id: vdev_id
- * @flowControl: flow control callback
- *
- * Return: 0 for success or error code
- */
-int ol_txrx_register_hl_flow_control(struct cdp_soc_t *soc,
+int ol_txrx_register_hl_flow_control(struct cdp_soc_t *soc_hdl,
 				     tx_pause_callback flowcontrol)
 {
-	struct ol_txrx_pdev_t *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
+	struct ol_txrx_soc_t *soc = cdp_soc_t_to_ol_txrx_soc_t(soc_hdl);
+	uint8_t pdev_id = OL_TXRX_PDEV_ID;
+	ol_txrx_pdev_handle pdev = ol_txrx_get_pdev_from_pdev_id(soc, pdev_id);
 	u32 desc_pool_size = ol_tx_desc_pool_size_hl(pdev->ctrl_pdev);
 
 	/*
@@ -1938,7 +1948,7 @@ int ol_txrx_register_hl_flow_control(struct cdp_soc_t *soc,
 	return 0;
 }
 
-int ol_txrx_set_vdev_os_queue_status(u8 vdev_id,
+int ol_txrx_set_vdev_os_queue_status(struct cdp_soc_t *soc_hdl, u8 vdev_id,
 				     enum netif_action_type action)
 {
 	struct ol_txrx_vdev_t *vdev =
@@ -1967,12 +1977,8 @@ int ol_txrx_set_vdev_os_queue_status(u8 vdev_id,
 	return 0;
 }
 
-/**
- * ol_txrx_set_vdev_tx_desc_limit() - Set TX descriptor limits for a vdev
- * @vdev_id: vdev id for the vdev under consideration.
- * @chan: Channel on which the vdev has been started.
- */
-int ol_txrx_set_vdev_tx_desc_limit(u8 vdev_id, u8 chan)
+int ol_txrx_set_vdev_tx_desc_limit(struct cdp_soc_t *soc_hdl, u8 vdev_id,
+				   u8 chan)
 {
 	struct ol_txrx_vdev_t *vdev =
 	(struct ol_txrx_vdev_t *)ol_txrx_get_vdev_from_vdev_id(vdev_id);
@@ -2049,11 +2055,13 @@ void ol_tx_dump_flow_pool_info_compact(void *ctx)
 	qdf_mem_free(comb_log_str);
 }
 
-void ol_tx_dump_flow_pool_info(void *ctx)
+void ol_tx_dump_flow_pool_info(struct cdp_soc_t *soc_hdl)
 {
-	struct ol_txrx_pdev_t *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
+	struct ol_txrx_soc_t *soc = cdp_soc_t_to_ol_txrx_soc_t(soc_hdl);
+	ol_txrx_pdev_handle pdev;
 	struct ol_txrx_vdev_t *vdev;
 
+	pdev = ol_txrx_get_pdev_from_pdev_id(soc, OL_TXRX_PDEV_ID);
 	if (!pdev) {
 		ol_txrx_err("pdev is NULL");
 		return;

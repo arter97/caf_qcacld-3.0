@@ -25,7 +25,7 @@
 
 #include <qdf_nbuf.h>           /* qdf_nbuf_t */
 #include <qdf_mem.h>
-#include <cds_queue.h>          /* TAILQ */
+#include "queue.h"          /* TAILQ */
 #include <a_types.h>            /* A_UINT8 */
 #include <htt.h>                /* htt_sec_type, htt_pkt_type, etc. */
 #include <qdf_atomic.h>         /* qdf_atomic_t */
@@ -80,6 +80,8 @@
 #define OL_TXRX_INVALID_VDEV_ID		(-1)
 #define ETHERTYPE_OCB_TX   0x8151
 #define ETHERTYPE_OCB_RX   0x8152
+
+#define OL_TXRX_MAX_PDEV_CNT	1
 
 struct ol_txrx_pdev_t;
 struct ol_txrx_vdev_t;
@@ -569,6 +571,23 @@ struct ol_txrx_fw_stats_desc_elem_t {
 	struct ol_txrx_fw_stats_desc_t desc;
 };
 
+/**
+ * struct ol_txrx_soc_t - soc reference structure
+ * @cdp_soc: common base structure
+ * @cdp_ctrl_objmgr_psoc: opaque handle for UMAC psoc object
+ * @pdev_list: list of all the pdev on a soc
+ *
+ * This is the reference to the soc and all the data
+ * which is soc specific.
+ */
+struct ol_txrx_soc_t {
+	/* Common base structure - Should be the first member */
+	struct cdp_soc_t cdp_soc;
+
+	struct cdp_ctrl_objmgr_psoc *psoc;
+	struct ol_txrx_pdev_t *pdev_list[OL_TXRX_MAX_PDEV_CNT];
+};
+
 /*
  * As depicted in the diagram below, the pdev contains an array of
  * NUM_EXT_TID ol_tx_active_queues_in_tid_t elements.
@@ -623,6 +642,9 @@ struct ol_txrx_fw_stats_desc_elem_t {
  *                        `------'
  */
 struct ol_txrx_pdev_t {
+	/* soc - reference to soc structure */
+	struct ol_txrx_soc_t *soc;
+
 	/* ctrl_pdev - handle for querying config info */
 	struct cdp_cfg *ctrl_pdev;
 
@@ -791,6 +813,9 @@ struct ol_txrx_pdev_t {
 		enum flow_pool_status status;
 #endif
 	} tx_desc;
+
+	/* The pdev_id for this pdev */
+	uint8_t id;
 
 	uint8_t is_mgmt_over_wmi_enabled;
 #if defined(QCA_LL_TX_FLOW_CONTROL_V2)
@@ -1498,6 +1523,8 @@ struct ol_txrx_peer_t {
 	qdf_time_t last_deauth_rcvd;
 	qdf_atomic_t fw_create_pending;
 	qdf_timer_t peer_unmap_timer;
+	bool is_tdls_peer; /* Mark peer as tdls peer */
+	bool tdls_offchan_enabled; /* TDLS OffChan operation in use */
 };
 
 struct ol_rx_remote_data {

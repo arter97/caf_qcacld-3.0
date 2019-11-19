@@ -568,14 +568,14 @@ struct nan_disable_req {
 /**
  * struct nan_enable_req - NAN request to enable NAN Discovery
  * @psoc: Pointer to the psoc object
- * @social_chan_2g: Social channel in 2G band for the NAN Discovery
- * @social_chan_5g: Social channel in 5G band for the NAN Discovery
+ * @social_chan_2g_freq: Social channel in 2G band for the NAN Discovery
+ * @social_chan_5g_freq: Social channel in 5G band for the NAN Discovery
  * @params: NAN request structure containing message for the target
  */
 struct nan_enable_req {
 	struct wlan_objmgr_psoc *psoc;
-	uint8_t social_chan_2g;
-	uint8_t social_chan_5g;
+	uint32_t social_chan_2g_freq;
+	uint32_t social_chan_5g_freq;
 	/* Variable length, do not add anything after this */
 	struct nan_msg_params params;
 };
@@ -722,8 +722,8 @@ struct nan_datapath_host_event {
  * struct nan_callbacks - struct containing callback to non-converged driver
  * @os_if_nan_event_handler: OS IF Callback for handling NAN Discovery events
  * @os_if_ndp_event_handler: OS IF Callback for handling NAN Datapath events
- * @ucfg_explicit_disable_cb: UCFG Callback to indicate NAN explicit disable is
- * complete
+ * @ucfg_nan_request_process_cb: Callback to indicate NAN enable/disable
+ * request processing is complete
  * @ndi_open: HDD callback for creating the NAN Datapath Interface
  * @ndi_start: HDD callback for starting the NAN Datapath Interface
  * @ndi_close: HDD callback for closing the NAN Datapath Interface
@@ -743,7 +743,7 @@ struct nan_callbacks {
 	void (*os_if_ndp_event_handler)(struct wlan_objmgr_psoc *psoc,
 					struct wlan_objmgr_vdev *vdev,
 					uint32_t type, void *msg);
-	void (*ucfg_explicit_disable_cb)(void *cookie);
+	void (*ucfg_nan_request_process_cb)(void *cookie);
 	int (*ndi_open)(char *iface_name);
 	int (*ndi_start)(char *iface_name, uint16_t);
 	void (*ndi_close)(uint8_t);

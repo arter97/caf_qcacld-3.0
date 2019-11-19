@@ -57,8 +57,7 @@ ap_beacon_process_5_ghz(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	if (!session->htCapability)
 		return;
 
-	if (bcn_struct->channelNumber != wlan_reg_freq_to_chan(
-		mac_ctx->pdev, session->curr_op_freq))
+	if (bcn_struct->chan_freq != session->curr_op_freq)
 		return;
 
 	/* 11a (non HT) AP  overlaps or */
@@ -101,8 +100,7 @@ ap_beacon_process_24_ghz(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	/* We are 11G AP. */
 	if ((phy_mode == WNI_CFG_PHY_MODE_11G) &&
 	    (false == session->htCapability)) {
-		if (bcn_struct->channelNumber != wlan_reg_freq_to_chan(
-			mac_ctx->pdev, session->curr_op_freq))
+		if (bcn_struct->chan_freq != session->curr_op_freq)
 			return;
 
 		tmp_exp = (!bcn_struct->erpPresent &&
@@ -131,8 +129,7 @@ ap_beacon_process_24_ghz(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	if (!session->htCapability)
 		return;
 
-	if (bcn_struct->channelNumber != wlan_reg_freq_to_chan(
-		mac_ctx->pdev, session->curr_op_freq))
+	if (bcn_struct->chan_freq != session->curr_op_freq)
 		return;
 
 	tmp_exp = (!bcn_struct->erpPresent && !bcn_struct->HTInfo.present) ||
@@ -351,12 +348,9 @@ sch_bcn_process_sta(struct mac_context *mac_ctx,
 	 * This is the Beacon received from the AP  we're currently associated
 	 * with. Check if there are any changes in AP's capabilities
 	 */
-	if (bcn->channelNumber != wlan_reg_freq_to_chan(
-		mac_ctx->pdev, session->curr_op_freq)) {
+	if (bcn->chan_freq != session->curr_op_freq) {
 		pe_err("Channel Change freq from %d --> %d - Ignoring beacon!",
-		       session->curr_op_freq,
-		       wlan_reg_chan_to_freq(
-				mac_ctx->pdev, bcn->channelNumber));
+		       session->curr_op_freq, bcn->chan_freq);
 		return false;
 	}
 
@@ -483,7 +477,7 @@ static void update_nss(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 		sta_ds->vhtSupportedRxNss =
 			beacon->OperatingMode.rxNSS + 1;
 		lim_set_nss_change(mac_ctx, session_entry,
-			sta_ds->vhtSupportedRxNss, sta_ds->staIndex,
+			sta_ds->vhtSupportedRxNss,
 			mgmt_hdr->sa);
 	}
 }
@@ -576,8 +570,8 @@ sch_bcn_update_opmode_change(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 			((oper_mode != bcn->OperatingMode.chanWidth) ||
 			(sta_ds->vhtSupportedRxNss !=
 			(bcn->OperatingMode.rxNSS + 1)))) {
-			pe_debug("received OpMode Chanwidth %d, staIdx = %d",
-			       bcn->OperatingMode.chanWidth, sta_ds->staIndex);
+			pe_debug("received OpMode Chanwidth %d",
+				 bcn->OperatingMode.chanWidth);
 			pe_debug("MAC - %0x:%0x:%0x:%0x:%0x:%0x",
 			       mac_hdr->sa[0], mac_hdr->sa[1],
 			       mac_hdr->sa[2], mac_hdr->sa[3],
@@ -618,7 +612,7 @@ sch_bcn_update_opmode_change(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 				ch_width = eHT_CHANNEL_WIDTH_20MHZ;
 			}
 			lim_check_vht_op_mode_change(mac_ctx, session,
-				ch_width, sta_ds->staIndex, mac_hdr->sa);
+				ch_width, mac_hdr->sa);
 			update_nss(mac_ctx, sta_ds, bcn, session, mac_hdr);
 		}
 		return;
@@ -645,8 +639,8 @@ sch_bcn_update_opmode_change(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 
 	if (!skip_opmode_update &&
 	    (oper_mode != bcn->VHTOperation.chanWidth)) {
-		pe_debug("received VHTOP CHWidth %d staIdx = %d",
-		       bcn->VHTOperation.chanWidth, sta_ds->staIndex);
+		pe_debug("received VHTOP CHWidth %d",
+			 bcn->VHTOperation.chanWidth);
 		pe_debug("MAC - %0x:%0x:%0x:%0x:%0x:%0x",
 		       mac_hdr->sa[0], mac_hdr->sa[1],
 		       mac_hdr->sa[2], mac_hdr->sa[3],
@@ -686,7 +680,7 @@ sch_bcn_update_opmode_change(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 			}
 		}
 		lim_check_vht_op_mode_change(mac_ctx, session, ch_width,
-						sta_ds->staIndex, mac_hdr->sa);
+						mac_hdr->sa);
 	}
 }
 
@@ -728,8 +722,7 @@ sch_bcn_process_sta_ibss(struct mac_context *mac_ctx,
 	/* check for VHT capability */
 	sta = dph_lookup_hash_entry(mac_ctx, pMh->sa, &aid,
 			&session->dph.dphHashTable);
-	if ((!sta) || ((sta) &&
-					(STA_INVALID_IDX == sta->staIndex)))
+	if ((!sta))
 		return;
 	sch_bcn_update_opmode_change(mac_ctx, sta, session, bcn, pMh,
 				     cb_mode);
@@ -811,6 +804,7 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 	tpSirMacMgmtHdr pMh = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
 	int8_t regMax = 0, maxTxPower = 0, local_constraint;
 	struct lim_max_tx_pwr_attr tx_pwr_attr = {0};
+	uint32_t chan_freq = 0;
 
 	qdf_mem_zero(&beaconParams, sizeof(tUpdateBeaconParams));
 	beaconParams.paramChangeBitmap = 0;
@@ -902,12 +896,12 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 	}
 
 	/* Indicate to LIM that Beacon is received */
-	if (bcn->HTInfo.present)
-		lim_received_hb_handler(mac_ctx,
-				(uint8_t) bcn->HTInfo.primaryChannel, session);
-	else
-		lim_received_hb_handler(mac_ctx, (uint8_t) bcn->channelNumber,
-				session);
+	if (bcn->HTInfo.present) {
+		chan_freq = wlan_reg_legacy_chan_to_freq(mac_ctx->pdev,
+							 bcn->HTInfo.primaryChannel);
+		lim_received_hb_handler(mac_ctx, chan_freq, session);
+	} else
+		lim_received_hb_handler(mac_ctx, bcn->chan_freq, session);
 
 	/*
 	 * I don't know if any additional IE is required here. Currently, not
@@ -1109,8 +1103,7 @@ void sch_send_beacon_report(struct mac_context *mac_ctx,
 		qdf_mem_copy(&beacon_report.time_stamp,
 			     &beacon_struct->timeStamp, sizeof(qdf_time_t));
 		beacon_report.beacon_interval = beacon_struct->beaconInterval;
-		beacon_report.frequency =
-				cds_chan_to_freq(beacon_struct->channelNumber);
+		beacon_report.frequency = beacon_struct->chan_freq;
 
 		beacon_report.ssid.length = beacon_struct->ssId.length;
 		qdf_mem_copy(&beacon_report.ssid.ssid,
@@ -1185,6 +1178,7 @@ sch_beacon_edca_process(struct mac_context *mac, tSirMacEdcaParamSetIE *edca,
 			struct pe_session *session)
 {
 	uint8_t i;
+	bool follow_ap_edca;
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
 	host_log_qos_edca_pkt_type *log_ptr = NULL;
 #endif /* FEATURE_WLAN_DIAG_SUPPORT */
@@ -1193,6 +1187,8 @@ sch_beacon_edca_process(struct mac_context *mac, tSirMacEdcaParamSetIE *edca,
 		pe_err("invalid mlme cfg");
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	follow_ap_edca = mlme_get_follow_ap_edca_flag(session->vdev);
 
 	pe_debug("Updating parameter set count: Old %d ---> new %d",
 		session->gLimEdcaParamSetCount, edca->qosInfo.count);
@@ -1203,7 +1199,7 @@ sch_beacon_edca_process(struct mac_context *mac, tSirMacEdcaParamSetIE *edca,
 	session->gLimEdcaParams[QCA_WLAN_AC_VI] = edca->acvi;
 	session->gLimEdcaParams[QCA_WLAN_AC_VO] = edca->acvo;
 
-	if (mac->mlme_cfg->edca_params.enable_edca_params) {
+	if (mac->mlme_cfg->edca_params.enable_edca_params && !follow_ap_edca) {
 		session->gLimEdcaParams[QCA_WLAN_AC_VO].aci.aifsn =
 			mac->mlme_cfg->edca_params.edca_ac_vo.vo_aifs;
 		session->gLimEdcaParams[QCA_WLAN_AC_VI].aci.aifsn =

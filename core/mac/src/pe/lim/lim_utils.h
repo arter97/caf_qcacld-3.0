@@ -193,7 +193,7 @@ void lim_update_short_slot_time(struct mac_context *mac, tSirMacAddr peerMacAddr
  * @frame_len: Length og mgmt frame
  * @session_id: session id
  * @psession_entry: PE Session Entry
- * @rx_channel: Channel of where packet is received
+ * @rx_freq: Frequency on which packet is received
  * @rx_rssi: rssi value
  * @rx_flags: RXMGMT flags to be set for the frame. Defined in enum rxmgmt_flags
  *
@@ -204,7 +204,7 @@ void lim_update_short_slot_time(struct mac_context *mac, tSirMacAddr peerMacAddr
 */
 void lim_send_sme_mgmt_frame_ind(struct mac_context *mac_ctx, uint8_t frame_type,
 				 uint8_t *frame, uint32_t frame_len,
-				 uint16_t session_id, uint32_t rx_channel,
+				 uint16_t session_id, uint32_t rx_freq,
 				 struct pe_session *psession_entry,
 				 int8_t rx_rssi, enum rxmgmt_flags rx_flags);
 
@@ -483,7 +483,6 @@ static inline uint32_t utils_power_xy(uint16_t base, uint16_t power)
 }
 
 QDF_STATUS lim_post_sm_state_update(struct mac_context *mac,
-		uint16_t StaIdx,
 		tSirMacHTMIMOPowerSaveState MIMOPSState,
 		uint8_t *pPeerStaMac, uint8_t sessionId);
 
@@ -502,10 +501,30 @@ void lim_delete_dialogue_token_list(struct mac_context *mac);
 void lim_add_channel_status_info(struct mac_context *p_mac,
 				 struct lim_channel_status *channel_stat,
 				 uint8_t channel_id);
-uint8_t lim_get_channel_from_beacon(struct mac_context *mac,
-		tpSchBeaconStruct pBeacon);
-tSirNwType lim_get_nw_type(struct mac_context *mac, uint8_t channelNum,
-		uint32_t type, tpSchBeaconStruct pBeacon);
+
+/**
+ * lim_get_channel_from_beacon() - extract channel number
+ * from beacon and convert to channel frequency
+ * @mac: Pointer to Global MAC structure
+ * @pBeacon: Pointer to beacon or probe rsp
+ *
+ * Return: channel frequency
+ */
+uint32_t lim_get_channel_from_beacon(struct mac_context *mac,
+				     tpSchBeaconStruct pBeacon);
+
+/**
+ * lim_get_nw_type() - Get type of the network from
+ * data packet or beacon
+ * @mac: Pointer to Global MAC structure
+ * @chan_freq: Channel frequency
+ * @type: Type of packet
+ * @pBeacon: Pointer to beacon or probe response
+ *
+ * Return: Network type a/b/g
+ */
+tSirNwType lim_get_nw_type(struct mac_context *mac, uint32_t chan_freq,
+			   uint32_t type, tpSchBeaconStruct pBeacon);
 
 void lim_set_tspec_uapsd_mask_per_session(struct mac_context *mac,
 		struct pe_session *pe_session,
@@ -595,17 +614,16 @@ uint32_t lim_get_max_rate_flags(struct mac_context *mac_ctx,
 
 bool lim_check_vht_op_mode_change(struct mac_context *mac,
 		struct pe_session *pe_session,
-		uint8_t chanWidth, uint8_t staId,
+		uint8_t chanWidth,
 		uint8_t *peerMac);
 #ifdef WLAN_FEATURE_11AX_BSS_COLOR
 bool lim_send_he_ie_update(struct mac_context *mac_ctx, struct pe_session *pe_session);
 #endif
 bool lim_set_nss_change(struct mac_context *mac, struct pe_session *pe_session,
-		uint8_t rxNss, uint8_t staId, uint8_t *peerMac);
+		uint8_t rxNss, uint8_t *peerMac);
 bool lim_check_membership_user_position(struct mac_context *mac,
 		struct pe_session *pe_session,
-		uint32_t membership, uint32_t userPosition,
-		uint8_t staId);
+		uint32_t membership, uint32_t userPosition);
 
 /**
  * enum ack_status - Indicate TX status of ASSOC/AUTH
@@ -1038,12 +1056,14 @@ void lim_log_he_6g_cap(struct mac_context *mac,
  * lim_log_he_op() - Print HE Operation
  * @mac: pointer to MAC context
  * @he_op: pointer to HE Operation
+ * @session: pointer to PE session
  *
  * Print HE operation stored as dot11f structure
  *
  * Return: None
  */
-void lim_log_he_op(struct mac_context *mac, tDot11fIEhe_op *he_ops);
+void lim_log_he_op(struct mac_context *mac, tDot11fIEhe_op *he_ops,
+		   struct pe_session *session);
 
 #ifdef WLAN_FEATURE_11AX_BSS_COLOR
 /**
@@ -1138,6 +1158,16 @@ static inline bool lim_is_sta_he_capable(tpDphHashNode sta_ds)
 {
 	return sta_ds->mlmStaContext.he_capable;
 }
+
+/**
+ * lim_update_bss_he_capable() - Update he_capable in add BSS params
+ * @mac: pointer to MAC context
+ * @add_bss: pointer to add BSS params
+ *
+ * Return: None
+ */
+void lim_update_bss_he_capable(struct mac_context *mac,
+			       struct bss_params *add_bss);
 
 /**
  * lim_update_stads_he_capable() - Update he_capable in sta ds context
@@ -1262,7 +1292,8 @@ static inline void lim_copy_join_req_he_cap(struct pe_session *session,
 }
 
 static inline void lim_log_he_op(struct mac_context *mac,
-	tDot11fIEhe_op *he_ops)
+				 tDot11fIEhe_op *he_ops,
+				 struct pe_session *session)
 {
 }
 
@@ -1290,6 +1321,11 @@ static inline uint8_t lim_get_session_he_frag_cap(struct pe_session *session)
 static inline bool lim_is_sta_he_capable(tpDphHashNode sta_ds)
 {
 	return false;
+}
+
+static inline void lim_update_bss_he_capable(struct mac_context *mac,
+					     struct bss_params *add_bss)
+{
 }
 
 static inline void lim_update_stads_he_capable(tpDphHashNode sta_ds,
