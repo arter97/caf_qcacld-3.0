@@ -148,6 +148,11 @@ QDF_STATUS ucfg_ipa_uc_ol_deinit(struct wlan_objmgr_pdev *pdev)
 	return ipa_uc_ol_deinit(pdev);
 }
 
+bool ucfg_ipa_is_tx_pending(struct wlan_objmgr_pdev *pdev)
+{
+	return ipa_is_tx_pending(pdev);
+}
+
 QDF_STATUS ucfg_ipa_send_mcc_scc_msg(struct wlan_objmgr_pdev *pdev,
 				     bool mcc_mode)
 {
@@ -210,4 +215,10 @@ void ucfg_ipa_component_config_update(struct wlan_objmgr_psoc *psoc)
 uint32_t ucfg_ipa_get_tx_buf_count(void)
 {
 	return ipa_get_tx_buf_count();
+}
+
+void ucfg_ipa_update_tx_stats(struct wlan_objmgr_pdev *pdev, uint64_t sta_tx,
+			      uint64_t ap_tx)
+{
+	ipa_update_tx_stats(pdev, sta_tx, ap_tx);
 }

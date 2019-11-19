@@ -187,7 +187,7 @@ static struct tdls_peer *tdls_add_peer(struct tdls_vdev_priv_obj *vdev_obj,
 				peer->pref_off_chan_num,
 				soc_obj->tdls_configs.tdls_pre_off_chan_bw);
 
-	peer->sta_id = INVALID_TDLS_PEER_ID;
+	peer->valid_entry = false;
 
 	qdf_list_insert_back(head, &peer->node);
 
@@ -399,9 +399,11 @@ static void tdls_determine_channel_opclass(struct tdls_soc_priv_obj *soc_obj,
 		vdev_id = wlan_vdev_get_id(vdev_obj->vdev);
 		opmode = wlan_vdev_mlme_get_opmode(vdev_obj->vdev);
 
-		*channel = policy_mgr_get_channel(soc_obj->soc,
+		*channel = wlan_freq_to_chan(
+			policy_mgr_get_channel(
+			soc_obj->soc,
 			policy_mgr_convert_device_mode_to_qdf_type(opmode),
-			&vdev_id);
+			&vdev_id));
 		*opclass = 0;
 	} else {
 		*channel = peer->pref_off_chan_num;
@@ -683,8 +685,8 @@ void tdls_set_peer_caps(struct tdls_vdev_priv_obj *vdev_obj,
 	curr_peer->qos = is_qos_wmm_sta;
 }
 
-QDF_STATUS tdls_set_sta_id(struct tdls_vdev_priv_obj *vdev_obj,
-			   const uint8_t *macaddr, uint8_t sta_id)
+QDF_STATUS tdls_set_valid(struct tdls_vdev_priv_obj *vdev_obj,
+			   const uint8_t *macaddr)
 {
 	struct tdls_peer *peer;
 
@@ -694,7 +696,7 @@ QDF_STATUS tdls_set_sta_id(struct tdls_vdev_priv_obj *vdev_obj,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	peer->sta_id = sta_id;
+	peer->valid_entry = true;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -770,7 +772,7 @@ QDF_STATUS tdls_reset_peer(struct tdls_vdev_priv_obj *vdev_obj,
 
 	tdls_set_peer_link_status(curr_peer, TDLS_LINK_IDLE,
 				  TDLS_LINK_UNSPECIFIED);
-	curr_peer->sta_id = INVALID_TDLS_PEER_ID;
+	curr_peer->valid_entry = false;
 
 	return QDF_STATUS_SUCCESS;
 }

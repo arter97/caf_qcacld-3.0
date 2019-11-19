@@ -2431,6 +2431,7 @@ static void lim_tdls_update_hash_node_info(struct mac_context *mac,
 	} else if (add_sta_req->tdls_oper == TDLS_OPER_UPDATE) {
 		lim_tdls_populate_dot11f_ht_caps(mac, NULL,
 						 add_sta_req, &htCap);
+		sta->rmfEnabled = add_sta_req->is_pmf;
 	}
 	htCaps = &htCap;
 	if (htCaps->present) {
@@ -2648,9 +2649,8 @@ static QDF_STATUS lim_tdls_del_sta(struct mac_context *mac,
 		pe_debug("DEL STA peer MAC: "QDF_MAC_ADDR_STR,
 			 QDF_MAC_ADDR_ARRAY(sta->staAddr));
 
-		pe_debug("STA type: %x, sta idx: %x resp_reqd: %d",
+		pe_debug("STA type: %x, resp_reqd: %d",
 			 sta->staType,
-			 sta->staIndex,
 			 resp_reqd);
 
 		status = lim_del_sta(mac, sta, resp_reqd, pe_session);
@@ -2683,9 +2683,7 @@ static QDF_STATUS lim_send_sme_tdls_add_sta_rsp(struct mac_context *mac,
 
 	add_sta_rsp->session_id = sessionId;
 	add_sta_rsp->status_code = status;
-	if (sta) {
-		add_sta_rsp->sta_id = sta->staIndex;
-	}
+
 	if (peerMac) {
 		qdf_mem_copy(add_sta_rsp->peermac.bytes,
 			     (uint8_t *) peerMac, QDF_MAC_ADDR_SIZE);
@@ -2722,8 +2720,7 @@ QDF_STATUS lim_process_tdls_add_sta_rsp(struct mac_context *mac, void *msg,
 	uint16_t aid = 0;
 
 	SET_LIM_PROCESS_DEFD_MESGS(mac, true);
-	pe_debug("staIdx: %d, staMac: "QDF_MAC_ADDR_STR,
-	       pAddStaParams->staIdx,
+	pe_debug("staMac: "QDF_MAC_ADDR_STR,
 	       QDF_MAC_ADDR_ARRAY(pAddStaParams->staMac));
 
 	if (pAddStaParams->status != QDF_STATUS_SUCCESS) {
@@ -2741,7 +2738,6 @@ QDF_STATUS lim_process_tdls_add_sta_rsp(struct mac_context *mac, void *msg,
 		goto add_sta_error;
 	}
 
-	sta->staIndex = pAddStaParams->staIdx;
 	sta->mlmStaContext.mlmState = eLIM_MLM_LINK_ESTABLISHED_STATE;
 	sta->valid = 1;
 add_sta_error:
@@ -2947,10 +2943,6 @@ static QDF_STATUS lim_send_sme_tdls_del_sta_rsp(struct mac_context *mac,
 
 	del_sta_rsp->session_id = sessionId;
 	del_sta_rsp->status_code = status;
-	if (sta) {
-		del_sta_rsp->sta_id = sta->staIndex;
-	} else
-		del_sta_rsp->sta_id = STA_INVALID_IDX;
 
 	qdf_copy_macaddr(&del_sta_rsp->peermac, &peerMac);
 

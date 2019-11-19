@@ -417,9 +417,8 @@ static int __tdls_get_all_peers_from_list(
 			if (buf_len < 32 + 1)
 				break;
 			len = qdf_scnprintf(buf, buf_len,
-				QDF_MAC_ADDR_STR "%3d%4s%3s%5d\n",
+				QDF_MAC_ADDR_STR "%4s%3s%5d\n",
 				QDF_MAC_ADDR_ARRAY(curr_peer->peer_mac.bytes),
-				curr_peer->sta_id,
 				(curr_peer->tdls_support ==
 				 TDLS_CAP_SUPPORTED) ? "Y" : "N",
 				TDLS_IS_LINK_CONNECTED(curr_peer) ? "Y" :
@@ -492,8 +491,7 @@ static QDF_STATUS tdls_process_reset_all_peers(struct wlan_objmgr_vdev *vdev)
 	reset_session_id = tdls_vdev->session_id;
 	for (staidx = 0; staidx < tdls_soc->max_num_tdls_sta;
 							staidx++) {
-		if (tdls_soc->tdls_conn_info[staidx].sta_id
-						== INVALID_TDLS_PEER_ID)
+		if (!tdls_soc->tdls_conn_info[staidx].valid_entry)
 			continue;
 		if (tdls_soc->tdls_conn_info[staidx].session_id !=
 		    reset_session_id)
@@ -506,8 +504,8 @@ static QDF_STATUS tdls_process_reset_all_peers(struct wlan_objmgr_vdev *vdev)
 		if (!curr_peer)
 			continue;
 
-		tdls_notice("indicate TDLS teardown (staId %d)",
-			    curr_peer->sta_id);
+		tdls_notice("indicate TDLS teardown %pM",
+			    curr_peer->peer_mac.bytes);
 
 		/* Indicate teardown to supplicant */
 		tdls_indicate_teardown(tdls_vdev,
@@ -522,7 +520,7 @@ static QDF_STATUS tdls_process_reset_all_peers(struct wlan_objmgr_vdev *vdev)
 					wlan_vdev_get_id(vdev),
 					&curr_peer->peer_mac);
 		tdls_decrement_peer_count(tdls_soc);
-		tdls_soc->tdls_conn_info[staidx].sta_id = INVALID_TDLS_PEER_ID;
+		tdls_soc->tdls_conn_info[staidx].valid_entry = false;
 		tdls_soc->tdls_conn_info[staidx].session_id = 255;
 		tdls_soc->tdls_conn_info[staidx].index =
 					INVALID_TDLS_PEER_INDEX;
@@ -806,7 +804,7 @@ static void tdls_state_param_setting_dump(struct tdls_info *info)
 	if (!info)
 		return;
 
-	tdls_debug("Setting tdls state and param in fw: vdev_id: %d, tdls_state: %d, notification_interval_ms: %d, tx_discovery_threshold: %d, tx_teardown_threshold: %d, rssi_teardown_threshold: %d, rssi_delta: %d, tdls_options: 0x%x, peer_traffic_ind_window: %d, peer_traffic_response_timeout: %d, puapsd_mask: 0x%x, puapsd_inactivity_time: %d, puapsd_rx_frame_threshold: %d, teardown_notification_ms: %d, tdls_peer_kickout_threshold: %d",
+	tdls_debug("Setting tdls state and param in fw: vdev_id: %d, tdls_state: %d, notification_interval_ms: %d, tx_discovery_threshold: %d, tx_teardown_threshold: %d, rssi_teardown_threshold: %d, rssi_delta: %d, tdls_options: 0x%x, peer_traffic_ind_window: %d, peer_traffic_response_timeout: %d, puapsd_mask: 0x%x, puapsd_inactivity_time: %d, puapsd_rx_frame_threshold: %d, teardown_notification_ms: %d, tdls_peer_kickout_threshold: %d, tdls_discovery_wake_timeout: %d",
 		   info->vdev_id,
 		   info->tdls_state,
 		   info->notification_interval_ms,
@@ -821,7 +819,8 @@ static void tdls_state_param_setting_dump(struct tdls_info *info)
 		   info->puapsd_inactivity_time,
 		   info->puapsd_rx_frame_threshold,
 		   info->teardown_notification_ms,
-		   info->tdls_peer_kickout_threshold);
+		   info->tdls_peer_kickout_threshold,
+		   info->tdls_discovery_wake_timeout);
 
 }
 
@@ -1210,6 +1209,8 @@ void tdls_send_update_to_fw(struct tdls_vdev_priv_obj *tdls_vdev_obj,
 		tdls_soc_obj->tdls_configs.tdls_idle_timeout;
 	tdls_info_to_fw->tdls_peer_kickout_threshold =
 		tdls_soc_obj->tdls_configs.tdls_peer_kickout_threshold;
+	tdls_info_to_fw->tdls_discovery_wake_timeout =
+		tdls_soc_obj->tdls_configs.tdls_discovery_wake_timeout;
 
 	tdls_state_param_setting_dump(tdls_info_to_fw);
 

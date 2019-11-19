@@ -779,11 +779,6 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 			}
 		}
 
-		if (session->vhtCapability &&
-			(session->ch_width > CH_WIDTH_80MHZ)) {
-			session->nss = 1;
-			pe_debug("nss set to [%d]", session->nss);
-		}
 		pe_debug("vht su tx bformer %d",
 			session->vht_config.su_beam_former);
 
@@ -890,7 +885,9 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 		if (LIM_IS_AP_ROLE(session)) {
 			mlm_start_req->dtimPeriod = session->dtimPeriod;
 			mlm_start_req->wps_state = session->wps_state;
-
+			session->cac_duration_ms =
+				mlm_start_req->cac_duration_ms;
+			session->dfs_regdomain = mlm_start_req->dfs_regdomain;
 		} else {
 			val = mac_ctx->mlme_cfg->sap_cfg.dtim_interval;
 			mlm_start_req->dtimPeriod = (uint8_t) val;
@@ -1915,10 +1912,8 @@ static void __lim_process_sme_reassoc_req(struct mac_context *mac_ctx,
 		     session_entry->pLimReAssocReq->bssDescription.bssId,
 		     sizeof(tSirMacAddr));
 
-	session_entry->limReassocChannelId = wlan_reg_freq_to_chan(
-		mac_ctx->pdev,
-		session_entry->pLimReAssocReq->bssDescription.chan_freq);
-
+	session_entry->lim_reassoc_chan_freq =
+		session_entry->pLimReAssocReq->bssDescription.chan_freq;
 	session_entry->reAssocHtSupportedChannelWidthSet =
 		(session_entry->pLimReAssocReq->cbMode) ? 1 : 0;
 	session_entry->reAssocHtRecommendedTxWidthSet =
@@ -3690,6 +3685,29 @@ static void __lim_process_roam_scan_offload_req(struct mac_context *mac_ctx,
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
+ * lim_send_roam_offload_init() - Process Roam offload flag from csr
+ * @mac_ctx: Pointer to Global MAC structure
+ * @msg_buf: Pointer to SME message buffer
+ *
+ * Return: None
+ */
+static void lim_send_roam_offload_init(struct mac_context *mac_ctx,
+				       uint32_t *msg_buf)
+{
+	struct scheduler_msg wma_msg = {0};
+	QDF_STATUS status;
+
+	wma_msg.type = WMA_ROAM_INIT_PARAM;
+	wma_msg.bodyptr = msg_buf;
+
+	status = wma_post_ctrl_msg(mac_ctx, &wma_msg);
+	if (QDF_STATUS_SUCCESS != status) {
+		pe_err("Posting WMA_ROAM_INIT_PARAM failed");
+		qdf_mem_free(msg_buf);
+	}
+}
+
+/**
  * lim_process_roam_invoke() - process the Roam Invoke req
  * @mac_ctx: Pointer to Global MAC structure
  * @msg_buf: Pointer to the SME message buffer
@@ -3714,6 +3732,11 @@ static void lim_process_roam_invoke(struct mac_context *mac_ctx,
 		pe_err("Not able to post SIR_HAL_ROAM_INVOKE to WMA");
 }
 #else
+static void lim_send_roam_offload_init(struct mac_context *mac_ctx,
+				       uint32_t *msg_buf)
+{
+	qdf_mem_free(msg_buf);
+}
 static void lim_process_roam_invoke(struct mac_context *mac_ctx,
 				    uint32_t *msg_buf)
 {
@@ -3923,7 +3946,6 @@ static void __lim_process_sme_set_ht2040_mode(struct mac_context *mac,
 				(pe_session->htSecondaryChannelOffset ==
 				 PHY_SINGLE_CHANNEL_CENTERED) ?
 				eHT_CHANNEL_WIDTH_20MHZ : eHT_CHANNEL_WIDTH_40MHZ;
-			pHtOpMode->staId = staId;
 			qdf_mem_copy(pHtOpMode->peer_mac, &sta->staAddr,
 				     sizeof(tSirMacAddr));
 			pHtOpMode->smesessionId = sessionId;
@@ -3940,11 +3962,11 @@ static void __lim_process_sme_set_ht2040_mode(struct mac_context *mac,
 				qdf_mem_free(pHtOpMode);
 				return;
 			}
-			pe_debug("Notified FW about OP mode: %d for staId=%d",
-				pHtOpMode->opMode, staId);
+			pe_debug("Notified FW about OP mode: %d",
+				pHtOpMode->opMode);
 
 		} else
-			pe_debug("station %d does not support HT40", staId);
+			pe_debug("station does not support HT40");
 	}
 
 	return;
@@ -4762,6 +4784,10 @@ bool lim_process_sme_req_messages(struct mac_context *mac,
 		__lim_process_roam_scan_offload_req(mac, msg_buf);
 		bufConsumed = false;
 		break;
+	case eWNI_SME_ROAM_INIT_PARAM:
+		lim_send_roam_offload_init(mac, msg_buf);
+		bufConsumed = false;
+		break;
 	case eWNI_SME_ROAM_INVOKE:
 		lim_process_roam_invoke(mac, msg_buf);
 		bufConsumed = false;
@@ -5023,11 +5049,10 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 	}
 	ch_change_req = (tpSirChanChangeRequest)msg_buf;
 
-	target_freq = wlan_reg_chan_to_freq(
-		mac_ctx->pdev, ch_change_req->targetChannel);
+	target_freq = ch_change_req->target_chan_freq;
 
-	max_tx_pwr = lim_get_regulatory_max_transmit_power(
-				mac_ctx, ch_change_req->targetChannel);
+	max_tx_pwr = wlan_reg_get_channel_reg_power_for_freq(
+				mac_ctx->pdev, target_freq);
 
 	if ((ch_change_req->messageType != eWNI_SME_CHANNEL_CHANGE_REQ) ||
 			(max_tx_pwr == WMA_MAX_TXPOWER_INVALID)) {
@@ -5643,7 +5668,7 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 
 	/* target channel */
 	session_entry->gLimChannelSwitch.primaryChannel =
-		dfs_csa_ie_req->targetChannel;
+		wlan_reg_freq_to_chan(mac_ctx->pdev, dfs_csa_ie_req->target_chan_freq);
 
 	/* Channel switch announcement needs to be included in beacon */
 	session_entry->dfsIncludeChanSwIe = true;
@@ -5904,6 +5929,11 @@ static void lim_process_nss_update_request(struct mac_context *mac_ctx,
 	if ((nss_update_req_ptr->new_nss == NSS_1x1_MODE) &&
 			(session_entry->ch_width > CH_WIDTH_80MHZ))
 		session_entry->gLimOperatingMode.chanWidth = CH_WIDTH_80MHZ;
+	if (session_entry->gLimOperatingMode.chanWidth <= CH_WIDTH_160MHZ &&
+	    nss_update_req_ptr->ch_width <
+			session_entry->gLimOperatingMode.chanWidth)
+		session_entry->gLimOperatingMode.chanWidth =
+			nss_update_req_ptr->ch_width;
 
 	pe_debug("ch width %d Rx NSS %d",
 		 session_entry->gLimOperatingMode.chanWidth,
@@ -6331,5 +6361,6 @@ void lim_add_roam_blacklist_ap(struct mac_context *mac_ctx,
 
 		/* Add this bssid to the rssi reject ap type in blacklist mgr */
 		lim_add_bssid_to_reject_list(mac_ctx->pdev, &entry);
+		blacklist++;
 	}
 }

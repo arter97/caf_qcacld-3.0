@@ -85,7 +85,8 @@ void lim_stop_tx_and_switch_channel(struct mac_context *mac, uint8_t sessionId)
 	mac->lim.lim_timers.gLimChannelSwitchTimer.sessionId = sessionId;
 	status = policy_mgr_check_and_set_hw_mode_for_channel_switch(mac->psoc,
 				pe_session->smeSessionId,
-				pe_session->gLimChannelSwitch.primaryChannel,
+				wlan_chan_to_freq(
+				pe_session->gLimChannelSwitch.primaryChannel),
 				POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH_STA);
 
 	/*
@@ -502,9 +503,8 @@ static void __lim_process_operating_mode_action_frame(struct mac_context *mac_ct
 		operating_mode_frm->OperatingMode.chanWidth)) {
 		uint32_t fw_vht_ch_wd = wma_get_vht_ch_width();
 
-		pe_debug("received Chanwidth: %d staIdx: %d",
-			(operating_mode_frm->OperatingMode.chanWidth),
-			sta_ptr->staIndex);
+		pe_debug("received Chanwidth: %d",
+			 operating_mode_frm->OperatingMode.chanWidth);
 
 		pe_debug(" MAC: %0x:%0x:%0x:%0x:%0x:%0x",
 			mac_hdr->sa[0], mac_hdr->sa[1], mac_hdr->sa[2],
@@ -541,7 +541,7 @@ static void __lim_process_operating_mode_action_frame(struct mac_context *mac_ct
 			ch_bw = eHT_CHANNEL_WIDTH_20MHZ;
 		}
 		lim_check_vht_op_mode_change(mac_ctx, session, ch_bw,
-					     sta_ptr->staIndex, mac_hdr->sa);
+					     mac_hdr->sa);
 	}
 
 update_nss:
@@ -550,7 +550,7 @@ update_nss:
 		sta_ptr->vhtSupportedRxNss =
 			operating_mode_frm->OperatingMode.rxNSS + 1;
 		lim_set_nss_change(mac_ctx, session, sta_ptr->vhtSupportedRxNss,
-			sta_ptr->staIndex, mac_hdr->sa);
+			mac_hdr->sa);
 	}
 
 end:
@@ -568,10 +568,11 @@ end:
  *
  * Return: none
  */
-static void __lim_process_gid_management_action_frame(struct mac_context *mac_ctx,
-			uint8_t *rx_pkt_info, struct pe_session *session)
+static void
+__lim_process_gid_management_action_frame(struct mac_context *mac_ctx,
+					  uint8_t *rx_pkt_info,
+					  struct pe_session *session)
 {
-
 	uint8_t *body_ptr;
 	uint16_t aid;
 	uint32_t frame_len, status, membership = 0, usr_position = 0;
@@ -609,8 +610,6 @@ static void __lim_process_gid_management_action_frame(struct mac_context *mac_ct
 		pe_err("Failed to get STA entry from hash table");
 		goto out;
 	}
-	pe_debug("received Gid Management Action Frame staIdx: %d",
-		sta_ptr->staIndex);
 
 	pe_debug(" MAC: %0x:%0x:%0x:%0x:%0x:%0x",
 		mac_hdr->sa[0], mac_hdr->sa[1], mac_hdr->sa[2],
@@ -620,8 +619,7 @@ static void __lim_process_gid_management_action_frame(struct mac_context *mac_ct
 	mem_upper = (uint32_t *) &vht_member_status->membershipStatusArray[4];
 
 	if (*mem_lower && *mem_upper) {
-		pe_err("rcved frame with mult group ID set, staIdx = %d",
-			sta_ptr->staIndex);
+		pe_err("rcved frame with mult group ID set");
 		goto out;
 	}
 	if (*mem_lower) {
@@ -630,8 +628,7 @@ static void __lim_process_gid_management_action_frame(struct mac_context *mac_ct
 		mem_cur = mem_upper;
 		membership += sizeof(uint32_t);
 	} else {
-		pe_err("rcved Gid frame with no group ID set, staIdx: %d",
-			sta_ptr->staIndex);
+		pe_err("rcved Gid frame with no group ID set");
 		goto out;
 	}
 	while (!(*mem_cur & 1)) {
@@ -639,8 +636,7 @@ static void __lim_process_gid_management_action_frame(struct mac_context *mac_ct
 		++membership;
 	}
 	if (*mem_cur) {
-		pe_err("rcved frame with mult group ID set, staIdx: %d",
-			sta_ptr->staIndex);
+		pe_err("rcved frame with mult group ID set");
 		goto out;
 	}
 
@@ -648,7 +644,7 @@ static void __lim_process_gid_management_action_frame(struct mac_context *mac_ct
 	vht_user_position = &gid_mgmt_frame->VhtUserPositionArray;
 	usr_position = vht_user_position->userPositionArray[membership] & 0x3;
 	lim_check_membership_user_position(mac_ctx, session, membership,
-			usr_position, sta_ptr->staIndex);
+			usr_position);
 out:
 	qdf_mem_free(gid_mgmt_frame);
 	return;
@@ -855,12 +851,12 @@ static void __lim_process_add_ts_rsp(struct mac_context *mac_ctx,
 		((upToAc(addts.tspec.tsinfo.traffic.userPrio) < QCA_WLAN_AC_ALL))) {
 #ifdef FEATURE_WLAN_ESE
 		retval = lim_send_hal_msg_add_ts(mac_ctx,
-				sta_ptr->staIndex, tspec_info->idx,
+				tspec_info->idx,
 				addts.tspec, session->peSessionId,
 				addts.tsmIE.msmt_interval);
 #else
 		retval = lim_send_hal_msg_add_ts(mac_ctx,
-				sta_ptr->staIndex, tspec_info->idx,
+				tspec_info->idx,
 				addts.tspec, session->peSessionId);
 #endif
 		if (QDF_STATUS_SUCCESS != retval) {
@@ -979,7 +975,7 @@ static void __lim_process_del_ts_req(struct mac_context *mac_ctx,
 					SIR_MAC_ACCESSPOLICY_BOTH))){
 		/* send message to HAL to delete TS */
 		if (QDF_STATUS_SUCCESS != lim_send_hal_msg_del_ts(mac_ctx,
-						sta_ptr->staIndex, tspec_idx,
+						tspec_idx,
 						delts, session->peSessionId,
 						session->bssId)) {
 			pe_warn("DelTs with UP: %d failed ignoring request",
@@ -1070,7 +1066,7 @@ static void __lim_process_qos_map_configure_frame(struct mac_context *mac_ctx,
 	lim_send_sme_mgmt_frame_ind(mac_ctx, mac_hdr->fc.subType,
 				    (uint8_t *)mac_hdr,
 				    frame_len + sizeof(tSirMacMgmtHdr), 0,
-				    WMA_GET_RX_CH(rx_pkt_info), session,
+				    WMA_GET_RX_FREQ(rx_pkt_info), session,
 				    WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info),
 				    RXMGMT_FLAG_NONE);
 }
@@ -1253,7 +1249,7 @@ __lim_process_sm_power_save_update(struct mac_context *mac, uint8_t *pRxPacketIn
 
 	/** Update in the HAL Station Table for the Update of the Protection Mode */
 	pSta->htMIMOPSState = state;
-	lim_post_sm_state_update(mac, pSta->staIndex, pSta->htMIMOPSState,
+	lim_post_sm_state_update(mac, pSta->htMIMOPSState,
 				 pSta->staAddr, pe_session->smeSessionId);
 }
 
@@ -1289,7 +1285,7 @@ __lim_process_radio_measure_request(struct mac_context *mac, uint8_t *pRxPacketI
 	mac->rrm.rrmPEContext.prev_rrm_report_seq_num = curr_seq_num;
 	lim_send_sme_mgmt_frame_ind(mac, pHdr->fc.subType, (uint8_t *)pHdr,
 				    frameLen + sizeof(tSirMacMgmtHdr), 0,
-				    WMA_GET_RX_CH(pRxPacketInfo), pe_session,
+				    WMA_GET_RX_FREQ(pRxPacketInfo), pe_session,
 				    WMA_GET_RX_RSSI_NORMALIZED(pRxPacketInfo),
 				    RXMGMT_FLAG_NONE);
 
@@ -1519,7 +1515,7 @@ static void __lim_process_sa_query_response_action_frame(struct mac_context *mac
 					    (uint8_t *)pHdr,
 					    frame_len + sizeof(tSirMacMgmtHdr),
 					    0,
-					    WMA_GET_RX_CH(pRxPacketInfo),
+					    WMA_GET_RX_FREQ(pRxPacketInfo),
 					    pe_session,
 					    WMA_GET_RX_RSSI_NORMALIZED(
 					    pRxPacketInfo), RXMGMT_FLAG_NONE);
@@ -1595,22 +1591,18 @@ lim_drop_unprotected_action_frame(struct mac_context *mac, struct pe_session *pe
 	tpDphHashNode sta;
 	bool rmfConnection = false;
 
-	if (LIM_IS_AP_ROLE(pe_session)) {
-		sta =
-			dph_lookup_hash_entry(mac, pHdr->sa, &aid,
-					      &pe_session->dph.dphHashTable);
-		if (sta)
-			if (sta->rmfEnabled)
-				rmfConnection = true;
-	} else if (pe_session->limRmfEnabled)
+	sta = dph_lookup_hash_entry(mac, pHdr->sa, &aid,
+				    &pe_session->dph.dphHashTable);
+	if (sta && sta->rmfEnabled)
 		rmfConnection = true;
 
 	if (rmfConnection && (pHdr->fc.wep == 0)) {
 		pe_err("Dropping unprotected Action category: %d frame since RMF is enabled",
 			category);
 		return true;
-	} else
-		return false;
+	}
+
+	return false;
 }
 #endif
 
@@ -1941,7 +1933,7 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 					(uint8_t *) mac_hdr,
 					frame_len + sizeof(tSirMacMgmtHdr),
 					session->smeSessionId,
-					WMA_GET_RX_CH(rx_pkt_info),
+					WMA_GET_RX_FREQ(rx_pkt_info),
 					session, rssi, RXMGMT_FLAG_NONE);
 			break;
 		default:
@@ -2029,7 +2021,7 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 					frame_len +
 					sizeof(tSirMacMgmtHdr),
 					session->smeSessionId,
-					WMA_GET_RX_CH(rx_pkt_info),
+					WMA_GET_RX_FREQ(rx_pkt_info),
 					session,
 					WMA_GET_RX_RSSI_NORMALIZED(
 					rx_pkt_info), RXMGMT_FLAG_NONE);
@@ -2089,7 +2081,7 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 					(uint8_t *) mac_hdr,
 					frame_len + sizeof(tSirMacMgmtHdr),
 					session->smeSessionId,
-					WMA_GET_RX_CH(rx_pkt_info), session,
+					WMA_GET_RX_FREQ(rx_pkt_info), session,
 					WMA_GET_RX_RSSI_NORMALIZED(
 					rx_pkt_info), RXMGMT_FLAG_NONE);
 			break;
@@ -2153,7 +2145,7 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 					    (uint8_t *)hdr,
 					    frame_len + sizeof(tSirMacMgmtHdr),
 					    session->smeSessionId,
-					    WMA_GET_RX_CH(rx_pkt_info),
+					    WMA_GET_RX_FREQ(rx_pkt_info),
 					    session,
 					    WMA_GET_RX_RSSI_NORMALIZED(
 					    rx_pkt_info), RXMGMT_FLAG_NONE);
@@ -2173,7 +2165,7 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 				mac_hdr->fc.subType, (uint8_t *) mac_hdr,
 				frame_len + sizeof(tSirMacMgmtHdr),
 				session->smeSessionId,
-				WMA_GET_RX_CH(rx_pkt_info), session, rssi,
+				WMA_GET_RX_FREQ(rx_pkt_info), session, rssi,
 				RXMGMT_FLAG_NONE);
 			break;
 		default:
@@ -2277,7 +2269,7 @@ void lim_process_action_frame_no_session(struct mac_context *mac, uint8_t *pBd)
 					mac_hdr->fc.subType,
 					(uint8_t *) mac_hdr,
 					frame_len + sizeof(tSirMacMgmtHdr), 0,
-					WMA_GET_RX_CH(pBd), NULL,
+					WMA_GET_RX_FREQ(pBd), NULL,
 					WMA_GET_RX_RSSI_NORMALIZED(pBd),
 					RXMGMT_FLAG_NONE);
 			break;

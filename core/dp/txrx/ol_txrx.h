@@ -75,6 +75,16 @@ int  ol_txrx_peer_release_ref(ol_txrx_peer_handle peer,
 			      enum peer_debug_id_type dbg_id);
 
 /**
+ * ol_txrx_soc_attach() - initialize the soc
+ * @scn_handle: Opaque SOC handle from control plane
+ * @dp_ol_if_ops: Offload Operations
+ *
+ * Return: SOC handle on success, NULL on failure
+ */
+ol_txrx_soc_handle ol_txrx_soc_attach(void *scn_handle,
+				      struct ol_if_ops *dp_ol_if_ops);
+
+/**
  * ol_tx_desc_pool_size_hl() - allocate tx descriptor pool size for HL systems
  * @ctrl_pdev: the control pdev handle
  *
@@ -140,6 +150,21 @@ ol_txrx_peer_get_ref_by_local_id(struct cdp_pdev *ppdev,
 				 enum peer_debug_id_type dbg_id);
 #endif /* QCA_SUPPORT_TXRX_LOCAL_PEER_ID */
 
+/**
+ * ol_txrx_get_pdev_from_pdev_id() - Returns pdev object given the pdev id
+ * @soc: core DP soc context
+ * @pdev_id: pdev id from pdev object can be retrieved
+ *
+ * Return: Pointer to DP pdev object
+ */
+
+static inline struct ol_txrx_pdev_t *
+ol_txrx_get_pdev_from_pdev_id(struct ol_txrx_soc_t *soc,
+			      uint8_t pdev_id)
+{
+	return soc->pdev_list[pdev_id];
+}
+
 /*
  * @nbuf: buffer which contains data to be displayed
  * @nbuf_paddr: physical address of the buffer
@@ -150,7 +175,25 @@ ol_txrx_peer_get_ref_by_local_id(struct cdp_pdev *ppdev,
 void
 ol_txrx_dump_pkt(qdf_nbuf_t nbuf, uint32_t nbuf_paddr, int len);
 
+/**
+ * ol_txrx_get_vdev_from_vdev_id() - get vdev from vdev_id
+ * @vdev_id: vdev_id
+ *
+ * Return: vdev handle
+ *            NULL if not found.
+ */
 struct cdp_vdev *ol_txrx_get_vdev_from_vdev_id(uint8_t vdev_id);
+
+/**
+ * ol_txrx_get_vdev_from_soc_vdev_id() - get vdev from soc and vdev_id
+ * @soc: datapath soc handle
+ * @vdev_id: vdev_id
+ *
+ * Return: vdev handle
+ *            NULL if not found.
+ */
+struct ol_txrx_vdev_t *ol_txrx_get_vdev_from_soc_vdev_id(
+				struct ol_txrx_soc_t *soc, uint8_t vdev_id);
 
 /**
  * ol_txrx_get_mon_vdev_from_pdev() - get monitor mode vdev from pdev
@@ -161,6 +204,20 @@ struct cdp_vdev *ol_txrx_get_vdev_from_vdev_id(uint8_t vdev_id);
  */
 struct cdp_vdev *ol_txrx_get_mon_vdev_from_pdev(struct cdp_pdev *ppdev);
 
+/**
+ * ol_txrx_get_vdev_by_peer_addr() - Get vdev handle by peer mac address
+ * @ppdev - data path device instance
+ * @peer_addr - peer mac address
+ *
+ * Get virtual interface handle by local peer mac address
+ *
+ * Return: Virtual interface instance handle
+ *         NULL in case cannot find
+ */
+ol_txrx_vdev_handle
+ol_txrx_get_vdev_by_peer_addr(struct cdp_pdev *ppdev,
+			      struct qdf_mac_addr peer_addr);
+
 void *ol_txrx_find_peer_by_addr(struct cdp_pdev *pdev,
 				uint8_t *peer_addr,
 				uint8_t *peer_id);
@@ -169,20 +226,49 @@ void htt_pkt_log_init(struct cdp_pdev *pdev_handle, void *scn);
 void peer_unmap_timer_handler(void *data);
 
 #ifdef QCA_LL_LEGACY_TX_FLOW_CONTROL
-int ol_txrx_register_tx_flow_control(uint8_t vdev_id,
+/**
+ * ol_txrx_register_tx_flow_control() - register tx flow control callback
+ * @soc_hdl: soc handle
+ * @vdev_id: vdev_id
+ * @flowControl: flow control callback
+ * @osif_fc_ctx: callback context
+ * @flow_control_is_pause: is vdev paused by flow control
+ *
+ * Return: 0 for success or error code
+ */
+int ol_txrx_register_tx_flow_control(struct cdp_soc_t *soc_hdl,
+				     uint8_t vdev_id,
 				     ol_txrx_tx_flow_control_fp flow_control,
 				     void *osif_fc_ctx,
 				     ol_txrx_tx_flow_control_is_pause_fp
 				     flow_control_is_pause);
 
-int ol_txrx_deregister_tx_flow_control_cb(uint8_t vdev_id);
+/**
+ * ol_txrx_de_register_tx_flow_control_cb() - deregister tx flow control
+ *                                            callback
+ * @soc_hdl: soc handle
+ * @vdev_id: vdev_id
+ *
+ * Return: 0 for success or error code
+ */
+int ol_txrx_deregister_tx_flow_control_cb(struct cdp_soc_t *soc_hdl,
+					  uint8_t vdev_id);
 
-bool ol_txrx_get_tx_resource(struct cdp_pdev *pdev,
+bool ol_txrx_get_tx_resource(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 			     struct qdf_mac_addr peer_addr,
 			     unsigned int low_watermark,
 			     unsigned int high_watermark_offset);
 
-int ol_txrx_ll_set_tx_pause_q_depth(uint8_t vdev_id, int pause_q_depth);
+/**
+ * ol_txrx_ll_set_tx_pause_q_depth() - set pause queue depth
+ * @soc_hdl: soc handle
+ * @vdev_id: vdev id
+ * @pause_q_depth: pause queue depth
+ *
+ * Return: 0 for success or error code
+ */
+int ol_txrx_ll_set_tx_pause_q_depth(struct cdp_soc_t *soc_hdl,
+				    uint8_t vdev_id, int pause_q_depth);
 #endif
 
 void ol_tx_init_pdev(ol_txrx_pdev_handle pdev);
@@ -236,6 +322,8 @@ void ol_txrx_add_last_real_peer(struct cdp_pdev *ppdev,
 bool is_vdev_restore_last_peer(void *ppeer);
 void ol_txrx_update_last_real_peer(struct cdp_pdev *ppdev, void *pvdev,
 				   uint8_t *peer_id, bool restore_last_peer);
+void ol_txrx_set_peer_as_tdls_peer(void *ppeer, bool val);
+void ol_txrx_set_tdls_offchan_enabled(void *ppeer, bool val);
 #endif
 
 #if defined(FEATURE_TSO) && defined(FEATURE_TSO_DEBUG)
@@ -294,6 +382,78 @@ uint32_t ol_tx_get_desc_global_pool_size(struct ol_txrx_pdev_t *pdev)
 #endif
 #endif
 
+/**
+ * cdp_soc_t_to_ol_txrx_soc_t() - typecast cdp_soc_t to ol_txrx_soc_t
+ * @soc: OL soc handle
+ *
+ * Return: struct ol_txrx_soc_t pointer
+ */
+static inline
+struct ol_txrx_soc_t *cdp_soc_t_to_ol_txrx_soc_t(ol_txrx_soc_handle soc)
+{
+	return (struct ol_txrx_soc_t *)soc;
+}
+
+/**
+ * ol_txrx_soc_t_to_cdp_soc_t() - typecast ol_txrx_soc_t to cdp_soc
+ * @soc: Opaque soc handle
+ *
+ * Return: struct cdp_soc_t pointer
+ */
+static inline
+ol_txrx_soc_handle ol_txrx_soc_t_to_cdp_soc_t(struct ol_txrx_soc_t *soc)
+{
+	return (struct cdp_soc_t *)soc;
+}
+
+/**
+ * cdp_pdev_to_ol_txrx_pdev_t() - typecast cdp_pdev to ol_txrx_pdev_t
+ * @pdev: OL pdev handle
+ *
+ * Return: struct ol_txrx_pdev_t pointer
+ */
+static inline
+struct ol_txrx_pdev_t *cdp_pdev_to_ol_txrx_pdev_t(struct cdp_pdev *pdev)
+{
+	return (struct ol_txrx_pdev_t *)pdev;
+}
+
+/**
+ * ol_txrx_pdev_t_to_cdp_pdev() - typecast ol_txrx_pdev_t to cdp_pdev
+ * @pdev: Opaque pdev handle
+ *
+ * Return: struct cdp_pdev pointer
+ */
+static inline
+struct cdp_pdev *ol_txrx_pdev_t_to_cdp_pdev(struct ol_txrx_pdev_t *pdev)
+{
+	return (struct cdp_pdev *)pdev;
+}
+
+/**
+ * cdp_vdev_to_ol_txrx_vdev_t() - typecast cdp_vdev to ol_txrx_vdev_t
+ * @vdev: OL vdev handle
+ *
+ * Return: struct ol_txrx_vdev_t pointer
+ */
+static inline
+struct ol_txrx_vdev_t *cdp_vdev_to_ol_txrx_vdev_t(struct cdp_vdev *vdev)
+{
+	return (struct ol_txrx_vdev_t *)vdev;
+}
+
+/**
+ * ol_txrx_vdev_t_to_cdp_vdev() - typecast ol_txrx_vdev_t to cdp_vdev
+ * @vdev: Opaque vdev handle
+ *
+ * Return: struct cdp_vdev pointer
+ */
+static inline
+struct cdp_vdev *ol_txrx_vdev_t_to_cdp_vdev(struct ol_txrx_vdev_t *vdev)
+{
+	return (struct cdp_vdev *)vdev;
+}
+
 #ifdef QCA_LL_TX_FLOW_CONTROL_V2
 void ol_tx_set_desc_global_pool_size(uint32_t num_msdu_desc);
 uint32_t ol_tx_get_total_free_desc(struct ol_txrx_pdev_t *pdev);
@@ -316,16 +476,26 @@ uint32_t ol_tx_get_total_free_desc(struct ol_txrx_pdev_t *pdev);
  * Return: true ; forward the packet, i.e., below threshold
  *         false; not enough descriptors, drop the packet
  */
-bool ol_txrx_fwd_desc_thresh_check(struct cdp_vdev *vdev);
+bool ol_txrx_fwd_desc_thresh_check(struct ol_txrx_vdev_t *txrx_vdev);
 
 /**
  * ol_tx_desc_thresh_reached() - is tx desc threshold reached
- * @vdev: vdev handle
+ * @soc_hdl: Datapath soc handle
+ * @vdev_id: id of vdev
  *
  * Return: true if tx desc available reached threshold or false otherwise
  */
-static inline bool ol_tx_desc_thresh_reached(struct cdp_vdev *vdev)
+static inline bool ol_tx_desc_thresh_reached(struct cdp_soc_t *soc_hdl,
+					     uint8_t vdev_id)
 {
+	struct ol_txrx_vdev_t *vdev;
+
+	vdev = (struct ol_txrx_vdev_t *)ol_txrx_get_vdev_from_vdev_id(vdev_id);
+	if (!vdev) {
+		dp_err("vdev is NULL");
+		return false;
+	}
+
 	return !(ol_txrx_fwd_desc_thresh_check(vdev));
 }
 
@@ -343,7 +513,7 @@ uint32_t ol_tx_get_total_free_desc(struct ol_txrx_pdev_t *pdev)
 }
 
 static inline
-bool ol_txrx_fwd_desc_thresh_check(struct cdp_vdev *vdev)
+bool ol_txrx_fwd_desc_thresh_check(struct ol_txrx_vdev_t *txrx_vdev)
 {
 	return true;
 }
@@ -376,10 +546,38 @@ struct ol_txrx_stats_req_internal
 				       uint8_t desc_id);
 
 #ifdef QCA_HL_NETDEV_FLOW_CONTROL
-int ol_txrx_register_hl_flow_control(struct cdp_soc_t *soc,
+/**
+ * ol_txrx_register_hl_flow_control() -register hl netdev flow control callback
+ * @soc_hdl: soc handle
+ * @vdev_id: vdev_id
+ * @flowControl: flow control callback
+ *
+ * Return: 0 for success or error code
+ */
+int ol_txrx_register_hl_flow_control(struct cdp_soc_t *soc_hdl,
 				     tx_pause_callback flowcontrol);
-int ol_txrx_set_vdev_os_queue_status(u8 vdev_id, enum netif_action_type action);
-int ol_txrx_set_vdev_tx_desc_limit(u8 vdev_id, u8 chan);
+
+/**
+ * ol_txrx_set_vdev_os_queue_status() - Set OS queue status for a vdev
+ * @soc_hdl: soc handle
+ * @vdev_id: vdev id for the vdev under consideration.
+ * @action: action to be done on queue for vdev
+ *
+ * Return: 0 on success, -EINVAL on failure
+ */
+int ol_txrx_set_vdev_os_queue_status(struct cdp_soc_t *soc_hdl, u8 vdev_id,
+				     enum netif_action_type action);
+
+/**
+ * ol_txrx_set_vdev_tx_desc_limit() - Set TX descriptor limits for a vdev
+ * @soc_hdl: soc handle
+ * @vdev_id: vdev id for the vdev under consideration.
+ * @chan: Channel on which the vdev has been started.
+ *
+ * Return: 0 on success, -EINVAL on failure
+ */
+int ol_txrx_set_vdev_tx_desc_limit(struct cdp_soc_t *soc_hdl, u8 vdev_id,
+				   u8 chan);
 #endif
 
 /**

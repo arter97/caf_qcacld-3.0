@@ -24,24 +24,19 @@
 #include "cfg_ucfg_api.h"
 #include "wmi_unified.h"
 #include "wlan_scan_public_structs.h"
+#include "wlan_psoc_mlme_api.h"
 #include "wlan_vdev_mlme_api.h"
 #include "wlan_mlme_api.h"
 #include <wlan_crypto_global_api.h>
 
 #define NUM_OF_SOUNDING_DIMENSIONS     1 /*Nss - 1, (Nss = 2 for 2x2)*/
 
-struct wlan_mlme_psoc_obj *mlme_get_psoc_obj_fl(struct wlan_objmgr_psoc *psoc,
-						const char *func, uint32_t line)
+struct wlan_mlme_psoc_ext_obj *mlme_get_psoc_ext_obj_fl(
+			       struct wlan_objmgr_psoc *psoc,
+			       const char *func, uint32_t line)
 {
-	struct wlan_mlme_psoc_obj *mlme_obj;
 
-	mlme_obj = (struct wlan_mlme_psoc_obj *)
-		wlan_objmgr_psoc_get_comp_private_obj(psoc,
-						      WLAN_UMAC_COMP_MLME);
-	if (!mlme_obj)
-		mlme_legacy_err("mlme obj is null, %s:%d", func, line);
-
-	return mlme_obj;
+	return wlan_psoc_mlme_get_ext_hdl(psoc);
 }
 
 struct wlan_mlme_nss_chains *mlme_get_dynamic_vdev_config(
@@ -97,55 +92,6 @@ uint8_t *mlme_get_dynamic_oce_flags(struct wlan_objmgr_vdev *vdev)
 	}
 
 	return &mlme_priv->sta_dynamic_oce_value;
-}
-
-QDF_STATUS
-mlme_psoc_object_created_notification(struct wlan_objmgr_psoc *psoc,
-				      void *arg)
-{
-	QDF_STATUS status;
-	struct wlan_mlme_psoc_obj *mlme_obj;
-
-	mlme_obj = qdf_mem_malloc(sizeof(struct wlan_mlme_psoc_obj));
-	if (!mlme_obj) {
-		mlme_legacy_err("Failed to allocate memory");
-		return QDF_STATUS_E_NOMEM;
-	}
-
-	status = wlan_objmgr_psoc_component_obj_attach(psoc,
-						       WLAN_UMAC_COMP_MLME,
-						       mlme_obj,
-						       QDF_STATUS_SUCCESS);
-	if (status != QDF_STATUS_SUCCESS) {
-		mlme_legacy_err("Failed to attach psoc_ctx with psoc");
-		qdf_mem_free(mlme_obj);
-	}
-
-	return status;
-}
-
-QDF_STATUS
-mlme_psoc_object_destroyed_notification(struct wlan_objmgr_psoc *psoc,
-					void *arg)
-{
-	struct wlan_mlme_psoc_obj *mlme_obj = NULL;
-	QDF_STATUS status;
-
-	mlme_obj = mlme_get_psoc_obj(psoc);
-
-	status = wlan_objmgr_psoc_component_obj_detach(psoc,
-						       WLAN_UMAC_COMP_MLME,
-						       mlme_obj);
-	if (status != QDF_STATUS_SUCCESS) {
-		mlme_legacy_err("Failed to detach psoc_ctx from psoc");
-		status = QDF_STATUS_E_FAILURE;
-		goto out;
-	}
-
-	qdf_mem_free(mlme_obj);
-
-out:
-	return status;
 }
 
 #ifdef CRYPTO_SET_KEY_CONVERGED
@@ -406,8 +352,6 @@ static void mlme_init_generic_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_ENABLE_BEACON_RECEPTION_STATS);
 	gen->enable_remove_time_stamp_sync_cmd =
 		cfg_get(psoc, CFG_REMOVE_TIME_STAMP_SYNC_CMD);
-	gen->enable_change_channel_bandwidth =
-		cfg_get(psoc, CFG_CHANGE_CHANNEL_BANDWIDTH);
 	gen->disable_4way_hs_offload =
 		cfg_get(psoc, CFG_DISABLE_4WAY_HS_OFFLOAD);
 }
@@ -1291,6 +1235,90 @@ static void mlme_init_threshold_cfg(struct wlan_objmgr_psoc *psoc,
 	threshold->frag_threshold = cfg_get(psoc, CFG_FRAG_THRESHOLD);
 }
 
+static bool
+mlme_is_freq_present_in_list(struct acs_weight *normalize_weight_chan_list,
+			     uint8_t num_freq, uint32_t freq, uint8_t *index)
+{
+	uint8_t i;
+
+	for (i = 0; i < num_freq; i++) {
+		if (normalize_weight_chan_list[i].chan_freq == freq) {
+			*index = i;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+static void
+mlme_acs_parse_weight_list(struct wlan_objmgr_psoc *psoc,
+			   struct wlan_mlme_acs *acs)
+{
+	char *acs_weight, *str1, *str2 = NULL, *acs_weight_temp, is_range = '-';
+	int freq1, freq2, normalize_factor;
+	uint8_t num_acs_weight = 0, num_acs_weight_range = 0, index = 0;
+	struct acs_weight *weight_list = acs->normalize_weight_chan;
+	struct acs_weight_range *range_list = acs->normalize_weight_range;
+
+	if (!qdf_str_len(cfg_get(psoc, CFG_NORMALIZE_ACS_WEIGHT)))
+		return;
+
+	acs_weight = qdf_mem_malloc(ACS_WEIGHT_MAX_STR_LEN);
+
+	if (!acs_weight)
+		return;
+
+	qdf_mem_copy(acs_weight, cfg_get(psoc, CFG_NORMALIZE_ACS_WEIGHT),
+		     ACS_WEIGHT_MAX_STR_LEN);
+	acs_weight_temp = acs_weight;
+
+	while(acs_weight_temp) {
+		str1 = strsep(&acs_weight_temp, ",");
+		if (!str1)
+			goto end;
+		freq1 = 0;
+		freq2 = 0;
+		if (strchr(str1, is_range)) {
+			str2 = strsep(&str1, "-");
+			sscanf(str2, "%d", &freq1);
+			sscanf(str1, "%d", &freq2);
+			strsep(&str1, "=");
+			sscanf(str1, "%d", &normalize_factor);
+
+			if (num_acs_weight_range == MAX_ACS_WEIGHT_RANGE)
+				continue;
+			range_list[num_acs_weight_range].normalize_weight =
+							normalize_factor;
+			range_list[num_acs_weight_range].start_freq = freq1;
+			range_list[num_acs_weight_range++].end_freq = freq2;
+		} else {
+			sscanf(str1, "%d", &freq1);
+			strsep(&str1, "=");
+			sscanf(str1, "%d", &normalize_factor);
+			if (mlme_is_freq_present_in_list(weight_list,
+							 num_acs_weight, freq1,
+							 &index)) {
+				weight_list[index].normalize_weight =
+							normalize_factor;
+			} else {
+				if (num_acs_weight == QDF_MAX_NUM_CHAN)
+					continue;
+
+				weight_list[num_acs_weight].chan_freq = freq1;
+				weight_list[num_acs_weight++].normalize_weight =
+							normalize_factor;
+			}
+		}
+	}
+
+	acs->normalize_weight_num_chan = num_acs_weight;
+	acs->num_weight_range = num_acs_weight_range;
+
+end:
+	qdf_mem_free(acs_weight);
+}
+
 static void mlme_init_acs_cfg(struct wlan_objmgr_psoc *psoc,
 			      struct wlan_mlme_acs *acs)
 {
@@ -1304,6 +1332,8 @@ static void mlme_init_acs_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_USER_ACS_DFS_LTE);
 	acs->is_external_acs_policy =
 		cfg_get(psoc, CFG_EXTERNAL_ACS_POLICY);
+
+	mlme_acs_parse_weight_list(psoc, acs);
 }
 
 QDF_STATUS mlme_init_ibss_cfg(struct wlan_objmgr_psoc *psoc,
@@ -2319,11 +2349,11 @@ mlme_init_dot11_mode_cfg(struct wlan_mlme_dot11_mode *dot11_mode)
 
 QDF_STATUS mlme_cfg_on_psoc_enable(struct wlan_objmgr_psoc *psoc)
 {
-	struct wlan_mlme_psoc_obj *mlme_obj;
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 	struct wlan_mlme_cfg *mlme_cfg;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
-	mlme_obj = mlme_get_psoc_obj(psoc);
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj) {
 		mlme_legacy_err("Failed to get MLME Obj");
 		return QDF_STATUS_E_FAILURE;
@@ -2499,6 +2529,32 @@ struct wlan_ies *mlme_get_peer_disconnect_ies(struct wlan_objmgr_vdev *vdev)
 	}
 
 	return &mlme_priv->peer_disconnect_ies;
+}
+
+void mlme_set_follow_ap_edca_flag(struct wlan_objmgr_vdev *vdev, bool flag)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return;
+	}
+
+	mlme_priv->follow_ap_edca = flag;
+}
+
+bool mlme_get_follow_ap_edca_flag(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return false;
+	}
+
+	return mlme_priv->follow_ap_edca;
 }
 
 void mlme_set_peer_pmf_status(struct wlan_objmgr_peer *peer,

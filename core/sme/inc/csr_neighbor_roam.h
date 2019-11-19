@@ -125,7 +125,7 @@ typedef struct sCsrNeighborRoamControlInfo {
 	eCsrNeighborRoamState prevNeighborRoamState;
 	tCsrNeighborRoamCfgParams cfgParams;
 	struct qdf_mac_addr currAPbssid;  /* current assoc AP */
-	uint8_t currAPoperationChannel; /* current assoc AP */
+	uint32_t curr_ap_op_chan_freq; /* current assoc AP */
 	tCsrNeighborRoamChannelInfo roamChannelInfo;
 	uint8_t currentNeighborLookupThreshold;
 	uint8_t currentOpportunisticThresholdDiff;
@@ -198,14 +198,14 @@ QDF_STATUS csr_neighbor_roam_update_fast_roaming_enabled(struct mac_context *mac
 		uint8_t sessionId, const bool fastRoamEnabled);
 QDF_STATUS csr_neighbor_roam_channels_filter_by_current_band(
 		struct mac_context *mac, uint8_t sessionId,
-		uint8_t *pInputChannelList,
+		uint32_t *input_chan_freq_list,
 		uint8_t inputNumOfChannels,
-		uint8_t *pOutputChannelList,
+		uint32_t *out_chan_freq_list,
 		uint8_t *pMergedOutputNumOfChannels);
 QDF_STATUS csr_neighbor_roam_merge_channel_lists(struct mac_context *mac,
 		uint32_t *pinput_chan_freq_list,
 		uint8_t inputNumOfChannels,
-		uint8_t *pOutputChannelList,
+		uint32_t *out_chan_freq_list,
 		uint8_t outputNumOfChannels,
 		uint8_t *pMergedOutputNumOfChannels);
 void csr_roam_reset_roam_params(struct mac_context *mac_ptr);
@@ -409,20 +409,6 @@ QDF_STATUS
 csr_roam_auth_offload_callback(struct mac_context *mac_ctx,
 			       uint8_t vdev_id,
 			       struct qdf_mac_addr bssid);
-
-/**
- * csr_process_roam_auth_offload_callback() - API to trigger the
- * WPA3 pre-auth event for candidate AP received from firmware.
- * @vdev_id: vdev id
- * @roam_bssid: Candidate BSSID to roam
- *
- * This function calls the hdd_sme_roam_callback with reason
- * eCSR_ROAM_SAE_COMPUTE to trigger SAE auth to supplicant.
- */
-QDF_STATUS
-csr_process_roam_auth_offload_callback(struct mac_context *mac_ctx,
-				       uint8_t vdev_id,
-				       struct qdf_mac_addr roam_bssid);
 #else
 static inline QDF_STATUS csr_roam_synch_callback(struct mac_context *mac,
 	struct roam_offload_synch_ind *roam_synch_data,
@@ -435,14 +421,6 @@ static inline QDF_STATUS
 csr_roam_auth_offload_callback(struct mac_context *mac_ctx,
 			       uint8_t vdev_id,
 			       struct qdf_mac_addr bssid)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static inline QDF_STATUS
-csr_process_roam_auth_offload_callback(struct mac_context *mac_ctx,
-				       uint8_t vdev_id,
-				       struct qdf_mac_addr roam_bssid)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
