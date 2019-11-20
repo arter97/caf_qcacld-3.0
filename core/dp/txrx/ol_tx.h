@@ -82,6 +82,8 @@ qdf_nbuf_t ol_tx_ll_queue(ol_txrx_vdev_handle vdev, qdf_nbuf_t msdu_list);
 void ol_tx_hl_vdev_bundle_timer(void *context);
 
 void ol_tx_hl_queue_flush_all(struct ol_txrx_vdev_t *vdev);
+qdf_nbuf_t
+ol_tx_hl_pdev_queue_send_all(struct ol_txrx_pdev_t *pdev);
 #else
 static inline
 void ol_tx_hl_vdev_bundle_timer(void *context)
@@ -91,6 +93,13 @@ void ol_tx_hl_vdev_bundle_timer(void *context)
 static inline
 void ol_tx_hl_queue_flush_all(struct ol_txrx_vdev_t *vdev)
 {
+}
+
+static inline
+qdf_nbuf_t
+ol_tx_hl_pdev_queue_send_all(struct ol_txrx_pdev_t *pdev)
+{
+	return NULL;
 }
 #endif
 

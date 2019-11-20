@@ -1521,25 +1521,69 @@ ol_tx_hl_vdev_queue_append(struct ol_txrx_vdev_t *vdev, qdf_nbuf_t msdu_list)
  * Return: NULL for success
  */
 static qdf_nbuf_t
-ol_tx_hl_vdev_queue_send_all(struct ol_txrx_vdev_t *vdev, bool call_sched)
+ol_tx_hl_vdev_queue_send_all(struct ol_txrx_vdev_t *vdev, bool call_sched,
+			     bool in_timer_context)
 {
 	qdf_nbuf_t msdu_list = NULL;
+	qdf_nbuf_t skb_list_head, skb_list_tail;
 	struct ol_txrx_pdev_t *pdev = vdev->pdev;
 	int tx_comp_req = pdev->cfg.default_tx_comp_req ||
 				pdev->cfg.request_tx_comp;
+	int pkt_to_sent;
 
 	qdf_spin_lock_bh(&vdev->bundle_queue.mutex);
 
-	if (vdev->bundle_queue.txq.depth != 0) {
+	if (!vdev->bundle_queue.txq.depth) {
+		qdf_spin_unlock_bh(&vdev->bundle_queue.mutex);
+		return msdu_list;
+	}
+
+	if (likely((qdf_atomic_read(&vdev->tx_desc_count) +
+		    vdev->bundle_queue.txq.depth) <
+		    vdev->queue_stop_th)) {
 		qdf_timer_stop(&vdev->bundle_queue.timer);
 		vdev->pdev->total_bundle_queue_length -=
-			vdev->bundle_queue.txq.depth;
+				vdev->bundle_queue.txq.depth;
 		msdu_list = ol_tx_hl_base(vdev, OL_TX_SPEC_STD,
-			vdev->bundle_queue.txq.head, tx_comp_req, call_sched);
-
+					  vdev->bundle_queue.txq.head,
+					  tx_comp_req, call_sched);
 		vdev->bundle_queue.txq.depth = 0;
 		vdev->bundle_queue.txq.head = NULL;
 		vdev->bundle_queue.txq.tail = NULL;
+	} else {
+		pkt_to_sent = vdev->queue_stop_th -
+			qdf_atomic_read(&vdev->tx_desc_count);
+
+		if (pkt_to_sent) {
+			skb_list_head = vdev->bundle_queue.txq.head;
+
+			while (pkt_to_sent) {
+				skb_list_tail =
+					vdev->bundle_queue.txq.head;
+				vdev->bundle_queue.txq.head =
+				    qdf_nbuf_next(vdev->bundle_queue.txq.head);
+				vdev->pdev->total_bundle_queue_length--;
+				vdev->bundle_queue.txq.depth--;
+				pkt_to_sent--;
+				if (!vdev->bundle_queue.txq.head) {
+					qdf_timer_stop(
+						&vdev->bundle_queue.timer);
+					break;
+				}
+			}
+
+			qdf_nbuf_set_next(skb_list_tail, NULL);
+			msdu_list = ol_tx_hl_base(vdev, OL_TX_SPEC_STD,
+						  skb_list_head, tx_comp_req,
+						  call_sched);
+		}
+
+		if (in_timer_context &&	vdev->bundle_queue.txq.head) {
+			qdf_timer_start(
+				&vdev->bundle_queue.timer,
+				ol_cfg_get_bundle_timer_value(
+					vdev->pdev->ctrl_pdev));
+		}
 	}
 	qdf_spin_unlock_bh(&vdev->bundle_queue.mutex);
 
@@ -1552,14 +1596,14 @@ ol_tx_hl_vdev_queue_send_all(struct ol_txrx_vdev_t *vdev, bool call_sched)
  *
  * Return: NULL for success
  */
-static qdf_nbuf_t
+qdf_nbuf_t
 ol_tx_hl_pdev_queue_send_all(struct ol_txrx_pdev_t *pdev)
 {
 	struct ol_txrx_vdev_t *vdev;
 	qdf_nbuf_t msdu_list;
 
 	TAILQ_FOREACH(vdev, &pdev->vdev_list, vdev_list_elem) {
-		msdu_list = ol_tx_hl_vdev_queue_send_all(vdev, false);
+		msdu_list = ol_tx_hl_vdev_queue_send_all(vdev, false, false);
 		if (msdu_list)
 			qdf_nbuf_tx_free(msdu_list, 1/*error*/);
 	}
@@ -1581,7 +1625,7 @@ ol_tx_hl_vdev_bundle_timer(struct timer_list *t)
 	struct ol_txrx_vdev_t *vdev = from_timer(vdev, t, bundle_queue.timer);
 
 	vdev->no_of_bundle_sent_in_timer++;
-	msdu_list = ol_tx_hl_vdev_queue_send_all(vdev, true);
+	msdu_list = ol_tx_hl_vdev_queue_send_all(vdev, true, true);
 	if (msdu_list)
 		qdf_nbuf_tx_free(msdu_list, 1/*error*/);
 }
@@ -1593,7 +1637,7 @@ ol_tx_hl_vdev_bundle_timer(void *ctx)
 	struct ol_txrx_vdev_t *vdev = (struct ol_txrx_vdev_t *)ctx;
 
 	vdev->no_of_bundle_sent_in_timer++;
-	msdu_list = ol_tx_hl_vdev_queue_send_all(vdev, true);
+	msdu_list = ol_tx_hl_vdev_queue_send_all(vdev, true, true);
 	if (msdu_list)
 		qdf_nbuf_tx_free(msdu_list, 1/*error*/);
 }
@@ -1606,7 +1650,12 @@ ol_tx_hl(struct ol_txrx_vdev_t *vdev, qdf_nbuf_t msdu_list)
 	int tx_comp_req = pdev->cfg.default_tx_comp_req ||
 				pdev->cfg.request_tx_comp;
 
-	if (vdev->bundling_required == true &&
+	/* No queuing for high priority packets */
+	if (ol_tx_desc_is_high_prio(msdu_list)) {
+		vdev->no_of_pkt_not_added_in_queue++;
+		return ol_tx_hl_base(vdev, OL_TX_SPEC_STD, msdu_list,
+					     tx_comp_req, true);
+	} else if (vdev->bundling_required &&
 	    (ol_cfg_get_bundle_size(vdev->pdev->ctrl_pdev) > 1)) {
 		ol_tx_hl_vdev_queue_append(vdev, msdu_list);
 
@@ -1618,7 +1667,7 @@ ol_tx_hl(struct ol_txrx_vdev_t *vdev, qdf_nbuf_t msdu_list)
 	} else {
 		if (vdev->bundle_queue.txq.depth != 0) {
 			ol_tx_hl_vdev_queue_append(vdev, msdu_list);
-			return ol_tx_hl_vdev_queue_send_all(vdev, true);
+			return ol_tx_hl_vdev_queue_send_all(vdev, true, false);
 		} else {
 			vdev->no_of_pkt_not_added_in_queue++;
 			return ol_tx_hl_base(vdev, OL_TX_SPEC_STD, msdu_list,
