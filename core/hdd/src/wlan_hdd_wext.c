@@ -55,6 +55,8 @@
 #include "dbglog_host.h"
 #include "wma.h"
 
+#include <ol_defines.h>
+
 #include "wlan_hdd_power.h"
 #include "qwlan_version.h"
 #include "wlan_hdd_host_offload.h"
@@ -4811,6 +4813,7 @@ static int hdd_we_clear_stats(struct hdd_adapter *adapter, int option)
 		break;
 	default:
 		status = cdp_clear_stats(cds_get_context(QDF_MODULE_ID_SOC),
+					 OL_TXRX_PDEV_ID,
 					 option);
 		if (status != QDF_STATUS_SUCCESS)
 			hdd_debug("Failed to dump stats for option: %d",
@@ -6154,8 +6157,10 @@ static int __iw_setnone_getint(struct net_device *dev,
 		if (!QDF_IS_STATUS_SUCCESS(status))
 			hdd_err("unable to get vht_enable2x2");
 		*value = (bval == 0) ? 1 : 2;
-		if (policy_mgr_is_current_hwmode_dbs(hdd_ctx->psoc))
+		if (!policy_mgr_is_hw_dbs_2x2_capable(hdd_ctx->psoc) &&
+		    policy_mgr_is_current_hwmode_dbs(hdd_ctx->psoc))
 			*value = *value - 1;
+
 		hdd_debug("GET_NSS: Current NSS:%d", *value);
 		break;
 	}

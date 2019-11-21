@@ -225,7 +225,7 @@ ol_txrx_vdev_handle
 ol_txrx_get_vdev_by_peer_addr(struct cdp_pdev *ppdev,
 			      struct qdf_mac_addr peer_addr)
 {
-	struct ol_txrx_pdev_t *pdev = (struct ol_txrx_pdev_t *)ppdev;
+	struct ol_txrx_pdev_t *pdev = cdp_pdev_to_ol_txrx_pdev_t(ppdev);
 	struct ol_txrx_peer_t *peer = NULL;
 	ol_txrx_vdev_handle vdev;
 	/* peer_id to be removed PEER_ID_CLEANUP */
@@ -1533,7 +1533,7 @@ static void ol_txrx_pdev_pre_detach(struct cdp_pdev *ppdev, int force)
 	}
 
 	/* to get flow pool status before freeing descs */
-	ol_tx_dump_flow_pool_info((void *)pdev);
+	ol_tx_dump_flow_pool_info(cds_get_context(QDF_MODULE_ID_SOC));
 	ol_tx_free_descs_inuse(pdev);
 	ol_tx_deregister_flow_control(pdev);
 
@@ -2687,15 +2687,23 @@ ol_txrx_remove_peers_for_vdev_no_lock(struct cdp_vdev *pvdev,
 #ifdef WLAN_FEATURE_DSRC
 /**
  * ol_txrx_set_ocb_chan_info() - set OCB channel info to vdev.
- * @vdev: vdev handle
+ * @soc_hdl: Datapath soc handle
+ * @vdev_id: id of vdev
  * @ocb_set_chan: OCB channel information to be set in vdev.
  *
  * Return: NONE
  */
-static void ol_txrx_set_ocb_chan_info(struct cdp_vdev *pvdev,
+static void
+ol_txrx_set_ocb_chan_info(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 			  struct ol_txrx_ocb_set_chan ocb_set_chan)
 {
-	struct ol_txrx_vdev_t *vdev = (struct ol_txrx_vdev_t *)pvdev;
+	struct ol_txrx_vdev_t *vdev =
+		(struct ol_txrx_vdev_t *)ol_txrx_get_vdev_from_vdev_id(vdev_id);
+
+	if (qdf_unlikely(!vdev)) {
+		ol_txrx_err("pdev is NULL");
+		return;
+	}
 
 	vdev->ocb_channel_info = ocb_set_chan.ocb_channel_info;
 	vdev->ocb_channel_count = ocb_set_chan.ocb_channel_count;
@@ -2703,14 +2711,21 @@ static void ol_txrx_set_ocb_chan_info(struct cdp_vdev *pvdev,
 
 /**
  * ol_txrx_get_ocb_chan_info() - return handle to vdev ocb_channel_info
- * @vdev: vdev handle
+ * @soc_hdl: Datapath soc handle
+ * @vdev_id: id of vdev
  *
  * Return: handle to struct ol_txrx_ocb_chan_info
  */
 static struct ol_txrx_ocb_chan_info *
-ol_txrx_get_ocb_chan_info(struct cdp_vdev *pvdev)
+ol_txrx_get_ocb_chan_info(struct cdp_soc_t *soc_hdl, uint8_t vdev_id)
 {
-	struct ol_txrx_vdev_t *vdev = (struct ol_txrx_vdev_t *)pvdev;
+	struct ol_txrx_vdev_t *vdev =
+		(struct ol_txrx_vdev_t *)ol_txrx_get_vdev_from_vdev_id(vdev_id);
+
+	if (qdf_unlikely(!vdev)) {
+		ol_txrx_err("pdev is NULL");
+		return NULL;
+	}
 
 	return vdev->ocb_channel_info;
 }
@@ -4480,7 +4495,7 @@ ol_txrx_display_stats(void *soc, uint16_t value,
 		if (verb_level == QDF_STATS_VERBOSITY_LEVEL_LOW)
 			ol_tx_dump_flow_pool_info_compact((void *)pdev);
 		else
-			ol_tx_dump_flow_pool_info((void *)pdev);
+			ol_tx_dump_flow_pool_info(soc);
 		break;
 	case CDP_TXRX_DESC_STATS:
 		qdf_nbuf_tx_desc_count_display();
@@ -4518,17 +4533,18 @@ ol_txrx_display_stats(void *soc, uint16_t value,
 /**
  * ol_txrx_clear_stats() - Clear OL TXRX stats
  * @soc - ol soc handle
+ * @pdev_id: pdev identifier
  * @value - Module id for which stats needs to be cleared
  *
  * Return: 0 - success/ non-zero failure
  */
-static QDF_STATUS ol_txrx_clear_stats(struct cdp_soc *soc,
-				      uint8_t value)
+static QDF_STATUS ol_txrx_clear_stats(struct cdp_soc_t *soc_hdl,
+				      uint8_t pdev_id, uint8_t value)
 {
-	ol_txrx_pdev_handle pdev;
+	struct ol_txrx_soc_t *soc = cdp_soc_t_to_ol_txrx_soc_t(soc_hdl);
+	ol_txrx_pdev_handle pdev = ol_txrx_get_pdev_from_pdev_id(soc, pdev_id);
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
-	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 	if (!pdev) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 			  "%s: pdev is NULL", __func__);
@@ -4984,15 +5000,18 @@ exit:
 
 /**
  * ol_txrx_register_pause_cb() - register pause callback
+ * @soc_hdl: Datapath soc handle
  * @pause_cb: pause callback
  *
  * Return: QDF status
  */
-static QDF_STATUS ol_txrx_register_pause_cb(struct cdp_soc_t *soc,
+static QDF_STATUS ol_txrx_register_pause_cb(struct cdp_soc_t *soc_hdl,
 					    tx_pause_callback pause_cb)
 {
-	struct ol_txrx_pdev_t *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
+	struct ol_txrx_soc_t *soc = cdp_soc_t_to_ol_txrx_soc_t(soc_hdl);
+	ol_txrx_pdev_handle pdev;
 
+	pdev = ol_txrx_get_pdev_from_pdev_id(soc, OL_TXRX_PDEV_ID);
 	if (!pdev || !pause_cb) {
 		ol_txrx_err("pdev or pause_cb is NULL");
 		return QDF_STATUS_E_INVAL;

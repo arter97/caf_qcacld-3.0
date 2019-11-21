@@ -5125,6 +5125,74 @@ QDF_STATUS csr_roam_set_bss_config_cfg(struct mac_context *mac, uint32_t session
 	return QDF_STATUS_SUCCESS;
 }
 
+/**
+ * csr_check_for_hidden_ssid_match() - Check if the current connected SSID
+ * is hidden ssid and if it matches with the roamed AP ssid.
+ * @mac: Global mac context pointer
+ * @session: csr session pointer
+ * @roamed_bss_desc: pointer to bss descriptor of roamed bss
+ * @roamed_bss_ies: Roamed AP beacon/probe IEs pointer
+ *
+ * Return: True if the SSID is hidden and matches with roamed SSID else false
+ */
+static bool
+csr_check_for_hidden_ssid_match(struct mac_context *mac,
+				struct csr_roam_session *session,
+				struct bss_description *roamed_bss_desc,
+				tDot11fBeaconIEs *roamed_bss_ies)
+{
+	QDF_STATUS status;
+	bool is_null_ssid_match = false;
+	tDot11fBeaconIEs *connected_profile_ies = NULL;
+
+	if (!session || !roamed_bss_ies)
+		return false;
+
+	status = csr_get_parsed_bss_description_ies(mac,
+						    session->pConnectBssDesc,
+						    &connected_profile_ies);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		sme_err("Unable to get IES");
+		goto error;
+	}
+
+	if (!csr_is_nullssid(connected_profile_ies->SSID.ssid,
+			     connected_profile_ies->SSID.num_ssid))
+		goto error;
+
+	/*
+	 * After roam synch indication is received, the driver compares
+	 * the SSID of the current AP and SSID of the roamed AP. If
+	 * there is a mismatch, driver issues disassociate to current
+	 * connected AP. This causes data path queues to be stopped and
+	 * M2 to the roamed AP from userspace will fail if EAPOL is
+	 * offloaded to userspace. The SSID of the current AP is
+	 * parsed from the beacon IEs stored in the connected bss
+	 * description. In hidden ssid case the SSID IE has 0 length
+	 * and the host receives unicast probe with SSID of the
+	 * AP in the roam synch indication. So SSID mismatch happens
+	 * and validation fails. So fetch if the connected bss
+	 * description has hidden ssid, fill the ssid from the
+	 * csr_session connected_profile structure which will
+	 * have the SSID.
+	 */
+	if (!roamed_bss_ies->SSID.present)
+		goto error;
+
+	if (roamed_bss_ies->SSID.num_ssid !=
+	    session->connectedProfile.SSID.length)
+		goto error;
+
+	is_null_ssid_match = !qdf_mem_cmp(session->connectedProfile.SSID.ssId,
+					  roamed_bss_ies->SSID.ssid,
+					  roamed_bss_ies->SSID.num_ssid);
+error:
+	if (connected_profile_ies)
+		qdf_mem_free(connected_profile_ies);
+
+	return is_null_ssid_match;
+}
+
 static
 QDF_STATUS csr_roam_stop_network(struct mac_context *mac, uint32_t sessionId,
 				 struct csr_roam_profile *roam_profile,
@@ -5134,6 +5202,7 @@ QDF_STATUS csr_roam_stop_network(struct mac_context *mac, uint32_t sessionId,
 	QDF_STATUS status;
 	struct bss_config_param *pBssConfig;
 	struct csr_roam_session *pSession = CSR_GET_SESSION(mac, sessionId);
+	bool ssid_match;
 
 	if (!pSession) {
 		sme_err("session %d not found", sessionId);
@@ -5175,10 +5244,16 @@ QDF_STATUS csr_roam_stop_network(struct mac_context *mac, uint32_t sessionId,
 			 * (roaming to a new SSID)...
 			 * Not worry about WDS connection for now
 			 */
+			ssid_match =
+				csr_check_for_hidden_ssid_match(mac, pSession,
+								bss_desc, pIes);
+			if (!ssid_match)
+				ssid_match = csr_is_ssid_equal(
+						mac, pSession->pConnectBssDesc,
+						bss_desc, pIes);
+
 			if (bss_desc &&
-			    (csr_is_ibss_bss_desc(bss_desc) ||
-			     !csr_is_ssid_equal(mac, pSession->pConnectBssDesc,
-						bss_desc, pIes)))
+			    (csr_is_ibss_bss_desc(bss_desc) || !ssid_match))
 				status = csr_roam_issue_disassociate(mac,
 						sessionId, substate, false);
 			else if (bss_desc)
@@ -13710,7 +13785,7 @@ csr_roam_get_phy_mode_band_for_bss(struct mac_context *mac_ctx,
 				   enum reg_wifi_band *p_band)
 {
 	enum reg_wifi_band band = REG_BAND_2G;
-	uint8_t opr_chn = eCSR_OPERATING_CHANNEL_AUTO;
+	uint8_t opr_freq = 0;
 	enum csr_cfgdot11mode curr_mode =
 		mac_ctx->roam.configParam.uCfgDot11Mode;
 	enum csr_cfgdot11mode cfg_dot11_mode =
@@ -13720,7 +13795,7 @@ csr_roam_get_phy_mode_band_for_bss(struct mac_context *mac_ctx,
 			mac_ctx->roam.configParam.ProprietaryRatesEnabled);
 
 	if (bss_op_ch_freq)
-		opr_chn = wlan_reg_freq_to_chan(mac_ctx->pdev, bss_op_ch_freq);
+		opr_freq = bss_op_ch_freq;
 	/*
 	 * If the global setting for dot11Mode is set to auto/abg, we overwrite
 	 * the setting in the profile.
@@ -13735,7 +13810,7 @@ csr_roam_get_phy_mode_band_for_bss(struct mac_context *mac_ctx,
 	} /* if( eCSR_CFG_DOT11_MODE_ABG == cfg_dot11_mode ) */
 	else {
 		/* dot11 mode is set, lets pick the band */
-		if (eCSR_OPERATING_CHANNEL_AUTO == opr_chn) {
+		if (0 == opr_freq) {
 			/* channel is Auto also. */
 			if (mac_ctx->mlme_cfg->gen.band == BAND_ALL) {
 				/* prefer 5GHz */
@@ -13748,7 +13823,7 @@ csr_roam_get_phy_mode_band_for_bss(struct mac_context *mac_ctx,
 	if (p_band)
 		*p_band = band;
 
-	if (opr_chn == 14 && wlan_reg_is_24ghz_ch_freq(bss_op_ch_freq)) {
+	if (opr_freq == 2484 && wlan_reg_is_24ghz_ch_freq(bss_op_ch_freq)) {
 		sme_err("Switching to Dot11B mode");
 		cfg_dot11_mode = eCSR_CFG_DOT11_MODE_11B;
 	}
