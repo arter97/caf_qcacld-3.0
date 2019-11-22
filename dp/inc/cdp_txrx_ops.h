@@ -755,6 +755,9 @@ struct cdp_mon_ops {
 
 	void (*txrx_deliver_tx_mgmt)
 		(struct cdp_pdev *pdev, qdf_nbuf_t nbuf);
+
+	void (*txrx_set_bsscolor)
+		(struct cdp_pdev *pdev, uint8_t bsscolor);
 };
 
 struct cdp_host_stats_ops {
@@ -1009,6 +1012,7 @@ struct ol_if_ops {
 	bool (*is_roam_inprogress)(uint32_t vdev_id);
 	enum QDF_GLOBAL_MODE (*get_con_mode)(void);
 	/* TODO: Add any other control path calls required to OL_IF/WMA layer */
+
 };
 
 #ifdef DP_PEER_EXTENDED_API
