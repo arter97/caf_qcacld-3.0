@@ -6774,7 +6774,7 @@ void lim_decide_he_op(struct mac_context *mac_ctx, uint32_t *mlme_he_ops,
 	uint32_t val;
 	uint8_t color;
 	struct he_ops_network_endian *he_ops_from_ie;
-	tDot11fIEhe_op he_ops;
+	tDot11fIEhe_op he_ops = {0};
 	struct add_ie_params *add_ie = &session->add_ie_params;
 	uint8_t extracted_buff[DOT11F_IE_HE_OP_MAX_LEN + 2];
 	QDF_STATUS status;
@@ -8397,6 +8397,8 @@ QDF_STATUS lim_set_ch_phy_mode(struct wlan_objmgr_vdev *vdev, uint8_t dot11mode)
 	uint16_t bw_val;
 	enum reg_wifi_band band;
 	uint8_t band_mask;
+	enum channel_state ch_state;
+	uint32_t start_ch_freq;
 
 	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(vdev);
 	if (!mlme_obj) {
@@ -8484,9 +8486,18 @@ QDF_STATUS lim_set_ch_phy_mode(struct wlan_objmgr_vdev *vdev, uint8_t dot11mode)
 	des_chan->ch_flagext = 0;
 	if (wlan_reg_is_dfs_for_freq(mac_ctx->pdev, des_chan->ch_freq))
 		des_chan->ch_flagext |= IEEE80211_CHAN_DFS;
-	if (des_chan->ch_cfreq2 &&
-	    wlan_reg_is_dfs_for_freq(mac_ctx->pdev, des_chan->ch_cfreq2))
-		des_chan->ch_flagext |= IEEE80211_CHAN_DFS_CFREQ2;
+	if (des_chan->ch_cfreq2) {
+		if (CH_WIDTH_80P80MHZ == des_chan->ch_width)
+			start_ch_freq = des_chan->ch_cfreq2 - 30;
+		else
+			start_ch_freq = des_chan->ch_freq;
+
+		ch_state = wlan_reg_get_5g_bonded_channel_state_for_freq(
+					mac_ctx->pdev, start_ch_freq,
+					des_chan->ch_width);
+		if (CHANNEL_STATE_DFS == ch_state)
+			des_chan->ch_flagext |= IEEE80211_CHAN_DFS_CFREQ2;
+	}
 
 	chan_mode = wma_chan_phy_mode(des_chan->ch_freq, ch_width,
 				      dot11mode);

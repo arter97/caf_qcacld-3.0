@@ -210,18 +210,10 @@ struct sme_5g_band_pref_params {
 
 /**
  * struct sme_session_params: Session creation params passed by HDD layer
- * @session_open_cb: callback to be registered with SME for opening the session
- * @session_close_cb: callback to be registered with SME for closing the session
- * @callback: callback to be invoked for roaming events
  * @vdev: pointer to vdev object
- * @callback_ctx: user-supplied context to be passed back on roaming events
  */
 struct sme_session_params {
-	csr_session_open_cb  session_open_cb;
-	csr_session_close_cb session_close_cb;
-	csr_roam_complete_cb callback;
 	struct wlan_objmgr_vdev *vdev;
-	void *callback_ctx;
 };
 
 #define MAX_CANDIDATE_INFO 10
@@ -3865,12 +3857,6 @@ QDF_STATUS sme_register_bcn_recv_pause_ind_cb(mac_handle_t mac_handle,
  */
 QDF_STATUS sme_set_disconnect_ies(mac_handle_t mac_handle, uint8_t vdev_id,
 				  uint8_t *ie_data, uint16_t ie_len);
-
-void sme_freq_to_chan_list(
-			struct wlan_objmgr_pdev *pdev,
-			uint8_t *chan_list,
-			uint32_t *freq_list,
-			uint32_t chan_list_len);
 
 void sme_chan_to_freq_list(
 			struct wlan_objmgr_pdev *pdev,

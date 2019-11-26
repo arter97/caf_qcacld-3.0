@@ -542,9 +542,6 @@ struct csr_roam_session {
 	/* For BT-AMP station, this serve as BSSID for self-BSS. */
 	struct qdf_mac_addr self_mac_addr;
 
-	csr_session_close_cb session_close_cb;
-	csr_roam_complete_cb callback;
-	void *pContext;
 	eCsrConnectState connectState;
 	struct rsn_caps rsn_caps;
 	tCsrRoamConnectedProfile connectedProfile;
@@ -977,16 +974,16 @@ uint32_t csr_get_infra_operation_chan_freq(
 bool csr_is_session_client_and_connected(struct mac_context *mac,
 		uint8_t sessionId);
 /**
- * csr_get_concurrent_operation_channel() - To get concurrent operating channel
+ * csr_get_concurrent_operation_freq() - To get concurrent operating freq
  * @mac_ctx: Pointer to mac context
  *
- * This routine will return operating channel on FIRST BSS that is
+ * This routine will return operating freq on FIRST BSS that is
  * active/operating to be used for concurrency mode.
  * If other BSS is not up or not connected it will return 0
  *
- * Return: uint8_t
+ * Return: uint32_t
  */
-uint8_t csr_get_concurrent_operation_channel(struct mac_context *mac_ctx);
+uint32_t csr_get_concurrent_operation_freq(struct mac_context *mac_ctx);
 
 /**
  * csr_get_beaconing_concurrent_channel() - To get concurrent operating channel

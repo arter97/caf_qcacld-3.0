@@ -726,8 +726,8 @@ struct start_bss_rsp {
 };
 
 struct report_channel_list {
-	uint8_t numChannels;
-	uint8_t channelNumber[SIR_ESE_MAX_MEAS_IE_REQS];
+	uint8_t num_channels;
+	uint32_t chan_freq_lst[SIR_ESE_MAX_MEAS_IE_REQS];
 };
 
 #ifdef FEATURE_OEM_DATA_SUPPORT
@@ -4427,11 +4427,11 @@ struct sir_sme_ext_cng_chan_req {
 /**
  * struct sir_sme_ext_change_chan_ind.
  * @session_id: session id
- * @new_channel: new channel to change
+ * @new_chan_freq: new channel frequency to change to
  */
 struct sir_sme_ext_cng_chan_ind {
 	uint8_t  session_id;
-	uint8_t  new_channel;
+	uint32_t  new_chan_freq;
 };
 
 /**

@@ -1427,11 +1427,11 @@ enum driver_modules_status {
 /**
  * struct acs_dfs_policy - Define ACS policies
  * @acs_dfs_mode: Dfs mode enabled/disabled.
- * @acs_channel: pre defined channel to avoid ACS.
+ * @acs_chan_freq: pre defined channel frequency to avoid ACS.
  */
 struct acs_dfs_policy {
 	enum dfs_mode acs_dfs_mode;
-	uint8_t acs_channel;
+	uint32_t acs_chan_freq;
 };
 
 /**
@@ -1877,12 +1877,12 @@ struct hdd_context {
 /**
  * struct hdd_vendor_acs_chan_params - vendor acs channel parameters
  * @pcl_count: pcl list count
- * @vendor_pcl_list: pointer to pcl list
+ * @vendor_pcl_list: pointer to pcl frequency (MHz) list
  * @vendor_weight_list: pointer to pcl weight list
  */
 struct hdd_vendor_acs_chan_params {
 	uint32_t pcl_count;
-	uint8_t *vendor_pcl_list;
+	uint32_t *vendor_pcl_list;
 	uint8_t *vendor_weight_list;
 };
 
@@ -1899,18 +1899,18 @@ struct hdd_external_acs_timer_context {
 /**
  * struct hdd_vendor_chan_info - vendor channel info
  * @band: channel operating band
- * @pri_ch: primary channel
- * @ht_sec_ch: secondary channel
- * @vht_seg0_center_ch: segment0 for vht
- * @vht_seg1_center_ch: vht segment 1
+ * @pri_chan_freq: primary channel freq in MHz
+ * @ht_sec_chan_freq: secondary channel freq in MHz
+ * @vht_seg0_center_chan_freq: segment0 for vht in MHz
+ * @vht_seg1_center_chan_freq: vht segment 1 in MHz
  * @chan_width: channel width
  */
 struct hdd_vendor_chan_info {
 	uint8_t band;
-	uint8_t pri_ch;
-	uint8_t ht_sec_ch;
-	uint8_t vht_seg0_center_ch;
-	uint8_t vht_seg1_center_ch;
+	uint32_t pri_chan_freq;
+	uint32_t ht_sec_chan_freq;
+	uint32_t vht_seg0_center_chan_freq;
+	uint32_t vht_seg1_center_chan_freq;
 	uint8_t chan_width;
 };
 
@@ -1946,9 +1946,19 @@ struct hdd_channel_info {
  * Function declarations and documentation
  */
 
+/**
+ * hdd_validate_channel_and_bandwidth() - Validate the channel-bandwidth combo
+ * @adapter: HDD adapter
+ * @chan_freq: Channel frequency
+ * @chan_bw: Bandwidth
+ *
+ * Checks if the given bandwidth is valid for the given channel number.
+ *
+ * Return: 0 for success, non-zero for failure
+ */
 int hdd_validate_channel_and_bandwidth(struct hdd_adapter *adapter,
-				uint32_t chan_number,
-				enum phy_ch_width chan_bw);
+				       uint32_t chan_freq,
+				       enum phy_ch_width chan_bw);
 
 /**
  * hdd_get_front_adapter() - Get the first adapter from the adapter list
@@ -2164,6 +2174,30 @@ QDF_STATUS hdd_start_all_adapters(struct hdd_context *hdd_ctx);
 struct hdd_adapter *hdd_get_adapter_by_vdev(struct hdd_context *hdd_ctx,
 					    uint32_t vdev_id);
 
+/**
+ * hdd_adapter_get_by_reference() - Return adapter with the given reference
+ * @hdd_ctx: hdd context
+ * @reference: reference for the adapter to get
+ *
+ * This function is used to get the adapter with provided reference.
+ * The adapter reference will be held until being released by calling
+ * hdd_adapter_put().
+ *
+ * Return: adapter pointer if found
+ *
+ */
+struct hdd_adapter *hdd_adapter_get_by_reference(struct hdd_context *hdd_ctx,
+						 struct hdd_adapter *reference);
+
+/**
+ * hdd_adapter_put() - Release reference to adapter
+ * @adapter: adapter reference
+ *
+ * Release reference to adapter previously acquired via
+ * hdd_adapter_get_*() function
+ */
+void hdd_adapter_put(struct hdd_adapter *adapter);
+
 struct hdd_adapter *hdd_get_adapter_by_macaddr(struct hdd_context *hdd_ctx,
 					       tSirMacAddr mac_addr);
 
@@ -2204,8 +2238,16 @@ hdd_get_adapter_by_rand_macaddr(struct hdd_context *hdd_ctx,
  */
 bool hdd_is_vdev_in_conn_state(struct hdd_adapter *adapter);
 
-int hdd_vdev_create(struct hdd_adapter *adapter,
-		    csr_roam_complete_cb callback, void *ctx);
+/**
+ * hdd_vdev_create() - Create the vdev in the firmware
+ * @adapter: hdd adapter
+ *
+ * This function will create the vdev in the firmware
+ *
+ * Return: 0 when the vdev create is sent to firmware or -EINVAL when
+ * there is a failure to send the command.
+ */
+int hdd_vdev_create(struct hdd_adapter *adapter);
 int hdd_vdev_destroy(struct hdd_adapter *adapter);
 int hdd_vdev_ready(struct hdd_adapter *adapter);
 
@@ -3966,4 +4008,20 @@ int hdd_psoc_idle_shutdown(struct device *dev);
  */
 int hdd_psoc_idle_restart(struct device *dev);
 
+/**
+ * hdd_common_roam_callback() - common sme roam callback
+ * @psoc: Object Manager Psoc
+ * @session_id: session id for which callback is called
+ * @roam_info: pointer to roam info
+ * @roam_status: roam status
+ * @roam_result: roam result
+ *
+ * Return: QDF_STATUS enumeration
+ */
+QDF_STATUS hdd_common_roam_callback(struct wlan_objmgr_psoc *psoc,
+				    uint8_t session_id,
+				    struct csr_roam_info *roam_info,
+				    uint32_t roam_id,
+				    eRoamCmdStatus roam_status,
+				    eCsrRoamResult roam_result);
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

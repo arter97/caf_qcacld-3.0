@@ -383,11 +383,6 @@ static void dump_csr_command_info(struct mac_context *mac, tSmeCmd *pCmd)
 			pCmd->u.wmStatusChangeCmd.Type);
 		break;
 
-	case e_sme_command_del_vdev:
-		sme_debug("Issue del vdev command for vdev:%d",
-			  pCmd->sessionId);
-		break;
-
 	default:
 		sme_debug("default: Unhandled command %d",
 			pCmd->command);
@@ -515,9 +510,6 @@ QDF_STATUS sme_ser_handle_active_cmd(struct wlan_serialization_command *cmd)
 	case eSmeCommandWmStatusChange:
 		csr_roam_process_wm_status_change_command(mac_ctx,
 					sme_cmd);
-		break;
-	case e_sme_command_del_vdev:
-		csr_process_del_vdev_command(mac_ctx, sme_cmd);
 		break;
 	case eSmeCommandAddTs:
 	case eSmeCommandDelTs:
@@ -1395,7 +1387,7 @@ static QDF_STATUS sme_extended_change_channel_ind(struct mac_context *mac_ctx,
 	if (!roam_info)
 		return QDF_STATUS_E_NOMEM;
 	session_id = ext_chan_ind->session_id;
-	roam_info->target_channel = ext_chan_ind->new_channel;
+	roam_info->target_chan_freq = ext_chan_ind->new_chan_freq;
 	roam_status = eCSR_ROAM_EXT_CHG_CHNL_IND;
 	roam_result = eCSR_ROAM_EXT_CHG_CHNL_UPDATE_IND;
 	sme_debug("sapdfs: Received eWNI_SME_EXT_CHANGE_CHANNEL_IND for session id [%d]",
@@ -1639,55 +1631,55 @@ QDF_STATUS sme_set_ese_beacon_request(mac_handle_t mac_handle,
 {
 	QDF_STATUS status;
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
-	tpSirBeaconReportReqInd pSmeBcnReportReq = NULL;
-	const tCsrEseBeaconReqParams *pBeaconReq = NULL;
+	tpSirBeaconReportReqInd sme_bcn_rpt_req = NULL;
+	const tCsrEseBeaconReqParams *bcn_req = NULL;
 	uint8_t counter = 0;
-	struct csr_roam_session *pSession = CSR_GET_SESSION(mac, sessionId);
-	tpRrmSMEContext pSmeRrmContext = &mac->rrm.rrmSmeContext;
+	struct csr_roam_session *session = CSR_GET_SESSION(mac, sessionId);
+	tpRrmSMEContext sme_rrm_ctx = &mac->rrm.rrmSmeContext;
 
-	if (pSmeRrmContext->eseBcnReqInProgress == true) {
+	if (sme_rrm_ctx->eseBcnReqInProgress == true) {
 		sme_err("A Beacon Report Req is already in progress");
 		return QDF_STATUS_E_RESOURCES;
 	}
 
 	/* Store the info in RRM context */
-	qdf_mem_copy(&pSmeRrmContext->eseBcnReqInfo, in_req,
+	qdf_mem_copy(&sme_rrm_ctx->eseBcnReqInfo, in_req,
 		     sizeof(tCsrEseBeaconReq));
 
 	/* Prepare the request to send to SME. */
-	pSmeBcnReportReq = qdf_mem_malloc(sizeof(tSirBeaconReportReqInd));
-	if (!pSmeBcnReportReq)
+	sme_bcn_rpt_req = qdf_mem_malloc(sizeof(tSirBeaconReportReqInd));
+	if (!sme_bcn_rpt_req)
 		return QDF_STATUS_E_NOMEM;
 
-	pSmeRrmContext->eseBcnReqInProgress = true;
+	sme_rrm_ctx->eseBcnReqInProgress = true;
 
 	sme_debug("Sending Beacon Report Req to SME");
 
-	pSmeBcnReportReq->messageType = eWNI_SME_BEACON_REPORT_REQ_IND;
-	pSmeBcnReportReq->length = sizeof(tSirBeaconReportReqInd);
-	qdf_mem_copy(pSmeBcnReportReq->bssId,
-		     pSession->connectedProfile.bssid.bytes,
+	sme_bcn_rpt_req->messageType = eWNI_SME_BEACON_REPORT_REQ_IND;
+	sme_bcn_rpt_req->length = sizeof(tSirBeaconReportReqInd);
+	qdf_mem_copy(sme_bcn_rpt_req->bssId,
+		     session->connectedProfile.bssid.bytes,
 		     sizeof(tSirMacAddr));
-	pSmeBcnReportReq->channelInfo.channelNum = 255;
-	pSmeBcnReportReq->channelList.numChannels = in_req->numBcnReqIe;
-	pSmeBcnReportReq->msgSource = eRRM_MSG_SOURCE_ESE_UPLOAD;
+	sme_bcn_rpt_req->channel_info.chan_num = 255;
+	sme_bcn_rpt_req->channel_list.num_channels = in_req->numBcnReqIe;
+	sme_bcn_rpt_req->msgSource = eRRM_MSG_SOURCE_ESE_UPLOAD;
 
 	for (counter = 0; counter < in_req->numBcnReqIe; counter++) {
-		pBeaconReq = &in_req->bcnReq[counter];
-		pSmeBcnReportReq->fMeasurementtype[counter] =
-			pBeaconReq->scanMode;
-		pSmeBcnReportReq->measurementDuration[counter] =
-			SYS_TU_TO_MS(pBeaconReq->measurementDuration);
-		pSmeBcnReportReq->channelList.channelNumber[counter] =
-			wlan_reg_freq_to_chan(mac->pdev, pBeaconReq->ch_freq);
+		bcn_req = &in_req->bcnReq[counter];
+		sme_bcn_rpt_req->fMeasurementtype[counter] =
+			bcn_req->scanMode;
+		sme_bcn_rpt_req->measurementDuration[counter] =
+			SYS_TU_TO_MS(bcn_req->measurementDuration);
+		sme_bcn_rpt_req->channel_list.chan_freq_lst[counter] =
+			bcn_req->ch_freq;
 	}
 
-	status = sme_rrm_process_beacon_report_req_ind(mac, pSmeBcnReportReq);
+	status = sme_rrm_process_beacon_report_req_ind(mac, sme_bcn_rpt_req);
 
 	if (status != QDF_STATUS_SUCCESS)
-		pSmeRrmContext->eseBcnReqInProgress = false;
+		sme_rrm_ctx->eseBcnReqInProgress = false;
 
-	qdf_mem_free(pSmeBcnReportReq);
+	qdf_mem_free(sme_bcn_rpt_req);
 
 	return status;
 }
@@ -16019,19 +16011,6 @@ QDF_STATUS sme_set_disconnect_ies(mac_handle_t mac_handle, uint8_t vdev_id,
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 	return QDF_STATUS_SUCCESS;
-}
-
-void sme_freq_to_chan_list(
-			struct wlan_objmgr_pdev *pdev,
-			uint8_t *chan_list,
-			uint32_t *freq_list,
-			uint32_t chan_list_len)
-{
-	uint32_t count;
-
-	for (count = 0; count < chan_list_len; count++)
-		chan_list[count] =
-			(uint8_t)wlan_reg_freq_to_chan(pdev, freq_list[count]);
 }
 
 void sme_chan_to_freq_list(

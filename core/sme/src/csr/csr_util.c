@@ -741,7 +741,7 @@ bool csr_is_session_client_and_connected(struct mac_context *mac, uint8_t sessio
 	return false;
 }
 
-uint8_t csr_get_concurrent_operation_channel(struct mac_context *mac_ctx)
+uint32_t csr_get_concurrent_operation_freq(struct mac_context *mac_ctx)
 {
 	struct csr_roam_session *session = NULL;
 	uint8_t i = 0;
@@ -762,10 +762,7 @@ uint8_t csr_get_concurrent_operation_channel(struct mac_context *mac_ctx)
 				(persona == QDF_SAP_MODE))
 				 && (session->connectState !=
 					 eCSR_ASSOC_STATE_TYPE_NOT_CONNECTED)))
-			return wlan_reg_freq_to_chan(
-					mac_ctx->pdev,
-					session->connectedProfile.op_freq);
-
+			return session->connectedProfile.op_freq;
 	}
 	return 0;
 }
@@ -1933,7 +1930,8 @@ bool csr_is_phy_mode_match(struct mac_context *mac, uint32_t phyMode,
 			   tDot11fBeaconIEs *pIes)
 {
 	bool fMatch = false;
-	eCsrPhyMode phyModeInBssDesc = eCSR_DOT11_MODE_AUTO, phyMode2;
+	eCsrPhyMode phyModeInBssDesc = eCSR_DOT11_MODE_AUTO;
+	eCsrPhyMode phyMode2 = eCSR_DOT11_MODE_AUTO;
 	enum csr_cfgdot11mode cfgDot11ModeToUse = eCSR_CFG_DOT11_MODE_AUTO;
 	uint32_t bitMask, loopCount;
 	uint8_t bss_chan_id;
@@ -6207,7 +6205,7 @@ uint16_t sme_chn_to_freq(uint8_t chanNum)
 }
 
 struct lim_channel_status *
-csr_get_channel_status(struct mac_context *mac, uint32_t channel_id)
+csr_get_channel_status(struct mac_context *mac, uint32_t chan_freq)
 {
 	uint8_t i;
 	struct lim_scan_channel_status *channel_status;
@@ -6219,10 +6217,10 @@ csr_get_channel_status(struct mac_context *mac, uint32_t channel_id)
 	channel_status = &mac->lim.scan_channel_status;
 	for (i = 0; i < channel_status->total_channel; i++) {
 		entry = &channel_status->channel_status_list[i];
-		if (entry->channel_id == channel_id)
+		if (entry->channelfreq == chan_freq)
 			return entry;
 	}
-	sme_err("Channel %d status info not exist", channel_id);
+	sme_err("Channel %d status info not exist", chan_freq);
 
 	return NULL;
 }

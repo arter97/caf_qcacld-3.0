@@ -3835,7 +3835,7 @@ int wlan_hdd_update_phymode(struct hdd_adapter *adapter, int new_phymode)
 	mac_handle_t mac_handle = hdd_ctx->mac_handle;
 	bool band_24 = false, band_5g = false;
 	bool ch_bond24 = false, ch_bond5g = false;
-	struct sme_config_params *sme_config;
+	struct sme_config_params *sme_config = NULL;
 	struct csr_config_params *csr_config;
 	uint32_t chwidth = WNI_CFG_CHANNEL_BONDING_MODE_DISABLE;
 	uint8_t vhtchanwidth;
@@ -7912,8 +7912,7 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
 		for (i = 0; i < len; i++) {
 			pr_info("|table_index[%d]\t\t\n", i);
 			pr_info("|\t|vdev_id - %-10d|\n", conn_info->vdev_id);
-			pr_info("|\t|chan    - %-10d|\n",
-				wlan_freq_to_chan(conn_info->freq));
+			pr_info("|\t|freq    - %-10d|\n", conn_info->freq);
 			pr_info("|\t|bw      - %-10d|\n", conn_info->bw);
 			pr_info("|\t|mode    - %-10d|\n", conn_info->mode);
 			pr_info("|\t|mac     - %-10d|\n", conn_info->mac);
