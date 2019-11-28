@@ -2658,12 +2658,15 @@ QDF_STATUS policy_mgr_nss_update(struct wlan_objmgr_psoc *psoc,
 	uint32_t original_nss;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	uint8_t chan;
+	enum phy_ch_width ch_width = CH_WIDTH_MAX;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
 		policy_mgr_err("Invalid Context");
 		return status;
 	}
+	if (next_action == PM_DBS2 && band == POLICY_MGR_BAND_5)
+		ch_width = CH_WIDTH_40MHZ;
 
 	count = policy_mgr_mode_specific_connection_count(psoc,
 			PM_P2P_GO_MODE, list);
@@ -2689,7 +2692,7 @@ QDF_STATUS policy_mgr_nss_update(struct wlan_objmgr_psoc *psoc,
 		    (band == POLICY_MGR_BAND_5 &&
 		    WLAN_REG_IS_5GHZ_CH(chan)))) {
 			status = pm_ctx->sme_cbacks.sme_nss_update_request(
-					vdev_id, new_nss,
+					vdev_id, new_nss, ch_width,
 					policy_mgr_nss_update_cb,
 					next_action, psoc, reason,
 					original_vdev_id);
@@ -2723,7 +2726,7 @@ QDF_STATUS policy_mgr_nss_update(struct wlan_objmgr_psoc *psoc,
 		    (band == POLICY_MGR_BAND_5 &&
 		    WLAN_REG_IS_5GHZ_CH(chan)))) {
 			status = pm_ctx->sme_cbacks.sme_nss_update_request(
-					vdev_id, new_nss,
+					vdev_id, new_nss, ch_width,
 					policy_mgr_nss_update_cb,
 					next_action, psoc, reason,
 					original_vdev_id);
