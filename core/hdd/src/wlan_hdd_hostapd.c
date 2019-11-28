@@ -2596,8 +2596,6 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 	case eSAP_ACS_CHANNEL_SELECTED:
 		hdd_debug("ACS Completed for wlan%d",
 					adapter->dev->ifindex);
-		clear_bit(ACS_PENDING, &adapter->event_flags);
-		clear_bit(ACS_IN_PROGRESS, &hdd_ctx->g_event_flags);
 		ap_ctx->sap_config.acs_cfg.pri_ch_freq =
 			sap_event->sapevt.sap_ch_selected.pri_ch_freq;
 		ap_ctx->sap_config.acs_cfg.ht_sec_ch_freq =
@@ -4120,7 +4118,7 @@ int wlan_hdd_cfg80211_update_apies(struct hdd_adapter *adapter)
 	wlan_hdd_add_sap_obss_scan_ie(adapter, genie, &total_ielen);
 
 	qdf_copy_macaddr(&update_ie.bssid, &adapter->mac_addr);
-	update_ie.smeSessionId = adapter->vdev_id;
+	update_ie.vdev_id = adapter->vdev_id;
 
 	if (test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
 		update_ie.ieBufferlength = total_ielen;
@@ -4546,19 +4544,18 @@ void hdd_check_and_disconnect_sta_on_invalid_channel(
 		struct hdd_context *hdd_ctx)
 {
 	struct hdd_adapter *sta_adapter;
-	uint8_t sta_chan;
+	uint32_t sta_chan_freq;
 
-	sta_chan = hdd_get_operating_channel(hdd_ctx, QDF_STA_MODE);
-
-	if (!sta_chan) {
+	sta_chan_freq = hdd_get_operating_chan_freq(hdd_ctx, QDF_STA_MODE);
+	if (!sta_chan_freq) {
 		hdd_err("STA not connected");
 		return;
 	}
 
-	hdd_err("STA connected on chan %d", sta_chan);
+	hdd_err("STA connected on %d", sta_chan_freq);
 
-	if (sme_is_channel_valid(hdd_ctx->mac_handle, sta_chan)) {
-		hdd_err("STA connected on chan %d and it is valid", sta_chan);
+	if (sme_is_channel_valid(hdd_ctx->mac_handle, sta_chan_freq)) {
+		hdd_err("STA connected on %d and it is valid", sta_chan_freq);
 		return;
 	}
 
@@ -4569,7 +4566,7 @@ void hdd_check_and_disconnect_sta_on_invalid_channel(
 		return;
 	}
 
-	hdd_err("chan %d not valid, issue disconnect", sta_chan);
+	hdd_err("chan %d not valid, issue disconnect", sta_chan_freq);
 	/* Issue Disconnect request */
 	wlan_hdd_disconnect(sta_adapter, eCSR_DISCONNECT_REASON_DEAUTH);
 }
@@ -4987,9 +4984,6 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 	}
 
 	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
-
-	clear_bit(ACS_PENDING, &adapter->event_flags);
-	clear_bit(ACS_IN_PROGRESS, &hdd_ctx->g_event_flags);
 
 	config = &adapter->session.ap.sap_config;
 	if (!config->chan_freq) {
@@ -5740,6 +5734,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 
 			if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 				hdd_err("qdf wait for single_event failed!!");
+				hdd_sap_indicate_disconnect_for_sta(adapter);
 				QDF_ASSERT(0);
 			}
 		}
@@ -5775,7 +5770,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	}
 
 	qdf_copy_macaddr(&update_ie.bssid, &adapter->mac_addr);
-	update_ie.smeSessionId = adapter->vdev_id;
+	update_ie.vdev_id = adapter->vdev_id;
 	update_ie.ieBufferlength = 0;
 	update_ie.pAdditionIEBuffer = NULL;
 	update_ie.append = true;

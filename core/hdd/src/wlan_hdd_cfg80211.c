@@ -143,6 +143,7 @@
 #include "wlan_hdd_oemdata.h"
 #include "os_if_fwol.h"
 #include "wlan_hdd_sta_info.h"
+#include <ol_defines.h>
 
 #define g_mode_rates_size (12)
 #define a_mode_rates_size (8)
@@ -924,10 +925,6 @@ static inline uint8_t hdd_get_bw_offset(uint32_t ch_width)
 }
 
 #endif /* FEATURE_WLAN_TDLS */
-
-#ifdef QCA_HT_2040_COEX
-static void wlan_hdd_cfg80211_start_pending_acs(struct work_struct *work);
-#endif
 
 int wlan_hdd_merge_avoid_freqs(struct ch_avoid_ind_type *destFreqList,
 		struct ch_avoid_ind_type *srcFreqList)
@@ -1835,10 +1832,6 @@ static int wlan_hdd_set_acs_ch_range(
 	return 0;
 }
 
-
-static void wlan_hdd_cfg80211_start_pending_acs(struct work_struct *work);
-
-
 static void hdd_update_acs_channel_list(struct sap_config *sap_config,
 					enum band_info band)
 {
@@ -1879,12 +1872,12 @@ static void hdd_update_acs_channel_list(struct sap_config *sap_config,
  */
 int wlan_hdd_cfg80211_start_acs(struct hdd_adapter *adapter)
 {
-
 	struct hdd_context *hdd_ctx;
 	struct sap_config *sap_config;
 	sap_event_cb acs_event_callback;
 	uint8_t mcc_to_scc_switch = 0;
 	int status;
+	QDF_STATUS qdf_status;
 
 	if (!adapter) {
 		hdd_err("adapter is NULL");
@@ -1921,7 +1914,6 @@ int wlan_hdd_cfg80211_start_acs(struct hdd_adapter *adapter)
 		if (status > 0) {
 			/*notify hostapd about channel override */
 			wlan_hdd_cfg80211_acs_ch_select_evt(adapter);
-			clear_bit(ACS_IN_PROGRESS, &hdd_ctx->g_event_flags);
 			return 0;
 		}
 	}
@@ -1962,18 +1954,17 @@ int wlan_hdd_cfg80211_start_acs(struct hdd_adapter *adapter)
 	qdf_mem_copy(sap_config->self_macaddr.bytes,
 		adapter->mac_addr.bytes, sizeof(struct qdf_mac_addr));
 	hdd_info("ACS Started for %s", adapter->dev->name);
-	status = wlansap_acs_chselect(
-		WLAN_HDD_GET_SAP_CTX_PTR(adapter),
-		acs_event_callback, sap_config, adapter->dev);
 
+	qdf_status = wlansap_acs_chselect(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
+				      acs_event_callback,
+				      sap_config, adapter->dev);
 
-	if (status) {
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
 		hdd_err("ACS channel select failed");
 		return -EINVAL;
 	}
 	if (sap_is_auto_channel_select(WLAN_HDD_GET_SAP_CTX_PTR(adapter)))
 		sap_config->acs_cfg.acs_mode = true;
-	set_bit(ACS_IN_PROGRESS, &hdd_ctx->g_event_flags);
 
 	return 0;
 }
@@ -2800,10 +2791,8 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	enum qca_wlan_vendor_acs_hw_mode hw_mode;
 	enum policy_mgr_con_mode pm_mode;
 	QDF_STATUS qdf_status;
-	bool is_vendor_acs_support =
-		cfg_default(CFG_USER_AUTO_CHANNEL_SELECTION);
-	bool is_external_acs_policy =
-		cfg_default(CFG_EXTERNAL_ACS_POLICY);
+	bool is_vendor_acs_support = false;
+	bool is_external_acs_policy = false;
 	bool sap_force_11n_for_11ac = 0;
 	bool go_force_11n_for_11ac = 0;
 	bool go_11ac_override = 0;
@@ -3131,34 +3120,16 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 			hdd_debug("%d ", sap_config->acs_cfg.freq_list[i]);
 	}
 
-	if (test_bit(ACS_IN_PROGRESS, &hdd_ctx->g_event_flags)) {
-		/* ***Note*** Completion variable usage is not allowed
-		 * here since ACS scan operation may take max 2.2 sec
-		 * for 5G band:
-		 *   9 Active channel X 40 ms active scan time +
-		 *   16 Passive channel X 110ms passive scan time
-		 * Since this CFG80211 call lock rtnl mutex, we cannot hold on
-		 * for this long. So we split up the scanning part.
-		 */
-		INIT_DELAYED_WORK(&adapter->acs_pending_work,
-				  wlan_hdd_cfg80211_start_pending_acs);
-		set_bit(ACS_PENDING, &adapter->event_flags);
-		hdd_debug("ACS Pending for %s", adapter->dev->name);
-		ret = 0;
-	} else {
-		qdf_status =
-			ucfg_mlme_get_vendor_acs_support(
-					hdd_ctx->psoc,
-					&is_vendor_acs_support);
-		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
-			hdd_err("get_vendor_acs_support failed, set default");
+	qdf_status = ucfg_mlme_get_vendor_acs_support(hdd_ctx->psoc,
+						&is_vendor_acs_support);
+	if (QDF_IS_STATUS_ERROR(qdf_status))
+		hdd_err("get_vendor_acs_support failed, set default");
 
-		/* Check if vendor specific acs is enabled */
-		if (is_vendor_acs_support)
-			ret = hdd_start_vendor_acs(adapter);
-		else
-			ret = wlan_hdd_cfg80211_start_acs(adapter);
-	}
+	/* Check if vendor specific acs is enabled */
+	if (is_vendor_acs_support)
+		ret = hdd_start_vendor_acs(adapter);
+	else
+		ret = wlan_hdd_cfg80211_start_acs(adapter);
 
 out:
 	if (ret == 0) {
@@ -3168,7 +3139,6 @@ out:
 			return cfg80211_vendor_cmd_reply(temp_skbuff);
 	}
 	qdf_atomic_set(&adapter->session.ap.acs_in_progress, 0);
-	clear_bit(ACS_IN_PROGRESS, &hdd_ctx->g_event_flags);
 
 	return ret;
 }
@@ -3217,30 +3187,6 @@ void wlan_hdd_undo_acs(struct hdd_adapter *adapter)
 {
 	sap_undo_acs(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
 		     &adapter->session.ap.sap_config);
-}
-
-/**
- * wlan_hdd_cfg80211_start_pending_acs : Start pending ACS procedure for SAP
- * @work:  Linux workqueue struct pointer for ACS work
- *
- * This function starts the ACS procedure which was marked pending when an ACS
- * procedure was in progress for a concurrent SAP interface.
- *
- * Return: None
- */
-static void wlan_hdd_cfg80211_start_pending_acs(struct work_struct *work)
-{
-	struct hdd_adapter *adapter = container_of(work, struct hdd_adapter,
-						   acs_pending_work.work);
-	struct osif_vdev_sync *vdev_sync;
-
-	if (osif_vdev_sync_op_start(adapter->dev, &vdev_sync))
-		return;
-
-	wlan_hdd_cfg80211_start_acs(adapter);
-	clear_bit(ACS_PENDING, &adapter->event_flags);
-
-	osif_vdev_sync_op_stop(vdev_sync);
 }
 
 /**
@@ -3346,7 +3292,6 @@ void wlan_hdd_cfg80211_acs_ch_select_evt(struct hdd_adapter *adapter)
 				&(WLAN_HDD_GET_AP_CTX_PTR(adapter))->sap_config;
 	struct sk_buff *vendor_event;
 	int ret_val;
-	struct hdd_adapter *con_sap_adapter;
 	uint16_t ch_width;
 	uint8_t pri_channel;
 	uint8_t ht_sec_channel;
@@ -3455,29 +3400,6 @@ void wlan_hdd_cfg80211_acs_ch_select_evt(struct hdd_adapter *adapter)
 		sap_cfg->acs_cfg.vht_seg1_center_ch_freq, ch_width);
 
 	cfg80211_vendor_event(vendor_event, GFP_KERNEL);
-	/* ***Note*** As already mentioned Completion variable usage is not
-	 * allowed here since ACS scan operation may take max 2.2 sec.
-	 * Further in AP-AP mode pending ACS is resumed here to serailize ACS
-	 * operation.
-	 * TODO: Delayed operation is used since SME-PMAC strut is global. Thus
-	 * when Primary AP ACS is complete and secondary AP ACS is started here
-	 * immediately, Primary AP start_bss may come inbetween ACS operation
-	 * and overwrite Sec AP ACS parameters. Thus Sec AP ACS is executed with
-	 * delay. This path and below constraint will be removed on sessionizing
-	 * SAP acs parameters and decoupling SAP from PMAC (WIP).
-	 * As per design constraint user space control application must take
-	 * care of serailizing hostapd start for each VIF in AP-AP mode to avoid
-	 * this code path. Sec AP hostapd should be started after Primary AP
-	 * start beaconing which can be confirmed by getchannel iwpriv command
-	 */
-
-	con_sap_adapter = hdd_get_con_sap_adapter(adapter, false);
-	if (con_sap_adapter &&
-		test_bit(ACS_PENDING, &con_sap_adapter->event_flags)) {
-		/* Lets give 1500ms for OBSS + START_BSS to complete */
-		schedule_delayed_work(&con_sap_adapter->acs_pending_work,
-					msecs_to_jiffies(1500));
-	}
 }
 
 /**
@@ -5610,9 +5532,7 @@ static int __wlan_hdd_cfg80211_handle_wisa_cmd(struct wiphy *wiphy,
 	QDF_STATUS status;
 	bool wisa_mode;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
-	void *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 	mac_handle_t mac_handle;
-	struct cdp_vdev *txrx_vdev = NULL;
 
 	hdd_enter_dev(dev);
 	ret_val = wlan_hdd_validate_context(hdd_ctx);
@@ -5646,15 +5566,8 @@ static int __wlan_hdd_cfg80211_handle_wisa_cmd(struct wiphy *wiphy,
 		hdd_err("Unable to set WISA mode: %d to FW", wisa_mode);
 		ret_val = -EINVAL;
 	}
-	if (QDF_IS_STATUS_SUCCESS(status) || !wisa_mode) {
-		txrx_vdev = cdp_get_vdev_from_vdev_id(soc,
-						      (struct cdp_pdev *)pdev,
-						      adapter->vdev_id);
-		if (!txrx_vdev)
-			ret_val = -EINVAL;
-		else
-			cdp_set_wisa_mode(soc, txrx_vdev, wisa_mode);
-	}
+	if (QDF_IS_STATUS_SUCCESS(status) || !wisa_mode)
+		cdp_set_wisa_mode(soc, adapter->vdev_id, wisa_mode);
 err:
 	hdd_exit();
 	return ret_val;
@@ -13366,7 +13279,7 @@ static int __wlan_hdd_cfg80211_get_nud_stats(struct wiphy *wiphy,
 		cdp_post_data_stall_event(soc,
 				      DATA_STALL_LOG_INDICATOR_FRAMEWORK,
 				      DATA_STALL_LOG_NUD_FAILURE,
-				      0xFF, 0XFF,
+				      OL_TXRX_PDEV_ID, 0XFF,
 				      DATA_STALL_LOG_RECOVERY_TRIGGER_PDR);
 
 	mac_handle = hdd_ctx->mac_handle;
@@ -17590,7 +17503,6 @@ wlan_hdd_inform_bss_frame(struct hdd_adapter *adapter,
 	uint32_t i;
 	struct cfg80211_bss *bss_status = NULL;
 	struct hdd_context *hdd_ctx;
-	struct timespec ts;
 	struct hdd_config *cfg_param;
 	struct wlan_cfg80211_inform_bss bss_data = {0};
 
@@ -17628,9 +17540,7 @@ wlan_hdd_inform_bss_frame(struct hdd_adapter *adapter,
 	/* Android does not want the timestamp from the frame.
 	 * Instead it wants a monotonic increasing value
 	 */
-	get_monotonic_boottime(&ts);
-	bss_data.mgmt->u.probe_resp.timestamp =
-		((u64) ts.tv_sec * 1000000) + (ts.tv_nsec / 1000);
+	bss_data.mgmt->u.probe_resp.timestamp = qdf_get_monotonic_boottime();
 
 	bss_data.mgmt->u.probe_resp.beacon_int = bss_desc->beaconInterval;
 	bss_data.mgmt->u.probe_resp.capab_info = bss_desc->capabilityInfo;
@@ -20074,7 +19984,7 @@ static int __wlan_hdd_cfg80211_leave_ibss(struct wiphy *wiphy,
 	/* Clearing add IE of beacon */
 	qdf_mem_copy(update_ie.bssid.bytes, adapter->mac_addr.bytes,
 		     sizeof(tSirMacAddr));
-	update_ie.smeSessionId = adapter->vdev_id;
+	update_ie.vdev_id = adapter->vdev_id;
 	update_ie.ieBufferlength = 0;
 	update_ie.pAdditionIEBuffer = NULL;
 	update_ie.append = true;
@@ -20900,31 +20810,25 @@ int wlan_hdd_disconnect(struct hdd_adapter *adapter, u16 reason)
 
 	status = sme_roam_disconnect(mac_handle,
 				     adapter->vdev_id, reason);
-	if ((QDF_STATUS_CMD_NOT_QUEUED == status) &&
-			prev_conn_state != eConnectionState_Connecting) {
-		hdd_debug("status = %d, already disconnected", status);
-		result = 0;
-		/*
-		 * Wait here instead of returning directly. This will block the
-		 * next connect command and allow processing of the disconnect
-		 * in SME else we might hit some race conditions leading to SME
-		 * and HDD out of sync. As disconnect is already in progress,
-		 * wait here for 1 sec instead of 5 sec.
-		 */
-		wait_time = WLAN_WAIT_DISCONNECT_ALREADY_IN_PROGRESS;
-	} else if (QDF_STATUS_CMD_NOT_QUEUED == status) {
+	if (QDF_STATUS_CMD_NOT_QUEUED == status &&
+	    prev_conn_state == eConnectionState_Connecting) {
 		/*
 		 * Wait here instead of returning directly, this will block the
 		 * next connect command and allow processing of the scan for
-		 * ssid and the previous connect command in CSR. Else we might
-		 * hit some race conditions leading to SME and HDD out of sync.
+		 * ssid and the previous connect command in CSR.
 		 */
-		hdd_debug("Already disconnected or connect was in sme/roam pending list and removed by disconnect");
-	} else if (0 != status) {
-		hdd_err("csr_roam_disconnect failure, status: %d", (int)status);
-		sta_ctx->sta_debug_state = status;
-		result = -EINVAL;
-		goto disconnected;
+		hdd_debug("CSR is not in connected state but scan for SSID is in progress, wait for scan to be aborted or completed.");
+	} else if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_debug("status = %d, already disconnect in progress or SME is disconencted OR connect removed from pending queue",
+			  status);
+		/*
+		 * Wait here instead of returning directly. This will block the
+		 * next connect command and allow processing of the disconnect
+		 * in SME. As disconnect is already in progress, wait here for
+		 * WLAN_WAIT_DISCONNECT_ALREADY_IN_PROGRESS instead of
+		 * SME_DISCONNECT_TIMEOUT.
+		 */
+		wait_time = WLAN_WAIT_DISCONNECT_ALREADY_IN_PROGRESS;
 	}
 wait_for_disconnect:
 	rc = wait_for_completion_timeout(&adapter->disconnect_comp_var,
@@ -20934,7 +20838,6 @@ wait_for_disconnect:
 		hdd_err("Failed to disconnect, timed out");
 		result = -ETIMEDOUT;
 	}
-disconnected:
 	hdd_conn_set_connection_state(adapter, eConnectionState_NotConnected);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 11, 0)
 	/* Sending disconnect event to userspace for kernel version < 3.11

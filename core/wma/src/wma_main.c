@@ -655,99 +655,6 @@ static void wma_process_send_addba_req(tp_wma_handle wma_handle,
 }
 
 /**
- * wma_ipa_get_stat() - get IPA data path stats from FW
- *
- * Return: 0 on success, errno on failure
- */
-#ifdef IPA_OFFLOAD
-static int wma_ipa_get_stat(void)
-{
-	struct cdp_pdev *pdev;
-
-	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
-	if (!pdev) {
-		WMA_LOGE("pdev NULL for uc stat");
-		return -EINVAL;
-	}
-	cdp_ipa_get_stat(cds_get_context(QDF_MODULE_ID_SOC), pdev);
-
-	return 0;
-}
-#else
-static int wma_ipa_get_stat(void)
-{
-	return 0;
-}
-#endif
-
-/**
- * wma_ipa_uc_get_share_stats() - get Tx/Rx byte stats from FW
- * @privcmd: private command
- *
- * Return: 0 on success, errno on failure
- */
-#if defined(IPA_OFFLOAD) && defined(FEATURE_METERING)
-static int wma_ipa_uc_get_share_stats(wma_cli_set_cmd_t *privcmd)
-{
-	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
-	struct cdp_pdev *pdev;
-	uint8_t reset_stats = privcmd->param_value;
-
-	WMA_LOGD("%s: reset_stats=%d",
-			"WMA_VDEV_TXRX_GET_IPA_UC_SHARING_STATS_CMDID",
-			reset_stats);
-	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
-	if (!pdev) {
-		WMA_LOGE("pdev NULL for uc get share stats");
-		return -EINVAL;
-	}
-	cdp_ipa_uc_get_share_stats(soc, pdev, reset_stats);
-
-	return 0;
-}
-#else
-static int wma_ipa_uc_get_share_stats(wma_cli_set_cmd_t *privcmd)
-{
-	return 0;
-}
-#endif
-
-/**
- * wma_ipa_uc_set_quota() - set quota limit to FW
- * @privcmd: private command
- *
- * Return: 0 on success, errno on failure
- */
-#if defined(IPA_OFFLOAD) && defined(FEATURE_METERING)
-static int wma_ipa_uc_set_quota(wma_cli_set_cmd_t *privcmd)
-{
-	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
-	struct cdp_pdev *pdev;
-	uint64_t quota_bytes = privcmd->param_sec_value;
-
-	quota_bytes <<= 32;
-	quota_bytes |= privcmd->param_value;
-
-	WMA_LOGD("%s: quota_bytes=%llu",
-			"WMA_VDEV_TXRX_SET_IPA_UC_QUOTA_CMDID",
-			quota_bytes);
-	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
-	if (!pdev) {
-		WMA_LOGE("pdev NULL for uc set quota");
-		return -EINVAL;
-	}
-	cdp_ipa_uc_set_quota(soc, pdev, quota_bytes);
-
-	return 0;
-}
-#else
-static int wma_ipa_uc_set_quota(wma_cli_set_cmd_t *privcmd)
-{
-	return 0;
-}
-#endif
-
-/**
  * wma_set_priv_cfg() - set private config parameters
  * @wma_handle: wma handle
  * @privcmd: private command
@@ -888,25 +795,6 @@ static int32_t wma_set_priv_cfg(tp_wma_handle wma_handle,
 		WMA_LOGD("%s: IBSS Power Save single RX Chain Enable In ATIM  = %d",
 			__func__, wma_handle->wma_ibss_power_save_params.
 			ibssPs1RxChainInAtimEnable);
-	}
-		break;
-
-	case WMA_VDEV_TXRX_GET_IPA_UC_FW_STATS_CMDID:
-	{
-		wma_ipa_get_stat();
-	}
-		break;
-
-	case WMA_VDEV_TXRX_GET_IPA_UC_SHARING_STATS_CMDID:
-	{
-		wma_ipa_uc_get_share_stats(privcmd);
-	}
-		break;
-
-	case WMA_VDEV_TXRX_SET_IPA_UC_QUOTA_CMDID:
-	{
-		wma_ipa_uc_set_quota(privcmd);
-
 	}
 		break;
 
@@ -2185,7 +2073,7 @@ static int wma_flush_complete_evt_handler(void *handle,
 		cdp_post_data_stall_event(soc,
 					DATA_STALL_LOG_INDICATOR_FIRMWARE,
 					data_stall_event->data_stall_type,
-					0XFF,
+					OL_TXRX_PDEV_ID,
 					data_stall_event->vdev_id_bitmap,
 					data_stall_event->recovery_type);
 	}
@@ -3721,7 +3609,7 @@ static int wma_pdev_set_hw_mode_resp_evt_handler(void *handle,
 
 		vdev_id = vdev_mac_entry[i].vdev_id;
 		pdev_id = vdev_mac_entry[i].pdev_id;
-		if (pdev_id == WMI_PDEV_ID_SOC) {
+		if (pdev_id == OL_TXRX_PDEV_ID) {
 			WMA_LOGE("%s: soc level id received for mac id)",
 				 __func__);
 			goto fail;
@@ -3822,7 +3710,7 @@ void wma_process_pdev_hw_mode_trans_ind(void *handle,
 		vdev_id = vdev_mac_entry[i].vdev_id;
 		pdev_id = vdev_mac_entry[i].pdev_id;
 
-		if (pdev_id == WMI_PDEV_ID_SOC) {
+		if (pdev_id == OL_TXRX_PDEV_ID) {
 			WMA_LOGE("%s: soc level id received for mac id)",
 				 __func__);
 			return;
@@ -5987,7 +5875,8 @@ int wma_rx_service_ready_event(void *handle, uint8_t *cmd_param_info,
 		goto free_hw_mode_list;
 	}
 
-	cdp_mark_first_wakeup_packet(soc,
+	cdp_mark_first_wakeup_packet(
+		soc, OL_TXRX_PDEV_ID,
 		wmi_service_enabled(wmi_handle,
 				    wmi_service_mark_first_wakeup_packet));
 	wma_handle->is_dfs_offloaded =
@@ -6058,7 +5947,7 @@ static QDF_STATUS wma_get_phyid_for_given_band(
 			struct target_psoc_info *tgt_hdl,
 			enum cds_band_type band, uint8_t *phyid)
 {
-	uint8_t idx, i, num_radios;
+	uint8_t idx, i, total_mac_phy_cnt;
 	struct wlan_psoc_host_mac_phy_caps *mac_phy_cap;
 
 	if (!wma_handle) {
@@ -6068,10 +5957,10 @@ static QDF_STATUS wma_get_phyid_for_given_band(
 
 	idx = 0;
 	*phyid = idx;
-	num_radios = target_psoc_get_num_radios(tgt_hdl);
+	total_mac_phy_cnt = target_psoc_get_total_mac_phy_cnt(tgt_hdl);
 	mac_phy_cap = target_psoc_get_mac_phy_cap(tgt_hdl);
 
-	for (i = 0; i < num_radios; i++) {
+	for (i = 0; i < total_mac_phy_cnt; i++) {
 		if ((band == CDS_BAND_2GHZ) &&
 		(WLAN_2G_CAPABILITY == mac_phy_cap[idx + i].supported_bands)) {
 			*phyid = idx + i;
@@ -6084,7 +5973,8 @@ static QDF_STATUS wma_get_phyid_for_given_band(
 			return QDF_STATUS_SUCCESS;
 		}
 	}
-	WMA_LOGD("Using default single hw mode phyid[%d]", *phyid);
+	WMA_LOGD("Using default single hw mode phyid[%d] total_mac_phy_cnt %d",
+		 *phyid, total_mac_phy_cnt);
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -9325,7 +9215,7 @@ QDF_STATUS wma_send_pdev_set_antenna_mode(tp_wma_handle wma_handle,
 		WMITLV_GET_STRUCT_TLVLEN(
 			wmi_pdev_set_antenna_mode_cmd_fixed_param));
 
-	cmd->pdev_id = WMI_PDEV_ID_SOC;
+	cmd->pdev_id = OL_TXRX_PDEV_ID;
 	/* Bits 0-15 is num of RX chains 16-31 is num of TX chains */
 	cmd->num_txrx_chains = msg->num_rx_chains;
 	cmd->num_txrx_chains |= (msg->num_tx_chains << 16);

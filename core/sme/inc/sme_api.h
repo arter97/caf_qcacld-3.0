@@ -357,34 +357,43 @@ sme_nss_chains_update(mac_handle_t mac_handle,
 		      uint8_t vdev_id);
 
 /**
- * sme_create_vdev() - Create vdev for given persona
+ * sme_vdev_create() - Create vdev for given persona
  * @mac_handle: The handle returned by mac_open
- * @params: to initialize the session open params
+ * @vdev_params: params required for vdev creation
  *
- * This is a synchronous API. For any protocol stack related activity
- * requires vdev to be created. This API needs to be called to create
- * vdev in SME module.
+ * This API will create the object manager vdev and in the same
+ * context vdev mlme object manager notification is invoked, which
+ * will send the vdev create to the firmware.
  *
- * Return: QDF_STATUS_SUCCESS - vdev is created
- * Other status means SME is failed to create vdev
+ * If the vdev creation is successful the following object is referenced
+ * by below modules:
+ * 1) WLAN_OBJMGR_ID
+ * 2) WLAN_LEGACY_SME_ID
+ * 3) WLAN_LEGACY_WMA_ID
+ *
+ * Return: Newly created Vdev object or NULL incase in any error
  */
-QDF_STATUS sme_create_vdev(mac_handle_t mac_handle,
-			   struct sme_session_params *params);
+struct wlan_objmgr_vdev *sme_vdev_create(mac_handle_t mac_handle,
+				  struct wlan_vdev_create_params *vdev_params);
+
 
 /**
  * sme_vdev_delete() - Delete vdev for given id
+ * @mac_handle: The handle returned by mac_open.
+ * @vdev: VDEV Object
  *
  * This is a synchronous API. This API needs to be called to delete vdev
  * in SME module before terminating the session completely.
  *
- * mac_handle: The handle returned by mac_open.
- * vdev_id: A previous created vdev id.
+ * The following modules releases their reference to the vdev object:
+ * 1) WLAN_LEGACY_WMA_ID
+ * 2) WLAN_LEGACY_SME_ID
  *
- * Return:
- * QDF_STATUS_SUCCESS - vdev is deleted.
- * Other status means SME is failed to delete vdev.
+ * Return: QDF_STATUS_SUCCESS - vdev is deleted.
+ *         QDF_STATUS_E_INVAL when failed to delete vdev.
  */
-QDF_STATUS sme_vdev_delete(mac_handle_t mac_handle, uint8_t vdev_id);
+QDF_STATUS sme_vdev_delete(mac_handle_t mac_handle,
+			   struct wlan_objmgr_vdev *vdev);
 
 /**
  * sme_cleanup_session() -  clean up sme session info for vdev
@@ -778,9 +787,20 @@ QDF_STATUS sme_get_cfg_valid_channels(uint32_t *valid_ch_freq, uint32_t *len);
 QDF_STATUS sme_8023_multicast_list(mac_handle_t mac_handle, uint8_t sessionId,
 		tpSirRcvFltMcAddrList pMulticastAddrs);
 #endif /* WLAN_FEATURE_PACKET_FILTERING */
-bool sme_is_channel_valid(mac_handle_t mac_handle, uint8_t channel);
 uint16_t sme_chn_to_freq(uint8_t chanNum);
-bool sme_is_channel_valid(mac_handle_t mac_handle, uint8_t channel);
+
+/*
+ * sme_is_channel_valid() - validate a channel against current regdmn
+ * To check if the channel is valid for currently established domain
+ *   This is a synchronous API.
+ *
+ * mac_handle - The handle returned by mac_open.
+ * chan_freq - channel to verify
+ *
+ * Return: true/false, true if channel is valid
+ */
+bool sme_is_channel_valid(mac_handle_t mac_handle, uint32_t chan_freq);
+
 QDF_STATUS sme_set_max_tx_power(mac_handle_t mac_handle,
 				struct qdf_mac_addr pBssid,
 				struct qdf_mac_addr pSelfMacAddress, int8_t dB);
@@ -3930,4 +3950,16 @@ uint16_t sme_get_full_roam_scan_period_global(mac_handle_t mac_handle);
 QDF_STATUS sme_get_full_roam_scan_period(mac_handle_t mac_handle,
 					 uint8_t vdev_id,
 					 uint32_t *full_roam_scan_period);
+
+/**
+ * sme_check_for_duplicate_session() - check for duplicate session
+ * @mac_handle: Opaque handle to the MAC context
+ * @peer_addr: Peer device mac address
+ *
+ * Check for duplicate mac address is available on other vdev.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_check_for_duplicate_session(mac_handle_t mac_handle,
+					   uint8_t *peer_addr);
 #endif /* #if !defined( __SME_API_H ) */

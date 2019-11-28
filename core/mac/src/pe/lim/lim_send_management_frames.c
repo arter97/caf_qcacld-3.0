@@ -190,6 +190,7 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	tDot11fIEExtCap extracted_ext_cap;
 	QDF_STATUS sir_status;
 	const uint8_t *qcn_ie = NULL;
+	uint32_t chan_freq;
 
 	if (additional_ielen)
 		addn_ielen = *additional_ielen;
@@ -406,10 +407,12 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 		payload += addn_ielen;
 	}
 
+	chan_freq = wlan_reg_chan_to_freq(mac_ctx->pdev, channel);
+
 	/* If this probe request is sent during P2P Search State, then we need
 	 * to send it at OFDM rate.
 	 */
-	if ((BAND_5G == lim_get_rf_band(channel)) ||
+	if ((REG_BAND_5G == lim_get_rf_band(chan_freq)) ||
 		/*
 		 * For unicast probe req mgmt from Join function we don't set
 		 * above variables. So we need to add one more check whether it
@@ -2779,9 +2782,8 @@ alloc_packet:
 			   frame, frame_len);
 
 	if ((session->ftPEContext.pFTPreAuthReq) &&
-	    (lim_get_rf_band(
-	     session->ftPEContext.pFTPreAuthReq->preAuthchannelNum)) ==
-				BAND_5G)
+	    (!wlan_reg_is_24ghz_ch_freq(
+	     session->ftPEContext.pFTPreAuthReq->pre_auth_channel_freq)))
 		tx_flag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
 	else if (wlan_reg_is_5ghz_ch_freq(session->curr_op_freq) ||
 		 session->opmode == QDF_P2P_CLIENT_MODE ||
@@ -2801,8 +2803,8 @@ alloc_packet:
 				      session, QDF_STATUS_SUCCESS, QDF_STATUS_SUCCESS);
 
 	if (session->ftPEContext.pFTPreAuthReq)
-		ch_freq_tx_frame = cds_chan_to_freq(
-			session->ftPEContext.pFTPreAuthReq->preAuthchannelNum);
+		ch_freq_tx_frame = session->ftPEContext.
+				pFTPreAuthReq->pre_auth_channel_freq;
 
 	qdf_status = wma_tx_frameWithTxComplete(mac_ctx, packet,
 				 (uint16_t)frame_len,
@@ -3893,7 +3895,7 @@ lim_send_extended_chan_switch_action_frame(struct mac_context *mac_ctx,
 	void                     *packet;
 	QDF_STATUS               qdf_status;
 	uint8_t                  txFlag = 0;
-	uint8_t                  sme_session_id = 0;
+	uint8_t                  vdev_id = 0;
 	uint8_t                  ch_spacing;
 	tLimWiderBWChannelSwitchInfo *wide_bw_ie;
 
@@ -3902,7 +3904,7 @@ lim_send_extended_chan_switch_action_frame(struct mac_context *mac_ctx,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	sme_session_id = session_entry->smeSessionId;
+	vdev_id = session_entry->smeSessionId;
 
 	qdf_mem_zero(&frm, sizeof(frm));
 
@@ -4000,7 +4002,7 @@ lim_send_extended_chan_switch_action_frame(struct mac_context *mac_ctx,
 						 ANI_TXDIR_TODS,
 						 7,
 						 lim_tx_complete, frame,
-						 txFlag, sme_session_id, 0,
+						 txFlag, vdev_id, 0,
 						 RATEID_DEFAULT);
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 			session_entry->peSessionId, qdf_status));
@@ -4061,14 +4063,14 @@ lim_p2p_oper_chan_change_confirm_action_frame(struct mac_context *mac_ctx,
 	void                     *packet;
 	QDF_STATUS               qdf_status;
 	uint8_t                  tx_flag = 0;
-	uint8_t                  sme_session_id = 0;
+	uint8_t                  vdev_id = 0;
 
 	if (!session_entry) {
 		pe_err("Session entry is NULL!!!");
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	sme_session_id = session_entry->smeSessionId;
+	vdev_id = session_entry->smeSessionId;
 
 	qdf_mem_zero(&frm, sizeof(frm));
 
@@ -4150,7 +4152,7 @@ lim_p2p_oper_chan_change_confirm_action_frame(struct mac_context *mac_ctx,
 			TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS,
 			7, lim_tx_complete, frame,
 			lim_oper_chan_change_confirm_tx_complete_cnf,
-			tx_flag, sme_session_id, false, 0, RATEID_DEFAULT);
+			tx_flag, vdev_id, false, 0, RATEID_DEFAULT);
 
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 			session_entry->peSessionId, qdf_status));
@@ -5097,7 +5099,7 @@ static void lim_tx_mgmt_frame(struct mac_context *mac_ctx,
 	uint16_t auth_ack_status;
 	enum rateid min_rid = RATEID_DEFAULT;
 
-	vdev_id = mb_msg->session_id;
+	vdev_id = mb_msg->vdev_id;
 	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
 	if (!session) {
 		cds_packet_free((void *)packet);
@@ -5137,7 +5139,7 @@ void lim_send_mgmt_frame_tx(struct mac_context *mac_ctx,
 	struct sir_mgmt_msg *mb_msg = (struct sir_mgmt_msg *)msg->bodyptr;
 	uint32_t msg_len;
 	tpSirMacFrameCtl fc = (tpSirMacFrameCtl) mb_msg->data;
-	uint8_t sme_session_id;
+	uint8_t vdev_id;
 	QDF_STATUS qdf_status;
 	uint8_t *frame;
 	void *packet;
@@ -5147,7 +5149,7 @@ void lim_send_mgmt_frame_tx(struct mac_context *mac_ctx,
 	pe_debug("sending fc->type: %d fc->subType: %d",
 		fc->type, fc->subType);
 
-	sme_session_id = mb_msg->session_id;
+	vdev_id = mb_msg->vdev_id;
 	mac_hdr = (tpSirMacMgmtHdr)mb_msg->data;
 
 	lim_add_mgmt_seq_num(mac_ctx, mac_hdr);

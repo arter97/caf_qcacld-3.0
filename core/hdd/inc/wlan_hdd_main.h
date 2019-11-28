@@ -208,7 +208,6 @@ static inline bool in_compat_syscall(void) { return is_compat_task(); }
  * @WMM_INIT_DONE: Adapter is initialized
  * @SOFTAP_BSS_STARTED: Software Access Point (SAP) is running
  * @DEVICE_IFACE_OPENED: Adapter has been "opened" via the kernel
- * @ACS_PENDING: Auto Channel Selection (ACS) is pending
  * @SOFTAP_INIT_DONE: Software Access Point (SAP) is initialized
  * @VENDOR_ACS_RESPONSE_PENDING: Waiting for event for vendor acs
  * @DOWN_DURING_SSR: Mark interface is down during SSR
@@ -220,18 +219,9 @@ enum hdd_adapter_flags {
 	WMM_INIT_DONE,
 	SOFTAP_BSS_STARTED,
 	DEVICE_IFACE_OPENED,
-	ACS_PENDING,
 	SOFTAP_INIT_DONE,
 	VENDOR_ACS_RESPONSE_PENDING,
 	DOWN_DURING_SSR,
-};
-
-/**
- * enum hdd_driver_flags - HDD global event bitmap flags
- * @ACS_IN_PROGRESS: Auto Channel Selection (ACS) in progress
- */
-enum hdd_driver_flags {
-	ACS_IN_PROGRESS,
 };
 
 #define WLAN_WAIT_DISCONNECT_ALREADY_IN_PROGRESS  1000
@@ -402,6 +392,8 @@ enum hdd_driver_flags {
 #endif
 
 #define NUM_TX_RX_HISTOGRAM_MASK (NUM_TX_RX_HISTOGRAM - 1)
+
+#define HDD_NOISE_FLOOR_DBM (-96)
 
 /**
  * enum hdd_auth_key_mgmt - auth key mgmt protocols
@@ -2050,6 +2042,44 @@ QDF_STATUS hdd_add_adapter_front(struct hdd_context *hdd_ctx,
 				 struct hdd_adapter *adapter);
 
 /**
+ * typedef hdd_adapter_iterate_cb() – Iteration callback function
+ * @adapter: current adapter of interest
+ * @context: user context supplied to the iterator
+ *
+ * This specifies the type of a callback function to supply to
+ * hdd_adapter_iterate().
+ *
+ * Return:
+ * * QDF_STATUS_SUCCESS if further iteration should continue
+ * * QDF_STATUS_E_ABORTED if further iteration should be aborted
+ */
+typedef QDF_STATUS (*hdd_adapter_iterate_cb)(struct hdd_adapter *adapter,
+					     void *context);
+
+/**
+ * hdd_adapter_iterate() – Safely iterate over all adapters
+ * @cb: callback function to invoke for each adapter
+ * @context: user-supplied context to pass to @cb
+ *
+ * This function will iterate over all of the adapters known to the system in
+ * a safe manner, invoking the callback function for each adapter.
+ * The callback function will be invoked in the same context/thread as the
+ * caller without any additional locks in force.
+ * Iteration continues until either the callback has been invoked for all
+ * adapters or a callback returns a value of QDF_STATUS_E_ABORTED to indicate
+ * that further iteration should cease.
+ *
+ * Return:
+ * * QDF_STATUS_E_ABORTED if any callback function returns that value
+ * * QDF_STATUS_E_FAILURE if the callback was not invoked for all adapters due
+ * to concurrency (i.e. adapter was deleted while iterating)
+ * * QDF_STATUS_SUCCESS if @cb was invoked for each adapter and none returned
+ * an error
+ */
+QDF_STATUS hdd_adapter_iterate(hdd_adapter_iterate_cb cb,
+			       void *context);
+
+/**
  * hdd_for_each_adapter - adapter iterator macro
  * @hdd_ctx: the global HDD context
  * @adapter: an hdd_adapter pointer to use as a cursor
@@ -2210,7 +2240,7 @@ struct hdd_adapter *hdd_get_adapter_by_macaddr(struct hdd_context *hdd_ctx,
  *
  * Return: home channel if connected/started or invalid channel 0
  */
-uint8_t hdd_get_adapter_home_channel(struct hdd_adapter *adapter);
+uint32_t hdd_get_adapter_home_channel(struct hdd_adapter *adapter);
 
 /*
  * hdd_get_adapter_by_rand_macaddr() - find Random mac adapter
@@ -2286,8 +2316,24 @@ uint8_t *wlan_hdd_get_intf_addr(struct hdd_context *hdd_ctx,
 				enum QDF_OPMODE interface_type);
 void wlan_hdd_release_intf_addr(struct hdd_context *hdd_ctx,
 				uint8_t *releaseAddr);
-uint8_t hdd_get_operating_channel(struct hdd_context *hdd_ctx,
-			enum QDF_OPMODE mode);
+
+/**
+ * hdd_get_operating_chan_freq() - return operating channel of the device mode
+ * @hdd_ctx:	Pointer to the HDD context.
+ * @mode:	Device mode for which operating channel is required.
+ *              Supported modes:
+ *			QDF_STA_MODE,
+ *			QDF_P2P_CLIENT_MODE,
+ *			QDF_SAP_MODE,
+ *			QDF_P2P_GO_MODE.
+ *
+ * This API returns the operating channel of the requested device mode
+ *
+ * Return: channel frequency, or
+ *         0 if the requested device mode is not found.
+ */
+uint32_t hdd_get_operating_chan_freq(struct hdd_context *hdd_ctx,
+				     enum QDF_OPMODE mode);
 
 void hdd_set_conparam(int32_t con_param);
 enum QDF_GLOBAL_MODE hdd_get_conparam(void);
@@ -2867,7 +2913,6 @@ static inline void wlan_hdd_mod_fc_timer(struct hdd_adapter *adapter,
 #endif /* QCA_HL_NETDEV_FLOW_CONTROL */
 
 int hdd_wlan_dump_stats(struct hdd_adapter *adapter, int value);
-void wlan_hdd_deinit_tx_rx_histogram(struct hdd_context *hdd_ctx);
 void wlan_hdd_display_tx_rx_histogram(struct hdd_context *hdd_ctx);
 void wlan_hdd_clear_tx_rx_histogram(struct hdd_context *hdd_ctx);
 

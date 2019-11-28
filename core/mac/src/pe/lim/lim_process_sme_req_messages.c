@@ -511,7 +511,7 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 	uint32_t auto_gen_bssid = false;
 	uint8_t session_id;
 	struct pe_session *session = NULL;
-	uint8_t sme_session_id = 0xFF;
+	uint8_t vdev_id = 0xFF;
 	uint32_t chanwidth;
 	struct vdev_type_nss *vdev_type_nss;
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
@@ -534,7 +534,7 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 		goto free;
 	}
 	qdf_mem_copy(sme_start_bss_req, msg_buf, size);
-	sme_session_id = sme_start_bss_req->sessionId;
+	vdev_id = sme_start_bss_req->vdev_id;
 
 	if ((mac_ctx->lim.gLimSmeState == eLIM_SME_OFFLINE_STATE) ||
 	    (mac_ctx->lim.gLimSmeState == eLIM_SME_IDLE_STATE)) {
@@ -562,7 +562,7 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 					sme_start_bss_req->bssid.bytes,
 					&session_id, mac_ctx->lim.maxStation,
 					sme_start_bss_req->bssType,
-					sme_start_bss_req->sessionId);
+					sme_start_bss_req->vdev_id);
 			if (!session) {
 				pe_warn("Session Can not be created");
 				ret_code = eSIR_SME_RESOURCES_UNAVAILABLE;
@@ -634,10 +634,8 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 		/* Update the phymode */
 		session->gLimPhyMode = sme_start_bss_req->nwType;
 
-		session->maxTxPower =
-			lim_get_regulatory_max_transmit_power(mac_ctx,
-				wlan_reg_freq_to_chan(
-				mac_ctx->pdev, session->curr_op_freq));
+		session->maxTxPower = wlan_reg_get_channel_reg_power_for_freq(
+			mac_ctx->pdev, session->curr_op_freq);
 		/* Store the dot 11 mode in to the session Table */
 		session->dot11mode = sme_start_bss_req->dot11mode;
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
@@ -772,6 +770,7 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 				sme_start_bss_req->center_freq_seg0;
 			session->ch_center_freq_seg1 =
 				sme_start_bss_req->center_freq_seg1;
+			lim_update_he_bw_cap_mcs(session);
 		}
 
 		pe_debug("vht su tx bformer %d",
@@ -913,13 +912,14 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 		mlm_start_req->txChannelWidthSet =
 			session->htRecommendedTxWidthSet;
 
-		session->limRFBand = lim_get_rf_band(channel_number);
+		session->limRFBand = lim_get_rf_band(
+			sme_start_bss_req->oper_ch_freq);
 
 		/* Initialize 11h Enable Flag */
 		session->lim11hEnable = 0;
 		if (mlm_start_req->bssType != eSIR_IBSS_MODE &&
 		    (CHAN_HOP_ALL_BANDS_ENABLE ||
-		     BAND_5G == session->limRFBand)) {
+		     REG_BAND_5G == session->limRFBand)) {
 			session->lim11hEnable =
 				mac_ctx->mlme_cfg->gen.enabled_11h;
 
@@ -971,7 +971,7 @@ free:
 		session = NULL;
 	}
 	lim_send_sme_start_bss_rsp(mac_ctx, eWNI_SME_START_BSS_RSP, ret_code,
-				   session, sme_session_id);
+				   session, vdev_id);
 }
 
 /**
@@ -1590,9 +1590,8 @@ __lim_process_sme_join_req(struct mac_context *mac_ctx, void *msg_buf)
 		session->limCurrentBssCaps =
 			session->lim_join_req->bssDescription.capabilityInfo;
 
-		reg_max = lim_get_regulatory_max_transmit_power(
-			mac_ctx, wlan_reg_freq_to_chan(mac_ctx->pdev,
-						       session->curr_op_freq));
+		reg_max = wlan_reg_get_channel_reg_power_for_freq(
+			mac_ctx->pdev, session->curr_op_freq);
 		local_power_constraint = reg_max;
 
 		lim_extract_ap_capability(mac_ctx,
@@ -1634,12 +1633,10 @@ __lim_process_sme_join_req(struct mac_context *mac_ctx, void *msg_buf)
 			session->gUapsdPerAcTriggerEnableMask = 0;
 		}
 
-		session->limRFBand = lim_get_rf_band(
-			wlan_reg_freq_to_chan(mac_ctx->pdev,
-					      session->curr_op_freq));
+		session->limRFBand = lim_get_rf_band(session->curr_op_freq);
 
 		/* Initialize 11h Enable Flag */
-		if (session->limRFBand == BAND_5G)
+		if (session->limRFBand == REG_BAND_5G)
 			session->lim11hEnable =
 				mac_ctx->mlme_cfg->gen.enabled_11h;
 		else
@@ -1918,9 +1915,8 @@ static void __lim_process_sme_reassoc_req(struct mac_context *mac_ctx,
 
 	session_entry->limReassocBssCaps =
 		session_entry->pLimReAssocReq->bssDescription.capabilityInfo;
-	reg_max = lim_get_regulatory_max_transmit_power(
-		mac_ctx, wlan_reg_freq_to_chan(
-		mac_ctx->pdev, session_entry->curr_op_freq));
+	reg_max = wlan_reg_get_channel_reg_power_for_freq(
+		mac_ctx->pdev, session_entry->curr_op_freq);
 	local_pwr_constraint = reg_max;
 
 	lim_extract_ap_capability(mac_ctx,
@@ -2276,7 +2272,7 @@ void __lim_process_sme_disassoc_cnf(struct mac_context *mac, uint32_t *msg_buf)
 	if (!pe_session) {
 		pe_err("session does not exist for given bssId");
 		status = lim_prepare_disconnect_done_ind(mac, &msg,
-						smeDisassocCnf.sme_session_id,
+						smeDisassocCnf.vdev_id,
 						eSIR_SME_INVALID_SESSION,
 						NULL);
 		if (QDF_IS_STATUS_SUCCESS(status))
@@ -2420,10 +2416,10 @@ static void __lim_process_sme_deauth_req(struct mac_context *mac_ctx,
 	tSirResultCodes ret_code = eSIR_SME_SUCCESS;
 	struct pe_session *session_entry;
 	uint8_t session_id;      /* PE sessionId */
-	uint8_t sme_session_id;
+	uint8_t vdev_id;
 
 	qdf_mem_copy(&sme_deauth_req, msg_buf, sizeof(sme_deauth_req));
-	sme_session_id = sme_deauth_req.sessionId;
+	vdev_id = sme_deauth_req.vdev_id;
 
 	/*
 	 * We need to get a session first but we don't even know
@@ -2448,8 +2444,8 @@ static void __lim_process_sme_deauth_req(struct mac_context *mac_ctx,
 		deauth_trigger = eLIM_HOST_DEAUTH;
 		goto send_deauth;
 	}
-	pe_debug("received DEAUTH_REQ sessionid %d Systemrole %d reasoncode %u limSmestate %d from "
-		QDF_MAC_ADDR_STR, sme_session_id,
+	pe_debug("received DEAUTH_REQ vdev_id %d Systemrole %d reasoncode %u limSmestate %d from "
+		QDF_MAC_ADDR_STR, vdev_id,
 		GET_LIM_SYSTEM_ROLE(session_entry), sme_deauth_req.reasonCode,
 		session_entry->limSmeState,
 		QDF_MAC_ADDR_ARRAY(sme_deauth_req.peer_macaddr.bytes));
@@ -2458,7 +2454,7 @@ static void __lim_process_sme_deauth_req(struct mac_context *mac_ctx,
 			session_entry, 0, sme_deauth_req.reasonCode);
 #endif /* FEATURE_WLAN_DIAG_SUPPORT */
 
-	session_entry->smeSessionId = sme_session_id;
+	session_entry->vdev_id = vdev_id;
 
 	switch (GET_LIM_SYSTEM_ROLE(session_entry)) {
 	case eLIM_STA_ROLE:
@@ -2592,8 +2588,7 @@ static void __lim_process_sme_deauth_req(struct mac_context *mac_ctx,
 
 send_deauth:
 	lim_send_sme_deauth_ntf(mac_ctx, sme_deauth_req.peer_macaddr.bytes,
-				ret_code, deauth_trigger, 1,
-				sme_session_id);
+				ret_code, deauth_trigger, 1, vdev_id);
 }
 
 /**
@@ -4556,7 +4551,7 @@ static void lim_process_sme_disassoc_cnf(struct mac_context *mac_ctx,
 		       sme_disassoc_cnf.bssid.bytes);
 		status = lim_prepare_disconnect_done_ind
 						(mac_ctx, &err_msg,
-						sme_disassoc_cnf.sme_session_id,
+						sme_disassoc_cnf.vdev_id,
 						eSIR_SME_INVALID_SESSION,
 						NULL);
 
@@ -4641,7 +4636,7 @@ static void lim_process_sme_deauth_req(struct mac_context *mac_ctx,
 					sme_deauth_req.peer_macaddr.bytes,
 					eSIR_SME_INVALID_PARAMETERS,
 					eLIM_HOST_DEAUTH, 1,
-					sme_deauth_req.sessionId);
+					sme_deauth_req.vdev_id);
 
 		return;
 	}
@@ -4653,7 +4648,7 @@ static void lim_process_sme_deauth_req(struct mac_context *mac_ctx,
 					sme_deauth_req.peer_macaddr.bytes,
 					eSIR_SME_INVALID_PARAMETERS,
 					eLIM_HOST_DEAUTH, 1,
-					sme_deauth_req.sessionId);
+					sme_deauth_req.vdev_id);
 		return;
 	}
 
@@ -5097,8 +5092,7 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 		session_entry->htSupportedChannelWidthSet;
 	session_entry->curr_op_freq = target_freq;
 	session_entry->limRFBand = lim_get_rf_band(
-		wlan_reg_freq_to_chan(
-		mac_ctx->pdev, session_entry->curr_op_freq));
+		session_entry->curr_op_freq);
 	session_entry->cac_duration_ms = ch_change_req->cac_duration_ms;
 	session_entry->dfs_regdomain = ch_change_req->dfs_regdomain;
 	session_entry->maxTxPower = max_tx_pwr;
@@ -5108,7 +5102,7 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 
 	/* Initialize 11h Enable Flag */
 	if (CHAN_HOP_ALL_BANDS_ENABLE ||
-	    session_entry->limRFBand == BAND_5G)
+	    session_entry->limRFBand == REG_BAND_5G)
 		session_entry->lim11hEnable =
 			mac_ctx->mlme_cfg->gen.enabled_11h;
 	else
