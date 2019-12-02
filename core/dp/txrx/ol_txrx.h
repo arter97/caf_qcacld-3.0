@@ -607,4 +607,26 @@ void ol_tx_vdev_set_driver_del_ack_enable(uint8_t vdev_id,
 
 #endif
 
+#ifdef WLAN_SUPPORT_TXRX_HL_BUNDLE
+void ol_tx_vdev_set_bundle_require(uint8_t vdev_id, unsigned long tx_bytes,
+				   uint32_t time_in_ms, uint32_t high_th,
+				   uint32_t low_th);
+
+void ol_tx_pdev_reset_bundle_require(void *pdev_handle);
+
+#else
+
+static inline
+void ol_tx_vdev_set_bundle_require(uint8_t vdev_id, unsigned long tx_bytes,
+				   uint32_t time_in_ms, uint32_t high_th,
+				   uint32_t low_th)
+{
+}
+
+static inline
+void ol_tx_pdev_reset_bundle_require(void *pdev_handle)
+{
+}
+#endif
+
 #endif /* _OL_TXRX__H_ */

@@ -8345,11 +8345,34 @@ void hdd_set_driver_del_ack_enable(uint16_t vdev_id,
 }
 #endif
 
+#ifdef WLAN_SUPPORT_TXRX_HL_BUNDLE
+static inline
+void hdd_set_vdev_bundle_require_flag(uint16_t vdev_id,
+				      struct hdd_context *hdd_ctx,
+				      uint64_t tx_bytes)
+{
+	struct hdd_config *cfg = hdd_ctx->config;
+
+	cdp_vdev_set_bundle_require_flag(cds_get_context(QDF_MODULE_ID_SOC),
+					 vdev_id, tx_bytes,
+					 cfg->bus_bw_compute_interval,
+					 cfg->pkt_bundle_threshold_high,
+					 cfg->pkt_bundle_threshold_low);
+}
+#else
+static inline
+void hdd_set_vdev_bundle_require_flag(uint16_t vdev_id,
+				      struct hdd_context *hdd_ctx,
+				      uint64_t tx_bytes)
+{
+}
+#endif
+
 #define HDD_BW_GET_DIFF(_x, _y) (unsigned long)((ULONG_MAX - (_y)) + (_x) + 1)
 static void __hdd_bus_bw_work_handler(struct hdd_context *hdd_ctx)
 {
 	struct hdd_adapter *adapter = NULL, *con_sap_adapter = NULL;
-	uint64_t tx_packets = 0, rx_packets = 0;
+	uint64_t tx_packets = 0, rx_packets = 0, tx_bytes = 0;
 	uint64_t fwd_tx_packets = 0, fwd_rx_packets = 0;
 	uint64_t fwd_tx_packets_diff = 0, fwd_rx_packets_diff = 0;
 	uint64_t total_tx = 0, total_rx = 0;
@@ -8390,6 +8413,8 @@ static void __hdd_bus_bw_work_handler(struct hdd_context *hdd_ctx)
 					      adapter->prev_tx_packets);
 		rx_packets += HDD_BW_GET_DIFF(adapter->stats.rx_packets,
 					      adapter->prev_rx_packets);
+		tx_bytes = HDD_BW_GET_DIFF(adapter->stats.tx_bytes,
+					   adapter->prev_tx_bytes);
 
 		if (adapter->device_mode == QDF_SAP_MODE ||
 				adapter->device_mode == QDF_P2P_GO_MODE ||
@@ -8415,6 +8440,9 @@ static void __hdd_bus_bw_work_handler(struct hdd_context *hdd_ctx)
 		hdd_set_driver_del_ack_enable(adapter->vdev_id, hdd_ctx,
 					      rx_packets);
 
+		hdd_set_vdev_bundle_require_flag(adapter->vdev_id, hdd_ctx,
+						 tx_bytes);
+
 		total_rx += adapter->stats.rx_packets;
 		total_tx += adapter->stats.tx_packets;
 
@@ -8423,6 +8451,7 @@ static void __hdd_bus_bw_work_handler(struct hdd_context *hdd_ctx)
 		adapter->prev_rx_packets = adapter->stats.rx_packets;
 		adapter->prev_fwd_tx_packets = fwd_tx_packets;
 		adapter->prev_fwd_rx_packets = fwd_rx_packets;
+		adapter->prev_tx_bytes = adapter->stats.tx_bytes;
 		spin_unlock_bh(&hdd_ctx->bus_bw_lock);
 		connected = true;
 	}
@@ -13136,6 +13165,8 @@ static void __hdd_bus_bw_compute_timer_stop(struct hdd_context *hdd_ctx)
 	hdd_reset_tcp_delack(hdd_ctx);
 	cdp_pdev_reset_driver_del_ack(cds_get_context(QDF_MODULE_ID_SOC),
 				      cds_get_context(QDF_MODULE_ID_TXRX));
+	cdp_pdev_reset_bundle_require_flag(cds_get_context(QDF_MODULE_ID_SOC),
+					   cds_get_context(QDF_MODULE_ID_TXRX));
 }
 
 void hdd_bus_bw_compute_timer_stop(struct hdd_context *hdd_ctx)
