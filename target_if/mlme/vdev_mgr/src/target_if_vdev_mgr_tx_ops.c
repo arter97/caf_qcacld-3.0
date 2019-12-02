@@ -103,6 +103,13 @@ static QDF_STATUS target_if_vdev_mgr_rsp_timer_start(
 		return QDF_STATUS_E_INVAL;
 	}
 
+	/* Schedule vdev response timer only when vdev obj is valid*/
+	if (wlan_objmgr_vdev_try_get_ref(vdev, WLAN_VDEV_TARGET_IF_ID) !=
+							QDF_STATUS_SUCCESS) {
+		return QDF_STATUS_E_FAILURE;
+	}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_VDEV_TARGET_IF_ID);
+
 	vdev_id = wlan_vdev_get_id(vdev);
 	/* it is expected to be only one command with FW at a time */
 	for (rsp_pos = START_RESPONSE_BIT; rsp_pos <= RESPONSE_BIT_MAX;
