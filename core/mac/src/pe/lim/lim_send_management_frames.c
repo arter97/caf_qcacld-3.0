@@ -182,7 +182,7 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	uint8_t sessionid;
 	const uint8_t *p2pie = NULL;
 	uint8_t txflag = 0;
-	uint8_t sme_sessionid = 0;
+	uint8_t vdev_id = 0;
 	bool is_vht_enabled = false;
 	uint8_t txPower;
 	uint16_t addn_ielen = 0;
@@ -220,7 +220,7 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	pesession = pe_find_session_by_bssid(mac_ctx, bssid, &sessionid);
 
 	if (pesession)
-		sme_sessionid = pesession->smeSessionId;
+		vdev_id = pesession->vdev_id;
 
 	/* The scheme here is to fill out a 'tDot11fProbeRequest' structure */
 	/* and then hand it off to 'dot11f_pack_probe_request' (for */
@@ -425,7 +425,7 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 		wma_tx_frame(mac_ctx, packet,
 			   (uint16_t) sizeof(tSirMacMgmtHdr) + payload,
 			   TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS, 7,
-			   lim_tx_complete, frame, txflag, sme_sessionid,
+			   lim_tx_complete, frame, txflag, vdev_id,
 			   0, RATEID_DEFAULT);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		pe_err("could not send Probe Request frame!");
@@ -511,7 +511,7 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	uint8_t total_noalen = 0;
 	uint8_t noa_stream[SIR_MAX_NOA_ATTR_LEN + SIR_P2P_IE_HEADER_LEN];
 	uint8_t noa_ie[SIR_MAX_NOA_ATTR_LEN + SIR_P2P_IE_HEADER_LEN];
-	uint8_t sme_sessionid = 0;
+	uint8_t vdev_id = 0;
 	bool is_vht_enabled = false;
 	tDot11fIEExtCap extracted_ext_cap = {0};
 	bool extracted_ext_cap_flag = false;
@@ -534,7 +534,7 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 			  FL("CAC timer is running, probe response dropped"));
 		return;
 	}
-	sme_sessionid = pe_session->smeSessionId;
+	vdev_id = pe_session->vdev_id;
 	frm = qdf_mem_malloc(sizeof(tDot11fProbeResponse));
 	if (!frm)
 		return;
@@ -795,7 +795,7 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 				  TXRX_FRM_802_11_MGMT,
 				  ANI_TXDIR_TODS,
 				  7, lim_tx_complete, frame, tx_flag,
-				  sme_sessionid, 0, RATEID_DEFAULT);
+				  vdev_id, 0, RATEID_DEFAULT);
 
 	/* Pkt will be freed up by the callback */
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status))
@@ -1791,7 +1791,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	int ret;
 	tDot11fAssocRequest *frm;
 	uint16_t caps;
-	uint8_t *frame;
+	uint8_t *frame, *rsnx_ie = NULL;
 	QDF_STATUS sir_status;
 	tLimMlmAssocCnf assoc_cnf;
 	uint32_t bytes = 0, payload, status;
@@ -1803,7 +1803,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	const uint8_t *wps_ie = NULL;
 	uint8_t power_caps = false;
 	uint8_t tx_flag = 0;
-	uint8_t sme_sessionid = 0;
+	uint8_t vdev_id = 0;
 	bool vht_enabled = false;
 	tDot11fIEExtCap extr_ext_cap;
 	bool extr_ext_flag = true;
@@ -1816,7 +1816,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	uint32_t aes_block_size_len = 0;
 	enum rateid min_rid = RATEID_DEFAULT;
 	uint8_t *mbo_ie = NULL, *adaptive_11r_ie = NULL, *vendor_ies = NULL;
-	uint8_t mbo_ie_len = 0, adaptive_11r_ie_len = 0;
+	uint8_t mbo_ie_len = 0, adaptive_11r_ie_len = 0, rsnx_ie_len = 0;
 	struct wlan_objmgr_peer *peer;
 
 	if (!pe_session) {
@@ -1825,7 +1825,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		return;
 	}
 
-	sme_sessionid = pe_session->smeSessionId;
+	vdev_id = pe_session->vdev_id;
 
 	/* check this early to avoid unncessary operation */
 	if (!pe_session->lim_join_req) {
@@ -2135,6 +2135,25 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		aes_block_size_len = AES_BLOCK_SIZE;
 	}
 
+	/* RSNX IE for SAE PWE derivation based on H2E */
+	if (wlan_get_ie_ptr_from_eid(WLAN_ELEMID_RSNXE, add_ie, add_ie_len)) {
+		rsnx_ie = qdf_mem_malloc(WLAN_MAX_IE_LEN + 2);
+		if (!rsnx_ie)
+			goto end;
+
+		qdf_status = lim_strip_ie(mac_ctx, add_ie, &add_ie_len,
+					  WLAN_ELEMID_RSNXE, ONE_BYTE,
+					  NULL, 0, rsnx_ie, WLAN_MAX_IE_LEN);
+		if (QDF_IS_STATUS_ERROR(qdf_status)) {
+			pe_err("Failed to strip Vendor IEs");
+			goto end;
+		}
+		rsnx_ie_len = rsnx_ie[1] + 2;
+		pe_debug("RSNX_IE added to association request");
+		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
+				   rsnx_ie, rsnx_ie_len);
+	}
+
 	/*
 	 * MBO IE needs to be appendded at the end of the assoc request
 	 * frame and is not parsed and unpacked by the frame parser
@@ -2234,9 +2253,8 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 			status);
 	}
 
-	bytes = payload + sizeof(tSirMacMgmtHdr) +
-			aes_block_size_len + mbo_ie_len + adaptive_11r_ie_len +
-			vendor_ie_len;
+	bytes = payload + sizeof(tSirMacMgmtHdr) + aes_block_size_len +
+		rsnx_ie_len + mbo_ie_len + adaptive_11r_ie_len + vendor_ie_len;
 
 	qdf_status = cds_packet_alloc((uint16_t) bytes, (void **)&frame,
 				(void **)&packet);
@@ -2274,6 +2292,12 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		goto end;
 	} else if (DOT11F_WARNED(status)) {
 		pe_warn("Assoc request pack warning (0x%08x)", status);
+	}
+
+	if (rsnx_ie && rsnx_ie_len) {
+		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
+			     rsnx_ie, rsnx_ie_len);
+		payload = payload + rsnx_ie_len;
 	}
 
 	/* Copy the vendor IEs to the end of the frame */
@@ -2344,7 +2368,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 			   (uint16_t) (sizeof(tSirMacMgmtHdr) + payload),
 			   TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS, 7,
 			   lim_tx_complete, frame, lim_assoc_tx_complete_cnf,
-			   tx_flag, sme_sessionid, false, 0, min_rid);
+			   tx_flag, vdev_id, false, 0, min_rid);
 	MTRACE(qdf_trace
 		       (QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 		       pe_session->peSessionId, qdf_status));
@@ -2358,6 +2382,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	}
 
 end:
+	qdf_mem_free(rsnx_ie);
 	qdf_mem_free(vendor_ies);
 	qdf_mem_free(mbo_ie);
 
@@ -2510,7 +2535,7 @@ lim_send_auth_mgmt_frame(struct mac_context *mac_ctx,
 	void *packet;
 	QDF_STATUS qdf_status;
 	uint8_t tx_flag = 0;
-	uint8_t sme_sessionid = 0;
+	uint8_t vdev_id = 0;
 	uint16_t ft_ies_length = 0;
 	bool challenge_req = false;
 	enum rateid min_rid = RATEID_DEFAULT;
@@ -2521,7 +2546,7 @@ lim_send_auth_mgmt_frame(struct mac_context *mac_ctx,
 		return;
 	}
 
-	sme_sessionid = session->smeSessionId;
+	vdev_id = session->vdev_id;
 
 	if (wep_challenge_len) {
 		/*
@@ -2811,7 +2836,7 @@ alloc_packet:
 				 TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS,
 				 7, lim_tx_complete, frame,
 				 lim_auth_tx_complete_cnf,
-				 tx_flag, sme_sessionid, false,
+				 tx_flag, vdev_id, false,
 				 ch_freq_tx_frame, min_rid);
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 		session->peSessionId, qdf_status));
@@ -4898,7 +4923,7 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 	void *pkt_ptr = NULL;
 	QDF_STATUS qdf_status;
 	uint8_t tx_flag = 0;
-	uint8_t sme_sessionid = 0;
+	uint8_t vdev_id = 0;
 	uint16_t buff_size, status_code, batimeout;
 	uint8_t peer_id, dialog_token;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
@@ -4908,7 +4933,7 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 	uint16_t aid;
 	bool he_cap = false;
 
-	sme_sessionid = session->smeSessionId;
+	vdev_id = session->vdev_id;
 
 	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 	if (!pdev) {
@@ -5061,7 +5086,7 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 						ANI_TXDIR_TODS, 7,
 						NULL, frame_ptr,
 						lim_addba_rsp_tx_complete_cnf,
-						tx_flag, sme_sessionid,
+						tx_flag, vdev_id,
 						false, 0, RATEID_DEFAULT);
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 			 session->peSessionId, qdf_status));
