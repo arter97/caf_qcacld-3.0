@@ -309,3 +309,11 @@ void ucfg_reg_restore_cached_channels(struct wlan_objmgr_pdev *pdev)
 	reg_restore_cached_channels(pdev);
 }
 #endif
+
+#ifdef DISABLE_UNII_SHARED_BANDS
+QDF_STATUS
+ucfg_reg_get_unii_5g_bitmap(struct wlan_objmgr_pdev *pdev, uint8_t *bitmap)
+{
+	return reg_get_unii_5g_bitmap(pdev, bitmap);
+}
+#endif

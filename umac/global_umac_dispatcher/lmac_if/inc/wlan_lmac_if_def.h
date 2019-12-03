@@ -982,6 +982,8 @@ struct wlan_lmac_if_reg_rx_ops {
 						 wlan_objmgr_pdev *pdev);
 	QDF_STATUS (*reg_disable_chan_coex)(struct wlan_objmgr_pdev *pdev,
 					    uint8_t unii_5g_bitmap);
+	QDF_STATUS (*reg_get_unii_5g_bitmap)(struct wlan_objmgr_pdev *pdev,
+					     uint8_t *bitmap);
 };
 
 #ifdef CONVERGED_P2P_ENABLE

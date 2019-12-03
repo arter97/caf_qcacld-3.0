@@ -349,4 +349,24 @@ struct wlan_psoc_host_hal_reg_capabilities_ext *ucfg_reg_get_hal_reg_cap(
 QDF_STATUS ucfg_reg_set_hal_reg_cap(struct wlan_objmgr_psoc *psoc,
 			struct wlan_psoc_host_hal_reg_capabilities_ext *reg_cap,
 			uint16_t phy_cnt);
+
+/**
+ * ucfg_reg_get_unii_5g_bitmap() - get unii_5g_bitmap value
+ * @pdev: pdev pointer
+ * @bitmap: Pointer to retrieve unii_5g_bitmap of enum reg_unii_band.
+ *
+ * Return: QDF_STATUS
+ */
+#ifdef DISABLE_UNII_SHARED_BANDS
+QDF_STATUS
+ucfg_reg_get_unii_5g_bitmap(struct wlan_objmgr_pdev *pdev, uint8_t *bitmap);
+#else
+static inline QDF_STATUS
+ucfg_reg_get_unii_5g_bitmap(struct wlan_objmgr_pdev *pdev, uint8_t *bitmap)
+{
+	*bitmap = 0;
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 #endif
