@@ -525,6 +525,18 @@ enum channel_enum {
 	NUM_DSRC_CHANNELS = (MAX_DSRC_CHANNEL - MIN_DSRC_CHANNEL + 1),
 
 	INVALID_CHANNEL = 0xBAD,
+
+#ifdef DISABLE_UNII_SHARED_BANDS
+	MIN_UNII_1_BAND_CHANNEL = CHAN_ENUM_5180,
+	MAX_UNII_1_BAND_CHANNEL = CHAN_ENUM_5240,
+	NUM_UNII_1_BAND_CHANNELS = (MAX_UNII_1_BAND_CHANNEL -
+				    MIN_UNII_1_BAND_CHANNEL + 1),
+
+	MIN_UNII_2A_BAND_CHANNEL = CHAN_ENUM_5260,
+	MAX_UNII_2A_BAND_CHANNEL = CHAN_ENUM_5320,
+	NUM_UNII_2A_BAND_CHANNELS = (MAX_UNII_2A_BAND_CHANNEL -
+				     MIN_UNII_2A_BAND_CHANNEL + 1),
+#endif
 };
 #endif
 
@@ -715,7 +727,6 @@ struct regulatory_channel {
 	bool nol_history;
 };
 
-
 /**
  * struct regulatory: regulatory information
  * @reg_domain: regulatory domain pair
@@ -878,6 +889,18 @@ enum band_info {
 	BAND_5G,
 	BAND_UNKNOWN
 };
+
+#ifdef DISABLE_UNII_SHARED_BANDS
+/**
+ * enum reg_unii_band
+ * @REG_UNII_BAND_1: Disable UNII-1 band channels
+ * @REG_UNII_BAND_2A: Disable UNII-2A band channels
+ */
+enum reg_unii_band {
+	REG_UNII_BAND_1 = 0x0,
+	REG_UNII_BAND_2A = 0x1,
+};
+#endif
 
 /**
  * enum restart_beaconing_on_ch_avoid_rule: control the beaconing entity to

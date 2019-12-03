@@ -980,6 +980,8 @@ struct wlan_lmac_if_reg_rx_ops {
 					      bool dfs_enable);
 	QDF_STATUS (*reg_modify_pdev_chan_range)(struct
 						 wlan_objmgr_pdev *pdev);
+	QDF_STATUS (*reg_disable_chan_coex)(struct wlan_objmgr_pdev *pdev,
+					    uint8_t unii_5g_bitmap);
 };
 
 #ifdef CONVERGED_P2P_ENABLE

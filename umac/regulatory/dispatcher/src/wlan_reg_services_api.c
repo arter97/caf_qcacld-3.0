@@ -724,3 +724,11 @@ QDF_STATUS wlan_reg_modify_pdev_chan_range(struct wlan_objmgr_pdev *pdev)
 {
 	return reg_modify_pdev_chan_range(pdev);
 }
+
+#ifdef DISABLE_UNII_SHARED_BANDS
+QDF_STATUS wlan_reg_disable_chan_coex(struct wlan_objmgr_pdev *pdev,
+				      uint8_t unii_5g_bitmap)
+{
+	return reg_disable_chan_coex(pdev, unii_5g_bitmap);
+}
+#endif
