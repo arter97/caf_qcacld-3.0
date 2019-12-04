@@ -1557,3 +1557,41 @@ enum pld_cc_src pld_get_cc_source(struct device *dev)
 	return PLD_SOURCE_CORE;
 }
 #endif
+
+#ifdef CONFIG_PLD_SNOC_ICNSS
+int pld_thermal_register(struct device *dev, int max_state)
+{
+	return icnss_thermal_register(dev, max_state);
+}
+
+void pld_thermal_unregister(struct device *dev)
+{
+	icnss_thermal_unregister(dev);
+}
+
+int pld_get_thermal_state(struct device *dev, uint16_t *thermal_state)
+{
+	int ret;
+	unsigned long thermal_state_t;
+
+	ret = icnss_get_curr_therm_state(dev, &thermal_state_t);
+	*thermal_state = (uint16_t)thermal_state_t;
+
+	return ret;
+}
+
+#else
+int pld_thermal_register(struct device *dev, int max_state)
+{
+	return -ENOTSUPP;
+}
+
+void pld_thermal_unregister(struct device *dev)
+{
+}
+
+int pld_get_thermal_state(struct device *dev, uint16_t *thermal_state)
+{
+	return -ENOTSUPP;
+}
+#endif
