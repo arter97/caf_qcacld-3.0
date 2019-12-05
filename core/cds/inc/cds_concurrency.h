@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -1042,4 +1042,16 @@ bool cds_allow_sap_go_concurrency(enum cds_con_mode mode, uint8_t channel);
  * Return: None
  */
 void cds_set_pcl_for_existing_combo(enum cds_con_mode mode);
+
+/**
+ * cds_pdev_get_pcl() - Gets PCL
+ * @mode: adapter mode
+ * @pcl: the pointer to the pcl list
+ *
+ * Fetches the PCL
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS cds_pdev_get_pcl(enum tQDF_ADAPTER_MODE mode,
+			    struct sir_pcl_list *pcl);
 #endif /* __CDS_CONCURRENCY_H */

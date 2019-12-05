@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -1166,6 +1166,7 @@ typedef struct sAniGetTsmStatsRsp {
 				 * Per STA stats request must
 				 * contain valid
 				 */
+	struct qdf_mac_addr bssid; /* bssid to get the tsm stats for */
 	tAniTrafStrmMetrics tsmMetrics;
 	void *tsmStatsReq;      /* tsm stats request backup */
 } tAniGetTsmStatsRsp, *tpAniGetTsmStatsRsp;
@@ -3531,6 +3532,14 @@ struct lca_disallow_config_params{
     uint32_t disallow_duration;
     uint32_t rssi_channel_penalization;
     uint32_t num_disallowed_aps;
+};
+
+/**
+ * struct roam_sync_timeout_timer_info - Info related to roam sync timer
+ * @vdev_id: Vdev id for which host waiting roam sync ind from fw
+ */
+struct roam_sync_timeout_timer_info {
+	uint8_t vdev_id;
 };
 
 typedef struct sSirRoamOffloadScanReq {
