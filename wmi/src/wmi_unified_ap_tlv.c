@@ -2465,6 +2465,9 @@ send_wmm_update_cmd_tlv(wmi_unified_t wmi_handle,
 	return ret;
 }
 
+#define WMI_TSF_SHIFT_UPPER 32
+#define WMI_TSF_MASK_UPPER_32 0xFFFFFFFF00000000
+
 /**
  * extract_vdev_start_resp_tlv() - extract vdev start response
  * @wmi_handle: wmi handle
@@ -2600,6 +2603,11 @@ static QDF_STATUS extract_mgmt_tx_compl_param_tlv(wmi_unified_t wmi_handle,
 	param->desc_id = cmpl_params->desc_id;
 	param->status = cmpl_params->status;
 	param->ppdu_id = cmpl_params->ppdu_id;
+	param->retries_count = cmpl_params->retries_count;
+	param->tx_tsf = cmpl_params->tx_tsf_u32;
+	param->tx_tsf = ((param->tx_tsf << WMI_TSF_SHIFT_UPPER) &
+			 WMI_TSF_MASK_UPPER_32) |
+			cmpl_params->tx_tsf_l32;
 
 	return QDF_STATUS_SUCCESS;
 }
