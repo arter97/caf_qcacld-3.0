@@ -7018,6 +7018,7 @@ dp_print_pdev_tx_stats(struct dp_pdev *pdev)
 				       i, pdev->stats.wdi_event[i]);
 	}
 
+	dp_print_pdev_tx_capture_stats(pdev);
 }
 
 /**
