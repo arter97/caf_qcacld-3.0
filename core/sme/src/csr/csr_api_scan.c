@@ -519,17 +519,15 @@ QDF_STATUS csr_save_to_channel_power2_g_5_g(struct mac_context *mac,
 		 * Now set the inter-channel offset based on the frequency band
 		 * the channel set lies in
 		 */
-		if ((WLAN_REG_IS_24GHZ_CH_FREQ(pChannelSet->first_chan_freq)) &&
-		    ((wlan_reg_freq_to_chan(mac->pdev, pChannelSet->first_chan_freq) +
-		      (pChannelSet->numChannels - 1)) <=
-		     WLAN_REG_MAX_24GHZ_CH_NUM)) {
-			pChannelSet->interChannelOffset = 1;
+		if (WLAN_REG_IS_24GHZ_CH_FREQ(pChannelSet->first_chan_freq) &&
+		    (pChannelSet->first_chan_freq + 5 * (pChannelSet->numChannels - 1) <=
+		     WLAN_REG_MAX_24GHZ_CHAN_FREQ)) {
+			pChannelSet->interChannelOffset = 5;
 			f2GHzInfoFound = true;
-		} else if ((WLAN_REG_IS_5GHZ_CH_FREQ(pChannelSet->first_chan_freq)) &&
-			   ((wlan_reg_freq_to_chan(mac->pdev, pChannelSet->first_chan_freq) +
-			   ((pChannelSet->numChannels - 1) * 4)) <=
-			   WLAN_REG_MAX_5GHZ_CH_NUM)) {
-			pChannelSet->interChannelOffset = 4;
+		} else if (WLAN_REG_IS_5GHZ_CH_FREQ(pChannelSet->first_chan_freq) &&
+			   (pChannelSet->first_chan_freq + 20 * (pChannelSet->numChannels - 1) <=
+			   WLAN_REG_MAX_5GHZ_CHAN_FREQ)) {
+			pChannelSet->interChannelOffset = 20;
 			f2GHzInfoFound = false;
 		} else {
 			sme_warn("Invalid Channel freq %d Present in Country IE",
@@ -702,8 +700,10 @@ static void csr_get_channel_power_info(struct mac_context *mac,
 		for (idx = 0; (idx < ch_set->numChannels)
 				&& (chn_idx < *num_ch); idx++) {
 			chn_pwr_info[chn_idx].chan_num =
-				(uint8_t)(wlan_reg_freq_to_chan(mac->pdev, ch_set->first_chan_freq)
-				 + (idx * ch_set->interChannelOffset));
+				(uint8_t)wlan_reg_freq_to_chan(
+					mac->pdev,
+					ch_set->first_chan_freq +
+					idx * ch_set->interChannelOffset);
 			chn_pwr_info[chn_idx++].tx_power = ch_set->txPower;
 		}
 		entry = csr_ll_next(list, entry, LL_ACCESS_LOCK);
@@ -1507,7 +1507,6 @@ static void csr_save_tx_power_to_cfg(struct mac_context *mac,
 	uint32_t idx, count = 0;
 	tSirMacChanInfo *ch_pwr_set;
 	uint8_t *p_buf = NULL;
-	uint8_t chan;
 
 	/* allocate maximum space for all channels */
 	dataLen = CFG_VALID_CHANNEL_LIST_LEN * sizeof(tSirMacChanInfo);
@@ -1524,7 +1523,7 @@ static void csr_save_tx_power_to_cfg(struct mac_context *mac,
 	while (pEntry) {
 		ch_set = GET_BASE_ADDR(pEntry,
 				struct csr_channel_powerinfo, link);
-		if (1 != ch_set->interChannelOffset) {
+		if (ch_set->interChannelOffset != 5) {
 			/*
 			 * we keep the 5G channel sets internally with an
 			 * interchannel offset of 4. Expand these to the right
@@ -1547,8 +1546,6 @@ static void csr_save_tx_power_to_cfg(struct mac_context *mac,
 			}
 
 			for (idx = 0; idx < ch_set->numChannels; idx++) {
-				chan = (wlan_reg_freq_to_chan(mac->pdev, ch_set->first_chan_freq)
-						+ (idx * ch_set->interChannelOffset));
 				ch_pwr_set->first_freq =
 					ch_set->first_chan_freq;
 				sme_debug(
@@ -1714,7 +1711,7 @@ QDF_STATUS csr_scan_abort_mac_scan(struct mac_context *mac_ctx,
 	return status;
 }
 QDF_STATUS csr_remove_nonscan_cmd_from_pending_list(struct mac_context *mac,
-						    uint8_t sessionId,
+						    uint8_t vdev_id,
 						    eSmeCommandType commandType)
 {
 	tDblLinkList localList;
@@ -1742,7 +1739,7 @@ QDF_STATUS csr_remove_nonscan_cmd_from_pending_list(struct mac_context *mac,
 		pCommand = GET_BASE_ADDR(pEntryToRemove, tSmeCmd, Link);
 
 		if ((pCommand->command == commandType) &&
-		    (pCommand->sessionId == sessionId)) {
+		    (pCommand->vdev_id == vdev_id)) {
 			/* Insert to localList and remove later */
 			csr_ll_insert_tail(&localList, pEntryToRemove,
 					   LL_ACCESS_NOLOCK);
@@ -1753,8 +1750,7 @@ QDF_STATUS csr_remove_nonscan_cmd_from_pending_list(struct mac_context *mac,
 
 	while ((pEntry = csr_ll_remove_head(&localList, LL_ACCESS_NOLOCK))) {
 		pCommand = GET_BASE_ADDR(pEntry, tSmeCmd, Link);
-		sme_debug("Sending abort for command ID %d",
-			sessionId);
+		sme_debug("Sending abort for command ID %d", vdev_id);
 		csr_release_command(mac, pCommand);
 	}
 
@@ -1981,6 +1977,8 @@ csr_get_channel_for_hw_mode_change(struct mac_context *mac_ctx,
 	}
 
 	if (!policy_mgr_is_hw_dbs_2x2_capable(mac_ctx->psoc) &&
+	    !policy_mgr_is_hw_dbs_required_for_band(mac_ctx->psoc,
+		HW_MODE_MAC_BAND_2G) &&
 	    !policy_mgr_get_connection_count(mac_ctx->psoc)) {
 		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
 			  FL("1x1 DBS HW with no prior connection"));
@@ -2000,7 +1998,9 @@ csr_get_channel_for_hw_mode_change(struct mac_context *mac_ctx,
 					    struct tag_csrscan_result,
 					    Link);
 		ch_freq = scan_result->Result.BssDescriptor.chan_freq;
-		if (policy_mgr_is_hw_dbs_2x2_capable(mac_ctx->psoc)) {
+		if (policy_mgr_is_hw_dbs_required_for_band(
+				mac_ctx->psoc,
+				HW_MODE_MAC_BAND_2G)) {
 			if (WLAN_REG_IS_24GHZ_CH_FREQ(ch_freq))
 				break;
 		} else {
@@ -2361,11 +2361,9 @@ static QDF_STATUS csr_fill_bss_from_scan_entry(struct mac_context *mac_ctx,
 	enum channel_state ap_channel_state;
 
 	ap_channel_state =
-		wlan_reg_get_channel_state(
+		wlan_reg_get_channel_state_for_freq(
 				mac_ctx->pdev,
-				wlan_reg_freq_to_chan(
-					mac_ctx->pdev,
-					scan_entry->channel.chan_freq));
+				scan_entry->channel.chan_freq);
 	if (ap_channel_state == CHANNEL_STATE_DISABLE ||
 	    ap_channel_state == CHANNEL_STATE_INVALID) {
 		sme_err("BSS %pM channel %d invalid, not populating this BSSID",
@@ -2848,7 +2846,7 @@ QDF_STATUS csr_scan_filter_results(struct mac_context *mac_ctx)
 	struct wlan_objmgr_pdev *pdev = NULL;
 	uint32_t i;
 	uint32_t ch_freq;
-	uint8_t valid_ch_list[CFG_VALID_CHANNEL_LIST_LEN];
+	uint32_t valid_ch_freq_list[CFG_VALID_CHANNEL_LIST_LEN];
 
 	pdev = wlan_objmgr_get_pdev_by_id(mac_ctx->psoc,
 		0, WLAN_LEGACY_MAC_ID);
@@ -2871,13 +2869,11 @@ QDF_STATUS csr_scan_filter_results(struct mac_context *mac_ctx)
 	/* This is a temporary conversion till the scm handles freq */
 
 	for (i = 0; i < len; i++) {
-		ch_freq =
-		    wlan_reg_freq_to_chan(pdev,
-					  mac_ctx->roam.valid_ch_freq_list[i]);
-		valid_ch_list[i] = ch_freq;
+		ch_freq = mac_ctx->roam.valid_ch_freq_list[i];
+		valid_ch_freq_list[i] = ch_freq;
 	}
 
-	ucfg_scan_filter_valid_channel(pdev, valid_ch_list, len);
+	ucfg_scan_filter_valid_channel(pdev, valid_ch_freq_list, len);
 
 	wlan_objmgr_pdev_release_ref(pdev, WLAN_LEGACY_MAC_ID);
 	return QDF_STATUS_SUCCESS;

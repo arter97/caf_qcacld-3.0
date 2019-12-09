@@ -436,28 +436,6 @@ void csr_purge_pdev_all_ser_cmd_list(struct mac_context *mac_ctx)
 	wlan_serialization_purge_all_pdev_cmd(mac_ctx->pdev);
 }
 
-uint32_t csr_nonscan_active_ll_count(struct mac_context *mac_ctx)
-{
-	return wlan_serialization_get_active_list_count(mac_ctx->psoc, false);
-}
-
-uint32_t csr_nonscan_pending_ll_count(struct mac_context *mac_ctx)
-{
-	return wlan_serialization_get_pending_list_count(mac_ctx->psoc, false);
-}
-
-bool csr_nonscan_active_ll_is_list_empty(struct mac_context *mac_ctx,
-					 bool inter_locked)
-{
-	return !wlan_serialization_get_active_list_count(mac_ctx->psoc, false);
-}
-
-bool csr_nonscan_pending_ll_is_list_empty(struct mac_context *mac_ctx,
-					  bool inter_locked)
-{
-	return !wlan_serialization_get_pending_list_count(mac_ctx->psoc, false);
-}
-
 tListElem *csr_nonscan_active_ll_peek_head(struct mac_context *mac_ctx,
 					   bool inter_locked)
 {
@@ -466,10 +444,9 @@ tListElem *csr_nonscan_active_ll_peek_head(struct mac_context *mac_ctx,
 
 	cmd = wlan_serialization_peek_head_active_cmd_using_psoc(mac_ctx->psoc,
 								 false);
-	if (!cmd) {
-		sme_err("No cmd found");
+	if (!cmd)
 		return NULL;
-	}
+
 	sme_cmd = cmd->umac_cmd;
 
 	return &sme_cmd->Link;
@@ -503,18 +480,6 @@ bool csr_nonscan_active_ll_remove_entry(struct mac_context *mac_ctx,
 	return false;
 }
 
-tListElem *csr_nonscan_active_ll_remove_head(struct mac_context *mac_ctx,
-					     bool inter_locked)
-{
-	return csr_nonscan_active_ll_peek_head(mac_ctx, inter_locked);
-}
-
-tListElem *csr_nonscan_pending_ll_remove_head(struct mac_context *mac_ctx,
-					      bool inter_locked)
-{
-	return csr_nonscan_pending_ll_peek_head(mac_ctx, inter_locked);
-}
-
 tListElem *csr_nonscan_pending_ll_next(struct mac_context *mac_ctx,
 				       tListElem *entry, bool inter_locked)
 {
@@ -528,7 +493,7 @@ tListElem *csr_nonscan_pending_ll_next(struct mac_context *mac_ctx,
 	cmd.cmd_type = csr_get_cmd_type(sme_cmd);
 	cmd.vdev = wlan_objmgr_get_vdev_by_id_from_psoc_no_state(
 				mac_ctx->psoc,
-				sme_cmd->sessionId, WLAN_LEGACY_SME_ID);
+				sme_cmd->vdev_id, WLAN_LEGACY_SME_ID);
 	tcmd = wlan_serialization_get_pending_list_next_node_using_psoc(
 				mac_ctx->psoc, &cmd, false);
 	if (cmd.vdev)
@@ -741,7 +706,7 @@ bool csr_is_session_client_and_connected(struct mac_context *mac, uint8_t sessio
 	return false;
 }
 
-uint8_t csr_get_concurrent_operation_channel(struct mac_context *mac_ctx)
+uint32_t csr_get_concurrent_operation_freq(struct mac_context *mac_ctx)
 {
 	struct csr_roam_session *session = NULL;
 	uint8_t i = 0;
@@ -762,10 +727,7 @@ uint8_t csr_get_concurrent_operation_channel(struct mac_context *mac_ctx)
 				(persona == QDF_SAP_MODE))
 				 && (session->connectState !=
 					 eCSR_ASSOC_STATE_TYPE_NOT_CONNECTED)))
-			return wlan_reg_freq_to_chan(
-					mac_ctx->pdev,
-					session->connectedProfile.op_freq);
-
+			return session->connectedProfile.op_freq;
 	}
 	return 0;
 }
@@ -1933,7 +1895,8 @@ bool csr_is_phy_mode_match(struct mac_context *mac, uint32_t phyMode,
 			   tDot11fBeaconIEs *pIes)
 {
 	bool fMatch = false;
-	eCsrPhyMode phyModeInBssDesc = eCSR_DOT11_MODE_AUTO, phyMode2;
+	eCsrPhyMode phyModeInBssDesc = eCSR_DOT11_MODE_AUTO;
+	eCsrPhyMode phyMode2 = eCSR_DOT11_MODE_AUTO;
 	enum csr_cfgdot11mode cfgDot11ModeToUse = eCSR_CFG_DOT11_MODE_AUTO;
 	uint32_t bitMask, loopCount;
 	uint8_t bss_chan_id;
@@ -6207,7 +6170,7 @@ uint16_t sme_chn_to_freq(uint8_t chanNum)
 }
 
 struct lim_channel_status *
-csr_get_channel_status(struct mac_context *mac, uint32_t channel_id)
+csr_get_channel_status(struct mac_context *mac, uint32_t chan_freq)
 {
 	uint8_t i;
 	struct lim_scan_channel_status *channel_status;
@@ -6219,10 +6182,10 @@ csr_get_channel_status(struct mac_context *mac, uint32_t channel_id)
 	channel_status = &mac->lim.scan_channel_status;
 	for (i = 0; i < channel_status->total_channel; i++) {
 		entry = &channel_status->channel_status_list[i];
-		if (entry->channel_id == channel_id)
+		if (entry->channelfreq == chan_freq)
 			return entry;
 	}
-	sme_err("Channel %d status info not exist", channel_id);
+	sme_err("Channel %d status info not exist", chan_freq);
 
 	return NULL;
 }
