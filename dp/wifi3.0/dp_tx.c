@@ -3494,8 +3494,9 @@ more_data:
 			 * Tx completions, and should just be ignored
 			 */
 
-			wbm_internal_error =
-			hal_get_wbm_internal_error(tx_comp_hal_desc);
+			wbm_internal_error = hal_get_wbm_internal_error(
+							tx_comp_hal_desc,
+							soc->hal_soc);
 
 			if (wbm_internal_error) {
 				QDF_TRACE(QDF_MODULE_ID_DP,
