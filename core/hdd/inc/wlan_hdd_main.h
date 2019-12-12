@@ -3210,6 +3210,15 @@ static inline void hdd_send_peer_status_ind_to_app(
 					&ch_info, dev_mode);
 }
 #else
+
+static inline void hdd_send_peer_status_ind_to_oem_app(struct qdf_mac_addr *peer_mac,
+					 uint8_t peer_status,
+					 uint8_t peer_capability,
+					 uint8_t vdev_id,
+					 struct oem_channel_info *chan_info,
+					 enum QDF_OPMODE dev_mode)
+{ }
+
 static inline void hdd_send_peer_status_ind_to_app(
 					struct qdf_mac_addr *peer_mac,
 					uint8_t peer_status,
