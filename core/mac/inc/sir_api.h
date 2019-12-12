@@ -516,6 +516,9 @@ typedef struct sSirSmeReadyReq {
 	uint16_t transactionId;
 	void *add_bssdescr_cb;
 	void *csr_roam_synch_cb;
+	QDF_STATUS (*csr_roam_auth_event_handle_cb)(tpAniSirGlobal mac,
+						    uint8_t vdev_id,
+						    struct qdf_mac_addr bssid);
 	void *pe_roam_synch_cb;
 	void *sme_msg_cb;
 	void *stop_roaming_cb;

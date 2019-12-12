@@ -2927,6 +2927,10 @@ QDF_STATUS wma_open(void *cds_context,
 				   WMI_ROAM_SYNCH_FRAME_EVENTID,
 				   wma_roam_synch_frame_event_handler,
 				   WMA_RX_SERIALIZER_CTX);
+        wmi_unified_register_event_handler(wma_handle->wmi_handle,
+                                           WMI_ROAM_PREAUTH_START_EVENTID,
+                                           wma_roam_auth_offload_event_handler,
+                                           WMA_RX_SERIALIZER_CTX);
 
 	wma_register_pmkid_req_event_handler(wma_handle);
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */

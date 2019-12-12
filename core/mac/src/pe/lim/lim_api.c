@@ -1181,6 +1181,7 @@ void pe_register_callbacks_with_wma(tpAniSirGlobal pMac,
 
 	retStatus = wma_register_roaming_callbacks(p_cds_gctx,
 			ready_req->csr_roam_synch_cb,
+			ready_req->csr_roam_auth_event_handle_cb,
 			ready_req->pe_roam_synch_cb,
 			ready_req->csr_roam_pmkid_req_cb);
 	if (retStatus != QDF_STATUS_SUCCESS)
