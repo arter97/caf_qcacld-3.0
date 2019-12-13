@@ -1434,6 +1434,35 @@ QDF_STATUS dp_send_dummy_mpdu_info_to_stack(struct dp_pdev *pdev,
 }
 
 /**
+ * dp_tx_ppdu_stats_flush(): Function to flush pending retried ppdu desc
+ * @pdev: DP pdev handle
+ * @nbuf: ppdu_desc
+ *
+ * return: void
+ */
+static void
+dp_tx_ppdu_stats_flush(struct dp_pdev *pdev,
+                       struct cdp_tx_completion_ppdu *ppdu_desc)
+{
+        struct dp_peer *peer;
+
+        peer = dp_peer_find_by_id(pdev->soc,
+                                  ppdu_desc->user[0].peer_id);
+
+        if (!peer)
+                return;
+
+        /*
+         * for all drop reason we are invoking
+         * proc xretries
+         */
+        dp_tx_mon_proc_xretries(pdev, peer, ppdu_desc->user[0].tid);
+
+        dp_peer_unref_del_find_by_id(peer);
+        return;
+}
+
+/**
  * dp_send_mpdu_info_to_stack(): Function to deliver mpdu info to stack
  * to upper layer
  * @pdev: DP pdev handle
@@ -1833,6 +1862,14 @@ dp_check_ppdu_and_deliver(struct dp_pdev *pdev,
 			qdf_nbuf_data(nbuf_ppdu_desc_list[desc_cnt]);
 
 		ppdu_id = ppdu_desc->ppdu_id;
+
+		if (ppdu_desc->is_flush) {
+			dp_tx_ppdu_stats_flush(pdev, ppdu_desc);
+			tmp_nbuf = nbuf_ppdu_desc_list[desc_cnt];
+			nbuf_ppdu_desc_list[desc_cnt] = NULL;
+			qdf_nbuf_free(tmp_nbuf);
+			continue;
+		}
 
 		if (ppdu_desc->frame_type == CDP_PPDU_FTYPE_CTRL ||
 		    ppdu_desc->htt_frame_type ==
