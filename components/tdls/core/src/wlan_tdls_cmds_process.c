@@ -1297,7 +1297,7 @@ QDF_STATUS tdls_process_send_mgmt_rsp(struct tdls_send_mgmt_rsp *rsp)
 	struct tdls_osif_indication ind;
 
 	psoc = rsp->psoc;
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, rsp->session_id,
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, rsp->vdev_id,
 						    WLAN_TDLS_SB_ID);
 	if (!vdev) {
 		tdls_err("invalid vdev");
@@ -1350,7 +1350,7 @@ QDF_STATUS tdls_send_mgmt_tx_completion(
 
 	psoc = tx_complete->psoc;
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
-						    tx_complete->session_id,
+						    tx_complete->vdev_id,
 						    WLAN_TDLS_SB_ID);
 
 	if (!vdev) {
@@ -1885,9 +1885,9 @@ QDF_STATUS tdls_process_remove_force_peer(struct tdls_oper_request *req)
 		status = QDF_STATUS_E_NULL_VALUE;
 		goto error;
 	}
-
-	tdls_set_peer_link_status(peer, TDLS_LINK_TEARING,
-				  TDLS_LINK_UNSPECIFIED);
+	if (peer->link_status == TDLS_LINK_CONNECTED)
+		tdls_set_peer_link_status(peer, TDLS_LINK_TEARING,
+					  TDLS_LINK_UNSPECIFIED);
 
 	if (soc_obj->tdls_dp_vdev_update)
 		soc_obj->tdls_dp_vdev_update(&soc_obj->soc,

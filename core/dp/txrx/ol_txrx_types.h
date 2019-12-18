@@ -25,7 +25,7 @@
 
 #include <qdf_nbuf.h>           /* qdf_nbuf_t */
 #include <qdf_mem.h>
-#include <cds_queue.h>          /* TAILQ */
+#include "queue.h"          /* TAILQ */
 #include <a_types.h>            /* A_UINT8 */
 #include <htt.h>                /* htt_sec_type, htt_pkt_type, etc. */
 #include <qdf_atomic.h>         /* qdf_atomic_t */
@@ -1106,6 +1106,9 @@ struct ol_txrx_pdev_t {
 	bool enable_tx_compl_tsf64;
 	uint64_t last_host_time;
 	uint64_t last_tsf64_time;
+
+	/* Current noise-floor reading for the pdev channel */
+	int16_t chan_noise_floor;
 };
 
 #define OL_TX_HL_DEL_ACK_HASH_SIZE    256
@@ -1523,6 +1526,8 @@ struct ol_txrx_peer_t {
 	qdf_time_t last_deauth_rcvd;
 	qdf_atomic_t fw_create_pending;
 	qdf_timer_t peer_unmap_timer;
+	bool is_tdls_peer; /* Mark peer as tdls peer */
+	bool tdls_offchan_enabled; /* TDLS OffChan operation in use */
 };
 
 struct ol_rx_remote_data {

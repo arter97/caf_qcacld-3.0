@@ -50,7 +50,6 @@ typedef enum eSmeCommandType {
 	eSmeCsrCommandMask = 0x10000,
 	eSmeCommandRoam,
 	eSmeCommandWmStatusChange,
-	e_sme_command_del_vdev,
 	/* QOS */
 	eSmeQosCommandMask = 0x40000,   /* To identify Qos commands */
 	eSmeCommandAddTs,
@@ -279,6 +278,7 @@ typedef void (*sme_get_isolation_cb)(struct sir_isolation_resp *param,
 
 #ifdef WLAN_FEATURE_MOTION_DETECTION
 typedef QDF_STATUS (*md_host_evt_cb)(void *hdd_ctx, struct sir_md_evt *event);
+typedef QDF_STATUS (*md_bl_evt_cb)(void *hdd_ctx, struct sir_md_bl_evt *event);
 #endif /* WLAN_FEATURE_MOTION_DETECTION */
 
 struct sme_context {
@@ -371,6 +371,7 @@ struct sme_context {
 #endif
 #ifdef WLAN_FEATURE_MOTION_DETECTION
 	md_host_evt_cb md_host_evt_cb;
+	md_bl_evt_cb md_bl_evt_cb;
 	void *md_ctx;
 #endif /* WLAN_FEATURE_MOTION_DETECTION */
 	/* hidden ssid rsp callback */

@@ -248,10 +248,10 @@ enum policy_mgr_conc_next_action policy_mgr_need_opportunistic_upgrade(
 		} else if ((pm_conc_connection_list[conn_index].mac == 1) &&
 			pm_conc_connection_list[conn_index].in_use) {
 			mac |= POLICY_MGR_MAC1;
-			if (policy_mgr_is_hw_dbs_2x2_capable(psoc) &&
+			if (policy_mgr_is_hw_dbs_required_for_band(
+					psoc, HW_MODE_MAC_BAND_2G) &&
 			    WLAN_REG_IS_24GHZ_CH_FREQ(
-				    pm_conc_connection_list[conn_index].freq)
-			    ) {
+				pm_conc_connection_list[conn_index].freq)) {
 				qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 				policy_mgr_debug("2X2 DBS capable with 2.4 GHZ connection");
 				goto done;
@@ -372,7 +372,7 @@ QDF_STATUS policy_mgr_update_connection_info(struct wlan_objmgr_psoc *psoc,
 			psoc, conn_index, mode, ch_freq,
 			policy_mgr_get_bw(conn_table_entry.chan_width),
 			conn_table_entry.mac_id, chain_mask,
-			nss, vdev_id, true, true);
+			nss, vdev_id, true, true, conn_table_entry.ch_flagext);
 
 	/* do we need to change the HW mode */
 	policy_mgr_check_n_start_opportunistic_timer(psoc);
@@ -527,7 +527,7 @@ bool policy_mgr_is_hwmode_set_for_given_chnl(struct wlan_objmgr_psoc *psoc,
 					     uint32_t ch_freq)
 {
 	enum policy_mgr_band band;
-	bool is_hwmode_dbs, is_2x2_dbs;
+	bool is_hwmode_dbs, dbs_required_for_2g;
 
 	if (policy_mgr_is_hw_dbs_capable(psoc) == false)
 		return true;
@@ -538,12 +538,14 @@ bool policy_mgr_is_hwmode_set_for_given_chnl(struct wlan_objmgr_psoc *psoc,
 		band = POLICY_MGR_BAND_5;
 
 	is_hwmode_dbs = policy_mgr_is_current_hwmode_dbs(psoc);
-	is_2x2_dbs = policy_mgr_is_hw_dbs_2x2_capable(psoc);
+	dbs_required_for_2g = policy_mgr_is_hw_dbs_required_for_band(
+					psoc, HW_MODE_MAC_BAND_2G);
 	/*
 	 * If HW supports 2x2 chains in DBS HW mode and if DBS HW mode is not
 	 * yet set then this is the right time to block the connection.
 	 */
-	if ((band == POLICY_MGR_BAND_24) && is_2x2_dbs && !is_hwmode_dbs) {
+	if (band == POLICY_MGR_BAND_24 && dbs_required_for_2g &&
+	    !is_hwmode_dbs) {
 		policy_mgr_err("HW mode is not yet in DBS!!!!!");
 		return false;
 	}
@@ -828,7 +830,8 @@ policy_mgr_get_next_action(struct wlan_objmgr_psoc *psoc,
 	switch (num_connections) {
 	case 0:
 		if (band == POLICY_MGR_BAND_24)
-			if (policy_mgr_is_hw_dbs_2x2_capable(psoc))
+			if (policy_mgr_is_hw_dbs_required_for_band(
+					psoc, HW_MODE_MAC_BAND_2G))
 				*next_action = PM_DBS;
 			else
 				*next_action = PM_NOP;
@@ -1818,11 +1821,6 @@ static void __policy_mgr_check_sta_ap_concurrent_ch_intf(void *data)
 
 end:
 	pm_ctx->do_sap_unsafe_ch_check = false;
-	if (work_info) {
-		qdf_mem_free(work_info);
-		if (pm_ctx)
-			pm_ctx->sta_ap_intf_check_work_info = NULL;
-	}
 }
 
 void policy_mgr_check_sta_ap_concurrent_ch_intf(void *data)
@@ -1988,6 +1986,10 @@ void policy_mgr_check_concurrent_intf_and_restart_sap(
 		policy_mgr_err("Invalid context");
 		return;
 	}
+	if (!pm_ctx->sta_ap_intf_check_work_info) {
+		policy_mgr_err("Invalid sta_ap_intf_check_work_info");
+		return;
+	}
 	/*
 	 * If STA+SAP sessions are on DFS channel and STA+SAP SCC is
 	 * enabled on DFS channel then move the SAP out of DFS channel
@@ -2038,17 +2040,8 @@ sap_restart:
 	 */
 	if (restart_sap ||
 	    ((mcc_to_scc_switch != QDF_MCC_TO_SCC_SWITCH_DISABLE) &&
-	    policy_mgr_valid_sta_channel_check(psoc, op_ch_freq_list[0]) &&
-	    !pm_ctx->sta_ap_intf_check_work_info)) {
-		struct sta_ap_intf_check_work_ctx *work_info;
-		work_info = qdf_mem_malloc(
-			sizeof(struct sta_ap_intf_check_work_ctx));
-		pm_ctx->sta_ap_intf_check_work_info = work_info;
-		if (work_info) {
-			work_info->psoc = psoc;
-			qdf_create_work(0, &pm_ctx->sta_ap_intf_check_work,
-				policy_mgr_check_sta_ap_concurrent_ch_intf,
-				work_info);
+	    policy_mgr_valid_sta_channel_check(psoc, op_ch_freq_list[0]))) {
+		if (pm_ctx->sta_ap_intf_check_work_info) {
 			qdf_sched_work(0, &pm_ctx->sta_ap_intf_check_work);
 			policy_mgr_info(
 				"Checking for Concurrent Change interference");
@@ -2348,7 +2341,9 @@ QDF_STATUS policy_mgr_check_and_set_hw_mode_for_channel_switch(
 	}
 
 	if (!policy_mgr_is_hw_dbs_capable(psoc) ||
-	    !policy_mgr_is_hw_dbs_2x2_capable(psoc)) {
+	    (!policy_mgr_is_hw_dbs_2x2_capable(psoc) &&
+	    !policy_mgr_is_hw_dbs_required_for_band(
+					psoc, HW_MODE_MAC_BAND_2G))) {
 		policy_mgr_err("2x2 DBS is not enabled");
 		return QDF_STATUS_E_NOSUPPORT;
 	}
@@ -2434,10 +2429,11 @@ void policy_mgr_checkn_update_hw_mode_single_mac_mode(
 				policy_mgr_debug("DBS required");
 				return;
 			}
-			if (policy_mgr_is_hw_dbs_2x2_capable(psoc) &&
+			if (policy_mgr_is_hw_dbs_required_for_band(
+					psoc, HW_MODE_MAC_BAND_2G) &&
 			    (WLAN_REG_IS_24GHZ_CH_FREQ(ch_freq) ||
-			    WLAN_REG_IS_24GHZ_CH_FREQ
-				(pm_conc_connection_list[i].freq))) {
+			    WLAN_REG_IS_24GHZ_CH_FREQ(
+					pm_conc_connection_list[i].freq))) {
 				qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 				policy_mgr_debug("DBS required");
 				return;
@@ -2575,6 +2571,7 @@ QDF_STATUS policy_mgr_update_connection_info_utfw(
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	uint32_t conn_index = 0, found = 0;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint16_t ch_flagext = 0;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -2600,10 +2597,14 @@ QDF_STATUS policy_mgr_update_connection_info_utfw(
 	}
 	policy_mgr_debug("--> updating entry at index[%d]", conn_index);
 
+	if (wlan_reg_is_dfs_for_freq(pm_ctx->pdev, ch_freq))
+		ch_flagext |= IEEE80211_CHAN_DFS;
+
 	policy_mgr_update_conc_list(psoc, conn_index,
 			policy_mgr_get_mode(type, sub_type),
 			ch_freq, HW_MODE_20_MHZ,
-			mac_id, chain_mask, 0, vdev_id, true, true);
+			mac_id, chain_mask, 0, vdev_id, true, true,
+			ch_flagext);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2618,6 +2619,8 @@ QDF_STATUS policy_mgr_incr_connection_count_utfw(
 	uint32_t conn_index = 0;
 	bool update_conn = true;
 	enum policy_mgr_con_mode mode;
+	uint16_t ch_flagext = 0;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
 
 	conn_index = policy_mgr_get_connection_count(psoc);
 	if (MAX_NUMBER_OF_CONC_CONNECTIONS <= conn_index) {
@@ -2632,11 +2635,17 @@ QDF_STATUS policy_mgr_incr_connection_count_utfw(
 	if (mode == PM_STA_MODE || mode == PM_P2P_CLIENT_MODE)
 		update_conn = false;
 
-	policy_mgr_update_conc_list(psoc, conn_index,
-				mode,
-				ch_freq, HW_MODE_20_MHZ,
-				mac_id, chain_mask, 0, vdev_id, true,
-				update_conn);
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid pm context");
+		return false;
+	}
+	if (wlan_reg_is_dfs_for_freq(pm_ctx->pdev, ch_freq))
+		ch_flagext |= IEEE80211_CHAN_DFS;
+
+	policy_mgr_update_conc_list(psoc, conn_index, mode, ch_freq,
+				    HW_MODE_20_MHZ, mac_id, chain_mask,
+				    0, vdev_id, true, update_conn, ch_flagext);
 
 	return QDF_STATUS_SUCCESS;
 }

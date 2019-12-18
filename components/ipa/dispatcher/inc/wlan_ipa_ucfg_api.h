@@ -69,15 +69,14 @@ void ucfg_ipa_set_dp_handle(struct wlan_objmgr_psoc *psoc,
 			       void *dp_soc);
 
 /**
- * ucfg_ipa_set_txrx_handle() - register pdev txrx handler
+ * ucfg_ipa_set_pdev_id() - register pdev id
  * @psoc: psoc handle
- * @psoc: psoc obj
- * @txrx_handle: data path pdev txrx handle
+ * @pdev_id: data path txrx pdev id
  *
  * Return: None
  */
-void ucfg_ipa_set_txrx_handle(struct wlan_objmgr_psoc *psoc,
-			      void *txrx_handle);
+void ucfg_ipa_set_pdev_id(struct wlan_objmgr_psoc *psoc,
+			  uint8_t pdev_id);
 
 /**
  * ucfg_ipa_set_perf_level() - Set IPA perf level
@@ -242,6 +241,14 @@ QDF_STATUS ucfg_ipa_uc_ol_init(struct wlan_objmgr_pdev *pdev,
 QDF_STATUS ucfg_ipa_uc_ol_deinit(struct wlan_objmgr_pdev *pdev);
 
 /**
+ * ucfg_ipa_is_tx_pending() - Check if IPA WLAN TX completions are pending
+ * @pdev: pdev obj
+ *
+ * Return: bool if pending TX for IPA.
+ */
+bool ucfg_ipa_is_tx_pending(struct wlan_objmgr_pdev *pdev);
+
+/**
  * ucfg_ipa_send_mcc_scc_msg() - Send IPA WLAN_SWITCH_TO_MCC/SCC message
  * @mcc_mode: 0=MCC/1=SCC
  *
@@ -395,8 +402,8 @@ QDF_STATUS ucfg_ipa_set_dp_handle(struct wlan_objmgr_psoc *psoc,
 }
 
 static inline
-QDF_STATUS ucfg_ipa_set_txrx_handle(struct wlan_objmgr_psoc *psoc,
-				    void *txrx_handle)
+QDF_STATUS ucfg_ipa_set_pdev_id(struct wlan_objmgr_psoc *psoc,
+				uint8_t pdev_id)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -500,6 +507,11 @@ static inline
 QDF_STATUS ucfg_ipa_uc_ol_deinit(struct wlan_objmgr_pdev *pdev)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline bool ucfg_ipa_is_tx_pending(struct wlan_objmgr_pdev *pdev)
+{
+	return false;
 }
 
 static inline

@@ -1841,22 +1841,22 @@ wma_process_update_beacon_params(tp_wma_handle wma,
 		return;
 	}
 
-	if (bcn_params->smeSessionId >= wma->max_bssid) {
-		WMA_LOGE("Invalid vdev id %d", bcn_params->smeSessionId);
+	if (bcn_params->vdev_id >= wma->max_bssid) {
+		WMA_LOGE("Invalid vdev id %d", bcn_params->vdev_id);
 		return;
 	}
 
 	if (bcn_params->paramChangeBitmap & PARAM_BCN_INTERVAL_CHANGED) {
-		wma_update_beacon_interval(wma, bcn_params->smeSessionId,
+		wma_update_beacon_interval(wma, bcn_params->vdev_id,
 					   bcn_params->beaconInterval);
 	}
 
 	if (bcn_params->paramChangeBitmap & PARAM_llBCOEXIST_CHANGED)
-		wma_update_protection_mode(wma, bcn_params->smeSessionId,
+		wma_update_protection_mode(wma, bcn_params->vdev_id,
 					   bcn_params->llbCoexist);
 
 	if (bcn_params->paramChangeBitmap & PARAM_BSS_COLOR_CHANGED)
-		wma_update_bss_color(wma, bcn_params->smeSessionId,
+		wma_update_bss_color(wma, bcn_params->vdev_id,
 				     bcn_params);
 }
 
@@ -2049,7 +2049,8 @@ static inline void wma_fill_in_wapi_key_params(
 static bool
 wma_skip_bip_key_set(tp_wma_handle wma_handle, uint32_t key_cipher)
 {
-	if ((key_cipher == WMI_CIPHER_AES_GMAC) &&
+	if ((key_cipher == WMI_CIPHER_AES_GMAC ||
+	     key_cipher == WMI_CIPHER_BIP_GMAC_256) &&
 	    !wmi_service_enabled(wma_handle->wmi_handle,
 				 wmi_service_gmac_offload_support))
 		return true;
@@ -2376,7 +2377,7 @@ void wma_adjust_ibss_heart_beat_timer(tp_wma_handle wma,
 
 	/* reset timer value if all peers departed */
 	if (new_peer_num == 0) {
-		cdp_set_ibss_vdev_heart_beat_timer(soc, vdev, 0);
+		cdp_set_ibss_vdev_heart_beat_timer(soc, vdev_id, 0);
 		return;
 	}
 
@@ -2388,7 +2389,7 @@ void wma_adjust_ibss_heart_beat_timer(tp_wma_handle wma,
 		return;
 	}
 	if (new_timer_value_sec ==
-	    cdp_set_ibss_vdev_heart_beat_timer(soc, vdev,
+	    cdp_set_ibss_vdev_heart_beat_timer(soc, vdev_id,
 					       new_timer_value_sec)) {
 		WMA_LOGD("timer value %d stays same, no need to notify target",
 			 new_timer_value_sec);
@@ -2442,7 +2443,7 @@ static void wma_set_ibsskey_helper(tp_wma_handle wma_handle,
 	}
 
 	qdf_mem_zero(&key_params, sizeof(key_params));
-	opmode = cdp_get_opmode(soc, txrx_vdev);
+	opmode = cdp_get_opmode(soc, key_info->vdev_id);
 	qdf_mem_zero(&key_params, sizeof(key_params));
 	key_params.vdev_id = key_info->vdev_id;
 	key_params.key_type = key_info->encType;
@@ -2531,7 +2532,7 @@ void wma_set_bsskey(tp_wma_handle wma_handle, tpSetBssKeyParams key_info)
 		key_info->status = QDF_STATUS_E_FAILURE;
 		goto out;
 	}
-	wlan_opmode = cdp_get_opmode(soc, txrx_vdev);
+	wlan_opmode = cdp_get_opmode(soc, key_info->vdev_id);
 
 	/*
 	 * For IBSS, WMI expects the BSS key to be set per peer key
@@ -2688,7 +2689,7 @@ void wma_set_stakey(tp_wma_handle wma_handle, tpSetStaKeyParams key_info)
 		key_info->status = QDF_STATUS_E_FAILURE;
 		goto out;
 	}
-	opmode = cdp_get_opmode(soc, txrx_vdev);
+	opmode = cdp_get_opmode(soc, key_info->vdev_id);
 
 	if (key_info->defWEPIdx == WMA_INVALID_KEY_IDX &&
 	    (key_info->encType == eSIR_ED_WEP40 ||
@@ -2800,7 +2801,6 @@ QDF_STATUS wma_process_update_edca_param_req(WMA_HANDLE handle,
 	struct wmi_host_wme_vparams wmm_param[QCA_WLAN_AC_ALL];
 	tSirMacEdcaParamRecord *edca_record;
 	int ac;
-	struct cdp_pdev *pdev;
 	struct ol_tx_wmm_param_t ol_tx_wmm_param;
 	uint8_t vdev_id;
 	QDF_STATUS status;
@@ -2847,12 +2847,7 @@ QDF_STATUS wma_process_update_edca_param_req(WMA_HANDLE handle,
 	else if (status == QDF_STATUS_E_FAILURE)
 		goto fail;
 
-	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
-	if (pdev)
-		cdp_set_wmm_param(soc, (struct cdp_pdev *)pdev,
-				 ol_tx_wmm_param);
-	else
-		QDF_ASSERT(0);
+	cdp_set_wmm_param(soc, WMI_PDEV_ID_SOC, ol_tx_wmm_param);
 
 	return QDF_STATUS_SUCCESS;
 
@@ -3440,7 +3435,7 @@ static int wma_process_mgmt_tx_completion(tp_wma_handle wma_handle,
 	packetdump_cb = wma_handle->wma_mgmt_tx_packetdump_cb;
 	pktdump_status = wma_mgmt_pktdump_status_map(status);
 	if (packetdump_cb)
-		packetdump_cb(soc, txrx_vdev,
+		packetdump_cb(soc, WMI_PDEV_ID_SOC, vdev_id,
 			      buf, pktdump_status, TX_MGMT_PKT);
 #endif
 
@@ -3808,41 +3803,22 @@ static bool
 wma_is_ccmp_pn_replay_attack(void *cds_ctx, struct ieee80211_frame *wh,
 			 uint8_t *ccmp_ptr)
 {
-	struct cdp_pdev *pdev;
-	struct cdp_vdev *vdev;
-	void *peer;
-	uint8_t vdev_id, peer_id;
+	uint8_t vdev_id;
 	uint8_t *last_pn_valid = NULL;
 	uint64_t *last_pn = NULL, new_pn;
 	uint32_t *rmf_pn_replays = NULL;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	bool ret = false;
 
-	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
-	if (!pdev) {
-		WMA_LOGE("%s: Failed to find pdev", __func__);
-		return true;
-	}
-
-	vdev = wma_find_vdev_by_bssid(cds_ctx, wh->i_addr3, &vdev_id);
-	if (!vdev) {
+	if (!wma_find_vdev_by_bssid(cds_ctx, wh->i_addr3, &vdev_id)) {
 		WMA_LOGE("%s: Failed to find vdev", __func__);
-		return true;
-	}
-
-	/* Retrieve the peer based on vdev and addr */
-	peer = cdp_peer_get_ref_by_addr(soc, pdev, wh->i_addr2, &peer_id,
-					PEER_DEBUG_ID_WMA_CCMP_REPLAY_ATTACK);
-
-	if (!peer) {
-		WMA_LOGE("%s: Failed to find peer, Not able to validate PN",
-			    __func__);
 		return true;
 	}
 
 	new_pn = wma_extract_ccmp_pn(ccmp_ptr);
 
-	cdp_get_pn_info(soc, peer, &last_pn_valid, &last_pn, &rmf_pn_replays);
+	cdp_get_pn_info(soc, wh->i_addr3, vdev_id, &last_pn_valid, &last_pn,
+			&rmf_pn_replays);
 
 	if (!last_pn_valid || !last_pn || !rmf_pn_replays) {
 		WMA_LOGE("%s: PN validation seems not supported", __func__);
@@ -3865,7 +3841,6 @@ wma_is_ccmp_pn_replay_attack(void *cds_ctx, struct ieee80211_frame *wh,
 	}
 
 rel_peer_ref:
-	cdp_peer_release_ref(soc, peer, PEER_DEBUG_ID_WMA_CCMP_REPLAY_ATTACK);
 	return ret;
 }
 
@@ -3896,7 +3871,8 @@ int wma_process_bip(tp_wma_handle wma_handle,
 
 	if (iface->key.key_cipher == WMI_CIPHER_AES_CMAC) {
 		mmie_size = cds_get_mmie_size();
-	} else if (iface->key.key_cipher == WMI_CIPHER_AES_GMAC) {
+	} else if (iface->key.key_cipher == WMI_CIPHER_AES_GMAC ||
+		   iface->key.key_cipher == WMI_CIPHER_BIP_GMAC_256) {
 		mmie_size = cds_get_gmac_mmie_size();
 	} else {
 		WMA_LOGE(FL("Invalid key cipher %d"), iface->key.key_cipher);
@@ -3945,6 +3921,7 @@ int wma_process_bip(tp_wma_handle wma_handle,
 		break;
 
 	case WMI_CIPHER_AES_GMAC:
+	case WMI_CIPHER_BIP_GMAC_256:
 		if (wmi_service_enabled(wma_handle->wmi_handle,
 				wmi_service_gmac_offload_support)) {
 			/*
@@ -4401,7 +4378,8 @@ int wma_form_rx_packet(qdf_nbuf_t buf,
 	if ((mgt_type == IEEE80211_FC0_TYPE_MGT &&
 		mgt_subtype != MGMT_SUBTYPE_BEACON) &&
 		packetdump_cb)
-		packetdump_cb(soc, txrx_vdev, rx_pkt->pkt_buf,
+		packetdump_cb(soc, mgmt_rx_params->pdev_id,
+			      rx_pkt->pkt_meta.session_id, rx_pkt->pkt_buf,
 			      QDF_STATUS_SUCCESS, RX_MGMT_PKT);
 #endif
 	return 0;
@@ -4502,17 +4480,9 @@ static int wma_mgmt_rx_process(void *handle, uint8_t *data,
 		 * is not there as BAND_6G works only on frequencies and channel
 		 * numbers can be treated as unique.
 		 */
-		if (mgmt_rx_params->channel >= WLAN_REG_MIN_24GHZ_CH_NUM &&
-		    mgmt_rx_params->channel <= WLAN_REG_MAX_24GHZ_CH_NUM)
-			mgmt_rx_params->chan_freq =
-					wlan_reg_chan_to_freq(
-						wma_handle->pdev,
-						mgmt_rx_params->channel);
-		else
-			mgmt_rx_params->chan_freq =
-					wlan_reg_chan_to_freq(
-						wma_handle->pdev,
-						mgmt_rx_params->channel);
+		mgmt_rx_params->chan_freq = wlan_reg_legacy_chan_to_freq(
+					    wma_handle->pdev,
+					    mgmt_rx_params->channel);
 	}
 
 	mgmt_rx_params->pdev_id = 0;

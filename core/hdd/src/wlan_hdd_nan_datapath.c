@@ -411,14 +411,9 @@ static int __wlan_hdd_cfg80211_process_ndp_cmd(struct wiphy *wiphy,
 		hdd_err_rl("NAN datapath is not enabled");
 		return -EPERM;
 	}
-	/* NAN data path coexists only with STA interface */
-	if (false == hdd_is_ndp_allowed(hdd_ctx)) {
-		hdd_err_rl("Unsupported concurrency for NAN datapath");
-		return -EPERM;
-	}
 
-	return os_if_nan_process_ndp_cmd(hdd_ctx->psoc,
-					 data, data_len);
+	return os_if_nan_process_ndp_cmd(hdd_ctx->psoc, data, data_len,
+					 hdd_is_ndp_allowed(hdd_ctx));
 }
 
 /**
@@ -465,7 +460,7 @@ int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 	bool bval = false;
 	uint8_t enable_sifs_burst = 0;
 
-	ret_val = hdd_vdev_create(adapter, hdd_sme_roam_callback, adapter);
+	ret_val = hdd_vdev_create(adapter);
 	if (ret_val) {
 		hdd_err("failed to create vdev: %d", ret_val);
 		return ret_val;
@@ -782,6 +777,7 @@ void hdd_ndi_drv_ndi_delete_rsp_handler(uint8_t vdev_id)
 	struct hdd_context *hdd_ctx;
 	struct hdd_adapter *adapter;
 	struct hdd_station_ctx *sta_ctx;
+	struct qdf_mac_addr bc_mac_addr = QDF_MAC_ADDR_BCAST_INIT;
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	if (!hdd_ctx) {
@@ -802,6 +798,7 @@ void hdd_ndi_drv_ndi_delete_rsp_handler(uint8_t vdev_id)
 	}
 
 	hdd_roam_deregister_sta(adapter, adapter->mac_addr);
+	hdd_delete_peer(sta_ctx, &bc_mac_addr);
 
 	wlan_hdd_netif_queue_control(adapter,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
@@ -927,6 +924,7 @@ void hdd_ndp_peer_departed_handler(uint8_t vdev_id, uint16_t sta_id,
 	}
 
 	hdd_roam_deregister_sta(adapter, *peer_mac_addr);
+	hdd_delete_peer(sta_ctx, peer_mac_addr);
 
 	if (last_peer) {
 		hdd_info("No more ndp peers.");

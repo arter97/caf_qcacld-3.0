@@ -208,7 +208,6 @@ static inline bool in_compat_syscall(void) { return is_compat_task(); }
  * @WMM_INIT_DONE: Adapter is initialized
  * @SOFTAP_BSS_STARTED: Software Access Point (SAP) is running
  * @DEVICE_IFACE_OPENED: Adapter has been "opened" via the kernel
- * @ACS_PENDING: Auto Channel Selection (ACS) is pending
  * @SOFTAP_INIT_DONE: Software Access Point (SAP) is initialized
  * @VENDOR_ACS_RESPONSE_PENDING: Waiting for event for vendor acs
  * @DOWN_DURING_SSR: Mark interface is down during SSR
@@ -220,18 +219,9 @@ enum hdd_adapter_flags {
 	WMM_INIT_DONE,
 	SOFTAP_BSS_STARTED,
 	DEVICE_IFACE_OPENED,
-	ACS_PENDING,
 	SOFTAP_INIT_DONE,
 	VENDOR_ACS_RESPONSE_PENDING,
 	DOWN_DURING_SSR,
-};
-
-/**
- * enum hdd_driver_flags - HDD global event bitmap flags
- * @ACS_IN_PROGRESS: Auto Channel Selection (ACS) in progress
- */
-enum hdd_driver_flags {
-	ACS_IN_PROGRESS,
 };
 
 #define WLAN_WAIT_DISCONNECT_ALREADY_IN_PROGRESS  1000
@@ -402,6 +392,8 @@ enum hdd_driver_flags {
 #endif
 
 #define NUM_TX_RX_HISTOGRAM_MASK (NUM_TX_RX_HISTOGRAM - 1)
+
+#define HDD_NOISE_FLOOR_DBM (-96)
 
 /**
  * enum hdd_auth_key_mgmt - auth key mgmt protocols
@@ -1046,6 +1038,7 @@ struct hdd_context;
  * @gpio_tsf_sync_work: work to sync send TSF CAP WMI command
  * @cache_sta_count: number of currently cached stations
  * @acs_complete_event: acs complete event
+ * @latency_level: 0 - normal, 1 - moderate, 2 - low, 3 - ultralow
  */
 struct hdd_adapter {
 	/* Magic cookie for adapter sanity verification.  Note that this
@@ -1189,6 +1182,8 @@ struct hdd_adapter {
 	uint64_t last_target_time;
 	/* to store the count of continuous invalid tstamp-pair */
 	int continuous_error_count;
+	/* to store the count of continuous capture retry */
+	int continuous_cap_retry_count;
 	/* to indicate whether tsf_sync has been initialized */
 	qdf_atomic_t tsf_sync_ready_flag;
 #ifdef WLAN_FEATURE_TSF_PLUS_EXT_GPIO_SYNC
@@ -1290,6 +1285,7 @@ struct hdd_adapter {
 	uint32_t track_dest_ipv4;
 	uint32_t mon_chan_freq;
 	uint32_t mon_bandwidth;
+	uint16_t latency_level;
 
 	/* rcpi information */
 	struct rcpi_info rcpi;
@@ -1304,6 +1300,9 @@ struct hdd_adapter {
 
 #ifdef WLAN_FEATURE_MOTION_DETECTION
 	bool motion_detection_mode;
+	bool motion_det_cfg;
+	bool motion_det_in_progress;
+	uint32_t motion_det_baseline_value;
 #endif /* WLAN_FEATURE_MOTION_DETECTION */
 };
 
@@ -1422,11 +1421,11 @@ enum driver_modules_status {
 /**
  * struct acs_dfs_policy - Define ACS policies
  * @acs_dfs_mode: Dfs mode enabled/disabled.
- * @acs_channel: pre defined channel to avoid ACS.
+ * @acs_chan_freq: pre defined channel frequency to avoid ACS.
  */
 struct acs_dfs_policy {
 	enum dfs_mode acs_dfs_mode;
-	uint8_t acs_channel;
+	uint32_t acs_chan_freq;
 };
 
 /**
@@ -1872,12 +1871,12 @@ struct hdd_context {
 /**
  * struct hdd_vendor_acs_chan_params - vendor acs channel parameters
  * @pcl_count: pcl list count
- * @vendor_pcl_list: pointer to pcl list
+ * @vendor_pcl_list: pointer to pcl frequency (MHz) list
  * @vendor_weight_list: pointer to pcl weight list
  */
 struct hdd_vendor_acs_chan_params {
 	uint32_t pcl_count;
-	uint8_t *vendor_pcl_list;
+	uint32_t *vendor_pcl_list;
 	uint8_t *vendor_weight_list;
 };
 
@@ -1894,18 +1893,18 @@ struct hdd_external_acs_timer_context {
 /**
  * struct hdd_vendor_chan_info - vendor channel info
  * @band: channel operating band
- * @pri_ch: primary channel
- * @ht_sec_ch: secondary channel
- * @vht_seg0_center_ch: segment0 for vht
- * @vht_seg1_center_ch: vht segment 1
+ * @pri_chan_freq: primary channel freq in MHz
+ * @ht_sec_chan_freq: secondary channel freq in MHz
+ * @vht_seg0_center_chan_freq: segment0 for vht in MHz
+ * @vht_seg1_center_chan_freq: vht segment 1 in MHz
  * @chan_width: channel width
  */
 struct hdd_vendor_chan_info {
 	uint8_t band;
-	uint8_t pri_ch;
-	uint8_t ht_sec_ch;
-	uint8_t vht_seg0_center_ch;
-	uint8_t vht_seg1_center_ch;
+	uint32_t pri_chan_freq;
+	uint32_t ht_sec_chan_freq;
+	uint32_t vht_seg0_center_chan_freq;
+	uint32_t vht_seg1_center_chan_freq;
 	uint8_t chan_width;
 };
 
@@ -1941,28 +1940,146 @@ struct hdd_channel_info {
  * Function declarations and documentation
  */
 
+/**
+ * hdd_validate_channel_and_bandwidth() - Validate the channel-bandwidth combo
+ * @adapter: HDD adapter
+ * @chan_freq: Channel frequency
+ * @chan_bw: Bandwidth
+ *
+ * Checks if the given bandwidth is valid for the given channel number.
+ *
+ * Return: 0 for success, non-zero for failure
+ */
 int hdd_validate_channel_and_bandwidth(struct hdd_adapter *adapter,
-				uint32_t chan_number,
-				enum phy_ch_width chan_bw);
+				       uint32_t chan_freq,
+				       enum phy_ch_width chan_bw);
 
+/**
+ * hdd_get_front_adapter() - Get the first adapter from the adapter list
+ * @hdd_ctx: pointer to the HDD context
+ * @current_adapter: pointer to the current adapter
+ * @out_adapter: double pointer to pass the next adapter
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS hdd_get_front_adapter(struct hdd_context *hdd_ctx,
 				 struct hdd_adapter **out_adapter);
 
+/**
+ * hdd_get_next_adapter() - Get the next adapter from the adapter list
+ * @hdd_ctx: pointer to the HDD context
+ * @current_adapter: pointer to the current adapter
+ * @out_adapter: double pointer to pass the next adapter
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS hdd_get_next_adapter(struct hdd_context *hdd_ctx,
 				struct hdd_adapter *current_adapter,
 				struct hdd_adapter **out_adapter);
 
+/**
+ * hdd_get_front_adapter_no_lock() - Get the first adapter from the adapter list
+ * This API doesnot use any lock in it's implementation. It is the caller's
+ * directive to ensure concurrency safety.
+ * @hdd_ctx: pointer to the HDD context
+ * @out_adapter: double pointer to pass the next adapter
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_get_front_adapter_no_lock(struct hdd_context *hdd_ctx,
+					 struct hdd_adapter **out_adapter);
+
+/**
+ * hdd_get_next_adapter_no_lock() - Get the next adapter from the adapter list
+ * This API doesnot use any lock in it's implementation. It is the caller's
+ * directive to ensure concurrency safety.
+ * @hdd_ctx: pointer to the HDD context
+ * @current_adapter: pointer to the current adapter
+ * @out_adapter: double pointer to pass the next adapter
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_get_next_adapter_no_lock(struct hdd_context *hdd_ctx,
+					struct hdd_adapter *current_adapter,
+					struct hdd_adapter **out_adapter);
+
+/**
+ * hdd_remove_adapter() - Remove the adapter from the adapter list
+ * @hdd_ctx: pointer to the HDD context
+ * @adapter: pointer to the adapter to be removed
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS hdd_remove_adapter(struct hdd_context *hdd_ctx,
 			      struct hdd_adapter *adapter);
 
+/**
+ * hdd_remove_front_adapter() - Remove the first adapter from the adapter list
+ * @hdd_ctx: pointer to the HDD context
+ * @out_adapter: pointer to the adapter to be removed
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS hdd_remove_front_adapter(struct hdd_context *hdd_ctx,
 				    struct hdd_adapter **out_adapter);
 
+/**
+ * hdd_add_adapter_back() - Add an adapter to the adapter list
+ * @hdd_ctx: pointer to the HDD context
+ * @adapter: pointer to the adapter to be added
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS hdd_add_adapter_back(struct hdd_context *hdd_ctx,
 				struct hdd_adapter *adapter);
 
+/**
+ * hdd_add_adapter_front() - Add an adapter to the head of the adapter list
+ * @hdd_ctx: pointer to the HDD context
+ * @adapter: pointer to the adapter to be added
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS hdd_add_adapter_front(struct hdd_context *hdd_ctx,
 				 struct hdd_adapter *adapter);
+
+/**
+ * typedef hdd_adapter_iterate_cb() – Iteration callback function
+ * @adapter: current adapter of interest
+ * @context: user context supplied to the iterator
+ *
+ * This specifies the type of a callback function to supply to
+ * hdd_adapter_iterate().
+ *
+ * Return:
+ * * QDF_STATUS_SUCCESS if further iteration should continue
+ * * QDF_STATUS_E_ABORTED if further iteration should be aborted
+ */
+typedef QDF_STATUS (*hdd_adapter_iterate_cb)(struct hdd_adapter *adapter,
+					     void *context);
+
+/**
+ * hdd_adapter_iterate() – Safely iterate over all adapters
+ * @cb: callback function to invoke for each adapter
+ * @context: user-supplied context to pass to @cb
+ *
+ * This function will iterate over all of the adapters known to the system in
+ * a safe manner, invoking the callback function for each adapter.
+ * The callback function will be invoked in the same context/thread as the
+ * caller without any additional locks in force.
+ * Iteration continues until either the callback has been invoked for all
+ * adapters or a callback returns a value of QDF_STATUS_E_ABORTED to indicate
+ * that further iteration should cease.
+ *
+ * Return:
+ * * QDF_STATUS_E_ABORTED if any callback function returns that value
+ * * QDF_STATUS_E_FAILURE if the callback was not invoked for all adapters due
+ * to concurrency (i.e. adapter was deleted while iterating)
+ * * QDF_STATUS_SUCCESS if @cb was invoked for each adapter and none returned
+ * an error
+ */
+QDF_STATUS hdd_adapter_iterate(hdd_adapter_iterate_cb cb,
+			       void *context);
 
 /**
  * hdd_for_each_adapter - adapter iterator macro
@@ -1973,6 +2090,76 @@ QDF_STATUS hdd_add_adapter_front(struct hdd_context *hdd_ctx,
 	for (hdd_get_front_adapter(hdd_ctx, &adapter); \
 	     adapter; \
 	     hdd_get_next_adapter(hdd_ctx, adapter, &adapter))
+
+/**
+ * __hdd_take_ref_and_fetch_front_adapter - Helper macro to lock, fetch front
+ * adapter, take ref and unlock.
+ * @hdd_ctx: the global HDD context
+ * @adapter: an hdd_adapter pointer to use as a cursor
+ */
+#define __hdd_take_ref_and_fetch_front_adapter(hdd_ctx, adapter) \
+	qdf_spin_lock_bh(&hdd_ctx->hdd_adapter_lock), \
+	hdd_get_front_adapter_no_lock(hdd_ctx, &adapter), \
+	(adapter) ? dev_hold(adapter->dev) : (false), \
+	qdf_spin_unlock_bh(&hdd_ctx->hdd_adapter_lock)
+
+/**
+ * __hdd_take_ref_and_fetch_next_adapter - Helper macro to lock, fetch next
+ * adapter, take ref and unlock.
+ * @hdd_ctx: the global HDD context
+ * @adapter: an hdd_adapter pointer to use as a cursor
+ */
+#define __hdd_take_ref_and_fetch_next_adapter(hdd_ctx, adapter) \
+	qdf_spin_lock_bh(&hdd_ctx->hdd_adapter_lock), \
+	hdd_get_next_adapter_no_lock(hdd_ctx, adapter, &adapter), \
+	(adapter) ? dev_hold(adapter->dev) : (false), \
+	qdf_spin_unlock_bh(&hdd_ctx->hdd_adapter_lock)
+
+/**
+ * __hdd_is_adapter_valid - Helper macro to return true/false for valid adapter.
+ * @adapter: an hdd_adapter pointer to use as a cursor
+ */
+#define __hdd_is_adapter_valid(_adapter) !!_adapter
+
+/**
+ * hdd_for_each_adapter_dev_held - Adapter iterator with dev_hold called
+ * @hdd_ctx: the global HDD context
+ * @adapter: an hdd_adapter pointer to use as a cursor
+ *
+ * This iterator will take the reference of the netdev associated with the
+ * given adapter so as to prevent it from being removed in other context.
+ * If the control goes inside the loop body then the dev_hold has been invoked.
+ *
+ *                           ***** NOTE *****
+ * Before the end of each iteration, dev_put(adapter->dev) must be
+ * called. Not calling this will keep hold of a reference, thus preventing
+ * unregister of the netdevice.
+ *
+ * Usage example:
+ *                 hdd_for_each_adapter_dev_held(hdd_ctx, adapter) {
+ *                         <work involving adapter>
+ *                         <some more work>
+ *                         dev_put(adapter->dev)
+ *                 }
+ */
+#define hdd_for_each_adapter_dev_held(hdd_ctx, adapter) \
+	for (__hdd_take_ref_and_fetch_front_adapter(hdd_ctx, adapter); \
+	     __hdd_is_adapter_valid(adapter); \
+	     __hdd_take_ref_and_fetch_next_adapter(hdd_ctx, adapter))
+
+/**
+ * wlan_hdd_get_adapter_by_vdev_id_from_objmgr() - Fetch adapter from objmgr
+ * using vdev_id.
+ * @hdd_ctx: the global HDD context
+ * @adapter: an hdd_adapter double pointer to store the address of the adapter
+ * @vdev: the vdev whose corresponding adapter has to be fetched
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_hdd_get_adapter_by_vdev_id_from_objmgr(struct hdd_context *hdd_ctx,
+					    struct hdd_adapter **adapter,
+					    struct wlan_objmgr_vdev *vdev);
 
 struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 				     uint8_t session_type,
@@ -2019,6 +2206,30 @@ QDF_STATUS hdd_start_all_adapters(struct hdd_context *hdd_ctx);
 struct hdd_adapter *hdd_get_adapter_by_vdev(struct hdd_context *hdd_ctx,
 					    uint32_t vdev_id);
 
+/**
+ * hdd_adapter_get_by_reference() - Return adapter with the given reference
+ * @hdd_ctx: hdd context
+ * @reference: reference for the adapter to get
+ *
+ * This function is used to get the adapter with provided reference.
+ * The adapter reference will be held until being released by calling
+ * hdd_adapter_put().
+ *
+ * Return: adapter pointer if found
+ *
+ */
+struct hdd_adapter *hdd_adapter_get_by_reference(struct hdd_context *hdd_ctx,
+						 struct hdd_adapter *reference);
+
+/**
+ * hdd_adapter_put() - Release reference to adapter
+ * @adapter: adapter reference
+ *
+ * Release reference to adapter previously acquired via
+ * hdd_adapter_get_*() function
+ */
+void hdd_adapter_put(struct hdd_adapter *adapter);
+
 struct hdd_adapter *hdd_get_adapter_by_macaddr(struct hdd_context *hdd_ctx,
 					       tSirMacAddr mac_addr);
 
@@ -2031,7 +2242,7 @@ struct hdd_adapter *hdd_get_adapter_by_macaddr(struct hdd_context *hdd_ctx,
  *
  * Return: home channel if connected/started or invalid channel 0
  */
-uint8_t hdd_get_adapter_home_channel(struct hdd_adapter *adapter);
+uint32_t hdd_get_adapter_home_channel(struct hdd_adapter *adapter);
 
 /*
  * hdd_get_adapter_by_rand_macaddr() - find Random mac adapter
@@ -2059,8 +2270,16 @@ hdd_get_adapter_by_rand_macaddr(struct hdd_context *hdd_ctx,
  */
 bool hdd_is_vdev_in_conn_state(struct hdd_adapter *adapter);
 
-int hdd_vdev_create(struct hdd_adapter *adapter,
-		    csr_roam_complete_cb callback, void *ctx);
+/**
+ * hdd_vdev_create() - Create the vdev in the firmware
+ * @adapter: hdd adapter
+ *
+ * This function will create the vdev in the firmware
+ *
+ * Return: 0 when the vdev create is sent to firmware or -EINVAL when
+ * there is a failure to send the command.
+ */
+int hdd_vdev_create(struct hdd_adapter *adapter);
 int hdd_vdev_destroy(struct hdd_adapter *adapter);
 int hdd_vdev_ready(struct hdd_adapter *adapter);
 
@@ -2099,8 +2318,24 @@ uint8_t *wlan_hdd_get_intf_addr(struct hdd_context *hdd_ctx,
 				enum QDF_OPMODE interface_type);
 void wlan_hdd_release_intf_addr(struct hdd_context *hdd_ctx,
 				uint8_t *releaseAddr);
-uint8_t hdd_get_operating_channel(struct hdd_context *hdd_ctx,
-			enum QDF_OPMODE mode);
+
+/**
+ * hdd_get_operating_chan_freq() - return operating channel of the device mode
+ * @hdd_ctx:	Pointer to the HDD context.
+ * @mode:	Device mode for which operating channel is required.
+ *              Supported modes:
+ *			QDF_STA_MODE,
+ *			QDF_P2P_CLIENT_MODE,
+ *			QDF_SAP_MODE,
+ *			QDF_P2P_GO_MODE.
+ *
+ * This API returns the operating channel of the requested device mode
+ *
+ * Return: channel frequency, or
+ *         0 if the requested device mode is not found.
+ */
+uint32_t hdd_get_operating_chan_freq(struct hdd_context *hdd_ctx,
+				     enum QDF_OPMODE mode);
 
 void hdd_set_conparam(int32_t con_param);
 enum QDF_GLOBAL_MODE hdd_get_conparam(void);
@@ -2680,7 +2915,6 @@ static inline void wlan_hdd_mod_fc_timer(struct hdd_adapter *adapter,
 #endif /* QCA_HL_NETDEV_FLOW_CONTROL */
 
 int hdd_wlan_dump_stats(struct hdd_adapter *adapter, int value);
-void wlan_hdd_deinit_tx_rx_histogram(struct hdd_context *hdd_ctx);
 void wlan_hdd_display_tx_rx_histogram(struct hdd_context *hdd_ctx);
 void wlan_hdd_clear_tx_rx_histogram(struct hdd_context *hdd_ctx);
 
@@ -3755,6 +3989,18 @@ void wlan_hdd_send_tcp_param_update_event(struct hdd_context *hdd_ctx,
  * QDF_STATUS_E_FAILURE on failure
  */
 QDF_STATUS hdd_md_host_evt_cb(void *ctx, struct sir_md_evt *event);
+
+/**
+ * hdd_md_bl_evt_cb - Callback for Motion Detection Baseline Event
+ * @ctx: HDD context
+ * @sir_md_bl_evt: motion detect baseline event
+ *
+ * Callback for Motion Detection Baseline Event
+ *
+ * Return: QDF_STATUS QDF_STATUS_SUCCESS on Success and
+ * QDF_STATUS_E_FAILURE on failure
+ */
+QDF_STATUS hdd_md_bl_evt_cb(void *ctx, struct sir_md_bl_evt *event);
 #endif /* WLAN_FEATURE_MOTION_DETECTION */
 
 /**
@@ -3809,4 +4055,20 @@ int hdd_psoc_idle_shutdown(struct device *dev);
  */
 int hdd_psoc_idle_restart(struct device *dev);
 
+/**
+ * hdd_common_roam_callback() - common sme roam callback
+ * @psoc: Object Manager Psoc
+ * @session_id: session id for which callback is called
+ * @roam_info: pointer to roam info
+ * @roam_status: roam status
+ * @roam_result: roam result
+ *
+ * Return: QDF_STATUS enumeration
+ */
+QDF_STATUS hdd_common_roam_callback(struct wlan_objmgr_psoc *psoc,
+				    uint8_t session_id,
+				    struct csr_roam_info *roam_info,
+				    uint32_t roam_id,
+				    eRoamCmdStatus roam_status,
+				    eCsrRoamResult roam_result);
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

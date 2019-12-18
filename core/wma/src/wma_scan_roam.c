@@ -131,7 +131,6 @@ QDF_STATUS wma_update_channel_list(WMA_HANDLE handle,
 	int i, len;
 	struct scan_chan_list_params *scan_ch_param;
 	struct channel_param *chan_p;
-	uint16_t channel;
 	struct ch_params ch_params;
 
 	len = sizeof(struct channel_param) * chan_list->numChan +
@@ -144,6 +143,7 @@ QDF_STATUS wma_update_channel_list(WMA_HANDLE handle,
 	WMA_LOGD("no of channels = %d", chan_list->numChan);
 	chan_p = &scan_ch_param->ch_param[0];
 	scan_ch_param->nallchans = chan_list->numChan;
+	scan_ch_param->max_bw_support_present = true;
 	wma_handle->saved_chan.num_channels = chan_list->numChan;
 	WMA_LOGD("ht %d, vht %d, vht_24 %d", chan_list->ht_en,
 			chan_list->vht_en, chan_list->vht_24_en);
@@ -152,8 +152,6 @@ QDF_STATUS wma_update_channel_list(WMA_HANDLE handle,
 		chan_p->mhz = chan_list->chanParam[i].freq;
 		chan_p->cfreq1 = chan_p->mhz;
 		chan_p->cfreq2 = 0;
-		channel = wlan_reg_freq_to_chan(wma_handle->pdev,
-						chan_list->chanParam[i].freq);
 		wma_handle->saved_chan.ch_freq_list[i] =
 					chan_list->chanParam[i].freq;
 
@@ -198,8 +196,10 @@ QDF_STATUS wma_update_channel_list(WMA_HANDLE handle,
 		chan_p->maxregpower = chan_list->chanParam[i].pwr;
 
 		ch_params.ch_width = CH_WIDTH_160MHZ;
-		wlan_reg_set_channel_params(wma_handle->pdev, channel, 0,
-					    &ch_params);
+		wlan_reg_set_channel_params_for_freq(wma_handle->pdev,
+						     chan_p->mhz, 0,
+						     &ch_params);
+
 		chan_p->max_bw_supported =
 		     wma_map_phy_ch_bw_to_wmi_channel_width(ch_params.ch_width);
 		chan_p++;
@@ -874,13 +874,6 @@ A_UINT32 e_csr_encryption_type_to_rsn_cipherset(eCsrEncryptionType encr)
 	}
 }
 
-/* ToDo: Replace this with WMI inteface enum nce the
- * interface changes are ready
- */
-#define CIPHER_BIP_CMAC_128 0xc
-#define CIPHER_BIP_GMAC_128 0xd
-#define CIPHER_BIP_GMAC_256 0xe
-
 /**
  * wma_convert_gp_mgmt_cipher_to_target_cipher_type() - map csr ani group mgmt
  * enc type to RSN cipher
@@ -896,16 +889,15 @@ wma_convert_gp_mgmt_cipher_to_target_cipher_type(tAniEdType cipher_type)
 	switch (cipher_type) {
 	/* BIP-CMAC-128 (00:0f:ac: 0x06) */
 	case eSIR_ED_AES_128_CMAC:
-		return CIPHER_BIP_CMAC_128;
+		return WMI_CIPHER_AES_CMAC;
 
 	/* BIP-GMAC-128 (00:0f:ac: 0x0b) */
 	case eSIR_ED_AES_GMAC_128:
-		return CIPHER_BIP_GMAC_128;
+		return WMI_CIPHER_AES_GMAC;
 
 	/* BIP-GMAC-256(00:0f:ac: 0x0c)*/
 	case eSIR_ED_AES_GMAC_256:
-		return CIPHER_BIP_GMAC_256;
-
+		return WMI_CIPHER_BIP_GMAC_256;
 	case eSIR_ED_NONE:
 	default:
 		return WMI_CIPHER_NONE;
@@ -3662,31 +3654,11 @@ QDF_STATUS wma_post_chan_switch_setup(uint8_t vdev_id)
 static QDF_STATUS wma_plm_start(tp_wma_handle wma,
 				struct plm_req_params *params)
 {
-	uint32_t num_channels;
-	uint32_t *channel_list = NULL;
-	uint32_t i;
 	QDF_STATUS status;
 
 	WMA_LOGD("PLM Start");
 
-	num_channels =  params->plm_num_ch;
-
-	if (num_channels) {
-		channel_list = qdf_mem_malloc(sizeof(uint32_t) * num_channels);
-		if (!channel_list)
-			return QDF_STATUS_E_FAILURE;
-
-		for (i = 0; i < num_channels; i++) {
-			channel_list[i] = params->plm_ch_list[i];
-
-			if (channel_list[i] < WMA_NLO_FREQ_THRESH)
-				channel_list[i] =
-					cds_chan_to_freq(channel_list[i]);
-		}
-	}
-	status = wmi_unified_plm_start_cmd(wma->wmi_handle, params,
-					   channel_list);
-	qdf_mem_free(channel_list);
+	status = wmi_unified_plm_start_cmd(wma->wmi_handle, params);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
 

@@ -265,7 +265,7 @@ populate_dot11_supp_operating_classes(struct mac_context *mac_ptr,
 void
 populate_dot11f_vht_tx_power_env(struct mac_context *mac,
 				 tDot11fIEvht_transmit_power_env *pDot11f,
-				 enum phy_ch_width ch_width, uint8_t chan)
+				 enum phy_ch_width ch_width, uint32_t chan_freq)
 {
 	uint8_t num_tx_power, i, tx_power;
 	int reg_max;
@@ -292,7 +292,7 @@ populate_dot11f_vht_tx_power_env(struct mac_context *mac,
 		return;
 	}
 
-	reg_max = lim_get_regulatory_max_transmit_power(mac, chan);
+	reg_max = wlan_reg_get_channel_reg_power_for_freq(mac->pdev, chan_freq);
 
 	/* in 0.5 dB steps */
 	reg_max *= 2;
@@ -386,7 +386,7 @@ populate_dot11f_country(struct mac_context *mac,
 			tDot11fIECountry *pDot11f, struct pe_session *pe_session)
 {
 	uint32_t len, j = 0;
-	enum band_info rfBand;
+	enum reg_wifi_band rfBand;
 	uint8_t temp[CFG_MAX_STR_LEN], code[3];
 	tSirMacChanInfo *max_tx_power_data;
 	uint32_t rem_length = 0, copied_length = 0;
@@ -395,7 +395,7 @@ populate_dot11f_country(struct mac_context *mac,
 		return QDF_STATUS_SUCCESS;
 
 	lim_get_rf_band_new(mac, &rfBand, pe_session);
-	if (rfBand == BAND_5G) {
+	if (rfBand == REG_BAND_5G) {
 		len = mac->mlme_cfg->power.max_tx_power_5.len;
 		max_tx_power_data =
 		(tSirMacChanInfo *)mac->mlme_cfg->power.max_tx_power_5.data;
@@ -563,10 +563,10 @@ populate_dot11f_erp_info(struct mac_context *mac,
 			 tDot11fIEERPInfo *pDot11f, struct pe_session *pe_session)
 {
 	uint32_t val;
-	enum band_info rfBand = BAND_UNKNOWN;
+	enum reg_wifi_band rfBand = REG_BAND_UNKNOWN;
 
 	lim_get_rf_band_new(mac, &rfBand, pe_session);
-	if (BAND_2G == rfBand) {
+	if (REG_BAND_2G == rfBand) {
 		pDot11f->present = 1;
 
 		val = pe_session->cfgProtection.fromllb;
@@ -1761,9 +1761,8 @@ populate_dot11f_tpc_report(struct mac_context *mac,
 			nSirStatus);
 		return QDF_STATUS_E_FAILURE;
 	}
-	tx_power = lim_get_regulatory_max_transmit_power(
-				mac, wlan_reg_freq_to_chan(
-				mac->pdev, pe_session->curr_op_freq));
+	tx_power = wlan_reg_get_channel_reg_power_for_freq(
+				mac->pdev, pe_session->curr_op_freq);
 	pDot11f->tx_power = tx_power;
 	pDot11f->link_margin = 0;
 	pDot11f->present = 1;
@@ -2447,11 +2446,17 @@ QDF_STATUS sir_convert_probe_frame2_struct(struct mac_context *mac,
 			     sizeof(tDot11fIEHTInfo));
 	}
 
-	if (pr->DSParams.present) {
+	if (pr->he_op.oper_info_6g_present) {
+		pProbeResp->chan_freq = wlan_reg_chan_band_to_freq(mac->pdev,
+						pr->he_op.oper_info_6g.info.primary_ch,
+						BIT(REG_BAND_6G));
+	} else if (pr->DSParams.present) {
 		pProbeResp->dsParamsPresent = 1;
-		pProbeResp->channelNumber = pr->DSParams.curr_channel;
+		pProbeResp->chan_freq =
+		    wlan_reg_legacy_chan_to_freq(mac->pdev, pr->DSParams.curr_channel);
 	} else if (pr->HTInfo.present) {
-		pProbeResp->channelNumber = pr->HTInfo.primaryChannel;
+		pProbeResp->chan_freq =
+		    wlan_reg_legacy_chan_to_freq(mac->pdev, pr->HTInfo.primaryChannel);
 	}
 
 	if (pr->RSNOpaque.present) {
@@ -3893,11 +3898,19 @@ sir_parse_beacon_ie(struct mac_context *mac,
 			     sizeof(tDot11fIEHTInfo));
 	}
 
-	if (pBies->DSParams.present) {
+	if (pBies->he_op.oper_info_6g_present) {
+		pBeaconStruct->chan_freq = wlan_reg_chan_band_to_freq(mac->pdev,
+						pBies->he_op.oper_info_6g.info.primary_ch,
+						BIT(REG_BAND_6G));
+	} else if (pBies->DSParams.present) {
 		pBeaconStruct->dsParamsPresent = 1;
-		pBeaconStruct->channelNumber = pBies->DSParams.curr_channel;
+		pBeaconStruct->chan_freq =
+		    wlan_reg_legacy_chan_to_freq(mac->pdev,
+						 pBies->DSParams.curr_channel);
 	} else if (pBies->HTInfo.present) {
-		pBeaconStruct->channelNumber = pBies->HTInfo.primaryChannel;
+		pBeaconStruct->chan_freq =
+		    wlan_reg_legacy_chan_to_freq(mac->pdev,
+						 pBies->HTInfo.primaryChannel);
 	}
 
 	if (pBies->RSN.present) {
@@ -4214,15 +4227,21 @@ sir_convert_beacon_frame2_struct(struct mac_context *mac,
 
 	}
 
-	if (pBeacon->DSParams.present) {
+	if (pBeacon->he_op.oper_info_6g_present) {
+		pBeaconStruct->chan_freq = wlan_reg_chan_band_to_freq(mac->pdev,
+						pBeacon->he_op.oper_info_6g.info.primary_ch,
+						BIT(REG_BAND_6G));
+	} else if (pBeacon->DSParams.present) {
 		pBeaconStruct->dsParamsPresent = 1;
-		pBeaconStruct->channelNumber = pBeacon->DSParams.curr_channel;
+		pBeaconStruct->chan_freq =
+		    wlan_reg_legacy_chan_to_freq(mac->pdev,
+						 pBeacon->DSParams.curr_channel);
 	} else if (pBeacon->HTInfo.present) {
-		pBeaconStruct->channelNumber = pBeacon->HTInfo.primaryChannel;
+		pBeaconStruct->chan_freq =
+		    wlan_reg_legacy_chan_to_freq(mac->pdev,
+						 pBeacon->HTInfo.primaryChannel);
 	} else {
-		pBeaconStruct->channelNumber =
-			wlan_reg_freq_to_chan(mac->pdev,
-					      WMA_GET_RX_FREQ(pFrame));
+		pBeaconStruct->chan_freq = WMA_GET_RX_FREQ(pFrame);
 		pe_debug_rl("In Beacon No Channel info");
 	}
 
@@ -6063,19 +6082,15 @@ populate_dot11f_he_operation(struct mac_context *mac_ctx,
 		}
 	} else {
 		he_op->oper_info_6g_present = 1;
-		if (session->ch_width > CH_WIDTH_40MHZ) {
-			he_op->oper_info_6g.info.ch_width = 1;
-			he_op->oper_info_6g.info.center_freq_seg0 =
-				session->ch_center_freq_seg0;
-			if (session->ch_width == CH_WIDTH_80P80MHZ ||
-			    session->ch_width == CH_WIDTH_160MHZ)
-				he_op->oper_info_6g.info.center_freq_seg1 =
-					session->ch_center_freq_seg1;
-			else
-				he_op->oper_info_6g.info.center_freq_seg1 = 0;
+		he_op->oper_info_6g.info.ch_width = session->ch_width;
+		he_op->oper_info_6g.info.center_freq_seg0 =
+					session->ch_center_freq_seg0;
+		if (session->ch_width == CH_WIDTH_80P80MHZ ||
+		    session->ch_width == CH_WIDTH_160MHZ) {
+			he_op->oper_info_6g.info.center_freq_seg1 =
+				session->ch_center_freq_seg1;
+			he_op->oper_info_6g.info.ch_width = CH_WIDTH_160MHZ;
 		} else {
-			he_op->oper_info_6g.info.ch_width = 0;
-			he_op->oper_info_6g.info.center_freq_seg0 = 0;
 			he_op->oper_info_6g.info.center_freq_seg1 = 0;
 		}
 		he_op->oper_info_6g.info.primary_ch =
@@ -6084,7 +6099,7 @@ populate_dot11f_he_operation(struct mac_context *mac_ctx,
 		he_op->oper_info_6g.info.dup_bcon = 0;
 		he_op->oper_info_6g.info.min_rate = 0;
 	}
-	lim_log_he_op(mac_ctx, he_op);
+	lim_log_he_op(mac_ctx, he_op, session);
 
 	return QDF_STATUS_SUCCESS;
 }

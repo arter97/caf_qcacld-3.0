@@ -1147,8 +1147,7 @@ static void __wlan_hdd_sap_pre_cac_success(struct hdd_adapter *adapter)
 	wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc, ap_adapter->vdev_id,
 				    CSA_REASON_PRE_CAC_SUCCESS);
 	i = hdd_softap_set_channel_change(ap_adapter->dev,
-			wlan_reg_freq_to_chan(hdd_ctx->pdev,
-					      ap_adapter->pre_cac_freq),
+					  ap_adapter->pre_cac_freq,
 			CH_WIDTH_MAX, false);
 	if (0 != i) {
 		hdd_err("failed to change channel");
@@ -2523,30 +2522,32 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		 */
 		ap_ctx->operating_chan_freq =
 			sap_event->sapevt.sap_ch_selected.pri_ch_freq;
-		ap_ctx->sap_config.acs_cfg.pri_ch =
-			wlan_reg_freq_to_chan(hdd_ctx->pdev,
-			sap_event->sapevt.sap_ch_selected.pri_ch_freq);
-		ap_ctx->sap_config.acs_cfg.ht_sec_ch =
-			wlan_reg_freq_to_chan(hdd_ctx->pdev,
-			sap_event->sapevt.sap_ch_selected.ht_sec_ch_freq);
-		ap_ctx->sap_config.acs_cfg.vht_seg0_center_ch =
-			sap_event->sapevt.sap_ch_selected.vht_seg0_center_ch;
-		ap_ctx->sap_config.acs_cfg.vht_seg1_center_ch =
-			sap_event->sapevt.sap_ch_selected.vht_seg1_center_ch;
+		ap_ctx->sap_config.acs_cfg.pri_ch_freq =
+			sap_event->sapevt.sap_ch_selected.pri_ch_freq;
+		ap_ctx->sap_config.acs_cfg.ht_sec_ch_freq =
+			sap_event->sapevt.sap_ch_selected.ht_sec_ch_freq;
+		ap_ctx->sap_config.acs_cfg.vht_seg0_center_ch_freq =
+		sap_event->sapevt.sap_ch_selected.vht_seg0_center_ch_freq;
+		ap_ctx->sap_config.acs_cfg.vht_seg1_center_ch_freq =
+		sap_event->sapevt.sap_ch_selected.vht_seg1_center_ch_freq;
 		ap_ctx->sap_config.acs_cfg.ch_width =
 			sap_event->sapevt.sap_ch_selected.ch_width;
 
 		sap_ch_param.ch_width =
 			sap_event->sapevt.sap_ch_selected.ch_width;
 		sap_ch_param.center_freq_seg0 =
-			sap_event->sapevt.sap_ch_selected.vht_seg0_center_ch;
+		wlan_reg_freq_to_chan(
+			hdd_ctx->pdev,
+		sap_event->sapevt.sap_ch_selected.vht_seg0_center_ch_freq);
+
 		sap_ch_param.center_freq_seg1 =
-			sap_event->sapevt.sap_ch_selected.vht_seg1_center_ch;
-		wlan_reg_set_channel_params(hdd_ctx->pdev,
-			wlan_reg_freq_to_chan(hdd_ctx->pdev,
-			sap_event->sapevt.sap_ch_selected.pri_ch_freq),
-			wlan_reg_freq_to_chan(hdd_ctx->pdev,
-			sap_event->sapevt.sap_ch_selected.ht_sec_ch_freq),
+		wlan_reg_freq_to_chan(
+			hdd_ctx->pdev,
+		sap_event->sapevt.sap_ch_selected.vht_seg1_center_ch_freq);
+		wlan_reg_set_channel_params_for_freq(
+			hdd_ctx->pdev,
+			sap_event->sapevt.sap_ch_selected.pri_ch_freq,
+			sap_event->sapevt.sap_ch_selected.ht_sec_ch_freq,
 			&sap_ch_param);
 
 		cdp_hl_fc_set_td_limit(cds_get_context(QDF_MODULE_ID_SOC),
@@ -2579,9 +2580,13 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		chan_change.chan_params.sec_ch_offset =
 			sap_ch_param.sec_ch_offset;
 		chan_change.chan_params.center_freq_seg0 =
-			sap_event->sapevt.sap_ch_selected.vht_seg0_center_ch;
+		wlan_reg_freq_to_chan(
+			hdd_ctx->pdev,
+		sap_event->sapevt.sap_ch_selected.vht_seg0_center_ch_freq);
 		chan_change.chan_params.center_freq_seg1 =
-			sap_event->sapevt.sap_ch_selected.vht_seg1_center_ch;
+		wlan_reg_freq_to_chan(
+			hdd_ctx->pdev,
+		sap_event->sapevt.sap_ch_selected.vht_seg1_center_ch_freq);
 
 		return hdd_chan_change_notify(adapter, dev,
 					      chan_change, legacy_phymode);
@@ -2591,18 +2596,14 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 	case eSAP_ACS_CHANNEL_SELECTED:
 		hdd_debug("ACS Completed for wlan%d",
 					adapter->dev->ifindex);
-		clear_bit(ACS_PENDING, &adapter->event_flags);
-		clear_bit(ACS_IN_PROGRESS, &hdd_ctx->g_event_flags);
-		ap_ctx->sap_config.acs_cfg.pri_ch =
-			wlan_reg_freq_to_chan(hdd_ctx->pdev,
-			sap_event->sapevt.sap_ch_selected.pri_ch_freq);
-		ap_ctx->sap_config.acs_cfg.ht_sec_ch =
-			wlan_reg_freq_to_chan(hdd_ctx->pdev,
-			sap_event->sapevt.sap_ch_selected.ht_sec_ch_freq);
-		ap_ctx->sap_config.acs_cfg.vht_seg0_center_ch =
-			sap_event->sapevt.sap_ch_selected.vht_seg0_center_ch;
-		ap_ctx->sap_config.acs_cfg.vht_seg1_center_ch =
-			sap_event->sapevt.sap_ch_selected.vht_seg1_center_ch;
+		ap_ctx->sap_config.acs_cfg.pri_ch_freq =
+			sap_event->sapevt.sap_ch_selected.pri_ch_freq;
+		ap_ctx->sap_config.acs_cfg.ht_sec_ch_freq =
+			sap_event->sapevt.sap_ch_selected.ht_sec_ch_freq;
+		ap_ctx->sap_config.acs_cfg.vht_seg0_center_ch_freq =
+		sap_event->sapevt.sap_ch_selected.vht_seg0_center_ch_freq;
+		ap_ctx->sap_config.acs_cfg.vht_seg1_center_ch_freq =
+		sap_event->sapevt.sap_ch_selected.vht_seg1_center_ch_freq;
 		ap_ctx->sap_config.acs_cfg.ch_width =
 			sap_event->sapevt.sap_ch_selected.ch_width;
 		wlan_hdd_cfg80211_acs_ch_select_evt(adapter);
@@ -2611,12 +2612,12 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 
 		return QDF_STATUS_SUCCESS;
 	case eSAP_ECSA_CHANGE_CHAN_IND:
-		hdd_debug("Channel change indication from peer for channel %d",
-			  sap_event->sapevt.sap_chan_cng_ind.new_chan);
+		hdd_debug("Channel change indication from peer for channel freq %d",
+			  sap_event->sapevt.sap_chan_cng_ind.new_chan_freq);
 		wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc, adapter->vdev_id,
 					    CSA_REASON_PEER_ACTION_FRAME);
 		if (hdd_softap_set_channel_change(dev,
-			 sap_event->sapevt.sap_chan_cng_ind.new_chan,
+			 sap_event->sapevt.sap_chan_cng_ind.new_chan_freq,
 			 CH_WIDTH_MAX, false))
 			return QDF_STATUS_E_FAILURE;
 		else
@@ -2892,21 +2893,8 @@ static bool hdd_is_any_sta_connecting(struct hdd_context *hdd_ctx)
 	return false;
 }
 
-/**
- * hdd_softap_set_channel_change() -
- * This function to support SAP channel change with CSA IE
- * set in the beacons.
- *
- * @dev: pointer to the net device.
- * @target_channel: target channel number.
- * @target_bw: Target bandwidth to move.
- * If no bandwidth is specified, the value is CH_WIDTH_MAX
- * @forced: Force to switch channel, ignore SCC/MCC check
- *
- * Return: 0 for success, non zero for failure
- */
-int hdd_softap_set_channel_change(struct net_device *dev, int target_channel,
-				 enum phy_ch_width target_bw, bool forced)
+int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
+				  enum phy_ch_width target_bw, bool forced)
 {
 	QDF_STATUS status;
 	int ret = 0;
@@ -2942,7 +2930,7 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_channel,
 	}
 
 	ret = hdd_validate_channel_and_bandwidth(adapter,
-						target_channel, target_bw);
+						 target_chan_freq, target_bw);
 	if (ret) {
 		hdd_err("Invalid CH and BW combo");
 		return ret;
@@ -2994,7 +2982,7 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_channel,
 				hdd_ctx->psoc,
 				policy_mgr_convert_device_mode_to_qdf_type(
 					adapter->device_mode),
-				wlan_chan_to_freq(target_channel),
+				target_chan_freq,
 				adapter->vdev_id,
 				forced,
 				sap_ctx->csa_reason)) {
@@ -3042,13 +3030,13 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_channel,
 
 	status = wlansap_set_channel_change_with_csa(
 		WLAN_HDD_GET_SAP_CTX_PTR(adapter),
-		wlan_reg_chan_to_freq(hdd_ctx->pdev, target_channel),
+		target_chan_freq,
 		target_bw,
 		(forced && !scc_on_lte_coex) || is_p2p_go_session);
 
 	if (QDF_STATUS_SUCCESS != status) {
-		hdd_err("SAP set channel failed for channel: %d, bw: %d",
-		       target_channel, target_bw);
+		hdd_err("SAP set channel failed for channel freq: %d, bw: %d",
+		        target_chan_freq, target_bw);
 		/*
 		 * If channel change command fails then clear the
 		 * radar found flag and also restart the netif
@@ -3070,19 +3058,8 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_channel,
 }
 
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
-/**
- * hdd_sap_restart_with_channel_switch() - SAP channel change with E/CSA
- * @ap_adapter: HDD adapter
- * @target_channel: Channel to which switch must happen
- * @target_bw: Bandwidth of the target channel
- * @forced: Force to switch channel, ignore SCC/MCC check
- *
- * Invokes the necessary API to perform channel switch for the SAP or GO
- *
- * Return: None
- */
 void hdd_sap_restart_with_channel_switch(struct hdd_adapter *ap_adapter,
-					uint32_t target_channel,
+					uint32_t target_chan_freq,
 					uint32_t target_bw,
 					bool forced)
 {
@@ -3096,7 +3073,7 @@ void hdd_sap_restart_with_channel_switch(struct hdd_adapter *ap_adapter,
 		return;
 	}
 
-	ret = hdd_softap_set_channel_change(dev, target_channel,
+	ret = hdd_softap_set_channel_change(dev, target_chan_freq,
 					    target_bw, forced);
 	if (ret) {
 		hdd_err("channel switch failed");
@@ -3117,7 +3094,7 @@ void hdd_sap_restart_chan_switch_cb(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 	hdd_sap_restart_with_channel_switch(ap_adapter,
-					    wlan_freq_to_chan(ch_freq),
+					    ch_freq,
 					    channel_bw, forced);
 }
 
@@ -3211,6 +3188,7 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(
 	 * Need to take care of 3 port cases with 2 STA iface in future.
 	 */
 	intf_ch = wlansap_check_cc_intf(hdd_ap_ctx->sap_context);
+	intf_ch_freq = wlan_reg_chan_to_freq(hdd_ctx->pdev, intf_ch);
 	hdd_info("sap_vdev %d intf_ch: %d", vdev_id, intf_ch);
 	if (QDF_MCC_TO_SCC_SWITCH_FORCE_PREFERRED_WITHOUT_DISCONNECTION !=
 		mcc_to_scc_switch) {
@@ -3240,10 +3218,9 @@ sap_restart:
 		hdd_ap_ctx->sap_context->csa_reason =
 			CSA_REASON_CONCURRENT_STA_CHANGED_CHANNEL;
 
-	wlan_reg_set_channel_params(hdd_ctx->pdev,
-				    intf_ch,
-				    0,
-				    &ch_params);
+	wlan_reg_set_channel_params_for_freq(hdd_ctx->pdev,
+					     intf_ch_freq, 0,
+					     &ch_params);
 
 	*ch_freq = wlan_chan_to_freq(intf_ch);
 	hdd_info("SAP channel change with CSA/ECSA");
@@ -3345,8 +3322,7 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter, bool reinit)
 
 	if (!reinit) {
 		adapter->session.ap.sap_config.chan_freq =
-			wlan_reg_chan_to_freq(hdd_ctx->pdev,
-					      hdd_ctx->acs_policy.acs_channel);
+					      hdd_ctx->acs_policy.acs_chan_freq;
 		acs_dfs_mode = hdd_ctx->acs_policy.acs_dfs_mode;
 		adapter->session.ap.sap_config.acs_dfs_mode =
 			wlan_hdd_get_dfs_mode(acs_dfs_mode);
@@ -3845,42 +3821,6 @@ static void wlan_hdd_check_11gmode(const u8 *ie, u8 *require_ht,
 	}
 }
 
-#ifdef WLAN_FEATURE_11AX
-/**
- * wlan_hdd_add_extn_ie() - add extension IE
- * @adapter: Pointer to hostapd adapter
- * @genie: Pointer to ie to be added
- * @total_ielen: Pointer to store total ie length
- * @oui: Pointer to oui
- * @oui_size: Size of oui
- *
- * Return: 0 for success non-zero for failure
- */
-static int wlan_hdd_add_extn_ie(struct hdd_adapter *adapter, uint8_t *genie,
-			   uint16_t *total_ielen, uint8_t *oui,
-			   uint8_t oui_size)
-{
-	const uint8_t *ie;
-	uint16_t ielen = 0;
-	struct hdd_beacon_data *beacon = adapter->session.ap.beacon;
-
-	ie = wlan_get_ext_ie_ptr_from_ext_id(oui, oui_size,
-					     beacon->tail,
-					     beacon->tail_len);
-	if (ie) {
-		ielen = ie[1] + 2;
-		if ((*total_ielen + ielen) <= MAX_GENIE_LEN) {
-			qdf_mem_copy(&genie[*total_ielen], ie, ielen);
-		} else {
-			hdd_err("**Ie Length is too big***");
-			return -EINVAL;
-		}
-		*total_ielen += ielen;
-	}
-	return 0;
-}
-#endif
-
 /**
  * wlan_hdd_add_hostapd_conf_vsie() - configure Vendor IE in sap mode
  * @adapter: Pointer to hostapd adapter
@@ -4126,41 +4066,6 @@ static void wlan_hdd_add_sap_obss_scan_ie(
 #endif
 
 /**
- * wlan_hdd_cfg80211_update_apies() - update ap mode 11ax ies
- * @adapter: Pointer to hostapd adapter
- * @genie: generic IE buffer
- * @total_ielen: out param to update total ielen
- *
- * Return: 0 for success non-zero for failure
- */
-
-#ifdef WLAN_FEATURE_11AX
-static int hdd_update_11ax_apies(struct hdd_adapter *adapter,
-				 uint8_t *genie, uint16_t *total_ielen)
-{
-	if (wlan_hdd_add_extn_ie(adapter, genie, total_ielen,
-			    HE_CAP_OUI_TYPE, HE_CAP_OUI_SIZE)) {
-		hdd_err("Adding HE Cap ie failed");
-		return -EINVAL;
-	}
-
-	if (wlan_hdd_add_extn_ie(adapter, genie, total_ielen,
-			    HE_OP_OUI_TYPE, HE_OP_OUI_SIZE)) {
-		hdd_err("Adding HE Op ie failed");
-		return -EINVAL;
-	}
-
-	return 0;
-}
-#else
-static int hdd_update_11ax_apies(struct hdd_adapter *adapter,
-				 uint8_t *genie, uint16_t *total_ielen)
-{
-	return 0;
-}
-#endif
-
-/**
  * wlan_hdd_cfg80211_update_apies() - update ap mode ies
  * @adapter: Pointer to hostapd adapter
  *
@@ -4210,14 +4115,10 @@ int wlan_hdd_cfg80211_update_apies(struct hdd_adapter *adapter)
 	wlan_hdd_add_hostapd_conf_vsie(adapter, genie,
 				       &total_ielen);
 
-	ret = hdd_update_11ax_apies(adapter, genie, &total_ielen);
-	if (ret)
-		goto done;
-
 	wlan_hdd_add_sap_obss_scan_ie(adapter, genie, &total_ielen);
 
 	qdf_copy_macaddr(&update_ie.bssid, &adapter->mac_addr);
-	update_ie.smeSessionId = adapter->vdev_id;
+	update_ie.vdev_id = adapter->vdev_id;
 
 	if (test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
 		update_ie.ieBufferlength = total_ielen;
@@ -4412,71 +4313,78 @@ QDF_STATUS wlan_hdd_config_acs(struct hdd_context *hdd_ctx,
 			hdd_ctx->skip_acs_scan_status == eSAP_SKIP_ACS_SCAN &&
 			con_sap_config->acs_cfg.hw_mode ==
 						sap_config->acs_cfg.hw_mode) {
-			uint8_t con_sap_st_ch, con_sap_end_ch;
-			uint8_t cur_sap_st_ch, cur_sap_end_ch;
-			uint8_t bandStartChannel, bandEndChannel;
+			uint32_t con_sap_st_ch_freq, con_sap_end_ch_freq;
+			uint32_t cur_sap_st_ch_freq, cur_sap_end_ch_freq;
+			uint32_t bandStartChannel, bandEndChannel;
 
-			con_sap_st_ch =
-					con_sap_config->acs_cfg.start_ch;
-			con_sap_end_ch =
-					con_sap_config->acs_cfg.end_ch;
-			cur_sap_st_ch = sap_config->acs_cfg.start_ch;
-			cur_sap_end_ch = sap_config->acs_cfg.end_ch;
+			con_sap_st_ch_freq =
+					con_sap_config->acs_cfg.start_ch_freq;
+			con_sap_end_ch_freq =
+					con_sap_config->acs_cfg.end_ch_freq;
+			cur_sap_st_ch_freq =
+					sap_config->acs_cfg.start_ch_freq;
+			cur_sap_end_ch_freq =
+					sap_config->acs_cfg.end_ch_freq;
 
-			wlansap_extend_to_acs_range(mac_handle, &cur_sap_st_ch,
-					&cur_sap_end_ch, &bandStartChannel,
-					&bandEndChannel);
-
-			wlansap_extend_to_acs_range(mac_handle,
-					&con_sap_st_ch, &con_sap_end_ch,
+			wlansap_extend_to_acs_range(
+					mac_handle, &cur_sap_st_ch_freq,
+					&cur_sap_end_ch_freq,
 					&bandStartChannel, &bandEndChannel);
 
-			if (con_sap_st_ch <= cur_sap_st_ch &&
-					con_sap_end_ch >= cur_sap_end_ch) {
+			wlansap_extend_to_acs_range(
+					mac_handle, &con_sap_st_ch_freq,
+					&con_sap_end_ch_freq,
+					&bandStartChannel, &bandEndChannel);
+
+			if (con_sap_st_ch_freq <= cur_sap_st_ch_freq &&
+			    con_sap_end_ch_freq >= cur_sap_end_ch_freq) {
 				sap_config->acs_cfg.skip_scan_status =
 							eSAP_SKIP_ACS_SCAN;
 
-			} else if (con_sap_st_ch >= cur_sap_st_ch &&
-					con_sap_end_ch >= cur_sap_end_ch) {
+			} else if (con_sap_st_ch_freq >= cur_sap_st_ch_freq &&
+				   con_sap_end_ch_freq >=
+						cur_sap_end_ch_freq) {
 				sap_config->acs_cfg.skip_scan_status =
 							eSAP_DO_PAR_ACS_SCAN;
 
 				sap_config->acs_cfg.skip_scan_range1_stch =
-							cur_sap_st_ch;
+							cur_sap_st_ch_freq;
 				sap_config->acs_cfg.skip_scan_range1_endch =
-							con_sap_st_ch - 1;
+							con_sap_st_ch_freq - 5;
 				sap_config->acs_cfg.skip_scan_range2_stch =
 							0;
 				sap_config->acs_cfg.skip_scan_range2_endch =
 							0;
 
-			} else if (con_sap_st_ch <= cur_sap_st_ch &&
-				con_sap_end_ch <= cur_sap_end_ch) {
+			} else if (con_sap_st_ch_freq <= cur_sap_st_ch_freq &&
+				   con_sap_end_ch_freq <=
+						cur_sap_end_ch_freq) {
 				sap_config->acs_cfg.skip_scan_status =
 							eSAP_DO_PAR_ACS_SCAN;
 
 				sap_config->acs_cfg.skip_scan_range1_stch =
-							con_sap_end_ch + 1;
+							con_sap_end_ch_freq + 5;
 				sap_config->acs_cfg.skip_scan_range1_endch =
-							cur_sap_end_ch;
+							cur_sap_end_ch_freq;
 				sap_config->acs_cfg.skip_scan_range2_stch =
 							0;
 				sap_config->acs_cfg.skip_scan_range2_endch =
 							0;
 
-			} else if (con_sap_st_ch >= cur_sap_st_ch &&
-				con_sap_end_ch <= cur_sap_end_ch) {
+			} else if (con_sap_st_ch_freq >= cur_sap_st_ch_freq &&
+				   con_sap_end_ch_freq <=
+						cur_sap_end_ch_freq) {
 				sap_config->acs_cfg.skip_scan_status =
 							eSAP_DO_PAR_ACS_SCAN;
 
 				sap_config->acs_cfg.skip_scan_range1_stch =
-							cur_sap_st_ch;
+							cur_sap_st_ch_freq;
 				sap_config->acs_cfg.skip_scan_range1_endch =
-							con_sap_st_ch - 1;
+							con_sap_st_ch_freq - 5;
 				sap_config->acs_cfg.skip_scan_range2_stch =
-							con_sap_end_ch;
+							con_sap_end_ch_freq;
 				sap_config->acs_cfg.skip_scan_range2_endch =
-							cur_sap_end_ch + 1;
+						cur_sap_end_ch_freq + 5;
 
 			} else
 				sap_config->acs_cfg.skip_scan_status =
@@ -4636,19 +4544,18 @@ void hdd_check_and_disconnect_sta_on_invalid_channel(
 		struct hdd_context *hdd_ctx)
 {
 	struct hdd_adapter *sta_adapter;
-	uint8_t sta_chan;
+	uint32_t sta_chan_freq;
 
-	sta_chan = hdd_get_operating_channel(hdd_ctx, QDF_STA_MODE);
-
-	if (!sta_chan) {
+	sta_chan_freq = hdd_get_operating_chan_freq(hdd_ctx, QDF_STA_MODE);
+	if (!sta_chan_freq) {
 		hdd_err("STA not connected");
 		return;
 	}
 
-	hdd_err("STA connected on chan %d", sta_chan);
+	hdd_err("STA connected on %d", sta_chan_freq);
 
-	if (sme_is_channel_valid(hdd_ctx->mac_handle, sta_chan)) {
-		hdd_err("STA connected on chan %d and it is valid", sta_chan);
+	if (sme_is_channel_valid(hdd_ctx->mac_handle, sta_chan_freq)) {
+		hdd_err("STA connected on %d and it is valid", sta_chan_freq);
 		return;
 	}
 
@@ -4659,7 +4566,7 @@ void hdd_check_and_disconnect_sta_on_invalid_channel(
 		return;
 	}
 
-	hdd_err("chan %d not valid, issue disconnect", sta_chan);
+	hdd_err("chan %d not valid, issue disconnect", sta_chan_freq);
 	/* Issue Disconnect request */
 	wlan_hdd_disconnect(sta_adapter, eCSR_DISCONNECT_REASON_DEAUTH);
 }
@@ -5078,9 +4985,6 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 
 	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
 
-	clear_bit(ACS_PENDING, &adapter->event_flags);
-	clear_bit(ACS_IN_PROGRESS, &hdd_ctx->g_event_flags);
-
 	config = &adapter->session.ap.sap_config;
 	if (!config->chan_freq) {
 		hdd_err("Invalid channel");
@@ -5142,13 +5046,12 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 	hdd_debug("acs_mode %d", config->acs_cfg.acs_mode);
 
 	if (config->acs_cfg.acs_mode == true) {
-		hdd_debug("acs_channel %d, acs_dfs_mode %d",
-			hdd_ctx->acs_policy.acs_channel,
-			hdd_ctx->acs_policy.acs_dfs_mode);
+		hdd_debug("acs_chan_freq %u, acs_dfs_mode %u",
+			  hdd_ctx->acs_policy.acs_chan_freq,
+			  hdd_ctx->acs_policy.acs_dfs_mode);
 
-		if (hdd_ctx->acs_policy.acs_channel)
-			config->chan_freq = wlan_reg_chan_to_freq(hdd_ctx->pdev,
-					    hdd_ctx->acs_policy.acs_channel);
+		if (hdd_ctx->acs_policy.acs_chan_freq)
+			config->chan_freq = hdd_ctx->acs_policy.acs_chan_freq;
 		mode = hdd_ctx->acs_policy.acs_dfs_mode;
 		config->acs_dfs_mode = wlan_hdd_get_dfs_mode(mode);
 	}
@@ -5831,6 +5734,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 
 			if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 				hdd_err("qdf wait for single_event failed!!");
+				hdd_sap_indicate_disconnect_for_sta(adapter);
 				QDF_ASSERT(0);
 			}
 		}
@@ -5866,7 +5770,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	}
 
 	qdf_copy_macaddr(&update_ie.bssid, &adapter->mac_addr);
-	update_ie.smeSessionId = adapter->vdev_id;
+	update_ie.vdev_id = adapter->vdev_id;
 	update_ie.ieBufferlength = 0;
 	update_ie.pAdditionIEBuffer = NULL;
 	update_ie.append = true;
@@ -6029,7 +5933,7 @@ static void hdd_update_beacon_rate(struct hdd_adapter *adapter,
 /**
  * wlan_hdd_ap_ap_force_scc_override() - force Same band SCC chan override
  * @adapter: SAP adapter pointer
- * @channel: SAP starting channel
+ * @freq: SAP starting channel freq
  * @new_chandef: new override SAP channel
  *
  * The function will override the second SAP chan to the first SAP's home
@@ -6039,19 +5943,18 @@ static void hdd_update_beacon_rate(struct hdd_adapter *adapter,
  */
 static bool
 wlan_hdd_ap_ap_force_scc_override(struct hdd_adapter *adapter,
-				  uint8_t channel,
+				  uint32_t freq,
 				  struct cfg80211_chan_def *new_chandef)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	uint32_t cc_count, i;
-	uint8_t op_ch[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	uint32_t op_freq[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	uint8_t vdev_id[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	struct ch_params ch_params;
 	enum nl80211_channel_type channel_type;
 	struct hdd_adapter *con_adapter;
 	uint8_t con_vdev_id;
-	uint8_t con_chan;
+	uint32_t con_freq;
 	uint8_t mcc_to_scc_switch;
 	struct ieee80211_channel *ieee_chan;
 
@@ -6084,25 +5987,23 @@ wlan_hdd_ap_ap_force_scc_override(struct hdd_adapter *adapter,
 					&vdev_id[cc_count],
 					PM_P2P_GO_MODE);
 	for (i = 0 ; i < cc_count; i++) {
-		op_ch[i] = wlan_freq_to_chan(op_freq[i]);
-
-		if (channel == op_ch[i])
+		if (freq == op_freq[i])
 			continue;
 		if (!policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc))
 			break;
-		if (wlan_reg_is_same_band_channels(channel,
-						   op_ch[i]))
+		if (wlan_reg_is_same_band_freqs(freq,
+						op_freq[i]))
 			break;
 	}
 	if (i >= cc_count)
 		return false;
-	con_chan = op_ch[i];
+	con_freq = op_freq[i];
 	con_vdev_id = vdev_id[i];
 	con_adapter = hdd_get_adapter_by_vdev(hdd_ctx, con_vdev_id);
 	if (!con_adapter)
 		return false;
 	ieee_chan = ieee80211_get_channel(hdd_ctx->wiphy,
-					  cds_chan_to_freq(con_chan));
+					  con_freq);
 	if (!ieee_chan) {
 		hdd_err("channel converion failed");
 		return false;
@@ -6110,9 +6011,9 @@ wlan_hdd_ap_ap_force_scc_override(struct hdd_adapter *adapter,
 
 	if (!wlan_sap_get_ch_params(WLAN_HDD_GET_SAP_CTX_PTR(con_adapter),
 				    &ch_params))
-		wlan_reg_set_channel_params(hdd_ctx->pdev,
-					    con_chan, 0,
-					    &ch_params);
+		wlan_reg_set_channel_params_for_freq(hdd_ctx->pdev,
+						     con_freq, 0,
+						     &ch_params);
 	switch (ch_params.sec_ch_offset) {
 	case PHY_SINGLE_CHANNEL_CENTERED:
 		channel_type = NL80211_CHAN_HT20;
@@ -6134,9 +6035,8 @@ wlan_hdd_ap_ap_force_scc_override(struct hdd_adapter *adapter,
 		break;
 	case CH_WIDTH_80P80MHZ:
 		new_chandef->width = NL80211_CHAN_WIDTH_80P80;
-		if (ch_params.center_freq_seg1)
-			new_chandef->center_freq2 = cds_chan_to_freq(
-				ch_params.center_freq_seg1);
+		if (ch_params.mhz_freq_seg1)
+			new_chandef->center_freq2 = ch_params.mhz_freq_seg1;
 		break;
 	case CH_WIDTH_160MHZ:
 		new_chandef->width = NL80211_CHAN_WIDTH_160;
@@ -6147,13 +6047,12 @@ wlan_hdd_ap_ap_force_scc_override(struct hdd_adapter *adapter,
 	if ((ch_params.ch_width == CH_WIDTH_80MHZ) ||
 	    (ch_params.ch_width == CH_WIDTH_80P80MHZ) ||
 	    (ch_params.ch_width == CH_WIDTH_160MHZ)) {
-		if (ch_params.center_freq_seg0)
-			new_chandef->center_freq1 = cds_chan_to_freq(
-				ch_params.center_freq_seg0);
+		if (ch_params.mhz_freq_seg0)
+			new_chandef->center_freq1 = ch_params.mhz_freq_seg0;
 	}
 
-	hdd_debug("override AP ch %d to first AP(vdev_id %d) chan:%d width:%d freq1:%d freq2:%d ",
-		  channel, con_vdev_id, new_chandef->chan->center_freq,
+	hdd_debug("override AP freq %d to first AP(vdev_id %d) center_freq:%d width:%d freq1:%d freq2:%d ",
+		  freq, con_vdev_id, new_chandef->chan->center_freq,
 		  new_chandef->width, new_chandef->center_freq1,
 		  new_chandef->center_freq2);
 	return true;
@@ -6257,7 +6156,8 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	chandef = &params->chandef;
 	if ((adapter->device_mode == QDF_SAP_MODE ||
 	     adapter->device_mode == QDF_P2P_GO_MODE) &&
-	    wlan_hdd_ap_ap_force_scc_override(adapter, channel,
+	    wlan_hdd_ap_ap_force_scc_override(adapter,
+					      chandef->chan->center_freq,
 					      &new_chandef)) {
 		chandef = &new_chandef;
 		channel = ieee80211_frequency_to_channel(
@@ -6669,6 +6569,7 @@ void hdd_sap_indicate_disconnect_for_sta(struct hdd_adapter *adapter)
 	uint8_t index = 0;
 	struct sap_context *sap_ctx;
 	struct hdd_station_info *sta_info;
+	struct hdd_sta_info_entry *tmp;
 
 	hdd_enter();
 
@@ -6678,12 +6579,15 @@ void hdd_sap_indicate_disconnect_for_sta(struct hdd_adapter *adapter)
 		return;
 	}
 
-	hdd_for_each_station(adapter->sta_info_list, sta_info, index) {
+	hdd_for_each_station_safe(adapter->sta_info_list, sta_info, index,
+				  tmp) {
 		hdd_debug("sta_mac: " QDF_MAC_ADDR_STR,
 			  QDF_MAC_ADDR_ARRAY(sta_info->sta_mac.bytes));
 
-		if (qdf_is_macaddr_broadcast(&sta_info->sta_mac))
+		if (qdf_is_macaddr_broadcast(&sta_info->sta_mac)) {
+			hdd_softap_deregister_sta(adapter, sta_info);
 			continue;
+		}
 
 		sap_event.sapHddEventCode = eSAP_STA_DISASSOC_EVENT;
 

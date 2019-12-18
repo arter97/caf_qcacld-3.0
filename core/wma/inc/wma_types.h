@@ -379,9 +379,6 @@
 #define WMA_LED_FLASHING_REQ   SIR_HAL_LED_FLASHING_REQ
 #endif
 
-/* Message posted by wmi when wmi event is received from FW */
-#define WMA_PROCESS_FW_EVENT		     SIR_HAL_PROCESS_FW_EVENT
-
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE
 #define WMA_UPDATE_Q2Q_IE_IND                 SIR_HAL_UPDATE_Q2Q_IE_IND
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
@@ -668,10 +665,13 @@ void wma_tx_abort(uint8_t vdev_id);
  * @txDir: tx diection
  * @tid: TID
  * @tx_frm_download_comp_cb: tx download callback handler
+ * @pData: tx packet
  * @tx_frm_ota_comp_cb: OTA complition handler
  * @tx_flag: tx flag
  * @vdev_id: vdev id
- * @tdlsFlag: tdls flag
+ * @tdls_flag: tdls flag
+ * @channel_freq: channel frequency
+ * @rid: rate id
  *
  * This function sends the frame corresponding to the
  * given vdev id.
@@ -684,7 +684,7 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 			 wma_tx_dwnld_comp_callback tx_frm_download_comp_cb,
 			 void *pData,
 			 wma_tx_ota_comp_callback tx_frm_ota_comp_cb,
-			 uint8_t tx_flag, uint8_t vdev_id, bool tdlsFlag,
+			 uint8_t tx_flag, uint8_t vdev_id, bool tdls_flag,
 			 uint16_t channel_freq, enum rateid rid);
 
 /**

@@ -39,10 +39,10 @@ bool ucfg_ipa_uc_is_enabled(void)
 	return ipa_config_is_uc_enabled();
 }
 
-void ucfg_ipa_set_txrx_handle(struct wlan_objmgr_psoc *psoc,
-				    void *txrx_handle)
+void ucfg_ipa_set_pdev_id(struct wlan_objmgr_psoc *psoc,
+			  uint8_t pdev_id)
 {
-	return ipa_set_txrx_handle(psoc, txrx_handle);
+	return ipa_set_pdev_id(psoc, pdev_id);
 }
 
 void ucfg_ipa_set_dp_handle(struct wlan_objmgr_psoc *psoc,
@@ -146,6 +146,11 @@ QDF_STATUS ucfg_ipa_uc_ol_init(struct wlan_objmgr_pdev *pdev,
 QDF_STATUS ucfg_ipa_uc_ol_deinit(struct wlan_objmgr_pdev *pdev)
 {
 	return ipa_uc_ol_deinit(pdev);
+}
+
+bool ucfg_ipa_is_tx_pending(struct wlan_objmgr_pdev *pdev)
+{
+	return ipa_is_tx_pending(pdev);
 }
 
 QDF_STATUS ucfg_ipa_send_mcc_scc_msg(struct wlan_objmgr_pdev *pdev,

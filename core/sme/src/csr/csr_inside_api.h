@@ -51,7 +51,7 @@
 #define CSR_MAX_BSSID_COUNT     (SME_ACTIVE_LIST_CMD_TIMEOUT_VALUE/5000) - 1
 #define CSR_CUSTOM_CONC_GO_BI    100
 extern uint8_t csr_wpa_oui[][CSR_WPA_OUI_SIZE];
-bool csr_is_supported_channel(struct mac_context *mac, uint8_t channelId);
+bool csr_is_supported_channel(struct mac_context *mac, uint32_t chan_freq);
 
 enum csr_scancomplete_nextcommand {
 	eCsrNextScanNothing,
@@ -298,37 +298,32 @@ bool csr_is_phy_mode_match(struct mac_context *mac, uint32_t phyMode,
 			   struct csr_roam_profile *pProfile,
 			   enum csr_cfgdot11mode *pReturnCfgDot11Mode,
 			   tDot11fBeaconIEs *pIes);
-bool csr_roam_is_channel_valid(struct mac_context *mac, uint8_t ch_freq);
 
 /**
- * csr_roam_is_chan_freq_valid() - validate channel frequency
+ * csr_roam_is_channel_valid() - validate channel frequency
  * @mac: mac context
- * @freq: channel frequency
+ * @chan_freq: channel frequency
  *
  * This function validates channel frequency present in valid channel
  * list or not.
  *
  * Return: true or false
  */
-bool csr_roam_is_chan_freq_valid(struct mac_context *mac, uint32_t freq);
+bool csr_roam_is_channel_valid(struct mac_context *mac, uint32_t chan_freq);
 
-/* pNumChan is a caller allocated space with the sizeof pChannels */
-QDF_STATUS csr_get_cfg_valid_channels(struct mac_context *mac,
-				      uint32_t *ch_freq_list,
-				      uint32_t *num_ch_freq);
 /**
- * csr_get_cfg_valid_freqs() - Get valid channel frequency list
+ * csr_get_cfg_valid_channels() - Get valid channel frequency list
  * @mac: mac context
- * @freq_list: valid channel frequencies
- * @num_of_freq: valid channel nummber
+ * @ch_freq_list: valid channel frequencies
+ * @num_ch_freq: valid channel nummber
  *
  * This function returns the valid channel frequencies.
  *
  * Return: QDF_STATUS_SUCCESS for success.
  */
-QDF_STATUS csr_get_cfg_valid_freqs(struct mac_context *mac,
-				   uint32_t *freq_list,
-				   uint32_t *num_of_freq);
+QDF_STATUS csr_get_cfg_valid_channels(struct mac_context *mac,
+				      uint32_t *ch_freq_list,
+				      uint32_t *num_ch_freq);
 
 int8_t csr_get_cfg_max_tx_power(struct mac_context *mac, uint32_t ch_freq);
 
@@ -382,7 +377,7 @@ QDF_STATUS csr_roam_vdev_delete(struct mac_context *mac_ctx,
 				uint8_t vdev_id, bool cleanup);
 
 /*
- * csr_cleanup_session() - CSR api to cleanup vdev
+ * csr_cleanup_vdev_session() - CSR api to cleanup vdev
  * @mac_ctx: pointer to mac context
  * @vdev_id: vdev id to be deleted.
  *
@@ -391,7 +386,7 @@ QDF_STATUS csr_roam_vdev_delete(struct mac_context *mac_ctx,
  *
  * Return QDF_STATUS
  */
-void csr_cleanup_session(struct mac_context *mac, uint8_t vdev_id);
+void csr_cleanup_vdev_session(struct mac_context *mac, uint8_t vdev_id);
 
 QDF_STATUS csr_roam_get_session_id_from_bssid(struct mac_context *mac,
 						struct qdf_mac_addr *bssid,
@@ -572,9 +567,18 @@ void csr_release_command_buffer(struct mac_context *mac, tSmeCmd *pCommand);
 bool csr_is_profile_wapi(struct csr_roam_profile *pProfile);
 #endif /* FEATURE_WLAN_WAPI */
 
-void csr_get_vdev_type_nss(struct mac_context *mac_ctx,
-		enum QDF_OPMODE dev_mode,
-		uint8_t *nss_2g, uint8_t *nss_5g);
+/**
+ * csr_get_vdev_type_nss() - gets the nss value based on vdev type
+ * @dev_mode: current device operating mode.
+ * @nss2g: Pointer to the 2G Nss parameter.
+ * @nss5g: Pointer to the 5G Nss parameter.
+ *
+ * Fills the 2G and 5G Nss values based on device mode.
+ *
+ * Return: None
+ */
+void csr_get_vdev_type_nss(enum QDF_OPMODE dev_mode, uint8_t *nss_2g,
+			   uint8_t *nss_5g);
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_CSR
 
@@ -1125,16 +1129,15 @@ csr_scan_get_channel_for_hw_mode_change(
 	struct mac_context *mac_ctx, uint32_t session_id,
 	struct csr_roam_profile *profile);
 /**
- * csr_create_vdev() - API to create vdev
- * @mac_ctx: pointer to mac context
- * @vdev: vdev object
- * @session_param: Session params
+ * csr_setup_vdev_session() - API to setup vdev mac session
+ * @vdev_mlme: vdev mlme private object
+ *
+ * This API setsup the vdev session for the mac layer
  *
  * Returns: QDF_STATUS
  */
-QDF_STATUS csr_create_vdev(struct mac_context *mac,
-			   struct wlan_objmgr_vdev *vdev,
-			   struct sme_session_params *session_param);
+QDF_STATUS csr_setup_vdev_session(struct vdev_mlme_obj *vdev_mlme);
+
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_CSR
 /**

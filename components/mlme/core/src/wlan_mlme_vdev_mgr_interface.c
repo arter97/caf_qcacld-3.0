@@ -834,6 +834,66 @@ void mlme_get_mbssid_info(struct wlan_objmgr_vdev *vdev,
 	mbss_11ax = &vdev_mlme->mgmt.mbss_11ax;
 }
 
+QDF_STATUS mlme_set_tx_power(struct wlan_objmgr_vdev *vdev,
+			     int8_t tx_power)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+
+	if (!vdev_mlme) {
+		mlme_legacy_err("vdev component object is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	vdev_mlme->mgmt.generic.tx_power = tx_power;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+int8_t mlme_get_tx_power(struct wlan_objmgr_vdev *vdev)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme) {
+		mlme_legacy_err("vdev component object is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return vdev_mlme->mgmt.generic.tx_power;
+}
+
+QDF_STATUS mlme_set_max_reg_power(struct wlan_objmgr_vdev *vdev,
+				 int8_t max_reg_power)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+
+	if (!vdev_mlme) {
+		mlme_legacy_err("vdev component object is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	vdev_mlme->mgmt.generic.maxregpower = max_reg_power;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+int8_t mlme_get_max_reg_power(struct wlan_objmgr_vdev *vdev)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme) {
+		mlme_legacy_err("vdev component object is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return vdev_mlme->mgmt.generic.maxregpower;
+}
+
 /**
  * vdevmgr_mlme_ext_hdl_create () - Create mlme legacy priv object
  * @vdev_mlme: vdev mlme object
@@ -1112,32 +1172,109 @@ vdevmgr_vdev_start_rsp_handle(struct vdev_mlme_obj *vdev_mlme,
 	return status;
 }
 
-QDF_STATUS mlme_vdev_create_send(struct wlan_objmgr_vdev *vdev)
+QDF_STATUS mlme_vdev_self_peer_create(struct wlan_objmgr_vdev *vdev)
 {
-	struct vdev_mlme_obj *vdev_mlme = NULL;
-	QDF_STATUS status;
+	struct vdev_mlme_obj *vdev_mlme;
 
 	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
 	if (!vdev_mlme) {
 		mlme_err("Failed to get vdev mlme obj for vdev id %d",
 			 wlan_vdev_get_id(vdev));
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return wma_vdev_self_peer_create(vdev_mlme);
+}
+
+/**
+ * mlme_get_vdev_types() - get vdev type and subtype from its operation mode
+ * @mode: operation mode of vdev
+ * @type: type of vdev
+ * @sub_type: sub_type of vdev
+ *
+ * This API is called to get vdev type and subtype from its operation mode.
+ * Vdev operation modes are defined in enum QDF_OPMODE.
+ *
+ * Type of vdev are WLAN_VDEV_MLME_TYPE_AP, WLAN_VDEV_MLME_TYPE_STA,
+ * WLAN_VDEV_MLME_TYPE_IBSS, ,WLAN_VDEV_MLME_TYPE_MONITOR,
+ * WLAN_VDEV_MLME_TYPE_NAN, WLAN_VDEV_MLME_TYPE_OCB, WLAN_VDEV_MLME_TYPE_NDI
+ *
+ * Sub_types of vdev are WLAN_VDEV_MLME_SUBTYPE_P2P_DEVICE,
+ * WLAN_VDEV_MLME_SUBTYPE_P2P_CLIENT, WLAN_VDEV_MLME_SUBTYPE_P2P_GO,
+ * WLAN_VDEV_MLME_SUBTYPE_PROXY_STA, WLAN_VDEV_MLME_SUBTYPE_MESH
+ * Return: QDF_STATUS
+ */
+
+static QDF_STATUS mlme_get_vdev_types(enum QDF_OPMODE mode, uint8_t *type,
+				      uint8_t *sub_type)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	*type = 0;
+	*sub_type = 0;
+
+	switch (mode) {
+	case QDF_STA_MODE:
+		*type = WLAN_VDEV_MLME_TYPE_STA;
+		break;
+	case QDF_SAP_MODE:
+		*type = WLAN_VDEV_MLME_TYPE_AP;
+		break;
+	case QDF_P2P_DEVICE_MODE:
+		*type = WLAN_VDEV_MLME_TYPE_AP;
+		*sub_type = WLAN_VDEV_MLME_SUBTYPE_P2P_DEVICE;
+		break;
+	case QDF_P2P_CLIENT_MODE:
+		*type = WLAN_VDEV_MLME_TYPE_STA;
+		*sub_type = WLAN_VDEV_MLME_SUBTYPE_P2P_CLIENT;
+		break;
+	case QDF_P2P_GO_MODE:
+		*type = WLAN_VDEV_MLME_TYPE_AP;
+		*sub_type = WLAN_VDEV_MLME_SUBTYPE_P2P_GO;
+		break;
+	case QDF_OCB_MODE:
+		*type = WLAN_VDEV_MLME_TYPE_OCB;
+		break;
+	case QDF_IBSS_MODE:
+		*type = WLAN_VDEV_MLME_TYPE_IBSS;
+		break;
+	case QDF_MONITOR_MODE:
+		*type = WMI_HOST_VDEV_TYPE_MONITOR;
+		break;
+	case QDF_NDI_MODE:
+		*type = WLAN_VDEV_MLME_TYPE_NDI;
+		break;
+	default:
+		mlme_err("Invalid device mode %d", mode);
 		status = QDF_STATUS_E_INVAL;
-		goto return_status;
+		break;
+	}
+	return status;
+}
+
+static
+QDF_STATUS vdevmgr_mlme_ext_post_hdl_create(struct vdev_mlme_obj *vdev_mlme)
+{
+	QDF_STATUS status;
+
+	sme_get_vdev_type_nss(wlan_vdev_mlme_get_opmode(vdev_mlme->vdev),
+			      &vdev_mlme->proto.generic.nss_2g,
+			      &vdev_mlme->proto.generic.nss_5g);
+
+	status = mlme_get_vdev_types(wlan_vdev_mlme_get_opmode(vdev_mlme->vdev),
+				     &vdev_mlme->mgmt.generic.type,
+				     &vdev_mlme->mgmt.generic.subtype);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_err("Get vdev type failed; status:%d", status);
+		return status;
 	}
 
 	status = vdev_mgr_create_send(vdev_mlme);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mlme_err("Failed to create vdev for vdev id %d",
-			 wlan_vdev_get_id(vdev));
-		goto return_status;
+			 wlan_vdev_get_id(vdev_mlme->vdev));
+		return status;
 	}
 
-	status = wma_post_vdev_create_setup(vdev);
-
-	if (QDF_IS_STATUS_ERROR(status))
-		vdev_mgr_delete_send(vdev_mlme);
-
-return_status:
 	return status;
 }
 
@@ -1250,20 +1387,10 @@ static struct vdev_mlme_ops mon_mlme_ops = {
 	.mlme_vdev_ext_start_rsp = vdevmgr_vdev_start_rsp_handle,
 };
 
-/**
- * struct mlme_ext_ops - MLME legacy global callbacks structure
- * @mlme_psoc_ext_hdl_create:           callback to invoke creation of legacy
- *                                      psoc object
- * @mlme_psoc_ext_hdl_destroy:          callback to invoke destroy of legacy
- *                                      psoc object
- * @mlme_vdev_ext_hdl_create:           callback to invoke creation of legacy
- *                                      vdev object
- * @mlme_vdev_ext_hdl_destroy:          callback to invoke destroy of legacy
- *                                      vdev object
- */
 static struct mlme_ext_ops ext_ops = {
 	.mlme_psoc_ext_hdl_create = psoc_mlme_ext_hdl_create,
 	.mlme_psoc_ext_hdl_destroy = psoc_mlme_ext_hdl_destroy,
 	.mlme_vdev_ext_hdl_create = vdevmgr_mlme_ext_hdl_create,
 	.mlme_vdev_ext_hdl_destroy = vdevmgr_mlme_ext_hdl_destroy,
+	.mlme_vdev_ext_hdl_post_create = vdevmgr_mlme_ext_post_hdl_create,
 };

@@ -57,8 +57,7 @@ ap_beacon_process_5_ghz(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	if (!session->htCapability)
 		return;
 
-	if (bcn_struct->channelNumber != wlan_reg_freq_to_chan(
-		mac_ctx->pdev, session->curr_op_freq))
+	if (bcn_struct->chan_freq != session->curr_op_freq)
 		return;
 
 	/* 11a (non HT) AP  overlaps or */
@@ -101,8 +100,7 @@ ap_beacon_process_24_ghz(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	/* We are 11G AP. */
 	if ((phy_mode == WNI_CFG_PHY_MODE_11G) &&
 	    (false == session->htCapability)) {
-		if (bcn_struct->channelNumber != wlan_reg_freq_to_chan(
-			mac_ctx->pdev, session->curr_op_freq))
+		if (bcn_struct->chan_freq != session->curr_op_freq)
 			return;
 
 		tmp_exp = (!bcn_struct->erpPresent &&
@@ -131,8 +129,7 @@ ap_beacon_process_24_ghz(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	if (!session->htCapability)
 		return;
 
-	if (bcn_struct->channelNumber != wlan_reg_freq_to_chan(
-		mac_ctx->pdev, session->curr_op_freq))
+	if (bcn_struct->chan_freq != session->curr_op_freq)
 		return;
 
 	tmp_exp = (!bcn_struct->erpPresent && !bcn_struct->HTInfo.present) ||
@@ -224,16 +221,16 @@ ap_beacon_process(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		  tpUpdateBeaconParams bcn_prm, struct pe_session *session)
 {
 	uint32_t phy_mode;
-	enum band_info rf_band = BAND_UNKNOWN;
+	enum reg_wifi_band rf_band = REG_BAND_UNKNOWN;
 	/* Get RF band from session */
 	rf_band = session->limRFBand;
 
 	lim_get_phy_mode(mac_ctx, &phy_mode, session);
 
-	if (BAND_5G == rf_band)
+	if (REG_BAND_5G == rf_band)
 		ap_beacon_process_5_ghz(mac_ctx, rx_pkt_info, bcn_struct,
 					bcn_prm, session, phy_mode);
-	else if (BAND_2G == rf_band)
+	else if (REG_BAND_2G == rf_band)
 		ap_beacon_process_24_ghz(mac_ctx, rx_pkt_info, bcn_struct,
 					 bcn_prm, session, phy_mode);
 }
@@ -351,12 +348,9 @@ sch_bcn_process_sta(struct mac_context *mac_ctx,
 	 * This is the Beacon received from the AP  we're currently associated
 	 * with. Check if there are any changes in AP's capabilities
 	 */
-	if (bcn->channelNumber != wlan_reg_freq_to_chan(
-		mac_ctx->pdev, session->curr_op_freq)) {
+	if (bcn->chan_freq != session->curr_op_freq) {
 		pe_err("Channel Change freq from %d --> %d - Ignoring beacon!",
-		       session->curr_op_freq,
-		       wlan_reg_chan_to_freq(
-				mac_ctx->pdev, bcn->channelNumber));
+		       session->curr_op_freq, bcn->chan_freq);
 		return false;
 	}
 
@@ -810,6 +804,7 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 	tpSirMacMgmtHdr pMh = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
 	int8_t regMax = 0, maxTxPower = 0, local_constraint;
 	struct lim_max_tx_pwr_attr tx_pwr_attr = {0};
+	uint32_t chan_freq = 0;
 
 	qdf_mem_zero(&beaconParams, sizeof(tUpdateBeaconParams));
 	beaconParams.paramChangeBitmap = 0;
@@ -859,9 +854,8 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 					rx_pkt_info, session,
 					&beaconParams, &sendProbeReq, pMh);
 	/* Obtain the Max Tx power for the current regulatory  */
-	regMax = lim_get_regulatory_max_transmit_power(
-				mac_ctx, wlan_reg_freq_to_chan(
-				mac_ctx->pdev, session->curr_op_freq));
+	regMax = wlan_reg_get_channel_reg_power_for_freq(
+				mac_ctx->pdev, session->curr_op_freq);
 
 	local_constraint = regMax;
 
@@ -901,12 +895,12 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 	}
 
 	/* Indicate to LIM that Beacon is received */
-	if (bcn->HTInfo.present)
-		lim_received_hb_handler(mac_ctx,
-				(uint8_t) bcn->HTInfo.primaryChannel, session);
-	else
-		lim_received_hb_handler(mac_ctx, (uint8_t) bcn->channelNumber,
-				session);
+	if (bcn->HTInfo.present) {
+		chan_freq = wlan_reg_legacy_chan_to_freq(mac_ctx->pdev,
+							 bcn->HTInfo.primaryChannel);
+		lim_received_hb_handler(mac_ctx, chan_freq, session);
+	} else
+		lim_received_hb_handler(mac_ctx, bcn->chan_freq, session);
 
 	/*
 	 * I don't know if any additional IE is required here. Currently, not
@@ -1108,8 +1102,7 @@ void sch_send_beacon_report(struct mac_context *mac_ctx,
 		qdf_mem_copy(&beacon_report.time_stamp,
 			     &beacon_struct->timeStamp, sizeof(qdf_time_t));
 		beacon_report.beacon_interval = beacon_struct->beaconInterval;
-		beacon_report.frequency =
-				cds_chan_to_freq(beacon_struct->channelNumber);
+		beacon_report.frequency = beacon_struct->chan_freq;
 
 		beacon_report.ssid.length = beacon_struct->ssId.length;
 		qdf_mem_copy(&beacon_report.ssid.ssid,
@@ -1119,6 +1112,8 @@ void sch_send_beacon_report(struct mac_context *mac_ctx,
 		beacon_report.boot_time =
 				qdf_do_div(qdf_get_monotonic_boottime(),
 					   QDF_MC_TIMER_TO_MS_UNIT);
+
+		beacon_report.vdev_id = session->vdev_id;
 
 		/* Send report to upper layer */
 		mac_ctx->lim.sme_bcn_rcv_callback(mac_ctx->hdd_handle,
@@ -1330,7 +1325,7 @@ QDF_STATUS lim_obss_generate_detection_config(struct mac_context *mac_ctx,
 					      struct obss_detection_cfg *cfg)
 {
 	uint32_t phy_mode;
-	enum band_info rf_band = BAND_UNKNOWN;
+	enum reg_wifi_band rf_band = REG_BAND_UNKNOWN;
 	struct obss_detection_cfg *cur_detect;
 
 	if (!mac_ctx || !session || !cfg) {
@@ -1366,7 +1361,7 @@ QDF_STATUS lim_obss_generate_detection_config(struct mac_context *mac_ctx,
 		 cur_detect->obss_ht_mixed_detect_mode,
 		 cur_detect->obss_ht_20mhz_detect_mode);
 
-	if (rf_band == BAND_2G) {
+	if (rf_band == REG_BAND_2G) {
 		if ((phy_mode == WNI_CFG_PHY_MODE_11G ||
 		    session->htCapability) &&
 		    !session->gLim11bParams.protectionEnabled) {
@@ -1428,7 +1423,7 @@ QDF_STATUS lim_obss_generate_detection_config(struct mac_context *mac_ctx,
 				OBSS_OFFLOAD_DETECTION_DISABLED;
 	}
 
-	if ((rf_band == BAND_5G) && session->htCapability) {
+	if ((rf_band == REG_BAND_5G) && session->htCapability) {
 		if (!session->gLim11aParams.protectionEnabled) {
 			if (!session->gLimOverlap11aParams.protectionEnabled)
 				cfg->obss_11a_detect_mode =
@@ -1442,7 +1437,7 @@ QDF_STATUS lim_obss_generate_detection_config(struct mac_context *mac_ctx,
 		}
 	}
 
-	if (((rf_band == BAND_2G) || (rf_band == BAND_5G)) &&
+	if (((rf_band == REG_BAND_2G) || (rf_band == REG_BAND_5G)) &&
 	    session->htCapability) {
 
 		if (!session->gLimHt20Params.protectionEnabled) {
@@ -1561,7 +1556,7 @@ QDF_STATUS lim_process_obss_detection_ind(struct mac_context *mac_ctx,
 	bool enable;
 	struct pe_session *session;
 	tUpdateBeaconParams bcn_prm;
-	enum band_info rf_band = BAND_UNKNOWN;
+	enum reg_wifi_band rf_band = REG_BAND_UNKNOWN;
 	struct obss_detection_cfg *cur_detect;
 
 	pe_debug("obss detect ind id %d, reason %d, msk 0x%x, " QDF_MAC_ADDR_STR,
@@ -1627,7 +1622,7 @@ QDF_STATUS lim_process_obss_detection_ind(struct mac_context *mac_ctx,
 
 	if (OBSS_DETECTION_IS_11B_AP(detect_masks)) {
 		if (reason != obss_cfg->obss_11b_ap_detect_mode ||
-		    rf_band != BAND_2G)
+		    rf_band != REG_BAND_2G)
 			goto wrong_detection;
 
 		lim_enable11g_protection(mac_ctx, enable, true,
@@ -1636,7 +1631,7 @@ QDF_STATUS lim_process_obss_detection_ind(struct mac_context *mac_ctx,
 	}
 	if (OBSS_DETECTION_IS_11B_STA(detect_masks)) {
 		if (reason != obss_cfg->obss_11b_sta_detect_mode ||
-		    rf_band != BAND_2G)
+		    rf_band != REG_BAND_2G)
 			goto wrong_detection;
 
 		lim_enable11g_protection(mac_ctx, enable, true,
@@ -1645,7 +1640,7 @@ QDF_STATUS lim_process_obss_detection_ind(struct mac_context *mac_ctx,
 	}
 	if (OBSS_DETECTION_IS_11G_AP(detect_masks)) {
 		if (reason != obss_cfg->obss_11g_ap_detect_mode ||
-		    rf_band != BAND_2G)
+		    rf_band != REG_BAND_2G)
 			goto wrong_detection;
 
 		lim_enable_ht_protection_from11g(mac_ctx, enable, true,
@@ -1654,7 +1649,7 @@ QDF_STATUS lim_process_obss_detection_ind(struct mac_context *mac_ctx,
 	}
 	if (OBSS_DETECTION_IS_11A(detect_masks)) {
 		if (reason != obss_cfg->obss_11a_detect_mode ||
-		    rf_band != BAND_5G)
+		    rf_band != REG_BAND_5G)
 			goto wrong_detection;
 
 		lim_update_11a_protection(mac_ctx, enable, true,
@@ -1664,7 +1659,7 @@ QDF_STATUS lim_process_obss_detection_ind(struct mac_context *mac_ctx,
 	if (OBSS_DETECTION_IS_HT_LEGACY(detect_masks)) {
 		/* for 5GHz, we have only 11a detection, which covers legacy */
 		if (reason != obss_cfg->obss_ht_legacy_detect_mode ||
-		    rf_band != BAND_2G)
+		    rf_band != REG_BAND_2G)
 			goto wrong_detection;
 
 		lim_enable_ht_protection_from11g(mac_ctx, enable, true,
@@ -1674,7 +1669,7 @@ QDF_STATUS lim_process_obss_detection_ind(struct mac_context *mac_ctx,
 	if (OBSS_DETECTION_IS_HT_MIXED(detect_masks)) {
 		/* for 5GHz, we have only 11a detection, which covers ht mix */
 		if (reason != obss_cfg->obss_ht_mixed_detect_mode ||
-		    rf_band != BAND_2G)
+		    rf_band != REG_BAND_2G)
 			goto wrong_detection;
 
 		lim_enable_ht_protection_from11g(mac_ctx, enable, true,

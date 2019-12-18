@@ -1312,26 +1312,11 @@ void pe_register_callbacks_with_wma(struct mac_context *mac,
 		pe_err("Registering roaming callbacks with WMA failed");
 }
 
-/**
- *\brief lim_received_hb_handler()
- *
- * This function is called by sch_beacon_process() upon
- * receiving a Beacon on STA. This also gets called upon
- * receiving Probe Response after heat beat failure is
- * detected.
- *
- * param mac - global mac structure
- * param channel - channel number indicated in Beacon, Probe Response
- * return - none
- */
-
 void
-lim_received_hb_handler(struct mac_context *mac, uint8_t channelId,
+lim_received_hb_handler(struct mac_context *mac, uint32_t chan_freq,
 			struct pe_session *pe_session)
 {
-	if (channelId == 0 ||
-	    channelId == wlan_reg_freq_to_chan(mac->pdev,
-					       pe_session->curr_op_freq))
+	if (chan_freq == 0 || chan_freq == pe_session->curr_op_freq)
 		pe_session->LimRxedBeaconCntDuringHB++;
 
 	pe_session->pmmOffloadInfo.bcnmiss = false;
@@ -1442,8 +1427,7 @@ lim_handle_ibss_coalescing(struct mac_context *mac,
 	 */
 	if ((!pBeacon->capabilityInfo.ibss) ||
 	    lim_cmp_ssid(&pBeacon->ssId, pe_session) ||
-	    (wlan_reg_freq_to_chan(mac->pdev, pe_session->curr_op_freq)
-	     != pBeacon->channelNumber))
+	    (pe_session->curr_op_freq != pBeacon->chan_freq))
 		retCode = QDF_STATUS_E_INVAL;
 	else if (lim_ibss_enc_type_matched(pBeacon, pe_session) != true) {
 		pe_debug("peer privacy: %d peer wpa: %d peer rsn: %d self encType: %d",
@@ -1577,13 +1561,13 @@ lim_detect_change_in_ap_capabilities(struct mac_context *mac,
 {
 	uint8_t len;
 	struct ap_new_caps apNewCaps;
-	uint8_t newChannel;
+	uint32_t new_chan_freq;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	bool security_caps_matched = true;
 
 	apNewCaps.capabilityInfo =
 		lim_get_u16((uint8_t *) &pBeacon->capabilityInfo);
-	newChannel = (uint8_t) pBeacon->channelNumber;
+	new_chan_freq = pBeacon->chan_freq;
 
 	security_caps_matched = lim_enc_type_matched(mac, pBeacon,
 						     pe_session);
@@ -1596,9 +1580,8 @@ lim_detect_change_in_ap_capabilities(struct mac_context *mac,
 	       SIR_MAC_GET_PRIVACY(pe_session->limCurrentBssCaps)) ||
 	      (SIR_MAC_GET_QOS(apNewCaps.capabilityInfo) !=
 	       SIR_MAC_GET_QOS(pe_session->limCurrentBssCaps)) ||
-	      ((newChannel != wlan_reg_freq_to_chan(
-				mac->pdev, pe_session->curr_op_freq)) &&
-		(newChannel != 0)) ||
+	      ((new_chan_freq != pe_session->curr_op_freq) &&
+		(new_chan_freq != 0)) ||
 	      (false == security_caps_matched)
 	     ))) {
 		if (false == pe_session->fWaitForProbeRsp) {
@@ -1636,12 +1619,9 @@ lim_detect_change_in_ap_capabilities(struct mac_context *mac,
 
 		qdf_mem_copy(apNewCaps.bssId.bytes,
 			     pe_session->bssId, QDF_MAC_ADDR_SIZE);
-		if (newChannel != wlan_reg_freq_to_chan(
-				mac->pdev, pe_session->curr_op_freq)) {
-			pe_err("Channel Change from %d --> %d Ignoring beacon!",
-				wlan_reg_freq_to_chan(
-					mac->pdev, pe_session->curr_op_freq),
-					newChannel);
+		if (new_chan_freq != pe_session->curr_op_freq) {
+			pe_err("Channel freq Change from %d --> %d Ignoring beacon!",
+			       pe_session->curr_op_freq, new_chan_freq);
 			return;
 		}
 
@@ -2141,10 +2121,12 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 	bss_desc_ptr->fProbeRsp = !roam_synch_ind_ptr->isBeacon;
 	/* Copy Timestamp */
 	bss_desc_ptr->scansystimensec = qdf_get_monotonic_boottime_ns();
-	if (parsed_frm_ptr->dsParamsPresent) {
-		bss_desc_ptr->chan_freq =
-			wlan_reg_chan_to_freq(mac->pdev,
-					      parsed_frm_ptr->channelNumber);
+	if (parsed_frm_ptr->he_op.oper_info_6g_present) {
+		bss_desc_ptr->chan_freq = wlan_reg_chan_band_to_freq(mac->pdev,
+						parsed_frm_ptr->he_op.oper_info_6g.info.primary_ch,
+						BIT(REG_BAND_6G));
+	} else if (parsed_frm_ptr->dsParamsPresent) {
+		bss_desc_ptr->chan_freq = parsed_frm_ptr->chan_freq;
 	} else if (parsed_frm_ptr->HTInfo.present) {
 		bss_desc_ptr->chan_freq =
 			wlan_reg_chan_to_freq(mac->pdev,
@@ -2160,8 +2142,7 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 
 	bss_desc_ptr->nwType = lim_get_nw_type(
 			mac,
-			wlan_reg_freq_to_chan(mac->pdev,
-					      bss_desc_ptr->chan_freq),
+			bss_desc_ptr->chan_freq,
 			SIR_MAC_MGMT_FRAME,
 			parsed_frm_ptr);
 
@@ -2261,6 +2242,27 @@ pe_disconnect_callback(struct mac_context *mac, uint8_t vdev_id,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_FILS_SK
+static void
+lim_fill_fils_ft(struct pe_session *src_session,
+		 struct pe_session *dst_session)
+{
+      if (src_session->fils_info &&
+          src_session->fils_info->fils_ft_len) {
+              dst_session->fils_info->fils_ft_len =
+                      src_session->fils_info->fils_ft_len;
+              qdf_mem_copy(dst_session->fils_info->fils_ft,
+                           src_session->fils_info->fils_ft,
+                           src_session->fils_info->fils_ft_len);
+      }
+}
+#else
+static inline void
+lim_fill_fils_ft(struct pe_session *src_session,
+		 struct pe_session *dst_session)
+{}
+#endif
+
 QDF_STATUS
 pe_roam_synch_callback(struct mac_context *mac_ctx,
 		       struct roam_offload_synch_ind *roam_sync_ind_ptr,
@@ -2344,8 +2346,9 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	status = QDF_STATUS_E_FAILURE;
 	ft_session_ptr = pe_create_session(mac_ctx, bss_desc->bssId,
 					   &session_id, mac_ctx->lim.maxStation,
-					   eSIR_INFRASTRUCTURE_MODE,
-					   session_ptr->smeSessionId);
+					   session_ptr->bssType,
+					   session_ptr->vdev_id,
+					   session_ptr->opmode);
 	if (!ft_session_ptr) {
 		pe_err("LFR3:Cannot create PE Session");
 		lim_print_mac_addr(mac_ctx, bss_desc->bssId, LOGE);
@@ -2370,17 +2373,8 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 
 	/* Next routine may update nss based on dot11Mode */
 	lim_ft_prepare_add_bss_req(mac_ctx, ft_session_ptr, bss_desc);
-	if (session_ptr->is11Rconnection) {
-		ft_session_ptr->is11Rconnection = session_ptr->is11Rconnection;
-		if (session_ptr->fils_info &&
-		    session_ptr->fils_info->fils_ft_len) {
-			ft_session_ptr->fils_info->fils_ft_len =
-			       session_ptr->fils_info->fils_ft_len;
-			qdf_mem_copy(ft_session_ptr->fils_info->fils_ft,
-				     session_ptr->fils_info->fils_ft,
-				     session_ptr->fils_info->fils_ft_len);
-		}
-	}
+	if (session_ptr->is11Rconnection)
+		lim_fill_fils_ft(session_ptr, ft_session_ptr);
 
 	roam_sync_ind_ptr->add_bss_params =
 		(struct bss_params *) ft_session_ptr->ftPEContext.pAddBssReq;
@@ -2705,7 +2699,8 @@ void lim_mon_init_session(struct mac_context *mac_ptr,
 					   &session_id,
 					   mac_ptr->lim.maxStation,
 					   eSIR_MONITOR_MODE,
-					   msg->vdev_id);
+					   msg->vdev_id,
+					   QDF_MONITOR_MODE);
 	if (!psession_entry) {
 		pe_err("Monitor mode: Session Can not be created");
 		lim_print_mac_addr(mac_ptr, msg->bss_id.bytes, LOGE);

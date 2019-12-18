@@ -421,9 +421,9 @@ typedef void (*txFailIndCallback)(uint8_t *peer_mac, uint8_t seqNo);
  *
  */
 enum wma_rx_exec_ctx {
-	WMA_RX_WORK_CTX,
-	WMA_RX_TASKLET_CTX,
-	WMA_RX_SERIALIZER_CTX
+	WMA_RX_WORK_CTX = WMI_RX_WORK_CTX,
+	WMA_RX_TASKLET_CTX = WMI_RX_TASKLET_CTX,
+	WMA_RX_SERIALIZER_CTX = WMI_RX_SERIALIZER_CTX,
 };
 
 /**
@@ -716,8 +716,6 @@ struct wma_invalid_peer_params {
  * @nss: nss value
  * @is_channel_switch: is channel switch
  * @pause_bitmap: pause bitmap
- * @tx_power: tx power in dbm
- * @max_tx_power: max tx power in dbm
  * @nwType: network type (802.11a/b/g/n/ac)
  * @staKeyParams: sta key parameters
  * @ps_enabled: is powersave enable/disable
@@ -771,8 +769,6 @@ struct wma_txrx_node {
 	enum tx_rate_info rate_flags;
 	uint8_t nss;
 	uint16_t pause_bitmap;
-	int8_t tx_power;
-	int8_t max_tx_power;
 	uint32_t nwType;
 	tSetStaKeyParams *staKeyParams;
 	uint32_t peer_count;
@@ -797,6 +793,7 @@ struct wma_txrx_node {
 	struct roam_synch_frame_ind roam_synch_frame_ind;
 	bool is_waiting_for_key;
 	uint32_t ch_freq;
+	uint16_t ch_flagext;
 	struct sir_roam_scan_stats *roam_scan_stats_req;
 	struct wma_invalid_peer_params invalid_peers[INVALID_PEER_MAX_NUM];
 	uint8_t invalid_peer_idx;
@@ -994,8 +991,6 @@ struct wma_wlm_stats_data {
  * @dynamic_nss_chains_update: per vdev nss, chains update
  * @ito_repeat_count: Indicates ito repeated count
  * @wma_fw_time_sync_timer: timer used for firmware time sync
- * @critical_events_in_flight: number of suspend-preventing events
- *   in flight
  * * @fw_therm_throt_support: FW Supports thermal throttling?
  *
  * This structure is the global wma context.  It contains global wma
@@ -1130,7 +1125,6 @@ typedef struct {
 	bool dynamic_nss_chains_support;
 	uint8_t  ito_repeat_count;
 	qdf_mc_timer_t wma_fw_time_sync_timer;
-	qdf_atomic_t critical_events_in_flight;
 	bool fw_therm_throt_support;
 	bool enable_tx_compl_tsf64;
 } t_wma_handle, *tp_wma_handle;
@@ -1527,28 +1521,6 @@ struct wma_roam_invoke_cmd {
 	uint8_t is_same_bssid;
 	bool forced_roaming;
 };
-
-/**
- * struct wma_process_fw_event_params - fw event parameters
- * @wmi_handle: wmi handle
- * @evt_buf: event buffer
- */
-typedef struct {
-	void *wmi_handle;
-	void *evt_buf;
-} wma_process_fw_event_params;
-
-/**
- * wma_process_fw_event_handler() - common event handler to serialize
- *                                  event processing through mc_thread
- * @scn_handle: scn handle
- * @ev: event buffer
- * @rx_ctx: rx execution context
- *
- * Return: 0 on success, errno on failure
- */
-int wma_process_fw_event_handler(ol_scn_t scn_handle, void *ev,
-				 uint8_t rx_ctx);
 
 A_UINT32 e_csr_auth_type_to_rsn_authmode(enum csr_akm_type authtype,
 					 eCsrEncryptionType encr);
@@ -2711,4 +2683,17 @@ QDF_STATUS wma_pre_vdev_start_setup(uint8_t vdev_id,
  */
 void wma_release_pending_vdev_refs(void);
 
+#ifdef FEATURE_ANI_LEVEL_REQUEST
+/**
+ * wma_send_ani_level_request() - Send get ani level cmd to WMI
+ * @wma_handle: wma handle.
+ * @freqs: pointer to channels for which ANI level has to be retrieved
+ * @num_freqs: number of channels in the above parameter
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wma_send_ani_level_request(tp_wma_handle wma_handle,
+				      uint32_t *freqs, uint8_t num_freqs);
+#endif /* FEATURE_ANI_LEVEL_REQUEST */
 #endif
+

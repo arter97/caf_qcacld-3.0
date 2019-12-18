@@ -337,7 +337,7 @@ QDF_STATUS csr_scan_result_purge(struct mac_context *mac,
 
 /* Add the channel to the occupiedChannels array */
 static void csr_add_to_occupied_channels(struct mac_context *mac,
-					 uint8_t ch,
+					 uint32_t ch_freq,
 					 uint8_t sessionId,
 					 struct csr_channel *occupied_ch,
 					 bool is_init_list)
@@ -350,15 +350,15 @@ static void csr_add_to_occupied_channels(struct mac_context *mac,
 		mac->scan.roam_candidate_count[sessionId]++;
 
 	if (csr_is_channel_present_in_list(occupied_ch_lst,
-					   num_occupied_ch, wlan_reg_chan_to_freq(mac->pdev, ch)))
+					   num_occupied_ch, ch_freq))
 		return;
 
 	status = csr_add_to_channel_list_front(occupied_ch_lst,
-					       num_occupied_ch, wlan_reg_chan_to_freq(mac->pdev, ch));
+					       num_occupied_ch, ch_freq);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 		occupied_ch->numChannels++;
-		sme_debug("Added channel %d to the list (count=%d)",
-			ch, occupied_ch->numChannels);
+		sme_debug("Added channel freq %d to the list (count=%d)",
+			  ch_freq, occupied_ch->numChannels);
 		if (occupied_ch->numChannels >
 		    CSR_BG_SCAN_OCCUPIED_CHANNEL_LIST_LEN)
 			occupied_ch->numChannels =
@@ -519,17 +519,15 @@ QDF_STATUS csr_save_to_channel_power2_g_5_g(struct mac_context *mac,
 		 * Now set the inter-channel offset based on the frequency band
 		 * the channel set lies in
 		 */
-		if ((WLAN_REG_IS_24GHZ_CH_FREQ(pChannelSet->first_chan_freq)) &&
-		    ((wlan_reg_freq_to_chan(mac->pdev, pChannelSet->first_chan_freq) +
-		      (pChannelSet->numChannels - 1)) <=
-		     WLAN_REG_MAX_24GHZ_CH_NUM)) {
-			pChannelSet->interChannelOffset = 1;
+		if (WLAN_REG_IS_24GHZ_CH_FREQ(pChannelSet->first_chan_freq) &&
+		    (pChannelSet->first_chan_freq + 5 * (pChannelSet->numChannels - 1) <=
+		     WLAN_REG_MAX_24GHZ_CHAN_FREQ)) {
+			pChannelSet->interChannelOffset = 5;
 			f2GHzInfoFound = true;
-		} else if ((WLAN_REG_IS_5GHZ_CH_FREQ(pChannelSet->first_chan_freq)) &&
-			   ((wlan_reg_freq_to_chan(mac->pdev, pChannelSet->first_chan_freq) +
-			   ((pChannelSet->numChannels - 1) * 4)) <=
-			   WLAN_REG_MAX_5GHZ_CH_NUM)) {
-			pChannelSet->interChannelOffset = 4;
+		} else if (WLAN_REG_IS_5GHZ_CH_FREQ(pChannelSet->first_chan_freq) &&
+			   (pChannelSet->first_chan_freq + 20 * (pChannelSet->numChannels - 1) <=
+			   WLAN_REG_MAX_5GHZ_CHAN_FREQ)) {
+			pChannelSet->interChannelOffset = 20;
 			f2GHzInfoFound = false;
 		} else {
 			sme_warn("Invalid Channel freq %d Present in Country IE",
@@ -702,8 +700,10 @@ static void csr_get_channel_power_info(struct mac_context *mac,
 		for (idx = 0; (idx < ch_set->numChannels)
 				&& (chn_idx < *num_ch); idx++) {
 			chn_pwr_info[chn_idx].chan_num =
-				(uint8_t)(wlan_reg_freq_to_chan(mac->pdev, ch_set->first_chan_freq)
-				 + (idx * ch_set->interChannelOffset));
+				(uint8_t)wlan_reg_freq_to_chan(
+					mac->pdev,
+					ch_set->first_chan_freq +
+					idx * ch_set->interChannelOffset);
 			chn_pwr_info[chn_idx++].tx_power = ch_set->txPower;
 		}
 		entry = csr_ll_next(list, entry, LL_ACCESS_LOCK);
@@ -849,14 +849,13 @@ void csr_save_channel_power_for_band(struct mac_context *mac, bool fill_5f)
 	qdf_mem_free(ch_info_start);
 }
 
-bool csr_is_supported_channel(struct mac_context *mac, uint8_t channelId)
+bool csr_is_supported_channel(struct mac_context *mac, uint32_t chan_freq)
 {
 	bool fRet = false;
 	uint32_t i;
 
 	for (i = 0; i < mac->scan.base_channels.numChannels; i++) {
-		if (wlan_reg_chan_to_freq(mac->pdev, channelId) ==
-		    mac->scan.base_channels.channel_freq_list[i]) {
+		if (chan_freq == mac->scan.base_channels.channel_freq_list[i]) {
 			fRet = true;
 			break;
 		}
@@ -1508,7 +1507,6 @@ static void csr_save_tx_power_to_cfg(struct mac_context *mac,
 	uint32_t idx, count = 0;
 	tSirMacChanInfo *ch_pwr_set;
 	uint8_t *p_buf = NULL;
-	uint8_t chan;
 
 	/* allocate maximum space for all channels */
 	dataLen = CFG_VALID_CHANNEL_LIST_LEN * sizeof(tSirMacChanInfo);
@@ -1525,7 +1523,7 @@ static void csr_save_tx_power_to_cfg(struct mac_context *mac,
 	while (pEntry) {
 		ch_set = GET_BASE_ADDR(pEntry,
 				struct csr_channel_powerinfo, link);
-		if (1 != ch_set->interChannelOffset) {
+		if (ch_set->interChannelOffset != 5) {
 			/*
 			 * we keep the 5G channel sets internally with an
 			 * interchannel offset of 4. Expand these to the right
@@ -1548,8 +1546,6 @@ static void csr_save_tx_power_to_cfg(struct mac_context *mac,
 			}
 
 			for (idx = 0; idx < ch_set->numChannels; idx++) {
-				chan = (wlan_reg_freq_to_chan(mac->pdev, ch_set->first_chan_freq)
-						+ (idx * ch_set->interChannelOffset));
 				ch_pwr_set->first_freq =
 					ch_set->first_chan_freq;
 				sme_debug(
@@ -1982,6 +1978,8 @@ csr_get_channel_for_hw_mode_change(struct mac_context *mac_ctx,
 	}
 
 	if (!policy_mgr_is_hw_dbs_2x2_capable(mac_ctx->psoc) &&
+	    !policy_mgr_is_hw_dbs_required_for_band(mac_ctx->psoc,
+		HW_MODE_MAC_BAND_2G) &&
 	    !policy_mgr_get_connection_count(mac_ctx->psoc)) {
 		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
 			  FL("1x1 DBS HW with no prior connection"));
@@ -2001,7 +1999,9 @@ csr_get_channel_for_hw_mode_change(struct mac_context *mac_ctx,
 					    struct tag_csrscan_result,
 					    Link);
 		ch_freq = scan_result->Result.BssDescriptor.chan_freq;
-		if (policy_mgr_is_hw_dbs_2x2_capable(mac_ctx->psoc)) {
+		if (policy_mgr_is_hw_dbs_required_for_band(
+				mac_ctx->psoc,
+				HW_MODE_MAC_BAND_2G)) {
 			if (WLAN_REG_IS_24GHZ_CH_FREQ(ch_freq))
 				break;
 		} else {
@@ -2736,7 +2736,6 @@ void csr_init_occupied_channels_list(struct mac_context *mac_ctx,
 	tpCsrNeighborRoamControlInfo neighbor_roam_info =
 		&mac_ctx->roam.neighborRoamInfo[sessionId];
 	tCsrRoamConnectedProfile *profile = NULL;
-	uint8_t ch;
 
 	if (!(mac_ctx && mac_ctx->roam.roamSession &&
 	      CSR_IS_SESSION_VALID(mac_ctx, sessionId))) {
@@ -2797,7 +2796,7 @@ void csr_init_occupied_channels_list(struct mac_context *mac_ctx,
 
 	csr_add_to_occupied_channels(
 			mac_ctx,
-			wlan_reg_freq_to_chan(mac_ctx->pdev, profile->op_freq),
+			profile->op_freq,
 			sessionId,
 			&mac_ctx->scan.occupiedChannels[sessionId],
 			true);
@@ -2817,11 +2816,8 @@ void csr_init_occupied_channels_list(struct mac_context *mac_ctx,
 	while (cur_lst) {
 		cur_node = qdf_container_of(cur_lst, struct scan_cache_node,
 					    node);
-		ch = wlan_reg_freq_to_chan(
-				pdev,
-				cur_node->entry->channel.chan_freq);
 		csr_add_to_occupied_channels(
-				mac_ctx, ch,
+				mac_ctx, cur_node->entry->channel.chan_freq,
 				sessionId,
 				&mac_ctx->scan.occupiedChannels[sessionId],
 				true);

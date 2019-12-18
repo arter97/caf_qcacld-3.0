@@ -542,9 +542,6 @@ struct csr_roam_session {
 	/* For BT-AMP station, this serve as BSSID for self-BSS. */
 	struct qdf_mac_addr self_mac_addr;
 
-	csr_session_close_cb session_close_cb;
-	csr_roam_complete_cb callback;
-	void *pContext;
 	eCsrConnectState connectState;
 	struct rsn_caps rsn_caps;
 	tCsrRoamConnectedProfile connectedProfile;
@@ -977,16 +974,16 @@ uint32_t csr_get_infra_operation_chan_freq(
 bool csr_is_session_client_and_connected(struct mac_context *mac,
 		uint8_t sessionId);
 /**
- * csr_get_concurrent_operation_channel() - To get concurrent operating channel
+ * csr_get_concurrent_operation_freq() - To get concurrent operating freq
  * @mac_ctx: Pointer to mac context
  *
- * This routine will return operating channel on FIRST BSS that is
+ * This routine will return operating freq on FIRST BSS that is
  * active/operating to be used for concurrency mode.
  * If other BSS is not up or not connected it will return 0
  *
- * Return: uint8_t
+ * Return: uint32_t
  */
-uint8_t csr_get_concurrent_operation_channel(struct mac_context *mac_ctx);
+uint32_t csr_get_concurrent_operation_freq(struct mac_context *mac_ctx);
 
 /**
  * csr_get_beaconing_concurrent_channel() - To get concurrent operating channel
@@ -1103,15 +1100,8 @@ static inline void csr_roaming_report_diag_event(
 {}
 #endif
 
-bool csr_find_session_by_bssid(struct mac_context *mac_ctx, uint8_t *bssid);
 QDF_STATUS csr_get_channels_and_power(struct mac_context *mac);
 
-bool csr_nonscan_active_ll_is_list_empty(
-			struct mac_context *mac_ctx,
-			bool inter_locked);
-bool csr_nonscan_pending_ll_is_list_empty(
-			struct mac_context *mac_ctx,
-			bool inter_locked);
 bool csr_nonscan_active_ll_remove_entry(
 			struct mac_context *mac_ctx,
 			tListElem *pEntryToRemove, bool inter_locked);
@@ -1121,16 +1111,6 @@ tListElem *csr_nonscan_active_ll_peek_head(
 tListElem *csr_nonscan_pending_ll_peek_head(
 			struct mac_context *mac_ctx,
 			bool inter_locked);
-tListElem *csr_nonscan_active_ll_remove_head(
-			struct mac_context *mac_ctx,
-			bool inter_locked);
-tListElem *csr_nonscan_pending_ll_remove_head(
-			struct mac_context *mac_ctx,
-			bool inter_locked);
-uint32_t csr_nonscan_pending_ll_count(
-			struct mac_context *mac_ctx);
-uint32_t csr_nonscan_active_ll_count(
-			struct mac_context *mac_ctx);
 tListElem *csr_nonscan_pending_ll_next(
 			struct mac_context *mac_ctx,
 		tListElem *entry, bool inter_locked);

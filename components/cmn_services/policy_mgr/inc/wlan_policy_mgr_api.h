@@ -151,6 +151,19 @@ policy_mgr_get_enable_overlap_chnl(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS policy_mgr_get_dual_mac_feature(struct wlan_objmgr_psoc *psoc,
 					   uint8_t *dual_mac_feature);
+
+/**
+ * policy_mgr_set_dual_mac_feature() - to set the dual mac feature value
+ * @psoc: pointer to psoc
+ * @dual_mac_feature: value to be updated
+ *
+ * This API is used to update the dual mac (dual radio) specific feature value
+ *
+ * Return: QDF_STATUS_SUCCESS up on success and any other status for failure.
+ */
+QDF_STATUS policy_mgr_set_dual_mac_feature(struct wlan_objmgr_psoc *psoc,
+					   uint8_t dual_mac_feature);
+
 /**
  * policy_mgr_get_force_1x1() - to find out if 1x1 connection is enforced
  *
@@ -316,6 +329,18 @@ QDF_STATUS policy_mgr_get_conc_rule2(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS policy_mgr_get_chnl_select_plcy(struct wlan_objmgr_psoc *psoc,
 					   uint32_t *chnl_select_plcy);
+
+/**
+ * policy_mgr_set_ch_select_plcy() - to set channel selection policy
+ * @psoc: pointer to psoc
+ * @ch_select_policy: value to be set
+ *
+ * This API is used to set the ch selection policy.
+ *
+ * Return: QDF_STATUS_SUCCESS up on success and any other status for failure.
+ */
+QDF_STATUS policy_mgr_set_ch_select_plcy(struct wlan_objmgr_psoc *psoc,
+					 uint32_t ch_select_policy);
 
 /**
  * policy_mgr_get_mcc_adaptive_sch() - to get mcc adaptive scheduler
@@ -681,6 +706,22 @@ bool policy_mgr_is_any_nondfs_chnl_present(struct wlan_objmgr_psoc *psoc,
  */
 uint32_t policy_mgr_get_dfs_beaconing_session_id(
 		struct wlan_objmgr_psoc *psoc);
+
+/**
+ * policy_mgr_is_dfs_beaconing_present_except_vdev() - to find
+ * if any DFS session except the given vdev id
+ * @psoc: PSOC object information
+ * @ch_freq: pointer to channel frequency that needs to filled
+ * @vdev_id: vdev id
+ *
+ * If any beaconing session except given vdev id such as SAP or GO present and
+ * it is on DFS channel then this function will return true
+ *
+ * Return: true if session is on DFS or false if session is on non-dfs channel
+ */
+bool policy_mgr_is_dfs_beaconing_present_except_vdev(
+		struct wlan_objmgr_psoc *psoc, uint32_t *ch_freq,
+		uint8_t vdev_id);
 
 /**
  * policy_mgr_is_any_dfs_beaconing_session_present() - to find
@@ -2229,6 +2270,16 @@ bool policy_mgr_is_hw_sbs_capable(struct wlan_objmgr_psoc *psoc);
 bool policy_mgr_is_current_hwmode_dbs(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * policy_mgr_is_dp_hw_dbs_2x2_capable() - if hardware is capable of dbs 2x2
+ * for Data Path.
+ * @psoc: PSOC object information
+ * This API is for Data Path to get HW dbs 2x2 capable.
+ *
+ * Return: true - DBS2x2, false - DBS1x1
+ */
+bool policy_mgr_is_dp_hw_dbs_2x2_capable(struct wlan_objmgr_psoc *psoc);
+
+/**
  * policy_mgr_is_hw_dbs_2x2_capable() - if hardware is capable of dbs 2x2
  * @psoc: PSOC object information
  * This function checks if hw_modes supported are always capable of
@@ -2240,6 +2291,22 @@ bool policy_mgr_is_current_hwmode_dbs(struct wlan_objmgr_psoc *psoc);
  * Return: true - DBS2x2, false - DBS1x1
  */
 bool policy_mgr_is_hw_dbs_2x2_capable(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * policy_mgr_is_hw_dbs_required_for_band() - Check whether hardware needs DBS
+ * mode to support the given band
+ * @psoc: PSOC object information
+ * @band: band
+ *
+ * The function checks whether DBS mode switching required or not to support
+ * given band based on target capability.
+ * Any HW which doesn't support given band on PHY A will need DBS HW mode when a
+ * connection is coming up on that band.
+ *
+ * Return: true - DBS mode required for requested band
+ */
+bool policy_mgr_is_hw_dbs_required_for_band(struct wlan_objmgr_psoc *psoc,
+					    enum hw_mode_mac_band_cap band);
 
 /*
  * policy_mgr_is_2x2_1x1_dbs_capable() - check 2x2+1x1 DBS supported or not

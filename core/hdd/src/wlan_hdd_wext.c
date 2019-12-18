@@ -55,6 +55,8 @@
 #include "dbglog_host.h"
 #include "wma.h"
 
+#include <ol_defines.h>
+
 #include "wlan_hdd_power.h"
 #include "qwlan_version.h"
 #include "wlan_hdd_host_offload.h"
@@ -3833,7 +3835,7 @@ int wlan_hdd_update_phymode(struct hdd_adapter *adapter, int new_phymode)
 	mac_handle_t mac_handle = hdd_ctx->mac_handle;
 	bool band_24 = false, band_5g = false;
 	bool ch_bond24 = false, ch_bond5g = false;
-	struct sme_config_params *sme_config;
+	struct sme_config_params *sme_config = NULL;
 	struct csr_config_params *csr_config;
 	uint32_t chwidth = WNI_CFG_CHANNEL_BONDING_MODE_DISABLE;
 	uint8_t vhtchanwidth;
@@ -4811,6 +4813,7 @@ static int hdd_we_clear_stats(struct hdd_adapter *adapter, int option)
 		break;
 	default:
 		status = cdp_clear_stats(cds_get_context(QDF_MODULE_ID_SOC),
+					 OL_TXRX_PDEV_ID,
 					 option);
 		if (status != QDF_STATUS_SUCCESS)
 			hdd_debug("Failed to dump stats for option: %d",
@@ -5477,11 +5480,28 @@ static int hdd_we_motion_det_start_stop(struct hdd_adapter *adapter, int value)
 		hdd_err("Invalid value %d in mt_start", value);
 		return -EINVAL;
 	}
+
+	if (!adapter->motion_det_cfg) {
+		hdd_err("Motion Detection config values not available");
+		return -EINVAL;
+	}
+
+	if (!adapter->motion_det_baseline_value) {
+		hdd_err("Motion Detection Baselining not started/completed");
+		return -EAGAIN;
+	}
+
 	motion_det.vdev_id = adapter->vdev_id;
 	motion_det.enable = value;
 
-	if (!value)
+	if (value) {
+		/* For motion detection start, set motion_det_in_progress */
+		adapter->motion_det_in_progress = true;
+	} else {
+		/* For motion detection stop, reset motion_det_in_progress */
+		adapter->motion_det_in_progress = false;
 		adapter->motion_detection_mode = 0;
+	}
 
 	sme_motion_det_enable(hdd_ctx->mac_handle, &motion_det);
 
@@ -5504,6 +5524,12 @@ static int hdd_we_motion_det_base_line_start_stop(struct hdd_adapter *adapter,
 	if (value < 0 || value > 1) {
 		hdd_err("Invalid value %d in mt_bl_start", value);
 		return -EINVAL;
+	}
+
+	/* Do not send baselining start/stop during motion detection phase */
+	if (adapter->motion_det_in_progress) {
+		hdd_err("Motion detection still in progress, try later");
+		return -EAGAIN;
 	}
 
 	motion_det_base_line.vdev_id = adapter->vdev_id;
@@ -6131,8 +6157,10 @@ static int __iw_setnone_getint(struct net_device *dev,
 		if (!QDF_IS_STATUS_SUCCESS(status))
 			hdd_err("unable to get vht_enable2x2");
 		*value = (bval == 0) ? 1 : 2;
-		if (policy_mgr_is_current_hwmode_dbs(hdd_ctx->psoc))
+		if (!policy_mgr_is_hw_dbs_2x2_capable(hdd_ctx->psoc) &&
+		    policy_mgr_is_current_hwmode_dbs(hdd_ctx->psoc))
 			*value = *value - 1;
+
 		hdd_debug("GET_NSS: Current NSS:%d", *value);
 		break;
 	}
@@ -7750,6 +7778,34 @@ static void hdd_ch_avoid_unit_cmd(struct hdd_context *hdd_ctx,
 {
 }
 #endif
+
+#ifdef FW_THERMAL_THROTTLE_SUPPORT
+/**
+ * hdd_send_thermal_mgmt_cmd - Send thermal management params
+ * @mac_handle: Opaque handle to the global MAC context
+ * @lower_thresh_deg: Lower threshold value of Temperature
+ * @higher_thresh_deg: Higher threshold value of Temperature
+ *
+ * Return: QDF_STATUS
+ */
+#ifndef QCN7605_SUPPORT
+static QDF_STATUS hdd_send_thermal_mgmt_cmd(mac_handle_t mac_handle,
+					    uint16_t lower_thresh_deg,
+					    uint16_t higher_thresh_deg)
+{
+	return sme_set_thermal_mgmt(mac_handle, lower_thresh_deg,
+				    higher_thresh_deg);
+}
+#else
+static QDF_STATUS hdd_send_thermal_mgmt_cmd(mac_handle_t mac_handle,
+					    uint16_t lower_thresh_deg,
+					    uint16_t higher_thresh_deg)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+#endif /* FW_THERMAL_THROTTLE_SUPPORT */
+
 /**
  * __iw_set_var_ints_getnone - Generic "set many" private ioctl handler
  * @dev: device upon which the ioctl was received
@@ -7776,7 +7832,6 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
 	struct hdd_context *hdd_ctx;
 	int ret, num_args;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
-	struct cdp_vdev *vdev = NULL;
 	struct cdp_txrx_stats_req req = {0};
 
 	hdd_enter_dev(dev);
@@ -7857,8 +7912,7 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
 		for (i = 0; i < len; i++) {
 			pr_info("|table_index[%d]\t\t\n", i);
 			pr_info("|\t|vdev_id - %-10d|\n", conn_info->vdev_id);
-			pr_info("|\t|chan    - %-10d|\n",
-				wlan_freq_to_chan(conn_info->freq));
+			pr_info("|\t|freq    - %-10d|\n", conn_info->freq);
 			pr_info("|\t|bw      - %-10d|\n", conn_info->bw);
 			pr_info("|\t|mode    - %-10d|\n", conn_info->mode);
 			pr_info("|\t|mac     - %-10d|\n", conn_info->mac);
@@ -8013,7 +8067,7 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
 					(char *)&sta_ctx->conn_info.bssid;
 			}
 		}
-		ret = cdp_txrx_stats_request(soc, vdev, &req);
+		ret = cdp_txrx_stats_request(soc, adapter->vdev_id, &req);
 		break;
 	}
 #ifdef WLAN_FEATURE_MOTION_DETECTION
@@ -8043,6 +8097,7 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
 		motion_det_cfg.md_fine_thr_low = apps_args[13];
 		adapter->motion_detection_mode = apps_args[14];
 		sme_motion_det_config(hdd_ctx->mac_handle, &motion_det_cfg);
+		adapter->motion_det_cfg =  true;
 	}
 	break;
 	case WE_MOTION_DET_BASE_LINE_CONFIG_PARAM:
@@ -8092,9 +8147,9 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
 			return qdf_status_to_os_return(status);
 
 		if (!apps_args[6]) {
-			status = sme_set_thermal_mgmt(hdd_ctx->mac_handle,
-						      apps_args[4],
-						      apps_args[5]);
+			status = hdd_send_thermal_mgmt_cmd(hdd_ctx->mac_handle,
+							   apps_args[4],
+							   apps_args[5]);
 			if (QDF_IS_STATUS_ERROR(status))
 				return qdf_status_to_os_return(status);
 		}

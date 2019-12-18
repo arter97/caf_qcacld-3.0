@@ -193,6 +193,7 @@ struct rsn_caps {
 
 /**
  * struct wlan_beacon_report - Beacon info to be send to userspace
+ * @vdev_id: vdev id
  * @ssid: ssid present in beacon
  * @bssid: bssid present in beacon
  * @frequency: channel frequency in MHz
@@ -201,6 +202,7 @@ struct rsn_caps {
  * @boot_time: Boot time when beacon received
  */
 struct wlan_beacon_report {
+	uint8_t vdev_id;
 	struct wlan_ssid ssid;
 	struct qdf_mac_addr bssid;
 	uint32_t frequency;
@@ -368,7 +370,7 @@ struct register_mgmt_frame {
 typedef struct sSirSmeRsp {
 	uint16_t messageType;   /* eWNI_SME_*_RSP */
 	uint16_t length;
-	uint8_t sessionId;
+	uint8_t vdev_id;
 	tSirResultCodes status_code;
 	struct wlan_objmgr_psoc *psoc;
 } tSirSmeRsp, *tpSirSmeRsp;
@@ -574,7 +576,7 @@ struct add_ie_params {
 struct start_bss_req {
 	uint16_t messageType;   /* eWNI_SME_START_BSS_REQ */
 	uint16_t length;
-	uint8_t sessionId;
+	uint8_t vdev_id;
 	struct qdf_mac_addr bssid;
 	struct qdf_mac_addr self_macaddr;
 	uint16_t beaconInterval;
@@ -726,8 +728,8 @@ struct start_bss_rsp {
 };
 
 struct report_channel_list {
-	uint8_t numChannels;
-	uint8_t channelNumber[SIR_ESE_MAX_MEAS_IE_REQS];
+	uint8_t num_channels;
+	uint32_t chan_freq_lst[SIR_ESE_MAX_MEAS_IE_REQS];
 };
 
 #ifdef FEATURE_OEM_DATA_SUPPORT
@@ -984,7 +986,7 @@ struct join_req {
 struct join_rsp {
 	uint16_t messageType;   /* eWNI_SME_JOIN_RSP */
 	uint16_t length;
-	uint8_t sessionId;      /* Session ID */
+	uint8_t vdev_id;      /* Session ID */
 	tSirResultCodes status_code;
 	tAniAuthType authType;
 	uint32_t vht_channel_width;
@@ -1241,7 +1243,7 @@ struct disassoc_rsp {
 struct disassoc_ind {
 	uint16_t messageType;   /* eWNI_SME_DISASSOC_IND */
 	uint16_t length;
-	uint8_t sessionId;      /* Session Identifier */
+	uint8_t vdev_id;
 	tSirResultCodes status_code;
 	struct qdf_mac_addr bssid;
 	struct qdf_mac_addr peer_macaddr;
@@ -1254,7 +1256,7 @@ struct disassoc_ind {
 struct disassoc_cnf {
 	uint16_t messageType;   /* eWNI_SME_DISASSOC_CNF */
 	uint16_t length;
-	uint8_t sme_session_id;
+	uint8_t vdev_id;
 	tSirResultCodes status_code;
 	struct qdf_mac_addr bssid;
 	struct qdf_mac_addr peer_macaddr;
@@ -1280,7 +1282,7 @@ struct sir_sme_discon_done_ind {
 struct deauth_req {
 	uint16_t messageType;   /* eWNI_SME_DEAUTH_REQ */
 	uint16_t length;
-	uint8_t sessionId;      /* Session ID */
+	uint8_t vdev_id;      /* Session ID */
 	struct qdf_mac_addr bssid;      /* AP BSSID */
 	struct qdf_mac_addr peer_macaddr;
 	uint16_t reasonCode;
@@ -1299,7 +1301,7 @@ struct deauth_rsp {
 struct deauth_ind {
 	uint16_t messageType;   /* eWNI_SME_DEAUTH_IND */
 	uint16_t length;
-	uint8_t sessionId;      /* Added for BT-AMP */
+	uint8_t vdev_id;
 	tSirResultCodes status_code;
 	struct qdf_mac_addr bssid;      /* AP BSSID */
 	struct qdf_mac_addr peer_macaddr;
@@ -1313,7 +1315,7 @@ struct deauth_ind {
 struct deauth_cnf {
 	uint16_t messageType;   /* eWNI_SME_DEAUTH_CNF */
 	uint16_t length;
-	uint8_t sme_session_id;
+	uint8_t vdev_id;
 	tSirResultCodes status_code;
 	struct qdf_mac_addr bssid;
 	struct qdf_mac_addr peer_macaddr;
@@ -2463,7 +2465,7 @@ typedef struct sAniHandoffReq {
 	uint16_t msgLen;        /* length of the entire request */
 	uint8_t sessionId;
 	uint8_t bssid[QDF_MAC_ADDR_SIZE];
-	uint8_t channel;
+	uint32_t ch_freq;
 	uint8_t handoff_src;
 } tAniHandoffReq, *tpAniHandoffReq;
 
@@ -2742,7 +2744,7 @@ typedef struct sSirSmeDfsEventInd {
 typedef struct sSirChanChangeRequest {
 	uint16_t messageType;
 	uint16_t messageLen;
-	uint8_t targetChannel;
+	uint32_t target_chan_freq;
 	uint8_t sec_ch_offset;
 	enum phy_ch_width ch_width;
 	uint8_t center_freq_seg_0;
@@ -2785,7 +2787,7 @@ typedef enum tUpdateIEsType {
 /* Modify particular IE in addition IE for prob resp Bcn */
 typedef struct sSirModifyIE {
 	struct qdf_mac_addr bssid;
-	uint16_t smeSessionId;
+	uint16_t vdev_id;
 	bool notify;
 	uint8_t ieID;
 	uint8_t ieIDLen;        /*ie length as per spec */
@@ -2811,7 +2813,7 @@ typedef struct sSirModifyIEsInd {
 /* Message format for Update IE message sent to PE  */
 typedef struct sSirUpdateIE {
 	struct qdf_mac_addr bssid;
-	uint16_t smeSessionId;
+	uint16_t vdev_id;
 	bool append;
 	bool notify;
 	uint16_t ieBufferlength;
@@ -4427,11 +4429,11 @@ struct sir_sme_ext_cng_chan_req {
 /**
  * struct sir_sme_ext_change_chan_ind.
  * @session_id: session id
- * @new_channel: new channel to change
+ * @new_chan_freq: new channel frequency to change to
  */
 struct sir_sme_ext_cng_chan_ind {
 	uint8_t  session_id;
-	uint8_t  new_channel;
+	uint32_t  new_chan_freq;
 };
 
 /**
@@ -5682,22 +5684,36 @@ struct sir_sae_msg {
 /**
  * struct set_pcl_req - Request message to set the PCL
  * @chan_weights: PCL channel weights
- * @band: Supported band
+ * @band_mask: Supported band mask
  */
 struct set_pcl_req {
 	struct wmi_pcl_chan_weights chan_weights;
-	enum band_info band;
+	uint32_t band_mask;
 };
 
+#ifdef WLAN_FEATURE_MOTION_DETECTION
 /**
  * struct sir_md_evt - motion detection event status
  * @vdev_id: vdev id
  * @status: md event status
  */
-#ifdef WLAN_FEATURE_MOTION_DETECTION
 struct sir_md_evt {
 	uint8_t vdev_id;
 	uint32_t status;
+};
+
+/**
+ * struct sir_md_bl_evt - motion detection baseline event values
+ * @vdev_id: vdev id
+ * @bl_baseline_value: baseline correlation value calculated during baselining
+ * @bl_max_corr_reserved: max corr value obtained during baselining phase in %
+ * @bl_min_corr_reserved: min corr value obtained during baselining phase in %
+ */
+struct sir_md_bl_evt {
+	uint8_t vdev_id;
+	uint32_t bl_baseline_value;
+	uint32_t bl_max_corr_reserved;
+	uint32_t bl_min_corr_reserved;
 };
 #endif /* WLAN_FEATURE_MOTION_DETECTION */
 
