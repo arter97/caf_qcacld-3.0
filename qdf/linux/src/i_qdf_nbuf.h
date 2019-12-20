@@ -146,11 +146,11 @@ typedef union {
  * @rx.trace.packet_track: RX_DATA packet
  * @rx.trace.rsrvd: enable packet logging
  *
- * @rx.ftype: mcast2ucast, TSO, SG, MESH
+ * @rx.vdev_id: vdev_id
  * @rx.is_raw_frame: RAW frame
  * @rx.fcs_err: FCS error
  * @rx.tid_val: tid value
- * @rx.reserved: reserved
+ * @rx.ftype: mcast2ucast, TSO, SG, MESH
  *
  * @tx.dev.priv_cb_w.fctx: ctx to handle special pkts defined by ftype
  * @tx.dev.priv_cb_w.ext_cb_ptr: extended cb pointer
@@ -261,11 +261,11 @@ struct qdf_nbuf_cb {
 					packet_track:4,
 					rsrvd:3;
 			} trace;
-			uint8_t ftype;
-			uint8_t is_raw_frame:1,
-				fcs_err:1,
-				tid_val:4,
-				reserved:2;
+			uint16_t vdev_id:6,
+				 is_raw_frame:1,
+				 fcs_err:1,
+				 tid_val:4,
+				 ftype:4;
 		} rx;
 
 		/* Note: MAX: 40 bytes */
@@ -378,6 +378,9 @@ QDF_COMPILE_TIME_ASSERT(qdf_nbuf_cb_size,
 
 #define QDF_NBUF_CB_RX_FTYPE(skb) \
 	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.ftype)
+
+#define QDF_NBUF_CB_RX_VDEV_ID(skb) \
+	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.vdev_id)
 
 #define QDF_NBUF_CB_RX_CHFRAG_START(skb) \
 	(((struct qdf_nbuf_cb *) \
