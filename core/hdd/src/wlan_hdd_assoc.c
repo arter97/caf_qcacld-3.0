@@ -2142,8 +2142,9 @@ static void hdd_send_re_assoc_event(struct net_device *dev,
 		goto done;
 	}
 
-	if (pCsrRoamInfo->nAssocRspLength == 0) {
-		hdd_err("Assoc rsp length is 0");
+	if (pCsrRoamInfo->nAssocRspLength < FT_ASSOC_RSP_IES_OFFSET) {
+		hdd_err("Invalid assoc rsp length %d",
+			pCsrRoamInfo->nAssocRspLength);
 		goto done;
 	}
 
