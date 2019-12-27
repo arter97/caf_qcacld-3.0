@@ -695,6 +695,7 @@ typedef struct tagCsrConfig {
 	bool roam_force_rssi_trigger;
 	bool roaming_scan_policy;
 	uint32_t btm_offload_config;
+	uint32_t pmkid_modes;
 	uint32_t btm_solicited_timeout;
 	uint32_t btm_max_attempt_cnt;
 	uint32_t btm_sticky_time;

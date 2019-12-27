@@ -10691,6 +10691,8 @@ QDF_STATUS hdd_set_sme_config(hdd_context_t *pHddCtx)
 
 	smeConfig->csrConfig.btm_offload_config =
 			pHddCtx->config->btm_offload_config;
+	smeConfig->csrConfig.pmkid_modes = pHddCtx->config->pmkid_modes;
+
 	smeConfig->csrConfig.btm_solicited_timeout =
 			pHddCtx->config->btm_solicited_timeout;
 	smeConfig->csrConfig.btm_max_attempt_cnt =
