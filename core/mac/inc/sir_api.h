@@ -193,6 +193,7 @@ struct rsn_caps {
 
 /**
  * struct wlan_beacon_report - Beacon info to be send to userspace
+ * @vdev_id: vdev id
  * @ssid: ssid present in beacon
  * @bssid: bssid present in beacon
  * @frequency: channel frequency in MHz
@@ -201,6 +202,7 @@ struct rsn_caps {
  * @boot_time: Boot time when beacon received
  */
 struct wlan_beacon_report {
+	uint8_t vdev_id;
 	struct wlan_ssid ssid;
 	struct qdf_mac_addr bssid;
 	uint32_t frequency;
@@ -368,7 +370,7 @@ struct register_mgmt_frame {
 typedef struct sSirSmeRsp {
 	uint16_t messageType;   /* eWNI_SME_*_RSP */
 	uint16_t length;
-	uint8_t sessionId;
+	uint8_t vdev_id;
 	tSirResultCodes status_code;
 	struct wlan_objmgr_psoc *psoc;
 } tSirSmeRsp, *tpSirSmeRsp;
@@ -574,7 +576,7 @@ struct add_ie_params {
 struct start_bss_req {
 	uint16_t messageType;   /* eWNI_SME_START_BSS_REQ */
 	uint16_t length;
-	uint8_t sessionId;
+	uint8_t vdev_id;
 	struct qdf_mac_addr bssid;
 	struct qdf_mac_addr self_macaddr;
 	uint16_t beaconInterval;
@@ -726,8 +728,8 @@ struct start_bss_rsp {
 };
 
 struct report_channel_list {
-	uint8_t numChannels;
-	uint8_t channelNumber[SIR_ESE_MAX_MEAS_IE_REQS];
+	uint8_t num_channels;
+	uint32_t chan_freq_lst[SIR_ESE_MAX_MEAS_IE_REQS];
 };
 
 #ifdef FEATURE_OEM_DATA_SUPPORT
@@ -984,7 +986,7 @@ struct join_req {
 struct join_rsp {
 	uint16_t messageType;   /* eWNI_SME_JOIN_RSP */
 	uint16_t length;
-	uint8_t sessionId;      /* Session ID */
+	uint8_t vdev_id;      /* Session ID */
 	tSirResultCodes status_code;
 	tAniAuthType authType;
 	uint32_t vht_channel_width;
@@ -1241,7 +1243,7 @@ struct disassoc_rsp {
 struct disassoc_ind {
 	uint16_t messageType;   /* eWNI_SME_DISASSOC_IND */
 	uint16_t length;
-	uint8_t sessionId;      /* Session Identifier */
+	uint8_t vdev_id;
 	tSirResultCodes status_code;
 	struct qdf_mac_addr bssid;
 	struct qdf_mac_addr peer_macaddr;
@@ -1254,7 +1256,7 @@ struct disassoc_ind {
 struct disassoc_cnf {
 	uint16_t messageType;   /* eWNI_SME_DISASSOC_CNF */
 	uint16_t length;
-	uint8_t sme_session_id;
+	uint8_t vdev_id;
 	tSirResultCodes status_code;
 	struct qdf_mac_addr bssid;
 	struct qdf_mac_addr peer_macaddr;
@@ -1280,7 +1282,7 @@ struct sir_sme_discon_done_ind {
 struct deauth_req {
 	uint16_t messageType;   /* eWNI_SME_DEAUTH_REQ */
 	uint16_t length;
-	uint8_t sessionId;      /* Session ID */
+	uint8_t vdev_id;      /* Session ID */
 	struct qdf_mac_addr bssid;      /* AP BSSID */
 	struct qdf_mac_addr peer_macaddr;
 	uint16_t reasonCode;
@@ -1299,7 +1301,7 @@ struct deauth_rsp {
 struct deauth_ind {
 	uint16_t messageType;   /* eWNI_SME_DEAUTH_IND */
 	uint16_t length;
-	uint8_t sessionId;      /* Added for BT-AMP */
+	uint8_t vdev_id;
 	tSirResultCodes status_code;
 	struct qdf_mac_addr bssid;      /* AP BSSID */
 	struct qdf_mac_addr peer_macaddr;
@@ -1313,7 +1315,7 @@ struct deauth_ind {
 struct deauth_cnf {
 	uint16_t messageType;   /* eWNI_SME_DEAUTH_CNF */
 	uint16_t length;
-	uint8_t sme_session_id;
+	uint8_t vdev_id;
 	tSirResultCodes status_code;
 	struct qdf_mac_addr bssid;
 	struct qdf_mac_addr peer_macaddr;
@@ -1593,7 +1595,6 @@ typedef struct sSmeIbssPeerInd {
 
 struct ibss_peer_inactivity_ind {
 	uint8_t bss_idx;
-	uint8_t staIdx;
 	struct qdf_mac_addr peer_addr;
 };
 
@@ -2785,7 +2786,7 @@ typedef enum tUpdateIEsType {
 /* Modify particular IE in addition IE for prob resp Bcn */
 typedef struct sSirModifyIE {
 	struct qdf_mac_addr bssid;
-	uint16_t smeSessionId;
+	uint16_t vdev_id;
 	bool notify;
 	uint8_t ieID;
 	uint8_t ieIDLen;        /*ie length as per spec */
@@ -2811,7 +2812,7 @@ typedef struct sSirModifyIEsInd {
 /* Message format for Update IE message sent to PE  */
 typedef struct sSirUpdateIE {
 	struct qdf_mac_addr bssid;
-	uint16_t smeSessionId;
+	uint16_t vdev_id;
 	bool append;
 	bool notify;
 	uint16_t ieBufferlength;
@@ -4427,11 +4428,11 @@ struct sir_sme_ext_cng_chan_req {
 /**
  * struct sir_sme_ext_change_chan_ind.
  * @session_id: session id
- * @new_channel: new channel to change
+ * @new_chan_freq: new channel frequency to change to
  */
 struct sir_sme_ext_cng_chan_ind {
 	uint8_t  session_id;
-	uint8_t  new_channel;
+	uint32_t  new_chan_freq;
 };
 
 /**
@@ -5530,6 +5531,7 @@ struct sme_rcpi_req {
  * @EAPOL_IN_PROGRESS: STA/P2P-CLI is in middle of EAPOL/WPS exchange
  * @SAP_EAPOL_IN_PROGRESS: SAP/P2P-GO is in middle of EAPOL/WPS exchange
  * @SAP_CONNECTION_IN_PROGRESS: SAP/P2P-GO is in middle of connection.
+ * @NAN_ENABLE_DISABLE_IN_PROGRESS: NAN is in middle of enable/disable discovery
  */
 enum scan_reject_states {
 	SCAN_REJECT_DEFAULT = 0,
@@ -5538,6 +5540,7 @@ enum scan_reject_states {
 	EAPOL_IN_PROGRESS,
 	SAP_EAPOL_IN_PROGRESS,
 	SAP_CONNECTION_IN_PROGRESS,
+	NAN_ENABLE_DISABLE_IN_PROGRESS,
 };
 
 /**

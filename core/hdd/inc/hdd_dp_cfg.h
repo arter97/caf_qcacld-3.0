@@ -867,6 +867,31 @@
 
 /*
  * <ini>
+ * RX_THREAD_UL_CPU_AFFINITY_MASK - CPU mask to affine Rx_thread
+ *
+ * @Min: 0
+ * @Max: 0xFF
+ * @Default: 0x0
+ *
+ * This ini is used to set Rx_thread CPU affinity for uplink traffic
+ *
+ * Supported Feature: Rx_thread
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_DP_RX_THREAD_UL_CPU_MASK \
+		CFG_INI_UINT( \
+		"RX_THREAD_UL_CPU_AFFINITY_MASK", \
+		0, \
+		0xFF, \
+		0x0, \
+		CFG_VALUE_OR_DEFAULT, \
+		"CPU mask to affine Rx_thread for uplink traffic")
+
+/*
+ * <ini>
  * rpsRxQueueCpuMapList - RPS map for different RX queues
  *
  * @Default: e
@@ -1230,6 +1255,46 @@
 #define CFG_DP_ENABLE_NUD_TRACKING_ALL
 #endif
 
+#ifdef WLAN_SUPPORT_TXRX_HL_BUNDLE
+
+#define CFG_DP_HL_BUNDLE_HIGH_TH \
+		CFG_INI_UINT( \
+		"tx_bundle_high_threashold", \
+		0, \
+		70000, \
+		4330, \
+		CFG_VALUE_OR_DEFAULT, \
+		"tx bundle high threashold")
+
+#define CFG_DP_HL_BUNDLE_LOW_TH \
+		CFG_INI_UINT( \
+		"tx_bundle_low_threashold", \
+		0, \
+		70000, \
+		4000, \
+		CFG_VALUE_OR_DEFAULT, \
+		"tx bundle low threashold")
+
+#define CFG_DP_HL_BUNDLE_TIMER_VALUE \
+		CFG_INI_UINT( \
+		"tx_bundle_timer_in_ms", \
+		10, \
+		10000, \
+		100, \
+		CFG_VALUE_OR_DEFAULT, \
+		"tx bundle timer value in ms")
+
+#define CFG_DP_HL_BUNDLE_SIZE \
+		CFG_INI_UINT( \
+		"tx_bundle_size", \
+		0, \
+		64, \
+		16, \
+		CFG_VALUE_OR_DEFAULT, \
+		"tx bundle size")
+
+#endif
+
 /*
  * <ini>
  * gWmiCreditCount - Credit count for WMI exchange
@@ -1301,9 +1366,20 @@
 #define CFG_DP_DRIVER_TCP_DELACK
 #endif
 
+#ifdef WLAN_SUPPORT_TXRX_HL_BUNDLE
+#define CFG_DP_HL_BUNDLE \
+	CFG(CFG_DP_HL_BUNDLE_HIGH_TH) \
+	CFG(CFG_DP_HL_BUNDLE_LOW_TH) \
+	CFG(CFG_DP_HL_BUNDLE_TIMER_VALUE) \
+	CFG(CFG_DP_HL_BUNDLE_SIZE)
+#else
+#define CFG_DP_HL_BUNDLE
+#endif
+
 #define CFG_HDD_DP_ALL \
 	CFG(CFG_DP_NAPI_CE_CPU_MASK) \
 	CFG(CFG_DP_RX_THREAD_CPU_MASK) \
+	CFG(CFG_DP_RX_THREAD_UL_CPU_MASK) \
 	CFG(CFG_DP_RPS_RX_QUEUE_CPU_MAP_LIST) \
 	CFG(CFG_DP_TX_ORPHAN_ENABLE) \
 	CFG(CFG_DP_RX_MODE) \
@@ -1323,5 +1399,6 @@
 	CFG_DP_DRIVER_TCP_DELACK \
 	CFG_HDD_DP_LEGACY_TX_FLOW \
 	CFG_DP_ENABLE_NUD_TRACKING_ALL \
-	CFG_DP_CONFIG_DP_TRACE_ALL
+	CFG_DP_CONFIG_DP_TRACE_ALL \
+	CFG_DP_HL_BUNDLE
 #endif

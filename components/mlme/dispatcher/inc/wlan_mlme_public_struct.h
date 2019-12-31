@@ -41,6 +41,14 @@
 #define CFG_VHT_TX_MCS_MAP_STAMAX    0xFFFF
 #define CFG_VHT_TX_MCS_MAP_STADEF    0xFFFE
 
+/* Roam debugging related macro defines */
+#define MAX_ROAM_DEBUG_BUF_SIZE    250
+#define MAX_ROAM_EVENTS_SUPPORTED  5
+#define ROAM_FAILURE_BUF_SIZE      40
+#define TIME_STRING_LEN            24
+
+#define ROAM_CHANNEL_BUF_SIZE      300
+#define LINE_STR "========================================="
 /*
  * MLME_CFG_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_FW_DEF + 1 is
  * assumed to be the default fw supported BF antennas, if fw
@@ -844,6 +852,7 @@ struct mlme_vht_capabilities_info {
 	uint8_t extended_nss_bw_supp;
 	uint8_t vht_extended_nss_bw_cap;
 	uint8_t max_nsts_total;
+	bool restricted_80p80_bw_supp;
 };
 
 /**
@@ -1111,6 +1120,9 @@ struct wlan_mlme_chainmask {
  * mode
  * @disable_4way_hs_offload: enable/disable 4 way handshake offload to firmware
  * @as_enabled: antenna sharing enabled or not (FW capability)
+ * @mgmt_retry_max: maximum retries for management frame
+ * @bmiss_skip_full_scan: Decide if full scan can be skipped in firmware if no
+ * candidate is found in partial scan based on channel map
  */
 struct wlan_mlme_generic {
 	enum band_info band_capability;
@@ -1142,6 +1154,8 @@ struct wlan_mlme_generic {
 	bool data_stall_recovery_fw_support;
 	bool disable_4way_hs_offload;
 	bool as_enabled;
+	uint8_t mgmt_retry_max;
+	bool bmiss_skip_full_scan;
 };
 
 /*
@@ -1337,7 +1351,6 @@ struct wlan_mlme_sta_cfg {
 	bool deauth_before_connection;
 	bool enable_go_cts2self_for_sta;
 	bool qcn_ie_support;
-	bool force_rsne_override;
 	bool single_tid;
 	bool allow_tpc_from_ap;
 	enum station_keepalive_method sta_keepalive_method;
@@ -2139,6 +2152,8 @@ struct wlan_mlme_mwc {
  * during acs
  * @avoid_acs_freq_list_num: Number of the frequencies to be avoided during acs
  * @ignore_fw_reg_offload_ind: Ignore fw regulatory offload indication
+ * @enable_pending_chan_list_req: enables/disables scan channel
+ * list command to FW till the current scan is complete.
  */
 struct wlan_mlme_reg {
 	uint32_t self_gen_frm_pwr;
@@ -2157,6 +2172,7 @@ struct wlan_mlme_reg {
 	uint8_t avoid_acs_freq_list_num;
 #endif
 	bool ignore_fw_reg_offload_ind;
+	bool enable_pending_chan_list_req;
 };
 
 /**
@@ -2278,6 +2294,20 @@ struct wlan_mlme_cfg {
 	struct wlan_mlme_reg reg;
 	struct roam_trigger_score_delta trig_score_delta[NUM_OF_ROAM_TRIGGERS];
 	struct roam_trigger_min_rssi trig_min_rssi[NUM_OF_ROAM_TRIGGERS];
+};
+
+/**
+ * struct mlme_roam_debug_info - Roam debug information storage structure.
+ * @trigger:            Roam trigger related data
+ * @scan:               Roam scan related data structure.
+ * @result:             Roam result parameters.
+ * @data_11kv:          Neighbor report/BTM parameters.
+ */
+struct mlme_roam_debug_info {
+	struct wmi_roam_trigger_info trigger;
+	struct wmi_roam_scan_data scan;
+	struct wmi_roam_result result;
+	struct wmi_neighbor_report_data data_11kv;
 };
 
 #endif

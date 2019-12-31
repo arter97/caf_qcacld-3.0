@@ -254,7 +254,6 @@ typedef struct {
 
 /**
  * struct tDeleteStaParams - parameters required for del sta request
- * @staIdx: station index
  * @assocId: association index
  * @status: status
  * @respReqd: is response required
@@ -264,7 +263,6 @@ typedef struct {
  * @staMac: station mac
  */
 typedef struct {
-	uint16_t staIdx;
 	uint16_t assocId;
 	QDF_STATUS status;
 	uint8_t respReqd;
@@ -532,7 +530,7 @@ typedef struct {
  * @fLsigTXOPProtectionFullSupport: TXOP protection supported or not
  * @fRIFSMode: RIFS mode
  * @paramChangeBitmap: change bitmap
- * @smeSessionId: SME  session id
+ * @vdev_id: vdev_id
  */
 typedef struct {
 	uint8_t bss_idx;
@@ -547,7 +545,7 @@ typedef struct {
 	uint8_t fLsigTXOPProtectionFullSupport;
 	uint8_t fRIFSMode;
 	uint16_t paramChangeBitmap;
-	uint8_t smeSessionId;
+	uint8_t vdev_id;
 	uint32_t bss_color;
 	bool bss_color_disabled;
 } tUpdateBeaconParams, *tpUpdateBeaconParams;

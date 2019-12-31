@@ -375,17 +375,18 @@ lim_assoc_rej_get_remaining_delta(struct sir_rssi_disallow_lst *node);
 QDF_STATUS
 lim_rem_blacklist_entry_with_lowest_delta(qdf_list_t *list);
 
-static inline enum band_info lim_get_rf_band(uint8_t channel)
+static inline enum reg_wifi_band lim_get_rf_band(uint32_t chan_freq)
 {
-	if ((channel >= SIR_11A_CHANNEL_BEGIN) &&
-			(channel <= SIR_11A_CHANNEL_END))
-		return BAND_5G;
+	if (WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq))
+		return REG_BAND_6G;
 
-	if ((channel >= SIR_11B_CHANNEL_BEGIN) &&
-			(channel <= SIR_11B_CHANNEL_END))
-		return BAND_2G;
+	if (WLAN_REG_IS_5GHZ_CH_FREQ(chan_freq))
+		return REG_BAND_5G;
 
-	return BAND_UNKNOWN;
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(chan_freq))
+		return REG_BAND_2G;
+
+	return REG_BAND_UNKNOWN;
 }
 
 static inline QDF_STATUS
@@ -1030,6 +1031,17 @@ void lim_copy_bss_he_cap(struct pe_session *session,
 			 struct start_bss_req *sme_start_bss_req);
 
 /**
+ * lim_update_he_6gop_assoc_resp() - Update HE 6GHz op info to BSS params
+ * @add_bss: pointer to add bss params
+ * @he_op: Pointer to HE operation info IE
+ * @session: Pointer to Session entry struct
+ *
+ * Return: None
+ */
+void lim_update_he_6gop_assoc_resp(struct bss_params *pAddBssParams,
+				   tDot11fIEhe_op *he_op,
+				   struct pe_session *pe_session);
+/**
  * lim_copy_join_req_he_cap() - Copy HE capability to PE session from Join req
  * and update as per bandwidth supported
  * @session: pointer to PE session
@@ -1144,6 +1156,19 @@ static inline bool lim_is_session_he_capable(struct pe_session *session)
 }
 
 /**
+ * lim_update_he_bw_cap_mcs(): Update he mcs map per bandwidth
+ * @session_entry: pointer to PE session
+ *
+ * Return: None
+ */
+void lim_update_he_bw_cap_mcs(struct pe_session *session);
+
+static inline bool lim_is_he_6ghz_band(struct pe_session *session)
+{
+	return session->he_6ghz_band;
+}
+
+/**
  * lim_get_session_he_frag_cap(): Get session HE fragmentation cap
  * @session: pointer to session
  *
@@ -1230,6 +1255,17 @@ QDF_STATUS lim_populate_he_mcs_set(struct mac_context *mac_ctx,
 				   struct pe_session *session_entry,
 				   uint8_t nss);
 
+/**
+ * lim_update_stads_he_6ghz_op() - Update sta ds channel info
+ * @session: pe session
+ * @sta_ds: pointer to sta ds struct
+
+ * Update sta_ds channel width.
+ *
+ * Return: void
+ */
+void lim_update_stads_he_6ghz_op(struct pe_session *session,
+				 tpDphHashNode sta_ds);
 #else
 static inline void lim_add_he_cap(tpAddStaParams add_sta_params,
 				  tpSirAssocReq assoc_req)
@@ -1249,6 +1285,13 @@ static inline void lim_add_bss_he_cap(struct bss_params *add_bss,
 
 static inline void lim_add_bss_he_cfg(struct bss_params *add_bss,
 					 struct pe_session *session)
+{
+}
+
+static inline void lim_update_he_6gop_assoc_resp(
+					struct bss_params *pAddBssParams,
+					tDot11fIEhe_op *he_op,
+					struct pe_session *pe_session)
 {
 }
 
@@ -1313,6 +1356,15 @@ static inline bool lim_is_session_he_capable(struct pe_session *session)
 	return false;
 }
 
+static inline void lim_update_he_bw_cap_mcs(struct pe_session *session)
+{
+}
+
+static inline bool lim_is_he_6ghz_band(struct pe_session *session)
+{
+	return false;
+}
+
 static inline uint8_t lim_get_session_he_frag_cap(struct pe_session *session)
 {
 	return 0;
@@ -1360,6 +1412,11 @@ QDF_STATUS lim_populate_he_mcs_set(struct mac_context *mac_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 
+static inline void
+lim_update_stads_he_6ghz_op(struct pe_session *session,
+			    tpDphHashNode sta_ds)
+{
+}
 #endif
 
 /**
@@ -1790,17 +1847,6 @@ static inline void lim_copy_set_key_req_mac_addr(struct qdf_mac_addr *dst,
 {
 }
 #endif
-
-/**
- * lim_get_regulatory_max_transmit_power() - Get regulatory max transmit
- * power on given channel
- * @mac:     pointer to mac data
- * @channel: channel number
- *
- * Return:  int8_t - power
- */
-int8_t lim_get_regulatory_max_transmit_power(struct mac_context *mac,
-					     uint8_t channel);
 
 /**
  * lim_get_capability_info() - Get capability information

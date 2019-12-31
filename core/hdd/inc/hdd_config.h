@@ -904,7 +904,7 @@ struct dhcp_server {
 /*
  * <ini>
  * gActionOUIConnect1x1 - Used to specify action OUIs for 1x1 connection
- * @Default: 000C43 00 25 42 001018 06 02FFF02C0000 BC 25 42 001018 06 02FF040C0000 BC 25 42 00037F 00 35 6C
+ * @Default: 000C43 00 25 C2 001018 06 02FFF02C0000 BC 25 42 001018 06 02FF040C0000 BC 25 42 00037F 00 35 6C 001018 06 02FF009C0000 BC 25 48
  * Note: User should strictly add new action OUIs at the end of this
  * default value.
  *
@@ -912,7 +912,7 @@ struct dhcp_server {
  * OUI 1 : 000C43
  *   OUI data Len : 00
  *   Info Mask : 25 - Check for NSS and Band
- *   Capabilities: 42 - NSS == 2 && Band == 2G
+ *   Capabilities: C2 - NSS == 2 && Band == 2G || Band == 5G
  * OUI 2 : 001018
  *   OUI data Len : 06
  *   OUI Data : 02FFF02C0000
@@ -951,7 +951,7 @@ struct dhcp_server {
 	"gActionOUIConnect1x1", \
 	0, \
 	ACTION_OUI_MAX_STR_LEN, \
-	"000C43 00 25 42 001018 06 02FFF02C0000 BC 25 42 001018 06 02FF040C0000 BC 25 42 00037F 00 35 6C 001018 06 02FF009C0000 BC 25 48", \
+	"000C43 00 25 C2 001018 06 02FFF02C0000 BC 25 42 001018 06 02FF040C0000 BC 25 42 00037F 00 35 6C 001018 06 02FF009C0000 BC 25 48", \
 	"Used to specify action OUIs for 1x1 connection")
 
 /*
@@ -1232,29 +1232,6 @@ struct dhcp_server {
 
 /*
  * <ini>
- * gEnableRTTsupport
- *
- * @Min: 0 - Disabled
- * @Max: 1 - Enabled
- * @Default: 1 - Enabled
- *
- * The param is used to enable/disable support for RTT
- *
- * Related: None.
- *
- * Supported Feature: RTT
- *
- * Usage: Internal/External
- *
- * </ini>
- */
-#define CFG_ENABLE_RTT_SUPPORT CFG_INI_BOOL( \
-		"gEnableRTTSupport", \
-		1, \
-		"The param is used to enable/disable support for RTT")
-
-/*
- * <ini>
  * gAdvertiseConcurrentOperation - Iface combination advertising
  * @Min: 0
  * @Max: 1
@@ -1499,7 +1476,6 @@ enum host_log_level {
 	CFG(CFG_ENABLE_MAC_PROVISION) \
 	CFG_ENABLE_MTRACE_ALL \
 	CFG(CFG_ENABLE_RAMDUMP_COLLECTION) \
-	CFG(CFG_ENABLE_RTT_SUPPORT) \
 	CFG(CFG_ENABLE_UNIT_TEST_FRAMEWORK) \
 	CFG(CFG_INTERFACE_CHANGE_WAIT) \
 	CFG(CFG_INFORM_BSS_RSSI_RAW) \

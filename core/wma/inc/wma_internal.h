@@ -95,12 +95,14 @@ struct index_data_rate_type {
  * @ht20_rate: VHT20 supported rate table
  * @ht40_rate: VHT40 supported rate table
  * @ht80_rate: VHT80 supported rate table
+ * @ht160_rate: VHT160 supported rate table
  */
 struct index_vht_data_rate_type {
 	uint8_t mcs_index;
 	uint16_t ht20_rate[2];
 	uint16_t ht40_rate[2];
 	uint16_t ht80_rate[2];
+	uint16_t ht160_rate[2];
 };
 
 #ifdef WLAN_FEATURE_11AX
@@ -111,12 +113,14 @@ struct index_vht_data_rate_type {
  * @supported_he80_rate: he80 rate
  * @supported_he40_rate: he40 rate
  * @supported_he20_rate: he20 rate
+ * @supported_he160_rate: he160 rate
  */
 struct index_he_data_rate_type {
 	uint8_t beacon_rate_index;
 	uint16_t supported_he20_rate[MAX_HE_DCM_INDEX][3];
 	uint16_t supported_he40_rate[MAX_HE_DCM_INDEX][3];
 	uint16_t supported_he80_rate[MAX_HE_DCM_INDEX][3];
+	uint16_t supported_he160_rate[MAX_HE_DCM_INDEX][3];
 };
 #endif
 
@@ -196,6 +200,22 @@ int wma_roam_auth_offload_event_handler(WMA_HANDLE handle, uint8_t *event,
 					uint32_t len);
 
 /**
+ * wma_roam_stats_event_handler() - Handle the WMI_ROAM_STATS_EVENTID
+ * from target
+ * @handle: wma_handle
+ * @event:  roam debug stats event data pointer
+ * @len: length of the data
+ *
+ * This function handles the roam debug stats from the target and logs it
+ * to kmsg. This WMI_ROAM_STATS_EVENTID event is received whenever roam
+ * scan trigger happens or when neighbor report is sent by the firmware.
+ *
+ * Return: Success or Failure status
+ */
+int wma_roam_stats_event_handler(WMA_HANDLE handle, uint8_t *event,
+				 uint32_t len);
+
+/**
  * wma_mlme_roam_synch_event_handler_cb() - roam synch event handler
  * @handle: wma handle
  * @event: event data
@@ -225,6 +245,13 @@ int wma_roam_synch_frame_event_handler(void *handle, uint8_t *event,
 static inline int wma_mlme_roam_synch_event_handler_cb(void *handle,
 						       uint8_t *event,
 						       uint32_t len)
+{
+	return 0;
+}
+
+static inline int
+wma_roam_stats_event_handler(WMA_HANDLE handle, uint8_t *event,
+			     uint32_t len)
 {
 	return 0;
 }
@@ -1879,6 +1906,18 @@ void wma_send_vdev_down(tp_wma_handle wma, struct del_bss_resp *req);
 int wma_cold_boot_cal_event_handler(void *wma_ctx, uint8_t *event_buff,
 				    uint32_t len);
 
+#ifdef FEATURE_OEM_DATA
+/**
+ * wma_oem_event_handler() - oem data event handler
+ * @wma_ctx: wma handle
+ * @event_buff: event data
+ * @len: length of event buffer
+ *
+ * Return: Success or Failure status
+ */
+int wma_oem_event_handler(void *wma_ctx, uint8_t *event_buff, uint32_t len);
+#endif
+
 /**
  * wma_set_roam_triggers() - Send roam trigger bitmap to WMI
  * @wma_handle: wma handle
@@ -1888,4 +1927,18 @@ int wma_cold_boot_cal_event_handler(void *wma_ctx, uint8_t *event_buff,
  */
 QDF_STATUS wma_set_roam_triggers(tp_wma_handle wma_handle,
 				 struct roam_triggers *triggers);
+
+/**
+ * wma_get_ani_level_evt_handler - event handler to fetch ani level
+ * @handle: the wma handle
+ * @event_buf: buffer with event
+ * @len: buffer length
+ *
+ * This function receives ani level from firmware and passes the event
+ * to upper layer
+ *
+ * Return: 0 on success
+ */
+int wma_get_ani_level_evt_handler(void *handle, uint8_t *event_buf,
+				  uint32_t len);
 #endif

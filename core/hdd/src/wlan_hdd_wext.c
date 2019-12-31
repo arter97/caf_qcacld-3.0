@@ -3835,7 +3835,7 @@ int wlan_hdd_update_phymode(struct hdd_adapter *adapter, int new_phymode)
 	mac_handle_t mac_handle = hdd_ctx->mac_handle;
 	bool band_24 = false, band_5g = false;
 	bool ch_bond24 = false, ch_bond5g = false;
-	struct sme_config_params *sme_config;
+	struct sme_config_params *sme_config = NULL;
 	struct csr_config_params *csr_config;
 	uint32_t chwidth = WNI_CFG_CHANNEL_BONDING_MODE_DISABLE;
 	uint8_t vhtchanwidth;
@@ -4298,9 +4298,9 @@ static int hdd_we_set_power(struct hdd_adapter *adapter, int value)
 		return 0;
 	case 2:
 		/* Disable PowerSave */
-		sme_save_usr_ps_cfg(mac_handle, false);
 		sme_ps_enable_disable(mac_handle, adapter->vdev_id,
 				      SME_PS_DISABLE);
+		sme_save_usr_ps_cfg(mac_handle, false);
 		return 0;
 	case 3:
 		/* Enable UASPD */
@@ -7313,6 +7313,7 @@ static int __iw_get_char_setnone(struct net_device *dev,
 	{
 		int8_t s7snr = 0;
 		int status = 0;
+		bool enable_snr_monitoring;
 		struct hdd_context *hdd_ctx;
 		struct hdd_station_ctx *sta_ctx;
 
@@ -7322,12 +7323,14 @@ static int __iw_get_char_setnone(struct net_device *dev,
 			return status;
 
 		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-		if (!hdd_ctx->config->enable_snr_monitoring ||
+		enable_snr_monitoring =
+				ucfg_scan_is_snr_monitor_enabled(hdd_ctx->psoc);
+		if (!enable_snr_monitoring ||
 		    eConnectionState_Associated !=
 		    sta_ctx->conn_info.conn_state) {
 			hdd_err("getSNR failed: Enable SNR Monitoring-%d, ConnectionState-%d",
-			       hdd_ctx->config->enable_snr_monitoring,
-			       sta_ctx->conn_info.conn_state);
+				enable_snr_monitoring,
+				sta_ctx->conn_info.conn_state);
 			return -ENONET;
 		}
 		wlan_hdd_get_snr(adapter, &s7snr);
@@ -7747,7 +7750,7 @@ static int iw_get_policy_manager_ut_ops(struct hdd_context *hdd_ctx,
  *
  * Return: void
  */
-#if WLAN_DEBUG
+#ifdef WLAN_DEBUG
 static void hdd_ch_avoid_unit_cmd(struct hdd_context *hdd_ctx,
 				  int num_args, int *apps_args)
 {
@@ -7912,8 +7915,7 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
 		for (i = 0; i < len; i++) {
 			pr_info("|table_index[%d]\t\t\n", i);
 			pr_info("|\t|vdev_id - %-10d|\n", conn_info->vdev_id);
-			pr_info("|\t|chan    - %-10d|\n",
-				wlan_freq_to_chan(conn_info->freq));
+			pr_info("|\t|freq    - %-10d|\n", conn_info->freq);
 			pr_info("|\t|bw      - %-10d|\n", conn_info->bw);
 			pr_info("|\t|mode    - %-10d|\n", conn_info->mode);
 			pr_info("|\t|mac     - %-10d|\n", conn_info->mac);

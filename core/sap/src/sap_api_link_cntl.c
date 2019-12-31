@@ -95,34 +95,38 @@
 
 void sap_config_acs_result(mac_handle_t mac_handle,
 			   struct sap_context *sap_ctx,
-			   uint32_t sec_ch)
+			   uint32_t sec_ch_freq)
 {
-	uint32_t channel = sap_ctx->acs_cfg->pri_ch;
 	struct ch_params ch_params = {0};
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 
 	ch_params.ch_width = sap_ctx->acs_cfg->ch_width;
-	wlan_reg_set_channel_params(mac_ctx->pdev, channel, sec_ch,
-			&ch_params);
+	wlan_reg_set_channel_params_for_freq(
+			mac_ctx->pdev, sap_ctx->acs_cfg->pri_ch_freq,
+			sec_ch_freq, &ch_params);
 	sap_ctx->acs_cfg->ch_width = ch_params.ch_width;
-	if (sap_ctx->acs_cfg->ch_width > CH_WIDTH_40MHZ)
-		sap_ctx->acs_cfg->vht_seg0_center_ch =
-						ch_params.center_freq_seg0;
+	if (sap_ctx->acs_cfg->ch_width > CH_WIDTH_40MHZ ||
+	    WLAN_REG_IS_6GHZ_CHAN_FREQ(sap_ctx->acs_cfg->pri_ch_freq))
+		sap_ctx->acs_cfg->vht_seg0_center_ch_freq =
+						ch_params.mhz_freq_seg0;
 	else
-		sap_ctx->acs_cfg->vht_seg0_center_ch = 0;
+		sap_ctx->acs_cfg->vht_seg0_center_ch_freq = 0;
 
-	if (sap_ctx->acs_cfg->ch_width == CH_WIDTH_80P80MHZ)
-		sap_ctx->acs_cfg->vht_seg1_center_ch =
-						ch_params.center_freq_seg1;
+	if (sap_ctx->acs_cfg->ch_width == CH_WIDTH_80P80MHZ ||
+	   (sap_ctx->acs_cfg->ch_width == CH_WIDTH_160MHZ))
+		sap_ctx->acs_cfg->vht_seg1_center_ch_freq =
+						ch_params.mhz_freq_seg1;
 	else
-		sap_ctx->acs_cfg->vht_seg1_center_ch = 0;
+		sap_ctx->acs_cfg->vht_seg1_center_ch_freq = 0;
 
 	if (ch_params.sec_ch_offset == PHY_DOUBLE_CHANNEL_HIGH_PRIMARY)
-		sap_ctx->acs_cfg->ht_sec_ch = sap_ctx->acs_cfg->pri_ch - 4;
+		sap_ctx->acs_cfg->ht_sec_ch_freq =
+				sap_ctx->acs_cfg->pri_ch_freq - 20;
 	else if (ch_params.sec_ch_offset == PHY_DOUBLE_CHANNEL_LOW_PRIMARY)
-		sap_ctx->acs_cfg->ht_sec_ch = sap_ctx->acs_cfg->pri_ch + 4;
+		sap_ctx->acs_cfg->ht_sec_ch_freq =
+				sap_ctx->acs_cfg->pri_ch_freq + 20;
 	else
-		sap_ctx->acs_cfg->ht_sec_ch = 0;
+		sap_ctx->acs_cfg->ht_sec_ch_freq = 0;
 }
 
 /**
@@ -289,7 +293,7 @@ QDF_STATUS wlansap_pre_start_bss_acs_scan_callback(mac_handle_t mac_handle,
 	if (!sap_ctx->acs_cfg->ch_list_count) {
 		sap_err("No channel left for SAP operation, hotspot fail");
 		sap_ctx->chan_freq = SAP_CHANNEL_NOT_SELECTED;
-		sap_ctx->acs_cfg->pri_ch = SAP_CHANNEL_NOT_SELECTED;
+		sap_ctx->acs_cfg->pri_ch_freq = SAP_CHANNEL_NOT_SELECTED;
 		sap_config_acs_result(mac_handle, sap_ctx, 0);
 		sap_ctx->sap_state = eSAP_ACS_CHANNEL_SELECTED;
 		sap_ctx->sap_status = eSAP_START_BSS_CHANNEL_NOT_SELECTED;
@@ -303,10 +307,9 @@ QDF_STATUS wlansap_pre_start_bss_acs_scan_callback(mac_handle_t mac_handle,
 		oper_channel =
 			sap_select_default_oper_chan(sap_ctx->acs_cfg);
 		sap_ctx->chan_freq = oper_channel;
-		sap_ctx->acs_cfg->pri_ch =
-			wlan_reg_freq_to_chan(mac_ctx->pdev, oper_channel);
+		sap_ctx->acs_cfg->pri_ch_freq = oper_channel;
 		sap_config_acs_result(mac_handle, sap_ctx,
-				      sap_ctx->acs_cfg->ht_sec_ch);
+				      sap_ctx->acs_cfg->ht_sec_ch_freq);
 		sap_ctx->sap_state = eSAP_ACS_CHANNEL_SELECTED;
 		sap_ctx->sap_status = eSAP_STATUS_SUCCESS;
 		goto close_session;
@@ -324,9 +327,9 @@ QDF_STATUS wlansap_pre_start_bss_acs_scan_callback(mac_handle_t mac_handle,
 	}
 
 	sap_ctx->chan_freq = oper_channel;
-	sap_ctx->acs_cfg->pri_ch = wlan_reg_freq_to_chan(mac_ctx->pdev,
-							 oper_channel);
-	sap_config_acs_result(mac_handle, sap_ctx, sap_ctx->acs_cfg->ht_sec_ch);
+	sap_ctx->acs_cfg->pri_ch_freq = oper_channel;
+	sap_config_acs_result(mac_handle, sap_ctx,
+			      sap_ctx->acs_cfg->ht_sec_ch_freq);
 
 	QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_HIGH,
 		  FL("Channel freq selected = %d"), sap_ctx->chan_freq);
@@ -1326,7 +1329,6 @@ void sap_scan_event_callback(struct wlan_objmgr_vdev *vdev,
 	eCsrScanStatus scan_status = eCSR_SCAN_FAILURE;
 	mac_handle_t mac_handle;
 	QDF_STATUS status;
-	struct qdf_op_sync *op_sync;
 
 	/*
 	 * It may happen that the SAP was deleted before the scan
@@ -1361,11 +1363,7 @@ void sap_scan_event_callback(struct wlan_objmgr_vdev *vdev,
 	if (success)
 		scan_status = eCSR_SCAN_SUCCESS;
 
-	if (qdf_op_protect(&op_sync))
-		return;
-
 	wlansap_pre_start_bss_acs_scan_callback(mac_handle,
 						arg, session_id,
 						scan_id, scan_status);
-	qdf_op_unprotect(op_sync);
 }

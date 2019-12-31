@@ -679,7 +679,6 @@ QDF_STATUS wma_mon_mlme_vdev_down_send(struct vdev_mlme_obj *vdev_mlme,
 
 /**
  * wma_vdev_detach_callback() - VDEV delete response handler
- * @vdev_mlme_obj:  VDEV MLME comp object
  * @rsp: pointer to vdev delete response
  *
  * This API proccesses vdev delete response and gives to upper layers
@@ -687,9 +686,7 @@ QDF_STATUS wma_mon_mlme_vdev_down_send(struct vdev_mlme_obj *vdev_mlme,
  * Return: SUCCESS on successful completion of VDEV delete operation
  *         FAILURE, if it fails due to any
  */
-QDF_STATUS wma_vdev_detach_callback(
-				struct vdev_mlme_obj *vdev_mlme,
-				struct vdev_delete_response *rsp);
+QDF_STATUS wma_vdev_detach_callback(struct vdev_delete_response *rsp);
 
 /**
  * wma_vdev_stop_resp_handler() - vdev stop response handler
@@ -773,4 +770,15 @@ void wma_update_roam_offload_flag(void *handle,
  * Return: QDF_STATUS
  */
 QDF_STATUS wma_vdev_self_peer_create(struct vdev_mlme_obj *vdev_mlme);
+
+/**
+ * wma_cleanup_vdev() - cleanup wma layers vdev
+ * @vdev: Object manager vdev
+ *
+ * This function cleansup the wma layers vdev related data.
+ *
+ * Return: None
+ */
+void wma_cleanup_vdev(struct wlan_objmgr_vdev *vdev);
+
 #endif /* WMA_API_H */

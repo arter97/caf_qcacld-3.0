@@ -54,8 +54,10 @@
 #include <cdp_txrx_cmn_reg.h>
 #include <cdp_txrx_cfg.h>
 #include <cdp_txrx_misc.h>
+#include <ol_defines.h>
 #include <dispatcher_init_deinit.h>
 #include <cdp_txrx_handle.h>
+#include <cdp_txrx_host_stats.h>
 #include "target_type.h"
 #include "wlan_ocb_ucfg_api.h"
 #include "wlan_ipa_ucfg_api.h"
@@ -89,7 +91,7 @@ static struct ol_if_ops  dp_ol_if_ops = {
 	.peer_set_default_routing = target_if_peer_set_default_routing,
 	.peer_rx_reorder_queue_setup = target_if_peer_rx_reorder_queue_setup,
 	.peer_rx_reorder_queue_remove = target_if_peer_rx_reorder_queue_remove,
-	.is_hw_dbs_2x2_capable = policy_mgr_is_hw_dbs_2x2_capable,
+	.is_hw_dbs_2x2_capable = policy_mgr_is_dp_hw_dbs_2x2_capable,
 	.lro_hash_config = target_if_lro_hash_config,
 	.rx_invalid_peer = wma_rx_invalid_peer_ind,
 	.is_roam_inprogress = wma_is_roam_in_progress,
@@ -367,6 +369,24 @@ cds_cdp_update_del_ack_params(struct wlan_objmgr_psoc *psoc,
 {}
 #endif
 
+#ifdef WLAN_SUPPORT_TXRX_HL_BUNDLE
+static inline void
+cds_cdp_update_bundle_params(struct wlan_objmgr_psoc *psoc,
+			     struct txrx_pdev_cfg_param_t *cdp_cfg)
+{
+	cdp_cfg->bundle_timer_value =
+		cfg_get(psoc, CFG_DP_HL_BUNDLE_TIMER_VALUE);
+	cdp_cfg->bundle_size =
+		cfg_get(psoc, CFG_DP_HL_BUNDLE_SIZE);
+}
+#else
+static inline void
+cds_cdp_update_bundle_params(struct wlan_objmgr_psoc *psoc,
+			     struct txrx_pdev_cfg_param_t *cdp_cfg)
+{
+}
+#endif
+
 /**
  * cds_cdp_cfg_attach() - attach data path config module
  * @cds_cfg: generic platform level config instance
@@ -405,6 +425,8 @@ static void cds_cdp_cfg_attach(struct wlan_objmgr_psoc *psoc)
 		cfg_get(psoc, CFG_DP_AP_STA_SECURITY_SEPERATION);
 
 	cds_cdp_update_del_ack_params(psoc, &cdp_cfg);
+
+	cds_cdp_update_bundle_params(psoc, &cdp_cfg);
 
 	gp_cds_context->cfg_ctx = cdp_cfg_attach(soc, gp_cds_context->qdf_ctx,
 					(void *)(&cdp_cfg));
@@ -789,9 +811,8 @@ QDF_STATUS cds_dp_open(struct wlan_objmgr_psoc *psoc)
 
 	cds_set_context(QDF_MODULE_ID_TXRX,
 		cdp_pdev_attach(cds_get_context(QDF_MODULE_ID_SOC),
-			(struct cdp_ctrl_objmgr_pdev *)gp_cds_context->cfg_ctx,
-			gp_cds_context->htc_ctx,
-			gp_cds_context->qdf_ctx, 0));
+				gp_cds_context->htc_ctx,
+				gp_cds_context->qdf_ctx, 0));
 	if (!gp_cds_context->pdev_txrx_ctx) {
 		/* Critical Error ...  Cannot proceed further */
 		cds_alert("Failed to open TXRX");
@@ -810,14 +831,14 @@ QDF_STATUS cds_dp_open(struct wlan_objmgr_psoc *psoc)
 		false : gp_cds_context->cds_cfg->enable_dp_rx_threads;
 
 	qdf_status = dp_txrx_init(cds_get_context(QDF_MODULE_ID_SOC),
-				  WMI_PDEV_ID_SOC,
+				  OL_TXRX_PDEV_ID,
 				  &dp_config);
 
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status))
 		goto intr_close;
 
-	ucfg_pmo_psoc_set_txrx_handle(psoc, gp_cds_context->pdev_txrx_ctx);
-	ucfg_ocb_set_txrx_pdev_id(psoc, WMI_PDEV_ID_SOC);
+	ucfg_pmo_psoc_set_txrx_pdev_id(psoc, OL_TXRX_PDEV_ID);
+	ucfg_ocb_set_txrx_pdev_id(psoc, OL_TXRX_PDEV_ID);
 
 	cds_debug("CDS successfully Opened");
 
@@ -874,7 +895,7 @@ QDF_STATUS cds_pre_enable(void)
 	/* call Packetlog connect service */
 	if (QDF_GLOBAL_FTM_MODE != cds_get_conparam() &&
 	    QDF_GLOBAL_EPPING_MODE != cds_get_conparam())
-		cdp_pkt_log_con_service(soc, gp_cds_context->pdev_txrx_ctx,
+		cdp_pkt_log_con_service(soc, OL_TXRX_PDEV_ID,
 					scn);
 
 	/*call WMA pre start */
@@ -1266,7 +1287,7 @@ QDF_STATUS cds_dp_close(struct wlan_objmgr_psoc *psoc)
 		       (struct cdp_pdev *)ctx, 1);
 
 	cds_set_context(QDF_MODULE_ID_TXRX, NULL);
-	ucfg_pmo_psoc_set_txrx_handle(psoc, NULL);
+	ucfg_pmo_psoc_set_txrx_pdev_id(psoc, OL_TXRX_INVALID_PDEV_ID);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1639,51 +1660,6 @@ QDF_STATUS cds_free_context(QDF_MODULE_ID module_id, void *module_context)
 	return QDF_STATUS_SUCCESS;
 } /* cds_free_context() */
 
-QDF_STATUS cds_get_vdev_types(enum QDF_OPMODE mode, uint8_t *type,
-			      uint8_t *sub_type)
-{
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	*type = 0;
-	*sub_type = 0;
-
-	switch (mode) {
-	case QDF_STA_MODE:
-		*type = WLAN_VDEV_MLME_TYPE_STA;
-		break;
-	case QDF_SAP_MODE:
-		*type = WLAN_VDEV_MLME_TYPE_AP;
-		break;
-	case QDF_P2P_DEVICE_MODE:
-		*type = WLAN_VDEV_MLME_TYPE_AP;
-		*sub_type = WLAN_VDEV_MLME_SUBTYPE_P2P_DEVICE;
-		break;
-	case QDF_P2P_CLIENT_MODE:
-		*type = WLAN_VDEV_MLME_TYPE_STA;
-		*sub_type = WLAN_VDEV_MLME_SUBTYPE_P2P_CLIENT;
-		break;
-	case QDF_P2P_GO_MODE:
-		*type = WLAN_VDEV_MLME_TYPE_AP;
-		*sub_type = WLAN_VDEV_MLME_SUBTYPE_P2P_GO;
-		break;
-	case QDF_OCB_MODE:
-		*type = WLAN_VDEV_MLME_TYPE_OCB;
-		break;
-	case QDF_IBSS_MODE:
-		*type = WLAN_VDEV_MLME_TYPE_IBSS;
-		break;
-	case QDF_MONITOR_MODE:
-		*type = WMI_HOST_VDEV_TYPE_MONITOR;
-		break;
-	case QDF_NDI_MODE:
-		*type = WLAN_VDEV_MLME_TYPE_NDI;
-		break;
-	default:
-		cds_err("Invalid device mode %d", mode);
-		status = QDF_STATUS_E_INVAL;
-		break;
-	}
-	return status;
-}
 
 /**
  * cds_flush_work() - flush pending works
@@ -2784,6 +2760,48 @@ void cds_incr_arp_stats_tx_tgt_acked(void)
 	if (adapter)
 		adapter->hdd_stats.hdd_arp_stats.tx_ack_cnt++;
 }
+
+#ifdef FEATURE_ALIGN_STATS_FROM_DP
+/**
+ * cds_get_cdp_vdev_stats() - Function which retrieves cdp vdev stats
+ * @vdev_id: vdev id
+ * @vdev_stats: cdp vdev stats retrieves from DP
+ *
+ * Return: If get cdp vdev stats success return true, otherwise return false
+ */
+static bool
+cds_get_cdp_vdev_stats(uint8_t vdev_id, struct cdp_vdev_stats *vdev_stats)
+{
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+
+	if (!vdev_stats)
+		return false;
+
+	if (cdp_host_get_vdev_stats(soc, vdev_id, vdev_stats, true))
+		return false;
+
+	return true;
+}
+
+bool
+cds_dp_get_vdev_stats(uint8_t vdev_id, struct cds_vdev_dp_stats *stats)
+{
+	struct cdp_vdev_stats *vdev_stats;
+	bool ret = false;
+
+	vdev_stats = qdf_mem_malloc(sizeof(*vdev_stats));
+	if (!vdev_stats)
+		return false;
+
+	if (cds_get_cdp_vdev_stats(vdev_id, vdev_stats)) {
+		stats->tx_retries = vdev_stats->tx.retries;
+		ret = true;
+	}
+
+	qdf_mem_free(vdev_stats);
+	return ret;
+}
+#endif
 
 #ifdef ENABLE_SMMU_S1_TRANSLATION
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))

@@ -35,6 +35,7 @@
 #include "wlan_policy_mgr_api.h"
 #include "qwlan_version.h"
 #include "bmi.h"
+#include <ol_defines.h>
 #include "cdp_txrx_bus.h"
 #include "cdp_txrx_misc.h"
 #include "pld_common.h"
@@ -150,6 +151,14 @@ static void hdd_hif_init_driver_state_callbacks(void *data,
 	cbk->is_driver_unloading = hdd_is_driver_unloading;
 	cbk->is_target_ready = hdd_is_target_ready;
 }
+
+#ifdef FORCE_WAKE
+void hdd_set_hif_init_phase(struct hif_opaque_softc *hif_ctx,
+			    bool hal_init_phase)
+{
+	hif_srng_init_phase(hif_ctx, hal_init_phase);
+}
+#endif /* FORCE_WAKE */
 
 /**
  * hdd_hif_set_attribute() - API to set CE attribute if memory is limited
@@ -381,7 +390,7 @@ static int check_for_probe_defer(int ret)
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0))
 static void hdd_abort_system_suspend(struct device *dev)
 {
-	pm_wakeup_hard_event(dev);
+	qdf_pm_system_wakeup();
 }
 #else
 static void hdd_abort_system_suspend(struct device *dev)
@@ -389,39 +398,11 @@ static void hdd_abort_system_suspend(struct device *dev)
 }
 #endif
 
-/* Total wait time for pm freeze is 10 seconds */
-#define HDD_SLEEP_FOR_PM_FREEZE_TIME (500)
-#define HDD_MAX_ATTEMPT_SLEEP_FOR_PM_FREEZE_TIME (20)
-
-static int hdd_wait_for_pm_freeze(void)
-{
-	uint8_t count = 0;
-
-	while (pm_freezing) {
-		hdd_info("pm freezing wait for %d ms",
-			 HDD_SLEEP_FOR_PM_FREEZE_TIME);
-		msleep(HDD_SLEEP_FOR_PM_FREEZE_TIME);
-		count++;
-		if (count > HDD_MAX_ATTEMPT_SLEEP_FOR_PM_FREEZE_TIME) {
-			hdd_err("timeout occurred for pm freezing");
-			return -EBUSY;
-		}
-	}
-
-	return 0;
-}
-
 int hdd_soc_idle_restart_lock(struct device *dev)
 {
 	hdd_prevent_suspend(WIFI_POWER_EVENT_WAKELOCK_DRIVER_IDLE_RESTART);
 
 	hdd_abort_system_suspend(dev);
-
-	if (hdd_wait_for_pm_freeze()) {
-		hdd_allow_suspend(
-			WIFI_POWER_EVENT_WAKELOCK_DRIVER_IDLE_RESTART);
-		return -EBUSY;
-	}
 
 	return 0;
 }
@@ -650,7 +631,6 @@ static void __hdd_soc_remove(struct device *dev)
 
 	if (hdd_get_conparam() == QDF_GLOBAL_EPPING_MODE) {
 		hdd_wlan_stop_modules(hdd_ctx, false);
-		hdd_bus_bandwidth_deinit(hdd_ctx);
 		qdf_nbuf_deinit_replenish_timer();
 	} else {
 		hdd_wlan_exit(hdd_ctx);
@@ -765,6 +745,7 @@ static void __hdd_soc_recovery_shutdown(void)
 
 	/* cancel/flush any pending/active idle shutdown work */
 	hdd_psoc_idle_timer_stop(hdd_ctx);
+	hdd_bus_bw_compute_timer_stop(hdd_ctx);
 
 	/* nothing to do if the soc is already unloaded */
 	if (hdd_ctx->driver_status == DRIVER_MODULES_CLOSED) {
@@ -973,7 +954,6 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params)
 	struct hdd_context *hdd_ctx;
 	void *hif_ctx;
 	void *dp_soc;
-	void *dp_pdev;
 	struct pmo_wow_enable_params pmo_params;
 
 	hdd_info("starting bus suspend");
@@ -1003,8 +983,7 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params)
 	}
 
 	dp_soc = cds_get_context(QDF_MODULE_ID_SOC);
-	dp_pdev = cds_get_context(QDF_MODULE_ID_TXRX);
-	err = qdf_status_to_os_return(cdp_bus_suspend(dp_soc, dp_pdev));
+	err = qdf_status_to_os_return(cdp_bus_suspend(dp_soc, OL_TXRX_PDEV_ID));
 	if (err) {
 		hdd_err("Failed cdp bus suspend: %d", err);
 		return err;
@@ -1050,7 +1029,7 @@ late_hif_resume:
 	QDF_BUG(QDF_IS_STATUS_SUCCESS(status));
 
 resume_cdp:
-	status = cdp_bus_resume(dp_soc, dp_pdev);
+	status = cdp_bus_resume(dp_soc, OL_TXRX_PDEV_ID);
 	QDF_BUG(QDF_IS_STATUS_SUCCESS(status));
 
 	return err;
@@ -1160,7 +1139,6 @@ int wlan_hdd_bus_resume(void)
 	int status;
 	QDF_STATUS qdf_status;
 	void *dp_soc;
-	void *dp_pdev;
 
 	if (cds_is_driver_recovering())
 		return 0;
@@ -1205,8 +1183,7 @@ int wlan_hdd_bus_resume(void)
 	}
 
 	dp_soc = cds_get_context(QDF_MODULE_ID_SOC);
-	dp_pdev = cds_get_context(QDF_MODULE_ID_TXRX);
-	qdf_status = cdp_bus_resume(dp_soc, dp_pdev);
+	qdf_status = cdp_bus_resume(dp_soc, OL_TXRX_PDEV_ID);
 	status = qdf_status_to_os_return(qdf_status);
 	if (status) {
 		hdd_err("Failed cdp bus resume");

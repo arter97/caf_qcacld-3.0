@@ -194,8 +194,6 @@ extern const uint8_t hdd_qdisc_ac_to_tl_ac[];
 extern const uint8_t hdd_wmm_up_to_ac_map[];
 extern const uint8_t hdd_linux_up_to_ac_map[];
 
-#define WLAN_HDD_MAX_DSCP 0x3f
-
 /**
  * hdd_wmmps_helper() - Function to set uapsd psb dynamically
  *
@@ -251,7 +249,10 @@ QDF_STATUS hdd_wmm_adapter_close(struct hdd_adapter *adapter);
  *
  * Return: Qdisc queue index.
  */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+uint16_t hdd_select_queue(struct net_device *dev, struct sk_buff *skb,
+			  struct net_device *sb_dev);
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
 uint16_t hdd_select_queue(struct net_device *dev, struct sk_buff *skb,
 			  struct net_device *sb_dev,
 			  select_queue_fallback_t fallback);

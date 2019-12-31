@@ -777,23 +777,34 @@ static QDF_STATUS wma_set_bss_rate_flags_he(enum tx_rate_info *rate_flags,
 
 	/*extend TX_RATE_HE160 in future*/
 	if (add_bss->ch_width == CH_WIDTH_160MHZ ||
-	    add_bss->ch_width == CH_WIDTH_80P80MHZ ||
-	    add_bss->ch_width == CH_WIDTH_80MHZ)
+	    add_bss->ch_width == CH_WIDTH_80P80MHZ)
+		*rate_flags |= TX_RATE_HE160;
+	else if (add_bss->ch_width == CH_WIDTH_80MHZ)
 		*rate_flags |= TX_RATE_HE80;
-
 	else if (add_bss->ch_width)
 		*rate_flags |= TX_RATE_HE40;
 	else
 		*rate_flags |= TX_RATE_HE20;
 
-	wma_debug("he_capable %d", add_bss->he_capable);
+	wma_debug("he_capable %d rate_flags 0x%x", add_bss->he_capable,
+		  *rate_flags);
 	return QDF_STATUS_SUCCESS;
+}
+
+static bool wma_get_bss_he_capable(struct bss_params *add_bss)
+{
+	return add_bss->he_capable;
 }
 #else
 static QDF_STATUS wma_set_bss_rate_flags_he(enum tx_rate_info *rate_flags,
 					    struct bss_params *add_bss)
 {
 	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static bool wma_get_bss_he_capable(struct bss_params *add_bss)
+{
+	return false;
 }
 #endif
 
@@ -818,9 +829,9 @@ void wma_set_bss_rate_flags(tp_wma_handle wma, uint8_t vdev_id,
 		wma_set_bss_rate_flags_he(rate_flags, add_bss)) {
 		if (add_bss->vhtCapable) {
 			if (add_bss->ch_width == CH_WIDTH_80P80MHZ)
-				*rate_flags |= TX_RATE_VHT80;
+				*rate_flags |= TX_RATE_VHT160;
 			if (add_bss->ch_width == CH_WIDTH_160MHZ)
-				*rate_flags |= TX_RATE_VHT80;
+				*rate_flags |= TX_RATE_VHT160;
 			if (add_bss->ch_width == CH_WIDTH_80MHZ)
 				*rate_flags |= TX_RATE_VHT80;
 			else if (add_bss->ch_width)
@@ -841,7 +852,8 @@ void wma_set_bss_rate_flags(tp_wma_handle wma, uint8_t vdev_id,
 	    add_bss->staContext.fShortGI40Mhz)
 		*rate_flags |= TX_RATE_SGI;
 
-	if (!add_bss->htCapable && !add_bss->vhtCapable)
+	if (!add_bss->htCapable && !add_bss->vhtCapable &&
+	    !wma_get_bss_he_capable(add_bss))
 		*rate_flags = TX_RATE_LEGACY;
 
 	wma_debug("capable: vht %u, ht %u, rate_flags %x, ch_width %d",
@@ -1041,9 +1053,8 @@ int wma_peer_state_change_event_handler(void *handle,
 	}
 
 	if ((cdp_get_opmode(cds_get_context(QDF_MODULE_ID_SOC),
-			vdev) ==
-			wlan_op_mode_sta) &&
-		event->state == WMI_PEER_STATE_AUTHORIZED) {
+			    event->vdev_id) == wlan_op_mode_sta) &&
+	    event->state == WMI_PEER_STATE_AUTHORIZED) {
 		/*
 		 * set event so that hdd
 		 * can procced and unpause tx queue
@@ -1635,17 +1646,12 @@ QDF_STATUS wma_process_init_bad_peer_tx_ctl_info(tp_wma_handle wma,
 					struct t_bad_peer_txtcl_config *config)
 {
 	/* Parameter sanity check */
-	struct cdp_pdev *curr_pdev;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 
 	if (!wma || !config) {
 		WMA_LOGE("%s Invalid input\n", __func__);
 		return QDF_STATUS_E_FAILURE;
 	}
-
-	curr_pdev = cds_get_context(QDF_MODULE_ID_TXRX);
-	if (!curr_pdev)
-		return QDF_STATUS_E_FAILURE;
 
 	WMA_LOGE("%s enable %d period %d txq limit %d\n", __func__,
 		 config->enable,
@@ -1659,7 +1665,7 @@ QDF_STATUS wma_process_init_bad_peer_tx_ctl_info(tp_wma_handle wma,
 		int i = 0;
 
 		cdp_bad_peer_txctl_set_setting(soc,
-					curr_pdev,
+					WMI_PDEV_ID_SOC,
 					config->enable,
 					config->period,
 					config->txq_limit);
@@ -1670,7 +1676,7 @@ QDF_STATUS wma_process_init_bad_peer_tx_ctl_info(tp_wma_handle wma,
 			threshold = config->threshold[i].thresh[0];
 			limit =	config->threshold[i].txlimit;
 			cdp_bad_peer_txctl_update_threshold(soc,
-						curr_pdev,
+						WMI_PDEV_ID_SOC,
 						i,
 						threshold,
 						limit);
@@ -2401,7 +2407,7 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 			 wma_tx_dwnld_comp_callback tx_frm_download_comp_cb,
 			 void *pData,
 			 wma_tx_ota_comp_callback tx_frm_ota_comp_cb,
-			 uint8_t tx_flag, uint8_t vdev_id, bool tdlsFlag,
+			 uint8_t tx_flag, uint8_t vdev_id, bool tdls_flag,
 			 uint16_t channel_freq, enum rateid rid)
 {
 	tp_wma_handle wma_handle = (tp_wma_handle) (wma_context);
@@ -2460,7 +2466,7 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	cdp_hl_tdls_flag_reset(soc, txrx_vdev, false);
+	cdp_hl_tdls_flag_reset(soc, vdev_id, false);
 
 	if (frmType >= TXRX_FRM_MAX) {
 		WMA_LOGE("Invalid Frame Type Fail to send Frame");
@@ -2685,14 +2691,14 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 
 		/* Send the Data frame to TxRx in Non Standard Path */
 		cdp_hl_tdls_flag_reset(soc,
-			txrx_vdev, tdlsFlag);
+			vdev_id, tdls_flag);
 
 		ret = cdp_tx_non_std(soc,
-			txrx_vdev,
+			vdev_id,
 			OL_TX_SPEC_NO_FREE, skb);
 
 		cdp_hl_tdls_flag_reset(soc,
-			txrx_vdev, false);
+			vdev_id, false);
 
 		if (ret) {
 			WMA_LOGE("TxRx Rejected. Fail to do Tx");
@@ -3196,7 +3202,7 @@ uint8_t wma_rx_invalid_peer_ind(uint8_t vdev_id, void *wh)
 	for (i = 0; i < INVALID_PEER_MAX_NUM; i++) {
 		if (qdf_mem_cmp
 			      (iface->invalid_peers[i].rx_macaddr,
-			      rx_inv_msg->ra,
+			      rx_inv_msg->ta,
 			      QDF_MAC_ADDR_SIZE) == 0) {
 			invalid_peer_found = true;
 			break;
@@ -3205,7 +3211,7 @@ uint8_t wma_rx_invalid_peer_ind(uint8_t vdev_id, void *wh)
 
 	if (!invalid_peer_found) {
 		qdf_mem_copy(iface->invalid_peers[index].rx_macaddr,
-			     rx_inv_msg->ra,
+			     rx_inv_msg->ta,
 			    QDF_MAC_ADDR_SIZE);
 
 		/* reset count if reached max */
@@ -3225,7 +3231,7 @@ uint8_t wma_rx_invalid_peer_ind(uint8_t vdev_id, void *wh)
 	} else {
 		wma_debug_rl("Ignore invalid peer indication as received more than once "
 			QDF_MAC_ADDR_STR,
-			QDF_MAC_ADDR_ARRAY(rx_inv_msg->ra));
+			QDF_MAC_ADDR_ARRAY(rx_inv_msg->ta));
 		qdf_mem_free(rx_inv_msg);
 	}
 

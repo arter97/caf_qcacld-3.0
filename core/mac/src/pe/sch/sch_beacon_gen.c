@@ -460,15 +460,13 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 		populate_dot11f_vht_tx_power_env(mac_ctx,
 						 &bcn_2->vht_transmit_power_env,
 						 session->ch_width,
-						 wlan_reg_freq_to_chan(
-						 mac_ctx->pdev,
-						 session->curr_op_freq));
+						 session->curr_op_freq);
 		populate_dot11f_qcn_ie(mac_ctx, &bcn_2->qcn_ie,
 				       QCN_IE_ATTR_ID_ALL);
 	}
 
 	if (lim_is_session_he_capable(session)) {
-		pe_warn("Populate HE IEs");
+		pe_debug("Populate HE IEs");
 		populate_dot11f_he_caps(mac_ctx, session,
 					&bcn_2->he_cap);
 		populate_dot11f_he_operation(mac_ctx, session,
@@ -935,6 +933,12 @@ static QDF_STATUS write_beacon_to_memory(struct mac_context *mac, uint16_t size,
 
 	/* copy end of beacon only if length > 0 */
 	if (length > 0) {
+		if (size + pe_session->schBeaconOffsetEnd >
+		    SIR_MAX_BEACON_SIZE) {
+			pe_err("beacon tmp fail size %d BeaconOffsetEnd %d",
+			       size, pe_session->schBeaconOffsetEnd);
+			return QDF_STATUS_E_FAILURE;
+		}
 		for (i = 0; i < pe_session->schBeaconOffsetEnd; i++)
 			pe_session->pSchBeaconFrameBegin[size++] =
 				pe_session->pSchBeaconFrameEnd[i];
