@@ -46,6 +46,7 @@
 #define REGULATORY_CHAN_RADAR        BIT(3)
 #define REGULATORY_CHAN_NO_OFDM      BIT(6)
 #define REGULATORY_CHAN_INDOOR_ONLY  BIT(9)
+#define REGULATORY_CHAN_AFC          BIT(13)
 
 #define REGULATORY_CHAN_NO_HT40      BIT(4)
 #define REGULATORY_CHAN_NO_80MHZ     BIT(7)
@@ -68,6 +69,9 @@
  * @DFS_MKK_REGION: MKK region
  * @DFS_CN_REGION: China region
  * @DFS_KR_REGION: Korea region
+ * @DFS_MKK_REGION: MKKN region
+ * that supports updated W53 RADAR pattern
+ * detection.
  * @DFS_UNDEF_REGION: Undefined region
  */
 enum dfs_reg {
@@ -77,6 +81,7 @@ enum dfs_reg {
 	DFS_MKK_REGION = 3,
 	DFS_CN_REGION = 4,
 	DFS_KR_REGION = 5,
+	DFS_MKKN_REGION = 6,
 	DFS_UNDEF_REGION = 0xFFFF,
 };
 

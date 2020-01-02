@@ -106,19 +106,6 @@ wlan_reg_chan_has_dfs_attribute(struct wlan_objmgr_pdev *pdev, uint32_t ch)
 	return reg_chan_has_dfs_attribute(pdev, ch);
 }
 
-enum channel_state wlan_reg_get_5g_bonded_channel_and_state(
-	struct wlan_objmgr_pdev *pdev, uint8_t ch,
-	enum phy_ch_width bw,
-	const struct bonded_channel **bonded_chan_ptr_ptr)
-{
-	/*
-	 * Get channel and state from regulatory
-	 */
-	return reg_get_5g_bonded_channel(pdev, ch, bw, bonded_chan_ptr_ptr);
-}
-
-qdf_export_symbol(wlan_reg_get_5g_bonded_channel_and_state);
-
 /**
  * wlan_reg_get_5g_bonded_channel_state() - Get 5G bonded channel state
  * @ch: channel number.
@@ -966,6 +953,8 @@ enum reg_wifi_band wlan_reg_freq_to_band(uint16_t freq)
 	return reg_freq_to_band(freq);
 }
 
+qdf_export_symbol(wlan_reg_freq_to_band);
+
 uint16_t wlan_reg_min_chan_freq(void)
 {
 	return reg_min_chan_freq();
@@ -1004,6 +993,23 @@ void wlan_reg_freq_to_chan_op_class(struct wlan_objmgr_pdev *pdev,
 					 op_class,
 					 chan_num);
 }
+
+enum channel_state
+wlan_reg_get_5g_bonded_channel_and_state_for_freq(struct wlan_objmgr_pdev *pdev,
+						  uint16_t freq,
+						  enum phy_ch_width bw,
+						  const
+						  struct bonded_channel_freq
+						  **bonded_chan_ptr_ptr)
+{
+	/*
+	 * Get channel frequencies and state from regulatory
+	 */
+	return reg_get_5g_bonded_channel_for_freq(pdev, freq, bw,
+						  bonded_chan_ptr_ptr);
+}
+
+qdf_export_symbol(wlan_reg_get_5g_bonded_channel_and_state_for_freq);
 
 #endif /* CONFIG CHAN FREQ API */
 

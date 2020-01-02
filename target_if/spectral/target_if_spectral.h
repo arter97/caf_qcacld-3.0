@@ -41,6 +41,7 @@
 
 #include <spectral_defs_i.h>
 
+#define FREQ_OFFSET_10MHZ 10
 #ifndef SPECTRAL_USE_NL_BCAST
 #define SPECTRAL_USE_NL_BCAST  (0)
 #endif
@@ -931,6 +932,7 @@ struct target_if_spectral {
 					param_info[SPECTRAL_SCAN_MODE_MAX];
 #endif
 	uint32_t                               ch_width;
+	uint32_t                               agile_ch_width;
 	struct spectral_diag_stats              diag_stats;
 	bool                                    is_160_format;
 	bool                                    is_lb_edge_extrabins_format;

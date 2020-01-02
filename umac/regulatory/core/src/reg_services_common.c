@@ -998,6 +998,7 @@ void reg_init_channel_map(enum dfs_reg dfs_region)
 		channel_map = channel_map_eu;
 		break;
 	case DFS_MKK_REGION:
+	case DFS_MKKN_REGION:
 		channel_map = channel_map_jp;
 		break;
 	case DFS_CN_REGION:
@@ -2933,7 +2934,7 @@ reg_get_5g_bonded_chan_array_for_freq(struct wlan_objmgr_pdev *pdev,
  *
  * Return: Channel State
  */
-static enum channel_state
+enum channel_state
 reg_get_5g_bonded_channel_for_freq(struct wlan_objmgr_pdev *pdev,
 				   uint16_t freq,
 				   enum phy_ch_width ch_width,
