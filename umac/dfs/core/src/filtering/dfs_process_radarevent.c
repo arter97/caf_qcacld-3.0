@@ -31,13 +31,24 @@
 #include "wlan_dfs_lmac_api.h"
 #include "../dfs_partial_offload_radar.h"
 
+#ifdef DFS_FCC_TYPE4_DURATION_CHECK
+#define DFS_WAR_30_MHZ_SEPARATION   30
+#define DFS_WAR_PEAK_INDEX_ZERO 0
+#define DFS_TYPE4_WAR_PULSE_DURATION_LOWER_LIMIT 11
+#define DFS_TYPE4_WAR_PULSE_DURATION_UPPER_LIMIT 33
+#define DFS_TYPE4_WAR_PRI_LOWER_LIMIT 200
+#define DFS_TYPE4_WAR_PRI_UPPER_LIMIT 500
+#define DFS_TYPE4_WAR_VALID_PULSE_DURATION 12
+#endif
+
 #define FREQ_5500_MHZ  5500
 #define FREQ_5500_MHZ       5500
 
 #define DFS_MAX_FREQ_SPREAD            (1375 * 1)
 #define DFS_LARGE_PRI_MULTIPLIER       4
 #define DFS_W53_DEFAULT_PRI_MULTIPLIER 2
-#define DFS_INVALID_PRI_LIMIT 100  /* should we use 135? */
+//#define DFS_INVALID_PRI_LIMIT 100  /* should we use 135? */
+#define DFS_INVALID_PRI_LIMIT 15  /* should we use 135? */
 #define DFS_BIG_SIDX          10000
 
 #define FRAC_PRI_SCORE_ARRAY_SIZE 40
@@ -92,6 +103,58 @@ static inline uint8_t dfs_process_pulse_dur(struct wlan_dfs *dfs,
 	return (uint8_t)dfs_round((int32_t)((dfs->dur_multiplier)*re_dur));
 }
 
+#ifdef DFS_FCC_TYPE4_DURATION_CHECK
+/*
+ * dfs_dur_check() - Modify the pulse duration for FCC Type 4 and JAPAN W56
+ *                   Type 8 radar pulses when the conditions mentioned in the
+ *                   function body are reported in the radar summary report.
+ * @dfs: Pointer to wlan_dfs structure.
+ * @chan: Current  channel.
+ * @re: Pointer to dfs_event.
+ * @diff_ts: timestamp of current pulse - timestamp of last pulse.
+ *
+ * return: Void
+ */
+static inline void dfs_dur_check(
+	struct wlan_dfs *dfs,
+	struct dfs_channel *chan,
+	struct dfs_event *re,
+	uint32_t diff_ts)
+{
+	if ((dfs->dfsdomain == DFS_FCC_DOMAIN ||
+	     dfs->dfsdomain == DFS_MKK4_DOMAIN) &&
+	    ((chan->dfs_ch_flags & WLAN_CHAN_VHT80) == WLAN_CHAN_VHT80) &&
+	    (DFS_DIFF(chan->dfs_ch_freq, chan->dfs_ch_mhz_freq_seg1) ==
+	    DFS_WAR_30_MHZ_SEPARATION) &&
+	    re->re_sidx == DFS_WAR_PEAK_INDEX_ZERO &&
+	    (re->re_dur > DFS_TYPE4_WAR_PULSE_DURATION_LOWER_LIMIT &&
+	    re->re_dur < DFS_TYPE4_WAR_PULSE_DURATION_UPPER_LIMIT) &&
+	    (diff_ts > DFS_TYPE4_WAR_PRI_LOWER_LIMIT &&
+	    diff_ts < DFS_TYPE4_WAR_PRI_UPPER_LIMIT)) {
+		dfs_debug(dfs, WLAN_DEBUG_DFS_ALWAYS,
+			  "chan flags=%llu, Pri Chan %d MHz center %d MHZ",
+			  chan->dfs_ch_flags,
+			  chan->dfs_ch_freq, chan->dfs_ch_mhz_freq_seg1);
+
+		dfs_debug(dfs, WLAN_DEBUG_DFS_ALWAYS,
+			  "Report Peak Index = %d,re.re_dur = %d,diff_ts = %d",
+			  re->re_sidx, re->re_dur, diff_ts);
+
+		re->re_dur = DFS_TYPE4_WAR_VALID_PULSE_DURATION;
+		dfs_debug(dfs, WLAN_DEBUG_DFS_ALWAYS,
+			  "Modifying the pulse duration to %d", re->re_dur);
+	}
+}
+#else
+static inline void dfs_dur_check(
+	struct wlan_dfs *dfs,
+	struct dfs_channel *chan,
+	struct dfs_event *re,
+	uint32_t diff_ts)
+{
+}
+#endif
+
 /*
  * dfs_print_radar_events() - Prints the Radar events.
  * @dfs: Pointer to wlan_dfs structure.
@@ -138,6 +201,28 @@ static void dfs_print_radar_events(struct wlan_dfs *dfs)
 }
 
 /**
+ * dfs_get_durmargin() - Find duration margin
+ * @rf: Pointer to dfs_filter structure.
+ * @durmargin: Duration margin
+ */
+static inline void dfs_get_durmargin(struct dfs_filter *rf,
+				     uint32_t *durmargin)
+{
+#define DUR_THRESH 10
+#define LOW_MARGIN 4
+#define HIGH_MARGIN 6
+
+	if (rf->rf_maxdur < DUR_THRESH)
+		*durmargin = LOW_MARGIN;
+	else
+		*durmargin = HIGH_MARGIN;
+
+#undef DUR_THRESH
+#undef LOW_MARGIN
+#undef HIGH_MARGIN
+}
+
+/**
  * dfs_confirm_radar() - This function checks for fractional PRI and jitter in
  * sidx index to determine if the radar is real or not.
  * @dfs: Pointer to dfs structure.
@@ -163,6 +248,12 @@ static int dfs_confirm_radar(struct wlan_dfs *dfs,
 	unsigned char max_score = 0;
 	int max_score_index = 0;
 
+	uint32_t min_searchdur = 0xFFFFFFFF;
+	uint32_t max_searchdur = 0x0;
+	uint32_t durmargin = 0;
+	uint32_t this_dur;
+	uint32_t this_deltadur;
+
 	pl = dfs->pulses;
 
 	OS_MEMZERO(scores, sizeof(scores));
@@ -170,6 +261,8 @@ static int dfs_confirm_radar(struct wlan_dfs *dfs,
 
 	pri_margin = dfs_get_pri_margin(dfs, ext_chan_flag,
 			(rf->rf_patterntype == 1));
+	dfs_get_durmargin(rf, &durmargin);
+
 
 	/*
 	 * Look for the entry that matches dl_seq_num_second.
@@ -181,6 +274,12 @@ static int dfs_confirm_radar(struct wlan_dfs *dfs,
 		de = &dl->dl_elems[index];
 		if (dl->dl_seq_num_second == de->de_seq_num)
 			target_ts = de->de_ts - de->de_time;
+
+		if (de->de_dur < min_searchdur)
+			min_searchdur = de->de_dur;
+
+		if (de->de_dur > max_searchdur)
+			max_searchdur = de->de_dur;
 	}
 
 	if (dfs->dfs_debug_mask & WLAN_DEBUG_DFS2) {
@@ -226,6 +325,10 @@ static int dfs_confirm_radar(struct wlan_dfs *dfs,
 		this_diff_ts = pl->pl_elems[next_index].p_time -
 			pl->pl_elems[current_index].p_time;
 
+		this_dur =  pl->pl_elems[next_index].p_dur;
+		this_deltadur = DFS_MIN(DFS_DIFF(this_dur, min_searchdur),
+					DFS_DIFF(this_dur, max_searchdur));
+
 		/* Now update the score for this diff_ts */
 		for (i = 1; i < FRAC_PRI_SCORE_ARRAY_SIZE; i++) {
 			search_bin = dl->dl_search_pri / (i + 1);
@@ -242,8 +345,8 @@ static int dfs_confirm_radar(struct wlan_dfs *dfs,
 			 * search_bin +/- margin.
 			 */
 			if ((this_diff_ts >= (search_bin - pri_margin)) &&
-					(this_diff_ts <=
-					 (search_bin + pri_margin))) {
+				(this_diff_ts <= (search_bin + pri_margin)) &&
+				(this_deltadur < durmargin)) {
 				/*increment score */
 				scores[i]++;
 			}
@@ -1260,6 +1363,8 @@ static inline int dfs_process_each_radarevent(
 
 		dfs_add_to_pulseline(dfs, &re, &this_ts, &test_ts, &diff_ts,
 				&index);
+
+		dfs_dur_check(dfs, chan, &re, diff_ts);
 
 		dfs_log_event(dfs, &re, this_ts, diff_ts, index);
 

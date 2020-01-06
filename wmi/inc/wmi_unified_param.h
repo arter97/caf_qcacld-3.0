@@ -1028,6 +1028,7 @@ typedef struct {
  * @peer_he_ops: Peer HE operation info
  * @peer_he_cap_phyinfo: Peer HE Cap PHY info
  * @peer_he_cap_info_internal: Peer HE internal PHY capability info
+ * @peer_he_caps_6ghz: Peer HE 6GHz Band Capabilities info
  * @peer_he_mcs_count: Peer HE MCS TX/RX MAP count
  * @peer_he_rx_mcs_set: Peer HE RX MCS MAP
  * @peer_he_tx_mcs_set: Peer HE TX MCS MAP
@@ -1088,6 +1089,7 @@ struct peer_assoc_params {
 	uint32_t peer_he_ops;
 	uint32_t peer_he_cap_phyinfo[WMI_HOST_MAX_HECAP_PHY_SIZE];
 	uint32_t peer_he_cap_info_internal;
+	uint32_t peer_he_caps_6ghz;
 	uint32_t peer_he_mcs_count;
 	uint32_t peer_he_rx_mcs_set[WMI_HOST_MAX_HE_RATE_SET];
 	uint32_t peer_he_tx_mcs_set[WMI_HOST_MAX_HE_RATE_SET];
@@ -4553,6 +4555,7 @@ typedef enum {
 	wmi_peer_tx_pn_response_event_id,
 	wmi_roam_stats_event_id,
 	wmi_oem_data_event_id,
+	wmi_mgmt_offload_data_event_id,
 	wmi_events_max,
 } wmi_conv_event_id;
 
@@ -5054,6 +5057,7 @@ typedef enum {
 	wmi_service_ext2_msg,
 	wmi_service_6ghz_support,
 	wmi_service_bw_165mhz_support,
+	wmi_service_packet_capture_support,
 	wmi_services_max,
 } wmi_conv_service_ids;
 #define WMI_SERVICE_UNAVAILABLE 0xFFFF
@@ -5224,7 +5228,8 @@ typedef struct {
 		 mgmt_comp_evt_bundle_support:1,
 		 tx_msdu_new_partition_id_support:1,
 		 new_htt_msg_format:1,
-		 peer_unmap_conf_support:1;
+		 peer_unmap_conf_support:1,
+		 pktcapture_support:1;
 	uint32_t iphdr_pad_config;
 	uint32_t
 		qwrap_config:16,
@@ -5580,12 +5585,16 @@ typedef struct {
  * @status: WMI_MGMT_TX_COMP_STATUS_TYPE
  * @pdev_id: pdev_id
  * @ppdu_id: ppdu_id
+ * @retries_count: retries count
+ * @tx_tsf: 64 bits completion timestamp
  */
 typedef struct {
 	uint32_t	desc_id;
 	uint32_t	status;
 	uint32_t	pdev_id;
 	uint32_t        ppdu_id;
+	uint32_t	retries_count;
+	uint64_t	tx_tsf;
 } wmi_host_mgmt_tx_compl_event;
 
 /**

@@ -154,6 +154,36 @@
 #define FILTER_DATA_DATA		0x0001
 #define FILTER_DATA_NULL		0x0008
 
+/*
+ * Multiply rate by 2 to avoid float point
+ * and get rate in units of 500kbps
+ */
+#define CDP_11B_RATE_0MCS (11 * 2)
+#define CDP_11B_RATE_1MCS (5.5 * 2)
+#define CDP_11B_RATE_2MCS (2 * 2)
+#define CDP_11B_RATE_3MCS (1 * 2)
+#define CDP_11B_RATE_4MCS (11 * 2)
+#define CDP_11B_RATE_5MCS (5.5 * 2)
+#define CDP_11B_RATE_6MCS (2 * 2)
+
+#define CDP_11A_RATE_0MCS (48 * 2)
+#define CDP_11A_RATE_1MCS (24 * 2)
+#define CDP_11A_RATE_2MCS (12 * 2)
+#define CDP_11A_RATE_3MCS (6 * 2)
+#define CDP_11A_RATE_4MCS (54 * 2)
+#define CDP_11A_RATE_5MCS (36 * 2)
+#define CDP_11A_RATE_6MCS (18 * 2)
+#define CDP_11A_RATE_7MCS (9 * 2)
+
+#define CDP_LEGACY_MCS0  0
+#define CDP_LEGACY_MCS1  1
+#define CDP_LEGACY_MCS2  2
+#define CDP_LEGACY_MCS3  3
+#define CDP_LEGACY_MCS4  4
+#define CDP_LEGACY_MCS5  5
+#define CDP_LEGACY_MCS6  6
+#define CDP_LEGACY_MCS7  7
+
 QDF_DECLARE_EWMA(tx_lag, 1024, 8)
 struct cdp_stats_cookie;
 
@@ -164,6 +194,32 @@ enum cdp_cfg_param_type {
 	CDP_CFG_MAX_PEER_ID,
 	CDP_CFG_CCE_DISABLE,
 	CDP_CFG_NUM_PARAMS
+};
+
+/*
+ * PPDU TYPE from FW -
+ * @CDP_PPDU_STATS_PPDU_TYPE_SU: single user type
+ * @CDP_PPDU_STATS_PPDU_TYPE_MU_MIMO: multi user mu-mimo
+ * @CDP_PPDU_STATS_PPDU_TYPE_MU_OFDMA: multi user ofdma
+ * @CDP_PPDU_STATS_PPDU_TYPE_MU_MIMO_OFDMA: multi user mu-mimo ofdma
+ * @CDP_PPDU_STATS_PPDU_TYPE_UL_TRIG: ul trigger ppdu
+ * @CDP_PPDU_STATS_PPDU_TYPE_BURST_BCN: burst beacon
+ * @CDP_PPDU_STATS_PPDU_TYPE_UL_BSR_RESP: bsr respond
+ * @CDP_PPDU_STATS_PPDU_TYPE_UL_BSR_TRIG: bsr trigger
+ * @CDP_PPDU_STATS_PPDU_TYPE_UL_RESP: ul response
+ * @CDP_PPDU_STATS_PPDU_TYPE_UNKNOWN
+ */
+enum CDP_PPDU_STATS_PPDU_TYPE {
+	CDP_PPDU_STATS_PPDU_TYPE_SU = 0,
+	CDP_PPDU_STATS_PPDU_TYPE_MU_MIMO = 1,
+	CDP_PPDU_STATS_PPDU_TYPE_MU_OFDMA = 2,
+	CDP_PPDU_STATS_PPDU_TYPE_MU_MIMO_OFDMA = 4,
+	CDP_PPDU_STATS_PPDU_TYPE_UL_TRIG = 5,
+	CDP_PPDU_STATS_PPDU_TYPE_BURST_BCN = 6,
+	CDP_PPDU_STATS_PPDU_TYPE_UL_BSR_RESP = 7,
+	CDP_PPDU_STATS_PPDU_TYPE_UL_BSR_TRIG = 8,
+	CDP_PPDU_STATS_PPDU_TYPE_UL_RESP = 9,
+	CDP_PPDU_STATS_PPDU_TYPE_UNKNOWN = 0x1F,
 };
 
 /*
@@ -1433,6 +1489,10 @@ struct cdp_tx_completion_ppdu_user {
  * @mcs: MCS index
  * @preamble: preamble
  * @gi: guard interval 800/400/1600/3200 ns
+ * @resp_type: response type
+ * @mprot_type: medium protection type
+ * @rts_success: rts success
+ * @rts failure: rts failure
  * @channel: frequency
  * @channel_num: channel number
  * @ack_rssi: ack rssi
@@ -1445,6 +1505,9 @@ struct cdp_tx_completion_ppdu_user {
  * @ba_start_seq: Block Ack sequence number
  * @ba_bitmap: Block Ack bitmap
  * @ppdu_cookie: 16-bit ppdu_cookie
+ * @long_retries: long retries
+ * @short_retries: short retries
+ * @completion_status: completion status - OK/Filter/Abort/Timeout
  */
 struct cdp_tx_indication_mpdu_info {
 	uint32_t ppdu_id;
@@ -1470,21 +1533,44 @@ struct cdp_tx_indication_mpdu_info {
 	uint32_t tx_rate;
 	uint8_t mac_address[QDF_MAC_ADDR_SIZE];
 	uint8_t bss_mac_address[QDF_MAC_ADDR_SIZE];
-	uint32_t ppdu_start_timestamp;
-	uint32_t ppdu_end_timestamp;
+	uint64_t ppdu_start_timestamp;
+	uint64_t ppdu_end_timestamp;
 	uint32_t ba_start_seq;
 	uint32_t ba_bitmap[CDP_BA_256_BIT_MAP_SIZE_DWORDS];
 	uint16_t ppdu_cookie;
+	uint16_t long_retries:4,
+		 short_retries:4,
+		 completion_status:8;
+	uint16_t resp_type:4,
+		 mprot_type:3,
+		 rts_success:1,
+		 rts_failure:1;
 };
 
 /**
  * struct cdp_tx_indication_info - Tx capture information
  * @mpdu_info: Tx MPDU completion information
  * @mpdu_nbuf: reconstructed mpdu packet
+ * @ppdu_desc: tx completion ppdu
  */
 struct cdp_tx_indication_info {
 	struct cdp_tx_indication_mpdu_info mpdu_info;
 	qdf_nbuf_t mpdu_nbuf;
+	struct cdp_tx_completion_ppdu *ppdu_desc;
+};
+
+/**
+ * struct cdp_tx_mgmt_comp_info - Tx mgmt comp info
+ * @ppdu_id: ppdu_id
+ * @is_sgen_pkt: payload recevied from wmi or htt path
+ * @retries_count: retries count
+ * @tx_tsf: 64 bit timestamp
+ */
+struct cdp_tx_mgmt_comp_info {
+	uint32_t ppdu_id;
+	bool is_sgen_pkt;
+	uint16_t retries_count;
+	uint64_t tx_tsf;
 };
 
 /**
@@ -1496,20 +1582,36 @@ struct cdp_tx_indication_info {
  * @bar_num_users: BA response user count, based on completion common TLV
  * @num_users: Number of users
  * @pending_retries: pending MPDUs (retries)
+ * @drop_reason: drop reason from flush status
+ * @is_flush: is_flush is set based on flush tlv
+ * @flow_type: tx flow type from flush status
+ * @queue_type: queue type from flush status
  * @num_mpdu: Number of MPDUs in PPDU
  * @num_msdu: Number of MSDUs in PPDU
  * @frame_type: frame SU or MU
+ * @htt_frame_type: frame type from htt
  * @frame_ctrl: frame control of 80211 header
  * @channel: Channel informartion
+ * @resp_type: response type
+ * @mprot_type: medium protection type
+ * @rts_success: rts success
+ * @rts failure: rts failure
+ * @phymode: phy mode
  * @ack_rssi: RSSI value of last ack packet (units=dB above noise floor)
  * @tx_duration: PPDU airtime
  * @ppdu_start_timestamp: TSF at PPDU start
  * @ppdu_end_timestamp: TSF at PPDU end
  * @ack_timestamp: TSF at the reception of ACK
  * @delayed_ba: Delayed ba flag
+ * @beam_change: beam change bit in ppdu for he-information
+ * @bss_color: 6 bit value for full bss color
  * @user: per-User stats (array of per-user structures)
  * @mpdu_q: queue of mpdu in a ppdu
  * @mpdus: MPDU list based on enqueue sequence bitmap
+ * @bar_ppdu_id: BAR ppdu_id
+ * @bar_tx_duration: BAR tx duration
+ * @bar_ppdu_start_timestamp: BAR start timestamp
+ * @bar_ppdu_end_timestamp: BAR end timestamp
  */
 struct cdp_tx_completion_ppdu {
 	uint32_t ppdu_id;
@@ -1519,21 +1621,36 @@ struct cdp_tx_completion_ppdu {
 	uint32_t num_users;
 	uint8_t last_usr_index;
 	uint32_t pending_retries;
+	uint32_t drop_reason;
+	uint32_t is_flush:1,
+		 flow_type:8,
+		 queue_type:8;
 	uint32_t num_mpdu:9,
 		 num_msdu:16;
 	uint16_t frame_type;
+	uint16_t htt_frame_type;
 	uint16_t frame_ctrl;
 	uint16_t channel;
+	uint16_t resp_type:4,
+		 mprot_type:3,
+		 rts_success:1,
+		 rts_failure:1;
 	uint16_t phy_mode;
 	uint32_t ack_rssi;
 	uint32_t tx_duration;
-	uint32_t ppdu_start_timestamp;
-	uint32_t ppdu_end_timestamp;
-	uint32_t ack_timestamp;
+	uint64_t ppdu_start_timestamp;
+	uint64_t ppdu_end_timestamp;
+	uint64_t ack_timestamp;
 	bool delayed_ba;
+	uint8_t beam_change;
+	uint8_t bss_color;
 	struct cdp_tx_completion_ppdu_user user[CDP_MU_MAX_USERS];
 	qdf_nbuf_queue_t mpdu_q;
 	qdf_nbuf_t *mpdus;
+	uint32_t bar_ppdu_id;
+	uint32_t bar_tx_duration;
+	uint32_t bar_ppdu_start_timestamp;
+	uint32_t bar_ppdu_end_timestamp;
 };
 
 /**

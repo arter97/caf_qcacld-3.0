@@ -756,6 +756,9 @@ struct cdp_mon_ops {
 
 	void (*txrx_deliver_tx_mgmt)
 		(struct cdp_pdev *pdev, qdf_nbuf_t nbuf);
+
+	void (*txrx_set_bsscolor)
+		(struct cdp_pdev *pdev, uint8_t bsscolor);
 };
 
 #ifdef WLAN_FEATURE_PKT_CAPTURE
@@ -1084,6 +1087,7 @@ struct ol_if_ops {
 	bool (*is_roam_inprogress)(uint32_t vdev_id);
 	enum QDF_GLOBAL_MODE (*get_con_mode)(void);
 	/* TODO: Add any other control path calls required to OL_IF/WMA layer */
+
 };
 
 #ifdef DP_PEER_EXTENDED_API
@@ -1401,7 +1405,7 @@ struct cdp_lflowctl_ops {
 					uint8_t pdev_id,
 					tx_pause_callback flowcontrol);
 	int (*set_vdev_tx_desc_limit)(struct cdp_soc_t *soc_hdl,
-				      uint8_t vdev_id, uint8_t chan);
+				      uint8_t vdev_id, uint32_t chan_freq);
 	int (*set_vdev_os_queue_status)(struct cdp_soc_t *soc_hdl,
 					uint8_t vdev_id,
 					enum netif_action_type action);

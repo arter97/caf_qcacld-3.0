@@ -47,6 +47,9 @@
 
 #define HTT_MGMT_CTRL_TLV_HDR_RESERVERD_LEN 16
 
+#define HTT_SHIFT_UPPER_TIMESTAMP 32
+#define HTT_MASK_UPPER_TIMESTAMP 0xFFFFFFFF00000000
+
 /*
  * dp_htt_get_ppdu_sniffer_ampdu_tlv_bitmap() - Get ppdu stats tlv
  * bitmap for sniffer mode
@@ -2044,22 +2047,28 @@ static void dp_process_ppdu_stats_common_tlv(struct dp_pdev *pdev,
 	uint16_t freq;
 	struct dp_soc *soc = NULL;
 	struct cdp_tx_completion_ppdu *ppdu_desc = NULL;
+	uint64_t ppdu_start_timestamp;
+	uint32_t *start_tag_buf;
 
+	start_tag_buf = tag_buf;
 	ppdu_desc = (struct cdp_tx_completion_ppdu *)qdf_nbuf_data(ppdu_info->nbuf);
 
-	tag_buf += 2;
+	tag_buf = start_tag_buf + HTT_GET_STATS_CMN_INDEX(RING_ID_SCH_CMD_ID);
 	ppdu_info->sched_cmdid =
 		HTT_PPDU_STATS_COMMON_TLV_SCH_CMDID_GET(*tag_buf);
 	ppdu_desc->num_users =
 		HTT_PPDU_STATS_COMMON_TLV_NUM_USERS_GET(*tag_buf);
-	tag_buf++;
+
+	tag_buf = start_tag_buf + HTT_GET_STATS_CMN_INDEX(QTYPE_FRM_TYPE);
 	frame_type = HTT_PPDU_STATS_COMMON_TLV_FRM_TYPE_GET(*tag_buf);
+	ppdu_desc->htt_frame_type = frame_type;
 
 	frame_ctrl = ppdu_desc->frame_ctrl;
 
 	switch (frame_type) {
 	case HTT_STATS_FTYPE_TIDQ_DATA_SU:
 	case HTT_STATS_FTYPE_TIDQ_DATA_MU:
+	case HTT_STATS_FTYPE_SGEN_QOS_NULL:
 		/*
 		 * for management packet, frame type come as DATA_SU
 		 * need to check frame_ctrl before setting frame_type
@@ -2072,24 +2081,20 @@ static void dp_process_ppdu_stats_common_tlv(struct dp_pdev *pdev,
 	case HTT_STATS_FTYPE_SGEN_MU_BAR:
 	case HTT_STATS_FTYPE_SGEN_BAR:
 		ppdu_desc->frame_type = CDP_PPDU_FTYPE_BAR;
+		ppdu_desc->bar_ppdu_id = ppdu_info->ppdu_id;
 	break;
 	default:
 		ppdu_desc->frame_type = CDP_PPDU_FTYPE_CTRL;
 	break;
 	}
 
-	tag_buf += 2;
+	tag_buf = start_tag_buf + HTT_GET_STATS_CMN_INDEX(FES_DUR_US);
 	ppdu_desc->tx_duration = *tag_buf;
-	tag_buf += 3;
+
+	tag_buf = start_tag_buf + HTT_GET_STATS_CMN_INDEX(START_TSTMP_L32_US);
 	ppdu_desc->ppdu_start_timestamp = *tag_buf;
 
-	ppdu_desc->ppdu_end_timestamp = ppdu_desc->ppdu_start_timestamp +
-					ppdu_desc->tx_duration;
-	/* Ack time stamp is same as end time stamp*/
-	ppdu_desc->ack_timestamp = ppdu_desc->ppdu_end_timestamp;
-
-	tag_buf++;
-
+	tag_buf = start_tag_buf + HTT_GET_STATS_CMN_INDEX(CHAN_MHZ_PHY_MODE);
 	freq = HTT_PPDU_STATS_COMMON_TLV_CHAN_MHZ_GET(*tag_buf);
 	if (freq != ppdu_desc->channel) {
 		soc = pdev->soc;
@@ -2101,6 +2106,33 @@ static void dp_process_ppdu_stats_common_tlv(struct dp_pdev *pdev,
 	}
 
 	ppdu_desc->phy_mode = HTT_PPDU_STATS_COMMON_TLV_PHY_MODE_GET(*tag_buf);
+
+	tag_buf = start_tag_buf + HTT_GET_STATS_CMN_INDEX(RESV_NUM_UL_BEAM);
+	ppdu_desc->beam_change =
+		HTT_PPDU_STATS_COMMON_TLV_BEAM_CHANGE_GET(*tag_buf);
+
+	dp_tx_capture_htt_frame_counter(pdev, frame_type);
+
+	tag_buf = start_tag_buf + HTT_GET_STATS_CMN_INDEX(START_TSTMP_U32_US);
+	ppdu_start_timestamp = *tag_buf;
+	ppdu_desc->ppdu_start_timestamp |= ((ppdu_start_timestamp <<
+					     HTT_SHIFT_UPPER_TIMESTAMP) &
+					    HTT_MASK_UPPER_TIMESTAMP);
+
+	ppdu_desc->ppdu_end_timestamp = ppdu_desc->ppdu_start_timestamp +
+					ppdu_desc->tx_duration;
+	/* Ack time stamp is same as end time stamp*/
+	ppdu_desc->ack_timestamp = ppdu_desc->ppdu_end_timestamp;
+
+	ppdu_desc->ppdu_end_timestamp = ppdu_desc->ppdu_start_timestamp +
+					ppdu_desc->tx_duration;
+
+	ppdu_desc->bar_ppdu_start_timestamp = ppdu_desc->ppdu_start_timestamp;
+	ppdu_desc->bar_ppdu_end_timestamp = ppdu_desc->ppdu_end_timestamp;
+	ppdu_desc->bar_tx_duration = ppdu_desc->tx_duration;
+
+	/* Ack time stamp is same as end time stamp*/
+	ppdu_desc->ack_timestamp = ppdu_desc->ppdu_end_timestamp;
 }
 
 /*
@@ -2118,6 +2150,8 @@ static void dp_process_ppdu_stats_user_common_tlv(
 	struct cdp_tx_completion_ppdu *ppdu_desc;
 	struct cdp_tx_completion_ppdu_user *ppdu_user_desc;
 	uint8_t curr_user_index = 0;
+	struct dp_peer *peer;
+	struct dp_vdev *vdev;
 
 	ppdu_desc =
 		(struct cdp_tx_completion_ppdu *)qdf_nbuf_data(ppdu_info->nbuf);
@@ -2133,9 +2167,20 @@ static void dp_process_ppdu_stats_user_common_tlv(
 	if (peer_id == DP_SCAN_PEER_ID) {
 		ppdu_desc->vdev_id =
 			HTT_PPDU_STATS_USER_COMMON_TLV_VAP_ID_GET(*tag_buf);
-	} else {
-		if (!dp_peer_find_by_id_valid(pdev->soc, peer_id))
+		vdev =
+		       dp_get_vdev_from_soc_vdev_id_wifi3(pdev->soc,
+							  ppdu_desc->vdev_id);
+		if (!vdev)
 			return;
+		qdf_mem_copy(ppdu_user_desc->mac_addr, vdev->mac_addr.raw,
+			     QDF_MAC_ADDR_SIZE);
+	} else {
+		peer = dp_peer_find_by_id(pdev->soc, peer_id);
+		if (!peer)
+			return;
+		qdf_mem_copy(ppdu_user_desc->mac_addr,
+			     peer->mac_addr.raw, QDF_MAC_ADDR_SIZE);
+		dp_peer_unref_del_find_by_id(peer);
 	}
 
 	ppdu_user_desc->peer_id = peer_id;
@@ -2212,14 +2257,10 @@ static void dp_process_ppdu_stats_user_rate_tlv(struct dp_pdev *pdev,
 							  ppdu_desc->vdev_id);
 		if (!vdev)
 			return;
-		qdf_mem_copy(ppdu_user_desc->mac_addr, vdev->mac_addr.raw,
-			     QDF_MAC_ADDR_SIZE);
 	} else {
 		peer = dp_peer_find_by_id(pdev->soc, peer_id);
 		if (!peer)
 			return;
-		qdf_mem_copy(ppdu_user_desc->mac_addr,
-			     peer->mac_addr.raw, QDF_MAC_ADDR_SIZE);
 		dp_peer_unref_del_find_by_id(peer);
 	}
 
@@ -2439,6 +2480,15 @@ static void dp_process_ppdu_stats_user_cmpltn_common_tlv(
 		HTT_PPDU_STATS_USER_CMPLTN_COMMON_TLV_IS_AMPDU_GET(*tag_buf);
 	ppdu_info->is_ampdu = ppdu_user_desc->is_ampdu;
 
+	ppdu_desc->resp_type =
+		HTT_PPDU_STATS_USER_CMPLTN_COMMON_TLV_RESP_TYPE_GET(*tag_buf);
+	ppdu_desc->mprot_type =
+		HTT_PPDU_STATS_USER_CMPLTN_COMMON_TLV_MPROT_TYPE_GET(*tag_buf);
+	ppdu_desc->rts_success =
+		HTT_PPDU_STATS_USER_CMPLTN_COMMON_TLV_RTS_SUCCESS_GET(*tag_buf);
+	ppdu_desc->rts_failure =
+		HTT_PPDU_STATS_USER_CMPLTN_COMMON_TLV_RTS_FAILURE_GET(*tag_buf);
+
 	/*
 	 * increase successful mpdu counter from
 	 * htt_ppdu_stats_user_cmpltn_common_tlv
@@ -2597,8 +2647,7 @@ static void dp_process_ppdu_stats_user_compltn_ack_ba_status_tlv(
 	ppdu_user_desc->peer_id = peer_id;
 
 	tag_buf++;
-	ppdu_user_desc->tid =
-		HTT_PPDU_STATS_USER_CMPLTN_ACK_BA_STATUS_TLV_TID_NUM_GET(*tag_buf);
+	/* not to update ppdu_desc->tid from this TLV */
 	ppdu_user_desc->num_mpdu =
 		HTT_PPDU_STATS_USER_CMPLTN_ACK_BA_STATUS_TLV_NUM_MPDU_GET(*tag_buf);
 
@@ -2675,37 +2724,50 @@ static void dp_process_ppdu_stats_user_common_array_tlv(
  * htt_ppdu_stats_flush_tlv
  * @pdev: DP PDEV handle
  * @tag_buf: buffer containing the htt_ppdu_stats_flush_tlv
+ * @ppdu_info: per ppdu tlv structure
  *
  * return:void
  */
-static void dp_process_ppdu_stats_user_compltn_flush_tlv(struct dp_pdev *pdev,
-						uint32_t *tag_buf)
+static void
+dp_process_ppdu_stats_user_compltn_flush_tlv(struct dp_pdev *pdev,
+					     uint32_t *tag_buf,
+					     struct ppdu_info *ppdu_info)
 {
+	struct cdp_tx_completion_ppdu *ppdu_desc;
 	uint32_t peer_id;
-	uint32_t drop_reason;
 	uint8_t tid;
-	uint32_t num_msdu;
 	struct dp_peer *peer;
 
-	tag_buf++;
-	drop_reason = *tag_buf;
+	ppdu_desc = (struct cdp_tx_completion_ppdu *)
+				qdf_nbuf_data(ppdu_info->nbuf);
+	ppdu_desc->is_flush = 1;
 
 	tag_buf++;
-	num_msdu = HTT_PPDU_STATS_FLUSH_TLV_NUM_MSDU_GET(*tag_buf);
+	ppdu_desc->drop_reason = *tag_buf;
 
 	tag_buf++;
-	peer_id =
-		HTT_PPDU_STATS_FLUSH_TLV_SW_PEER_ID_GET(*tag_buf);
+	ppdu_desc->num_msdu = HTT_PPDU_STATS_FLUSH_TLV_NUM_MSDU_GET(*tag_buf);
+	ppdu_desc->num_mpdu = HTT_PPDU_STATS_FLUSH_TLV_NUM_MPDU_GET(*tag_buf);
+	ppdu_desc->flow_type = HTT_PPDU_STATS_FLUSH_TLV_FLOW_TYPE_GET(*tag_buf);
+
+	tag_buf++;
+	peer_id = HTT_PPDU_STATS_FLUSH_TLV_SW_PEER_ID_GET(*tag_buf);
+	tid = HTT_PPDU_STATS_FLUSH_TLV_TID_NUM_GET(*tag_buf);
+
+	ppdu_desc->user[0].peer_id = peer_id;
+	ppdu_desc->user[0].tid = tid;
+
+	ppdu_desc->queue_type =
+			HTT_PPDU_STATS_FLUSH_TLV_QUEUE_TYPE_GET(*tag_buf);
 
 	peer = dp_peer_find_by_id(pdev->soc, peer_id);
 	if (!peer)
 		return;
 
-	tid = HTT_PPDU_STATS_FLUSH_TLV_TID_NUM_GET(*tag_buf);
-
-	if (drop_reason == HTT_FLUSH_EXCESS_RETRIES) {
-		DP_STATS_INC(peer, tx.excess_retries_per_ac[TID_TO_WME_AC(tid)],
-					num_msdu);
+	if (ppdu_desc->drop_reason == HTT_FLUSH_EXCESS_RETRIES) {
+		DP_STATS_INC(peer,
+			     tx.excess_retries_per_ac[TID_TO_WME_AC(tid)],
+			     ppdu_desc->num_msdu);
 	}
 
 	dp_peer_unref_del_find_by_id(peer);
@@ -2745,6 +2807,8 @@ dp_process_ppdu_stats_tx_mgmtctrl_payload_tlv(struct dp_pdev *pdev,
 {
 	uint32_t *nbuf_ptr;
 	uint8_t trim_size;
+	size_t head_size;
+	struct cdp_tx_mgmt_comp_info *ptr_mgmt_comp_info;
 
 	if ((!pdev->tx_sniffer_enable) && (!pdev->mcopy_mode) &&
 	    (!pdev->bpr_enable) && (!pdev->tx_capture_enabled))
@@ -2760,9 +2824,24 @@ dp_process_ppdu_stats_tx_mgmtctrl_payload_tlv(struct dp_pdev *pdev,
 	qdf_nbuf_trim_tail(tag_buf, qdf_nbuf_len(tag_buf) -
 			    pdev->mgmtctrl_frm_info.mgmt_buf_len);
 
-	nbuf_ptr = (uint32_t *)qdf_nbuf_push_head(
-				tag_buf, sizeof(ppdu_id));
-	*nbuf_ptr = ppdu_id;
+	if (pdev->tx_capture_enabled) {
+		head_size = sizeof(struct cdp_tx_mgmt_comp_info);
+		if (qdf_unlikely(qdf_nbuf_headroom(tag_buf) < head_size)) {
+			qdf_err("Fail to get headroom h_sz %d h_avail %d\n",
+				head_size, qdf_nbuf_headroom(tag_buf));
+			qdf_assert_always(0);
+			return QDF_STATUS_E_NOMEM;
+		}
+		ptr_mgmt_comp_info = (struct cdp_tx_mgmt_comp_info *)
+					qdf_nbuf_push_head(tag_buf, head_size);
+		qdf_assert_always(ptr_mgmt_comp_info);
+		ptr_mgmt_comp_info->ppdu_id = ppdu_id;
+		ptr_mgmt_comp_info->is_sgen_pkt = true;
+	} else {
+		head_size = sizeof(ppdu_id);
+		nbuf_ptr = (uint32_t *)qdf_nbuf_push_head(tag_buf, head_size);
+		*nbuf_ptr = ppdu_id;
+	}
 
 	if (pdev->bpr_enable) {
 		dp_wdi_event_handler(WDI_EVENT_TX_BEACON, pdev->soc,
@@ -2904,8 +2983,8 @@ static void dp_process_ppdu_tag(struct dp_pdev *pdev, uint32_t *tag_buf,
 		tlv_expected_size = sizeof(htt_ppdu_stats_flush_tlv);
 		tlv_desc = dp_validate_fix_ppdu_tlv(pdev, tag_buf,
 						    tlv_expected_size, tlv_len);
-		dp_process_ppdu_stats_user_compltn_flush_tlv(
-				pdev, tlv_desc);
+		dp_process_ppdu_stats_user_compltn_flush_tlv(pdev, tlv_desc,
+							     ppdu_info);
 		break;
 	default:
 		break;
@@ -2996,7 +3075,9 @@ dp_ppdu_desc_user_stats_update(struct dp_pdev *pdev,
 		 */
 
 		if ((ppdu_desc->user[i].tid < CDP_DATA_TID_MAX ||
-		     (ppdu_desc->user[i].tid == CDP_DATA_NON_QOS_TID)) &&
+		     (ppdu_desc->user[i].tid == CDP_DATA_NON_QOS_TID) ||
+		     (ppdu_desc->htt_frame_type ==
+		      HTT_STATS_FTYPE_SGEN_QOS_NULL)) &&
 		      (ppdu_desc->frame_type != CDP_PPDU_FTYPE_CTRL)) {
 
 			dp_tx_stats_update(pdev, peer,
@@ -3236,6 +3317,9 @@ static struct ppdu_info *dp_htt_process_tlv(struct dp_pdev *pdev,
 		ppdu_info = dp_get_ppdu_desc(pdev, ppdu_id, tlv_type);
 		if (!ppdu_info)
 			return NULL;
+		ppdu_info->ppdu_desc->bss_color =
+			pdev->rx_mon_recv_status.bsscolor;
+
 		ppdu_info->ppdu_id = ppdu_id;
 		ppdu_info->tlv_bitmap |= (1 << tlv_type);
 
@@ -3323,6 +3407,9 @@ static struct ppdu_info *dp_htt_process_tlv(struct dp_pdev *pdev,
 			if (peer->last_delayed_ba) {
 				dp_peer_copy_stats_to_bar(peer,
 							  &ppdu_desc->user[i]);
+				ppdu_desc->bar_ppdu_id = ppdu_desc->ppdu_id;
+				ppdu_desc->ppdu_id =
+					peer->last_delayed_ba_ppduid;
 			}
 			dp_peer_unref_del_find_by_id(peer);
 		}
@@ -3334,9 +3421,12 @@ static struct ppdu_info *dp_htt_process_tlv(struct dp_pdev *pdev,
 	 * which comes out of order. successful mpdu also populated from
 	 * COMPLTN COMMON TLV which comes in order. for every ppdu_info
 	 * we store successful mpdu from both tlv and compare before delivering
-	 * to make sure we received ACK BA STATUS TLV.
+	 * to make sure we received ACK BA STATUS TLV. For some self generated
+	 * frame we won't get ack ba status tlv so no need to wait for
+	 * ack ba status tlv.
 	 */
-	if (ppdu_desc->frame_type != CDP_PPDU_FTYPE_CTRL) {
+	if (ppdu_desc->frame_type != CDP_PPDU_FTYPE_CTRL &&
+	    ppdu_desc->htt_frame_type != HTT_STATS_FTYPE_SGEN_QOS_NULL) {
 		/*
 		 * successful mpdu count should match with both tlv
 		 */
@@ -3351,9 +3441,12 @@ static struct ppdu_info *dp_htt_process_tlv(struct dp_pdev *pdev,
 	 * tlv_bitmap_expected can't be available for different frame type.
 	 * But STATS COMMON TLV is the last TLV from the FW for a ppdu.
 	 * apart from ACK BA TLV, FW sends other TLV in sequential order.
+	 * flush tlv comes separate.
 	 */
-	if (ppdu_info->tlv_bitmap != 0 &&
-	    (ppdu_info->tlv_bitmap & (1 << HTT_PPDU_STATS_COMMON_TLV)))
+	if ((ppdu_info->tlv_bitmap != 0 &&
+	     (ppdu_info->tlv_bitmap & (1 << HTT_PPDU_STATS_COMMON_TLV))) ||
+	    (ppdu_info->tlv_bitmap &
+	     (1 << HTT_PPDU_STATS_USR_COMPLTN_FLUSH_TLV)))
 		return ppdu_info;
 
 	return NULL;
