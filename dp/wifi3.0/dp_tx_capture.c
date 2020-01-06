@@ -33,8 +33,29 @@
 
 #define MAX_MONITOR_HEADER (512)
 #define MAX_DUMMY_FRM_BODY (128)
+#define DP_BA_ACK_FRAME_SIZE (sizeof(struct ieee80211_ctlframe_addr2) + 36)
+#define DP_ACK_FRAME_SIZE (struct ieee80211_frame_min_one)
+#define DP_MAX_MPDU_64 64
+#define DP_NUM_WORDS_PER_PPDU_BITMAP_64 (DP_MAX_MPDU_64 >> 5)
+#define DP_NUM_BYTES_PER_PPDU_BITMAP_64 (DP_MAX_MPDU_64 >> 3)
+#define DP_NUM_BYTES_PER_PPDU_BITMAP (HAL_RX_MAX_MPDU >> 3)
+#define DP_IEEE80211_BAR_CTL_TID_S 12
+#define DP_IEEE80211_BA_S_SEQ_S 4
+#define DP_IEEE80211_BAR_CTL_COMBA 0x0004
 
 /* Macros to handle sequence number bitmaps */
+
+/* HW generated rts frame flag */
+#define SEND_WIFIRTS_LEGACY_E 1
+
+/* HW generated 11 AC static bw flag */
+#define SEND_WIFIRTS_11AC_STATIC_BW_E 2
+
+/* HW generated 11 AC dynamic bw flag */
+#define SEND_WIFIRTS_11AC_DYNAMIC_BW_E 3
+
+/* HW generated cts frame flag */
+#define SEND_WIFICTS2SELF_E 4
 
 /* Size (in bits) of a segment of sequence number bitmap */
 #define SEQ_SEG_SZ_BITS(_seqarr) (sizeof(_seqarr[0]) << 3)
@@ -58,7 +79,63 @@
 #define SEQ_BIT(_seqarr, _seqno) \
 	SEQ_SEG_BIT(SEQ_SEG(_seqarr, (_seqno)), (_seqno))
 
+/* Lower 32 mask for timestamp us as completion path has 32 bits timestamp */
+#define LOWER_32_MASK 0xFFFFFFFF
+
+/* Maximum time taken to enqueue next mgmt pkt */
+#define MAX_MGMT_ENQ_DELAY 10000
+
+/* Schedule id counter mask in ppdu_id */
+#define SCH_ID_MASK 0xFF
+
 #ifdef WLAN_TX_PKT_CAPTURE_ENH
+
+/*
+ * dp_tx_capture_htt_frame_counter: increment counter for htt_frame_type
+ * pdev: DP pdev handle
+ * htt_frame_type: htt frame type received from fw
+ *
+ * return: void
+ */
+void dp_tx_capture_htt_frame_counter(struct dp_pdev *pdev,
+				     uint32_t htt_frame_type)
+{
+	if (htt_frame_type >= TX_CAP_HTT_MAX_FTYPE)
+		return;
+
+	pdev->tx_capture.htt_frame_type[htt_frame_type]++;
+}
+
+/*
+ * dp_tx_cature_stats: print tx capture stats
+ * @pdev: DP PDEV handle
+ *
+ * return: void
+ */
+void dp_print_pdev_tx_capture_stats(struct dp_pdev *pdev)
+{
+	struct dp_pdev_tx_capture *ptr_tx_cap;
+	uint8_t i = 0, j = 0;
+
+	ptr_tx_cap = &(pdev->tx_capture);
+
+	DP_PRINT_STATS("tx capture stats\n");
+	for (i = 0; i < TXCAP_MAX_TYPE; i++) {
+		for (j = 0; j < TXCAP_MAX_SUBTYPE; j++) {
+			if (ptr_tx_cap->ctl_mgmt_q[i][j].qlen)
+				DP_PRINT_STATS(" ctl_mgmt_q[%d][%d] = queue_len[%d]\n",
+				       i, j, ptr_tx_cap->ctl_mgmt_q[i][j].qlen);
+		}
+	}
+
+	for (i = 0; i < TX_CAP_HTT_MAX_FTYPE; i++) {
+		if (!ptr_tx_cap->htt_frame_type[i])
+			continue;
+		DP_PRINT_STATS(" sgen htt frame type[%d] = %d",
+			       i, ptr_tx_cap->htt_frame_type[i]);
+	}
+}
+
 /**
  * dp_peer_or_pdev_tx_cap_enabled - Returns status of tx_cap_enabled
  * based on global per-pdev setting or per-peer setting
@@ -163,8 +240,6 @@ void dp_peer_update_80211_hdr(struct dp_vdev *vdev, struct dp_peer *peer)
  */
 void dp_deliver_mgmt_frm(struct dp_pdev *pdev, qdf_nbuf_t nbuf)
 {
-	uint32_t ppdu_id;
-
 	if (pdev->tx_sniffer_enable || pdev->mcopy_mode) {
 		dp_wdi_event_handler(WDI_EVENT_TX_MGMT_CTRL, pdev->soc,
 				     nbuf, HTT_INVALID_PEER,
@@ -176,14 +251,28 @@ void dp_deliver_mgmt_frm(struct dp_pdev *pdev, qdf_nbuf_t nbuf)
 		/* invoke WDI event handler here send mgmt pkt here */
 		struct ieee80211_frame *wh;
 		uint8_t type, subtype;
+		struct cdp_tx_mgmt_comp_info *ptr_mgmt_hdr;
 
-		ppdu_id = *(uint32_t *)qdf_nbuf_data(nbuf);
+		ptr_mgmt_hdr = (struct cdp_tx_mgmt_comp_info *)
+				qdf_nbuf_data(nbuf);
 		wh = (struct ieee80211_frame *)(qdf_nbuf_data(nbuf) +
-			sizeof(uint32_t));
+			sizeof(struct cdp_tx_mgmt_comp_info));
 		type = (wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) >>
 			IEEE80211_FC0_TYPE_SHIFT;
 		subtype = (wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK) >>
 			IEEE80211_FC0_SUBTYPE_SHIFT;
+
+		if (!ptr_mgmt_hdr->ppdu_id || !ptr_mgmt_hdr->tx_tsf) {
+			/*
+			 * if either ppdu_id and tx_tsf are zero then
+			 * storing the payload won't be useful
+			 * in constructing the packet
+			 * Hence freeing the packet
+			 */
+			qdf_nbuf_free(nbuf);
+			return;
+		}
+
 		qdf_spin_lock_bh(
 			&pdev->tx_capture.ctl_mgmt_lock[type][subtype]);
 		qdf_nbuf_queue_add(&pdev->tx_capture.ctl_mgmt_q[type][subtype],
@@ -192,7 +281,7 @@ void dp_deliver_mgmt_frm(struct dp_pdev *pdev, qdf_nbuf_t nbuf)
 			&pdev->tx_capture.ctl_mgmt_lock[type][subtype]);
 		QDF_TRACE(QDF_MODULE_ID_TX_CAPTURE, QDF_TRACE_LEVEL_DEBUG,
 			"dlvr mgmt frm(0x%08x): fc 0x%x %x, dur 0x%x%x\n",
-			ppdu_id, wh->i_fc[1], wh->i_fc[0],
+			ptr_mgmt_hdr->ppdu_id, wh->i_fc[1], wh->i_fc[0],
 			wh->i_dur[1], wh->i_dur[0]);
 	}
 }
@@ -227,6 +316,8 @@ void dp_tx_ppdu_stats_attach(struct dp_pdev *pdev)
 				&pdev->tx_capture.ctl_mgmt_lock[i][j]);
 		}
 	}
+	qdf_mem_zero(&pdev->tx_capture.dummy_ppdu_desc,
+		     sizeof(struct cdp_tx_completion_ppdu));
 }
 
 /**
@@ -304,7 +395,7 @@ dp_update_msdu_to_list(struct dp_soc *soc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if (ts->tid > DP_NON_QOS_TID) {
+	if (ts->tid > DP_MAX_TIDS) {
 		QDF_TRACE(QDF_MODULE_ID_TX_CAPTURE, QDF_TRACE_LEVEL_ERROR,
 			  "%s: %d peer_id %d, tid %d > NON_QOS_TID!",
 			  __func__, __LINE__, ts->peer_id, ts->tid);
@@ -681,7 +772,7 @@ QDF_STATUS dp_tx_print_bitmap(struct dp_pdev *pdev,
 	start_seq = user->start_seq;
 	num_mpdu = user->mpdu_success;
 
-	if (user->tid > DP_NON_QOS_TID) {
+	if (user->tid > DP_MAX_TIDS) {
 		QDF_TRACE(QDF_MODULE_ID_TX_CAPTURE, QDF_TRACE_LEVEL_ERROR,
 			  "%s: ppdu[%d] peer_id[%d] TID[%d] > NON_QOS_TID!",
 			  __func__, ppdu_id, user->peer_id, user->tid);
@@ -1198,6 +1289,10 @@ dp_tx_update_user_mpdu_info(uint32_t ppdu_id,
 	mpdu_info->ldpc = user->ldpc;
 	mpdu_info->ppdu_cookie = user->ppdu_cookie;
 
+	mpdu_info->long_retries = user->long_retries;
+	mpdu_info->short_retries = user->short_retries;
+	mpdu_info->completion_status = user->completion_status;
+
 	qdf_mem_copy(mpdu_info->mac_address, user->mac_addr, 6);
 
 	mpdu_info->ba_start_seq = user->ba_seq_no;
@@ -1222,8 +1317,258 @@ void dp_tx_update_sequence_number(qdf_nbuf_t nbuf, uint32_t seq_no)
 	qdf_mem_copy(ptr_wh->i_seq, &wh_seq, sizeof(uint16_t));
 }
 
+static inline
+void dp_update_frame_ctrl_from_frame_type(void *desc)
+{
+	struct cdp_tx_completion_ppdu *ppdu_desc = desc;
+
+	/* frame control is not set properly, sometimes it is zero */
+	switch (ppdu_desc->htt_frame_type) {
+	case HTT_STATS_FTYPE_SGEN_NDPA:
+	case HTT_STATS_FTYPE_SGEN_NDP:
+	case HTT_STATS_FTYPE_SGEN_AX_NDPA:
+	case HTT_STATS_FTYPE_SGEN_AX_NDP:
+		ppdu_desc->frame_ctrl = (IEEE80211_FC0_SUBTYPE_NDPA |
+					 IEEE80211_FC0_TYPE_CTL);
+	break;
+	case HTT_STATS_FTYPE_SGEN_BRP:
+	case HTT_STATS_FTYPE_SGEN_MU_BRP:
+		ppdu_desc->frame_ctrl = (IEEE80211_FC0_SUBTYPE_BRPOLL |
+					 IEEE80211_FC0_TYPE_CTL);
+	break;
+	case HTT_STATS_FTYPE_SGEN_RTS:
+	case HTT_STATS_FTYPE_SGEN_MU_RTS:
+		ppdu_desc->frame_ctrl = (IEEE80211_FC0_SUBTYPE_RTS |
+					 IEEE80211_FC0_TYPE_CTL);
+	break;
+	case HTT_STATS_FTYPE_SGEN_CTS:
+		ppdu_desc->frame_ctrl = (IEEE80211_FC0_SUBTYPE_CTS |
+					 IEEE80211_FC0_TYPE_CTL);
+	break;
+	case HTT_STATS_FTYPE_SGEN_CFEND:
+		ppdu_desc->frame_ctrl = (IEEE80211_FC0_SUBTYPE_CF_END |
+					 IEEE80211_FC0_TYPE_CTL);
+	break;
+	case HTT_STATS_FTYPE_SGEN_MU_TRIG:
+		ppdu_desc->frame_ctrl = (IEEE80211_FC0_SUBTYPE_TRIGGER |
+					 IEEE80211_FC0_TYPE_CTL);
+	break;
+	case HTT_STATS_FTYPE_SGEN_BAR:
+	case HTT_STATS_FTYPE_SGEN_MU_BAR:
+		ppdu_desc->frame_ctrl = (IEEE80211_FC0_SUBTYPE_BAR |
+					  IEEE80211_FC0_TYPE_CTL);
+	break;
+	}
+}
+
 /**
- * dp_send_mpdu_info_to_stack(): Function to deliver mpdu info to stack
+ * dp_send_dummy_mpdu_info_to_stack(): send dummy payload to stack
+ * to upper layer if complete
+ * @pdev: DP pdev handle
+ * @desc: cdp tx completion ppdu desc
+ *
+ * return: status
+ */
+static inline
+QDF_STATUS dp_send_dummy_mpdu_info_to_stack(struct dp_pdev *pdev,
+					  void *desc)
+{
+	struct dp_peer *peer;
+	struct cdp_tx_completion_ppdu *ppdu_desc = desc;
+	struct cdp_tx_completion_ppdu_user *user = &ppdu_desc->user[0];
+	struct ieee80211_ctlframe_addr2 *wh_min;
+	uint16_t frame_ctrl_le, duration_le;
+	struct cdp_tx_indication_info tx_capture_info;
+	struct cdp_tx_indication_mpdu_info *mpdu_info;
+	uint8_t type, subtype;
+
+	qdf_mem_set(&tx_capture_info,
+		    sizeof(struct cdp_tx_indication_info),
+		    0);
+
+	tx_capture_info.mpdu_nbuf =
+		qdf_nbuf_alloc(pdev->soc->osdev,
+		MAX_MONITOR_HEADER + MAX_DUMMY_FRM_BODY,
+		MAX_MONITOR_HEADER,
+		4, FALSE);
+	if (!tx_capture_info.mpdu_nbuf)
+		return QDF_STATUS_E_ABORTED;
+
+	mpdu_info = &tx_capture_info.mpdu_info;
+
+	mpdu_info->resp_type = ppdu_desc->resp_type;
+	mpdu_info->mprot_type = ppdu_desc->mprot_type;
+	mpdu_info->rts_success = ppdu_desc->rts_success;
+	mpdu_info->rts_failure = ppdu_desc->rts_failure;
+
+	/* update cdp_tx_indication_mpdu_info */
+	dp_tx_update_user_mpdu_info(ppdu_desc->bar_ppdu_id,
+				    &tx_capture_info.mpdu_info,
+				    &ppdu_desc->user[0]);
+	tx_capture_info.ppdu_desc = ppdu_desc;
+
+	mpdu_info->ppdu_id = ppdu_desc->ppdu_id;
+	mpdu_info->channel_num = pdev->operating_channel;
+	mpdu_info->channel = ppdu_desc->channel;
+	mpdu_info->frame_type = ppdu_desc->frame_type;
+	mpdu_info->ppdu_start_timestamp = ppdu_desc->ppdu_start_timestamp;
+	mpdu_info->ppdu_end_timestamp = ppdu_desc->ppdu_end_timestamp;
+	mpdu_info->tx_duration = ppdu_desc->tx_duration;
+	mpdu_info->seq_no = user->start_seq;
+	qdf_mem_copy(mpdu_info->mac_address, user->mac_addr, QDF_MAC_ADDR_SIZE);
+
+	mpdu_info->ba_start_seq = user->ba_seq_no;
+	qdf_mem_copy(mpdu_info->ba_bitmap, user->ba_bitmap,
+		     CDP_BA_256_BIT_MAP_SIZE_DWORDS * sizeof(uint32_t));
+
+	mpdu_info->frame_ctrl = ppdu_desc->frame_ctrl;
+
+	type = (ppdu_desc->frame_ctrl & IEEE80211_FC0_TYPE_MASK);
+	subtype = (ppdu_desc->frame_ctrl & IEEE80211_FC0_SUBTYPE_MASK);
+
+	if (type == IEEE80211_FC0_TYPE_CTL &&
+	    subtype == IEEE80211_FC0_SUBTYPE_BAR) {
+		mpdu_info->frame_ctrl = (IEEE80211_FC0_SUBTYPE_BAR |
+					  IEEE80211_FC0_TYPE_CTL);
+		mpdu_info->ppdu_id = ppdu_desc->bar_ppdu_id;
+		mpdu_info->ppdu_start_timestamp =
+					ppdu_desc->bar_ppdu_start_timestamp;
+		mpdu_info->ppdu_end_timestamp =
+					ppdu_desc->bar_ppdu_end_timestamp;
+		mpdu_info->tx_duration = ppdu_desc->bar_tx_duration;
+	}
+
+	wh_min = (struct ieee80211_ctlframe_addr2 *)
+		qdf_nbuf_data(
+		tx_capture_info.mpdu_nbuf);
+	qdf_mem_zero(wh_min, MAX_DUMMY_FRM_BODY);
+	frame_ctrl_le =
+		qdf_cpu_to_le16(mpdu_info->frame_ctrl);
+	duration_le =
+		qdf_cpu_to_le16(ppdu_desc->bar_tx_duration);
+	wh_min->i_fc[1] = (frame_ctrl_le & 0xFF00) >> 8;
+	wh_min->i_fc[0] = (frame_ctrl_le & 0xFF);
+	wh_min->i_aidordur[1] = (duration_le & 0xFF00) >> 8;
+	wh_min->i_aidordur[0] = (duration_le & 0xFF);
+	qdf_mem_copy(wh_min->i_addr1,
+		mpdu_info->mac_address,
+		QDF_MAC_ADDR_SIZE);
+
+	peer = dp_peer_find_by_id(pdev->soc, user->peer_id);
+	if (peer) {
+		struct dp_vdev *vdev = NULL;
+		vdev = peer->vdev;
+		if (vdev)
+			qdf_mem_copy(wh_min->i_addr2,
+				     vdev->mac_addr.raw,
+				     QDF_MAC_ADDR_SIZE);
+		dp_peer_unref_del_find_by_id(peer);
+	}
+
+	qdf_nbuf_set_pktlen(tx_capture_info.mpdu_nbuf,
+		sizeof(*wh_min));
+	QDF_TRACE(QDF_MODULE_ID_TX_CAPTURE,
+		QDF_TRACE_LEVEL_DEBUG,
+		"HTT_FTYPE[%d] frm(0x%08x): fc %x %x, dur 0x%x%x\n",
+		ppdu_desc->htt_frame_type, mpdu_info->ppdu_id,
+		wh_min->i_fc[1], wh_min->i_fc[0],
+		wh_min->i_aidordur[1], wh_min->i_aidordur[0]);
+	/*
+	 * send MPDU to osif layer
+	 */
+	dp_wdi_event_handler(WDI_EVENT_TX_DATA, pdev->soc,
+			     &tx_capture_info, HTT_INVALID_PEER,
+			     WDI_NO_VAL, pdev->pdev_id);
+
+	if (tx_capture_info.mpdu_nbuf)
+		qdf_nbuf_free(tx_capture_info.mpdu_nbuf);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * dp_send_dummy_rts_cts_frame(): send dummy rts and cts frame out
+ * to upper layer if complete
+ * @pdev: DP pdev handle
+ * @cur_ppdu_desc: cdp tx completion ppdu desc
+ *
+ * return: void
+ */
+static
+void dp_send_dummy_rts_cts_frame(struct dp_pdev *pdev,
+				 struct cdp_tx_completion_ppdu *cur_ppdu_desc)
+{
+	struct cdp_tx_completion_ppdu *ppdu_desc;
+	struct dp_pdev_tx_capture *ptr_tx_cap;
+	struct dp_peer *peer;
+	uint8_t rts_send;
+
+	rts_send = 0;
+	ptr_tx_cap = &pdev->tx_capture;
+	ppdu_desc = &ptr_tx_cap->dummy_ppdu_desc;
+
+	ppdu_desc->channel = cur_ppdu_desc->channel;
+	ppdu_desc->num_mpdu = 1;
+	ppdu_desc->num_msdu = 1;
+	ppdu_desc->user[0].ppdu_type = HTT_PPDU_STATS_PPDU_TYPE_SU;
+	ppdu_desc->bar_num_users = 0;
+	ppdu_desc->num_users = 1;
+
+	if (cur_ppdu_desc->mprot_type == SEND_WIFIRTS_LEGACY_E ||
+	    cur_ppdu_desc->mprot_type == SEND_WIFIRTS_11AC_DYNAMIC_BW_E ||
+	    cur_ppdu_desc->mprot_type == SEND_WIFIRTS_11AC_STATIC_BW_E) {
+		rts_send = 1;
+		/*
+		 *  send dummy RTS frame followed by CTS
+		 *  update frame_ctrl and htt_frame_type
+		 */
+		ppdu_desc->htt_frame_type = HTT_STATS_FTYPE_SGEN_RTS;
+		ppdu_desc->frame_type = CDP_PPDU_FTYPE_CTRL;
+		ppdu_desc->ppdu_start_timestamp =
+				cur_ppdu_desc->ppdu_start_timestamp;
+		ppdu_desc->ppdu_end_timestamp =
+				cur_ppdu_desc->ppdu_end_timestamp;
+		ppdu_desc->user[0].peer_id = cur_ppdu_desc->user[0].peer_id;
+		ppdu_desc->frame_ctrl = (IEEE80211_FC0_SUBTYPE_RTS |
+					 IEEE80211_FC0_TYPE_CTL);
+		qdf_mem_copy(&ppdu_desc->user[0].mac_addr,
+			     &cur_ppdu_desc->user[0].mac_addr,
+			     QDF_MAC_ADDR_SIZE);
+
+		dp_send_dummy_mpdu_info_to_stack(pdev, ppdu_desc);
+	}
+
+	if ((rts_send && cur_ppdu_desc->rts_success) ||
+	    cur_ppdu_desc->mprot_type == SEND_WIFICTS2SELF_E) {
+		/* send dummy CTS frame */
+		ppdu_desc->htt_frame_type = HTT_STATS_FTYPE_SGEN_CTS;
+		ppdu_desc->frame_type = CDP_PPDU_FTYPE_CTRL;
+		ppdu_desc->frame_ctrl = (IEEE80211_FC0_SUBTYPE_CTS |
+					 IEEE80211_FC0_TYPE_CTL);
+		ppdu_desc->ppdu_start_timestamp =
+				cur_ppdu_desc->ppdu_start_timestamp;
+		ppdu_desc->ppdu_end_timestamp =
+				cur_ppdu_desc->ppdu_end_timestamp;
+		ppdu_desc->user[0].peer_id = cur_ppdu_desc->user[0].peer_id;
+		peer = dp_peer_find_by_id(pdev->soc,
+					  cur_ppdu_desc->user[0].peer_id);
+		if (peer) {
+			struct dp_vdev *vdev = NULL;
+
+			vdev = peer->vdev;
+			if (vdev)
+				qdf_mem_copy(&ppdu_desc->user[0].mac_addr,
+					     vdev->mac_addr.raw,
+					     QDF_MAC_ADDR_SIZE);
+			dp_peer_unref_del_find_by_id(peer);
+		}
+
+		dp_send_dummy_mpdu_info_to_stack(pdev, ppdu_desc);
+	}
+}
+
+/**
+ * dp_send_data_to_stack(): Function to deliver mpdu info to stack
  * to upper layer
  * @pdev: DP pdev handle
  * @nbuf_ppdu_desc_list: ppdu_desc_list per sched cmd id
@@ -1232,9 +1577,8 @@ void dp_tx_update_sequence_number(qdf_nbuf_t nbuf, uint32_t seq_no)
  * return: status
  */
 static
-void dp_send_mpdu_info_to_stack(struct dp_pdev *pdev,
-				struct cdp_tx_completion_ppdu
-				*ppdu_desc)
+void dp_send_data_to_stack(struct dp_pdev *pdev,
+			   struct cdp_tx_completion_ppdu *ppdu_desc)
 {
 	struct cdp_tx_indication_info tx_capture_info;
 	struct cdp_tx_indication_mpdu_info *mpdu_info;
@@ -1257,13 +1601,22 @@ void dp_send_mpdu_info_to_stack(struct dp_pdev *pdev,
 	mpdu_info->tx_duration = ppdu_desc->tx_duration;
 	mpdu_info->num_msdu = ppdu_desc->num_msdu;
 
+	mpdu_info->resp_type = ppdu_desc->resp_type;
+	mpdu_info->mprot_type = ppdu_desc->mprot_type;
+	mpdu_info->rts_success = ppdu_desc->rts_success;
+	mpdu_info->rts_failure = ppdu_desc->rts_failure;
+
 	/* update cdp_tx_indication_mpdu_info */
 	dp_tx_update_user_mpdu_info(ppdu_id,
 				    &tx_capture_info.mpdu_info,
 				    &ppdu_desc->user[0]);
+	tx_capture_info.ppdu_desc = ppdu_desc;
 
 	tx_capture_info.mpdu_info.channel_num =
 		pdev->operating_channel;
+
+	if (ppdu_desc->mprot_type)
+		dp_send_dummy_rts_cts_frame(pdev, ppdu_desc);
 
 	start_seq = ppdu_desc->user[0].start_seq;
 	for (i = 0; i < ppdu_desc->user[0].ba_size; i++) {
@@ -1377,7 +1730,7 @@ dp_tx_mon_proc_xretries(struct dp_pdev *pdev, struct dp_peer *peer,
 			qdf_nbuf_queue_first(&tx_tid->pending_ppdu_q))) {
 			qdf_nbuf_queue_remove(&tx_tid->pending_ppdu_q);
 			/* Deliver PPDU */
-			dp_send_mpdu_info_to_stack(pdev, ppdu_desc);
+			dp_send_data_to_stack(pdev, ppdu_desc);
 			qdf_nbuf_queue_free(&ppdu_desc->mpdu_q);
 			qdf_mem_free(ppdu_desc->mpdus);
 			ppdu_desc->mpdus = NULL;
@@ -1423,7 +1776,7 @@ dp_tx_mon_proc_pending_ppdus(struct dp_pdev *pdev, struct dp_tx_tid *tx_tid,
 			if ((ppdu_desc->pending_retries == 0) &&
 			    qdf_nbuf_is_queue_empty(&tx_tid->pending_ppdu_q) &&
 			    qdf_nbuf_is_queue_empty(head_ppdu)) {
-				dp_send_mpdu_info_to_stack(pdev, ppdu_desc);
+				dp_send_data_to_stack(pdev, ppdu_desc);
 				qdf_nbuf_queue_free(&ppdu_desc->mpdu_q);
 				qdf_mem_free(ppdu_desc->mpdus);
 				ppdu_desc->mpdus = NULL;
@@ -1568,7 +1921,7 @@ dp_tx_mon_proc_pending_ppdus(struct dp_pdev *pdev, struct dp_tx_tid *tx_tid,
 		    qdf_nbuf_queue_first(&tx_tid->pending_ppdu_q)) &&
 		    (ppdu_desc->pending_retries == 0)) {
 			qdf_nbuf_queue_remove(&tx_tid->pending_ppdu_q);
-			dp_send_mpdu_info_to_stack(pdev, ppdu_desc);
+			dp_send_data_to_stack(pdev, ppdu_desc);
 			qdf_nbuf_queue_free(&ppdu_desc->mpdu_q);
 			qdf_mem_free(ppdu_desc->mpdus);
 			ppdu_desc->mpdus = NULL;
@@ -1579,6 +1932,399 @@ dp_tx_mon_proc_pending_ppdus(struct dp_pdev *pdev, struct dp_tx_tid *tx_tid,
 			pend_ppdu = qdf_nbuf_queue_next(pend_ppdu);
 		}
 	}
+}
+
+static uint32_t
+dp_send_mgmt_ctrl_to_stack(struct dp_pdev *pdev,
+			   qdf_nbuf_t nbuf_ppdu_desc,
+			   struct cdp_tx_indication_info *ptr_tx_cap_info,
+			   qdf_nbuf_t mgmt_ctl_nbuf,
+			   bool is_payload)
+{
+	struct cdp_tx_completion_ppdu *ppdu_desc;
+	struct cdp_tx_indication_mpdu_info *mpdu_info;
+	struct ieee80211_frame *wh;
+	uint16_t duration_le, seq_le;
+	struct ieee80211_frame_min_one *wh_min;
+	uint16_t frame_ctrl_le;
+	uint8_t type, subtype;
+
+	mpdu_info = &ptr_tx_cap_info->mpdu_info;
+	ppdu_desc = (struct cdp_tx_completion_ppdu *)
+			qdf_nbuf_data(nbuf_ppdu_desc);
+
+	type = (ppdu_desc->frame_ctrl &
+		IEEE80211_FC0_TYPE_MASK) >>
+		IEEE80211_FC0_TYPE_SHIFT;
+	subtype = (ppdu_desc->frame_ctrl &
+		IEEE80211_FC0_SUBTYPE_MASK) >>
+		IEEE80211_FC0_SUBTYPE_SHIFT;
+
+	if (is_payload) {
+		wh = (struct ieee80211_frame *)qdf_nbuf_data(mgmt_ctl_nbuf);
+
+		if (subtype != IEEE80211_FC0_SUBTYPE_BEACON) {
+			duration_le = qdf_cpu_to_le16(ppdu_desc->tx_duration);
+			wh->i_dur[1] = (duration_le & 0xFF00) >> 8;
+			wh->i_dur[0] = duration_le & 0xFF;
+			seq_le = qdf_cpu_to_le16(ppdu_desc->user[0].start_seq <<
+						 IEEE80211_SEQ_SEQ_SHIFT);
+			wh->i_seq[1] = (seq_le & 0xFF00) >> 8;
+			wh->i_seq[0] = seq_le & 0xFF;
+		}
+		QDF_TRACE(QDF_MODULE_ID_TX_CAPTURE,
+			  QDF_TRACE_LEVEL_DEBUG,
+			  "ctrl/mgmt frm(0x%08x): fc 0x%x 0x%x\n",
+			  ptr_tx_cap_info->mpdu_info.ppdu_id,
+			  wh->i_fc[1], wh->i_fc[0]);
+		QDF_TRACE(QDF_MODULE_ID_TX_CAPTURE,
+			  QDF_TRACE_LEVEL_DEBUG,
+			  "desc->ppdu_id 0x%08x\n", ppdu_desc->ppdu_id);
+
+		/* append ext list */
+		qdf_nbuf_append_ext_list(ptr_tx_cap_info->mpdu_nbuf,
+					 mgmt_ctl_nbuf,
+					 qdf_nbuf_len(mgmt_ctl_nbuf));
+	} else {
+		wh_min = (struct ieee80211_frame_min_one *)
+				qdf_nbuf_data(ptr_tx_cap_info->mpdu_nbuf);
+		qdf_mem_zero(wh_min, MAX_DUMMY_FRM_BODY);
+		frame_ctrl_le = qdf_cpu_to_le16(ppdu_desc->frame_ctrl);
+		duration_le = qdf_cpu_to_le16(ppdu_desc->tx_duration);
+		wh_min->i_fc[1] = (frame_ctrl_le & 0xFF00) >> 8;
+		wh_min->i_fc[0] = (frame_ctrl_le & 0xFF);
+		wh_min->i_dur[1] = (duration_le & 0xFF00) >> 8;
+		wh_min->i_dur[0] = (duration_le & 0xFF);
+		qdf_mem_copy(wh_min->i_addr1, mpdu_info->mac_address,
+			     QDF_MAC_ADDR_SIZE);
+		qdf_nbuf_set_pktlen(ptr_tx_cap_info->mpdu_nbuf,
+				    sizeof(*wh_min));
+		QDF_TRACE(QDF_MODULE_ID_TX_CAPTURE,
+			  QDF_TRACE_LEVEL_DEBUG,
+			  "frm(0x%08x): fc %x %x, dur 0x%x%x\n",
+			  ptr_tx_cap_info->mpdu_info.ppdu_id,
+			  wh_min->i_fc[1], wh_min->i_fc[0],
+			  wh_min->i_dur[1], wh_min->i_dur[0]);
+	}
+
+
+	dp_wdi_event_handler(WDI_EVENT_TX_DATA, pdev->soc,
+			     ptr_tx_cap_info, HTT_INVALID_PEER,
+			     WDI_NO_VAL, pdev->pdev_id);
+
+	if (ptr_tx_cap_info->mpdu_nbuf)
+		qdf_nbuf_free(ptr_tx_cap_info->mpdu_nbuf);
+
+	return 0;
+}
+
+static uint32_t
+dp_update_tx_cap_info(struct dp_pdev *pdev,
+		      qdf_nbuf_t nbuf_ppdu_desc,
+		      void *tx_info, bool is_payload)
+{
+	struct cdp_tx_completion_ppdu *ppdu_desc;
+	struct cdp_tx_indication_info *tx_capture_info =
+		(struct cdp_tx_indication_info *)tx_info;
+	struct cdp_tx_indication_mpdu_info *mpdu_info;
+
+	ppdu_desc = (struct cdp_tx_completion_ppdu *)
+			qdf_nbuf_data(nbuf_ppdu_desc);
+
+	qdf_mem_set(tx_capture_info, sizeof(struct cdp_tx_indication_info), 0);
+	mpdu_info = &tx_capture_info->mpdu_info;
+
+	mpdu_info->channel = ppdu_desc->channel;
+	mpdu_info->frame_type = ppdu_desc->frame_type;
+	mpdu_info->ppdu_start_timestamp = ppdu_desc->ppdu_start_timestamp;
+	mpdu_info->ppdu_end_timestamp = ppdu_desc->ppdu_end_timestamp;
+	mpdu_info->tx_duration = ppdu_desc->tx_duration;
+	mpdu_info->seq_no = ppdu_desc->user[0].start_seq;
+	mpdu_info->num_msdu = ppdu_desc->num_msdu;
+
+	/* update cdp_tx_indication_mpdu_info */
+	dp_tx_update_user_mpdu_info(ppdu_desc->ppdu_id,
+				    &tx_capture_info->mpdu_info,
+				    &ppdu_desc->user[0]);
+	tx_capture_info->ppdu_desc = ppdu_desc;
+
+	tx_capture_info->mpdu_info.channel_num = pdev->operating_channel;
+	tx_capture_info->mpdu_info.ppdu_id = ppdu_desc->ppdu_id;
+	if (is_payload)
+		tx_capture_info->mpdu_nbuf = qdf_nbuf_alloc(pdev->soc->osdev,
+							    MAX_MONITOR_HEADER,
+							    MAX_MONITOR_HEADER,
+							    4, FALSE);
+	else
+		tx_capture_info->mpdu_nbuf = qdf_nbuf_alloc(pdev->soc->osdev,
+							    MAX_MONITOR_HEADER +
+							    MAX_DUMMY_FRM_BODY,
+							    MAX_MONITOR_HEADER,
+							    4, FALSE);
+	return 0;
+}
+
+static uint32_t
+dp_check_mgmt_ctrl_ppdu(struct dp_pdev *pdev,
+			qdf_nbuf_t nbuf_ppdu_desc)
+{
+	struct cdp_tx_indication_info tx_capture_info;
+	qdf_nbuf_t mgmt_ctl_nbuf;
+	uint8_t type, subtype;
+	bool is_sgen_pkt;
+	struct cdp_tx_mgmt_comp_info *ptr_comp_info;
+	qdf_nbuf_queue_t *retries_q;
+	struct cdp_tx_completion_ppdu *ppdu_desc;
+	uint32_t ppdu_id;
+	size_t head_size;
+	uint32_t status = 1;
+
+	ppdu_desc = (struct cdp_tx_completion_ppdu *)
+		qdf_nbuf_data(nbuf_ppdu_desc);
+	/*
+	 * only for host generated frame we do have
+	 * timestamp and retries count.
+	 */
+	head_size = sizeof(struct cdp_tx_mgmt_comp_info);
+
+	type = (ppdu_desc->frame_ctrl &
+		IEEE80211_FC0_TYPE_MASK) >>
+		IEEE80211_FC0_TYPE_SHIFT;
+	subtype = (ppdu_desc->frame_ctrl &
+		IEEE80211_FC0_SUBTYPE_MASK) >>
+		IEEE80211_FC0_SUBTYPE_SHIFT;
+
+	if (ppdu_desc->htt_frame_type == HTT_STATS_FTYPE_SGEN_NDP) {
+		dp_update_frame_ctrl_from_frame_type(ppdu_desc);
+		type = 0;
+		subtype = 0;
+	}
+
+	retries_q = &pdev->tx_capture.retries_ctl_mgmt_q[type][subtype];
+get_mgmt_pkt_from_queue:
+	qdf_spin_lock_bh(
+		&pdev->tx_capture.ctl_mgmt_lock[type][subtype]);
+	mgmt_ctl_nbuf = qdf_nbuf_queue_remove(
+		&pdev->tx_capture.ctl_mgmt_q[type][subtype]);
+	qdf_spin_unlock_bh(&pdev->tx_capture.ctl_mgmt_lock[type][subtype]);
+
+	if (mgmt_ctl_nbuf) {
+		qdf_nbuf_t tmp_mgmt_ctl_nbuf;
+		uint32_t start_tsf;
+
+		ptr_comp_info = (struct cdp_tx_mgmt_comp_info *)
+				qdf_nbuf_data(mgmt_ctl_nbuf);
+		is_sgen_pkt = ptr_comp_info->is_sgen_pkt;
+		ppdu_id = ptr_comp_info->ppdu_id;
+
+		if (!is_sgen_pkt && ptr_comp_info->tx_tsf <
+		    ppdu_desc->ppdu_start_timestamp) {
+			/*
+			 * free the older mgmt buffer from
+			 * the queue and get new mgmt buffer
+			 */
+			qdf_nbuf_free(mgmt_ctl_nbuf);
+			goto get_mgmt_pkt_from_queue;
+		}
+
+		QDF_TRACE(QDF_MODULE_ID_TX_CAPTURE,
+			  QDF_TRACE_LEVEL_INFO_HIGH,
+			  "ppdu_id [%d 0x%x] type_subtype[%d %d] is_sgen[%d] h_sz[%d]",
+			  ppdu_id, ppdu_id, type, subtype,
+			  is_sgen_pkt, head_size);
+
+		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_TX_CAPTURE,
+				   QDF_TRACE_LEVEL_INFO_HIGH,
+				   qdf_nbuf_data(mgmt_ctl_nbuf), 32);
+
+		/*
+		 * for sgen frame we won't have, retries count
+		 * and 64 bits tsf in the head.
+		 */
+		if (ppdu_id != ppdu_desc->ppdu_id) {
+			if (is_sgen_pkt) {
+				start_tsf = (ppdu_desc->ppdu_start_timestamp &
+					     LOWER_32_MASK);
+				if ((ptr_comp_info->tx_tsf <
+				     (start_tsf + MAX_MGMT_ENQ_DELAY)) &&
+				    ((ppdu_id & SCH_ID_MASK) <
+				     (ppdu_desc->ppdu_id & SCH_ID_MASK))) {
+					/*
+					 * free the older mgmt buffer from
+					 * the queue and get new mgmt buffer
+					 */
+					qdf_nbuf_free(mgmt_ctl_nbuf);
+					goto get_mgmt_pkt_from_queue;
+				}
+			}
+
+			if (ppdu_desc->user[0].completion_status ==
+			    HTT_PPDU_STATS_USER_STATUS_FILTERED) {
+				qdf_nbuf_free(nbuf_ppdu_desc);
+				status = 0;
+				goto free_ppdu_desc;
+			}
+
+			/*
+			 * add the ppdu_desc into retry queue
+			 */
+			qdf_nbuf_queue_add(retries_q, nbuf_ppdu_desc);
+			status = 0;
+
+			/*
+			 * insert the mgmt_ctl buffer back to
+			 * the queue
+			 */
+			qdf_spin_lock_bh(
+			&pdev->tx_capture.ctl_mgmt_lock[type][subtype]);
+			qdf_nbuf_queue_insert_head(
+			&pdev->tx_capture.ctl_mgmt_q[type][subtype],
+			mgmt_ctl_nbuf);
+			qdf_spin_unlock_bh(
+			&pdev->tx_capture.ctl_mgmt_lock[type][subtype]);
+		} else {
+			qdf_nbuf_t nbuf_retry_ppdu;
+			struct cdp_tx_completion_ppdu *tmp_ppdu_desc;
+			uint16_t frame_ctrl_le;
+			struct ieee80211_frame *wh;
+
+			if (ppdu_desc->user[0].completion_status ==
+			    HTT_PPDU_STATS_USER_STATUS_FILTERED) {
+				qdf_nbuf_free(nbuf_ppdu_desc);
+				qdf_nbuf_free(mgmt_ctl_nbuf);
+				status = 0;
+				goto free_ppdu_desc;
+			}
+
+			while (!!qdf_nbuf_queue_len(retries_q)) {
+				/*
+				 * send retried packet stored
+				 * in queue
+				 */
+				nbuf_retry_ppdu =
+					qdf_nbuf_queue_remove(retries_q);
+				tmp_ppdu_desc =
+					(struct cdp_tx_completion_ppdu *)
+						qdf_nbuf_data(nbuf_retry_ppdu);
+				tmp_mgmt_ctl_nbuf =
+					skb_copy_expand(mgmt_ctl_nbuf,
+							0, 0, GFP_ATOMIC);
+
+				dp_update_tx_cap_info(pdev, nbuf_retry_ppdu,
+						      &tx_capture_info, true);
+				if (!tx_capture_info.mpdu_nbuf) {
+					qdf_nbuf_free(nbuf_retry_ppdu);
+					qdf_nbuf_free(tmp_mgmt_ctl_nbuf);
+					continue;
+				}
+
+				/* pull head based on sgen pkt or mgmt pkt */
+				qdf_nbuf_pull_head(tmp_mgmt_ctl_nbuf,
+						   head_size);
+
+				/*
+				 * frame control from ppdu_desc has
+				 * retry flag set
+				 */
+				frame_ctrl_le =
+				qdf_cpu_to_le16(tmp_ppdu_desc->frame_ctrl);
+				wh = (struct ieee80211_frame *)
+					(qdf_nbuf_data(tmp_mgmt_ctl_nbuf));
+				wh->i_fc[1] = (frame_ctrl_le & 0xFF00) >> 8;
+				wh->i_fc[0] = (frame_ctrl_le & 0xFF);
+
+				/*
+				 * send MPDU to osif layer
+				 */
+				dp_send_mgmt_ctrl_to_stack(pdev,
+							   nbuf_retry_ppdu,
+							   &tx_capture_info,
+							   tmp_mgmt_ctl_nbuf,
+							   true);
+
+				/* free retried queue nbuf ppdu_desc */
+				qdf_nbuf_free(nbuf_retry_ppdu);
+			}
+
+			dp_update_tx_cap_info(pdev, nbuf_ppdu_desc,
+					      &tx_capture_info, true);
+			if (!tx_capture_info.mpdu_nbuf) {
+				qdf_nbuf_free(mgmt_ctl_nbuf);
+				goto free_ppdu_desc;
+			}
+
+			tx_capture_info.mpdu_info.ppdu_id =
+				*(uint32_t *)qdf_nbuf_data(mgmt_ctl_nbuf);
+			/* pull head based on sgen pkt or mgmt pkt */
+			qdf_nbuf_pull_head(mgmt_ctl_nbuf, head_size);
+
+			/* frame control from ppdu_desc has retry flag set */
+			frame_ctrl_le = qdf_cpu_to_le16(ppdu_desc->frame_ctrl);
+			wh = (struct ieee80211_frame *)
+				(qdf_nbuf_data(mgmt_ctl_nbuf));
+			wh->i_fc[1] = (frame_ctrl_le & 0xFF00) >> 8;
+			wh->i_fc[0] = (frame_ctrl_le & 0xFF);
+
+			/*
+			 * send MPDU to osif layer
+			 */
+			dp_send_mgmt_ctrl_to_stack(pdev, nbuf_ppdu_desc,
+						   &tx_capture_info,
+						   mgmt_ctl_nbuf, true);
+		}
+	} else if ((ppdu_desc->frame_ctrl &
+		   IEEE80211_FC0_TYPE_MASK) ==
+		   IEEE80211_FC0_TYPE_CTL) {
+
+		if (ppdu_desc->user[0].completion_status ==
+		    HTT_PPDU_STATS_USER_STATUS_FILTERED) {
+			qdf_nbuf_free(nbuf_ppdu_desc);
+			status = 0;
+			goto free_ppdu_desc;
+		}
+
+		dp_update_tx_cap_info(pdev, nbuf_ppdu_desc,
+				      &tx_capture_info, false);
+		if (!tx_capture_info.mpdu_nbuf)
+			goto free_ppdu_desc;
+		/*
+		 * send MPDU to osif layer
+		 */
+		dp_send_mgmt_ctrl_to_stack(pdev, nbuf_ppdu_desc,
+					   &tx_capture_info, NULL, false);
+	}
+
+free_ppdu_desc:
+	return status;
+}
+
+/**
+ * dp_tx_ppdu_stats_flush(): Function to flush pending retried ppdu desc
+ * @pdev: DP pdev handle
+ * @nbuf: ppdu_desc
+ *
+ * return: void
+ */
+static void
+dp_tx_ppdu_stats_flush(struct dp_pdev *pdev,
+		       struct cdp_tx_completion_ppdu *ppdu_desc)
+{
+	struct dp_peer *peer;
+
+	peer = dp_peer_find_by_id(pdev->soc,
+				  ppdu_desc->user[0].peer_id);
+
+	if (!peer)
+		return;
+
+	/*
+	 * for all drop reason we are invoking
+	 * proc xretries
+	 */
+	dp_tx_mon_proc_xretries(pdev, peer, ppdu_desc->user[0].tid);
+
+	dp_peer_unref_del_find_by_id(peer);
+	return;
 }
 
 /**
@@ -1609,6 +2355,7 @@ dp_check_ppdu_and_deliver(struct dp_pdev *pdev,
 		uint32_t len;
 		qdf_nbuf_t mpdu_nbuf;
 		struct dp_peer *peer;
+		uint8_t type;
 
 		if (!nbuf_ppdu_desc_list[desc_cnt])
 			continue;
@@ -1617,147 +2364,30 @@ dp_check_ppdu_and_deliver(struct dp_pdev *pdev,
 			qdf_nbuf_data(nbuf_ppdu_desc_list[desc_cnt]);
 
 		ppdu_id = ppdu_desc->ppdu_id;
+		type = (ppdu_desc->frame_ctrl & IEEE80211_FC0_TYPE_MASK) >>
+			IEEE80211_FC0_TYPE_SHIFT;
 
-		if (ppdu_desc->frame_type == CDP_PPDU_FTYPE_CTRL) {
-			struct cdp_tx_indication_info tx_capture_info;
-			struct cdp_tx_indication_mpdu_info *mpdu_info;
-			qdf_nbuf_t mgmt_ctl_nbuf;
-			uint8_t type, subtype;
-
-			qdf_mem_set(&tx_capture_info,
-				    sizeof(struct cdp_tx_indication_info),
-				    0);
-			mpdu_info = &tx_capture_info.mpdu_info;
-
-			mpdu_info->channel = ppdu_desc->channel;
-			mpdu_info->frame_type = ppdu_desc->frame_type;
-			mpdu_info->ppdu_start_timestamp =
-						ppdu_desc->ppdu_start_timestamp;
-			mpdu_info->ppdu_end_timestamp =
-						ppdu_desc->ppdu_end_timestamp;
-			mpdu_info->tx_duration = ppdu_desc->tx_duration;
-			mpdu_info->seq_no = seq_no;
-			mpdu_info->num_msdu = ppdu_desc->num_msdu;
-
-			/* update cdp_tx_indication_mpdu_info */
-			dp_tx_update_user_mpdu_info(ppdu_id,
-						    &tx_capture_info.mpdu_info,
-						    &ppdu_desc->user[0]);
-
-			tx_capture_info.mpdu_info.channel_num =
-				pdev->operating_channel;
-
-			type = (ppdu_desc->frame_ctrl &
-				IEEE80211_FC0_TYPE_MASK) >>
-				IEEE80211_FC0_TYPE_SHIFT;
-			subtype = (ppdu_desc->frame_ctrl &
-				IEEE80211_FC0_SUBTYPE_MASK) >>
-				IEEE80211_FC0_SUBTYPE_SHIFT;
-			qdf_spin_lock_bh(
-				&pdev->tx_capture.ctl_mgmt_lock[type][subtype]);
-			mgmt_ctl_nbuf = qdf_nbuf_queue_remove(
-				&pdev->tx_capture.ctl_mgmt_q[type][subtype]);
-			qdf_spin_unlock_bh(
-				&pdev->tx_capture.ctl_mgmt_lock[type][subtype]);
-			if (mgmt_ctl_nbuf) {
-				struct ieee80211_frame *wh;
-				uint16_t duration_le, seq_le;
-
-				tx_capture_info.mpdu_nbuf =
-					qdf_nbuf_alloc(pdev->soc->osdev,
-					MAX_MONITOR_HEADER, MAX_MONITOR_HEADER,
-					4, FALSE);
-				if (!tx_capture_info.mpdu_nbuf) {
-					qdf_nbuf_free(mgmt_ctl_nbuf);
-					goto free_ppdu_desc;
-				}
-				/* pull ppdu_id from the packet */
-				tx_capture_info.mpdu_info.ppdu_id =
-					*(uint32_t *)qdf_nbuf_data(mgmt_ctl_nbuf);
-				qdf_nbuf_pull_head(mgmt_ctl_nbuf, sizeof(uint32_t));
-				wh = (struct ieee80211_frame *)qdf_nbuf_data(mgmt_ctl_nbuf);
-
-				if (subtype != IEEE80211_FC0_SUBTYPE_BEACON) {
-					duration_le = qdf_cpu_to_le16(
-						ppdu_desc->tx_duration);
-					wh->i_dur[1] =
-						(duration_le & 0xFF00) >> 8;
-					wh->i_dur[0] = duration_le & 0xFF;
-					seq_le = qdf_cpu_to_le16(
-						ppdu_desc->user[0].start_seq <<
-						IEEE80211_SEQ_SEQ_SHIFT);
-					wh->i_seq[1] = (seq_le & 0xFF00) >> 8;
-					wh->i_seq[0] = seq_le & 0xFF;
-				}
-				qdf_nbuf_append_ext_list(
-					tx_capture_info.mpdu_nbuf,
-					mgmt_ctl_nbuf,
-					qdf_nbuf_len(mgmt_ctl_nbuf));
-				QDF_TRACE(QDF_MODULE_ID_TX_CAPTURE,
-					QDF_TRACE_LEVEL_DEBUG,
-					"ctrl/mgmt frm(0x%08x): fc 0x%x 0x%x\n",
-					tx_capture_info.mpdu_info.ppdu_id,
-					wh->i_fc[1], wh->i_fc[0]);
-				QDF_TRACE(QDF_MODULE_ID_TX_CAPTURE,
-					QDF_TRACE_LEVEL_DEBUG,
-					"desc->ppdu_id 0x%08x\n", ppdu_id);
-			} else if ((ppdu_desc->frame_ctrl &
-				   IEEE80211_FC0_TYPE_MASK) ==
-				   IEEE80211_FC0_TYPE_CTL) {
-				struct ieee80211_frame_min_one *wh_min;
-				uint16_t frame_ctrl_le, duration_le;
-
-				tx_capture_info.mpdu_nbuf =
-					qdf_nbuf_alloc(pdev->soc->osdev,
-					MAX_MONITOR_HEADER + MAX_DUMMY_FRM_BODY,
-					MAX_MONITOR_HEADER,
-					4, FALSE);
-				if (!tx_capture_info.mpdu_nbuf)
-					goto free_ppdu_desc;
-				wh_min = (struct ieee80211_frame_min_one *)
-					qdf_nbuf_data(
-					tx_capture_info.mpdu_nbuf);
-				qdf_mem_zero(wh_min, MAX_DUMMY_FRM_BODY);
-				frame_ctrl_le =
-					qdf_cpu_to_le16(ppdu_desc->frame_ctrl);
-				duration_le =
-					qdf_cpu_to_le16(ppdu_desc->tx_duration);
-				wh_min->i_fc[1] = (frame_ctrl_le & 0xFF00) >> 8;
-				wh_min->i_fc[0] = (frame_ctrl_le & 0xFF);
-				wh_min->i_dur[1] = (duration_le & 0xFF00) >> 8;
-				wh_min->i_dur[0] = (duration_le & 0xFF);
-				qdf_mem_copy(wh_min->i_addr1,
-					mpdu_info->mac_address,
-					QDF_MAC_ADDR_SIZE);
-				qdf_nbuf_set_pktlen(tx_capture_info.mpdu_nbuf,
-					sizeof(*wh_min));
-				QDF_TRACE(QDF_MODULE_ID_TX_CAPTURE,
-					QDF_TRACE_LEVEL_DEBUG,
-					"frm(0x%08x): fc %x %x, dur 0x%x%x\n",
-					ppdu_id, wh_min->i_fc[1], wh_min->i_fc[0],
-					wh_min->i_dur[1], wh_min->i_dur[0]);
-			}
-			/*
-			 * send MPDU to osif layer
-			 */
-			dp_wdi_event_handler(WDI_EVENT_TX_DATA, pdev->soc,
-					     &tx_capture_info, HTT_INVALID_PEER,
-					     WDI_NO_VAL, pdev->pdev_id);
-
-			if (tx_capture_info.mpdu_nbuf)
-				qdf_nbuf_free(tx_capture_info.mpdu_nbuf);
-
-free_ppdu_desc:
+		if (ppdu_desc->is_flush) {
+			dp_tx_ppdu_stats_flush(pdev, ppdu_desc);
 			tmp_nbuf = nbuf_ppdu_desc_list[desc_cnt];
 			nbuf_ppdu_desc_list[desc_cnt] = NULL;
 			qdf_nbuf_free(tmp_nbuf);
 			continue;
 		}
 
-		if (qdf_nbuf_is_queue_empty(&ppdu_desc->mpdu_q)) {
-			tmp_nbuf = nbuf_ppdu_desc_list[desc_cnt];
+		if (ppdu_desc->frame_type == CDP_PPDU_FTYPE_CTRL ||
+		    ppdu_desc->htt_frame_type ==
+		    HTT_STATS_FTYPE_SGEN_QOS_NULL ||
+		    type != FRAME_CTRL_TYPE_DATA) {
+			qdf_nbuf_t nbuf_ppdu = nbuf_ppdu_desc_list[desc_cnt];
+
+			if (dp_check_mgmt_ctrl_ppdu(pdev, nbuf_ppdu)) {
+				tmp_nbuf = nbuf_ppdu_desc_list[desc_cnt];
+				nbuf_ppdu_desc_list[desc_cnt] = NULL;
+				qdf_nbuf_free(tmp_nbuf);
+				continue;
+			}
 			nbuf_ppdu_desc_list[desc_cnt] = NULL;
-			qdf_nbuf_free(tmp_nbuf);
 			continue;
 		}
 
@@ -1791,9 +2421,16 @@ free_ppdu_desc:
 				ppdu_desc->user[0].start_seq;
 		}
 
+		if (ppdu_desc->user[0].ba_size == 0)
+			ppdu_desc->user[0].ba_size = 1;
+
 		/* find list of missing sequence */
 		ppdu_desc->mpdus = qdf_mem_malloc(sizeof(qdf_nbuf_t) *
 			ppdu_desc->user[0].ba_size);
+
+		if (ppdu_desc->frame_type == CDP_PPDU_FTYPE_BAR)
+			dp_send_dummy_mpdu_info_to_stack(pdev,
+							 ppdu_desc);
 
 		if (qdf_unlikely(!ppdu_desc->mpdus)) {
 			QDF_TRACE(QDF_MODULE_ID_TX_CAPTURE,
@@ -1804,12 +2441,14 @@ free_ppdu_desc:
 			nbuf_ppdu_desc_list[desc_cnt] = NULL;
 			qdf_nbuf_queue_free(&ppdu_desc->mpdu_q);
 			qdf_nbuf_free(tmp_nbuf);
+			dp_peer_unref_del_find_by_id(peer);
 			continue;
 		}
 
 		if (qdf_unlikely(ppdu_desc->user[0].ba_size >
 		    CDP_BA_256_BIT_MAP_SIZE_DWORDS *
 		    SEQ_SEG_SZ_BITS(ppdu_desc->user[0].failed_bitmap))) {
+			dp_peer_unref_del_find_by_id(peer);
 			qdf_assert_always(0);
 			return;
 		}
@@ -1865,7 +2504,7 @@ free_ppdu_desc:
 
 		if ((ppdu_desc->pending_retries == 0) &&
 		    qdf_nbuf_is_queue_empty(&tx_tid->pending_ppdu_q)) {
-			dp_send_mpdu_info_to_stack(pdev, ppdu_desc);
+			dp_send_data_to_stack(pdev, ppdu_desc);
 			qdf_nbuf_queue_free(&ppdu_desc->mpdu_q);
 			qdf_mem_free(ppdu_desc->mpdus);
 			ppdu_desc->mpdus = NULL;
@@ -1887,6 +2526,7 @@ free_ppdu_desc:
 			nbuf_ppdu_desc_list[i]);
 		if (!cur_ppdu_desc)
 			continue;
+
 		peer = dp_peer_find_by_id(pdev->soc,
 					  cur_ppdu_desc->user[0].peer_id);
 		if (!peer) {
@@ -1911,7 +2551,7 @@ free_ppdu_desc:
 					qdf_nbuf_data(tmp_nbuf);
 				if (cur_ppdu_desc->pending_retries)
 					break;
-				dp_send_mpdu_info_to_stack(pdev, cur_ppdu_desc);
+				dp_send_data_to_stack(pdev, cur_ppdu_desc);
 				qdf_nbuf_queue_free(&cur_ppdu_desc->mpdu_q);
 				qdf_mem_free(cur_ppdu_desc->mpdus);
 				cur_ppdu_desc->mpdus = NULL;
@@ -2109,7 +2749,9 @@ void dp_tx_ppdu_stats_process(void *context)
 				continue;
 			}
 
-			if (ppdu_desc->frame_type == CDP_PPDU_FTYPE_DATA) {
+			if ((ppdu_desc->frame_type == CDP_PPDU_FTYPE_DATA) ||
+			    (ppdu_desc->num_mpdu &&
+			     ppdu_desc->frame_type == CDP_PPDU_FTYPE_BAR)) {
 				/**
 				 * check whether it is bss peer,
 				 * if bss_peer no need to process further
@@ -2127,7 +2769,7 @@ void dp_tx_ppdu_stats_process(void *context)
 				/* print the bit map */
 				dp_tx_print_bitmap(pdev, ppdu_desc,
 						   0, ppdu_desc->ppdu_id);
-				if (ppdu_desc->user[0].tid > DP_NON_QOS_TID) {
+				if (ppdu_desc->user[0].tid > DP_MAX_TIDS) {
 					QDF_TRACE(QDF_MODULE_ID_TX_CAPTURE,
 						  QDF_TRACE_LEVEL_ERROR,
 						  "%s: ppdu[%d] peer_id[%d] TID[%d] > NON_QOS_TID!",
@@ -2233,12 +2875,12 @@ dequeue_msdu_again:
 					  ppdu_desc->user[0].start_seq,
 					  ppdu_cnt,
 					  ppdu_desc_cnt);
-			} else if (ppdu_desc->frame_type ==
-				   CDP_PPDU_FTYPE_CTRL) {
-				nbuf_ppdu_desc_list[ppdu_desc_cnt++] = nbuf;
 			} else {
-				qdf_nbuf_queue_free(&ppdu_desc->mpdu_q);
-				qdf_nbuf_free(nbuf);
+				/*
+				 * other packet frame also added to
+				 * descriptor list
+				 */
+				nbuf_ppdu_desc_list[ppdu_desc_cnt++] = nbuf;
 			}
 
 			dp_peer_unref_del_find_by_id(peer);
@@ -2304,4 +2946,225 @@ void dp_ppdu_desc_deliver(struct dp_pdev *pdev,
 	}
 }
 
+static void set_mpdu_info(
+	struct cdp_tx_indication_info *tx_capture_info,
+	struct mon_rx_status *rx_status,
+	struct mon_rx_user_status *rx_user_status)
+{
+	struct cdp_tx_indication_mpdu_info *mpdu_info;
+
+	qdf_mem_set(tx_capture_info,
+		    sizeof(struct cdp_tx_indication_info), 0);
+
+	mpdu_info = &tx_capture_info->mpdu_info;
+	mpdu_info->ppdu_start_timestamp = rx_status->tsft + 16;
+	mpdu_info->channel_num = rx_status->chan_num;
+	mpdu_info->bw = 0;
+
+	if  (mpdu_info->channel_num < 20)
+		mpdu_info->preamble = DOT11_B;
+	else
+		mpdu_info->preamble = DOT11_A;
+}
+
+static void dp_gen_ack_frame(struct hal_rx_ppdu_info *ppdu_info,
+			     struct dp_peer *peer,
+			     qdf_nbuf_t mpdu_nbuf)
+{
+	struct ieee80211_frame_min_one *wh_addr1;
+
+	wh_addr1 = (struct ieee80211_frame_min_one *)
+		qdf_nbuf_data(mpdu_nbuf);
+
+	wh_addr1->i_fc[0] = 0;
+	wh_addr1->i_fc[1] = 0;
+	wh_addr1->i_fc[0] =  IEEE80211_FC0_VERSION_0 |
+		IEEE80211_FC0_TYPE_CTL |
+		IEEE80211_FC0_SUBTYPE_ACK;
+	if (peer) {
+		qdf_mem_copy(wh_addr1->i_addr1,
+			     &peer->mac_addr.raw[0],
+			     QDF_MAC_ADDR_SIZE);
+	} else {
+		qdf_mem_copy(wh_addr1->i_addr1,
+			     &ppdu_info->nac_info.mac_addr2[0],
+			     QDF_MAC_ADDR_SIZE);
+	}
+	*(u_int16_t *)(&wh_addr1->i_dur) = qdf_cpu_to_le16(0x0000);
+	qdf_nbuf_set_pktlen(mpdu_nbuf, sizeof(*wh_addr1));
+}
+
+static void dp_gen_block_ack_frame(
+	struct mon_rx_user_status *rx_user_status,
+	struct dp_peer *peer,
+	qdf_nbuf_t mpdu_nbuf)
+{
+	struct dp_vdev *vdev = NULL;
+	struct ieee80211_ctlframe_addr2 *wh_addr2;
+	uint8_t *frm;
+
+	wh_addr2 = (struct ieee80211_ctlframe_addr2 *)
+			qdf_nbuf_data(mpdu_nbuf);
+
+	qdf_mem_zero(wh_addr2, DP_BA_ACK_FRAME_SIZE);
+
+	wh_addr2->i_fc[0] = 0;
+	wh_addr2->i_fc[1] = 0;
+	wh_addr2->i_fc[0] =  IEEE80211_FC0_VERSION_0 |
+		IEEE80211_FC0_TYPE_CTL |
+		IEEE80211_FC0_BLOCK_ACK;
+	*(u_int16_t *)(&wh_addr2->i_aidordur) = qdf_cpu_to_le16(0x0000);
+
+	vdev = peer->vdev;
+	if (vdev)
+		qdf_mem_copy(wh_addr2->i_addr2, vdev->mac_addr.raw,
+			     QDF_MAC_ADDR_SIZE);
+	qdf_mem_copy(wh_addr2->i_addr1, &peer->mac_addr.raw[0],
+		     QDF_MAC_ADDR_SIZE);
+
+	frm = (uint8_t *)&wh_addr2[1];
+	*((uint16_t *)frm) =
+		qdf_cpu_to_le16((rx_user_status->tid <<
+		DP_IEEE80211_BAR_CTL_TID_S) |
+		DP_IEEE80211_BAR_CTL_COMBA);
+	frm += 2;
+	*((uint16_t *)frm) =
+		rx_user_status->first_data_seq_ctrl;
+	frm += 2;
+	if ((rx_user_status->mpdu_cnt_fcs_ok +
+		rx_user_status->mpdu_cnt_fcs_err)
+		> DP_MAX_MPDU_64) {
+		qdf_mem_copy(frm,
+			     rx_user_status->mpdu_fcs_ok_bitmap,
+			     HAL_RX_NUM_WORDS_PER_PPDU_BITMAP *
+			     sizeof(rx_user_status->mpdu_fcs_ok_bitmap[0]));
+		frm += DP_NUM_BYTES_PER_PPDU_BITMAP;
+	} else {
+		qdf_mem_copy(frm,
+			     rx_user_status->mpdu_fcs_ok_bitmap,
+			     DP_NUM_WORDS_PER_PPDU_BITMAP_64 *
+			     sizeof(rx_user_status->mpdu_fcs_ok_bitmap[0]));
+		frm += DP_NUM_BYTES_PER_PPDU_BITMAP_64;
+	}
+	qdf_nbuf_set_pktlen(mpdu_nbuf,
+			    (frm - (uint8_t *)qdf_nbuf_data(mpdu_nbuf)));
+}
+
+/**
+ * dp_send_ack_frame_to_stack(): Function to generate BA or ACK frame and
+ * send to upper layer on received unicast frame
+ * @soc: core txrx main context
+ * @pdev: DP pdev object
+ * @ppdu_info: HAL RX PPDU info retrieved from status ring TLV
+ *
+ * return: status
+ */
+QDF_STATUS dp_send_ack_frame_to_stack(struct dp_soc *soc,
+				      struct dp_pdev *pdev,
+				      struct hal_rx_ppdu_info *ppdu_info)
+{
+	struct cdp_tx_indication_info tx_capture_info;
+	struct dp_peer *peer;
+	struct dp_ast_entry *ast_entry;
+	uint32_t peer_id;
+	struct mon_rx_status *rx_status;
+	struct mon_rx_user_status *rx_user_status;
+	uint32_t ast_index;
+	uint32_t i;
+
+	rx_status = &ppdu_info->rx_status;
+
+	if (!rx_status->rxpcu_filter_pass)
+		return QDF_STATUS_SUCCESS;
+
+	if (ppdu_info->sw_frame_group_id ==
+	    HAL_MPDU_SW_FRAME_GROUP_MGMT_BEACON)
+		return QDF_STATUS_SUCCESS;
+
+	for (i = 0; i < ppdu_info->com_info.num_users; i++) {
+		if (i > OFDMA_NUM_USERS)
+			return QDF_STATUS_E_FAULT;
+
+		rx_user_status =  &ppdu_info->rx_user_status[i];
+
+		ast_index = rx_user_status->ast_index;
+		if (ast_index >=
+		    wlan_cfg_get_max_ast_idx(soc->wlan_cfg_ctx)) {
+			set_mpdu_info(&tx_capture_info,
+				      rx_status, rx_user_status);
+			tx_capture_info.mpdu_nbuf =
+				qdf_nbuf_alloc(pdev->soc->osdev,
+					       MAX_MONITOR_HEADER +
+					       DP_BA_ACK_FRAME_SIZE,
+					       MAX_MONITOR_HEADER,
+					       4, FALSE);
+			if (!tx_capture_info.mpdu_nbuf)
+				continue;
+			dp_gen_ack_frame(ppdu_info, NULL,
+					 tx_capture_info.mpdu_nbuf);
+			dp_wdi_event_handler(WDI_EVENT_TX_DATA, pdev->soc,
+					     &tx_capture_info, HTT_INVALID_PEER,
+					     WDI_NO_VAL, pdev->pdev_id);
+			continue;
+		}
+
+		qdf_spin_lock_bh(&soc->ast_lock);
+		ast_entry = soc->ast_table[ast_index];
+		if (!ast_entry) {
+			qdf_spin_unlock_bh(&soc->ast_lock);
+			continue;
+		}
+
+		peer = ast_entry->peer;
+		if (!peer || peer->peer_ids[0] == HTT_INVALID_PEER) {
+			qdf_spin_unlock_bh(&soc->ast_lock);
+			continue;
+		}
+		peer_id = peer->peer_ids[0];
+		qdf_spin_unlock_bh(&soc->ast_lock);
+
+		peer = dp_peer_find_by_id(soc, peer_id);
+		if (!peer)
+			continue;
+
+		if (!dp_peer_or_pdev_tx_cap_enabled(pdev,
+						    peer)) {
+			dp_peer_unref_del_find_by_id(peer);
+			continue;
+		}
+
+		set_mpdu_info(&tx_capture_info,
+			      rx_status, rx_user_status);
+
+		tx_capture_info.mpdu_nbuf =
+			qdf_nbuf_alloc(pdev->soc->osdev,
+				       MAX_MONITOR_HEADER +
+				       DP_BA_ACK_FRAME_SIZE,
+				       MAX_MONITOR_HEADER,
+				       4, FALSE);
+
+		if (!tx_capture_info.mpdu_nbuf) {
+			dp_peer_unref_del_find_by_id(peer);
+			return QDF_STATUS_E_NOMEM;
+		}
+
+		if (rx_status->rs_flags & IEEE80211_AMPDU_FLAG) {
+			dp_gen_block_ack_frame(
+					       rx_user_status, peer,
+					       tx_capture_info.mpdu_nbuf);
+			tx_capture_info.mpdu_info.tid = rx_user_status->tid;
+
+		} else {
+			dp_gen_ack_frame(ppdu_info, peer,
+					 tx_capture_info.mpdu_nbuf);
+		}
+		dp_peer_unref_del_find_by_id(peer);
+		dp_wdi_event_handler(WDI_EVENT_TX_DATA, pdev->soc,
+				     &tx_capture_info, HTT_INVALID_PEER,
+				     WDI_NO_VAL, pdev->pdev_id);
+
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
 #endif

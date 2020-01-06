@@ -15,7 +15,6 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
-
 #ifndef _DP_TX_CAPTURE_H_
 #define _DP_TX_CAPTURE_H_
 
@@ -29,10 +28,13 @@ struct dp_vdev;
 struct dp_peer;
 struct dp_tx_desc_s;
 
+#define TX_CAP_HTT_MAX_FTYPE 19
+
 #define TXCAP_MAX_TYPE \
-	((IEEE80211_FC0_TYPE_CTL >> IEEE80211_FC0_TYPE_SHIFT) + 1)
+	((IEEE80211_FC0_TYPE_DATA >> IEEE80211_FC0_TYPE_SHIFT) + 1)
 #define TXCAP_MAX_SUBTYPE \
 	((IEEE80211_FC0_SUBTYPE_MASK >> IEEE80211_FC0_SUBTYPE_SHIFT) + 1)
+
 struct dp_pdev_tx_capture {
 	/* For deferred PPDU status processing */
 	qdf_spinlock_t ppdu_stats_lock;
@@ -53,8 +55,11 @@ struct dp_pdev_tx_capture {
 	qdf_event_t miss_ppdu_event;
 	uint32_t ppdu_dropped;
 	qdf_nbuf_queue_t ctl_mgmt_q[TXCAP_MAX_TYPE][TXCAP_MAX_SUBTYPE];
+	qdf_nbuf_queue_t retries_ctl_mgmt_q[TXCAP_MAX_TYPE][TXCAP_MAX_SUBTYPE];
 	qdf_spinlock_t ctl_mgmt_lock[TXCAP_MAX_TYPE][TXCAP_MAX_SUBTYPE];
 	qdf_spinlock_t config_lock;
+	uint32_t htt_frame_type[TX_CAP_HTT_MAX_FTYPE];
+	struct cdp_tx_completion_ppdu dummy_ppdu_desc;
 };
 
 /* Tx TID */
@@ -220,5 +225,35 @@ void dp_tx_ppdu_stats_process(void *context);
 void dp_ppdu_desc_deliver(struct dp_pdev *pdev,
 			  struct ppdu_info *ppdu_info);
 
+/*
+ * dp_tx_capture_htt_frame_counter: increment counter for htt_frame_type
+ * pdev: DP pdev handle
+ * htt_frame_type: htt frame type received from fw
+ *
+ * return: void
+ */
+void dp_tx_capture_htt_frame_counter(struct dp_pdev *pdev,
+				     uint32_t htt_frame_type);
+
+/*
+ * dp_print_pdev_tx_capture_stats: print tx capture stats
+ * @pdev: DP PDEV handle
+ *
+ * return: void
+ */
+void dp_print_pdev_tx_capture_stats(struct dp_pdev *pdev);
+
+/**
+ * dp_send_ack_frame_to_stack(): Function to generate BA or ACK frame and
+ * send to upper layer on received unicast frame
+ * @soc: core txrx main context
+ * @pdev: DP pdev object
+ * @ppdu_info: HAL RX PPDU info retrieved from status ring TLV
+ *
+ * return: status
+ */
+QDF_STATUS dp_send_ack_frame_to_stack(struct dp_soc *soc,
+				      struct dp_pdev *pdev,
+				      struct hal_rx_ppdu_info *ppdu_info);
 #endif
 #endif
