@@ -1355,8 +1355,8 @@ struct cdp_tx_indication_mpdu_info {
 	uint32_t tx_rate;
 	uint8_t mac_address[QDF_MAC_ADDR_SIZE];
 	uint8_t bss_mac_address[QDF_MAC_ADDR_SIZE];
-	uint32_t ppdu_start_timestamp;
-	uint32_t ppdu_end_timestamp;
+	uint64_t ppdu_start_timestamp;
+	uint64_t ppdu_end_timestamp;
 	uint32_t ba_start_seq;
 	uint32_t ba_bitmap[CDP_BA_256_BIT_MAP_SIZE_DWORDS];
 	uint16_t ppdu_cookie;
@@ -1380,6 +1380,20 @@ struct cdp_tx_indication_info {
 };
 
 /**
+ * struct cdp_tx_mgmt_comp_info - Tx mgmt comp info
+ * @ppdu_id: ppdu_id
+ * @is_sgen_pkt: payload recevied from wmi or htt path
+ * @retries_count: retries count
+ * @tx_tsf: 64 bit timestamp
+ */
+struct cdp_tx_mgmt_comp_info {
+	uint32_t ppdu_id;
+	bool is_sgen_pkt;
+	uint16_t retries_count;
+	uint64_t tx_tsf;
+};
+
+/**
  * struct cdp_tx_completion_ppdu - Tx PPDU completion information
  * @completion_status: completion status - OK/Filter/Abort/Timeout
  * @ppdu_id: PPDU Id
@@ -1388,6 +1402,10 @@ struct cdp_tx_indication_info {
  * @bar_num_users: BA response user count, based on completion common TLV
  * @num_users: Number of users
  * @pending_retries: pending MPDUs (retries)
+ * @drop_reason: drop reason from flush status
+ * @is_flush: is_flush is set based on flush tlv
+ * @flow_type: tx flow type from flush status
+ * @queue_type: queue type from flush status
  * @num_mpdu: Number of MPDUs in PPDU
  * @num_msdu: Number of MSDUs in PPDU
  * @frame_type: frame SU or MU
@@ -1421,6 +1439,10 @@ struct cdp_tx_completion_ppdu {
 	uint32_t num_users;
 	uint8_t last_usr_index;
 	uint32_t pending_retries;
+	uint32_t drop_reason;
+	uint32_t is_flush:1,
+		 flow_type:8,
+		 queue_type:8;
 	uint32_t num_mpdu:9,
 		 num_msdu:16;
 	uint16_t frame_type;
@@ -1434,9 +1456,9 @@ struct cdp_tx_completion_ppdu {
 	uint16_t phy_mode;
 	uint32_t ack_rssi;
 	uint32_t tx_duration;
-	uint32_t ppdu_start_timestamp;
-	uint32_t ppdu_end_timestamp;
-	uint32_t ack_timestamp;
+	uint64_t ppdu_start_timestamp;
+	uint64_t ppdu_end_timestamp;
+	uint64_t ack_timestamp;
 	bool delayed_ba;
 	struct cdp_tx_completion_ppdu_user user[CDP_MU_MAX_USERS];
 	qdf_nbuf_queue_t mpdu_q;
