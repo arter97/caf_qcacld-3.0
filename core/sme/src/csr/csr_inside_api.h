@@ -298,19 +298,18 @@ bool csr_is_phy_mode_match(struct mac_context *mac, uint32_t phyMode,
 			   struct csr_roam_profile *pProfile,
 			   enum csr_cfgdot11mode *pReturnCfgDot11Mode,
 			   tDot11fBeaconIEs *pIes);
-bool csr_roam_is_channel_valid(struct mac_context *mac, uint8_t ch_freq);
 
 /**
- * csr_roam_is_chan_freq_valid() - validate channel frequency
+ * csr_roam_is_channel_valid() - validate channel frequency
  * @mac: mac context
- * @freq: channel frequency
+ * @chan_freq: channel frequency
  *
  * This function validates channel frequency present in valid channel
  * list or not.
  *
  * Return: true or false
  */
-bool csr_roam_is_chan_freq_valid(struct mac_context *mac, uint32_t freq);
+bool csr_roam_is_channel_valid(struct mac_context *mac, uint32_t chan_freq);
 
 /**
  * csr_get_cfg_valid_channels() - Get valid channel frequency list
@@ -378,7 +377,7 @@ QDF_STATUS csr_roam_vdev_delete(struct mac_context *mac_ctx,
 				uint8_t vdev_id, bool cleanup);
 
 /*
- * csr_cleanup_session() - CSR api to cleanup vdev
+ * csr_cleanup_vdev_session() - CSR api to cleanup vdev
  * @mac_ctx: pointer to mac context
  * @vdev_id: vdev id to be deleted.
  *
@@ -387,7 +386,7 @@ QDF_STATUS csr_roam_vdev_delete(struct mac_context *mac_ctx,
  *
  * Return QDF_STATUS
  */
-void csr_cleanup_session(struct mac_context *mac, uint8_t vdev_id);
+void csr_cleanup_vdev_session(struct mac_context *mac, uint8_t vdev_id);
 
 QDF_STATUS csr_roam_get_session_id_from_bssid(struct mac_context *mac,
 						struct qdf_mac_addr *bssid,
@@ -568,9 +567,18 @@ void csr_release_command_buffer(struct mac_context *mac, tSmeCmd *pCommand);
 bool csr_is_profile_wapi(struct csr_roam_profile *pProfile);
 #endif /* FEATURE_WLAN_WAPI */
 
-void csr_get_vdev_type_nss(struct mac_context *mac_ctx,
-		enum QDF_OPMODE dev_mode,
-		uint8_t *nss_2g, uint8_t *nss_5g);
+/**
+ * csr_get_vdev_type_nss() - gets the nss value based on vdev type
+ * @dev_mode: current device operating mode.
+ * @nss2g: Pointer to the 2G Nss parameter.
+ * @nss5g: Pointer to the 5G Nss parameter.
+ *
+ * Fills the 2G and 5G Nss values based on device mode.
+ *
+ * Return: None
+ */
+void csr_get_vdev_type_nss(enum QDF_OPMODE dev_mode, uint8_t *nss_2g,
+			   uint8_t *nss_5g);
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_CSR
 
@@ -914,13 +922,6 @@ QDF_STATUS csr_dequeue_roam_command(struct mac_context *mac,
 				enum csr_roam_reason reason,
 				uint8_t session_id);
 void csr_init_occupied_channels_list(struct mac_context *mac, uint8_t sessionId);
-bool csr_neighbor_roam_is_new_connected_profile(struct mac_context *mac,
-						uint8_t sessionId);
-bool csr_neighbor_roam_connected_profile_match(struct mac_context *mac,
-					       uint8_t sessionId,
-					       struct tag_csrscan_result
-						*pResult,
-					       tDot11fBeaconIEs *pIes);
 
 QDF_STATUS csr_scan_create_entry_in_scan_cache(struct mac_context *mac,
 						uint32_t sessionId,
@@ -1121,16 +1122,15 @@ csr_scan_get_channel_for_hw_mode_change(
 	struct mac_context *mac_ctx, uint32_t session_id,
 	struct csr_roam_profile *profile);
 /**
- * csr_create_vdev() - API to create vdev
- * @mac_ctx: pointer to mac context
- * @vdev: vdev object
- * @session_param: Session params
+ * csr_setup_vdev_session() - API to setup vdev mac session
+ * @vdev_mlme: vdev mlme private object
+ *
+ * This API setsup the vdev session for the mac layer
  *
  * Returns: QDF_STATUS
  */
-QDF_STATUS csr_create_vdev(struct mac_context *mac,
-			   struct wlan_objmgr_vdev *vdev,
-			   struct sme_session_params *session_param);
+QDF_STATUS csr_setup_vdev_session(struct vdev_mlme_obj *vdev_mlme);
+
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_CSR
 /**

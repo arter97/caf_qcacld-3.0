@@ -535,7 +535,6 @@ enum wlan_phymode wma_chan_phy_mode(uint32_t freq, enum phy_ch_width chan_width,
 	enum wlan_phymode phymode = WLAN_PHYMODE_AUTO;
 	uint16_t bw_val = wlan_reg_get_bw_value(chan_width);
 	t_wma_handle *wma = cds_get_context(QDF_MODULE_ID_WMA);
-	uint16_t chan;
 
 	if (!wma) {
 		WMA_LOGE("%s : wma_handle is NULL", __func__);
@@ -547,7 +546,6 @@ enum wlan_phymode wma_chan_phy_mode(uint32_t freq, enum phy_ch_width chan_width,
 		return WLAN_PHYMODE_AUTO;
 	}
 
-	chan = wlan_reg_freq_to_chan(wma->pdev, freq);
 	if (wlan_reg_is_24ghz_ch_freq(freq)) {
 		if (((CH_WIDTH_5MHZ == chan_width) ||
 		     (CH_WIDTH_10MHZ == chan_width)) &&
@@ -598,7 +596,7 @@ enum wlan_phymode wma_chan_phy_mode(uint32_t freq, enum phy_ch_width chan_width,
 				break;
 			}
 		}
-	} else if (wlan_reg_is_dsrc_chan(wma->pdev, chan))
+	} else if (wlan_reg_is_dsrc_freq(freq))
 		phymode = WLAN_PHYMODE_11A;
 	else {
 		if (((CH_WIDTH_5MHZ == chan_width) ||
@@ -1073,6 +1071,32 @@ int wma_unified_csa_offload_enable(tp_wma_handle wma, uint8_t vdev_id)
 }
 #endif /* WLAN_POWER_MANAGEMENT_OFFLOAD */
 
+static uint8_t *
+wma_parse_ch_switch_wrapper_ie(uint8_t *ch_wr_ie, uint8_t sub_ele_id)
+{
+	uint8_t len = 0, sub_ele_len = 0;
+	struct ie_header *ele;
+
+	ele = (struct ie_header *)ch_wr_ie;
+	if (ele->ie_id != WLAN_ELEMID_CHAN_SWITCH_WRAP ||
+	    ele->ie_len == 0)
+		return NULL;
+
+	len = ele->ie_len;
+	ele = (struct ie_header *)(ch_wr_ie + sizeof(struct ie_header));
+
+	while (len > 0) {
+		sub_ele_len = sizeof(struct ie_header) + ele->ie_len;
+		len -= sub_ele_len;
+		if (ele->ie_id == sub_ele_id)
+			return (uint8_t *)ele;
+
+		ele = (struct ie_header *)((uint8_t *)ele + sub_ele_len);
+	}
+
+	return NULL;
+}
+
 /**
  * wma_csa_offload_handler() - CSA event handler
  * @handle: wma handle
@@ -1150,12 +1174,32 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 		csa_offload_event->new_ch_width = wb_ie->new_ch_width;
 		csa_offload_event->new_ch_freq_seg1 = wb_ie->new_ch_freq_seg1;
 		csa_offload_event->new_ch_freq_seg2 = wb_ie->new_ch_freq_seg2;
+	} else if (csa_event->ies_present_flag &
+		   WMI_CSWRAP_IE_EXTENDED_PRESENT) {
+		wb_ie = (struct ieee80211_ie_wide_bw_switch *)
+				wma_parse_ch_switch_wrapper_ie(
+				(uint8_t *)&csa_event->cswrap_ie_extended,
+				WLAN_ELEMID_WIDE_BAND_CHAN_SWITCH);
+		if (wb_ie) {
+			csa_offload_event->new_ch_width = wb_ie->new_ch_width;
+			csa_offload_event->new_ch_freq_seg1 =
+						wb_ie->new_ch_freq_seg1;
+			csa_offload_event->new_ch_freq_seg2 =
+						wb_ie->new_ch_freq_seg2;
+			csa_event->ies_present_flag |= WMI_WBW_IE_PRESENT;
+		}
 	}
 
 	csa_offload_event->ies_present_flag = csa_event->ies_present_flag;
 
 	WMA_LOGD("CSA: New Channel = %d BSSID:%pM",
 		 csa_offload_event->channel, csa_offload_event->bssId);
+	WMA_LOGD("CSA: IEs Present Flag = 0x%x new ch width = %d ch center freq1 = %d ch center freq2 = %d new op class = %d",
+		 csa_event->ies_present_flag,
+		 csa_offload_event->new_ch_width,
+		 csa_offload_event->new_ch_freq_seg1,
+		 csa_offload_event->new_ch_freq_seg2,
+		 csa_offload_event->new_op_class);
 
 	cur_chan = cds_freq_to_chan(intr[vdev_id].mhz);
 	/*
@@ -1553,6 +1597,12 @@ static void wma_print_wow_stats(t_wma_handle *wma,
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma->psoc,
 						    wake_info->vdev_id,
 						    WLAN_LEGACY_WMA_ID);
+	if (!vdev) {
+		WMA_LOGE("%s, vdev_id: %d, failed to get vdev from psoc",
+			 __func__, wake_info->vdev_id);
+		return;
+	}
+
 	ucfg_mc_cp_stats_get_vdev_wake_lock_stats(vdev, &stats);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
 	wma_wow_stats_display(&stats);
@@ -2412,7 +2462,6 @@ static int wma_wake_event_piggybacked(
 	uint32_t wake_reason;
 	uint32_t event_id;
 	uint8_t *bssid;
-	uint8_t peer_id;
 	void *peer, *pdev;
 	tpDeleteStaContext del_sta_ctx;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
@@ -2442,8 +2491,7 @@ static int wma_wake_event_piggybacked(
 			 __func__, event_param->fixed_param->vdev_id);
 		return 0;
 	}
-
-	peer = cdp_peer_find_by_addr(soc, pdev, bssid, &peer_id);
+	peer = cdp_peer_find_by_addr(soc, pdev, bssid);
 	wake_reason = event_param->fixed_param->wake_reason;
 
 	/* parse piggybacked event from param buffer */
@@ -2791,17 +2839,11 @@ static QDF_STATUS wma_set_tsm_interval(struct add_ts_param *req)
 	 *
 	 */
 	uint32_t interval_milliseconds;
-	struct cdp_pdev *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
-
-	if (!pdev) {
-		WMA_LOGE("%s: Failed to get pdev", __func__);
-		return QDF_STATUS_E_FAILURE;
-	}
 
 	interval_milliseconds = (req->tsm_interval * 1024) / 1000;
 
 	cdp_tx_set_compute_interval(cds_get_context(QDF_MODULE_ID_SOC),
-			pdev,
+			WMI_PDEV_ID_SOC,
 			interval_milliseconds);
 	return QDF_STATUS_SUCCESS;
 }
@@ -2874,25 +2916,18 @@ QDF_STATUS wma_process_tsm_stats_req(tp_wma_handle wma_handler,
 	 * than required by TSM, hence different (6) size array used
 	 */
 	uint16_t bin_values[QCA_TX_DELAY_HIST_REPORT_BINS] = { 0, };
-	struct cdp_pdev *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
-
-	if (!pdev) {
-		WMA_LOGE("%s: Failed to get pdev", __func__);
-		qdf_mem_free(pTsmStatsMsg);
-		return QDF_STATUS_E_INVAL;
-	}
 
 	/* get required values from data path APIs */
 	cdp_tx_delay(soc,
-		pdev,
+		WMI_PDEV_ID_SOC,
 		&queue_delay_microsec,
 		&tx_delay_microsec, tid);
 	cdp_tx_delay_hist(soc,
-		pdev,
+		WMI_PDEV_ID_SOC,
 		bin_values, tid);
 	cdp_tx_packet_count(soc,
-		pdev,
+		WMI_PDEV_ID_SOC,
 		&packet_count,
 		&packet_loss_count, tid);
 
@@ -2985,8 +3020,6 @@ QDF_STATUS wma_process_get_peer_info_req
 	uint16_t len;
 	wmi_buf_t buf;
 	int32_t vdev_id;
-	/* Will be removed in cleanup */
-	uint8_t sta_id;
 	struct cdp_pdev *pdev;
 	void *peer;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
@@ -3018,8 +3051,7 @@ QDF_STATUS wma_process_get_peer_info_req
 		qdf_mem_copy(peer_mac, bcast_mac, QDF_MAC_ADDR_SIZE);
 	} else {
 		/*get info for a single peer */
-		peer = cdp_peer_find_by_addr(soc, pdev,
-					     pReq->peer_mac.bytes, &sta_id);
+		peer = cdp_peer_find_by_addr(soc, pdev, pReq->peer_mac.bytes);
 		if (!peer) {
 			WMA_LOGE("%s: Failed to get peer handle using peer "
 				 QDF_MAC_ADDR_STR, __func__,
@@ -3747,7 +3779,6 @@ int wma_update_tdls_peer_state(WMA_HANDLE handle,
 	tp_wma_handle wma_handle = (tp_wma_handle) handle;
 	uint32_t i;
 	struct cdp_pdev *pdev;
-	uint8_t peer_id;
 	void *peer, *vdev;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	struct tdls_peer_params *peer_cap;
@@ -3809,8 +3840,7 @@ int wma_update_tdls_peer_state(WMA_HANDLE handle,
 
 	peer = cdp_peer_find_by_addr(soc,
 				     pdev,
-				     peer_state->peer_macaddr,
-				     &peer_id);
+				     peer_state->peer_macaddr);
 	if (!peer) {
 		WMA_LOGE("%s: Failed to get peer handle using peer mac %pM",
 				__func__, peer_state->peer_macaddr);
@@ -3856,9 +3886,8 @@ int wma_update_tdls_peer_state(WMA_HANDLE handle,
 			ret = -EINVAL;
 			goto end_tdls_peer_state;
 		}
-		cdp_peer_update_last_real_peer(soc,
-				pdev, vdev, &peer_id,
-				restore_last_peer);
+		cdp_peer_update_last_real_peer(soc, pdev, vdev,
+					       restore_last_peer);
 	}
 
 	if (TDLS_PEER_STATE_CONNECTED == peer_state->peer_state) {
@@ -5454,3 +5483,50 @@ int wma_vdev_bss_color_collision_info_handler(void *handle,
 
 	return 0;
 }
+
+#ifdef FEATURE_ANI_LEVEL_REQUEST
+int wma_get_ani_level_evt_handler(void *handle, uint8_t *event_buf,
+				  uint32_t len)
+{
+	tp_wma_handle wma = (tp_wma_handle)handle;
+	struct wmi_host_ani_level_event *ani = NULL;
+	uint32_t num_freqs = 0;
+	QDF_STATUS status;
+	struct mac_context *pmac;
+	int ret = 0;
+
+	pmac = (struct mac_context *)cds_get_context(QDF_MODULE_ID_PE);
+	if (!pmac || !wma) {
+		WMA_LOGE(FL("Invalid pmac or wma"));
+		return -EINVAL;
+	}
+
+	status = wmi_unified_extract_ani_level(wma->wmi_handle, event_buf,
+					       &ani, &num_freqs);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		WMA_LOGE("%s: Failed to extract ani level", __func__);
+		return -EINVAL;
+	}
+
+	if (!pmac->ani_params.ani_level_cb) {
+		WMA_LOGE(FL("Invalid ani_level_cb"));
+		ret = -EINVAL;
+		goto free;
+	}
+
+	pmac->ani_params.ani_level_cb(ani, num_freqs,
+				      pmac->ani_params.context);
+
+free:
+	qdf_mem_free(ani);
+	return ret;
+}
+#else
+int wma_get_ani_level_evt_handler(void *handle, uint8_t *event_buf,
+				  uint32_t len)
+{
+	return 0;
+}
+#endif
+

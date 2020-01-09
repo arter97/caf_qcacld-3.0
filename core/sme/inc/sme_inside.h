@@ -84,7 +84,7 @@ typedef struct tagSmeCmd {
 	tListElem Link;
 	eSmeCommandType command;
 	uint32_t cmd_id;
-	uint32_t sessionId;
+	uint32_t vdev_id;
 	union {
 		struct roam_cmd roamCmd;
 		struct wmstatus_changecmd wmStatusChangeCmd;
@@ -144,17 +144,6 @@ void csr_roam_wm_status_change_complete(struct mac_context *mac_ctx,
 					uint8_t session_id);
 void csr_roam_process_wm_status_change_command(struct mac_context *mac,
 		tSmeCmd *pCommand);
-/**
- * csr_process_del_vdev_command() - Post eWNI_SME_VDEV_DELETE_REQ to wma
- * @mac_ctx: global mac context
- * @sme_command: received Delete Self station request command
- *
- * This API sends the eWNI_SME_VDEV_DELETE_REQ msg to PE.
- *
- * Return: QDF_STATUS_SUCCESS or QDF_STATUS_E_FAILURE
- */
-QDF_STATUS csr_process_del_vdev_command(struct mac_context *mac_ctx,
-					tSmeCmd *sme_command);
 void csr_reinit_roam_cmd(struct mac_context *mac, tSmeCmd *pCommand);
 void csr_reinit_wm_status_change_cmd(struct mac_context *mac,
 				     tSmeCmd *pCommand);

@@ -354,6 +354,8 @@ static void mlme_init_generic_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_REMOVE_TIME_STAMP_SYNC_CMD);
 	gen->disable_4way_hs_offload =
 		cfg_get(psoc, CFG_DISABLE_4WAY_HS_OFFLOAD);
+	gen->mgmt_retry_max = cfg_get(psoc, CFG_MGMT_RETRY_MAX);
+	gen->bmiss_skip_full_scan = cfg_get(psoc, CFG_BMISS_SKIP_FULL_SCAN);
 }
 
 static void mlme_init_edca_ani_cfg(struct wlan_mlme_edca_params *edca_params)
@@ -1411,8 +1413,6 @@ static void mlme_init_sta_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_QCN_IE_SUPPORT);
 	sta->fils_max_chan_guard_time =
 		cfg_get(psoc, CFG_FILS_MAX_CHAN_GUARD_TIME);
-	sta->force_rsne_override =
-		cfg_get(psoc, CFG_FORCE_RSNE_OVERRIDE);
 	sta->single_tid =
 		cfg_get(psoc, CFG_SINGLE_TID_RC);
 	sta->sta_miracast_mcc_rest_time =
@@ -2313,6 +2313,8 @@ static void mlme_init_reg_cfg(struct wlan_objmgr_psoc *psoc,
 	reg->enable_11d_in_world_mode = cfg_get(psoc,
 						CFG_ENABLE_11D_IN_WORLD_MODE);
 	reg->scan_11d_interval = cfg_get(psoc, CFG_SCAN_11D_INTERVAL);
+	reg->enable_pending_chan_list_req = cfg_get(psoc,
+					CFG_ENABLE_PENDING_CHAN_LIST_REQ);
 	reg->ignore_fw_reg_offload_ind = cfg_get(
 						psoc,
 						CFG_IGNORE_FW_REG_OFFLOAD_IND);

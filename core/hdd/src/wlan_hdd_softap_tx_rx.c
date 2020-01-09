@@ -45,6 +45,7 @@
 #include "wlan_policy_mgr_ucfg.h"
 #include <wma_types.h>
 #include "wlan_hdd_sta_info.h"
+#include "ol_defines.h"
 
 /* Preprocessor definitions and constants */
 #undef QCA_HDD_SAP_DUMP_SK_BUFF
@@ -695,11 +696,12 @@ static void __hdd_softap_tx_timeout(struct net_device *dev)
 		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_ERROR,
 			  "Detected data stall due to continuous TX timeouts");
 		adapter->hdd_stats.tx_rx_stats.cont_txtimeout_cnt = 0;
+
 		if (cdp_cfg_get(soc, cfg_dp_enable_data_stall))
 			cdp_post_data_stall_event(soc,
 					  DATA_STALL_LOG_INDICATOR_HOST_DRIVER,
 					  DATA_STALL_LOG_HOST_SOFTAP_TX_TIMEOUT,
-					  0xFF, 0xFF,
+					  OL_TXRX_PDEV_ID, 0xFF,
 					  DATA_STALL_LOG_RECOVERY_TRIGGER_PDR);
 	}
 }
@@ -1009,7 +1011,6 @@ QDF_STATUS hdd_softap_deregister_sta(struct hdd_adapter *adapter,
 QDF_STATUS hdd_softap_register_sta(struct hdd_adapter *adapter,
 				   bool auth_required,
 				   bool privacy_required,
-				   uint8_t sta_id,
 				   struct qdf_mac_addr *sta_mac,
 				   bool wmm_enabled)
 {
@@ -1037,8 +1038,6 @@ QDF_STATUS hdd_softap_register_sta(struct hdd_adapter *adapter,
 		hdd_softap_deregister_sta(adapter, sta_info);
 	}
 
-	/* Get the Station ID from the one saved during the association. */
-	txrx_desc.sta_id = sta_id;
 	/*
 	 * If the address is a broadcast address, then provide the self mac addr
 	 * to the data path. Else provide the mac address of the connected peer.
@@ -1086,7 +1085,6 @@ QDF_STATUS hdd_softap_register_sta(struct hdd_adapter *adapter,
 	cdp_vdev_register(soc,
 			  txrx_vdev,
 			  adapter,
-			  (struct cdp_ctrl_objmgr_vdev *)adapter->vdev,
 			  &txrx_ops);
 	adapter->txrx_vdev = cdp_get_vdev_from_vdev_id(soc,
 					(struct cdp_pdev *)pdev,
@@ -1172,7 +1170,7 @@ QDF_STATUS hdd_softap_register_bc_sta(struct hdd_adapter *adapter,
 	}
 
 	qdf_status = hdd_softap_register_sta(adapter, false,
-					     privacy_required, sta_id,
+					     privacy_required,
 					     &broadcast_macaddr, 0);
 
 	return qdf_status;

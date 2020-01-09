@@ -2117,7 +2117,7 @@ wlan_mlme_get_mcc_feature(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS wlan_mlme_get_rrm_enabled(struct wlan_objmgr_psoc *psoc,
 				     bool *value);
 
-/*
+/**
  * wlan_mlme_get_dtim_selection_diversity() - get dtim selection diversity
  * bitmap
  * @psoc: pointer to psoc object
@@ -2193,7 +2193,7 @@ QDF_STATUS wlan_mlme_override_bmps_imps(struct wlan_objmgr_psoc *psoc);
 QDF_STATUS wlan_mlme_is_imps_enabled(struct wlan_objmgr_psoc *psoc,
 				     bool *value);
 
-/*
+/**
  * wlan_mlme_get_wps_uuid() - get the wps uuid string
  * @wps_params:   pointer to mlme wps parameters structure
  * @data:          data to which the parameter is to be copied
@@ -2204,7 +2204,7 @@ QDF_STATUS wlan_mlme_is_imps_enabled(struct wlan_objmgr_psoc *psoc,
 void
 wlan_mlme_get_wps_uuid(struct wlan_mlme_wps_params *wps_params, uint8_t *data);
 
-/*
+/**
  * wlan_mlme_get_self_gen_frm_pwr() - get self gen frm pwr
  * @psoc: pointer to psoc object
  * @val:  Pointer to the value which will be filled for the caller
@@ -2215,7 +2215,7 @@ QDF_STATUS
 wlan_mlme_get_self_gen_frm_pwr(struct wlan_objmgr_psoc *psoc,
 			       uint32_t *value);
 
-/*
+/**
  * wlan_mlme_get_4way_hs_offload() - get 4-way hs offload to fw cfg
  * @psoc: pointer to psoc object
  * @val:  Pointer to the value which will be filled for the caller
@@ -2224,6 +2224,18 @@ wlan_mlme_get_self_gen_frm_pwr(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS
 wlan_mlme_get_4way_hs_offload(struct wlan_objmgr_psoc *psoc, bool *value);
+
+/**
+ * wlan_mlme_get_bmiss_skip_full_scan_value() - To get value of
+ * bmiss_skip_full_scan ini
+ * @psoc: pointer to psoc object
+ * @val:  Pointer to the value which will be filled for the caller
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_get_bmiss_skip_full_scan_value(struct wlan_objmgr_psoc *psoc,
+					 bool *value);
 
 /**
  * mlme_get_peer_phymode() - get phymode of peer
@@ -2258,4 +2270,53 @@ QDF_STATUS mlme_set_tgt_wpa3_roam_cap(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 wlan_mlme_get_ignore_fw_reg_offload_ind(struct wlan_objmgr_psoc *psoc,
 					bool *disabled);
+
+/**
+ * mlme_get_roam_trigger_str() - Get the string for enum
+ * WMI_ROAM_TRIGGER_REASON_ID reason.
+ * @roam_scan_trigger: roam scan trigger ID
+ *
+ *  Return: Meaningful string from enum WMI_ROAM_TRIGGER_REASON_ID
+ */
+char *mlme_get_roam_trigger_str(uint32_t roam_scan_trigger);
+
+/**
+ * mlme_get_converted_timestamp() - Return time of the day
+ * from timestamp
+ * @timestamp:    Timestamp value in milliseconds
+ * @time:         Output buffer to fill time into
+ *
+ * Return: Time of the day in [HH:MM:SS.uS]
+ */
+void mlme_get_converted_timestamp(uint32_t timestamp, char *time);
+
+/**
+ * mlme_get_roam_fail_reason_str() - Get fail string from enum
+ * WMI_ROAM_FAIL_REASON_ID
+ * @result:   Roam fail reason
+ *
+ * Return: Meaningful string from enum
+ */
+char *mlme_get_roam_fail_reason_str(uint32_t result);
+
+/**
+ * mlme_get_sub_reason_str() - Get roam trigger sub reason from enum
+ * WMI_ROAM_TRIGGER_SUB_REASON_ID
+ * @sub_reason: Sub reason value
+ *
+ * Return: Meaningful string from enum WMI_ROAM_TRIGGER_SUB_REASON_ID
+ */
+char *mlme_get_sub_reason_str(uint32_t sub_reason);
+
+/**
+ * wlan_mlme_get_mgmt_max_retry() - Get the
+ * max mgmt retry
+ * @psoc: pointer to psoc object
+ * @max_retry: output pointer to hold user config
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_get_mgmt_max_retry(struct wlan_objmgr_psoc *psoc,
+			     uint8_t *max_retry);
 #endif /* _WLAN_MLME_API_H_ */

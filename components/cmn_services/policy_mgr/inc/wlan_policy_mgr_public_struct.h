@@ -568,6 +568,16 @@ enum policy_mgr_one_connection_mode {
  *			1x1
  * @PM_SAP_SAP_DBS_2x2: SAP & SAP connection on DBS using 2x2
  * @PM_SAP_SAP_SBS_5_1x1: SAP & SAP connection on 5G SBS using 1x1
+ * @PM_SAP_NAN_DISC_SCC_24_1x1: SAP & NAN connection on
+ *			SCC using 1x1@2.4 Ghz
+ * @PM_SAP_NAN_DISC_SCC_24_2x2: SAP & NAN connection on
+ *			SCC using 2x2@2.4 Ghz
+ * @PM_SAP_NAN_DISC_MCC_24_1x1: SAP & NAN connection on
+ *			MCC using 1x1@2.4 Ghz
+ * @PM_SAP_NAN_DISC_MCC_24_2x2: SAP & NAN connection on
+ *			SCC using 2x2@2.4 Ghz
+ * @PM_SAP_NAN_DISC_DBS_1x1: SAP & NAN connection on DBS using 1x1
+ * @PM_SAP_NAN_DISC_DBS_2x2: SAP & NAN connection on DBS using 2x2
  * @PM_STA_STA_SCC_24_1x1: STA & STA connection on
  *			SCC using 1x1@2.4 Ghz
  * @PM_STA_STA_SCC_24_2x2: STA & STA connection on
@@ -715,6 +725,12 @@ enum policy_mgr_two_connection_mode {
 	PM_SAP_SAP_DBS_1x1,
 	PM_SAP_SAP_DBS_2x2,
 	PM_SAP_SAP_SBS_5_1x1,
+	PM_SAP_NAN_DISC_SCC_24_1x1,
+	PM_SAP_NAN_DISC_SCC_24_2x2,
+	PM_SAP_NAN_DISC_MCC_24_1x1,
+	PM_SAP_NAN_DISC_MCC_24_2x2,
+	PM_SAP_NAN_DISC_DBS_1x1,
+	PM_SAP_NAN_DISC_DBS_2x2,
 	PM_STA_STA_SCC_24_1x1,
 	PM_STA_STA_SCC_24_2x2,
 	PM_STA_STA_MCC_24_1x1,
@@ -769,12 +785,21 @@ enum policy_mgr_two_connection_mode {
  * STA on 5G
  * @PM_STA_SAP_SCC_5_STA_24_DBS: STA & SAP connection on 5 Ghz SCC, another
  * STA on 2.4 G
+ * @PM_NAN_DISC_SAP_SCC_24_NDI_5_DBS: NAN_DISC & SAP connection on 2.4 Ghz SCC,
+ * NDI/NDP on 5 G
+ * @PM_NAN_DISC_NDI_SCC_24_SAP_5_DBS: NAN_DISC & NDI/NDP connection on 2.4 Ghz
+ * SCC, SAP on 5 G
+ * @PM_SAP_NDI_SCC_5_NAN_DISC_24_DBS: SAP & NDI/NDP connection on 5 Ghz,
+ * NAN_DISC on 24 Ghz
  */
 enum policy_mgr_three_connection_mode {
 	PM_STA_SAP_SCC_24_SAP_5_DBS,
 	PM_STA_SAP_SCC_5_SAP_24_DBS,
 	PM_STA_SAP_SCC_24_STA_5_DBS,
 	PM_STA_SAP_SCC_5_STA_24_DBS,
+	PM_NAN_DISC_SAP_SCC_24_NDI_5_DBS,
+	PM_NAN_DISC_NDI_SCC_24_SAP_5_DBS,
+	PM_SAP_NDI_SCC_5_NAN_DISC_24_DBS,
 
 	PM_MAX_THREE_CONNECTION_MODE
 };
@@ -988,6 +1013,7 @@ enum dbs_support {
  * @original_nss: nss negotiated at connection time
  * @vdev_id: vdev id of the connection
  * @in_use: if the table entry is active
+ * @ch_flagext: Channel extension flags.
  */
 struct policy_mgr_conc_connection_info {
 	enum policy_mgr_con_mode mode;
@@ -998,6 +1024,7 @@ struct policy_mgr_conc_connection_info {
 	uint32_t      original_nss;
 	uint32_t      vdev_id;
 	bool          in_use;
+	uint16_t      ch_flagext;
 };
 
 /**
@@ -1109,6 +1136,7 @@ struct policy_mgr_pcl_chan_weights {
  * @mhz: channel frequency in MHz
  * @chan_width: channel bandwidth
  * @mac_id: the mac on which vdev is on
+ * @ch_flagext: Channel extension flags.
  */
 struct policy_mgr_vdev_entry_info {
 	uint32_t type;
@@ -1116,6 +1144,7 @@ struct policy_mgr_vdev_entry_info {
 	uint32_t mhz;
 	uint32_t chan_width;
 	uint32_t mac_id;
+	uint16_t ch_flagext;
 };
 
 /**
@@ -1179,10 +1208,12 @@ struct policy_mgr_user_cfg {
  * struct dbs_nss - Number of spatial streams in DBS mode
  * @mac0_ss: Number of spatial streams on MAC0
  * @mac1_ss: Number of spatial streams on MAC1
+ * @single_mac0_band_cap: Mac0 band capability for single mac hw mode
  */
 struct dbs_nss {
 	enum hw_mode_ss_config mac0_ss;
 	enum hw_mode_ss_config mac1_ss;
+	uint32_t single_mac0_band_cap;
 };
 
 /**

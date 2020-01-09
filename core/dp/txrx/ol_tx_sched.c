@@ -427,7 +427,7 @@ ol_tx_sched_init_rr(
 }
 
 void
-ol_txrx_set_wmm_param(struct cdp_pdev *data_pdev,
+ol_txrx_set_wmm_param(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 		      struct ol_tx_wmm_param_t wmm_param)
 {
 	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO_LOW,
@@ -1108,10 +1108,12 @@ ol_tx_sched_init_wrr_adv(
  * settings of the scheduler, ie. VO, VI, BE, or BK.
  */
 void
-ol_txrx_set_wmm_param(struct cdp_pdev *pdev,
+ol_txrx_set_wmm_param(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 		      struct ol_tx_wmm_param_t wmm_param)
 {
-	struct ol_txrx_pdev_t *data_pdev = (struct ol_txrx_pdev_t *)pdev;
+	struct ol_txrx_soc_t *soc = cdp_soc_t_to_ol_txrx_soc_t(soc_hdl);
+	ol_txrx_pdev_handle data_pdev =
+				ol_txrx_get_pdev_from_pdev_id(soc, pdev_id);
 	struct ol_tx_sched_wrr_adv_t def_cfg;
 	struct ol_tx_sched_wrr_adv_t *scheduler =
 					data_pdev->tx_sched.scheduler;
@@ -1524,6 +1526,13 @@ ol_tx_sched(struct ol_txrx_pdev_t *pdev)
 				  qdf_atomic_read(&pdev->target_tx_credit) -
 				  num_credits);
 #endif
+			DPTRACE(qdf_dp_trace_credit_record(QDF_TX_SCHED,
+				QDF_CREDIT_DEC, num_credits,
+				qdf_atomic_read(&pdev->target_tx_credit) -
+				num_credits,
+				qdf_atomic_read(&pdev->txq_grps[0].credit),
+				qdf_atomic_read(&pdev->txq_grps[1].credit)));
+
 			qdf_atomic_add(-num_credits, &pdev->target_tx_credit);
 		}
 		qdf_spin_unlock_bh(&pdev->tx_queue_spinlock);

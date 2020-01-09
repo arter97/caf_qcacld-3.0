@@ -660,7 +660,7 @@ static int drv_cmd_set_ibss_beacon_oui_data(struct hdd_adapter *adapter,
 	qdf_copy_macaddr(&modify_ie.bssid,
 		     roam_profile->BSSIDs.bssid);
 
-	modify_ie.smeSessionId = adapter->vdev_id;
+	modify_ie.vdev_id = adapter->vdev_id;
 	modify_ie.notify = true;
 	modify_ie.ieID = WLAN_ELEMID_VENDOR;
 	modify_ie.ieIDLen = ibss_ie_length;
@@ -7145,7 +7145,9 @@ static int drv_cmd_set_channel_switch(struct hdd_adapter *adapter,
 
 	wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc, adapter->vdev_id,
 				    CSA_REASON_USER_INITIATED);
-	status = hdd_softap_set_channel_change(dev, chan_number, width, true);
+	status = hdd_softap_set_channel_change(dev,
+					       wlan_reg_legacy_chan_to_freq(hdd_ctx->pdev, chan_number),
+					       width, true);
 	if (status) {
 		hdd_err("Set channel change fail");
 		return status;
@@ -7560,6 +7562,175 @@ static int drv_cmd_get_disable_chan_list(struct hdd_adapter *adapter,
 	return 0;
 }
 #endif
+
+#ifdef FEATURE_ANI_LEVEL_REQUEST
+static int drv_cmd_get_ani_level(struct hdd_adapter *adapter,
+				 struct hdd_context *hdd_ctx,
+				 uint8_t *command,
+				 uint8_t command_len,
+				 struct hdd_priv_data *priv_data)
+{
+	char *extra;
+	int copied_length = 0, j, temp_int, ret = 0;
+	uint8_t *param, num_freqs, num_recv_channels;
+	uint32_t parsed_freqs[MAX_NUM_FREQS_FOR_ANI_LEVEL];
+	struct wmi_host_ani_level_event ani[MAX_NUM_FREQS_FOR_ANI_LEVEL];
+	size_t user_size = priv_data->total_len;
+
+	hdd_debug("Received Command to get ANI level");
+
+	param = strnchr(command, strlen(command), ' ');
+
+	/* No argument after the command */
+	if (!param)
+		return -EINVAL;
+
+	/* No space after the command */
+	else if (SPACE_ASCII_VALUE != *param)
+		return -EINVAL;
+
+	param++;
+
+	/* Removing empty spaces*/
+	while ((SPACE_ASCII_VALUE  == *param) && ('\0' !=  *param))
+		param++;
+
+	/*no argument followed by spaces */
+	if ('\0' == *param)
+		return -EINVAL;
+
+	/* Getting the first argument ie the number of channels */
+	if (sscanf(param, "%d ", &temp_int) != 1) {
+		hdd_err("Cannot get number of freq from input");
+		return -EINVAL;
+	}
+
+	if (temp_int < 0 || temp_int > MAX_NUM_FREQS_FOR_ANI_LEVEL) {
+		hdd_err("Invalid Number of channel received");
+		return -EINVAL;
+	}
+
+	hdd_debug("Number of freq to fetch ANI level are: %d", temp_int);
+
+	if (!temp_int)
+		return 0;
+
+	num_freqs = temp_int;
+
+	for (j = 0; j < num_freqs; j++) {
+		/*
+		 * Param pointing to the beginning of first space
+		 * after number of channels.
+		 */
+		param = strpbrk(param, " ");
+		/*no channel list after the number of channels argument*/
+		if (!param) {
+			hdd_err("Invalid No of freq provided in the list");
+			ret = -EINVAL;
+			goto parse_failed;
+		}
+
+		param++;
+
+		/* Removing empty space */
+		while ((SPACE_ASCII_VALUE == *param) && ('\0' != *param))
+			param++;
+
+		if ('\0' == *param) {
+			hdd_err("No freq is provided in the list");
+			ret = -EINVAL;
+			goto parse_failed;
+		}
+
+		if (sscanf(param, "%d ", &temp_int) != 1) {
+			hdd_err("Cannot read freq number");
+			ret = -EINVAL;
+			goto parse_failed;
+		}
+
+		hdd_debug("channel_freq[%d] = %d", j, temp_int);
+		parsed_freqs[j] = temp_int;
+	}
+
+	/* Extra arguments check */
+	param = strpbrk(param, " ");
+	if (param) {
+		while ((SPACE_ASCII_VALUE == *param) && ('\0' != *param))
+			param++;
+
+		if ('\0' !=  *param) {
+			hdd_err("Invalid argument received");
+			ret = -EINVAL;
+			goto parse_failed;
+		}
+	}
+
+	qdf_mem_zero(ani, sizeof(ani));
+	hdd_debug("num_freq: %d", num_freqs);
+	if (QDF_IS_STATUS_ERROR(wlan_hdd_get_ani_level(adapter, ani,
+						       parsed_freqs,
+						       num_freqs))) {
+		hdd_err("Unable to retrieve ani level");
+		return -EINVAL;
+	}
+
+	extra = qdf_mem_malloc(user_size);
+	if (!extra) {
+		hdd_err("memory allocation failed");
+		ret = -ENOMEM;
+		goto parse_failed;
+	}
+
+	/*
+	 * Find the number of channels that are populated. If freq is not
+	 * filled then stop count there
+	 */
+	for (num_recv_channels = 0;
+	     (num_recv_channels < num_freqs &&
+	     ani[num_recv_channels].chan_freq); num_recv_channels++)
+		;
+
+	for (j = 0; j < num_recv_channels; j++) {
+		/* Sanity check for ANI level validity */
+		if (ani[j].ani_level > MAX_ANI_LEVEL)
+			continue;
+
+		copied_length += scnprintf(extra + copied_length,
+					   user_size - copied_length, "%d:%d\n",
+					   ani[j].chan_freq, ani[j].ani_level);
+	}
+
+	if (copied_length == 0) {
+		hdd_err("ANI level not fetched");
+		ret = -EINVAL;
+		goto free;
+	}
+
+	hdd_debug("data: %s", extra);
+
+	if (copy_to_user(priv_data->buf, extra, copied_length + 1)) {
+		hdd_err("failed to copy data to user buffer");
+		ret = -EFAULT;
+		goto free;
+	}
+
+free:
+	qdf_mem_free(extra);
+
+parse_failed:
+	return ret;
+}
+
+#else
+static int drv_cmd_get_ani_level(struct hdd_adapter *adapter,
+				 struct hdd_context *hdd_ctx,
+				 uint8_t *command,
+				 uint8_t command_len,
+				 struct hdd_priv_data *priv_data)
+{
+	return 0;
+}
+#endif
 /*
  * The following table contains all supported WLAN HDD
  * IOCTL driver commands and the handler for each of them.
@@ -7677,6 +7848,7 @@ static const struct hdd_drv_cmd hdd_drv_cmds[] = {
 	{"GETANTENNAMODE",            drv_cmd_get_antenna_mode, false},
 	{"SET_DISABLE_CHANNEL_LIST",  drv_cmd_set_disable_chan_list, true},
 	{"GET_DISABLE_CHANNEL_LIST",  drv_cmd_get_disable_chan_list, false},
+	{"GET_ANI_LEVEL",             drv_cmd_get_ani_level, false},
 	{"STOP",                      drv_cmd_dummy, false},
 	/* Deprecated commands */
 	{"RXFILTER-START",            drv_cmd_dummy, false},

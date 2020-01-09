@@ -333,7 +333,6 @@ lim_process_ext_channel_switch_action_frame(struct mac_context *mac_ctx,
 	tDot11fext_channel_switch_action_frame *ext_channel_switch_frame;
 	uint32_t                frame_len;
 	uint32_t                status;
-	uint8_t                 target_channel;
 	uint32_t                target_freq;
 
 	hdr = WMA_GET_RX_MAC_HEADER(rx_packet_info);
@@ -361,9 +360,20 @@ lim_process_ext_channel_switch_action_frame(struct mac_context *mac_ctx,
 		  status, frame_len);
 	}
 
-	target_channel =
-	 ext_channel_switch_frame->ext_chan_switch_ann_action.new_channel;
-	target_freq = wlan_reg_chan_to_freq(mac_ctx->pdev, target_channel);
+	if (!wlan_reg_is_6ghz_supported(mac_ctx->pdev) &&
+	    (wlan_reg_is_6ghz_op_class(mac_ctx->pdev,
+				       ext_channel_switch_frame->
+				       ext_chan_switch_ann_action.op_class))) {
+		pe_err("channel belongs to 6 ghz spectrum, abort");
+		qdf_mem_free(ext_channel_switch_frame);
+		return;
+	}
+
+	target_freq =
+		wlan_reg_chan_opclass_to_freq(ext_channel_switch_frame->ext_chan_switch_ann_action.new_channel,
+					      ext_channel_switch_frame->ext_chan_switch_ann_action.op_class,
+					      false);
+
 	/* Free ext_channel_switch_frame here as its no longer needed */
 	qdf_mem_free(ext_channel_switch_frame);
 	/*
@@ -372,13 +382,13 @@ lim_process_ext_channel_switch_action_frame(struct mac_context *mac_ctx,
 	 * and no concurrent session is running.
 	 */
 	if (!(session_entry->curr_op_freq != target_freq &&
-	      ((wlan_reg_get_channel_state(mac_ctx->pdev, target_channel) ==
+	      ((wlan_reg_get_channel_state_for_freq(mac_ctx->pdev, target_freq) ==
 		  CHANNEL_STATE_ENABLE) ||
-	       (wlan_reg_get_channel_state(mac_ctx->pdev, target_channel) ==
+	       (wlan_reg_get_channel_state_for_freq(mac_ctx->pdev, target_freq) ==
 		  CHANNEL_STATE_DFS &&
 		!policy_mgr_concurrent_open_sessions_running(
 			mac_ctx->psoc))))) {
-		pe_err("Channel: %d is not valid", target_channel);
+		pe_err("Channel freq: %d is not valid", target_freq);
 		return;
 	}
 
@@ -397,7 +407,7 @@ lim_process_ext_channel_switch_action_frame(struct mac_context *mac_ctx,
 		/* No need to extract op mode as BW will be decided in
 		 *  in SAP FSM depending on previous BW.
 		 */
-		ext_cng_chan_ind->new_channel = target_channel;
+		ext_cng_chan_ind->new_chan_freq = target_freq;
 
 		mmh_msg.type = eWNI_SME_EXT_CHANGE_CHANNEL_IND;
 		mmh_msg.bodyptr = ext_cng_chan_ind;
@@ -1392,6 +1402,7 @@ __lim_process_neighbor_report(struct mac_context *mac, uint8_t *pRxPacketInfo,
 		pe_debug("There were warnings while unpacking a Neighbor report response (0x%08x, %d bytes):",
 			nStatus, frameLen);
 	}
+
 	/* Call rrm function to handle the request. */
 	rrm_process_neighbor_report_response(mac, pFrm, pe_session);
 
@@ -1624,7 +1635,6 @@ static void lim_process_addba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 	tDot11faddba_req *addba_req;
 	uint32_t frame_len, status;
 	QDF_STATUS qdf_status;
-	uint8_t peer_id;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	void *peer, *pdev;
 
@@ -1658,7 +1668,7 @@ static void lim_process_addba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 			status, frame_len);
 	}
 
-	peer = cdp_peer_get_ref_by_addr(soc, pdev, mac_hdr->sa, &peer_id,
+	peer = cdp_peer_get_ref_by_addr(soc, pdev, mac_hdr->sa,
 					PEER_DEBUG_ID_WMA_ADDBA_REQ);
 	if (!peer) {
 		pe_err("PEER [%pM] not found", mac_hdr->sa);
@@ -1672,16 +1682,24 @@ static void lim_process_addba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 			addba_req->addba_param_set.buff_size,
 			addba_req->ba_start_seq_ctrl.ssn);
 
-	cdp_peer_release_ref(soc, peer, PEER_DEBUG_ID_WMA_ADDBA_REQ);
-
 	if (QDF_STATUS_SUCCESS == qdf_status) {
-		lim_send_addba_response_frame(mac_ctx, mac_hdr->sa,
-			addba_req->addba_param_set.tid, session,
+		qdf_status = lim_send_addba_response_frame(mac_ctx,
+			mac_hdr->sa,
+			addba_req->addba_param_set.tid,
+			session,
 			addba_req->addba_extn_element.present,
 			addba_req->addba_param_set.amsdu_supp);
+		if (qdf_status != QDF_STATUS_SUCCESS) {
+			pe_err("Failed to send addba response frame");
+			cdp_addba_resp_tx_completion(soc, peer,
+				addba_req->addba_param_set.tid,
+				WMI_MGMT_TX_COMP_TYPE_DISCARD);
+		}
 	} else {
-		pe_err("Failed to process addba request");
+		pe_err_rl("Failed to process addba request");
 	}
+
+	cdp_peer_release_ref(soc, peer, PEER_DEBUG_ID_WMA_ADDBA_REQ);
 
 error:
 	qdf_mem_free(addba_req);
@@ -1706,7 +1724,6 @@ static void lim_process_delba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 	tDot11fdelba_req *delba_req;
 	uint32_t frame_len, status;
 	QDF_STATUS qdf_status;
-	uint8_t peer_id;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	void *peer, *pdev;
 
@@ -1740,7 +1757,7 @@ static void lim_process_delba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 			status, frame_len);
 	}
 
-	peer = cdp_peer_get_ref_by_addr(soc, pdev, mac_hdr->sa, &peer_id,
+	peer = cdp_peer_get_ref_by_addr(soc, pdev, mac_hdr->sa,
 					PEER_DEBUG_ID_WMA_DELBA_REQ);
 	if (!peer) {
 		pe_err("PEER [%pM] not found", mac_hdr->sa);

@@ -210,18 +210,10 @@ struct sme_5g_band_pref_params {
 
 /**
  * struct sme_session_params: Session creation params passed by HDD layer
- * @session_open_cb: callback to be registered with SME for opening the session
- * @session_close_cb: callback to be registered with SME for closing the session
- * @callback: callback to be invoked for roaming events
  * @vdev: pointer to vdev object
- * @callback_ctx: user-supplied context to be passed back on roaming events
  */
 struct sme_session_params {
-	csr_session_open_cb  session_open_cb;
-	csr_session_close_cb session_close_cb;
-	csr_roam_complete_cb callback;
 	struct wlan_objmgr_vdev *vdev;
-	void *callback_ctx;
 };
 
 #define MAX_CANDIDATE_INFO 10
@@ -365,34 +357,43 @@ sme_nss_chains_update(mac_handle_t mac_handle,
 		      uint8_t vdev_id);
 
 /**
- * sme_create_vdev() - Create vdev for given persona
+ * sme_vdev_create() - Create vdev for given persona
  * @mac_handle: The handle returned by mac_open
- * @params: to initialize the session open params
+ * @vdev_params: params required for vdev creation
  *
- * This is a synchronous API. For any protocol stack related activity
- * requires vdev to be created. This API needs to be called to create
- * vdev in SME module.
+ * This API will create the object manager vdev and in the same
+ * context vdev mlme object manager notification is invoked, which
+ * will send the vdev create to the firmware.
  *
- * Return: QDF_STATUS_SUCCESS - vdev is created
- * Other status means SME is failed to create vdev
+ * If the vdev creation is successful the following object is referenced
+ * by below modules:
+ * 1) WLAN_OBJMGR_ID
+ * 2) WLAN_LEGACY_SME_ID
+ * 3) WLAN_LEGACY_WMA_ID
+ *
+ * Return: Newly created Vdev object or NULL incase in any error
  */
-QDF_STATUS sme_create_vdev(mac_handle_t mac_handle,
-			   struct sme_session_params *params);
+struct wlan_objmgr_vdev *sme_vdev_create(mac_handle_t mac_handle,
+				  struct wlan_vdev_create_params *vdev_params);
+
 
 /**
  * sme_vdev_delete() - Delete vdev for given id
+ * @mac_handle: The handle returned by mac_open.
+ * @vdev: VDEV Object
  *
  * This is a synchronous API. This API needs to be called to delete vdev
  * in SME module before terminating the session completely.
  *
- * mac_handle: The handle returned by mac_open.
- * vdev_id: A previous created vdev id.
+ * The following modules releases their reference to the vdev object:
+ * 1) WLAN_LEGACY_WMA_ID
+ * 2) WLAN_LEGACY_SME_ID
  *
- * Return:
- * QDF_STATUS_SUCCESS - vdev is deleted.
- * Other status means SME is failed to delete vdev.
+ * Return: QDF_STATUS_SUCCESS - vdev is deleted.
+ *         QDF_STATUS_E_INVAL when failed to delete vdev.
  */
-QDF_STATUS sme_vdev_delete(mac_handle_t mac_handle, uint8_t vdev_id);
+QDF_STATUS sme_vdev_delete(mac_handle_t mac_handle,
+			   struct wlan_objmgr_vdev *vdev);
 
 /**
  * sme_cleanup_session() -  clean up sme session info for vdev
@@ -772,15 +773,34 @@ uint16_t sme_check_concurrent_channel_overlap(mac_handle_t mac_handle,
 					      eCsrPhyMode sapPhyMode,
 					      uint8_t cc_switch_mode);
 #endif
-QDF_STATUS sme_get_cfg_valid_channels(uint8_t *aValidChannels,
-		uint32_t *len);
+
+/**
+ * sme_get_cfg_valid_channels() - To get valid channel list
+ * @valid_ch_freq: pointer to array which save the valid channel list
+ * @len: the length of the valid channel list
+ *
+ * Return: QDF status
+ */
+QDF_STATUS sme_get_cfg_valid_channels(uint32_t *valid_ch_freq, uint32_t *len);
+
 #ifdef WLAN_FEATURE_PACKET_FILTERING
 QDF_STATUS sme_8023_multicast_list(mac_handle_t mac_handle, uint8_t sessionId,
 		tpSirRcvFltMcAddrList pMulticastAddrs);
 #endif /* WLAN_FEATURE_PACKET_FILTERING */
-bool sme_is_channel_valid(mac_handle_t mac_handle, uint8_t channel);
 uint16_t sme_chn_to_freq(uint8_t chanNum);
-bool sme_is_channel_valid(mac_handle_t mac_handle, uint8_t channel);
+
+/*
+ * sme_is_channel_valid() - validate a channel against current regdmn
+ * To check if the channel is valid for currently established domain
+ *   This is a synchronous API.
+ *
+ * mac_handle - The handle returned by mac_open.
+ * chan_freq - channel to verify
+ *
+ * Return: true/false, true if channel is valid
+ */
+bool sme_is_channel_valid(mac_handle_t mac_handle, uint32_t chan_freq);
+
 QDF_STATUS sme_set_max_tx_power(mac_handle_t mac_handle,
 				struct qdf_mac_addr pBssid,
 				struct qdf_mac_addr pSelfMacAddress, int8_t dB);
@@ -1169,7 +1189,19 @@ QDF_STATUS sme_notify_ht2040_mode(mac_handle_t mac_handle,
 QDF_STATUS sme_set_ht2040_mode(mac_handle_t mac_handle, uint8_t sessionId,
 			       uint8_t channel_type, bool obssEnabled);
 #endif
-QDF_STATUS sme_get_reg_info(mac_handle_t mac_handle, uint8_t chanId,
+
+/**
+ * sme_get_reg_info() - To get tx power information
+ * @mac_handle: Opaque handle to the global MAC context
+ * @chan_freq: channel freq
+ * @regInfo1: first reg info to fill
+ * @regInfo2: second reg info to fill
+ *
+ * This routine will give you tx power information
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_get_reg_info(mac_handle_t mac_handle, uint32_t chan_freq,
 			    uint32_t *regInfo1, uint32_t *regInfo2);
 
 #ifdef FEATURE_WLAN_CH_AVOID
@@ -1346,10 +1378,21 @@ QDF_STATUS sme_update_dfs_scan_mode(mac_handle_t mac_handle,
 		uint8_t allowDFSChannelRoam);
 uint8_t sme_get_dfs_scan_mode(mac_handle_t mac_handle);
 
+/**
+ * sme_get_valid_channels_by_band() - to fetch valid channels filtered by band
+ * @mac_handle: Opaque handle to the global MAC context
+ * @wifi_band: RF band information
+ * @valid_chan_list: output array to store channel info
+ * @valid_chan_len: output number of channels
+ *
+ *  SME API to fetch all valid channels filtered by band
+ *
+ *  Return: QDF_STATUS
+ */
 QDF_STATUS sme_get_valid_channels_by_band(mac_handle_t mac_handle,
-					  uint8_t wifiBand,
-					  uint32_t *aValidChannels,
-					  uint8_t *pNumChannels);
+					  uint8_t wifi_band,
+					  uint32_t *valid_chan_list,
+					  uint8_t *valid_chan_len);
 
 #ifdef FEATURE_WLAN_EXTSCAN
 /**
@@ -1489,6 +1532,14 @@ QDF_STATUS sme_ext_scan_register_callback(mac_handle_t mac_handle,
 }
 #endif /* FEATURE_WLAN_EXTSCAN */
 QDF_STATUS sme_abort_roam_scan(mac_handle_t mac_handle, uint8_t sessionId);
+
+/**
+ * sme_get_vht_ch_width() - SME API to get the max supported FW chan width
+ *
+ * Return: Max channel width supported by FW (eg. 20, 40, 80, 160, 80+80)
+ */
+uint32_t sme_get_vht_ch_width(void);
+
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS
 QDF_STATUS sme_ll_stats_clear_req(mac_handle_t mac_handle,
 		tSirLLStatsClearReq * pclearStatsReq);
@@ -3835,12 +3886,6 @@ QDF_STATUS sme_register_bcn_recv_pause_ind_cb(mac_handle_t mac_handle,
 QDF_STATUS sme_set_disconnect_ies(mac_handle_t mac_handle, uint8_t vdev_id,
 				  uint8_t *ie_data, uint16_t ie_len);
 
-void sme_freq_to_chan_list(
-			struct wlan_objmgr_pdev *pdev,
-			uint8_t *chan_list,
-			uint32_t *freq_list,
-			uint32_t chan_list_len);
-
 void sme_chan_to_freq_list(
 			struct wlan_objmgr_pdev *pdev,
 			uint32_t *freq_list,
@@ -3913,4 +3958,72 @@ uint16_t sme_get_full_roam_scan_period_global(mac_handle_t mac_handle);
 QDF_STATUS sme_get_full_roam_scan_period(mac_handle_t mac_handle,
 					 uint8_t vdev_id,
 					 uint32_t *full_roam_scan_period);
+
+/**
+ * sme_check_for_duplicate_session() - check for duplicate session
+ * @mac_handle: Opaque handle to the MAC context
+ * @peer_addr: Peer device mac address
+ *
+ * Check for duplicate mac address is available on other vdev.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_check_for_duplicate_session(mac_handle_t mac_handle,
+					   uint8_t *peer_addr);
+#ifdef FEATURE_ANI_LEVEL_REQUEST
+/*
+ * sme_get_ani_level() -
+ * A wrapper function that client calls to register a callback to get ani level
+ *
+ * @mac_handle - pointer to mac handle
+ * @freqs - frequencies for which ANI level has to be fetched
+ * @num_freqs - number of frequencies
+ * @callback - SME sends back the ani level using the callback
+ * @context - user context to be passed back along with the callback
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_get_ani_level(mac_handle_t mac_handle, uint32_t *freqs,
+			     uint8_t num_freqs, void (*callback)(
+			     struct wmi_host_ani_level_event *ani, uint8_t num,
+			     void *context), void *context);
+#endif /* FEATURE_ANI_LEVEL_REQUEST */
+
+#ifdef FEATURE_OEM_DATA
+/**
+ * sme_set_oem_data_event_handler_cb() - Register oem data event handler
+ * callback
+ * @mac_handle: Opaque handle to the MAC context
+ * @oem_data_event_handler_cb: callback to be registered
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_set_oem_data_event_handler_cb(
+			mac_handle_t mac_handle,
+			void (*oem_data_event_handler_cb)
+				(const struct oem_data *oem_event_data));
+
+/**
+ * sme_reset_oem_data_event_handler_cb() - De-register oem data event handler
+ * @mac_handle: Handler return by mac_open
+ *
+ * This function De-registers the OEM data event handler callback to SME
+ *
+ * Return: None
+ */
+void sme_reset_oem_data_event_handler_cb(mac_handle_t  mac_handle);
+#else
+static inline QDF_STATUS sme_set_oem_data_event_handler_cb(
+			mac_handle_t mac_handle,
+			void (*oem_data_event_handler_cb)
+				(void *oem_event_data))
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline void sme_reset_oem_data_event_handler_cb(mac_handle_t  mac_handle)
+{
+}
+#endif
+
 #endif /* #if !defined( __SME_API_H ) */

@@ -350,8 +350,8 @@ typedef struct sap_MaxAssocExceededEvent_s {
 struct sap_ch_selected_s {
 	uint32_t pri_ch_freq;
 	uint32_t ht_sec_ch_freq;
-	uint16_t vht_seg0_center_ch;
-	uint16_t vht_seg1_center_ch;
+	uint16_t vht_seg0_center_ch_freq;
+	uint16_t vht_seg1_center_ch_freq;
 	uint16_t ch_width;
 };
 
@@ -369,10 +369,10 @@ struct sap_acs_scan_complete_event {
 
 /**
  * struct sap_ch_change_ind - channel change indication
- * @new_chan: channel to change
+ * @new_chan_freq: channel frequency to change to
  */
 struct sap_ch_change_ind {
-	uint16_t new_chan;
+	uint32_t new_chan_freq;
 };
 
 /*
@@ -429,18 +429,18 @@ struct sap_acs_cfg {
 	/* ACS Algo Input */
 	uint8_t    acs_mode;
 	eCsrPhyMode hw_mode;
-	uint8_t    start_ch;
-	uint8_t    end_ch;
+	uint32_t    start_ch_freq;
+	uint32_t    end_ch_freq;
 	uint32_t   *freq_list;
 	uint8_t    ch_list_count;
 	uint32_t   *master_freq_list;
 	uint8_t    master_ch_list_count;
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
 	uint8_t    skip_scan_status;
-	uint8_t    skip_scan_range1_stch;
-	uint8_t    skip_scan_range1_endch;
-	uint8_t    skip_scan_range2_stch;
-	uint8_t    skip_scan_range2_endch;
+	uint32_t    skip_scan_range1_stch;
+	uint32_t    skip_scan_range1_endch;
+	uint32_t    skip_scan_range2_stch;
+	uint32_t    skip_scan_range2_endch;
 #endif
 
 	uint16_t   ch_width;
@@ -450,10 +450,10 @@ struct sap_acs_cfg {
 	uint8_t    is_ht_enabled;
 	uint8_t    is_vht_enabled;
 	/* ACS Algo Output */
-	uint8_t    pri_ch;
-	uint8_t    ht_sec_ch;
-	uint8_t    vht_seg0_center_ch;
-	uint8_t    vht_seg1_center_ch;
+	uint32_t   pri_ch_freq;
+	uint32_t   ht_sec_ch_freq;
+	uint32_t    vht_seg0_center_ch_freq;
+	uint32_t    vht_seg1_center_ch_freq;
 	uint32_t   band;
 };
 
@@ -1249,7 +1249,7 @@ void wlan_sap_set_sap_ctx_acs_cfg(struct sap_context *sap_ctx,
 
 void sap_config_acs_result(mac_handle_t mac_handle,
 			   struct sap_context *sap_ctx,
-			   uint32_t sec_ch);
+			   uint32_t sec_ch_freq);
 
 QDF_STATUS wlansap_update_sap_config_add_ie(struct sap_config *config,
 					    const uint8_t *pAdditionIEBuffer,
@@ -1260,10 +1260,10 @@ QDF_STATUS wlansap_reset_sap_config_add_ie(struct sap_config *config,
 					   eUpdateIEsType updateType);
 
 void wlansap_extend_to_acs_range(mac_handle_t mac_handle,
-				 uint8_t *startChannelNum,
-				 uint8_t *endChannelNum,
-				 uint8_t *bandStartChannel,
-				 uint8_t *bandEndChannel);
+				 uint32_t *start_ch_freq,
+				 uint32_t *end_ch_freq,
+				 uint32_t *bandStartChannel,
+				 uint32_t *bandEndChannel);
 
 /**
  * wlansap_set_dfs_nol() - Set dfs nol
@@ -1459,6 +1459,19 @@ QDF_STATUS wlansap_filter_ch_based_acs(struct sap_context *sap_ctx,
  */
 uint32_t
 wlansap_get_safe_channel_from_pcl_and_acs_range(struct sap_context *sap_ctx);
+
+/**
+ * wlansap_get_chan_band_restrict() -  get new chan for band change
+ * @sap_ctx: sap context pointer
+ *
+ * Sap/p2p go channel switch from 5G to 2G by CSA when 5G band disabled to
+ * avoid conflict with modem N79.
+ * Sap/p2p go channel restore to 5G channel when 5G band enabled.
+ *
+ * Return - restart channel in MHZ
+ */
+qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx);
+
 #ifdef __cplusplus
 }
 #endif

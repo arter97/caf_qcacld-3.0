@@ -153,8 +153,9 @@ void lim_process_mlm_start_cnf(struct mac_context *mac, uint32_t *msg_buf)
 	struct pe_session *pe_session = NULL;
 	tLimMlmStartCnf *pLimMlmStartCnf;
 	uint8_t smesessionId;
-	uint8_t channelId;
+	uint32_t chan_freq, ch_cfreq1 = 0;
 	uint8_t send_bcon_ind = false;
+	enum reg_wifi_band band;
 
 	if (!msg_buf) {
 		pe_err("Buffer is Pointing to NULL");
@@ -207,8 +208,6 @@ void lim_process_mlm_start_cnf(struct mac_context *mac, uint32_t *msg_buf)
 				pe_session, smesessionId);
 	if (pe_session &&
 	    (((tLimMlmStartCnf *)msg_buf)->resultCode == eSIR_SME_SUCCESS)) {
-		channelId = wlan_reg_freq_to_chan(mac->pdev,
-				pe_session->pLimStartBssReq->oper_ch_freq);
 		lim_ndi_mlme_vdev_up_transition(pe_session);
 
 		/* We should start beacon transmission only if the channel
@@ -216,24 +215,36 @@ void lim_process_mlm_start_cnf(struct mac_context *mac, uint32_t *msg_buf)
 		 * availability check is done. The PE will receive an explicit
 		 * request from upper layers to start the beacon transmission
 		 */
+		chan_freq = pe_session->curr_op_freq;
+		band = wlan_reg_freq_to_band(pe_session->curr_op_freq);
+		if (pe_session->ch_center_freq_seg1)
+			ch_cfreq1 = wlan_reg_chan_band_to_freq(
+					mac->pdev,
+					pe_session->ch_center_freq_seg1,
+					BIT(band));
+
 		if (!(LIM_IS_IBSS_ROLE(pe_session) ||
 			(LIM_IS_AP_ROLE(pe_session))))
 				return;
 		if (pe_session->ch_width == CH_WIDTH_160MHZ) {
 			send_bcon_ind = false;
 		} else if (pe_session->ch_width == CH_WIDTH_80P80MHZ) {
-			if ((wlan_reg_get_channel_state(mac->pdev, channelId)
-						!= CHANNEL_STATE_DFS) &&
-			    (wlan_reg_get_channel_state(mac->pdev,
-					pe_session->ch_center_freq_seg1 -
-					SIR_80MHZ_START_CENTER_CH_DIFF) !=
-						CHANNEL_STATE_DFS))
+			if ((wlan_reg_get_channel_state_for_freq(
+					mac->pdev, chan_freq) !=
+					CHANNEL_STATE_DFS) &&
+			    (wlan_reg_get_channel_state_for_freq(
+					mac->pdev, ch_cfreq1) !=
+					CHANNEL_STATE_DFS))
 				send_bcon_ind = true;
 		} else {
-			if (wlan_reg_get_channel_state(mac->pdev, channelId)
+			if (wlan_reg_get_channel_state_for_freq(mac->pdev,
+								chan_freq)
 					!= CHANNEL_STATE_DFS)
 				send_bcon_ind = true;
 		}
+		if (WLAN_REG_IS_6GHZ_CHAN_FREQ(pe_session->curr_op_freq))
+			send_bcon_ind = true;
+
 		if (send_bcon_ind) {
 			/* Configure beacon and send beacons to HAL */
 			QDF_TRACE(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
@@ -533,6 +544,21 @@ void lim_process_mlm_auth_cnf(struct mac_context *mac_ctx, uint32_t *msg)
 			MTRACE(mac_trace(mac_ctx, TRACE_CODE_MLM_STATE,
 				session_entry->peSessionId,
 				session_entry->limMlmState));
+
+			/* WAR for some IOT issue on specific AP:
+			 * STA failed to connect to SAE AP due to incorrect
+			 * password is used. Then AP will still reject the
+			 * authentication even correct password is used unless
+			 * STA send deauth to AP upon authentication failure.
+			 */
+			if (auth_type == eSIR_AUTH_TYPE_SAE) {
+				pe_debug("Send deauth for SAE auth failure");
+				lim_send_deauth_mgmt_frame(mac_ctx,
+						       auth_cnf->protStatusCode,
+						       auth_cnf->peerMacAddr,
+						       session_entry, false);
+			}
+
 			/*
 			 * Need to send Join response with
 			 * auth failure to Host.
@@ -2447,7 +2473,22 @@ void lim_process_mlm_set_sta_key_rsp(struct mac_context *mac_ctx,
 	vdev_id = set_key_params->vdev_id;
 	session_entry = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
 	if (!session_entry) {
-		pe_err("session does not exist for given session_id");
+		pe_err("session does not exist for given vdev_id %d", vdev_id);
+		qdf_mem_zero(msg->bodyptr, sizeof(*set_key_params));
+		qdf_mem_free(msg->bodyptr);
+		msg->bodyptr = NULL;
+		lim_send_sme_set_context_rsp(mac_ctx,
+					     mlm_set_key_cnf.peer_macaddr,
+					     0, eSIR_SME_INVALID_SESSION, NULL,
+					     vdev_id);
+		return;
+	}
+
+	if (!lim_is_set_key_req_converged() &&
+	    (session_entry->limMlmState != eLIM_MLM_WT_SET_STA_KEY_STATE)) {
+		pe_err("Received in unexpected limMlmState %X vdev %d pe_session_id %d",
+			session_entry->limMlmState, session_entry->vdev_id,
+			session_entry->peSessionId);
 		qdf_mem_zero(msg->bodyptr, sizeof(*set_key_params));
 		qdf_mem_free(msg->bodyptr);
 		msg->bodyptr = NULL;
@@ -2461,14 +2502,7 @@ void lim_process_mlm_set_sta_key_rsp(struct mac_context *mac_ctx,
 	pe_debug("PE session ID %d, vdev_id %d", session_id, vdev_id);
 	result_status = set_key_params->status;
 	if (!lim_is_set_key_req_converged()) {
-		if (eLIM_MLM_WT_SET_STA_KEY_STATE !=
-				session_entry->limMlmState) {
-			pe_err("Received unexpected [Mesg Id - %d] in state %X",
-			       msg->type, session_entry->limMlmState);
-			resp_reqd = 0;
-		} else {
-			mlm_set_key_cnf.resultCode = result_status;
-		}
+		mlm_set_key_cnf.resultCode = result_status;
 		/* Restore MLME state */
 		session_entry->limMlmState = session_entry->limPrevMlmState;
 	}
@@ -2552,8 +2586,24 @@ void lim_process_mlm_set_bss_key_rsp(struct mac_context *mac_ctx,
 					     vdev_id);
 		return;
 	}
+	if (!lim_is_set_key_req_converged() &&
+	    (session_entry->limMlmState != eLIM_MLM_WT_SET_BSS_KEY_STATE) &&
+	    (session_entry->limMlmState !=
+	     eLIM_MLM_WT_SET_STA_BCASTKEY_STATE)) {
+		pe_err("Received in unexpected limMlmState %X vdev %d pe_session_id %d",
+			session_entry->limMlmState, session_entry->vdev_id,
+			session_entry->peSessionId);
+		qdf_mem_zero(msg->bodyptr, sizeof(tSetBssKeyParams));
+		qdf_mem_free(msg->bodyptr);
+		msg->bodyptr = NULL;
+		lim_send_sme_set_context_rsp(mac_ctx, set_key_cnf.peer_macaddr,
+					     0, eSIR_SME_INVALID_SESSION, NULL,
+					     vdev_id);
+		return;
+	}
+
 	session_id = session_entry->peSessionId;
-	pe_debug("PE session ID %d, SME vdev_id %d", session_id, vdev_id);
+	pe_debug("PE session ID %d, vdev_id %d", session_id, vdev_id);
 	if (eLIM_MLM_WT_SET_BSS_KEY_STATE == session_entry->limMlmState) {
 		result_status =
 			(uint16_t)(((tpSetBssKeyParams)msg->bodyptr)->status);
@@ -2581,15 +2631,7 @@ void lim_process_mlm_set_bss_key_rsp(struct mac_context *mac_ctx,
 		set_key_cnf.key_len_nonzero = false;
 
 	if (!lim_is_set_key_req_converged()) {
-		if (eLIM_MLM_WT_SET_BSS_KEY_STATE !=
-				session_entry->limMlmState &&
-				eLIM_MLM_WT_SET_STA_BCASTKEY_STATE !=
-				session_entry->limMlmState) {
-			pe_err("Received unexpected [Mesg Id - %d] in state %X",
-			       msg->type, session_entry->limMlmState);
-		} else {
-			set_key_cnf.resultCode = result_status;
-		}
+		set_key_cnf.resultCode = result_status;
 		session_entry->limMlmState = session_entry->limPrevMlmState;
 	}
 
