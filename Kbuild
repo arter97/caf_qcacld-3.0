@@ -98,6 +98,9 @@ HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_debugfs.o
 ifeq ($(CONFIG_WLAN_FEATURE_LINK_LAYER_STATS), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_debugfs_llstat.o
 endif
+ifeq ($(CONFIG_WLAN_FEATURE_MIB_STATS), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_debugfs_mibstat.o
+endif
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_debugfs_csr.o
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_debugfs_connect.o
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_debugfs_offload.o
@@ -683,6 +686,10 @@ OS_IF_INC += -I$(WLAN_COMMON_INC)/os_if/linux \
 OS_IF_OBJ += $(OS_IF_DIR)/linux/wlan_osif_request_manager.o \
 	     $(OS_IF_DIR)/linux/crypto/src/wlan_nl_to_crypto_params.o
 
+ifeq ($(CONFIG_CRYPTO_COMPONENT), y)
+OS_IF_OBJ += $(OS_IF_DIR)/linux/crypto/src/wlan_cfg80211_crypto.o
+endif
+
 ############ UMAC_DISP ############
 UMAC_DISP_DIR := umac/global_umac_dispatcher/lmac_if
 UMAC_DISP_INC_DIR := $(UMAC_DISP_DIR)/inc
@@ -762,6 +769,7 @@ UMAC_CRYPTO_CORE_DIR := $(WLAN_COMMON_ROOT)/$(UMAC_CRYPTO_DIR)/src
 UMAC_CRYPTO_INC := -I$(WLAN_COMMON_INC)/$(UMAC_CRYPTO_DIR)/inc \
 		-I$(WLAN_COMMON_INC)/$(UMAC_CRYPTO_DIR)/src
 UMAC_CRYPTO_OBJS := $(UMAC_CRYPTO_CORE_DIR)/wlan_crypto_global_api.o \
+		$(UMAC_CRYPTO_CORE_DIR)/wlan_crypto_ucfg_api.o \
 		$(UMAC_CRYPTO_CORE_DIR)/wlan_crypto_main.o \
 		$(UMAC_CRYPTO_CORE_DIR)/wlan_crypto_obj_mgr.o \
 		$(UMAC_CRYPTO_CORE_DIR)/wlan_crypto_param_handling.o
@@ -1149,9 +1157,11 @@ TARGET_IF_DIR := $(WLAN_COMMON_ROOT)/target_if
 TARGET_IF_INC := -I$(WLAN_COMMON_INC)/target_if/core/inc \
 		 -I$(WLAN_COMMON_INC)/target_if/core/src \
 		 -I$(WLAN_COMMON_INC)/target_if/init_deinit/inc \
+		 -I$(WLAN_COMMON_INC)/target_if/crypto/inc \
 		 -I$(WLAN_COMMON_INC)/target_if/regulatory/inc \
 		 -I$(WLAN_COMMON_INC)/target_if/mlme/vdev_mgr/inc \
-		 -I$(WLAN_COMMON_INC)/target_if/dispatcher/inc
+		 -I$(WLAN_COMMON_INC)/target_if/dispatcher/inc \
+		 -I$(WLAN_COMMON_INC)/target_if/mlme/psoc/inc
 
 TARGET_IF_OBJ := $(TARGET_IF_DIR)/core/src/target_if_main.o \
 		$(TARGET_IF_DIR)/regulatory/src/target_if_reg.o \
@@ -1162,10 +1172,15 @@ TARGET_IF_OBJ := $(TARGET_IF_DIR)/core/src/target_if_main.o \
 		$(TARGET_IF_DIR)/init_deinit/src/init_event_handler.o \
 		$(TARGET_IF_DIR)/init_deinit/src/service_ready_util.o \
 		$(TARGET_IF_DIR)/mlme/vdev_mgr/src/target_if_vdev_mgr_tx_ops.o \
-		$(TARGET_IF_DIR)/mlme/vdev_mgr/src/target_if_vdev_mgr_rx_ops.o
+		$(TARGET_IF_DIR)/mlme/vdev_mgr/src/target_if_vdev_mgr_rx_ops.o \
+		$(TARGET_IF_DIR)/mlme/psoc/src/target_if_psoc_timer_tx_ops.o
 
 ifeq ($(CONFIG_FEATURE_VDEV_RSP_WAKELOCK), y)
-TARGET_IF_OBJ += $(TARGET_IF_DIR)/mlme/vdev_mgr/src/target_if_vdev_mgr_wake_lock.o
+TARGET_IF_OBJ += $(TARGET_IF_DIR)/mlme/psoc/src/target_if_psoc_wake_lock.o
+endif
+
+ifeq ($(CONFIG_CRYPTO_COMPONENT), y)
+TARGET_IF_OBJ += $(TARGET_IF_DIR)/crypto/src/target_if_crypto.o
 endif
 
 ########### GLOBAL_LMAC_IF ##########
@@ -2108,6 +2123,7 @@ cppflags-$(CONFIG_FEATURE_WLAN_LPHB) += -DFEATURE_WLAN_LPHB
 cppflags-$(CONFIG_QCA_SUPPORT_TX_THROTTLE) += -DQCA_SUPPORT_TX_THROTTLE
 cppflags-$(CONFIG_WMI_INTERFACE_EVENT_LOGGING) += -DWMI_INTERFACE_EVENT_LOGGING
 cppflags-$(CONFIG_WLAN_FEATURE_LINK_LAYER_STATS) += -DWLAN_FEATURE_LINK_LAYER_STATS
+cppflags-$(CONFIG_WLAN_FEATURE_MIB_STATS) += -DWLAN_FEATURE_MIB_STATS
 cppflags-$(CONFIG_FEATURE_WLAN_EXTSCAN) += -DFEATURE_WLAN_EXTSCAN
 cppflags-$(CONFIG_160MHZ_SUPPORT) += -DCONFIG_160MHZ_SUPPORT
 cppflags-$(CONFIG_MCL) += -DCONFIG_MCL
@@ -2332,6 +2348,10 @@ ifeq ($(CONFIG_QCA_IBSS_SUPPORT), y)
 cppflags-$(CONFIG_QCA_IBSS_SUPPORT) += -DQCA_IBSS_SUPPORT
 endif
 
+ifeq ($(CONFIG_DFS_FCC_TYPE4_DURATION_CHECK), y)
+cppflags-$(CONFIG_DFS_FCC_TYPE4_DURATION_CHECK) += -DDFS_FCC_TYPE4_DURATION_CHECK
+endif
+
 cppflags-$(CONFIG_WLAN_SYSFS) += -DWLAN_SYSFS
 cppflags-$(CONFIG_FEATURE_WLAN_RMC) += -DFEATURE_WLAN_RMC
 cppflags-$(CONFIG_FEATURE_BECN_STATS) += -DWLAN_FEATURE_BEACON_RECEPTION_STATS
@@ -2419,6 +2439,7 @@ cppflags-$(CONFIG_FEATURE_HL_DBS_GROUP_CREDIT_SHARING) += -DFEATURE_HL_DBS_GROUP
 cppflags-$(CONFIG_CREDIT_REP_THROUGH_CREDIT_UPDATE) += -DCONFIG_CREDIT_REP_THROUGH_CREDIT_UPDATE
 cppflags-$(CONFIG_RX_PN_CHECK_OFFLOAD) += -DCONFIG_RX_PN_CHECK_OFFLOAD
 
+cppflags-$(CONFIG_WLAN_SYNC_TSF_TIMER) += -DWLAN_FEATURE_TSF_TIMER_SYNC
 cppflags-$(CONFIG_WLAN_SYNC_TSF_PTP) += -DWLAN_FEATURE_TSF_PTP
 cppflags-$(CONFIG_WLAN_SYNC_TSF_PLUS_EXT_GPIO_IRQ) += -DWLAN_FEATURE_TSF_PLUS_EXT_GPIO_IRQ
 cppflags-$(CONFIG_WLAN_SYNC_TSF_PLUS_EXT_GPIO_SYNC) += -DWLAN_FEATURE_TSF_PLUS_EXT_GPIO_SYNC
@@ -2483,8 +2504,10 @@ CONFIG_FEATURE_SG := y
 endif
 
 ifeq ($(CONFIG_ARCH_MSM8996), y)
+ifneq ($(CONFIG_QCN7605_SUPPORT), y)
 CONFIG_FEATURE_SG := y
 CONFIG_RX_THREAD_PRIORITY := y
+endif
 endif
 
 ifeq ($(CONFIG_FEATURE_SG), y)
@@ -2554,6 +2577,8 @@ cppflags-$(CONFIG_QCACLD_FEATURE_APF) += -DFEATURE_WLAN_APF
 cppflags-$(CONFIG_WLAN_FEATURE_SARV1_TO_SARV2) += -DWLAN_FEATURE_SARV1_TO_SARV2
 #CRYPTO Coverged Component
 cppflags-$(CONFIG_CRYPTO_COMPONENT) += -DWLAN_CONV_CRYPTO_SUPPORTED \
+                                       -DCRYPTO_SET_KEY_CONVERGED \
+                                       -DWLAN_CONV_CRYPTO_IE_SUPPORT \
                                        -DWLAN_CRYPTO_WEP_OS_DERIVATIVE \
                                        -DWLAN_CRYPTO_TKIP_OS_DERIVATIVE \
                                        -DWLAN_CRYPTO_CCMP_OS_DERIVATIVE \
@@ -2626,7 +2651,7 @@ cppflags-$(CONFIG_ENABLE_DEBUG_ADDRESS_MARKING) += -DENABLE_DEBUG_ADDRESS_MARKIN
 cppflags-$(CONFIG_FEATURE_TSO) += -DFEATURE_TSO
 cppflags-$(CONFIG_FEATURE_TSO_DEBUG) += -DFEATURE_TSO_DEBUG
 cppflags-$(CONFIG_FEATURE_TSO_STATS) += -DFEATURE_TSO_STATS
-
+cppflags-$(CONFIG_FEATURE_FORCE_WAKE) += -DFORCE_WAKE
 cppflags-$(CONFIG_WLAN_LRO) += -DFEATURE_LRO
 
 cppflags-$(CONFIG_FEATURE_AP_MCC_CH_AVOIDANCE) += -DFEATURE_AP_MCC_CH_AVOIDANCE
@@ -2685,6 +2710,7 @@ endif
 
 ifeq ($(CONFIG_LITHIUM), y)
 cppflags-$(CONFIG_WLAN_TX_FLOW_CONTROL_V2) += -DQCA_AC_BASED_FLOW_CONTROL
+cppflags-y += -DHAL_DISABLE_NON_BA_2K_JUMP_ERROR
 endif
 
 cppflags-$(CONFIG_WLAN_CLD_PM_QOS) += -DCLD_PM_QOS
@@ -2697,8 +2723,11 @@ cppflags-$(CONFIG_LITHIUM) += -DFEATURE_AST
 cppflags-$(CONFIG_LITHIUM) += -DPEER_PROTECTED_ACCESS
 cppflags-$(CONFIG_LITHIUM) += -DSERIALIZE_QUEUE_SETUP
 cppflags-$(CONFIG_LITHIUM) += -DDP_RX_PKT_NO_PEER_DELIVER
+cppflags-$(CONFIG_LITHIUM) += -DFEATURE_ALIGN_STATS_FROM_DP
 cppflags-$(CONFIG_VERBOSE_DEBUG) += -DENABLE_VERBOSE_DEBUG
 cppflags-$(CONFIG_RX_DESC_DEBUG_CHECK) += -DRX_DESC_DEBUG_CHECK
+cppflags-$(CONFIG_REGISTER_OP_DEBUG) += -DHAL_REGISTER_WRITE_DEBUG
+cppflags-$(CONFIG_ENABLE_QDF_PTR_HASH_DEBUG) += -DENABLE_QDF_PTR_HASH_DEBUG
 #Enable STATE MACHINE HISTORY
 cppflags-$(CONFIG_SM_ENG_HIST) += -DSM_ENG_HIST_ENABLE
 cppflags-$(CONFIG_FEATURE_VDEV_RSP_WAKELOCK) += -DFEATURE_VDEV_RSP_WAKELOCK
@@ -2717,6 +2746,11 @@ cppflags-$(CONFIG_FEATURE_SAP_COND_CHAN_SWITCH) += -DFEATURE_SAP_COND_CHAN_SWITC
 #if converged p2p is enabled
 ifeq ($(CONFIG_CONVERGED_P2P_ENABLE), y)
 cppflags-$(CONFIG_FEATURE_P2P_LISTEN_OFFLOAD) += -DFEATURE_P2P_LISTEN_OFFLOAD
+endif
+
+#Enable support to get ANI value
+ifeq ($(CONFIG_ANI_LEVEL_REQUEST), y)
+cppflags-y += -DFEATURE_ANI_LEVEL_REQUEST
 endif
 
 #Flags to enable/disable WMI APIs
@@ -2738,7 +2772,10 @@ cppflags-y += -DDP_MOB_DEFS
 cppflags-y += -DDP_PRINT_NO_CONSOLE
 cppflags-y += -DDP_INTR_POLL_BOTH
 cppflags-y += -DDP_INVALID_PEER_ASSERT
-cppflags-y += -DHIF_CE_HISTORY_MAX=8192
+
+ifdef CONFIG_HIF_LARGE_CE_RING_HISTORY
+ccflags-y += -DHIF_CE_HISTORY_MAX=$(CONFIG_HIF_LARGE_CE_RING_HISTORY)
+endif
 #endof dummy flags
 
 ccflags-$(CONFIG_ENABLE_SIZE_OPTIMIZE) += -Os
@@ -2812,6 +2849,8 @@ cppflags-$(CONFIG_WLAN_FEATURE_DP_EVENT_HISTORY) += -DWLAN_FEATURE_DP_EVENT_HIST
 cppflags-$(CONFIG_WLAN_DP_PER_RING_TYPE_CONFIG) += -DWLAN_DP_PER_RING_TYPE_CONFIG
 cppflags-$(CONFIG_SAP_DHCP_FW_IND) += -DSAP_DHCP_FW_IND
 cppflags-$(CONFIG_WLAN_DP_PENDING_MEM_FLUSH) += -DWLAN_DP_PENDING_MEM_FLUSH
+cppflags-$(CONFIG_WLAN_SUPPORT_DATA_STALL) += -DWLAN_SUPPORT_DATA_STALL
+cppflags-$(CONFIG_WLAN_SUPPORT_TXRX_HL_BUNDLE) += -DWLAN_SUPPORT_TXRX_HL_BUNDLE
 
 ifdef CONFIG_MAX_LOGS_PER_SEC
 ccflags-y += -DWLAN_MAX_LOGS_PER_SEC=$(CONFIG_MAX_LOGS_PER_SEC)
@@ -2996,10 +3035,12 @@ cppflags-y += -DCONFIG_CHAN_NUM_API
 cppflags-y += -DCONFIG_CHAN_FREQ_API
 
 cppflags-$(CONFIG_BAND_6GHZ) += -DCONFIG_BAND_6GHZ
+cppflags-$(CONFIG_6G_SCAN_CHAN_SORT_ALGO) += -DFEATURE_6G_SCAN_CHAN_SORT_ALGO
 
 ccflags-$(CONFIG_HASTINGS_BT_WAR) += -DHASTINGS_BT_WAR
 
 cppflags-$(CONFIG_SLUB_DEBUG_ON) += -DHIF_CONFIG_SLUB_DEBUG_ON
+cppflags-$(CONFIG_SLUB_DEBUG_ON) += -DHAL_CONFIG_SLUB_DEBUG_ON
 
 ccflags-$(CONFIG_FOURTH_CONNECTION) += -DFEATURE_FOURTH_CONNECTION
 ccflags-$(CONFIG_WMI_SEND_RECV_QMI) += -DWLAN_FEATURE_WMI_SEND_RECV_QMI

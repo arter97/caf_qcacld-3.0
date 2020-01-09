@@ -793,6 +793,7 @@ struct wma_txrx_node {
 	struct roam_synch_frame_ind roam_synch_frame_ind;
 	bool is_waiting_for_key;
 	uint32_t ch_freq;
+	uint16_t ch_flagext;
 	struct sir_roam_scan_stats *roam_scan_stats_req;
 	struct wma_invalid_peer_params invalid_peers[INVALID_PEER_MAX_NUM];
 	uint8_t invalid_peer_idx;
@@ -2556,8 +2557,6 @@ QDF_STATUS wma_pre_assoc_req(struct bss_params *add_bss);
  */
 void wma_add_bss_lfr3(tp_wma_handle wma, struct bss_params *add_bss);
 
-uint8_t wma_peer_get_peet_id(uint8_t *mac);
-
 #ifdef WLAN_FEATURE_HOST_ROAM
 /**
  * wma_add_bss_lfr2_vdev_start() - add bss and start vdev during host roaming
@@ -2682,4 +2681,17 @@ QDF_STATUS wma_pre_vdev_start_setup(uint8_t vdev_id,
  */
 void wma_release_pending_vdev_refs(void);
 
+#ifdef FEATURE_ANI_LEVEL_REQUEST
+/**
+ * wma_send_ani_level_request() - Send get ani level cmd to WMI
+ * @wma_handle: wma handle.
+ * @freqs: pointer to channels for which ANI level has to be retrieved
+ * @num_freqs: number of channels in the above parameter
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wma_send_ani_level_request(tp_wma_handle wma_handle,
+				      uint32_t *freqs, uint8_t num_freqs);
+#endif /* FEATURE_ANI_LEVEL_REQUEST */
 #endif
+

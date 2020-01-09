@@ -1083,7 +1083,7 @@ struct csr_roam_info {
 	uint8_t subnet_change_status;
 #endif
 	struct oem_channel_info chan_info;
-	uint8_t target_channel;
+	uint32_t target_chan_freq;
 
 #ifdef WLAN_FEATURE_NAN
 	union {
@@ -1295,7 +1295,8 @@ struct wep_update_default_key_idx {
 	uint8_t default_idx;
 };
 
-typedef QDF_STATUS (*csr_roam_complete_cb)(void *context,
+typedef QDF_STATUS (*csr_roam_complete_cb)(struct wlan_objmgr_psoc *psoc,
+					   uint8_t session_id,
 					   struct csr_roam_info *param,
 					   uint32_t roam_id,
 					   eRoamCmdStatus roam_status,
@@ -1446,12 +1447,12 @@ void csr_packetdump_timer_stop(void);
 /**
  * csr_get_channel_status() - get chan info via channel number
  * @mac: Pointer to Global MAC structure
- * @channel_id: channel id
+ * @chan_freq: channel frequency
  *
  * Return: chan status info
  */
 struct lim_channel_status *
-csr_get_channel_status(struct mac_context *mac, uint32_t channel_id);
+csr_get_channel_status(struct mac_context *mac, uint32_t chan_freq);
 
 /**
  * csr_clear_channel_status() - clear chan info
@@ -1482,4 +1483,24 @@ QDF_STATUS csr_update_owe_info(struct mac_context *mac,
 QDF_STATUS
 csr_send_roam_offload_init_msg(struct mac_context *mac, uint32_t vdev_id,
 			       bool enable);
+
+typedef void (*csr_ani_callback)(int8_t *ani, void *context);
+
+#ifdef WLAN_FEATURE_11W
+/**
+ * csr_update_pmf_cap_from_connected_profile() - Update pmf cap from profile
+ * @profile: connected profile
+ * @filter: scan filter
+ *
+ * Return: None
+ */
+void
+csr_update_pmf_cap_from_connected_profile(tCsrRoamConnectedProfile *profile,
+					  struct scan_filter *filter);
+#else
+inline void
+csr_update_pmf_cap_from_connected_profile(tCsrRoamConnectedProfile *profile,
+					  struct scan_filter *filter)
+{}
+#endif
 #endif

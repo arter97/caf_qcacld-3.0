@@ -983,17 +983,6 @@ ucfg_mlme_get_go_cts2self_for_sta(struct wlan_objmgr_psoc *psoc,
 				  bool *val);
 
 /**
- * ucfg_mlme_get_force_rsne_override() - Force rsnie override from user
- * @psoc: pointer to psoc object
- * @val:  Pointer to the value which will be filled for the caller
- *
- * Return: QDF Status
- */
-QDF_STATUS
-ucfg_mlme_get_force_rsne_override(struct wlan_objmgr_psoc *psoc,
-				  bool *val);
-
-/**
  * ucfg_mlme_get_qcn_ie_support() - QCN IE support or not
  * @psoc: pointer to psoc object
  * @val:  Pointer to the value which will be filled for the caller
@@ -3832,6 +3821,24 @@ ucfg_mlme_set_obss_detection_offload_enabled(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 ucfg_mlme_set_obss_color_collision_offload_enabled(
 		struct wlan_objmgr_psoc *psoc, uint8_t value);
+
+/**
+ * ucfg_mlme_set_restricted_80p80_bw_supp() - Set the restricted 80p80 support
+ * @psoc: pointer to psoc object
+ * @restricted_80p80_supp: Value to be set from the caller
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS ucfg_mlme_set_restricted_80p80_bw_supp(struct wlan_objmgr_psoc *psoc,
+						  bool restricted_80p80_supp);
+
+/**
+ * ucfg_mlme_get_restricted_80p80_bw_supp() - Get the restricted 80p80 support
+ * @psoc: pointer to psoc object
+ *
+ * Return: true or false
+ */
+bool ucfg_mlme_get_restricted_80p80_bw_supp(struct wlan_objmgr_psoc *psoc);
 
 /**
  * ucfg_mlme_get_channel_bonding_24ghz() - get channel bonding mode of 24ghz

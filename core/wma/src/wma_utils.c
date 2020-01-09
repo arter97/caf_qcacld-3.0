@@ -95,32 +95,32 @@ static struct index_data_rate_type mcs_nss2[] = {
 /* MCS Based VHT rate table */
 /* MCS parameters with Nss = 1*/
 static struct index_vht_data_rate_type vht_mcs_nss1[] = {
-	/* MCS L20  S20    L40   S40    L80   S80 */
-	{0,  {65,   72 }, {135,  150},  {293,  325} },
-	{1,  {130,  144}, {270,  300},  {585,  650} },
-	{2,  {195,  217}, {405,  450},  {878,  975} },
-	{3,  {260,  289}, {540,  600},  {1170, 1300} },
-	{4,  {390,  433}, {810,  900},  {1755, 1950} },
-	{5,  {520,  578}, {1080, 1200}, {2340, 2600} },
-	{6,  {585,  650}, {1215, 1350}, {2633, 2925} },
-	{7,  {650,  722}, {1350, 1500}, {2925, 3250} },
-	{8,  {780,  867}, {1620, 1800}, {3510, 3900} },
-	{9,  {865,  960}, {1800, 2000}, {3900, 4333} }
+	/* MCS L20  S20    L40   S40    L80   S80    L160  S160*/
+	{0,  {65,   72 }, {135,  150},  {293,  325}, {585, 650} },
+	{1,  {130,  144}, {270,  300},  {585,  650}, {1170, 1300} },
+	{2,  {195,  217}, {405,  450},  {878,  975}, {1755, 1950} },
+	{3,  {260,  289}, {540,  600},  {1170, 1300}, {2340, 2600} },
+	{4,  {390,  433}, {810,  900},  {1755, 1950}, {3510, 3900} },
+	{5,  {520,  578}, {1080, 1200}, {2340, 2600}, {4680, 5200} },
+	{6,  {585,  650}, {1215, 1350}, {2633, 2925}, {5265, 5850} },
+	{7,  {650,  722}, {1350, 1500}, {2925, 3250}, {5850, 6500} },
+	{8,  {780,  867}, {1620, 1800}, {3510, 3900}, {7020, 7800} },
+	{9,  {865,  960}, {1800, 2000}, {3900, 4333}, {7800, 8667} }
 };
 
 /*MCS parameters with Nss = 2*/
 static struct index_vht_data_rate_type vht_mcs_nss2[] = {
-	/* MCS L20  S20    L40    S40    L80    S80 */
-	{0,  {130,  144},  {270,  300},  { 585,  650} },
-	{1,  {260,  289},  {540,  600},  {1170, 1300} },
-	{2,  {390,  433},  {810,  900},  {1755, 1950} },
-	{3,  {520,  578},  {1080, 1200}, {2340, 2600} },
-	{4,  {780,  867},  {1620, 1800}, {3510, 3900} },
-	{5,  {1040, 1156}, {2160, 2400}, {4680, 5200} },
-	{6,  {1170, 1300}, {2430, 2700}, {5265, 5850} },
-	{7,  {1300, 1444}, {2700, 3000}, {5850, 6500} },
-	{8,  {1560, 1733}, {3240, 3600}, {7020, 7800} },
-	{9,  {1730, 1920}, {3600, 4000}, {7800, 8667} }
+	/* MCS L20  S20    L40    S40    L80    S80    L160   S160*/
+	{0,  {130,  144},  {270,  300},  { 585,  650}, {1170, 1300} },
+	{1,  {260,  289},  {540,  600},  {1170, 1300}, {2340, 2600} },
+	{2,  {390,  433},  {810,  900},  {1755, 1950}, {3510, 3900} },
+	{3,  {520,  578},  {1080, 1200}, {2340, 2600}, {4680, 5200} },
+	{4,  {780,  867},  {1620, 1800}, {3510, 3900}, {7020, 7800} },
+	{5,  {1040, 1156}, {2160, 2400}, {4680, 5200}, {9360, 10400} },
+	{6,  {1170, 1300}, {2430, 2700}, {5265, 5850}, {10530, 11700} },
+	{7,  {1300, 1444}, {2700, 3000}, {5850, 6500}, {11700, 13000} },
+	{8,  {1560, 1733}, {3240, 3600}, {7020, 7800}, {14040, 15600} },
+	{9,  {1730, 1920}, {3600, 4000}, {7800, 8667}, {15600, 17333} }
 };
 
 #ifdef WLAN_FEATURE_11AX
@@ -130,40 +130,52 @@ static struct index_he_data_rate_type he_mcs_nss1[] = {
 /* MCS,  {dcm0:0.8/1.6/3.2}, {dcm1:0.8/1.6/3.2} */
 	{0,  {{86,   81,   73  }, {43,   40,  36 } }, /* HE20 */
 	     {{172,  163,  146 }, {86,   81,  73 } }, /* HE40 */
-	     {{360,  340,  306 }, {180,  170, 153} } }, /* HE80 */
+	     {{360,  340,  306 }, {180,  170, 153} }, /* HE80 */
+	     {{721,  681,  613 }, {360,  340, 306} } }, /* HE160/HE80+80 */
 	{1,  {{172,  163,  146 }, {86,   81,  73 } },
 	     {{344,  325,  293 }, {172,  163, 146} },
-	     {{721,  681,  613 }, {360,  340, 306} } },
+	     {{721,  681,  613 }, {360,  340, 306} },
+	     {{1441, 1361, 1225}, {721,  681, 613} } },
 	{2,  {{258,  244,  219 }, {0} },
 	     {{516,  488,  439 }, {0} },
-	     {{1081, 1021, 919 }, {0} } },
+	     {{1081, 1021, 919 }, {0} },
+	     {{2162, 2042, 1838}, {0} } },
 	{3,  {{344,  325,  293 }, {172,  163, 146} },
 	     {{688,  650,  585 }, {344,  325, 293} },
-	     {{1441, 1361, 1225}, {721,  681, 613} } },
+	     {{1441, 1361, 1225}, {721,  681, 613} },
+	     {{2882, 2722, 2450}, {1441, 1361, 1225} } },
 	{4,  {{516,  488,  439 }, {258,  244, 219} },
 	     {{1032, 975,  878 }, {516,  488, 439} },
-	     {{2162, 2042, 1838}, {1081, 1021, 919} } },
+	     {{2162, 2042, 1838}, {1081, 1021, 919} },
+	     {{4324, 4083, 3675}, {2162, 2042, 1838} } },
 	{5,  {{688,  650,  585 }, {0} },
 	     {{1376, 1300, 1170}, {0} },
-	     {{2882, 2722, 2450}, {0} } },
+	     {{2882, 2722, 2450}, {0} },
+	     {{5765, 5444, 4900}, {0} } },
 	{6,  {{774,  731,  658 }, {0} },
 	     {{1549, 1463, 1316}, {0} },
-	     {{3243, 3063, 2756}, {0} } },
+	     {{3243, 3063, 2756}, {0} },
+	     {{6485, 6125, 5513}, {0} } },
 	{7,  {{860,  813,  731 }, {0} },
 	     {{1721, 1625, 1463}, {0} },
-	     {{3603, 3403, 3063}, {0} } },
+	     {{3603, 3403, 3063}, {0} },
+	     {{7206, 6806, 6125}, {0} } },
 	{8,  {{1032, 975,  878 }, {0} },
 	     {{2065, 1950, 1755}, {0} },
-	     {{4324, 4083, 3675}, {0} } },
+	     {{4324, 4083, 3675}, {0} },
+	     {{8647, 8167, 7350}, {0} } },
 	{9,  {{1147, 1083, 975 }, {0} },
 	     {{2294, 2167, 1950}, {0} },
-	     {{4804, 4537, 4083}, {0} } },
+	     {{4804, 4537, 4083}, {0} },
+	     {{9607, 9074, 8166}, {0} } },
 	{10, {{1290, 1219, 1097}, {0} },
 	     {{2581, 2438, 2194}, {0} },
-	     {{5404, 5104, 4594}, {0} } },
+	     {{5404, 5104, 4594}, {0} },
+	     {{10809, 10208, 9188}, {0} } },
 	{11, {{1434, 1354, 1219}, {0} },
 	     {{2868, 2708, 2438}, {0} },
-	     {{6004, 5671, 5104}, {0} } }
+	     {{6004, 5671, 5104}, {0} },
+	     {{12010, 11342, 10208}, {0} } }
 };
 
 /*MCS parameters with Nss = 2*/
@@ -171,40 +183,52 @@ static struct index_he_data_rate_type he_mcs_nss2[] = {
 /* MCS,  {dcm0:0.8/1.6/3.2}, {dcm1:0.8/1.6/3.2} */
 	{0,  {{172,   163,   146 }, {86,   81,   73 } }, /* HE20 */
 	     {{344,   325,   293 }, {172,  163,  146} }, /* HE40 */
-	     {{721,   681,   613 }, {360,  340,  306} } }, /* HE80 */
+	     {{721,   681,   613 }, {360,  340,  306} }, /* HE80 */
+	     {{1441, 1361, 1225},   {721, 681, 613} } }, /* HE160/HE80+80 */
 	{1,  {{344,   325,   293 }, {172,  163,  146} },
 	     {{688,   650,   585 }, {344,  325,  293} },
-	     {{1441,  1361,  1225}, {721,  681,  613} } },
+	     {{1441,  1361,  1225}, {721,  681,  613} },
+	     {{2882, 2722, 2450},   {1441, 1361, 1225} } },
 	{2,  {{516,   488,   439 }, {0} },
 	     {{1032,  975,   878 }, {0} },
-	     {{2162,  2042,  1838}, {0} } },
+	     {{2162,  2042,  1838}, {0} },
+	     {{4324, 4083, 3675}, {0} } },
 	{3,  {{688,   650,   585 }, {344,  325,  293 } },
 	     {{1376,  1300,  1170}, {688,  650,  585  } },
-	     {{2882,  2722,  2450}, {1441, 1361, 1225} } },
+	     {{2882,  2722,  2450}, {1441, 1361, 1225} },
+	     {{5765, 5444, 4900}, {2882, 2722, 2450} } },
 	{4,  {{1032,  975,   878 }, {516,  488,  439 } },
 	     {{2065,  1950,  1755}, {1032, 975,  878 } },
-	     {{4324,  4083,  3675}, {2162, 2042, 1838} } },
+	     {{4324,  4083,  3675}, {2162, 2042, 1838} },
+	     {{8647, 8167, 7350}, {4324, 4083, 3675} } },
 	{5,  {{1376,  1300,  1170}, {0} },
 	     {{2753,  2600,  2340}, {0} },
-	     {{5765,  5444,  4900}, {0} } },
+	     {{5765,  5444,  4900}, {0} },
+	     {{11529, 10889, 9800}, {0} } },
 	{6,  {{1549,  1463,  1316}, {0} },
 	     {{3097,  2925,  2633}, {0} },
-	     {{6485,  6125,  5513}, {0} } },
+	     {{6485,  6125,  5513}, {0} },
+	     {{12971, 12250, 11025}, {0} } },
 	{7,  {{1721,  1625,  1463}, {0} },
 	     {{3441,  3250,  2925}, {0} },
-	     {{7206,  6806,  6125}, {0} } },
+	     {{7206,  6806,  6125}, {0} },
+	     {{14412, 13611, 12250}, {0} } },
 	{8,  {{2065,  1950,  1755}, {0} },
 	     {{4129,  3900,  3510}, {0} },
-	     {{8647,  8167,  7350}, {0} } },
+	     {{8647,  8167,  7350}, {0} },
+	     {{17294, 16333, 14700}, {0} } },
 	{9,  {{2294,  2167,  1950}, {0} },
 	     {{4588,  4333,  3900}, {0} },
-	     {{9607,  9074,  8166}, {0} } },
+	     {{9607,  9074,  8166}, {0} },
+	     {{19215, 18148, 16333}, {0} } },
 	{10, {{2581,  2438,  2194}, {0} },
 	     {{5162,  4875,  4388}, {0} },
-	     {{10809, 10208, 9188}, {0} } },
+	     {{10809, 10208, 9188}, {0} },
+	     {{21618, 20417, 18375}, {0} } },
 	{11, {{2868,  2708,  2438}, {0} },
 	     {{5735,  5417,  4875}, {0} },
-	     {{12010, 11343, 10208}, {0} } }
+	     {{12010, 11343, 10208}, {0} },
+	     {{24019, 22685, 20416}, {0} } }
 };
 #endif
 
@@ -325,7 +349,7 @@ static uint16_t wma_match_he_rate(uint16_t raw_rate,
 	uint16_t *nss2_rate;
 
 	*p_index = 0;
-	if (!(rate_flags & (TX_RATE_HE80 | TX_RATE_HE40 |
+	if (!(rate_flags & (TX_RATE_HE160 | TX_RATE_HE80 | TX_RATE_HE40 |
 		TX_RATE_HE20)))
 		return 0;
 
@@ -334,7 +358,22 @@ static uint16_t wma_match_he_rate(uint16_t raw_rate,
 
 		for (dcm_index = 0; dcm_index < dcm_index_max;
 			 dcm_index++) {
-			if (rate_flags & TX_RATE_HE80) {
+			if (rate_flags & TX_RATE_HE160) {
+				nss1_rate = &he_mcs_nss1[index].
+					supported_he160_rate[dcm_index][0];
+				nss2_rate = &he_mcs_nss2[index].
+					supported_he160_rate[dcm_index][0];
+				/* check for he160 nss1/2 rate set */
+				match_rate = wma_mcs_rate_match(raw_rate, 1,
+								nss1_rate,
+								nss2_rate,
+								nss,
+								guard_interval);
+				if (match_rate)
+					goto rate_found;
+			}
+
+			if (rate_flags & (TX_RATE_HE80 | TX_RATE_HE160)) {
 				nss1_rate = &he_mcs_nss1[index].
 					supported_he80_rate[dcm_index][0];
 				nss2_rate = &he_mcs_nss2[index].
@@ -345,11 +384,14 @@ static uint16_t wma_match_he_rate(uint16_t raw_rate,
 								nss2_rate,
 								nss,
 								guard_interval);
-				if (match_rate)
+				if (match_rate) {
+					*mcs_rate_flag &= ~TX_RATE_HE160;
 					goto rate_found;
+				}
 			}
 
-			if (rate_flags & (TX_RATE_HE40 | TX_RATE_HE80)) {
+			if (rate_flags & (TX_RATE_HE40 | TX_RATE_HE80 |
+					  TX_RATE_HE160)) {
 				nss1_rate = &he_mcs_nss1[index].
 					supported_he40_rate[dcm_index][0];
 				nss2_rate = &he_mcs_nss2[index].
@@ -368,7 +410,7 @@ static uint16_t wma_match_he_rate(uint16_t raw_rate,
 			}
 
 			if (rate_flags & (TX_RATE_HE80 | TX_RATE_HE40 |
-				TX_RATE_HE20)) {
+				TX_RATE_HE20 | TX_RATE_HE160)) {
 				nss1_rate = &he_mcs_nss1[index].
 					supported_he20_rate[dcm_index][0];
 				nss2_rate = &he_mcs_nss2[index].
@@ -430,10 +472,10 @@ uint8_t wma_get_mcs_idx(uint16_t raw_rate, enum tx_rate_info rate_flags,
 		goto rate_found;
 
 	for (index = 0; index < MAX_VHT_MCS_IDX; index++) {
-		if (rate_flags & TX_RATE_VHT80) {
-			nss1_rate = &vht_mcs_nss1[index].ht80_rate[0];
-			nss2_rate = &vht_mcs_nss2[index].ht80_rate[0];
-			/* check for vht80 nss1/2 rate set */
+		if (rate_flags & TX_RATE_VHT160) {
+			nss1_rate = &vht_mcs_nss1[index].ht160_rate[0];
+			nss2_rate = &vht_mcs_nss2[index].ht160_rate[0];
+			/* check for vht160 nss1/2 rate set */
 			match_rate = wma_mcs_rate_match(raw_rate, 0,
 							nss1_rate,
 							nss2_rate,
@@ -441,7 +483,21 @@ uint8_t wma_get_mcs_idx(uint16_t raw_rate, enum tx_rate_info rate_flags,
 			if (match_rate)
 				goto rate_found;
 		}
-		if (rate_flags & (TX_RATE_VHT40 | TX_RATE_VHT80)) {
+		if (rate_flags & (TX_RATE_VHT80 | TX_RATE_VHT160)) {
+			nss1_rate = &vht_mcs_nss1[index].ht80_rate[0];
+			nss2_rate = &vht_mcs_nss2[index].ht80_rate[0];
+			/* check for vht80 nss1/2 rate set */
+			match_rate = wma_mcs_rate_match(raw_rate, 0,
+							nss1_rate,
+							nss2_rate,
+							nss, guard_interval);
+			if (match_rate) {
+				*mcs_rate_flag &= ~TX_RATE_VHT160;
+				goto rate_found;
+			}
+		}
+		if (rate_flags & (TX_RATE_VHT40 | TX_RATE_VHT80 |
+				TX_RATE_VHT160)) {
 			nss1_rate = &vht_mcs_nss1[index].ht40_rate[0];
 			nss2_rate = &vht_mcs_nss2[index].ht40_rate[0];
 			/* check for vht40 nss1/2 rate set */
@@ -455,7 +511,7 @@ uint8_t wma_get_mcs_idx(uint16_t raw_rate, enum tx_rate_info rate_flags,
 			}
 		}
 		if (rate_flags & (TX_RATE_VHT20 | TX_RATE_VHT40 |
-			TX_RATE_VHT80)) {
+			TX_RATE_VHT80 | TX_RATE_VHT160)) {
 			nss1_rate = &vht_mcs_nss1[index].ht20_rate[0];
 			nss2_rate = &vht_mcs_nss2[index].ht20_rate[0];
 			/* check for vht20 nss1/2 rate set */
@@ -2714,6 +2770,16 @@ int wma_link_status_event_handler(void *handle, uint8_t *cmd_param_info,
 		return -EINVAL;
 	}
 
+	if (!wma_is_vdev_valid(ht_info->vdevid)) {
+		wma_err("Invalid vdevid %d", ht_info->vdevid);
+		return -EINVAL;
+	}
+
+	if (!intr[ht_info->vdevid].vdev) {
+		wma_err("Vdev is NULL");
+		return -EINVAL;
+	}
+
 	status = wma_get_vdev_rate_flag(intr[ht_info->vdevid].vdev, &rate_flag);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		WMA_LOGE("%s: Failed to get rate flag",	__func__);
@@ -3415,6 +3481,7 @@ QDF_STATUS wma_get_connection_info(uint8_t vdev_id,
 	conn_table_entry->mhz = wma_conn_table_entry->mhz;
 	conn_table_entry->sub_type = wma_conn_table_entry->sub_type;
 	conn_table_entry->type = wma_conn_table_entry->type;
+	conn_table_entry->ch_flagext = wma_conn_table_entry->ch_flagext;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -3840,6 +3907,7 @@ static void wma_set_roam_offload_flag(tp_wma_handle wma, uint8_t vdev_id,
 	QDF_STATUS status;
 	uint32_t flag = 0;
 	bool disable_4way_hs_offload;
+	bool bmiss_skip_full_scan;
 
 	if (is_set) {
 		flag = WMI_ROAM_FW_OFFLOAD_ENABLE_FLAG |
@@ -3853,6 +3921,17 @@ static void wma_set_roam_offload_flag(tp_wma_handle wma, uint8_t vdev_id,
 		 */
 		if (disable_4way_hs_offload)
 			flag |= WMI_VDEV_PARAM_SKIP_ROAM_EAPOL_4WAY_HANDSHAKE;
+
+		wlan_mlme_get_bmiss_skip_full_scan_value(wma->psoc,
+							 &bmiss_skip_full_scan);
+		/*
+		 * If WMI_ROAM_BMISS_FINAL_SCAN_ENABLE_FLAG is set, then
+		 * WMI_ROAM_BMISS_FINAL_SCAN_TYPE_FLAG decides whether firmware
+		 * does channel map based partial scan or partial scan followed
+		 * by full scan in case no candidate is found in partial scan.
+		 */
+		if (bmiss_skip_full_scan)
+			flag |= WMI_ROAM_BMISS_FINAL_SCAN_TYPE_FLAG;
 	}
 
 	WMA_LOGD("%s: vdev_id:%d, is_set:%d, flag:%d",
@@ -4136,7 +4215,6 @@ void wma_remove_bss_peer_on_vdev_start_failure(tp_wma_handle wma,
 {
 	struct cdp_pdev *pdev;
 	void *peer = NULL;
-	uint8_t peer_id;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	QDF_STATUS status;
 	struct qdf_mac_addr bss_peer;
@@ -4158,8 +4236,8 @@ void wma_remove_bss_peer_on_vdev_start_failure(tp_wma_handle wma,
 		return;
 	}
 
-	peer = cdp_peer_find_by_addr(soc, pdev, bss_peer.bytes,
-				     &peer_id);
+	peer = cdp_peer_find_by_addr(soc, pdev, bss_peer.bytes);
+
 	if (!peer) {
 		WMA_LOGE("%s Failed to find peer %pM",
 			 __func__, bss_peer.bytes);
@@ -4691,3 +4769,50 @@ int wma_cold_boot_cal_event_handler(void *wma_ctx, uint8_t *event_buff,
 
 	return 0;
 }
+
+#ifdef FEATURE_OEM_DATA
+int wma_oem_event_handler(void *wma_ctx, uint8_t *event_buff, uint32_t len)
+{
+	WMI_OEM_DATA_EVENTID_param_tlvs *param_buf;
+	struct mac_context *pmac =
+		(struct mac_context *)cds_get_context(QDF_MODULE_ID_PE);
+	wmi_oem_data_event_fixed_param *event;
+	struct oem_data oem_event_data;
+
+	if (!pmac) {
+		wma_err("NULL mac handle");
+		return -EINVAL;
+	}
+
+	if (!pmac->sme.oem_data_event_handler_cb) {
+		wma_err("oem data handler cb is not registered");
+		return -EINVAL;
+	}
+
+	param_buf =
+		   (WMI_OEM_DATA_EVENTID_param_tlvs *)event_buff;
+	if (!param_buf) {
+		wma_err("Invalid oem data Event");
+		return -EINVAL;
+	}
+
+	event = param_buf->fixed_param;
+	if (!event) {
+		wma_err("Invalid fixed param in oem data Event");
+		return -EINVAL;
+	}
+
+	if (event->data_len > param_buf->num_data) {
+		wma_err("Invalid data len %d num_data %d", event->data_len,
+			param_buf->num_data);
+		return -EINVAL;
+	}
+
+	oem_event_data.data_len = event->data_len;
+	oem_event_data.data = param_buf->data;
+
+	pmac->sme.oem_data_event_handler_cb(&oem_event_data);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif

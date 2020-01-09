@@ -324,7 +324,7 @@ static void csr_neighbor_roam_reset_init_state_control_info(struct mac_context *
 }
 
 #ifdef WLAN_FEATURE_11W
-static void
+void
 csr_update_pmf_cap_from_connected_profile(tCsrRoamConnectedProfile *profile,
 					  struct scan_filter *filter)
 {
@@ -333,11 +333,6 @@ csr_update_pmf_cap_from_connected_profile(tCsrRoamConnectedProfile *profile,
 	if (profile->MFPRequired)
 		filter->pmf_cap = WLAN_PMF_REQUIRED;
 }
-#else
-static inline void
-csr_update_pmf_cap_from_connected_profile(tCsrRoamConnectedProfile *profile,
-					  struct scan_filter *filter)
-{}
 #endif
 
 QDF_STATUS
@@ -414,9 +409,9 @@ csr_neighbor_roam_get_scan_filter_from_profile(struct mac_context *mac,
 		filter->num_of_channels = num_ch;
 		if (filter->num_of_channels > QDF_MAX_NUM_CHAN)
 			filter->num_of_channels = QDF_MAX_NUM_CHAN;
-		sme_freq_to_chan_list(mac->pdev, filter->channel_list,
-				      chan_info->freq_list,
-				      filter->num_of_channels);
+		qdf_mem_copy(filter->chan_freq_list, chan_info->freq_list,
+			     filter->num_of_channels *
+			     sizeof(filter->chan_freq_list[0]));
 	}
 
 	if (nbr_roam_info->is11rAssoc)
@@ -590,140 +585,6 @@ QDF_STATUS csr_neighbor_roam_merge_channel_lists(struct mac_context *mac,
 	*pMergedOutputNumOfChannels = numChannels;
 
 	return QDF_STATUS_SUCCESS;
-}
-
-/**
- * csr_neighbor_roam_is_ssid_and_security_match() - to match ssid/security
- * @mac: Pointer to mac context
- * @pCurProfile: pointer to current roam profile
- * @bss_desc: pointer to bss description
- * @pIes: pointer to local ies
- * @session_id: Session ID
- *
- * This routine will be called to see if SSID and security parameters
- * are matching.
- *
- * Return: bool
- */
-static bool csr_neighbor_roam_is_ssid_and_security_match(struct mac_context *mac,
-		tCsrRoamConnectedProfile *pCurProfile,
-		struct bss_description *bss_desc, tDot11fBeaconIEs *pIes,
-		uint8_t session_id)
-{
-	tCsrAuthList authType;
-	tCsrEncryptionList uCEncryptionType;
-	tCsrEncryptionList mCEncryptionType;
-	bool fMatch = false;
-
-	authType.numEntries = 1;
-	authType.authType[0] = pCurProfile->AuthType;
-	uCEncryptionType.numEntries = 1;
-	uCEncryptionType.encryptionType[0] = pCurProfile->EncryptionType;
-	mCEncryptionType.numEntries = 1;
-	mCEncryptionType.encryptionType[0] = pCurProfile->mcEncryptionType;
-
-	/* Again, treat missing pIes as a non-match. */
-	if (!pIes)
-		return false;
-
-	/* Treat a missing SSID as a non-match. */
-	if (!pIes->SSID.present)
-		return false;
-
-	fMatch = csr_is_ssid_match(mac,
-			(void *)pCurProfile->SSID.ssId,
-			pCurProfile->SSID.length,
-			pIes->SSID.ssid,
-			pIes->SSID.num_ssid, true);
-	if (true == fMatch) {
-#ifdef WLAN_FEATURE_11W
-		/*
-		 * We are sending current connected APs profile setting
-		 * if other AP doesn't have the same PMF setting as currently
-		 * connected AP then we will have some issues in roaming.
-		 *
-		 * Make sure all the APs have same PMF settings to avoid
-		 * any corner cases.
-		 */
-		fMatch = csr_is_security_match(mac, &authType,
-				&uCEncryptionType, &mCEncryptionType,
-				&pCurProfile->MFPEnabled,
-				&pCurProfile->MFPRequired,
-				&pCurProfile->MFPCapable,
-				bss_desc, pIes, session_id);
-#else
-		fMatch = csr_is_security_match(mac, &authType,
-				&uCEncryptionType,
-				&mCEncryptionType, NULL,
-				NULL, NULL, bss_desc,
-				pIes, session_id);
-#endif
-		return fMatch;
-	} else {
-		return fMatch;
-	}
-
-}
-
-bool csr_neighbor_roam_is_new_connected_profile(struct mac_context *mac,
-						uint8_t sessionId)
-{
-	tpCsrNeighborRoamControlInfo pNeighborRoamInfo =
-		&mac->roam.neighborRoamInfo[sessionId];
-	tCsrRoamConnectedProfile *pCurrProfile = NULL;
-	tCsrRoamConnectedProfile *pPrevProfile = NULL;
-	tDot11fBeaconIEs *pIes = NULL;
-	struct bss_description *bss_desc = NULL;
-	bool fNew = true;
-
-	if (!(mac->roam.roamSession && CSR_IS_SESSION_VALID(mac, sessionId)))
-		return fNew;
-
-	pCurrProfile = &mac->roam.roamSession[sessionId].connectedProfile;
-	if (!pCurrProfile)
-		return fNew;
-
-	pPrevProfile = &pNeighborRoamInfo->prevConnProfile;
-	if (!pPrevProfile)
-		return fNew;
-
-	bss_desc = pPrevProfile->bss_desc;
-	if (bss_desc) {
-		if (QDF_IS_STATUS_SUCCESS(
-		    csr_get_parsed_bss_description_ies(mac, bss_desc, &pIes))
-		    && csr_neighbor_roam_is_ssid_and_security_match(mac,
-				pCurrProfile, bss_desc, pIes, sessionId)) {
-			fNew = false;
-		}
-		if (pIes)
-			qdf_mem_free(pIes);
-	}
-
-	sme_debug("roam profile match: %d", !fNew);
-
-	return fNew;
-}
-
-bool csr_neighbor_roam_connected_profile_match(struct mac_context *mac,
-					       uint8_t sessionId,
-					       struct tag_csrscan_result
-						*pResult,
-					       tDot11fBeaconIEs *pIes)
-{
-	tCsrRoamConnectedProfile *pCurProfile = NULL;
-	struct bss_description *bss_desc = &pResult->Result.BssDescriptor;
-
-	if (!(mac->roam.roamSession && CSR_IS_SESSION_VALID(mac, sessionId)))
-		return false;
-
-	pCurProfile = &mac->roam.roamSession[sessionId].connectedProfile;
-
-	if (!pCurProfile)
-		return false;
-
-	return csr_neighbor_roam_is_ssid_and_security_match(mac, pCurProfile,
-							    bss_desc, pIes,
-							    sessionId);
 }
 
 /**

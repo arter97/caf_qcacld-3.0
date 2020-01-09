@@ -158,7 +158,6 @@ struct pe_session {
 	tLimSmeStates limPrevSmeState;  /* Previous SME State */
 	tLimSystemRole limSystemRole;
 	enum bss_type bssType;
-	uint8_t operMode;       /* AP - 0; STA - 1 ; */
 	tSirNwType nwType;
 	struct start_bss_req *pLimStartBssReq; /* handle to start bss req */
 	struct join_req *lim_join_req;    /* handle to sme join req */
@@ -180,7 +179,7 @@ struct pe_session {
 	uint8_t htRecommendedTxWidthSet;
 	/* Identifies the 40 MHz extension channel */
 	ePhyChanBondState htSecondaryChannelOffset;
-	enum band_info limRFBand;
+	enum reg_wifi_band limRFBand;
 	uint8_t limIbssActive;  /* TO SUPPORT CONCURRENCY */
 
 	/* These global varibales moved to session Table to support BT-AMP : Oct 9th review */
@@ -615,7 +614,8 @@ static inline void pe_free_dph_node_array_buffer(void)
  * @sessionId: PE session ID is returned here, if PE session is created.
  * @numSta: number of stations
  * @bssType: bss type of new session to do conditional memory allocation.
- * @sme_session_id: sme session identifier
+ * @vdev_id: vdev_id
+ * @opmode: operating mode
  *
  * This function returns the session context and the session ID if the session
  * corresponding to the passed BSSID is found in the PE session table.
@@ -623,10 +623,9 @@ static inline void pe_free_dph_node_array_buffer(void)
  * Return: ptr to the session context or NULL if session can not be created.
  */
 struct pe_session *pe_create_session(struct mac_context *mac,
-			      uint8_t *bssid,
-			      uint8_t *sessionId,
-			      uint16_t numSta, enum bss_type bssType,
-			      uint8_t sme_session_id);
+				     uint8_t *bssid, uint8_t *sessionId,
+				     uint16_t numSta, enum bss_type bssType,
+				     uint8_t vdev_id, enum QDF_OPMODE opmode);
 
 /**
  * pe_find_session_by_bssid() - looks up the PE session given the BSSID.

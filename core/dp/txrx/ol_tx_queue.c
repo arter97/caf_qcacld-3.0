@@ -68,6 +68,8 @@ ol_tx_queue_vdev_flush(struct ol_txrx_pdev_t *pdev, struct ol_txrx_vdev_t *vdev)
 	struct ol_txrx_peer_t *peer, *peers[PEER_ARRAY_COUNT];
 	int i, j, peer_count;
 
+	ol_tx_hl_queue_flush_all(vdev);
+
 	/* flush VDEV TX queues */
 	for (i = 0; i < OL_TX_VDEV_NUM_QUEUES; i++) {
 		txq = &vdev->txqs[i];
@@ -583,16 +585,23 @@ ol_txrx_peer_tid_unpause(ol_txrx_peer_handle peer, int tid)
 }
 
 void
-ol_txrx_vdev_pause(struct cdp_vdev *pvdev, uint32_t reason,
-		   uint32_t pause_type)
+ol_txrx_vdev_pause(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
+		   uint32_t reason, uint32_t pause_type)
 {
-	struct ol_txrx_vdev_t *vdev = (struct ol_txrx_vdev_t *)pvdev;
-	struct ol_txrx_pdev_t *pdev = vdev->pdev;
+	struct ol_txrx_vdev_t *vdev =
+		(struct ol_txrx_vdev_t *)ol_txrx_get_vdev_from_vdev_id(vdev_id);
+	struct ol_txrx_pdev_t *pdev;
 	struct ol_txrx_peer_t *peer;
 	/* TO DO: log the queue pause */
 	/* acquire the mutex lock, since we'll be modifying the queues */
 	TX_SCHED_DEBUG_PRINT("Enter %s\n", __func__);
 
+	if (qdf_unlikely(!vdev)) {
+		ol_txrx_err("vdev is NULL");
+		return;
+	}
+
+	pdev = vdev->pdev;
 
 	/* use peer_ref_mutex before accessing peer_list */
 	qdf_spin_lock_bh(&pdev->peer_ref_mutex);
@@ -614,19 +623,24 @@ ol_txrx_vdev_pause(struct cdp_vdev *pvdev, uint32_t reason,
 	TX_SCHED_DEBUG_PRINT("Leave %s\n", __func__);
 }
 
-
-void ol_txrx_vdev_unpause(struct cdp_vdev *pvdev, uint32_t reason,
-			  uint32_t pause_type)
+void ol_txrx_vdev_unpause(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
+			  uint32_t reason, uint32_t pause_type)
 {
-	struct ol_txrx_vdev_t *vdev = (struct ol_txrx_vdev_t *)pvdev;
-	struct ol_txrx_pdev_t *pdev = vdev->pdev;
+	struct ol_txrx_vdev_t *vdev =
+		(struct ol_txrx_vdev_t *)ol_txrx_get_vdev_from_vdev_id(vdev_id);
+	struct ol_txrx_pdev_t *pdev;
 	struct ol_txrx_peer_t *peer;
 
 	/* TO DO: log the queue unpause */
 	/* acquire the mutex lock, since we'll be modifying the queues */
 	TX_SCHED_DEBUG_PRINT("Enter %s\n", __func__);
 
+	if (qdf_unlikely(!vdev)) {
+		ol_txrx_err("vdev is NULL");
+		return;
+	}
 
+	pdev = vdev->pdev;
 
 	/* take peer_ref_mutex before accessing peer_list */
 	qdf_spin_lock_bh(&pdev->peer_ref_mutex);
@@ -649,9 +663,15 @@ void ol_txrx_vdev_unpause(struct cdp_vdev *pvdev, uint32_t reason,
 	TX_SCHED_DEBUG_PRINT("Leave %s\n", __func__);
 }
 
-void ol_txrx_vdev_flush(struct cdp_vdev *pvdev)
+void ol_txrx_vdev_flush(struct cdp_soc_t *soc_hdl, uint8_t vdev_id)
 {
-	struct ol_txrx_vdev_t *vdev = (struct ol_txrx_vdev_t *)pvdev;
+	struct ol_txrx_vdev_t *vdev =
+		(struct ol_txrx_vdev_t *)ol_txrx_get_vdev_from_vdev_id(vdev_id);
+
+	if (qdf_unlikely(!vdev)) {
+		ol_txrx_err("vdev is NULL");
+		return;
+	}
 
 	ol_tx_queue_vdev_flush(vdev->pdev, vdev);
 }
@@ -851,10 +871,11 @@ ol_tx_bad_peer_update_tx_limit(struct ol_txrx_pdev_t *pdev,
 }
 
 void
-ol_txrx_bad_peer_txctl_set_setting(struct cdp_pdev *ppdev,
+ol_txrx_bad_peer_txctl_set_setting(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 				   int enable, int period, int txq_limit)
 {
-	struct ol_txrx_pdev_t *pdev = (struct ol_txrx_pdev_t *)ppdev;
+	struct ol_txrx_soc_t *soc = cdp_soc_t_to_ol_txrx_soc_t(soc_hdl);
+	ol_txrx_pdev_handle pdev = ol_txrx_get_pdev_from_pdev_id(soc, pdev_id);
 
 	if (enable)
 		pdev->tx_peer_bal.enabled = ol_tx_peer_bal_enable;
@@ -867,11 +888,12 @@ ol_txrx_bad_peer_txctl_set_setting(struct cdp_pdev *ppdev,
 }
 
 void
-ol_txrx_bad_peer_txctl_update_threshold(struct cdp_pdev *ppdev,
-					int level, int tput_thresh,
-					int tx_limit)
+ol_txrx_bad_peer_txctl_update_threshold(struct cdp_soc_t *soc_hdl,
+					uint8_t pdev_id, int level,
+					int tput_thresh, int tx_limit)
 {
-	struct ol_txrx_pdev_t *pdev = (struct ol_txrx_pdev_t *)ppdev;
+	struct ol_txrx_soc_t *soc = cdp_soc_t_to_ol_txrx_soc_t(soc_hdl);
+	ol_txrx_pdev_handle pdev = ol_txrx_get_pdev_from_pdev_id(soc, pdev_id);
 
 	/* Set the current settingl */
 	pdev->tx_peer_bal.ctl_thresh[level].tput_thresh =
@@ -1717,9 +1739,8 @@ void ol_txrx_pdev_pause(struct ol_txrx_pdev_t *pdev, uint32_t reason)
 	struct ol_txrx_vdev_t *vdev = NULL, *tmp;
 
 	TAILQ_FOREACH_SAFE(vdev, &pdev->vdev_list, vdev_list_elem, tmp) {
-		cdp_fc_vdev_pause(
-			cds_get_context(QDF_MODULE_ID_SOC),
-			(struct cdp_vdev *)vdev, reason, 0);
+		cdp_fc_vdev_pause(cds_get_context(QDF_MODULE_ID_SOC),
+				  vdev->vdev_id, reason, 0);
 	}
 
 }
@@ -1737,7 +1758,7 @@ void ol_txrx_pdev_unpause(struct ol_txrx_pdev_t *pdev, uint32_t reason)
 
 	TAILQ_FOREACH_SAFE(vdev, &pdev->vdev_list, vdev_list_elem, tmp) {
 		cdp_fc_vdev_unpause(cds_get_context(QDF_MODULE_ID_SOC),
-				    (struct cdp_vdev *)vdev, reason, 0);
+				    vdev->vdev_id, reason, 0);
 	}
 
 }

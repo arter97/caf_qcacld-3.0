@@ -76,6 +76,7 @@ typedef const enum policy_mgr_conc_next_action
  * @CSA_REASON_UNSAFE_CHANNEL: Unsafe channel.
  * @CSA_REASON_LTE_COEX: LTE coex.
  * @CSA_REASON_CONCURRENT_NAN_EVENT: NAN concurrency.
+ * @CSA_REASON_BAND_RESTRICTED: band disabled or re-enabled
  *
  */
 enum sap_csa_reason_code {
@@ -87,7 +88,8 @@ enum sap_csa_reason_code {
 	CSA_REASON_CONCURRENT_STA_CHANGED_CHANNEL,
 	CSA_REASON_UNSAFE_CHANNEL,
 	CSA_REASON_LTE_COEX,
-	CSA_REASON_CONCURRENT_NAN_EVENT
+	CSA_REASON_CONCURRENT_NAN_EVENT,
+	CSA_REASON_BAND_RESTRICTED
 };
 
 /**
@@ -151,6 +153,19 @@ policy_mgr_get_enable_overlap_chnl(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS policy_mgr_get_dual_mac_feature(struct wlan_objmgr_psoc *psoc,
 					   uint8_t *dual_mac_feature);
+
+/**
+ * policy_mgr_set_dual_mac_feature() - to set the dual mac feature value
+ * @psoc: pointer to psoc
+ * @dual_mac_feature: value to be updated
+ *
+ * This API is used to update the dual mac (dual radio) specific feature value
+ *
+ * Return: QDF_STATUS_SUCCESS up on success and any other status for failure.
+ */
+QDF_STATUS policy_mgr_set_dual_mac_feature(struct wlan_objmgr_psoc *psoc,
+					   uint8_t dual_mac_feature);
+
 /**
  * policy_mgr_get_force_1x1() - to find out if 1x1 connection is enforced
  *
@@ -316,6 +331,18 @@ QDF_STATUS policy_mgr_get_conc_rule2(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS policy_mgr_get_chnl_select_plcy(struct wlan_objmgr_psoc *psoc,
 					   uint32_t *chnl_select_plcy);
+
+/**
+ * policy_mgr_set_ch_select_plcy() - to set channel selection policy
+ * @psoc: pointer to psoc
+ * @ch_select_policy: value to be set
+ *
+ * This API is used to set the ch selection policy.
+ *
+ * Return: QDF_STATUS_SUCCESS up on success and any other status for failure.
+ */
+QDF_STATUS policy_mgr_set_ch_select_plcy(struct wlan_objmgr_psoc *psoc,
+					 uint32_t ch_select_policy);
 
 /**
  * policy_mgr_get_mcc_adaptive_sch() - to get mcc adaptive scheduler
@@ -2245,6 +2272,16 @@ bool policy_mgr_is_hw_sbs_capable(struct wlan_objmgr_psoc *psoc);
 bool policy_mgr_is_current_hwmode_dbs(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * policy_mgr_is_dp_hw_dbs_2x2_capable() - if hardware is capable of dbs 2x2
+ * for Data Path.
+ * @psoc: PSOC object information
+ * This API is for Data Path to get HW dbs 2x2 capable.
+ *
+ * Return: true - DBS2x2, false - DBS1x1
+ */
+bool policy_mgr_is_dp_hw_dbs_2x2_capable(struct wlan_objmgr_psoc *psoc);
+
+/**
  * policy_mgr_is_hw_dbs_2x2_capable() - if hardware is capable of dbs 2x2
  * @psoc: PSOC object information
  * This function checks if hw_modes supported are always capable of
@@ -2256,6 +2293,22 @@ bool policy_mgr_is_current_hwmode_dbs(struct wlan_objmgr_psoc *psoc);
  * Return: true - DBS2x2, false - DBS1x1
  */
 bool policy_mgr_is_hw_dbs_2x2_capable(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * policy_mgr_is_hw_dbs_required_for_band() - Check whether hardware needs DBS
+ * mode to support the given band
+ * @psoc: PSOC object information
+ * @band: band
+ *
+ * The function checks whether DBS mode switching required or not to support
+ * given band based on target capability.
+ * Any HW which doesn't support given band on PHY A will need DBS HW mode when a
+ * connection is coming up on that band.
+ *
+ * Return: true - DBS mode required for requested band
+ */
+bool policy_mgr_is_hw_dbs_required_for_band(struct wlan_objmgr_psoc *psoc,
+					    enum hw_mode_mac_band_cap band);
 
 /*
  * policy_mgr_is_2x2_1x1_dbs_capable() - check 2x2+1x1 DBS supported or not
@@ -3133,4 +3186,13 @@ uint32_t policy_mgr_get_mode_specific_conn_info(struct wlan_objmgr_psoc *psoc,
 						uint32_t *ch_freq_list,
 						uint8_t *vdev_id,
 						enum policy_mgr_con_mode mode);
+
+/**
+ * policy_mgr_is_sap_go_on_2g() - check if sap/go is on 2g
+ * @psoc: PSOC object information
+ *
+ * Return: true or false
+ */
+bool policy_mgr_is_sap_go_on_2g(struct wlan_objmgr_psoc *psoc);
+
 #endif /* __WLAN_POLICY_MGR_API_H */

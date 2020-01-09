@@ -1769,7 +1769,8 @@ void lim_ps_offload_handle_missed_beacon_ind(struct mac_context *mac,
 		pe_find_session_by_vdev_id(mac, missed_beacon_ind->bss_idx);
 
 	if (!pe_session) {
-		pe_err("session does not exist for given BSSId");
+		pe_err("session does not exist for vdev_id %d",
+			missed_beacon_ind->bss_idx);
 		return;
 	}
 
@@ -2242,6 +2243,27 @@ pe_disconnect_callback(struct mac_context *mac, uint8_t vdev_id,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_FILS_SK
+static void
+lim_fill_fils_ft(struct pe_session *src_session,
+		 struct pe_session *dst_session)
+{
+      if (src_session->fils_info &&
+          src_session->fils_info->fils_ft_len) {
+              dst_session->fils_info->fils_ft_len =
+                      src_session->fils_info->fils_ft_len;
+              qdf_mem_copy(dst_session->fils_info->fils_ft,
+                           src_session->fils_info->fils_ft,
+                           src_session->fils_info->fils_ft_len);
+      }
+}
+#else
+static inline void
+lim_fill_fils_ft(struct pe_session *src_session,
+		 struct pe_session *dst_session)
+{}
+#endif
+
 QDF_STATUS
 pe_roam_synch_callback(struct mac_context *mac_ctx,
 		       struct roam_offload_synch_ind *roam_sync_ind_ptr,
@@ -2325,8 +2347,9 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	status = QDF_STATUS_E_FAILURE;
 	ft_session_ptr = pe_create_session(mac_ctx, bss_desc->bssId,
 					   &session_id, mac_ctx->lim.maxStation,
-					   eSIR_INFRASTRUCTURE_MODE,
-					   session_ptr->smeSessionId);
+					   session_ptr->bssType,
+					   session_ptr->vdev_id,
+					   session_ptr->opmode);
 	if (!ft_session_ptr) {
 		pe_err("LFR3:Cannot create PE Session");
 		lim_print_mac_addr(mac_ctx, bss_desc->bssId, LOGE);
@@ -2351,17 +2374,8 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 
 	/* Next routine may update nss based on dot11Mode */
 	lim_ft_prepare_add_bss_req(mac_ctx, ft_session_ptr, bss_desc);
-	if (session_ptr->is11Rconnection) {
-		ft_session_ptr->is11Rconnection = session_ptr->is11Rconnection;
-		if (session_ptr->fils_info &&
-		    session_ptr->fils_info->fils_ft_len) {
-			ft_session_ptr->fils_info->fils_ft_len =
-			       session_ptr->fils_info->fils_ft_len;
-			qdf_mem_copy(ft_session_ptr->fils_info->fils_ft,
-				     session_ptr->fils_info->fils_ft,
-				     session_ptr->fils_info->fils_ft_len);
-		}
-	}
+	if (session_ptr->is11Rconnection)
+		lim_fill_fils_ft(session_ptr, ft_session_ptr);
 
 	roam_sync_ind_ptr->add_bss_params =
 		(struct bss_params *) ft_session_ptr->ftPEContext.pAddBssReq;
@@ -2420,6 +2434,7 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	curr_sta_ds->nss = ft_session_ptr->nss;
 	roam_sync_ind_ptr->nss = ft_session_ptr->nss;
 	ft_session_ptr->limMlmState = eLIM_MLM_LINK_ESTABLISHED_STATE;
+	ft_session_ptr->limPrevMlmState = ft_session_ptr->limMlmState;
 	lim_init_tdls_data(mac_ctx, ft_session_ptr);
 	join_rsp_len = ft_session_ptr->RICDataLen +
 			sizeof(struct join_rsp) - sizeof(uint8_t);
@@ -2473,8 +2488,8 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	lim_set_tdls_flags(roam_sync_ind_ptr, ft_session_ptr);
 	roam_sync_ind_ptr->join_rsp->aid = ft_session_ptr->limAID;
 	lim_fill_join_rsp_ht_caps(ft_session_ptr, roam_sync_ind_ptr->join_rsp);
-	ft_session_ptr->limPrevSmeState = ft_session_ptr->limSmeState;
 	ft_session_ptr->limSmeState = eLIM_SME_LINK_EST_STATE;
+	ft_session_ptr->limPrevSmeState = ft_session_ptr->limSmeState;
 	ft_session_ptr->bRoamSynchInProgress = false;
 	if (mac_ctx->roam.pReassocResp)
 		qdf_mem_free(mac_ctx->roam.pReassocResp);
@@ -2686,7 +2701,8 @@ void lim_mon_init_session(struct mac_context *mac_ptr,
 					   &session_id,
 					   mac_ptr->lim.maxStation,
 					   eSIR_MONITOR_MODE,
-					   msg->vdev_id);
+					   msg->vdev_id,
+					   QDF_MONITOR_MODE);
 	if (!psession_entry) {
 		pe_err("Monitor mode: Session Can not be created");
 		lim_print_mac_addr(mac_ptr, msg->bss_id.bytes, LOGE);

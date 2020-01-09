@@ -98,6 +98,9 @@
 					1, 4, 3, \
 					CFG_VALUE_OR_DEFAULT, \
 					"Config max num allowed connections")
+
+#define POLICY_MGR_CH_SELECT_POLICY_DEF         0x00000003
+
 /*
  * <ini>
  * channel_select_logic_conc - Set channel selection logic
@@ -121,12 +124,12 @@
  * </ini>
  */
 #define CFG_CHNL_SELECT_LOGIC_CONC CFG_INI_UINT(\
-						"channel_select_logic_conc",\
-						0x00000000, \
-						0xFFFFFFFF, \
-						0x00000003, \
-						CFG_VALUE_OR_DEFAULT, \
-						"Set channel selection policy for various concurrency")
+					"channel_select_logic_conc",\
+					0x00000000, \
+					0xFFFFFFFF, \
+					POLICY_MGR_CH_SELECT_POLICY_DEF, \
+					CFG_VALUE_OR_DEFAULT, \
+					"Set channel selection policy for various concurrency")
 /*
  * <ini>
  * dbs_selection_policy - Configure dbs selection policy.
@@ -387,7 +390,7 @@ CFG_INI_UINT("gDualMacFeatureDisable", 0, 6, 0, CFG_VALUE_OR_DEFAULT, \
  * mode support disabled.
  * @Min: 0
  * @Max: 2
- * @Default: 0
+ * @Default: 2
  *
  * This ini is used to allow STA+SAP SCC on DFS channel with master mode
  * support disabled, the value is defined by enum PM_AP_DFS_MASTER_MODE.
@@ -408,7 +411,7 @@ CFG_INI_UINT("gDualMacFeatureDisable", 0, 6, 0, CFG_VALUE_OR_DEFAULT, \
  */
 
 #define CFG_STA_SAP_SCC_ON_DFS_CHAN \
-CFG_INI_UINT("g_sta_sap_scc_on_dfs_chan", 0, 2, 0, CFG_VALUE_OR_DEFAULT, \
+CFG_INI_UINT("g_sta_sap_scc_on_dfs_chan", 0, 2, 2, CFG_VALUE_OR_DEFAULT, \
 	     "Allow STA+SAP SCC on DFS channel with master mode disable")
 
 /*
@@ -490,7 +493,7 @@ CFG_INI_BOOL("g_nan_sap_scc_on_lte_coex_chan", 1, \
  * g_sta_sap_scc_on_lte_coex_chan - Allow STA+SAP SCC on LTE coex channel
  * @Min: 0
  * @Max: 1
- * @Default: 0
+ * @Default: 1
  *
  * This ini is used to allow STA+SAP SCC on LTE coex channel
  * 0 - Disallow STA+SAP SCC on LTE coex channel
@@ -505,7 +508,7 @@ CFG_INI_BOOL("g_nan_sap_scc_on_lte_coex_chan", 1, \
  * </ini>
  */
 #define CFG_STA_SAP_SCC_ON_LTE_COEX_CHAN \
-CFG_INI_UINT("g_sta_sap_scc_on_lte_coex_chan", 0, 1, 0, CFG_VALUE_OR_DEFAULT, \
+CFG_INI_UINT("g_sta_sap_scc_on_lte_coex_chan", 0, 1, 1, CFG_VALUE_OR_DEFAULT, \
 	     "Allow STA+SAP SCC on LTE coex channel")
 
 /*

@@ -56,8 +56,6 @@
 #include "sme_api.h"
 #include "wlan_mlme_ucfg_api.h"
 
-#define WLAN_HDD_MAX_DSCP 0x3f
-
 #define HDD_WMM_UP_TO_AC_MAP_SIZE 8
 
 const uint8_t hdd_wmm_up_to_ac_map[] = {
@@ -1478,7 +1476,7 @@ QDF_STATUS hdd_wmm_init(struct hdd_adapter *adapter)
 	/* DSCP to User Priority Lookup Table
 	 * By default use the 3 Precedence bits of DSCP as the User Priority
 	 */
-	for (dscp = 0; dscp <= WLAN_HDD_MAX_DSCP; dscp++)
+	for (dscp = 0; dscp <= WLAN_MAX_DSCP; dscp++)
 		dscp_to_up_map[dscp] = dscp >> 3;
 
 	/* Special case for Expedited Forwarding (DSCP 46) */
@@ -1804,7 +1802,13 @@ static uint16_t hdd_wmm_select_queue(struct net_device *dev,
 	return index;
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+uint16_t hdd_select_queue(struct net_device *dev, struct sk_buff *skb,
+			  struct net_device *sb_dev)
+{
+	return hdd_wmm_select_queue(dev, skb);
+}
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
 uint16_t hdd_select_queue(struct net_device *dev, struct sk_buff *skb,
 			  struct net_device *sb_dev,
 			  select_queue_fallback_t fallback)

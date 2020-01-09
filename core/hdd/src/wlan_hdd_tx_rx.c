@@ -60,6 +60,7 @@
 
 #include "wlan_hdd_nud_tracking.h"
 #include "dp_txrx.h"
+#include <ol_defines.h>
 #include "cfg_ucfg_api.h"
 #include "target_type.h"
 #include "wlan_hdd_object_manager.h"
@@ -358,7 +359,7 @@ void hdd_get_tx_resource(struct hdd_adapter *adapter,
 {
 	if (false ==
 	    cdp_fc_get_tx_resource(cds_get_context(QDF_MODULE_ID_SOC),
-				   cds_get_context(QDF_MODULE_ID_TXRX),
+				   OL_TXRX_PDEV_ID,
 				   *mac_addr,
 				   adapter->tx_flow_low_watermark,
 				   adapter->tx_flow_hi_watermark_offset)) {
@@ -417,7 +418,6 @@ static inline struct sk_buff *hdd_skb_orphan(struct hdd_adapter *adapter,
 uint32_t hdd_txrx_get_tx_ack_count(struct hdd_adapter *adapter)
 {
 	return cdp_get_tx_ack_stats(cds_get_context(QDF_MODULE_ID_SOC),
-				    cds_get_context(QDF_MODULE_ID_TXRX),
 				    adapter->vdev_id);
 }
 
@@ -565,13 +565,11 @@ static inline bool hdd_is_tx_allowed(struct sk_buff *skb, uint8_t *peer_mac)
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	void *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 	void *peer;
-	/* Will be removed in Phase 3 cleanup */
-	uint8_t peer_id;
 
 	QDF_BUG(soc);
 	QDF_BUG(pdev);
 
-	peer = cdp_peer_find_by_addr(soc, pdev, peer_mac, &peer_id);
+	peer = cdp_peer_find_by_addr(soc, pdev, peer_mac);
 
 	if (!peer) {
 		hdd_err_rl("Unable to find peer entry for sta: "
@@ -1286,11 +1284,12 @@ static void __hdd_tx_timeout(struct net_device *dev)
 		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_ERROR,
 			  "Data stall due to continuous TX timeouts");
 		adapter->hdd_stats.tx_rx_stats.cont_txtimeout_cnt = 0;
+
 		if (cdp_cfg_get(soc, cfg_dp_enable_data_stall))
 			cdp_post_data_stall_event(soc,
 					  DATA_STALL_LOG_INDICATOR_HOST_DRIVER,
 					  DATA_STALL_LOG_HOST_STA_TX_TIMEOUT,
-					  0xFF, 0xFF,
+					  OL_TXRX_PDEV_ID, 0xFF,
 					  DATA_STALL_LOG_RECOVERY_TRIGGER_PDR);
 	}
 }
@@ -1948,6 +1947,24 @@ QDF_STATUS hdd_rx_pkt_thread_enqueue_cbk(void *adapter,
 	return dp_rx_enqueue_pkt(cds_get_context(QDF_MODULE_ID_SOC), nbuf_list);
 }
 
+#ifdef CONFIG_HL_SUPPORT
+QDF_STATUS hdd_rx_deliver_to_stack(struct hdd_adapter *adapter,
+				   struct sk_buff *skb)
+{
+	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
+	int status = QDF_STATUS_E_FAILURE;
+	int netif_status;
+
+	adapter->hdd_stats.tx_rx_stats.rx_non_aggregated++;
+	hdd_ctx->no_rx_offload_pkt_cnt++;
+	netif_status = netif_rx_ni(skb);
+
+	if (netif_status == NET_RX_SUCCESS)
+		status = QDF_STATUS_SUCCESS;
+
+	return status;
+}
+#else
 QDF_STATUS hdd_rx_deliver_to_stack(struct hdd_adapter *adapter,
 				   struct sk_buff *skb)
 {
@@ -2002,6 +2019,7 @@ QDF_STATUS hdd_rx_deliver_to_stack(struct hdd_adapter *adapter,
 
 	return status;
 }
+#endif
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0))
 static bool hdd_is_gratuitous_arp_unsolicited_na(struct sk_buff *skb)
@@ -2017,34 +2035,28 @@ static bool hdd_is_gratuitous_arp_unsolicited_na(struct sk_buff *skb)
 
 QDF_STATUS hdd_rx_flush_packet_cbk(void *adapter_context, uint8_t vdev_id)
 {
-	struct hdd_adapter *adapter = NULL;
-	struct hdd_context *hdd_ctx = NULL;
+	struct hdd_adapter *adapter;
+	struct hdd_context *hdd_ctx;
 	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
 
-	/* Sanity check on inputs */
-	if (unlikely(!adapter_context)) {
-		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_ERROR,
-			  "%s: Null params being passed", __func__);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	adapter = (struct hdd_adapter *)adapter_context;
-	if (unlikely(adapter->magic != WLAN_HDD_ADAPTER_MAGIC)) {
-		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_ERROR,
-			  "Magic cookie(%x) for adapter sanity verification is invalid",
-			  adapter->magic);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	if (unlikely(!hdd_ctx)) {
 		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_ERROR,
 			  "%s: HDD context is Null", __func__);
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	adapter = hdd_adapter_get_by_reference(hdd_ctx, adapter_context);
+	if (!adapter) {
+		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_ERROR,
+			  "%s: Adapter reference is Null", __func__);
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	if (hdd_ctx->enable_dp_rx_threads)
 		dp_txrx_flush_pkts_by_vdev_id(soc, vdev_id);
+
+	hdd_adapter_put(adapter);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2722,10 +2734,8 @@ int hdd_set_mon_rx_cb(struct net_device *dev)
 	txrx_ops.rx.rx = hdd_mon_rx_packet_cbk;
 	hdd_monitor_set_rx_monitor_cb(&txrx_ops, hdd_rx_monitor_callback);
 	cdp_vdev_register(soc,
-		(struct cdp_vdev *)cdp_get_mon_vdev_from_pdev(soc,
-		(struct cdp_pdev *)pdev),
-		adapter, (struct cdp_ctrl_objmgr_vdev *)adapter->vdev,
-		&txrx_ops);
+			  cdp_get_mon_vdev_from_pdev(soc, pdev),
+			  adapter, &txrx_ops);
 	/* peer is created wma_vdev_attach->wma_create_peer */
 	qdf_status = cdp_peer_register(soc,
 			(struct cdp_pdev *)pdev, &sta_desc);
@@ -3134,6 +3144,26 @@ static void hdd_ini_tcp_del_ack_settings(struct hdd_config *config,
 }
 #endif
 
+#ifdef WLAN_SUPPORT_TXRX_HL_BUNDLE
+static void hdd_dp_hl_bundle_cfg_update(struct hdd_config *config,
+					struct wlan_objmgr_psoc *psoc)
+{
+	config->pkt_bundle_threshold_high =
+		cfg_get(psoc, CFG_DP_HL_BUNDLE_HIGH_TH);
+	config->pkt_bundle_threshold_low =
+		cfg_get(psoc, CFG_DP_HL_BUNDLE_LOW_TH);
+	config->pkt_bundle_timer_value =
+		cfg_get(psoc, CFG_DP_HL_BUNDLE_TIMER_VALUE);
+	config->pkt_bundle_size =
+		cfg_get(psoc, CFG_DP_HL_BUNDLE_SIZE);
+}
+#else
+static void hdd_dp_hl_bundle_cfg_update(struct hdd_config *config,
+					struct wlan_objmgr_psoc *psoc)
+{
+}
+#endif
+
 void hdd_dp_cfg_update(struct wlan_objmgr_psoc *psoc,
 		       struct hdd_context *hdd_ctx)
 {
@@ -3147,8 +3177,12 @@ void hdd_dp_cfg_update(struct wlan_objmgr_psoc *psoc,
 
 	hdd_ini_tcp_del_ack_settings(config, psoc);
 
+	hdd_dp_hl_bundle_cfg_update(config, psoc);
+
 	config->napi_cpu_affinity_mask =
 		cfg_get(psoc, CFG_DP_NAPI_CE_CPU_MASK);
+	config->rx_thread_ul_affinity_mask =
+		cfg_get(psoc, CFG_DP_RX_THREAD_UL_CPU_MASK);
 	config->rx_thread_affinity_mask =
 		cfg_get(psoc, CFG_DP_RX_THREAD_CPU_MASK);
 	qdf_uint8_array_parse(cfg_get(psoc, CFG_DP_RPS_RX_QUEUE_CPU_MAP_LIST),
@@ -3182,7 +3216,7 @@ bool wlan_hdd_rx_rpm_mark_last_busy(struct hdd_context *hdd_ctx,
 				      current_us + 1);
 	rpm_delay_ms = ucfg_pmo_get_runtime_pm_delay(hdd_ctx->psoc);
 
-	if ((duration_us / 1000) < rpm_delay_ms)
+	if (duration_us < (rpm_delay_ms * 1000))
 		return true;
 	else
 		return false;
