@@ -726,6 +726,9 @@ struct cdp_mon_ops {
 
 	void (*txrx_deliver_tx_mgmt)
 		(struct cdp_pdev *pdev, qdf_nbuf_t nbuf);
+
+	void (*txrx_set_bsscolor)
+		(struct cdp_pdev *pdev, uint8_t bsscolor);
 };
 
 struct cdp_host_stats_ops {
@@ -996,6 +999,7 @@ struct ol_if_ops {
 						uint8_t *peer_macaddr,
 						uint32_t flags);
 	/* TODO: Add any other control path calls required to OL_IF/WMA layer */
+
 };
 
 #ifndef CONFIG_WIN

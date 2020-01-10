@@ -6467,6 +6467,19 @@ dp_deliver_tx_mgmt(struct cdp_pdev *pdev_handle, qdf_nbuf_t nbuf)
 }
 
 /**
+ * dp_set_bsscolor() - sets bsscolor for tx capture
+ * @pdev_handle: Datapath PDEV handle
+ * @bsscolor: new bsscolor
+ */
+static void
+dp_mon_set_bsscolor(struct cdp_pdev *pdev_handle, uint8_t bsscolor)
+{
+	struct dp_pdev *pdev = (struct dp_pdev *)pdev_handle;
+
+	pdev->rx_mon_recv_status.bsscolor = bsscolor;
+}
+
+/**
  * dp_get_pdev_id_frm_pdev() - get pdev_id
  * @pdev_handle: Datapath PDEV handle
  *
@@ -10459,6 +10472,7 @@ static struct cdp_mon_ops dp_ops_mon = {
 	/* Added support for HK advance filter */
 	.txrx_set_advance_monitor_filter = dp_pdev_set_advance_monitor_filter,
 	.txrx_deliver_tx_mgmt = dp_deliver_tx_mgmt,
+	.txrx_set_bsscolor = dp_mon_set_bsscolor,
 };
 
 static struct cdp_host_stats_ops dp_ops_host_stats = {
