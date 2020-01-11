@@ -35,6 +35,9 @@
 #include "hal_api_mon.h"
 #include "phyrx_other_receive_info_ru_details.h"
 
+#define HAL_RX_GET_SW_FRAME_GROUP_ID(rx_mpdu_start)	\
+	HAL_RX_GET(rx_mpdu_start, RX_MPDU_INFO_0, SW_FRAME_GROUP_ID)
+
 #if defined(QCA_WIFI_QCA6290_11AX)
 #define HAL_RX_MSDU_START_MIMO_SS_BITMAP(_rx_msdu_start)\
 	(_HAL_MS((*_OFFSET_TO_WORD_PTR((_rx_msdu_start),\

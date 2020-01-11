@@ -29,6 +29,10 @@
 	RX_MSDU_START_5_MIMO_SS_BITMAP_OFFSET)),	\
 	RX_MSDU_START_5_MIMO_SS_BITMAP_MASK,		\
 	RX_MSDU_START_5_MIMO_SS_BITMAP_LSB))
+
+#define HAL_RX_GET_SW_FRAME_GROUP_ID(rx_mpdu_start)	\
+	HAL_RX_GET(rx_mpdu_start, RX_MPDU_INFO_0, SW_FRAME_GROUP_ID)
+
 /*
  * hal_rx_msdu_start_nss_get_8074v2(): API to get the NSS
  * Interval from rx_msdu_start
