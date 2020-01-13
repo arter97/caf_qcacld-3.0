@@ -826,7 +826,8 @@ add_ast_entry:
 				(struct cdp_peer *)peer,
 				mac_addr,
 				next_node_mac,
-				flags)) {
+				flags,
+				ast_entry->type)) {
 			qdf_spin_unlock_bh(&soc->ast_lock);
 			return 0;
 		}

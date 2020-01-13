@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -937,7 +937,8 @@ struct ol_if_ops {
 				  struct cdp_peer *peer_handle,
 				  const uint8_t *dest_macaddr,
 				  uint8_t *next_node_mac,
-				  uint32_t flags);
+				  uint32_t flags,
+				  uint8_t type);
 	int (*peer_update_wds_entry)(void *ol_soc_handle,
 			uint8_t *dest_macaddr, uint8_t *peer_macaddr,
 			uint32_t flags);
