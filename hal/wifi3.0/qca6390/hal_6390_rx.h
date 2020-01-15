@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -40,6 +40,9 @@
 	RX_MSDU_START_5_MIMO_SS_BITMAP_OFFSET)),	\
 	RX_MSDU_START_5_MIMO_SS_BITMAP_MASK,		\
 	RX_MSDU_START_5_MIMO_SS_BITMAP_LSB))
+
+#define HAL_RX_GET_MAC_ADDR1_VALID(rx_mpdu_start) \
+	HAL_RX_GET(rx_mpdu_start, RX_MPDU_INFO_2, MAC_ADDR_AD1_VALID)
 
 #define HAL_RX_GET_SW_FRAME_GROUP_ID(rx_mpdu_start)	\
 	HAL_RX_GET(rx_mpdu_start, RX_MPDU_INFO_0, SW_FRAME_GROUP_ID)
