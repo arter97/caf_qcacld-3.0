@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -71,6 +71,15 @@ enum cds_driver_state {
 	CDS_DRIVER_STATE_BAD                    = BIT(4),
 	CDS_DRIVER_STATE_FW_READY               = BIT(5),
 	CDS_DRIVER_STATE_MODULE_STOPPING        = BIT(6),
+};
+
+/**
+ * struce cds_vdev_dp_stats - vdev stats populated from DP
+ * @tx_retries: packet number of successfully transmitted after more
+ *              than one retransmission attempt
+ */
+struct cds_vdev_dp_stats {
+	uint32_t tx_retries;
 };
 
 #define __CDS_IS_DRIVER_STATE(_state, _mask) (((_state) & (_mask)) == (_mask))
@@ -318,8 +327,6 @@ QDF_STATUS cds_dp_close(struct wlan_objmgr_psoc *psoc);
 
 void *cds_get_context(QDF_MODULE_ID module_id);
 
-uint8_t cds_get_datapath_handles(void **soc, struct cdp_pdev **pdev,
-			 struct cdp_vdev **vdev, uint8_t sessionId);
 void *cds_get_global_context(void);
 
 QDF_STATUS cds_alloc_context(QDF_MODULE_ID module_id, void **module_context,
@@ -502,6 +509,23 @@ uint32_t cds_get_connectivity_stats_pkt_bitmap(void *context);
 void cds_incr_arp_stats_tx_tgt_delivered(void);
 void cds_incr_arp_stats_tx_tgt_acked(void);
 
+#ifdef FEATURE_ALIGN_STATS_FROM_DP
+/**
+ * cds_dp_get_vdev_stats() - get vdev stats from DP
+ * @vdev_id: vdev id
+ * @stats: structure of counters which CP is interested in
+ *
+ * Return: if get vdev stats from DP success, return true otherwise false
+ */
+bool cds_dp_get_vdev_stats(uint8_t vdev_id, struct cds_vdev_dp_stats *stats);
+#else
+static inline bool
+cds_dp_get_vdev_stats(uint8_t vdev_id, struct cds_vdev_dp_stats *stats)
+{
+	return false;
+}
+#endif
+
 /**
  * cds_smmu_mem_map_setup() - Check SMMU S1 stage enable
  *                            status and setup wlan driver
@@ -527,4 +551,40 @@ QDF_STATUS cds_smmu_mem_map_setup(qdf_device_t osdev, bool ipa_present);
  * Return: Status of map operation
  */
 int cds_smmu_map_unmap(bool map, uint32_t num_buf, qdf_mem_info_t *buf_arr);
+
+#ifdef WLAN_FEATURE_PKT_CAPTURE
+/**
+ * cds_is_pktcapture_enabled() - is packet capture support enabled
+ *
+ * Check is packet capture mode enabled from ini
+ *
+ * Return: 0 - disable, 1 - enable
+ */
+bool cds_is_pktcapture_enabled(void);
+
+/**
+ * cds_get_pktcapture_mode() - get pktcapture mode value
+ *
+ * Get the pktcapture mode value from hdd context
+ *
+ * Return: 0 - disable
+ *         1 - Mgmt packets
+ *         2 - Data packets
+ *         3 - Both Mgmt and Data packets
+ */
+uint8_t cds_get_pktcapture_mode(void);
+#else
+static inline
+bool cds_is_pktcapture_enabled(void)
+{
+	return false;
+}
+
+static inline
+uint8_t cds_get_pktcapture_mode(void)
+{
+	return 0;
+}
+#endif /* WLAN_FEATURE_PKT_CAPTURE */
+
 #endif /* if !defined __CDS_API_H */

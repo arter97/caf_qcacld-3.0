@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1182,7 +1182,7 @@ void hdd_ch_avoid_ind(struct hdd_context *hdd_ctxt,
 
 	for (i = 0; i < unsafe_chan_list->chan_cnt; i++) {
 		hdd_ctxt->unsafe_channel_list[i] =
-			wlan_reg_freq_to_chan(hdd_ctxt->pdev, unsafe_chan_list->chan_freq_list[i]);
+				unsafe_chan_list->chan_freq_list[i];
 	}
 	hdd_debug("number of unsafe channels is %d ",
 	       hdd_ctxt->unsafe_channel_count);
@@ -1450,12 +1450,17 @@ static void hdd_regulatory_dyn_cbk(struct wlan_objmgr_psoc *psoc,
 		hdd_send_wiphy_regd_sync_event(hdd_ctx);
 #endif
 
-	if (avoid_freq_ind)
+	if (avoid_freq_ind) {
 		hdd_ch_avoid_ind(hdd_ctx, &avoid_freq_ind->chan_list,
 				&avoid_freq_ind->freq_list);
-	else
+	} else {
+		hdd_config_tdls_with_band_switch(hdd_ctx);
+
 		sme_generic_change_country_code(hdd_ctx->mac_handle,
 				hdd_ctx->reg.alpha2);
+		/*Check whether need restart SAP/P2p Go*/
+		policy_mgr_check_concurrent_intf_and_restart_sap(hdd_ctx->psoc);
+	}
 }
 
 int hdd_update_regulatory_config(struct hdd_context *hdd_ctx)

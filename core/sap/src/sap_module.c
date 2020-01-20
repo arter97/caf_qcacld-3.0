@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -485,7 +485,7 @@ bool wlansap_is_channel_leaking_in_nol(struct sap_context *sap_ctx,
 uint16_t wlansap_check_cc_intf(struct sap_context *sap_ctx)
 {
 	struct mac_context *mac;
-	uint16_t intf_ch;
+	uint16_t intf_ch_freq;
 	eCsrPhyMode phy_mode;
 
 	mac = sap_get_mac_context();
@@ -494,11 +494,12 @@ uint16_t wlansap_check_cc_intf(struct sap_context *sap_ctx)
 		return 0;
 	}
 	phy_mode = sap_ctx->csr_roamProfile.phyMode;
-	intf_ch = sme_check_concurrent_channel_overlap(MAC_HANDLE(mac),
-						       sap_ctx->chan_freq,
-						       phy_mode,
-						       sap_ctx->cc_switch_mode);
-	return intf_ch;
+	intf_ch_freq = sme_check_concurrent_channel_overlap(
+						MAC_HANDLE(mac),
+						sap_ctx->chan_freq,
+						phy_mode,
+						sap_ctx->cc_switch_mode);
+	return intf_ch_freq;
 }
 #endif
 
@@ -688,6 +689,24 @@ void wlan_sap_set_sap_ctx_acs_cfg(struct sap_context *sap_ctx,
 	sap_ctx->acs_cfg = &sap_config->acs_cfg;
 }
 
+#ifdef WLAN_CONV_CRYPTO_SUPPORTED
+static inline QDF_STATUS
+wlansap_set_vdev_crypto_prarams_from_ie(struct wlan_objmgr_vdev *vdev,
+					uint8_t *ie_ptr,
+					uint16_t ie_len)
+{
+	return wlan_set_vdev_crypto_prarams_from_ie(vdev, ie_ptr, ie_len);
+}
+#else
+static inline QDF_STATUS
+wlansap_set_vdev_crypto_prarams_from_ie(struct wlan_objmgr_vdev *vdev,
+					uint8_t *ie_ptr,
+					uint16_t ie_len)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 QDF_STATUS wlansap_start_bss(struct sap_context *sap_ctx,
 			     sap_event_cb sap_event_cb,
 			     struct sap_config *config, void *user_context)
@@ -719,6 +738,13 @@ QDF_STATUS wlansap_start_bss(struct sap_context *sap_ctx,
 	}
 
 	sap_ctx->fsm_state = SAP_INIT;
+
+	qdf_status = wlansap_set_vdev_crypto_prarams_from_ie(
+			sap_ctx->vdev,
+			config->RSNWPAReqIE,
+			config->RSNWPAReqIELength);
+	if (QDF_IS_STATUS_ERROR(qdf_status))
+		sap_err("Failed to set crypto params from IE");
 
 	/* Channel selection is auto or configured */
 	sap_ctx->chan_freq = config->chan_freq;
@@ -1336,7 +1362,6 @@ static inline void sap_start_csa_restart(struct mac_context *mac,
  *
  * Return: string reason
  */
-#ifdef WLAN_DEBUG
 static char *sap_get_csa_reason_str(enum sap_csa_reason_code reason)
 {
 	switch (reason) {
@@ -1358,11 +1383,12 @@ static char *sap_get_csa_reason_str(enum sap_csa_reason_code reason)
 		return "LTE_COEX";
 	case CSA_REASON_CONCURRENT_NAN_EVENT:
 		return "CONCURRENT_NAN_EVENT";
+	case CSA_REASON_BAND_RESTRICTED:
+		return "BAND_RESTRICTED";
 	default:
 		return "UNKNOWN";
 	}
 }
-#endif
 
 QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 					       uint32_t target_chan_freq,
@@ -1566,59 +1592,6 @@ QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 		  __func__, target_chan_freq);
 
 	return QDF_STATUS_SUCCESS;
-}
-
-#ifdef CRYPTO_SET_KEY_CONVERGED
-static QDF_STATUS wlan_sap_set_key_helper(struct sap_context *sap_ctx,
-					  tCsrRoamSetKey *set_key_info)
-{
-	struct wlan_crypto_key *crypto_key;
-
-	crypto_key = wlan_crypto_get_key(sap_ctx->vdev, 0);
-	if (!crypto_key) {
-		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
-				"Crypto KEY is NULL");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	return ucfg_crypto_set_key_req(sap_ctx->vdev, crypto_key,
-				       WLAN_CRYPTO_KEY_TYPE_UNICAST);
-}
-#else
-static QDF_STATUS wlan_sap_set_key_helper(struct sap_context *sap_ctx,
-					  tCsrRoamSetKey *set_key_info)
-{
-	uint32_t roam_id = INVALID_ROAM_ID;
-	struct mac_context *mac;
-
-	mac = sap_get_mac_context();
-	if (!mac) {
-		QDF_TRACE_ERROR(QDF_MODULE_ID_SAP, "Invalid MAC context");
-		return QDF_STATUS_E_FAULT;
-	}
-
-	return sme_roam_set_key(MAC_HANDLE(mac), sap_ctx->sessionId,
-				set_key_info, &roam_id);
-}
-#endif
-
-QDF_STATUS wlansap_set_key_sta(struct sap_context *sap_ctx,
-			       tCsrRoamSetKey *set_key_info)
-{
-	QDF_STATUS qdf_status;
-
-	if (!sap_ctx) {
-		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
-			  "%s: Invalid SAP pointer",
-			  __func__);
-		return QDF_STATUS_E_FAULT;
-	}
-
-	qdf_status = wlan_sap_set_key_helper(sap_ctx, set_key_info);
-	if (qdf_status != QDF_STATUS_SUCCESS)
-		qdf_status = QDF_STATUS_E_FAULT;
-
-	return qdf_status;
 }
 
 QDF_STATUS wlan_sap_getstation_ie_information(struct sap_context *sap_ctx,
@@ -2951,6 +2924,25 @@ QDF_STATUS wlansap_filter_ch_based_acs(struct sap_context *sap_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 
+bool wlansap_is_6ghz_included_in_acs_range(struct sap_context *sap_ctx)
+{
+	uint32_t i;
+	uint32_t *ch_freq_list;
+
+	if (!sap_ctx || !sap_ctx->acs_cfg ||
+	    !sap_ctx->acs_cfg->master_freq_list ||
+	    !sap_ctx->acs_cfg->master_ch_list_count) {
+		sap_err("NULL parameters");
+		return false;
+	}
+	ch_freq_list = sap_ctx->acs_cfg->master_freq_list;
+	for (i = 0; i < sap_ctx->acs_cfg->master_ch_list_count; i++) {
+		if (WLAN_REG_IS_6GHZ_CHAN_FREQ(ch_freq_list[i]))
+			return true;
+	}
+	return false;
+}
+
 #if defined(FEATURE_WLAN_CH_AVOID)
 /**
  * wlansap_get_safe_channel() - Get safe channel from current regulatory
@@ -3056,6 +3048,11 @@ wlansap_get_safe_channel_from_pcl_and_acs_range(struct sap_context *sap_ctx)
 	}
 	mac_handle = MAC_HANDLE(mac);
 
+	if (policy_mgr_get_connection_count(mac->psoc) == 1) {
+		sap_debug("only SAP present return best channel from ACS list");
+		return wlansap_get_safe_channel(sap_ctx);
+	}
+
 	status = policy_mgr_get_pcl_for_existing_conn(
 			mac->psoc, PM_SAP_MODE, pcl_freqs, &pcl_len,
 			pcl.weight_list, QDF_ARRAY_SIZE(pcl.weight_list),
@@ -3090,3 +3087,123 @@ wlansap_get_safe_channel_from_pcl_and_acs_range(struct sap_context *sap_ctx)
 	 */
 	return wlansap_get_safe_channel(sap_ctx);
 }
+
+static uint32_t wlansap_get_2g_first_safe_chan_freq(struct sap_context *sap_ctx)
+{
+	uint32_t i;
+	uint32_t freq;
+	enum channel_state state;
+	struct regulatory_channel *cur_chan_list;
+	struct wlan_objmgr_pdev *pdev;
+	struct wlan_objmgr_psoc *psoc;
+	uint32_t *acs_freq_list;
+	uint8_t acs_list_count;
+
+	pdev = sap_ctx->vdev->vdev_objmgr.wlan_pdev;
+	psoc = pdev->pdev_objmgr.wlan_psoc;
+
+	cur_chan_list = qdf_mem_malloc(NUM_CHANNELS *
+			sizeof(struct regulatory_channel));
+	if (!cur_chan_list)
+		return TWOG_CHAN_6_IN_MHZ;
+
+	if (wlan_reg_get_current_chan_list(pdev, cur_chan_list) !=
+					   QDF_STATUS_SUCCESS) {
+		freq = TWOG_CHAN_6_IN_MHZ;
+		goto err;
+	}
+
+	acs_freq_list = sap_ctx->acs_cfg->master_freq_list;
+	acs_list_count = sap_ctx->acs_cfg->master_ch_list_count;
+	for (i = 0; i < NUM_CHANNELS; i++) {
+		freq = cur_chan_list[i].center_freq;
+		state = wlan_reg_get_channel_state_for_freq(pdev, freq);
+		if (state != CHANNEL_STATE_DISABLE &&
+		    state != CHANNEL_STATE_INVALID &&
+		    wlan_reg_is_24ghz_ch_freq(freq) &&
+		    policy_mgr_is_safe_channel(psoc, freq) &&
+		    wlansap_is_channel_present_in_acs_list(freq,
+							   acs_freq_list,
+							   acs_list_count)) {
+			sap_debug("find a 2g channel: %d", freq);
+			goto err;
+		}
+	}
+
+	freq = TWOG_CHAN_6_IN_MHZ;
+err:
+	qdf_mem_free(cur_chan_list);
+	return freq;
+}
+
+qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx)
+{
+	uint32_t restart_freq;
+	enum phy_ch_width restart_ch_width;
+	uint16_t intf_ch_freq;
+	uint32_t phy_mode;
+	struct mac_context *mac;
+	uint8_t cc_mode;
+	uint8_t vdev_id;
+	enum reg_wifi_band sap_band;
+	enum band_info band;
+
+	if (!sap_ctx) {
+		sap_err("sap_ctx NULL parameter");
+		return 0;
+	}
+	if (cds_is_driver_recovering())
+		return 0;
+
+	mac = cds_get_context(QDF_MODULE_ID_PE);
+	if (ucfg_reg_get_curr_band(mac->pdev, &band) != QDF_STATUS_SUCCESS) {
+		sap_err("Failed to get current band config");
+		return 0;
+	}
+	sap_band = wlan_reg_freq_to_band(sap_ctx->chan_freq);
+	sap_debug("SAP/Go current band: %d, pdev band capability: %d",
+		  sap_band, band);
+	if (sap_band == REG_BAND_5G && band == BAND_2G) {
+		sap_ctx->chan_freq_before_switch_band = sap_ctx->chan_freq;
+		sap_ctx->chan_width_before_switch_band =
+			sap_ctx->ch_params.ch_width;
+		sap_debug("Save chan info before switch: %d, width: %d",
+			  sap_ctx->chan_freq, sap_ctx->ch_params.ch_width);
+		restart_freq = wlansap_get_2g_first_safe_chan_freq(sap_ctx);
+		if (restart_freq == 0) {
+			sap_debug("use default chan 6");
+			restart_freq = TWOG_CHAN_6_IN_MHZ;
+		}
+		restart_ch_width = sap_ctx->ch_params.ch_width;
+		if (restart_ch_width > CH_WIDTH_40MHZ) {
+			sap_debug("set 40M when switch SAP to 2G");
+			restart_ch_width = CH_WIDTH_40MHZ;
+		}
+	} else if (sap_band == REG_BAND_2G &&
+		   (band == BAND_ALL || band == BAND_5G)) {
+		if (sap_ctx->chan_freq_before_switch_band == 0)
+			return 0;
+		restart_freq = sap_ctx->chan_freq_before_switch_band;
+		restart_ch_width = sap_ctx->chan_width_before_switch_band;
+		sap_debug("Restore chan freq: %d, width: %d",
+			  restart_freq, restart_ch_width);
+	} else {
+		sap_debug("No need switch SAP/Go channel");
+		return 0;
+	}
+
+	cc_mode = sap_ctx->cc_switch_mode;
+	phy_mode = sap_ctx->csr_roamProfile.phyMode;
+	intf_ch_freq = sme_check_concurrent_channel_overlap(
+						       MAC_HANDLE(mac),
+						       restart_freq,
+						       phy_mode,
+						       cc_mode);
+	if (intf_ch_freq)
+		restart_freq = intf_ch_freq;
+	vdev_id = sap_ctx->vdev->vdev_objmgr.vdev_id;
+	sap_debug("vdev: %d, CSA target freq: %d", vdev_id, restart_freq);
+
+	return restart_freq;
+}
+

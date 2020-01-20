@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -300,260 +300,6 @@ uint8_t lim_check_mcs_set(struct mac_context *mac, uint8_t *supportedMCSSet)
 #define SECURITY_SUITE_TYPE_WEP104 0x4
 #define SECURITY_SUITE_TYPE_GCMP 0x8
 #define SECURITY_SUITE_TYPE_GCMP_256 0x9
-
-#ifndef WLAN_CONV_CRYPTO_IE_SUPPORT
-/**
- * is_non_rsn_cipher()- API to check whether cipher suit is rsn or not
- * @cipher_suite: cipher suit
- *
- * Return: True in case non ht cipher else false
- */
-static inline bool is_non_rsn_cipher(uint8_t cipher_suite)
-{
-	uint8_t cipher_mask;
-
-	cipher_mask = cipher_suite & SECURITY_SUITE_TYPE_MASK;
-	if ((cipher_mask == SECURITY_SUITE_TYPE_CCMP) ||
-	    (cipher_mask == SECURITY_SUITE_TYPE_GCMP) ||
-	    (cipher_mask == SECURITY_SUITE_TYPE_GCMP_256))
-		return false;
-
-	return true;
-}
-
-/**
- * lim_check_rx_rsn_ie_match()- validate received rsn ie with supported cipher
- *      suites.
- * @mac_ctx: pointer to global mac structure
- * @rx_rsn_ie: received rsn IE pointer
- * @session_entry: pe session entry
- * @sta_is_ht: peer station HT capability
- * @pmf_connection: set to true if this is pmf connection
- *
- * This function is called during Association/Reassociation
- * frame handling to determine whether received RSN in
- * Assoc/Reassoc request frames include supported cipher suites or not.
- *
- * Return: QDF_STATUS_SUCCESS if ALL supported cipher suites are present in the
- *                  received rsn IE else failure status.
- */
-
-uint8_t lim_check_rx_rsn_ie_match(struct mac_context *mac_ctx,
-				  tDot11fIERSN * const rx_rsn_ie,
-				  struct pe_session *session_entry, uint8_t sta_is_ht,
-				  bool *pmf_connection)
-{
-	tDot11fIERSN *rsn_ie;
-	bool match = false;
-	uint8_t i, j, only_non_ht_cipher = 1;
-#ifdef WLAN_FEATURE_11W
-	bool we_are_pmf_capable;
-	bool we_require_pmf;
-	bool they_are_pmf_capable;
-	bool they_require_pmf;
-#endif
-
-	/* RSN IE should be received from PE */
-	rsn_ie = &session_entry->gStartBssRSNIe;
-
-	if (!rx_rsn_ie) {
-		pe_debug("Rx RSN IE is NULL");
-		return eSIR_MAC_UNSPEC_FAILURE_STATUS;
-	}
-
-	/* We should have only one AKM in assoc/reassoc request */
-	if (rx_rsn_ie->akm_suite_cnt != 1) {
-		pe_debug("Invalid RX akm_suite_cnt %d",
-			 rx_rsn_ie->akm_suite_cnt);
-		return eSIR_MAC_INVALID_AKMP_STATUS;
-	}
-	/* Check if we support the received AKM */
-	for (i = 0; i < rsn_ie->akm_suite_cnt; i++)
-		if (!qdf_mem_cmp(&rx_rsn_ie->akm_suite[0],
-				 &rsn_ie->akm_suite[i],
-				 sizeof(rsn_ie->akm_suite[i]))) {
-			match = true;
-			break;
-		}
-	if (!match) {
-		pe_debug("Invalid RX akm_suite");
-		return eSIR_MAC_INVALID_AKMP_STATUS;
-	}
-
-	/* Check groupwise cipher suite */
-	for (i = 0; i < sizeof(rx_rsn_ie->gp_cipher_suite); i++)
-		if (rsn_ie->gp_cipher_suite[i] !=
-				 rx_rsn_ie->gp_cipher_suite[i]) {
-			pe_debug("Invalid groupwise cipher suite");
-			return eSIR_MAC_INVALID_GROUP_CIPHER_STATUS;
-		}
-
-	/*
-	 * For each Pairwise cipher suite check whether we support
-	 * received pairwise
-	 */
-	match = false;
-	for (i = 0; i < rx_rsn_ie->pwise_cipher_suite_count; i++) {
-		for (j = 0; j < rsn_ie->pwise_cipher_suite_count; j++) {
-			if (!qdf_mem_cmp(&rx_rsn_ie->pwise_cipher_suites[i],
-			    &rsn_ie->pwise_cipher_suites[j],
-			    sizeof(rsn_ie->pwise_cipher_suites[j]))) {
-				match = true;
-				break;
-			}
-		}
-
-		if (sta_is_ht)
-#ifdef ANI_LITTLE_BYTE_ENDIAN
-			only_non_ht_cipher = is_non_rsn_cipher(
-				rx_rsn_ie->pwise_cipher_suites[i][3]);
-#else
-			only_non_ht_cipher = is_non_rsn_cipher(
-				rx_rsn_ie->pwise_cipher_suites[i][0]);
-#endif
-	}
-
-	if ((!match) || ((sta_is_ht) && only_non_ht_cipher)) {
-		pe_debug("Invalid pairwise cipher suite");
-		return eSIR_MAC_INVALID_PAIRWISE_CIPHER_STATUS;
-	}
-	/*
-	 * Check RSN capabilities
-	 * Bit 0 of First Byte - PreAuthentication Capability
-	 */
-	if (((rx_rsn_ie->RSN_Cap[0] >> 0) & 0x1) == true) {
-		/* this is supported by AP only */
-		pe_debug("Invalid RSN information element capabilities");
-		return eSIR_MAC_INVALID_RSN_IE_CAPABILITIES_STATUS;
-	}
-
-	*pmf_connection = false;
-
-#ifdef WLAN_FEATURE_11W
-	we_are_pmf_capable = session_entry->pLimStartBssReq->pmfCapable;
-	we_require_pmf = session_entry->pLimStartBssReq->pmfRequired;
-	they_are_pmf_capable = (rx_rsn_ie->RSN_Cap[0] >> 7) & 0x1;
-	they_require_pmf = (rx_rsn_ie->RSN_Cap[0] >> 6) & 0x1;
-
-	if ((they_require_pmf && they_are_pmf_capable && !we_are_pmf_capable) ||
-	    (we_require_pmf && !they_are_pmf_capable)) {
-		pe_debug("Association fail, robust management frames policy"
-				" violation they_require_pmf =%d"
-				" theyArePMFCapable %d weArePMFCapable %d"
-				" weRequirePMF %d theyArePMFCapable %d",
-			they_require_pmf, they_are_pmf_capable,
-			we_are_pmf_capable, we_require_pmf,
-			they_are_pmf_capable);
-		return eSIR_MAC_ROBUST_MGMT_FRAMES_POLICY_VIOLATION;
-	}
-
-	if (they_are_pmf_capable && we_are_pmf_capable)
-		*pmf_connection = true;
-
-	pe_debug("weAreCapable %d, weRequire %d, theyAreCapable %d,"
-			" theyRequire %d, PMFconnection %d",
-		we_are_pmf_capable, we_require_pmf, they_are_pmf_capable,
-		they_require_pmf, *pmf_connection);
-#endif
-
-	return eSIR_MAC_SUCCESS_STATUS;
-}
-
-/**
- * lim_check_rx_wpa_ie_match() - to check supported cipher suites
- *
- * @mac: pointer to global mac structure
- * @rx_wpaie: Received WPA IE in (Re)Assco req
- * @session_entry: pointer to PE session
- * @sta_is_ht: peer station is HT
- *
- * This function is called during Association/Reassociation
- * frame handling to determine whether received RSN in
- * Assoc/Reassoc request frames include supported cipher suites or not.
- *
- * Return: Success if ALL supported cipher suites are present in the
- *                  received wpa IE else failure status.
- */
-
-uint8_t
-lim_check_rx_wpa_ie_match(struct mac_context *mac, tDot11fIEWPA *rx_wpaie,
-			  struct pe_session *session_entry, uint8_t sta_is_ht)
-{
-	tDot11fIEWPA *wpa_ie;
-	bool match = false;
-	uint8_t i, j, only_non_ht_cipher = 1;
-
-	/* WPA IE should be received from PE */
-	wpa_ie = &session_entry->gStartBssWPAIe;
-
-	/* We should have only one AKM in assoc/reassoc request */
-	if (rx_wpaie->auth_suite_count != 1) {
-		pe_debug("Invalid RX auth_suite_count %d",
-			 rx_wpaie->auth_suite_count);
-		return eSIR_MAC_INVALID_AKMP_STATUS;
-	}
-	/* Check if we support the received AKM */
-	for (i = 0; i < wpa_ie->auth_suite_count; i++)
-		if (!qdf_mem_cmp(&rx_wpaie->auth_suites[0],
-				 &wpa_ie->auth_suites[i],
-				 sizeof(wpa_ie->auth_suites[i]))) {
-			match = true;
-			break;
-		}
-	if (!match) {
-		pe_debug("Invalid RX auth_suites");
-		return eSIR_MAC_INVALID_AKMP_STATUS;
-	}
-
-	/* Check groupwise cipher suite */
-	for (i = 0; i < 4; i++) {
-		if (wpa_ie->multicast_cipher[i] !=
-				rx_wpaie->multicast_cipher[i]) {
-			pe_debug("Invalid groupwise cipher suite");
-			return eSIR_MAC_INVALID_GROUP_CIPHER_STATUS;
-		}
-	}
-
-	/*
-	 * For each Pairwise cipher suite check whether we support
-	 * received pairwise
-	 */
-	match = false;
-	for (i = 0; i < rx_wpaie->unicast_cipher_count; i++) {
-		for (j = 0; j < wpa_ie->unicast_cipher_count; j++) {
-			if (!qdf_mem_cmp(rx_wpaie->unicast_ciphers[i],
-					    wpa_ie->unicast_ciphers[j], 4)) {
-				match = true;
-				break;
-			}
-		}
-
-		if ((sta_is_ht)
-#ifdef ANI_LITTLE_BYTE_ENDIAN
-		    &&
-		    ((rx_wpaie->
-		      unicast_ciphers[i][3] & SECURITY_SUITE_TYPE_MASK) ==
-		     SECURITY_SUITE_TYPE_CCMP))
-#else
-		    &&
-		    ((rx_wpaie->
-		      unicast_ciphers[i][0] & SECURITY_SUITE_TYPE_MASK) ==
-		     SECURITY_SUITE_TYPE_CCMP))
-#endif
-		{
-			only_non_ht_cipher = 0;
-		}
-
-	}
-
-	if ((!match) || ((sta_is_ht) && only_non_ht_cipher)) {
-		pe_debug("Invalid pairwise cipher suite");
-		return eSIR_MAC_CIPHER_SUITE_REJECTED_STATUS;
-	}
-
-	return eSIR_MAC_SUCCESS_STATUS;
-}
-#endif
 
 /**
  * lim_cleanup_rx_path()
@@ -1797,7 +1543,7 @@ QDF_STATUS lim_populate_peer_rate_set(struct mac_context *mac,
 	tDot11fIEhe_cap *peer_he_caps;
 	struct bss_description *bssDescription =
 		&pe_session->lim_join_req->bssDescription;
-	tSchBeaconStruct *pBeaconStruct;
+	tSchBeaconStruct *pBeaconStruct = NULL;
 
 	/* copy operational rate set from pe_session */
 	if (pe_session->rateSet.numRates <= WLAN_SUPPORTED_RATES_IE_MAX_LEN) {
@@ -1951,6 +1697,9 @@ QDF_STATUS lim_populate_peer_rate_set(struct mac_context *mac,
 		pe_session->nss = NSS_1x1_MODE;
 	}
 	pe_debug("nss: %d", pe_session->nss);
+
+	if (pBeaconStruct)
+		qdf_mem_free(pBeaconStruct);
 
 	return QDF_STATUS_SUCCESS;
 } /*** lim_populate_peer_rate_set() ***/
@@ -2352,7 +2101,6 @@ lim_add_sta(struct mac_context *mac_ctx,
 	pe_debug("Assoc ID: %d wmmEnabled: %d listenInterval: %d",
 		 add_sta_params->assocId, add_sta_params->wmmEnabled,
 		 add_sta_params->listenInterval);
-
 	add_sta_params->staType = sta_ds->staType;
 
 	add_sta_params->updateSta = update_entry;
@@ -2527,7 +2275,8 @@ lim_add_sta(struct mac_context *mac_ctx,
 				lim_populate_vht_caps(vht_caps);
 		}
 
-		lim_add_he_cap(add_sta_params, assoc_req);
+		lim_add_he_cap(mac_ctx, session_entry,
+			       add_sta_params, assoc_req);
 
 	} else if (LIM_IS_IBSS_ROLE(session_entry)) {
 
@@ -2675,6 +2424,20 @@ lim_add_sta(struct mac_context *mac_ctx,
 			add_sta_params->stbc_capable = 0;
 	}
 
+	if (session_entry->opmode == QDF_SAP_MODE ||
+	    session_entry->opmode == QDF_P2P_GO_MODE) {
+		if (session_entry->parsedAssocReq) {
+			uint16_t aid = sta_ds->assocId;
+			/* Get a copy of the already parsed Assoc Request */
+			assoc_req =
+			(tpSirAssocReq) session_entry->parsedAssocReq[aid];
+
+			add_sta_params->wpa_rsn = assoc_req->rsnPresent;
+			add_sta_params->wpa_rsn |=
+				(assoc_req->wpaPresent << 1);
+		}
+	}
+
 	lim_update_he_stbc_capable(add_sta_params);
 
 	msg_q.type = WMA_ADD_STA_REQ;
@@ -2805,10 +2568,10 @@ lim_del_sta(struct mac_context *mac,
 	msgQ.bodyval = 0;
 
 	pe_debug("Sessionid %d :Sending SIR_HAL_DELETE_STA_REQ "
-		 "for STAID: %X and AssocID: %d MAC : "
+		 "for mac_addr %pM and AssocID: %d MAC : "
 		 QDF_MAC_ADDR_STR, pDelStaParams->sessionId,
-		pDelStaParams->staIdx, pDelStaParams->assocId,
-		QDF_MAC_ADDR_ARRAY(sta->staAddr));
+		 pDelStaParams->staMac, pDelStaParams->assocId,
+		 QDF_MAC_ADDR_ARRAY(sta->staAddr));
 
 	MTRACE(mac_trace_msg_tx(mac, pe_session->peSessionId, msgQ.type));
 	retCode = wma_post_ctrl_msg(mac, &msgQ);
@@ -3183,6 +2946,7 @@ lim_delete_dph_hash_entry(struct mac_context *mac_ctx, tSirMacAddr sta_addr,
 	if (dph_delete_hash_entry(mac_ctx, sta_addr, sta_id,
 		 &session_entry->dph.dphHashTable) != QDF_STATUS_SUCCESS)
 		pe_err("error deleting hash entry");
+	lim_ap_check_6g_compatible_peer(mac_ctx, session_entry);
 }
 
 /**
@@ -3568,8 +3332,25 @@ static void lim_update_vht_oper_assoc_resp(struct mac_context *mac_ctx,
 		struct bss_params *pAddBssParams,
 		tDot11fIEVHTOperation *vht_oper, struct pe_session *pe_session)
 {
-	if (vht_oper->chanWidth && pe_session->ch_width)
-		pAddBssParams->ch_width = vht_oper->chanWidth + 1;
+	int16_t ccfs0 = vht_oper->chan_center_freq_seg0;
+	int16_t ccfs1 = vht_oper->chan_center_freq_seg1;
+	int16_t offset = abs((ccfs0 -  ccfs1));
+	uint8_t ch_width;
+
+	ch_width = pAddBssParams->ch_width;
+	if (vht_oper->chanWidth && pe_session->ch_width) {
+		ch_width = CH_WIDTH_80MHZ;
+		if (ccfs1 && offset == 8)
+			ch_width = CH_WIDTH_160MHZ;
+		else if (ccfs1 && offset > 16)
+			ch_width = CH_WIDTH_80P80MHZ;
+	}
+	if (ch_width > pe_session->ch_width)
+		ch_width = pe_session->ch_width;
+	pAddBssParams->ch_width = ch_width;
+	pAddBssParams->staContext.ch_width = ch_width;
+	pe_debug("ch_width %d, pe chanWidth %d ccfs0 %d, ccfs1 %d",
+		 pAddBssParams->ch_width, pe_session->ch_width, ccfs0, ccfs1);
 }
 
 #ifdef WLAN_SUPPORT_TWT
@@ -3709,15 +3490,10 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 					vht_caps, pe_session);
 	}
 
-	pe_debug("vhtCapable %d ch_width %d", pAddBssParams->vhtCapable,
-		 pAddBssParams->ch_width);
-
 	if (lim_is_session_he_capable(pe_session) &&
 			(pAssocRsp->he_cap.present)) {
 		lim_add_bss_he_cap(pAddBssParams, pAssocRsp);
 		lim_add_bss_he_cfg(pAddBssParams, pe_session);
-		lim_update_he_6gop_assoc_resp(pAddBssParams, &pAssocRsp->he_op,
-					      pe_session);
 	}
 	/*
 	 * Populate the STA-related parameters here
@@ -3830,18 +3606,21 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 		if (chan_width_support &&
 		    ((pAssocRsp->HTCaps.supportedChannelWidthSet) ||
 		    (pBeaconStruct->HTCaps.supportedChannelWidthSet))) {
+			pAddBssParams->ch_width =
+					pe_session->ch_width;
 			pAddBssParams->staContext.ch_width =
 					pe_session->ch_width;
 		} else {
+			pAddBssParams->ch_width = CH_WIDTH_20MHZ;
 			sta_context->ch_width =	CH_WIDTH_20MHZ;
 			if (!vht_cap_info->enable_txbf_20mhz)
 				sta_context->vhtTxBFCapable = 0;
 		}
 
-		pe_debug("StaCtx: vhtCap %d ChBW %d TxBF %d",
+		pe_debug("StaCtx: vhtCap %d ChBW %d TxBF %d ch_width %d",
 			 pAddBssParams->staContext.vhtCapable,
 			 pAddBssParams->staContext.ch_width,
-			 sta_context->vhtTxBFCapable);
+			 sta_context->vhtTxBFCapable, pAddBssParams->ch_width);
 		pe_debug("StaContext su_tx_bfer %d, vht_mcs11 %d",
 			 sta_context->enable_su_tx_bformer,
 			 pAddBssParams->staContext.vht_mcs_10_11_supp);
@@ -3935,6 +3714,12 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 						 NULL,
 						 pAssocRsp);
 			lim_update_he_stbc_capable(&pAddBssParams->staContext);
+			lim_update_he_6gop_assoc_resp(pAddBssParams,
+						      &pAssocRsp->he_op,
+						      pe_session);
+			lim_update_he_6ghz_band_caps(mac,
+						&pAssocRsp->he_6ghz_band_cap,
+						&pAddBssParams->staContext);
 		}
 	}
 	pAddBssParams->staContext.smesessionId =
@@ -4036,6 +3821,8 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 
 	if (lim_is_fils_connection(pe_session))
 		pAddBssParams->no_ptk_4_way = true;
+	pe_debug("vhtCapable %d ch_width %d", pAddBssParams->vhtCapable,
+		 pAddBssParams->staContext.ch_width);
 
 	retCode = wma_send_peer_assoc_req(pAddBssParams);
 	if (QDF_IS_STATUS_ERROR(retCode)) {

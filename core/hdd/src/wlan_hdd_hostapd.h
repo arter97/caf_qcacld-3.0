@@ -109,6 +109,19 @@ void hdd_sap_restart_chan_switch_cb(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS wlan_hdd_get_channel_for_sap_restart(
 				struct wlan_objmgr_psoc *psoc,
 				uint8_t vdev_id, uint32_t *ch_freq);
+
+/**
+ * hdd_get_ap_6ghz_capable() - Get ap vdev 6ghz capable flags
+ * @psoc: PSOC object information
+ * @vdev_id: vdev id
+ *
+ * This function gets 6ghz capable information based on hdd ap adapter
+ * context.
+ *
+ * Return: uint32_t, vdev 6g capable flags from enum conn_6ghz_flag
+ */
+uint32_t hdd_get_ap_6ghz_capable(struct wlan_objmgr_psoc *psoc,
+				 uint8_t vdev_id);
 #endif
 
 /**
@@ -262,5 +275,24 @@ int wlan_hdd_disable_channels(struct hdd_context *hdd_ctx);
  */
 void hdd_check_and_disconnect_sta_on_invalid_channel(
 						struct hdd_context *hdd_ctx);
+
+/**
+ * hdd_stop_sap_due_to_invalid_channel() - to stop sap in case of invalid chnl
+ * @work: pointer to work structure
+ *
+ * Let's say SAP detected RADAR and trying to select the new channel and if no
+ * valid channel is found due to none of the channels are available or
+ * regulatory restriction then SAP needs to be stopped. so SAP state-machine
+ * will create a work to stop the bss
+ *
+ * stop bss has to happen through worker thread because radar indication comes
+ * from FW through mc thread or main host thread and if same thread is used to
+ * do stopbss then waiting for stopbss to finish operation will halt mc thread
+ * to freeze which will trigger stopbss timeout. Instead worker thread can do
+ * the stopbss operation while mc thread waits for stopbss to finish.
+ *
+ * Return: none
+ */
+void hdd_stop_sap_due_to_invalid_channel(struct work_struct *work);
 
 #endif /* end #if !defined(WLAN_HDD_HOSTAPD_H) */

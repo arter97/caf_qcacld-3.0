@@ -1232,29 +1232,6 @@ struct dhcp_server {
 
 /*
  * <ini>
- * gEnableRTTsupport
- *
- * @Min: 0 - Disabled
- * @Max: 1 - Enabled
- * @Default: 1 - Enabled
- *
- * The param is used to enable/disable support for RTT
- *
- * Related: None.
- *
- * Supported Feature: RTT
- *
- * Usage: Internal/External
- *
- * </ini>
- */
-#define CFG_ENABLE_RTT_SUPPORT CFG_INI_BOOL( \
-		"gEnableRTTSupport", \
-		1, \
-		"The param is used to enable/disable support for RTT")
-
-/*
- * <ini>
  * gAdvertiseConcurrentOperation - Iface combination advertising
  * @Min: 0
  * @Max: 1
@@ -1318,26 +1295,27 @@ struct dhcp_server {
 
 /*
  * <ini>
- * gSarVersion - Used to specify SAR version
+ * gEnableSARV1toSARV2 - Used to Enable/Disable SAR version conversion
  *
- * @Min: 1
- * @Max: 2
- * Default: 1
+ * @Min: 0
+ * @Max: 1
+ * Default: 0
  *
- * This ini is used to specify the SAR feature version.
- * If value of this ini is set to 2, SAR version 2 will
- * be used.
+ * If user space is using SARV1 and FW is using SARV2 in BDF in that case
+ * this ini is used to enable conversion from user specified SARV1 command
+ * to FW expected SARV2 command.
+ * If value of this ini is set to 0, SAR version 1 will
+ * not be converted to SARV2 and command will be rejected.
+ * If value of this ini is set to 1 SAR version 1 will be converted to
+ * SARV2 based on FW capability
  * Usage: External
  *
  * </ini>
  */
-#define CFG_SAR_VERSION  CFG_INI_UINT( \
-			"gSarVersion", \
-			1, \
-			2, \
-			1, \
-			CFG_VALUE_OR_DEFAULT, \
-			"Specify the SAR version")
+#define CFG_SAR_CONVERSION  CFG_INI_BOOL( \
+			"gEnableSARV1toSARV2", \
+			0, \
+			"Enable/Disable conversion from SARV1 to SARV2")
 
 /*
  * <ini>
@@ -1499,7 +1477,6 @@ enum host_log_level {
 	CFG(CFG_ENABLE_MAC_PROVISION) \
 	CFG_ENABLE_MTRACE_ALL \
 	CFG(CFG_ENABLE_RAMDUMP_COLLECTION) \
-	CFG(CFG_ENABLE_RTT_SUPPORT) \
 	CFG(CFG_ENABLE_UNIT_TEST_FRAMEWORK) \
 	CFG(CFG_INTERFACE_CHANGE_WAIT) \
 	CFG(CFG_INFORM_BSS_RSSI_RAW) \
@@ -1511,7 +1488,7 @@ enum host_log_level {
 	CFG(CFG_TIMER_MULTIPLIER) \
 	CFG(CFG_HDD_DOT11_MODE) \
 	CFG(CFG_ENABLE_DISABLE_CHANNEL) \
-	CFG(CFG_SAR_VERSION) \
+	CFG(CFG_SAR_CONVERSION) \
 	CFG(CFG_WOW_DISABLE) \
 	CFG(CFG_ENABLE_HOST_MODULE_LOG_LEVEL)
 #endif

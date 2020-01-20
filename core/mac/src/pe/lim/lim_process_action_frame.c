@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -85,8 +85,7 @@ void lim_stop_tx_and_switch_channel(struct mac_context *mac, uint8_t sessionId)
 	mac->lim.lim_timers.gLimChannelSwitchTimer.sessionId = sessionId;
 	status = policy_mgr_check_and_set_hw_mode_for_channel_switch(mac->psoc,
 				pe_session->smeSessionId,
-				wlan_chan_to_freq(
-				pe_session->gLimChannelSwitch.primaryChannel),
+				pe_session->gLimChannelSwitch.sw_target_freq,
 				POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH_STA);
 
 	/*
@@ -100,8 +99,9 @@ void lim_stop_tx_and_switch_channel(struct mac_context *mac, uint8_t sessionId)
 	 * So contunue with CSA from here.
 	 */
 	if (status == QDF_STATUS_E_FAILURE) {
-		pe_err("Failed to set required HW mode for channel %d, ignore CSA",
-		       pe_session->gLimChannelSwitch.primaryChannel);
+		pe_err("Failed to set required HW mode for channel %d freq %d, ignore CSA",
+		       pe_session->gLimChannelSwitch.primaryChannel,
+		       pe_session->gLimChannelSwitch.sw_target_freq);
 		return;
 	}
 
@@ -240,6 +240,9 @@ static void __lim_process_channel_switch_action_frame(struct mac_context *mac_ct
 	bcn_period = (uint16_t)val;
 	ch_switch_params->primaryChannel =
 		chnl_switch_frame->ChanSwitchAnn.newChannel;
+	ch_switch_params->sw_target_freq = wlan_reg_legacy_chan_to_freq
+			(mac_ctx->pdev,
+			chnl_switch_frame->ChanSwitchAnn.newChannel);
 	ch_switch_params->switchCount =
 		chnl_switch_frame->ChanSwitchAnn.switchCount;
 	ch_switch_params->switchTimeoutValue =
@@ -1635,15 +1638,7 @@ static void lim_process_addba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 	tDot11faddba_req *addba_req;
 	uint32_t frame_len, status;
 	QDF_STATUS qdf_status;
-	uint8_t peer_id;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
-	void *peer, *pdev;
-
-	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
-	if (!pdev) {
-		pe_err("pdev is NULL");
-		return;
-	}
 
 	mac_hdr = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
 	body_ptr = WMA_GET_RX_MPDU_DATA(rx_pkt_info);
@@ -1669,29 +1664,31 @@ static void lim_process_addba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 			status, frame_len);
 	}
 
-	peer = cdp_peer_get_ref_by_addr(soc, pdev, mac_hdr->sa, &peer_id,
-					PEER_DEBUG_ID_WMA_ADDBA_REQ);
-	if (!peer) {
-		pe_err("PEER [%pM] not found", mac_hdr->sa);
-		goto error;
-	}
-
-	qdf_status = cdp_addba_requestprocess(soc, peer,
-			addba_req->DialogToken.token,
-			addba_req->addba_param_set.tid,
-			addba_req->ba_timeout.timeout,
-			addba_req->addba_param_set.buff_size,
-			addba_req->ba_start_seq_ctrl.ssn);
-
-	cdp_peer_release_ref(soc, peer, PEER_DEBUG_ID_WMA_ADDBA_REQ);
+	qdf_status = cdp_addba_requestprocess(
+					soc, mac_hdr->sa,
+					session->vdev_id,
+					addba_req->DialogToken.token,
+					addba_req->addba_param_set.tid,
+					addba_req->ba_timeout.timeout,
+					addba_req->addba_param_set.buff_size,
+					addba_req->ba_start_seq_ctrl.ssn);
 
 	if (QDF_STATUS_SUCCESS == qdf_status) {
-		lim_send_addba_response_frame(mac_ctx, mac_hdr->sa,
-			addba_req->addba_param_set.tid, session,
+		qdf_status = lim_send_addba_response_frame(mac_ctx,
+			mac_hdr->sa,
+			addba_req->addba_param_set.tid,
+			session,
 			addba_req->addba_extn_element.present,
 			addba_req->addba_param_set.amsdu_supp);
+		if (qdf_status != QDF_STATUS_SUCCESS) {
+			pe_err("Failed to send addba response frame");
+			cdp_addba_resp_tx_completion(
+					soc, mac_hdr->sa, session->vdev_id,
+					addba_req->addba_param_set.tid,
+					WMI_MGMT_TX_COMP_TYPE_DISCARD);
+		}
 	} else {
-		pe_err("Failed to process addba request");
+		pe_err_rl("Failed to process addba request");
 	}
 
 error:
@@ -1717,15 +1714,7 @@ static void lim_process_delba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 	tDot11fdelba_req *delba_req;
 	uint32_t frame_len, status;
 	QDF_STATUS qdf_status;
-	uint8_t peer_id;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
-	void *peer, *pdev;
-
-	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
-	if (!pdev) {
-		pe_err("pdev is NULL");
-		return;
-	}
 
 	mac_hdr = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
 	body_ptr = WMA_GET_RX_MPDU_DATA(rx_pkt_info);
@@ -1751,17 +1740,8 @@ static void lim_process_delba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 			status, frame_len);
 	}
 
-	peer = cdp_peer_get_ref_by_addr(soc, pdev, mac_hdr->sa, &peer_id,
-					PEER_DEBUG_ID_WMA_DELBA_REQ);
-	if (!peer) {
-		pe_err("PEER [%pM] not found", mac_hdr->sa);
-		goto error;
-	}
-
-	qdf_status = cdp_delba_process(soc, peer,
+	qdf_status = cdp_delba_process(soc, mac_hdr->sa, session->vdev_id,
 			delba_req->delba_param_set.tid, delba_req->Reason.code);
-
-	cdp_peer_release_ref(soc, peer, PEER_DEBUG_ID_WMA_DELBA_REQ);
 
 	if (QDF_STATUS_SUCCESS != qdf_status)
 		pe_err("Failed to process delba request");

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -120,6 +120,46 @@ void hdd_wlan_offload_event(uint8_t type, uint8_t state)
 	host_offload.state = state;
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&host_offload, EVENT_WLAN_OFFLOAD_REQ);
+}
+#endif
+
+#ifdef WLAN_FEATURE_PKT_CAPTURE
+
+/* timeout in msec to wait for RX_THREAD to suspend */
+#define HDD_MONTHREAD_SUSPEND_TIMEOUT 200
+
+void wlan_hdd_mon_thread_resume(struct hdd_context *hdd_ctx)
+{
+	if (hdd_ctx->is_ol_mon_thread_suspended) {
+		cds_resume_mon_thread();
+		hdd_ctx->is_ol_mon_thread_suspended = false;
+	}
+}
+
+int wlan_hdd_mon_thread_suspend(struct hdd_context *hdd_ctx)
+{
+	p_cds_sched_context cds_sched_context = get_cds_sched_ctxt();
+	int rc;
+
+	if (!cds_sched_context)
+		return -EINVAL;
+
+	set_bit(RX_SUSPEND_EVENT,
+		&cds_sched_context->sched_mon_ctx.ol_mon_event_flag);
+	wake_up_interruptible(&cds_sched_context->
+			      sched_mon_ctx.ol_mon_wait_queue);
+	rc = wait_for_completion_timeout(
+			&cds_sched_context->sched_mon_ctx.ol_suspend_mon_event,
+			msecs_to_jiffies(HDD_MONTHREAD_SUSPEND_TIMEOUT));
+	if (!rc) {
+		clear_bit(RX_SUSPEND_EVENT,
+			  &cds_sched_context->sched_mon_ctx.ol_mon_event_flag);
+		hdd_err("Failed to stop tl_shim mon thread");
+		return -EINVAL;
+	}
+	hdd_ctx->is_ol_mon_thread_suspended = true;
+
+	return 0;
 }
 #endif
 
@@ -407,7 +447,7 @@ void hdd_enable_ns_offload(struct hdd_adapter *adapter,
 	/* check if offload cache and send is required or not */
 	status = ucfg_pmo_ns_offload_check(psoc, trigger, adapter->vdev_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_info("NS offload is not required");
+		hdd_debug("NS offload is not required");
 		goto free_req;
 	}
 
@@ -465,7 +505,7 @@ void hdd_disable_ns_offload(struct hdd_adapter *adapter,
 	status = ucfg_pmo_ns_offload_check(hdd_ctx->psoc, trigger,
 					   adapter->vdev_id);
 	if (status != QDF_STATUS_SUCCESS) {
-		hdd_err("Flushing of NS offload not required");
+		hdd_debug("Flushing of NS offload not required");
 		goto out;
 	}
 
@@ -957,7 +997,7 @@ void hdd_enable_arp_offload(struct hdd_adapter *adapter,
 
 	status = ucfg_pmo_check_arp_offload(psoc, trigger, adapter->vdev_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_info("ARP offload not required");
+		hdd_debug("ARP offload not required");
 		goto free_req;
 	}
 
@@ -1002,7 +1042,7 @@ void hdd_disable_arp_offload(struct hdd_adapter *adapter,
 	status = ucfg_pmo_check_arp_offload(hdd_ctx->psoc, trigger,
 					    adapter->vdev_id);
 	if (status != QDF_STATUS_SUCCESS) {
-		hdd_err("Flushing of ARP offload not required");
+		hdd_debug("Flushing of ARP offload not required");
 		goto out;
 	}
 
@@ -1296,7 +1336,6 @@ QDF_STATUS hdd_wlan_shutdown(void)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	hdd_bus_bw_compute_timer_stop(hdd_ctx);
 	hdd_set_connection_in_progress(false);
 	policy_mgr_clear_concurrent_session_count(hdd_ctx->psoc);
 
@@ -1313,6 +1352,9 @@ QDF_STATUS hdd_wlan_shutdown(void)
 	wlan_hdd_rx_thread_resume(hdd_ctx);
 
 	dp_txrx_resume(cds_get_context(QDF_MODULE_ID_SOC));
+
+	if (cds_is_pktcapture_enabled())
+		wlan_hdd_mon_thread_resume(hdd_ctx);
 
 	/*
 	 * After SSR, FW clear its txrx stats. In host,
@@ -1346,7 +1388,6 @@ QDF_STATUS hdd_wlan_shutdown(void)
 
 	hdd_wlan_stop_modules(hdd_ctx, false);
 
-	hdd_bus_bandwidth_deinit(hdd_ctx);
 	hdd_lpass_notify_stop(hdd_ctx);
 
 	hdd_info("WLAN driver shutdown complete");
@@ -1476,7 +1517,6 @@ QDF_STATUS hdd_wlan_re_init(void)
 		hdd_err("Failed to get adapter");
 
 	hdd_dp_trace_init(hdd_ctx->config);
-	hdd_bus_bandwidth_init(hdd_ctx);
 
 	ret = hdd_wlan_start_modules(hdd_ctx, true);
 	if (ret) {
@@ -1517,7 +1557,6 @@ QDF_STATUS hdd_wlan_re_init(void)
 	return QDF_STATUS_SUCCESS;
 
 err_re_init:
-	hdd_bus_bandwidth_deinit(hdd_ctx);
 	qdf_dp_trace_deinit();
 
 err_ctx_null:
@@ -1722,6 +1761,9 @@ static int __wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 	if (hdd_ctx->enable_dp_rx_threads)
 		dp_txrx_resume(cds_get_context(QDF_MODULE_ID_SOC));
 
+	if (cds_is_pktcapture_enabled())
+		wlan_hdd_mon_thread_resume(hdd_ctx);
+
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
 		   TRACE_CODE_HDD_CFG80211_RESUME_WLAN,
 		   NO_SESSION, hdd_ctx->is_wiphy_suspended);
@@ -1808,8 +1850,8 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam() ||
 	    QDF_GLOBAL_MONITOR_MODE == hdd_get_conparam()) {
-		hdd_err("Command not allowed in mode %d",
-			hdd_get_conparam());
+		hdd_err_rl("Command not allowed in mode %d",
+			   hdd_get_conparam());
 		return -EINVAL;
 	}
 
@@ -1918,6 +1960,11 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 	if (hdd_ctx->enable_dp_rx_threads)
 		dp_txrx_suspend(cds_get_context(QDF_MODULE_ID_SOC));
 
+	if (cds_is_pktcapture_enabled()) {
+		if (wlan_hdd_mon_thread_suspend(hdd_ctx))
+			goto resume_ol_mon;
+	}
+
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
 		   TRACE_CODE_HDD_CFG80211_SUSPEND_WLAN,
 		   NO_SESSION, hdd_ctx->is_wiphy_suspended);
@@ -1937,6 +1984,11 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 resume_dp_thread:
 	if (hdd_ctx->enable_dp_rx_threads)
 		dp_txrx_resume(cds_get_context(QDF_MODULE_ID_SOC));
+
+resume_ol_mon:
+	/* Resume tlshim MON thread */
+	if (cds_is_pktcapture_enabled())
+		wlan_hdd_mon_thread_resume(hdd_ctx);
 
 resume_ol_rx:
 	/* Resume tlshim Rx thread */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -153,8 +153,9 @@ void lim_process_mlm_start_cnf(struct mac_context *mac, uint32_t *msg_buf)
 	struct pe_session *pe_session = NULL;
 	tLimMlmStartCnf *pLimMlmStartCnf;
 	uint8_t smesessionId;
-	uint8_t channelId;
+	uint32_t chan_freq, ch_cfreq1 = 0;
 	uint8_t send_bcon_ind = false;
+	enum reg_wifi_band band;
 
 	if (!msg_buf) {
 		pe_err("Buffer is Pointing to NULL");
@@ -207,8 +208,6 @@ void lim_process_mlm_start_cnf(struct mac_context *mac, uint32_t *msg_buf)
 				pe_session, smesessionId);
 	if (pe_session &&
 	    (((tLimMlmStartCnf *)msg_buf)->resultCode == eSIR_SME_SUCCESS)) {
-		channelId = wlan_reg_freq_to_chan(mac->pdev,
-				pe_session->pLimStartBssReq->oper_ch_freq);
 		lim_ndi_mlme_vdev_up_transition(pe_session);
 
 		/* We should start beacon transmission only if the channel
@@ -216,24 +215,36 @@ void lim_process_mlm_start_cnf(struct mac_context *mac, uint32_t *msg_buf)
 		 * availability check is done. The PE will receive an explicit
 		 * request from upper layers to start the beacon transmission
 		 */
+		chan_freq = pe_session->curr_op_freq;
+		band = wlan_reg_freq_to_band(pe_session->curr_op_freq);
+		if (pe_session->ch_center_freq_seg1)
+			ch_cfreq1 = wlan_reg_chan_band_to_freq(
+					mac->pdev,
+					pe_session->ch_center_freq_seg1,
+					BIT(band));
+
 		if (!(LIM_IS_IBSS_ROLE(pe_session) ||
 			(LIM_IS_AP_ROLE(pe_session))))
 				return;
 		if (pe_session->ch_width == CH_WIDTH_160MHZ) {
 			send_bcon_ind = false;
 		} else if (pe_session->ch_width == CH_WIDTH_80P80MHZ) {
-			if ((wlan_reg_get_channel_state(mac->pdev, channelId)
-						!= CHANNEL_STATE_DFS) &&
-			    (wlan_reg_get_channel_state(mac->pdev,
-					pe_session->ch_center_freq_seg1 -
-					SIR_80MHZ_START_CENTER_CH_DIFF) !=
-						CHANNEL_STATE_DFS))
+			if ((wlan_reg_get_channel_state_for_freq(
+					mac->pdev, chan_freq) !=
+					CHANNEL_STATE_DFS) &&
+			    (wlan_reg_get_channel_state_for_freq(
+					mac->pdev, ch_cfreq1) !=
+					CHANNEL_STATE_DFS))
 				send_bcon_ind = true;
 		} else {
-			if (wlan_reg_get_channel_state(mac->pdev, channelId)
+			if (wlan_reg_get_channel_state_for_freq(mac->pdev,
+								chan_freq)
 					!= CHANNEL_STATE_DFS)
 				send_bcon_ind = true;
 		}
+		if (WLAN_REG_IS_6GHZ_CHAN_FREQ(pe_session->curr_op_freq))
+			send_bcon_ind = true;
+
 		if (send_bcon_ind) {
 			/* Configure beacon and send beacons to HAL */
 			QDF_TRACE(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
@@ -533,6 +544,21 @@ void lim_process_mlm_auth_cnf(struct mac_context *mac_ctx, uint32_t *msg)
 			MTRACE(mac_trace(mac_ctx, TRACE_CODE_MLM_STATE,
 				session_entry->peSessionId,
 				session_entry->limMlmState));
+
+			/* WAR for some IOT issue on specific AP:
+			 * STA failed to connect to SAE AP due to incorrect
+			 * password is used. Then AP will still reject the
+			 * authentication even correct password is used unless
+			 * STA send deauth to AP upon authentication failure.
+			 */
+			if (auth_type == eSIR_AUTH_TYPE_SAE) {
+				pe_debug("Send deauth for SAE auth failure");
+				lim_send_deauth_mgmt_frame(mac_ctx,
+						       auth_cnf->protStatusCode,
+						       auth_cnf->peerMacAddr,
+						       session_entry, false);
+			}
+
 			/*
 			 * Need to send Join response with
 			 * auth failure to Host.
@@ -1395,8 +1421,6 @@ void lim_process_sta_mlm_add_sta_rsp(struct mac_context *mac_ctx,
 	tpDphHashNode sta_ds;
 	uint32_t msg_type = LIM_MLM_ASSOC_CNF;
 	tpAddStaParams add_sta_params = (tpAddStaParams) msg->bodyptr;
-	struct pe_session *ft_session = NULL;
-	uint8_t ft_session_id;
 
 	if (!add_sta_params) {
 		pe_err("Encountered NULL Pointer");
@@ -1438,23 +1462,6 @@ void lim_process_sta_mlm_add_sta_rsp(struct mac_context *mac_ctx,
 			mlm_assoc_cnf.resultCode =
 				(tSirResultCodes) eSIR_SME_REFUSED;
 			goto end;
-		}
-		if (session_entry->limSmeState == eLIM_SME_WT_REASSOC_STATE) {
-			/* check if we have keys(PTK)to install in case of 11r */
-			tpftPEContext ft_ctx = &session_entry->ftPEContext;
-
-			ft_session = pe_find_session_by_bssid(mac_ctx,
-				session_entry->limReAssocbssId, &ft_session_id);
-			if (ft_session &&
-				ft_ctx->PreAuthKeyInfo.extSetStaKeyParamValid
-				== true) {
-				tpLimMlmSetKeysReq pMlmStaKeys =
-					&ft_ctx->PreAuthKeyInfo.extSetStaKeyParam;
-				lim_send_set_sta_key_req(mac_ctx, pMlmStaKeys,
-					0, ft_session, false);
-				ft_ctx->PreAuthKeyInfo.extSetStaKeyParamValid =
-					false;
-			}
 		}
 		/*
 		 * Update the DPH Hash Entry for this STA
@@ -2447,7 +2454,7 @@ void lim_process_mlm_set_sta_key_rsp(struct mac_context *mac_ctx,
 	vdev_id = set_key_params->vdev_id;
 	session_entry = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
 	if (!session_entry) {
-		pe_err("session does not exist for given session_id");
+		pe_err("session does not exist for given vdev_id %d", vdev_id);
 		qdf_mem_zero(msg->bodyptr, sizeof(*set_key_params));
 		qdf_mem_free(msg->bodyptr);
 		msg->bodyptr = NULL;
@@ -2457,22 +2464,10 @@ void lim_process_mlm_set_sta_key_rsp(struct mac_context *mac_ctx,
 					     vdev_id);
 		return;
 	}
+
 	session_id = session_entry->peSessionId;
 	pe_debug("PE session ID %d, vdev_id %d", session_id, vdev_id);
 	result_status = set_key_params->status;
-	if (!lim_is_set_key_req_converged()) {
-		if (eLIM_MLM_WT_SET_STA_KEY_STATE !=
-				session_entry->limMlmState) {
-			pe_err("Received unexpected [Mesg Id - %d] in state %X",
-			       msg->type, session_entry->limMlmState);
-			resp_reqd = 0;
-		} else {
-			mlm_set_key_cnf.resultCode = result_status;
-		}
-		/* Restore MLME state */
-		session_entry->limMlmState = session_entry->limPrevMlmState;
-	}
-
 	key_len = set_key_params->key[0].keyLength;
 
 	if (result_status == eSIR_SME_SUCCESS && key_len)
@@ -2499,9 +2494,8 @@ void lim_process_mlm_set_sta_key_rsp(struct mac_context *mac_ctx,
 			qdf_mem_free(mac_ctx->lim.gpLimMlmSetKeysReq);
 			mac_ctx->lim.gpLimMlmSetKeysReq = NULL;
 		} else {
-			lim_copy_set_key_req_mac_addr(
-					&mlm_set_key_cnf.peer_macaddr,
-					&set_key_params->macaddr);
+			qdf_copy_macaddr(&mlm_set_key_cnf.peer_macaddr,
+					 &set_key_params->macaddr);
 		}
 		mlm_set_key_cnf.sessionId = session_id;
 		lim_post_sme_message(mac_ctx, LIM_MLM_SETKEYS_CNF,
@@ -2552,24 +2546,17 @@ void lim_process_mlm_set_bss_key_rsp(struct mac_context *mac_ctx,
 					     vdev_id);
 		return;
 	}
+
 	session_id = session_entry->peSessionId;
-	pe_debug("PE session ID %d, SME vdev_id %d", session_id, vdev_id);
+	pe_debug("PE session ID %d, vdev_id %d", session_id, vdev_id);
 	if (eLIM_MLM_WT_SET_BSS_KEY_STATE == session_entry->limMlmState) {
 		result_status =
 			(uint16_t)(((tpSetBssKeyParams)msg->bodyptr)->status);
 		key_len = ((tpSetBssKeyParams)msg->bodyptr)->key[0].keyLength;
-	} else if (lim_is_set_key_req_converged()) {
+	} else {
 		result_status =
 			(uint16_t)(((tpSetBssKeyParams)msg->bodyptr)->status);
 		key_len = ((tpSetBssKeyParams)msg->bodyptr)->key[0].keyLength;
-	} else {
-		/*
-		 * BCAST key also uses tpSetStaKeyParams.
-		 * Done this way for readabilty.
-		 */
-		result_status =
-			(uint16_t)(((tpSetStaKeyParams)msg->bodyptr)->status);
-		key_len = ((tpSetStaKeyParams)msg->bodyptr)->key[0].keyLength;
 	}
 
 	pe_debug("limMlmState %d status %d key_len %d",
@@ -2579,19 +2566,6 @@ void lim_process_mlm_set_bss_key_rsp(struct mac_context *mac_ctx,
 		set_key_cnf.key_len_nonzero = true;
 	else
 		set_key_cnf.key_len_nonzero = false;
-
-	if (!lim_is_set_key_req_converged()) {
-		if (eLIM_MLM_WT_SET_BSS_KEY_STATE !=
-				session_entry->limMlmState &&
-				eLIM_MLM_WT_SET_STA_BCASTKEY_STATE !=
-				session_entry->limMlmState) {
-			pe_err("Received unexpected [Mesg Id - %d] in state %X",
-			       msg->type, session_entry->limMlmState);
-		} else {
-			set_key_cnf.resultCode = result_status;
-		}
-		session_entry->limMlmState = session_entry->limPrevMlmState;
-	}
 
 	MTRACE(mac_trace
 		(mac_ctx, TRACE_CODE_MLM_STATE, session_entry->peSessionId,
@@ -2613,9 +2587,8 @@ void lim_process_mlm_set_bss_key_rsp(struct mac_context *mac_ctx,
 		qdf_mem_free(mac_ctx->lim.gpLimMlmSetKeysReq);
 		mac_ctx->lim.gpLimMlmSetKeysReq = NULL;
 	} else {
-		lim_copy_set_key_req_mac_addr(
-				&set_key_cnf.peer_macaddr,
-				&((tpSetBssKeyParams)msg->bodyptr)->macaddr);
+		qdf_copy_macaddr(&set_key_cnf.peer_macaddr,
+				 &((tpSetBssKeyParams)msg->bodyptr)->macaddr);
 	}
 	qdf_mem_zero(msg->bodyptr, sizeof(tSetBssKeyParams));
 	qdf_mem_free(msg->bodyptr);

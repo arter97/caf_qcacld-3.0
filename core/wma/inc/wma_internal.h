@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -95,12 +95,14 @@ struct index_data_rate_type {
  * @ht20_rate: VHT20 supported rate table
  * @ht40_rate: VHT40 supported rate table
  * @ht80_rate: VHT80 supported rate table
+ * @ht160_rate: VHT160 supported rate table
  */
 struct index_vht_data_rate_type {
 	uint8_t mcs_index;
 	uint16_t ht20_rate[2];
 	uint16_t ht40_rate[2];
 	uint16_t ht80_rate[2];
+	uint16_t ht160_rate[2];
 };
 
 #ifdef WLAN_FEATURE_11AX
@@ -111,12 +113,14 @@ struct index_vht_data_rate_type {
  * @supported_he80_rate: he80 rate
  * @supported_he40_rate: he40 rate
  * @supported_he20_rate: he20 rate
+ * @supported_he160_rate: he160 rate
  */
 struct index_he_data_rate_type {
 	uint8_t beacon_rate_index;
 	uint16_t supported_he20_rate[MAX_HE_DCM_INDEX][3];
 	uint16_t supported_he40_rate[MAX_HE_DCM_INDEX][3];
 	uint16_t supported_he80_rate[MAX_HE_DCM_INDEX][3];
+	uint16_t supported_he160_rate[MAX_HE_DCM_INDEX][3];
 };
 #endif
 
@@ -196,6 +200,22 @@ int wma_roam_auth_offload_event_handler(WMA_HANDLE handle, uint8_t *event,
 					uint32_t len);
 
 /**
+ * wma_roam_stats_event_handler() - Handle the WMI_ROAM_STATS_EVENTID
+ * from target
+ * @handle: wma_handle
+ * @event:  roam debug stats event data pointer
+ * @len: length of the data
+ *
+ * This function handles the roam debug stats from the target and logs it
+ * to kmsg. This WMI_ROAM_STATS_EVENTID event is received whenever roam
+ * scan trigger happens or when neighbor report is sent by the firmware.
+ *
+ * Return: Success or Failure status
+ */
+int wma_roam_stats_event_handler(WMA_HANDLE handle, uint8_t *event,
+				 uint32_t len);
+
+/**
  * wma_mlme_roam_synch_event_handler_cb() - roam synch event handler
  * @handle: wma handle
  * @event: event data
@@ -225,6 +245,13 @@ int wma_roam_synch_frame_event_handler(void *handle, uint8_t *event,
 static inline int wma_mlme_roam_synch_event_handler_cb(void *handle,
 						       uint8_t *event,
 						       uint32_t len)
+{
+	return 0;
+}
+
+static inline int
+wma_roam_stats_event_handler(WMA_HANDLE handle, uint8_t *event,
+			     uint32_t len)
 {
 	return 0;
 }
@@ -932,39 +959,6 @@ void wma_update_rts_params(tp_wma_handle wma, uint32_t value);
  * Return: none
  */
 void wma_update_frag_params(tp_wma_handle wma, uint32_t value);
-
-#ifdef CRYPTO_SET_KEY_CONVERGED
-static inline void wma_set_stakey(tp_wma_handle wma_handle,
-				  tpSetStaKeyParams key_info)
-{
-}
-
-static inline void wma_set_bsskey(tp_wma_handle wma_handle,
-				  tpSetBssKeyParams key_info)
-{
-}
-#else
-/**
- * wma_set_stakey() - set encryption key
- * @wma_handle: wma handle
- * @key_info: station key info
- *
- * This function sets encryption key for WEP/WPA/WPA2
- * encryption mode in firmware and send response to upper layer.
- *
- * Return: none
- */
-void wma_set_stakey(tp_wma_handle wma_handle, tpSetStaKeyParams key_info);
-
-/**
- * wma_set_bsskey() - set encryption key to fw.
- * @wma_handle: wma handle
- * @key_info: key info
- *
- * Return: none
- */
-void wma_set_bsskey(tp_wma_handle wma_handle, tpSetBssKeyParams key_info);
-#endif
 
 QDF_STATUS wma_process_update_edca_param_req(WMA_HANDLE handle,
 						    tEdcaParams *edca_params);
@@ -1878,6 +1872,18 @@ void wma_send_vdev_down(tp_wma_handle wma, struct del_bss_resp *req);
  */
 int wma_cold_boot_cal_event_handler(void *wma_ctx, uint8_t *event_buff,
 				    uint32_t len);
+
+#ifdef FEATURE_OEM_DATA
+/**
+ * wma_oem_event_handler() - oem data event handler
+ * @wma_ctx: wma handle
+ * @event_buff: event data
+ * @len: length of event buffer
+ *
+ * Return: Success or Failure status
+ */
+int wma_oem_event_handler(void *wma_ctx, uint8_t *event_buff, uint32_t len);
+#endif
 
 /**
  * wma_set_roam_triggers() - Send roam trigger bitmap to WMI

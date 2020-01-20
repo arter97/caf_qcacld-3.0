@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -4298,9 +4298,9 @@ static int hdd_we_set_power(struct hdd_adapter *adapter, int value)
 		return 0;
 	case 2:
 		/* Disable PowerSave */
-		sme_save_usr_ps_cfg(mac_handle, false);
 		sme_ps_enable_disable(mac_handle, adapter->vdev_id,
 				      SME_PS_DISABLE);
+		sme_save_usr_ps_cfg(mac_handle, false);
 		return 0;
 	case 3:
 		/* Enable UASPD */
@@ -7313,6 +7313,7 @@ static int __iw_get_char_setnone(struct net_device *dev,
 	{
 		int8_t s7snr = 0;
 		int status = 0;
+		bool enable_snr_monitoring;
 		struct hdd_context *hdd_ctx;
 		struct hdd_station_ctx *sta_ctx;
 
@@ -7322,12 +7323,14 @@ static int __iw_get_char_setnone(struct net_device *dev,
 			return status;
 
 		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-		if (!hdd_ctx->config->enable_snr_monitoring ||
+		enable_snr_monitoring =
+				ucfg_scan_is_snr_monitor_enabled(hdd_ctx->psoc);
+		if (!enable_snr_monitoring ||
 		    eConnectionState_Associated !=
 		    sta_ctx->conn_info.conn_state) {
 			hdd_err("getSNR failed: Enable SNR Monitoring-%d, ConnectionState-%d",
-			       hdd_ctx->config->enable_snr_monitoring,
-			       sta_ctx->conn_info.conn_state);
+				enable_snr_monitoring,
+				sta_ctx->conn_info.conn_state);
 			return -ENONET;
 		}
 		wlan_hdd_get_snr(adapter, &s7snr);
@@ -7506,6 +7509,7 @@ hdd_policy_mgr_set_hw_mode_ut(struct hdd_context *hdd_ctx,
 	enum hw_mode_bandwidth mac1_bw;
 	enum hw_mode_mac_band_cap mac0_band_cap;
 	enum hw_mode_dbs_capab dbs;
+	enum policy_mgr_conc_next_action action;
 
 	switch (cmd) {
 	case 0:
@@ -7516,6 +7520,7 @@ hdd_policy_mgr_set_hw_mode_ut(struct hdd_context *hdd_ctx,
 		mac1_bw = HW_MODE_BW_NONE;
 		mac0_band_cap = HW_MODE_MAC_BAND_NONE;
 		dbs = HW_MODE_DBS_NONE;
+		action = PM_SINGLE_MAC;
 		break;
 	case 1:
 		hdd_debug("set hw mode for dual mac");
@@ -7525,6 +7530,7 @@ hdd_policy_mgr_set_hw_mode_ut(struct hdd_context *hdd_ctx,
 		mac1_bw = HW_MODE_40_MHZ;
 		mac0_band_cap = HW_MODE_MAC_BAND_NONE;
 		dbs = HW_MODE_DBS;
+		action = PM_DBS;
 		break;
 	case 2:
 		hdd_debug("set hw mode for 2x2 5g + 1x1 2g");
@@ -7534,6 +7540,7 @@ hdd_policy_mgr_set_hw_mode_ut(struct hdd_context *hdd_ctx,
 		mac1_bw = HW_MODE_40_MHZ;
 		mac0_band_cap = HW_MODE_MAC_BAND_5G;
 		dbs = HW_MODE_DBS;
+		action = PM_DBS1;
 		break;
 	case 3:
 		hdd_debug("set hw mode for 2x2 2g + 1x1 5g");
@@ -7543,6 +7550,7 @@ hdd_policy_mgr_set_hw_mode_ut(struct hdd_context *hdd_ctx,
 		mac1_bw = HW_MODE_40_MHZ;
 		mac0_band_cap = HW_MODE_MAC_BAND_2G;
 		dbs = HW_MODE_DBS;
+		action = PM_DBS2;
 		break;
 	default:
 		hdd_err("unknown cmd %d", cmd);
@@ -7552,7 +7560,8 @@ hdd_policy_mgr_set_hw_mode_ut(struct hdd_context *hdd_ctx,
 				    mac0_ss, mac0_bw, mac1_ss, mac1_bw,
 				    mac0_band_cap, dbs, HW_MODE_AGILE_DFS_NONE,
 				    HW_MODE_SBS_NONE,
-				    POLICY_MGR_UPDATE_REASON_UT, PM_NOP);
+				    POLICY_MGR_UPDATE_REASON_UT, PM_NOP,
+				    action);
 }
 
 static int iw_get_policy_manager_ut_ops(struct hdd_context *hdd_ctx,
@@ -7747,7 +7756,7 @@ static int iw_get_policy_manager_ut_ops(struct hdd_context *hdd_ctx,
  *
  * Return: void
  */
-#if WLAN_DEBUG
+#ifdef WLAN_DEBUG
 static void hdd_ch_avoid_unit_cmd(struct hdd_context *hdd_ctx,
 				  int num_args, int *apps_args)
 {

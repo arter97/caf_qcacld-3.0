@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -36,6 +36,7 @@
 #include "wni_cfg.h"
 #include <cdp_txrx_tx_delay.h>
 #include <cdp_txrx_peer_ops.h>
+#include "cdp_txrx_misc.h"
 
 #include "qdf_nbuf.h"
 #include "qdf_types.h"
@@ -1071,6 +1072,32 @@ int wma_unified_csa_offload_enable(tp_wma_handle wma, uint8_t vdev_id)
 }
 #endif /* WLAN_POWER_MANAGEMENT_OFFLOAD */
 
+static uint8_t *
+wma_parse_ch_switch_wrapper_ie(uint8_t *ch_wr_ie, uint8_t sub_ele_id)
+{
+	uint8_t len = 0, sub_ele_len = 0;
+	struct ie_header *ele;
+
+	ele = (struct ie_header *)ch_wr_ie;
+	if (ele->ie_id != WLAN_ELEMID_CHAN_SWITCH_WRAP ||
+	    ele->ie_len == 0)
+		return NULL;
+
+	len = ele->ie_len;
+	ele = (struct ie_header *)(ch_wr_ie + sizeof(struct ie_header));
+
+	while (len > 0) {
+		sub_ele_len = sizeof(struct ie_header) + ele->ie_len;
+		len -= sub_ele_len;
+		if (ele->ie_id == sub_ele_id)
+			return (uint8_t *)ele;
+
+		ele = (struct ie_header *)((uint8_t *)ele + sub_ele_len);
+	}
+
+	return NULL;
+}
+
 /**
  * wma_csa_offload_handler() - CSA event handler
  * @handle: wma handle
@@ -1129,6 +1156,9 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 		csa_ie = (struct ieee80211_channelswitch_ie *)
 						(&csa_event->csa_ie[0]);
 		csa_offload_event->channel = csa_ie->newchannel;
+		csa_offload_event->csa_chan_freq =
+			wlan_reg_legacy_chan_to_freq(wma->pdev,
+						     csa_ie->newchannel);
 		csa_offload_event->switch_mode = csa_ie->switchmode;
 	} else if (csa_event->ies_present_flag & WMI_XCSA_IE_PRESENT) {
 		xcsa_ie = (struct ieee80211_extendedchannelswitch_ie *)
@@ -1136,6 +1166,16 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 		csa_offload_event->channel = xcsa_ie->newchannel;
 		csa_offload_event->switch_mode = xcsa_ie->switchmode;
 		csa_offload_event->new_op_class = xcsa_ie->newClass;
+		if (wlan_reg_is_6ghz_op_class(wma->pdev, xcsa_ie->newClass)) {
+			csa_offload_event->csa_chan_freq =
+				wlan_reg_chan_band_to_freq
+					(wma->pdev, xcsa_ie->newchannel,
+					 BIT(REG_BAND_6G));
+		} else {
+			csa_offload_event->csa_chan_freq =
+				wlan_reg_legacy_chan_to_freq
+					(wma->pdev, xcsa_ie->newchannel);
+		}
 	} else {
 		WMA_LOGE("CSA Event error: No CSA IE present");
 		qdf_mem_free(csa_offload_event);
@@ -1148,12 +1188,33 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 		csa_offload_event->new_ch_width = wb_ie->new_ch_width;
 		csa_offload_event->new_ch_freq_seg1 = wb_ie->new_ch_freq_seg1;
 		csa_offload_event->new_ch_freq_seg2 = wb_ie->new_ch_freq_seg2;
+	} else if (csa_event->ies_present_flag &
+		   WMI_CSWRAP_IE_EXTENDED_PRESENT) {
+		wb_ie = (struct ieee80211_ie_wide_bw_switch *)
+				wma_parse_ch_switch_wrapper_ie(
+				(uint8_t *)&csa_event->cswrap_ie_extended,
+				WLAN_ELEMID_WIDE_BAND_CHAN_SWITCH);
+		if (wb_ie) {
+			csa_offload_event->new_ch_width = wb_ie->new_ch_width;
+			csa_offload_event->new_ch_freq_seg1 =
+						wb_ie->new_ch_freq_seg1;
+			csa_offload_event->new_ch_freq_seg2 =
+						wb_ie->new_ch_freq_seg2;
+			csa_event->ies_present_flag |= WMI_WBW_IE_PRESENT;
+		}
 	}
 
 	csa_offload_event->ies_present_flag = csa_event->ies_present_flag;
 
-	WMA_LOGD("CSA: New Channel = %d BSSID:%pM",
-		 csa_offload_event->channel, csa_offload_event->bssId);
+	WMA_LOGD("CSA: New Channel = %d freq %d BSSID:%pM",
+		 csa_offload_event->channel, csa_offload_event->csa_chan_freq,
+		 csa_offload_event->bssId);
+	WMA_LOGD("CSA: IEs Present Flag = 0x%x new ch width = %d ch center freq1 = %d ch center freq2 = %d new op class = %d",
+		 csa_event->ies_present_flag,
+		 csa_offload_event->new_ch_width,
+		 csa_offload_event->new_ch_freq_seg1,
+		 csa_offload_event->new_ch_freq_seg2,
+		 csa_offload_event->new_op_class);
 
 	cur_chan = cds_freq_to_chan(intr[vdev_id].mhz);
 	/*
@@ -2416,7 +2477,6 @@ static int wma_wake_event_piggybacked(
 	uint32_t wake_reason;
 	uint32_t event_id;
 	uint8_t *bssid;
-	uint8_t peer_id;
 	void *peer, *pdev;
 	tpDeleteStaContext del_sta_ctx;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
@@ -2446,8 +2506,7 @@ static int wma_wake_event_piggybacked(
 			 __func__, event_param->fixed_param->vdev_id);
 		return 0;
 	}
-
-	peer = cdp_peer_find_by_addr(soc, pdev, bssid, &peer_id);
+	peer = cdp_peer_find_by_addr(soc, pdev, bssid);
 	wake_reason = event_param->fixed_param->wake_reason;
 
 	/* parse piggybacked event from param buffer */
@@ -2976,8 +3035,6 @@ QDF_STATUS wma_process_get_peer_info_req
 	uint16_t len;
 	wmi_buf_t buf;
 	int32_t vdev_id;
-	/* Will be removed in cleanup */
-	uint8_t sta_id;
 	struct cdp_pdev *pdev;
 	void *peer;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
@@ -3009,8 +3066,7 @@ QDF_STATUS wma_process_get_peer_info_req
 		qdf_mem_copy(peer_mac, bcast_mac, QDF_MAC_ADDR_SIZE);
 	} else {
 		/*get info for a single peer */
-		peer = cdp_peer_find_by_addr(soc, pdev,
-					     pReq->peer_mac.bytes, &sta_id);
+		peer = cdp_peer_find_by_addr(soc, pdev, pReq->peer_mac.bytes);
 		if (!peer) {
 			WMA_LOGE("%s: Failed to get peer handle using peer "
 				 QDF_MAC_ADDR_STR, __func__,
@@ -3346,12 +3402,16 @@ QDF_STATUS wma_stats_ext_req(void *wma_ptr, tpStatsExtRequest preq)
 	tp_wma_handle wma = (tp_wma_handle) wma_ptr;
 	struct stats_ext_params *params;
 	size_t params_len;
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	QDF_STATUS status;
 
 	if (!wma) {
 		WMA_LOGE("%s: wma handle is NULL", __func__);
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	/* Request RX HW stats */
+	cdp_request_rx_hw_stats(soc, preq->vdev_id);
 
 	params_len = sizeof(*params) + preq->request_data_len;
 	params = qdf_mem_malloc(params_len);
@@ -3738,7 +3798,6 @@ int wma_update_tdls_peer_state(WMA_HANDLE handle,
 	tp_wma_handle wma_handle = (tp_wma_handle) handle;
 	uint32_t i;
 	struct cdp_pdev *pdev;
-	uint8_t peer_id;
 	void *peer, *vdev;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	struct tdls_peer_params *peer_cap;
@@ -3800,8 +3859,7 @@ int wma_update_tdls_peer_state(WMA_HANDLE handle,
 
 	peer = cdp_peer_find_by_addr(soc,
 				     pdev,
-				     peer_state->peer_macaddr,
-				     &peer_id);
+				     peer_state->peer_macaddr);
 	if (!peer) {
 		WMA_LOGE("%s: Failed to get peer handle using peer mac %pM",
 				__func__, peer_state->peer_macaddr);
@@ -3847,9 +3905,8 @@ int wma_update_tdls_peer_state(WMA_HANDLE handle,
 			ret = -EINVAL;
 			goto end_tdls_peer_state;
 		}
-		cdp_peer_update_last_real_peer(soc,
-				pdev, vdev, &peer_id,
-				restore_last_peer);
+		cdp_peer_update_last_real_peer(soc, pdev, vdev,
+					       restore_last_peer);
 	}
 
 	if (TDLS_PEER_STATE_CONNECTED == peer_state->peer_state) {
@@ -5253,7 +5310,6 @@ int wma_vdev_obss_detection_info_handler(void *handle, uint8_t *event,
 	return 0;
 }
 
-#ifdef CRYPTO_SET_KEY_CONVERGED
 static void wma_send_set_key_rsp(uint8_t vdev_id, bool pairwise,
 				 uint8_t key_index)
 {
@@ -5405,7 +5461,6 @@ void wma_update_set_key(uint8_t session_id, bool pairwise,
 
 	wma_send_set_key_rsp(session_id, pairwise, key_index);
 }
-#endif /* CRYPTO_SET_KEY_CONVERGED */
 
 int wma_vdev_bss_color_collision_info_handler(void *handle,
 					      uint8_t *event,

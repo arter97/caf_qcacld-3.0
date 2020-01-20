@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -632,7 +632,6 @@ struct wma_version_info {
 	u_int32_t revision;
 };
 
-#ifdef WLAN_FEATURE_11W
 #define CMAC_IPN_LEN         (6)
 #define WMA_IGTK_KEY_INDEX_4 (4)
 #define WMA_IGTK_KEY_INDEX_5 (5)
@@ -663,7 +662,6 @@ typedef struct {
 	wma_igtk_ipn_t key_id[2];
 	uint32_t key_cipher;
 } wma_igtk_key_t;
-#endif
 
 struct roam_synch_frame_ind {
 	uint32_t bcn_probe_rsp_len;
@@ -759,9 +757,7 @@ struct wma_txrx_node {
 	tAddStaParams *addBssStaContext;
 	uint8_t aid;
 	uint8_t rmfEnabled;
-#ifdef WLAN_FEATURE_11W
 	wma_igtk_key_t key;
-#endif /* WLAN_FEATURE_11W */
 	uint32_t uapsd_cached_val;
 	void *del_staself_req;
 	bool is_del_sta_defered;
@@ -1953,36 +1949,6 @@ uint16_t wma_vdev_get_pause_bitmap(uint8_t vdev_id)
 }
 
 /**
- * wma_vdev_get_dp_handle() - Get vdev datapth handle
- * @vdev_id: the Id of the vdev to configure
- *
- * Return: Vdev datapath handle else NULL on error
- */
-static inline
-struct cdp_vdev *wma_vdev_get_vdev_dp_handle(uint8_t vdev_id)
-{
-	tp_wma_handle wma = (tp_wma_handle)cds_get_context(QDF_MODULE_ID_WMA);
-	struct wma_txrx_node *iface;
-
-	if (!wma) {
-		WMA_LOGE("%s: WMA context is invald!", __func__);
-		return NULL;
-	}
-
-	if (vdev_id >= wma->max_bssid)
-		return NULL;
-
-	iface = &wma->interfaces[vdev_id];
-
-	if (!iface || !iface->vdev) {
-		WMA_LOGE("%s: Vdev is NULL", __func__);
-		return NULL;
-	}
-
-	return wlan_vdev_get_dp_handle(iface->vdev);
-}
-
-/**
  * wma_vdev_is_device_in_low_pwr_mode - is device in power save mode
  * @vdev_id: the Id of the vdev to configure
  *
@@ -2459,8 +2425,6 @@ bool wma_is_roam_in_progress(uint32_t vdev_id);
  */
 struct wlan_objmgr_psoc *wma_get_psoc_from_scn_handle(void *scn_handle);
 
-#ifdef CRYPTO_SET_KEY_CONVERGED
-
 /**
  * wma_set_peer_ucast_cipher() - Update unicast cipher fof the peer
  * @mac_addr: peer mac address
@@ -2483,7 +2447,6 @@ void wma_set_peer_ucast_cipher(uint8_t *mac_addr,
 void wma_update_set_key(uint8_t session_id, bool pairwise,
 			uint8_t key_index,
 			enum wlan_crypto_cipher_type cipher_type);
-#endif
 
 /**
  * wma_get_igtk() - Get the IGTK that was stored in the session earlier
@@ -2556,8 +2519,6 @@ QDF_STATUS wma_pre_assoc_req(struct bss_params *add_bss);
  * Return: None
  */
 void wma_add_bss_lfr3(tp_wma_handle wma, struct bss_params *add_bss);
-
-uint8_t wma_peer_get_peet_id(uint8_t *mac);
 
 #ifdef WLAN_FEATURE_HOST_ROAM
 /**
@@ -2670,18 +2631,6 @@ QDF_STATUS wma_post_vdev_start_setup(uint8_t vdev_id);
  */
 QDF_STATUS wma_pre_vdev_start_setup(uint8_t vdev_id,
 				    struct bss_params *add_bss);
-
-/**
- * wma_release_pending_vdev_refs() - release vdev ref taken by interface txrx
- * node and delete all the peers attached to this vdev.
- *
- * This API loop and release vdev ref taken by all iface and all the peers
- * attached to the vdev, this need to be called on recovery to flush vdev
- * and peer.
- *
- * Return: void.
- */
-void wma_release_pending_vdev_refs(void);
 
 #ifdef FEATURE_ANI_LEVEL_REQUEST
 /**

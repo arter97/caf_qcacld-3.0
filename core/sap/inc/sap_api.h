@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -865,9 +865,9 @@ QDF_STATUS wlan_sap_get_pre_cac_vdev_id(mac_handle_t handle, uint8_t *vdev_id);
  * wlansap_check_cc_intf() - Get interfering concurrent channel
  * @sap_ctx: SAP context pointer
  *
- * Determine if a Concurrent Channel is interfering.
+ * Determine if a concurrent channel is interfering.
  *
- * Return: Channel number of the interfering channel, or 0 if none.
+ * Return: Channel freq (Mhz) of the interfering channel, or 0 if none.
  */
 uint16_t wlansap_check_cc_intf(struct sap_context *sap_ctx);
 #endif
@@ -932,18 +932,6 @@ QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 					       enum phy_ch_width target_bw,
 					       bool strict);
 
-/**
- * wlansap_set_key_sta() - set keys for a stations.
- * @sap_ctx: Pointer to the SAP context
- * @key_info : tCsrRoamSetKey structure for the station
- *
- * This api function provides for Ap App/HDD to set key for a station.
- *
- * Return: The QDF_STATUS code associated with performing the operation
- *         QDF_STATUS_SUCCESS:  Success
- */
-QDF_STATUS wlansap_set_key_sta(struct sap_context *sap_ctx,
-			       tCsrRoamSetKey *key_info);
 
 /**
  * wlan_sap_getstation_ie_information() - RSNIE Population
@@ -1446,6 +1434,15 @@ QDF_STATUS wlansap_filter_ch_based_acs(struct sap_context *sap_ctx,
 				       uint32_t *ch_cnt);
 
 /**
+ * wlansap_is_6ghz_included_in_acs_range() - check 6ghz channel included in
+ * ACS range
+ * @sap_ctx: sap context
+ *
+ * Return: QDF_STATUS
+ */
+bool wlansap_is_6ghz_included_in_acs_range(struct sap_context *sap_ctx);
+
+/**
  * wlansap_get_safe_channel_from_pcl_and_acs_range() - Get safe channel for SAP
  * restart
  * @sap_ctx: sap context
@@ -1459,6 +1456,42 @@ QDF_STATUS wlansap_filter_ch_based_acs(struct sap_context *sap_ctx,
  */
 uint32_t
 wlansap_get_safe_channel_from_pcl_and_acs_range(struct sap_context *sap_ctx);
+
+/**
+ * wlansap_get_chan_band_restrict() -  get new chan for band change
+ * @sap_ctx: sap context pointer
+ *
+ * Sap/p2p go channel switch from 5G to 2G by CSA when 5G band disabled to
+ * avoid conflict with modem N79.
+ * Sap/p2p go channel restore to 5G channel when 5G band enabled.
+ *
+ * Return - restart channel in MHZ
+ */
+qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx);
+
+/**
+ * sap_acquire_vdev_ref() - Increment reference count for vdev object
+ * @psoc: Object Manager PSoC object
+ * @sap_ctx: to store vdev object pointer
+ * @session_id: used to get vdev object
+ *
+ * This function is used to increment vdev object reference count and store
+ * vdev pointer in sap_ctx.
+ *
+ * Return: QDF_STATUS_SUCCESS - If able to get vdev object reference
+ *				else qdf status failure codes
+ */
+QDF_STATUS sap_acquire_vdev_ref(struct wlan_objmgr_psoc *psoc,
+				struct sap_context *sap_ctx,
+				uint8_t session_id);
+
+/**
+ * sap_release_vdev_ref() - Decrement reference count for vdev object
+ * @sap_ctx: for which vdev reference is to be decremented
+ *
+ * Return: None
+ */
+void sap_release_vdev_ref(struct sap_context *sap_ctx);
 #ifdef __cplusplus
 }
 #endif
