@@ -261,6 +261,7 @@ const char *get_e_roam_cmd_status_str(eRoamCmdStatus val)
 		CASE_RETURN_STR(eCSR_ROAM_START);
 		CASE_RETURN_STR(eCSR_ROAM_ABORT);
 		CASE_RETURN_STR(eCSR_ROAM_NAPI_OFF);
+		CASE_RETURN_STR(eCSR_ROAM_FIPS_PMK_REQUEST);
 	default:
 		return "unknown";
 	}
