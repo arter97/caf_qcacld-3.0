@@ -646,11 +646,19 @@ dp_config_enh_rx_capture(struct cdp_pdev *pdev_handle, uint32_t val)
 	return dp_pdev_configure_monitor_rings(pdev);
 }
 
-void
-dp_peer_set_rx_capture_enabled(struct cdp_peer *peer_handle, bool value)
+QDF_STATUS
+dp_peer_set_rx_capture_enabled(struct dp_pdev *pdev, struct dp_peer *peer,
+			       bool value, uint8_t *mac_addr)
 {
-	struct dp_peer *peer = (struct dp_peer *)peer_handle;
+	if (!peer) {
+		dp_err("Invalid Peer");
+		if (value)
+			return QDF_STATUS_E_FAILURE;
+		return QDF_STATUS_SUCCESS;
+	}
 
 	peer->rx_cap_enabled = value;
+
+	return QDF_STATUS_SUCCESS;
 }
 #endif /* WLAN_RX_PKT_CAPTURE_ENH */
