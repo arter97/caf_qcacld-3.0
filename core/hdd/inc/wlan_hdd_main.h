@@ -110,7 +110,7 @@
 #endif
 
 #if defined(CLD_PM_QOS) && \
-	(LINUX_VERSION_CODE <= KERNEL_VERSION(4, 19, 0))
+	(LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 #include <linux/pm_qos.h>
 #endif
 
@@ -731,7 +731,6 @@ struct hdd_station_ctx {
 	struct qdf_mac_addr requested_bssid;
 	struct hdd_connection_info conn_info;
 	struct hdd_connection_info cache_conn_info;
-	struct hdd_roaming_info roam_info;
 	int ft_carrier_on;
 	int ibss_sta_generation;
 	bool ibss_enc_key_installed;
@@ -739,7 +738,6 @@ struct hdd_station_ctx {
 	tSirPeerInfoRspParams ibss_peer_info;
 	bool hdd_reassoc_scenario;
 	int sta_debug_state;
-	uint8_t broadcast_sta_id;
 	struct hdd_mon_set_ch_info ch_info;
 	bool ap_supports_immediate_power_save;
 };
@@ -1744,6 +1742,11 @@ struct hdd_context {
 	/* IPv4 notifier callback for handling ARP offload on change in IP */
 	struct notifier_block ipv4_notifier;
 
+#ifdef FEATURE_RUNTIME_PM
+	struct notifier_block pm_qos_notifier;
+	bool runtime_pm_prevented;
+	qdf_spinlock_t pm_qos_lock;
+#endif
 	/* number of rf chains supported by target */
 	uint32_t  num_rf_chains;
 	/* Is htTxSTBC supported by target */
@@ -1884,7 +1887,7 @@ struct hdd_context {
 	qdf_time_t runtime_resume_start_time_stamp;
 	qdf_time_t runtime_suspend_done_time_stamp;
 #if defined(CLD_PM_QOS) && \
-	(LINUX_VERSION_CODE <= KERNEL_VERSION(4, 19, 0))
+	(LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 	struct pm_qos_request pm_qos_req;
 #endif
 #ifdef WLAN_FEATURE_PKT_CAPTURE

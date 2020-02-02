@@ -217,6 +217,20 @@ static uint32_t wma_get_number_of_tids_supported(uint8_t no_of_peers_supported,
 }
 #endif
 
+#if (defined(IPA_DISABLE_OVERRIDE)) && (!defined(IPA_OFFLOAD))
+static void wma_set_ipa_disable_config(
+					target_resource_config *tgt_cfg)
+{
+	tgt_cfg->ipa_disable = true;
+}
+#else
+static void wma_set_ipa_disable_config(
+					target_resource_config *tgt_cfg)
+{
+	tgt_cfg->ipa_disable = false;
+}
+#endif
+
 #ifndef NUM_OF_ADDITIONAL_FW_PEERS
 #define NUM_OF_ADDITIONAL_FW_PEERS	2
 #endif
@@ -302,6 +316,8 @@ static void wma_set_default_tgt_config(tp_wma_handle wma_handle,
 
 	if (cds_get_conparam() == QDF_GLOBAL_MONITOR_MODE)
 		tgt_cfg->rx_decap_mode = CFG_TGT_RX_DECAP_MODE_RAW;
+
+	wma_set_ipa_disable_config(tgt_cfg);
 }
 
 /**
@@ -1775,9 +1791,6 @@ static void wma_state_info_dump(char **buf_ptr, uint16_t *size)
 		if (!vdev)
 			continue;
 
-		if (!wlan_vdev_get_dp_handle(iface->vdev))
-			continue;
-
 		status = wma_get_vdev_rate_flag(iface->vdev, &rate_flag);
 		if (QDF_IS_STATUS_ERROR(status))
 			continue;
@@ -3246,6 +3259,8 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 					   wmi_roam_stats_event_id,
 					   wma_roam_stats_event_handler,
 					   WMA_RX_SERIALIZER_CTX);
+
+	wma_register_pmkid_req_event_handler(wma_handle);
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
 	wmi_unified_register_event_handler(wma_handle->wmi_handle,
 				wmi_rssi_breach_event_id,
@@ -4257,10 +4272,10 @@ QDF_STATUS wma_stop(void)
 		vdev = wma_handle->interfaces[i].vdev;
 		if (!vdev)
 			continue;
-		if (wlan_vdev_get_dp_handle(vdev) && wma_is_vdev_up(i)) {
+
+		if (wma_is_vdev_up(i))
 			cdp_fc_vdev_flush(cds_get_context(QDF_MODULE_ID_SOC),
 					  i);
-		}
 	}
 
 	if (!mac->mlme_cfg->gen.enable_remove_time_stamp_sync_cmd &&
@@ -7096,7 +7111,8 @@ static void wma_set_wifi_start_packet_stats(void *wma_handle,
 	log_state = ATH_PKTLOG_ANI | ATH_PKTLOG_RCUPDATE | ATH_PKTLOG_RCFIND |
 		ATH_PKTLOG_RX | ATH_PKTLOG_TX |
 		ATH_PKTLOG_TEXT | ATH_PKTLOG_SW_EVENT;
-#elif defined(QCA_WIFI_QCA6390) || defined(QCA_WIFI_QCA6490)
+#elif defined(QCA_WIFI_QCA6390) || defined(QCA_WIFI_QCA6490) || \
+      defined(QCA_WIFI_QCA6750)
 	log_state = ATH_PKTLOG_RCFIND | ATH_PKTLOG_RCUPDATE |
 		    ATH_PKTLOG_TX | ATH_PKTLOG_LITE_T2H |
 		    ATH_PKTLOG_SW_EVENT | ATH_PKTLOG_RX;

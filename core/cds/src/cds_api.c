@@ -197,6 +197,7 @@ QDF_STATUS cds_init(void)
 
 	qdf_register_self_recovery_callback(__cds_trigger_recovery);
 	qdf_register_fw_down_callback(cds_is_fw_down);
+	qdf_register_is_driver_unloading_callback(cds_is_driver_unloading);
 	qdf_register_recovering_state_query_callback(cds_is_driver_recovering);
 	qdf_register_drv_connected_callback(cds_is_drv_connected);
 	qdf_register_wmi_send_recv_qmi_callback(cds_wmi_send_recv_qmi);
@@ -223,6 +224,7 @@ void cds_deinit(void)
 
 	qdf_register_recovering_state_query_callback(NULL);
 	qdf_register_fw_down_callback(NULL);
+	qdf_register_is_driver_unloading_callback(NULL);
 	qdf_register_self_recovery_callback(NULL);
 	qdf_register_wmi_send_recv_qmi_callback(NULL);
 
@@ -398,7 +400,7 @@ static void cds_cdp_cfg_attach(struct wlan_objmgr_psoc *psoc)
 	gp_cds_context->cfg_ctx = cdp_cfg_attach(soc, gp_cds_context->qdf_ctx,
 					(void *)(&cdp_cfg));
 	if (!gp_cds_context->cfg_ctx) {
-		WMA_LOGP("%s: failed to init cfg handle", __func__);
+		WMA_LOGD("%s: failed to init cfg handle", __func__);
 		return;
 	}
 
@@ -661,16 +663,18 @@ QDF_STATUS cds_open(struct wlan_objmgr_psoc *psoc)
 		goto err_wma_close;
 	}
 
-	cds_debug("target_type %d 8074:%d 6290:%d 6390: %d 6490: %d",
+	cds_debug("target_type %d 8074:%d 6290:%d 6390: %d 6490: %d 6750: %d",
 		  hdd_ctx->target_type,
 		  TARGET_TYPE_QCA8074,
 		  TARGET_TYPE_QCA6290,
 		  TARGET_TYPE_QCA6390,
-		  TARGET_TYPE_QCA6490);
+		  TARGET_TYPE_QCA6490,
+		  TARGET_TYPE_QCA6750);
 
 	if (TARGET_TYPE_QCA6290 == hdd_ctx->target_type ||
 	    TARGET_TYPE_QCA6390 == hdd_ctx->target_type ||
-	    TARGET_TYPE_QCA6490 == hdd_ctx->target_type)
+	    TARGET_TYPE_QCA6490 == hdd_ctx->target_type ||
+	    TARGET_TYPE_QCA6750 == hdd_ctx->target_type)
 		gp_cds_context->dp_soc = cdp_soc_attach(LITHIUM_DP,
 			gp_cds_context->hif_context, htcInfo.target_psoc,
 			gp_cds_context->htc_ctx, gp_cds_context->qdf_ctx,
@@ -776,11 +780,10 @@ QDF_STATUS cds_dp_open(struct wlan_objmgr_psoc *psoc)
 	QDF_STATUS qdf_status;
 	struct dp_txrx_config dp_config;
 
-	cds_set_context(QDF_MODULE_ID_TXRX,
-		cdp_pdev_attach(cds_get_context(QDF_MODULE_ID_SOC),
-				gp_cds_context->htc_ctx,
-				gp_cds_context->qdf_ctx, 0));
-	if (!gp_cds_context->pdev_txrx_ctx) {
+	qdf_status = cdp_pdev_attach(cds_get_context(QDF_MODULE_ID_SOC),
+				     gp_cds_context->htc_ctx,
+				     gp_cds_context->qdf_ctx, 0);
+	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		/* Critical Error ...  Cannot proceed further */
 		cds_alert("Failed to open TXRX");
 		QDF_ASSERT(0);
@@ -1117,7 +1120,7 @@ QDF_STATUS cds_post_disable(void)
 	 * - Clean up CE tasklets.
 	 */
 
-	cds_info("send deinit sequence to firmware");
+	cds_debug("send deinit sequence to firmware");
 	if (!(cds_is_driver_recovering() || cds_is_driver_in_bad_state()))
 		cds_suspend_target(wma_handle);
 	hif_disable_isr(hif_ctx);
@@ -1237,16 +1240,12 @@ QDF_STATUS cds_close(struct wlan_objmgr_psoc *psoc)
 
 QDF_STATUS cds_dp_close(struct wlan_objmgr_psoc *psoc)
 {
-	void *ctx;
-
 	cdp_txrx_intr_detach(gp_cds_context->dp_soc);
-	ctx = cds_get_context(QDF_MODULE_ID_TXRX);
 
 	dp_txrx_deinit(cds_get_context(QDF_MODULE_ID_SOC));
 
 	cdp_pdev_detach(cds_get_context(QDF_MODULE_ID_SOC), OL_TXRX_PDEV_ID, 1);
 
-	cds_set_context(QDF_MODULE_ID_TXRX, NULL);
 	ucfg_pmo_psoc_set_txrx_pdev_id(psoc, OL_TXRX_INVALID_PDEV_ID);
 
 	return QDF_STATUS_SUCCESS;
@@ -1324,12 +1323,6 @@ void *cds_get_context(QDF_MODULE_ID module_id)
 	case QDF_MODULE_ID_BMI:
 	{
 		context = gp_cds_context->g_ol_context;
-		break;
-	}
-
-	case QDF_MODULE_ID_TXRX:
-	{
-		context = (void *)gp_cds_context->pdev_txrx_ctx;
 		break;
 	}
 
@@ -1536,9 +1529,6 @@ QDF_STATUS cds_set_context(QDF_MODULE_ID module_id, void *context)
 	case QDF_MODULE_ID_HDD:
 		p_cds_context->hdd_context = context;
 		break;
-	case QDF_MODULE_ID_TXRX:
-		p_cds_context->pdev_txrx_ctx = context;
-		break;
 	case QDF_MODULE_ID_HIF:
 		p_cds_context->hif_context = context;
 		break;
@@ -1584,10 +1574,6 @@ QDF_STATUS cds_free_context(QDF_MODULE_ID module_id, void *module_context)
 
 	case QDF_MODULE_ID_HIF:
 		cds_mod_context = &gp_cds_context->hif_context;
-		break;
-
-	case QDF_MODULE_ID_TXRX:
-		cds_mod_context = (void **)&gp_cds_context->pdev_txrx_ctx;
 		break;
 
 	case QDF_MODULE_ID_BMI:

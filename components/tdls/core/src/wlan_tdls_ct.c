@@ -531,8 +531,9 @@ void tdls_indicate_teardown(struct tdls_vdev_priv_obj *tdls_vdev,
 	tdls_notice("Teardown reason %d", reason);
 
 	if (tdls_soc->tdls_dp_vdev_update)
-		tdls_soc->tdls_dp_vdev_update(&tdls_soc->soc,
-				&curr_peer->peer_mac,
+		tdls_soc->tdls_dp_vdev_update(
+				&tdls_soc->soc,
+				wlan_vdev_get_id(tdls_vdev->vdev),
 				tdls_soc->tdls_update_dp_vdev_flags,
 				false);
 
@@ -1227,7 +1228,7 @@ void tdls_disable_offchan_and_teardown_links(
 	}
 
 	if (TDLS_SUPPORT_SUSPENDED >= tdls_soc->tdls_current_mode) {
-		tdls_notice("TDLS mode %d is disabled OR not suspended now",
+		tdls_debug("TDLS mode %d is disabled OR not suspended now",
 			   tdls_soc->tdls_current_mode);
 		return;
 	}
@@ -1237,7 +1238,7 @@ void tdls_disable_offchan_and_teardown_links(
 		tdls_in_progress = true;
 
 	if (!(connected_tdls_peers || tdls_in_progress)) {
-		tdls_notice("No TDLS connected/progress peers to delete");
+		tdls_debug("No TDLS connected/progress peers to delete");
 		vdev_id = vdev->vdev_objmgr.vdev_id;
 		if (tdls_soc->set_state_info.set_state_cnt > 0) {
 			tdls_debug("Disable the tdls in FW as second interface is coming up");

@@ -462,7 +462,7 @@ lim_configure_ap_start_bss_session(struct mac_context *mac_ctx,
 	session->sap_dot11mc = sme_start_bss_req->sap_dot11mc;
 	session->vendor_vht_sap =
 			sme_start_bss_req->vendor_vht_sap;
-	pe_info("vendor_vht_sap %d", session->vendor_vht_sap);
+	pe_debug("vendor_vht_sap %d", session->vendor_vht_sap);
 	lim_get_short_slot_from_phy_mode(mac_ctx, session, session->gLimPhyMode,
 		&session->shortSlotTimeSupported);
 	session->isCoalesingInIBSSAllowed =
@@ -1203,6 +1203,39 @@ static void lim_set_rmf_enabled(struct mac_context *mac,
 	pe_debug("vdev %d limRmfEnabled %d rsn_caps 0x%x",
 		 csr_join_req->vdev_id, session->limRmfEnabled,
 		 rsn_caps);
+}
+
+bool lim_get_bss_rmf_capable(struct mac_context *mac,
+			     struct pe_session *session)
+{
+	struct wlan_objmgr_vdev *vdev;
+	uint16_t rsn_caps;
+	bool peer_rmf_capable = false;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac->psoc,
+						    session->vdev_id,
+						    WLAN_LEGACY_SME_ID);
+	if (!vdev) {
+		pe_err("Invalid vdev");
+		return false;
+	}
+	rsn_caps = (uint16_t)wlan_crypto_get_param(vdev,
+						   WLAN_CRYPTO_PARAM_RSN_CAP);
+	if (wlan_crypto_vdev_has_mgmtcipher(
+				vdev,
+				(1 << WLAN_CRYPTO_CIPHER_AES_GMAC) |
+				(1 << WLAN_CRYPTO_CIPHER_AES_GMAC_256) |
+				(1 << WLAN_CRYPTO_CIPHER_AES_CMAC)) &&
+	    (rsn_caps & WLAN_CRYPTO_RSN_CAP_MFP_ENABLED))
+		peer_rmf_capable = true;
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+
+	pe_debug("vdev %d peer_rmf_capable %d rsn_caps 0x%x",
+		 session->vdev_id, peer_rmf_capable,
+		 rsn_caps);
+
+	return peer_rmf_capable;
 }
 #else
 /**
@@ -4965,7 +4998,8 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 		 ch_change_req->dot11mode);
 
 	if (IS_DOT11_MODE_HE(ch_change_req->dot11mode) &&
-	    lim_is_session_he_capable(session_entry)) {
+		((QDF_MONITOR_MODE == session_entry->opmode) ||
+		lim_is_session_he_capable(session_entry))) {
 		lim_update_session_he_capable_chan_switch
 			(mac_ctx, session_entry, target_freq);
 	} else if (wlan_reg_is_6ghz_chan_freq(target_freq)) {

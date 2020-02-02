@@ -3046,7 +3046,7 @@ static int hdd_check_wext_control(enum hdd_wext_control wext_control,
 		hdd_err_rl("Rejecting disabled ioctl %x", info->cmd);
 		return -ENOTSUPP;
 	case hdd_wext_deprecated:
-		hdd_warn_rl("Using deprecated ioctl %x", info->cmd);
+		hdd_debug("Using deprecated ioctl %x", info->cmd);
 		return 0;
 	case hdd_wext_enabled:
 		return 0;
@@ -5975,12 +5975,12 @@ static int __iw_setchar_getnone(struct net_device *dev,
 	case WE_WOWL_ADD_PTRN:
 		hdd_debug("ADD_PTRN");
 		if (!hdd_add_wowl_ptrn(adapter, str_arg))
-			return -EINVAL;
+			ret = -EINVAL;
 		break;
 	case WE_WOWL_DEL_PTRN:
 		hdd_debug("DEL_PTRN");
 		if (!hdd_del_wowl_ptrn(adapter, str_arg))
-			return -EINVAL;
+			ret = -EINVAL;
 		break;
 	case WE_NEIGHBOR_REPORT_REQUEST:
 	{

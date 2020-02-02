@@ -980,25 +980,25 @@ policy_mgr_validate_dbs_switch(struct wlan_objmgr_psoc *psoc,
 	 */
 	if (policy_mgr_is_2x2_5G_1x1_2G_dbs_capable(psoc) ||
 	    policy_mgr_is_2x2_2G_1x1_5G_dbs_capable(psoc)) {
-		policy_mgr_info("curr dbs action %d new action %d",
-				hw_mode.action_type, action);
+		policy_mgr_debug("curr dbs action %d new action %d",
+				 hw_mode.action_type, action);
 		if (hw_mode.action_type == PM_DBS1 &&
 		    ((action == PM_DBS1 ||
 		    action == PM_DBS1_DOWNGRADE))) {
-			policy_mgr_err("driver is already in DBS_5G_2x2_24G_1x1 (%d), no further action %d needed",
-				       hw_mode.action_type, action);
+			policy_mgr_debug("driver is already in DBS_5G_2x2_24G_1x1 (%d), no further action %d needed",
+					 hw_mode.action_type, action);
 			return QDF_STATUS_E_ALREADY;
 		} else if (hw_mode.action_type == PM_DBS2 &&
 			   ((action == PM_DBS2 ||
 			   action == PM_DBS2_DOWNGRADE))) {
-			policy_mgr_err("driver is already in DBS_24G_2x2_5G_1x1 (%d), no further action %d needed",
-				       hw_mode.action_type, action);
+			policy_mgr_debug("driver is already in DBS_24G_2x2_5G_1x1 (%d), no further action %d needed",
+					 hw_mode.action_type, action);
 			return QDF_STATUS_E_ALREADY;
 		}
 	} else if ((action == PM_DBS_DOWNGRADE) || (action == PM_DBS) ||
 		   (action == PM_DBS_UPGRADE)) {
-		policy_mgr_err("driver is already in %s mode, no further action needed",
-			       (hw_mode.dbs_cap) ? "dbs" : "non dbs");
+		policy_mgr_debug("driver is already in %s mode, no further action needed",
+				 (hw_mode.dbs_cap) ? "dbs" : "non dbs");
 		return QDF_STATUS_E_ALREADY;
 	}
 	return QDF_STATUS_SUCCESS;
@@ -1330,6 +1330,7 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 		policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(psoc);
 	bool sta_sap_scc_on_lte_coex_chan =
 		policy_mgr_sta_sap_scc_on_lte_coex_chan(psoc);
+	uint8_t sta_sap_scc_on_dfs_chnl_config_value = 0;
 	uint32_t cc_count, i, go_index_start, pcl_len = 0;
 	uint32_t op_ch_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	uint8_t vdev_id[MAX_NUMBER_OF_CONC_CONNECTIONS];
@@ -1350,6 +1351,8 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 		return false;
 	if (!sta_sap_scc_on_dfs_chan && !sta_sap_scc_on_lte_coex_chan)
 		return false;
+
+	policy_mgr_get_sta_sap_scc_on_dfs_chnl(psoc, &sta_sap_scc_on_dfs_chnl_config_value);
 
 	if (!policy_mgr_is_hw_dbs_capable(psoc))
 		if (policy_mgr_get_connection_count(psoc) > 1)
@@ -1375,12 +1378,14 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 				POLICY_MGR_BAND_24 : POLICY_MGR_BAND_5))
 			continue;
 		if (sta_sap_scc_on_dfs_chan &&
+		    (sta_sap_scc_on_dfs_chnl_config_value != 2) &&
 		    wlan_reg_is_dfs_for_freq(pm_ctx->pdev,
 					     op_ch_freq_list[i])) {
 			sap_vdev_id = vdev_id[i];
 			curr_sap_freq = op_ch_freq_list[i];
-			policy_mgr_debug("sta_sap_scc_on_dfs_chan %u, dfs sap_ch_freq %u",
+			policy_mgr_debug("sta_sap_scc_on_dfs_chan %u, sta_sap_scc_on_dfs_chnl_config_value %u, dfs sap_ch_freq %u",
 					 sta_sap_scc_on_dfs_chan,
+					 sta_sap_scc_on_dfs_chnl_config_value,
 					 curr_sap_freq);
 			break;
 		}
@@ -1751,8 +1756,8 @@ static void __policy_mgr_check_sta_ap_concurrent_ch_intf(void *data)
 	mcc_to_scc_switch =
 		policy_mgr_get_mcc_to_scc_switch_mode(psoc);
 
-	policy_mgr_info("Concurrent open sessions running: %d",
-		policy_mgr_concurrent_open_sessions_running(psoc));
+	policy_mgr_debug("Concurrent open sessions running: %d",
+			 policy_mgr_concurrent_open_sessions_running(psoc));
 
 	if (!policy_mgr_is_sap_go_existed(psoc))
 		goto end;
@@ -1793,8 +1798,8 @@ static void __policy_mgr_check_sta_ap_concurrent_ch_intf(void *data)
 				wlan_hdd_get_channel_for_sap_restart
 					(psoc, vdev_id[i], &ch_freq);
 			if (status == QDF_STATUS_SUCCESS) {
-				policy_mgr_info("SAP restarts due to MCC->SCC switch, old ch freq :%d new ch freq: %d",
-						op_ch_freq_list[i], ch_freq);
+				policy_mgr_debug("SAP restarts due to MCC->SCC switch, old ch freq :%d new ch freq: %d",
+						 op_ch_freq_list[i], ch_freq);
 				break;
 			}
 		}
@@ -2047,7 +2052,7 @@ void policy_mgr_check_concurrent_intf_and_restart_sap(
 	 * capability change.
 	 * If sta exist, sap/p2p go may need switch channel to force scc
 	 */
-	bool sta_check;
+	bool sta_check = false, gc_check = false;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -2092,10 +2097,20 @@ void policy_mgr_check_concurrent_intf_and_restart_sap(
 	sta_check = !cc_count ||
 		    policy_mgr_valid_sta_channel_check(psoc, op_ch_freq_list[0]);
 
+	cc_count = 0;
+	cc_count = policy_mgr_get_mode_specific_conn_info(
+				psoc, &op_ch_freq_list[cc_count],
+				&vdev_id[cc_count], PM_P2P_CLIENT_MODE);
+	if (!cc_count)
+		policy_mgr_debug("Could not get GC operating channel&vdevid");
+
+	gc_check = !!cc_count;
+	policy_mgr_debug("gc_check: %d", gc_check);
+
 	mcc_to_scc_switch =
 		policy_mgr_get_mcc_to_scc_switch_mode(psoc);
-	policy_mgr_info("MCC to SCC switch: %d chan: %d",
-			mcc_to_scc_switch, op_ch_freq_list[0]);
+	policy_mgr_debug("MCC to SCC switch: %d chan: %d",
+			 mcc_to_scc_switch, op_ch_freq_list[0]);
 sap_restart:
 	/*
 	 * If sta_sap_scc_on_dfs_chan is true then standalone SAP is not
@@ -2108,10 +2123,10 @@ sap_restart:
 	 */
 	if (restart_sap ||
 	    ((mcc_to_scc_switch != QDF_MCC_TO_SCC_SWITCH_DISABLE) &&
-	    sta_check)) {
+	    (sta_check || gc_check))) {
 		if (pm_ctx->sta_ap_intf_check_work_info) {
 			qdf_sched_work(0, &pm_ctx->sta_ap_intf_check_work);
-			policy_mgr_info(
+			policy_mgr_debug(
 				"Checking for Concurrent Change interference");
 		}
 	}
@@ -2412,7 +2427,7 @@ QDF_STATUS policy_mgr_check_and_set_hw_mode_for_channel_switch(
 	    (!policy_mgr_is_hw_dbs_2x2_capable(psoc) &&
 	    !policy_mgr_is_hw_dbs_required_for_band(
 					psoc, HW_MODE_MAC_BAND_2G))) {
-		policy_mgr_err("2x2 DBS is not enabled");
+		policy_mgr_debug("2x2 DBS is not enabled");
 		return QDF_STATUS_E_NOSUPPORT;
 	}
 
@@ -2424,12 +2439,12 @@ QDF_STATUS policy_mgr_check_and_set_hw_mode_for_channel_switch(
 	policy_mgr_stop_opportunistic_timer(psoc);
 
 	if (policy_mgr_is_current_hwmode_dbs(psoc)) {
-		policy_mgr_err("Already in DBS mode");
+		policy_mgr_debug("Already in DBS mode");
 		return QDF_STATUS_E_ALREADY;
 	}
 
 	if (wlan_reg_freq_to_band(ch_freq) != REG_BAND_2G) {
-		policy_mgr_err("DBS is not required for 5Ghz chan");
+		policy_mgr_debug("DBS is not required for 5Ghz chan");
 		return QDF_STATUS_E_NOSUPPORT;
 	}
 
@@ -2613,21 +2628,21 @@ enum policy_mgr_hw_mode_change policy_mgr_get_hw_mode_change_from_hw_mode_index(
 	}
 
 	if (hw_mode.dbs_cap) {
-		policy_mgr_info("DBS is requested with HW (%d)",
-		hw_mode_index);
+		policy_mgr_debug("DBS is requested with HW (%d)",
+				 hw_mode_index);
 		value = POLICY_MGR_DBS_IN_PROGRESS;
 		goto ret_value;
 	}
 
 	if (hw_mode.sbs_cap) {
-		policy_mgr_info("SBS is requested with HW (%d)",
-		hw_mode_index);
+		policy_mgr_debug("SBS is requested with HW (%d)",
+				 hw_mode_index);
 		value = POLICY_MGR_SBS_IN_PROGRESS;
 		goto ret_value;
 	}
 
 	value = POLICY_MGR_SMM_IN_PROGRESS;
-	policy_mgr_info("SMM is requested with HW (%d)", hw_mode_index);
+	policy_mgr_debug("SMM is requested with HW (%d)", hw_mode_index);
 
 ret_value:
 	return value;

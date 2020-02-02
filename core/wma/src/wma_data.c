@@ -947,17 +947,12 @@ static void wma_data_tx_ack_work_handler(void *ack_work)
 void
 wma_data_tx_ack_comp_hdlr(void *wma_context, qdf_nbuf_t netbuf, int32_t status)
 {
-	void *pdev;
 	tp_wma_handle wma_handle = (tp_wma_handle) wma_context;
 
 	if (!wma_handle) {
 		WMA_LOGE("%s: Invalid WMA Handle", __func__);
 		return;
 	}
-
-	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
-	if (!pdev)
-		return;
 
 	/*
 	 * if netBuf does not match with pending nbuf then just free the
@@ -1232,7 +1227,6 @@ QDF_STATUS wma_process_rate_update_indicate(tp_wma_handle wma,
 {
 	int32_t ret = 0;
 	uint8_t vdev_id = 0;
-	void *pdev;
 	int32_t mbpsx10_rate = -1;
 	uint32_t paramId;
 	uint8_t rate = 0;
@@ -1241,9 +1235,8 @@ QDF_STATUS wma_process_rate_update_indicate(tp_wma_handle wma,
 	QDF_STATUS status;
 
 	/* Get the vdev id */
-	pdev = wma_find_vdev_by_addr(wma, pRateUpdateParams->bssid.bytes,
-					&vdev_id);
-	if (!pdev) {
+	if (wma_find_vdev_id_by_addr(wma, pRateUpdateParams->bssid.bytes,
+				     &vdev_id)) {
 		WMA_LOGE("vdev handle is invalid for %pM",
 			 pRateUpdateParams->bssid.bytes);
 		qdf_mem_free(pRateUpdateParams);
@@ -1515,7 +1508,6 @@ int wma_mcc_vdev_tx_pause_evt_handler(void *handle, uint8_t *event,
 	wmi_tx_pause_event_fixed_param *wmi_event;
 	uint8_t vdev_id;
 	A_UINT32 vdev_map;
-	struct cdp_vdev *dp_handle;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 
 	param_buf = (WMI_TX_PAUSE_EVENTID_param_tlvs *) event;
@@ -1547,15 +1539,6 @@ int wma_mcc_vdev_tx_pause_evt_handler(void *handle, uint8_t *event,
 		} else {
 			if (!wma->interfaces[vdev_id].vdev) {
 				WMA_LOGE("%s: vdev is NULL for %d", __func__,
-					 vdev_id);
-				/* Test Next VDEV */
-				vdev_map >>= 1;
-				continue;
-			}
-			dp_handle = wlan_vdev_get_dp_handle
-					(wma->interfaces[vdev_id].vdev);
-			if (!dp_handle) {
-				WMA_LOGE("%s: invalid vdev ID %d", __func__,
 					 vdev_id);
 				/* Test Next VDEV */
 				vdev_map >>= 1;
@@ -2084,7 +2067,6 @@ int wma_ibss_peer_info_event_handler(void *handle, uint8_t *data,
 {
 	struct scheduler_msg cds_msg = {0};
 	wmi_peer_info *peer_info;
-	void *pdev;
 	tSirIbssPeerInfoParams *pSmeRsp;
 	uint32_t count, num_peers, status;
 	tSirIbssGetPeerInfoRspParams *pRsp;
@@ -2097,10 +2079,6 @@ int wma_ibss_peer_info_event_handler(void *handle, uint8_t *data,
 		WMA_LOGE("Invalid wma");
 		return 0;
 	}
-
-	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
-	if (!pdev)
-		return 0;
 
 	param_tlvs = (WMI_PEER_INFO_EVENTID_param_tlvs *) data;
 	fix_param = param_tlvs->fixed_param;

@@ -1307,7 +1307,8 @@ void pe_register_callbacks_with_wma(struct mac_context *mac,
 			ready_req->csr_roam_synch_cb,
 			ready_req->csr_roam_auth_event_handle_cb,
 			ready_req->pe_roam_synch_cb,
-			ready_req->pe_disconnect_cb);
+			ready_req->pe_disconnect_cb,
+			ready_req->csr_roam_pmkid_req_cb);
 	if (status != QDF_STATUS_SUCCESS)
 		pe_err("Registering roaming callbacks with WMA failed");
 }
@@ -2804,7 +2805,7 @@ QDF_STATUS lim_update_ext_cap_ie(struct mac_context *mac_ctx, uint8_t *ie_data,
 		populate_dot11f_twt_extended_caps(mac_ctx, session,
 						  &driver_ext_cap);
 	else
-		pe_err("Session NULL, cannot set TWT caps");
+		pe_debug("Session NULL, cannot set TWT caps");
 
 	local_ie_buf[*local_ie_len + 1] = driver_ext_cap.num_bytes;
 

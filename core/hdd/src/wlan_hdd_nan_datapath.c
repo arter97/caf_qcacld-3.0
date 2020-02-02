@@ -651,7 +651,6 @@ int hdd_ndi_delete(uint8_t vdev_id, char *iface_name, uint16_t transaction_id)
 	struct hdd_adapter *adapter;
 	struct hdd_station_ctx *sta_ctx;
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	uint8_t sta_id;
 
 	if (!hdd_ctx) {
 		hdd_err("hdd_ctx is null");
@@ -668,12 +667,6 @@ int hdd_ndi_delete(uint8_t vdev_id, char *iface_name, uint16_t transaction_id)
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 	if (!sta_ctx) {
 		hdd_err("sta_ctx is NULL");
-		return -EINVAL;
-	}
-
-	sta_id = sta_ctx->broadcast_sta_id;
-	if (sta_id >= HDD_MAX_ADAPTERS) {
-		hdd_err("Error: Invalid sta id %u", sta_id);
 		return -EINVAL;
 	}
 
@@ -803,6 +796,13 @@ void hdd_ndi_drv_ndi_delete_rsp_handler(uint8_t vdev_id)
 	wlan_hdd_netif_queue_control(adapter,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 				     WLAN_CONTROL_PATH);
+
+	/*
+	 * For NAN Data interface, the close session results in the final
+	 * indication to the userspace
+	 */
+	if (adapter->device_mode == QDF_NDI_MODE)
+		hdd_ndp_session_end_handler(adapter);
 
 	complete(&adapter->disconnect_comp_var);
 }

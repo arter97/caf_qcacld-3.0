@@ -302,6 +302,7 @@ const char *get_e_roam_cmd_status_str(eRoamCmdStatus val)
 		CASE_RETURN_STR(eCSR_ROAM_NAPI_OFF);
 		CASE_RETURN_STR(eCSR_ROAM_CHANNEL_COMPLETE_IND);
 		CASE_RETURN_STR(eCSR_ROAM_SAE_COMPUTE);
+		CASE_RETURN_STR(eCSR_ROAM_FIPS_PMK_REQUEST);
 	default:
 		return "unknown";
 	}
@@ -1079,8 +1080,7 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 		intf_lfreq = intf_cfreq - intf_hbw;
 		intf_hfreq = intf_cfreq + intf_hbw;
 
-		sme_err("SAP:  OCH: %03d CCH: %03d BW: %d LF: %d HF: %d"
-			" INTF: OCH: %03d CF: %d BW: %d LF: %d HF: %d",
+		sme_debug("SAP:  OCH: %03d CCH: %03d BW: %d LF: %d HF: %d INTF: OCH: %03d CF: %d BW: %d LF: %d HF: %d",
 			sap_ch_freq, sap_cfreq, sap_hbw * 2,
 			sap_lfreq, sap_hfreq, intf_ch_freq,
 			intf_cfreq, intf_hbw * 2, intf_lfreq, intf_hfreq);
@@ -1122,8 +1122,8 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 	if (intf_ch_freq == sap_ch_freq)
 		intf_ch_freq = 0;
 
-	sme_err("##Concurrent Channels %s Interfering",
-		intf_ch_freq == 0 ? "Not" : "Are");
+	sme_debug("##Concurrent Channels %s Interfering",
+		  intf_ch_freq == 0 ? "Not" : "Are");
 
 	return intf_ch_freq;
 }
@@ -2406,7 +2406,7 @@ static bool csr_validate_sta_bcn_intrvl(struct mac_context *mac_ctx,
 		 *  MCC should not be enabled so making it
 		 * false to enforce on same channel
 		 */
-		sme_err("*** MCC with SAP+STA sessions ****");
+		sme_debug("*** MCC with SAP+STA sessions ****");
 		*status = QDF_STATUS_SUCCESS;
 		return true;
 	}

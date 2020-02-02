@@ -2771,6 +2771,64 @@ static void wlan_hdd_trim_acs_channel_list(uint32_t *pcl, uint8_t pcl_count,
 }
 
 /**
+ * wlan_hdd_handle_zero_acs_list() - Handle worst case of acs channel
+ * trimmed to zero
+ * @hdd_ctx: struct hdd_context
+ * @org_ch_list: ACS channel list from user space
+ * @org_ch_list_count: ACS channel count from user space
+ *
+ * When all chan in ACS freq list is filtered out
+ * by wlan_hdd_trim_acs_channel_list, the hostapd start will fail.
+ * This happens when PCL is PM_24G_SCC_CH_SBS_CH, and SAP acs range includes
+ * 5G channel list. One example is STA active on 6Ghz chan. Hostapd
+ * start SAP on 5G ACS range. The intersection of PCL and ACS range is zero.
+ * Instead of ACS failure, this API selects one channel from ACS range
+ * and report to Hostapd. When hostapd do start_ap, the driver will
+ * force SCC to 6G or move SAP to 2G based on SAP's configuration.
+ *
+ * Return: None
+ */
+static void wlan_hdd_handle_zero_acs_list(struct hdd_context *hdd_ctx,
+					  uint32_t *acs_freq_list,
+					  uint8_t *acs_ch_list_count,
+					  uint32_t *org_freq_list,
+					  uint8_t org_ch_list_count)
+{
+	uint16_t i, sta_count;
+	uint32_t acs_chan_default = 0;
+
+	if (!acs_ch_list_count || *acs_ch_list_count > 0 ||
+	    !acs_freq_list) {
+		return;
+	}
+	if (!org_ch_list_count || !org_freq_list)
+		return;
+
+	if (!policy_mgr_is_force_scc(hdd_ctx->psoc))
+		return;
+	sta_count = policy_mgr_mode_specific_connection_count
+			(hdd_ctx->psoc, PM_STA_MODE, NULL);
+	sta_count += policy_mgr_mode_specific_connection_count
+			(hdd_ctx->psoc, PM_P2P_CLIENT_MODE, NULL);
+	if (!sta_count)
+		return;
+
+	for (i = 0; i < org_ch_list_count; i++) {
+		if (!wlan_reg_is_dfs_for_freq(hdd_ctx->pdev,
+					      org_freq_list[i])) {
+			acs_chan_default = org_freq_list[i];
+			break;
+		}
+	}
+	if (!acs_chan_default)
+		acs_chan_default = org_freq_list[0];
+
+	acs_freq_list[0] = acs_chan_default;
+	*acs_ch_list_count = 1;
+	hdd_debug("retore acs chan list to single freq %d", acs_chan_default);
+}
+
+/**
  * __wlan_hdd_cfg80211_do_acs(): CFG80211 handler function for DO_ACS Vendor CMD
  * @wiphy:  Linux wiphy struct pointer
  * @wdev:   Linux wireless device struct pointer
@@ -2918,7 +2976,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 
 	qdf_mem_zero(&sap_config->acs_cfg, sizeof(struct sap_acs_cfg));
 
-	hdd_debug("channel width =%d", ch_width);
+	hdd_debug("channel width =%d hw_mode %d", ch_width, hw_mode);
 	if (ch_width == 160)
 		sap_config->acs_cfg.ch_width = CH_WIDTH_160MHZ;
 	else if (ch_width == 80)
@@ -3036,7 +3094,14 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 					sap_config->acs_cfg.pcl_ch_count,
 					sap_config->acs_cfg.freq_list,
 					&sap_config->acs_cfg.ch_list_count);
-
+		if (!sap_config->acs_cfg.ch_list_count &&
+		    sap_config->acs_cfg.master_ch_list_count)
+			wlan_hdd_handle_zero_acs_list(
+				hdd_ctx,
+				sap_config->acs_cfg.freq_list,
+				&sap_config->acs_cfg.ch_list_count,
+				sap_config->acs_cfg.master_freq_list,
+				sap_config->acs_cfg.master_ch_list_count);
 		/* if it is only one channel, send ACS event to upper layer */
 		if (sap_config->acs_cfg.ch_list_count == 1) {
 			sap_config->acs_cfg.pri_ch_freq =
@@ -16567,18 +16632,9 @@ static int wlan_hdd_add_key_sta(struct hdd_adapter *adapter,
 				mac_handle_t mac_handle, bool *ft_mode)
 {
 	struct wlan_objmgr_vdev *vdev;
-	struct hdd_station_ctx *sta_ctx =
-		WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 	int errno;
 	QDF_STATUS status;
 
-	if (!pairwise) {
-		/* set group key */
-		if (sta_ctx->roam_info.defer_key_complete) {
-			hdd_debug("Perform Set key Complete");
-			hdd_perform_roam_set_key_complete(adapter);
-		}
-	}
 	/* The supplicant may attempt to set the PTK once
 	 * pre-authentication is done. Save the key in the
 	 * UMAC and include it in the ADD BSS request
@@ -19819,111 +19875,114 @@ static void wlan_hdd_cfg80211_clear_privacy(struct hdd_adapter *adapter)
 	wlan_hdd_clear_wapi_privacy(adapter);
 }
 
-int wlan_hdd_try_disconnect(struct hdd_adapter *adapter)
+static int wlan_hdd_wait_for_disconnect(mac_handle_t mac_handle,
+					struct hdd_adapter *adapter,
+					uint16_t reason)
 {
+	eConnectionState prev_conn_state;
+	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	int ret = 0;
 	unsigned long rc;
-	struct hdd_station_ctx *sta_ctx;
-	int status, result = 0;
-	mac_handle_t mac_handle;
 	uint32_t wait_time = SME_DISCONNECT_TIMEOUT;
+
+	/* Return if already disconnected */
+	if (sta_ctx->conn_info.conn_state == eConnectionState_NotConnected ||
+	    sta_ctx->conn_info.conn_state == eConnectionState_IbssDisconnected)
+		return 0;
+
+	/* If already in disconnecting state just wait for its completion */
+	if (sta_ctx->conn_info.conn_state == eConnectionState_Disconnecting)
+		goto wait_for_disconnect;
+
+	INIT_COMPLETION(adapter->disconnect_comp_var);
+	prev_conn_state = sta_ctx->conn_info.conn_state;
+	hdd_conn_set_connection_state(adapter, eConnectionState_Disconnecting);
+
+	status = sme_roam_disconnect(mac_handle, adapter->vdev_id, reason);
+	if (status == QDF_STATUS_CMD_NOT_QUEUED &&
+	    prev_conn_state == eConnectionState_Connecting) {
+		/*
+		 * Wait here instead of returning directly, this will block the
+		 * next connect command and allow processing of the scan for
+		 * ssid and the previous connect command in CSR.
+		 */
+		hdd_debug("CSR not connected but scan for SSID is in progress, wait for scan to be aborted or completed.");
+	} else if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_debug("SB Disconnect in progress/SME is disconencted/Connect removed from pending queue: status = %d",
+			  status);
+		/*
+		 * Wait here instead of returning directly. This will block the
+		 * next connect command and allow processing of the disconnect
+		 * in SME. As disconnect is already in progress, wait here for
+		 * WLAN_WAIT_DISCONNECT_ALREADY_IN_PROGRESS instead of
+		 * SME_DISCONNECT_TIMEOUT.
+		 */
+		wait_time = WLAN_WAIT_DISCONNECT_ALREADY_IN_PROGRESS;
+	}
+
+wait_for_disconnect:
+	rc = wait_for_completion_timeout(&adapter->disconnect_comp_var,
+					 msecs_to_jiffies(wait_time));
+
+	if (!rc && QDF_IS_STATUS_SUCCESS(status)) {
+		hdd_err("Disconnect timed out!!!");
+		ret = -ETIMEDOUT;
+	}
+
+	hdd_conn_set_connection_state(adapter, eConnectionState_NotConnected);
+
+	return ret;
+}
+
+static void wlan_hdd_wait_for_roaming(mac_handle_t mac_handle,
+				      struct hdd_adapter *adapter)
+{
 	struct hdd_context *hdd_ctx;
+	unsigned long rc;
+
+	if (adapter->device_mode != QDF_STA_MODE)
+		return;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-	mac_handle = hdd_adapter_get_mac_handle(adapter);
-	if (adapter->device_mode ==  QDF_STA_MODE) {
-		hdd_debug("Stop firmware roaming");
-		sme_stop_roaming(mac_handle, adapter->vdev_id,
-				 REASON_DRIVER_DISABLED,
-				 RSO_INVALID_REQUESTOR);
-		/*
-		 * If firmware has already started roaming process, driver
-		 * needs to wait for processing of this disconnect request.
-		 *
-		 */
-		INIT_COMPLETION(adapter->roaming_comp_var);
-		if (hdd_is_roaming_in_progress(hdd_ctx) ||
-		    sme_neighbor_middle_of_roaming(mac_handle,
-						   adapter->vdev_id)) {
-			rc = wait_for_completion_timeout(
-				&adapter->roaming_comp_var,
+	hdd_debug("Stop firmware roaming");
+	sme_stop_roaming(mac_handle, adapter->vdev_id,
+			 REASON_DRIVER_DISABLED,
+			 RSO_INVALID_REQUESTOR);
+	/*
+	 * If firmware has already started roaming process, driver
+	 * needs to wait for processing of this disconnect request.
+	 *
+	 */
+	INIT_COMPLETION(adapter->roaming_comp_var);
+	if (hdd_is_roaming_in_progress(hdd_ctx) ||
+	    sme_neighbor_middle_of_roaming(mac_handle,
+					   adapter->vdev_id)) {
+		rc = wait_for_completion_timeout(&adapter->roaming_comp_var,
 				msecs_to_jiffies(WLAN_WAIT_TIME_STOP_ROAM));
-			if (!rc) {
-				hdd_err("roaming_comp_var time out vdev id: %d",
-					adapter->vdev_id);
-				/* Clear roaming in progress flag */
-				hdd_set_roaming_in_progress(false);
-			}
-			if (adapter->roam_ho_fail) {
-				INIT_COMPLETION(adapter->disconnect_comp_var);
-				hdd_conn_set_connection_state(adapter,
-						eConnectionState_Disconnecting);
-			}
-		}
-	}
-
-	if ((QDF_IBSS_MODE == adapter->device_mode) ||
-	  (eConnectionState_Associated == sta_ctx->conn_info.conn_state) ||
-	  (eConnectionState_Connecting == sta_ctx->conn_info.conn_state) ||
-	  (eConnectionState_IbssConnected == sta_ctx->conn_info.conn_state)) {
-		eConnectionState prev_conn_state;
-
-		INIT_COMPLETION(adapter->disconnect_comp_var);
-		prev_conn_state = sta_ctx->conn_info.conn_state;
-		hdd_conn_set_connection_state(adapter,
-					      eConnectionState_Disconnecting);
-		/* Issue disconnect to CSR */
-		status = sme_roam_disconnect(mac_handle,
-				adapter->vdev_id,
-				eCSR_DISCONNECT_REASON_UNSPECIFIED);
-
-		if ((status == QDF_STATUS_CMD_NOT_QUEUED) &&
-		    prev_conn_state != eConnectionState_Connecting) {
-			hdd_debug("Already disconnect in progress");
-			result = 0;
-			/*
-			 * Wait here instead of returning directly. This will
-			 * block the connect command and allow processing
-			 * of the disconnect in SME. As disconnect is already
-			 * in progress, wait here for 1 sec instead of 5 sec.
-			 */
-			wait_time = WLAN_WAIT_DISCONNECT_ALREADY_IN_PROGRESS;
-		} else if (status == QDF_STATUS_CMD_NOT_QUEUED) {
-			/*
-			 * Wait here instead of returning directly, this will
-			 * block the connect command and allow processing
-			 * of the scan for ssid and the previous connect command
-			 * in CSR.
-			 */
-			hdd_debug("Already disconnected or connect was in sme/roam pending list and removed by disconnect");
-		} else if (0 != status) {
-			hdd_err("sme_roam_disconnect failure, status: %d",
-				(int)status);
-			sta_ctx->sta_debug_state = status;
-			result = -EINVAL;
-			goto disconnected;
-		}
-
-		rc = wait_for_completion_timeout(&adapter->disconnect_comp_var,
-						 msecs_to_jiffies(wait_time));
-		if (!rc && (QDF_STATUS_CMD_NOT_QUEUED != status)) {
-			hdd_err("Sme disconnect event timed out vdev id: %d sta_debug_state: %d",
-				adapter->vdev_id, sta_ctx->sta_debug_state);
-			result = -ETIMEDOUT;
-		}
-	} else if (eConnectionState_Disconnecting ==
-				sta_ctx->conn_info.conn_state) {
-		rc = wait_for_completion_timeout(&adapter->disconnect_comp_var,
-						 msecs_to_jiffies(wait_time));
 		if (!rc) {
-			hdd_err("Disconnect event timed out vdev id: %d sta_debug_state: %d",
-				adapter->vdev_id, sta_ctx->sta_debug_state);
-			result = -ETIMEDOUT;
+			hdd_err("roaming_comp_var time out vdev id: %d",
+				adapter->vdev_id);
+			/* Clear roaming in progress flag */
+			hdd_set_roaming_in_progress(false);
+		}
+		if (adapter->roam_ho_fail) {
+			INIT_COMPLETION(adapter->disconnect_comp_var);
+			hdd_conn_set_connection_state(adapter,
+					eConnectionState_Disconnecting);
 		}
 	}
-disconnected:
-	hdd_conn_set_connection_state(adapter, eConnectionState_NotConnected);
-	return result;
+}
+
+int wlan_hdd_try_disconnect(struct hdd_adapter *adapter)
+{
+	mac_handle_t mac_handle;
+
+	mac_handle = hdd_adapter_get_mac_handle(adapter);
+	wlan_hdd_wait_for_roaming(mac_handle, adapter);
+
+	return wlan_hdd_wait_for_disconnect(mac_handle, adapter,
+					    eCSR_DISCONNECT_REASON_UNSPECIFIED);
 }
 
 /**
@@ -19969,10 +20028,16 @@ static int wlan_hdd_reassoc_bssid_hint(struct hdd_adapter *adapter,
 		qdf_mem_copy(sta_ctx->requested_bssid.bytes, bssid,
 			     QDF_MAC_ADDR_SIZE);
 
+		hdd_set_roaming_in_progress(true);
+
 		status = hdd_reassoc(adapter, bssid, ch_freq,
 				     CONNECT_CMD_USERSPACE);
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_set_roaming_in_progress(false);
+
 		hdd_debug("hdd_reassoc: status: %d", status);
 	}
+
 	return status;
 }
 #else
@@ -20152,10 +20217,8 @@ static int __wlan_hdd_cfg80211_connect(struct wiphy *wiphy,
 	 * Check if this is reassoc to same bssid, if reassoc is success, return
 	 */
 	status = wlan_hdd_reassoc_bssid_hint(adapter, req);
-	if (!status) {
-		hdd_set_roaming_in_progress(true);
+	if (!status)
 		return status;
-	}
 
 	/* Try disconnecting if already in connected state */
 	status = wlan_hdd_try_disconnect(adapter);
@@ -20280,96 +20343,19 @@ static int wlan_hdd_cfg80211_connect(struct wiphy *wiphy,
 
 int wlan_hdd_disconnect(struct hdd_adapter *adapter, u16 reason)
 {
-	QDF_STATUS status;
-	int result = 0;
-	unsigned long rc;
-	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	eConnectionState prev_conn_state;
+	int ret;
 	mac_handle_t mac_handle;
-	uint32_t wait_time = SME_DISCONNECT_TIMEOUT;
 
-	hdd_enter();
+	mac_handle = hdd_adapter_get_mac_handle(adapter);
+	wlan_hdd_wait_for_roaming(mac_handle, adapter);
 
-	mac_handle = hdd_ctx->mac_handle;
-	if (adapter->device_mode ==  QDF_STA_MODE) {
-		hdd_debug("Stop firmware roaming");
-		status = sme_stop_roaming(mac_handle, adapter->vdev_id,
-					  REASON_DRIVER_DISABLED,
-					  RSO_INVALID_REQUESTOR);
-		/*
-		 * If firmware has already started roaming process, driver
-		 * needs to wait for processing of this disconnect request.
-		 *
-		 */
-		INIT_COMPLETION(adapter->roaming_comp_var);
-		if (hdd_is_roaming_in_progress(hdd_ctx) ||
-		    sme_neighbor_middle_of_roaming(mac_handle,
-						   adapter->vdev_id)) {
-			rc = wait_for_completion_timeout(
-				&adapter->roaming_comp_var,
-				msecs_to_jiffies(WLAN_WAIT_TIME_STOP_ROAM));
-			if (!rc) {
-				hdd_err("roaming_comp_var time out vdev id: %d",
-					adapter->vdev_id);
-				/* Clear roaming in progress flag */
-				hdd_set_roaming_in_progress(false);
-			}
-			if (adapter->roam_ho_fail) {
-				INIT_COMPLETION(adapter->disconnect_comp_var);
-				hdd_debug("Disabling queues");
-				wlan_hdd_netif_queue_control(adapter,
-					WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
-					WLAN_CONTROL_PATH);
-				hdd_conn_set_connection_state(adapter,
-						eConnectionState_Disconnecting);
-				goto wait_for_disconnect;
-			}
-		}
-	}
-
-	INIT_COMPLETION(adapter->disconnect_comp_var);
-	prev_conn_state = sta_ctx->conn_info.conn_state;
 	/*stop tx queues */
 	hdd_info("Disabling queues");
 	wlan_hdd_netif_queue_control(adapter,
 		WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER, WLAN_CONTROL_PATH);
-	hdd_debug("Set HDD conn_state to eConnectionState_Disconnecting");
-	hdd_conn_set_connection_state(adapter, eConnectionState_Disconnecting);
 
-	/* issue disconnect */
+	ret = wlan_hdd_wait_for_disconnect(mac_handle, adapter, reason);
 
-	status = sme_roam_disconnect(mac_handle,
-				     adapter->vdev_id, reason);
-	if (QDF_STATUS_CMD_NOT_QUEUED == status &&
-	    prev_conn_state == eConnectionState_Connecting) {
-		/*
-		 * Wait here instead of returning directly, this will block the
-		 * next connect command and allow processing of the scan for
-		 * ssid and the previous connect command in CSR.
-		 */
-		hdd_debug("CSR is not in connected state but scan for SSID is in progress, wait for scan to be aborted or completed.");
-	} else if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_debug("status = %d, already disconnect in progress or SME is disconencted OR connect removed from pending queue",
-			  status);
-		/*
-		 * Wait here instead of returning directly. This will block the
-		 * next connect command and allow processing of the disconnect
-		 * in SME. As disconnect is already in progress, wait here for
-		 * WLAN_WAIT_DISCONNECT_ALREADY_IN_PROGRESS instead of
-		 * SME_DISCONNECT_TIMEOUT.
-		 */
-		wait_time = WLAN_WAIT_DISCONNECT_ALREADY_IN_PROGRESS;
-	}
-wait_for_disconnect:
-	rc = wait_for_completion_timeout(&adapter->disconnect_comp_var,
-					 msecs_to_jiffies(wait_time));
-
-	if (!rc && (QDF_STATUS_CMD_NOT_QUEUED != status)) {
-		hdd_err("Failed to disconnect, timed out");
-		result = -ETIMEDOUT;
-	}
-	hdd_conn_set_connection_state(adapter, eConnectionState_NotConnected);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 11, 0)
 	/* Sending disconnect event to userspace for kernel version < 3.11
 	 * is handled by __cfg80211_disconnect call to __cfg80211_disconnected
@@ -20379,7 +20365,7 @@ wait_for_disconnect:
 					      WLAN_REASON_UNSPECIFIED, NULL, 0);
 #endif
 
-	return result;
+	return ret;
 }
 
 /**

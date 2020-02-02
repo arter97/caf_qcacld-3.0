@@ -869,7 +869,7 @@ void lim_handle_update_olbc_cache(struct mac_context *mac_ctx)
 	struct pe_session *pe_session = lim_is_ap_session_active(mac_ctx);
 
 	if (!pe_session) {
-		pe_err(" Session not found");
+		pe_debug(" Session not found");
 		return;
 	}
 
@@ -4713,9 +4713,7 @@ void lim_handle_heart_beat_failure_timeout(struct mac_context *mac_ctx)
 			 * beacon after connection.
 			 */
 			 (psession_entry->currentBssBeaconCnt == 0))) {
-			pe_debug("for session: %d",
-						psession_entry->peSessionId);
-
+			pe_nofl_info("HB fail vdev %d",psession_entry->vdev_id);
 			lim_send_deauth_mgmt_frame(mac_ctx,
 				eSIR_MAC_DISASSOC_DUE_TO_INACTIVITY_REASON,
 				psession_entry->bssId, psession_entry, false);
@@ -7973,7 +7971,7 @@ QDF_STATUS lim_sta_mlme_vdev_stop_send(struct vdev_mlme_obj *vdev_mlme,
 	}
 
 	connection_fail = mlme_is_connection_fail(vdev_mlme->vdev);
-	pe_info("Send vdev stop, connection_fail %d", connection_fail);
+	pe_debug("Send vdev stop, connection_fail %d", connection_fail);
 	if (connection_fail) {
 		assoc_type = mlme_get_assoc_type(vdev_mlme->vdev);
 		switch (assoc_type) {

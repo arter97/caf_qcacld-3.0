@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -230,6 +230,8 @@ static enum qdf_bus_type to_bus_type(enum pld_bus_type bus_type)
 		return QDF_BUS_TYPE_SDIO;
 	case PLD_BUS_TYPE_USB:
 		return QDF_BUS_TYPE_USB;
+	case PLD_BUS_TYPE_IPCI:
+		return QDF_BUS_TYPE_IPCI;
 	default:
 		return QDF_BUS_TYPE_NONE;
 	}
@@ -253,7 +255,7 @@ int hdd_hif_open(struct device *dev, void *bdev, const struct hif_bus_id *bid,
 
 	hdd_hif_init_driver_state_callbacks(dev, &cbk);
 
-	hif_ctx = hif_open(qdf_ctx, mode, bus_type, &cbk);
+	hif_ctx = hif_open(qdf_ctx, mode, bus_type, &cbk, hdd_ctx->psoc);
 	if (!hif_ctx) {
 		hdd_err("hif_open error");
 		return -ENOMEM;

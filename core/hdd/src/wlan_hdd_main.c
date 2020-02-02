@@ -2132,9 +2132,6 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 	 */
 	hdd_component_cfg_chan_to_freq(hdd_ctx->pdev);
 
-	wlan_pdev_set_dp_handle(hdd_ctx->pdev,
-				cds_get_context(QDF_MODULE_ID_TXRX));
-
 	hdd_objmgr_update_tgt_max_vdev_psoc(hdd_ctx, cfg->max_intf_count);
 
 	ucfg_ipa_set_dp_handle(hdd_ctx->psoc,
@@ -3166,9 +3163,7 @@ static void hdd_check_for_leaks(struct hdd_context *hdd_ctx, bool is_ssr)
 {
 	/* DO NOT REMOVE these checks; for false positives, read above first */
 
-	wlan_objmgr_psoc_check_for_peer_leaks(hdd_ctx->psoc);
-	wlan_objmgr_psoc_check_for_vdev_leaks(hdd_ctx->psoc);
-	wlan_objmgr_psoc_check_for_pdev_leaks(hdd_ctx->psoc);
+	wlan_objmgr_psoc_check_for_leaks(hdd_ctx->psoc);
 
 	/* many adapter resources are not freed by design during SSR */
 	if (is_ssr)
@@ -4539,13 +4534,6 @@ QDF_STATUS hdd_sme_close_session_callback(uint8_t vdev_id)
 		return QDF_STATUS_NOT_INITIALIZED;
 	}
 
-	/*
-	 * For NAN Data interface, the close session results in the final
-	 * indication to the userspace
-	 */
-	if (adapter->device_mode == QDF_NDI_MODE)
-		hdd_ndp_session_end_handler(adapter);
-
 	clear_bit(SME_SESSION_OPENED, &adapter->event_flags);
 
 	/*
@@ -4649,9 +4637,6 @@ int hdd_vdev_destroy(struct hdd_adapter *adapter)
 					 SME_CMD_VDEV_CREATE_DELETE_TIMEOUT);
 	if (rc) {
 		clear_bit(SME_SESSION_OPENED, &adapter->event_flags);
-
-		if (adapter->device_mode == QDF_NDI_MODE)
-			hdd_ndp_session_end_handler(adapter);
 
 		if (status == QDF_STATUS_E_TIMEOUT) {
 			hdd_err("timed out waiting for sme vdev delete");
@@ -6219,7 +6204,7 @@ QDF_STATUS hdd_stop_adapter(struct hdd_context *hdd_ctx,
 	case QDF_OCB_MODE:
 		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 		cdp_clear_peer(cds_get_context(QDF_MODULE_ID_SOC),
-			       cds_get_context(QDF_MODULE_ID_TXRX),
+			       OL_TXRX_PDEV_ID,
 			       sta_ctx->conn_info.peer_macaddr[0]);
 		hdd_deregister_hl_netdev_fc_timer(adapter);
 		hdd_deregister_tx_flow_control(adapter);
@@ -7659,6 +7644,74 @@ void hdd_set_disconnect_status(struct hdd_adapter *adapter, bool status)
 	hdd_debug("setting disconnection status: %d", status);
 }
 
+#ifdef FEATURE_RUNTIME_PM
+/**
+ * hdd_wlan_register_pm_qos_notifier() - register PM QOS notifier
+ * @hdd_ctx: Pointer to hdd context
+ *
+ * Register for PM QOS change notifications.
+ *
+ * Return: None
+ */
+static int hdd_wlan_register_pm_qos_notifier(struct hdd_context *hdd_ctx)
+{
+	int ret;
+
+	/* if gRuntimePM is 1 then feature is enabled without CXPC */
+	if (hdd_ctx->config->runtime_pm != hdd_runtime_pm_dynamic) {
+		hdd_debug("Dynamic Runtime PM disabled");
+		return 0;
+	}
+
+	qdf_spinlock_create(&hdd_ctx->pm_qos_lock);
+	hdd_ctx->pm_qos_notifier.notifier_call = wlan_hdd_pm_qos_notify;
+	ret = pm_qos_add_notifier(PM_QOS_CPU_DMA_LATENCY,
+				  &hdd_ctx->pm_qos_notifier);
+	if (ret)
+		hdd_err("Failed to register PM_QOS notifier: %d", ret);
+	else
+		hdd_debug("PM QOS Notifier registered");
+
+	return ret;
+}
+
+/**
+ * hdd_wlan_unregister_pm_qos_notifier() - unregister PM QOS notifier
+ * @hdd_ctx: Pointer to hdd context
+ *
+ * Unregister for PM QOS change notifications.
+ *
+ * Return: None
+ */
+static void hdd_wlan_unregister_pm_qos_notifier(struct hdd_context *hdd_ctx)
+{
+	int ret;
+
+	ret = pm_qos_remove_notifier(PM_QOS_CPU_DMA_LATENCY,
+				     &hdd_ctx->pm_qos_notifier);
+	if (ret)
+		hdd_warn("Failed to remove qos notifier, err = %d\n", ret);
+
+	qdf_spin_lock_irqsave(&hdd_ctx->pm_qos_lock);
+
+	if (hdd_ctx->runtime_pm_prevented) {
+		pm_runtime_put_noidle(hdd_ctx->parent_dev);
+		hdd_ctx->runtime_pm_prevented = false;
+	}
+
+	qdf_spin_unlock_irqrestore(&hdd_ctx->pm_qos_lock);
+}
+#else
+static int hdd_wlan_register_pm_qos_notifier(struct hdd_context *hdd_ctx)
+{
+	return 0;
+}
+
+static void hdd_wlan_unregister_pm_qos_notifier(struct hdd_context *hdd_ctx)
+{
+}
+#endif
+
 /**
  * hdd_register_notifiers - Register netdev notifiers.
  * @hdd_ctx: HDD context
@@ -7688,15 +7741,21 @@ static int hdd_register_notifiers(struct hdd_context *hdd_ctx)
 			ret);
 		goto unregister_inetaddr_notifier;
 	}
+
+	ret = hdd_wlan_register_pm_qos_notifier(hdd_ctx);
+	if (ret)
+		goto unregister_nud_notifier;
+
 	return 0;
 
+unregister_nud_notifier:
+	hdd_nud_unregister_netevent_notifier(hdd_ctx);
 unregister_inetaddr_notifier:
 	unregister_inetaddr_notifier(&hdd_ctx->ipv4_notifier);
 unregister_ip6_notifier:
 	hdd_wlan_unregister_ip6_notifier(hdd_ctx);
 out:
 	return ret;
-
 }
 
 /**
@@ -7709,6 +7768,7 @@ out:
  */
 void hdd_unregister_notifiers(struct hdd_context *hdd_ctx)
 {
+	hdd_wlan_unregister_pm_qos_notifier(hdd_ctx);
 	hdd_nud_unregister_netevent_notifier(hdd_ctx);
 	hdd_wlan_unregister_ip6_notifier(hdd_ctx);
 
@@ -8313,7 +8373,7 @@ static void hdd_clear_rps_cpu_mask(struct hdd_context *hdd_ctx)
 }
 
 #if defined(CLD_PM_QOS) && \
-	(LINUX_VERSION_CODE <= KERNEL_VERSION(4, 19, 0))
+	(LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 #define PLD_REMOVE_PM_QOS(x)
 #define PLD_REQUEST_PM_QOS(x, y)
 /**
@@ -8346,6 +8406,21 @@ static inline void hdd_pm_qos_update_cpu_mask(cpumask_t *mask,
  *
  * Return: none
  */
+#ifdef FEATURE_RUNTIME_PM
+static inline void hdd_pm_qos_update_request(struct hdd_context *hdd_ctx,
+					     cpumask_t *pm_qos_cpu_mask)
+{
+	cpumask_copy(&hdd_ctx->pm_qos_req.cpus_affine, pm_qos_cpu_mask);
+
+	/* Latency value to be read from INI */
+	if (cpumask_empty(pm_qos_cpu_mask) &&
+	    hdd_ctx->config->runtime_pm == hdd_runtime_pm_dynamic)
+		pm_qos_update_request(&hdd_ctx->pm_qos_req,
+				      PM_QOS_DEFAULT_VALUE);
+	else
+		pm_qos_update_request(&hdd_ctx->pm_qos_req, 1);
+}
+#else
 static inline void hdd_pm_qos_update_request(struct hdd_context *hdd_ctx,
 					     cpumask_t *pm_qos_cpu_mask)
 {
@@ -8358,6 +8433,7 @@ static inline void hdd_pm_qos_update_request(struct hdd_context *hdd_ctx,
 	else
 		pm_qos_update_request(&hdd_ctx->pm_qos_req, 1);
 }
+#endif
 
 #ifdef CONFIG_SMP
 /**
@@ -10132,7 +10208,6 @@ static int __hdd_psoc_idle_shutdown(struct hdd_context *hdd_ctx)
 	}
 
 	osif_psoc_sync_wait_for_ops(psoc_sync);
-
 	errno = hdd_wlan_stop_modules(hdd_ctx, false);
 
 	osif_psoc_sync_trans_stop(psoc_sync);
@@ -12569,6 +12644,8 @@ void hdd_dp_trace_init(struct hdd_config *config)
 	uint8_t num_entries = 0;
 	uint32_t bw_compute_interval;
 
+	qdf_dp_set_proto_event_bitmap(config->dp_proto_event_bitmap);
+
 	if (!config->enable_dp_trace) {
 		hdd_err("dp trace is disabled from ini");
 		return;
@@ -14906,6 +14983,9 @@ static void hdd_driver_unload(void)
 	pr_info("%s: Unloading driver v%s\n", WLAN_MODULE_NAME,
 		QWLAN_VERSIONSTR);
 
+	cds_set_driver_loaded(false);
+	cds_set_unload_in_progress(true);
+
 	if (hdd_ctx)
 		hdd_psoc_idle_timer_stop(hdd_ctx);
 
@@ -14921,9 +15001,6 @@ static void hdd_driver_unload(void)
 
 	osif_driver_sync_unregister();
 	osif_driver_sync_wait_for_ops(driver_sync);
-
-	cds_set_driver_loaded(false);
-	cds_set_unload_in_progress(true);
 
 	hdd_driver_mode_change_unregister();
 	pld_deinit();

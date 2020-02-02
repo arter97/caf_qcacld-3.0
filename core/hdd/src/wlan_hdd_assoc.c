@@ -52,6 +52,7 @@
 #include <cdp_txrx_peer_ops.h>
 #include <cdp_txrx_misc.h>
 #include <cdp_txrx_ctrl.h>
+#include "ol_txrx.h"
 #include <wlan_logging_sock_svc.h>
 #include <wlan_hdd_object_manager.h>
 #include <cdp_txrx_handle.h>
@@ -1618,8 +1619,7 @@ QDF_STATUS hdd_roam_deregister_sta(struct hdd_adapter *adapter,
 	QDF_STATUS qdf_status;
 
 	qdf_status = cdp_clear_peer(cds_get_context(QDF_MODULE_ID_SOC),
-			(struct cdp_pdev *)cds_get_context(QDF_MODULE_ID_TXRX),
-			mac_addr);
+				    OL_TXRX_PDEV_ID, mac_addr);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		hdd_err("cdp_clear_peer() failed for sta mac: "
 			QDF_MAC_ADDR_STR ". Status(%d) [0x%08X]",
@@ -1942,7 +1942,7 @@ static void hdd_set_peer_authorized_event(uint32_t vdev_id)
 
 #if defined(QCA_LL_LEGACY_TX_FLOW_CONTROL) || defined(QCA_LL_TX_FLOW_CONTROL_V2)
 static inline
-void hdd_set_unpause_queue(void *soc, struct hdd_adapter *adapter, void *peer)
+void hdd_set_unpause_queue(void *soc, struct hdd_adapter *adapter)
 {
 	unsigned long rc;
 	/* wait for event from firmware to set the event */
@@ -1958,7 +1958,7 @@ void hdd_set_unpause_queue(void *soc, struct hdd_adapter *adapter, void *peer)
 }
 #else
 static inline
-void hdd_set_unpause_queue(void *soc, struct hdd_adapter *adapter, void *peer)
+void hdd_set_unpause_queue(void *soc, struct hdd_adapter *adapter)
 { }
 #endif
 
@@ -1968,20 +1968,9 @@ QDF_STATUS hdd_change_peer_state(struct hdd_adapter *adapter,
 				 bool roam_synch_in_progress)
 {
 	QDF_STATUS err;
-	void *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
-	void *peer;
 
-	if (!pdev) {
-		hdd_err("Failed to get txrx context");
-		return QDF_STATUS_E_FAULT;
-	}
-
-	peer = cdp_peer_find_by_addr(soc, (struct cdp_pdev *)pdev, peer_mac);
-	if (!peer)
-		return QDF_STATUS_E_FAULT;
-
-	err = cdp_peer_state_update(soc, pdev, peer_mac, sta_state);
+	err = cdp_peer_state_update(soc, peer_mac, sta_state);
 	if (err != QDF_STATUS_SUCCESS) {
 		hdd_err("peer state update failed");
 		return QDF_STATUS_E_FAULT;
@@ -2011,23 +2000,22 @@ QDF_STATUS hdd_change_peer_state(struct hdd_adapter *adapter,
 
 		if (adapter->device_mode == QDF_STA_MODE ||
 		    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
-			hdd_set_unpause_queue(soc, adapter, peer);
+			hdd_set_unpause_queue(soc, adapter);
 		}
 	}
 	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS hdd_update_dp_vdev_flags(void *cbk_data,
-				    struct qdf_mac_addr *mac_addr,
+				    uint8_t vdev_id,
 				    uint32_t vdev_param,
 				    bool is_link_up)
 {
-	struct cdp_vdev *data_vdev;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	struct hdd_context *hdd_ctx;
-	void *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 	struct wlan_objmgr_psoc **psoc;
+	cdp_config_param_type val;
 
 	if (!cbk_data)
 		return status;
@@ -2043,13 +2031,13 @@ QDF_STATUS hdd_update_dp_vdev_flags(void *cbk_data,
 	if (!hdd_ctx->tdls_nap_active)
 		return status;
 
-	data_vdev = cdp_peer_get_vdev_by_peer_addr(soc, pdev, *mac_addr);
-	if (!data_vdev) {
+	if (vdev_id == WLAN_INVALID_VDEV_ID) {
 		status = QDF_STATUS_E_FAILURE;
 		return status;
 	}
 
-	cdp_txrx_set_vdev_param(soc, data_vdev, vdev_param, is_link_up);
+	val.cdp_vdev_param_tdls_flags = is_link_up;
+	cdp_txrx_set_vdev_param(soc, vdev_id, vdev_param, val);
 
 	return status;
 }
@@ -2100,7 +2088,6 @@ QDF_STATUS hdd_roam_register_sta(struct hdd_adapter *adapter,
 	struct ol_txrx_desc_type txrx_desc = {0};
 	struct ol_txrx_ops txrx_ops;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
-	void *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 
 	if (!bss_desc)
 		return QDF_STATUS_E_FAILURE;
@@ -2153,8 +2140,7 @@ QDF_STATUS hdd_roam_register_sta(struct hdd_adapter *adapter,
 	}
 
 	adapter->tx_fn = txrx_ops.tx.tx;
-	qdf_status = cdp_peer_register(soc,
-			(struct cdp_pdev *)pdev, &txrx_desc);
+	qdf_status = cdp_peer_register(soc, OL_TXRX_PDEV_ID, &txrx_desc);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		hdd_err("cdp_peer_register() failed Status: %d [0x%08X]",
 			 qdf_status, qdf_status);
@@ -2834,40 +2820,6 @@ hdd_roam_set_key_complete_handler(struct hdd_adapter *adapter,
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * hdd_perform_roam_set_key_complete() - perform set key complete
- * @adapter: pointer to adapter
- *
- * Return: none
- */
-void hdd_perform_roam_set_key_complete(struct hdd_adapter *adapter)
-{
-	QDF_STATUS qdf_ret_status = QDF_STATUS_SUCCESS;
-	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-	struct csr_roam_info *roam_info;
-
-	roam_info = qdf_mem_malloc(sizeof(*roam_info));
-	if (!roam_info)
-		return;
-	roam_info->fAuthRequired = false;
-	qdf_mem_copy(roam_info->bssid.bytes,
-		     sta_ctx->roam_info.bssid, QDF_MAC_ADDR_SIZE);
-	qdf_mem_copy(roam_info->peerMac.bytes,
-		     sta_ctx->roam_info.peer_mac, QDF_MAC_ADDR_SIZE);
-
-	qdf_ret_status =
-			hdd_roam_set_key_complete_handler(adapter,
-					   roam_info,
-					   sta_ctx->roam_info.roam_id,
-					   sta_ctx->roam_info.roam_status,
-					   eCSR_ROAM_RESULT_AUTHENTICATED);
-	if (qdf_ret_status != QDF_STATUS_SUCCESS)
-		hdd_err("Set Key complete failure");
-
-	sta_ctx->roam_info.defer_key_complete = false;
-	qdf_mem_free(roam_info);
-}
-
 #if defined(WLAN_FEATURE_FILS_SK) && \
 	(defined(CFG80211_FILS_SK_OFFLOAD_SUPPORT) || \
 		 (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)))
@@ -3295,31 +3247,6 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 							assoc_rsp,
 							assoc_rsp_len,
 							roam_info);
-					}
-					if (sme_get_ftptk_state
-						    (mac_handle,
-						    adapter->vdev_id)) {
-						sme_set_ftptk_state
-							(mac_handle,
-							adapter->vdev_id,
-							false);
-						roam_info->fAuthRequired =
-							false;
-
-						qdf_mem_copy(sta_ctx->
-							     roam_info.bssid,
-							     roam_info->bssid.bytes,
-							     QDF_MAC_ADDR_SIZE);
-						qdf_mem_copy(sta_ctx->
-							     roam_info.peer_mac,
-							     roam_info->peerMac.bytes,
-							     QDF_MAC_ADDR_SIZE);
-						sta_ctx->roam_info.roam_id =
-							roam_id;
-						sta_ctx->roam_info.roam_status =
-							roam_status;
-						sta_ctx->roam_info.
-						defer_key_complete = true;
 					}
 				} else if (!hddDisconInProgress) {
 					hdd_debug("ft_carrier_on is %d, sending connect indication",
@@ -4062,7 +3989,6 @@ QDF_STATUS hdd_roam_register_tdlssta(struct hdd_adapter *adapter,
 	struct ol_txrx_desc_type txrx_desc = { 0 };
 	struct ol_txrx_ops txrx_ops;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
-	void *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 
 	/*
 	 * TDLS sta in BSS should be set as STA type TDLS and STA MAC should
@@ -4091,8 +4017,7 @@ QDF_STATUS hdd_roam_register_tdlssta(struct hdd_adapter *adapter,
 	txrx_ops.rx.stats_rx = hdd_tx_rx_collect_connectivity_stats_info;
 
 	/* Register the Station with TL...  */
-	qdf_status = cdp_peer_register(soc,
-			(struct cdp_pdev *)pdev, &txrx_desc);
+	qdf_status = cdp_peer_register(soc, OL_TXRX_PDEV_ID, &txrx_desc);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		hdd_err("cdp_peer_register() failed Status: %d [0x%08X]",
 			qdf_status, qdf_status);
@@ -4108,8 +4033,7 @@ QDF_STATUS hdd_roam_deregister_tdlssta(struct hdd_adapter *adapter,
 	QDF_STATUS qdf_status;
 
 	qdf_status = cdp_clear_peer(cds_get_context(QDF_MODULE_ID_SOC),
-			(struct cdp_pdev *)cds_get_context(QDF_MODULE_ID_TXRX),
-			*peer_mac);
+				    OL_TXRX_PDEV_ID, *peer_mac);
 
 	return qdf_status;
 }
@@ -5035,6 +4959,12 @@ hdd_sme_roam_callback(void *context, struct csr_roam_info *roam_info,
 							adapter->device_mode,
 							adapter->vdev_id);
 		}
+		break;
+
+	case eCSR_ROAM_FIPS_PMK_REQUEST:
+		/* notify the supplicant of a new candidate */
+		qdf_ret_status = wlan_hdd_cfg80211_pmksa_candidate_notify(
+					adapter, roam_info, 1, false);
 		break;
 
 	default:
