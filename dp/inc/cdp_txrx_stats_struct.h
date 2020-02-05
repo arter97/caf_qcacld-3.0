@@ -1755,6 +1755,8 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_MBSS_EN  = 426,
 	/* UNII-1 and UNII-2A channel coexistance */
 	OL_ATH_PARAM_CHAN_COEX = 427,
+	/* set operating class table (MBO) value. */
+	OL_ATH_PARAM_OPCLASS_TBL = 428,
 };
 #endif
 /* Bitmasks for stats that can block */
