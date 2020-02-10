@@ -25,6 +25,7 @@
 #include "wlan_pmo_obj_mgmt_public_struct.h"
 #include <wlan_scan_ucfg_api.h>
 #include "wlan_pmo_static_config.h"
+#include "wlan_pmo_ucfg_api.h"
 #include "wlan_reg_services_api.h"
 #include "cfg_nan_api.h"
 #include "wlan_utility.h"
@@ -302,6 +303,11 @@ bool pmo_core_is_wow_applicable(struct wlan_objmgr_psoc *psoc)
 
 	if (!psoc) {
 		pmo_err("psoc is null");
+		return false;
+	}
+
+	if (ucfg_pmo_get_wow_enable(psoc) == PMO_WOW_DISABLE_BOTH) {
+		pmo_info("wow is disabled");
 		return false;
 	}
 
