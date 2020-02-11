@@ -16161,6 +16161,36 @@ enum hdd_external_acs_policy {
 #define CFG_ENABLE_RTT_SUPPORT_MIN        (0)
 #define CFG_ENABLE_RTT_SUPPORT_MAX        (1)
 
+
+#define CFG_PKT_CAPTURE_MODE_MGMT_PKT	BIT(0)
+#define CFG_PKT_CAPTURE_MODE_DATA_PKT	BIT(1)
+
+/*
+ * <ini>
+ * packet_capture_mode - Packet capture mode
+ * @Min: 0
+ * @Max: 3
+ * Default: 0 - Capture no packets
+ *
+ * This ini is used to decide packet capture mode
+ *
+ * packet_capture_mode = 0 - Capture no packets
+ * packet_capture_mode = 1 - Capture management packets only
+ * packet_capture_mode = 2 - Capture data packets only
+ * packet_capture_mode = 3 - Capture both data and management packets
+ *
+ * Supported Feature: packet capture
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_PKT_CAPTURE_MODE		"packet_capture_mode"
+#define CFG_PKT_CAPTURE_MODE_MIN	0
+#define CFG_PKT_CAPTURE_MODE_MAX	(CFG_PKT_CAPTURE_MODE_MGMT_PKT | \
+					 CFG_PKT_CAPTURE_MODE_DATA_PKT)
+#define CFG_PKT_CAPTURE_MODE_DEFAULT	0
+
 /*
  * Type declarations
  */
@@ -17131,6 +17161,8 @@ struct hdd_config {
 	uint32_t bss_load_sample_time;
 
 	bool enable_beacon_reception_stats;
+	uint32_t pkt_capture_mode;
+
 };
 
 #define VAR_OFFSET(_Struct, _Var) (offsetof(_Struct, _Var))
