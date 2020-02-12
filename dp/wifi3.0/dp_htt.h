@@ -92,7 +92,7 @@ int htt_wbm_event_record(struct htt_logger *h, uint8_t tx_status,
 #define FRAME_CTRL_TYPE_RESV	0x3
 
 #define HTT_FRAMECTRL_DATATYPE 0x08
-#define HTT_PPDU_DESC_MAX_DEPTH 16
+#define HTT_PPDU_DESC_MAX_DEPTH (16 * 3)
 #define DP_SCAN_PEER_ID 0xFFFF
 
 #define DP_HTT_HTC_PKT_MISCLIST_SIZE          256

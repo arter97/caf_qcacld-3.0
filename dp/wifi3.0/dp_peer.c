@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1448,6 +1448,8 @@ static inline struct dp_peer *dp_peer_find_add_id(struct dp_soc *soc,
 		if (dp_peer_find_add_id_to_obj(peer, peer_id)) {
 			/* TBDXXX: assert for now */
 			QDF_ASSERT(0);
+		} else {
+			dp_peer_tid_peer_id_update(peer, peer->peer_ids[0]);
 		}
 
 		return peer;
@@ -2274,37 +2276,6 @@ static void dp_peer_setup_remaining_tids(struct dp_peer *peer)
 }
 #else
 static void dp_peer_setup_remaining_tids(struct dp_peer *peer) {};
-#endif
-
-#ifndef WLAN_TX_PKT_CAPTURE_ENH
-/*
- * dp_peer_tid_queue_init() – Initialize ppdu stats queue per TID
- * @peer: Datapath peer
- *
- */
-static inline void dp_peer_tid_queue_init(struct dp_peer *peer)
-{
-}
-
-/*
- * dp_peer_tid_queue_cleanup() – remove ppdu stats queue per TID
- * @peer: Datapath peer
- *
- */
-static inline void dp_peer_tid_queue_cleanup(struct dp_peer *peer)
-{
-}
-
-/*
- * dp_peer_update_80211_hdr() – dp peer update 80211 hdr
- * @vdev: Datapath vdev
- * @peer: Datapath peer
- *
- */
-static inline void
-dp_peer_update_80211_hdr(struct dp_vdev *vdev, struct dp_peer *peer)
-{
-}
 #endif
 
 /*

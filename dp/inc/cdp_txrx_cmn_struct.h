@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1271,6 +1271,8 @@ struct cdp_tx_sojourn_stats {
  * @is_mcast: MCAST or UCAST
  * @user_pos: user position
  * @mu_group_id: mu group id
+ * @ppdu_start_timestamp: 64 bits ppdu start timestamp
+ * @ppdu_end_timestamp: 64 bits ppdu end timestamp
  */
 struct cdp_delayed_tx_completion_ppdu_user {
 	uint32_t frame_ctrl:16,
@@ -1294,6 +1296,8 @@ struct cdp_delayed_tx_completion_ppdu_user {
 	bool is_mcast;
 	uint32_t user_pos;
 	uint32_t mu_group_id;
+	uint64_t ppdu_start_timestamp;
+	uint64_t ppdu_end_timestamp;
 };
 
 /**
@@ -1329,6 +1333,7 @@ struct cdp_delayed_tx_completion_ppdu_user {
  * @dcm: dcm
  * @ldpc: ldpc
  * @delayed_ba: delayed ba bit
+ * @ack_ba_tlv: ack ba recv tlv bit
  * @ppdu_type: SU/MU_MIMO/MU_OFDMA/MU_MIMO_OFDMA/UL_TRIG/BURST_BCN/UL_BSR_RESP/
  * UL_BSR_TRIG/UNKNOWN
  * @ba_seq_no: Block Ack sequence number
@@ -1352,6 +1357,11 @@ struct cdp_delayed_tx_completion_ppdu_user {
  * @sa_goodput: smart antenna tx feedback info goodput
  * @current_rate_per: Moving average per
  * @last_enq_seq: last equeue sequence number
+ * @mpdu_q: queue of mpdu in a ppdu
+ * @mpdus: MPDU list based on enqueue sequence bitmap
+ * @pending_retries: pending MPDUs (retries)
+ * @tlv_bitmap: per user tlv bitmap
+ * @skip: tx capture skip flag
  */
 struct cdp_tx_completion_ppdu_user {
 	uint32_t completion_status:8,
@@ -1388,7 +1398,8 @@ struct cdp_tx_completion_ppdu_user {
 		 gi:4,
 		 dcm:1,
 		 ldpc:1,
-		 delayed_ba:1;
+		 delayed_ba:1,
+		 ack_ba_tlv:1;
 	uint32_t ba_seq_no;
 	uint32_t ba_bitmap[CDP_BA_256_BIT_MAP_SIZE_DWORDS];
 	uint32_t start_seq;
@@ -1437,6 +1448,12 @@ struct cdp_tx_completion_ppdu_user {
 	 */
 	uint32_t current_rate_per;
 	uint32_t last_enq_seq;
+
+	qdf_nbuf_queue_t mpdu_q;
+	qdf_nbuf_t *mpdus;
+	uint32_t pending_retries;
+	uint32_t tlv_bitmap;
+	bool skip;
 };
 
 /**
@@ -1481,6 +1498,7 @@ struct cdp_tx_completion_ppdu_user {
  * @long_retries: long retries
  * @short_retries: short retries
  * @completion_status: completion status - OK/Filter/Abort/Timeout
+ * @usr_idx: user index
  */
 struct cdp_tx_indication_mpdu_info {
 	uint32_t ppdu_id;
@@ -1518,6 +1536,7 @@ struct cdp_tx_indication_mpdu_info {
 		 mprot_type:3,
 		 rts_success:1,
 		 rts_failure:1;
+	uint8_t usr_idx;
 };
 
 /**
@@ -1554,7 +1573,6 @@ struct cdp_tx_mgmt_comp_info {
  * @vdev_id: VAP Id
  * @bar_num_users: BA response user count, based on completion common TLV
  * @num_users: Number of users
- * @pending_retries: pending MPDUs (retries)
  * @drop_reason: drop reason from flush status
  * @is_flush: is_flush is set based on flush tlv
  * @flow_type: tx flow type from flush status
@@ -1581,12 +1599,12 @@ struct cdp_tx_mgmt_comp_info {
  * @doppler: value for doppler (will be 0 most of the times)
  * @spatial_reuse: value for spatial reuse used in radiotap HE header
  * @user: per-User stats (array of per-user structures)
- * @mpdu_q: queue of mpdu in a ppdu
- * @mpdus: MPDU list based on enqueue sequence bitmap
  * @bar_ppdu_id: BAR ppdu_id
  * @bar_tx_duration: BAR tx duration
  * @bar_ppdu_start_timestamp: BAR start timestamp
  * @bar_ppdu_end_timestamp: BAR end timestamp
+ * @tlv_bitmap: tlv_bitmap for the PPDU
+ * @sched_cmdid: schedule command id
  */
 struct cdp_tx_completion_ppdu {
 	uint32_t ppdu_id;
@@ -1595,7 +1613,6 @@ struct cdp_tx_completion_ppdu {
 	uint16_t bar_num_users;
 	uint32_t num_users;
 	uint8_t last_usr_index;
-	uint32_t pending_retries;
 	uint32_t drop_reason;
 	uint32_t is_flush:1,
 		 flow_type:8,
@@ -1622,12 +1639,12 @@ struct cdp_tx_completion_ppdu {
 	uint8_t doppler;
 	uint8_t spatial_reuse;
 	struct cdp_tx_completion_ppdu_user user[CDP_MU_MAX_USERS];
-	qdf_nbuf_queue_t mpdu_q;
-	qdf_nbuf_t *mpdus;
 	uint32_t bar_ppdu_id;
 	uint32_t bar_tx_duration;
 	uint32_t bar_ppdu_start_timestamp;
 	uint32_t bar_ppdu_end_timestamp;
+	uint32_t tlv_bitmap;
+	uint16_t sched_cmdid;
 };
 
 /**
