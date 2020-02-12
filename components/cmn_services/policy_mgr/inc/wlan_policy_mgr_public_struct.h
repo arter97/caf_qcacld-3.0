@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -177,6 +177,18 @@ enum policy_mgr_pcl_channel_order {
 	POLICY_MGR_PCL_ORDER_NONE,
 	POLICY_MGR_PCL_ORDER_24G_THEN_5G,
 	POLICY_MGR_PCL_ORDER_5G_THEN_2G,
+};
+
+/**
+ * policy_mgr_pcl_band_priority - Band priority between 5G and 6G channel
+ * @POLICY_MGR_PCL_BAND_5G_THEN_6G: 5 Ghz channel followed by 6 Ghz channel
+ * @POLICY_MGR_PCL_BAND_6G_THEN_5G: 6 Ghz channel followed by 5 Ghz channel
+ *
+ *  Band priority between 5G and 6G
+ */
+enum policy_mgr_pcl_band_priority {
+	POLICY_MGR_PCL_BAND_5G_THEN_6G = 0,
+	POLICY_MGR_PCL_BAND_6G_THEN_5G,
 };
 
 /**
@@ -937,6 +949,7 @@ enum hw_mode_bandwidth {
  * enum set_hw_mode_status - Status of set HW mode command
  * @SET_HW_MODE_STATUS_OK: command successful
  * @SET_HW_MODE_STATUS_EINVAL: Requested invalid hw_mode
+ * @SET_HW_MODE_STATUS_ALREADY: Requested hw mode is already applied to FW.
  * @SET_HW_MODE_STATUS_ECANCELED: HW mode change cancelled
  * @SET_HW_MODE_STATUS_ENOTSUP: HW mode not supported
  * @SET_HW_MODE_STATUS_EHARDWARE: HW mode change prevented by hardware
@@ -946,6 +959,7 @@ enum hw_mode_bandwidth {
 enum set_hw_mode_status {
 	SET_HW_MODE_STATUS_OK,
 	SET_HW_MODE_STATUS_EINVAL,
+	SET_HW_MODE_STATUS_ALREADY,
 	SET_HW_MODE_STATUS_ECANCELED,
 	SET_HW_MODE_STATUS_ENOTSUP,
 	SET_HW_MODE_STATUS_EHARDWARE,
@@ -1002,6 +1016,31 @@ enum dbs_support {
 };
 
 /**
+ * enum conn_6ghz_flag - structure to define connection 6ghz capable info
+ * in policy mgr conn info struct
+ *
+ * @CONN_6GHZ_FLAG_VALID: The 6ghz flag is valid (has been initialized)
+ * @CONN_6GHZ_FLAG_ACS_OR_USR_ALLOWED: AP is configured in 6ghz band capable
+ *   by user:
+ *   a. ACS channel range includes 6ghz.
+ *   b. SAP is started in 6ghz fix channel.
+ * @CONN_6GHZ_FLAG_SECURITY_ALLOWED: AP has security mode which is permitted in
+ *   6ghz band.
+ * @CONN_6GHZ_FLAG_NO_LEGACY_CLIENT: AP has no legacy client connected
+ */
+enum conn_6ghz_flag {
+	CONN_6GHZ_FLAG_VALID = 0x0001,
+	CONN_6GHZ_FLAG_ACS_OR_USR_ALLOWED = 0x0002,
+	CONN_6GHZ_FLAG_SECURITY_ALLOWED = 0x0004,
+	CONN_6GHZ_FLAG_NO_LEGACY_CLIENT = 0x0008,
+};
+
+#define CONN_6GHZ_CAPABLIE (CONN_6GHZ_FLAG_VALID | \
+			     CONN_6GHZ_FLAG_ACS_OR_USR_ALLOWED | \
+			     CONN_6GHZ_FLAG_SECURITY_ALLOWED | \
+			     CONN_6GHZ_FLAG_NO_LEGACY_CLIENT)
+
+/**
  * struct policy_mgr_conc_connection_info - information of all existing
  * connections in the wlan system
  *
@@ -1014,6 +1053,7 @@ enum dbs_support {
  * @vdev_id: vdev id of the connection
  * @in_use: if the table entry is active
  * @ch_flagext: Channel extension flags.
+ * @conn_6ghz_flag: connection 6ghz capable flags
  */
 struct policy_mgr_conc_connection_info {
 	enum policy_mgr_con_mode mode;
@@ -1025,6 +1065,7 @@ struct policy_mgr_conc_connection_info {
 	uint32_t      vdev_id;
 	bool          in_use;
 	uint16_t      ch_flagext;
+	enum conn_6ghz_flag conn_6ghz_flag;
 };
 
 /**
@@ -1084,6 +1125,7 @@ struct policy_mgr_dual_mac_config {
  * @reason: Reason for HW mode change
  * @session_id: Session id
  * @next_action: next action to happen at policy mgr
+ * @action: current hw change action to be done
  * @context: psoc context
  */
 struct policy_mgr_hw_mode {
@@ -1092,6 +1134,7 @@ struct policy_mgr_hw_mode {
 	enum policy_mgr_conn_update_reason reason;
 	uint32_t session_id;
 	uint8_t next_action;
+	enum policy_mgr_conc_next_action action;
 	struct wlan_objmgr_psoc *context;
 };
 
@@ -1221,10 +1264,12 @@ struct dbs_nss {
  * @mac_id: The HW mac it is running
  * @vdev_id: vdev id
  * @channel: channel of the connection
+ * @ch_freq: channel freq in Mhz
  */
 struct connection_info {
 	uint8_t mac_id;
 	uint8_t vdev_id;
 	uint8_t channel;
+	uint32_t ch_freq;
 };
 #endif /* __WLAN_POLICY_MGR_PUBLIC_STRUCT_H */

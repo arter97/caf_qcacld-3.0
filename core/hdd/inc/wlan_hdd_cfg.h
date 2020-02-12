@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -110,7 +110,6 @@ struct hdd_config {
 #ifdef ENABLE_MTRACE_LOG
 	bool enable_mtrace;
 #endif
-	bool enable_snr_monitoring;
 	bool advertise_concurrent_operation;
 #ifdef DHCP_SERVER_OFFLOAD
 	struct dhcp_server dhcp_server_ip;
@@ -195,6 +194,7 @@ struct hdd_config {
 #endif /* QCA_LL_LEGACY_TX_FLOW_CONTROL */
 	uint32_t napi_cpu_affinity_mask;
 	/* CPU affinity mask for rx_thread */
+	uint32_t rx_thread_ul_affinity_mask;
 	uint32_t rx_thread_affinity_mask;
 	uint8_t cpu_map_list[CFG_DP_RPS_RX_QUEUE_CPU_MAP_LIST_LEN];
 	bool multicast_replay_filter;
@@ -212,20 +212,26 @@ struct hdd_config {
 	uint8_t enable_concurrent_sta[CFG_CONCURRENT_IFACE_MAX_LEN];
 	uint8_t dbs_scan_selection[CFG_DBS_SCAN_PARAM_LENGTH];
 #ifdef FEATURE_RUNTIME_PM
-	bool runtime_pm;
+	uint8_t runtime_pm;
 #endif
 	uint8_t inform_bss_rssi_raw;
 
 	bool mac_provision;
 	uint32_t provisioned_intf_pool;
 	uint32_t derived_intf_pool;
-	uint8_t enable_rtt_support;
 	uint32_t cfg_wmi_credit_cnt;
-	uint32_t sar_version;
+	uint32_t enable_sar_conversion;
 	bool is_wow_disabled;
 #ifdef WLAN_FEATURE_TSF_PLUS
 	uint8_t tsf_ptp_options;
 #endif /* WLAN_FEATURE_TSF_PLUS */
+
+#ifdef WLAN_SUPPORT_TXRX_HL_BUNDLE
+	uint32_t pkt_bundle_threshold_high;
+	uint32_t pkt_bundle_threshold_low;
+	uint16_t pkt_bundle_timer_value;
+	uint16_t pkt_bundle_size;
+#endif
 };
 
 /**

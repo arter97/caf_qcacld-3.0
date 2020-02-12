@@ -486,6 +486,73 @@ static QDF_STATUS lim_get_addn_ie_for_probe_resp(struct mac_context *mac,
 	return QDF_STATUS_SUCCESS;
 }
 
+/**
+ * lim_add_additional_ie() - Add additional IE to management frame
+ * @frame:          pointer to frame
+ * @frame_offset:   current offset of frame
+ * @add_ie:         pointer to addtional ie
+ * @add_ie_len:     length of addtional ie
+ * @p2p_ie:         pointer to p2p ie
+ * @noa_ie:         pointer to noa ie, this is seperate p2p ie
+ * @noa_ie_len:     length of noa ie
+ * @noa_stream:     pointer to noa stream, this is noa attribute only
+ * @noa_stream_len: length of noa stream
+ *
+ * This function adds additional IE to management frame.
+ *
+ * Return: None
+ */
+static void lim_add_additional_ie(uint8_t *frame, uint32_t frame_offset,
+				  uint8_t *add_ie, uint32_t add_ie_len,
+				  uint8_t *p2p_ie, uint8_t *noa_ie,
+				  uint32_t noa_ie_len, uint8_t *noa_stream,
+				  uint32_t noa_stream_len) {
+	uint16_t p2p_ie_offset;
+
+	if (!add_ie_len || !add_ie) {
+		pe_debug("no valid addtional ie");
+		return;
+	}
+
+	if (!noa_stream_len) {
+		qdf_mem_copy(frame + frame_offset, &add_ie[0], add_ie_len);
+		return;
+	}
+
+	if (noa_ie_len > (SIR_MAX_NOA_ATTR_LEN + SIR_P2P_IE_HEADER_LEN)) {
+		pe_err("Not able to insert NoA, len=%d", noa_ie_len);
+		return;
+	} else if (noa_ie_len > 0) {
+		pe_debug("new p2p ie for noa attr");
+		qdf_mem_copy(frame + frame_offset, &add_ie[0], add_ie_len);
+		frame_offset += add_ie_len;
+		qdf_mem_copy(frame + frame_offset, &noa_ie[0], noa_ie_len);
+	} else {
+		if (!p2p_ie || (p2p_ie < add_ie) ||
+		    (p2p_ie > (add_ie + add_ie_len))) {
+			pe_err("invalid p2p ie");
+			return;
+		}
+		p2p_ie_offset = p2p_ie - add_ie + p2p_ie[1] + 2;
+		if (p2p_ie_offset > add_ie_len) {
+			pe_err("Invalid p2p ie");
+			return;
+		}
+		pe_debug("insert noa attr to existed p2p ie");
+		p2p_ie[1] = p2p_ie[1] + noa_stream_len;
+		qdf_mem_copy(frame + frame_offset, &add_ie[0], p2p_ie_offset);
+		frame_offset += p2p_ie_offset;
+		qdf_mem_copy(frame + frame_offset, &noa_stream[0],
+			     noa_stream_len);
+		if (p2p_ie_offset < add_ie_len) {
+			frame_offset += noa_stream_len;
+			qdf_mem_copy(frame + frame_offset,
+				     &add_ie[p2p_ie_offset],
+				     add_ie_len - p2p_ie_offset);
+		}
+	}
+}
+
 void
 lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 			      tSirMacAddr peer_macaddr,
@@ -506,7 +573,7 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	bool wps_ap = 0;
 	uint8_t tx_flag = 0;
 	uint8_t *add_ie = NULL;
-	const uint8_t *p2p_ie = NULL;
+	uint8_t *p2p_ie = NULL;
 	uint8_t noalen = 0;
 	uint8_t total_noalen = 0;
 	uint8_t noa_stream[SIR_MAX_NOA_ATTR_LEN + SIR_P2P_IE_HEADER_LEN];
@@ -696,18 +763,25 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 		bytes = bytes + addn_ie_len;
 
 		if (preq_p2pie)
-			p2p_ie = limGetP2pIEPtr(mac_ctx, &add_ie[0],
-					addn_ie_len);
+			p2p_ie = (uint8_t *)limGetP2pIEPtr(mac_ctx, &add_ie[0],
+							   addn_ie_len);
 
 		if (p2p_ie) {
 			/* get NoA attribute stream P2P IE */
 			noalen = lim_get_noa_attr_stream(mac_ctx,
 					noa_stream, pe_session);
-			if (noalen != 0) {
-				total_noalen =
-					lim_build_p2p_ie(mac_ctx, &noa_ie[0],
-						&noa_stream[0], noalen);
-				bytes = bytes + total_noalen;
+			if (noalen) {
+				if ((p2p_ie[1] + noalen) >
+				    WNI_CFG_PROBE_RSP_BCN_ADDNIE_DATA_LEN) {
+					total_noalen = lim_build_p2p_ie(
+								mac_ctx,
+								&noa_ie[0],
+								&noa_stream[0],
+								noalen);
+					bytes = bytes + total_noalen;
+				} else {
+					bytes = bytes + noalen;
+				}
 			}
 		}
 	}
@@ -768,21 +842,9 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	pe_debug("Sending Probe Response frame to");
 	lim_print_mac_addr(mac_ctx, peer_macaddr, LOGD);
 
-	if (addn_ie_present)
-		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
-			     &add_ie[0], addn_ie_len);
-
-	if (noalen != 0) {
-		if (total_noalen >
-		    (SIR_MAX_NOA_ATTR_LEN + SIR_P2P_IE_HEADER_LEN)) {
-			pe_err("Not able to insert NoA, total len=%d",
-				total_noalen);
-			goto err_ret;
-		} else {
-			qdf_mem_copy(&frame[bytes - (total_noalen)],
-				     &noa_ie[0], total_noalen);
-		}
-	}
+	lim_add_additional_ie(frame, sizeof(tSirMacMgmtHdr) + payload, add_ie,
+			      addn_ie_len, p2p_ie, noa_ie, total_noalen,
+			      noa_stream, noalen);
 
 	if (wlan_reg_is_5ghz_ch_freq(pe_session->curr_op_freq) ||
 	    pe_session->opmode == QDF_P2P_CLIENT_MODE ||
@@ -1806,7 +1868,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	uint8_t vdev_id = 0;
 	bool vht_enabled = false;
 	tDot11fIEExtCap extr_ext_cap;
-	bool extr_ext_flag = true;
+	bool extr_ext_flag = true, is_open_auth = false;
 	tpSirMacMgmtHdr mac_hdr;
 	uint32_t ie_offset = 0;
 	uint8_t *p_ext_cap = NULL;
@@ -2180,19 +2242,27 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 
 		/* Include the EID and length fields */
 		mbo_ie_len = mbo_ie[1] + 2;
-		pe_debug("Stripped MBO IE of length %d", mbo_ie_len);
 
-		peer = wlan_objmgr_get_peer_by_mac(mac_ctx->psoc,
-						   mlm_assoc_req->peerMacAddr,
-						   WLAN_MBO_ID);
-		if (peer && !mlme_get_peer_pmf_status(peer)) {
-			pe_debug("Peer doesn't support PMF, Don't add MBO IE");
-			qdf_mem_free(mbo_ie);
-			mbo_ie = NULL;
-			mbo_ie_len = 0;
+		if (pe_session->connected_akm == ANI_AKM_TYPE_NONE)
+			is_open_auth = true;
+
+		pe_debug("Stripped MBO IE of length %d is_open_auth:%d",
+			 mbo_ie_len, is_open_auth);
+
+		if (!is_open_auth) {
+			peer = wlan_objmgr_get_peer_by_mac(
+						mac_ctx->psoc,
+						mlm_assoc_req->peerMacAddr,
+						WLAN_MBO_ID);
+			if (peer && !mlme_get_peer_pmf_status(peer)) {
+				pe_debug("Peer doesn't support PMF, Don't add MBO IE");
+				qdf_mem_free(mbo_ie);
+				mbo_ie = NULL;
+				mbo_ie_len = 0;
+			}
+			if (peer)
+				wlan_objmgr_peer_release_ref(peer, WLAN_MBO_ID);
 		}
-		if (peer)
-			wlan_objmgr_peer_release_ref(peer, WLAN_MBO_ID);
 	}
 
 	/*
@@ -2412,12 +2482,10 @@ static QDF_STATUS lim_addba_rsp_tx_complete_cnf(void *context,
 	tSirMacMgmtHdr *mac_hdr;
 	tDot11faddba_rsp rsp;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
-	void *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
-	uint8_t peer_id;
-	void *peer;
 	uint32_t frame_len;
 	QDF_STATUS status;
 	uint8_t *data;
+	struct wmi_mgmt_params *mgmt_params = (struct wmi_mgmt_params *)params;
 
 	if (tx_complete == WMI_MGMT_TX_COMP_TYPE_COMPLETE_OK)
 		pe_debug("Add ba response successfully sent");
@@ -2449,15 +2517,8 @@ static QDF_STATUS lim_addba_rsp_tx_complete_cnf(void *context,
 		goto error;
 	}
 
-	peer = cdp_peer_get_ref_by_addr(soc, pdev, mac_hdr->da, &peer_id,
-					PEER_DEBUG_ID_WMA_ADDBA_REQ);
-	if (!peer) {
-		pe_debug("no PEER found for mac_addr:%pM", mac_hdr->da);
-		goto error;
-	}
-	cdp_addba_resp_tx_completion(soc, peer, rsp.addba_param_set.tid,
-				     tx_complete);
-	cdp_peer_release_ref(soc, peer, PEER_DEBUG_ID_WMA_ADDBA_REQ);
+	cdp_addba_resp_tx_completion(soc, mac_hdr->da, mgmt_params->vdev_id,
+				     rsp.addba_param_set.tid, tx_complete);
 error:
 	if (buf)
 		qdf_nbuf_free(buf);
@@ -4925,9 +4986,8 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 	uint8_t tx_flag = 0;
 	uint8_t vdev_id = 0;
 	uint16_t buff_size, status_code, batimeout;
-	uint8_t peer_id, dialog_token;
+	uint8_t dialog_token;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
-	void *peer, *pdev;
 	uint8_t he_frag = 0;
 	tpDphHashNode sta_ds;
 	uint16_t aid;
@@ -4935,23 +4995,10 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 
 	vdev_id = session->vdev_id;
 
-	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
-	if (!pdev) {
-		pe_err("pdev is NULL");
-		return QDF_STATUS_E_FAILURE;
-	}
+	cdp_addba_responsesetup(soc, peer_mac, vdev_id, tid,
+				&dialog_token, &status_code, &buff_size,
+				&batimeout);
 
-	peer = cdp_peer_get_ref_by_addr(soc, pdev, peer_mac, &peer_id,
-					PEER_DEBUG_ID_LIM_SEND_ADDBA_RESP);
-	if (!peer) {
-		pe_err("PEER [%pM] not found", peer_mac);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	cdp_addba_responsesetup(soc, peer, tid, &dialog_token,
-		&status_code, &buff_size, &batimeout);
-
-	cdp_peer_release_ref(soc, peer, PEER_DEBUG_ID_LIM_SEND_ADDBA_RESP);
 	qdf_mem_zero((uint8_t *) &frm, sizeof(frm));
 	frm.Category.category = ACTION_CATEGORY_BACK;
 	frm.Action.action = ADDBA_RESPONSE;

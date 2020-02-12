@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1653,11 +1653,12 @@ static void sap_sort_chl_weight_80_mhz(struct mac_context *mac_ctx,
 		minIdx = 0;
 
 		for (i = 0; i < 4; i++) {
-			pSpectInfo[j + i].weight = SAP_ACS_WEIGHT_MAX * 4;
 			if (min_ch_weight > pSpectInfo[j + i].weight) {
 				min_ch_weight = pSpectInfo[j + i].weight;
 				minIdx = i;
 			}
+			pSpectInfo[j + i].weight = SAP_ACS_WEIGHT_MAX * 4;
+			pSpectInfo[j + i].weight_calc_done = true;
 		}
 
 		pSpectInfo[j + minIdx].weight = combined_weight;
@@ -1818,12 +1819,12 @@ static void sap_sort_chl_weight_160_mhz(struct mac_context *mac_ctx,
 		minIdx = 0;
 
 		for (i = 0; i < 8; i++) {
-			pSpectInfo[j + i].weight = SAP_ACS_WEIGHT_MAX * 8;
-
 			if (min_ch_weight > pSpectInfo[j + i].weight) {
 				min_ch_weight = pSpectInfo[j + i].weight;
 				minIdx = i;
 			}
+			pSpectInfo[j + i].weight = SAP_ACS_WEIGHT_MAX * 8;
+			pSpectInfo[j + i].weight_calc_done = true;
 		}
 
 		pSpectInfo[j + minIdx].weight = combined_weight;
@@ -2118,11 +2119,12 @@ static void sap_sort_chl_weight_40_mhz(struct mac_context *mac_ctx,
 		minIdx = 0;
 
 		for (i = 0; i < 2; i++) {
-			pSpectInfo[j + i].weight = SAP_ACS_WEIGHT_MAX * 2;
 			if (min_ch_weight > pSpectInfo[j + i].weight) {
 				min_ch_weight = pSpectInfo[j + i].weight;
 				minIdx = i;
 			}
+			pSpectInfo[j + i].weight = SAP_ACS_WEIGHT_MAX * 2;
+			pSpectInfo[j + i].weight_calc_done = true;
 		}
 
 		pSpectInfo[j + minIdx].weight = combined_weight;
@@ -2336,26 +2338,31 @@ uint32_t sap_select_channel(mac_handle_t mac_handle,
 	 * channel which has same weightage and is in PCL, choose the one in
 	 * PCL
 	 */
-	for (count = 0; count < spect_info->numSpectChans; count++) {
-		if (best_chan_freq == spect_info->pSpectCh[count].chan_freq)
-			continue;
+	if (!ch_in_pcl(sap_ctx, best_chan_freq)) {
+		uint32_t cal_chan_freq, cal_chan_weight;
+		for (count = 0; count < spect_info->numSpectChans; count++) {
+			cal_chan_freq = spect_info->pSpectCh[count].chan_freq;
+			cal_chan_weight = spect_info->pSpectCh[count].weight;
+			/* skip pcl channel whose weight is bigger than best */
+			if (!ch_in_pcl(sap_ctx, cal_chan_freq) ||
+			    (cal_chan_weight > best_ch_weight))
+				continue;
 
-		if (!ch_in_pcl(sap_ctx,
-			       spect_info->pSpectCh[count].chan_freq) ||
-		    (spect_info->pSpectCh[count].weight != best_ch_weight))
-			continue;
+			if (best_chan_freq == cal_chan_freq)
+				continue;
 
-		if (sap_select_preferred_channel_from_channel_list(
-			spect_info->pSpectCh[count].chan_freq, sap_ctx,
-			spect_info)
-			== SAP_CHANNEL_NOT_SELECTED)
-			continue;
+			if (sap_select_preferred_channel_from_channel_list(
+				cal_chan_freq, sap_ctx,
+				spect_info)
+				== SAP_CHANNEL_NOT_SELECTED)
+				continue;
 
-		best_chan_freq = spect_info->pSpectCh[count].chan_freq;
-		sap_debug("Changed best freq to %d Preferred freq",
-			  best_chan_freq);
+			best_chan_freq = cal_chan_freq;
+			sap_debug("Changed best freq to %d Preferred freq",
+				  best_chan_freq);
 
-		break;
+			break;
+		}
 	}
 
 	sap_ctx->acs_cfg->pri_ch_freq = best_chan_freq;

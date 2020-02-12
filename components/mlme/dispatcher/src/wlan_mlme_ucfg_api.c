@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -250,6 +250,24 @@ ucfg_mlme_get_dfs_master_capability(struct wlan_objmgr_psoc *psoc,
 	}
 
 	*val = mlme_obj->cfg.dfs_cfg.dfs_master_capable;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+ucfg_mlme_get_oem_6g_supported(struct wlan_objmgr_psoc *psoc,
+			       bool *oem_6g_disable)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		*oem_6g_disable =
+			cfg_default(CFG_OEM_SIXG_SUPPORT_DISABLE);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*oem_6g_disable = mlme_obj->cfg.wifi_pos_cfg.oem_6g_support_disable;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -680,23 +698,6 @@ ucfg_mlme_get_go_cts2self_for_sta(struct wlan_objmgr_psoc *psoc,
 	}
 
 	*val = mlme_obj->cfg.sta.enable_go_cts2self_for_sta;
-
-	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS
-ucfg_mlme_get_force_rsne_override(struct wlan_objmgr_psoc *psoc,
-				  bool *val)
-{
-	struct wlan_mlme_psoc_ext_obj *mlme_obj;
-
-	mlme_obj = mlme_get_psoc_ext_obj(psoc);
-	if (!mlme_obj) {
-		*val = cfg_default(CFG_FORCE_RSNE_OVERRIDE);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	*val = mlme_obj->cfg.sta.force_rsne_override;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1718,6 +1719,33 @@ ucfg_mlme_set_obss_color_collision_offload_enabled(
 	mlme_obj->cfg.obss_ht40.obss_color_collision_offload_enabled = value;
 
 	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS ucfg_mlme_set_restricted_80p80_bw_supp(struct wlan_objmgr_psoc *psoc,
+						  bool restricted_80p80_supp)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_INVAL;
+
+	mlme_obj->cfg.vht_caps.vht_cap_info.restricted_80p80_bw_supp =
+					restricted_80p80_supp;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+bool ucfg_mlme_get_restricted_80p80_bw_supp(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+
+	if (!mlme_obj)
+		return true;
+
+	return mlme_obj->cfg.vht_caps.vht_cap_info.restricted_80p80_bw_supp;
 }
 
 QDF_STATUS

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -950,4 +950,128 @@ QDF_STATUS ucfg_ndi_remove_entry_from_policy_mgr(struct wlan_objmgr_vdev *vdev)
 	}
 
 	return QDF_STATUS_SUCCESS;
+}
+
+bool ucfg_nan_is_enable_disable_in_progress(struct wlan_objmgr_psoc *psoc)
+{
+	enum nan_disc_state nan_state;
+
+	nan_state = nan_get_discovery_state(psoc);
+	if (nan_state == NAN_DISC_ENABLE_IN_PROGRESS ||
+	    nan_state == NAN_DISC_DISABLE_IN_PROGRESS) {
+		nan_info("NAN enable/disable is in progress, state: %u",
+			 nan_state);
+		return true;
+	}
+
+	return false;
+}
+
+#ifdef NDP_SAP_CONCURRENCY_ENABLE
+/**
+ * is_sap_ndp_concurrency_allowed() - Is SAP+NDP allowed
+ *
+ * Return: True if the NDP_SAP_CONCURRENCY_ENABLE feature define
+ *	   is enabled, false otherwise.
+ */
+static inline bool is_sap_ndp_concurrency_allowed(void)
+{
+	return true;
+}
+#else
+static inline bool is_sap_ndp_concurrency_allowed(void)
+{
+	return false;
+}
+#endif
+
+bool ucfg_nan_is_sta_ndp_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
+					     struct wlan_objmgr_vdev *vdev)
+{
+	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint32_t freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint32_t ndi_cnt, sta_cnt, id;
+
+	sta_cnt = policy_mgr_mode_specific_connection_count(psoc,
+							    PM_STA_MODE, NULL);
+	/* Allow if STA is not in connected state */
+	if (!sta_cnt)
+		return true;
+
+	/* Reject if STA+STA is present */
+	if (sta_cnt > 1) {
+		nan_err("STA+STA+NDP concurrency is not allowed");
+		return false;
+	}
+
+	/*
+	 * SAP+NDP concurrency is already validated in hdd_is_ndp_allowed().
+	 * If SAP+NDP concurrency is enabled, return true from here to avoid
+	 * failure.
+	 */
+	if (is_sap_ndp_concurrency_allowed())
+		return true;
+
+	ndi_cnt = policy_mgr_get_mode_specific_conn_info(psoc,
+							 freq_list,
+							 vdev_id_list,
+							 PM_NDI_MODE);
+
+	/* Allow if no other NDP peers are present on the NDIs */
+	if (!ndi_cnt)
+		return true;
+
+	/*
+	 * Allow NDP creation if the current NDP request is on
+	 * the NDI which already has an NDP by checking the vdev id of
+	 * the NDIs
+	 */
+	for (id = 0; id < ndi_cnt; id++)
+		if (wlan_vdev_get_id(vdev) == vdev_id_list[id])
+			return true;
+
+	return false;
+}
+
+bool ucfg_nan_is_vdev_creation_allowed(struct wlan_objmgr_psoc *psoc)
+{
+	struct nan_psoc_priv_obj *psoc_nan_obj;
+
+	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
+	if (!psoc_nan_obj) {
+		nan_err("psoc_nan_obj is null");
+		return false;
+	}
+
+	return psoc_nan_obj->nan_caps.nan_vdev_allowed;
+}
+
+QDF_STATUS ucfg_disable_nan_discovery(struct wlan_objmgr_psoc *psoc,
+				      uint8_t *data, uint32_t data_len)
+{
+	struct nan_disable_req *nan_req;
+	QDF_STATUS status;
+
+	nan_req = qdf_mem_malloc(sizeof(*nan_req) + data_len);
+	if (!nan_req)
+		return -ENOMEM;
+
+	nan_req->psoc = psoc;
+	nan_req->disable_2g_discovery = true;
+	nan_req->disable_5g_discovery = true;
+	if (data_len && data) {
+		nan_req->params.request_data_len = data_len;
+		qdf_mem_copy(nan_req->params.request_data, data, data_len);
+	}
+
+	nan_debug("sending NAN Disable Req");
+	status = ucfg_nan_discovery_req(nan_req, NAN_DISABLE_REQ);
+
+	if (QDF_IS_STATUS_SUCCESS(status))
+		nan_debug("Successfully sent NAN Disable request");
+	else
+		nan_err("Unable to send NAN Disable request: %u", status);
+
+	qdf_mem_free(nan_req);
+	return status;
 }

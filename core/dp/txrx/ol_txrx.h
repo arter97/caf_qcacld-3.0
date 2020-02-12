@@ -67,9 +67,8 @@ enum ol_txrx_fc_limit_id {
 
 ol_txrx_peer_handle ol_txrx_peer_get_ref_by_addr(ol_txrx_pdev_handle pdev,
 						 u8 *peer_addr,
-						 u8 *peer_id,
 						 enum peer_debug_id_type
-									dbg_id);
+						 dbg_id);
 
 int  ol_txrx_peer_release_ref(ol_txrx_peer_handle peer,
 			      enum peer_debug_id_type dbg_id);
@@ -144,9 +143,6 @@ void *ol_get_pldev(struct cdp_pdev *txrx_pdev)
 
 #ifdef QCA_SUPPORT_TXRX_LOCAL_PEER_ID
 ol_txrx_peer_handle
-ol_txrx_peer_find_by_local_id(struct cdp_pdev *pdev,
-			      uint8_t local_peer_id);
-ol_txrx_peer_handle
 ol_txrx_peer_get_ref_by_local_id(struct cdp_pdev *ppdev,
 				 uint8_t local_peer_id,
 				 enum peer_debug_id_type dbg_id);
@@ -199,12 +195,14 @@ struct ol_txrx_vdev_t *ol_txrx_get_vdev_from_soc_vdev_id(
 
 /**
  * ol_txrx_get_mon_vdev_from_pdev() - get monitor mode vdev from pdev
- * @ppdev: the physical device the virtual device belongs to
+ * @soc: datapath soc handle
+ * @pdev_id: the physical device id the virtual device belongs to
  *
- * Return: vdev handle
- *         NULL if not found.
+ * Return: vdev id
+ *         error if not found.
  */
-struct cdp_vdev *ol_txrx_get_mon_vdev_from_pdev(struct cdp_pdev *ppdev);
+uint8_t ol_txrx_get_mon_vdev_from_pdev(struct cdp_soc_t *soc,
+				       uint8_t pdev_id);
 
 /**
  * ol_txrx_get_vdev_by_peer_addr() - Get vdev handle by peer mac address
@@ -221,8 +219,7 @@ ol_txrx_get_vdev_by_peer_addr(struct cdp_pdev *ppdev,
 			      struct qdf_mac_addr peer_addr);
 
 void *ol_txrx_find_peer_by_addr(struct cdp_pdev *pdev,
-				uint8_t *peer_addr,
-				uint8_t *peer_id);
+				uint8_t *peer_addr);
 
 void htt_pkt_log_init(struct cdp_soc_t *soc_hdl, uint8_t pdev_id, void *scn);
 void peer_unmap_timer_handler(void *data);
@@ -320,10 +317,10 @@ ol_txrx_pdev_grp_stat_destroy(struct ol_txrx_pdev_t *pdev) {}
 #if defined(CONFIG_HL_SUPPORT) && defined(FEATURE_WLAN_TDLS)
 void ol_txrx_copy_mac_addr_raw(struct cdp_vdev *pvdev, uint8_t *bss_addr);
 void ol_txrx_add_last_real_peer(struct cdp_pdev *ppdev,
-				struct cdp_vdev *pvdev, uint8_t *peer_id);
+				struct cdp_vdev *pvdev);
 bool is_vdev_restore_last_peer(void *ppeer);
 void ol_txrx_update_last_real_peer(struct cdp_pdev *ppdev, void *pvdev,
-				   uint8_t *peer_id, bool restore_last_peer);
+				   bool restore_last_peer);
 void ol_txrx_set_peer_as_tdls_peer(void *ppeer, bool val);
 void ol_txrx_set_tdls_offchan_enabled(void *ppeer, bool val);
 #endif
@@ -575,12 +572,12 @@ int ol_txrx_set_vdev_os_queue_status(struct cdp_soc_t *soc_hdl, u8 vdev_id,
  * ol_txrx_set_vdev_tx_desc_limit() - Set TX descriptor limits for a vdev
  * @soc_hdl: soc handle
  * @vdev_id: vdev id for the vdev under consideration.
- * @chan: Channel on which the vdev has been started.
+ * @chan_freq: channel frequency on which the vdev has been started.
  *
  * Return: 0 on success, -EINVAL on failure
  */
 int ol_txrx_set_vdev_tx_desc_limit(struct cdp_soc_t *soc_hdl, u8 vdev_id,
-				   u8 chan);
+				   u32 chan_freq);
 #endif
 
 /**
@@ -807,6 +804,28 @@ void ol_tx_vdev_set_driver_del_ack_enable(struct cdp_soc_t *soc_hdl,
 {
 }
 
+#endif
+
+#ifdef WLAN_SUPPORT_TXRX_HL_BUNDLE
+void ol_tx_vdev_set_bundle_require(uint8_t vdev_id, unsigned long tx_bytes,
+				   uint32_t time_in_ms, uint32_t high_th,
+				   uint32_t low_th);
+
+void ol_tx_pdev_reset_bundle_require(struct cdp_soc_t *soc_hdl, uint8_t pdev_id);
+
+#else
+
+static inline
+void ol_tx_vdev_set_bundle_require(uint8_t vdev_id, unsigned long tx_bytes,
+				   uint32_t time_in_ms, uint32_t high_th,
+				   uint32_t low_th)
+{
+}
+
+static inline
+void ol_tx_pdev_reset_bundle_require(struct cdp_soc_t *soc_hdl, uint8_t pdev_id)
+{
+}
 #endif
 
 #endif /* _OL_TXRX__H_ */

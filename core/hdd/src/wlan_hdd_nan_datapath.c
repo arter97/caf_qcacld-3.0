@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -651,7 +651,6 @@ int hdd_ndi_delete(uint8_t vdev_id, char *iface_name, uint16_t transaction_id)
 	struct hdd_adapter *adapter;
 	struct hdd_station_ctx *sta_ctx;
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	uint8_t sta_id;
 
 	if (!hdd_ctx) {
 		hdd_err("hdd_ctx is null");
@@ -668,12 +667,6 @@ int hdd_ndi_delete(uint8_t vdev_id, char *iface_name, uint16_t transaction_id)
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 	if (!sta_ctx) {
 		hdd_err("sta_ctx is NULL");
-		return -EINVAL;
-	}
-
-	sta_id = sta_ctx->broadcast_sta_id;
-	if (sta_id >= HDD_MAX_ADAPTERS) {
-		hdd_err("Error: Invalid sta id %u", sta_id);
 		return -EINVAL;
 	}
 
@@ -804,6 +797,13 @@ void hdd_ndi_drv_ndi_delete_rsp_handler(uint8_t vdev_id)
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 				     WLAN_CONTROL_PATH);
 
+	/*
+	 * For NAN Data interface, the close session results in the final
+	 * indication to the userspace
+	 */
+	if (adapter->device_mode == QDF_NDI_MODE)
+		hdd_ndp_session_end_handler(adapter);
+
 	complete(&adapter->disconnect_comp_var);
 }
 
@@ -845,11 +845,6 @@ int hdd_ndp_new_peer_handler(uint8_t vdev_id, uint16_t sta_id,
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 	if (!sta_ctx) {
 		hdd_err("sta_ctx is null");
-		return -EINVAL;
-	}
-
-	if (sta_id >= HDD_MAX_ADAPTERS) {
-		hdd_err("Error: Invalid sta_id: %u", sta_id);
 		return -EINVAL;
 	}
 
@@ -915,11 +910,6 @@ void hdd_ndp_peer_departed_handler(uint8_t vdev_id, uint16_t sta_id,
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 	if (!sta_ctx) {
 		hdd_err("sta_ctx is null");
-		return;
-	}
-
-	if (sta_id >= HDD_MAX_ADAPTERS) {
-		hdd_err("Error: Invalid sta_id: %u", sta_id);
 		return;
 	}
 

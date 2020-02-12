@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -939,7 +939,7 @@ QDF_STATUS wlan_mlme_configure_chain_mask(struct wlan_objmgr_psoc *psoc,
 
 	if (enable2x2 || !enable_bt_chain_sep || as_enabled ||
 	   (!hw_dbs_2x2_cap && dual_mac_feature != DISABLE_DBS_CXN_AND_SCAN)) {
-		mlme_legacy_err("Cannot configure chainmask to FW");
+		mlme_legacy_debug("Cannot configure chainmask to FW");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -1730,6 +1730,21 @@ wlan_mlme_get_sap_bcast_deauth_enabled(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS
+wlan_mlme_is_6g_sap_fd_enabled(struct wlan_objmgr_psoc *psoc,
+			       bool *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	*value = mlme_obj->cfg.sap_cfg.is_6g_sap_fd_enabled;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS wlan_mlme_get_sap_allow_all_channels(struct wlan_objmgr_psoc *psoc,
 						bool *value)
 {
@@ -2453,7 +2468,6 @@ QDF_STATUS wlan_mlme_get_edca_params(struct wlan_mlme_edca_params *edca_params,
 	return QDF_STATUS_SUCCESS;
 }
 
-#ifdef CRYPTO_SET_KEY_CONVERGED
 QDF_STATUS mlme_get_wep_key(struct wlan_objmgr_vdev *vdev,
 			    struct wlan_mlme_wep_cfg *wep_params,
 			    enum wep_key_id wep_keyid, uint8_t *default_key,
@@ -2480,45 +2494,6 @@ QDF_STATUS mlme_get_wep_key(struct wlan_objmgr_vdev *vdev,
 
 	return QDF_STATUS_SUCCESS;
 }
-#else
-QDF_STATUS mlme_get_wep_key(struct wlan_objmgr_vdev *vdev,
-			    struct wlan_mlme_wep_cfg *wep_params,
-			    enum wep_key_id wep_keyid, uint8_t *default_key,
-			    qdf_size_t *key_len)
-{
-	switch (wep_keyid) {
-	case MLME_WEP_DEFAULT_KEY_1:
-		wlan_mlme_get_cfg_str(default_key,
-				      &wep_params->wep_default_key_1,
-				      key_len);
-		break;
-
-	case MLME_WEP_DEFAULT_KEY_2:
-		wlan_mlme_get_cfg_str(default_key,
-				      &wep_params->wep_default_key_2,
-				      key_len);
-		break;
-
-	case MLME_WEP_DEFAULT_KEY_3:
-		wlan_mlme_get_cfg_str(default_key,
-				      &wep_params->wep_default_key_3,
-				      key_len);
-		break;
-
-	case MLME_WEP_DEFAULT_KEY_4:
-		wlan_mlme_get_cfg_str(default_key,
-				      &wep_params->wep_default_key_4,
-				      key_len);
-		break;
-
-	default:
-		mlme_legacy_err("Invalid key id:%d", wep_keyid);
-		return QDF_STATUS_E_INVAL;
-	}
-	mlme_legacy_debug("key_id:%d key_len:%zd", wep_keyid, *key_len);
-	return QDF_STATUS_SUCCESS;
-}
-#endif /* CRYPTO_SET_KEY_CONVERGED */
 
 QDF_STATUS mlme_set_wep_key(struct wlan_mlme_wep_cfg *wep_params,
 			    enum wep_key_id wep_keyid, uint8_t *key_to_set,
@@ -3500,6 +3475,24 @@ wlan_mlme_get_4way_hs_offload(struct wlan_objmgr_psoc *psoc, bool *value)
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS
+wlan_mlme_get_bmiss_skip_full_scan_value(struct wlan_objmgr_psoc *psoc,
+					 bool *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		*value = cfg_default(CFG_BMISS_SKIP_FULL_SCAN);
+		mlme_legacy_err("Failed to get MLME Obj");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	*value = mlme_obj->cfg.gen.bmiss_skip_full_scan;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS mlme_get_peer_phymode(struct wlan_objmgr_psoc *psoc, uint8_t *mac,
 				 enum wlan_phymode *peer_phymode)
 {
@@ -3543,5 +3536,139 @@ wlan_mlme_get_ignore_fw_reg_offload_ind(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_FAILURE;
 
 	*disabled = mlme_obj->cfg.reg.ignore_fw_reg_offload_ind;
+	return QDF_STATUS_SUCCESS;
+}
+
+char *mlme_get_roam_trigger_str(uint32_t roam_scan_trigger)
+{
+	switch (roam_scan_trigger) {
+	case WMI_ROAM_TRIGGER_REASON_PER:
+		return "PER";
+	case WMI_ROAM_TRIGGER_REASON_BMISS:
+		return "BEACON MISS";
+	case WMI_ROAM_TRIGGER_REASON_LOW_RSSI:
+		return "LOW RSSI";
+	case WMI_ROAM_TRIGGER_REASON_HIGH_RSSI:
+		return "HIGH RSSI";
+	case WMI_ROAM_TRIGGER_REASON_PERIODIC:
+		return "PERIODIC SCAN";
+	case WMI_ROAM_TRIGGER_REASON_MAWC:
+		return "MAWC";
+	case WMI_ROAM_TRIGGER_REASON_DENSE:
+		return "DENSE ENVIRONMENT";
+	case WMI_ROAM_TRIGGER_REASON_BACKGROUND:
+		return "BACKGROUND SCAN";
+	case WMI_ROAM_TRIGGER_REASON_FORCED:
+		return "FORCED SCAN";
+	case WMI_ROAM_TRIGGER_REASON_BTM:
+		return "BTM TRIGGER";
+	case WMI_ROAM_TRIGGER_REASON_UNIT_TEST:
+		return "TEST COMMMAND";
+	case WMI_ROAM_TRIGGER_REASON_BSS_LOAD:
+		return "HIGH BSS LOAD";
+	case WMI_ROAM_TRIGGER_REASON_DEAUTH:
+		return "DEAUTH RECEIVED";
+	case WMI_ROAM_TRIGGER_REASON_IDLE:
+		return "IDLE STATE SCAN";
+	case WMI_ROAM_TRIGGER_REASON_NONE:
+		return "NONE";
+	default:
+		return "UNKNOWN";
+	}
+}
+
+void mlme_get_converted_timestamp(uint32_t timestamp, char *time)
+{
+	uint32_t hr, mins, secs;
+
+	secs = timestamp / 1000;
+	mins = secs / 60;
+	hr = mins / 60;
+	qdf_snprintf(time, TIME_STRING_LEN, "[%02d:%02d:%02d.%06u]",
+		     (hr % 24), (mins % 60), (secs % 60),
+		     (timestamp % 1000) * 1000);
+}
+
+char *mlme_get_roam_fail_reason_str(uint32_t result)
+{
+	switch (result) {
+	case WMI_ROAM_FAIL_REASON_NO_SCAN_START:
+		return "SCAN NOT STARTED";
+	case WMI_ROAM_FAIL_REASON_NO_AP_FOUND:
+		return "NO AP FOUND";
+	case WMI_ROAM_FAIL_REASON_NO_CAND_AP_FOUND:
+		return "NO CANDIDATE FOUND";
+	case WMI_ROAM_FAIL_REASON_HOST:
+		return "HOST ABORTED";
+	case WMI_ROAM_FAIL_REASON_AUTH_SEND:
+		return "Send AUTH Failed";
+	case WMI_ROAM_FAIL_REASON_AUTH_RECV:
+		return "Received AUTH with FAILURE Status";
+	case WMI_ROAM_FAIL_REASON_NO_AUTH_RESP:
+		return "No Auth response from AP";
+	case WMI_ROAM_FAIL_REASON_REASSOC_SEND:
+		return "Send Re-assoc request failed";
+	case WMI_ROAM_FAIL_REASON_REASSOC_RECV:
+		return "Received Re-Assoc resp with Failure status";
+	case WMI_ROAM_FAIL_REASON_NO_REASSOC_RESP:
+		return "No Re-assoc response from AP";
+	case WMI_ROAM_FAIL_REASON_EAPOL_TIMEOUT:
+		return "EAPOL timed out";
+	case WMI_ROAM_FAIL_REASON_MLME:
+		return "MLME error";
+	case WMI_ROAM_FAIL_REASON_INTERNAL_ABORT:
+		return "Target aborted roam";
+	default:
+		return "NONE";
+	}
+}
+
+char *mlme_get_sub_reason_str(uint32_t sub_reason)
+{
+	switch (sub_reason) {
+	case WMI_ROAM_TRIGGER_SUB_REASON_PERIODIC_TIMER:
+		return "PERIODIC TIMER";
+	case WMI_ROAM_TRIGGER_SUB_REASON_INACTIVITY_TIMER:
+		return "INACTIVITY TIMER";
+	case WMI_ROAM_TRIGGER_SUB_REASON_BTM_DI_TIMER:
+		return "BTM DISASSOC TIMER";
+	case WMI_ROAM_TRIGGER_SUB_REASON_FULL_SCAN:
+		return "FULL SCAN";
+	default:
+		return "NONE";
+	}
+}
+
+QDF_STATUS
+wlan_mlme_get_mgmt_max_retry(struct wlan_objmgr_psoc *psoc,
+			     uint8_t *max_retry)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+
+	if (!mlme_obj) {
+		*max_retry = cfg_default(CFG_MGMT_RETRY_MAX);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	*max_retry = mlme_obj->cfg.gen.mgmt_retry_max;
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_mlme_get_status_ring_buffer(struct wlan_objmgr_psoc *psoc,
+				 bool *enable_ring_buffer)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+
+	if (!mlme_obj) {
+		*enable_ring_buffer = cfg_default(CFG_ENABLE_RING_BUFFER);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	*enable_ring_buffer = mlme_obj->cfg.gen.enable_ring_buffer;
 	return QDF_STATUS_SUCCESS;
 }

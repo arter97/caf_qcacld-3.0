@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1595,7 +1595,6 @@ typedef struct sSmeIbssPeerInd {
 
 struct ibss_peer_inactivity_ind {
 	uint8_t bss_idx;
-	uint8_t staIdx;
 	struct qdf_mac_addr peer_addr;
 };
 
@@ -2760,7 +2759,7 @@ typedef struct sSirChanChangeRequest {
 
 typedef struct sSirChanChangeResponse {
 	uint8_t sessionId;
-	uint8_t new_op_freq;
+	uint32_t new_op_freq;
 	uint8_t channelChangeStatus;
 } tSirChanChangeResponse, *tpSirChanChangeResponse;
 
@@ -4503,6 +4502,7 @@ struct adaptive_dwelltime_params {
  */
 struct csa_offload_params {
 	uint8_t channel;
+	uint32_t csa_chan_freq;
 	uint8_t switch_mode;
 	uint8_t sec_chan_offset;
 	uint8_t new_ch_width;
@@ -5532,6 +5532,7 @@ struct sme_rcpi_req {
  * @EAPOL_IN_PROGRESS: STA/P2P-CLI is in middle of EAPOL/WPS exchange
  * @SAP_EAPOL_IN_PROGRESS: SAP/P2P-GO is in middle of EAPOL/WPS exchange
  * @SAP_CONNECTION_IN_PROGRESS: SAP/P2P-GO is in middle of connection.
+ * @NAN_ENABLE_DISABLE_IN_PROGRESS: NAN is in middle of enable/disable discovery
  */
 enum scan_reject_states {
 	SCAN_REJECT_DEFAULT = 0,
@@ -5540,6 +5541,7 @@ enum scan_reject_states {
 	EAPOL_IN_PROGRESS,
 	SAP_EAPOL_IN_PROGRESS,
 	SAP_CONNECTION_IN_PROGRESS,
+	NAN_ENABLE_DISABLE_IN_PROGRESS,
 };
 
 /**

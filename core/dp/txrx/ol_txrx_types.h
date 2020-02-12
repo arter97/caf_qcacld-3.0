@@ -648,8 +648,6 @@ struct ol_txrx_pdev_t {
 	/* ctrl_pdev - handle for querying config info */
 	struct cdp_cfg *ctrl_pdev;
 
-	struct cdp_ctrl_objmgr_pdev *control_pdev;
-
 	/* osdev - handle for mem alloc / free, map / unmap */
 	qdf_device_t osdev;
 
@@ -1109,6 +1107,7 @@ struct ol_txrx_pdev_t {
 
 	/* Current noise-floor reading for the pdev channel */
 	int16_t chan_noise_floor;
+	uint32_t total_bundle_queue_length;
 };
 
 #define OL_TX_HL_DEL_ACK_HASH_SIZE    256
@@ -1348,6 +1347,20 @@ struct ol_txrx_vdev_t {
 	uint64_t fwd_rx_packets;
 	bool is_wisa_mode_enable;
 	uint8_t mac_id;
+
+	uint64_t no_of_bundle_sent_after_threshold;
+	uint64_t no_of_bundle_sent_in_timer;
+	uint64_t no_of_pkt_not_added_in_queue;
+	bool bundling_required;
+	struct {
+		struct {
+			qdf_nbuf_t head;
+			qdf_nbuf_t tail;
+			int depth;
+		} txq;
+		qdf_spinlock_t mutex;
+		qdf_timer_t timer;
+	} bundle_queue;
 };
 
 struct ol_rx_reorder_array_elem_t {

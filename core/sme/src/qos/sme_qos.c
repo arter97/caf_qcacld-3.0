@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3359,7 +3359,7 @@ static void sme_qos_fill_aggr_info(int ac_id, int ts_id,
 				   tSirAggrQosReq *msg,
 				   struct sme_qos_sessioninfo *session)
 {
-	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_WARN,
+	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
 		  FL("Found tspec entry AC=%d, flow=%d, direction = %d"),
 		  ac_id, ts_id, direction);
 
@@ -3451,7 +3451,7 @@ static QDF_STATUS sme_qos_ft_aggr_qos_req(struct mac_context *mac_ctx, uint8_t
 		}
 	}
 
-	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_INFO,
+	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
 		  FL("Sending aggregated message to HAL 0x%x"),
 		  aggr_req->aggrInfo.tspecIdx);
 
@@ -4719,6 +4719,54 @@ static QDF_STATUS sme_qos_process_reassoc_failure_ev(struct mac_context *mac,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+#ifdef FEATURE_WLAN_ESE
+static bool sme_qos_ft_handoff_required(struct mac_context *mac,
+					uint8_t session_id)
+{
+	struct csr_roam_session *csr_roam_session;
+
+	if (csr_roam_is11r_assoc(mac, session_id))
+		return true;
+
+	csr_roam_session = CSR_GET_SESSION(mac, session_id);
+
+	if (csr_roam_session->roam_synch_in_progress &&
+	    csr_roam_is_ese_assoc(mac, session_id) &&
+	    csr_roam_session->connectedInfo.nTspecIeLength)
+		return true;
+
+	return false;
+}
+#else
+static inline bool sme_qos_ft_handoff_required(struct mac_context *mac,
+					       uint8_t session_id)
+{
+	return csr_roam_is11r_assoc(mac, session_id) ? true : false;
+}
+#endif
+#else
+static inline bool sme_qos_ft_handoff_required(struct mac_context *mac,
+					       uint8_t session_id)
+{
+	return false;
+}
+#endif
+
+#ifdef FEATURE_WLAN_ESE
+static inline bool sme_qos_legacy_handoff_required(struct mac_context *mac,
+						   uint8_t session_id)
+{
+	return csr_roam_is_ese_assoc(mac, session_id) ? false : true;
+}
+#else
+static inline bool sme_qos_legacy_handoff_required(struct mac_context *mac,
+						   uint8_t session_id)
+{
+	return true;
+}
+#endif
+
 /*
  * sme_qos_process_handoff_assoc_req_ev() - Function to process the
  *  SME_QOS_CSR_HANDOFF_ASSOC_REQ event indication from CSR
@@ -4767,16 +4815,13 @@ static QDF_STATUS sme_qos_process_handoff_assoc_req_ev(struct mac_context *mac,
 			break;
 		}
 	}
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
-	if (csr_roam_is11r_assoc(mac, sessionId))
+
+	if (sme_qos_ft_handoff_required(mac, sessionId))
 		pSession->ftHandoffInProgress = true;
-#endif
+
 	/* If FT handoff/ESE in progress, legacy handoff need not be enabled */
-	if (!pSession->ftHandoffInProgress
-#ifdef FEATURE_WLAN_ESE
-	    && !csr_roam_is_ese_assoc(mac, sessionId)
-#endif
-	   )
+	if (!pSession->ftHandoffInProgress &&
+	    sme_qos_legacy_handoff_required(mac, sessionId))
 		pSession->handoffRequested = true;
 
 	/* this session no longer needs UAPSD */
@@ -7233,7 +7278,7 @@ static bool sme_qos_validate_requested_params(struct mac_context *mac,
 	return true;
 }
 
-static QDF_STATUS qos_issue_command(struct mac_context *mac, uint8_t sessionId,
+static QDF_STATUS qos_issue_command(struct mac_context *mac, uint8_t vdev_id,
 				    eSmeCommandType cmdType,
 				    struct sme_qos_wmmtspecinfo *pQoSInfo,
 				    enum qca_wlan_ac_type ac, uint8_t tspec_mask)
@@ -7250,7 +7295,7 @@ static QDF_STATUS qos_issue_command(struct mac_context *mac, uint8_t sessionId,
 			break;
 		}
 		pCommand->command = cmdType;
-		pCommand->sessionId = sessionId;
+		pCommand->vdev_id = vdev_id;
 		switch (cmdType) {
 		case eSmeCommandAddTs:
 			if (pQoSInfo) {
@@ -7296,7 +7341,7 @@ bool qos_process_command(struct mac_context *mac, tSmeCmd *pCommand)
 		case eSmeCommandAddTs:
 			status =
 				sme_qos_add_ts_req(mac, (uint8_t)
-						pCommand->sessionId,
+						pCommand->vdev_id,
 						  &pCommand->u.qosCmd.tspecInfo,
 						   pCommand->u.qosCmd.ac);
 			if (QDF_IS_STATUS_SUCCESS(status))
@@ -7305,7 +7350,7 @@ bool qos_process_command(struct mac_context *mac, tSmeCmd *pCommand)
 		case eSmeCommandDelTs:
 			status =
 				sme_qos_del_ts_req(mac, (uint8_t)
-						pCommand->sessionId,
+						pCommand->vdev_id,
 						   pCommand->u.qosCmd.ac,
 						 pCommand->u.qosCmd.tspec_mask);
 			if (QDF_IS_STATUS_SUCCESS(status))

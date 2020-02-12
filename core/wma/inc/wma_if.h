@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -243,6 +243,7 @@ typedef struct {
 	bool he_capable;
 	tDot11fIEhe_cap he_config;
 	tDot11fIEhe_op he_op;
+	tDot11fIEhe_6ghz_band_cap he_6ghz_band_caps;
 #endif
 	uint8_t stbc_capable;
 #ifdef WLAN_SUPPORT_TWT
@@ -254,7 +255,6 @@ typedef struct {
 
 /**
  * struct tDeleteStaParams - parameters required for del sta request
- * @staIdx: station index
  * @assocId: association index
  * @status: status
  * @respReqd: is response required
@@ -264,7 +264,6 @@ typedef struct {
  * @staMac: station mac
  */
 typedef struct {
-	uint16_t staIdx;
 	uint16_t assocId;
 	QDF_STATUS status;
 	uint8_t respReqd;

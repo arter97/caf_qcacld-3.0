@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -807,6 +807,17 @@ ucfg_mlme_set_dfs_filter_offload(struct wlan_objmgr_psoc *psoc,
 				 bool dfs_filter_offload);
 
 /**
+ * ucfg_mlme_get_oem_6g_supported() - Get oem 6Ghz supported
+ * @psoc: pointer to psoc object
+ * @oem_6g_supported: Pointer to the value which will be filled for the caller
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+ucfg_mlme_get_oem_6g_supported(struct wlan_objmgr_psoc *psoc,
+			       bool *oem_6g_supported);
+
+/**
  * ucfg_mlme_get_fine_time_meas_cap() - Get fine timing measurement capability
  * @psoc: pointer to psoc object
  * @fine_time_meas_cap: Pointer to the value which will be filled for the caller
@@ -980,17 +991,6 @@ ucfg_mlme_get_dot11p_mode(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS
 ucfg_mlme_get_go_cts2self_for_sta(struct wlan_objmgr_psoc *psoc,
-				  bool *val);
-
-/**
- * ucfg_mlme_get_force_rsne_override() - Force rsnie override from user
- * @psoc: pointer to psoc object
- * @val:  Pointer to the value which will be filled for the caller
- *
- * Return: QDF Status
- */
-QDF_STATUS
-ucfg_mlme_get_force_rsne_override(struct wlan_objmgr_psoc *psoc,
 				  bool *val);
 
 /**
@@ -1435,6 +1435,23 @@ ucfg_mlme_get_sap_bcast_deauth_enabled(struct wlan_objmgr_psoc *psoc,
 				       bool *value)
 {
 	return wlan_mlme_get_sap_bcast_deauth_enabled(psoc, value);
+}
+
+/**
+ * ucfg_mlme_is_6g_sap_fd_enabled() - get the sap fils discovery
+ *                                           enabled value
+ * @psoc: pointer to psoc object
+ * @value: Value that needs to be get from the caller
+ *
+ * Inline UCFG API to be used by HDD/OSIF callers
+ *
+ * Return: QDF Status
+ */
+static inline QDF_STATUS
+ucfg_mlme_is_6g_sap_fd_enabled(struct wlan_objmgr_psoc *psoc,
+			       bool *value)
+{
+	return wlan_mlme_is_6g_sap_fd_enabled(psoc, value);
 }
 
 /**
@@ -3832,6 +3849,24 @@ ucfg_mlme_set_obss_detection_offload_enabled(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 ucfg_mlme_set_obss_color_collision_offload_enabled(
 		struct wlan_objmgr_psoc *psoc, uint8_t value);
+
+/**
+ * ucfg_mlme_set_restricted_80p80_bw_supp() - Set the restricted 80p80 support
+ * @psoc: pointer to psoc object
+ * @restricted_80p80_supp: Value to be set from the caller
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS ucfg_mlme_set_restricted_80p80_bw_supp(struct wlan_objmgr_psoc *psoc,
+						  bool restricted_80p80_supp);
+
+/**
+ * ucfg_mlme_get_restricted_80p80_bw_supp() - Get the restricted 80p80 support
+ * @psoc: pointer to psoc object
+ *
+ * Return: true or false
+ */
+bool ucfg_mlme_get_restricted_80p80_bw_supp(struct wlan_objmgr_psoc *psoc);
 
 /**
  * ucfg_mlme_get_channel_bonding_24ghz() - get channel bonding mode of 24ghz

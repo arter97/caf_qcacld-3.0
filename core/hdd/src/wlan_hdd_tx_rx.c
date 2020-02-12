@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -48,6 +48,7 @@
 #include <cdp_txrx_cmn.h>
 #include <cdp_txrx_peer_ops.h>
 #include <cdp_txrx_flow_ctrl_v2.h>
+#include <cdp_txrx_mon.h>
 #include "wlan_hdd_nan_datapath.h"
 #include "pld_common.h"
 #include <cdp_txrx_misc.h>
@@ -565,13 +566,11 @@ static inline bool hdd_is_tx_allowed(struct sk_buff *skb, uint8_t *peer_mac)
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	void *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 	void *peer;
-	/* Will be removed in Phase 3 cleanup */
-	uint8_t peer_id;
 
 	QDF_BUG(soc);
 	QDF_BUG(pdev);
 
-	peer = cdp_peer_find_by_addr(soc, pdev, peer_mac, &peer_id);
+	peer = cdp_peer_find_by_addr(soc, pdev, peer_mac);
 
 	if (!peer) {
 		hdd_err_rl("Unable to find peer entry for sta: "
@@ -941,6 +940,7 @@ static void __hdd_hard_start_xmit(struct sk_buff *skb,
 	bool is_arp = false;
 	struct wlan_objmgr_vdev *vdev;
 	struct hdd_context *hdd_ctx;
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 
 #ifdef QCA_WIFI_FTM
 	if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE) {
@@ -1141,8 +1141,7 @@ static void __hdd_hard_start_xmit(struct sk_buff *skb,
 		goto drop_pkt_and_release_skb;
 	}
 
-	if (adapter->tx_fn(adapter->txrx_vdev,
-		 (qdf_nbuf_t)skb) != NULL) {
+	if (adapter->tx_fn(soc, adapter->vdev_id, (qdf_nbuf_t)skb)) {
 		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_INFO_HIGH,
 			  "%s: Failed to send packet to txrx for sta_id: "
 			  QDF_MAC_ADDR_STR,
@@ -1351,7 +1350,6 @@ QDF_STATUS hdd_deinit_tx_rx(struct hdd_adapter *adapter)
 	if (!adapter)
 		return QDF_STATUS_E_FAILURE;
 
-	adapter->txrx_vdev = NULL;
 	adapter->tx_fn = NULL;
 
 	return QDF_STATUS_SUCCESS;
@@ -2713,6 +2711,37 @@ void hdd_print_netdev_txq_status(struct net_device *dev)
 	}
 }
 
+#ifdef WLAN_FEATURE_PKT_CAPTURE
+/**
+ * hdd_set_pktcapture_cb() - Set pkt capture mode callback
+ * @dev: Pointer to net_device structure
+ * @pdev_id: pdev id
+ *
+ * Return: 0 on success; non-zero for failure
+ */
+int hdd_set_pktcapture_cb(struct net_device *dev, uint8_t pdev_id)
+{
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+
+	return cdp_register_pktcapture_cb(soc, pdev_id, adapter,
+					  hdd_mon_rx_packet_cbk);
+}
+
+/**
+ * hdd_reset_pktcapture_cb() - Reset pkt capture mode callback
+ * @pdev_id: pdev id
+ *
+ * Return: None
+ */
+void hdd_reset_pktcapture_cb(uint8_t pdev_id)
+{
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+
+	cdp_deregister_pktcapture_cb(soc, pdev_id);
+}
+#endif /* WLAN_FEATURE_PKT_CAPTURE */
+
 #ifdef FEATURE_MONITOR_MODE_SUPPORT
 /**
  * hdd_set_mon_rx_cb() - Set Monitor mode Rx callback
@@ -2735,11 +2764,9 @@ int hdd_set_mon_rx_cb(struct net_device *dev)
 	qdf_mem_zero(&txrx_ops, sizeof(txrx_ops));
 	txrx_ops.rx.rx = hdd_mon_rx_packet_cbk;
 	hdd_monitor_set_rx_monitor_cb(&txrx_ops, hdd_rx_monitor_callback);
-	cdp_vdev_register(soc,
-		(struct cdp_vdev *)cdp_get_mon_vdev_from_pdev(soc,
-		(struct cdp_pdev *)pdev),
-		adapter, (struct cdp_ctrl_objmgr_vdev *)adapter->vdev,
-		&txrx_ops);
+	cdp_vdev_register(soc, adapter->vdev_id,
+			  (ol_osif_vdev_handle)adapter,
+			  &txrx_ops);
 	/* peer is created wma_vdev_attach->wma_create_peer */
 	qdf_status = cdp_peer_register(soc,
 			(struct cdp_pdev *)pdev, &sta_desc);
@@ -3148,6 +3175,51 @@ static void hdd_ini_tcp_del_ack_settings(struct hdd_config *config,
 }
 #endif
 
+#ifdef WLAN_SUPPORT_TXRX_HL_BUNDLE
+static void hdd_dp_hl_bundle_cfg_update(struct hdd_config *config,
+					struct wlan_objmgr_psoc *psoc)
+{
+	config->pkt_bundle_threshold_high =
+		cfg_get(psoc, CFG_DP_HL_BUNDLE_HIGH_TH);
+	config->pkt_bundle_threshold_low =
+		cfg_get(psoc, CFG_DP_HL_BUNDLE_LOW_TH);
+	config->pkt_bundle_timer_value =
+		cfg_get(psoc, CFG_DP_HL_BUNDLE_TIMER_VALUE);
+	config->pkt_bundle_size =
+		cfg_get(psoc, CFG_DP_HL_BUNDLE_SIZE);
+}
+#else
+static void hdd_dp_hl_bundle_cfg_update(struct hdd_config *config,
+					struct wlan_objmgr_psoc *psoc)
+{
+}
+#endif
+
+#ifdef WLAN_FEATURE_PKT_CAPTURE
+/**
+ * hdd_set_pktcapture_mode_value() - set pktcapture_mode values
+ * @hdd_ctx: hdd context
+ * @psoc: pointer to psoc obj
+ *
+ * Return: none
+ */
+static inline void
+hdd_dp_pktcapture_mode_cfg_update(struct hdd_context *hdd_ctx,
+				  struct wlan_objmgr_psoc *psoc)
+{
+	hdd_ctx->enable_pkt_capture_support = cfg_get(
+					psoc, CFG_DP_PKT_CAPTURE_MODE_ENABLE);
+	hdd_ctx->val_pkt_capture_mode = cfg_get(
+					psoc, CFG_DP_PKT_CAPTURE_MODE_VALUE);
+}
+#else
+static inline void
+hdd_dp_pktcapture_mode_cfg_update(struct hdd_context *hdd_ctx,
+				  struct wlan_objmgr_psoc *psoc)
+{
+}
+#endif /* WLAN_FEATURE_PKT_CAPTURE */
+
 void hdd_dp_cfg_update(struct wlan_objmgr_psoc *psoc,
 		       struct hdd_context *hdd_ctx)
 {
@@ -3161,8 +3233,12 @@ void hdd_dp_cfg_update(struct wlan_objmgr_psoc *psoc,
 
 	hdd_ini_tcp_del_ack_settings(config, psoc);
 
+	hdd_dp_hl_bundle_cfg_update(config, psoc);
+
 	config->napi_cpu_affinity_mask =
 		cfg_get(psoc, CFG_DP_NAPI_CE_CPU_MASK);
+	config->rx_thread_ul_affinity_mask =
+		cfg_get(psoc, CFG_DP_RX_THREAD_UL_CPU_MASK);
 	config->rx_thread_affinity_mask =
 		cfg_get(psoc, CFG_DP_RX_THREAD_CPU_MASK);
 	qdf_uint8_array_parse(cfg_get(psoc, CFG_DP_RPS_RX_QUEUE_CPU_MAP_LIST),
@@ -3179,6 +3255,7 @@ void hdd_dp_cfg_update(struct wlan_objmgr_psoc *psoc,
 	config->cfg_wmi_credit_cnt = cfg_get(psoc, CFG_DP_HTC_WMI_CREDIT_CNT);
 	hdd_dp_dp_trace_cfg_update(config, psoc);
 	hdd_dp_nud_tracking_cfg_update(config, psoc);
+	hdd_dp_pktcapture_mode_cfg_update(hdd_ctx, psoc);
 }
 
 bool wlan_hdd_rx_rpm_mark_last_busy(struct hdd_context *hdd_ctx,
@@ -3196,7 +3273,7 @@ bool wlan_hdd_rx_rpm_mark_last_busy(struct hdd_context *hdd_ctx,
 				      current_us + 1);
 	rpm_delay_ms = ucfg_pmo_get_runtime_pm_delay(hdd_ctx->psoc);
 
-	if ((duration_us / 1000) < rpm_delay_ms)
+	if (duration_us < (rpm_delay_ms * 1000))
 		return true;
 	else
 		return false;

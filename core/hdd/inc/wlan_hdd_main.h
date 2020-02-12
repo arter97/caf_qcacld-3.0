@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -47,9 +47,6 @@
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>
 #include <net/cfg80211.h>
-#ifdef CLD_PM_QOS
-#include <linux/pm_qos.h>
-#endif
 #include <linux/ieee80211.h>
 #include <qdf_delayed_work.h>
 #include <qdf_list.h>
@@ -110,6 +107,11 @@
 
 #ifdef WLAN_FEATURE_DP_BUS_BANDWIDTH
 #include "qdf_periodic_work.h"
+#endif
+
+#if defined(CLD_PM_QOS) && \
+	(LINUX_VERSION_CODE <= KERNEL_VERSION(4, 19, 0))
+#include <linux/pm_qos.h>
 #endif
 
 #include "wlan_hdd_sta_info.h"
@@ -729,7 +731,6 @@ struct hdd_station_ctx {
 	struct qdf_mac_addr requested_bssid;
 	struct hdd_connection_info conn_info;
 	struct hdd_connection_info cache_conn_info;
-	struct hdd_roaming_info roam_info;
 	int ft_carrier_on;
 	int ibss_sta_generation;
 	bool ibss_enc_key_installed;
@@ -737,7 +738,6 @@ struct hdd_station_ctx {
 	tSirPeerInfoRspParams ibss_peer_info;
 	bool hdd_reassoc_scenario;
 	int sta_debug_state;
-	uint8_t broadcast_sta_id;
 	struct hdd_mon_set_ch_info ch_info;
 	bool ap_supports_immediate_power_save;
 };
@@ -1056,8 +1056,6 @@ struct hdd_adapter {
 	qdf_spinlock_t vdev_lock;
 	uint8_t vdev_id;
 
-	struct cdp_vdev *txrx_vdev;
-
 	/** Handle to the network device */
 	struct net_device *dev;
 
@@ -1101,8 +1099,17 @@ struct hdd_adapter {
 	/* estimated link speed */
 	uint32_t estimated_linkspeed;
 
-	/* QDF event for session close */
-	qdf_event_t qdf_session_close_event;
+	/**
+	 * vdev_destroy_event is moved from the qdf_event to linux event
+	 * consciously, Lets take example when sap interface is waiting on the
+	 * session_close event and then there is a SSR the wait event is
+	 * completed the interface down is returned and the next command to the
+	 * driver will  hdd_hostapd_uinit-->vhdd_deinit_ap_mode-->
+	 * hdd_hostapd_deinit_sap_session where in the sap_ctx would be freed.
+	 * During the SSR if the same sap context is used it would result
+	 * in null pointer de-reference.
+	 */
+	struct completion vdev_destroy_event;
 
 	/* QDF event for session open */
 	qdf_event_t qdf_session_open_event;
@@ -1213,6 +1220,7 @@ struct hdd_adapter {
 #ifdef WLAN_FEATURE_DP_BUS_BANDWIDTH
 	unsigned long prev_rx_packets;
 	unsigned long prev_tx_packets;
+	unsigned long prev_tx_bytes;
 	uint64_t prev_fwd_tx_packets;
 	uint64_t prev_fwd_rx_packets;
 #endif /*WLAN_FEATURE_DP_BUS_BANDWIDTH*/
@@ -1230,7 +1238,7 @@ struct hdd_adapter {
 	bool offloads_configured;
 
 	/* DSCP to UP QoS Mapping */
-	enum sme_qos_wmmuptype dscp_to_up_map[WLAN_HDD_MAX_DSCP + 1];
+	enum sme_qos_wmmuptype dscp_to_up_map[WLAN_MAX_DSCP + 1];
 
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS
 	bool is_link_layer_stats_set;
@@ -1597,15 +1605,25 @@ struct hdd_context {
 	struct ieee80211_channel *channels_2ghz;
 	struct ieee80211_channel *channels_5ghz;
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
+#if (defined(CONFIG_BAND_6GHZ) && defined(CFG80211_6GHZ_BAND_SUPPORTED)) || \
+		(LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
 	struct ieee80211_sband_iftype_data *iftype_data_2g;
 	struct ieee80211_sband_iftype_data *iftype_data_5g;
 #endif
 
+#if defined(CONFIG_BAND_6GHZ) && (defined(CFG80211_6GHZ_BAND_SUPPORTED) || \
+		(KERNEL_VERSION(5, 4, 0) <= LINUX_VERSION_CODE))
+
+	struct ieee80211_sband_iftype_data *iftype_data_6g;
+#endif
 	/* Completion  variable to indicate Mc Thread Suspended */
 	struct completion mc_sus_event_var;
 
 	bool is_scheduler_suspended;
+
+#ifdef WLAN_FEATURE_PKT_CAPTURE
+	bool is_ol_mon_thread_suspended;
+#endif
 
 #ifdef QCA_CONFIG_SMP
 	bool is_ol_rx_thread_suspended;
@@ -1724,6 +1742,11 @@ struct hdd_context {
 	/* IPv4 notifier callback for handling ARP offload on change in IP */
 	struct notifier_block ipv4_notifier;
 
+#ifdef FEATURE_RUNTIME_PM
+	struct notifier_block pm_qos_notifier;
+	bool runtime_pm_prevented;
+	qdf_spinlock_t pm_qos_lock;
+#endif
 	/* number of rf chains supported by target */
 	uint32_t  num_rf_chains;
 	/* Is htTxSTBC supported by target */
@@ -1863,8 +1886,15 @@ struct hdd_context {
 
 	qdf_time_t runtime_resume_start_time_stamp;
 	qdf_time_t runtime_suspend_done_time_stamp;
-#ifdef CLD_PM_QOS
+#if defined(CLD_PM_QOS) && \
+	(LINUX_VERSION_CODE <= KERNEL_VERSION(4, 19, 0))
 	struct pm_qos_request pm_qos_req;
+#endif
+#ifdef WLAN_FEATURE_PKT_CAPTURE
+	/* enable packet capture support */
+	bool enable_pkt_capture_support;
+	/* value for packet capturte mode */
+	uint8_t val_pkt_capture_mode;
 #endif
 };
 
@@ -1951,7 +1981,7 @@ struct hdd_channel_info {
  * Return: 0 for success, non-zero for failure
  */
 int hdd_validate_channel_and_bandwidth(struct hdd_adapter *adapter,
-				       uint32_t chan_freq,
+				       qdf_freq_t chan_freq,
 				       enum phy_ch_width chan_bw);
 
 /**
@@ -3780,16 +3810,16 @@ void hdd_set_disconnect_status(struct hdd_adapter *adapter, bool disconnecting);
 /**
  * wlan_hdd_set_mon_chan() - Set capture channel on the monitor mode interface.
  * @adapter: Handle to adapter
- * @chan: Monitor mode channel
+ * @freq: Monitor mode frequency (MHz)
  * @bandwidth: Capture channel bandwidth
  *
  * Return: 0 on success else error code.
  */
-int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter, uint32_t chan,
+int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter, qdf_freq_t freq,
 			  uint32_t bandwidth);
 #else
 static inline
-int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter, uint32_t chan,
+int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter, qdf_freq_t freq,
 			  uint32_t bandwidth)
 {
 	return 0;
@@ -4071,4 +4101,82 @@ QDF_STATUS hdd_common_roam_callback(struct wlan_objmgr_psoc *psoc,
 				    uint32_t roam_id,
 				    eRoamCmdStatus roam_status,
 				    eCsrRoamResult roam_result);
+
+#ifdef WLAN_FEATURE_PKT_CAPTURE
+
+/**
+ * wlan_hdd_is_session_type_monitor() - check if session type is MONITOR
+ * @session_type: session type
+ *
+ * Return: True - if session type for adapter is monitor, else False
+ *
+ */
+bool wlan_hdd_is_session_type_monitor(uint8_t session_type);
+
+/**
+ * wlan_hdd_check_mon_concurrency() - check if MONITOR and STA concurrency
+ * is UP when packet capture mode is enabled.
+ *
+ * Return: True - if STA and monitor concurrency is there, else False
+ *
+ */
+bool wlan_hdd_check_mon_concurrency(void);
+
+/**
+ * wlan_hdd_add_monitor_check() - check for monitor intf and add if needed
+ * @hdd_ctx: pointer to hdd context
+ * @adapter: output pointer to hold created monitor adapter
+ * @type: type of the interface
+ * @name: name of the interface
+ * @rtnl_held: True if RTNL lock is held
+ * @name_assign_type: the name of assign type of the netdev
+ *
+ * Return: 0 - on success
+ *         err code - on failure
+ */
+int wlan_hdd_add_monitor_check(struct hdd_context *hdd_ctx,
+			       struct hdd_adapter **adapter,
+			       enum nl80211_iftype type, const char *name,
+			       bool rtnl_held, unsigned char name_assign_type);
+
+/**
+ * wlan_hdd_del_monitor() - delete monitor interface
+ * @hdd_ctx: pointer to hdd context
+ * @adapter: adapter to be deleted
+ * @rtnl_held: rtnl lock held
+ *
+ * This function is invoked to delete monitor interface.
+ *
+ * Return: None
+ */
+void wlan_hdd_del_monitor(struct hdd_context *hdd_ctx,
+			  struct hdd_adapter *adapter, bool rtnl_held);
+#else
+static inline
+bool wlan_hdd_is_session_type_monitor(uint8_t session_type)
+{
+	return false;
+}
+
+static inline
+bool wlan_hdd_check_mon_concurrency(void)
+{
+	return false;
+}
+
+static inline
+int wlan_hdd_add_monitor_check(struct hdd_context *hdd_ctx,
+			       struct hdd_adapter **adapter,
+			       enum nl80211_iftype type, const char *name,
+			       bool rtnl_held, unsigned char name_assign_type)
+{
+	return 0;
+}
+
+static inline
+void wlan_hdd_del_monitor(struct hdd_context *hdd_ctx,
+			  struct hdd_adapter *adapter, bool rtnl_held)
+{
+}
+#endif /* WLAN_FEATURE_PKT_CAPTURE */
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

@@ -148,7 +148,6 @@ endif
 CONFIG_WLAN_DISABLE_EXPORT_SYMBOL := y
 
 CONFIG_QCACLD_FEATURE_GREEN_AP := y
-CONFIG_CRYPTO_COMPONENT := y
 #Flag to enable Android Packet Filtering
 CONFIG_QCACLD_FEATURE_APF := y
 
@@ -198,9 +197,14 @@ ifeq ($(CONFIG_ARCH_LITO), y)
 CONFIG_QCACLD_FEATURE_METERING := y
 endif
 
+ifeq ($(CONFIG_ARCH_BENGAL), y)
+CONFIG_QCACLD_FEATURE_METERING := y
+endif
+
 ifeq ($(CONFIG_ARCH_KONA), y)
 CONFIG_QCACLD_FEATURE_METERING := y
 CONFIG_WDI3_STATS_UPDATE := y
+CONFIG_WLAN_SYNC_TSF_TIMER := y
 endif
 
 #Flag to enable Fast Transition (11r) feature
@@ -275,15 +279,15 @@ CONFIG_WLAN_FEATURE_DSRC := y
 endif
 
 ifneq ($(CONFIG_ROME_IF),usb)
+	#Flag to enable SAE
+	CONFIG_WLAN_FEATURE_SAE := y
+
 ifneq ($(CONFIG_ROME_IF),sdio)
 	#Flag to enable DISA
 	CONFIG_WLAN_FEATURE_DISA := y
 
 	#Flag to enable FIPS
 	CONFIG_WLAN_FEATURE_FIPS := y
-
-	#Flag to enable SAE
-	CONFIG_WLAN_FEATURE_SAE := y
 
 	#Flag to enable Fast Path feature
 	ifneq ($(CONFIG_LITHIUM), y)
@@ -465,8 +469,14 @@ ifeq ($(CONFIG_DEBUG_FS), y)
        CONFIG_WLAN_DEBUGFS := y
 
        CONFIG_WLAN_POWER_DEBUGFS := y
+endif
 
+ifeq ($(CONFIG_WLAN_DEBUGFS), y)
        CONFIG_WLAN_MWS_INFO_DEBUGFS := y
+       CONFIG_WLAN_FEATURE_MIB_STATS := y
+else
+       CONFIG_WLAN_MWS_INFO_DEBUGFS := n
+       CONFIG_WLAN_FEATURE_MIB_STATS := n
 endif
 
 # Feature flags which are not (currently) configurable via Kconfig
@@ -709,6 +719,12 @@ endif
 endif
 
 ifeq ($(CONFIG_ARCH_SM6150), y)
+ifeq ($(CONFIG_IPA_OFFLOAD), y)
+CONFIG_ENABLE_SMMU_S1_TRANSLATION := y
+endif
+endif
+
+ifeq ($(CONFIG_ARCH_BENGAL), y)
 ifeq ($(CONFIG_IPA_OFFLOAD), y)
 CONFIG_ENABLE_SMMU_S1_TRANSLATION := y
 endif

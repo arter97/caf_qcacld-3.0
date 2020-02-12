@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -94,7 +94,6 @@ uint8_t *mlme_get_dynamic_oce_flags(struct wlan_objmgr_vdev *vdev)
 	return &mlme_priv->sta_dynamic_oce_value;
 }
 
-#ifdef CRYPTO_SET_KEY_CONVERGED
 QDF_STATUS mlme_get_peer_mic_len(struct wlan_objmgr_psoc *psoc, uint8_t pdev_id,
 				 uint8_t *peer_mac, uint8_t *mic_len,
 				 uint8_t *mic_hdr_len)
@@ -132,43 +131,6 @@ QDF_STATUS mlme_get_peer_mic_len(struct wlan_objmgr_psoc *psoc, uint8_t pdev_id,
 
 	return QDF_STATUS_SUCCESS;
 }
-
-#else
-
-QDF_STATUS mlme_get_peer_mic_len(struct wlan_objmgr_psoc *psoc, uint8_t pdev_id,
-				 uint8_t *peer_mac, uint8_t *mic_len,
-				 uint8_t *mic_hdr_len)
-{
-	struct wlan_objmgr_peer *peer;
-	uint32_t key_cipher;
-
-	if (!psoc || !mic_len || !mic_hdr_len || !peer_mac) {
-		mlme_legacy_debug("psoc/mic_len/mic_hdr_len/peer_mac null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	peer = wlan_objmgr_get_peer(psoc, pdev_id,
-				    peer_mac, WLAN_LEGACY_MAC_ID);
-	if (!peer) {
-		mlme_legacy_debug("Peer of peer_mac %pM not found", peer_mac);
-		return QDF_STATUS_E_INVAL;
-	}
-	key_cipher = wlan_peer_get_unicast_cipher(peer);
-	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
-
-	if (key_cipher == WMI_CIPHER_AES_GCM) {
-		*mic_hdr_len = WLAN_IEEE80211_GCMP_HEADERLEN;
-		*mic_len = WLAN_IEEE80211_GCMP_MICLEN;
-	} else {
-		*mic_hdr_len = IEEE80211_CCMP_HEADERLEN;
-		*mic_len = IEEE80211_CCMP_MICLEN;
-	}
-	mlme_legacy_debug("peer %pM hdr_len %d mic_len %d key_cipher %d",
-			  peer_mac, *mic_hdr_len, *mic_len, key_cipher);
-
-	return QDF_STATUS_SUCCESS;
-}
-#endif
 
 QDF_STATUS
 mlme_peer_object_created_notification(struct wlan_objmgr_peer *peer,
@@ -354,6 +316,9 @@ static void mlme_init_generic_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_REMOVE_TIME_STAMP_SYNC_CMD);
 	gen->disable_4way_hs_offload =
 		cfg_get(psoc, CFG_DISABLE_4WAY_HS_OFFLOAD);
+	gen->mgmt_retry_max = cfg_get(psoc, CFG_MGMT_RETRY_MAX);
+	gen->bmiss_skip_full_scan = cfg_get(psoc, CFG_BMISS_SKIP_FULL_SCAN);
+	gen->enable_ring_buffer = cfg_get(psoc, CFG_ENABLE_RING_BUFFER);
 }
 
 static void mlme_init_edca_ani_cfg(struct wlan_mlme_edca_params *edca_params)
@@ -1201,6 +1166,8 @@ static void mlme_init_sap_cfg(struct wlan_objmgr_psoc *psoc,
 	sap_cfg->sap_sae_enabled = is_sae_sap_enabled(psoc);
 	sap_cfg->is_sap_bcast_deauth_enabled =
 		cfg_get(psoc, CFG_IS_SAP_BCAST_DEAUTH_ENABLED);
+	sap_cfg->is_6g_sap_fd_enabled =
+		cfg_get(psoc, CFG_6G_SAP_FILS_DISCOVERY_ENABLED);
 }
 
 static void mlme_init_obss_ht40_cfg(struct wlan_objmgr_psoc *psoc,
@@ -1411,8 +1378,6 @@ static void mlme_init_sta_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_QCN_IE_SUPPORT);
 	sta->fils_max_chan_guard_time =
 		cfg_get(psoc, CFG_FILS_MAX_CHAN_GUARD_TIME);
-	sta->force_rsne_override =
-		cfg_get(psoc, CFG_FORCE_RSNE_OVERRIDE);
 	sta->single_tid =
 		cfg_get(psoc, CFG_SINGLE_TID_RC);
 	sta->sta_miracast_mcc_rest_time =
@@ -2021,6 +1986,8 @@ static void mlme_init_wifi_pos_cfg(struct wlan_objmgr_psoc *psoc,
 {
 	wifi_pos_cfg->fine_time_meas_cap =
 		cfg_get(psoc, CFG_FINE_TIME_MEAS_CAPABILITY);
+	wifi_pos_cfg->oem_6g_support_disable =
+		cfg_get(psoc, CFG_OEM_SIXG_SUPPORT_DISABLE);
 }
 
 #ifdef FEATURE_WLAN_ESE
@@ -2313,6 +2280,8 @@ static void mlme_init_reg_cfg(struct wlan_objmgr_psoc *psoc,
 	reg->enable_11d_in_world_mode = cfg_get(psoc,
 						CFG_ENABLE_11D_IN_WORLD_MODE);
 	reg->scan_11d_interval = cfg_get(psoc, CFG_SCAN_11D_INTERVAL);
+	reg->enable_pending_chan_list_req = cfg_get(psoc,
+					CFG_ENABLE_PENDING_CHAN_LIST_REQ);
 	reg->ignore_fw_reg_offload_ind = cfg_get(
 						psoc,
 						CFG_IGNORE_FW_REG_OFFLOAD_IND);

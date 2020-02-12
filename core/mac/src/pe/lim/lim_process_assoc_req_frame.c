@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -829,7 +829,6 @@ static void lim_print_ht_cap(struct mac_context *mac_ctx, struct pe_session *ses
 	}
 }
 
-#ifdef WLAN_CONV_CRYPTO_IE_SUPPORT
 static
 enum mac_status_code lim_check_rsn_ie(struct pe_session *session,
 				      struct mac_context *mac_ctx,
@@ -895,27 +894,6 @@ static enum mac_status_code lim_check_wpa_ie(struct pe_session *session,
 
 	return eSIR_MAC_INVALID_IE_STATUS;
 }
-#else
-static enum mac_status_code lim_check_rsn_ie(struct pe_session *session,
-					     struct mac_context *mac_ctx,
-					     tpSirAssocReq assoc_req,
-					     tDot11fIERSN *rsn,
-					     bool *pmf_connection)
-{
-	return lim_check_rx_rsn_ie_match(mac_ctx, rsn, session,
-					 assoc_req->HTCaps.present,
-					 pmf_connection);
-}
-
-static enum mac_status_code lim_check_wpa_ie(struct pe_session *session,
-					     struct mac_context *mac_ctx,
-					     tpSirAssocReq assoc_req,
-					     tDot11fIEWPA *wpa)
-{
-	return lim_check_rx_wpa_ie_match(mac_ctx, wpa, session,
-					 assoc_req->HTCaps.present);
-}
-#endif
 
 /**
   * lim_check_sae_pmf_cap() - check pmf capability for SAE STA
@@ -929,7 +907,7 @@ static enum mac_status_code lim_check_wpa_ie(struct pe_session *session,
   *
   * Return: mac_status_code
   */
-#ifdef WLAN_FEATURE_SAE
+#if defined(WLAN_FEATURE_SAE) && defined(WLAN_FEATURE_11W)
 static enum mac_status_code lim_check_sae_pmf_cap(struct pe_session *session,
 						  tDot11fIERSN *rsn,
 						  enum ani_akm_type akm_type)
@@ -1424,6 +1402,14 @@ static bool lim_chk_wmm(struct mac_context *mac_ctx, tpSirMacMgmtHdr hdr,
 	return true;
 }
 
+static void lim_update_sta_ds_op_classes(tpSirAssocReq assoc_req,
+					 tpDphHashNode sta_ds)
+{
+	qdf_mem_copy(&sta_ds->supp_operating_classes,
+		     &assoc_req->supp_operating_classes,
+		     sizeof(tDot11fIESuppOperatingClasses));
+}
+
 /**
  * lim_update_sta_ds() - updates ds dph entry
  * @mac_ctx: pointer to Global MAC structure
@@ -1704,7 +1690,8 @@ static bool lim_update_sta_ds(struct mac_context *mac_ctx, tpSirMacMgmtHdr hdr,
 			((sta_ds->supportedRates.vhtRxMCSMap & MCSMAPMASK2x2)
 				== MCSMAPMASK2x2) ? 1 : 2;
 	}
-
+	lim_update_stads_he_6ghz_op(session, sta_ds);
+	lim_update_sta_ds_op_classes(assoc_req, sta_ds);
 	/* Add STA context at MAC HW (BMU, RHP & TFP) */
 	sta_ds->qosMode = false;
 	sta_ds->lleEnabled = false;
@@ -1798,6 +1785,7 @@ static bool lim_update_sta_ds(struct mac_context *mac_ctx, tpSirMacMgmtHdr hdr,
 		sta_ds->timingMeasCap = 0;
 		pe_debug("ExtCap not present");
 	}
+	lim_ap_check_6g_compatible_peer(mac_ctx, session);
 	return true;
 }
 

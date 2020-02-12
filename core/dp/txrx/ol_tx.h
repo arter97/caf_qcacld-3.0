@@ -81,6 +81,31 @@ qdf_nbuf_t ol_tx_ll_queue(ol_txrx_vdev_handle vdev, qdf_nbuf_t msdu_list);
 #define OL_TX_LL ol_tx_ll_wrapper
 #endif
 
+#ifdef WLAN_SUPPORT_TXRX_HL_BUNDLE
+void ol_tx_hl_vdev_bundle_timer(void *context);
+
+void ol_tx_hl_queue_flush_all(struct ol_txrx_vdev_t *vdev);
+qdf_nbuf_t
+ol_tx_hl_pdev_queue_send_all(struct ol_txrx_pdev_t *pdev);
+#else
+static inline
+void ol_tx_hl_vdev_bundle_timer(void *context)
+{
+}
+
+static inline
+void ol_tx_hl_queue_flush_all(struct ol_txrx_vdev_t *vdev)
+{
+}
+
+static inline
+qdf_nbuf_t
+ol_tx_hl_pdev_queue_send_all(struct ol_txrx_pdev_t *pdev)
+{
+	return NULL;
+}
+#endif
+
 #ifdef QCA_LL_LEGACY_TX_FLOW_CONTROL
 void ol_tx_vdev_ll_pause_queue_send(void *context);
 void ol_tx_pdev_ll_pause_queue_send_all(struct ol_txrx_pdev_t *pdev);
@@ -183,7 +208,8 @@ void ol_txrx_mgmt_tx_complete(void *ctxt, qdf_nbuf_t netbuf, int err);
 /**
  * ol_txrx_mgmt_tx_cb_set() - Store a callback for delivery
  *	notifications for management frames.
- * @ppdev: the data physical device object
+ * @soc: Datapath soc handle
+ * @pdev_id: Physical device instance id
  * @type: the type of mgmt frame the callback is used for
  * @download_cb: the callback for notification of delivery to the target
  * @ota_ack_cb: the callback for notification of delivery to the peer
@@ -199,14 +225,15 @@ void ol_txrx_mgmt_tx_complete(void *ctxt, qdf_nbuf_t netbuf, int err);
  * This function is used by the control SW to store a callback pointer
  * for a given type of management frame.
  */
-void
-ol_txrx_mgmt_tx_cb_set(struct cdp_pdev *ppdev, uint8_t type,
+QDF_STATUS
+ol_txrx_mgmt_tx_cb_set(struct cdp_soc_t *soc, uint8_t pdev_id, uint8_t type,
 		       ol_txrx_mgmt_tx_cb download_cb,
 		       ol_txrx_mgmt_tx_cb ota_ack_cb, void *ctxt);
 
 /**
  * ol_txrx_mgmt_send_ext() - Transmit a management frame
- * @pvdev: virtual device transmitting the frame
+ * @soc: Datapath soc handle
+ * @vdev_id: virtual interface id
  * @tx_mgmt_frm: management frame to transmit
  * @type: the type of management frame (determines what callback to use)
  * @use_6mbps: specify whether management frame to transmit should
@@ -222,7 +249,7 @@ ol_txrx_mgmt_tx_cb_set(struct cdp_pdev *ppdev, uint8_t type,
  *         1 - the frame was not accepted
  */
 int
-ol_txrx_mgmt_send_ext(struct cdp_vdev *pvdev,
+ol_txrx_mgmt_send_ext(struct cdp_soc_t *soc, uint8_t vdev_id,
 		      qdf_nbuf_t tx_mgmt_frm,
 		      uint8_t type, uint8_t use_6mbps, uint16_t chanfreq);
 
