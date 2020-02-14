@@ -28,6 +28,29 @@
 #include "dp_rx_mon.h"
 #include "wlan_cfg.h"
 #include "dp_internal.h"
+#ifdef WLAN_TX_PKT_CAPTURE_ENH
+#include "dp_rx_mon_feature.h"
+
+static inline void
+dp_handle_tx_capture(struct dp_soc *soc, struct dp_pdev *pdev,
+		     qdf_nbuf_t mon_mpdu)
+{
+	struct hal_rx_ppdu_info *ppdu_info = &pdev->ppdu_info;
+
+	if (pdev->tx_capture_enabled != CDP_TX_ENH_CAPTURE_DISABLED &&
+	    ppdu_info->sw_frame_group_id == HAL_MPDU_SW_FRAME_GROUP_CTRL_NDPA)
+		dp_handle_tx_capture_from_dest(soc, pdev, mon_mpdu);
+}
+
+#else
+static inline void
+dp_handle_tx_capture(struct dp_soc *soc, struct dp_pdev *pdev,
+		     qdf_nbuf_t mon_mpdu)
+{
+}
+
+#endif
+
 
 /* The maxinum buffer length allocated for radio tap */
 #define MAX_MONITOR_HEADER (512)
@@ -963,6 +986,8 @@ QDF_STATUS dp_rx_mon_deliver(struct dp_soc *soc, uint32_t mac_id,
 		 */
 		if (pdev->ppdu_info.rx_status.chan_num == 0)
 			pdev->ppdu_info.rx_status.chan_num = pdev->mon_chan_num;
+
+		dp_handle_tx_capture(soc, pdev, mon_mpdu);
 
 		if (!qdf_nbuf_update_radiotap(&pdev->ppdu_info.rx_status,
 					      mon_mpdu,
