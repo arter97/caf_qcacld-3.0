@@ -7656,7 +7656,6 @@ void hdd_set_disconnect_status(struct hdd_adapter *adapter, bool status)
 static int hdd_wlan_register_pm_qos_notifier(struct hdd_context *hdd_ctx)
 {
 	int ret;
-
 	/* if gRuntimePM is 1 then feature is enabled without CXPC */
 	if (hdd_ctx->config->runtime_pm != hdd_runtime_pm_dynamic) {
 		hdd_debug("Dynamic Runtime PM disabled");
@@ -7686,6 +7685,11 @@ static int hdd_wlan_register_pm_qos_notifier(struct hdd_context *hdd_ctx)
 static void hdd_wlan_unregister_pm_qos_notifier(struct hdd_context *hdd_ctx)
 {
 	int ret;
+
+	if (hdd_ctx->config->runtime_pm != hdd_runtime_pm_dynamic) {
+		hdd_debug("Dynamic Runtime PM disabled");
+		return;
+	}
 
 	ret = pm_qos_remove_notifier(PM_QOS_CPU_DMA_LATENCY,
 				     &hdd_ctx->pm_qos_notifier);
