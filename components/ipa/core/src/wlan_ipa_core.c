@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -313,9 +313,10 @@ static void wlan_ipa_send_pkt_to_tl(
 
 	qdf_spin_lock_bh(&ipa_ctx->q_lock);
 	/* get free Tx desc and assign ipa_tx_desc pointer */
-	if (qdf_list_remove_front(&ipa_ctx->tx_desc_free_list,
+	if (ipa_ctx->tx_desc_free_list.count &&
+	    qdf_list_remove_front(&ipa_ctx->tx_desc_free_list,
 				  (qdf_list_node_t **)&tx_desc) ==
-	    QDF_STATUS_SUCCESS) {
+							QDF_STATUS_SUCCESS) {
 		tx_desc->ipa_tx_desc_ptr = ipa_tx_desc;
 		ipa_ctx->stats.num_tx_desc_q_cnt++;
 		qdf_spin_unlock_bh(&ipa_ctx->q_lock);
@@ -465,7 +466,7 @@ drop_pkt:
  * TODO: Get WDI version through FW capabilities
  */
 #if defined(QCA_WIFI_QCA6290) || defined(QCA_WIFI_QCA6390) || \
-	defined(QCA_WIFI_QCA6490)
+    defined(QCA_WIFI_QCA6490) || defined(QCA_WIFI_QCA6750)
 static inline void wlan_ipa_wdi_get_wdi_version(struct wlan_ipa_priv *ipa_ctx)
 {
 	ipa_ctx->wdi_version = IPA_WDI_3;
@@ -1239,6 +1240,9 @@ QDF_STATUS wlan_ipa_uc_enable_pipes(struct wlan_ipa_priv *ipa_ctx)
 	ipa_ctx->pipes_enable_in_progress = true;
 	qdf_spin_unlock_bh(&ipa_ctx->enable_disable_lock);
 
+	if (qdf_atomic_read(&ipa_ctx->waiting_on_pending_tx))
+		wlan_ipa_reset_pending_tx_timer(ipa_ctx);
+
 	if (qdf_atomic_read(&ipa_ctx->pipes_disabled)) {
 		result = cdp_ipa_enable_pipes(ipa_ctx->dp_soc,
 					      ipa_ctx->dp_pdev_id);
@@ -1605,7 +1609,7 @@ end:
 }
 
 #if defined(QCA_WIFI_QCA6290) || defined(QCA_WIFI_QCA6390) || \
-	defined(QCA_WIFI_QCA6490)
+    defined(QCA_WIFI_QCA6490) || defined(QCA_WIFI_QCA6750)
 /**
  * wlan_ipa_uc_handle_first_con() - Handle first uC IPA connection
  * @ipa_ctx: IPA context
@@ -2635,9 +2639,10 @@ static inline void wlan_ipa_free_tx_desc_list(struct wlan_ipa_priv *ipa_ctx)
 		if (ipa_tx_desc)
 			qdf_ipa_free_skb(ipa_tx_desc);
 
-		if (qdf_list_remove_node(&ipa_ctx->tx_desc_free_list,
+		if (ipa_ctx->tx_desc_free_list.count &&
+		    qdf_list_remove_node(&ipa_ctx->tx_desc_free_list,
 					 &ipa_ctx->tx_desc_pool[i].node) !=
-		    QDF_STATUS_SUCCESS)
+							QDF_STATUS_SUCCESS)
 			ipa_err("Failed to remove node from tx desc freelist");
 	}
 	qdf_spin_unlock_bh(&ipa_ctx->q_lock);

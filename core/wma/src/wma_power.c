@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -336,22 +336,21 @@ void wma_set_tx_power(WMA_HANDLE handle,
 	tp_wma_handle wma_handle = (tp_wma_handle) handle;
 	uint8_t vdev_id;
 	QDF_STATUS ret = QDF_STATUS_E_FAILURE;
-	struct cdp_vdev *vdev;
 	int8_t max_reg_power;
 	struct wma_txrx_node *iface;
 
 	if (tx_pwr_params->dev_mode == QDF_SAP_MODE ||
 	    tx_pwr_params->dev_mode == QDF_P2P_GO_MODE) {
-		vdev = wma_find_vdev_by_addr(wma_handle,
-					     tx_pwr_params->bssId.bytes,
-					     &vdev_id);
+		ret = wma_find_vdev_id_by_addr(wma_handle,
+					       tx_pwr_params->bssId.bytes,
+					       &vdev_id);
 	} else {
-		vdev = wma_find_vdev_by_bssid(wma_handle,
-					      tx_pwr_params->bssId.bytes,
-					      &vdev_id);
+		ret = wma_find_vdev_id_by_bssid(wma_handle,
+						tx_pwr_params->bssId.bytes,
+						&vdev_id);
 	}
-	if (!vdev) {
-		WMA_LOGE("vdev handle is invalid for %pM",
+	if (ret) {
+		WMA_LOGE("vdev id is invalid for %pM",
 			 tx_pwr_params->bssId.bytes);
 		qdf_mem_free(tx_pwr_params);
 		return;
@@ -415,21 +414,19 @@ void wma_set_max_tx_power(WMA_HANDLE handle,
 	tp_wma_handle wma_handle = (tp_wma_handle) handle;
 	uint8_t vdev_id;
 	QDF_STATUS ret = QDF_STATUS_E_FAILURE;
-	struct cdp_vdev *vdev;
 	int8_t prev_max_power;
 	int8_t max_reg_power;
 	struct wma_txrx_node *iface;
 
-	vdev = wma_find_vdev_by_addr(wma_handle, tx_pwr_params->bssId.bytes,
-				     &vdev_id);
-	if (!vdev) {
+	if (wma_find_vdev_id_by_addr(wma_handle, tx_pwr_params->bssId.bytes,
+				     &vdev_id)) {
 		/* not in SAP array. Try the station/p2p array */
-		vdev = wma_find_vdev_by_bssid(wma_handle,
-					      tx_pwr_params->bssId.bytes,
-					      &vdev_id);
+		ret = wma_find_vdev_id_by_bssid(wma_handle,
+						tx_pwr_params->bssId.bytes,
+						&vdev_id);
 	}
-	if (!vdev) {
-		WMA_LOGE("vdev handle is invalid for %pM",
+	if (ret) {
+		WMA_LOGE("vdev id is invalid for %pM",
 			 tx_pwr_params->bssId.bytes);
 		qdf_mem_free(tx_pwr_params);
 		return;
@@ -734,10 +731,6 @@ void wma_enable_sta_ps_mode(tp_wma_handle wma, tpEnablePsParams ps_req)
 		return;
 	}
 
-	if (!wlan_vdev_get_dp_handle(iface->vdev)) {
-		WMA_LOGE("vdev id %d is not active", vdev_id);
-		return;
-	}
 	if (eSIR_ADDON_NOTHING == ps_req->psSetting) {
 		if (qpower_config && iface->uapsd_cached_val) {
 			qpower_config = 0;
@@ -879,10 +872,6 @@ void wma_enable_uapsd_mode(tp_wma_handle wma, tpEnableUapsdParams ps_req)
 
 	if (!iface->vdev) {
 		WMA_LOGE("%s: vdev is NULL for vdev_%d", __func__, vdev_id);
-		return;
-	}
-	if (!wlan_vdev_get_dp_handle(iface->vdev)) {
-		WMA_LOGE("vdev id %d is not active", vdev_id);
 		return;
 	}
 

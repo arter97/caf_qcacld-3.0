@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1739,7 +1739,10 @@ static QDF_STATUS lim_assoc_tx_complete_cnf(void *context,
 	uint16_t reason_code;
 	struct mac_context *mac_ctx = (struct mac_context *)context;
 
-	pe_debug("tx_complete= %d", tx_complete);
+	pe_nofl_info("Assoc TX %s",
+		     (tx_complete == WMI_MGMT_TX_COMP_TYPE_COMPLETE_OK) ?
+		      "success" : "fail");
+
 	if (tx_complete == WMI_MGMT_TX_COMP_TYPE_COMPLETE_OK) {
 		assoc_ack_status = ACKED;
 		reason_code = QDF_STATUS_SUCCESS;
@@ -1879,7 +1882,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	enum rateid min_rid = RATEID_DEFAULT;
 	uint8_t *mbo_ie = NULL, *adaptive_11r_ie = NULL, *vendor_ies = NULL;
 	uint8_t mbo_ie_len = 0, adaptive_11r_ie_len = 0, rsnx_ie_len = 0;
-	struct wlan_objmgr_peer *peer;
+	bool bss_mfp_capable;
 
 	if (!pe_session) {
 		pe_err("pe_session is NULL");
@@ -2250,18 +2253,14 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 			 mbo_ie_len, is_open_auth);
 
 		if (!is_open_auth) {
-			peer = wlan_objmgr_get_peer_by_mac(
-						mac_ctx->psoc,
-						mlm_assoc_req->peerMacAddr,
-						WLAN_MBO_ID);
-			if (peer && !mlme_get_peer_pmf_status(peer)) {
+			bss_mfp_capable =
+				lim_get_bss_rmf_capable(mac_ctx, pe_session);
+			if (!bss_mfp_capable) {
 				pe_debug("Peer doesn't support PMF, Don't add MBO IE");
 				qdf_mem_free(mbo_ie);
 				mbo_ie = NULL;
 				mbo_ie_len = 0;
 			}
-			if (peer)
-				wlan_objmgr_peer_release_ref(peer, WLAN_MBO_ID);
 		}
 	}
 
@@ -2427,7 +2426,10 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_MGMT,
 			 pe_session->peSessionId, mac_hdr->fc.subType));
 
-	pe_debug("Sending Association Request length %d to ", bytes);
+	pe_nofl_info("vid %d Assoc TX to %pM seq num %d",
+		     pe_session->vdev_id, pe_session->bssId,
+		     mac_ctx->mgmtSeqNum);
+
 	min_rid = lim_get_min_session_txrate(pe_session);
 	lim_diag_event_report(mac_ctx, WLAN_PE_DIAG_ASSOC_START_EVENT,
 			      pe_session, QDF_STATUS_SUCCESS, QDF_STATUS_SUCCESS);
@@ -2482,11 +2484,10 @@ static QDF_STATUS lim_addba_rsp_tx_complete_cnf(void *context,
 	tSirMacMgmtHdr *mac_hdr;
 	tDot11faddba_rsp rsp;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
-	void *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
-	void *peer;
 	uint32_t frame_len;
 	QDF_STATUS status;
 	uint8_t *data;
+	struct wmi_mgmt_params *mgmt_params = (struct wmi_mgmt_params *)params;
 
 	if (tx_complete == WMI_MGMT_TX_COMP_TYPE_COMPLETE_OK)
 		pe_debug("Add ba response successfully sent");
@@ -2518,15 +2519,8 @@ static QDF_STATUS lim_addba_rsp_tx_complete_cnf(void *context,
 		goto error;
 	}
 
-	peer = cdp_peer_get_ref_by_addr(soc, pdev, mac_hdr->da,
-					PEER_DEBUG_ID_WMA_ADDBA_REQ);
-	if (!peer) {
-		pe_debug("no PEER found for mac_addr:%pM", mac_hdr->da);
-		goto error;
-	}
-	cdp_addba_resp_tx_completion(soc, peer, rsp.addba_param_set.tid,
-				     tx_complete);
-	cdp_peer_release_ref(soc, peer, PEER_DEBUG_ID_WMA_ADDBA_REQ);
+	cdp_addba_resp_tx_completion(soc, mac_hdr->da, mgmt_params->vdev_id,
+				     rsp.addba_param_set.tid, tx_complete);
 error:
 	if (buf)
 		qdf_nbuf_free(buf);
@@ -2553,9 +2547,9 @@ static QDF_STATUS lim_auth_tx_complete_cnf(void *context,
 	uint16_t auth_ack_status;
 	uint16_t reason_code;
 
-	pe_debug("tx_complete = %d %s", tx_complete,
-		(tx_complete == WMI_MGMT_TX_COMP_TYPE_COMPLETE_OK) ?
-		 "success" : "fail");
+	pe_nofl_info("Auth TX %s",
+		     (tx_complete == WMI_MGMT_TX_COMP_TYPE_COMPLETE_OK) ?
+		     "success" : "fail");
 	if (tx_complete == WMI_MGMT_TX_COMP_TYPE_COMPLETE_OK) {
 		mac_ctx->auth_ack_status = LIM_AUTH_ACK_RCD_SUCCESS;
 		auth_ack_status = ACKED;
@@ -2822,9 +2816,8 @@ alloc_packet:
 				qdf_mem_copy(body, auth_frame->challengeText,
 					     SIR_MAC_SAP_AUTH_CHALLENGE_LENGTH);
 				body += SIR_MAC_SAP_AUTH_CHALLENGE_LENGTH;
-
 				body_len -= SIR_MAC_SAP_AUTH_CHALLENGE_LENGTH +
-							SIR_MAC_CHALLENGE_ID_LEN;
+					    SIR_MAC_CHALLENGE_ID_LEN;
 			}
 		}
 
@@ -2863,13 +2856,12 @@ alloc_packet:
 			lim_add_fils_data_to_auth_frame(session, body);
 		}
 
-		pe_debug("*** Sending Auth seq# %d status %d (%d) to "
-				QDF_MAC_ADDR_STR,
-			auth_frame->authTransactionSeqNumber,
-			auth_frame->authStatusCode,
-			(auth_frame->authStatusCode ==
-				eSIR_MAC_SUCCESS_STATUS),
-			QDF_MAC_ADDR_ARRAY(mac_hdr->da));
+		pe_nofl_info("Auth TX seq %d seq num %d status %d to "
+			     QDF_MAC_ADDR_STR,
+			     auth_frame->authTransactionSeqNumber,
+			     mac_ctx->mgmtSeqNum,
+			     auth_frame->authStatusCode,
+			     QDF_MAC_ADDR_ARRAY(mac_hdr->da));
 	}
 	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE,
 			   QDF_TRACE_LEVEL_DEBUG,
@@ -3158,7 +3150,9 @@ static QDF_STATUS lim_deauth_tx_complete_cnf_handler(void *context,
 	QDF_STATUS status_code;
 	struct scheduler_msg msg = {0};
 
-	pe_debug("tx_success: %d", tx_success);
+	pe_debug("tx_complete = %s tx_success = %d",
+		(tx_success == WMI_MGMT_TX_COMP_TYPE_COMPLETE_OK) ?
+		 "success" : "fail", tx_success);
 
 	if (buf)
 		qdf_nbuf_free(buf);
@@ -3500,12 +3494,11 @@ lim_send_deauth_mgmt_frame(struct mac_context *mac,
 				&nPayload, discon_ie);
 	mlme_free_self_disconnect_ies(pe_session->vdev);
 
-	pe_debug("***Sessionid %d Sending Deauth frame with "
-		       "reason %u and waitForAck %d to " QDF_MAC_ADDR_STR
-		       " ,From " QDF_MAC_ADDR_STR,
-		pe_session->peSessionId, nReason, waitForAck,
-		QDF_MAC_ADDR_ARRAY(pMacHdr->da),
-		QDF_MAC_ADDR_ARRAY(pe_session->self_mac_addr));
+	pe_nofl_info("vdev %d Deauth TX seq_num %d reason %u to " QDF_MAC_ADDR_STR
+		     " from " QDF_MAC_ADDR_STR,
+		     pe_session->vdev_id, mac->mgmtSeqNum, nReason,
+		     QDF_MAC_ADDR_ARRAY(pMacHdr->da),
+		     QDF_MAC_ADDR_ARRAY(pe_session->self_mac_addr));
 
 	if (wlan_reg_is_5ghz_ch_freq(pe_session->curr_op_freq) ||
 	    pe_session->opmode == QDF_P2P_CLIENT_MODE ||
@@ -4955,7 +4948,7 @@ returnAfterError:
 #endif
 
 #if defined(QCA_WIFI_QCA6290) || defined(QCA_WIFI_QCA6390) || \
-	defined(QCA_WIFI_QCA6490)
+    defined(QCA_WIFI_QCA6490) || defined(QCA_WIFI_QCA6750)
 #ifdef WLAN_FEATURE_11AX
 #define IS_PE_SESSION_HE_MODE(_session) ((_session)->he_capable)
 #else
@@ -4996,7 +4989,6 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 	uint16_t buff_size, status_code, batimeout;
 	uint8_t dialog_token;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
-	void *peer, *pdev;
 	uint8_t he_frag = 0;
 	tpDphHashNode sta_ds;
 	uint16_t aid;
@@ -5004,23 +4996,10 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 
 	vdev_id = session->vdev_id;
 
-	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
-	if (!pdev) {
-		pe_err("pdev is NULL");
-		return QDF_STATUS_E_FAILURE;
-	}
+	cdp_addba_responsesetup(soc, peer_mac, vdev_id, tid,
+				&dialog_token, &status_code, &buff_size,
+				&batimeout);
 
-	peer = cdp_peer_get_ref_by_addr(soc, pdev, peer_mac,
-					PEER_DEBUG_ID_LIM_SEND_ADDBA_RESP);
-	if (!peer) {
-		pe_err("PEER [%pM] not found", peer_mac);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	cdp_addba_responsesetup(soc, peer, tid, &dialog_token,
-		&status_code, &buff_size, &batimeout);
-
-	cdp_peer_release_ref(soc, peer, PEER_DEBUG_ID_LIM_SEND_ADDBA_RESP);
 	qdf_mem_zero((uint8_t *) &frm, sizeof(frm));
 	frm.Category.category = ACTION_CATEGORY_BACK;
 	frm.Action.action = ADDBA_RESPONSE;

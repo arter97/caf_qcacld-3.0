@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1952,6 +1952,20 @@ static int wma_unified_link_radio_stats_event_handler(void *handle,
 	 * num_channels * size of(struct wmi_channel_stats)
 	 */
 	fixed_param = param_tlvs->fixed_param;
+	if (fixed_param && !fixed_param->num_radio &&
+	    !fixed_param->more_radio_events) {
+		WMA_LOGD("FW indicates dummy link radio stats");
+		if (!wma_handle->link_stats_results) {
+			wma_handle->link_stats_results = qdf_mem_malloc(
+						sizeof(*link_stats_results));
+			if (!wma_handle->link_stats_results)
+				return -ENOMEM;
+		}
+		link_stats_results = wma_handle->link_stats_results;
+		link_stats_results->num_radio = fixed_param->num_radio;
+		goto link_radio_stats_cb;
+	}
+
 	radio_stats = param_tlvs->radio_stats;
 	channel_stats = param_tlvs->channel_stats;
 
@@ -2024,21 +2038,6 @@ static int wma_unified_link_radio_stats_event_handler(void *handle,
 	WMA_LOGD("on_time_host_scan: %u, on_time_lpi_scan: %u",
 		radio_stats->on_time_host_scan, radio_stats->on_time_lpi_scan);
 
-	link_stats_results->paramId = WMI_LINK_STATS_RADIO;
-	link_stats_results->rspId = fixed_param->request_id;
-	link_stats_results->ifaceId = 0;
-	link_stats_results->peer_event_number = 0;
-
-	/*
-	 * Backward compatibility:
-	 * There are firmware(s) which will send Radio stats only with
-	 * more_radio_events set to 0 and firmware which sends Radio stats
-	 * followed by tx_power level stats with more_radio_events set to 1.
-	 * if more_radio_events is set to 1, buffer the radio stats and
-	 * wait for tx_power_level stats.
-	 */
-	link_stats_results->moreResultToFollow = fixed_param->more_radio_events;
-
 	results = (uint8_t *) link_stats_results->results;
 	t_radio_stats = (uint8_t *) radio_stats;
 	t_channel_stats = (uint8_t *) channel_stats;
@@ -2097,15 +2096,34 @@ static int wma_unified_link_radio_stats_event_handler(void *handle,
 		}
 	}
 
+link_radio_stats_cb:
+	link_stats_results->paramId = WMI_LINK_STATS_RADIO;
+	link_stats_results->rspId = fixed_param->request_id;
+	link_stats_results->ifaceId = 0;
+	link_stats_results->peer_event_number = 0;
+
+	/*
+	 * Backward compatibility:
+	 * There are firmware(s) which will send Radio stats only with
+	 * more_radio_events set to 0 and firmware which sends Radio stats
+	 * followed by tx_power level stats with more_radio_events set to 1.
+	 * if more_radio_events is set to 1, buffer the radio stats and
+	 * wait for tx_power_level stats.
+	 */
+	link_stats_results->moreResultToFollow = fixed_param->more_radio_events;
+
 	if (link_stats_results->moreResultToFollow) {
 		/* More results coming, don't post yet */
 		return 0;
 	}
-	link_stats_results->nr_received++;
+	if (link_stats_results->num_radio) {
+		link_stats_results->nr_received++;
 
-	if (link_stats_results->num_radio != link_stats_results->nr_received) {
-		/* Not received all radio stats yet, don't post yet */
-		return 0;
+		if (link_stats_results->num_radio !=
+		    link_stats_results->nr_received) {
+			/* Not received all radio stats yet, don't post yet */
+			return 0;
+		}
 	}
 
 	mac->sme.link_layer_stats_cb(mac->hdd_handle,
@@ -2279,12 +2297,6 @@ QDF_STATUS wma_process_ll_stats_clear_req(tp_wma_handle wma,
 	vdev = wma->interfaces[clearReq->staId].vdev;
 	if (!vdev) {
 		WMA_LOGE("%s: vdev is NULL for vdev_%d",
-			 __func__, clearReq->staId);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	if (!wlan_vdev_get_dp_handle(vdev)) {
-		WMA_LOGE("%s: vdev_id %d dp handle is NULL",
 			 __func__, clearReq->staId);
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -3273,7 +3285,6 @@ int32_t wma_txrx_fw_stats_reset(tp_wma_handle wma_handle,
 				uint8_t vdev_id, uint32_t value)
 {
 	struct ol_txrx_stats_req req;
-	struct cdp_vdev *vdev;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 
 	if (!soc) {
@@ -3281,14 +3292,9 @@ int32_t wma_txrx_fw_stats_reset(tp_wma_handle wma_handle,
 		return -EINVAL;
 	}
 
-	vdev = wma_find_vdev_by_id(wma_handle, vdev_id);
-	if (!vdev) {
-		WMA_LOGE("%s:Invalid vdev handle", __func__);
-		return -EINVAL;
-	}
 	qdf_mem_zero(&req, sizeof(req));
 	req.stats_type_reset_mask = value;
-	cdp_fw_stats_get(soc, vdev, &req, false, false);
+	cdp_fw_stats_get(soc, vdev_id, &req, false, false);
 
 	return 0;
 }
@@ -3339,18 +3345,11 @@ int32_t wma_set_txrx_fw_stats_level(tp_wma_handle wma_handle,
 				    uint8_t vdev_id, uint32_t value)
 {
 	struct ol_txrx_stats_req req;
-	struct cdp_vdev *vdev;
 	uint32_t l_up_mask;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 
 	if (!soc) {
 		WMA_LOGE("%s:SOC context is NULL", __func__);
-		return -EINVAL;
-	}
-
-	vdev = wma_find_vdev_by_id(wma_handle, vdev_id);
-	if (!vdev) {
-		WMA_LOGE("%s:Invalid vdev handle", __func__);
 		return -EINVAL;
 	}
 
@@ -3364,7 +3363,7 @@ int32_t wma_set_txrx_fw_stats_level(tp_wma_handle wma_handle,
 	l_up_mask = 1 << (value - 1);
 	req.stats_type_upload_mask = l_up_mask;
 
-	cdp_fw_stats_get(soc, vdev, &req, false, true);
+	cdp_fw_stats_get(soc, vdev_id, &req, false, true);
 
 	return 0;
 }
@@ -4213,8 +4212,7 @@ QDF_STATUS wma_get_roam_scan_stats(WMA_HANDLE handle,
 void wma_remove_bss_peer_on_vdev_start_failure(tp_wma_handle wma,
 					       uint8_t vdev_id)
 {
-	struct cdp_pdev *pdev;
-	void *peer = NULL;
+	uint8_t pdev_id = WMI_PDEV_ID_SOC;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	QDF_STATUS status;
 	struct qdf_mac_addr bss_peer;
@@ -4230,21 +4228,13 @@ void wma_remove_bss_peer_on_vdev_start_failure(tp_wma_handle wma,
 
 	WMA_LOGE("%s: ADD BSS failure for vdev %d", __func__, vdev_id);
 
-	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
-	if (!pdev) {
-		WMA_LOGE("%s: Failed to get pdev", __func__);
-		return;
-	}
-
-	peer = cdp_peer_find_by_addr(soc, pdev, bss_peer.bytes);
-
-	if (!peer) {
+	if (!cdp_find_peer_exist(soc, pdev_id, bss_peer.bytes)) {
 		WMA_LOGE("%s Failed to find peer %pM",
 			 __func__, bss_peer.bytes);
 		return;
 	}
 
-	wma_remove_peer(wma, bss_peer.bytes, vdev_id, peer, false);
+	wma_remove_peer(wma, bss_peer.bytes, vdev_id, false);
 }
 
 QDF_STATUS wma_sta_vdev_up_send(struct vdev_mlme_obj *vdev_mlme,

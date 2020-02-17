@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -212,7 +212,7 @@ struct hdd_config {
 	uint8_t enable_concurrent_sta[CFG_CONCURRENT_IFACE_MAX_LEN];
 	uint8_t dbs_scan_selection[CFG_DBS_SCAN_PARAM_LENGTH];
 #ifdef FEATURE_RUNTIME_PM
-	bool runtime_pm;
+	uint8_t runtime_pm;
 #endif
 	uint8_t inform_bss_rssi_raw;
 
@@ -220,7 +220,7 @@ struct hdd_config {
 	uint32_t provisioned_intf_pool;
 	uint32_t derived_intf_pool;
 	uint32_t cfg_wmi_credit_cnt;
-	uint32_t sar_version;
+	uint32_t enable_sar_conversion;
 	bool is_wow_disabled;
 #ifdef WLAN_FEATURE_TSF_PLUS
 	uint8_t tsf_ptp_options;
@@ -232,6 +232,7 @@ struct hdd_config {
 	uint16_t pkt_bundle_timer_value;
 	uint16_t pkt_bundle_size;
 #endif
+	uint32_t dp_proto_event_bitmap;
 };
 
 /**

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2257,17 +2257,6 @@ uint32_t sap_select_channel(mac_handle_t mac_handle,
 	QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_HIGH,
 		  "In %s, Running SAP Ch Select", __func__);
 
-	/*
-	 * If ACS weight is not enabled on noise_floor/channel_free/tx_power,
-	 * then skip acs process if no bss found.
-	 */
-	if ((!scan_list || !qdf_list_size(scan_list)) &&
-	    !(sap_ctx->auto_channel_select_weight & 0xffff00)) {
-		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_HIGH,
-			  FL("No external AP present, select default channel"));
-		return sap_select_default_oper_chan(sap_ctx->acs_cfg);
-	}
-
 	/* Initialize the structure pointed by spect_info */
 	if (sap_chan_sel_init(mac_handle, spect_info, sap_ctx) != true) {
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
@@ -2338,26 +2327,31 @@ uint32_t sap_select_channel(mac_handle_t mac_handle,
 	 * channel which has same weightage and is in PCL, choose the one in
 	 * PCL
 	 */
-	for (count = 0; count < spect_info->numSpectChans; count++) {
-		if (best_chan_freq == spect_info->pSpectCh[count].chan_freq)
-			continue;
+	if (!ch_in_pcl(sap_ctx, best_chan_freq)) {
+		uint32_t cal_chan_freq, cal_chan_weight;
+		for (count = 0; count < spect_info->numSpectChans; count++) {
+			cal_chan_freq = spect_info->pSpectCh[count].chan_freq;
+			cal_chan_weight = spect_info->pSpectCh[count].weight;
+			/* skip pcl channel whose weight is bigger than best */
+			if (!ch_in_pcl(sap_ctx, cal_chan_freq) ||
+			    (cal_chan_weight > best_ch_weight))
+				continue;
 
-		if (!ch_in_pcl(sap_ctx,
-			       spect_info->pSpectCh[count].chan_freq) ||
-		    (spect_info->pSpectCh[count].weight != best_ch_weight))
-			continue;
+			if (best_chan_freq == cal_chan_freq)
+				continue;
 
-		if (sap_select_preferred_channel_from_channel_list(
-			spect_info->pSpectCh[count].chan_freq, sap_ctx,
-			spect_info)
-			== SAP_CHANNEL_NOT_SELECTED)
-			continue;
+			if (sap_select_preferred_channel_from_channel_list(
+				cal_chan_freq, sap_ctx,
+				spect_info)
+				== SAP_CHANNEL_NOT_SELECTED)
+				continue;
 
-		best_chan_freq = spect_info->pSpectCh[count].chan_freq;
-		sap_debug("Changed best freq to %d Preferred freq",
-			  best_chan_freq);
+			best_chan_freq = cal_chan_freq;
+			sap_debug("Changed best freq to %d Preferred freq",
+				  best_chan_freq);
 
-		break;
+			break;
+		}
 	}
 
 	sap_ctx->acs_cfg->pri_ch_freq = best_chan_freq;

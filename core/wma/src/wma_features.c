@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -501,9 +501,9 @@ QDF_STATUS wma_process_dhcp_ind(WMA_HANDLE handle,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if (!wma_find_vdev_by_addr(wma_handle,
-				   ta_dhcp_ind->adapterMacAddr.bytes,
-				   &vdev_id)) {
+	if (wma_find_vdev_id_by_addr(wma_handle,
+				     ta_dhcp_ind->adapterMacAddr.bytes,
+				     &vdev_id)) {
 		WMA_LOGE("%s: Failed to find vdev id for DHCP indication",
 			 __func__);
 		return QDF_STATUS_E_FAILURE;
@@ -542,7 +542,7 @@ enum wlan_phymode wma_chan_phy_mode(uint32_t freq, enum phy_ch_width chan_width,
 	}
 
 	if (chan_width >= CH_WIDTH_INVALID) {
-		WMA_LOGE("%s : Invalid channel width", __func__);
+		wma_err_rl("%s : Invalid channel width", __func__);
 		return WLAN_PHYMODE_AUTO;
 	}
 
@@ -1131,7 +1131,7 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 	csa_event = param_buf->fixed_param;
 	WMI_MAC_ADDR_TO_CHAR_ARRAY(&csa_event->i_addr2, &bssid[0]);
 
-	if (wma_find_vdev_by_bssid(wma, bssid, &vdev_id) == NULL) {
+	if (wma_find_vdev_id_by_bssid(wma, bssid, &vdev_id)) {
 		WMA_LOGE("Invalid bssid received %s:%d", __func__, __LINE__);
 		return -EINVAL;
 	}
@@ -1155,6 +1155,9 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 		csa_ie = (struct ieee80211_channelswitch_ie *)
 						(&csa_event->csa_ie[0]);
 		csa_offload_event->channel = csa_ie->newchannel;
+		csa_offload_event->csa_chan_freq =
+			wlan_reg_legacy_chan_to_freq(wma->pdev,
+						     csa_ie->newchannel);
 		csa_offload_event->switch_mode = csa_ie->switchmode;
 	} else if (csa_event->ies_present_flag & WMI_XCSA_IE_PRESENT) {
 		xcsa_ie = (struct ieee80211_extendedchannelswitch_ie *)
@@ -1162,6 +1165,16 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 		csa_offload_event->channel = xcsa_ie->newchannel;
 		csa_offload_event->switch_mode = xcsa_ie->switchmode;
 		csa_offload_event->new_op_class = xcsa_ie->newClass;
+		if (wlan_reg_is_6ghz_op_class(wma->pdev, xcsa_ie->newClass)) {
+			csa_offload_event->csa_chan_freq =
+				wlan_reg_chan_band_to_freq
+					(wma->pdev, xcsa_ie->newchannel,
+					 BIT(REG_BAND_6G));
+		} else {
+			csa_offload_event->csa_chan_freq =
+				wlan_reg_legacy_chan_to_freq
+					(wma->pdev, xcsa_ie->newchannel);
+		}
 	} else {
 		WMA_LOGE("CSA Event error: No CSA IE present");
 		qdf_mem_free(csa_offload_event);
@@ -1192,8 +1205,9 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 
 	csa_offload_event->ies_present_flag = csa_event->ies_present_flag;
 
-	WMA_LOGD("CSA: New Channel = %d BSSID:%pM",
-		 csa_offload_event->channel, csa_offload_event->bssId);
+	WMA_LOGD("CSA: New Channel = %d freq %d BSSID:%pM",
+		 csa_offload_event->channel, csa_offload_event->csa_chan_freq,
+		 csa_offload_event->bssId);
 	WMA_LOGD("CSA: IEs Present Flag = 0x%x new ch width = %d ch center freq1 = %d ch center freq2 = %d new op class = %d",
 		 csa_event->ies_present_flag,
 		 csa_offload_event->new_ch_width,
@@ -2462,9 +2476,7 @@ static int wma_wake_event_piggybacked(
 	uint32_t wake_reason;
 	uint32_t event_id;
 	uint8_t *bssid;
-	void *peer, *pdev;
 	tpDeleteStaContext del_sta_ctx;
-	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 
 	/*
 	 * There are "normal" cases where a wake reason that usually contains a
@@ -2478,12 +2490,6 @@ static int wma_wake_event_piggybacked(
 		return 0;
 	}
 
-	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
-	if (!pdev) {
-		WMA_LOGE("Invalid pdev");
-		return -EINVAL;
-	}
-
 	bssid = wma_get_vdev_bssid
 		(wma->interfaces[event_param->fixed_param->vdev_id].vdev);
 	if (!bssid) {
@@ -2491,7 +2497,6 @@ static int wma_wake_event_piggybacked(
 			 __func__, event_param->fixed_param->vdev_id);
 		return 0;
 	}
-	peer = cdp_peer_find_by_addr(soc, pdev, bssid);
 	wake_reason = event_param->fixed_param->wake_reason;
 
 	/* parse piggybacked event from param buffer */
@@ -3020,8 +3025,7 @@ QDF_STATUS wma_process_get_peer_info_req
 	uint16_t len;
 	wmi_buf_t buf;
 	int32_t vdev_id;
-	struct cdp_pdev *pdev;
-	void *peer;
+	uint8_t pdev_id;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	uint8_t peer_mac[QDF_MAC_ADDR_SIZE];
 	wmi_peer_info_req_cmd_fixed_param *p_get_peer_info_cmd;
@@ -3040,9 +3044,9 @@ QDF_STATUS wma_process_get_peer_info_req
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
-	if (!pdev) {
-		WMA_LOGE("%s: Failed to get pdev context", __func__);
+	pdev_id = WMI_PDEV_ID_SOC;
+	if (pdev_id == OL_TXRX_INVALID_PDEV_ID) {
+		WMA_LOGE("%s: Failed to get pdev id", __func__);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -3051,8 +3055,7 @@ QDF_STATUS wma_process_get_peer_info_req
 		qdf_mem_copy(peer_mac, bcast_mac, QDF_MAC_ADDR_SIZE);
 	} else {
 		/*get info for a single peer */
-		peer = cdp_peer_find_by_addr(soc, pdev, pReq->peer_mac.bytes);
-		if (!peer) {
+		if (!cdp_find_peer_exist(soc, pdev_id, pReq->peer_mac.bytes)) {
 			WMA_LOGE("%s: Failed to get peer handle using peer "
 				 QDF_MAC_ADDR_STR, __func__,
 				 QDF_MAC_ADDR_ARRAY(pReq->peer_mac.bytes));
@@ -3314,9 +3317,9 @@ QDF_STATUS wma_process_add_periodic_tx_ptrn_ind(WMA_HANDLE handle,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	if (!wma_find_vdev_by_addr(wma_handle,
-				   pattern->mac_address.bytes,
-				   &vdev_id)) {
+	if (wma_find_vdev_id_by_addr(wma_handle,
+				     pattern->mac_address.bytes,
+				     &vdev_id)) {
 		WMA_LOGE("%s: Failed to find vdev id for %pM", __func__,
 			 pattern->mac_address.bytes);
 		return QDF_STATUS_E_INVAL;
@@ -3361,9 +3364,10 @@ QDF_STATUS wma_process_del_periodic_tx_ptrn_ind(WMA_HANDLE handle,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	if (!wma_find_vdev_by_addr(wma_handle,
-				   pDelPeriodicTxPtrnParams->mac_address.bytes,
-				   &vdev_id)) {
+	if (wma_find_vdev_id_by_addr(
+			wma_handle,
+			pDelPeriodicTxPtrnParams->mac_address.bytes,
+			&vdev_id)) {
 		WMA_LOGE("%s: Failed to find vdev id for %pM", __func__,
 			 pDelPeriodicTxPtrnParams->mac_address.bytes);
 		return QDF_STATUS_E_INVAL;
@@ -3778,11 +3782,8 @@ int wma_update_tdls_peer_state(WMA_HANDLE handle,
 {
 	tp_wma_handle wma_handle = (tp_wma_handle) handle;
 	uint32_t i;
-	struct cdp_pdev *pdev;
-	void *peer, *vdev;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	struct tdls_peer_params *peer_cap;
-	uint8_t *peer_mac_addr;
 	int ret = 0;
 	uint32_t *ch_mhz = NULL;
 	size_t ch_mhz_len;
@@ -3830,29 +3831,9 @@ int wma_update_tdls_peer_state(WMA_HANDLE handle,
 		}
 	}
 
-	/* Make sure that peer exists before sending peer state cmd*/
-	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
-	if (!pdev) {
-		WMA_LOGE("%s: Failed to find pdev", __func__);
-		ret = -EIO;
-		goto end_tdls_peer_state;
-	}
-
-	peer = cdp_peer_find_by_addr(soc,
-				     pdev,
-				     peer_state->peer_macaddr);
-	if (!peer) {
-		WMA_LOGE("%s: Failed to get peer handle using peer mac %pM",
-				__func__, peer_state->peer_macaddr);
-		ret = -EIO;
-		goto end_tdls_peer_state;
-	}
-
-	cdp_peer_set_tdls_offchan_enabled(soc,
-					  peer,
+	cdp_peer_set_tdls_offchan_enabled(soc, peer_state->vdev_id,
+					  peer_state->peer_macaddr,
 					  !!peer_cap->peer_off_chan_support);
-
-	vdev = cdp_peer_get_vdev(soc, peer);
 
 	if (wmi_unified_update_tdls_peer_state_cmd(wma_handle->wmi_handle,
 						   peer_state,
@@ -3865,36 +3846,31 @@ int wma_update_tdls_peer_state(WMA_HANDLE handle,
 
 	/* in case of teardown, remove peer from fw */
 	if (TDLS_PEER_STATE_TEARDOWN == peer_state->peer_state) {
-		peer_mac_addr = cdp_peer_get_peer_mac_addr(soc, peer);
-		if (!peer_mac_addr) {
-			WMA_LOGE("peer_mac_addr is NULL");
-			ret = -EIO;
-			goto end_tdls_peer_state;
-		}
-
 		restore_last_peer = cdp_peer_is_vdev_restore_last_peer(
-						soc, peer);
+						soc,
+						peer_state->vdev_id,
+						peer_state->peer_macaddr);
 
 		wma_debug("calling wma_remove_peer for peer " QDF_MAC_ADDR_STR
 			 " vdevId: %d",
-			 QDF_MAC_ADDR_ARRAY(peer_mac_addr),
+			 QDF_MAC_ADDR_ARRAY(peer_state->peer_macaddr),
 			 peer_state->vdev_id);
-		qdf_status = wma_remove_peer(wma_handle, peer_mac_addr,
-					     peer_state->vdev_id, peer, false);
+		qdf_status = wma_remove_peer(wma_handle,
+					     peer_state->peer_macaddr,
+					     peer_state->vdev_id, false);
 		if (QDF_IS_STATUS_ERROR(qdf_status)) {
 			WMA_LOGE(FL("wma_remove_peer failed"));
 			ret = -EINVAL;
 			goto end_tdls_peer_state;
 		}
-		cdp_peer_update_last_real_peer(soc, pdev, vdev,
+		cdp_peer_update_last_real_peer(soc, WMI_PDEV_ID_SOC,
+					       peer_state->vdev_id,
 					       restore_last_peer);
 	}
 
 	if (TDLS_PEER_STATE_CONNECTED == peer_state->peer_state) {
-		peer_mac_addr = cdp_peer_get_peer_mac_addr(soc, peer);
-		if (peer_mac_addr)
-			cdp_peer_state_update(soc, pdev, peer_mac_addr,
-					      OL_TXRX_PEER_STATE_AUTH);
+		cdp_peer_state_update(soc, peer_state->peer_macaddr,
+				      OL_TXRX_PEER_STATE_AUTH);
 	}
 
 end_tdls_peer_state:
@@ -5291,7 +5267,6 @@ int wma_vdev_obss_detection_info_handler(void *handle, uint8_t *event,
 	return 0;
 }
 
-#ifdef CRYPTO_SET_KEY_CONVERGED
 static void wma_send_set_key_rsp(uint8_t vdev_id, bool pairwise,
 				 uint8_t key_index)
 {
@@ -5443,7 +5418,6 @@ void wma_update_set_key(uint8_t session_id, bool pairwise,
 
 	wma_send_set_key_rsp(session_id, pairwise, key_index);
 }
-#endif /* CRYPTO_SET_KEY_CONVERGED */
 
 int wma_vdev_bss_color_collision_info_handler(void *handle,
 					      uint8_t *event,

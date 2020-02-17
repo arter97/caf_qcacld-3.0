@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -549,10 +549,6 @@ QDF_STATUS sme_roam_get_connect_profile(mac_handle_t mac_handle,
 					uint8_t sessionId,
 					tCsrRoamConnectedProfile *pProfile);
 void sme_roam_free_connect_profile(tCsrRoamConnectedProfile *profile);
-QDF_STATUS sme_roam_set_pmkid_cache(mac_handle_t mac_handle, uint8_t sessionId,
-		tPmkidCacheInfo *pPMKIDCache,
-		uint32_t numItems,
-		bool update_entire_cache);
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
@@ -668,8 +664,6 @@ void sme_deregister_oem_data_rsp_callback(mac_handle_t mac_handle)
 
 #endif
 
-QDF_STATUS sme_roam_set_key(mac_handle_t mac_handle, uint8_t sessionId,
-			    tCsrRoamSetKey *pSetKey, uint32_t *pRoamId);
 QDF_STATUS sme_get_country_code(mac_handle_t mac_handle, uint8_t *pBuf,
 				uint8_t *pbLen);
 
@@ -768,6 +762,17 @@ QDF_STATUS sme_configure_app_type2_params(mac_handle_t mac_handle,
 uint32_t sme_get_beaconing_concurrent_operation_channel(mac_handle_t mac_handle,
 						       uint8_t vdev_id_to_skip);
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
+/**
+ * sme_check_concurrent_channel_overlap() - Get interfering concurrent channel
+ * @mac_handle: SAP context pointer
+ * @sap_ch_freq: SAP home channel frequency
+ * @sapPhyMode: sap phymode
+ * @cc_switch_mode: force scc channel switch mode
+ *
+ * Determine if a concurrent channel is interfering.
+ *
+ * Return: Channel freq (Mhz) of the interfering channel, or 0 if none.
+ */
 uint16_t sme_check_concurrent_channel_overlap(mac_handle_t mac_handle,
 					      uint16_t sap_ch_freq,
 					      eCsrPhyMode sapPhyMode,
