@@ -2943,19 +2943,19 @@ void dp_tx_ppdu_stats_process(void *context)
 				continue;
 			}
 
-			peer = dp_peer_find_by_id(pdev->soc,
-						  ppdu_desc->user[0].peer_id);
-			/**
-			 * peer can be NULL
-			 */
-			if (!peer) {
-				qdf_nbuf_free(nbuf);
-				continue;
-			}
-
 			if ((ppdu_desc->frame_type == CDP_PPDU_FTYPE_DATA) ||
 			    (ppdu_desc->num_mpdu &&
 			     ppdu_desc->frame_type == CDP_PPDU_FTYPE_BAR)) {
+				peer = dp_peer_find_by_id(pdev->soc,
+							  ppdu_desc->user[0].
+							  peer_id);
+				/**
+				 * peer can be NULL
+				 */
+				if (!peer) {
+					qdf_nbuf_free(nbuf);
+					continue;
+				}
 				/**
 				 * check whether it is bss peer,
 				 * if bss_peer no need to process further
@@ -3071,6 +3071,8 @@ dequeue_msdu_again:
 					  ppdu_desc->user[0].start_seq,
 					  ppdu_cnt,
 					  ppdu_desc_cnt);
+
+				dp_peer_unref_del_find_by_id(peer);
 			} else {
 				/*
 				 * other packet frame also added to
@@ -3078,8 +3080,6 @@ dequeue_msdu_again:
 				 */
 				nbuf_ppdu_desc_list[ppdu_desc_cnt++] = nbuf;
 			}
-
-			dp_peer_unref_del_find_by_id(peer);
 		}
 
 		/*
