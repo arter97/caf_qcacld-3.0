@@ -758,7 +758,7 @@ rrm_fill_beacon_ies(tpAniSirGlobal pMac,
 	*pNumIes += sizeof(uint16_t);
 	pIes += sizeof(uint16_t);
 
-	while (BcnNumIes > 0) {
+	while (BcnNumIes >= 2) {
 		len = *(pBcnIes + 1);
 		len += 2;       /* element id + length. */
 		lim_log(pMac, LOG3, "EID = %d, len = %d total = %d",
