@@ -370,6 +370,8 @@ void dp_deliver_mgmt_frm(struct dp_pdev *pdev, qdf_nbuf_t nbuf)
 void dp_tx_ppdu_stats_attach(struct dp_pdev *pdev)
 {
 	int i, j;
+
+	pdev->tx_capture.tx_cap_mode_flag = true;
 	/* Work queue setup for HTT stats and tx capture handling */
 	qdf_create_work(0, &pdev->tx_capture.ppdu_stats_work,
 			dp_tx_ppdu_stats_process,
@@ -749,6 +751,44 @@ static void  dp_iterate_free_peer_msdu_q(void *pdev_hdl)
 }
 
 /*
+ * dp_enh_tx_capture_disable()- API to disable enhanced tx capture
+ * @pdev_handle: DP_PDEV handle
+ *
+ * Return: void
+ */
+void
+dp_enh_tx_capture_disable(struct dp_pdev *pdev)
+{
+	int i, j;
+
+	dp_soc_set_txrx_ring_map(pdev->soc);
+	dp_h2t_cfg_stats_msg_send(pdev,
+				  DP_PPDU_STATS_CFG_ENH_STATS,
+				  pdev->pdev_id);
+	dp_iterate_free_peer_msdu_q(pdev);
+	for (i = 0; i < TXCAP_MAX_TYPE; i++) {
+		for (j = 0; j < TXCAP_MAX_SUBTYPE; j++) {
+			qdf_nbuf_queue_t *retries_q;
+
+			qdf_spin_lock_bh(
+				&pdev->tx_capture.ctl_mgmt_lock[i][j]);
+			qdf_nbuf_queue_free(
+				&pdev->tx_capture.ctl_mgmt_q[i][j]);
+			qdf_spin_unlock_bh(
+				&pdev->tx_capture.ctl_mgmt_lock[i][j]);
+			retries_q = &pdev->tx_capture.retries_ctl_mgmt_q[i][j];
+			if (!qdf_nbuf_is_queue_empty(retries_q))
+				qdf_nbuf_queue_free(retries_q);
+		}
+	}
+
+	pdev->tx_capture.tx_cap_mode_flag = true;
+	QDF_TRACE(QDF_MODULE_ID_TX_CAPTURE, QDF_TRACE_LEVEL_INFO_LOW,
+		  "Mode change request done cur mode - %d\n",
+		  pdev->tx_capture_enabled);
+}
+
+/*
  * dp_config_enh_tx_capture()- API to enable/disable enhanced tx capture
  * @pdev_handle: DP_PDEV handle
  * @val: user provided value
@@ -759,10 +799,29 @@ QDF_STATUS
 dp_config_enh_tx_capture(struct cdp_pdev *pdev_handle, uint8_t val)
 {
 	struct dp_pdev *pdev = (struct dp_pdev *)pdev_handle;
-	int i, j;
 
 	qdf_spin_lock(&pdev->tx_capture.config_lock);
-	pdev->tx_capture_enabled = val;
+	if (pdev->tx_capture.tx_cap_mode_flag) {
+		pdev->tx_capture.tx_cap_mode_flag = false;
+		pdev->tx_capture_enabled = val;
+		QDF_TRACE(QDF_MODULE_ID_TX_CAPTURE, QDF_TRACE_LEVEL_INFO_LOW,
+			  "Mode change requested - %d\n",
+			  pdev->tx_capture_enabled);
+	} else if (!pdev->tx_capture.tx_cap_mode_flag &&
+		   !val && !!pdev->tx_capture_enabled) {
+		/* here the val is always 0 which is disable */
+		pdev->tx_capture_enabled = val;
+		pdev->tx_capture.tx_cap_mode_flag = false;
+		QDF_TRACE(QDF_MODULE_ID_TX_CAPTURE, QDF_TRACE_LEVEL_INFO_LOW,
+			  "Mode change requested - %d\n",
+			  pdev->tx_capture_enabled);
+	} else {
+		QDF_TRACE(QDF_MODULE_ID_TX_CAPTURE, QDF_TRACE_LEVEL_INFO_LOW,
+			  "Mode change request pending prev mode - %d\n",
+			  pdev->tx_capture_enabled);
+		qdf_spin_unlock(&pdev->tx_capture.config_lock);
+		return QDF_STATUS_E_BUSY;
+	}
 
 	if (pdev->tx_capture_enabled == CDP_TX_ENH_CAPTURE_ENABLE_ALL_PEERS ||
 	    pdev->tx_capture_enabled == CDP_TX_ENH_CAPTURE_ENDIS_PER_PEER) {
@@ -771,25 +830,13 @@ dp_config_enh_tx_capture(struct cdp_pdev *pdev_handle, uint8_t val)
 			dp_h2t_cfg_stats_msg_send(pdev,
 						  DP_PPDU_STATS_CFG_SNIFFER,
 						  pdev->pdev_id);
-	} else {
-		dp_soc_set_txrx_ring_map(pdev->soc);
-		dp_h2t_cfg_stats_msg_send(pdev,
-					  DP_PPDU_STATS_CFG_ENH_STATS,
-					  pdev->pdev_id);
-		dp_iterate_free_peer_msdu_q(pdev);
-		for (i = 0; i < TXCAP_MAX_TYPE; i++) {
-			for (j = 0; j < TXCAP_MAX_SUBTYPE; j++) {
-				qdf_spin_lock_bh(
-					&pdev->tx_capture.ctl_mgmt_lock[i][j]);
-				qdf_nbuf_queue_free(
-					&pdev->tx_capture.ctl_mgmt_q[i][j]);
-				qdf_spin_unlock_bh(
-					&pdev->tx_capture.ctl_mgmt_lock[i][j]);
-			}
-		}
+		pdev->tx_capture.tx_cap_mode_flag = true;
+		QDF_TRACE(QDF_MODULE_ID_TX_CAPTURE, QDF_TRACE_LEVEL_INFO_LOW,
+			  "Mode change request done cur mode - %d\n",
+			  pdev->tx_capture_enabled);
 	}
-
 	qdf_spin_unlock(&pdev->tx_capture.config_lock);
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -2965,6 +3012,9 @@ void dp_tx_ppdu_stats_process(void *context)
 			/* send WDI event */
 			if (pdev->tx_capture_enabled ==
 			    CDP_TX_ENH_CAPTURE_DISABLED) {
+				if (!pdev->tx_capture.tx_cap_mode_flag)
+					dp_enh_tx_capture_disable(pdev);
+
 				/**
 				 * Deliver PPDU stats only for valid (acked)
 				 * data frames if sniffer mode is not enabled.
@@ -3156,6 +3206,11 @@ dequeue_msdu_again:
 
 		qdf_spin_unlock(&ptr_tx_cap->config_lock);
 		qdf_mem_free(nbuf_ppdu_desc_list);
+
+		qdf_spin_lock(&pdev->tx_capture.config_lock);
+		if (!pdev->tx_capture.tx_cap_mode_flag)
+			dp_enh_tx_capture_disable(pdev);
+		qdf_spin_unlock(&pdev->tx_capture.config_lock);
 	}
 }
 
