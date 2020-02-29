@@ -707,3 +707,15 @@ QDF_STATUS wmi_unified_set_rx_pkt_type_routing_tag(
 	return QDF_STATUS_E_FAILURE;
 }
 #endif /* WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG */
+
+QDF_STATUS wmi_extract_muedca_params_handler(
+		wmi_unified_t wmi_handle,
+		void *evt_buf,
+		struct muedca_params *muedca_param_list)
+{
+	if (wmi_handle->ops->extract_muedca_params_handler)
+		return wmi_handle->ops->extract_muedca_params_handler(
+					wmi_handle, evt_buf, muedca_param_list);
+
+	return QDF_STATUS_E_FAILURE;
+}

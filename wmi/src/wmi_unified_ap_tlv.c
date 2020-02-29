@@ -1027,6 +1027,37 @@ static QDF_STATUS extract_tbttoffset_update_params_tlv(void *wmi_hdl,
 	return QDF_STATUS_SUCCESS;
 }
 
+static QDF_STATUS extract_muedca_params_tlv(wmi_unified_t wmi_hdl,
+					    void *evt_buf,
+					    struct muedca_params *muedca_param_list)
+{
+	WMI_MUEDCA_PARAMS_CONFIG_EVENTID_param_tlvs *param_buf;
+	wmi_muedca_params_config_event_fixed_param *muedca_param;
+	int i;
+
+	param_buf = (WMI_MUEDCA_PARAMS_CONFIG_EVENTID_param_tlvs *)evt_buf;
+	if (!param_buf) {
+		WMI_LOGE("%s: Invalid muedca evt buffer", __func__);
+		return QDF_STATUS_E_INVAL;
+	}
+	muedca_param = param_buf->fixed_param;
+
+	muedca_param_list->pdev_id = wmi_hdl->ops->
+		convert_target_pdev_id_to_host(muedca_param->pdev_id);
+	for (i = 0; i < WMI_AC_MAX; i++) {
+		muedca_param_list->muedca_aifsn[i] = muedca_param->aifsn[i] &
+						      WMI_MUEDCA_PARAM_MASK;
+		muedca_param_list->muedca_ecwmin[i] = muedca_param->ecwmin[i] &
+						      WMI_MUEDCA_PARAM_MASK;
+		muedca_param_list->muedca_ecwmax[i] = muedca_param->ecwmax[i] &
+						      WMI_MUEDCA_PARAM_MASK;
+		muedca_param_list->muedca_timer[i] = muedca_param->muedca_expiration_time[i] &
+						      WMI_MUEDCA_PARAM_MASK;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 /**
  * extract_ext_tbttoffset_update_params_tlv() - extract ext tbtt offset param
  * @wmi_handle: wmi handle
@@ -2807,6 +2838,8 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 				extract_tbttoffset_num_vdevs_tlv;
 	ops->extract_ext_tbttoffset_num_vdevs =
 				extract_ext_tbttoffset_num_vdevs_tlv;
+	ops->extract_muedca_params_handler =
+				extract_muedca_params_tlv;
 	ops->extract_swba_num_vdevs = extract_swba_num_vdevs_tlv;
 	ops->extract_swba_tim_info = extract_swba_tim_info_tlv;
 	ops->extract_swba_quiet_info = extract_swba_quiet_info_tlv;
