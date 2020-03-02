@@ -72,6 +72,7 @@ typedef const enum policy_mgr_conc_next_action
  * @CSA_REASON_LTE_COEX: LTE coex.
  * @CSA_REASON_CONCURRENT_NAN_EVENT: NAN concurrency.
  * @CSA_REASON_BAND_RESTRICTED: band disabled or re-enabled
+ * @CSA_REASON_DCS: DCS
  *
  */
 enum sap_csa_reason_code {
@@ -84,7 +85,8 @@ enum sap_csa_reason_code {
 	CSA_REASON_UNSAFE_CHANNEL,
 	CSA_REASON_LTE_COEX,
 	CSA_REASON_CONCURRENT_NAN_EVENT,
-	CSA_REASON_BAND_RESTRICTED
+	CSA_REASON_BAND_RESTRICTED,
+	CSA_REASON_DCS,
 };
 
 /**
@@ -1879,6 +1881,33 @@ QDF_STATUS policy_mgr_get_chan_by_session_id(struct wlan_objmgr_psoc *psoc,
 					     uint32_t *ch_freq);
 
 /**
+ * policy_mgr_get_sap_go_count_on_mac() - Provide the count of sap and go on
+ * given mac
+ * @psoc: PSOC object information
+ * @list: To provide the vdev_id of the satisfied sap and go (optional)
+ * @mac_id: MAC ID
+ *
+ * This function provides the count of the matched sap and go
+ *
+ * Return: count of the satisfied sap and go
+ */
+uint32_t policy_mgr_get_sap_go_count_on_mac(struct wlan_objmgr_psoc *psoc,
+					    uint32_t *list, uint8_t mac_id);
+
+/**
+ * policy_mgr_is_sta_gc_active_on_mac() - Is there active sta/gc for a
+ * given mac id
+ * @psoc: PSOC object information
+ * @mac_id: MAC ID
+ *
+ * Checks if there is active sta/gc for a given mac id
+ *
+ * Return: true if there is active sta/gc for a given mac id, false otherwise
+ */
+bool policy_mgr_is_sta_gc_active_on_mac(struct wlan_objmgr_psoc *psoc,
+					uint8_t mac_id);
+
+/**
  * policy_mgr_get_mac_id_by_session_id() - Get MAC ID for a given session ID
  * @psoc: PSOC object information
  * @session_id: Session ID
@@ -3301,5 +3330,18 @@ bool policy_mgr_is_sap_go_on_2g(struct wlan_objmgr_psoc *psoc);
  */
 bool policy_mgr_get_5g_scc_prefer(
 	struct wlan_objmgr_psoc *psoc, enum policy_mgr_con_mode mode);
+
+/**
+ * policy_mgr_dump_channel_list() - Print channel list
+ * @len: Length of pcl list
+ * @pcl_channels: pcl channels list
+ * @pcl_weight: pcl weight list
+ *
+ *
+ * Return: True or false
+ */
+bool policy_mgr_dump_channel_list(uint32_t len,
+				  uint32_t *pcl_channels,
+				  uint8_t *pcl_weight);
 
 #endif /* __WLAN_POLICY_MGR_API_H */

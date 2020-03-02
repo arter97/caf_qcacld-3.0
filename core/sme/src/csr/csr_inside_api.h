@@ -214,16 +214,31 @@ QDF_STATUS csr_roam_issue_reassoc(struct mac_context *mac, uint32_t sessionId,
 				  bool fImediate);
 void csr_roam_complete(struct mac_context *mac, enum csr_roamcomplete_result Result,
 		       void *Context, uint8_t session_id);
+
+/**
+ * csr_issue_set_context_req_helper  - Function to fill unicast/broadcast keys
+ * request to set the keys to fw
+ * @mac:         Poiner to mac context
+ * @profile:     Pointer to connected profile
+ * @vdev_id:     vdev id
+ * @bssid:       Connected BSSID
+ * @addkey:      Is add key request to crypto
+ * @unicast:     Unicast(1) or broadcast key(0)
+ * @key_direction: Key used in TX or RX or both Tx and RX path
+ * @key_id:       Key index
+ * @key_length:   Key length
+ * @key:          Pointer to the key
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS
-csr_roam_issue_set_context_req_helper(struct mac_context *mac,
-				      uint32_t session_id,
-				      eCsrEncryptionType encr_type,
-				      struct bss_description *bss_descr,
-				      tSirMacAddr *bssid, bool addkey,
-				      bool unicast,
-				      tAniKeyDirection key_direction,
-				      uint8_t key_id, uint16_t key_length,
-				      uint8_t *key, uint8_t pae_role);
+csr_issue_set_context_req_helper(struct mac_context *mac,
+				 struct csr_roam_profile *profile,
+				 uint32_t session_id,
+				 tSirMacAddr *bssid, bool addkey,
+				 bool unicast, tAniKeyDirection key_direction,
+				 uint8_t key_id, uint16_t key_length,
+				 uint8_t *key);
 
 QDF_STATUS csr_roam_process_disassoc_deauth(struct mac_context *mac,
 						tSmeCmd *pCommand,
@@ -254,10 +269,12 @@ eRoamCmdStatus csr_get_roam_complete_status(struct mac_context *mac,
 					    uint32_t sessionId);
 /* pBand can be NULL if caller doesn't need to get it */
 QDF_STATUS csr_roam_issue_disassociate_cmd(struct mac_context *mac,
-					uint32_t sessionId,
-					   eCsrRoamDisconnectReason reason);
+					   uint32_t sessionId,
+					   eCsrRoamDisconnectReason reason,
+					   tSirMacReasonCodes mac_reason);
 QDF_STATUS csr_roam_disconnect_internal(struct mac_context *mac, uint32_t sessionId,
-					eCsrRoamDisconnectReason reason);
+					eCsrRoamDisconnectReason reason,
+					tSirMacReasonCodes mac_reason);
 /* pCommand may be NULL */
 void csr_roam_remove_duplicate_command(struct mac_context *mac, uint32_t sessionId,
 				       tSmeCmd *pCommand,
@@ -813,15 +830,17 @@ void csr_roam_free_connect_profile(tCsrRoamConnectedProfile *profile);
 QDF_STATUS csr_apply_channel_and_power_list(struct mac_context *mac);
 
 /*
- * csr_roam_disconnect() -
- *  To disconnect from a network
+ * csr_roam_disconnect() - To disconnect from a network
+ * @mac: pointer to mac context
+ * @session_id: Session ID
+ * @reason: CSR disconnect reason code as per @enum eCsrRoamDisconnectReason
+ * @mac_reason: Mac Disconnect reason code as per @enum eSirMacReasonCodes
  *
- * Reason -- To indicate the reason for disconnecting. Currently, only
- * eCSR_DISCONNECT_REASON_MIC_ERROR is meanful.
  * Return QDF_STATUS
  */
-QDF_STATUS csr_roam_disconnect(struct mac_context *mac, uint32_t sessionId,
-			       eCsrRoamDisconnectReason reason);
+QDF_STATUS csr_roam_disconnect(struct mac_context *mac, uint32_t session_id,
+			       eCsrRoamDisconnectReason reason,
+			       tSirMacReasonCodes mac_reason);
 
 /* This function is used to stop a BSS. It is similar of csr_roamIssueDisconnect
  * but this function doesn't have any logic other than blindly trying to stop
@@ -914,6 +933,26 @@ QDF_STATUS csr_roam_del_pmkid_from_cache(struct mac_context *mac,
 					 uint32_t sessionId,
 					 tPmkidCacheInfo *pmksa,
 					 bool flush_cache);
+
+#if defined(WLAN_SAE_SINGLE_PMK) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
+/**
+ * csr_clear_sae_single_pmk - API to clear single_pmk_info cache
+ * @psoc: psoc common object
+ * @vdev_id: session id
+ * @pmksa: pmk info
+ *
+ * Return : None
+ */
+void csr_clear_sae_single_pmk(struct wlan_objmgr_psoc *psoc,
+			      uint8_t vdev_id, tPmkidCacheInfo *pmksa);
+
+#else
+static inline void
+csr_clear_sae_single_pmk(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			 tPmkidCacheInfo *pmksa)
+{
+}
+#endif
 
 QDF_STATUS csr_send_ext_change_channel(struct mac_context *mac_ctx,
 				uint32_t channel, uint8_t session_id);

@@ -502,9 +502,12 @@ dp_rx_get_fisa_flow(struct dp_rx_fst *fisa_hdl, struct dp_vdev *vdev,
 
 	flow_idx_valid = is_flow_idx_valid(flow_invalid, flow_timeout);
 	if (flow_idx_valid) {
-		qdf_assert_always(flow_idx < fisa_hdl->max_entries);
 		dp_fisa_debug("flow_idx is valid 0x%x", flow_idx);
-		return &sw_ft_base[flow_idx];
+		qdf_assert_always(flow_idx < fisa_hdl->max_entries);
+		sw_ft_entry = &sw_ft_base[flow_idx];
+		sw_ft_entry->vdev = vdev;
+
+		return sw_ft_entry;
 	}
 
 	/* else new flow, add entry to FT */
@@ -801,11 +804,15 @@ dp_rx_fisa_flush_udp_flow(struct dp_vdev *vdev,
 	dp_fisa_debug("fisa_flow->curr_aggr %d", fisa_flow->cur_aggr);
 	linear_skb = dp_fisa_rx_linear_skb(vdev, fisa_flow->head_skb, 24000);
 	if (linear_skb) {
-		vdev->osif_rx(vdev->osif_vdev, linear_skb);
+		if (qdf_likely(vdev->osif_rx))
+			vdev->osif_rx(vdev->osif_vdev, linear_skb);
 		/* Free non linear skb */
 		qdf_nbuf_free(fisa_flow->head_skb);
 	} else {
-		vdev->osif_rx(vdev->osif_vdev, fisa_flow->head_skb);
+		if (qdf_likely(vdev->osif_rx))
+			vdev->osif_rx(vdev->osif_vdev, fisa_flow->head_skb);
+		else
+			qdf_nbuf_free(fisa_flow->head_skb);
 	}
 
 out:
@@ -1015,6 +1022,9 @@ QDF_STATUS dp_fisa_rx(struct dp_soc *soc, struct dp_vdev *vdev,
 		next_nbuf = head_nbuf->next;
 		qdf_nbuf_set_next(head_nbuf, NULL);
 
+		qdf_nbuf_push_head(head_nbuf, RX_PKT_TLVS_LEN +
+				   QDF_NBUF_CB_RX_PACKET_L3_HDR_PAD(head_nbuf));
+
 		/* Add new flow if the there is no ongoing flow */
 		fisa_flow = dp_rx_get_fisa_flow(dp_fisa_rx_hdl, vdev,
 						head_nbuf);
@@ -1046,7 +1056,10 @@ pull_nbuf:
 deliver_nbuf: /* Deliver without FISA */
 		qdf_nbuf_set_next(head_nbuf, NULL);
 		hex_dump_skb_data(head_nbuf, false);
-		vdev->osif_rx(vdev->osif_vdev, head_nbuf);
+		if (qdf_likely(vdev->osif_rx))
+			vdev->osif_rx(vdev->osif_vdev, head_nbuf);
+		else
+			qdf_nbuf_free(head_nbuf);
 next_msdu:
 		head_nbuf = next_nbuf;
 	}

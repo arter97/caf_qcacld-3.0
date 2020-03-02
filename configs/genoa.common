@@ -97,8 +97,17 @@ ifeq ($(CONFIG_REMOVE_PKT_LOG), n)
 CONFIG_PKTLOG_HAS_SPECIFIC_DATA := y
 endif
 
-PANIC_ON_BUG := y
-WLAN_WARN_ON_ASSERT := y
+ifeq ($(CONFIG_SLUB_DEBUG), y)
+        PANIC_ON_BUG := y
+        WLAN_WARN_ON_ASSERT := y
+else ifeq ($(CONFIG_PERF_DEBUG), y)
+        PANIC_ON_BUG := y
+        WLAN_WARN_ON_ASSERT := y
+else
+        PANIC_ON_BUG := n
+        WLAN_WARN_ON_ASSERT := n
+endif
+
 CONFIG_WLAN_LOGGING_SOCK_SVC := y
 
 #Flag to enable wbuff feature
@@ -230,4 +239,6 @@ CONFIG_SAP_DHCP_FW_IND := n
 #Enable FW Offload
 CONFIG_WLAN_FW_OFFLOAD := y
 
+#Enable PCIe Shadow Register
+CONFIG_QCN7605_PCIE_SHADOW_REG_SUPPORT := y
 ###################################
