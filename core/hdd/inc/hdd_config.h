@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -449,15 +449,31 @@ enum hdd_dot11_mode {
 #endif
 
 #ifdef FEATURE_RUNTIME_PM
+
+/**
+ * enum hdd_runtime_pm_cfg - Runtime PM (RTPM) configuration options
+ * @hdd_runtime_pm_disabled: RTPM and CxPC aware RTPM  disabled
+ * @hdd_runtime_pm_static: RTPM enabled, but CxPC aware RTPM disabled
+ * @hdd_runtime_pm_dynamic: RTPM and CxPC aware RTPM enabled
+ */
+enum hdd_runtime_pm_cfg {
+	hdd_runtime_pm_disabled = 0,
+	hdd_runtime_pm_static = 1,
+	hdd_runtime_pm_dynamic = 2,
+};
+
 /*
  * <ini>
  * gRuntimePM - enable runtime suspend
  * @Min: 0
- * @Max: 1
+ * @Max: 2
  * @Default: 0
  *
- * This ini is used to enable runtime_suspend
+ * This ini is used to enable runtime PM
  *
+ * 0: RTPM disabled, so CxPC aware RTPM will be disabled as well
+ * 1: RTPM enabled, but CxPC aware RTPM disabled
+ * 2: RTPM enabled and CxPC aware RTPM enabled as well
  * Related: None
  *
  * Supported Feature: Power Save
@@ -466,9 +482,12 @@ enum hdd_dot11_mode {
  *
  * </ini>
  */
-#define CFG_ENABLE_RUNTIME_PM CFG_INI_BOOL( \
+#define CFG_ENABLE_RUNTIME_PM CFG_INI_UINT( \
 		"gRuntimePM", \
 		0, \
+		2, \
+		0, \
+		CFG_VALUE_OR_DEFAULT, \
 		"This ini is used to enable runtime_suspend")
 #define CFG_ENABLE_RUNTIME_PM_ALL \
 	CFG(CFG_ENABLE_RUNTIME_PM)
@@ -1295,26 +1314,27 @@ struct dhcp_server {
 
 /*
  * <ini>
- * gSarVersion - Used to specify SAR version
+ * gEnableSARV1toSARV2 - Used to Enable/Disable SAR version conversion
  *
- * @Min: 1
- * @Max: 2
- * Default: 1
+ * @Min: 0
+ * @Max: 1
+ * Default: 0
  *
- * This ini is used to specify the SAR feature version.
- * If value of this ini is set to 2, SAR version 2 will
- * be used.
+ * If user space is using SARV1 and FW is using SARV2 in BDF in that case
+ * this ini is used to enable conversion from user specified SARV1 command
+ * to FW expected SARV2 command.
+ * If value of this ini is set to 0, SAR version 1 will
+ * not be converted to SARV2 and command will be rejected.
+ * If value of this ini is set to 1 SAR version 1 will be converted to
+ * SARV2 based on FW capability
  * Usage: External
  *
  * </ini>
  */
-#define CFG_SAR_VERSION  CFG_INI_UINT( \
-			"gSarVersion", \
-			1, \
-			2, \
-			1, \
-			CFG_VALUE_OR_DEFAULT, \
-			"Specify the SAR version")
+#define CFG_SAR_CONVERSION  CFG_INI_BOOL( \
+			"gEnableSARV1toSARV2", \
+			0, \
+			"Enable/Disable conversion from SARV1 to SARV2")
 
 /*
  * <ini>
@@ -1487,7 +1507,7 @@ enum host_log_level {
 	CFG(CFG_TIMER_MULTIPLIER) \
 	CFG(CFG_HDD_DOT11_MODE) \
 	CFG(CFG_ENABLE_DISABLE_CHANNEL) \
-	CFG(CFG_SAR_VERSION) \
+	CFG(CFG_SAR_CONVERSION) \
 	CFG(CFG_WOW_DISABLE) \
 	CFG(CFG_ENABLE_HOST_MODULE_LOG_LEVEL)
 #endif

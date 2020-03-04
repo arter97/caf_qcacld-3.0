@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -335,7 +335,7 @@ int hdd_softap_inspect_dhcp_packet(struct hdd_adapter *adapter,
 						       macaddr->bytes);
 
 		if (!hdd_sta_info) {
-			hdd_err("Station not found");
+			hdd_debug("Station not found");
 			return -EINVAL;
 		}
 
@@ -422,7 +422,7 @@ static void __hdd_softap_hard_start_xmit(struct sk_buff *skb,
 	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
 	struct qdf_mac_addr *dest_mac_addr, *mac_addr;
 	static struct qdf_mac_addr bcast_mac_addr = QDF_MAC_ADDR_BCAST_INIT;
-
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	uint32_t num_seg;
 	struct hdd_station_info *sta_info;
 
@@ -596,8 +596,7 @@ static void __hdd_softap_hard_start_xmit(struct sk_buff *skb,
 		goto drop_pkt_and_release_skb;
 	}
 
-	if (adapter->tx_fn(adapter->txrx_vdev,
-		 (qdf_nbuf_t)skb) != NULL) {
+	if (adapter->tx_fn(soc, adapter->vdev_id, (qdf_nbuf_t)skb)) {
 		QDF_TRACE(QDF_MODULE_ID_HDD_SAP_DATA, QDF_TRACE_LEVEL_INFO_HIGH,
 			  "%s: Failed to send packet to txrx for sta: "
 			  QDF_MAC_ADDR_STR, __func__,
@@ -729,7 +728,6 @@ QDF_STATUS hdd_softap_deinit_tx_rx(struct hdd_adapter *adapter)
 	if (!adapter)
 		return QDF_STATUS_E_FAILURE;
 
-	adapter->txrx_vdev = NULL;
 	adapter->tx_fn = NULL;
 
 	return QDF_STATUS_SUCCESS;
@@ -859,7 +857,7 @@ QDF_STATUS hdd_softap_rx_packet_cbk(void *adapter_context, qdf_nbuf_t rx_buf)
 
 /* Debug code, remove later */
 #if defined(QCA_WIFI_QCA6290) || defined(QCA_WIFI_QCA6390) || \
-	defined(QCA_WIFI_QCA6490)
+    defined(QCA_WIFI_QCA6490) || defined(QCA_WIFI_QCA6750)
 		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_DEBUG,
 			 "%s: skb %pK skb->len %d\n", __func__, skb, skb->len);
 #endif
@@ -927,10 +925,15 @@ QDF_STATUS hdd_softap_rx_packet_cbk(void *adapter_context, qdf_nbuf_t rx_buf)
 
 		qdf_status = hdd_rx_deliver_to_stack(adapter, skb);
 
-		if (QDF_IS_STATUS_SUCCESS(qdf_status))
+		if (QDF_IS_STATUS_SUCCESS(qdf_status)) {
 			++adapter->hdd_stats.tx_rx_stats.rx_delivered[cpu_index];
-		else
+		} else {
 			++adapter->hdd_stats.tx_rx_stats.rx_refused[cpu_index];
+			DPTRACE(qdf_dp_log_proto_pkt_info(NULL, NULL, 0, 0,
+						      QDF_RX,
+						      QDF_TRACE_DEFAULT_MSDU_ID,
+						      QDF_TX_RX_STATUS_DROP));
+		}
 	}
 
 	return QDF_STATUS_SUCCESS;
@@ -984,10 +987,10 @@ QDF_STATUS hdd_softap_deregister_sta(struct hdd_adapter *adapter,
 
 	qdf_status = cdp_clear_peer(
 			cds_get_context(QDF_MODULE_ID_SOC),
-			(struct cdp_pdev *)cds_get_context(QDF_MODULE_ID_TXRX),
+			OL_TXRX_PDEV_ID,
 			*mac_addr);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
-		hdd_err("cdp_clear_peer failed for sta: " QDF_MAC_ADDR_STR
+		hdd_debug("cdp_clear_peer failed for sta: " QDF_MAC_ADDR_STR
 			", Status=%d [0x%08X]",
 			QDF_MAC_ADDR_ARRAY(mac_addr->bytes), qdf_status,
 			qdf_status);
@@ -999,9 +1002,9 @@ QDF_STATUS hdd_softap_deregister_sta(struct hdd_adapter *adapter,
 				      adapter->vdev_id,
 				      WLAN_IPA_CLIENT_DISCONNECT,
 				      mac_addr->bytes) != QDF_STATUS_SUCCESS)
-			hdd_err("WLAN_CLIENT_DISCONNECT event failed");
+			hdd_debug("WLAN_CLIENT_DISCONNECT event failed");
 	}
-	hdd_sta_info_detach(&adapter->sta_info_list, sta_info);
+	hdd_sta_info_detach(&adapter->sta_info_list, &sta_info);
 
 	ucfg_mlme_update_oce_flags(hdd_ctx->pdev);
 
@@ -1019,8 +1022,6 @@ QDF_STATUS hdd_softap_register_sta(struct hdd_adapter *adapter,
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct ol_txrx_ops txrx_ops;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
-	void *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
-	struct cdp_vdev *txrx_vdev = NULL;
 	struct hdd_ap_ctx *ap_ctx;
 	struct hdd_station_info *sta_info;
 
@@ -1033,8 +1034,8 @@ QDF_STATUS hdd_softap_register_sta(struct hdd_adapter *adapter,
 	sta_info = hdd_get_sta_info_by_mac(&adapter->sta_info_list,
 					   sta_mac->bytes);
 	if (sta_info) {
-		hdd_info("clean up old entry for STA MAC " QDF_MAC_ADDR_STR,
-			 QDF_MAC_ADDR_ARRAY(sta_mac->bytes));
+		hdd_debug("clean up old entry for STA MAC " QDF_MAC_ADDR_STR,
+			  QDF_MAC_ADDR_ARRAY(sta_mac->bytes));
 		hdd_softap_deregister_sta(adapter, sta_info);
 	}
 
@@ -1054,7 +1055,7 @@ QDF_STATUS hdd_softap_register_sta(struct hdd_adapter *adapter,
 					   sta_mac->bytes);
 
 	if (!sta_info) {
-		hdd_err("STA not found");
+		hdd_debug("STA not found");
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -1076,26 +1077,16 @@ QDF_STATUS hdd_softap_register_sta(struct hdd_adapter *adapter,
 		txrx_ops.rx.rx_flush = NULL;
 	}
 
-	txrx_vdev = cdp_get_vdev_from_vdev_id(soc,
-					      (struct cdp_pdev *)pdev,
-					      adapter->vdev_id);
-	if (!txrx_vdev)
-		return QDF_STATUS_E_FAILURE;
-
 	cdp_vdev_register(soc,
-			  txrx_vdev,
-			  adapter,
+			  adapter->vdev_id,
+			  (ol_osif_vdev_handle)adapter,
 			  &txrx_ops);
-	adapter->txrx_vdev = cdp_get_vdev_from_vdev_id(soc,
-					(struct cdp_pdev *)pdev,
-					adapter->vdev_id);
 	adapter->tx_fn = txrx_ops.tx.tx;
 
-	qdf_status = cdp_peer_register(soc,
-			(struct cdp_pdev *)pdev, &txrx_desc);
+	qdf_status = cdp_peer_register(soc, OL_TXRX_PDEV_ID, &txrx_desc);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
-		hdd_err("cdp_peer_register() failed to register.  Status = %d [0x%08X]",
-			qdf_status, qdf_status);
+		hdd_debug("cdp_peer_register() failed to register.  Status = %d [0x%08X]",
+			  qdf_status, qdf_status);
 		return qdf_status;
 	}
 
@@ -1108,8 +1099,8 @@ QDF_STATUS hdd_softap_register_sta(struct hdd_adapter *adapter,
 	sta_info->is_qos_enabled = wmm_enabled;
 
 	if (!auth_required) {
-		hdd_info("open/shared auth STA MAC= " QDF_MAC_ADDR_STR
-			 ".  Changing TL state to AUTHENTICATED at Join time",
+		hdd_debug("open/shared auth STA MAC= " QDF_MAC_ADDR_STR
+			  ".  Changing TL state to AUTHENTICATED at Join time",
 			 QDF_MAC_ADDR_ARRAY(sta_info->sta_mac.bytes));
 
 		/* Connections that do not need Upper layer auth,
@@ -1127,8 +1118,8 @@ QDF_STATUS hdd_softap_register_sta(struct hdd_adapter *adapter,
 							sta_mac);
 	} else {
 
-		hdd_info("ULA auth STA MAC = " QDF_MAC_ADDR_STR
-			 ".  Changing TL state to CONNECTED at Join time",
+		hdd_debug("ULA auth STA MAC = " QDF_MAC_ADDR_STR
+			  ".  Changing TL state to CONNECTED at Join time",
 			 QDF_MAC_ADDR_ARRAY(sta_info->sta_mac.bytes));
 
 		qdf_status = hdd_change_peer_state(adapter,
@@ -1204,8 +1195,9 @@ QDF_STATUS hdd_softap_stop_bss(struct hdd_adapter *adapter)
 						   sta_info);
 
 		if (QDF_IS_STATUS_ERROR(status) && sta_info)
-			hdd_err("Deregistering STA " QDF_MAC_ADDR_STR " failed",
-				QDF_MAC_ADDR_ARRAY(sta_info->sta_mac.bytes));
+			hdd_debug("Deregistering STA " QDF_MAC_ADDR_STR
+				  " failed",
+				  QDF_MAC_ADDR_ARRAY(sta_info->sta_mac.bytes));
 	}
 
 	if (adapter->device_mode == QDF_SAP_MODE &&
@@ -1246,8 +1238,8 @@ QDF_STATUS hdd_softap_change_sta_state(struct hdd_adapter *adapter,
 					   sta_mac->bytes);
 
 	if (!sta_info) {
-		hdd_err("Failed to find right station MAC: " QDF_MAC_ADDR_STR,
-			QDF_MAC_ADDR_ARRAY(sta_mac->bytes));
+		hdd_debug("Failed to find right station MAC: " QDF_MAC_ADDR_STR,
+			  QDF_MAC_ADDR_ARRAY(sta_mac->bytes));
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -1259,8 +1251,8 @@ QDF_STATUS hdd_softap_change_sta_state(struct hdd_adapter *adapter,
 	qdf_status =
 		hdd_change_peer_state(adapter, mac_addr.bytes,
 				      state, false);
-	hdd_info("Station " QDF_MAC_ADDR_STR " changed to state %d",
-		 QDF_MAC_ADDR_ARRAY(mac_addr.bytes), state);
+	hdd_debug("Station " QDF_MAC_ADDR_STR " changed to state %d",
+		  QDF_MAC_ADDR_ARRAY(mac_addr.bytes), state);
 
 	if (QDF_STATUS_SUCCESS == qdf_status) {
 		sta_info->peer_state = OL_TXRX_PEER_STATE_AUTH;
