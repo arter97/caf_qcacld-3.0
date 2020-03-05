@@ -2076,6 +2076,28 @@ static QDF_STATUS hdd_conn_change_peer_state(struct hdd_adapter *adapter,
 }
 #endif
 
+#if defined(WLAN_SUPPORT_RX_FISA)
+/**
+ * hdd_rx_register_fisa_ops() - FISA callback functions
+ * @txrx_ops: operations handle holding callback functions
+ * @hdd_rx_fisa_cbk: callback for fisa aggregation handle function
+ * @hdd_rx_fisa_flush: callback function to flush fisa aggregation
+ *
+ * Return: None
+ */
+static inline void
+hdd_rx_register_fisa_ops(struct ol_txrx_ops *txrx_ops)
+{
+	txrx_ops->rx.osif_fisa_rx = hdd_rx_fisa_cbk;
+	txrx_ops->rx.osif_fisa_flush = hdd_rx_fisa_flush;
+}
+#else
+static inline void
+hdd_rx_register_fisa_ops(struct ol_txrx_ops *txrx_ops)
+{
+}
+#endif
+
 /**
  * hdd_roam_register_sta() - register station
  * @adapter: pointer to adapter
@@ -2132,6 +2154,12 @@ QDF_STATUS hdd_roam_register_sta(struct hdd_adapter *adapter,
 		txrx_ops.rx.rx = hdd_rx_packet_cbk;
 		txrx_ops.rx.rx_stack = NULL;
 		txrx_ops.rx.rx_flush = NULL;
+	}
+
+	if (adapter->hdd_ctx->config->fisa_enable &&
+		(adapter->device_mode != QDF_MONITOR_MODE)) {
+		hdd_debug("FISA feature enabled");
+		hdd_rx_register_fisa_ops(&txrx_ops);
 	}
 
 	txrx_ops.rx.stats_rx = hdd_tx_rx_collect_connectivity_stats_info;
@@ -2949,8 +2977,6 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 			adapter->wapi_info.is_wapi_sta = false;
 		}
 #endif /* FEATURE_WLAN_WAPI */
-		hdd_debug("bss_descr[%d] devicemode[%d]", !!roam_info->bss_desc,
-			  adapter->device_mode);
 		if ((QDF_STA_MODE == adapter->device_mode) &&
 						roam_info->bss_desc) {
 			ie_len = GET_IE_LEN_IN_BSS(roam_info->bss_desc->length);
@@ -3029,7 +3055,6 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 
 		conn_info_freq = sta_ctx->conn_info.chan_freq;
 
-		hdd_debug("check if STA chan ok for DNBS");
 		if (policy_mgr_is_chan_ok_for_dnbs(hdd_ctx->psoc,
 						   conn_info_freq, &ok)) {
 			hdd_err("Unable to check DNBS eligibility for chan(freq):%u",
@@ -3133,7 +3158,6 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 					FT_ASSOC_RSP_IES_OFFSET;
 
 				hdd_debug("assoc_rsp_len %d", assoc_rsp_len);
-				hdd_debug("Assoc Rsp IE dump");
 				QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_HDD,
 						   QDF_TRACE_LEVEL_DEBUG,
 						   assoc_rsp,
@@ -3172,7 +3196,6 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 				}
 
 				hdd_debug("assoc_req_len %d", assoc_req_len);
-				hdd_debug("Assoc/Reassoc Req IE dump");
 				QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_HDD,
 						   QDF_TRACE_LEVEL_DEBUG,
 						   assoc_req,
