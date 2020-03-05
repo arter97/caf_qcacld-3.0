@@ -1721,7 +1721,6 @@ QDF_STATUS sme_get_tsm_stats(mac_handle_t mac_handle,
 	}
 	return status;
 }
-#endif
 
 /**
  * sme_set_ese_roam_scan_channel_list() - To set ese roam scan channel list
