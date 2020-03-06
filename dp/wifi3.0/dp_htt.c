@@ -274,6 +274,15 @@ dp_tx_stats_update(struct dp_soc *soc, struct dp_peer *peer,
 		return;
 
 	if (ppdu->completion_status != HTT_PPDU_STATS_USER_STATUS_OK) {
+		/*
+		 *
+		 * All failed mpdu will be retried, so incrementing
+		 * retries mpdu based on mpdu failed. Even for
+		 * ack failure i.e for long retries we get
+		 * mpdu failed equal mpdu tried.
+		 */
+		DP_STATS_INC(peer, tx.retries, mpdu_failed);
+		DP_STATS_INC(peer, tx.tx_failed, ppdu->failed_msdus);
 		return;
 	}
 
