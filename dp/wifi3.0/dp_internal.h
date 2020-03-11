@@ -2195,6 +2195,34 @@ void mscs_parse_ipv4(uint8_t *data,
 
 int mscs_parse_ipv6(uint8_t *data,
 		    struct dp_peer_mscs_tuple_ipv6 *mscs_tuple);
+
+uint8_t dp_mscs_get_tid(struct dp_soc *soc, struct dp_vdev *vdev,
+			uint8_t *data, uint8_t tid);
+
+void dp_mscs_set_tid(struct dp_peer *peer, uint8_t *data, uint8_t tid);
+
+void
+dp_mscs_rx_set_tid_ipv4(struct dp_peer_mscs_session_ipv4
+	*mscs_session_ipv4, struct dp_peer_mscs_tuple_ipv4
+	*ipv4_params, struct dp_peer_mscs_parameter *params, u_int8_t tid);
+
+uint8_t
+dp_mscs_tx_get_tid_ipv4(struct dp_peer_mscs_session_ipv4
+	*mscs_session_ipv4, struct dp_peer_mscs_tuple_ipv4
+	*ipv4_params, struct dp_peer_mscs_parameter *params, uint8_t tid);
+
+#else
+static inline uint8_t
+dp_mscs_get_tid(struct dp_soc *soc, struct dp_vdev *vdev,
+		uint8_t *data, uint8_t tid)
+{
+	return tid;
+}
+
+static inline void
+dp_mscs_set_tid(struct dp_peer *peer, uint8_t *data, uint8_t tid)
+{
+}
 #endif
 
 #if defined(WLAN_SUPPORT_RX_FISA)
