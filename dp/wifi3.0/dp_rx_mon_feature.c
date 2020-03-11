@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -28,6 +28,8 @@
 #include "dp_internal.h"
 #include "qdf_mem.h"   /* qdf_mem_malloc,free */
 #include "wlan_cfg.h"
+#include "dp_htt.h"
+#include "dp_mon_filter.h"
 
 #ifdef WLAN_RX_PKT_CAPTURE_ENH
 
@@ -79,6 +81,7 @@ dp_rx_populate_cdp_indication_mpdu_info(
 
 	cdp_mpdu_info->ppdu_id = ppdu_info->com_info.ppdu_id;
 	cdp_mpdu_info->channel = ppdu_info->rx_status.chan_num;
+	cdp_mpdu_info->chan_freq = ppdu_info->rx_status.chan_freq;
 	cdp_mpdu_info->duration = ppdu_info->rx_status.duration;
 	cdp_mpdu_info->timestamp = ppdu_info->rx_status.tsft;
 	cdp_mpdu_info->bw = ppdu_info->rx_status.bw;
@@ -597,13 +600,13 @@ dp_rx_mon_enh_capture_process(struct dp_pdev *pdev, uint32_t tlv_status,
  * Return: 0 for success. nonzero for failure.
  */
 QDF_STATUS
-dp_config_enh_rx_capture(struct cdp_pdev *pdev_handle, uint32_t val)
+dp_config_enh_rx_capture(struct dp_pdev *pdev, uint32_t val)
 {
-	struct dp_pdev *pdev = (struct dp_pdev *)pdev_handle;
 	uint8_t rx_cap_mode = (val & CDP_RX_ENH_CAPTURE_MODE_MASK);
 	uint32_t rx_enh_capture_peer;
 	bool is_mpdu_hdr = false;
 	uint8_t user_id;
+	enum dp_mon_filter_action action = DP_MON_FILTER_SET;
 
 	rx_enh_capture_peer =
 		(val & CDP_RX_ENH_CAPTURE_PEER_MASK)
@@ -620,17 +623,34 @@ dp_config_enh_rx_capture(struct cdp_pdev *pdev_handle, uint32_t val)
 		return QDF_STATUS_E_INVAL;
 	}
 
+	if ((pdev->rx_enh_capture_mode == CDP_RX_ENH_CAPTURE_DISABLED) &&
+			(rx_cap_mode == CDP_RX_ENH_CAPTURE_DISABLED)) {
+		dp_err("Rx capture is already disabled %d", rx_cap_mode);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/*
+	 * Store the monitor vdev if present. The monitor vdev will be restored
+	 * when the Rx enhance capture mode will be disabled.
+	 */
 	if (pdev->rx_enh_capture_mode == CDP_RX_ENH_CAPTURE_DISABLED &&
 	    rx_cap_mode != CDP_RX_ENH_CAPTURE_DISABLED) {
 		pdev->rx_enh_monitor_vdev = pdev->monitor_vdev;
 	}
 
-	dp_reset_monitor_mode(pdev_handle);
+	/*
+	 * Disable the monitor mode and re-enable it later if enhance capture
+	 * gets enabled later.
+	 */
+	dp_reset_monitor_mode((struct cdp_soc_t *)pdev->soc, pdev->pdev_id, 0);
 
 	if (pdev->rx_enh_capture_mode != CDP_RX_ENH_CAPTURE_DISABLED &&
 	    rx_cap_mode == CDP_RX_ENH_CAPTURE_DISABLED) {
 		pdev->monitor_vdev = pdev->rx_enh_monitor_vdev;
+		pdev->rx_enh_monitor_vdev = NULL;
+		action = DP_MON_FILTER_CLEAR;
 	}
+
 	pdev->rx_enh_capture_mode = rx_cap_mode;
 	pdev->rx_enh_capture_peer = rx_enh_capture_peer;
 
@@ -643,7 +663,41 @@ dp_config_enh_rx_capture(struct cdp_pdev *pdev_handle, uint32_t val)
 	/* Use a bit from val to enable MSDU trailer for internal debug use */
 	pdev->is_rx_enh_capture_trailer_enabled =
 		(val & RX_ENH_CAPTURE_TRAILER_ENABLE_MASK) ? true : false;
-	return dp_pdev_configure_monitor_rings(pdev);
+
+	/*
+	 * Restore the monitor filters if previously monitor mode was enabled.
+	 */
+	if (pdev->monitor_vdev) {
+		pdev->monitor_configured = true;
+		dp_mon_filter_setup_mon_mode(pdev);
+	}
+
+	/*
+	 * Clear up the monitor mode filters if the monitor mode is enabled.
+	 * Resotre the monitor mode filters once the Rx enhance capture is
+	 * disabled.
+	 */
+	if (action == DP_MON_FILTER_SET)
+		dp_mon_filter_setup_rx_enh_capture(pdev);
+	else
+		dp_mon_filter_reset_rx_enh_capture(pdev);
+
+	return dp_mon_filter_update(pdev);
 }
 
+QDF_STATUS
+dp_peer_set_rx_capture_enabled(struct dp_pdev *pdev, struct dp_peer *peer,
+			       bool value, uint8_t *mac_addr)
+{
+	if (!peer) {
+		dp_err("Invalid Peer");
+		if (value)
+			return QDF_STATUS_E_FAILURE;
+		return QDF_STATUS_SUCCESS;
+	}
+
+	peer->rx_cap_enabled = value;
+
+	return QDF_STATUS_SUCCESS;
+}
 #endif /* WLAN_RX_PKT_CAPTURE_ENH */

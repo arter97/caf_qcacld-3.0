@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -35,6 +35,16 @@ struct dp_tx_desc_s;
 #define TXCAP_MAX_SUBTYPE \
 	((IEEE80211_FC0_SUBTYPE_MASK >> IEEE80211_FC0_SUBTYPE_SHIFT) + 1)
 
+#define SIFS_INTERVAL 16
+
+#define MAX_MGMT_PEER_FILTER 16
+struct dp_peer_mgmt_list {
+	uint8_t mac_addr[QDF_MAC_ADDR_SIZE];
+	uint32_t mgmt_pkt_counter;
+	uint16_t peer_id;
+	bool avail;
+};
+
 struct dp_pdev_tx_capture {
 	/* For deferred PPDU status processing */
 	qdf_spinlock_t ppdu_stats_lock;
@@ -60,6 +70,8 @@ struct dp_pdev_tx_capture {
 	qdf_spinlock_t config_lock;
 	uint32_t htt_frame_type[TX_CAP_HTT_MAX_FTYPE];
 	struct cdp_tx_completion_ppdu dummy_ppdu_desc;
+	struct dp_peer_mgmt_list *ptr_peer_mgmt_list;
+	bool tx_cap_mode_flag;
 };
 
 /* Tx TID */
@@ -73,6 +85,9 @@ struct dp_tx_tid {
 	qdf_nbuf_queue_t msdu_comp_q;
 	qdf_nbuf_queue_t pending_ppdu_q;
 	struct cdp_tx_completion_ppdu xretry_ppdu;
+	uint16_t first_data_seq_ctrl;
+	uint32_t mpdu_cnt;
+	uint32_t mpdu_fcs_ok_bitmap[QDF_MON_STATUS_MPDU_FCS_BMAP_NWORDS];
 };
 
 struct dp_peer_tx_capture {
@@ -179,7 +194,7 @@ QDF_STATUS dp_tx_add_to_comp_queue(struct dp_soc *soc,
  * Return: QDF_STATUS
  */
 QDF_STATUS
-dp_config_enh_tx_capture(struct cdp_pdev *pdev_handle, uint8_t val);
+dp_config_enh_tx_capture(struct dp_pdev *pdev_handle, uint8_t val);
 
 /*
  * dp_deliver_mgmt_frm: Process
@@ -255,5 +270,89 @@ void dp_print_pdev_tx_capture_stats(struct dp_pdev *pdev);
 QDF_STATUS dp_send_ack_frame_to_stack(struct dp_soc *soc,
 				      struct dp_pdev *pdev,
 				      struct hal_rx_ppdu_info *ppdu_info);
+
+/**
+ * dp_handle_tx_capture_from_dest: Handle any TX capture frames from
+ * monitor destination path.
+ * @soc: SoC handle
+ * @pdev: PDEV pointer
+ * @mon_mpdu: mpdu from monitor destination path
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+dp_handle_tx_capture_from_dest(struct dp_soc *soc, struct dp_pdev *pdev,
+			       qdf_nbuf_t mon_mpdu);
+
+/**
+ * dp_peer_set_tx_capture_enabled: Set tx_cap_enabled bit in peer
+ * @pdev: DP PDEV handle
+ * @peer: Peer handle
+ * @value: Enable/disable setting for tx_cap_enabled
+ * @peer_mac: peer_mac Enable/disable setting for tx_cap_enabled
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+dp_peer_set_tx_capture_enabled(struct dp_pdev *pdev,
+			       struct dp_peer *peer, uint8_t value,
+			       uint8_t *peer_mac);
+
+/*
+ * dp_peer_tx_cap_add_filter: add peer filter mgmt pkt based on peer
+ * and mac address
+ * @pdev: DP PDEV handle
+ * @peer_id: DP PEER ID
+ * @mac_addr: pointer to mac address
+ *
+ * return: true on added and false on not failed
+ */
+bool dp_pdev_tx_cap_add_filter(struct dp_pdev *pdev,
+			       uint16_t peer_id, uint8_t *mac_addr);
+
+/*
+ * dp_peer_tx_cap_del_filter: delete peer filter mgmt pkt based on peer
+ * and mac address
+ * @pdev: DP PDEV handle
+ * @peer_id: DP PEER ID
+ * @mac_addr: pointer to mac address
+ *
+ * return: true on added and false on not failed
+ */
+bool dp_peer_tx_cap_del_filter(struct dp_pdev *pdev,
+			       uint16_t peer_id, uint8_t *mac_addr);
+
+/*
+ * dp_peer_tx_cap_print_mgmt_filter: pradd peer filter mgmt pkt based on peer
+ * and mac address
+ * @pdev: DP PDEV handle
+ * @peer_id: DP PEER ID
+ * @mac_addr: pointer to mac address
+ *
+ * return: true on added and false on not failed
+ */
+void dp_peer_tx_cap_print_mgmt_filter(struct dp_pdev *pdev,
+				      uint16_t peer_id, uint8_t *mac_addr);
+
+/*
+ * dp_peer_mgmt_pkt_filter: filter mgmt pkt based on peer and mac address
+ * @pdev: DP PDEV handle
+ * @nbuf: buffer containing the ppdu_desc
+ *
+ * return: status
+ */
+bool is_dp_peer_mgmt_pkt_filter(struct dp_pdev *pdev,
+				uint32_t peer_id, uint8_t *mac_addr);
+
+/*
+ * dp_peer_tx_capture_filter_check: check filter is enable for the filter
+ * and update tx_cap_enabled flag
+ * @pdev: DP PDEV handle
+ * @peer: DP PEER handle
+ *
+ * return: void
+ */
+void dp_peer_tx_capture_filter_check(struct dp_pdev *pdev,
+				     struct dp_peer *peer);
 #endif
 #endif

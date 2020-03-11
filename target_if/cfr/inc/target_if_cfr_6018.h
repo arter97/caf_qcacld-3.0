@@ -59,8 +59,8 @@
 
 #define CYP_MAX_HEADER_LENGTH_WORDS 16
 
-/* Max(2048, 16016, 10240) */
-#define CYP_MAX_DATA_LENGTH_BYTES 16016
+/* payload_len = Max(2048, 16016, 10240) = 16064 (64-bit alignment) */
+#define CYP_MAX_DATA_LENGTH_BYTES 16064
 
 /* in ms */
 #define LUT_AGE_TIMER 3000
@@ -254,18 +254,18 @@ QDF_STATUS cfr_6018_deinit_pdev(
  * entries
  * @pdev: pointer to pdev object
  *
- * Return: Success/Failure status
+ * Return: None
  */
-QDF_STATUS target_if_cfr_start_lut_age_timer(struct wlan_objmgr_pdev *pdev);
+void target_if_cfr_start_lut_age_timer(struct wlan_objmgr_pdev *pdev);
 
 /**
  * target_if_cfr_stop_lut_age_timer() - Stop timer to flush aged-out LUT
  * entries
  * @pdev: pointer to pdev object
  *
- * Return: Success/Failure status
+ * Return: None
  */
-QDF_STATUS target_if_cfr_stop_lut_age_timer(struct wlan_objmgr_pdev *pdev);
+void target_if_cfr_stop_lut_age_timer(struct wlan_objmgr_pdev *pdev);
 
 /**
  * target_if_cfr_dump_lut_enh() - Dump all valid LUT entries
@@ -308,6 +308,15 @@ void target_if_cfr_default_ta_ra_config(struct cfr_rcc_param *rcc_param,
  * Return: none
  */
 void target_if_cfr_rx_tlv_process(struct wlan_objmgr_pdev *pdev, void *nbuf);
+
+/**
+ * target_if_cfr_update_global_cfg() - Update global config after a successful
+ * commit
+ * @pdev: pointer to pdev object
+ *
+ * Return: None
+ */
+void target_if_cfr_update_global_cfg(struct wlan_objmgr_pdev *pdev);
 #else
 static QDF_STATUS cfr_6018_init_pdev(
 		struct wlan_objmgr_psoc *psoc,

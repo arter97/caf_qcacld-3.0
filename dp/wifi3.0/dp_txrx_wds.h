@@ -26,7 +26,11 @@
 ((DP_WDS_AST_AGING_TIMER_DEFAULT_MS / DP_AST_AGING_TIMER_DEFAULT_MS) - 1)
 void dp_soc_wds_attach(struct dp_soc *soc);
 void dp_soc_wds_detach(struct dp_soc *soc);
-
+#ifdef QCA_PEER_MULTIQ_SUPPORT
+int dp_peer_find_ast_index_by_flowq_id(struct cdp_soc_t *soc,
+	       uint16_t vdev_id, uint8_t *peer_mac_addr,
+	       uint8_t flow_id, uint8_t tid);
+#endif
 void
 dp_rx_da_learn(struct dp_soc *soc,
 	       uint8_t *rx_tlv_hdr,
@@ -286,11 +290,10 @@ static inline void
 dp_rx_wds_srcport_learn(struct dp_soc *soc,
 			uint8_t *rx_tlv_hdr,
 			struct dp_peer *ta_peer,
-			qdf_nbuf_t nbuf)
+			qdf_nbuf_t nbuf,
+			struct hal_rx_msdu_metadata msdu_end_info)
 {
-	uint16_t sa_sw_peer_id = hal_rx_msdu_end_sa_sw_peer_id_get(soc->hal_soc, rx_tlv_hdr);
-	uint8_t sa_is_valid = hal_rx_msdu_end_sa_is_valid_get(soc->hal_soc, rx_tlv_hdr);
-	uint16_t sa_idx;
+	uint8_t sa_is_valid = qdf_nbuf_is_sa_valid(nbuf);
 	uint8_t is_chfrag_start = 0;
 	uint8_t is_ad4_valid = 0;
 
@@ -305,11 +308,9 @@ dp_rx_wds_srcport_learn(struct dp_soc *soc,
 	/*
 	 * Get the AST entry from HW SA index and mark it as active
 	 */
-	sa_idx = hal_rx_msdu_end_sa_idx_get(soc->hal_soc, rx_tlv_hdr);
-
 	dp_rx_wds_add_or_update_ast(soc, ta_peer, nbuf, is_ad4_valid,
 				    sa_is_valid, is_chfrag_start,
-				    sa_idx, sa_sw_peer_id);
+				    msdu_end_info.sa_idx, msdu_end_info.sa_sw_peer_id);
 }
 
 /*

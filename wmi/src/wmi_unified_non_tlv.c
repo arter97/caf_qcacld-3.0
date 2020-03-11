@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -20,7 +20,6 @@
 #include "wmi_unified_priv.h"
 #include "target_type.h"
 #include <qdf_module.h>
-
 #if defined(WMI_NON_TLV_SUPPORT) || defined(WMI_TLV_AND_NON_TLV_SUPPORT)
 #include "wmi.h"
 #include "wmi_unified.h"
@@ -501,6 +500,11 @@ static QDF_STATUS send_vdev_start_cmd_non_tlv(wmi_unified_t wmi,
 	cmd->chan.band_center_freq1 = param->channel.cfreq1;
 	cmd->chan.band_center_freq2 = param->channel.cfreq2;
 	cmd->disable_hw_ack = param->disable_hw_ack;
+	cmd->beacon_interval = param->beacon_interval;
+	cmd->dtim_period = param->dtim_period;
+	cmd->bcn_tx_rate = param->bcn_tx_rate_code;
+	if (param->bcn_tx_rate_code)
+		cmd->flags |= WMI_UNIFIED_VDEV_START_BCN_TX_RATE_PRESENT;
 
 	WMI_SET_CHANNEL_MIN_POWER(&cmd->chan, param->channel.minpower);
 	WMI_SET_CHANNEL_MAX_POWER(&cmd->chan, param->channel.maxpower);
@@ -1179,6 +1183,22 @@ static QDF_STATUS send_peer_create_cmd_non_tlv(wmi_unified_t wmi_handle,
 		wmi_buf_free(buf);
 	}
 	return ret;
+}
+
+/**
+ * send_peer_vlan_config_cmd_non_tlv() - Send PEER vlan hw accel cmdd to fw
+ * @wmi: wmi handle
+ * @peer_addr: peer mac addr
+ * @param: struct peer_vlan_config_param *
+ *
+ * It is not supported for legacy.
+ * Return: QDF_STATUS_E_NOSUPPORT
+ */
+static QDF_STATUS send_peer_vlan_config_cmd_non_tlv(wmi_unified_t wmi,
+					uint8_t peer_addr[QDF_MAC_ADDR_SIZE],
+					struct peer_vlan_config_param *param)
+{
+	return QDF_STATUS_E_NOSUPPORT;
 }
 
 /**
@@ -7030,22 +7050,100 @@ static QDF_STATUS extract_hal_reg_cap_non_tlv(wmi_unified_t wmi_handle,
 }
 
 /**
- * extract_host_mem_req_non_tlv() - Extract host memory request event
+ * extract_num_mem_reqs_non_tlv() - Extract number of memory entries requested
  * @wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @param num_entries: pointer to hold number of entries requested
+ * @evt_buf: pointer to event buffer
  *
  * Return: Number of entries requested
  */
-static host_mem_req *extract_host_mem_req_non_tlv(wmi_unified_t wmi_handle,
-		void *evt_buf, uint8_t *num_entries)
+static uint32_t extract_num_mem_reqs_non_tlv(wmi_unified_t wmi_handle,
+					     void *evt_buf)
 {
 	wmi_service_ready_event *ev;
 
 	ev = (wmi_service_ready_event *) evt_buf;
 
-	*num_entries = ev->num_mem_reqs;
-	return (host_mem_req *)ev->mem_reqs;
+	return ev->num_mem_reqs;
+}
+
+/**
+ * extract_host_mem_req_non_tlv() - Extract host memory required from
+ *                                  service ready event
+ * @wmi_handle: wmi handle
+ * @evt_buf: pointer to event buffer
+ * @mem_reqs: pointer to host memory request structure
+ * @num_active_peers: number of active peers for peer cache
+ * @num_peers: number of peers
+ * @fw_prio: FW priority
+ * @idx: index for memory request
+ *
+ * Return: Host memory request parameters requested by target
+ */
+static QDF_STATUS extract_host_mem_req_non_tlv(wmi_unified_t wmi_handle,
+		void *evt_buf, host_mem_req *mem_reqs,
+		uint32_t num_active_peers, uint32_t num_peers,
+		enum wmi_fw_mem_prio fw_prio, uint16_t idx)
+{
+	wmi_service_ready_event *ev;
+
+	ev = (wmi_service_ready_event *) evt_buf;
+
+	mem_reqs->req_id = (uint32_t)ev->mem_reqs[idx].req_id;
+	mem_reqs->unit_size = (uint32_t)ev->mem_reqs[idx].unit_size;
+	mem_reqs->num_unit_info =
+		(uint32_t)ev->mem_reqs[idx].num_unit_info;
+	mem_reqs->num_units = (uint32_t)ev->mem_reqs[idx].num_units;
+	mem_reqs->tgt_num_units = 0;
+
+	if (((fw_prio == WMI_FW_MEM_HIGH_PRIORITY) &&
+	     (mem_reqs->num_unit_info &
+	      REQ_TO_HOST_FOR_CONT_MEMORY)) ||
+	    ((fw_prio == WMI_FW_MEM_LOW_PRIORITY) &&
+	     (!(mem_reqs->num_unit_info &
+	      REQ_TO_HOST_FOR_CONT_MEMORY)))) {
+		/* First allocate the memory that requires contiguous memory */
+		mem_reqs->tgt_num_units = mem_reqs->num_units;
+		if (mem_reqs->num_unit_info) {
+			if (mem_reqs->num_unit_info &
+					NUM_UNITS_IS_NUM_PEERS) {
+				/*
+				 * number of units allocated is equal to number
+				 * of peers, 1 extra for self peer on target.
+				 * this needs to be fixed, host and target can
+				 * get out of sync
+				 */
+				mem_reqs->tgt_num_units =
+					num_peers + 1;
+			}
+			if (mem_reqs->num_unit_info &
+					NUM_UNITS_IS_NUM_ACTIVE_PEERS) {
+				/*
+				 * Requesting allocation of memory using
+				 * num_active_peers in qcache. if qcache is
+				 * disabled in host, then it should allocate
+				 * memory for num_peers instead of
+				 * num_active_peers.
+				 */
+				if (num_active_peers)
+					mem_reqs->tgt_num_units =
+						num_active_peers + 1;
+				else
+					mem_reqs->tgt_num_units =
+						num_peers + 1;
+			}
+		}
+
+		WMI_LOGI("idx %d req %d  num_units %d num_unit_info %d"
+				"unit size %d actual units %d",
+				idx, mem_reqs->req_id,
+				mem_reqs->num_units,
+				mem_reqs->num_unit_info,
+				mem_reqs->unit_size,
+				mem_reqs->tgt_num_units);
+
+	}
+
+	return QDF_STATUS_SUCCESS;
 }
 
 /**
@@ -8830,7 +8928,8 @@ static QDF_STATUS extract_all_stats_counts_non_tlv(wmi_unified_t wmi_handle,
 		stats_param->stats_id |= WMI_HOST_REQUEST_PEER_EXTD_STAT;
 	if (stats_id & WMI_REQUEST_VDEV_EXTD_STAT)
 		stats_param->stats_id |= WMI_HOST_REQUEST_VDEV_EXTD_STAT;
-	if (stats_id & (WMI_REQUEST_PDEV_EXT2_STAT | WMI_REQUEST_NAC_RSSI_STAT))
+	if ((stats_id & WMI_REQUEST_PDEV_EXT2_STAT) &&
+		(stats_id & WMI_REQUEST_NAC_RSSI_STAT))
 		stats_param->stats_id |= WMI_HOST_REQUEST_NAC_RSSI;
 	if (stats_id & WMI_REQUEST_PEER_RETRY_STAT)
 		stats_param->stats_id |= WMI_HOST_REQUEST_PEER_RETRY_STAT;
@@ -9772,7 +9871,7 @@ QDF_STATUS send_peer_del_all_wds_entries_cmd_non_tlv(wmi_unified_t wmi_handle,
 }
 
 /**
- * send_multiple_vdev_restart_req_cmd_non_tlv() - send multi vdev restart req
+ * send_mvr_cmd() - send multi vdev restart req
  * @wmi_handle: wmi handle
  * @param: wmi multiple vdev restart req param
  *
@@ -9780,7 +9879,7 @@ QDF_STATUS send_peer_del_all_wds_entries_cmd_non_tlv(wmi_unified_t wmi_handle,
  *
  * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
  */
-QDF_STATUS send_multiple_vdev_restart_req_cmd_non_tlv(
+static QDF_STATUS send_mvr_cmd(
 		wmi_unified_t wmi_handle,
 		struct multiple_vdev_restart_params *param)
 {
@@ -9792,16 +9891,13 @@ QDF_STATUS send_multiple_vdev_restart_req_cmd_non_tlv(
 	wmi_pdev_multiple_vdev_restart_request_cmd *cmd;
 	uint16_t len = sizeof(*cmd);
 
-	if (param->num_vdevs)
-		len += sizeof(uint32_t) * param->num_vdevs;
-
+	len += sizeof(uint32_t) * param->num_vdevs;
 	buf = wmi_buf_alloc(wmi_handle, len);
 	if (!buf) {
 		WMI_LOGE("Failed to allocate memory");
 		return QDF_STATUS_E_NOMEM;
 	}
-
-	cmd = (wmi_pdev_multiple_vdev_restart_request_cmd *)wmi_buf_data(buf);
+	cmd = (wmi_pdev_multiple_vdev_restart_request_cmd *) wmi_buf_data(buf);
 
 	cmd->requestor_id = param->requestor_id;
 	cmd->disable_hw_ack = param->disable_hw_ack;
@@ -9853,14 +9949,186 @@ QDF_STATUS send_multiple_vdev_restart_req_cmd_non_tlv(
 	ret = wmi_unified_cmd_send(
 			wmi_handle, buf, len,
 			WMI_PDEV_MULTIPLE_VDEV_RESTART_REQUEST_CMDID);
+
 	if (QDF_IS_STATUS_ERROR(ret)) {
 		WMI_LOGE("Failed to send WMI_PDEV_MULTIPLE_VDEV_RESTART_REQUEST_CMDID");
 		wmi_buf_free(buf);
 	}
+
 	return ret;
+}
+
+/**
+ * send_mvr_ext_cmd() - send multi vdev restart req extension
+ * @wmi_handle: wmi handle
+ * @param: wmi multiple vdev restart req ext param
+ *
+ * Send WMI_PDEV_MULTIPLE_VDEV_RESTART_REQUEST_EXT_ CMDID parameters to fw.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
+ */
+static QDF_STATUS send_mvr_ext_cmd(
+		wmi_unified_t wmi_handle,
+		struct multiple_vdev_restart_params *param)
+{
+	int i;
+	wmi_buf_t buf_ptr;
+	QDF_STATUS ret;
+	wmi_channel *chan_info;
+	struct mlme_channel_param *tchan_info;
+	wmi_pdev_multiple_vdev_restart_request_ext_cmd *cmd;
+	uint8_t *buf;
+	uint16_t len = sizeof(*cmd);
+	uint16_t param_len;
+	wmi_vdev_param *vdev_param;
+
+	/*
+	 * vdev_id & phymode are expected in TAG, VALUE format
+	 * The vdev_param structure contains one "uint32_t" member.
+	 * Hence, while calcuating the required buffer-length,
+	 * the same needs to be excluded.The requirement is to
+	 * send "num_vdev" count of (tag,value) parameters, e.g.
+	 * vdev_id, phymode.
+	 */
+	param_len = ((sizeof(*vdev_param) - sizeof(uint32_t)) +
+		     ((param->num_vdevs) * sizeof(uint32_t)));
+	len += 2 * param_len;
+	buf_ptr = wmi_buf_alloc(wmi_handle, len);
+	if (!buf_ptr) {
+		WMI_LOGE("Failed to allocate memory");
+		return QDF_STATUS_E_NOMEM;
+	}
+	buf = (uint8_t *)wmi_buf_data(buf_ptr);
+	cmd = (wmi_pdev_multiple_vdev_restart_request_ext_cmd *)buf;
+	cmd->requestor_id = param->requestor_id;
+	cmd->disable_hw_ack = param->disable_hw_ack;
+
+	WMI_LOGI("req_id:%d dis_hw_ack:%d",
+		 cmd->requestor_id, cmd->disable_hw_ack);
+
+	chan_info = &cmd->chan;
+	tchan_info = &param->ch_param;
+	chan_info->mhz = tchan_info->mhz;
+	chan_info->band_center_freq1 = tchan_info->cfreq1;
+	chan_info->band_center_freq2 = tchan_info->cfreq2;
+
+	if (tchan_info->is_chan_passive)
+		WMI_SET_CHANNEL_FLAG(chan_info, WMI_CHAN_FLAG_PASSIVE);
+
+	if (tchan_info->dfs_set)
+		WMI_SET_CHANNEL_FLAG(chan_info, WMI_CHAN_FLAG_DFS);
+
+	if (tchan_info->dfs_set_cfreq2)
+		WMI_SET_CHANNEL_FLAG(chan_info, WMI_CHAN_FLAG_DFS_CFREQ2);
+
+	if (tchan_info->allow_vht)
+		WMI_SET_CHANNEL_FLAG(chan_info, WMI_CHAN_FLAG_ALLOW_VHT);
+	else  if (tchan_info->allow_ht)
+		WMI_SET_CHANNEL_FLAG(chan_info, WMI_CHAN_FLAG_ALLOW_HT);
+
+	WMI_SET_CHANNEL_MODE(chan_info, tchan_info->phy_mode);
+	WMI_SET_CHANNEL_MIN_POWER(chan_info, tchan_info->minpower);
+	WMI_SET_CHANNEL_MAX_POWER(chan_info, tchan_info->maxpower);
+	WMI_SET_CHANNEL_REG_POWER(chan_info, tchan_info->maxregpower);
+	WMI_SET_CHANNEL_ANTENNA_MAX(chan_info, tchan_info->antennamax);
+	WMI_SET_CHANNEL_REG_CLASSID(chan_info, tchan_info->reg_class_id);
+	WMI_SET_CHANNEL_MAX_TX_POWER(chan_info, tchan_info->maxregpower);
+
+	WMI_LOGI("is_chan_passive:%d dfs_set:%d allow_vht:%d allow_ht:%d",
+		 tchan_info->is_chan_passive, tchan_info->dfs_set,
+		 tchan_info->allow_vht, tchan_info->allow_ht);
+	WMI_LOGI("antennamax:%d phy_mode:%d minpower:%d maxpower:%d",
+		 tchan_info->antennamax, tchan_info->phy_mode,
+		 tchan_info->minpower, tchan_info->maxpower);
+	WMI_LOGI("maxregpower:%d reg_class_id:%d",
+		 tchan_info->maxregpower, tchan_info->reg_class_id);
+
+	/* To fill the Tag,Value pairs, move the buf accordingly */
+	buf += sizeof(*cmd);
+
+	vdev_param = (wmi_vdev_param *)buf;
+	vdev_param->tag = WMI_VDEV_PARAM_TAG_VDEV_ID;
+	vdev_param->num_param_values = param->num_vdevs;
+	for (i = 0; i < param->num_vdevs; i++)
+		vdev_param->param_value[i] = param->vdev_ids[i];
 
 
+	buf += param_len;
+	vdev_param = (wmi_vdev_param *)buf;
+	vdev_param->tag = WMI_VDEV_PARAM_TAG_PHYMODE_ID;
+	vdev_param->num_param_values = param->num_vdevs;
+	for (i = 0; i < param->num_vdevs; i++)
+		vdev_param->param_value[i] = param->mvr_param[i].phymode;
 
+	ret = wmi_unified_cmd_send(
+			wmi_handle, buf_ptr, len,
+			WMI_PDEV_MULTIPLE_VDEV_RESTART_REQUEST_EXT_CMDID);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		WMI_LOGE("Failed to send WMI_PDEV_MULTIPLE_VDEV_RESTART_REQUEST_CMDID");
+		wmi_buf_free(buf_ptr);
+	}
+	return ret;
+}
+
+/**
+ * send_multiple_vdev_restart_req_cmd_non_tlv() - send multi vdev restart
+ * @wmi_handle: wmi handle
+ * @param: wmi multiple vdev restart req param
+ *
+ * Send mvr or mvr_ext parameters to fw.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
+ */
+QDF_STATUS send_multiple_vdev_restart_req_cmd_non_tlv(
+		wmi_unified_t wmi_handle,
+		struct multiple_vdev_restart_params *param)
+{
+	bool mvr_ext;
+
+	if (!param->num_vdevs) {
+		WMI_LOGE("vdev's not found for MVR cmd");
+		return QDF_STATUS_E_FAULT;
+	}
+
+	mvr_ext = is_service_enabled_non_tlv(wmi_handle,
+				WMI_SERVICE_MULTI_VDEV_RESTART_EXT_COMMAND);
+
+	if (mvr_ext)
+		return send_mvr_ext_cmd(wmi_handle, param);
+	else
+		return send_mvr_cmd(wmi_handle, param);
+}
+
+/*
+ * extract_multi_vdev_restart_resp_event_non_tlv() -
+ * extract multiple vdev restart response event
+ * @wmi_handle: wmi handle
+ * @evt_buf: pointer to event buffer
+ * @param: Pointer to hold vdev_id of multiple vdev restart response
+ *
+ * Return: QDF_STATUS_SUCCESS for success or QDF_STATUS_E_FAILURE on error
+ */
+static QDF_STATUS extract_multi_vdev_restart_resp_event_non_tlv(
+		wmi_unified_t wmi_hdl, void *evt_buf,
+		struct multi_vdev_restart_resp *param)
+{
+	wmi_vdev_multi_vdev_restart_response_event *ev;
+
+	ev = (wmi_vdev_multi_vdev_restart_response_event *)evt_buf;
+	if (!ev) {
+		WMI_LOGE("Invalid multi_vdev restart response");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/* For legacy platforms, pdev_id is set to 0 by default */
+	param->pdev_id = 0;
+	param->status = ev->status;
+	qdf_mem_copy(param->vdev_id_bmap, &ev->requestor_id,
+		     sizeof(uint32_t));
+
+	WMI_LOGD("vdev_id_bmap :0x%x%x", param->vdev_id_bmap[1],
+		 param->vdev_id_bmap[0]);
+	return QDF_STATUS_SUCCESS;
 }
 
 /**
@@ -9954,6 +10222,7 @@ struct wmi_ops non_tlv_ops =  {
 	.send_peer_param_cmd = send_peer_param_cmd_non_tlv,
 	.send_vdev_up_cmd = send_vdev_up_cmd_non_tlv,
 	.send_peer_create_cmd = send_peer_create_cmd_non_tlv,
+	.send_peer_vlan_config_cmd = send_peer_vlan_config_cmd_non_tlv,
 	.send_peer_delete_cmd = send_peer_delete_cmd_non_tlv,
 	.send_peer_delete_all_cmd = send_peer_delete_all_cmd_non_tlv,
 	.send_peer_ft_roam_cmd = send_peer_ft_roam_cmd_non_tlv,
@@ -10103,6 +10372,7 @@ struct wmi_ops non_tlv_ops =  {
 	.extract_fw_version = extract_fw_version_non_tlv,
 	.extract_fw_abi_version = extract_fw_abi_version_non_tlv,
 	.extract_hal_reg_cap = extract_hal_reg_cap_non_tlv,
+	.extract_num_mem_reqs = extract_num_mem_reqs_non_tlv,
 	.extract_host_mem_req = extract_host_mem_req_non_tlv,
 	.save_service_bitmap = save_service_bitmap_non_tlv,
 	.is_service_enabled = is_service_enabled_non_tlv,
@@ -10214,6 +10484,8 @@ struct wmi_ops non_tlv_ops =  {
 	.send_vdev_tidmap_prec_cmd = send_vdev_tidmap_prec_cmd_non_tlv,
 	.send_multiple_vdev_restart_req_cmd =
 			send_multiple_vdev_restart_req_cmd_non_tlv,
+	.extract_multi_vdev_restart_resp_event =
+		extract_multi_vdev_restart_resp_event_non_tlv,
 };
 
 /**
@@ -10364,6 +10636,8 @@ static void populate_non_tlv_service(uint32_t *wmi_service)
 	wmi_service[wmi_service_mawc] = WMI_SERVICE_UNAVAILABLE;
 	wmi_service[wmi_service_multiple_vdev_restart] =
 				WMI_SERVICE_MULTIPLE_VDEV_RESTART;
+	wmi_service[wmi_service_multiple_vdev_restart_ext] =
+				WMI_SERVICE_MULTI_VDEV_RESTART_EXT_COMMAND;
 	wmi_service[wmi_service_peer_assoc_conf] = WMI_SERVICE_UNAVAILABLE;
 	wmi_service[wmi_service_egap] = WMI_SERVICE_UNAVAILABLE;
 	wmi_service[wmi_service_sta_pmf_offload] = WMI_SERVICE_UNAVAILABLE;
@@ -10417,7 +10691,9 @@ static void populate_non_tlv_service(uint32_t *wmi_service)
 	wmi_service[wmi_service_cfr_capture_support] =
 		WMI_SERVICE_CFR_CAPTURE_SUPPORT;
 	wmi_service[wmi_service_rx_fse_support] = WMI_SERVICE_UNAVAILABLE;
-	wmi_service[wmi_service_bw_165mhz_support] =
+	wmi_service[wmi_service_bw_restricted_80p80_support] =
+		WMI_SERVICE_UNAVAILABLE;
+	wmi_service[wmi_service_nss_ratio_to_host_support] =
 		WMI_SERVICE_UNAVAILABLE;
 }
 
@@ -10532,6 +10808,8 @@ static void populate_non_tlv_events_id(uint32_t *event_ids)
 					WMI_PDEV_CTL_FAILSAFE_CHECK_EVENTID;
 	event_ids[wmi_peer_delete_all_response_event_id] =
 					WMI_VDEV_DELETE_ALL_PEER_RESP_EVENTID;
+	event_ids[wmi_pdev_multi_vdev_restart_response_event_id] =
+				WMI_PDEV_MULTIPLE_VDEV_RESTART_RESP_EVENTID;
 }
 #endif
 

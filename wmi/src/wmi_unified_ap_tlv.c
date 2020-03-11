@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1131,14 +1131,22 @@ static QDF_STATUS send_multiple_vdev_restart_req_cmd_tlv(
 	wmi_pdev_multiple_vdev_restart_request_cmd_fixed_param *cmd;
 	int i;
 	uint8_t *buf_ptr;
-	uint32_t *vdev_ids;
+	uint32_t *vdev_ids, *phymode;
 	wmi_channel *chan_info;
 	struct mlme_channel_param *tchan_info;
 	uint16_t len = sizeof(*cmd) + WMI_TLV_HDR_SIZE;
 
+	if (!param->num_vdevs) {
+		WMI_LOGE("vdev's not found for MVR cmd");
+		qdf_status = QDF_STATUS_E_FAULT;
+		goto end;
+	}
 	len += sizeof(wmi_channel);
-	if (param->num_vdevs)
+	if (param->num_vdevs) {
+		len += sizeof(uint32_t) * param->num_vdevs + WMI_TLV_HDR_SIZE;
+		/* for phymode */
 		len += sizeof(uint32_t) * param->num_vdevs;
+	}
 
 	buf = wmi_buf_alloc(wmi_handle, len);
 	if (!buf) {
@@ -1223,6 +1231,23 @@ static QDF_STATUS send_multiple_vdev_restart_req_cmd_tlv(
 		tchan_info->minpower, tchan_info->maxpower,
 		tchan_info->maxregpower, tchan_info->reg_class_id,
 		tchan_info->maxregpower);
+
+	buf_ptr += sizeof(*chan_info);
+	WMITLV_SET_HDR(buf_ptr,
+		       WMITLV_TAG_ARRAY_UINT32,
+		       sizeof(uint32_t) * param->num_vdevs);
+	phymode = (uint32_t *)(buf_ptr + WMI_TLV_HDR_SIZE);
+	for (i = 0; i < param->num_vdevs; i++)
+		WMI_MULTIPLE_VDEV_RESTART_FLAG_SET_PHYMODE(
+				phymode[i], param->mvr_param[i].phymode);
+
+	/* Target expects flag for phymode processing */
+	WMI_MULTIPLE_VDEV_RESTART_FLAG_SET_PHYMODE_PRESENT(cmd->flags, 1);
+	/*
+	 * Target expects to be informed that MVR response is
+	 * expected by host corresponding to this request.
+	 */
+	WMI_MULTIPLE_VDEV_RESTART_FLAG_SET_MVRR_EVENT_SUPPORT(cmd->flags, 1);
 
 	wmi_mtrace(WMI_PDEV_MULTIPLE_VDEV_RESTART_REQUEST_CMDID, NO_SESSION, 0);
 	qdf_status = wmi_unified_cmd_send(wmi_handle, buf, len,
@@ -1701,6 +1726,93 @@ static QDF_STATUS set_rx_pkt_type_routing_tag_update_tlv(
 	return QDF_STATUS_SUCCESS;
 }
 #endif /* WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG */
+
+/**
+ * send_peer_vlan_config_cmd_tlv() - Send PEER vlan hw acceleration cmd to fw
+ * @wmi: wmi handle
+ * @peer_addr: peer mac addr
+ * @param: struct peer_vlan_config_param *
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+static QDF_STATUS send_peer_vlan_config_cmd_tlv(wmi_unified_t wmi,
+					uint8_t peer_addr[QDF_MAC_ADDR_SIZE],
+					struct peer_vlan_config_param *param)
+{
+	wmi_peer_config_vlan_cmd_fixed_param *cmd;
+	wmi_buf_t buf;
+	uint32_t len = sizeof(*cmd);
+
+	buf = wmi_buf_alloc(wmi, len);
+	if (!buf)
+		return QDF_STATUS_E_NOMEM;
+
+	cmd = (wmi_peer_config_vlan_cmd_fixed_param *)wmi_buf_data(buf);
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		       WMITLV_TAG_STRUC_wmi_peer_config_vlan_cmd_fixed_param,
+		       WMITLV_GET_STRUCT_TLVLEN
+			       (wmi_peer_config_vlan_cmd_fixed_param));
+	WMI_CHAR_ARRAY_TO_MAC_ADDR(peer_addr, &cmd->peer_macaddr);
+
+	/* vdev id */
+	cmd->vdev_id = param->vdev_id;
+
+	/* Tx command - Check if cmd is Tx then configure Tx cmd */
+	if (param->tx_cmd) {
+		WMI_VLAN_TX_SET(cmd->peer_vlan_config_mask, param->tx_cmd);
+
+		/* Setting insert_or_strip bit for Tx */
+		WMI_TX_INSERT_OR_STRIP_SET(cmd->peer_vlan_config_mask,
+					   param->tx_strip_insert);
+
+		if (param->tx_strip_insert_inner && param->tx_strip_insert) {
+		/* Setting the strip_insert_vlan_inner bit fo Tx */
+			WMI_TX_STRIP_INSERT_VLAN_INNER_SET(cmd->peer_vlan_config_mask,
+				param->tx_strip_insert_inner);
+		/* If Insert inner tag bit is set, then fill inner_tci */
+			WMI_TX_INSERT_VLAN_INNER_TCI_SET(cmd->insert_vlan_tci,
+						param->insert_vlan_inner_tci);
+		}
+
+		if (param->tx_strip_insert_outer && param->tx_strip_insert) {
+			/* Setting the strip_insert_vlan_outer bit fo Tx */
+			WMI_TX_STRIP_INSERT_VLAN_OUTER_SET(cmd->peer_vlan_config_mask,
+					param->tx_strip_insert_outer);
+			/* If Insert outer tag bit is set, then fill outer_tci */
+			WMI_TX_INSERT_VLAN_OUTER_TCI_SET(cmd->insert_vlan_tci,
+						param->insert_vlan_outer_tci);
+		}
+	}
+
+	/* Rx command - Check if cmd is Rx then configure Rx cmd */
+	if (param->rx_cmd) {
+		WMI_VLAN_RX_SET(cmd->peer_vlan_config_mask, param->rx_cmd);
+
+		/* Setting the strip_vlan_c_tag_decap bit in RX */
+		WMI_RX_STRIP_VLAN_C_TAG_SET(cmd->peer_vlan_config_mask,
+				param->rx_strip_c_tag);
+
+		/* Setting the strip_vlan_s_tag_decap bit in RX */
+		WMI_RX_STRIP_VLAN_S_TAG_SET(cmd->peer_vlan_config_mask,
+					    param->rx_strip_s_tag);
+
+		/* Setting the insert_vlan_c_tag_decap bit in RX */
+		WMI_RX_INSERT_VLAN_C_TAG_SET(cmd->peer_vlan_config_mask,
+					     param->rx_insert_c_tag);
+
+		/* Setting the insert_vlan_s_tag_decap bit in RX */
+		WMI_RX_INSERT_VLAN_S_TAG_SET(cmd->peer_vlan_config_mask,
+					     param->rx_insert_s_tag);
+	}
+
+	if (wmi_unified_cmd_send(wmi, buf, len, WMI_PEER_CONFIG_VLAN_CMDID)) {
+		WMI_LOGE("%s: Failed to send peer hw vlan acceleration command", __func__);
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
 
 #ifdef WLAN_SUPPORT_FILS
 /**
@@ -2401,6 +2513,49 @@ send_peer_chan_width_switch_cmd_tlv(wmi_unified_t wmi_handle,
 	return QDF_STATUS_SUCCESS;
 }
 
+static QDF_STATUS extract_multi_vdev_restart_resp_event_tlv(
+		wmi_unified_t wmi_hdl, void *evt_buf,
+		struct multi_vdev_restart_resp *param)
+{
+	WMI_PDEV_MULTIPLE_VDEV_RESTART_RESP_EVENTID_param_tlvs *param_buf;
+	wmi_pdev_multiple_vdev_restart_resp_event_fixed_param *ev;
+
+	param_buf =
+	(WMI_PDEV_MULTIPLE_VDEV_RESTART_RESP_EVENTID_param_tlvs *)evt_buf;
+	if (!param_buf) {
+		WMI_LOGE("Invalid buf multi_vdev restart response");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	ev = (wmi_pdev_multiple_vdev_restart_resp_event_fixed_param *)
+							param_buf->fixed_param;
+	if (!ev) {
+		WMI_LOGE("Invalid ev multi_vdev restart response");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	param->pdev_id = ev->pdev_id;
+	param->status = ev->status;
+
+	if (!param_buf->num_vdev_ids_bitmap)
+		return QDF_STATUS_E_FAILURE;
+
+	if ((param_buf->num_vdev_ids_bitmap * sizeof(uint32_t)) >
+			sizeof(param->vdev_id_bmap)) {
+		WMI_LOGE("vdevId bitmap overflow size:%d",
+			 param_buf->num_vdev_ids_bitmap);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	qdf_mem_copy(param->vdev_id_bmap, param_buf->vdev_ids_bitmap,
+		     param_buf->num_vdev_ids_bitmap * sizeof(uint32_t));
+
+	WMI_LOGD("vdev_id_bmap :0x%x%x", param->vdev_id_bmap[1],
+		 param->vdev_id_bmap[0]);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 {
 	struct wmi_ops *ops = wmi_handle->ops;
@@ -2469,4 +2624,7 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 	ops->set_rx_pkt_type_routing_tag_cmd =
 					set_rx_pkt_type_routing_tag_update_tlv;
 #endif /* WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG */
+	ops->send_peer_vlan_config_cmd = send_peer_vlan_config_cmd_tlv;
+	ops->extract_multi_vdev_restart_resp_event =
+				extract_multi_vdev_restart_resp_event_tlv;
 }

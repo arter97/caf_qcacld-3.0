@@ -177,20 +177,21 @@ int correlate_and_relay(struct wlan_objmgr_pdev *pdev, uint32_t cookie,
 
 			/*
 			 * This is condition can occur if DBR buffer did not get
-			 * released or leaked either by Host / Target
+			 * released, or leaked either by Host/Target.
 			 * we may need to add recovery here.
 			 *
 			 * 1. Stop all captures
 			 * 2. Flush/release DBR buffer and LUT
 			 * 3. Start capture again
 			 */
-			if (pdev_cfrobj->dbr_evt_cnt - pdev_cfrobj->release_cnt > 1) {
+			if ((pdev_cfrobj->dbr_evt_cnt -
+				pdev_cfrobj->release_cnt) >= MAX_LUT_ENTRIES) {
 				cfr_err("cookie = %u dbr_cnt = %d, release_cnt = %d",
 					cookie, pdev_cfrobj->dbr_evt_cnt,
 					pdev_cfrobj->release_cnt);
 				dump_lut(pdev);
 				dump_dma_hdr(&lut->dma_hdr, 1);
-				cfr_debug("correlation_info1: 0x%08x correlation_info2 0x%08x",
+				cfr_err("correlation_info1: 0x%08x correlation_info2 0x%08x",
 					  lut->tx_address1, lut->tx_address2);
 			}
 
@@ -606,7 +607,7 @@ target_if_unregister_to_dbr(struct wlan_objmgr_pdev *pdev)
 
 	psoc = wlan_pdev_get_psoc(pdev);
 	dbr_tx_ops = &psoc->soc_cb.tx_ops.dbr_tx_ops;
-	if (dbr_tx_ops->direct_buf_rx_module_register) {
+	if (dbr_tx_ops->direct_buf_rx_module_unregister) {
 		return dbr_tx_ops->direct_buf_rx_module_unregister
 			(pdev, DBR_MODULE_CFR);
 	}

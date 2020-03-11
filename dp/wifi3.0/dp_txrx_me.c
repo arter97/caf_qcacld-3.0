@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -18,6 +18,7 @@
 
 #include "hal_hw_headers.h"
 #include "dp_types.h"
+#include "dp_peer.h"
 #include "qdf_nbuf.h"
 #include "qdf_atomic.h"
 #include "qdf_types.h"
@@ -96,14 +97,19 @@ dp_tx_me_init(struct dp_pdev *pdev)
 
 /**
  * dp_tx_me_alloc_descriptor():Allocate ME descriptor
- * @pdev_handle: DP PDEV handle
+ * @soc: DP SOC handle
+ * @pdev_id: id of DP PDEV handle
  *
  * Return:void
  */
-void
-dp_tx_me_alloc_descriptor(struct cdp_pdev *pdev_handle)
+void dp_tx_me_alloc_descriptor(struct cdp_soc_t *soc, uint8_t pdev_id)
 {
-	struct dp_pdev *pdev = (struct dp_pdev *)pdev_handle;
+	struct dp_pdev *pdev =
+		dp_get_pdev_from_soc_pdev_id_wifi3((struct dp_soc *)soc,
+						   pdev_id);
+
+	if (!pdev)
+		return;
 
 	if (qdf_atomic_read(&pdev->mc_num_vap_attached) == 0) {
 		dp_tx_me_init(pdev);
@@ -162,20 +168,27 @@ dp_tx_me_exit(struct dp_pdev *pdev)
 
 /**
  * dp_tx_me_free_descriptor():free ME descriptor
- * @pdev_handle:DP_PDEV handle
+ * @soc: DP SOC handle
+ * @pdev_id: id of DP PDEV handle
  *
  * Return:void
  */
 void
-dp_tx_me_free_descriptor(struct cdp_pdev *pdev_handle)
+dp_tx_me_free_descriptor(struct cdp_soc_t *soc, uint8_t pdev_id)
 {
-	struct dp_pdev *pdev = (struct dp_pdev *)pdev_handle;
+	struct dp_pdev *pdev =
+		dp_get_pdev_from_soc_pdev_id_wifi3((struct dp_soc *)soc,
+						   pdev_id);
 
-	qdf_atomic_dec(&pdev->mc_num_vap_attached);
-	if (atomic_read(&pdev->mc_num_vap_attached) == 0) {
-		dp_tx_me_exit(pdev);
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
-			  "Disable MCAST_TO_UCAST");
+	if (!pdev)
+		return;
+
+	if (atomic_read(&pdev->mc_num_vap_attached)) {
+		if (qdf_atomic_dec_and_test(&pdev->mc_num_vap_attached)) {
+			dp_tx_me_exit(pdev);
+			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
+				  "Disable MCAST_TO_UCAST");
+		}
 	}
 }
 
@@ -189,10 +202,10 @@ dp_tx_me_free_descriptor(struct cdp_pdev *pdev_handle)
 QDF_STATUS
 dp_tx_prepare_send_me(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
 {
-	if (vdev->me_convert) {
-		if (vdev->me_convert(vdev->osif_vdev, nbuf) > 0)
-			return QDF_STATUS_SUCCESS;
-	}
+	if (dp_me_mcast_convert((struct cdp_soc_t *)(vdev->pdev->soc),
+				vdev->vdev_id, vdev->pdev->pdev_id,
+				nbuf) > 0)
+		return QDF_STATUS_SUCCESS;
 
 	return QDF_STATUS_E_FAILURE;
 }
@@ -231,7 +244,8 @@ static void dp_tx_me_mem_free(struct dp_pdev *pdev,
 
 /**
  * dp_tx_me_send_convert_ucast(): function to convert multicast to unicast
- * @vdev: DP VDEV handle
+ * @soc: Datapath soc handle
+ * @vdev_id: vdev id
  * @nbuf: Multicast nbuf
  * @newmac: Table of the clients to which packets have to be sent
  * @new_mac_cnt: No of clients
@@ -239,11 +253,12 @@ static void dp_tx_me_mem_free(struct dp_pdev *pdev,
  * return: no of converted packets
  */
 uint16_t
-dp_tx_me_send_convert_ucast(struct cdp_vdev *vdev_handle, qdf_nbuf_t nbuf,
-		uint8_t newmac[][QDF_MAC_ADDR_SIZE], uint8_t new_mac_cnt)
+dp_tx_me_send_convert_ucast(struct cdp_soc_t *soc, uint8_t vdev_id,
+			    qdf_nbuf_t nbuf,
+			    uint8_t newmac[][QDF_MAC_ADDR_SIZE],
+			    uint8_t new_mac_cnt)
 {
-	struct dp_vdev *vdev = (struct dp_vdev *) vdev_handle;
-	struct dp_pdev *pdev = vdev->pdev;
+	struct dp_pdev *pdev;
 	qdf_ether_header_t *eh;
 	uint8_t *data;
 	uint16_t len;
@@ -265,6 +280,31 @@ dp_tx_me_send_convert_ucast(struct cdp_vdev *vdev_handle, qdf_nbuf_t nbuf,
 	qdf_dma_addr_t paddr_mcbuf = 0;
 	uint8_t empty_entry_mac[QDF_MAC_ADDR_SIZE] = {0};
 	QDF_STATUS status;
+	struct dp_vdev *vdev =
+		dp_get_vdev_from_soc_vdev_id_wifi3((struct dp_soc *)soc,
+						   vdev_id);
+
+	if (!vdev) {
+		qdf_nbuf_free(nbuf);
+		return 1;
+	}
+
+	pdev = vdev->pdev;
+
+	if (!pdev) {
+		qdf_nbuf_free(nbuf);
+		return 1;
+	}
+
+	vdev = dp_get_vdev_from_soc_vdev_id_wifi3((struct dp_soc *)soc,
+						  vdev_id);
+	if (!vdev)
+		return 1;
+
+	pdev = vdev->pdev;
+
+	if (!pdev)
+		return 1;
 
 	qdf_mem_zero(&msdu_info, sizeof(msdu_info));
 
