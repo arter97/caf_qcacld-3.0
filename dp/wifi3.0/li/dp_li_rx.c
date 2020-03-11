@@ -592,6 +592,9 @@ done:
 
 			qdf_nbuf_set_pktlen(nbuf, pkt_len);
 			dp_rx_skip_tlvs(soc, nbuf, msdu_metadata.l3_hdr_pad);
+#ifdef WLAN_SUPPORT_MSCS
+			dp_mscs_set_tid(peer, qdf_nbuf_data(nbuf), tid);
+#endif
 		}
 
 		/*

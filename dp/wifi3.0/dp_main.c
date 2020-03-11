@@ -7251,9 +7251,8 @@ dp_record_mscs_params(struct cdp_soc_t *soc_hdl, uint8_t *peer_mac,
 	QDF_STATUS status = QDF_STATUS_E_INVAL;
 	struct dp_soc *soc = (struct dp_soc *)soc_hdl;
 
-	peer = dp_peer_find_hash_find((struct dp_soc *)
-			soc, peer_mac, 0, vdev_id);
-
+	peer = dp_peer_find_hash_find(soc, peer_mac, 0, vdev_id,
+				      DP_MOD_ID_CDP);
 	if (!peer) {
 		dp_err("Peer is NULL!");
 		goto fail;
@@ -7295,7 +7294,7 @@ dp_record_mscs_params(struct cdp_soc_t *soc_hdl, uint8_t *peer_mac,
 	status = QDF_STATUS_SUCCESS;
 fail:
 	if (peer)
-		dp_peer_unref_delete(peer);
+		dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
 	return status;
 }
 #endif
