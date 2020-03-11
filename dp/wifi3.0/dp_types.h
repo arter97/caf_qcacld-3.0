@@ -2461,6 +2461,20 @@ struct dp_peer_ast_params {
 #define IEEE80211_MSCS_MAX_ELEM_SIZE    5
 #define IEEE80211_TCLAS_MASK_CLA_TYPE_4  4
 
+#define IEEE80211_DP_MSCS_RX_SET            1
+#define IEEE80211_DP_MSCS_TX_GET            0
+#define IEEE80211_DP_MSCS_ENTRY_UPDATED     8
+#define IEEE80211_DP_MSCS_ENTRY_TO_BE_ADDED 0
+
+/* Defining Classifier mask bitmap */
+#define IEEE80211_MSCS_DP_SRC_IP            0x02
+#define IEEE80211_MSCS_DP_DST_IP              (IEEE80211_MSCS_DP_SRC_IP << 1)
+#define IEEE80211_MSCS_DP_SRC_PORT            (IEEE80211_MSCS_DP_DST_IP << 1)
+#define IEEE80211_MSCS_DP_DST_PORT          (IEEE80211_MSCS_DP_SRC_PORT << 1)
+#define IEEE80211_MSCS_DP_DSCP              (IEEE80211_MSCS_DP_DST_PORT << 1)
+#define IEEE80211_MSCS_DP_PROTO                 (IEEE80211_MSCS_DP_DSCP << 1)
+#define IEEE80211_MSCS_DP_FLOW_LABEL           (IEEE80211_MSCS_DP_PROTO << 1)
+
 /* Defining Protocol types */
 #define PROTO_TCP 6
 #define PROTO_UDP 17

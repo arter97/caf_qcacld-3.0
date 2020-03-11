@@ -4289,6 +4289,272 @@ int mscs_parse_ipv6(uint8_t *data,
 		QDF_NBUF_TRAC_TCP_DPORT_OFFSET));
 	return 0;
 }
+
+/*
+ * dp_mscs_add_ipv4_entry - Adds MSCS IPv4 entry
+ * to the logical tuple
+ * @mscs_session_ipv4 - MSCS logical tuple
+ * @ipv4_params - Entry to be added
+ * @tid  - User priority as the key to this entry
+ */
+static int
+dp_mscs_add_v4(struct dp_peer_mscs_session_ipv4
+		*mscs_session_ipv4, struct dp_peer_mscs_tuple_ipv4
+		*ipv4_params, u_int8_t tid)
+{
+	u_int8_t max_count = mscs_session_ipv4->ipv4_ctr;
+
+	if (max_count == IEEE80211_MSCS_MAX_ELEM_SIZE) {
+		qdf_err("Number of entries exceeded MAX_MSCS_ELEM_SIZE");
+		return -EINVAL;
+	}
+	mscs_session_ipv4->mscs_entry_ipv4[max_count].src_ip
+		= ipv4_params->src_ip;
+	mscs_session_ipv4->mscs_entry_ipv4[max_count].dst_ip
+		= ipv4_params->dst_ip;
+	mscs_session_ipv4->mscs_entry_ipv4[max_count].src_port
+		= ipv4_params->src_port;
+	mscs_session_ipv4->mscs_entry_ipv4[max_count].dst_port
+		= ipv4_params->dst_port;
+	mscs_session_ipv4->mscs_entry_ipv4[max_count].proto
+		= ipv4_params->proto;
+	mscs_session_ipv4->mscs_entry_ipv4[max_count].dscp
+		= ipv4_params->dscp;
+	mscs_session_ipv4->mscs_entry_ipv4[max_count].tid = tid;
+	mscs_session_ipv4->ipv4_ctr++;
+	return 0;
+}
+
+/*
+ * dp_mscs_rx_set_tid_ipv4 - Adds or modifies the current
+ * entry inside the logical tuple with the user priority
+ * of the MSDU received.
+ * The AP will look into the MSDU received and match the
+ * parameters specified in the Classifier Mask that was
+ * sent as a part of the MSCS request by the STA, with
+ * the current entries of the tuple and then either adds
+ * an entry, if one or more masked parameters don't match,
+ * or modifies the tid value, if the parameters matches
+ * the entry
+ * @mscs_session_ipv4 - MSCS data table
+ * @params - MSCS handshake parameters
+ * @ipv4_params - Entry to be verified
+ * @tid - TID value of the MSDU
+ */
+void
+dp_mscs_rx_set_tid_ipv4(struct dp_peer_mscs_session_ipv4
+	*mscs_session_ipv4, struct dp_peer_mscs_tuple_ipv4
+	*ipv4_params, struct dp_peer_mscs_parameter *params, u_int8_t tid)
+{
+	/* We have received the parameters as an argument here,
+	 * before we add the entry, we need to check
+	 * if we already have the entry in our table
+	 */
+	u_int8_t ctr;
+	u_int8_t cla_mask = params->classifier_mask;
+	u_int8_t up_bitmap = params->user_priority_bitmap;
+	u_int8_t up_limit = params->user_priority_limit;
+	u_int8_t max_count = mscs_session_ipv4->ipv4_ctr;
+
+	for (ctr = 0; ctr < max_count; ctr++) {
+		if ((cla_mask & IEEE80211_MSCS_DP_SRC_IP) &&
+		    (mscs_session_ipv4->mscs_entry_ipv4[ctr].src_ip
+			!= ipv4_params->src_ip)) {
+			continue;
+		} else if ((cla_mask & IEEE80211_MSCS_DP_DST_IP) &&
+			(mscs_session_ipv4->mscs_entry_ipv4[ctr].dst_ip
+			!= ipv4_params->dst_ip)) {
+			continue;
+		} else if (((ipv4_params->proto == PROTO_TCP) ||
+			(ipv4_params->proto == PROTO_UDP)) &&
+			(cla_mask & IEEE80211_MSCS_DP_SRC_PORT) &&
+			(mscs_session_ipv4->mscs_entry_ipv4[ctr].src_port
+			!= ipv4_params->src_port)) {
+			continue;
+		} else if (((ipv4_params->proto == PROTO_TCP) ||
+			(ipv4_params->proto == PROTO_UDP)) &&
+			(cla_mask & IEEE80211_MSCS_DP_DST_PORT) &&
+			(mscs_session_ipv4->mscs_entry_ipv4[ctr].dst_port
+			!= ipv4_params->dst_port)) {
+			continue;
+		} else if ((!((ipv4_params->proto == PROTO_TCP) ||
+			(ipv4_params->proto == PROTO_UDP))) &&
+			(cla_mask & IEEE80211_MSCS_DP_DSCP) &&
+			(mscs_session_ipv4->mscs_entry_ipv4[ctr].dscp
+			!= ipv4_params->dscp)) {
+			continue;
+		} else if ((cla_mask & IEEE80211_MSCS_DP_PROTO) &&
+			(mscs_session_ipv4->mscs_entry_ipv4[ctr].proto
+			!= ipv4_params->proto)) {
+			continue;
+		}
+		if ((1 << tid) & up_bitmap)
+			mscs_session_ipv4->mscs_entry_ipv4[ctr].tid =
+				QDF_MIN(tid, up_limit);
+		return;
+	}
+	if ((1 << tid) & up_bitmap)
+		dp_mscs_add_v4(mscs_session_ipv4,
+			       ipv4_params, QDF_MIN(tid, up_limit));
+}
+
+/*
+ * dp_mscs_rx_get_tid_ipv4 - Used in TX operation, to
+ * retrieve the current entry inside the logical tuple
+ * with the user priority of the MSDU received,
+ * during the RX operation.
+ * The AP will look into the MSDU that is to be sent
+ * and match the parameters specified in the Classifier
+ * Mask that was sent as a part of the MSCS request by the STA,
+ * with the current entries of the tuple and then either uses
+ * the default DSCP to UP mapping, if one or more masked
+ * parameters don't match, or retrives the tid value present
+ * inside the table if the parameters match
+ * the mirrored entry.
+ * @mscs_session_ipv4 - MSCS data table
+ * @params - MSCS Handshake parameters
+ * @ipv4_params - Entry to be verified
+ * @tid - TID value of the MSDU
+ */
+uint8_t
+dp_mscs_tx_get_tid_ipv4(struct dp_peer_mscs_session_ipv4
+	*mscs_session_ipv4, struct dp_peer_mscs_tuple_ipv4
+	*ipv4_params, struct dp_peer_mscs_parameter *params,  uint8_t tid)
+{
+	/* We have the tuple with us present and
+	 * we have received some classifier parameters
+	 * as an argument here, we need to check if the
+	 * entry is present in the tuple, if yes, send the
+	 * corresponding tid or if the entry is not present,
+	 * use the default tid mapping
+	 */
+	u_int8_t ctr;
+	u_int8_t cla_mask = params->classifier_mask;
+	u_int8_t max_count = mscs_session_ipv4->ipv4_ctr;
+
+	for (ctr = 0; ctr < max_count; ctr++) {
+		if ((cla_mask & IEEE80211_MSCS_DP_SRC_IP) &&
+		    (mscs_session_ipv4->mscs_entry_ipv4[ctr].src_ip
+			!= ipv4_params->dst_ip)) {
+			continue;
+		} else if ((cla_mask & IEEE80211_MSCS_DP_DST_IP) &&
+			(mscs_session_ipv4->mscs_entry_ipv4[ctr].dst_ip
+			!= ipv4_params->src_ip)) {
+			continue;
+		} else if (((ipv4_params->proto == PROTO_TCP) ||
+			(ipv4_params->proto == PROTO_UDP)) &&
+			(cla_mask & IEEE80211_MSCS_DP_SRC_PORT) &&
+			(mscs_session_ipv4->mscs_entry_ipv4[ctr].src_port
+			!= ipv4_params->dst_port)) {
+			continue;
+		} else if (((ipv4_params->proto == PROTO_TCP) ||
+			(ipv4_params->proto == PROTO_UDP)) &&
+			(cla_mask & IEEE80211_MSCS_DP_DST_PORT) &&
+			(mscs_session_ipv4->mscs_entry_ipv4[ctr].dst_port
+			!= ipv4_params->src_port)) {
+			continue;
+		} else if ((cla_mask & IEEE80211_MSCS_DP_DSCP) &&
+			(mscs_session_ipv4->mscs_entry_ipv4[ctr].dscp
+			!= ipv4_params->dscp)) {
+			continue;
+		} else if ((cla_mask & IEEE80211_MSCS_DP_PROTO) &&
+			(mscs_session_ipv4->mscs_entry_ipv4[ctr].proto
+			!= ipv4_params->proto)) {
+			continue;
+		}
+		return mscs_session_ipv4->mscs_entry_ipv4[ctr].tid;
+	}
+	return tid;
+}
+
+/*
+ * dp_mscs_get_tid - This function is used both in
+ * TX side, to get the correct TID value for
+ * the downlink traffic
+ * designated to a particular STA.
+ * In the TX side, the AP compares the mirrored parameters
+ * with the entry present inside the table and gets the
+ * TID value stored and sends the MSDU with this value.
+ * @soc - Datapath soc handle
+ * @vdev - Datapath vdev handle
+ * @data - MSDU sent/received
+ * @tid - TID of the MSDU
+ */
+uint8_t dp_mscs_get_tid(struct dp_soc *soc, struct dp_vdev *vdev,
+			uint8_t *data, uint8_t tid)
+{
+	union dp_peer_mscs_tuple mscs_tuple;
+	uint16_t ether_type;
+	struct dp_peer *peer;
+	struct ether_header *eh;
+	char *mac;
+
+	eh = (struct ether_header *)data;
+	mac = eh->ether_dhost;
+
+	ether_type = (uint16_t)(*(uint16_t *)(data +
+	QDF_NBUF_TRAC_ETH_TYPE_OFFSET));
+
+	peer = dp_peer_find_hash_find(soc, mac, 0, vdev->vdev_id);
+	if (!peer)
+		return tid;
+
+	if (peer->mscs_active == 0)
+		return tid;
+
+	switch (qdf_ntohs(ether_type)) {
+	case QDF_NBUF_TRAC_IPV4_ETH_TYPE:
+		mscs_parse_ipv4(data, &mscs_tuple.ipv4);
+			return dp_mscs_tx_get_tid_ipv4(
+			&peer->mscs_session_ipv4,
+			&mscs_tuple.ipv4,
+			&peer->mscs_ipv4_parameter,
+			tid);
+		break;
+	}
+	return tid;
+}
+
+/*
+ * dp_mscs_set_tid - This function is used both in
+ * RX side, to set the correct TID value for
+ * the uplink traffic originating from
+ * a particular STA.
+ * In the RX side, when the AP receives an MSDU from
+ * a STA supporting MSCS, the AP adds an entry of the
+ * IP or higher layer parameters into its MSCS table,
+ * with the key as the TID value of this MSDU.
+ * @peer - Associated STA handle (peer)
+ * @data - MSDU sent/received
+ * @tid - TID of the MSDU
+ */
+
+void dp_mscs_set_tid(struct dp_peer *peer, uint8_t *data, uint8_t tid)
+{
+	union dp_peer_mscs_tuple mscs_tuple;
+	uint16_t ether_type;
+
+	ether_type = (uint16_t)(*(uint16_t *)(data +
+	QDF_NBUF_TRAC_ETH_TYPE_OFFSET));
+
+	if (!peer)
+		return;
+
+	if (peer->mscs_active == 0)
+		return;
+
+	switch (qdf_ntohs(ether_type)) {
+	case QDF_NBUF_TRAC_IPV4_ETH_TYPE:
+		mscs_parse_ipv4(data, &mscs_tuple.ipv4);
+			dp_mscs_rx_set_tid_ipv4(
+			&peer->mscs_session_ipv4,
+			&mscs_tuple.ipv4,
+			&peer->mscs_ipv4_parameter,
+			tid);
+			return;
+		break;
+	}
+}
 #endif
 
 /**

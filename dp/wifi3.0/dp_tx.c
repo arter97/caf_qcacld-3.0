@@ -1826,6 +1826,7 @@ dp_tx_send_msdu_single(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 		goto release_desc;
 	}
 
+	tid = dp_mscs_get_tid(soc, vdev, qdf_nbuf_data(nbuf), tid);
 	/* Enqueue the Tx MSDU descriptor to HW for transmit */
 	status = dp_tx_hw_enqueue(soc, vdev, tx_desc, tid,
 			htt_tcl_metadata, tx_q->ring_id, tx_exc_metadata);

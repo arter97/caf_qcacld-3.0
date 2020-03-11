@@ -2112,7 +2112,7 @@ uint32_t dp_rx_process(struct dp_intr *int_ctx, hal_ring_handle_t hal_ring_hdl,
 	uint32_t num_rx_bufs_reaped = 0;
 	uint32_t intr_id;
 	struct hif_opaque_softc *scn;
-	int32_t tid = 0;
+	uint32_t tid = 0;
 	bool is_prev_msdu_last = true;
 	uint32_t num_entries_avail = 0;
 	uint32_t rx_ol_pkt_cnt = 0;
@@ -2571,6 +2571,7 @@ done:
 
 			qdf_nbuf_set_pktlen(nbuf, pkt_len);
 			dp_rx_skip_tlvs(nbuf, msdu_metadata.l3_hdr_pad);
+			dp_mscs_set_tid(peer, qdf_nbuf_data(nbuf), tid);
 		}
 
 		/*
