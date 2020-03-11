@@ -140,9 +140,6 @@
 
 #define WMA_MISSED_BEACON_IND          SIR_HAL_MISSED_BEACON_IND
 
-#define WMA_ENTER_PS_REQ               SIR_HAL_ENTER_PS_REQ
-#define WMA_EXIT_PS_REQ                SIR_HAL_EXIT_PS_REQ
-
 #define WMA_HIDDEN_SSID_RESTART_RSP    SIR_HAL_HIDDEN_SSID_RESTART_RSP
 #define WMA_SWITCH_CHANNEL_RSP         SIR_HAL_SWITCH_CHANNEL_RSP
 #define WMA_P2P_NOA_ATTR_IND           SIR_HAL_P2P_NOA_ATTR_IND
@@ -733,7 +730,8 @@ QDF_STATUS wma_register_roaming_callbacks(
 		QDF_STATUS (*pe_disconnect_cb) (struct mac_context *mac,
 			uint8_t vdev_id,
 			uint8_t *deauth_disassoc_frame,
-			uint16_t deauth_disassoc_frame_len),
+			uint16_t deauth_disassoc_frame_len,
+			uint16_t reason_code),
 		QDF_STATUS (*csr_roam_pmkid_req_cb)(uint8_t vdev_id,
 			struct roam_pmkid_req_event *bss_list));
 #else
@@ -753,7 +751,8 @@ static inline QDF_STATUS wma_register_roaming_callbacks(
 		QDF_STATUS (*pe_disconnect_cb) (struct mac_context *mac,
 			uint8_t vdev_id,
 			uint8_t *deauth_disassoc_frame,
-			uint16_t deauth_disassoc_frame_len),
+			uint16_t deauth_disassoc_frame_len,
+			uint16_t reason_code),
 		QDF_STATUS (*csr_roam_pmkid_req_cb)(uint8_t vdev_id,
 			struct roam_pmkid_req_event *bss_list))
 {

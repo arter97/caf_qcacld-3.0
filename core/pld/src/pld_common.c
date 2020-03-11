@@ -1614,7 +1614,11 @@ int pld_athdiag_read(struct device *dev, uint32_t offset,
 					    datalen, output);
 		break;
 	case PLD_BUS_TYPE_SDIO:
+		break;
 	case PLD_BUS_TYPE_USB:
+		ret = pld_usb_athdiag_read(dev, offset, memtype,
+					   datalen, output);
+		break;
 	case PLD_BUS_TYPE_PCIE_FW_SIM:
 	case PLD_BUS_TYPE_SNOC_FW_SIM:
 	case PLD_BUS_TYPE_IPCI:
@@ -1654,7 +1658,11 @@ int pld_athdiag_write(struct device *dev, uint32_t offset,
 					     datalen, input);
 		break;
 	case PLD_BUS_TYPE_SDIO:
+		break;
 	case PLD_BUS_TYPE_USB:
+		ret = pld_usb_athdiag_write(dev, offset, memtype,
+					    datalen, input);
+		break;
 	case PLD_BUS_TYPE_PCIE_FW_SIM:
 	case PLD_BUS_TYPE_SNOC_FW_SIM:
 	case PLD_BUS_TYPE_IPCI:
@@ -2641,3 +2649,42 @@ int pld_idle_restart(struct device *dev,
 
 	return errno;
 }
+
+#ifdef FEATURE_WLAN_TIME_SYNC_FTM
+/**
+ * pld_get_audio_wlan_timestamp() - Get audio timestamp
+ * @dev: device pointer
+ * @type: trigger type
+ * @ts: audio timestamp
+ *
+ * This API can be used to get audio timestamp.
+ *
+ * Return: 0 if trigger to get audio timestamp is successful
+ *         Non zero failure code for errors
+ */
+int pld_get_audio_wlan_timestamp(struct device *dev,
+				 enum pld_wlan_time_sync_trigger_type type,
+				 uint64_t *ts)
+{
+	int ret = 0;
+	enum pld_bus_type bus_type;
+
+	bus_type = pld_get_bus_type(dev);
+	switch (bus_type) {
+	case PLD_BUS_TYPE_SNOC:
+		ret = pld_snoc_get_audio_wlan_timestamp(dev, type, ts);
+		break;
+	case PLD_BUS_TYPE_PCIE:
+	case PLD_BUS_TYPE_SNOC_FW_SIM:
+	case PLD_BUS_TYPE_PCIE_FW_SIM:
+	case PLD_BUS_TYPE_SDIO:
+	case PLD_BUS_TYPE_USB:
+	case PLD_BUS_TYPE_IPCI:
+		break;
+	default:
+		ret = -EINVAL;
+		break;
+	}
+	return ret;
+}
+#endif /* FEATURE_WLAN_TIME_SYNC_FTM */

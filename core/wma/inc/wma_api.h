@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -133,6 +133,16 @@ int wma_cli_set2_command(int vdev_id, int param_id, int sval1,
 			 int sval2, int vpdev);
 
 /**
+ * wma_get_fw_phy_mode_for_freq_cb() - Callback to get current PHY Mode.
+ * @freq: channel freq
+ * @chan_width: maximum channel width possible
+ * @phy_mode: firmware PHY Mode
+ *
+ * Return: None
+ */
+void wma_get_fw_phy_mode_for_freq_cb(uint32_t freq, uint32_t chan_width,
+				     uint32_t  *phy_mode);
+/**
  * wma_get_phy_mode_cb() - Callback to get current PHY Mode.
  * @chan: channel number
  * @chan_width: maximum channel width possible
@@ -186,6 +196,17 @@ bool wma_is_rx_ldpc_supported_for_channel(uint32_t ch_freq);
 
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS
 int wma_unified_radio_tx_mem_free(void *handle);
+
+/*
+ * wma_unified_link_stats_results_mem_free() - Free the memory for
+ * link_stats_results->results allocated when event comes.
+ * @link_stats_results: pointer to the memory that is to be freed
+ *
+ * Return: None
+ */
+void
+wma_unified_link_stats_results_mem_free(tSirLLStatsResults *link_stats_results);
+
 #else /* WLAN_FEATURE_LINK_LAYER_STATS */
 static inline int wma_unified_radio_tx_mem_free(void *handle)
 {

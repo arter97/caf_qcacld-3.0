@@ -392,6 +392,8 @@ static void cds_cdp_cfg_attach(struct wlan_objmgr_psoc *psoc)
 		cfg_get(psoc, CFG_DP_FLOW_STEERING_ENABLED);
 	cdp_cfg.disable_intra_bss_fwd =
 		cfg_get(psoc, CFG_DP_AP_STA_SECURITY_SEPERATION);
+	cdp_cfg.pktlog_buffer_size =
+		cfg_get(psoc, CFG_DP_PKTLOG_BUFFER_SIZE);
 
 	cds_cdp_update_del_ack_params(psoc, &cdp_cfg);
 
@@ -1134,12 +1136,6 @@ QDF_STATUS cds_post_disable(void)
 	qdf_status = cds_close_rx_thread();
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		cds_err("Failed to close RX thread!");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	qdf_status = cds_close_mon_thread();
-	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
-		cds_err("Failed to close MON thread!");
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -2299,7 +2295,7 @@ QDF_STATUS cds_flush_logs(uint32_t is_fatal,
 		  is_fatal, indicator, reason_code);
 
 	if (dump_mac_trace)
-		qdf_trace_dump_all(p_cds_context->mac_context, 0, 0, 500, 0);
+		qdf_trace_dump_all(p_cds_context->mac_context, 0, 0, 100, 0);
 
 	if (WLAN_LOG_INDICATOR_HOST_ONLY == indicator) {
 		cds_wlan_flush_host_logs_for_fatal();

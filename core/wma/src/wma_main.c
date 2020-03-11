@@ -620,6 +620,10 @@ QDF_STATUS wma_form_unit_test_cmd_and_send(uint32_t vdev_id,
 	QDF_STATUS status;
 
 	WMA_LOGD(FL("enter"));
+
+	if (!wma_is_vdev_valid(vdev_id))
+		return QDF_STATUS_E_FAILURE;
+
 	if (arg_count > WMA_MAX_NUM_ARGS) {
 		WMA_LOGE(FL("arg_count is crossed the boundary"));
 		return QDF_STATUS_E_FAILURE;
@@ -862,8 +866,6 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 	struct pdev_params pdev_param;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	struct target_psoc_info *tgt_hdl;
-
-	WMA_LOGD("wmihandle %pK", wma->wmi_handle);
 
 	if (!mac) {
 		WMA_LOGE("%s: Failed to get mac", __func__);
@@ -2789,6 +2791,24 @@ struct wlan_objmgr_psoc *wma_get_psoc_from_scn_handle(void *scn_handle)
 	return wma_handle->psoc;
 }
 
+void wma_get_fw_phy_mode_for_freq_cb(uint32_t freq, uint32_t chan_width,
+				     uint32_t *phy_mode)
+{
+	uint32_t dot11_mode;
+	enum wlan_phymode host_phy_mode;
+	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
+
+	if (!mac) {
+		wma_err("MAC context is NULL");
+		*phy_mode = WLAN_PHYMODE_AUTO;
+		return;
+	}
+
+	dot11_mode = mac->mlme_cfg->dot11_mode.dot11_mode;
+	host_phy_mode = wma_chan_phy_mode(freq, chan_width, dot11_mode);
+	*phy_mode = wma_host_to_fw_phymode(host_phy_mode);
+}
+
 void wma_get_phy_mode_cb(uint8_t chan, uint32_t chan_width,
 			 enum wlan_phymode *phy_mode)
 {
@@ -3325,6 +3345,9 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 	wma_register_debug_callback();
 	wifi_pos_register_get_phy_mode_cb(wma_handle->psoc,
 					  wma_get_phy_mode_cb);
+	wifi_pos_register_get_fw_phy_mode_for_freq_cb(
+					wma_handle->psoc,
+					wma_get_fw_phy_mode_for_freq_cb);
 
 	/* Register callback with PMO so PMO can update the vdev pause bitmap*/
 	pmo_register_pause_bitmap_notifier(wma_handle->psoc,
@@ -4106,7 +4129,7 @@ QDF_STATUS wma_start(void)
 			goto end;
 		}
 	} else {
-		WMA_LOGE("Target does not support cesium network");
+		WMA_LOGD("Target does not support cesium network");
 	}
 
 	qdf_status = wma_tx_attach(wma_handle);
@@ -5392,6 +5415,10 @@ static int wma_update_hdd_cfg(tp_wma_handle wma_handle)
 		return -EINVAL;
 	}
 
+	wlan_res_cfg->nan_separate_iface_support =
+		ucfg_nan_is_vdev_creation_allowed(wma_handle->psoc) &&
+		ucfg_nan_get_is_separate_nan_iface(wma_handle->psoc);
+
 	service_ext_param =
 			target_psoc_get_service_ext_param(tgt_hdl);
 	wmi_handle = get_wmi_unified_hdl_from_psoc(wma_handle->psoc);
@@ -6664,7 +6691,8 @@ int wma_rx_service_ready_ext_event(void *handle, uint8_t *event,
 		wlan_res_cfg->new_htt_msg_format = false;
 	}
 
-	if (cfg_get(wma_handle->psoc, CFG_DP_ENABLE_PEER_UMAP_CONF_SUPPORT) &&
+	if (QDF_GLOBAL_FTM_MODE  != cds_get_conparam() &&
+	    ucfg_mlme_get_peer_unmap_conf(wma_handle->psoc) &&
 	    wmi_service_enabled(wmi_handle,
 				wmi_service_peer_unmap_cnf_support)) {
 		wlan_res_cfg->peer_unmap_conf_support = true;
@@ -7532,15 +7560,25 @@ static void wma_set_arp_req_stats(WMA_HANDLE handle,
 	QDF_STATUS status;
 	struct set_arp_stats *arp_stats;
 	tp_wma_handle wma_handle = (tp_wma_handle) handle;
+	struct wlan_objmgr_vdev *vdev;
 
 	if (!wma_handle || !wma_handle->wmi_handle) {
 		WMA_LOGE("%s: WMA is closed, cannot send per roam config",
 			 __func__);
 		return;
 	}
+
 	if (!wma_is_vdev_valid(req_buf->vdev_id)) {
 		WMA_LOGE("vdev id:%d is not active", req_buf->vdev_id);
 		return;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma_handle->psoc,
+						    req_buf->vdev_id,
+						    WLAN_LEGACY_WMA_ID);
+	if (!wma_is_vdev_started(vdev)) {
+		WMA_LOGD("vdev id:%d is not started", req_buf->vdev_id);
+		goto release_ref;
 	}
 
 	arp_stats = (struct set_arp_stats *)req_buf;
@@ -7548,6 +7586,9 @@ static void wma_set_arp_req_stats(WMA_HANDLE handle,
 					       arp_stats);
 	if (QDF_IS_STATUS_ERROR(status))
 		wma_err("failed to set arp stats to FW");
+
+release_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
 }
 
 /**
@@ -8314,16 +8355,6 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 		qdf_mem_free(msg->bodyptr);
 		break;
 #endif /* REMOVE_PKT_LOG */
-	case WMA_ENTER_PS_REQ:
-		wma_enable_sta_ps_mode(wma_handle,
-				       (tpEnablePsParams) msg->bodyptr);
-		qdf_mem_free(msg->bodyptr);
-		break;
-	case WMA_EXIT_PS_REQ:
-		wma_disable_sta_ps_mode(wma_handle,
-					(tpDisablePsParams) msg->bodyptr);
-		qdf_mem_free(msg->bodyptr);
-		break;
 	case WMA_ENABLE_UAPSD_REQ:
 		wma_enable_uapsd_mode(wma_handle,
 				      (tpEnableUapsdParams) msg->bodyptr);

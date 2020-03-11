@@ -36,6 +36,7 @@
 #include "rrm_global.h"
 #include <wlan_scan_ucfg_api.h>
 #include <wlan_scan_utils_api.h>
+#include <wlan_reg_services_api.h>
 #include <wlan_utility.h>
 
 /* Roam score for a neighbor AP will be calculated based on the below
@@ -961,31 +962,28 @@ free_ch_lst:
 static QDF_STATUS sme_rrm_fill_scan_channels(struct mac_context *mac,
 					     uint8_t *country,
 					     tpRrmSMEContext sme_rrm_context,
-					     uint8_t reg_class,
+					     uint8_t op_class,
 					     uint32_t num_channels)
 {
 	uint32_t num_chan = 0;
 	uint32_t i;
 	uint32_t *freq_list;
-	uint16_t op_class;
-
-	/* List all the channels in the requested RC */
-	wlan_reg_dmn_print_channels_in_opclass(country, reg_class);
+	bool found;
 
 	freq_list = sme_rrm_context->channelList.freq_list;
-
+	found = false;
 	for (i = 0; i < num_channels; i++) {
-		uint8_t chan = (uint8_t)wlan_reg_freq_to_chan(mac->pdev,
-							      freq_list[i]);
-		op_class = wlan_reg_dmn_get_opclass_from_channel(country,
-								 chan,
-								 BWALL);
-
-		if (op_class == reg_class) {
+		found = wlan_reg_country_opclass_freq_check(mac->pdev,
+							    country,
+							    op_class,
+							    freq_list[i]);
+		if (found) {
 			freq_list[num_chan] = freq_list[i];
 			num_chan++;
 		}
+		found = false;
 	}
+
 	sme_rrm_context->channelList.numOfChannels = num_chan;
 	if (sme_rrm_context->channelList.numOfChannels == 0) {
 		qdf_mem_free(sme_rrm_context->channelList.freq_list);
@@ -1058,11 +1056,10 @@ QDF_STATUS sme_rrm_process_beacon_report_req_ind(struct mac_context *mac,
 	else
 		country[2] = OP_CLASS_GLOBAL;
 
-	sme_debug("Channel = %d", beacon_req->channel_info.chan_num);
-
-	sme_debug("Request Reg class %d, AP's country code %c%c 0x%x",
+	sme_debug("Request Reg class %d, AP's country code %c%c 0x%x, channel = %d",
 		  beacon_req->channel_info.reg_class,
-		  country[0], country[1], country[2]);
+		  country[0], country[1], country[2],
+		  beacon_req->channel_info.chan_num);
 
 	if (beacon_req->channel_list.num_channels > SIR_ESE_MAX_MEAS_IE_REQS) {
 		sme_err("Beacon report request numChannels:%u exceeds max num channels",
@@ -1185,12 +1182,11 @@ QDF_STATUS sme_rrm_process_beacon_report_req_ind(struct mac_context *mac,
 		     (uint8_t *)&beacon_req->measurementDuration,
 		     SIR_ESE_MAX_MEAS_IE_REQS);
 
-	sme_debug("token: %d regClass: %d randnIntvl: %d msgSource: %d measurementduration %d, rrm_ctx duration %d Meas_mode: %s",
-		sme_rrm_ctx->token, sme_rrm_ctx->regClass,
-		sme_rrm_ctx->randnIntvl, sme_rrm_ctx->msgSource,
-		beacon_req->measurementDuration[0],
-		sme_rrm_ctx->duration[0],
-		sme_rrm_get_meas_mode_string(sme_rrm_ctx->measMode[0]));
+	sme_debug("token: %d randnIntvl: %d msgSource: %d measurementduration %d, rrm_ctx duration %d Meas_mode: %s",
+		  sme_rrm_ctx->token, sme_rrm_ctx->randnIntvl,
+		  sme_rrm_ctx->msgSource, beacon_req->measurementDuration[0],
+		  sme_rrm_ctx->duration[0],
+		  sme_rrm_get_meas_mode_string(sme_rrm_ctx->measMode[0]));
 
 	return sme_rrm_issue_scan_req(mac);
 
@@ -1562,7 +1558,7 @@ static void rrm_iter_meas_timer_handle(void *userData)
 {
 	struct mac_context *mac = (struct mac_context *) userData;
 
-	sme_warn("Randomization timer expired...send on next channel");
+	sme_debug("Randomization timer expired...send on next channel");
 	/* Issue a scan req for next channel. */
 	sme_rrm_issue_scan_req(mac);
 }

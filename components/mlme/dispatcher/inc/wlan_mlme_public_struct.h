@@ -1126,6 +1126,7 @@ struct wlan_mlme_chainmask {
  * @bmiss_skip_full_scan: Decide if full scan can be skipped in firmware if no
  * candidate is found in partial scan based on channel map
  * @enable_ring_buffer: Decide to enable/disable ring buffer for bug report
+ * @enable_peer_unmap_conf_support: Indicate whether to send conf for peer unmap
  */
 struct wlan_mlme_generic {
 	enum band_info band_capability;
@@ -1160,6 +1161,7 @@ struct wlan_mlme_generic {
 	uint8_t mgmt_retry_max;
 	bool bmiss_skip_full_scan;
 	bool enable_ring_buffer;
+	bool enable_peer_unmap_conf_support;
 };
 
 /*
@@ -1875,6 +1877,8 @@ struct wlan_mlme_per_slot_scoring {
  * @roam_score_delta: percentage delta in roam score
  * @apsd_enabled: Enable automatic power save delivery
  * @vendor_roam_score_algorithm: Preferred vendor roam score algorithm
+ * @min_roam_score_delta: Minimum difference between connected AP's and
+ *			candidate AP's roam score to start roaming.
  */
 struct wlan_mlme_scoring_cfg {
 	bool enable_scoring_for_roam;
@@ -1889,6 +1893,7 @@ struct wlan_mlme_scoring_cfg {
 	uint32_t roam_score_delta;
 	bool apsd_enabled;
 	uint32_t vendor_roam_score_algorithm;
+	uint32_t min_roam_score_delta;
 };
 
 /* struct wlan_mlme_threshold - Threshold related config items
@@ -2131,10 +2136,14 @@ struct wlan_mlme_fe_rrm {
  * struct wlan_mlme_mwc - MWC related configs
  * @mws_coex_4g_quick_tdm:  bitmap to set mws-coex 5g-nr power limit
  * @mws_coex_5g_nr_pwr_limit: bitmap to set mws-coex 5g-nr power limit
+ * @mws_coex_pcc_channel_avoid_delay: PCC avoidance delay in seconds
+ * @mws_coex_scc_channel_avoid_delay: SCC avoidance delay in seconds
  **/
 struct wlan_mlme_mwc {
 	uint32_t mws_coex_4g_quick_tdm;
 	uint32_t mws_coex_5g_nr_pwr_limit;
+	uint32_t mws_coex_pcc_channel_avoid_delay;
+	uint32_t mws_coex_scc_channel_avoid_delay;
 };
 #else
 struct wlan_mlme_mwc {

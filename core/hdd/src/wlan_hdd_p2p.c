@@ -718,7 +718,6 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 			wlan_abort_scan(hdd_ctx->pdev, INVAL_PDEV_ID,
 					adapter->vdev_id, INVALID_SCAN_ID,
 					false);
-			hdd_debug("Abort Scan while adding virtual interface");
 		}
 	}
 
@@ -899,7 +898,6 @@ int __wlan_hdd_del_virtual_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
 	} else if (wlan_hdd_is_session_type_monitor(
 					adapter->device_mode)) {
 		wlan_hdd_del_monitor(hdd_ctx, adapter, TRUE);
-		hdd_reset_pktcapture_cb(OL_TXRX_PDEV_ID);
 	} else {
 		wlan_hdd_release_intf_addr(hdd_ctx,
 					   adapter->mac_addr.bytes);

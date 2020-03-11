@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -908,8 +908,7 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 	 */
 	if (sendProbeReq)
 		lim_send_probe_req_mgmt_frame(mac_ctx, &session->ssId,
-			session->bssId, wlan_reg_freq_to_chan(
-			mac_ctx->pdev, session->curr_op_freq),
+			session->bssId, session->curr_op_freq,
 			session->self_mac_addr, session->dot11mode, NULL, NULL);
 
 	if ((false == mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running)
@@ -1191,9 +1190,6 @@ sch_beacon_edca_process(struct mac_context *mac, tSirMacEdcaParamSetIE *edca,
 
 	follow_ap_edca = mlme_get_follow_ap_edca_flag(session->vdev);
 
-	pe_debug("Updating parameter set count: Old %d ---> new %d",
-		session->gLimEdcaParamSetCount, edca->qosInfo.count);
-
 	session->gLimEdcaParamSetCount = edca->qosInfo.count;
 	session->gLimEdcaParams[QCA_WLAN_AC_BE] = edca->acbe;
 	session->gLimEdcaParams[QCA_WLAN_AC_BK] = edca->acbk;
@@ -1262,15 +1258,15 @@ sch_beacon_edca_process(struct mac_context *mac, tSirMacEdcaParamSetIE *edca,
 	}
 	WLAN_HOST_DIAG_LOG_REPORT(log_ptr);
 #endif /* FEATURE_WLAN_DIAG_SUPPORT */
-	pe_debug("Edca param enabled in ini %d. Updating Local EDCA Params(gLimEdcaParams) to: ",
+	pe_debug("Edca param enabled %d. Updating Local Params to: ",
 		 mac->mlme_cfg->edca_params.enable_edca_params);
 	for (i = 0; i < QCA_WLAN_AC_ALL; i++) {
-		pe_debug("AC[%d]:  AIFSN: %d, ACM %d, CWmin %d, CWmax %d, TxOp %d",
-		       i, session->gLimEdcaParams[i].aci.aifsn,
-		       session->gLimEdcaParams[i].aci.acm,
-		       session->gLimEdcaParams[i].cw.min,
-		       session->gLimEdcaParams[i].cw.max,
-		       session->gLimEdcaParams[i].txoplimit);
+		pe_nofl_debug("AC[%d]:  AIFSN: %d, ACM %d, CWmin %d, CWmax %d, TxOp %d",
+			      i, session->gLimEdcaParams[i].aci.aifsn,
+			      session->gLimEdcaParams[i].aci.acm,
+			      session->gLimEdcaParams[i].cw.min,
+			      session->gLimEdcaParams[i].cw.max,
+			      session->gLimEdcaParams[i].txoplimit);
 	}
 	return QDF_STATUS_SUCCESS;
 }

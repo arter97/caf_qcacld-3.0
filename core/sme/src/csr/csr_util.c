@@ -1000,8 +1000,6 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 	uint32_t sap_lfreq, sap_hfreq, intf_lfreq, intf_hfreq;
 	QDF_STATUS status;
 
-	sme_debug("sap_ch_freq: %d sap_phymode: %d", sap_ch_freq, sap_phymode);
-
 	if (mac_ctx->roam.configParam.cc_switch_mode ==
 			QDF_MCC_TO_SCC_SWITCH_DISABLE)
 		return 0;
@@ -1022,7 +1020,7 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 	}
 
 	sme_debug("sap_ch:%d sap_phymode:%d sap_cch:%d sap_hbw:%d chb:%d",
-		sap_ch_freq, sap_phymode, sap_cfreq, sap_hbw, chb);
+		  sap_ch_freq, sap_phymode, sap_cfreq, sap_hbw, chb);
 
 	for (i = 0; i < WLAN_MAX_VDEVS; i++) {
 		if (!CSR_IS_SESSION_VALID(mac_ctx, i))
@@ -1055,11 +1053,6 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 					session, &sap_ch_freq, &sap_hbw,
 					&sap_cfreq, &intf_ch_freq, &intf_hbw,
 					&intf_cfreq);
-
-			sme_debug("%d: sap_ch:%d sap_hbw:%d sap_cfreq:%d"
-				  " intf_ch:%d intf_hbw:%d, intf_cfreq:%d",
-				  i, sap_ch_freq, sap_hbw, sap_cfreq,
-				  intf_ch_freq, intf_hbw, intf_cfreq);
 		}
 		if (intf_ch_freq &&
 		    ((intf_ch_freq <= wlan_reg_ch_to_freq(CHAN_ENUM_2484) &&
@@ -1070,8 +1063,8 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 	}
 
 	sme_debug("intf_ch:%d sap_ch:%d cc_switch_mode:%d, dbs:%d",
-			intf_ch_freq, sap_ch_freq, cc_switch_mode,
-			policy_mgr_is_dbs_enable(mac_ctx->psoc));
+		  intf_ch_freq, sap_ch_freq, cc_switch_mode,
+		  policy_mgr_is_dbs_enable(mac_ctx->psoc));
 
 	if (intf_ch_freq && sap_ch_freq != intf_ch_freq &&
 	    !policy_mgr_is_force_scc(mac_ctx->psoc)) {
@@ -1557,7 +1550,6 @@ uint32_t csr_translate_to_wni_cfg_dot11_mode(struct mac_context *mac,
 
 	switch (csrDot11Mode) {
 	case eCSR_CFG_DOT11_MODE_AUTO:
-		sme_debug("eCSR_CFG_DOT11_MODE_AUTO");
 		if (IS_FEATURE_SUPPORTED_BY_FW(DOT11AX))
 			ret = MLME_DOT11_MODE_11AX;
 		else if (IS_FEATURE_SUPPORTED_BY_FW(DOT11AC))
@@ -2697,22 +2689,32 @@ bool csr_is_pmkid_found_for_peer(struct mac_context *mac,
 {
 	uint32_t i, index;
 	uint8_t *session_pmkid;
-	tPmkidCacheInfo pmkid_cache;
+	tPmkidCacheInfo *pmkid_cache;
 
-	qdf_mem_zero(&pmkid_cache, sizeof(pmkid_cache));
-	qdf_mem_copy(pmkid_cache.BSSID.bytes, peer_mac_addr,
+	pmkid_cache = qdf_mem_malloc(sizeof(*pmkid_cache));
+	if (!pmkid_cache)
+		return false;
+
+	qdf_mem_copy(pmkid_cache->BSSID.bytes, peer_mac_addr,
 		     QDF_MAC_ADDR_SIZE);
 
-	if (!csr_lookup_pmkid_using_bssid(mac, session, &pmkid_cache, &index))
+	if (!csr_lookup_pmkid_using_bssid(mac, session, pmkid_cache, &index)) {
+		qdf_mem_free(pmkid_cache);
 		return false;
-	session_pmkid = &pmkid_cache.PMKID[0];
+	}
+
+	session_pmkid = pmkid_cache->PMKID;
 	for (i = 0; i < pmkid_count; i++) {
 		if (!qdf_mem_cmp(pmkid + (i * PMKID_LEN),
-				 session_pmkid, PMKID_LEN))
+				 session_pmkid, PMKID_LEN)) {
+			qdf_mem_free(pmkid_cache);
 			return true;
+		}
 	}
 
 	sme_debug("PMKID in PmkidCacheInfo doesn't match with PMKIDs of peer");
+	qdf_mem_free(pmkid_cache);
+
 	return false;
 }
 

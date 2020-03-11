@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1540,6 +1540,11 @@ hdd_sendactionframe(struct hdd_adapter *adapter, const uint8_t *bssid,
 	struct cfg80211_mgmt_tx_params params;
 #endif
 
+	if (payload_len < sizeof(tSirMacVendorSpecificFrameHdr)) {
+		hdd_warn("Invalid payload length: %d", payload_len);
+		return -EINVAL;
+	}
+
 	if (QDF_STA_MODE != adapter->device_mode) {
 		hdd_warn("Unsupported in mode %s(%d)",
 			 qdf_opmode_str(adapter->device_mode),
@@ -1875,12 +1880,10 @@ hdd_parse_channellist(struct hdd_context *hdd_ctx,
 		in_ptr = strpbrk(in_ptr, " ");
 		/* no channel list after the number of channels argument */
 		if (!in_ptr) {
-			if (0 != j) {
-				*num_channels = j;
+			if ((j != 0) && (*num_channels == j))
 				return 0;
-			} else {
-				return -EINVAL;
-			}
+			else
+				goto cnt_mismatch;
 		}
 
 		/* remove empty space */
@@ -1892,12 +1895,10 @@ hdd_parse_channellist(struct hdd_context *hdd_ctx,
 		 * argument and spaces
 		 */
 		if ('\0' == *in_ptr) {
-			if (0 != j) {
-				*num_channels = j;
+			if ((j != 0) && (*num_channels == j))
 				return 0;
-			} else {
-				return -EINVAL;
-			}
+			else
+				goto cnt_mismatch;
 		}
 
 		v = sscanf(in_ptr, "%31s ", buf);
@@ -1918,6 +1919,12 @@ hdd_parse_channellist(struct hdd_context *hdd_ctx,
 	}
 
 	return 0;
+
+cnt_mismatch:
+	hdd_debug("Mismatch in ch cnt: %d and num of ch: %d", *num_channels, j);
+	*num_channels = 0;
+	return -EINVAL;
+
 }
 
 /**
@@ -2787,6 +2794,12 @@ static int hdd_get_dwell_time(struct wlan_objmgr_psoc *psoc, uint8_t *command,
 				 val);
 		return 0;
 	}
+	if (strncmp(command, "GETDWELLTIME 2G MAX", 19) == 0) {
+		ucfg_scan_cfg_get_active_2g_dwelltime(psoc, &val);
+		*len = scnprintf(extra, n, "GETDWELLTIME 2G MAX %u\n",
+				 val);
+		return 0;
+	}
 	if (strncmp(command, "GETDWELLTIME", 12) == 0) {
 		ucfg_scan_cfg_get_active_dwelltime(psoc, &val);
 		*len = scnprintf(extra, n, "GETDWELLTIME %u\n", val);
@@ -2814,7 +2827,7 @@ static int hdd_set_dwell_time(struct wlan_objmgr_psoc *psoc, uint8_t *command)
 		value = value + 24;
 		temp = kstrtou32(value, 10, &val);
 		if (temp || !cfg_in_range(CFG_ACTIVE_MAX_CHANNEL_TIME, val)) {
-			hdd_err("argument passed for SETDWELLTIME ACTIVE MAX is incorrect");
+			hdd_err_rl("argument passed for SETDWELLTIME ACTIVE MAX is incorrect");
 			return -EFAULT;
 		}
 		ucfg_scan_cfg_set_active_dwelltime(psoc, val);
@@ -2825,10 +2838,22 @@ static int hdd_set_dwell_time(struct wlan_objmgr_psoc *psoc, uint8_t *command)
 		value = value + 25;
 		temp = kstrtou32(value, 10, &val);
 		if (temp || !cfg_in_range(CFG_PASSIVE_MAX_CHANNEL_TIME, val)) {
-			hdd_err("argument passed for SETDWELLTIME PASSIVE MAX is incorrect");
+			hdd_err_rl("argument passed for SETDWELLTIME PASSIVE MAX is incorrect");
 			return -EFAULT;
 		}
 		ucfg_scan_cfg_set_passive_dwelltime(psoc, val);
+	} else if (strncmp(command, "SETDWELLTIME 2G MAX", 19) == 0) {
+		if (drv_cmd_validate(command, 19))
+			return -EINVAL;
+
+		value = value + 20;
+		temp = kstrtou32(value, 10, &val);
+		if (temp || !cfg_in_range(CFG_ACTIVE_MAX_2G_CHANNEL_TIME,
+					  val)) {
+			hdd_err_rl("argument passed for SETDWELLTIME 2G MAX is incorrect");
+			return -EFAULT;
+		}
+		ucfg_scan_cfg_set_active_2g_dwelltime(psoc, val);
 	} else if (strncmp(command, "SETDWELLTIME", 12) == 0) {
 		if (drv_cmd_validate(command, 12))
 			return -EINVAL;
@@ -2836,7 +2861,7 @@ static int hdd_set_dwell_time(struct wlan_objmgr_psoc *psoc, uint8_t *command)
 		value = value + 13;
 		temp = kstrtou32(value, 10, &val);
 		if (temp || !cfg_in_range(CFG_ACTIVE_MAX_CHANNEL_TIME, val)) {
-			hdd_err("argument passed for SETDWELLTIME is incorrect");
+			hdd_err_rl("argument passed for SETDWELLTIME is incorrect");
 			return -EFAULT;
 		}
 		ucfg_scan_cfg_set_active_dwelltime(psoc, val);
@@ -4576,7 +4601,7 @@ static int drv_cmd_get_scan_home_away_time(struct hdd_adapter *adapter,
 {
 	int ret = 0;
 	uint16_t val;
-	char extra[32];
+	char extra[32] = {0};
 	uint8_t len = 0;
 	QDF_STATUS status;
 
@@ -6461,7 +6486,7 @@ static int hdd_driver_rxfilter_command_handler(uint8_t *command,
 		ret = hdd_set_rx_filter(adapter, action, 0x01);
 		break;
 	default:
-		hdd_warn("Unsupported RXFILTER type %d", type);
+		hdd_debug("Unsupported RXFILTER type %d", type);
 		break;
 	}
 
@@ -7237,6 +7262,7 @@ static bool check_disable_channels(struct hdd_context *hdd_ctx,
  * disconnect_sta_and_stop_sap() - Disconnect STA and stop SAP
  *
  * @hdd_ctx: Pointer to hdd context
+ * @reason: Disconnect reason code as per @enum eSirMacReasonCodes
  *
  * Disable channels provided by user and disconnect STA if it is
  * connected to any AP, stop SAP and send deauthentication request
@@ -7244,7 +7270,8 @@ static bool check_disable_channels(struct hdd_context *hdd_ctx,
  *
  * Return: None
  */
-static void disconnect_sta_and_stop_sap(struct hdd_context *hdd_ctx)
+static void disconnect_sta_and_stop_sap(struct hdd_context *hdd_ctx,
+					enum eSirMacReasonCodes reason)
 {
 	struct hdd_adapter *adapter, *next = NULL;
 	QDF_STATUS status;
@@ -7253,7 +7280,7 @@ static void disconnect_sta_and_stop_sap(struct hdd_context *hdd_ctx)
 	if (!hdd_ctx)
 		return;
 
-	hdd_check_and_disconnect_sta_on_invalid_channel(hdd_ctx);
+	hdd_check_and_disconnect_sta_on_invalid_channel(hdd_ctx, reason);
 
 	status = hdd_get_front_adapter(hdd_ctx, &adapter);
 	while (adapter && (status == QDF_STATUS_SUCCESS)) {
@@ -7450,7 +7477,8 @@ mem_alloc_failed:
 		ret = wlan_hdd_disable_channels(hdd_ctx);
 		if (ret)
 			return ret;
-		disconnect_sta_and_stop_sap(hdd_ctx);
+		disconnect_sta_and_stop_sap(hdd_ctx,
+					    eSIR_MAC_OPER_CHANNEL_BAND_CHANGE);
 	}
 
 	hdd_exit();
