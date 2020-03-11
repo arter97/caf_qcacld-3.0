@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2019-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -264,6 +264,9 @@
 #define HAL_RX_GET_TO_DS_FLAG(rx_mpdu_start)	\
 	HAL_RX_GET(rx_mpdu_start, RX_MPDU_INFO_11, TO_DS)
 
+#define HAL_RX_GET_MAC_ADDR1_VALID(rx_mpdu_start) \
+	HAL_RX_GET(rx_mpdu_start, RX_MPDU_INFO_11, MAC_ADDR_AD1_VALID)
+
 #define HAL_RX_GET_MAC_ADDR2_VALID(rx_mpdu_start) \
 	HAL_RX_GET(rx_mpdu_start, RX_MPDU_INFO_11, MAC_ADDR_AD2_VALID)
 
@@ -353,4 +356,50 @@ RX_MSDU_DETAILS_2_RX_MSDU_DESC_INFO_DETAILS_RESERVED_0A_OFFSET))
 			 RX_MSDU_END_10_TCP_UDP_CHKSUM_OFFSET)), \
 		RX_MSDU_END_10_TCP_UDP_CHKSUM_MASK, \
 		RX_MSDU_END_10_TCP_UDP_CHKSUM_LSB))
+
+#define HAL_RX_MSDU_END_DA_IDX_GET(_rx_msdu_end)	\
+	(_HAL_MS((*_OFFSET_TO_WORD_PTR(_rx_msdu_end,	\
+		RX_MSDU_END_11_DA_IDX_OR_SW_PEER_ID_OFFSET)),	\
+		RX_MSDU_END_11_DA_IDX_OR_SW_PEER_ID_MASK,	\
+		RX_MSDU_END_11_DA_IDX_OR_SW_PEER_ID_LSB))
+
+#define HAL_RX_TLV_GET_FLOW_AGGR_CONT(buf) \
+	(_HAL_MS( \
+		 (*_OFFSET_TO_WORD_PTR(&(((struct rx_pkt_tlvs *)(buf))->\
+			 msdu_end_tlv.rx_msdu_end), \
+		RX_MSDU_END_17_FLOW_AGGREGATION_CONTINUATION_OFFSET)),	\
+		RX_MSDU_END_17_FLOW_AGGREGATION_CONTINUATION_MASK,	\
+		RX_MSDU_END_17_FLOW_AGGREGATION_CONTINUATION_LSB))
+
+#define HAL_RX_TLV_GET_FLOW_AGGR_COUNT(buf) \
+	(_HAL_MS( \
+		 (*_OFFSET_TO_WORD_PTR(&(((struct rx_pkt_tlvs *)(buf))->\
+			 msdu_end_tlv.rx_msdu_end), \
+		RX_MSDU_END_17_AGGREGATION_COUNT_OFFSET)),	\
+		RX_MSDU_END_17_AGGREGATION_COUNT_MASK,	\
+		RX_MSDU_END_17_AGGREGATION_COUNT_LSB))
+
+#define HAL_RX_TLV_GET_FISA_TIMEOUT(buf) \
+	(_HAL_MS( \
+		 (*_OFFSET_TO_WORD_PTR(&(((struct rx_pkt_tlvs *)(buf))->\
+			 msdu_end_tlv.rx_msdu_end), \
+		RX_MSDU_END_17_FISA_TIMEOUT_OFFSET)),	\
+		RX_MSDU_END_17_FISA_TIMEOUT_MASK,	\
+		RX_MSDU_END_17_FISA_TIMEOUT_LSB))
+
+#define HAL_RX_TLV_GET_FISA_CUMULATIVE_L4_CHECKSUM(buf) \
+	(_HAL_MS( \
+		 (*_OFFSET_TO_WORD_PTR(&(((struct rx_pkt_tlvs *)(buf))->\
+			 msdu_end_tlv.rx_msdu_end), \
+		RX_MSDU_END_18_CUMULATIVE_L4_CHECKSUM_OFFSET)),	\
+		RX_MSDU_END_18_CUMULATIVE_L4_CHECKSUM_MASK,	\
+		RX_MSDU_END_18_CUMULATIVE_L4_CHECKSUM_LSB))
+
+#define HAL_RX_TLV_GET_FISA_CUMULATIVE_IP_LENGTH(buf) \
+	(_HAL_MS( \
+		 (*_OFFSET_TO_WORD_PTR(&(((struct rx_pkt_tlvs *)(buf))->\
+			 msdu_end_tlv.rx_msdu_end), \
+		RX_MSDU_END_18_CUMULATIVE_IP_LENGTH_OFFSET)),	\
+		RX_MSDU_END_18_CUMULATIVE_IP_LENGTH_MASK,	\
+		RX_MSDU_END_18_CUMULATIVE_IP_LENGTH_LSB))
 #endif

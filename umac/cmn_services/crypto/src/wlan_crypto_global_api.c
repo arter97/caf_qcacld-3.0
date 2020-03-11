@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -336,6 +336,19 @@ QDF_STATUS wlan_crypto_set_pmksa(struct wlan_crypto_params *crypto_params,
 			qdf_mem_free(crypto_params->pmksa[i]);
 			crypto_params->pmksa[i] = pmksa;
 			return QDF_STATUS_SUCCESS;
+		} else if (pmksa->ssid_len &&
+			    !qdf_mem_cmp(pmksa->ssid,
+					 crypto_params->pmksa[i]->ssid,
+					 pmksa->ssid_len) &&
+			    !qdf_mem_cmp(pmksa->cache_id,
+					 crypto_params->pmksa[i]->cache_id,
+					 WLAN_CACHE_ID_LEN)){
+			/* free the current pmksa and use this slot */
+			qdf_mem_zero(crypto_params->pmksa[i],
+				     sizeof(struct wlan_crypto_pmksa));
+			qdf_mem_free(crypto_params->pmksa[i]);
+			crypto_params->pmksa[i] = pmksa;
+			return QDF_STATUS_SUCCESS;
 		}
 	}
 
@@ -365,10 +378,22 @@ QDF_STATUS wlan_crypto_del_pmksa(struct wlan_crypto_params *crypto_params,
 			qdf_mem_free(crypto_params->pmksa[i]);
 			crypto_params->pmksa[i] = NULL;
 			return QDF_STATUS_SUCCESS;
+		} else if (pmksa->ssid_len &&
+			   !qdf_mem_cmp(pmksa->ssid,
+					crypto_params->pmksa[i]->ssid,
+					pmksa->ssid_len) &&
+			   !qdf_mem_cmp(pmksa->cache_id,
+					crypto_params->pmksa[i]->cache_id,
+					WLAN_CACHE_ID_LEN)){
+			qdf_mem_zero(crypto_params->pmksa[i],
+				     sizeof(struct wlan_crypto_pmksa));
+			qdf_mem_free(crypto_params->pmksa[i]);
+			crypto_params->pmksa[i] = NULL;
+			return QDF_STATUS_SUCCESS;
 		}
 	}
 
-	return QDF_STATUS_E_INVAL;
+	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS wlan_crypto_pmksa_flush(struct wlan_crypto_params *crypto_params)
@@ -429,6 +454,48 @@ QDF_STATUS wlan_crypto_set_del_pmksa(struct wlan_objmgr_vdev *vdev,
 }
 
 struct wlan_crypto_pmksa *
+wlan_crypto_get_peer_pmksa(struct wlan_objmgr_vdev *vdev,
+			   struct wlan_crypto_pmksa *pmksa)
+{
+	struct wlan_crypto_comp_priv *crypto_priv;
+	struct wlan_crypto_params *crypto_params;
+	uint8_t i;
+
+	if (!pmksa) {
+		crypto_err("pmksa is NULL");
+		return NULL;
+	}
+	crypto_priv = (struct wlan_crypto_comp_priv *)
+					wlan_get_vdev_crypto_obj(vdev);
+
+	if (!crypto_priv) {
+		crypto_err("crypto_priv NULL");
+		return NULL;
+	}
+
+	crypto_params = &crypto_priv->crypto_params;
+
+	for (i = 0; i < WLAN_CRYPTO_MAX_PMKID; i++) {
+		if (!crypto_params->pmksa[i])
+			continue;
+		if (qdf_is_macaddr_equal(&pmksa->bssid,
+					 &crypto_params->pmksa[i]->bssid)) {
+			return crypto_params->pmksa[i];
+		} else if (pmksa->ssid_len &&
+			   !qdf_mem_cmp(pmksa->ssid,
+					crypto_params->pmksa[i]->ssid,
+					pmksa->ssid_len) &&
+			   !qdf_mem_cmp(pmksa->cache_id,
+					crypto_params->pmksa[i]->cache_id,
+					WLAN_CACHE_ID_LEN)){
+			return crypto_params->pmksa[i];
+		}
+	}
+
+	return NULL;
+}
+
+struct wlan_crypto_pmksa *
 wlan_crypto_get_pmksa(struct wlan_objmgr_vdev *vdev, struct qdf_mac_addr *bssid)
 {
 	struct wlan_crypto_comp_priv *crypto_priv;
@@ -460,6 +527,7 @@ wlan_crypto_get_pmksa(struct wlan_objmgr_vdev *vdev, struct qdf_mac_addr *bssid)
 
 	return NULL;
 }
+
 /**
  * wlan_crypto_is_htallowed - called to check is HT allowed for cipher
  * @vdev:  vdev
@@ -2632,19 +2700,9 @@ uint8_t *wlan_crypto_build_wpaie(struct wlan_objmgr_vdev *vdev,
 	return frm;
 }
 
-/**
- * wlan_crypto_build_rsnie - called by mlme to build rsnie
- * @vdev: vdev
- * @iebuf: ie buffer
- * @bssid: bssid mac address to add pmkid in rsnie
- *
- * This function gets called by mlme to build rsnie from given vdev
- *
- * Return: end of buffer
- */
-uint8_t *wlan_crypto_build_rsnie(struct wlan_objmgr_vdev *vdev,
-					uint8_t *iebuf,
-					struct qdf_mac_addr *bssid)
+uint8_t *wlan_crypto_build_rsnie_with_pmksa(struct wlan_objmgr_vdev *vdev,
+					    uint8_t *iebuf,
+					    struct wlan_crypto_pmksa *pmksa)
 {
 	uint8_t *frm = iebuf;
 	uint8_t *selcnt;
@@ -2796,20 +2854,13 @@ add_rsn_caps:
 	/* optional capabilities */
 	if (crypto_params->rsn_caps & WLAN_CRYPTO_RSN_CAP_MFP_ENABLED) {
 		/* PMK list */
-		if (bssid) {
-			struct wlan_crypto_pmksa *pmksa;
-
-			pmksa = wlan_crypto_get_pmksa(vdev, bssid);
-
-			if (pmksa) {
-				WLAN_CRYPTO_ADDSHORT(frm, 1);
-				qdf_mem_copy(frm, pmksa->pmkid, PMKID_LEN);
-				frm += PMKID_LEN;
-			} else {
-				WLAN_CRYPTO_ADDSHORT(frm, 0);
-			}
-		} else
+		if (pmksa) {
+			WLAN_CRYPTO_ADDSHORT(frm, 1);
+			qdf_mem_copy(frm, pmksa->pmkid, PMKID_LEN);
+			frm += PMKID_LEN;
+		} else {
 			WLAN_CRYPTO_ADDSHORT(frm, 0);
+		}
 
 		if (HAS_MGMT_CIPHER(crypto_params,
 						WLAN_CRYPTO_CIPHER_AES_CMAC)) {
@@ -2836,17 +2887,12 @@ add_rsn_caps:
 		}
 	} else {
 		/* PMK list */
-		if (bssid) {
-			struct wlan_crypto_pmksa *pmksa;
-
-			pmksa = wlan_crypto_get_pmksa(vdev, bssid);
-			if (pmksa) {
-				WLAN_CRYPTO_ADDSHORT(frm, 1);
-				qdf_mem_copy(frm, pmksa->pmkid, PMKID_LEN);
-				frm += PMKID_LEN;
-			} else {
-				WLAN_CRYPTO_ADDSHORT(frm, 0);
-			}
+		if (pmksa) {
+			WLAN_CRYPTO_ADDSHORT(frm, 1);
+			qdf_mem_copy(frm, pmksa->pmkid, PMKID_LEN);
+			frm += PMKID_LEN;
+		} else {
+			WLAN_CRYPTO_ADDSHORT(frm, 0);
 		}
 	}
 
@@ -2854,6 +2900,18 @@ add_rsn_caps:
 	iebuf[1] = frm - iebuf - 2;
 
 	return frm;
+}
+
+uint8_t *wlan_crypto_build_rsnie(struct wlan_objmgr_vdev *vdev,
+				 uint8_t *iebuf,
+				 struct qdf_mac_addr *bssid)
+{
+	struct wlan_crypto_pmksa *pmksa = NULL;
+
+	if (bssid)
+		pmksa = wlan_crypto_get_pmksa(vdev, bssid);
+
+	return wlan_crypto_build_rsnie_with_pmksa(vdev, iebuf, pmksa);
 }
 
 bool wlan_crypto_rsn_info(struct wlan_objmgr_vdev *vdev,
@@ -3193,7 +3251,7 @@ QDF_STATUS wlan_crypto_set_peer_wep_keys(struct wlan_objmgr_vdev *vdev,
 	if (opmode == QDF_STA_MODE) {
 		peer = wlan_objmgr_vdev_try_get_bsspeer(vdev, WLAN_CRYPTO_ID);
 		if (!peer) {
-			crypto_err("peer NULL");
+			crypto_debug("peer NULL");
 			return QDF_STATUS_E_INVAL;
 		}
 	}
@@ -3816,7 +3874,7 @@ wlan_get_crypto_params_from_rsn_ie(struct wlan_crypto_params *crypto_params,
 	qdf_mem_zero(crypto_params, sizeof(struct wlan_crypto_params));
 	rsn_ie = wlan_get_ie_ptr_from_eid(WLAN_ELEMID_RSN, ie_ptr, ie_len);
 	if (!rsn_ie) {
-		crypto_err("RSN IE NULL");
+		crypto_debug("RSN IE not present");
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -3843,7 +3901,7 @@ wlan_get_crypto_params_from_wpa_ie(struct wlan_crypto_params *crypto_params,
 	wpa_ie = wlan_get_vendor_ie_ptr_from_oui((uint8_t *)&wpa_oui,
 						 WLAN_OUI_SIZE, ie_ptr, ie_len);
 	if (!wpa_ie) {
-		crypto_err("WPA IE NULL");
+		crypto_debug("WPA IE not present");
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -3861,6 +3919,7 @@ wlan_get_crypto_params_from_wpa_ie(struct wlan_crypto_params *crypto_params,
  * @vdev_id: vdev id
  * @ie_ptr: pointer to IEs
  * @ie_len: IE length
+ * @peer_crypto_params: return peer crypto parameters
  *
  * This function gets called from ucfg to check RSN match.
  *
@@ -3868,9 +3927,9 @@ wlan_get_crypto_params_from_wpa_ie(struct wlan_crypto_params *crypto_params,
  */
 bool wlan_crypto_check_rsn_match(struct wlan_objmgr_psoc *psoc,
 				 uint8_t vdev_id, uint8_t *ie_ptr,
-				 uint16_t ie_len)
+				 uint16_t ie_len, struct wlan_crypto_params *
+				 peer_crypto_params)
 {
-	struct wlan_crypto_params peer_crypto_params;
 	struct wlan_objmgr_vdev *vdev;
 	bool match = true;
 	QDF_STATUS status;
@@ -3879,7 +3938,7 @@ bool wlan_crypto_check_rsn_match(struct wlan_objmgr_psoc *psoc,
 		crypto_err("PSOC is NULL");
 		return false;
 	}
-	status = wlan_get_crypto_params_from_rsn_ie(&peer_crypto_params,
+	status = wlan_get_crypto_params_from_rsn_ie(peer_crypto_params,
 						    ie_ptr, ie_len);
 	if (QDF_STATUS_SUCCESS != status) {
 		crypto_err("get crypto prarams from RSN IE failed");
@@ -3892,7 +3951,8 @@ bool wlan_crypto_check_rsn_match(struct wlan_objmgr_psoc *psoc,
 		return false;
 	}
 
-	match = wlan_crypto_rsn_info(vdev, &peer_crypto_params);
+	match = wlan_crypto_rsn_info(vdev, peer_crypto_params);
+
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_CRYPTO_ID);
 
 	return match;
@@ -3904,6 +3964,7 @@ bool wlan_crypto_check_rsn_match(struct wlan_objmgr_psoc *psoc,
  * @vdev_id: vdev id
  * @ie_ptr: pointer to IEs
  * @ie_len: IE length
+ * @peer_crypto_params: return peer crypto parameters
  *
  * This function gets called from ucfg to check WPA match.
  *
@@ -3911,9 +3972,9 @@ bool wlan_crypto_check_rsn_match(struct wlan_objmgr_psoc *psoc,
  */
 bool wlan_crypto_check_wpa_match(struct wlan_objmgr_psoc *psoc,
 				 uint8_t vdev_id, uint8_t *ie_ptr,
-				 uint16_t ie_len)
+				 uint16_t ie_len, struct wlan_crypto_params *
+				 peer_crypto_params)
 {
-	struct wlan_crypto_params peer_crypto_params;
 	struct wlan_objmgr_vdev *vdev;
 	bool match = true;
 	QDF_STATUS status;
@@ -3929,14 +3990,15 @@ bool wlan_crypto_check_wpa_match(struct wlan_objmgr_psoc *psoc,
 		return false;
 	}
 
-	status = wlan_get_crypto_params_from_wpa_ie(&peer_crypto_params,
+	status = wlan_get_crypto_params_from_wpa_ie(peer_crypto_params,
 						    ie_ptr, ie_len);
 	if (QDF_STATUS_SUCCESS != status) {
 		crypto_err("get crypto prarams from WPA IE failed");
 		match = false;
 		goto send_res;
 	}
-	match = wlan_crypto_rsn_info(vdev, &peer_crypto_params);
+	match = wlan_crypto_rsn_info(vdev, peer_crypto_params);
+
 send_res:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_CRYPTO_ID);
 
@@ -4002,20 +4064,16 @@ QDF_STATUS wlan_set_vdev_crypto_prarams_from_ie(struct wlan_objmgr_vdev *vdev,
 	wlan_crypto_reset_prarams(vdev_crypto_params);
 	status = wlan_get_crypto_params_from_rsn_ie(&crypto_params,
 						    ie_ptr, ie_len);
-	if (QDF_STATUS_SUCCESS == status) {
+	if (QDF_IS_STATUS_SUCCESS(status))
 		wlan_crypto_merge_prarams(vdev_crypto_params, &crypto_params);
-	} else {
-		crypto_err("get crypto prarams from RSN IE failed");
+	else
 		send_fail = true;
-	}
 
 	status = wlan_get_crypto_params_from_wpa_ie(&crypto_params,
 						    ie_ptr, ie_len);
-	if (QDF_STATUS_SUCCESS == status) {
+	if (QDF_IS_STATUS_SUCCESS(status)) {
 		wlan_crypto_merge_prarams(vdev_crypto_params, &crypto_params);
 		send_fail = false;
-	} else {
-		crypto_debug("get crypto prarams from WPA IE failed");
 	}
 
 	return send_fail ? QDF_STATUS_E_FAILURE : QDF_STATUS_SUCCESS;

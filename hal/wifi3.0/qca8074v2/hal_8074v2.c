@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -588,14 +588,16 @@ static uint32_t hal_rx_tid_get_8074v2(hal_soc_handle_t hal_soc_hdl,
 
 /**
  * hal_rx_hw_desc_get_ppduid_get_8074v2(): retrieve ppdu id
- * @hw_desc_addr: hw addr
+ * @rx_tlv_hdr: packtet rx tlv header
+ * @rxdma_dst_ring_desc: rxdma HW descriptor
  *
  * Return: ppdu id
  */
-static uint32_t hal_rx_hw_desc_get_ppduid_get_8074v2(void *hw_desc_addr)
+static uint32_t hal_rx_hw_desc_get_ppduid_get_8074v2(void *rx_tlv_hdr,
+						     void *rxdma_dst_ring_desc)
 {
 	struct rx_mpdu_info *rx_mpdu_info;
-	struct rx_pkt_tlvs *rx_desc = (struct rx_pkt_tlvs *)hw_desc_addr;
+	struct rx_pkt_tlvs *rx_desc = (struct rx_pkt_tlvs *)rx_tlv_hdr;
 
 	rx_mpdu_info =
 		&rx_desc->mpdu_start_tlv.rx_mpdu_start.rx_mpdu_info_details;
@@ -800,7 +802,13 @@ static uint8_t hal_rx_get_filter_category_8074v2(uint8_t *buf)
 static uint32_t
 hal_rx_get_ppdu_id_8074v2(uint8_t *buf)
 {
-	return HAL_RX_GET_PPDU_ID(buf);
+	struct rx_mpdu_info *rx_mpdu_info;
+	struct rx_pkt_tlvs *rx_desc = (struct rx_pkt_tlvs *)buf;
+
+	rx_mpdu_info =
+		&rx_desc->mpdu_start_tlv.rx_mpdu_start.rx_mpdu_info_details;
+
+	return HAL_RX_GET_PPDU_ID(rx_mpdu_info);
 }
 
 /**
@@ -983,6 +991,24 @@ static inline qdf_iomem_t hal_get_window_address_8074v2(struct hal_soc *hal_soc,
 	return addr;
 }
 
+/**
+ * hal_rx_mpdu_start_tlv_tag_valid_8074v2 () - API to check if RX_MPDU_START
+ * tlv tag is valid
+ *
+ * @rx_tlv_hdr: start address of rx_pkt_tlvs
+ *
+ * Return: true if RX_MPDU_START is valied, else false.
+ */
+uint8_t hal_rx_mpdu_start_tlv_tag_valid_8074v2(void *rx_tlv_hdr)
+{
+	struct rx_pkt_tlvs *rx_desc = (struct rx_pkt_tlvs *)rx_tlv_hdr;
+	uint32_t tlv_tag;
+
+	tlv_tag = HAL_RX_GET_USER_TLV32_TYPE(&rx_desc->mpdu_start_tlv);
+
+	return tlv_tag == WIFIRX_MPDU_START_E ? true : false;
+}
+
 struct hal_hw_txrx_ops qca8074v2_hal_hw_txrx_ops = {
 
 	/* init and setup */
@@ -1004,7 +1030,9 @@ struct hal_hw_txrx_ops qca8074v2_hal_hw_txrx_ops = {
 	hal_tx_desc_set_cache_set_num_generic,
 	hal_tx_comp_get_status_generic,
 	hal_tx_comp_get_release_reason_generic,
+	hal_get_wbm_internal_error_generic,
 	hal_tx_desc_set_mesh_en_8074v2,
+	hal_tx_init_cmd_credit_ring_8074v2,
 
 	/* rx */
 	hal_rx_msdu_start_nss_get_8074v2,
@@ -1071,6 +1099,23 @@ struct hal_hw_txrx_ops qca8074v2_hal_hw_txrx_ops = {
 	hal_rx_msdu_get_flow_params_8074v2,
 	hal_rx_tlv_get_tcp_chksum_8074v2,
 	hal_rx_get_rx_sequence_8074v2,
+#if defined(QCA_WIFI_QCA6018) && defined(WLAN_CFR_ENABLE) && \
+	defined(WLAN_ENH_CFR_ENABLE)
+	hal_rx_get_bb_info_8074v2,
+	hal_rx_get_rtt_info_8074v2,
+#else
+	NULL,
+	NULL,
+#endif
+	/* rx - msdu fast path info fields */
+	hal_rx_msdu_packet_metadata_get_generic,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	hal_rx_mpdu_start_tlv_tag_valid_8074v2,
 };
 
 struct hal_hw_srng_config hw_srng_table_8074v2[] = {
@@ -1205,10 +1250,11 @@ struct hal_hw_srng_config hw_srng_table_8074v2[] = {
 			HWIO_TCL_R0_SW2TCL1_RING_BASE_MSB_RING_SIZE_SHFT,
 	},
 	{ /* TCL_CMD */
+	  /* qca8074v2 and qcn9000 uses this ring for data commands */
 		.start_ring_id = HAL_SRNG_SW2TCL_CMD,
 		.max_rings = 1,
 		.entry_size = (sizeof(struct tlv_32_hdr) +
-			sizeof(struct tcl_gse_cmd)) >> 2,
+			sizeof(struct tcl_data_cmd)) >> 2,
 		.lmac_ring =  FALSE,
 		.ring_dir = HAL_SRNG_SRC_RING,
 		.reg_start = {

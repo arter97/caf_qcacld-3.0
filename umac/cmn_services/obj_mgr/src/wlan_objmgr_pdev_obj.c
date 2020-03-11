@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -29,7 +29,7 @@
 #include "wlan_objmgr_global_obj_i.h"
 #include "wlan_objmgr_psoc_obj_i.h"
 #include "wlan_objmgr_pdev_obj_i.h"
-
+#include <wlan_utility.h>
 
 /**
  ** APIs to Create/Delete Global object APIs
@@ -121,6 +121,8 @@ struct wlan_objmgr_pdev *wlan_objmgr_pdev_obj_create(
 		qdf_mem_free(pdev);
 		return NULL;
 	}
+	wlan_minidump_log(pdev, sizeof(*pdev), psoc,
+			  WLAN_MD_OBJMGR_PDEV, "wlan_objmgr_pdev");
 	/* Save PSOC object pointer in PDEV */
 	wlan_pdev_set_psoc(pdev, psoc);
 	/* Initialize PDEV's VDEV list, assign default values */
@@ -172,7 +174,7 @@ struct wlan_objmgr_pdev *wlan_objmgr_pdev_obj_create(
 		return NULL;
 	}
 
-	obj_mgr_info("Created pdev %d", pdev->pdev_objmgr.wlan_pdev_id);
+	obj_mgr_debug("Created pdev %d", pdev->pdev_objmgr.wlan_pdev_id);
 
 	return pdev;
 }
@@ -195,7 +197,7 @@ static QDF_STATUS wlan_objmgr_pdev_obj_destroy(struct wlan_objmgr_pdev *pdev)
 	pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
 
 	wlan_print_pdev_info(pdev);
-	obj_mgr_info("Physically deleting pdev %d", pdev_id);
+	obj_mgr_debug("Physically deleting pdev %d", pdev_id);
 
 	if (pdev->obj_state != WLAN_OBJ_STATE_LOGICALLY_DELETED) {
 		obj_mgr_err("PDEV object delete is not invoked pdevid:%d objstate:%d",
@@ -231,6 +233,7 @@ static QDF_STATUS wlan_objmgr_pdev_obj_destroy(struct wlan_objmgr_pdev *pdev)
 		return QDF_STATUS_COMP_ASYNC;
 	}
 
+	wlan_minidump_remove(pdev);
 	/* Free PDEV object */
 	return wlan_objmgr_pdev_obj_free(pdev);
 }
@@ -244,8 +247,8 @@ QDF_STATUS wlan_objmgr_pdev_obj_delete(struct wlan_objmgr_pdev *pdev)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	obj_mgr_info("Logically deleting pdev %d",
-		     pdev->pdev_objmgr.wlan_pdev_id);
+	obj_mgr_debug("Logically deleting pdev %d",
+		      pdev->pdev_objmgr.wlan_pdev_id);
 
 	print_idx = qdf_get_pidx();
 	wlan_objmgr_print_ref_ids(pdev->pdev_objmgr.ref_id_dbg,

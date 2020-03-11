@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
  * Copyright (c) 2011, Atheros Communications Inc.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -30,6 +30,7 @@
 #if defined(WLAN_DFS_PARTIAL_OFFLOAD) && defined(HOST_DFS_SPOOF_TEST)
 #include "../dfs_process_radar_found_ind.h"
 #endif
+#include "../dfs_confirm_radar.h"
 
 /**
  * struct dfs_pulse dfs_fcc_radars - FCC radar table for Offload chipsets.
@@ -94,29 +95,6 @@ static struct dfs_pulse dfs_mkk4_radars[] = {
 
 	/* FCC TYPE 4 */
 	{16, 15, 2000, 5000, 0,  4,  7, 11, 23, 22,  0, 3, 0, 5, 0, 11},
-};
-
-/**
- * struct dfs_pulse dfs_mkkn_radars - MKKN radar table for Offload chipsets.
- */
-static struct dfs_pulse dfs_mkkn_radars[] = {
-	/** Since the table is empty  no new radar type shall be detected.
-	 * New filters shall be added to this tables after proper testing
-	 * and verification.
-	 */
-	/* constant PRF based */
-	/* Type 1 */
-	/* 0.8-5us, 200  300 PRF, 10 pulses */
-	{10, 5,   200,  400, 0,  4,  5,  0,  8, 15, 0,   0, 2, 5, 0, 91},
-	{10, 5,   400,  600, 0,  4,  5,  0,  8, 15, 0,   0, 2, 5, 0, 92},
-	{10, 5,   600,  800, 0,  4,  5,  0,  8, 15, 0,   0, 2, 5, 0, 93},
-	{10, 5,   800, 1000, 0,  4,  5,  0,  8, 15, 0,   0, 2, 5, 0, 94},
-	/* {10, 5,   200, 1000, 0,  6,  5,  0,  8, 15, 0,   0, 2, 5, 33}, */
-
-	/* Type 2 */
-	/* 0.8-15us, 200-1600 PRF, 15 pulses */
-	{15, 15,  200, 1600, 0,  4, 8,  0, 18, 24, 0,   0, 0, 5, 0, 95},
-
 };
 
 /**
@@ -347,6 +325,57 @@ static inline void dfs_set_adrastea_rf_thrshold(
 }
 #endif
 
+static
+void dfs_handle_radar_tab_init_failure(struct wlan_dfs_radar_tab_info *rinfo)
+{
+	rinfo->dfsdomain = DFS_UNINIT_DOMAIN;
+	rinfo->dfs_radars = NULL;
+	rinfo->numradars = 0;
+	rinfo->b5pulses = NULL;
+	rinfo->numb5radars = 0;
+}
+
+/**
+ * dfs_merge_external_radar() - Get and merge the external radar table with
+ * internal radar table.
+ * @dfs: Pointer to the DFS structure.
+ * @rinfo: Pointer to wlan_dfs_radar_tab_info structure.
+ * @dfsdomain: dfs domain.
+ *
+ * Return: Pointer to the allocated merged radar table if success, else NULL.
+ * The caller is responsible for freeing up the allocated memory when no longer
+ * needed.
+ */
+static struct dfs_pulse
+*dfs_merge_external_radar(struct wlan_dfs_radar_tab_info *rinfo,
+			  struct dfs_pulse *external_radars,
+			  int dfsdomain,
+			  uint8_t num_ext_radars)
+{
+	struct dfs_pulse *merged_radars;
+
+	merged_radars = qdf_mem_malloc((rinfo->numradars + num_ext_radars) *
+				       sizeof(struct dfs_pulse));
+	if (!merged_radars)
+		return NULL;
+	qdf_mem_copy(merged_radars,
+		     rinfo->dfs_radars,
+		     rinfo->numradars * sizeof(struct dfs_pulse));
+	qdf_mem_copy(merged_radars + rinfo->numradars,
+		     external_radars,
+		     num_ext_radars * sizeof(struct dfs_pulse));
+	return merged_radars;
+}
+
+static
+void dfs_update_radar_info(struct wlan_dfs_radar_tab_info *rinfo,
+			   struct dfs_pulse *merged_radars,
+			   uint8_t num_ext_radars)
+{
+	rinfo->dfs_radars = merged_radars;
+	rinfo->numradars += num_ext_radars;
+}
+
 void dfs_get_po_radars(struct wlan_dfs *dfs)
 {
 	struct wlan_dfs_radar_tab_info rinfo;
@@ -355,6 +384,8 @@ void dfs_get_po_radars(struct wlan_dfs *dfs)
 	int i;
 	uint32_t target_type;
 	int dfsdomain = DFS_FCC_DOMAIN;
+	struct dfs_pulse *external_radars, *merged_radars = NULL;
+	uint8_t num_ext_radars;
 
 	/* Fetch current radar patterns from the lmac */
 	qdf_mem_zero(&rinfo, sizeof(rinfo));
@@ -432,8 +463,8 @@ void dfs_get_po_radars(struct wlan_dfs *dfs)
 	case DFS_MKKN_DOMAIN:
 		dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS, "MKKN domain");
 		rinfo.dfsdomain = DFS_MKKN_DOMAIN;
-		rinfo.dfs_radars = dfs_mkkn_radars;
-		rinfo.numradars = QDF_ARRAY_SIZE(dfs_mkkn_radars);
+		rinfo.dfs_radars = dfs_mkk4_radars;
+		rinfo.numradars = QDF_ARRAY_SIZE(dfs_mkk4_radars);
 		rinfo.b5pulses = NULL;
 		rinfo.numb5radars = 0;
 		break;
@@ -461,12 +492,22 @@ void dfs_get_po_radars(struct wlan_dfs *dfs)
 		break;
 	default:
 		dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS, "UNINIT domain");
-		rinfo.dfsdomain = DFS_UNINIT_DOMAIN;
-		rinfo.dfs_radars = NULL;
-		rinfo.numradars = 0;
-		rinfo.b5pulses = NULL;
-		rinfo.numb5radars = 0;
+		dfs_handle_radar_tab_init_failure(&rinfo);
 		break;
+	}
+
+	external_radars = dfs_get_ext_filter(dfsdomain, &num_ext_radars);
+	if (external_radars) {
+		merged_radars = dfs_merge_external_radar(&rinfo,
+							 external_radars,
+							 dfsdomain,
+							 num_ext_radars);
+		if (!merged_radars)
+			dfs_handle_radar_tab_init_failure(&rinfo);
+		else
+			dfs_update_radar_info(&rinfo,
+					      merged_radars,
+					      num_ext_radars);
 	}
 
 	if (tx_ops->tgt_is_tgt_type_ar900b(target_type) ||
@@ -494,6 +535,7 @@ void dfs_get_po_radars(struct wlan_dfs *dfs)
 	WLAN_DFS_DATA_STRUCT_LOCK(dfs);
 	dfs_init_radar_filters(dfs, &rinfo);
 	WLAN_DFS_DATA_STRUCT_UNLOCK(dfs);
+	qdf_mem_free(merged_radars);
 }
 
 #if defined(WLAN_DFS_PARTIAL_OFFLOAD) && defined(HOST_DFS_SPOOF_TEST)
@@ -604,13 +646,13 @@ void dfs_radarfound_action_fcc(struct wlan_dfs *dfs, uint8_t seg_id)
 	qdf_mem_copy(&dfs->dfs_radar_found_chan, dfs->dfs_curchan,
 		     sizeof(dfs->dfs_radar_found_chan));
 	dfs_extract_radar_found_params(dfs, &params);
-	dfs_send_avg_params_to_fw(dfs, &params);
 	dfs->dfs_is_host_wait_running = 1;
-	dfs->dfs_seg_id = seg_id;
 	qdf_timer_mod(&dfs->dfs_host_wait_timer,
 		      (dfs->dfs_status_timeout_override ==
 		       -1) ? HOST_DFS_STATUS_WAIT_TIMER_MS :
 		      dfs->dfs_status_timeout_override);
+	dfs->dfs_seg_id = seg_id;
+	dfs_send_avg_params_to_fw(dfs, &params);
 }
 
 void dfs_host_wait_timer_reset(struct wlan_dfs *dfs)

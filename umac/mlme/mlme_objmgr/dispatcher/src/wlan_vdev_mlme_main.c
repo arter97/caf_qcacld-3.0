@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -88,6 +88,8 @@ static QDF_STATUS mlme_vdev_obj_create_handler(struct wlan_objmgr_vdev *vdev,
 	vdev_mlme = qdf_mem_malloc(sizeof(*vdev_mlme));
 	if (!vdev_mlme)
 		return QDF_STATUS_E_NOMEM;
+	wlan_minidump_log(vdev_mlme, sizeof(*vdev_mlme), psoc,
+			  WLAN_MD_OBJMGR_VDEV_MLME, "vdev_mlme");
 
 	vdev_mlme->vdev = vdev;
 
@@ -127,8 +129,8 @@ ext_hdl_post_create_failed:
 ext_hdl_create_failed:
 	mlme_vdev_sm_destroy(vdev_mlme);
 init_failed:
+	wlan_minidump_remove(vdev_mlme);
 	qdf_mem_free(vdev_mlme);
-
 	return QDF_STATUS_E_FAILURE;
 }
 
@@ -136,8 +138,6 @@ static QDF_STATUS mlme_vdev_obj_destroy_handler(struct wlan_objmgr_vdev *vdev,
 						void *arg)
 {
 	struct vdev_mlme_obj *vdev_mlme;
-	struct wlan_objmgr_psoc *psoc;
-	struct cdp_soc_t *soc_txrx_handle;
 
 	if (!vdev) {
 		mlme_err(" VDEV is NULL");
@@ -150,20 +150,13 @@ static QDF_STATUS mlme_vdev_obj_destroy_handler(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_SUCCESS;
 	}
 
-	psoc = wlan_vdev_get_psoc(vdev);
-	soc_txrx_handle = (struct cdp_soc_t *)wlan_psoc_get_dp_handle(psoc);
-	if (soc_txrx_handle) {
-		wlan_vdev_set_dp_handle(vdev, NULL);
-		cdp_vdev_detach(soc_txrx_handle, wlan_vdev_get_id(vdev),
-				NULL, NULL);
-	}
-
 	mlme_vdev_sm_destroy(vdev_mlme);
 
 	mlme_vdev_ops_ext_hdl_destroy(vdev_mlme);
 
 	wlan_objmgr_vdev_component_obj_detach(vdev, WLAN_UMAC_COMP_MLME,
 					      vdev_mlme);
+	wlan_minidump_remove(vdev_mlme);
 	qdf_mem_free(vdev_mlme);
 
 	return QDF_STATUS_SUCCESS;

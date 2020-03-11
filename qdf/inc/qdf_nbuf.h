@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -32,6 +32,7 @@
 #include <qdf_net_types.h>
 
 #define IPA_NBUF_OWNER_ID			0xaa55aa55
+#define QDF_NBUF_PKT_TRAC_TYPE_DNS		0x01
 #define QDF_NBUF_PKT_TRAC_TYPE_EAPOL		0x02
 #define QDF_NBUF_PKT_TRAC_TYPE_DHCP		0x04
 #define QDF_NBUF_PKT_TRAC_TYPE_MGMT_ACTION	0x08
@@ -241,12 +242,15 @@
  * @rxpcu_filter_pass: Flag which indicates whether RX packets are received in
  *						BSS mode(not in promisc mode)
  * @rssi_chain: Rssi chain per nss per bw
+ * @tx_status: packet tx status
+ * @tx_retry_cnt: tx retry count
+ * @add_rtap_ext: add radio tap extension
  */
 struct mon_rx_status {
 	uint64_t tsft;
 	uint32_t ppdu_timestamp;
 	uint32_t preamble_type;
-	uint16_t chan_freq;
+	qdf_freq_t chan_freq;
 	uint16_t chan_num;
 	uint16_t chan_flags;
 	uint16_t ht_flags;
@@ -322,6 +326,9 @@ struct mon_rx_status {
 	uint8_t rxpcu_filter_pass;
 	int8_t rssi_chain[8][8];
 	uint32_t rx_antenna;
+	uint8_t  tx_status;
+	uint8_t  tx_retry_cnt;
+	bool add_rtap_ext;
 };
 
 /**
@@ -580,14 +587,15 @@ struct qdf_radiotap_vendor_ns_ath {
 #define QDF_MON_STATUS_STA_CODING_KNOWN 0x80
 
 /**
- * qdf_proto_type - protocol type
+ * enum qdf_proto_type - protocol type
  * @QDF_PROTO_TYPE_DHCP - DHCP
  * @QDF_PROTO_TYPE_EAPOL - EAPOL
  * @QDF_PROTO_TYPE_ARP - ARP
  * @QDF_PROTO_TYPE_MGMT - MGMT
  * @QDF_PROTO_TYPE_ICMP - ICMP
  * @QDF_PROTO_TYPE_ICMPv6 - ICMPv6
- * QDF_PROTO_TYPE_EVENT - EVENT
+ * @QDF_PROTO_TYPE_EVENT - EVENT
+ * @QDF_PROTO_TYPE_DNS - DNS
  */
 enum qdf_proto_type {
 	QDF_PROTO_TYPE_DHCP,
@@ -597,6 +605,7 @@ enum qdf_proto_type {
 	QDF_PROTO_TYPE_ICMP,
 	QDF_PROTO_TYPE_ICMPv6,
 	QDF_PROTO_TYPE_EVENT,
+	QDF_PROTO_TYPE_DNS,
 	QDF_PROTO_TYPE_MAX
 };
 
@@ -641,7 +650,7 @@ enum cb_ftype {
 };
 
 /**
- * qdf_proto_subtype - subtype of packet
+ * enum qdf_proto_subtype - subtype of packet
  * @QDF_PROTO_EAPOL_M1 - EAPOL 1/4
  * @QDF_PROTO_EAPOL_M2 - EAPOL 2/4
  * @QDF_PROTO_EAPOL_M3 - EAPOL 3/4
@@ -672,9 +681,11 @@ enum cb_ftype {
  * @QDF_PROTO_MGMT_DISASSOC - disassoc
  * @QDF_PROTO_MGMT_AUTH - auth
  * @QDF_PROTO_MGMT_DEAUTH - deauth
- * QDF_ROAM_SYNCH - roam synch indication from fw
- * QDF_ROAM_COMPLETE - roam complete cmd to fw
- * QDF_ROAM_EVENTID - roam eventid from fw
+ * @QDF_ROAM_SYNCH - roam synch indication from fw
+ * @QDF_ROAM_COMPLETE - roam complete cmd to fw
+ * @QDF_ROAM_EVENTID - roam eventid from fw
+ * @QDF_PROTO_DNS_QUERY - dns query
+ * @QDF_PROTO_DNS_RES -dns response
  */
 enum qdf_proto_subtype {
 	QDF_PROTO_INVALID,
@@ -711,6 +722,8 @@ enum qdf_proto_subtype {
 	QDF_ROAM_SYNCH,
 	QDF_ROAM_COMPLETE,
 	QDF_ROAM_EVENTID,
+	QDF_PROTO_DNS_QUERY,
+	QDF_PROTO_DNS_RES,
 	QDF_PROTO_SUBTYPE_MAX
 };
 
@@ -1684,7 +1697,31 @@ static inline qdf_nbuf_t qdf_nbuf_copy_expand(qdf_nbuf_t buf, int headroom,
 {
 	return __qdf_nbuf_copy_expand(buf, headroom, tailroom);
 }
+
 #endif /* NBUF_MEMORY_DEBUG */
+
+/**
+ * qdf_nbuf_copy_expand_fraglist() - copy and expand nbuf and
+ * get reference of the fraglist.
+ * @buf: Network buf instance
+ * @headroom: Additional headroom to be added
+ * @tailroom: Additional tailroom to be added
+ *
+ * Return: New nbuf that is a copy of buf, with additional head and tailroom
+ *	or NULL if there is no memory
+ */
+static inline qdf_nbuf_t
+qdf_nbuf_copy_expand_fraglist(qdf_nbuf_t buf, int headroom,
+			      int tailroom)
+{
+	buf = qdf_nbuf_copy_expand(buf, headroom, tailroom);
+
+	/* get fraglist reference */
+	if (buf)
+		__qdf_nbuf_get_ref_fraglist(buf);
+
+	return buf;
+}
 
 #ifdef WLAN_FEATURE_FASTPATH
 /**

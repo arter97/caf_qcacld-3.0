@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -29,6 +29,7 @@
 #include "wlan_objmgr_psoc_obj_i.h"
 #include "wlan_objmgr_pdev_obj_i.h"
 #include "wlan_objmgr_vdev_obj_i.h"
+#include <wlan_utility.h>
 
 /**
  ** APIs to Create/Delete Global object APIs
@@ -110,6 +111,7 @@ static QDF_STATUS wlan_objmgr_vdev_obj_free(struct wlan_objmgr_vdev *vdev)
 	qdf_mem_free(vdev->vdev_mlme.bss_chan);
 	qdf_mem_free(vdev->vdev_mlme.des_chan);
 	qdf_mem_free(vdev->vdev_nif.osdev);
+	wlan_minidump_remove(vdev);
 	qdf_mem_free(vdev);
 
 	return QDF_STATUS_SUCCESS;
@@ -143,7 +145,6 @@ struct wlan_objmgr_vdev *wlan_objmgr_vdev_obj_create(
 	vdev = qdf_mem_malloc(sizeof(*vdev));
 	if (!vdev)
 		return NULL;
-
 	vdev->obj_state = WLAN_OBJ_STATE_ALLOCATED;
 
 	vdev->vdev_mlme.bss_chan = qdf_mem_malloc(sizeof(struct wlan_channel));
@@ -262,7 +263,10 @@ struct wlan_objmgr_vdev *wlan_objmgr_vdev_obj_create(
 		return NULL;
 	}
 
-	obj_mgr_info("Created vdev %d", vdev->vdev_objmgr.vdev_id);
+	wlan_minidump_log(vdev, sizeof(*vdev), psoc,
+			  WLAN_MD_OBJMGR_VDEV, "wlan_objmgr_vdev");
+
+	obj_mgr_debug("Created vdev %d", vdev->vdev_objmgr.vdev_id);
 
 	return vdev;
 }
@@ -334,7 +338,7 @@ QDF_STATUS wlan_objmgr_vdev_obj_delete(struct wlan_objmgr_vdev *vdev)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	obj_mgr_info("Logically deleting vdev %d", vdev->vdev_objmgr.vdev_id);
+	obj_mgr_debug("Logically deleting vdev %d", vdev->vdev_objmgr.vdev_id);
 
 	print_idx = qdf_get_pidx();
 	wlan_objmgr_print_ref_ids(vdev->vdev_objmgr.ref_id_dbg,

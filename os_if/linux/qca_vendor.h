@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -370,6 +370,29 @@
  *	coex chain mode from application/service.
  *	The attributes defined in enum qca_vendor_attr_btc_chain_mode are used
  *	to deliver the parameters.
+ * @QCA_NL80211_VENDOR_SUBCMD_REQUEST_SAR_LIMITS_EVENT: This acts as an event.
+ *	Host drivers can request the user space entity to set the SAR power
+ *	limits with this event. Accordingly, the user space entity is expected
+ *	to set the SAR power limits. Host drivers can retry this event to the
+ *	user space for the SAR power limits configuration from user space. If
+ *	the driver does not get the SAR power limits from user space for all
+ *	the retried attempts, it can configure a default SAR power limit.
+ * @QCA_NL80211_VENDOR_SUBCMD_UPDATE_STA_INFO: This acts as a vendor event and
+ *	is used to update the information about the station from the driver to
+ *	userspace. Uses attributes from enum
+ *	qca_wlan_vendor_attr_update_sta_info.
+ *
+ * @QCA_NL80211_VENDOR_SUBCMD_DRIVER_DISCONNECT_REASON: This acts as an event.
+ *	The host driver initiates the disconnection for scenarios such as beacon
+ *	miss, NUD failure, peer kick out, etc. The disconnection indication
+ *	through cfg80211_disconnected() expects the reason codes from enum
+ *	ieee80211_reasoncode which does not signify these various reasons why
+ *	the driver has triggered the disconnection. This event will be used to
+ *	send the driver specific reason codes by the host driver to userspace.
+ *	Host drivers should trigger this event and pass the respective reason
+ *	code immediately prior to triggering cfg80211_disconnected(). The
+ *	attributes used with this event are defined in enum
+ *	qca_wlan_vendor_attr_driver_disconnect_reason.
  */
 
 enum qca_nl80211_vendor_subcmds {
@@ -574,6 +597,7 @@ enum qca_nl80211_vendor_subcmds {
 	QCA_NL80211_VENDOR_SUBCMD_GET_SAR_LIMITS = 164,
 	QCA_NL80211_VENDOR_SUBCMD_WLAN_MAC_INFO = 165,
 	QCA_NL80211_VENDOR_SUBCMD_SET_QDEPTH_THRESH = 166,
+	QCA_NL80211_VENDOR_SUBCMD_THERMAL_CMD = 167,
 	/* Wi-Fi test configuration subcommand */
 	QCA_NL80211_VENDOR_SUBCMD_WIFI_TEST_CONFIGURATION = 169,
 	QCA_NL80211_VENDOR_SUBCMD_NAN_EXT = 171,
@@ -588,6 +612,9 @@ enum qca_nl80211_vendor_subcmds {
 	QCA_NL80211_VENDOR_SUBCMD_AVOID_FREQUENCY_EXT = 183,
 	QCA_NL80211_VENDOR_SUBCMD_ADD_STA_NODE = 184,
 	QCA_NL80211_VENDOR_SUBCMD_BTC_CHAIN_MODE = 185,
+	QCA_NL80211_VENDOR_SUBCMD_GET_SAR_LIMITS_EVENT = 187,
+	QCA_NL80211_VENDOR_SUBCMD_UPDATE_STA_INFO = 188,
+	QCA_NL80211_VENDOR_SUBCMD_DRIVER_DISCONNECT_REASON = 189,
 };
 
 enum qca_wlan_vendor_tos {
@@ -712,6 +739,29 @@ enum qca_wlan_vendor_attr_get_station {
 };
 
 /**
+ * enum qca_wlan_vendor_attr_update_sta_info - Defines attributes
+ * used by QCA_NL80211_VENDOR_SUBCMD_UPDATE_STA_INFO vendor command.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_UPDATE_STA_INFO_CONNECT_CHANNELS: Type is NLA_UNSPEC.
+ * Used in STA mode. This attribute represents the list of channel center
+ * frequencies in MHz (u32) the station has learnt during the last connection
+ * or roaming attempt. This information shall not signify the channels for
+ * an explicit scan request from the user space. Host drivers can update this
+ * information to the user space in both connected and disconnected state.
+ * In the disconnected state this information shall signify the channels
+ * scanned in the last connection/roam attempt that lead to the disconnection.
+ */
+enum qca_wlan_vendor_attr_update_sta_info {
+	QCA_WLAN_VENDOR_ATTR_UPDATE_STA_INFO_INVALID = 0,
+	QCA_WLAN_VENDOR_ATTR_UPDATE_STA_INFO_CONNECT_CHANNELS = 1,
+
+	/* keep last */
+	QCA_WLAN_VENDOR_ATTR_UPDATE_STA_INFO_AFTER_LAST,
+	QCA_WLAN_VENDOR_ATTR_UPDATE_STA_INFO_MAX =
+		QCA_WLAN_VENDOR_ATTR_UPDATE_STA_INFO_AFTER_LAST - 1,
+};
+
+/**
  * enum qca_wlan_802_11_mode - dot11 mode
  * @QCA_WLAN_802_11_MODE_11B: mode B
  * @QCA_WLAN_802_11_MODE_11G: mode G
@@ -828,6 +878,21 @@ enum qca_wlan_auth_type {
  * @QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_SGI_ENABLE:
  *  Remote station short GI enable/disable
  * @QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_PAD: Attribute type for padding
+ * @QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_BEACON_IES: Binary attribute
+ *  containing the raw information elements from Beacon frames. Represents
+ *  the Beacon frames of the current BSS in the connected state. When queried
+ *  in the disconnected state, these IEs correspond to the last connected BSSID.
+ * @QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_DRIVER_DISCONNECT_REASON: u32, Driver
+ *  disconnect reason for the last disconnection if the disconnection is
+ *  triggered from the host driver. The values are referred from
+ *  enum qca_disconnect_reason_codes. If the disconnect is from
+ *  peer/userspace this value is QCA_DISCONNECT_REASON_UNSPECIFIED.
+ * @QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_ASSOC_REQ_IES: Binary attribute
+ *  Applicable in AP mode only. It contains the raw information elements
+ *  from assoc request frame of the given peer station. User queries with the
+ *  mac address of peer station when it disconnects. Host driver sends
+ *  assoc request frame of the given station. Host driver doesn't provide
+ *  the IEs when the peer station is still in connected state.
  * @QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_AFTER_LAST: After last
  */
 enum qca_wlan_vendor_attr_get_station_info {
@@ -858,6 +923,18 @@ enum qca_wlan_vendor_attr_get_station_info {
 	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_PAD,
 	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_RX_RETRY_COUNT,
 	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_RX_BC_MC_COUNT,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_TX_FAILURE,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_AVG_RSSI_PER_CHAIN,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_TX_RETRY_SUCCEED,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_RX_LAST_PKT_RSSI,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_TX_RETRY,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_TX_RETRY_EXHAUST,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_TX_TOTAL_FW,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_TX_RETRY_FW,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_TX_RETRY_EXHAUST_FW,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_BEACON_IES,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_DRIVER_DISCONNECT_REASON,
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_ASSOC_REQ_IES,
 
 	/* keep last */
 	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_AFTER_LAST,
@@ -936,6 +1013,7 @@ enum qca_wlan_vendor_attr_get_station_info {
  * @QCA_NL80211_VENDOR_SUBCMD_WLAN_MAC_INFO_INDEX: MAC mode info index
  * @QCA_NL80211_VENDOR_SUBCMD_NAN_EXT_INDEX: NAN Extended index
  * @QCA_NL80211_VENDOR_SUBCMD_BEACON_REPORTING_INDEX: Beacon reporting index
+ * @QCA_NL80211_VENDOR_SUBCMD_REQUEST_SAR_LIMITS_INDEX: Request SAR limit index
  */
 
 enum qca_nl80211_vendor_subcmds_index {
@@ -1023,6 +1101,8 @@ enum qca_nl80211_vendor_subcmds_index {
 	QCA_NL80211_VENDOR_SUBCMD_BEACON_REPORTING_INDEX,
 	QCA_NL80211_VENDOR_SUBCMD_ROAM_INDEX,
 	QCA_NL80211_VENDOR_SUBCMD_OEM_DATA_INDEX,
+	QCA_NL80211_VENDOR_SUBCMD_REQUEST_SAR_LIMITS_INDEX,
+	QCA_NL80211_VENDOR_SUBCMD_UPDATE_STA_INFO_INDEX,
 };
 
 /**
@@ -3555,6 +3635,11 @@ enum qca_wlan_vendor_attr_nd_offload {
  * @QCA_WLAN_VENDOR_FEATURE_TWT: Device supports TWT (Target Wake Time).
  * @QCA_WLAN_VENDOR_FEATURE_11AX: Device supports 802.11ax (HE)
  * @QCA_WLAN_VENDOR_FEATURE_6GHZ_SUPPORT: Device supports 6 GHz band operation
+ * @QCA_WLAN_VENDOR_FEATURE_THERMAL_CONFIG: Device is capable of receiving
+ *	and applying thermal configuration through
+ *	%QCA_WLAN_VENDOR_ATTR_THERMAL_LEVEL and
+ *	%QCA_WLAN_VENDOR_ATTR_THERMAL_COMPLETION_WINDOW attributes from
+ *	userspace.
  * @NUM_QCA_WLAN_VENDOR_FEATURES: Number of assigned feature bits
  */
 enum qca_wlan_vendor_features {
@@ -3569,6 +3654,7 @@ enum qca_wlan_vendor_features {
 	QCA_WLAN_VENDOR_FEATURE_TWT = 8,
 	QCA_WLAN_VENDOR_FEATURE_11AX = 9,
 	QCA_WLAN_VENDOR_FEATURE_6GHZ_SUPPORT = 10,
+	QCA_WLAN_VENDOR_FEATURE_THERMAL_CONFIG = 11,
 
 	NUM_QCA_WLAN_VENDOR_FEATURES /* keep last */
 };
@@ -3814,6 +3900,12 @@ enum qca_ignore_assoc_disallowed {
  * QCA_NL80211_VENDOR_SUBCMD_SET_WIFI_CONFIGURATION and
  * QCA_NL80211_VENDOR_SUBCMD_GET_WIFI_CONFIGURATION subcommands.
  */
+#define QCA_WLAN_VENDOR_ATTR_DISCONNECT_IES\
+		QCA_WLAN_VENDOR_ATTR_CONFIG_DISCONNECT_IES
+#define QCA_WLAN_VENDOR_ATTR_BEACON_REPORT_FAIL\
+		QCA_WLAN_VENDOR_ATTR_CONFIG_BEACON_REPORT_FAIL
+#define QCA_WLAN_VENDOR_ATTR_ROAM_REASON\
+		QCA_WLAN_VENDOR_ATTR_CONFIG_ROAM_REASON
 enum qca_wlan_vendor_attr_config {
 	QCA_WLAN_VENDOR_ATTR_CONFIG_INVALID = 0,
 	/*
@@ -4128,12 +4220,25 @@ enum qca_wlan_vendor_attr_config {
 	 * take the union of IEs from both of these interfaces and send in
 	 * further disassoc/deauth frames.
 	 */
-	QCA_WLAN_VENDOR_ATTR_DISCONNECT_IES = 58,
+	QCA_WLAN_VENDOR_ATTR_CONFIG_DISCONNECT_IES = 58,
 
 	/* 8-bit unsigned value for ELNA bypass.
 	 * 1-Enable, 0-Disable
 	 */
 	QCA_WLAN_VENDOR_ATTR_CONFIG_ELNA_BYPASS = 59,
+
+	/* 8-bit unsigned value. This attribute enables/disables the host driver
+	 * to send the Beacon Report response with failure reason for the
+	 * scenarios where STA cannot honor the Beacon report request from AP.
+	 * 1-Enable, 0-Disable.
+	 */
+	QCA_WLAN_VENDOR_ATTR_CONFIG_BEACON_REPORT_FAIL = 60,
+
+	/* 8-bit unsigned value. This attribute enables/disables the host driver
+	 * to send roam reason information in the reassociation request to the
+	 * AP. 1-Enable, 0-Disable.
+	 */
+	QCA_WLAN_VENDOR_ATTR_CONFIG_ROAM_REASON = 61,
 
 	/* keep last */
 	QCA_WLAN_VENDOR_ATTR_CONFIG_AFTER_LAST,
@@ -4721,6 +4826,93 @@ enum qca_wlan_vendor_attr_wake_stats {
 	QCA_WLAN_VENDOR_GET_WAKE_STATS_AFTER_LAST,
 	QCA_WLAN_VENDOR_GET_WAKE_STATS_MAX =
 		QCA_WLAN_VENDOR_GET_WAKE_STATS_AFTER_LAST - 1,
+};
+
+/**
+ * enum qca_wlan_vendor_thermal_level - Defines various thermal levels
+ * configured by userspace to the driver/firmware. The values will be
+ * encapsulated in QCA_WLAN_VENDOR_ATTR_THERMAL_LEVEL attribute.
+ * The driver/firmware takes necessary actions requested by userspace
+ * such as throttling wifi tx etc. in order to mitigate high temperature.
+ *
+ * @QCA_WLAN_VENDOR_THERMAL_LEVEL_NONE: Stop/clear all throttling actions.
+ * @QCA_WLAN_VENDOR_THERMAL_LEVEL_LIGHT: Throttle tx lightly.
+ * @QCA_WLAN_VENDOR_THERMAL_LEVEL_MODERATE: Throttle tx moderately.
+ * @QCA_WLAN_VENDOR_THERMAL_LEVEL_SEVERE: Throttle tx severely.
+ * @QCA_WLAN_VENDOR_THERMAL_LEVEL_CRITICAL: Critical thermal level reached.
+ * @QCA_WLAN_VENDOR_THERMAL_LEVEL_EMERGENCY: Emergency thermal level reached.
+ */
+enum qca_wlan_vendor_thermal_level {
+	QCA_WLAN_VENDOR_THERMAL_LEVEL_NONE = 0,
+	QCA_WLAN_VENDOR_THERMAL_LEVEL_LIGHT = 1,
+	QCA_WLAN_VENDOR_THERMAL_LEVEL_MODERATE = 2,
+	QCA_WLAN_VENDOR_THERMAL_LEVEL_SEVERE = 3,
+	QCA_WLAN_VENDOR_THERMAL_LEVEL_CRITICAL = 4,
+	QCA_WLAN_VENDOR_THERMAL_LEVEL_EMERGENCY = 5,
+};
+
+/**
+ * enum qca_wlan_vendor_attr_thermal_cmd - Vendor subcmd attributes to set
+ * cmd value. Used for NL attributes for data used by
+ * QCA_NL80211_VENDOR_SUBCMD_THERMAL_CMD sub command.
+ */
+enum qca_wlan_vendor_attr_thermal_cmd {
+	QCA_WLAN_VENDOR_ATTR_THERMAL_CMD_INVALID = 0,
+	/*
+	 * The value of command, driver will implement different operations
+	 * according to this value. It uses values defined in
+	 * enum qca_wlan_vendor_attr_thermal_cmd_type.
+	 * u32 attribute.
+	 */
+	QCA_WLAN_VENDOR_ATTR_THERMAL_CMD_VALUE = 1,
+	/*
+	 * Userspace uses this attribute to configure thermal level to
+	 * driver/firmware. Used in request, u32 attribute, possible values
+	 * are defined in enum qca_wlan_vendor_thermal_level.
+	 */
+	QCA_WLAN_VENDOR_ATTR_THERMAL_LEVEL = 2,
+	/*
+	 * Userspace uses this attribute to configure the time in which the
+	 * driver/firmware should complete applying settings it received from
+	 * userspace with QCA_WLAN_VENDOR_ATTR_THERMAL_CMD_TYPE_SET_LEVEL
+	 * command type. Used in request, u32 attribute, value is in milli
+	 * seconds. A value of zero indicates to apply the settings
+	 * immediately. The driver/firmware can delay applying the configured
+	 * thermal settings within the time specified in this attribute if
+	 * there is any critical ongoing operation.
+	 */
+	QCA_WLAN_VENDOR_ATTR_THERMAL_COMPLETION_WINDOW = 3,
+	/* keep last */
+	QCA_WLAN_VENDOR_ATTR_THERMAL_CMD_AFTER_LAST,
+	QCA_WLAN_VENDOR_ATTR_THERMAL_CMD_MAX =
+		QCA_WLAN_VENDOR_ATTR_THERMAL_CMD_AFTER_LAST - 1
+};
+
+/**
+ * qca_wlan_vendor_attr_thermal_cmd_type: Attribute values for
+ * QCA_WLAN_VENDOR_ATTR_THERMAL_CMD_VALUE to the vendor subcmd
+ * QCA_NL80211_VENDOR_SUBCMD_THERMAL_CMD. This represents the
+ * thermal command types sent to driver.
+ * @QCA_WLAN_VENDOR_ATTR_THERMAL_CMD_TYPE_GET_PARAMS: Request to
+ * get thermal shutdown configuration parameters for display. Parameters
+ * responded from driver are defined in
+ * enum qca_wlan_vendor_attr_get_thermal_params_rsp.
+ * @QCA_WLAN_VENDOR_ATTR_THERMAL_CMD_TYPE_GET_TEMPERATURE: Request to
+ * get temperature. Host should respond with a temperature data. It is defined
+ * in enum qca_wlan_vendor_attr_thermal_get_temperature.
+ * @QCA_WLAN_VENDOR_ATTR_THERMAL_CMD_TYPE_SUSPEND: Request to execute thermal
+ * suspend action.
+ * @QCA_WLAN_VENDOR_ATTR_THERMAL_CMD_TYPE_RESUME: Request to execute thermal
+ * resume action.
+ * @QCA_WLAN_VENDOR_ATTR_THERMAL_CMD_TYPE_SET_LEVEL: Configure thermal level to
+ * the driver/firmware.
+ */
+enum qca_wlan_vendor_attr_thermal_cmd_type {
+	QCA_WLAN_VENDOR_ATTR_THERMAL_CMD_TYPE_GET_PARAMS,
+	QCA_WLAN_VENDOR_ATTR_THERMAL_CMD_TYPE_GET_TEMPERATURE,
+	QCA_WLAN_VENDOR_ATTR_THERMAL_CMD_TYPE_SUSPEND,
+	QCA_WLAN_VENDOR_ATTR_THERMAL_CMD_TYPE_RESUME,
+	QCA_WLAN_VENDOR_ATTR_THERMAL_CMD_TYPE_SET_LEVEL,
 };
 
 /**
@@ -6795,12 +6987,22 @@ enum qca_wlan_vendor_attr_rrop_info {
 enum qca_wlan_vendor_attr_rtplinst {
 	QCA_WLAN_VENDOR_ATTR_RTPLINST_INVALID = 0,
 
-	/* Primary channel number (u8) */
+	/* Primary channel number (u8).
+	 * Note: If both the driver and user space application support the
+	 * 6 GHz band, this attribute is deprecated and
+	 * QCA_WLAN_VENDOR_ATTR_RTPLINST_PRIMARY_FREQUENCY should be used. To
+	 * maintain backward compatibility,
+	 * QCA_WLAN_VENDOR_ATTR_RTPLINST_PRIMARY is still used if either the
+	 * driver or user space application or both do not support the 6 GHz
+	 * band.
+	 */
 	QCA_WLAN_VENDOR_ATTR_RTPLINST_PRIMARY = 1,
 	/* Representative Tx power in dBm (s32) with emphasis on throughput. */
 	QCA_WLAN_VENDOR_ATTR_RTPLINST_TXPOWER_THROUGHPUT = 2,
 	/* Representative Tx power in dBm (s32) with emphasis on range. */
 	QCA_WLAN_VENDOR_ATTR_RTPLINST_TXPOWER_RANGE = 3,
+	/* Primary channel center frequency (u32) in MHz */
+	QCA_WLAN_VENDOR_ATTR_RTPLINST_PRIMARY_FREQUENCY = 4,
 
 	QCA_WLAN_VENDOR_ATTR_RTPLINST_AFTER_LAST,
 	QCA_WLAN_VENDOR_ATTR_RTPLINST_MAX =
@@ -8207,4 +8409,102 @@ enum qca_vendor_attr_btc_chain_mode {
 	QCA_VENDOR_ATTR_BTC_CHAIN_MODE_LAST - 1,
 };
 
+/**
+ * enum qca_disconnect_reason_codes - Specifies driver disconnect reason codes.
+ * Used when the driver triggers the STA to disconnect from the AP.
+ *
+ * @QCA_DISCONNECT_REASON_UNSPECIFIED: The host driver triggered the
+ * disconnection with the AP due to unspecified reasons.
+ *
+ * @QCA_DISCONNECT_REASON_INTERNAL_ROAM_FAILURE: The host driver triggered the
+ * disconnection with the AP due to a roaming failure. This roaming is triggered
+ * internally (host driver/firmware).
+ *
+ * @QCA_DISCONNECT_REASON_EXTERNAL_ROAM_FAILURE: The driver disconnected from
+ * the AP when the user/external triggered roaming fails.
+ *
+ * @QCA_DISCONNECT_REASON_GATEWAY_REACHABILITY_FAILURE: This reason code is used
+ * by the host driver whenever gateway reachability failure is detected and the
+ * driver disconnects with AP.
+ *
+ * @QCA_DISCONNECT_REASON_UNSUPPORTED_CHANNEL_CSA: The driver disconnected from
+ * the AP on a channel switch announcement from it with an unsupported channel.
+ *
+ * @QCA_DISCONNECT_REASON_OPER_CHANNEL_DISABLED_INDOOR: On a concurrent AP start
+ * with indoor channels disabled and if the STA is connected on one of these
+ * disabled channels, the host driver disconnected the STA with this reason
+ * code.
+ *
+ * @QCA_DISCONNECT_REASON_OPER_CHANNEL_USER_DISABLED: Disconnection due to an
+ * explicit request from the user to disable the current operating channel.
+ *
+ * @QCA_DISCONNECT_REASON_DEVICE_RECOVERY: STA disconnected from the AP due to
+ * the internal host driver/firmware recovery.
+ *
+ * @QCA_DISCONNECT_REASON_KEY_TIMEOUT: The driver triggered the disconnection on
+ * a timeout for the key installations from the user space.
+ *
+ * @QCA_DISCONNECT_REASON_OPER_CHANNEL_BAND_CHANGE: The dDriver disconnected the
+ * STA on a band change request from the user space to a different band from the
+ * current operation channel/band.
+ *
+ * @QCA_DISCONNECT_REASON_IFACE_DOWN: The STA disconnected from the AP on an
+ * interface down trigger from the user space.
+ *
+ * @QCA_DISCONNECT_REASON_PEER_XRETRY_FAIL: The host driver disconnected the
+ * STA on getting continuous transmission failures for multiple Data frames.
+ *
+ * @QCA_DISCONNECT_REASON_PEER_INACTIVITY: The STA does a keep alive
+ * notification to the AP by transmitting NULL/G-ARP frames. This disconnection
+ * represents inactivity from AP on such transmissions.
+
+ * @QCA_DISCONNECT_REASON_SA_QUERY_TIMEOUT: This reason code is used on
+ * disconnection when SA Query times out (AP does not respond to SA Query).
+ *
+ * @QCA_DISCONNECT_REASON_BEACON_MISS_FAILURE: The host driver disconnected the
+ * STA on missing the beacons continuously from the AP.
+ *
+ * @QCA_DISCONNECT_REASON_CHANNEL_SWITCH_FAILURE: Disconnection due to STA not
+ * able to move to the channel mentioned by the AP in CSA.
+ *
+ * @QCA_DISCONNECT_REASON_USER_TRIGGERED: User triggered disconnection.
+ */
+enum qca_disconnect_reason_codes {
+	QCA_DISCONNECT_REASON_UNSPECIFIED = 0,
+	QCA_DISCONNECT_REASON_INTERNAL_ROAM_FAILURE = 1,
+	QCA_DISCONNECT_REASON_EXTERNAL_ROAM_FAILURE = 2,
+	QCA_DISCONNECT_REASON_GATEWAY_REACHABILITY_FAILURE = 3,
+	QCA_DISCONNECT_REASON_UNSUPPORTED_CHANNEL_CSA = 4,
+	QCA_DISCONNECT_REASON_OPER_CHANNEL_DISABLED_INDOOR = 5,
+	QCA_DISCONNECT_REASON_OPER_CHANNEL_USER_DISABLED = 6,
+	QCA_DISCONNECT_REASON_DEVICE_RECOVERY = 7,
+	QCA_DISCONNECT_REASON_KEY_TIMEOUT = 8,
+	QCA_DISCONNECT_REASON_OPER_CHANNEL_BAND_CHANGE = 9,
+	QCA_DISCONNECT_REASON_IFACE_DOWN = 10,
+	QCA_DISCONNECT_REASON_PEER_XRETRY_FAIL = 11,
+	QCA_DISCONNECT_REASON_PEER_INACTIVITY = 12,
+	QCA_DISCONNECT_REASON_SA_QUERY_TIMEOUT = 13,
+	QCA_DISCONNECT_REASON_BEACON_MISS_FAILURE = 14,
+	QCA_DISCONNECT_REASON_CHANNEL_SWITCH_FAILURE = 15,
+	QCA_DISCONNECT_REASON_USER_TRIGGERED = 16,
+};
+
+/**
+ * enum qca_wlan_vendor_attr_driver_disconnect_reason - Defines attributes
+ * used by %QCA_NL80211_VENDOR_SUBCMD_DRIVER_DISCONNECT_REASON vendor command.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_DRIVER_DISCONNECT_REASCON_CODE: u32 attribute.
+ * This attribute represents the driver specific reason codes (local
+ * driver/firmware initiated reasons for disconnection) defined
+ * in enum qca_disconnect_reason_codes.
+ */
+enum qca_wlan_vendor_attr_driver_disconnect_reason {
+	QCA_WLAN_VENDOR_ATTR_DRIVER_DISCONNECT_REASON_INVALID = 0,
+	QCA_WLAN_VENDOR_ATTR_DRIVER_DISCONNECT_REASCON_CODE = 1,
+
+	/* keep last */
+	QCA_WLAN_VENDOR_ATTR_DRIVER_DISCONNECT_REASON_AFTER_LAST,
+	QCA_WLAN_VENDOR_ATTR_DRIVER_DISCONNECT_REASON_MAX =
+	QCA_WLAN_VENDOR_ATTR_DRIVER_DISCONNECT_REASON_AFTER_LAST - 1,
+};
 #endif

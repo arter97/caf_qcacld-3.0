@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -159,6 +159,7 @@ struct element_info {
  * @mbo_oce: pointer to mbo/oce indication ie
  * @rnrie: reduced neighbor report IE
  * @adaptive_11r: pointer to adaptive 11r IE
+ * @single_pmk: Pointer to sae single pmk IE
  */
 struct ie_list {
 	uint8_t *tim;
@@ -210,6 +211,7 @@ struct ie_list {
 	uint8_t *rnrie;
 	uint8_t *extender;
 	uint8_t *adaptive_11r;
+	uint8_t *single_pmk;
 };
 
 enum scan_entry_connection_state {
@@ -359,6 +361,11 @@ struct reduced_neighbor_report {
 	struct rnr_bss_info bss_info[MAX_RNR_BSS];
 };
 
+#define SCAN_SECURITY_TYPE_WEP 0x01
+#define SCAN_SECURITY_TYPE_WPA 0x02
+#define SCAN_SECURITY_TYPE_WAPI 0x04
+#define SCAN_SECURITY_TYPE_RSN 0x08
+
 /**
  * struct scan_cache_entry: structure containing scan entry
  * @frm_subtype: updated from beacon/probe
@@ -366,6 +373,7 @@ struct reduced_neighbor_report {
  * @mac_addr: mac address
  * @ssid: ssid
  * @is_hidden_ssid: is AP having hidden ssid.
+ * @security_type: security supported
  * @seq_num: sequence number
  * @phy_mode: Phy mode of the AP
  * @avg_rssi: Average RSSI of the AP
@@ -409,6 +417,7 @@ struct scan_cache_entry {
 	struct qdf_mac_addr mac_addr;
 	struct wlan_ssid ssid;
 	bool is_hidden_ssid;
+	uint8_t security_type;
 	uint16_t seq_num;
 	enum wlan_phymode phy_mode;
 	int32_t avg_rssi;
@@ -1246,7 +1255,7 @@ enum scan_cb_type {
 
 /* Set PNO */
 #define SCAN_PNO_MAX_PLAN_REQUEST   2
-#define SCAN_PNO_MAX_NETW_CHANNELS_EX  60
+#define SCAN_PNO_MAX_NETW_CHANNELS_EX  (QDF_MAX_NUM_CHAN)
 #define SCAN_PNO_MAX_SUPP_NETWORKS  16
 #define SCAN_PNO_DEF_SLOW_SCAN_MULTIPLIER 6
 #define SCAN_PNO_DEF_SCAN_TIMER_REPEAT 20

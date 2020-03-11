@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -188,9 +188,9 @@
 #define WLAN_CFG_WBM_RELEASE_RING_SIZE_MIN 64
 #define WLAN_CFG_WBM_RELEASE_RING_SIZE_MAX 64
 
-#define WLAN_CFG_TCL_CMD_RING_SIZE 32
-#define WLAN_CFG_TCL_CMD_RING_SIZE_MIN 32
-#define WLAN_CFG_TCL_CMD_RING_SIZE_MAX 32
+#define WLAN_CFG_TCL_CMD_CREDIT_RING_SIZE 32
+#define WLAN_CFG_TCL_CMD_CREDIT_RING_SIZE_MIN 32
+#define WLAN_CFG_TCL_CMD_CREDIT_RING_SIZE_MAX 32
 
 #define WLAN_CFG_TCL_STATUS_RING_SIZE 32
 #define WLAN_CFG_TCL_STATUS_RING_SIZE_MIN 32
@@ -211,7 +211,8 @@
 
 #define WLAN_CFG_RX_RELEASE_RING_SIZE 1024
 #define WLAN_CFG_RX_RELEASE_RING_SIZE_MIN 8
-#if defined(QCA_WIFI_QCA6390) || defined(QCA_WIFI_QCA6490)
+#if defined(QCA_WIFI_QCA6390) || defined(QCA_WIFI_QCA6490) || \
+    defined(QCA_WIFI_QCA6750)
 #define WLAN_CFG_RX_RELEASE_RING_SIZE_MAX 1024
 #else
 #define WLAN_CFG_RX_RELEASE_RING_SIZE_MAX 8192
@@ -314,6 +315,10 @@
 #define WLAN_CFG_RX_FLOW_SEARCH_TABLE_SIZE 16384
 #define WLAN_CFG_RX_FLOW_SEARCH_TABLE_SIZE_MIN 1
 #define WLAN_CFG_RX_FLOW_SEARCH_TABLE_SIZE_MAX 16384
+
+#define WLAN_CFG_PKTLOG_BUFFER_SIZE 10
+#define WLAN_CFG_PKTLOG_MIN_BUFFER_SIZE 1
+#define WLAN_CFG_PKTLOG_MAX_BUFFER_SIZE 10
 
 /* DP INI Declerations */
 #define CFG_DP_HTT_PACKET_TYPE \
@@ -545,12 +550,12 @@
 		WLAN_CFG_WBM_RELEASE_RING_SIZE, \
 		CFG_VALUE_OR_DEFAULT, "DP WBM Release Ring")
 
-#define CFG_DP_TCL_CMD_RING \
-		CFG_INI_UINT("dp_tcl_cmd_ring", \
-		WLAN_CFG_TCL_CMD_RING_SIZE_MIN, \
-		WLAN_CFG_TCL_CMD_RING_SIZE_MAX, \
-		WLAN_CFG_TCL_CMD_RING_SIZE, \
-		CFG_VALUE_OR_DEFAULT, "DP TCL command ring")
+#define CFG_DP_TCL_CMD_CREDIT_RING \
+		CFG_INI_UINT("dp_tcl_cmd_credit_ring", \
+		WLAN_CFG_TCL_CMD_CREDIT_RING_SIZE_MIN, \
+		WLAN_CFG_TCL_CMD_CREDIT_RING_SIZE_MAX, \
+		WLAN_CFG_TCL_CMD_CREDIT_RING_SIZE, \
+		CFG_VALUE_OR_DEFAULT, "DP TCL Cmd_Credit ring")
 
 #define CFG_DP_TCL_STATUS_RING \
 		CFG_INI_UINT("dp_tcl_status_ring",\
@@ -748,6 +753,27 @@
 	CFG_INI_BOOL("dp_rx_monitor_protocol_flow_tag_enable", true, \
 		     "Enable/Disable Rx Protocol & Flow tags in Monitor mode")
 
+/*
+ * <ini>
+ * dp_rx_fisa_enable - Control Rx datapath FISA
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable DP Rx FISA feature
+ *
+ * Related: dp_rx_flow_search_table_size
+ *
+ * Supported Feature: STA,P2P and SAP IPA disabled terminating
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+#define CFG_DP_RX_FISA_ENABLE \
+	CFG_INI_BOOL("dp_rx_fisa_enable", false, \
+		     "Enable/Disable DP Rx FISA")
+
 #define CFG_DP_RXDMA_MONITOR_RX_DROP_THRESHOLD \
 		CFG_INI_UINT("mon_drop_thresh", \
 		WLAN_CFG_RXDMA_MONITOR_RX_DROP_THRESH_SIZE_MIN, \
@@ -755,30 +781,12 @@
 		WLAN_CFG_RXDMA_MONITOR_RX_DROP_THRESH_SIZE, \
 		CFG_VALUE_OR_DEFAULT, "RXDMA monitor rx drop theshold")
 
-#ifdef WLAN_FEATURE_PKT_CAPTURE
-#define CFG_PKTCAPTURE_MODE_DEFAULT       (0)
-#define CFG_PKTCAPTURE_MODE_MGMT_PKT      BIT(0)
-#define CFG_PKTCAPTURE_MODE_DATA_PKT      BIT(1)
-#define CFG_PKTCAPTURE_MODE_MAX           (CFG_PKTCAPTURE_MODE_MGMT_PKT | \
-					   CFG_PKTCAPTURE_MODE_DATA_PKT)
-
-#define CFG_DP_PKT_CAPTURE_MODE_ENABLE \
-		CFG_INI_BOOL("pktcap_mode_enable", \
-		false, "Ctrl to enable packet capture support")
-
-#define CFG_DP_PKT_CAPTURE_MODE_VALUE \
-		CFG_INI_UINT("pktcapture_mode", \
-		0, \
-		CFG_PKTCAPTURE_MODE_MAX, \
-		CFG_PKTCAPTURE_MODE_DEFAULT, \
-		CFG_VALUE_OR_DEFAULT, "Value for packet capture mode")
-
-#define CFG_DP_CONFIG_PKT_CAPTURE_MODE_ALL \
-		CFG(CFG_DP_PKT_CAPTURE_MODE_ENABLE) \
-		CFG(CFG_DP_PKT_CAPTURE_MODE_VALUE)
-#else
-#define CFG_DP_CONFIG_PKT_CAPTURE_MODE_ALL
-#endif /*  WLAN_FEATURE_PKT_CAPTURE */
+#define CFG_DP_PKTLOG_BUFFER_SIZE \
+		CFG_INI_UINT("PktlogBufSize", \
+		WLAN_CFG_PKTLOG_MIN_BUFFER_SIZE, \
+		WLAN_CFG_PKTLOG_MAX_BUFFER_SIZE, \
+		WLAN_CFG_PKTLOG_BUFFER_SIZE, \
+		CFG_VALUE_OR_DEFAULT, "Packet Log buffer size")
 
 #define CFG_DP \
 		CFG(CFG_DP_HTT_PACKET_TYPE) \
@@ -817,7 +825,7 @@
 		CFG(CFG_DP_TCP_UDP_CKSUM_OFFLOAD) \
 		CFG(CFG_DP_DEFRAG_TIMEOUT_CHECK) \
 		CFG(CFG_DP_WBM_RELEASE_RING) \
-		CFG(CFG_DP_TCL_CMD_RING) \
+		CFG(CFG_DP_TCL_CMD_CREDIT_RING) \
 		CFG(CFG_DP_TCL_STATUS_RING) \
 		CFG(CFG_DP_REO_REINJECT_RING) \
 		CFG(CFG_DP_RX_RELEASE_RING) \
@@ -851,6 +859,7 @@
 		CFG(CFG_DP_RX_FLOW_SEARCH_TABLE_PER_PDEV) \
 		CFG(CFG_DP_RX_MON_PROTOCOL_FLOW_TAG_ENABLE) \
 		CFG(CFG_DP_RXDMA_MONITOR_RX_DROP_THRESHOLD) \
-		CFG_DP_CONFIG_PKT_CAPTURE_MODE_ALL
+		CFG(CFG_DP_PKTLOG_BUFFER_SIZE) \
+		CFG(CFG_DP_RX_FISA_ENABLE)
 
 #endif /* _CFG_DP_H_ */

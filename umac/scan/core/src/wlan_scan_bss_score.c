@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -639,7 +639,7 @@ static int32_t scm_calculate_oce_wan_score(
 #ifdef WLAN_POLICY_MGR_ENABLE
 
 static uint32_t scm_get_sta_nss(struct wlan_objmgr_psoc *psoc,
-			uint8_t bss_channel,
+			qdf_freq_t bss_channel_freq,
 			uint8_t vdev_nss_2g,
 			uint8_t vdev_nss_5g)
 {
@@ -650,22 +650,22 @@ static uint32_t scm_get_sta_nss(struct wlan_objmgr_psoc *psoc,
 	 */
 
 	if (policy_mgr_is_chnl_in_diff_band(
-	    psoc, wlan_chan_to_freq(bss_channel)) &&
+	    psoc, bss_channel_freq) &&
 	    policy_mgr_is_hw_dbs_capable(psoc) &&
 	    !(policy_mgr_is_hw_dbs_2x2_capable(psoc)))
 		return 1;
 
-	return (WLAN_REG_IS_24GHZ_CH(bss_channel) ?
+	return (WLAN_REG_IS_24GHZ_CH_FREQ(bss_channel_freq) ?
 		vdev_nss_2g :
 		vdev_nss_5g);
 }
 #else
 static uint32_t scm_get_sta_nss(struct wlan_objmgr_psoc *psoc,
-			uint8_t bss_channel,
+			qdf_freq_t bss_channel_freq,
 			uint8_t vdev_nss_2g,
 			uint8_t vdev_nss_5g)
 {
-	return (WLAN_REG_IS_24GHZ_CH(bss_channel) ?
+	return (WLAN_REG_IS_24GHZ_CH_FREQ(bss_channel_freq) ?
 		vdev_nss_2g :
 		vdev_nss_5g);
 }
@@ -812,9 +812,7 @@ int scm_calculate_bss_score(struct wlan_objmgr_psoc *psoc,
 	}
 
 	sta_nss = scm_get_sta_nss(psoc,
-				  wlan_reg_freq_to_chan(
-						pdev,
-						entry->channel.chan_freq),
+				  entry->channel.chan_freq,
 				  score_config->vdev_nss_24g,
 				  score_config->vdev_nss_5g);
 
@@ -828,24 +826,25 @@ int scm_calculate_bss_score(struct wlan_objmgr_psoc *psoc,
 					    prorated_pcnt, sta_nss);
 	score += nss_score;
 
-	scm_debug("Self Cap: HT %d VHT %d HE %d VHT_24Ghz %d BF cap %d cb_mode_24g %d cb_mode_5G %d NSS %d",
-		  score_config->ht_cap, score_config->vht_cap,
-		  score_config->he_cap,  score_config->vht_24G_cap,
-		  score_config->beamformee_cap, score_config->cb_mode_24G,
-		  score_config->cb_mode_5G, sta_nss);
+	scm_nofl_debug("Self: HT %d VHT %d HE %d VHT_24Ghz %d BF cap %d cb_mode_24g %d cb_mode_5G %d NSS %d",
+		       score_config->ht_cap, score_config->vht_cap,
+		       score_config->he_cap,  score_config->vht_24G_cap,
+		       score_config->beamformee_cap, score_config->cb_mode_24G,
+		       score_config->cb_mode_5G, sta_nss);
 
-	scm_debug("Candidate (BSSID: %pM freq %d) Cap:: rssi=%d HT=%d VHT=%d HE %d su beamformer %d phymode=%d  air time fraction %d qbss load %d cong_pct %d NSS %d",
-		  entry->bssid.bytes, entry->channel.chan_freq,
-		  entry->rssi_raw, util_scan_entry_htcap(entry) ? 1 : 0,
-		  util_scan_entry_vhtcap(entry) ? 1 : 0,
-		  util_scan_entry_hecap(entry) ? 1 : 0, ap_su_beam_former,
-		  entry->phy_mode, entry->air_time_fraction,
-		  entry->qbss_chan_load, congestion_pct, entry->nss);
+	scm_nofl_debug("Candidate(%pM freq %d): rssi %d HT %d VHT %d HE %d su bfer %d phy %d  air time frac %d qbss %d cong_pct %d NSS %d",
+		       entry->bssid.bytes, entry->channel.chan_freq,
+		       entry->rssi_raw, util_scan_entry_htcap(entry) ? 1 : 0,
+		       util_scan_entry_vhtcap(entry) ? 1 : 0,
+		       util_scan_entry_hecap(entry) ? 1 : 0, ap_su_beam_former,
+		       entry->phy_mode, entry->air_time_fraction,
+		       entry->qbss_chan_load, congestion_pct, entry->nss);
 
-	scm_debug("Candidate Scores : prorated_pcnt %d rssi %d pcl %d ht %d vht %d he %d beamformee %d bw %d band %d congestion %d nss %d oce wan %d TOTAL score %d",
-		  prorated_pcnt, rssi_score, pcl_score, ht_score, vht_score,
-		  he_score, beamformee_score, bandwidth_score, band_score,
-		  congestion_score, nss_score, oce_wan_score, score);
+	scm_nofl_debug("Scores: prorated_pcnt %d rssi %d pcl %d ht %d vht %d he %d bfee %d bw %d band %d congestion %d nss %d oce wan %d TOTAL %d",
+		       prorated_pcnt, rssi_score, pcl_score, ht_score,
+		       vht_score, he_score, beamformee_score, bandwidth_score,
+		       band_score, congestion_score, nss_score, oce_wan_score,
+		       score);
 
 	entry->bss_score = score;
 	return score;

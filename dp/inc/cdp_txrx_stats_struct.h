@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -296,6 +296,65 @@ struct cdp_tidq_stats {
 	uint32_t stats[TIDQ_STATS_MAX];
 };
 
+#if defined(WLAN_CFR_ENABLE) && defined(WLAN_ENH_CFR_ENABLE)
+/**
+ * struct cdp_rx_ppdu_cfr_info - struct for storing ppdu info extracted from HW
+ * TLVs, this will be used for CFR correlation
+ *
+ * @bb_captured_channel : Set by RXPCU when MACRX_FREEZE_CAPTURE_CHANNEL TLV is
+ * sent to PHY, SW checks it to correlate current PPDU TLVs with uploaded
+ * channel information.
+ *
+ * @bb_captured_timeout : Set by RxPCU to indicate channel capture condition is
+ * met, but MACRX_FREEZE_CAPTURE_CHANNEL is not sent to PHY due to AST delay,
+ * which means the rx_frame_falling edge to FREEZE TLV ready time exceeds
+ * the threshold time defined by RXPCU register FREEZE_TLV_DELAY_CNT_THRESH.
+ * Bb_captured_reason is still valid in this case.
+ *
+ * @bb_captured_reason : Copy capture_reason of MACRX_FREEZE_CAPTURE_CHANNEL
+ * TLV to here for FW usage. Valid when bb_captured_channel or
+ * bb_captured_timeout is set.
+ * <enum 0 freeze_reason_TM>
+ * <enum 1 freeze_reason_FTM>
+ * <enum 2 freeze_reason_ACK_resp_to_TM_FTM>
+ * <enum 3 freeze_reason_TA_RA_TYPE_FILTER>
+ * <enum 4 freeze_reason_NDPA_NDP>
+ * <enum 5 freeze_reason_ALL_PACKET>
+ * <legal 0-5>
+ *
+ * @rx_location_info_valid: Indicates whether CFR DMA address in the PPDU TLV
+ * is valid
+ * <enum 0 rx_location_info_is_not_valid>
+ * <enum 1 rx_location_info_is_valid>
+ * <legal all>
+ *
+ * @chan_capture_status : capture status reported by ucode
+ * a. CAPTURE_IDLE: FW has disabled "REPETITIVE_CHE_CAPTURE_CTRL"
+ * b. CAPTURE_BUSY: previous PPDU’s channel capture upload DMA ongoing. (Note
+ * that this upload is triggered after receiving freeze_channel_capture TLV
+ * after last PPDU is rx)
+ * c. CAPTURE_ACTIVE: channel capture is enabled and no previous channel
+ * capture ongoing
+ * d. CAPTURE_NO_BUFFER: next buffer in IPC ring not available
+ *
+ * @rtt_che_buffer_pointer_high8 : The high 8 bits of the 40 bits pointer to
+ * external RTT channel information buffer
+ *
+ * @rtt_che_buffer_pointer_low32 : The low 32 bits of the 40 bits pointer to
+ * external RTT channel information buffer
+ *
+ */
+
+struct cdp_rx_ppdu_cfr_info {
+	bool bb_captured_channel;
+	bool bb_captured_timeout;
+	uint8_t bb_captured_reason;
+	bool rx_location_info_valid;
+	uint8_t chan_capture_status;
+	uint8_t rtt_che_buffer_pointer_high8;
+	uint32_t rtt_che_buffer_pointer_low32;
+};
+#endif
 /*
  * struct cdp_rx_su_evm_info: Rx evm info
  * @number_of_symbols: number of symbols
@@ -558,6 +617,82 @@ struct cdp_tso_stats {
 #endif /* FEATURE_TSO_STATS */
 };
 
+#define CDP_PEER_STATS_START 0
+
+enum cdp_peer_stats_type {
+	cdp_peer_stats_min = CDP_PEER_STATS_START,
+
+	/* Tx types */
+	cdp_peer_tx_ucast = cdp_peer_stats_min,
+	cdp_peer_tx_mcast,
+	cdp_peer_tx_rate,
+	cdp_peer_tx_last_tx_rate,
+	cdp_peer_tx_inactive_time,
+	cdp_peer_tx_ratecode,
+	cdp_peer_tx_flags,
+	cdp_peer_tx_power,
+
+	/* Rx types */
+	cdp_peer_rx_rate,
+	cdp_peer_rx_last_rx_rate,
+	cdp_peer_rx_ratecode,
+	cdp_peer_rx_ucast,
+	cdp_peer_rx_flags,
+	cdp_peer_rx_avg_rssi,
+	cdp_peer_stats_max,
+};
+
+/*
+ * The max size of cdp_peer_stats_param_t is limited to 16 bytes.
+ * If the buffer size is exceeding this size limit,
+ * dp_txrx_get_peer_stats is to be used instead.
+ */
+typedef union cdp_peer_stats_buf {
+	/* Tx types */
+	struct cdp_pkt_info tx_ucast;
+	struct cdp_pkt_info tx_mcast;
+	uint32_t tx_rate;
+	uint32_t last_tx_rate;
+	uint32_t tx_inactive_time;
+	uint32_t tx_flags;
+	uint32_t tx_power;
+	uint16_t tx_ratecode;
+
+	/* Rx types */
+	struct cdp_pkt_info rx_ucast;
+	uint32_t rx_rate;
+	uint32_t last_rx_rate;
+	uint32_t rx_ratecode;
+	uint32_t rx_flags;
+	uint32_t rx_avg_rssi;
+} cdp_peer_stats_param_t; /* Max union size 16 bytes */
+
+/**
+ * enum cdp_protocol_trace -  Protocols supported by per-peer protocol trace
+ * @CDP_TRACE_ICMP: ICMP packets
+ * @CDP_TRACE_EAP: EAPOL packets
+ * @CDP_TRACE_ARP: ARP packets
+ *
+ * Enumeration of all protocols supported by per-peer protocol trace feature
+ */
+enum cdp_protocol_trace {
+	CDP_TRACE_ICMP,
+	CDP_TRACE_EAP,
+	CDP_TRACE_ARP,
+	CDP_TRACE_MAX
+};
+
+/**
+ * struct protocol_trace_count - type of count on per-peer protocol trace
+ * @egress_cnt: how many packets go out of host driver
+ * @ingress_cnt: how many packets come into the host driver
+ *
+ * Type of count on per-peer protocol trace
+ */
+struct protocol_trace_count {
+	uint16_t egress_cnt;
+	uint16_t ingress_cnt;
+};
 /* struct cdp_tx_stats - tx stats
  * @cdp_pkt_info comp_pkt: Pkt Info for which completions were received
  * @cdp_pkt_info ucast: Unicast Packet Count
@@ -566,6 +701,7 @@ struct cdp_tso_stats {
  * @cdp_pkt_info nawds_mcast: NAWDS  Multicast Packet Count
  * @cdp_pkt_info tx_success: Successful Tx Packets
  * @nawds_mcast_drop: NAWDS  Multicast Drop Count
+ * @protocol_trace_cnt: per-peer protocol counter
  * @tx_failed: Total Tx failure
  * @ofdma: Total Packets as ofdma
  * @stbc: Packets in STBC
@@ -640,6 +776,9 @@ struct cdp_tx_stats {
 	struct cdp_pkt_info mcast;
 	struct cdp_pkt_info bcast;
 	struct cdp_pkt_info nawds_mcast;
+#ifdef VDEV_PEER_PROTOCOL_COUNT
+	struct protocol_trace_count protocol_trace_cnt[CDP_TRACE_MAX];
+#endif
 	struct cdp_pkt_info tx_success;
 	uint32_t nawds_mcast_drop;
 	uint32_t tx_failed;
@@ -733,6 +872,7 @@ struct cdp_tx_stats {
  * @pkts: Intra BSS packets received
  * @fail: Intra BSS packets failed
  * @mdns_no_fwd: Intra BSS MDNS packets not forwarded
+ * @protocol_trace_cnt: per-peer protocol counters
  * @mic_err: Rx MIC errors CCMP
  * @decrypt_err: Rx Decryption Errors CRC
  * @fcserr: rx MIC check failed (CCMP)
@@ -780,6 +920,7 @@ struct cdp_tx_stats {
  * @rx_rssi_measured_time: Time at which rssi is measured
  * @rssi: RSSI of received signal
  * @last_rssi: Previous rssi
+ * @multipass_rx_pkt_drop: Dropped multipass rx pkt
  */
 struct cdp_rx_stats {
 	struct cdp_pkt_info to_stack;
@@ -795,6 +936,9 @@ struct cdp_rx_stats {
 		struct cdp_pkt_info fail;
 		uint32_t mdns_no_fwd;
 	} intra_bss;
+#ifdef VDEV_PEER_PROTOCOL_COUNT
+	struct protocol_trace_count protocol_trace_cnt[CDP_TRACE_MAX];
+#endif
 
 	struct {
 		uint32_t mic_err;
@@ -843,6 +987,7 @@ struct cdp_rx_stats {
 	uint32_t rx_rssi_measured_time;
 	uint8_t rssi;
 	uint8_t last_rssi;
+	uint32_t multipass_rx_pkt_drop;
 };
 
 /* struct cdp_tx_ingress_stats - Tx ingress Stats
@@ -1408,6 +1553,82 @@ struct cdp_htt_rx_pdev_stats {
 #define OFDMA_NUM_RU_SIZE 7
 
 #define OFDMA_NUM_USERS	37
+
+#if defined(WLAN_CFR_ENABLE) && defined(WLAN_ENH_CFR_ENABLE)
+/*
+ * mac_freeze_capture_reason - capture reason counters
+ * @FREEZE_REASON_TM: When m_directed_ftm is enabled, this CFR data is
+ * captured for a Timing Measurement (TM) frame.
+ * @FREEZE_REASON_FTM: When m_directed_ftm is enabled, this CFR data is
+ * captured for a Fine Timing Measurement (FTM) frame.
+ * @FREEZE_REASON_ACK_RESP_TO_TM_FTM: When m_all_ftm_ack is enabled, this CFR
+ * data is captured for an ACK received for the FTM/TM frame sent to a station.
+ * @FREEZE_REASON_TA_RA_TYPE_FILTER: When m_ta_ra_filter is enabled, this CFR
+ * data is captured for a PPDU received,since the CFR TA_RA filter is met.
+ * @FREEZE_REASON_NDPA_NDP: When m_ndpa_ndp_directed(or)m_ndpa_ndp_all is
+ * enabled, this CFR data is captured for an NDP frame received.
+ * @FREEZE_REASON_ALL_PACKET: When m_all_packet is enabled, this CFR data is
+ * captured for an incoming PPDU.
+ */
+enum mac_freeze_capture_reason {
+	FREEZE_REASON_TM = 0,
+	FREEZE_REASON_FTM,
+	FREEZE_REASON_ACK_RESP_TO_TM_FTM,
+	FREEZE_REASON_TA_RA_TYPE_FILTER,
+	FREEZE_REASON_NDPA_NDP,
+	FREEZE_REASON_ALL_PACKET,
+	FREEZE_REASON_MAX,
+};
+
+/*
+ * chan_capture_status: capture status counters
+ * @CAPTURE_IDLE: CFR data is not captured, since VCSR setting for CFR/RCC is
+ * not enabled.
+ * @CAPTURE_BUSY: CFR data is not available, since previous channel
+ * upload is in progress
+ * @CAPTURE_ACTIVE: CFR data is captured in HW registers
+ * @CAPTURE_NO_BUFFER: CFR data is not captured, since no buffer is available
+ * in IPC ring to DMA CFR data
+ */
+enum chan_capture_status {
+	CAPTURE_IDLE = 0,
+	CAPTURE_BUSY,
+	CAPTURE_ACTIVE,
+	CAPTURE_NO_BUFFER,
+	CAPTURE_MAX,
+};
+
+/* struct cdp_cfr_rcc_stats - CFR RCC debug statistics
+ * @bb_captured_channel_cnt: No. of PPDUs for which MAC sent Freeze TLV to PHY
+ * @bb_captured_timeout_cnt: No. of PPDUs for which CFR filter criteria matched
+ * but MAC did not send Freeze TLV to PHY as time exceeded freeze tlv delay
+ * count threshold
+ * @rx_loc_info_valid_cnt: No. of PPDUs for which PHY could find a valid buffer
+ * in ucode IPC ring
+ * @chan_capture_status[]: capture status counters
+ *	[0] - No. of PPDUs with capture status CAPTURE_IDLE
+ *	[1] - No. of PPDUs with capture status CAPTURE_BUSY
+ *	[2] - No. of PPDUs with capture status CAPTURE_ACTIVE
+ *	[3] - No. of PPDUs with capture status CAPTURE_NO_BUFFER
+ * @reason_cnt[]: capture reason counters
+ *	[0] - No. PPDUs filtered due to freeze_reason_TM
+ *	[1] - No. PPDUs filtered due to freeze_reason_FTM
+ *	[2] - No. PPDUs filtered due to freeze_reason_ACK_resp_to_TM_FTM
+ *	[3] - No. PPDUs filtered due to freeze_reason_TA_RA_TYPE_FILTER
+ *	[4] - No. PPDUs filtered due to freeze_reason_NDPA_NDP
+ *	[5] - No. PPDUs filtered due to freeze_reason_ALL_PACKET
+ */
+struct cdp_cfr_rcc_stats {
+	uint64_t bb_captured_channel_cnt;
+	uint64_t bb_captured_timeout_cnt;
+	uint64_t rx_loc_info_valid_cnt;
+	uint64_t chan_capture_status[CAPTURE_MAX];
+	uint64_t reason_cnt[FREEZE_REASON_MAX];
+};
+#else
+struct cdp_cfr_rcc_stats {
+};
+#endif
 /* struct cdp_pdev_stats - pdev stats
  * @msdu_not_done: packets dropped because msdu done bit not set
  * @mec:Multicast Echo check
@@ -1504,371 +1725,35 @@ struct cdp_pdev_stats {
 	} ul_ofdma;
 
 	struct cdp_tso_stats tso_stats;
+	struct cdp_cfr_rcc_stats rcc;
 };
 
 #ifdef QCA_ENH_V3_STATS_SUPPORT
 /*
  * Enumeration of PDEV Configuration parameter
  */
-enum _ol_ath_param_t {
-	OL_ATH_PARAM_TXCHAINMASK               = 1,
-	OL_ATH_PARAM_RXCHAINMASK               = 2,
-	OL_ATH_PARAM_AMPDU                     = 6,
-	OL_ATH_PARAM_AMPDU_LIMIT               = 7,
-	OL_ATH_PARAM_AMPDU_SUBFRAMES           = 8,
-	OL_ATH_PARAM_TXPOWER_LIMIT2G           = 12,
-	OL_ATH_PARAM_TXPOWER_LIMIT5G           = 13,
-	OL_ATH_PARAM_LDPC                      = 32,
-	OL_ATH_PARAM_VOW_EXT_STATS             = 45,
-	OL_ATH_PARAM_DYN_TX_CHAINMASK          = 73,
-	OL_ATH_PARAM_BURST_ENABLE              = 77,
-	OL_ATH_PARAM_BURST_DUR                 = 78,
-	OL_ATH_PARAM_BCN_BURST                 = 80,
-	OL_ATH_PARAM_DCS                       = 82,
-#if UMAC_SUPPORT_PERIODIC_PERFSTATS
-	OL_ATH_PARAM_PRDPERFSTAT_THRPUT_ENAB   = 83,
-	OL_ATH_PARAM_PRDPERFSTAT_THRPUT_WIN    = 84,
-	OL_ATH_PARAM_PRDPERFSTAT_THRPUT        = 85,
-	OL_ATH_PARAM_PRDPERFSTAT_PER_ENAB      = 86,
-	OL_ATH_PARAM_PRDPERFSTAT_PER_WIN       = 87,
-	OL_ATH_PARAM_PRDPERFSTAT_PER           = 88,
-#endif
-	/* UMAC_SUPPORT_PERIODIC_PERFSTATS */
-	OL_ATH_PARAM_TOTAL_PER                 = 89,
-	/* set manual rate for rts frame */
-	OL_ATH_PARAM_RTS_CTS_RATE              = 92,
-	/* co channel interference threshold level */
-	OL_ATH_PARAM_DCS_COCH_THR              = 93,
-	/* transmit error threshold */
-	OL_ATH_PARAM_DCS_TXERR_THR             = 94,
-	/* phy error threshold */
-	OL_ATH_PARAM_DCS_PHYERR_THR            = 95,
-	/*
-	 * The IOCTL number is 114, it is made 114, inorder to make the IOCTL
-	 * number same as Direct-attach IOCTL.
-	 * Please, don't change number. This IOCTL gets the Interface code path
-	 * it should be either DIRECT-ATTACH or OFF-LOAD.
-	 */
-	OL_ATH_PARAM_GET_IF_ID                 = 114,
-	/* Enable Acs back Ground Channel selection Scan timer in AP mode*/
-	OL_ATH_PARAM_ACS_ENABLE_BK_SCANTIMEREN = 118,
-	 /* ACS scan timer value in Seconds */
-	OL_ATH_PARAM_ACS_SCANTIME              = 119,
-	 /* Negligence Delta RSSI between two channel */
-	OL_ATH_PARAM_ACS_RSSIVAR               = 120,
-	 /* Negligence Delta Channel load between two channel*/
-	OL_ATH_PARAM_ACS_CHLOADVAR             = 121,
-	  /* Enable Limited OBSS check */
-	OL_ATH_PARAM_ACS_LIMITEDOBSS           = 122,
-	/* Acs control flag for Scan timer */
-	OL_ATH_PARAM_ACS_CTRLFLAG              = 123,
-	 /* Acs Run time Debug level*/
-	OL_ATH_PARAM_ACS_DEBUGTRACE            = 124,
-	OL_ATH_PARAM_SET_FW_HANG_ID            = 137,
-	 /* Radio type 1:11ac 0:11abgn */
-	OL_ATH_PARAM_RADIO_TYPE                = 138,
-	OL_ATH_PARAM_IGMPMLD_OVERRIDE, /* IGMP/MLD packet override */
-	OL_ATH_PARAM_IGMPMLD_TID, /* IGMP/MLD packet TID no */
-	OL_ATH_PARAM_ARPDHCP_AC_OVERRIDE,
-	OL_ATH_PARAM_NON_AGG_SW_RETRY_TH,
-	OL_ATH_PARAM_AGG_SW_RETRY_TH,
-	/* Dont change this number it as per sync with DA
-	     Blocking certian channel from ic channel list */
-	OL_ATH_PARAM_DISABLE_DFS   = 144,
-	OL_ATH_PARAM_ENABLE_AMSDU  = 145,
-	OL_ATH_PARAM_ENABLE_AMPDU  = 146,
-	OL_ATH_PARAM_STA_KICKOUT_TH,
-	OL_ATH_PARAM_WLAN_PROF_ENABLE,
-	OL_ATH_PARAM_LTR_ENABLE,
-	OL_ATH_PARAM_LTR_AC_LATENCY_BE = 150,
-	OL_ATH_PARAM_LTR_AC_LATENCY_BK,
-	OL_ATH_PARAM_LTR_AC_LATENCY_VI,
-	OL_ATH_PARAM_LTR_AC_LATENCY_VO,
-	OL_ATH_PARAM_LTR_AC_LATENCY_TIMEOUT,
-	OL_ATH_PARAM_LTR_TX_ACTIVITY_TIMEOUT = 155,
-	OL_ATH_PARAM_LTR_SLEEP_OVERRIDE,
-	OL_ATH_PARAM_LTR_RX_OVERRIDE,
-	OL_ATH_PARAM_L1SS_ENABLE,
-	OL_ATH_PARAM_DSLEEP_ENABLE,
-	/* radar error threshold */
-	OL_ATH_PARAM_DCS_RADAR_ERR_THR = 160,
-	/* Tx channel utilization due to AP's tx and rx */
-	OL_ATH_PARAM_DCS_USERMAX_CU_THR,
-	/* interference detection threshold */
-	OL_ATH_PARAM_DCS_INTR_DETECT_THR,
-	/* sampling window, default 10secs */
-	OL_ATH_PARAM_DCS_SAMPLE_WINDOW,
-	/* debug logs enable/disable */
-	OL_ATH_PARAM_DCS_DEBUG,
-	OL_ATH_PARAM_ANI_ENABLE = 165,
-	OL_ATH_PARAM_ANI_POLL_PERIOD,
-	OL_ATH_PARAM_ANI_LISTEN_PERIOD,
-	OL_ATH_PARAM_ANI_OFDM_LEVEL,
-	OL_ATH_PARAM_ANI_CCK_LEVEL,
-	OL_ATH_PARAM_DSCP_TID_MAP = 170,
-	OL_ATH_PARAM_TXPOWER_SCALE,
-	/* Phy error penalty */
-	OL_ATH_PARAM_DCS_PHYERR_PENALTY,
-#if ATH_SUPPORT_DSCP_OVERRIDE
-	/* set/get TID for sending HMMC packets */
-	OL_ATH_PARAM_HMMC_DSCP_TID_MAP,
-	/* set/get DSCP mapping override */
-	OL_ATH_PARAM_DSCP_OVERRIDE,
-	/* set/get HMMC-DSCP mapping override */
-	OL_ATH_PARAM_HMMC_DSCP_OVERRIDE = 175,
-#endif
-#if ATH_RX_LOOPLIMIT_TIMER
-	OL_ATH_PARAM_LOOPLIMIT_NUM,
-#endif
-	OL_ATH_PARAM_ANTENNA_GAIN_2G,
-	OL_ATH_PARAM_ANTENNA_GAIN_5G,
-	OL_ATH_PARAM_RX_FILTER,
-#if ATH_SUPPORT_HYFI_ENHANCEMENTS
-	OL_ATH_PARAM_BUFF_THRESH = 180,
-	OL_ATH_PARAM_BLK_REPORT_FLOOD,
-	OL_ATH_PARAM_DROP_STA_QUERY,
-#endif
-	OL_ATH_PARAM_QBOOST,
-	OL_ATH_PARAM_SIFS_FRMTYPE,
-	OL_ATH_PARAM_SIFS_UAPSD = 185,
-	OL_ATH_PARAM_FW_RECOVERY_ID,
-	OL_ATH_PARAM_RESET_OL_STATS,
-	OL_ATH_PARAM_AGGR_BURST,
-	/* Number of deauth sent in consecutive rx_peer_invalid */
-	OL_ATH_PARAM_DEAUTH_COUNT,
-	OL_ATH_PARAM_BLOCK_INTERBSS = 190,
-	/* Firmware reset control for Bmiss / timeout / reset */
-	OL_ATH_PARAM_FW_DISABLE_RESET,
-	OL_ATH_PARAM_MSDU_TTL,
-	OL_ATH_PARAM_PPDU_DURATION,
-	OL_ATH_PARAM_SET_TXBF_SND_PERIOD,
-	OL_ATH_PARAM_ALLOW_PROMISC = 195,
-	OL_ATH_PARAM_BURST_MODE,
-	OL_ATH_PARAM_DYN_GROUPING,
-	OL_ATH_PARAM_DPD_ENABLE,
-	OL_ATH_PARAM_DBGLOG_RATELIM,
-	/* firmware should intimate us about ps state change for node  */
-	OL_ATH_PARAM_PS_STATE_CHANGE = 200,
-	OL_ATH_PARAM_MCAST_BCAST_ECHO,
-	/* OBSS RSSI threshold for 20/40 coexistence */
-	OL_ATH_PARAM_OBSS_RSSI_THRESHOLD,
-	/* Link/node RX RSSI threshold  for 20/40 coexistence */
-	OL_ATH_PARAM_OBSS_RX_RSSI_THRESHOLD,
-#if ATH_CHANNEL_BLOCKING
-	OL_ATH_PARAM_ACS_BLOCK_MODE = 205,
-#endif
-	OL_ATH_PARAM_ACS_TX_POWER_OPTION,
-	/*
-	 * Default Antenna Polarization MSB 8 bits (24:31) specifying
-	 * enable/disable ; LSB 24 bits (0:23) antenna mask value
-	 */
-	OL_ATH_PARAM_ANT_POLARIZATION,
-	/* rate limit mute type error prints */
-	OL_ATH_PARAM_PRINT_RATE_LIMIT,
-	OL_ATH_PARAM_PDEV_RESET,   /* Reset FW PDEV*/
-	/* Do not crash host when target assert happened*/
-	OL_ATH_PARAM_FW_DUMP_NO_HOST_CRASH = 210,
-	/* Consider OBSS non-erp to change to long slot*/
-	OL_ATH_PARAM_CONSIDER_OBSS_NON_ERP_LONG_SLOT = 211,
-	OL_ATH_PARAM_STATS_FC,
-	OL_ATH_PARAM_QFLUSHINTERVAL,
-	OL_ATH_PARAM_TOTAL_Q_SIZE,
-	OL_ATH_PARAM_TOTAL_Q_SIZE_RANGE0,
-	OL_ATH_PARAM_TOTAL_Q_SIZE_RANGE1,
-	OL_ATH_PARAM_TOTAL_Q_SIZE_RANGE2,
-	OL_ATH_PARAM_TOTAL_Q_SIZE_RANGE3,
-	OL_ATH_PARAM_MIN_THRESHOLD,
-	OL_ATH_PARAM_MAX_Q_LIMIT,
-	OL_ATH_PARAM_MIN_Q_LIMIT,
-	OL_ATH_PARAM_CONG_CTRL_TIMER_INTV,
-	OL_ATH_PARAM_STATS_TIMER_INTV,
-	OL_ATH_PARAM_ROTTING_TIMER_INTV,
-	OL_ATH_PARAM_LATENCY_PROFILE,
-	OL_ATH_PARAM_HOSTQ_DUMP,
-	OL_ATH_PARAM_TIDQ_MAP,
-	OL_ATH_PARAM_DBG_ARP_SRC_ADDR, /* ARP DEBUG source address*/
-	OL_ATH_PARAM_DBG_ARP_DST_ADDR, /* ARP DEBUG destination address*/
-	OL_ATH_PARAM_ARP_DBG_CONF,   /* ARP debug configuration */
-	OL_ATH_PARAM_DISABLE_STA_VAP_AMSDU, /* Disable AMSDU for station vap */
-#if ATH_SUPPORT_DFS && ATH_SUPPORT_STA_DFS
-	OL_ATH_PARAM_STADFS_ENABLE = 300,    /* STA DFS is enabled or not  */
-#endif
-#if QCA_AIRTIME_FAIRNESS
-	OL_ATH_PARAM_ATF_STRICT_SCHED = 301,
-	OL_ATH_PARAM_ATF_GROUP_POLICY = 302,
-#endif
-#if DBDC_REPEATER_SUPPORT
-	OL_ATH_PARAM_PRIMARY_RADIO,
-	OL_ATH_PARAM_DBDC_ENABLE,
-#endif
-	OL_ATH_PARAM_TXPOWER_DBSCALE,
-	OL_ATH_PARAM_CTL_POWER_SCALE,
-#if QCA_AIRTIME_FAIRNESS
-	OL_ATH_PARAM_ATF_OBSS_SCHED = 307,
-	OL_ATH_PARAM_ATF_OBSS_SCALE = 308,
-#endif
-	OL_ATH_PARAM_PHY_OFDM_ERR = 309,
-	OL_ATH_PARAM_PHY_CCK_ERR = 310,
-	OL_ATH_PARAM_FCS_ERR = 311,
-	OL_ATH_PARAM_CHAN_UTIL = 312,
-#if DBDC_REPEATER_SUPPORT
-	OL_ATH_PARAM_CLIENT_MCAST,
-#endif
-	OL_ATH_PARAM_EMIWAR_80P80 = 314,
-	OL_ATH_PARAM_BATCHMODE = 315,
-	OL_ATH_PARAM_PACK_AGGR_DELAY = 316,
-#if UMAC_SUPPORT_ACFG
-	OL_ATH_PARAM_DIAG_ENABLE = 317,
-#endif
-#if ATH_SUPPORT_VAP_QOS
-	OL_ATH_PARAM_VAP_QOS = 318,
-#endif
-	OL_ATH_PARAM_CHAN_STATS_TH = 319,
-	/* Passive scan is enabled or disabled  */
-	OL_ATH_PARAM_PASSIVE_SCAN_ENABLE = 320,
-	OL_ATH_MIN_RSSI_ENABLE = 321,
-	OL_ATH_MIN_RSSI = 322,
-	OL_ATH_PARAM_ACS_2G_ALLCHAN = 323,
-#if DBDC_REPEATER_SUPPORT
-	OL_ATH_PARAM_DELAY_STAVAP_UP = 324,
-#endif
-	/* It is used to set the channel switch options */
-	OL_ATH_PARAM_CHANSWITCH_OPTIONS = 327,
-	OL_ATH_BTCOEX_ENABLE        = 328,
-	OL_ATH_BTCOEX_WL_PRIORITY   = 329,
-	OL_ATH_PARAM_TID_OVERRIDE_QUEUE_MAPPING = 330,
-	OL_ATH_PARAM_CAL_VER_CHECK = 331,
-	OL_ATH_PARAM_NO_VLAN       = 332,
-	OL_ATH_PARAM_CCA_THRESHOLD = 333,
-	OL_ATH_PARAM_ATF_LOGGING = 334,
-	OL_ATH_PARAM_STRICT_DOTH = 335,
-	OL_ATH_PARAM_DISCONNECTION_TIMEOUT   = 336,
-	OL_ATH_PARAM_RECONFIGURATION_TIMEOUT = 337,
-	OL_ATH_PARAM_CHANNEL_SWITCH_COUNT = 338,
-	OL_ATH_PARAM_ALWAYS_PRIMARY = 339,
-	OL_ATH_PARAM_FAST_LANE = 340,
-	OL_ATH_GET_BTCOEX_DUTY_CYCLE = 341,
-	OL_ATH_PARAM_SECONDARY_OFFSET_IE = 342,
-	OL_ATH_PARAM_WIDE_BAND_SUB_ELEMENT = 343,
-	OL_ATH_PARAM_PREFERRED_UPLINK = 344,
-	OL_ATH_PARAM_PRECAC_ENABLE = 345,
-	OL_ATH_PARAM_PRECAC_TIMEOUT = 346,
-	OL_ATH_COEX_VER_CFG = 347,
-	OL_ATH_PARAM_DUMP_TARGET = 348,
-	OL_ATH_PARAM_PDEV_TO_REO_DEST = 349,
-	OL_ATH_PARAM_DUMP_CHAINMASK_TABLES = 350,
-	OL_ATH_PARAM_DUMP_OBJECTS = 351,
-	OL_ATH_PARAM_ACS_SRLOADVAR = 352,
-	OL_ATH_PARAM_MGMT_RSSI_THRESHOLD = 353,
-	OL_ATH_PARAM_EXT_NSS_CAPABLE = 354,
-	OL_ATH_PARAM_MGMT_PDEV_STATS_TIMER = 355,
-	OL_ATH_PARAM_TXACKTIMEOUT = 356,
-	OL_ATH_PARAM_ICM_ACTIVE = 357,
-	OL_ATH_PARAM_NOMINAL_NOISEFLOOR = 358,
-	OL_ATH_PARAM_CHAN_INFO = 359,
-	OL_ATH_PARAM_ACS_RANK = 360,
-	OL_ATH_PARAM_TXCHAINSOFT = 361,
-	OL_ATH_PARAM_WIDE_BAND_SCAN = 362,
-	OL_ATH_PARAM_CCK_TX_ENABLE = 363,
-	OL_ATH_PARAM_PAPI_ENABLE = 364,
-	OL_ATH_PARAM_ISOLATION = 365,
-	OL_ATH_PARAM_MAX_CLIENTS_PER_RADIO = 366,
-#if defined(WLAN_DFS_PARTIAL_OFFLOAD) && defined(HOST_DFS_SPOOF_TEST)
-	OL_ATH_PARAM_DFS_HOST_WAIT_TIMEOUT = 367,
-#endif
-	OL_ATH_PARAM_NF_THRESH = 368,
-#ifdef OL_ATH_SMART_LOGGING
-	OL_ATH_PARAM_SMARTLOG_ENABLE = 369,
-	OL_ATH_PARAM_SMARTLOG_FATAL_EVENT = 370,
-	OL_ATH_PARAM_SMARTLOG_SKB_SZ = 371,
-	OL_ATH_PARAM_SMARTLOG_P1PINGFAIL = 372,
-#endif /* OL_ATH_SMART_LOGGING */
-#ifdef WLAN_DFS_PRECAC_AUTO_CHAN_SUPPORT
-	OL_ATH_PARAM_PRECAC_INTER_CHANNEL = 373,
-	OL_ATH_PARAM_PRECAC_CHAN_STATE = 374,
-#endif
-	OL_ATH_PARAM_DBR_RING_STATUS = 375,
-#ifdef QCN_ESP_IE
-	OL_ATH_PARAM_ESP_PERIODICITY = 376,
-	OL_ATH_PARAM_ESP_AIRTIME = 377,
-	OL_ATH_PARAM_ESP_PPDU_DURATION = 378,
-	OL_ATH_PARAM_ESP_BA_WINDOW = 379,
-#endif /* QCN_ESP_IE */
+enum _dp_param_t {
+	DP_PARAM_MSDU_TTL,
+	DP_PARAM_TOTAL_Q_SIZE_RANGE0,
+	DP_PARAM_TOTAL_Q_SIZE_RANGE1,
+	DP_PARAM_TOTAL_Q_SIZE_RANGE2,
+	DP_PARAM_TOTAL_Q_SIZE_RANGE3,
+	DP_PARAM_VIDEO_DELAY_STATS_FC,
+	DP_PARAM_QFLUSHINTERVAL,
+	DP_PARAM_TOTAL_Q_SIZE,
+	DP_PARAM_MIN_THRESHOLD,
+	DP_PARAM_MAX_Q_LIMIT,
+	DP_PARAM_MIN_Q_LIMIT,
+	DP_PARAM_CONG_CTRL_TIMER_INTV,
+	DP_PARAM_STATS_TIMER_INTV,
+	DP_PARAM_ROTTING_TIMER_INTV,
+	DP_PARAM_LATENCY_PROFILE,
+	DP_PARAM_HOSTQ_DUMP,
+	DP_PARAM_TIDQ_MAP,
+	DP_PARAM_VIDEO_STATS_FC,
+	DP_PARAM_STATS_FC,
 
-	OL_ATH_PARAM_CBS = 380,
-	OL_ATH_PARAM_DCS_SIM = 381,
-	OL_ATH_PARAM_CBS_DWELL_SPLIT_TIME = 382,
-	OL_ATH_PARAM_CBS_DWELL_REST_TIME = 383,
-	OL_ATH_PARAM_CBS_WAIT_TIME = 384,
-	OL_ATH_PARAM_CBS_REST_TIME = 385,
-	OL_ATH_PARAM_CBS_CSA = 386,
-	OL_ATH_PARAM_TWICE_ANTENNA_GAIN = 387,
-	OL_ATH_PARAM_ACTIVITY_FACTOR = 388,
-	OL_ATH_PARAM_CHAN_AP_RX_UTIL = 389,
-	OL_ATH_PARAM_CHAN_FREE  = 390,
-	OL_ATH_PARAM_CHAN_AP_TX_UTIL = 391,
-	OL_ATH_PARAM_CHAN_OBSS_RX_UTIL = 392,
-	OL_ATH_PARAM_CHAN_NON_WIFI = 393,
-#if PEER_FLOW_CONTROL
-	OL_ATH_PARAM_VIDEO_STATS_FC = 394,
-	OL_ATH_PARAM_VIDEO_DELAY_STATS_FC = 395,
-#endif
-	OL_ATH_PARAM_ENABLE_PEER_RETRY_STATS = 396,
-	OL_ATH_PARAM_HE_UL_TRIG_INT = 397,
-	OL_ATH_PARAM_DFS_NOL_SUBCHANNEL_MARKING = 398,
-	/*
-	 * Get the band that is tuned for low, high,
-	 * full band freq range or it's 2g
-	 */
-	OL_ATH_PARAM_BAND_INFO = 399,
-	OL_ATH_PARAM_BW_REDUCE = 400,
-	/* Enable/disable Spatial Reuse */
-	OL_ATH_PARAM_HE_SR = 401,
-	OL_ATH_PARAM_HE_UL_PPDU_DURATION = 402,
-	OL_ATH_PARAM_HE_UL_RU_ALLOCATION = 403,
-	OL_ATH_PARAM_PERIODIC_CFR_CAPTURE = 404,
-	OL_ATH_PARAM_FLUSH_PEER_RATE_STATS = 405,
-	OL_ATH_PARAM_DCS_RE_ENABLE_TIMER = 406,
-	/* Enable/disable Rx lite monitor mode */
-	OL_ATH_PARAM_RX_MON_LITE = 407,
-	/* wifi down indication used in MBSS feature */
-	OL_ATH_PARAM_WIFI_DOWN_IND = 408,
-	OL_ATH_PARAM_TX_CAPTURE = 409,
-	/* Enable fw dump collectin if wmi disconnects */
-	OL_ATH_PARAM_WMI_DIS_DUMP = 410,
-	OL_ATH_PARAM_ACS_CHAN_GRADE_ALGO = 411,
-	OL_ATH_PARAM_ACS_CHAN_EFFICIENCY_VAR = 412,
-	OL_ATH_PARAM_ACS_NEAR_RANGE_WEIGHTAGE = 413,
-	OL_ATH_PARAM_ACS_MID_RANGE_WEIGHTAGE = 414,
-	OL_ATH_PARAM_ACS_FAR_RANGE_WEIGHTAGE = 415,
-	/* Set SELF AP OBSS_PD_THRESHOLD value */
-	OL_ATH_PARAM_SET_CMD_OBSS_PD_THRESHOLD = 416,
-	/* Enable/Disable/Set MGMT_TTL in milliseconds. */
-	OL_ATH_PARAM_MGMT_TTL = 417,
-	/* Enable/Disable/Set PROBE_RESP_TTL in milliseconds */
-	OL_ATH_PARAM_PROBE_RESP_TTL = 418,
-	/* Set global MU PPDU duration for DL (usec units) */
-	OL_ATH_PARAM_MU_PPDU_DURATION = 419,
-	/* Set TBTT_CTRL_CFG */
-	OL_ATH_PARAM_TBTT_CTRL = 420,
-	/* Enable/disable AP OBSS_PD_THRESHOLD */
-	OL_ATH_PARAM_SET_CMD_OBSS_PD_THRESHOLD_ENABLE = 421,
-	/* Get baseline radio level channel width */
-	OL_ATH_PARAM_RCHWIDTH = 422,
-	/* Whether external ACS request is in progress */
-	OL_ATH_EXT_ACS_REQUEST_IN_PROGRESS = 423,
-	/* set/get hw mode */
-	OL_ATH_PARAM_HW_MODE  = 424,
-#if DBDC_REPEATER_SUPPORT
-	/* same ssid feature global disable */
-	OL_ATH_PARAM_SAME_SSID_DISABLE = 425,
-#endif
-	/* get MBSS enable flag */
-	OL_ATH_PARAM_MBSS_EN  = 426,
-	/* UNII-1 and UNII-2A channel coexistance */
-	OL_ATH_PARAM_CHAN_COEX = 427,
-	/* Out of Band Advertisement feature */
-	OL_ATH_PARAM_OOB_ENABLE = 428,
+	DP_PARAM_MAX,
 };
 #endif
 /* Bitmasks for stats that can block */

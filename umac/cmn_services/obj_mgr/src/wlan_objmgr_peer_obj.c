@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -192,6 +192,7 @@ struct wlan_objmgr_peer *wlan_objmgr_peer_obj_create(
 	peer->obj_state = WLAN_OBJ_STATE_ALLOCATED;
 	qdf_atomic_init(&peer->peer_objmgr.ref_cnt);
 	wlan_objmgr_peer_init_ref_id_debug(peer);
+	wlan_objmgr_peer_trace_init_lock(peer);
 	wlan_objmgr_peer_get_ref(peer, WLAN_OBJMGR_ID);
 	/* set vdev to peer */
 	wlan_peer_set_vdev(peer, vdev);
@@ -205,7 +206,6 @@ struct wlan_objmgr_peer *wlan_objmgr_peer_obj_create(
 	peer->peer_objmgr.print_cnt = 0;
 
 	qdf_spinlock_create(&peer->peer_lock);
-	wlan_objmgr_peer_trace_init_lock(peer);
 	/* Attach peer to psoc, psoc maintains the node table for the device */
 	if (wlan_objmgr_psoc_peer_attach(psoc, peer) !=
 					QDF_STATUS_SUCCESS) {
@@ -275,8 +275,8 @@ struct wlan_objmgr_peer *wlan_objmgr_peer_obj_create(
 		return NULL;
 	}
 
-	obj_mgr_debug("Created peer " QDF_MAC_ADDR_STR,
-		      QDF_MAC_ADDR_ARRAY(macaddr));
+	obj_mgr_debug("Created peer " QDF_MAC_ADDR_STR " type %d",
+		      QDF_MAC_ADDR_ARRAY(macaddr), type);
 
 	return peer;
 }

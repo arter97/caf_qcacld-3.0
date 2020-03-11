@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -61,8 +61,6 @@ static void wlan_cfg80211_mc_cp_stats_dealloc(void *priv)
 {
 	struct stats_event *stats = priv;
 
-	osif_debug("Enter");
-
 	if (!stats) {
 		osif_err("stats is NULL");
 		return;
@@ -75,7 +73,6 @@ static void wlan_cfg80211_mc_cp_stats_dealloc(void *priv)
 	qdf_mem_free(stats->vdev_chain_rssi);
 	qdf_mem_free(stats->peer_adv_stats);
 	wlan_free_mib_stats(stats);
-	osif_debug("Exit");
 }
 
 /**
@@ -98,7 +95,7 @@ static int wlan_cfg80211_mc_cp_stats_send_wake_lock_stats(struct wiphy *wiphy,
 	nl_buf_len += QCA_WLAN_VENDOR_GET_WAKE_STATS_MAX *
 				(NLMSG_HDRLEN + sizeof(uint32_t));
 
-	skb = cfg80211_vendor_cmd_alloc_reply_skb(wiphy, nl_buf_len);
+	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy, nl_buf_len);
 
 	if (!skb) {
 		osif_err("cfg80211_vendor_cmd_alloc_reply_skb failed");
@@ -202,11 +199,11 @@ static int wlan_cfg80211_mc_cp_stats_send_wake_lock_stats(struct wiphy *wiphy,
 		goto nla_put_failure;
 	}
 
-	cfg80211_vendor_cmd_reply(skb);
+	wlan_cfg80211_vendor_cmd_reply(skb);
 	return 0;
 
 nla_put_failure:
-	kfree_skb(skb);
+	wlan_cfg80211_vendor_free_skb(skb);
 	return -EINVAL;
 }
 
@@ -448,8 +445,6 @@ static void get_station_stats_cb(struct stats_event *ev, void *cookie)
 	struct osif_request *request;
 	uint32_t summary_size, rssi_size, peer_adv_size;
 
-	osif_debug("Enter");
-
 	request = osif_request_get(cookie);
 	if (!request) {
 		osif_err("Obsolete request");
@@ -464,6 +459,12 @@ static void get_station_stats_cb(struct stats_event *ev, void *cookie)
 	if (summary_size == 0 || rssi_size == 0) {
 		osif_err("Invalid stats, summary %d rssi %d",
 			 summary_size, rssi_size);
+		goto station_stats_cb_fail;
+	}
+	if (priv->vdev_summary_stats || priv->vdev_chain_rssi ||
+	    priv->peer_adv_stats) {
+		osif_err("invalid context cookie %pK request %pK",
+			 cookie, request);
 		goto station_stats_cb_fail;
 	}
 
@@ -497,8 +498,6 @@ static void get_station_stats_cb(struct stats_event *ev, void *cookie)
 station_stats_cb_fail:
 	osif_request_complete(request);
 	osif_request_put(request);
-
-	osif_debug("Exit");
 }
 
 struct stats_event *

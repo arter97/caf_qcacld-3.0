@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -93,9 +93,14 @@ uint32_t hif_read32_mb_reg_window(void *sc,
 #endif
 #ifdef HIF_SNOC
 #include "hif_io32_snoc.h"
-#endif /* HIF_PCI */
+#endif
+#ifdef HIF_IPCI
+#include "hif_io32_ipci.h"
+#endif
 
-#if defined(HIF_REG_WINDOW_SUPPORT) && defined(HIF_PCI)
+#if defined(HIF_REG_WINDOW_SUPPORT) && (defined(HIF_PCI) || \
+    defined(HIF_IPCI))
+
 #include "qdf_lock.h"
 #include "qdf_util.h"
 

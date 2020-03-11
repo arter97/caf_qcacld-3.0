@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -562,6 +562,21 @@ uint8_t wlan_reg_get_opclass_from_freq_width(uint8_t *country,
 					     uint16_t behav_limit);
 
 /**
+ * wlan_reg_get_band_cap_from_op_class() - Return band capability bitmap
+ * @country: Pointer to Country code.
+ * @num_of_opclass: Number of Operating class.
+ * @opclass: Pointer to opclass.
+ *
+ * Return supported band bitmap based on the input operating class list
+ * provided.
+ *
+ * Return: Return supported band capability
+ */
+uint8_t wlan_reg_get_band_cap_from_op_class(const uint8_t *country,
+					    uint8_t num_of_opclass,
+					    const uint8_t *opclass);
+
+/**
  * wlan_reg_dmn_print_channels_in_opclass() - Print channels in op-class
  * @country: country alpha2
  * @opclass: oplcass
@@ -604,6 +619,23 @@ uint16_t wlan_reg_dmn_set_curr_opclasses(uint8_t num_classes,
 uint16_t wlan_reg_dmn_get_curr_opclasses(uint8_t *num_classes,
 					 uint8_t *class);
 
+
+/**
+ * wlan_reg_get_opclass_details() - Get details about the current opclass table.
+ * @pdev: Pointer to pdev.
+ * @reg_ap_cap: Pointer to reg_ap_cap.
+ * @n_opclasses: Pointer to number of opclasses.
+ * @max_supp_op_class: Maximum number of operating classes supported.
+ * @global_tbl_lookup: Whether to lookup global op class tbl.
+ *
+ * Return: QDF_STATUS_SUCCESS if success, else return QDF_STATUS_FAILURE.
+ */
+QDF_STATUS
+wlan_reg_get_opclass_details(struct wlan_objmgr_pdev *pdev,
+			     struct regdmn_ap_cap_opclass_t *reg_ap_cap,
+			     uint8_t *n_opclasses,
+			     uint8_t max_supp_op_class,
+			     bool global_tbl_lookup);
 
 /**
  * wlan_regulatory_init() - init regulatory component
@@ -664,15 +696,6 @@ void wlan_reg_update_nol_ch(struct wlan_objmgr_pdev *pdev,
 			    uint8_t *ch_list,
 			    uint8_t num_ch,
 			    bool nol_ch);
-
-/**
- * wlan_reg_is_dfs_ch () - Checks the channel state for DFS
- * @pdev: pdev ptr
- * @chan: channel
- *
- * Return: true or false
- */
-bool wlan_reg_is_dfs_ch(struct wlan_objmgr_pdev *pdev, uint8_t chan);
 
 /**
  * wlan_reg_is_dsrc_chan () - Checks if the channel is dsrc channel or not
@@ -1146,6 +1169,27 @@ void wlan_reg_freq_width_to_chan_op_class(struct wlan_objmgr_pdev *pdev,
 					  uint8_t *chan_num);
 
 /**
+ * wlan_reg_freq_width_to_chan_op_class_auto() - convert frequency to
+ * operating class,channel
+ * @pdev: pdev pointer
+ * @freq: channel frequency in mhz
+ * @chan_width: channel width
+ * @global_tbl_lookup: whether to lookup global op class tbl
+ * @behav_limit: behavior limit
+ * @op_class: operating class
+ * @chan_num: channel number
+ *
+ * Return: Void.
+ */
+void wlan_reg_freq_width_to_chan_op_class_auto(struct wlan_objmgr_pdev *pdev,
+					       qdf_freq_t freq,
+					       uint16_t chan_width,
+					       bool global_tbl_lookup,
+					       uint16_t behav_limit,
+					       uint8_t *op_class,
+					       uint8_t *chan_num);
+
+/**
  * wlan_reg_freq_to_chan_and_op_class() - Converts freq to oper class
  * @pdev: pdev ptr
  * @freq: channel frequency
@@ -1162,6 +1206,21 @@ void wlan_reg_freq_to_chan_op_class(struct wlan_objmgr_pdev *pdev,
 				    uint16_t behav_limit,
 				    uint8_t *op_class,
 				    uint8_t *chan_num);
+
+/**
+ * wlan_reg_country_opclass_freq_check() - checks frequency in (ctry, op class)
+ *                                         pair
+ * @pdev: pdev ptr
+ * @country: country information
+ * @op_class: operating class
+ * @chan_freq: channel frequency
+ *
+ * Return: bool
+ */
+bool wlan_reg_country_opclass_freq_check(struct wlan_objmgr_pdev *pdev,
+					 const uint8_t country[3],
+					 uint8_t op_class,
+					 qdf_freq_t chan_freq);
 
 /**
  * wlan_reg_get_5g_bonded_channel_and_state_for_freq()- Return the channel
@@ -1214,6 +1273,30 @@ bool wlan_reg_is_6ghz_op_class(struct wlan_objmgr_pdev *pdev,
  * Return: bool
  */
 bool wlan_reg_is_6ghz_supported(struct wlan_objmgr_pdev *pdev);
+
+#ifdef HOST_OPCLASS_EXT
+/**
+ * wlan_reg_country_chan_opclass_to_freq() - Convert channel number to
+ * frequency based on country code and op class
+ * @pdev: pdev object.
+ * @country: country code.
+ * @chan: IEEE Channel Number.
+ * @op_class: Opclass.
+ * @strict: flag to find channel from matched operating class code.
+ *
+ * Look up (channel, operating class) pair in country operating class tables
+ * and return the channel frequency.
+ * If not found and "strict" flag is false, try to get frequency (Mhz) by
+ * channel number only.
+ *
+ * Return: Channel center frequency else return 0.
+ */
+qdf_freq_t
+wlan_reg_country_chan_opclass_to_freq(struct wlan_objmgr_pdev *pdev,
+				      const uint8_t country[3],
+				      uint8_t chan, uint8_t op_class,
+				      bool strict);
+#endif
 
 /**
  * reg_chan_opclass_to_freq() - Convert channel number and opclass to frequency

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -33,6 +33,11 @@
 #ifdef FEATURE_PERPKT_INFO
 #include "dp_ratetable.h"
 #endif
+
+static inline void
+dp_rx_populate_cfr_non_assoc_sta(struct dp_pdev *pdev,
+				 struct hal_rx_ppdu_info *ppdu_info,
+				 struct cdp_rx_indication_ppdu *cdp_rx_ppdu);
 
 #ifdef WLAN_RX_PKT_CAPTURE_ENH
 #include "dp_rx_mon_feature.h"
@@ -147,19 +152,19 @@ dp_rx_inc_rusize_cnt(struct dp_pdev *pdev,
  * dp_rx_populate_cdp_indication_ppdu_user() - Populate per user cdp indication
  * @pdev: pdev ctx
  * @ppdu_info: ppdu info structure from ppdu ring
- * @ppdu_nbuf: qdf nbuf abstraction for linux skb
+ * @cdp_rx_ppdu: Rx PPDU indication structure
  *
  * Return: none
  */
 static inline void
 dp_rx_populate_cdp_indication_ppdu_user(struct dp_pdev *pdev,
 					struct hal_rx_ppdu_info *ppdu_info,
-					qdf_nbuf_t ppdu_nbuf)
+					struct cdp_rx_indication_ppdu
+					*cdp_rx_ppdu)
 {
 	struct dp_peer *peer;
 	struct dp_soc *soc = pdev->soc;
 	struct dp_ast_entry *ast_entry;
-	struct cdp_rx_indication_ppdu *cdp_rx_ppdu;
 	uint32_t ast_index;
 	int i;
 	struct mon_rx_user_status *rx_user_status;
@@ -167,8 +172,6 @@ dp_rx_populate_cdp_indication_ppdu_user(struct dp_pdev *pdev,
 	int ru_size;
 	bool is_data = false;
 	uint32_t num_users;
-
-	cdp_rx_ppdu = (struct cdp_rx_indication_ppdu *)ppdu_nbuf->data;
 
 	num_users = ppdu_info->com_info.num_users;
 	for (i = 0; i < num_users; i++) {
@@ -286,26 +289,23 @@ dp_rx_populate_cdp_indication_ppdu_user(struct dp_pdev *pdev,
 }
 
 /**
-* dp_rx_populate_cdp_indication_ppdu() - Populate cdp rx indication structure
-* @pdev: pdev ctx
-* @ppdu_info: ppdu info structure from ppdu ring
-* @ppdu_nbuf: qdf nbuf abstraction for linux skb
-*
-* Return: none
-*/
+ * dp_rx_populate_cdp_indication_ppdu() - Populate cdp rx indication structure
+ * @pdev: pdev ctx
+ * @ppdu_info: ppdu info structure from ppdu ring
+ * @cdp_rx_ppdu: Rx PPDU indication structure
+ *
+ * Return: none
+ */
 static inline void
 dp_rx_populate_cdp_indication_ppdu(struct dp_pdev *pdev,
-	struct hal_rx_ppdu_info *ppdu_info,
-	qdf_nbuf_t ppdu_nbuf)
+				   struct hal_rx_ppdu_info *ppdu_info,
+				   struct cdp_rx_indication_ppdu *cdp_rx_ppdu)
 {
 	struct dp_peer *peer;
 	struct dp_soc *soc = pdev->soc;
 	struct dp_ast_entry *ast_entry;
-	struct cdp_rx_indication_ppdu *cdp_rx_ppdu;
 	uint32_t ast_index;
 	uint32_t i;
-
-	cdp_rx_ppdu = (struct cdp_rx_indication_ppdu *)ppdu_nbuf->data;
 
 	cdp_rx_ppdu->first_data_seq_ctrl =
 		ppdu_info->rx_status.first_data_seq_ctrl;
@@ -319,11 +319,11 @@ dp_rx_populate_cdp_indication_ppdu(struct dp_pdev *pdev,
 	cdp_rx_ppdu->num_mpdu = ppdu_info->com_info.mpdu_cnt_fcs_ok;
 	/* num msdu is consolidated and added together in num user loop */
 	cdp_rx_ppdu->num_msdu = (cdp_rx_ppdu->tcp_msdu_count +
-			cdp_rx_ppdu->udp_msdu_count +
-			cdp_rx_ppdu->other_msdu_count);
+				 cdp_rx_ppdu->udp_msdu_count +
+				 cdp_rx_ppdu->other_msdu_count);
 
 	cdp_rx_ppdu->retries = CDP_FC_IS_RETRY_SET(cdp_rx_ppdu->frame_ctrl) ?
-					ppdu_info->com_info.mpdu_cnt_fcs_ok : 0;
+		ppdu_info->com_info.mpdu_cnt_fcs_ok : 0;
 
 	if (ppdu_info->com_info.mpdu_cnt_fcs_ok > 1)
 		cdp_rx_ppdu->is_ampdu = 1;
@@ -335,18 +335,21 @@ dp_rx_populate_cdp_indication_ppdu(struct dp_pdev *pdev,
 	ast_index = ppdu_info->rx_status.ast_index;
 	if (ast_index >= wlan_cfg_get_max_ast_idx(soc->wlan_cfg_ctx)) {
 		cdp_rx_ppdu->peer_id = HTT_INVALID_PEER;
-		return;
+		cdp_rx_ppdu->num_users = 0;
+		goto end;
 	}
 
 	ast_entry = soc->ast_table[ast_index];
 	if (!ast_entry) {
 		cdp_rx_ppdu->peer_id = HTT_INVALID_PEER;
-		return;
+		cdp_rx_ppdu->num_users = 0;
+		goto end;
 	}
 	peer = ast_entry->peer;
 	if (!peer || peer->peer_ids[0] == HTT_INVALID_PEER) {
 		cdp_rx_ppdu->peer_id = HTT_INVALID_PEER;
-		return;
+		cdp_rx_ppdu->num_users = 0;
+		goto end;
 	}
 
 	qdf_mem_copy(cdp_rx_ppdu->mac_addr,
@@ -392,13 +395,17 @@ dp_rx_populate_cdp_indication_ppdu(struct dp_pdev *pdev,
 	cdp_rx_ppdu->num_mpdu = 0;
 	cdp_rx_ppdu->num_msdu = 0;
 
-	dp_rx_populate_cdp_indication_ppdu_user(pdev, ppdu_info, ppdu_nbuf);
+	dp_rx_populate_cdp_indication_ppdu_user(pdev, ppdu_info, cdp_rx_ppdu);
+
+	return;
+end:
+	dp_rx_populate_cfr_non_assoc_sta(pdev, ppdu_info, cdp_rx_ppdu);
 }
 #else
 static inline void
 dp_rx_populate_cdp_indication_ppdu(struct dp_pdev *pdev,
-		struct hal_rx_ppdu_info *ppdu_info,
-		qdf_nbuf_t ppdu_nbuf)
+				   struct hal_rx_ppdu_info *ppdu_info,
+				   struct cdp_rx_indication_ppdu *cdp_rx_ppdu)
 {
 }
 #endif
@@ -418,22 +425,30 @@ static inline void dp_rx_rate_stats_update(struct dp_peer *peer,
 	uint32_t ratekbps = 0;
 	uint32_t ppdu_rx_rate = 0;
 	uint32_t nss = 0;
+	uint8_t mcs = 0;
 	uint32_t rix;
 	uint16_t ratecode;
-	struct cdp_rx_stats_ppdu_user *ppdu_user;
+	struct cdp_rx_stats_ppdu_user *ppdu_user = NULL;
 
 	if (!peer || !ppdu)
 		return;
 
-	ppdu_user = &ppdu->user[user];
+	if (ppdu->u.ppdu_type != HAL_RX_TYPE_SU) {
+		ppdu_user = &ppdu->user[user];
 
-	if (ppdu_user->nss == 0)
-		nss = 0;
-	else
-		nss = ppdu_user->nss - 1;
+		if (ppdu_user->nss == 0)
+			nss = 0;
+		else
+			nss = ppdu_user->nss - 1;
+		mcs = ppdu_user->mcs;
+
+	} else {
+		mcs = ppdu->u.mcs;
+		nss = ppdu->u.nss;
+	}
 
 	ratekbps = dp_getrateindex(ppdu->u.gi,
-				   ppdu_user->mcs,
+				   mcs,
 				   nss,
 				   ppdu->u.preamble,
 				   ppdu->u.bw,
@@ -899,6 +914,309 @@ dp_rx_handle_smart_mesh_mode(struct dp_soc *soc, struct dp_pdev *pdev,
 	return 0;
 }
 
+#if defined(WLAN_CFR_ENABLE) && defined(WLAN_ENH_CFR_ENABLE)
+/*
+ * dp_rx_mon_handle_cfr_mu_info() - Gather macaddr and ast_index of peer(s) in
+ * the PPDU received, this will be used for correlation of CFR data captured
+ * for an UL-MU-PPDU
+ * @pdev: pdev ctx
+ * @ppdu_info: pointer to ppdu info structure populated from ppdu status TLVs
+ * @cdp_rx_ppdu: Rx PPDU indication structure
+ *
+ * Return: none
+ */
+static inline void
+dp_rx_mon_handle_cfr_mu_info(struct dp_pdev *pdev,
+			     struct hal_rx_ppdu_info *ppdu_info,
+			     struct cdp_rx_indication_ppdu *cdp_rx_ppdu)
+{
+	struct dp_peer *peer;
+	struct dp_soc *soc = pdev->soc;
+	struct dp_ast_entry *ast_entry;
+	struct mon_rx_user_status *rx_user_status;
+	struct cdp_rx_stats_ppdu_user *rx_stats_peruser;
+	uint32_t num_users;
+	int user_id;
+	uint32_t ast_index;
+
+	qdf_spin_lock_bh(&soc->ast_lock);
+
+	num_users = ppdu_info->com_info.num_users;
+	for (user_id = 0; user_id < num_users; user_id++) {
+		if (user_id > OFDMA_NUM_USERS) {
+			qdf_spin_unlock_bh(&soc->ast_lock);
+			return;
+		}
+
+		rx_user_status =  &ppdu_info->rx_user_status[user_id];
+		rx_stats_peruser = &cdp_rx_ppdu->user[user_id];
+		ast_index = rx_user_status->ast_index;
+
+		if (ast_index >= wlan_cfg_get_max_ast_idx(soc->wlan_cfg_ctx)) {
+			rx_stats_peruser->peer_id = HTT_INVALID_PEER;
+			continue;
+		}
+
+		ast_entry = soc->ast_table[ast_index];
+		if (!ast_entry) {
+			rx_stats_peruser->peer_id = HTT_INVALID_PEER;
+			continue;
+		}
+
+		peer = ast_entry->peer;
+		if (!peer || peer->peer_ids[0] == HTT_INVALID_PEER) {
+			rx_stats_peruser->peer_id = HTT_INVALID_PEER;
+			continue;
+		}
+
+		qdf_mem_copy(rx_stats_peruser->mac_addr,
+			     peer->mac_addr.raw, QDF_MAC_ADDR_SIZE);
+	}
+
+	qdf_spin_unlock_bh(&soc->ast_lock);
+}
+
+/*
+ * dp_rx_mon_populate_cfr_ppdu_info() - Populate cdp ppdu info from hal ppdu
+ * info
+ * @pdev: pdev ctx
+ * @ppdu_info: ppdu info structure from ppdu ring
+ * @cdp_rx_ppdu : Rx PPDU indication structure
+ *
+ * Return: none
+ */
+static inline void
+dp_rx_mon_populate_cfr_ppdu_info(struct dp_pdev *pdev,
+				 struct hal_rx_ppdu_info *ppdu_info,
+				 struct cdp_rx_indication_ppdu *cdp_rx_ppdu)
+{
+	int chain;
+
+	cdp_rx_ppdu->ppdu_id = ppdu_info->com_info.ppdu_id;
+	cdp_rx_ppdu->timestamp = ppdu_info->rx_status.tsft;
+	cdp_rx_ppdu->u.ppdu_type = ppdu_info->rx_status.reception_type;
+	cdp_rx_ppdu->num_users = ppdu_info->com_info.num_users;
+
+	for (chain = 0; chain < MAX_CHAIN; chain++)
+		cdp_rx_ppdu->per_chain_rssi[chain] =
+			ppdu_info->rx_status.rssi[chain];
+	dp_rx_mon_handle_cfr_mu_info(pdev, ppdu_info, cdp_rx_ppdu);
+}
+
+/**
+ * dp_cfr_rcc_mode_status() - Return status of cfr rcc mode
+ * @pdev: pdev ctx
+ *
+ * Return: True or False
+ */
+
+static inline bool
+dp_cfr_rcc_mode_status(struct dp_pdev *pdev)
+{
+	return pdev->cfr_rcc_mode;
+}
+
+/*
+ * dp_rx_mon_populate_cfr_info() - Populate cdp ppdu info from hal cfr info
+ * @pdev: pdev ctx
+ * @ppdu_info: ppdu info structure from ppdu ring
+ * @cdp_rx_ppdu: Rx PPDU indication structure
+ *
+ * Return: none
+ */
+static inline void
+dp_rx_mon_populate_cfr_info(struct dp_pdev *pdev,
+			    struct hal_rx_ppdu_info *ppdu_info,
+			    struct cdp_rx_indication_ppdu *cdp_rx_ppdu)
+{
+	struct cdp_rx_ppdu_cfr_info *cfr_info;
+
+	if (!dp_cfr_rcc_mode_status(pdev))
+		return;
+
+	cfr_info = &cdp_rx_ppdu->cfr_info;
+
+	cfr_info->bb_captured_channel
+		= ppdu_info->cfr_info.bb_captured_channel;
+	cfr_info->bb_captured_timeout
+		= ppdu_info->cfr_info.bb_captured_timeout;
+	cfr_info->bb_captured_reason
+		= ppdu_info->cfr_info.bb_captured_reason;
+	cfr_info->rx_location_info_valid
+		= ppdu_info->cfr_info.rx_location_info_valid;
+	cfr_info->chan_capture_status
+		= ppdu_info->cfr_info.chan_capture_status;
+	cfr_info->rtt_che_buffer_pointer_high8
+		= ppdu_info->cfr_info.rtt_che_buffer_pointer_high8;
+	cfr_info->rtt_che_buffer_pointer_low32
+		= ppdu_info->cfr_info.rtt_che_buffer_pointer_low32;
+}
+
+/**
+ * dp_update_cfr_dbg_stats() - Increment RCC debug statistics
+ * @pdev: pdev structure
+ * @ppdu_info: structure for rx ppdu ring
+ *
+ * Return: none
+ */
+static inline void
+dp_update_cfr_dbg_stats(struct dp_pdev *pdev,
+			struct hal_rx_ppdu_info *ppdu_info)
+{
+	struct hal_rx_ppdu_cfr_info *cfr = &ppdu_info->cfr_info;
+
+	DP_STATS_INC(pdev,
+		     rcc.chan_capture_status[cfr->chan_capture_status], 1);
+	if (cfr->rx_location_info_valid) {
+		DP_STATS_INC(pdev, rcc.rx_loc_info_valid_cnt, 1);
+		if (cfr->bb_captured_channel) {
+			DP_STATS_INC(pdev, rcc.bb_captured_channel_cnt, 1);
+			DP_STATS_INC(pdev,
+				     rcc.reason_cnt[cfr->bb_captured_reason],
+				     1);
+		} else if (cfr->bb_captured_timeout) {
+			DP_STATS_INC(pdev, rcc.bb_captured_timeout_cnt, 1);
+			DP_STATS_INC(pdev,
+				     rcc.reason_cnt[cfr->bb_captured_reason],
+				     1);
+		}
+	}
+}
+
+/*
+ * dp_rx_handle_cfr() - Gather cfr info from hal ppdu info
+ * @soc: core txrx main context
+ * @pdev: pdev ctx
+ * @ppdu_info: ppdu info structure from ppdu ring
+ *
+ * Return: none
+ */
+static inline void
+dp_rx_handle_cfr(struct dp_soc *soc, struct dp_pdev *pdev,
+		 struct hal_rx_ppdu_info *ppdu_info)
+{
+	qdf_nbuf_t ppdu_nbuf;
+	struct cdp_rx_indication_ppdu *cdp_rx_ppdu;
+
+	dp_update_cfr_dbg_stats(pdev, ppdu_info);
+	if (!ppdu_info->cfr_info.bb_captured_channel)
+		return;
+
+	ppdu_nbuf = qdf_nbuf_alloc(soc->osdev,
+				   sizeof(struct cdp_rx_indication_ppdu),
+				   0,
+				   0,
+				   FALSE);
+	if (ppdu_nbuf) {
+		cdp_rx_ppdu = (struct cdp_rx_indication_ppdu *)ppdu_nbuf->data;
+
+		dp_rx_mon_populate_cfr_info(pdev, ppdu_info, cdp_rx_ppdu);
+		dp_rx_mon_populate_cfr_ppdu_info(pdev, ppdu_info, cdp_rx_ppdu);
+		qdf_nbuf_put_tail(ppdu_nbuf,
+				  sizeof(struct cdp_rx_indication_ppdu));
+		dp_wdi_event_handler(WDI_EVENT_RX_PPDU_DESC, soc,
+				     ppdu_nbuf, HTT_INVALID_PEER,
+				     WDI_NO_VAL, pdev->pdev_id);
+	}
+}
+
+/**
+ * dp_rx_populate_cfr_non_assoc_sta() - Populate cfr ppdu info for PPDUs from
+ * non-associated stations
+ * @pdev: pdev ctx
+ * @ppdu_info: ppdu info structure from ppdu ring
+ * @cdp_rx_ppdu: Rx PPDU indication structure
+ *
+ * Return: none
+ */
+static inline void
+dp_rx_populate_cfr_non_assoc_sta(struct dp_pdev *pdev,
+				 struct hal_rx_ppdu_info *ppdu_info,
+				 struct cdp_rx_indication_ppdu *cdp_rx_ppdu)
+{
+	if (!dp_cfr_rcc_mode_status(pdev))
+		return;
+
+	if (ppdu_info->cfr_info.bb_captured_channel)
+		dp_rx_mon_populate_cfr_ppdu_info(pdev, ppdu_info, cdp_rx_ppdu);
+}
+
+/**
+ * dp_bb_captured_chan_status() - Get the bb_captured_channel status
+ * @ppdu_info: structure for rx ppdu ring
+ *
+ * Return: Success/ Failure
+ */
+
+static inline QDF_STATUS
+dp_bb_captured_chan_status(struct dp_pdev *pdev,
+			   struct hal_rx_ppdu_info *ppdu_info)
+{
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	struct hal_rx_ppdu_cfr_info *cfr = &ppdu_info->cfr_info;
+
+	if (dp_cfr_rcc_mode_status(pdev)) {
+		if (cfr->bb_captured_channel)
+			status = QDF_STATUS_SUCCESS;
+	}
+
+	return status;
+}
+#else
+static inline void
+dp_rx_mon_handle_cfr_mu_info(struct dp_pdev *pdev,
+			     struct hal_rx_ppdu_info *ppdu_info,
+			     struct cdp_rx_indication_ppdu *cdp_rx_ppdu)
+{
+}
+
+static inline void
+dp_rx_mon_populate_cfr_ppdu_info(struct dp_pdev *pdev,
+				 struct hal_rx_ppdu_info *ppdu_info,
+				 struct cdp_rx_indication_ppdu *cdp_rx_ppdu)
+{
+}
+
+static inline void
+dp_rx_mon_populate_cfr_info(struct dp_pdev *pdev,
+			    struct hal_rx_ppdu_info *ppdu_info,
+			    struct cdp_rx_indication_ppdu *cdp_rx_ppdu)
+{
+}
+
+static inline void
+dp_rx_handle_cfr(struct dp_soc *soc, struct dp_pdev *pdev,
+		 struct hal_rx_ppdu_info *ppdu_info)
+{
+}
+
+static inline void
+dp_rx_populate_cfr_non_assoc_sta(struct dp_pdev *pdev,
+				 struct hal_rx_ppdu_info *ppdu_info,
+				 struct cdp_rx_indication_ppdu *cdp_rx_ppdu)
+{
+}
+
+static inline void
+dp_update_cfr_dbg_stats(struct dp_pdev *pdev,
+			struct hal_rx_ppdu_info *ppdu_info)
+{
+}
+
+static inline QDF_STATUS
+dp_bb_captured_chan_status(struct dp_pdev *pdev,
+			   struct hal_rx_ppdu_info *ppdu_info)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline bool
+dp_cfr_rcc_mode_status(struct dp_pdev *pdev)
+{
+	return false;
+}
+#endif
+
 /**
 * dp_rx_handle_ppdu_stats() - Allocate and deliver ppdu stats to cdp layer
 * @soc: core txrx main context
@@ -918,6 +1236,8 @@ dp_rx_handle_ppdu_stats(struct dp_soc *soc, struct dp_pdev *pdev,
 	/*
 	 * Do not allocate if fcs error,
 	 * ast idx invalid / fctl invalid
+	 *
+	 * In CFR RCC mode - PPDU status TLVs of error pkts are also needed
 	 */
 	if (ppdu_info->com_info.mpdu_cnt_fcs_ok == 0)
 		return;
@@ -943,26 +1263,35 @@ dp_rx_handle_ppdu_stats(struct dp_soc *soc, struct dp_pdev *pdev,
 		qdf_spin_unlock_bh(&pdev->neighbour_peer_mutex);
 	}
 
-	/* need not generate wdi event when mcopy and
+	/* need not generate wdi event when mcopy, cfr rcc mode and
 	 * enhanced stats are not enabled
 	 */
-	if (!pdev->mcopy_mode && !pdev->enhanced_stats_en)
+	if (!pdev->mcopy_mode && !pdev->enhanced_stats_en &&
+	    !dp_cfr_rcc_mode_status(pdev))
 		return;
 
-	if (!pdev->mcopy_mode) {
-		if (!ppdu_info->rx_status.frame_control_info_valid)
-			return;
+	if (dp_cfr_rcc_mode_status(pdev))
+		dp_update_cfr_dbg_stats(pdev, ppdu_info);
 
-		if (ppdu_info->rx_status.ast_index == HAL_AST_IDX_INVALID)
+	if (!ppdu_info->rx_status.frame_control_info_valid ||
+	    (ppdu_info->rx_status.ast_index == HAL_AST_IDX_INVALID)) {
+		if (!(pdev->mcopy_mode ||
+		      (dp_bb_captured_chan_status(pdev, ppdu_info) ==
+		       QDF_STATUS_SUCCESS)))
 			return;
 	}
+
 	ppdu_nbuf = qdf_nbuf_alloc(soc->osdev,
-			sizeof(struct cdp_rx_indication_ppdu), 0, 0, FALSE);
+				   sizeof(struct cdp_rx_indication_ppdu),
+				   0, 0, FALSE);
 	if (ppdu_nbuf) {
-		dp_rx_populate_cdp_indication_ppdu(pdev, ppdu_info, ppdu_nbuf);
-		qdf_nbuf_put_tail(ppdu_nbuf,
-				sizeof(struct cdp_rx_indication_ppdu));
 		cdp_rx_ppdu = (struct cdp_rx_indication_ppdu *)ppdu_nbuf->data;
+
+		dp_rx_mon_populate_cfr_info(pdev, ppdu_info, cdp_rx_ppdu);
+		dp_rx_populate_cdp_indication_ppdu(pdev,
+						   ppdu_info, cdp_rx_ppdu);
+		qdf_nbuf_put_tail(ppdu_nbuf,
+				  sizeof(struct cdp_rx_indication_ppdu));
 		dp_rx_stats_update(pdev, cdp_rx_ppdu);
 
 		if (cdp_rx_ppdu->peer_id != HTT_INVALID_PEER) {
@@ -970,10 +1299,10 @@ dp_rx_handle_ppdu_stats(struct dp_soc *soc, struct dp_pdev *pdev,
 					     soc, ppdu_nbuf,
 					     cdp_rx_ppdu->peer_id,
 					     WDI_NO_VAL, pdev->pdev_id);
-		} else if (pdev->mcopy_mode) {
+		} else if (pdev->mcopy_mode || dp_cfr_rcc_mode_status(pdev)) {
 			dp_wdi_event_handler(WDI_EVENT_RX_PPDU_DESC, soc,
-					ppdu_nbuf, HTT_INVALID_PEER,
-					WDI_NO_VAL, pdev->pdev_id);
+					     ppdu_nbuf, HTT_INVALID_PEER,
+					     WDI_NO_VAL, pdev->pdev_id);
 		} else {
 			qdf_nbuf_free(ppdu_nbuf);
 		}
@@ -1132,7 +1461,7 @@ static inline void
 dp_rx_mon_status_process_tlv(struct dp_soc *soc, uint32_t mac_id,
 	uint32_t quota)
 {
-	struct dp_pdev *pdev = dp_get_pdev_for_mac_id(soc, mac_id);
+	struct dp_pdev *pdev = dp_get_pdev_for_lmac_id(soc, mac_id);
 	struct hal_rx_ppdu_info *ppdu_info;
 	qdf_nbuf_t status_nbuf;
 	uint8_t *rx_tlv;
@@ -1163,7 +1492,7 @@ dp_rx_mon_status_process_tlv(struct dp_soc *soc, uint32_t mac_id,
 		nbuf_used = false;
 
 		if ((pdev->monitor_vdev) || (pdev->enhanced_stats_en) ||
-		    pdev->mcopy_mode ||
+		    (pdev->mcopy_mode) || (dp_cfr_rcc_mode_status(pdev)) ||
 		    (rx_enh_capture_mode != CDP_RX_ENH_CAPTURE_DISABLED)) {
 			do {
 				tlv_status = hal_rx_status_get_tlv_info(rx_tlv,
@@ -1179,7 +1508,8 @@ dp_rx_mon_status_process_tlv(struct dp_soc *soc, uint32_t mac_id,
 
 				rx_tlv = hal_rx_status_get_next_tlv(rx_tlv);
 
-				if ((rx_tlv - rx_tlv_start) >= RX_BUFFER_SIZE)
+				if ((rx_tlv - rx_tlv_start) >=
+					RX_DATA_BUFFER_SIZE)
 					break;
 
 			} while ((tlv_status == HAL_TLV_STATUS_PPDU_NOT_DONE) ||
@@ -1240,8 +1570,26 @@ dp_rx_mon_status_process_tlv(struct dp_soc *soc, uint32_t mac_id,
 			if (pdev->enhanced_stats_en ||
 			    pdev->mcopy_mode || pdev->neighbour_peers_added)
 				dp_rx_handle_ppdu_stats(soc, pdev, ppdu_info);
+			else if (dp_cfr_rcc_mode_status(pdev))
+				dp_rx_handle_cfr(soc, pdev, ppdu_info);
 
 			pdev->mon_ppdu_status = DP_PPDU_STATUS_DONE;
+
+			/*
+			* if chan_num is not fetched correctly from ppdu RX TLV,
+			 * get it from pdev saved.
+			 */
+			if (qdf_unlikely(pdev->ppdu_info.rx_status.chan_num == 0))
+				pdev->ppdu_info.rx_status.chan_num = pdev->mon_chan_num;
+			/*
+			 * if chan_freq is not fetched correctly from ppdu RX TLV,
+			 * get it from pdev saved.
+			 */
+			if (qdf_unlikely(pdev->ppdu_info.rx_status.chan_freq == 0)) {
+				pdev->ppdu_info.rx_status.chan_freq =
+					pdev->mon_chan_freq;
+			}
+
 			dp_rx_mon_dest_process(soc, mac_id, quota);
 			pdev->mon_ppdu_status = DP_PPDU_STATUS_START;
 		}
@@ -1266,15 +1614,14 @@ static inline uint32_t
 dp_rx_mon_status_srng_process(struct dp_soc *soc, uint32_t mac_id,
 	uint32_t quota)
 {
-	struct dp_pdev *pdev = dp_get_pdev_for_mac_id(soc, mac_id);
+	struct dp_pdev *pdev = dp_get_pdev_for_lmac_id(soc, mac_id);
 	hal_soc_handle_t hal_soc;
 	void *mon_status_srng;
 	void *rxdma_mon_status_ring_entry;
 	QDF_STATUS status;
 	uint32_t work_done = 0;
-	int mac_for_pdev = dp_get_mac_id_for_mac(soc, mac_id);
 
-	mon_status_srng = pdev->rxdma_mon_status_ring[mac_for_pdev].hal_srng;
+	mon_status_srng = soc->rxdma_mon_status_ring[mac_id].hal_srng;
 
 	qdf_assert(mon_status_srng);
 	if (!mon_status_srng || !hal_srng_initialized(mon_status_srng)) {
@@ -1341,7 +1688,7 @@ dp_rx_mon_status_srng_process(struct dp_soc *soc, uint32_t mac_id,
 				hal_srng_src_get_next(hal_soc, mon_status_srng);
 				continue;
 			}
-			qdf_nbuf_set_pktlen(status_nbuf, RX_BUFFER_SIZE);
+			qdf_nbuf_set_pktlen(status_nbuf, RX_DATA_BUFFER_SIZE);
 
 			qdf_nbuf_unmap_single(soc->osdev, status_nbuf,
 				QDF_DMA_FROM_DEVICE);
@@ -1526,7 +1873,7 @@ QDF_STATUS dp_rx_mon_status_buffers_replenish(struct dp_soc *dp_soc,
 	void *rxdma_ring_entry;
 	union dp_rx_desc_list_elem_t *next;
 	void *rxdma_srng;
-	struct dp_pdev *dp_pdev = dp_get_pdev_for_mac_id(dp_soc, mac_id);
+	struct dp_pdev *dp_pdev = dp_get_pdev_for_lmac_id(dp_soc, mac_id);
 
 	rxdma_srng = dp_rxdma_srng->hal_srng;
 
@@ -1661,9 +2008,8 @@ dp_rx_pdev_mon_status_attach(struct dp_pdev *pdev, int ring_id) {
 	uint32_t i;
 	struct rx_desc_pool *rx_desc_pool;
 	QDF_STATUS status;
-	int mac_for_pdev = dp_get_mac_id_for_mac(soc, ring_id);
 
-	mon_status_ring = &pdev->rxdma_mon_status_ring[mac_for_pdev];
+	mon_status_ring = &soc->rxdma_mon_status_ring[ring_id];
 
 	num_entries = mon_status_ring->num_entries;
 
@@ -1676,6 +2022,9 @@ dp_rx_pdev_mon_status_attach(struct dp_pdev *pdev, int ring_id) {
 				       rx_desc_pool);
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		return status;
+
+	rx_desc_pool->buf_size = RX_DATA_BUFFER_SIZE;
+	rx_desc_pool->buf_alignment = RX_DATA_BUFFER_ALIGNMENT;
 
 	dp_debug("Mon RX Status Buffers Replenish ring_id=%d", ring_id);
 

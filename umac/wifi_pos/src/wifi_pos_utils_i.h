@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -301,8 +301,15 @@ struct wifi_pos_dma_rings_cfg {
  * @dma_buf_pool: DMA buffer pools maintained at host: this will be 2-D array
  * where with num_rows = number of rings num_elements in each row = ring depth
  * @wifi_pos_lock: lock to access wifi pos priv object
+ * @oem_6g_support_disable: oem target 6ghz support is disabled if set
  * @wifi_pos_req_handler: function pointer to handle TLV or non-TLV
  * @wifi_pos_send_rsp: function pointer to send msg to userspace APP
+ * @wifi_pos_get_phy_mode: function pointer to get wlan phymode for given
+ *                         channel, channel width
+ * @wifi_pos_get_fw_phy_mode_for_freq: function pointer to get fw phymode
+ *                                     for given freq and channel width
+ * @wifi_pos_send_action: function pointer to send registered action frames
+ *                        to userspace APP
  *
  * wifi pos request messages
  * <----- fine_time_meas_cap (in bits) ----->
@@ -338,10 +345,13 @@ struct wifi_pos_psoc_priv_obj {
 	struct wifi_pos_dma_buf_info **dma_buf_pool;
 
 	qdf_spinlock_t wifi_pos_lock;
+	bool oem_6g_support_disable;
 	QDF_STATUS (*wifi_pos_req_handler)(struct wlan_objmgr_psoc *psoc,
 				    struct wifi_pos_req_msg *req);
 	void (*wifi_pos_send_rsp)(uint32_t, uint32_t, uint32_t, uint8_t *);
 	void (*wifi_pos_get_phy_mode)(uint8_t, uint32_t, uint32_t *);
+	void (*wifi_pos_get_fw_phy_mode_for_freq)(uint32_t, uint32_t,
+						  uint32_t *);
 	void (*wifi_pos_send_action)(struct wlan_objmgr_psoc *psoc,
 				     uint32_t oem_subtype, uint8_t *buf,
 				     uint32_t len);

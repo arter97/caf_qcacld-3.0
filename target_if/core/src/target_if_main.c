@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -79,6 +79,15 @@
 #include <target_if_crypto.h>
 #endif
 #include <target_if_vdev_mgr_tx_ops.h>
+
+#ifdef FEATURE_COEX
+#include <target_if_coex.h>
+#endif
+#include <wlan_utility.h>
+
+#ifdef DCS_INTERFERENCE_DETECTION
+#include <target_if_dcs.h>
+#endif
 
 static struct target_if_ctx *g_target_if_ctx;
 
@@ -338,6 +347,20 @@ static inline void target_if_crypto_tx_ops_register(
 }
 #endif
 
+#ifdef FEATURE_COEX
+static QDF_STATUS
+target_if_coex_tx_ops_register(struct wlan_lmac_if_tx_ops *tx_ops)
+{
+	return target_if_coex_register_tx_ops(tx_ops);
+}
+#else
+static inline QDF_STATUS
+target_if_coex_tx_ops_register(struct wlan_lmac_if_tx_ops *tx_ops)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 static void target_if_target_tx_ops_register(
 		struct wlan_lmac_if_tx_ops *tx_ops)
 {
@@ -380,6 +403,20 @@ target_if_cp_stats_tx_ops_register(struct wlan_lmac_if_tx_ops *tx_ops)
 {
 	return target_if_cp_stats_register_tx_ops(tx_ops);
 }
+
+#ifdef DCS_INTERFERENCE_DETECTION
+static QDF_STATUS
+target_if_dcs_tx_ops_register(struct wlan_lmac_if_tx_ops *tx_ops)
+{
+	return target_if_dcs_register_tx_ops(tx_ops);
+}
+#else
+static QDF_STATUS
+target_if_dcs_tx_ops_register(struct wlan_lmac_if_tx_ops *tx_ops)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 static QDF_STATUS
 target_if_vdev_mgr_tx_ops_register(struct wlan_lmac_if_tx_ops *tx_ops)
@@ -437,9 +474,13 @@ QDF_STATUS target_if_register_umac_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops)
 
 	target_if_cp_stats_tx_ops_register(tx_ops);
 
+	target_if_dcs_tx_ops_register(tx_ops);
+
 	target_if_crypto_tx_ops_register(tx_ops);
 
 	target_if_vdev_mgr_tx_ops_register(tx_ops);
+
+	target_if_coex_tx_ops_register(tx_ops);
 
 	/* Converged UMAC components to register their TX-ops here */
 	return QDF_STATUS_SUCCESS;
@@ -545,6 +586,9 @@ QDF_STATUS target_if_alloc_psoc_tgt_info(struct wlan_objmgr_psoc *psoc)
 
 	wlan_psoc_set_tgt_if_handle(psoc, tgt_psoc_info);
 	target_psoc_set_preferred_hw_mode(tgt_psoc_info, WMI_HOST_HW_MODE_MAX);
+	wlan_minidump_log(tgt_psoc_info,
+			  sizeof(*tgt_psoc_info), psoc,
+			  WLAN_MD_OBJMGR_PSOC_TGT_INFO, "target_psoc_info");
 
 	qdf_event_create(&tgt_psoc_info->info.event);
 
@@ -576,6 +620,7 @@ QDF_STATUS target_if_free_psoc_tgt_info(struct wlan_objmgr_psoc *psoc)
 
 	wlan_psoc_set_tgt_if_handle(psoc, NULL);
 
+	wlan_minidump_remove(tgt_psoc_info);
 	qdf_mem_free(tgt_psoc_info);
 
 	return QDF_STATUS_SUCCESS;

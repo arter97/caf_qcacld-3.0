@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -107,6 +107,27 @@ wlan_lmac_if_cp_stats_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
 {
 }
 #endif /* QCA_SUPPORT_CP_STATS */
+
+#ifdef DCS_INTERFERENCE_DETECTION
+/**
+ * wlan_target_if_dcs_rx_ops_register() - API to register dcs Rx Ops
+ * @rx_ops:	pointer to lmac rx ops
+ *
+ * This API will be used to register function pointers for FW events
+ *
+ * Return: void
+ */
+static void
+wlan_target_if_dcs_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
+{
+	rx_ops->dcs_rx_ops.process_dcs_event = tgt_dcs_process_event;
+}
+#else
+static void
+wlan_target_if_dcs_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
+{
+}
+#endif /* DCS_INTERFERENCE_DETECTION */
 
 #ifdef WLAN_ATF_ENABLE
 /**
@@ -523,7 +544,18 @@ wlan_lmac_if_umac_dfs_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
 		tgt_dfs_set_fw_adfs_support;
 	dfs_rx_ops->dfs_reset_dfs_prevchan =
 		utils_dfs_reset_dfs_prevchan;
-
+	dfs_rx_ops->dfs_init_tmp_psoc_nol =
+		tgt_dfs_init_tmp_psoc_nol;
+	dfs_rx_ops->dfs_deinit_tmp_psoc_nol =
+		tgt_dfs_deinit_tmp_psoc_nol;
+	dfs_rx_ops->dfs_save_dfs_nol_in_psoc =
+		tgt_dfs_save_dfs_nol_in_psoc;
+	dfs_rx_ops->dfs_reinit_nol_from_psoc_copy =
+		tgt_dfs_reinit_nol_from_psoc_copy;
+	dfs_rx_ops->dfs_reinit_precac_lists =
+		tgt_dfs_reinit_precac_lists;
+	dfs_rx_ops->dfs_complete_deferred_tasks =
+		tgt_dfs_complete_deferred_tasks;
 	register_precac_auto_chan_rx_ops(dfs_rx_ops);
 	register_precac_auto_chan_rx_ops_ieee(dfs_rx_ops);
 	register_precac_auto_chan_rx_ops_freq(dfs_rx_ops);
@@ -641,6 +673,8 @@ wlan_lmac_if_umac_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
 	wlan_lmac_if_atf_rx_ops_register(rx_ops);
 
 	wlan_lmac_if_cp_stats_rx_ops_register(rx_ops);
+
+	wlan_target_if_dcs_rx_ops_register(rx_ops);
 
 	wlan_lmac_if_sa_api_rx_ops_register(rx_ops);
 

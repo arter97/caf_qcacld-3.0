@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -134,6 +134,16 @@ void htc_dump(HTC_HANDLE HTCHandle, uint8_t CmdId, bool start)
 	hif_dump(target->hif_dev, CmdId, start);
 }
 
+void htc_ce_tasklet_debug_dump(HTC_HANDLE htc_handle)
+{
+	HTC_TARGET *target = GET_HTC_TARGET_FROM_HANDLE(htc_handle);
+
+	if (!target->hif_dev)
+		return;
+
+	hif_display_stats(target->hif_dev);
+}
+
 /* cleanup the HTC instance */
 static void htc_cleanup(HTC_TARGET *target)
 {
@@ -243,8 +253,26 @@ int htc_runtime_resume(HTC_HANDLE htc_ctx)
 	qdf_sched_work(0, &target->queue_kicker);
 	return 0;
 }
+
+/**
+ * htc_runtime_pm_deinit(): runtime pm related de-intialization
+ *
+ * need to de-initialize the work item.
+ *
+ * @target: HTC target pointer
+ *
+ */
+static void htc_runtime_pm_deinit(HTC_TARGET *target)
+{
+	if (!target)
+		return;
+
+	qdf_destroy_work(0, &target->queue_kicker);
+}
+
 #else
 static inline void htc_runtime_pm_init(HTC_TARGET *target) { }
+static inline void htc_runtime_pm_deinit(HTC_TARGET *target) { }
 #endif
 
 #if defined(DEBUG_HL_LOGGING) && defined(CONFIG_HL_SUPPORT)
@@ -828,6 +856,8 @@ void htc_stop(HTC_HANDLE HTCHandle)
 #endif
 
 	AR_DEBUG_PRINTF(ATH_DEBUG_TRC, ("+htc_stop\n"));
+
+	htc_runtime_pm_deinit(target);
 
 	HTC_INFO("%s: endpoints cleanup\n", __func__);
 	/* cleanup endpoints */

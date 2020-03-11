@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -40,6 +40,8 @@
 #define CH_AVOID_MAX_RANGE   4
 #define REG_ALPHA2_LEN 2
 #define MAX_REG_RULES 10
+#define TWOG_START_FREQ 2407
+#define FIVEG_START_FREQ 5000
 
 #define REGULATORY_CHAN_DISABLED     BIT(0)
 #define REGULATORY_CHAN_NO_IR        BIT(1)
@@ -60,6 +62,10 @@
 #define REGULATORY_CHAN_NO11N        BIT(3)
 #define REGULATORY_PHYMODE_NO11AC    BIT(4)
 #define REGULATORY_PHYMODE_NO11AX    BIT(5)
+
+#define BW_80_MHZ     80
+#define BW_160_MHZ    160
+#define BW_40_MHZ     40
 
 /**
  * enum dfs_reg - DFS region
@@ -528,8 +534,8 @@ enum ctl_value {
 struct ch_params {
 	enum phy_ch_width ch_width;
 	uint8_t sec_ch_offset;
-	qdf_freq_t center_freq_seg0;
-	qdf_freq_t center_freq_seg1;
+	uint8_t center_freq_seg0;
+	uint8_t center_freq_seg1;
 	qdf_freq_t mhz_freq_seg0;
 	qdf_freq_t mhz_freq_seg1;
 };
@@ -595,6 +601,30 @@ struct reg_dmn_op_class_map_t {
 	uint16_t behav_limit;
 	qdf_freq_t start_freq;
 	uint8_t channels[REG_MAX_CHANNELS_PER_OPERATING_CLASS];
+};
+
+/**
+ * struct regdmn_ap_cap_opclass_t: AP Cap operation class table
+ * @op_class: operating class number
+ * @ch_width: channel width in MHz
+ * @start_freq: Starting Frequency in MHz
+ * @behav_limit: OR of bitmaps of enum behav_limit
+ * @max_tx_pwr_dbm: Maximum tx power in dbm
+ * @num_supported_chan: Number of supported channels
+ * @num_non_supported_chan: Number of non-supported channels
+ * @sup_chan_list: Array of supported channel numbers
+ * @non_sup_chan_list: Array of non supported channel numbers
+ */
+struct regdmn_ap_cap_opclass_t {
+	uint8_t op_class;
+	uint8_t ch_width;
+	qdf_freq_t start_freq;
+	uint16_t behav_limit;
+	uint8_t max_tx_pwr_dbm;
+	uint8_t num_supported_chan;
+	uint8_t num_non_supported_chan;
+	uint8_t sup_chan_list[REG_MAX_CHANNELS_PER_OPERATING_CLASS];
+	uint8_t non_sup_chan_list[REG_MAX_CHANNELS_PER_OPERATING_CLASS];
 };
 
 /**

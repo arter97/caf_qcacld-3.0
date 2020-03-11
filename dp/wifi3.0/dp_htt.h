@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -95,7 +95,12 @@ int htt_wbm_event_record(struct htt_logger *h, uint8_t tx_status,
 #define HTT_PPDU_DESC_MAX_DEPTH 16
 #define DP_SCAN_PEER_ID 0xFFFF
 
-#define DP_HTT_HTC_PKT_MISCLIST_SIZE          256
+/*
+ * Set the base misclist size to HTT copy engine source ring size
+ * to guarantee that a packet on the misclist wont be freed while it
+ * is sitting in the copy engine.
+ */
+#define DP_HTT_HTC_PKT_MISCLIST_SIZE          2048
 #define HTT_T2H_MAX_MSG_SIZE 2048
 
 #define HTT_T2H_EXT_STATS_TLV_START_OFFSET    3
@@ -200,6 +205,8 @@ struct htt_soc {
  * @rx_msdu_end_offset: Offset of rx_msdu_end tlv
  * @rx_msdu_start_offset: Offset of rx_msdu_start tlv
  * @rx_attn_offset: Offset of rx_attention tlv
+ *
+ * NOTE: Do not change the layout of this structure
  */
 struct htt_rx_ring_tlv_filter {
 	u_int32_t mpdu_start:1,
@@ -286,6 +293,19 @@ struct dp_htt_rx_flow_fst_operation {
 	enum dp_htt_flow_fst_operation op_code;
 	struct cdp_rx_flow_info *rx_flow;
 };
+
+/**
+ * struct dp_htt_rx_fisa_config - Rx fisa config
+ * @pdev_id: DP Pdev identifier
+ * @fisa_timeout: fisa aggregation timeout
+ */
+struct dp_htt_rx_fisa_cfg {
+	uint8_t pdev_id;
+	uint32_t fisa_timeout;
+};
+
+QDF_STATUS dp_htt_rx_fisa_config(struct dp_pdev *pdev,
+				 struct dp_htt_rx_fisa_cfg *fisa_config);
 
 /*
  * htt_soc_initialize() - SOC level HTT initialization

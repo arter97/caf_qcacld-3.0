@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -100,6 +100,10 @@
 #include "wmi_unified_fwol_api.h"
 #endif
 
+#ifdef WLAN_FEATURE_PKT_CAPTURE
+#include "wlan_pkt_capture_public_structs.h"
+#endif
+
 typedef qdf_nbuf_t wmi_buf_t;
 #define wmi_buf_data(_buf) qdf_nbuf_data(_buf)
 
@@ -146,6 +150,18 @@ enum wmi_rx_exec_ctx {
 	WMI_RX_UMAC_CTX,
 	WMI_RX_TASKLET_CTX = WMI_RX_UMAC_CTX,
 	WMI_RX_SERIALIZER_CTX = 2
+};
+
+/**
+ * enum wmi_fw_mem_prio - defines FW Memory requirement type
+ * @WMI_FW_MEM_HIGH_PRIORITY:   Memory requires contiguous memory allocation
+ * @WMI_FW_MEM_LOW_PRIORITY:    Memory can be fragmented
+ * @WMI_FW_PRIORITY_MAX:        Invalid type
+ */
+enum wmi_fw_mem_prio {
+	WMI_FW_MEM_HIGH_PRIORITY = 0,
+	WMI_FW_MEM_LOW_PRIORITY,
+	WMI_FW_PRIORITY_MAX
 };
 
 /**
@@ -459,8 +475,9 @@ void
 wmi_flush_endpoint(wmi_unified_t wmi_handle);
 
 /**
- * wmi_pdev_id_conversion_enable() - API to enable pdev_id conversion in WMI
- *                     By default pdev_id conversion is not done in WMI.
+ * wmi_pdev_id_conversion_enable() - API to enable pdev_id and phy_id
+ *                     conversion in WMI. By default pdev_id and
+ *                     phyid conversion is not done in WMI.
  *                     This API can be used enable conversion in WMI.
  * @param wmi_handle   : handle to WMI
  * @param *pdev_id_map : pdev conversion map
@@ -468,7 +485,8 @@ wmi_flush_endpoint(wmi_unified_t wmi_handle);
  * Return none
  */
 void wmi_pdev_id_conversion_enable(wmi_unified_t wmi_handle,
-				   uint32_t *pdev_id_map, uint8_t size);
+				   uint32_t *pdev_id_map,
+				   uint8_t size);
 
 /**
  * API to handle wmi rx event after UMAC has taken care of execution
@@ -1803,6 +1821,18 @@ wmi_unified_wlan_profile_trigger_cmd_send(wmi_unified_t wmi_handle,
 					  struct wlan_profile_params *param);
 
 /**
+ *  wmi_unified_wlan_profile_hist_intvl_cmd_send() - WMI wlan profile history
+ *						  cmd function
+ *  @wmi_handle: handle to WMI.
+ *  @param: pointer to hold wlan profile param
+ *
+ *  Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS
+wmi_unified_wlan_profile_hist_intvl_cmd_send(wmi_unified_t wmi_handle,
+					     struct wlan_profile_params *param);
+
+/**
  *  wmi_unified_set_chan_cmd_send() - WMI set channel cmd function
  *  @wmi_handle: handle to WMI.
  *  @param: pointer to hold channel param
@@ -2250,17 +2280,34 @@ wmi_extract_hal_reg_cap(wmi_unified_t wmi_handle, void *evt_buf,
 			struct wlan_psoc_hal_reg_capability *hal_reg_cap);
 
 /**
+ * wmi_extract_num_mem_reqs_from_service_ready() - Extract number of memory
+ *                                                 entries requested
+ * @wmi_handle: wmi handle
+ * @evt_buf: pointer to event buffer
+ *
+ * Return: Number of entries requested
+ */
+uint32_t wmi_extract_num_mem_reqs_from_service_ready(
+		wmi_unified_t wmi_handle,
+		void *evt_buf);
+
+/**
  * wmi_extract_host_mem_req_from_service_ready() - Extract host memory
  *                                                 request event
  * @wmi_handle: wmi handle
  * @evt_buf: pointer to event buffer
- * @num_entries: pointer to hold number of entries requested
+ * @mem_reqs: pointer to host memory request structure
+ * @num_active_peers: number of active peers for peer cache
+ * @num_peers: number of peers
+ * @fw_prio: FW priority
+ * @idx: Index for memory request
  *
- * Return: Number of entries requested
+ * Return: Host memory request parameters requested by target
  */
-host_mem_req *wmi_extract_host_mem_req_from_service_ready(
-		wmi_unified_t wmi_handle,
-		void *evt_buf, uint8_t *num_entries);
+QDF_STATUS wmi_extract_host_mem_req_from_service_ready(
+		wmi_unified_t wmi_handle, void *evt_buf, host_mem_req *mem_reqs,
+		uint32_t num_active_peers, uint32_t num_peers,
+		enum wmi_fw_mem_prio fw_prio, uint16_t idx);
 
 /**
  * wmi_ready_extract_init_status() - Extract init status from ready event
@@ -3786,4 +3833,83 @@ QDF_STATUS wmi_unified_extract_ani_level(wmi_unified_t wmi_handle,
 					 struct wmi_host_ani_level_event **info,
 					 uint32_t *num_freqs);
 #endif /* FEATURE_ANI_LEVEL_REQUEST */
+
+#ifdef WLAN_FEATURE_PKT_CAPTURE
+/**
+ * wmi_unified_extract_vdev_mgmt_offload_event() - Extract mgmt offload params
+ * @wmi: WMI handle
+ * @evt_buf: Event buffer
+ * @params: Management offload event params
+ *
+ * WMI function to extract management offload event params
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wmi_unified_extract_vdev_mgmt_offload_event(wmi_unified_t wmi, void *evt_buf,
+				struct mgmt_offload_event_params *params);
+#endif
+
+#ifdef FEATURE_WLAN_TIME_SYNC_FTM
+/**
+ * wmi_unified_send_wlan_time_sync_ftm_trigger() - send ftm timesync trigger cmd
+ * @wmi_handle: wmi handle
+ * @vdev_id: vdev id
+ * @burst_mode: mode reg getting time sync relation from FW
+ *
+ * This function indicates the FW to trigger wlan time sync using FTM
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS
+wmi_unified_send_wlan_time_sync_ftm_trigger(wmi_unified_t wmi_handle,
+					    uint32_t vdev_id,
+					    bool burst_mode);
+
+/**
+ * wmi_unified_send_wlan_time_sync_qtime() - send ftm time sync qtime cmd.
+ * @wmi_handle: wmi handle
+ * @vdev_id: vdev id
+ * @lpass_ts: audio qtime
+ *
+ * This function sends the wmi cmd to FW having audio qtime
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS
+wmi_unified_send_wlan_time_sync_qtime(wmi_unified_t wmi_handle,
+				      uint32_t vdev_id, uint64_t lpass_ts);
+
+/**
+ * wmi_unified_extract_time_sync_ftm_start_stop_params() - extract FTM time sync
+ *							   params
+ * @wmi_handle: wmi handle
+ * @evt_buf: event buffer
+ * @param: params received in start stop ftm timesync event
+ *
+ * This function extracts the params from ftm timesync start stop event
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS
+wmi_unified_extract_time_sync_ftm_start_stop_params(
+				wmi_unified_t wmi_handle, void *evt_buf,
+				struct ftm_time_sync_start_stop_params *param);
+
+/**
+ * wmi_unified_extract_time_sync_ftm_offset() - extract timesync FTM offset
+ * @wmi_handle: wmi handle
+ * @evt_buf: event buffer
+ * @param: params received in ftm timesync offset event
+ *
+ * This function extracts the params from ftm timesync offset event
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS
+wmi_unified_extract_time_sync_ftm_offset(wmi_unified_t wmi_handle,
+					 void *evt_buf,
+					 struct ftm_time_sync_offset *param);
+#endif /* FEATURE_WLAN_TIME_SYNC_FTM */
+
 #endif /* _WMI_UNIFIED_API_H_ */

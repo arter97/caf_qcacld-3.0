@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -260,6 +260,9 @@ typedef void (*wlan_objmgr_peer_status_handler)(
  * @WLAN_FWOL_NB_ID:            fw offload northbound operations
  * @WLAN_FWOL_SB_ID:            fw offload southbound operations
  * @WLAN_PSOC_TARGET_IF_ID      PSOC related target_if operations
+ * @FTM_TIME_SYNC_ID:           ftm time sync operations
+ * @WLAN_PKT_CAPTURE_ID         Packet capture operations
+ * @WLAN_DCS_ID:                DCS operations
  * @WLAN_REF_ID_MAX:            Max id used to generate ref count tracking array
  */
  /* New value added to the enum must also be reflected in function
@@ -339,6 +342,9 @@ typedef enum {
 	WLAN_FWOL_NB_ID       = 70,
 	WLAN_FWOL_SB_ID       = 71,
 	WLAN_PSOC_TARGET_IF_ID = 72,
+	FTM_TIME_SYNC_ID       = 73,
+	WLAN_PKT_CAPTURE_ID   = 74,
+	WLAN_DCS_ID           = 75,
 	WLAN_REF_ID_MAX,
 } wlan_objmgr_ref_dbgid;
 
@@ -424,6 +430,10 @@ static inline char *string_from_dbgid(wlan_objmgr_ref_dbgid id)
 					"WLAN_MISC_ID",
 					"WLAN_FWOL_NB_ID",
 					"WLAN_FWOL_SB_ID",
+					"WLAN_PSOC_TARGET_IF_ID",
+					"FTM_TIME_SYNC_ID",
+					"WLAN_PKT_CAPTURE_ID",
+					"WLAN_DCS_ID",
 					"WLAN_REF_ID_MAX"};
 
 	return (char *)strings[id];

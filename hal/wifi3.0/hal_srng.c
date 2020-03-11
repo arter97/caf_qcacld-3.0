@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -39,9 +39,45 @@ void hal_qca6490_attach(struct hal_soc *hal);
 #ifdef QCA_WIFI_QCN9000
 void hal_qcn9000_attach(struct hal_soc *hal);
 #endif
+#ifdef QCA_WIFI_QCA6750
+void hal_qca6750_attach(struct hal_soc *hal);
+#endif
 
 #ifdef ENABLE_VERBOSE_DEBUG
 bool is_hal_verbose_debug_enabled;
+#endif
+
+#ifdef ENABLE_HAL_REG_WR_HISTORY
+struct hal_reg_write_fail_history hal_reg_wr_hist;
+
+void hal_reg_wr_fail_history_add(struct hal_soc *hal_soc,
+				 uint32_t offset,
+				 uint32_t wr_val, uint32_t rd_val)
+{
+	struct hal_reg_write_fail_entry *record;
+	int idx;
+
+	idx = hal_history_get_next_index(&hal_soc->reg_wr_fail_hist->index,
+					 HAL_REG_WRITE_HIST_SIZE);
+
+	record = &hal_soc->reg_wr_fail_hist->record[idx];
+
+	record->timestamp = qdf_get_log_timestamp();
+	record->reg_offset = offset;
+	record->write_val = wr_val;
+	record->read_val = rd_val;
+}
+
+static void hal_reg_write_fail_history_init(struct hal_soc *hal)
+{
+	hal->reg_wr_fail_hist = &hal_reg_wr_hist;
+
+	qdf_atomic_set(&hal->reg_wr_fail_hist->index, -1);
+}
+#else
+static void hal_reg_write_fail_history_init(struct hal_soc *hal)
+{
+}
 #endif
 
 /**
@@ -252,6 +288,13 @@ static void hal_target_based_configure(struct hal_soc *hal)
 		hal_qca6490_attach(hal);
 	break;
 #endif
+#ifdef QCA_WIFI_QCA6750
+		case TARGET_TYPE_QCA6750:
+			hal->use_register_windowing = true;
+			hal->static_window_map = true;
+			hal_qca6750_attach(hal);
+		break;
+#endif
 #if defined(QCA_WIFI_QCA8074) && defined(WIFI_TARGET_TYPE_3_0)
 	case TARGET_TYPE_QCA8074:
 		hal_qca8074_attach(hal);
@@ -321,7 +364,6 @@ void *hal_attach(struct hif_opaque_softc *hif_handle, qdf_device_t qdf_dev)
 			"%s: hal_soc allocation failed", __func__);
 		goto fail0;
 	}
-	qdf_minidump_log(hal, sizeof(*hal), "hal_soc");
 	hal->hif_handle = hif_handle;
 	hal->dev_base_addr = hif_get_dev_ba(hif_handle);
 	hal->qdf_dev = qdf_dev;
@@ -360,11 +402,14 @@ void *hal_attach(struct hif_opaque_softc *hif_handle, qdf_device_t qdf_dev)
 	hal->target_type = hal_get_target_type(hal_soc_to_hal_soc_handle(hal));
 
 	hal_target_based_configure(hal);
+	hal_reg_write_fail_history_init(hal);
 	/**
 	 * Indicate Initialization of srngs to avoid force wake
 	 * as umac power collapse is not enabled yet
 	 */
 	hal->init_phase = true;
+
+	qdf_minidump_log(hal, sizeof(*hal), "hal_soc");
 
 	return (void *)hal;
 
