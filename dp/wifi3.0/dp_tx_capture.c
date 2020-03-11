@@ -214,6 +214,8 @@ void dp_print_pdev_tx_capture_stats(struct dp_pdev *pdev)
 	ptr_tx_cap = &(pdev->tx_capture);
 
 	DP_PRINT_STATS("tx capture stats:");
+	DP_PRINT_STATS(" pending ppdu dropped: %u",
+		       ptr_tx_cap->pend_ppdu_dropped);
 	DP_PRINT_STATS(" mgmt control enqueue stats:");
 	for (i = 0; i < TXCAP_MAX_TYPE; i++) {
 		for (j = 0; j < TXCAP_MAX_SUBTYPE; j++) {
@@ -650,6 +652,7 @@ void dp_tx_ppdu_stats_attach(struct dp_pdev *pdev)
 	STAILQ_INIT(&pdev->tx_capture.ppdu_stats_queue);
 	STAILQ_INIT(&pdev->tx_capture.ppdu_stats_defer_queue);
 	qdf_spinlock_create(&pdev->tx_capture.ppdu_stats_lock);
+	qdf_spinlock_create(&pdev->tx_capture.config_lock);
 	pdev->tx_capture.ppdu_stats_queue_depth = 0;
 	pdev->tx_capture.ppdu_stats_next_sched = 0;
 	pdev->tx_capture.ppdu_stats_defer_queue_depth = 0;
@@ -691,6 +694,7 @@ void dp_tx_ppdu_stats_detach(struct dp_pdev *pdev)
 	qdf_flush_workqueue(0, pdev->tx_capture.ppdu_stats_workqueue);
 	qdf_destroy_workqueue(0, pdev->tx_capture.ppdu_stats_workqueue);
 
+	qdf_spinlock_destroy(&pdev->tx_capture.config_lock);
 	qdf_spinlock_destroy(&pdev->tx_capture.ppdu_stats_lock);
 
 	STAILQ_FOREACH_SAFE(ppdu_info,
@@ -1082,6 +1086,33 @@ static void  dp_iterate_free_peer_msdu_q(void *pdev_hdl)
 }
 
 /*
+ * dp_soc_check_enh_tx_capture() - API to get tx capture set in any pdev
+ * @soc_handle: DP_SOC handle
+ *
+ * return: true
+ */
+uint8_t
+dp_soc_is_tx_capture_set_in_pdev(struct dp_soc *soc)
+{
+	struct dp_pdev *pdev;
+	uint8_t pdev_tx_capture = 0;
+	uint8_t i;
+
+	for (i = 0; i < MAX_PDEV_CNT; i++) {
+		pdev = soc->pdev_list[i];
+		if (!pdev) {
+			continue;
+		}
+		if (!pdev->tx_capture_enabled)
+			continue;
+
+		pdev_tx_capture++;
+	}
+
+	return pdev_tx_capture;
+}
+
+/*
  * dp_enh_tx_capture_disable()- API to disable enhanced tx capture
  * @pdev_handle: DP_PDEV handle
  *
@@ -1092,10 +1123,13 @@ dp_enh_tx_capture_disable(struct dp_pdev *pdev)
 {
 	int i, j;
 
-	dp_soc_set_txrx_ring_map(pdev->soc);
+	if (!dp_soc_is_tx_capture_set_in_pdev(pdev->soc))
+		dp_soc_set_txrx_ring_map(pdev->soc);
+
 	dp_h2t_cfg_stats_msg_send(pdev,
 				  DP_PPDU_STATS_CFG_ENH_STATS,
 				  pdev->pdev_id);
+
 	dp_iterate_free_peer_msdu_q(pdev);
 	for (i = 0; i < TXCAP_MAX_TYPE; i++) {
 		for (j = 0; j < TXCAP_MAX_SUBTYPE; j++) {
@@ -1156,7 +1190,9 @@ dp_config_enh_tx_capture(struct cdp_pdev *pdev_handle, uint8_t val)
 
 	if (pdev->tx_capture_enabled == CDP_TX_ENH_CAPTURE_ENABLE_ALL_PEERS ||
 	    pdev->tx_capture_enabled == CDP_TX_ENH_CAPTURE_ENDIS_PER_PEER) {
-		dp_soc_set_txrx_ring_map_single(pdev->soc);
+		if (dp_soc_is_tx_capture_set_in_pdev(pdev->soc) == 1)
+			dp_soc_set_txrx_ring_map_single(pdev->soc);
+
 		if (!pdev->pktlog_ppdu_stats)
 			dp_h2t_cfg_stats_msg_send(pdev,
 						  DP_PPDU_STATS_CFG_SNIFFER,
@@ -3201,6 +3237,7 @@ dp_check_ppdu_and_deliver(struct dp_pdev *pdev,
 	uint32_t ppdu_id;
 	uint32_t desc_cnt;
 	qdf_nbuf_t tmp_nbuf;
+	struct cdp_tx_completion_ppdu *tmp_ppdu_desc;
 	struct dp_tx_tid *tx_tid  = NULL;
 	int i;
 
@@ -3390,6 +3427,7 @@ dp_check_ppdu_and_deliver(struct dp_pdev *pdev,
 		struct cdp_tx_completion_ppdu *cur_ppdu_desc;
 		struct dp_peer *peer;
 		qdf_nbuf_queue_t head_ppdu;
+		uint16_t peer_id;
 
 		if (!nbuf_ppdu_desc_list[i])
 			continue;
@@ -3398,8 +3436,8 @@ dp_check_ppdu_and_deliver(struct dp_pdev *pdev,
 		if (!cur_ppdu_desc)
 			continue;
 
-		peer = dp_tx_cap_peer_find_by_id(pdev->soc,
-					  cur_ppdu_desc->user[0].peer_id);
+		peer_id = cur_ppdu_desc->user[0].peer_id;
+		peer = dp_tx_cap_peer_find_by_id(pdev->soc, peer_id);
 		if (!peer) {
 			tmp_nbuf = nbuf_ppdu_desc_list[i];
 			nbuf_ppdu_desc_list[i] = NULL;
@@ -3412,7 +3450,7 @@ dp_check_ppdu_and_deliver(struct dp_pdev *pdev,
 		dp_tx_mon_proc_pending_ppdus(pdev, tx_tid,
 					     nbuf_ppdu_desc_list + i,
 					     ppdu_desc_cnt - i, &head_ppdu,
-					     cur_ppdu_desc->user[0].peer_id);
+					     peer_id);
 
 		if (qdf_nbuf_is_queue_empty(&tx_tid->pending_ppdu_q)) {
 			while ((tmp_nbuf = qdf_nbuf_queue_first(&head_ppdu))) {
@@ -3437,8 +3475,21 @@ dp_check_ppdu_and_deliver(struct dp_pdev *pdev,
 			QDF_TRACE(QDF_MODULE_ID_TX_CAPTURE,
 				  QDF_TRACE_LEVEL_FATAL,
 				  "pending ppdus (%d, %d) : %d\n",
-				  cur_ppdu_desc->user[0].peer_id,
+				  peer_id,
 				  tx_tid->tid, pending_ppdus);
+			tmp_nbuf =
+				qdf_nbuf_queue_remove(&tx_tid->pending_ppdu_q);
+			if (qdf_unlikely(!tmp_nbuf)) {
+				qdf_assert_always(0);
+				return;
+			}
+
+			tmp_ppdu_desc = (struct cdp_tx_completion_ppdu *)
+				qdf_nbuf_data(tmp_nbuf);
+			dp_send_data_to_stack(pdev, tmp_ppdu_desc);
+			dp_ppdu_queue_free(tmp_ppdu_desc);
+			qdf_nbuf_free(tmp_nbuf);
+			pdev->tx_capture.pend_ppdu_dropped++;
 		}
 	}
 }
