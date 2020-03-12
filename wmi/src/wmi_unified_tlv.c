@@ -6867,6 +6867,8 @@ void wmi_copy_resource_config(wmi_resource_config *resource_cfg,
 		resource_cfg->host_service_flags,
 		tgt_res_cfg->nan_separate_iface_support);
 
+	WMI_RSRC_CFG_FLAG_VIDEO_OVER_WIFI_ENABLE_SET(
+		resource_cfg->flag1, tgt_res_cfg->carrier_vow_optimization);
 }
 
 /* copy_hw_mode_id_in_init_cmd() - Helper routine to copy hw_mode in init cmd
