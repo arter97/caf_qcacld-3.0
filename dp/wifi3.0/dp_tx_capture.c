@@ -3177,7 +3177,7 @@ void dp_tx_ppdu_stats_process(void *context)
 				continue;
 			}
 
-			if (((ppdu_desc->frame_type == CDP_PPDU_FTYPE_DATA) ||
+			if (((ppdu_desc->frame_type == CDP_PPDU_FTYPE_DATA) &&
 			     (ppdu_desc->htt_frame_type !=
 			      HTT_STATS_FTYPE_SGEN_QOS_NULL)) ||
 			    ((ppdu_desc->num_mpdu) &&
@@ -3318,6 +3318,22 @@ dequeue_msdu_again:
 				 * other packet frame also added to
 				 * descriptor list
 				 */
+				/* print ppdu_desc info for debugging purpose */
+				QDF_TRACE(QDF_MODULE_ID_TX_CAPTURE,
+					  QDF_TRACE_LEVEL_INFO_HIGH,
+					  "%s: ppdu[%d], p_id[%d], tid[%d], fctrl[0x%x 0x%x] ftype[%d] h_frm_t[%d] seq[%d] tsf[%u b %u] dur[%u]",
+					  __func__, ppdu_desc->ppdu_id,
+					  ppdu_desc->user[0].peer_id,
+					  ppdu_desc->user[0].tid,
+					  ppdu_desc->frame_ctrl,
+					  ppdu_desc->user[0].frame_ctrl,
+					  ppdu_desc->frame_type,
+					  ppdu_desc->htt_frame_type,
+					  ppdu_desc->user[0].start_seq,
+					  ppdu_desc->ppdu_start_timestamp,
+					  ppdu_desc->bar_ppdu_start_timestamp,
+					  ppdu_desc->tx_duration);
+
 				nbuf_ppdu_desc_list[ppdu_desc_cnt++] = nbuf;
 			}
 		}
