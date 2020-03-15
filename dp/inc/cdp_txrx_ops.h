@@ -685,8 +685,8 @@ struct cdp_ctrl_ops {
 #endif
 #if defined(WLAN_TX_PKT_CAPTURE_ENH) || defined(WLAN_RX_PKT_CAPTURE_ENH)
 	QDF_STATUS (*txrx_update_peer_pkt_capture_params)(
-			struct cdp_pdev *txrx_pdev_handle,
-			bool is_rx_pkt_cap_enable, bool is_tx_pkt_cap_enable,
+			struct cdp_pdev *pdev,
+			bool is_rx_pkt_cap_enable, uint8_t is_tx_pkt_cap_enable,
 			uint8_t *peer_mac);
 #endif /* WLAN_TX_PKT_CAPTURE_ENH || WLAN_RX_PKT_CAPTURE_ENH */
 };
