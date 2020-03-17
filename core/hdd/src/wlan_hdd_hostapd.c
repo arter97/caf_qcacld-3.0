@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -8040,18 +8040,6 @@ int wlan_hdd_cfg80211_start_bss(hdd_adapter_t *pHostapdAdapter,
 		hdd_debug("Disconnecting STA with session id: %d",
 			  sta_adapter->sessionId);
 		wlan_hdd_disconnect(sta_adapter, eCSR_DISCONNECT_REASON_DEAUTH);
-	}
-
-	/*
-	 * Reject start bss if reassoc in progress on any adapter.
-	 * sme_is_any_session_in_middle_of_roaming is for LFR2 and
-	 * hdd_is_roaming_in_progress is for LFR3
-	 */
-	if (sme_is_any_session_in_middle_of_roaming(hHal) ||
-	    hdd_is_roaming_in_progress(pHddCtx)) {
-		hdd_info("Reassociation in progress");
-		ret = -EINVAL;
-		goto ret_status;
 	}
 
 	/*
