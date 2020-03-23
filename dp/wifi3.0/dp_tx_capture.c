@@ -225,7 +225,7 @@ void dp_print_pdev_tx_capture_stats(struct dp_pdev *pdev)
 	DP_PRINT_STATS(" mgmt control retry queue stats:");
 	for (i = 0; i < TXCAP_MAX_TYPE; i++) {
 		for (j = 0; j < TXCAP_MAX_SUBTYPE; j++) {
-			if (ptr_tx_cap->ctl_mgmt_q[i][j].qlen)
+			if (ptr_tx_cap->retries_ctl_mgmt_q[i][j].qlen)
 				DP_PRINT_STATS(" retries_ctl_mgmt_q[%d][%d] = queue_len[%d]",
 				i, j,
 				ptr_tx_cap->retries_ctl_mgmt_q[i][j].qlen);
@@ -419,6 +419,9 @@ void dp_deliver_mgmt_frm(struct dp_pdev *pdev, qdf_nbuf_t nbuf)
 			"dlvr mgmt frm(0x%08x): fc 0x%x %x, dur 0x%x%x\n",
 			ptr_mgmt_hdr->ppdu_id, wh->i_fc[1], wh->i_fc[0],
 			wh->i_dur[1], wh->i_dur[0]);
+	} else {
+		qdf_nbuf_free(nbuf);
+		return;
 	}
 }
 
@@ -1055,6 +1058,7 @@ static void  dp_iterate_free_peer_msdu_q(void *pdev_hdl)
 							continue;
 						qdf_nbuf_free(
 							ppdu_desc->mpdus[i]);
+						ppdu_desc->mpdus[i] = NULL;
 					}
 					qdf_mem_free(ppdu_desc->mpdus);
 					ppdu_desc->mpdus = NULL;
@@ -1379,21 +1383,6 @@ dp_tx_mon_restitch_mpdu(struct dp_pdev *pdev, struct dp_peer *peer,
 			/* pull ethernet header from first MSDU alone */
 			qdf_nbuf_pull_head(curr_nbuf,
 					   sizeof(qdf_ether_header_t));
-			mpdu_nbuf = qdf_nbuf_alloc(pdev->soc->osdev,
-						   MAX_MONITOR_HEADER,
-						   MAX_MONITOR_HEADER,
-						   4, FALSE);
-
-			if (!mpdu_nbuf) {
-				QDF_TRACE(QDF_MODULE_ID_TX_CAPTURE,
-					  QDF_TRACE_LEVEL_FATAL,
-					  "MPDU head allocation failed !!!");
-				goto free_ppdu_desc_mpdu_q;
-			}
-
-			dp_tx_update_80211_hdr(pdev, peer,
-					       ppdu_desc, mpdu_nbuf,
-					       ether_type, eh->ether_shost);
 
 			/* update first buffer to previous buffer */
 			prev_nbuf = curr_nbuf;
@@ -1436,6 +1425,23 @@ dp_tx_mon_restitch_mpdu(struct dp_pdev *pdev, struct dp_peer *peer,
 		frag_list_sum_len += qdf_nbuf_len(curr_nbuf);
 
 		if (last_msdu) {
+
+			mpdu_nbuf = qdf_nbuf_alloc(pdev->soc->osdev,
+						   MAX_MONITOR_HEADER,
+						   MAX_MONITOR_HEADER,
+						   4, FALSE);
+
+			if (!mpdu_nbuf) {
+				QDF_TRACE(QDF_MODULE_ID_TX_CAPTURE,
+					  QDF_TRACE_LEVEL_FATAL,
+					  "MPDU head allocation failed !!!");
+				goto free_ppdu_desc_mpdu_q;
+			}
+
+			dp_tx_update_80211_hdr(pdev, peer,
+					       ppdu_desc, mpdu_nbuf,
+					       ether_type, eh->ether_shost);
+
 			/*
 			 * first nbuf will hold list of msdu
 			 * stored in prev_nbuf
@@ -1462,6 +1468,9 @@ dp_tx_mon_restitch_mpdu(struct dp_pdev *pdev, struct dp_peer *peer,
 			QDF_TRACE(QDF_MODULE_ID_TX_CAPTURE,
 				  QDF_TRACE_LEVEL_FATAL,
 				  "!!!! WAITING for msdu but list empty !!!!");
+
+			/* for incomplete list, free up the queue */
+			goto free_ppdu_desc_mpdu_q;
 		}
 
 		continue;
@@ -2157,6 +2166,50 @@ void dp_send_data_to_stack(struct dp_pdev *pdev,
 		dp_gen_ack_rx_frame(pdev, &tx_capture_info);
 }
 
+static qdf_nbuf_t dp_tx_mon_get_next_mpdu(
+	struct cdp_tx_completion_ppdu *xretry_ppdu,
+	qdf_nbuf_t mpdu_nbuf)
+{
+	qdf_nbuf_t next_nbuf = NULL;
+	qdf_nbuf_queue_t temp_xretries;
+
+	if (mpdu_nbuf != qdf_nbuf_queue_first(&xretry_ppdu->mpdu_q)) {
+		next_nbuf = qdf_nbuf_queue_next(mpdu_nbuf);
+		/* Initialize temp list */
+		qdf_nbuf_queue_init(&temp_xretries);
+		/* Move entries into temp list till the mpdu_nbuf is found */
+		while ((qdf_nbuf_queue_first(&xretry_ppdu->mpdu_q)) &&
+		       (mpdu_nbuf !=
+				qdf_nbuf_queue_first(&xretry_ppdu->mpdu_q))) {
+			qdf_nbuf_queue_add(&temp_xretries,
+				qdf_nbuf_queue_remove(&xretry_ppdu->mpdu_q));
+		}
+		if ((qdf_nbuf_queue_first(&xretry_ppdu->mpdu_q)) &&
+		    (mpdu_nbuf == qdf_nbuf_queue_first(&xretry_ppdu->mpdu_q))) {
+			/* Remove mpdu_nbuf from queue */
+			qdf_nbuf_queue_remove(&xretry_ppdu->mpdu_q);
+			/* Add remaining nbufs into temp queue */
+			qdf_nbuf_queue_append(&temp_xretries,
+					      &xretry_ppdu->mpdu_q);
+			/* Reinit xretry_ppdu->mpdu_q */
+			qdf_nbuf_queue_init(&xretry_ppdu->mpdu_q);
+			/* append all the entries into original queue */
+			qdf_nbuf_queue_append(&xretry_ppdu->mpdu_q,
+					      &temp_xretries);
+		} else {
+			QDF_TRACE(QDF_MODULE_ID_TX_CAPTURE,
+				  QDF_TRACE_LEVEL_FATAL,
+				  "%s: This is buggy scenario, did not find nbuf in queue ",
+				  __func__);
+		}
+	} else {
+		qdf_nbuf_queue_remove(&xretry_ppdu->mpdu_q);
+		next_nbuf = qdf_nbuf_queue_first(&xretry_ppdu->mpdu_q);
+	}
+
+	return next_nbuf;
+}
+
 static void
 dp_tx_mon_proc_xretries(struct dp_pdev *pdev, struct dp_peer *peer,
 			uint16_t tid)
@@ -2192,7 +2245,8 @@ dp_tx_mon_proc_xretries(struct dp_pdev *pdev, struct dp_peer *peer,
 			mpdu_tried = ppdu_desc->user[0].mpdu_tried_ucast +
 			ppdu_desc->user[0].mpdu_tried_mcast;
 			mpdu_nbuf = qdf_nbuf_queue_first(&xretry_ppdu->mpdu_q);
-			for (i = 0; (mpdu_tried > 0) && mpdu_nbuf; i++) {
+			for (i = 0; (i < ppdu_desc->user[0].ba_size) &&
+				(mpdu_tried > 0) && (mpdu_nbuf); i++) {
 				if (!(SEQ_BIT(ppdu_desc->user[0].enq_bitmap,
 				    i)))
 					continue;
@@ -2219,11 +2273,13 @@ dp_tx_mon_proc_xretries(struct dp_pdev *pdev, struct dp_peer *peer,
 				ppdu_desc->pending_retries--;
 				if (ptr_msdu_info->transmit_cnt == 0) {
 					ppdu_desc->mpdus[seq_no - start_seq] =
-						mpdu_nbuf;
-					qdf_nbuf_queue_remove(
-						&xretry_ppdu->mpdu_q);
-					mpdu_nbuf = qdf_nbuf_queue_first(
-						&xretry_ppdu->mpdu_q);
+							mpdu_nbuf;
+					/*
+					 * This API removes mpdu_nbuf from q and
+					 * returns next mpdu from the queue
+					 */
+					mpdu_nbuf = dp_tx_mon_get_next_mpdu(
+							xretry_ppdu, mpdu_nbuf);
 				} else {
 					ppdu_desc->mpdus[seq_no - start_seq] =
 					qdf_nbuf_copy_expand_fraglist(
@@ -2597,6 +2653,7 @@ dp_check_mgmt_ctrl_ppdu(struct dp_pdev *pdev,
 	struct cdp_tx_indication_info tx_capture_info;
 	qdf_nbuf_t mgmt_ctl_nbuf;
 	uint8_t type, subtype;
+	uint8_t fc_type, fc_subtype;
 	bool is_sgen_pkt;
 	struct cdp_tx_mgmt_comp_info *ptr_comp_info;
 	qdf_nbuf_queue_t *retries_q;
@@ -2604,6 +2661,7 @@ dp_check_mgmt_ctrl_ppdu(struct dp_pdev *pdev,
 	uint32_t ppdu_id;
 	size_t head_size;
 	uint32_t status = 1;
+	uint32_t tsf_delta;
 
 	ppdu_desc = (struct cdp_tx_completion_ppdu *)
 		qdf_nbuf_data(nbuf_ppdu_desc);
@@ -2612,6 +2670,11 @@ dp_check_mgmt_ctrl_ppdu(struct dp_pdev *pdev,
 	 * timestamp and retries count.
 	 */
 	head_size = sizeof(struct cdp_tx_mgmt_comp_info);
+
+	fc_type = (ppdu_desc->frame_ctrl &
+		  IEEE80211_FC0_TYPE_MASK);
+	fc_subtype = (ppdu_desc->frame_ctrl &
+		     IEEE80211_FC0_SUBTYPE_MASK);
 
 	type = (ppdu_desc->frame_ctrl &
 		IEEE80211_FC0_TYPE_MASK) >>
@@ -2635,7 +2698,11 @@ dp_check_mgmt_ctrl_ppdu(struct dp_pdev *pdev,
 	switch (ppdu_desc->htt_frame_type) {
 	case HTT_STATS_FTYPE_TIDQ_DATA_SU:
 	case HTT_STATS_FTYPE_TIDQ_DATA_MU:
-		is_sgen_pkt = false;
+		if ((fc_type == IEEE80211_FC0_TYPE_MGT) &&
+		    (fc_subtype == IEEE80211_FC0_SUBTYPE_BEACON))
+			is_sgen_pkt = true;
+		else
+			is_sgen_pkt = false;
 	break;
 	default:
 		is_sgen_pkt = true;
@@ -2687,8 +2754,13 @@ get_mgmt_pkt_from_queue:
 			if (is_sgen_pkt) {
 				start_tsf = (ppdu_desc->ppdu_start_timestamp &
 					     LOWER_32_MASK);
-				if (ptr_comp_info->tx_tsf <
-				     (start_tsf + MAX_MGMT_ENQ_DELAY)) {
+
+				if (start_tsf > ptr_comp_info->tx_tsf)
+					tsf_delta = start_tsf - ptr_comp_info->tx_tsf;
+				else
+					tsf_delta = ptr_comp_info->tx_tsf - start_tsf;
+
+				if (tsf_delta > MAX_MGMT_ENQ_DELAY) {
 					/*
 					 * free the older mgmt buffer from
 					 * the queue and get new mgmt buffer
