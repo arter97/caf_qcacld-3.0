@@ -767,7 +767,7 @@ void wlan_hdd_three_connections_scenario(struct hdd_context *hdd_ctx,
 	uint8_t channel_id_1 = first_chnl, channel_id_2 = second_chnl;
 	uint8_t mac_id_1, mac_id_2;
 	uint8_t type_1 = WMI_VDEV_TYPE_STA, type_2 = WMI_VDEV_TYPE_STA;
-	uint8_t pcl[MAX_NUM_CHAN] = {0}, weight_list[MAX_NUM_CHAN] = {0};
+	uint8_t pcl[NUM_CHANNELS] = {0}, weight_list[NUM_CHANNELS] = {0};
 	uint32_t pcl_len = 0, i, pcl_freqs[NUM_CHANNELS];
 	enum policy_mgr_chain_mode chain_mask_1;
 	enum policy_mgr_chain_mode chain_mask_2;
