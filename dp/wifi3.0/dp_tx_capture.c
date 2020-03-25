@@ -814,7 +814,7 @@ dp_update_msdu_to_list(struct dp_soc *soc,
 		if (ts->tsf > ptr_msdu_info->tsf)
 			tsf_delta = ts->tsf - ptr_msdu_info->tsf;
 		else
-			tsf_delta = ptr_msdu_info->tsf - ts->tsf;
+			tsf_delta = LOWER_32_MASK - ptr_msdu_info->tsf + ts->tsf;
 
 		if (tsf_delta < MAX_MSDU_THRESHOLD_TSF)
 			break;
@@ -2761,7 +2761,7 @@ get_mgmt_pkt_from_queue:
 				if (start_tsf > ptr_comp_info->tx_tsf)
 					tsf_delta = start_tsf - ptr_comp_info->tx_tsf;
 				else
-					tsf_delta = ptr_comp_info->tx_tsf - start_tsf;
+					tsf_delta = LOWER_32_MASK - ptr_comp_info->tx_tsf + start_tsf;
 
 				if (tsf_delta > MAX_MGMT_ENQ_DELAY) {
 					/*
