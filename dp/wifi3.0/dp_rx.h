@@ -627,7 +627,7 @@ dp_rx_wds_srcport_learn(struct dp_soc *soc,
 			qdf_nbuf_t nbuf)
 {
 	uint16_t sa_sw_peer_id = hal_rx_msdu_end_sa_sw_peer_id_get(rx_tlv_hdr);
-	uint8_t sa_is_valid = hal_rx_msdu_end_sa_is_valid_get(rx_tlv_hdr);
+	uint8_t sa_is_valid = qdf_nbuf_is_sa_valid(nbuf);
 	uint16_t sa_idx;
 	uint8_t is_chfrag_start = 0;
 	uint8_t is_ad4_valid = 0;
