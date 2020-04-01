@@ -77,6 +77,7 @@
 #include "wlan_ipa_ucfg_api.h"
 #include <wlan_cfg80211_mc_cp_stats.h>
 #include "wlan_p2p_ucfg_api.h"
+#include "wlan_pkt_capture_ucfg_api.h"
 
 /* Preprocessor definitions and constants */
 #ifdef QCA_WIFI_NAPIER_EMULATION
@@ -1242,6 +1243,7 @@ static void hdd_purge_all_pdev_cmd(struct hdd_context *hdd_ctx)
 QDF_STATUS hdd_wlan_shutdown(void)
 {
 	struct hdd_context *hdd_ctx;
+	struct hdd_adapter *adapter;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 
 	hdd_info("WLAN driver shutting down!");
@@ -1274,6 +1276,11 @@ QDF_STATUS hdd_wlan_shutdown(void)
 	}
 #endif
 
+	if (ucfg_pkt_capture_get_mode(hdd_ctx->psoc)) {
+		adapter = hdd_get_adapter(hdd_ctx, QDF_MONITOR_MODE);
+		if (adapter)
+			ucfg_pkt_capture_resume_mon_thread(adapter->vdev);
+	}
 	/*
 	 * After SSR, FW clear its txrx stats. In host,
 	 * as adapter is intact so those counts are still
@@ -1629,6 +1636,7 @@ static int __wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 {
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct hdd_adapter *adapter;
 	int exit_code;
 	p_cds_sched_context cds_sched_context = get_cds_sched_ctxt();
 
@@ -1680,6 +1688,11 @@ static int __wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 		hdd_ctx->is_ol_rx_thread_suspended = false;
 	}
 #endif
+	if (ucfg_pkt_capture_get_mode(hdd_ctx->psoc)) {
+		adapter = hdd_get_adapter(hdd_ctx, QDF_MONITOR_MODE);
+		if (adapter)
+			ucfg_pkt_capture_resume_mon_thread(adapter->vdev);
+	}
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
 		   TRACE_CODE_HDD_CFG80211_RESUME_WLAN,
@@ -1867,6 +1880,12 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 	}
 	hdd_ctx->is_ol_rx_thread_suspended = true;
 #endif
+	if (ucfg_pkt_capture_get_mode(hdd_ctx->psoc)) {
+		adapter = hdd_get_adapter(hdd_ctx, QDF_MONITOR_MODE);
+		if (adapter)
+			if (ucfg_pkt_capture_suspend_mon_thread(adapter->vdev))
+				goto resume_pkt_capture_mon_thread;
+	}
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
 		   TRACE_CODE_HDD_CFG80211_SUSPEND_WLAN,
@@ -1874,7 +1893,7 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 
 	if (hdd_suspend_wlan() < 0) {
 		hdd_err("Failed to suspend WLAN");
-		goto resume_all;
+		goto resume_pkt_capture_mon_thread;
 	}
 
 	hdd_ctx->is_wiphy_suspended = true;
@@ -1883,6 +1902,14 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 
 	hdd_exit();
 	return 0;
+
+resume_pkt_capture_mon_thread:
+	/* Resume packet capture MON thread */
+	if (ucfg_pkt_capture_get_mode(hdd_ctx->psoc)) {
+		adapter = hdd_get_adapter(hdd_ctx, QDF_MONITOR_MODE);
+		if (adapter)
+			ucfg_pkt_capture_resume_mon_thread(adapter->vdev);
+	}
 
 #ifdef QCA_CONFIG_SMP
 resume_all:

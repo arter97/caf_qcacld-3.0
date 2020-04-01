@@ -5952,6 +5952,15 @@ struct reg_table_entry g_registry_table[] = {
 		     CFG_ENABLE_RTT_SUPPORT_DEFAULT,
 		     CFG_ENABLE_RTT_SUPPORT_MIN,
 		     CFG_ENABLE_RTT_SUPPORT_MAX),
+
+#ifdef WLAN_FEATURE_PKT_CAPTURE
+	REG_VARIABLE(CFG_PKT_CAPTURE_MODE, WLAN_PARAM_Integer,
+		     struct hdd_config, pkt_capture_mode,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_PKT_CAPTURE_MODE_DEFAULT,
+		     CFG_PKT_CAPTURE_MODE_MIN,
+		     CFG_PKT_CAPTURE_MODE_MAX),
+#endif
 };
 
 
@@ -7986,6 +7995,9 @@ void hdd_cfg_print(struct hdd_context *hdd_ctx)
 	hdd_cfg_print_action_oui(hdd_ctx);
 	hdd_cfg_print_btc_params(hdd_ctx);
 	hdd_cfg_print_roam_preauth(hdd_ctx);
+	hdd_debug("Name = [%s] Value =[%x]",
+		  CFG_PKT_CAPTURE_MODE,
+		  hdd_ctx->config->pkt_capture_mode);
 }
 
 /**
