@@ -16402,6 +16402,9 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
 	if (0 != status)
 		return status;
 
+	if (wlan_hdd_check_mon_concurrency())
+		return -EINVAL;
+
 	if (cds_is_fw_down()) {
 		hdd_err("Ignore if FW is already down");
 		return -EINVAL;
@@ -22738,6 +22741,11 @@ __wlan_hdd_cfg80211_update_connect_params(struct wiphy *wiphy,
 
 		fils_info->sequence_number = req->fils_erp_next_seq_num + 1;
 		fils_info->r_rk_length = req->fils_erp_rrk_len;
+
+		if (fils_info->r_rk_length > FILS_MAX_RRK_LENGTH) {
+			hdd_err("r_rk_length is invalid");
+			return -EINVAL;
+		}
 
 		if (req->fils_erp_rrk_len && req->fils_erp_rrk)
 			qdf_mem_copy(fils_info->r_rk, req->fils_erp_rrk,
