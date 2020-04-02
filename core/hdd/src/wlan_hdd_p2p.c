@@ -51,6 +51,7 @@
 #include "wlan_p2p_cfg_api.h"
 #include "wlan_policy_mgr_ucfg.h"
 #include "nan_ucfg_api.h"
+#include "wlan_pkt_capture_ucfg_api.h"
 
 /* Ms to Time Unit Micro Sec */
 #define MS_TO_TU_MUS(x)   ((x) * 1024)
@@ -718,18 +719,21 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 			wlan_abort_scan(hdd_ctx->pdev, INVAL_PDEV_ID,
 					adapter->vdev_id, INVALID_SCAN_ID,
 					false);
-			hdd_debug("Abort Scan while adding virtual interface");
 		}
 	}
 
 	adapter = NULL;
-	ret = wlan_hdd_add_monitor_check(hdd_ctx, &adapter, type, name,
-					 true, name_assign_type);
-	if (ret)
-		return ERR_PTR(-EINVAL);
-	if (adapter) {
-		hdd_exit();
-		return adapter->dev->ieee80211_ptr;
+	if ((ucfg_pkt_capture_get_mode(hdd_ctx->psoc)) &&
+	    (type == NL80211_IFTYPE_MONITOR)) {
+		ret = wlan_hdd_add_monitor_check(hdd_ctx, &adapter, name,
+						 true, name_assign_type);
+		if (ret)
+			return ERR_PTR(-EINVAL);
+
+		if (adapter) {
+			hdd_exit();
+			return adapter->dev->ieee80211_ptr;
+		}
 	}
 
 	if (mode == QDF_SAP_MODE) {
@@ -899,7 +903,6 @@ int __wlan_hdd_del_virtual_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
 	} else if (wlan_hdd_is_session_type_monitor(
 					adapter->device_mode)) {
 		wlan_hdd_del_monitor(hdd_ctx, adapter, TRUE);
-		hdd_reset_pktcapture_cb(OL_TXRX_PDEV_ID);
 	} else {
 		wlan_hdd_release_intf_addr(hdd_ctx,
 					   adapter->mac_addr.bytes);

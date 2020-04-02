@@ -923,7 +923,7 @@ void lim_merge_extcap_struct(tDot11fIEExtCap *dst, tDot11fIEExtCap *src,
 void lim_del_pmf_sa_query_timer(struct mac_context *mac_ctx, struct pe_session *pe_session);
 
 /**
- * lim_get_bss_rmf_capable() - get rmf capable - MFPC
+ * lim_get_vdev_rmf_capable() - get rmf capable - MFPC
  * @mac: mac context
  * @session: pe session
  *
@@ -932,8 +932,8 @@ void lim_del_pmf_sa_query_timer(struct mac_context *mac_ctx, struct pe_session *
  *
  * Return: bool
  */
-bool lim_get_bss_rmf_capable(struct mac_context *mac,
-			     struct pe_session *session);
+bool lim_get_vdev_rmf_capable(struct mac_context *mac,
+			      struct pe_session *session);
 #else
 /**
  * lim_del_pmf_sa_query_timer() - This function deletes SA query timer
@@ -950,8 +950,8 @@ lim_del_pmf_sa_query_timer(struct mac_context *mac_ctx, struct pe_session *pe_se
 }
 
 static inline
-bool lim_get_bss_rmf_capable(struct mac_context *mac,
-			     struct pe_session *session)
+bool lim_get_vdev_rmf_capable(struct mac_context *mac,
+			      struct pe_session *session)
 {
 	return false;
 }
@@ -1059,14 +1059,17 @@ void lim_intersect_ap_he_caps(struct pe_session *session, struct bss_params *add
 
 /**
  * lim_intersect_sta_he_caps() - Intersect STA capability with SAP capability
+ * @mac_ctx: pointer to the MAC context
  * @assoc_req: pointer to assoc request
  * @session: pointer to PE session
  * @sta_ds: pointer to STA dph hash table entry
  *
  * Return: None
  */
-void lim_intersect_sta_he_caps(tpSirAssocReq assoc_req, struct pe_session *session,
-		tpDphHashNode sta_ds);
+void lim_intersect_sta_he_caps(struct mac_context *mac_ctx,
+			       tpSirAssocReq assoc_req,
+			       struct pe_session *session,
+			       tpDphHashNode sta_ds);
 
 /**
  * lim_add_he_cap() - Copy HE capability into Add sta params
@@ -1193,13 +1196,15 @@ void lim_log_he_cap(struct mac_context *mac, tDot11fIEhe_cap *he_cap);
 
 /**
  * lim_update_stads_he_caps() - Copy HE capability into STA DPH hash table entry
+ * @mac_ctx: pointer to mac context
  * @sta_ds: pointer to sta dph hash table entry
  * @assoc_rsp: pointer to assoc response
  * @session_entry: pointer to PE session
  *
  * Return: None
  */
-void lim_update_stads_he_caps(tpDphHashNode sta_ds, tpSirAssocRsp assoc_rsp,
+void lim_update_stads_he_caps(struct mac_context *mac_ctx,
+			      tpDphHashNode sta_ds, tpSirAssocRsp assoc_rsp,
 			      struct pe_session *session_entry);
 
 /**
@@ -1420,13 +1425,17 @@ static inline void lim_intersect_ap_he_caps(struct pe_session *session,
 	return;
 }
 
-static inline void lim_intersect_sta_he_caps(tpSirAssocReq assoc_req,
-		struct pe_session *session, tpDphHashNode sta_ds)
+static inline void lim_intersect_sta_he_caps(struct mac_context *mac_ctx,
+					     tpSirAssocReq assoc_req,
+					     struct pe_session *session,
+					     tpDphHashNode sta_ds)
 {
 }
 
-static inline void lim_update_stads_he_caps(tpDphHashNode sta_ds, tpSirAssocRsp assoc_rsp,
-		struct pe_session *session_entry)
+static inline void lim_update_stads_he_caps(struct mac_context *mac_ctx,
+					    tpDphHashNode sta_ds,
+					    tpSirAssocRsp assoc_rsp,
+					    struct pe_session *session_entry)
 {
 	return;
 }
@@ -1548,6 +1557,30 @@ lim_update_he_6ghz_band_caps(struct mac_context *mac,
 			     tDot11fIEhe_6ghz_band_cap *he_6ghz_band_cap,
 			     tpAddStaParams params)
 {
+}
+#endif
+
+#if defined(CONFIG_BAND_6GHZ) && defined(WLAN_FEATURE_11AX)
+/**
+ * lim_send_he_6g_band_caps_ie() - Send HE 6ghz band caps to FW
+ * @mac_ctx: Global MAC context
+ * @session: session ptr
+ * @vdev_id: vdev id
+ *
+ * Send HE 6ghz band capabilities IE to firmware
+ *
+ * Return: QDF_STATUS_SUCCESS on success
+ */
+QDF_STATUS lim_send_he_6g_band_caps_ie(struct mac_context *mac_ctx,
+				       struct pe_session *session,
+				       uint8_t vdev_id);
+#else
+static inline
+QDF_STATUS lim_send_he_6g_band_caps_ie(struct mac_context *mac_ctx,
+				       struct pe_session *session,
+				       uint8_t vdev_id)
+{
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 

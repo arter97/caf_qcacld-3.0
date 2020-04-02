@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -108,10 +108,9 @@ void hdd_notify_teardown_tdls_links(struct wlan_objmgr_psoc *psoc)
 	struct wlan_objmgr_vdev *vdev;
 
 	vdev = ucfg_get_tdls_vdev(psoc, WLAN_OSIF_ID);
-	if (!vdev) {
-		osif_err("Unable to get the vdev");
+	if (!vdev)
 		return;
-	}
+
 	osif_priv = wlan_vdev_get_ospriv(vdev);
 
 	if (!osif_priv || !osif_priv->osif_tdls) {
@@ -629,10 +628,6 @@ void wlan_cfg80211_tdls_rx_callback(void *user_data,
 	struct vdev_osif_priv *osif_priv;
 	struct wireless_dev *wdev;
 
-	osif_debug("user data:%pK, vdev id:%d, rssi:%d, buf:%pK, len:%d",
-		   user_data, rx_frame->vdev_id, rx_frame->rx_rssi,
-		   rx_frame->buf, rx_frame->frame_len);
-
 	psoc = user_data;
 	if (!psoc) {
 		osif_err("psoc is null");
@@ -909,7 +904,6 @@ wlan_cfg80211_tdls_indicate_discovery(struct tdls_osif_indication *ind)
 
 	osif_vdev = wlan_vdev_get_ospriv(ind->vdev);
 
-	osif_debug("Implicit TDLS, request Send Discovery request");
 	cfg80211_tdls_oper_request(osif_vdev->wdev->netdev,
 				   ind->peer_mac, NL80211_TDLS_DISCOVERY_REQ,
 				   false, GFP_KERNEL);

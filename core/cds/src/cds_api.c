@@ -64,7 +64,9 @@
 #include "dp_txrx.h"
 #ifdef ENABLE_SMMU_S1_TRANSLATION
 #include "pld_common.h"
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 #include <asm/dma-iommu.h>
+#endif
 #include <linux/iommu.h>
 #endif
 
@@ -392,6 +394,8 @@ static void cds_cdp_cfg_attach(struct wlan_objmgr_psoc *psoc)
 		cfg_get(psoc, CFG_DP_FLOW_STEERING_ENABLED);
 	cdp_cfg.disable_intra_bss_fwd =
 		cfg_get(psoc, CFG_DP_AP_STA_SECURITY_SEPERATION);
+	cdp_cfg.pktlog_buffer_size =
+		cfg_get(psoc, CFG_DP_PKTLOG_BUFFER_SIZE);
 
 	cds_cdp_update_del_ack_params(psoc, &cdp_cfg);
 
@@ -1137,12 +1141,6 @@ QDF_STATUS cds_post_disable(void)
 		return QDF_STATUS_E_INVAL;
 	}
 
-	qdf_status = cds_close_mon_thread();
-	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
-		cds_err("Failed to close MON thread!");
-		return QDF_STATUS_E_INVAL;
-	}
-
 	cdp_pdev_pre_detach(cds_get_context(QDF_MODULE_ID_SOC),
 			    OL_TXRX_PDEV_ID, 1);
 
@@ -1812,6 +1810,8 @@ static void cds_trigger_recovery_work(void *context)
 void __cds_trigger_recovery(enum qdf_hang_reason reason, const char *func,
 			    const uint32_t line)
 {
+	bool is_work_queue_needed = false;
+
 	if (!gp_cds_context) {
 		cds_err("gp_cds_context is null");
 		return;
@@ -1819,7 +1819,11 @@ void __cds_trigger_recovery(enum qdf_hang_reason reason, const char *func,
 
 	gp_cds_context->recovery_reason = reason;
 
-	if (in_atomic()) {
+	if (in_atomic() ||
+	    (QDF_RESUME_TIMEOUT == reason || QDF_SUSPEND_TIMEOUT == reason))
+		is_work_queue_needed = true;
+
+	if (is_work_queue_needed) {
 		__cds_recovery_caller.func = func;
 		__cds_recovery_caller.line = line;
 		qdf_queue_work(0, gp_cds_context->cds_recovery_wq,
@@ -2299,7 +2303,7 @@ QDF_STATUS cds_flush_logs(uint32_t is_fatal,
 		  is_fatal, indicator, reason_code);
 
 	if (dump_mac_trace)
-		qdf_trace_dump_all(p_cds_context->mac_context, 0, 0, 500, 0);
+		qdf_trace_dump_all(p_cds_context->mac_context, 0, 0, 100, 0);
 
 	if (WLAN_LOG_INDICATOR_HOST_ONLY == indicator) {
 		cds_wlan_flush_host_logs_for_fatal();
@@ -2878,31 +2882,3 @@ int cds_smmu_map_unmap(bool map, uint32_t num_buf, qdf_mem_info_t *buf_arr)
 	return 0;
 }
 #endif
-
-#ifdef WLAN_FEATURE_PKT_CAPTURE
-bool cds_is_pktcapture_enabled(void)
-{
-	struct hdd_context *hdd_ctx;
-
-	hdd_ctx = gp_cds_context->hdd_context;
-	if (!hdd_ctx) {
-		cds_err("HDD context is NULL");
-		return false;
-	}
-
-	return hdd_ctx->enable_pkt_capture_support;
-}
-
-uint8_t cds_get_pktcapture_mode(void)
-{
-	struct hdd_context *hdd_ctx;
-
-	hdd_ctx = gp_cds_context->hdd_context;
-	if (!hdd_ctx) {
-		cds_err("HDD context is NULL");
-		return false;
-	}
-
-	return hdd_ctx->val_pkt_capture_mode;
-}
-#endif /* WLAN_FEATURE_PKT_CAPTURE */

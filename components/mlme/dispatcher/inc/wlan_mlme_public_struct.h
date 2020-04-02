@@ -44,7 +44,7 @@
 /* Roam debugging related macro defines */
 #define MAX_ROAM_DEBUG_BUF_SIZE    250
 #define MAX_ROAM_EVENTS_SUPPORTED  5
-#define ROAM_FAILURE_BUF_SIZE      40
+#define ROAM_FAILURE_BUF_SIZE      50
 #define TIME_STRING_LEN            24
 
 #define ROAM_CHANNEL_BUF_SIZE      300
@@ -66,6 +66,8 @@
 #define CFG_POWER_USAGE_MAX_LEN      4
 #define CFG_MAX_STR_LEN       256
 #define MAX_VENDOR_IES_LEN 1532
+
+#define CFG_MAX_PMK_LEN       64
 
 #define CFG_VALID_CHANNEL_LIST_STRING_LEN (CFG_VALID_CHANNEL_LIST_LEN * 4)
 
@@ -278,6 +280,7 @@ enum mlme_ts_info_ack_policy {
  * @RSO_CHANNEL_SWITCH: disable roaming due to STA channel switch
  * @RSO_CONNECT_START: disable roaming temporarily due to connect
  * @RSO_SAP_CHANNEL_CHANGE: disable roaming due to SAP channel change
+ * @RSO_NDP_CON_ON_NDI: disable roaming due to NDP connection on NDI
  */
 enum roam_control_requestor {
 	RSO_INVALID_REQUESTOR,
@@ -285,6 +288,7 @@ enum roam_control_requestor {
 	RSO_CHANNEL_SWITCH     = BIT(1),
 	RSO_CONNECT_START      = BIT(2),
 	RSO_SAP_CHANNEL_CHANGE = BIT(3),
+	RSO_NDP_CON_ON_NDI     = BIT(4),
 };
 
 /**
@@ -925,6 +929,8 @@ struct wlan_mlme_he_caps {
 	uint8_t enable_ul_mimo;
 	uint8_t enable_ul_ofdm;
 	uint32_t he_sta_obsspd;
+	uint16_t he_mcs_12_13_supp_2g;
+	uint16_t he_mcs_12_13_supp_5g;
 };
 #endif
 
@@ -1126,6 +1132,8 @@ struct wlan_mlme_chainmask {
  * @bmiss_skip_full_scan: Decide if full scan can be skipped in firmware if no
  * candidate is found in partial scan based on channel map
  * @enable_ring_buffer: Decide to enable/disable ring buffer for bug report
+ * @enable_peer_unmap_conf_support: Indicate whether to send conf for peer unmap
+ * @dfs_chan_ageout_time: Set DFS Channel ageout time
  */
 struct wlan_mlme_generic {
 	enum band_info band_capability;
@@ -1160,6 +1168,8 @@ struct wlan_mlme_generic {
 	uint8_t mgmt_retry_max;
 	bool bmiss_skip_full_scan;
 	bool enable_ring_buffer;
+	bool enable_peer_unmap_conf_support;
+	uint8_t dfs_chan_ageout_time;
 };
 
 /*
@@ -1418,6 +1428,9 @@ struct bss_load_trigger {
 #define AKM_SAE              3
 #define AKM_OWE              4
 
+#define LFR3_STA_ROAM_DISABLE_BY_P2P BIT(0)
+#define LFR3_STA_ROAM_DISABLE_BY_NAN BIT(1)
+
 /*
  * @mawc_roam_enabled:              Enable/Disable MAWC during roaming
  * @enable_fast_roam_in_concurrency:Enable LFR roaming on STA during concurrency
@@ -1432,6 +1445,10 @@ struct bss_load_trigger {
  * below which the connection is idle.
  * @idle_roam_min_rssi: Minimum rssi of connected AP to be considered for
  * idle roam trigger.
+ * @enable_roam_reason_vsie:        Enable/disable incluison of roam reason
+ * vsie in Re(assoc) frame
+ * @roam_trigger_bitmap:            Bitmap of roaming triggers.
+ * @sta_roam_disable                STA roaming disabled by interfaces
  * @early_stop_scan_enable:         Set early stop scan
  * @enable_5g_band_pref:            Enable preference for 5G from INI
  * @ese_enabled:                    Enable ESE feature
@@ -1519,6 +1536,8 @@ struct bss_load_trigger {
  * @fw_akm_bitmap:                  Supported Akm suites of firmware
  * @roam_full_scan_period: Idle period in seconds between two successive
  * full channel roam scans
+ * @sae_single_pmk_feature_enabled: Contains value of ini
+ * sae_single_pmk_feature_enabled
  */
 struct wlan_mlme_lfr_cfg {
 	bool mawc_roam_enabled;
@@ -1532,6 +1551,9 @@ struct wlan_mlme_lfr_cfg {
 	uint32_t idle_data_packet_count;
 	uint32_t idle_roam_band;
 	int32_t idle_roam_min_rssi;
+	bool enable_roam_reason_vsie;
+	uint32_t roam_trigger_bitmap;
+	uint32_t sta_roam_disable;
 #endif
 	bool early_stop_scan_enable;
 	bool enable_5g_band_pref;
@@ -1622,6 +1644,9 @@ struct wlan_mlme_lfr_cfg {
 	uint32_t roam_scan_period_after_inactivity;
 	uint32_t fw_akm_bitmap;
 	uint32_t roam_full_scan_period;
+#if defined(WLAN_SAE_SINGLE_PMK) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
+	bool sae_single_pmk_feature_enabled;
+#endif
 };
 
 /**
@@ -1875,6 +1900,8 @@ struct wlan_mlme_per_slot_scoring {
  * @roam_score_delta: percentage delta in roam score
  * @apsd_enabled: Enable automatic power save delivery
  * @vendor_roam_score_algorithm: Preferred vendor roam score algorithm
+ * @min_roam_score_delta: Minimum difference between connected AP's and
+ *			candidate AP's roam score to start roaming.
  */
 struct wlan_mlme_scoring_cfg {
 	bool enable_scoring_for_roam;
@@ -1889,6 +1916,7 @@ struct wlan_mlme_scoring_cfg {
 	uint32_t roam_score_delta;
 	bool apsd_enabled;
 	uint32_t vendor_roam_score_algorithm;
+	uint32_t min_roam_score_delta;
 };
 
 /* struct wlan_mlme_threshold - Threshold related config items
@@ -2131,10 +2159,14 @@ struct wlan_mlme_fe_rrm {
  * struct wlan_mlme_mwc - MWC related configs
  * @mws_coex_4g_quick_tdm:  bitmap to set mws-coex 5g-nr power limit
  * @mws_coex_5g_nr_pwr_limit: bitmap to set mws-coex 5g-nr power limit
+ * @mws_coex_pcc_channel_avoid_delay: PCC avoidance delay in seconds
+ * @mws_coex_scc_channel_avoid_delay: SCC avoidance delay in seconds
  **/
 struct wlan_mlme_mwc {
 	uint32_t mws_coex_4g_quick_tdm;
 	uint32_t mws_coex_5g_nr_pwr_limit;
+	uint32_t mws_coex_pcc_channel_avoid_delay;
+	uint32_t mws_coex_scc_channel_avoid_delay;
 };
 #else
 struct wlan_mlme_mwc {
@@ -2308,6 +2340,27 @@ enum pkt_origin {
 };
 
 /**
+ * struct mlme_pmk_info - SAE Roaming using single pmk info
+ * @pmk: pmk
+ * @pmk_len: pmk length
+ */
+struct mlme_pmk_info {
+	uint8_t pmk[CFG_MAX_PMK_LEN];
+	uint8_t pmk_len;
+};
+
+/**
+ * struct wlan_mlme_sae_single_pmk - SAE Roaming using single pmk configuration
+ * structure
+ * @sae_single_pmk_ap: Current connected AP has VSIE or not
+ * @pmk_info: pmk information
+ */
+struct wlan_mlme_sae_single_pmk {
+	bool sae_single_pmk_ap;
+	struct mlme_pmk_info pmk_info;
+};
+
+/**
  * struct mlme_roam_debug_info - Roam debug information storage structure.
  * @trigger:            Roam trigger related data
  * @scan:               Roam scan related data structure.
@@ -2321,4 +2374,13 @@ struct mlme_roam_debug_info {
 	struct wmi_neighbor_report_data data_11kv;
 };
 
+/**
+ * struct wlan_ies - Generic WLAN Information Element(s) format
+ * @len: Total length of the IEs
+ * @data: IE data
+ */
+struct wlan_ies {
+	uint16_t len;
+	uint8_t *data;
+};
 #endif

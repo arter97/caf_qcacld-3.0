@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -340,6 +340,7 @@ static int wlan_hdd_update_scan_ies(struct hdd_adapter *adapter,
 	uint16_t rem_len = scan_info->default_scan_ies_len;
 	uint8_t *temp_ie = scan_info->default_scan_ies;
 	uint8_t *current_ie;
+	const uint8_t *mbo_ie;
 	uint8_t elem_id;
 	uint16_t elem_len;
 	bool add_ie = false;
@@ -347,6 +348,9 @@ static int wlan_hdd_update_scan_ies(struct hdd_adapter *adapter,
 	if (!scan_info->default_scan_ies_len || !scan_info->default_scan_ies)
 		return 0;
 
+	mbo_ie = wlan_get_vendor_ie_ptr_from_oui(MBO_OUI_TYPE,
+						 MBO_OUI_TYPE_SIZE, scan_ie,
+						 *scan_ie_len);
 	while (rem_len >= 2) {
 		current_ie = temp_ie;
 		elem_id = *temp_ie++;
@@ -366,10 +370,12 @@ static int wlan_hdd_update_scan_ies(struct hdd_adapter *adapter,
 				add_ie = true;
 			break;
 		case WLAN_ELEMID_VENDOR:
-			if ((0 != qdf_mem_cmp(&temp_ie[0], MBO_OUI_TYPE,
-							MBO_OUI_TYPE_SIZE)) ||
-				(0 == qdf_mem_cmp(&temp_ie[0], QCN_OUI_TYPE,
-							QCN_OUI_TYPE_SIZE)))
+			/* Donot add MBO IE if its already present */
+			if ((!mbo_ie &&
+			     0 == qdf_mem_cmp(&temp_ie[0], MBO_OUI_TYPE,
+					      MBO_OUI_TYPE_SIZE)) ||
+			    (0 == qdf_mem_cmp(&temp_ie[0], QCN_OUI_TYPE,
+					      QCN_OUI_TYPE_SIZE)))
 				add_ie = true;
 			break;
 		}
@@ -464,8 +470,6 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 	QDF_STATUS qdf_status;
 	bool enable_connected_scan;
 
-	hdd_enter();
-
 	if (cds_is_fw_down()) {
 		hdd_err("firmware is down, scan cmd cannot be processed");
 		return -EINVAL;
@@ -508,10 +512,6 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 		schedule_work(&adapter->scan_block_work);
 		return 0;
 	}
-
-	hdd_debug("Device_mode %s(%d)",
-		  qdf_opmode_str(adapter->device_mode),
-		  adapter->device_mode);
 
 	/*
 	 * IBSS vdev does not need to scan to establish
@@ -697,7 +697,7 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 error:
 	if (params.default_ie.ptr)
 		qdf_mem_free(params.default_ie.ptr);
-	hdd_exit();
+
 	return status;
 }
 
@@ -925,7 +925,7 @@ static int wlan_hdd_vendor_scan_random_attr(struct wiphy *wiphy,
 }
 #endif
 
-static const
+const
 struct nla_policy scan_policy[QCA_WLAN_VENDOR_ATTR_SCAN_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_SCAN_FLAGS] = {.type = NLA_U32},
 	[QCA_WLAN_VENDOR_ATTR_SCAN_TX_NO_CCK_RATE] = {.type = NLA_FLAG},
@@ -936,6 +936,10 @@ struct nla_policy scan_policy[QCA_WLAN_VENDOR_ATTR_SCAN_MAX + 1] = {
 					   .len = QDF_MAC_ADDR_SIZE},
 	[QCA_WLAN_VENDOR_ATTR_SCAN_MAC_MASK] = {.type = NLA_UNSPEC,
 						.len = QDF_MAC_ADDR_SIZE},
+	[QCA_WLAN_VENDOR_ATTR_SCAN_FREQUENCIES] = {.type = NLA_NESTED},
+	[QCA_WLAN_VENDOR_ATTR_SCAN_SSIDS] = {.type = NLA_NESTED},
+	[QCA_WLAN_VENDOR_ATTR_SCAN_SUPP_RATES] = {.type = NLA_NESTED},
+	[QCA_WLAN_VENDOR_ATTR_SCAN_BSSID] = {.type = NLA_BINARY},
 };
 
 /**
@@ -1291,8 +1295,6 @@ static int __wlan_hdd_cfg80211_sched_scan_start(struct wiphy *wiphy,
 	bool enable_connected_scan;
 	enum QDF_GLOBAL_MODE curr_mode;
 
-	hdd_enter();
-
 	curr_mode = hdd_get_conparam();
 
 	if (QDF_GLOBAL_FTM_MODE == curr_mode ||
@@ -1424,8 +1426,6 @@ static int __wlan_hdd_cfg80211_sched_scan_stop(struct net_device *dev)
 	int errno;
 	enum QDF_GLOBAL_MODE curr_mode;
 
-	hdd_enter();
-
 	curr_mode = hdd_get_conparam();
 
 	if (QDF_GLOBAL_FTM_MODE == curr_mode ||
@@ -1471,8 +1471,6 @@ static int __wlan_hdd_cfg80211_sched_scan_stop(struct net_device *dev)
 
 	errno = wlan_hdd_sched_scan_stop(dev);
 
-	hdd_exit();
-
 	return errno;
 }
 
@@ -1491,7 +1489,16 @@ int wlan_hdd_cfg80211_sched_scan_stop(struct wiphy *wiphy,
 
 	osif_vdev_sync_op_stop(vdev_sync);
 
-	return errno;
+	/* The return 0 is intentional. We observed a crash due to a return of
+	 * failure in sched_scan_stop , especially for a case where the unload
+	 * of the happens at the same time. The function
+	 * __cfg80211_stop_sched_scan was clearing rdev->sched_scan_req only
+	 * when the sched_scan_stop returns success. If it returns a failure ,
+	 * then its next invocation due to the clean up of the second interface
+	 * will have the dev pointer corresponding to the first one leading to
+	 * a crash.
+	 */
+	return 0;
 }
 #else
 int wlan_hdd_cfg80211_sched_scan_stop(struct wiphy *wiphy,
@@ -1509,7 +1516,16 @@ int wlan_hdd_cfg80211_sched_scan_stop(struct wiphy *wiphy,
 
 	osif_vdev_sync_op_stop(vdev_sync);
 
-	return errno;
+	/* The return 0 is intentional. We observed a crash due to a return of
+	 * failure in sched_scan_stop , especially for a case where the unload
+	 * of the happens at the same time. The function
+	 * __cfg80211_stop_sched_scan was clearing rdev->sched_scan_req only
+	 * when the sched_scan_stop returns success. If it returns a failure ,
+	 * then its next invocation due to the clean up of the second interface
+	 * will have the dev pointer corresponding to the first one leading to
+	 * a crash.
+	 */
+	return 0;
 }
 #endif /* KERNEL_VERSION(4, 12, 0) */
 #endif /*FEATURE_WLAN_SCAN_PNO */

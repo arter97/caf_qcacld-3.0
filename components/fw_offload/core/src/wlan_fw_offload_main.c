@@ -132,14 +132,20 @@ fwol_init_thermal_temp_in_cfg(struct wlan_objmgr_psoc *psoc,
 	thermal_temp->thermal_mitigation_enable =
 				cfg_get(psoc, CFG_THERMAL_MITIGATION_ENABLE);
 	thermal_temp->throttle_period = cfg_get(psoc, CFG_THROTTLE_PERIOD);
+	thermal_temp->thermal_sampling_time =
+				cfg_get(psoc, CFG_THERMAL_SAMPLING_TIME);
 	thermal_temp->throttle_dutycycle_level[0] =
 				cfg_get(psoc, CFG_THROTTLE_DUTY_CYCLE_LEVEL0);
-	thermal_temp->throttle_dutycycle_level[1]=
+	thermal_temp->throttle_dutycycle_level[1] =
 				cfg_get(psoc, CFG_THROTTLE_DUTY_CYCLE_LEVEL1);
-	thermal_temp->throttle_dutycycle_level[2]=
+	thermal_temp->throttle_dutycycle_level[2] =
 				cfg_get(psoc, CFG_THROTTLE_DUTY_CYCLE_LEVEL2);
-	thermal_temp->throttle_dutycycle_level[3]=
+	thermal_temp->throttle_dutycycle_level[3] =
 				cfg_get(psoc, CFG_THROTTLE_DUTY_CYCLE_LEVEL3);
+	thermal_temp->throttle_dutycycle_level[4] =
+				cfg_get(psoc, CFG_THROTTLE_DUTY_CYCLE_LEVEL4);
+	thermal_temp->throttle_dutycycle_level[5] =
+				cfg_get(psoc, CFG_THROTTLE_DUTY_CYCLE_LEVEL5);
 }
 
 QDF_STATUS fwol_init_neighbor_report_cfg(struct wlan_objmgr_psoc *psoc,
@@ -533,6 +539,7 @@ QDF_STATUS fwol_cfg_on_psoc_enable(struct wlan_objmgr_psoc *psoc)
 	ucfg_fwol_fetch_tsf_irq_host_gpio_pin(psoc, fwol_cfg);
 	ucfg_fwol_fetch_tsf_sync_host_gpio_pin(psoc, fwol_cfg);
 	ucfg_fwol_fetch_dhcp_server_settings(psoc, fwol_cfg);
+	fwol_cfg->sap_xlna_bypass = cfg_get(psoc, CFG_SET_SAP_XLNA_BYPASS);
 
 	return status;
 }

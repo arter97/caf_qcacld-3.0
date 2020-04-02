@@ -1087,7 +1087,8 @@ typedef struct {
 	QDF_STATUS (*pe_disconnect_cb) (struct mac_context *mac,
 					uint8_t vdev_id,
 					uint8_t *deauth_disassoc_frame,
-					uint16_t deauth_disassoc_frame_len);
+					uint16_t deauth_disassoc_frame_len,
+					uint16_t reason_code);
 	QDF_STATUS (*csr_roam_pmkid_req_cb)(uint8_t vdev_id,
 		struct roam_pmkid_req_event *bss_list);
 	qdf_wake_lock_t wmi_cmd_rsp_wake_lock;
@@ -1120,9 +1121,6 @@ typedef struct {
 	qdf_mc_timer_t wma_fw_time_sync_timer;
 	bool fw_therm_throt_support;
 	bool enable_tx_compl_tsf64;
-#ifdef WLAN_FEATURE_PKT_CAPTURE
-	bool is_pktcapture_enabled;
-#endif
 } t_wma_handle, *tp_wma_handle;
 
 /**
@@ -1845,6 +1843,7 @@ QDF_STATUS wma_mgmt_unified_cmd_send(struct wlan_objmgr_vdev *vdev,
 				qdf_nbuf_t buf, uint32_t desc_id,
 				void *mgmt_tx_params);
 
+#ifndef CONFIG_HL_SUPPORT
 /**
  * wma_mgmt_nbuf_unmap_cb() - dma unmap for pending mgmt pkts
  * @pdev: objmgr pdev
@@ -1854,13 +1853,29 @@ QDF_STATUS wma_mgmt_unified_cmd_send(struct wlan_objmgr_vdev *vdev,
  *
  * Return: None
  */
-#ifndef CONFIG_HL_SUPPORT
 void wma_mgmt_nbuf_unmap_cb(struct wlan_objmgr_pdev *pdev,
 			    qdf_nbuf_t buf);
+/**
+ * wma_mgmt_nbuf_unmap_cb() - dma unmap for pending mgmt pkts
+ * @pdev: objmgr pdev
+ * @buf: buffer
+ *
+ * This is a cb function drains all mgmt packets of a vdev.
+ * This is called in event of target going down without sending completions.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wma_mgmt_frame_fill_peer_cb(struct wlan_objmgr_peer *peer,
+				       qdf_nbuf_t buf);
 #else
 static inline void wma_mgmt_nbuf_unmap_cb(struct wlan_objmgr_pdev *pdev,
 					  qdf_nbuf_t buf)
 {}
+static inline QDF_STATUS wma_mgmt_frame_fill_peer_cb(struct wlan_objmgr_peer *peer,
+						     qdf_nbuf_t buf)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 
 /**
@@ -2459,13 +2474,13 @@ int wma_motion_det_base_line_host_event_handler(void *handle, u_int8_t *event,
 
 /**
  * wma_add_bss_peer_sta() - creat bss peer when sta connect
- * @self_mac: self mac address
+ * @vdev_id: vdev id
  * @bssid: AP bssid
  * @roam_sync: if roam sync is in progress
  *
  * Return: 0 on success, else error on failure
  */
-QDF_STATUS wma_add_bss_peer_sta(uint8_t *self_mac, uint8_t *bssid,
+QDF_STATUS wma_add_bss_peer_sta(uint8_t vdev_id, uint8_t *bssid,
 				bool roam_sync);
 
 /**
@@ -2617,5 +2632,14 @@ QDF_STATUS wma_pre_vdev_start_setup(uint8_t vdev_id,
 QDF_STATUS wma_send_ani_level_request(tp_wma_handle wma_handle,
 				      uint32_t *freqs, uint8_t num_freqs);
 #endif /* FEATURE_ANI_LEVEL_REQUEST */
+
+/**
+ * wma_vdev_detach() - send vdev delete command to fw
+ * @wma_handle: wma handle
+ * @pdel_vdev_req_param: del vdev params
+ *
+ * Return: QDF status
+ */
+QDF_STATUS wma_vdev_detach(struct del_vdev_params *pdel_vdev_req_param);
 #endif
 

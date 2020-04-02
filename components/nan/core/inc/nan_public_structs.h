@@ -45,6 +45,7 @@ struct wlan_objmgr_vdev;
 #define NAN_PASSPHRASE_MIN_LEN 8
 #define NAN_PASSPHRASE_MAX_LEN 63
 #define NAN_CH_INFO_MAX_CHANNELS 4
+#define WLAN_WAIT_TIME_NDP_END 2000
 
 #define NAN_PSEUDO_VDEV_ID CFG_TGT_NUM_VDEV
 
@@ -609,6 +610,17 @@ struct nan_datapath_end_indication_event {
 	struct wlan_objmgr_vdev *vdev;
 	uint32_t num_ndp_ids;
 	struct peer_nan_datapath_map ndp_map[];
+};
+
+/**
+ * struct nan_datapath_peer_ind - ndp peer indication
+ * @msg: msg received by FW
+ * @data_len: data length
+ *
+ */
+struct nan_dump_msg {
+	uint8_t *msg;
+	uint32_t data_len;
 };
 
 /**

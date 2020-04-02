@@ -589,6 +589,52 @@ int pld_get_fw_files_for_target(struct device *dev,
 }
 
 /**
+ * pld_prevent_l1() - Prevent PCIe enter L1 state
+ * @dev: device
+ *
+ * Prevent PCIe enter L1 and L1ss states
+ *
+ * Return: 0 for success
+ *         Non zero failure code for errors
+ */
+int pld_prevent_l1(struct device *dev)
+{
+	int ret = 0;
+
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_PCIE:
+		ret = pld_pcie_prevent_l1(dev);
+		break;
+	default:
+		ret = -EINVAL;
+		pr_err("Invalid device type\n");
+		break;
+	}
+
+	return ret;
+}
+
+/**
+ * pld_allow_l1() - Allow PCIe enter L1 state
+ * @dev: device
+ *
+ * Allow PCIe enter L1 and L1ss states
+ *
+ * Return: void
+ */
+void pld_allow_l1(struct device *dev)
+{
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_PCIE:
+		pld_pcie_allow_l1(dev);
+		break;
+	default:
+		pr_err("Invalid device type\n");
+		break;
+	}
+}
+
+/**
  * pld_is_pci_link_down() - Notification for pci link down event
  * @dev: device
  *
@@ -1614,7 +1660,11 @@ int pld_athdiag_read(struct device *dev, uint32_t offset,
 					    datalen, output);
 		break;
 	case PLD_BUS_TYPE_SDIO:
+		break;
 	case PLD_BUS_TYPE_USB:
+		ret = pld_usb_athdiag_read(dev, offset, memtype,
+					   datalen, output);
+		break;
 	case PLD_BUS_TYPE_PCIE_FW_SIM:
 	case PLD_BUS_TYPE_SNOC_FW_SIM:
 	case PLD_BUS_TYPE_IPCI:
@@ -1654,7 +1704,11 @@ int pld_athdiag_write(struct device *dev, uint32_t offset,
 					     datalen, input);
 		break;
 	case PLD_BUS_TYPE_SDIO:
+		break;
 	case PLD_BUS_TYPE_USB:
+		ret = pld_usb_athdiag_write(dev, offset, memtype,
+					    datalen, input);
+		break;
 	case PLD_BUS_TYPE_PCIE_FW_SIM:
 	case PLD_BUS_TYPE_SNOC_FW_SIM:
 	case PLD_BUS_TYPE_IPCI:
@@ -1690,6 +1744,7 @@ void *pld_smmu_get_domain(struct device *dev)
 	case PLD_BUS_TYPE_SNOC_FW_SIM:
 		break;
 	case PLD_BUS_TYPE_IPCI:
+		pld_ipci_smmu_get_domain(dev);
 		break;
 	case PLD_BUS_TYPE_SDIO:
 	case PLD_BUS_TYPE_USB:
@@ -1759,6 +1814,7 @@ int pld_smmu_map(struct device *dev, phys_addr_t paddr,
 	case PLD_BUS_TYPE_SNOC_FW_SIM:
 		break;
 	case PLD_BUS_TYPE_IPCI:
+		ret = pld_ipci_smmu_map(dev, paddr, iova_addr, size);
 		break;
 	case PLD_BUS_TYPE_PCIE:
 		ret = pld_pcie_smmu_map(dev, paddr, iova_addr, size);
@@ -1771,6 +1827,42 @@ int pld_smmu_map(struct device *dev, phys_addr_t paddr,
 
 	return ret;
 }
+
+#ifdef CONFIG_SMMU_S1_UNMAP
+/**
+ * pld_smmu_unmap() - Unmap SMMU
+ * @dev: device
+ * @iova_addr: IOVA address to be unmapped
+ * @size: size to be unmapped
+ *
+ * Return: 0 for success
+ *         Non zero failure code for errors
+ */
+int pld_smmu_unmap(struct device *dev,
+		   uint32_t iova_addr, size_t size)
+{
+	int ret = 0;
+	enum pld_bus_type type = pld_get_bus_type(dev);
+
+	switch (type) {
+	case PLD_BUS_TYPE_SNOC:
+		ret = pld_snoc_smmu_unmap(dev, iova_addr, size);
+		break;
+	case PLD_BUS_TYPE_PCIE_FW_SIM:
+	case PLD_BUS_TYPE_SNOC_FW_SIM:
+	case PLD_BUS_TYPE_IPCI:
+	case PLD_BUS_TYPE_PCIE:
+		pr_err("Not supported on type %d\n", type);
+		break;
+	default:
+		pr_err("Invalid device type %d\n", type);
+		ret = -EINVAL;
+		break;
+	}
+
+	return ret;
+}
+#endif
 
 /**
  * pld_get_user_msi_assignment() - Get MSI assignment information
@@ -1863,6 +1955,7 @@ int pld_srng_request_irq(struct device *dev, int irq, irq_handler_t handler,
 		ret = -ENODEV;
 		break;
 	case PLD_BUS_TYPE_IPCI:
+		ret = request_irq(irq, handler, irqflags, devname, dev_data);
 		break;
 	default:
 		pr_err("Invalid device type %d\n", type);
@@ -1905,6 +1998,7 @@ int pld_srng_free_irq(struct device *dev, int irq, void *dev_data)
 		ret = -ENODEV;
 		break;
 	case PLD_BUS_TYPE_IPCI:
+		free_irq(irq, dev_data);
 		break;
 	default:
 		pr_err("Invalid device type %d\n", type);
@@ -1937,6 +2031,7 @@ void pld_srng_enable_irq(struct device *dev, int irq)
 	case PLD_BUS_TYPE_SDIO:
 		break;
 	case PLD_BUS_TYPE_IPCI:
+		enable_irq(irq);
 		break;
 	default:
 		pr_err("Invalid device type\n");
@@ -1966,6 +2061,7 @@ void pld_srng_disable_irq(struct device *dev, int irq)
 	case PLD_BUS_TYPE_SDIO:
 		break;
 	case PLD_BUS_TYPE_IPCI:
+		disable_irq_nosync(irq);
 		break;
 	default:
 		pr_err("Invalid device type\n");
@@ -2558,6 +2654,7 @@ bool pld_have_platform_driver_support(struct device *dev)
 	case PLD_BUS_TYPE_SNOC:
 		break;
 	case PLD_BUS_TYPE_IPCI:
+		ret = true;
 		break;
 	case PLD_BUS_TYPE_SDIO:
 		ret = pld_sdio_platform_driver_support();
@@ -2641,3 +2738,42 @@ int pld_idle_restart(struct device *dev,
 
 	return errno;
 }
+
+#ifdef FEATURE_WLAN_TIME_SYNC_FTM
+/**
+ * pld_get_audio_wlan_timestamp() - Get audio timestamp
+ * @dev: device pointer
+ * @type: trigger type
+ * @ts: audio timestamp
+ *
+ * This API can be used to get audio timestamp.
+ *
+ * Return: 0 if trigger to get audio timestamp is successful
+ *         Non zero failure code for errors
+ */
+int pld_get_audio_wlan_timestamp(struct device *dev,
+				 enum pld_wlan_time_sync_trigger_type type,
+				 uint64_t *ts)
+{
+	int ret = 0;
+	enum pld_bus_type bus_type;
+
+	bus_type = pld_get_bus_type(dev);
+	switch (bus_type) {
+	case PLD_BUS_TYPE_SNOC:
+		ret = pld_snoc_get_audio_wlan_timestamp(dev, type, ts);
+		break;
+	case PLD_BUS_TYPE_PCIE:
+	case PLD_BUS_TYPE_SNOC_FW_SIM:
+	case PLD_BUS_TYPE_PCIE_FW_SIM:
+	case PLD_BUS_TYPE_SDIO:
+	case PLD_BUS_TYPE_USB:
+	case PLD_BUS_TYPE_IPCI:
+		break;
+	default:
+		ret = -EINVAL;
+		break;
+	}
+	return ret;
+}
+#endif /* FEATURE_WLAN_TIME_SYNC_FTM */

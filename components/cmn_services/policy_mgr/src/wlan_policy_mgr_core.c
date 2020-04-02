@@ -2010,10 +2010,10 @@ void policy_mgr_set_weight_of_dfs_passive_channels_to_zero(
 				(channel_state == CHANNEL_STATE_INVALID))
 			/* Set weight of inactive channels to 0 */
 			weight_list[i] = 0;
-
-		policy_mgr_debug("ch freq: [%d] - %d, weight[%d] - %d",
-				 i, pcl_channels[i], i, weight_list[i]);
 	}
+
+	policy_mgr_dump_channel_list(orig_channel_count,
+				     pcl_channels, weight_list);
 
 	return;
 }
@@ -2172,7 +2172,6 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 	 */
 	sta_sap_scc_on_dfs_chan =
 		policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(psoc);
-	policy_mgr_debug("sta_sap_scc_on_dfs_chan %u", sta_sap_scc_on_dfs_chan);
 	if ((mode == PM_SAP_MODE) || (mode == PM_P2P_GO_MODE)) {
 		if ((policy_mgr_mode_specific_connection_count(psoc,
 							       PM_STA_MODE,
@@ -2701,7 +2700,7 @@ bool policy_mgr_allow_new_home_channel(
 		  (IEEE80211_CHAN_DFS | IEEE80211_CHAN_DFS_CFREQ2)) ||
 		 (pm_conc_connection_list[1].ch_flagext &
 		  (IEEE80211_CHAN_DFS | IEEE80211_CHAN_DFS_CFREQ2)))) {
-			policy_mgr_err("Existing DFS connection, new 3-port DFS connection is not allowed");
+			policy_mgr_rl_debug("Existing DFS connection, new 3-port DFS connection is not allowed");
 			status = false;
 
 		} else if (((pm_conc_connection_list[0].freq !=
@@ -2715,7 +2714,7 @@ bool policy_mgr_allow_new_home_channel(
 				    pm_conc_connection_list[0].freq &&
 				    ch_freq !=
 				    pm_conc_connection_list[1].freq) {
-					policy_mgr_err("don't allow 3rd home channel on same MAC");
+					policy_mgr_rl_debug("don't allow 3rd home channel on same MAC");
 					status = false;
 				}
 			} else if ((pm_conc_connection_list[0].mode ==
@@ -2743,7 +2742,7 @@ bool policy_mgr_allow_new_home_channel(
 				   (pm_conc_connection_list[0].freq)) &&
 				   (WLAN_REG_IS_5GHZ_CH_FREQ
 				   (pm_conc_connection_list[1].freq)))) {
-				policy_mgr_err("don't allow 3rd home channel on same MAC");
+				policy_mgr_rl_debug("don't allow 3rd home channel on same MAC");
 				status = false;
 			}
 		} else if (pm_conc_connection_list[0].mac ==
@@ -2751,8 +2750,8 @@ bool policy_mgr_allow_new_home_channel(
 			/* Existing two connections are SCC */
 			if (policy_mgr_is_hw_dbs_capable(psoc) == false) {
 				/* keep legacy chip "allow" as it is */
-				policy_mgr_debug("allow 2 intf SCC + new intf ch %d for legacy hw",
-						 ch_freq);
+				policy_mgr_rl_debug("allow 2 intf SCC + new intf ch %d for legacy hw",
+						    ch_freq);
 			} else if ((pm_conc_connection_list[0].mode ==
 							    PM_NAN_DISC_MODE &&
 				    pm_conc_connection_list[1].mode ==
@@ -2767,13 +2766,13 @@ bool policy_mgr_allow_new_home_channel(
 				 * and therefore a 3rd connection with the
 				 * same MAC is possible.
 				 */
-			} else if (wlan_reg_is_same_band_channels(
-				ch_freq, pm_conc_connection_list[0].freq) &&
-				policy_mgr_is_multi_ap_plus_sta_3vif_conc(
+			} else if (wlan_reg_is_same_band_freqs(ch_freq,
+					pm_conc_connection_list[0].freq) &&
+				   policy_mgr_is_multi_ap_plus_sta_3vif_conc(
 					pm_conc_connection_list[0].mode,
 					pm_conc_connection_list[1].mode,
 					mode)) {
-				policy_mgr_err("don't allow 3rd home channel on same MAC - sta existing");
+				policy_mgr_rl_debug("don't allow 3rd home channel on same MAC - sta existing");
 				status = false;
 			}
 		}
@@ -2784,7 +2783,7 @@ bool policy_mgr_allow_new_home_channel(
 		(pm_conc_connection_list[0].ch_flagext &
 		 (IEEE80211_CHAN_DFS | IEEE80211_CHAN_DFS_CFREQ2))) {
 
-		policy_mgr_err("Existing DFS connection, new 2-port DFS connection is not allowed");
+		policy_mgr_rl_debug("Existing DFS connection, new 2-port DFS connection is not allowed");
 		status = false;
 	}
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
@@ -2813,7 +2812,7 @@ bool policy_mgr_is_5g_channel_allowed(struct wlan_objmgr_psoc *psoc,
 		    WLAN_REG_IS_5GHZ_CH_FREQ(ch_freq) &&
 		    (ch_freq != pm_conc_connection_list[list[index]].freq)) {
 			qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
-			policy_mgr_err("don't allow MCC if SAP/GO on DFS channel");
+			policy_mgr_rl_debug("don't allow MCC if SAP/GO on DFS channel");
 			return false;
 		}
 		index++;
@@ -3002,7 +3001,7 @@ QDF_STATUS policy_mgr_complete_action(struct wlan_objmgr_psoc *psoc,
 	enum policy_mgr_band downgrade_band;
 
 	if (policy_mgr_is_hw_dbs_capable(psoc) == false) {
-		policy_mgr_err("driver isn't dbs capable, no further action needed");
+		policy_mgr_rl_debug("driver isn't dbs capable, no further action needed");
 		return QDF_STATUS_E_NOSUPPORT;
 	}
 

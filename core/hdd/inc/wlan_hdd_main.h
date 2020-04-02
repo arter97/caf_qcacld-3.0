@@ -1039,6 +1039,8 @@ struct hdd_context;
  * @cache_sta_count: number of currently cached stations
  * @acs_complete_event: acs complete event
  * @latency_level: 0 - normal, 1 - moderate, 2 - low, 3 - ultralow
+ * @last_disconnect_reason: Last disconnected internal reason code
+ *                          as per enum qca_disconnect_reason_codes
  */
 struct hdd_adapter {
 	/* Magic cookie for adapter sanity verification.  Note that this
@@ -1312,6 +1314,15 @@ struct hdd_adapter {
 	bool motion_det_in_progress;
 	uint32_t motion_det_baseline_value;
 #endif /* WLAN_FEATURE_MOTION_DETECTION */
+	enum qca_disconnect_reason_codes last_disconnect_reason;
+
+#ifdef WLAN_FEATURE_PERIODIC_STA_STATS
+	/* Indicate whether to display sta periodic stats */
+	bool is_sta_periodic_stats_enabled;
+	uint16_t periodic_stats_timer_count;
+	uint32_t periodic_stats_timer_counter;
+	qdf_mutex_t sta_periodic_stats_lock;
+#endif /* WLAN_FEATURE_PERIODIC_STA_STATS */
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(adapter) (&(adapter)->session.station)
@@ -1621,10 +1632,6 @@ struct hdd_context {
 
 	bool is_scheduler_suspended;
 
-#ifdef WLAN_FEATURE_PKT_CAPTURE
-	bool is_ol_mon_thread_suspended;
-#endif
-
 #ifdef QCA_CONFIG_SMP
 	bool is_ol_rx_thread_suspended;
 #endif
@@ -1883,6 +1890,12 @@ struct hdd_context {
 	unsigned long derived_intf_addr_mask;
 
 	struct sar_limit_cmd_params *sar_cmd_params;
+#ifdef SAR_SAFETY_FEATURE
+	qdf_mc_timer_t sar_safety_timer;
+	qdf_mc_timer_t sar_safety_unsolicited_timer;
+	qdf_event_t sar_safety_req_resp_event;
+	qdf_atomic_t sar_safety_req_resp_event_in_progress;
+#endif
 
 	qdf_time_t runtime_resume_start_time_stamp;
 	qdf_time_t runtime_suspend_done_time_stamp;
@@ -1896,6 +1909,7 @@ struct hdd_context {
 	/* value for packet capturte mode */
 	uint8_t val_pkt_capture_mode;
 #endif
+	bool roam_ch_from_fw_supported;
 };
 
 /**
@@ -2700,10 +2714,24 @@ bool hdd_is_5g_supported(struct hdd_context *hdd_ctx);
  *
  * Return:  true if 2GHz channels are supported
  */
-
 bool hdd_is_2g_supported(struct hdd_context *hdd_ctx);
 
 int wlan_hdd_scan_abort(struct hdd_adapter *adapter);
+
+/**
+ * hdd_indicate_active_ndp_cnt() - Callback to indicate active ndp count to hdd
+ * if ndp connection is on NDI established
+ * @psoc: pointer to psoc object
+ * @vdev_id: vdev id
+ * @cnt: number of active ndp sessions
+ *
+ * This HDD callback registerd with policy manager to indicates number of active
+ * ndp sessions to hdd.
+ *
+ * Return:  none
+ */
+void hdd_indicate_active_ndp_cnt(struct wlan_objmgr_psoc *psoc,
+				 uint8_t vdev_id, uint8_t cnt);
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 static inline bool roaming_offload_enabled(struct hdd_context *hdd_ctx)
@@ -2951,6 +2979,17 @@ void wlan_hdd_clear_tx_rx_histogram(struct hdd_context *hdd_ctx);
 void
 wlan_hdd_display_netif_queue_history(struct hdd_context *hdd_ctx,
 				     enum qdf_stats_verbosity_level verb_lvl);
+
+/**
+ * wlan_hdd_display_adapter_netif_queue_history() - display adapter based netif
+ * queue history
+ * @adapter: hdd adapter
+ *
+ * Return: none
+ */
+void
+wlan_hdd_display_adapter_netif_queue_history(struct hdd_adapter *adapter);
+
 void wlan_hdd_clear_netif_queue_history(struct hdd_context *hdd_ctx);
 const char *hdd_get_fwpath(void);
 void hdd_indicate_mgmt_frame(tSirSmeMgmtFrameInd *frame_ind);
@@ -4126,7 +4165,6 @@ bool wlan_hdd_check_mon_concurrency(void);
  * wlan_hdd_add_monitor_check() - check for monitor intf and add if needed
  * @hdd_ctx: pointer to hdd context
  * @adapter: output pointer to hold created monitor adapter
- * @type: type of the interface
  * @name: name of the interface
  * @rtnl_held: True if RTNL lock is held
  * @name_assign_type: the name of assign type of the netdev
@@ -4136,8 +4174,8 @@ bool wlan_hdd_check_mon_concurrency(void);
  */
 int wlan_hdd_add_monitor_check(struct hdd_context *hdd_ctx,
 			       struct hdd_adapter **adapter,
-			       enum nl80211_iftype type, const char *name,
-			       bool rtnl_held, unsigned char name_assign_type);
+			       const char *name, bool rtnl_held,
+			       unsigned char name_assign_type);
 
 /**
  * wlan_hdd_del_monitor() - delete monitor interface
@@ -4167,8 +4205,8 @@ bool wlan_hdd_check_mon_concurrency(void)
 static inline
 int wlan_hdd_add_monitor_check(struct hdd_context *hdd_ctx,
 			       struct hdd_adapter **adapter,
-			       enum nl80211_iftype type, const char *name,
-			       bool rtnl_held, unsigned char name_assign_type)
+			       const char *name, bool rtnl_held,
+			       unsigned char name_assign_type)
 {
 	return 0;
 }
@@ -4179,4 +4217,27 @@ void wlan_hdd_del_monitor(struct hdd_context *hdd_ctx,
 {
 }
 #endif /* WLAN_FEATURE_PKT_CAPTURE */
+
+#ifdef CONFIG_WLAN_DEBUG_CRASH_INJECT
+/**
+ * hdd_crash_inject() - Inject a crash
+ * @adapter: Adapter upon which the command was received
+ * @v1: first value to inject
+ * @v2: second value to inject
+ *
+ * This function is the handler for the crash inject debug feature.
+ * This feature only exists for internal testing and must not be
+ * enabled on a production device.
+ *
+ * Return: 0 on success and errno on failure
+ */
+int hdd_crash_inject(struct hdd_adapter *adapter, uint32_t v1, uint32_t v2);
+#else
+static inline
+int hdd_crash_inject(struct hdd_adapter *adapter, uint32_t v1, uint32_t v2)
+{
+	return -ENOTSUPP;
+}
+#endif
+
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

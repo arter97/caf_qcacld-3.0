@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -41,17 +41,17 @@
 #define PARAM_IPV4_ADDR QCA_WLAN_VENDOR_ATTR_GW_PARAM_CONFIG_IPV4_ADDR
 #define PARAM_IPV6_ADDR QCA_WLAN_VENDOR_ATTR_GW_PARAM_CONFIG_IPV6_ADDR
 
-static const struct nla_policy
-	policy[QCA_WLAN_VENDOR_ATTR_GW_PARAM_CONFIG_MAX + 1] = {
-		[PARAM_MAC_ADDR] = {
+const struct nla_policy subnet_detect_policy[
+			QCA_WLAN_VENDOR_ATTR_GW_PARAM_CONFIG_MAX + 1] = {
+		[QCA_WLAN_VENDOR_ATTR_GW_PARAM_CONFIG_GW_MAC_ADDR] = {
 				.type = NLA_UNSPEC,
 				.len = QDF_MAC_ADDR_SIZE
 		},
-		[PARAM_IPV4_ADDR] = {
+		[QCA_WLAN_VENDOR_ATTR_GW_PARAM_CONFIG_IPV4_ADDR] = {
 				.type = NLA_UNSPEC,
 				.len = QDF_IPV4_ADDR_SIZE
 		},
-		[PARAM_IPV6_ADDR] = {
+		[QCA_WLAN_VENDOR_ATTR_GW_PARAM_CONFIG_IPV6_ADDR] = {
 				.type = NLA_UNSPEC,
 				.len = QDF_IPV6_ADDR_SIZE
 		}
@@ -90,7 +90,7 @@ static int __wlan_hdd_cfg80211_set_gateway_params(struct wiphy *wiphy,
 	ucfg_mlme_is_subnet_detection_enabled(hdd_ctx->psoc,
 					      &subnet_detection_enabled);
 	if (!subnet_detection_enabled) {
-		hdd_info("LFR Subnet Detection disabled in INI");
+		hdd_debug("LFR Subnet Detection disabled in INI");
 		return -ENOTSUPP;
 	}
 
@@ -98,12 +98,12 @@ static int __wlan_hdd_cfg80211_set_gateway_params(struct wiphy *wiphy,
 	 * and only in the connected state.
 	 */
 	if (QDF_STA_MODE != adapter->device_mode) {
-		hdd_err("Received GW param update for non-STA mode adapter");
+		hdd_debug("Received GW param update for non-STA mode adapter");
 		return -ENOTSUPP;
 	}
 
 	if (!hdd_conn_is_connected(WLAN_HDD_GET_STATION_CTX_PTR(adapter))) {
-		hdd_err("Received GW param update in disconnected state!");
+		hdd_debug("Received GW param update in disconnected state!");
 		return -ENOTSUPP;
 	}
 
@@ -114,7 +114,7 @@ static int __wlan_hdd_cfg80211_set_gateway_params(struct wiphy *wiphy,
 	 */
 	if (wlan_cfg80211_nla_parse(tb,
 				    QCA_WLAN_VENDOR_ATTR_GW_PARAM_CONFIG_MAX,
-				    data, data_len, policy)) {
+				    data, data_len, subnet_detect_policy)) {
 		hdd_err("Invalid ATTR list");
 		return -EINVAL;
 	}

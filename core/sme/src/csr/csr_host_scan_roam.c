@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -422,8 +422,6 @@ QDF_STATUS csr_neighbor_roam_candidate_found_ind_hdlr(struct mac_context *mac,
 		&mac->roam.neighborRoamInfo[sessionId];
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
-	sme_debug("Received indication from firmware");
-
 	/* we must be in connected state, if not ignore it */
 	if ((eCSR_NEIGHBOR_ROAM_STATE_CONNECTED !=
 	     pNeighborRoamInfo->neighborRoamState)
@@ -453,9 +451,6 @@ void csr_neighbor_roam_free_roamable_bss_list(struct mac_context *mac_ctx,
 					      tDblLinkList *llist)
 {
 	tpCsrNeighborRoamBSSInfo result = NULL;
-
-	sme_debug("Emptying the BSS list. Current count: %d",
-		  csr_ll_count(llist));
 
 	/*
 	 * Pick up the head, remove and free the node till
@@ -573,10 +568,11 @@ void csr_neighbor_roam_request_handoff(struct mac_context *mac_ctx,
 
 	sme_debug("csr_roamHandoffRequested: disassociating with current AP");
 
-	if (!QDF_IS_STATUS_SUCCESS
-		    (csr_roam_issue_disassociate_cmd
-			    (mac_ctx, session_id,
-			    eCSR_DISCONNECT_REASON_HANDOFF))) {
+	if (!QDF_IS_STATUS_SUCCESS(csr_roam_issue_disassociate_cmd(
+					mac_ctx,
+					session_id,
+					eCSR_DISCONNECT_REASON_HANDOFF,
+					eSIR_MAC_UNSPEC_FAILURE_REASON))) {
 		sme_warn("csr_roamHandoffRequested: fail to issue disassoc");
 		qdf_mem_free(roam_info);
 		return;
