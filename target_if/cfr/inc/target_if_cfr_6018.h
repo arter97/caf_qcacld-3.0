@@ -68,10 +68,10 @@
 #define NUM_LUT_ENTRIES 136
 
 /* Max size :
- * 16173 = 93 bytes(csi header) + 64 bytes(cfr header) + 16016 bytes(cfr
+ * 16240 = 112 bytes(csi header) + 64 bytes(cfr header) + 16064 bytes(cfr
  * payload)
  */
-#define STREAMFS_MAX_SUBBUF_CYP 16173
+#define STREAMFS_MAX_SUBBUF_CYP 16240
 
 #define STREAMFS_NUM_SUBBUF_CYP 255
 
