@@ -334,7 +334,7 @@ QDF_STATUS wlansap_pre_start_bss_acs_scan_callback(mac_handle_t mac_handle,
 			scan_status);
 		oper_channel =
 			sap_select_default_oper_chan(sap_ctx->acs_cfg);
-		sap_ctx->chan_freq = oper_channel;
+		wlansap_set_acs_ch_freq(sap_ctx, oper_channel);
 		sap_ctx->acs_cfg->pri_ch_freq = oper_channel;
 		sap_config_acs_result(mac_handle, sap_ctx,
 				      sap_ctx->acs_cfg->ht_sec_ch_freq);
@@ -354,10 +354,12 @@ QDF_STATUS wlansap_pre_start_bss_acs_scan_callback(mac_handle_t mac_handle,
 		oper_channel = sap_select_default_oper_chan(sap_ctx->acs_cfg);
 	}
 
-	sap_ctx->chan_freq = oper_channel;
+	wlansap_set_acs_ch_freq(sap_ctx, oper_channel);
 	sap_ctx->acs_cfg->pri_ch_freq = oper_channel;
 	sap_config_acs_result(mac_handle, sap_ctx,
 			      sap_ctx->acs_cfg->ht_sec_ch_freq);
+
+	wlansap_dump_acs_ch_freq(sap_ctx);
 
 	sap_ctx->sap_state = eSAP_ACS_CHANNEL_SELECTED;
 	sap_ctx->sap_status = eSAP_STATUS_SUCCESS;
@@ -573,10 +575,13 @@ wlansap_roam_process_dfs_chansw_update(mac_handle_t mac_handle,
 	 * second SAP's channel change due to some previous platform's single
 	 * radio limitation.
 	 *
+	 * For DCS case, SAP will do channel switch one by one.
+	 *
 	 */
 	sap_scc_dfs = sap_is_conc_sap_doing_scc_dfs(mac_handle, sap_ctx);
 	if (sap_get_total_number_sap_intf(mac_handle) <= 1 ||
 	    policy_mgr_is_current_hwmode_dbs(mac_ctx->psoc) ||
+	    sap_ctx->csa_reason == CSA_REASON_DCS ||
 	    !sap_scc_dfs) {
 		sap_get_cac_dur_dfs_region(sap_ctx,
 			&sap_ctx->csr_roamProfile.cac_duration_ms,
@@ -1067,8 +1072,6 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 	case eCSR_ROAM_SET_CHANNEL_RSP:
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_HIGH,
 			  FL("Received set channel response"));
-		/* SAP channel change request processing is completed */
-		sap_ctx->is_chan_change_inprogress = false;
 		break;
 	case eCSR_ROAM_CAC_COMPLETE_IND:
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_HIGH,

@@ -51,6 +51,7 @@
 #include "wlan_p2p_cfg_api.h"
 #include "wlan_policy_mgr_ucfg.h"
 #include "nan_ucfg_api.h"
+#include "wlan_pkt_capture_ucfg_api.h"
 
 /* Ms to Time Unit Micro Sec */
 #define MS_TO_TU_MUS(x)   ((x) * 1024)
@@ -722,13 +723,17 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 	}
 
 	adapter = NULL;
-	ret = wlan_hdd_add_monitor_check(hdd_ctx, &adapter, type, name,
-					 true, name_assign_type);
-	if (ret)
-		return ERR_PTR(-EINVAL);
-	if (adapter) {
-		hdd_exit();
-		return adapter->dev->ieee80211_ptr;
+	if ((ucfg_pkt_capture_get_mode(hdd_ctx->psoc)) &&
+	    (type == NL80211_IFTYPE_MONITOR)) {
+		ret = wlan_hdd_add_monitor_check(hdd_ctx, &adapter, name,
+						 true, name_assign_type);
+		if (ret)
+			return ERR_PTR(-EINVAL);
+
+		if (adapter) {
+			hdd_exit();
+			return adapter->dev->ieee80211_ptr;
+		}
 	}
 
 	if (mode == QDF_SAP_MODE) {
@@ -977,20 +982,17 @@ wlan_hdd_set_rxmgmt_external_auth_flag(enum nl80211_rxmgmt_flags *nl80211_flag)
  * @flag: flags set by driver(SME/PE) from enum rxmgmt_flags
  *
  * Convert driver internal RXMGMT flag value to nl80211 defined RXMGMT flag
- * Return: 0 on success, -EINVAL on invalid value
+ * Return: void
  */
-static int
+static void
 wlan_hdd_cfg80211_convert_rxmgmt_flags(enum rxmgmt_flags flag,
 				       enum nl80211_rxmgmt_flags *nl80211_flag)
 {
-	int ret = -EINVAL;
 
 	if (flag & RXMGMT_FLAG_EXTERNAL_AUTH) {
 		wlan_hdd_set_rxmgmt_external_auth_flag(nl80211_flag);
-		ret = 0;
 	}
 
-	return ret;
 }
 
 static void
@@ -1087,9 +1089,7 @@ __hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
 	hdd_debug("Indicate Frame over NL80211 sessionid : %d, idx :%d",
 		   adapter->vdev_id, adapter->dev->ifindex);
 
-	if (wlan_hdd_cfg80211_convert_rxmgmt_flags(rx_flags, &nl80211_flag))
-		hdd_debug("Failed to convert RXMGMT flags :0x%x to nl80211 format",
-			  rx_flags);
+	wlan_hdd_cfg80211_convert_rxmgmt_flags(rx_flags, &nl80211_flag);
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
 	cfg80211_rx_mgmt(adapter->dev->ieee80211_ptr,
@@ -1158,43 +1158,6 @@ int wlan_hdd_set_power_save(struct hdd_adapter *adapter,
 }
 
 /**
- * wlan_hdd_update_mcc_adaptive_scheduler() - Function to update
- * MAS value to FW
- * @adapter:            adapter object data
- * @is_enable:          0-Disable, 1-Enable MAS
- *
- * This function passes down the value of MAS to UMAC
- *
- * Return: 0 for success else non zero
- *
- */
-static int32_t wlan_hdd_update_mcc_adaptive_scheduler(
-		struct hdd_adapter *adapter, bool is_enable)
-{
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	uint8_t enable_mcc_adaptive_sch = 0;
-
-	if (!hdd_ctx) {
-		hdd_err("HDD context is null");
-		return -EINVAL;
-	}
-
-	hdd_info("enable/disable MAS :%d", is_enable);
-	ucfg_policy_mgr_get_mcc_adaptive_sch(hdd_ctx->psoc,
-					     &enable_mcc_adaptive_sch);
-	if (enable_mcc_adaptive_sch) {
-		/* Todo check where to set the MCC apative SCHED for read */
-
-		if (QDF_STATUS_SUCCESS != sme_set_mas(is_enable)) {
-			hdd_err("Failed to enable/disable MAS");
-			return -EAGAIN;
-		}
-	}
-
-	return 0;
-}
-
-/**
  * wlan_hdd_update_mcc_p2p_quota() - Function to Update P2P
  * quota to FW
  * @adapter:            Pointer to HDD adapter
@@ -1233,20 +1196,32 @@ static void wlan_hdd_update_mcc_p2p_quota(struct hdd_adapter *adapter,
 
 int32_t wlan_hdd_set_mas(struct hdd_adapter *adapter, uint8_t mas_value)
 {
-	int32_t ret = 0;
+	struct hdd_context *hdd_ctx;
+	uint8_t enable_mcc_adaptive_sch = 0;
 
 	if (!adapter) {
 		hdd_err("Adapter is NULL");
 		return -EINVAL;
 	}
 
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	if (!hdd_ctx) {
+		hdd_err("HDD context is null");
+		return -EINVAL;
+	}
+
 	if (mas_value) {
 		hdd_info("Miracast is ON. Disable MAS and configure P2P quota");
-		ret = wlan_hdd_update_mcc_adaptive_scheduler(
-			adapter, false);
-		if (0 != ret) {
-			hdd_err("Failed to disable MAS");
-			goto done;
+		ucfg_policy_mgr_get_mcc_adaptive_sch(hdd_ctx->psoc,
+						     &enable_mcc_adaptive_sch);
+		if (enable_mcc_adaptive_sch) {
+			ucfg_policy_mgr_set_dynamic_mcc_adaptive_sch(
+							hdd_ctx->psoc, false);
+
+			if (QDF_STATUS_SUCCESS != sme_set_mas(false)) {
+				hdd_err("Failed to disable MAS");
+				return -EAGAIN;
+			}
 		}
 
 		/* Config p2p quota */
@@ -1255,16 +1230,20 @@ int32_t wlan_hdd_set_mas(struct hdd_adapter *adapter, uint8_t mas_value)
 		hdd_info("Miracast is OFF. Enable MAS and reset P2P quota");
 		wlan_hdd_update_mcc_p2p_quota(adapter, false);
 
-		ret = wlan_hdd_update_mcc_adaptive_scheduler(
-			adapter, true);
-		if (0 != ret) {
-			hdd_err("Failed to enable MAS");
-			goto done;
+		ucfg_policy_mgr_get_mcc_adaptive_sch(hdd_ctx->psoc,
+						     &enable_mcc_adaptive_sch);
+		if (enable_mcc_adaptive_sch) {
+			ucfg_policy_mgr_set_dynamic_mcc_adaptive_sch(
+							hdd_ctx->psoc, true);
+
+			if (QDF_STATUS_SUCCESS != sme_set_mas(true)) {
+				hdd_err("Failed to enable MAS");
+				return -EAGAIN;
+			}
 		}
 	}
 
-done:
-	return ret;
+	return 0;
 }
 
 /**

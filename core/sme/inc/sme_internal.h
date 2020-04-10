@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -253,8 +253,8 @@ typedef void (*hidden_ssid_cb)(hdd_handle_t hdd_handle,
  * @hdd_handle: HDD handle registered with SME
  * @beacon_report: Beacon report structure
  */
-typedef void (*beacon_report_cb)(hdd_handle_t hdd_handle,
-				 struct wlan_beacon_report *beacon_report);
+typedef QDF_STATUS (*beacon_report_cb)
+	(hdd_handle_t hdd_handle, struct wlan_beacon_report *beacon_report);
 
 /**
  * beacon_pause_cb : scan start callback fun
@@ -391,6 +391,11 @@ struct sme_context {
 #ifdef FEATURE_OEM_DATA
 	void (*oem_data_event_handler_cb)
 			(const struct oem_data *oem_event_data);
+#endif
+	sme_get_raom_scan_ch_callback roam_scan_ch_callback;
+	void *roam_scan_ch_get_context;
+#ifdef FEATURE_MONITOR_MODE_SUPPORT
+	void (*monitor_mode_cb)(uint8_t vdev_id);
 #endif
 };
 

@@ -44,16 +44,6 @@ struct wlan_mlme_psoc_ext_obj {
 };
 
 /**
- * struct wlan_ies - Generic WLAN Information Element(s) format
- * @len: Total length of the IEs
- * @data: IE data
- */
-struct wlan_ies {
-	uint16_t len;
-	uint8_t *data;
-};
-
-/**
  * struct wlan_disconnect_info - WLAN Disconnection Information
  * @self_discon_ies: Disconnect IEs to be sent in deauth/disassoc frames
  *                   originated from driver
@@ -122,10 +112,14 @@ struct wlan_mlme_roaming_config {
  *  roam config info
  * @roam_sm: Structure containing roaming state related details
  * @roam_config: Roaming configurations structure
+ * @sae_single_pmk: Details for sae roaming using single pmk
  */
 struct wlan_mlme_roam {
 	struct wlan_mlme_roam_state_info roam_sm;
 	struct wlan_mlme_roaming_config roam_cfg;
+#if defined(WLAN_SAE_SINGLE_PMK) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
+	struct wlan_mlme_sae_single_pmk sae_single_pmk;
+#endif
 };
 
 /**
@@ -145,6 +139,7 @@ struct wlan_mlme_roam {
  * @disconnect_info: Disconnection information
  * @vdev_stop_type: vdev stop type request
  * @roam_off_state: Roam offload state
+ * @bigtk_vdev_support: BIGTK feature support for this vdev (SAP)
  */
 struct mlme_legacy_priv {
 	bool chan_switch_in_progress;
@@ -161,6 +156,7 @@ struct mlme_legacy_priv {
 	struct wlan_disconnect_info disconnect_info;
 	uint32_t vdev_stop_type;
 	struct wlan_mlme_roam mlme_roam;
+	bool bigtk_vdev_support;
 };
 
 /**

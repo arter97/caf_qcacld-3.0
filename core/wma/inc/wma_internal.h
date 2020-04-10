@@ -301,6 +301,27 @@ wma_roam_pmkid_request_event_handler(void *handle,
 }
 #endif
 
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+/**
+ * wma_roam_scan_chan_list_event_handler() - roam scan chan list event handler
+ * @handle: wma handle
+ * @event: pointer to fw event
+ * @len: length of event
+ *
+ * Return: Success or Failure status
+ */
+int wma_roam_scan_chan_list_event_handler(WMA_HANDLE handle,
+					  uint8_t *event,
+					  uint32_t len);
+#else
+static inline int
+wma_roam_scan_chan_list_event_handler(WMA_HANDLE handle, uint8_t *event,
+				      uint32_t len)
+{
+	return 0;
+}
+#endif
+
 /**
  * wma_update_per_roam_config() -per roam config parameter updation to FW
  * @handle: wma handle
@@ -772,16 +793,6 @@ static inline uint8_t *wma_find_bssid_by_vdev_id(tp_wma_handle wma,
  */
 QDF_STATUS wma_find_vdev_id_by_bssid(tp_wma_handle wma, uint8_t *bssid,
 				     uint8_t *vdev_id);
-
-/**
- * wma_vdev_detach() - send vdev delete command to fw
- * @wma_handle: wma handle
- * @pdel_vdev_req_param: del vdev params
- *
- * Return: QDF status
- */
-QDF_STATUS wma_vdev_detach(tp_wma_handle wma_handle,
-			struct del_vdev_params *pdel_vdev_req_param);
 
 QDF_STATUS wma_vdev_set_param(wmi_unified_t wmi_handle, uint32_t if_id,
 				uint32_t param_id, uint32_t param_value);
@@ -1797,16 +1808,6 @@ int wma_fill_beacon_interval_reset_req(tp_wma_handle wma, uint8_t vdev_id,
  * Return: 'true' on valid vdev else 'false'
  */
 bool wma_is_vdev_valid(uint32_t vdev_id);
-
-/*
- * wma_is_vdev_started() - check whether vdev is started or not
- * @vdev: pointer to vdev object
- *
- * This function verifies the vdev is started nor not
- *
- * Return: 'true' if vdev is started else 'false'
- */
-bool wma_is_vdev_started(struct wlan_objmgr_vdev *vdev);
 
 /**
  * wma_vdev_obss_detection_info_handler - event handler to handle obss detection

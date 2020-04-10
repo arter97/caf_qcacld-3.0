@@ -437,7 +437,7 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 			}
 		}
 	}
-	if (mac_ctx->rrm.rrmSmeContext.rrmConfig.rrm_enabled)
+	if (mac_ctx->rrm.rrmConfig.rrm_enabled)
 		populate_dot11f_rrm_ie(mac_ctx, &bcn_2->RRMEnabledCap,
 			session);
 
@@ -467,7 +467,7 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 						 &bcn_2->vht_transmit_power_env,
 						 session->ch_width,
 						 session->curr_op_freq);
-		populate_dot11f_qcn_ie(mac_ctx, &bcn_2->qcn_ie,
+		populate_dot11f_qcn_ie(mac_ctx, session, &bcn_2->qcn_ie,
 				       QCN_IE_ATTR_ID_ALL);
 	}
 
