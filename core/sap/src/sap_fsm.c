@@ -702,8 +702,19 @@ uint8_t sap_select_default_oper_chan(struct sap_acs_cfg *acs_cfg)
 {
 	uint16_t i;
 
-	if (!acs_cfg || !acs_cfg->ch_list || !acs_cfg->ch_list_count)
+	if (!acs_cfg)
 		return 0;
+
+	if (!acs_cfg->ch_list_count || !acs_cfg->ch_list) {
+		if (mac_ctx->mlme_cfg->acs.force_sap_start) {
+			sap_debug("SAP forced, freq selected %d",
+				  acs_cfg->master_ch_list[0]);
+			return acs_cfg->master_ch_list[0];
+		} else {
+			sap_debug("No channel left for operation");
+			return 0;
+		}
+	}
 
 	/*
 	 * There could be both 2.4Ghz and 5ghz channels present in the list
@@ -1048,7 +1059,7 @@ QDF_STATUS sap_channel_sel(struct sap_context *sap_context)
 				  FL("SAP Configuring default channel, Ch=%d"),
 				  sap_context->channel);
 			sap_context->channel = sap_select_default_oper_chan(
-					sap_context->acs_cfg);
+						mac_ctx, sap_context->acs_cfg);
 
 			if (sap_context->channelList) {
 				sap_context->channel =
