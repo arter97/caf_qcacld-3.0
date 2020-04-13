@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017, 2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -924,11 +924,7 @@ lim_send_sme_disassoc_ntf(tpAniSirGlobal pMac,
 					break;
 			}
 		}
-		if (sta_ds
-#ifdef WLAN_FEATURE_11W
-			&& (!sta_ds->rmfEnabled)
-#endif
-		) {
+		if (sta_ds) {
 			if (lim_add_sta(pMac, sta_ds, false, session) !=
 					eSIR_SUCCESS)
 					pe_err("could not Add STA with assocId: %d",
