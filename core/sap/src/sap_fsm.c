@@ -3382,28 +3382,26 @@ static QDF_STATUS sap_get_channel_list(struct sap_context *sap_ctx,
 			continue;
 
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
-		uint8_t ch;
-
-		ch = WLAN_REG_CH_NUM(loop_count);
 		if ((sap_ctx->acs_cfg->skip_scan_status ==
 			eSAP_DO_PAR_ACS_SCAN)) {
-		    if ((ch >= sap_ctx->acs_cfg->skip_scan_range1_stch &&
-			 ch <= sap_ctx->acs_cfg->skip_scan_range1_endch) ||
-			(ch >= sap_ctx->acs_cfg->skip_scan_range2_stch &&
-			 ch <= sap_ctx->acs_cfg->skip_scan_range2_endch)) {
-			list[ch_count] =
-				WLAN_REG_CH_NUM(loop_count);
-			ch_count++;
-			QDF_TRACE(QDF_MODULE_ID_SAP,
-				QDF_TRACE_LEVEL_INFO,
-				FL("%d %d added to ACS ch range"),
-				ch_count, ch);
-		    } else {
-			QDF_TRACE(QDF_MODULE_ID_SAP,
-				QDF_TRACE_LEVEL_INFO_HIGH,
-				FL("%d %d skipped from ACS ch range"),
-				ch_count, ch);
-		    }
+			uint8_t ch = WLAN_REG_CH_NUM(loop_count);
+
+			if ((ch >= sap_ctx->acs_cfg->skip_scan_range1_stch &&
+			     ch <= sap_ctx->acs_cfg->skip_scan_range1_endch) ||
+			    (ch >= sap_ctx->acs_cfg->skip_scan_range2_stch &&
+			     ch <= sap_ctx->acs_cfg->skip_scan_range2_endch)) {
+				list[ch_count] = ch;
+				ch_count++;
+				QDF_TRACE(QDF_MODULE_ID_SAP,
+					  QDF_TRACE_LEVEL_INFO,
+					  FL("%d %d added to ACS ch range"),
+					  ch_count, ch);
+			} else {
+				QDF_TRACE(QDF_MODULE_ID_SAP,
+					  QDF_TRACE_LEVEL_INFO_HIGH,
+					  FL("%d %d skipped from ACS range"),
+					  ch_count, ch);
+			}
 		} else {
 			list[ch_count] =
 				WLAN_REG_CH_NUM(loop_count);
@@ -3411,7 +3409,7 @@ static QDF_STATUS sap_get_channel_list(struct sap_context *sap_ctx,
 			QDF_TRACE(QDF_MODULE_ID_SAP,
 				QDF_TRACE_LEVEL_INFO,
 				FL("%d %d added to ACS ch range"),
-				ch_count, ch);
+				ch_count, WLAN_REG_CH_NUM(loop_count));
 		}
 #else
 		list[ch_count] = WLAN_REG_CH_NUM(loop_count);
