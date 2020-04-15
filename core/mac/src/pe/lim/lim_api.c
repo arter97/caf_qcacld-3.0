@@ -2749,8 +2749,8 @@ tMgmtFrmDropReason lim_is_pkt_candidate_for_drop(tpAniSirGlobal pMac,
 		/* Drop the Probe Request in IBSS mode, if STA did not send out the last beacon */
 		/* In IBSS, the node which sends out the beacon, is supposed to respond to ProbeReq */
 		return eMGMT_DROP_NOT_LAST_IBSS_BCN;
-	} else if ((subType == SIR_MAC_MGMT_ASSOC_REQ) &&
-		   (subType == SIR_MAC_MGMT_DISASSOC) &&
+	} else if ((subType == SIR_MAC_MGMT_ASSOC_REQ) ||
+		   (subType == SIR_MAC_MGMT_DISASSOC) ||
 		   (subType == SIR_MAC_MGMT_DEAUTH)) {
 		uint16_t assoc_id;
 		dphHashTableClass *dph_table;
@@ -2761,7 +2761,7 @@ tMgmtFrmDropReason lim_is_pkt_candidate_for_drop(tpAniSirGlobal pMac,
 		psessionEntry = pe_find_session_by_bssid(pMac, pHdr->bssId,
 				&sessionId);
 		if (!psessionEntry)
-			return eMGMT_DROP_NO_DROP;
+			return eMGMT_DROP_SPURIOUS_FRAME;
 		dph_table = &psessionEntry->dph.dphHashTable;
 		sta_ds = dph_lookup_hash_entry(pMac, pHdr->sa, &assoc_id,
 					       dph_table);
@@ -2769,7 +2769,7 @@ tMgmtFrmDropReason lim_is_pkt_candidate_for_drop(tpAniSirGlobal pMac,
 			if (subType == SIR_MAC_MGMT_ASSOC_REQ)
 				return eMGMT_DROP_NO_DROP;
 			else
-				return eMGMT_DROP_EXCESSIVE_MGMT_FRAME;
+				return eMGMT_DROP_SPURIOUS_FRAME;
 		}
 
 		if (subType == SIR_MAC_MGMT_ASSOC_REQ)
