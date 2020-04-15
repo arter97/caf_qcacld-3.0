@@ -822,7 +822,7 @@ dp_rx_handle_ppdu_stats(struct dp_soc *soc, struct dp_pdev *pdev,
 			struct hal_rx_ppdu_info *ppdu_info)
 {
 	qdf_nbuf_t ppdu_nbuf;
-	struct dp_peer *peer;
+	struct dp_peer *peer = NULL;
 	struct cdp_rx_indication_ppdu *cdp_rx_ppdu;
 
 	/*
@@ -873,11 +873,15 @@ dp_rx_handle_ppdu_stats(struct dp_soc *soc, struct dp_pdev *pdev,
 		qdf_nbuf_put_tail(ppdu_nbuf,
 				sizeof(struct cdp_rx_indication_ppdu));
 		cdp_rx_ppdu = (struct cdp_rx_indication_ppdu *)ppdu_nbuf->data;
-		peer = dp_peer_find_by_id(soc, cdp_rx_ppdu->peer_id);
+		if (cdp_rx_ppdu->peer_id != HTT_INVALID_PEER) {
+			peer = dp_peer_find_hash_find(soc,
+						      cdp_rx_ppdu->mac_addr,
+						      0, cdp_rx_ppdu->vdev_id);
+		}
 		if (peer) {
 			cdp_rx_ppdu->cookie = (void *)peer->wlanstats_ctx;
 			dp_rx_stats_update(pdev, peer, cdp_rx_ppdu);
-			dp_peer_unref_del_find_by_id(peer);
+			dp_peer_unref_delete(peer);
 		}
 		if (cdp_rx_ppdu->peer_id != HTT_INVALID_PEER) {
 			dp_wdi_event_handler(WDI_EVENT_RX_PPDU_DESC,
