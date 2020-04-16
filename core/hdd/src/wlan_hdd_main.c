@@ -856,13 +856,13 @@ static int hdd_netdev_notifier_call(struct notifier_block *nb,
 
 	errno = osif_vdev_sync_op_start(net_dev, &vdev_sync);
 	if (errno)
-		return errno;
+		return NOTIFY_DONE;
 
 	errno = __hdd_netdev_notifier_call(net_dev, state);
 
 	osif_vdev_sync_op_stop(vdev_sync);
 
-	return errno;
+	return NOTIFY_DONE;
 }
 
 struct notifier_block hdd_netdev_notifier = {
@@ -9114,6 +9114,9 @@ static void hdd_init_channel_avoidance(struct hdd_context *hdd_ctx)
 
 	}
 
+	ucfg_policy_mgr_init_chan_avoidance(hdd_ctx->psoc,
+					    hdd_ctx->unsafe_channel_list,
+					    hdd_ctx->unsafe_channel_count);
 }
 
 static void hdd_lte_coex_restart_sap(struct hdd_adapter *adapter,
