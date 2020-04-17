@@ -758,6 +758,7 @@ struct cdp_rx_stats {
  * @clone_fail: NBUF clone failure
  * @dropped_pkt: Total scatter gather packets
  * @desc_na: Desc Not Available
+ * @exc_desc_na: Exception desc Not Available
  * @ring_full: ring full
  * @enqueue_fail: hw enqueue fail
  * @dma_error: dma fail
@@ -815,6 +816,7 @@ struct cdp_tx_ingress_stats {
 	struct {
 		struct cdp_pkt_info dropped_pkt;
 		struct cdp_pkt_info  desc_na;
+		struct cdp_pkt_info  exc_desc_na;
 		uint32_t ring_full;
 		uint32_t enqueue_fail;
 		uint32_t dma_error;
