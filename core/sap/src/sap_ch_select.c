@@ -2421,7 +2421,8 @@ uint8_t sap_select_channel(mac_handle_t mac_handle,
 #ifndef SOFTAP_CHANNEL_RANGE
 		return SAP_CHANNEL_NOT_SELECTED;
 #else
-		return sap_select_default_oper_chan(sap_ctx->acs_cfg);
+		return sap_select_default_oper_chan(mac_ctx,
+						    sap_ctx->acs_cfg);
 #endif
 	}
 

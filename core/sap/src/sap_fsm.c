@@ -698,7 +698,8 @@ sap_chan_bond_dfs_sub_chan(struct sap_context *sap_context,
 	return false;
 }
 
-uint8_t sap_select_default_oper_chan(struct sap_acs_cfg *acs_cfg)
+uint8_t sap_select_default_oper_chan(struct mac_context *mac_ctx,
+				     struct sap_acs_cfg *acs_cfg)
 {
 	uint16_t i;
 
