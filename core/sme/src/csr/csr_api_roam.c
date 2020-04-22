@@ -15099,7 +15099,6 @@ static void csr_update_sae_config(struct join_req *csr_join_req,
 	struct mac_context *mac, struct csr_roam_session *session)
 {
 	tPmkidCacheInfo *pmkid_cache;
-	uint32_t index;
 
 	pmkid_cache = qdf_mem_malloc(sizeof(*pmkid_cache));
 	if (!pmkid_cache)
@@ -15110,7 +15109,7 @@ static void csr_update_sae_config(struct join_req *csr_join_req,
 		     QDF_MAC_ADDR_SIZE);
 
 	csr_join_req->sae_pmk_cached =
-	       csr_lookup_pmkid_using_bssid(mac, session, pmkid_cache, &index);
+	       csr_lookup_pmkid_using_bssid(mac, session, pmkid_cache);
 
 	qdf_mem_free(pmkid_cache);
 
@@ -21328,7 +21327,6 @@ static QDF_STATUS csr_process_roam_sync_callback(struct mac_context *mac_ctx,
 	struct bss_params *add_bss_params;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	tPmkidCacheInfo *pmkid_cache;
-	uint32_t pmkid_index;
 	uint16_t len;
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 	struct ht_profile *src_profile = NULL;
@@ -21581,16 +21579,15 @@ static QDF_STATUS csr_process_roam_sync_callback(struct mac_context *mac_ctx,
 		sme_debug("Trying to find PMKID for " QDF_MAC_ADDR_STR,
 			  QDF_MAC_ADDR_ARRAY(pmkid_cache->BSSID.bytes));
 		if (csr_lookup_pmkid_using_bssid(mac_ctx, session,
-						 pmkid_cache,
-						 &pmkid_index)) {
+						 pmkid_cache)) {
 			session->pmk_len = pmkid_cache->pmk_len;
 			qdf_mem_zero(session->psk_pmk,
 				     sizeof(session->psk_pmk));
 			qdf_mem_copy(session->psk_pmk, pmkid_cache->pmk,
 				     session->pmk_len);
-			sme_debug("pmkid found for " QDF_MAC_ADDR_STR " at %d len %d",
+			sme_debug("pmkid found for " QDF_MAC_ADDR_STR " len %d",
 				  QDF_MAC_ADDR_ARRAY(pmkid_cache->BSSID.bytes),
-				  pmkid_index, (uint32_t)session->pmk_len);
+				  (uint32_t)session->pmk_len);
 		} else {
 			sme_debug("PMKID Not found in cache for " QDF_MAC_ADDR_STR,
 				  QDF_MAC_ADDR_ARRAY(pmkid_cache->BSSID.bytes));
