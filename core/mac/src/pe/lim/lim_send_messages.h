@@ -99,6 +99,8 @@ void lim_set_active_edca_params(tpAniSirGlobal pMac,
 tSirRetStatus lim_send_beacon_filter_info(tpAniSirGlobal pMac,
 					  tpPESession psessionEntry);
 
+#define MAX_VENDOR_IES_LEN 1532
+
 #ifdef WLAN_FEATURE_11W
 tSirRetStatus lim_send_exclude_unencrypt_ind(tpAniSirGlobal pMac,
 					     bool excludeUnenc,

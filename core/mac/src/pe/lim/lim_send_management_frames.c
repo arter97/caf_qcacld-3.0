@@ -1623,6 +1623,7 @@ lim_send_assoc_req_mgmt_frame(tpAniSirGlobal mac_ctx,
 	void *packet;
 	QDF_STATUS qdf_status;
 	uint16_t add_ie_len, assoc_ack_status;
+	uint16_t current_len = 0, vendor_ie_len = 0;
 	uint8_t *add_ie;
 	uint8_t *wps_ie = NULL;
 	uint8_t power_caps = false;
@@ -1639,7 +1640,7 @@ lim_send_assoc_req_mgmt_frame(tpAniSirGlobal mac_ctx,
 	uint32_t bcn_ie_len = 0;
 	uint32_t aes_block_size_len = 0;
 	enum rateid min_rid = RATEID_DEFAULT;
-	uint8_t *mbo_ie = NULL;
+	uint8_t *mbo_ie = NULL, *vendor_ies = NULL;
 	uint8_t mbo_ie_len = 0;
 
 	if (NULL == pe_session) {
@@ -1957,6 +1958,33 @@ lim_send_assoc_req_mgmt_frame(tpAniSirGlobal mac_ctx,
 	}
 
 	/*
+	 * Strip rest of the vendor IEs and append to the assoc request frame.
+	 * Append the IEs just before MBO IEs as MBO IEs have to be at the
+	 * end of the frame.
+	 */
+	if (lim_get_ie_ptr_new(mac_ctx, add_ie, add_ie_len, SIR_MAC_EID_VENDOR,
+			       ONE_BYTE)) {
+		vendor_ies = qdf_mem_malloc(MAX_VENDOR_IES_LEN + 2);
+		if (vendor_ies) {
+			current_len = add_ie_len;
+			qdf_status = lim_strip_ie(mac_ctx, add_ie, &add_ie_len,
+						  SIR_MAC_EID_VENDOR, ONE_BYTE,
+						  NULL,
+						  0,
+						  vendor_ies,
+						  MAX_VENDOR_IES_LEN);
+			if (QDF_IS_STATUS_ERROR(qdf_status)) {
+				pe_err("Failed to strip Vendor IEs");
+				goto end;
+			}
+
+			vendor_ie_len = current_len - add_ie_len;
+			pe_debug("Stripped vendor IEs of size: %u",
+				 current_len);
+		}
+	}
+
+	/*
 	 * Do unpack to populate the add_ie buffer to frm structure
 	 * before packing the frm structure. In this way, the IE ordering
 	 * which the latest 802.11 spec mandates is maintained.
@@ -1982,7 +2010,7 @@ lim_send_assoc_req_mgmt_frame(tpAniSirGlobal mac_ctx,
 	}
 
 	bytes = payload + sizeof(tSirMacMgmtHdr) +
-			aes_block_size_len + mbo_ie_len;
+			aes_block_size_len + mbo_ie_len + vendor_ie_len;
 
 	qdf_status = cds_packet_alloc((uint16_t) bytes, (void **)&frame,
 				(void **)&packet);
@@ -2021,6 +2049,11 @@ lim_send_assoc_req_mgmt_frame(tpAniSirGlobal mac_ctx,
 	} else if (DOT11F_WARNED(status)) {
 		pe_warn("Assoc request pack warning (0x%08x)", status);
 	}
+
+	/* Copy the vendor IEs to the end of the frame */
+	qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
+		     vendor_ies, vendor_ie_len);
+	payload = payload + vendor_ie_len;
 
 	/* Copy the MBO IE to the end of the frame */
 	qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
@@ -2099,6 +2132,7 @@ lim_send_assoc_req_mgmt_frame(tpAniSirGlobal mac_ctx,
 		goto end;
 	}
 end:
+	qdf_mem_free(vendor_ies);
 	qdf_mem_free(mbo_ie);
 	/* Free up buffer allocated for mlm_assoc_req */
 	qdf_mem_free(mlm_assoc_req);
