@@ -3615,6 +3615,8 @@ static inline QDF_STATUS dp_pdev_attach_wifi3(struct cdp_soc_t *txrx_soc,
 				  "dp_pdev");
 	}
 
+	soc->pdev_list[pdev_id] = NULL;
+
 	if (!pdev) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 			FL("DP PDEV memory allocation failed"));
