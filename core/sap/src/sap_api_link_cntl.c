@@ -232,6 +232,75 @@ wlansap_calculate_chan_from_scan_result(mac_handle_t mac_handle,
 	return oper_channel;
 }
 
+static void
+wlansap_filter_unsafe_ch(struct wlan_objmgr_psoc *psoc,
+			 struct sap_context *sap_ctx)
+{
+	uint16_t i;
+	uint16_t num_safe_ch = 0;
+
+	/*
+	 * There are two channel list, one acs cfg channel list, and one
+	 * sap_ctx->freq_list, the unsafe channels for acs cfg is updated here
+	 * and the sap_ctx->freq list would be handled in sap_chan_sel_init
+	 * which would consider more params other than unsafe channels.
+	 * So the two lists now would be in sync. But in case the ACS weight
+	 * calculation does not get through due to no scan result or no chan
+	 * selected, or any other reason, the default channel is chosen which
+	 * would contain the channels in acs cfg. Now since the scan takes time
+	 * there could be channels present in acs cfg that could become unsafe
+	 * in the mean time, so it is better to filter out those channels from
+	 * the acs channel list before chosing one of them as a default channel
+	 */
+	for (i = 0; i < sap_ctx->acs_cfg->ch_list_count; i++) {
+		if (!policy_mgr_is_safe_channel(psoc,
+					        sap_ctx->acs_cfg->ch_list[i])) {
+			sap_debug("unsafe ch %d removed from acs list",
+				  sap_ctx->acs_cfg->ch_list[i]);
+			continue;
+		}
+		/* Add only safe channels to the acs cfg ch list */
+		sap_ctx->acs_cfg->ch_list[num_safe_ch++] =
+						sap_ctx->acs_cfg->ch_list[i];
+	}
+
+	sap_debug("Updated ACS ch list len %d", num_safe_ch);
+	sap_ctx->acs_cfg->ch_list_count = num_safe_ch;
+
+	for (i = 0; i < num_safe_ch; i++)
+		sap_debug("Ch %d", sap_ctx->acs_cfg->ch_list[i]);
+}
+
+static void
+wlan_sap_filter_non_preferred_channels(struct wlan_objmgr_pdev *pdev,
+				       struct sap_context *sap_ctx)
+{
+	uint16_t i;
+	uint16_t num_ch = 0;
+	bool preferred_freq_found = false;
+
+	for (i = 0; i < sap_ctx->acs_cfg->ch_list_count; i++) {
+		if (sap_ctx->acs_cfg->ch_list[i] == 12 ||
+		    sap_ctx->acs_cfg->ch_list[i] == 13 ||
+		    sap_ctx->acs_cfg->ch_list[i] == 14) {
+			sap_debug("Skip channel %d if preferred channel present",
+				  sap_ctx->acs_cfg->ch_list[i]);
+			continue;
+		}
+		sap_ctx->acs_cfg->ch_list[num_ch++] =
+						sap_ctx->acs_cfg->ch_list[i];
+		preferred_freq_found = true;
+	}
+
+	if (!preferred_freq_found) {
+		sap_debug("No preferred ch, list unchanged");
+		return;
+	}
+	sap_debug("preferred channel found updated ACS ch list len %d",
+		  num_ch);
+	sap_ctx->acs_cfg->ch_list_count = num_ch;
+}
+
 QDF_STATUS wlansap_pre_start_bss_acs_scan_callback(mac_handle_t mac_handle,
 						   struct sap_context *sap_ctx,
 						   uint8_t sessionid,
@@ -239,15 +308,35 @@ QDF_STATUS wlansap_pre_start_bss_acs_scan_callback(mac_handle_t mac_handle,
 						   eCsrScanStatus scan_status)
 {
 	uint8_t oper_channel = SAP_CHANNEL_NOT_SELECTED;
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 
 	host_log_acs_scan_done(acs_scan_done_status_str(scan_status),
 			  sessionid, scanid);
+
+	/* This has to be done before the ACS selects default channel */
+	wlansap_filter_unsafe_ch(mac_ctx->psoc, sap_ctx);
+
+	wlan_sap_filter_non_preferred_channels(mac_ctx->pdev, sap_ctx);
+
+	if (!sap_ctx->acs_cfg->ch_list_count) {
+		oper_channel =
+			sap_select_default_oper_chan(mac_ctx,
+						     sap_ctx->acs_cfg);
+		sap_ctx->channel = oper_channel;
+		sap_ctx->acs_cfg->pri_ch = oper_channel;
+		sap_config_acs_result(mac_handle, sap_ctx, 0);
+		sap_ctx->sap_state = eSAP_ACS_CHANNEL_SELECTED;
+		sap_ctx->sap_status = eSAP_STATUS_SUCCESS;
+		goto close_session;
+	}
+
 	if (eCSR_SCAN_SUCCESS != scan_status) {
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
 			FL("CSR scan_status = eCSR_SCAN_ABORT/FAILURE (%d), choose default channel"),
 			scan_status);
 		oper_channel =
-			sap_select_default_oper_chan(sap_ctx->acs_cfg);
+			sap_select_default_oper_chan(mac_ctx,
+						     sap_ctx->acs_cfg);
 		sap_ctx->channel = oper_channel;
 		sap_ctx->acs_cfg->pri_ch = oper_channel;
 		sap_config_acs_result(mac_handle, sap_ctx,
@@ -266,7 +355,8 @@ QDF_STATUS wlansap_pre_start_bss_acs_scan_callback(mac_handle_t mac_handle,
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO,
 			  FL("No suitable channel, so select default channel"));
 		sap_ctx->channel =
-			sap_select_default_oper_chan(sap_ctx->acs_cfg);
+			sap_select_default_oper_chan(mac_ctx,
+						     sap_ctx->acs_cfg);
 		sap_ctx->acs_cfg->pri_ch = sap_ctx->channel;
 	} else {
 		/* Valid Channel Found from scan results. */

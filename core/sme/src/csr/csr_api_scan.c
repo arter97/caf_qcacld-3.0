@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1695,54 +1695,6 @@ QDF_STATUS csr_scan_abort_mac_scan(struct mac_context *mac_ctx,
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 
-	return status;
-}
-QDF_STATUS csr_remove_nonscan_cmd_from_pending_list(struct mac_context *mac,
-						    uint8_t sessionId,
-						    eSmeCommandType commandType)
-{
-	tDblLinkList localList;
-	tListElem *pEntry;
-	tSmeCmd *pCommand;
-	tListElem *pEntryToRemove;
-	QDF_STATUS status = QDF_STATUS_E_FAILURE;
-
-	qdf_mem_zero(&localList, sizeof(tDblLinkList));
-	if (!QDF_IS_STATUS_SUCCESS(csr_ll_open(&localList))) {
-		sme_err("failed to open list");
-		return status;
-	}
-
-	pEntry = csr_nonscan_pending_ll_peek_head(mac, LL_ACCESS_NOLOCK);
-
-	/*
-	 * Have to make sure we don't loop back to the head of the list,
-	 * which will happen if the entry is NOT on the list
-	 */
-	while (pEntry) {
-		pEntryToRemove = pEntry;
-		pEntry = csr_nonscan_pending_ll_next(mac,
-					pEntry, LL_ACCESS_NOLOCK);
-		pCommand = GET_BASE_ADDR(pEntryToRemove, tSmeCmd, Link);
-
-		if ((pCommand->command == commandType) &&
-		    (pCommand->sessionId == sessionId)) {
-			/* Insert to localList and remove later */
-			csr_ll_insert_tail(&localList, pEntryToRemove,
-					   LL_ACCESS_NOLOCK);
-			status = QDF_STATUS_SUCCESS;
-		}
-	}
-
-
-	while ((pEntry = csr_ll_remove_head(&localList, LL_ACCESS_NOLOCK))) {
-		pCommand = GET_BASE_ADDR(pEntry, tSmeCmd, Link);
-		sme_debug("Sending abort for command ID %d",
-			sessionId);
-		csr_release_command(mac, pCommand);
-	}
-
-	csr_ll_close(&localList);
 	return status;
 }
 

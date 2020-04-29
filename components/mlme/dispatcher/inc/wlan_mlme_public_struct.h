@@ -1161,6 +1161,7 @@ struct wlan_mlme_product_details_cfg {
  * @is_vendor_acs_support - enable application based channel selection
  * @is_acs_support_for_dfs_ltecoex - enable channel for dfs and lte coex
  * @is_external_acs_policy - control external policy
+ * @force_sap_start: Force SAP start when no channel is found suitable
  */
 struct wlan_mlme_acs {
 	bool is_acs_with_more_param;
@@ -1168,6 +1169,7 @@ struct wlan_mlme_acs {
 	bool is_vendor_acs_support;
 	bool is_acs_support_for_dfs_ltecoex;
 	bool is_external_acs_policy;
+	bool force_sap_start;
 };
 
 /*
