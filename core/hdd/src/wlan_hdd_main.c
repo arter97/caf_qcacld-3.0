@@ -1814,6 +1814,9 @@ static void hdd_update_wiphy_he_cap(struct hdd_context *hdd_ctx)
 	struct ieee80211_supported_band *band_5g =
 			hdd_ctx->wiphy->bands[HDD_NL80211_BAND_5GHZ];
 	QDF_STATUS status;
+	uint8_t *phy_info_5g =
+		hdd_ctx->iftype_data_5g->he_cap.he_cap_elem.phy_cap_info;
+	uint8_t max_fw_bw = wma_get_vht_ch_width();
 	uint32_t channel_bonding_mode_2g;
 	uint8_t *phy_info_2g =
 		hdd_ctx->iftype_data_2g->he_cap.he_cap_elem.phy_cap_info;
@@ -1842,6 +1845,15 @@ static void hdd_update_wiphy_he_cap(struct hdd_context *hdd_ctx)
 		hdd_ctx->iftype_data_5g->he_cap.has_he = he_cap_cfg.present;
 		band_5g->n_iftype_data = 1;
 		band_5g->iftype_data = hdd_ctx->iftype_data_5g;
+		if (max_fw_bw >= WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ)
+			phy_info_5g[0] |=
+				IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_40MHZ_80MHZ_IN_5G;
+		if (max_fw_bw >= WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ)
+			phy_info_5g[0] |=
+				IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_160MHZ_IN_5G;
+		if (max_fw_bw >= WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ)
+			phy_info_5g[0] |=
+			     IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_80PLUS80_MHZ_IN_5G;
 	}
 }
 #else
