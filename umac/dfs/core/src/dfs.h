@@ -1248,6 +1248,7 @@ struct wlan_dfs {
 	bool           dfs_allow_hw_pulses;
 #endif
 	struct dfs_mode_switch_defer_params dfs_defer_params;
+	uint16_t       dfs_lowest_pri_limit;
 };
 
 #if defined(QCA_SUPPORT_AGILE_DFS) || defined(ATH_SUPPORT_ZERO_CAC_DFS)
