@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2018-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2016, 2018-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -55,7 +55,7 @@
 void lim_init_peer_idxpool(struct mac_context *mac, struct pe_session *pe_session)
 {
 	uint8_t i;
-	uint8_t maxAssocSta = mac->lim.maxStation;
+	uint8_t maxAssocSta = mac->lim.max_sta_of_pe_session;
 
 	pe_session->gpLimPeerIdxpool[0] = 0;
 
