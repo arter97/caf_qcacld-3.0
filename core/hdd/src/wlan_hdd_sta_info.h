@@ -32,6 +32,7 @@
 #include "cdp_txrx_cmn_struct.h"
 #include "sir_mac_prot_def.h"
 #include <linux/ieee80211.h>
+#include <wlan_mlme_public_struct.h>
 
 /* A bucket size of 2^4 = 16 */
 #define WLAN_HDD_STA_INFO_SIZE 4
@@ -65,6 +66,12 @@ enum dhcp_nego_status {
 	DHCP_NEGO_STOP,
 	DHCP_NEGO_IN_PROGRESS
 };
+
+/**
+ * Pending frame type of EAP_FAILURE, bit number used in "pending_eap_frm_type"
+ * of sta_info.
+ */
+#define PENDING_TYPE_EAP_FAILURE  0
 
 /**
  * struct hdd_station_info - Per station structure kept in HDD for
@@ -120,6 +127,9 @@ enum dhcp_nego_status {
  * feature or not, if first bit is 1 it indicates that FW supports this
  * feature, if it is 0 it indicates FW doesn't support this feature
  * @sta_info: The sta_info node for the station info list maintained in adapter
+ * @assoc_req_ies: Assoc request IEs of the peer station
+ * @ref_cnt: Reference count to synchronize sta_info access
+ * @pending_eap_frm_type: EAP frame type in tx queue without tx completion
  */
 struct hdd_station_info {
 	bool in_use;
@@ -168,6 +178,9 @@ struct hdd_station_info {
 	uint32_t rx_retry_cnt;
 	uint32_t rx_mc_bc_cnt;
 	struct qdf_ht_entry sta_node;
+	struct wlan_ies assoc_req_ies;
+	qdf_atomic_t ref_cnt;
+	unsigned long pending_eap_frm_type;
 };
 
 /**
@@ -266,6 +279,18 @@ QDF_STATUS hdd_sta_info_attach(struct hdd_sta_info_obj *sta_info_container,
 struct hdd_station_info *hdd_get_sta_info_by_mac(
 				struct hdd_sta_info_obj *sta_info_container,
 				const uint8_t *mac_addr);
+
+/**
+ * hdd_put_sta_info() - Release sta_info for synchronization
+ * @sta_info_container: The station info container obj that stores and maintains
+ *                      the sta_info obj.
+ * @sta_info: Station info structure to be released.
+ *
+ * Return: None
+ */
+void hdd_put_sta_info(struct hdd_sta_info_obj *sta_info_container,
+		      struct hdd_station_info **sta_info, bool lock_required);
+
 /**
  * hdd_clear_cached_sta_info() - Clear the cached sta info from the container
  * @sta_info_container: The station info container obj that stores and maintains

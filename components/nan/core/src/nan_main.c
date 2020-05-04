@@ -35,6 +35,7 @@
 #include "wlan_objmgr_pdev_obj.h"
 #include "wlan_objmgr_vdev_obj.h"
 #include "qdf_platform.h"
+#include "wlan_osif_request_manager.h"
 
 QDF_STATUS nan_set_discovery_state(struct wlan_objmgr_psoc *psoc,
 				   enum nan_disc_state new_state)
@@ -86,8 +87,8 @@ QDF_STATUS nan_set_discovery_state(struct wlan_objmgr_psoc *psoc,
 
 	qdf_spin_unlock_bh(&psoc_priv->lock);
 
-	nan_info("NAN State transitioned from %d -> %d", cur_state,
-		 psoc_priv->disc_state);
+	nan_debug("NAN State transitioned from %d -> %d", cur_state,
+		  psoc_priv->disc_state);
 
 	return status;
 }
@@ -730,6 +731,7 @@ static QDF_STATUS nan_handle_ndp_end_rsp(
 {
 	struct wlan_objmgr_psoc *psoc;
 	struct nan_psoc_priv_obj *psoc_nan_obj;
+	struct osif_request *request;
 
 	*vdev = rsp->vdev;
 	psoc = wlan_vdev_get_psoc(rsp->vdev);
@@ -744,6 +746,14 @@ static QDF_STATUS nan_handle_ndp_end_rsp(
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
+	/* Unblock the wait here if NDP_END request is a failure */
+	if (rsp->status != 0) {
+		request = osif_request_get(psoc_nan_obj->request_context);
+		if (request) {
+			osif_request_complete(request);
+			osif_request_put(request);
+		}
+	}
 	psoc_nan_obj->cb_obj.os_if_ndp_event_handler(psoc, rsp->vdev,
 						     NDP_END_RSP, rsp);
 
@@ -758,6 +768,7 @@ static QDF_STATUS nan_handle_end_ind(
 	struct nan_psoc_priv_obj *psoc_nan_obj;
 	struct wlan_objmgr_vdev *vdev_itr;
 	struct nan_vdev_priv_obj *vdev_nan_obj;
+	struct osif_request *request;
 
 	psoc = wlan_vdev_get_psoc(ind->vdev);
 	if (!psoc) {
@@ -803,6 +814,13 @@ static QDF_STATUS nan_handle_end_ind(
 	psoc_nan_obj->cb_obj.ndp_delete_peers(ind->ndp_map, ind->num_ndp_ids);
 	psoc_nan_obj->cb_obj.os_if_ndp_event_handler(psoc, ind->vdev,
 						     NDP_END_IND, ind);
+
+	/* Unblock the NDP_END wait */
+	request = osif_request_get(psoc_nan_obj->request_context);
+	if (request) {
+		osif_request_complete(request);
+		osif_request_put(request);
+	}
 
 	return QDF_STATUS_SUCCESS;
 }

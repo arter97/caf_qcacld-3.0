@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -133,6 +133,16 @@ int wma_cli_set2_command(int vdev_id, int param_id, int sval1,
 			 int sval2, int vpdev);
 
 /**
+ * wma_get_fw_phy_mode_for_freq_cb() - Callback to get current PHY Mode.
+ * @freq: channel freq
+ * @chan_width: maximum channel width possible
+ * @phy_mode: firmware PHY Mode
+ *
+ * Return: None
+ */
+void wma_get_fw_phy_mode_for_freq_cb(uint32_t freq, uint32_t chan_width,
+				     uint32_t  *phy_mode);
+/**
  * wma_get_phy_mode_cb() - Callback to get current PHY Mode.
  * @chan: channel number
  * @chan_width: maximum channel width possible
@@ -168,6 +178,10 @@ QDF_STATUS wma_get_connection_info(uint8_t vdev_id,
 QDF_STATUS wma_ndi_update_connection_info(uint8_t vdev_id,
 		struct nan_datapath_channel_info *ndp_chan_info);
 
+#ifdef WLAN_FEATURE_PKT_CAPTURE
+int wma_get_rmf_status(uint8_t vdev_id);
+#endif
+
 bool wma_is_vdev_up(uint8_t vdev_id);
 
 void *wma_get_beacon_buffer_by_vdev_id(uint8_t vdev_id, uint32_t *buffer_size);
@@ -186,6 +200,17 @@ bool wma_is_rx_ldpc_supported_for_channel(uint32_t ch_freq);
 
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS
 int wma_unified_radio_tx_mem_free(void *handle);
+
+/*
+ * wma_unified_link_stats_results_mem_free() - Free the memory for
+ * link_stats_results->results allocated when event comes.
+ * @link_stats_results: pointer to the memory that is to be freed
+ *
+ * Return: None
+ */
+void
+wma_unified_link_stats_results_mem_free(tSirLLStatsResults *link_stats_results);
+
 #else /* WLAN_FEATURE_LINK_LAYER_STATS */
 static inline int wma_unified_radio_tx_mem_free(void *handle)
 {
@@ -273,6 +298,25 @@ void wma_process_pdev_hw_mode_trans_ind(void *wma,
  */
 QDF_STATUS wma_set_cts2self_for_p2p_go(void *wma_handle,
 		uint32_t cts2self_for_p2p_go);
+
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+/**
+ * wma_get_roam_scan_ch() - API to get roam scan channel list.
+ * @wma_handle: pointer to wma handle.
+ * @vdev_id: vdev id
+ *
+ * Return: QDF_STATUS.
+ */
+QDF_STATUS wma_get_roam_scan_ch(wmi_unified_t wma,
+				uint8_t vdev_id);
+#else
+static inline
+QDF_STATUS wma_get_roam_scan_ch(wmi_unified_t wma,
+				uint8_t vdev_id)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
 
 /**
  * wma_set_tx_rx_aggr_size() - set tx rx aggregation size
@@ -370,6 +414,17 @@ QDF_STATUS wma_set_sar_limit(WMA_HANDLE handle,
 QDF_STATUS wma_send_coex_config_cmd(WMA_HANDLE wma_handle,
 				    struct coex_config_params *coex_cfg_params);
 
+/**
+ * wma_send_ocl_cmd() - Send OCL command
+ * @wma_handle: wma handle
+ * @ocl_params: OCL command params
+ *
+ * This function sends WMI command to send OCL mode configuration
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wma_send_ocl_cmd(WMA_HANDLE wma_handle,
+			    struct ocl_cmd_params *ocl_params);
 /**
  * wma_set_qpower_config() - update qpower config in wma
  * @vdev_id:	the Id of the vdev to configure

@@ -79,6 +79,7 @@
 #include <wlan_cp_stats_mc_ucfg_api.h>
 #include <wlan_crypto_global_api.h>
 #include <wlan_mlme_main.h>
+#include "wlan_pkt_capture_ucfg_api.h"
 
 struct wma_search_rate {
 	int32_t rate;
@@ -1111,7 +1112,7 @@ QDF_STATUS wma_set_enable_disable_mcc_adaptive_scheduler(uint32_t
 QDF_STATUS wma_set_mcc_channel_time_latency(tp_wma_handle wma,
 	uint32_t mcc_channel, uint32_t mcc_channel_time_latency)
 {
-	uint8_t mcc_adapt_sch = 0;
+	bool mcc_adapt_sch = false;
 	struct mac_context *mac = NULL;
 	uint32_t channel1 = mcc_channel;
 	uint32_t chan1_freq = cds_chan_to_freq(channel1);
@@ -1134,11 +1135,10 @@ QDF_STATUS wma_set_mcc_channel_time_latency(tp_wma_handle wma,
 		return QDF_STATUS_E_FAILURE;
 	}
 	/* Confirm MCC adaptive scheduler feature is disabled */
-	if (policy_mgr_get_mcc_adaptive_sch(mac->psoc,
-					    &mcc_adapt_sch) ==
+	if (policy_mgr_get_dynamic_mcc_adaptive_sch(mac->psoc,
+						    &mcc_adapt_sch) ==
 	    QDF_STATUS_SUCCESS) {
-		if (mcc_adapt_sch ==
-		    cfg_max(CFG_ENABLE_MCC_ADAPTIVE_SCH_ENABLED_NAME)) {
+		if (mcc_adapt_sch) {
 			WMA_LOGD("%s: Can't set channel latency while MCC ADAPTIVE SCHED is enabled. Exit",
 				__func__);
 			return QDF_STATUS_SUCCESS;
@@ -1175,7 +1175,7 @@ QDF_STATUS wma_set_mcc_channel_time_quota(tp_wma_handle wma,
 		uint32_t adapter_1_chan_number,	uint32_t adapter_1_quota,
 		uint32_t adapter_2_chan_number)
 {
-	uint8_t mcc_adapt_sch = 0;
+	bool mcc_adapt_sch = false;
 	struct mac_context *mac = NULL;
 	uint32_t chan1_freq = cds_chan_to_freq(adapter_1_chan_number);
 	uint32_t chan2_freq = cds_chan_to_freq(adapter_2_chan_number);
@@ -1199,11 +1199,10 @@ QDF_STATUS wma_set_mcc_channel_time_quota(tp_wma_handle wma,
 	}
 
 	/* Confirm MCC adaptive scheduler feature is disabled */
-	if (policy_mgr_get_mcc_adaptive_sch(mac->psoc,
-					    &mcc_adapt_sch) ==
+	if (policy_mgr_get_dynamic_mcc_adaptive_sch(mac->psoc,
+						    &mcc_adapt_sch) ==
 	    QDF_STATUS_SUCCESS) {
-		if (mcc_adapt_sch ==
-		    cfg_max(CFG_ENABLE_MCC_ADAPTIVE_SCH_ENABLED_NAME)) {
+		if (mcc_adapt_sch) {
 			WMA_LOGD("%s: Can't set channel quota while MCC_ADAPTIVE_SCHED is enabled. Exit",
 				 __func__);
 			return QDF_STATUS_SUCCESS;
@@ -2442,8 +2441,9 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 		cds_packet_free((void *)tx_frame);
 		return QDF_STATUS_E_FAILURE;
 	}
+
 #ifdef WLAN_FEATURE_11W
-	if ((iface && iface->rmfEnabled) &&
+	if ((iface && (iface->rmfEnabled || tx_flag & HAL_USE_PMF)) &&
 	    (frmType == TXRX_FRM_802_11_MGMT) &&
 	    (pFc->subType == SIR_MAC_MGMT_DISASSOC ||
 	     pFc->subType == SIR_MAC_MGMT_DEAUTH ||
@@ -2458,17 +2458,21 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 				/* Allocate extra bytes for privacy header and
 				 * trailer
 				 */
-				pdev_id = wlan_objmgr_pdev_get_pdev_id(
+				if (iface->type == WMI_VDEV_TYPE_NDI &&
+				    (tx_flag & HAL_USE_PMF)) {
+					hdr_len = IEEE80211_CCMP_HEADERLEN;
+					mic_len = IEEE80211_CCMP_MICLEN;
+				} else {
+					pdev_id = wlan_objmgr_pdev_get_pdev_id(
 							wma_handle->pdev);
-				qdf_status =
-					mlme_get_peer_mic_len(wma_handle->psoc,
-							      pdev_id,
-							      wh->i_addr1,
-							      &mic_len,
-							      &hdr_len);
+					qdf_status = mlme_get_peer_mic_len(
+							wma_handle->psoc,
+							pdev_id, wh->i_addr1,
+							&mic_len, &hdr_len);
 
-				if (QDF_IS_STATUS_ERROR(qdf_status))
-					return qdf_status;
+					if (QDF_IS_STATUS_ERROR(qdf_status))
+						return qdf_status;
+				}
 
 				newFrmLen = frmLen + hdr_len + mic_len;
 				qdf_status =
@@ -2736,8 +2740,6 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 		chanfreq = 0;
 	}
 
-	WMA_LOGD("%s: chan freq %d vdev:%d subType:%d",
-		 __func__, chanfreq, vdev_id, pFc->subType);
 	if (mac->mlme_cfg->gen.debug_packet_log & 0x1) {
 		if ((pFc->type == SIR_MAC_MGMT_FRAME) &&
 		    (pFc->subType != SIR_MAC_MGMT_PROBE_REQ) &&
@@ -2791,6 +2793,14 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 		mac_addr = wh->i_addr2;
 		peer = wlan_objmgr_get_peer(psoc, pdev_id, mac_addr,
 					WLAN_MGMT_NB_ID);
+	}
+
+	if (ucfg_pkt_capture_get_pktcap_mode(psoc) &
+	    PKT_CAPTURE_MODE_MGMT_ONLY) {
+		ucfg_pkt_capture_mgmt_tx(wma_handle->pdev,
+					 tx_frame,
+					 wma_handle->interfaces[vdev_id].mhz,
+					 mgmt_param.tx_param.preamble_type);
 	}
 
 	status = wlan_mgmt_txrx_mgmt_frame_tx(peer, wma_handle->mac_context,
@@ -3180,6 +3190,31 @@ uint8_t wma_rx_invalid_peer_ind(uint8_t vdev_id, void *wh)
 			QDF_MAC_ADDR_ARRAY(rx_inv_msg->ta));
 		qdf_mem_free(rx_inv_msg);
 	}
+
+	return 0;
+}
+
+int wma_dp_send_delba_ind(uint8_t vdev_id, uint8_t *peer_macaddr,
+			  uint8_t tid, uint8_t reason_code)
+{
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+	struct lim_delba_req_info *req;
+
+	if (!wma || !peer_macaddr) {
+		wma_err("wma handle or mac addr is NULL");
+		return -EINVAL;
+	}
+	req = qdf_mem_malloc(sizeof(*req));
+	if (!req)
+		return -ENOMEM;
+	req->vdev_id = vdev_id;
+	qdf_mem_copy(req->peer_macaddr, peer_macaddr, QDF_MAC_ADDR_SIZE);
+	req->tid = tid;
+	req->reason_code = reason_code;
+	WMA_LOGD("req delba_ind vdev %d %pM tid %d reason %d",
+		 vdev_id, peer_macaddr, tid, reason_code);
+	wma_send_msg_high_priority(wma, SIR_HAL_REQ_SEND_DELBA_REQ_IND,
+				   (void *)req, 0);
 
 	return 0;
 }

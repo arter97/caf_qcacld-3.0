@@ -83,7 +83,10 @@
 #include <ol_txrx_ipa.h>
 #include "wlan_roam_debug.h"
 #include "cfg_ucfg_api.h"
-
+#ifdef DP_SUPPORT_RECOVERY_NOTIFY
+#include <qdf_notifier.h>
+#include <qdf_hang_event_notifier.h>
+#endif
 
 #define DPT_DEBUGFS_PERMS	(QDF_FILE_USR_READ |	\
 				QDF_FILE_USR_WRITE |	\
@@ -354,7 +357,7 @@ static bool ol_txrx_find_peer_exist_on_other_vdev(struct cdp_soc_t *soc_hdl,
 	struct ol_txrx_vdev_t *vdev;
 
 	for (i = 0; i < max_bssid; i++) {
-		vdev = ol_txrx_get_vdev_from_soc_vdev_id(soc, vdev_id);
+		vdev = ol_txrx_get_vdev_from_soc_vdev_id(soc, i);
 		/* Need to check vdevs other than the vdev_id */
 		if (vdev_id == i || !vdev)
 			continue;
@@ -362,7 +365,7 @@ static bool ol_txrx_find_peer_exist_on_other_vdev(struct cdp_soc_t *soc_hdl,
 					ol_txrx_pdev_t_to_cdp_pdev(vdev->pdev),
 					ol_txrx_vdev_t_to_cdp_vdev(vdev),
 					peer_addr)) {
-			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO_HIGH,
+			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
 				  "%s: Duplicate peer %pM already exist on vdev %d",
 				  __func__, peer_addr, i);
 			return true;
@@ -3322,6 +3325,63 @@ ol_txrx_clear_peer(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 	return status;
 }
 
+#ifdef DP_SUPPORT_RECOVERY_NOTIFY
+static
+int ol_peer_recovery_notifier_cb(struct notifier_block *block,
+				 unsigned long state, void *data)
+{
+	struct qdf_notifer_data *notif_data = data;
+	qdf_notif_block *notif_block;
+	struct ol_txrx_peer_t *peer;
+	struct peer_hang_data hang_data;
+	enum peer_debug_id_type dbg_id;
+
+	if (!data || !block)
+		return -EINVAL;
+
+	notif_block = qdf_container_of(block, qdf_notif_block, notif_block);
+
+	peer = notif_block->priv_data;
+	if (!peer)
+		return -EINVAL;
+
+	QDF_HANG_EVT_SET_HDR(&hang_data.tlv_header,
+			     HANG_EVT_TAG_DP_PEER_INFO,
+			     QDF_HANG_GET_STRUCT_TLVLEN(struct peer_hang_data));
+
+	qdf_mem_copy(&hang_data.peer_mac_addr, &peer->mac_addr.raw,
+		     QDF_MAC_ADDR_SIZE);
+
+	for (dbg_id = 0; dbg_id < PEER_DEBUG_ID_MAX; dbg_id++)
+		if (qdf_atomic_read(&peer->access_list[dbg_id]))
+			hang_data.peer_timeout_bitmask |= (1 << dbg_id);
+
+	qdf_mem_copy(notif_data->hang_data + notif_data->offset,
+		     &hang_data, sizeof(struct peer_hang_data));
+	notif_data->offset += sizeof(struct peer_hang_data);
+
+	return 0;
+}
+
+static qdf_notif_block ol_peer_recovery_notifier = {
+	.notif_block.notifier_call = ol_peer_recovery_notifier_cb,
+};
+
+static
+QDF_STATUS ol_register_peer_recovery_notifier(struct ol_txrx_peer_t *peer)
+{
+	ol_peer_recovery_notifier.priv_data = peer;
+
+	return qdf_hang_event_register_notifier(&ol_peer_recovery_notifier);
+}
+#else
+static inline
+QDF_STATUS ol_register_peer_recovery_notifier(struct ol_txrx_peer_t *peer)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 /**
  * peer_unmap_timer_handler() - peer unmap timer function
  * @data: peer object pointer
@@ -3340,6 +3400,7 @@ void peer_unmap_timer_handler(void *data)
 	ol_txrx_err("peer %pK ("QDF_MAC_ADDR_STR")",
 		    peer,
 		    QDF_MAC_ADDR_ARRAY(peer->mac_addr.raw));
+	ol_register_peer_recovery_notifier(peer);
 
 	cds_trigger_recovery(QDF_PEER_UNMAP_TIMEDOUT);
 }
@@ -5928,117 +5989,6 @@ void ol_deregister_packetdump_callback(struct cdp_soc_t *soc_hdl,
 	pdev->ol_rx_packetdump_cb = NULL;
 }
 
-#ifdef WLAN_FEATURE_PKT_CAPTURE
-/**
- * ol_txrx_register_pktcapture_cb() - Register pkt capture mode callback
- * @soc: soc handle
- * @pdev_id: pdev id
- * @context: virtual device's osif_dev
- * @cb: callback to register
- *
- * Return: QDF_STATUS Enumeration
- */
-static QDF_STATUS ol_txrx_register_pktcapture_cb(
-					struct cdp_soc_t *soc,
-					uint8_t pdev_id,
-					void *context,
-					QDF_STATUS(cb)(void *, qdf_nbuf_t))
-{
-	struct ol_txrx_pdev_t *pdev = ol_txrx_get_pdev_from_pdev_id(
-					cdp_soc_t_to_ol_txrx_soc_t(soc),
-					pdev_id);
-
-	if (!pdev) {
-		ol_txrx_err("pdev NULL!");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	pdev->mon_osif_dev = context;
-	pdev->mon_cb = cb;
-	return QDF_STATUS_SUCCESS;
-}
-
-/**
- * ol_txrx_deregister_pktcapture_cb() - Register pkt capture mode callback
- * @soc: soc handle
- * @pdev_id: pdev id
- *
- * Return: QDF_STATUS Enumeration
- */
-static QDF_STATUS ol_txrx_deregister_pktcapture_cb(struct cdp_soc_t *soc,
-						   uint8_t pdev_id)
-{
-	ol_txrx_pdev_handle pdev = ol_txrx_get_pdev_from_pdev_id(
-					cdp_soc_t_to_ol_txrx_soc_t(soc),
-					pdev_id);
-
-	if (qdf_unlikely(!pdev)) {
-		qdf_print("%s: pdev is NULL!\n", __func__);
-		qdf_assert(0);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	pdev->mon_osif_dev = NULL;
-	pdev->mon_cb = NULL;
-
-	return QDF_STATUS_SUCCESS;
-}
-
-/**
- * ol_txrx_get_pktcapture_mode() - return pktcapture mode
- * @soc: soc handle
- * @pdev_id: pdev id
- *
- * Return: 0 - disable
- *         1 - Mgmt packets
- *         2 - Data packets
- *         3 - Both Mgmt and Data packets
- */
-static uint8_t ol_txrx_get_pktcapture_mode(struct cdp_soc_t *soc,
-					   uint8_t pdev_id)
-{
-	struct ol_txrx_pdev_t *pdev = ol_txrx_get_pdev_from_pdev_id(
-					cdp_soc_t_to_ol_txrx_soc_t(soc),
-					pdev_id);
-
-	if (!pdev) {
-		qdf_print("%s: pdev is NULL\n", __func__);
-		return 0;
-	}
-
-	if (!pdev->mon_cb || !pdev->mon_osif_dev)
-		return 0;
-
-	return pdev->pktcapture_mode_value;
-}
-
-/**
- * ol_txrx_set_pktcapture_mode() - set pktcapture mode
- * @soc: soc handle
- * @pdev_id: pdev id
- * @val  : 0 - disable
- *         1 - Mgmt packets
- *         2 - Data packets
- *         3 - Both Mgmt and Data packets
- *
- * Return: none
- */
-static void ol_txrx_set_pktcapture_mode(struct cdp_soc_t *soc,
-					uint8_t pdev_id, uint8_t val)
-{
-	struct ol_txrx_pdev_t *pdev = ol_txrx_get_pdev_from_pdev_id(
-					cdp_soc_t_to_ol_txrx_soc_t(soc),
-					pdev_id);
-
-	if (!pdev) {
-		qdf_print("%s: pdev is NULL\n", __func__);
-		return;
-	}
-
-	pdev->pktcapture_mode_value = val;
-}
-#endif /* WLAN_FEATURE_PKT_CAPTURE */
-
 static struct cdp_cmn_ops ol_ops_cmn = {
 	.txrx_soc_attach_target = ol_txrx_soc_attach_target,
 	.txrx_vdev_attach = ol_txrx_vdev_attach,
@@ -6286,15 +6236,6 @@ static struct cdp_raw_ops ol_ops_raw = {
 	/* EMPTY FOR MCL */
 };
 
-#ifdef WLAN_FEATURE_PKT_CAPTURE
-static struct cdp_pktcapture_ops ol_ops_pkt_capture = {
-	.txrx_pktcapture_cb_register = ol_txrx_register_pktcapture_cb,
-	.txrx_pktcapture_cb_deregister = ol_txrx_deregister_pktcapture_cb,
-	.txrx_pktcapture_set_mode = ol_txrx_set_pktcapture_mode,
-	.txrx_pktcapture_get_mode = ol_txrx_get_pktcapture_mode,
-};
-#endif /* #ifdef WLAN_FEATURE_PKT_CAPTURE */
-
 static struct cdp_ops ol_txrx_ops = {
 	.cmn_drv_ops = &ol_ops_cmn,
 	.ctrl_ops = &ol_ops_ctrl,
@@ -6322,9 +6263,6 @@ static struct cdp_ops ol_txrx_ops = {
 	.mob_stats_ops = &ol_ops_mob_stats,
 	.delay_ops = &ol_ops_delay,
 	.pmf_ops = &ol_ops_pmf,
-#ifdef WLAN_FEATURE_PKT_CAPTURE
-	.pktcapture_ops = &ol_ops_pkt_capture,
-#endif
 };
 
 ol_txrx_soc_handle ol_txrx_soc_attach(void *scn_handle,

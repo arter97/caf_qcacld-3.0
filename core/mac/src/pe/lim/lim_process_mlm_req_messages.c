@@ -384,7 +384,7 @@ lim_process_mlm_post_join_suspend_link(struct mac_context *mac_ctx,
 	mac_ctx->lim.lim_timers.gLimJoinFailureTimer.sessionId =
 		session->peSessionId;
 
-	status = wma_add_bss_peer_sta(session->self_mac_addr, session->bssId,
+	status = wma_add_bss_peer_sta(session->vdev_id, session->bssId,
 				      false);
 	lim_post_join_set_link_state_callback(mac_ctx, session, status);
 
@@ -440,8 +440,6 @@ void lim_process_mlm_join_req(struct mac_context *mac_ctx,
 		SIR_MAC_GET_IBSS(mlm_join_req->bssDescription.
 			capabilityInfo))) {
 		session->pLimMlmJoinReq = mlm_join_req;
-		pe_debug("vdev_id:%d Join req on current freq %d",
-			 session->vdev_id, session->curr_op_freq);
 		lim_process_mlm_post_join_suspend_link(mac_ctx, session);
 		return;
 	}
@@ -663,12 +661,11 @@ static void lim_process_mlm_auth_req(struct mac_context *mac_ctx, uint32_t *msg)
 		return;
 	}
 
-	pe_debug("Process Auth Req sessionID %d Systemrole %d"
-		       "mlmstate %d from: " QDF_MAC_ADDR_STR
-		       " with authtype %d", session_id,
-		GET_LIM_SYSTEM_ROLE(session), session->limMlmState,
-		QDF_MAC_ADDR_ARRAY(mac_ctx->lim.gpLimMlmAuthReq->peerMacAddr),
-		mac_ctx->lim.gpLimMlmAuthReq->authType);
+	pe_debug("vdev %d Systemrole %d mlmstate %d from: " QDF_MAC_ADDR_STR "with authtype %d",
+		 session->vdev_id, GET_LIM_SYSTEM_ROLE(session),
+		 session->limMlmState,
+		 QDF_MAC_ADDR_ARRAY(mac_ctx->lim.gpLimMlmAuthReq->peerMacAddr),
+		 mac_ctx->lim.gpLimMlmAuthReq->authType);
 
 	sir_copy_mac_addr(curr_bssid, session->bssId);
 
@@ -865,8 +862,7 @@ static void lim_process_mlm_assoc_req(struct mac_context *mac_ctx, uint32_t *msg
 	MTRACE(mac_trace(mac_ctx, TRACE_CODE_MLM_STATE,
 			 session_entry->peSessionId,
 			 session_entry->limMlmState));
-	pe_debug("SessionId:%d Sending Assoc_Req Frame",
-		session_entry->peSessionId);
+	pe_debug("vdev %d Sending Assoc_Req Frame", session_entry->vdev_id);
 
 	/* Prepare and send Association request frame */
 	lim_send_assoc_req_mgmt_frame(mac_ctx, mlm_assoc_req, session_entry);
@@ -931,12 +927,6 @@ lim_process_mlm_disassoc_req_ntf(struct mac_context *mac_ctx,
 		mlm_disassoccnf.resultCode = eSIR_SME_INVALID_PARAMETERS;
 		goto end;
 	}
-
-	pe_debug("Process DisAssoc Req on sessionID %d Systemrole %d"
-		   "mlmstate %d from: " QDF_MAC_ADDR_STR,
-		mlm_disassocreq->sessionId, GET_LIM_SYSTEM_ROLE(session),
-		session->limMlmState,
-		QDF_MAC_ADDR_ARRAY(mlm_disassocreq->peer_macaddr.bytes));
 
 	qdf_mem_copy(curr_bssid.bytes, session->bssId, QDF_MAC_ADDR_SIZE);
 
@@ -1222,10 +1212,6 @@ lim_process_mlm_disassoc_req(struct mac_context *mac_ctx, uint32_t *msg_buf)
 	}
 
 	mlm_disassoc_req = (tLimMlmDisassocReq *) msg_buf;
-	pe_debug("Process disassoc req, sessionID %d from: "QDF_MAC_ADDR_STR,
-		mlm_disassoc_req->sessionId,
-		QDF_MAC_ADDR_ARRAY(mlm_disassoc_req->peer_macaddr.bytes));
-
 	lim_process_mlm_disassoc_req_ntf(mac_ctx, QDF_STATUS_SUCCESS,
 					 (uint32_t *) msg_buf);
 }
@@ -1268,12 +1254,6 @@ lim_process_mlm_deauth_req_ntf(struct mac_context *mac_ctx,
 		qdf_mem_free(mlm_deauth_req);
 		return;
 	}
-	pe_debug("Process Deauth Req on sessionID %d Systemrole %d"
-		       "mlmstate %d from: " QDF_MAC_ADDR_STR,
-		mlm_deauth_req->sessionId,
-		GET_LIM_SYSTEM_ROLE(session),
-		session->limMlmState,
-		QDF_MAC_ADDR_ARRAY(mlm_deauth_req->peer_macaddr.bytes));
 	sir_copy_mac_addr(curr_bssId, session->bssId);
 
 	switch (GET_LIM_SYSTEM_ROLE(session)) {
@@ -1307,11 +1287,6 @@ lim_process_mlm_deauth_req_ntf(struct mac_context *mac_ctx,
 					qdf_mem_free(mlm_deauth_req);
 					return;
 				}
-
-				pe_debug("send deauth rsp with ret code %d for" QDF_MAC_ADDR_STR,
-					eSIR_SME_DEAUTH_STATUS,
-					QDF_MAC_ADDR_ARRAY(
-					  mlm_deauth_req->peer_macaddr.bytes));
 
 				sme_deauth_rsp->messageType =
 						eWNI_SME_DEAUTH_RSP;
@@ -1513,11 +1488,6 @@ void lim_process_mlm_deauth_req(struct mac_context *mac_ctx, uint32_t *msg_buf)
 	}
 
 	mlm_deauth_req = (tLimMlmDeauthReq *) msg_buf;
-	pe_debug("Process Deauth Req on sessionID %d from: "
-		   QDF_MAC_ADDR_STR,
-		mlm_deauth_req->sessionId,
-		QDF_MAC_ADDR_ARRAY(mlm_deauth_req->peer_macaddr.bytes));
-
 	session = pe_find_session_by_session_id(mac_ctx,
 				mlm_deauth_req->sessionId);
 	if (!session) {
@@ -1621,8 +1591,7 @@ static void lim_process_periodic_join_probe_req_timer(struct mac_context *mac_ct
 		ssid.length = session->ssId.length;
 		lim_send_probe_req_mgmt_frame(mac_ctx, &ssid,
 			session->pLimMlmJoinReq->bssDescription.bssId,
-			wlan_reg_freq_to_chan(mac_ctx->pdev,
-					      session->curr_op_freq),
+			session->curr_op_freq,
 			session->self_mac_addr, session->dot11mode,
 			&session->lim_join_req->addIEScan.length,
 			session->lim_join_req->addIEScan.addIEdata);

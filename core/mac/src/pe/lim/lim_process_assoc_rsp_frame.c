@@ -41,6 +41,7 @@
 #include "lim_ser_des_utils.h"
 #include "lim_send_messages.h"
 #include "lim_process_fils.h"
+#include "wlan_blm_api.h"
 
 /**
  * lim_update_stads_htcap() - Updates station Descriptor HT capability
@@ -185,7 +186,8 @@ void lim_update_assoc_sta_datas(struct mac_context *mac_ctx,
 	}
 
 	if (IS_DOT11_MODE_HE(session_entry->dot11mode))
-		lim_update_stads_he_caps(sta_ds, assoc_rsp, session_entry);
+		lim_update_stads_he_caps(mac_ctx, sta_ds, assoc_rsp,
+					 session_entry);
 
 	if (lim_is_sta_he_capable(sta_ds))
 		he_cap = &assoc_rsp->he_cap;
@@ -310,7 +312,6 @@ static void lim_update_ric_data(struct mac_context *mac_ctx,
 			pe_err("RIC data not present");
 		}
 	} else {
-		pe_debug("Ric is not present");
 		session_entry->RICDataLen = 0;
 		session_entry->ricData = NULL;
 	}
@@ -356,7 +357,6 @@ static void lim_update_ese_tspec(struct mac_context *mac_ctx,
 	} else {
 		session_entry->tspecLen = 0;
 		session_entry->tspecIes = NULL;
-		pe_debug("Tspec EID *NOT* present in assoc rsp");
 	}
 	return;
 }
@@ -587,34 +587,14 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx,
 	struct csr_roam_session *roam_session;
 #endif
 	uint8_t ap_nss;
+	int8_t rssi;
 
-	/* Initialize status code to success. */
-	if (lim_is_roam_synch_in_progress(session_entry))
-		hdr = (tpSirMacMgmtHdr) mac_ctx->roam.pReassocResp;
-	else
-		hdr = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 	vdev_id = session_entry->vdev_id;
 #endif
 	assoc_cnf.resultCode = eSIR_SME_SUCCESS;
 	/* Update PE session Id */
 	assoc_cnf.sessionId = session_entry->peSessionId;
-	if (!hdr) {
-		pe_err("LFR3: Reassoc response packet header is NULL");
-		return;
-	}
-
-	pe_nofl_info("Assoc RX %d vid %d sys role %d"
-		     " lim state %d rssi %d from "QDF_MAC_ADDR_STR, subtype,
-		     session_entry->peSessionId,
-		     GET_LIM_SYSTEM_ROLE(session_entry),
-		     session_entry->limMlmState,
-		     WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info),
-		     QDF_MAC_ADDR_ARRAY(hdr->sa));
-
-	beacon = qdf_mem_malloc(sizeof(tSchBeaconStruct));
-	if (!beacon)
-		return;
 
 	if (LIM_IS_AP_ROLE(session_entry)) {
 		/*
@@ -623,16 +603,36 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx,
 		 */
 		pe_err("Should not received Re/Assoc Response in role: %d",
 			GET_LIM_SYSTEM_ROLE(session_entry));
-		qdf_mem_free(beacon);
 		return;
 	}
+
 	if (lim_is_roam_synch_in_progress(session_entry)) {
 		hdr = (tpSirMacMgmtHdr) mac_ctx->roam.pReassocResp;
 		frame_len = mac_ctx->roam.reassocRespLen - SIR_MAC_HDR_LEN_3A;
+		rssi = 0;
 	} else {
 		hdr = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
 		frame_len = WMA_GET_RX_PAYLOAD_LEN(rx_pkt_info);
+		rssi = WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info);
 	}
+
+	if (!hdr) {
+		pe_err("LFR3: Reassoc response packet header is NULL");
+		return;
+	}
+
+	pe_nofl_info("Assoc rsp RX: subtype %d vdev %d sys role %d lim state %d rssi %d from " QDF_MAC_ADDR_STR,
+		     subtype, session_entry->vdev_id,
+		     GET_LIM_SYSTEM_ROLE(session_entry),
+		     session_entry->limMlmState, rssi,
+		     QDF_MAC_ADDR_ARRAY(hdr->sa));
+	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
+			   (uint8_t *)hdr, frame_len + SIR_MAC_HDR_LEN_3A);
+
+	beacon = qdf_mem_malloc(sizeof(tSchBeaconStruct));
+	if (!beacon)
+		return;
+
 	if (((subtype == LIM_ASSOC) &&
 		(session_entry->limMlmState != eLIM_MLM_WT_ASSOC_RSP_STATE)) ||
 		((subtype == LIM_REASSOC) &&
@@ -797,11 +797,17 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx,
 	    assoc_rsp->rssi_assoc_rej.present) {
 		struct sir_rssi_disallow_lst ap_info = {{0}};
 
+		if (!assoc_rsp->rssi_assoc_rej.retry_delay)
+			ap_info.expected_rssi = assoc_rsp->rssi_assoc_rej.delta_rssi +
+				WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info) +
+				wlan_blm_get_rssi_blacklist_threshold(mac_ctx->pdev);
+		else
+			ap_info.expected_rssi = assoc_rsp->rssi_assoc_rej.delta_rssi +
+				WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info);
+
 		ap_info.retry_delay = assoc_rsp->rssi_assoc_rej.retry_delay *
 							QDF_MC_TIMER_TO_MS_UNIT;
 		qdf_mem_copy(ap_info.bssid.bytes, hdr->sa, QDF_MAC_ADDR_SIZE);
-		ap_info.expected_rssi = assoc_rsp->rssi_assoc_rej.delta_rssi +
-					WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info);
 		lim_add_bssid_to_reject_list(mac_ctx->pdev, &ap_info);
 	}
 	if (assoc_rsp->status_code != eSIR_MAC_SUCCESS_STATUS) {

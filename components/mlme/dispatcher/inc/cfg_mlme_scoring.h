@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -642,12 +642,17 @@
  *
  * @Min: 1
  * @Max: 15
- * @Default: 4
+ * @Default: 8
  *
  * Number of slots in which the esp/qbss load will be divided. Max 15. index 0
  * is used for 'not_present. Num_slot will equally divide 100. e.g, if
  * num_slot = 4 slot 1 = 0-25% load, slot 2 = 26-50% load, slot 3 = 51-75% load,
  * slot 4 = 76-100% load. Remaining unused index can be 0.
+ * Following is load percentage, score percentage and score of num_slot = 8,
+ * weight=25.
+ * 0-12% 13-25% 26-38% 39-50% 51-63 %64-75% 76-88% 87-100% Not Present
+ * 100%  90%    80%    70%    50%   25%     10%    5%      50%
+ * 2500  2250   2000   1750   1250  625     250    125     1250
  *
  * Usage: External
  *
@@ -657,7 +662,7 @@
 	"num_esp_qbss_slots", \
 	1, \
 	15, \
-	4, \
+	8, \
 	CFG_VALUE_OR_DEFAULT, \
 	"Num ESP QPSS Slots")
 
@@ -666,7 +671,7 @@
  * esp_qbss_score_idx3_to_0 - percentage for  esp/qbss load for slots 0-3
  * @Min: 0x00000000
  * @Max: 0x64646464
- * @Default: 0x19326432
+ * @Default: 0x505A6432
  *
  * This INI give percentage value of channel_congestion_weightage to be used as
  * index in which the load value falls. Index 0 is for percentage when ESP/QBSS
@@ -691,7 +696,7 @@
 	"esp_qbss_score_idx3_to_0", \
 	0x00000000, \
 	0x64646464, \
-	0x19326432, \
+	0x505A6432, \
 	CFG_VALUE_OR_DEFAULT, \
 	"ESP QPSS Score Index 3 to 0")
 
@@ -700,7 +705,7 @@
  * esp_qbss_score_idx7_to_4 - percentage for  esp/qbss load for slots 4-7
  * @Min: 0x00000000
  * @Max: 0x64646464
- * @Default: 0x0000000A
+ * @Default: 0x0A193246
  *
  * This INI give percentage value of channel_congestion_weightage to be used as
  * index in which the load value falls. Used only if num_esp_qbss_slots is
@@ -725,7 +730,7 @@
 	"esp_qbss_score_idx7_to_4", \
 	0x00000000, \
 	0x64646464, \
-	0x0000000A, \
+	0x0A193246, \
 	CFG_VALUE_OR_DEFAULT, \
 	"ESP QPSS Score Index 7 to 4")
 
@@ -734,7 +739,7 @@
  * esp_qbss_score_idx11_to_8 - percentage for  esp/qbss load for slots 8-11
  * @Min: 0x00000000
  * @Max: 0x64646464
- * @Default: 0x00000000
+ * @Default: 0x00000005
  *
  * This INI give percentage value of channel_congestion_weightage to be used as
  * index in which the load value falls. Used only if num_esp_qbss_slots is
@@ -759,7 +764,7 @@
 	"esp_qbss_score_idx11_to_8", \
 	0x00000000, \
 	0x64646464, \
-	0x00000000, \
+	0x00000005, \
 	CFG_VALUE_OR_DEFAULT, \
 	"ESP QPSS Score Index 11 to 8")
 
@@ -999,7 +1004,7 @@
  *
  * </ini>
  */
-#define CFG_ROAM_TRIGGER_BITMAP CFG_INI_UINT( \
+#define CFG_ROAM_SCORE_DELTA_TRIGGER_BITMAP CFG_INI_UINT( \
 			"roam_score_delta_bitmap", \
 			0, \
 			0xFFFFFFFF, \
@@ -1034,6 +1039,40 @@
 			0, \
 			CFG_VALUE_OR_DEFAULT, \
 			"candidate AP's percentage roam score delta")
+
+/*
+ * <ini>
+ * min_roam_score_delta - Difference of roam score values between connected
+ * AP and roam candidate AP.
+ * @Min: 0
+ * @Max: 10000
+ * @Default: 0
+ *
+ * This ini is used during CU and low rssi based roam triggers, consider
+ * AP as roam candidate only if its roam score is better than connected
+ * AP score by at least min_roam_score_delta.
+ * If user configured "roam_score_delta" and "min_roam_score_delta" both,
+ * then firmware selects roam candidate AP by considering values of both
+ * INIs.
+ * Example: If DUT is connected with AP1 and roam candidate AP2 has roam
+ * score greater than roam_score_delta and min_roam_score_delta then only
+ * firmware will trigger roaming to AP2.
+ *
+ * Related: roam_score_delta
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_CAND_MIN_ROAM_SCORE_DELTA CFG_INI_UINT( \
+			"min_roam_score_delta", \
+			0, \
+			10000, \
+			0, \
+			CFG_VALUE_OR_DEFAULT, \
+			"Diff between connected AP's and candidate AP's roam score")
 
 /*
  * <ini>
@@ -1221,6 +1260,31 @@
 	CFG_VALUE_OR_DEFAULT, \
 	"Roam candidate selection score algorithm")
 
+/*
+ * <ini>
+ * CFG_OCE_AP_TX_PWR_WEIGHTAGE - update scoring param based on ap tx power
+ * @Min: 0
+ * @Max: 10
+ * @Default: 5
+ *
+ * This ini is used to store calculate weightage based on ap tx power.
+ *
+ * Related: None
+ *
+ * Supported Feature: STA
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_OCE_AP_TX_PWR_WEIGHTAGE CFG_INI_UINT( \
+		"oce_ap_tx_pwr_weightage", \
+		0, \
+		10, \
+		5, \
+		CFG_VALUE_OR_DEFAULT,\
+		"AP weigtage for OCE ap tx power")
+
 #define CFG_SCORING_ALL \
 	CFG(CFG_SCORING_RSSI_WEIGHTAGE) \
 	CFG(CFG_SCORING_HT_CAPS_WEIGHTAGE) \
@@ -1254,8 +1318,9 @@
 	CFG(CFG_SCORING_OCE_WAN_SCORE_IDX_7_TO_4) \
 	CFG(CFG_SCORING_OCE_WAN_SCORE_IDX_11_TO_8) \
 	CFG(CFG_SCORING_OCE_WAN_SCORE_IDX_15_TO_12) \
-	CFG(CFG_ROAM_TRIGGER_BITMAP) \
+	CFG(CFG_ROAM_SCORE_DELTA_TRIGGER_BITMAP) \
 	CFG(CFG_ROAM_SCORE_DELTA) \
+	CFG(CFG_CAND_MIN_ROAM_SCORE_DELTA) \
 	CFG(CFG_ENABLE_SCORING_FOR_ROAM) \
 	CFG(CFG_APSD_ENABLED) \
 	CFG(CFG_DISCONNECT_ROAM_TRIGGER_MIN_RSSI) \
@@ -1263,5 +1328,6 @@
 	CFG(CFG_IDLE_ROAM_SCORE_DELTA) \
 	CFG(CFG_BTM_ROAM_SCORE_DELTA) \
 	CFG(CFG_VENDOR_ROAM_SCORE_ALGORITHM) \
+	CFG(CFG_OCE_AP_TX_PWR_WEIGHTAGE) \
 
 #endif /* __CFG_MLME_SCORING_H */

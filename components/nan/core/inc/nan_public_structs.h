@@ -45,6 +45,7 @@ struct wlan_objmgr_vdev;
 #define NAN_PASSPHRASE_MIN_LEN 8
 #define NAN_PASSPHRASE_MAX_LEN 63
 #define NAN_CH_INFO_MAX_CHANNELS 4
+#define WLAN_WAIT_TIME_NDP_END 2000
 
 #define NAN_PSEUDO_VDEV_ID CFG_TGT_NUM_VDEV
 
@@ -612,6 +613,17 @@ struct nan_datapath_end_indication_event {
 };
 
 /**
+ * struct nan_datapath_peer_ind - ndp peer indication
+ * @msg: msg received by FW
+ * @data_len: data length
+ *
+ */
+struct nan_dump_msg {
+	uint8_t *msg;
+	uint32_t data_len;
+};
+
+/**
  * struct nan_datapath_confirm_event - ndp confirmation event from FW
  * @vdev: pointer to vdev object
  * @ndp_instance_id: ndp instance id for which confirm is being generated
@@ -794,6 +806,8 @@ struct wlan_nan_rx_ops {
  * @nan_sap_supported: Target supports NAN Discovery with SAP concurrency
  * @ndi_sap_supported: Target supports NAN Datapth with SAP concurrency
  * @nan_vdev_allowed: Allow separate vdev creation for NAN discovery
+ * @sta_nan_ndi_ndi_allowed: 4 port concurrency of STA+NAN+NDI+NDI is supported
+ * by Fw or not.
  */
 struct nan_tgt_caps {
 	uint32_t nan_disable_supported:1;
@@ -802,6 +816,7 @@ struct nan_tgt_caps {
 	uint32_t nan_sap_supported:1;
 	uint32_t ndi_sap_supported:1;
 	uint32_t nan_vdev_allowed:1;
+	uint32_t sta_nan_ndi_ndi_allowed:1;
 };
 
 #endif

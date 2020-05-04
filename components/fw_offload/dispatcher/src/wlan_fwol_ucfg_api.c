@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -72,6 +72,7 @@ fwol_psoc_object_created_notification(struct wlan_objmgr_psoc *psoc, void *arg)
 	if (QDF_IS_STATUS_ERROR(status)) {
 		fwol_err("Failed to attach psoc_ctx with psoc");
 		qdf_mem_free(fwol_obj);
+		return status;
 	}
 
 	tgt_fwol_register_rx_ops(&fwol_obj->rx_ops);
@@ -504,6 +505,36 @@ QDF_STATUS ucfg_fwol_get_enable_fw_module_log_level(
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS ucfg_fwol_get_sap_xlna_bypass(struct wlan_objmgr_psoc *psoc,
+					 bool *sap_xlna_bypass)
+{
+	struct wlan_fwol_psoc_obj *fwol_obj;
+
+	fwol_obj = fwol_get_psoc_obj(psoc);
+	if (!fwol_obj) {
+		fwol_err("Failed to get FWOL obj");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	*sap_xlna_bypass = fwol_obj->cfg.sap_xlna_bypass;
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS ucfg_fwol_get_ocl_cfg(struct wlan_objmgr_psoc *psoc,
+				 uint32_t *ocl_cfg)
+{
+	struct wlan_fwol_psoc_obj *fwol_obj;
+
+	fwol_obj = fwol_get_psoc_obj(psoc);
+	if (!fwol_obj) {
+		fwol_err("Failed to get FWOL obj");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	*ocl_cfg = fwol_obj->cfg.ocl_cfg;
+	return QDF_STATUS_SUCCESS;
+}
+
 #ifdef FEATURE_WLAN_RA_FILTERING
 QDF_STATUS ucfg_fwol_set_is_rate_limit_enabled(struct wlan_objmgr_psoc *psoc,
 					       bool is_rate_limit_enabled)
@@ -896,3 +927,34 @@ QDF_STATUS ucfg_fwol_get_elna_bypass(struct wlan_objmgr_vdev *vdev,
 	return status;
 }
 #endif /* WLAN_FEATURE_ELNA */
+
+#ifdef WLAN_SEND_DSCP_UP_MAP_TO_FW
+QDF_STATUS ucfg_fwol_send_dscp_up_map_to_fw(struct wlan_objmgr_vdev *vdev,
+					   uint32_t *dscp_to_up_map)
+{
+	QDF_STATUS status;
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_fwol_psoc_obj *fwol_obj;
+	struct wlan_fwol_tx_ops *tx_ops;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		fwol_err("NULL pointer for psoc");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	fwol_obj = fwol_get_psoc_obj(psoc);
+	if (!fwol_obj) {
+		fwol_err("Failed to get FWOL Obj");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	tx_ops = &fwol_obj->tx_ops;
+	if (tx_ops && tx_ops->send_dscp_up_map_to_fw)
+		status = tx_ops->send_dscp_up_map_to_fw(psoc, dscp_to_up_map);
+	else
+		status = QDF_STATUS_E_IO;
+
+	return status;
+}
+#endif /* WLAN_SEND_DSCP_UP_MAP_TO_FW */

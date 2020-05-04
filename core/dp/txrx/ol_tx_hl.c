@@ -1622,19 +1622,6 @@ ol_tx_hl_pdev_queue_send_all(struct ol_txrx_pdev_t *pdev)
  *
  * Return: none
  */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
-void
-ol_tx_hl_vdev_bundle_timer(struct timer_list *t)
-{
-	qdf_nbuf_t msdu_list;
-	struct ol_txrx_vdev_t *vdev = from_timer(vdev, t, bundle_queue.timer);
-
-	vdev->no_of_bundle_sent_in_timer++;
-	msdu_list = ol_tx_hl_vdev_queue_send_all(vdev, true, true);
-	if (msdu_list)
-		qdf_nbuf_tx_free(msdu_list, 1/*error*/);
-}
-#else
 void
 ol_tx_hl_vdev_bundle_timer(void *ctx)
 {
@@ -1646,7 +1633,6 @@ ol_tx_hl_vdev_bundle_timer(void *ctx)
 	if (msdu_list)
 		qdf_nbuf_tx_free(msdu_list, 1/*error*/);
 }
-#endif
 
 qdf_nbuf_t
 ol_tx_hl(struct ol_txrx_vdev_t *vdev, qdf_nbuf_t msdu_list)
@@ -1925,6 +1911,11 @@ ol_txrx_hl_tdls_flag_reset(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 {
 	struct ol_txrx_vdev_t *vdev =
 		(struct ol_txrx_vdev_t *)ol_txrx_get_vdev_from_vdev_id(vdev_id);
+	if (!vdev) {
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
+			  "%s: Invalid vdev_id %d", __func__, vdev_id);
+		return;
+	}
 
 	vdev->hlTdlsFlag = flag;
 }

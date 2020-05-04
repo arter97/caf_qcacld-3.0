@@ -240,7 +240,6 @@ rrm_process_link_measurement_request(struct mac_context *mac,
 
 	tx_pwr_attr.reg_max = pe_session->def_max_tx_pwr;
 	tx_pwr_attr.ap_tx_power = pLinkReq->MaxTxPower.maxTxPower;
-	tx_pwr_attr.ini_tx_power = mac->mlme_cfg->power.max_tx_power;
 
 	LinkReport.txPower = lim_get_max_tx_power(mac, &tx_pwr_attr);
 
@@ -391,6 +390,7 @@ rrm_process_neighbor_report_response(struct mac_context *mac,
 
 	pSmeNeighborRpt->messageType = eWNI_SME_NEIGHBOR_REPORT_IND;
 	pSmeNeighborRpt->length = length;
+	pSmeNeighborRpt->measurement_idx = DEFAULT_RRM_IDX;
 	pSmeNeighborRpt->sessionId = pe_session->smeSessionId;
 	pSmeNeighborRpt->numNeighborReports = pNeighborRep->num_NeighborReport;
 	qdf_mem_copy(pSmeNeighborRpt->bssId, pe_session->bssId,
@@ -465,6 +465,44 @@ rrm_process_neighbor_report_req(struct mac_context *mac,
 	return status;
 }
 
+/**
+ * rrm_get_country_code_from_connected_profile() - Get country code
+ * from connected profile
+ * @mac: Mac context
+ * @pe_session: pe session
+ * @country_code: country code
+ *
+ * Return: void
+ */
+static inline void
+rrm_get_country_code_from_connected_profile(
+				struct mac_context *mac,
+				struct pe_session *pe_session,
+				uint8_t country_code[WNI_CFG_COUNTRY_CODE_LEN])
+{
+	uint8_t id;
+	uint8_t *country;
+
+	qdf_mem_zero(country_code, sizeof(country_code[0]) *
+					WNI_CFG_COUNTRY_CODE_LEN);
+	if (!pe_session) {
+		pe_err("pe_session is NULL");
+		return;
+	}
+	id = pe_session->smeSessionId;
+	if (!CSR_IS_SESSION_VALID(mac, id)) {
+		pe_err("smeSessionId %d is invalid", id);
+		return;
+	}
+	country =
+		mac->roam.roamSession[id].connectedProfile.country_code;
+	if (country[0])
+		qdf_mem_copy(country_code, country, sizeof(country_code[0]) *
+						WNI_CFG_COUNTRY_CODE_LEN);
+	else
+		country_code[2] = OP_CLASS_GLOBAL;
+}
+
 #define ABS(x)      ((x < 0) ? -x : x)
 /* -------------------------------------------------------------------- */
 /**
@@ -498,9 +536,14 @@ rrm_process_beacon_report_req(struct mac_context *mac,
 	tDot11fIEAPChannelReport *ie_ap_chan_rpt;
 	uint8_t tmp_idx, buf_left, buf_cons;
 	uint16_t ch_ctr = 0;
-	char req_ssid[WLAN_SSID_MAX_LEN] = {0};
 	char ch_buf[RRM_CH_BUF_LEN];
 	char *tmp_buf = NULL;
+	uint8_t country[WNI_CFG_COUNTRY_CODE_LEN];
+
+	if (!pe_session) {
+		pe_err("pe_session is NULL");
+		return eRRM_INCAPABLE;
+	}
 
 	if (pBeaconReq->measurement_request.Beacon.BeaconReporting.present &&
 	    (pBeaconReq->measurement_request.Beacon.BeaconReporting.
@@ -536,20 +579,16 @@ rrm_process_beacon_report_req(struct mac_context *mac,
 
 	measDuration = pBeaconReq->measurement_request.Beacon.meas_duration;
 
-	if (pBeaconReq->measurement_request.Beacon.SSID.present)
-		qdf_snprintf(req_ssid, WLAN_SSID_MAX_LEN, "%s",
-			     pBeaconReq->measurement_request.Beacon.SSID.ssid);
-
-	pe_nofl_info("RX: [802.11 BCN_RPT] SSID:%s BSSID:%pM Token:%d op_class:%d ch:%d meas_mode:%d meas_duration:%d",
-		     req_ssid, pBeaconReq->measurement_request.Beacon.BSSID,
+	pe_nofl_info("RX: [802.11 BCN_RPT] seq:%d SSID:%.*s BSSID:%pM Token:%d op_class:%d ch:%d meas_mode:%d meas_duration:%d max_dur: %d sign: %d max_meas_dur: %d",
+		     mac->rrm.rrmPEContext.prev_rrm_report_seq_num,
+		     pBeaconReq->measurement_request.Beacon.SSID.num_ssid,
+		     pBeaconReq->measurement_request.Beacon.SSID.ssid,
+		     pBeaconReq->measurement_request.Beacon.BSSID,
 		     pBeaconReq->measurement_token,
 		     pBeaconReq->measurement_request.Beacon.regClass,
 		     pBeaconReq->measurement_request.Beacon.channel,
 		     pBeaconReq->measurement_request.Beacon.meas_mode,
-		     measDuration);
-
-	pe_debug("RX: [802.11 BCN_RPT] max_dur: %d sign: %d max_meas_dur: %d",
-		 maxDuration, sign, maxMeasduration);
+		     measDuration, maxDuration, sign, maxMeasduration);
 
 	if (measDuration == 0 &&
 	    pBeaconReq->measurement_request.Beacon.meas_mode !=
@@ -603,11 +642,6 @@ rrm_process_beacon_report_req(struct mac_context *mac,
 			     pBeaconReq->measurement_request.Beacon.
 			     RequestedInfo.requested_eids,
 			     pCurrentReq->request.Beacon.reqIes.num);
-		pe_debug("RX: [802.11 BCN_RPT] Requested EIDs:[%d]",
-			 pCurrentReq->request.Beacon.reqIes.num);
-		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
-			   pCurrentReq->request.Beacon.reqIes.pElementIds,
-			   pCurrentReq->request.Beacon.reqIes.num);
 	}
 
 	/* Prepare the request to send to SME. */
@@ -624,6 +658,7 @@ rrm_process_beacon_report_req(struct mac_context *mac,
 	psbrr->msgSource = eRRM_MSG_SOURCE_11K;
 	psbrr->randomizationInterval =
 		SYS_TU_TO_MS(pBeaconReq->measurement_request.Beacon.randomization);
+	psbrr->measurement_idx = pCurrentReq->measurement_idx;
 
 	if (!wlan_reg_is_6ghz_supported(mac->pdev) &&
 	    (wlan_reg_is_6ghz_op_class(mac->pdev,
@@ -633,14 +668,37 @@ rrm_process_beacon_report_req(struct mac_context *mac,
 		return eRRM_FAILURE;
 	}
 
+	rrm_get_country_code_from_connected_profile(mac, pe_session,
+						    country);
 	psbrr->channel_info.chan_num =
 		pBeaconReq->measurement_request.Beacon.channel;
 	psbrr->channel_info.reg_class =
 		pBeaconReq->measurement_request.Beacon.regClass;
-	psbrr->channel_info.chan_freq =
-		wlan_reg_chan_opclass_to_freq(psbrr->channel_info.chan_num,
-					      psbrr->channel_info.reg_class,
-					      false);
+	if (psbrr->channel_info.chan_num &&
+	    psbrr->channel_info.chan_num != 255) {
+		psbrr->channel_info.chan_freq =
+			wlan_reg_country_chan_opclass_to_freq(
+				mac->pdev,
+				country,
+				psbrr->channel_info.chan_num,
+				psbrr->channel_info.reg_class,
+				false);
+		if (!psbrr->channel_info.chan_freq) {
+			pe_debug("invalid ch freq, chan_num %d",
+				  psbrr->channel_info.chan_num);
+			qdf_mem_free(psbrr);
+			return eRRM_FAILURE;
+		}
+	} else {
+		psbrr->channel_info.chan_freq = 0;
+	}
+	sme_debug("opclass %d, ch %d freq %d AP's country code %c%c 0x%x index:%d",
+		  psbrr->channel_info.reg_class,
+		  psbrr->channel_info.chan_num,
+		  psbrr->channel_info.chan_freq,
+		  country[0], country[1], country[2],
+		  psbrr->measurement_idx);
+
 	psbrr->measurementDuration[0] = measDuration;
 	psbrr->fMeasurementtype[0] =
 		pBeaconReq->measurement_request.Beacon.meas_mode;
@@ -772,20 +830,15 @@ rrm_fill_beacon_ies(struct mac_context *mac, uint8_t *pIes,
 		pIes += sizeof(uint16_t);
 	}
 
-	while (BcnNumIes > 0) {
+	while (BcnNumIes >= 2) {
 		len = *(pBcnIes + 1);
 		len += 2;       /* element id + length. */
 		pe_debug("EID = %d, len = %d total = %d",
 			*pBcnIes, *(pBcnIes + 1), len);
 
-		if (BcnNumIes < len) {
+		if (BcnNumIes < len || len <= 2) {
 			pe_err("RRM: Invalid IE len:%d exp_len:%d",
 			       len, BcnNumIes);
-			break;
-		}
-
-		if (len <= 2) {
-			pe_err("RRM: Invalid IE");
 			break;
 		}
 
@@ -793,9 +846,6 @@ rrm_fill_beacon_ies(struct mac_context *mac, uint8_t *pIes,
 		do {
 			if ((!eids) || (*pBcnIes == eids[i])) {
 				if (((*pNumIes) + len) < pIesMaxSize) {
-					pe_debug("Adding Eid %d, len=%d",
-						 *pBcnIes, len);
-
 					qdf_mem_copy(pIes, pBcnIes, len);
 					pIes += len;
 					*pNumIes += len;
@@ -848,7 +898,9 @@ rrm_process_beacon_report_xmit(struct mac_context *mac_ctx,
 	tSirMacRadioMeasureReport *report = NULL;
 	tSirMacBeaconReport *beacon_report;
 	struct bss_description *bss_desc;
-	tpRRMReq curr_req = mac_ctx->rrm.rrmPEContext.pCurrentReq;
+	tpRRMReq curr_req =
+		mac_ctx->rrm.rrmPEContext.
+		pCurrentReq[beacon_xmit_ind->measurement_idx];
 	struct pe_session *session_entry;
 	uint8_t session_id, counter;
 	uint8_t i, j, offset = 0;
@@ -858,7 +910,6 @@ rrm_process_beacon_report_xmit(struct mac_context *mac_ctx,
 	uint8_t frag_id = 0;
 	uint8_t num_frames, num_reports_in_frame;
 
-	pe_debug("Received beacon report xmit indication");
 
 	if (!beacon_xmit_ind) {
 		pe_err("Received beacon_xmit_ind is NULL in PE");
@@ -870,6 +921,9 @@ rrm_process_beacon_report_xmit(struct mac_context *mac_ctx,
 		status = QDF_STATUS_E_FAILURE;
 		goto end;
 	}
+
+	pe_debug("Received beacon report xmit indication on idx:%d",
+		 beacon_xmit_ind->measurement_idx);
 
 	if ((beacon_xmit_ind->numBssDesc) || curr_req->sendEmptyBcnRpt) {
 		beacon_xmit_ind->numBssDesc = (beacon_xmit_ind->numBssDesc ==
@@ -938,15 +992,14 @@ rrm_process_beacon_report_xmit(struct mac_context *mac_ctx,
 					bss_desc->bssId, sizeof(tSirMacAddr));
 			}
 
+			pe_debug("TX: [802.11 BCN_RPT] reporting detail requested %d",
+				 curr_req->request.Beacon.reportingDetail);
 			switch (curr_req->request.Beacon.reportingDetail) {
 			case BEACON_REPORTING_DETAIL_NO_FF_IE:
 				/* 0: No need to include any elements. */
-				pe_debug("TX: [802.11 BCN_RPT] No reporting detail requested");
 				break;
 			case BEACON_REPORTING_DETAIL_ALL_FF_REQ_IE:
 				/* 1: Include all FFs and Requested Ies. */
-				pe_debug("TX: [802.11 BCN_RPT] Only requested IEs in reporting detail requested");
-
 				if (!bss_desc)
 					break;
 
@@ -962,7 +1015,6 @@ rrm_process_beacon_report_xmit(struct mac_context *mac_ctx,
 			case BEACON_REPORTING_DETAIL_ALL_FF_IE:
 				/* 2: default - Include all FFs and all Ies. */
 			default:
-				pe_debug("TX: [802.11 BCN_RPT] Default all IEs and FFs");
 				if (!bss_desc)
 					break;
 
@@ -1020,9 +1072,6 @@ rrm_process_beacon_report_xmit(struct mac_context *mac_ctx,
 		for (j = 0; j < num_frames; j++) {
 			num_reports_in_frame = QDF_MIN((i - report_index),
 						RADIO_REPORTS_MAX_IN_A_FRAME);
-
-			pe_debug("TX: [802.11 BCN_RPT] Sending Action frame number %d",
-				 num_reports_in_frame);
 			lim_send_radio_measure_report_action_frame(mac_ctx,
 				curr_req->dialog_token, num_reports_in_frame,
 				(j == num_frames - 1) ? true : false,
@@ -1038,7 +1087,7 @@ end:
 		qdf_mem_free(beacon_xmit_ind->pBssDescription[counter]);
 
 	if (beacon_xmit_ind->fMeasureDone) {
-		pe_debug("Measurement done....cleanup the context");
+		pe_debug("Measurement done.");
 		rrm_cleanup(mac_ctx);
 	}
 
@@ -1048,13 +1097,19 @@ end:
 	return status;
 }
 
-static void rrm_process_beacon_request_failure(struct mac_context *mac,
-					       struct pe_session *pe_session,
-					       tSirMacAddr peer,
-					       tRrmRetStatus status)
+static void
+rrm_process_beacon_request_failure(struct mac_context *mac,
+				   struct pe_session *pe_session,
+				   tSirMacAddr peer,
+				   tRrmRetStatus status, uint8_t index)
 {
 	tpSirMacRadioMeasureReport pReport = NULL;
-	tpRRMReq pCurrentReq = mac->rrm.rrmPEContext.pCurrentReq;
+	tpRRMReq pCurrentReq = mac->rrm.rrmPEContext.pCurrentReq[index];
+
+	if (!pCurrentReq) {
+		pe_err("Current request is NULL");
+		return;
+	}
 
 	pReport = qdf_mem_malloc(sizeof(tSirMacRadioMeasureReport));
 	if (!pReport)
@@ -1072,8 +1127,7 @@ static void rrm_process_beacon_request_failure(struct mac_context *mac,
 		pReport->incapable = 1;
 		break;
 	default:
-		pe_err("RX [802.11 BCN_RPT] Beacon request processing failed no report sent with status %d",
-		       status);
+		pe_err("RX [802.11 BCN_RPT] Beacon request processing failed no report sent");
 		qdf_mem_free(pReport);
 		return;
 	}
@@ -1093,7 +1147,6 @@ static void rrm_process_beacon_request_failure(struct mac_context *mac,
  * @mac_ctx: Global pointer to MAC context
  * @peer: Macaddress of the peer requesting the radio measurement
  * @session_entry: session entry
- * @curr_req: Pointer to RRM request
  * @radiomes_report: Pointer to radio measurement report
  * @rrm_req: Array of Measurement request IEs
  * @num_report: No.of reports
@@ -1106,15 +1159,16 @@ static void rrm_process_beacon_request_failure(struct mac_context *mac,
  */
 static
 QDF_STATUS rrm_process_beacon_req(struct mac_context *mac_ctx, tSirMacAddr peer,
-				  struct pe_session *session_entry, tpRRMReq curr_req,
+				  struct pe_session *session_entry,
 				  tpSirMacRadioMeasureReport *radiomes_report,
 				  tDot11fRadioMeasurementRequest *rrm_req,
 				  uint8_t *num_report, int index)
 {
 	tRrmRetStatus rrm_status = eRRM_SUCCESS;
 	tpSirMacRadioMeasureReport report;
+	tpRRMReq curr_req;
 
-	if (curr_req) {
+	if (index  >= MAX_MEASUREMENT_REQUEST) {
 		if (!*radiomes_report) {
 			/*
 			 * Allocate memory to send reports for
@@ -1135,25 +1189,34 @@ QDF_STATUS rrm_process_beacon_req(struct mac_context *mac_ctx, tSirMacAddr peer,
 		(*num_report)++;
 		return QDF_STATUS_SUCCESS;
 	} else {
+		curr_req = mac_ctx->rrm.rrmPEContext.pCurrentReq[index];
+		if (curr_req) {
+			qdf_mem_free(curr_req);
+			curr_req = NULL;
+		}
+
 		curr_req = qdf_mem_malloc(sizeof(*curr_req));
 		if (!curr_req) {
-				qdf_mem_free(*radiomes_report);
+			qdf_mem_free(*radiomes_report);
+			mac_ctx->rrm.rrmPEContext.pCurrentReq[index] = NULL;
 			return QDF_STATUS_E_NOMEM;
 		}
-		pe_debug("Processing Beacon Report request");
+		pe_debug("Processing Beacon Report request %d", index);
 		curr_req->dialog_token = rrm_req->DialogToken.token;
 		curr_req->token = rrm_req->
 				  MeasurementRequest[index].measurement_token;
 		curr_req->sendEmptyBcnRpt = true;
-		mac_ctx->rrm.rrmPEContext.pCurrentReq = curr_req;
+		curr_req->measurement_idx = index;
+		mac_ctx->rrm.rrmPEContext.pCurrentReq[index] = curr_req;
 		rrm_status = rrm_process_beacon_report_req(mac_ctx, curr_req,
 			&rrm_req->MeasurementRequest[index], session_entry);
 		if (eRRM_SUCCESS != rrm_status) {
 			rrm_process_beacon_request_failure(mac_ctx,
-				session_entry, peer, rrm_status);
+				session_entry, peer, rrm_status, index);
 			rrm_cleanup(mac_ctx);
 		}
 	}
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -1220,7 +1283,6 @@ rrm_process_radio_measurement_request(struct mac_context *mac_ctx,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	tpSirMacRadioMeasureReport report = NULL;
 	uint8_t num_report = 0;
-	tpRRMReq curr_req = mac_ctx->rrm.rrmPEContext.pCurrentReq;
 
 	if (!rrm_req->num_MeasurementRequest) {
 		report = qdf_mem_malloc(sizeof(tSirMacRadioMeasureReport));
@@ -1257,9 +1319,10 @@ rrm_process_radio_measurement_request(struct mac_context *mac_ctx,
 		case SIR_MAC_RRM_BEACON_TYPE:
 			/* Process beacon request. */
 			status = rrm_process_beacon_req(mac_ctx, peer,
-				 session_entry, curr_req, &report, rrm_req,
-				 &num_report, i);
-			if (QDF_STATUS_SUCCESS != status)
+							session_entry, &report,
+							rrm_req, &num_report,
+							i);
+			if (QDF_IS_STATUS_ERROR(status))
 				return status;
 			break;
 		case SIR_MAC_RRM_LCI_TYPE:
@@ -1350,7 +1413,8 @@ QDF_STATUS rrm_initialize(struct mac_context *mac)
 {
 	tpRRMCaps pRRMCaps = &mac->rrm.rrmPEContext.rrmEnabledCaps;
 
-	mac->rrm.rrmPEContext.pCurrentReq = NULL;
+	mac->rrm.rrmPEContext.pCurrentReq[0] = NULL;
+	mac->rrm.rrmPEContext.pCurrentReq[1] = NULL;
 	mac->rrm.rrmPEContext.txMgmtPower = 0;
 	mac->rrm.rrmPEContext.DialogToken = 0;
 
@@ -1393,17 +1457,21 @@ QDF_STATUS rrm_initialize(struct mac_context *mac)
 
 QDF_STATUS rrm_cleanup(struct mac_context *mac)
 {
-	if (mac->rrm.rrmPEContext.pCurrentReq) {
-		if (mac->rrm.rrmPEContext.pCurrentReq->request.Beacon.reqIes.
-		    pElementIds) {
-			qdf_mem_free(mac->rrm.rrmPEContext.pCurrentReq->
-				     request.Beacon.reqIes.pElementIds);
-		}
+	uint8_t i;
 
-		qdf_mem_free(mac->rrm.rrmPEContext.pCurrentReq);
+	for (i = 0; i < MAX_MEASUREMENT_REQUEST; i++) {
+		if (mac->rrm.rrmPEContext.pCurrentReq[i]) {
+			if (mac->rrm.rrmPEContext.pCurrentReq[i]->request.
+			    Beacon.reqIes.pElementIds)
+				qdf_mem_free(mac->rrm.rrmPEContext.
+					     pCurrentReq[i]->request.Beacon.
+					     reqIes.pElementIds);
+
+			qdf_mem_free(mac->rrm.rrmPEContext.pCurrentReq[i]);
+		}
+		mac->rrm.rrmPEContext.pCurrentReq[i] = NULL;
 	}
 
-	mac->rrm.rrmPEContext.pCurrentReq = NULL;
 	return QDF_STATUS_SUCCESS;
 }
 

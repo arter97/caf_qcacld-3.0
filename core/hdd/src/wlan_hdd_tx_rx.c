@@ -39,7 +39,6 @@
 #include <wlan_hdd_p2p.h>
 #include <linux/wireless.h>
 #include <net/cfg80211.h>
-#include <net/ieee80211_radiotap.h>
 #include "sap_api.h"
 #include "wlan_hdd_wmm.h"
 #include "wlan_hdd_tdls.h"
@@ -48,7 +47,6 @@
 #include <cdp_txrx_cmn.h>
 #include <cdp_txrx_peer_ops.h>
 #include <cdp_txrx_flow_ctrl_v2.h>
-#include <cdp_txrx_mon.h>
 #include "wlan_hdd_nan_datapath.h"
 #include "pld_common.h"
 #include <cdp_txrx_misc.h>
@@ -61,12 +59,18 @@
 
 #include "wlan_hdd_nud_tracking.h"
 #include "dp_txrx.h"
+#if defined(WLAN_SUPPORT_RX_FISA)
+#include "dp_fisa_rx.h"
+#else
+#include <net/ieee80211_radiotap.h>
+#endif
 #include <ol_defines.h>
 #include "cfg_ucfg_api.h"
 #include "target_type.h"
 #include "wlan_hdd_object_manager.h"
 #include "nan_public_structs.h"
 #include "nan_ucfg_api.h"
+#include <wlan_hdd_sar_limits.h>
 
 #if defined(QCA_LL_TX_FLOW_CONTROL_V2) || defined(QCA_LL_PDEV_TX_FLOW_CONTROL)
 /*
@@ -129,7 +133,6 @@ void hdd_tx_resume_timer_expired_handler(void *adapter_context)
 {
 	struct hdd_adapter *adapter = (struct hdd_adapter *)adapter_context;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	u32 p_qpaused;
 	u32 np_qpaused;
 
@@ -140,8 +143,7 @@ void hdd_tx_resume_timer_expired_handler(void *adapter_context)
 
 	cdp_display_stats(soc, CDP_DUMP_TX_FLOW_POOL_INFO,
 			  QDF_STATS_VERBOSITY_LEVEL_LOW);
-	wlan_hdd_display_netif_queue_history(hdd_ctx,
-					     QDF_STATS_VERBOSITY_LEVEL_LOW);
+	wlan_hdd_display_adapter_netif_queue_history(adapter);
 	hdd_debug("Enabling queues");
 	spin_lock_bh(&adapter->pause_map_lock);
 	p_qpaused = adapter->pause_map & BIT(WLAN_DATA_FLOW_CONTROL_PRIORITY);
@@ -931,6 +933,9 @@ static void __hdd_hard_start_xmit(struct sk_buff *skb,
 	struct wlan_objmgr_vdev *vdev;
 	struct hdd_context *hdd_ctx;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	enum qdf_proto_subtype subtype = QDF_PROTO_INVALID;
+	bool is_eapol = false;
+	bool is_dhcp = false;
 
 #ifdef QCA_WIFI_FTM
 	if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE) {
@@ -945,27 +950,47 @@ static void __hdd_hard_start_xmit(struct sk_buff *skb,
 
 	if (cds_is_driver_recovering() || cds_is_driver_in_bad_state() ||
 	    cds_is_load_or_unload_in_progress()) {
-		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_INFO_HIGH,
-			  "Recovery/(Un)load in progress, dropping the packet");
+		QDF_TRACE_DEBUG_RL(QDF_MODULE_ID_HDD_DATA,
+				   "Recovery/(Un)load in progress, dropping the packet");
 		goto drop_pkt;
 	}
 
 	hdd_ctx = adapter->hdd_ctx;
 	if (wlan_hdd_validate_context(hdd_ctx)) {
-		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_INFO_HIGH,
-			  "Invalid HDD context");
+		QDF_TRACE_DEBUG_RL(QDF_MODULE_ID_HDD_DATA,
+				   "Invalid HDD context");
 		goto drop_pkt;
 	}
 
 	wlan_hdd_classify_pkt(skb);
 	if (QDF_NBUF_CB_GET_PACKET_TYPE(skb) == QDF_NBUF_CB_PACKET_TYPE_ARP) {
-		is_arp = true;
 		if (qdf_nbuf_data_is_arp_req(skb) &&
 		    (adapter->track_arp_ip == qdf_nbuf_get_arp_tgt_ip(skb))) {
+			is_arp = true;
 			++adapter->hdd_stats.hdd_arp_stats.tx_arp_req_count;
 			QDF_TRACE(QDF_MODULE_ID_HDD_DATA,
 				  QDF_TRACE_LEVEL_INFO_HIGH,
 					"%s : ARP packet", __func__);
+		}
+	} else if (QDF_NBUF_CB_GET_PACKET_TYPE(skb) ==
+		   QDF_NBUF_CB_PACKET_TYPE_EAPOL) {
+		subtype = qdf_nbuf_get_eapol_subtype(skb);
+		if (subtype == QDF_PROTO_EAPOL_M2) {
+			++adapter->hdd_stats.hdd_eapol_stats.eapol_m2_count;
+			is_eapol = true;
+		} else if (subtype == QDF_PROTO_EAPOL_M4) {
+			++adapter->hdd_stats.hdd_eapol_stats.eapol_m4_count;
+			is_eapol = true;
+		}
+	} else if (QDF_NBUF_CB_GET_PACKET_TYPE(skb) ==
+		   QDF_NBUF_CB_PACKET_TYPE_DHCP) {
+		subtype = qdf_nbuf_get_dhcp_subtype(skb);
+		if (subtype == QDF_PROTO_DHCP_DISCOVER) {
+			++adapter->hdd_stats.hdd_dhcp_stats.dhcp_dis_count;
+			is_dhcp = true;
+		} else if (subtype == QDF_PROTO_DHCP_REQUEST) {
+			++adapter->hdd_stats.hdd_dhcp_stats.dhcp_req_count;
+			is_dhcp = true;
 		}
 	}
 	/* track connectivity stats */
@@ -1143,6 +1168,8 @@ static void __hdd_hard_start_xmit(struct sk_buff *skb,
 
 	netif_trans_update(dev);
 
+	wlan_hdd_sar_unsolicited_timer_start(hdd_ctx);
+
 	return;
 
 drop_pkt_and_release_skb:
@@ -1167,6 +1194,12 @@ drop_pkt_accounting:
 		++adapter->hdd_stats.hdd_arp_stats.tx_dropped;
 		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_INFO_HIGH,
 			"%s : ARP packet dropped", __func__);
+	} else if (is_eapol) {
+		++adapter->hdd_stats.hdd_eapol_stats.
+				tx_dropped[subtype - QDF_PROTO_EAPOL_M1];
+	} else if (is_dhcp) {
+		++adapter->hdd_stats.hdd_dhcp_stats.
+				tx_dropped[subtype - QDF_PROTO_DHCP_DISCOVER];
 	}
 }
 
@@ -1240,8 +1273,8 @@ static void __hdd_tx_timeout(struct net_device *dev)
 
 	hdd_debug("carrier state: %d", netif_carrier_ok(dev));
 
-	wlan_hdd_display_netif_queue_history(hdd_ctx,
-					     QDF_STATS_VERBOSITY_LEVEL_HIGH);
+	wlan_hdd_display_adapter_netif_queue_history(adapter);
+
 	cdp_dump_flow_pool_info(cds_get_context(QDF_MODULE_ID_SOC));
 
 	++adapter->hdd_stats.tx_rx_stats.tx_timeout_cnt;
@@ -1347,18 +1380,7 @@ QDF_STATUS hdd_deinit_tx_rx(struct hdd_adapter *adapter)
 }
 
 #ifdef FEATURE_MONITOR_MODE_SUPPORT
-/**
- * hdd_mon_rx_packet_cbk() - Receive callback registered with OL layer.
- * @context: [in] pointer to qdf context
- * @rxBuf:      [in] pointer to rx qdf_nbuf
- *
- * TL will call this to notify the HDD when one or more packets were
- * received for a registered STA.
- *
- * Return: QDF_STATUS_E_FAILURE if any errors encountered, QDF_STATUS_SUCCESS
- * otherwise
- */
-static QDF_STATUS hdd_mon_rx_packet_cbk(void *context, qdf_nbuf_t rxbuf)
+QDF_STATUS hdd_mon_rx_packet_cbk(void *context, qdf_nbuf_t rxbuf)
 {
 	struct hdd_adapter *adapter;
 	int rxstat;
@@ -2052,6 +2074,19 @@ QDF_STATUS hdd_rx_flush_packet_cbk(void *adapter_context, uint8_t vdev_id)
 	return QDF_STATUS_SUCCESS;
 }
 
+#if defined(WLAN_SUPPORT_RX_FISA)
+QDF_STATUS hdd_rx_fisa_cbk(void *dp_soc, void *dp_vdev, qdf_nbuf_t nbuf_list)
+{
+	return dp_fisa_rx((struct dp_soc *)dp_soc, (struct dp_vdev *)dp_vdev,
+			  nbuf_list);
+}
+
+QDF_STATUS hdd_rx_fisa_flush(void *dp_soc, int ring_num)
+{
+	return dp_rx_fisa_flush((struct dp_soc *)dp_soc, ring_num);
+}
+#endif
+
 QDF_STATUS hdd_rx_packet_cbk(void *adapter_context,
 			     qdf_nbuf_t rxBuf)
 {
@@ -2067,6 +2102,9 @@ QDF_STATUS hdd_rx_packet_cbk(void *adapter_context,
 	uint8_t pkt_type = 0;
 	bool track_arp = false;
 	struct wlan_objmgr_vdev *vdev;
+	enum qdf_proto_subtype subtype = QDF_PROTO_INVALID;
+	bool is_eapol = false;
+	bool is_dhcp = false;
 
 	/* Sanity check on inputs */
 	if (unlikely((!adapter_context) || (!rxBuf))) {
@@ -2099,8 +2137,7 @@ QDF_STATUS hdd_rx_packet_cbk(void *adapter_context,
 		next = skb->next;
 		skb->next = NULL;
 
-		if (QDF_NBUF_CB_PACKET_TYPE_ARP ==
-		    QDF_NBUF_CB_GET_PACKET_TYPE(skb)) {
+		if (qdf_nbuf_is_ipv4_arp_pkt(skb)) {
 			if (qdf_nbuf_data_is_arp_rsp(skb) &&
 				(adapter->track_arp_ip ==
 			     qdf_nbuf_get_arp_src_ip(skb))) {
@@ -2111,6 +2148,28 @@ QDF_STATUS hdd_rx_packet_cbk(void *adapter_context,
 						"%s: ARP packet received",
 						__func__);
 				track_arp = true;
+			}
+		} else if (qdf_nbuf_is_ipv4_eapol_pkt(skb)) {
+			subtype = qdf_nbuf_get_eapol_subtype(skb);
+			if (subtype == QDF_PROTO_EAPOL_M1) {
+				++adapter->hdd_stats.hdd_eapol_stats.
+						eapol_m1_count;
+				is_eapol = true;
+			} else if (subtype == QDF_PROTO_EAPOL_M3) {
+				++adapter->hdd_stats.hdd_eapol_stats.
+						eapol_m3_count;
+				is_eapol = true;
+			}
+		} else if (qdf_nbuf_is_ipv4_dhcp_pkt(skb)) {
+			subtype = qdf_nbuf_get_dhcp_subtype(skb);
+			if (subtype == QDF_PROTO_DHCP_OFFER) {
+				++adapter->hdd_stats.hdd_dhcp_stats.
+						dhcp_off_count;
+				is_dhcp = true;
+			} else if (subtype == QDF_PROTO_DHCP_ACK) {
+				++adapter->hdd_stats.hdd_dhcp_stats.
+						dhcp_ack_count;
+				is_dhcp = true;
 			}
 		}
 		/* track connectivity stats */
@@ -2204,6 +2263,13 @@ QDF_STATUS hdd_rx_packet_cbk(void *adapter_context,
 			if (track_arp)
 				++adapter->hdd_stats.hdd_arp_stats.
 							rx_delivered;
+			if (is_eapol)
+				++adapter->hdd_stats.hdd_eapol_stats.
+				     rx_delivered[subtype - QDF_PROTO_EAPOL_M1];
+			else if (is_dhcp)
+				++adapter->hdd_stats.hdd_dhcp_stats.
+				rx_delivered[subtype - QDF_PROTO_DHCP_DISCOVER];
+
 			/* track connectivity stats */
 			if (adapter->pkt_type_bitmap)
 				hdd_tx_rx_collect_connectivity_stats_info(
@@ -2213,6 +2279,13 @@ QDF_STATUS hdd_rx_packet_cbk(void *adapter_context,
 			++adapter->hdd_stats.tx_rx_stats.rx_refused[cpu_index];
 			if (track_arp)
 				++adapter->hdd_stats.hdd_arp_stats.rx_refused;
+
+			if (is_eapol)
+				++adapter->hdd_stats.hdd_eapol_stats.
+				       rx_refused[subtype - QDF_PROTO_EAPOL_M1];
+			else if (is_dhcp)
+				++adapter->hdd_stats.hdd_dhcp_stats.
+				  rx_refused[subtype - QDF_PROTO_DHCP_DISCOVER];
 
 			/* track connectivity stats */
 			if (adapter->pkt_type_bitmap)
@@ -2706,37 +2779,6 @@ void hdd_print_netdev_txq_status(struct net_device *dev)
 	}
 }
 
-#ifdef WLAN_FEATURE_PKT_CAPTURE
-/**
- * hdd_set_pktcapture_cb() - Set pkt capture mode callback
- * @dev: Pointer to net_device structure
- * @pdev_id: pdev id
- *
- * Return: 0 on success; non-zero for failure
- */
-int hdd_set_pktcapture_cb(struct net_device *dev, uint8_t pdev_id)
-{
-	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
-	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
-
-	return cdp_register_pktcapture_cb(soc, pdev_id, adapter,
-					  hdd_mon_rx_packet_cbk);
-}
-
-/**
- * hdd_reset_pktcapture_cb() - Reset pkt capture mode callback
- * @pdev_id: pdev id
- *
- * Return: None
- */
-void hdd_reset_pktcapture_cb(uint8_t pdev_id)
-{
-	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
-
-	cdp_deregister_pktcapture_cb(soc, pdev_id);
-}
-#endif /* WLAN_FEATURE_PKT_CAPTURE */
-
 #ifdef FEATURE_MONITOR_MODE_SUPPORT
 /**
  * hdd_set_mon_rx_cb() - Set Monitor mode Rx callback
@@ -3190,31 +3232,6 @@ static void hdd_dp_hl_bundle_cfg_update(struct hdd_config *config,
 }
 #endif
 
-#ifdef WLAN_FEATURE_PKT_CAPTURE
-/**
- * hdd_set_pktcapture_mode_value() - set pktcapture_mode values
- * @hdd_ctx: hdd context
- * @psoc: pointer to psoc obj
- *
- * Return: none
- */
-static inline void
-hdd_dp_pktcapture_mode_cfg_update(struct hdd_context *hdd_ctx,
-				  struct wlan_objmgr_psoc *psoc)
-{
-	hdd_ctx->enable_pkt_capture_support = cfg_get(
-					psoc, CFG_DP_PKT_CAPTURE_MODE_ENABLE);
-	hdd_ctx->val_pkt_capture_mode = cfg_get(
-					psoc, CFG_DP_PKT_CAPTURE_MODE_VALUE);
-}
-#else
-static inline void
-hdd_dp_pktcapture_mode_cfg_update(struct hdd_context *hdd_ctx,
-				  struct wlan_objmgr_psoc *psoc)
-{
-}
-#endif /* WLAN_FEATURE_PKT_CAPTURE */
-
 void hdd_dp_cfg_update(struct wlan_objmgr_psoc *psoc,
 		       struct hdd_context *hdd_ctx)
 {
@@ -3236,6 +3253,7 @@ void hdd_dp_cfg_update(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_DP_RX_THREAD_UL_CPU_MASK);
 	config->rx_thread_affinity_mask =
 		cfg_get(psoc, CFG_DP_RX_THREAD_CPU_MASK);
+	config->fisa_enable = cfg_get(psoc, CFG_DP_RX_FISA_ENABLE);
 	qdf_uint8_array_parse(cfg_get(psoc, CFG_DP_RPS_RX_QUEUE_CPU_MAP_LIST),
 			      config->cpu_map_list,
 			      sizeof(config->cpu_map_list), &array_out_size);
@@ -3250,7 +3268,6 @@ void hdd_dp_cfg_update(struct wlan_objmgr_psoc *psoc,
 	config->cfg_wmi_credit_cnt = cfg_get(psoc, CFG_DP_HTC_WMI_CREDIT_CNT);
 	hdd_dp_dp_trace_cfg_update(config, psoc);
 	hdd_dp_nud_tracking_cfg_update(config, psoc);
-	hdd_dp_pktcapture_mode_cfg_update(hdd_ctx, psoc);
 }
 
 bool wlan_hdd_rx_rpm_mark_last_busy(struct hdd_context *hdd_ctx,

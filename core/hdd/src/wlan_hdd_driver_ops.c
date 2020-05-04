@@ -44,6 +44,8 @@
 #include "wlan_hdd_debugfs.h"
 #include "cfg_ucfg_api.h"
 #include <linux/suspend.h>
+#include <qdf_notifier.h>
+#include <qdf_hang_event_notifier.h>
 
 #ifdef MODULE
 #define WLAN_MODULE_NAME  module_name(THIS_MODULE)
@@ -72,6 +74,19 @@ static inline void hdd_request_pm_qos(struct device *dev, int val)
 static inline void hdd_remove_pm_qos(struct device *dev)
 {
 	pld_remove_pm_qos(dev);
+}
+
+/**
+ * hdd_get_bandwidth_level() - get current bandwidth level
+ * @data: Context
+ *
+ * Return: current bandwidth level
+ */
+static int hdd_get_bandwidth_level(void *data)
+{
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	return hdd_get_current_throughput_level(hdd_ctx);
 }
 
 /**
@@ -150,6 +165,7 @@ static void hdd_hif_init_driver_state_callbacks(void *data,
 	cbk->is_load_unload_in_progress = hdd_is_load_or_unload_in_progress;
 	cbk->is_driver_unloading = hdd_is_driver_unloading;
 	cbk->is_target_ready = hdd_is_target_ready;
+	cbk->get_bandwidth_level = hdd_get_bandwidth_level;
 }
 
 #ifdef FORCE_WAKE
@@ -161,6 +177,7 @@ void hdd_set_hif_init_phase(struct hif_opaque_softc *hif_ctx,
 #endif /* FORCE_WAKE */
 
 /**
+
  * hdd_hif_set_attribute() - API to set CE attribute if memory is limited
  * @hif_ctx: hif context
  *
@@ -230,6 +247,7 @@ static enum qdf_bus_type to_bus_type(enum pld_bus_type bus_type)
 		return QDF_BUS_TYPE_SDIO;
 	case PLD_BUS_TYPE_USB:
 		return QDF_BUS_TYPE_USB;
+	case PLD_BUS_TYPE_IPCI_FW_SIM:
 	case PLD_BUS_TYPE_IPCI:
 		return QDF_BUS_TYPE_IPCI;
 	default:
@@ -682,11 +700,12 @@ static inline void hdd_wlan_ssr_shutdown_event(void) { }
 #endif
 
 /**
- * hdd_send_hang_reason() - Send hang reason to the userspace
+ * hdd_send_hang_data() - Send hang data to userspace
+ * @data: Hang data
  *
  * Return: None
  */
-static void hdd_send_hang_reason(void)
+static void hdd_send_hang_data(void *data, size_t data_len)
 {
 	enum qdf_hang_reason reason = QDF_REASON_UNSPECIFIED;
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
@@ -696,7 +715,7 @@ static void hdd_send_hang_reason(void)
 
 	cds_get_recovery_reason(&reason);
 	cds_reset_recovery_reason();
-	wlan_hdd_send_hang_reason_event(hdd_ctx, reason);
+	wlan_hdd_send_hang_reason_event(hdd_ctx, reason, data, data_len);
 }
 
 /**
@@ -728,7 +747,7 @@ static void hdd_psoc_shutdown_notify(struct hdd_context *hdd_ctx)
 	cds_shutdown_notifier_purge();
 
 	hdd_wlan_ssr_shutdown_event();
-	hdd_send_hang_reason();
+	hdd_send_hang_data(NULL, 0);
 }
 
 static void __hdd_soc_recovery_shutdown(void)
@@ -1691,6 +1710,9 @@ static void wlan_hdd_pld_notify_handler(struct device *dev,
 static void
 wlan_hdd_pld_uevent(struct device *dev, struct pld_uevent_data *event_data)
 {
+	struct qdf_notifer_data hang_evt_data;
+	enum qdf_hang_reason reason = QDF_REASON_UNSPECIFIED;
+
 	switch (event_data->uevent) {
 	case PLD_FW_DOWN:
 		hdd_info("Received firmware down indication");
@@ -1710,13 +1732,35 @@ wlan_hdd_pld_uevent(struct device *dev, struct pld_uevent_data *event_data)
 		 * on a firmware we already know is down.
 		 */
 		qdf_complete_wait_events();
+		cds_get_recovery_reason(&reason);
+		hang_evt_data.hang_data =
+				qdf_mem_malloc(QDF_HANG_EVENT_DATA_SIZE);
+		if (!hang_evt_data.hang_data)
+			return;
+		hang_evt_data.offset = 0;
+		qdf_hang_event_notifier_call(reason, &hang_evt_data);
+		if (event_data->fw_down.hang_event_data_len >=
+		    QDF_HANG_EVENT_DATA_SIZE / 2)
+			event_data->fw_down.hang_event_data_len =
+						QDF_HANG_EVENT_DATA_SIZE / 2;
 
+		hang_evt_data.offset = QDF_WLAN_HANG_FW_OFFSET;
+		if (event_data->fw_down.hang_event_data_len)
+			qdf_mem_copy((hang_evt_data.hang_data +
+				      hang_evt_data.offset),
+				     event_data->fw_down.hang_event_data,
+				     event_data->fw_down.hang_event_data_len);
+
+		hdd_send_hang_data(hang_evt_data.hang_data,
+				   QDF_HANG_EVENT_DATA_SIZE);
+		qdf_mem_free(hang_evt_data.hang_data);
 		break;
 	default:
 		/* other events intentionally not handled */
 		hdd_debug("Received uevent %d", event_data->uevent);
 		break;
 	}
+
 }
 
 #ifdef FEATURE_RUNTIME_PM
