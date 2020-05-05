@@ -1205,10 +1205,9 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 
 	csa_offload_event->ies_present_flag = csa_event->ies_present_flag;
 
-	WMA_LOGD("CSA: New Channel = %d freq %d BSSID:%pM",
-		 csa_offload_event->channel, csa_offload_event->csa_chan_freq,
-		 csa_offload_event->bssId);
-	WMA_LOGD("CSA: IEs Present Flag = 0x%x new ch width = %d ch center freq1 = %d ch center freq2 = %d new op class = %d",
+	WMA_LOGD("CSA: BSSID %pM chan %d freq %d flag 0x%x width = %d freq1 = %d freq2 = %d op class = %d",
+		 csa_offload_event->bssId, csa_offload_event->channel,
+		 csa_offload_event->csa_chan_freq,
 		 csa_event->ies_present_flag,
 		 csa_offload_event->new_ch_width,
 		 csa_offload_event->new_ch_freq_seg1,
@@ -3388,13 +3387,6 @@ QDF_STATUS wma_process_del_periodic_tx_ptrn_ind(WMA_HANDLE handle,
 }
 
 #ifdef WLAN_FEATURE_STATS_EXT
-/**
- * wma_stats_ext_req() - request ext stats from fw
- * @wma_ptr: wma handle
- * @preq: stats ext params
- *
- * Return: QDF status
- */
 QDF_STATUS wma_stats_ext_req(void *wma_ptr, tpStatsExtRequest preq)
 {
 	tp_wma_handle wma = (tp_wma_handle) wma_ptr;
@@ -4732,6 +4724,25 @@ QDF_STATUS wma_send_coex_config_cmd(WMA_HANDLE wma_handle,
 					       coex_cfg_params);
 }
 
+QDF_STATUS wma_send_ocl_cmd(WMA_HANDLE wma_handle,
+			    struct ocl_cmd_params *ocl_params)
+{
+	tp_wma_handle wma = (tp_wma_handle)wma_handle;
+
+	if (!wma || !wma->wmi_handle) {
+		WMA_LOGE("%s: WMA is closed, can not issue coex config command",
+			 __func__);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!ocl_params) {
+		WMA_LOGE("%s: ocl params ptr NULL", __func__);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return wmi_unified_send_ocl_cmd(wma->wmi_handle, ocl_params);
+}
+
 /**
  * wma_get_arp_stats_handler() - handle arp stats data
  * indicated by FW
@@ -5396,8 +5407,10 @@ void wma_update_set_key(uint8_t session_id, bool pairwise,
 		return;
 	}
 	iface = &wma->interfaces[session_id];
-	if (!iface)
-		wma_info("iface not found for session id %d", session_id);
+	if (!iface) {
+		wma_err("iface not found for session id %d", session_id);
+		return;
+	}
 
 	if (cipher_type == WLAN_CRYPTO_CIPHER_AES_GMAC ||
 	    cipher_type == WLAN_CRYPTO_CIPHER_AES_GMAC_256 ||

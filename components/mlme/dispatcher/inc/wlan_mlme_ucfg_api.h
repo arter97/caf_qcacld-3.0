@@ -1027,6 +1027,17 @@ ucfg_mlme_is_override_ht20_40_24g(struct wlan_objmgr_psoc *psoc, bool *val);
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
+ * ucfg_mlme_get_roam_disable_config() - Get sta roam disable value
+ * @psoc: pointer to psoc object
+ * @val:  Pointer to bitmap of interfaces for those sta roaming is disabled
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+ucfg_mlme_get_roam_disable_config(struct wlan_objmgr_psoc *psoc,
+				  uint32_t *val);
+
+/**
  * ucfg_mlme_get_roaming_offload() - Get roaming offload setting
  * @psoc: pointer to psoc object
  * @val:  Pointer to enable/disable roaming offload
@@ -1047,7 +1058,27 @@ ucfg_mlme_get_roaming_offload(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 ucfg_mlme_set_roaming_offload(struct wlan_objmgr_psoc *psoc,
 			      bool val);
+
+/**
+ * ucfg_mlme_get_roaming_triggers() - Get roaming triggers bitmap
+ * value
+ * @psoc: pointer to psoc object
+ *
+ * Return: Roaming triggers value
+ */
+static inline uint32_t
+ucfg_mlme_get_roaming_triggers(struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_mlme_get_roaming_triggers(psoc);
+}
 #else
+static inline QDF_STATUS
+ucfg_mlme_get_roam_disable_config(struct wlan_objmgr_psoc *psoc,
+				  uint32_t *val)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
 static inline QDF_STATUS
 ucfg_mlme_get_roaming_offload(struct wlan_objmgr_psoc *psoc,
 			      bool *val)
@@ -1062,6 +1093,12 @@ ucfg_mlme_set_roaming_offload(struct wlan_objmgr_psoc *psoc,
 			      bool val)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline uint32_t
+ucfg_mlme_get_roaming_triggers(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
 }
 #endif
 
@@ -1206,6 +1243,26 @@ ucfg_mlme_get_delay_before_vdev_stop(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 ucfg_mlme_get_roam_bmiss_final_bcnt(struct wlan_objmgr_psoc *psoc,
 				    uint8_t *val);
+
+#if defined(WLAN_SAE_SINGLE_PMK) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
+/**
+ * ucfg_mlme_update_sae_single_pmk_info() - Update sae_single_pmk_info
+ * @vdev: pointer to VDEV common object
+ * @pmk_info:  Pointer mlme pmkid info
+ *
+ * Return: None
+ */
+void
+ucfg_mlme_update_sae_single_pmk_info(struct wlan_objmgr_vdev *vdev,
+				     struct mlme_pmk_info *pmk_info);
+#else
+static inline void
+ucfg_mlme_update_sae_single_pmk_info(struct wlan_objmgr_vdev *vdev,
+				     struct mlme_pmk_info *pmk_info)
+{
+}
+#endif
+
 /**
  * ucfg_mlme_get_roam_bmiss_first_bcnt() - Get roam bmiss final count
  * @psoc: pointer to psoc object
@@ -1776,6 +1833,23 @@ QDF_STATUS ucfg_mlme_get_oce_sta_enabled_info(struct wlan_objmgr_psoc *psoc,
 					      bool *value)
 {
 	return wlan_mlme_get_oce_sta_enabled_info(psoc, value);
+}
+
+/**
+ * ucfg_mlme_get_bigtk_support() - Get whether bigtk is supported or not.
+ *
+ * @psoc: pointer to psoc object
+ * @value: pointer to the value which will be filled for the caller
+ *
+ * Inline UCFG API to be used by HDD/OSIF callers to get the BIGTK support
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+static inline
+QDF_STATUS ucfg_mlme_get_bigtk_support(struct wlan_objmgr_psoc *psoc,
+				       bool *value)
+{
+	return wlan_mlme_get_bigtk_support(psoc, value);
 }
 
 /**
@@ -3685,6 +3759,30 @@ ucfg_mlme_get_mws_coex_4g_quick_tdm(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 ucfg_mlme_get_mws_coex_5g_nr_pwr_limit(struct wlan_objmgr_psoc *psoc,
 				       uint32_t *val);
+
+/**
+ * ucfg_mlme_get_mws_coex_pcc_channel_avoid_delay() - Get mws coex pcc
+ *                                                    avoid channel delay
+ * @psoc: pointer to psoc object
+ * @val:  Pointer to the value which will be filled for the caller
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+ucfg_mlme_get_mws_coex_pcc_channel_avoid_delay(struct wlan_objmgr_psoc *psoc,
+					       uint32_t *val);
+
+/**
+ * ucfg_mlme_get_mws_coex_scc_channel_avoid_delay() - Get mws coex scc
+ *                                                    avoidance channel delay
+ * @psoc: pointer to psoc object
+ * @val:  Pointer to the value which will be filled for the caller
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+ucfg_mlme_get_mws_coex_scc_channel_avoid_delay(struct wlan_objmgr_psoc *psoc,
+					       uint32_t *val);
 #endif
 
 /**
@@ -3969,4 +4067,60 @@ QDF_STATUS ucfg_mlme_get_peer_unmap_conf(struct wlan_objmgr_psoc *psoc)
 {
 	return wlan_mlme_get_peer_unmap_conf(psoc);
 }
+
+/**
+ * ucfg_mlme_get_discon_reason_n_from_ap() - Get disconnect reason and from ap
+ * @psoc: PSOC pointer
+ * @vdev_id: vdev id
+ * @from_ap: Get the from_ap cached through mlme_set_discon_reason_n_from_ap
+ *           and copy to this buffer.
+ * @reason_code: Get the reason_code cached through
+ *               mlme_set_discon_reason_n_from_ap and copy to this buffer.
+ *
+ * Fetch the contents of from_ap and reason_codes.
+ *
+ * Return: void
+ */
+static inline void
+ucfg_mlme_get_discon_reason_n_from_ap(struct wlan_objmgr_psoc *psoc,
+				      uint8_t vdev_id, bool *from_ap,
+				      uint32_t *reason_code)
+{
+	mlme_get_discon_reason_n_from_ap(psoc, vdev_id, from_ap, reason_code);
+}
+
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+/**
+ * ucfg_mlme_get_roam_reason_vsie_status() - Get roam reason vsie is
+ * enabled or disabled
+ * @psoc: pointer to psoc object
+ * @roam_reason_vsie_enabled: pointer to hold value of roam reason vsie
+ *
+ * Return: Success if able to get bcn rpt err vsie value, else failure
+ */
+static inline QDF_STATUS
+ucfg_mlme_get_roam_reason_vsie_status(struct wlan_objmgr_psoc *psoc,
+				      uint8_t *roam_reason_vsie_enabled)
+{
+	return wlan_mlme_get_roam_reason_vsie_status(psoc,
+					roam_reason_vsie_enabled);
+}
+
+/**
+ * ucfg_mlme_set_roam_reason_vsie_status() - Update roam reason vsie status
+ * value with user configured value
+ * @psoc: pointer to psoc object
+ * @roam_reason_vsie_enabled: value of roam reason vsie status
+ *
+ * Return: Success if able to get bcn rpt err vsie value, else failure
+ */
+static inline QDF_STATUS
+ucfg_mlme_set_roam_reason_vsie_status(struct wlan_objmgr_psoc *psoc,
+				      uint8_t roam_reason_vsie_enabled)
+{
+	return wlan_mlme_set_roam_reason_vsie_status(psoc,
+					roam_reason_vsie_enabled);
+}
+
+#endif
 #endif /* _WLAN_MLME_UCFG_API_H_ */

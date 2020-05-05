@@ -186,7 +186,7 @@ get_flow_tuple_from_nbuf(hal_soc_handle_t hal_soc_hdl,
 
 	qdf_nbuf_push_head(nbuf, RX_PKT_TLVS_LEN + l2_hdr_offset);
 
-	dp_fisa_debug("head_skb: %pk head_skb->next:%pk head_skb->data:%pk len %d data_len",
+	dp_fisa_debug("head_skb: %pk head_skb->next:%pk head_skb->data:%pk len %d data_len %d",
 		      nbuf, qdf_nbuf_next(nbuf), qdf_nbuf_data(nbuf), nbuf->len,
 		      nbuf->data_len);
 }
@@ -502,9 +502,12 @@ dp_rx_get_fisa_flow(struct dp_rx_fst *fisa_hdl, struct dp_vdev *vdev,
 
 	flow_idx_valid = is_flow_idx_valid(flow_invalid, flow_timeout);
 	if (flow_idx_valid) {
-		qdf_assert_always(flow_idx < fisa_hdl->max_entries);
 		dp_fisa_debug("flow_idx is valid 0x%x", flow_idx);
-		return &sw_ft_base[flow_idx];
+		qdf_assert_always(flow_idx < fisa_hdl->max_entries);
+		sw_ft_entry = &sw_ft_base[flow_idx];
+		sw_ft_entry->vdev = vdev;
+
+		return sw_ft_entry;
 	}
 
 	/* else new flow, add entry to FT */
@@ -801,11 +804,15 @@ dp_rx_fisa_flush_udp_flow(struct dp_vdev *vdev,
 	dp_fisa_debug("fisa_flow->curr_aggr %d", fisa_flow->cur_aggr);
 	linear_skb = dp_fisa_rx_linear_skb(vdev, fisa_flow->head_skb, 24000);
 	if (linear_skb) {
-		vdev->osif_rx(vdev->osif_vdev, linear_skb);
+		if (qdf_likely(vdev->osif_rx))
+			vdev->osif_rx(vdev->osif_vdev, linear_skb);
 		/* Free non linear skb */
 		qdf_nbuf_free(fisa_flow->head_skb);
 	} else {
-		vdev->osif_rx(vdev->osif_vdev, fisa_flow->head_skb);
+		if (qdf_likely(vdev->osif_rx))
+			vdev->osif_rx(vdev->osif_vdev, fisa_flow->head_skb);
+		else
+			qdf_nbuf_free(fisa_flow->head_skb);
 	}
 
 out:
@@ -896,7 +903,7 @@ static int dp_add_nbuf_to_fisa_flow(struct dp_rx_fst *fisa_hdl,
 	hal_soc_handle_t hal_soc_hdl = fisa_hdl->soc_hdl->hal_soc;
 
 	dump_tlvs(hal_soc_hdl, rx_tlv_hdr, QDF_TRACE_LEVEL_ERROR);
-	dp_fisa_debug("nbuf: %pk nbuf->next:%pk nbuf->data:%pk len %d data_len",
+	dp_fisa_debug("nbuf: %pk nbuf->next:%pk nbuf->data:%pk len %d data_len %d",
 		      nbuf, qdf_nbuf_next(nbuf), qdf_nbuf_data(nbuf), nbuf->len,
 		      nbuf->data_len);
 
@@ -1015,6 +1022,9 @@ QDF_STATUS dp_fisa_rx(struct dp_soc *soc, struct dp_vdev *vdev,
 		next_nbuf = head_nbuf->next;
 		qdf_nbuf_set_next(head_nbuf, NULL);
 
+		qdf_nbuf_push_head(head_nbuf, RX_PKT_TLVS_LEN +
+				   QDF_NBUF_CB_RX_PACKET_L3_HDR_PAD(head_nbuf));
+
 		/* Add new flow if the there is no ongoing flow */
 		fisa_flow = dp_rx_get_fisa_flow(dp_fisa_rx_hdl, vdev,
 						head_nbuf);
@@ -1046,7 +1056,10 @@ pull_nbuf:
 deliver_nbuf: /* Deliver without FISA */
 		qdf_nbuf_set_next(head_nbuf, NULL);
 		hex_dump_skb_data(head_nbuf, false);
-		vdev->osif_rx(vdev->osif_vdev, head_nbuf);
+		if (qdf_likely(vdev->osif_rx))
+			vdev->osif_rx(vdev->osif_vdev, head_nbuf);
+		else
+			qdf_nbuf_free(head_nbuf);
 next_msdu:
 		head_nbuf = next_nbuf;
 	}
@@ -1076,8 +1089,8 @@ QDF_STATUS dp_rx_dump_fisa_stats(struct dp_soc *soc)
 			sw_ft_entry->napi_id);
 		dp_info("num msdu aggr %d", sw_ft_entry->aggr_count);
 		dp_info("flush count %d", sw_ft_entry->flush_count);
-		dp_info("bytes_aggregated %d", sw_ft_entry->bytes_aggregated);
-		dp_info("avg aggregation %d",
+		dp_info("bytes_aggregated %llu", sw_ft_entry->bytes_aggregated);
+		dp_info("avg aggregation %llu",
 			sw_ft_entry->bytes_aggregated / sw_ft_entry->flush_count
 			);
 		print_flow_tuple(&sw_ft_entry->rx_flow_tuple_info);

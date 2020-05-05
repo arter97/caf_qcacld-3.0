@@ -42,6 +42,7 @@
 #include "nan_datapath.h"
 #include "wlan_reg_services_api.h"
 #include "wma.h"
+#include "wlan_pkt_capture_ucfg_api.h"
 
 #define MAX_SUPPORTED_PEERS_WEP 16
 
@@ -971,8 +972,6 @@ static void lim_process_mlm_deauth_ind(struct mac_context *mac_ctx,
 		return;
 	}
 	role = GET_LIM_SYSTEM_ROLE(session);
-	pe_debug("*** Received Deauthentication from staId=%d role=%d***",
-		 deauth_ind->aid, role);
 	if (role == eLIM_STA_ROLE) {
 		session->limSmeState = eLIM_SME_WT_DEAUTH_STATE;
 		MTRACE(mac_trace(mac_ctx, TRACE_CODE_SME_STATE,
@@ -1039,7 +1038,6 @@ void lim_process_mlm_deauth_cnf(struct mac_context *mac, uint32_t *msg_buf)
 		}
 		if (pMlmDeauthCnf->resultCode == eSIR_SME_SUCCESS) {
 			pe_session->limSmeState = eLIM_SME_IDLE_STATE;
-			pe_debug("*** Deauthenticated with BSS ***");
 		} else
 			pe_session->limSmeState =
 				pe_session->limPrevSmeState;
@@ -1564,7 +1562,6 @@ void lim_process_sta_mlm_del_bss_rsp(struct mac_context *mac,
 		goto end;
 	}
 	if (vdev_stop_rsp->status == QDF_STATUS_SUCCESS) {
-		pe_debug("STA received the DEL_BSS_RSP");
 		if (!sta) {
 			pe_err("DPH Entry for STA 1 missing");
 			status_code = eSIR_SME_REFUSED;
@@ -1577,8 +1574,7 @@ void lim_process_sta_mlm_del_bss_rsp(struct mac_context *mac,
 			status_code = eSIR_SME_REFUSED;
 			goto end;
 		}
-		pe_debug("STA AssocID %d MAC",	sta->assocId);
-		       lim_print_mac_addr(mac, sta->staAddr, LOGD);
+		pe_debug("STA AssocID %d MAC %pM", sta->assocId, sta->staAddr);
 	} else {
 		pe_err("DEL BSS failed!");
 		status_code = eSIR_SME_STOP_BSS_FAILURE;
@@ -2781,8 +2777,7 @@ static void lim_process_switch_channel_join_req(
 	/* include additional IE if there is */
 	lim_send_probe_req_mgmt_frame(mac_ctx, &ssId,
 		session_entry->pLimMlmJoinReq->bssDescription.bssId,
-		wlan_reg_freq_to_chan(mac_ctx->pdev,
-				      session_entry->curr_op_freq),
+		session_entry->curr_op_freq,
 		session_entry->self_mac_addr,
 		session_entry->dot11mode,
 		&session_entry->lim_join_req->addIEScan.length,
@@ -2821,6 +2816,8 @@ error:
 static void lim_handle_mon_switch_channel_rsp(struct pe_session *session,
 					      QDF_STATUS status)
 {
+	struct scheduler_msg message = {0};
+
 	if (session->bssType != eSIR_MONITOR_MODE)
 		return;
 
@@ -2834,6 +2831,17 @@ static void lim_handle_mon_switch_channel_rsp(struct pe_session *session,
 
 	wlan_vdev_mlme_sm_deliver_evt(session->vdev,
 				      WLAN_VDEV_SM_EV_START_SUCCESS, 0, NULL);
+
+	message.type = eWNI_SME_MONITOR_MODE_VDEV_UP;
+	message.bodyval = session->vdev_id;
+	pe_debug("vdev id %d ", session->vdev_id);
+
+	if (QDF_STATUS_SUCCESS !=
+	    scheduler_post_message(QDF_MODULE_ID_PE,
+				   QDF_MODULE_ID_SME,
+				   QDF_MODULE_ID_SME, &message)) {
+		pe_err("Failed to post message montior mode vdev up");
+	}
 }
 
 /**
@@ -2909,6 +2917,9 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 			pe_debug("Send p2p operating channel change conf action frame once first beacon is received on new channel");
 			pe_session->send_p2p_conf_frame = true;
 		}
+
+		if (ucfg_pkt_capture_get_pktcap_mode(mac->psoc))
+			ucfg_pkt_capture_record_channel(pe_session->vdev);
 		break;
 	case LIM_SWITCH_CHANNEL_SAP_DFS:
 		/* Note: This event code specific to SAP mode
@@ -2935,6 +2946,8 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 		 */
 		policy_mgr_update_connection_info(mac->psoc,
 						  pe_session->smeSessionId);
+		if (ucfg_pkt_capture_get_pktcap_mode(mac->psoc))
+			ucfg_pkt_capture_record_channel(pe_session->vdev);
 		break;
 	default:
 		break;

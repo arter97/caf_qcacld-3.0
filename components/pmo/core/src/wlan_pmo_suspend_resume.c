@@ -531,18 +531,10 @@ QDF_STATUS pmo_core_psoc_user_space_suspend_req(struct wlan_objmgr_psoc *psoc,
 		goto out;
 	}
 
-	/* Suspend all components before sending target suspend command */
-	status = pmo_suspend_all_components(psoc, type);
-	if (status != QDF_STATUS_SUCCESS) {
-		pmo_err("Failed to suspend all component");
-		goto dec_psoc_ref;
-	}
-
 	status = pmo_core_psoc_configure_suspend(psoc, false);
 	if (status != QDF_STATUS_SUCCESS)
 		pmo_err("Failed to configure suspend");
 
-dec_psoc_ref:
 	pmo_psoc_put_ref(psoc);
 out:
 	pmo_exit();
@@ -712,18 +704,10 @@ QDF_STATUS pmo_core_psoc_user_space_resume_req(struct wlan_objmgr_psoc *psoc,
 		goto out;
 	}
 
-	/* Resume all components */
-	status = pmo_resume_all_components(psoc, type);
-	if (status != QDF_STATUS_SUCCESS) {
-		pmo_err("Failed to resume all the components");
-		goto dec_psoc_ref;
-	}
-
 	status = pmo_core_psoc_configure_resume(psoc, false);
 	if (status != QDF_STATUS_SUCCESS)
 		pmo_err("Failed to configure resume");
 
-dec_psoc_ref:
 	pmo_psoc_put_ref(psoc);
 out:
 	pmo_exit();
@@ -832,7 +816,7 @@ pmo_core_enable_wow_in_fw(struct wlan_objmgr_psoc *psoc,
 			pmo_tgt_psoc_get_host_credits(psoc),
 			pmo_tgt_psoc_get_pending_cmnds(psoc));
 		pmo_tgt_update_target_suspend_flag(psoc, false);
-		qdf_trigger_self_recovery(QDF_SUSPEND_TIMEOUT);
+		qdf_trigger_self_recovery(psoc, QDF_SUSPEND_TIMEOUT);
 		goto out;
 	}
 
@@ -850,7 +834,7 @@ pmo_core_enable_wow_in_fw(struct wlan_objmgr_psoc *psoc,
 		pmo_err("No Credits after HTC ACK:%d, pending_cmds:%d,"
 			 "cannot resume back", host_credits, wmi_pending_cmds);
 		htc_dump_counter_info(pmo_core_psoc_get_htc_handle(psoc));
-		qdf_trigger_self_recovery(QDF_SUSPEND_TIMEOUT);
+		qdf_trigger_self_recovery(psoc, QDF_SUSPEND_TIMEOUT);
 	}
 	pmo_debug("WOW enabled successfully in fw: credits:%d pending_cmds: %d",
 		host_credits, wmi_pending_cmds);
@@ -887,7 +871,7 @@ QDF_STATUS pmo_core_psoc_suspend_target(struct wlan_objmgr_psoc *psoc,
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pmo_err("Failed to get ACK from firmware for pdev suspend");
 		pmo_tgt_update_target_suspend_flag(psoc, false);
-		qdf_trigger_self_recovery(QDF_SUSPEND_TIMEOUT);
+		qdf_trigger_self_recovery(psoc, QDF_SUSPEND_TIMEOUT);
 	}
 
 out:
@@ -1152,7 +1136,7 @@ QDF_STATUS pmo_core_psoc_bus_runtime_resume(struct wlan_objmgr_psoc *psoc,
 
 fail:
 	if (status != QDF_STATUS_SUCCESS)
-		qdf_trigger_self_recovery(QDF_RESUME_TIMEOUT);
+		qdf_trigger_self_recovery(psoc, QDF_RESUME_TIMEOUT);
 
 dec_psoc_ref:
 	pmo_psoc_put_ref(psoc);
@@ -1198,7 +1182,7 @@ QDF_STATUS pmo_core_psoc_send_host_wakeup_ind_to_fw(
 		pmo_err("Pending commands %d credits %d",
 			pmo_tgt_psoc_get_pending_cmnds(psoc),
 			pmo_tgt_psoc_get_host_credits(psoc));
-		qdf_trigger_self_recovery(QDF_RESUME_TIMEOUT);
+		qdf_trigger_self_recovery(psoc, QDF_RESUME_TIMEOUT);
 	} else {
 		pmo_debug("Host wakeup received");
 	}
@@ -1270,7 +1254,7 @@ QDF_STATUS pmo_core_psoc_resume_target(struct wlan_objmgr_psoc *psoc,
 		pmo_fatal("Pending commands %d credits %d",
 			pmo_tgt_psoc_get_pending_cmnds(psoc),
 			pmo_tgt_psoc_get_host_credits(psoc));
-		qdf_trigger_self_recovery(QDF_RESUME_TIMEOUT);
+		qdf_trigger_self_recovery(psoc, QDF_RESUME_TIMEOUT);
 	} else {
 		pmo_debug("Host wakeup received");
 	}
@@ -1308,7 +1292,7 @@ QDF_STATUS pmo_core_psoc_bus_resume_req(struct wlan_objmgr_psoc *psoc,
 	wow_mode = pmo_core_is_wow_enabled(psoc_ctx);
 	pmo_debug("wow mode %d", wow_mode);
 
-	pmo_core_update_wow_initial_wake_up(psoc_ctx, false);
+	pmo_core_update_wow_initial_wake_up(psoc_ctx, 0);
 
 	/* If target was not suspended, bail out */
 	if (!pmo_tgt_is_target_suspended(psoc)) {
@@ -1440,7 +1424,7 @@ int pmo_core_psoc_clear_target_wake_up(struct wlan_objmgr_psoc *psoc)
 	}
 
 	psoc_ctx = pmo_psoc_get_priv(psoc);
-	pmo_core_update_wow_initial_wake_up(psoc_ctx, false);
+	pmo_core_update_wow_initial_wake_up(psoc_ctx, 0);
 
 	pmo_psoc_put_ref(psoc);
 out:
@@ -1461,7 +1445,7 @@ void pmo_core_psoc_handle_initial_wake_up(void *cb_ctx)
 	}
 
 	psoc_ctx = pmo_psoc_get_priv(psoc);
-	pmo_core_update_wow_initial_wake_up(psoc_ctx, true);
+	pmo_core_update_wow_initial_wake_up(psoc_ctx, 1);
 
 out:
 	pmo_exit();

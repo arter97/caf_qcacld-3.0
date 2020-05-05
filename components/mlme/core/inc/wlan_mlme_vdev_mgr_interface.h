@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -25,6 +25,7 @@
 #include <wlan_objmgr_vdev_obj.h>
 #include "include/wlan_vdev_mlme.h"
 #include "wlan_mlme_main.h"
+#include "wma_if.h"
 
 /**
  * mlme_register_mlme_ext_ops() - Register mlme ext ops
@@ -109,6 +110,10 @@ mlme_set_vdev_start_failed(struct wlan_objmgr_vdev *vdev, bool val);
  * Return: value of vdev connection failure flag
  */
 bool mlme_is_connection_fail(struct wlan_objmgr_vdev *vdev);
+
+QDF_STATUS mlme_set_bigtk_support(struct wlan_objmgr_vdev *vdev, bool val);
+
+bool mlme_get_bigtk_support(struct wlan_objmgr_vdev *vdev);
 
 /**
  * mlme_set_connection_fail() - set connection failure flag
@@ -287,4 +292,38 @@ QDF_STATUS mlme_vdev_create_send(struct wlan_objmgr_vdev *vdev);
  * to firmware or QDF_STATUS_E_** when there is a failure.
  */
 QDF_STATUS mlme_vdev_self_peer_create(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * mlme_vdev_self_peer_delete() - function to delete vdev self peer
+ * @self_peer_del_msg: scheduler message containing the del_vdev_params
+ *
+ * Return: QDF_STATUS_SUCCESS when the self peer is successfully deleted
+ * to firmware or QDF_STATUS_E_** when there is a failure.
+ */
+QDF_STATUS mlme_vdev_self_peer_delete(struct scheduler_msg *self_peer_del_msg);
+
+/**
+ * mlme_vdev_uses_self_peer() - send vdev del resp to Upper layer
+ * @vdev_type: params of del vdev response
+ *
+ * Return: boolean
+ */
+bool mlme_vdev_uses_self_peer(uint32_t vdev_type, uint32_t vdev_subtype);
+
+/**
+ * mlme_vdev_self_peer_delete_resp() - send vdev self peer delete resp to Upper
+ * layer
+ * @param: params of del vdev response
+ *
+ * Return: none
+ */
+void mlme_vdev_self_peer_delete_resp(struct del_vdev_params *param);
+
+/**
+ * mlme_vdev_del_resp() - send vdev delete resp to Upper layer
+ * @vdev_id: vdev id for which del vdev response is received
+ *
+ * Return: none
+ */
+void mlme_vdev_del_resp(uint8_t vdev_id);
 #endif

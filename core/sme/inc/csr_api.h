@@ -602,8 +602,8 @@ typedef enum {
 
 } eCsrWEPStaticKeyID;
 
-/* Two extra key indicies are used for the IGTK (which is used by BIP) */
-#define CSR_MAX_NUM_KEY     (eCSR_SECURITY_WEP_STATIC_KEY_ID_MAX + 2 + 1)
+/* Two extra key indicies are used for the IGTK, two for BIGTK */
+#define CSR_MAX_NUM_KEY     (eCSR_SECURITY_WEP_STATIC_KEY_ID_MAX + 2 + 1 + 2)
 
 typedef enum {
 	/*
@@ -901,6 +901,7 @@ struct csr_neighbor_report_offload_params {
 struct csr_config_params {
 	/* keep this uint32_t. This gets converted to ePhyChannelBondState */
 	uint32_t channelBondingMode24GHz;
+	uint8_t nud_fail_behaviour;
 	uint32_t channelBondingMode5GHz;
 	eCsrPhyMode phyMode;
 	uint32_t HeartbeatThresh50;
@@ -927,10 +928,6 @@ struct csr_config_params {
 	 */
 	uint8_t fAllowMCCGODiffBI;
 	tCsr11dinfo Csr11dinfo;
-	/* stats request frequency from PE while in full power */
-	uint32_t statsReqPeriodicity;
-	/* stats request frequency from PE while in power save */
-	uint32_t statsReqPeriodicityInPS;
 #ifdef FEATURE_WLAN_ESE
 	uint8_t isEseIniFeatureEnabled;
 #endif
@@ -942,15 +939,8 @@ struct csr_config_params {
 	 * (apprx 1.3 sec)
 	 */
 	uint8_t fEnableDFSChnlScan;
-	/*
-	 * To enable/disable scanning 2.4Ghz channels twice on a single scan
-	 * request from HDD
-	 */
-	bool fScanTwice;
-	bool vendor_vht_sap;
 	bool send_smps_action;
 
-	uint8_t disable_high_ht_mcs_2x2;
 	uint8_t isCoalesingInIBSSAllowed;
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 	uint8_t cc_switch_mode;
@@ -973,10 +963,7 @@ struct csr_config_params {
 	int8_t roam_bg_scan_bad_rssi_thresh;
 	uint8_t roam_bad_rssi_thresh_offset_2g;
 	struct csr_sta_roam_policy_params sta_roam_policy_params;
-	bool enable_bcast_probe_rsp;
-	bool is_fils_enabled;
 	enum force_1x1_type is_force_1x1;
-	uint8_t oce_feature_bitmap;
 	uint32_t offload_11k_enable_bitmask;
 	bool wep_tkip_in_he;
 	struct csr_neighbor_report_offload_params neighbor_report_offload;
@@ -1434,6 +1421,11 @@ static inline void csr_roam_fill_tdls_info(struct mac_context *mac_ctx,
 					   struct join_rsp *join_rsp)
 {}
 #endif
+
+typedef void (*sme_get_raom_scan_ch_callback)(
+				hdd_handle_t hdd_handle,
+				struct roam_scan_ch_resp *roam_ch,
+				void *context);
 
 /**
  * csr_packetdump_timer_stop() - stops packet dump timer
