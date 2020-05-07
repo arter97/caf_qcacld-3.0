@@ -16,6 +16,11 @@
 
 #ifndef _CFG80211_VEN_CMD_
 #define _CFG80211_VEN_CMD_
+
+#ifdef CONFIG_SUPPORT_LIBROXML
+#include <ieee80211_external_config.h>
+#endif
+
 /*
  * vendor_commands: Structure to maintain vendor command
  * @cmd_value: Corresponding macro for command
@@ -1118,8 +1123,6 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_ACS_NEAR_RANGE_WEIGHTAGE = 413,
 	OL_ATH_PARAM_ACS_MID_RANGE_WEIGHTAGE = 414,
 	OL_ATH_PARAM_ACS_FAR_RANGE_WEIGHTAGE = 415,
-	/* Set SELF AP OBSS_PD_THRESHOLD value */
-	OL_ATH_PARAM_SET_CMD_OBSS_PD_THRESHOLD = 416,
 	/* Enable/Disable/Set MGMT_TTL in milliseconds. */
 	OL_ATH_PARAM_MGMT_TTL = 417,
 	/* Enable/Disable/Set PROBE_RESP_TTL in milliseconds */
@@ -1128,8 +1131,6 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_MU_PPDU_DURATION = 419,
 	/* Set TBTT_CTRL_CFG */
 	OL_ATH_PARAM_TBTT_CTRL = 420,
-	/* Enable/disable AP OBSS_PD_THRESHOLD */
-	OL_ATH_PARAM_SET_CMD_OBSS_PD_THRESHOLD_ENABLE = 421,
 	/* Get baseline radio level channel width */
 	OL_ATH_PARAM_RCHWIDTH = 422,
 	/* Whether external ACS request is in progress */
@@ -1178,7 +1179,7 @@ enum _ol_ath_param_t {
 	/* Prioritize scan over CAC time */
 	OL_ATH_SCAN_OVER_CAC = 441,
 #endif
-
+	OL_ATH_PARAM_CFR_CAPTURE_STATUS = 442,
 };
 
 #ifdef CONFIG_SUPPORT_LIBROXML
@@ -2451,6 +2452,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_OBSS_RSSI_THRESHOLD, SET_PARAM, 1},
 	{"gobss_rssi_th",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_OBSS_RSSI_THRESHOLD, GET_PARAM, 0},
+	{"obss_rxrssi_th",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_OBSS_RX_RSSI_THRESHOLD, SET_PARAM, 1},
+	{"gobss_rxrssi_th",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_OBSS_RX_RSSI_THRESHOLD, GET_PARAM, 0},
 #if ATH_CHANNEL_BLOCKING
 	{"acs_bmode",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ACS_BLOCK_MODE, SET_PARAM, 1},
@@ -2919,10 +2924,6 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ACS_FAR_RANGE_WEIGHTAGE, SET_PARAM, 1},
 	{"get_acs_far_range_weightage",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ACS_FAR_RANGE_WEIGHTAGE, GET_PARAM, 0},
-	{"set_self_obss_pd_tx_threshold",
-		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SET_CMD_OBSS_PD_THRESHOLD, SET_PARAM, 1},
-	{"get_self_obss_pd_tx_threshold",
-		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SET_CMD_OBSS_PD_THRESHOLD, GET_PARAM, 0},
 	{"set_mgmt_ttl",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MGMT_TTL, SET_PARAM, 1},
 	{"get_mgmt_ttl",
@@ -2939,12 +2940,6 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_TBTT_CTRL, SET_PARAM, 1},
 	{"get_tbtt_ctrl",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_TBTT_CTRL, GET_PARAM, 0},
-	{"self_obss_pd_tx_enable",
-		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SET_CMD_OBSS_PD_THRESHOLD_ENABLE,
-		SET_PARAM, 1},
-	{"get_self_obss_pd_tx_enable",
-		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SET_CMD_OBSS_PD_THRESHOLD_ENABLE,
-		GET_PARAM, 0},
 	{"get_rchwidth",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_RCHWIDTH, GET_PARAM, 0},
 	{"hw_mode",
@@ -3062,6 +3057,9 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"setHALparam",         35808, SET_PARAM, 1},
 	{"getHALparam",         35809, GET_PARAM, 0},
 	{"get_aggr_burst",      35821, GET_PARAM, 0},
+	{"get_cfr_capture_status",
+	 OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_CFR_CAPTURE_STATUS, GET_PARAM, 0},
+
 };
 #endif
 #endif
