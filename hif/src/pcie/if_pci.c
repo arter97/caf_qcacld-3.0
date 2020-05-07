@@ -39,6 +39,7 @@
 #include <linux/seq_file.h>
 #include "qdf_status.h"
 #include "qdf_atomic.h"
+#include "qdf_platform.h"
 #include "pld_common.h"
 #include "mp_dev.h"
 #include "hif_debug.h"
@@ -1273,6 +1274,25 @@ static void hif_pm_runtime_open(struct hif_pci_softc *sc)
 	INIT_LIST_HEAD(&sc->prevent_suspend_list);
 }
 
+static void  hif_check_for_get_put_out_of_sync(struct hif_pci_softc *sc)
+{
+	int32_t i;
+	int32_t get_count, put_count;
+
+	if (qdf_is_fw_down())
+		return;
+
+	for (i = 0; i < RTPM_ID_MAX; i++) {
+		get_count = qdf_atomic_read(&sc->pm_stats.runtime_get_dbgid[i]);
+		put_count = qdf_atomic_read(&sc->pm_stats.runtime_put_dbgid[i]);
+		if (get_count != put_count) {
+			QDF_DEBUG_PANIC("%s get-put out of sync. get %d put %d",
+					rtpm_string_from_dbgid(i),
+					get_count, put_count);
+		}
+	}
+}
+
 /**
  * hif_pm_runtime_sanitize_on_exit(): sanitize the pm usage count and state
  * @sc: pci context
@@ -1288,6 +1308,8 @@ static void hif_pm_runtime_open(struct hif_pci_softc *sc)
 static void hif_pm_runtime_sanitize_on_exit(struct hif_pci_softc *sc)
 {
 	struct hif_pm_runtime_lock *ctx, *tmp;
+
+	hif_check_for_get_put_out_of_sync(sc);
 
 	if (atomic_read(&sc->dev->power.usage_count) != 2)
 		hif_pci_runtime_pm_warn(sc, "Driver Module Closing");
@@ -2538,6 +2560,14 @@ void hif_pci_nointrs(struct hif_softc *scn)
 	scn->request_irq_done = false;
 }
 
+static inline
+bool hif_pci_default_link_up(struct hif_target_info *tgt_info)
+{
+	if (ADRASTEA_BU && (tgt_info->target_type != TARGET_TYPE_QCN7605))
+		return true;
+	else
+		return false;
+}
 /**
  * hif_disable_bus(): hif_disable_bus
  *
@@ -2561,7 +2591,7 @@ void hif_pci_disable_bus(struct hif_softc *scn)
 		return;
 
 	pdev = sc->pdev;
-	if (ADRASTEA_BU) {
+	if (hif_pci_default_link_up(tgt_info)) {
 		hif_vote_link_down(GET_HIF_OPAQUE_HDL(scn));
 
 		hif_write32_mb(sc, sc->mem + PCIE_INTR_ENABLE_ADDRESS, 0);
@@ -4003,7 +4033,7 @@ again:
 	if (!ce_srng_based(ol_sc)) {
 		hif_target_sync(ol_sc);
 
-		if (ADRASTEA_BU)
+		if (hif_pci_default_link_up(tgt_info))
 			hif_vote_link_up(hif_hdl);
 	}
 
@@ -4491,10 +4521,10 @@ static int __hif_pm_runtime_prevent_suspend(struct hif_pci_softc
 
 	qdf_atomic_inc(&hif_sc->pm_stats.prevent_suspend);
 
-	HIF_ERROR("%s: in pm_state:%s ret: %d", __func__,
-		hif_pm_runtime_state_to_string(
-			qdf_atomic_read(&hif_sc->pm_state)),
-					ret);
+	hif_debug("%s: in pm_state:%s ret: %d", __func__,
+		  hif_pm_runtime_state_to_string(
+			  qdf_atomic_read(&hif_sc->pm_state)),
+		  ret);
 
 	return ret;
 }
@@ -4539,10 +4569,10 @@ static int __hif_pm_runtime_allow_suspend(struct hif_pci_softc *hif_sc,
 	hif_pm_runtime_mark_last_busy(hif_ctx);
 	ret = hif_pm_runtime_put_auto(hif_sc->dev);
 
-	HIF_ERROR("%s: in pm_state:%s ret: %d", __func__,
-		hif_pm_runtime_state_to_string(
-			qdf_atomic_read(&hif_sc->pm_state)),
-					ret);
+	hif_debug("%s: in pm_state:%s ret: %d", __func__,
+		  hif_pm_runtime_state_to_string(
+			  qdf_atomic_read(&hif_sc->pm_state)),
+		  ret);
 
 	qdf_atomic_inc(&hif_sc->pm_stats.allow_suspend);
 	return ret;

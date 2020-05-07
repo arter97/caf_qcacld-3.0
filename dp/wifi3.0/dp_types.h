@@ -384,15 +384,19 @@ struct dp_tx_ext_desc_pool_s {
 struct dp_tx_desc_s {
 	struct dp_tx_desc_s *next;
 	qdf_nbuf_t nbuf;
+	uint16_t length;
+	uint16_t flags;
+	qdf_dma_addr_t dma_addr;
 	uint32_t id;
 	struct dp_vdev *vdev;
 	struct dp_pdev *pdev;
-	struct dp_tx_ext_desc_elem_s *msdu_ext_desc;
-	uint16_t flags;
-	uint16_t tx_encap_type;
+	uint8_t tx_encap_type;
 	uint8_t frm_type;
 	uint8_t pkt_offset;
 	uint8_t  pool_id;
+	uint16_t peer_id;
+	uint16_t tx_status;
+	struct dp_tx_ext_desc_elem_s *msdu_ext_desc;
 	void *me_buffer;
 	void *tso_desc;
 	void *tso_num_desc;
@@ -843,6 +847,8 @@ struct dp_soc_stats {
 			uint32_t reo_err_oor_to_stack;
 			/* REO OOR scattered msdu count */
 			uint32_t reo_err_oor_sg_count;
+			/* RX msdu rejected count on delivery to vdev stack_fn*/
+			uint32_t rejected;
 		} err;
 
 		/* packet count per core - per ring */
@@ -1119,15 +1125,6 @@ struct dp_soc {
 	struct dp_txrx_pool_stats pool_stats;
 #endif /* !QCA_LL_TX_FLOW_CONTROL_V2 */
 
-	/*
-	 * Re-use memory section ends. reuse memory indicator.
-	 * Everything above this variable "dp_soc_reinit" is retained across
-	 * WiFi up/down for AP use-cases.
-	 * Everything below this variable "dp_soc_reinit" is reset during
-	 * dp_soc_deinit.
-	 */
-	bool dp_soc_reinit;
-
 	uint32_t wbm_idle_scatter_buf_size;
 
 	/* VDEVs on this SOC */
@@ -1324,11 +1321,21 @@ struct dp_soc {
 	uint8_t fisa_enable;
 #endif
 #endif /* WLAN_SUPPORT_RX_FLOW_TAG || WLAN_SUPPORT_RX_FISA */
-
 	/* Full monitor mode support */
 	bool full_mon_mode;
 	/* SG supported for msdu continued packets from wbm release ring */
 	bool wbm_release_desc_rx_sg_support;
+	bool peer_map_attach_success;
+
+	struct {
+		/* 1st msdu in sg for msdu continued packets in wbm rel ring */
+		bool wbm_is_first_msdu_in_sg;
+		/* Wbm sg list head */
+		qdf_nbuf_t wbm_sg_nbuf_head;
+		/* Wbm sg list tail */
+		qdf_nbuf_t wbm_sg_nbuf_tail;
+		uint32_t wbm_sg_desc_msdu_len;
+	} wbm_sg_param;
 };
 
 #ifdef IPA_OFFLOAD
@@ -1543,12 +1550,6 @@ struct dp_pdev {
 	/* Stuck count on monitor destination ring MPDU process */
 	uint32_t mon_dest_ring_stuck_cnt;
 
-	/*
-	 * re-use memory section ends
-	 * reuse memory/deinit indicator
-	 *
-	 * DO NOT CHANGE NAME OR MOVE THIS VARIABLE
-	 */
 	bool pdev_deinit;
 
 	/* pdev status down or up required to handle dynamic hw

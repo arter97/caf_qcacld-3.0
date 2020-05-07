@@ -1,3 +1,4 @@
+
 /*
  * Copyright (c) 2019-2020 The Linux Foundation. All rights reserved.
  *
@@ -507,8 +508,16 @@ struct pdev_cfr {
 	qdf_spinlock_t lut_lock;
 };
 
-#define PEER_CFR_CAPTURE_ENABLE   1
-#define PEER_CFR_CAPTURE_DISABLE  0
+/**
+ * enum cfr_capt_status - CFR capture status
+ */
+enum cfr_capt_status {
+	/* Capture not in progress */
+	PEER_CFR_CAPTURE_DISABLE,
+	/* Capture in progress */
+	PEER_CFR_CAPTURE_ENABLE,
+};
+
 /**
  * struct peer_cfr - private peer object for cfr
  * peer_obj: pointer to peer_obj
@@ -578,6 +587,14 @@ QDF_STATUS wlan_cfr_pdev_close(struct wlan_objmgr_pdev *pdev);
  * Return: No. of set bits
  */
 uint8_t count_set_bits(uint32_t value);
+
+/**
+ * wlan_cfr_is_feature_disabled() - Check if cfr feature is disabled
+ * @pdev - the physical device object.
+ *
+ * Return : true if cfr is disabled, else false.
+ */
+bool wlan_cfr_is_feature_disabled(struct wlan_objmgr_pdev *pdev);
 
 #ifdef WLAN_ENH_CFR_ENABLE
 /**

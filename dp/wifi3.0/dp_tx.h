@@ -25,7 +25,7 @@
 
 #define DP_TX_MAX_NUM_FRAGS 6
 
-#define DP_TX_DESC_FLAG_ALLOCATED	0x1
+#define DP_TX_DESC_FLAG_SIMPLE		0x1
 #define DP_TX_DESC_FLAG_TO_FW		0x2
 #define DP_TX_DESC_FLAG_FRAG		0x4
 #define DP_TX_DESC_FLAG_RAW		0x8
@@ -34,6 +34,7 @@
 #define DP_TX_DESC_FLAG_COMPLETED_TX	0x40
 #define DP_TX_DESC_FLAG_ME		0x80
 #define DP_TX_DESC_FLAG_TDLS_FRAME	0x100
+#define DP_TX_DESC_FLAG_ALLOCATED	0x200
 
 #define DP_TX_FREE_SINGLE_BUF(soc, buf)                  \
 do {                                                           \
@@ -170,9 +171,29 @@ void dp_tx_deinit_pair_by_index(struct dp_soc *soc, int index);
 QDF_STATUS dp_tx_vdev_attach(struct dp_vdev *vdev);
 QDF_STATUS dp_tx_vdev_detach(struct dp_vdev *vdev);
 void dp_tx_vdev_update_search_flags(struct dp_vdev *vdev);
+void dp_tx_tso_cmn_desc_pool_deinit(struct dp_soc *soc, uint8_t num_pool);
+void dp_tx_tso_cmn_desc_pool_free(struct dp_soc *soc, uint8_t num_pool);
+QDF_STATUS dp_tx_tso_cmn_desc_pool_alloc(struct dp_soc *soc,
+					 uint8_t num_pool,
+					 uint16_t num_desc);
+QDF_STATUS dp_tx_tso_cmn_desc_pool_init(struct dp_soc *soc,
+					uint8_t num_pool,
+					uint16_t num_desc);
+QDF_STATUS dp_tx_pdev_detach(struct dp_pdev *pdev);
+QDF_STATUS dp_tx_pdev_attach(struct dp_pdev *pdev);
 
-QDF_STATUS dp_tx_soc_attach(struct dp_soc *soc);
-QDF_STATUS dp_tx_soc_detach(struct dp_soc *soc);
+void dp_tx_tso_cmn_desc_pool_deinit(struct dp_soc *soc, uint8_t num_pool);
+void dp_tx_tso_cmn_desc_pool_free(struct dp_soc *soc, uint8_t num_pool);
+void dp_soc_tx_desc_sw_pools_free(struct dp_soc *soc);
+void dp_soc_tx_desc_sw_pools_deinit(struct dp_soc *soc);
+QDF_STATUS dp_tx_tso_cmn_desc_pool_alloc(struct dp_soc *soc,
+					 uint8_t num_pool,
+					 uint16_t num_desc);
+QDF_STATUS dp_tx_tso_cmn_desc_pool_init(struct dp_soc *soc,
+					uint8_t num_pool,
+					uint16_t num_desc);
+QDF_STATUS dp_soc_tx_desc_sw_pools_alloc(struct dp_soc *soc);
+QDF_STATUS dp_soc_tx_desc_sw_pools_init(struct dp_soc *soc);
 
 /**
  * dp_tso_attach() - TSO Attach handler
@@ -196,8 +217,7 @@ QDF_STATUS dp_tso_soc_attach(struct cdp_soc_t *txrx_soc);
  */
 QDF_STATUS dp_tso_soc_detach(struct cdp_soc_t *txrx_soc);
 
-QDF_STATUS dp_tx_pdev_detach(struct dp_pdev *pdev);
-QDF_STATUS dp_tx_pdev_attach(struct dp_pdev *pdev);
+QDF_STATUS dp_tx_pdev_init(struct dp_pdev *pdev);
 
 qdf_nbuf_t dp_tx_send(struct cdp_soc_t *soc, uint8_t vdev_id, qdf_nbuf_t nbuf);
 

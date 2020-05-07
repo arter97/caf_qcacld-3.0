@@ -1514,8 +1514,6 @@ static inline int dp_get_mac_id_for_mac(struct dp_soc *soc, uint32_t mac_id)
 	return 0;
 }
 
-bool dp_is_soc_reinit(struct dp_soc *soc);
-
 /*
  * dp_is_subtype_data() - check if the frame subtype is data
  *
@@ -1792,7 +1790,7 @@ static inline void dp_srng_dst_inv_cached_descs(struct dp_soc *dp_soc,
 {
 	hal_soc_handle_t hal_soc = dp_soc->hal_soc;
 
-	hal_srng_dst_inv_cached_descs(soc->hal_soc, hal_ring_hdl, num_entries);
+	hal_srng_dst_inv_cached_descs(hal_soc, hal_ring_hdl, num_entries);
 }
 #else
 static inline void *dp_srng_dst_get_next(struct dp_soc *dp_soc,
