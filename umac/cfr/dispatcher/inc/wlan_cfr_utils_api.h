@@ -498,8 +498,16 @@ struct pdev_cfr {
 	qdf_spinlock_t lut_lock;
 };
 
-#define PEER_CFR_CAPTURE_ENABLE   1
-#define PEER_CFR_CAPTURE_DISABLE  0
+/**
+ * enum cfr_capt_status - CFR capture status
+ */
+enum cfr_capt_status {
+	/* Capture not in progress */
+	PEER_CFR_CAPTURE_DISABLE,
+	/* Capture in progress */
+	PEER_CFR_CAPTURE_ENABLE,
+};
+
 /**
  * struct peer_cfr - private peer object for cfr
  * peer_obj: pointer to peer_obj
