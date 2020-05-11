@@ -2432,6 +2432,7 @@ static QDF_STATUS send_beacon_tmpl_send_cmd_tlv(wmi_unified_t wmi_handle,
 	cmd->ext_csa_switch_count_offset = param->ext_csa_switch_count_offset;
 	cmd->esp_ie_offset = param->esp_ie_offset;
 	cmd->mu_edca_ie_offset = param->mu_edca_ie_offset;
+	cmd->ema_params = param->ema_params;
 	cmd->buf_len = param->tmpl_len;
 
 	WMI_BEACON_PROTECTION_EN_SET(cmd->feature_enable_bitmap,
@@ -6772,6 +6773,9 @@ void wmi_copy_resource_config(wmi_resource_config *resource_cfg,
 	 * and it can support 6Ghz.
 	 */
 	resource_cfg->max_rnr_neighbours = MAX_SUPPORTED_NEIGHBORS;
+	resource_cfg->ema_max_vap_cnt = tgt_res_cfg->ema_max_vap_cnt;
+	resource_cfg->ema_max_profile_period =
+			tgt_res_cfg->ema_max_profile_period;
 	if (tgt_res_cfg->atf_config)
 		WMI_RSRC_CFG_FLAG_ATF_CONFIG_ENABLE_SET(resource_cfg->flag1, 1);
 	if (tgt_res_cfg->mgmt_comp_evt_bundle_support)
@@ -8500,6 +8504,115 @@ QDF_STATUS send_obss_spatial_reuse_set_cmd_tlv(wmi_unified_t wmi_handle,
 	if (QDF_IS_STATUS_ERROR(ret)) {
 		WMI_LOGE(
 		 "WMI_PDEV_OBSS_PD_SPATIAL_REUSE_CMDID send returned Error %d",
+		 ret);
+		wmi_buf_free(buf);
+	}
+
+	return ret;
+}
+
+/**
+ * send_self_srg_bss_color_bitmap_set_cmd_tlv() - Send 64-bit BSS color bitmap
+ * to be used by SRG based Spatial Reuse feature to the FW
+ * @wmi_handle: wmi handle
+ * @bitmap_0: lower 32 bits in BSS color bitmap
+ * @bitmap_1: upper 32 bits in BSS color bitmap
+ * @pdev_id: pdev ID
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+static QDF_STATUS
+send_self_srg_bss_color_bitmap_set_cmd_tlv(
+	wmi_unified_t wmi_handle, uint32_t bitmap_0,
+	uint32_t bitmap_1, uint8_t pdev_id)
+{
+	wmi_buf_t buf;
+	wmi_pdev_srg_bss_color_bitmap_cmd_fixed_param *cmd;
+	QDF_STATUS ret;
+	uint32_t len;
+
+	len = sizeof(*cmd);
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf)
+		return QDF_STATUS_E_FAILURE;
+
+	cmd = (wmi_pdev_srg_bss_color_bitmap_cmd_fixed_param *)
+			wmi_buf_data(buf);
+
+	WMITLV_SET_HDR(
+		&cmd->tlv_header,
+		WMITLV_TAG_STRUC_wmi_pdev_srg_bss_color_bitmap_cmd_fixed_param,
+		WMITLV_GET_STRUCT_TLVLEN
+		(wmi_pdev_srg_bss_color_bitmap_cmd_fixed_param));
+
+	cmd->pdev_id = wmi_handle->ops->convert_pdev_id_host_to_target(
+					wmi_handle, pdev_id);
+	cmd->srg_bss_color_bitmap[0] = bitmap_0;
+	cmd->srg_bss_color_bitmap[1] = bitmap_1;
+
+	ret = wmi_unified_cmd_send(
+			wmi_handle, buf, len,
+			WMI_PDEV_SET_SRG_BSS_COLOR_BITMAP_CMDID);
+
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		WMI_LOGE(
+		 "WMI_PDEV_SET_SRG_BSS_COLOR_BITMAP_CMDID send returned Error %d",
+		 ret);
+		wmi_buf_free(buf);
+	}
+
+	return ret;
+}
+
+/**
+ * send_self_srg_partial_bssid_bitmap_set_cmd_tlv() - Send 64-bit partial BSSID
+ * bitmap to be used by SRG based Spatial Reuse feature to the FW
+ * @wmi_handle: wmi handle
+ * @bitmap_0: lower 32 bits in partial BSSID bitmap
+ * @bitmap_1: upper 32 bits in partial BSSID bitmap
+ * @pdev_id: pdev ID
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+static QDF_STATUS
+send_self_srg_partial_bssid_bitmap_set_cmd_tlv(
+	wmi_unified_t wmi_handle, uint32_t bitmap_0,
+	uint32_t bitmap_1, uint8_t pdev_id)
+{
+	wmi_buf_t buf;
+	wmi_pdev_srg_partial_bssid_bitmap_cmd_fixed_param *cmd;
+	QDF_STATUS ret;
+	uint32_t len;
+
+	len = sizeof(*cmd);
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf)
+		return QDF_STATUS_E_FAILURE;
+
+	cmd = (wmi_pdev_srg_partial_bssid_bitmap_cmd_fixed_param *)
+			wmi_buf_data(buf);
+
+	WMITLV_SET_HDR(
+		&cmd->tlv_header,
+		WMITLV_TAG_STRUC_wmi_pdev_srg_partial_bssid_bitmap_cmd_fixed_param,
+		WMITLV_GET_STRUCT_TLVLEN
+		(wmi_pdev_srg_partial_bssid_bitmap_cmd_fixed_param));
+
+	cmd->pdev_id = wmi_handle->ops->convert_pdev_id_host_to_target(
+					wmi_handle, pdev_id);
+
+	cmd->srg_partial_bssid_bitmap[0] = bitmap_0;
+	cmd->srg_partial_bssid_bitmap[1] = bitmap_1;
+
+	ret = wmi_unified_cmd_send(
+			wmi_handle, buf, len,
+			WMI_PDEV_SET_SRG_PARTIAL_BSSID_BITMAP_CMDID);
+
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		WMI_LOGE(
+		 "WMI_PDEV_SET_SRG_PARTIAL_BSSID_BITMAP_CMDID send returned Error %d",
 		 ret);
 		wmi_buf_free(buf);
 	}
@@ -13793,6 +13906,10 @@ struct wmi_ops tlv_ops =  {
 	.send_obss_spatial_reuse_set = send_obss_spatial_reuse_set_cmd_tlv,
 	.send_obss_spatial_reuse_set_def_thresh =
 		send_obss_spatial_reuse_set_def_thresh_cmd_tlv,
+	.send_self_srg_bss_color_bitmap_set =
+		send_self_srg_bss_color_bitmap_set_cmd_tlv,
+	.send_self_srg_partial_bssid_bitmap_set =
+		send_self_srg_partial_bssid_bitmap_set_cmd_tlv,
 #endif
 	.extract_offload_bcn_tx_status_evt = extract_offload_bcn_tx_status_evt,
 	.extract_ctl_failsafe_check_ev_param =
@@ -14443,6 +14560,7 @@ static void populate_tlv_service(uint32_t *wmi_service)
 	wmi_service[wmi_service_wlm_stats_support] =
 			WMI_SERVICE_WLM_STATS_REQUEST;
 	wmi_service[wmi_service_infra_mbssid] = WMI_SERVICE_INFRA_MBSSID;
+	wmi_service[wmi_service_ema_ap_support] = WMI_SERVICE_EMA_AP_SUPPORT;
 	wmi_service[wmi_service_ul_ru26_allowed] = WMI_SERVICE_UL_RU26_ALLOWED;
 	wmi_service[wmi_service_cfr_capture_support] =
 			WMI_SERVICE_CFR_CAPTURE_SUPPORT;
