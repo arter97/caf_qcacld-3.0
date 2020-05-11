@@ -1180,6 +1180,10 @@ enum _ol_ath_param_t {
 	OL_ATH_SCAN_OVER_CAC = 441,
 #endif
 	OL_ATH_PARAM_CFR_CAPTURE_STATUS = 442,
+	/* Non-inheritance IE enable */
+	OL_ATH_PARAM_NON_INHERIT_ENABLE = 443,
+	/* Set/Get next frequency for radar */
+	OL_ATH_PARAM_NXT_RDR_FREQ = 444,
 };
 
 #ifdef CONFIG_SUPPORT_LIBROXML
@@ -2998,6 +3002,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"get_rCACfreq",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_CONFIGURE_RCAC_FREQ, GET_PARAM, 0},
 #endif
+	{"setNxtRadarFreq",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_NXT_RDR_FREQ, SET_PARAM, 1},
+	{"getNxtRadarFreq",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_NXT_RDR_FREQ, GET_PARAM, 0},
 #if ATH_SUPPORT_DFS
 	{"scan_over_cac_en",
 		OL_ATH_PARAM_SHIFT | OL_ATH_SCAN_OVER_CAC, SET_PARAM, 1},
@@ -3059,7 +3067,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"get_aggr_burst",      35821, GET_PARAM, 0},
 	{"get_cfr_capture_status",
 	 OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_CFR_CAPTURE_STATUS, GET_PARAM, 0},
-
+	{"non_inherit_enable",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_NON_INHERIT_ENABLE, SET_PARAM, 1},
+	{"g_non_inherit_enable",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_NON_INHERIT_ENABLE, GET_PARAM, 0},
 };
 #endif
 #endif
