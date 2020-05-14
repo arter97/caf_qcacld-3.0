@@ -56,9 +56,13 @@ struct wlan_ies {
 /**
  * struct peer_mlme_priv_obj - peer MLME component object
  * @ucast_key_cipher: unicast crypto type.
+ * @last_assoc_received_time: last assoc received time
+ * @last_disassoc_deauth_received_time: last disassoc/deauth received time
  */
 struct peer_mlme_priv_obj {
 	uint32_t ucast_key_cipher;
+	qdf_time_t last_assoc_received_time;
+	qdf_time_t last_disassoc_deauth_received_time;
 };
 
 /**
