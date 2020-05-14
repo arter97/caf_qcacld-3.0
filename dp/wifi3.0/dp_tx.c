@@ -102,6 +102,31 @@ dp_tx_limit_check(struct dp_vdev *vdev)
 }
 
 /**
+ * dp_tx_exception_limit_check - Check if allocated tx exception descriptors
+ * reached soc max limit
+ * @vdev: DP vdev handle
+ *
+ * Return: true if allocated tx descriptors reached max configured value, else
+ * false
+ */
+static inline bool
+dp_tx_exception_limit_check(struct dp_vdev *vdev)
+{
+	struct dp_pdev *pdev = vdev->pdev;
+	struct dp_soc *soc = pdev->soc;
+
+	if (qdf_atomic_read(&soc->num_tx_exception) >=
+			soc->num_msdu_exception_desc) {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
+			  "%s: queued exc packets are more than max tx drop the exc pkt", __func__);
+		DP_STATS_INC(vdev, tx_i.dropped.exc_desc_na.num, 1);
+		return true;
+	}
+
+	return false;
+}
+
+/**
  * dp_tx_outstanding_inc - Increment outstanding tx desc values on pdev and soc
  * @vdev: DP pdev handle
  *
@@ -134,6 +159,12 @@ dp_tx_outstanding_dec(struct dp_pdev *pdev)
 #else //QCA_TX_LIMIT_CHECK
 static inline bool
 dp_tx_limit_check(struct dp_vdev *vdev)
+{
+	return false;
+}
+
+static inline bool
+dp_tx_exception_limit_check(struct dp_vdev *vdev)
 {
 	return false;
 }
@@ -270,7 +301,7 @@ dp_tx_desc_release(struct dp_tx_desc_s *tx_desc, uint8_t desc_pool_id)
 	dp_tx_outstanding_dec(pdev);
 
 	if (tx_desc->flags & DP_TX_DESC_FLAG_TO_FW)
-		qdf_atomic_dec(&pdev->num_tx_exception);
+		qdf_atomic_dec(&soc->num_tx_exception);
 
 	if (HAL_TX_COMP_RELEASE_SOURCE_TQM ==
 				hal_tx_comp_get_buffer_source(&tx_desc->comp))
@@ -647,7 +678,7 @@ struct dp_tx_ext_desc_elem_s *dp_tx_prepare_ext_desc(struct dp_vdev *vdev,
 		qdf_mem_copy(&cached_ext_desc[HAL_TX_EXTENSION_DESC_LEN_BYTES],
 				&msdu_info->meta_data[0],
 				sizeof(struct htt_tx_msdu_desc_ext2_t));
-		qdf_atomic_inc(&vdev->pdev->num_tx_exception);
+		qdf_atomic_inc(&soc->num_tx_exception);
 	}
 
 	switch (msdu_info->frm_type) {
@@ -850,7 +881,7 @@ struct dp_tx_desc_s *dp_tx_prepare_desc_single(struct dp_vdev *vdev,
 	{
 		/* Temporary WAR due to TQM VP issues */
 		tx_desc->flags |= DP_TX_DESC_FLAG_TO_FW;
-		qdf_atomic_inc(&pdev->num_tx_exception);
+		qdf_atomic_inc(&soc->num_tx_exception);
 	}
 
 	return tx_desc;
@@ -920,7 +951,7 @@ static struct dp_tx_desc_s *dp_tx_prepare_desc(struct dp_vdev *vdev,
 #if TQM_BYPASS_WAR
 	/* Temporary WAR due to TQM VP issues */
 	tx_desc->flags |= DP_TX_DESC_FLAG_TO_FW;
-	qdf_atomic_inc(&pdev->num_tx_exception);
+	qdf_atomic_inc(&soc->num_tx_exception);
 #endif
 	if (qdf_unlikely(msdu_info->exception_fw))
 		tx_desc->flags |= DP_TX_DESC_FLAG_TO_FW;
@@ -2102,6 +2133,12 @@ dp_tx_send_exception(struct cdp_vdev *vap_dev, qdf_nbuf_t nbuf,
 	 *  to minimize lock contention for these resources.
 	 */
 	dp_tx_get_queue(vdev, nbuf, &msdu_info.tx_queue);
+
+	/*
+	 * Check exception descriptors
+	 */
+	if (dp_tx_exception_limit_check(vdev))
+		goto fail;
 
 	/*  Single linear frame */
 	/*
@@ -3946,7 +3983,6 @@ QDF_STATUS dp_tx_pdev_attach(struct dp_pdev *pdev)
 	struct dp_soc *soc = pdev->soc;
 
 	/* Initialize Flow control counters */
-	qdf_atomic_init(&pdev->num_tx_exception);
 	qdf_atomic_init(&pdev->num_tx_outstanding);
 
 	if (wlan_cfg_per_pdev_tx_ring(soc->wlan_cfg_ctx)) {

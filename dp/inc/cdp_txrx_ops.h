@@ -434,6 +434,8 @@ struct cdp_cmn_ops {
 
 	void (*txrx_pdev_set_ctrl_pdev)(struct cdp_pdev *pdev_hdl,
 					struct cdp_ctrl_objmgr_pdev *ctrl_pdev);
+	QDF_STATUS (*set_soc_param)(ol_txrx_soc_handle soc,
+				    uint32_t num_msdu_desc);
 
 	ol_txrx_tx_fp tx_send;
 	/**

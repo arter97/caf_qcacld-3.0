@@ -194,6 +194,10 @@ static int init_deinit_service_ready_event_handler(ol_scn_t scn_handle,
 		init_deinit_set_send_init_cmd(psoc, tgt_hdl);
 	}
 
+	/* Send num_msdu_desc to DP layer */
+	cdp_soc_set_param(wlan_psoc_get_dp_handle(psoc),
+			  tgt_hdl->info.target_caps.num_msdu_desc);
+
 exit:
 	return err_code;
 }

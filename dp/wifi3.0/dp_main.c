@@ -8716,6 +8716,19 @@ static void dp_set_rate_stats_cap(struct cdp_soc_t *soc_hdl,
 	soc->wlanstats_enabled = val;
 }
 
+static QDF_STATUS dp_soc_set_param(struct cdp_soc_t  *soc_hdl,
+				   uint32_t num_msdu_desc)
+{
+	struct dp_soc *soc = (struct dp_soc *)soc_hdl;
+
+	soc->num_msdu_exception_desc = num_msdu_desc;
+
+	dp_info("%s num_msdu)exception_desc %u",
+		__func__, num_msdu_desc);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static void dp_soc_set_rate_stats_ctx(struct cdp_soc_t *soc_handle,
 				      void *stats_ctx)
 {
@@ -9073,6 +9086,7 @@ static struct cdp_cmn_ops dp_ops_cmn = {
 	.txrx_peer_flush_ast_table = dp_wds_flush_ast_table_wifi3,
 	.txrx_peer_map_attach = dp_peer_map_attach_wifi3,
 	.txrx_pdev_set_ctrl_pdev = dp_pdev_set_ctrl_pdev,
+	.set_soc_param = dp_soc_set_param,
 	.txrx_get_os_rx_handles_from_vdev =
 					dp_get_os_rx_handles_from_vdev_wifi3,
 	.delba_tx_completion = dp_delba_tx_completion_wifi3,
@@ -9741,6 +9755,7 @@ void *dp_soc_init(void *dpsoc, HTC_HANDLE htc_handle,
 	soc->cce_disable = false;
 
 	qdf_atomic_init(&soc->num_tx_outstanding);
+	qdf_atomic_init(&soc->num_tx_exception);
 	soc->num_tx_allowed =
 		wlan_cfg_get_dp_soc_tx_device_limit(soc->wlan_cfg_ctx);
 

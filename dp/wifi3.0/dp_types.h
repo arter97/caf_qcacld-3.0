@@ -1145,6 +1145,8 @@ struct dp_soc {
 	struct wlan_srng_cfg *wlan_srng_cfg;
 	/* Num Tx outstanding on device */
 	qdf_atomic_t num_tx_outstanding;
+	/* Num Tx exception on device */
+	qdf_atomic_t num_tx_exception;
 	/* Num Tx allowed */
 	uint32_t num_tx_allowed;
 
@@ -1160,6 +1162,7 @@ struct dp_soc {
 	 */
 	struct dp_rx_fst *rx_fst;
 #endif /* WLAN_SUPPORT_RX_FLOW_TAG */
+	uint32_t num_msdu_exception_desc;
 };
 
 #ifdef IPA_OFFLOAD

@@ -2316,6 +2316,24 @@ cdp_pdev_set_ctrl_pdev(ol_txrx_soc_handle soc, struct cdp_pdev *dp_pdev,
 							       ctrl_pdev);
 }
 
+/* cdp_soc_set_param() - CDP API to set soc parameters
+ * @soc: opaque soc handle
+ * @num_msdu_desc: number of msdu descriptor limit given by FW
+ *
+ *
+ * Return: QDF_STATUS
+ */
+static inline QDF_STATUS
+cdp_soc_set_param(ol_txrx_soc_handle soc, uint32_t num_msdu_desc)
+{
+	if (soc && soc->ops && soc->ops->cmn_drv_ops &&
+	    soc->ops->cmn_drv_ops->set_soc_param)
+		return soc->ops->cmn_drv_ops->set_soc_param(soc,
+							num_msdu_desc);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 /* cdp_txrx_classify_and_update() - To classify the packet and update stats
  * @soc: opaque soc handle
  * @vdev: opaque dp vdev handle
