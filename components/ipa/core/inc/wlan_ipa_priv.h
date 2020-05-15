@@ -480,6 +480,7 @@ struct wlan_ipa_uc_pending_event {
 	uint8_t session_id;
 	uint8_t mac_addr[QDF_MAC_ADDR_SIZE];
 	bool is_loading;
+	bool is_2g_iface;
 };
 
 /**
