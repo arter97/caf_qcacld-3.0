@@ -19,6 +19,13 @@
 #ifndef _DP_RX_MON_H_
 #define _DP_RX_MON_H_
 
+/*
+ * MON_BUF_MIN_ENTRIES macro defines minimum number of network buffers
+ * to be refilled in the RXDMA monitor buffer ring at init, remaining
+ * buffers are replenished at the time of monitor vap creation
+ */
+#define MON_BUF_MIN_ENTRIES 64
+
 /**
 * dp_rx_mon_dest_process() - Brain of the Rx processing functionality
 *	Called from the bottom half (tasklet/NET_RX_SOFTIRQ)

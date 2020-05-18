@@ -28,6 +28,7 @@
 #include "dp_rx_mon.h"
 #include "wlan_cfg.h"
 #include "dp_internal.h"
+#include "dp_htt.h"
 #ifdef WLAN_TX_PKT_CAPTURE_ENH
 #include "dp_rx_mon_feature.h"
 
@@ -1445,6 +1446,7 @@ void dp_mon_buf_delayed_replenish(struct dp_pdev *pdev)
 	union dp_rx_desc_list_elem_t *desc_list = NULL;
 	uint32_t num_entries;
 	uint32_t id;
+	struct dp_srng *mon_buf_ring;
 
 	soc = pdev->soc;
 	num_entries = wlan_cfg_get_dma_mon_buf_ring_size(pdev->wlan_cfg_ctx);
@@ -1467,6 +1469,17 @@ void dp_mon_buf_delayed_replenish(struct dp_pdev *pdev)
 								mac_for_pdev,
 								pdev->pdev_id),
 					num_entries, &desc_list, &tail);
+		/*
+		 * Configure low interrupt threshld when monitor mode is
+		 * configured.
+		 */
+		mon_buf_ring = &pdev->soc->rxdma_mon_buf_ring[mac_for_pdev];
+		num_entries = mon_buf_ring->num_entries;
+		hal_set_low_threshold(pdev->soc->rxdma_mon_buf_ring[mac_for_pdev].hal_srng,
+				      num_entries >> 3);
+		htt_srng_setup(pdev->soc->htt_handle, pdev->pdev_id,
+			       pdev->soc->rxdma_mon_buf_ring[mac_for_pdev]
+			       .hal_srng, RXDMA_MONITOR_BUF);
 	}
 }
 #else

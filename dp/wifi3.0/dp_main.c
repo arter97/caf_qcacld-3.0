@@ -1323,9 +1323,8 @@ dp_srng_configure_interrupt_thresholds(struct dp_soc *soc,
 
 	/* During initialisation monitor rings are only filled with
 	 * MON_BUF_MIN_ENTRIES entries. So low threshold needs to be set to
-	 * a value less than that. Once HTT dynamic config of ring threshold
-	 * setting is enabled, then the low threshold updated should be
-	 * adjusted accrodingly.
+	 * a value less than that. Low threshold value is reconfigured again
+	 * to 1/8th of the ring size when monitor vap is created.
 	 */
 	if (ring_type == RXDMA_MONITOR_BUF)
 		ring_params->low_threshold = MON_BUF_MIN_ENTRIES >> 1;
