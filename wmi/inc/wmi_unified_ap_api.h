@@ -766,4 +766,17 @@ QDF_STATUS wmi_unified_set_rx_pkt_type_routing_tag(
 		wmi_unified_t wmi_handle,
 		struct wmi_rx_pkt_protocol_routing_info *param);
 #endif /* WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG */
+
+/**
+ * wmi_extract_muedca_params_handler() - WMI function to extract Muedca params
+ *
+ * @wmi_handle: WMI handle
+ * @evt_buf: Event data buffer
+ * @muedca_param_list: struct muedca_params
+ *
+ * Return: QDF_STATUS_SUCCESS if success, else returns proper error code.
+ */
+QDF_STATUS wmi_extract_muedca_params_handler(wmi_unified_t wmi_handle,
+		void *evt_buf, struct muedca_params *muedca_param_list);
+
 #endif /* _WMI_UNIFIED_AP_API_H_ */
