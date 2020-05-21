@@ -76,6 +76,10 @@
 #include "wlan_mlme_ucfg_api.h"
 #include "cfg_ucfg_api.h"
 #include "wlan_cp_stats_mc_ucfg_api.h"
+#include <qdf_hang_event_notifier.h>
+#include <qdf_notifier.h>
+#include <qwlan_version.h>
+#include <qdf_trace.h>
 
 /* Preprocessor Definitions and Constants */
 
@@ -88,7 +92,22 @@ static struct __qdf_device g_qdf_ctx;
 
 static uint8_t cds_multicast_logging;
 
+struct cds_hang_event_fixed_param {
+	uint32_t tlv_header;
+	uint32_t recovery_reason;
+	char driver_version[11];
+	char hang_event_version[3];
+} qdf_packed;
+
 #ifdef QCA_WIFI_QCA8074
+static inline int
+cds_send_delba(struct cdp_ctrl_objmgr_psoc *psoc,
+	       uint8_t vdev_id, uint8_t *peer_macaddr,
+	       uint8_t tid, uint8_t reason_code)
+{
+	return wma_dp_send_delba_ind(vdev_id, peer_macaddr, tid, reason_code);
+}
+
 static struct ol_if_ops  dp_ol_if_ops = {
 	.peer_set_default_routing = target_if_peer_set_default_routing,
 	.peer_rx_reorder_queue_setup = target_if_peer_rx_reorder_queue_setup,
@@ -97,7 +116,8 @@ static struct ol_if_ops  dp_ol_if_ops = {
 	.lro_hash_config = target_if_lro_hash_config,
 	.rx_invalid_peer = wma_rx_invalid_peer_ind,
 	.is_roam_inprogress = wma_is_roam_in_progress,
-	.get_con_mode = cds_get_conparam
+	.get_con_mode = cds_get_conparam,
+	.send_delba = cds_send_delba,
     /* TODO: Add any other control path calls required to OL_IF/WMA layer */
 };
 #else
@@ -197,7 +217,7 @@ QDF_STATUS cds_init(void)
 
 	gp_cds_context->qdf_ctx = &g_qdf_ctx;
 
-	qdf_register_self_recovery_callback(__cds_trigger_recovery);
+	qdf_register_self_recovery_callback(cds_trigger_recovery_psoc);
 	qdf_register_fw_down_callback(cds_is_fw_down);
 	qdf_register_is_driver_unloading_callback(cds_is_driver_unloading);
 	qdf_register_recovering_state_query_callback(cds_is_driver_recovering);
@@ -506,6 +526,47 @@ cds_set_ac_specs_params(struct cds_config_info *cds_cfg)
 	}
 }
 
+static int cds_hang_event_notifier_call(struct notifier_block *block,
+					unsigned long state,
+					void *data)
+{
+	struct qdf_notifer_data *cds_hang_data = data;
+	uint32_t total_len;
+	struct cds_hang_event_fixed_param *cmd;
+	uint8_t *cds_hang_evt_buff;
+
+	if (!cds_hang_data)
+		return NOTIFY_STOP_MASK;
+
+	cds_hang_evt_buff = cds_hang_data->hang_data;
+
+	if (!cds_hang_evt_buff)
+		return NOTIFY_STOP_MASK;
+
+	if (cds_hang_data->offset >= QDF_WLAN_MAX_HOST_OFFSET)
+		return NOTIFY_STOP_MASK;
+
+	total_len = sizeof(*cmd);
+
+	cds_hang_evt_buff = cds_hang_data->hang_data + cds_hang_data->offset;
+	cmd = (struct cds_hang_event_fixed_param *)cds_hang_evt_buff;
+	QDF_HANG_EVT_SET_HDR(&cmd->tlv_header, HANG_EVT_TAG_CDS,
+			     QDF_HANG_GET_STRUCT_TLVLEN(*cmd));
+
+	cmd->recovery_reason = gp_cds_context->recovery_reason;
+
+	qdf_mem_copy(&cmd->driver_version, QWLAN_VERSIONSTR, 11);
+
+	qdf_mem_copy(&cmd->hang_event_version, QDF_HANG_EVENT_VERSION, 3);
+
+	cds_hang_data->offset += total_len;
+	return NOTIFY_OK;
+}
+
+static qdf_notif_block cds_hang_event_notifier = {
+	.notif_block.notifier_call = cds_hang_event_notifier_call,
+};
+
 /**
  * cds_open() - open the CDS Module
  *
@@ -678,11 +739,23 @@ QDF_STATUS cds_open(struct wlan_objmgr_psoc *psoc)
 	if (TARGET_TYPE_QCA6290 == hdd_ctx->target_type ||
 	    TARGET_TYPE_QCA6390 == hdd_ctx->target_type ||
 	    TARGET_TYPE_QCA6490 == hdd_ctx->target_type ||
-	    TARGET_TYPE_QCA6750 == hdd_ctx->target_type)
+	    TARGET_TYPE_QCA6750 == hdd_ctx->target_type) {
 		gp_cds_context->dp_soc = cdp_soc_attach(LITHIUM_DP,
 			gp_cds_context->hif_context, htcInfo.target_psoc,
 			gp_cds_context->htc_ctx, gp_cds_context->qdf_ctx,
 			&dp_ol_if_ops);
+
+		if (gp_cds_context->dp_soc)
+			if (!cdp_soc_init(gp_cds_context->dp_soc, LITHIUM_DP,
+					  gp_cds_context->hif_context,
+					  htcInfo.target_psoc,
+					  gp_cds_context->htc_ctx,
+					  gp_cds_context->qdf_ctx,
+					  &dp_ol_if_ops)) {
+				status = QDF_STATUS_E_FAILURE;
+				goto err_soc_detach;
+			}
+	}
 	else
 		gp_cds_context->dp_soc = cdp_soc_attach(MOB_DRV_LEGACY_DP,
 			gp_cds_context->hif_context, htcInfo.target_psoc,
@@ -711,7 +784,7 @@ QDF_STATUS cds_open(struct wlan_objmgr_psoc *psoc)
 
 	if (QDF_STATUS_SUCCESS != status) {
 		cds_alert("Failed to open MAC");
-		goto err_soc_detach;
+		goto err_soc_deinit;
 	}
 	gp_cds_context->mac_context = mac_handle;
 
@@ -731,6 +804,7 @@ QDF_STATUS cds_open(struct wlan_objmgr_psoc *psoc)
 	}
 
 	ucfg_mc_cp_stats_register_pmo_handler();
+	qdf_hang_event_register_notifier(&cds_hang_event_notifier);
 
 	return QDF_STATUS_SUCCESS;
 
@@ -741,6 +815,9 @@ deregister_modules:
 err_mac_close:
 	mac_close(mac_handle);
 	gp_cds_context->mac_context = NULL;
+
+err_soc_deinit:
+	cdp_soc_deinit(gp_cds_context->dp_soc);
 
 err_soc_detach:
 	cdp_soc_detach(gp_cds_context->dp_soc);
@@ -783,6 +860,14 @@ QDF_STATUS cds_dp_open(struct wlan_objmgr_psoc *psoc)
 {
 	QDF_STATUS qdf_status;
 	struct dp_txrx_config dp_config;
+	struct hdd_context *hdd_ctx;
+
+
+	hdd_ctx = gp_cds_context->hdd_context;
+	if (!hdd_ctx) {
+		cds_err("HDD context is null");
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	qdf_status = cdp_pdev_attach(cds_get_context(QDF_MODULE_ID_SOC),
 				     gp_cds_context->htc_ctx,
@@ -794,10 +879,25 @@ QDF_STATUS cds_dp_open(struct wlan_objmgr_psoc *psoc)
 		goto close;
 	}
 
+	if (hdd_ctx->target_type == TARGET_TYPE_QCA6290 ||
+	    hdd_ctx->target_type == TARGET_TYPE_QCA6390 ||
+	    hdd_ctx->target_type == TARGET_TYPE_QCA6490 ||
+	    hdd_ctx->target_type == TARGET_TYPE_QCA6750) {
+		qdf_status = cdp_pdev_init(cds_get_context(QDF_MODULE_ID_SOC),
+					   gp_cds_context->htc_ctx,
+					   gp_cds_context->qdf_ctx, 0);
+		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
+			/* Critical Error ...  Cannot proceed further */
+			cds_alert("Failed to init TXRX");
+			QDF_ASSERT(0);
+			goto pdev_detach;
+		}
+	}
+
 	if (cdp_txrx_intr_attach(gp_cds_context->dp_soc)
 				!= QDF_STATUS_SUCCESS) {
 		cds_alert("Failed to attach interrupts");
-		goto pdev_detach;
+		goto pdev_deinit;
 	}
 
 	dp_config.enable_rx_threads =
@@ -821,6 +921,10 @@ QDF_STATUS cds_dp_open(struct wlan_objmgr_psoc *psoc)
 intr_close:
 	cdp_txrx_intr_detach(gp_cds_context->dp_soc);
 
+pdev_deinit:
+	cdp_pdev_deinit(gp_cds_context->dp_soc,
+			OL_TXRX_PDEV_ID, false);
+
 pdev_detach:
 	cdp_pdev_detach(gp_cds_context->dp_soc,
 			OL_TXRX_PDEV_ID, false);
@@ -828,6 +932,26 @@ pdev_detach:
 close:
 	return QDF_STATUS_E_FAILURE;
 }
+
+#ifdef HIF_USB
+static inline void cds_suspend_target(tp_wma_handle wma_handle)
+{
+	QDF_STATUS status;
+	/* Suspend the target and disable interrupt */
+	status = ucfg_pmo_psoc_suspend_target(wma_handle->psoc, 0);
+	if (status)
+		cds_err("Failed to suspend target, status = %d", status);
+}
+#else
+static inline void cds_suspend_target(tp_wma_handle wma_handle)
+{
+	QDF_STATUS status;
+	/* Suspend the target and disable interrupt */
+	status = ucfg_pmo_psoc_suspend_target(wma_handle->psoc, 1);
+	if (status)
+		cds_err("Failed to suspend target, status = %d", status);
+}
+#endif /* HIF_USB */
 
 /**
  * cds_pre_enable() - pre enable cds
@@ -901,6 +1025,12 @@ QDF_STATUS cds_pre_enable(void)
 	return QDF_STATUS_SUCCESS;
 
 stop_wmi:
+	/* Send pdev suspend to fw otherwise FW is not aware that
+	 * host is freeing resources.
+	 */
+	if (!(cds_is_driver_recovering() || cds_is_driver_in_bad_state()))
+		cds_suspend_target(gp_cds_context->wma_context);
+
 	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
 	if (!hif_ctx)
 		cds_err("%s: Failed to get hif_handle!", __func__);
@@ -1066,26 +1196,6 @@ QDF_STATUS cds_disable(struct wlan_objmgr_psoc *psoc)
 	return qdf_status;
 }
 
-#ifdef HIF_USB
-static inline void cds_suspend_target(tp_wma_handle wma_handle)
-{
-	QDF_STATUS status;
-	/* Suspend the target and disable interrupt */
-	status = ucfg_pmo_psoc_suspend_target(wma_handle->psoc, 0);
-	if (status)
-		cds_err("Failed to suspend target, status = %d", status);
-}
-#else
-static inline void cds_suspend_target(tp_wma_handle wma_handle)
-{
-	QDF_STATUS status;
-	/* Suspend the target and disable interrupt */
-	status = ucfg_pmo_psoc_suspend_target(wma_handle->psoc, 1);
-	if (status)
-		cds_err("Failed to suspend target, status = %d", status);
-}
-#endif /* HIF_USB */
-
 /**
  * cds_post_disable() - post disable cds module
  *
@@ -1160,6 +1270,7 @@ QDF_STATUS cds_close(struct wlan_objmgr_psoc *psoc)
 {
 	QDF_STATUS qdf_status;
 
+	qdf_hang_event_unregister_notifier(&cds_hang_event_notifier);
 	qdf_status = cds_sched_close();
 	QDF_ASSERT(QDF_IS_STATUS_SUCCESS(qdf_status));
 	if (QDF_IS_STATUS_ERROR(qdf_status))
@@ -1198,6 +1309,7 @@ QDF_STATUS cds_close(struct wlan_objmgr_psoc *psoc)
 
 	gp_cds_context->mac_context = NULL;
 
+	cdp_soc_deinit(gp_cds_context->dp_soc);
 	cdp_soc_detach(gp_cds_context->dp_soc);
 	gp_cds_context->dp_soc = NULL;
 
@@ -1241,6 +1353,8 @@ QDF_STATUS cds_dp_close(struct wlan_objmgr_psoc *psoc)
 	cdp_txrx_intr_detach(gp_cds_context->dp_soc);
 
 	dp_txrx_deinit(cds_get_context(QDF_MODULE_ID_SOC));
+
+	cdp_pdev_deinit(cds_get_context(QDF_MODULE_ID_SOC), OL_TXRX_PDEV_ID, 1);
 
 	cdp_pdev_detach(cds_get_context(QDF_MODULE_ID_SOC), OL_TXRX_PDEV_ID, 1);
 
@@ -1833,6 +1947,13 @@ void __cds_trigger_recovery(enum qdf_hang_reason reason, const char *func,
 
 	cds_trigger_recovery_handler(func, line);
 }
+
+void cds_trigger_recovery_psoc(void *psoc, enum qdf_hang_reason reason,
+			       const char *func, const uint32_t line)
+{
+	__cds_trigger_recovery(reason, func, line);
+}
+
 
 /**
  * cds_get_recovery_reason() - get self recovery reason

@@ -41,7 +41,7 @@
 #include "lim_ser_des_utils.h"
 #include "lim_send_messages.h"
 #include "lim_process_fils.h"
-#include "wlan_blm_core.h"
+#include "wlan_blm_api.h"
 
 /**
  * lim_update_stads_htcap() - Updates station Descriptor HT capability
@@ -555,6 +555,20 @@ static uint8_t lim_get_nss_supported_by_ap(tDot11fIEVHTCaps *vht_caps,
 	return NSS_1x1_MODE;
 }
 
+#ifdef WLAN_FEATURE_11AX
+static void lim_process_he_info(tpSirProbeRespBeacon beacon,
+				tpDphHashNode sta_ds)
+{
+	if (beacon->he_op.present)
+		sta_ds->parsed_ies.he_operation = beacon->he_op;
+}
+#else
+static inline void lim_process_he_info(tpSirProbeRespBeacon beacon,
+				       tpDphHashNode sta_ds)
+{
+}
+#endif
+
 /**
  * lim_process_assoc_rsp_frame() - Processes assoc response
  * @mac_ctx: Pointer to Global MAC structure
@@ -800,7 +814,7 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx,
 		if (!assoc_rsp->rssi_assoc_rej.retry_delay)
 			ap_info.expected_rssi = assoc_rsp->rssi_assoc_rej.delta_rssi +
 				WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info) +
-				blm_get_rssi_blacklist_threshold(mac_ctx->pdev);
+				wlan_blm_get_rssi_blacklist_threshold(mac_ctx->pdev);
 		else
 			ap_info.expected_rssi = assoc_rsp->rssi_assoc_rej.delta_rssi +
 				WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info);
@@ -1053,6 +1067,8 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx,
 		sta_ds->parsed_ies.ht_operation = beacon->HTInfo;
 	if (beacon->VHTOperation.present)
 		sta_ds->parsed_ies.vht_operation = beacon->VHTOperation;
+
+	lim_process_he_info(beacon, sta_ds);
 
 	if (mac_ctx->lim.gLimProtectionControl !=
 	    MLME_FORCE_POLICY_PROTECTION_DISABLE)

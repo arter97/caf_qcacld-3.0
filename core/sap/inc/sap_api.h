@@ -444,8 +444,8 @@ struct sap_acs_cfg {
 #endif
 
 	uint16_t   ch_width;
-	uint32_t   pcl_chan_freq[QDF_MAX_NUM_CHAN];
-	uint8_t    pcl_channels_weight_list[QDF_MAX_NUM_CHAN];
+	uint32_t   pcl_chan_freq[NUM_CHANNELS];
+	uint8_t    pcl_channels_weight_list[NUM_CHANNELS];
 	uint32_t   pcl_ch_count;
 	uint8_t    is_ht_enabled;
 	uint8_t    is_vht_enabled;
@@ -490,7 +490,7 @@ struct sap_config {
 	/* Max ie length 255 * 2(WPA+RSN) + 2 bytes(vendor specific ID) * 2 */
 	uint8_t RSNWPAReqIE[(WLAN_MAX_IE_LEN * 2) + 4];
 	/* it is ignored if [0] is 0. */
-	uint8_t countryCode[CFG_COUNTRY_CODE_LEN];
+	uint8_t countryCode[REG_ALPHA2_LEN + 1];
 	uint8_t RSNEncryptType;
 	uint8_t mcRSNEncryptType;
 	eSapAuthType authType;
@@ -1137,6 +1137,17 @@ QDF_STATUS wlansap_get_dfs_ignore_cac(mac_handle_t mac_handle,
  */
 QDF_STATUS wlansap_set_dfs_ignore_cac(mac_handle_t mac_handle,
 				      uint8_t ignore_cac);
+/**
+ * wlansap_get_dfs_cac_state() - Get cac_state value
+ * @mac_handle: Opaque handle to the global MAC context
+ * @cac_state: Location to store cac_state value
+ *
+ * This API is used to Get the value of ignore_cac value
+ *
+ * Return: The QDF_STATUS code associated with performing the operation
+ */
+QDF_STATUS wlansap_get_dfs_cac_state(mac_handle_t mac_handle,
+				     eSapDfsCACState_t *cac_state);
 
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE
 QDF_STATUS

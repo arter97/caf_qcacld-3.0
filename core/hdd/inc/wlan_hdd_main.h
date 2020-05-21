@@ -252,10 +252,15 @@ enum hdd_adapter_flags {
 /* rcpi request timeout in milli seconds */
 #define WLAN_WAIT_TIME_RCPI 500
 
+#define WLAN_WAIT_PEER_CLEANUP 5000
+
 #define MAX_CFG_STRING_LEN  255
 
 /* Maximum time(ms) to wait for external acs response */
 #define WLAN_VENDOR_ACS_WAIT_TIME 1000
+
+/* Maximum time(ms) to wait for monitor mode vdev up event completion*/
+#define WLAN_MONITOR_MODE_VDEV_UP_EVT      SME_CMD_VDEV_START_BSS_TIMEOUT
 
 /* Mac Address string length */
 #define MAC_ADDRESS_STR_LEN 18  /* Including null terminator */
@@ -608,6 +613,52 @@ struct hdd_peer_stats {
 	uint32_t fcs_count;
 };
 
+#define MAX_SUBTYPES_TRACKED	4
+
+/**
+ * struct hdd_eapol_stats_s - eapol debug stats count
+ * @eapol_m1_count: eapol m1 count
+ * @eapol_m2_count: eapol m2 count
+ * @eapol_m3_count: eapol m3 count
+ * @eapol_m4_count: eapol m4 count
+ * @tx_dropped: no of tx frames dropped by host
+ * @tx_noack_cnt: no of frames for which there is no ack
+ * @rx_delivered: no. of frames delivered to network stack
+ * @rx_refused: no of frames not delivered to network stack
+ */
+struct hdd_eapol_stats_s {
+	uint16_t eapol_m1_count;
+	uint16_t eapol_m2_count;
+	uint16_t eapol_m3_count;
+	uint16_t eapol_m4_count;
+	uint16_t tx_dropped[MAX_SUBTYPES_TRACKED];
+	uint16_t tx_noack_cnt[MAX_SUBTYPES_TRACKED];
+	uint16_t rx_delivered[MAX_SUBTYPES_TRACKED];
+	uint16_t rx_refused[MAX_SUBTYPES_TRACKED];
+};
+
+/**
+ * struct hdd_dhcp_stats_s - dhcp debug stats count
+ * @dhcp_dis_count: dhcp discovery count
+ * @dhcp_off_count: dhcp offer count
+ * @dhcp_req_count: dhcp request count
+ * @dhcp_ack_count: dhcp ack count
+ * @tx_dropped: no of tx frames dropped by host
+ * @tx_noack_cnt: no of frames for which there is no ack
+ * @rx_delivered: no. of frames delivered to network stack
+ * @rx_refused: no of frames not delivered to network stack
+ */
+struct hdd_dhcp_stats_s {
+	uint16_t dhcp_dis_count;
+	uint16_t dhcp_off_count;
+	uint16_t dhcp_req_count;
+	uint16_t dhcp_ack_count;
+	uint16_t tx_dropped[MAX_SUBTYPES_TRACKED];
+	uint16_t tx_noack_cnt[MAX_SUBTYPES_TRACKED];
+	uint16_t rx_delivered[MAX_SUBTYPES_TRACKED];
+	uint16_t rx_refused[MAX_SUBTYPES_TRACKED];
+};
+
 struct hdd_stats {
 	tCsrSummaryStatsInfo summary_stat;
 	tCsrGlobalClassAStatsInfo class_a_stat;
@@ -622,6 +673,8 @@ struct hdd_stats {
 #ifdef WLAN_FEATURE_11W
 	struct hdd_pmf_stats hdd_pmf_stats;
 #endif
+	struct hdd_eapol_stats_s hdd_eapol_stats;
+	struct hdd_dhcp_stats_s hdd_dhcp_stats;
 };
 
 /**
@@ -764,6 +817,8 @@ enum bss_state {
  *    When a STA is disassociated userspace thread can wait on this
  *    event. The event will be set when the STA Disassociation
  *    processing in UMAC has completed.
+ * @qdf_sta_eap_frm_done_event: Event to synchronize P2P GO disassoc
+ *    frame and EAP frame.
  * @qdf_status: Used to communicate state from other threads to the
  *    userspace thread.
  */
@@ -772,6 +827,7 @@ struct hdd_hostapd_state {
 	qdf_event_t qdf_event;
 	qdf_event_t qdf_stop_bss_event;
 	qdf_event_t qdf_sta_disassoc_event;
+	qdf_event_t qdf_sta_eap_frm_done_event;
 	QDF_STATUS qdf_status;
 };
 
@@ -1116,6 +1172,11 @@ struct hdd_adapter {
 	/* QDF event for session open */
 	qdf_event_t qdf_session_open_event;
 
+#ifdef FEATURE_MONITOR_MODE_SUPPORT
+	/* QDF event for monitor mode vdev up */
+	qdf_event_t qdf_monitor_mode_vdev_up_event;
+#endif
+
 	/* TODO: move these to sta ctx. These may not be used in AP */
 	/** completion variable for disconnect callback */
 	struct completion disconnect_comp_var;
@@ -1296,7 +1357,9 @@ struct hdd_adapter {
 	uint32_t mon_chan_freq;
 	uint32_t mon_bandwidth;
 	uint16_t latency_level;
-
+#ifdef FEATURE_MONITOR_MODE_SUPPORT
+	bool monitor_mode_vdev_up_in_progress;
+#endif
 	/* rcpi information */
 	struct rcpi_info rcpi;
 	bool send_mode_change;
@@ -1323,6 +1386,7 @@ struct hdd_adapter {
 	uint32_t periodic_stats_timer_counter;
 	qdf_mutex_t sta_periodic_stats_lock;
 #endif /* WLAN_FEATURE_PERIODIC_STA_STATS */
+	qdf_event_t peer_cleanup_done;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(adapter) (&(adapter)->session.station)
@@ -1910,6 +1974,9 @@ struct hdd_context {
 	uint8_t val_pkt_capture_mode;
 #endif
 	bool roam_ch_from_fw_supported;
+#ifdef FW_THERMAL_THROTTLE_SUPPORT
+	uint8_t dutycycle_off_percent;
+#endif
 };
 
 /**
@@ -3726,16 +3793,6 @@ void hdd_dp_trace_init(struct hdd_config *config) {}
 void hdd_set_rx_mode_rps(bool enable);
 
 /**
- * hdd_limit_max_per_index_score() -check if per index score doesn't exceed 100%
- * (0x64). If it exceed make it 100%
- *
- * @per_index_score: per_index_score as input
- *
- * Return: per_index_score within the max limit
- */
-uint32_t hdd_limit_max_per_index_score(uint32_t per_index_score);
-
-/**
  * hdd_update_score_config - API to update candidate scoring related params
  * configuration parameters
  * @score_config: score config to update
@@ -4237,6 +4294,61 @@ static inline
 int hdd_crash_inject(struct hdd_adapter *adapter, uint32_t v1, uint32_t v2)
 {
 	return -ENOTSUPP;
+}
+#endif
+
+#ifdef FEATURE_MONITOR_MODE_SUPPORT
+
+void hdd_sme_monitor_mode_callback(uint8_t vdev_id);
+
+QDF_STATUS hdd_monitor_mode_vdev_status(struct hdd_adapter *adapter);
+
+QDF_STATUS hdd_monitor_mode_qdf_create_event(struct hdd_adapter *adapter,
+					     uint8_t session_type);
+#else
+static inline void hdd_sme_monitor_mode_callback(uint8_t vdev_id) {}
+
+static inline QDF_STATUS
+hdd_monitor_mode_vdev_status(struct hdd_adapter *adapter)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+hdd_monitor_mode_qdf_create_event(struct hdd_adapter *adapter,
+				  uint8_t session_type)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)) && \
+     defined(WLAN_FEATURE_11AX)
+/**
+ * hdd_cleanup_conn_info() - Cleanup connectin info
+ * @adapter: Adapter upon which the command was received
+ *
+ * This function frees the memory allocated for the connection
+ * info structure
+ *
+ * Return: none
+ */
+void hdd_cleanup_conn_info(struct hdd_adapter *adapter);
+/**
+ * hdd_sta_destroy_ctx_all() - cleanup all station contexts
+ * @hdd_ctx: Global HDD context
+ *
+ * This function destroys all the station contexts
+ *
+ * Return: none
+ */
+void hdd_sta_destroy_ctx_all(struct hdd_context *hdd_ctx);
+#else
+static inline void hdd_cleanup_conn_info(struct hdd_adapter *adapter)
+{
+}
+static inline void hdd_sta_destroy_ctx_all(struct hdd_context *hdd_ctx)
+{
 }
 #endif
 

@@ -52,6 +52,7 @@
 #include "wlan_blm_api.h"
 #include "qdf_crypto.h"
 #include <wlan_crypto_global_api.h>
+#include "wlan_reg_ucfg_api.h"
 
 static void csr_set_cfg_valid_channel_list(struct mac_context *mac,
 					   uint32_t *pchan_freq_list,
@@ -60,9 +61,6 @@ static void csr_set_cfg_valid_channel_list(struct mac_context *mac,
 static void csr_save_tx_power_to_cfg(struct mac_context *mac,
 				     tDblLinkList *pList,
 				     uint32_t cfgId);
-
-static void csr_set_cfg_country_code(struct mac_context *mac,
-				     uint8_t *countryCode);
 
 static void csr_purge_channel_power(struct mac_context *mac,
 				    tDblLinkList *pChannelList);
@@ -528,8 +526,7 @@ QDF_STATUS csr_save_to_channel_power2_g_5_g(struct mac_context *mac,
 			qdf_mem_free(pChannelSet);
 			return QDF_STATUS_E_FAILURE;
 		}
-		pChannelSet->txPower = QDF_MIN(pChannelInfo->maxTxPower,
-					mac->mlme_cfg->power.max_tx_power);
+		pChannelSet->txPower = pChannelInfo->maxTxPower;
 		if (f2GHzInfoFound) {
 			if (!f2GListPurged) {
 				/* purge previous results if found new */
@@ -610,7 +607,7 @@ void csr_apply_channel_power_info_to_fw(struct mac_context *mac_ctx,
 	} else {
 		sme_err("11D channel list is empty");
 	}
-	csr_set_cfg_country_code(mac_ctx, countryCode);
+	sch_edca_profile_update_all(mac_ctx);
 }
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_CSR
@@ -634,9 +631,8 @@ static void csr_diag_reset_country_information(struct mac_context *mac)
 		     Index++) {
 			p11dLog->Channels[Index] =
 				wlan_reg_freq_to_chan(mac->pdev, mac->scan.base_channels.channel_freq_list[Index]);
-			p11dLog->TxPwr[Index] = QDF_MIN(
-				mac->scan.defaultPowerTable[Index].tx_power,
-				mac->mlme_cfg->power.max_tx_power);
+			p11dLog->TxPwr[Index] =
+				mac->scan.defaultPowerTable[Index].tx_power;
 		}
 	}
 	if (!mac->mlme_cfg->gen.enabled_11d)
@@ -832,8 +828,7 @@ void csr_save_channel_power_for_band(struct mac_context *mac, bool fill_5f)
 			mac->scan.defaultPowerTable[idx].center_freq;
 		chan_info->numChannels = 1;
 		chan_info->maxTxPower =
-			QDF_MIN(mac->scan.defaultPowerTable[idx].tx_power,
-				mac->mlme_cfg->power.max_tx_power);
+			mac->scan.defaultPowerTable[idx].tx_power;
 		chan_info++;
 		count++;
 	}
@@ -1542,9 +1537,7 @@ static void csr_save_tx_power_to_cfg(struct mac_context *mac,
 				ch_pwr_set->first_freq =
 					ch_set->first_chan_freq;
 				ch_pwr_set->numChannels = 1;
-				ch_pwr_set->maxTxPower =
-					QDF_MIN(ch_set->txPower,
-					mac->mlme_cfg->power.max_tx_power);
+				ch_pwr_set->maxTxPower = ch_set->txPower;
 				cbLen += sizeof(tSirMacChanInfo);
 				ch_pwr_set++;
 				count++;
@@ -1561,8 +1554,7 @@ static void csr_save_tx_power_to_cfg(struct mac_context *mac,
 			}
 			ch_pwr_set->first_freq = ch_set->first_chan_freq;
 			ch_pwr_set->numChannels = ch_set->numChannels;
-			ch_pwr_set->maxTxPower = QDF_MIN(ch_set->txPower,
-					mac->mlme_cfg->power.max_tx_power);
+			ch_pwr_set->maxTxPower = ch_set->txPower;
 			cbLen += sizeof(tSirMacChanInfo);
 			ch_pwr_set++;
 			count++;
@@ -1593,58 +1585,6 @@ static void csr_save_tx_power_to_cfg(struct mac_context *mac,
 			     mac->mlme_cfg->power.max_tx_power_5.len);
 	}
 	qdf_mem_free(p_buf);
-}
-
-static void csr_set_cfg_country_code(struct mac_context *mac,
-				     uint8_t *countryCode)
-{
-	uint8_t cc[CFG_COUNTRY_CODE_LEN];
-	/* v_REGDOMAIN_t DomainId */
-
-	sme_debug("Set Country in Cfg %s", countryCode);
-	qdf_mem_copy(cc, countryCode, CFG_COUNTRY_CODE_LEN);
-
-	/*
-	 * Don't program the bogus country codes that we created for Korea in
-	 * the MAC. if we see the bogus country codes, program the MAC with
-	 * the right country code.
-	 */
-	if (('K' == countryCode[0] && '1' == countryCode[1]) ||
-	    ('K' == countryCode[0] && '2' == countryCode[1]) ||
-	    ('K' == countryCode[0] && '3' == countryCode[1]) ||
-	    ('K' == countryCode[0] && '4' == countryCode[1])) {
-		/*
-		 * replace the alternate Korea country codes, 'K1', 'K2', ..
-		 * with 'KR' for Korea
-		 */
-		cc[1] = 'R';
-	}
-
-	/*
-	 * country code is moved to mlme component, and it is limited to call
-	 * legacy api, so required to call sch_edca_profile_update_all if
-	 * overwrite country code in mlme component
-	 */
-	qdf_mem_copy(mac->mlme_cfg->reg.country_code, cc, CFG_COUNTRY_CODE_LEN);
-	mac->mlme_cfg->reg.country_code_len = CFG_COUNTRY_CODE_LEN;
-	sch_edca_profile_update_all(mac);
-	/*
-	 * Need to let HALPHY know about the current domain so it can apply some
-	 * domain-specific settings (TX filter...)
-	 */
-}
-
-QDF_STATUS csr_get_country_code(struct mac_context *mac, uint8_t *pBuf,
-				uint8_t *pbLen)
-{
-	if (pBuf && pbLen && (*pbLen >= CFG_COUNTRY_CODE_LEN)) {
-		*pbLen = mac->mlme_cfg->reg.country_code_len;
-		qdf_mem_copy(pBuf, mac->mlme_cfg->reg.country_code,
-			     (uint32_t)*pbLen);
-		return QDF_STATUS_SUCCESS;
-	}
-
-	return QDF_STATUS_E_INVAL;
 }
 
 QDF_STATUS csr_scan_abort_mac_scan(struct mac_context *mac_ctx,
@@ -1690,53 +1630,6 @@ QDF_STATUS csr_scan_abort_mac_scan(struct mac_context *mac_ctx,
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 
-	return status;
-}
-QDF_STATUS csr_remove_nonscan_cmd_from_pending_list(struct mac_context *mac,
-						    uint8_t vdev_id,
-						    eSmeCommandType commandType)
-{
-	tDblLinkList localList;
-	tListElem *pEntry;
-	tSmeCmd *pCommand;
-	tListElem *pEntryToRemove;
-	QDF_STATUS status = QDF_STATUS_E_FAILURE;
-
-	qdf_mem_zero(&localList, sizeof(tDblLinkList));
-	if (!QDF_IS_STATUS_SUCCESS(csr_ll_open(&localList))) {
-		sme_err("failed to open list");
-		return status;
-	}
-
-	pEntry = csr_nonscan_pending_ll_peek_head(mac, LL_ACCESS_NOLOCK);
-
-	/*
-	 * Have to make sure we don't loop back to the head of the list,
-	 * which will happen if the entry is NOT on the list
-	 */
-	while (pEntry) {
-		pEntryToRemove = pEntry;
-		pEntry = csr_nonscan_pending_ll_next(mac,
-					pEntry, LL_ACCESS_NOLOCK);
-		pCommand = GET_BASE_ADDR(pEntryToRemove, tSmeCmd, Link);
-
-		if ((pCommand->command == commandType) &&
-		    (pCommand->vdev_id == vdev_id)) {
-			/* Insert to localList and remove later */
-			csr_ll_insert_tail(&localList, pEntryToRemove,
-					   LL_ACCESS_NOLOCK);
-			status = QDF_STATUS_SUCCESS;
-		}
-	}
-
-
-	while ((pEntry = csr_ll_remove_head(&localList, LL_ACCESS_NOLOCK))) {
-		pCommand = GET_BASE_ADDR(pEntry, tSmeCmd, Link);
-		sme_debug("Sending abort for command ID %d", vdev_id);
-		csr_release_command(mac, pCommand);
-	}
-
-	csr_ll_close(&localList);
 	return status;
 }
 
@@ -2446,6 +2339,9 @@ static QDF_STATUS csr_fill_bss_from_scan_entry(struct mac_context *mac_ctx,
 	bss_desc->assoc_disallowed = csr_is_assoc_disallowed(mac_ctx,
 							     scan_entry);
 	bss_desc->adaptive_11r_ap = scan_entry->adaptive_11r_ap;
+
+	bss_desc->mbo_oce_enabled_ap =
+			util_scan_entry_mbo_oce(scan_entry) ? true : false;
 
 	csr_fill_single_pmk_ap_cap_from_scan_entry(bss_desc, scan_entry);
 

@@ -121,6 +121,8 @@
 #define SME_CMD_PEER_DISCONNECT_TIMEOUT (SIR_DELETE_STA_TIMEOUT + 1000)
 #define SME_PEER_DISCONNECT_TIMEOUT (SME_CMD_PEER_DISCONNECT_TIMEOUT + 1000)
 
+#define SME_CMD_GET_DISCONNECT_STATS_TIMEOUT 200
+
 /* Roam cmds timeout = vdev start + peer assoc + 1 sec */
 #define SME_CMD_ROAM_CMD_TIMEOUT (START_RESPONSE_TIMER + \
 				  SIR_PEER_ASSOC_TIMEOUT + 1000)
@@ -613,7 +615,8 @@ void sme_get_pmk_info(mac_handle_t mac_handle, uint8_t session_id,
 		      tPmkidCacheInfo *pmk_cache);
 
 QDF_STATUS sme_roam_set_psk_pmk(mac_handle_t mac_handle, uint8_t sessionId,
-		uint8_t *pPSK_PMK, size_t pmk_len);
+				uint8_t *psk_pmk, size_t pmk_len,
+				bool update_to_fw);
 #else
 static inline
 void sme_get_pmk_info(mac_handle_t mac_handle, uint8_t session_id,
@@ -636,7 +639,8 @@ sme_set_roam_scan_ch_event_cb(mac_handle_t mac_handle,
 
 static inline
 QDF_STATUS sme_roam_set_psk_pmk(mac_handle_t mac_handle, uint8_t sessionId,
-				uint8_t *pPSK_PMK, size_t pmk_len)
+				uint8_t *psk_pmk, size_t pmk_len,
+				bool update_to_fw)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -734,9 +738,6 @@ void sme_deregister_oem_data_rsp_callback(mac_handle_t mac_handle)
 }
 
 #endif
-
-QDF_STATUS sme_get_country_code(mac_handle_t mac_handle, uint8_t *pBuf,
-				uint8_t *pbLen);
 
 QDF_STATUS sme_generic_change_country_code(mac_handle_t mac_handle,
 					   uint8_t *pCountry);
@@ -2294,7 +2295,7 @@ QDF_STATUS sme_set_lost_link_info_cb(mac_handle_t mac_handle,
  */
 QDF_STATUS sme_update_new_channel_event(mac_handle_t mac_handle,
 					uint8_t session_id);
-#ifdef WLAN_POWER_DEBUGFS
+#ifdef WLAN_POWER_DEBUG
 QDF_STATUS sme_power_debug_stats_req(
 		mac_handle_t mac_handle,
 		void (*callback_fn)(struct power_stats_response *response,
@@ -2347,6 +2348,14 @@ QDF_STATUS sme_set_sar_power_limits(mac_handle_t mac_handle,
  * Return: QDF_STATUS
  */
 QDF_STATUS sme_send_coex_config_cmd(struct coex_config_params *coex_cfg_params);
+
+/**
+ * sme_send_ocl_cmd() - Send OCL command
+ * @ocl_params: OCL command params
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_send_ocl_cmd(struct ocl_cmd_params *ocl_params);
 
 void sme_set_cc_src(mac_handle_t mac_handle, enum country_src);
 
@@ -4177,4 +4186,38 @@ QDF_STATUS sme_vdev_self_peer_delete_resp(struct del_vdev_params *param);
  * Return: None
  */
 void sme_vdev_del_resp(uint8_t vdev_id);
+
+#ifdef FEATURE_MONITOR_MODE_SUPPORT
+/**
+ * sme_set_monitor_mode_cb() - Register monitor mode vdev up operation callback
+ * @mac_handle: Opaque handle to the MAC context
+ * @monitor_mode_cb: callback to be registered
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_set_monitor_mode_cb(mac_handle_t mac_handle,
+				   void (*monitor_mode_cb)(uint8_t vdev_id));
+
+/*
+ * sme_process_monitor_mode_vdev_up_evt() - Handle vdev up completion
+ * @vdev_id: vdev id
+ *
+ * Return: QDF_STATUS.
+ */
+QDF_STATUS sme_process_monitor_mode_vdev_up_evt(uint8_t vdev_id);
+#else
+static inline
+QDF_STATUS sme_set_monitor_mode_cb(mac_handle_t mac_handle,
+				   void (*monitor_mode_cb)(uint8_t vdev_id))
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+sme_process_monitor_mode_vdev_up_evt(uint8_t vdev_id)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
+
 #endif /* #if !defined( __SME_API_H ) */

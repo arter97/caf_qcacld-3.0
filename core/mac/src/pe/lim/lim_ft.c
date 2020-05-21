@@ -524,8 +524,11 @@ void lim_fill_ft_session(struct mac_context *mac,
 	ft_session->limRFBand = lim_get_rf_band(ft_session->curr_op_freq);
 
 	lim_fill_dot11mode(mac, ft_session, pe_session, pBeaconStruct);
-
 	pe_debug("dot11mode: %d", ft_session->dot11mode);
+
+	if (IS_DOT11_MODE_HE(ft_session->dot11mode))
+		lim_update_session_he_capable(mac, ft_session);
+
 	ft_session->vhtCapability =
 		(IS_DOT11_MODE_VHT(ft_session->dot11mode)
 		 && IS_BSS_VHT_CAPABLE(pBeaconStruct->VHTCaps));
@@ -534,7 +537,7 @@ void lim_fill_ft_session(struct mac_context *mac,
 		 && pBeaconStruct->HTCaps.present);
 
 	/* Assign default configured nss value in the new session */
-	if (wlan_reg_is_5ghz_ch_freq(ft_session->curr_op_freq))
+	if (!wlan_reg_is_24ghz_ch_freq(ft_session->curr_op_freq))
 		ft_session->vdev_nss = mac->vdev_type_nss_5g.sta;
 	else
 		ft_session->vdev_nss = mac->vdev_type_nss_2g.sta;
@@ -643,7 +646,6 @@ void lim_fill_ft_session(struct mac_context *mac,
 
 	tx_pwr_attr.reg_max = regMax;
 	tx_pwr_attr.ap_tx_power = localPowerConstraint;
-	tx_pwr_attr.ini_tx_power = mac->mlme_cfg->power.max_tx_power;
 	tx_pwr_attr.frequency = ft_session->curr_op_freq;
 
 #ifdef FEATURE_WLAN_ESE
@@ -652,10 +654,8 @@ void lim_fill_ft_session(struct mac_context *mac,
 	ft_session->maxTxPower = QDF_MIN(regMax, (localPowerConstraint));
 #endif
 
-	pe_debug("Reg max: %d local pwr: %d, ini tx pwr: %d max tx pwr: %d",
-		regMax, localPowerConstraint,
-		mac->mlme_cfg->power.max_tx_power,
-		ft_session->maxTxPower);
+	pe_debug("Reg max: %d local pwr: %d, max tx pwr: %d", regMax,
+		 localPowerConstraint, ft_session->maxTxPower);
 	if (!lim_is_roam_synch_in_progress(pe_session)) {
 		ft_session->limPrevSmeState = ft_session->limSmeState;
 		ft_session->limSmeState = eLIM_SME_WT_REASSOC_STATE;

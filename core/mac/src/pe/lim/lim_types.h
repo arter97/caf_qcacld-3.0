@@ -818,6 +818,9 @@ void lim_process_mlm_add_sta_rsp(struct mac_context *mac,
 void lim_process_mlm_del_sta_rsp(struct mac_context *mac,
 				 struct scheduler_msg *limMsgQ);
 
+QDF_STATUS
+lim_process_mlm_del_all_sta_rsp(struct vdev_mlme_obj *vdev_mlme,
+				struct peer_delete_all_response *rsp);
 /**
  * lim_process_mlm_del_bss_rsp () - API to process delete bss response
  * @mac: Pointer to Global MAC structure
@@ -1163,6 +1166,22 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 					 struct pe_session *session,
 					 uint8_t addba_extn_present,
 					 uint8_t amsdu_support, uint8_t is_wep);
+
+/**
+ * lim_send_delba_action_frame() - Send delba to peer
+ * @mac_ctx: mac context
+ * @vdev_id: vdev id
+ * @peer_macaddr: Peer mac addr
+ * @tid: Tid number
+ * @reason_code: reason code
+ *
+ * Return: 0 for success, non-zero for failure
+ */
+QDF_STATUS lim_send_delba_action_frame(struct mac_context *mac_ctx,
+				       uint8_t vdev_id,
+				       uint8_t *peer_macaddr, uint8_t tid,
+				       uint8_t reason_code);
+
 /**
  * lim_process_join_failure_timeout() - This function is called to process
  * JoinFailureTimeout

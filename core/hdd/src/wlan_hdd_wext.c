@@ -7542,8 +7542,8 @@ static int iw_get_policy_manager_ut_ops(struct hdd_context *hdd_ctx,
 
 	case WE_POLICY_MANAGER_PCL_CMD:
 	{
-		uint32_t pcl[QDF_MAX_NUM_CHAN] = {0};
-		uint8_t weight_list[QDF_MAX_NUM_CHAN] = {0};
+		uint32_t pcl[NUM_CHANNELS] = {0};
+		uint8_t weight_list[NUM_CHANNELS] = {0};
 		uint32_t pcl_len = 0, i = 0;
 
 		hdd_debug("<iwpriv wlan0 pm_pcl> is called");
@@ -9618,7 +9618,15 @@ static int __iw_set_two_ints_getnone(struct net_device *dev,
 		hdd_set_dump_dp_trace(value[1], value[2]);
 		break;
 	case WE_SET_MON_MODE_CHAN:
-		ret = wlan_hdd_set_mon_chan(adapter, value[1], value[2]);
+		if (value[1] > 256)
+			ret = wlan_hdd_set_mon_chan(adapter, value[1],
+						    value[2]);
+		else
+			ret = wlan_hdd_set_mon_chan(
+						adapter,
+						wlan_reg_legacy_chan_to_freq(
+						hdd_ctx->pdev, value[1]),
+						value[2]);
 		break;
 	case WE_SET_WLAN_SUSPEND:
 		ret = hdd_wlan_fake_apps_suspend(hdd_ctx->wiphy, dev,

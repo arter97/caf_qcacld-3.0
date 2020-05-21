@@ -912,6 +912,12 @@ void wma_update_target_ext_he_cap(struct target_psoc_info *tgt_hdl,
 	mac_phy_cap = target_psoc_get_mac_phy_cap(tgt_hdl);
 	total_mac_phy_cnt = target_psoc_get_total_mac_phy_cnt(tgt_hdl);
 
+	if (!mac_phy_cap) {
+		WMA_LOGE(FL("Invalid MAC PHY capabilities handle"));
+		he_cap->present = false;
+		return;
+	}
+
 	if (!num_hw_modes) {
 		WMA_LOGE(FL("No extended HE cap for current SOC"));
 		he_cap->present = false;
@@ -1328,8 +1334,9 @@ void wma_populate_peer_he_cap(struct peer_assoc_params *peer,
 	wma_print_he_ppet(&peer->peer_ppet);
 
 	qdf_mem_copy(&peer->peer_he_caps_6ghz,
-		     ((uint16_t *)&params->he_6ghz_band_caps) + 1,
-		     sizeof(peer->peer_he_caps_6ghz));
+		     ((uint8_t *)&params->he_6ghz_band_caps) + 1,
+		     DOT11F_IE_HE_6GHZ_BAND_CAP_MAX_LEN);
+	WMA_LOGD(FL("HE 6GHz band caps: %0x"), peer->peer_he_caps_6ghz);
 	return;
 }
 

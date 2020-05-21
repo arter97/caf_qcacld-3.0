@@ -1671,7 +1671,7 @@ static QDF_STATUS policy_mgr_get_sbs_channels(
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint32_t conn_index = 0, num_channels = 0;
 	uint32_t num_5g_channels = 0, cur_5g_ch_freq = 0;
-	uint32_t remaining_5g_ch_freqs[QDF_MAX_NUM_CHAN] = {};
+	uint32_t remaining_5g_ch_freqs[NUM_CHANNELS] = {};
 	uint32_t remaining_channel_index = 0;
 	uint32_t j = 0, i = 0, weight1, weight2;
 
@@ -1995,7 +1995,7 @@ void policy_mgr_set_weight_of_dfs_passive_channels_to_zero(
 		return;
 
 	if (len)
-		orig_channel_count = QDF_MIN(*len, QDF_MAX_NUM_CHAN);
+		orig_channel_count = QDF_MIN(*len, NUM_CHANNELS);
 	else {
 		policy_mgr_err("invalid number of channel length");
 		return;
@@ -2119,7 +2119,6 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 	bool is_etsi13_srd_chan_allowed_in_mas_mode = true;
 	uint32_t i = 0, j = 0;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
-	bool sta_sap_scc_on_dfs_chan;
 	uint32_t *channel_list, *channel_list_24, *channel_list_5,
 		 *sbs_channel_list, *channel_list_6;
 
@@ -2166,20 +2165,9 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 		goto end;
 	}
 
-	/*
-	 * if you have atleast one STA connection then don't fill DFS channels
-	 * in the preferred channel list
-	 */
-	sta_sap_scc_on_dfs_chan =
-		policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(psoc);
 	if ((mode == PM_SAP_MODE) || (mode == PM_P2P_GO_MODE)) {
-		if ((policy_mgr_mode_specific_connection_count(psoc,
-							       PM_STA_MODE,
-							       NULL) > 0) &&
-		    (!sta_sap_scc_on_dfs_chan)) {
-			policy_mgr_debug("skip DFS ch from pcl for SAP/Go");
-			skip_dfs_channel = true;
-		}
+		policy_mgr_skip_dfs_ch(psoc,
+				       &skip_dfs_channel);
 		is_etsi13_srd_chan_allowed_in_mas_mode =
 			wlan_reg_is_etsi13_srd_chan_allowed_master_mode(pm_ctx->
 									pdev);
@@ -2865,7 +2853,7 @@ static void policy_mgr_nss_update_cb(struct wlan_objmgr_psoc *psoc,
 	policy_mgr_debug("nss update successful for vdev:%d ori %d reason %d",
 			 vdev_id, original_vdev_id, reason);
 	if (PM_NOP != next_action) {
-		if (reason == POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH)
+		if (reason == POLICY_MGR_UPDATE_REASON_AFTER_CHANNEL_SWITCH)
 			policy_mgr_next_actions(psoc, vdev_id, next_action,
 						reason);
 		else
@@ -3360,7 +3348,7 @@ uint32_t policy_mgr_get_sap_mandatory_chan_list_len(
 
 void  policy_mgr_init_sap_mandatory_2g_chan(struct wlan_objmgr_psoc *psoc)
 {
-	uint32_t ch_freq_list[QDF_MAX_NUM_CHAN] = {0};
+	uint32_t ch_freq_list[NUM_CHANNELS] = {0};
 	uint32_t len = 0;
 	int i;
 	QDF_STATUS status;
@@ -3379,7 +3367,7 @@ void  policy_mgr_init_sap_mandatory_2g_chan(struct wlan_objmgr_psoc *psoc)
 	}
 	pm_ctx->sap_mandatory_channels_len = 0;
 
-	for (i = 0; (i < len) && (i < QDF_MAX_NUM_CHAN); i++) {
+	for (i = 0; (i < len) && (i < NUM_CHANNELS); i++) {
 		if (WLAN_REG_IS_24GHZ_CH_FREQ(ch_freq_list[i])) {
 			policy_mgr_debug("Add chan %hu to mandatory list",
 					ch_freq_list[i]);
@@ -3393,7 +3381,7 @@ void  policy_mgr_init_sap_mandatory_2g_chan(struct wlan_objmgr_psoc *psoc)
 void policy_mgr_remove_sap_mandatory_chan(struct wlan_objmgr_psoc *psoc,
 					  uint32_t ch_freq)
 {
-	uint32_t ch_freq_list[QDF_MAX_NUM_CHAN] = {0};
+	uint32_t ch_freq_list[NUM_CHANNELS] = {0};
 	uint32_t num_chan = 0;
 	int i;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
@@ -3404,7 +3392,7 @@ void policy_mgr_remove_sap_mandatory_chan(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	if (pm_ctx->sap_mandatory_channels_len >= QDF_MAX_NUM_CHAN) {
+	if (pm_ctx->sap_mandatory_channels_len >= NUM_CHANNELS) {
 		policy_mgr_err("Invalid channel len %d ",
 				pm_ctx->sap_mandatory_channels_len);
 		return;

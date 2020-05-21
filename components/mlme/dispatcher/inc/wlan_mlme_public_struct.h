@@ -44,7 +44,7 @@
 /* Roam debugging related macro defines */
 #define MAX_ROAM_DEBUG_BUF_SIZE    250
 #define MAX_ROAM_EVENTS_SUPPORTED  5
-#define ROAM_FAILURE_BUF_SIZE      50
+#define ROAM_FAILURE_BUF_SIZE      60
 #define TIME_STRING_LEN            24
 
 #define ROAM_CHANNEL_BUF_SIZE      300
@@ -951,12 +951,17 @@ struct wlan_mlme_chain_cfg {
 /**
  * struct mlme_tgt_caps - mlme related capability coming from target (FW)
  * @data_stall_recovery_fw_support: does target supports data stall recovery.
+ * @bigtk_support: does the target support bigtk capability or not.
+ * @stop_all_host_scan_support: Target capability that indicates if the target
+ * supports stop all host scan request type.
  *
  * Add all the mlme-tgt related capablities here, and the public API would fill
  * the related capability in the required mlme cfg structure.
  */
 struct mlme_tgt_caps {
 	bool data_stall_recovery_fw_support;
+	bool bigtk_support;
+	bool stop_all_host_scan_support;
 };
 
 /**
@@ -1134,6 +1139,9 @@ struct wlan_mlme_chainmask {
  * @enable_ring_buffer: Decide to enable/disable ring buffer for bug report
  * @enable_peer_unmap_conf_support: Indicate whether to send conf for peer unmap
  * @dfs_chan_ageout_time: Set DFS Channel ageout time
+ * @bigtk_support: Whether BIGTK is supported or not
+ * @stop_all_host_scan_support: Target capability that indicates if the target
+ * supports stop all host scan request type.
  */
 struct wlan_mlme_generic {
 	enum band_info band_capability;
@@ -1170,6 +1178,8 @@ struct wlan_mlme_generic {
 	bool enable_ring_buffer;
 	bool enable_peer_unmap_conf_support;
 	uint8_t dfs_chan_ageout_time;
+	bool bigtk_support;
+	bool stop_all_host_scan_support;
 };
 
 /*
@@ -1211,6 +1221,7 @@ struct acs_weight_range {
 };
 
 #define MAX_ACS_WEIGHT_RANGE              10
+#define MLME_GET_DFS_CHAN_WEIGHT(np_chan_weight) (np_chan_weight & 0x000000FF)
 
 /*
  * struct wlan_mlme_acs - All acs related cfg items
@@ -1223,6 +1234,9 @@ struct acs_weight_range {
  * @normalize_weight_num_chan: Number of freq items for normalization.
  * @normalize_weight_range: Frequency range for weight normalization
  * @num_weight_range: num of ranges provided by user
+ * @force_sap_start: Force SAP start when no channel is found suitable
+ * by ACS
+ * @np_chan_weightage: Weightage to be given to non preferred channels.
  */
 struct wlan_mlme_acs {
 	bool is_acs_with_more_param;
@@ -1230,10 +1244,12 @@ struct wlan_mlme_acs {
 	bool is_vendor_acs_support;
 	bool is_acs_support_for_dfs_ltecoex;
 	bool is_external_acs_policy;
-	struct acs_weight normalize_weight_chan[QDF_MAX_NUM_CHAN];
+	struct acs_weight normalize_weight_chan[NUM_CHANNELS];
 	uint16_t normalize_weight_num_chan;
 	struct acs_weight_range normalize_weight_range[MAX_ACS_WEIGHT_RANGE];
 	uint16_t num_weight_range;
+	bool force_sap_start;
+	uint32_t np_chan_weightage;
 };
 
 /*
@@ -1435,6 +1451,7 @@ struct bss_load_trigger {
  * @mawc_roam_enabled:              Enable/Disable MAWC during roaming
  * @enable_fast_roam_in_concurrency:Enable LFR roaming on STA during concurrency
  * @lfr3_roaming_offload:           Enable/disable roam offload feature
+ * @enable_self_bss_roam:               enable roaming to connected BSSID
  * @enable_disconnect_roam_offload: enable disassoc/deauth roam scan.
  * @enable_idle_roam: flag to enable/disable idle roam in fw
  * @idle_roam_rssi_delta: rssi delta of connected ap which is used to
@@ -1544,6 +1561,7 @@ struct wlan_mlme_lfr_cfg {
 	bool enable_fast_roam_in_concurrency;
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 	bool lfr3_roaming_offload;
+	bool enable_self_bss_roam;
 	bool enable_disconnect_roam_offload;
 	bool enable_idle_roam;
 	uint32_t idle_roam_rssi_delta;
@@ -1811,6 +1829,7 @@ struct wlan_mlme_wmm_params {
  * @pcl_weightage: PCL weightage
  * @channel_congestion_weightage: channel congestion weightage
  * @oce_wan_weightage: OCE WAN metrics weightage
+ * @oce_ap_tx_pwr_weightage: weightage based on ap tx power
  */
 struct  wlan_mlme_weight_config {
 	uint8_t rssi_weightage;
@@ -1824,6 +1843,7 @@ struct  wlan_mlme_weight_config {
 	uint8_t pcl_weightage;
 	uint8_t channel_congestion_weightage;
 	uint8_t oce_wan_weightage;
+	uint8_t oce_ap_tx_pwr_weightage;
 };
 
 /**
@@ -1978,7 +1998,6 @@ struct mlme_power_usage {
  * @power_usage: power usage mode, min, max, mod
  * @tx_power_2g: limit tx power in 2.4 ghz
  * @tx_power_5g: limit tx power in 5 ghz
- * @max_tx_power: WLAN max tx power
  * @current_tx_power_level: current tx power level
  * @local_power_constraint: local power constraint
  */
@@ -1990,7 +2009,6 @@ struct wlan_mlme_power {
 	struct mlme_power_usage power_usage;
 	uint8_t tx_power_2g;
 	uint8_t tx_power_5g;
-	uint8_t max_tx_power;
 	uint8_t current_tx_power_level;
 	uint8_t local_power_constraint;
 };
@@ -2144,12 +2162,14 @@ struct wlan_mlme_fe_wlm {
 
 /**
  * struct wlan_mlme_fe_rrm - RRM related configs
- * @rrm_enabled: Flag to check if RRM is enabled
+ * @rrm_enabled: Flag to check if RRM is enabled for STA
+ * @sap_rrm_enabled: Flag to check if RRM is enabled for SAP
  * @rrm_rand_interval: RRM randomization interval
  * @rm_capability: RM enabled capabilities IE
  */
 struct wlan_mlme_fe_rrm {
 	bool rrm_enabled;
+	bool sap_rrm_enabled;
 	uint8_t rrm_rand_interval;
 	uint8_t rm_capability[MLME_RMENABLEDCAP_MAX_LEN];
 };
@@ -2183,8 +2203,6 @@ struct wlan_mlme_mwc {
  * @scan_11d_interval: scan 11d interval
  * @valid_channel_freq_list: array for valid channel list
  * @valid_channel_list_num: valid channel list number
- * @country_code: country code
- * @country_code_len: country code length
  * @enable_11d_in_world_mode: Whether to enable 11d scan in world mode or not
  * @avoid_acs_freq_list: List of the frequencies which need to be avoided
  * during acs
@@ -2202,8 +2220,6 @@ struct wlan_mlme_reg {
 	uint32_t scan_11d_interval;
 	uint32_t valid_channel_freq_list[CFG_VALID_CHANNEL_LIST_LEN];
 	uint32_t valid_channel_list_num;
-	uint8_t country_code[CFG_COUNTRY_CODE_LEN + 1];
-	uint8_t country_code_len;
 	bool enable_11d_in_world_mode;
 #ifdef SAP_AVOID_ACS_FREQ_LIST
 	uint16_t avoid_acs_freq_list[CFG_VALID_CHANNEL_LIST_LEN];
