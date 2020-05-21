@@ -767,6 +767,7 @@ mpdu_stitch_fail:
 		/* Free the head buffer */
 		qdf_nbuf_free(mpdu_buf);
 	}
+	dp_pdev->ppdu_info.rx_status.rs_fcs_err = 0;
 	return NULL;
 }
 

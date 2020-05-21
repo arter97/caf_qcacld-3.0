@@ -4244,6 +4244,8 @@ unsigned int qdf_nbuf_update_radiotap(struct mon_rx_status *rx_status,
 	put_unaligned_le64(rx_status->tsft, &rtap_buf[rtap_len]);
 	rtap_len += 8;
 
+	rx_status->rtap_flags = 0;
+
 	/* IEEE80211_RADIOTAP_FLAGS u8 */
 	rthdr->it_present |= (1 << IEEE80211_RADIOTAP_FLAGS);
 
@@ -4254,8 +4256,8 @@ unsigned int qdf_nbuf_update_radiotap(struct mon_rx_status *rx_status,
 	rtap_len += 1;
 
 	/* IEEE80211_RADIOTAP_RATE  u8           500kb/s */
-	if (!rx_status->ht_flags && !rx_status->vht_flags &&
-	    !rx_status->he_flags) {
+	if ((rx_status->preamble_type == QDF_RX_PKT_TYPE_11A) ||
+	    (rx_status->preamble_type == QDF_RX_PKT_TYPE_11B)) {
 		rthdr->it_present |= (1 << IEEE80211_RADIOTAP_RATE);
 		rtap_buf[rtap_len] = rx_status->rate;
 	} else
@@ -4304,7 +4306,7 @@ unsigned int qdf_nbuf_update_radiotap(struct mon_rx_status *rx_status,
 		return 0;
 	}
 
-	if (rx_status->ht_flags) {
+	if (rx_status->preamble_type == QDF_RX_PKT_TYPE_11N) {
 		length = rtap_len;
 		/* IEEE80211_RADIOTAP_VHT u8, u8, u8 */
 		rthdr->it_present |= (1 << IEEE80211_RADIOTAP_MCS);
@@ -4338,7 +4340,7 @@ unsigned int qdf_nbuf_update_radiotap(struct mon_rx_status *rx_status,
 								rtap_len);
 	}
 
-	if (rx_status->vht_flags) {
+	if (rx_status->preamble_type == QDF_RX_PKT_TYPE_11AC) {
 		length = rtap_len;
 		/* IEEE80211_RADIOTAP_VHT u16, u8, u8, u8[4], u8, u8, u16 */
 		rthdr->it_present |= (1 << IEEE80211_RADIOTAP_VHT);
@@ -4352,7 +4354,7 @@ unsigned int qdf_nbuf_update_radiotap(struct mon_rx_status *rx_status,
 		}
 	}
 
-	if (rx_status->he_flags) {
+	if (rx_status->preamble_type == QDF_RX_PKT_TYPE_11AX) {
 		length = rtap_len;
 		/* IEEE80211_RADIOTAP_HE */
 		rthdr->it_present |= (1 << IEEE80211_RADIOTAP_HE);

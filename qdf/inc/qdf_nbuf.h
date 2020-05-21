@@ -169,6 +169,12 @@
 #define MAX_CHAIN 8
 #define QDF_MON_STATUS_MPDU_FCS_BMAP_NWORDS 8
 
+#define QDF_RX_PKT_TYPE_11A     0
+#define QDF_RX_PKT_TYPE_11B     1
+#define QDF_RX_PKT_TYPE_11N     2
+#define QDF_RX_PKT_TYPE_11AC    3
+#define QDF_RX_PKT_TYPE_11AX    4
+
 /**
  * struct mon_rx_status - This will have monitor mode rx_status extracted from
  * htt_rx_desc used later to update radiotap information.
