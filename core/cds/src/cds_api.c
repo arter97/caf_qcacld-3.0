@@ -1716,6 +1716,10 @@ static QDF_STATUS cds_force_assert_target(qdf_device_t qdf)
 	if (QDF_IS_STATUS_SUCCESS(status))
 		return QDF_STATUS_SUCCESS;
 
+	/* if MHI notify CNSS_FW_DOWN, status may be QDF_STATUS_E_FAULT */
+	if (status == QDF_STATUS_E_FAULT)
+		return status;
+
 	/* wmi assert failed, start recovery without the firmware assert */
 	cds_err("Scheduling recovery work without firmware assert");
 	pld_schedule_recovery_work(qdf->dev, PLD_REASON_DEFAULT);
