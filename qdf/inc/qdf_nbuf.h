@@ -174,6 +174,7 @@
 #define QDF_RX_PKT_TYPE_11N     2
 #define QDF_RX_PKT_TYPE_11AC    3
 #define QDF_RX_PKT_TYPE_11AX    4
+#define QDF_SGI_PRESENT 0x80
 
 /**
  * struct mon_rx_status - This will have monitor mode rx_status extracted from

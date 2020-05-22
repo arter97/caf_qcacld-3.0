@@ -4252,6 +4252,9 @@ unsigned int qdf_nbuf_update_radiotap(struct mon_rx_status *rx_status,
 	if (rx_status->rs_fcs_err)
 		rx_status->rtap_flags |= IEEE80211_RADIOTAP_F_BADFCS;
 
+	if (rx_status->preamble_type == QDF_RX_PKT_TYPE_11N)
+		 rx_status->rtap_flags |= QDF_SGI_PRESENT;
+
 	rtap_buf[rtap_len] = rx_status->rtap_flags;
 	rtap_len += 1;
 
