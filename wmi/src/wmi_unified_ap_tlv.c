@@ -2437,7 +2437,7 @@ send_peer_chan_width_switch_cmd_tlv(wmi_unified_t wmi_handle,
 {
 	wmi_buf_t buf;
 	wmi_peer_chan_width_switch_cmd_fixed_param *cmd;
-	int32_t len = sizeof(*cmd) + WMI_TLV_HDR_SIZE;
+	int32_t len;
 	int16_t max_peers_per_command;
 	wmi_chan_width_peer_list *cmd_peer_list;
 	int16_t pending_peers = param->num_peers;
@@ -2450,6 +2450,7 @@ send_peer_chan_width_switch_cmd_tlv(wmi_unified_t wmi_handle,
 				sizeof(*cmd_peer_list);
 
 	while (pending_peers > 0) {
+		len = sizeof(*cmd) + WMI_TLV_HDR_SIZE;
 		if (pending_peers >= max_peers_per_command) {
 			len += (max_peers_per_command * sizeof(*cmd_peer_list));
 		} else {
