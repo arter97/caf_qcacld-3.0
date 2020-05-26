@@ -22,6 +22,7 @@
 #include <cdp_txrx_cmn_struct.h>
 #include <cdp_txrx_peer_ops.h>
 #include <cds_sched.h>
+#include <dp_rx.h>
 
 /* Timeout in ms to wait for a DP rx thread */
 #define DP_RX_THREAD_WAIT_TIMEOUT 200
@@ -157,6 +158,11 @@ static QDF_STATUS dp_rx_tm_thread_enqueue(struct dp_rx_thread *rx_thread,
 	struct dp_rx_tm_handle_cmn *tm_handle_cmn;
 	uint8_t reo_ring_num = QDF_NBUF_CB_RX_CTX_ID(nbuf_list);
 	qdf_wait_queue_head_t *wait_q_ptr;
+	struct dp_txrx_handle_cmn *txrx_handle_cmn;
+	ol_txrx_soc_handle soc;
+	uint32_t nbuf_queued_total;
+	uint32_t rx_pending_hl_threshold;
+	int i;
 
 	tm_handle_cmn = rx_thread->rtm_handle_cmn;
 
@@ -166,6 +172,23 @@ static QDF_STATUS dp_rx_tm_thread_enqueue(struct dp_rx_thread *rx_thread,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	txrx_handle_cmn =
+		dp_rx_thread_get_txrx_handle(tm_handle_cmn);
+	if (!txrx_handle_cmn) {
+		dp_err("invalid txrx_handle_cmn!");
+		QDF_BUG(0);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	soc = dp_txrx_get_soc_from_ext_handle(txrx_handle_cmn);
+	if (!soc) {
+		dp_err("invalid soc!");
+		QDF_BUG(0);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	rx_pending_hl_threshold = wlan_cfg_rx_pending_hl_threshold(
+				  ((struct dp_soc *)soc)->wlan_cfg_ctx);
 	wait_q_ptr = &rx_thread->wait_q;
 
 	if (reo_ring_num >= DP_RX_TM_MAX_REO_RINGS) {
@@ -214,6 +237,14 @@ enq_done:
 	temp_qlen = qdf_nbuf_queue_head_qlen(&rx_thread->nbuf_queue);
 
 	rx_thread->stats.nbuf_queued[reo_ring_num] += nbuf_queued;
+
+	nbuf_queued_total = 0;
+	for (i = 0; i < DP_RX_TM_MAX_REO_RINGS; i++)
+		nbuf_queued_total += rx_thread->stats.nbuf_queued[i];
+
+	if ((nbuf_queued_total - rx_thread->stats.nbuf_dequeued) >
+		 rx_pending_hl_threshold)
+		dp_set_rx_pending_flag((struct dp_soc *)soc, true);
 
 	if (temp_qlen > rx_thread->stats.nbufq_max_len)
 		rx_thread->stats.nbufq_max_len = temp_qlen;
@@ -296,6 +327,9 @@ static int dp_rx_thread_process_nbufq(struct dp_rx_thread *rx_thread)
 	ol_osif_vdev_handle osif_vdev;
 	ol_txrx_soc_handle soc;
 	uint32_t num_list_elements = 0;
+	uint32_t nbuf_queued_total;
+	uint32_t rx_pending_lo_threshold;
+	int i;
 
 	struct dp_txrx_handle_cmn *txrx_handle_cmn;
 
@@ -309,6 +343,9 @@ static int dp_rx_thread_process_nbufq(struct dp_rx_thread *rx_thread)
 		return -EFAULT;
 	}
 
+	rx_pending_lo_threshold = wlan_cfg_rx_pending_lo_threshold(
+				  ((struct dp_soc *)soc)->wlan_cfg_ctx);
+
 	dp_debug("enter: qlen  %u",
 		 qdf_nbuf_queue_head_qlen(&rx_thread->nbuf_queue));
 
@@ -317,6 +354,14 @@ static int dp_rx_thread_process_nbufq(struct dp_rx_thread *rx_thread)
 		num_list_elements =
 			QDF_NBUF_CB_RX_NUM_ELEMENTS_IN_LIST(nbuf_list);
 		rx_thread->stats.nbuf_dequeued += num_list_elements;
+
+		nbuf_queued_total = 0;
+		for (i = 0; i < DP_RX_TM_MAX_REO_RINGS; i++)
+			nbuf_queued_total += rx_thread->stats.nbuf_queued[i];
+
+		if ((nbuf_queued_total - rx_thread->stats.nbuf_dequeued) <
+			 rx_pending_lo_threshold)
+			dp_set_rx_pending_flag((struct dp_soc *)soc, false);
 
 		vdev_id = QDF_NBUF_CB_RX_VDEV_ID(nbuf_list);
 		cdp_get_os_rx_handles_from_vdev(soc, vdev_id, &stack_fn,
