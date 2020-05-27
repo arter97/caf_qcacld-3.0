@@ -42,6 +42,7 @@
 #include "nan_datapath.h"
 #include "wlan_reg_services_api.h"
 #include "wma.h"
+#include "wlan_pkt_capture_ucfg_api.h"
 
 #define MAX_SUPPORTED_PEERS_WEP 16
 
@@ -1648,6 +1649,43 @@ end:
 }
 
 /**
+ * lim_process_mlm_del_all_sta_rsp() - Process DEL STA response
+ * @mac_ctx: Pointer to Global MAC structure
+ * @msg: The MsgQ header, which contains the response buffer
+ *
+ * This function is called to process a WMA_DEL_ALL_STA_RSP from
+ * WMA Upon receipt of this message from FW.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+lim_process_mlm_del_all_sta_rsp(struct vdev_mlme_obj *vdev_mlme,
+				struct peer_delete_all_response *rsp)
+{
+	struct pe_session *session_entry;
+	tSirResultCodes status_code = eSIR_SME_SUCCESS;
+	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t vdev_id;
+
+	vdev = vdev_mlme->vdev;
+	vdev_id = wlan_vdev_get_id(vdev);
+
+	SET_LIM_PROCESS_DEFD_MESGS(mac_ctx, true);
+
+	session_entry = pe_find_session_by_vdev_id(mac_ctx,
+						   vdev_id);
+	if (!session_entry) {
+		pe_err("Session Doesn't exist: %d", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	lim_prepare_and_send_del_all_sta_cnf(mac_ctx, status_code,
+					     session_entry);
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * lim_process_mlm_del_sta_rsp() - Process DEL STA response
  * @mac_ctx: Pointer to Global MAC structure
  * @msg: The MsgQ header, which contains the response buffer
@@ -2815,6 +2853,8 @@ error:
 static void lim_handle_mon_switch_channel_rsp(struct pe_session *session,
 					      QDF_STATUS status)
 {
+	struct scheduler_msg message = {0};
+
 	if (session->bssType != eSIR_MONITOR_MODE)
 		return;
 
@@ -2828,6 +2868,17 @@ static void lim_handle_mon_switch_channel_rsp(struct pe_session *session,
 
 	wlan_vdev_mlme_sm_deliver_evt(session->vdev,
 				      WLAN_VDEV_SM_EV_START_SUCCESS, 0, NULL);
+
+	message.type = eWNI_SME_MONITOR_MODE_VDEV_UP;
+	message.bodyval = session->vdev_id;
+	pe_debug("vdev id %d ", session->vdev_id);
+
+	if (QDF_STATUS_SUCCESS !=
+	    scheduler_post_message(QDF_MODULE_ID_PE,
+				   QDF_MODULE_ID_SME,
+				   QDF_MODULE_ID_SME, &message)) {
+		pe_err("Failed to post message montior mode vdev up");
+	}
 }
 
 /**
@@ -2903,6 +2954,9 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 			pe_debug("Send p2p operating channel change conf action frame once first beacon is received on new channel");
 			pe_session->send_p2p_conf_frame = true;
 		}
+
+		if (ucfg_pkt_capture_get_pktcap_mode(mac->psoc))
+			ucfg_pkt_capture_record_channel(pe_session->vdev);
 		break;
 	case LIM_SWITCH_CHANNEL_SAP_DFS:
 		/* Note: This event code specific to SAP mode
@@ -2929,6 +2983,8 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 		 */
 		policy_mgr_update_connection_info(mac->psoc,
 						  pe_session->smeSessionId);
+		if (ucfg_pkt_capture_get_pktcap_mode(mac->psoc))
+			ucfg_pkt_capture_record_channel(pe_session->vdev);
 		break;
 	default:
 		break;

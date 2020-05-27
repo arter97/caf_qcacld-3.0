@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -126,6 +126,10 @@ struct sap_context {
 	uint32_t chan_freq;
 	uint32_t sec_ch_freq;
 
+#ifdef DCS_INTERFERENCE_DETECTION
+	qdf_freq_t dcs_ch_freq;
+#endif
+
 	/* Include the SME(CSR) sessionId here */
 	uint8_t sessionId;
 
@@ -225,6 +229,7 @@ struct sap_context {
 	bool dfs_cac_offload;
 	bool is_chan_change_inprogress;
 	qdf_list_t owe_pending_assoc_ind_list;
+	uint32_t freq_before_ch_switch;
 };
 
 /*----------------------------------------------------------------------------
@@ -447,6 +452,7 @@ static inline uint8_t sap_indicate_radar(struct sap_context *sap_ctx)
 
 /**
  * sap_select_default_oper_chan() - Select AP mode default operating channel
+ * @mac_ctx: mac context
  * @acs_cfg: pointer to ACS config info
  *
  * Select AP mode default operating channel based on ACS hw mode and channel
@@ -455,7 +461,8 @@ static inline uint8_t sap_indicate_radar(struct sap_context *sap_ctx)
  *
  * Return: Selected operating channel frequency
  */
-uint32_t sap_select_default_oper_chan(struct sap_acs_cfg *acs_cfg);
+uint32_t sap_select_default_oper_chan(struct mac_context *mac_ctx,
+				      struct sap_acs_cfg *acs_cfg);
 
 /*
  * sap_is_dfs_cac_wait_state() - check if sap is in cac wait state

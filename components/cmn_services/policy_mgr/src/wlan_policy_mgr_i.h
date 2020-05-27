@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -40,6 +40,8 @@
 #define PM_24_GHZ_CH_FREQ_6   (2437)
 #define PM_5_GHZ_CH_FREQ_36   (5180)
 #define CHANNEL_SWITCH_COMPLETE_TIMEOUT   (2000)
+
+#define DUAL_MAC_CONFIG_TIMEOUT   (POLICY_MGR_SER_CMD_TIMEOUT + 1000)
 
 /**
  * Policy Mgr hardware mode list bit-mask definitions.
@@ -181,6 +183,9 @@
 #define policymgr_nofl_debug(params...) \
 	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_POLICY_MGR, params)
 
+#define policy_mgr_rl_debug(params...) \
+	QDF_TRACE_DEBUG_RL(QDF_MODULE_ID_POLICY_MGR, params)
+
 #define PM_CONC_CONNECTION_LIST_VALID_INDEX(index) \
 		((MAX_NUMBER_OF_CONC_CONNECTIONS > index) && \
 			(pm_conc_connection_list[index].in_use))
@@ -257,7 +262,7 @@ struct policy_mgr_cfg {
 	uint8_t max_conc_cxns;
 	uint8_t conc_rule1;
 	uint8_t conc_rule2;
-	uint8_t enable_mcc_adaptive_sch;
+	bool enable_mcc_adaptive_sch;
 	uint8_t allow_mcc_go_diff_bi;
 	uint8_t enable_overlap_chnl;
 	uint8_t dual_mac_feature;
@@ -329,6 +334,10 @@ struct policy_mgr_cfg {
  * @mode_change_cb: Mode change callback
  * @user_config_sap_ch_freq: SAP channel freq configured by user application
  * @cfg: Policy manager config data
+ * @dynamic_mcc_adaptive_sched: disable/enable mcc adaptive scheduler feature
+ * @dynamic_dfs_master_disabled: current state of dynamic dfs master
+ * @dual_mac_configuration_complete_evt: qdf event to synchronize dual mac
+ *					 configuration setting
  */
 struct policy_mgr_psoc_priv_obj {
 	struct wlan_objmgr_psoc *psoc;
@@ -369,6 +378,9 @@ struct policy_mgr_psoc_priv_obj {
 	struct policy_mgr_cfg cfg;
 	uint32_t valid_ch_freq_list[NUM_CHANNELS];
 	uint32_t valid_ch_freq_list_count;
+	bool dynamic_mcc_adaptive_sched;
+	bool dynamic_dfs_master_disabled;
+	qdf_event_t dual_mac_configuration_complete_evt;
 };
 
 /**

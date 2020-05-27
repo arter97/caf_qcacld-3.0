@@ -153,7 +153,7 @@ static const struct nla_policy
 							.type = NLA_U32},
 };
 
-static const struct nla_policy
+const struct nla_policy
 	wlan_hdd_tdls_mode_configuration_policy
 	[QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_MAX + 1] = {
 		[QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_TRIGGER_MODE] = {
@@ -865,26 +865,6 @@ QDF_STATUS hdd_tdls_register_peer(void *userdata, uint32_t vdev_id,
 	}
 
 	return hdd_roam_register_tdlssta(adapter, mac, qos);
-}
-
-QDF_STATUS hdd_tdls_deregister_peer(void *userdata, uint32_t vdev_id,
-				    struct qdf_mac_addr *peer_mac)
-{
-	struct hdd_adapter *adapter;
-	struct hdd_context *hddctx;
-
-	hddctx = userdata;
-	if (!hddctx) {
-		hdd_err("Invalid hddctx");
-		return QDF_STATUS_E_INVAL;
-	}
-	adapter = hdd_get_adapter_by_vdev(hddctx, vdev_id);
-	if (!adapter) {
-		hdd_err("Invalid adapter");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	return hdd_roam_deregister_tdlssta(adapter, peer_mac);
 }
 
 void hdd_init_tdls_config(struct tdls_start_params *tdls_cfg)

@@ -79,6 +79,7 @@
 #include <wlan_cp_stats_mc_ucfg_api.h>
 #include <wlan_crypto_global_api.h>
 #include <wlan_mlme_main.h>
+#include "wlan_pkt_capture_ucfg_api.h"
 
 struct wma_search_rate {
 	int32_t rate;
@@ -1111,7 +1112,7 @@ QDF_STATUS wma_set_enable_disable_mcc_adaptive_scheduler(uint32_t
 QDF_STATUS wma_set_mcc_channel_time_latency(tp_wma_handle wma,
 	uint32_t mcc_channel, uint32_t mcc_channel_time_latency)
 {
-	uint8_t mcc_adapt_sch = 0;
+	bool mcc_adapt_sch = false;
 	struct mac_context *mac = NULL;
 	uint32_t channel1 = mcc_channel;
 	uint32_t chan1_freq = cds_chan_to_freq(channel1);
@@ -1134,11 +1135,10 @@ QDF_STATUS wma_set_mcc_channel_time_latency(tp_wma_handle wma,
 		return QDF_STATUS_E_FAILURE;
 	}
 	/* Confirm MCC adaptive scheduler feature is disabled */
-	if (policy_mgr_get_mcc_adaptive_sch(mac->psoc,
-					    &mcc_adapt_sch) ==
+	if (policy_mgr_get_dynamic_mcc_adaptive_sch(mac->psoc,
+						    &mcc_adapt_sch) ==
 	    QDF_STATUS_SUCCESS) {
-		if (mcc_adapt_sch ==
-		    cfg_max(CFG_ENABLE_MCC_ADAPTIVE_SCH_ENABLED_NAME)) {
+		if (mcc_adapt_sch) {
 			WMA_LOGD("%s: Can't set channel latency while MCC ADAPTIVE SCHED is enabled. Exit",
 				__func__);
 			return QDF_STATUS_SUCCESS;
@@ -1175,7 +1175,7 @@ QDF_STATUS wma_set_mcc_channel_time_quota(tp_wma_handle wma,
 		uint32_t adapter_1_chan_number,	uint32_t adapter_1_quota,
 		uint32_t adapter_2_chan_number)
 {
-	uint8_t mcc_adapt_sch = 0;
+	bool mcc_adapt_sch = false;
 	struct mac_context *mac = NULL;
 	uint32_t chan1_freq = cds_chan_to_freq(adapter_1_chan_number);
 	uint32_t chan2_freq = cds_chan_to_freq(adapter_2_chan_number);
@@ -1199,11 +1199,10 @@ QDF_STATUS wma_set_mcc_channel_time_quota(tp_wma_handle wma,
 	}
 
 	/* Confirm MCC adaptive scheduler feature is disabled */
-	if (policy_mgr_get_mcc_adaptive_sch(mac->psoc,
-					    &mcc_adapt_sch) ==
+	if (policy_mgr_get_dynamic_mcc_adaptive_sch(mac->psoc,
+						    &mcc_adapt_sch) ==
 	    QDF_STATUS_SUCCESS) {
-		if (mcc_adapt_sch ==
-		    cfg_max(CFG_ENABLE_MCC_ADAPTIVE_SCH_ENABLED_NAME)) {
+		if (mcc_adapt_sch) {
 			WMA_LOGD("%s: Can't set channel quota while MCC_ADAPTIVE_SCHED is enabled. Exit",
 				 __func__);
 			return QDF_STATUS_SUCCESS;
@@ -1678,7 +1677,7 @@ QDF_STATUS wma_process_init_bad_peer_tx_ctl_info(tp_wma_handle wma,
 static QDF_STATUS wma_update_thermal_mitigation_to_fw(tp_wma_handle wma,
 						      u_int8_t thermal_level)
 {
-	struct thermal_mitigation_params therm_data;
+	struct thermal_mitigation_params therm_data = {0};
 
 	/* Check if vdev is in mcc, if in mcc set dc value as 10, else 100 */
 	therm_data.dc = 100;
@@ -2352,23 +2351,6 @@ static void wma_update_tx_send_params(struct tx_send_params *tx_param,
 		     tx_param->preamble_type);
 }
 
-#ifdef WLAN_FEATURE_11W
-uint8_t *wma_get_igtk(struct wma_txrx_node *iface, uint16_t *key_len)
-{
-	struct wlan_crypto_key *crypto_key;
-
-	crypto_key = wlan_crypto_get_key(iface->vdev, WMA_IGTK_KEY_INDEX_4);
-	if (!crypto_key) {
-		wma_err("IGTK not found");
-		*key_len = 0;
-		return NULL;
-	}
-	*key_len = crypto_key->keylen;
-
-	return &crypto_key->keyval[0];
-}
-#endif
-
 QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 			 eFrameType frmType, eFrameTxDir txDir, uint8_t tid,
 			 wma_tx_dwnld_comp_callback tx_frm_download_comp_cb,
@@ -2391,8 +2373,6 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 	uint8_t *pFrame = NULL;
 	void *pPacket = NULL;
 	uint16_t newFrmLen = 0;
-	uint8_t *igtk;
-	uint16_t key_len;
 #endif /* WLAN_FEATURE_11W */
 	struct wma_txrx_node *iface;
 	struct mac_context *mac;
@@ -2416,6 +2396,7 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 
 	if (!soc) {
 		WMA_LOGE("%s:SOC context is NULL", __func__);
+		cds_packet_free((void *)tx_frame);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -2442,8 +2423,9 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 		cds_packet_free((void *)tx_frame);
 		return QDF_STATUS_E_FAILURE;
 	}
+
 #ifdef WLAN_FEATURE_11W
-	if ((iface && iface->rmfEnabled) &&
+	if ((iface && (iface->rmfEnabled || tx_flag & HAL_USE_PMF)) &&
 	    (frmType == TXRX_FRM_802_11_MGMT) &&
 	    (pFc->subType == SIR_MAC_MGMT_DISASSOC ||
 	     pFc->subType == SIR_MAC_MGMT_DEAUTH ||
@@ -2458,17 +2440,24 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 				/* Allocate extra bytes for privacy header and
 				 * trailer
 				 */
-				pdev_id = wlan_objmgr_pdev_get_pdev_id(
+				if (iface->type == WMI_VDEV_TYPE_NDI &&
+				    (tx_flag & HAL_USE_PMF)) {
+					hdr_len = IEEE80211_CCMP_HEADERLEN;
+					mic_len = IEEE80211_CCMP_MICLEN;
+				} else {
+					pdev_id = wlan_objmgr_pdev_get_pdev_id(
 							wma_handle->pdev);
-				qdf_status =
-					mlme_get_peer_mic_len(wma_handle->psoc,
-							      pdev_id,
-							      wh->i_addr1,
-							      &mic_len,
-							      &hdr_len);
+					qdf_status = mlme_get_peer_mic_len(
+							wma_handle->psoc,
+							pdev_id, wh->i_addr1,
+							&mic_len, &hdr_len);
 
-				if (QDF_IS_STATUS_ERROR(qdf_status))
-					return qdf_status;
+					if (QDF_IS_STATUS_ERROR(qdf_status)) {
+						cds_packet_free(
+							(void *)tx_frame);
+						goto error;
+					}
+				}
 
 				newFrmLen = frmLen + hdr_len + mic_len;
 				qdf_status =
@@ -2505,8 +2494,24 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 						(qdf_nbuf_data(tx_frame));
 			}
 		} else {
+			uint16_t mmie_size;
+			int32_t mgmtcipherset;
+
+			mgmtcipherset = wlan_crypto_get_param(iface->vdev,
+						WLAN_CRYPTO_PARAM_MGMT_CIPHER);
+			if (mgmtcipherset <= 0) {
+				wma_err("Invalid key cipher %d", mgmtcipherset);
+				cds_packet_free((void *)tx_frame);
+				return -EINVAL;
+			}
+
+			if (mgmtcipherset & (1 << WLAN_CRYPTO_CIPHER_AES_CMAC))
+				mmie_size = cds_get_mmie_size();
+			else
+				mmie_size = cds_get_gmac_mmie_size();
+
 			/* Allocate extra bytes for MMIE */
-			newFrmLen = frmLen + IEEE80211_MMIE_LEN;
+			newFrmLen = frmLen + mmie_size;
 			qdf_status = cds_packet_alloc((uint16_t) newFrmLen,
 						      (void **)&pFrame,
 						      (void **)&pPacket);
@@ -2522,26 +2527,20 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 			/*
 			 * Initialize the frame with 0's and only fill
 			 * MAC header and data. MMIE field will be
-			 * filled by cds_attach_mmie API
+			 * filled by wlan_crypto_add_mmie API
 			 */
 			qdf_mem_zero(pFrame, newFrmLen);
 			qdf_mem_copy(pFrame, wh, sizeof(*wh));
 			qdf_mem_copy(pFrame + sizeof(*wh),
 				     pData + sizeof(*wh), frmLen - sizeof(*wh));
-			igtk = wma_get_igtk(iface, &key_len);
-			if (!igtk) {
-				wma_alert("IGTK not present");
-				cds_packet_free((void *)tx_frame);
-				goto error;
-			}
-			if (!cds_attach_mmie(igtk,
-					     iface->key.key_id[0].ipn,
-					     WMA_IGTK_KEY_INDEX_4,
-					     pFrame,
-					     pFrame + newFrmLen, newFrmLen)) {
+
+			/* The API expect length without the mmie size */
+			if (!wlan_crypto_add_mmie(iface->vdev, pFrame,
+						  frmLen)) {
 				wma_alert("Failed to attach MMIE");
 				/* Free the original packet memory */
 				cds_packet_free((void *)tx_frame);
+				cds_packet_free((void *)pPacket);
 				goto error;
 			}
 			cds_packet_free((void *)tx_frame);
@@ -2711,6 +2710,7 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 			WMA_LOGP("%s: Event Reset failed tx comp event %x",
 				 __func__, qdf_status);
+			cds_packet_free((void *)tx_frame);
 			goto error;
 		}
 	}
@@ -2736,8 +2736,6 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 		chanfreq = 0;
 	}
 
-	WMA_LOGD("%s: chan freq %d vdev:%d subType:%d",
-		 __func__, chanfreq, vdev_id, pFc->subType);
 	if (mac->mlme_cfg->gen.debug_packet_log & 0x1) {
 		if ((pFc->type == SIR_MAC_MGMT_FRAME) &&
 		    (pFc->subType != SIR_MAC_MGMT_PROBE_REQ) &&
@@ -2775,11 +2773,13 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 	psoc = wma_handle->psoc;
 	if (!psoc) {
 		WMA_LOGE("%s: psoc ctx is NULL", __func__);
+		cds_packet_free((void *)tx_frame);
 		goto error;
 	}
 
 	if (!wma_handle->pdev) {
 		WMA_LOGE("%s: pdev ctx is NULL", __func__);
+		cds_packet_free((void *)tx_frame);
 		goto error;
 	}
 
@@ -2791,6 +2791,14 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 		mac_addr = wh->i_addr2;
 		peer = wlan_objmgr_get_peer(psoc, pdev_id, mac_addr,
 					WLAN_MGMT_NB_ID);
+	}
+
+	if (ucfg_pkt_capture_get_pktcap_mode(psoc) &
+	    PKT_CAPTURE_MODE_MGMT_ONLY) {
+		ucfg_pkt_capture_mgmt_tx(wma_handle->pdev,
+					 tx_frame,
+					 wma_handle->interfaces[vdev_id].mhz,
+					 mgmt_param.tx_param.preamble_type);
 	}
 
 	status = wlan_mgmt_txrx_mgmt_frame_tx(peer, wma_handle->mac_context,
@@ -3180,6 +3188,31 @@ uint8_t wma_rx_invalid_peer_ind(uint8_t vdev_id, void *wh)
 			QDF_MAC_ADDR_ARRAY(rx_inv_msg->ta));
 		qdf_mem_free(rx_inv_msg);
 	}
+
+	return 0;
+}
+
+int wma_dp_send_delba_ind(uint8_t vdev_id, uint8_t *peer_macaddr,
+			  uint8_t tid, uint8_t reason_code)
+{
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+	struct lim_delba_req_info *req;
+
+	if (!wma || !peer_macaddr) {
+		wma_err("wma handle or mac addr is NULL");
+		return -EINVAL;
+	}
+	req = qdf_mem_malloc(sizeof(*req));
+	if (!req)
+		return -ENOMEM;
+	req->vdev_id = vdev_id;
+	qdf_mem_copy(req->peer_macaddr, peer_macaddr, QDF_MAC_ADDR_SIZE);
+	req->tid = tid;
+	req->reason_code = reason_code;
+	WMA_LOGD("req delba_ind vdev %d %pM tid %d reason %d",
+		 vdev_id, peer_macaddr, tid, reason_code);
+	wma_send_msg_high_priority(wma, SIR_HAL_REQ_SEND_DELBA_REQ_IND,
+				   (void *)req, 0);
 
 	return 0;
 }

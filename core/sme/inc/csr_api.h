@@ -277,7 +277,7 @@ typedef struct sCsrChnPower_ {
 
 typedef struct tagCsr11dinfo {
 	sCsrChannel Channels;
-	uint8_t countryCode[CFG_COUNTRY_CODE_LEN + 1];
+	uint8_t countryCode[REG_ALPHA2_LEN + 1];
 	/* max power channel list */
 	sCsrChnPower ChnPower[CFG_VALID_CHANNEL_LIST_LEN];
 } tCsr11dinfo;
@@ -602,8 +602,8 @@ typedef enum {
 
 } eCsrWEPStaticKeyID;
 
-/* Two extra key indicies are used for the IGTK (which is used by BIP) */
-#define CSR_MAX_NUM_KEY     (eCSR_SECURITY_WEP_STATIC_KEY_ID_MAX + 2 + 1)
+/* Two extra key indicies are used for the IGTK, two for BIGTK */
+#define CSR_MAX_NUM_KEY     (eCSR_SECURITY_WEP_STATIC_KEY_ID_MAX + 2 + 1 + 2)
 
 typedef enum {
 	/*
@@ -709,7 +709,6 @@ struct csr_roam_profile {
 	uint8_t MFPRequired;
 	uint8_t MFPCapable;
 #endif
-	tAniEdType mgmt_encryption_type;
 	tCsrKeys Keys;
 	tCsrChannelInfo ChannelInfo;
 	uint32_t op_freq;
@@ -744,7 +743,7 @@ struct csr_roam_profile {
 	 */
 	uint8_t *pAddIEAssoc;
 	/* it is ignored if [0] is 0. */
-	uint8_t countryCode[CFG_COUNTRY_CODE_LEN];
+	uint8_t countryCode[REG_ALPHA2_LEN + 1];
 	/* WPS Association if true => auth and ecryption should be ignored */
 	bool bWPSAssociation;
 	bool bOSENAssociation;
@@ -806,8 +805,6 @@ typedef struct tagCsrRoamConnectedProfile {
 	tCsrEncryptionList EncryptionInfo;
 	eCsrEncryptionType mcEncryptionType;
 	tCsrEncryptionList mcEncryptionInfo;
-	/* group management cipher suite used for 11w */
-	tAniEdType mgmt_encryption_type;
 	uint8_t country_code[WNI_CFG_COUNTRY_CODE_LEN];
 	uint32_t vht_channel_width;
 	tCsrKeys Keys;
@@ -928,10 +925,6 @@ struct csr_config_params {
 	 */
 	uint8_t fAllowMCCGODiffBI;
 	tCsr11dinfo Csr11dinfo;
-	/* stats request frequency from PE while in full power */
-	uint32_t statsReqPeriodicity;
-	/* stats request frequency from PE while in power save */
-	uint32_t statsReqPeriodicityInPS;
 #ifdef FEATURE_WLAN_ESE
 	uint8_t isEseIniFeatureEnabled;
 #endif
@@ -943,15 +936,8 @@ struct csr_config_params {
 	 * (apprx 1.3 sec)
 	 */
 	uint8_t fEnableDFSChnlScan;
-	/*
-	 * To enable/disable scanning 2.4Ghz channels twice on a single scan
-	 * request from HDD
-	 */
-	bool fScanTwice;
-	bool vendor_vht_sap;
 	bool send_smps_action;
 
-	uint8_t disable_high_ht_mcs_2x2;
 	uint8_t isCoalesingInIBSSAllowed;
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 	uint8_t cc_switch_mode;
@@ -967,17 +953,12 @@ struct csr_config_params {
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE
 	bool sap_channel_avoidance;
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
-	uint32_t dual_mac_feature_disable;
-	uint32_t sta_sap_scc_on_dfs_chan;
 	uint32_t roam_dense_rssi_thresh_offset;
 	uint32_t roam_dense_min_aps;
 	int8_t roam_bg_scan_bad_rssi_thresh;
 	uint8_t roam_bad_rssi_thresh_offset_2g;
 	struct csr_sta_roam_policy_params sta_roam_policy_params;
-	bool enable_bcast_probe_rsp;
-	bool is_fils_enabled;
 	enum force_1x1_type is_force_1x1;
-	uint8_t oce_feature_bitmap;
 	uint32_t offload_11k_enable_bitmask;
 	bool wep_tkip_in_he;
 	struct csr_neighbor_report_offload_params neighbor_report_offload;
@@ -1099,6 +1080,9 @@ struct csr_roam_info {
 	tDot11fIEhs20vendor_ie hs20vendor_ie;
 	tDot11fIEVHTOperation vht_operation;
 	tDot11fIEHTInfo ht_operation;
+#ifdef WLAN_FEATURE_11AX
+	tDot11fIEhe_op he_operation;
+#endif
 	bool reassoc;
 	bool ampdu;
 	bool sgi_enable;
@@ -1435,6 +1419,11 @@ static inline void csr_roam_fill_tdls_info(struct mac_context *mac_ctx,
 					   struct join_rsp *join_rsp)
 {}
 #endif
+
+typedef void (*sme_get_raom_scan_ch_callback)(
+				hdd_handle_t hdd_handle,
+				struct roam_scan_ch_resp *roam_ch,
+				void *context);
 
 /**
  * csr_packetdump_timer_stop() - stops packet dump timer

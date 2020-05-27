@@ -37,6 +37,7 @@
 #include "wma_tgt_cfg.h"
 #include "wma_fips_public_structs.h"
 #include "wma_sar_public_structs.h"
+#include "wma_if.h"
 #include "wlan_mlme_public_struct.h"
 #include "sme_rrm_internal.h"
 #include "sir_types.h"
@@ -119,6 +120,8 @@
 /* Peer disconenct timeout = peer delete + 1 sec */
 #define SME_CMD_PEER_DISCONNECT_TIMEOUT (SIR_DELETE_STA_TIMEOUT + 1000)
 #define SME_PEER_DISCONNECT_TIMEOUT (SME_CMD_PEER_DISCONNECT_TIMEOUT + 1000)
+
+#define SME_CMD_GET_DISCONNECT_STATS_TIMEOUT 200
 
 /* Roam cmds timeout = vdev start + peer assoc + 1 sec */
 #define SME_CMD_ROAM_CMD_TIMEOUT (START_RESPONSE_TIMER + \
@@ -369,7 +372,6 @@ sme_nss_chains_update(mac_handle_t mac_handle,
  * by below modules:
  * 1) WLAN_OBJMGR_ID
  * 2) WLAN_LEGACY_SME_ID
- * 3) WLAN_LEGACY_WMA_ID
  *
  * Return: Newly created Vdev object or NULL incase in any error
  */
@@ -377,6 +379,21 @@ struct wlan_objmgr_vdev *sme_vdev_create(mac_handle_t mac_handle,
 				  struct wlan_vdev_create_params *vdev_params);
 
 
+/**
+ * sme_vdev_post_vdev_create_setup() - setup the lower layers for the new vdev
+ * @mac_handle: The handle returned by mac_open
+ * @vdev: Object manger vdev
+ *
+ * This api will setup the csr/mlme/wma layer for the newly created vdev.
+ *
+ * If the post vdev setup is successfull, we will have following vdev refs
+ * 1) WLAN_OBJMGR_ID  for self peer
+ * 2) WLAN_LEGACY_WMA_ID for vdev
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_vdev_post_vdev_create_setup(mac_handle_t mac_handle,
+					   struct wlan_objmgr_vdev *vdev);
 /**
  * sme_vdev_delete() - Delete vdev for given id
  * @mac_handle: The handle returned by mac_open.
@@ -561,6 +578,32 @@ void sme_roam_free_connect_profile(tCsrRoamConnectedProfile *profile);
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
+ * sme_set_roam_scan_ch_event_cb() - Register roam scan ch callback
+ * @mac_handle: Opaque handle to the MAC context
+ * @cb: callback to be registered
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+sme_set_roam_scan_ch_event_cb(mac_handle_t mac_handle,
+			      sme_get_raom_scan_ch_callback cb);
+
+/**
+ * sme_get_roam_scan_ch() -API to get roam scan channels
+ * @mac_handle: Pointer to mac handle
+ * @sta_id: vdev id
+ * @pcontext: pointer to the context
+ *
+ * Extract number of frequencies and frequency list from chan_info and print
+ * to the logs.
+ *
+ * Return: None
+ */
+QDF_STATUS
+sme_get_roam_scan_ch(mac_handle_t mac_handle,
+		     uint8_t vdev_id, void *pcontext);
+
+/**
  * sme_get_pmk_info(): A wrapper function to request CSR to save PMK
  * @mac_handle: Global structure
  * @session_id: SME session_id
@@ -572,12 +615,35 @@ void sme_get_pmk_info(mac_handle_t mac_handle, uint8_t session_id,
 		      tPmkidCacheInfo *pmk_cache);
 
 QDF_STATUS sme_roam_set_psk_pmk(mac_handle_t mac_handle, uint8_t sessionId,
-		uint8_t *pPSK_PMK, size_t pmk_len);
+				uint8_t *psk_pmk, size_t pmk_len,
+				bool update_to_fw);
 #else
 static inline
 void sme_get_pmk_info(mac_handle_t mac_handle, uint8_t session_id,
 		      tPmkidCacheInfo *pmk_cache)
 {}
+
+static inline QDF_STATUS
+sme_get_roam_scan_ch(mac_handle_t mac_handle,
+		     uint8_t vdev_id, void *pcontext)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static inline QDF_STATUS
+sme_set_roam_scan_ch_event_cb(mac_handle_t mac_handle,
+			      void *cb)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static inline
+QDF_STATUS sme_roam_set_psk_pmk(mac_handle_t mac_handle, uint8_t sessionId,
+				uint8_t *psk_pmk, size_t pmk_len,
+				bool update_to_fw)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 
 /**
@@ -672,9 +738,6 @@ void sme_deregister_oem_data_rsp_callback(mac_handle_t mac_handle)
 }
 
 #endif
-
-QDF_STATUS sme_get_country_code(mac_handle_t mac_handle, uint8_t *pBuf,
-				uint8_t *pbLen);
 
 QDF_STATUS sme_generic_change_country_code(mac_handle_t mac_handle,
 					   uint8_t *pCountry);
@@ -1106,6 +1169,7 @@ QDF_STATUS sme_get_roam_scan_channel_list(mac_handle_t mac_handle,
 					  uint32_t *freq_list,
 					  uint8_t *pNumChannels,
 					  uint8_t sessionId);
+
 /**
  * sme_dump_freq_list() - Dump the frequencies from given chan info
  * @chan_info: Contains the frequency list and number of frequencies
@@ -1135,9 +1199,10 @@ QDF_STATUS sme_del_periodic_tx_ptrn(mac_handle_t mac_handle,
 QDF_STATUS sme_send_rate_update_ind(mac_handle_t mac_handle,
 		tSirRateUpdateInd *rateUpdateParams);
 QDF_STATUS sme_roam_del_pmkid_from_cache(mac_handle_t mac_handle,
-					 uint8_t sessionId,
-					 tPmkidCacheInfo *pmksa,
-					 bool flush_cache);
+					 uint8_t vdev_id,
+					 struct wlan_crypto_pmksa *pmksa,
+					 bool set_pmk);
+
 void sme_get_command_q_status(mac_handle_t mac_handle);
 
 #ifdef FEATURE_WLAN_RMC
@@ -2230,7 +2295,7 @@ QDF_STATUS sme_set_lost_link_info_cb(mac_handle_t mac_handle,
  */
 QDF_STATUS sme_update_new_channel_event(mac_handle_t mac_handle,
 					uint8_t session_id);
-#ifdef WLAN_POWER_DEBUGFS
+#ifdef WLAN_POWER_DEBUG
 QDF_STATUS sme_power_debug_stats_req(
 		mac_handle_t mac_handle,
 		void (*callback_fn)(struct power_stats_response *response,
@@ -2283,6 +2348,14 @@ QDF_STATUS sme_set_sar_power_limits(mac_handle_t mac_handle,
  * Return: QDF_STATUS
  */
 QDF_STATUS sme_send_coex_config_cmd(struct coex_config_params *coex_cfg_params);
+
+/**
+ * sme_send_ocl_cmd() - Send OCL command
+ * @ocl_params: OCL command params
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_send_ocl_cmd(struct ocl_cmd_params *ocl_params);
 
 void sme_set_cc_src(mac_handle_t mac_handle, enum country_src);
 
@@ -2715,16 +2788,32 @@ QDF_STATUS sme_set_vc_mode_config(uint32_t vc_bitmap);
 
 /**
  * sme_set_del_pmkid_cache() - API to update PMKID cache
- * @mac_handle: Opaque handle to the global MAC context
+ * @psoc: psoc common object
  * @session_id: Session id
  * @pmk_cache_info: Pointer to PMK cache info
  * @is_add: boolean that implies whether to add or delete PMKID entry
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS sme_set_del_pmkid_cache(mac_handle_t mac_handle, uint8_t session_id,
+QDF_STATUS sme_set_del_pmkid_cache(struct wlan_objmgr_psoc *psoc,
+				   uint8_t session_id,
 				   tPmkidCacheInfo *pmk_cache_info,
 				   bool is_add);
+
+/**
+ * sme_clear_sae_single_pmk_info() - Clear sae_single_pmk onfo
+ * @psoc: Psoc object
+ * @session_id: session id
+ * @pmk_cache_info: pmk cache info
+ *
+ * This function will clear sae_single_pmk info while processing delete pmk
+ * command from userspace.
+ *
+ * Return: None
+ */
+void sme_clear_sae_single_pmk_info(struct wlan_objmgr_psoc *psoc,
+				   uint8_t session_id,
+				   tPmkidCacheInfo *pmk_cache_info);
 
 /**
  * sme_send_hlp_ie_info() - API to send HLP IE info to fw
@@ -4058,6 +4147,76 @@ static inline QDF_STATUS sme_set_oem_data_event_handler_cb(
 
 static inline void sme_reset_oem_data_event_handler_cb(mac_handle_t  mac_handle)
 {
+}
+#endif
+
+/**
+ * sme_get_prev_connected_bss_ies() - Get the previous connected AP IEs
+ * @mac_handle: The handle returned by mac_open.
+ * @vdev_id: vdev id
+ * @ies: IEs of the disconnected AP. Currently to carry beacon IEs.
+ * @ie_len: Length of the @ies
+ *
+ * This API extracts the IEs from the previous connected AP info and update
+ * them to the ies and ie_len.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_get_prev_connected_bss_ies(mac_handle_t mac_handle,
+					  uint8_t vdev_id,
+					  uint8_t **ies, uint32_t *ie_len);
+/*
+ * sme_vdev_self_peer_delete_resp() - Response for self peer delete
+ * @del_vdev_params: parameters for which vdev self peer has been deleted
+ *
+ * This function is called by the lower level function as a response to
+ * vdev self peer delete request.
+ *
+ * Return: QDF_STATUS.
+ */
+QDF_STATUS sme_vdev_self_peer_delete_resp(struct del_vdev_params *param);
+
+/**
+ * sme_vdev_del_resp() - Vdev delete response function
+ * @vdev_id: vdevid which  has been deleted
+ *
+ * This function is called by the lower level function as a response to
+ * vdev delete request
+ *
+ * Return: None
+ */
+void sme_vdev_del_resp(uint8_t vdev_id);
+
+#ifdef FEATURE_MONITOR_MODE_SUPPORT
+/**
+ * sme_set_monitor_mode_cb() - Register monitor mode vdev up operation callback
+ * @mac_handle: Opaque handle to the MAC context
+ * @monitor_mode_cb: callback to be registered
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_set_monitor_mode_cb(mac_handle_t mac_handle,
+				   void (*monitor_mode_cb)(uint8_t vdev_id));
+
+/*
+ * sme_process_monitor_mode_vdev_up_evt() - Handle vdev up completion
+ * @vdev_id: vdev id
+ *
+ * Return: QDF_STATUS.
+ */
+QDF_STATUS sme_process_monitor_mode_vdev_up_evt(uint8_t vdev_id);
+#else
+static inline
+QDF_STATUS sme_set_monitor_mode_cb(mac_handle_t mac_handle,
+				   void (*monitor_mode_cb)(uint8_t vdev_id))
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+sme_process_monitor_mode_vdev_up_evt(uint8_t vdev_id)
+{
+	return QDF_STATUS_E_FAILURE;
 }
 #endif
 

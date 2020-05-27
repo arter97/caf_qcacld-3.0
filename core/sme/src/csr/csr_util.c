@@ -445,7 +445,7 @@ tListElem *csr_nonscan_active_ll_peek_head(struct mac_context *mac_ctx,
 
 	cmd = wlan_serialization_peek_head_active_cmd_using_psoc(mac_ctx->psoc,
 								 false);
-	if (!cmd)
+	if (!cmd || cmd->source != WLAN_UMAC_COMP_MLME)
 		return NULL;
 
 	sme_cmd = cmd->umac_cmd;
@@ -461,12 +461,16 @@ tListElem *csr_nonscan_pending_ll_peek_head(struct mac_context *mac_ctx,
 
 	cmd = wlan_serialization_peek_head_pending_cmd_using_psoc(mac_ctx->psoc,
 								  false);
-	if (!cmd)
-		return NULL;
+	while (cmd) {
+		if (cmd->source == WLAN_UMAC_COMP_MLME) {
+			sme_cmd = cmd->umac_cmd;
+			return &sme_cmd->Link;
+		}
+		cmd = wlan_serialization_get_pending_list_next_node_using_psoc(
+						mac_ctx->psoc, cmd, false);
+	}
 
-	sme_cmd = cmd->umac_cmd;
-
-	return &sme_cmd->Link;
+	return NULL;
 }
 
 bool csr_nonscan_active_ll_remove_entry(struct mac_context *mac_ctx,
@@ -499,12 +503,16 @@ tListElem *csr_nonscan_pending_ll_next(struct mac_context *mac_ctx,
 				mac_ctx->psoc, &cmd, false);
 	if (cmd.vdev)
 		wlan_objmgr_vdev_release_ref(cmd.vdev, WLAN_LEGACY_SME_ID);
-	if (!tcmd) {
-		sme_err("No cmd found");
-		return NULL;
+	while (tcmd) {
+		if (tcmd->source == WLAN_UMAC_COMP_MLME) {
+			sme_cmd = tcmd->umac_cmd;
+			return &sme_cmd->Link;
+		}
+		tcmd = wlan_serialization_get_pending_list_next_node_using_psoc(
+						mac_ctx->psoc, tcmd, false);
 	}
-	sme_cmd = tcmd->umac_cmd;
-	return &sme_cmd->Link;
+
+	return NULL;
 }
 
 bool csr_get_bss_id_bss_desc(struct bss_description *pSirBssDesc,
@@ -2619,75 +2627,13 @@ bool csr_is_profile_wapi(struct csr_roam_profile *pProfile)
 }
 #endif /* FEATURE_WLAN_WAPI */
 
-#ifdef WLAN_FEATURE_11W
-static bool csr_is_wpa_oui_equal(struct mac_context *mac, uint8_t *Oui1,
-				 uint8_t *Oui2)
-{
-	return !qdf_mem_cmp(Oui1, Oui2, CSR_WPA_OUI_SIZE);
-}
-
-static bool csr_is_oui_match(struct mac_context *mac,
-			     uint8_t AllCyphers[][CSR_WPA_OUI_SIZE],
-			   uint8_t cAllCyphers, uint8_t Cypher[], uint8_t Oui[])
-{
-	bool fYes = false;
-	uint8_t idx;
-
-	for (idx = 0; idx < cAllCyphers; idx++) {
-		if (csr_is_wpa_oui_equal(mac, AllCyphers[idx], Cypher)) {
-			fYes = true;
-			break;
-		}
-	}
-
-	if (fYes && Oui)
-		qdf_mem_copy(Oui, AllCyphers[idx], CSR_WPA_OUI_SIZE);
-
-	return fYes;
-}
-
-/*
- * csr_is_group_mgmt_gmac_128() - check whether oui is GMAC_128
- * @mac: Global MAC context
- * @all_suites: pointer to all supported akm suites
- * @suite_count: all supported akm suites count
- * @oui: Oui needs to be matched
- *
- * Return: True if OUI is GMAC_128, false otherwise
- */
-static bool csr_is_group_mgmt_gmac_128(struct mac_context *mac,
-				uint8_t AllSuites[][CSR_RSN_OUI_SIZE],
-				uint8_t cAllSuites, uint8_t Oui[])
-{
-	return csr_is_oui_match(mac, AllSuites, cAllSuites,
-				csr_group_mgmt_oui[ENUM_GMAC_128], Oui);
-}
-
-/*
- * csr_is_group_mgmt_gmac_256() - check whether oui is GMAC_256
- * @mac: Global MAC context
- * @all_suites: pointer to all supported akm suites
- * @suite_count: all supported akm suites count
- * @oui: Oui needs to be matched
- *
- * Return: True if OUI is GMAC_256, false otherwise
- */
-static bool csr_is_group_mgmt_gmac_256(struct mac_context *mac,
-				uint8_t AllSuites[][CSR_RSN_OUI_SIZE],
-				uint8_t cAllSuites, uint8_t Oui[])
-{
-	return csr_is_oui_match(mac, AllSuites, cAllSuites,
-				csr_group_mgmt_oui[ENUM_GMAC_256], Oui);
-}
-#endif
-
 bool csr_is_pmkid_found_for_peer(struct mac_context *mac,
 				 struct csr_roam_session *session,
 				 tSirMacAddr peer_mac_addr,
 				 uint8_t *pmkid,
 				 uint16_t pmkid_count)
 {
-	uint32_t i, index;
+	uint32_t i;
 	uint8_t *session_pmkid;
 	tPmkidCacheInfo *pmkid_cache;
 
@@ -2698,7 +2644,7 @@ bool csr_is_pmkid_found_for_peer(struct mac_context *mac,
 	qdf_mem_copy(pmkid_cache->BSSID.bytes, peer_mac_addr,
 		     QDF_MAC_ADDR_SIZE);
 
-	if (!csr_lookup_pmkid_using_bssid(mac, session, pmkid_cache, &index)) {
+	if (!csr_lookup_pmkid_using_bssid(mac, session, pmkid_cache)) {
 		qdf_mem_free(pmkid_cache);
 		return false;
 	}
@@ -2720,8 +2666,7 @@ bool csr_is_pmkid_found_for_peer(struct mac_context *mac,
 
 bool csr_lookup_pmkid_using_bssid(struct mac_context *mac,
 				  struct csr_roam_session *session,
-				  tPmkidCacheInfo *pmk_cache,
-				  uint32_t *index)
+				  tPmkidCacheInfo *pmk_cache)
 {
 	struct wlan_crypto_pmksa *pmksa;
 	struct wlan_objmgr_vdev *vdev;
@@ -2746,6 +2691,56 @@ bool csr_lookup_pmkid_using_bssid(struct mac_context *mac,
 	return true;
 }
 
+/**
+ * csr_update_session_pmk() - Update the pmk len and pmk in the roam session
+ * @session: pointer to the CSR Roam session
+ * @pmkid_cache: pointer to the pmkid cache
+ *
+ * Return: None
+ */
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+static void csr_update_session_pmk(struct csr_roam_session *session,
+				   struct wlan_crypto_pmksa *pmksa)
+{
+	session->pmk_len = pmksa->pmk_len;
+	qdf_mem_zero(session->psk_pmk, sizeof(session->psk_pmk));
+	qdf_mem_copy(session->psk_pmk, pmksa->pmk, session->pmk_len);
+}
+#else
+static inline void csr_update_session_pmk(struct csr_roam_session *session,
+					  struct wlan_crypto_pmksa *pmksa)
+{
+}
+#endif
+
+#ifdef WLAN_FEATURE_FILS_SK
+/**
+ * csr_update_pmksa_to_profile() - update pmk and pmkid to profile which will be
+ * used in case of fils session
+ * @profile: profile
+ * @pmkid_cache: pmksa cache
+ *
+ * Return: None
+ */
+static inline void csr_update_pmksa_to_profile(struct csr_roam_profile *profile,
+					       struct wlan_crypto_pmksa *pmksa)
+{
+	if (!profile->fils_con_info)
+		return;
+
+	profile->fils_con_info->pmk_len = pmksa->pmk_len;
+	qdf_mem_copy(profile->fils_con_info->pmk,
+		     pmksa->pmk, pmksa->pmk_len);
+	qdf_mem_copy(profile->fils_con_info->pmkid,
+		     pmksa->pmkid, PMKID_LEN);
+}
+#else
+static inline void csr_update_pmksa_to_profile(struct csr_roam_profile *profile,
+					       struct wlan_crypto_pmksa *pmksa)
+{
+}
+#endif
+
 uint8_t csr_construct_rsn_ie(struct mac_context *mac, uint32_t sessionId,
 			     struct csr_roam_profile *pProfile,
 			     struct bss_description *pSirBssDesc,
@@ -2756,8 +2751,9 @@ uint8_t csr_construct_rsn_ie(struct mac_context *mac, uint32_t sessionId,
 	uint8_t *rsn_ie = (uint8_t *)pRSNIe;
 	uint8_t ie_len = 0;
 	tDot11fBeaconIEs *local_ap_ie = ap_ie;
-	uint16_t rsn_cap = 0;
-	struct qdf_mac_addr bssid;
+	uint16_t rsn_cap = 0, self_rsn_cap;
+	struct wlan_crypto_pmksa pmksa, *pmksa_peer;
+	struct csr_roam_session *session = &mac->roam.roamSession[sessionId];
 
 	if (!local_ap_ie &&
 	    (!QDF_IS_STATUS_SUCCESS(csr_get_parsed_bss_description_ies
@@ -2776,23 +2772,57 @@ uint8_t csr_construct_rsn_ie(struct mac_context *mac, uint32_t sessionId,
 		sme_err("Invalid vdev");
 		return ie_len;
 	}
-	/*
-	 * Use intersection of the RSN cap sent by user space and
-	 * the AP, so that only common capability are enabled.
-	 */
-	rsn_cap &= (uint16_t)wlan_crypto_get_param(vdev,
-						   WLAN_CRYPTO_PARAM_RSN_CAP);
-	wlan_crypto_set_vdev_param(vdev, WLAN_CRYPTO_PARAM_RSN_CAP, rsn_cap);
-	qdf_mem_copy(bssid.bytes, pSirBssDesc->bssId, QDF_MAC_ADDR_SIZE);
 
+	self_rsn_cap = (uint16_t)wlan_crypto_get_param(vdev,
+						   WLAN_CRYPTO_PARAM_RSN_CAP);
+	/* If AP is capable then use self capability else set PMF as 0 */
+	if (rsn_cap & WLAN_CRYPTO_RSN_CAP_MFP_ENABLED &&
+	    pProfile->MFPCapable) {
+		self_rsn_cap |= WLAN_CRYPTO_RSN_CAP_MFP_ENABLED;
+		if (pProfile->MFPRequired)
+			self_rsn_cap |= WLAN_CRYPTO_RSN_CAP_MFP_REQUIRED;
+	} else {
+		self_rsn_cap &= ~WLAN_CRYPTO_RSN_CAP_MFP_ENABLED;
+		self_rsn_cap &= ~WLAN_CRYPTO_RSN_CAP_MFP_REQUIRED;
+	}
+	wlan_crypto_set_vdev_param(vdev, WLAN_CRYPTO_PARAM_RSN_CAP,
+				   self_rsn_cap);
+	qdf_mem_zero(&pmksa, sizeof(pmksa));
+	if (pSirBssDesc->fils_info_element.is_cache_id_present) {
+		pmksa.ssid_len =
+			pProfile->SSIDs.SSIDList[0].SSID.length;
+		qdf_mem_copy(pmksa.ssid,
+			     pProfile->SSIDs.SSIDList[0].SSID.ssId,
+			     pProfile->SSIDs.SSIDList[0].SSID.length);
+		qdf_mem_copy(pmksa.cache_id,
+			     pSirBssDesc->fils_info_element.cache_id,
+			     CACHE_ID_LEN);
+		qdf_mem_copy(&pmksa.bssid,
+			     pSirBssDesc->bssId, QDF_MAC_ADDR_SIZE);
+	} else {
+		qdf_mem_copy(&pmksa.bssid,
+			     pSirBssDesc->bssId, QDF_MAC_ADDR_SIZE);
+	}
+	pmksa_peer = wlan_crypto_get_peer_pmksa(vdev, &pmksa);
+	qdf_mem_zero(&pmksa, sizeof(pmksa));
 	/*
 	 * TODO: Add support for Adaptive 11r connection after
 	 * call to csr_get_rsn_information is added here
 	 */
-	rsn_ie_end = wlan_crypto_build_rsnie(vdev, rsn_ie, &bssid);
-
+	rsn_ie_end = wlan_crypto_build_rsnie_with_pmksa(vdev, rsn_ie,
+							pmksa_peer);
 	if (rsn_ie_end)
 		ie_len = rsn_ie_end - rsn_ie;
+
+	/*
+	 * If a PMK cache is found for the BSSID, then
+	 * update the PMK in CSR session also as this
+	 * will be sent to the FW during RSO.
+	 */
+	if (pmksa_peer) {
+		csr_update_session_pmk(session, pmksa_peer);
+		csr_update_pmksa_to_profile(pProfile, pmksa_peer);
+	}
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 
@@ -2884,78 +2914,6 @@ uint8_t csr_retrieve_wpa_ie(struct mac_context *mac, uint8_t session_id,
 	return cbWpaIe;
 }
 
-#ifdef WLAN_FEATURE_11W
-/**
- * csr_get_mc_mgmt_cipher(): Get mcast management cipher from profile rsn
- * @mac: mac ctx
- * @profile: connect profile
- * @bss: ap scan entry
- * @ap_ie: AP IE's
- *
- * Return: none
- */
-static void csr_get_mc_mgmt_cipher(struct mac_context *mac,
-				   struct csr_roam_profile *profile,
-				   struct bss_description *bss,
-				   tDot11fBeaconIEs *ap_ie)
-{
-	int ret;
-	tDot11fIERSN rsn_ie = {0};
-	uint8_t n_mgmt_cipher = 1;
-	struct rsn_caps rsn_caps;
-	tDot11fBeaconIEs *local_ap_ie = ap_ie;
-	uint8_t grp_mgmt_arr[CSR_RSN_MAX_MULTICAST_CYPHERS][CSR_RSN_OUI_SIZE];
-
-	if (!profile->MFPEnabled)
-		return;
-
-	if (!local_ap_ie &&
-	    (!QDF_IS_STATUS_SUCCESS(csr_get_parsed_bss_description_ies
-				    (mac, bss, &local_ap_ie))))
-		return;
-
-	qdf_mem_copy(&rsn_caps, local_ap_ie->RSN.RSN_Cap, sizeof(rsn_caps));
-
-	if (!ap_ie && local_ap_ie)
-		/* locally allocated */
-		qdf_mem_free(local_ap_ie);
-
-	/* if AP is not PMF capable return */
-	if (!rsn_caps.MFPCapable)
-		return;
-
-	ret = dot11f_unpack_ie_rsn(mac, profile->pRSNReqIE + 2,
-				   profile->nRSNReqIELength -2,
-				   &rsn_ie, false);
-	if (DOT11F_FAILED(ret))
-		return;
-
-	qdf_mem_copy(&rsn_caps, rsn_ie.RSN_Cap, sizeof(rsn_caps));
-
-	/* if self cap is not PMF capable return */
-	if (!rsn_caps.MFPCapable)
-		return;
-
-	qdf_mem_copy(grp_mgmt_arr, rsn_ie.gp_mgmt_cipher_suite,
-		     CSR_RSN_OUI_SIZE);
-	if (csr_is_group_mgmt_gmac_128(mac, grp_mgmt_arr, n_mgmt_cipher, NULL))
-		profile->mgmt_encryption_type = eSIR_ED_AES_GMAC_128;
-	else if (csr_is_group_mgmt_gmac_256(mac, grp_mgmt_arr,
-		 n_mgmt_cipher, NULL))
-		profile->mgmt_encryption_type = eSIR_ED_AES_GMAC_256;
-	else
-		/* Default is CMAC */
-		profile->mgmt_encryption_type = eSIR_ED_AES_128_CMAC;
-}
-#else
-static inline
-void csr_get_mc_mgmt_cipher(struct mac_context *mac,
-			    struct csr_roam_profile *profile,
-			    struct bss_description *bss,
-			    tDot11fBeaconIEs *ap_ie)
-{
-}
-#endif
 /* If a RSNIE exists in the profile, just use it. Or else construct
  * one from the BSS Caller allocated memory for pWpaIe and guarrantee
  * it can contain a max length WPA IE
@@ -2979,8 +2937,6 @@ uint8_t csr_retrieve_rsn_ie(struct mac_context *mac, uint32_t sessionId,
 				cbRsnIe = (uint8_t) pProfile->nRSNReqIELength;
 				qdf_mem_copy(pRsnIe, pProfile->pRSNReqIE,
 					     cbRsnIe);
-				csr_get_mc_mgmt_cipher(mac, pProfile,
-						       pSirBssDesc, pIes);
 			} else {
 				sme_warn("Invalid RSN IE length: %d",
 					 pProfile->nRSNReqIELength);

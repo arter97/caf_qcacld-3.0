@@ -83,6 +83,7 @@
 #include "wlan_osif_request_manager.h"
 #include <wlan_hdd_sar_limits.h>
 #include "wlan_pkt_capture_ucfg_api.h"
+#include "wlan_hdd_thermal.h"
 
 /* Preprocessor definitions and constants */
 #ifdef QCA_WIFI_NAPIER_EMULATION
@@ -925,16 +926,17 @@ int wlan_hdd_pm_qos_notify(struct notifier_block *nb, unsigned long curr_val,
 		return -EINVAL;
 	}
 
-	hdd_debug("PM QOS update. Current value: %ld", curr_val);
+	hdd_debug("PM QOS update: runtime_pm_prevented %d Current value: %ld",
+		  hdd_ctx->runtime_pm_prevented, curr_val);
 	qdf_spin_lock_irqsave(&hdd_ctx->pm_qos_lock);
 
 	if (!hdd_ctx->runtime_pm_prevented &&
 	    curr_val != PM_QOS_CPU_DMA_LAT_DEFAULT_VALUE) {
-		hif_pm_runtime_get_noresume(hif_ctx);
+		hif_pm_runtime_get_noresume(hif_ctx, RTPM_ID_QOS_NOTIFY);
 		hdd_ctx->runtime_pm_prevented = true;
 	} else if (hdd_ctx->runtime_pm_prevented &&
 		   curr_val == PM_QOS_CPU_DMA_LAT_DEFAULT_VALUE) {
-		hif_pm_runtime_put_noidle(hif_ctx);
+		hif_pm_runtime_put(hif_ctx, RTPM_ID_QOS_NOTIFY);
 		hdd_ctx->runtime_pm_prevented = false;
 	}
 
@@ -983,11 +985,9 @@ void hdd_enable_arp_offload(struct hdd_adapter *adapter,
 	struct pmo_arp_req *arp_req;
 	struct in_ifaddr *ifa;
 
-	hdd_enter();
-
 	arp_req = qdf_mem_malloc(sizeof(*arp_req));
 	if (!arp_req)
-		goto out;
+		return;
 
 	arp_req->psoc = psoc;
 	arp_req->vdev_id = adapter->vdev_id;
@@ -1024,9 +1024,6 @@ void hdd_enable_arp_offload(struct hdd_adapter *adapter,
 
 free_req:
 	qdf_mem_free(arp_req);
-
-out:
-	hdd_exit();
 }
 
 void hdd_disable_arp_offload(struct hdd_adapter *adapter,
@@ -1358,11 +1355,6 @@ QDF_STATUS hdd_wlan_shutdown(void)
 	 * increment their counts from 0.
 	 */
 	hdd_reset_all_adapters_connectivity_stats(hdd_ctx);
-	/*
-	 * Purge all active and pending list to avoid vdev destroy timeout and
-	 * thus avoid peer/vdev refcount leak.
-	 */
-	sme_purge_pdev_all_ser_cmd_list(hdd_ctx->mac_handle);
 
 	hdd_reset_all_adapters(hdd_ctx);
 
@@ -1533,6 +1525,7 @@ QDF_STATUS hdd_wlan_re_init(void)
 	sme_set_chip_pwr_save_fail_cb(hdd_ctx->mac_handle,
 				      hdd_chip_pwr_save_fail_detected_cb);
 
+	hdd_restore_thermal_mitigation_config(hdd_ctx);
 	hdd_restore_sar_config(hdd_ctx);
 
 	hdd_send_default_scan_ies(hdd_ctx);
@@ -1788,7 +1781,7 @@ static int _wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 
 	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
 	errno = __wlan_hdd_cfg80211_resume_wlan(wiphy);
-	hif_pm_runtime_put(hif_ctx);
+	hif_pm_runtime_put(hif_ctx, RTPM_ID_SUSPEND_RESUME);
 
 	return errno;
 }
@@ -1958,14 +1951,16 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 			goto resume_ol_rx;
 	}
 
-	if (hdd_ctx->enable_dp_rx_threads)
-		dp_txrx_suspend(cds_get_context(QDF_MODULE_ID_SOC));
+	if (hdd_ctx->enable_dp_rx_threads) {
+		if (dp_txrx_suspend(cds_get_context(QDF_MODULE_ID_SOC)))
+			goto resume_ol_rx;
+	}
 
 	if (ucfg_pkt_capture_get_mode(hdd_ctx->psoc)) {
 		adapter = hdd_get_adapter(hdd_ctx, QDF_MONITOR_MODE);
 		if (adapter)
 			if (ucfg_pkt_capture_suspend_mon_thread(adapter->vdev))
-				goto resume_pkt_capture_mon_thread;
+				goto resume_dp_thread;
 	}
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
@@ -1988,7 +1983,6 @@ resume_dp_thread:
 	if (hdd_ctx->enable_dp_rx_threads)
 		dp_txrx_resume(cds_get_context(QDF_MODULE_ID_SOC));
 
-resume_pkt_capture_mon_thread:
 	/* Resume packet capture MON thread */
 	if (ucfg_pkt_capture_get_mode(hdd_ctx->psoc)) {
 		adapter = hdd_get_adapter(hdd_ctx, QDF_MONITOR_MODE);
@@ -2024,13 +2018,13 @@ static int _wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 	}
 
 	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
-	errno = hif_pm_runtime_get_sync(hif_ctx);
+	errno = hif_pm_runtime_get_sync(hif_ctx, RTPM_ID_SUSPEND_RESUME);
 	if (errno)
 		return errno;
 
 	errno = __wlan_hdd_cfg80211_suspend_wlan(wiphy, wow);
 	if (errno) {
-		hif_pm_runtime_put(hif_ctx);
+		hif_pm_runtime_put(hif_ctx, RTPM_ID_SUSPEND_RESUME);
 		return errno;
 	}
 
@@ -2513,40 +2507,37 @@ int wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 	return errno;
 }
 
-int hdd_set_qpower_config(struct hdd_context *hddctx,
-			  struct hdd_adapter *adapter,
-			  u8 qpower)
+int hdd_set_power_config(struct hdd_context *hddctx,
+			 struct hdd_adapter *adapter,
+			 uint8_t power)
 {
 	QDF_STATUS status;
 
 	if (!ucfg_pmo_get_power_save_mode(hddctx->psoc)) {
-		hdd_err("qpower is disabled in configuration");
+		hdd_err("power save is disabled in configuration");
 		return -EINVAL;
 	}
 	if (adapter->device_mode != QDF_STA_MODE &&
 	    adapter->device_mode != QDF_P2P_CLIENT_MODE) {
-		hdd_info("QPOWER only allowed in STA/P2P-Client modes:%d",
+		hdd_info("Advanced power save only allowed in STA/P2P-Client modes:%d",
 			 adapter->device_mode);
 		return -EINVAL;
 	}
 
-	if (qpower > PS_DUTY_CYCLING_QPOWER ||
-	    qpower < PS_LEGACY_NODEEPSLEEP) {
-		hdd_err("invalid qpower value: %d", qpower);
+	if (power > PMO_PS_ADVANCED_POWER_SAVE_ENABLE ||
+	    power < PMO_PS_ADVANCED_POWER_SAVE_DISABLE) {
+		hdd_err("invalid power value: %d", power);
 		return -EINVAL;
 	}
 
 	if (ucfg_pmo_get_max_ps_poll(hddctx->psoc)) {
-		if ((qpower == PS_QPOWER_NODEEPSLEEP) ||
-				(qpower == PS_LEGACY_NODEEPSLEEP))
-			qpower = PS_LEGACY_NODEEPSLEEP;
-		else
-			qpower = PS_LEGACY_DEEPSLEEP;
-		hdd_info("Qpower disabled, %d", qpower);
+		hdd_info("Disable advanced power save since max ps poll is enabled");
+		power = PMO_PS_ADVANCED_POWER_SAVE_DISABLE;
 	}
-	status = wma_set_qpower_config(adapter->vdev_id, qpower);
+
+	status = wma_set_power_config(adapter->vdev_id, power);
 	if (status != QDF_STATUS_SUCCESS) {
-		hdd_err("failed to configure qpower: %d", status);
+		hdd_err("failed to configure power: %d", status);
 		return -EINVAL;
 	}
 

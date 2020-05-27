@@ -632,32 +632,6 @@ struct wma_version_info {
 	u_int32_t revision;
 };
 
-#define CMAC_IPN_LEN         (6)
-#define WMA_IGTK_KEY_INDEX_4 (4)
-#define WMA_IGTK_KEY_INDEX_5 (5)
-
-/**
- * struct wma_igtk_ipn_t - GTK IPN info
- * @ipn: IPN info
- */
-typedef struct {
-	uint8_t ipn[CMAC_IPN_LEN];
-} wma_igtk_ipn_t;
-
-/**
- * struct wma_igtk_key_t - GTK key
- * @key_id: key id
- * @key_cipher: key type
- */
-typedef struct {
-	/* IPN is maintained per iGTK keyID
-	 * 0th index for iGTK keyID = 4;
-	 * 1st index for iGTK KeyID = 5
-	 */
-	wma_igtk_ipn_t key_id[2];
-	uint32_t key_cipher;
-} wma_igtk_key_t;
-
 struct roam_synch_frame_ind {
 	uint32_t bcn_probe_rsp_len;
 	uint8_t *bcn_probe_rsp;
@@ -701,7 +675,6 @@ struct wma_invalid_peer_params {
  * @addBssStaContext: add bss context
  * @aid: association id
  * @rmfEnabled: Robust Management Frame (RMF) enabled/disabled
- * @key: GTK key
  * @uapsd_cached_val: uapsd cached value
  * @stats_rsp: stats response
  * @del_staself_req: delete sta self request
@@ -752,7 +725,6 @@ struct wma_txrx_node {
 	tAddStaParams *addBssStaContext;
 	uint8_t aid;
 	uint8_t rmfEnabled;
-	wma_igtk_key_t key;
 	uint32_t uapsd_cached_val;
 	void *del_staself_req;
 	bool is_del_sta_defered;
@@ -841,7 +813,7 @@ struct wma_ini_config {
  */
 struct wma_valid_channels {
 	uint8_t num_channels;
-	uint32_t ch_freq_list[MAX_NUM_CHAN];
+	uint32_t ch_freq_list[NUM_CHANNELS];
 };
 
 #ifdef FEATURE_WLM_STATS
@@ -1121,9 +1093,6 @@ typedef struct {
 	qdf_mc_timer_t wma_fw_time_sync_timer;
 	bool fw_therm_throt_support;
 	bool enable_tx_compl_tsf64;
-#ifdef WLAN_FEATURE_PKT_CAPTURE
-	bool is_pktcapture_enabled;
-#endif
 } t_wma_handle, *tp_wma_handle;
 
 /**
@@ -1742,6 +1711,9 @@ QDF_STATUS wma_peer_unmap_conf_cb(uint8_t vdev_id,
 				  uint32_t peer_id_cnt,
 				  uint16_t *peer_id_list);
 
+bool wma_objmgr_peer_exist(tp_wma_handle wma,
+			   uint8_t *peer_addr, uint8_t *peer_vdev_id);
+
 /**
  * wma_get_cca_stats() - send request to fw to get CCA
  * @wmi_hdl: wma handle
@@ -1846,6 +1818,7 @@ QDF_STATUS wma_mgmt_unified_cmd_send(struct wlan_objmgr_vdev *vdev,
 				qdf_nbuf_t buf, uint32_t desc_id,
 				void *mgmt_tx_params);
 
+#ifndef CONFIG_HL_SUPPORT
 /**
  * wma_mgmt_nbuf_unmap_cb() - dma unmap for pending mgmt pkts
  * @pdev: objmgr pdev
@@ -1855,13 +1828,29 @@ QDF_STATUS wma_mgmt_unified_cmd_send(struct wlan_objmgr_vdev *vdev,
  *
  * Return: None
  */
-#ifndef CONFIG_HL_SUPPORT
 void wma_mgmt_nbuf_unmap_cb(struct wlan_objmgr_pdev *pdev,
 			    qdf_nbuf_t buf);
+/**
+ * wma_mgmt_nbuf_unmap_cb() - dma unmap for pending mgmt pkts
+ * @pdev: objmgr pdev
+ * @buf: buffer
+ *
+ * This is a cb function drains all mgmt packets of a vdev.
+ * This is called in event of target going down without sending completions.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wma_mgmt_frame_fill_peer_cb(struct wlan_objmgr_peer *peer,
+				       qdf_nbuf_t buf);
 #else
 static inline void wma_mgmt_nbuf_unmap_cb(struct wlan_objmgr_pdev *pdev,
 					  qdf_nbuf_t buf)
 {}
+static inline QDF_STATUS wma_mgmt_frame_fill_peer_cb(struct wlan_objmgr_peer *peer,
+						     qdf_nbuf_t buf)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 
 /**
@@ -2382,6 +2371,21 @@ void wma_delete_invalid_peer_entries(uint8_t vdev_id, uint8_t *peer_mac_addr);
 uint8_t wma_rx_invalid_peer_ind(uint8_t vdev_id, void *wh);
 
 /**
+ * wma_dp_send_delba_ind() - the callback for DP to notify WMA layer
+ * to del ba of rx
+ * @vdev_id: vdev id
+ * @peer_macaddr: peer mac address
+ * @tid: tid of rx
+ * @reason_code: reason code
+ *
+ * Return: 0 for success or non-zero on failure
+ */
+int wma_dp_send_delba_ind(uint8_t vdev_id,
+			  uint8_t *peer_macaddr,
+			  uint8_t tid,
+			  uint8_t reason_code);
+
+/**
  * is_roam_inprogress() - Is vdev in progress
  * @vdev_id: vdev of interest
  *
@@ -2422,15 +2426,6 @@ void wma_update_set_key(uint8_t session_id, bool pairwise,
 			uint8_t key_index,
 			enum wlan_crypto_cipher_type cipher_type);
 
-/**
- * wma_get_igtk() - Get the IGTK that was stored in the session earlier
- * @iface: Interface for which the key is being requested
- * @key_len: key length
- *
- * Return: Pointer to the key
- */
-uint8_t *wma_get_igtk(struct wma_txrx_node *iface, uint16_t *key_len);
-
 #ifdef WLAN_FEATURE_MOTION_DETECTION
 /**
  * wma_motion_det_host_event_handler - motion detection event handler
@@ -2460,13 +2455,13 @@ int wma_motion_det_base_line_host_event_handler(void *handle, u_int8_t *event,
 
 /**
  * wma_add_bss_peer_sta() - creat bss peer when sta connect
- * @self_mac: self mac address
+ * @vdev_id: vdev id
  * @bssid: AP bssid
  * @roam_sync: if roam sync is in progress
  *
  * Return: 0 on success, else error on failure
  */
-QDF_STATUS wma_add_bss_peer_sta(uint8_t *self_mac, uint8_t *bssid,
+QDF_STATUS wma_add_bss_peer_sta(uint8_t vdev_id, uint8_t *bssid,
 				bool roam_sync);
 
 /**
@@ -2618,5 +2613,14 @@ QDF_STATUS wma_pre_vdev_start_setup(uint8_t vdev_id,
 QDF_STATUS wma_send_ani_level_request(tp_wma_handle wma_handle,
 				      uint32_t *freqs, uint8_t num_freqs);
 #endif /* FEATURE_ANI_LEVEL_REQUEST */
+
+/**
+ * wma_vdev_detach() - send vdev delete command to fw
+ * @wma_handle: wma handle
+ * @pdel_vdev_req_param: del vdev params
+ *
+ * Return: QDF status
+ */
+QDF_STATUS wma_vdev_detach(struct del_vdev_params *pdel_vdev_req_param);
 #endif
 

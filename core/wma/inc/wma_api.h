@@ -178,6 +178,10 @@ QDF_STATUS wma_get_connection_info(uint8_t vdev_id,
 QDF_STATUS wma_ndi_update_connection_info(uint8_t vdev_id,
 		struct nan_datapath_channel_info *ndp_chan_info);
 
+#ifdef WLAN_FEATURE_PKT_CAPTURE
+int wma_get_rmf_status(uint8_t vdev_id);
+#endif
+
 bool wma_is_vdev_up(uint8_t vdev_id);
 
 void *wma_get_beacon_buffer_by_vdev_id(uint8_t vdev_id, uint32_t *buffer_size);
@@ -295,6 +299,25 @@ void wma_process_pdev_hw_mode_trans_ind(void *wma,
 QDF_STATUS wma_set_cts2self_for_p2p_go(void *wma_handle,
 		uint32_t cts2self_for_p2p_go);
 
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+/**
+ * wma_get_roam_scan_ch() - API to get roam scan channel list.
+ * @wma_handle: pointer to wma handle.
+ * @vdev_id: vdev id
+ *
+ * Return: QDF_STATUS.
+ */
+QDF_STATUS wma_get_roam_scan_ch(wmi_unified_t wma,
+				uint8_t vdev_id);
+#else
+static inline
+QDF_STATUS wma_get_roam_scan_ch(wmi_unified_t wma,
+				uint8_t vdev_id)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
+
 /**
  * wma_set_tx_rx_aggr_size() - set tx rx aggregation size
  * @vdev_id: vdev id
@@ -392,13 +415,24 @@ QDF_STATUS wma_send_coex_config_cmd(WMA_HANDLE wma_handle,
 				    struct coex_config_params *coex_cfg_params);
 
 /**
- * wma_set_qpower_config() - update qpower config in wma
+ * wma_send_ocl_cmd() - Send OCL command
+ * @wma_handle: wma handle
+ * @ocl_params: OCL command params
+ *
+ * This function sends WMI command to send OCL mode configuration
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wma_send_ocl_cmd(WMA_HANDLE wma_handle,
+			    struct ocl_cmd_params *ocl_params);
+/**
+ * wma_set_power_config() - update power config in wma
  * @vdev_id:	the Id of the vdev to configure
- * @qpower:	new qpower value
+ * @power:	new power value
  *
  * Return: QDF_STATUS_SUCCESS on success, error number otherwise
  */
-QDF_STATUS wma_set_qpower_config(uint8_t vdev_id, uint8_t qpower);
+QDF_STATUS wma_set_power_config(uint8_t vdev_id, enum powersave_mode power);
 
 #ifdef FEATURE_WLAN_D0WOW
 static inline bool wma_d0_wow_is_supported(void)

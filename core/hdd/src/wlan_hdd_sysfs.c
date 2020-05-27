@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -33,8 +33,15 @@
 #include "cds_api.h"
 #include <wlan_osif_request_manager.h>
 #include <qdf_mem.h>
+#ifdef WLAN_POWER_DEBUG
 #include <sir_api.h>
+#endif
 #include "osif_sync.h"
+#include <wlan_hdd_sysfs_set_fw_mode_cfg.h>
+#include <wlan_hdd_sysfs_reassoc.h>
+#include "wlan_hdd_sysfs_crash_inject.h"
+#include "wlan_hdd_sysfs_suspend_resume.h"
+#include "wlan_hdd_sysfs_unit_test.h"
 
 #define MAX_PSOC_ID_SIZE 10
 
@@ -48,6 +55,28 @@ static struct kobject *wlan_kobject;
 static struct kobject *driver_kobject;
 static struct kobject *fw_kobject;
 static struct kobject *psoc_kobject;
+
+int
+hdd_sysfs_validate_and_copy_buf(char *dest_buf, size_t dest_buf_size,
+				char const *source_buf, size_t source_buf_size)
+{
+	if (source_buf_size > (dest_buf_size - 1)) {
+		hdd_err_rl("Command length is larger than %zu bytes",
+			   dest_buf_size);
+		return -EINVAL;
+	}
+
+	/* sysfs already provides kernel space buffer so copy from user
+	 * is not needed. Doing this extra copy operation just to ensure
+	 * the local buf is properly null-terminated.
+	 */
+	strlcpy(dest_buf, source_buf, dest_buf_size);
+	/* default 'echo' cmd takes new line character to here */
+	if (dest_buf[source_buf_size - 1] == '\n')
+		dest_buf[source_buf_size - 1] = '\0';
+
+	return 0;
+}
 
 static ssize_t __show_driver_version(char *buf)
 {
@@ -123,6 +152,7 @@ static ssize_t show_fw_version(struct kobject *kobj,
 	return length;
 };
 
+#ifdef WLAN_POWER_DEBUG
 struct power_stats_priv {
 	struct power_stats_response power_stats;
 };
@@ -273,6 +303,7 @@ static ssize_t show_device_power_stats(struct kobject *kobj,
 
 	return length;
 }
+#endif
 
 #ifdef WLAN_FEATURE_BEACON_RECEPTION_STATS
 struct beacon_reception_stats_priv {
@@ -431,10 +462,12 @@ static struct kobj_attribute dr_ver_attribute =
 	__ATTR(driver_version, 0440, show_driver_version, NULL);
 static struct kobj_attribute fw_ver_attribute =
 	__ATTR(version, 0440, show_fw_version, NULL);
+#ifdef WLAN_POWER_DEBUG
 static struct kobj_attribute power_stats_attribute =
 	__ATTR(power_stats, 0444, show_device_power_stats, NULL);
+#endif
 
-void hdd_sysfs_create_version_interface(struct wlan_objmgr_psoc *psoc)
+static void hdd_sysfs_create_version_interface(struct wlan_objmgr_psoc *psoc)
 {
 	int error = 0;
 	uint32_t psoc_id;
@@ -483,7 +516,7 @@ free_fw_kobj:
 	fw_kobject = NULL;
 }
 
-void hdd_sysfs_destroy_version_interface(void)
+static void hdd_sysfs_destroy_version_interface(void)
 {
 	if (psoc_kobject) {
 		kobject_put(psoc_kobject);
@@ -493,7 +526,8 @@ void hdd_sysfs_destroy_version_interface(void)
 	}
 }
 
-void hdd_sysfs_create_powerstats_interface(void)
+#ifdef WLAN_POWER_DEBUG
+static void hdd_sysfs_create_powerstats_interface(void)
 {
 	int error;
 
@@ -507,7 +541,7 @@ void hdd_sysfs_create_powerstats_interface(void)
 		hdd_err("could not create power_stats sysfs file");
 }
 
-void hdd_sysfs_destroy_powerstats_interface(void)
+static void hdd_sysfs_destroy_powerstats_interface(void)
 {
 	if (!driver_kobject) {
 		hdd_err("could not get driver kobject!");
@@ -515,8 +549,17 @@ void hdd_sysfs_destroy_powerstats_interface(void)
 	}
 	sysfs_remove_file(driver_kobject, &power_stats_attribute.attr);
 }
+#else
+static void hdd_sysfs_create_powerstats_interface(void)
+{
+}
 
-void hdd_sysfs_create_driver_root_obj(void)
+static void hdd_sysfs_destroy_powerstats_interface(void)
+{
+}
+#endif
+
+static void hdd_sysfs_create_driver_root_obj(void)
 {
 	driver_kobject = kobject_create_and_add(DRIVER_NAME, kernel_kobj);
 	if (!driver_kobject) {
@@ -532,7 +575,7 @@ void hdd_sysfs_create_driver_root_obj(void)
 	}
 }
 
-void hdd_sysfs_destroy_driver_root_obj(void)
+static void hdd_sysfs_destroy_driver_root_obj(void)
 {
 	if (wlan_kobject) {
 		kobject_put(wlan_kobject);
@@ -558,19 +601,103 @@ static int hdd_sysfs_create_bcn_reception_interface(struct hdd_adapter
 	return error;
 }
 
-void hdd_sysfs_create_adapter_root_obj(struct hdd_adapter *adapter)
-{
-	hdd_sysfs_create_bcn_reception_interface(adapter);
-}
-
 static void hdd_sysfs_destroy_bcn_reception_interface(struct hdd_adapter
 						      *adapter)
 {
 	device_remove_file(&adapter->dev->dev, &dev_attr_beacon_stats);
 }
 
-void hdd_sysfs_destroy_adapter_root_obj(struct hdd_adapter *adapter)
+#endif
+
+static void
+hdd_sysfs_create_sta_adapter_root_obj(struct hdd_adapter *adapter)
 {
+	hdd_sysfs_create_bcn_reception_interface(adapter);
+	hdd_sysfs_reassoc_create(adapter);
+	hdd_sysfs_crash_inject_create(adapter);
+	hdd_sysfs_suspend_create(adapter);
+	hdd_sysfs_resume_create(adapter);
+	hdd_sysfs_unit_test_target_create(adapter);
+}
+
+static void
+hdd_sysfs_destroy_sta_adapter_root_obj(struct hdd_adapter *adapter)
+{
+	hdd_sysfs_unit_test_target_destroy(adapter);
+	hdd_sysfs_resume_destroy(adapter);
+	hdd_sysfs_suspend_destroy(adapter);
+	hdd_sysfs_crash_inject_destroy(adapter);
+	hdd_sysfs_reassoc_destroy(adapter);
 	hdd_sysfs_destroy_bcn_reception_interface(adapter);
 }
-#endif
+
+static void
+hdd_sysfs_create_sap_adapter_root_obj(struct hdd_adapter *adapter)
+{
+	hdd_sysfs_crash_inject_create(adapter);
+	hdd_sysfs_suspend_create(adapter);
+	hdd_sysfs_resume_create(adapter);
+	hdd_sysfs_unit_test_target_create(adapter);
+}
+
+static void
+hdd_sysfs_destroy_sap_adapter_root_obj(struct hdd_adapter *adapter)
+{
+	hdd_sysfs_unit_test_target_destroy(adapter);
+	hdd_sysfs_resume_destroy(adapter);
+	hdd_sysfs_suspend_destroy(adapter);
+	hdd_sysfs_crash_inject_destroy(adapter);
+}
+
+void hdd_create_sysfs_files(struct hdd_context *hdd_ctx)
+{
+	hdd_sysfs_create_driver_root_obj();
+	hdd_sysfs_create_version_interface(hdd_ctx->psoc);
+	if  (QDF_GLOBAL_MISSION_MODE == hdd_get_conparam()) {
+		hdd_sysfs_create_powerstats_interface();
+		hdd_sysfs_set_fw_mode_cfg_create(driver_kobject);
+	}
+}
+
+void hdd_destroy_sysfs_files(void)
+{
+	if  (QDF_GLOBAL_MISSION_MODE == hdd_get_conparam()) {
+		hdd_sysfs_set_fw_mode_cfg_destroy(driver_kobject);
+		hdd_sysfs_destroy_powerstats_interface();
+	}
+	hdd_sysfs_destroy_version_interface();
+	hdd_sysfs_destroy_driver_root_obj();
+}
+
+void hdd_create_adapter_sysfs_files(struct hdd_adapter *adapter)
+{
+	int device_mode = adapter->device_mode;
+
+	switch (device_mode){
+	case QDF_STA_MODE:
+	case QDF_P2P_DEVICE_MODE:
+		hdd_sysfs_create_sta_adapter_root_obj(adapter);
+		break;
+	case QDF_SAP_MODE:
+		hdd_sysfs_create_sap_adapter_root_obj(adapter);
+		break;
+	default:
+		break;
+	}
+}
+
+void hdd_destroy_adapter_sysfs_files(struct hdd_adapter *adapter)
+{
+	int device_mode = adapter->device_mode;
+
+	switch (device_mode){
+	case QDF_STA_MODE:
+		hdd_sysfs_destroy_sta_adapter_root_obj(adapter);
+		break;
+	case QDF_SAP_MODE:
+		hdd_sysfs_destroy_sap_adapter_root_obj(adapter);
+		break;
+	default:
+		break;
+	}
+}

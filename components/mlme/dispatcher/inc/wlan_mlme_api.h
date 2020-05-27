@@ -795,6 +795,25 @@ QDF_STATUS wlan_mlme_get_oce_sta_enabled_info(struct wlan_objmgr_psoc *psoc,
 					      bool *value);
 
 /**
+ * wlan_mlme_get_bigtk_support() - Get the BIGTK support
+ * @psoc: pointer to psoc object
+ * @value: pointer to the value which will be filled for the caller
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS wlan_mlme_get_bigtk_support(struct wlan_objmgr_psoc *psoc,
+				       bool *value);
+
+/**
+ * wlan_mlme_get_host_scan_abort_support() - Get support for stop all host
+ * scans service capability.
+ * @psoc: PSOC object pointer
+ *
+ * Return: True if capability is supported, else False
+ */
+bool wlan_mlme_get_host_scan_abort_support(struct wlan_objmgr_psoc *psoc);
+
+/**
  * wlan_mlme_get_oce_sap_enabled_info() - Get the OCE feature enable
  * info for SAP
  * @psoc: pointer to psoc object
@@ -1895,6 +1914,18 @@ QDF_STATUS
 wlan_mlme_get_vht20_mcs9(struct wlan_objmgr_psoc *psoc, bool *value);
 
 /**
+ * wlan_mlme_get_force_sap_enabled() - Get the value of force SAP enabled
+ * @psoc: psoc context
+ * @value: data to get
+ *
+ * Get the value of force SAP enabled
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+QDF_STATUS
+wlan_mlme_get_force_sap_enabled(struct wlan_objmgr_psoc *psoc, bool *value);
+
+/**
  * wlan_mlme_get_vht_enable2x2() - Enables/disables VHT Tx/Rx MCS values for 2x2
  * @psoc: psoc context
  * @value: data to be set
@@ -2302,6 +2333,74 @@ char *mlme_get_roam_trigger_str(uint32_t roam_scan_trigger);
  */
 void mlme_get_converted_timestamp(uint32_t timestamp, char *time);
 
+#if defined(WLAN_SAE_SINGLE_PMK) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
+/**
+ * wlan_mlme_set_sae_single_pmk_bss_cap - API to set WPA3 single pmk AP IE
+ * @psoc: Pointer to psoc object
+ * @vdev_id: vdev id
+ * @val: value to be set
+ *
+ * Return : None
+ */
+void wlan_mlme_set_sae_single_pmk_bss_cap(struct wlan_objmgr_psoc *psoc,
+					  uint8_t vdev_id, bool val);
+
+/**
+ * wlan_mlme_update_sae_single_pmk - API to update mlme_pmkid_info
+ * @vdev: vdev object
+ * @sae_single_pmk: pointer to sae_single_pmk_info struct
+ *
+ * Return : None
+ */
+void
+wlan_mlme_update_sae_single_pmk(struct wlan_objmgr_vdev *vdev,
+				struct mlme_pmk_info *sae_single_pmk);
+
+/**
+ * wlan_mlme_get_sae_single_pmk_info - API to get mlme_pmkid_info
+ * @vdev: vdev object
+ * @pmksa: pointer to PMKSA struct
+ *
+ * Return : None
+ */
+void
+wlan_mlme_get_sae_single_pmk_info(struct wlan_objmgr_vdev *vdev,
+				  struct wlan_mlme_sae_single_pmk *pmksa);
+/**
+ * wlan_mlme_clear_sae_single_pmk_info - API to clear mlme_pmkid_info ap caps
+ * @vdev: vdev object
+ * @pmk : pmk info to clear
+ *
+ * Return : None
+ */
+void wlan_mlme_clear_sae_single_pmk_info(struct wlan_objmgr_vdev *vdev,
+					 struct mlme_pmk_info *pmk);
+#else
+static inline void
+wlan_mlme_set_sae_single_pmk_bss_cap(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id, bool val)
+{
+}
+
+static inline void
+wlan_mlme_update_sae_single_pmk(struct wlan_objmgr_vdev *vdev,
+				struct mlme_pmk_info *sae_single_pmk)
+{
+}
+
+static inline void
+wlan_mlme_get_sae_single_pmk_info(struct wlan_objmgr_vdev *vdev,
+				  struct wlan_mlme_sae_single_pmk *pmksa)
+{
+}
+
+static inline
+void wlan_mlme_clear_sae_single_pmk_info(struct wlan_objmgr_vdev *vdev,
+					 struct mlme_pmk_info *pmk)
+{
+}
+#endif
+
 /**
  * mlme_get_roam_fail_reason_str() - Get fail string from enum
  * WMI_ROAM_FAIL_REASON_ID
@@ -2353,4 +2452,70 @@ wlan_mlme_get_status_ring_buffer(struct wlan_objmgr_psoc *psoc,
  * Return: true if peer unmap confirmation support is enabled, else false
  */
 bool wlan_mlme_get_peer_unmap_conf(struct wlan_objmgr_psoc *psoc);
+
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+/**
+ * wlan_mlme_get_roam_reason_vsie_status() - Indicate if roam reason
+ * vsie is enabled or disabled
+ * @psoc: pointer to psoc object
+ * @roam_reason_vsie_enabled: pointer to hold value of roam reason
+ * vsie
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_get_roam_reason_vsie_status(struct wlan_objmgr_psoc *psoc,
+				      uint8_t *roam_reason_vsie_enabled);
+
+/**
+ * wlan_mlme_set_roam_reason_vsie_status() - Update roam reason vsie status
+ * @psoc: pointer to psoc object
+ * @roam_reason_vsie_enabled: value of roam reason vsie
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_set_roam_reason_vsie_status(struct wlan_objmgr_psoc *psoc,
+				      uint8_t roam_reason_vsie_enabled);
+
+/**
+ * wlan_mlme_get_roaming_triggers  - Get the roaming triggers bitmap
+ * @psoc: Pointer to PSOC object
+ *
+ * Return: Roaming triggers value
+ */
+uint32_t wlan_mlme_get_roaming_triggers(struct wlan_objmgr_psoc *psoc);
+#else
+static inline QDF_STATUS
+wlan_mlme_get_roam_reason_vsie_status(struct wlan_objmgr_psoc *psoc,
+				      uint8_t *roam_reason_vsie_enable)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static inline QDF_STATUS
+wlan_mlme_set_roam_reason_vsie_status(struct wlan_objmgr_psoc *psoc,
+				      uint8_t roam_reason_vsie_enable)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static inline
+uint32_t wlan_mlme_get_roaming_triggers(struct wlan_objmgr_psoc *psoc)
+{
+	return 0xFFFF;
+}
+#endif
+
+/**
+ * wlan_mlme_get_dfs_chan_ageout_time() - Get the DFS Channel ageout time
+ * @psoc: pointer to psoc object
+ * @dfs_chan_ageout_time: output pointer to hold configured value of DFS
+ * Channel ageout time
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_get_dfs_chan_ageout_time(struct wlan_objmgr_psoc *psoc,
+				   uint8_t *dfs_chan_ageout_time);
 #endif /* _WLAN_MLME_API_H_ */

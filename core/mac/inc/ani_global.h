@@ -281,7 +281,6 @@ typedef struct sLimTimers {
 	/* Update OLBC Cache Timer */
 	TX_TIMER gLimUpdateOlbcCacheTimer;
 
-	TX_TIMER gLimChannelSwitchTimer;
 	TX_TIMER gLimFTPreAuthRspTimer;
 
 	TX_TIMER gLimPeriodicJoinProbeReqTimer;
@@ -661,7 +660,7 @@ typedef struct sAniSirLim {
 	QDF_STATUS(*sme_msg_callback)
 		(struct mac_context *mac, struct scheduler_msg *msg);
 	QDF_STATUS(*stop_roaming_callback)
-		(struct mac_context *mac, uint8_t session_id, uint8_t reason,
+		(mac_handle_t mac, uint8_t session_id, uint8_t reason,
 		 uint32_t requestor);
 	uint8_t retry_packet_cnt;
 	uint8_t beacon_probe_rsp_cnt_per_scan;
@@ -679,7 +678,8 @@ struct mgmt_frm_reg_info {
 };
 
 typedef struct sRrmContext {
-	tRrmSMEContext rrmSmeContext;
+	struct rrm_config_param rrmConfig;
+	tRrmSMEContext rrmSmeContext[MAX_MEASUREMENT_REQUEST];
 	tRrmPEContext rrmPEContext;
 } tRrmContext, *tpRrmContext;
 
@@ -774,7 +774,6 @@ struct mac_context {
 	struct csr_roamstruct roam;
 	tRrmContext rrm;
 	uint8_t isCoalesingInIBSSAllowed;
-	uint8_t lteCoexAntShare;
 	uint8_t beacon_offload;
 	bool pmf_offload;
 	bool is_fils_roaming_supported;
@@ -787,15 +786,11 @@ struct mac_context {
 	struct vdev_type_nss vdev_type_nss_5g;
 
 	uint16_t mgmtSeqNum;
-	uint32_t sta_sap_scc_on_dfs_chan;
 	sir_mgmt_frame_ind_callback mgmt_frame_ind_cb;
 	qdf_atomic_t global_cmd_id;
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_pdev *pdev;
 	void (*chan_info_cb)(struct scan_chan_info *chan_info);
-	/* Based on INI parameter */
-	uint32_t dual_mac_feature_disable;
-
 	enum  country_src reg_hint_src;
 	uint32_t rx_packet_drop_counter;
 	enum auth_tx_ack_status auth_ack_status;

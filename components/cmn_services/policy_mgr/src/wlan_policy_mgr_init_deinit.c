@@ -410,6 +410,7 @@ QDF_STATUS policy_mgr_psoc_enable(struct wlan_objmgr_psoc *psoc)
 {
 	QDF_STATUS status;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	bool enable_mcc_adaptive_sch = false;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -439,6 +440,13 @@ QDF_STATUS policy_mgr_psoc_enable(struct wlan_objmgr_psoc *psoc)
 		return status;
 	}
 
+	/* init dual_mac_configuration_complete_evt */
+	status = qdf_event_create(&pm_ctx->dual_mac_configuration_complete_evt);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		policy_mgr_err("dual_mac_configuration_complete_evt init failed");
+		return status;
+	}
+
 	status = qdf_event_create(&pm_ctx->opportunistic_update_done_evt);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		policy_mgr_err("opportunistic_update_done_evt init failed");
@@ -450,6 +458,8 @@ QDF_STATUS policy_mgr_psoc_enable(struct wlan_objmgr_psoc *psoc)
 		policy_mgr_err("channel_switch_complete_evt init failed");
 		return status;
 	}
+	policy_mgr_get_mcc_adaptive_sch(psoc, &enable_mcc_adaptive_sch);
+	policy_mgr_set_dynamic_mcc_adaptive_sch(psoc, enable_mcc_adaptive_sch);
 	pm_ctx->do_hw_mode_change = false;
 	pm_ctx->hw_mode_change_in_progress = POLICY_MGR_HW_MODE_NOT_IN_PROGRESS;
 	/* reset sap mandatory channels */
@@ -592,6 +602,14 @@ QDF_STATUS policy_mgr_psoc_disable(struct wlan_objmgr_psoc *psoc)
 		QDF_ASSERT(0);
 	}
 
+	/* destroy dual_mac_configuration_complete_evt */
+	if (!QDF_IS_STATUS_SUCCESS(qdf_event_destroy
+		(&pm_ctx->dual_mac_configuration_complete_evt))) {
+		policy_mgr_err("Failed to destroy dual_mac_configuration_complete_evt");
+		status = QDF_STATUS_E_FAILURE;
+		QDF_ASSERT(0);
+	}
+
 	/* deinit pm_conc_connection_list */
 	qdf_mem_zero(pm_conc_connection_list, sizeof(pm_conc_connection_list));
 
@@ -667,6 +685,8 @@ QDF_STATUS policy_mgr_register_hdd_cb(struct wlan_objmgr_psoc *psoc,
 		hdd_cbacks->hdd_is_cac_in_progress;
 	pm_ctx->hdd_cbacks.hdd_get_ap_6ghz_capable =
 		hdd_cbacks->hdd_get_ap_6ghz_capable;
+	pm_ctx->hdd_cbacks.wlan_hdd_indicate_active_ndp_cnt =
+		hdd_cbacks->wlan_hdd_indicate_active_ndp_cnt;
 
 	return QDF_STATUS_SUCCESS;
 }

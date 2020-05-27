@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -226,22 +226,6 @@
 		 VALID_CHANNEL_LIST_DEFAULT, \
 		 "valid channel list")
 
- /*
-  * country_code - Set country code
-  * @Default: NA
-  *
-  * This ini is used to set country code
-  *
-  * Usage: Internal
-  *
-  */
-#define CFG_COUNTRY_CODE CFG_STRING( \
-		 "country_code", \
-		 0, \
-		 CFG_COUNTRY_CODE_LEN, \
-		 "", \
-		 "country code")
-
 /*
  * <ini>
  * ignore_fw_reg_offload_ind - If set, Ignore the FW offload indication
@@ -251,15 +235,6 @@
  *
  * This ini is used to ignore regdb offload indication from FW and
  * regulatory will be treated as non offload.
- * There is a case where FW is sending the offload indication in
- * service ready event but not sending the cc list event
- * WMI_REG_CHAN_LIST_CC_EVENTID and because of this driver is not
- * able to populate the channel list. To address this issue, this ini
- * is added. If this ini is enabled, regulatory will always be treated as
- * non offload solution.
- *
- * This ini should only be enabled to circumvent the above mentioned firmware
- * bug.
  *
  * Related: None
  *
@@ -306,7 +281,6 @@
 	CFG(CFG_INDOOR_CHANNEL_SUPPORT) \
 	CFG(CFG_SCAN_11D_INTERVAL) \
 	CFG(CFG_VALID_CHANNEL_LIST) \
-	CFG(CFG_COUNTRY_CODE) \
 	CFG(CFG_IGNORE_FW_REG_OFFLOAD_IND) \
 	CFG_SAP_AVOID_ACS_FREQ_LIST_ALL
 

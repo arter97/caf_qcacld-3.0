@@ -828,26 +828,6 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 		lim_update_sta_run_time_ht_switch_chnl_params(mac_ctx,
 						&bcn->HTInfo, session);
 
-	if ((LIM_IS_STA_ROLE(session) && !wma_is_csa_offload_enabled())
-	    || LIM_IS_IBSS_ROLE(session)) {
-		/* Channel Switch information element updated */
-		if (bcn->channelSwitchPresent) {
-			/*
-			 * on receiving channel switch announcement from AP,
-			 * delete all TDLS peers before leaving BSS and proceed
-			 * for channel switch
-			 */
-			if (LIM_IS_STA_ROLE(session)) {
-				lim_update_tdls_set_state_for_fw(session,
-								 false);
-				lim_delete_tdls_peers(mac_ctx, session);
-			}
-			lim_update_channel_switch(mac_ctx, bcn, session);
-		} else if (session->gLimSpecMgmt.dot11hChanSwState ==
-				eLIM_11H_CHANSW_RUNNING) {
-			lim_cancel_dot11h_channel_switch(mac_ctx, session);
-		}
-	}
 	if (LIM_IS_STA_ROLE(session)
 	    || LIM_IS_IBSS_ROLE(session))
 		sch_bcn_process_sta_ibss(mac_ctx, bcn,
@@ -861,34 +841,26 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 
 	if (mac_ctx->mlme_cfg->sta.allow_tpc_from_ap) {
 		get_local_power_constraint_beacon(bcn, &local_constraint);
-		pe_debug("ESE localPowerConstraint = %d,",
-				local_constraint);
 
 		if (mac_ctx->rrm.rrmPEContext.rrmEnable &&
 				bcn->powerConstraintPresent) {
 			local_constraint = regMax;
 			local_constraint -=
 				bcn->localPowerConstraint.localPowerConstraints;
-			pe_debug("localPowerConstraint = %d,",
-				local_constraint);
 			}
 	}
 
 	tx_pwr_attr.reg_max = regMax;
 	tx_pwr_attr.ap_tx_power = local_constraint;
-	tx_pwr_attr.ini_tx_power = mac_ctx->mlme_cfg->power.max_tx_power;
 	tx_pwr_attr.frequency = session->curr_op_freq;
 
 	maxTxPower = lim_get_max_tx_power(mac_ctx, &tx_pwr_attr);
 
-	pe_debug("RegMax = %d, MaxTx pwr = %d",
-			regMax, maxTxPower);
-
 	/* If maxTxPower is increased or decreased */
 	if (maxTxPower != session->maxTxPower) {
-		pe_debug(
-			FL("Local power constraint change, Updating new maxTx power %d from old pwr %d"),
-			maxTxPower, session->maxTxPower);
+		pe_debug("Local power constraint change, Updating new maxTx power %d from old pwr %d (regMax %d local %d)",
+			 maxTxPower, session->maxTxPower, regMax,
+			 local_constraint);
 		if (lim_send_set_max_tx_power_req(mac_ctx, maxTxPower, session)
 		    == QDF_STATUS_SUCCESS)
 			session->maxTxPower = maxTxPower;
@@ -913,10 +885,8 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 
 	if ((false == mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running)
 	    && beaconParams.paramChangeBitmap) {
-		pe_debug("Beacon for session[%d] got changed.",
-			 session->peSessionId);
-		pe_debug("sending beacon param change bitmap: 0x%x",
-			 beaconParams.paramChangeBitmap);
+		pe_debug("Beacon for session[%d] got changed param change bitmap: 0x%x",
+			 session->peSessionId, beaconParams.paramChangeBitmap);
 		lim_send_beacon_params(mac_ctx, &beaconParams, session);
 	}
 

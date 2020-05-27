@@ -488,8 +488,8 @@ lim_send_start_vdev_req(struct pe_session *session, tLimMlmStartReq *mlm_start_r
 }
 
 #ifdef WLAN_FEATURE_11AX
-static void lim_strip_he_ies_from_add_ies(struct mac_context *mac_ctx,
-					  struct pe_session *session)
+void lim_strip_he_ies_from_add_ies(struct mac_context *mac_ctx,
+				   struct pe_session *session)
 {
 	struct add_ie_params *add_ie = &session->add_ie_params;
 	QDF_STATUS status;
@@ -517,8 +517,8 @@ static void lim_strip_he_ies_from_add_ies(struct mac_context *mac_ctx,
 		pe_debug("Failed to strip HE op IE status: %d", status);
 }
 #else
-static inline void lim_strip_he_ies_from_add_ies(struct mac_context *mac_ctx,
-						 struct pe_session *session)
+void lim_strip_he_ies_from_add_ies(struct mac_context *mac_ctx,
+				   struct pe_session *session)
 {
 }
 #endif
@@ -701,7 +701,7 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 			     (void *)&sme_start_bss_req->extendedRateSet,
 			     sizeof(tSirMacRateSet));
 
-		if (wlan_reg_is_5ghz_ch_freq(session->curr_op_freq))
+		if (!wlan_reg_is_24ghz_ch_freq(session->curr_op_freq))
 			vdev_type_nss = &mac_ctx->vdev_type_nss_5g;
 		else
 			vdev_type_nss = &mac_ctx->vdev_type_nss_2g;
@@ -789,7 +789,7 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 				sme_start_bss_req->center_freq_seg0;
 			session->ch_center_freq_seg1 =
 				sme_start_bss_req->center_freq_seg1;
-			lim_update_he_bw_cap_mcs(session);
+			lim_update_he_bw_cap_mcs(session, NULL);
 		}
 
 		/* Delete pre-auth list if any */
@@ -1550,8 +1550,6 @@ __lim_process_sme_join_req(struct mac_context *mac_ctx, void *msg_buf)
 
 		tx_pwr_attr.reg_max = reg_max;
 		tx_pwr_attr.ap_tx_power = local_power_constraint;
-		tx_pwr_attr.ini_tx_power =
-				mac_ctx->mlme_cfg->power.max_tx_power;
 		tx_pwr_attr.frequency = session->curr_op_freq;
 
 		session->maxTxPower = lim_get_max_tx_power(mac_ctx,
@@ -1677,7 +1675,6 @@ uint8_t lim_get_max_tx_power(struct mac_context *mac,
 		return attr->reg_max;
 
 	tx_power = QDF_MIN(attr->reg_max, attr->ap_tx_power);
-	tx_power = QDF_MIN(tx_power, attr->ini_tx_power);
 
 	if (tx_power >= MIN_TX_PWR_CAP && tx_power <= MAX_TX_PWR_CAP)
 		max_tx_power = tx_power;
@@ -5355,7 +5352,6 @@ end:
 void send_extended_chan_switch_action_frame(struct mac_context *mac_ctx,
 					    uint16_t new_channel_freq,
 					    enum phy_ch_width ch_bandwidth,
-					    enum offset_t offset,
 					    struct pe_session *session_entry)
 {
 	uint8_t op_class = 0;
@@ -5364,17 +5360,11 @@ void send_extended_chan_switch_action_frame(struct mac_context *mac_ctx,
 	uint8_t switch_count;
 	uint8_t new_channel = 0;
 
+	op_class =
+		lim_op_class_from_bandwidth(mac_ctx, new_channel_freq,
+					    ch_bandwidth,
+					    session_entry->gLimChannelSwitch.sec_ch_offset);
 	new_channel = wlan_reg_freq_to_chan(mac_ctx->pdev, new_channel_freq);
-	if (WLAN_REG_IS_6GHZ_CHAN_FREQ(new_channel_freq))
-		wlan_reg_freq_width_to_chan_op_class
-			(mac_ctx->pdev, new_channel_freq,
-			 ch_width_in_mhz(ch_bandwidth),
-			 true, BIT(BEHAV_NONE), &op_class,
-			 &new_channel);
-	else
-		op_class = wlan_reg_dmn_get_opclass_from_channel
-			(mac_ctx->scan.countryCodeCurrent, new_channel, offset);
-
 	if (LIM_IS_AP_ROLE(session_entry) &&
 		(mac_ctx->sap.SapDfsInfo.disable_dfs_ch_switch == false))
 		switch_mode = session_entry->gLimChannelSwitch.switchMode;
@@ -5404,7 +5394,6 @@ void send_extended_chan_switch_action_frame(struct mac_context *mac_ctx,
 void lim_send_chan_switch_action_frame(struct mac_context *mac_ctx,
 				       uint16_t new_channel_freq,
 				       enum phy_ch_width ch_bandwidth,
-				       enum offset_t offset,
 				       struct pe_session *session_entry)
 {
 	uint8_t op_class = 0, new_channel;
@@ -5414,18 +5403,12 @@ void lim_send_chan_switch_action_frame(struct mac_context *mac_ctx,
 	tpDphHashNode dph_node_array_ptr;
 
 	dph_node_array_ptr = session_entry->dph.dphHashTable.pDphNodeArray;
-
+	op_class =
+		lim_op_class_from_bandwidth(mac_ctx, new_channel_freq,
+					    ch_bandwidth,
+					    session_entry->gLimChannelSwitch.sec_ch_offset);
 	new_channel = wlan_reg_freq_to_chan(mac_ctx->pdev, new_channel_freq);
-	if (WLAN_REG_IS_6GHZ_CHAN_FREQ(new_channel_freq))
-		wlan_reg_freq_width_to_chan_op_class
-			(mac_ctx->pdev, new_channel_freq,
-			 ch_width_in_mhz(ch_bandwidth),
-			 true, BIT(BEHAV_NONE), &op_class,
-			 &new_channel);
-	else
-		op_class = wlan_reg_dmn_get_opclass_from_channel
-			(mac_ctx->scan.countryCodeCurrent,
-			 new_channel, offset);
+
 	if (LIM_IS_AP_ROLE(session_entry) &&
 	    (false == mac_ctx->sap.SapDfsInfo.disable_dfs_ch_switch))
 		switch_mode = session_entry->gLimChannelSwitch.switchMode;
@@ -5473,7 +5456,6 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 	struct pe_session *session_entry = NULL;
 	uint8_t session_id;
 	tLimWiderBWChannelSwitchInfo *wider_bw_ch_switch;
-	enum offset_t ch_offset;
 	QDF_STATUS status;
 	enum phy_ch_width ch_width;
 	uint32_t target_ch_freq;
@@ -5610,19 +5592,13 @@ skip_vht:
 	if (QDF_IS_STATUS_ERROR(status))
 		pe_err("cannot start ap_ecsa_timer");
 
-	if (ch_width == CH_WIDTH_80MHZ || ch_width == CH_WIDTH_160MHZ ||
-	    ch_width == CH_WIDTH_80P80MHZ)
-		ch_offset = BW80;
-	else
-		ch_offset = dfs_csa_ie_req->ch_params.sec_ch_offset;
-
 	pe_debug("IE count:%d chan:%d freq %d width:%d wrapper:%d ch_offset:%d",
 		 session_entry->gLimChannelSwitch.switchCount,
 		 session_entry->gLimChannelSwitch.primaryChannel,
 		 session_entry->gLimChannelSwitch.sw_target_freq,
 		 session_entry->gLimChannelSwitch.ch_width,
 		 session_entry->dfsIncludeChanWrapperIe,
-		 ch_offset);
+		 session_entry->gLimChannelSwitch.sec_ch_offset);
 
 	/* Send ECSA/CSA Action frame after updating the beacon */
 	if (CHAN_HOP_ALL_BANDS_ENABLE &&
@@ -5630,10 +5606,10 @@ skip_vht:
 		lim_send_chan_switch_action_frame
 			(mac_ctx,
 			 session_entry->gLimChannelSwitch.primaryChannel,
-			 ch_width, ch_offset, session_entry);
+			 ch_width, session_entry);
 	else
 		send_extended_chan_switch_action_frame
-			(mac_ctx, target_ch_freq, ch_width, ch_offset,
+			(mac_ctx, target_ch_freq, ch_width,
 			 session_entry);
 }
 
@@ -5674,8 +5650,9 @@ static void lim_process_ext_change_channel(struct mac_context *mac_ctx,
 	new_ext_chan_freq =
 		wlan_reg_legacy_chan_to_freq(mac_ctx->pdev,
 					     ext_chng_channel->new_channel);
+	session_entry->gLimChannelSwitch.sec_ch_offset = 0;
 	send_extended_chan_switch_action_frame(mac_ctx, new_ext_chan_freq, 0,
-					       0, session_entry);
+					       session_entry);
 }
 
 /**
@@ -6185,7 +6162,7 @@ void lim_send_csa_restart_req(struct mac_context *mac_ctx, uint8_t vdev_id)
 void lim_continue_sta_csa_req(struct mac_context *mac_ctx, uint8_t vdev_id)
 {
 	pe_info("Continue CSA for STA vdev id %d", vdev_id);
-	lim_process_channel_switch_timeout(mac_ctx);
+	lim_process_channel_switch(mac_ctx, vdev_id);
 }
 
 void lim_add_roam_blacklist_ap(struct mac_context *mac_ctx,
@@ -6199,10 +6176,19 @@ void lim_add_roam_blacklist_ap(struct mac_context *mac_ctx,
 	for (i = 0; i < src_lst->num_entries; i++) {
 
 		entry.bssid = blacklist->bssid;
-		entry.retry_delay = blacklist->timeout;
 		entry.time_during_rejection = blacklist->received_time;
-		/* set 0dbm as expected rssi for btm blaclisted entries */
-		entry.expected_rssi = LIM_MIN_RSSI;
+		/* If timeout = 0 and rssi = 0 ignore the entry */
+		if (!blacklist->timeout && !blacklist->rssi) {
+			continue;
+		} else if (blacklist->timeout) {
+			entry.retry_delay = blacklist->timeout;
+			/* set 0dbm as expected rssi */
+			entry.expected_rssi = LIM_MIN_RSSI;
+		} else {
+			/* blacklist timeout as 0 */
+			entry.retry_delay = blacklist->timeout;
+			entry.expected_rssi = blacklist->rssi;
+		}
 
 		/* Add this bssid to the rssi reject ap type in blacklist mgr */
 		lim_add_bssid_to_reject_list(mac_ctx->pdev, &entry);

@@ -41,6 +41,7 @@
 #include "lim_ser_des_utils.h"
 #include "lim_send_messages.h"
 #include "lim_process_fils.h"
+#include "wlan_blm_api.h"
 
 /**
  * lim_update_stads_htcap() - Updates station Descriptor HT capability
@@ -185,7 +186,8 @@ void lim_update_assoc_sta_datas(struct mac_context *mac_ctx,
 	}
 
 	if (IS_DOT11_MODE_HE(session_entry->dot11mode))
-		lim_update_stads_he_caps(sta_ds, assoc_rsp, session_entry);
+		lim_update_stads_he_caps(mac_ctx, sta_ds, assoc_rsp,
+					 session_entry);
 
 	if (lim_is_sta_he_capable(sta_ds))
 		he_cap = &assoc_rsp->he_cap;
@@ -553,6 +555,20 @@ static uint8_t lim_get_nss_supported_by_ap(tDot11fIEVHTCaps *vht_caps,
 	return NSS_1x1_MODE;
 }
 
+#ifdef WLAN_FEATURE_11AX
+static void lim_process_he_info(tpSirProbeRespBeacon beacon,
+				tpDphHashNode sta_ds)
+{
+	if (beacon->he_op.present)
+		sta_ds->parsed_ies.he_operation = beacon->he_op;
+}
+#else
+static inline void lim_process_he_info(tpSirProbeRespBeacon beacon,
+				       tpDphHashNode sta_ds)
+{
+}
+#endif
+
 /**
  * lim_process_assoc_rsp_frame() - Processes assoc response
  * @mac_ctx: Pointer to Global MAC structure
@@ -795,11 +811,17 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx,
 	    assoc_rsp->rssi_assoc_rej.present) {
 		struct sir_rssi_disallow_lst ap_info = {{0}};
 
+		if (!assoc_rsp->rssi_assoc_rej.retry_delay)
+			ap_info.expected_rssi = assoc_rsp->rssi_assoc_rej.delta_rssi +
+				WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info) +
+				wlan_blm_get_rssi_blacklist_threshold(mac_ctx->pdev);
+		else
+			ap_info.expected_rssi = assoc_rsp->rssi_assoc_rej.delta_rssi +
+				WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info);
+
 		ap_info.retry_delay = assoc_rsp->rssi_assoc_rej.retry_delay *
 							QDF_MC_TIMER_TO_MS_UNIT;
 		qdf_mem_copy(ap_info.bssid.bytes, hdr->sa, QDF_MAC_ADDR_SIZE);
-		ap_info.expected_rssi = assoc_rsp->rssi_assoc_rej.delta_rssi +
-					WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info);
 		lim_add_bssid_to_reject_list(mac_ctx->pdev, &ap_info);
 	}
 	if (assoc_rsp->status_code != eSIR_MAC_SUCCESS_STATUS) {
@@ -1045,6 +1067,8 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx,
 		sta_ds->parsed_ies.ht_operation = beacon->HTInfo;
 	if (beacon->VHTOperation.present)
 		sta_ds->parsed_ies.vht_operation = beacon->VHTOperation;
+
+	lim_process_he_info(beacon, sta_ds);
 
 	if (mac_ctx->lim.gLimProtectionControl !=
 	    MLME_FORCE_POLICY_PROTECTION_DISABLE)

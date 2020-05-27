@@ -522,8 +522,12 @@ void tdls_indicate_teardown(struct tdls_vdev_priv_obj *tdls_vdev,
 		return;
 	}
 
-	if (TDLS_LINK_CONNECTED != curr_peer->link_status)
+	if (curr_peer->link_status != TDLS_LINK_CONNECTED) {
+		tdls_err("link state %d peer:" QDF_MAC_ADDR_STR,
+			 curr_peer->link_status,
+			 QDF_MAC_ADDR_ARRAY(curr_peer->peer_mac.bytes));
 		return;
+	}
 
 	tdls_set_peer_link_status(curr_peer,
 				  TDLS_LINK_TEARING,
@@ -759,13 +763,12 @@ static void tdls_ct_process_cap_supported(struct tdls_peer *curr_peer,
 					struct tdls_vdev_priv_obj *tdls_vdev,
 					struct tdls_soc_priv_obj *tdls_soc_obj)
 {
-	tdls_debug("tx %d rx %d thr.pkt %d/idle %d rssi %d thr.trig %d/tear %d",
-		 curr_peer->tx_pkt, curr_peer->rx_pkt,
-		 tdls_vdev->threshold_config.tx_packet_n,
-		 tdls_vdev->threshold_config.idle_packet_n,
-		 curr_peer->rssi,
-		 tdls_vdev->threshold_config.rssi_trigger_threshold,
-		 tdls_vdev->threshold_config.rssi_teardown_threshold);
+	if (curr_peer->rx_pkt || curr_peer->tx_pkt)
+		tdls_debug(QDF_MAC_ADDR_STR "link_status %d tdls_support %d tx %d rx %d rssi %d",
+			   QDF_MAC_ADDR_ARRAY(curr_peer->peer_mac.bytes),
+			   curr_peer->link_status, curr_peer->tdls_support,
+			   curr_peer->tx_pkt, curr_peer->rx_pkt,
+			   curr_peer->rssi);
 
 	switch (curr_peer->link_status) {
 	case TDLS_LINK_IDLE:
@@ -805,9 +808,11 @@ static void tdls_ct_process_cap_unknown(struct tdls_peer *curr_peer,
 			(!curr_peer->is_forced_peer))
 			return;
 
-	tdls_debug("threshold tx pkt = %d peer tx_pkt = %d & rx_pkt = %d ",
-		tdls_vdev->threshold_config.tx_packet_n, curr_peer->tx_pkt,
-		curr_peer->rx_pkt);
+	if (curr_peer->rx_pkt || curr_peer->tx_pkt)
+		tdls_debug(QDF_MAC_ADDR_STR "link_status %d tdls_support %d tx %d rx %d",
+			   QDF_MAC_ADDR_ARRAY(curr_peer->peer_mac.bytes),
+			   curr_peer->link_status, curr_peer->tdls_support,
+			   curr_peer->tx_pkt, curr_peer->rx_pkt);
 
 	if (!TDLS_IS_LINK_CONNECTED(curr_peer) &&
 	    ((curr_peer->tx_pkt + curr_peer->rx_pkt) >=
@@ -848,10 +853,6 @@ static void tdls_ct_process_peers(struct tdls_peer *curr_peer,
 				  struct tdls_vdev_priv_obj *tdls_vdev_obj,
 				  struct tdls_soc_priv_obj *tdls_soc_obj)
 {
-	tdls_debug(QDF_MAC_ADDR_STR " link_status %d tdls_support %d",
-		 QDF_MAC_ADDR_ARRAY(curr_peer->peer_mac.bytes),
-		 curr_peer->link_status, curr_peer->tdls_support);
-
 	switch (curr_peer->tdls_support) {
 	case TDLS_CAP_SUPPORTED:
 		tdls_ct_process_cap_supported(curr_peer, tdls_vdev_obj,
@@ -1293,11 +1294,6 @@ void tdls_disable_offchan_and_teardown_links(
 		 */
 		tdls_reset_peer(tdls_vdev, curr_peer->peer_mac.bytes);
 
-		if (tdls_soc->tdls_dereg_peer)
-			tdls_soc->tdls_dereg_peer(
-					tdls_soc->tdls_peer_context,
-					wlan_vdev_get_id(vdev),
-					&curr_peer->peer_mac);
 		tdls_decrement_peer_count(tdls_soc);
 		tdls_soc->tdls_conn_info[staidx].valid_entry = false;
 		tdls_soc->tdls_conn_info[staidx].session_id = 255;

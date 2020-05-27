@@ -68,6 +68,8 @@
 	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_HT_OPERATION
 #define VHT_OPERATION \
 	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_VHT_OPERATION
+#define HE_OPERATION \
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_HE_OPERATION
 #define INFO_ASSOC_FAIL_REASON \
 	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_ASSOC_FAIL_REASON
 #define REMOTE_MAX_PHY_RATE \
@@ -104,6 +106,12 @@
 	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_RX_RETRY_COUNT
 #define REMOTE_RX_BC_MC_COUNT \
 	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_RX_BC_MC_COUNT
+#define DISCONNECT_REASON \
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_DRIVER_DISCONNECT_REASON
+#define BEACON_IES \
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_BEACON_IES
+#define ASSOC_REQ_IES \
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_ASSOC_REQ_IES
 
 /*
  * MSB of rx_mc_bc_cnt indicates whether FW supports rx_mc_bc_cnt
@@ -113,7 +121,7 @@
 #define HDD_STATION_INFO_RX_MC_BC_COUNT (1 << 31)
 
 
-static const struct nla_policy
+const struct nla_policy
 hdd_get_station_policy[STATION_MAX + 1] = {
 	[STATION_INFO] = {.type = NLA_FLAG},
 	[STATION_ASSOC_FAIL_REASON] = {.type = NLA_FLAG},
@@ -575,6 +583,47 @@ fail:
 	return -EINVAL;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)) && \
+     defined(WLAN_FEATURE_11AX)
+static int32_t hdd_add_he_oper_info(
+				struct sk_buff *skb,
+				struct hdd_station_ctx *hdd_sta_ctx)
+{
+	int32_t ret = 0;
+
+	if (!hdd_sta_ctx->cache_conn_info.he_oper_len ||
+	    !hdd_sta_ctx->cache_conn_info.he_operation)
+		return ret;
+
+	if (nla_put(skb, HE_OPERATION,
+		    hdd_sta_ctx->cache_conn_info.he_oper_len,
+		     hdd_sta_ctx->cache_conn_info.he_operation))
+		ret = -EINVAL;
+
+	qdf_mem_free(hdd_sta_ctx->cache_conn_info.he_operation);
+	hdd_sta_ctx->cache_conn_info.he_operation = NULL;
+	hdd_sta_ctx->cache_conn_info.he_oper_len = 0;
+	return ret;
+}
+
+static int32_t hdd_get_he_op_len(struct hdd_station_ctx *hdd_sta_ctx)
+{
+	return hdd_sta_ctx->cache_conn_info.he_oper_len;
+}
+#else
+static inline uint32_t hdd_add_he_oper_info(
+					struct sk_buff *skb,
+					struct hdd_station_ctx *hdd_sta_ctx)
+{
+	return 0;
+}
+
+static uint32_t hdd_get_he_op_len(struct hdd_station_ctx *hdd_sta_ctx)
+{
+	return 0;
+}
+#endif
+
 /**
  * hdd_get_station_info() - send BSS information to supplicant
  * @hdd_ctx: pointer to hdd context
@@ -586,9 +635,10 @@ static int hdd_get_station_info(struct hdd_context *hdd_ctx,
 				struct hdd_adapter *adapter)
 {
 	struct sk_buff *skb = NULL;
-	uint8_t *tmp_hs20 = NULL;
-	uint32_t nl_buf_len;
+	uint8_t *tmp_hs20 = NULL, *ies = NULL;
+	uint32_t nl_buf_len, ie_len = 0, hdd_he_op_len = 0;
 	struct hdd_station_ctx *hdd_sta_ctx;
+	QDF_STATUS status;
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 
@@ -603,7 +653,8 @@ static int hdd_get_station_info(struct hdd_context *hdd_ctx,
 		      sizeof(hdd_sta_ctx->cache_conn_info.txrate.nss) +
 		      sizeof(hdd_sta_ctx->cache_conn_info.roam_count) +
 		      sizeof(hdd_sta_ctx->cache_conn_info.last_auth_type) +
-		      sizeof(hdd_sta_ctx->cache_conn_info.dot11mode);
+		      sizeof(hdd_sta_ctx->cache_conn_info.dot11mode) +
+		      sizeof(uint32_t);
 	if (hdd_sta_ctx->cache_conn_info.conn_flag.vht_present)
 		nl_buf_len += sizeof(hdd_sta_ctx->cache_conn_info.vht_caps);
 	if (hdd_sta_ctx->cache_conn_info.conn_flag.ht_present)
@@ -620,6 +671,14 @@ static int hdd_get_station_info(struct hdd_context *hdd_ctx,
 	if (hdd_sta_ctx->cache_conn_info.conn_flag.vht_op_present)
 		nl_buf_len += sizeof(hdd_sta_ctx->
 						cache_conn_info.vht_operation);
+	status = sme_get_prev_connected_bss_ies(hdd_ctx->mac_handle,
+						adapter->vdev_id,
+						&ies, &ie_len);
+	if (QDF_IS_STATUS_SUCCESS(status))
+		nl_buf_len += ie_len;
+
+	hdd_he_op_len = hdd_get_he_op_len(hdd_sta_ctx);
+	nl_buf_len += hdd_he_op_len;
 
 	skb = cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy, nl_buf_len);
 	if (!skb) {
@@ -663,6 +722,10 @@ static int hdd_get_station_info(struct hdd_context *hdd_ctx,
 			hdd_err("put fail");
 			goto fail;
 		}
+	if (hdd_add_he_oper_info(skb, hdd_sta_ctx)) {
+		hdd_err("put fail");
+		goto fail;
+	}
 	if (hdd_sta_ctx->cache_conn_info.conn_flag.hs20_present)
 		if (nla_put(skb, AP_INFO_HS20_INDICATION,
 			    (sizeof(hdd_sta_ctx->cache_conn_info.hs20vendor_ie)
@@ -672,10 +735,26 @@ static int hdd_get_station_info(struct hdd_context *hdd_ctx,
 			goto fail;
 		}
 
+	if (nla_put_u32(skb, DISCONNECT_REASON,
+			adapter->last_disconnect_reason)) {
+		hdd_err("Failed to put disconect reason");
+		goto fail;
+	}
+
+	if (ie_len) {
+		if (nla_put(skb, BEACON_IES, ie_len, ies)) {
+			hdd_err("Failed to put beacon IEs: bytes left: %d, ie_len: %u total buf_len: %u",
+				skb_tailroom(skb), ie_len, nl_buf_len);
+			goto fail;
+		}
+		qdf_mem_free(ies);
+	}
+
 	return cfg80211_vendor_cmd_reply(skb);
 fail:
 	if (skb)
 		kfree_skb(skb);
+	qdf_mem_free(ies);
 	return -EINVAL;
 }
 
@@ -1024,8 +1103,13 @@ static int hdd_get_cached_station_remote(struct hdd_context *hdd_ctx,
 			 NLA_HDRLEN) +
 			(sizeof(stainfo->rx_retry_cnt) +
 			 NLA_HDRLEN);
+	if (stainfo->assoc_req_ies.len)
+		nl_buf_len += stainfo->assoc_req_ies.len + NLA_HDRLEN;
+
 	skb = cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy, nl_buf_len);
 	if (!skb) {
+		hdd_put_sta_info_ref(&adapter->cache_sta_info_list,
+				     &stainfo, true);
 		hdd_err("cfg80211_vendor_cmd_alloc_reply_skb failed");
 		return -ENOMEM;
 	}
@@ -1084,11 +1168,20 @@ static int hdd_get_cached_station_remote(struct hdd_context *hdd_ctx,
 		}
 	}
 
+	if (stainfo->assoc_req_ies.len) {
+		if (nla_put(skb, ASSOC_REQ_IES, stainfo->assoc_req_ies.len,
+			    stainfo->assoc_req_ies.data)) {
+			hdd_err("Failed to put assoc req IEs");
+			goto fail;
+		}
+	}
 	hdd_sta_info_detach(&adapter->cache_sta_info_list, &stainfo);
+	hdd_put_sta_info_ref(&adapter->sta_info_list, &stainfo, true);
 	qdf_atomic_dec(&adapter->cache_sta_count);
 
 	return cfg80211_vendor_cmd_reply(skb);
 fail:
+	hdd_put_sta_info_ref(&adapter->cache_sta_info_list, &stainfo, true);
 	if (skb)
 		kfree_skb(skb);
 
@@ -1246,11 +1339,13 @@ static int hdd_get_station_remote(struct hdd_context *hdd_ctx,
 	if (!is_associated) {
 		status = hdd_get_cached_station_remote(hdd_ctx, adapter,
 						       mac_addr);
+		hdd_put_sta_info_ref(&adapter->sta_info_list, &stainfo, true);
 		return status;
 	}
 
 	status = hdd_get_connected_station_info(hdd_ctx, adapter,
 						mac_addr, stainfo);
+	hdd_put_sta_info_ref(&adapter->sta_info_list, &stainfo, true);
 	return status;
 }
 

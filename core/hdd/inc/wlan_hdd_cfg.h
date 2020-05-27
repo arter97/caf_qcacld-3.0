@@ -242,8 +242,15 @@ struct hdd_config {
 	bool enable_sar_safety;
 	bool config_sar_safety_sleep_index;
 #endif
-
+	bool get_roam_chan_from_fw;
 	uint32_t fisa_enable;
+
+#ifdef WLAN_FEATURE_PERIODIC_STA_STATS
+	/* Periodicity of logging */
+	uint32_t periodic_stats_timer_interval;
+	/* Duration for which periodic logging should be done */
+	uint32_t periodic_stats_timer_duration;
+#endif /* WLAN_FEATURE_PERIODIC_STA_STATS */
 };
 
 /**
@@ -316,7 +323,6 @@ bool hdd_dfs_indicate_radar(struct hdd_context *hdd_ctx);
  * gRuntimePM=0
  * gWlanAutoShutdown = 0
  * gEnableSuspend=0
- * gEnablePowerSaveOffload=0
  * gEnableWoW=0
  *
  * Return: None

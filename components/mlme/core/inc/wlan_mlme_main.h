@@ -44,16 +44,6 @@ struct wlan_mlme_psoc_ext_obj {
 };
 
 /**
- * struct wlan_ies - Generic WLAN Information Element(s) format
- * @len: Total length of the IEs
- * @data: IE data
- */
-struct wlan_ies {
-	uint16_t len;
-	uint8_t *data;
-};
-
-/**
  * struct wlan_disconnect_info - WLAN Disconnection Information
  * @self_discon_ies: Disconnect IEs to be sent in deauth/disassoc frames
  *                   originated from driver
@@ -71,11 +61,17 @@ struct wlan_disconnect_info {
 
 /**
  * struct peer_mlme_priv_obj - peer MLME component object
+ * @last_pn_valid if last PN is valid
+ * @last_pn: last pn received
+ * @rmf_pn_replays: rmf pn replay count
  * @is_pmf_enabled: True if PMF is enabled
  * @last_assoc_received_time: last assoc received time
  * @last_disassoc_deauth_received_time: last disassoc/deauth received time
  */
 struct peer_mlme_priv_obj {
+	uint8_t last_pn_valid;
+	uint64_t last_pn;
+	uint32_t rmf_pn_replays;
 	bool is_pmf_enabled;
 	qdf_time_t last_assoc_received_time;
 	qdf_time_t last_disassoc_deauth_received_time;
@@ -122,10 +118,14 @@ struct wlan_mlme_roaming_config {
  *  roam config info
  * @roam_sm: Structure containing roaming state related details
  * @roam_config: Roaming configurations structure
+ * @sae_single_pmk: Details for sae roaming using single pmk
  */
 struct wlan_mlme_roam {
 	struct wlan_mlme_roam_state_info roam_sm;
 	struct wlan_mlme_roaming_config roam_cfg;
+#if defined(WLAN_SAE_SINGLE_PMK) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
+	struct wlan_mlme_sae_single_pmk sae_single_pmk;
+#endif
 };
 
 /**
@@ -137,6 +137,7 @@ struct wlan_mlme_roam {
  * @connection_fail: flag to indicate connection failed
  * @cac_required_for_new_channel: if CAC is required for new channel
  * @follow_ap_edca: if true, it is forced to follow the AP's edca.
+ * @reconn_after_assoc_timeout: reconnect to the same AP if association timeout
  * @assoc_type: vdev associate/reassociate type
  * @dynamic_cfg: current configuration of nss, chains for vdev.
  * @ini_cfg: Max configuration of nss, chains supported for vdev.
@@ -145,6 +146,7 @@ struct wlan_mlme_roam {
  * @disconnect_info: Disconnection information
  * @vdev_stop_type: vdev stop type request
  * @roam_off_state: Roam offload state
+ * @bigtk_vdev_support: BIGTK feature support for this vdev (SAP)
  */
 struct mlme_legacy_priv {
 	bool chan_switch_in_progress;
@@ -153,6 +155,7 @@ struct mlme_legacy_priv {
 	bool connection_fail;
 	bool cac_required_for_new_channel;
 	bool follow_ap_edca;
+	bool reconn_after_assoc_timeout;
 	enum vdev_assoc_type assoc_type;
 	struct wlan_mlme_nss_chains dynamic_cfg;
 	struct wlan_mlme_nss_chains ini_cfg;
@@ -161,6 +164,7 @@ struct mlme_legacy_priv {
 	struct wlan_disconnect_info disconnect_info;
 	uint32_t vdev_stop_type;
 	struct wlan_mlme_roam mlme_roam;
+	bool bigtk_vdev_support;
 };
 
 /**
@@ -336,6 +340,29 @@ void mlme_set_follow_ap_edca_flag(struct wlan_objmgr_vdev *vdev, bool flag);
  * Return: value of follow_ap_edca
  */
 bool mlme_get_follow_ap_edca_flag(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * mlme_set_reconn_after_assoc_timeout_flag() - Set reconn after assoc timeout
+ * flag
+ * @psoc: soc object
+ * @vdev_id: vdev id
+ * @flag: enable or disable reconnect
+ *
+ * Return: void
+ */
+void mlme_set_reconn_after_assoc_timeout_flag(struct wlan_objmgr_psoc *psoc,
+					      uint8_t vdev_id, bool flag);
+
+/**
+ * mlme_get_reconn_after_assoc_timeout_flag() - Get reconn after assoc timeout
+ * flag
+ * @psoc: soc object
+ * @vdev_id: vdev id
+ *
+ * Return: true for enabling reconnect, otherwise false
+ */
+bool mlme_get_reconn_after_assoc_timeout_flag(struct wlan_objmgr_psoc *psoc,
+					      uint8_t vdev_id);
 
 /**
  * mlme_get_peer_disconnect_ies() - Get diconnect IEs from vdev object

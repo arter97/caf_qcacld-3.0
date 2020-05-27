@@ -356,16 +356,16 @@ void hdd_ndp_event_handler(struct hdd_adapter *adapter,
 		case eCSR_ROAM_RESULT_NDI_CREATE_RSP:
 			success = (roam_info->ndp.ndi_create_params.status ==
 					NAN_DATAPATH_RSP_STATUS_SUCCESS);
-			hdd_debug("posting ndi create status: %d to umac",
-				success);
+			hdd_debug("posting ndi create status: %d (%s) to umac",
+				  success, success ? "Success" : "Failure");
 			os_if_nan_post_ndi_create_rsp(psoc, adapter->vdev_id,
 							success);
 			return;
 		case eCSR_ROAM_RESULT_NDI_DELETE_RSP:
 			success = (roam_info->ndp.ndi_create_params.status ==
 					NAN_DATAPATH_RSP_STATUS_SUCCESS);
-			hdd_debug("posting ndi delete status: %d to umac",
-				success);
+			hdd_debug("posting ndi delete status: %d (%s) to umac",
+				  success, success ? "Success" : "Failure");
 			os_if_nan_post_ndi_delete_rsp(psoc, adapter->vdev_id,
 							success);
 			return;
@@ -395,8 +395,6 @@ static int __wlan_hdd_cfg80211_process_ndp_cmd(struct wiphy *wiphy,
 {
 	int ret_val;
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
-
-	hdd_enter();
 
 	ret_val = wlan_hdd_validate_context(hdd_ctx);
 	if (ret_val)
@@ -454,6 +452,7 @@ int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 {
 	struct net_device *wlan_dev = adapter->dev;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	void *soc;
 	QDF_STATUS status;
 	int32_t ret_val;
 	mac_handle_t mac_handle;
@@ -510,6 +509,22 @@ int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 	if (0 != ret_val)
 		hdd_err("WMI_PDEV_PARAM_BURST_ENABLE set failed %d", ret_val);
 
+	soc = cds_get_context(QDF_MODULE_ID_SOC);
+	/*
+	 * In case of USB tethering, LRO is disabled. If SSR happened
+	 * during that time, then as part of SSR init, do not enable
+	 * the LRO again. Keep the LRO state same as before SSR.
+	 */
+	if (cdp_cfg_get(soc, cfg_dp_lro_enable) &&
+	    !(qdf_atomic_read(&hdd_ctx->vendor_disable_lro_flag)))
+		adapter->dev->features |= NETIF_F_LRO;
+
+	if (cdp_cfg_get(soc, cfg_dp_enable_ip_tcp_udp_checksum_offload))
+		adapter->dev->features |= NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM;
+
+	adapter->dev->features |= NETIF_F_RXCSUM;
+
+	hdd_set_tso_flags(hdd_ctx, adapter->dev);
 
 	update_ndi_state(adapter, NAN_DATA_NDI_CREATING_STATE);
 	return ret_val;
@@ -567,6 +582,8 @@ int hdd_ndi_open(char *iface_name)
 	adapter = hdd_open_adapter(hdd_ctx, QDF_NDI_MODE, iface_name,
 				   ndi_mac_addr, NET_NAME_UNKNOWN, true);
 	if (!adapter) {
+		if (!cfg_nan_get_ndi_mac_randomize(hdd_ctx->psoc))
+			wlan_hdd_release_intf_addr(hdd_ctx, ndi_mac_addr);
 		hdd_err("hdd_open_adapter failed");
 		return -EINVAL;
 	}
@@ -799,7 +816,6 @@ void hdd_ndi_drv_ndi_delete_rsp_handler(uint8_t vdev_id)
 		return;
 	}
 
-	hdd_roam_deregister_sta(adapter, adapter->mac_addr);
 	hdd_delete_peer(sta_ctx, &bc_mac_addr);
 
 	wlan_hdd_netif_queue_control(adapter,
@@ -837,8 +853,6 @@ int hdd_ndp_new_peer_handler(uint8_t vdev_id, uint16_t sta_id,
 	struct bss_description tmp_bss_descp = {0};
 	struct csr_roam_info *roam_info;
 
-	hdd_enter();
-
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	if (!hdd_ctx) {
 		hdd_err("hdd_ctx is null");
@@ -875,7 +889,7 @@ int hdd_ndp_new_peer_handler(uint8_t vdev_id, uint16_t sta_id,
 
 	/* perform following steps for first new peer ind */
 	if (fist_peer) {
-		hdd_info("Set ctx connection state to connected");
+		hdd_debug("Set ctx connection state to connected");
 		hdd_bus_bw_compute_prev_txrx_stats(adapter);
 		hdd_bus_bw_compute_timer_start(hdd_ctx);
 		sta_ctx->conn_info.conn_state = eConnectionState_NdiConnected;
@@ -884,8 +898,26 @@ int hdd_ndp_new_peer_handler(uint8_t vdev_id, uint16_t sta_id,
 				WLAN_WAKE_ALL_NETIF_QUEUE, WLAN_CONTROL_PATH);
 	}
 	qdf_mem_free(roam_info);
-	hdd_exit();
 	return 0;
+}
+
+void hdd_cleanup_ndi(struct hdd_context *hdd_ctx,
+		     struct hdd_adapter *adapter)
+{
+	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+
+	if (sta_ctx->conn_info.conn_state != eConnectionState_NdiConnected) {
+		hdd_debug("NDI has no NDPs");
+		return;
+	}
+	sta_ctx->conn_info.conn_state = eConnectionState_NdiDisconnected;
+	hdd_conn_set_connection_state(adapter,
+		eConnectionState_NdiDisconnected);
+	hdd_debug("Stop netif tx queues.");
+	wlan_hdd_netif_queue_control(adapter, WLAN_STOP_ALL_NETIF_QUEUE,
+				     WLAN_CONTROL_PATH);
+	hdd_bus_bw_compute_reset_prev_txrx_stats(adapter);
+	hdd_bus_bw_compute_timer_try_stop(hdd_ctx);
 }
 
 /**
@@ -901,8 +933,6 @@ void hdd_ndp_peer_departed_handler(uint8_t vdev_id, uint16_t sta_id,
 	struct hdd_context *hdd_ctx;
 	struct hdd_adapter *adapter;
 	struct hdd_station_ctx *sta_ctx;
-
-	hdd_enter();
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	if (!hdd_ctx) {
@@ -922,20 +952,11 @@ void hdd_ndp_peer_departed_handler(uint8_t vdev_id, uint16_t sta_id,
 		return;
 	}
 
-	hdd_roam_deregister_sta(adapter, *peer_mac_addr);
 	hdd_delete_peer(sta_ctx, peer_mac_addr);
 
 	if (last_peer) {
-		hdd_info("No more ndp peers.");
-		sta_ctx->conn_info.conn_state = eConnectionState_NdiDisconnected;
-		hdd_conn_set_connection_state(adapter,
-			eConnectionState_NdiDisconnected);
-		hdd_info("Stop netif tx queues.");
-		wlan_hdd_netif_queue_control(adapter, WLAN_STOP_ALL_NETIF_QUEUE,
-					     WLAN_CONTROL_PATH);
-		hdd_bus_bw_compute_reset_prev_txrx_stats(adapter);
-		hdd_bus_bw_compute_timer_try_stop(hdd_ctx);
+		hdd_debug("No more ndp peers.");
+		hdd_cleanup_ndi(hdd_ctx, adapter);
+		qdf_event_set(&adapter->peer_cleanup_done);
 	}
-
-	hdd_exit();
 }

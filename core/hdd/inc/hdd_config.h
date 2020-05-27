@@ -1224,6 +1224,39 @@ struct dhcp_server {
 	"", \
 	"Used to specify action OUIs to control edca configuration")
 
+/*
+ * <ini>
+ * gActionOUIReconnAssocTimeout - Used to specify action OUIs to
+ * reconnect to same BSSID when wait for association response timeout
+ *
+ * This ini is used to specify AP OUIs. Some of AP doesn't response our
+ * first association request, but it would response our second association
+ * request. Add such OUI configuration INI to apply reconnect logic when
+ * association timeout happends with such AP.
+ * For default:
+ *     gActionOUIReconnAssocTimeout=00E04C 00 01
+ *          Explain: 00E04C: OUI
+ *                   00: data length is 0
+ *                   01: info mask, only OUI present in Info mask
+ * Note: User should strictly add new action OUIs at the end of this
+ * default value.
+ * Refer to gEnableActionOUI for more detail about the format.
+ *
+ * Related: gEnableActionOUI
+ *
+ * Supported Feature: Action OUIs
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ACTION_OUI_RECONN_ASSOCTIMEOUT CFG_INI_STRING( \
+	"gActionOUIReconnAssocTimeout", \
+	0, \
+	ACTION_OUI_MAX_STR_LEN, \
+	"00E04C 00 01", \
+	"Used to specify action OUIs to reconnect when assoc timeout")
+
 /* End of action oui inis */
 
 #ifdef ENABLE_MTRACE_LOG
@@ -1362,6 +1395,70 @@ struct dhcp_server {
 			CFG_VALUE_OR_DEFAULT, \
 			"Disable wow feature")
 
+#ifdef WLAN_FEATURE_PERIODIC_STA_STATS
+/*
+ * <ini>
+ * periodic_stats_timer_interval - Print selective stats on this specified
+ *				   interval
+ *
+ * @Min: 0
+ * @Max: 10000
+ * Default: 3000
+ *
+ * This ini is used to specify interval in milliseconds for periodic stats
+ * timer. This timer will print selective stats after expiration of each
+ * interval. STA starts this periodic timer after initial connection or after
+ * roaming is successful. This will be restarted for every
+ * periodic_stats_timer_interval till the periodic_stats_timer_duration expires.
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_PERIODIC_STATS_TIMER_INTERVAL  CFG_INI_UINT( \
+				"periodic_stats_timer_interval", \
+				0, \
+				10000, \
+				3000, \
+				CFG_VALUE_OR_DEFAULT, \
+				"Periodic stats timer interval")
+
+/*
+ * <ini>
+ * periodic_stats_timer_duration - Used as duration for which periodic timer
+ *				   should run
+ *
+ * @Min: 0
+ * @Max: 60000
+ * Default: 30000
+ *
+ * This ini is used as duration in milliseconds for which periodic stats timer
+ * should run. This periodic timer will print selective stats for every
+ * periodic_stats_timer_interval until this duration is reached.
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_PERIODIC_STATS_TIMER_DURATION  CFG_INI_UINT( \
+			"periodic_stats_timer_duration", \
+			0, \
+			60000, \
+			30000, \
+			CFG_VALUE_OR_DEFAULT, \
+			"Periodic stats timer duration")
+
+#define CFG_WLAN_STA_PERIODIC_STATS \
+	 CFG(CFG_PERIODIC_STATS_TIMER_DURATION) \
+	 CFG(CFG_PERIODIC_STATS_TIMER_INTERVAL)
+#else
+#define CFG_WLAN_STA_PERIODIC_STATS
+#endif /* WLAN_FEATURE_PERIODIC_STA_STATS */
+
 /**
  * enum host_log_level - Debug verbose level imposed by user
  * @HOST_LOG_LEVEL_NONE: no trace will be logged.
@@ -1478,6 +1575,7 @@ enum host_log_level {
 	CFG_VC_MODE_BITMAP_ALL \
 	CFG_WLAN_AUTO_SHUTDOWN_ALL \
 	CFG_WLAN_LOGGING_SUPPORT_ALL \
+	CFG_WLAN_STA_PERIODIC_STATS \
 	CFG(CFG_ACTION_OUI_CCKM_1X1) \
 	CFG(CFG_ACTION_OUI_CONNECT_1X1) \
 	CFG(CFG_ACTION_OUI_CONNECT_1X1_WITH_1_CHAIN) \
@@ -1487,6 +1585,7 @@ enum host_log_level {
 	CFG(CFG_ACTION_OUI_FORCE_MAX_NSS) \
 	CFG(CFG_ACTION_OUI_DISABLE_AGGRESSIVE_EDCA) \
 	CFG(CFG_ACTION_OUI_SWITCH_TO_11N_MODE) \
+	CFG(CFG_ACTION_OUI_RECONN_ASSOCTIMEOUT) \
 	CFG(CFG_ADVERTISE_CONCURRENT_OPERATION) \
 	CFG(CFG_BUG_ON_REINIT_FAILURE) \
 	CFG(CFG_DBS_SCAN_SELECTION) \

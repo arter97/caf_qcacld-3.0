@@ -584,6 +584,9 @@ struct s_ext_cap {
 	uint8_t reserved7:2;
 	uint8_t twt_requestor_support:1;
 	uint8_t twt_responder_support:1;
+	uint8_t reserved8: 1;
+	uint8_t reserved9: 4;
+	uint8_t beacon_protection_enable: 1;
 };
 
 void swap_bit_field16(uint16_t in, uint16_t *out);
@@ -1068,6 +1071,7 @@ populate_dot11f_ext_cap(struct mac_context *mac, bool isVHTEnabled,
 			tDot11fIEExtCap *pDot11f, struct pe_session *pe_session);
 
 void populate_dot11f_qcn_ie(struct mac_context *mac,
+			    struct pe_session *pe_session,
 			    tDot11fIEqcn_ie *qcn_ie,
 			    uint8_t attr_id);
 

@@ -28,8 +28,6 @@
 /* Include files */
 #include <wmi_unified_api.h>
 
-#define POLICY_MGR_MAX_CHANNEL_LIST 128
-
 /**
  *  Some max value greater than the max length of the channel list
  */
@@ -803,6 +801,14 @@ enum policy_mgr_two_connection_mode {
  * SCC, SAP on 5 G
  * @PM_SAP_NDI_SCC_5_NAN_DISC_24_DBS: SAP & NDI/NDP connection on 5 Ghz,
  * NAN_DISC on 24 Ghz
+ * @PM_NAN_DISC_STA_24_NDI_5_DBS: STA and NAN Disc on 2.4Ghz and NDI on 5ghz DBS
+ * @PM_NAN_DISC_NDI_24_STA_5_DBS: NDI and NAN Disc on 2.4Ghz and STA on 5ghz DBS
+ * @PM_STA_NDI_5_NAN_DISC_24_DBS: STA, NDI on 5ghz and NAN Disc on 2.4Ghz DBS
+ * @PM_STA_NDI_NAN_DISC_24_SMM: STA, NDI, NAN Disc all on 2.4ghz SMM
+ * @PM_NAN_DISC_NDI_24_NDI_5_DBS: NDI and NAN Disc on 2.4Ghz and second NDI in
+ * 5ghz DBS
+ * @PM_NDI_NDI_5_NAN_DISC_24_DBS: Both NDI on 5ghz and NAN Disc on 2.4Ghz DBS
+ * @PM_NDI_NDI_NAN_DISC_24_SMM: Both NDI, NAN Disc on 2.4ghz SMM
  */
 enum policy_mgr_three_connection_mode {
 	PM_STA_SAP_SCC_24_SAP_5_DBS,
@@ -812,6 +818,13 @@ enum policy_mgr_three_connection_mode {
 	PM_NAN_DISC_SAP_SCC_24_NDI_5_DBS,
 	PM_NAN_DISC_NDI_SCC_24_SAP_5_DBS,
 	PM_SAP_NDI_SCC_5_NAN_DISC_24_DBS,
+	PM_NAN_DISC_STA_24_NDI_5_DBS,
+	PM_NAN_DISC_NDI_24_STA_5_DBS,
+	PM_STA_NDI_5_NAN_DISC_24_DBS,
+	PM_STA_NDI_NAN_DISC_24_SMM,
+	PM_NAN_DISC_NDI_24_NDI_5_DBS,
+	PM_NDI_NDI_5_NAN_DISC_24_DBS,
+	PM_NDI_NDI_NAN_DISC_24_SMM,
 
 	PM_MAX_THREE_CONNECTION_MODE
 };
@@ -891,8 +904,9 @@ enum policy_mgr_band {
  * @POLICY_MGR_UPDATE_REASON_HIDDEN_STA: Connection to Hidden STA
  * @POLICY_MGR_UPDATE_REASON_OPPORTUNISTIC: Opportunistic HW mode update
  * @POLICY_MGR_UPDATE_REASON_NSS_UPDATE: NSS update
- * @POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH: Channel switch
- * @POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH_STA: Channel switch for STA
+ * @POLICY_MGR_UPDATE_REASON_AFTER_CHANNEL_SWITCH: After Channel switch
+ * @POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH_STA: Before Channel switch for STA
+ * @POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH_SAP: Before Channel switch for SAP
  * @POLICY_MGR_UPDATE_REASON_PRI_VDEV_CHANGE: In Dual DBS HW, if the vdev based
  *        2x2 preference enabled, the vdev down may cause prioritized active
  *        vdev change, then DBS hw mode may needs to change from one DBS mode
@@ -909,8 +923,9 @@ enum policy_mgr_conn_update_reason {
 	POLICY_MGR_UPDATE_REASON_HIDDEN_STA,
 	POLICY_MGR_UPDATE_REASON_OPPORTUNISTIC,
 	POLICY_MGR_UPDATE_REASON_NSS_UPDATE,
-	POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH,
+	POLICY_MGR_UPDATE_REASON_AFTER_CHANNEL_SWITCH,
 	POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH_STA,
+	POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH_SAP,
 	POLICY_MGR_UPDATE_REASON_PRE_CAC,
 	POLICY_MGR_UPDATE_REASON_PRI_VDEV_CHANGE,
 	POLICY_MGR_UPDATE_REASON_NAN_DISCOVERY,
@@ -967,9 +982,10 @@ enum set_hw_mode_status {
 	SET_HW_MODE_STATUS_ALREADY,
 };
 
-typedef void (*dual_mac_cb)(enum set_hw_mode_status status,
-		uint32_t scan_config,
-		uint32_t fw_mode_config);
+typedef void (*dual_mac_cb)(struct wlan_objmgr_psoc *psoc,
+			    enum set_hw_mode_status status,
+			    uint32_t scan_config,
+			    uint32_t fw_mode_config);
 /**
  * enum policy_mgr_hw_mode_change - identify the HW mode switching to.
  *
@@ -1145,8 +1161,8 @@ struct policy_mgr_hw_mode {
  * @pcl_len: Number of channels in the PCL
  */
 struct policy_mgr_pcl_list {
-	uint32_t pcl_list[POLICY_MGR_MAX_CHANNEL_LIST];
-	uint8_t weight_list[POLICY_MGR_MAX_CHANNEL_LIST];
+	uint32_t pcl_list[NUM_CHANNELS];
+	uint8_t weight_list[NUM_CHANNELS];
 	uint32_t pcl_len;
 };
 
@@ -1163,12 +1179,12 @@ struct policy_mgr_pcl_list {
  * @weight_list: Weights assigned by policy manager
  */
 struct policy_mgr_pcl_chan_weights {
-	uint32_t pcl_list[POLICY_MGR_MAX_CHANNEL_LIST];
+	uint32_t pcl_list[NUM_CHANNELS];
 	uint32_t pcl_len;
-	uint32_t saved_chan_list[POLICY_MGR_MAX_CHANNEL_LIST];
+	uint32_t saved_chan_list[NUM_CHANNELS];
 	uint32_t saved_num_chan;
-	uint8_t weighed_valid_list[POLICY_MGR_MAX_CHANNEL_LIST];
-	uint8_t weight_list[POLICY_MGR_MAX_CHANNEL_LIST];
+	uint8_t weighed_valid_list[NUM_CHANNELS];
+	uint8_t weight_list[NUM_CHANNELS];
 };
 
 /**
