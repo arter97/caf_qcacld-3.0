@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017, 2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -562,7 +562,8 @@ lim_indicate_probe_req_to_hdd(tpAniSirGlobal pMac, uint8_t *pBd,
 				    (frameLen + sizeof(tSirMacMgmtHdr)),
 				    psessionEntry->smeSessionId, WMA_GET_RX_CH(pBd),
 				    psessionEntry,
-				    WMA_GET_RX_RSSI_NORMALIZED(pBd));
+				    WMA_GET_RX_RSSI_NORMALIZED(pBd),
+				    RXMGMT_FLAG_NONE);
 } /*** end lim_indicate_probe_req_to_hdd() ***/
 
 /**
