@@ -2290,7 +2290,7 @@ static int wmi_unified_probe_rsp_tmpl_send(tp_wma_handle wma,
 
 	WMA_LOGD(FL("Send probe response template for vdev %d"), vdev_id);
 
-	frm = probe_rsp_info->pProbeRespTemplate;
+	frm = probe_rsp_info->probeRespTemplate;
 
 	/*
 	 * Make the TSF offset negative so probe response in the same
@@ -2302,7 +2302,7 @@ static int wmi_unified_probe_rsp_tmpl_send(tp_wma_handle wma,
 	wh = (struct ieee80211_frame *)frm;
 	A_MEMCPY(&wh[1], &adjusted_tsf_le, sizeof(adjusted_tsf_le));
 
-	params.pProbeRespTemplate = probe_rsp_info->pProbeRespTemplate;
+	params.pProbeRespTemplate = probe_rsp_info->probeRespTemplate;
 	params.probeRespTemplateLen = probe_rsp_info->probeRespTemplateLen;
 	qdf_mem_copy(params.bssId, probe_rsp_info->bssId,
 		     IEEE80211_ADDR_LEN);
@@ -2519,7 +2519,8 @@ int wma_tbttoffset_update_event_handler(void *handle, uint8_t *event,
 
 		qdf_spin_lock_bh(&bcn->lock);
 		qdf_mem_zero(&bcn_info, sizeof(bcn_info));
-		bcn_info.beacon = qdf_nbuf_data(bcn->buf);
+		qdf_mem_copy(bcn_info.beacon, qdf_nbuf_data(bcn->buf),
+			     bcn->len);
 		bcn_info.p2pIeOffset = bcn->p2p_ie_offset;
 		bcn_info.beaconLength = bcn->len;
 		bcn_info.timIeOffset = bcn->tim_ie_offset;
@@ -2574,7 +2575,7 @@ void wma_send_probe_rsp_tmpl(tp_wma_handle wma,
 	}
 
 	probe_rsp = (struct sAniProbeRspStruct *)
-				 (probe_rsp_info->pProbeRespTemplate);
+				 (probe_rsp_info->probeRespTemplate);
 	if (!probe_rsp) {
 		WMA_LOGE(FL("probe_rsp is NULL"));
 		return;
@@ -3456,37 +3457,33 @@ static bool wma_is_pkt_drop_candidate(tp_wma_handle wma_handle,
 	}
 
 	switch (subtype) {
-	case SIR_MAC_MGMT_ASSOC_REQ:
-		if (peer->last_assoc_rcvd) {
-			if (qdf_get_system_timestamp() - peer->last_assoc_rcvd <
-					WMA_MGMT_FRAME_DETECT_DOS_TIMER) {
-				WMA_LOGD(FL("Dropping Assoc Req received"));
-				should_drop = true;
-			}
+	case IEEE80211_FC0_SUBTYPE_ASSOC_REQ:
+		if (peer->last_assoc_rcvd &&
+		    qdf_system_time_before(qdf_get_system_timestamp(),
+		    peer->last_assoc_rcvd + WMA_MGMT_FRAME_DETECT_DOS_TIMER)) {
+			WMA_LOGD(FL("Dropping Assoc Req as it is received after %d ms of last frame. Allow it only after %d ms"),
+				 (int) (qdf_get_system_timestamp() -
+				  peer->last_assoc_rcvd),
+				  WMA_MGMT_FRAME_DETECT_DOS_TIMER);
+			should_drop = true;
+			break;
 		}
 		peer->last_assoc_rcvd = qdf_get_system_timestamp();
 		break;
-	case SIR_MAC_MGMT_DISASSOC:
-		if (peer->last_disassoc_rcvd) {
-			if (qdf_get_system_timestamp() -
-					peer->last_disassoc_rcvd <
-					WMA_MGMT_FRAME_DETECT_DOS_TIMER) {
-				WMA_LOGI(FL("Dropping DisAssoc received"));
-				should_drop = true;
-			}
+	case IEEE80211_FC0_SUBTYPE_DISASSOC:
+	case IEEE80211_FC0_SUBTYPE_DEAUTH:
+		if (peer->last_disassoc_deauth_rcvd &&
+		    qdf_system_time_before(qdf_get_system_timestamp(),
+		    peer->last_disassoc_deauth_rcvd +
+		    WMA_MGMT_FRAME_DETECT_DOS_TIMER)) {
+			WMA_LOGD(FL("Dropping subtype %x frame as it is received after %d ms of last frame. Allow it only after %d ms"),
+				 subtype, (int) (qdf_get_system_timestamp() -
+				 peer->last_disassoc_deauth_rcvd),
+				 WMA_MGMT_FRAME_DETECT_DOS_TIMER);
+			should_drop = true;
+			break;
 		}
-		peer->last_disassoc_rcvd = qdf_get_system_timestamp();
-		break;
-	case SIR_MAC_MGMT_DEAUTH:
-		if (peer->last_deauth_rcvd) {
-			if (qdf_get_system_timestamp() -
-					peer->last_deauth_rcvd <
-					WMA_MGMT_FRAME_DETECT_DOS_TIMER) {
-				WMA_LOGI(FL("Dropping Deauth received"));
-				should_drop = true;
-			}
-		}
-		peer->last_deauth_rcvd = qdf_get_system_timestamp();
+		peer->last_disassoc_deauth_rcvd = qdf_get_system_timestamp();
 		break;
 	default:
 		break;

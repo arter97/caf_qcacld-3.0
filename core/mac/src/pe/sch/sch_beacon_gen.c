@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -278,7 +278,7 @@ sch_set_fixed_beacon_fields(tpAniSirGlobal mac_ctx, tpPESession session)
 	}
 
 	n_status = dot11f_pack_beacon1(mac_ctx, bcn_1, ptr,
-				      SCH_MAX_BEACON_SIZE - offset, &n_bytes);
+				      SIR_MAX_BEACON_SIZE - offset, &n_bytes);
 	if (DOT11F_FAILED(n_status)) {
 		pe_err("Failed to packed a tDot11fBeacon1 (0x%08x)",
 			n_status);
@@ -522,7 +522,7 @@ sch_set_fixed_beacon_fields(tpAniSirGlobal mac_ctx, tpPESession session)
 
 	n_status = dot11f_pack_beacon2(mac_ctx, bcn_2,
 				      session->pSchBeaconFrameEnd,
-				      SCH_MAX_BEACON_SIZE, &n_bytes);
+				      SIR_MAX_BEACON_SIZE, &n_bytes);
 	if (DOT11F_FAILED(n_status)) {
 		pe_err("Failed to packed a tDot11fBeacon2 (0x%08x)",
 			n_status);
@@ -542,8 +542,9 @@ sch_set_fixed_beacon_fields(tpAniSirGlobal mac_ctx, tpPESession session)
 	/* TODO: Append additional IE here. */
 	if (addn_ielen > 0)
 		sch_append_addn_ie(mac_ctx, session,
-			session->pSchBeaconFrameEnd + n_bytes,
-			SCH_MAX_BEACON_SIZE, &n_bytes, addn_ie, addn_ielen);
+				   session->pSchBeaconFrameEnd + n_bytes,
+				   SIR_MAX_BEACON_SIZE, &n_bytes,
+				   addn_ie, addn_ielen);
 
 	session->schBeaconOffsetEnd = (uint16_t) n_bytes;
 	extra_ie_len = n_bytes - extra_ie_offset;
@@ -820,6 +821,12 @@ static void write_beacon_to_memory(tpAniSirGlobal pMac, uint16_t size,
 
 	/* copy end of beacon only if length > 0 */
 	if (length > 0) {
+		if (size + psessionEntry->schBeaconOffsetEnd >
+		    SIR_MAX_BEACON_SIZE) {
+			pe_err("beacon tmp fail size %d BeaconOffsetEnd %d",
+			       size, psessionEntry->schBeaconOffsetEnd);
+			return;
+		}
 		for (i = 0; i < psessionEntry->schBeaconOffsetEnd; i++)
 			psessionEntry->pSchBeaconFrameBegin[size++] =
 				psessionEntry->pSchBeaconFrameEnd[i];
