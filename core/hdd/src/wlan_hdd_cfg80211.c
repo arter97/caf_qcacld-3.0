@@ -353,7 +353,6 @@ static const u32 hdd_sta_akm_suites[] = {
 	WLAN_AKM_SUITE_PSK_SHA256,
 	WLAN_AKM_SUITE_TDLS,
 	WLAN_AKM_SUITE_SAE,
-	WLAN_AKM_SUITE_FT_OVER_SAE,
 	WLAN_AKM_SUITE_8021X_SUITE_B,
 	WLAN_AKM_SUITE_8021X_SUITE_B_192,
 	WLAN_AKM_SUITE_FILS_SHA256,
@@ -366,8 +365,6 @@ static const u32 hdd_sta_akm_suites[] = {
 /*akm suits supported by AP*/
 static const u32 hdd_ap_akm_suites[] = {
 	WLAN_AKM_SUITE_PSK,
-	WLAN_AKM_SUITE_SAE,
-	WLAN_AKM_SUITE_OWE,
 };
 
 /* This structure contain information what akm suits are
