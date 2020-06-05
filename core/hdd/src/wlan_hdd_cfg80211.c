@@ -16182,6 +16182,17 @@ static int wlan_hdd_add_key_sap(struct hdd_adapter *adapter,
 	vdev = hdd_objmgr_get_vdev(adapter);
 	if (!vdev)
 		return -EINVAL;
+
+	/* Do not send install key when sap restart is in progress. If there is
+	 * critical channel request handling going on, fw will stop that request
+	 * and will not send restart resposne
+	 */
+	if (wlan_vdev_is_restart_progress(vdev) == QDF_STATUS_SUCCESS) {
+		hdd_err("vdev: %d restart in progress", wlan_vdev_get_id(vdev));
+		hdd_objmgr_put_vdev(vdev);
+		return -EINVAL;
+	}
+
 	if (hostapd_state->bss_state == BSS_START) {
 		errno =
 		wlan_cfg80211_crypto_add_key(vdev, (pairwise ?
@@ -20144,6 +20155,12 @@ wlan_hdd_get_cfg80211_disconnect_reason(struct hdd_adapter *adapter,
 	if (reason >= eSIR_MAC_REASON_PROP_START) {
 		adapter->last_disconnect_reason =
 			wlan_hdd_sir_mac_to_qca_reason(reason);
+		/*
+		 * Applications expect reason code as 0 for beacon miss failure
+		 * due to backward compatibility. So send ieee80211_reason as 0.
+		 */
+		if (reason == eSIR_MAC_BEACON_MISSED)
+			ieee80211_reason = 0;
 	} else {
 		ieee80211_reason = (enum ieee80211_reasoncode)reason;
 		adapter->last_disconnect_reason =
