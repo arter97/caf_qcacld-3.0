@@ -43,7 +43,7 @@ interop_issues_ap_policy[QCA_WLAN_VENDOR_ATTR_INTEROP_ISSUES_AP_MAX + 1] = {
 						.type = NLA_U32,
 						.len = sizeof(uint32_t) },
 	[QCA_WLAN_VENDOR_ATTR_INTEROP_ISSUES_AP_BSSID] = {
-						.type = NLA_UNSPEC,
+						.type = NLA_BINARY,
 						.len = QDF_MAC_ADDR_SIZE },
 };
 
@@ -179,6 +179,11 @@ __wlan_cfg80211_set_interop_issues_ap_config(struct wiphy *wiphy,
 	uint32_t count = 0;
 	struct wlan_interop_issues_ap_info interop_issues_ap = {0};
 	struct wlan_objmgr_psoc *psoc;
+
+	if (!adapter->vdev) {
+		osif_err("Invalid vdev");
+		return -EINVAL;
+	}
 
 	psoc = wlan_vdev_get_psoc(adapter->vdev);
 	if (!psoc) {

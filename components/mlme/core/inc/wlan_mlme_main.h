@@ -61,11 +61,17 @@ struct wlan_disconnect_info {
 
 /**
  * struct peer_mlme_priv_obj - peer MLME component object
+ * @last_pn_valid if last PN is valid
+ * @last_pn: last pn received
+ * @rmf_pn_replays: rmf pn replay count
  * @is_pmf_enabled: True if PMF is enabled
  * @last_assoc_received_time: last assoc received time
  * @last_disassoc_deauth_received_time: last disassoc/deauth received time
  */
 struct peer_mlme_priv_obj {
+	uint8_t last_pn_valid;
+	uint64_t last_pn;
+	uint32_t rmf_pn_replays;
 	bool is_pmf_enabled;
 	qdf_time_t last_assoc_received_time;
 	qdf_time_t last_disassoc_deauth_received_time;
@@ -131,6 +137,7 @@ struct wlan_mlme_roam {
  * @connection_fail: flag to indicate connection failed
  * @cac_required_for_new_channel: if CAC is required for new channel
  * @follow_ap_edca: if true, it is forced to follow the AP's edca.
+ * @reconn_after_assoc_timeout: reconnect to the same AP if association timeout
  * @assoc_type: vdev associate/reassociate type
  * @dynamic_cfg: current configuration of nss, chains for vdev.
  * @ini_cfg: Max configuration of nss, chains supported for vdev.
@@ -148,6 +155,7 @@ struct mlme_legacy_priv {
 	bool connection_fail;
 	bool cac_required_for_new_channel;
 	bool follow_ap_edca;
+	bool reconn_after_assoc_timeout;
 	enum vdev_assoc_type assoc_type;
 	struct wlan_mlme_nss_chains dynamic_cfg;
 	struct wlan_mlme_nss_chains ini_cfg;
@@ -263,16 +271,6 @@ struct wlan_mlme_psoc_ext_obj *mlme_get_psoc_ext_obj_fl(struct wlan_objmgr_psoc
 							uint32_t line);
 
 /**
- * mlme_init_ibss_cfg() - Init IBSS config data structure with default CFG value
- * @psoc: pointer to the psoc object
- * @ibss_cfg: Pointer to IBSS cfg data structure to return values
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS mlme_init_ibss_cfg(struct wlan_objmgr_psoc *psoc,
-			      struct wlan_mlme_ibss_cfg *ibss_cfg);
-
-/**
  * mlme_set_self_disconnect_ies() - Set diconnect IEs configured from userspace
  * @vdev: vdev pointer
  * @ie: pointer for disconnect IEs
@@ -332,6 +330,29 @@ void mlme_set_follow_ap_edca_flag(struct wlan_objmgr_vdev *vdev, bool flag);
  * Return: value of follow_ap_edca
  */
 bool mlme_get_follow_ap_edca_flag(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * mlme_set_reconn_after_assoc_timeout_flag() - Set reconn after assoc timeout
+ * flag
+ * @psoc: soc object
+ * @vdev_id: vdev id
+ * @flag: enable or disable reconnect
+ *
+ * Return: void
+ */
+void mlme_set_reconn_after_assoc_timeout_flag(struct wlan_objmgr_psoc *psoc,
+					      uint8_t vdev_id, bool flag);
+
+/**
+ * mlme_get_reconn_after_assoc_timeout_flag() - Get reconn after assoc timeout
+ * flag
+ * @psoc: soc object
+ * @vdev_id: vdev id
+ *
+ * Return: true for enabling reconnect, otherwise false
+ */
+bool mlme_get_reconn_after_assoc_timeout_flag(struct wlan_objmgr_psoc *psoc,
+					      uint8_t vdev_id);
 
 /**
  * mlme_get_peer_disconnect_ies() - Get diconnect IEs from vdev object

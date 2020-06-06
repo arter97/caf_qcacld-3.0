@@ -84,7 +84,7 @@ const struct nla_policy vendor_attr_policy[
 						.len = sizeof(uint32_t)
 	},
 	[QCA_WLAN_VENDOR_ATTR_NDP_PEER_DISCOVERY_MAC_ADDR] = {
-						.type = NLA_UNSPEC,
+						.type = NLA_BINARY,
 						.len = QDF_MAC_ADDR_SIZE
 	},
 	[QCA_WLAN_VENDOR_ATTR_NDP_CONFIG_SECURITY] = {
@@ -156,7 +156,7 @@ const struct nla_policy vendor_attr_policy[
 						.len = sizeof(uint32_t)
 	},
 	[QCA_WLAN_VENDOR_ATTR_NDP_IPV6_ADDR] = {
-						.type = NLA_UNSPEC,
+						.type = NLA_BINARY,
 						.len = QDF_IPV6_ADDR_SIZE
 	},
 	[QCA_WLAN_VENDOR_ATTR_NDP_TRANSPORT_PORT] = {
@@ -2369,14 +2369,17 @@ void os_if_nan_ndi_session_end(struct wlan_objmgr_vdev *vdev)
 	struct sk_buff *vendor_event;
 	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
 	struct pdev_osif_priv *os_priv = wlan_pdev_get_ospriv(pdev);
+	enum nan_datapath_state state;
 
 	/*
 	 * The virtual adapters are stopped and closed even during
 	 * driver unload or stop, the service layer is not required
 	 * to be informed in that case (response is not expected)
 	 */
-	if (NAN_DATA_NDI_DELETING_STATE != ucfg_nan_get_ndi_state(vdev)) {
-		osif_err("NDI interface deleted");
+	state = ucfg_nan_get_ndi_state(vdev);
+	if (state != NAN_DATA_NDI_DELETING_STATE &&
+	    state != NAN_DATA_DISCONNECTED_STATE) {
+		osif_err("NDI interface deleted: state: %u", state);
 		return;
 	}
 

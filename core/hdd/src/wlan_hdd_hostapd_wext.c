@@ -144,7 +144,6 @@ static int __iw_softap_set_two_ints_getnone(struct net_device *dev,
 	struct hdd_context *hdd_ctx;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	struct cdp_txrx_stats_req req = {0};
-	uint8_t index = 0;
 	struct hdd_station_info *sta_info;
 
 	hdd_enter_dev(dev);
@@ -176,8 +175,7 @@ static int __iw_softap_set_two_ints_getnone(struct net_device *dev,
 			ret = cdp_txrx_stats_request(soc, adapter->vdev_id,
 						     &req);
 
-			hdd_for_each_station(adapter->sta_info_list, sta_info,
-					     index) {
+			hdd_for_each_sta_ref(adapter->sta_info_list, sta_info) {
 				hdd_debug("bss_id: " QDF_MAC_ADDR_STR,
 					  QDF_MAC_ADDR_ARRAY(
 					  sta_info->sta_mac.bytes));
@@ -186,6 +184,8 @@ static int __iw_softap_set_two_ints_getnone(struct net_device *dev,
 					&sta_info->sta_mac;
 				ret = cdp_txrx_stats_request(
 					soc, adapter->vdev_id, &req);
+				hdd_put_sta_info_ref(&adapter->sta_info_list,
+						     &sta_info, true);
 			}
 		} else {
 			ret = cdp_txrx_stats_request(soc, adapter->vdev_id,
@@ -1682,7 +1682,6 @@ static __iw_softap_getassoc_stamacaddr(struct net_device *dev,
 	struct hdd_station_info *sta_info;
 	struct hdd_context *hdd_ctx;
 	char *buf;
-	int index = 0;
 	int left;
 	int ret;
 	/* maclist_index must be u32 to match userspace */
@@ -1729,13 +1728,14 @@ static __iw_softap_getassoc_stamacaddr(struct net_device *dev,
 	maclist_index = sizeof(maclist_index);
 	left = wrqu->data.length - maclist_index;
 
-	hdd_for_each_station(adapter->sta_info_list, sta_info, index) {
+	hdd_for_each_sta_ref(adapter->sta_info_list, sta_info) {
 		if (!qdf_is_macaddr_broadcast(&sta_info->sta_mac)) {
 			memcpy(&buf[maclist_index], &sta_info->sta_mac,
 			       QDF_MAC_ADDR_SIZE);
 			maclist_index += QDF_MAC_ADDR_SIZE;
 			left -= QDF_MAC_ADDR_SIZE;
 		}
+		hdd_put_sta_info_ref(&adapter->sta_info_list, &sta_info, true);
 	}
 
 	*((u32 *) buf) = maclist_index;
@@ -1817,7 +1817,7 @@ static __iw_softap_disassoc_sta(struct net_device *dev,
 		  QDF_MAC_ADDR_ARRAY(peer_macaddr));
 	wlansap_populate_del_sta_params(peer_macaddr,
 					eSIR_MAC_DEAUTH_LEAVING_BSS_REASON,
-					(SIR_MAC_MGMT_DISASSOC >> 4),
+					SIR_MAC_MGMT_DISASSOC,
 					&del_sta_params);
 	hdd_softap_sta_disassoc(adapter, &del_sta_params);
 
@@ -1996,9 +1996,10 @@ int iw_get_channel_list_with_cc(struct net_device *dev,
 {
 	uint8_t i, len;
 	char *buf;
-	uint8_t ubuf[CFG_COUNTRY_CODE_LEN] = {0};
-	uint8_t ubuf_len = CFG_COUNTRY_CODE_LEN;
+	uint8_t ubuf[REG_ALPHA2_LEN + 1] = {0};
+	uint8_t ubuf_len = REG_ALPHA2_LEN + 1;
 	struct channel_list_info channel_list;
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
 
 	hdd_enter_dev(dev);
 
@@ -2020,14 +2021,13 @@ int iw_get_channel_list_with_cc(struct net_device *dev,
 		return -EINVAL;
 	}
 	len = scnprintf(buf, WE_MAX_STR_LEN, "%u ", channel_list.num_channels);
-	if (QDF_STATUS_SUCCESS == sme_get_country_code(mac_handle, ubuf,
-						       &ubuf_len)) {
-		/* Printing Country code in getChannelList */
-		for (i = 0; i < (ubuf_len - 1); i++)
-			len += scnprintf(buf + len, WE_MAX_STR_LEN - len, "%c", ubuf[i]);
-	}
+	wlan_reg_get_cc_and_src(mac->psoc, ubuf);
+	/* Printing Country code in getChannelList */
+	for (i = 0; i < (ubuf_len - 1); i++)
+		len += scnprintf(buf + len, WE_MAX_STR_LEN - len, "%c", ubuf[i]);
 	for (i = 0; i < channel_list.num_channels; i++)
-		len += scnprintf(buf + len, WE_MAX_STR_LEN - len, " %u", channel_list.channels[i]);
+		len += scnprintf(buf + len, WE_MAX_STR_LEN - len, " %u",
+				 channel_list.channels[i]);
 
 	wrqu->data.length = strlen(extra) + 1;
 
@@ -2221,7 +2221,6 @@ static int hdd_softap_get_sta_info(struct hdd_adapter *adapter,
 				   uint8_t *buf,
 				   int size)
 {
-	uint8_t index = 0;
 	int written;
 	struct hdd_station_info *sta;
 
@@ -2229,12 +2228,18 @@ static int hdd_softap_get_sta_info(struct hdd_adapter *adapter,
 
 	written = scnprintf(buf, size, "\nstaId staAddress\n");
 
-	hdd_for_each_station(adapter->sta_info_list, sta, index) {
-		if (written >= size - 1)
+	hdd_for_each_sta_ref(adapter->sta_info_list, sta) {
+		if (written >= size - 1) {
+			hdd_put_sta_info_ref(&adapter->sta_info_list,
+					     &sta, true);
 			break;
+		}
 
-		if (QDF_IS_ADDR_BROADCAST(sta->sta_mac.bytes))
+		if (QDF_IS_ADDR_BROADCAST(sta->sta_mac.bytes)) {
+			hdd_put_sta_info_ref(&adapter->sta_info_list,
+					     &sta, true);
 			continue;
+		}
 
 		written += scnprintf(buf + written, size - written,
 				     QDF_MAC_ADDR_STR
@@ -2246,6 +2251,7 @@ static int hdd_softap_get_sta_info(struct hdd_adapter *adapter,
 				     sta->sta_mac.bytes[4],
 				     sta->sta_mac.bytes[5],
 				     sta->ecsa_capable);
+		hdd_put_sta_info_ref(&adapter->sta_info_list, &sta, true);
 	}
 
 	hdd_exit();
@@ -2448,7 +2454,6 @@ int __iw_get_softap_linkspeed(struct net_device *dev,
 	char macaddr_string[MAC_ADDRESS_STR_LEN + 1];
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	int rc, ret;
-	uint8_t index = 0;
 
 	hdd_enter_dev(dev);
 
@@ -2490,13 +2495,17 @@ int __iw_get_softap_linkspeed(struct net_device *dev,
 	if (wrqu->data.length < 17 || !QDF_IS_STATUS_SUCCESS(status)) {
 		struct hdd_station_info *sta_info;
 
-		hdd_for_each_station(adapter->sta_info_list, sta_info, index) {
+		hdd_for_each_sta_ref(adapter->sta_info_list, sta_info) {
 			if (!qdf_is_macaddr_broadcast(&sta_info->sta_mac)) {
 				qdf_copy_macaddr(&mac_address,
 						 &sta_info->sta_mac);
 				status = QDF_STATUS_SUCCESS;
+				hdd_put_sta_info_ref(&adapter->sta_info_list,
+						     &sta_info, true);
 				break;
 			}
+			hdd_put_sta_info_ref(&adapter->sta_info_list,
+					     &sta_info, true);
 		}
 	}
 	if (!QDF_IS_STATUS_SUCCESS(status)) {

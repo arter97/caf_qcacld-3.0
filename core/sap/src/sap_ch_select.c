@@ -1340,10 +1340,6 @@ static void sap_compute_spect_weight(tSapChSelSpectInfo *pSpectInfoParams,
 				    center_freq0, center_freq1, chan_freq,
 				    spectch_start, spectch_end);
 
-			sap_debug("freq = %d, rssi aggr = %d, bss count yet = %d",
-				  chan_freq, pSpectCh->rssiAgr,
-				  pSpectCh->bssCount);
-
 			pSpectCh++;
 			break;
 
@@ -1410,6 +1406,15 @@ static void sap_compute_spect_weight(tSapChSelSpectInfo *pSpectInfoParams,
 		}
 
 		chan_freq = pSpectCh->chan_freq;
+
+		if (wlan_reg_is_dfs_for_freq(mac->pdev, chan_freq)) {
+			normalize_factor =
+				MLME_GET_DFS_CHAN_WEIGHT(
+				mac->mlme_cfg->acs.np_chan_weightage);
+			freq_present_in_list = true;
+			sap_debug_rl("DFS channel weightage %d",
+				     normalize_factor);
+		}
 
 		/* Check if the freq is present in range list */
 		for (i = 0; i < mac->mlme_cfg->acs.num_weight_range; i++) {

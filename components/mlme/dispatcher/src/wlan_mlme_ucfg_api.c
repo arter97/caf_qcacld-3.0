@@ -980,14 +980,6 @@ ucfg_mlme_get_delay_before_vdev_stop(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
-#if defined(WLAN_SAE_SINGLE_PMK) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
-void ucfg_mlme_update_sae_single_pmk_info(struct wlan_objmgr_vdev *vdev,
-					  struct mlme_pmk_info *sae_single_pmk)
-{
-	wlan_mlme_update_sae_single_pmk(vdev, sae_single_pmk);
-}
-#endif
-
 QDF_STATUS
 ucfg_mlme_get_roam_bmiss_final_bcnt(struct wlan_objmgr_psoc *psoc,
 				    uint8_t *val)
@@ -1435,38 +1427,6 @@ ucfg_mlme_get_latency_enable(struct wlan_objmgr_psoc *psoc, bool *value)
 	}
 
 	*value = mlme_obj->cfg.wlm_config.latency_enable;
-	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS ucfg_mlme_get_ibss_cfg(struct wlan_objmgr_psoc *psoc,
-				  struct wlan_mlme_ibss_cfg *ibss_cfg)
-{
-	struct wlan_mlme_psoc_ext_obj *mlme_obj;
-
-	if (!ibss_cfg)
-		return QDF_STATUS_E_FAILURE;
-
-	mlme_obj = mlme_get_psoc_ext_obj(psoc);
-	if (!mlme_obj) {
-		mlme_legacy_err("MLME Obj null on get IBSS config");
-		mlme_init_ibss_cfg(psoc, ibss_cfg);
-		return QDF_STATUS_E_INVAL;
-	}
-	*ibss_cfg = mlme_obj->cfg.ibss;
-	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS ucfg_mlme_set_ibss_auto_bssid(struct wlan_objmgr_psoc *psoc,
-					 uint32_t auto_bssid)
-{
-	struct wlan_mlme_psoc_ext_obj *mlme_obj;
-
-	mlme_obj = mlme_get_psoc_ext_obj(psoc);
-	if (!mlme_obj) {
-		mlme_legacy_err("MLME Obj null on get IBSS config");
-		return QDF_STATUS_E_INVAL;
-	}
-	mlme_obj->cfg.ibss.auto_bssid = auto_bssid;
 	return QDF_STATUS_SUCCESS;
 }
 

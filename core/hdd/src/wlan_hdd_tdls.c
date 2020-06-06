@@ -112,7 +112,7 @@ static const struct nla_policy
 	wlan_hdd_tdls_config_enable_policy[QCA_WLAN_VENDOR_ATTR_TDLS_ENABLE_MAX +
 					   1] = {
 	[QCA_WLAN_VENDOR_ATTR_TDLS_ENABLE_MAC_ADDR] = {
-		.type = NLA_UNSPEC,
+		.type = NLA_BINARY,
 		.len = QDF_MAC_ADDR_SIZE},
 	[QCA_WLAN_VENDOR_ATTR_TDLS_ENABLE_CHANNEL] = {.type = NLA_U32},
 	[QCA_WLAN_VENDOR_ATTR_TDLS_ENABLE_GLOBAL_OPERATING_CLASS] = {.type =
@@ -125,14 +125,14 @@ static const struct nla_policy
 	wlan_hdd_tdls_config_disable_policy[QCA_WLAN_VENDOR_ATTR_TDLS_DISABLE_MAX +
 					    1] = {
 	[QCA_WLAN_VENDOR_ATTR_TDLS_DISABLE_MAC_ADDR] = {
-		.type = NLA_UNSPEC,
+		.type = NLA_BINARY,
 		.len = QDF_MAC_ADDR_SIZE},
 };
 static const struct nla_policy
 	wlan_hdd_tdls_config_state_change_policy[QCA_WLAN_VENDOR_ATTR_TDLS_STATE_MAX
 						 + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_TDLS_STATE_MAC_ADDR] = {
-		.type = NLA_UNSPEC,
+		.type = NLA_BINARY,
 		.len = QDF_MAC_ADDR_SIZE},
 	[QCA_WLAN_VENDOR_ATTR_TDLS_NEW_STATE] = {.type = NLA_U32},
 	[QCA_WLAN_VENDOR_ATTR_TDLS_STATE_REASON] = {.type = NLA_S32},
@@ -144,7 +144,7 @@ static const struct nla_policy
 	wlan_hdd_tdls_config_get_status_policy
 [QCA_WLAN_VENDOR_ATTR_TDLS_GET_STATUS_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_TDLS_GET_STATUS_MAC_ADDR] = {
-		.type = NLA_UNSPEC,
+		.type = NLA_BINARY,
 		.len = QDF_MAC_ADDR_SIZE},
 	[QCA_WLAN_VENDOR_ATTR_TDLS_GET_STATUS_STATE] = {.type = NLA_U32},
 	[QCA_WLAN_VENDOR_ATTR_TDLS_GET_STATUS_REASON] = {.type = NLA_S32},
@@ -865,26 +865,6 @@ QDF_STATUS hdd_tdls_register_peer(void *userdata, uint32_t vdev_id,
 	}
 
 	return hdd_roam_register_tdlssta(adapter, mac, qos);
-}
-
-QDF_STATUS hdd_tdls_deregister_peer(void *userdata, uint32_t vdev_id,
-				    struct qdf_mac_addr *peer_mac)
-{
-	struct hdd_adapter *adapter;
-	struct hdd_context *hddctx;
-
-	hddctx = userdata;
-	if (!hddctx) {
-		hdd_err("Invalid hddctx");
-		return QDF_STATUS_E_INVAL;
-	}
-	adapter = hdd_get_adapter_by_vdev(hddctx, vdev_id);
-	if (!adapter) {
-		hdd_err("Invalid adapter");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	return hdd_roam_deregister_tdlssta(adapter, peer_mac);
 }
 
 void hdd_init_tdls_config(struct tdls_start_params *tdls_cfg)

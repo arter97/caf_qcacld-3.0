@@ -298,6 +298,7 @@ typedef struct sap_StationDisassocCompleteEvent_s {
 	int tx_rate;
 	int rx_rate;
 	uint32_t rx_mc_bc_cnt;
+	uint32_t rx_retry_cnt;
 } tSap_StationDisassocCompleteEvent;
 
 typedef struct sap_StationSetKeyCompleteEvent_s {
@@ -490,7 +491,7 @@ struct sap_config {
 	/* Max ie length 255 * 2(WPA+RSN) + 2 bytes(vendor specific ID) * 2 */
 	uint8_t RSNWPAReqIE[(WLAN_MAX_IE_LEN * 2) + 4];
 	/* it is ignored if [0] is 0. */
-	uint8_t countryCode[CFG_COUNTRY_CODE_LEN];
+	uint8_t countryCode[REG_ALPHA2_LEN + 1];
 	uint8_t RSNEncryptType;
 	uint8_t mcRSNEncryptType;
 	eSapAuthType authType;
@@ -1137,6 +1138,17 @@ QDF_STATUS wlansap_get_dfs_ignore_cac(mac_handle_t mac_handle,
  */
 QDF_STATUS wlansap_set_dfs_ignore_cac(mac_handle_t mac_handle,
 				      uint8_t ignore_cac);
+/**
+ * wlansap_get_dfs_cac_state() - Get cac_state value
+ * @mac_handle: Opaque handle to the global MAC context
+ * @cac_state: Location to store cac_state value
+ *
+ * This API is used to Get the value of ignore_cac value
+ *
+ * Return: The QDF_STATUS code associated with performing the operation
+ */
+QDF_STATUS wlansap_get_dfs_cac_state(mac_handle_t mac_handle,
+				     eSapDfsCACState_t *cac_state);
 
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE
 QDF_STATUS
@@ -1214,18 +1226,6 @@ eCsrPhyMode wlan_sap_get_phymode(struct sap_context *sap_ctx);
  * Return: VHT channel width
  */
 uint32_t wlan_sap_get_vht_ch_width(struct sap_context *sap_ctx);
-
-/**
- * wlan_sap_set_vht_ch_width() - Sets SAP VHT channel width.
- * @sap_ctx:		Pointer to Sap Context
- * @vht_channel_width:	SAP VHT channel width value.
- *
- * This function sets the SAP current VHT channel width.
- *
- * Return: None
- */
-void wlan_sap_set_vht_ch_width(struct sap_context *sap_ctx,
-			       uint32_t vht_channel_width);
 
 /**
  * wlan_sap_get_ch_params() - get ch params

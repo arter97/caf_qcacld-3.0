@@ -19,7 +19,7 @@
 /**
  *  DOC:  wma_mgmt.c
  *
- *  This file contains STA/SAP/IBSS and protocol related functions.
+ *  This file contains STA/SAP and protocol related functions.
  */
 
 /* Header files */
@@ -43,7 +43,7 @@
 #include "lim_session_utils.h"
 
 #include "cds_utils.h"
-
+#include "wlan_blm_api.h"
 #if !defined(REMOVE_PKT_LOG)
 #include "pktlog_ac.h"
 #else
@@ -328,10 +328,10 @@ int wma_peer_sta_kickout_event_handler(void *handle, uint8_t *event,
 	wmi_peer_sta_kickout_event_fixed_param *kickout_event = NULL;
 	uint8_t vdev_id, macaddr[QDF_MAC_ADDR_SIZE];
 	tpDeleteStaContext del_sta_ctx;
-	struct ibss_peer_inactivity_ind *inactivity;
 	uint8_t *addr, *bssid;
 	struct wlan_objmgr_vdev *vdev;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	struct reject_ap_info ap_info;
 
 	param_buf = (WMI_PEER_STA_KICKOUT_EVENTID_param_tlvs *) event;
 	kickout_event = param_buf->fixed_param;
@@ -364,15 +364,6 @@ int wma_peer_sta_kickout_event_handler(void *handle, uint8_t *event,
 
 	switch (kickout_event->reason) {
 	case WMI_PEER_STA_KICKOUT_REASON_IBSS_DISCONNECT:
-		inactivity = qdf_mem_malloc(sizeof(*inactivity));
-		if (!inactivity) {
-			WMA_LOGE("QDF MEM Alloc Failed for tSirIbssPeerInactivity");
-			return -ENOMEM;
-		}
-		qdf_mem_copy(inactivity->peer_addr.bytes, macaddr,
-			     QDF_MAC_ADDR_SIZE);
-		wma_send_msg(wma, WMA_IBSS_PEER_INACTIVITY_IND,
-			     inactivity, 0);
 		goto exit_handler;
 #ifdef FEATURE_WLAN_TDLS
 	case WMI_PEER_STA_KICKOUT_REASON_TDLS_DISCONNECT:
@@ -468,6 +459,11 @@ int wma_peer_sta_kickout_event_handler(void *handle, uint8_t *event,
 	wma_send_msg(wma, SIR_LIM_DELETE_STA_CONTEXT_IND, (void *)del_sta_ctx,
 		     0);
 	wma_lost_link_info_handler(wma, vdev_id, del_sta_ctx->rssi);
+
+	qdf_mem_copy(&ap_info.bssid, macaddr, QDF_MAC_ADDR_SIZE);
+	ap_info.reject_ap_type = DRIVER_AVOID_TYPE;
+	wlan_blm_add_bssid_to_reject_list(wma->pdev, &ap_info);
+
 exit_handler:
 	return 0;
 }
@@ -1389,12 +1385,11 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 			     peer_ht_rates.num_rates);
 	}
 
-	/* in ap/ibss mode and for tdls peer, use mac address of the peer in
+	/* in ap mode and for tdls peer, use mac address of the peer in
 	 * the other end as the new peer address; in sta mode, use bss id to
 	 * be the new peer address
 	 */
 	if ((wma_is_vdev_in_ap_mode(wma, params->smesessionId))
-	    || (wma_is_vdev_in_ibss_mode(wma, params->smesessionId))
 #ifdef FEATURE_WLAN_TDLS
 	    || (STA_ENTRY_TDLS_PEER == params->staType)
 #endif /* FEATURE_WLAN_TDLS */
@@ -1894,93 +1889,6 @@ static inline void wma_fill_in_wapi_key_params(
 }
 #endif
 #endif
-
-#ifdef QCA_IBSS_SUPPORT
-/**
- * wma_calc_ibss_heart_beat_timer() - calculate IBSS heart beat timer
- * @peer_num: number of peers
- *
- * Return: heart beat timer value
- */
-static uint16_t wma_calc_ibss_heart_beat_timer(int16_t peer_num)
-{
-	/* heart beat timer value look-up table */
-	/* entry index : (the number of currently connected peers) - 1
-	 * entry value : the heart time threshold value in seconds for
-	 * detecting ibss peer departure
-	 */
-	static const uint16_t heart_beat_timer[MAX_PEERS] = {
-		4, 4, 4, 4, 4, 4, 4, 4,
-		8, 8, 8, 8, 8, 8, 8, 8,
-		12, 12, 12, 12, 12, 12, 12, 12,
-		16, 16, 16, 16, 16, 16, 16, 16
-	};
-
-	if (peer_num < 1 || peer_num > MAX_PEERS)
-		return 0;
-
-	return heart_beat_timer[peer_num - 1];
-}
-
-void wma_adjust_ibss_heart_beat_timer(tp_wma_handle wma,
-				      uint8_t vdev_id,
-				      int8_t peer_num_delta)
-{
-	int16_t new_peer_num;
-	uint16_t new_timer_value_sec;
-	uint32_t new_timer_value_ms;
-	QDF_STATUS status;
-	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
-
-	if (peer_num_delta != 1 && peer_num_delta != -1) {
-		WMA_LOGE("Invalid peer_num_delta value %d", peer_num_delta);
-		return;
-	}
-
-	/* adjust peer numbers */
-	new_peer_num = cdp_peer_update_ibss_add_peer_num_of_vdev(
-								soc, vdev_id,
-								peer_num_delta);
-	if (OL_TXRX_INVALID_NUM_PEERS == new_peer_num) {
-		WMA_LOGE("new peer num %d out of valid boundary", new_peer_num);
-		return;
-	}
-
-	/* reset timer value if all peers departed */
-	if (new_peer_num == 0) {
-		cdp_set_ibss_vdev_heart_beat_timer(soc, vdev_id, 0);
-		return;
-	}
-
-	/* calculate new timer value */
-	new_timer_value_sec = wma_calc_ibss_heart_beat_timer(new_peer_num);
-	if (new_timer_value_sec == 0) {
-		WMA_LOGE("timer value %d is invalid for peer number %d",
-			 new_timer_value_sec, new_peer_num);
-		return;
-	}
-	if (new_timer_value_sec ==
-	    cdp_set_ibss_vdev_heart_beat_timer(soc, vdev_id,
-					       new_timer_value_sec)) {
-		wma_nofl_debug("timer value %d stays same, no need to notify target",
-			       new_timer_value_sec);
-		return;
-	}
-
-	new_timer_value_ms = ((uint32_t)new_timer_value_sec) * 1000;
-
-	status = wma_vdev_set_param(wma->wmi_handle, vdev_id,
-				    WMI_VDEV_PARAM_IBSS_MAX_BCN_LOST_MS,
-				    new_timer_value_ms);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		WMA_LOGE("Failed to set IBSS link monitoring timer value");
-		return;
-	}
-
-	wma_nofl_debug("Set IBSS link monitor timer: peer_num = %d timer_value = %d",
-		       new_peer_num, new_timer_value_ms);
-}
-#endif /* QCA_IBSS_SUPPORT */
 
 /**
  * wma_process_update_edca_param_req() - update EDCA params
@@ -3029,61 +2937,56 @@ static uint64_t wma_extract_ccmp_pn(uint8_t *ccmp_ptr)
 		 ((uint64_t) pn[2] << 16) |
 		 ((uint64_t) pn[1] << 8) | ((uint64_t) pn[0] << 0);
 
-	WMA_LOGE("PN of received packet is %llu", new_pn);
 	return new_pn;
 }
 
 /**
  * wma_is_ccmp_pn_replay_attack() - detect replay attacking using PN in CCMP
- * @cds_ctx: cds context
+ * @wma: wma context
  * @wh: 802.11 frame header
  * @ccmp_ptr: CCMP frame header
  *
  * Return: true/false
  */
 static bool
-wma_is_ccmp_pn_replay_attack(void *cds_ctx, struct ieee80211_frame *wh,
-			 uint8_t *ccmp_ptr)
+wma_is_ccmp_pn_replay_attack(tp_wma_handle wma, struct ieee80211_frame *wh,
+			     uint8_t *ccmp_ptr)
 {
-	uint8_t vdev_id;
-	uint8_t *last_pn_valid = NULL;
-	uint64_t *last_pn = NULL, new_pn;
-	uint32_t *rmf_pn_replays = NULL;
-	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	uint64_t new_pn;
 	bool ret = false;
-
-	if (wma_find_vdev_id_by_bssid(cds_ctx, wh->i_addr3, &vdev_id) &&
-	    wma_find_vdev_id_by_addr(cds_ctx, wh->i_addr1, &vdev_id)) {
-		WMA_LOGE("%s: Failed to find vdev", __func__);
-		return true;
-	}
+	struct peer_mlme_priv_obj *peer_priv;
+	struct wlan_objmgr_peer *peer;
 
 	new_pn = wma_extract_ccmp_pn(ccmp_ptr);
 
-	cdp_get_pn_info(soc, wh->i_addr3, vdev_id, &last_pn_valid, &last_pn,
-			&rmf_pn_replays);
+	peer = wlan_objmgr_get_peer_by_mac(wma->psoc, wh->i_addr2,
+					   WLAN_LEGACY_WMA_ID);
+	if (!peer)
+		return ret;
 
-	if (!last_pn_valid || !last_pn || !rmf_pn_replays) {
-		WMA_LOGE("%s: PN validation seems not supported", __func__);
-		goto rel_peer_ref;
+	peer_priv = wlan_objmgr_peer_get_comp_private_obj(peer,
+							  WLAN_UMAC_COMP_MLME);
+	if (!peer_priv) {
+		wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_WMA_ID);
+		return ret;
 	}
 
-	if (*last_pn_valid) {
-		if (new_pn > *last_pn) {
-			*last_pn = new_pn;
-			WMA_LOGE("%s: PN validation successful", __func__);
+	if (peer_priv->last_pn_valid) {
+		if (new_pn > peer_priv->last_pn) {
+			peer_priv->last_pn = new_pn;
 		} else {
-			WMA_LOGE("%s: PN Replay attack detected", __func__);
+			wma_err_rl("PN Replay attack detected");
 			/* per 11W amendment, keeping track of replay attacks */
-			*rmf_pn_replays += 1;
+			peer_priv->rmf_pn_replays += 1;
 			ret = true;
 		}
 	} else {
-		*last_pn_valid = 1;
-		*last_pn = new_pn;
+		peer_priv->last_pn_valid = 1;
+		peer_priv->last_pn = new_pn;
 	}
 
-rel_peer_ref:
+	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_WMA_ID);
+
 	return ret;
 }
 
@@ -3097,104 +3000,72 @@ rel_peer_ref:
  *
  * Return: 0 for success or error code
  */
-
 static
-int wma_process_bip(tp_wma_handle wma_handle,
-	struct wma_txrx_node *iface,
-	struct ieee80211_frame *wh,
-	qdf_nbuf_t wbuf
-)
+int wma_process_bip(tp_wma_handle wma_handle, struct wma_txrx_node *iface,
+		    struct ieee80211_frame *wh, qdf_nbuf_t wbuf)
 {
 	uint16_t mmie_size;
-	uint16_t key_id;
 	uint8_t *efrm;
-	uint8_t *igtk;
-	uint16_t key_len;
+	int32_t mgmtcipherset;
+	enum wlan_crypto_cipher_type key_cipher;
 
 	efrm = qdf_nbuf_data(wbuf) + qdf_nbuf_len(wbuf);
 
-	if (iface->key.key_cipher == WMI_CIPHER_AES_CMAC) {
+	mgmtcipherset = wlan_crypto_get_param(iface->vdev,
+					      WLAN_CRYPTO_PARAM_MGMT_CIPHER);
+	if (mgmtcipherset <= 0) {
+		wma_err("Invalid key cipher %d", mgmtcipherset);
+		return -EINVAL;
+	}
+
+	if (mgmtcipherset & (1 << WLAN_CRYPTO_CIPHER_AES_CMAC)) {
+		key_cipher = WLAN_CRYPTO_CIPHER_AES_CMAC;
 		mmie_size = cds_get_mmie_size();
-	} else if (iface->key.key_cipher == WMI_CIPHER_AES_GMAC ||
-		   iface->key.key_cipher == WMI_CIPHER_BIP_GMAC_256) {
+	} else if (mgmtcipherset & (1 << WLAN_CRYPTO_CIPHER_AES_GMAC)) {
+		key_cipher = WLAN_CRYPTO_CIPHER_AES_GMAC;
+		mmie_size = cds_get_gmac_mmie_size();
+	} else if (mgmtcipherset & (1 << WLAN_CRYPTO_CIPHER_AES_GMAC_256)) {
+		key_cipher = WLAN_CRYPTO_CIPHER_AES_GMAC_256;
 		mmie_size = cds_get_gmac_mmie_size();
 	} else {
-		WMA_LOGE(FL("Invalid key cipher %d"), iface->key.key_cipher);
+		wma_err("Invalid key cipher %d", mgmtcipherset);
 		return -EINVAL;
 	}
 
 	/* Check if frame is invalid length */
 	if (efrm - (uint8_t *)wh < sizeof(*wh) + mmie_size) {
-		WMA_LOGE(FL("Invalid frame length"));
+		wma_err("Invalid frame length");
 		return -EINVAL;
 	}
 
-	key_id = (uint16_t)*(efrm - mmie_size + 2);
-	if (!((key_id == WMA_IGTK_KEY_INDEX_4)
-	     || (key_id == WMA_IGTK_KEY_INDEX_5))) {
-		WMA_LOGE(FL("Invalid KeyID(%d) dropping the frame"), key_id);
-		return -EINVAL;
-	}
-
-	wma_debug("key_cipher %d key_id %d", iface->key.key_cipher, key_id);
-
-	igtk = wma_get_igtk(iface, &key_len);
-	switch (iface->key.key_cipher) {
-	case WMI_CIPHER_AES_CMAC:
-		if (wmi_service_enabled(wma_handle->wmi_handle,
-				wmi_service_sta_pmf_offload)) {
-			/*
-			 * if 11w offload is enabled then mmie validation is
-			 * performed in firmware, host just need to trim the
-			 * mmie.
-			 */
-			qdf_nbuf_trim_tail(wbuf, cds_get_mmie_size());
-		} else {
-			if (cds_is_mmie_valid(igtk, iface->key.key_id[
-					      key_id -
-					      WMA_IGTK_KEY_INDEX_4].ipn,
-					      (uint8_t *)wh, efrm)) {
-				wma_debug("Protected BC/MC frame MMIE validation successful");
-				/* Remove MMIE */
-				qdf_nbuf_trim_tail(wbuf, cds_get_mmie_size());
-			} else {
+	switch (key_cipher) {
+	case WLAN_CRYPTO_CIPHER_AES_CMAC:
+		if (!wmi_service_enabled(wma_handle->wmi_handle,
+					 wmi_service_sta_pmf_offload)) {
+			if (!wlan_crypto_is_mmie_valid(iface->vdev,
+						       (uint8_t *)wh, efrm)) {
 				wma_debug("BC/MC MIC error or MMIE not present, dropping the frame");
 				return -EINVAL;
 			}
 		}
 		break;
-
-	case WMI_CIPHER_AES_GMAC:
-	case WMI_CIPHER_BIP_GMAC_256:
-		if (wmi_service_enabled(wma_handle->wmi_handle,
-				wmi_service_gmac_offload_support)) {
-			/*
-			 * if gmac offload is enabled then mmie validation is
-			 * performed in firmware, host just need to trim the
-			 * mmie.
-			 */
-			wma_debug("Trim GMAC MMIE");
-			qdf_nbuf_trim_tail(wbuf, cds_get_gmac_mmie_size());
-		} else {
-			if (cds_is_gmac_mmie_valid(igtk,
-			   iface->key.key_id[key_id - WMA_IGTK_KEY_INDEX_4].ipn,
-			   (uint8_t *) wh, efrm, key_len)) {
-				wma_debug("Protected BC/MC frame GMAC MMIE validation successful");
-				/* Remove MMIE */
-				qdf_nbuf_trim_tail(wbuf,
-						   cds_get_gmac_mmie_size());
-			} else {
+	case WLAN_CRYPTO_CIPHER_AES_GMAC:
+	case WLAN_CRYPTO_CIPHER_AES_GMAC_256:
+		if (!wmi_service_enabled(wma_handle->wmi_handle,
+					 wmi_service_gmac_offload_support)) {
+			if (!wlan_crypto_is_mmie_valid(iface->vdev,
+						       (uint8_t *)wh, efrm)) {
 				wma_debug("BC/MC GMAC MIC error or MMIE not present, dropping the frame");
 				return -EINVAL;
 			}
 		}
 		break;
-
 	default:
-		WMA_LOGE(FL("Unsupported key cipher %d"),
-			iface->key.key_cipher);
+		wma_err("Invalid key_type %d", key_cipher);
+		return -EINVAL;
 	}
 
+	qdf_nbuf_trim_tail(wbuf, mmie_size);
 
 	return 0;
 }
@@ -3256,9 +3127,8 @@ int wma_process_rmf_frame(tp_wma_handle wma_handle,
 		orig_hdr = (uint8_t *) qdf_nbuf_data(wbuf);
 		/* Pointer to head of CCMP header */
 		ccmp = orig_hdr + sizeof(*wh);
-		if (wma_is_ccmp_pn_replay_attack(
-			wma_handle, wh, ccmp)) {
-			WMA_LOGE("Dropping the frame");
+		if (wma_is_ccmp_pn_replay_attack(wma_handle, wh, ccmp)) {
+			wma_err_rl("Dropping the frame");
 			cds_pkt_return_packet(rx_pkt);
 			return -EINVAL;
 		}
@@ -4031,8 +3901,7 @@ void wma_mgmt_nbuf_unmap_cb(struct wlan_objmgr_pdev *pdev,
 	}
 
 	dev = wlan_psoc_get_qdf_dev(psoc);
-	if (wlan_psoc_nif_fw_ext_cap_get(psoc, WLAN_SOC_CEXT_WMI_MGMT_REF))
-		qdf_nbuf_unmap_single(dev, buf, QDF_DMA_TO_DEVICE);
+	qdf_nbuf_unmap_single(dev, buf, QDF_DMA_TO_DEVICE);
 }
 
 QDF_STATUS wma_mgmt_frame_fill_peer_cb(struct wlan_objmgr_peer *peer,

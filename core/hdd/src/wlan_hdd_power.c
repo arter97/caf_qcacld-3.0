@@ -83,6 +83,7 @@
 #include "wlan_osif_request_manager.h"
 #include <wlan_hdd_sar_limits.h>
 #include "wlan_pkt_capture_ucfg_api.h"
+#include "wlan_hdd_thermal.h"
 
 /* Preprocessor definitions and constants */
 #ifdef QCA_WIFI_NAPIER_EMULATION
@@ -1143,8 +1144,7 @@ static void hdd_update_conn_state_mask(struct hdd_adapter *adapter,
 
 	conn_state = sta_ctx->conn_info.conn_state;
 
-	if (conn_state == eConnectionState_Associated ||
-			conn_state == eConnectionState_IbssConnected)
+	if (conn_state == eConnectionState_Associated)
 		*conn_state_mask |= (1 << adapter->vdev_id);
 }
 
@@ -1354,11 +1354,6 @@ QDF_STATUS hdd_wlan_shutdown(void)
 	 * increment their counts from 0.
 	 */
 	hdd_reset_all_adapters_connectivity_stats(hdd_ctx);
-	/*
-	 * Purge all active and pending list to avoid vdev destroy timeout and
-	 * thus avoid peer/vdev refcount leak.
-	 */
-	sme_purge_pdev_all_ser_cmd_list(hdd_ctx->mac_handle);
 
 	hdd_reset_all_adapters(hdd_ctx);
 
@@ -1529,6 +1524,7 @@ QDF_STATUS hdd_wlan_re_init(void)
 	sme_set_chip_pwr_save_fail_cb(hdd_ctx->mac_handle,
 				      hdd_chip_pwr_save_fail_detected_cb);
 
+	hdd_restore_thermal_mitigation_config(hdd_ctx);
 	hdd_restore_sar_config(hdd_ctx);
 
 	hdd_send_default_scan_ies(hdd_ctx);
@@ -1720,8 +1716,6 @@ static int __wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 		exit_code = 0;
 		goto exit_with_code;
 	}
-
-	pld_request_bus_bandwidth(hdd_ctx->parent_dev, PLD_BUS_WIDTH_MEDIUM);
 
 	status = hdd_resume_wlan();
 	if (status != QDF_STATUS_SUCCESS) {
@@ -1977,8 +1971,6 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 
 	hdd_ctx->is_wiphy_suspended = true;
 
-	pld_request_bus_bandwidth(hdd_ctx->parent_dev, PLD_BUS_WIDTH_NONE);
-
 	hdd_exit();
 	return 0;
 
@@ -2145,8 +2137,15 @@ static int __wlan_hdd_cfg80211_set_power_mgmt(struct wiphy *wiphy,
 
 	status = wlan_hdd_set_powersave(adapter, allow_power_save, timeout);
 
-	allow_power_save ? hdd_stop_dhcp_ind(adapter) :
-		hdd_start_dhcp_ind(adapter);
+	if (hdd_adapter_is_connected_sta(adapter)) {
+		hdd_debug("vdev mode %d enable dhcp protection",
+			  adapter->device_mode);
+		allow_power_save ? hdd_stop_dhcp_ind(adapter) :
+			hdd_start_dhcp_ind(adapter);
+	} else {
+		hdd_debug("vdev mod %d disconnected ignore dhcp protection",
+			  adapter->device_mode);
+	}
 
 	hdd_exit();
 	return status;
@@ -2269,9 +2268,13 @@ static int __wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
 		break;
 
 	case NL80211_TX_POWER_FIXED:    /* Fix TX power to the mBm parameter */
-		hdd_err("NL80211_TX_POWER_FIXED not supported");
-		return -EOPNOTSUPP;
-
+		status = sme_set_tx_power(mac_handle, adapter->vdev_id,
+					  bssid, adapter->device_mode, dbm);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("Setting tx power failed, %d", status);
+			return -EIO;
+		}
+		break;
 	default:
 		hdd_err("Invalid power setting type %d", type);
 		return -EIO;
@@ -2510,40 +2513,37 @@ int wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 	return errno;
 }
 
-int hdd_set_qpower_config(struct hdd_context *hddctx,
-			  struct hdd_adapter *adapter,
-			  u8 qpower)
+int hdd_set_power_config(struct hdd_context *hddctx,
+			 struct hdd_adapter *adapter,
+			 uint8_t power)
 {
 	QDF_STATUS status;
 
 	if (!ucfg_pmo_get_power_save_mode(hddctx->psoc)) {
-		hdd_err("qpower is disabled in configuration");
+		hdd_err("power save is disabled in configuration");
 		return -EINVAL;
 	}
 	if (adapter->device_mode != QDF_STA_MODE &&
 	    adapter->device_mode != QDF_P2P_CLIENT_MODE) {
-		hdd_info("QPOWER only allowed in STA/P2P-Client modes:%d",
+		hdd_info("Advanced power save only allowed in STA/P2P-Client modes:%d",
 			 adapter->device_mode);
 		return -EINVAL;
 	}
 
-	if (qpower > PS_DUTY_CYCLING_QPOWER ||
-	    qpower < PS_LEGACY_NODEEPSLEEP) {
-		hdd_err("invalid qpower value: %d", qpower);
+	if (power > PMO_PS_ADVANCED_POWER_SAVE_ENABLE ||
+	    power < PMO_PS_ADVANCED_POWER_SAVE_DISABLE) {
+		hdd_err("invalid power value: %d", power);
 		return -EINVAL;
 	}
 
 	if (ucfg_pmo_get_max_ps_poll(hddctx->psoc)) {
-		if ((qpower == PS_QPOWER_NODEEPSLEEP) ||
-				(qpower == PS_LEGACY_NODEEPSLEEP))
-			qpower = PS_LEGACY_NODEEPSLEEP;
-		else
-			qpower = PS_LEGACY_DEEPSLEEP;
-		hdd_info("Qpower disabled, %d", qpower);
+		hdd_info("Disable advanced power save since max ps poll is enabled");
+		power = PMO_PS_ADVANCED_POWER_SAVE_DISABLE;
 	}
-	status = wma_set_qpower_config(adapter->vdev_id, qpower);
+
+	status = wma_set_power_config(adapter->vdev_id, power);
 	if (status != QDF_STATUS_SUCCESS) {
-		hdd_err("failed to configure qpower: %d", status);
+		hdd_err("failed to configure power: %d", status);
 		return -EINVAL;
 	}
 

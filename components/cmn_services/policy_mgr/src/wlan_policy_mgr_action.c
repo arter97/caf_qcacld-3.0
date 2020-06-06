@@ -1381,7 +1381,8 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 	uint8_t num_cxn_del = 0;
 	QDF_STATUS status;
 
-	*intf_ch_freq = 0;
+	if (intf_ch_freq)
+		*intf_ch_freq = 0;
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
 		policy_mgr_err("Invalid pm context");
@@ -2273,6 +2274,77 @@ QDF_STATUS policy_mgr_set_connection_update(struct wlan_objmgr_psoc *psoc)
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS
+policy_mgr_wait_for_dual_mac_configuration(struct wlan_objmgr_psoc *psoc)
+{
+	QDF_STATUS status;
+	struct policy_mgr_psoc_priv_obj *policy_mgr_context;
+
+	policy_mgr_context = policy_mgr_get_context(psoc);
+	if (!policy_mgr_context) {
+		policy_mgr_err("Invalid context");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	status = qdf_wait_single_event(
+		   &policy_mgr_context->dual_mac_configuration_complete_evt,
+		   DUAL_MAC_CONFIG_TIMEOUT);
+
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		policy_mgr_err("wait for event failed");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+policy_mgr_dual_mac_configuration_complete(struct wlan_objmgr_psoc *psoc)
+{
+	QDF_STATUS status;
+	struct policy_mgr_psoc_priv_obj *policy_mgr_context;
+
+	policy_mgr_context = policy_mgr_get_context(psoc);
+	if (!policy_mgr_context) {
+		policy_mgr_err("Invalid context");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	status = qdf_event_set(
+		   &policy_mgr_context->dual_mac_configuration_complete_evt);
+
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		policy_mgr_err("set event failed");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+policy_mgr_reset_dual_mac_configuration(struct wlan_objmgr_psoc *psoc)
+{
+	QDF_STATUS status;
+	struct policy_mgr_psoc_priv_obj *policy_mgr_context;
+
+	policy_mgr_context = policy_mgr_get_context(psoc);
+	if (!policy_mgr_context) {
+		policy_mgr_err("Invalid context");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	status = qdf_event_reset(
+		&policy_mgr_context->dual_mac_configuration_complete_evt);
+
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		policy_mgr_err("clear event failed");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+
 QDF_STATUS policy_mgr_set_chan_switch_complete_evt(
 		struct wlan_objmgr_psoc *psoc)
 {
@@ -2438,7 +2510,7 @@ QDF_STATUS policy_mgr_set_hw_mode_on_channel_switch(
 
 	/* For DBS, we want to move right away to DBS mode */
 	status = policy_mgr_next_actions(psoc, session_id, action,
-			POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH);
+			POLICY_MGR_UPDATE_REASON_AFTER_CHANNEL_SWITCH);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		policy_mgr_err("no set hw mode command was issued");
 		goto done;
