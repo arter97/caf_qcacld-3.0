@@ -3884,6 +3884,95 @@ bool dp_find_peer_exist(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 }
 #endif
 
+#ifdef WLAN_SUPPORT_MSCS
+union dp_peer_mscs_tuple {
+	struct dp_peer_mscs_tuple_ipv4 ipv4;
+	struct dp_peer_mscs_tuple_ipv6 ipv6;
+};
+
+/*
+ * mscs_parse_ipv4 - Function to parse IPv4
+ * params from an MSDU.
+ * @data - MSDU obtained
+ * @mscs_tuple - IPV4 data structure to be
+ * used for MSCS Procedures
+ */
+void mscs_parse_ipv4(uint8_t *data,
+		     struct dp_peer_mscs_tuple_ipv4
+		     *mscs_tuple)
+{
+	uint8_t *tcp_udp_ptr;
+	uint8_t ip_header_len;
+
+	mscs_tuple->src_ip = *((uint32_t *)(data +
+		QDF_NBUF_TRAC_IPV4_SRC_ADDR_OFFSET));
+	mscs_tuple->dst_ip = *((uint32_t *)(data +
+		QDF_NBUF_TRAC_IPV4_DEST_ADDR_OFFSET));
+	mscs_tuple->dscp =   *((uint32_t *)(data +
+		QDF_NBUF_TRAC_IPV4_DSCP_OFFSET));
+	mscs_tuple->dscp &= 0xFC;
+	mscs_tuple->dscp >>= 2;
+	mscs_tuple->proto = *((uint32_t *)(data +
+		QDF_NBUF_TRAC_IPV4_PROTO_TYPE_OFFSET));
+	ip_header_len = ((*(data + QDF_NBUF_TRAC_IPV4_OFFSET)) & 0x0F) * 4;
+
+	tcp_udp_ptr = data + ip_header_len +
+		QDF_NBUF_TRAC_IPV4_OFFSET;
+	mscs_tuple->src_port = *((uint16_t *)(tcp_udp_ptr +
+		QDF_NBUF_TRAC_TCP_SPORT_OFFSET));
+	mscs_tuple->dst_port = *((uint16_t *)(tcp_udp_ptr +
+		QDF_NBUF_TRAC_TCP_DPORT_OFFSET));
+}
+
+/*
+ * mscs_parse_ipv6 - Function to parse IPv6
+ * params from an MSDU.
+ * @data - MSDU obtained
+ * @mscs_tuple - IPV6 data structure to be
+ * used for MSCS Procedures
+ */
+int mscs_parse_ipv6(uint8_t *data,
+		    struct dp_peer_mscs_tuple_ipv6 *mscs_tuple)
+{
+	uint8_t *tcp_udp_ptr;
+	uint16_t traffic_class;
+	uint32_t flow_label;
+
+	memcpy(&traffic_class, (data + QDF_NBUF_TRAC_IPV6_OFFSET),
+	       sizeof(uint16_t));
+	memcpy(&flow_label, (data + QDF_NBUF_TRAC_IPV6_FL_OFFSET),
+	       sizeof(uint32_t));
+	flow_label = ntohl(flow_label);
+	flow_label &= 0x000FFFFF;
+	traffic_class &= 0x0FF0;
+	traffic_class >>= 4;
+	mscs_tuple->dscp &= 0xFC;
+	mscs_tuple->dscp >>= 2;
+	mscs_tuple->flow_label = flow_label;
+	mscs_tuple->proto = *(data + QDF_NBUF_TRAC_IPV6_NH_OFFSET);
+
+	if (!((mscs_tuple->proto == QDF_NBUF_TRAC_UDP_TYPE) ||
+	      (mscs_tuple->proto ==
+	       QDF_NBUF_TRAC_TCP_TYPE))) {
+		/* The next header is not a TCP/UDP header */
+		return -EINVAL;
+	}
+	memcpy(mscs_tuple->src_ip, (data +
+		QDF_NBUF_TRAC_IPV6_SRC_IP_OFFSET), QDF_IPV6_ADDR_SIZE);
+
+	memcpy(mscs_tuple->dst_ip, (data +
+		QDF_NBUF_TRAC_IPV6_DEST_ADDR_OFFSET), QDF_IPV6_ADDR_SIZE);
+
+	tcp_udp_ptr = data + QDF_NBUF_TRAC_IPV6_OFFSET +
+		QDF_NBUF_TRAC_IPV6_HEADER_SIZE;
+	mscs_tuple->src_port = *((uint16_t *)(tcp_udp_ptr +
+		QDF_NBUF_TRAC_TCP_SPORT_OFFSET));
+	mscs_tuple->dst_port = *((uint16_t *)(tcp_udp_ptr +
+		QDF_NBUF_TRAC_TCP_DPORT_OFFSET));
+	return 0;
+}
+#endif
+
 /**
  * dp_peer_rxtid_stats: Retried Rx TID (REO queue) stats from HW
  * @peer: DP peer handle

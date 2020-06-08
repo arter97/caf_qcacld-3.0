@@ -6034,13 +6034,15 @@ dp_record_mscs_params(struct cdp_soc_t *soc_hdl, uint8_t *peer_mac,
 	QDF_STATUS status = QDF_STATUS_E_INVAL;
 	struct dp_soc *soc = (struct dp_soc *)soc_hdl;
 
-	peer = dp_peer_find_hash_find(soc, peer_mac, 0, vdev_id,
-				      DP_MOD_ID_CDP);
+	peer = dp_peer_find_hash_find((struct dp_soc *)
+			soc, peer_mac, 0, vdev_id);
 
-	if (!peer) {
-		dp_err("%s: Peer is NULL!\n", __func__);
+	if (!peer || peer->delete_in_progress) {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
+				"%s: Peer is NULL!\n", __func__);
 		goto fail;
 	}
+
 	if (!active) {
 		dp_info("MSCS Procedure is terminated");
 		peer->mscs_active = active;
@@ -6077,7 +6079,7 @@ dp_record_mscs_params(struct cdp_soc_t *soc_hdl, uint8_t *peer_mac,
 	status = QDF_STATUS_SUCCESS;
 fail:
 	if (peer)
-		dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
+		dp_peer_unref_delete(peer);
 	return status;
 }
 #endif

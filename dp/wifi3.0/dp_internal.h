@@ -2188,6 +2188,14 @@ uint16_t dp_get_peer_mac_list(ol_txrx_soc_handle soc, uint8_t vdev_id,
 void dp_is_hw_dbs_enable(struct dp_soc *soc,
 				int *max_mac_rings);
 
+#ifdef WLAN_SUPPORT_MSCS
+void mscs_parse_ipv4(uint8_t *data,
+		     struct dp_peer_mscs_tuple_ipv4
+		     *mscs_tuple);
+
+int mscs_parse_ipv6(uint8_t *data,
+		    struct dp_peer_mscs_tuple_ipv6 *mscs_tuple);
+#endif
 
 #if defined(WLAN_SUPPORT_RX_FISA)
 void dp_rx_dump_fisa_table(struct dp_soc *soc);

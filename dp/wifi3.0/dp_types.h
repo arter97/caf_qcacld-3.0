@@ -2237,6 +2237,11 @@ struct dp_peer_ast_params {
 /*MSCS Procedure based macros */
 #define IEEE80211_MSCS_MAX_ELEM_SIZE    5
 #define IEEE80211_TCLAS_MASK_CLA_TYPE_4  4
+
+/* Defining Protocol types */
+#define PROTO_TCP 6
+#define PROTO_UDP 17
+
 /*
  * struct dp_peer_mscs_parameter - MSCS database obtained from
  * MSCS Request and Response in the control path. This data is used
@@ -2252,6 +2257,71 @@ struct dp_peer_mscs_parameter {
 	uint8_t user_priority_bitmap;
 	uint8_t user_priority_limit;
 	uint8_t classifier_mask;
+};
+
+/*
+ * struct dp_peer_mscs_tuple_ipv4 - classifier
+ * parameters of an msdu having ipv4 packet
+ * @src_ip - source ip address of the msdu
+ * @dst_ip - destination ip address of the msdu
+ * @src_port - source port
+ * @dst_port - destination port
+ * @dscp - dscp value
+ * @protocol - protocol of the corresponding ipv4 packet
+ * @tid - TID for the corresponding tuple - having the above parameters
+ */
+struct dp_peer_mscs_tuple_ipv4 {
+	uint32_t src_ip;
+	uint32_t dst_ip;
+	uint16_t src_port;
+	uint16_t dst_port;
+	uint8_t dscp;
+	uint8_t proto;
+	uint8_t tid;
+};
+
+/*
+ * struct dp_peer_mscs_tuple_ipv6 - classifier
+ * parameters of an msdu having ipv6 packet
+ * @src_ip - source ip address of the msdu
+ * @dst_ip - destination ip address of the msdu
+ * @src_port - source port
+ * @dst_port - destination port
+ * @dscp - dscp value
+ * @protocol - protocol of the corresponding ipv6 packet
+ * @tid - TID for the corresponding tuple - having the above parameters
+ */
+struct dp_peer_mscs_tuple_ipv6 {
+	uint8_t src_ip[QDF_IPV6_ADDR_SIZE];
+	uint8_t dst_ip[QDF_IPV6_ADDR_SIZE];
+	uint16_t src_port;
+	uint16_t dst_port;
+	uint8_t dscp;
+	uint8_t proto;
+	uint32_t flow_label;
+	uint8_t tid;
+};
+
+/*
+ * struct dp_peer_mscs_session_ipv4 - MSCS database for every IPv4 MSDU
+ * @dp_peer_mscs_table_entry - MSCS procedure based mapping
+ * @mscs_params - MSCS control path parameters
+ */
+struct dp_peer_mscs_session_ipv4 {
+	struct dp_peer_mscs_tuple_ipv4
+		mscs_entry_ipv4[IEEE80211_MSCS_MAX_ELEM_SIZE];
+	u_int8_t ipv4_ctr;
+};
+
+/*
+ * struct dp_peer_mscs_session_ipv6 - MSCS database for every IPv6 MSDU
+ * @dp_peer_mscs_table_entry - MSCS procedure based mapping
+ * @mscs_params - MSCS control path parameters
+ */
+struct dp_peer_mscs_session_ipv6 {
+	struct dp_peer_mscs_tuple_ipv6
+		mscs_entry_ipv6[IEEE80211_MSCS_MAX_ELEM_SIZE];
+	u_int8_t ipv6_ctr;
 };
 #endif
 
@@ -2363,14 +2433,10 @@ struct dp_peer {
 #ifdef QCA_PEER_MULTIQ_SUPPORT
 	struct dp_peer_ast_params peer_ast_flowq_idx[DP_PEER_AST_FLOWQ_MAX];
 #endif
-	/* entry to inactive_list*/
-	TAILQ_ENTRY(dp_peer) inactive_list_elem;
-
-	qdf_atomic_t mod_refs[DP_MOD_ID_MAX];
-
-	uint8_t peer_state;
 #ifdef WLAN_SUPPORT_MSCS
 	struct dp_peer_mscs_parameter mscs_ipv4_parameter, mscs_ipv6_parameter;
+	struct dp_peer_mscs_session_ipv4 mscs_session_ipv4;
+	struct dp_peer_mscs_session_ipv6 mscs_session_ipv6;
 	bool mscs_active;
 #endif
 };
