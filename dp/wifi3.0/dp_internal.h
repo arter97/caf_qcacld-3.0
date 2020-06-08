@@ -2211,6 +2211,16 @@ dp_mscs_tx_get_tid_ipv4(struct dp_peer_mscs_session_ipv4
 	*mscs_session_ipv4, struct dp_peer_mscs_tuple_ipv4
 	*ipv4_params, struct dp_peer_mscs_parameter *params, uint8_t tid);
 
+void
+dp_mscs_rx_set_tid_ipv6(struct dp_peer_mscs_session_ipv6
+	*mscs_session_ipv6, struct dp_peer_mscs_tuple_ipv6
+	*ipv6_params, struct dp_peer_mscs_parameter *params, u_int8_t tid);
+
+int
+dp_mscs_tx_get_tid_ipv6(struct dp_peer_mscs_session_ipv6
+	*mscs_session_ipv6, struct dp_peer_mscs_tuple_ipv6
+	*ipv6_params, struct dp_peer_mscs_parameter *params, uint8_t tid);
+
 #else
 static inline uint8_t
 dp_mscs_get_tid(struct dp_soc *soc, struct dp_vdev *vdev,

@@ -4008,6 +4008,43 @@ dp_mscs_add_v4(struct dp_peer_mscs_session_ipv4
 }
 
 /*
+ * dp_mscs_add_ipv6_entry - Adds MSCS IPv6 entry
+ * to the logical tuple
+ * @mscs_session_ipv6 - MSCS logical tuple
+ * @ipv6_params - Entry to be added
+ * @tid  - User priority as the key to this entry
+ */
+static int
+dp_mscs_add_v6(struct dp_peer_mscs_session_ipv6
+		*mscs_session_ipv6, struct dp_peer_mscs_tuple_ipv6
+		*ipv6_params, u_int8_t tid)
+{
+	u_int8_t max_count = mscs_session_ipv6->ipv6_ctr;
+
+	if (max_count == IEEE80211_MSCS_MAX_ELEM_SIZE) {
+		qdf_err("Number of entries exceeded MSCS_MAX_ELEM_SIZE");
+		return -EINVAL;
+	}
+	memcpy(mscs_session_ipv6->mscs_entry_ipv6[max_count].src_ip,
+	       ipv6_params->src_ip, QDF_IPV6_ADDR_SIZE);
+	memcpy(mscs_session_ipv6->mscs_entry_ipv6[max_count].dst_ip,
+	       ipv6_params->dst_ip, QDF_IPV6_ADDR_SIZE);
+	mscs_session_ipv6->mscs_entry_ipv6[max_count].src_port
+		= ipv6_params->src_port;
+	mscs_session_ipv6->mscs_entry_ipv6[max_count].dst_port
+		= ipv6_params->dst_port;
+	mscs_session_ipv6->mscs_entry_ipv6[max_count].proto
+		= ipv6_params->proto;
+	mscs_session_ipv6->mscs_entry_ipv6[max_count].dscp
+		= ipv6_params->dscp;
+	mscs_session_ipv6->mscs_entry_ipv6[max_count].flow_label
+		= ipv6_params->flow_label;
+	mscs_session_ipv6->mscs_entry_ipv6[max_count].tid = tid;
+	mscs_session_ipv6->ipv6_ctr++;
+	return 0;
+}
+
+/*
  * dp_mscs_rx_set_tid_ipv4 - Adds or modifies the current
  * entry inside the logical tuple with the user priority
  * of the MSDU received.
@@ -4150,6 +4187,155 @@ dp_mscs_tx_get_tid_ipv4(struct dp_peer_mscs_session_ipv4
 }
 
 /*
+ * dp_mscs_rx_set_tid_ipv6 - Adds or modifies the current
+ * entry inside the logical tuple with the user priority
+ * of the MSDU received.
+ * The AP will look into the MSDU received and match the
+ * parameters specified in the Classifier Mask that was
+ * sent as a part of the MSCS request by the STA, with
+ * the current entries of the tuple and then either adds
+ * an entry, if one or more masked parameters don't match,
+ * or modifies the tid value, if the parameters matches
+ * the entry
+ * @mscs_session_ipv6 - MSCS data table
+ * @ipv6_params - Entry to be verified
+ * @tid - TID value of the MSDU
+ */
+void
+dp_mscs_rx_set_tid_ipv6(struct dp_peer_mscs_session_ipv6
+	*mscs_session_ipv6, struct dp_peer_mscs_tuple_ipv6
+	*ipv6_params,struct dp_peer_mscs_parameter *params,  u_int8_t tid)
+{
+	/* We have received the parameters as an argument here,
+	 * before we add the entry, we need to check
+	 * if we already have the entry in our table
+	 */
+	u_int8_t ctr;
+	u_int8_t cla_mask = params->classifier_mask;
+	u_int8_t up_bitmap = params->user_priority_bitmap;
+	u_int8_t up_limit = params->user_priority_limit;
+	u_int8_t max_count = mscs_session_ipv6->ipv6_ctr;
+
+	for (ctr = 0; ctr < max_count; ctr++) {
+		if ((cla_mask & IEEE80211_MSCS_DP_SRC_IP) && (memcmp(
+			mscs_session_ipv6->mscs_entry_ipv6[ctr].src_ip
+			, ipv6_params->src_ip, 16) != 0)){
+			continue;
+		} else if ((cla_mask & IEEE80211_MSCS_DP_DST_IP) && (memcmp(
+				mscs_session_ipv6->mscs_entry_ipv6[ctr].dst_ip
+				, ipv6_params->dst_ip, 16) != 0)){
+			continue;
+		} else if (((ipv6_params->proto == PROTO_TCP) ||
+			(ipv6_params->proto == PROTO_UDP)) &&
+			(cla_mask & IEEE80211_MSCS_DP_SRC_PORT) &&
+			(mscs_session_ipv6->mscs_entry_ipv6[ctr].src_port
+			!= ipv6_params->src_port)) {
+			continue;
+		} else if (((ipv6_params->proto == PROTO_TCP) ||
+			(ipv6_params->proto == PROTO_UDP)) &&
+			(cla_mask & IEEE80211_MSCS_DP_DST_PORT) &&
+			(mscs_session_ipv6->mscs_entry_ipv6[ctr].dst_port
+			!= ipv6_params->dst_port)) {
+			continue;
+		} else if ((!((ipv6_params->proto == PROTO_TCP) ||
+			(ipv6_params->proto == PROTO_UDP))) &&
+			(cla_mask & IEEE80211_MSCS_DP_DSCP) &&
+			(mscs_session_ipv6->mscs_entry_ipv6[ctr].dscp
+			!= ipv6_params->dscp)) {
+			continue;
+		} else if ((cla_mask & IEEE80211_MSCS_DP_PROTO) &&
+				(mscs_session_ipv6->mscs_entry_ipv6[ctr].proto
+			!= ipv6_params->proto)) {
+			continue;
+		} else if ((cla_mask & IEEE80211_MSCS_DP_FLOW_LABEL) &&
+			(mscs_session_ipv6->mscs_entry_ipv6[ctr].flow_label
+			!= ipv6_params->flow_label)){
+			continue;
+		}
+		if ((1 << tid) & up_bitmap)
+			mscs_session_ipv6->mscs_entry_ipv6[ctr].tid =
+				QDF_MIN(tid, up_limit);
+		return;
+	}
+	if ((1 << tid) & up_bitmap)
+		dp_mscs_add_v6(mscs_session_ipv6, ipv6_params,
+			       QDF_MIN(tid, up_limit));
+}
+
+/*
+ * dp_mscs_rx_get_tid_ipv6 - Used in TX operation, to
+ * retrieve the current entry inside the logical tuple
+ * with the user priority of the MSDU received,
+ * during the RX operation.
+ * The AP will look into the MSDU that is to be sent
+ * and match the parameters specified in the Classifier
+ * Mask that was sent as a part of the MSCS request by the STA,
+ * with the current entries of the tuple and then either uses
+ * the default DSCP to UP mapping, if one or more masked
+ * parameters don't match, or retrives the tid value present
+ * inside the table if the parameters match
+ * the mirrored entry.
+ * @mscs_session_ipv6 - MSCS data table
+ * @ipv6_params - Entry to be verified
+ * @params- MSCS Handshake parameters
+ * @tid - TID value of the MSDU
+ */
+int
+dp_mscs_tx_get_tid_ipv6(struct dp_peer_mscs_session_ipv6
+	*mscs_session_ipv6, struct dp_peer_mscs_tuple_ipv6
+	*ipv6_params, struct dp_peer_mscs_parameter *params, uint8_t tid)
+{
+	/* We have the tuple with us present and
+	 *  we have received some classifier parameters as
+	 *  an argument here, we need to check if the entry is present
+	 *  in the tuple, if yes, send the corresponding tid or if the
+	 *  entry is not present, use the default tid mapping
+	 */
+	u_int8_t ctr;
+	u_int8_t cla_mask = params->classifier_mask;
+	u_int8_t max_count = mscs_session_ipv6->ipv6_ctr;
+
+	for (ctr = 0; ctr < max_count; ctr++) {
+		if ((cla_mask & IEEE80211_MSCS_DP_SRC_IP) && (memcmp(
+				mscs_session_ipv6->mscs_entry_ipv6[ctr].src_ip
+				, ipv6_params->dst_ip, 16) != 0)) {
+			continue;
+		} else if ((cla_mask & IEEE80211_MSCS_DP_DST_IP) &&
+			(memcmp(
+				mscs_session_ipv6->mscs_entry_ipv6[ctr].dst_ip
+				, ipv6_params->src_ip, 16) != 0)) {
+			continue;
+		} else if (((ipv6_params->proto == PROTO_TCP) ||
+			(ipv6_params->proto == PROTO_UDP)) &&
+			(cla_mask & IEEE80211_MSCS_DP_SRC_PORT) &&
+			(mscs_session_ipv6->mscs_entry_ipv6[ctr].src_port
+			!= ipv6_params->dst_port)) {
+			continue;
+		} else if (((ipv6_params->proto == PROTO_TCP) ||
+			(ipv6_params->proto == PROTO_UDP)) &&
+			(cla_mask & IEEE80211_MSCS_DP_DST_PORT) &&
+			(mscs_session_ipv6->mscs_entry_ipv6[ctr].dst_port
+			!= ipv6_params->src_port)) {
+			continue;
+		} else if ((cla_mask & IEEE80211_MSCS_DP_DSCP) &&
+			(mscs_session_ipv6->mscs_entry_ipv6[ctr].dscp
+			!= ipv6_params->dscp)) {
+			continue;
+		} else if ((cla_mask & IEEE80211_MSCS_DP_PROTO) &&
+			(mscs_session_ipv6->mscs_entry_ipv6[ctr].proto
+				!= ipv6_params->proto)){
+			continue;
+		} else if ((cla_mask & IEEE80211_MSCS_DP_FLOW_LABEL) &&
+			(mscs_session_ipv6->mscs_entry_ipv6[ctr].flow_label
+			!= ipv6_params->flow_label)){
+			continue;
+		}
+		return mscs_session_ipv6->mscs_entry_ipv6[ctr].tid;
+	}
+	return tid;
+}
+
+/*
  * dp_mscs_get_tid - This function is used both in
  * TX side, to get the correct TID value for
  * the downlink traffic
@@ -4193,6 +4379,14 @@ uint8_t dp_mscs_get_tid(struct dp_soc *soc, struct dp_vdev *vdev,
 			&peer->mscs_ipv4_parameter,
 			tid);
 		break;
+	case QDF_NBUF_TRAC_IPV6_ETH_TYPE:
+		mscs_parse_ipv6(data, &mscs_tuple.ipv6);
+			return dp_mscs_tx_get_tid_ipv6(
+			&peer->mscs_session_ipv6,
+			&mscs_tuple.ipv6,
+			&peer->mscs_ipv6_parameter,
+			tid);
+		break;
 	}
 	return tid;
 }
@@ -4232,6 +4426,15 @@ void dp_mscs_set_tid(struct dp_peer *peer, uint8_t *data, uint8_t tid)
 			&peer->mscs_session_ipv4,
 			&mscs_tuple.ipv4,
 			&peer->mscs_ipv4_parameter,
+			tid);
+			return;
+		break;
+	case QDF_NBUF_TRAC_IPV6_ETH_TYPE:
+		mscs_parse_ipv6(data, &mscs_tuple.ipv6);
+			dp_mscs_rx_set_tid_ipv6(
+			&peer->mscs_session_ipv6,
+			&mscs_tuple.ipv6,
+			&peer->mscs_ipv6_parameter,
 			tid);
 			return;
 		break;
