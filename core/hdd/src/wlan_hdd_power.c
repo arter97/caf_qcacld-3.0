@@ -684,9 +684,11 @@ void hdd_conf_hostoffload(hdd_adapter_t *pAdapter, bool fenable)
 			hdd_conf_ns_offload(pAdapter, fenable);
 	}
 
-	/* Configure DTIM hardware filter rules */
-	hdd_conf_hw_filter_mode(pAdapter, pHddCtx->config->hw_filter_mode,
-				fenable);
+	/* Configure DTIM hardware filter rules. Not supported for NDI mode */
+	if (pAdapter->device_mode != QDF_NDI_MODE)
+		hdd_conf_hw_filter_mode(pAdapter,
+					pHddCtx->config->hw_filter_mode,
+					fenable);
 
 	EXIT();
 }
