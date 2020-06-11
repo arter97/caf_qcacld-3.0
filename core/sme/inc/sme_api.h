@@ -2598,4 +2598,14 @@ sme_get_mws_coex_info(mac_handle_t mac_handle, uint32_t vdev_id,
 							   cmd_id),
 		      void *context);
 #endif
+
+/**
+ * sme_update_owe_info() - Update OWE info
+ * @mac: mac context
+ * @assoc_ind: assoc ind
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_update_owe_info(tpAniSirGlobal mac,
+			       tSirSmeAssocInd *assoc_ind);
 #endif /* #if !defined( __SME_API_H ) */
