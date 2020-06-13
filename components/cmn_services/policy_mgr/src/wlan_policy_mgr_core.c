@@ -2045,7 +2045,7 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 
 	/* Let's divide the list in 2.4 & 5 Ghz lists */
 	while ((chan_index < QDF_MAX_NUM_CHAN) &&
-		(channel_list[chan_index] <= 11) &&
+		wlan_reg_is_24ghz_ch(channel_list[chan_index]) &&
 		(chan_index_24 < QDF_MAX_NUM_CHAN))
 		channel_list_24[chan_index_24++] = channel_list[chan_index++];
 	if ((chan_index < QDF_MAX_NUM_CHAN) &&
