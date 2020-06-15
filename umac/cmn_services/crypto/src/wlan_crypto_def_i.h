@@ -517,6 +517,12 @@ static inline uint8_t ieee80211_hdrsize(const void *data)
 		if (hdr->i_fc[1] & WLAN_FC1_ORDER)
 			size += (sizeof(uint8_t)*4);
 	}
+	if (((WLAN_FC0_GET_STYPE(hdr->i_fc[0])
+			== WLAN_FC0_STYPE_ACTION))) {
+		/* Qos frame with Order bit set indicates an HTC frame */
+		if (hdr->i_fc[1] & WLAN_FC1_ORDER)
+			size += (sizeof(uint8_t)*4);
+	}
 	return size;
 }
 
