@@ -1458,7 +1458,9 @@ static void hdd_send_association_event(struct net_device *dev,
 		spin_unlock_bh(&hdd_ctx->bus_bw_lock);
 		hdd_bus_bw_compute_timer_start(hdd_ctx);
 #endif
-		ucfg_pkt_capture_record_channel();
+
+		if (ucfg_pkt_capture_get_pktcap_mode())
+			ucfg_pkt_capture_record_channel();
 	} else if (eConnectionState_IbssConnected ==    /* IBss Associated */
 			sta_ctx->conn_info.connState) {
 		policy_mgr_update_connection_info(hdd_ctx->psoc,
