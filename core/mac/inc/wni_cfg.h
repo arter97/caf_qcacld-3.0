@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2018, 2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -264,6 +264,9 @@ enum {
 	WNI_CFG_EDCA_ETSI_ACBE,
 	WNI_CFG_EDCA_ETSI_ACVI,
 	WNI_CFG_EDCA_ETSI_ACVO,
+#ifdef WLAN_FEATURE_SAE
+	WNI_CFG_SAP_SAE_ENABLED,
+#endif
 	/* Any new items to be added should be above this strictly */
 	CFG_PARAM_MAX_NUM
 };

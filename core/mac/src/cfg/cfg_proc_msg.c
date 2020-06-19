@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2018, 2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -1197,6 +1197,11 @@ cgstatic cfg_static[CFG_PARAM_MAX_NUM] = {
 	{WNI_CFG_EDCA_ETSI_ACVO,
 	 CFG_CTL_VALID | CFG_CTL_RE | CFG_CTL_WE | CFG_CTL_RESTART,
 	 0, 0, 0},
+#ifdef WLAN_FEATURE_SAE
+	{WNI_CFG_SAP_SAE_ENABLED,
+	 CFG_CTL_VALID | CFG_CTL_RE | CFG_CTL_WE | CFG_CTL_INT,
+	 0, 1, 1},
+#endif
 };
 
 
