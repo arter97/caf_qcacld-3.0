@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017, 2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -332,7 +332,8 @@ static const struct ieee80211_txrx_stypes
 	[NL80211_IFTYPE_STATION] = {
 		.tx = 0xffff,
 		.rx = BIT(SIR_MAC_MGMT_ACTION) |
-		      BIT(SIR_MAC_MGMT_PROBE_REQ),
+		      BIT(SIR_MAC_MGMT_PROBE_REQ) |
+		      BIT(SIR_MAC_MGMT_AUTH),
 	},
 	[NL80211_IFTYPE_AP] = {
 		.tx = 0xffff,
@@ -12033,6 +12034,30 @@ static void wlan_hdd_cfg80211_set_wiphy_fils_feature(struct wiphy *wiphy)
 }
 #endif
 
+#if defined(WLAN_FEATURE_SAE) && \
+	defined(CFG80211_EXTERNAL_AUTH_SUPPORT)
+/**
+ * wlan_hdd_cfg80211_set_wiphy_sae_feature() - Indicates support of SAE feature
+ * @wiphy: Pointer to wiphy
+ * @config: pointer to config
+ *
+ * This function is used to indicate the support of SAE
+ *
+ * Return: None
+ */
+static void wlan_hdd_cfg80211_set_wiphy_sae_feature(struct wiphy *wiphy,
+						    struct hdd_config *config)
+{
+	if (config->is_sae_enabled)
+		wiphy->features |= NL80211_FEATURE_SAE;
+}
+#else
+static void wlan_hdd_cfg80211_set_wiphy_sae_feature(struct wiphy *wiphy,
+						    struct hdd_config *config)
+{
+}
+#endif
+
 /*
  * FUNCTION: wlan_hdd_cfg80211_init
  * This function is called by hdd_wlan_startup()
@@ -12097,6 +12122,8 @@ int wlan_hdd_cfg80211_init(struct device *dev,
 #endif
 	if (pCfg->is_fils_enabled)
 		wlan_hdd_cfg80211_set_wiphy_fils_feature(wiphy);
+
+	wlan_hdd_cfg80211_set_wiphy_sae_feature(wiphy, pCfg);
 
 	hdd_config_sched_scan_plans_to_wiphy(wiphy, pCfg);
 	wlan_hdd_cfg80211_add_connected_pno_support(wiphy);
@@ -15496,6 +15523,29 @@ static int wlan_hdd_set_akm_suite(hdd_adapter_t *pAdapter, u32 key_mgmt)
 			eCSR_AUTH_TYPE_FT_FILS_SHA384;
 		break;
 #endif
+
+#ifdef WLAN_FEATURE_OWE
+	case WLAN_AKM_SUITE_OWE:
+		hdd_debug("setting key mgmt type to OWE");
+		pWextState->authKeyMgmt |= IW_AUTH_KEY_MGMT_802_1X;
+		break;
+#endif
+
+	case WLAN_AKM_SUITE_EAP_SHA256:
+		hdd_debug("setting key mgmt type to EAP_SHA256");
+		pWextState->authKeyMgmt |= IW_AUTH_KEY_MGMT_802_1X;
+		break;
+
+	case WLAN_AKM_SUITE_EAP_SHA384:
+		hdd_debug("setting key mgmt type to EAP_SHA384");
+		pWextState->authKeyMgmt |= IW_AUTH_KEY_MGMT_802_1X;
+		break;
+
+	case WLAN_AKM_SUITE_SAE:
+		hdd_debug("setting key mgmt type to SAE");
+		pWextState->authKeyMgmt |= IW_AUTH_KEY_MGMT_802_1X;
+		break;
+
 	default:
 		hdd_err("Unsupported key mgmt type: %d", key_mgmt);
 		return -EINVAL;
@@ -15998,6 +16048,15 @@ static int wlan_hdd_cfg80211_set_ie(hdd_adapter_t *pAdapter, const uint8_t *ie,
 							roamProfile,
 							genie - 2, eLen + 2,
 							true);
+					status = wlan_hdd_add_assoc_ie(
+							pWextState, genie - 2,
+							eLen + 2);
+					if (status)
+						return status;
+				} else if (genie[0] ==
+					   SIR_DH_PARAMETER_ELEMENT_EXT_EID) {
+					hdd_debug("Set DH EXT IE(len %d)",
+							eLen + 2);
 					status = wlan_hdd_add_assoc_ie(
 							pWextState, genie - 2,
 							eLen + 2);
@@ -19426,6 +19485,118 @@ static int wlan_hdd_cfg80211_update_connect_params(struct wiphy *wiphy,
 }
 #endif
 
+#if defined(WLAN_FEATURE_SAE) && \
+        defined(CFG80211_EXTERNAL_AUTH_SUPPORT)
+#if defined(CFG80211_EXTERNAL_AUTH_AP_SUPPORT)
+/**
+ * wlan_hdd_extauth_cache_pmkid() - Extract and cache pmkid
+ * @adapter: hdd vdev/net_device context
+ * @hHal: Handle to the hal
+ * @params: Pointer to external auth params.
+ *
+ * Extract the PMKID and BSS from external auth params and add to the
+ * PMKSA Cache in CSR.
+ */
+static void
+wlan_hdd_extauth_cache_pmkid(hdd_adapter_t *adapter,
+                             tHalHandle hHal,
+                             struct cfg80211_external_auth_params *params)
+{
+        tPmkidCacheInfo pmk_cache;
+        QDF_STATUS result;
+
+        if (params->pmkid) {
+                qdf_mem_zero(&pmk_cache, sizeof(pmk_cache));
+                qdf_mem_copy(pmk_cache.BSSID.bytes, params->bssid,
+                             MAC_ADDR_LEN);
+                qdf_mem_copy(pmk_cache.PMKID, params->pmkid,
+                             CSR_RSN_PMKID_SIZE);
+                result = sme_roam_set_pmkid_cache(hHal, adapter->sessionId,
+                                                  &pmk_cache, 1, false);
+                if (!QDF_IS_STATUS_SUCCESS(result))
+                        hdd_debug("external_auth: Failed to cache PMKID");
+        }
+}
+#else
+static void
+wlan_hdd_extauth_cache_pmkid(hdd_adapter_t *adapter,
+                             tHalHandle hHal,
+                             struct cfg80211_external_auth_params *params)
+{}
+#endif
+/**
+ * __wlan_hdd_cfg80211_external_auth() - Handle external auth
+ *
+ * @wiphy: Pointer to wireless phy
+ * @dev: net device
+ * @params: Pointer to external auth params.
+ * Return: 0 on success, negative errno on failure
+ *
+ * Userspace sends status of the external authentication(e.g., SAE) with a peer.
+ * The message carries BSSID of the peer and auth status (WLAN_STATUS_SUCCESS/
+ * WLAN_STATUS_UNSPECIFIED_FAILURE) in params.
+ * Userspace may send PMKID in params, which can be used for
+ * further connections.
+ */
+static int
+__wlan_hdd_cfg80211_external_auth(struct wiphy *wiphy,
+                                  struct net_device *dev,
+                                  struct cfg80211_external_auth_params *params)
+{
+        hdd_adapter_t *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+        hdd_context_t *hdd_ctx = wiphy_priv(wiphy);
+        int ret;
+        struct qdf_mac_addr peer_mac_addr;
+
+        if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE) {
+                hdd_err("Command not allowed in FTM mode");
+                return -EPERM;
+        }
+
+        if (wlan_hdd_validate_session_id(adapter->sessionId)) {
+                hdd_err("invalid session id: %d", adapter->sessionId);
+                return -EINVAL;
+        }
+
+        ret = wlan_hdd_validate_context(hdd_ctx);
+        if (ret)
+                return ret;
+
+        hdd_debug("external_auth status: %d peer mac: " MAC_ADDRESS_STR,
+                  params->status, MAC_ADDR_ARRAY(params->bssid));
+        qdf_mem_copy(peer_mac_addr.bytes, params->bssid, MAC_ADDR_LEN);
+
+        wlan_hdd_extauth_cache_pmkid(adapter, hdd_ctx->hHal, params);
+
+        sme_handle_sae_msg(hdd_ctx->hHal, adapter->sessionId, params->status,
+                           peer_mac_addr);
+
+        return ret;
+}
+
+/**
+ * wlan_hdd_cfg80211_external_auth() - Handle external auth
+ * @wiphy: Pointer to wireless phy
+ * @dev: net device
+ * @params: Pointer to external auth params
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+static int
+wlan_hdd_cfg80211_external_auth(struct wiphy *wiphy,
+                                struct net_device *dev,
+                                struct cfg80211_external_auth_params *params)
+{
+        int ret;
+
+        cds_ssr_protect(__func__);
+        ret = __wlan_hdd_cfg80211_external_auth(wiphy, dev, params);
+        cds_ssr_unprotect(__func__);
+
+        return ret;
+}
+#endif
+
 /**
  * wlan_hdd_chan_info_cb() - channel info callback
  * @chan_info: struct scan_chan_info
@@ -19684,5 +19855,9 @@ static struct cfg80211_ops wlan_hdd_cfg80211_ops = {
 	(defined(CFG80211_UPDATE_CONNECT_PARAMS) ||\
 		(LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0)))
 	.update_connect_params = wlan_hdd_cfg80211_update_connect_params,
+#endif
+#if defined(WLAN_FEATURE_SAE) && \
+        defined(CFG80211_EXTERNAL_AUTH_SUPPORT)
+        .external_auth = wlan_hdd_cfg80211_external_auth,
 #endif
 };

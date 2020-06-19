@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017, 2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -144,6 +144,18 @@ typedef struct {
 #define WLAN_AKM_SUITE_FT_FILS_SHA384 0x000FAC11
 #endif
 
+#ifndef WLAN_AKM_SUITE_OWE
+#define WLAN_AKM_SUITE_OWE 0x000FAC12
+#endif
+#ifndef WLAN_AKM_SUITE_EAP_SHA256
+#define WLAN_AKM_SUITE_EAP_SHA256 0x000FAC0B
+#endif
+#ifndef WLAN_AKM_SUITE_EAP_SHA384
+#define WLAN_AKM_SUITE_EAP_SHA384 0x000FAC0C
+#endif
+#ifndef WLAN_AKM_SUITE_SAE
+#define WLAN_AKM_SUITE_SAE 0x000FAC08
+#endif
 
 #ifdef FEATURE_WLAN_TDLS
 #define WLAN_IS_TDLS_SETUP_ACTION(action) \
