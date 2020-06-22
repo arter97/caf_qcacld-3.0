@@ -976,6 +976,16 @@ void lim_process_assoc_failure_timeout(tpAniSirGlobal mac_ctx,
 						     uint32_t msg_type);
 
 /**
+ * lim_send_mgmt_frame_tx() - Sends mgmt frame
+ * @mac_ctx Pointer to Global MAC structure
+ * @msg: Received message info
+ *
+ * Return: None
+ */
+void lim_send_mgmt_frame_tx(tpAniSirGlobal mac_ctx,
+		uint32_t *msg_buf);
+
+/**
  * lim_process_assoc_cleanup() - frees up resources used in function
  *                               lim_process_assoc_req_frame()
  * @mac_ctx: pointer to Global MAC structure
@@ -1017,5 +1027,4 @@ bool lim_send_assoc_ind_to_sme(tpAniSirGlobal mac_ctx,
 			       bool pmf_connection,
 			       bool *assoc_req_copied,
 			       bool dup_entry);
-
 #endif /* __LIM_TYPES_H */

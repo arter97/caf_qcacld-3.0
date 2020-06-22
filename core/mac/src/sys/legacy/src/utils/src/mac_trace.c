@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2017, 2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -425,6 +425,9 @@ uint8_t *mac_trace_get_sme_msg_string(uint16_t sme_msg)
 		CASE_RETURN_STRING(eWNI_SME_GET_PEER_INFO_IND);
 		CASE_RETURN_STRING(eWNI_SME_GET_PEER_INFO_EXT_IND);
 		CASE_RETURN_STRING(eWNI_SME_RSO_CMD_STATUS_IND);
+		CASE_RETURN_STRING(eWNI_SME_TRIGGER_SAE);
+		CASE_RETURN_STRING(eWNI_SME_SEND_MGMT_FRAME_TX);
+		CASE_RETURN_STRING(eWNI_SME_SEND_SAE_MSG);
 		CASE_RETURN_STRING(eWNI_SME_MSG_TYPES_END);
 	default:
 		return (uint8_t *) "UNKNOWN";

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017, 2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -273,6 +273,9 @@ enum eWniMsgTypes {
 	eWNI_SME_RX_AGGR_HOLE_IND,
 	eWNI_SME_TDLS_NOTIFY_SET_STATE_DISABLE,
 	eWNI_SME_UPDATE_CONFIG,
+	eWNI_SME_TRIGGER_SAE,
+	eWNI_SME_SEND_MGMT_FRAME_TX,
+	eWNI_SME_SEND_SAE_MSG,
 	eWNI_SME_MSG_TYPES_END
 };
 
