@@ -1311,6 +1311,7 @@ typedef struct sSirSmeJoinReq {
 #ifdef WLAN_FEATURE_FILS_SK
 	struct cds_fils_connection_info fils_con_info;
 #endif
+	bool sae_pmk_cached;
 	bool ignore_assoc_disallowed;
 	bool enable_bcast_probe_rsp;
 	bool force_24ghz_in_ht20;
@@ -1464,6 +1465,7 @@ typedef struct sSirSmeAssocInd {
 	uint8_t max_mcs_idx;
 	uint8_t rx_mcs_map;
 	uint8_t tx_mcs_map;
+	bool is_sae_authenticated;
 } tSirSmeAssocInd, *tpSirSmeAssocInd;
 
 /* / Definition for Association confirm */
@@ -1477,6 +1479,7 @@ typedef struct sSirSmeAssocCnf {
 	uint16_t aid;
 	struct qdf_mac_addr alternate_bssid;
 	uint8_t alternateChannelId;
+	tSirMacStatusCodes mac_status_code;
 } tSirSmeAssocCnf, *tpSirSmeAssocCnf;
 
 /* / Enum definition for  Wireless medium status change codes */

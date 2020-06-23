@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017, 2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -46,6 +46,7 @@ typedef enum {
 	/* MAC layer authentication types */
 	eCSR_AUTH_TYPE_OPEN_SYSTEM,
 	eCSR_AUTH_TYPE_SHARED_KEY,
+	eCSR_AUTH_TYPE_SAE,
 	eCSR_AUTH_TYPE_AUTOSWITCH,
 
 	/* Upper layer authentication types */
@@ -69,6 +70,9 @@ typedef enum {
 	eCSR_AUTH_TYPE_FILS_SHA384,
 	eCSR_AUTH_TYPE_FT_FILS_SHA256,
 	eCSR_AUTH_TYPE_FT_FILS_SHA384,
+	eCSR_AUTH_TYPE_OWE,
+	eCSR_AUTH_TYPE_SUITEB_EAP_SHA256,
+	eCSR_AUTH_TYPE_SUITEB_EAP_SHA384,
 	eCSR_NUM_OF_SUPPORT_AUTH_TYPE,
 	eCSR_AUTH_TYPE_FAILED = 0xff,
 	eCSR_AUTH_TYPE_UNKNOWN = eCSR_AUTH_TYPE_FAILED,
@@ -537,6 +541,7 @@ typedef enum {
 	eCSR_ROAM_START,
 	eCSR_ROAM_ABORT,
 	eCSR_ROAM_NAPI_OFF,
+	eCSR_ROAM_SAE_COMPUTE,
 } eRoamCmdStatus;
 
 /* comment inside indicates what roaming callback gets */
@@ -1541,6 +1546,9 @@ typedef struct tagCsrRoamInfo {
 #ifdef WLAN_FEATURE_FILS_SK
 	struct fils_join_rsp_params *fils_join_rsp;
 #endif
+#ifdef WLAN_FEATURE_SAE
+	struct sir_sae_info *sae_info;
+#endif
 } tCsrRoamInfo;
 
 typedef struct tagCsrFreqScanInfo {
@@ -1785,6 +1793,20 @@ typedef QDF_STATUS (*csr_roamSessionCloseCallback)(void *pContext);
 		(eCSR_AUTH_TYPE_FILS_SHA384 == auth_type) || \
 		(eCSR_AUTH_TYPE_FT_FILS_SHA256 == auth_type) || \
 		(eCSR_AUTH_TYPE_FT_FILS_SHA384 == auth_type))
+
+#ifdef WLAN_FEATURE_OWE
+#define CSR_IS_AUTH_TYPE_OWE(auth_type) \
+	(eCSR_AUTH_TYPE_OWE == auth_type)
+#else
+#define CSR_IS_AUTH_TYPE_OWE(auth_type) (false)
+#endif
+
+#ifdef WLAN_FEATURE_SAE
+#define CSR_IS_AUTH_TYPE_SAE(auth_type) \
+	(eCSR_AUTH_TYPE_SAE == auth_type)
+#else
+#define CSR_IS_AUTH_TYPE_SAE(auth_type) (false)
+#endif
 
 QDF_STATUS csr_set_channels(tHalHandle hHal, tCsrConfigParam *pParam);
 

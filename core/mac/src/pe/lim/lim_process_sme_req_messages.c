@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017, 2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -1489,6 +1489,30 @@ static void __lim_process_clear_dfs_channel_list(tpAniSirGlobal pMac, tpSirMsgQ 
 	qdf_mem_set(&pMac->lim.dfschannelList, sizeof(tSirDFSChannelList), 0);
 }
 
+#ifdef WLAN_FEATURE_SAE
+/**
+ * lim_update_sae_config()- This API update SAE session info to csr config
+ * from join request.
+ * @session: PE session
+ * @sme_join_req: pointer to join request
+ *
+ * Return: None
+ */
+static void lim_update_sae_config(tpPESession session,
+		tpSirSmeJoinReq sme_join_req)
+{
+	session->sae_pmk_cached = sme_join_req->sae_pmk_cached;
+
+	pe_debug("pmk_cached %d for BSSID=" MAC_ADDRESS_STR,
+		session->sae_pmk_cached,
+		MAC_ADDR_ARRAY(sme_join_req->bssDescription.bssId));
+}
+#else
+static inline void lim_update_sae_config(tpPESession session,
+		tpSirSmeJoinReq sme_join_req)
+{}
+#endif
+
 /**
  * __lim_process_sme_join_req() - process SME_JOIN_REQ message
  * @mac_ctx: Pointer to Global MAC structure
@@ -1804,6 +1828,7 @@ __lim_process_sme_join_req(tpAniSirGlobal mac_ctx, uint32_t *msg_buf)
 			sme_join_req->txLdpcIniFeatureEnabled;
 
 		lim_update_fils_config(session, sme_join_req);
+		lim_update_sae_config(session, sme_join_req);
 		if (session->bssType == eSIR_INFRASTRUCTURE_MODE) {
 			session->limSystemRole = eLIM_STA_ROLE;
 		} else {
@@ -3522,15 +3547,20 @@ void __lim_process_sme_assoc_cnf_new(tpAniSirGlobal mac_ctx, uint32_t msg_type,
 		 * denied STA we need to remove this HAL entry.
 		 * So to do that set updateContext to 1
 		 */
+		tSirMacStatusCodes mac_status_code =
+			eSIR_MAC_UNSPEC_FAILURE_STATUS;
 		if (!sta_ds->mlmStaContext.updateContext)
 			sta_ds->mlmStaContext.updateContext = 1;
-		pe_debug("Recv Assoc Cnf, status Code : %d(assoc id=%d)",
-			assoc_cnf.statusCode, sta_ds->assocId);
+		pe_debug("Recv Assoc Cnf, status Code : %d(assoc id=%d) Reason code: %d",
+			 assoc_cnf.statusCode, sta_ds->assocId,
+			 assoc_cnf.mac_status_code);
+		if (assoc_cnf.mac_status_code)
+			mac_status_code = assoc_cnf.mac_status_code;
 		lim_reject_association(mac_ctx, sta_ds->staAddr,
 				       sta_ds->mlmStaContext.subType,
 				       true, sta_ds->mlmStaContext.authType,
 				       sta_ds->assocId, true,
-				       eSIR_SME_UNEXPECTED_REQ_RESULT_CODE,
+				       mac_status_code,
 				       session_entry);
 	}
 end:

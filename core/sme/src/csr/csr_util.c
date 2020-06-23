@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2018, 2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -104,6 +104,29 @@ uint8_t csr_rsn_oui[][CSR_RSN_OUI_SIZE] = {
 	{0x00, 0x0F, 0xAC, 0x08},
 	/* AES GCMP-256 */
 	{0x00, 0x0F, 0xAC, 0x09},
+#ifdef WLAN_FEATURE_OWE
+#define ENUM_OWE 15
+	/* OWE https://tools.ietf.org/html/rfc8110 */
+	{0x00, 0x0F, 0xAC, 0x12},
+#else
+	{0x00, 0x00, 0x00, 0x00},
+#endif
+#define ENUM_SUITEB_EAP256 16
+	{0x00, 0x0F, 0xAC, 0x0B},
+#define ENUM_SUITEB_EAP384 17
+	{0x00, 0x0F, 0xAC, 0x0C},
+#ifdef WLAN_FEATURE_SAE
+#define ENUM_SAE 18
+	/* SAE */
+	{0x00, 0x0F, 0xAC, 0x08},
+#define ENUM_FT_SAE 19
+	/* FT SAE */
+	{0x00, 0x0F, 0xAC, 0x09},
+#else
+	{0x00, 0x00, 0x00, 0x00},
+	{0x00, 0x00, 0x00, 0x00},
+#endif
+
 	/* define new oui here, update #define CSR_OUI_***_INDEX  */
 };
 
@@ -261,6 +284,7 @@ const char *get_e_roam_cmd_status_str(eRoamCmdStatus val)
 		CASE_RETURN_STR(eCSR_ROAM_START);
 		CASE_RETURN_STR(eCSR_ROAM_ABORT);
 		CASE_RETURN_STR(eCSR_ROAM_NAPI_OFF);
+		CASE_RETURN_STR(eCSR_ROAM_SAE_COMPUTE);
 	default:
 		return "unknown";
 	}
@@ -1926,6 +1950,10 @@ bool csr_is_profile_rsn(tCsrRoamProfile *pProfile)
 	case eCSR_AUTH_TYPE_FILS_SHA384:
 	case eCSR_AUTH_TYPE_FT_FILS_SHA256:
 	case eCSR_AUTH_TYPE_FT_FILS_SHA384:
+	case eCSR_AUTH_TYPE_OWE:
+	case eCSR_AUTH_TYPE_SUITEB_EAP_SHA256:
+	case eCSR_AUTH_TYPE_SUITEB_EAP_SHA384:
+	case eCSR_AUTH_TYPE_SAE:
 		fRSNProfile = true;
 		break;
 
@@ -2691,6 +2719,78 @@ static bool csr_is_auth_fils_ft_sha384(tpAniSirGlobal mac,
 }
 #endif
 
+#ifdef WLAN_FEATURE_OWE
+/*
+ * csr_is_auth_wpa_owe() - check whether oui is OWE
+ * @mac: Global MAC context
+ * @all_suites: pointer to all supported akm suites
+ * @suite_count: all supported akm suites count
+ * @oui: Oui needs to be matched
+ *
+ * Return: True if OUI is OWE, false otherwise
+ */
+static bool csr_is_auth_wpa_owe(tpAniSirGlobal mac,
+			       uint8_t all_suites[][CSR_RSN_OUI_SIZE],
+			       uint8_t suite_count, uint8_t oui[])
+{
+	return csr_is_oui_match
+		(mac, all_suites, suite_count, csr_rsn_oui[ENUM_OWE], oui);
+}
+#endif
+
+/*
+ * csr_is_auth_suiteb_eap_256() - check whether oui is SuiteB EAP256
+ * @mac: Global MAC context
+ * @all_suites: pointer to all supported akm suites
+ * @suite_count: all supported akm suites count
+ * @oui: Oui needs to be matched
+ *
+ * Return: True if OUI is SuiteB EAP256, false otherwise
+ */
+static bool csr_is_auth_suiteb_eap_256(tpAniSirGlobal mac,
+			       uint8_t all_suites[][CSR_RSN_OUI_SIZE],
+			       uint8_t suite_count, uint8_t oui[])
+{
+	return csr_is_oui_match(mac, all_suites, suite_count,
+				csr_rsn_oui[ENUM_SUITEB_EAP256], oui);
+}
+
+/*
+ * csr_is_auth_suiteb_eap_384() - check whether oui is SuiteB EAP384
+ * @mac: Global MAC context
+ * @all_suites: pointer to all supported akm suites
+ * @suite_count: all supported akm suites count
+ * @oui: Oui needs to be matched
+ *
+ * Return: True if OUI is SuiteB EAP384, false otherwise
+ */
+static bool csr_is_auth_suiteb_eap_384(tpAniSirGlobal mac,
+			       uint8_t all_suites[][CSR_RSN_OUI_SIZE],
+			       uint8_t suite_count, uint8_t oui[])
+{
+	return csr_is_oui_match(mac, all_suites, suite_count,
+				csr_rsn_oui[ENUM_SUITEB_EAP384], oui);
+}
+
+#ifdef WLAN_FEATURE_SAE
+/*
+ * csr_is_auth_wpa_sae() - check whether oui is SAE
+ * @mac: Global MAC context
+ * @all_suites: pointer to all supported akm suites
+ * @suite_count: all supported akm suites count
+ * @oui: Oui needs to be matched
+ *
+ * Return: True if OUI is SAE, false otherwise
+ */
+static bool csr_is_auth_wpa_sae(tpAniSirGlobal mac,
+			       uint8_t all_suites[][CSR_RSN_OUI_SIZE],
+			       uint8_t suite_count, uint8_t oui[])
+{
+	return csr_is_oui_match
+		(mac, all_suites, suite_count, csr_rsn_oui[ENUM_SAE], oui);
+}
+#endif
+
 static bool csr_is_auth_wpa(tpAniSirGlobal pMac,
 			    uint8_t AllSuites[][CSR_WPA_OUI_SIZE],
 			    uint8_t cAllSuites, uint8_t Oui[])
@@ -2807,6 +2907,106 @@ static void csr_is_fils_auth(tpAniSirGlobal mac_ctx,
 {
 }
 #endif
+
+#ifdef WLAN_FEATURE_OWE
+/**
+ * csr_check_n_set_owe_auth() - update negotiated auth if matches to OWE auth type
+ * @mac_ctx: pointer to mac context
+ * @authsuites: auth suites
+ * @c_auth_suites: auth suites count
+ * @authentication: authentication
+ * @auth_type: authentication type list
+ * @index: current counter
+ * @neg_authtype: pointer to negotiated auth
+ *
+ * Return: None
+ */
+static void csr_check_n_set_owe_auth(tpAniSirGlobal mac_ctx,
+	uint8_t authsuites[][CSR_RSN_OUI_SIZE], uint8_t c_auth_suites,
+	uint8_t authentication[], tCsrAuthList *auth_type,
+	uint8_t index, eCsrAuthType *neg_authtype)
+{
+	if ((*neg_authtype == eCSR_AUTH_TYPE_UNKNOWN) &&
+	    csr_is_auth_wpa_owe(mac_ctx, authsuites,
+	    c_auth_suites, authentication)) {
+		if (eCSR_AUTH_TYPE_OWE == auth_type->authType[index])
+			*neg_authtype = eCSR_AUTH_TYPE_OWE;
+	}
+
+	sme_debug("negotiated auth type is %d", *neg_authtype);
+}
+#else
+static void csr_check_n_set_owe_auth(tpAniSirGlobal mac_ctx,
+	uint8_t authsuites[][CSR_RSN_OUI_SIZE], uint8_t c_auth_suites,
+	uint8_t authentication[], tCsrAuthList *auth_type,
+	uint8_t index, eCsrAuthType *neg_authtype)
+{
+}
+#endif
+
+#ifdef WLAN_FEATURE_SAE
+/**
+ * csr_check_sae_auth() - update negotiated auth if matches to SAE auth type
+ * @mac_ctx: pointer to mac context
+ * @authsuites: auth suites
+ * @c_auth_suites: auth suites count
+ * @authentication: authentication
+ * @auth_type: authentication type list
+ * @index: current counter
+ * @neg_authtype: pointer to negotiated auth
+ *
+ * Return: None
+ */
+static void csr_check_sae_auth(tpAniSirGlobal mac_ctx,
+	uint8_t authsuites[][CSR_RSN_OUI_SIZE], uint8_t c_auth_suites,
+	uint8_t authentication[], tCsrAuthList *auth_type,
+	uint8_t index, eCsrAuthType *neg_authtype)
+{
+	if ((*neg_authtype == eCSR_AUTH_TYPE_UNKNOWN) &&
+	   csr_is_auth_wpa_sae(mac_ctx, authsuites,
+	   c_auth_suites, authentication)) {
+		if (eCSR_AUTH_TYPE_SAE == auth_type->authType[index])
+			*neg_authtype = eCSR_AUTH_TYPE_SAE;
+		if (eCSR_AUTH_TYPE_OPEN_SYSTEM == auth_type->authType[index])
+			*neg_authtype = eCSR_AUTH_TYPE_OPEN_SYSTEM;
+	}
+	sme_debug("negotiated auth type is %d", *neg_authtype);
+}
+#else
+static void csr_check_sae_auth(tpAniSirGlobal mac_ctx,
+	uint8_t authsuites[][CSR_RSN_OUI_SIZE], uint8_t c_auth_suites,
+	uint8_t authentication[], tCsrAuthList *auth_type,
+	uint8_t index, eCsrAuthType *neg_authtype)
+{
+}
+#endif
+
+bool csr_is_pmkid_found_for_peer(tpAniSirGlobal mac,
+				 tCsrRoamSession *session,
+				 tSirMacAddr peer_mac_addr,
+				 uint8_t *pmkid,
+				 uint16_t pmkid_count)
+{
+	uint32_t i, index;
+	uint8_t *session_pmkid;
+	tPmkidCacheInfo pmkid_cache;
+
+	qdf_mem_zero(&pmkid_cache, sizeof(pmkid_cache));
+	qdf_mem_copy(pmkid_cache.BSSID.bytes, peer_mac_addr, MAC_ADDR_LEN);
+
+	if (!csr_lookup_pmkid_using_bssid(mac, session, &pmkid_cache, &index))
+		return false;
+	session_pmkid = &session->PmkidCacheInfo[index].PMKID[0];
+	for (i = 0; i < pmkid_count; i++) {
+		if (!qdf_mem_cmp(pmkid + (i * CSR_RSN_PMKID_SIZE),
+				 session_pmkid, CSR_RSN_PMKID_SIZE))
+			return true;
+	}
+
+	sme_debug("PMKID in PmkidCacheInfo doesn't match with PMKIDs of peer");
+	return false;
+}
+
 /**
  * csr_get_rsn_information() - to get RSN infomation
  * @hal: pointer to HAL
@@ -2895,6 +3095,9 @@ static bool csr_get_rsn_information(tHalHandle hal, tCsrAuthList *auth_type,
 		csr_is_fils_auth(mac_ctx, authsuites, c_auth_suites,
 			authentication, auth_type, i, &neg_authtype);
 		/* Changed the AKM suites according to order of preference */
+		csr_check_sae_auth(mac_ctx, authsuites, c_auth_suites,
+			authentication, auth_type, i, &neg_authtype);
+
 		if ((neg_authtype == eCSR_AUTH_TYPE_UNKNOWN) &&
 				csr_is_ft_auth_rsn(mac_ctx, authsuites,
 					c_auth_suites, authentication)) {
@@ -2945,7 +3148,23 @@ static bool csr_get_rsn_information(tHalHandle hal, tCsrAuthList *auth_type,
 				neg_authtype = eCSR_AUTH_TYPE_RSN_8021X_SHA256;
 		}
 #endif
+		csr_check_n_set_owe_auth(mac_ctx, authsuites, c_auth_suites,
+			authentication, auth_type, i, &neg_authtype);
 
+		if ((neg_authtype == eCSR_AUTH_TYPE_UNKNOWN) &&
+		   csr_is_auth_suiteb_eap_256(mac_ctx, authsuites,
+		   c_auth_suites, authentication)) {
+			if (eCSR_AUTH_TYPE_SUITEB_EAP_SHA256 ==
+						auth_type->authType[i])
+				neg_authtype = eCSR_AUTH_TYPE_SUITEB_EAP_SHA256;
+		}
+		if ((neg_authtype == eCSR_AUTH_TYPE_UNKNOWN) &&
+		   csr_is_auth_suiteb_eap_384(mac_ctx, authsuites,
+		   c_auth_suites, authentication)) {
+			if (eCSR_AUTH_TYPE_SUITEB_EAP_SHA384 ==
+						auth_type->authType[i])
+				neg_authtype = eCSR_AUTH_TYPE_SUITEB_EAP_SHA384;
+		}
 		/*
 		 * The 1st auth type in the APs RSN IE, to match stations
 		 * connecting profiles auth type will cause us to exit this
@@ -3147,19 +3366,10 @@ static bool csr_lookup_pmkid_using_ssid(tpAniSirGlobal mac,
 	return false;
 }
 
-/**
- * csr_lookup_pmkid_using_bssid() - lookup pmkid using bssid
- * @mac: pointer to mac
- * @session: sme session pointer
- * @pmk_cache: pointer to pmk cache
- * @index: index value needs to be seached
- *
- * Return: true if pmkid is found else false
- */
-static bool csr_lookup_pmkid_using_bssid(tpAniSirGlobal mac,
-					tCsrRoamSession *session,
-					tPmkidCacheInfo *pmk_cache,
-					uint32_t *index)
+bool csr_lookup_pmkid_using_bssid(tpAniSirGlobal mac,
+				  tCsrRoamSession *session,
+				  tPmkidCacheInfo *pmk_cache,
+				  uint32_t *index)
 {
 	uint32_t i;
 	tPmkidCacheInfo *session_pmk;

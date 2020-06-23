@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017, 2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -508,6 +508,7 @@ typedef struct sPESession       /* Added to Support BT-AMP */
 	bool ch_switch_in_progress;
 	/* previous auth frame's sequence number */
 	uint16_t prev_auth_seq_num;
+	bool sae_pmk_cached;
 } tPESession, *tpPESession;
 
 /*-------------------------------------------------------------------------

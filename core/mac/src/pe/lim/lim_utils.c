@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2017, 2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -621,6 +621,8 @@ void lim_deactivate_timers(tpAniSirGlobal mac_ctx)
 
 	tx_timer_deactivate(&lim_timer->
 			gLimActiveToPassiveChannelTimer);
+
+	tx_timer_deactivate(&lim_timer->sae_auth_timer);
 }
 
 
@@ -708,6 +710,8 @@ void lim_cleanup_mlm(tpAniSirGlobal mac_ctx)
 
 		tx_timer_delete(&lim_timer->
 				gLimActiveToPassiveChannelTimer);
+
+		tx_timer_delete(&lim_timer->sae_auth_timer);
 
 		mac_ctx->lim.gLimTimersCreated = 0;
 	}

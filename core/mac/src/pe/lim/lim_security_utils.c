@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2017, 2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -329,12 +329,21 @@ void lim_add_pre_auth_node(tpAniSirGlobal pMac, struct tLimPreAuthNode *pAuthNod
 void lim_release_pre_auth_node(tpAniSirGlobal pMac, tpLimPreAuthNode pAuthNode)
 {
 	pAuthNode->fFree = 1;
-	MTRACE(mac_trace
-		       (pMac, TRACE_CODE_TIMER_DEACTIVATE, NO_SESSION,
-		       eLIM_PRE_AUTH_CLEANUP_TIMER));
+	if (pAuthNode->authType == eSIR_AUTH_TYPE_SAE &&
+	    pAuthNode->assoc_req.present) {
+		tpSirAssocReq assoc =
+			 (tpSirAssocReq)pAuthNode->assoc_req.assoc_req;
+
+		if (assoc->assocReqFrameLength)
+			qdf_mem_free(assoc->assocReqFrame);
+		qdf_mem_free(assoc);
+		pAuthNode->assoc_req.present = false;
+	}
+	MTRACE(mac_trace(pMac, TRACE_CODE_TIMER_DEACTIVATE, NO_SESSION,
+			 eLIM_PRE_AUTH_CLEANUP_TIMER));
 	tx_timer_deactivate(&pAuthNode->timer);
 	pMac->lim.gLimNumPreAuthContexts--;
-} /*** end lim_release_pre_auth_node() ***/
+}
 
 /**
  * lim_delete_pre_auth_node
@@ -472,11 +481,17 @@ lim_restore_from_auth_state(tpAniSirGlobal pMac, tSirResultCodes resultCode,
 	 * retry is needed also cancel the auth rety timer
 	 */
 	pMac->auth_ack_status = LIM_AUTH_ACK_RCD_SUCCESS;
-	/* 'Change' timer for future activations */
-	lim_deactivate_and_change_timer(pMac, eLIM_AUTH_RETRY_TIMER);
 
+	/* Auth retry and AUth failure timers are not started for SAE */
 	/* 'Change' timer for future activations */
-	lim_deactivate_and_change_timer(pMac, eLIM_AUTH_FAIL_TIMER);
+	if (tx_timer_running(&pMac->lim.limTimers.
+	    g_lim_periodic_auth_retry_timer))
+		lim_deactivate_and_change_timer(pMac,
+				eLIM_AUTH_RETRY_TIMER);
+	/* 'Change' timer for future activations */
+	if (tx_timer_running(&pMac->lim.limTimers.gLimAuthFailureTimer))
+		lim_deactivate_and_change_timer(pMac,
+				eLIM_AUTH_FAIL_TIMER);
 
 	sir_copy_mac_addr(currentBssId, sessionEntry->bssId);
 

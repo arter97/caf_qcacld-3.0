@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017, 2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -333,6 +333,10 @@ typedef struct sLimTimers {
 	 */
 	TX_TIMER gLimActiveToPassiveChannelTimer;
 	TX_TIMER g_lim_periodic_auth_retry_timer;
+
+	/* SAE authentication related timer */
+	TX_TIMER sae_auth_timer;
+
 	/*
 	 * This timer is used for delay between shared auth failure and
 	 * open auth start

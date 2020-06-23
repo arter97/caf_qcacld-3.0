@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017, 2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -424,6 +424,7 @@ typedef struct sSirAssocReq {
 	tDot11fIEExtCap ExtCap;
 	tDot11fIEvendor_vht_ie vendor_vht_ie;
 	tDot11fIEhs20vendor_ie hs20vendor_ie;
+	bool is_sae_authenticated;
 } tSirAssocReq, *tpSirAssocReq;
 
 /* / Association Response structure (one day to be replaced by */
