@@ -134,10 +134,12 @@ struct comp_hdls {
  *
  * @num_modes: Number of modes supported
  * @hw_mode_ids: List of HW mode ids
+ * @phy_bit_map: List of Phy bit maps
  */
 struct target_supported_modes {
 	uint8_t num_modes;
 	uint32_t hw_mode_ids[WMI_HOST_HW_MODE_MAX];
+	uint32_t phy_bit_map[WMI_HOST_HW_MODE_MAX];
 };
 
 /**
@@ -2037,14 +2039,21 @@ static inline void target_if_print_service_ready_ext_param(
  *
  * Return: none
  */
+#ifdef QCA_HOST_ADD_11AX_MODE_WAR
 static inline void target_if_add_11ax_modes(struct wlan_objmgr_psoc *psoc,
-					struct target_psoc_info *tgt_hdl)
+					    struct target_psoc_info *tgt_hdl)
 {
 	if ((tgt_hdl->tif_ops) &&
 		(tgt_hdl->tif_ops->add_11ax_modes)) {
 		tgt_hdl->tif_ops->add_11ax_modes(psoc, tgt_hdl);
 	}
 }
+#else
+static inline void target_if_add_11ax_modes(struct wlan_objmgr_psoc *psoc,
+					    struct target_psoc_info *tgt_hdl)
+{
+}
+#endif
 
 /**
  * target_if_set_default_config - Set default config in init command
@@ -2341,5 +2350,22 @@ static inline void target_psoc_get_version_info(
 	*bdf_minor =
 		psoc_info->info.service_ext2_param.bdf_reg_db_version_minor;
 }
-#endif
 
+/**
+ * target_psoc_get_chan_width_switch_num_peers() - Get peer limit
+ * @psoc_info: pointer to structure target_psoc_info
+ *
+ * API to get the number of peers supported per WMI command with the ID
+ * WMI_PEER_CHAN_WIDTH_SWITCH_CMDID.
+ *
+ * Return: maximum peers allowed in a single WMI command with the given ID.
+ */
+static inline uint32_t target_psoc_get_chan_width_switch_num_peers(
+					    struct target_psoc_info *psoc_info)
+{
+	if (!psoc_info)
+		return 0;
+
+	return psoc_info->info.service_ext2_param.chwidth_num_peer_caps;
+}
+#endif

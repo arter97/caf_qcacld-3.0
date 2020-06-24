@@ -20,6 +20,7 @@
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/if_arp.h>
+#include <linux/of_pci.h>
 #ifdef CONFIG_PCI_MSM
 #include <linux/msm_pcie.h>
 #endif
@@ -63,22 +64,116 @@
  * use TargetCPU warm reset * instead of SOC_GLOBAL_RESET
  */
 #define CPU_WARM_RESET_WAR
+#define WLAN_CFG_MAX_PCIE_GROUPS 2
+#define WLAN_CFG_MAX_CE_COUNT 12
 
-const char *dp_irqname[WLAN_CFG_INT_NUM_CONTEXTS] = {
-"WLAN_GRP_DP_0",
-"WLAN_GRP_DP_1",
-"WLAN_GRP_DP_2",
-"WLAN_GRP_DP_3",
-"WLAN_GRP_DP_4",
-"WLAN_GRP_DP_5",
-"WLAN_GRP_DP_6",
+const char *dp_irqname[WLAN_CFG_MAX_PCIE_GROUPS][WLAN_CFG_INT_NUM_CONTEXTS] = {
+{
+"pci0_wlan_grp_dp_0",
+"pci0_wlan_grp_dp_1",
+"pci0_wlan_grp_dp_2",
+"pci0_wlan_grp_dp_3",
+"pci0_wlan_grp_dp_4",
+"pci0_wlan_grp_dp_5",
+"pci0_wlan_grp_dp_6",
 #if !defined(WLAN_MAX_PDEVS)
-"WLAN_GRP_DP_7",
-"WLAN_GRP_DP_8",
-"WLAN_GRP_DP_9",
-"WLAN_GRP_DP_10",
+"pci0_wlan_grp_dp_7",
+"pci0_wlan_grp_dp_8",
+"pci0_wlan_grp_dp_9",
+"pci0_wlan_grp_dp_10",
 #endif
+},
+{
+"pci1_wlan_grp_dp_0",
+"pci1_wlan_grp_dp_1",
+"pci1_wlan_grp_dp_2",
+"pci1_wlan_grp_dp_3",
+"pci1_wlan_grp_dp_4",
+"pci1_wlan_grp_dp_5",
+"pci1_wlan_grp_dp_6",
+#if !defined(WLAN_MAX_PDEVS)
+"pci1_wlan_grp_dp_7",
+"pci1_wlan_grp_dp_8",
+"pci1_wlan_grp_dp_9",
+"pci1_wlan_grp_dp_10",
+#endif
+}
 };
+
+const char *ce_irqname[WLAN_CFG_MAX_PCIE_GROUPS][WLAN_CFG_MAX_CE_COUNT] = {
+{
+"pci0_wlan_ce_0",
+"pci0_wlan_ce_1",
+"pci0_wlan_ce_2",
+"pci0_wlan_ce_3",
+"pci0_wlan_ce_4",
+"pci0_wlan_ce_5",
+"pci0_wlan_ce_6",
+"pci0_wlan_ce_7",
+"pci0_wlan_ce_8",
+"pci0_wlan_ce_9",
+"pci0_wlan_ce_10",
+"pci0_wlan_ce_11",
+},
+{
+"pci1_wlan_ce_0",
+"pci1_wlan_ce_1",
+"pci1_wlan_ce_2",
+"pci1_wlan_ce_3",
+"pci1_wlan_ce_4",
+"pci1_wlan_ce_5",
+"pci1_wlan_ce_6",
+"pci1_wlan_ce_7",
+"pci1_wlan_ce_8",
+"pci1_wlan_ce_9",
+"pci1_wlan_ce_10",
+"pci1_wlan_ce_11",
+}
+};
+
+#if defined(WLAN_MAX_PDEVS) && (WLAN_MAX_PDEVS == 1)
+static inline int hif_get_pci_slot(struct hif_softc *scn)
+{
+	/*
+	 * If WLAN_MAX_PDEVS is defined as 1, always return pci slot 0
+	 * since there is only one pci device attached.
+	 */
+	return 0;
+}
+#else
+static inline int hif_get_pci_slot(struct hif_softc *scn)
+{
+	uint32_t pci_id;
+	struct hif_opaque_softc *hif_hdl = GET_HIF_OPAQUE_HDL(scn);
+	struct hif_target_info *tgt_info = hif_get_target_info_handle(hif_hdl);
+	uint32_t target_type = tgt_info->target_type;
+	struct device_node *mhi_node;
+	struct device_node *pcierp_node;
+	struct device_node *pcie_node;
+
+	switch (target_type) {
+	case TARGET_TYPE_QCN9000:
+		/* of_node stored in qdf_dev points to the mhi node */
+		mhi_node = scn->qdf_dev->dev->of_node;
+		/*
+		 * pcie id is stored in the main pci node which has to be taken
+		 * from the second parent of mhi_node.
+		 */
+		pcierp_node = mhi_node->parent;
+		pcie_node = pcierp_node->parent;
+		pci_id = of_get_pci_domain_nr(pcie_node);
+		if (pci_id < 0 || pci_id >= WLAN_CFG_MAX_PCIE_GROUPS) {
+			HIF_ERROR("pci_id:%d is invalid", pci_id);
+			QDF_ASSERT(0);
+			return 0;
+		}
+		return pci_id;
+	default:
+		/* Send pci_id 0 for all other targets */
+		return 0;
+	}
+}
+#endif
 
 /*
  * Top-level interrupt handler for all PCI interrupts from a Target.
@@ -1294,27 +1389,20 @@ static void  hif_check_for_get_put_out_of_sync(struct hif_pci_softc *sc)
 }
 
 /**
- * hif_pm_runtime_sanitize_on_exit(): sanitize the pm usage count and state
+ * hif_pm_runtime_sanitize_on_exit(): sanitize runtime PM gets/puts from driver
  * @sc: pci context
  *
- * Ensure we have only one vote against runtime suspend before closing
- * the runtime suspend feature.
+ * Ensure all gets/puts are in sync before exiting runtime PM feature.
+ * Also make sure all runtime PM locks are deinitialized properly.
  *
- * all gets by the wlan driver should have been returned
- * one vote should remain as part of cnss_runtime_exit
+ * Return: void
  *
- * needs to be revisited if we share the root complex.
  */
 static void hif_pm_runtime_sanitize_on_exit(struct hif_pci_softc *sc)
 {
 	struct hif_pm_runtime_lock *ctx, *tmp;
 
 	hif_check_for_get_put_out_of_sync(sc);
-
-	if (atomic_read(&sc->dev->power.usage_count) != 2)
-		hif_pci_runtime_pm_warn(sc, "Driver Module Closing");
-	else
-		return;
 
 	spin_lock_bh(&sc->runtime_lock);
 	list_for_each_entry_safe(ctx, tmp, &sc->prevent_suspend_list, list) {
@@ -1323,16 +1411,6 @@ static void hif_pm_runtime_sanitize_on_exit(struct hif_pci_softc *sc)
 		spin_lock_bh(&sc->runtime_lock);
 	}
 	spin_unlock_bh(&sc->runtime_lock);
-
-	/* Since default usage count is 2 so ensure 2 and only 2 usage count
-	 * when exit so that when the WLAN driver module is re-enabled runtime
-	 * PM won't be disabled also ensures runtime PM doesn't get broken on
-	 * by being less than 2.
-	 */
-	if (atomic_read(&sc->dev->power.usage_count) <= 1)
-		atomic_set(&sc->dev->power.usage_count, 2);
-	while (atomic_read(&sc->dev->power.usage_count) > 2)
-		hif_pm_runtime_put_auto(sc->dev);
 }
 
 static int __hif_pm_runtime_allow_suspend(struct hif_pci_softc *hif_sc,
@@ -2508,6 +2586,8 @@ static void hif_pci_deconfigure_grp_irq(struct hif_softc *scn)
 			hif_ext_group->irq_requested = false;
 			for (j = 0; j < hif_ext_group->numirq; j++) {
 				irq = hif_ext_group->os_irq[j];
+				if (scn->irq_unlazy_disable)
+					irq_clear_status_flags(irq, IRQ_DISABLE_UNLAZY);
 				pfrm_free_irq(scn->qdf_dev->dev,
 					      irq, hif_ext_group);
 			}
@@ -3493,6 +3573,7 @@ static int hif_ce_msi_configure_irq(struct hif_softc *scn)
 	struct HIF_CE_state *ce_sc = HIF_GET_CE_STATE(scn);
 	struct hif_pci_softc *pci_sc = HIF_GET_PCI_SOFTC(scn);
 	struct CE_attr *host_ce_conf = ce_sc->host_ce_config;
+	int pci_slot;
 
 	if (!scn->disable_wake_irq) {
 		/* do wake irq assignment */
@@ -3534,6 +3615,7 @@ static int hif_ce_msi_configure_irq(struct hif_softc *scn)
 	/* needs to match the ce_id -> irq data mapping
 	 * used in the srng parameter configuration
 	 */
+	pci_slot = hif_get_pci_slot(scn);
 	for (ce_id = 0; ce_id < scn->ce_count; ce_id++) {
 		unsigned int msi_data = (ce_id % msi_data_count) +
 			msi_irq_start;
@@ -3552,7 +3634,7 @@ static int hif_ce_msi_configure_irq(struct hif_softc *scn)
 		ret = pfrm_request_irq(scn->qdf_dev->dev,
 				       irq, hif_ce_interrupt_handler,
 				       IRQF_SHARED,
-				       ce_name[ce_id],
+				       ce_irqname[pci_slot][ce_id],
 				       &ce_sc->tasklets[ce_id]);
 		if (ret)
 			goto free_irq;
@@ -3695,22 +3777,25 @@ int hif_pci_configure_grp_irq(struct hif_softc *scn,
 	int ret = 0;
 	int irq = 0;
 	int j;
+	int pci_slot;
 
 	hif_ext_group->irq_enable = &hif_exec_grp_irq_enable;
 	hif_ext_group->irq_disable = &hif_exec_grp_irq_disable;
 	hif_ext_group->irq_name = &hif_pci_get_irq_name;
 	hif_ext_group->work_complete = &hif_dummy_grp_done;
 
+	pci_slot = hif_get_pci_slot(scn);
 	for (j = 0; j < hif_ext_group->numirq; j++) {
 		irq = hif_ext_group->irq[j];
-
+		if (scn->irq_unlazy_disable)
+			irq_set_status_flags(irq, IRQ_DISABLE_UNLAZY);
 		hif_info("request_irq = %d for grp %d",
 			 irq, hif_ext_group->grp_id);
 		ret = pfrm_request_irq(
 				scn->qdf_dev->dev, irq,
 				hif_ext_group_interrupt_handler,
 				IRQF_SHARED | IRQF_NO_SUSPEND,
-				dp_irqname[hif_ext_group->grp_id],
+				dp_irqname[pci_slot][hif_ext_group->grp_id],
 				hif_ext_group);
 		if (ret) {
 			HIF_ERROR("%s: request_irq failed ret = %d",
@@ -3872,11 +3957,14 @@ static void hif_pci_get_soc_info_pld(struct hif_pci_softc *sc,
 				     struct device *dev)
 {
 	struct pld_soc_info info;
+	struct hif_softc *scn = HIF_GET_SOFTC(sc);
 
 	pld_get_soc_info(dev, &info);
 	sc->mem = info.v_addr;
 	sc->ce_sc.ol_sc.mem    = info.v_addr;
 	sc->ce_sc.ol_sc.mem_pa = info.p_addr;
+	scn->target_info.target_version = info.soc_id;
+	scn->target_info.target_revision = 0;
 }
 
 static void hif_pci_get_soc_info_nopld(struct hif_pci_softc *sc,
@@ -3969,8 +4057,10 @@ QDF_STATUS hif_pci_enable_bus(struct hif_softc *ol_sc,
 		HIF_ERROR("%s: hif_ctx is NULL", __func__);
 		return QDF_STATUS_E_NOMEM;
 	}
-
-	HIF_TRACE("%s: con_mode = 0x%x, device_id = 0x%x",
+	/* Following print is used by various tools to identify
+	 * WLAN SOC (e.g. crash dump analysis and reporting tool).
+	 */
+	HIF_TRACE("%s: con_mode = 0x%x, WLAN_SOC_device_id = 0x%x",
 		  __func__, hif_get_conparam(ol_sc), id->device);
 
 	sc->pdev = pdev;
@@ -4012,6 +4102,12 @@ again:
 	hif_pci_init_reg_windowing_support(sc, target_type);
 
 	tgt_info->target_type = target_type;
+
+	/*
+	 * Disable unlzay interrupt registration for QCN9000
+	 */
+	if (target_type == TARGET_TYPE_QCN9000)
+		ol_sc->irq_unlazy_disable = 1;
 
 	if (ce_srng_based(ol_sc)) {
 		HIF_TRACE("%s:Skip tgt_wake up for srng devices\n", __func__);

@@ -303,6 +303,16 @@ static const struct qwlan_hw qwlan_hw_list[] = {
 		.name = "AR6320_REV3_2_VERSION",
 	},
 	{
+		.id = QCA6390_V1,
+		.subid = 0x0,
+		.name = "QCA6390_V1",
+	},
+	{
+		.id = QCA6490_V1,
+		.subid = 0x0,
+		.name = "QCA6490_V1",
+	},
+	{
 		.id = WCN3990_v1,
 		.subid = 0x0,
 		.name = "WCN3990_V1",
@@ -403,6 +413,21 @@ void *hif_get_dev_ba(struct hif_opaque_softc *hif_handle)
 	return scn->mem;
 }
 qdf_export_symbol(hif_get_dev_ba);
+
+/**
+ * hif_get_dev_ba_ce(): API to get device ce base address.
+ * @scn: scn
+ *
+ * Return: dev mem base address for CE
+ */
+void *hif_get_dev_ba_ce(struct hif_opaque_softc *hif_handle)
+{
+	struct hif_softc *scn = (struct hif_softc *)hif_handle;
+
+	return scn->mem_ce;
+}
+
+qdf_export_symbol(hif_get_dev_ba_ce);
 
 #ifdef WLAN_CE_INTERRUPT_THRESHOLD_CONFIG
 /**
@@ -930,8 +955,7 @@ void hif_clear_stats(struct hif_opaque_softc *hif_ctx)
  *
  * Return: n/a
  */
-#if defined(TARGET_RAMDUMP_AFTER_KERNEL_PANIC) \
-&& defined(DEBUG)
+#if defined(TARGET_RAMDUMP_AFTER_KERNEL_PANIC) && defined(WLAN_FEATURE_BMI)
 
 static void hif_crash_shutdown_dump_bus_register(void *hif_ctx)
 {
@@ -978,6 +1002,7 @@ void hif_crash_shutdown(struct hif_opaque_softc *hif_ctx)
 	}
 
 	hif_crash_shutdown_dump_bus_register(hif_ctx);
+	hif_set_target_status(hif_ctx, TARGET_STATUS_RESET);
 
 	if (ol_copy_ramdump(hif_ctx))
 		goto out;
@@ -1536,6 +1561,9 @@ QDF_STATUS hif_send_single(struct hif_opaque_softc *osc, qdf_nbuf_t msdu,
 			   uint32_t transfer_id, u_int32_t len)
 {
 	void *ce_tx_hdl = hif_get_ce_handle(osc, CE_HTT_TX_CE);
+
+	if (!ce_tx_hdl)
+		return QDF_STATUS_E_NULL_VALUE;
 
 	return ce_send_single((struct CE_handle *)ce_tx_hdl, msdu, transfer_id,
 			len);

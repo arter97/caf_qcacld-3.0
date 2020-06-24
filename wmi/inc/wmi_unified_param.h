@@ -28,6 +28,11 @@
 #ifdef FEATURE_WLAN_TDLS
 #include <wlan_tdls_public_structs.h>
 #endif
+#ifdef WLAN_CONV_SPECTRAL_ENABLE
+#include <wlan_spectral_public_structs.h>
+#endif /* WLAN_CONV_SPECTRAL_ENABLE */
+#include <wlan_vdev_mgr_tgt_if_tx_defs.h>
+#include <wlan_vdev_mgr_tgt_if_rx_defs.h>
 
 #define MAC_MAX_KEY_LENGTH 32
 #define MAC_PN_LENGTH 8
@@ -1688,6 +1693,8 @@ struct roam_fils_params {
  * device is considered to be inactive
  * @is_sae_same_pmk: Flag to indicate fw whether WLAN_SAE_SINGLE_PMK feature is
  * enable or not
+ * @enable_ft_im_roaming: Flag to enable/disable FT-IM roaming upon receiving
+ * deauth
  * @roam_inactive_data_packet_count: Maximum allowed data packets count during
  * roam_scan_inactivity_time.
  * @roam_scan_period_after_inactivity: Roam scan period in ms after device is
@@ -1717,6 +1724,7 @@ struct roam_offload_scan_params {
 	uint32_t rct_validity_timer;
 	bool is_adaptive_11r;
 	bool is_sae_same_pmk;
+	bool enable_ft_im_roaming;
 #endif
 	uint32_t min_delay_btw_roam_scans;
 	uint32_t roam_trigger_reason_bitmask;
@@ -2536,7 +2544,7 @@ struct stats_ext_params {
  */
 struct wmi_host_mem_chunk {
 	uint32_t *vaddr;
-	uint32_t paddr;
+	qdf_dma_addr_t paddr;
 	qdf_dma_mem_context(memctx);
 	uint32_t len;
 	uint32_t req_id;
@@ -2788,11 +2796,13 @@ struct peer_chan_width_switch_info {
 /**
  * struct peer_chan_width_switch_params - Peer channel width capability wrapper
  * @num_peers: Total number of peers connected to AP
+ * @max_peers_per_cmd: Peer limit per WMI command
  * @chan_width_peer_list: List of capabilities for all connected peers
  */
 
 struct peer_chan_width_switch_params {
 	uint32_t num_peers;
+	uint32_t max_peers_per_cmd;
 	struct peer_chan_width_switch_info *chan_width_peer_list;
 };
 
@@ -2904,6 +2914,37 @@ struct smart_ant_enable_tx_feedback_params {
 };
 
 /**
+ * struct simulation_test_params
+ * pdev_id: pdev id
+ * vdev_id: vdev id
+ * peer_macaddr: peer MAC address
+ * test_cmd_type: test command type
+ * test_subcmd_type: test command sub type
+ * frame_type: frame type
+ * frame_subtype: frame subtype
+ * seq: sequence number
+ * offset: Frame content offset
+ * frame_length: Frame content length
+ * buf_len: Buffer length
+ * bufp: buffer
+ */
+struct simulation_test_params {
+	u32 pdev_id;
+	u32 vdev_id;
+	u8 peer_mac[QDF_MAC_ADDR_SIZE];
+	u32 test_cmd_type;
+	u32 test_subcmd_type;
+	u8 frame_type;
+	u8 frame_subtype;
+	u8 seq;
+	u8 reserved;
+	u16 offset;
+	u16 frame_length;
+	u32 buf_len;
+	u8 *bufp;
+};
+
+/**
  * struct vdev_spectral_configure_params - SPectral config params
  * @vdev_id: VDEV id
  * @count: count
@@ -2925,7 +2966,8 @@ struct smart_ant_enable_tx_feedback_params {
  * @dbm_adj: DBM adjust
  * @chn_mask: chain mask
  * @mode: Mode
- * @center_freq: Center frequency
+ * @center_freq1: Center frequency 1
+ * @center_freq2: Center frequency 2
  * @chan_freq: Primary channel frequency
  * @chan_width: Channel width
  */
@@ -2950,7 +2992,8 @@ struct vdev_spectral_configure_params {
 	uint16_t dbm_adj;
 	uint16_t chn_mask;
 	uint16_t mode;
-	uint16_t center_freq;
+	uint16_t center_freq1;
+	uint16_t center_freq2;
 	uint16_t chan_freq;
 	uint16_t chan_width;
 };
@@ -2972,6 +3015,49 @@ struct vdev_spectral_enable_params {
 	uint8_t enabled;
 	uint8_t mode;
 };
+
+#ifdef WLAN_CONV_SPECTRAL_ENABLE
+/**
+ * struct spectral_fft_bin_markers_160_165mhz - Stores the start index
+ * and length of FFT bins in 165 MHz/Restricted 80p80 or 160 MHz
+ * mode in targets with a single Spectral detector
+ * @is_valid: Indicates whether this structure holds valid data
+ * @start_pri80: Starting index of FFT bins corresponding to primary 80 MHz
+ *               in 165 MHz/Restricted 80p80 or 160 MHz mode
+ * @num_pri80: Number of FFT bins corresponding to primary 80 MHz
+ *             in 165 MHz/Restricted 80p80 or 160 MHz mode
+ * @start_5mhz: Starting index of FFT bins corresponding to extra 5 MHz
+ *               in 165 MHz/Restricted 80p80 mode
+ * @num_5mhz: Number of FFT bins corresponding to extra 5 MHz
+ *             in 165 MHz/Restricted 80p80 mode
+ * @start_sec80: Starting index of FFT bins corresponding to secondary 80 MHz
+ *               in 165 MHz/Restricted 80p80 or 160 MHz mode
+ * @num_sec80: Number of FFT bins corresponding to secondary 80 MHz
+ *             in 165 MHz/Restricted 80p80 or 160 MHz mode
+ */
+struct spectral_fft_bin_markers_160_165mhz {
+	bool is_valid;
+	uint16_t start_pri80;
+	uint16_t num_pri80;
+	uint16_t start_5mhz;
+	uint16_t num_5mhz;
+	uint16_t start_sec80;
+	uint16_t num_sec80;
+};
+
+/**
+ * struct spectral_startscan_resp_params - Params from the event send by
+ * FW as a response to the scan start command
+ * @pdev_id: Pdev id
+ * @smode: Spectral scan mode
+ * @num_fft_bin_index: Number of TLVs with FFT bin start and end indices
+ */
+struct spectral_startscan_resp_params {
+	uint32_t pdev_id;
+	enum spectral_scan_mode smode;
+	uint8_t num_fft_bin_index;
+};
+#endif
 
 /**
  * struct pdev_set_regdomain_params - PDEV set reg domain params
@@ -4617,6 +4703,7 @@ typedef enum {
 #endif
 	wmi_roam_scan_chan_list_id,
 	wmi_muedca_params_config_eventid,
+	wmi_pdev_sscan_fw_param_eventid,
 	wmi_events_max,
 } wmi_conv_event_id;
 
@@ -4922,6 +5009,7 @@ typedef enum {
 	wmi_vdev_param_enable_disable_roam_reason_vsie,
 	wmi_vdev_param_set_cmd_obss_pd_threshold,
 	wmi_vdev_param_set_cmd_obss_pd_per_ac,
+	wmi_vdev_param_enable_srp,
 } wmi_conv_vdev_param_id;
 
 /**
@@ -5136,6 +5224,9 @@ typedef enum {
 	wmi_service_sta_nan_ndi_four_port,
 	wmi_service_host_scan_stop_vdev_all,
 	wmi_service_ema_ap_support,
+	wmi_support_extend_address,
+	wmi_service_srg_srp_spatial_reuse_support,
+	wmi_service_suiteb_roam_support,
 	wmi_services_max,
 } wmi_conv_service_ids;
 #define WMI_SERVICE_UNAVAILABLE 0xFFFF
@@ -5275,6 +5366,8 @@ struct wmi_host_fw_abi_ver {
  * @max_rnr_neighbours: Max supported RNR neighbors in multisoc APs
  * @ema_max_vap_cnt: Number of maximum EMA tx-vaps at any instance of time
  * @ema_max_profile_period: Maximum EMA profile periodicity on any pdev
+ * @max_ndp_sessions: Max ndp sessions support
+ * @max_ndi: max number of ndi host supports
  */
 typedef struct {
 	uint32_t num_vdevs;
@@ -5376,6 +5469,8 @@ typedef struct {
 	uint32_t max_rnr_neighbours;
 	uint32_t ema_max_vap_cnt;
 	uint32_t ema_max_profile_period;
+	uint32_t max_ndp_sessions;
+	uint32_t max_ndi;
 } target_resource_config;
 
 /**

@@ -28,6 +28,9 @@
 #include "target_type.h"
 #include "wcss_version.h"
 #include "qdf_module.h"
+#include "hal_flow.h"
+#include "rx_flow_search_entry.h"
+#include "hal_rx_flow_info.h"
 
 #define UNIFIED_RXPCU_PPDU_END_INFO_8_RX_PPDU_DURATION_OFFSET \
 	RXPCU_PPDU_END_INFO_9_RX_PPDU_DURATION_OFFSET
@@ -1412,6 +1415,24 @@ bool hal_rx_get_fisa_timeout_6490(uint8_t *buf)
 }
 
 /**
+ * hal_rx_mpdu_start_tlv_tag_valid_6490 () - API to check if RX_MPDU_START
+ * tlv tag is valid
+ *
+ *@rx_tlv_hdr: start address of rx_pkt_tlvs
+ *
+ * Return: true if RX_MPDU_START is valied, else false.
+ */
+static uint8_t hal_rx_mpdu_start_tlv_tag_valid_6490(void *rx_tlv_hdr)
+{
+	struct rx_pkt_tlvs *rx_desc = (struct rx_pkt_tlvs *)rx_tlv_hdr;
+	uint32_t tlv_tag;
+
+	tlv_tag = HAL_RX_GET_USER_TLV32_TYPE(&rx_desc->mpdu_start_tlv);
+
+	return tlv_tag == WIFIRX_MPDU_START_E ? true : false;
+}
+
+/**
  * hal_reo_set_err_dst_remap_6490(): Function to set REO error destination
  *				     ring remap register
  * @hal_soc: Pointer to hal_soc
@@ -1445,6 +1466,166 @@ hal_reo_set_err_dst_remap_6490(void *hal_soc)
 			 hal_soc,
 			 HWIO_REO_R0_ERROR_DESTINATION_MAPPING_IX_0_ADDR(
 			 SEQ_WCSS_UMAC_REO_REG_OFFSET)));
+}
+
+/**
+ * hal_rx_flow_setup_fse_6490() - Setup a flow search entry in HW FST
+ * @fst: Pointer to the Rx Flow Search Table
+ * @table_offset: offset into the table where the flow is to be setup
+ * @flow: Flow Parameters
+ *
+ * Flow table entry fields are updated in host byte order, little endian order.
+ *
+ * Return: Success/Failure
+ */
+static void *
+hal_rx_flow_setup_fse_6490(uint8_t *rx_fst, uint32_t table_offset,
+		               uint8_t *rx_flow)
+{
+	struct hal_rx_fst *fst = (struct hal_rx_fst *)rx_fst;
+	struct hal_rx_flow *flow = (struct hal_rx_flow *)rx_flow;
+	uint8_t *fse;
+	bool fse_valid;
+
+	if (table_offset >= fst->max_entries) {
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
+				"HAL FSE table offset %u exceeds max entries %u",
+				table_offset, fst->max_entries);
+		return NULL;
+	}
+
+	fse = (uint8_t *)fst->base_vaddr +
+		(table_offset * HAL_RX_FST_ENTRY_SIZE);
+
+	fse_valid = HAL_GET_FLD(fse, RX_FLOW_SEARCH_ENTRY_9, VALID);
+
+	if (fse_valid) {
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_DEBUG,
+				"HAL FSE %pK already valid", fse);
+		return NULL;
+	}
+
+	HAL_SET_FLD(fse, RX_FLOW_SEARCH_ENTRY_0, SRC_IP_127_96) =
+		HAL_SET_FLD_SM(RX_FLOW_SEARCH_ENTRY_0, SRC_IP_127_96,
+			(flow->tuple_info.src_ip_127_96));
+
+	HAL_SET_FLD(fse, RX_FLOW_SEARCH_ENTRY_1, SRC_IP_95_64) =
+		HAL_SET_FLD_SM(RX_FLOW_SEARCH_ENTRY_1, SRC_IP_95_64,
+			(flow->tuple_info.src_ip_95_64));
+
+	HAL_SET_FLD(fse, RX_FLOW_SEARCH_ENTRY_2, SRC_IP_63_32) =
+		HAL_SET_FLD_SM(RX_FLOW_SEARCH_ENTRY_2, SRC_IP_63_32,
+			(flow->tuple_info.src_ip_63_32));
+
+	HAL_SET_FLD(fse, RX_FLOW_SEARCH_ENTRY_3, SRC_IP_31_0) =
+		HAL_SET_FLD_SM(RX_FLOW_SEARCH_ENTRY_3, SRC_IP_31_0,
+			(flow->tuple_info.src_ip_31_0));
+
+	HAL_SET_FLD(fse, RX_FLOW_SEARCH_ENTRY_4, DEST_IP_127_96) =
+		HAL_SET_FLD_SM(RX_FLOW_SEARCH_ENTRY_4, DEST_IP_127_96,
+			(flow->tuple_info.dest_ip_127_96));
+
+	HAL_SET_FLD(fse, RX_FLOW_SEARCH_ENTRY_5, DEST_IP_95_64) =
+		HAL_SET_FLD_SM(RX_FLOW_SEARCH_ENTRY_5, DEST_IP_95_64,
+			(flow->tuple_info.dest_ip_95_64));
+
+	HAL_SET_FLD(fse, RX_FLOW_SEARCH_ENTRY_6, DEST_IP_63_32) =
+		HAL_SET_FLD_SM(RX_FLOW_SEARCH_ENTRY_6, DEST_IP_63_32,
+			(flow->tuple_info.dest_ip_63_32));
+
+	HAL_SET_FLD(fse, RX_FLOW_SEARCH_ENTRY_7, DEST_IP_31_0) =
+		HAL_SET_FLD_SM(RX_FLOW_SEARCH_ENTRY_7, DEST_IP_31_0,
+			(flow->tuple_info.dest_ip_31_0));
+
+	HAL_CLR_FLD(fse, RX_FLOW_SEARCH_ENTRY_8, DEST_PORT);
+	HAL_SET_FLD(fse, RX_FLOW_SEARCH_ENTRY_8, DEST_PORT) |=
+		HAL_SET_FLD_SM(RX_FLOW_SEARCH_ENTRY_8, DEST_PORT,
+			(flow->tuple_info.dest_port));
+
+	HAL_CLR_FLD(fse, RX_FLOW_SEARCH_ENTRY_8, SRC_PORT);
+	HAL_SET_FLD(fse, RX_FLOW_SEARCH_ENTRY_8, SRC_PORT) |=
+		HAL_SET_FLD_SM(RX_FLOW_SEARCH_ENTRY_8, SRC_PORT,
+			(flow->tuple_info.src_port));
+
+	HAL_CLR_FLD(fse, RX_FLOW_SEARCH_ENTRY_9, L4_PROTOCOL);
+	HAL_SET_FLD(fse, RX_FLOW_SEARCH_ENTRY_9, L4_PROTOCOL) |=
+		HAL_SET_FLD_SM(RX_FLOW_SEARCH_ENTRY_9, L4_PROTOCOL,
+			flow->tuple_info.l4_protocol);
+
+	HAL_CLR_FLD(fse, RX_FLOW_SEARCH_ENTRY_9, REO_DESTINATION_HANDLER);
+	HAL_SET_FLD(fse, RX_FLOW_SEARCH_ENTRY_9, REO_DESTINATION_HANDLER) |=
+		HAL_SET_FLD_SM(RX_FLOW_SEARCH_ENTRY_9, REO_DESTINATION_HANDLER,
+			flow->reo_destination_handler);
+
+	HAL_CLR_FLD(fse, RX_FLOW_SEARCH_ENTRY_9, VALID);
+	HAL_SET_FLD(fse, RX_FLOW_SEARCH_ENTRY_9, VALID) |=
+		HAL_SET_FLD_SM(RX_FLOW_SEARCH_ENTRY_9, VALID, 1);
+
+	HAL_CLR_FLD(fse, RX_FLOW_SEARCH_ENTRY_10, METADATA);
+	HAL_SET_FLD(fse, RX_FLOW_SEARCH_ENTRY_10, METADATA) =
+		HAL_SET_FLD_SM(RX_FLOW_SEARCH_ENTRY_10, METADATA,
+			(flow->fse_metadata));
+
+	HAL_CLR_FLD(fse, RX_FLOW_SEARCH_ENTRY_9, REO_DESTINATION_INDICATION);
+	HAL_SET_FLD(fse, RX_FLOW_SEARCH_ENTRY_9, REO_DESTINATION_INDICATION) |=
+		HAL_SET_FLD_SM(RX_FLOW_SEARCH_ENTRY_9,
+				REO_DESTINATION_INDICATION,
+				flow->reo_destination_indication);
+
+	/* Reset all the other fields in FSE */
+	HAL_CLR_FLD(fse, RX_FLOW_SEARCH_ENTRY_9, RESERVED_9);
+	HAL_CLR_FLD(fse, RX_FLOW_SEARCH_ENTRY_9, MSDU_DROP);
+	HAL_CLR_FLD(fse, RX_FLOW_SEARCH_ENTRY_11, MSDU_COUNT);
+	HAL_CLR_FLD(fse, RX_FLOW_SEARCH_ENTRY_12, MSDU_BYTE_COUNT);
+	HAL_CLR_FLD(fse, RX_FLOW_SEARCH_ENTRY_13, TIMESTAMP);
+
+	return fse;
+}
+
+static
+void hal_compute_reo_remap_ix2_ix3_6490(uint32_t *ring, uint32_t num_rings,
+					uint32_t *remap1, uint32_t *remap2)
+{
+	switch (num_rings) {
+	case 3:
+		*remap1 = HAL_REO_REMAP_IX2(ring[0], 16) |
+				HAL_REO_REMAP_IX2(ring[1], 17) |
+				HAL_REO_REMAP_IX2(ring[2], 18) |
+				HAL_REO_REMAP_IX2(ring[0], 19) |
+				HAL_REO_REMAP_IX2(ring[1], 20) |
+				HAL_REO_REMAP_IX2(ring[2], 21) |
+				HAL_REO_REMAP_IX2(ring[0], 22) |
+				HAL_REO_REMAP_IX2(ring[1], 23);
+
+		*remap2 = HAL_REO_REMAP_IX3(ring[2], 24) |
+				HAL_REO_REMAP_IX3(ring[0], 25) |
+				HAL_REO_REMAP_IX3(ring[1], 26) |
+				HAL_REO_REMAP_IX3(ring[2], 27) |
+				HAL_REO_REMAP_IX3(ring[0], 28) |
+				HAL_REO_REMAP_IX3(ring[1], 29) |
+				HAL_REO_REMAP_IX3(ring[2], 30) |
+				HAL_REO_REMAP_IX3(ring[0], 31);
+		break;
+	case 4:
+		*remap1 = HAL_REO_REMAP_IX2(ring[0], 16) |
+				HAL_REO_REMAP_IX2(ring[1], 17) |
+				HAL_REO_REMAP_IX2(ring[2], 18) |
+				HAL_REO_REMAP_IX2(ring[3], 19) |
+				HAL_REO_REMAP_IX2(ring[0], 20) |
+				HAL_REO_REMAP_IX2(ring[1], 21) |
+				HAL_REO_REMAP_IX2(ring[2], 22) |
+				HAL_REO_REMAP_IX2(ring[3], 23);
+
+		*remap2 = HAL_REO_REMAP_IX3(ring[0], 24) |
+				HAL_REO_REMAP_IX3(ring[1], 25) |
+				HAL_REO_REMAP_IX3(ring[2], 26) |
+				HAL_REO_REMAP_IX3(ring[3], 27) |
+				HAL_REO_REMAP_IX3(ring[0], 28) |
+				HAL_REO_REMAP_IX3(ring[1], 29) |
+				HAL_REO_REMAP_IX3(ring[2], 30) |
+				HAL_REO_REMAP_IX3(ring[3], 31);
+		break;
+	}
 }
 
 struct hal_hw_txrx_ops qca6490_hal_hw_txrx_ops = {
@@ -1553,7 +1734,7 @@ struct hal_hw_txrx_ops qca6490_hal_hw_txrx_ops = {
 	hal_rx_get_flow_agg_continuation_6490,
 	hal_rx_get_flow_agg_count_6490,
 	hal_rx_get_fisa_timeout_6490,
-	NULL,
+	hal_rx_mpdu_start_tlv_tag_valid_6490,
 	NULL,
 	NULL,
 
@@ -1562,7 +1743,9 @@ struct hal_hw_txrx_ops qca6490_hal_hw_txrx_ops = {
 	hal_rx_attn_offset_get_generic,
 	hal_rx_msdu_start_offset_get_generic,
 	hal_rx_mpdu_start_offset_get_generic,
-	hal_rx_mpdu_end_offset_get_generic
+	hal_rx_mpdu_end_offset_get_generic,
+	hal_rx_flow_setup_fse_6490,
+	hal_compute_reo_remap_ix2_ix3_6490
 };
 
 struct hal_hw_srng_config hw_srng_table_6490[] = {

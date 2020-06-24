@@ -266,6 +266,7 @@ dp_rx_msdus_drop(struct dp_soc *soc, hal_ring_desc_t ring_desc,
 	int i;
 	uint8_t *rx_tlv_hdr;
 	uint32_t tid;
+	struct rx_desc_pool *rx_desc_pool;
 
 	hal_rx_reo_buf_paddr_get(ring_desc, &buf_info);
 
@@ -299,8 +300,11 @@ dp_rx_msdus_drop(struct dp_soc *soc, hal_ring_desc_t ring_desc,
 			return rx_bufs_used;
 		}
 
-		qdf_nbuf_unmap_single(soc->osdev,
-				      rx_desc->nbuf, QDF_DMA_FROM_DEVICE);
+		rx_desc_pool = &soc->rx_desc_buf[rx_desc->pool_id];
+		qdf_nbuf_unmap_nbytes_single(soc->osdev, rx_desc->nbuf,
+					     QDF_DMA_FROM_DEVICE,
+					     rx_desc_pool->buf_size);
+		rx_desc->unmapped = 1;
 
 		rx_desc->rx_buf_start = qdf_nbuf_data(rx_desc->nbuf);
 
@@ -457,6 +461,7 @@ dp_rx_reo_err_entry_process(struct dp_soc *soc,
 	uint32_t tid = DP_MAX_TIDS;
 	uint16_t peer_id;
 	struct dp_rx_desc *rx_desc;
+	struct rx_desc_pool *rx_desc_pool;
 	qdf_nbuf_t nbuf;
 	struct hal_buf_info buf_info;
 	struct hal_rx_msdu_list msdu_list;
@@ -486,8 +491,11 @@ more_msdu_link_desc:
 		pdev = dp_get_pdev_for_lmac_id(soc, rx_desc->pool_id);
 
 		nbuf = rx_desc->nbuf;
-		qdf_nbuf_unmap_single(soc->osdev,
-				      nbuf, QDF_DMA_FROM_DEVICE);
+		rx_desc_pool = &soc->rx_desc_buf[rx_desc->pool_id];
+		qdf_nbuf_unmap_nbytes_single(soc->osdev, nbuf,
+					     QDF_DMA_FROM_DEVICE,
+					     rx_desc_pool->buf_size);
+		rx_desc->unmapped = 1;
 
 		QDF_NBUF_CB_RX_PKT_LEN(nbuf) = msdu_list.msdu_info[i].msdu_len;
 		rx_bufs_used++;
@@ -1077,44 +1085,37 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc, qdf_nbuf_t nbuf,
 		qdf_nbuf_set_next(nbuf, NULL);
 		dp_rx_deliver_raw(vdev, nbuf, peer);
 	} else {
-		if (vdev->osif_rx) {
-			qdf_nbuf_set_next(nbuf, NULL);
-			DP_STATS_INC_PKT(peer, rx.to_stack, 1,
+		qdf_nbuf_set_next(nbuf, NULL);
+		DP_STATS_INC_PKT(peer, rx.to_stack, 1,
+				 qdf_nbuf_len(nbuf));
+
+		/*
+		 * Update the protocol tag in SKB based on
+		 * CCE metadata
+		 */
+		dp_rx_update_protocol_tag(soc, vdev, nbuf, rx_tlv_hdr,
+					  EXCEPTION_DEST_RING_ID,
+					  true, true);
+
+		/* Update the flow tag in SKB based on FSE metadata */
+		dp_rx_update_flow_tag(soc, vdev, nbuf,
+				      rx_tlv_hdr, true);
+
+		if (qdf_unlikely(hal_rx_msdu_end_da_is_mcbc_get(
+				 soc->hal_soc, rx_tlv_hdr) &&
+				 (vdev->rx_decap_type ==
+				  htt_cmn_pkt_type_ethernet))) {
+			eh = (qdf_ether_header_t *)qdf_nbuf_data(nbuf);
+			DP_STATS_INC_PKT(peer, rx.multicast, 1,
 					 qdf_nbuf_len(nbuf));
 
-			/*
-			 * Update the protocol tag in SKB based on
-			 * CCE metadata
-			 */
-			dp_rx_update_protocol_tag(soc, vdev, nbuf, rx_tlv_hdr,
-						  EXCEPTION_DEST_RING_ID,
-						  true, true);
-
-			/* Update the flow tag in SKB based on FSE metadata */
-			dp_rx_update_flow_tag(soc, vdev, nbuf,
-					      rx_tlv_hdr, true);
-
-			if (qdf_unlikely(hal_rx_msdu_end_da_is_mcbc_get(
-					soc->hal_soc, rx_tlv_hdr) &&
-					 (vdev->rx_decap_type ==
-					  htt_cmn_pkt_type_ethernet))) {
-				eh = (qdf_ether_header_t *)qdf_nbuf_data(nbuf);
-
-				DP_STATS_INC_PKT(peer, rx.multicast, 1,
+			if (QDF_IS_ADDR_BROADCAST(eh->ether_dhost))
+				DP_STATS_INC_PKT(peer, rx.bcast, 1,
 						 qdf_nbuf_len(nbuf));
-				if (QDF_IS_ADDR_BROADCAST(eh->ether_dhost)) {
-					DP_STATS_INC_PKT(peer, rx.bcast, 1,
-							 qdf_nbuf_len(nbuf));
-				}
-			}
-
-			vdev->osif_rx(vdev->osif_vdev, nbuf);
-
-		} else {
-			dp_err_rl("INVALID osif_rx. vdev %pK", vdev);
-			DP_STATS_INC(soc, rx.err.invalid_vdev, 1);
-			goto drop_nbuf;
 		}
+
+		qdf_nbuf_set_exc_frame(nbuf, 1);
+		dp_rx_deliver_to_stack(soc, vdev, peer, nbuf, NULL);
 	}
 	return QDF_STATUS_SUCCESS;
 
@@ -1283,6 +1284,7 @@ process_rx:
 		/* Update the flow tag in SKB based on FSE metadata */
 		dp_rx_update_flow_tag(soc, vdev, nbuf, rx_tlv_hdr, true);
 		DP_STATS_INC(peer, rx.to_stack.num, 1);
+		qdf_nbuf_set_exc_frame(nbuf, 1);
 		dp_rx_deliver_to_stack(soc, vdev, peer, nbuf, NULL);
 	}
 
@@ -1789,7 +1791,11 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 		}
 
 		nbuf = rx_desc->nbuf;
-		qdf_nbuf_unmap_single(soc->osdev, nbuf,	QDF_DMA_FROM_DEVICE);
+		rx_desc_pool = &soc->rx_desc_buf[rx_desc->pool_id];
+		qdf_nbuf_unmap_nbytes_single(soc->osdev, nbuf,
+					     QDF_DMA_FROM_DEVICE,
+					     rx_desc_pool->buf_size);
+		rx_desc->unmapped = 1;
 
 		/*
 		 * save the wbm desc info in nbuf TLV. We will need this
@@ -2365,6 +2371,7 @@ dp_handle_wbm_internal_error(struct dp_soc *soc, void *hal_desc,
 {
 	struct hal_buf_info buf_info = {0};
 	struct dp_rx_desc *rx_desc = NULL;
+	struct rx_desc_pool *rx_desc_pool;
 	uint32_t rx_buf_cookie;
 	uint32_t rx_bufs_reaped = 0;
 	union dp_rx_desc_list_elem_t *head = NULL;
@@ -2386,9 +2393,10 @@ dp_handle_wbm_internal_error(struct dp_soc *soc, void *hal_desc,
 		rx_desc = dp_rx_cookie_2_va_rxdma_buf(soc, rx_buf_cookie);
 
 		if (rx_desc && rx_desc->nbuf) {
-			qdf_nbuf_unmap_single(soc->osdev, rx_desc->nbuf,
-					      QDF_DMA_FROM_DEVICE);
-
+			rx_desc_pool = &soc->rx_desc_buf[rx_desc->pool_id];
+			qdf_nbuf_unmap_nbytes_single(soc->osdev, rx_desc->nbuf,
+						     QDF_DMA_FROM_DEVICE,
+						     rx_desc_pool->buf_size);
 			rx_desc->unmapped = 1;
 
 			qdf_nbuf_free(rx_desc->nbuf);

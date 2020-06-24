@@ -2454,7 +2454,9 @@ static void hif_post_recv_buffers_failure(struct HIF_CE_pipe_info *pipe_info,
 	 *	there is no trigger to refill the ce and we will
 	 *	eventually crash
 	 */
-	if (bufs_needed_tmp == CE_state->dest_ring->nentries - 1)
+	if (bufs_needed_tmp == CE_state->dest_ring->nentries - 1 ||
+	    (ce_srng_based(scn) &&
+	     bufs_needed_tmp == CE_state->dest_ring->nentries - 2))
 		qdf_sched_work(scn->qdf_dev, &CE_state->oom_allocation_work);
 
 }
@@ -2799,7 +2801,8 @@ void hif_ce_stop(struct hif_softc *scn)
 
 		pipe_info = &hif_state->pipe_info[pipe_num];
 		if (pipe_info->ce_hdl) {
-			if (pipe_info->ce_hdl != ce_diag) {
+			if (pipe_info->ce_hdl != ce_diag &&
+			    hif_state->started) {
 				attr = hif_state->host_ce_config[pipe_num];
 				if (attr.src_nentries)
 					qdf_spinlock_destroy(&pipe_info->

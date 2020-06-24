@@ -1297,6 +1297,19 @@ wmi_unified_smart_ant_enable_tx_feedback_cmd_send(
 qdf_export_symbol(wmi_unified_smart_ant_enable_tx_feedback_cmd_send);
 
 QDF_STATUS
+wmi_unified_simulation_test_cmd_send(
+		wmi_unified_t wmi_handle,
+		struct simulation_test_params *param)
+{
+	if (wmi_handle->ops->send_simulation_test_cmd)
+		return wmi_handle->ops->send_simulation_test_cmd(
+							wmi_handle, param);
+
+	return QDF_STATUS_E_FAILURE;
+}
+qdf_export_symbol(wmi_unified_simulation_test_cmd_send);
+
+QDF_STATUS
 wmi_unified_vdev_spectral_configure_cmd_send(
 		wmi_unified_t wmi_handle,
 		struct vdev_spectral_configure_params *param)
@@ -1643,6 +1656,18 @@ wmi_extract_hal_reg_cap(wmi_unified_t wmi_handle, void *evt_buf,
 	if (wmi_handle->ops->extract_hal_reg_cap)
 		return wmi_handle->ops->extract_hal_reg_cap(wmi_handle,
 			evt_buf, hal_reg_cap);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS
+wmi_extract_hal_reg_cap_ext2(
+		wmi_unified_t wmi_handle, void *evt_buf, uint8_t phy_idx,
+		struct wlan_psoc_host_hal_reg_capabilities_ext2 *hal_reg_cap)
+{
+	if (wmi_handle->ops->extract_hal_reg_cap_ext2)
+		return wmi_handle->ops->extract_hal_reg_cap_ext2(
+			wmi_handle, evt_buf, phy_idx, hal_reg_cap);
 
 	return QDF_STATUS_E_FAILURE;
 }
@@ -2470,6 +2495,22 @@ QDF_STATUS wmi_extract_mac_phy_cap_service_ready_ext(
 	return QDF_STATUS_E_FAILURE;
 }
 
+QDF_STATUS wmi_extract_mac_phy_cap_service_ready_ext2(
+			wmi_unified_t wmi_handle,
+			uint8_t *evt_buf,
+			uint8_t hw_mode_id,
+			uint8_t phy_id,
+			uint8_t phy_idx,
+			struct wlan_psoc_host_mac_phy_caps_ext2 *mac_phy_cap)
+{
+	if (wmi_handle->ops->extract_mac_phy_cap_service_ready_ext2)
+		return wmi_handle->ops->extract_mac_phy_cap_service_ready_ext2(
+				wmi_handle, evt_buf, hw_mode_id, phy_id,
+				phy_idx, mac_phy_cap);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
 QDF_STATUS wmi_extract_reg_cap_service_ready_ext(
 			wmi_unified_t wmi_handle,
 			uint8_t *evt_buf, uint8_t phy_idx,
@@ -2508,6 +2549,34 @@ QDF_STATUS wmi_extract_dbr_ring_cap_service_ready_ext2(
 
 	return QDF_STATUS_E_FAILURE;
 }
+
+#ifdef WLAN_CONV_SPECTRAL_ENABLE
+QDF_STATUS wmi_extract_pdev_sscan_fw_cmd_fixed_param(
+			wmi_unified_t wmi_handle,
+			uint8_t *evt_buf,
+			struct spectral_startscan_resp_params *param)
+{
+	if (wmi_handle->ops->extract_pdev_sscan_fw_cmd_fixed_param)
+		return wmi_handle->ops->extract_pdev_sscan_fw_cmd_fixed_param(
+				wmi_handle,
+				evt_buf, param);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS wmi_extract_pdev_sscan_fft_bin_index(
+			wmi_unified_t wmi_handle,
+			uint8_t *evt_buf,
+			struct spectral_fft_bin_markers_160_165mhz *param)
+{
+	if (wmi_handle->ops->extract_pdev_sscan_fft_bin_index)
+		return wmi_handle->ops->extract_pdev_sscan_fft_bin_index(
+				wmi_handle,
+				evt_buf, param);
+
+	return QDF_STATUS_E_FAILURE;
+}
+#endif /* WLAN_CONV_SPECTRAL_ENABLE */
 
 QDF_STATUS wmi_extract_spectral_scaling_params_service_ready_ext(
 			wmi_unified_t wmi_handle,
@@ -2991,6 +3060,54 @@ QDF_STATUS wmi_unified_send_self_srg_partial_bssid_bitmap_set_cmd(
 {
 	if (wmi_handle->ops->send_self_srg_partial_bssid_bitmap_set)
 		return wmi_handle->ops->send_self_srg_partial_bssid_bitmap_set(
+				wmi_handle, bitmap_0, bitmap_1, pdev_id);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS wmi_unified_send_self_srg_obss_color_enable_bitmap_cmd(
+	wmi_unified_t wmi_handle,  uint32_t bitmap_0,
+	uint32_t bitmap_1, uint8_t pdev_id)
+{
+	if (wmi_handle->ops->send_self_srg_obss_color_enable_bitmap)
+		return wmi_handle->ops->
+			send_self_srg_obss_color_enable_bitmap(
+				wmi_handle, bitmap_0, bitmap_1, pdev_id);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS wmi_unified_send_self_srg_obss_bssid_enable_bitmap_cmd(
+	wmi_unified_t wmi_handle,  uint32_t bitmap_0,
+	uint32_t bitmap_1, uint8_t pdev_id)
+{
+	if (wmi_handle->ops->send_self_srg_obss_bssid_enable_bitmap)
+		return wmi_handle->ops->
+			send_self_srg_obss_bssid_enable_bitmap(
+				wmi_handle, bitmap_0, bitmap_1, pdev_id);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS wmi_unified_send_self_non_srg_obss_color_enable_bitmap_cmd(
+	wmi_unified_t wmi_handle,  uint32_t bitmap_0,
+	uint32_t bitmap_1, uint8_t pdev_id)
+{
+	if (wmi_handle->ops->send_self_non_srg_obss_color_enable_bitmap)
+		return wmi_handle->ops->
+			send_self_non_srg_obss_color_enable_bitmap(
+				wmi_handle, bitmap_0, bitmap_1, pdev_id);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS wmi_unified_send_self_non_srg_obss_bssid_enable_bitmap_cmd(
+	wmi_unified_t wmi_handle,  uint32_t bitmap_0,
+	uint32_t bitmap_1, uint8_t pdev_id)
+{
+	if (wmi_handle->ops->send_self_non_srg_obss_bssid_enable_bitmap)
+		return wmi_handle->ops->
+			send_self_non_srg_obss_bssid_enable_bitmap(
 				wmi_handle, bitmap_0, bitmap_1, pdev_id);
 
 	return QDF_STATUS_E_FAILURE;

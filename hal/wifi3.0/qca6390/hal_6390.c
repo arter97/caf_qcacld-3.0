@@ -976,6 +976,24 @@ uint16_t hal_rx_get_rx_sequence_6390(uint8_t *buf)
 }
 
 /**
+ * hal_rx_mpdu_start_tlv_tag_valid_6390 () - API to check if RX_MPDU_START
+ * tlv tag is valid
+ *
+ *@rx_tlv_hdr: start address of rx_pkt_tlvs
+ *
+ * Return: true if RX_MPDU_START is valied, else false.
+ */
+static uint8_t hal_rx_mpdu_start_tlv_tag_valid_6390(void *rx_tlv_hdr)
+{
+	struct rx_pkt_tlvs *rx_desc = (struct rx_pkt_tlvs *)rx_tlv_hdr;
+	uint32_t tlv_tag;
+
+	tlv_tag = HAL_RX_GET_USER_TLV32_TYPE(&rx_desc->mpdu_start_tlv);
+
+	return tlv_tag == WIFIRX_MPDU_START_E ? true : false;
+}
+
+/**
  * hal_get_window_address_6390(): Function to get hp/tp address
  * @hal_soc: Pointer to hal_soc
  * @addr: address offset of register
@@ -1024,6 +1042,52 @@ hal_reo_set_err_dst_remap_6390(void *hal_soc)
 			 hal_soc,
 			 HWIO_REO_R0_ERROR_DESTINATION_MAPPING_IX_0_ADDR(
 			 SEQ_WCSS_UMAC_REO_REG_OFFSET)));
+}
+
+static
+void hal_compute_reo_remap_ix2_ix3_6390(uint32_t *ring, uint32_t num_rings,
+					uint32_t *remap1, uint32_t *remap2)
+{
+	switch (num_rings) {
+	case 3:
+		*remap1 = HAL_REO_REMAP_IX2(ring[0], 16) |
+				HAL_REO_REMAP_IX2(ring[1], 17) |
+				HAL_REO_REMAP_IX2(ring[2], 18) |
+				HAL_REO_REMAP_IX2(ring[0], 19) |
+				HAL_REO_REMAP_IX2(ring[1], 20) |
+				HAL_REO_REMAP_IX2(ring[2], 21) |
+				HAL_REO_REMAP_IX2(ring[0], 22) |
+				HAL_REO_REMAP_IX2(ring[1], 23);
+
+		*remap2 = HAL_REO_REMAP_IX3(ring[2], 24) |
+				HAL_REO_REMAP_IX3(ring[0], 25) |
+				HAL_REO_REMAP_IX3(ring[1], 26) |
+				HAL_REO_REMAP_IX3(ring[2], 27) |
+				HAL_REO_REMAP_IX3(ring[0], 28) |
+				HAL_REO_REMAP_IX3(ring[1], 29) |
+				HAL_REO_REMAP_IX3(ring[2], 30) |
+				HAL_REO_REMAP_IX3(ring[0], 31);
+		break;
+	case 4:
+		*remap1 = HAL_REO_REMAP_IX2(ring[0], 16) |
+				HAL_REO_REMAP_IX2(ring[1], 17) |
+				HAL_REO_REMAP_IX2(ring[2], 18) |
+				HAL_REO_REMAP_IX2(ring[3], 19) |
+				HAL_REO_REMAP_IX2(ring[0], 20) |
+				HAL_REO_REMAP_IX2(ring[1], 21) |
+				HAL_REO_REMAP_IX2(ring[2], 22) |
+				HAL_REO_REMAP_IX2(ring[3], 23);
+
+		*remap2 = HAL_REO_REMAP_IX3(ring[0], 24) |
+				HAL_REO_REMAP_IX3(ring[1], 25) |
+				HAL_REO_REMAP_IX3(ring[2], 26) |
+				HAL_REO_REMAP_IX3(ring[3], 27) |
+				HAL_REO_REMAP_IX3(ring[0], 28) |
+				HAL_REO_REMAP_IX3(ring[1], 29) |
+				HAL_REO_REMAP_IX3(ring[2], 30) |
+				HAL_REO_REMAP_IX3(ring[3], 31);
+		break;
+	}
 }
 
 struct hal_hw_txrx_ops qca6390_hal_hw_txrx_ops = {
@@ -1126,7 +1190,7 @@ struct hal_hw_txrx_ops qca6390_hal_hw_txrx_ops = {
 	NULL,
 	NULL,
 	NULL,
-	NULL,
+	hal_rx_mpdu_start_tlv_tag_valid_6390,
 	NULL,
 	NULL,
 
@@ -1135,7 +1199,9 @@ struct hal_hw_txrx_ops qca6390_hal_hw_txrx_ops = {
 	hal_rx_attn_offset_get_generic,
 	hal_rx_msdu_start_offset_get_generic,
 	hal_rx_mpdu_start_offset_get_generic,
-	hal_rx_mpdu_end_offset_get_generic
+	hal_rx_mpdu_end_offset_get_generic,
+	NULL,
+	hal_compute_reo_remap_ix2_ix3_6390
 };
 
 struct hal_hw_srng_config hw_srng_table_6390[] = {

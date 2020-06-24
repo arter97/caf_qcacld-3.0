@@ -602,6 +602,13 @@ struct hal_hw_txrx_ops {
 	uint32_t (*hal_rx_msdu_start_offset_get)(void);
 	uint32_t (*hal_rx_mpdu_start_offset_get)(void);
 	uint32_t (*hal_rx_mpdu_end_offset_get)(void);
+	void * (*hal_rx_flow_setup_fse)(uint8_t *rx_fst,
+					uint32_t table_offset,
+					uint8_t *rx_flow);
+	void (*hal_compute_reo_remap_ix2_ix3)(uint32_t *ring,
+					      uint32_t num_rings,
+					      uint32_t *remap1,
+					      uint32_t *remap2);
 };
 
 /**
@@ -665,6 +672,8 @@ struct hal_soc {
 
 	/* Device base address */
 	void *dev_base_addr;
+	/* Device base address for ce - qca5018 target */
+	void *dev_base_addr_ce;
 
 	/* HAL internal state for all SRNG rings.
 	 * TODO: See if this is required

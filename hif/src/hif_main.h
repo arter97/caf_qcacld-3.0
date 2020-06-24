@@ -173,6 +173,7 @@ struct hif_softc {
 	struct hif_config_info hif_config;
 	struct hif_target_info target_info;
 	void __iomem *mem;
+	void __iomem *mem_ce;
 	enum qdf_bus_type bus_type;
 	struct hif_bus_ops bus_ops;
 	void *ce_id_to_state[CE_COUNT_MAX];
@@ -249,6 +250,8 @@ struct hif_softc {
 	/* The CPU hotplug event registration handle */
 	struct qdf_cpuhp_handler *cpuhp_event_handle;
 #endif
+	uint32_t irq_unlazy_disable;
+	/* Should the unlzay support for interrupt delivery be disabled */
 };
 
 static inline

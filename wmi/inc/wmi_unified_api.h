@@ -30,6 +30,8 @@
 #include "service_ready_param.h"
 #include "wlan_objmgr_psoc_obj.h"
 #include "wlan_mgmt_txrx_utils_api.h"
+#include <wlan_dfs_public_struct.h>
+#include <wlan_crypto_global_def.h>
 #ifdef WLAN_POWER_MANAGEMENT_OFFLOAD
 #include "wmi_unified_pmo_api.h"
 #endif
@@ -1992,6 +1994,18 @@ QDF_STATUS wmi_unified_smart_ant_enable_tx_feedback_cmd_send(
 			struct smart_ant_enable_tx_feedback_params *param);
 
 /**
+ *  wmi_unified_simulation_test_cmd_send() -
+ *  WMI simulation test command
+ *  @wmi_handle: handle to WMI.
+ *  @param: pointer to hold simulation test param
+ *
+ *  Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_simulation_test_cmd_send(wmi_unified_t wmi_handle,
+						struct simulation_test_params
+						*param);
+
+/**
  *  wmi_unified_vdev_spectral_configure_cmd_send() -
  *					WMI set spectral config function
  *  @wmi_handle: handle to WMI.
@@ -2013,6 +2027,36 @@ QDF_STATUS wmi_unified_vdev_spectral_configure_cmd_send(
 QDF_STATUS wmi_unified_vdev_spectral_enable_cmd_send(
 			wmi_unified_t wmi_handle,
 			struct vdev_spectral_enable_params *param);
+
+#ifdef WLAN_CONV_SPECTRAL_ENABLE
+/**
+ *  wmi_extract_pdev_sscan_fw_cmd_fixed_param() - Extract fixed params
+ *  from start scan response event
+ *  @wmi_handle: handle to WMI.
+ *  @evt_buf: Event buffer
+ *  @param: pointer to hold fixed params from fw params event
+ *
+ *  Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_extract_pdev_sscan_fw_cmd_fixed_param(
+			wmi_unified_t wmi_handle,
+			uint8_t *evt_buf,
+			struct spectral_startscan_resp_params *param);
+
+/**
+ *  wmi_extract_pdev_sscan_fft_bin_index() - Extract FFT bin indexes
+ *  from start scan response event
+ *  @wmi_handle: handle to WMI.
+ *  @evt_buf: Event buffer
+ *  @param: pointer to hold FFT bin indexes from fw params event
+ *
+ *  Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_extract_pdev_sscan_fft_bin_index(
+			wmi_unified_t wmi_handle,
+			uint8_t *evt_buf,
+			struct spectral_fft_bin_markers_160_165mhz *param);
+#endif /* WLAN_CONV_SPECTRAL_ENABLE */
 
 #if defined(WLAN_SUPPORT_FILS) || defined(CONFIG_BAND_6GHZ)
 /**
@@ -2290,6 +2334,22 @@ QDF_STATUS wmi_get_target_cap_from_service_ready(
 QDF_STATUS
 wmi_extract_hal_reg_cap(wmi_unified_t wmi_handle, void *evt_buf,
 			struct wlan_psoc_hal_reg_capability *hal_reg_cap);
+
+/**
+ * wmi_extract_hal_reg_cap_ext2() - Extract HAL reg capabilities from service
+ * ready ext2 event
+ * @wmi_handle: wmi handle
+ * @evt_buf: Pointer to event buffer
+ * @phy_idx: Phy id
+ * @wireless_modes: 11AX wireless modes
+ * @hal_reg_cap: pointer to hold HAL reg capabilities ext2 structure
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS
+wmi_extract_hal_reg_cap_ext2(
+		wmi_unified_t wmi_handle, void *evt_buf, uint8_t phy_idx,
+		struct wlan_psoc_host_hal_reg_capabilities_ext2 *hal_reg_cap);
 
 /**
  * wmi_extract_num_mem_reqs_from_service_ready() - Extract number of memory
@@ -3195,6 +3255,26 @@ QDF_STATUS wmi_extract_mac_phy_cap_service_ready_ext(
 			struct wlan_psoc_host_mac_phy_caps *param);
 
 /**
+ * wmi_extract_mac_phy_cap_service_ready_ext2() - Extract MAC phy cap from
+ * service ready ext2 event.
+ * @wmi_handle: wmi handle
+ * @evt_buf: pointer to event buffer
+ * @hw_mode_id: hw mode id of hw_mode_caps
+ * @phy_id: phy_id within hw_mode_cap
+ * @phy_idx: index to hw_mode_cap for the given hw_mode_id and phy_id
+ * @mac_phy_cap: Pointer to mac_phy_cap_ext2 structure
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS wmi_extract_mac_phy_cap_service_ready_ext2(
+			wmi_unified_t wmi_handle,
+			uint8_t *evt_buf,
+			uint8_t hw_mode_id,
+			uint8_t phy_id,
+			uint8_t phy_idx,
+			struct wlan_psoc_host_mac_phy_caps_ext2 *mac_phy_cap);
+
+/**
  * wmi_extract_reg_cap_service_ready_ext() -
  *       extract REG cap from service ready event
  * @wmi_handle: wmi handle
@@ -3713,6 +3793,64 @@ QDF_STATUS wmi_unified_send_self_srg_bss_color_bitmap_set_cmd(
  * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
  */
 QDF_STATUS wmi_unified_send_self_srg_partial_bssid_bitmap_set_cmd(
+	wmi_unified_t wmi_handle,  uint32_t bitmap_0,
+	uint32_t bitmap_1, uint8_t pdev_id);
+
+/**
+ * wmi_unified_send_self_srg_obss_color_enable_bitmap_cmd() - Send 64-bit BSS
+ * color enable bitmap to be used by SRG based Spatial Reuse feature to the FW
+ * @wmi_handle: wmi handle
+ * @bitmap_0: lower 32 bits in BSS color enable bitmap
+ * @bitmap_1: upper 32 bits in BSS color enable bitmap
+ * @pdev_id: pdev ID
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_send_self_srg_obss_color_enable_bitmap_cmd(
+	wmi_unified_t wmi_handle,  uint32_t bitmap_0,
+	uint32_t bitmap_1, uint8_t pdev_id);
+
+/**
+ * wmi_unified_send_self_srg_obss_bssid_enable_bitmap_cmd() - Send 64-bit OBSS
+ * BSSID enable bitmap to be used by SRG based Spatial Reuse feature to the FW
+ * @wmi_handle: wmi handle
+ * @bitmap_0: lower 32 bits in BSSID enable bitmap
+ * @bitmap_1: upper 32 bits in BSSID enable bitmap
+ * @pdev_id: pdev ID
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_send_self_srg_obss_bssid_enable_bitmap_cmd(
+	wmi_unified_t wmi_handle,  uint32_t bitmap_0,
+	uint32_t bitmap_1, uint8_t pdev_id);
+
+/**
+ * wmi_unified_send_self_non_srg_obss_color_enable_bitmap_cmd() - Send 64-bit
+ * BSS color enable bitmap to be used by Non-SRG based Spatial Reuse
+ * feature to the FW
+ * @wmi_handle: wmi handle
+ * @bitmap_0: lower 32 bits in BSS color enable bitmap
+ * @bitmap_1: upper 32 bits in BSS color enable bitmap
+ * @pdev_id: pdev ID
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_send_self_non_srg_obss_color_enable_bitmap_cmd(
+	wmi_unified_t wmi_handle,  uint32_t bitmap_0,
+	uint32_t bitmap_1, uint8_t pdev_id);
+
+/**
+ * wmi_unified_send_self_non_srg_obss_bssid_enable_bitmap_cmd() - Send 64-bit
+ * OBSS BSSID enable bitmap to be used by Non-SRG based Spatial Reuse
+ * feature to the FW
+ * @wmi_handle: wmi handle
+ * @bitmap_0: lower 32 bits in BSSID enable bitmap
+ * @bitmap_1: upper 32 bits in BSSID enable bitmap
+ * @pdev_id: pdev ID
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_send_self_non_srg_obss_bssid_enable_bitmap_cmd(
 	wmi_unified_t wmi_handle,  uint32_t bitmap_0,
 	uint32_t bitmap_1, uint8_t pdev_id);
 #endif /* OBSS_PD */

@@ -26,6 +26,8 @@
 #ifndef __WLAN_REG_SERVICES_API_H
 #define __WLAN_REG_SERVICES_API_H
 
+#include <reg_services_public_struct.h>
+
 #ifdef CONFIG_CHAN_NUM_API
 /**
  * wlan_reg_min_24ghz_ch_num() - Get minimum 2.4GHz channel number
@@ -335,6 +337,29 @@ QDF_STATUS wlan_reg_get_channel_list_with_power(struct wlan_objmgr_pdev *pdev,
  */
 QDF_STATUS wlan_reg_read_default_country(struct wlan_objmgr_psoc *psoc,
 				   uint8_t *country);
+
+/**
+ * wlan_reg_get_ctry_idx_max_bw_from_country_code() - Get the max 5G
+ * bandwidth from country code
+ * @cc : Country Code
+ * @max_bw_5g : Max 5G bandwidth supported by the country
+ *
+ * Return : QDF_STATUS
+ */
+
+QDF_STATUS wlan_reg_get_max_5g_bw_from_country_code(uint16_t cc,
+						    uint16_t *max_bw_5g);
+
+/**
+ * wlan_reg_get_max_5g_bw_from_regdomain() - Get the max 5G bandwidth
+ * supported by the regdomain
+ * @orig_regdmn : Regdomain Pair value
+ * @max_bw_5g : Max 5G bandwidth supported by the country
+ *
+ * Return : QDF_STATUS
+ */
+QDF_STATUS wlan_reg_get_max_5g_bw_from_regdomain(uint16_t regdmn,
+						 uint16_t *max_bw_5g);
 
 /**
  * wlan_reg_get_fcc_constraint() - Check FCC constraint on given frequency
@@ -955,6 +980,16 @@ bool wlan_reg_is_regdmn_en302502_applicable(struct wlan_objmgr_pdev *pdev);
 QDF_STATUS wlan_reg_modify_pdev_chan_range(struct wlan_objmgr_pdev *pdev);
 
 /**
+ * wlan_reg_get_phybitmap() - Get phybitmap from regulatory pdev_priv_obj
+ * @pdev: pdev pointer
+ * @phybitmap: pointer to phybitmap
+ *
+ * Return: QDF STATUS
+ */
+QDF_STATUS wlan_reg_get_phybitmap(struct wlan_objmgr_pdev *pdev,
+				  uint16_t *phybitmap);
+
+/**
  * wlan_reg_update_pdev_wireless_modes() - Update the wireless_modes in the
  * pdev_priv_obj with the input wireless_modes
  * @pdev: pointer to wlan_objmgr_pdev.
@@ -1311,6 +1346,7 @@ uint16_t wlan_reg_get_op_class_width(struct wlan_objmgr_pdev *pdev,
 bool wlan_reg_is_6ghz_op_class(struct wlan_objmgr_pdev *pdev,
 			       uint8_t op_class);
 
+#ifdef CONFIG_REG_CLIENT
 /**
  * wlan_reg_is_6ghz_supported() - Whether 6ghz is supported
  * @psoc: psoc ptr
@@ -1318,6 +1354,7 @@ bool wlan_reg_is_6ghz_op_class(struct wlan_objmgr_pdev *pdev,
  * Return: bool
  */
 bool wlan_reg_is_6ghz_supported(struct wlan_objmgr_psoc *psoc);
+#endif
 
 #ifdef HOST_OPCLASS_EXT
 /**
@@ -1367,4 +1404,28 @@ uint16_t wlan_reg_chan_opclass_to_freq(uint8_t chan,
 
 qdf_freq_t wlan_reg_chan_opclass_to_freq_auto(uint8_t chan, uint8_t op_class,
 					      bool global_tbl_lookup);
+
+#ifdef CHECK_REG_PHYMODE
+/**
+ * wlan_reg_get_max_phymode() - Find the best possible phymode given a
+ * phymode, a frequency, and per-country regulations
+ * @pdev: pdev pointer
+ * @phy_in: phymode that the user requested
+ * @freq: current operating center frequency
+ *
+ * Return: maximum phymode allowed in current country that is <= phy_in
+ */
+enum reg_phymode wlan_reg_get_max_phymode(struct wlan_objmgr_pdev *pdev,
+					  enum reg_phymode phy_in,
+					  qdf_freq_t freq);
+#else
+static inline enum reg_phymode
+wlan_reg_get_max_phymode(struct wlan_objmgr_pdev *pdev,
+			 enum reg_phymode phy_in,
+			 qdf_freq_t freq)
+{
+	return REG_PHYMODE_INVALID;
+}
+#endif /* CHECK_REG_PHYMODE */
+
 #endif

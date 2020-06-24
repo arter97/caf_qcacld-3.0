@@ -168,6 +168,7 @@ static QDF_STATUS __dp_rx_desc_nbuf_free(struct dp_soc *soc,
 		offset = i % num_desc_per_page;
 		rx_desc_elem = dp_rx_desc_find(page_id, offset, rx_desc_pool);
 		rx_desc = &rx_desc_elem->rx_desc;
+		dp_rx_desc_free_dbg_info(rx_desc);
 		if (rx_desc->in_use) {
 			nbuf = rx_desc->nbuf;
 			if (!rx_desc->unmapped) {
@@ -445,6 +446,7 @@ void dp_rx_add_desc_list_to_free_list(struct dp_soc *soc,
 	rx_desc_pool->freelist = *local_desc_list;
 	(*tail)->next = temp_list;
 	*tail = NULL;
+	*local_desc_list = NULL;
 
 	qdf_spin_unlock_bh(&rx_desc_pool->lock);
 }

@@ -1066,6 +1066,8 @@ wmi_fill_sae_single_pmk_param(struct roam_offload_scan_params *params,
 }
 #endif
 
+#define ROAM_OFFLOAD_PMK_EXT_BYTES 16
+
 /**
  * send_roam_scan_offload_mode_cmd_tlv() - send roam scan mode request to fw
  * @wmi_handle: wmi handle
@@ -1311,6 +1313,9 @@ send_roam_scan_offload_mode_cmd_tlv(wmi_unified_t wmi_handle,
 					roam_req->mdid.mobility_domain;
 				roam_offload_11r->adaptive_11r =
 					roam_req->is_adaptive_11r;
+				roam_offload_11r->ft_im_for_deauth =
+					roam_req->enable_ft_im_roaming;
+
 				if (auth_mode == WMI_AUTH_OPEN) {
 					/* If FT-Open ensure pmk length
 					   and r0khid len are zero */
@@ -1373,6 +1378,18 @@ send_roam_scan_offload_mode_cmd_tlv(wmi_unified_t wmi_handle,
 					     roam_req->psk_pmk,
 					     roam_offload_11i->pmk_len);
 
+				roam_offload_11i->pmk_ext_len =
+					((roam_req->pmk_len >
+					 ROAM_OFFLOAD_PMK_BYTES) &&
+					 (auth_mode ==
+					 WMI_AUTH_RSNA_SUITE_B_8021X_SHA384)) ?
+					ROAM_OFFLOAD_PMK_EXT_BYTES : 0;
+
+				qdf_mem_copy(roam_offload_11i->pmk_ext,
+					     &roam_req->psk_pmk[
+					     ROAM_OFFLOAD_PMK_BYTES],
+					     roam_offload_11i->pmk_ext_len);
+
 				WMITLV_SET_HDR(&roam_offload_11i->tlv_header,
 				WMITLV_TAG_STRUC_wmi_roam_11i_offload_tlv_param,
 				WMITLV_GET_STRUCT_TLVLEN
@@ -1387,11 +1404,8 @@ send_roam_scan_offload_mode_cmd_tlv(wmi_unified_t wmi_handle,
 				buf_ptr += WMI_TLV_HDR_SIZE;
 				WMI_LOGD("pmk_len = %d",
 					roam_offload_11i->pmk_len);
-				if (roam_offload_11i->pmk_len)
-					QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_WMI,
-						QDF_TRACE_LEVEL_DEBUG,
-						roam_offload_11i->pmk,
-						roam_offload_11i->pmk_len);
+				WMI_LOGD("pmk_ext_len = %d",
+					 roam_offload_11i->pmk_ext_len);
 			}
 		} else {
 			WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
@@ -1600,10 +1614,12 @@ send_roam_scan_offload_ap_profile_cmd_tlv(wmi_unified_t wmi_handle,
 			ap_profile->param.oce_wan_weightage;
 	score_param->oce_ap_tx_pwr_weightage_pcnt =
 				ap_profile->param.oce_ap_tx_pwr_weightage;
+	score_param->oce_ap_subnet_id_weightage_pcnt =
+				ap_profile->param.oce_subnet_id_weightage;
 	score_param->vendor_roam_score_algorithm_id =
 			ap_profile->param.vendor_roam_score_algorithm;
 
-	WMI_LOGD("Score params weightage: disable_bitmap %x rssi %d ht %d vht %d he %d BW %d band %d NSS %d ESP %d BF %d PCL %d OCE WAN %d APTX %d roam score algo %d",
+	WMI_LOGD("Score params weightage: disable_bitmap %x rssi %d ht %d vht %d he %d BW %d band %d NSS %d ESP %d BF %d PCL %d OCE WAN %d APTX %d roam score algo %d subnet id %d",
 		 score_param->disable_bitmap, score_param->rssi_weightage_pcnt,
 		 score_param->ht_weightage_pcnt,
 		 score_param->vht_weightage_pcnt,
@@ -1615,7 +1631,8 @@ send_roam_scan_offload_ap_profile_cmd_tlv(wmi_unified_t wmi_handle,
 		 score_param->pcl_weightage_pcnt,
 		 score_param->oce_wan_weightage_pcnt,
 		 score_param->oce_ap_tx_pwr_weightage_pcnt,
-		 score_param->vendor_roam_score_algorithm_id);
+		 score_param->vendor_roam_score_algorithm_id,
+		 score_param->oce_ap_subnet_id_weightage_pcnt);
 
 	score_param->bw_scoring.score_pcnt = ap_profile->param.bw_index_score;
 	score_param->band_scoring.score_pcnt =
@@ -2534,6 +2551,9 @@ convert_control_roam_trigger_reason_bitmap(uint32_t trigger_reason_bitmap)
 
 	if (trigger_reason_bitmap & BIT(ROAM_TRIGGER_REASON_STA_KICKOUT))
 		fw_trigger_bitmap |= BIT(WMI_ROAM_TRIGGER_REASON_STA_KICKOUT);
+
+	if (trigger_reason_bitmap & BIT(ROAM_TRIGGER_REASON_ESS_RSSI))
+		fw_trigger_bitmap |= BIT(WMI_ROAM_TRIGGER_REASON_ESS_RSSI);
 
 	return fw_trigger_bitmap;
 }

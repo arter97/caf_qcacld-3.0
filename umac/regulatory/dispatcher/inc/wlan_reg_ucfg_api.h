@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -25,6 +25,8 @@
 
 #ifndef __WLAN_REG_UCFG_API_H
 #define __WLAN_REG_UCFG_API_H
+
+#include <reg_services_public_struct.h>
 
 typedef QDF_STATUS (*reg_event_cb)(void *status_struct);
 
@@ -371,6 +373,17 @@ struct wlan_psoc_host_hal_reg_capabilities_ext *ucfg_reg_get_hal_reg_cap(
 QDF_STATUS ucfg_reg_set_hal_reg_cap(struct wlan_objmgr_psoc *psoc,
 			struct wlan_psoc_host_hal_reg_capabilities_ext *reg_cap,
 			uint16_t phy_cnt);
+
+/**
+ * ucfg_reg_update_hal_reg_cap() - update hal reg cap
+ * @psoc: psoc ptr
+ * @wireless_modes: 11AX wireless modes
+ * @phy_id: phy id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_reg_update_hal_reg_cap(struct wlan_objmgr_psoc *psoc,
+				       uint32_t wireless_modes, uint8_t phy_id);
 
 /**
  * ucfg_set_ignore_fw_reg_offload_ind() - API to set ignore regdb offload ind
