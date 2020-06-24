@@ -2437,26 +2437,41 @@ send_peer_chan_width_switch_cmd_tlv(wmi_unified_t wmi_handle,
 {
 	wmi_buf_t buf;
 	wmi_peer_chan_width_switch_cmd_fixed_param *cmd;
-	int32_t len = sizeof(*cmd) + WMI_TLV_HDR_SIZE;
-	int16_t max_peers_per_command;
+	int32_t len;
+	uint32_t max_peers_per_command, max_peers_per_buf;
 	wmi_chan_width_peer_list *cmd_peer_list;
 	int16_t pending_peers = param->num_peers;
 	struct peer_chan_width_switch_info *param_peer_list =
 						param->chan_width_peer_list;
 	uint8_t ix;
 
-	max_peers_per_command = (wmi_get_max_msg_len(wmi_handle) -
-				 sizeof(*cmd) - WMI_TLV_HDR_SIZE) /
-				sizeof(*cmd_peer_list);
+	/* Max peers per WMI buffer */
+	max_peers_per_buf = (wmi_get_max_msg_len(wmi_handle) -
+			     sizeof(*cmd) - WMI_TLV_HDR_SIZE) /
+			    sizeof(*cmd_peer_list);
+
+	/*
+	 * Use param value only if it's greater than 0 and less than
+	 * the max peers per WMI buf.
+	 */
+	if (param->max_peers_per_cmd &&
+	    (param->max_peers_per_cmd <= max_peers_per_buf)) {
+		max_peers_per_command = param->max_peers_per_cmd;
+	} else {
+		max_peers_per_command = max_peers_per_buf;
+	}
+
+	WMI_LOGD("Setting peer limit as %u", max_peers_per_command);
 
 	while (pending_peers > 0) {
+		len = sizeof(*cmd) + WMI_TLV_HDR_SIZE;
 		if (pending_peers >= max_peers_per_command) {
 			len += (max_peers_per_command * sizeof(*cmd_peer_list));
 		} else {
 			len += (pending_peers * sizeof(*cmd_peer_list));
 		}
 
-                buf = wmi_buf_alloc(wmi_handle, len);
+		buf = wmi_buf_alloc(wmi_handle, len);
 		if (!buf) {
 			WMI_LOGE("wmi_buf_alloc failed");
 			return QDF_STATUS_E_FAILURE;
@@ -2543,18 +2558,12 @@ static QDF_STATUS extract_multi_vdev_restart_resp_event_tlv(
 	if (!param_buf->num_vdev_ids_bitmap)
 		return QDF_STATUS_E_FAILURE;
 
-	if ((param_buf->num_vdev_ids_bitmap * sizeof(uint32_t)) >
-			sizeof(param->vdev_id_bmap)) {
-		WMI_LOGE("vdevId bitmap overflow size:%d",
-			 param_buf->num_vdev_ids_bitmap);
-		return QDF_STATUS_E_FAILURE;
-	}
-
 	qdf_mem_copy(param->vdev_id_bmap, param_buf->vdev_ids_bitmap,
-		     param_buf->num_vdev_ids_bitmap * sizeof(uint32_t));
+		     sizeof(param->vdev_id_bmap));
 
-	WMI_LOGD("vdev_id_bmap :0x%x%x", param->vdev_id_bmap[1],
-		 param->vdev_id_bmap[0]);
+	WMI_LOGD("vdev_id_bmap is as follows");
+	qdf_trace_hex_dump(QDF_MODULE_ID_WMI, QDF_TRACE_LEVEL_DEBUG,
+			   param->vdev_id_bmap, sizeof(param->vdev_id_bmap));
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2563,6 +2572,7 @@ static QDF_STATUS send_multisoc_tbtt_sync_cmd_tlv(wmi_unified_t wmi,
 		struct rnr_tbtt_multisoc_sync_param *param)
 {
 	wmi_pdev_tbtt_offset_sync_cmd_fixed_param *tbtt_sync_cmd;
+	struct rnr_bss_tbtt_info_param *tmp_bss;
 	wmi_buf_t buf;
 	wmi_pdev_rnr_bss_tbtt_info *bss_tbtt_info;
 	int32_t len = 0;
@@ -2583,6 +2593,7 @@ static QDF_STATUS send_multisoc_tbtt_sync_cmd_tlv(wmi_unified_t wmi,
 		WMI_LOGP("%s: cmd_type: %d invalid", __func__, param->cmd_type);
 		return QDF_STATUS_E_FAILURE;
 	}
+	tmp_bss = param->rnr_bss_tbtt;
 	buf = wmi_buf_alloc(wmi, len);
 	if (!buf) {
 		WMI_LOGP("%s: wmi_buf_alloc failed", __func__);
@@ -2610,24 +2621,24 @@ static QDF_STATUS send_multisoc_tbtt_sync_cmd_tlv(wmi_unified_t wmi,
 			WMITLV_SET_HDR(&bss_tbtt_info->tlv_header,
 				WMITLV_TAG_STRUC_wmi_pdev_rnr_bss_tbtt_info,
 				WMITLV_GET_STRUCT_TLVLEN(wmi_pdev_rnr_bss_tbtt_info));
-			WMI_CHAR_ARRAY_TO_MAC_ADDR(param->rnr_bss_tbtt->bss_mac,
+			WMI_CHAR_ARRAY_TO_MAC_ADDR(tmp_bss->bss_mac,
 					&bss_tbtt_info->bss_mac);
 			bss_tbtt_info->beacon_intval =
-				param->rnr_bss_tbtt->beacon_intval;
-			bss_tbtt_info->opclass = param->rnr_bss_tbtt->opclass;
+				tmp_bss->beacon_intval;
+			bss_tbtt_info->opclass = tmp_bss->opclass;
 			bss_tbtt_info->chan_idx =
-				param->rnr_bss_tbtt->chan_idx;
+				tmp_bss->chan_idx;
 			bss_tbtt_info->next_qtime_tbtt_high =
-				param->rnr_bss_tbtt->next_qtime_tbtt_high;
+				tmp_bss->next_qtime_tbtt_high;
 			bss_tbtt_info->next_qtime_tbtt_low =
-				param->rnr_bss_tbtt->next_qtime_tbtt_low;
+				tmp_bss->next_qtime_tbtt_low;
 			QDF_TRACE(QDF_MODULE_ID_WMI, QDF_TRACE_LEVEL_DEBUG,
 				  "Beacon Intval: %d, Chan: %d, opclass: %d",
 				  bss_tbtt_info->beacon_intval,
 				  bss_tbtt_info->chan_idx,
 				  bss_tbtt_info->opclass);
 			bss_tbtt_info++;
-			param->rnr_bss_tbtt++;
+			tmp_bss++;
 		}
 	}
 	QDF_TRACE(QDF_MODULE_ID_WMI, QDF_TRACE_LEVEL_DEBUG,

@@ -758,6 +758,10 @@ enum {
 	IEEE80211_PARAM_HE_DL_MU_OFDMA_BFER        = 693, /* Sets 11ax - HE DL MU OFDMA + TxBF*/
 	IEEE80211_PARAM_SEND_PROBE_REQ             = 694, /* Send bcast probe request with current ssid */
 	IEEE80211_PARAM_ASSOC_MIN_RSSI             = 695,
+	IEEE80211_PARAM_OCE_TX_POWER               = 696, /* Enables tx power to be advertised as OCE attribute in Beacon and  Probe response frame */
+	IEEE80211_PARAM_OCE_IP_SUBNET_ID           = 697, /* IP subnet identifier value to be advertised as OCE attribute in Beacon and  Probe response frame */
+	IEEE80211_PARAM_OCE_ADD_ESS_RPT            = 698, /* Add ESS Report */
+	IEEE80211_PARAM_RSNX_OVERRIDE              = 700,
 };
 
 enum {
@@ -1184,6 +1188,9 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_NON_INHERIT_ENABLE = 443,
 	/* Set/Get next frequency for radar */
 	OL_ATH_PARAM_NXT_RDR_FREQ = 444,
+	/* set the flag for a radio with no backhaul */
+	OL_ATH_PARAM_NO_BACKHAUL_RADIO = 445,
+
 };
 
 #ifdef CONFIG_SUPPORT_LIBROXML
@@ -1200,7 +1207,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_mcastkeylen",     IEEE80211_PARAM_MCASTKEYLEN, GET_PARAM, 0},
 	{"ucastciphers",        IEEE80211_PARAM_UCASTCIPHERS, SET_PARAM, 1},
 	{"get_uciphers",        IEEE80211_PARAM_UCASTCIPHERS, GET_PARAM, 0},
-	{"ucastciphers",        IEEE80211_PARAM_UCASTCIPHER, SET_PARAM, 1},
+	{"ucastcipher",         IEEE80211_PARAM_UCASTCIPHER, SET_PARAM, 1},
 	{"get_ucastcipher",     IEEE80211_PARAM_UCASTCIPHER, GET_PARAM, 0},
 	{"ucastkeylen",         IEEE80211_PARAM_UCASTKEYLEN, SET_PARAM, 1},
 	{"get_ucastkeylen",     IEEE80211_PARAM_UCASTKEYLEN, GET_PARAM, 0},
@@ -1293,7 +1300,6 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"set11NRetries",       IEEE80211_PARAM_11N_RETRIES, SET_PARAM, 1},
 	{"get11NRetries",       IEEE80211_PARAM_11N_RETRIES, GET_PARAM, 0},
 	{"dbgLVL",              IEEE80211_PARAM_DBG_LVL, SET_PARAM, 1},
-	{"getdbgLVL",           IEEE80211_PARAM_DBG_LVL, GET_PARAM, 0},
 	{"wdsdetect",           IEEE80211_PARAM_WDS_AUTODETECT, SET_PARAM, 1},
 	{"get_wdsdetect",       IEEE80211_PARAM_WDS_AUTODETECT, GET_PARAM, 0},
 	{"ignore11d",           IEEE80211_PARAM_IGNORE_11DBEACON, SET_PARAM, 1},
@@ -1323,7 +1329,6 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_hbrtimer",        IEEE80211_PARAM_HBR_TIMER, GET_PARAM, 0},
 	{"get_hbrstate",        IEEE80211_PARAM_HBR_STATE, GET_PARAM, 0},
 	{"chextoffset",         IEEE80211_PARAM_CHEXTOFFSET, SET_PARAM, 1},
-	{"get_chextoffset",     IEEE80211_PARAM_CHEXTOFFSET, GET_PARAM, 0},
 	{"chscaninit",          IEEE80211_PARAM_CHSCANINIT, SET_PARAM, 1},
 	{"get_chscaninit",      IEEE80211_PARAM_CHSCANINIT, GET_PARAM, 0},
 	{"ht40intol",           IEEE80211_PARAM_HT40_INTOLERANT, SET_PARAM, 1},
@@ -1432,8 +1437,6 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_oce",               IEEE80211_PARAM_OCE, GET_PARAM, 0},
 	{"oce_asoc_rej",        IEEE80211_PARAM_OCE_ASSOC_REJECT, SET_PARAM, 1},
 	{"g_oce_asoc_rej",      IEEE80211_PARAM_OCE_ASSOC_REJECT, GET_PARAM, 0},
-	{"oce_asoc_rssi",       IEEE80211_PARAM_OCE_ASSOC_MIN_RSSI, SET_PARAM, 1},
-	{"g_oce_asoc_rssi",     IEEE80211_PARAM_OCE_ASSOC_MIN_RSSI, GET_PARAM, 0},
 	{"oce_asoc_dly",        IEEE80211_PARAM_OCE_ASSOC_RETRY_DELAY, SET_PARAM, 1},
 	{"g_oce_asoc_dly",      IEEE80211_PARAM_OCE_ASSOC_RETRY_DELAY, GET_PARAM, 0},
 	{"oce_wan_mtr",         IEEE80211_PARAM_OCE_WAN_METRICS, SET_PARAM, 2},
@@ -1449,8 +1452,9 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"rnr_fd",              IEEE80211_PARAM_RNR_FD, SET_PARAM, 1},
 	{"g_rnr_fd",            IEEE80211_PARAM_RNR_FD, GET_PARAM, 0},
 	{"rnr_tbtt",            IEEE80211_PARAM_RNR_TBTT, SET_PARAM, 1},
-	{"apchanrpt",           IEEE80211_PARAM_RNR_TBTT, GET_PARAM, 0},
-	{"g_apchanrpt",         IEEE80211_PARAM_AP_CHAN_RPT, SET_PARAM, 1},
+	{"g_rnr_tbtt",          IEEE80211_PARAM_RNR_TBTT, GET_PARAM, 0},
+	{"apchanrpt",           IEEE80211_PARAM_AP_CHAN_RPT, SET_PARAM, 1},
+	{"g_apchanrpt",         IEEE80211_PARAM_AP_CHAN_RPT, GET_PARAM, 0},
 	{"mgmt_rate",           IEEE80211_PARAM_MGMT_RATE, SET_PARAM, 1},
 	{"g_mgmt_rate",         IEEE80211_PARAM_MGMT_RATE, GET_PARAM, 0},
 	{"rrm",                 IEEE80211_PARAM_RRM_CAP, SET_PARAM, 1},
@@ -1486,19 +1490,19 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_ccmpSwSelEn",     IEEE80211_PARAM_CCMPSW_ENCDEC, GET_PARAM, 0},
 	{"periodicScan",        IEEE80211_PARAM_PERIODIC_SCAN, SET_PARAM, 1},
 	{"g_periodicScan",      IEEE80211_PARAM_PERIODIC_SCAN, GET_PARAM, 0},
+	{"csa2g",               IEEE80211_PARAM_2G_CSA, SET_PARAM, 1},
+	{"get_csa2g",           IEEE80211_PARAM_2G_CSA, GET_PARAM, 0},
 	{"wapi_rkupkt",         IEEE80211_PARAM_WAPIREKEY_USK, SET_PARAM, 1},
 	{"get_wapi_rkupkt",     IEEE80211_PARAM_WAPIREKEY_USK, GET_PARAM, 0},
 	{"wapi_rkmpkt",         IEEE80211_PARAM_WAPIREKEY_MSK, SET_PARAM, 1},
 	{"get_wapi_rkmpkt",     IEEE80211_PARAM_WAPIREKEY_MSK, GET_PARAM, 0},
-	{"csa2g",               IEEE80211_PARAM_2G_CSA, SET_PARAM, 1},
-	{"get_csa2g",           IEEE80211_PARAM_2G_CSA, GET_PARAM, 0},
 	{"wapi_rkupdate",       IEEE80211_PARAM_WAPIREKEY_UPDATE, SET_PARAM, 1},
 	{"wdsaddr",             IEEE80211_PARAM_ADD_WDS_ADDR, SET_PARAM, 1},
 #if UMAC_SUPPORT_VI_DBG
 	{"dbgcfg",              IEEE80211_PARAM_DBG_CFG, SET_PARAM, 1},
 	{"getdbgcfg",           IEEE80211_PARAM_DBG_CFG, GET_PARAM, 0},
-	{"dbgrestart",          IEEE80211_PARAM_DBG_NUM_STREAMS, SET_PARAM, 1},
-	{"getdbgrestart",       IEEE80211_PARAM_DBG_NUM_STREAMS, GET_PARAM, 0},
+	{"dbgrestart",          IEEE80211_PARAM_RESTART, SET_PARAM, 1},
+	{"getdbgrestart",       IEEE80211_PARAM_RESTART, GET_PARAM, 0},
 	{"rxdropstats",         IEEE80211_PARAM_RXDROP_STATUS, SET_PARAM, 1},
 	{"getrxdropstats",      IEEE80211_PARAM_RXDROP_STATUS, GET_PARAM, 0},
 #endif
@@ -1634,8 +1638,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_vhtstscap",       IEEE80211_PARAM_VHT_STS_CAP, GET_PARAM, 0},
 	{"vhtsounddim",         IEEE80211_PARAM_VHT_SOUNDING_DIM, SET_PARAM, 1},
 	{"get_vhtsounddim",     IEEE80211_PARAM_VHT_SOUNDING_DIM, GET_PARAM, 0},
-	{"vhtsubfee",           IEEE80211_PARAM_VHT_MUBFEE, SET_PARAM, 1},
-	{"get_vhtsubfee",       IEEE80211_PARAM_VHT_MUBFEE, GET_PARAM, 0},
+	{"vhtsubfee",           IEEE80211_PARAM_VHT_SUBFEE, SET_PARAM, 1},
+	{"get_vhtsubfee",       IEEE80211_PARAM_VHT_SUBFEE, GET_PARAM, 0},
 	{"vhtmubfee",           IEEE80211_PARAM_VHT_MUBFEE, SET_PARAM, 1},
 	{"get_vhtmubfee",       IEEE80211_PARAM_VHT_MUBFEE, GET_PARAM, 0},
 	{"vhtsubfer",           IEEE80211_PARAM_VHT_SUBFER, SET_PARAM, 1},
@@ -1713,9 +1717,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_blbwnssmap",      IEEE80211_DISABLE_STA_BWNSS_ADV, GET_PARAM, 0},
 	{"neighbourfilter",     IEEE80211_PARAM_RX_FILTER_NEIGHBOUR_PEERS_MONITOR,
 		SET_PARAM, 1},
-#if ATH_DATA_RX_INFO_EN
-	{"get_whc_wds",         IEEE80211_PARAM_RXINFO_PERPKT, GET_PARAM, 0},
-#endif
+	{"get_whc_wds",         IEEE80211_PARAM_WHC_APINFO_WDS, GET_PARAM, 0},
 	{"set_whc_dist",        IEEE80211_PARAM_WHC_APINFO_ROOT_DIST, SET_PARAM, 1},
 	{"get_whc_dist",        IEEE80211_PARAM_WHC_APINFO_ROOT_DIST, GET_PARAM, 0},
 	{"assocwar160",         IEEE80211_PARAM_CONFIG_ASSOC_WAR_160W, SET_PARAM, 1},
@@ -1809,7 +1811,6 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_vie_ena",           IEEE80211_PARAM_ENABLE_VENDOR_IE, GET_PARAM, 0},
 	{"set_whc_sfactor",     IEEE80211_PARAM_WHC_APINFO_SFACTOR, SET_PARAM, 1},
 	{"get_whc_sfactor",     IEEE80211_PARAM_WHC_APINFO_SFACTOR, GET_PARAM, 0},
-	{"get_whc_bssid",       IEEE80211_PARAM_WHC_APINFO_BSSID, GET_PARAM, 0},
 	{"get_whc_rate",        IEEE80211_PARAM_WHC_APINFO_RATE, GET_PARAM, 0},
 	{"mon_decoder",         IEEE80211_PARAM_CONFIG_MON_DECODER, SET_PARAM, 1},
 	{"g_mon_decoder",       IEEE80211_PARAM_CONFIG_MON_DECODER, GET_PARAM, 0},
@@ -1819,7 +1820,6 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_mucapwar",        IEEE80211_PARAM_CONFIG_MU_CAP_WAR, GET_PARAM, 0},
 	{"nstswar",             IEEE80211_PARAM_CONFIG_NSTSCAP_WAR, SET_PARAM, 1},
 	{"get_nstswar",         IEEE80211_PARAM_CONFIG_NSTSCAP_WAR, GET_PARAM, 0},
-	{"g_whc_cap_bssid",     IEEE80211_PARAM_WHC_APINFO_CAP_BSSID, GET_PARAM, 0},
 	{"set_bcn_rate",        IEEE80211_PARAM_BEACON_RATE_FOR_VAP, SET_PARAM, 1},
 	{"get_bcn_rate",        IEEE80211_PARAM_BEACON_RATE_FOR_VAP, GET_PARAM, 0},
 	{"csmode",              IEEE80211_PARAM_CHANNEL_SWITCH_MODE, SET_PARAM, 1},
@@ -1837,7 +1837,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_db_timeout",        IEEE80211_PARAM_DBEACON_TIMEOUT, GET_PARAM, 0},
 #endif
 	{"s_txpow_mgmt",        IEEE80211_PARAM_TXPOW_MGMT, SET_PARAM, 2},
-	{"g_txpow_mgmt",        IEEE80211_PARAM_TXPOW_MGMT, GET_PARAM, 0},
+	{"g_txpow_mgmt",        IEEE80211_PARAM_TXPOW_MGMT, GET_PARAM, 1},
 	{"tx_capture",          IEEE80211_PARAM_CONFIG_TX_CAPTURE, SET_PARAM, 1},
 	{"g_tx_capture",        IEEE80211_PARAM_CONFIG_TX_CAPTURE, GET_PARAM, 0},
 	{"backhaul",            IEEE80211_PARAM_BACKHAUL, SET_PARAM, 1},
@@ -1868,11 +1868,6 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"caprssi",             IEEE80211_PARAM_WHC_CAP_RSSI, SET_PARAM, 1},
 	{"g_caprssi",           IEEE80211_PARAM_WHC_CAP_RSSI, GET_PARAM, 0},
 	{"g_curr_caprssi",      IEEE80211_PARAM_WHC_CURRENT_CAP_RSSI, GET_PARAM, 0},
-	{"g_best_ob_bssid",
-		IEEE80211_PARAM_WHC_APINFO_BEST_UPLINK_OTHERBAND_BSSID, GET_PARAM, 0},
-	{"g_whc_ob_bssid",      IEEE80211_PARAM_WHC_APINFO_OTHERBAND_UPLINK_BSSID,
-		GET_PARAM, 0},
-	{"otherband_bssid",     IEEE80211_PARAM_WHC_APINFO_OTHERBAND_BSSID, SET_PARAM, 2},
 	{"set_whc_ul_rate",     IEEE80211_PARAM_WHC_APINFO_UPLINK_RATE, SET_PARAM, 1},
 	{"get_whc_ul_rate",     IEEE80211_PARAM_WHC_APINFO_UPLINK_RATE, GET_PARAM, 0},
 	{"he_subfee",           IEEE80211_PARAM_HE_SU_BFEE, SET_PARAM, 1},
@@ -1935,7 +1930,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"enable_11v_dms",      IEEE80211_PARAM_DMS_AMSDU_WAR, SET_PARAM, 1},
 	{"g_enable_11v_dms",    IEEE80211_PARAM_DMS_AMSDU_WAR, GET_PARAM, 0},
 	{"s_txpow",             IEEE80211_PARAM_TXPOW, SET_PARAM, 2},
-	{"g_txpow",             IEEE80211_PARAM_TXPOW, GET_PARAM, 0},
+	{"g_txpow",             IEEE80211_PARAM_TXPOW, GET_PARAM, 1},
 	{"ul_hyst",             IEEE80211_PARAM_BEST_UL_HYST, SET_PARAM, 1},
 	{"g_ul_hyst",           IEEE80211_PARAM_BEST_UL_HYST, GET_PARAM, 0},
 	{"he_txmcsmap",         IEEE80211_PARAM_HE_TX_MCSMAP, SET_PARAM, 1},
@@ -2000,7 +1995,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"he_ul_mcs",           IEEE80211_PARAM_HE_UL_FIXED_RATE, SET_PARAM, 1},
 	{"get_he_ul_mcs",       IEEE80211_PARAM_HE_UL_FIXED_RATE, GET_PARAM, 0},
 #if WLAN_SER_DEBUG
-	{"ser_history",         IEEE80211_PARAM_WLAN_SER_HISTORY, GET_PARAM, 2},
+	{"ser_history",         IEEE80211_PARAM_WLAN_SER_HISTORY, SET_PARAM, 2},
 #endif
 	{"da_wds_war",          IEEE80211_PARAM_DA_WAR_ENABLE, SET_PARAM, 1},
 	{"g_da_wds_war",        IEEE80211_PARAM_DA_WAR_ENABLE, GET_PARAM, 0},
@@ -2033,7 +2028,6 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_he_amsdu_in_ampdu_supp",  IEEE80211_PARAM_HE_AMSDU_IN_AMPDU_SUPRT,
 		GET_PARAM, 0},
 	{"he_bfee_sts_supp",        IEEE80211_PARAM_HE_SUBFEE_STS_SUPRT, SET_PARAM, 2},
-	{"get_he_bfee_sts_supp",    IEEE80211_PARAM_HE_SUBFEE_STS_SUPRT, GET_PARAM, 0},
 	{"he_4xltf_800nsgi_rx",     IEEE80211_PARAM_HE_4XLTF_800NS_GI_RX_SUPRT,
 		SET_PARAM, 1},
 	{"get_he_4xltf_800nsgi_rx", IEEE80211_PARAM_HE_4XLTF_800NS_GI_RX_SUPRT,
@@ -2049,7 +2043,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"tx_lat_capture",      IEEE80211_PARAM_CONFIG_CAPTURE_LATENCY_ENABLE,
 		SET_PARAM, 1},
 	{"g_tx_lat_cptr",       IEEE80211_PARAM_CONFIG_CAPTURE_LATENCY_ENABLE,
-		SET_PARAM, 1},
+		GET_PARAM, 1},
 	{"get_ru26_tolerance",  IEEE80211_PARAM_GET_RU26_TOLERANCE, GET_PARAM, 0},
 	{"get_whc_ul_snr",      IEEE80211_PARAM_WHC_APINFO_UPLINK_SNR, GET_PARAM, 0},
 	{"set_dpp_mode",        IEEE80211_PARAM_DPP_VAP_MODE, SET_PARAM, 1},
@@ -2144,9 +2138,12 @@ struct vendor_commands vap_vendor_cmds[] = {
 #endif
 	{"he_dlofdma_bf",       IEEE80211_PARAM_HE_DL_MU_OFDMA_BFER, SET_PARAM, 1},
 	{"g_he_dlofdma_bf",     IEEE80211_PARAM_HE_DL_MU_OFDMA_BFER, GET_PARAM, 0},
-	{"sendprobereq",        IEEE80211_PARAM_SEND_PROBE_REQ, GET_PARAM, 0},
-	{"min_asoc_rssi",       IEEE80211_PARAM_ASSOC_MIN_RSSI, SET_PARAM, 1},
-	{"g_min_asoc_rssi",     IEEE80211_PARAM_ASSOC_MIN_RSSI, GET_PARAM, 0},
+	{"sendprobereq",        IEEE80211_PARAM_SEND_PROBE_REQ, SET_PARAM, 1},
+	{"oce_txpower",         IEEE80211_PARAM_OCE_TX_POWER, SET_PARAM, 2},
+	{"g_oce_txpower",       IEEE80211_PARAM_OCE_TX_POWER, GET_PARAM, 0},
+	{"oce_subnet_id",       IEEE80211_PARAM_OCE_IP_SUBNET_ID, SET_PARAM, 2},
+	{"oce_ess_report",      IEEE80211_PARAM_OCE_ADD_ESS_RPT, SET_PARAM, 2},
+	{"rsnx_override",       IEEE80211_PARAM_RSNX_OVERRIDE, SET_PARAM, 1},
 	{"setiebuf",            35828, SET_PARAM, 1},
 	{"getiebuf",            35827, GET_PARAM, 0},
 	{"dbgreq",              35832, SET_PARAM, 1},
@@ -2543,7 +2540,7 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"arp_dbg_dstaddr",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DBG_ARP_DST_ADDR, SET_PARAM, 1},
 	{"arp_dbg_conf",
-		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DBG_ARP_DST_ADDR, SET_PARAM, 1},
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ARP_DBG_CONF, SET_PARAM, 1},
 	{"g_arp_dbg_conf",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ARP_DBG_CONF, GET_PARAM, 0},
 	{"st_ht_noamsdu",
@@ -2727,7 +2724,7 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"get_reo_dest",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_PDEV_TO_REO_DEST, GET_PARAM, 0},
 	{"dump_chmsk_tbl",
-		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DUMP_CHAINMASK_TABLES, SET_PARAM, 1},
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DUMP_CHAINMASK_TABLES, GET_PARAM, 0},
 	{"print_obj_refs",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DUMP_OBJECTS, SET_PARAM, 1},
 	{"acs_srloadvar",
@@ -2986,12 +2983,12 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_GET_PDEV_NUM_MONITOR_VDEVS, GET_PARAM, 0},
 	{"set_opclass_tbl",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_OPCLASS_TBL, SET_PARAM, 1},
+	{"get_opclass_tbl",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_OPCLASS_TBL, GET_PARAM, 0},
 #ifdef CE_TASKLET_DEBUG_ENABLE
 	{"ce_debug_stats",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ENABLE_CE_LATENCY_STATS, SET_PARAM, 1},
 #endif
-	{"get_opclass_tbl",
-		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_OPCLASS_TBL, GET_PARAM, 0},
 #ifdef QCA_SUPPORT_ADFS_RCAC
 	{"rCACEn",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ROLLING_CAC_ENABLE, SET_PARAM, 1},
@@ -3002,14 +2999,14 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"get_rCACfreq",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_CONFIGURE_RCAC_FREQ, GET_PARAM, 0},
 #endif
-	{"setNxtRadarFreq",
-		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_NXT_RDR_FREQ, SET_PARAM, 1},
-	{"getNxtRadarFreq",
-		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_NXT_RDR_FREQ, GET_PARAM, 0},
 #if ATH_SUPPORT_DFS
 	{"scan_over_cac_en",
 		OL_ATH_PARAM_SHIFT | OL_ATH_SCAN_OVER_CAC, SET_PARAM, 1},
 #endif
+	{"setNxtRadarFreq",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_NXT_RDR_FREQ, SET_PARAM, 1},
+	{"getNxtRadarFreq",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_NXT_RDR_FREQ, GET_PARAM, 0},
 	{"setCountryID",
 		OL_SPECIAL_PARAM_SHIFT | OL_SPECIAL_PARAM_COUNTRY_ID, SET_PARAM, 1},
 	{"getCountryID",
@@ -3071,6 +3068,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_NON_INHERIT_ENABLE, SET_PARAM, 1},
 	{"g_non_inherit_enable",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_NON_INHERIT_ENABLE, GET_PARAM, 0},
+	{"nobckhlradio",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_NO_BACKHAUL_RADIO, SET_PARAM, 1},
+	{"g_nobckhlradio",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_NO_BACKHAUL_RADIO, GET_PARAM, 0},
 };
 #endif
 #endif

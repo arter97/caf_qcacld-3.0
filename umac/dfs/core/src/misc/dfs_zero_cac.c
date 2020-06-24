@@ -509,7 +509,7 @@ dfs_find_cac_status_for_chan_for_freq(struct dfs_precac_entry *precac_entry,
 				      uint16_t chan_freq)
 {
 	struct precac_tree_node *node = precac_entry->tree_root;
-	uint8_t n_cur_lvl_subchs = N_SUBCHANS_FOR_160BW;
+	uint8_t n_cur_lvl_subchs = node->n_valid_subchs;
 
 	while (node) {
 		if (node->ch_freq == chan_freq)
@@ -539,6 +539,9 @@ dfs_find_cac_status_for_chan_for_freq(struct dfs_precac_entry *precac_entry,
 
 #define IS_WITHIN_RANGE(_A, _B, _C)  \
 	(((_A) >= ((_B)-(_C))) && ((_A) <= ((_B)+(_C))))
+
+#define IS_WITHIN_RANGE_STRICT(_A, _B, _C)  \
+	(((_A) > ((_B)-(_C))) && ((_A) < ((_B)+(_C))))
 
 #ifdef CONFIG_CHAN_NUM_API
 bool dfs_is_precac_done_on_ht20_40_80_chan(struct wlan_dfs *dfs,
@@ -599,9 +602,9 @@ dfs_is_precac_done_on_ht20_40_80_160_165_chan_for_freq(struct wlan_dfs *dfs,
 			/* Find if the channel frequency is
 			 * in this precac_list.
 			 */
-			if (IS_WITHIN_RANGE(chan_freq,
-					    precac_entry->center_ch_freq,
-					    VHT160_FREQ_OFFSET)) {
+			if (IS_WITHIN_RANGE_STRICT(chan_freq,
+					precac_entry->center_ch_freq,
+					(precac_entry->bw/2))) {
 				ret_val = dfs_find_cac_status_for_chan_for_freq(
 						precac_entry, chan_freq);
 				break;
@@ -1391,9 +1394,9 @@ void dfs_mark_precac_done_for_freq(struct wlan_dfs *dfs,
 				   &dfs->dfs_precac_list,
 				   pe_list,
 				   tmp_precac_entry) {
-			if (IS_WITHIN_RANGE(channels[i],
-					    precac_entry->center_ch_freq,
-					    VHT160_FREQ_OFFSET)) {
+			if (IS_WITHIN_RANGE_STRICT(channels[i],
+					precac_entry->center_ch_freq,
+					(precac_entry->bw/2))) {
 				dfs_mark_tree_node_as_cac_done_for_freq
 					(dfs, precac_entry, channels[i]);
 				break;
@@ -1638,9 +1641,9 @@ void dfs_unmark_precac_nol_for_freq(struct wlan_dfs *dfs, uint16_t chan_freq)
 	if (!TAILQ_EMPTY(&dfs->dfs_precac_list)) {
 		TAILQ_FOREACH_SAFE(pcac_entry, &dfs->dfs_precac_list,
 				   pe_list, tmp_precac_entry) {
-			if (IS_WITHIN_RANGE(chan_freq,
-					    pcac_entry->center_ch_freq,
-					    VHT160_FREQ_OFFSET)) {
+			if (IS_WITHIN_RANGE_STRICT(chan_freq,
+					pcac_entry->center_ch_freq,
+					(pcac_entry->bw/2))) {
 				dfs_unmark_tree_node_as_nol_for_freq(dfs,
 								     pcac_entry,
 								     chan_freq);
@@ -1865,9 +1868,9 @@ void dfs_mark_precac_nol_for_freq(struct wlan_dfs *dfs,
 				   &dfs->dfs_precac_list,
 				   pe_list,
 				   tmp_precac_entry) {
-			if (IS_WITHIN_RANGE(freq_lst[i],
-					    precac_entry->center_ch_freq,
-					    VHT160_FREQ_OFFSET)) {
+			if (IS_WITHIN_RANGE_STRICT(freq_lst[i],
+					precac_entry->center_ch_freq,
+					(precac_entry->bw/2))) {
 				dfs_mark_tree_node_as_nol_for_freq(dfs,
 								   precac_entry,
 								   freq_lst[i]);
@@ -5235,6 +5238,7 @@ static inline qdf_freq_t dfs_find_rcac_chan(struct wlan_dfs *dfs,
 
 #endif
 
+#ifdef QCA_SUPPORT_AGILE_DFS
 /* dfs_find_precac_chan() - Find out a channel to perform preCAC.
  *
  * @dfs: Pointer to struct wlan_dfs.
@@ -5313,6 +5317,7 @@ void dfs_set_agilecac_chan_for_freq(struct wlan_dfs *dfs,
 	if (!*ch_freq)
 		qdf_info("%s: No valid Agile channels available in the current pdev", __func__);
 }
+#endif
 #endif
 
 #ifdef CONFIG_CHAN_NUM_API
@@ -5556,10 +5561,11 @@ void dfs_find_vht80_chan_for_precac_for_freq(struct wlan_dfs *dfs,
 void dfs_set_precac_enable(struct wlan_dfs *dfs, uint32_t value)
 {
 	struct wlan_objmgr_psoc *psoc;
-	struct wlan_lmac_if_target_tx_ops *tx_ops;
+	struct wlan_lmac_if_target_tx_ops *tgt_tx_ops;
 	uint32_t target_type;
 	struct target_psoc_info *tgt_hdl;
 	struct tgt_info *info;
+	struct wlan_lmac_if_tx_ops *tx_ops;
 
 	psoc = wlan_pdev_get_psoc(dfs->dfs_pdev_obj);
 	if (!psoc) {
@@ -5569,7 +5575,13 @@ void dfs_set_precac_enable(struct wlan_dfs *dfs, uint32_t value)
 		return;
 	}
 
-	tx_ops = &psoc->soc_cb.tx_ops.target_tx_ops;
+	tx_ops = wlan_psoc_get_lmac_if_txops(psoc);
+	if (!tx_ops) {
+		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS, "tx_ops is NULL");
+		return;
+	}
+
+	tgt_tx_ops = &tx_ops->target_tx_ops;
 	target_type = lmac_get_target_type(dfs->dfs_pdev_obj);
 
 	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
@@ -5603,7 +5615,7 @@ void dfs_set_precac_enable(struct wlan_dfs *dfs, uint32_t value)
 
 	if ((1 == value) &&
 	    (utils_get_dfsdomain(dfs->dfs_pdev_obj) == DFS_ETSI_DOMAIN)) {
-		if (tx_ops->tgt_is_tgt_type_qca9984(target_type))
+		if (tgt_tx_ops->tgt_is_tgt_type_qca9984(target_type))
 			dfs->dfs_legacy_precac_ucfg = value;
 		else
 			dfs->dfs_agile_precac_ucfg = value;
@@ -5833,6 +5845,7 @@ void dfs_reinit_precac_lists(struct wlan_dfs *src_dfs,
 	PRECAC_LIST_UNLOCK(dest_dfs);
 }
 
+#ifdef QCA_SUPPORT_ADFS_RCAC
 /* dfs_start_agile_engine() - Prepare ADFS params and program the agile
  *                            engine sending agile config cmd to FW.
  * @dfs: Pointer to struct wlan_dfs.
@@ -5866,8 +5879,6 @@ void dfs_start_agile_engine(struct wlan_dfs *dfs)
 			"dfs_tx_ops=%pK", dfs_tx_ops);
 }
 
-
-#ifdef QCA_SUPPORT_ADFS_RCAC
 /**
  * --------------------- ROLLING CAC STATE MACHINE ----------------------
  *
