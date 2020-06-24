@@ -1879,4 +1879,8 @@ ucfg_pmo_get_runtime_pm_delay(struct wlan_objmgr_psoc *psoc)
  */
 bool
 ucfg_pmo_get_enable_sap_suspend(struct wlan_objmgr_psoc *psoc);
+
+bool
+ucfg_pmo_get_runtime_pdev_suspend(struct wlan_objmgr_psoc *psoc);
+
 #endif /* end  of _WLAN_PMO_UCFG_API_H_ */

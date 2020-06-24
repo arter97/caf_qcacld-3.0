@@ -28,6 +28,7 @@
 #include "wlan_reg_services_api.h"
 #include "cfg_nan_api.h"
 #include "wlan_utility.h"
+#include "wlan_pmo_ucfg_api.h"
 
 void pmo_set_wow_event_bitmap(WOW_WAKE_EVENT_TYPE event,
 			      uint32_t wow_bitmap_size,
@@ -363,6 +364,11 @@ bool pmo_core_is_wow_applicable(struct wlan_objmgr_psoc *psoc)
 
 		if (is_wow_applicable)
 			return true;
+	}
+
+	if (!ucfg_pmo_get_runtime_pdev_suspend(psoc)) {
+		pmo_info("runtime pdev suspend not supported, enabling wow");
+		return true;
 	}
 
 	pmo_debug("All vdev are in disconnected state\n"
