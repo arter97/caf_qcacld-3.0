@@ -34,6 +34,7 @@
 #include <qdf_types.h>
 #include <csr_api.h>
 #include <sap_api.h>
+#include <sir_mac_prot_def.h>
 #include "osapi_linux.h"
 #include <wmi_unified.h>
 #include "wlan_pmo_hw_filter_public_struct.h"
@@ -171,6 +172,7 @@ struct hdd_config {
 	uint32_t tcp_delack_timer_count;
 	bool     enable_tcp_param_update;
 	uint32_t bus_low_cnt_threshold;
+	bool enable_latency_crit_clients;
 #endif /*WLAN_FEATURE_DP_BUS_BANDWIDTH*/
 
 #ifdef QCA_SUPPORT_TXRX_DRIVER_TCP_DEL_ACK
@@ -323,10 +325,75 @@ bool hdd_dfs_indicate_radar(struct hdd_context *hdd_ctx);
  * gRuntimePM=0
  * gWlanAutoShutdown = 0
  * gEnableSuspend=0
- * gEnablePowerSaveOffload=0
  * gEnableWoW=0
  *
  * Return: None
  */
 void hdd_override_all_ps(struct hdd_context *hdd_ctx);
-#endif
+
+/**
+ * hdd_get_ldpc() - Get adapter LDPC
+ * @adapter: adapter being queried
+ * @value: where to store the value
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int hdd_get_ldpc(struct hdd_adapter *adapter, int *value);
+
+/**
+ * hdd_set_ldpc() - Set adapter LDPC
+ * @adapter: adapter being modified
+ * @value: new LDPC value
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int hdd_set_ldpc(struct hdd_adapter *adapter, int value);
+
+/**
+ * hdd_get_tx_stbc() - Get adapter TX STBC
+ * @adapter: adapter being queried
+ * @value: where to store the value
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int hdd_get_tx_stbc(struct hdd_adapter *adapter, int *value);
+
+/**
+ * hdd_set_tx_stbc() - Set adapter TX STBC
+ * @adapter: adapter being modified
+ * @value: new TX STBC value
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int hdd_set_tx_stbc(struct hdd_adapter *adapter, int value);
+
+/**
+ * hdd_get_rx_stbc() - Get adapter RX STBC
+ * @adapter: adapter being queried
+ * @value: where to store the value
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int hdd_get_rx_stbc(struct hdd_adapter *adapter, int *value);
+
+/**
+ * hdd_set_rx_stbc() - Set adapter RX STBC
+ * @adapter: adapter being modified
+ * @value: new RX STBC value
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int hdd_set_rx_stbc(struct hdd_adapter *adapter, int value);
+
+/**
+ * hdd_update_channel_width() - Update adapter channel width settings
+ * @adapter: adapter being modified
+ * @chwidth: new channel width of enum eSirMacHTChannelWidth
+ * @bonding_mode: channel bonding mode of the new channel width
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int hdd_update_channel_width(struct hdd_adapter *adapter,
+			     enum eSirMacHTChannelWidth chwidth,
+			     uint32_t bonding_mode);
+#endif /* end #if !defined(HDD_CONFIG_H__) */

@@ -402,9 +402,6 @@ csr_neighbor_roam_get_scan_filter_from_profile(struct mac_context *mac,
 
 	if (profile->BSSType == eCSR_BSS_TYPE_INFRASTRUCTURE)
 		filter->bss_type = WLAN_TYPE_BSS;
-	else if (profile->BSSType == eCSR_BSS_TYPE_IBSS ||
-		 profile->BSSType == eCSR_BSS_TYPE_START_IBSS)
-		filter->bss_type = WLAN_TYPE_IBSS;
 	else
 		filter->bss_type = WLAN_TYPE_ANY;
 
@@ -856,6 +853,14 @@ static void csr_neighbor_roam_info_ctx_init(struct mac_context *mac,
 	}
 
 	if (csr_roam_is_roam_offload_scan_enabled(mac)) {
+		/*
+		 * Store the current PMK info of the AP
+		 * to the single pmk global cache if the BSS allows
+		 * single pmk roaming capable.
+		 */
+		csr_store_sae_single_pmk_to_global_cache(mac, session,
+							 session_id);
+
 		/*
 		 * If this is not a INFRA type BSS, then do not send the command
 		 * down to firmware.Do not send the START command for

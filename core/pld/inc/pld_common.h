@@ -76,6 +76,7 @@ enum pld_bus_type {
  * @PLD_BUS_WIDTH_MEDIUM: vote for medium bus bandwidth
  * @PLD_BUS_WIDTH_HIGH: vote for high bus bandwidth
  * @PLD_BUS_WIDTH_VERY_HIGH: vote for very high bus bandwidth
+ * @PLD_BUS_WIDTH_LOW_LATENCY: vote for low latency bus bandwidth
  */
 enum pld_bus_width_type {
 	PLD_BUS_WIDTH_NONE,
@@ -84,6 +85,7 @@ enum pld_bus_width_type {
 	PLD_BUS_WIDTH_MEDIUM,
 	PLD_BUS_WIDTH_HIGH,
 	PLD_BUS_WIDTH_VERY_HIGH,
+	PLD_BUS_WIDTH_LOW_LATENCY,
 };
 
 #define PLD_MAX_FILE_NAME NAME_MAX
@@ -144,6 +146,7 @@ enum pld_uevent {
 	PLD_FW_DOWN,
 	PLD_FW_CRASHED,
 	PLD_FW_RECOVERY_START,
+	PLD_FW_HANG_EVENT,
 };
 
 /**
@@ -156,9 +159,11 @@ struct pld_uevent_data {
 	union {
 		struct {
 			bool crashed;
+		} fw_down;
+		struct {
 			void *hang_event_data;
 			u16 hang_event_data_len;
-		} fw_down;
+		} hang_data;
 	};
 };
 

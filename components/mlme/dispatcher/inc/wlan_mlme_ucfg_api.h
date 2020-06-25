@@ -675,6 +675,19 @@ QDF_STATUS ucfg_mlme_configure_chain_mask(struct wlan_objmgr_psoc *psoc,
 	return wlan_mlme_configure_chain_mask(psoc, session_id);
 }
 
+/**
+ * ucfg_mlme_is_chain_mask_supported() - check if configure chainmask can
+ * be supported
+ * @psoc: pointer to psoc object
+ *
+ * Return: true if supported else false
+ */
+static inline
+bool ucfg_mlme_is_chain_mask_supported(struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_mlme_is_chain_mask_supported(psoc);
+}
+
 /*
  * ucfg_mlme_get_sta_keep_alive_period() - Get the sta keep alive period
  * @psoc: pointer to psoc object
@@ -1098,7 +1111,7 @@ ucfg_mlme_set_roaming_offload(struct wlan_objmgr_psoc *psoc,
 static inline uint32_t
 ucfg_mlme_get_roaming_triggers(struct wlan_objmgr_psoc *psoc)
 {
-	return 0;
+	return 0xffff;
 }
 #endif
 
@@ -1243,25 +1256,6 @@ ucfg_mlme_get_delay_before_vdev_stop(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 ucfg_mlme_get_roam_bmiss_final_bcnt(struct wlan_objmgr_psoc *psoc,
 				    uint8_t *val);
-
-#if defined(WLAN_SAE_SINGLE_PMK) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
-/**
- * ucfg_mlme_update_sae_single_pmk_info() - Update sae_single_pmk_info
- * @vdev: pointer to VDEV common object
- * @pmk_info:  Pointer mlme pmkid info
- *
- * Return: None
- */
-void
-ucfg_mlme_update_sae_single_pmk_info(struct wlan_objmgr_vdev *vdev,
-				     struct mlme_pmk_info *pmk_info);
-#else
-static inline void
-ucfg_mlme_update_sae_single_pmk_info(struct wlan_objmgr_vdev *vdev,
-				     struct mlme_pmk_info *pmk_info)
-{
-}
-#endif
 
 /**
  * ucfg_mlme_get_roam_bmiss_first_bcnt() - Get roam bmiss final count
@@ -1410,22 +1404,6 @@ QDF_STATUS ucfg_mlme_set_assoc_sta_limit(struct wlan_objmgr_psoc *psoc,
 					 int value)
 {
 	return wlan_mlme_set_assoc_sta_limit(psoc, value);
-}
-
-/**
- * ucfg_mlme_set_rmc_action_period_freq() - Set the rmc action period frequency
- * @psoc: pointer to psoc object
- * @value: Value that needs to be set from the caller
- *
- * Inline UCFG API to be used by HDD/OSIF callers
- *
- * Return: QDF Status
- */
-static inline
-QDF_STATUS ucfg_mlme_set_rmc_action_period_freq(struct wlan_objmgr_psoc *psoc,
-						int value)
-{
-	return wlan_mlme_set_rmc_action_period_freq(psoc, value);
 }
 
 /**
@@ -2520,6 +2498,21 @@ ucfg_mlme_get_vht_enable2x2(struct wlan_objmgr_psoc *psoc, bool *value)
 }
 
 /**
+ * ucfg_mlme_get_force_sap_enabled() - Get the value of force SAP enabled
+ * @psoc: psoc context
+ * @value: data to get
+ *
+ * Get the value of force SAP enabled
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+static inline QDF_STATUS
+ucfg_mlme_get_force_sap_enabled(struct wlan_objmgr_psoc *psoc, bool *value)
+{
+	return wlan_mlme_get_force_sap_enabled(psoc, value);
+}
+
+/**
  * ucfg_mlme_set_vht_enable2x2() - Enables/disables VHT Tx/Rx MCS values for 2x2
  * @psoc: psoc context
  * @value: data to be set
@@ -2823,40 +2816,6 @@ ucfg_mlme_stats_is_link_speed_report_max(struct wlan_objmgr_psoc *psoc);
  */
 bool
 ucfg_mlme_stats_is_link_speed_report_max_scaled(struct wlan_objmgr_psoc *psoc);
-
-/**
- * ucfg_mlme_get_ibss_cfg() - Get IBSS config params data structure
- * @psoc: pointer to psoc object
- * @auto_bssid: Pointer to return the IBSS config data structure
- *
- * Return: QDF Status
- */
-QDF_STATUS ucfg_mlme_get_ibss_cfg(struct wlan_objmgr_psoc *psoc,
-				  struct wlan_mlme_ibss_cfg *ibss_cfg);
-
-/**
- * ucfg_mlme_set_ibss_auto_bssid() - Set IBSS Auto BSSID config
- * @psoc: pointer to psoc object
- * @auto_bssid: IBSS Auto BSSID config value
- *
- * Return: QDF Status
- */
-QDF_STATUS ucfg_mlme_set_ibss_auto_bssid(struct wlan_objmgr_psoc *psoc,
-					 uint32_t auto_bssid);
-
-/**
- * ucfg_mlme_ibss_power_save_setup() - Set IBSS power save params
- * @psoc: pointer to psoc object
- * @vdev_id: IBSS Vdev ID
- *
- * Return: QDF Status
- */
-static inline
-QDF_STATUS ucfg_mlme_ibss_power_save_setup(struct wlan_objmgr_psoc *psoc,
-					   uint32_t vdev_id)
-{
-	return wlan_mlme_ibss_power_save_setup(psoc, vdev_id);
-}
 
 /**
  * ucfg_mlme_get_tl_delayed_trgr_frm_int() - Get delay interval(in ms)

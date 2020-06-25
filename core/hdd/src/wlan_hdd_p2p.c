@@ -612,48 +612,6 @@ int hdd_set_p2p_ps(struct net_device *dev, void *msgData)
 }
 
 /**
- * wlan_hdd_allow_sap_add() - check to add new sap interface
- * @hdd_ctx: pointer to hdd context
- * @name: name of the new interface
- * @sap_dev: output pointer to hold existing interface
- *
- * Return: If able to add interface return true else false
- */
-static bool
-wlan_hdd_allow_sap_add(struct hdd_context *hdd_ctx, const char *name,
-		       struct wireless_dev **sap_dev)
-{
-	struct hdd_adapter *adapter;
-
-	*sap_dev = NULL;
-
-	hdd_for_each_adapter(hdd_ctx, adapter) {
-		if (adapter->device_mode == QDF_SAP_MODE &&
-		    test_bit(NET_DEVICE_REGISTERED, &adapter->event_flags) &&
-		    adapter->dev &&
-		    !strncmp(adapter->dev->name, name, IFNAMSIZ)) {
-			struct hdd_beacon_data *beacon =
-						adapter->session.ap.beacon;
-
-			hdd_debug("iface already registered");
-			if (beacon) {
-				adapter->session.ap.beacon = NULL;
-				qdf_mem_free(beacon);
-			}
-			if (adapter->dev->ieee80211_ptr) {
-				*sap_dev = adapter->dev->ieee80211_ptr;
-				return false;
-			}
-
-			hdd_err("ieee80211_ptr points to NULL");
-			return false;
-		}
-	}
-
-	return true;
-}
-
-/**
  * __wlan_hdd_add_virtual_intf() - Add virtual interface
  * @wiphy: wiphy pointer
  * @name: User-visible name of the interface
@@ -683,6 +641,11 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 
 	if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE) {
 		hdd_err("Command not allowed in FTM mode");
+		return ERR_PTR(-EINVAL);
+	}
+
+	if (cds_get_conparam() == QDF_GLOBAL_MONITOR_MODE) {
+		hdd_err("Concurrency not allowed with standalone monitor mode");
 		return ERR_PTR(-EINVAL);
 	}
 
@@ -736,18 +699,6 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 		}
 	}
 
-	if (mode == QDF_SAP_MODE) {
-		struct wireless_dev *sap_dev;
-		bool allow_add_sap = wlan_hdd_allow_sap_add(hdd_ctx, name,
-							    &sap_dev);
-		if (!allow_add_sap) {
-			if (sap_dev)
-				return sap_dev;
-
-			return ERR_PTR(-EINVAL);
-		}
-	}
-
 	adapter = NULL;
 	cfg_p2p_get_device_addr_admin(hdd_ctx->psoc, &p2p_dev_addr_admin);
 	if (p2p_dev_addr_admin &&
@@ -763,10 +714,17 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 					   p2p_device_address.bytes,
 					   name_assign_type, true);
 	} else {
+		uint8_t *device_address;
+
+		device_address = wlan_hdd_get_intf_addr(hdd_ctx, mode);
+		if (!device_address)
+			return ERR_PTR(-EINVAL);
+
 		adapter = hdd_open_adapter(hdd_ctx, mode, name,
-					   wlan_hdd_get_intf_addr(hdd_ctx,
-								  mode),
+					   device_address,
 					   name_assign_type, true);
+		if (!adapter)
+			wlan_hdd_release_intf_addr(hdd_ctx, device_address);
 	}
 
 	if (!adapter) {
@@ -911,6 +869,8 @@ int __wlan_hdd_del_virtual_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
 		hdd_close_adapter(hdd_ctx, adapter, true);
 	}
 
+	if (!hdd_is_any_interface_open(hdd_ctx))
+		hdd_psoc_idle_timer_start(hdd_ctx);
 	hdd_exit();
 
 	return 0;
@@ -1197,7 +1157,7 @@ static void wlan_hdd_update_mcc_p2p_quota(struct hdd_adapter *adapter,
 int32_t wlan_hdd_set_mas(struct hdd_adapter *adapter, uint8_t mas_value)
 {
 	struct hdd_context *hdd_ctx;
-	uint8_t enable_mcc_adaptive_sch = 0;
+	bool enable_mcc_adaptive_sch = false;
 
 	if (!adapter) {
 		hdd_err("Adapter is NULL");

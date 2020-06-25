@@ -202,7 +202,7 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	 * if gEnableVhtFor24GHzBand is false and dot11mode is 11ac
 	 * set it to 11n.
 	 */
-	if (channel <= SIR_11B_CHANNEL_END &&
+	if (wlan_reg_is_24ghz_ch_freq(chan_freq) &&
 	    !mac_ctx->mlme_cfg->vht_caps.vht_cap_info.b24ghz_band &&
 	    (MLME_DOT11_MODE_11AC == dot11mode ||
 	     MLME_DOT11_MODE_11AC_ONLY == dot11mode))
@@ -268,7 +268,6 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	populate_dot11f_wfatpc(mac_ctx, &pr.WFATPC, txPower, 0);
 
 	if (pesession) {
-		pesession->htCapability = IS_DOT11_MODE_HT(dot11mode);
 		/* Include HT Capability IE */
 		if (pesession->htCapability &&
 		    !(WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq)))
@@ -283,8 +282,7 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	 * Set channelbonding information as "disabled" when tunned to a
 	 * 2.4 GHz channel
 	 */
-	if (channel <= SIR_11B_CHANNEL_END &&
-	    !(WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq))) {
+	if (wlan_reg_is_24ghz_ch_freq(chan_freq)) {
 		if (mac_ctx->roam.configParam.channelBondingMode24GHz
 		    == PHY_SINGLE_CHANNEL_CENTERED) {
 			pr.HTCaps.supportedChannelWidthSet =
@@ -296,7 +294,6 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 		}
 	}
 	if (pesession) {
-		pesession->vhtCapability = IS_DOT11_MODE_VHT(dot11mode);
 		/* Include VHT Capability IE */
 		if (pesession->vhtCapability &&
 		    !(WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq))) {
@@ -350,13 +347,18 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 				SIR_MAC_QCN_OUI_TYPE_SIZE,
 				additional_ie, addn_ielen);
 	}
+
 	/* Add qcn_ie only if qcn ie is not present in additional_ie */
-	if (!qcn_ie)
-		populate_dot11f_qcn_ie(mac_ctx, pesession,
-				       &pr.qcn_ie, QCN_IE_ATTR_ID_ALL);
-	else
-		populate_dot11f_qcn_ie(mac_ctx, pesession,
-				       &pr.qcn_ie, QCN_IE_ATTR_ID_VHT_MCS11);
+	if (pesession) {
+		if (!qcn_ie)
+			populate_dot11f_qcn_ie(mac_ctx, pesession,
+					       &pr.qcn_ie,
+					       QCN_IE_ATTR_ID_ALL);
+		else
+			populate_dot11f_qcn_ie(mac_ctx, pesession,
+					       &pr.qcn_ie,
+					       QCN_IE_ATTR_ID_VHT_MCS11);
+	}
 
 	/*
 	 * Extcap IE now support variable length, merge Extcap IE from addn_ie
@@ -641,7 +643,6 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 		mac_ctx, &frm->DSParams,
 		wlan_reg_freq_to_chan(mac_ctx->pdev,
 				      pe_session->curr_op_freq));
-	populate_dot11f_ibss_params(mac_ctx, &frm->IBSSParams, pe_session);
 
 	if (LIM_IS_AP_ROLE(pe_session)) {
 		if (pe_session->wps_state != SAP_WPS_DISABLED)
@@ -692,6 +693,11 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 		populate_dot11f_vht_caps(mac_ctx, pe_session, &frm->VHTCaps);
 		populate_dot11f_vht_operation(mac_ctx, pe_session,
 			&frm->VHTOperation);
+		populate_dot11f_vht_tx_power_env(
+				mac_ctx,
+				&frm->vht_transmit_power_env,
+				pe_session->ch_width,
+				pe_session->curr_op_freq);
 		/*
 		 * we do not support multi users yet.
 		 * populate_dot11f_vht_ext_bss_load( mac_ctx,
@@ -2891,6 +2897,7 @@ QDF_STATUS lim_send_deauth_cnf(struct mac_context *mac_ctx)
 	tLimMlmDeauthReq *deauth_req;
 	tLimMlmDeauthCnf deauth_cnf;
 	struct pe_session *session_entry;
+	QDF_STATUS qdf_status;
 
 	deauth_req = mac_ctx->lim.limDisassocDeauthCnfReq.pMlmDeauthReq;
 	if (deauth_req) {
@@ -2907,12 +2914,21 @@ QDF_STATUS lim_send_deauth_cnf(struct mac_context *mac_ctx)
 				eSIR_SME_INVALID_PARAMETERS;
 			goto end;
 		}
+		if (qdf_is_macaddr_broadcast(&deauth_req->peer_macaddr) &&
+		    mac_ctx->mlme_cfg->sap_cfg.is_sap_bcast_deauth_enabled) {
+			qdf_status = lim_del_sta_all(mac_ctx, session_entry);
+			qdf_mem_free(deauth_req);
+			mac_ctx->lim.limDisassocDeauthCnfReq.pMlmDeauthReq =
+									 NULL;
+			return qdf_status;
+		}
 
 		sta_ds =
 			dph_lookup_hash_entry(mac_ctx,
 					      deauth_req->peer_macaddr.bytes,
 					      &aid,
-					      &session_entry->dph.dphHashTable);
+					      &session_entry->
+					      dph.dphHashTable);
 		if (!sta_ds) {
 			deauth_cnf.resultCode = eSIR_SME_INVALID_PARAMETERS;
 			goto end;
@@ -3722,6 +3738,7 @@ lim_send_tpc_report_frame(struct mac_context *mac,
 	uint32_t nBytes, nPayload, nStatus;
 	void *pPacket;
 	QDF_STATUS qdf_status;
+	struct vdev_mlme_obj *mlme_obj;
 
 	qdf_mem_zero((uint8_t *) &frm, sizeof(frm));
 
@@ -3729,7 +3746,10 @@ lim_send_tpc_report_frame(struct mac_context *mac,
 	frm.Action.action = ACTION_SPCT_TPC_RPRT;
 	frm.DialogToken.token = pTpcReqFrame->actionHeader.dialogToken;
 
-	frm.TPCReport.tx_power = 0;
+	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(pe_session->vdev);
+	if (mlme_obj)
+		frm.TPCReport.tx_power = mlme_obj->mgmt.generic.tx_pwrlimit;
+
 	frm.TPCReport.link_margin = 0;
 	frm.TPCReport.present = 1;
 

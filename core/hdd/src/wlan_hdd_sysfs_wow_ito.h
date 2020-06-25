@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -17,33 +17,46 @@
  */
 
 /**
- * DOC: wlan_hdd_debugfs_crash_inject.h
+ * DOC: wlan_hdd_sysfs_wow_ito.h
  *
- * implementation for creating debugfs file crash_inject
+ * implementation for creating sysfs file wow_ito
  */
 
-#ifndef _WLAN_HDD_DEBUGFS_CRASH_INJECT_H
-#define _WLAN_HDD_DEBUGFS_CRASH_INJECT_H
+#ifndef _WLAN_HDD_SYSFS_WOW_ITO_H
+#define _WLAN_HDD_SYSFS_WOW_ITO_H
 
-#if defined(WLAN_DEBUGFS) && defined(CONFIG_WLAN_DEBUG_CRASH_INJECT)
+#if defined(WLAN_SYSFS) && defined(CONFIG_WLAN_WOW_ITO)
 /**
- * wlan_hdd_debugfs_crash_inject_create() - API to create crash_inject
- * @adapter: hdd adapter
+ * hdd_sysfs_wow_ito_create() - API to create wow_ito
+ * @driver_kobject: sysfs driver kobject
  *
- * this file is created per adapter.
- * file path: /sys/kernel/debug/wlan_xx/crash_inject
- *                (wlan_xx is adapter name)
+ * file path: /sys/kernel/wifi/wow_ito
+ *
  * usage:
- *      echo [arg_0] [arg_1] > crash_inject
+ *      echo [arg_0] > wow_ito
  *
  * Return: 0 on success and errno on failure
  */
-int wlan_hdd_debugfs_crash_inject_create(struct hdd_adapter *adapter);
+int hdd_sysfs_wow_ito_create(struct kobject *driver_kobject);
+
+/**
+ * hdd_sysfs_wow_ito_destroy() -
+ *   API to destroy wow_ito
+ *
+ * Return: none
+ */
+void
+hdd_sysfs_wow_ito_destroy(struct kobject *driver_kobject);
 #else
 static inline int
-wlan_hdd_debugfs_crash_inject_create(struct hdd_adapter *adapter)
+hdd_sysfs_wow_ito_create(struct kobject *driver_kobject)
 {
 	return 0;
 }
+
+static inline void
+hdd_sysfs_wow_ito_destroy(struct kobject *driver_kobject)
+{
+}
 #endif
-#endif /* #ifndef _WLAN_HDD_DEBUGFS_CRASH_INJECT_H */
+#endif /* #ifndef _WLAN_HDD_SYSFS_WOW_ITO_H */

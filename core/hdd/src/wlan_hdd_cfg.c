@@ -47,6 +47,7 @@
 #include "wlan_fwol_ucfg_api.h"
 #include "cfg_ucfg_api.h"
 #include "hdd_dp_cfg.h"
+#include <wma_api.h>
 
 /**
  * get_next_line() - find and locate the new line pointer
@@ -832,15 +833,7 @@ QDF_STATUS hdd_set_sme_config(struct hdd_context *hdd_ctx)
 #ifdef FEATURE_WLAN_ESE
 	bool ese_enabled;
 #endif
-	struct wlan_mlme_ibss_cfg ibss_cfg = {0};
-
 	struct hdd_config *config = hdd_ctx->config;
-
-	if (QDF_IS_STATUS_ERROR(ucfg_mlme_get_ibss_cfg(
-				hdd_ctx->psoc, &ibss_cfg))) {
-		hdd_err("Unable to get IBSS config params");
-		return QDF_STATUS_E_FAILURE;
-	}
 
 	sme_config = qdf_mem_malloc(sizeof(*sme_config));
 	if (!sme_config) {
@@ -876,8 +869,6 @@ QDF_STATUS hdd_set_sme_config(struct hdd_context *hdd_ctx)
 	 */
 	/* This param cannot be configured from INI */
 	sme_config->csr_config.send_smps_action = true;
-	sme_config->csr_config.ad_hoc_ch_freq_5g = ibss_cfg.adhoc_ch_5g;
-	sme_config->csr_config.ad_hoc_ch_freq_2g = ibss_cfg.adhoc_ch_2g;
 	sme_config->csr_config.ProprietaryRatesEnabled = 0;
 	sme_config->csr_config.HeartbeatThresh50 = 40;
 	ucfg_scan_cfg_get_dfs_chan_scan_allowed(hdd_ctx->psoc,
@@ -902,9 +893,6 @@ QDF_STATUS hdd_set_sme_config(struct hdd_context *hdd_ctx)
 		ucfg_mlme_set_fast_roam_in_concurrency_enabled(
 					hdd_ctx->psoc, false);
 	}
-
-	sme_config->csr_config.isCoalesingInIBSSAllowed =
-						ibss_cfg.coalesing_enable;
 
 	/* Update maximum interfaces information */
 	sme_config->csr_config.max_intf_count = hdd_ctx->max_intf_count;
@@ -1235,4 +1223,218 @@ skip_ht_cap_update:
 	hdd_set_policy_mgr_user_cfg(hdd_ctx);
 
 	return (status == false) ? QDF_STATUS_E_FAILURE : QDF_STATUS_SUCCESS;
+}
+
+int hdd_get_ldpc(struct hdd_adapter *adapter, int *value)
+{
+	mac_handle_t mac_handle = adapter->hdd_ctx->mac_handle;
+	int ret;
+
+	hdd_enter();
+	ret = sme_get_ht_config(mac_handle, adapter->vdev_id,
+				WNI_CFG_HT_CAP_INFO_ADVANCE_CODING);
+	if (ret < 0) {
+		hdd_err("Failed to get LDPC value");
+	} else {
+		*value = ret;
+		ret = 0;
+	}
+	return ret;
+}
+
+int hdd_set_ldpc(struct hdd_adapter *adapter, int value)
+{
+	mac_handle_t mac_handle = adapter->hdd_ctx->mac_handle;
+	int ret;
+	QDF_STATUS status;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct mlme_ht_capabilities_info ht_cap_info;
+
+	hdd_debug("%d", value);
+
+	if (!mac_handle) {
+		hdd_err("NULL Mac handle");
+		return -EINVAL;
+	}
+
+	status = ucfg_mlme_get_ht_cap_info(hdd_ctx->psoc, &ht_cap_info);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to get HT capability info");
+		return -EIO;
+	}
+
+	ht_cap_info.adv_coding_cap = value;
+	status = ucfg_mlme_set_ht_cap_info(hdd_ctx->psoc, ht_cap_info);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to set HT capability info");
+		return -EIO;
+	}
+	status = ucfg_mlme_cfg_set_vht_ldpc_coding_cap(hdd_ctx->psoc, value);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to set VHT LDPC capability info");
+		return -EIO;
+	}
+	ret = sme_update_ht_config(mac_handle, adapter->vdev_id,
+				   WNI_CFG_HT_CAP_INFO_ADVANCE_CODING,
+				   value);
+	if (ret)
+		hdd_err("Failed to set LDPC value");
+	ret = sme_update_he_ldpc_supp(mac_handle, adapter->vdev_id, value);
+	if (ret)
+		hdd_err("Failed to set HE LDPC value");
+	ret = sme_set_auto_rate_ldpc(mac_handle, adapter->vdev_id,
+				     (value ? 0 : 1));
+
+	return ret;
+}
+
+int hdd_get_tx_stbc(struct hdd_adapter *adapter, int *value)
+{
+	mac_handle_t mac_handle = adapter->hdd_ctx->mac_handle;
+	int ret;
+
+	hdd_enter();
+	ret = sme_get_ht_config(mac_handle, adapter->vdev_id,
+				WNI_CFG_HT_CAP_INFO_TX_STBC);
+	if (ret < 0) {
+		hdd_err("Failed to get TX STBC value");
+	} else {
+		*value = ret;
+		ret = 0;
+	}
+
+	return ret;
+}
+
+int hdd_set_tx_stbc(struct hdd_adapter *adapter, int value)
+{
+	mac_handle_t mac_handle = adapter->hdd_ctx->mac_handle;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	int ret;
+	QDF_STATUS status;
+	struct mlme_ht_capabilities_info ht_cap_info;
+
+	hdd_debug("%d", value);
+
+	if (!mac_handle) {
+		hdd_err("NULL Mac handle");
+		return -EINVAL;
+	}
+
+	if (value) {
+		/* make sure HT capabilities allow this */
+		status = ucfg_mlme_get_ht_cap_info(hdd_ctx->psoc,
+						   &ht_cap_info);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("Failed to get HT capability info");
+			return -EIO;
+		}
+		if (!ht_cap_info.tx_stbc) {
+			hdd_err("TX STBC not supported");
+			return -EINVAL;
+		}
+	}
+	ret = sme_update_ht_config(mac_handle, adapter->vdev_id,
+				   WNI_CFG_HT_CAP_INFO_TX_STBC,
+				   value);
+	if (ret)
+		hdd_err("Failed to set TX STBC value");
+	ret = sme_update_he_tx_stbc_cap(mac_handle, adapter->vdev_id, value);
+	if (ret)
+		hdd_err("Failed to set HE TX STBC value");
+
+	return ret;
+}
+
+int hdd_get_rx_stbc(struct hdd_adapter *adapter, int *value)
+{
+	mac_handle_t mac_handle = adapter->hdd_ctx->mac_handle;
+	int ret;
+
+	hdd_enter();
+	ret = sme_get_ht_config(mac_handle, adapter->vdev_id,
+				WNI_CFG_HT_CAP_INFO_RX_STBC);
+	if (ret < 0) {
+		hdd_err("Failed to get RX STBC value");
+	} else {
+		*value = ret;
+		ret = 0;
+	}
+
+	return ret;
+}
+
+int hdd_set_rx_stbc(struct hdd_adapter *adapter, int value)
+{
+	mac_handle_t mac_handle = adapter->hdd_ctx->mac_handle;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	int ret;
+	QDF_STATUS status;
+	struct mlme_ht_capabilities_info ht_cap_info;
+
+	hdd_debug("%d", value);
+
+	if (!mac_handle) {
+		hdd_err("NULL Mac handle");
+		return -EINVAL;
+	}
+
+	if (value) {
+		/* make sure HT capabilities allow this */
+		status = ucfg_mlme_get_ht_cap_info(hdd_ctx->psoc,
+						   &ht_cap_info);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("Failed to get HT capability info");
+			return -EIO;
+		}
+		if (!ht_cap_info.rx_stbc) {
+			hdd_warn("RX STBC not supported");
+			return -EINVAL;
+		}
+	}
+	ret = sme_update_ht_config(mac_handle, adapter->vdev_id,
+				   WNI_CFG_HT_CAP_INFO_RX_STBC,
+				   value);
+	if (ret)
+		hdd_err("Failed to set RX STBC value");
+
+	ret = sme_update_he_rx_stbc_cap(mac_handle, adapter->vdev_id, value);
+	if (ret)
+		hdd_err("Failed to set HE RX STBC value");
+
+	return ret;
+}
+
+int hdd_update_channel_width(struct hdd_adapter *adapter,
+			     enum eSirMacHTChannelWidth chwidth,
+			     uint32_t bonding_mode)
+{
+	struct hdd_context *hdd_ctx;
+	struct sme_config_params *sme_config;
+	int ret;
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	if (!hdd_ctx) {
+		hdd_err("hdd_ctx failure");
+		return -EINVAL;
+	}
+
+	sme_config = qdf_mem_malloc(sizeof(*sme_config));
+	if (!sme_config)
+		return -ENOMEM;
+
+	ret = wma_cli_set_command(adapter->vdev_id, WMI_VDEV_PARAM_CHWIDTH,
+				  chwidth, VDEV_CMD);
+	if (ret)
+		goto free_config;
+
+	sme_get_config_param(hdd_ctx->mac_handle, sme_config);
+	sme_config->csr_config.channelBondingMode5GHz = bonding_mode;
+	sme_config->csr_config.channelBondingMode24GHz = bonding_mode;
+	sme_update_config(hdd_ctx->mac_handle, sme_config);
+
+free_config:
+	qdf_mem_free(sme_config);
+	return ret;
+
 }

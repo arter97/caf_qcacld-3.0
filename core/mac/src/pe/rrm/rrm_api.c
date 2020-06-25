@@ -229,6 +229,7 @@ rrm_process_link_measurement_request(struct mac_context *mac,
 	tpSirMacMgmtHdr pHdr;
 	int8_t currentRSSI = 0;
 	struct lim_max_tx_pwr_attr tx_pwr_attr = {0};
+	struct vdev_mlme_obj *mlme_obj;
 
 	pe_debug("Received Link measurement request");
 
@@ -242,6 +243,15 @@ rrm_process_link_measurement_request(struct mac_context *mac,
 	tx_pwr_attr.ap_tx_power = pLinkReq->MaxTxPower.maxTxPower;
 
 	LinkReport.txPower = lim_get_max_tx_power(mac, &tx_pwr_attr);
+
+	/** If firmware updated max tx power is non zero, respond to rrm link
+	 *  measurement request with min of firmware updated ap tx power and
+	 *  max power derived from lim_get_max_tx_power API.
+	 */
+	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(pe_session->vdev);
+	if (mlme_obj && mlme_obj->mgmt.generic.tx_pwrlimit)
+		LinkReport.txPower = QDF_MIN(LinkReport.txPower,
+					mlme_obj->mgmt.generic.tx_pwrlimit);
 
 	if ((LinkReport.txPower != (uint8_t) (pe_session->maxTxPower)) &&
 	    (QDF_STATUS_SUCCESS == rrm_send_set_max_tx_power_req(mac,
@@ -371,7 +381,7 @@ rrm_process_neighbor_report_response(struct mac_context *mac,
 		fMobilityDomain =
 			pNeighborRep->NeighborReport[i].MobilityDomain;
 
-		if (!wlan_reg_is_6ghz_supported(mac->pdev) &&
+		if (!wlan_reg_is_6ghz_supported(mac->psoc) &&
 		    (wlan_reg_is_6ghz_op_class(mac->pdev,
 					       pNeighborRep->NeighborReport[i].
 					       regulatoryClass))) {
@@ -660,7 +670,7 @@ rrm_process_beacon_report_req(struct mac_context *mac,
 		SYS_TU_TO_MS(pBeaconReq->measurement_request.Beacon.randomization);
 	psbrr->measurement_idx = pCurrentReq->measurement_idx;
 
-	if (!wlan_reg_is_6ghz_supported(mac->pdev) &&
+	if (!wlan_reg_is_6ghz_supported(mac->psoc) &&
 	    (wlan_reg_is_6ghz_op_class(mac->pdev,
 			 pBeaconReq->measurement_request.Beacon.regClass))) {
 		pe_nofl_err("RX: [802.11 BCN_RPT] Ch belongs to 6 ghz spectrum, abort");
@@ -723,7 +733,7 @@ rrm_process_beacon_report_req(struct mac_context *mac,
 		for (tmp_idx = 0;
 		     tmp_idx < ie_ap_chan_rpt->num_channelList;
 		     tmp_idx++) {
-			if (!wlan_reg_is_6ghz_supported(mac->pdev) &&
+			if (!wlan_reg_is_6ghz_supported(mac->psoc) &&
 			    (wlan_reg_is_6ghz_op_class(mac->pdev,
 					    ie_ap_chan_rpt->regulatoryClass))) {
 				pe_nofl_err("RX: [802.11 BCN_RPT] Ch belongs to 6 ghz spectrum, abort");
@@ -732,10 +742,11 @@ rrm_process_beacon_report_req(struct mac_context *mac,
 			}
 
 			psbrr->channel_list.chan_freq_lst[ch_ctr++] =
-				wlan_reg_chan_opclass_to_freq(
+				wlan_reg_country_chan_opclass_to_freq(
+					mac->pdev, country,
 					ie_ap_chan_rpt->channelList[tmp_idx],
-					ie_ap_chan_rpt->regulatoryClass,
-					false);
+					ie_ap_chan_rpt->regulatoryClass, true);
+
 			if (ch_ctr >= QDF_ARRAY_SIZE(psbrr->channel_list.chan_freq_lst))
 				break;
 		}
@@ -1088,7 +1099,7 @@ end:
 
 	if (beacon_xmit_ind->fMeasureDone) {
 		pe_debug("Measurement done.");
-		rrm_cleanup(mac_ctx);
+		rrm_cleanup(mac_ctx, beacon_xmit_ind->measurement_idx);
 	}
 
 	if (report)
@@ -1168,7 +1179,8 @@ QDF_STATUS rrm_process_beacon_req(struct mac_context *mac_ctx, tSirMacAddr peer,
 	tpSirMacRadioMeasureReport report;
 	tpRRMReq curr_req;
 
-	if (index  >= MAX_MEASUREMENT_REQUEST) {
+	if (index  >= MAX_MEASUREMENT_REQUEST ||
+	    mac_ctx->rrm.rrmPEContext.pCurrentReq[index]) {
 		if (!*radiomes_report) {
 			/*
 			 * Allocate memory to send reports for
@@ -1192,7 +1204,7 @@ QDF_STATUS rrm_process_beacon_req(struct mac_context *mac_ctx, tSirMacAddr peer,
 		curr_req = mac_ctx->rrm.rrmPEContext.pCurrentReq[index];
 		if (curr_req) {
 			qdf_mem_free(curr_req);
-			curr_req = NULL;
+			mac_ctx->rrm.rrmPEContext.pCurrentReq[index] = NULL;
 		}
 
 		curr_req = qdf_mem_malloc(sizeof(*curr_req));
@@ -1213,7 +1225,7 @@ QDF_STATUS rrm_process_beacon_req(struct mac_context *mac_ctx, tSirMacAddr peer,
 		if (eRRM_SUCCESS != rrm_status) {
 			rrm_process_beacon_request_failure(mac_ctx,
 				session_entry, peer, rrm_status, index);
-			rrm_cleanup(mac_ctx);
+			rrm_cleanup(mac_ctx, index);
 		}
 	}
 
@@ -1412,9 +1424,11 @@ tpRRMCaps rrm_get_capabilities(struct mac_context *mac, struct pe_session *pe_se
 QDF_STATUS rrm_initialize(struct mac_context *mac)
 {
 	tpRRMCaps pRRMCaps = &mac->rrm.rrmPEContext.rrmEnabledCaps;
+	uint8_t i;
 
-	mac->rrm.rrmPEContext.pCurrentReq[0] = NULL;
-	mac->rrm.rrmPEContext.pCurrentReq[1] = NULL;
+	for (i = 0; i < MAX_MEASUREMENT_REQUEST; i++)
+		mac->rrm.rrmPEContext.pCurrentReq[i] = NULL;
+
 	mac->rrm.rrmPEContext.txMgmtPower = 0;
 	mac->rrm.rrmPEContext.DialogToken = 0;
 
@@ -1437,42 +1451,20 @@ QDF_STATUS rrm_initialize(struct mac_context *mac)
 	return QDF_STATUS_SUCCESS;
 }
 
-/* -------------------------------------------------------------------- */
-/**
- * rrm_cleanup
- *
- * FUNCTION:
- * cleanup RRM module
- *
- * LOGIC:
- *
- * ASSUMPTIONS:
- *
- * NOTE:
- *
- * @param mode
- * @param rate
- * @return None
- */
-
-QDF_STATUS rrm_cleanup(struct mac_context *mac)
+void rrm_cleanup(struct mac_context *mac, uint8_t idx)
 {
-	uint8_t i;
+	tpRRMReq cur_rrm_req = NULL;
 
-	for (i = 0; i < MAX_MEASUREMENT_REQUEST; i++) {
-		if (mac->rrm.rrmPEContext.pCurrentReq[i]) {
-			if (mac->rrm.rrmPEContext.pCurrentReq[i]->request.
-			    Beacon.reqIes.pElementIds)
-				qdf_mem_free(mac->rrm.rrmPEContext.
-					     pCurrentReq[i]->request.Beacon.
-					     reqIes.pElementIds);
+	cur_rrm_req = mac->rrm.rrmPEContext.pCurrentReq[idx];
+	if (!cur_rrm_req)
+		return;
 
-			qdf_mem_free(mac->rrm.rrmPEContext.pCurrentReq[i]);
-		}
-		mac->rrm.rrmPEContext.pCurrentReq[i] = NULL;
-	}
+	qdf_mem_free(cur_rrm_req->request.Beacon.reqIes.pElementIds);
+	cur_rrm_req->request.Beacon.reqIes.pElementIds = NULL;
+	cur_rrm_req->request.Beacon.reqIes.num = 0;
 
-	return QDF_STATUS_SUCCESS;
+	qdf_mem_free(cur_rrm_req);
+	mac->rrm.rrmPEContext.pCurrentReq[idx] = NULL;
 }
 
 /**

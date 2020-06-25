@@ -39,7 +39,7 @@
 
 #define CSR_ROAM_SCAN_CHANNEL_SWITCH_TIME        3
 
-/* No of sessions to be supported, and a session is for Infra, IBSS or BT-AMP */
+/* No of sessions to be supported, and a session is for Infra, BT-AMP */
 #define CSR_IS_SESSION_VALID(mac, sessionId) \
 	((sessionId) < WLAN_MAX_VDEVS && \
 	 (mac)->roam.roamSession[(sessionId)].sessionActive)
@@ -115,7 +115,6 @@ enum csr_roam_reason {
 	eCsrSmeIssuedDisassocForHandoff,
 	/* will be issued by Handoff logic to join a new AP with same profile */
 	eCsrSmeIssuedAssocToSimilarAP,
-	eCsrForcedIbssLeave,
 	eCsrStopBss,
 	eCsrSmeIssuedFTReassoc,
 	eCsrForcedDisassocSta,
@@ -159,8 +158,6 @@ enum csr_roam_state {
 enum csr_join_state {
 	eCsrContinueRoaming,
 	eCsrStopRoaming,
-	eCsrStartIbss,
-	eCsrStartIbssSameIbss,
 	eCsrReassocToSelfNoCapChange,
 	eCsrStopRoamingDueToConcurrency,
 
@@ -223,7 +220,7 @@ struct csr_roamstart_bssparams {
 
 	/*
 	 * This is the BSSID for the party we want to
-	 * join (only use for IBSS or WDS).
+	 * join (only use for WDS).
 	 */
 	struct qdf_mac_addr bssid;
 	tSirNwType sirNwType;
@@ -344,8 +341,6 @@ struct csr_config {
 	bool mcc_rts_cts_prot_enable;
 	bool mcc_bcast_prob_resp_enable;
 	uint8_t fAllowMCCGODiffBI;
-	uint32_t ad_hoc_ch_freq_2g;
-	uint32_t ad_hoc_ch_freq_5g;
 	uint8_t bCatRssiOffset; /* to set RSSI difference for each category */
 	bool nRoamScanControl;
 
@@ -356,7 +351,6 @@ struct csr_config {
 	bool doBMPSWorkaround;
 	uint32_t nVhtChannelWidth;
 	bool send_smps_action;
-	uint8_t isCoalesingInIBSSAllowed;
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 	uint8_t cc_switch_mode;
 #endif
@@ -400,9 +394,9 @@ struct csr_scanstruct {
 	tDblLinkList channelPowerInfoList5G;
 	uint32_t nLastAgeTimeOut;
 	uint32_t nAgingCountDown;
-	uint8_t countryCodeDefault[CFG_COUNTRY_CODE_LEN];
-	uint8_t countryCodeCurrent[CFG_COUNTRY_CODE_LEN];
-	uint8_t countryCode11d[CFG_COUNTRY_CODE_LEN];
+	uint8_t countryCodeDefault[REG_ALPHA2_LEN + 1];
+	uint8_t countryCodeCurrent[REG_ALPHA2_LEN + 1];
+	uint8_t countryCode11d[REG_ALPHA2_LEN + 1];
 	v_REGDOMAIN_t domainIdDefault;  /* default regulatory domain */
 	v_REGDOMAIN_t domainIdCurrent;  /* current regulatory domain */
 
@@ -410,7 +404,7 @@ struct csr_scanstruct {
 	 * in 11d IE from probe rsp or beacons of neighboring APs
 	 * will use the most popular one (max count)
 	 */
-	uint8_t countryCodeElected[CFG_COUNTRY_CODE_LEN];
+	uint8_t countryCodeElected[REG_ALPHA2_LEN + 1];
 	/*
 	 * Customer wants to optimize the scan time. Avoiding scans(passive)
 	 * on DFS channels while swipping through both bands can save some time
@@ -544,12 +538,12 @@ struct csr_roam_session {
 	bool fRoaming;
 	/*
 	 * to remember some parameters needed for START_BSS.
-	 * All member must be set every time we try to join or start an IBSS
+	 * All member must be set every time we try to join
 	 */
 	struct csr_roamstart_bssparams bssParams;
 	/* the byte count of pWpaRsnIE; */
 	uint32_t nWpaRsnReqIeLength;
-	/* contain the WPA/RSN IE in assoc req or one sent in beacon(IBSS) */
+	/* contain the WPA/RSN IE in assoc req */
 	uint8_t *pWpaRsnReqIE;
 	/* the byte count for pWpaRsnRspIE */
 	uint32_t nWpaRsnRspIeLength;
@@ -558,7 +552,7 @@ struct csr_roam_session {
 #ifdef FEATURE_WLAN_WAPI
 	/* the byte count of pWapiReqIE; */
 	uint32_t nWapiReqIeLength;
-	/* this contain the WAPI IE in assoc req or one sent in beacon (IBSS) */
+	/* this contain the WAPI IE in assoc req */
 	uint8_t *pWapiReqIE;
 	/* the byte count for pWapiRspIE */
 	uint32_t nWapiRspIeLength;
@@ -623,7 +617,7 @@ struct csr_roam_session {
 	bool nss_forced_1x1;
 	bool disable_hi_rssi;
 	bool dhcp_done;
-	uint8_t disconnect_reason;
+	tSirMacReasonCodes disconnect_reason;
 	uint8_t uapsd_mask;
 	struct scan_cmd_info scan_info;
 	qdf_mc_timer_t roaming_offload_timer;
@@ -834,59 +828,6 @@ bool csr_is_conn_state_connected(struct mac_context *mac,
 					       uint32_t sessionId);
 bool csr_is_conn_state_infra(struct mac_context *mac,
 					uint32_t sessionId);
-
-#ifdef QCA_IBSS_SUPPORT
-/**
- * csr_is_conn_state_ibss() - get the connection state for ibss session
- * @mac_ctx:  pointer to global mac structure
- * @sessionId: session id
- *
- *
- * Return: true if IBSS connected/disconnected state, else flase
- */
-bool csr_is_conn_state_ibss(struct mac_context *mac, uint32_t sessionId);
-
-/**
- * csr_is_conn_state_connected_ibss() - get the connected state for ibss
- * @mac_ctx:  pointer to global mac structure
- * @sessionId: session id
- *
- *
- * Return: true if IBSS connected state, else false
- */
-bool csr_is_conn_state_connected_ibss(struct mac_context *mac,
-				      uint32_t sessionId);
-
-/**
- * csr_is_conn_state_connected_ibss() - get the connected state for ibss
- * @mac_ctx:  pointer to global mac structure
- * @sessionId: session id
- *
- *
- * Return: true if IBSS disconnected state, else false
- */
-bool csr_is_conn_state_disconnected_ibss(struct mac_context *mac,
-					 uint32_t sessionId);
-#else
-static inline bool
-csr_is_conn_state_ibss(struct mac_context *mac, uint32_t sessionId)
-{
-	return false;
-}
-
-static inline bool
-csr_is_conn_state_connected_ibss(struct mac_context *mac, uint32_t sessionId)
-{
-	return false;
-}
-
-static inline bool
-csr_is_conn_state_disconnected_ibss(struct mac_context *mac,
-				    uint32_t sessionId)
-{
-	return false;
-}
-#endif
 
 bool csr_is_conn_state_wds(struct mac_context *mac, uint32_t sessionId);
 bool csr_is_conn_state_connected_wds(struct mac_context *mac,

@@ -907,7 +907,8 @@ void policy_mgr_pdev_set_hw_mode_cb(uint32_t status,
 				struct policy_mgr_vdev_mac_map *vdev_mac_map,
 				uint8_t next_action,
 				enum policy_mgr_conn_update_reason reason,
-				uint32_t session_id, void *context)
+				uint32_t session_id, void *context,
+				uint32_t request_id)
 {
 	QDF_STATUS ret;
 	struct policy_mgr_hw_mode_params hw_mode;
@@ -980,7 +981,7 @@ next_action:
 	if (PM_NOP != next_action && (status == SET_HW_MODE_STATUS_ALREADY ||
 	    status == SET_HW_MODE_STATUS_OK))
 		policy_mgr_next_actions(context, session_id,
-			next_action, reason);
+			next_action, reason, request_id);
 	else
 		policy_mgr_debug("No action needed right now");
 
@@ -1023,10 +1024,6 @@ static uint32_t policy_mgr_dump_current_concurrency_one_connection(
 		break;
 	case PM_P2P_GO_MODE:
 		count = strlcat(cc_mode, "P2P GO",
-					length);
-		break;
-	case PM_IBSS_MODE:
-		count = strlcat(cc_mode, "IBSS",
 					length);
 		break;
 	case PM_NAN_DISC_MODE:
@@ -1086,12 +1083,6 @@ static uint32_t policy_mgr_dump_current_concurrency_two_connection(
 		count += strlcat(cc_mode, "+P2P GO",
 					length);
 		break;
-	case PM_IBSS_MODE:
-		count = policy_mgr_dump_current_concurrency_one_connection(
-				cc_mode, length);
-		count += strlcat(cc_mode, "+IBSS",
-					length);
-		break;
 	case PM_NDI_MODE:
 		count = policy_mgr_dump_current_concurrency_one_connection(
 				cc_mode, length);
@@ -1147,12 +1138,6 @@ static uint32_t policy_mgr_dump_current_concurrency_three_connection(
 		count = policy_mgr_dump_current_concurrency_two_connection(
 				cc_mode, length);
 		count += strlcat(cc_mode, "+P2P GO",
-					length);
-		break;
-	case PM_IBSS_MODE:
-		count = policy_mgr_dump_current_concurrency_two_connection(
-				cc_mode, length);
-		count += strlcat(cc_mode, "+IBSS",
 					length);
 		break;
 	case PM_NAN_DISC_MODE:
@@ -1341,9 +1326,6 @@ QDF_STATUS policy_mgr_pdev_get_pcl(struct wlan_objmgr_psoc *psoc,
 	case QDF_SAP_MODE:
 		con_mode = PM_SAP_MODE;
 		break;
-	case QDF_IBSS_MODE:
-		con_mode = PM_IBSS_MODE;
-		break;
 	default:
 		policy_mgr_err("Unable to set PCL to FW: %d", mode);
 		return QDF_STATUS_E_FAILURE;
@@ -1474,7 +1456,7 @@ void pm_dbs_opportunistic_timer_handler(void *data)
 	}
 	session_id = pm_get_vdev_id_of_first_conn_idx(psoc);
 	policy_mgr_next_actions(psoc, session_id, action,
-				reason);
+				reason, POLICY_MGR_DEF_REQ_ID);
 }
 
 /**
@@ -1552,8 +1534,6 @@ enum policy_mgr_con_mode policy_mgr_get_mode(uint8_t type,
 				subtype, type);
 			break;
 		}
-	} else if (type == WMI_VDEV_TYPE_IBSS) {
-		mode = PM_IBSS_MODE;
 	} else if (type == WMI_VDEV_TYPE_NAN) {
 		mode = PM_NAN_DISC_MODE;
 	} else if (type == WMI_VDEV_TYPE_NDI) {
@@ -2119,7 +2099,6 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 	bool is_etsi13_srd_chan_allowed_in_mas_mode = true;
 	uint32_t i = 0, j = 0;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
-	bool sta_sap_scc_on_dfs_chan;
 	uint32_t *channel_list, *channel_list_24, *channel_list_5,
 		 *sbs_channel_list, *channel_list_6;
 
@@ -2166,20 +2145,9 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 		goto end;
 	}
 
-	/*
-	 * if you have atleast one STA connection then don't fill DFS channels
-	 * in the preferred channel list
-	 */
-	sta_sap_scc_on_dfs_chan =
-		policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(psoc);
 	if ((mode == PM_SAP_MODE) || (mode == PM_P2P_GO_MODE)) {
-		if ((policy_mgr_mode_specific_connection_count(psoc,
-							       PM_STA_MODE,
-							       NULL) > 0) &&
-		    (!sta_sap_scc_on_dfs_chan)) {
-			policy_mgr_debug("skip DFS ch from pcl for SAP/Go");
-			skip_dfs_channel = true;
-		}
+		policy_mgr_skip_dfs_ch(psoc,
+				       &skip_dfs_channel);
 		is_etsi13_srd_chan_allowed_in_mas_mode =
 			wlan_reg_is_etsi13_srd_chan_allowed_master_mode(pm_ctx->
 									pdev);
@@ -2865,12 +2833,13 @@ static void policy_mgr_nss_update_cb(struct wlan_objmgr_psoc *psoc,
 	policy_mgr_debug("nss update successful for vdev:%d ori %d reason %d",
 			 vdev_id, original_vdev_id, reason);
 	if (PM_NOP != next_action) {
-		if (reason == POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH)
+		if (reason == POLICY_MGR_UPDATE_REASON_AFTER_CHANNEL_SWITCH)
 			policy_mgr_next_actions(psoc, vdev_id, next_action,
-						reason);
+						reason, POLICY_MGR_DEF_REQ_ID);
 		else
 			policy_mgr_next_actions(psoc, original_vdev_id,
-						next_action, reason);
+						next_action, reason,
+						POLICY_MGR_DEF_REQ_ID);
 	} else {
 		policy_mgr_debug("No action needed right now");
 		ret = policy_mgr_set_opportunistic_update(psoc);
@@ -3022,7 +2991,8 @@ QDF_STATUS policy_mgr_complete_action(struct wlan_objmgr_psoc *psoc,
 				       session_id);
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		status = policy_mgr_next_actions(psoc, session_id,
-						next_action, reason);
+						 next_action, reason,
+						 POLICY_MGR_DEF_REQ_ID);
 
 	return status;
 }
