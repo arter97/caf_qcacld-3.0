@@ -641,7 +641,6 @@ struct wlan_mlme_wps_params {
  * @sap_11g_policy:  Check if 11g support is enabled
  * @assoc_sta_limit: Limit on number of STA associated to SAP
  * @enable_lte_coex: Flag for LTE coexistence
- * @rmc_action_period_freq: rmc action period frequency
  * @rate_tx_mgmt: mgmt frame tx rate
  * @rate_tx_mgmt_2g: mgmt frame tx rate for 2G band
  * @rate_tx_mgmt_5g: mgmt frame tx rate for 5G band
@@ -676,7 +675,6 @@ struct wlan_mlme_cfg_sap {
 	bool sap_11g_policy;
 	uint8_t assoc_sta_limit;
 	bool enable_lte_coex;
-	uint16_t rmc_action_period_freq;
 	uint8_t rate_tx_mgmt;
 	uint8_t rate_tx_mgmt_2g;
 	uint8_t rate_tx_mgmt_5g;
@@ -952,6 +950,8 @@ struct wlan_mlme_chain_cfg {
  * struct mlme_tgt_caps - mlme related capability coming from target (FW)
  * @data_stall_recovery_fw_support: does target supports data stall recovery.
  * @bigtk_support: does the target support bigtk capability or not.
+ * @stop_all_host_scan_support: Target capability that indicates if the target
+ * supports stop all host scan request type.
  *
  * Add all the mlme-tgt related capablities here, and the public API would fill
  * the related capability in the required mlme cfg structure.
@@ -959,6 +959,7 @@ struct wlan_mlme_chain_cfg {
 struct mlme_tgt_caps {
 	bool data_stall_recovery_fw_support;
 	bool bigtk_support;
+	bool stop_all_host_scan_support;
 };
 
 /**
@@ -1137,6 +1138,8 @@ struct wlan_mlme_chainmask {
  * @enable_peer_unmap_conf_support: Indicate whether to send conf for peer unmap
  * @dfs_chan_ageout_time: Set DFS Channel ageout time
  * @bigtk_support: Whether BIGTK is supported or not
+ * @stop_all_host_scan_support: Target capability that indicates if the target
+ * supports stop all host scan request type.
  */
 struct wlan_mlme_generic {
 	enum band_info band_capability;
@@ -1174,6 +1177,7 @@ struct wlan_mlme_generic {
 	bool enable_peer_unmap_conf_support;
 	uint8_t dfs_chan_ageout_time;
 	bool bigtk_support;
+	bool stop_all_host_scan_support;
 };
 
 /*
@@ -1215,6 +1219,7 @@ struct acs_weight_range {
 };
 
 #define MAX_ACS_WEIGHT_RANGE              10
+#define MLME_GET_DFS_CHAN_WEIGHT(np_chan_weight) (np_chan_weight & 0x000000FF)
 
 /*
  * struct wlan_mlme_acs - All acs related cfg items
@@ -1227,6 +1232,9 @@ struct acs_weight_range {
  * @normalize_weight_num_chan: Number of freq items for normalization.
  * @normalize_weight_range: Frequency range for weight normalization
  * @num_weight_range: num of ranges provided by user
+ * @force_sap_start: Force SAP start when no channel is found suitable
+ * by ACS
+ * @np_chan_weightage: Weightage to be given to non preferred channels.
  */
 struct wlan_mlme_acs {
 	bool is_acs_with_more_param;
@@ -1238,6 +1246,8 @@ struct wlan_mlme_acs {
 	uint16_t normalize_weight_num_chan;
 	struct acs_weight_range normalize_weight_range[MAX_ACS_WEIGHT_RANGE];
 	uint16_t num_weight_range;
+	bool force_sap_start;
+	uint32_t np_chan_weightage;
 };
 
 /*
@@ -1431,6 +1441,7 @@ struct bss_load_trigger {
 #define AKM_FT_FILS          2
 #define AKM_SAE              3
 #define AKM_OWE              4
+#define AKM_SUITEB           5
 
 #define LFR3_STA_ROAM_DISABLE_BY_P2P BIT(0)
 #define LFR3_STA_ROAM_DISABLE_BY_NAN BIT(1)
@@ -1520,6 +1531,7 @@ struct bss_load_trigger {
  * @enable_adaptive_11r             Flag to check if adaptive 11r ini is enabled
  * @tgt_adaptive_11r_cap:           Flag to check if target supports adaptive
  * 11r
+ * @enable_ft_im_roaming:           Flag to enable/disable FT-IM roaming
  * @roam_scan_home_away_time:       The home away time to firmware
  * @roam_scan_n_probes:    The number of probes to be sent for firmware roaming
  * @delay_before_vdev_stop:Wait time for tx complete before vdev stop
@@ -1630,6 +1642,7 @@ struct wlan_mlme_lfr_cfg {
 	bool enable_adaptive_11r;
 	bool tgt_adaptive_11r_cap;
 #endif
+	bool enable_ft_im_roaming;
 	uint16_t roam_scan_home_away_time;
 	uint32_t roam_scan_n_probes;
 	uint8_t delay_before_vdev_stop;
@@ -2150,12 +2163,14 @@ struct wlan_mlme_fe_wlm {
 
 /**
  * struct wlan_mlme_fe_rrm - RRM related configs
- * @rrm_enabled: Flag to check if RRM is enabled
+ * @rrm_enabled: Flag to check if RRM is enabled for STA
+ * @sap_rrm_enabled: Flag to check if RRM is enabled for SAP
  * @rrm_rand_interval: RRM randomization interval
  * @rm_capability: RM enabled capabilities IE
  */
 struct wlan_mlme_fe_rrm {
 	bool rrm_enabled;
+	bool sap_rrm_enabled;
 	uint8_t rrm_rand_interval;
 	uint8_t rm_capability[MLME_RMENABLEDCAP_MAX_LEN];
 };
@@ -2189,8 +2204,6 @@ struct wlan_mlme_mwc {
  * @scan_11d_interval: scan 11d interval
  * @valid_channel_freq_list: array for valid channel list
  * @valid_channel_list_num: valid channel list number
- * @country_code: country code
- * @country_code_len: country code length
  * @enable_11d_in_world_mode: Whether to enable 11d scan in world mode or not
  * @avoid_acs_freq_list: List of the frequencies which need to be avoided
  * during acs
@@ -2208,8 +2221,6 @@ struct wlan_mlme_reg {
 	uint32_t scan_11d_interval;
 	uint32_t valid_channel_freq_list[CFG_VALID_CHANNEL_LIST_LEN];
 	uint32_t valid_channel_list_num;
-	uint8_t country_code[CFG_COUNTRY_CODE_LEN + 1];
-	uint8_t country_code_len;
 	bool enable_11d_in_world_mode;
 #ifdef SAP_AVOID_ACS_FREQ_LIST
 	uint16_t avoid_acs_freq_list[CFG_VALID_CHANNEL_LIST_LEN];
@@ -2217,38 +2228,6 @@ struct wlan_mlme_reg {
 #endif
 	bool ignore_fw_reg_offload_ind;
 	bool enable_pending_chan_list_req;
-};
-
-/**
- * struct wlan_mlme_ibss_cfg - IBSS config params
- * @auto_bssid: Enable Auto BSSID for IBSS
- * @atim_win_size: Set IBSS ATIM window size
- * @adhoc_ch_5g: Default 5Ghz IBSS channel if not provided by supplicant
- * @adhoc_ch_2g: Default 2.4Ghz IBSS channel if not provided by supplicant
- * @coalesing_enable: IBSS coalesing control param
- * @power_save_allow: IBSS Power Save control
- * @power_collapse_allow: IBSS Power collapse control
- * @awake_on_tx_rx: IBSS sta power save mode on TX/RX activity
- * @inactivity_bcon_count: No of Beacons of data inactivity for power save
- * @txsp_end_timeout: TX service period inactivity timeout
- * @ps_warm_up_time: IBSS Power save skip time
- * @ps_1rx_chain_atim_win: Control IBSS Power save in 1RX chain during ATIM
- * @bssid: BSSID Mac address: IBSS BSSID if not provided by supplicant
- */
-struct wlan_mlme_ibss_cfg {
-	bool auto_bssid;
-	uint32_t atim_win_size;
-	uint32_t adhoc_ch_5g;
-	uint32_t adhoc_ch_2g;
-	bool coalesing_enable;
-	bool power_save_allow;
-	bool power_collapse_allow;
-	bool awake_on_tx_rx;
-	uint32_t inactivity_bcon_count;
-	uint32_t txsp_end_timeout;
-	uint32_t ps_warm_up_time;
-	uint32_t ps_1rx_chain_atim_win;
-	struct qdf_mac_addr bssid;
 };
 
 /**
@@ -2304,7 +2283,6 @@ struct wlan_mlme_cfg {
 	struct wlan_mlme_he_caps he_caps;
 #endif
 	struct wlan_mlme_lfr_cfg lfr;
-	struct wlan_mlme_ibss_cfg ibss;
 	struct wlan_mlme_obss_ht40 obss_ht40;
 	struct wlan_mlme_mbo mbo_cfg;
 	struct wlan_mlme_vht_caps vht_caps;

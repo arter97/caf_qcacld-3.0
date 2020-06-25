@@ -31,6 +31,7 @@
 
 #define HDD_WAKELOCK_TIMEOUT_CONNECT 1000
 #define HDD_WAKELOCK_TIMEOUT_RESUME 1000
+#define DISABLE_KRAIT_IDLE_PS_VAL      1
 
 /*
  * HDD_WAKELOCK_CONNECT_COMPLETE = CSR_JOIN_FAILURE_TIMEOUT_DEFAULT (3000) +
@@ -441,16 +442,15 @@ int wlan_hdd_ipv6_changed(struct notifier_block *nb,
 			  unsigned long data, void *arg);
 
 /**
- * hdd_set_qpower_config() - set qpower config to firmware
+ * hdd_set_power_config() - set power config to firmware
  * @hddctx: HDD context
  * @adapter: HDD adapter
- * @qpower: new qpower config value
+ * @power: new power config value
  *
  * Return: 0 on success; Errno on failure
  */
-int hdd_set_qpower_config(struct hdd_context *hddctx,
-			  struct hdd_adapter *adapter,
-			  uint8_t qpower);
+int hdd_set_power_config(struct hdd_context *hddctx,
+			 struct hdd_adapter *adapter, uint8_t power);
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
 /**

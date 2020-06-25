@@ -51,6 +51,7 @@ typedef enum eSmeCommandType {
 	eSmeCsrCommandMask = 0x10000,
 	eSmeCommandRoam,
 	eSmeCommandWmStatusChange,
+	eSmeCommandGetdisconnectStats,
 	/* QOS */
 	eSmeQosCommandMask = 0x40000,   /* To identify Qos commands */
 	eSmeCommandAddTs,
@@ -69,16 +70,6 @@ typedef enum eSmeState {
 
 #define SME_IS_START(mac)  (SME_STATE_STOP != (mac)->sme.state)
 #define SME_IS_READY(mac)  (SME_STATE_READY == (mac)->sme.state)
-
-/* HDD Callback function */
-typedef void (*ibss_peer_info_cb)(void *cb_context,
-				  tSirPeerInfoRspParams *infoParam);
-
-/* Peer info */
-struct ibss_peer_info_cb_info {
-	void *peer_info_cb_context;
-	ibss_peer_info_cb peer_info_cb;
-};
 
 /**
  * struct stats_ext_event - stats_ext_event payload
@@ -290,7 +281,6 @@ struct sme_context {
 	void **sme_cmd_buf_addr;
 	tDblLinkList sme_cmd_freelist;    /* preallocated roam cmd list */
 	enum QDF_OPMODE curr_device_mode;
-	struct ibss_peer_info_cb_info peer_info_cb_info;
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_CSR
 	host_event_wlan_status_payload_type eventPayload;
 #endif
@@ -298,7 +288,7 @@ struct sme_context {
 	link_layer_stats_cb link_layer_stats_cb;
 	void (*link_layer_stats_ext_cb)(hdd_handle_t callback_ctx,
 					tSirLLStatsResults *rsp);
-#ifdef WLAN_POWER_DEBUGFS
+#ifdef WLAN_POWER_DEBUG
 	void *power_debug_stats_context;
 	void (*power_stats_resp_callback)(struct power_stats_response *rsp,
 						void *callback_context);

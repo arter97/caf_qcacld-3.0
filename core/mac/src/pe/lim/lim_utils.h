@@ -318,16 +318,13 @@ uint8_t lim_is_null_ssid(tSirMacSSid *pSsid);
 void lim_stop_tx_and_switch_channel(struct mac_context *mac, uint8_t sessionId);
 
 /**
- * lim_process_channel_switch_timeout() - Process chanel switch timeout
+ * lim_process_channel_switch() - Process chanel switch
  * @mac: pointer to Global MAC structure
+ * @vdev_id: Vdev on which CSA is happening
  *
  * Return: none
  */
-void lim_process_channel_switch_timeout(struct mac_context *);
-QDF_STATUS lim_start_channel_switch(struct mac_context *mac,
-		struct pe_session *pe_session);
-void lim_update_channel_switch(struct mac_context *, tpSirProbeRespBeacon,
-		struct pe_session *pe_session);
+void lim_process_channel_switch(struct mac_context *mac, uint8_t vdev_id);
 
 /**
  * lim_switch_primary_channel() - switch primary channel of session
@@ -372,8 +369,6 @@ void lim_update_sta_run_time_ht_capability(struct mac_context *mac,
 		tDot11fIEHTCaps *pHTCaps);
 void lim_update_sta_run_time_ht_info(struct mac_context *mac,
 		tDot11fIEHTInfo *pRcvdHTInfo,
-		struct pe_session *pe_session);
-void lim_cancel_dot11h_channel_switch(struct mac_context *mac,
 		struct pe_session *pe_session);
 
 /**
@@ -608,30 +603,13 @@ void lim_process_ap_mlm_del_sta_rsp(struct mac_context *mac,
 		struct scheduler_msg *limMsgQ,
 		struct pe_session *pe_session);
 
-#ifdef QCA_IBSS_SUPPORT
 /**
- * lim_is_ibss_session_active() - API to check IBSS session active
- * @mac: Pointer to Global MAC structure
+ * ch_width_in_mhz() - API to get channel space in MHz
  *
- * Return: Pointer to active IBSS pe_session else NULL
+ * For CH_WIDTH_80P80MHZ, the channel space is max channel space of one
+ * segment - 80MHz.
+ *
  */
-struct pe_session *lim_is_ibss_session_active(struct mac_context *mac);
-#else
-/**
- * lim_is_ibss_session_active() - API to check IBSS session active
- * @mac: Pointer to Global MAC structure
- *
- * This function is dummy.
- *
- * Return: NULL
- */
-static inline
-struct pe_session *lim_is_ibss_session_active(struct mac_context *mac)
-{
-	return NULL;
-}
-#endif
-
 static inline uint8_t ch_width_in_mhz(enum phy_ch_width ch_width)
 {
 	switch (ch_width) {
@@ -642,7 +620,7 @@ static inline uint8_t ch_width_in_mhz(enum phy_ch_width ch_width)
 	case CH_WIDTH_160MHZ:
 		return 160;
 	case CH_WIDTH_80P80MHZ:
-		return 160;
+		return 80;
 	case CH_WIDTH_5MHZ:
 		return 5;
 	case CH_WIDTH_10MHZ:
@@ -907,6 +885,18 @@ QDF_STATUS lim_strip_extcap_update_struct(struct mac_context *mac_ctx,
 		uint8_t *addn_ie, uint16_t *addn_ielen, tDot11fIEExtCap *dst);
 void lim_merge_extcap_struct(tDot11fIEExtCap *dst, tDot11fIEExtCap *src,
 		bool add);
+
+/**
+ * lim_strip_he_ies_from_add_ies() - This function strip HE IE from add_ie
+ * @mac_ctx: pointer to mac context
+ * @pe_session: pointer to PE session
+ *
+ * This API is to strip HE IE from add_ie
+ *
+ * Return: none
+ */
+void lim_strip_he_ies_from_add_ies(struct mac_context *mac_ctx,
+				   struct pe_session *session);
 
 #ifdef WLAN_FEATURE_11W
 /**
@@ -1248,10 +1238,12 @@ static inline bool lim_is_session_he_capable(struct pe_session *session)
 /**
  * lim_update_he_bw_cap_mcs(): Update he mcs map per bandwidth
  * @session_entry: pointer to PE session
+ * @beacon: pointer to beacon
  *
  * Return: None
  */
-void lim_update_he_bw_cap_mcs(struct pe_session *session);
+void lim_update_he_bw_cap_mcs(struct pe_session *session,
+			      tSirProbeRespBeacon *beacon);
 
 static inline bool lim_is_he_6ghz_band(struct pe_session *session)
 {
@@ -1481,7 +1473,8 @@ static inline bool lim_is_session_he_capable(struct pe_session *session)
 	return false;
 }
 
-static inline void lim_update_he_bw_cap_mcs(struct pe_session *session)
+static inline void lim_update_he_bw_cap_mcs(struct pe_session *session,
+					    tSirProbeRespBeacon *beacon)
 {
 }
 
@@ -1694,7 +1687,6 @@ void lim_send_start_bss_confirm(struct mac_context *mac_ctx,
  * @mac_ctx: pointer to global mac structure
  * @new_channel_freq: new channel freq(Mhz) to switch to.
  * @ch_bandwidth: ch bw of enum phy_ch_width
- * @offset: BW of type enum offset_t
  * @session_entry: pe session
  *
  * Return: void
@@ -1702,7 +1694,6 @@ void lim_send_start_bss_confirm(struct mac_context *mac_ctx,
 void lim_send_chan_switch_action_frame(struct mac_context *mac_ctx,
 				       uint16_t new_channel_freq,
 				       enum phy_ch_width ch_bandwidth,
-				       enum offset_t offset,
 				       struct pe_session *session_entry);
 
 /**
@@ -1712,7 +1703,6 @@ void lim_send_chan_switch_action_frame(struct mac_context *mac_ctx,
  * @mac_ctx: pointer to global mac structure
  * @new_channel_freq: new channel to switch to.
  * @ch_bandwidth: channel bw of type enum phy_ch_width
- * @offset: BW of enum offset_t
  * @session_entry: pe session
  *
  * This function is called to send ECSA frame for STA/CLI and SAP/GO.
@@ -1722,7 +1712,6 @@ void lim_send_chan_switch_action_frame(struct mac_context *mac_ctx,
 void send_extended_chan_switch_action_frame(struct mac_context *mac_ctx,
 					    uint16_t new_channel_freq,
 					    enum phy_ch_width ch_bandwidth,
-					    enum offset_t offset,
 					    struct pe_session *session_entry);
 
 /**
@@ -2033,6 +2022,23 @@ QDF_STATUS lim_mon_mlme_vdev_start_send(struct vdev_mlme_obj *vdev_mlme,
  */
 QDF_STATUS lim_get_capability_info(struct mac_context *mac, uint16_t *pCap,
 				   struct pe_session *pe_session);
+
+/**
+ * lim_op_class_from_bandwidth() - get op class from bandwidth
+ * @mac_ctx: mac context
+ * @channel_freq: channel frequency MHz
+ * @ch_bandwidth: channel bandwidth
+ * @offset: second channel offfset
+ *
+ * This API can get the operating class based on channel freq,
+ * bandwidth and second channel offset.
+ *
+ * Return: op class
+ */
+uint8_t lim_op_class_from_bandwidth(struct mac_context *mac_ctx,
+				    uint16_t channel_freq,
+				    enum phy_ch_width ch_bandwidth,
+				    enum offset_t offset);
 
 /**
  * lim_flush_bssid() - flush bssid from scan cache

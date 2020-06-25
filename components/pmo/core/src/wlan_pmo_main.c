@@ -183,14 +183,10 @@ static void wlan_pmo_init_cfg(struct wlan_objmgr_psoc *psoc,
 	psoc_cfg->sta_dynamic_dtim = cfg_get(psoc, CFG_PMO_ENABLE_DYNAMIC_DTIM);
 	psoc_cfg->sta_mod_dtim = cfg_get(psoc, CFG_PMO_ENABLE_MODULATED_DTIM);
 	psoc_cfg->enable_mc_list = cfg_get(psoc, CFG_PMO_MC_ADDR_LIST_ENABLE);
-	psoc_cfg->power_save_mode = cfg_get(psoc, CFG_PMO_POWERSAVE_OFFLOAD);
+	psoc_cfg->power_save_mode = cfg_get(psoc, CFG_PMO_POWERSAVE_MODE);
 	psoc_cfg->max_ps_poll = cfg_get(psoc, CFG_PMO_MAX_PS_POLL);
 
 	psoc_cfg->wow_enable = cfg_get(psoc, CFG_PMO_WOW_ENABLE);
-	psoc_cfg->wowlan_deauth_enable =
-			cfg_get(psoc, CFG_PMO_WOWLAN_DEAUTH_ENABLE);
-	psoc_cfg->wowlan_disassoc_enable =
-			cfg_get(psoc, CFG_PMO_WOWLAN_DISASSOC_ENABLE);
 
 	wlan_extwow_init_cfg(psoc, psoc_cfg);
 	psoc_cfg->apf_enable = cfg_get(psoc, CFG_PMO_APF_ENABLE);

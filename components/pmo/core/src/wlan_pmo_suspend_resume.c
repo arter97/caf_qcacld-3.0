@@ -853,11 +853,13 @@ QDF_STATUS pmo_core_psoc_suspend_target(struct wlan_objmgr_psoc *psoc,
 	QDF_STATUS status;
 	struct pmo_suspend_params param;
 	struct pmo_psoc_priv_obj *psoc_ctx;
+	void *dp_soc = pmo_core_psoc_get_dp_handle(psoc);
 
 	pmo_enter();
 
 	psoc_ctx = pmo_psoc_get_priv(psoc);
 
+	cdp_process_target_suspend_req(dp_soc, OL_TXRX_PDEV_ID);
 	qdf_event_reset(&psoc_ctx->wow.target_suspend);
 	param.disable_target_intr = disable_target_intr;
 	status = pmo_tgt_psoc_send_supend_req(psoc, &param);
@@ -1295,7 +1297,7 @@ QDF_STATUS pmo_core_psoc_bus_resume_req(struct wlan_objmgr_psoc *psoc,
 	pmo_core_update_wow_initial_wake_up(psoc_ctx, 0);
 
 	/* If target was not suspended, bail out */
-	if (!pmo_tgt_is_target_suspended(psoc)) {
+	if (qdf_is_fw_down() || !pmo_tgt_is_target_suspended(psoc)) {
 		pmo_psoc_put_ref(psoc);
 		goto out;
 	}

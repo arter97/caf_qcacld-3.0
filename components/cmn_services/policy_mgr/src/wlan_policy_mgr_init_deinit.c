@@ -410,7 +410,7 @@ QDF_STATUS policy_mgr_psoc_enable(struct wlan_objmgr_psoc *psoc)
 {
 	QDF_STATUS status;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
-	uint8_t enable_mcc_adaptive_sch = 0;
+	bool enable_mcc_adaptive_sch = false;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -437,6 +437,13 @@ QDF_STATUS policy_mgr_psoc_enable(struct wlan_objmgr_psoc *psoc)
 	status = policy_mgr_init_connection_update(pm_ctx);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		policy_mgr_err("connection_update_done_evt init failed");
+		return status;
+	}
+
+	/* init dual_mac_configuration_complete_evt */
+	status = qdf_event_create(&pm_ctx->dual_mac_configuration_complete_evt);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		policy_mgr_err("dual_mac_configuration_complete_evt init failed");
 		return status;
 	}
 
@@ -591,6 +598,14 @@ QDF_STATUS policy_mgr_psoc_disable(struct wlan_objmgr_psoc *psoc)
 	if (QDF_IS_STATUS_ERROR(
 		policy_mgr_reset_sap_mandatory_channels(pm_ctx))) {
 		policy_mgr_err("failed to reset sap mandatory channels");
+		status = QDF_STATUS_E_FAILURE;
+		QDF_ASSERT(0);
+	}
+
+	/* destroy dual_mac_configuration_complete_evt */
+	if (!QDF_IS_STATUS_SUCCESS(qdf_event_destroy
+		(&pm_ctx->dual_mac_configuration_complete_evt))) {
+		policy_mgr_err("Failed to destroy dual_mac_configuration_complete_evt");
 		status = QDF_STATUS_E_FAILURE;
 		QDF_ASSERT(0);
 	}

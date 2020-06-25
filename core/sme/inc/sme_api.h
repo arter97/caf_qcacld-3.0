@@ -121,6 +121,8 @@
 #define SME_CMD_PEER_DISCONNECT_TIMEOUT (SIR_DELETE_STA_TIMEOUT + 1000)
 #define SME_PEER_DISCONNECT_TIMEOUT (SME_CMD_PEER_DISCONNECT_TIMEOUT + 1000)
 
+#define SME_CMD_GET_DISCONNECT_STATS_TIMEOUT 200
+
 /* Roam cmds timeout = vdev start + peer assoc + 1 sec */
 #define SME_CMD_ROAM_CMD_TIMEOUT (START_RESPONSE_TIMER + \
 				  SIR_PEER_ASSOC_TIMEOUT + 1000)
@@ -613,7 +615,8 @@ void sme_get_pmk_info(mac_handle_t mac_handle, uint8_t session_id,
 		      tPmkidCacheInfo *pmk_cache);
 
 QDF_STATUS sme_roam_set_psk_pmk(mac_handle_t mac_handle, uint8_t sessionId,
-		uint8_t *pPSK_PMK, size_t pmk_len);
+				uint8_t *psk_pmk, size_t pmk_len,
+				bool update_to_fw);
 #else
 static inline
 void sme_get_pmk_info(mac_handle_t mac_handle, uint8_t session_id,
@@ -636,7 +639,8 @@ sme_set_roam_scan_ch_event_cb(mac_handle_t mac_handle,
 
 static inline
 QDF_STATUS sme_roam_set_psk_pmk(mac_handle_t mac_handle, uint8_t sessionId,
-				uint8_t *pPSK_PMK, size_t pmk_len)
+				uint8_t *psk_pmk, size_t pmk_len,
+				bool update_to_fw)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -735,9 +739,6 @@ void sme_deregister_oem_data_rsp_callback(mac_handle_t mac_handle)
 
 #endif
 
-QDF_STATUS sme_get_country_code(mac_handle_t mac_handle, uint8_t *pBuf,
-				uint8_t *pbLen);
-
 QDF_STATUS sme_generic_change_country_code(mac_handle_t mac_handle,
 					   uint8_t *pCountry);
 
@@ -752,9 +753,6 @@ QDF_STATUS sme_generic_change_country_code(mac_handle_t mac_handle,
  */
 QDF_STATUS sme_update_channel_list(mac_handle_t mac_handle);
 
-QDF_STATUS sme_tx_fail_monitor_start_stop_ind(mac_handle_t mac_handle,
-		uint8_t tx_fail_count,
-		void *txFailIndCallback);
 QDF_STATUS sme_dhcp_start_ind(mac_handle_t mac_handle,
 		uint8_t device_mode,
 		uint8_t *macAddr, uint8_t sessionId);
@@ -1203,44 +1201,6 @@ QDF_STATUS sme_roam_del_pmkid_from_cache(mac_handle_t mac_handle,
 					 bool set_pmk);
 
 void sme_get_command_q_status(mac_handle_t mac_handle);
-
-#ifdef FEATURE_WLAN_RMC
-QDF_STATUS sme_enable_rmc(mac_handle_t mac_handle, uint32_t sessionId);
-QDF_STATUS sme_disable_rmc(mac_handle_t mac_handle, uint32_t sessionId);
-QDF_STATUS sme_send_rmc_action_period(mac_handle_t mac_handle,
-				      uint32_t sessionId);
-#endif
-
-#ifdef QCA_IBSS_SUPPORT
-/*
- * sme_request_ibss_peer_info() -  request ibss peer info
- * @mac_handle: Opaque handle to the global MAC context
- * @cb_context: Pointer to user data
- * @peer_info_cb: Peer info callback
- * @allPeerInfoReqd: All peer info required or not
- * @staIdx: sta index
- *
- * Return:  QDF_STATUS
- */
-QDF_STATUS sme_request_ibss_peer_info(mac_handle_t mac_handle,
-				      void *cb_context,
-				      ibss_peer_info_cb peer_info_cb,
-				      bool allPeerInfoReqd,
-				      uint8_t *mac_addr);
-#else
-static inline
-QDF_STATUS sme_request_ibss_peer_info(mac_handle_t mac_handle,
-				      void *cb_context,
-				      ibss_peer_info_cb peer_info_cb,
-				      bool allPeerInfoReqd,
-				      uint8_t *mac_addr)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif
-
-QDF_STATUS sme_send_cesium_enable_ind(mac_handle_t mac_handle,
-				      uint32_t sessionId);
 
 /**
  * sme_set_wlm_latency_level_ind() - Used to set the latency level to fw
@@ -2158,9 +2118,6 @@ QDF_STATUS sme_process_mac_pwr_dbg_cmd(mac_handle_t mac_handle,
 
 void sme_get_vdev_type_nss(enum QDF_OPMODE dev_mode,
 			   uint8_t *nss_2g, uint8_t *nss_5g);
-QDF_STATUS sme_roam_set_default_key_index(mac_handle_t mac_handle,
-					  uint8_t session_id,
-					  uint8_t default_idx);
 void sme_send_disassoc_req_frame(mac_handle_t mac_handle,
 				 uint8_t session_id, uint8_t *peer_mac,
 				 uint16_t reason, uint8_t wait_for_ack);
@@ -2294,7 +2251,7 @@ QDF_STATUS sme_set_lost_link_info_cb(mac_handle_t mac_handle,
  */
 QDF_STATUS sme_update_new_channel_event(mac_handle_t mac_handle,
 					uint8_t session_id);
-#ifdef WLAN_POWER_DEBUGFS
+#ifdef WLAN_POWER_DEBUG
 QDF_STATUS sme_power_debug_stats_req(
 		mac_handle_t mac_handle,
 		void (*callback_fn)(struct power_stats_response *response,

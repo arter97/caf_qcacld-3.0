@@ -234,12 +234,6 @@ typedef void (*CHANGE_CHANNEL_CALLBACK)(struct mac_context *mac, QDF_STATUS stat
 					uint32_t *data,
 					struct pe_session *pe_session);
 
-/* / LIM global definitions */
-struct lim_ibss_info {
-	void *mac_hdr;
-	void *beacon;
-};
-
 typedef struct sDialogueToken {
 	/* bytes 0-3 */
 	uint16_t assocId;
@@ -281,7 +275,6 @@ typedef struct sLimTimers {
 	/* Update OLBC Cache Timer */
 	TX_TIMER gLimUpdateOlbcCacheTimer;
 
-	TX_TIMER gLimChannelSwitchTimer;
 	TX_TIMER gLimFTPreAuthRspTimer;
 
 	TX_TIMER gLimPeriodicJoinProbeReqTimer;
@@ -338,20 +331,6 @@ typedef struct sAniSirLim {
 	void *gpLimMlmSetKeysReq;
 
 	/* ////////////////////////////////////////     BSS RELATED END /////////////////////////////////////////// */
-
-	/* ////////////////////////////////////////     IBSS RELATED START /////////////////////////////////////////// */
-	/* This indicates whether this STA coalesced and adapter to peer's capabilities or not. */
-	uint8_t gLimIbssCoalescingHappened;
-
-	/* / Definition for storing IBSS peers BSS description */
-	tLimIbssPeerNode *gLimIbssPeerList;
-	uint32_t gLimNumIbssPeers;
-	uint32_t ibss_retry_cnt;
-
-	/* ibss info - params for which ibss to join while coalescing */
-	struct lim_ibss_info ibss_info;
-
-	/* ////////////////////////////////////////     IBSS RELATED END /////////////////////////////////////////// */
 
 	/* ////////////////////////////////////////     STATS/COUNTER RELATED START /////////////////////////////////////////// */
 
@@ -729,8 +708,6 @@ struct vdev_type_nss {
  * struct mgmt_beacon_probe_filter
  * @num_sta_sessions: Number of active PE STA sessions
  * @sta_bssid: Array of PE STA session's peer BSSIDs
- * @num_ibss_sessions: Number of active PE IBSS sessions
- * @ibss_ssid: Array of PE IBSS session's SSID
  * @num_sap_session: Number of active PE SAP sessions
  * @sap_channel: Array of PE SAP session's channels
  *
@@ -740,8 +717,6 @@ struct vdev_type_nss {
 struct mgmt_beacon_probe_filter {
 	uint8_t num_sta_sessions;
 	tSirMacAddr sta_bssid[WLAN_MAX_VDEVS];
-	uint8_t num_ibss_sessions;
-	tSirMacSSid ibss_ssid[WLAN_MAX_VDEVS];
 	uint8_t num_sap_sessions;
 	uint8_t sap_channel[WLAN_MAX_VDEVS];
 };
@@ -774,8 +749,6 @@ struct mac_context {
 	struct csr_scanstruct scan;
 	struct csr_roamstruct roam;
 	tRrmContext rrm;
-	uint8_t isCoalesingInIBSSAllowed;
-	uint8_t lteCoexAntShare;
 	uint8_t beacon_offload;
 	bool pmf_offload;
 	bool is_fils_roaming_supported;
@@ -788,15 +761,11 @@ struct mac_context {
 	struct vdev_type_nss vdev_type_nss_5g;
 
 	uint16_t mgmtSeqNum;
-	uint32_t sta_sap_scc_on_dfs_chan;
 	sir_mgmt_frame_ind_callback mgmt_frame_ind_cb;
 	qdf_atomic_t global_cmd_id;
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_pdev *pdev;
 	void (*chan_info_cb)(struct scan_chan_info *chan_info);
-	/* Based on INI parameter */
-	uint32_t dual_mac_feature_disable;
-
 	enum  country_src reg_hint_src;
 	uint32_t rx_packet_drop_counter;
 	enum auth_tx_ack_status auth_ack_status;

@@ -229,6 +229,7 @@ rrm_process_link_measurement_request(struct mac_context *mac,
 	tpSirMacMgmtHdr pHdr;
 	int8_t currentRSSI = 0;
 	struct lim_max_tx_pwr_attr tx_pwr_attr = {0};
+	struct vdev_mlme_obj *mlme_obj;
 
 	pe_debug("Received Link measurement request");
 
@@ -242,6 +243,15 @@ rrm_process_link_measurement_request(struct mac_context *mac,
 	tx_pwr_attr.ap_tx_power = pLinkReq->MaxTxPower.maxTxPower;
 
 	LinkReport.txPower = lim_get_max_tx_power(mac, &tx_pwr_attr);
+
+	/** If firmware updated max tx power is non zero, respond to rrm link
+	 *  measurement request with min of firmware updated ap tx power and
+	 *  max power derived from lim_get_max_tx_power API.
+	 */
+	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(pe_session->vdev);
+	if (mlme_obj && mlme_obj->mgmt.generic.tx_pwrlimit)
+		LinkReport.txPower = QDF_MIN(LinkReport.txPower,
+					mlme_obj->mgmt.generic.tx_pwrlimit);
 
 	if ((LinkReport.txPower != (uint8_t) (pe_session->maxTxPower)) &&
 	    (QDF_STATUS_SUCCESS == rrm_send_set_max_tx_power_req(mac,
@@ -371,7 +381,7 @@ rrm_process_neighbor_report_response(struct mac_context *mac,
 		fMobilityDomain =
 			pNeighborRep->NeighborReport[i].MobilityDomain;
 
-		if (!wlan_reg_is_6ghz_supported(mac->pdev) &&
+		if (!wlan_reg_is_6ghz_supported(mac->psoc) &&
 		    (wlan_reg_is_6ghz_op_class(mac->pdev,
 					       pNeighborRep->NeighborReport[i].
 					       regulatoryClass))) {
@@ -660,7 +670,7 @@ rrm_process_beacon_report_req(struct mac_context *mac,
 		SYS_TU_TO_MS(pBeaconReq->measurement_request.Beacon.randomization);
 	psbrr->measurement_idx = pCurrentReq->measurement_idx;
 
-	if (!wlan_reg_is_6ghz_supported(mac->pdev) &&
+	if (!wlan_reg_is_6ghz_supported(mac->psoc) &&
 	    (wlan_reg_is_6ghz_op_class(mac->pdev,
 			 pBeaconReq->measurement_request.Beacon.regClass))) {
 		pe_nofl_err("RX: [802.11 BCN_RPT] Ch belongs to 6 ghz spectrum, abort");
@@ -723,7 +733,7 @@ rrm_process_beacon_report_req(struct mac_context *mac,
 		for (tmp_idx = 0;
 		     tmp_idx < ie_ap_chan_rpt->num_channelList;
 		     tmp_idx++) {
-			if (!wlan_reg_is_6ghz_supported(mac->pdev) &&
+			if (!wlan_reg_is_6ghz_supported(mac->psoc) &&
 			    (wlan_reg_is_6ghz_op_class(mac->pdev,
 					    ie_ap_chan_rpt->regulatoryClass))) {
 				pe_nofl_err("RX: [802.11 BCN_RPT] Ch belongs to 6 ghz spectrum, abort");
@@ -1168,7 +1178,8 @@ QDF_STATUS rrm_process_beacon_req(struct mac_context *mac_ctx, tSirMacAddr peer,
 	tpSirMacRadioMeasureReport report;
 	tpRRMReq curr_req;
 
-	if (index  >= MAX_MEASUREMENT_REQUEST) {
+	if (index  >= MAX_MEASUREMENT_REQUEST ||
+	    mac_ctx->rrm.rrmPEContext.pCurrentReq[index]) {
 		if (!*radiomes_report) {
 			/*
 			 * Allocate memory to send reports for

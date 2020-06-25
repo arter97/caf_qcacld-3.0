@@ -252,6 +252,8 @@ enum hdd_adapter_flags {
 /* rcpi request timeout in milli seconds */
 #define WLAN_WAIT_TIME_RCPI 500
 
+#define WLAN_WAIT_PEER_CLEANUP 5000
+
 #define MAX_CFG_STRING_LEN  255
 
 /* Maximum time(ms) to wait for external acs response */
@@ -759,13 +761,6 @@ struct hdd_mon_set_ch_info {
  * @conn_info: current connection information
  * @roam_info: current roaming information
  * @ft_carrier_on: is carrier on
- * @ibss_sta_generation: current ibss generation. Incremented whenever
- *    ibss New peer joins and departs the network
- * @ibss_enc_key_installed: is the ibss wep/wpa-none encryptions key
- *    installed?
- * @ibss_enc_key: current ibss wep/wpa-none encryption key (if
- *    @ibss_enc_key_installed is %true)
- * @ibss_peer_info: information about the ibss peer
  * @hdd_reassoc_scenario: is station in the middle of reassociation?
  * @sta_debug_state: STA context debug variable
  * @broadcast_sta_id: STA ID assigned for broadcast frames
@@ -783,10 +778,6 @@ struct hdd_station_ctx {
 	struct hdd_connection_info conn_info;
 	struct hdd_connection_info cache_conn_info;
 	int ft_carrier_on;
-	int ibss_sta_generation;
-	bool ibss_enc_key_installed;
-	tCsrRoamSetKey ibss_enc_key;
-	tSirPeerInfoRspParams ibss_peer_info;
 	bool hdd_reassoc_scenario;
 	int sta_debug_state;
 	struct hdd_mon_set_ch_info ch_info;
@@ -1191,8 +1182,6 @@ struct hdd_adapter {
 
 	struct completion sta_authorized_event;
 
-	struct completion ibss_peer_info_comp;
-
 	/* Track whether the linkup handling is needed  */
 	bool is_link_up_service_needed;
 
@@ -1384,6 +1373,7 @@ struct hdd_adapter {
 	uint32_t periodic_stats_timer_counter;
 	qdf_mutex_t sta_periodic_stats_lock;
 #endif /* WLAN_FEATURE_PERIODIC_STA_STATS */
+	qdf_event_t peer_cleanup_done;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(adapter) (&(adapter)->session.station)
@@ -1849,6 +1839,7 @@ struct hdd_context {
 	int radio_index;
 	qdf_work_t sap_pre_cac_work;
 	bool hbw_requested;
+	bool llm_enabled;
 	enum RX_OFFLOAD ol_enable;
 #ifdef WLAN_FEATURE_NAN
 	bool nan_datapath_enabled;
@@ -1971,6 +1962,9 @@ struct hdd_context {
 	uint8_t val_pkt_capture_mode;
 #endif
 	bool roam_ch_from_fw_supported;
+#ifdef FW_THERMAL_THROTTLE_SUPPORT
+	uint8_t dutycycle_off_percent;
+#endif
 };
 
 /**
@@ -2463,27 +2457,6 @@ struct hdd_adapter *hdd_get_first_valid_adapter(struct hdd_context *hdd_ctx);
 void hdd_allow_suspend(uint32_t reason);
 void hdd_prevent_suspend_timeout(uint32_t timeout, uint32_t reason);
 
-#ifdef QCA_IBSS_SUPPORT
-/**
- * hdd_set_ibss_power_save_params() - update IBSS Power Save params to WMA.
- * @struct hdd_adapter Hdd adapter.
- *
- * This function sets the IBSS power save config parameters to WMA
- * which will send it to firmware if FW supports IBSS power save
- * before vdev start.
- *
- * Return: QDF_STATUS QDF_STATUS_SUCCESS on Success and QDF_STATUS_E_FAILURE
- *         on failure.
- */
-QDF_STATUS hdd_set_ibss_power_save_params(struct hdd_adapter *adapter);
-#else
-static inline QDF_STATUS
-hdd_set_ibss_power_save_params(struct hdd_adapter *adapter)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif
-
 /**
  * wlan_hdd_validate_context() - check the HDD context
  * @hdd_ctx: Global HDD context pointer
@@ -2549,6 +2522,15 @@ bool wlan_hdd_validate_modules_state(struct hdd_context *hdd_ctx);
 
 QDF_STATUS __wlan_hdd_validate_mac_address(struct qdf_mac_addr *mac_addr,
 					   const char *func);
+
+/**
+ * hdd_is_any_adapter_connected() - Check if any adapter is in connected state
+ * @hdd_ctx: the global hdd context
+ *
+ * Returns: true, if any of the adapters is in connected state,
+ *	    false, if none of the adapters is in connected state.
+ */
+bool hdd_is_any_adapter_connected(struct hdd_context *hdd_ctx);
 
 #ifdef WLAN_FEATURE_DP_BUS_BANDWIDTH
 /**
@@ -2636,6 +2618,24 @@ hdd_get_current_throughput_level(struct hdd_context *hdd_ctx)
 	return hdd_ctx->cur_vote_level;
 }
 
+/**
+ * hdd_set_current_throughput_level() - update the current vote
+ * level
+ * @hdd_ctx: the global hdd context
+ * @next_vote_level: pld_bus_width_type voting level
+ *
+ * This function updates the current vote level to the new level
+ * provided
+ *
+ * Return: None
+ */
+static inline void
+hdd_set_current_throughput_level(struct hdd_context *hdd_ctx,
+				 enum pld_bus_width_type next_vote_level)
+{
+	hdd_ctx->cur_vote_level = next_vote_level;
+}
+
 static inline bool
 hdd_is_low_tput_gro_enable(struct hdd_context *hdd_ctx)
 {
@@ -2691,6 +2691,12 @@ static inline enum pld_bus_width_type
 hdd_get_current_throughput_level(struct hdd_context *hdd_ctx)
 {
 	return PLD_BUS_WIDTH_NONE;
+}
+
+static inline void
+hdd_set_current_throughput_level(struct hdd_context *hdd_ctx,
+				 enum pld_bus_width_type next_vote_level)
+{
 }
 
 static inline bool
@@ -3033,7 +3039,30 @@ static inline void wlan_hdd_mod_fc_timer(struct hdd_adapter *adapter,
 }
 #endif /* QCA_HL_NETDEV_FLOW_CONTROL */
 
-int hdd_wlan_dump_stats(struct hdd_adapter *adapter, int value);
+/**
+ * hdd_wlan_dump_stats() - display dump Stats
+ * @adapter: adapter handle
+ * @stats_id: stats id from user
+ *
+ * Return: 0 => success, error code on failure
+ */
+int hdd_wlan_dump_stats(struct hdd_adapter *adapter, int stats_id);
+
+/**
+ * hdd_wlan_clear_stats() - clear Stats
+ * @adapter: adapter handle
+ * @stats_id: stats id from user
+ *
+ * Return: 0 => success, error code on failure
+ */
+int hdd_wlan_clear_stats(struct hdd_adapter *adapter, int stats_id);
+
+/**
+ * wlan_hdd_display_tx_rx_histogram() - display tx rx histogram
+ * @hdd_ctx: hdd context
+ *
+ * Return: none
+ */
 void wlan_hdd_display_tx_rx_histogram(struct hdd_context *hdd_ctx);
 void wlan_hdd_clear_tx_rx_histogram(struct hdd_context *hdd_ctx);
 
@@ -3787,16 +3816,6 @@ void hdd_dp_trace_init(struct hdd_config *config) {}
 void hdd_set_rx_mode_rps(bool enable);
 
 /**
- * hdd_limit_max_per_index_score() -check if per index score doesn't exceed 100%
- * (0x64). If it exceed make it 100%
- *
- * @per_index_score: per_index_score as input
- *
- * Return: per_index_score within the max limit
- */
-uint32_t hdd_limit_max_per_index_score(uint32_t per_index_score);
-
-/**
  * hdd_update_score_config - API to update candidate scoring related params
  * configuration parameters
  * @score_config: score config to update
@@ -4323,6 +4342,36 @@ hdd_monitor_mode_qdf_create_event(struct hdd_adapter *adapter,
 				  uint8_t session_type)
 {
 	return QDF_STATUS_SUCCESS;
+}
+#endif
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)) && \
+     defined(WLAN_FEATURE_11AX)
+/**
+ * hdd_cleanup_conn_info() - Cleanup connectin info
+ * @adapter: Adapter upon which the command was received
+ *
+ * This function frees the memory allocated for the connection
+ * info structure
+ *
+ * Return: none
+ */
+void hdd_cleanup_conn_info(struct hdd_adapter *adapter);
+/**
+ * hdd_sta_destroy_ctx_all() - cleanup all station contexts
+ * @hdd_ctx: Global HDD context
+ *
+ * This function destroys all the station contexts
+ *
+ * Return: none
+ */
+void hdd_sta_destroy_ctx_all(struct hdd_context *hdd_ctx);
+#else
+static inline void hdd_cleanup_conn_info(struct hdd_adapter *adapter)
+{
+}
+static inline void hdd_sta_destroy_ctx_all(struct hdd_context *hdd_ctx)
+{
 }
 #endif
 

@@ -540,22 +540,6 @@ ucfg_pmo_set_wow_enable(struct wlan_objmgr_psoc *psoc,
 }
 
 bool
-ucfg_pmo_is_wowlan_deauth_enabled(struct wlan_objmgr_psoc *psoc)
-{
-	struct pmo_psoc_priv_obj *pmo_psoc_ctx = pmo_psoc_get_priv(psoc);
-
-	return pmo_psoc_ctx->psoc_cfg.wowlan_deauth_enable;
-}
-
-bool
-ucfg_pmo_is_wowlan_disassoc_enabled(struct wlan_objmgr_psoc *psoc)
-{
-	struct pmo_psoc_priv_obj *pmo_psoc_ctx = pmo_psoc_get_priv(psoc);
-
-	return pmo_psoc_ctx->psoc_cfg.wowlan_disassoc_enable;
-}
-
-bool
 ucfg_pmo_is_arp_offload_enabled(struct wlan_objmgr_psoc *psoc)
 {
 	struct pmo_psoc_priv_obj *pmo_psoc_ctx = pmo_psoc_get_priv(psoc);
@@ -713,20 +697,13 @@ ucfg_pmo_get_max_ps_poll(struct wlan_objmgr_psoc *psoc)
 uint8_t
 ucfg_pmo_power_save_offload_enabled(struct wlan_objmgr_psoc *psoc)
 {
-	uint8_t powersave_offload_enabled;
+	uint8_t powersave_offload_enabled = PMO_PS_ADVANCED_POWER_SAVE_ENABLE;
 	struct pmo_psoc_priv_obj *pmo_psoc_ctx = pmo_psoc_get_priv(psoc);
 
 	if (!pmo_psoc_ctx->psoc_cfg.max_ps_poll ||
 	    !pmo_psoc_ctx->psoc_cfg.power_save_mode)
 		powersave_offload_enabled =
 			pmo_psoc_ctx->psoc_cfg.power_save_mode;
-	else if ((pmo_psoc_ctx->psoc_cfg.power_save_mode ==
-		  PS_QPOWER_NODEEPSLEEP) ||
-		 (pmo_psoc_ctx->psoc_cfg.power_save_mode ==
-		  PS_LEGACY_NODEEPSLEEP))
-		powersave_offload_enabled = PS_LEGACY_NODEEPSLEEP;
-	else
-		powersave_offload_enabled = PS_LEGACY_DEEPSLEEP;
 
 	pmo_debug("powersave offload enabled type:%d",
 		  powersave_offload_enabled);

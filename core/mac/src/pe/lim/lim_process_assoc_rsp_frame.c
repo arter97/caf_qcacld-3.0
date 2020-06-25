@@ -156,8 +156,7 @@ void lim_update_assoc_sta_datas(struct mac_context *mac_ctx,
 	else if (assoc_rsp->vendor_vht_ie.VHTCaps.present)
 		vht_caps = &assoc_rsp->vendor_vht_ie.VHTCaps;
 
-	if ((IS_DOT11_MODE_VHT(session_entry->dot11mode)) &&
-	    ((vht_caps) && vht_caps->present)) {
+	if (session_entry->vhtCapability && (vht_caps && vht_caps->present)) {
 		sta_ds->mlmStaContext.vhtCapability =
 			vht_caps->present;
 		/*
@@ -554,6 +553,20 @@ static uint8_t lim_get_nss_supported_by_ap(tDot11fIEVHTCaps *vht_caps,
 
 	return NSS_1x1_MODE;
 }
+
+#ifdef WLAN_FEATURE_11AX
+static void lim_process_he_info(tpSirProbeRespBeacon beacon,
+				tpDphHashNode sta_ds)
+{
+	if (beacon->he_op.present)
+		sta_ds->parsed_ies.he_operation = beacon->he_op;
+}
+#else
+static inline void lim_process_he_info(tpSirProbeRespBeacon beacon,
+				       tpDphHashNode sta_ds)
+{
+}
+#endif
 
 /**
  * lim_process_assoc_rsp_frame() - Processes assoc response
@@ -1053,6 +1066,8 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx,
 		sta_ds->parsed_ies.ht_operation = beacon->HTInfo;
 	if (beacon->VHTOperation.present)
 		sta_ds->parsed_ies.vht_operation = beacon->VHTOperation;
+
+	lim_process_he_info(beacon, sta_ds);
 
 	if (mac_ctx->lim.gLimProtectionControl !=
 	    MLME_FORCE_POLICY_PROTECTION_DISABLE)

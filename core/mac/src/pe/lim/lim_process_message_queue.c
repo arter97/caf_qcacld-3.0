@@ -39,7 +39,6 @@
 #include "lim_prop_exts_utils.h"
 
 #include "lim_admit_control.h"
-#include "lim_ibss_peer_mgmt.h"
 #include "sch_api.h"
 #include "lim_ft_defs.h"
 #include "lim_session.h"
@@ -874,7 +873,7 @@ static QDF_STATUS lim_allocate_and_get_bcn(
 	tSchBeaconStruct *bcn_l = NULL;
 	cds_pkt_t *pkt_l = NULL;
 
-	pkt_l = qdf_mem_malloc(sizeof(cds_pkt_t));
+	pkt_l = qdf_mem_malloc_atomic(sizeof(cds_pkt_t));
 	if (!pkt_l)
 		return QDF_STATUS_E_FAILURE;
 
@@ -885,7 +884,7 @@ static QDF_STATUS lim_allocate_and_get_bcn(
 		goto free;
 	}
 
-	bcn_l = qdf_mem_malloc(sizeof(tSchBeaconStruct));
+	bcn_l = qdf_mem_malloc_atomic(sizeof(tSchBeaconStruct));
 	if (!bcn_l)
 		goto free;
 
@@ -1881,9 +1880,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 		/* Does not receive CNF or dummy packet */
 		lim_handle_cnf_wait_timeout(mac_ctx, (uint16_t) msg->bodyval);
 		break;
-	case SIR_LIM_CHANNEL_SWITCH_TIMEOUT:
-		lim_process_channel_switch_timeout(mac_ctx);
-		break;
 	case SIR_LIM_UPDATE_OLBC_CACHEL_TIMEOUT:
 		lim_handle_update_olbc_cache(mac_ctx);
 		break;
@@ -1933,11 +1929,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 		break;
 	case WMA_RX_CHN_STATUS_EVENT:
 		lim_process_rx_channel_status_event(mac_ctx, msg->bodyptr);
-		break;
-	case WMA_IBSS_PEER_INACTIVITY_IND:
-		lim_process_ibss_peer_inactivity(mac_ctx, msg->bodyptr);
-		qdf_mem_free((void *)(msg->bodyptr));
-		msg->bodyptr = NULL;
 		break;
 	case WMA_DFS_BEACON_TX_SUCCESS_IND:
 		lim_process_beacon_tx_success_ind(mac_ctx, msg->type,

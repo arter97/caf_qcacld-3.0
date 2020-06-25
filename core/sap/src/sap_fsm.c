@@ -666,13 +666,24 @@ sap_chan_bond_dfs_sub_chan(struct sap_context *sap_context,
 	return false;
 }
 
-uint32_t sap_select_default_oper_chan(struct sap_acs_cfg *acs_cfg)
+uint32_t sap_select_default_oper_chan(struct mac_context *mac_ctx,
+				      struct sap_acs_cfg *acs_cfg)
 {
 	uint16_t i;
 
-	if (!acs_cfg || !acs_cfg->freq_list || !acs_cfg->ch_list_count)
+	if (!acs_cfg)
 		return 0;
 
+	if (!acs_cfg->ch_list_count || !acs_cfg->freq_list) {
+		if (mac_ctx->mlme_cfg->acs.force_sap_start) {
+			sap_debug("SAP forced, freq selected %d",
+				  acs_cfg->master_freq_list[0]);
+			return acs_cfg->master_freq_list[0];
+		} else {
+			sap_debug("No channel left for operation");
+			return 0;
+		}
+	}
 	/*
 	 * There could be both 2.4Ghz and 5ghz channels present in the list
 	 * based upon the Hw mode received from hostapd, it is always better
@@ -954,7 +965,7 @@ QDF_STATUS sap_channel_sel(struct sap_context *sap_context)
 				  FL("SAP Configuring default ch, Ch_freq=%d"),
 				  sap_context->chan_freq);
 			default_op_freq = sap_select_default_oper_chan(
-						sap_context->acs_cfg);
+						mac_ctx, sap_context->acs_cfg);
 			wlansap_set_acs_ch_freq(sap_context, default_op_freq);
 
 			if (sap_context->freq_list) {
@@ -2227,14 +2238,7 @@ static QDF_STATUS sap_goto_starting(struct sap_context *sap_ctx,
 		&sap_ctx->csr_roamProfile.op_freq;
 	sap_ctx->csr_roamProfile.op_freq = sap_ctx->chan_freq;
 
-	sap_ctx->csr_roamProfile.ch_params.ch_width =
-				sap_ctx->ch_params.ch_width;
-	sap_ctx->csr_roamProfile.ch_params.center_freq_seg0 =
-			sap_ctx->ch_params.center_freq_seg0;
-	sap_ctx->csr_roamProfile.ch_params.center_freq_seg1 =
-			sap_ctx->ch_params.center_freq_seg1;
-	sap_ctx->csr_roamProfile.ch_params.sec_ch_offset =
-			sap_ctx->ch_params.sec_ch_offset;
+	sap_ctx->csr_roamProfile.ch_params = sap_ctx->ch_params;
 	sap_get_cac_dur_dfs_region(sap_ctx,
 				   &sap_ctx->csr_roamProfile.cac_duration_ms,
 				   &sap_ctx->csr_roamProfile.dfs_regdomain);
@@ -2315,31 +2319,28 @@ static QDF_STATUS sap_fsm_state_init(struct sap_context *sap_ctx,
 		 * request so, set the third to false.
 		 */
 		qdf_status = sap_validate_chan(sap_ctx, false, true);
-		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
+		if (QDF_IS_STATUS_ERROR(qdf_status)) {
 			QDF_TRACE(QDF_MODULE_ID_SAP,
 				  QDF_TRACE_LEVEL_ERROR,
 				  FL("channel is not valid!"));
 			goto exit;
 		}
 
-		/* Transition from SAP_INIT to SAP_STARTING */
-		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_HIGH,
-			  FL("new from state %s => %s: session:%d"),
-			  "SAP_INIT", "SAP_STARTING",
-			  sap_ctx->sessionId);
-
 		qdf_status = sap_goto_starting(sap_ctx, sap_event,
 					       mac_ctx, mac_handle);
-		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
-			QDF_TRACE(QDF_MODULE_ID_SAP,
-				  QDF_TRACE_LEVEL_ERROR,
-				  FL("sap_goto_starting failed"));
+		if (QDF_IS_STATUS_ERROR(qdf_status))
+			sap_err("sap_goto_starting failed");
 	} else if (msg == eSAP_DFS_CHANNEL_CAC_START) {
+		if (sap_ctx->is_chan_change_inprogress) {
+			sap_ctx->is_chan_change_inprogress = false;
+			sap_signal_hdd_event(sap_ctx,
+					     NULL,
+					     eSAP_CHANNEL_CHANGE_EVENT,
+					     (void *)eSAP_STATUS_SUCCESS);
+		}
 		qdf_status = sap_fsm_cac_start(sap_ctx, mac_ctx, mac_handle);
 	} else {
-		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
-			  FL("in state %s, event msg %d"),
-			  "SAP_INIT", msg);
+		sap_err("in state %s, event msg %d", "SAP_INIT", msg);
 	}
 
 exit:
@@ -2524,7 +2525,7 @@ static QDF_STATUS sap_fsm_state_starting(struct sap_context *sap_ctx,
 		if (sap_ctx->ch_params.ch_width == CH_WIDTH_160MHZ) {
 			is_dfs = wlan_reg_get_5g_bonded_channel_state_for_freq(
 					mac_ctx->pdev, sap_chan_freq,
-					CH_WIDTH_160MHZ);
+					CH_WIDTH_160MHZ) == CHANNEL_STATE_DFS;
 		} else if (sap_ctx->ch_params.ch_width == CH_WIDTH_80P80MHZ) {
 			if (wlan_reg_get_channel_state_for_freq(
 							mac_ctx->pdev,
@@ -2877,8 +2878,7 @@ sapconvert_to_csr_profile(struct sap_config *config, eCsrRoamBssType bssType,
 	profile->nWPAReqIELength = 0;
 
 	if (profile->pRSNReqIE) {
-		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_DEBUG,
-			  FL("pRSNReqIE already allocated."));
+		sap_debug("pRSNReqIE already allocated.");
 		qdf_mem_free(profile->pRSNReqIE);
 		profile->pRSNReqIE = NULL;
 	}
@@ -2913,7 +2913,6 @@ sapconvert_to_csr_profile(struct sap_config *config, eCsrRoamBssType bssType,
 		sap_err("Get ap UAPSD enabled/disabled failed");
 
 	profile->ApUapsdEnable = sap_uapsd;
-	sap_debug("Uapsd %d", sap_uapsd);
 	/* Enable protection parameters */
 	profile->protEnabled = ucfg_mlme_is_ap_prot_enabled(mac_ctx->psoc);
 
@@ -2924,19 +2923,15 @@ sapconvert_to_csr_profile(struct sap_config *config, eCsrRoamBssType bssType,
 		sap_err("Get ap obss protection failed");
 	profile->obssProtEnabled = ap_obss_prot;
 
-	sap_debug("ProtEnabled = %d", profile->protEnabled);
-	sap_debug("OBSSProtEnabled = %d", profile->obssProtEnabled);
-
 	qdf_status = ucfg_mlme_get_ap_protection_mode(mac_ctx->psoc, &ap_prot);
 	if (QDF_IS_STATUS_ERROR(qdf_status))
 		sap_err("Get ap protection mode failed using default value");
 	profile->cfg_protection = ap_prot;
 
-	sap_debug("cfg_protection = %d", profile->cfg_protection);
 	/* country code */
 	if (config->countryCode[0])
 		qdf_mem_copy(profile->countryCode, config->countryCode,
-			     CFG_COUNTRY_CODE_LEN);
+			     REG_ALPHA2_LEN + 1);
 	profile->ieee80211d = config->ieee80211d;
 	/* wps config info */
 	profile->wps_state = config->wps_state;
@@ -3010,7 +3005,6 @@ sapconvert_to_csr_profile(struct sap_config *config, eCsrRoamBssType bssType,
 		if (mcc_to_scc_switch != QDF_MCC_TO_SCC_SWITCH_DISABLE)
 			profile->chan_switch_hostapd_rate_enabled = false;
 	}
-	sap_debug("rate_enabled %d", profile->chan_switch_hostapd_rate_enabled);
 
 	return eSAP_STATUS_SUCCESS;
 }
@@ -3406,6 +3400,10 @@ static QDF_STATUS sap_get_freq_list(struct sap_context *sap_ctx,
 					mac_ctx->psoc,
 					WLAN_REG_CH_TO_FREQ(loop_count)))
 				continue;
+			normalize_factor =
+				MLME_GET_DFS_CHAN_WEIGHT(
+				mac_ctx->mlme_cfg->acs.np_chan_weightage);
+			freq_present_in_list = true;
 		}
 
 		/* Dont scan ETSI13 SRD channels if the ETSI13 SRD channels
