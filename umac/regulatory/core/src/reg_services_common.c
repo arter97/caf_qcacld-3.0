@@ -2558,6 +2558,30 @@ bool reg_is_6ghz_psc_chan_freq(uint16_t freq)
 	return false;
 }
 
+bool reg_is_6g_freq_indoor(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq)
+{
+	struct regulatory_channel *cur_chan_list;
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+	enum channel_enum chan_enum;
+
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
+		reg_err("reg pdev priv obj is NULL");
+		return false;
+	}
+
+	if (!REG_IS_6GHZ_FREQ(freq)) {
+		reg_debug(" Channel frequency is not a 6GHz frequency");
+		return false;
+	}
+
+	cur_chan_list = pdev_priv_obj->cur_chan_list;
+	chan_enum = reg_get_chan_enum_for_freq(freq);
+
+	return (cur_chan_list[chan_enum].chan_flags &
+		REGULATORY_CHAN_INDOOR_ONLY);
+}
+
 /**
  * BAND_6G_PRESENT() - Check if REG_BAND_6G is set in the band_mask
  * @band_mask: Bitmask for bands
