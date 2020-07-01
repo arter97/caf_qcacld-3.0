@@ -330,5 +330,14 @@ static inline void lim_fill_join_rsp_ht_caps(tpPESession session,
 #endif
 QDF_STATUS lim_update_ext_cap_ie(tpAniSirGlobal mac_ctx,
 	uint8_t *ie_data, uint8_t *local_ie_buf, uint16_t *local_ie_len);
+
+/**
+ * lim_translate_rsn_oui_to_akm_type() - translate RSN OUI to AKM type
+ * @auth_suite: auth suite
+ *
+ * Return: AKM type
+ */
+enum ani_akm_type lim_translate_rsn_oui_to_akm_type(uint8_t auth_suite[4]);
+
 /************************************************************/
 #endif /* __LIM_API_H */
