@@ -8771,13 +8771,15 @@ static int __wlan_hdd_cfg80211_wifi_logger_start(struct wiphy *wiphy,
 		return 0;
 	}
 
-	if (hdd_ctx->is_pktlog_enabled &&
-	    (start_log.verbose_level == WLAN_LOG_LEVEL_ACTIVE))
-		return 0;
+	if (start_log.ring_id == RING_ID_PER_PACKET_STATS) {
+		if (hdd_ctx->is_pktlog_enabled &&
+		    (start_log.verbose_level == WLAN_LOG_LEVEL_ACTIVE))
+			return 0;
 
-	if ((!hdd_ctx->is_pktlog_enabled) &&
-	    (start_log.verbose_level != WLAN_LOG_LEVEL_ACTIVE))
-		return 0;
+		if ((!hdd_ctx->is_pktlog_enabled) &&
+		    (start_log.verbose_level != WLAN_LOG_LEVEL_ACTIVE))
+			return 0;
+	}
 
 	mac_handle = hdd_ctx->mac_handle;
 	status = sme_wifi_start_logger(mac_handle, start_log);
@@ -8787,10 +8789,12 @@ static int __wlan_hdd_cfg80211_wifi_logger_start(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	if (start_log.verbose_level != WLAN_LOG_LEVEL_ACTIVE)
-		hdd_ctx->is_pktlog_enabled = true;
-	else
-		hdd_ctx->is_pktlog_enabled = false;
+	if (start_log.ring_id == RING_ID_PER_PACKET_STATS) {
+		if (start_log.verbose_level == WLAN_LOG_LEVEL_ACTIVE)
+			hdd_ctx->is_pktlog_enabled = true;
+		else
+			hdd_ctx->is_pktlog_enabled = false;
+	}
 
 	return 0;
 }
@@ -14715,7 +14719,7 @@ wlan_hdd_iftype_data_mem_free(struct hdd_context *hdd_ctx)
 #endif
 
 #if defined(WLAN_FEATURE_NAN) && \
-	   (KERNEL_VERSION(4, 19, 0) <= LINUX_VERSION_CODE)
+	   (KERNEL_VERSION(4, 14, 0) <= LINUX_VERSION_CODE)
 static void wlan_hdd_set_nan_if_mode(struct wiphy *wiphy)
 {
 	wiphy->interface_modes |= BIT(NL80211_IFTYPE_NAN);
@@ -23313,7 +23317,7 @@ wlan_hdd_cfg80211_external_auth(struct wiphy *wiphy,
 #endif
 
 #if defined(WLAN_FEATURE_NAN) && \
-	   (KERNEL_VERSION(4, 19, 0) <= LINUX_VERSION_CODE)
+	   (KERNEL_VERSION(4, 14, 0) <= LINUX_VERSION_CODE)
 static int
 wlan_hdd_cfg80211_start_nan(struct wiphy *wiphy, struct wireless_dev *wdev,
 			    struct cfg80211_nan_conf *conf)
@@ -23673,7 +23677,7 @@ static struct cfg80211_ops wlan_hdd_cfg80211_ops = {
 	.external_auth = wlan_hdd_cfg80211_external_auth,
 #endif
 #if defined(WLAN_FEATURE_NAN) && \
-	   (KERNEL_VERSION(4, 19, 0) <= LINUX_VERSION_CODE)
+	   (KERNEL_VERSION(4, 14, 0) <= LINUX_VERSION_CODE)
 	.start_nan = wlan_hdd_cfg80211_start_nan,
 	.stop_nan = wlan_hdd_cfg80211_stop_nan,
 	.add_nan_func = wlan_hdd_cfg80211_add_nan_func,
