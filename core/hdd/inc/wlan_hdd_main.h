@@ -1,8 +1,7 @@
 /*
- * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2018,2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
- *
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -70,6 +69,29 @@
 #else
 #define NUM_TX_QUEUES 4
 #endif
+
+/* HDD_IS_RATE_LIMIT_REQ: Macro helper to implement rate limiting
+ * @flag: The flag to determine if limiting is required or not
+ * @rate: The number of seconds within which if multiple commands come, the
+ *	  flag will be set to true
+ *
+ * If the function in which this macro is used is called multiple times within
+ * "rate" number of seconds, the "flag" will be set to true which can be used
+ * to reject/take appropriate action.
+ */
+#define HDD_IS_RATE_LIMIT_REQ(flag, rate)\
+	do {\
+		static ulong __last_ticks;\
+		ulong __ticks = jiffies;\
+		flag = false; \
+		if (!time_after(__ticks,\
+		    __last_ticks + rate * HZ)) {\
+			flag = true; \
+		} \
+		else { \
+			__last_ticks = __ticks;\
+		} \
+	} while (0)
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 7, 0)) || \
 	defined(CFG80211_REMOVE_IEEE80211_BACKPORT)
