@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017, 2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -12003,6 +12003,51 @@ enum hw_filter_mode {
 #define CFG_VHT_CAPABILITY_WEIGHTAGE_DEFAULT (5)
 #define CFG_VHT_CAPABILITY_WEIGHTAGE_MIN     (0)
 #define CFG_VHT_CAPABILITY_WEIGHTAGE_MAX     (100)
+
+/*
+ * <ini>
+ * sae_enabled - Enable/Disable SAE support in driver
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to enable/disable SAE support in driver
+ * Driver will update config to supplicant based on this config.
+ *
+ * Related: None
+ *
+ * Supported Feature: SAE
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_IS_SAE_ENABLED_NAME    "sae_enabled"
+#define CFG_IS_SAE_ENABLED_DEFAULT (1)
+#define CFG_IS_SAE_ENABLED_MIN     (0)
+#define CFG_IS_SAE_ENABLED_MAX     (1)
+
+/*
+ * <ini>
+ * enable_sae_for_sap - Enable/Disable SAE support in driver for SAP
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to enable/disable SAE support in driver for SAP mode
+ * Driver will process/drop the SAE authentication frames based on this config.
+ *
+ * Related: None
+ *
+ * Supported Feature: SAE
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_SAE_FOR_SAP_NAME    "enable_sae_for_sap"
+#define CFG_ENABLE_SAE_FOR_SAP_DEFAULT (1)
+#define CFG_ENABLE_SAE_FOR_SAP_MIN     (0)
+#define CFG_ENABLE_SAE_FOR_SAP_MAX     (1)
+
 /*
  * <ini>
  * chan_width_weightage - Channel Width Weightage to calculate best candidate
@@ -12996,6 +13041,10 @@ struct hdd_config {
 	uint8_t beamforming_cap_weightage;
 	uint8_t pcl_weightage;
 	uint8_t channel_congestion_weightage;
+#ifdef WLAN_FEATURE_SAE
+	bool is_sae_enabled;
+	bool enable_sae_for_sap;
+#endif
 	bool chan_switch_hostapd_rate_enabled;
 	bool is_unit_test_framework_enabled;
 };

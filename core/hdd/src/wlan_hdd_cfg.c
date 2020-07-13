@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017, 2020 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -5018,6 +5018,22 @@ struct reg_table_entry g_registry_table[] = {
 		CFG_CHANNEL_CONGESTION_WEIGHTAGE_MIN,
 		CFG_CHANNEL_CONGESTION_WEIGHTAGE_MAX),
 
+#ifdef WLAN_FEATURE_SAE
+	REG_VARIABLE(CFG_IS_SAE_ENABLED_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, is_sae_enabled,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_IS_SAE_ENABLED_DEFAULT,
+		CFG_IS_SAE_ENABLED_MIN,
+		CFG_IS_SAE_ENABLED_MAX),
+
+	REG_VARIABLE(CFG_ENABLE_SAE_FOR_SAP_NAME, WLAN_PARAM_Integer,
+		struct hdd_config, enable_sae_for_sap,
+		VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		CFG_ENABLE_SAE_FOR_SAP_DEFAULT,
+		CFG_ENABLE_SAE_FOR_SAP_MIN,
+		CFG_ENABLE_SAE_FOR_SAP_MAX),
+#endif
+
 	REG_VARIABLE(CFG_CHAN_SWITCH_HOSTAPD_RATE_ENABLED_NAME,
 		WLAN_PARAM_Integer,
 		struct hdd_config, chan_switch_hostapd_rate_enabled,
@@ -5906,6 +5922,30 @@ static void hdd_mawc_cfg_log(hdd_context_t *pHddCtx)
 		pHddCtx->config->mawc_roam_rssi_low_adjust);
 }
 
+#ifdef WLAN_FEATURE_SAE
+static void hdd_cfg_print_sae(hdd_context_t *hdd_ctx)
+{
+	hdd_debug("Name = [%s] value = [%u]",
+		CFG_IS_SAE_ENABLED_NAME,
+		hdd_ctx->config->is_sae_enabled);
+}
+
+static void hdd_cfg_print_sae_sap(hdd_context_t *hdd_ctx)
+{
+	hdd_debug("Name = [%s] value = [%u]",
+		CFG_ENABLE_SAE_FOR_SAP_NAME,
+		hdd_ctx->config->enable_sae_for_sap);
+}
+#else
+static void hdd_cfg_print_sae(hdd_context_t *hdd_ctx)
+{
+}
+
+static void hdd_cfg_print_sae_sap(hdd_context_t *hdd_ctx)
+{
+}
+#endif
+
 /**
  * hdd_cfg_print() - print the hdd configuration
  * @iniTable: pointer to hdd context
@@ -6720,6 +6760,8 @@ void hdd_cfg_print(hdd_context_t *pHddCtx)
 	hdd_debug("Name = [%s] value = [%u]",
 		CFG_CHANNEL_CONGESTION_WEIGHTAGE_NAME,
 		pHddCtx->config->channel_congestion_weightage);
+	hdd_cfg_print_sae(pHddCtx);
+	hdd_cfg_print_sae_sap(pHddCtx);
 	hdd_debug("Name = [%s] value = [%u]",
 		CFG_DOT11P_MODE_NAME,
 		pHddCtx->config->dot11p_mode);
