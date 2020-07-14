@@ -20827,7 +20827,7 @@ QDF_STATUS hdd_softap_deauth_current_sta(struct hdd_adapter *adapter,
 
 	qdf_event_reset(&hapd_state->qdf_sta_disassoc_event);
 
-	if (!qdf_is_macaddr_broadcast(&sta_info->sta_mac))
+	if (!qdf_is_macaddr_broadcast(&param->peerMacAddr))
 		sme_send_disassoc_req_frame(hdd_ctx->mac_handle,
 					    adapter->vdev_id,
 					    (uint8_t *)&param->peerMacAddr,
@@ -20902,6 +20902,9 @@ QDF_STATUS hdd_softap_deauth_all_sta(struct hdd_adapter *adapter,
 		if (!sta_info->is_deauth_in_progress) {
 			hdd_debug("Delete STA with MAC:" QDF_MAC_ADDR_STR,
 				  QDF_MAC_ADDR_ARRAY(sta_info->sta_mac.bytes));
+			qdf_mem_copy(param->peerMacAddr.bytes,
+				     sta_info->sta_mac.bytes,
+				     QDF_MAC_ADDR_SIZE);
 			status =
 			    hdd_softap_deauth_current_sta(adapter, sta_info,
 							  hapd_state, param);
