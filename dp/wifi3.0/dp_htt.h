@@ -124,6 +124,10 @@ int htt_wbm_event_record(struct htt_logger *h, uint8_t tx_status,
 #define HTT_GET_STATS_CMN_INDEX(index) \
 	HTT_PPDU_STATS_COMMON_TLV_##index##_OFFSET
 
+#define MAX_SCHED_STARVE 100000
+#define WRAP_DROP_TSF_DELTA 10000
+#define MAX_TSF_32 0xFFFFFFFF
+
 struct dp_htt_htc_pkt {
 	void *soc_ctxt;
 	qdf_dma_addr_t nbuf_paddr;

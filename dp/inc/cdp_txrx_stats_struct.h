@@ -1338,6 +1338,7 @@ struct cdp_htt_rx_pdev_stats {
  * @tx_ppdu_proc: stats counter for tx ppdu processed
  * @ack_ba_comes_twice: stats counter for ack_ba_comes twice
  * @ppdu_drop: stats counter for ppdu_desc drop once threshold reached
+ * @ppdu_wrap_drop: stats counter for ppdu desc drop on wrap around
  */
 struct cdp_pdev_stats {
 	struct {
@@ -1399,8 +1400,9 @@ struct cdp_pdev_stats {
 	} ul_ofdma;
 
 	uint64_t tx_ppdu_proc;
-	uint32_t ack_ba_comes_twice;
-	uint32_t ppdu_drop;
+	uint64_t ack_ba_comes_twice;
+	uint64_t ppdu_drop;
+	uint64_t ppdu_wrap_drop;
 };
 
 #ifdef QCA_ENH_V3_STATS_SUPPORT
