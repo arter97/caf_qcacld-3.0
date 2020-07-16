@@ -1679,14 +1679,14 @@ QDF_STATUS lim_populate_peer_rate_set(struct mac_context *mac,
 				      uint8_t basicOnly,
 				      struct pe_session *pe_session,
 				      tDot11fIEVHTCaps *pVHTCaps,
-				      tDot11fIEhe_cap *he_caps)
+				      tDot11fIEhe_cap *he_caps,
+				      struct bss_description *bss_desc)
 {
 	tSirMacRateSet tempRateSet;
 	tSirMacRateSet tempRateSet2;
 	uint32_t i, j, val, min, isArate = 0;
 	qdf_size_t val_len;
 	tDot11fIEhe_cap *peer_he_caps;
-	struct bss_description *bssDescription;
 	tSchBeaconStruct *pBeaconStruct = NULL;
 
 	/* copy operational rate set from pe_session */
@@ -1817,18 +1817,17 @@ QDF_STATUS lim_populate_peer_rate_set(struct mac_context *mac,
 	if (lim_check_valid_mcs_for_nss(pe_session, he_caps)) {
 		peer_he_caps = he_caps;
 	} else {
-		bssDescription = &pe_session->lim_join_req->bssDescription;
-		if (!bssDescription) {
+		if (!bss_desc) {
 			pe_err("bssDescription is NULL");
 			return QDF_STATUS_E_INVAL;
 		}
 		pBeaconStruct = qdf_mem_malloc(sizeof(tSchBeaconStruct));
 		if (!pBeaconStruct)
 			return QDF_STATUS_E_NOMEM;
-		lim_extract_ap_capabilities(mac,
-				(uint8_t *)bssDescription->ieFields,
-				lim_get_ielen_from_bss_description(
-					bssDescription),
+
+		lim_extract_ap_capabilities(
+				mac, (uint8_t *)bss_desc->ieFields,
+				lim_get_ielen_from_bss_description(bss_desc),
 				pBeaconStruct);
 		peer_he_caps = &pBeaconStruct->he_cap;
 	}
@@ -4026,10 +4025,15 @@ QDF_STATUS lim_sta_send_add_bss_pre_assoc(struct mac_context *mac, uint8_t updat
 	tDot11fIEVHTOperation *vht_oper = NULL;
 	tDot11fIEVHTCaps *vht_caps = NULL;
 	uint32_t listen_interval = MLME_CFG_LISTEN_INTERVAL;
-	struct bss_description *bssDescription =
-		&pe_session->lim_join_req->bssDescription;
+	struct bss_description *bssDescription = NULL;
 	struct mlme_vht_capabilities_info *vht_cap_info;
 
+	if (!pe_session->lim_join_req) {
+		pe_err("Lim Join request is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	bssDescription = &pe_session->lim_join_req->bssDescription;
 	vht_cap_info = &mac->mlme_cfg->vht_caps.vht_cap_info;
 
 	pBeaconStruct = qdf_mem_malloc(sizeof(tSchBeaconStruct));
@@ -4336,7 +4340,8 @@ QDF_STATUS lim_sta_send_add_bss_pre_assoc(struct mac_context *mac, uint8_t updat
 			pBeaconStruct->HTCaps.supportedMCSSet,
 			false, pe_session,
 			&pBeaconStruct->VHTCaps,
-			&pBeaconStruct->he_cap);
+			&pBeaconStruct->he_cap,
+			bssDescription);
 
 	pAddBssParams->staContext.encryptType = pe_session->encryptType;
 
