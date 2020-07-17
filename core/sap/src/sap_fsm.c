@@ -699,6 +699,7 @@ uint8_t sap_select_default_oper_chan(struct mac_context *mac_ctx,
 				     struct sap_acs_cfg *acs_cfg)
 {
 	uint16_t i;
+	uint8_t chan0 = 0, chan1 = 0, chan2 = 0, default_chan;
 
 	if (!acs_cfg)
 		return 0;
@@ -721,19 +722,36 @@ uint8_t sap_select_default_oper_chan(struct mac_context *mac_ctx,
 	 * rare in 2.4ghz band, so 5ghz should be preferred. If we get a 5Ghz
 	 * chan in the acs cfg ch list , we should go for that first else the
 	 * default channel can be 2.4ghz.
+	 * Add check regulatory channel state before select the channel.
 	 */
 
 	for (i = 0; i < acs_cfg->ch_list_count; i++) {
-		if (WLAN_CHAN_IS_5GHZ(acs_cfg->ch_list[i])) {
-			sap_debug("default channel chosen as %d",
-				  acs_cfg->ch_list[i]);
-			return acs_cfg->ch_list[i];
+		enum channel_state state =
+			wlan_reg_get_channel_state(
+					mac_ctx->pdev, acs_cfg->ch_list[i]);
+		if (!chan0 && state == CHANNEL_STATE_ENABLE &&
+		    WLAN_CHAN_IS_5GHZ(acs_cfg->ch_list[i])) {
+			chan0 = acs_cfg->ch_list[i];
+			break;
+		} else if (!chan1 && state == CHANNEL_STATE_DFS &&
+			   WLAN_CHAN_IS_5GHZ(acs_cfg->ch_list[i])) {
+			chan1 = acs_cfg->ch_list[i];
+		} else if (!chan2 && state == CHANNEL_STATE_ENABLE) {
+			chan2 = acs_cfg->ch_list[i];
 		}
 	}
+	default_chan = chan0;
+	if (!default_chan)
+		default_chan = chan1;
+	if (!default_chan)
+		default_chan = chan2;
+	if (!default_chan)
+		default_chan = acs_cfg->ch_list[0];
 
-	sap_debug("default channel chosen as %d", acs_cfg->ch_list[0]);
+	sap_debug("default chan %d chosen from %d %d %d %d", default_chan,
+		  chan0, chan1, chan2, acs_cfg->ch_list[0]);
 
-	return acs_cfg->ch_list[0];
+	return default_chan;
 }
 
 QDF_STATUS

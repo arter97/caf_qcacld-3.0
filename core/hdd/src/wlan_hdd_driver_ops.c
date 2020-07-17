@@ -743,12 +743,6 @@ static void hdd_send_hang_reason(void)
  */
 static void hdd_psoc_shutdown_notify(struct hdd_context *hdd_ctx)
 {
-	/* Notify external threads currently waiting on firmware by forcefully
-	 * completing waiting events with a "reset" status. This will cause the
-	 * event to fail early instead of timing out.
-	 */
-	qdf_complete_wait_events();
-
 	wlan_cfg80211_cleanup_scan_queue(hdd_ctx->pdev, NULL);
 
 	if (ucfg_ipa_is_enabled()) {
