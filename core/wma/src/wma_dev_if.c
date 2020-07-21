@@ -1288,8 +1288,8 @@ static void wma_handle_hidden_ssid_restart(tp_wma_handle wma,
 				      hidden_ssid_restart);
 }
 
-static void wma_sap_peer_send_phymode(struct wlan_objmgr_vdev *vdev,
-				      void *object, void *arg)
+static void wma_peer_send_phymode(struct wlan_objmgr_vdev *vdev,
+				  void *object, void *arg)
 {
 	struct wlan_objmgr_peer *peer = object;
 	enum wlan_phymode old_peer_phymode;
@@ -1343,16 +1343,16 @@ static void wma_sap_peer_send_phymode(struct wlan_objmgr_vdev *vdev,
 	wma_set_peer_param(wma, peer_mac_addr, WMI_PEER_CHWIDTH,
 			   max_ch_width_supported, vdev_id);
 
-	wma_debug("old phymode %d new phymode %d bw %d macaddr "QDF_MAC_ADDR_STR,
-		  old_peer_phymode, new_phymode, max_ch_width_supported,
+	wma_debug("FW phymode %d old phymode %d new phymode %d bw %d macaddr "QDF_MAC_ADDR_STR,
+		  fw_phymode, old_peer_phymode, new_phymode, max_ch_width_supported,
 		  QDF_MAC_ADDR_ARRAY(peer_mac_addr));
 }
 
 static void
-wma_update_peer_phymode_sap(struct wlan_objmgr_vdev *vdev)
+wma_update_peer_phymode(struct wlan_objmgr_vdev *vdev)
 {
 	wlan_objmgr_iterate_peerobj_list(vdev,
-					 wma_sap_peer_send_phymode,
+					 wma_peer_send_phymode,
 					 NULL,
 					 WLAN_LEGACY_WMA_ID);
 }
@@ -1407,29 +1407,16 @@ wma_handle_channel_switch_resp(tp_wma_handle wma,
 	if (QDF_IS_STATUS_SUCCESS(resp_event->status) &&
 	    iface->type == WMI_VDEV_TYPE_AP &&
 	    resp_event->resp_type == WMI_VDEV_RESTART_RESP_EVENT)
-		wma_update_peer_phymode_sap(iface->vdev);
+		wma_update_peer_phymode(iface->vdev);
 
 	if ((QDF_IS_STATUS_SUCCESS(resp_event->status) &&
 	     (resp_event->resp_type == WMI_VDEV_RESTART_RESP_EVENT) &&
 	     ((iface->type == WMI_VDEV_TYPE_STA) ||
 	      (iface->type == WMI_VDEV_TYPE_MONITOR))) ||
 	    ((resp_event->resp_type == WMI_VDEV_START_RESP_EVENT) &&
-	     (iface->type == WMI_VDEV_TYPE_MONITOR))) {
-		wmi_host_channel_width chanwidth;
-		int err;
+	     (iface->type == WMI_VDEV_TYPE_MONITOR)))
+		wma_update_peer_phymode(iface->vdev);
 
-		/* for CSA case firmware expects phymode before ch_wd */
-		err = wma_set_peer_param(wma, iface->bssid,
-					 WMI_PEER_PHYMODE, iface->chanmode,
-					resp_event->vdev_id);
-		chanwidth = wmi_get_ch_width_from_phy_mode(wma->wmi_handle,
-							   iface->chanmode);
-		err = wma_set_peer_param(wma, iface->bssid, WMI_PEER_CHWIDTH,
-					 chanwidth, resp_event->vdev_id);
-		wma_debug("vdev_id %d chanwidth %d chanmode %d",
-			  resp_event->vdev_id, chanwidth,
-			  iface->chanmode);
-	}
 
 	if (wma_is_vdev_in_ap_mode(wma, resp_event->vdev_id) ||
 	    mlme_is_chan_switch_in_progress(iface->vdev))
