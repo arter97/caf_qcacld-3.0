@@ -81,6 +81,10 @@
 #include "wlan_spectral_public_structs.h"
 #endif /* WLAN_CONV_SPECTRAL_ENABLE */
 
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+#include <wlan_cm_roam_public_srtuct.h>
+#endif
+
 #define WMI_UNIFIED_MAX_EVENT 0x100
 
 #ifdef WMI_EXT_DBG
@@ -326,6 +330,17 @@ struct wmi_wq_dbg_info {
 };
 
 struct wmi_ops {
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+QDF_STATUS
+(*extract_roam_btm_response_stats)(wmi_unified_t wmi_handle, void *evt_buf,
+				   struct roam_btm_response_data *dst,
+				   uint8_t idx);
+
+QDF_STATUS
+(*extract_roam_initial_info)(wmi_unified_t wmi_handle, void *evt_buf,
+			     struct roam_initial_data *dst, uint8_t idx);
+#endif
+
 QDF_STATUS (*send_vdev_create_cmd)(wmi_unified_t wmi_handle,
 				 uint8_t macaddr[QDF_MAC_ADDR_SIZE],
 				 struct vdev_create_params *param);
@@ -602,8 +617,15 @@ QDF_STATUS (*send_set_rssi_monitoring_cmd)(wmi_unified_t wmi_handle,
 					struct rssi_monitor_param *req);
 #endif /* FEATURE_RSSI_MONITOR */
 
-QDF_STATUS (*send_roam_scan_offload_rssi_thresh_cmd)(wmi_unified_t wmi_handle,
+#ifdef ROAM_OFFLOAD_V1
+QDF_STATUS (*send_roam_scan_offload_rssi_thresh_cmd)(
+			wmi_unified_t wmi_handle,
+			struct wlan_roam_offload_scan_rssi_params *roam_req);
+#else
+QDF_STATUS (*send_roam_scan_offload_rssi_thresh_cmd)(
+				wmi_unified_t wmi_handle,
 				struct roam_offload_scan_rssi_params *roam_req);
+#endif
 
 QDF_STATUS (*send_roam_mawc_params_cmd)(wmi_unified_t wmi_handle,
 		struct wmi_mawc_roam_params *params);
@@ -686,6 +708,9 @@ QDF_STATUS (*send_process_roam_synch_complete_cmd)(wmi_unified_t wmi_handle,
 QDF_STATUS (*send_roam_invoke_cmd)(wmi_unified_t wmi_handle,
 		struct wmi_roam_invoke_cmd *roaminvoke,
 		uint32_t ch_hz);
+
+QDF_STATUS (*send_set_roam_trigger_cmd)(wmi_unified_t wmi_handle,
+					struct wlan_roam_triggers *triggers);
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
 #endif /* WMI_ROAM_SUPPORT */
 
@@ -2257,10 +2282,6 @@ QDF_STATUS (*extract_oem_response_param)
 
 QDF_STATUS (*extract_hw_mode_resp_event)(wmi_unified_t wmi_handle,
 					 void *evt_buf, uint32_t *cmd_status);
-
-QDF_STATUS (*send_set_roam_trigger_cmd)(wmi_unified_t wmi_handle,
-					uint32_t vdev_id,
-					uint32_t trigger_bitmap);
 
 #ifdef WLAN_FEATURE_ELNA
 QDF_STATUS (*send_set_elna_bypass_cmd)(wmi_unified_t wmi_handle,

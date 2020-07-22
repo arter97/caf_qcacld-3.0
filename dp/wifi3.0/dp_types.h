@@ -1583,6 +1583,8 @@ struct dp_pdev {
 	/* Empty ring used by firmware to post rx buffers to the MAC */
 	struct dp_srng rx_mac_buf_ring[MAX_RX_MAC_RINGS];
 
+	int ch_band_lmac_id_mapping[REG_BAND_UNKNOWN];
+
 	/* wlan_cfg pdev ctxt*/
 	 struct wlan_cfg_dp_pdev_ctxt *wlan_cfg_ctx;
 
@@ -1986,9 +1988,6 @@ struct dp_vdev {
 
 	/* Handle to the OS shim SW's virtual device */
 	ol_osif_vdev_handle osif_vdev;
-
-	/* Handle to the UMAC handle */
-	struct cdp_ctrl_objmgr_vdev *ctrl_vdev;
 
 	/* MAC address */
 	union dp_align_mac_addr mac_addr;

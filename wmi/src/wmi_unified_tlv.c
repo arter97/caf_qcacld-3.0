@@ -327,6 +327,7 @@ static const uint32_t pdev_param_tlv[] = {
 			WMI_PDEV_PARAM_ENABLE_FW_DYNAMIC_HE_EDCA,
 	[wmi_pdev_param_enable_srp] = WMI_PDEV_PARAM_ENABLE_SRP,
 	[wmi_pdev_param_enable_sr_prohibit] = WMI_PDEV_PARAM_ENABLE_SR_PROHIBIT,
+	[wmi_pdev_param_sr_trigger_margin] = WMI_PDEV_PARAM_SR_TRIGGER_MARGIN,
 };
 
 /**
@@ -15256,7 +15257,8 @@ static void populate_tlv_service(uint32_t *wmi_service)
 			WMI_SERVICE_DUAL_STA_ROAM_SUPPORT;
 	wmi_service[wmi_service_peer_create_conf] =
 			WMI_SERVICE_PEER_CREATE_CONF;
-
+	wmi_service[wmi_service_configure_roam_trigger_param_support] =
+			WMI_SERVICE_CONFIGURE_ROAM_TRIGGER_PARAM_SUPPORT;
 }
 
 /**
