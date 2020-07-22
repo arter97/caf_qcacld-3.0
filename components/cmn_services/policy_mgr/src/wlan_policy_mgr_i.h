@@ -223,15 +223,6 @@ extern enum policy_mgr_conc_next_action
 	(struct wlan_objmgr_psoc *psoc);
 
 /**
- * struct sta_ap_intf_check_work_ctx - sta_ap_intf_check_work
- * related info
- * @psoc: pointer to PSOC object information
- */
-struct sta_ap_intf_check_work_ctx {
-	struct wlan_objmgr_psoc *psoc;
-};
-
-/**
  * struct policy_mgr_cfg - all the policy manager owned configs
  * @mcc_to_scc_switch: switch to indicate MCC to SCC config
  * @sys_pref: system's preference while selecting PCLs
@@ -556,7 +547,8 @@ void policy_mgr_pdev_set_hw_mode_cb(uint32_t status,
 				struct policy_mgr_vdev_mac_map *vdev_mac_map,
 				uint8_t next_action,
 				enum policy_mgr_conn_update_reason reason,
-				uint32_t session_id, void *context);
+				uint32_t session_id, void *context,
+				uint32_t request_id);
 void policy_mgr_dump_current_concurrency(struct wlan_objmgr_psoc *psoc);
 
 /**

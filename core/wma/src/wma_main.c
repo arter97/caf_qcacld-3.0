@@ -83,8 +83,10 @@
 #include <wlan_pmo_ucfg_api.h>
 #include "wifi_pos_api.h"
 #include "hif_main.h"
+#ifdef WLAN_CONV_SPECTRAL_ENABLE
 #include <target_if_spectral.h>
 #include <wlan_spectral_utils_api.h>
+#endif
 #include "init_event_handler.h"
 #include "init_deinit_lmac.h"
 #include "target_if_green_ap.h"
@@ -101,14 +103,13 @@
 #include "wlan_policy_mgr_i.h"
 #include "target_if_psoc_timer_tx_ops.h"
 #include <ftm_time_sync_ucfg_api.h>
+#include "wlan_ipa_ucfg_api.h"
 
 #ifdef DIRECT_BUF_RX_ENABLE
 #include <target_if_direct_buf_rx_api.h>
 #endif
 
-#ifdef WLAN_FEATURE_PKT_CAPTURE
 #include "wlan_pkt_capture_ucfg_api.h"
-#endif
 
 #define WMA_LOG_COMPLETION_TIMER 3000 /* 3 seconds */
 #define WMI_TLV_HEADROOM 128
@@ -185,6 +186,11 @@ struct wma_ini_config *wma_get_ini_handle(tp_wma_handle wma)
 
 #define MAX_SUPPORTED_PEERS_REV1_1 14
 #define MAX_SUPPORTED_PEERS_REV1_3 32
+#ifdef WLAN_MAX_CLIENTS_ALLOWED
+#define MAX_SUPPORTED_PEERS WLAN_MAX_CLIENTS_ALLOWED
+#else
+#define MAX_SUPPORTED_PEERS 32
+#endif
 #define MIN_NO_OF_PEERS 1
 
 /**
@@ -232,7 +238,7 @@ static void wma_set_ipa_disable_config(
 static void wma_set_ipa_disable_config(
 					target_resource_config *tgt_cfg)
 {
-	tgt_cfg->ipa_disable = false;
+	tgt_cfg->ipa_disable = ucfg_ipa_is_enabled() ? false : true;
 }
 #endif
 
@@ -341,8 +347,14 @@ static void wma_set_default_tgt_config(tp_wma_handle wma_handle,
 	tgt_cfg->mgmt_comp_evt_bundle_support = true;
 	tgt_cfg->tx_msdu_new_partition_id_support = true;
 
+	cfg_nan_get_max_ndi(wma_handle->psoc,
+			    &tgt_cfg->max_ndi);
+
 	if (cds_get_conparam() == QDF_GLOBAL_MONITOR_MODE)
 		tgt_cfg->rx_decap_mode = CFG_TGT_RX_DECAP_MODE_RAW;
+
+	cfg_nan_get_ndp_max_sessions(wma_handle->psoc,
+				     &tgt_cfg->max_ndp_sessions);
 
 	wma_set_ipa_disable_config(tgt_cfg);
 }
@@ -481,6 +493,18 @@ int wma_cli_get_command(int vdev_id, int param_id, int vpdev)
 			break;
 		case GEN_VDEV_ROAM_SYNCH_DELAY:
 			ret = intr[vdev_id].roam_synch_delay;
+			break;
+		case GEN_VDEV_PARAM_TX_AMPDU:
+			ret = intr[vdev_id].config.tx_ampdu;
+			break;
+		case GEN_VDEV_PARAM_RX_AMPDU:
+			ret = intr[vdev_id].config.rx_ampdu;
+			break;
+		case GEN_VDEV_PARAM_TX_AMSDU:
+			ret = intr[vdev_id].config.tx_amsdu;
+			break;
+		case GEN_VDEV_PARAM_RX_AMSDU:
+			ret = intr[vdev_id].config.rx_amsdu;
 			break;
 		default:
 			WMA_LOGE("Invalid generic vdev command/Not yet implemented 0x%x",
@@ -772,79 +796,6 @@ static int32_t wma_set_priv_cfg(tp_wma_handle wma_handle,
 						     adapter_1_quota,
 						     adapter_2_chan_number);
 	}
-		break;
-	case WMA_VDEV_IBSS_SET_ATIM_WINDOW_SIZE:
-	{
-		wma_handle->wma_ibss_power_save_params.atimWindowLength =
-							privcmd->param_value;
-		WMA_LOGD("%s: IBSS power save ATIM Window = %d",
-			 __func__, wma_handle->wma_ibss_power_save_params.
-			 atimWindowLength);
-	}
-		break;
-	case WMA_VDEV_IBSS_SET_POWER_SAVE_ALLOWED:
-	{
-		wma_handle->wma_ibss_power_save_params.isPowerSaveAllowed =
-							privcmd->param_value;
-		WMA_LOGD("%s: IBSS is Power Save Allowed = %d",
-			 __func__, wma_handle->wma_ibss_power_save_params.
-			 isPowerSaveAllowed);
-	}
-		break;
-	case WMA_VDEV_IBSS_SET_POWER_COLLAPSE_ALLOWED:
-	{
-		wma_handle->wma_ibss_power_save_params.	isPowerCollapseAllowed =
-							 privcmd->param_value;
-		WMA_LOGD("%s: IBSS is Power Collapse Allowed = %d",
-			 __func__, wma_handle->wma_ibss_power_save_params.
-			 isPowerCollapseAllowed);
-	}
-		break;
-	case WMA_VDEV_IBSS_SET_AWAKE_ON_TX_RX:
-	{
-		wma_handle->wma_ibss_power_save_params.isAwakeonTxRxEnabled =
-							 privcmd->param_value;
-		WMA_LOGD("%s: IBSS Power Save Awake on Tx/Rx Enabled = %d",
-			__func__, wma_handle->wma_ibss_power_save_params.
-			isAwakeonTxRxEnabled);
-	}
-		break;
-	case WMA_VDEV_IBSS_SET_INACTIVITY_TIME:
-	{
-		wma_handle->wma_ibss_power_save_params.inactivityCount =
-							privcmd->param_value;
-		WMA_LOGD("%s: IBSS Power Save Data Inactivity Count = %d",
-			__func__, wma_handle->wma_ibss_power_save_params.
-			inactivityCount);
-	}
-		break;
-	case WMA_VDEV_IBSS_SET_TXSP_END_INACTIVITY_TIME:
-	{
-		wma_handle->wma_ibss_power_save_params.txSPEndInactivityTime =
-							 privcmd->param_value;
-		WMA_LOGD("%s: IBSS Power Save Transmit EOSP inactivity time out = %d",
-			__func__, wma_handle->wma_ibss_power_save_params.
-			txSPEndInactivityTime);
-	}
-		break;
-	case WMA_VDEV_IBSS_PS_SET_WARMUP_TIME_SECS:
-	{
-		wma_handle->wma_ibss_power_save_params.ibssPsWarmupTime =
-							privcmd->param_value;
-		WMA_LOGD("%s: IBSS Power Save Warm Up Time in Seconds = %d",
-			__func__, wma_handle->wma_ibss_power_save_params.
-			ibssPsWarmupTime);
-	}
-		break;
-	case WMA_VDEV_IBSS_PS_SET_1RX_CHAIN_IN_ATIM_WINDOW:
-	{
-		wma_handle->wma_ibss_power_save_params.ibssPs1RxChainInAtimEnable
-							 = privcmd->param_value;
-		WMA_LOGD("%s: IBSS Power Save single RX Chain Enable In ATIM  = %d",
-			__func__, wma_handle->wma_ibss_power_save_params.
-			ibssPs1RxChainInAtimEnable);
-	}
-		break;
 
 	default:
 		WMA_LOGE("Invalid wma config command id:%d", privcmd->param_id);
@@ -1533,15 +1484,17 @@ QDF_STATUS wma_process_hal_pwr_dbg_cmd(WMA_HANDLE handle,
 	return status;
 }
 
-static void wma_discard_fw_event(struct scheduler_msg *msg)
+static QDF_STATUS wma_discard_fw_event(struct scheduler_msg *msg)
 {
 	if (!msg->bodyptr)
-		return;
+		return QDF_STATUS_E_INVAL;
 
 	qdf_mem_free(msg->bodyptr);
 	msg->bodyptr = NULL;
 	msg->bodyval = 0;
 	msg->type = 0;
+
+	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS
@@ -1668,17 +1621,28 @@ static uint8_t wma_init_max_no_of_peers(tp_wma_handle wma_handle,
 	struct hif_opaque_softc *scn = cds_get_context(QDF_MODULE_ID_HIF);
 	uint32_t tgt_version = hif_get_target_info_handle(scn)->target_version;
 	uint8_t max_no_of_peers;
-	uint8_t max_supported_peers = (tgt_version == AR6320_REV1_1_VERSION) ?
-			MAX_SUPPORTED_PEERS_REV1_1 : MAX_SUPPORTED_PEERS_REV1_3;
+	uint8_t max_supported_peers;
 
 	if (!cfg) {
 		WMA_LOGE("%s: NULL WMA ini handle", __func__);
 		return 0;
 	}
 
+	switch (tgt_version) {
+	case AR6320_REV1_1_VERSION:
+		max_supported_peers = MAX_SUPPORTED_PEERS_REV1_1;
+		break;
+	case AR6320_REV1_3_VERSION:
+		max_supported_peers = MAX_SUPPORTED_PEERS_REV1_3;
+		break;
+	default:
+		max_supported_peers = MAX_SUPPORTED_PEERS;
+		break;
+	}
 	max_no_of_peers = (max_peers > max_supported_peers) ?
 				max_supported_peers : max_peers;
 	cfg->max_no_of_peers = max_no_of_peers;
+
 	return max_no_of_peers;
 }
 
@@ -1959,22 +1923,6 @@ static void wma_target_if_open(tp_wma_handle wma_handle)
 		wma_register_tx_ops_handler);
 	wlan_global_lmac_if_open(psoc);
 
-}
-
-/**
- * wma_target_if_close() - Detach UMAC modules' interface with wmi layer
- * @wma_handle: wma handle
- *
- * Return: None
- */
-static void wma_target_if_close(tp_wma_handle wma_handle)
-{
-	struct wlan_objmgr_psoc *psoc = wma_handle->psoc;
-
-	if (!psoc)
-		return;
-
-	wlan_global_lmac_if_close(psoc);
 }
 
 /**
@@ -3988,13 +3936,13 @@ static void wma_send_time_stamp_sync_cmd(void *data)
 #ifdef WLAN_CONV_SPECTRAL_ENABLE
 static void wma_register_spectral_cmds(tp_wma_handle wma_handle)
 {
-	struct wmi_spectral_cmd_ops cmd_ops;
+	struct spectral_wmi_ops cmd_ops;
 
 	cmd_ops.wmi_spectral_configure_cmd_send =
 			wmi_unified_vdev_spectral_configure_cmd_send;
 	cmd_ops.wmi_spectral_enable_cmd_send =
 			wmi_unified_vdev_spectral_enable_cmd_send;
-	wlan_register_wmi_spectral_cmd_ops(wma_handle->pdev, &cmd_ops);
+	wlan_register_spectral_wmi_ops(wma_handle->psoc, &cmd_ops);
 }
 #else
 static void wma_register_spectral_cmds(tp_wma_handle wma_handle)
@@ -4142,34 +4090,6 @@ QDF_STATUS wma_start(void)
 	if (cds_get_conparam() == QDF_GLOBAL_FTM_MODE)
 		goto end;
 #endif /* QCA_WIFI_FTM */
-
-	if (wmi_service_enabled(wmi_handle, wmi_service_rmc)) {
-
-		WMA_LOGD("FW supports cesium network, registering event handlers");
-
-		status = wmi_unified_register_event_handler(
-					wmi_handle,
-					wmi_peer_info_event_id,
-					wma_ibss_peer_info_event_handler,
-					WMA_RX_SERIALIZER_CTX);
-		if (status) {
-			WMA_LOGE("Failed to register ibss peer info event cb");
-			qdf_status = QDF_STATUS_E_FAILURE;
-			goto end;
-		}
-		status = wmi_unified_register_event_handler(
-					wmi_handle,
-					wmi_peer_tx_fail_cnt_thr_event_id,
-					wma_fast_tx_fail_event_handler,
-					WMA_RX_SERIALIZER_CTX);
-		if (status) {
-			WMA_LOGE("Failed to register peer fast tx failure event cb");
-			qdf_status = QDF_STATUS_E_FAILURE;
-			goto end;
-		}
-	} else {
-		WMA_LOGD("Target does not support cesium network");
-	}
 
 	qdf_status = wma_tx_attach(wma_handle);
 	if (qdf_status != QDF_STATUS_SUCCESS) {
@@ -4545,7 +4465,6 @@ QDF_STATUS wma_close(void)
 
 	wlan_objmgr_psoc_release_ref(wma_handle->psoc, WLAN_LEGACY_WMA_ID);
 	wma_handle->psoc = NULL;
-	wma_target_if_close(wma_handle);
 
 	WMA_LOGD("%s: Exit", __func__);
 	return QDF_STATUS_SUCCESS;
@@ -5715,6 +5634,10 @@ static void wma_set_mlme_caps(struct wlan_objmgr_psoc *psoc)
 	if (tgt_cap)
 		akm_bitmap |= (1 << AKM_SAE);
 
+	tgt_cap = wmi_service_enabled(wma->wmi_handle,
+				      wmi_service_suiteb_roam_support);
+	if (tgt_cap)
+		akm_bitmap |= (1 << AKM_SUITEB);
 
 	status = mlme_set_tgt_wpa3_roam_cap(psoc, akm_bitmap);
 	if (QDF_IS_STATUS_ERROR(status))
@@ -6506,6 +6429,12 @@ static QDF_STATUS wma_update_hw_mode_list(t_wma_handle *wma_handle,
 	num_hw_modes = target_psoc_get_num_hw_modes(tgt_hdl);
 	mac_phy_cap = target_psoc_get_mac_phy_cap(tgt_hdl);
 	tgt_cap_info = target_psoc_get_target_caps(tgt_hdl);
+
+	if (!mac_phy_cap) {
+		WMA_LOGE("mac_phy_cap Null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	/*
 	 * This list was updated as part of service ready event. Re-populate
 	 * HW mode list from the device capabilities.
@@ -6825,6 +6754,13 @@ int wma_rx_service_ready_ext_event(void *handle, uint8_t *event,
 		wlan_res_cfg->num_vdevs--;
 		wma_update_num_peers_tids(wma_handle, wlan_res_cfg);
 	}
+
+	if (ucfg_pkt_capture_get_mode(wma_handle->psoc) &&
+	    wmi_service_enabled(wmi_handle,
+				wmi_service_packet_capture_support))
+		wlan_res_cfg->pktcapture_support = true;
+	else
+		wlan_res_cfg->pktcapture_support = false;
 
 	WMA_LOGD("%s: num_vdevs: %u", __func__, wlan_res_cfg->num_vdevs);
 
@@ -7310,25 +7246,6 @@ void wma_send_flush_logs_to_fw(tp_wma_handle wma_handle)
 				    WMA_LOG_COMPLETION_TIMER);
 	if (QDF_IS_STATUS_ERROR(status))
 		WMA_LOGE("Failed to start the log completion timer");
-}
-
-/**
- * wma_update_wep_default_key - To update default key id
- * @wma: pointer to wma handler
- * @update_def_key: pointer to wep_update_default_key_idx
- *
- * This function makes a copy of default key index to txrx node
- *
- * Return: Success
- */
-static QDF_STATUS wma_update_wep_default_key(tp_wma_handle wma,
-			struct wep_update_default_key_idx *update_def_key)
-{
-	struct wma_txrx_node *iface =
-		&wma->interfaces[update_def_key->session_id];
-	iface->wep_default_key_idx = update_def_key->default_idx;
-
-	return QDF_STATUS_SUCCESS;
 }
 
 /**
@@ -8613,31 +8530,6 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 		wma_process_dhcp_ind(wma_handle, (tAniDHCPInd *) msg->bodyptr);
 		qdf_mem_free(msg->bodyptr);
 		break;
-
-	case WMA_IBSS_CESIUM_ENABLE_IND:
-		wma_process_cesium_enable_ind(wma_handle);
-		break;
-	case WMA_GET_IBSS_PEER_INFO_REQ:
-		wma_process_get_peer_info_req(wma_handle,
-					      (tSirIbssGetPeerInfoReqParams *)
-					      msg->bodyptr);
-		qdf_mem_free(msg->bodyptr);
-		break;
-	case WMA_TX_FAIL_MONITOR_IND:
-		wma_process_tx_fail_monitor_ind(wma_handle,
-				(tAniTXFailMonitorInd *) msg->bodyptr);
-		qdf_mem_free(msg->bodyptr);
-		break;
-
-	case WMA_RMC_ENABLE_IND:
-		wma_process_rmc_enable_ind(wma_handle);
-		break;
-	case WMA_RMC_DISABLE_IND:
-		wma_process_rmc_disable_ind(wma_handle);
-		break;
-	case WMA_RMC_ACTION_PERIOD_IND:
-		wma_process_rmc_action_period_ind(wma_handle);
-		break;
 	case WMA_INIT_THERMAL_INFO_CMD:
 		wma_process_init_thermal_info(wma_handle,
 					      (t_thermal_mgmt *) msg->bodyptr);
@@ -8928,11 +8820,6 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 	case SIR_HAL_POWER_DBG_CMD:
 		wma_process_hal_pwr_dbg_cmd(wma_handle,
 					    msg->bodyptr);
-		qdf_mem_free(msg->bodyptr);
-		break;
-	case WMA_UPDATE_WEP_DEFAULT_KEY:
-		wma_update_wep_default_key(wma_handle,
-			(struct wep_update_default_key_idx *)msg->bodyptr);
 		qdf_mem_free(msg->bodyptr);
 		break;
 	case WMA_SEND_FREQ_RANGE_CONTROL_IND:

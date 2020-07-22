@@ -341,15 +341,8 @@ nan_increment_ndp_sessions(struct wlan_objmgr_psoc *psoc,
 		wlan_objmgr_peer_release_ref(peer, WLAN_NAN_ID);
 		return QDF_STATUS_E_NULL_VALUE;
 	}
-
 	qdf_spin_lock_bh(&peer_nan_obj->lock);
-	if (peer_nan_obj->active_ndp_sessions == MAX_NDP_INSTANCES_PER_PEER) {
-		qdf_spin_unlock_bh(&peer_nan_obj->lock);
-		nan_err("Already reached Max limit(%d) for NDP's per peer!",
-			MAX_NDP_INSTANCES_PER_PEER);
-		wlan_objmgr_peer_release_ref(peer, WLAN_NAN_ID);
-		return QDF_STATUS_E_FAILURE;
-	}
+
 	/*
 	 * Store the first channel info in NDP Confirm as the home channel info
 	 * and store it in the peer private object.
@@ -602,7 +595,8 @@ static QDF_STATUS nan_handle_confirm(
 
 			status = policy_mgr_current_connections_update(
 				psoc, vdev_id, wlan_chan_to_freq(channel),
-				POLICY_MGR_UPDATE_REASON_NDP_UPDATE);
+				POLICY_MGR_UPDATE_REASON_NDP_UPDATE,
+				POLICY_MGR_DEF_REQ_ID);
 			if (QDF_STATUS_E_FAILURE == status) {
 				nan_err("connections update failed!!");
 				return status;
@@ -1266,13 +1260,13 @@ static QDF_STATUS nan_discovery_generic_req(struct nan_generic_req *req)
 	return tx_ops->nan_discovery_req_tx(req, NAN_GENERIC_REQ);
 }
 
-void nan_discovery_flush_callback(struct scheduler_msg *msg)
+QDF_STATUS nan_discovery_flush_callback(struct scheduler_msg *msg)
 {
 	struct wlan_objmgr_psoc *psoc;
 
 	if (!msg || !msg->bodyptr) {
 		nan_err("Null pointer for NAN Discovery message");
-		return;
+		return QDF_STATUS_E_INVAL;
 	}
 
 	switch (msg->type) {
@@ -1288,11 +1282,13 @@ void nan_discovery_flush_callback(struct scheduler_msg *msg)
 	default:
 		nan_err("Unsupported request type: %d", msg->type);
 		qdf_mem_free(msg->bodyptr);
-		return;
+		return QDF_STATUS_E_INVAL;
 	}
 
 	wlan_objmgr_psoc_release_ref(psoc, WLAN_NAN_ID);
 	qdf_mem_free(msg->bodyptr);
+
+	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS nan_discovery_scheduled_handler(struct scheduler_msg *msg)

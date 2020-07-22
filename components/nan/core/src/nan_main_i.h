@@ -58,9 +58,6 @@ struct scheduler_msg;
 #define nan_nofl_debug(params...) \
 	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_NAN, params)
 
-/* Maximum number of NDP instances supported on each NAN Peer */
-#define MAX_NDP_INSTANCES_PER_PEER 2
-
 /**
  * enum nan_disc_state - NAN Discovery states
  * @NAN_DISC_DISABLED: NAN Discovery is disabled
@@ -86,6 +83,8 @@ enum nan_disc_state {
  * wait to kickout peer if peer is not reachable
  * @support_mp0_discovery: To support discovery of NAN cluster with Master
  * Preference (MP) as 0 when a new device is enabling NAN
+ * @max_ndp_sessions: max ndp sessions host supports
+ * @max_ndi: max number of ndi host supports
  */
 struct nan_cfg_params {
 	bool enable;
@@ -95,6 +94,8 @@ struct nan_cfg_params {
 	bool nan_separate_iface_support;
 	uint16_t ndp_keep_alive_period;
 	bool support_mp0_discovery;
+	uint32_t max_ndp_sessions;
+	uint32_t max_ndi;
 };
 
 /**
@@ -189,9 +190,9 @@ QDF_STATUS nan_scheduled_msg_handler(struct scheduler_msg *msg);
  * nan_discovery_flush_callback: callback to flush the NAN scheduler msg
  * @msg: pointer to msg
  *
- * Return: None
+ * Return: QDF_STATUS
  */
-void nan_discovery_flush_callback(struct scheduler_msg *msg);
+QDF_STATUS nan_discovery_flush_callback(struct scheduler_msg *msg);
 
 /**
  * nan_discovery_scheduled_handler: callback pointer to be called when scheduler

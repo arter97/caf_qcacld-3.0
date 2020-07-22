@@ -25,9 +25,10 @@ CONFIG_QCA_CLD_WLAN_PROFILE ?= $(WLAN_PROFILE)
 
 ifeq ($(KERNEL_BUILD), n)
 ifneq ($(ANDROID_BUILD_TOP),)
-      override WLAN_ROOT := $(ANDROID_BUILD_TOP)/$(WLAN_ROOT)
-      override WLAN_COMMON_INC := $(ANDROID_BUILD_TOP)/$(WLAN_COMMON_INC)
-      override WLAN_FW_API := $(ANDROID_BUILD_TOP)/$(WLAN_FW_API)
+      ANDROID_BUILD_TOP_REL := $(shell python -c "import os.path; print(os.path.relpath('$(ANDROID_BUILD_TOP)'))")
+      override WLAN_ROOT := $(ANDROID_BUILD_TOP_REL)/$(WLAN_ROOT)
+      override WLAN_COMMON_INC := $(ANDROID_BUILD_TOP_REL)/$(WLAN_COMMON_INC)
+      override WLAN_FW_API := $(ANDROID_BUILD_TOP_REL)/$(WLAN_FW_API)
 endif
 endif
 
@@ -114,7 +115,6 @@ ifeq ($(CONFIG_WLAN_FEATURE_MIB_STATS), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_debugfs_mibstat.o
 endif
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_debugfs_csr.o
-HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_debugfs_connect.o
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_debugfs_offload.o
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_debugfs_roam.o
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_debugfs_config.o
@@ -260,11 +260,17 @@ endif
 
 ifeq ($(CONFIG_WLAN_SYSFS), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs.o
+ifeq ($(CONFIG_WLAN_SYSFS_GET_CHANNEL), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_get_channel.o
+endif
 ifeq ($(CONFIG_WLAN_SET_FW_MODE_CFG), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_set_fw_mode_cfg.o
 endif
 ifeq ($(CONFIG_WLAN_REASSOC), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_reassoc.o
+endif
+ifeq ($(CONFIG_WLAN_SYSFS_GET_STA_INFO), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_get_sta_info.o
 endif
 ifeq ($(CONFIG_WLAN_DEBUG_CRASH_INJECT), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_crash_inject.o
@@ -272,7 +278,96 @@ endif
 ifeq ($(CONFIG_FEATURE_UNIT_TEST_SUSPEND), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_suspend_resume.o
 endif
+ifeq ($(CONFIG_WLAN_SYSFS_MEM_STATS), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_mem_stats.o
+endif
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_unit_test.o
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_modify_acl.o
+ifeq ($(CONFIG_WLAN_SYSFS_CONNECT_INFO), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_connect_info.o
+endif
+ifeq ($(CONFIG_WLAN_SCAN_DISABLE), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_scan_disable.o
+endif
+ifeq ($(CONFIG_WLAN_SYSFS_DCM), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_dcm.o
+endif
+ifeq ($(CONFIG_WLAN_WOW_ITO), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_wow_ito.o
+endif
+ifeq ($(CONFIG_WLAN_WOWL_ADD_PTRN), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_wowl_add_ptrn.o
+endif
+ifeq ($(CONFIG_WLAN_WOWL_DEL_PTRN), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_wowl_del_ptrn.o
+endif
+ifeq ($(CONFIG_WLAN_GET_TX_STBC), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_get_tx_stbc.o
+endif
+ifeq ($(CONFIG_WLAN_GET_STATS), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_get_stats.o
+endif
+ifeq ($(CONFIG_WLAN_SET_SCAN_CFG), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_set_scan_cfg.o
+endif
+ifeq ($(CONFIG_WLAN_SET_MON_CHAN), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_set_mon_chan.o
+endif
+ifeq ($(CONFIG_WLAN_SET_RANGE_EXT), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_set_range_ext.o
+endif
+ifeq ($(CONFIG_WLAN_SET_RADAR), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_set_radar.o
+endif
+ifeq ($(CONFIG_WLAN_SYSFS_RTS_CTS), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_rts_cts.o
+endif
+ifeq ($(CONFIG_WLAN_SYSFS_HE_BSS_COLOR), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_he_bss_color.o
+endif
+ifeq ($(CONFIG_WLAN_TXRX_FW_STATS), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_txrx_fw_stats.o
+endif
+ifeq ($(CONFIG_WLAN_TXRX_STATS), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_txrx_stats.o
+endif
+ifeq ($(CONFIG_WLAN_SYSFS_DP_TRACE), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_dp_trace.o
+endif
+ifeq ($(CONFIG_WLAN_SYSFS_STATS), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_stats.o
+endif
+ifeq ($(CONFIG_WLAN_GET_RANGE_EXT), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_get_range_ext.o
+endif
+ifeq ($(CONFIG_WLAN_GET_TDLS_PEERS), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_get_tdls_peers.o
+endif
+ifeq ($(CONFIG_WLAN_GET_TEMP), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_get_temp.o
+endif
+ifeq ($(CONFIG_WLAN_THERMAL_CFG), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_thermal_cfg.o
+endif
+ifeq ($(CONFIG_FEATURE_MOTION_DETECTION), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_motion_detection.o
+endif
+ifeq ($(CONFIG_WLAN_SET_WLAN_DBG), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_set_wlan_dbg.o
+endif
+ifeq ($(CONFIG_WLAN_TXRX_FW_ST_RST), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_txrx_fw_st_rst.o
+endif
+ifeq ($(CONFIG_WLAN_GTX_BW_MASK), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_gtx_bw_mask.o
+endif
+ifeq ($(CONFIG_IPA_OFFLOAD), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_ipa.o
+endif
+ifeq ($(CONFIG_REMOVE_PKT_LOG), n)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_pktlog.o
+endif
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_policy_mgr.o
 endif
 
 ifeq ($(CONFIG_QCACLD_FEATURE_FW_STATE), y)
@@ -429,10 +524,6 @@ MAC_LIM_OBJS := $(MAC_SRC_DIR)/pe/lim/lim_aid_mgmt.o \
 		$(MAC_SRC_DIR)/pe/lim/lim_timer_utils.o \
 		$(MAC_SRC_DIR)/pe/lim/lim_trace.o \
 		$(MAC_SRC_DIR)/pe/lim/lim_utils.o
-
-ifeq ($(CONFIG_QCA_IBSS_SUPPORT), y)
-MAC_LIM_OBJS += $(MAC_SRC_DIR)/pe/lim/lim_ibss_peer_mgmt.o
-endif
 
 ifeq ($(CONFIG_QCOM_TDLS), y)
 MAC_LIM_OBJS += $(MAC_SRC_DIR)/pe/lim/lim_process_tdls.o
@@ -644,6 +735,7 @@ QDF_OBJS := \
 	$(QDF_LINUX_OBJ_DIR)/qdf_delayed_work.o \
 	$(QDF_LINUX_OBJ_DIR)/qdf_event.o \
 	$(QDF_LINUX_OBJ_DIR)/qdf_file.o \
+	$(QDF_LINUX_OBJ_DIR)/qdf_func_tracker.o \
 	$(QDF_LINUX_OBJ_DIR)/qdf_idr.o \
 	$(QDF_LINUX_OBJ_DIR)/qdf_list.o \
 	$(QDF_LINUX_OBJ_DIR)/qdf_lock.o \
@@ -1122,10 +1214,10 @@ PKT_CAPTURE_INC := -I$(WLAN_ROOT)/$(PKT_CAPTURE_DIR)/core/inc \
 ifeq ($(CONFIG_WLAN_FEATURE_PKT_CAPTURE), y)
 PKT_CAPTURE_OBJS := $(PKT_CAPTURE_DIR)/core/src/wlan_pkt_capture_main.o \
 		$(PKT_CAPTURE_DIR)/core/src/wlan_pkt_capture_mon_thread.o \
-		$(PKT_CAPTURE_DIR)/dispatcher/src/wlan_pkt_capture_ucfg_api.o \
 		$(PKT_CAPTURE_DIR)/core/src/wlan_pkt_capture_mgmt_txrx.o \
 		$(PKT_CAPTURE_DIR)/core/src/wlan_pkt_capture_data_txrx.o \
 		$(PKT_CAPTURE_DIR)/dispatcher/src/wlan_pkt_capture_ucfg_api.o \
+		$(PKT_CAPTURE_DIR)/dispatcher/src/wlan_pkt_capture_tgt_api.o \
 		$(PKT_CAPTURE_TARGET_IF_DIR)/src/target_if_pkt_capture.o
 endif
 
@@ -2245,7 +2337,9 @@ endif
 
 ifeq ($(CONFIG_LITHIUM), y)
 OBJS += 	$(HAL_OBJS)
+ifeq ($(CONFIG_WDI_EVENT_ENABLE), y)
 OBJS += 	$(TXRX_DIR)/ol_txrx_event.o
+endif
 endif
 
 ifeq ($(CONFIG_FEATURE_FW_LOG_PARSING), y)
@@ -2501,8 +2595,32 @@ cppflags-$(CONFIG_UNIT_TEST) += -DWLAN_UNIT_TEST
 cppflags-$(CONFIG_WLAN_DEBUG_CRASH_INJECT) += -DCONFIG_WLAN_DEBUG_CRASH_INJECT
 cppflags-$(CONFIG_WLAN_SET_FW_MODE_CFG) += -DCONFIG_WLAN_SET_FW_MODE_CFG
 cppflags-$(CONFIG_WLAN_REASSOC) += -DCONFIG_WLAN_REASSOC
+cppflags-$(CONFIG_WLAN_SCAN_DISABLE) += -DCONFIG_WLAN_SCAN_DISABLE
+cppflags-$(CONFIG_WLAN_WOW_ITO) += -DCONFIG_WLAN_WOW_ITO
+cppflags-$(CONFIG_WLAN_WOWL_ADD_PTRN) += -DCONFIG_WLAN_WOWL_ADD_PTRN
+cppflags-$(CONFIG_WLAN_WOWL_DEL_PTRN) += -DCONFIG_WLAN_WOWL_DEL_PTRN
+cppflags-$(CONFIG_WLAN_GET_TX_STBC) += -DCONFIG_WLAN_GET_TX_STBC
+cppflags-$(CONFIG_WLAN_GET_STATS) += -DCONFIG_WLAN_GET_STATS
+cppflags-$(CONFIG_WLAN_SET_WLAN_DBG) += -DCONFIG_WLAN_SET_WLAN_DBG
+cppflags-$(CONFIG_WLAN_TXRX_FW_ST_RST) += -DCONFIG_WLAN_TXRX_FW_ST_RST
+cppflags-$(CONFIG_WLAN_GTX_BW_MASK) += -DCONFIG_WLAN_GTX_BW_MASK
+cppflags-$(CONFIG_WLAN_SET_SCAN_CFG) += -DCONFIG_WLAN_SET_SCAN_CFG
+cppflags-$(CONFIG_WLAN_SET_MON_CHAN) += -DCONFIG_WLAN_SET_MON_CHAN
+cppflags-$(CONFIG_WLAN_SET_RADAR) += -DCONFIG_WLAN_SET_RADAR
+cppflags-$(CONFIG_WLAN_SYSFS_RTS_CTS) += -DWLAN_SYSFS_RTS_CTS
+cppflags-$(CONFIG_WLAN_TXRX_FW_STATS) += -DCONFIG_WLAN_TXRX_FW_STATS
+cppflags-$(CONFIG_WLAN_TXRX_STATS) += -DCONFIG_WLAN_TXRX_STATS
+cppflags-$(CONFIG_WLAN_SYSFS_DP_TRACE) += -DWLAN_SYSFS_DP_TRACE
+cppflags-$(CONFIG_WLAN_SYSFS_STATS) += -DWLAN_SYSFS_STATS
+cppflags-$(CONFIG_WLAN_GET_RANGE_EXT) += -DCONFIG_WLAN_GET_RANGE_EXT
+cppflags-$(CONFIG_WLAN_GET_TEMP) += -DCONFIG_WLAN_GET_TEMP
+cppflags-$(CONFIG_WLAN_THERMAL_CFG) += -DCONFIG_WLAN_THERMAL_CFG
 cppflags-$(CONFIG_FEATURE_UNIT_TEST_SUSPEND) += -DWLAN_SUSPEND_RESUME_TEST
 cppflags-$(CONFIG_FEATURE_WLM_STATS) += -DFEATURE_WLM_STATS
+cppflags-$(CONFIG_WLAN_SYSFS_MEM_STATS) += -DCONFIG_WLAN_SYSFS_MEM_STATS
+cppflags-$(CONFIG_WLAN_SYSFS_DCM) += -DWLAN_SYSFS_DCM
+cppflags-$(CONFIG_WLAN_SYSFS_HE_BSS_COLOR) += -DWLAN_SYSFS_HE_BSS_COLOR
+cppflags-$(CONFIG_WLAN_SYSFS_GET_STA_INFO) += -DWLAN_SYSFS_GET_STA_INFO
 
 ifeq ($(CONFIG_LEAK_DETECTION), y)
 cppflags-y += \
@@ -2530,6 +2648,8 @@ endif
 
 #normally, TDLS negative behavior is not needed
 cppflags-$(CONFIG_QCOM_TDLS) += -DFEATURE_WLAN_TDLS
+cppflags-$(CONFIG_WLAN_GET_TDLS_PEERS) += -DWLAN_GET_TDLS_PEERS
+cppflags-$(CONFIG_WLAN_SET_RANGE_EXT) += -DWLAN_SET_RANGE_EXT
 
 cppflags-$(CONFIG_QCACLD_WLAN_LFR3) += -DWLAN_FEATURE_ROAM_OFFLOAD
 
@@ -2602,17 +2722,15 @@ cppflags-$(CONFIG_FEATURE_STATS_EXT) += -DWLAN_FEATURE_STATS_EXT
 cppflags-$(CONFIG_QCACLD_FEATURE_NAN) += -DWLAN_FEATURE_NAN
 cppflags-$(CONFIG_NDP_SAP_CONCURRENCY_ENABLE) += -DNDP_SAP_CONCURRENCY_ENABLE
 
-ifeq ($(CONFIG_QCA_IBSS_SUPPORT), y)
-cppflags-$(CONFIG_QCA_IBSS_SUPPORT) += -DQCA_IBSS_SUPPORT
-endif
-
 ifeq ($(CONFIG_DFS_FCC_TYPE4_DURATION_CHECK), y)
 cppflags-$(CONFIG_DFS_FCC_TYPE4_DURATION_CHECK) += -DDFS_FCC_TYPE4_DURATION_CHECK
 endif
 
 cppflags-$(CONFIG_WLAN_SYSFS) += -DWLAN_SYSFS
-cppflags-$(CONFIG_FEATURE_WLAN_RMC) += -DFEATURE_WLAN_RMC
+cppflags-$(CONFIG_WLAN_SYSFS_GET_CHANNEL) += -DWLAN_SYSFS_GET_CHANNEL
 cppflags-$(CONFIG_FEATURE_BECN_STATS) += -DWLAN_FEATURE_BEACON_RECEPTION_STATS
+
+cppflags-$(CONFIG_WLAN_SYSFS_CONNECT_INFO) += -DWLAN_SYSFS_CONNECT_INFO
 
 #Set RX_PERFORMANCE
 cppflags-$(CONFIG_RX_PERFORMANCE) += -DRX_PERFORMANCE
@@ -2984,6 +3102,9 @@ cppflags-y += -DENABLE_HAL_SOC_STATS
 cppflags-y += -DENABLE_HAL_REG_WR_HISTORY
 endif
 
+# Enable Low latency optimisation mode
+cppflags-$(CONFIG_WLAN_FEATURE_LL_MODE) += -DWLAN_FEATURE_LL_MODE
+
 cppflags-$(CONFIG_WLAN_CLD_PM_QOS) += -DCLD_PM_QOS
 cppflags-$(CONFIG_REO_DESC_DEFER_FREE) += -DREO_DESC_DEFER_FREE
 cppflags-$(CONFIG_WLAN_FEATURE_11AX) += -DWLAN_FEATURE_11AX
@@ -2999,7 +3120,6 @@ cppflags-$(CONFIG_LITHIUM) += -DPEER_PROTECTED_ACCESS
 cppflags-$(CONFIG_LITHIUM) += -DSERIALIZE_QUEUE_SETUP
 cppflags-$(CONFIG_LITHIUM) += -DDP_RX_PKT_NO_PEER_DELIVER
 cppflags-$(CONFIG_LITHIUM) += -DFEATURE_ALIGN_STATS_FROM_DP
-cppflags-$(CONFIG_LITHIUM) += -DDROP_RXDMA_DECRYPT_ERR
 cppflags-$(CONFIG_LITHIUM) += -DDP_RX_SPECIAL_FRAME_NEED
 cppflags-$(CONFIG_LITHIUM) += -DFEATURE_STATS_EXT_V2
 cppflags-$(CONFIG_VERBOSE_DEBUG) += -DENABLE_VERBOSE_DEBUG
@@ -3082,6 +3202,8 @@ cppflags-$(CONFIG_ENABLE_SMMU_S1_TRANSLATION) += -DENABLE_SMMU_S1_TRANSLATION
 
 #Flag to enable/disable MTRACE feature
 cppflags-$(CONFIG_ENABLE_MTRACE_LOG) += -DENABLE_MTRACE_LOG
+
+cppflags-$(CONFIG_FUNC_CALL_MAP) += -DFUNC_CALL_MAP
 
 #Flag to enable/disable Adaptive 11r feature
 cppflags-$(CONFIG_ADAPTIVE_11R) += -DWLAN_ADAPTIVE_11R
@@ -3331,6 +3453,9 @@ cppflags-y += -DTGT_IF_VDEV_MGR_CONV
 cppflags-y += -DCONFIG_CHAN_NUM_API
 cppflags-y += -DCONFIG_CHAN_FREQ_API
 
+#Flag to enable/disable MCC specific feature regarding unallowed phymodes
+cppflags-y += -DCHECK_REG_PHYMODE
+
 cppflags-$(CONFIG_BAND_6GHZ) += -DCONFIG_BAND_6GHZ
 cppflags-$(CONFIG_6G_SCAN_CHAN_SORT_ALGO) += -DFEATURE_6G_SCAN_CHAN_SORT_ALGO
 
@@ -3354,6 +3479,10 @@ cppflags-$(CONFIG_WLAN_SEND_DSCP_UP_MAP_TO_FW) += -DWLAN_SEND_DSCP_UP_MAP_TO_FW
 
 cppflags-$(CONFIG_SMMU_S1_UNMAP) += -DCONFIG_SMMU_S1_UNMAP
 cppflags-$(CONFIG_HIF_CPU_PERF_AFFINE_MASK) += -DHIF_CPU_PERF_AFFINE_MASK
+
+ifdef CONFIG_MAX_CLIENTS_ALLOWED
+ccflags-y += -DWLAN_MAX_CLIENTS_ALLOWED=$(CONFIG_MAX_CLIENTS_ALLOWED)
+endif
 
 KBUILD_CPPFLAGS += $(cppflags-y)
 

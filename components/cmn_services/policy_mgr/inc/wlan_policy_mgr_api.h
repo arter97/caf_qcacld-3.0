@@ -502,6 +502,8 @@ bool policy_mgr_check_for_session_conc(struct wlan_objmgr_psoc *psoc,
  * @session_id: Session ID
  * @ch_freq: Channel frequency
  * @reason: reason for connection update
+ * @request_id: Request id provided by the requester, can be used while
+ * calling callback to the requester
  *
  * This routine will handle STA side concurrency when policy manager
  * is enabled.
@@ -511,7 +513,8 @@ bool policy_mgr_check_for_session_conc(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 policy_mgr_handle_conc_multiport(struct wlan_objmgr_psoc *psoc,
 				 uint8_t session_id, uint32_t ch_freq,
-				 enum policy_mgr_conn_update_reason reason);
+				 enum policy_mgr_conn_update_reason reason,
+				 uint32_t request_id);
 
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 /**
@@ -966,6 +969,8 @@ QDF_STATUS policy_mgr_decr_connection_count(struct wlan_objmgr_psoc *psoc,
  * @session_id: Session id
  * @ch_freq: Channel frequency on which new connection will be
  * @reason: Reason for which connection update is required
+ * @request_id: Request id provided by the requester, can be used while
+ * calling callback to the requester
  *
  * This function initiates initiates actions
  * needed on current connections once channel has been decided
@@ -976,7 +981,8 @@ QDF_STATUS policy_mgr_decr_connection_count(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 policy_mgr_current_connections_update(struct wlan_objmgr_psoc *psoc,
 				      uint32_t session_id, uint32_t ch_freq,
-				      enum policy_mgr_conn_update_reason);
+				      enum policy_mgr_conn_update_reason,
+				      uint32_t request_id);
 
 /**
  * policy_mgr_is_dbs_allowed_for_concurrency() - If dbs is allowed for current
@@ -1017,19 +1023,6 @@ policy_mgr_get_preferred_dbs_action_table(
 	uint32_t vdev_id,
 	uint32_t ch_freq,
 	enum policy_mgr_conn_update_reason reason);
-
-/**
- * policy_mgr_is_ibss_conn_exist() - to check if IBSS connection already present
- * @psoc: PSOC object information
- * @ibss_ch_freq: pointer to ibss channel which needs to be filled
- *
- * this routine will check if IBSS connection already exist or no. If it
- * exist then this routine will return true and fill the ibss_channel value.
- *
- * Return: true if ibss connection exist else false
- */
-bool policy_mgr_is_ibss_conn_exist(struct wlan_objmgr_psoc *psoc,
-				   uint32_t *ibss_ch_freq);
 
 /**
  * policy_mgr_get_conn_info() - get the current connections list
@@ -1238,6 +1231,9 @@ QDF_STATUS policy_mgr_check_n_start_opportunistic_timer(
  *		HW mode change
  * @action: action to be applied before hw mode change
  *
+ * @request_id: Request id provided by the requester, can be used while
+ * calling callback to the requester
+ *
  * Sends the set hw mode request to FW
  *
  * e.g.: To configure 2x2_80
@@ -1284,7 +1280,8 @@ QDF_STATUS policy_mgr_pdev_set_hw_mode(struct wlan_objmgr_psoc *psoc,
 		enum hw_mode_agile_dfs_capab dfs,
 		enum hw_mode_sbs_capab sbs,
 		enum policy_mgr_conn_update_reason reason,
-		uint8_t next_action, enum policy_mgr_conc_next_action action);
+		uint8_t next_action, enum policy_mgr_conc_next_action action,
+		uint32_t request_id);
 
 /**
  * policy_mgr_pdev_set_hw_mode_cback() - callback invoked by
@@ -1298,6 +1295,8 @@ QDF_STATUS policy_mgr_pdev_set_hw_mode(struct wlan_objmgr_psoc *psoc,
  * @reason: Reason for set HW mode
  * @session_id: vdev id on which the request was made
  * @context: PSOC object information
+ * @request_id: Request id provided by the requester, can be used while
+ * calling callback to the requester
  *
  * This function is the callback registered with SME at set HW
  * mode request time
@@ -1310,7 +1309,8 @@ typedef void (*policy_mgr_pdev_set_hw_mode_cback)(uint32_t status,
 				struct policy_mgr_vdev_mac_map *vdev_mac_map,
 				uint8_t next_action,
 				enum policy_mgr_conn_update_reason reason,
-				uint32_t session_id, void *context);
+				uint32_t session_id, void *context,
+				uint32_t request_id);
 
 /**
  * policy_mgr_nss_update_cback() - callback invoked by other
@@ -1495,6 +1495,8 @@ enum policy_mgr_conc_next_action policy_mgr_need_opportunistic_upgrade(
  * @session_id: Session id
  * @action: action to be executed
  * @reason: Reason for connection update
+ * @request_id: Request id provided by the requester, can be used while
+ * calling callback to the requester
  *
  * This function initiates initiates actions
  * needed on current connections once channel has been decided
@@ -1505,7 +1507,8 @@ enum policy_mgr_conc_next_action policy_mgr_need_opportunistic_upgrade(
 QDF_STATUS policy_mgr_next_actions(struct wlan_objmgr_psoc *psoc,
 		uint32_t session_id,
 		enum policy_mgr_conc_next_action action,
-		enum policy_mgr_conn_update_reason reason);
+		enum policy_mgr_conn_update_reason reason,
+		uint32_t request_id);
 
 /**
  * policy_mgr_validate_dbs_switch() - Check DBS action valid or not

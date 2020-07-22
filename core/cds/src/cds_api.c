@@ -555,9 +555,11 @@ static int cds_hang_event_notifier_call(struct notifier_block *block,
 
 	cmd->recovery_reason = gp_cds_context->recovery_reason;
 
-	qdf_mem_copy(&cmd->driver_version, QWLAN_VERSIONSTR, 11);
+	qdf_mem_copy(&cmd->driver_version, QWLAN_VERSIONSTR,
+		     sizeof(QWLAN_VERSIONSTR));
 
-	qdf_mem_copy(&cmd->hang_event_version, QDF_HANG_EVENT_VERSION, 3);
+	qdf_mem_copy(&cmd->hang_event_version, QDF_HANG_EVENT_VERSION,
+		     sizeof(QDF_HANG_EVENT_VERSION));
 
 	cds_hang_data->offset += total_len;
 	return NOTIFY_OK;
@@ -1904,7 +1906,9 @@ static void cds_trigger_recovery_handler(const char *func, const uint32_t line)
 	}
 
 	cds_set_recovery_in_progress(true);
+	cds_set_assert_target_in_progress(true);
 	cds_force_assert_target(qdf);
+	cds_set_assert_target_in_progress(false);
 
 	status = qdf_runtime_pm_allow_suspend(&rtl);
 	if (QDF_IS_STATUS_ERROR(status))
