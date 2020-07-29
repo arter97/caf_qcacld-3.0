@@ -27,6 +27,24 @@
 #define MON_BUF_MIN_ENTRIES 64
 
 /*
+ * dp_mon_reap_status - monitor status ring ppdu status
+ *
+ * dp_mon_status_no_dma - DMA not done for status ring entry
+ * dp_mon_status_match - status and dest ppdu id mathes
+ * dp_mon_status_lag - status ppdu id is lagging
+ * dp_mon_status_lead - status ppdu id is leading
+ * dp_mon_status_replenish - status ring entry is NULL
+ * dp_mon_status_skip - skip status ring entry
+ */
+enum dp_mon_reap_status {
+	dp_mon_status_no_dma,
+	dp_mon_status_match,
+	dp_mon_status_lag,
+	dp_mon_status_lead,
+	dp_mon_status_replenish
+};
+
+/*
  * dp_rx_mon_status_process() - Process monitor status ring and
  *			TLV in status ring.
  *
@@ -79,6 +97,9 @@ void dp_rx_pdev_mon_status_buffers_free(struct dp_pdev *pdev, uint32_t mac_id);
 QDF_STATUS
 dp_rx_pdev_mon_buf_buffers_alloc(struct dp_pdev *pdev, uint32_t mac_id,
 				 bool delayed_replenish);
+enum dp_mon_reap_status
+dp_rx_mon_handle_status_buf_done(struct dp_pdev *pdev,
+				 void *mon_status_srng);
 
 #ifdef QCA_SUPPORT_FULL_MON
 
@@ -432,4 +453,5 @@ dp_rx_mon_init_dbg_ppdu_stats(struct hal_rx_ppdu_info *ppdu_info,
 }
 
 #endif
+
 #endif
