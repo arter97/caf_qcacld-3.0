@@ -762,6 +762,11 @@ enum {
 	IEEE80211_PARAM_OCE_IP_SUBNET_ID           = 697, /* IP subnet identifier value to be advertised as OCE attribute in Beacon and  Probe response frame */
 	IEEE80211_PARAM_OCE_ADD_ESS_RPT            = 698, /* Add ESS Report */
 	IEEE80211_PARAM_RSNX_OVERRIDE              = 700,
+	IEEE80211_PARAM_HE_ER_SU_ENABLE            = 701,
+	IEEE80211_PARAM_HE_1024QAM_LT242RU_RX_ENABLE = 702,
+	IEEE80211_PARAM_HE_UL_MU_DATA_DIS_RX_SUPP  = 703,
+	IEEE80211_PARAM_HE_FULL_BW_UL_MUMIMO       = 704,
+	IEEE80211_PARAM_HE_DCM_MAX_CONSTELLATION_RX = 705,
 };
 
 enum {
@@ -2151,6 +2156,16 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"me_adddeny",          35835, SET_PARAM, 1},
 	{"hbrparams",           35838, SET_PARAM, 1},
 	{"rxtimeout",           35839, SET_PARAM, 1},
+	{"he_er_su_supp",       IEEE80211_PARAM_HE_ER_SU_ENABLE, SET_PARAM, 1},
+	{"get_he_er_su_supp",   IEEE80211_PARAM_HE_ER_SU_ENABLE, GET_PARAM, 0},
+	{"he_1024qam_lt242ru_rx",       IEEE80211_PARAM_HE_1024QAM_LT242RU_RX_ENABLE, SET_PARAM, 1},
+	{"g_he_1024qam_lt242ru_rx",     IEEE80211_PARAM_HE_1024QAM_LT242RU_RX_ENABLE, GET_PARAM, 0},
+	{"he_ul_mu_data_dis_rx",        IEEE80211_PARAM_HE_UL_MU_DATA_DIS_RX_SUPP, SET_PARAM, 1},
+	{"g_he_ul_mu_data_dis_rx",      IEEE80211_PARAM_HE_UL_MU_DATA_DIS_RX_SUPP, GET_PARAM, 0},
+	{"he_full_bw_ulmumimo",         IEEE80211_PARAM_HE_FULL_BW_UL_MUMIMO, SET_PARAM, 1},
+	{"get_he_full_bw_ulmumimo",     IEEE80211_PARAM_HE_FULL_BW_UL_MUMIMO, GET_PARAM, 0},
+	{"he_dcm_max_const_rx",         IEEE80211_PARAM_HE_DCM_MAX_CONSTELLATION_RX, SET_PARAM, 1},
+	{"get_he_dcm_max_const_rx",     IEEE80211_PARAM_HE_DCM_MAX_CONSTELLATION_RX, GET_PARAM, 0},
 };
 
 struct vendor_commands radio_vendor_cmds[] = {
