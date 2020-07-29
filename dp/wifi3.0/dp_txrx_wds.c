@@ -690,6 +690,15 @@ void dp_peer_set_vlan_id(struct cdp_soc_t *cdp_soc,
 		return;
 	}
 
+	/* If peer already exists in vdev multipass list, do not add it */
+	if (peer->vlan_id) {
+		dp_debug("peer already added to vdev multipass list"
+			 "MAC: "QDF_MAC_ADDR_STR" vlan: %d ",
+			 QDF_MAC_ADDR_ARRAY(peer->mac_addr.raw), peer->vlan_id);
+		dp_peer_unref_delete(peer);
+		return;
+	}
+
 	peer->vlan_id = vlan_id;
 
 	/* Ref_cnt is incremented inside dp_peer_find_hash_find().
