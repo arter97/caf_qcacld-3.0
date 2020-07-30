@@ -339,7 +339,7 @@ QDF_STATUS lim_ft_setup_auth_session(struct mac_context *mac,
 		lim_fill_ft_session(mac,
 				    pe_session->ftPEContext.pFTPreAuthReq->
 				    pbssDescription, ft_session,
-				    pe_session);
+				    pe_session, WLAN_PHYMODE_AUTO);
 
 		lim_ft_prepare_add_bss_req(mac, false, ft_session,
 		     pe_session->ftPEContext.pFTPreAuthReq->pbssDescription);
