@@ -135,8 +135,26 @@ dp_rx_mon_status_buf_validate(struct dp_pdev *pdev,
 			  FL("Monitor status ring: DMA is not done "
 			     "for nbuf: %pK buf_addr: %llx"),
 			     status_nbuf, buf_paddr);
-		pdev->rx_mon_stats.tlv_tag_status_err++;
-		status = dp_mon_status_no_dma;
+		status = dp_rx_mon_handle_status_buf_done(pdev,
+							  mon_status_srng);
+
+		if (status == dp_mon_status_replenish) {
+			union dp_rx_desc_list_elem_t *desc_list = NULL;
+			union dp_rx_desc_list_elem_t *tail = NULL;
+
+			/* If this is DMA not done WAR case,
+			 * free current SW descriptor and make buf_addr_info
+			 * NULL, so that call to dp_rx_mon_status_process()
+			 * replenishes entry to status ring
+			 */
+			dp_rx_add_to_free_desc_list(&desc_list,
+						&tail, rx_desc);
+			dp_rx_add_desc_list_to_free_list(soc, &desc_list,
+						&tail, mac_id, rx_desc_pool);
+			hal_rxdma_buff_addr_info_set(
+						ring_entry,
+						0, 0, HAL_RX_BUF_RBM_SW3_BM);
+		}
 		goto done;
 	}
 
