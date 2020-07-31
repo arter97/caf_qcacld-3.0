@@ -2877,6 +2877,7 @@ int wma_mlme_roam_synch_event_handler_cb(void *handle, uint8_t *event,
 	A_UINT32 bcn_probe_rsp_len;
 	A_UINT32 reassoc_rsp_len;
 	A_UINT32 reassoc_req_len;
+	WMI_HOST_WLAN_PHY_MODE phymode;
 
 	WMA_LOGD("LFR3:%s", __func__);
 	if (!event) {
@@ -3070,15 +3071,17 @@ int wma_mlme_roam_synch_event_handler_cb(void *handle, uint8_t *event,
 	 */
 	channel = wlan_freq_to_chan(wma->interfaces[synch_event->vdev_id].mhz);
 	if (param_buf->chan) {
-		wma->interfaces[synch_event->vdev_id].chanmode =
-			WMI_GET_CHANNEL_MODE(param_buf->chan);
+		phymode = WMI_GET_CHANNEL_MODE(param_buf->chan);
 	} else {
 		wma_get_phy_mode_cb(channel,
-				    wma->interfaces[synch_event->vdev_id].
-				    chan_width,
-				    &wma->interfaces[synch_event->vdev_id].
-				    chanmode);
+			wma->interfaces[synch_event->vdev_id].chan_width,
+			&phymode);
 	}
+	wma->interfaces[synch_event->vdev_id].chanmode = phymode;
+	/* Update new peer phymode after roaming */
+	wma_objmgr_set_peer_mlme_phymode(wma, roam_synch_ind_ptr->bssid.bytes,
+					 phymode);
+	wma_debug("LFR3: new phymode %d", phymode);
 
 	wma->csr_roam_synch_cb(wma->mac_context, roam_synch_ind_ptr,
 			       bss_desc_ptr, SIR_ROAM_SYNCH_COMPLETE);
