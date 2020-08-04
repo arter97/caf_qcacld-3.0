@@ -49,6 +49,74 @@ dp_rx_populate_cfr_non_assoc_sta(struct dp_pdev *pdev,
 				 struct hal_rx_ppdu_info *ppdu_info,
 				 struct cdp_rx_indication_ppdu *cdp_rx_ppdu);
 
+/**
+ * dp_rx_mon_handle_status_buf_done () - Handle status buf DMA not done
+ *
+ * As per MAC team's suggestion, If HP + 2 entry's DMA done is set,
+ * skip HP + 1 entry and start processing in next interrupt.
+ * If HP + 2 entry's DMA done is not set, poll onto HP + 1 entry
+ * for it's DMA done TLV to be set.
+ *
+ */
+enum dp_mon_reap_status
+dp_rx_mon_handle_status_buf_done(struct dp_pdev *pdev,
+				 void *mon_status_srng)
+{
+	struct dp_soc *soc = pdev->soc;
+	hal_soc_handle_t hal_soc;
+	void *ring_entry;
+	uint32_t rx_buf_cookie;
+	qdf_nbuf_t status_nbuf;
+	struct dp_rx_desc *rx_desc;
+	void *rx_tlv;
+	QDF_STATUS buf_status;
+	enum dp_mon_reap_status status;
+
+	hal_soc = soc->hal_soc;
+
+	ring_entry = hal_srng_src_peek_n_get_next_next(hal_soc,
+						       mon_status_srng);
+	if (!ring_entry) {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
+			  FL("Monitor status ring entry is NULL "
+			     "for SRNG: %pK"),
+			     mon_status_srng);
+		status = dp_mon_status_replenish;
+		return status;
+	}
+	rx_buf_cookie = HAL_RX_BUF_COOKIE_GET(ring_entry);
+	rx_desc = dp_rx_cookie_2_va_mon_status(soc, rx_buf_cookie);
+
+	qdf_assert(rx_desc);
+
+	status_nbuf = rx_desc->nbuf;
+
+	qdf_nbuf_sync_for_cpu(soc->osdev, status_nbuf,
+			      QDF_DMA_FROM_DEVICE);
+
+	rx_tlv = qdf_nbuf_data(status_nbuf);
+	buf_status = hal_get_rx_status_done(rx_tlv);
+
+	/* If status buffer DMA is not done,
+	 * 1. As per MAC team's suggestion, If HP + 2 entry's DMA done is set,
+	 * replenish HP + 1 entry and start processing in next interrupt.
+	 * 2. If HP + 2 entry's DMA done is not set
+	 * hold on to mon destination ring.
+	 */
+	if (buf_status != QDF_STATUS_SUCCESS) {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
+			  FL("Monitor status ring: DMA is not done "
+			     "for nbuf: %pK"), status_nbuf);
+		status = dp_mon_status_no_dma;
+		pdev->rx_mon_stats.tlv_tag_status_err++;
+		return status;
+	}
+
+	pdev->rx_mon_stats.status_buf_done_war++;
+
+	return dp_mon_status_replenish;
+}
+
 #ifndef QCA_SUPPORT_FULL_MON
 /**
  * dp_rx_mon_process () - Core brain processing for monitor mode
@@ -1754,6 +1822,7 @@ dp_rx_mon_status_srng_process(struct dp_soc *soc, struct dp_intr *int_ctx,
 	void *mon_status_srng;
 	void *rxdma_mon_status_ring_entry;
 	QDF_STATUS status;
+	enum dp_mon_reap_status reap_status;
 	uint32_t work_done = 0;
 
 	if (!pdev) {
@@ -1830,19 +1899,27 @@ dp_rx_mon_status_srng_process(struct dp_soc *soc, struct dp_intr *int_ctx,
 
 				/* RxDMA status done bit might not be set even
 				 * though tp is moved by HW.
-				 * So Hold on to current entry on
-				 * monitor status ring
 				 */
 
-				/* If done status is missing, hold onto status
-				 * ring until status is done for this status
-				 * ring buffer.
-				 * Keep HP in mon_status_ring unchanged,
-				 * and break from here.
-				 * Check status for same buffer for next time
-				 * dp_rx_mon_status_srng_process
+				/* If done status is missing:
+				 * 1. As per MAC team's suggestion,
+				 *    when HP + 1 entry is peeked and if DMA
+				 *    is not done and if HP + 2 entry's DMA done
+				 *    is set. skip HP + 1 entry and
+				 *    start processing in next interrupt.
+				 * 2. If HP + 2 entry's DMA done is not set,
+				 *    poll onto HP + 1 entry DMA done to be set.
+				 *    Check status for same buffer for next time
+				 *    dp_rx_mon_status_srng_process
 				 */
-				break;
+				reap_status = dp_rx_mon_handle_status_buf_done(pdev,
+									  mon_status_srng);
+				if (reap_status == dp_mon_status_no_dma)
+					continue;
+				else if (reap_status == dp_mon_status_replenish) {
+					qdf_nbuf_free(status_nbuf);
+					goto buf_replenish;
+				}
 			}
 			qdf_nbuf_set_pktlen(status_nbuf, RX_DATA_BUFFER_SIZE);
 
@@ -1874,6 +1951,7 @@ dp_rx_mon_status_srng_process(struct dp_soc *soc, struct dp_intr *int_ctx,
 			rx_desc = &desc_list->rx_desc;
 		}
 
+buf_replenish:
 		status_nbuf = dp_rx_nbuf_prepare(soc, pdev);
 
 		/*
