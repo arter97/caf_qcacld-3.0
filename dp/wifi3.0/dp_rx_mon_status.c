@@ -76,12 +76,17 @@ dp_rx_mon_handle_status_buf_done(struct dp_pdev *pdev,
 
 	ring_entry = hal_srng_src_peek_n_get_next_next(hal_soc,
 						       mon_status_srng);
+	/* ring entry can be NULL if HW has not moved TP ahead of
+	 * HP + 1, If ring entry is NULL,
+	 * return from here and poll on to HP + 1 entry
+	 * for DMA done to be set.
+	 */
 	if (!ring_entry) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
 			  FL("Monitor status ring entry is NULL "
 			     "for SRNG: %pK"),
 			     mon_status_srng);
-		status = dp_mon_status_replenish;
+		status = dp_mon_status_no_dma;
 		return status;
 	}
 	rx_buf_cookie = HAL_RX_BUF_COOKIE_GET(ring_entry);
