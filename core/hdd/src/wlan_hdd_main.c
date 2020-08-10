@@ -1601,7 +1601,7 @@ static void hdd_update_tgt_vht_cap(struct hdd_context *hdd_ctx,
 	struct ieee80211_supported_band *band_5g =
 		wiphy->bands[HDD_NL80211_BAND_5GHZ];
 	uint32_t ch_width = eHT_CHANNEL_WIDTH_80MHZ;
-	struct wma_caps_per_phy caps_per_phy;
+	struct wma_caps_per_phy caps_per_phy = {0};
 	uint8_t val = 0;
 
 	if (!band_5g) {
@@ -1743,7 +1743,7 @@ static void hdd_update_vhtcap_2g(struct hdd_context *hdd_ctx)
 	QDF_STATUS status;
 	bool b2g_vht_cfg = false;
 	bool b2g_vht_target = false;
-	struct wma_caps_per_phy caps_per_phy;
+	struct wma_caps_per_phy caps_per_phy = {0};
 	struct wmi_unified *wmi_handle;
 
 	wmi_handle = get_wmi_unified_hdl_from_psoc(hdd_ctx->psoc);
