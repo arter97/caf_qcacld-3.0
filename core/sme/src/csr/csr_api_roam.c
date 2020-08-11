@@ -10639,6 +10639,11 @@ void csr_roaming_state_msg_processor(struct mac_context *mac, void *msg_buf)
 
 	pSmeRsp = (tSirSmeRsp *)msg_buf;
 
+	if (cds_is_driver_recovering()) {
+		sme_err("recovering, ignore");
+		return;
+	}
+
 	switch (pSmeRsp->messageType) {
 
 	case eWNI_SME_JOIN_RSP:
