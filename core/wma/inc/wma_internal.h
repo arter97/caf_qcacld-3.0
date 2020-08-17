@@ -781,6 +781,17 @@ int wma_vdev_install_key_complete_event_handler(void *handle,
 						uint8_t *event,
 						uint32_t len);
 
+/**
+ * wma_objmgr_set_peer_mlme_phymode() - set phymode to peer object
+ * @wma:      wma handle
+ * @mac_addr: mac addr of peer
+ * @phymode:  phymode value to set
+ *
+ * Return: None
+ */
+void wma_objmgr_set_peer_mlme_phymode(tp_wma_handle wma, uint8_t *mac_addr,
+				      WMI_HOST_WLAN_PHY_MODE phymode);
+
 QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 					   tSirNwType nw_type,
 					   tpAddStaParams params);
