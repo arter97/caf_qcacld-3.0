@@ -2233,25 +2233,6 @@ struct dp_peer_ast_params {
 	uint8_t flowQ;
 };
 
-#define IEEE80211_MSCS_MAX_ELEM_SIZE    5
-#define IEEE80211_TCLAS_MASK_CLA_TYPE_4  4
-/*
- * struct dp_peer_mscs_node_stats - MSCS database obtained from
- * MSCS Request and Response in the control path. This data is used
- * by the AP to find out what priority to set based on the tuple
- * classification during packet processing.
- * @user_priority_bitmap - User priority bitmap obtained during
- * handshake
- * @user_priority_limit - User priority limit obtained during
- * handshake
- * @classifier_mask - params to be compared during processing
- */
-struct dp_peer_mscs_parameter {
-	uint8_t user_priority_bitmap;
-	uint8_t user_priority_limit;
-	uint8_t classifier_mask;
-};
-
 /* Peer structure for data path state */
 struct dp_peer {
 	/* VDEV to which this peer is associated */
@@ -2360,14 +2341,6 @@ struct dp_peer {
 #ifdef QCA_PEER_MULTIQ_SUPPORT
 	struct dp_peer_ast_params peer_ast_flowq_idx[DP_PEER_AST_FLOWQ_MAX];
 #endif
-	/* entry to inactive_list*/
-	TAILQ_ENTRY(dp_peer) inactive_list_elem;
-
-	qdf_atomic_t mod_refs[DP_MOD_ID_MAX];
-
-	uint8_t peer_state;
-	struct dp_peer_mscs_parameter mscs_ipv4_parameter, mscs_ipv6_parameter;
-	bool mscs_active;
 };
 
 /*
