@@ -583,6 +583,7 @@ static int __hdd_soc_recovery_reinit(struct device *dev,
 	cds_set_recovery_in_progress(false);
 
 	hdd_soc_load_unlock(dev);
+	hdd_start_complete(0);
 
 	return 0;
 
@@ -593,6 +594,7 @@ assert_fail_count:
 unlock:
 	cds_set_driver_in_bad_state(true);
 	hdd_soc_load_unlock(dev);
+	hdd_start_complete(errno);
 
 	return check_for_probe_defer(errno);
 }
@@ -798,6 +800,7 @@ static void __hdd_soc_recovery_shutdown(void)
 
 	/* recovery starts via firmware down indication; ensure we got one */
 	QDF_BUG(cds_is_driver_recovering());
+	hdd_init_start_completion();
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	if (!hdd_ctx) {
@@ -1520,6 +1523,18 @@ static void wlan_hdd_pld_remove(struct device *dev, enum pld_bus_type bus_type)
 	hdd_exit();
 }
 
+static void hdd_soc_idle_shutdown_lock(struct device *dev)
+{
+	hdd_prevent_suspend(WIFI_POWER_EVENT_WAKELOCK_DRIVER_IDLE_SHUTDOWN);
+
+	hdd_abort_system_suspend(dev);
+}
+
+static void hdd_soc_idle_shutdown_unlock(void)
+{
+	hdd_allow_suspend(WIFI_POWER_EVENT_WAKELOCK_DRIVER_IDLE_SHUTDOWN);
+}
+
 /**
  * wlan_hdd_pld_idle_shutdown() - wifi module idle shutdown after interface
  *                                inactivity timeout has trigerred idle shutdown
@@ -1531,7 +1546,15 @@ static void wlan_hdd_pld_remove(struct device *dev, enum pld_bus_type bus_type)
 static int wlan_hdd_pld_idle_shutdown(struct device *dev,
 				       enum pld_bus_type bus_type)
 {
-	return hdd_psoc_idle_shutdown(dev);
+	int ret;
+
+	hdd_soc_idle_shutdown_lock(dev);
+
+	ret = hdd_psoc_idle_shutdown(dev);
+
+	hdd_soc_idle_shutdown_unlock();
+
+	return ret;
 }
 
 /**

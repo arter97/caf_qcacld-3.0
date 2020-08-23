@@ -109,9 +109,7 @@
 #include <target_if_direct_buf_rx_api.h>
 #endif
 
-#ifdef WLAN_FEATURE_PKT_CAPTURE
 #include "wlan_pkt_capture_ucfg_api.h"
-#endif
 
 #define WMA_LOG_COMPLETION_TIMER 3000 /* 3 seconds */
 #define WMI_TLV_HEADROOM 128
@@ -188,6 +186,11 @@ struct wma_ini_config *wma_get_ini_handle(tp_wma_handle wma)
 
 #define MAX_SUPPORTED_PEERS_REV1_1 14
 #define MAX_SUPPORTED_PEERS_REV1_3 32
+#ifdef WLAN_MAX_CLIENTS_ALLOWED
+#define MAX_SUPPORTED_PEERS WLAN_MAX_CLIENTS_ALLOWED
+#else
+#define MAX_SUPPORTED_PEERS 32
+#endif
 #define MIN_NO_OF_PEERS 1
 
 /**
@@ -328,7 +331,7 @@ static void wma_set_default_tgt_config(tp_wma_handle wma_handle,
 	tgt_cfg->num_multicast_filter_entries =
 		CFG_TGT_MAX_MULTICAST_FILTER_ENTRIES;
 	tgt_cfg->num_wow_filters = 0;
-	tgt_cfg->num_keep_alive_pattern = WMA_MAXNUM_PERIODIC_TX_PTRNS;
+	tgt_cfg->num_keep_alive_pattern = MAXNUM_PERIODIC_TX_PTRNS;
 	tgt_cfg->num_max_sta_vdevs = CFG_TGT_DEFAULT_MAX_STA_VDEVS;
 	tgt_cfg->keep_alive_pattern_size = 0;
 	tgt_cfg->max_tdls_concurrent_sleep_sta =
@@ -344,8 +347,14 @@ static void wma_set_default_tgt_config(tp_wma_handle wma_handle,
 	tgt_cfg->mgmt_comp_evt_bundle_support = true;
 	tgt_cfg->tx_msdu_new_partition_id_support = true;
 
+	cfg_nan_get_max_ndi(wma_handle->psoc,
+			    &tgt_cfg->max_ndi);
+
 	if (cds_get_conparam() == QDF_GLOBAL_MONITOR_MODE)
 		tgt_cfg->rx_decap_mode = CFG_TGT_RX_DECAP_MODE_RAW;
+
+	cfg_nan_get_ndp_max_sessions(wma_handle->psoc,
+				     &tgt_cfg->max_ndp_sessions);
 
 	wma_set_ipa_disable_config(tgt_cfg);
 }
@@ -484,6 +493,18 @@ int wma_cli_get_command(int vdev_id, int param_id, int vpdev)
 			break;
 		case GEN_VDEV_ROAM_SYNCH_DELAY:
 			ret = intr[vdev_id].roam_synch_delay;
+			break;
+		case GEN_VDEV_PARAM_TX_AMPDU:
+			ret = intr[vdev_id].config.tx_ampdu;
+			break;
+		case GEN_VDEV_PARAM_RX_AMPDU:
+			ret = intr[vdev_id].config.rx_ampdu;
+			break;
+		case GEN_VDEV_PARAM_TX_AMSDU:
+			ret = intr[vdev_id].config.tx_amsdu;
+			break;
+		case GEN_VDEV_PARAM_RX_AMSDU:
+			ret = intr[vdev_id].config.rx_amsdu;
 			break;
 		default:
 			WMA_LOGE("Invalid generic vdev command/Not yet implemented 0x%x",
@@ -1600,17 +1621,28 @@ static uint8_t wma_init_max_no_of_peers(tp_wma_handle wma_handle,
 	struct hif_opaque_softc *scn = cds_get_context(QDF_MODULE_ID_HIF);
 	uint32_t tgt_version = hif_get_target_info_handle(scn)->target_version;
 	uint8_t max_no_of_peers;
-	uint8_t max_supported_peers = (tgt_version == AR6320_REV1_1_VERSION) ?
-			MAX_SUPPORTED_PEERS_REV1_1 : MAX_SUPPORTED_PEERS_REV1_3;
+	uint8_t max_supported_peers;
 
 	if (!cfg) {
 		WMA_LOGE("%s: NULL WMA ini handle", __func__);
 		return 0;
 	}
 
+	switch (tgt_version) {
+	case AR6320_REV1_1_VERSION:
+		max_supported_peers = MAX_SUPPORTED_PEERS_REV1_1;
+		break;
+	case AR6320_REV1_3_VERSION:
+		max_supported_peers = MAX_SUPPORTED_PEERS_REV1_3;
+		break;
+	default:
+		max_supported_peers = MAX_SUPPORTED_PEERS;
+		break;
+	}
 	max_no_of_peers = (max_peers > max_supported_peers) ?
 				max_supported_peers : max_peers;
 	cfg->max_no_of_peers = max_no_of_peers;
+
 	return max_no_of_peers;
 }
 
@@ -6397,6 +6429,12 @@ static QDF_STATUS wma_update_hw_mode_list(t_wma_handle *wma_handle,
 	num_hw_modes = target_psoc_get_num_hw_modes(tgt_hdl);
 	mac_phy_cap = target_psoc_get_mac_phy_cap(tgt_hdl);
 	tgt_cap_info = target_psoc_get_target_caps(tgt_hdl);
+
+	if (!mac_phy_cap) {
+		WMA_LOGE("mac_phy_cap Null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	/*
 	 * This list was updated as part of service ready event. Re-populate
 	 * HW mode list from the device capabilities.
@@ -6716,6 +6754,13 @@ int wma_rx_service_ready_ext_event(void *handle, uint8_t *event,
 		wlan_res_cfg->num_vdevs--;
 		wma_update_num_peers_tids(wma_handle, wlan_res_cfg);
 	}
+
+	if (ucfg_pkt_capture_get_mode(wma_handle->psoc) &&
+	    wmi_service_enabled(wmi_handle,
+				wmi_service_packet_capture_support))
+		wlan_res_cfg->pktcapture_support = true;
+	else
+		wlan_res_cfg->pktcapture_support = false;
 
 	WMA_LOGD("%s: num_vdevs: %u", __func__, wlan_res_cfg->num_vdevs);
 

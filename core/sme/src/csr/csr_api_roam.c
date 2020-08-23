@@ -8389,7 +8389,8 @@ QDF_STATUS csr_roam_connect(struct mac_context *mac, uint32_t sessionId,
 
 			status = policy_mgr_handle_conc_multiport(
 					mac->psoc, sessionId, ch_freq,
-					POLICY_MGR_UPDATE_REASON_NORMAL_STA);
+					POLICY_MGR_UPDATE_REASON_NORMAL_STA,
+					POLICY_MGR_DEF_REQ_ID);
 			if ((QDF_IS_STATUS_SUCCESS(status)) &&
 				(!csr_wait_for_connection_update(mac, true))) {
 					sme_debug("conn update error");
@@ -9934,7 +9935,8 @@ void csr_handle_disassoc_ho(struct mac_context *mac, uint32_t session_id)
 	status = policy_mgr_handle_conc_multiport(
 			mac->psoc, session_id,
 			bss_node->pBssDescription->chan_freq,
-			POLICY_MGR_UPDATE_REASON_LFR2_ROAM);
+			POLICY_MGR_UPDATE_REASON_LFR2_ROAM,
+			POLICY_MGR_DEF_REQ_ID);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 		mac->roam.neighborRoamInfo[session_id].scan_res_lfr2_roam_ap =
 							scan_handle_roam_ap;
@@ -18465,6 +18467,8 @@ csr_post_rso_stop(struct mac_context *mac, uint8_t vdev_id, uint16_t reason)
 		req->reason = REASON_SUPPLICANT_DISABLED_ROAMING;
 	else if (reason == REASON_DISCONNECTED)
 		req->reason = REASON_DISCONNECTED;
+	else if (reason == REASON_OS_REQUESTED_ROAMING_NOW)
+		req->reason = REASON_OS_REQUESTED_ROAMING_NOW;
 	else
 		req->reason = REASON_SME_ISSUED;
 
@@ -18649,6 +18653,10 @@ csr_roam_switch_to_rso_stop(struct mac_context *mac, uint8_t vdev_id,
 	 * nothing to do here
 	 */
 	default:
+		/* For LFR2 BTM request, need handoff even roam disabled */
+		if (reason == REASON_OS_REQUESTED_ROAMING_NOW)
+			csr_neighbor_roam_proceed_with_handoff_req(mac,
+								   vdev_id);
 		return QDF_STATUS_SUCCESS;
 	}
 	mlme_set_roam_state(mac->psoc, vdev_id, ROAM_RSO_STOPPED);

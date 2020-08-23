@@ -32,6 +32,7 @@ ifneq ($(ANDROID_BUILD_TOP),)
 endif
 endif
 
+include $(WLAN_ROOT)/configs/$(CONFIG_QCA_CLD_WLAN_PROFILE)_defconfig
 
 # add configurations in WLAN_CFG_OVERRIDE
 ifneq ($(WLAN_CFG_OVERRIDE),)
@@ -44,8 +45,6 @@ $(foreach cfg, $(WLAN_CFG_OVERRIDE), \
 include $(WLAN_CFG_OVERRIDE_FILE)
 $(warning "Overriding WLAN config with: $(shell cat $(WLAN_CFG_OVERRIDE_FILE))")
 endif
-
-include $(WLAN_ROOT)/configs/$(CONFIG_QCA_CLD_WLAN_PROFILE)_defconfig
 
 ############ UAPI ############
 UAPI_DIR :=	uapi
@@ -278,6 +277,9 @@ HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_crash_inject.o
 endif
 ifeq ($(CONFIG_FEATURE_UNIT_TEST_SUSPEND), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_suspend_resume.o
+endif
+ifeq ($(CONFIG_WLAN_SYSFS_MEM_STATS), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_mem_stats.o
 endif
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_unit_test.o
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_modify_acl.o
@@ -733,6 +735,7 @@ QDF_OBJS := \
 	$(QDF_LINUX_OBJ_DIR)/qdf_delayed_work.o \
 	$(QDF_LINUX_OBJ_DIR)/qdf_event.o \
 	$(QDF_LINUX_OBJ_DIR)/qdf_file.o \
+	$(QDF_LINUX_OBJ_DIR)/qdf_func_tracker.o \
 	$(QDF_LINUX_OBJ_DIR)/qdf_idr.o \
 	$(QDF_LINUX_OBJ_DIR)/qdf_list.o \
 	$(QDF_LINUX_OBJ_DIR)/qdf_lock.o \
@@ -2334,7 +2337,9 @@ endif
 
 ifeq ($(CONFIG_LITHIUM), y)
 OBJS += 	$(HAL_OBJS)
+ifeq ($(CONFIG_WDI_EVENT_ENABLE), y)
 OBJS += 	$(TXRX_DIR)/ol_txrx_event.o
+endif
 endif
 
 ifeq ($(CONFIG_FEATURE_FW_LOG_PARSING), y)
@@ -2612,6 +2617,7 @@ cppflags-$(CONFIG_WLAN_GET_TEMP) += -DCONFIG_WLAN_GET_TEMP
 cppflags-$(CONFIG_WLAN_THERMAL_CFG) += -DCONFIG_WLAN_THERMAL_CFG
 cppflags-$(CONFIG_FEATURE_UNIT_TEST_SUSPEND) += -DWLAN_SUSPEND_RESUME_TEST
 cppflags-$(CONFIG_FEATURE_WLM_STATS) += -DFEATURE_WLM_STATS
+cppflags-$(CONFIG_WLAN_SYSFS_MEM_STATS) += -DCONFIG_WLAN_SYSFS_MEM_STATS
 cppflags-$(CONFIG_WLAN_SYSFS_DCM) += -DWLAN_SYSFS_DCM
 cppflags-$(CONFIG_WLAN_SYSFS_HE_BSS_COLOR) += -DWLAN_SYSFS_HE_BSS_COLOR
 cppflags-$(CONFIG_WLAN_SYSFS_GET_STA_INFO) += -DWLAN_SYSFS_GET_STA_INFO
@@ -3197,6 +3203,8 @@ cppflags-$(CONFIG_ENABLE_SMMU_S1_TRANSLATION) += -DENABLE_SMMU_S1_TRANSLATION
 #Flag to enable/disable MTRACE feature
 cppflags-$(CONFIG_ENABLE_MTRACE_LOG) += -DENABLE_MTRACE_LOG
 
+cppflags-$(CONFIG_FUNC_CALL_MAP) += -DFUNC_CALL_MAP
+
 #Flag to enable/disable Adaptive 11r feature
 cppflags-$(CONFIG_ADAPTIVE_11R) += -DWLAN_ADAPTIVE_11R
 
@@ -3321,7 +3329,7 @@ ccflags-y += -DCFG_TGT_DEFAULT_ROAM_OFFLOAD_MAX_VDEV=$(CONFIG_CFG_ROAM_OFFLOAD_M
 endif
 
 ifdef CONFIG_CFG_MAX_PERIODIC_TX_PTRNS
-ccflags-y += -DWMA_MAXNUM_PERIODIC_TX_PTRNS=$(CONFIG_CFG_MAX_PERIODIC_TX_PTRNS)
+ccflags-y += -DMAXNUM_PERIODIC_TX_PTRNS=$(CONFIG_CFG_MAX_PERIODIC_TX_PTRNS)
 endif
 
 ifdef CONFIG_CFG_MAX_STA_VDEVS
@@ -3444,6 +3452,9 @@ cppflags-y += -DTGT_IF_VDEV_MGR_CONV
 
 cppflags-y += -DCONFIG_CHAN_NUM_API
 cppflags-y += -DCONFIG_CHAN_FREQ_API
+
+#Flag to enable/disable MCC specific feature regarding unallowed phymodes
+cppflags-y += -DCHECK_REG_PHYMODE
 
 cppflags-$(CONFIG_BAND_6GHZ) += -DCONFIG_BAND_6GHZ
 cppflags-$(CONFIG_6G_SCAN_CHAN_SORT_ALGO) += -DFEATURE_6G_SCAN_CHAN_SORT_ALGO

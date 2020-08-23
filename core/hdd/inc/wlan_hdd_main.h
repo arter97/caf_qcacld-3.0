@@ -1374,6 +1374,11 @@ struct hdd_adapter {
 	qdf_mutex_t sta_periodic_stats_lock;
 #endif /* WLAN_FEATURE_PERIODIC_STA_STATS */
 	qdf_event_t peer_cleanup_done;
+#ifdef FEATURE_OEM_DATA
+	bool oem_data_in_progress;
+	void *cookie;
+	bool response_expected;
+#endif
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(adapter) (&(adapter)->session.station)
@@ -1637,11 +1642,13 @@ struct hdd_fw_ver_info {
  * @pdev: object manager pdev context
  * @iftype_data_2g: Interface data for 2g band
  * @iftype_data_5g: Interface data for 5g band
+ * @num_latency_critical_clients: Number of latency critical clients connected
  * @bus_bw_work: work for periodically computing DDR bus bandwidth requirements
  * @g_event_flags: a bitmap of hdd_driver_flags
  * @psoc_idle_timeout_work: delayed work for psoc idle shutdown
  * @dynamic_nss_chains_support: Per vdev dynamic nss chains update capability
  * @sar_cmd_params: SAR command params to be configured to the FW
+ * @country_change_work: work for updating vdev when country changes
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -1703,6 +1710,7 @@ struct hdd_context {
 	int32_t oem_pid;
 #endif
 
+	qdf_atomic_t num_latency_critical_clients;
 	/** Concurrency Parameters*/
 	uint32_t concurrency_mode;
 
@@ -1965,6 +1973,7 @@ struct hdd_context {
 #ifdef FW_THERMAL_THROTTLE_SUPPORT
 	uint8_t dutycycle_off_percent;
 #endif
+	qdf_work_t country_change_work;
 };
 
 /**
@@ -2531,6 +2540,54 @@ QDF_STATUS __wlan_hdd_validate_mac_address(struct qdf_mac_addr *mac_addr,
  *	    false, if none of the adapters is in connected state.
  */
 bool hdd_is_any_adapter_connected(struct hdd_context *hdd_ctx);
+
+/**
+ * hdd_add_latency_critical_client() - Add latency critical client
+ * @hdd_ctx: Global HDD context
+ * @phymode: the phymode of the connected adapter
+ *
+ * This function adds to the latency critical count if the present
+ * connection is also a latency critical one.
+ *
+ * Returns: None
+ */
+static inline void
+hdd_add_latency_critical_client(struct hdd_context *hdd_ctx,
+				enum qca_wlan_802_11_mode phymode)
+{
+	switch (phymode) {
+	case QCA_WLAN_802_11_MODE_11A:
+	case QCA_WLAN_802_11_MODE_11G:
+		qdf_atomic_inc(&hdd_ctx->num_latency_critical_clients);
+		break;
+	default:
+		break;
+	}
+}
+
+/**
+ * hdd_del_latency_critical_client() - Add tlatency critical client
+ * @hdd_ctx: Global HDD context
+ * @phymode: the phymode of the connected adapter
+ *
+ * This function removes from the latency critical count if the present
+ * connection is also a latency critical one.
+ *
+ * Returns: None
+ */
+static inline void
+hdd_del_latency_critical_client(struct hdd_context *hdd_ctx,
+				enum qca_wlan_802_11_mode phymode)
+{
+	switch (phymode) {
+	case QCA_WLAN_802_11_MODE_11A:
+	case QCA_WLAN_802_11_MODE_11G:
+		qdf_atomic_dec(&hdd_ctx->num_latency_critical_clients);
+		break;
+	default:
+		break;
+	}
+}
 
 #ifdef WLAN_FEATURE_DP_BUS_BANDWIDTH
 /**
@@ -4375,4 +4432,28 @@ static inline void hdd_sta_destroy_ctx_all(struct hdd_context *hdd_ctx)
 }
 #endif
 
+/**
+ * hdd_init_start_completion() - Init the completion variable to wait on ON/OFF
+ *
+ * Return: None
+ */
+void hdd_init_start_completion(void);
+
+/**
+ * hdd_update_phymode() - update the PHY mode of the adapter
+ * @adapter: adapter being modified
+ * @phymode: new PHY mode for the adapter
+ * @band: new band for the adapter
+ * @chwidth: new channel width for the adapter
+ *
+ * This function is called when the adapter is set to a new PHY mode.
+ * It takes a holistic look at the desired PHY mode along with the
+ * configured capabilities of the driver and the reported capabilities
+ * of the hardware in order to correctly configure all PHY-related
+ * parameters.
+ *
+ * Return: 0 on success, negative errno value on error
+ */
+int hdd_update_phymode(struct hdd_adapter *adapter, eCsrPhyMode phymode,
+		       enum band_info band, uint32_t chwidth);
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

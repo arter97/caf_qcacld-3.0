@@ -60,7 +60,7 @@ struct mac_context;
 
 #define SIR_MAX_ELEMENT_ID         255
 
-#define SIR_BCN_REPORT_MAX_BSS_DESC       4
+#define SIR_BCN_REPORT_MAX_BSS_DESC       8
 
 #define SIR_NUM_11B_RATES 4     /* 1,2,5.5,11 */
 #define SIR_NUM_11A_RATES 8     /* 6,9,12,18,24,36,48,54 */
@@ -72,7 +72,9 @@ typedef uint8_t tSirVersionString[SIR_VERSION_STRING_LEN];
 
 /* Periodic Tx pattern offload feature */
 #define PERIODIC_TX_PTRN_MAX_SIZE 1536
+#ifndef MAXNUM_PERIODIC_TX_PTRNS
 #define MAXNUM_PERIODIC_TX_PTRNS 6
+#endif
 
 /* FW response timeout values in milli seconds */
 #define SIR_PEER_ASSOC_TIMEOUT           (4000) /* 4 seconds */
@@ -5331,6 +5333,14 @@ struct ppet_hdr {
 #define HE_MCS_0_11    0x2
 #define HE_MCS_DISABLE 0x3
 
+#define HE_6G_MIN_MPDU_START_SAPCE_BIT_POS 0
+#define HE_6G_MAX_AMPDU_LEN_EXP_BIT_POS 3
+#define HE_6G_MAX_MPDU_LEN_BIT_POS 6
+#define HE_6G_SMPS_BIT_POS 9
+#define HE_6G_RD_RESP_BIT_POS 11
+#define HE_6G_RX_ANT_PATTERN_BIT_POS 12
+#define HE_6G_TX_ANT_PATTERN_BIT_POS 13
+
 /*
  * Following formuala has been arrived at using karnaugh map and unit tested
  * with sample code. Take MCS for each NSS as 2 bit value first and solve for
@@ -5686,4 +5696,18 @@ struct sir_get_mws_coex_info {
 	uint32_t cmd_id;
 };
 #endif /* WLAN_MWS_INFO_DEBUGFS */
+
+/*
+ * struct sir_update_session_txq_edca_param
+ * @message_type: SME message type
+ * @length: size of struct sir_update_session_txq_edca_param
+ * @vdev_id: vdev ID
+ * @txq_edca_params: txq edca parameter to update
+ */
+struct sir_update_session_txq_edca_param {
+	uint16_t message_type;
+	uint16_t length;
+	uint8_t vdev_id;
+	tSirMacEdcaParamRecord txq_edca_params;
+};
 #endif /* __SIR_API_H */

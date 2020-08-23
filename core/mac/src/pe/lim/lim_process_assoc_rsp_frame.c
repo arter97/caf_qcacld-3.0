@@ -601,6 +601,7 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx,
 #endif
 	uint8_t ap_nss;
 	int8_t rssi;
+	tpRRMCaps rrm_caps = &mac_ctx->rrm.rrmPEContext.rrmEnabledCaps;
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 	vdev_id = session_entry->vdev_id;
@@ -773,19 +774,6 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx,
 #ifdef FEATURE_WLAN_ESE
 	lim_update_ese_tspec(mac_ctx, session_entry, assoc_rsp);
 #endif
-
-	if (assoc_rsp->capabilityInfo.ibss) {
-		/*
-		 * Received Re/Association Response from peer
-		 * with IBSS capability set.
-		 * Ignore the frame and wait until Re/assoc
-		 * failure timeout.
-		 */
-		pe_err("received Re/AssocRsp frame with IBSS capability");
-		qdf_mem_free(assoc_rsp);
-		qdf_mem_free(beacon);
-		return;
-	}
 
 	if (lim_get_capability_info(mac_ctx, &caps, session_entry)
 		!= QDF_STATUS_SUCCESS) {
@@ -1081,6 +1069,12 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx,
 			session_entry->beaconParams.fShortPreamble = true;
 	}
 
+	if (assoc_rsp->rrm_caps.present) {
+		rrm_caps->nonOperatingChanMax =
+					assoc_rsp->rrm_caps.nonOperatinChanMax;
+		rrm_caps->operatingChanMax =
+					assoc_rsp->rrm_caps.operatingChanMax;
+	}
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
 	lim_diag_event_report(mac_ctx, WLAN_PE_DIAG_CONNECTED, session_entry,
 			      QDF_STATUS_SUCCESS, QDF_STATUS_SUCCESS);

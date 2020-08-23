@@ -178,6 +178,7 @@ ifeq ($(CONFIG_WLAN_SYSFS), y)
 	CONFIG_WLAN_SYSFS_GET_STA_INFO := y
 	CONFIG_WLAN_SYSFS_GET_CHANNEL := y
 	CONFIG_WLAN_SET_FW_MODE_CFG := y
+	CONFIG_WLAN_SYSFS_MEM_STATS := y
 	CONFIG_WLAN_REASSOC := y
 	CONFIG_WLAN_SYSFS_CONNECT_INFO := y
 	CONFIG_WLAN_SCAN_DISABLE := y
@@ -861,6 +862,9 @@ CONFIG_ENABLE_MTRACE_LOG := y
 
 #Flag to enable nud tracking feature
 CONFIG_WLAN_NUD_TRACKING := y
+
+#Flag to enable/Disable Function call trace
+CONFIG_FUNC_CALL_MAP := n
 
 #Flag to enable wbuff feature
 CONFIG_WLAN_WBUFF := y
