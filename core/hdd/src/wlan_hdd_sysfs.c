@@ -31,6 +31,7 @@
 #include "wlan_hdd_sysfs.h"
 #include "qwlan_version.h"
 #include "cds_api.h"
+#include <wma_api.h>
 #include <wlan_osif_request_manager.h>
 #include <qdf_mem.h>
 #ifdef WLAN_POWER_DEBUG
@@ -109,6 +110,17 @@ hdd_sysfs_validate_and_copy_buf(char *dest_buf, size_t dest_buf_size,
 		dest_buf[source_buf_size - 1] = '\0';
 
 	return 0;
+}
+
+static ssize_t show_dot11ax_capabilty(struct kobject *kobj,
+				      struct kobj_attribute *attr,
+				      char *buf)
+{
+	bool is_support_11ax;
+
+	is_support_11ax = wma_get_fw_wlan_feat_caps(DOT11AX);
+
+	return scnprintf(buf, PAGE_SIZE, "11ax %d", is_support_11ax ? 1 : 0);
 }
 
 static ssize_t __show_driver_version(char *buf)
@@ -491,6 +503,8 @@ static DEVICE_ATTR(beacon_stats, 0444,
 		   show_beacon_reception_stats, NULL);
 #endif
 
+static struct kobj_attribute dot11ax_attribute =
+	__ATTR(dot11ax, 0444, show_dot11ax_capabilty, NULL);
 static struct kobj_attribute dr_ver_attribute =
 	__ATTR(driver_version, 0440, show_driver_version, NULL);
 static struct kobj_attribute fw_ver_attribute =
@@ -510,6 +524,12 @@ static void hdd_sysfs_create_version_interface(struct wlan_objmgr_psoc *psoc)
 		hdd_err("could not get driver kobject!");
 		return;
 	}
+	error = sysfs_create_file(wlan_kobject, &dot11ax_attribute.attr);
+	if (error) {
+		hdd_err("could not create wlan dot11ax file");
+		return;
+	}
+
 
 	error = sysfs_create_file(wlan_kobject, &dr_ver_attribute.attr);
 	if (error) {
