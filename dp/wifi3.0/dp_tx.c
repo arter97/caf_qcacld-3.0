@@ -1710,6 +1710,7 @@ qdf_nbuf_t dp_tx_send_msdu_multiple(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 	hal_ring_handle_t hal_ring_hdl =
 				soc->tcl_data_ring[tx_q->ring_id].hal_srng;
 	struct cdp_tid_tx_stats *tid_stats = NULL;
+	uint8_t prep_desc_fail = 0, hw_enq_fail = 0;
 
 	if (qdf_unlikely(hal_srng_access_start(soc->hal_soc, hal_ring_hdl))) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
@@ -1750,9 +1751,32 @@ qdf_nbuf_t dp_tx_send_msdu_multiple(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 
 		if (!tx_desc) {
 			if (msdu_info->frm_type == dp_tx_frm_me) {
+				prep_desc_fail++;
 				dp_tx_me_free_buf(pdev,
 					(void *)(msdu_info->u.sg_info
 						.curr_seg->frags[0].vaddr));
+				if (prep_desc_fail == msdu_info->num_seg) {
+					/*
+					 * Unmap is needed only if descriptor
+					 * preparation failed for all segments.
+					 */
+					qdf_nbuf_unmap(soc->osdev,
+						       msdu_info->u.sg_info.
+						       curr_seg->nbuf,
+						       QDF_DMA_TO_DEVICE);
+				}
+				/*
+				 * Free the nbuf for the current segment
+				 * and make it point to the next in the list.
+				 * For me, there are as many segments as there
+				 * are no of clients.
+				 */
+				qdf_nbuf_free(msdu_info->u.sg_info
+					      .curr_seg->nbuf);
+				if (msdu_info->u.sg_info.curr_seg->next)
+					msdu_info->u.sg_info.curr_seg =
+						msdu_info->u.sg_info
+						.curr_seg->next;
 				i++;
 				continue;
 			}
@@ -1791,6 +1815,29 @@ qdf_nbuf_t dp_tx_send_msdu_multiple(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 
 			dp_tx_desc_release(tx_desc, tx_q->desc_pool_id);
 			if (msdu_info->frm_type == dp_tx_frm_me) {
+				hw_enq_fail++;
+				if (hw_enq_fail == msdu_info->num_seg) {
+					/*
+					 * Unmap is needed only if enqueue
+					 * failed for all segments.
+					 */
+					qdf_nbuf_unmap(soc->osdev,
+						       msdu_info->u.sg_info.
+						       curr_seg->nbuf,
+						       QDF_DMA_TO_DEVICE);
+				}
+				/*
+				 * Free the nbuf for the current segment
+				 * and make it point to the next in the list.
+				 * For me, there are as many segments as there
+				 * are no of clients.
+				 */
+				qdf_nbuf_free(msdu_info->u.sg_info
+					      .curr_seg->nbuf);
+				if (msdu_info->u.sg_info.curr_seg->next)
+					msdu_info->u.sg_info.curr_seg =
+						msdu_info->u.sg_info
+						.curr_seg->next;
 				i++;
 				continue;
 			}
