@@ -615,7 +615,8 @@ QDF_STATUS ol_txrx_ipa_setup(struct cdp_pdev *ppdev, void *ipa_i2w_cb,
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS ol_txrx_ipa_cleanup(uint32_t tx_pipe_handle, uint32_t rx_pipe_handle)
+QDF_STATUS ol_txrx_ipa_cleanup(struct cdp_pdev *ppdev, uint32_t tx_pipe_handle,
+			       uint32_t rx_pipe_handle)
 {
 	int ret;
 
@@ -1101,7 +1102,8 @@ QDF_STATUS ol_txrx_ipa_setup(struct cdp_pdev *ppdev, void *ipa_i2w_cb,
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS ol_txrx_ipa_cleanup(uint32_t tx_pipe_handle, uint32_t rx_pipe_handle)
+QDF_STATUS ol_txrx_ipa_cleanup(struct cdp_pdev *ppdev, uint32_t tx_pipe_handle,
+			       uint32_t rx_pipe_handle)
 {
 	int ret;
 
