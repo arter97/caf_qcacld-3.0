@@ -159,10 +159,10 @@ QDF_STATUS ucfg_ipa_wlan_evt(struct wlan_objmgr_pdev *pdev,
 			     qdf_netdev_t net_dev, uint8_t device_mode,
 			     uint8_t sta_id, uint8_t session_id,
 			     enum wlan_ipa_wlan_event ipa_event_type,
-			     uint8_t *mac_addr)
+			     uint8_t *mac_addr, bool is_2g_iface)
 {
 	return ipa_wlan_evt(pdev, net_dev, device_mode, sta_id, session_id,
-			    ipa_event_type, mac_addr);
+			    ipa_event_type, mac_addr, is_2g_iface);
 }
 
 int ucfg_ipa_uc_smmu_map(bool map, uint32_t num_buf, qdf_mem_info_t *buf_arr)

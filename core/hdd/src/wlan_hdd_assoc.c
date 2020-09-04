@@ -1726,7 +1726,8 @@ static QDF_STATUS hdd_dis_connect_handler(struct hdd_adapter *adapter,
 				  sta_ctx->conn_info.sta_id[0],
 				  adapter->vdev_id,
 				  WLAN_IPA_STA_DISCONNECT,
-				  sta_ctx->conn_info.bssid.bytes);
+				  sta_ctx->conn_info.bssid.bytes,
+				  false);
 
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
 	wlan_hdd_auto_shutdown_enable(hdd_ctx, true);
@@ -2941,7 +2942,9 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 					  roam_info->staId,
 					  adapter->vdev_id,
 					  WLAN_IPA_STA_CONNECT,
-					  roam_info->bssid.bytes);
+					  roam_info->bssid.bytes,
+					  WLAN_CHAN_IS_2GHZ(
+						  sta_ctx->conn_info.channel));
 
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
 		wlan_hdd_auto_shutdown_enable(hdd_ctx, false);

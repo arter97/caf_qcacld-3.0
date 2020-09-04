@@ -652,7 +652,7 @@ static inline void wlan_ipa_mcc_work_handler(void *data)
 QDF_STATUS wlan_ipa_wlan_evt(qdf_netdev_t net_dev, uint8_t device_mode,
 			     uint8_t sta_id, uint8_t session_id,
 			     enum wlan_ipa_wlan_event ipa_event_type,
-			     uint8_t *mac_addr);
+			     uint8_t *mac_addr, bool is_2g_iface);
 
 /**
  * wlan_ipa_uc_smmu_map() - Map / Unmap DMA buffer to IPA UC
