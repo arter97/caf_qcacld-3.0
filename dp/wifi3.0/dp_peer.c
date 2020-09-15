@@ -4681,7 +4681,9 @@ uint8_t dp_mscs_get_tid(struct dp_soc *soc, struct dp_vdev *vdev,
 	ether_type = (uint16_t)(*(uint16_t *)(data +
 	QDF_NBUF_TRAC_ETH_TYPE_OFFSET));
 
-	peer = dp_peer_find_hash_find(soc, mac, 0, vdev->vdev_id);
+	peer = dp_peer_find_hash_find(soc, mac, 0, vdev->vdev_id,
+			DP_MOD_ID_CDP);
+
 	if (!peer)
 		return tid;
 

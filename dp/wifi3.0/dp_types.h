@@ -2672,6 +2672,12 @@ struct dp_peer {
 #ifdef QCA_PEER_MULTIQ_SUPPORT
 	struct dp_peer_ast_params peer_ast_flowq_idx[DP_PEER_AST_FLOWQ_MAX];
 #endif
+	/* entry to inactive_list*/
+	TAILQ_ENTRY(dp_peer) inactive_list_elem;
+
+	qdf_atomic_t mod_refs[DP_MOD_ID_MAX];
+
+	uint8_t peer_state;
 #ifdef WLAN_SUPPORT_MSCS
 	struct dp_peer_mscs_parameter mscs_ipv4_parameter, mscs_ipv6_parameter;
 	struct dp_peer_mscs_session_ipv4 mscs_session_ipv4;
