@@ -12093,6 +12093,10 @@ static uint32_t sme_get_connected_roaming_vdev_band_mask(void)
 	session_id = csr_get_roam_enabled_sta_sessionid(mac);
 	if (session_id != WLAN_UMAC_VDEV_ID_MAX) {
 		session = CSR_GET_SESSION(mac, session_id);
+		if (!session) {
+			sme_err("Session not found for session_id:%d", session_id);
+			return band_mask;
+		}
 		band_mask = BIT(wlan_reg_freq_to_band(
 					session->connectedProfile.op_freq));
 		return band_mask;
