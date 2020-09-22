@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -16,27 +16,30 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#if !defined(__CDS_CRYPTO_H)
-#define __CDS_CRYPTO_H
-
 /**
- * DOC:  cds_crypto.h
+ * DOC: wlan_hdd_unit_test.h
  *
- * Crypto APIs
- *
+ * config wlan_hdd_unit_test
  */
 
-#include <linux/crypto.h>
+#ifndef _WLAN_HDD_UNIT_TEST_H
+#define _WLAN_HDD_UNIT_TEST_H
 
-static inline struct crypto_cipher *
-cds_crypto_alloc_cipher(const char *alg_name, u32 type, u32 mask)
+#ifdef WLAN_UNIT_TEST
+/**
+ * wlan_hdd_unit_test() - API to begin unit test on host side
+ * @hdd_ctx: hdd context
+ * @name: test item name
+ *
+ * Return: 0 on success and errno on failure
+ */
+int wlan_hdd_unit_test(struct hdd_context *hdd_ctx, const char *name);
+#else
+static inline int
+wlan_hdd_unit_test(struct hdd_context *hdd_ctx, const char *name)
 {
-	return crypto_alloc_cipher(alg_name, type, mask);
+	return -EOPNOTSUPP;
 }
+#endif
 
-static inline void cds_crypto_free_cipher(struct crypto_cipher *tfm)
-{
-	crypto_free_cipher(tfm);
-}
-
-#endif /* if !defined __CDS_CRYPTO_H */
+#endif /* _WLAN_HDD_UNIT_TEST_H */

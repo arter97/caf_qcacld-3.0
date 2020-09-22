@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -355,7 +355,8 @@ void ipa_set_dfs_cac_tx(struct wlan_objmgr_pdev *pdev, bool tx_block)
 	return wlan_ipa_set_dfs_cac_tx(ipa_obj, tx_block);
 }
 
-void ipa_set_ap_ibss_fwd(struct wlan_objmgr_pdev *pdev, bool intra_bss)
+void ipa_set_ap_ibss_fwd(struct wlan_objmgr_pdev *pdev, uint8_t session_id,
+			 bool intra_bss)
 {
 	struct wlan_ipa_priv *ipa_obj;
 
@@ -370,12 +371,17 @@ void ipa_set_ap_ibss_fwd(struct wlan_objmgr_pdev *pdev, bool intra_bss)
 		return;
 	}
 
-	return wlan_ipa_set_ap_ibss_fwd(ipa_obj, intra_bss);
+	return wlan_ipa_set_ap_ibss_fwd(ipa_obj, session_id, intra_bss);
 }
 
 void ipa_uc_force_pipe_shutdown(struct wlan_objmgr_pdev *pdev)
 {
 	struct wlan_ipa_priv *ipa_obj;
+
+	if (!pdev) {
+		ipa_debug("objmgr pdev is null!");
+		return;
+	}
 
 	if (!ipa_config_is_enabled()) {
 		ipa_debug("ipa is disabled");
@@ -614,6 +620,11 @@ void ipa_fw_rejuvenate_send_msg(struct wlan_objmgr_pdev *pdev)
 {
 	struct wlan_ipa_priv *ipa_obj;
 
+	if (!pdev) {
+		ipa_debug("objmgr pdev is null!");
+		return;
+	}
+
 	ipa_obj = ipa_pdev_get_priv_obj(pdev);
 	if (!ipa_obj) {
 		ipa_err("IPA object is NULL");
@@ -673,4 +684,21 @@ void ipa_update_tx_stats(struct wlan_objmgr_pdev *pdev, uint64_t sta_tx,
 	}
 
 	wlan_ipa_update_tx_stats(ipa_obj, sta_tx, ap_tx);
+}
+
+void ipa_flush_pending_vdev_events(struct wlan_objmgr_pdev *pdev,
+				   uint8_t vdev_id)
+{
+	struct wlan_ipa_priv *ipa_obj;
+
+	if (!ipa_config_is_enabled())
+		return;
+
+	ipa_obj = ipa_pdev_get_priv_obj(pdev);
+	if (!ipa_obj) {
+		ipa_err("IPA object is NULL");
+		return;
+	}
+
+	wlan_ipa_flush_pending_vdev_events(ipa_obj, vdev_id);
 }

@@ -56,7 +56,11 @@
 #define WLAN_IPA_CLIENT_MAX_IFACE           3
 #define WLAN_IPA_MAX_SYSBAM_PIPE            4
 #define WLAN_IPA_MAX_SESSION                5
+#ifdef WLAN_MAX_CLIENTS_ALLOWED
+#define WLAN_IPA_MAX_STA_COUNT              WLAN_MAX_CLIENTS_ALLOWED
+#else
 #define WLAN_IPA_MAX_STA_COUNT              41
+#endif
 
 #define WLAN_IPA_RX_PIPE                    WLAN_IPA_MAX_IFACE
 #define WLAN_IPA_ENABLE_MASK                BIT(0)
@@ -487,10 +491,12 @@ struct uc_rm_work_struct {
  * struct uc_op_work_struct
  * @work: uC OP work
  * @msg: OP message
+ * @osdev: poiner to qdf net device, used by osif_psoc_sync_trans_start_wait
  */
 struct uc_op_work_struct {
 	qdf_work_t work;
 	struct op_msg_type *msg;
+	qdf_device_t osdev;
 };
 
 /**
@@ -670,7 +676,7 @@ struct wlan_ipa_priv {
 	bool vdev_offload_enabled[WLAN_IPA_MAX_SESSION];
 	bool mcc_mode;
 	qdf_work_t mcc_work;
-	bool ap_intrabss_fwd;
+	bool disable_intrabss_fwd[WLAN_IPA_MAX_SESSION];
 	bool dfs_cac_block_tx;
 #ifdef FEATURE_METERING
 	struct ipa_uc_sharing_stats ipa_sharing_stats;
@@ -714,7 +720,7 @@ struct wlan_ipa_priv {
 
 #define BW_GET_DIFF(_x, _y) (unsigned long)((ULONG_MAX - (_y)) + (_x) + 1)
 
-#define IPA_RESOURCE_COMP_WAIT_TIME	100
+#define IPA_RESOURCE_COMP_WAIT_TIME	500
 
 #ifdef FEATURE_METERING
 #define IPA_UC_SHARING_STATES_WAIT_TIME	500

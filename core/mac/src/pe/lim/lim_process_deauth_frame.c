@@ -202,8 +202,7 @@ lim_process_deauth_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 			break;
 		}
 	} else {
-		/* Received Deauth frame in either IBSS */
-		/* or un-known role. Log and ignore it */
+		/* Received Deauth frame un-known role. Log and ignore it */
 		pe_err("received Deauth frame with reasonCode %d in role %d from "
 			QDF_MAC_ADDR_STR, reasonCode,
 			GET_LIM_SYSTEM_ROLE(pe_session),
@@ -236,13 +235,13 @@ lim_process_deauth_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 
 	if (lim_is_reassoc_in_progress(mac, pe_session) ||
 	    lim_is_reassoc_in_progress(mac, pRoamSessionEntry) ||
-	    pe_session->fw_roaming_started) {
+	    MLME_IS_ROAMING_IN_PROG(mac->psoc, pe_session->vdev_id)) {
 		/*
 		 * For LFR3, the roaming bssid is not known during ROAM_START,
 		 * so check if the deauth is received from current AP when
 		 * roaming is being done in the firmware
 		 */
-		if (pe_session->fw_roaming_started &&
+		if (MLME_IS_ROAMING_IN_PROG(mac->psoc, pe_session->vdev_id) &&
 		    IS_CURRENT_BSSID(mac, pHdr->sa, pe_session)) {
 			pe_debug("LFR3: Drop deauth frame from connected AP");
 			/*
@@ -326,6 +325,7 @@ void lim_perform_deauth(struct mac_context *mac_ctx, struct pe_session *pe_sessi
 	tLimMlmAssocCnf mlmAssocCnf;
 	uint16_t aid;
 	tpDphHashNode sta_ds;
+	tpSirAssocRsp assoc_rsp;
 
 	sta_ds = dph_lookup_hash_entry(mac_ctx, addr, &aid,
 				       &pe_session->dph.dphHashTable);
@@ -483,9 +483,6 @@ void lim_perform_deauth(struct mac_context *mac_ctx, struct pe_session *pe_sessi
 		}
 		break;
 
-	case eLIM_STA_IN_IBSS_ROLE:
-		break;
-
 	case eLIM_AP_ROLE:
 		break;
 
@@ -541,6 +538,10 @@ void lim_perform_deauth(struct mac_context *mac_ctx, struct pe_session *pe_sessi
 			lim_delete_pre_auth_node(mac_ctx, addr);
 
 		if (pe_session->limAssocResponseData) {
+			assoc_rsp = (tpSirAssocRsp) pe_session->
+					limAssocResponseData;
+			qdf_mem_free(assoc_rsp->sha384_ft_subelem.gtk);
+			qdf_mem_free(assoc_rsp->sha384_ft_subelem.igtk);
 			qdf_mem_free(pe_session->limAssocResponseData);
 			pe_session->limAssocResponseData = NULL;
 		}

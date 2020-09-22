@@ -24,7 +24,7 @@
 #include <linux/pm.h>
 #include <osapi_linux.h>
 
-#ifdef CONFIG_CNSS_UTILS
+#if IS_ENABLED(CONFIG_CNSS_UTILS)
 #include <net/cnss_utils.h>
 #endif
 
@@ -38,7 +38,7 @@
 
 #define TOTAL_DUMP_SIZE         0x00200000
 
-#ifdef CONFIG_WCNSS_MEM_PRE_ALLOC
+#if IS_ENABLED(CONFIG_WCNSS_MEM_PRE_ALLOC)
 #include <net/cnss_prealloc.h>
 #endif
 
@@ -52,6 +52,7 @@
  * @PLD_BUS_TYPE_SNOC_FW_SIM : SNOC FW SIM bus
  * @PLD_BUS_TYPE_PCIE_FW_SIM : PCIE FW SIM bus
  * @PLD_BUS_TYPE_IPCI : IPCI bus
+ * @PLD_BUS_TYPE_IPCI_FW_SIM : IPCI FW SIM bus
  */
 enum pld_bus_type {
 	PLD_BUS_TYPE_NONE = -1,
@@ -62,6 +63,7 @@ enum pld_bus_type {
 	PLD_BUS_TYPE_SNOC_FW_SIM,
 	PLD_BUS_TYPE_PCIE_FW_SIM,
 	PLD_BUS_TYPE_IPCI,
+	PLD_BUS_TYPE_IPCI_FW_SIM,
 };
 
 #define PLD_MAX_FIRMWARE_SIZE (1 * 1024 * 1024)
@@ -74,6 +76,7 @@ enum pld_bus_type {
  * @PLD_BUS_WIDTH_MEDIUM: vote for medium bus bandwidth
  * @PLD_BUS_WIDTH_HIGH: vote for high bus bandwidth
  * @PLD_BUS_WIDTH_VERY_HIGH: vote for very high bus bandwidth
+ * @PLD_BUS_WIDTH_LOW_LATENCY: vote for low latency bus bandwidth
  */
 enum pld_bus_width_type {
 	PLD_BUS_WIDTH_NONE,
@@ -82,6 +85,7 @@ enum pld_bus_width_type {
 	PLD_BUS_WIDTH_MEDIUM,
 	PLD_BUS_WIDTH_HIGH,
 	PLD_BUS_WIDTH_VERY_HIGH,
+	PLD_BUS_WIDTH_LOW_LATENCY,
 };
 
 #define PLD_MAX_FILE_NAME NAME_MAX
@@ -115,10 +119,12 @@ struct pld_fw_files {
  * enum pld_platform_cap_flag - platform capability flag
  * @PLD_HAS_EXTERNAL_SWREG: has external regulator
  * @PLD_HAS_UART_ACCESS: has UART access
+ * @PLD_HAS_DRV_SUPPORT: has PCIe DRV support
  */
 enum pld_platform_cap_flag {
 	PLD_HAS_EXTERNAL_SWREG = 0x01,
 	PLD_HAS_UART_ACCESS = 0x02,
+	PLD_HAS_DRV_SUPPORT = 0x04,
 };
 
 /**
@@ -142,6 +148,7 @@ enum pld_uevent {
 	PLD_FW_DOWN,
 	PLD_FW_CRASHED,
 	PLD_FW_RECOVERY_START,
+	PLD_FW_HANG_EVENT,
 };
 
 /**
@@ -155,6 +162,10 @@ struct pld_uevent_data {
 		struct {
 			bool crashed;
 		} fw_down;
+		struct {
+			void *hang_event_data;
+			u16 hang_event_data_len;
+		} hang_data;
 	};
 };
 
@@ -427,6 +438,8 @@ void pld_get_default_fw_files(struct pld_fw_files *pfw_files);
 int pld_get_fw_files_for_target(struct device *dev,
 				struct pld_fw_files *pfw_files,
 				u32 target_type, u32 target_version);
+int pld_prevent_l1(struct device *dev);
+void pld_allow_l1(struct device *dev);
 void pld_is_pci_link_down(struct device *dev);
 int pld_shadow_control(struct device *dev, bool enable);
 void pld_schedule_recovery_work(struct device *dev,
@@ -438,7 +451,7 @@ int pld_get_audio_wlan_timestamp(struct device *dev,
 				 uint64_t *ts);
 #endif /* FEATURE_WLAN_TIME_SYNC_FTM */
 
-#ifdef CONFIG_CNSS_UTILS
+#if IS_ENABLED(CONFIG_CNSS_UTILS)
 /**
  * pld_set_wlan_unsafe_channel() - Set unsafe channel
  * @dev: device
@@ -568,13 +581,15 @@ static inline int pld_set_wlan_unsafe_channel(struct device *dev,
 					      u16 *unsafe_ch_list,
 					      u16 ch_count)
 {
-	return -EINVAL;
+	return 0;
 }
 static inline int pld_get_wlan_unsafe_channel(struct device *dev,
 					      u16 *unsafe_ch_list,
 					      u16 *ch_count, u16 buf_len)
 {
-	return -EINVAL;
+	*ch_count = 0;
+
+	return 0;
 }
 static inline int pld_wlan_set_dfs_nol(struct device *dev,
 				       void *info, u16 info_len)
@@ -631,6 +646,16 @@ void *pld_get_fw_ptr(struct device *dev);
 int pld_auto_suspend(struct device *dev);
 int pld_auto_resume(struct device *dev);
 int pld_force_wake_request(struct device *dev);
+
+/**
+ * pld_force_wake_request_sync() - Request to awake MHI synchronously
+ * @dev: device
+ * @timeout_us: timeout in micro-sec request to wake
+ *
+ * Return: 0 for success
+ *         Non zero failure code for errors
+ */
+int pld_force_wake_request_sync(struct device *dev, int timeout_us);
 int pld_is_device_awake(struct device *dev);
 int pld_force_wake_release(struct device *dev);
 int pld_ce_request_irq(struct device *dev, unsigned int ce_id,
@@ -659,6 +684,16 @@ void *pld_smmu_get_mapping(struct device *dev);
 #endif
 int pld_smmu_map(struct device *dev, phys_addr_t paddr,
 		 uint32_t *iova_addr, size_t size);
+#ifdef CONFIG_SMMU_S1_UNMAP
+int pld_smmu_unmap(struct device *dev,
+		   uint32_t iova_addr, size_t size);
+#else
+static inline int pld_smmu_unmap(struct device *dev,
+				 uint32_t iova_addr, size_t size)
+{
+	return 0;
+}
+#endif
 int pld_get_user_msi_assignment(struct device *dev, char *user_name,
 				int *num_vectors, uint32_t *user_base_data,
 				uint32_t *base_vector);
@@ -815,7 +850,7 @@ int pld_pci_read_config_dword(struct pci_dev *pdev, int offset, uint32_t *val);
  *         Non zero failure code for errors
  */
 int pld_pci_write_config_dword(struct pci_dev *pdev, int offset, uint32_t val);
-#if defined(CONFIG_WCNSS_MEM_PRE_ALLOC) && defined(FEATURE_SKB_PRE_ALLOC)
+#if IS_ENABLED(CONFIG_WCNSS_MEM_PRE_ALLOC) && defined(FEATURE_SKB_PRE_ALLOC)
 
 /**
  * pld_nbuf_pre_alloc() - get allocated nbuf from platform driver.

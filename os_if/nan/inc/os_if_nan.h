@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -27,6 +27,15 @@
 #ifdef WLAN_FEATURE_NAN
 #include "nan_public_structs.h"
 #include "nan_ucfg_api.h"
+#include "qca_vendor.h"
+
+/* QCA_NL80211_VENDOR_SUBCMD_NAN_EXT policy */
+extern const struct nla_policy nan_attr_policy[
+			QCA_WLAN_VENDOR_ATTR_NAN_PARAMS_MAX + 1];
+
+/* QCA_NL80211_VENDOR_SUBCMD_NDP policy */
+extern const struct nla_policy vendor_attr_policy[
+			QCA_WLAN_VENDOR_ATTR_NDP_PARAMS_MAX + 1];
 
 /**
  * struct ndi_find_vdev_filter - find vdev filter object. this can be extended
@@ -145,18 +154,6 @@ static inline QDF_STATUS os_if_nan_set_ndp_delete_transaction_id(
 {
 	return ucfg_nan_set_ndp_delete_transaction_id(vdev, val);
 }
-
-/**
- * os_if_nan_legacy_req: os_if api to handle NAN requests attached to the vendor
- * command QCA_NL80211_VENDOR_SUBCMD_NAN
- * @psoc: pointer to psoc object
- * @data: request data. contains vendor cmd tlvs
- * @data_len: length of data
- *
- * Return: status of operation
- */
-int os_if_nan_legacy_req(struct wlan_objmgr_psoc *psoc, const void *data,
-			 int data_len);
 
 /**
  * os_if_process_nan_req: os_if api to handle NAN requests attached to the

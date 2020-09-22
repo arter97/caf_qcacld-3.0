@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -42,7 +42,7 @@
  *
  * Supported Feature: Concurrency
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
@@ -68,7 +68,7 @@
  *
  * Supported Feature: DBS
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
@@ -89,7 +89,7 @@
  *
  * Supported Feature: Concurrency
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
@@ -147,7 +147,7 @@
  *
  * Supported Feature: DBS
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
@@ -186,7 +186,7 @@
  *
  * Supported Feature: DBS
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
@@ -210,7 +210,7 @@
  *
  * Supported Feature: Concurrency
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
@@ -236,7 +236,7 @@
  *
  * Supported Feature: Concurrency
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
@@ -258,14 +258,13 @@
  *
  * Supported Feature: Concurrency
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
-#define CFG_ENABLE_MCC_ADAPTIVE_SCH_ENABLED_NAME CFG_INI_UINT(\
+#define CFG_ENABLE_MCC_ADAPTIVE_SCH_ENABLED_NAME CFG_INI_BOOL(\
 					"gEnableMCCAdaptiveScheduler", \
-					0, 1, 1, \
-					CFG_VALUE_OR_DEFAULT, \
+					true, \
 					"Enable/Disable MCC Adaptive Scheduler")
 
 /*
@@ -281,7 +280,7 @@
  *
  * Supported Feature: Concurrency
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
@@ -319,7 +318,7 @@
  *
  * Supported Feature: Concurrency
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
@@ -341,7 +340,7 @@ CFG_INI_UINT("gAllowMCCGODiffBI", 0, 4, 4, CFG_VALUE_OR_DEFAULT, \
  *
  * Supported Feature: STA
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
@@ -355,8 +354,8 @@ CFG_INI_UINT("gEnableOverLapCh", 0, 1, 0, CFG_VALUE_OR_DEFAULT, \
  * <ini>
  * gDualMacFeatureDisable - Disable Dual MAC feature.
  * @Min: 0
- * @Max: 4
- * @Default: 0
+ * @Max: 6
+ * @Default: 6
  *
  * This ini is used to enable/disable dual MAC feature.
  * 0 - enable DBS
@@ -376,12 +375,12 @@ CFG_INI_UINT("gEnableOverLapCh", 0, 1, 0, CFG_VALUE_OR_DEFAULT, \
  *
  * Supported Feature: DBS
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
 #define CFG_DUAL_MAC_FEATURE_DISABLE \
-CFG_INI_UINT("gDualMacFeatureDisable", 0, 6, 0, CFG_VALUE_OR_DEFAULT, \
+CFG_INI_UINT("gDualMacFeatureDisable", 0, 6, 6, CFG_VALUE_OR_DEFAULT, \
 	     "This INI is used to enable/disable Dual MAC feature")
 
 /*
@@ -401,11 +400,15 @@ CFG_INI_UINT("gDualMacFeatureDisable", 0, 6, 0, CFG_VALUE_OR_DEFAULT, \
  *	 b. Allow CAC process on DFS channel in single SAP (GO) mode
  *	 c. Allow DFS radar event process in single SAP (GO) mode
  *	 d. Disallow CAC and radar event process in SAP (GO) + STA mode.
+ *	 The value 2 of this ini requires master mode to be enabled so it is
+ *	 mandatory to enable the dfs master mode ini gEnableDFSMasterCap
+ *	 along with it.
+ *
  * Related: None.
  *
  * Supported Feature: Non-DBS, DBS
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
@@ -456,7 +459,7 @@ CFG_INI_UINT("gForce1x1Exception", 0, 2, 1, CFG_VALUE_OR_DEFAULT, \
  * Supported Feature: SAP
  *
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
@@ -480,7 +483,7 @@ CFG_INI_UINT("gEnableSAPManadatoryChanList", 0, 1, 0, CFG_VALUE_OR_DEFAULT, \
  *
  * Supported Feature: Non-DBS, DBS
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
@@ -503,7 +506,7 @@ CFG_INI_BOOL("g_nan_sap_scc_on_lte_coex_chan", 1, \
  *
  * Supported Feature: Non-DBS, DBS
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
@@ -577,7 +580,7 @@ CFG_INI_UINT("g_enable_go_force_scc", 0, 1, 0, CFG_VALUE_OR_DEFAULT, \
  * Supported Feature: STA, SAP
  *
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */

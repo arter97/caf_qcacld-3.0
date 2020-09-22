@@ -22,10 +22,12 @@
 #include "wlan_mlme_vdev_mgr_interface.h"
 #include "lim_utils.h"
 #include "wma_api.h"
+#include "wma.h"
 #include "lim_types.h"
 #include <include/wlan_mlme_cmn.h>
 #include <../../core/src/vdev_mgr_ops.h>
 #include "wlan_psoc_mlme_api.h"
+#include "target_if_cm_roam_offload.h"
 
 static struct vdev_mlme_ops sta_mlme_ops;
 static struct vdev_mlme_ops ap_mlme_ops;
@@ -627,6 +629,93 @@ bool ap_mlme_is_hidden_ssid_restart_in_progress(struct wlan_objmgr_vdev *vdev)
 	return mlme_priv->hidden_ssid_restart_in_progress;
 }
 
+QDF_STATUS mlme_set_bigtk_support(struct wlan_objmgr_vdev *vdev, bool val)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mlme_priv->bigtk_vdev_support = val;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+bool mlme_get_bigtk_support(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return false;
+	}
+
+	return mlme_priv->bigtk_vdev_support;
+}
+
+QDF_STATUS
+mlme_set_roam_reason_better_ap(struct wlan_objmgr_vdev *vdev, bool val)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mlme_priv->roam_reason_better_ap = val;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+bool mlme_get_roam_reason_better_ap(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return false;
+	}
+
+	return mlme_priv->roam_reason_better_ap;
+}
+
+QDF_STATUS
+mlme_set_hb_ap_rssi(struct wlan_objmgr_vdev *vdev, uint32_t val)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mlme_priv->hb_failure_rssi = val;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+uint32_t mlme_get_hb_ap_rssi(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return 0;
+	}
+
+	return mlme_priv->hb_failure_rssi;
+}
+
+
 QDF_STATUS mlme_set_connection_fail(struct wlan_objmgr_vdev *vdev, bool val)
 {
 	struct mlme_legacy_priv *mlme_priv;
@@ -895,6 +984,74 @@ int8_t mlme_get_max_reg_power(struct wlan_objmgr_vdev *vdev)
 }
 
 /**
+ * mlme_get_vdev_types() - get vdev type and subtype from its operation mode
+ * @mode: operation mode of vdev
+ * @type: type of vdev
+ * @sub_type: sub_type of vdev
+ *
+ * This API is called to get vdev type and subtype from its operation mode.
+ * Vdev operation modes are defined in enum QDF_OPMODE.
+ *
+ * Type of vdev are WLAN_VDEV_MLME_TYPE_AP, WLAN_VDEV_MLME_TYPE_STA,
+ * WLAN_VDEV_MLME_TYPE_IBSS, ,WLAN_VDEV_MLME_TYPE_MONITOR,
+ * WLAN_VDEV_MLME_TYPE_NAN, WLAN_VDEV_MLME_TYPE_OCB, WLAN_VDEV_MLME_TYPE_NDI
+ *
+ * Sub_types of vdev are WLAN_VDEV_MLME_SUBTYPE_P2P_DEVICE,
+ * WLAN_VDEV_MLME_SUBTYPE_P2P_CLIENT, WLAN_VDEV_MLME_SUBTYPE_P2P_GO,
+ * WLAN_VDEV_MLME_SUBTYPE_PROXY_STA, WLAN_VDEV_MLME_SUBTYPE_MESH
+ * Return: QDF_STATUS
+ */
+
+static QDF_STATUS mlme_get_vdev_types(enum QDF_OPMODE mode, uint8_t *type,
+				      uint8_t *sub_type)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	*type = 0;
+	*sub_type = 0;
+
+	switch (mode) {
+	case QDF_STA_MODE:
+		*type = WLAN_VDEV_MLME_TYPE_STA;
+		break;
+	case QDF_SAP_MODE:
+		*type = WLAN_VDEV_MLME_TYPE_AP;
+		break;
+	case QDF_P2P_DEVICE_MODE:
+		*type = WLAN_VDEV_MLME_TYPE_AP;
+		*sub_type = WLAN_VDEV_MLME_SUBTYPE_P2P_DEVICE;
+		break;
+	case QDF_P2P_CLIENT_MODE:
+		*type = WLAN_VDEV_MLME_TYPE_STA;
+		*sub_type = WLAN_VDEV_MLME_SUBTYPE_P2P_CLIENT;
+		break;
+	case QDF_P2P_GO_MODE:
+		*type = WLAN_VDEV_MLME_TYPE_AP;
+		*sub_type = WLAN_VDEV_MLME_SUBTYPE_P2P_GO;
+		break;
+	case QDF_OCB_MODE:
+		*type = WLAN_VDEV_MLME_TYPE_OCB;
+		break;
+	case QDF_IBSS_MODE:
+		*type = WLAN_VDEV_MLME_TYPE_IBSS;
+		break;
+	case QDF_MONITOR_MODE:
+		*type = WMI_HOST_VDEV_TYPE_MONITOR;
+		break;
+	case QDF_NDI_MODE:
+		*type = WLAN_VDEV_MLME_TYPE_NDI;
+		break;
+	case QDF_NAN_DISC_MODE:
+		*type = WLAN_VDEV_MLME_TYPE_NAN;
+		break;
+	default:
+		mlme_err("Invalid device mode %d", mode);
+		status = QDF_STATUS_E_INVAL;
+		break;
+	}
+	return status;
+}
+
+/**
  * vdevmgr_mlme_ext_hdl_create () - Create mlme legacy priv object
  * @vdev_mlme: vdev mlme object
  *
@@ -903,6 +1060,8 @@ int8_t mlme_get_max_reg_power(struct wlan_objmgr_vdev *vdev)
 static
 QDF_STATUS vdevmgr_mlme_ext_hdl_create(struct vdev_mlme_obj *vdev_mlme)
 {
+	QDF_STATUS status;
+
 	mlme_legacy_debug("vdev id = %d ",
 			  vdev_mlme->vdev->vdev_objmgr.vdev_id);
 	vdev_mlme->ext_vdev_ptr =
@@ -912,7 +1071,29 @@ QDF_STATUS vdevmgr_mlme_ext_hdl_create(struct vdev_mlme_obj *vdev_mlme)
 		return QDF_STATUS_E_NOMEM;
 	}
 
-	return QDF_STATUS_SUCCESS;
+	target_if_cm_roam_register_tx_ops(
+			&vdev_mlme->ext_vdev_ptr->cm_roam.tx_ops);
+
+	sme_get_vdev_type_nss(wlan_vdev_mlme_get_opmode(vdev_mlme->vdev),
+			      &vdev_mlme->proto.generic.nss_2g,
+			      &vdev_mlme->proto.generic.nss_5g);
+
+	status = mlme_get_vdev_types(wlan_vdev_mlme_get_opmode(vdev_mlme->vdev),
+				     &vdev_mlme->mgmt.generic.type,
+				     &vdev_mlme->mgmt.generic.subtype);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_err("Get vdev type failed; status:%d", status);
+		return status;
+	}
+
+	status = vdev_mgr_create_send(vdev_mlme);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_err("Failed to create vdev for vdev id %d",
+			 wlan_vdev_get_id(vdev_mlme->vdev));
+		return status;
+	}
+
+	return status;
 }
 
 /**
@@ -924,14 +1105,27 @@ QDF_STATUS vdevmgr_mlme_ext_hdl_create(struct vdev_mlme_obj *vdev_mlme)
 static
 QDF_STATUS vdevmgr_mlme_ext_hdl_destroy(struct vdev_mlme_obj *vdev_mlme)
 {
-	mlme_legacy_debug("vdev id = %d ",
-			  vdev_mlme->vdev->vdev_objmgr.vdev_id);
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	struct vdev_delete_response rsp;
+	uint8_t vdev_id;
+
+	vdev_id = vdev_mlme->vdev->vdev_objmgr.vdev_id;
+	mlme_legacy_debug("Sending vdev delete to firmware for vdev id = %d ",
+			  vdev_id);
 
 	if (!vdev_mlme->ext_vdev_ptr)
-		return QDF_STATUS_E_FAILURE;
+		return status;
+
+	status = vdev_mgr_delete_send(vdev_mlme);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_err("Failed to send vdev delete to firmware");
+			 rsp.vdev_id = vdev_id;
+		wma_vdev_detach_callback(&rsp);
+	}
 
 	mlme_free_self_disconnect_ies(vdev_mlme->vdev);
 	mlme_free_peer_disconnect_ies(vdev_mlme->vdev);
+	mlme_free_sae_auth_retry(vdev_mlme->vdev);
 	qdf_mem_free(vdev_mlme->ext_vdev_ptr);
 	vdev_mlme->ext_vdev_ptr = NULL;
 
@@ -1171,6 +1365,18 @@ vdevmgr_vdev_start_rsp_handle(struct vdev_mlme_obj *vdev_mlme,
 	return status;
 }
 
+static QDF_STATUS
+vdevmgr_vdev_peer_delete_all_rsp_handle(struct vdev_mlme_obj *vdev_mlme,
+					struct peer_delete_all_response *rsp)
+{
+	QDF_STATUS status;
+
+	status = lim_process_mlm_del_all_sta_rsp(vdev_mlme, rsp);
+	if (QDF_IS_STATUS_ERROR(status))
+		mlme_err("Failed to call lim_process_mlm_del_all_sta_rsp");
+	return status;
+}
+
 QDF_STATUS mlme_vdev_self_peer_create(struct wlan_objmgr_vdev *vdev)
 {
 	struct vdev_mlme_obj *vdev_mlme;
@@ -1185,97 +1391,75 @@ QDF_STATUS mlme_vdev_self_peer_create(struct wlan_objmgr_vdev *vdev)
 	return wma_vdev_self_peer_create(vdev_mlme);
 }
 
-/**
- * mlme_get_vdev_types() - get vdev type and subtype from its operation mode
- * @mode: operation mode of vdev
- * @type: type of vdev
- * @sub_type: sub_type of vdev
- *
- * This API is called to get vdev type and subtype from its operation mode.
- * Vdev operation modes are defined in enum QDF_OPMODE.
- *
- * Type of vdev are WLAN_VDEV_MLME_TYPE_AP, WLAN_VDEV_MLME_TYPE_STA,
- * WLAN_VDEV_MLME_TYPE_IBSS, ,WLAN_VDEV_MLME_TYPE_MONITOR,
- * WLAN_VDEV_MLME_TYPE_NAN, WLAN_VDEV_MLME_TYPE_OCB, WLAN_VDEV_MLME_TYPE_NDI
- *
- * Sub_types of vdev are WLAN_VDEV_MLME_SUBTYPE_P2P_DEVICE,
- * WLAN_VDEV_MLME_SUBTYPE_P2P_CLIENT, WLAN_VDEV_MLME_SUBTYPE_P2P_GO,
- * WLAN_VDEV_MLME_SUBTYPE_PROXY_STA, WLAN_VDEV_MLME_SUBTYPE_MESH
- * Return: QDF_STATUS
- */
-
-static QDF_STATUS mlme_get_vdev_types(enum QDF_OPMODE mode, uint8_t *type,
-				      uint8_t *sub_type)
-{
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	*type = 0;
-	*sub_type = 0;
-
-	switch (mode) {
-	case QDF_STA_MODE:
-		*type = WLAN_VDEV_MLME_TYPE_STA;
-		break;
-	case QDF_SAP_MODE:
-		*type = WLAN_VDEV_MLME_TYPE_AP;
-		break;
-	case QDF_P2P_DEVICE_MODE:
-		*type = WLAN_VDEV_MLME_TYPE_AP;
-		*sub_type = WLAN_VDEV_MLME_SUBTYPE_P2P_DEVICE;
-		break;
-	case QDF_P2P_CLIENT_MODE:
-		*type = WLAN_VDEV_MLME_TYPE_STA;
-		*sub_type = WLAN_VDEV_MLME_SUBTYPE_P2P_CLIENT;
-		break;
-	case QDF_P2P_GO_MODE:
-		*type = WLAN_VDEV_MLME_TYPE_AP;
-		*sub_type = WLAN_VDEV_MLME_SUBTYPE_P2P_GO;
-		break;
-	case QDF_OCB_MODE:
-		*type = WLAN_VDEV_MLME_TYPE_OCB;
-		break;
-	case QDF_IBSS_MODE:
-		*type = WLAN_VDEV_MLME_TYPE_IBSS;
-		break;
-	case QDF_MONITOR_MODE:
-		*type = WMI_HOST_VDEV_TYPE_MONITOR;
-		break;
-	case QDF_NDI_MODE:
-		*type = WLAN_VDEV_MLME_TYPE_NDI;
-		break;
-	case QDF_NAN_DISC_MODE:
-		*type = WLAN_VDEV_MLME_TYPE_NAN;
-		break;
-	default:
-		mlme_err("Invalid device mode %d", mode);
-		status = QDF_STATUS_E_INVAL;
-		break;
-	}
-	return status;
-}
-
 static
 QDF_STATUS vdevmgr_mlme_ext_post_hdl_create(struct vdev_mlme_obj *vdev_mlme)
 {
+	return QDF_STATUS_SUCCESS;
+}
+
+bool mlme_vdev_uses_self_peer(uint32_t vdev_type, uint32_t vdev_subtype)
+{
+	switch (vdev_type) {
+	case WMI_VDEV_TYPE_AP:
+		return vdev_subtype == WMI_UNIFIED_VDEV_SUBTYPE_P2P_DEVICE;
+
+	case WMI_VDEV_TYPE_MONITOR:
+	case WMI_VDEV_TYPE_OCB:
+		return true;
+
+	default:
+		return false;
+	}
+}
+
+void mlme_vdev_del_resp(uint8_t vdev_id)
+{
+	sme_vdev_del_resp(vdev_id);
+}
+
+static
+QDF_STATUS mlme_vdev_self_peer_delete_resp_flush_cb(struct scheduler_msg *msg)
+{
+	/*
+	 * sme should be the last component to hold the reference invoke the
+	 * same to release the reference gracefully
+	 */
+	sme_vdev_self_peer_delete_resp(msg->bodyptr);
+	return QDF_STATUS_SUCCESS;
+}
+
+void mlme_vdev_self_peer_delete_resp(struct del_vdev_params *param)
+{
+	struct scheduler_msg peer_del_rsp = {0};
 	QDF_STATUS status;
 
-	sme_get_vdev_type_nss(wlan_vdev_mlme_get_opmode(vdev_mlme->vdev),
-			      &vdev_mlme->proto.generic.nss_2g,
-			      &vdev_mlme->proto.generic.nss_5g);
+	peer_del_rsp.type = eWNI_SME_VDEV_DELETE_RSP;
+	peer_del_rsp.bodyptr = param;
+	peer_del_rsp.flush_callback = mlme_vdev_self_peer_delete_resp_flush_cb;
 
-	status = mlme_get_vdev_types(wlan_vdev_mlme_get_opmode(vdev_mlme->vdev),
-				     &vdev_mlme->mgmt.generic.type,
-				     &vdev_mlme->mgmt.generic.subtype);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		mlme_err("Get vdev type failed; status:%d", status);
-		return status;
+	status = scheduler_post_message(QDF_MODULE_ID_MLME,
+					QDF_MODULE_ID_SME,
+					QDF_MODULE_ID_SME, &peer_del_rsp);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		/* In the error cases release the final sme referene */
+		wlan_objmgr_vdev_release_ref(param->vdev, WLAN_LEGACY_SME_ID);
+		qdf_mem_free(param);
+	}
+}
+
+QDF_STATUS mlme_vdev_self_peer_delete(struct scheduler_msg *self_peer_del_msg)
+{
+	QDF_STATUS status;
+	struct del_vdev_params *del_vdev = self_peer_del_msg->bodyptr;
+
+	if (!del_vdev) {
+		mlme_err("Invalid del self peer params");
+		return QDF_STATUS_E_INVAL;
 	}
 
-	status = vdev_mgr_create_send(vdev_mlme);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		mlme_err("Failed to create vdev for vdev id %d",
-			 wlan_vdev_get_id(vdev_mlme->vdev));
-		return status;
-	}
+	status = wma_vdev_detach(del_vdev);
+	if (QDF_IS_STATUS_ERROR(status))
+		mlme_err("Failed to detach vdev");
 
 	return status;
 }
@@ -1354,6 +1538,8 @@ static struct vdev_mlme_ops sta_mlme_ops = {
  *                                      to INIT state
  * @mlme_vdev_is_newchan_no_cac:        callback to check if new channel is DFS
  *                                      and cac is not required
+ * @mlme_vdev_ext_peer_delete_all_rsp:  callback to handle vdev delete all peer
+ *                                      response and send result to upper layer
  */
 static struct vdev_mlme_ops ap_mlme_ops = {
 	.mlme_vdev_start_send = ap_mlme_vdev_start_send,
@@ -1373,6 +1559,8 @@ static struct vdev_mlme_ops ap_mlme_ops = {
 	.mlme_vdev_is_newchan_no_cac = ap_mlme_vdev_is_newchan_no_cac,
 	.mlme_vdev_ext_stop_rsp = vdevmgr_vdev_stop_rsp_handle,
 	.mlme_vdev_ext_start_rsp = vdevmgr_vdev_start_rsp_handle,
+	.mlme_vdev_ext_peer_delete_all_rsp =
+				vdevmgr_vdev_peer_delete_all_rsp_handle,
 };
 
 static struct vdev_mlme_ops mon_mlme_ops = {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -162,6 +162,15 @@ pld_pcie_get_fw_files_for_target(struct device *dev,
 	return 0;
 }
 
+static inline int pld_pcie_prevent_l1(struct device *dev)
+{
+	return 0;
+}
+
+static inline void pld_pcie_allow_l1(struct device *dev)
+{
+}
+
 static inline void pld_pcie_link_down(struct device *dev)
 {
 }
@@ -261,6 +270,12 @@ static inline int pld_pcie_auto_resume(struct device *dev)
 }
 
 static inline int pld_pcie_force_wake_request(struct device *dev)
+{
+	return 0;
+}
+
+static inline int pld_pcie_force_wake_request_sync(struct device *dev,
+						   int timeout_us)
 {
 	return 0;
 }
@@ -423,6 +438,16 @@ pld_pcie_smmu_map(struct device *dev,
 	return cnss_smmu_map(dev, paddr, iova_addr, size);
 }
 
+static inline int pld_pcie_prevent_l1(struct device *dev)
+{
+	return cnss_pci_prevent_l1(dev);
+}
+
+static inline void pld_pcie_allow_l1(struct device *dev)
+{
+	cnss_pci_allow_l1(dev);
+}
+
 static inline void pld_pcie_link_down(struct device *dev)
 {
 	cnss_pci_link_down(dev);
@@ -491,6 +516,12 @@ static inline int pld_pcie_auto_resume(struct device *dev)
 static inline int pld_pcie_force_wake_request(struct device *dev)
 {
 	return cnss_pci_force_wake_request(dev);
+}
+
+static inline int pld_pcie_force_wake_request_sync(struct device *dev,
+						   int timeout_us)
+{
+	return cnss_pci_force_wake_request_sync(dev, timeout_us);
 }
 
 static inline int pld_pcie_is_device_awake(struct device *dev)

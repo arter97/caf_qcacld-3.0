@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -57,6 +57,7 @@ QDF_STATUS hdd_softap_ipa_start_xmit(qdf_nbuf_t nbuf, qdf_netdev_t dev);
 /**
  * hdd_softap_tx_timeout() - TX timeout handler
  * @dev: pointer to network device
+ * @txqueue: tx queue
  *
  * Function registered as a net_device .ndo_tx_timeout() method for
  * master mode interfaces (SoftAP/P2P GO), called by the OS if the
@@ -64,8 +65,11 @@ QDF_STATUS hdd_softap_ipa_start_xmit(qdf_nbuf_t nbuf, qdf_netdev_t dev);
  *
  * Return: None
  */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0))
+void hdd_softap_tx_timeout(struct net_device *dev, unsigned int txqueue);
+#else
 void hdd_softap_tx_timeout(struct net_device *dev);
-
+#endif
 /**
  * hdd_softap_init_tx_rx() - Initialize Tx/Rx module
  * @adapter: pointer to adapter context
@@ -111,12 +115,12 @@ QDF_STATUS hdd_softap_rx_packet_cbk(void *adapter_context, qdf_nbuf_t rx_buf);
 /**
  * hdd_softap_deregister_sta() - Deregister a STA with the Data Path
  * @adapter: pointer to adapter context
- * @sta_info: pointer to HDD station info structure
+ * @sta_info: double pointer to HDD station info structure
  *
  * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
  */
 QDF_STATUS hdd_softap_deregister_sta(struct hdd_adapter *adapter,
-				     struct hdd_station_info *sta_info);
+				     struct hdd_station_info **sta_info);
 
 /**
  * hdd_softap_register_sta() - Register a SoftAP STA
@@ -258,4 +262,16 @@ int hdd_softap_inspect_dhcp_packet(struct hdd_adapter *adapter,
 }
 #endif
 
+/**
+ * hdd_softap_check_wait_for_tx_eap_pkt() - Check and wait for eap failure
+ * pkt completion event
+ * @adapter: pointer to hdd adapter
+ * @mac_addr: mac address of peer
+ *
+ * Check and wait for eap failure pkt tx completion.
+ *
+ * Return: void
+ */
+void hdd_softap_check_wait_for_tx_eap_pkt(struct hdd_adapter *adapter,
+					  struct qdf_mac_addr *mac_addr);
 #endif /* end #if !defined(WLAN_HDD_SOFTAP_TX_RX_H) */

@@ -196,6 +196,11 @@ lim_mlm_add_bss(struct mac_context *mac_ctx,
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
 	struct bss_params *addbss_param = NULL;
 
+	if (!wma) {
+		pe_err("Invalid wma handle");
+		return eSIR_SME_INVALID_PARAMETERS;
+	}
+
 	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(vdev);
 	if (!mlme_obj) {
 		pe_err("vdev component object is NULL");
@@ -384,8 +389,7 @@ lim_process_mlm_post_join_suspend_link(struct mac_context *mac_ctx,
 	mac_ctx->lim.lim_timers.gLimJoinFailureTimer.sessionId =
 		session->peSessionId;
 
-	status = wma_add_bss_peer_sta(session->self_mac_addr, session->bssId,
-				      false);
+	status = wma_add_bss_peer_sta(session->vdev_id, session->bssId);
 	lim_post_join_set_link_state_callback(mac_ctx, session, status);
 
 	return;
@@ -485,8 +489,7 @@ static bool lim_is_auth_req_expected(struct mac_context *mac_ctx,
 	/*
 	 * Expect Auth request only when:
 	 * 1. STA joined/associated with a BSS or
-	 * 2. STA is in IBSS mode
-	 * and STA is going to authenticate with a unicast
+	 * 2. STA is going to authenticate with a unicast
 	 * address and requested authentication algorithm is
 	 * supported.
 	 */
@@ -494,10 +497,7 @@ static bool lim_is_auth_req_expected(struct mac_context *mac_ctx,
 	flag = (((LIM_IS_STA_ROLE(session) &&
 		 ((session->limMlmState == eLIM_MLM_JOINED_STATE) ||
 		  (session->limMlmState ==
-					eLIM_MLM_LINK_ESTABLISHED_STATE))) ||
-		  (LIM_IS_IBSS_ROLE(session) &&
-		  (session->limMlmState ==
-					eLIM_MLM_BSS_STARTED_STATE))) &&
+					eLIM_MLM_LINK_ESTABLISHED_STATE)))) &&
 		(!IEEE80211_IS_MULTICAST(
 			mac_ctx->lim.gpLimMlmAuthReq->peerMacAddr)) &&
 		 lim_is_auth_algo_supported(mac_ctx,
@@ -797,6 +797,27 @@ end:
 			     (uint32_t *) &mlm_auth_cnf);
 }
 
+#ifdef WLAN_FEATURE_11W
+static void lim_store_pmfcomeback_timerinfo(struct pe_session *session_entry)
+{
+	if (session_entry->opmode != QDF_STA_MODE ||
+	    !session_entry->limRmfEnabled)
+		return;
+	/*
+	 * Store current MLM state in case ASSOC response returns with
+	 * TRY_AGAIN_LATER return code.
+	 */
+	session_entry->pmf_retry_timer_info.lim_prev_mlm_state =
+		session_entry->limPrevMlmState;
+	session_entry->pmf_retry_timer_info.lim_mlm_state =
+		session_entry->limMlmState;
+}
+#else
+static void lim_store_pmfcomeback_timerinfo(struct pe_session *session_entry)
+{
+}
+#endif /* WLAN_FEATURE_11W */
+
 /**
  * lim_process_mlm_assoc_req() - This function is called to process
  * MLM_ASSOC_REQ message from SME
@@ -857,6 +878,7 @@ static void lim_process_mlm_assoc_req(struct mac_context *mac_ctx, uint32_t *msg
 	/* map the session entry pointer to the AssocFailureTimer */
 	mac_ctx->lim.lim_timers.gLimAssocFailureTimer.sessionId =
 		mlm_assoc_req->sessionId;
+	lim_store_pmfcomeback_timerinfo(session_entry);
 	session_entry->limPrevMlmState = session_entry->limMlmState;
 	session_entry->limMlmState = eLIM_MLM_WT_ASSOC_RSP_STATE;
 	MTRACE(mac_trace(mac_ctx, TRACE_CODE_MLM_STATE,
@@ -969,17 +991,6 @@ lim_process_mlm_disassoc_req_ntf(struct mac_context *mac_ctx,
 			qdf_mem_free(mlm_disassocreq);
 			return;
 
-		}
-		break;
-	case eLIM_STA_IN_IBSS_ROLE:
-		break;
-	case eLIM_AP_ROLE:
-	case eLIM_P2P_DEVICE_GO:
-		if (true ==
-			 mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running) {
-			pe_err("CAC timer is running, drop disassoc from going out");
-			mlm_disassoccnf.resultCode = eSIR_SME_SUCCESS;
-			goto end;
 		}
 		break;
 	default:
@@ -1232,7 +1243,7 @@ static void
 lim_process_mlm_deauth_req_ntf(struct mac_context *mac_ctx,
 			       QDF_STATUS suspend_status, uint32_t *msg_buf)
 {
-	uint16_t aid;
+	uint16_t aid, i;
 	tSirMacAddr curr_bssId;
 	tpDphHashNode sta_ds;
 	struct tLimPreAuthNode *auth_node;
@@ -1342,20 +1353,6 @@ lim_process_mlm_deauth_req_ntf(struct mac_context *mac_ctx,
 			goto end;
 		}
 		break;
-	case eLIM_STA_IN_IBSS_ROLE:
-		pe_err("received MLM_DEAUTH_REQ IBSS Mode");
-		mlm_deauth_cnf.resultCode = eSIR_SME_INVALID_PARAMETERS;
-		goto end;
-	case eLIM_AP_ROLE:
-	case eLIM_P2P_DEVICE_GO:
-		if (true ==
-			mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running) {
-			pe_err("CAC timer is running, drop disassoc from going out");
-			mlm_deauth_cnf.resultCode = eSIR_SME_SUCCESS;
-			goto end;
-		}
-		break;
-
 	default:
 		break;
 	} /* end switch (GET_LIM_SYSTEM_ROLE(session)) */
@@ -1366,56 +1363,90 @@ lim_process_mlm_deauth_req_ntf(struct mac_context *mac_ctx,
 	 */
 	sta_ds = dph_lookup_hash_entry(mac_ctx,
 				       mlm_deauth_req->peer_macaddr.bytes,
-				       &aid, &session->dph.dphHashTable);
+				       &aid,
+				       &session->dph.dphHashTable);
 
-	if (!sta_ds) {
+	if (!sta_ds && (!mac_ctx->mlme_cfg->sap_cfg.is_sap_bcast_deauth_enabled
+	    || (mac_ctx->mlme_cfg->sap_cfg.is_sap_bcast_deauth_enabled &&
+	    !qdf_is_macaddr_broadcast(&mlm_deauth_req->peer_macaddr)))) {
 		/* Check if there exists pre-auth context for this STA */
-		auth_node = lim_search_pre_auth_list(mac_ctx,
-					mlm_deauth_req->peer_macaddr.bytes);
+		auth_node = lim_search_pre_auth_list(mac_ctx, mlm_deauth_req->
+						     peer_macaddr.bytes);
 		if (!auth_node) {
 			/*
 			 * Received DEAUTH REQ for a STA that is neither
 			 * Associated nor Pre-authenticated. Log error,
 			 * Prepare and Send LIM_MLM_DEAUTH_CNF
 			 */
-			pe_warn("received MLM_DEAUTH_REQ in mlme state %d for STA that "
-				   "does not have context, Addr="
-				   QDF_MAC_ADDR_STR,
-				session->limMlmState,
+			pe_warn("rcvd MLM_DEAUTH_REQ in mlme state %d",
+				session->limMlmState);
+			pe_warn("STA does not have context, Addr="
+				QDF_MAC_ADDR_STR,
 				QDF_MAC_ADDR_ARRAY(
-					mlm_deauth_req->peer_macaddr.bytes));
+				mlm_deauth_req->peer_macaddr.bytes));
 			mlm_deauth_cnf.resultCode =
 				eSIR_SME_STA_NOT_AUTHENTICATED;
 		} else {
 			mlm_deauth_cnf.resultCode = eSIR_SME_SUCCESS;
 			/* Delete STA from pre-auth STA list */
 			lim_delete_pre_auth_node(mac_ctx,
-					 mlm_deauth_req->peer_macaddr.bytes);
-			/* Send Deauthentication frame to peer entity */
+						 mlm_deauth_req->
+						 peer_macaddr.bytes);
+			/*Send Deauthentication frame to peer entity*/
 			lim_send_deauth_mgmt_frame(mac_ctx,
-					   mlm_deauth_req->reasonCode,
-					   mlm_deauth_req->peer_macaddr.bytes,
-					   session, false);
+						   mlm_deauth_req->reasonCode,
+						   mlm_deauth_req->
+						   peer_macaddr.bytes,
+						   session, false);
 		}
 		goto end;
-	} else if ((sta_ds->mlmStaContext.mlmState !=
-		    eLIM_MLM_LINK_ESTABLISHED_STATE) &&
+	} else if (sta_ds && (sta_ds->mlmStaContext.mlmState !=
+		   eLIM_MLM_LINK_ESTABLISHED_STATE) &&
 		   (sta_ds->mlmStaContext.mlmState !=
-		    eLIM_MLM_WT_ASSOC_CNF_STATE)) {
+		   eLIM_MLM_WT_ASSOC_CNF_STATE)) {
 		/*
-		 * received MLM_DEAUTH_REQ for STA that either has no context or
-		 * in some transit state
+		 * received MLM_DEAUTH_REQ for STA that either has no
+		 * context or in some transit state
 		 */
-		pe_warn("Invalid MLM_DEAUTH_REQ, Addr="QDF_MAC_ADDR_STR,
-			QDF_MAC_ADDR_ARRAY(mlm_deauth_req->peer_macaddr.bytes));
+		pe_warn("Invalid MLM_DEAUTH_REQ, Addr=" QDF_MAC_ADDR_STR,
+			QDF_MAC_ADDR_ARRAY(mlm_deauth_req->
+			peer_macaddr.bytes));
 		/* Prepare and Send LIM_MLM_DEAUTH_CNF */
 		mlm_deauth_cnf.resultCode = eSIR_SME_INVALID_PARAMETERS;
 		goto end;
+	} else if (sta_ds) {
+		/* sta_ds->mlmStaContext.rxPurgeReq     = 1; */
+		sta_ds->mlmStaContext.disassocReason = (tSirMacReasonCodes)
+						mlm_deauth_req->reasonCode;
+		sta_ds->mlmStaContext.cleanupTrigger =
+						mlm_deauth_req->deauthTrigger;
+
+		/*
+		 * Set state to mlm State to eLIM_MLM_WT_DEL_STA_RSP_STATE
+		 * This is to address the issue of race condition between
+		 * disconnect request from the HDD and disassoc from
+		 * inactivity timer. This will make sure that we will not
+		 * process disassoc if deauth is in progress for the station
+		 * and thus mlmStaContext.cleanupTrigger will not be
+		 * overwritten.
+		 */
+		sta_ds->mlmStaContext.mlmState = eLIM_MLM_WT_DEL_STA_RSP_STATE;
+	} else if (mac_ctx->mlme_cfg->sap_cfg.is_sap_bcast_deauth_enabled &&
+		   qdf_is_macaddr_broadcast(&mlm_deauth_req->peer_macaddr)) {
+		for (i = 0; i < session->dph.dphHashTable.size; i++) {
+			sta_ds = dph_get_hash_entry(mac_ctx, i,
+						   &session->dph.dphHashTable);
+			if (!sta_ds)
+				continue;
+
+			sta_ds->mlmStaContext.disassocReason =
+				(tSirMacReasonCodes)mlm_deauth_req->reasonCode;
+			sta_ds->mlmStaContext.cleanupTrigger =
+						mlm_deauth_req->deauthTrigger;
+			sta_ds->mlmStaContext.mlmState =
+						eLIM_MLM_WT_DEL_STA_RSP_STATE;
+		}
 	}
-	/* sta_ds->mlmStaContext.rxPurgeReq     = 1; */
-	sta_ds->mlmStaContext.disassocReason = (tSirMacReasonCodes)
-					       mlm_deauth_req->reasonCode;
-	sta_ds->mlmStaContext.cleanupTrigger = mlm_deauth_req->deauthTrigger;
 
 	if (mac_ctx->lim.limDisassocDeauthCnfReq.pMlmDeauthReq) {
 		pe_err("pMlmDeauthReq is not NULL, freeing");
@@ -1424,15 +1455,6 @@ lim_process_mlm_deauth_req_ntf(struct mac_context *mac_ctx,
 	}
 	mac_ctx->lim.limDisassocDeauthCnfReq.pMlmDeauthReq = mlm_deauth_req;
 
-	/*
-	 * Set state to mlm State to eLIM_MLM_WT_DEL_STA_RSP_STATE
-	 * This is to address the issue of race condition between
-	 * disconnect request from the HDD and disassoc from
-	 * inactivity timer. This will make sure that we will not
-	 * process disassoc if deauth is in progress for the station
-	 * and thus mlmStaContext.cleanupTrigger will not be overwritten.
-	 */
-	sta_ds->mlmStaContext.mlmState = eLIM_MLM_WT_DEL_STA_RSP_STATE;
 	/* Send Deauthentication frame to peer entity */
 	lim_send_deauth_mgmt_frame(mac_ctx, mlm_deauth_req->reasonCode,
 				   mlm_deauth_req->peer_macaddr.bytes,
@@ -1607,6 +1629,36 @@ static void lim_process_periodic_join_probe_req_timer(struct mac_context *mac_ct
 	}
 }
 
+static void lim_handle_sae_auth_timeout(struct mac_context *mac_ctx,
+					struct pe_session *session_entry)
+{
+	struct sae_auth_retry *sae_retry;
+
+	sae_retry = mlme_get_sae_auth_retry(session_entry->vdev);
+	if (!(sae_retry && sae_retry->sae_auth.data)) {
+		pe_debug("sae auth frame is not buffered vdev id %d",
+			 session_entry->vdev_id);
+		return;
+	}
+
+	pe_debug("retry sae auth for seq num %d vdev id %d",
+		 mac_ctx->mgmtSeqNum, session_entry->vdev_id);
+	lim_send_frame(mac_ctx, session_entry->vdev_id,
+		       sae_retry->sae_auth.data, sae_retry->sae_auth.len);
+
+	sae_retry->sae_auth_max_retry--;
+	/* Activate Auth Retry timer if max_retries are not done */
+	if (!sae_retry->sae_auth_max_retry || (tx_timer_activate(
+	    &mac_ctx->lim.lim_timers.g_lim_periodic_auth_retry_timer) !=
+	    TX_SUCCESS))
+		goto free_and_deactivate_timer;
+
+	return;
+
+free_and_deactivate_timer:
+	lim_sae_auth_cleanup_retry(mac_ctx, session_entry->vdev_id);
+}
+
 /**
  * lim_process_auth_retry_timer()- function to Retry Auth when auth timeout
  * occurs
@@ -1619,15 +1671,19 @@ static void lim_process_auth_retry_timer(struct mac_context *mac_ctx)
 	struct pe_session *session_entry;
 	tAniAuthType auth_type;
 	tLimTimers *lim_timers = &mac_ctx->lim.lim_timers;
-	uint16_t vdev_id =
+	uint16_t pe_session_id =
 		lim_timers->g_lim_periodic_auth_retry_timer.sessionId;
 
-	session_entry = pe_find_session_by_session_id(mac_ctx, vdev_id);
+	session_entry = pe_find_session_by_session_id(mac_ctx, pe_session_id);
 	if (!session_entry) {
-		pe_err("session does not exist for vdev_id: %d", vdev_id);
+		pe_err("session does not exist for pe_session_id: %d",
+		       pe_session_id);
 		return;
 	}
 
+	/** For WPA3 SAE gLimAuthFailureTimer is not running hence
+	 *  we don't enter in below "if" block in case of wpa3 sae
+	 */
 	if (tx_timer_running(&mac_ctx->lim.lim_timers.gLimAuthFailureTimer) &&
 	    (session_entry->limMlmState == eLIM_MLM_WT_AUTH_FRAME2_STATE) &&
 	     (LIM_AUTH_ACK_RCD_SUCCESS != mac_ctx->auth_ack_status)) {
@@ -1664,12 +1720,14 @@ static void lim_process_auth_retry_timer(struct mac_context *mac_ctx)
 		/* Activate Auth Retry timer */
 		if (tx_timer_activate
 		     (&mac_ctx->lim.lim_timers.g_lim_periodic_auth_retry_timer)
-			 != TX_SUCCESS) {
+			 != TX_SUCCESS)
 			pe_err("could not activate Auth Retry failure timer");
-			return;
-		}
+
+		return;
 	}
-	return;
+
+	/* Auth retry time out for wpa3 sae */
+	lim_handle_sae_auth_timeout(mac_ctx, session_entry);
 } /*** lim_process_auth_retry_timer() ***/
 
 void lim_process_auth_failure_timeout(struct mac_context *mac_ctx)
@@ -1775,7 +1833,7 @@ lim_process_auth_rsp_timeout(struct mac_context *mac_ctx, uint32_t auth_idx)
 				session, 0, AUTH_RESPONSE_TIMEOUT);
 #endif
 
-	if (LIM_IS_AP_ROLE(session) || LIM_IS_IBSS_ROLE(session)) {
+	if (LIM_IS_AP_ROLE(session)) {
 		if (auth_node->mlmState != eLIM_MLM_WT_AUTH_FRAME3_STATE) {
 			pe_err("received AUTH rsp timeout in unexpected "
 				   "state for MAC address: " QDF_MAC_ADDR_STR,
@@ -1841,13 +1899,22 @@ void lim_process_assoc_failure_timeout(struct mac_context *mac_ctx,
 	 * when device has missed the assoc resp sent by peer.
 	 * By sending deauth try to clear the session created on peer device.
 	 */
-	pe_debug("Sessionid: %d try sending deauth on channel freq %d to BSSID: "
-		QDF_MAC_ADDR_STR, session->peSessionId,
-		session->curr_op_freq,
-		QDF_MAC_ADDR_ARRAY(session->bssId));
-	lim_send_deauth_mgmt_frame(mac_ctx, eSIR_MAC_UNSPEC_FAILURE_REASON,
-		session->bssId, session, false);
-
+	if (msg_type == LIM_ASSOC &&
+	    mlme_get_reconn_after_assoc_timeout_flag(mac_ctx->psoc,
+						     session->vdev_id)) {
+		pe_debug("vdev: %d skip sending deauth on channel freq %d to BSSID: "
+			QDF_MAC_ADDR_STR, session->vdev_id,
+			session->curr_op_freq,
+			QDF_MAC_ADDR_ARRAY(session->bssId));
+	} else {
+		pe_debug("vdev: %d try sending deauth on channel freq %d to BSSID: "
+			QDF_MAC_ADDR_STR, session->vdev_id,
+			session->curr_op_freq,
+			QDF_MAC_ADDR_ARRAY(session->bssId));
+		lim_send_deauth_mgmt_frame(mac_ctx,
+					   eSIR_MAC_UNSPEC_FAILURE_REASON,
+					   session->bssId, session, false);
+	}
 	if ((LIM_IS_AP_ROLE(session)) ||
 	    ((session->limMlmState != eLIM_MLM_WT_ASSOC_RSP_STATE) &&
 	    (session->limMlmState != eLIM_MLM_WT_REASSOC_RSP_STATE) &&
@@ -1871,6 +1938,7 @@ void lim_process_assoc_failure_timeout(struct mac_context *mac_ctx,
 			session->peSessionId, session->limMlmState));
 		/* Change timer for future activations */
 		lim_deactivate_and_change_timer(mac_ctx, eLIM_ASSOC_FAIL_TIMER);
+		lim_stop_pmfcomeback_timer(session);
 		/*
 		 * Free up buffer allocated for JoinReq held by
 		 * MLM state machine

@@ -46,13 +46,6 @@
 #define WMA_LINK_MONITOR_DEFAULT_TIME_SECS 10
 #define WMA_KEEP_ALIVE_DEFAULT_TIME_SECS   5
 
-/* The maximum number of patterns that can be transmitted by the firmware
- *  and maximum patterns size.
- */
-#ifndef WMA_MAXNUM_PERIODIC_TX_PTRNS
-#define WMA_MAXNUM_PERIODIC_TX_PTRNS 6
-#endif
-
 #define WMA_WMM_EXPO_TO_VAL(val)        ((1 << (val)) - 1)
 
 #define MAX_HT_MCS_IDX 8
@@ -186,6 +179,15 @@ void wma_process_roam_synch_fail(WMA_HANDLE handle,
 int wma_roam_synch_event_handler(void *handle, uint8_t *event,
 					uint32_t len);
 
+/**
+ * wma_register_roam_vdev_disc_event_handler() - API to register handler for
+ * roam vdev disconnect event id
+ * @wma_handle: wma handle
+ *
+ * Return: void
+ */
+void wma_register_roam_vdev_disc_event_handler(tp_wma_handle wma_handle);
+
 #ifdef WLAN_FEATURE_FIPS
 /**
  * wma_register_pmkid_req_event_handler() - Register pmkid request event handler
@@ -277,10 +279,29 @@ int wma_mlme_roam_synch_event_handler_cb(void *handle, uint8_t *event,
  */
 int wma_roam_synch_frame_event_handler(void *handle, uint8_t *event,
 					uint32_t len);
+
+/**
+ * wma_roam_vdev_disconnect_event_handler() - Handles roam vdev disconnect event
+ * @handle: wma_handle
+ * @event: pmkid request event data pointer
+ * @len: length of the data
+ *
+ * @Return: 0 on sucees else error code
+ */
+int wma_roam_vdev_disconnect_event_handler(void *handle, uint8_t *event,
+					   uint32_t len);
+
 #else
 static inline int wma_mlme_roam_synch_event_handler_cb(void *handle,
 						       uint8_t *event,
 						       uint32_t len)
+{
+	return 0;
+}
+
+static inline int
+wma_roam_vdev_disconnect_event_handler(void *handle, uint8_t *event,
+				       uint32_t len)
 {
 	return 0;
 }
@@ -301,6 +322,28 @@ wma_roam_pmkid_request_event_handler(void *handle,
 }
 #endif
 
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+/**
+ * wma_roam_scan_chan_list_event_handler() - roam scan chan list event handler
+ * @handle: wma handle
+ * @event: pointer to fw event
+ * @len: length of event
+ *
+ * Return: Success or Failure status
+ */
+int wma_roam_scan_chan_list_event_handler(WMA_HANDLE handle,
+					  uint8_t *event,
+					  uint32_t len);
+#else
+static inline int
+wma_roam_scan_chan_list_event_handler(WMA_HANDLE handle, uint8_t *event,
+				      uint32_t len)
+{
+	return 0;
+}
+#endif
+
+#ifndef ROAM_OFFLOAD_V1
 /**
  * wma_update_per_roam_config() -per roam config parameter updation to FW
  * @handle: wma handle
@@ -309,8 +352,8 @@ wma_roam_pmkid_request_event_handler(void *handle,
  * Return: none
  */
 void wma_update_per_roam_config(WMA_HANDLE handle,
-				 struct wmi_per_roam_config_req *req_buf);
-
+				 struct wlan_per_roam_config_req *req_buf);
+#endif
 QDF_STATUS wma_update_channel_list(WMA_HANDLE handle,
 				   tSirUpdateChanList *chan_list);
 
@@ -594,17 +637,6 @@ int wma_roam_event_callback(WMA_HANDLE handle, uint8_t *event_buf,
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 void wma_process_roam_synch_complete(WMA_HANDLE handle, uint8_t vdev_id);
-static inline bool wma_is_roam_synch_in_progress(tp_wma_handle wma,
-		uint8_t vdev_id)
-{
-	return wma->interfaces[vdev_id].roam_synch_in_progress;
-}
-#else
-static inline bool wma_is_roam_synch_in_progress(tp_wma_handle wma,
-		uint8_t vdev_id)
-{
-	return false;
-}
 #endif
 
 /*
@@ -623,117 +655,6 @@ QDF_STATUS wma_find_vdev_id_by_addr(tp_wma_handle wma, uint8_t *addr,
 				    uint8_t *vdev_id);
 
 bool wma_is_vdev_in_ap_mode(tp_wma_handle wma, uint8_t vdev_id);
-
-#ifdef QCA_IBSS_SUPPORT
-/**
- * wma_is_vdev_in_ibss_mode() - check that vdev is in ibss mode or not
- * @wma: wma handle
- * @vdev_id: vdev id
- *
- * Helper function to know whether given vdev id
- * is in IBSS mode or not.
- *
- * Return: True/False
- */
-bool wma_is_vdev_in_ibss_mode(tp_wma_handle wma, uint8_t vdev_id);
-
-/**
- * wma_adjust_ibss_heart_beat_timer() - set ibss heart beat timer in fw.
- * @wma: wma handle
- * @vdev_id: vdev id
- * @peer_num_delta: peer number delta value
- *
- * Return: none
- */
-void wma_adjust_ibss_heart_beat_timer(tp_wma_handle wma,
-				      uint8_t vdev_id,
-				      int8_t peer_num_delta);
-
-/**
- * wma_set_ibss_pwrsave_params() - set ibss power save parameter to fw
- * @wma: wma handle
- * @vdev_id: vdev id
- *
- * Return: 0 for success or error code.
- */
-QDF_STATUS
-wma_set_ibss_pwrsave_params(tp_wma_handle wma, uint8_t vdev_id);
-
-/**
- * wma_ibss_peer_info_event_handler() - IBSS peer info event handler
- * @handle: wma handle
- * @data: event data
- * @len: length of data
- *
- * This function handles IBSS peer info event from FW.
- *
- * Return: 0 for success or error code
- */
-int wma_ibss_peer_info_event_handler(void *handle, uint8_t *data,
-				     uint32_t len);
-#else
-/**
- * wma_is_vdev_in_ibss_mode(): dummy function
- * @wma: wma handle
- * @vdev_id: vdev id
- *
- * Return false since no vdev can be in ibss mode without ibss support
- */
-static inline
-bool wma_is_vdev_in_ibss_mode(tp_wma_handle wma, uint8_t vdev_id)
-{
-	return false;
-}
-
-/**
- * wma_adjust_ibss_heart_beat_timer() - set ibss heart beat timer in fw.
- * @wma: wma handle
- * @vdev_id: vdev id
- * @peer_num_delta: peer number delta value
- *
- * This function is dummy
- *
- * Return: none
- */
-static inline void
-wma_adjust_ibss_heart_beat_timer(tp_wma_handle wma,
-				 uint8_t vdev_id,
-				 int8_t peer_num_delta)
-{
-}
-
-/**
- * wma_ibss_peer_info_event_handler() - IBSS peer info event handler
- * @handle: wma handle
- * @data: event data
- * @len: length of data
- *
- * This function is dummy
- *
- * Return: 0 for success or error code
- */
-static inline int
-wma_ibss_peer_info_event_handler(void *handle, uint8_t *data,
-				 uint32_t len)
-{
-	return 0;
-}
-
-/**
- * wma_set_ibss_pwrsave_params() - set ibss power save parameter to fw
- * @wma: wma handle
- * @vdev_id: vdev id
- *
- * This function is dummy
- *
- * Return: 0 for success or error code.
- */
-static inline QDF_STATUS
-wma_set_ibss_pwrsave_params(tp_wma_handle wma, uint8_t vdev_id)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif /* QCA_IBSS_SUPPORT */
 
 /**
  * wma_get_vdev_bssid() - Get BSSID from mlme_obj
@@ -773,29 +694,18 @@ static inline uint8_t *wma_find_bssid_by_vdev_id(tp_wma_handle wma,
 QDF_STATUS wma_find_vdev_id_by_bssid(tp_wma_handle wma, uint8_t *bssid,
 				     uint8_t *vdev_id);
 
-/**
- * wma_vdev_detach() - send vdev delete command to fw
- * @wma_handle: wma handle
- * @pdel_vdev_req_param: del vdev params
- *
- * Return: QDF status
- */
-QDF_STATUS wma_vdev_detach(tp_wma_handle wma_handle,
-			struct del_vdev_params *pdel_vdev_req_param);
-
 QDF_STATUS wma_vdev_set_param(wmi_unified_t wmi_handle, uint32_t if_id,
 				uint32_t param_id, uint32_t param_value);
 
 QDF_STATUS wma_remove_peer(tp_wma_handle wma, uint8_t *mac_addr,
-			   uint8_t vdev_id, bool roam_synch_in_progress);
+			   uint8_t vdev_id);
 
 QDF_STATUS wma_peer_unmap_conf_send(tp_wma_handle wma,
 				    struct send_peer_unmap_conf_params *msg);
 
 QDF_STATUS wma_create_peer(tp_wma_handle wma,
 			   uint8_t peer_addr[QDF_MAC_ADDR_SIZE],
-			   uint32_t peer_type, uint8_t vdev_id,
-			   bool roam_synch_in_progress);
+			   uint32_t peer_type, uint8_t vdev_id);
 
 /**
  * wma_send_del_bss_response() - send delete bss resp
@@ -1061,6 +971,15 @@ void wma_set_max_tx_power(WMA_HANDLE handle,
 void wma_disable_sta_ps_mode(tpDisablePsParams ps_req);
 
 /**
+ * wma_send_max_tx_pwrlmt() - send max tx power limit to fw
+ * @handle: wma handle
+ * @vdev_id: vdev id
+ *
+ * Return: none
+ */
+void wma_send_max_tx_pwrlmt(WMA_HANDLE handle, uint8_t vdev_id);
+
+/**
  * wma_enable_uapsd_mode() - enable uapsd mode in fw
  * @wma: wma handle
  * @ps_req: power save request
@@ -1196,10 +1115,6 @@ QDF_STATUS wma_set_thermal_mgmt(tp_wma_handle wma_handle,
 
 int wma_thermal_mgmt_evt_handler(void *handle, uint8_t *event,
 					uint32_t len);
-
-int wma_fast_tx_fail_event_handler(void *handle, uint8_t *data,
-					  uint32_t len);
-
 /*
  * wma_utils.c functions declarations
  */
@@ -1332,18 +1247,6 @@ void wma_process_link_status_req(tp_wma_handle wma,
 				 tAniGetLinkStatus *pGetLinkStatus);
 
 /**
- * wma_get_peer_info_ext() - get peer info
- * @handle: wma interface
- * @peer_info_req: get peer info request information
- *
- * This function will send WMI_REQUEST_PEER_STATS_INFO_CMDID to FW
- *
- * Return: 0 on success, otherwise error value
- */
-QDF_STATUS wma_get_peer_info_ext(WMA_HANDLE handle,
-				struct sir_peer_info_ext_req *peer_info_req);
-
-/**
  * wma_get_isolation() - get antenna isolation
  * @handle: wma interface
  *
@@ -1352,19 +1255,6 @@ QDF_STATUS wma_get_peer_info_ext(WMA_HANDLE handle,
  * Return: 0 on success, otherwise error value
  */
 QDF_STATUS wma_get_isolation(tp_wma_handle wma);
-
-/**
- * wma_peer_info_event_handler() - Handler for WMI_PEER_STATS_INFO_EVENTID
- * @handle: WMA global handle
- * @cmd_param_info: Command event data
- * @len: Length of cmd_param_info
- *
- * This function will handle WMI_PEER_STATS_INFO_EVENTID
- *
- * Return: 0 on success, error code otherwise
- */
-int wma_peer_info_event_handler(void *handle, u_int8_t *cmd_param_info,
-				   u_int32_t len);
 
 int wma_profile_data_report_event_handler(void *handle, uint8_t *event_buf,
 				       uint32_t len);
@@ -1423,39 +1313,6 @@ void wma_config_plm(tp_wma_handle wma, struct plm_req_params *plm);
 
 QDF_STATUS wma_process_mcbc_set_filter_req(tp_wma_handle wma_handle,
 					   tSirRcvFltMcAddrList * mcbc_param);
-QDF_STATUS wma_process_cesium_enable_ind(tp_wma_handle wma);
-
-QDF_STATUS wma_process_get_peer_info_req
-	(tp_wma_handle wma, tSirIbssGetPeerInfoReqParams *pReq);
-
-QDF_STATUS wma_process_tx_fail_monitor_ind
-	(tp_wma_handle wma, tAniTXFailMonitorInd *pReq);
-
-#ifdef FEATURE_WLAN_RMC
-QDF_STATUS wma_process_rmc_enable_ind(tp_wma_handle wma);
-
-QDF_STATUS wma_process_rmc_disable_ind(tp_wma_handle wma);
-
-QDF_STATUS wma_process_rmc_action_period_ind(tp_wma_handle wma);
-#else
-static inline
-QDF_STATUS wma_process_rmc_enable_ind(tp_wma_handle wma)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline
-QDF_STATUS wma_process_rmc_disable_ind(tp_wma_handle wma)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline
-QDF_STATUS wma_process_rmc_action_period_ind(tp_wma_handle wma)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif
 
 QDF_STATUS wma_process_add_periodic_tx_ptrn_ind(WMA_HANDLE handle,
 						tSirAddPeriodicTxPtrn *pattern);
@@ -1626,6 +1483,26 @@ int wma_unified_power_debug_stats_event_handler(void *handle,
 int wma_unified_beacon_debug_stats_event_handler(void *handle,
 						 uint8_t *cmd_param_info,
 						 uint32_t len);
+
+#if defined(CLD_PM_QOS) && defined(WLAN_FEATURE_LL_MODE)
+/**
+ * wma_vdev_bcn_latency_event_handler() - Get the latency info received in bcn
+ * @handle: WMA handle
+ * @event: data in event
+ * @len: length
+ *
+ * Return: 0 for success or error code
+ */
+int wma_vdev_bcn_latency_event_handler(void *handle, uint8_t *event,
+				       uint32_t len);
+#else
+static inline int wma_vdev_bcn_latency_event_handler(void *handle,
+						     uint8_t *event,
+						     uint32_t len)
+{
+	return 0;
+}
+#endif
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
 /**
@@ -1798,16 +1675,6 @@ int wma_fill_beacon_interval_reset_req(tp_wma_handle wma, uint8_t vdev_id,
  */
 bool wma_is_vdev_valid(uint32_t vdev_id);
 
-/*
- * wma_is_vdev_started() - check whether vdev is started or not
- * @vdev: pointer to vdev object
- *
- * This function verifies the vdev is started nor not
- *
- * Return: 'true' if vdev is started else 'false'
- */
-bool wma_is_vdev_started(struct wlan_objmgr_vdev *vdev);
-
 /**
  * wma_vdev_obss_detection_info_handler - event handler to handle obss detection
  * @handle: the wma handle
@@ -1939,7 +1806,7 @@ int wma_oem_event_handler(void *wma_ctx, uint8_t *event_buff, uint32_t len);
  * Return: Success or Failure status
  */
 QDF_STATUS wma_set_roam_triggers(tp_wma_handle wma_handle,
-				 struct roam_triggers *triggers);
+				 struct wlan_roam_triggers *triggers);
 
 /**
  * wma_get_ani_level_evt_handler - event handler to fetch ani level

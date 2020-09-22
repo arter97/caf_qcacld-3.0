@@ -28,6 +28,7 @@
 #include <wlan_cmn.h>
 #include <wlan_objmgr_vdev_obj.h>
 #include <wlan_objmgr_peer_obj.h>
+#include "wlan_cm_roam_public_srtuct.h"
 
 #define mlme_legacy_fatal(params...) QDF_TRACE_FATAL(QDF_MODULE_ID_MLME, params)
 #define mlme_legacy_err(params...) QDF_TRACE_ERROR(QDF_MODULE_ID_MLME, params)
@@ -41,16 +42,6 @@
  */
 struct wlan_mlme_psoc_ext_obj {
 	struct wlan_mlme_cfg cfg;
-};
-
-/**
- * struct wlan_ies - Generic WLAN Information Element(s) format
- * @len: Total length of the IEs
- * @data: IE data
- */
-struct wlan_ies {
-	uint16_t len;
-	uint8_t *data;
 };
 
 /**
@@ -70,12 +61,28 @@ struct wlan_disconnect_info {
 };
 
 /**
+ * struct sae_auth_retry - SAE auth retry Information
+ * @sae_auth_max_retry: Max number of sae auth retries
+ * @sae_auth: SAE auth frame information
+ */
+struct sae_auth_retry {
+	uint8_t sae_auth_max_retry;
+	struct wlan_ies sae_auth;
+};
+
+/**
  * struct peer_mlme_priv_obj - peer MLME component object
+ * @last_pn_valid if last PN is valid
+ * @last_pn: last pn received
+ * @rmf_pn_replays: rmf pn replay count
  * @is_pmf_enabled: True if PMF is enabled
  * @last_assoc_received_time: last assoc received time
  * @last_disassoc_deauth_received_time: last disassoc/deauth received time
  */
 struct peer_mlme_priv_obj {
+	uint8_t last_pn_valid;
+	uint64_t last_pn;
+	uint32_t rmf_pn_replays;
 	bool is_pmf_enabled;
 	qdf_time_t last_assoc_received_time;
 	qdf_time_t last_disassoc_deauth_received_time;
@@ -122,10 +129,14 @@ struct wlan_mlme_roaming_config {
  *  roam config info
  * @roam_sm: Structure containing roaming state related details
  * @roam_config: Roaming configurations structure
+ * @sae_single_pmk: Details for sae roaming using single pmk
  */
 struct wlan_mlme_roam {
 	struct wlan_mlme_roam_state_info roam_sm;
 	struct wlan_mlme_roaming_config roam_cfg;
+#if defined(WLAN_SAE_SINGLE_PMK) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
+	struct wlan_mlme_sae_single_pmk sae_single_pmk;
+#endif
 };
 
 /**
@@ -137,6 +148,7 @@ struct wlan_mlme_roam {
  * @connection_fail: flag to indicate connection failed
  * @cac_required_for_new_channel: if CAC is required for new channel
  * @follow_ap_edca: if true, it is forced to follow the AP's edca.
+ * @reconn_after_assoc_timeout: reconnect to the same AP if association timeout
  * @assoc_type: vdev associate/reassociate type
  * @dynamic_cfg: current configuration of nss, chains for vdev.
  * @ini_cfg: Max configuration of nss, chains supported for vdev.
@@ -145,6 +157,11 @@ struct wlan_mlme_roam {
  * @disconnect_info: Disconnection information
  * @vdev_stop_type: vdev stop type request
  * @roam_off_state: Roam offload state
+ * @cm_roam: Roaming configuration
+ * @bigtk_vdev_support: BIGTK feature support for this vdev (SAP)
+ * @sae_auth_retry: SAE auth retry information
+ * @roam_reason_better_ap: roam due to better AP found
+ * @better_ap_hb_failure_rssi: heartbeat failure AP RSSI
  */
 struct mlme_legacy_priv {
 	bool chan_switch_in_progress;
@@ -153,6 +170,7 @@ struct mlme_legacy_priv {
 	bool connection_fail;
 	bool cac_required_for_new_channel;
 	bool follow_ap_edca;
+	bool reconn_after_assoc_timeout;
 	enum vdev_assoc_type assoc_type;
 	struct wlan_mlme_nss_chains dynamic_cfg;
 	struct wlan_mlme_nss_chains ini_cfg;
@@ -161,6 +179,11 @@ struct mlme_legacy_priv {
 	struct wlan_disconnect_info disconnect_info;
 	uint32_t vdev_stop_type;
 	struct wlan_mlme_roam mlme_roam;
+	struct wlan_cm_roam cm_roam;
+	bool bigtk_vdev_support;
+	struct sae_auth_retry sae_retry;
+	bool roam_reason_better_ap;
+	uint32_t hb_failure_rssi;
 };
 
 /**
@@ -242,6 +265,16 @@ struct mlme_roam_after_data_stall *
 mlme_get_roam_invoke_params(struct wlan_objmgr_vdev *vdev);
 
 /**
+ * mlme_is_roam_invoke_in_progress  - Get if roam invoked by host
+ * is active.
+ * @psoc: Pointer to global psoc.
+ * @vdev_id: vdev id
+ *
+ * Return: True if roaming invoke is in progress
+ */
+bool mlme_is_roam_invoke_in_progress(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id);
+/**
  * mlme_cfg_on_psoc_enable() - Populate MLME structure from CFG and INI
  * @psoc: pointer to the psoc object
  *
@@ -267,14 +300,20 @@ struct wlan_mlme_psoc_ext_obj *mlme_get_psoc_ext_obj_fl(struct wlan_objmgr_psoc
 							uint32_t line);
 
 /**
- * mlme_init_ibss_cfg() - Init IBSS config data structure with default CFG value
- * @psoc: pointer to the psoc object
- * @ibss_cfg: Pointer to IBSS cfg data structure to return values
+ * mlme_get_sae_auth_retry() - Get sae_auth_retry pointer
+ * @vdev: vdev pointer
  *
- * Return: QDF_STATUS
+ * Return: Pointer to struct sae_auth_retry or NULL
  */
-QDF_STATUS mlme_init_ibss_cfg(struct wlan_objmgr_psoc *psoc,
-			      struct wlan_mlme_ibss_cfg *ibss_cfg);
+struct sae_auth_retry *mlme_get_sae_auth_retry(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * mlme_free_sae_auth_retry() - Free the SAE auth info
+ * @vdev: vdev pointer
+ *
+ * Return: None
+ */
+void mlme_free_sae_auth_retry(struct wlan_objmgr_vdev *vdev);
 
 /**
  * mlme_set_self_disconnect_ies() - Set diconnect IEs configured from userspace
@@ -336,6 +375,29 @@ void mlme_set_follow_ap_edca_flag(struct wlan_objmgr_vdev *vdev, bool flag);
  * Return: value of follow_ap_edca
  */
 bool mlme_get_follow_ap_edca_flag(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * mlme_set_reconn_after_assoc_timeout_flag() - Set reconn after assoc timeout
+ * flag
+ * @psoc: soc object
+ * @vdev_id: vdev id
+ * @flag: enable or disable reconnect
+ *
+ * Return: void
+ */
+void mlme_set_reconn_after_assoc_timeout_flag(struct wlan_objmgr_psoc *psoc,
+					      uint8_t vdev_id, bool flag);
+
+/**
+ * mlme_get_reconn_after_assoc_timeout_flag() - Get reconn after assoc timeout
+ * flag
+ * @psoc: soc object
+ * @vdev_id: vdev id
+ *
+ * Return: true for enabling reconnect, otherwise false
+ */
+bool mlme_get_reconn_after_assoc_timeout_flag(struct wlan_objmgr_psoc *psoc,
+					      uint8_t vdev_id);
 
 /**
  * mlme_get_peer_disconnect_ies() - Get diconnect IEs from vdev object
@@ -494,22 +556,34 @@ mlme_get_operations_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
  */
 void
 mlme_set_operations_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
-			   enum roam_control_requestor reqs, bool clear);
+			   enum wlan_cm_rso_control_requestor reqs, bool clear);
 
-#define MLME_IS_ROAM_STATE_RSO_STARTED(psoc, vdev_id) \
-	(mlme_get_roam_state(psoc, vdev_id) == ROAM_RSO_STARTED)
+#define MLME_IS_ROAM_STATE_RSO_ENABLED(psoc, vdev_id) \
+	(mlme_get_roam_state(psoc, vdev_id) == WLAN_ROAM_RSO_ENABLED)
 
 #define MLME_IS_ROAM_STATE_DEINIT(psoc, vdev_id) \
-	(mlme_get_roam_state(psoc, vdev_id) == ROAM_DEINIT)
+	(mlme_get_roam_state(psoc, vdev_id) == WLAN_ROAM_DEINIT)
 
 #define MLME_IS_ROAM_STATE_INIT(psoc, vdev_id) \
-	(mlme_get_roam_state(psoc, vdev_id) == ROAM_INIT)
+	(mlme_get_roam_state(psoc, vdev_id) == WLAN_ROAM_INIT)
 
 #define MLME_IS_ROAM_STATE_STOPPED(psoc, vdev_id) \
-	(mlme_get_roam_state(psoc, vdev_id) == ROAM_RSO_STOPPED)
+	(mlme_get_roam_state(psoc, vdev_id) == WLAN_ROAM_RSO_STOPPED)
 
 #define MLME_IS_ROAM_INITIALIZED(psoc, vdev_id) \
-	(mlme_get_roam_state(psoc, vdev_id) >= ROAM_INIT)
+	(mlme_get_roam_state(psoc, vdev_id) >= WLAN_ROAM_INIT)
+#endif
+
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+#define MLME_IS_ROAMING_IN_PROG(psoc, vdev_id) \
+	(mlme_get_roam_state(psoc, vdev_id) == WLAN_ROAMING_IN_PROG)
+
+#define MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id) \
+	(mlme_get_roam_state(psoc, vdev_id) == WLAN_ROAM_SYNCH_IN_PROG)
+
+#else
+#define MLME_IS_ROAMING_IN_PROG(psoc, vdev_id) (false)
+#define MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id) (false)
 #endif
 
 /**

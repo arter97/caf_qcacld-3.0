@@ -61,6 +61,7 @@
  * CDS_DRIVER_STATE_RECOVERING: Recovery in progress.
  * CDS_DRIVER_STATE_BAD: Driver in bad state.
  * CDS_DRIVER_STATE_MODULE_STOPPING: Module stop in progress.
+ * CDS_DRIVER_STATE_ASSERTING_TARGET: Driver assert target in progress.
  */
 enum cds_driver_state {
 	CDS_DRIVER_STATE_UNINITIALIZED          = 0,
@@ -71,6 +72,7 @@ enum cds_driver_state {
 	CDS_DRIVER_STATE_BAD                    = BIT(4),
 	CDS_DRIVER_STATE_FW_READY               = BIT(5),
 	CDS_DRIVER_STATE_MODULE_STOPPING        = BIT(6),
+	CDS_DRIVER_STATE_ASSERTING_TARGET       = BIT(7),
 };
 
 /**
@@ -273,6 +275,33 @@ static inline bool cds_is_driver_loaded(void)
 }
 
 /**
+ * cds_set_assert_target_in_progress() - Setting assert target in progress
+ *
+ * @value: value to set
+ *
+ * Return: none
+ */
+static inline void cds_set_assert_target_in_progress(bool value)
+{
+	if (value)
+		cds_set_driver_state(CDS_DRIVER_STATE_ASSERTING_TARGET);
+	else
+		cds_clear_driver_state(CDS_DRIVER_STATE_ASSERTING_TARGET);
+}
+
+/**
+ * cds_is_target_asserting() - Is driver asserting target
+ *
+ * Return: true if driver is asserting target
+ */
+static inline bool cds_is_target_asserting(void)
+{
+	enum cds_driver_state state = cds_get_driver_state();
+
+	return __CDS_IS_DRIVER_STATE(state, CDS_DRIVER_STATE_ASSERTING_TARGET);
+}
+
+/**
  * cds_init() - Initialize CDS
  *
  * This function allocates the resource required for CDS, but does not
@@ -372,6 +401,10 @@ void cds_reset_recovery_reason(void);
  */
 #define cds_trigger_recovery(reason) \
 	__cds_trigger_recovery(reason, __func__, __LINE__)
+
+void cds_trigger_recovery_psoc(void *psoc, enum qdf_hang_reason reason,
+			       const char *func, const uint32_t line);
+
 void __cds_trigger_recovery(enum qdf_hang_reason reason, const char *func,
 			    const uint32_t line);
 
@@ -493,21 +526,12 @@ bool cds_is_group_addr(uint8_t *mac_addr)
 }
 
 /**
- * cds_get_arp_stats_gw_ip() - get arp stats track IP
- * @context: osif dev
- *
- * Return: ARP stats IP to track.
- */
-uint32_t cds_get_arp_stats_gw_ip(void *context);
-/**
  * cds_get_connectivity_stats_pkt_bitmap() - get pkt-type bitmap
  * @context: osif dev context
  *
  * Return: pkt bitmap to track
  */
 uint32_t cds_get_connectivity_stats_pkt_bitmap(void *context);
-void cds_incr_arp_stats_tx_tgt_delivered(void);
-void cds_incr_arp_stats_tx_tgt_acked(void);
 
 #ifdef FEATURE_ALIGN_STATS_FROM_DP
 /**
@@ -551,40 +575,4 @@ QDF_STATUS cds_smmu_mem_map_setup(qdf_device_t osdev, bool ipa_present);
  * Return: Status of map operation
  */
 int cds_smmu_map_unmap(bool map, uint32_t num_buf, qdf_mem_info_t *buf_arr);
-
-#ifdef WLAN_FEATURE_PKT_CAPTURE
-/**
- * cds_is_pktcapture_enabled() - is packet capture support enabled
- *
- * Check is packet capture mode enabled from ini
- *
- * Return: 0 - disable, 1 - enable
- */
-bool cds_is_pktcapture_enabled(void);
-
-/**
- * cds_get_pktcapture_mode() - get pktcapture mode value
- *
- * Get the pktcapture mode value from hdd context
- *
- * Return: 0 - disable
- *         1 - Mgmt packets
- *         2 - Data packets
- *         3 - Both Mgmt and Data packets
- */
-uint8_t cds_get_pktcapture_mode(void);
-#else
-static inline
-bool cds_is_pktcapture_enabled(void)
-{
-	return false;
-}
-
-static inline
-uint8_t cds_get_pktcapture_mode(void)
-{
-	return 0;
-}
-#endif /* WLAN_FEATURE_PKT_CAPTURE */
-
 #endif /* if !defined __CDS_API_H */

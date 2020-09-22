@@ -68,13 +68,14 @@ include $(foreach chip, $(TARGET_WLAN_CHIP), $(LOCAL_PATH)/.$(chip)/Android.mk)
 
 else # Multi-ok check
 
+WLAN_PROFILE := default
+
 ifeq ($(LOCAL_DEV_NAME), qcacld-3.0)
 
 LOCAL_DEV_NAME := wlan
 LOCAL_MOD_NAME := wlan
 CMN_OFFSET := ..
 LOCAL_SRC_DIR :=
-WLAN_PROFILE := default
 TARGET_FW_DIR := firmware/wlan/qca_cld
 TARGET_CFG_PATH := /vendor/etc/wifi
 TARGET_MAC_BIN_PATH := /mnt/vendor/persist
@@ -83,7 +84,10 @@ else
 
 LOCAL_SRC_DIR := .$(LOCAL_DEV_NAME)
 CMN_OFFSET := .
+# Use default profile if WLAN_CFG_USE_DEFAULT defined.
+ifeq ($(WLAN_CFG_USE_DEFAULT),)
 WLAN_PROFILE := $(LOCAL_DEV_NAME)
+endif
 TARGET_FW_DIR := firmware/wlan/qca_cld/$(LOCAL_DEV_NAME)
 TARGET_CFG_PATH := /vendor/etc/wifi/$(LOCAL_DEV_NAME)
 TARGET_MAC_BIN_PATH := /mnt/vendor/persist/$(LOCAL_DEV_NAME)
@@ -126,6 +130,15 @@ ifneq ($(WLAN_CFG_OVERRIDE_$(LOCAL_DEV_NAME)),)
 KBUILD_OPTIONS += WLAN_CFG_OVERRIDE="$(WLAN_CFG_OVERRIDE_$(LOCAL_DEV_NAME))"
 endif
 
+# Pass build options per chip to Kbuild. This will be injected from upper layer
+# makefile.
+#
+# e.g.
+#  WLAN_KBUILD_OPTIONS_qca6390 := CONFIG_CNSS_QCA6390=y
+ifneq ($(WLAN_KBUILD_OPTIONS_$(LOCAL_DEV_NAME)),)
+KBUILD_OPTIONS += "$(WLAN_KBUILD_OPTIONS_$(LOCAL_DEV_NAME))"
+endif
+
 include $(CLEAR_VARS)
 LOCAL_MODULE              := $(WLAN_CHIPSET)_$(LOCAL_DEV_NAME).ko
 LOCAL_MODULE_KBUILD_NAME  := $(LOCAL_MOD_NAME).ko
@@ -163,9 +176,10 @@ TARGET_FW_PATH := $(TARGET_OUT_ETC)/$(TARGET_FW_DIR)
 endif
 
 $(shell mkdir -p $(TARGET_FW_PATH); \
-	ln -sf $(TARGET_MAC_BIN_PATH)/wlan_mac.bin $(TARGET_FW_PATH)/wlan_mac.bin; \
-	ln -sf $(TARGET_CFG_PATH)/WCNSS_qcom_cfg.ini $(TARGET_FW_PATH)/WCNSS_qcom_cfg.ini)
-
+	ln -sf $(TARGET_MAC_BIN_PATH)/wlan_mac.bin $(TARGET_FW_PATH)/wlan_mac.bin)
+ifneq ($(GENERIC_ODM_IMAGE),true)
+$(shell ln -sf $(TARGET_CFG_PATH)/WCNSS_qcom_cfg.ini $(TARGET_FW_PATH)/WCNSS_qcom_cfg.ini)
+endif
 endif # Multi-ko check
 endif # DLKM check
 endif # supported target check

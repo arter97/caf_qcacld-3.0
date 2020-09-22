@@ -28,8 +28,6 @@
 #define IS_FEATURE_SUPPORTED_BY_FW(feat_enum_value) \
 				wma_get_fw_wlan_feat_caps(feat_enum_value)
 
-#define IS_IBSS_HEARTBEAT_OFFLOAD_FEATURE_ENABLE 1
-
 #define DPU_FEEDBACK_UNPROTECTED_ERROR 0x0F
 
 #define WMA_GET_RX_MAC_HEADER(pRxMeta) \
@@ -165,6 +163,8 @@
 #define WMA_TSM_STATS_RSP              SIR_HAL_TSM_STATS_RSP
 #endif
 
+#define WMA_ROAM_SCAN_CH_REQ              SIR_HAL_ROAM_SCAN_CH_REQ
+
 #define WMA_HT40_OBSS_SCAN_IND                  SIR_HAL_HT40_OBSS_SCAN_IND
 
 #define WMA_SET_MIMOPS_REQ                      SIR_HAL_SET_MIMOPS_REQ
@@ -173,6 +173,7 @@
 #define WMA_SET_TX_POWER_REQ                    SIR_HAL_SET_TX_POWER_REQ
 #define WMA_SET_TX_POWER_RSP                    SIR_HAL_SET_TX_POWER_RSP
 #define WMA_GET_TX_POWER_REQ                    SIR_HAL_GET_TX_POWER_REQ
+#define WMA_SEND_MAX_TX_POWER                   SIR_HAL_SEND_MAX_TX_POWER
 
 #define WMA_ENABLE_UAPSD_REQ            SIR_HAL_ENABLE_UAPSD_REQ
 #define WMA_DISABLE_UAPSD_REQ           SIR_HAL_DISABLE_UAPSD_REQ
@@ -238,8 +239,6 @@
 #define WMA_DHCP_START_IND              SIR_HAL_DHCP_START_IND
 #define WMA_DHCP_STOP_IND               SIR_HAL_DHCP_STOP_IND
 
-#define WMA_TX_FAIL_MONITOR_IND         SIR_HAL_TX_FAIL_MONITOR_IND
-
 #ifdef WLAN_FEATURE_GTK_OFFLOAD
 #define WMA_GTK_OFFLOAD_REQ             SIR_HAL_GTK_OFFLOAD_REQ
 #define WMA_GTK_OFFLOAD_GETINFO_REQ     SIR_HAL_GTK_OFFLOAD_GETINFO_REQ
@@ -262,7 +261,6 @@
 #define WMA_UPDATE_CHAN_LIST_REQ    SIR_HAL_UPDATE_CHAN_LIST_REQ
 #define WMA_RX_SCAN_EVENT           SIR_HAL_RX_SCAN_EVENT
 #define WMA_RX_CHN_STATUS_EVENT     SIR_HAL_RX_CHN_STATUS_EVENT
-#define WMA_IBSS_PEER_INACTIVITY_IND SIR_HAL_IBSS_PEER_INACTIVITY_IND
 
 #define WMA_CLI_SET_CMD             SIR_HAL_CLI_SET_CMD
 
@@ -292,14 +290,6 @@
 #define WMA_SEND_ADDBA_REQ          SIR_HAL_SEND_ADDBA_REQ
 #define WMA_INIT_THERMAL_INFO_CMD   SIR_HAL_INIT_THERMAL_INFO_CMD
 #define WMA_SET_THERMAL_LEVEL       SIR_HAL_SET_THERMAL_LEVEL
-#define WMA_RMC_ENABLE_IND          SIR_HAL_RMC_ENABLE_IND
-#define WMA_RMC_DISABLE_IND         SIR_HAL_RMC_DISABLE_IND
-#define WMA_RMC_ACTION_PERIOD_IND   SIR_HAL_RMC_ACTION_PERIOD_IND
-
-/* IBSS peer info related message */
-#define WMA_GET_IBSS_PEER_INFO_REQ  SIR_HAL_IBSS_PEER_INFO_REQ
-
-#define WMA_IBSS_CESIUM_ENABLE_IND  SIR_HAL_IBSS_CESIUM_ENABLE_IND
 
 #define WMA_INIT_BAD_PEER_TX_CTL_INFO_CMD   SIR_HAL_BAD_PEER_TX_CTL_INI_CMD
 
@@ -317,8 +307,6 @@
 #define WMA_DFS_BEACON_TX_SUCCESS_IND   SIR_HAL_BEACON_TX_SUCCESS_IND
 #define WMA_DISASSOC_TX_COMP       SIR_HAL_DISASSOC_TX_COMP
 #define WMA_DEAUTH_TX_COMP         SIR_HAL_DEAUTH_TX_COMP
-
-#define WMA_GET_PEER_INFO_EXT      SIR_HAL_GET_PEER_INFO_EXT
 
 #define WMA_GET_ISOLATION          SIR_HAL_GET_ISOLATION
 
@@ -398,7 +386,6 @@
 #define WMA_ROAM_SYNC_TIMEOUT                SIR_HAL_WMA_ROAM_SYNC_TIMEOUT
 
 #define WMA_SET_PDEV_IE_REQ                  SIR_HAL_SET_PDEV_IE_REQ
-#define WMA_UPDATE_WEP_DEFAULT_KEY           SIR_HAL_UPDATE_WEP_DEFAULT_KEY
 #define WMA_SEND_FREQ_RANGE_CONTROL_IND      SIR_HAL_SEND_FREQ_RANGE_CONTROL_IND
 #define WMA_POWER_DEBUG_STATS_REQ            SIR_HAL_POWER_DEBUG_STATS_REQ
 #define WMA_BEACON_DEBUG_STATS_REQ           SIR_HAL_BEACON_DEBUG_STATS_REQ
@@ -409,7 +396,9 @@
 
 #define WMA_SET_WOW_PULSE_CMD                SIR_HAL_SET_WOW_PULSE_CMD
 
+#ifndef ROAM_OFFLOAD_V1
 #define WMA_SET_PER_ROAM_CONFIG_CMD          SIR_HAL_SET_PER_ROAM_CONFIG_CMD
+#endif
 
 #define WMA_SEND_AP_VDEV_UP                  SIR_HAL_SEND_AP_VDEV_UP
 
@@ -444,7 +433,12 @@
 #endif
 #define WMA_SET_ROAM_TRIGGERS                SIR_HAL_SET_ROAM_TRIGGERS
 
+#ifndef ROAM_OFFLOAD_V1
 #define WMA_ROAM_INIT_PARAM                  SIR_HAL_INIT_ROAM_OFFLOAD_PARAM
+#endif
+
+#define WMA_DATA_STALL_TRIGGER 6
+#define WMA_ROAM_DISABLE_CFG                 SIR_HAL_INIT_ROAM_DISABLE_CFG
 
 /* Bit 6 will be used to control BD rate for Management frames */
 #define HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME 0x40
@@ -627,6 +621,17 @@ QDF_STATUS wma_set_idle_ps_config(void *wma_ptr, uint32_t idle_ps);
 QDF_STATUS wma_get_snr(tAniGetSnrReq *psnr_req);
 
 /**
+ * wma_get_rx_retry_cnt() - API to get rx retry count from data path
+ * @mac: pointer to mac context
+ * @vdev_id: vdev id
+ * @mac_addr: mac address of the remote station
+ *
+ * Return: none
+ */
+void wma_get_rx_retry_cnt(struct mac_context *mac, uint8_t vdev_id,
+			  uint8_t *mac_addr);
+
+/**
  * wma_set_wlm_latency_level() - set latency level to FW
  * @wma_ptr: wma handle
  * @latency_params: latency params
@@ -715,46 +720,32 @@ QDF_STATUS wma_register_mgmt_frm_client(void);
 QDF_STATUS wma_de_register_mgmt_frm_client(void);
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 QDF_STATUS wma_register_roaming_callbacks(
-		QDF_STATUS (*csr_roam_synch_cb)(struct mac_context *mac,
-			struct roam_offload_synch_ind *roam_synch_data,
-			struct bss_description *bss_desc_ptr,
-			enum sir_roam_op_code reason),
+		csr_roam_synch_fn_t csr_roam_synch_cb,
 		QDF_STATUS (*csr_roam_auth_event_handle_cb)(
 			struct mac_context *mac,
 			uint8_t vdev_id,
 			struct qdf_mac_addr bssid),
-		QDF_STATUS (*pe_roam_synch_cb)(struct mac_context *mac,
-			struct roam_offload_synch_ind *roam_synch_data,
-			struct bss_description *bss_desc_ptr,
-			enum sir_roam_op_code reason),
+		pe_roam_synch_fn_t pe_roam_synch_cb,
 		QDF_STATUS (*pe_disconnect_cb) (struct mac_context *mac,
 			uint8_t vdev_id,
 			uint8_t *deauth_disassoc_frame,
 			uint16_t deauth_disassoc_frame_len,
 			uint16_t reason_code),
-		QDF_STATUS (*csr_roam_pmkid_req_cb)(uint8_t vdev_id,
-			struct roam_pmkid_req_event *bss_list));
+		csr_roam_pmkid_req_fn_t csr_roam_pmkid_req_cb);
 #else
 static inline QDF_STATUS wma_register_roaming_callbacks(
-		QDF_STATUS (*csr_roam_synch_cb)(struct mac_context *mac,
-			struct roam_offload_synch_ind *roam_synch_data,
-			struct bss_description *bss_desc_ptr,
-			enum sir_roam_op_code reason),
+		csr_roam_synch_fn_t csr_roam_synch_cb,
 		QDF_STATUS (*csr_roam_auth_event_handle_cb)(
 			struct mac_context *mac,
 			uint8_t vdev_id,
 			struct qdf_mac_addr bssid),
-		QDF_STATUS (*pe_roam_synch_cb)(struct mac_context *mac,
-			struct roam_offload_synch_ind *roam_synch_data,
-			struct bss_description *bss_desc_ptr,
-			enum sir_roam_op_code reason),
+		pe_roam_synch_fn_t pe_roam_synch_cb,
 		QDF_STATUS (*pe_disconnect_cb) (struct mac_context *mac,
 			uint8_t vdev_id,
 			uint8_t *deauth_disassoc_frame,
 			uint16_t deauth_disassoc_frame_len,
 			uint16_t reason_code),
-		QDF_STATUS (*csr_roam_pmkid_req_cb)(uint8_t vdev_id,
-			struct roam_pmkid_req_event *bss_list))
+		csr_roam_pmkid_req_fn_t csr_roam_pmkid_req_cb)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }

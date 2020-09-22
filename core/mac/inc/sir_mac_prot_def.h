@@ -168,6 +168,11 @@
 #define VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_2_2       780
 #define VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_2_2       780
 
+#define VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_1_1_SGI80 433
+#define VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_1_1_SGI80 433
+#define VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_2_2_SGI80 866
+#define VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_2_2_SGI80 866
+
 #define VHT_CAP_NO_160M_SUPP 0
 #define VHT_CAP_160_SUPP 1
 #define VHT_CAP_160_AND_80P80_SUPP 2
@@ -213,6 +218,8 @@
 /* OWE DH Parameter element https://tools.ietf.org/html/rfc8110 */
 #define SIR_DH_PARAMETER_ELEMENT_EXT_EID 32
 
+#define SIR_MSCS_ELEMENT_EXT_EID 88
+
 /* OUI and type definition for WPA IE in network byte order */
 #define SIR_MAC_WPA_OUI             0x01F25000
 #define SIR_MAC_WSC_OUI             "\x00\x50\xf2\x04"
@@ -246,7 +253,10 @@
 #define SIR_MAC_B_PR_SSID_OFFSET             12
 
 /* Association/Reassociation offsets */
-#define SIR_MAC_REASSOC_SSID_OFFSET          10
+#define SIR_MAC_REASSOC_REQ_SSID_OFFSET      10
+
+/* Association Request offsets */
+#define SIR_MAC_ASSOC_REQ_SSID_OFFSET        4
 
 /* / Transaction sequence number definitions (used in Authentication frames) */
 #define    SIR_MAC_AUTH_FRAME_1        1
@@ -474,6 +484,8 @@ typedef enum eSirMacReasonCodes {
 	eSIR_MAC_PEER_TIMEDOUT_REASON = 39,     /* Requested from peer STA due to timeout */
 	eSIR_MAC_CIPHER_NOT_SUPPORTED_REASON = 45,      /* Peer STA does not support the requested cipher suite */
 	eSIR_MAC_DISASSOC_DUE_TO_FTHANDOFF_REASON = 46, /* FT reason */
+	eSIR_MAC_POOR_RSSI_CONDITIONS = 71, /* Disassociated due to poor RSSI conditions */
+
 	/* reserved                                         47 - 65535. */
 
 	/*
@@ -1469,9 +1481,9 @@ typedef struct sSirMacLinkReport {
 	uint8_t rsni;
 } tSirMacLinkReport, *tpSirMacLinkReport;
 
-#define BEACON_REPORT_MAX_IES 224       /* Refer IEEE 802.11k-2008, Table 7-31d */
+#define BEACON_REPORT_MAX_IES 215
 /* Max number of beacon reports per channel supported in the driver */
-#define MAX_BEACON_REPORTS 8
+#define MAX_BEACON_REPORTS 32
 /* Offset of IEs after Fixed Fields in Beacon Frame */
 #define BEACON_FRAME_IES_OFFSET 12
 
@@ -1527,7 +1539,7 @@ typedef struct sSirMacBeaconReport {
 
 } tSirMacBeaconReport, *tpSirMacBeaconReport;
 
-#define RADIO_REPORTS_MAX_IN_A_FRAME 4
+#define RADIO_REPORTS_MAX_IN_A_FRAME 7
 typedef struct sSirMacRadioMeasureReport {
 	uint8_t token;
 	uint8_t refused;
@@ -1880,7 +1892,10 @@ struct he_capability_info {
 /*
  * frame parser does not include optional 160 and 80+80 mcs set for MIN IE len
  */
-#define SIR_MAC_HE_CAP_MIN_LEN       (DOT11F_IE_HE_CAP_MIN_LEN + 8)
+#define SIR_MAC_HE_CAP_MIN_LEN       (DOT11F_IE_HE_CAP_MIN_LEN)
+#define HE_CAP_160M_MCS_MAP_LEN      4
+#define HE_CAP_80P80_MCS_MAP_LEN     4
+#define HE_CAP_OUI_LEN               3
 
 /* QOS action frame definitions */
 

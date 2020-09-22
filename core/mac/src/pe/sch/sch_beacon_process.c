@@ -238,52 +238,6 @@ ap_beacon_process(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 /* -------------------------------------------------------------------- */
 
 /**
- * __sch_beacon_process_no_session
- *
- * FUNCTION:
- * Process the received beacon frame when
- *  -- Station is not scanning
- *  -- No corresponding session is found
- *
- * LOGIC:
- *        Following scenarios exist when Session Does not exist:
- *             * IBSS Beacons, when IBSS session already exists with same SSID,
- *                but from STA which has not yet joined and has a different BSSID.
- *                - invoke lim_handle_ibs_scoalescing with the session context of existing IBSS session.
- *
- *             * IBSS Beacons when IBSS session does not exist, only Infra or BT-AMP session exists,
- *                then save the beacon in the scan results and throw it away.
- *
- *             * Infra Beacons
- *                - beacons received when no session active
- *                    should not come here, it should be handled as part of scanning,
- *                    else they should not be getting received, should update scan results and drop it if that happens.
- *                - beacons received when IBSS session active:
- *                    update scan results and drop it.
- *                - beacons received when Infra session(STA) is active:
- *                    update scan results and drop it
- *                - beacons received when BT-STA session is active:
- *                    update scan results and drop it.
- *                - beacons received when Infra/BT-STA  or Infra/IBSS is active.
- *                    update scan results and drop it.
- *
-
- */
-static void __sch_beacon_process_no_session(struct mac_context *mac,
-					    tpSchBeaconStruct pBeacon,
-					    uint8_t *pRxPacketInfo)
-{
-	struct pe_session *pe_session = NULL;
-
-	pe_session = lim_is_ibss_session_active(mac);
-	if (pe_session) {
-		lim_handle_ibss_coalescing(mac, pBeacon, pRxPacketInfo,
-					   pe_session);
-	}
-	return;
-}
-
-/**
  * get_operating_channel_width() - Get operating channel width
  * @stads - station entry.
  *
@@ -684,28 +638,13 @@ sch_bcn_update_opmode_change(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 	}
 }
 
-/*
- * sch_bcn_process_sta_ibss() - Process the received beacon frame
- * for sta and ibss
- * @mac_ctx:        mac_ctx
- * @bcn:            beacon struct
- * @rx_pkt_info:    received packet info
- * @session:        pe session pointer
- * @beaconParams:   update beacon params
- * @sendProbeReq:   out flag to indicate if probe rsp is to be sent
- * @pMh:            mac header
- *
- * Process the received beacon frame for sta and ibss
- *
- * Return: void
- */
 static void
-sch_bcn_process_sta_ibss(struct mac_context *mac_ctx,
-				    tpSchBeaconStruct bcn,
-				    uint8_t *rx_pkt_info,
-				    struct pe_session *session,
-				    tUpdateBeaconParams *beaconParams,
-				    uint8_t *sendProbeReq, tpSirMacMgmtHdr pMh)
+sch_bcn_process_sta_opmode(struct mac_context *mac_ctx,
+			    tpSchBeaconStruct bcn,
+			    uint8_t *rx_pkt_info,
+			    struct pe_session *session,
+			    tUpdateBeaconParams *beaconParams,
+			    uint8_t *sendProbeReq, tpSirMacMgmtHdr pMh)
 {
 	tpDphHashNode sta = NULL;
 	uint16_t aid;
@@ -755,45 +694,6 @@ static void get_local_power_constraint_beacon(
 }
 #endif
 
-/*
- * __sch_beacon_process_for_session() - Process the received beacon frame when
- * station is not scanning and corresponding session is found
- *
- *
- * @mac_ctx:        mac_ctx
- * @bcn:            beacon struct
- * @rx_pkt_info:    received packet info
- * @session:        pe session pointer
- *
- * Following scenarios exist when Session exists
- *   IBSS STA receiving beacons from IBSS Peers, who are part of IBSS.
- *     - call lim_handle_ibs_scoalescing with that session context.
- *   Infra STA receiving beacons from AP to which it is connected
- *     - call sch_beacon_processFromAP with that session's context.
- *     - call sch_beacon_processFromAP with that session's context.
- *     (here need to make sure BTAP creates session entry for BT STA)
- *     - just update the beacon count for heart beat purposes for now,
- *       for now, don't process the beacon.
- *   Infra/IBSS both active and receives IBSS beacon:
- *     - call lim_handle_ibs_scoalescing with that session context.
- *   Infra/IBSS both active and receives Infra beacon:
- *     - call sch_beacon_processFromAP with that session's context.
- *        any updates to EDCA parameters will be effective for IBSS as well,
- *        even though no WMM for IBSS ?? Need to figure out how to handle
- *        this scenario.
- *   Infra/BTSTA both active and receive Infra beacon.
- *     - change in EDCA parameters on Infra affect the BTSTA link.
- *        Update the same parameters on BT link
- *   Infra/BTSTA both active and receive BT-AP beacon.
- *     - update beacon cnt for heartbeat
- *   Infra/BTAP both active and receive Infra beacon.
- *     - BT-AP starts advertising BE parameters from Infra AP, if they get
- *       changed.
- *   Infra/BTAP both active and receive BTSTA beacon.
- *       - update beacon cnt for heartbeat
- *
- * Return: void
- */
 static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 					     tpSchBeaconStruct bcn,
 					     uint8_t *rx_pkt_info,
@@ -809,9 +709,7 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 	qdf_mem_zero(&beaconParams, sizeof(tUpdateBeaconParams));
 	beaconParams.paramChangeBitmap = 0;
 
-	if (LIM_IS_IBSS_ROLE(session)) {
-		lim_handle_ibss_coalescing(mac_ctx, bcn, rx_pkt_info, session);
-	} else if (LIM_IS_STA_ROLE(session)) {
+	if (LIM_IS_STA_ROLE(session)) {
 		if (false == sch_bcn_process_sta(mac_ctx, bcn, rx_pkt_info,
 						 session, &beaconParams,
 						 &sendProbeReq, pMh))
@@ -824,35 +722,13 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 	 */
 	if (!(session->vhtCapability && (bcn->OperatingMode.present ||
 	   bcn->VHTOperation.present)) && session->htCapability &&
-	   bcn->HTInfo.present && !LIM_IS_IBSS_ROLE(session))
+	   bcn->HTInfo.present)
 		lim_update_sta_run_time_ht_switch_chnl_params(mac_ctx,
 						&bcn->HTInfo, session);
 
-	if ((LIM_IS_STA_ROLE(session) && !wma_is_csa_offload_enabled())
-	    || LIM_IS_IBSS_ROLE(session)) {
-		/* Channel Switch information element updated */
-		if (bcn->channelSwitchPresent) {
-			/*
-			 * on receiving channel switch announcement from AP,
-			 * delete all TDLS peers before leaving BSS and proceed
-			 * for channel switch
-			 */
-			if (LIM_IS_STA_ROLE(session)) {
-				lim_update_tdls_set_state_for_fw(session,
-								 false);
-				lim_delete_tdls_peers(mac_ctx, session);
-			}
-			lim_update_channel_switch(mac_ctx, bcn, session);
-		} else if (session->gLimSpecMgmt.dot11hChanSwState ==
-				eLIM_11H_CHANSW_RUNNING) {
-			lim_cancel_dot11h_channel_switch(mac_ctx, session);
-		}
-	}
-	if (LIM_IS_STA_ROLE(session)
-	    || LIM_IS_IBSS_ROLE(session))
-		sch_bcn_process_sta_ibss(mac_ctx, bcn,
-					rx_pkt_info, session,
-					&beaconParams, &sendProbeReq, pMh);
+	if (LIM_IS_STA_ROLE(session))
+		sch_bcn_process_sta_opmode(mac_ctx, bcn, rx_pkt_info, session,
+					    &beaconParams, &sendProbeReq, pMh);
 	/* Obtain the Max Tx power for the current regulatory  */
 	regMax = wlan_reg_get_channel_reg_power_for_freq(
 				mac_ctx->pdev, session->curr_op_freq);
@@ -861,34 +737,26 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 
 	if (mac_ctx->mlme_cfg->sta.allow_tpc_from_ap) {
 		get_local_power_constraint_beacon(bcn, &local_constraint);
-		pe_debug("ESE localPowerConstraint = %d,",
-				local_constraint);
 
 		if (mac_ctx->rrm.rrmPEContext.rrmEnable &&
 				bcn->powerConstraintPresent) {
 			local_constraint = regMax;
 			local_constraint -=
 				bcn->localPowerConstraint.localPowerConstraints;
-			pe_debug("localPowerConstraint = %d,",
-				local_constraint);
 			}
 	}
 
 	tx_pwr_attr.reg_max = regMax;
 	tx_pwr_attr.ap_tx_power = local_constraint;
-	tx_pwr_attr.ini_tx_power = mac_ctx->mlme_cfg->power.max_tx_power;
 	tx_pwr_attr.frequency = session->curr_op_freq;
 
 	maxTxPower = lim_get_max_tx_power(mac_ctx, &tx_pwr_attr);
 
-	pe_debug("RegMax = %d, MaxTx pwr = %d",
-			regMax, maxTxPower);
-
 	/* If maxTxPower is increased or decreased */
 	if (maxTxPower != session->maxTxPower) {
-		pe_debug(
-			FL("Local power constraint change, Updating new maxTx power %d from old pwr %d"),
-			maxTxPower, session->maxTxPower);
+		pe_debug("Local power constraint change, Updating new maxTx power %d from old pwr %d (regMax %d local %d)",
+			 maxTxPower, session->maxTxPower, regMax,
+			 local_constraint);
 		if (lim_send_set_max_tx_power_req(mac_ctx, maxTxPower, session)
 		    == QDF_STATUS_SUCCESS)
 			session->maxTxPower = maxTxPower;
@@ -913,10 +781,8 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 
 	if ((false == mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running)
 	    && beaconParams.paramChangeBitmap) {
-		pe_debug("Beacon for session[%d] got changed.",
-			 session->peSessionId);
-		pe_debug("sending beacon param change bitmap: 0x%x",
-			 beaconParams.paramChangeBitmap);
+		pe_debug("Beacon for session[%d] got changed param change bitmap: 0x%x",
+			 session->peSessionId, beaconParams.paramChangeBitmap);
 		lim_send_beacon_params(mac_ctx, &beaconParams, session);
 	}
 
@@ -1086,8 +952,10 @@ void sch_send_beacon_report(struct mac_context *mac_ctx,
 			    struct pe_session *session)
 {
 	struct wlan_beacon_report beacon_report;
+	beacon_report_cb sme_bcn_cb;
 
-	if (!mac_ctx->lim.sme_bcn_rcv_callback)
+	sme_bcn_cb = mac_ctx->lim.sme_bcn_rcv_callback;
+	if (!sme_bcn_cb)
 		return;
 
 	if (!LIM_IS_STA_ROLE(session))
@@ -1115,8 +983,7 @@ void sch_send_beacon_report(struct mac_context *mac_ctx,
 		beacon_report.vdev_id = session->vdev_id;
 
 		/* Send report to upper layer */
-		mac_ctx->lim.sme_bcn_rcv_callback(mac_ctx->hdd_handle,
-						  &beacon_report);
+		sme_bcn_cb(mac_ctx->hdd_handle, &beacon_report);
 	}
 }
 
@@ -1143,6 +1010,8 @@ sch_beacon_process(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 {
 	static tSchBeaconStruct bcn;
 
+	if (!session)
+		return;
 	/* Convert the beacon frame into a structure */
 	if (sir_convert_beacon_frame2_struct(mac_ctx, (uint8_t *) rx_pkt_info,
 		&bcn) != QDF_STATUS_SUCCESS) {
@@ -1150,17 +1019,8 @@ sch_beacon_process(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		return;
 	}
 
-	/*
-	 * Now process the beacon in the context of the BSS which is
-	 * transmitting the beacons, if one is found
-	 */
-	if (!session) {
-		__sch_beacon_process_no_session(mac_ctx, &bcn, rx_pkt_info);
-	} else {
-		sch_send_beacon_report(mac_ctx, &bcn, session);
-		__sch_beacon_process_for_session(mac_ctx, &bcn, rx_pkt_info,
-						 session);
-	}
+	sch_send_beacon_report(mac_ctx, &bcn, session);
+	__sch_beacon_process_for_session(mac_ctx, &bcn, rx_pkt_info, session);
 }
 
 /**

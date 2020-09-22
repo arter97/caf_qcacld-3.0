@@ -377,7 +377,7 @@ QDF_STATUS csr_neighbor_roam_process_scan_complete(struct mac_context *mac,
 		qdf_mem_free(filter);
 		return QDF_STATUS_E_FAILURE;
 	}
-	hstatus = csr_scan_get_result(mac, filter, &scanResult);
+	hstatus = csr_scan_get_result(mac, filter, &scanResult, true);
 	qdf_mem_free(filter);
 	if (hstatus != QDF_STATUS_SUCCESS)
 		sme_err("Get Scan Result status code %d", hstatus);
@@ -421,8 +421,6 @@ QDF_STATUS csr_neighbor_roam_candidate_found_ind_hdlr(struct mac_context *mac,
 	tpCsrNeighborRoamControlInfo pNeighborRoamInfo =
 		&mac->roam.neighborRoamInfo[sessionId];
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-
-	sme_debug("Received indication from firmware");
 
 	/* we must be in connected state, if not ignore it */
 	if ((eCSR_NEIGHBOR_ROAM_STATE_CONNECTED !=

@@ -33,32 +33,16 @@
 
 #define HDD_TIME_STRING_LEN 24
 
-/* Preprocessor Definitions and Constants */
-#ifdef FEATURE_WLAN_TDLS
-#define HDD_MAX_NUM_TDLS_STA          8
-#define HDD_MAX_NUM_TDLS_STA_P_UAPSD_OFFCHAN  1
-#else
-#define HDD_MAX_NUM_TDLS_STA          0
-
-#endif
 /* Timeout (in ms) for Link to Up before Registering Station */
 #define ASSOC_LINKUP_TIMEOUT 60
-
-/* Timeout in ms for peer info request commpletion */
-#define IBSS_PEER_INFO_REQ_TIMOEUT 1000
 
 #define INVALID_PEER_IDX -1
 
 /**
  * enum eConnectionState - connection state values at HDD
- * @eConnectionState_NotConnected: Not associated in Infra or participating in
- *			in an IBSS / Ad-hoc network
+ * @eConnectionState_NotConnected: Not associated in Infra
  * @eConnectionState_Connecting: While connection in progress
  * @eConnectionState_Associated: Associated in an Infrastructure network
- * @eConnectionState_IbssDisconnected: Participating in an IBSS network though
- *			disconnected (no partner stations in the IBSS)
- * @eConnectionState_IbssConnected: Participating in an IBSS network with
- *			partner stations also present
  * @eConnectionState_Disconnecting: Disconnecting in an Infrastructure network.
  * @eConnectionState_NdiDisconnected: NDI in disconnected state - no peers
  * @eConnectionState_NdiConnected: NDI in connected state - at least one peer
@@ -67,8 +51,6 @@ typedef enum {
 	eConnectionState_NotConnected,
 	eConnectionState_Connecting,
 	eConnectionState_Associated,
-	eConnectionState_IbssDisconnected,
-	eConnectionState_IbssConnected,
 	eConnectionState_Disconnecting,
 	eConnectionState_NdiDisconnected,
 	eConnectionState_NdiConnected,
@@ -197,6 +179,11 @@ struct hdd_connection_info {
 	tDot11fIEhs20vendor_ie hs20vendor_ie;
 	struct ieee80211_ht_operation ht_operation;
 	struct ieee80211_vht_operation vht_operation;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)) \
+     && defined(WLAN_FEATURE_11AX)
+	struct ieee80211_he_operation *he_operation;
+	uint32_t he_oper_len;
+#endif
 	uint32_t roam_count;
 	int8_t signal;
 	int32_t assoc_status_code;
@@ -336,23 +323,6 @@ int hdd_set_csr_auth_type(struct hdd_adapter *adapter,
  */
 QDF_STATUS hdd_roam_register_tdlssta(struct hdd_adapter *adapter,
 				     const uint8_t *peerMac, uint8_t qos);
-/**
- * hdd_roam_deregister_tdlssta() - deregister new TDLS station
- * @adapter: pointer to adapter
- * @peer_mac: peer mac address
- *
- * Return: QDF_STATUS enumeration
- */
-QDF_STATUS hdd_roam_deregister_tdlssta(struct hdd_adapter *adapter,
-				       struct qdf_mac_addr *peer_mac);
-
-#else
-static
-inline QDF_STATUS hdd_roam_deregister_tdlssta(struct hdd_adapter *adapter,
-					      struct qdf_mac_addr *peer_mac)
-{
-	return QDF_STATUS_SUCCESS;
-}
 #endif
 
 #ifdef FEATURE_WLAN_ESE
@@ -380,23 +350,12 @@ hdd_indicate_ese_bcn_report_no_results(const struct hdd_adapter *adapter,
  * @adapter: HDD adapter
  * @peer_mac_addr: Peer MAC address
  * @sta_state: peer state
- * @roam_synch_in_progress: roam synch in progress
  *
  * Return: QDF status
  */
 QDF_STATUS hdd_change_peer_state(struct hdd_adapter *adapter,
 				 uint8_t *peer_mac_addr,
-				 enum ol_txrx_peer_state sta_state,
-				 bool roam_synch_in_progress);
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
-bool hdd_is_roam_sync_in_progress(struct csr_roam_info *roaminfo);
-#else
-static inline bool hdd_is_roam_sync_in_progress(struct csr_roam_info *roaminfo)
-{
-	return false;
-}
-#endif
-
+				 enum ol_txrx_peer_state sta_state);
 /**
  * hdd_update_dp_vdev_flags() - update datapath vdev flags
  * @cbk_data: callback data
@@ -437,17 +396,6 @@ bool hdd_save_peer(struct hdd_station_ctx *sta_ctx,
  */
 void hdd_delete_peer(struct hdd_station_ctx *sta_ctx,
 		     struct qdf_mac_addr *peer_mac_addr);
-
-/**
- * hdd_roam_deregister_sta() - deregister station
- * @adapter: pointer to adapter
- * @sta_id: station identifier
- * @mac_addr: peer mac address
- *
- * Return: QDF_STATUS enumeration
- */
-QDF_STATUS hdd_roam_deregister_sta(struct hdd_adapter *adapter,
-				   struct qdf_mac_addr mac_addr);
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 QDF_STATUS
@@ -518,5 +466,16 @@ void hdd_copy_vht_caps(struct ieee80211_vht_cap *hdd_vht_cap,
  * Return: void
  */
 void hdd_roam_profile_init(struct hdd_adapter *adapter);
+
+/**
+ * hdd_any_valid_peer_present() - Check if any valid peer is present
+ * @adapter: The HDD adapter
+ *
+ * Check if there is any peer present with non-zero mac address other than
+ * broadcast address.
+ *
+ * Return: True if there is any valid peer present
+ */
+bool hdd_any_valid_peer_present(struct hdd_adapter *adapter);
 
 #endif

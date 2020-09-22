@@ -28,8 +28,6 @@
 /* Include files */
 #include <wmi_unified_api.h>
 
-#define POLICY_MGR_MAX_CHANNEL_LIST 128
-
 /**
  *  Some max value greater than the max length of the channel list
  */
@@ -64,6 +62,9 @@
 #else
 #define MAX_NUMBER_OF_CONC_CONNECTIONS 3
 #endif
+
+/* Policy manager default request id */
+#define POLICY_MGR_DEF_REQ_ID 0
 
 typedef int (*send_mode_change_event_cb)(void);
 
@@ -257,7 +258,6 @@ enum policy_mgr_conc_priority_mode {
  * @PM_SAP_MODE: SAP mode
  * @PM_P2P_CLIENT_MODE: P2P client mode
  * @PM_P2P_GO_MODE: P2P Go mode
- * @PM_IBSS_MODE: IBSS mode
  * @PM_NDI_MODE: NDI mode
  * @PM_NAN_DISC_MODE: NAN Discovery mode
  * @PM_MAX_NUM_OF_MODE: max value place holder
@@ -267,7 +267,6 @@ enum policy_mgr_con_mode {
 	PM_SAP_MODE,
 	PM_P2P_CLIENT_MODE,
 	PM_P2P_GO_MODE,
-	PM_IBSS_MODE,
 	PM_NDI_MODE,
 	PM_NAN_DISC_MODE,
 	PM_MAX_NUM_OF_MODE
@@ -373,10 +372,6 @@ enum policy_mgr_pcl_type {
  * @PM_SAP_24_2x2: SAP connection using 2x2@2.4 Ghz
  * @PM_SAP_5_1x1: SAP connection using 1x1@5 Ghz
  * @PM_SAP_5_1x1: SAP connection using 2x2@5 Ghz
- * @PM_IBSS_24_1x1:  IBSS connection using 1x1@2.4 Ghz
- * @PM_IBSS_24_2x2:  IBSS connection using 2x2@2.4 Ghz
- * @PM_IBSS_5_1x1:  IBSS connection using 1x1@5 Ghz
- * @PM_IBSS_5_2x2:  IBSS connection using 2x2@5 Ghz
  * @PM_NAN_DISC_24_1x1:  NAN Discovery using 1x1@2.4 Ghz
  * @PM_NAN_DISC_24_2x2:  NAN Discovery using 2x2@2.4 Ghz
  * @PM_NDI_24_1x1:  NAN Datapath using 1x1@2.4 Ghz
@@ -405,10 +400,6 @@ enum policy_mgr_one_connection_mode {
 	PM_SAP_24_2x2,
 	PM_SAP_5_1x1,
 	PM_SAP_5_2x2,
-	PM_IBSS_24_1x1,
-	PM_IBSS_24_2x2,
-	PM_IBSS_5_1x1,
-	PM_IBSS_5_2x2,
 	PM_NAN_DISC_24_1x1,
 	PM_NAN_DISC_24_2x2,
 	PM_NDI_24_1x1,
@@ -803,6 +794,14 @@ enum policy_mgr_two_connection_mode {
  * SCC, SAP on 5 G
  * @PM_SAP_NDI_SCC_5_NAN_DISC_24_DBS: SAP & NDI/NDP connection on 5 Ghz,
  * NAN_DISC on 24 Ghz
+ * @PM_NAN_DISC_STA_24_NDI_5_DBS: STA and NAN Disc on 2.4Ghz and NDI on 5ghz DBS
+ * @PM_NAN_DISC_NDI_24_STA_5_DBS: NDI and NAN Disc on 2.4Ghz and STA on 5ghz DBS
+ * @PM_STA_NDI_5_NAN_DISC_24_DBS: STA, NDI on 5ghz and NAN Disc on 2.4Ghz DBS
+ * @PM_STA_NDI_NAN_DISC_24_SMM: STA, NDI, NAN Disc all on 2.4ghz SMM
+ * @PM_NAN_DISC_NDI_24_NDI_5_DBS: NDI and NAN Disc on 2.4Ghz and second NDI in
+ * 5ghz DBS
+ * @PM_NDI_NDI_5_NAN_DISC_24_DBS: Both NDI on 5ghz and NAN Disc on 2.4Ghz DBS
+ * @PM_NDI_NDI_NAN_DISC_24_SMM: Both NDI, NAN Disc on 2.4ghz SMM
  */
 enum policy_mgr_three_connection_mode {
 	PM_STA_SAP_SCC_24_SAP_5_DBS,
@@ -812,6 +811,13 @@ enum policy_mgr_three_connection_mode {
 	PM_NAN_DISC_SAP_SCC_24_NDI_5_DBS,
 	PM_NAN_DISC_NDI_SCC_24_SAP_5_DBS,
 	PM_SAP_NDI_SCC_5_NAN_DISC_24_DBS,
+	PM_NAN_DISC_STA_24_NDI_5_DBS,
+	PM_NAN_DISC_NDI_24_STA_5_DBS,
+	PM_STA_NDI_5_NAN_DISC_24_DBS,
+	PM_STA_NDI_NAN_DISC_24_SMM,
+	PM_NAN_DISC_NDI_24_NDI_5_DBS,
+	PM_NDI_NDI_5_NAN_DISC_24_DBS,
+	PM_NDI_NDI_NAN_DISC_24_SMM,
 
 	PM_MAX_THREE_CONNECTION_MODE
 };
@@ -884,15 +890,15 @@ enum policy_mgr_band {
 /**
  * enum policy_mgr_conn_update_reason: Reason for conc connection update
  * @POLICY_MGR_UPDATE_REASON_SET_OPER_CHAN: Set probable operating channel
- * @POLICY_MGR_UPDATE_REASON_JOIN_IBSS: Join IBSS
  * @POLICY_MGR_UPDATE_REASON_UT: Unit test related
  * @POLICY_MGR_UPDATE_REASON_START_AP: Start AP
  * @POLICY_MGR_UPDATE_REASON_NORMAL_STA: Connection to Normal STA
  * @POLICY_MGR_UPDATE_REASON_HIDDEN_STA: Connection to Hidden STA
  * @POLICY_MGR_UPDATE_REASON_OPPORTUNISTIC: Opportunistic HW mode update
  * @POLICY_MGR_UPDATE_REASON_NSS_UPDATE: NSS update
- * @POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH: Channel switch
- * @POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH_STA: Channel switch for STA
+ * @POLICY_MGR_UPDATE_REASON_AFTER_CHANNEL_SWITCH: After Channel switch
+ * @POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH_STA: Before Channel switch for STA
+ * @POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH_SAP: Before Channel switch for SAP
  * @POLICY_MGR_UPDATE_REASON_PRI_VDEV_CHANGE: In Dual DBS HW, if the vdev based
  *        2x2 preference enabled, the vdev down may cause prioritized active
  *        vdev change, then DBS hw mode may needs to change from one DBS mode
@@ -902,15 +908,15 @@ enum policy_mgr_band {
  */
 enum policy_mgr_conn_update_reason {
 	POLICY_MGR_UPDATE_REASON_SET_OPER_CHAN,
-	POLICY_MGR_UPDATE_REASON_JOIN_IBSS,
 	POLICY_MGR_UPDATE_REASON_UT,
 	POLICY_MGR_UPDATE_REASON_START_AP,
 	POLICY_MGR_UPDATE_REASON_NORMAL_STA,
 	POLICY_MGR_UPDATE_REASON_HIDDEN_STA,
 	POLICY_MGR_UPDATE_REASON_OPPORTUNISTIC,
 	POLICY_MGR_UPDATE_REASON_NSS_UPDATE,
-	POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH,
+	POLICY_MGR_UPDATE_REASON_AFTER_CHANNEL_SWITCH,
 	POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH_STA,
+	POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH_SAP,
 	POLICY_MGR_UPDATE_REASON_PRE_CAC,
 	POLICY_MGR_UPDATE_REASON_PRI_VDEV_CHANGE,
 	POLICY_MGR_UPDATE_REASON_NAN_DISCOVERY,
@@ -967,9 +973,10 @@ enum set_hw_mode_status {
 	SET_HW_MODE_STATUS_ALREADY,
 };
 
-typedef void (*dual_mac_cb)(enum set_hw_mode_status status,
-		uint32_t scan_config,
-		uint32_t fw_mode_config);
+typedef void (*dual_mac_cb)(struct wlan_objmgr_psoc *psoc,
+			    enum set_hw_mode_status status,
+			    uint32_t scan_config,
+			    uint32_t fw_mode_config);
 /**
  * enum policy_mgr_hw_mode_change - identify the HW mode switching to.
  *
@@ -1127,6 +1134,8 @@ struct policy_mgr_dual_mac_config {
  * @next_action: next action to happen at policy mgr
  * @action: current hw change action to be done
  * @context: psoc context
+ * @request_id: Request id provided by the requester, can be used while
+ * calling callback to the requester
  */
 struct policy_mgr_hw_mode {
 	uint32_t hw_mode_index;
@@ -1136,6 +1145,7 @@ struct policy_mgr_hw_mode {
 	uint8_t next_action;
 	enum policy_mgr_conc_next_action action;
 	struct wlan_objmgr_psoc *context;
+	uint32_t request_id;
 };
 
 /**
@@ -1145,8 +1155,8 @@ struct policy_mgr_hw_mode {
  * @pcl_len: Number of channels in the PCL
  */
 struct policy_mgr_pcl_list {
-	uint32_t pcl_list[POLICY_MGR_MAX_CHANNEL_LIST];
-	uint8_t weight_list[POLICY_MGR_MAX_CHANNEL_LIST];
+	uint32_t pcl_list[NUM_CHANNELS];
+	uint8_t weight_list[NUM_CHANNELS];
 	uint32_t pcl_len;
 };
 
@@ -1163,12 +1173,12 @@ struct policy_mgr_pcl_list {
  * @weight_list: Weights assigned by policy manager
  */
 struct policy_mgr_pcl_chan_weights {
-	uint32_t pcl_list[POLICY_MGR_MAX_CHANNEL_LIST];
+	uint32_t pcl_list[NUM_CHANNELS];
 	uint32_t pcl_len;
-	uint32_t saved_chan_list[POLICY_MGR_MAX_CHANNEL_LIST];
+	uint32_t saved_chan_list[NUM_CHANNELS];
 	uint32_t saved_num_chan;
-	uint8_t weighed_valid_list[POLICY_MGR_MAX_CHANNEL_LIST];
-	uint8_t weight_list[POLICY_MGR_MAX_CHANNEL_LIST];
+	uint8_t weighed_valid_list[NUM_CHANNELS];
+	uint8_t weight_list[NUM_CHANNELS];
 };
 
 /**
@@ -1271,5 +1281,14 @@ struct connection_info {
 	uint8_t vdev_id;
 	uint8_t channel;
 	uint32_t ch_freq;
+};
+
+/**
+ * struct sta_ap_intf_check_work_ctx - sta_ap_intf_check_work
+ * related info
+ * @psoc: pointer to PSOC object information
+ */
+struct sta_ap_intf_check_work_ctx {
+	struct wlan_objmgr_psoc *psoc;
 };
 #endif /* __WLAN_POLICY_MGR_PUBLIC_STRUCT_H */

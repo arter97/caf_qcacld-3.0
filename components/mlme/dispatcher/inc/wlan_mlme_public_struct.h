@@ -44,11 +44,11 @@
 /* Roam debugging related macro defines */
 #define MAX_ROAM_DEBUG_BUF_SIZE    250
 #define MAX_ROAM_EVENTS_SUPPORTED  5
-#define ROAM_FAILURE_BUF_SIZE      40
+#define ROAM_FAILURE_BUF_SIZE      60
 #define TIME_STRING_LEN            24
 
 #define ROAM_CHANNEL_BUF_SIZE      300
-#define LINE_STR "========================================="
+#define LINE_STR "=============================================================="
 /*
  * MLME_CFG_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_FW_DEF + 1 is
  * assumed to be the default fw supported BF antennas, if fw
@@ -66,6 +66,8 @@
 #define CFG_POWER_USAGE_MAX_LEN      4
 #define CFG_MAX_STR_LEN       256
 #define MAX_VENDOR_IES_LEN 1532
+
+#define CFG_MAX_PMK_LEN       64
 
 #define CFG_VALID_CHANNEL_LIST_STRING_LEN (CFG_VALID_CHANNEL_LIST_LEN * 4)
 
@@ -268,42 +270,6 @@ enum mlme_ts_info_ack_policy {
 	TS_INFO_ACK_POLICY_NORMAL_ACK = 0,
 	TS_INFO_ACK_POLICY_HT_IMMEDIATE_BLOCK_ACK = 1,
 };
-
-#if defined(WLAN_FEATURE_HOST_ROAM) || defined(WLAN_FEATURE_ROAM_OFFLOAD)
-/**
- * enum roam_control_requestor - Driver disabled roaming requestor that will
- *  request the roam module to disable roaming based on the mlme operation
- * @RSO_INVALID_REQUESTOR: invalid requestor
- * @RSO_START_BSS: disable roaming temporarily due to start bss
- * @RSO_CHANNEL_SWITCH: disable roaming due to STA channel switch
- * @RSO_CONNECT_START: disable roaming temporarily due to connect
- * @RSO_SAP_CHANNEL_CHANGE: disable roaming due to SAP channel change
- */
-enum roam_control_requestor {
-	RSO_INVALID_REQUESTOR,
-	RSO_START_BSS          = BIT(0),
-	RSO_CHANNEL_SWITCH     = BIT(1),
-	RSO_CONNECT_START      = BIT(2),
-	RSO_SAP_CHANNEL_CHANGE = BIT(3),
-};
-
-/**
- * enum roam_offload_state - Roaming module state for each STA vdev.
- * @ROAM_DEINIT: Roaming module is not initialized at the
- *  firmware.
- * @ROAM_INIT: Roaming module initialized at the firmware.
- * @ROAM_RSO_STARTED: RSO started, firmware can roam to different AP.
- * @ROAM_RSO_STOPPED: RSO stopped - roaming module is initialized at firmware,
- *  but firmware cannot do roaming due to supplicant disabled roaming/driver
- * disabled roaming.
- */
-enum roam_offload_state {
-	ROAM_DEINIT,
-	ROAM_INIT,
-	ROAM_RSO_STARTED,
-	ROAM_RSO_STOPPED
-};
-#endif
 
 /**
  * struct mlme_edca_params - EDCA pramaters related config items
@@ -637,7 +603,6 @@ struct wlan_mlme_wps_params {
  * @sap_11g_policy:  Check if 11g support is enabled
  * @assoc_sta_limit: Limit on number of STA associated to SAP
  * @enable_lte_coex: Flag for LTE coexistence
- * @rmc_action_period_freq: rmc action period frequency
  * @rate_tx_mgmt: mgmt frame tx rate
  * @rate_tx_mgmt_2g: mgmt frame tx rate for 2G band
  * @rate_tx_mgmt_5g: mgmt frame tx rate for 5G band
@@ -672,7 +637,6 @@ struct wlan_mlme_cfg_sap {
 	bool sap_11g_policy;
 	uint8_t assoc_sta_limit;
 	bool enable_lte_coex;
-	uint16_t rmc_action_period_freq;
 	uint8_t rate_tx_mgmt;
 	uint8_t rate_tx_mgmt_2g;
 	uint8_t rate_tx_mgmt_5g;
@@ -925,6 +889,9 @@ struct wlan_mlme_he_caps {
 	uint8_t enable_ul_mimo;
 	uint8_t enable_ul_ofdm;
 	uint32_t he_sta_obsspd;
+	uint16_t he_mcs_12_13_supp_2g;
+	uint16_t he_mcs_12_13_supp_5g;
+	bool enable_6g_sec_check;
 };
 #endif
 
@@ -945,12 +912,21 @@ struct wlan_mlme_chain_cfg {
 /**
  * struct mlme_tgt_caps - mlme related capability coming from target (FW)
  * @data_stall_recovery_fw_support: does target supports data stall recovery.
+ * @bigtk_support: does the target support bigtk capability or not.
+ * @stop_all_host_scan_support: Target capability that indicates if the target
+ * supports stop all host scan request type.
+ * @peer_create_conf_support: Peer create confirmation command support
+ * @dual_sta_roam_fw_support: Firmware support for dual sta roaming feature
  *
  * Add all the mlme-tgt related capablities here, and the public API would fill
  * the related capability in the required mlme cfg structure.
  */
 struct mlme_tgt_caps {
 	bool data_stall_recovery_fw_support;
+	bool bigtk_support;
+	bool stop_all_host_scan_support;
+	bool peer_create_conf_support;
+	bool dual_sta_roam_fw_support;
 };
 
 /**
@@ -1127,10 +1103,18 @@ struct wlan_mlme_chainmask {
  * candidate is found in partial scan based on channel map
  * @enable_ring_buffer: Decide to enable/disable ring buffer for bug report
  * @enable_peer_unmap_conf_support: Indicate whether to send conf for peer unmap
+ * @dfs_chan_ageout_time: Set DFS Channel ageout time
+ * @bigtk_support: Whether BIGTK is supported or not
+ * @stop_all_host_scan_support: Target capability that indicates if the target
+ * supports stop all host scan request type.
+ * @peer_create_conf_support: Peer create confirmation command support
+ * @dual_sta_roam_fw_support: Firmware support for dual sta roaming feature
+ * @sae_connect_retries: sae connect retry bitmask
+ * @wls_6ghz_capable: wifi location service(WLS) is 6ghz capable
  */
 struct wlan_mlme_generic {
-	enum band_info band_capability;
-	enum band_info band;
+	uint32_t band_capability;
+	uint32_t band;
 	uint8_t select_5ghz_margin;
 	uint8_t sub_20_chan_width;
 	uint8_t ito_repeat_count;
@@ -1162,6 +1146,13 @@ struct wlan_mlme_generic {
 	bool bmiss_skip_full_scan;
 	bool enable_ring_buffer;
 	bool enable_peer_unmap_conf_support;
+	uint8_t dfs_chan_ageout_time;
+	bool bigtk_support;
+	bool stop_all_host_scan_support;
+	bool peer_create_conf_support;
+	bool dual_sta_roam_fw_support;
+	uint32_t sae_connect_retries;
+	bool wls_6ghz_capable;
 };
 
 /*
@@ -1203,6 +1194,7 @@ struct acs_weight_range {
 };
 
 #define MAX_ACS_WEIGHT_RANGE              10
+#define MLME_GET_DFS_CHAN_WEIGHT(np_chan_weight) (np_chan_weight & 0x000000FF)
 
 /*
  * struct wlan_mlme_acs - All acs related cfg items
@@ -1215,6 +1207,9 @@ struct acs_weight_range {
  * @normalize_weight_num_chan: Number of freq items for normalization.
  * @normalize_weight_range: Frequency range for weight normalization
  * @num_weight_range: num of ranges provided by user
+ * @force_sap_start: Force SAP start when no channel is found suitable
+ * by ACS
+ * @np_chan_weightage: Weightage to be given to non preferred channels.
  */
 struct wlan_mlme_acs {
 	bool is_acs_with_more_param;
@@ -1222,10 +1217,12 @@ struct wlan_mlme_acs {
 	bool is_vendor_acs_support;
 	bool is_acs_support_for_dfs_ltecoex;
 	bool is_external_acs_policy;
-	struct acs_weight normalize_weight_chan[QDF_MAX_NUM_CHAN];
+	struct acs_weight normalize_weight_chan[NUM_CHANNELS];
 	uint16_t normalize_weight_num_chan;
 	struct acs_weight_range normalize_weight_range[MAX_ACS_WEIGHT_RANGE];
 	uint16_t num_weight_range;
+	bool force_sap_start;
+	uint32_t np_chan_weightage;
 };
 
 /*
@@ -1296,6 +1293,7 @@ enum dot11p_mode {
  * @num_tx_chains_11a:               number of tx chains in 11a mode
  * @disable_rx_mrc:                  disable 2 rx chains, in rx nss 1 mode
  * @disable_tx_mrc:                  disable 2 tx chains, in tx nss 1 mode
+ * @enable_dynamic_nss_chains_cfg:   enable the dynamic nss chain config to FW
  */
 struct wlan_mlme_nss_chains {
 	uint32_t num_tx_chains[NSS_CHAINS_BAND_MAX];
@@ -1307,6 +1305,7 @@ struct wlan_mlme_nss_chains {
 	uint32_t num_tx_chains_11a;
 	bool disable_rx_mrc[NSS_CHAINS_BAND_MAX];
 	bool disable_tx_mrc[NSS_CHAINS_BAND_MAX];
+	bool enable_dynamic_nss_chains_cfg;
 };
 
 /**
@@ -1341,6 +1340,7 @@ enum station_keepalive_method {
  * @force_rsne_override:            Force rsnie override from user
  * @single_tid:                     Set replay counter for all TID
  * @allow_tpc_from_ap:              Support for AP power constraint
+ * @usr_disabled_roaming:           User config for roaming disable
  */
 struct wlan_mlme_sta_cfg {
 	uint32_t sta_keep_alive_period;
@@ -1360,6 +1360,7 @@ struct wlan_mlme_sta_cfg {
 	bool single_tid;
 	bool allow_tpc_from_ap;
 	enum station_keepalive_method sta_keepalive_method;
+	bool usr_disabled_roaming;
 };
 
 /**
@@ -1419,11 +1420,28 @@ struct bss_load_trigger {
 #define AKM_FT_FILS          2
 #define AKM_SAE              3
 #define AKM_OWE              4
+#define AKM_SUITEB           5
+
+#define LFR3_STA_ROAM_DISABLE_BY_P2P BIT(0)
+#define LFR3_STA_ROAM_DISABLE_BY_NAN BIT(1)
+
+/**
+ * struct fw_scan_channels  - Channel details part of VDEV set PCL command
+ * @num_channels: Number of channels
+ * @ch_freq_list: Channel Frequency list
+ */
+struct fw_scan_channels {
+	uint8_t num_channels;
+	uint32_t freq[NUM_CHANNELS];
+};
 
 /*
  * @mawc_roam_enabled:              Enable/Disable MAWC during roaming
  * @enable_fast_roam_in_concurrency:Enable LFR roaming on STA during concurrency
  * @lfr3_roaming_offload:           Enable/disable roam offload feature
+ * @lfr3_dual_sta_roaming_enabled:  Enable/Disable dual sta roaming offload
+ * feature
+ * @enable_self_bss_roam:               enable roaming to connected BSSID
  * @enable_disconnect_roam_offload: enable disassoc/deauth roam scan.
  * @enable_idle_roam: flag to enable/disable idle roam in fw
  * @idle_roam_rssi_delta: rssi delta of connected ap which is used to
@@ -1434,6 +1452,10 @@ struct bss_load_trigger {
  * below which the connection is idle.
  * @idle_roam_min_rssi: Minimum rssi of connected AP to be considered for
  * idle roam trigger.
+ * @enable_roam_reason_vsie:        Enable/disable incluison of roam reason
+ * vsie in Re(assoc) frame
+ * @roam_trigger_bitmap:            Bitmap of roaming triggers.
+ * @sta_roam_disable                STA roaming disabled by interfaces
  * @early_stop_scan_enable:         Set early stop scan
  * @enable_5g_band_pref:            Enable preference for 5G from INI
  * @ese_enabled:                    Enable ESE feature
@@ -1500,6 +1522,7 @@ struct bss_load_trigger {
  * @enable_adaptive_11r             Flag to check if adaptive 11r ini is enabled
  * @tgt_adaptive_11r_cap:           Flag to check if target supports adaptive
  * 11r
+ * @enable_ft_im_roaming:           Flag to enable/disable FT-IM roaming
  * @roam_scan_home_away_time:       The home away time to firmware
  * @roam_scan_n_probes:    The number of probes to be sent for firmware roaming
  * @delay_before_vdev_stop:Wait time for tx complete before vdev stop
@@ -1521,12 +1544,17 @@ struct bss_load_trigger {
  * @fw_akm_bitmap:                  Supported Akm suites of firmware
  * @roam_full_scan_period: Idle period in seconds between two successive
  * full channel roam scans
+ * @saved_freq_list: Valid channel list
+ * @sae_single_pmk_feature_enabled: Contains value of ini
+ * sae_single_pmk_feature_enabled
  */
 struct wlan_mlme_lfr_cfg {
 	bool mawc_roam_enabled;
 	bool enable_fast_roam_in_concurrency;
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 	bool lfr3_roaming_offload;
+	bool lfr3_dual_sta_roaming_enabled;
+	bool enable_self_bss_roam;
 	bool enable_disconnect_roam_offload;
 	bool enable_idle_roam;
 	uint32_t idle_roam_rssi_delta;
@@ -1534,6 +1562,9 @@ struct wlan_mlme_lfr_cfg {
 	uint32_t idle_data_packet_count;
 	uint32_t idle_roam_band;
 	int32_t idle_roam_min_rssi;
+	bool enable_roam_reason_vsie;
+	uint32_t roam_trigger_bitmap;
+	uint32_t sta_roam_disable;
 #endif
 	bool early_stop_scan_enable;
 	bool enable_5g_band_pref;
@@ -1604,6 +1635,7 @@ struct wlan_mlme_lfr_cfg {
 	bool enable_adaptive_11r;
 	bool tgt_adaptive_11r_cap;
 #endif
+	bool enable_ft_im_roaming;
 	uint16_t roam_scan_home_away_time;
 	uint32_t roam_scan_n_probes;
 	uint8_t delay_before_vdev_stop;
@@ -1624,6 +1656,10 @@ struct wlan_mlme_lfr_cfg {
 	uint32_t roam_scan_period_after_inactivity;
 	uint32_t fw_akm_bitmap;
 	uint32_t roam_full_scan_period;
+	struct fw_scan_channels saved_freq_list;
+#if defined(WLAN_SAE_SINGLE_PMK) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
+	bool sae_single_pmk_feature_enabled;
+#endif
 };
 
 /**
@@ -1776,7 +1812,6 @@ struct wlan_mlme_wmm_params {
 /**
  * struct wlan_mlme_weight_config - weight params to
  * calculate best candidate
- *
  * @rssi_weightage: RSSI weightage
  * @ht_caps_weightage: HT caps weightage
  * @vht_caps_weightage: VHT caps weightage
@@ -1788,6 +1823,8 @@ struct wlan_mlme_wmm_params {
  * @pcl_weightage: PCL weightage
  * @channel_congestion_weightage: channel congestion weightage
  * @oce_wan_weightage: OCE WAN metrics weightage
+ * @oce_ap_tx_pwr_weightage: weightage based on ap tx power
+ * @oce_subnet_id_weightage: weightage based on subnet id
  */
 struct  wlan_mlme_weight_config {
 	uint8_t rssi_weightage;
@@ -1801,12 +1838,13 @@ struct  wlan_mlme_weight_config {
 	uint8_t pcl_weightage;
 	uint8_t channel_congestion_weightage;
 	uint8_t oce_wan_weightage;
+	uint8_t oce_ap_tx_pwr_weightage;
+	uint8_t oce_subnet_id_weightage;
 };
 
 /**
  * struct wlan_mlme_rssi_cfg_score - RSSI params to
  * calculate best candidate
- *
  * @best_rssi_threshold: Best RSSI threshold
  * @good_rssi_threshold: Good RSSI threshold
  * @bad_rssi_threshold: Bad RSSI threshold
@@ -1827,52 +1865,9 @@ struct wlan_mlme_rssi_cfg_score  {
 	uint32_t rssi_pref_5g_rssi_thresh;
 };
 
-/**
- * struct wlan_mlme_per_slot_scoring - define % score for differents slots
- *				for a scoring param.
- * num_slot: number of slots in which the param will be divided.
- *           Max 15. index 0 is used for 'not_present. Num_slot will
- *           equally divide 100. e.g, if num_slot = 4 slot 0 = 0-25%, slot
- *           1 = 26-50% slot 2 = 51-75%, slot 3 = 76-100%
- * score_pcnt3_to_0: Conatins score percentage for slot 0-3
- *             BITS 0-7   :- the scoring pcnt when not present
- *             BITS 8-15  :- SLOT_1
- *             BITS 16-23 :- SLOT_2
- *             BITS 24-31 :- SLOT_3
- * score_pcnt7_to_4: Conatins score percentage for slot 4-7
- *             BITS 0-7   :- SLOT_4
- *             BITS 8-15  :- SLOT_5
- *             BITS 16-23 :- SLOT_6
- *             BITS 24-31 :- SLOT_7
- * score_pcnt11_to_8: Conatins score percentage for slot 8-11
- *             BITS 0-7   :- SLOT_8
- *             BITS 8-15  :- SLOT_9
- *             BITS 16-23 :- SLOT_10
- *             BITS 24-31 :- SLOT_11
- * score_pcnt15_to_12: Conatins score percentage for slot 12-15
- *             BITS 0-7   :- SLOT_12
- *             BITS 8-15  :- SLOT_13
- *             BITS 16-23 :- SLOT_14
- *             BITS 24-31 :- SLOT_15
- */
-struct wlan_mlme_per_slot_scoring {
-	uint32_t num_slot;
-	uint32_t score_pcnt3_to_0;
-	uint32_t score_pcnt7_to_4;
-	uint32_t score_pcnt11_to_8;
-	uint32_t score_pcnt15_to_12;
-};
-
 /*
- * struct wlan_mlme_score_config - MLME BSS Scoring related config
+ * struct wlan_mlme_roam_scoring_cfg - MLME roam related scoring config
  * @enable_scoring_for_roam: Enable/disable BSS Scoring for Roaming
- * @weight_cfg: Various Weight related Scoring Configs
- * @rssi_score: RSSI Scoring related thresholds/percentages config
- * @esp_qbss_scoring: ESP QBSS Scoring configs
- * @oce_wan_scoring: OCE WAN Scoring Configs
- * @bandwidth_weight_per_index: Bandwidth weight per index for scoring logic
- * @nss_weight_per_index: NSS weight per index for scoring logic
- * @band_weight_per_index: Band weight per index for scoring logic
  * @roam_trigger_bitmap: bitmap for various roam triggers
  * @roam_score_delta: percentage delta in roam score
  * @apsd_enabled: Enable automatic power save delivery
@@ -1880,15 +1875,8 @@ struct wlan_mlme_per_slot_scoring {
  * @min_roam_score_delta: Minimum difference between connected AP's and
  *			candidate AP's roam score to start roaming.
  */
-struct wlan_mlme_scoring_cfg {
+struct wlan_mlme_roam_scoring_cfg {
 	bool enable_scoring_for_roam;
-	struct wlan_mlme_weight_config weight_cfg;
-	struct wlan_mlme_rssi_cfg_score rssi_score;
-	struct wlan_mlme_per_slot_scoring esp_qbss_scoring;
-	struct wlan_mlme_per_slot_scoring oce_wan_scoring;
-	uint32_t bandwidth_weight_per_index;
-	uint32_t nss_weight_per_index;
-	uint32_t band_weight_per_index;
 	uint32_t roam_trigger_bitmap;
 	uint32_t roam_score_delta;
 	bool apsd_enabled;
@@ -1955,7 +1943,6 @@ struct mlme_power_usage {
  * @power_usage: power usage mode, min, max, mod
  * @tx_power_2g: limit tx power in 2.4 ghz
  * @tx_power_5g: limit tx power in 5 ghz
- * @max_tx_power: WLAN max tx power
  * @current_tx_power_level: current tx power level
  * @local_power_constraint: local power constraint
  */
@@ -1967,7 +1954,6 @@ struct wlan_mlme_power {
 	struct mlme_power_usage power_usage;
 	uint8_t tx_power_2g;
 	uint8_t tx_power_5g;
-	uint8_t max_tx_power;
 	uint8_t current_tx_power_level;
 	uint8_t local_power_constraint;
 };
@@ -2121,12 +2107,14 @@ struct wlan_mlme_fe_wlm {
 
 /**
  * struct wlan_mlme_fe_rrm - RRM related configs
- * @rrm_enabled: Flag to check if RRM is enabled
+ * @rrm_enabled: Flag to check if RRM is enabled for STA
+ * @sap_rrm_enabled: Flag to check if RRM is enabled for SAP
  * @rrm_rand_interval: RRM randomization interval
  * @rm_capability: RM enabled capabilities IE
  */
 struct wlan_mlme_fe_rrm {
 	bool rrm_enabled;
+	bool sap_rrm_enabled;
 	uint8_t rrm_rand_interval;
 	uint8_t rm_capability[MLME_RMENABLEDCAP_MAX_LEN];
 };
@@ -2155,13 +2143,12 @@ struct wlan_mlme_mwc {
  * @self_gen_frm_pwr: self-generated frame power in tx chain mask
  * for CCK rates
  * @etsi13_srd_chan_in_master_mode: etsi13 srd chan in master mode
+ * @fcc_5dot9_ghz_chan_in_master_mode: fcc 5.9 GHz chan in master mode
  * @restart_beaconing_on_ch_avoid: restart beaconing on ch avoid
  * @indoor_channel_support: indoor channel support
  * @scan_11d_interval: scan 11d interval
  * @valid_channel_freq_list: array for valid channel list
  * @valid_channel_list_num: valid channel list number
- * @country_code: country code
- * @country_code_len: country code length
  * @enable_11d_in_world_mode: Whether to enable 11d scan in world mode or not
  * @avoid_acs_freq_list: List of the frequencies which need to be avoided
  * during acs
@@ -2169,18 +2156,18 @@ struct wlan_mlme_mwc {
  * @ignore_fw_reg_offload_ind: Ignore fw regulatory offload indication
  * @enable_pending_chan_list_req: enables/disables scan channel
  * list command to FW till the current scan is complete.
+ * @retain_nol_across_regdmn_update: Retain the NOL list across the regdomain.
  */
 struct wlan_mlme_reg {
 	uint32_t self_gen_frm_pwr;
 	bool etsi13_srd_chan_in_master_mode;
+	bool fcc_5dot9_ghz_chan_in_master_mode;
 	enum restart_beaconing_on_ch_avoid_rule
 		restart_beaconing_on_ch_avoid;
 	bool indoor_channel_support;
 	uint32_t scan_11d_interval;
 	uint32_t valid_channel_freq_list[CFG_VALID_CHANNEL_LIST_LEN];
 	uint32_t valid_channel_list_num;
-	uint8_t country_code[CFG_COUNTRY_CODE_LEN + 1];
-	uint8_t country_code_len;
 	bool enable_11d_in_world_mode;
 #ifdef SAP_AVOID_ACS_FREQ_LIST
 	uint16_t avoid_acs_freq_list[CFG_VALID_CHANNEL_LIST_LEN];
@@ -2188,38 +2175,7 @@ struct wlan_mlme_reg {
 #endif
 	bool ignore_fw_reg_offload_ind;
 	bool enable_pending_chan_list_req;
-};
-
-/**
- * struct wlan_mlme_ibss_cfg - IBSS config params
- * @auto_bssid: Enable Auto BSSID for IBSS
- * @atim_win_size: Set IBSS ATIM window size
- * @adhoc_ch_5g: Default 5Ghz IBSS channel if not provided by supplicant
- * @adhoc_ch_2g: Default 2.4Ghz IBSS channel if not provided by supplicant
- * @coalesing_enable: IBSS coalesing control param
- * @power_save_allow: IBSS Power Save control
- * @power_collapse_allow: IBSS Power collapse control
- * @awake_on_tx_rx: IBSS sta power save mode on TX/RX activity
- * @inactivity_bcon_count: No of Beacons of data inactivity for power save
- * @txsp_end_timeout: TX service period inactivity timeout
- * @ps_warm_up_time: IBSS Power save skip time
- * @ps_1rx_chain_atim_win: Control IBSS Power save in 1RX chain during ATIM
- * @bssid: BSSID Mac address: IBSS BSSID if not provided by supplicant
- */
-struct wlan_mlme_ibss_cfg {
-	bool auto_bssid;
-	uint32_t atim_win_size;
-	uint32_t adhoc_ch_5g;
-	uint32_t adhoc_ch_2g;
-	bool coalesing_enable;
-	bool power_save_allow;
-	bool power_collapse_allow;
-	bool awake_on_tx_rx;
-	uint32_t inactivity_bcon_count;
-	uint32_t txsp_end_timeout;
-	uint32_t ps_warm_up_time;
-	uint32_t ps_1rx_chain_atim_win;
-	struct qdf_mac_addr bssid;
+	bool retain_nol_across_regdmn_update;
 };
 
 /**
@@ -2275,7 +2231,6 @@ struct wlan_mlme_cfg {
 	struct wlan_mlme_he_caps he_caps;
 #endif
 	struct wlan_mlme_lfr_cfg lfr;
-	struct wlan_mlme_ibss_cfg ibss;
 	struct wlan_mlme_obss_ht40 obss_ht40;
 	struct wlan_mlme_mbo mbo_cfg;
 	struct wlan_mlme_vht_caps vht_caps;
@@ -2288,7 +2243,7 @@ struct wlan_mlme_cfg {
 	struct wlan_mlme_nss_chains nss_chains_ini_cfg;
 	struct wlan_mlme_sta_cfg sta;
 	struct wlan_mlme_stats_cfg stats;
-	struct wlan_mlme_scoring_cfg scoring;
+	struct wlan_mlme_roam_scoring_cfg roam_scoring;
 	struct wlan_mlme_oce oce;
 	struct wlan_mlme_threshold threshold;
 	struct wlan_mlme_timeout timeouts;
@@ -2317,17 +2272,51 @@ enum pkt_origin {
 };
 
 /**
+ * struct mlme_pmk_info - SAE Roaming using single pmk info
+ * @pmk: pmk
+ * @pmk_len: pmk length
+ */
+struct mlme_pmk_info {
+	uint8_t pmk[CFG_MAX_PMK_LEN];
+	uint8_t pmk_len;
+};
+
+/**
+ * struct wlan_mlme_sae_single_pmk - SAE Roaming using single pmk configuration
+ * structure
+ * @sae_single_pmk_ap: Current connected AP has VSIE or not
+ * @pmk_info: pmk information
+ */
+struct wlan_mlme_sae_single_pmk {
+	bool sae_single_pmk_ap;
+	struct mlme_pmk_info pmk_info;
+};
+
+/**
  * struct mlme_roam_debug_info - Roam debug information storage structure.
  * @trigger:            Roam trigger related data
  * @scan:               Roam scan related data structure.
  * @result:             Roam result parameters.
  * @data_11kv:          Neighbor report/BTM parameters.
+ * @btm_rsp:            BTM response information
+ * @roam_init_info:     Roam initial info
  */
 struct mlme_roam_debug_info {
 	struct wmi_roam_trigger_info trigger;
 	struct wmi_roam_scan_data scan;
 	struct wmi_roam_result result;
 	struct wmi_neighbor_report_data data_11kv;
+	struct roam_btm_response_data btm_rsp;
+	struct roam_initial_data roam_init_info;
 };
 
+/**
+ * struct wlan_ies - Generic WLAN Information Element(s) format
+ * @len: Total length of the IEs
+ * @data: IE data
+ */
+struct wlan_ies {
+	uint16_t len;
+	uint8_t *data;
+};
 #endif

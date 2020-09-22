@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -51,6 +51,7 @@ typedef enum eSmeCommandType {
 	eSmeCsrCommandMask = 0x10000,
 	eSmeCommandRoam,
 	eSmeCommandWmStatusChange,
+	eSmeCommandGetdisconnectStats,
 	/* QOS */
 	eSmeQosCommandMask = 0x40000,   /* To identify Qos commands */
 	eSmeCommandAddTs,
@@ -69,16 +70,6 @@ typedef enum eSmeState {
 
 #define SME_IS_START(mac)  (SME_STATE_STOP != (mac)->sme.state)
 #define SME_IS_READY(mac)  (SME_STATE_READY == (mac)->sme.state)
-
-/* HDD Callback function */
-typedef void (*ibss_peer_info_cb)(void *cb_context,
-				  tSirPeerInfoRspParams *infoParam);
-
-/* Peer info */
-struct ibss_peer_info_cb_info {
-	void *peer_info_cb_context;
-	ibss_peer_info_cb peer_info_cb;
-};
 
 /**
  * struct stats_ext_event - stats_ext_event payload
@@ -253,8 +244,8 @@ typedef void (*hidden_ssid_cb)(hdd_handle_t hdd_handle,
  * @hdd_handle: HDD handle registered with SME
  * @beacon_report: Beacon report structure
  */
-typedef void (*beacon_report_cb)(hdd_handle_t hdd_handle,
-				 struct wlan_beacon_report *beacon_report);
+typedef QDF_STATUS (*beacon_report_cb)
+	(hdd_handle_t hdd_handle, struct wlan_beacon_report *beacon_report);
 
 /**
  * beacon_pause_cb : scan start callback fun
@@ -290,7 +281,6 @@ struct sme_context {
 	void **sme_cmd_buf_addr;
 	tDblLinkList sme_cmd_freelist;    /* preallocated roam cmd list */
 	enum QDF_OPMODE curr_device_mode;
-	struct ibss_peer_info_cb_info peer_info_cb_info;
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_CSR
 	host_event_wlan_status_payload_type eventPayload;
 #endif
@@ -298,7 +288,7 @@ struct sme_context {
 	link_layer_stats_cb link_layer_stats_cb;
 	void (*link_layer_stats_ext_cb)(hdd_handle_t callback_ctx,
 					tSirLLStatsResults *rsp);
-#ifdef WLAN_POWER_DEBUGFS
+#ifdef WLAN_POWER_DEBUG
 	void *power_debug_stats_context;
 	void (*power_stats_resp_callback)(struct power_stats_response *rsp,
 						void *callback_context);
@@ -319,10 +309,6 @@ struct sme_context {
 	sme_link_speed_cb link_speed_cb;
 	void *link_speed_context;
 
-	/* get extended peer info callback */
-	void (*pget_peer_info_ext_ind_cb)(struct sir_peer_info_ext_resp *param,
-		void *pcontext);
-	void *pget_peer_info_ext_cb_context;
 	sme_get_isolation_cb get_isolation_cb;
 	void *get_isolation_cb_context;
 #ifdef FEATURE_WLAN_EXTSCAN
@@ -390,7 +376,17 @@ struct sme_context {
 #endif
 #ifdef FEATURE_OEM_DATA
 	void (*oem_data_event_handler_cb)
-			(const struct oem_data *oem_event_data);
+			(const struct oem_data *oem_event_data,
+			 uint8_t vdev_id);
+	uint8_t oem_data_vdev_id;
+#endif
+	sme_get_raom_scan_ch_callback roam_scan_ch_callback;
+	void *roam_scan_ch_get_context;
+#ifdef FEATURE_MONITOR_MODE_SUPPORT
+	void (*monitor_mode_cb)(uint8_t vdev_id);
+#endif
+#if defined(CLD_PM_QOS) && defined(WLAN_FEATURE_LL_MODE)
+	void (*beacon_latency_event_cb)(uint32_t latency_level);
 #endif
 };
 

@@ -26,16 +26,29 @@
 #include "wlan_objmgr_cmn.h"
 #include "nan_public_structs.h"
 
+#define NAN_CONCURRENCY_SUPPORTED(psoc) \
+	(ucfg_is_nan_dbs_supported(psoc) || \
+	 ucfg_is_nan_conc_control_supported(psoc))
+
+#define NDI_CONCURRENCY_SUPPORTED(psoc) \
+	(ucfg_is_ndi_dbs_supported(psoc) || \
+	 ucfg_is_nan_conc_control_supported(psoc))
+
 #ifdef WLAN_FEATURE_NAN
+#define ucfg_nan_set_ndi_state(vdev, state) \
+	__ucfg_nan_set_ndi_state(vdev, state, __func__)
+
 /**
  * ucfg_nan_set_ndi_state: set ndi state
  * @vdev: pointer to vdev object
  * @state: value to set
+ * @func: Caller of this API
  *
  * Return: status of operation
  */
-QDF_STATUS ucfg_nan_set_ndi_state(struct wlan_objmgr_vdev *vdev,
-				  uint32_t state);
+QDF_STATUS __ucfg_nan_set_ndi_state(struct wlan_objmgr_vdev *vdev,
+				    enum nan_datapath_state state,
+				    const char *func);
 
 /**
  * ucfg_nan_psoc_open: Setup NAN priv object params on PSOC open
@@ -233,14 +246,14 @@ QDF_STATUS ucfg_nan_get_callbacks(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS ucfg_nan_discovery_req(void *in_req, uint32_t req_type);
 
 /**
- * ucfg_is_nan_disable_supported() - ucfg API to query NAN Disable support
+ * ucfg_is_nan_conc_control_supported() - is NAN concurrency controlled by host
  * @psoc: pointer to psoc object
  *
- * This function returns NAN Disable support status
+ * This function returns NAN concurrency support status
  *
- * Return: True if NAN Disable is supported, False otherwise
+ * Return: True if NAN concurrency is controlled by host, False otherwise
  */
-bool ucfg_is_nan_disable_supported(struct wlan_objmgr_psoc *psoc);
+bool ucfg_is_nan_conc_control_supported(struct wlan_objmgr_psoc *psoc);
 
 /**
  * ucfg_is_nan_dbs_supported() - ucfg API to query NAN DBS support
@@ -362,21 +375,33 @@ bool ucfg_nan_is_sta_ndp_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 					     struct wlan_objmgr_vdev *vdev);
 
 /**
+ * ucfg_nan_set_vdev_creation_supp_by_fw()- Set the NAN separate vdev psoc param
+ * @psoc: pointer to psoc object
+ * @set: True if firmware supports NAN separate vdev feature
+ *
+ * Cache the value of set in NAN psoc object param.
+ *
+ * Return: None
+ */
+void
+ucfg_nan_set_vdev_creation_supp_by_fw(struct wlan_objmgr_psoc *psoc, bool set);
+
+/**
  * ucfg_nan_is_vdev_creation_allowed()- Get support for NAN vdev creation
  * @psoc: pointer to psoc object
  *
- * Return: True if NAN vdev creation is allowed else false
+ * Return: True if NAN vdev creation is allowed by host and firmware else false
  */
 bool ucfg_nan_is_vdev_creation_allowed(struct wlan_objmgr_psoc *psoc);
 
 /**
- * ucfg_nan_get_is_separate_nan_iface() - get is_separate_nan_iface value
+ * ucfg_nan_is_sta_nan_ndi_4_port_allowed- Get support for 4 port (STA +
+ * NAN Disc + NDI + NDI)
  * @psoc: pointer to psoc object
  *
- * Return: True if host supports separate vdev for NAN, false otherwise
+ * Return: True if 4 port concurrency allowed or not.
  */
-bool
-ucfg_nan_get_is_separate_nan_iface(struct wlan_objmgr_psoc *psoc);
+bool ucfg_nan_is_sta_nan_ndi_4_port_allowed(struct wlan_objmgr_psoc *psoc);
 
 /**
  * ucfg_disable_nan_discovery() - Disable NAN discovery
@@ -392,6 +417,52 @@ ucfg_nan_get_is_separate_nan_iface(struct wlan_objmgr_psoc *psoc);
  */
 QDF_STATUS ucfg_disable_nan_discovery(struct wlan_objmgr_psoc *psoc,
 				      uint8_t *data, uint32_t data_len);
+
+/**
+ * ucfg_nan_disable_ndi() - Disable the NDI with given vdev_id
+ * @psoc: pointer to psoc object
+ * @ndi_vdev_id: vdev_id of the NDI to be disabled
+ *
+ * Disable all the NDPs present on the given NDI by sending NDP_END_ALL
+ * to firmware. Firmwere sends an immediate response(NDP_HOST_UPDATE) with
+ * ndp_disable param as 1 followed by NDP_END indication for all the NDPs.
+ *
+ * Return: status of operation
+ */
+QDF_STATUS
+ucfg_nan_disable_ndi(struct wlan_objmgr_psoc *psoc, uint32_t ndi_vdev_id);
+
+/**
+ * ucfg_get_nan_feature_config() - Get NAN feature bitmap
+ * @psoc: pointer to psoc object
+ * @nan_feature_config: NAN feature config bitmap to be enabled in firmware
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_get_nan_feature_config(struct wlan_objmgr_psoc *psoc,
+				       uint32_t *nan_feature_config);
+
+/**
+ * ucfg_is_nan_vdev() - Check if the current vdev supports NAN or not
+ * @vdev: pointer to vdev object
+ *
+ * Return true
+ * 1. If the VDEV type is NAN_DISC or
+ * 2. If the VDEV type is STA and nan_separate_iface feature is not supported
+ *
+ * Return: Bool
+ */
+bool ucfg_is_nan_vdev(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * ucfg_nan_disable_ind_to_userspace() - Send NAN disble ind to userspace
+ * @psoc: pointer to psoc object
+ *
+ * Prepare NAN disable indication and send it to userspace
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_nan_disable_ind_to_userspace(struct wlan_objmgr_psoc *psoc);
 #else /* WLAN_FEATURE_NAN */
 
 static inline
@@ -444,6 +515,11 @@ bool ucfg_nan_is_sta_ndp_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 	return false;
 }
 
+static inline void
+ucfg_nan_set_vdev_creation_supp_by_fw(struct wlan_objmgr_psoc *psoc, bool set)
+{
+}
+
 static inline
 bool ucfg_nan_is_vdev_creation_allowed(struct wlan_objmgr_psoc *psoc)
 {
@@ -451,7 +527,7 @@ bool ucfg_nan_is_vdev_creation_allowed(struct wlan_objmgr_psoc *psoc)
 }
 
 static inline
-bool ucfg_nan_get_is_separate_nan_iface(struct wlan_objmgr_psoc *psoc)
+bool ucfg_nan_is_sta_nan_ndi_4_port_allowed(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }
@@ -459,6 +535,44 @@ bool ucfg_nan_get_is_separate_nan_iface(struct wlan_objmgr_psoc *psoc)
 static inline
 QDF_STATUS ucfg_disable_nan_discovery(struct wlan_objmgr_psoc *psoc,
 				      uint8_t *data, uint32_t data_len)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS
+ucfg_nan_disable_ndi(struct wlan_objmgr_psoc *psoc, uint32_t ndi_vdev_id)
+{
+	return QDF_STATUS_E_INVAL;
+}
+
+static inline
+bool ucfg_is_nan_conc_control_supported(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline
+QDF_STATUS ucfg_get_nan_feature_config(struct wlan_objmgr_psoc *psoc,
+				       uint32_t *nan_feature_config)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+bool ucfg_is_nan_vdev(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
+}
+
+static inline
+bool ucfg_is_nan_dbs_supported(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline
+QDF_STATUS ucfg_nan_disable_ind_to_userspace(struct wlan_objmgr_psoc *psoc)
 {
 	return QDF_STATUS_SUCCESS;
 }

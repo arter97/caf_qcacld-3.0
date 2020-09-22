@@ -51,6 +51,8 @@
 #include "wlan_p2p_cfg_api.h"
 #include "wlan_policy_mgr_ucfg.h"
 #include "nan_ucfg_api.h"
+#include "wlan_pkt_capture_ucfg_api.h"
+#include "wlan_hdd_object_manager.h"
 
 /* Ms to Time Unit Micro Sec */
 #define MS_TO_TU_MUS(x)   ((x) * 1024)
@@ -84,12 +86,20 @@ const char *tdls_action_frame_type[] = { "TDLS Setup Request",
 
 void wlan_hdd_cancel_existing_remain_on_channel(struct hdd_adapter *adapter)
 {
+	struct wlan_objmgr_vdev *vdev;
+
 	if (!adapter) {
 		hdd_err("null adapter");
 		return;
 	}
 
-	ucfg_p2p_cleanup_roc_by_vdev(adapter->vdev);
+	vdev = hdd_objmgr_get_vdev(adapter);
+	if (!vdev) {
+		hdd_err("vdev is NULL");
+		return;
+	}
+	ucfg_p2p_cleanup_roc_by_vdev(vdev);
+	hdd_objmgr_put_vdev(vdev);
 }
 
 int wlan_hdd_check_remain_on_channel(struct hdd_adapter *adapter)
@@ -103,22 +113,39 @@ int wlan_hdd_check_remain_on_channel(struct hdd_adapter *adapter)
 /* Clean up RoC context at hdd_stop_adapter*/
 void wlan_hdd_cleanup_remain_on_channel_ctx(struct hdd_adapter *adapter)
 {
+	struct wlan_objmgr_vdev *vdev;
+
 	if (!adapter) {
 		hdd_err("null adapter");
 		return;
 	}
 
-	ucfg_p2p_cleanup_roc_by_vdev(adapter->vdev);
+	vdev = hdd_objmgr_get_vdev(adapter);
+	if (!vdev) {
+		hdd_err("vdev is NULL");
+		return;
+	}
+
+	ucfg_p2p_cleanup_roc_by_vdev(vdev);
+	hdd_objmgr_put_vdev(vdev);
 }
 
 void wlan_hdd_cleanup_actionframe(struct hdd_adapter *adapter)
 {
+	struct wlan_objmgr_vdev *vdev;
+
 	if (!adapter) {
 		hdd_err("null adapter");
 		return;
 	}
 
-	ucfg_p2p_cleanup_tx_by_vdev(adapter->vdev);
+	vdev = hdd_objmgr_get_vdev(adapter);
+	if (!vdev) {
+		hdd_err("vdev is NULL");
+		return;
+	}
+	ucfg_p2p_cleanup_tx_by_vdev(vdev);
+	hdd_objmgr_put_vdev(vdev);
 }
 
 static int __wlan_hdd_cfg80211_remain_on_channel(struct wiphy *wiphy,
@@ -130,6 +157,7 @@ static int __wlan_hdd_cfg80211_remain_on_channel(struct wiphy *wiphy,
 	struct net_device *dev = wdev->netdev;
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_context *hdd_ctx;
+	struct wlan_objmgr_vdev *vdev;
 	QDF_STATUS status;
 	int ret;
 
@@ -148,10 +176,17 @@ static int __wlan_hdd_cfg80211_remain_on_channel(struct wiphy *wiphy,
 	if (wlan_hdd_validate_vdev_id(adapter->vdev_id))
 		return -EINVAL;
 
+	vdev = hdd_objmgr_get_vdev(adapter);
+	if (!vdev) {
+		hdd_err("vdev is NULL");
+		return -EINVAL;
+	}
+
 	/* Disable NAN Discovery if enabled */
 	ucfg_nan_disable_concurrency(hdd_ctx->psoc);
 
-	status = wlan_cfg80211_roc(adapter->vdev, chan, duration, cookie);
+	status = wlan_cfg80211_roc(vdev, chan, duration, cookie);
+	hdd_objmgr_put_vdev(vdev);
 	hdd_debug("remain on channel request, status:%d, cookie:0x%llx",
 		  status, *cookie);
 
@@ -186,6 +221,7 @@ __wlan_hdd_cfg80211_cancel_remain_on_channel(struct wiphy *wiphy,
 	QDF_STATUS status;
 	struct net_device *dev = wdev->netdev;
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct wlan_objmgr_vdev *vdev;
 
 	hdd_enter();
 
@@ -197,7 +233,15 @@ __wlan_hdd_cfg80211_cancel_remain_on_channel(struct wiphy *wiphy,
 	if (wlan_hdd_validate_vdev_id(adapter->vdev_id))
 		return -EINVAL;
 
-	status = wlan_cfg80211_cancel_roc(adapter->vdev, cookie);
+	vdev = hdd_objmgr_get_vdev(adapter);
+	if (!vdev) {
+		hdd_err("vdev is NULL");
+		return -EINVAL;
+	}
+
+	status = wlan_cfg80211_cancel_roc(vdev, cookie);
+	hdd_objmgr_put_vdev(vdev);
+
 	hdd_debug("cancel remain on channel, status:%d", status);
 
 	return 0;
@@ -261,6 +305,7 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 	struct net_device *dev = wdev->netdev;
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct wlan_objmgr_vdev *vdev;
 	uint8_t type;
 	uint8_t sub_type;
 	QDF_STATUS qdf_status;
@@ -295,8 +340,7 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 	    (type == SIR_MAC_MGMT_FRAME &&
 	    sub_type == SIR_MAC_MGMT_AUTH)) {
 		qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_SME,
-			   TRACE_CODE_HDD_SEND_MGMT_TX,
-			   wlan_vdev_get_id(adapter->vdev), 0);
+			   TRACE_CODE_HDD_SEND_MGMT_TX, adapter->vdev_id, 0);
 
 		qdf_status = sme_send_mgmt_tx(hdd_ctx->mac_handle,
 					      adapter->vdev_id, buf, len);
@@ -315,12 +359,19 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 
 	wlan_hdd_validate_and_override_offchan(adapter, chan, &offchan);
 
+	vdev = hdd_objmgr_get_vdev(adapter);
+	if (!vdev) {
+		hdd_err("vdev is NULL");
+		return -EINVAL;
+	}
+
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_OS_IF,
 		   TRACE_CODE_HDD_SEND_MGMT_TX,
-		   wlan_vdev_get_id(adapter->vdev), 0);
+		   wlan_vdev_get_id(vdev), 0);
 
-	status = wlan_cfg80211_mgmt_tx(adapter->vdev, chan, offchan, wait, buf,
+	status = wlan_cfg80211_mgmt_tx(vdev, chan, offchan, wait, buf,
 				       len, no_cck, dont_wait_for_ack, cookie);
+	hdd_objmgr_put_vdev(vdev);
 	hdd_debug("mgmt tx, status:%d, cookie:0x%llx", status, *cookie);
 
 	return 0;
@@ -367,6 +418,7 @@ static int __wlan_hdd_cfg80211_mgmt_tx_cancel_wait(struct wiphy *wiphy,
 	QDF_STATUS status;
 	struct net_device *dev = wdev->netdev;
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct wlan_objmgr_vdev *vdev;
 
 	hdd_enter();
 
@@ -378,7 +430,15 @@ static int __wlan_hdd_cfg80211_mgmt_tx_cancel_wait(struct wiphy *wiphy,
 	if (wlan_hdd_validate_vdev_id(adapter->vdev_id))
 		return -EINVAL;
 
-	status = wlan_cfg80211_mgmt_tx_cancel(adapter->vdev, cookie);
+	vdev = hdd_objmgr_get_vdev(adapter);
+	if (!vdev) {
+		hdd_err("vdev is NULL");
+		return -EINVAL;
+	}
+
+	status = wlan_cfg80211_mgmt_tx_cancel(vdev, cookie);
+	hdd_objmgr_put_vdev(vdev);
+
 	hdd_debug("cancel mgmt tx, status:%d", status);
 
 	return 0;
@@ -611,48 +671,6 @@ int hdd_set_p2p_ps(struct net_device *dev, void *msgData)
 }
 
 /**
- * wlan_hdd_allow_sap_add() - check to add new sap interface
- * @hdd_ctx: pointer to hdd context
- * @name: name of the new interface
- * @sap_dev: output pointer to hold existing interface
- *
- * Return: If able to add interface return true else false
- */
-static bool
-wlan_hdd_allow_sap_add(struct hdd_context *hdd_ctx, const char *name,
-		       struct wireless_dev **sap_dev)
-{
-	struct hdd_adapter *adapter;
-
-	*sap_dev = NULL;
-
-	hdd_for_each_adapter(hdd_ctx, adapter) {
-		if (adapter->device_mode == QDF_SAP_MODE &&
-		    test_bit(NET_DEVICE_REGISTERED, &adapter->event_flags) &&
-		    adapter->dev &&
-		    !strncmp(adapter->dev->name, name, IFNAMSIZ)) {
-			struct hdd_beacon_data *beacon =
-						adapter->session.ap.beacon;
-
-			hdd_debug("iface already registered");
-			if (beacon) {
-				adapter->session.ap.beacon = NULL;
-				qdf_mem_free(beacon);
-			}
-			if (adapter->dev->ieee80211_ptr) {
-				*sap_dev = adapter->dev->ieee80211_ptr;
-				return false;
-			}
-
-			hdd_err("ieee80211_ptr points to NULL");
-			return false;
-		}
-	}
-
-	return true;
-}
-
-/**
  * __wlan_hdd_add_virtual_intf() - Add virtual interface
  * @wiphy: wiphy pointer
  * @name: User-visible name of the interface
@@ -676,12 +694,18 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 	bool p2p_dev_addr_admin = false;
 	enum QDF_OPMODE mode;
 	QDF_STATUS status;
+	struct wlan_objmgr_vdev *vdev;
 	int ret;
 
 	hdd_enter();
 
 	if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE) {
 		hdd_err("Command not allowed in FTM mode");
+		return ERR_PTR(-EINVAL);
+	}
+
+	if (cds_get_conparam() == QDF_GLOBAL_MONITOR_MODE) {
+		hdd_err("Concurrency not allowed with standalone monitor mode");
 		return ERR_PTR(-EINVAL);
 	}
 
@@ -713,33 +737,31 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 
 	adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
 	if (adapter && !wlan_hdd_validate_vdev_id(adapter->vdev_id)) {
-		if (ucfg_scan_get_vdev_status(adapter->vdev) !=
-				SCAN_NOT_IN_PROGRESS) {
-			wlan_abort_scan(hdd_ctx->pdev, INVAL_PDEV_ID,
-					adapter->vdev_id, INVALID_SCAN_ID,
-					false);
+		vdev = hdd_objmgr_get_vdev(adapter);
+		if (vdev) {
+			if (ucfg_scan_get_vdev_status(vdev) !=
+							SCAN_NOT_IN_PROGRESS) {
+				wlan_abort_scan(hdd_ctx->pdev, INVAL_PDEV_ID,
+						adapter->vdev_id,
+						INVALID_SCAN_ID, false);
+			}
+			hdd_objmgr_put_vdev(vdev);
+		} else {
+			hdd_err("vdev is NULL");
 		}
 	}
 
 	adapter = NULL;
-	ret = wlan_hdd_add_monitor_check(hdd_ctx, &adapter, type, name,
-					 true, name_assign_type);
-	if (ret)
-		return ERR_PTR(-EINVAL);
-	if (adapter) {
-		hdd_exit();
-		return adapter->dev->ieee80211_ptr;
-	}
-
-	if (mode == QDF_SAP_MODE) {
-		struct wireless_dev *sap_dev;
-		bool allow_add_sap = wlan_hdd_allow_sap_add(hdd_ctx, name,
-							    &sap_dev);
-		if (!allow_add_sap) {
-			if (sap_dev)
-				return sap_dev;
-
+	if ((ucfg_pkt_capture_get_mode(hdd_ctx->psoc)) &&
+	    (type == NL80211_IFTYPE_MONITOR)) {
+		ret = wlan_hdd_add_monitor_check(hdd_ctx, &adapter, name,
+						 true, name_assign_type);
+		if (ret)
 			return ERR_PTR(-EINVAL);
+
+		if (adapter) {
+			hdd_exit();
+			return adapter->dev->ieee80211_ptr;
 		}
 	}
 
@@ -758,10 +780,17 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 					   p2p_device_address.bytes,
 					   name_assign_type, true);
 	} else {
+		uint8_t *device_address;
+
+		device_address = wlan_hdd_get_intf_addr(hdd_ctx, mode);
+		if (!device_address)
+			return ERR_PTR(-EINVAL);
+
 		adapter = hdd_open_adapter(hdd_ctx, mode, name,
-					   wlan_hdd_get_intf_addr(hdd_ctx,
-								  mode),
+					   device_address,
 					   name_assign_type, true);
+		if (!adapter)
+			wlan_hdd_release_intf_addr(hdd_ctx, device_address);
 	}
 
 	if (!adapter) {
@@ -906,6 +935,8 @@ int __wlan_hdd_del_virtual_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
 		hdd_close_adapter(hdd_ctx, adapter, true);
 	}
 
+	if (!hdd_is_any_interface_open(hdd_ctx))
+		hdd_psoc_idle_timer_start(hdd_ctx);
 	hdd_exit();
 
 	return 0;
@@ -977,20 +1008,17 @@ wlan_hdd_set_rxmgmt_external_auth_flag(enum nl80211_rxmgmt_flags *nl80211_flag)
  * @flag: flags set by driver(SME/PE) from enum rxmgmt_flags
  *
  * Convert driver internal RXMGMT flag value to nl80211 defined RXMGMT flag
- * Return: 0 on success, -EINVAL on invalid value
+ * Return: void
  */
-static int
+static void
 wlan_hdd_cfg80211_convert_rxmgmt_flags(enum rxmgmt_flags flag,
 				       enum nl80211_rxmgmt_flags *nl80211_flag)
 {
-	int ret = -EINVAL;
 
 	if (flag & RXMGMT_FLAG_EXTERNAL_AUTH) {
 		wlan_hdd_set_rxmgmt_external_auth_flag(nl80211_flag);
-		ret = 0;
 	}
 
-	return ret;
 }
 
 static void
@@ -1087,9 +1115,7 @@ __hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
 	hdd_debug("Indicate Frame over NL80211 sessionid : %d, idx :%d",
 		   adapter->vdev_id, adapter->dev->ifindex);
 
-	if (wlan_hdd_cfg80211_convert_rxmgmt_flags(rx_flags, &nl80211_flag))
-		hdd_debug("Failed to convert RXMGMT flags :0x%x to nl80211 format",
-			  rx_flags);
+	wlan_hdd_cfg80211_convert_rxmgmt_flags(rx_flags, &nl80211_flag);
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
 	cfg80211_rx_mgmt(adapter->dev->ieee80211_ptr,
@@ -1158,43 +1184,6 @@ int wlan_hdd_set_power_save(struct hdd_adapter *adapter,
 }
 
 /**
- * wlan_hdd_update_mcc_adaptive_scheduler() - Function to update
- * MAS value to FW
- * @adapter:            adapter object data
- * @is_enable:          0-Disable, 1-Enable MAS
- *
- * This function passes down the value of MAS to UMAC
- *
- * Return: 0 for success else non zero
- *
- */
-static int32_t wlan_hdd_update_mcc_adaptive_scheduler(
-		struct hdd_adapter *adapter, bool is_enable)
-{
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	uint8_t enable_mcc_adaptive_sch = 0;
-
-	if (!hdd_ctx) {
-		hdd_err("HDD context is null");
-		return -EINVAL;
-	}
-
-	hdd_info("enable/disable MAS :%d", is_enable);
-	ucfg_policy_mgr_get_mcc_adaptive_sch(hdd_ctx->psoc,
-					     &enable_mcc_adaptive_sch);
-	if (enable_mcc_adaptive_sch) {
-		/* Todo check where to set the MCC apative SCHED for read */
-
-		if (QDF_STATUS_SUCCESS != sme_set_mas(is_enable)) {
-			hdd_err("Failed to enable/disable MAS");
-			return -EAGAIN;
-		}
-	}
-
-	return 0;
-}
-
-/**
  * wlan_hdd_update_mcc_p2p_quota() - Function to Update P2P
  * quota to FW
  * @adapter:            Pointer to HDD adapter
@@ -1233,20 +1222,32 @@ static void wlan_hdd_update_mcc_p2p_quota(struct hdd_adapter *adapter,
 
 int32_t wlan_hdd_set_mas(struct hdd_adapter *adapter, uint8_t mas_value)
 {
-	int32_t ret = 0;
+	struct hdd_context *hdd_ctx;
+	bool enable_mcc_adaptive_sch = false;
 
 	if (!adapter) {
 		hdd_err("Adapter is NULL");
 		return -EINVAL;
 	}
 
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	if (!hdd_ctx) {
+		hdd_err("HDD context is null");
+		return -EINVAL;
+	}
+
 	if (mas_value) {
 		hdd_info("Miracast is ON. Disable MAS and configure P2P quota");
-		ret = wlan_hdd_update_mcc_adaptive_scheduler(
-			adapter, false);
-		if (0 != ret) {
-			hdd_err("Failed to disable MAS");
-			goto done;
+		ucfg_policy_mgr_get_mcc_adaptive_sch(hdd_ctx->psoc,
+						     &enable_mcc_adaptive_sch);
+		if (enable_mcc_adaptive_sch) {
+			ucfg_policy_mgr_set_dynamic_mcc_adaptive_sch(
+							hdd_ctx->psoc, false);
+
+			if (QDF_STATUS_SUCCESS != sme_set_mas(false)) {
+				hdd_err("Failed to disable MAS");
+				return -EAGAIN;
+			}
 		}
 
 		/* Config p2p quota */
@@ -1255,16 +1256,20 @@ int32_t wlan_hdd_set_mas(struct hdd_adapter *adapter, uint8_t mas_value)
 		hdd_info("Miracast is OFF. Enable MAS and reset P2P quota");
 		wlan_hdd_update_mcc_p2p_quota(adapter, false);
 
-		ret = wlan_hdd_update_mcc_adaptive_scheduler(
-			adapter, true);
-		if (0 != ret) {
-			hdd_err("Failed to enable MAS");
-			goto done;
+		ucfg_policy_mgr_get_mcc_adaptive_sch(hdd_ctx->psoc,
+						     &enable_mcc_adaptive_sch);
+		if (enable_mcc_adaptive_sch) {
+			ucfg_policy_mgr_set_dynamic_mcc_adaptive_sch(
+							hdd_ctx->psoc, true);
+
+			if (QDF_STATUS_SUCCESS != sme_set_mas(true)) {
+				hdd_err("Failed to enable MAS");
+				return -EAGAIN;
+			}
 		}
 	}
 
-done:
-	return ret;
+	return 0;
 }
 
 /**

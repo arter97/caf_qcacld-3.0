@@ -57,7 +57,8 @@ QDF_STATUS lim_populate_peer_rate_set(struct mac_context *mac,
 				      struct pe_session *pe_session,
 				      tDot11fIEVHTCaps *pVHTCaps,
 				      tDot11fIEhe_cap *he_caps,
-				      struct sDphHashNode *sta_ds);
+				      struct sDphHashNode *sta_ds,
+				      struct bss_description *bss_desc);
 
 /**
  * lim_populate_own_rate_set() - comprises the basic and extended rates read
@@ -103,6 +104,26 @@ QDF_STATUS lim_add_sta(struct mac_context *, tpDphHashNode, uint8_t, struct pe_s
 QDF_STATUS lim_del_bss(struct mac_context *, tpDphHashNode, uint16_t, struct pe_session *);
 QDF_STATUS lim_del_sta(struct mac_context *, tpDphHashNode, bool, struct pe_session *);
 QDF_STATUS lim_add_sta_self(struct mac_context *, uint8_t, struct pe_session *);
+
+/**
+ *lim_del_peer_info() - remove all peer information from host driver and fw
+ * @mac:    Pointer to Global MAC structure
+ * @pe_session: Pointer to PE Session entry
+ *
+ * @Return: QDF_STATUS
+ */
+QDF_STATUS lim_del_peer_info(struct mac_context *mac,
+			     struct pe_session *pe_session);
+
+/**
+ * lim_del_sta_all() - Cleanup all peers associated with VDEV
+ * @mac:    Pointer to Global MAC structure
+ * @pe_session: Pointer to PE Session entry
+ *
+ * @Return: QDF Status of operation.
+ */
+QDF_STATUS lim_del_sta_all(struct mac_context *mac,
+			   struct pe_session *pe_session);
 
 #ifdef WLAN_FEATURE_HOST_ROAM
 void lim_restore_pre_reassoc_state(struct mac_context *,
@@ -150,12 +171,14 @@ static inline QDF_STATUS lim_add_ft_sta_self(struct mac_context *mac,
 #endif
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
-static inline bool lim_is_roam_synch_in_progress(struct pe_session *pe_session)
+static inline bool lim_is_roam_synch_in_progress(struct wlan_objmgr_psoc *psoc,
+						 struct pe_session *pe_session)
 {
-	return pe_session->bRoamSynchInProgress;
+	return MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, pe_session->vdev_id);
 }
 #else
-static inline bool lim_is_roam_synch_in_progress(struct pe_session *pe_session)
+static inline bool lim_is_roam_synch_in_progress(struct wlan_objmgr_psoc *psoc,
+						 struct pe_session *pe_session)
 {
 	return false;
 }
@@ -179,7 +202,8 @@ void lim_update_re_assoc_globals(struct mac_context *mac,
 
 void lim_update_assoc_sta_datas(struct mac_context *mac,
 				tpDphHashNode sta, tpSirAssocRsp pAssocRsp,
-				struct pe_session *pe_session);
+				struct pe_session *pe_session,
+				tSchBeaconStruct *beacon);
 
 /**
  * lim_sta_add_bss_update_ht_parameter() - function to update ht related
@@ -226,6 +250,10 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
  * Return: none
  */
 QDF_STATUS lim_sta_send_add_bss_pre_assoc(struct mac_context *mac,
+					  struct pe_session *pe_session);
+
+void lim_prepare_and_send_del_all_sta_cnf(struct mac_context *mac,
+					  tSirResultCodes status_code,
 					  struct pe_session *pe_session);
 
 void lim_prepare_and_send_del_sta_cnf(struct mac_context *mac,
@@ -336,4 +364,18 @@ void
 lim_extract_ies_from_deauth_disassoc(struct pe_session *session,
 				     uint8_t *deauth_disassoc_frame,
 				     uint16_t deauth_disassoc_frame_len);
+
+/**
+ * lim_update_vhtcaps_assoc_resp : Update VHT caps in assoc response.
+ * @mac_ctx Pointer to Global MAC structure
+ * @pAddBssParams: parameters required for add bss params.
+ * @vht_caps: VHT capabilities.
+ * @pe_session : session entry.
+ *
+ * Return : void
+ */
+void lim_update_vhtcaps_assoc_resp(struct mac_context *mac_ctx,
+				   struct bss_params *pAddBssParams,
+				   tDot11fIEVHTCaps *vht_caps,
+				   struct pe_session *pe_session);
 #endif /* __LIM_ASSOC_UTILS_H */

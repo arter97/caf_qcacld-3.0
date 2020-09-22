@@ -42,7 +42,6 @@
 #include "lim_assoc_utils.h"
 #include "lim_prop_exts_utils.h"
 #include "lim_ser_des_utils.h"
-#include "lim_ibss_peer_mgmt.h"
 #include "lim_admit_control.h"
 #include "lim_send_sme_rsp_messages.h"
 #include "lim_security_utils.h"
@@ -51,6 +50,7 @@
 #include "lim_ft_defs.h"
 #include "lim_session.h"
 #include "wma_types.h"
+#include "wlan_crypto_global_api.h"
 
 #include "rrm_api.h"
 
@@ -74,6 +74,18 @@
 #include "cfg_ucfg_api.h"
 #include "wlan_mlme_public_struct.h"
 #include "wlan_scan_utils_api.h"
+#include <qdf_hang_event_notifier.h>
+#include <qdf_notifier.h>
+#include "wlan_pkt_capture_ucfg_api.h"
+
+struct pe_hang_event_fixed_param {
+	uint16_t tlv_header;
+	uint8_t vdev_id;
+	uint8_t limmlmstate;
+	uint8_t limprevmlmstate;
+	uint8_t limsmestate;
+	uint8_t limprevsmestate;
+} qdf_packed;
 
 static void __lim_init_bss_vars(struct mac_context *mac)
 {
@@ -390,7 +402,6 @@ QDF_STATUS lim_initialize(struct mac_context *mac)
 	mac->lim.tdls_frm_session_id = NO_SESSION;
 	mac->lim.deferredMsgCnt = 0;
 	mac->lim.retry_packet_cnt = 0;
-	mac->lim.ibss_retry_cnt = 0;
 	mac->lim.deauthMsgCnt = 0;
 	mac->lim.disassocMsgCnt = 0;
 
@@ -400,9 +411,6 @@ QDF_STATUS lim_initialize(struct mac_context *mac)
 	__lim_init_stats_vars(mac);
 	__lim_init_bss_vars(mac);
 	__lim_init_ht_vars(mac);
-
-	/* Initializations for maintaining peers in IBSS */
-	lim_ibss_init(mac);
 
 	rrm_initialize(mac);
 
@@ -504,7 +512,8 @@ void lim_cleanup(struct mac_context *mac)
 	/* Now, finally reset the deferred message queue pointers */
 	lim_reset_deferred_msg_q(mac);
 
-	rrm_cleanup(mac);
+	for (i = 0; i < MAX_MEASUREMENT_REQUEST; i++)
+		rrm_cleanup(mac, i);
 
 	lim_ft_cleanup_all_ft_sessions(mac);
 
@@ -583,6 +592,17 @@ static inline void lim_nan_register_callbacks(struct mac_context *mac_ctx)
 }
 #endif
 
+#ifdef WLAN_FEATURE_11W
+void lim_stop_pmfcomeback_timer(struct pe_session *session)
+{
+	if (session->opmode != QDF_STA_MODE)
+		return;
+
+	qdf_mc_timer_stop(&session->pmf_retry_timer);
+	session->pmf_retry_timer_info.retried = false;
+}
+#endif
+
 /*
  * pe_shutdown_notifier_cb - Shutdown notifier callback
  * @ctx: Pointer to Global MAC structure
@@ -602,6 +622,7 @@ static void pe_shutdown_notifier_cb(void *ctx)
 			if (LIM_IS_AP_ROLE(session))
 				qdf_mc_timer_stop(&session->
 						 protection_fields_reset_timer);
+			lim_stop_pmfcomeback_timer(session);
 		}
 	}
 }
@@ -652,6 +673,7 @@ static bool is_mgmt_protected(uint32_t vdev_id,
 
 	return protected;
 }
+
 #else
 /**
  * is_mgmt_protected - check RMF enabled for the peer
@@ -725,6 +747,53 @@ static QDF_STATUS lim_unregister_sap_bcn_callback(struct mac_context *mac_ctx)
 	return status;
 }
 
+static int pe_hang_event_notifier_call(struct notifier_block *block,
+				       unsigned long state,
+				       void *data)
+{
+	qdf_notif_block *notif_block = qdf_container_of(block, qdf_notif_block,
+							notif_block);
+	struct mac_context *mac;
+	struct pe_session *session;
+	struct qdf_notifer_data *pe_hang_data = data;
+	uint8_t *pe_data;
+	uint8_t i;
+	struct pe_hang_event_fixed_param *cmd;
+
+	if (!data)
+		return NOTIFY_STOP_MASK;
+
+	mac = notif_block->priv_data;
+	if (!mac)
+		return NOTIFY_STOP_MASK;
+
+	if (pe_hang_data->offset >= QDF_WLAN_MAX_HOST_OFFSET)
+		return NOTIFY_STOP_MASK;
+
+	for (i = 0; i < mac->lim.maxBssId; i++) {
+		session = &mac->lim.gpSession[i];
+		if (!session->valid)
+			continue;
+
+		pe_data = (pe_hang_data->hang_data + pe_hang_data->offset);
+		cmd = (struct pe_hang_event_fixed_param *)pe_data;
+		QDF_HANG_EVT_SET_HDR(&cmd->tlv_header, HANG_EVT_TAG_LEGACY_MAC,
+				     QDF_HANG_GET_STRUCT_TLVLEN(*cmd));
+		cmd->vdev_id = session->vdev_id;
+		cmd->limmlmstate = session->limMlmState;
+		cmd->limprevmlmstate = session->limPrevMlmState;
+		cmd->limsmestate = session->limSmeState;
+		cmd->limprevsmestate = session->limPrevSmeState;
+		pe_hang_data->offset += sizeof(*cmd);
+	}
+
+	return NOTIFY_OK;
+}
+
+static qdf_notif_block pe_hang_event_notifier = {
+	.notif_block.notifier_call = pe_hang_event_notifier_call,
+};
+
 /** -------------------------------------------------------------
    \fn pe_open
    \brief will be called in Open sequence from mac_open
@@ -742,6 +811,9 @@ QDF_STATUS pe_open(struct mac_context *mac, struct cds_config_info *cds_cfg)
 
 	mac->lim.maxBssId = cds_cfg->max_bssid;
 	mac->lim.maxStation = cds_cfg->max_station;
+	mac->lim.max_sta_of_pe_session =
+			(cds_cfg->max_station > SIR_SAP_MAX_NUM_PEERS) ?
+				SIR_SAP_MAX_NUM_PEERS : cds_cfg->max_station;
 	qdf_spinlock_create(&mac->sys.bbt_mgmt_lock);
 
 	if ((mac->lim.maxBssId == 0) || (mac->lim.maxStation == 0)) {
@@ -793,6 +865,9 @@ QDF_STATUS pe_open(struct mac_context *mac, struct cds_config_info *cds_cfg)
 		pe_err("%s: Shutdown notifier register failed", __func__);
 	}
 
+	pe_hang_event_notifier.priv_data = mac;
+	qdf_hang_event_register_notifier(&pe_hang_event_notifier);
+
 	return status; /* status here will be QDF_STATUS_SUCCESS */
 
 pe_open_lock_fail:
@@ -821,6 +896,7 @@ QDF_STATUS pe_close(struct mac_context *mac)
 	if (ANI_DRIVER_TYPE(mac) == QDF_DRIVER_TYPE_MFG)
 		return QDF_STATUS_SUCCESS;
 
+	qdf_hang_event_unregister_notifier(&pe_hang_event_notifier);
 	lim_cleanup(mac);
 	lim_unregister_sap_bcn_callback(mac);
 
@@ -1052,12 +1128,7 @@ static bool pe_filter_bcn_probe_frame(struct mac_context *mac_ctx,
 					uint8_t *rx_pkt_info)
 {
 	uint8_t session_id;
-	uint8_t *body;
-	const uint8_t *ssid_ie;
-	uint16_t frame_len;
 	struct mgmt_beacon_probe_filter *filter;
-	tpSirMacCapabilityInfo bcn_caps;
-	tSirMacSSid bcn_ssid;
 
 	if (pe_is_ext_scan_bcn_probe_rsp(hdr, rx_pkt_info))
 		return true;
@@ -1073,44 +1144,6 @@ static bool pe_filter_bcn_probe_frame(struct mac_context *mac_ctx,
 		     session_id++) {
 			if (sir_compare_mac_addr(filter->sta_bssid[session_id],
 			    hdr->bssId)) {
-				return true;
-			}
-		}
-	}
-
-	/*
-	 * If any IBSS session exists and beacon is has IBSS capability set
-	 * and SSID matches the IBSS SSID, allow the frame
-	 */
-	if (filter->num_ibss_sessions) {
-		body = WMA_GET_RX_MPDU_DATA(rx_pkt_info);
-		frame_len = WMA_GET_RX_PAYLOAD_LEN(rx_pkt_info);
-		if (frame_len < SIR_MAC_B_PR_SSID_OFFSET)
-			return false;
-
-		bcn_caps = (tpSirMacCapabilityInfo)
-				(body + SIR_MAC_B_PR_CAPAB_OFFSET);
-		if (!bcn_caps->ibss)
-			return false;
-
-		ssid_ie = wlan_get_ie_ptr_from_eid(WLAN_ELEMID_SSID,
-				body + SIR_MAC_B_PR_SSID_OFFSET,
-				frame_len);
-
-		if (!ssid_ie)
-			return false;
-
-		bcn_ssid.length = ssid_ie[1];
-		qdf_mem_copy(&bcn_ssid.ssId,
-			     &ssid_ie[2],
-			     bcn_ssid.length);
-
-		for (session_id = 0; session_id < WLAN_MAX_VDEVS;
-		     session_id++) {
-			if (filter->ibss_ssid[session_id].length ==
-			    bcn_ssid.length &&
-			    (!qdf_mem_cmp(filter->ibss_ssid[session_id].ssId,
-			    bcn_ssid.ssId, bcn_ssid.length))) {
 				return true;
 			}
 		}
@@ -1174,6 +1207,13 @@ static QDF_STATUS pe_handle_mgmt_frame(struct wlan_objmgr_psoc *psoc,
 	QDF_STATUS qdf_status;
 	uint8_t *pRxPacketInfo;
 	int ret;
+
+	/* skip offload packets */
+	if (ucfg_pkt_capture_get_mode(psoc) &&
+	    mgmt_rx_params->status & WMI_RX_OFFLOAD_MON_MODE) {
+		qdf_nbuf_free(buf);
+		return QDF_STATUS_SUCCESS;
+	}
 
 	mac = cds_get_context(QDF_MODULE_ID_PE);
 	if (!mac) {
@@ -1369,90 +1409,6 @@ lim_update_overlap_sta_param(struct mac_context *mac, tSirMacAddr bssId,
 	}
 }
 
-#ifdef QCA_IBSS_SUPPORT
-/**
- * lim_ibss_enc_type_matched() - API to check enc type match
- * @param  pBeacon  - Parsed Beacon Frame structure
- * @param  pSession - Pointer to the PE session
- *
- * This function compares the encryption type of the peer with self
- * while operating in IBSS mode and detects mismatch.
- *
- * @return true if encryption type is matched; false otherwise
- */
-static bool lim_ibss_enc_type_matched(tpSchBeaconStruct pBeacon,
-					  struct pe_session *pSession)
-{
-	if (!pBeacon || !pSession)
-		return false;
-
-	/* Open case */
-	if (pBeacon->capabilityInfo.privacy == 0
-	    && pSession->encryptType == eSIR_ED_NONE)
-		return true;
-
-	/* WEP case */
-	if (pBeacon->capabilityInfo.privacy == 1 && pBeacon->wpaPresent == 0
-	    && pBeacon->rsnPresent == 0
-	    && (pSession->encryptType == eSIR_ED_WEP40
-		|| pSession->encryptType == eSIR_ED_WEP104))
-		return true;
-
-	/* WPA-None case */
-	if (pBeacon->capabilityInfo.privacy == 1 && pBeacon->wpaPresent == 1
-	    && pBeacon->rsnPresent == 0
-	    && ((pSession->encryptType == eSIR_ED_CCMP) ||
-		(pSession->encryptType == eSIR_ED_GCMP) ||
-		(pSession->encryptType == eSIR_ED_GCMP_256) ||
-		(pSession->encryptType == eSIR_ED_TKIP)))
-		return true;
-
-	return false;
-}
-
-QDF_STATUS
-lim_handle_ibss_coalescing(struct mac_context *mac,
-			   tpSchBeaconStruct pBeacon,
-			   uint8_t *pRxPacketInfo, struct pe_session *pe_session)
-{
-	tpSirMacMgmtHdr pHdr;
-	QDF_STATUS retCode;
-
-	pHdr = WMA_GET_RX_MAC_HEADER(pRxPacketInfo);
-
-	/* Ignore the beacon when any of the conditions below is met:
-	   1. The beacon claims no IBSS network
-	   2. SSID in the beacon does not match SSID of self station
-	   3. Operational channel in the beacon does not match self station
-	   4. Encyption type in the beacon does not match with self station
-	 */
-	if ((!pBeacon->capabilityInfo.ibss) ||
-	    lim_cmp_ssid(&pBeacon->ssId, pe_session) ||
-	    (pe_session->curr_op_freq != pBeacon->chan_freq))
-		retCode = QDF_STATUS_E_INVAL;
-	else if (lim_ibss_enc_type_matched(pBeacon, pe_session) != true) {
-		pe_debug("peer privacy: %d peer wpa: %d peer rsn: %d self encType: %d",
-			       pBeacon->capabilityInfo.privacy,
-			       pBeacon->wpaPresent, pBeacon->rsnPresent,
-			       pe_session->encryptType);
-		retCode = QDF_STATUS_E_INVAL;
-	} else {
-		uint32_t ieLen;
-		uint16_t tsfLater;
-		uint8_t *pIEs;
-
-		ieLen = WMA_GET_RX_PAYLOAD_LEN(pRxPacketInfo);
-		tsfLater = WMA_GET_RX_TSF_LATER(pRxPacketInfo);
-		pIEs = WMA_GET_RX_MPDU_DATA(pRxPacketInfo);
-		pe_debug("BEFORE Coalescing tsfLater val: %d", tsfLater);
-		retCode =
-			lim_ibss_coalesce(mac, pHdr, pBeacon, pIEs, ieLen, tsfLater,
-					  pe_session);
-	}
-	return retCode;
-} /*** end lim_handle_ibs_scoalescing() ***/
-#endif
-
 /**
  * lim_enc_type_matched() - matches security type of incoming beracon with
  * current
@@ -1471,13 +1427,6 @@ lim_enc_type_matched(struct mac_context *mac_ctx,
 {
 	if (!bcn || !session)
 		return false;
-
-	pe_debug("Beacon/Probe:: Privacy: %d WPA Present: %d RSN Present: %d",
-		bcn->capabilityInfo.privacy, bcn->wpaPresent, bcn->rsnPresent);
-	pe_debug("session:: Privacy: %d EncyptionType: %d OSEN: %d WPS: %d",
-		SIR_MAC_GET_PRIVACY(session->limCurrentBssCaps),
-		session->encryptType, session->isOSENConnection,
-		session->wps_registration);
 
 	/*
 	 * This is handled by sending probe req due to IOT issues so
@@ -1528,6 +1477,12 @@ lim_enc_type_matched(struct mac_context *mac_ctx,
 	if (session->isOSENConnection ||
 	   session->wps_registration)
 		return true;
+
+	pe_debug("AP:: Privacy %d WPA %d RSN %d, SELF:: Privacy %d Enc %d OSEN %d WPS %d",
+		 bcn->capabilityInfo.privacy, bcn->wpaPresent, bcn->rsnPresent,
+		 SIR_MAC_GET_PRIVACY(session->limCurrentBssCaps),
+		 session->encryptType, session->isOSENConnection,
+		 session->wps_registration);
 
 	return false;
 }
@@ -1823,6 +1778,65 @@ void lim_fill_join_rsp_ht_caps(struct pe_session *session,
 #endif
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
+#ifdef WLAN_FEATURE_11W
+static void pe_set_rmf_caps(struct mac_context *mac_ctx,
+			    struct pe_session *ft_session,
+			    struct roam_offload_synch_ind *roam_synch)
+{
+	uint8_t *assoc_body;
+	uint16_t len;
+	tDot11fReAssocRequest *assoc_req;
+	uint32_t status;
+	tSirMacRsnInfo rsn_ie;
+
+	assoc_body = (uint8_t *)roam_synch + roam_synch->reassoc_req_offset +
+			sizeof(tSirMacMgmtHdr);
+	len = roam_synch->reassoc_req_length - sizeof(tSirMacMgmtHdr);
+
+	assoc_req = qdf_mem_malloc(sizeof(*assoc_req));
+	if (!assoc_req)
+		return;
+
+	/* delegate to the framesc-generated code, */
+	status = dot11f_unpack_re_assoc_request(mac_ctx, assoc_body, len,
+						assoc_req, false);
+	if (DOT11F_FAILED(status)) {
+		pe_err("Failed to parse a Re-association Request (0x%08x, %d bytes):",
+		       status, len);
+		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_INFO,
+				   assoc_body, len);
+		qdf_mem_free(assoc_req);
+		return;
+	} else if (DOT11F_WARNED(status)) {
+		pe_debug("There were warnings while unpacking a Re-association Request (0x%08x, %d bytes):",
+			 status, len);
+	}
+	ft_session->limRmfEnabled = false;
+	if (!assoc_req->RSNOpaque.present) {
+		qdf_mem_free(assoc_req);
+		return;
+	}
+	rsn_ie.info[0] = WLAN_ELEMID_RSN;
+	rsn_ie.info[1] = assoc_req->RSNOpaque.num_data;
+
+	rsn_ie.length = assoc_req->RSNOpaque.num_data + 2;
+	qdf_mem_copy(&rsn_ie.info[2], assoc_req->RSNOpaque.data,
+		     assoc_req->RSNOpaque.num_data);
+	qdf_mem_free(assoc_req);
+	wlan_set_vdev_crypto_prarams_from_ie(ft_session->vdev, rsn_ie.info,
+					     rsn_ie.length);
+
+	ft_session->limRmfEnabled =
+		lim_get_vdev_rmf_capable(mac_ctx, ft_session);
+}
+#else
+static inline void pe_set_rmf_caps(struct mac_context *mac_ctx,
+				   struct pe_session *ft_session,
+				   struct roam_offload_synch_ind *roam_synch)
+{
+}
+#endif
+
 /**
  * sir_parse_bcn_fixed_fields() - Parse fixed fields in Beacon IE's
  *
@@ -2216,6 +2230,91 @@ lim_copy_and_free_hlp_data_from_session(struct pe_session *session_ptr,
 {}
 #endif
 
+static
+uint8_t *lim_process_rmf_disconnect_frame(struct mac_context *mac,
+					  struct pe_session *session,
+					  uint8_t *deauth_disassoc_frame,
+					  uint16_t deauth_disassoc_frame_len,
+					  uint16_t *extracted_length)
+{
+	struct wlan_frame_hdr *mac_hdr;
+	uint8_t mic_len, hdr_len, pdev_id;
+	uint8_t *orig_ptr, *efrm;
+	int32_t mgmtcipherset;
+	uint32_t mmie_len;
+	QDF_STATUS status;
+
+	mac_hdr = (struct wlan_frame_hdr *)deauth_disassoc_frame;
+	orig_ptr = (uint8_t *)mac_hdr;
+
+	if (mac_hdr->i_fc[1] & IEEE80211_FC1_WEP) {
+		if (QDF_IS_ADDR_BROADCAST(mac_hdr->i_addr1) ||
+		    IEEE80211_IS_MULTICAST(mac_hdr->i_addr1)) {
+			pe_err("Encrypted BC/MC frame dropping the frame");
+			*extracted_length = 0;
+			return NULL;
+		}
+
+		pdev_id = wlan_objmgr_pdev_get_pdev_id(mac->pdev);
+		status = mlme_get_peer_mic_len(mac->psoc, pdev_id,
+					       mac_hdr->i_addr2, &mic_len,
+					       &hdr_len);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_err("Failed to get mic hdr and length");
+			*extracted_length = 0;
+			return NULL;
+		}
+
+		if (deauth_disassoc_frame_len <
+		    (sizeof(*mac_hdr) + hdr_len + mic_len)) {
+			pe_err("Frame len less than expected %d",
+			       deauth_disassoc_frame_len);
+			*extracted_length = 0;
+			return NULL;
+		}
+
+		/*
+		 * Strip the privacy headers and trailer
+		 * for the received deauth/disassoc frame
+		 */
+		qdf_mem_move(orig_ptr + hdr_len, mac_hdr,
+			     sizeof(*mac_hdr));
+		*extracted_length = deauth_disassoc_frame_len -
+				    (hdr_len + mic_len);
+		return orig_ptr + hdr_len;
+	}
+
+	if (!(QDF_IS_ADDR_BROADCAST(mac_hdr->i_addr1) ||
+	      IEEE80211_IS_MULTICAST(mac_hdr->i_addr1))) {
+		pe_err("Rx unprotected unicast mgmt frame");
+		*extracted_length = 0;
+		return NULL;
+	}
+
+	mgmtcipherset = wlan_crypto_get_param(session->vdev,
+					      WLAN_CRYPTO_PARAM_MGMT_CIPHER);
+	if (mgmtcipherset < 0) {
+		pe_err("Invalid mgmt cipher");
+		*extracted_length = 0;
+		return NULL;
+	}
+
+	mmie_len = (mgmtcipherset & (1 << WLAN_CRYPTO_CIPHER_AES_CMAC) ?
+		    cds_get_mmie_size() : cds_get_gmac_mmie_size());
+
+	efrm = orig_ptr + deauth_disassoc_frame_len;
+	if (!mac->pmf_offload &&
+	    !wlan_crypto_is_mmie_valid(session->vdev, orig_ptr, efrm)) {
+		pe_err("Invalid MMIE");
+		*extracted_length = 0;
+		return NULL;
+	}
+
+	*extracted_length = deauth_disassoc_frame_len - mmie_len;
+
+	return deauth_disassoc_frame;
+}
+
 QDF_STATUS
 pe_disconnect_callback(struct mac_context *mac, uint8_t vdev_id,
 		       uint8_t *deauth_disassoc_frame,
@@ -2223,6 +2322,9 @@ pe_disconnect_callback(struct mac_context *mac, uint8_t vdev_id,
 		       uint16_t reason_code)
 {
 	struct pe_session *session;
+	uint8_t *extracted_frm = NULL;
+	uint16_t extracted_frm_len;
+	bool is_pmf_connection;
 
 	session = pe_find_session_by_vdev_id(mac, vdev_id);
 	if (!session) {
@@ -2230,16 +2332,47 @@ pe_disconnect_callback(struct mac_context *mac, uint8_t vdev_id,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if (deauth_disassoc_frame &&
-	    deauth_disassoc_frame_len > SIR_MAC_MIN_IE_LEN) {
-		lim_extract_ies_from_deauth_disassoc(session,
-						     deauth_disassoc_frame,
-						     deauth_disassoc_frame_len);
-
-		reason_code = sir_read_u16(deauth_disassoc_frame +
-					   sizeof(struct wlan_frame_hdr));
+	if (!((session->limMlmState == eLIM_MLM_LINK_ESTABLISHED_STATE) &&
+	      (session->limSmeState != eLIM_SME_WT_DISASSOC_STATE) &&
+	      (session->limSmeState != eLIM_SME_WT_DEAUTH_STATE))) {
+		pe_info("Cannot handle in mlmstate %d sme state %d as vdev_id:%d is not in connected state",
+			session->limMlmState, session->limSmeState, vdev_id);
+		return QDF_STATUS_SUCCESS;
 	}
 
+	if (!(deauth_disassoc_frame ||
+	      deauth_disassoc_frame_len > SIR_MAC_MIN_IE_LEN))
+		goto end;
+
+	/*
+	 * Use vdev pmf status instead of peer pmf capability as
+	 * the firmware might roam to new AP in powersave case and
+	 * roam synch can come before emergency deauth event.
+	 * In that case, get peer will fail and reason code received
+	 * from the WMI_ROAM_EVENTID  will be sent to upper layers.
+	 */
+	is_pmf_connection = lim_get_vdev_rmf_capable(mac, session);
+	if (is_pmf_connection) {
+		extracted_frm = lim_process_rmf_disconnect_frame(
+						mac, session,
+						deauth_disassoc_frame,
+						deauth_disassoc_frame_len,
+						&extracted_frm_len);
+		if (!extracted_frm) {
+			pe_err("PMF frame validation failed");
+			goto end;
+		}
+	} else {
+		extracted_frm = deauth_disassoc_frame;
+		extracted_frm_len = deauth_disassoc_frame_len;
+	}
+
+	lim_extract_ies_from_deauth_disassoc(session, extracted_frm,
+					     extracted_frm_len);
+
+	reason_code = sir_read_u16(extracted_frm +
+				   sizeof(struct wlan_frame_hdr));
+end:
 	lim_tear_down_link_with_ap(mac, session->peSessionId,
 				   reason_code,
 				   eLIM_PEER_ENTITY_DEAUTH);
@@ -2268,6 +2401,35 @@ lim_fill_fils_ft(struct pe_session *src_session,
 {}
 #endif
 
+/**
+ * lim_check_ft_initial_im_association() - To check FT initial mobility(im)
+ * association
+ * @roam_synch: A pointer to roam sync ind structure
+ * @session_entry: pe session
+ *
+ * This function is to check ft_initial_im_association.
+ *
+ * Return: None
+ */
+void
+lim_check_ft_initial_im_association(struct roam_offload_synch_ind *roam_synch,
+				    struct pe_session *session_entry)
+{
+	tpSirMacMgmtHdr hdr;
+	uint8_t *assoc_req_ptr;
+
+	assoc_req_ptr = (uint8_t *) roam_synch + roam_synch->reassoc_req_offset;
+	hdr = (tpSirMacMgmtHdr) assoc_req_ptr;
+
+	if (hdr->fc.type == SIR_MAC_MGMT_FRAME &&
+	    hdr->fc.subType == SIR_MAC_MGMT_ASSOC_REQ &&
+	    session_entry->is11Rconnection) {
+		pe_debug("Frame subtype: %d and connection is %d",
+			 hdr->fc.subType, session_entry->is11Rconnection);
+		roam_synch->is_ft_im_roam = true;
+	}
+}
+
 QDF_STATUS
 pe_roam_synch_callback(struct mac_context *mac_ctx,
 		       struct roam_offload_synch_ind *roam_sync_ind_ptr,
@@ -2277,6 +2439,7 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	struct pe_session *session_ptr;
 	struct pe_session *ft_session_ptr;
 	uint8_t session_id;
+	uint8_t *reassoc_resp;
 	tpDphHashNode curr_sta_ds;
 	uint16_t aid;
 	struct bss_params *add_bss_params;
@@ -2301,11 +2464,7 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 
 	pe_debug("LFR3: PE callback reason: %d", reason);
 	switch (reason) {
-	case SIR_ROAMING_START:
-		session_ptr->fw_roaming_started = true;
-		return QDF_STATUS_SUCCESS;
 	case SIR_ROAMING_ABORT:
-		session_ptr->fw_roaming_started = false;
 		/*
 		 * If there was a disassoc or deauth that was received
 		 * during roaming and it was not honored, then we have
@@ -2325,13 +2484,12 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 		}
 		return QDF_STATUS_SUCCESS;
 	case SIR_ROAM_SYNCH_PROPAGATION:
-		session_ptr->fw_roaming_started = false;
 		break;
 	default:
 		return status;
 	}
 
-	pe_debug("LFR3:Received ROAM_OFFLOAD_SYNCH_IND bssid %pM auth: %d vdevId: %d",
+	pe_debug("LFR3:Received ROAM SYNCH IND bssid %pM auth: %d vdevId: %d",
 		 roam_sync_ind_ptr->bssid.bytes, roam_sync_ind_ptr->authStatus,
 		 roam_sync_ind_ptr->roamed_vdev_id);
 
@@ -2350,7 +2508,8 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	}
 	status = QDF_STATUS_E_FAILURE;
 	ft_session_ptr = pe_create_session(mac_ctx, bss_desc->bssId,
-					   &session_id, mac_ctx->lim.maxStation,
+					   &session_id,
+					   mac_ctx->lim.max_sta_of_pe_session,
 					   session_ptr->bssType,
 					   session_ptr->vdev_id,
 					   session_ptr->opmode);
@@ -2360,7 +2519,7 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 		return status;
 	}
 	/* Update the beacon/probe filter in mac_ctx */
-	lim_set_bcn_probe_filter(mac_ctx, ft_session_ptr, NULL, 0);
+	lim_set_bcn_probe_filter(mac_ctx, ft_session_ptr, 0);
 
 	sir_copy_mac_addr(ft_session_ptr->self_mac_addr,
 			  session_ptr->self_mac_addr);
@@ -2374,8 +2533,9 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	ft_session_ptr->csaOffloadEnable = session_ptr->csaOffloadEnable;
 
 	/* Next routine will update nss and vdev_nss with AP's capabilities */
-	lim_fill_ft_session(mac_ctx, bss_desc, ft_session_ptr, session_ptr);
-
+	lim_fill_ft_session(mac_ctx, bss_desc, ft_session_ptr,
+			    session_ptr, roam_sync_ind_ptr->phy_mode);
+	pe_set_rmf_caps(mac_ctx, ft_session_ptr, roam_sync_ind_ptr);
 	/* Next routine may update nss based on dot11Mode */
 	lim_ft_prepare_add_bss_req(mac_ctx, ft_session_ptr, bss_desc);
 	if (session_ptr->is11Rconnection)
@@ -2409,22 +2569,20 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 		return status;
 	}
 
-	mac_ctx->roam.reassocRespLen = roam_sync_ind_ptr->reassocRespLength;
-	mac_ctx->roam.pReassocResp =
-		qdf_mem_malloc(mac_ctx->roam.reassocRespLen);
-	if (!mac_ctx->roam.pReassocResp) {
-		ft_session_ptr->bRoamSynchInProgress = false;
-		return QDF_STATUS_E_NOMEM;
+
+	if (roam_sync_ind_ptr->authStatus ==
+	    CSR_ROAM_AUTH_STATUS_AUTHENTICATED) {
+		ft_session_ptr->is_key_installed = true;
+		curr_sta_ds->is_key_installed = true;
 	}
-	qdf_mem_copy(mac_ctx->roam.pReassocResp,
-			(uint8_t *)roam_sync_ind_ptr +
-			roam_sync_ind_ptr->reassocRespOffset,
-			mac_ctx->roam.reassocRespLen);
 
-	ft_session_ptr->bRoamSynchInProgress = true;
-
-	lim_process_assoc_rsp_frame(mac_ctx, mac_ctx->roam.pReassocResp,
+	reassoc_resp = (uint8_t *)roam_sync_ind_ptr +
+			roam_sync_ind_ptr->reassocRespOffset;
+	lim_process_assoc_rsp_frame(mac_ctx, reassoc_resp,
+				    roam_sync_ind_ptr->reassocRespLength,
 				    LIM_REASSOC, ft_session_ptr);
+
+	lim_check_ft_initial_im_association(roam_sync_ind_ptr, ft_session_ptr);
 
 	lim_copy_and_free_hlp_data_from_session(ft_session_ptr,
 						roam_sync_ind_ptr);
@@ -2447,9 +2605,6 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	roam_sync_ind_ptr->join_rsp = qdf_mem_malloc(join_rsp_len);
 	if (!roam_sync_ind_ptr->join_rsp) {
 		ft_session_ptr->bRoamSynchInProgress = false;
-		if (mac_ctx->roam.pReassocResp)
-			qdf_mem_free(mac_ctx->roam.pReassocResp);
-		mac_ctx->roam.pReassocResp = NULL;
 		return QDF_STATUS_E_NOMEM;
 	}
 
@@ -2491,12 +2646,6 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	ft_session_ptr->limSmeState = eLIM_SME_LINK_EST_STATE;
 	ft_session_ptr->limPrevSmeState = ft_session_ptr->limSmeState;
 	ft_session_ptr->bRoamSynchInProgress = false;
-	if (mac_ctx->roam.pReassocResp)
-		qdf_mem_free(mac_ctx->roam.pReassocResp);
-	mac_ctx->roam.pReassocResp = NULL;
-
-	if (roam_sync_ind_ptr->authStatus == CSR_ROAM_AUTH_STATUS_AUTHENTICATED)
-		ft_session_ptr->is_key_installed = true;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2524,8 +2673,6 @@ static bool lim_is_beacon_miss_scenario(struct mac_context *mac,
 
    - In Scan State, drop the frames which are not marked as scan frames
    - In non-Scan state, drop the frames which are marked as scan frames.
-   - Drop INFRA Beacons and Probe Responses in IBSS Mode
-   - Drop the Probe Request in IBSS mode, if STA did not send out the last beacon
 
    \param mac - global mac structure
    \return - none
@@ -2578,19 +2725,6 @@ tMgmtFrmDropReason lim_is_pkt_candidate_for_drop(struct mac_context *mac,
 		if (capabilityInfo.ess)
 			return eMGMT_DROP_INFRA_BCN_IN_IBSS;
 
-	} else if ((subType == SIR_MAC_MGMT_PROBE_REQ) &&
-		   (!WMA_GET_RX_BEACON_SENT(pRxPacketInfo))) {
-		pHdr = WMA_GET_RX_MAC_HEADER(pRxPacketInfo);
-		pe_session = pe_find_session_by_bssid(mac,
-							 pHdr->bssId,
-							 &sessionId);
-		if ((pe_session && !LIM_IS_IBSS_ROLE(pe_session)) ||
-		    (!pe_session))
-			return eMGMT_DROP_NO_DROP;
-
-		/* Drop the Probe Request in IBSS mode, if STA did not send out the last beacon */
-		/* In IBSS, the node which sends out the beacon, is supposed to respond to ProbeReq */
-		return eMGMT_DROP_NOT_LAST_IBSS_BCN;
 	} else if (subType == SIR_MAC_MGMT_AUTH) {
 		uint16_t curr_seq_num = 0;
 		struct tLimPreAuthNode *auth_node;
@@ -2714,7 +2848,7 @@ void lim_mon_init_session(struct mac_context *mac_ptr,
 
 	psession_entry = pe_create_session(mac_ptr, msg->bss_id.bytes,
 					   &session_id,
-					   mac_ptr->lim.maxStation,
+					   mac_ptr->lim.max_sta_of_pe_session,
 					   eSIR_MONITOR_MODE,
 					   msg->vdev_id,
 					   QDF_MONITOR_MODE);

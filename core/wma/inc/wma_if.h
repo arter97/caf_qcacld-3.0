@@ -164,8 +164,6 @@ struct sAniProbeRspStruct {
  * @vht_caps: VHT vapabalities
  * @nwType: NW Type
  * @maxTxPower: max tx power
- * @atimIePresent: Peer Atim Info
- * @peerAtimWindowLength: peer ATIM Window length
  * @nss: Return the number of spatial streams supported
  * @stbc_capable: stbc capable
  * @no_ptk_4_way: Do not need 4-way handshake
@@ -235,8 +233,6 @@ typedef struct {
 	uint32_t vht_caps;
 	tSirNwType nwType;
 	int8_t maxTxPower;
-	uint8_t atimIePresent;
-	uint32_t peerAtimWindowLength;
 	uint8_t nonRoamReassoc;
 	uint32_t nss;
 #ifdef WLAN_FEATURE_11AX
@@ -244,6 +240,7 @@ typedef struct {
 	tDot11fIEhe_cap he_config;
 	tDot11fIEhe_op he_op;
 	tDot11fIEhe_6ghz_band_cap he_6ghz_band_caps;
+	uint16_t he_mcs_12_13_map;
 #endif
 	uint8_t stbc_capable;
 #ifdef WLAN_SUPPORT_TWT
@@ -402,7 +399,9 @@ typedef enum eDelStaReasonCode {
 	HAL_DEL_STA_REASON_CODE_TIM_BASED = 0x2,
 	HAL_DEL_STA_REASON_CODE_RA_BASED = 0x3,
 	HAL_DEL_STA_REASON_CODE_UNKNOWN_A2 = 0x4,
-	HAL_DEL_STA_REASON_CODE_BTM_DISASSOC_IMMINENT = 0x5
+	HAL_DEL_STA_REASON_CODE_BTM_DISASSOC_IMMINENT = 0x5,
+	HAL_DEL_STA_REASON_CODE_SA_QUERY_TIMEOUT = 0x6,
+	HAL_DEL_STA_REASON_CODE_XRETRY = 0x7,
 } tDelStaReasonCode;
 
 typedef enum eSmpsModeValue {
@@ -711,14 +710,14 @@ struct set_dtim_params {
  * struct del_vdev_params - Del Sta Self params
  * @session_id: SME Session ID
  * @status: response status code
- * @sme_callback: callback to be called from WMA to SME
+ * @vdev: Object to vdev
  * @sme_ctx: pointer to context provided by SME
  */
 struct del_vdev_params {
 	tSirMacAddr self_mac_addr;
 	uint8_t vdev_id;
 	uint32_t status;
-	csr_session_close_cb sme_callback;
+	struct wlan_objmgr_vdev *vdev;
 	void *sme_ctx;
 };
 
@@ -772,11 +771,19 @@ typedef struct sStatsExtRequest {
  * @bssid - bssid that is to be blacklisted
  * @timeout - time duration for which the bssid is blacklisted
  * @received_time - boot timestamp at which the firmware event was received
+ * @rssi - rssi value for which the bssid is blacklisted
+ * @reject_reason: reason to add the BSSID to BLM
+ * @original_timeout: original timeout sent by the AP
+ * @source: Source of adding the BSSID to BLM
  */
 struct roam_blacklist_timeout {
 	struct qdf_mac_addr bssid;
 	uint32_t timeout;
 	qdf_time_t received_time;
+	int32_t rssi;
+	enum blm_reject_ap_reason reject_reason;
+	uint32_t original_timeout;
+	enum blm_reject_ap_source source;
 };
 
 /*

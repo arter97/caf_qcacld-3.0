@@ -20,8 +20,53 @@
  * DOC: Define internal APIs related to the packet capture component
  */
 
-#include "wlan_pkt_capture_priv.h"
+#include "wlan_pkt_capture_mon_thread.h"
 #include <linux/kthread.h>
+#include "cds_ieee80211_common.h"
+#include "wlan_mgmt_txrx_utils_api.h"
+#include "cdp_txrx_ctrl.h"
+#include "cfg_ucfg_api.h"
+
+void pkt_capture_mon(struct pkt_capture_cb_context *cb_ctx, qdf_nbuf_t msdu,
+		     struct wlan_objmgr_vdev *vdev, uint16_t ch_freq)
+{
+	struct radiotap_header *rthdr;
+	uint8_t rtlen, type, sub_type;
+	struct ieee80211_frame *wh;
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
+	cdp_config_param_type val;
+
+	rthdr = (struct radiotap_header *)qdf_nbuf_data(msdu);
+	rtlen = rthdr->it_len;
+	wh = (struct ieee80211_frame *)(qdf_nbuf_data(msdu) + rtlen);
+	type = (wh)->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
+	sub_type = (wh)->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
+
+	if ((type == QDF_IEEE80211_FC0_TYPE_DATA) &&
+	    (sub_type == QDF_IEEE80211_FC0_SUBTYPE_QOS_NULL)) {
+		qdf_nbuf_free(msdu);
+		return;
+	}
+
+	if ((type == IEEE80211_FC0_TYPE_MGT) &&
+	    (sub_type == MGMT_SUBTYPE_AUTH)) {
+		uint8_t chan = wlan_freq_to_chan(ch_freq);
+
+		val.cdp_pdev_param_monitor_chan = chan;
+		cdp_txrx_set_pdev_param(soc, wlan_objmgr_pdev_get_pdev_id(pdev),
+					CDP_MONITOR_CHANNEL, val);
+
+		val.cdp_pdev_param_mon_freq = ch_freq;
+		cdp_txrx_set_pdev_param(soc, wlan_objmgr_pdev_get_pdev_id(pdev),
+					CDP_MONITOR_FREQUENCY, val);
+	}
+
+	if (cb_ctx->mon_cb(cb_ctx->mon_ctx, msdu) != QDF_STATUS_SUCCESS) {
+		pkt_capture_err("Frame Rx to HDD failed");
+		qdf_nbuf_free(msdu);
+	}
+}
 
 void pkt_capture_free_mon_pkt_freeq(struct pkt_capture_mon_context *mon_ctx)
 {
@@ -209,8 +254,9 @@ pkt_capture_process_from_queue(struct pkt_capture_mon_context *mon_ctx)
 		spin_unlock_bh(&mon_ctx->mon_queue_lock);
 		vdev_id = pkt->vdev_id;
 		tid = pkt->tid;
-		pkt->callback(pkt->context, pkt->monpkt, vdev_id,
-			      tid, pkt->status, pkt->pkt_format);
+		pkt->callback(pkt->context, pkt->pdev, pkt->monpkt, vdev_id,
+			      tid, pkt->status, pkt->pkt_format, pkt->bssid,
+			      pkt->tx_retry_cnt);
 		pkt_capture_free_mon_pkt(mon_ctx, pkt);
 		spin_lock_bh(&mon_ctx->mon_queue_lock);
 	}
@@ -285,7 +331,17 @@ static int pkt_capture_mon_thread(void *arg)
 				shutdown = true;
 				break;
 			}
-			pkt_capture_process_from_queue(mon_ctx);
+
+			/*
+			 * if packet capture deregistratin happens stop
+			 * processing packets in queue because mon cb will
+			 * be set to NULL.
+			 */
+			if (test_bit(PKT_CAPTURE_REGISTER_EVENT,
+				     &mon_ctx->mon_event_flag))
+				pkt_capture_process_from_queue(mon_ctx);
+			else
+				complete(&mon_ctx->mon_register_event);
 
 			if (test_bit(PKT_CAPTURE_RX_SUSPEND_EVENT,
 				     &mon_ctx->mon_event_flag)) {
@@ -312,7 +368,7 @@ void pkt_capture_close_mon_thread(struct pkt_capture_mon_context *mon_ctx)
 	if (!mon_ctx->mon_thread)
 		return;
 
-	/* Shut down Tlshim Rx thread */
+	/* Shut down mon thread */
 	set_bit(PKT_CAPTURE_RX_SHUTDOWN_EVENT,
 		&mon_ctx->mon_event_flag);
 	set_bit(PKT_CAPTURE_RX_POST_EVENT,
@@ -448,6 +504,7 @@ pkt_capture_alloc_mon_thread(struct pkt_capture_mon_context *mon_ctx)
 	init_completion(&mon_ctx->suspend_mon_event);
 	init_completion(&mon_ctx->resume_mon_event);
 	init_completion(&mon_ctx->mon_shutdown);
+	init_completion(&mon_ctx->mon_register_event);
 	mon_ctx->mon_event_flag = 0;
 	spin_lock_init(&mon_ctx->mon_queue_lock);
 	spin_lock_init(&mon_ctx->mon_pkt_freeq_lock);

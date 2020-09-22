@@ -109,6 +109,53 @@ static inline int pld_ipci_set_fw_log_mode(struct device *dev, u8 fw_log_mode)
 	return 0;
 }
 
+static inline void *pld_ipci_smmu_get_domain(struct device *dev)
+{
+	return NULL;
+}
+
+static inline int pld_ipci_smmu_map(struct device *dev, phys_addr_t paddr,
+				    uint32_t *iova_addr, size_t size)
+{
+	return 0;
+}
+
+static inline int pld_ipci_force_wake_request(struct device *dev)
+{
+	return 0;
+}
+
+static inline int pld_ipci_force_wake_release(struct device *dev)
+{
+	return 0;
+}
+
+static inline int pld_ipci_is_device_awake(struct device *dev)
+{
+	return 0;
+}
+
+static inline int pld_ipci_athdiag_read(struct device *dev, uint32_t offset,
+					uint32_t memtype, uint32_t datalen,
+					uint8_t *output)
+{
+	return 0;
+}
+
+static inline int pld_ipci_athdiag_write(struct device *dev, uint32_t offset,
+					 uint32_t memtype, uint32_t datalen,
+					 uint8_t *input)
+{
+	return 0;
+}
+
+static inline int
+pld_ipci_qmi_send(struct device *dev, int type, void *cmd,
+		  int cmd_len, void *cb_ctx,
+		  int (*cb)(void *ctx, void *event, int event_len))
+{
+	return 0;
+}
 #else
 int pld_ipci_register_driver(void);
 void pld_ipci_unregister_driver(void);
@@ -175,5 +222,52 @@ static inline int pld_ipci_set_fw_log_mode(struct device *dev, u8 fw_log_mode)
 	return icnss_set_fw_log_mode(dev, fw_log_mode);
 }
 
+static inline void *pld_ipci_smmu_get_domain(struct device *dev)
+{
+	return icnss_smmu_get_domain(dev);
+}
+
+static inline int pld_ipci_smmu_map(struct device *dev, phys_addr_t paddr,
+				    uint32_t *iova_addr, size_t size)
+{
+	return icnss_smmu_map(dev, paddr, iova_addr, size);
+}
+
+static inline int pld_ipci_force_wake_request(struct device *dev)
+{
+	return icnss_force_wake_request(dev);
+}
+
+static inline int pld_ipci_force_wake_release(struct device *dev)
+{
+	return icnss_force_wake_release(dev);
+}
+
+static inline int pld_ipci_is_device_awake(struct device *dev)
+{
+	return icnss_is_device_awake(dev);
+}
+
+static inline int pld_ipci_athdiag_read(struct device *dev, uint32_t offset,
+					uint32_t memtype, uint32_t datalen,
+					uint8_t *output)
+{
+	return icnss_athdiag_read(dev, offset, memtype, datalen, output);
+}
+
+static inline int pld_ipci_athdiag_write(struct device *dev, uint32_t offset,
+					 uint32_t memtype, uint32_t datalen,
+					 uint8_t *input)
+{
+	return icnss_athdiag_write(dev, offset, memtype, datalen, input);
+}
+
+static inline int
+pld_ipci_qmi_send(struct device *dev, int type, void *cmd,
+		  int cmd_len, void *cb_ctx,
+		  int (*cb)(void *ctx, void *event, int event_len))
+{
+	return icnss_qmi_send(dev, type, cmd, cmd_len, cb_ctx, cb);
+}
 #endif
 #endif

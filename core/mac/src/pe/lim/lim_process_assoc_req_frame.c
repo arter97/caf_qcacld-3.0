@@ -230,33 +230,6 @@ static bool lim_chk_sa_da(struct mac_context *mac_ctx, tpSirMacMgmtHdr hdr,
 }
 
 /**
- * lim_chk_tkip() - checks TKIP counter measure is active
- * @mac_ctx: pointer to Global MAC structure
- * @hdr: pointer to the MAC head
- * @session: pointer to pe session entry
- * @sub_type: Assoc(=0) or Reassoc(=1) Requestframe
- *
- * Checks TKIP counter measure is active
- *
- * Return: true of no error, false otherwise
- */
-static bool lim_chk_tkip(struct mac_context *mac_ctx, tpSirMacMgmtHdr hdr,
-			 struct pe_session *session, uint8_t sub_type)
-{
-	/*
-	 * If TKIP counter measures active send Assoc Rsp frame to station
-	 * with eSIR_MAC_MIC_FAILURE_REASON
-	 */
-	if (!(session->bTkipCntrMeasActive && LIM_IS_AP_ROLE(session)))
-		return true;
-
-	pe_err("Assoc Req rejected: TKIP counter measure is active");
-	lim_send_assoc_rsp_mgmt_frame(mac_ctx, eSIR_MAC_MIC_FAILURE_REASON, 1,
-				      hdr->sa, sub_type, 0, session, false);
-	return false;
-}
-
-/**
  * lim_chk_assoc_req_parse_error() - checks for error in frame parsing
  * @mac_ctx: pointer to Global MAC structure
  * @hdr: pointer to the MAC head
@@ -829,30 +802,42 @@ static void lim_print_ht_cap(struct mac_context *mac_ctx, struct pe_session *ses
 	}
 }
 
+static enum mac_status_code
+lim_check_crypto_param(tpSirAssocReq assoc_req,
+		       struct wlan_crypto_params *peer_crypto_params)
+{
+	/* TKIP/WEP is not allowed in HT/VHT mode*/
+	if (assoc_req->HTCaps.present) {
+		if ((peer_crypto_params->ucastcipherset &
+			(1 << WLAN_CRYPTO_CIPHER_TKIP)) ||
+		    (peer_crypto_params->ucastcipherset &
+			(1 << WLAN_CRYPTO_CIPHER_WEP))) {
+			pe_info("TKIP/WEP cipher with HT supported client, reject assoc");
+			return eSIR_MAC_INVALID_IE_STATUS;
+		}
+	}
+	return eSIR_MAC_SUCCESS_STATUS;
+}
+
 static
 enum mac_status_code lim_check_rsn_ie(struct pe_session *session,
 				      struct mac_context *mac_ctx,
 				      tpSirAssocReq assoc_req,
-				      tDot11fIERSN *rsn,
 				      bool *pmf_connection)
 {
 	struct wlan_objmgr_vdev *vdev;
-
-	uint8_t buffer[WLAN_MAX_IE_LEN];
-	uint32_t dot11f_status, written = 0, nbuffer = WLAN_MAX_IE_LEN;
 	tSirMacRsnInfo rsn_ie;
+	struct wlan_crypto_params peer_crypto_params;
 
-	dot11f_status = dot11f_pack_ie_rsn(mac_ctx, rsn, buffer,
-					   nbuffer, &written);
-	if (DOT11F_FAILED(dot11f_status)) {
-		pe_err("Failed to re-pack the RSN IE (0x%0x8)", dot11f_status);
-		return eSIR_MAC_INVALID_IE_STATUS;
-	}
+	rsn_ie.info[0] = WLAN_ELEMID_RSN;
+	rsn_ie.info[1] = assoc_req->rsn.length;
 
-	rsn_ie.length = (uint8_t) written;
-	qdf_mem_copy(&rsn_ie.info[0], buffer, rsn_ie.length);
+	rsn_ie.length = assoc_req->rsn.length + 2;
+	qdf_mem_copy(&rsn_ie.info[2], assoc_req->rsn.info,
+		     assoc_req->rsn.length);
 	if (wlan_crypto_check_rsn_match(mac_ctx->psoc, session->smeSessionId,
-					&rsn_ie.info[0], rsn_ie.length)) {
+					&rsn_ie.info[0], rsn_ie.length,
+					&peer_crypto_params)) {
 		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
 							session->smeSessionId,
 							WLAN_LEGACY_MAC_ID);
@@ -860,9 +845,14 @@ enum mac_status_code lim_check_rsn_ie(struct pe_session *session,
 			pe_err("vdev is NULL");
 			return eSIR_MAC_UNSPEC_FAILURE_STATUS;
 		}
+		if ((peer_crypto_params.rsn_caps &
+		    WLAN_CRYPTO_RSN_CAP_MFP_ENABLED) &&
+		    wlan_crypto_vdev_is_pmf_enabled(vdev))
+			*pmf_connection = true;
 
-		*pmf_connection = wlan_crypto_vdev_is_pmf_enabled(vdev);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+		return lim_check_crypto_param(assoc_req, &peer_crypto_params);
+
 	} else {
 		return eSIR_MAC_INVALID_IE_STATUS;
 	}
@@ -878,6 +868,7 @@ static enum mac_status_code lim_check_wpa_ie(struct pe_session *session,
 	uint8_t buffer[WLAN_MAX_IE_LEN];
 	uint32_t dot11f_status, written = 0, nbuffer = WLAN_MAX_IE_LEN;
 	tSirMacRsnInfo wpa_ie = {0};
+	struct wlan_crypto_params peer_crypto_params;
 
 	dot11f_status = dot11f_pack_ie_wpa(mac_ctx, wpa, buffer,
 					   nbuffer, &written);
@@ -889,8 +880,10 @@ static enum mac_status_code lim_check_wpa_ie(struct pe_session *session,
 	wpa_ie.length = (uint8_t) written;
 	qdf_mem_copy(&wpa_ie.info[0], buffer, wpa_ie.length);
 	if (wlan_crypto_check_wpa_match(mac_ctx->psoc, session->smeSessionId,
-					&wpa_ie.info[0], wpa_ie.length))
-		return eSIR_MAC_SUCCESS_STATUS;
+					&wpa_ie.info[0], wpa_ie.length,
+					&peer_crypto_params)) {
+		return lim_check_crypto_param(assoc_req, &peer_crypto_params);
+	}
 
 	return eSIR_MAC_INVALID_IE_STATUS;
 }
@@ -997,7 +990,6 @@ static bool lim_check_wpa_rsn_ie(struct pe_session *session,
 		if (SIR_MAC_OUI_VERSION_1 == dot11f_ie_rsn.version) {
 			/* check the groupwise and pairwise cipher suites */
 			status = lim_check_rsn_ie(session, mac_ctx, assoc_req,
-						  &dot11f_ie_rsn,
 						  pmf_connection);
 			if (eSIR_MAC_SUCCESS_STATUS != status) {
 				pe_warn("Re/Assoc rejected from: "
@@ -1639,7 +1631,7 @@ static bool lim_update_sta_ds(struct mac_context *mac_ctx, tpSirMacMgmtHdr hdr,
 		sta_ds->non_ecsa_capable = 1;
 
 	if (sta_ds->mlmStaContext.vhtCapability &&
-	    IS_DOT11_MODE_VHT(session->dot11mode)) {
+	    session->vhtCapability) {
 		sta_ds->htMaxRxAMpduFactor =
 				vht_caps->maxAMPDULenExp;
 		sta_ds->vhtLdpcCapable =
@@ -1677,7 +1669,7 @@ static bool lim_update_sta_ds(struct mac_context *mac_ctx, tpSirMacMgmtHdr hdr,
 				assoc_req->qcn_ie.vht_mcs11_attr.
 				vht_mcs_10_11_supp;
 	}
-	lim_intersect_sta_he_caps(assoc_req, session, sta_ds);
+	lim_intersect_sta_he_caps(mac_ctx, assoc_req, session, sta_ds);
 
 	if (lim_populate_matching_rate_set(mac_ctx, sta_ds,
 			&(assoc_req->supportedRates),
@@ -2103,6 +2095,18 @@ bool lim_send_assoc_ind_to_sme(struct mac_context *mac_ctx,
 		return false;
 	}
 
+	if (LIM_IS_AP_ROLE(session)) {
+		if ((assoc_req->wpaPresent || assoc_req->rsnPresent) &&
+		    !session->privacy) {
+			lim_reject_association(mac_ctx, hdr->sa, sub_type,
+					       true, auth_type, peer_idx,
+					       true,
+					       eSIR_MAC_UNSPEC_FAILURE_STATUS,
+					       session);
+			return false;
+		}
+	}
+
 send_ind_to_sme:
 	if (!lim_update_sta_ds(mac_ctx, hdr, session, assoc_req,
 			       sub_type, sta_ds, auth_type, akm_type,
@@ -2135,6 +2139,43 @@ send_ind_to_sme:
 	}
 
 	return true;
+}
+
+/**
+ * lim_peer_present_on_any_sta() - Check if Same MAC is connected with STA, i.e.
+ * duplicate mac detection.
+ * @mac_ctx: Pointer to Global MAC structure
+ * @peer_addr: peer address to check
+ *
+ * This function will return true if a peer STA and AP are using same mac
+ * address.
+ *
+ * @Return: bool
+ */
+static bool
+lim_peer_present_on_any_sta(struct mac_context *mac_ctx, uint8_t *peer_addr)
+{
+	struct wlan_objmgr_peer *peer;
+	bool sta_peer_present = false;
+	enum QDF_OPMODE mode;
+	uint8_t peer_vdev_id;
+
+	peer = wlan_objmgr_get_peer_by_mac(mac_ctx->psoc, peer_addr,
+					   WLAN_LEGACY_MAC_ID);
+	if (!peer)
+		return sta_peer_present;
+
+	peer_vdev_id = wlan_vdev_get_id(wlan_peer_get_vdev(peer));
+	mode = wlan_vdev_mlme_get_opmode(wlan_peer_get_vdev(peer));
+	if (mode == QDF_STA_MODE || mode == QDF_P2P_CLIENT_MODE) {
+		pe_debug("duplicate mac detected!!! Peer " QDF_MAC_ADDR_STR " present on STA vdev %d",
+			 QDF_MAC_ADDR_ARRAY(peer_addr), peer_vdev_id);
+		sta_peer_present = true;
+	}
+
+	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
+
+	return sta_peer_present;
 }
 
 /**
@@ -2207,12 +2248,20 @@ void lim_process_assoc_req_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_in
 		return;
 	}
 
-	if (wlan_vdev_is_up(vdev) != QDF_STATUS_SUCCESS) {
+	if (wlan_vdev_mlme_get_state(vdev) != WLAN_VDEV_S_UP) {
 		pe_err("SAP is not up, drop ASSOC REQ on sessionid: %d",
 		       session->peSessionId);
 
 		return;
 	}
+
+	if (lim_peer_present_on_any_sta(mac_ctx, hdr->sa))
+		/*
+		 * This mean a AP and STA have same mac address and device STA
+		 * is already connected to the AP, and STA is now trying to
+		 * connect to device SAP. So ignore association.
+		 */
+		return;
 
 	/*
 	 * If a STA is already present in DPH and it is initiating a Assoc
@@ -2301,9 +2350,6 @@ void lim_process_assoc_req_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_in
 				(uint8_t *) frm_body, frame_len);
 
 	if (false == lim_chk_sa_da(mac_ctx, hdr, session, sub_type))
-		return;
-
-	if (false == lim_chk_tkip(mac_ctx, hdr, session, sub_type))
 		return;
 
 	/* check for the presence of vendor IE */
@@ -2623,6 +2669,39 @@ static void fill_mlm_assoc_ind_vht(tpSirAssocReq assocreq,
 	}
 }
 
+/**
+ *lim_convert_channel_width_enum() - map between two channel width enums
+ *@ch_width: channel width of enum type phy_ch_width
+ *
+ *Return: channel width of enum type tSirMacHTChannelWidth
+ */
+static tSirMacHTChannelWidth
+lim_convert_channel_width_enum(enum phy_ch_width ch_width)
+{
+	switch (ch_width) {
+	case CH_WIDTH_20MHZ:
+		return eHT_CHANNEL_WIDTH_20MHZ;
+	case CH_WIDTH_40MHZ:
+		return eHT_CHANNEL_WIDTH_40MHZ;
+	case CH_WIDTH_80MHZ:
+		return eHT_CHANNEL_WIDTH_80MHZ;
+	case CH_WIDTH_160MHZ:
+		return eHT_CHANNEL_WIDTH_160MHZ;
+	case CH_WIDTH_80P80MHZ:
+		return eHT_CHANNEL_WIDTH_80P80MHZ;
+	case CH_WIDTH_MAX:
+		return eHT_MAX_CHANNEL_WIDTH;
+	case CH_WIDTH_5MHZ:
+		break;
+	case CH_WIDTH_10MHZ:
+		break;
+	case CH_WIDTH_INVALID:
+		break;
+	}
+	pe_debug("invalid enum: %d", ch_width);
+	return eHT_CHANNEL_WIDTH_20MHZ;
+}
+
 bool lim_fill_lim_assoc_ind_params(
 		tpLimMlmAssocInd assoc_ind,
 		struct mac_context *mac_ctx,
@@ -2830,14 +2909,23 @@ bool lim_fill_lim_assoc_ind_params(
 		assoc_ind->ecsa_capable =
 		((struct s_ext_cap *)assoc_req->ExtCap.bytes)->ext_chan_switch;
 	/* updates VHT information in assoc indication */
-	 qdf_mem_copy(&assoc_ind->vht_caps, &assoc_req->VHTCaps,
-		      sizeof(tDot11fIEVHTCaps));
+	if (assoc_req->VHTCaps.present)
+		qdf_mem_copy(&assoc_ind->vht_caps, &assoc_req->VHTCaps,
+			     sizeof(tDot11fIEVHTCaps));
+	else if (assoc_req->vendor_vht_ie.VHTCaps.present)
+		qdf_mem_copy(&assoc_ind->vht_caps,
+			     &assoc_req->vendor_vht_ie.VHTCaps,
+			     sizeof(tDot11fIEVHTCaps));
+
 	lim_fill_assoc_ind_vht_info(mac_ctx, session_entry, assoc_req,
 				    assoc_ind, sta_ds);
 	assoc_ind->he_caps_present = assoc_req->he_cap.present;
 	assoc_ind->is_sae_authenticated =
 				assoc_req->is_sae_authenticated;
-
+	/* updates HE bandwidth in assoc indication */
+	if (wlan_reg_is_6ghz_chan_freq(session_entry->curr_op_freq))
+		assoc_ind->ch_width =
+			lim_convert_channel_width_enum(sta_ds->ch_width);
 	return true;
 }
 

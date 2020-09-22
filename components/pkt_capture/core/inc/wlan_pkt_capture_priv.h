@@ -54,22 +54,28 @@ struct pkt_capture_cb_context {
 /**
  * struct pkt_capture_vdev_priv - Private object to be stored in vdev
  * @vdev: pointer to vdev object
- * @pkt_capture_mon_ctx: pointer to packet capture mon context
+ * @mon_ctx: pointer to packet capture mon context
  * @cb_ctx: pointer to packet capture mon callback context
+ * @rx_ops: rx ops
+ * @tx_ops: tx ops
  */
 struct pkt_capture_vdev_priv {
 	struct wlan_objmgr_vdev *vdev;
 	struct pkt_capture_mon_context *mon_ctx;
 	struct pkt_capture_cb_context *cb_ctx;
+	struct wlan_pkt_capture_rx_ops rx_ops;
+	struct wlan_pkt_capture_tx_ops tx_ops;
 };
 
 /**
  * struct pkt_psoc_priv - Private object to be stored in psoc
  * @psoc: pointer to psoc object
  * @cfg_param: INI config params for packet capture
+ * @cb_obj: struct contaning callback pointers
  */
 struct pkt_psoc_priv {
 	struct wlan_objmgr_psoc *psoc;
 	struct pkt_capture_cfg cfg_param;
+	struct pkt_capture_callbacks cb_obj;
 };
 #endif /* End  of _WLAN_PKT_CAPTURE_PRIV_STRUCT_H_ */

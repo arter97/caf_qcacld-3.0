@@ -210,7 +210,7 @@ static void pe_reset_protection_callback(void *ptr)
 
 	qdf_mem_zero(&beacon_params, sizeof(tUpdateBeaconParams));
 	/* index 0, is self node, peers start from 1 */
-	for (i = 1 ; i <= mac_ctx->mlme_cfg->sap_cfg.assoc_sta_limit ; i++) {
+	for (i = 1 ; i <= mac_ctx->lim.max_sta_of_pe_session; i++) {
 		station_hash_node = dph_get_hash_entry(mac_ctx, i,
 					&pe_session_entry->dph.dphHashTable);
 		if (!station_hash_node)
@@ -268,6 +268,41 @@ restart_timer:
 		pe_err("cannot create or start protectionFieldsResetTimer");
 	}
 }
+
+#ifdef WLAN_FEATURE_11W
+/**
+ * pe_init_pmf_comeback_timer: init PMF comeback timer
+ * @mac_ctx: pointer to global adapter context
+ * @session: pe session
+ *
+ * Return: void
+ */
+static void
+pe_init_pmf_comeback_timer(tpAniSirGlobal mac_ctx, struct pe_session *session)
+{
+	QDF_STATUS status;
+
+	if (session->opmode != QDF_STA_MODE)
+		return;
+
+	pe_debug("init pmf comeback timer for vdev %d", session->vdev_id);
+	session->pmf_retry_timer_info.mac = mac_ctx;
+	session->pmf_retry_timer_info.vdev_id = session->vdev_id;
+	session->pmf_retry_timer_info.retried = false;
+	status = qdf_mc_timer_init(
+			&session->pmf_retry_timer, QDF_TIMER_TYPE_SW,
+			lim_pmf_comeback_timer_callback,
+			(void *)&session->pmf_retry_timer_info);
+	if (!QDF_IS_STATUS_SUCCESS(status))
+		pe_err("cannot init pmf comeback timer");
+}
+#else
+static inline void
+pe_init_pmf_comeback_timer(tpAniSirGlobal mac_ctx, struct pe_session *session,
+			   uint8_t vdev_id)
+{
+}
+#endif
 
 #ifdef WLAN_FEATURE_FILS_SK
 /**
@@ -384,7 +419,6 @@ lim_get_peer_idxpool_size(uint16_t num_sta, enum bss_type bss_type)
 
 void lim_set_bcn_probe_filter(struct mac_context *mac_ctx,
 				struct pe_session *session,
-				tSirMacSSid *ibss_ssid,
 				uint8_t sap_channel)
 {
 	struct mgmt_beacon_probe_filter *filter;
@@ -414,18 +448,6 @@ void lim_set_bcn_probe_filter(struct mac_context *mac_ctx,
 		sir_copy_mac_addr(filter->sta_bssid[session_id], *bssid);
 		pe_debug("Set filter for STA Session %d bssid "QDF_MAC_ADDR_STR,
 			session_id, QDF_MAC_ADDR_ARRAY(*bssid));
-	} else if (eSIR_IBSS_MODE == bss_type) {
-		if (!ibss_ssid) {
-			pe_err("IBSS Type with NULL SSID");
-			goto done;
-		}
-		filter->num_ibss_sessions++;
-		filter->ibss_ssid[session_id].length = ibss_ssid->length;
-		qdf_mem_copy(&filter->ibss_ssid[session_id].ssId,
-			     ibss_ssid->ssId,
-			     ibss_ssid->length);
-		pe_debug("Set filter for IBSS session %d ssid %s",
-			session_id, ibss_ssid->ssId);
 	} else if (eSIR_INFRA_AP_MODE == bss_type) {
 		if (!sap_channel) {
 			pe_err("SAP Type with invalid channel");
@@ -438,9 +460,8 @@ void lim_set_bcn_probe_filter(struct mac_context *mac_ctx,
 	}
 
 done:
-	pe_debug("sta %d ibss %d sap %d",
-		filter->num_sta_sessions, filter->num_ibss_sessions,
-		filter->num_sap_sessions);
+	pe_debug("sta %d sap %d", filter->num_sta_sessions,
+		 filter->num_sap_sessions);
 }
 
 void lim_reset_bcn_probe_filter(struct mac_context *mac_ctx,
@@ -472,13 +493,6 @@ void lim_reset_bcn_probe_filter(struct mac_context *mac_ctx,
 		qdf_mem_zero(&filter->sta_bssid[session_id],
 			    sizeof(tSirMacAddr));
 		pe_debug("Cleared STA Filter for session %d", session_id);
-	} else if (eSIR_IBSS_MODE == bss_type) {
-		if (filter->num_ibss_sessions)
-			filter->num_ibss_sessions--;
-		filter->ibss_ssid[session_id].length = 0;
-		qdf_mem_zero(&filter->ibss_ssid[session_id].ssId,
-			    WLAN_SSID_MAX_LEN);
-		pe_debug("Cleared IBSS Filter for session %d", session_id);
 	} else if (eSIR_INFRA_AP_MODE == bss_type) {
 		if (filter->num_sap_sessions)
 			filter->num_sap_sessions--;
@@ -486,9 +500,8 @@ void lim_reset_bcn_probe_filter(struct mac_context *mac_ctx,
 		pe_debug("Cleared SAP Filter for session %d", session_id);
 	}
 
-	pe_debug("sta %d ibss %d sap %d",
-		filter->num_sta_sessions, filter->num_ibss_sessions,
-		filter->num_sap_sessions);
+	pe_debug("sta %d sap %d", filter->num_sta_sessions,
+		 filter->num_sap_sessions);
 }
 
 void lim_update_bcn_probe_filter(struct mac_context *mac_ctx,
@@ -524,9 +537,8 @@ void lim_update_bcn_probe_filter(struct mac_context *mac_ctx,
 			bss_type, session_id);
 	}
 
-	pe_debug("sta %d ibss %d sap %d",
-		filter->num_sta_sessions, filter->num_ibss_sessions,
-		filter->num_sap_sessions);
+	pe_debug("sta %d sap %d", filter->num_sta_sessions,
+		 filter->num_sap_sessions);
 }
 
 struct pe_session *pe_create_session(struct mac_context *mac,
@@ -614,7 +626,7 @@ struct pe_session *pe_create_session(struct mac_context *mac,
 		 *sessionId, opmode, vdev_id, QDF_MAC_ADDR_ARRAY(bssid),
 		 numSta);
 
-	if (eSIR_INFRA_AP_MODE == bssType || eSIR_IBSS_MODE == bssType) {
+	if (bssType == eSIR_INFRA_AP_MODE) {
 		session_ptr->pSchProbeRspTemplate =
 			qdf_mem_malloc(SIR_MAX_PROBE_RESP_SIZE);
 		session_ptr->pSchBeaconFrameBegin =
@@ -676,6 +688,7 @@ struct pe_session *pe_create_session(struct mac_context *mac,
 			pe_err("cannot create ap_ecsa_timer");
 	}
 	pe_init_fils_info(session_ptr);
+	pe_init_pmf_comeback_timer(mac, session_ptr);
 	session_ptr->ht_client_cnt = 0;
 	/* following is invalid value since seq number is 12 bit */
 	session_ptr->prev_auth_seq_num = 0xFFFF;
@@ -800,6 +813,25 @@ struct pe_session *pe_find_session_by_session_id(struct mac_context *mac,
 	return NULL;
 }
 
+#ifdef WLAN_FEATURE_11W
+static void lim_clear_pmfcomeback_timer(struct pe_session *session)
+{
+	if (session->opmode != QDF_STA_MODE)
+		return;
+
+	pe_debug("deinit pmf comeback timer for vdev %d", session->vdev_id);
+	if (QDF_TIMER_STATE_RUNNING ==
+	    qdf_mc_timer_get_current_state(&session->pmf_retry_timer))
+		qdf_mc_timer_stop(&session->pmf_retry_timer);
+	qdf_mc_timer_destroy(&session->pmf_retry_timer);
+	session->pmf_retry_timer_info.retried = false;
+}
+#else
+static void lim_clear_pmfcomeback_timer(struct pe_session *session)
+{
+}
+#endif
+
 /**
  * pe_delete_session() - deletes the PE session given the session ID.
  * @mac_ctx: pointer to global adapter context
@@ -815,6 +847,7 @@ void pe_delete_session(struct mac_context *mac_ctx, struct pe_session *session)
 	uint16_t n;
 	TX_TIMER *timer_ptr;
 	struct wlan_objmgr_vdev *vdev;
+	tpSirAssocRsp assoc_rsp;
 
 	if (!session || (session && !session->valid)) {
 		pe_debug("session already deleted or not valid");
@@ -826,6 +859,7 @@ void pe_delete_session(struct mac_context *mac_ctx, struct pe_session *session)
 		 QDF_MAC_ADDR_ARRAY(session->bssId));
 
 	lim_reset_bcn_probe_filter(mac_ctx, session);
+	lim_sae_auth_cleanup_retry(mac_ctx, session->vdev_id);
 
 	/* Restore default failure timeout */
 	if (session->defaultAuthFailureTimeout) {
@@ -935,6 +969,9 @@ void pe_delete_session(struct mac_context *mac_ctx, struct pe_session *session)
 		session->parsedAssocReq = NULL;
 	}
 	if (session->limAssocResponseData) {
+		assoc_rsp = (tpSirAssocRsp) session->limAssocResponseData;
+		qdf_mem_free(assoc_rsp->sha384_ft_subelem.gtk);
+		qdf_mem_free(assoc_rsp->sha384_ft_subelem.igtk);
 		qdf_mem_free(session->limAssocResponseData);
 		session->limAssocResponseData = NULL;
 	}
@@ -979,6 +1016,7 @@ void pe_delete_session(struct mac_context *mac_ctx, struct pe_session *session)
 		session->add_ie_params.probeRespBCNDataLen = 0;
 	}
 	pe_delete_fils_info(session);
+	lim_clear_pmfcomeback_timer(session);
 	session->valid = false;
 
 	session->mac_ctx = NULL;

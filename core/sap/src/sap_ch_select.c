@@ -413,8 +413,7 @@ static bool sap_chan_sel_init(mac_handle_t mac_handle,
 	uint16_t channelnum = 0;
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
 	bool include_dfs_ch = true;
-	bool sta_sap_scc_on_dfs_chan =
-		policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(mac->psoc);
+	uint8_t sta_sap_scc_on_dfs_chnl_config_value;
 
 	pSpectInfoParams->numSpectChans =
 		mac->scan.base_channels.numChannels;
@@ -430,6 +429,8 @@ static bool sap_chan_sel_init(mac_handle_t mac_handle,
 
 	pChans = mac->scan.base_channels.channel_freq_list;
 
+	policy_mgr_get_sta_sap_scc_on_dfs_chnl(mac->psoc,
+			&sta_sap_scc_on_dfs_chnl_config_value);
 #if defined(FEATURE_WLAN_STA_AP_MODE_DFS_DISABLE)
 	if (sap_ctx->dfs_ch_disable == true)
 		include_dfs_ch = false;
@@ -462,14 +463,15 @@ static bool sap_chan_sel_init(mac_handle_t mac_handle,
 			continue;
 		}
 
-		if (!include_dfs_ch || sta_sap_scc_on_dfs_chan) {
+		if (!include_dfs_ch ||
+		    sta_sap_scc_on_dfs_chnl_config_value == 1) {
 			if (wlan_reg_is_dfs_for_freq(mac->pdev,
 						     pSpectCh->chan_freq)) {
 				QDF_TRACE(QDF_MODULE_ID_SAP,
 					  QDF_TRACE_LEVEL_INFO_HIGH,
-					  "In %s, DFS Ch %d not considered for ACS. include_dfs_ch %u, sta_sap_scc_on_dfs_chan %d",
+					  "In %s, DFS Ch %d not considered for ACS. include_dfs_ch %u, sta_sap_scc_on_dfs_chnl_config_value %d",
 					  __func__, channel, include_dfs_ch,
-					  sta_sap_scc_on_dfs_chan);
+					  sta_sap_scc_on_dfs_chnl_config_value);
 				continue;
 			}
 		}
@@ -1340,10 +1342,6 @@ static void sap_compute_spect_weight(tSapChSelSpectInfo *pSpectInfoParams,
 				    center_freq0, center_freq1, chan_freq,
 				    spectch_start, spectch_end);
 
-			sap_debug("freq = %d, rssi aggr = %d, bss count yet = %d",
-				  chan_freq, pSpectCh->rssiAgr,
-				  pSpectCh->bssCount);
-
 			pSpectCh++;
 			break;
 
@@ -1410,6 +1408,15 @@ static void sap_compute_spect_weight(tSapChSelSpectInfo *pSpectInfoParams,
 		}
 
 		chan_freq = pSpectCh->chan_freq;
+
+		if (wlan_reg_is_dfs_for_freq(mac->pdev, chan_freq)) {
+			normalize_factor =
+				MLME_GET_DFS_CHAN_WEIGHT(
+				mac->mlme_cfg->acs.np_chan_weightage);
+			freq_present_in_list = true;
+			sap_debug_rl("DFS channel weightage %d",
+				     normalize_factor);
+		}
 
 		/* Check if the freq is present in range list */
 		for (i = 0; i < mac->mlme_cfg->acs.num_weight_range; i++) {

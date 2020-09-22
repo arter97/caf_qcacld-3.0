@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -184,11 +184,13 @@ void ucfg_ipa_set_dfs_cac_tx(struct wlan_objmgr_pdev *pdev, bool tx_block);
 /**
  * ucfg_ipa_set_ap_ibss_fwd() - Set AP intra bss forward
  * @pdev: pdev obj
+ * @session_id: vdev id
  * @intra_bss: enable or disable ap intra bss forward
  *
  * Return: void
  */
-void ucfg_ipa_set_ap_ibss_fwd(struct wlan_objmgr_pdev *pdev, bool intra_bss);
+void ucfg_ipa_set_ap_ibss_fwd(struct wlan_objmgr_pdev *pdev, uint8_t session_id,
+			      bool intra_bss);
 
 /**
  * ucfg_ipa_uc_force_pipe_shutdown() - Force shutdown IPA pipe
@@ -372,7 +374,15 @@ uint32_t ucfg_ipa_get_tx_buf_count(void);
  */
 void ucfg_ipa_update_tx_stats(struct wlan_objmgr_pdev *pdev, uint64_t sta_tx,
 			      uint64_t ap_tx);
-
+/**
+ * ucfg_ipa_flush_pending_vdev_events() - flush pending vdev wlan ipa events
+ * @pdev: pdev obj
+ * @vdev_id: vdev id
+ *
+ * Return: None
+ */
+void ucfg_ipa_flush_pending_vdev_events(struct wlan_objmgr_pdev *pdev,
+					uint8_t vdev_id);
 #else
 
 static inline bool ucfg_ipa_is_present(void)
@@ -470,7 +480,8 @@ void ucfg_ipa_set_dfs_cac_tx(struct wlan_objmgr_pdev *pdev, bool tx_block)
 }
 
 static inline
-void ucfg_ipa_set_ap_ibss_fwd(struct wlan_objmgr_pdev *pdev, bool intra_bss)
+void ucfg_ipa_set_ap_ibss_fwd(struct wlan_objmgr_pdev *pdev, uint8_t session_id,
+			      bool intra_bss)
 {
 }
 
@@ -586,6 +597,12 @@ uint32_t ucfg_ipa_get_tx_buf_count(void)
 static inline
 void ucfg_ipa_update_tx_stats(struct wlan_objmgr_pdev *pdev, uint64_t sta_tx,
 			      uint64_t ap_tx)
+{
+}
+
+static inline
+void ucfg_ipa_flush_pending_vdev_events(struct wlan_objmgr_pdev *pdev,
+					uint8_t vdev_id)
 {
 }
 #endif /* IPA_OFFLOAD */

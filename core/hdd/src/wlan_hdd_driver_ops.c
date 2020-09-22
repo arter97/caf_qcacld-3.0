@@ -44,6 +44,8 @@
 #include "wlan_hdd_debugfs.h"
 #include "cfg_ucfg_api.h"
 #include <linux/suspend.h>
+#include <qdf_notifier.h>
+#include <qdf_hang_event_notifier.h>
 
 #ifdef MODULE
 #define WLAN_MODULE_NAME  module_name(THIS_MODULE)
@@ -51,10 +53,11 @@
 #define WLAN_MODULE_NAME  "wlan"
 #endif
 
-#define DISABLE_KRAIT_IDLE_PS_VAL      1
-
 #define SSR_MAX_FAIL_CNT 3
 static uint8_t re_init_fail_cnt, probe_fail_cnt;
+
+/* An atomic flag to check if SSR cleanup has been done or not */
+static qdf_atomic_t is_recovery_cleanup_done;
 
 /*
  * In BMI Phase we are only sending small chunk (256 bytes) of the FW image at
@@ -72,6 +75,23 @@ static inline void hdd_request_pm_qos(struct device *dev, int val)
 static inline void hdd_remove_pm_qos(struct device *dev)
 {
 	pld_remove_pm_qos(dev);
+}
+
+/**
+ * hdd_get_bandwidth_level() - get current bandwidth level
+ * @data: Context
+ *
+ * Return: current bandwidth level
+ */
+static int hdd_get_bandwidth_level(void *data)
+{
+	int ret = PLD_BUS_WIDTH_NONE;
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	if (hdd_ctx)
+		ret = hdd_get_current_throughput_level(hdd_ctx);
+
+	return ret;
 }
 
 /**
@@ -150,6 +170,7 @@ static void hdd_hif_init_driver_state_callbacks(void *data,
 	cbk->is_load_unload_in_progress = hdd_is_load_or_unload_in_progress;
 	cbk->is_driver_unloading = hdd_is_driver_unloading;
 	cbk->is_target_ready = hdd_is_target_ready;
+	cbk->get_bandwidth_level = hdd_get_bandwidth_level;
 }
 
 #ifdef FORCE_WAKE
@@ -161,6 +182,7 @@ void hdd_set_hif_init_phase(struct hif_opaque_softc *hif_ctx,
 #endif /* FORCE_WAKE */
 
 /**
+
  * hdd_hif_set_attribute() - API to set CE attribute if memory is limited
  * @hif_ctx: hif context
  *
@@ -175,6 +197,20 @@ static void hdd_hif_set_attribute(struct hif_opaque_softc *hif_ctx)
 static void hdd_hif_set_attribute(struct hif_opaque_softc *hif_ctx)
 {}
 #endif
+
+/**
+ * hdd_hif_register_shutdown_notifier() - Register HIF shutdown notifier
+ * @hif_ctx: HIF Context
+ *
+ * Return: success/failure
+ */
+static QDF_STATUS
+hdd_hif_register_shutdown_notifier(struct hif_opaque_softc *hif_ctx)
+{
+	return cds_shutdown_notifier_register(
+					hif_shutdown_notifier_cb,
+					hif_ctx);
+}
 
 /**
  * hdd_init_cds_hif_context() - API to set CDS HIF Context
@@ -230,6 +266,7 @@ static enum qdf_bus_type to_bus_type(enum pld_bus_type bus_type)
 		return QDF_BUS_TYPE_SDIO;
 	case PLD_BUS_TYPE_USB:
 		return QDF_BUS_TYPE_USB;
+	case PLD_BUS_TYPE_IPCI_FW_SIM:
 	case PLD_BUS_TYPE_IPCI:
 		return QDF_BUS_TYPE_IPCI;
 	default:
@@ -267,6 +304,12 @@ int hdd_hif_open(struct device *dev, void *bdev, const struct hif_bus_id *bid,
 		goto err_hif_close;
 	}
 
+	status = hdd_hif_register_shutdown_notifier(hif_ctx);
+	if (status != QDF_STATUS_SUCCESS) {
+		hdd_err("Shutdown notifier register failed: %d", status);
+		goto err_deinit_hif_context;
+	}
+
 	hdd_hif_set_attribute(hif_ctx);
 
 	status = hif_enable(hif_ctx, dev, bdev, bid, bus_type,
@@ -277,7 +320,7 @@ int hdd_hif_open(struct device *dev, void *bdev, const struct hif_bus_id *bid,
 			status, reinit);
 
 		ret = qdf_status_to_os_return(status);
-		goto err_hif_close;
+		goto err_deinit_hif_context;
 	} else {
 		cds_set_target_ready(true);
 		ret = hdd_napi_create();
@@ -307,8 +350,10 @@ int hdd_hif_open(struct device *dev, void *bdev, const struct hif_bus_id *bid,
 mark_target_not_ready:
 	cds_set_target_ready(false);
 
-err_hif_close:
+err_deinit_hif_context:
 	hdd_deinit_cds_hif_context();
+
+err_hif_close:
 	hif_close(hif_ctx);
 	return ret;
 }
@@ -557,9 +602,20 @@ static int __hdd_soc_recovery_reinit(struct device *dev,
 	}
 
 	re_init_fail_cnt = 0;
-	cds_set_recovery_in_progress(false);
+
+	/*
+	 * In case of SSR within SSR we have seen the race
+	 * where the reinit is successful and fw down is received
+	 * which sets the recovery in progress. Now as reinit is
+	 * successful we reset the recovery in progress here.
+	 * So check if FW is down then don't reset the recovery
+	 * in progress
+	 */
+	if (!qdf_is_fw_down())
+		cds_set_recovery_in_progress(false);
 
 	hdd_soc_load_unlock(dev);
+	hdd_start_complete(0);
 
 	return 0;
 
@@ -570,6 +626,7 @@ assert_fail_count:
 unlock:
 	cds_set_driver_in_bad_state(true);
 	hdd_soc_load_unlock(dev);
+	hdd_start_complete(errno);
 
 	return check_for_probe_defer(errno);
 }
@@ -682,11 +739,12 @@ static inline void hdd_wlan_ssr_shutdown_event(void) { }
 #endif
 
 /**
- * hdd_send_hang_reason() - Send hang reason to the userspace
+ * hdd_send_hang_data() - Send hang data to userspace
+ * @data: Hang data
  *
  * Return: None
  */
-static void hdd_send_hang_reason(void)
+static void hdd_send_hang_data(uint8_t *data, size_t data_len)
 {
 	enum qdf_hang_reason reason = QDF_REASON_UNSPECIFIED;
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
@@ -696,7 +754,7 @@ static void hdd_send_hang_reason(void)
 
 	cds_get_recovery_reason(&reason);
 	cds_reset_recovery_reason();
-	wlan_hdd_send_hang_reason_event(hdd_ctx, reason);
+	wlan_hdd_send_hang_reason_event(hdd_ctx, reason, data, data_len);
 }
 
 /**
@@ -708,12 +766,6 @@ static void hdd_send_hang_reason(void)
  */
 static void hdd_psoc_shutdown_notify(struct hdd_context *hdd_ctx)
 {
-	/* Notify external threads currently waiting on firmware by forcefully
-	 * completing waiting events with a "reset" status. This will cause the
-	 * event to fail early instead of timing out.
-	 */
-	qdf_complete_wait_events();
-
 	wlan_cfg80211_cleanup_scan_queue(hdd_ctx->pdev, NULL);
 
 	if (ucfg_ipa_is_enabled()) {
@@ -728,16 +780,20 @@ static void hdd_psoc_shutdown_notify(struct hdd_context *hdd_ctx)
 	cds_shutdown_notifier_purge();
 
 	hdd_wlan_ssr_shutdown_event();
-	hdd_send_hang_reason();
 }
 
-static void __hdd_soc_recovery_shutdown(void)
+/**
+ * hdd_soc_recovery_cleanup() - Perform SSR related cleanup activities.
+ *
+ * This function will perform cleanup activities related to when driver
+ * undergoes SSR. Activities inclues stopping idle timer and invoking shutdown
+ * notifier.
+ *
+ * Return: None
+ */
+static void hdd_soc_recovery_cleanup(void)
 {
 	struct hdd_context *hdd_ctx;
-	void *hif_ctx;
-
-	/* recovery starts via firmware down indication; ensure we got one */
-	QDF_BUG(cds_is_driver_recovering());
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	if (!hdd_ctx) {
@@ -760,6 +816,36 @@ static void __hdd_soc_recovery_shutdown(void)
 		return;
 	}
 
+	hdd_psoc_shutdown_notify(hdd_ctx);
+}
+
+static void __hdd_soc_recovery_shutdown(void)
+{
+	struct hdd_context *hdd_ctx;
+	void *hif_ctx;
+
+	/* recovery starts via firmware down indication; ensure we got one */
+	QDF_BUG(cds_is_driver_recovering());
+	hdd_init_start_completion();
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx) {
+		hdd_err("hdd_ctx is null");
+		return;
+	}
+
+	/*
+	 * Perform SSR related cleanup if it has not already been done as a
+	 * part of receiving the uevent.
+	 */
+	if (!qdf_atomic_read(&is_recovery_cleanup_done))
+		hdd_soc_recovery_cleanup();
+	else
+		qdf_atomic_set(&is_recovery_cleanup_done, 0);
+
+	if (!hdd_wait_for_debugfs_threads_completion())
+		hdd_err("Debufs threads are still pending, attempting SSR anyway");
+
 	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
 	if (!hif_ctx) {
 		hdd_err("Failed to get HIF context, ignore SSR shutdown");
@@ -768,11 +854,6 @@ static void __hdd_soc_recovery_shutdown(void)
 
 	/* mask the host controller interrupts */
 	hif_mask_interrupt_call(hif_ctx);
-
-	hdd_psoc_shutdown_notify(hdd_ctx);
-
-	if (!hdd_wait_for_debugfs_threads_completion())
-		hdd_err("Debufs threads are still pending, attempting SSR anyway");
 
 	if (!QDF_IS_EPPING_ENABLED(cds_get_conparam())) {
 		hif_disable_isr(hif_ctx);
@@ -800,7 +881,6 @@ static void hdd_soc_recovery_shutdown(struct device *dev)
 	int errno;
 
 	errno = osif_psoc_sync_trans_start_wait(dev, &psoc_sync);
-	QDF_BUG(!errno);
 	if (errno)
 		return;
 
@@ -1018,6 +1098,12 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params)
 		goto resume_pmo;
 	}
 
+	/*
+	 * Remove bus votes at the very end, after making sure there are no
+	 * pending bus transactions from WLAN SOC for TX/RX.
+	 */
+	pld_request_bus_bandwidth(hdd_ctx->parent_dev, PLD_BUS_WIDTH_NONE);
+
 	hdd_info("bus suspend succeeded");
 	return 0;
 
@@ -1162,6 +1248,18 @@ int wlan_hdd_bus_resume(void)
 	if (!hif_ctx) {
 		hdd_err("Failed to get hif context");
 		return -EINVAL;
+	}
+
+	/*
+	 * Add bus votes at the beginning, before making sure there are any
+	 * bus transactions from WLAN SOC for TX/RX.
+	 */
+	if (hdd_is_any_adapter_connected(hdd_ctx)) {
+		pld_request_bus_bandwidth(hdd_ctx->parent_dev,
+					  PLD_BUS_WIDTH_MEDIUM);
+	} else {
+		pld_request_bus_bandwidth(hdd_ctx->parent_dev,
+					  PLD_BUS_WIDTH_NONE);
 	}
 
 	status = hif_bus_resume(hif_ctx);
@@ -1401,7 +1499,7 @@ static int wlan_hdd_runtime_resume(struct device *dev)
 		hdd_err("PMO Runtime resume failed: %d", status);
 	} else {
 		if (policy_mgr_get_connection_count(hdd_ctx->psoc))
-			hdd_bus_bw_compute_timer_start(hdd_ctx);
+			hdd_bus_bw_compute_timer_try_start(hdd_ctx);
 	}
 
 	hdd_debug("Runtime resume done");
@@ -1450,6 +1548,18 @@ static void wlan_hdd_pld_remove(struct device *dev, enum pld_bus_type bus_type)
 	hdd_exit();
 }
 
+static void hdd_soc_idle_shutdown_lock(struct device *dev)
+{
+	hdd_prevent_suspend(WIFI_POWER_EVENT_WAKELOCK_DRIVER_IDLE_SHUTDOWN);
+
+	hdd_abort_system_suspend(dev);
+}
+
+static void hdd_soc_idle_shutdown_unlock(void)
+{
+	hdd_allow_suspend(WIFI_POWER_EVENT_WAKELOCK_DRIVER_IDLE_SHUTDOWN);
+}
+
 /**
  * wlan_hdd_pld_idle_shutdown() - wifi module idle shutdown after interface
  *                                inactivity timeout has trigerred idle shutdown
@@ -1461,7 +1571,15 @@ static void wlan_hdd_pld_remove(struct device *dev, enum pld_bus_type bus_type)
 static int wlan_hdd_pld_idle_shutdown(struct device *dev,
 				       enum pld_bus_type bus_type)
 {
-	return hdd_psoc_idle_shutdown(dev);
+	int ret;
+
+	hdd_soc_idle_shutdown_lock(dev);
+
+	ret = hdd_psoc_idle_shutdown(dev);
+
+	hdd_soc_idle_shutdown_unlock();
+
+	return ret;
 }
 
 /**
@@ -1691,25 +1809,66 @@ static void wlan_hdd_pld_notify_handler(struct device *dev,
 static void
 wlan_hdd_pld_uevent(struct device *dev, struct pld_uevent_data *event_data)
 {
+	struct qdf_notifer_data hang_evt_data;
+	enum qdf_hang_reason reason = QDF_REASON_UNSPECIFIED;
+	uint8_t bus_type;
+
+	bus_type = pld_get_bus_type(dev);
+
 	switch (event_data->uevent) {
 	case PLD_FW_DOWN:
 		hdd_info("Received firmware down indication");
 
-		/* NOTE! SSR cleanup logic goes in pld shutdown, not here */
-
 		cds_set_target_ready(false);
 		cds_set_recovery_in_progress(true);
 
-		/* SSR cleanup happens in pld shutdown, which is serialized by
-		 * the platform driver. Other operations are also serialized by
-		 * platform driver, such as probe, remove, and reinit. If the
-		 * firmware goes down during one of these operations, the driver
-		 * would normally have to wait for a timeout before shutdown
-		 * could begin. Instead, forcefully complete events waiting on
-		 * firmware with a "reset" status to avoid waiting to time out
-		 * on a firmware we already know is down.
+		/* Notify external threads currently waiting on firmware
+		 * by forcefully completing waiting events with a "reset"
+		 * status. This will cause the event to fail early instead
+		 * of timing out.
 		 */
 		qdf_complete_wait_events();
+
+		/*
+		 * In case of some platforms, uevent will come to the driver in
+		 * process context. In that case, it is safe to complete the
+		 * SSR cleanup activities in the same context. In case of
+		 * other platforms, it will be invoked in interrupt context.
+		 * Performing the cleanup in interrupt context is not ideal,
+		 * thus defer the cleanup to be done during
+		 * hdd_soc_recovery_shutdown
+		 */
+		if (qdf_in_interrupt() || bus_type == PLD_BUS_TYPE_PCIE)
+			break;
+
+		hdd_soc_recovery_cleanup();
+		qdf_atomic_set(&is_recovery_cleanup_done, 1);
+
+		break;
+	case PLD_FW_HANG_EVENT:
+		hdd_info("Received firmware hang event");
+		cds_get_recovery_reason(&reason);
+		hang_evt_data.hang_data =
+				qdf_mem_malloc(QDF_HANG_EVENT_DATA_SIZE);
+		if (!hang_evt_data.hang_data)
+			return;
+		hang_evt_data.offset = 0;
+		qdf_hang_event_notifier_call(reason, &hang_evt_data);
+		hang_evt_data.offset = QDF_WLAN_HANG_FW_OFFSET;
+		if (event_data->hang_data.hang_event_data_len >=
+		    QDF_HANG_EVENT_DATA_SIZE / 2)
+			event_data->hang_data.hang_event_data_len =
+						QDF_HANG_EVENT_DATA_SIZE / 2;
+
+		if (event_data->hang_data.hang_event_data_len)
+			qdf_mem_copy((hang_evt_data.hang_data +
+				      hang_evt_data.offset),
+				     event_data->hang_data.hang_event_data,
+				     event_data->hang_data.hang_event_data_len);
+
+		hdd_send_hang_data(hang_evt_data.hang_data,
+				   QDF_HANG_EVENT_DATA_SIZE);
+		qdf_mem_free(hang_evt_data.hang_data);
 
 		break;
 	default:
@@ -1717,6 +1876,7 @@ wlan_hdd_pld_uevent(struct device *dev, struct pld_uevent_data *event_data)
 		hdd_debug("Received uevent %d", event_data->uevent);
 		break;
 	}
+
 }
 
 #ifdef FEATURE_RUNTIME_PM
@@ -1735,12 +1895,20 @@ static int wlan_hdd_pld_runtime_suspend(struct device *dev,
 
 	errno = osif_psoc_sync_op_start(dev, &psoc_sync);
 	if (errno)
-		return errno;
+		goto out;
 
 	errno = wlan_hdd_runtime_suspend(dev);
 
 	osif_psoc_sync_op_stop(psoc_sync);
 
+out:
+	/* If it returns other errno to kernel, it will treat
+	 * it as critical issue, so all the future runtime
+	 * PM api will return error, pm runtime can't be work
+	 * anymore. Such case found in SSR.
+	 */
+	if (errno && errno != -EAGAIN && errno != -EBUSY)
+		errno = -EAGAIN;
 	return errno;
 }
 

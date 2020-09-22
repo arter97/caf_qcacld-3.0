@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -64,7 +64,7 @@ struct report_t {
 	bool status;
 	char result_code[MAX_ALLOWED_CHAR_IN_REPORT];
 	char reason[MAX_ALLOWED_CHAR_IN_REPORT];
-	char pcl[2 * QDF_MAX_NUM_CHAN];
+	char pcl[2 * NUM_CHANNELS];
 };
 
 static struct report_t report[NUMBER_OF_SCENARIO];
@@ -75,8 +75,6 @@ static uint8_t wlan_hdd_valid_type_of_persona(uint32_t sub_type)
 	switch (sub_type) {
 	case PM_STA_MODE:
 		return WMI_VDEV_TYPE_STA;
-	case PM_IBSS_MODE:
-		return WMI_VDEV_TYPE_IBSS;
 	case PM_SAP_MODE:
 	case PM_P2P_CLIENT_MODE:
 	case PM_P2P_GO_MODE:
@@ -105,7 +103,6 @@ static const char *device_mode_to_string(uint8_t idx)
 	CASE_RETURN_STRING(PM_SAP_MODE);
 	CASE_RETURN_STRING(PM_P2P_CLIENT_MODE);
 	CASE_RETURN_STRING(PM_P2P_GO_MODE);
-	CASE_RETURN_STRING(PM_IBSS_MODE);
 	default:
 		return "none";
 	}
@@ -230,7 +227,7 @@ void fill_report(struct hdd_context *hdd_ctx, char *title,
 	if (pcl) {
 		qdf_mem_zero(report[report_idx].pcl,
 				sizeof(report[report_idx].pcl));
-		for (i = 0; i < QDF_MAX_NUM_CHAN; i++) {
+		for (i = 0; i < NUM_CHANNELS; i++) {
 			if (pcl[i] == 0)
 				break;
 			qdf_mem_zero(buf, sizeof(buf));
@@ -622,9 +619,9 @@ static void wlan_hdd_map_subtypes_hdd_wma(enum policy_mgr_con_mode *dst,
 void wlan_hdd_one_connection_scenario(struct hdd_context *hdd_ctx)
 {
 	enum policy_mgr_con_mode sub_type;
-	uint8_t pcl[QDF_MAX_NUM_CHAN] = {0},
-		weight_list[QDF_MAX_NUM_CHAN] = {0};
-	uint32_t pcl_len = 0, i, pcl_freqs[QDF_MAX_NUM_CHAN] = {0};
+	uint8_t pcl[NUM_CHANNELS] = {0},
+		weight_list[NUM_CHANNELS] = {0};
+	uint32_t pcl_len = 0, i, pcl_freqs[NUM_CHANNELS] = {0};
 	bool status = false;
 	enum policy_mgr_pcl_type pcl_type;
 	char reason[20] = {0};
@@ -678,9 +675,9 @@ void wlan_hdd_two_connections_scenario(struct hdd_context *hdd_ctx,
 {
 	uint8_t vdevid = 0, tx_stream = 2, rx_stream = 2;
 	uint8_t type = WMI_VDEV_TYPE_STA, channel_id = first_chnl, mac_id = 1;
-	uint8_t pcl[QDF_MAX_NUM_CHAN] = {0},
-			weight_list[QDF_MAX_NUM_CHAN] = {0};
-	uint32_t pcl_len = 0, i, pcl_freqs[QDF_MAX_NUM_CHAN];
+	uint8_t pcl[NUM_CHANNELS] = {0},
+			weight_list[NUM_CHANNELS] = {0};
+	uint32_t pcl_len = 0, i, pcl_freqs[NUM_CHANNELS];
 	enum policy_mgr_chain_mode chain_mask = first_chain_mask;
 	enum policy_mgr_con_mode sub_type, next_sub_type, dummy_type;
 	enum policy_mgr_pcl_type pcl_type;
@@ -767,8 +764,8 @@ void wlan_hdd_three_connections_scenario(struct hdd_context *hdd_ctx,
 	uint8_t channel_id_1 = first_chnl, channel_id_2 = second_chnl;
 	uint8_t mac_id_1, mac_id_2;
 	uint8_t type_1 = WMI_VDEV_TYPE_STA, type_2 = WMI_VDEV_TYPE_STA;
-	uint8_t pcl[MAX_NUM_CHAN] = {0}, weight_list[MAX_NUM_CHAN] = {0};
-	uint32_t pcl_len = 0, i, pcl_freqs[QDF_MAX_NUM_CHAN];
+	uint8_t pcl[NUM_CHANNELS] = {0}, weight_list[NUM_CHANNELS] = {0};
+	uint32_t pcl_len = 0, i, pcl_freqs[NUM_CHANNELS];
 	enum policy_mgr_chain_mode chain_mask_1;
 	enum policy_mgr_chain_mode chain_mask_2;
 	enum policy_mgr_con_mode sub_type_1, sub_type_2, next_sub_type;

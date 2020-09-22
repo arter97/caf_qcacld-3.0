@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -390,8 +390,8 @@
 	"gFwDebugModuleLoglevel", \
 	0, \
 	FW_MODULE_LOG_LEVEL_STRING_LENGTH, \
-	"2,1,3,1,5,1,9,1,13,1,14,1,18,1,19,1,26,1,28,1,29,1,31,1,36,1,38,1,"\
-	"46,1,47,1,50,1,52,1,53,1,56,1,60,1,61,1,4,1", \
+	"2,1,3,1,4,1,5,1,9,1,13,1,14,1,17,1,18,1,19,1,22,1,26,1,28,1,29,1," \
+	"31,1,36,1,38,1,46,1,47,1,50,1,52,1,53,1,56,1,60,1,61,1", \
 	"Set modulized firmware debug log level")
 
 #ifdef FEATURE_WLAN_RA_FILTERING
@@ -705,6 +705,59 @@
 		CFG_VALUE_OR_DEFAULT, \
 		"Secondary Retry Rate feature subset control")
 
+/*
+ * <ini>
+ * sap_xlna_bypass - Enable/Disable xLNA bypass
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable/disable SAP xLNA bypass in the FW
+ *
+ * Related: None
+ *
+ * Supported Feature: SAP
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+
+#define CFG_SET_SAP_XLNA_BYPASS CFG_INI_BOOL( \
+		"xlna_bypass", \
+		0, \
+		"SAP xLNA bypass control")
+
+/*
+ * <ini>
+ * gOclCfg - Enable/Disable OCL mode
+ * @Min: 0
+ * @Max: 2
+ * @Default: 2
+ *
+ * This ini is used to set one chain listen (OCL) mode to static or dynamic
+ * enable/disable during bootup. value 0 disables both static/dynamic OCL.
+ * value 1 enables static OCL. Once its enabled it stays enabled. value 2
+ * enables dynamic OCL. In dynamic OCL mode one chain listen will be
+ * enabled/disabled by firmware during runtime based on RSSI.
+ *
+ * Related: None
+ *
+ * Supported Feature: OCL
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+
+#define CFG_SET_OCL_CFG CFG_INI_UINT( \
+		"gOclCfg", \
+		0, \
+		2, \
+		2, \
+		CFG_VALUE_OR_DEFAULT, \
+		"OCL configuration")
+
 #define CFG_FWOL_GENERIC_ALL \
 	CFG_FWOL_DHCP \
 	CFG(CFG_ENABLE_ANI) \
@@ -730,6 +783,8 @@
 	__CFG_IS_SAE_ENABLED \
 	CFG(CFG_ENABLE_GCMP) \
 	CFG(CFG_TX_SCH_DELAY) \
-	CFG(CFG_ENABLE_SECONDARY_RATE)
+	CFG(CFG_ENABLE_SECONDARY_RATE) \
+	CFG(CFG_SET_SAP_XLNA_BYPASS) \
+	CFG(CFG_SET_OCL_CFG)
 
 #endif

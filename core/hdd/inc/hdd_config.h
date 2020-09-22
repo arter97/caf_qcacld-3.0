@@ -339,16 +339,33 @@ enum hdd_dot11_mode {
 
 /*
  * <ini>
- * wlanLoggingToConsole - Wlan logging to console
- * @Min: 0
- * @Max: 1
- * @Default: 1
+ * wlanConsoleLogLevelsBitmap - Bitmap to enable/disable console log levels
+ * @Min: 0x00000000
+ * @Max: 0x000003ff
+ * @Default: 0x0000001e
+ *
+ * This INI is used to enable/disable console logs for specific log level.
+ *
+ * bit-0: Reserved
+ * bit-1: QDF_TRACE_LEVEL_FATAL
+ * bit-2: QDF_TRACE_LEVEL_ERROR
+ * bit-3: QDF_TRACE_LEVEL_WARN
+ * bit-4: QDF_TRACE_LEVEL_INFO
+ * bit-5: QDF_TRACE_LEVEL_INFO_HIGH
+ * bit-6: QDF_TRACE_LEVEL_INFO_MED
+ * bit-7: QDF_TRACE_LEVEL_INFO_LOW
+ * bit-8: QDF_TRACE_LEVEL_DEBUG
+ * bit-9: QDF_TRACE_LEVEL_TRACE
+ * bit-10 to bit-31: Reserved
  *
  * </ini>
  */
-#define CFG_WLAN_LOGGING_CONSOLE_SUPPORT CFG_INI_BOOL( \
-				"wlanLoggingToConsole", \
-				1, \
+#define CFG_WLAN_LOGGING_CONSOLE_SUPPORT CFG_INI_UINT( \
+				"wlanConsoleLogLevelsBitmap", \
+				0x00000000, \
+				0x000003ff, \
+				0x0000001e, \
+				CFG_VALUE_OR_DEFAULT, \
 				"Wlan logging to console")
 
 #define CFG_WLAN_LOGGING_SUPPORT_ALL \
@@ -495,6 +512,41 @@ enum hdd_runtime_pm_cfg {
 	CFG(CFG_ENABLE_RUNTIME_PM)
 #else
 #define CFG_ENABLE_RUNTIME_PM_ALL
+#endif
+
+#ifdef WLAN_FEATURE_WMI_SEND_RECV_QMI
+/*
+ * <ini>
+ * enable_qmi_stats - enable periodic stats over qmi
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to enable periodic stats over qmi if DUT is
+ * in RTPM suspended state to avoid WoW enter/exit for every stats
+ * request.
+ *
+ * 0: Periodic stats over QMI is disabled
+ * 1: Periodic stats over QMI is enabled
+ * Related: None
+ *
+ * Supported Feature: Power Save
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_QMI_STATS CFG_INI_UINT( \
+		"enable_qmi_stats", \
+		0, \
+		1, \
+		1, \
+		CFG_VALUE_OR_DEFAULT, \
+		"This ini is used to enable periodic stats over qmi")
+#define CFG_ENABLE_QMI_STATS_ALL \
+	CFG(CFG_ENABLE_QMI_STATS)
+#else
+#define CFG_ENABLE_QMI_STATS_ALL
 #endif
 
 /*
@@ -1224,6 +1276,39 @@ struct dhcp_server {
 	"", \
 	"Used to specify action OUIs to control edca configuration")
 
+/*
+ * <ini>
+ * gActionOUIReconnAssocTimeout - Used to specify action OUIs to
+ * reconnect to same BSSID when wait for association response timeout
+ *
+ * This ini is used to specify AP OUIs. Some of AP doesn't response our
+ * first association request, but it would response our second association
+ * request. Add such OUI configuration INI to apply reconnect logic when
+ * association timeout happends with such AP.
+ * For default:
+ *     gActionOUIReconnAssocTimeout=00E04C 00 01
+ *          Explain: 00E04C: OUI
+ *                   00: data length is 0
+ *                   01: info mask, only OUI present in Info mask
+ * Note: User should strictly add new action OUIs at the end of this
+ * default value.
+ * Refer to gEnableActionOUI for more detail about the format.
+ *
+ * Related: gEnableActionOUI
+ *
+ * Supported Feature: Action OUIs
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ACTION_OUI_RECONN_ASSOCTIMEOUT CFG_INI_STRING( \
+	"gActionOUIReconnAssocTimeout", \
+	0, \
+	ACTION_OUI_MAX_STR_LEN, \
+	"00E04C 00 01", \
+	"Used to specify action OUIs to reconnect when assoc timeout")
+
 /* End of action oui inis */
 
 #ifdef ENABLE_MTRACE_LOG
@@ -1362,6 +1447,95 @@ struct dhcp_server {
 			CFG_VALUE_OR_DEFAULT, \
 			"Disable wow feature")
 
+/*
+ * <ini>
+ * nb_commands_interval - Used to rate limit nb commands from userspace
+ *
+ * @Min: 0
+ * @Max: 10
+ * Default: 3
+ *
+ * This ini is used to specify the duration in which any supp. nb command from
+ * userspace will not be processed completely in driver. For ex, the default
+ * value of 3 seconds signifies that consecutive commands within that
+ * time will not be processed fully.
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_NB_COMMANDS_RATE_LIMIT CFG_INI_UINT( \
+			"nb_commands_interval", \
+			0, \
+			10, \
+			3, \
+			CFG_VALUE_OR_DEFAULT, \
+			"Rate limiting for nb commands")
+
+#ifdef WLAN_FEATURE_PERIODIC_STA_STATS
+/*
+ * <ini>
+ * periodic_stats_timer_interval - Print selective stats on this specified
+ *				   interval
+ *
+ * @Min: 0
+ * @Max: 10000
+ * Default: 3000
+ *
+ * This ini is used to specify interval in milliseconds for periodic stats
+ * timer. This timer will print selective stats after expiration of each
+ * interval. STA starts this periodic timer after initial connection or after
+ * roaming is successful. This will be restarted for every
+ * periodic_stats_timer_interval till the periodic_stats_timer_duration expires.
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_PERIODIC_STATS_TIMER_INTERVAL  CFG_INI_UINT( \
+				"periodic_stats_timer_interval", \
+				0, \
+				10000, \
+				3000, \
+				CFG_VALUE_OR_DEFAULT, \
+				"Periodic stats timer interval")
+
+/*
+ * <ini>
+ * periodic_stats_timer_duration - Used as duration for which periodic timer
+ *				   should run
+ *
+ * @Min: 0
+ * @Max: 60000
+ * Default: 30000
+ *
+ * This ini is used as duration in milliseconds for which periodic stats timer
+ * should run. This periodic timer will print selective stats for every
+ * periodic_stats_timer_interval until this duration is reached.
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_PERIODIC_STATS_TIMER_DURATION  CFG_INI_UINT( \
+			"periodic_stats_timer_duration", \
+			0, \
+			60000, \
+			30000, \
+			CFG_VALUE_OR_DEFAULT, \
+			"Periodic stats timer duration")
+
+#define CFG_WLAN_STA_PERIODIC_STATS \
+	 CFG(CFG_PERIODIC_STATS_TIMER_DURATION) \
+	 CFG(CFG_PERIODIC_STATS_TIMER_INTERVAL)
+#else
+#define CFG_WLAN_STA_PERIODIC_STATS
+#endif /* WLAN_FEATURE_PERIODIC_STA_STATS */
+
 /**
  * enum host_log_level - Debug verbose level imposed by user
  * @HOST_LOG_LEVEL_NONE: no trace will be logged.
@@ -1475,9 +1649,11 @@ enum host_log_level {
 #define CFG_HDD_ALL \
 	CFG_ENABLE_PACKET_LOG_ALL \
 	CFG_ENABLE_RUNTIME_PM_ALL \
+	CFG_ENABLE_QMI_STATS_ALL \
 	CFG_VC_MODE_BITMAP_ALL \
 	CFG_WLAN_AUTO_SHUTDOWN_ALL \
 	CFG_WLAN_LOGGING_SUPPORT_ALL \
+	CFG_WLAN_STA_PERIODIC_STATS \
 	CFG(CFG_ACTION_OUI_CCKM_1X1) \
 	CFG(CFG_ACTION_OUI_CONNECT_1X1) \
 	CFG(CFG_ACTION_OUI_CONNECT_1X1_WITH_1_CHAIN) \
@@ -1487,6 +1663,7 @@ enum host_log_level {
 	CFG(CFG_ACTION_OUI_FORCE_MAX_NSS) \
 	CFG(CFG_ACTION_OUI_DISABLE_AGGRESSIVE_EDCA) \
 	CFG(CFG_ACTION_OUI_SWITCH_TO_11N_MODE) \
+	CFG(CFG_ACTION_OUI_RECONN_ASSOCTIMEOUT) \
 	CFG(CFG_ADVERTISE_CONCURRENT_OPERATION) \
 	CFG(CFG_BUG_ON_REINIT_FAILURE) \
 	CFG(CFG_DBS_SCAN_SELECTION) \
@@ -1507,6 +1684,7 @@ enum host_log_level {
 	CFG(CFG_PRIVATE_WEXT_CONTROL) \
 	CFG(CFG_PROVISION_INTERFACE_POOL) \
 	CFG(CFG_TIMER_MULTIPLIER) \
+	CFG(CFG_NB_COMMANDS_RATE_LIMIT) \
 	CFG(CFG_HDD_DOT11_MODE) \
 	CFG(CFG_ENABLE_DISABLE_CHANNEL) \
 	CFG(CFG_SAR_CONVERSION) \

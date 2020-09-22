@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -193,35 +193,31 @@
 
 /*
  * <ini>
- * gEnablePowerSaveOffload - Enable Power Save Offload
+ * gOptimizedPowerManagement - Optimized Power Management
  * @Min: 0
- * @Max: 5
- * @Default: 2
+ * @Max: 1
+ * @Default: 1
  *
- * This ini is used to set Power Save Offload configuration:
- * Current values of gEnablePowerSaveOffload:
- * 0 -> Power save offload is disabled
- * 1 -> Legacy Power save enabled + Deep sleep Disabled
- * 2 -> QPower enabled + Deep sleep Disabled
- * 3 -> Legacy Power save enabled + Deep sleep Enabled
- * 4 -> QPower enabled + Deep sleep Enabled
- * 5 -> Duty cycling QPower enabled
+ * This ini is used to set Optimized Power Management configuration:
+ * Current values of gOptimizedPowerManagement:
+ * 0 -> Disable optimized power management
+ * 1 -> Enable optimized power management
  *
  * Related: None
  *
- * Supported Feature: Power Save
+ * Supported Feature: Optimized Power Management
  *
  * Usage: External
  *
  * </ini>
  */
-#define CFG_PMO_POWERSAVE_OFFLOAD CFG_INI_UINT( \
-	"gEnablePowerSaveOffload", \
+#define CFG_PMO_POWERSAVE_MODE CFG_INI_UINT( \
+	"gOptimizedPowerManagement", \
 	0, \
-	5, \
-	2, \
+	1, \
+	1, \
 	CFG_VALUE_OR_DEFAULT, \
-	"Enable Power Save Offload")
+	"Optimized Power Management")
 
 /*
  * <ini>
@@ -269,46 +265,6 @@
 					0, 3, 3, \
 					CFG_VALUE_OR_DEFAULT, \
 					"Enable WoW Support")
-/*
- * <ini>
- * wowlan_deauth_enable - Enable/Disable wowlan deauth enable
- * @Min: 0
- * @Max: 1
- * @Default: 1
- *
- * This ini is used to enable/disable wowlan deauth enable.
- *
- * Related: None
- *
- * Supported Feature: Power Save
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_PMO_WOWLAN_DEAUTH_ENABLE CFG_INI_BOOL("wowlan_deauth_enable", \
-						  1, \
-						  "Enable WoWLan deauth")
-/*
- * <ini>
- * wowlan_disassoc_enable - Enable/Disable wowlan disassoc enable
- * @Min: 0
- * @Max: 1
- * @Default: 1
- *
- * This ini is used to enable/disable wowlan disassoc enable.
- *
- * Related: None
- *
- * Supported Feature: Power Save
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_PMO_WOWLAN_DISASSOC_ENABLE CFG_INI_BOOL("wowlan_disassoc_enable", \
-						    1, \
-						    "Enable WoW Support")
 
 /*
  * <ini>
@@ -429,10 +385,8 @@
 	CFG(CFG_PMO_ENABLE_DYNAMIC_DTIM) \
 	CFG(CFG_PMO_ENABLE_MODULATED_DTIM) \
 	CFG(CFG_PMO_MC_ADDR_LIST_ENABLE) \
-	CFG(CFG_PMO_POWERSAVE_OFFLOAD) \
+	CFG(CFG_PMO_POWERSAVE_MODE) \
 	CFG(CFG_PMO_MAX_PS_POLL) \
-	CFG(CFG_PMO_WOWLAN_DEAUTH_ENABLE) \
-	CFG(CFG_PMO_WOWLAN_DISASSOC_ENABLE) \
 	CFG(CFG_PMO_WOW_ENABLE) \
 	CFG(CFG_PMO_ACTIVE_MODE) \
 	CFG(CFG_PMO_PWR_FAILURE) \

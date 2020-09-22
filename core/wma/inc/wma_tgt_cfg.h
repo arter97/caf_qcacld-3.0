@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -43,6 +43,7 @@
  * @twt_requestor: TWT requestor capability
  * @twt_responder: TWT responder capability
  * @bcn_reception_stats: Beacon Reception stats capability
+ * @is_roam_scan_ch_to_host: Get roam scan channels from fw supported
  */
 struct wma_tgt_services {
 	uint32_t sta_power_save;
@@ -75,6 +76,7 @@ struct wma_tgt_services {
 	bool twt_responder;
 	bool obss_scan_offload;
 	bool bcn_reception_stats;
+	bool is_roam_scan_ch_to_host;
 };
 
 /**
@@ -155,7 +157,7 @@ struct board_info {
  * struct wma_tgt_cfg - target config
  * @target_fw_version: target fw version
  * @target_fw_vers_ext: target fw extended sub version
- * @band_cap: band capability
+ * @band_cap: band capability bitmap
  * @reg_domain: reg domain
  * @eeprom_rd_ext: eeprom rd ext
  * @hw_macaddr: hw mcast addr
@@ -180,7 +182,7 @@ struct board_info {
 struct wma_tgt_cfg {
 	uint32_t target_fw_version;
 	uint32_t target_fw_vers_ext;
-	uint8_t band_cap;
+	uint32_t band_cap;
 	uint32_t reg_domain;
 	uint32_t eeprom_rd_ext;
 	struct qdf_mac_addr hw_macaddr;
@@ -204,6 +206,8 @@ struct wma_tgt_cfg {
 	uint8_t ppet_5g[HE_MAX_PPET_SIZE];
 	tDot11fIEhe_cap he_cap_2g;
 	tDot11fIEhe_cap he_cap_5g;
+	uint16_t he_mcs_12_13_supp_2g;
+	uint16_t he_mcs_12_13_supp_5g;
 #endif
 	bool dfs_cac_offload;
 	bool tx_bfee_8ss_enabled;

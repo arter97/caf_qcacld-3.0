@@ -267,7 +267,6 @@ typedef struct sSirProbeRespBeacon {
 	tDot11fIEvendor_vht_ie vendor_vht_ie;
 	uint8_t Vendor3IEPresent;
 	tDot11fIEhs20vendor_ie hs20vendor_ie;
-	tDot11fIEIBSSParams IBSSParams;
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE
 	tDot11fIEQComVendorIE   AvoidChannelIE;
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
@@ -455,6 +454,7 @@ typedef struct sSirAssocRsp {
 #ifdef WLAN_FEATURE_11W
 	tDot11fIETimeoutInterval TimeoutInterval;
 #endif
+	tDot11fIERRMEnabledCap rrm_caps;
 	tDot11fIEvendor_vht_ie vendor_vht_ie;
 	tDot11fIEOBSSScanParameters obss_scanparams;
 	tDot11fTLVrssi_assoc_rej rssi_assoc_rej;
@@ -483,7 +483,6 @@ typedef struct sSirEseBcnReportMandatoryIe {
 	tSirMacFHParamSet fhParamSet;
 	tSirMacDsParamSetIE dsParamSet;
 	tSirMacCfParamSet cfParamSet;
-	tSirMacIBSSParams ibssParamSet;
 	tSirMacTim tim;
 	tSirMacRRMEnabledCap rmEnabledCapabilities;
 
@@ -492,7 +491,6 @@ typedef struct sSirEseBcnReportMandatoryIe {
 	uint8_t fhParamPresent;
 	uint8_t dsParamsPresent;
 	uint8_t cfPresent;
-	uint8_t ibssParamPresent;
 	uint8_t timPresent;
 	uint8_t rrmPresent;
 } tSirEseBcnReportMandatoryIe, *tpSirEseBcnReportMandatoryIe;
@@ -584,6 +582,9 @@ struct s_ext_cap {
 	uint8_t reserved7:2;
 	uint8_t twt_requestor_support:1;
 	uint8_t twt_responder_support:1;
+	uint8_t reserved8: 1;
+	uint8_t reserved9: 4;
+	uint8_t beacon_protection_enable: 1;
 };
 
 void swap_bit_field16(uint16_t in, uint16_t *out);
@@ -776,9 +777,6 @@ QDF_STATUS
 populate_dot11f_ht_info(struct mac_context *mac,
 			tDot11fIEHTInfo *pDot11f, struct pe_session *pe_session);
 
-void populate_dot11f_ibss_params(struct mac_context *mac,
-				tDot11fIEIBSSParams *pDot11f,
-				struct pe_session *pe_session);
 
 #ifdef ANI_SUPPORT_11H
 QDF_STATUS
@@ -1068,6 +1066,7 @@ populate_dot11f_ext_cap(struct mac_context *mac, bool isVHTEnabled,
 			tDot11fIEExtCap *pDot11f, struct pe_session *pe_session);
 
 void populate_dot11f_qcn_ie(struct mac_context *mac,
+			    struct pe_session *pe_session,
 			    tDot11fIEqcn_ie *qcn_ie,
 			    uint8_t attr_id);
 

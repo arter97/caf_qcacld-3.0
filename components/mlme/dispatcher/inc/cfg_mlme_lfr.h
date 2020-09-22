@@ -2150,6 +2150,28 @@
 
 /*
  * <ini>
+ * enable_self_bss_roam - enable/disable roaming to self bss
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This INI is used to enable/disable roaming to already connected BSSID
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_LFR3_ENABLE_SELF_BSS_ROAM CFG_INI_BOOL( \
+	"enable_self_bss_roam", \
+	0, \
+	"enable self bss roam")
+
+/*
+ * <ini>
  * enable_disconnect_roam_offload - Enable/Disable emergency roaming during
  * deauth/disassoc
  * @Min: 0 - Disabled
@@ -2340,8 +2362,116 @@
 	CFG_VALUE_OR_DEFAULT, \
 	"Band on which idle roam needs to be enabled")
 
+/*
+ * <ini>
+ * roam_triggers - Bitmap of roaming triggers. Setting this to
+ * zero will disable roaming altogether for the STA interface.
+ * ESS report element of beacon explores BSS information, for roaming station
+ * uses it to consider next AP to roam. ROAM_TRIGGER_REASON_ESS_RSSI bit is
+ * to enable/disable roam trigger for ESS RSSI reason. This bit of ini is also
+ * used for WFA certification.
+ * @Min: 0
+ * @Max: 0xFFFFFFFF
+ * @Default: 0x1FFFF
+ *
+ * ROAM_TRIGGER_REASON_PER         BIT 1
+ * ROAM_TRIGGER_REASON_BMISS       BIT 2
+ * ROAM_TRIGGER_REASON_LOW_RSSI    BIT 3
+ * ROAM_TRIGGER_REASON_HIGH_RSSI   BIT 4
+ * ROAM_TRIGGER_REASON_PERIODIC    BIT 5
+ * ROAM_TRIGGER_REASON_MAWC        BIT 6
+ * ROAM_TRIGGER_REASON_DENSE       BIT 7
+ * ROAM_TRIGGER_REASON_BACKGROUND  BIT 8
+ * ROAM_TRIGGER_REASON_FORCED      BIT 9
+ * ROAM_TRIGGER_REASON_BTM         BIT 10
+ * ROAM_TRIGGER_REASON_UNIT_TEST   BIT 11
+ * ROAM_TRIGGER_REASON_BSS_LOAD    BIT 12
+ * ROAM_TRIGGER_REASON_DEAUTH      BIT 13
+ * ROAM_TRIGGER_REASON_IDLE        BIT 14
+ * ROAM_TRIGGER_REASON_STA_KICKOUT BIT 15
+ * ROAM_TRIGGER_REASON_ESS_RSSI    BIT 16
+ * ROAM_TRIGGER_REASON_MAX         BIT 17
+ *
+ * Related: none
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ROAM_TRIGGER_BITMAP CFG_INI_UINT( \
+			"roam_triggers", \
+			0, \
+			0xFFFFFFFF, \
+			0x1FFFF, \
+			CFG_VALUE_OR_DEFAULT, \
+			"Bitmap of roaming triggers")
+
+/*
+ * <ini>
+ * sta_disable_roam - Disable Roam on sta interface
+ * @Min: 0 - Roam Enabled on sta interface
+ * @Max: 0xffffffff - Roam Disabled on sta interface irrespective
+ * of other interface connections
+ * @Default: 0x00
+ *
+ * Disable roaming on STA iface to avoid audio glitches on p2p and ndp if
+ * those are in connected state. Each bit for "sta_disable_roam" INI represents
+ * an interface for which sta roaming can be disabled.
+ *
+ * LFR3_STA_ROAM_DISABLE_BY_P2P BIT(0)
+ * LFR3_STA_ROAM_DISABLE_BY_NAN BIT(1)
+ *
+ * Related: None.
+ *
+ * Supported Feature: ROAM
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_STA_DISABLE_ROAM CFG_INI_UINT( \
+		"sta_disable_roam", \
+		0, \
+		0xffffffff, \
+		0x00, \
+		CFG_VALUE_OR_DEFAULT, \
+		"disable roam on STA iface if one of the iface mentioned in default is in connected state")
+
+/*
+ * <ini>
+ * enable_dual_sta_roam_offload - Enable roaming offload on both interfaces
+ * for STA + STA
+ * @Min: 0 - Dual STA Roam offload Disabled
+ * @Max: 1 - Dual STA Roam offload Enabled
+ * @Default: 1
+ *
+ * Enabling this ini will:
+ *  a) Enforce the STA + STA connection be DBS if the hw is capable.
+ *  b) Enable Roam Scan Offload on both the STA vdev.
+ *  c) Enable firmware to support sequential roaming on both STA vdev
+ *     if the firmware is capable of dual sta roaming.
+ *
+ * Related: None.
+ *
+ * Supported Feature: ROAM
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_DUAL_STA_ROAM_OFFLOAD CFG_INI_UINT( \
+		"enable_dual_sta_roam_offload", \
+		false, \
+		true, \
+		true, \
+		CFG_VALUE_OR_DEFAULT, \
+		"Enable roam on both STA vdev")
+
 #define ROAM_OFFLOAD_ALL \
 	CFG(CFG_LFR3_ROAMING_OFFLOAD) \
+	CFG(CFG_LFR3_ENABLE_SELF_BSS_ROAM) \
 	CFG(CFG_LFR_ENABLE_DISCONNECT_ROAM) \
 	CFG(CFG_LFR_ENABLE_IDLE_ROAM) \
 	CFG(CFG_LFR_IDLE_ROAM_RSSI_DELTA) \
@@ -2349,6 +2479,9 @@
 	CFG(CFG_LFR_IDLE_ROAM_PACKET_COUNT) \
 	CFG(CFG_LFR_IDLE_ROAM_MIN_RSSI) \
 	CFG(CFG_LFR_IDLE_ROAM_BAND) \
+	CFG(CFG_ROAM_TRIGGER_BITMAP) \
+	CFG(CFG_STA_DISABLE_ROAM) \
+	CFG(CFG_ENABLE_DUAL_STA_ROAM_OFFLOAD) \
 
 #else
 #define ROAM_OFFLOAD_ALL
@@ -2414,6 +2547,34 @@
 #define LFR_SUBNET_DETECTION_ALL
 #endif
 
+#if defined(WLAN_SAE_SINGLE_PMK) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
+/*
+ * <ini>
+ * sae_single_pmk_feature_enabled - Enable/disable sae single pmk feature.
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This INI is to enable/disable SAE Roaming with same PMK/PMKID feature support
+ *
+ * Related: None.
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_SAE_SINGLE_PMK CFG_INI_BOOL( \
+		"sae_single_pmk_feature_enabled", \
+		false, \
+		"Enable/disable SAE Roaming with single PMK/PMKID")
+
+#define SAE_SINGLE_PMK_ALL CFG(CFG_SAE_SINGLE_PMK)
+#else
+#define SAE_SINGLE_PMK_ALL
+#endif
+
 #ifdef WLAN_ADAPTIVE_11R
 /*
  * <ini>
@@ -2473,6 +2634,31 @@
 		"roaming_scan_policy", \
 		0, \
 		"Config roam scan policy")
+
+/*
+ * <ini>
+ * enable_ft_im_roaming - FW needs to perform FT initial moiblity association
+ * instead of FT roaming for deauth roam trigger
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to FT roaming for deauth roam trigger behavior from HOST
+ * 0 - To disable FT-IM
+ * 1 - To enable FT-IM
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_FT_IM_ROAMING CFG_INI_BOOL( \
+		"enable_ft_im_roaming", \
+		1, \
+		"FT roaming for deauth roam trigger")
 
 /*
  * <ini>
@@ -2571,6 +2757,36 @@
 	CFG_VALUE_OR_DEFAULT, \
 	"Roam scan period post inactivity")
 
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+/*
+ * <ini>
+ * enable_roam_reason_vsie - Enable/Disable inclusion of Roam Reason
+ * in Re(association) frame
+ *
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable fw to include/exclude roam reason vsie in
+ * Re(association)
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: internal
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_ROAM_REASON_VSIE CFG_INI_BOOL( \
+		"enable_roam_reason_vsie", \
+		0, \
+		"To Enable enable_roam_reason_vsie")
+#define ROAM_REASON_VSIE_ALL CFG(CFG_ENABLE_ROAM_REASON_VSIE)
+#else
+#define ROAM_REASON_VSIE_ALL
+#endif
+
 #define CFG_LFR_ALL \
 	CFG(CFG_LFR_MAWC_ROAM_ENABLED) \
 	CFG(CFG_LFR_MAWC_ROAM_TRAFFIC_THRESHOLD) \
@@ -2650,6 +2866,7 @@
 	CFG(CFG_LFR_ROAM_FORCE_RSSI_TRIGGER) \
 	CFG(CFG_ROAM_SCAN_SCAN_POLICY) \
 	CFG(CFG_ROAM_SCAN_INACTIVITY_TIME) \
+	CFG(CFG_FT_IM_ROAMING) \
 	CFG(CFG_ROAM_INACTIVE_COUNT) \
 	CFG(CFG_POST_INACTIVITY_ROAM_SCAN_PERIOD) \
 	CFG(CFG_BSS_LOAD_TRIG_5G_RSSI_THRES) \
@@ -2658,6 +2875,8 @@
 	ADAPTIVE_11R_ALL \
 	ROAM_OFFLOAD_ALL \
 	LFR_ESE_ALL \
-	LFR_SUBNET_DETECTION_ALL
+	LFR_SUBNET_DETECTION_ALL \
+	SAE_SINGLE_PMK_ALL \
+	ROAM_REASON_VSIE_ALL
 
 #endif /* CFG_MLME_LFR_H__ */

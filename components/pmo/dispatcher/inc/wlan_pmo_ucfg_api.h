@@ -686,24 +686,6 @@ ucfg_pmo_set_wow_enable(struct wlan_objmgr_psoc *psoc,
 			enum pmo_wow_enable_type val);
 
 /**
- * ucfg_pmo_is_wowlan_deauth_enabled() - Get wowlan deauth enable
- * @psoc: pointer to psoc object
- *
- * Return: wowlan deauth enable or not
- */
-bool
-ucfg_pmo_is_wowlan_deauth_enabled(struct wlan_objmgr_psoc *psoc);
-
-/**
- * ucfg_pmo_is_wowlan_disassoc_enabled() - Get wowlan disassoc enable
- * @psoc: pointer to psoc object
- *
- * Return: wowlan disassoc enable
- */
-bool
-ucfg_pmo_is_wowlan_disassoc_enabled(struct wlan_objmgr_psoc *psoc);
-
-/**
  * ucfg_pmo_get_gtk_rsp(): API to send gtk response request to fwr
  * @vdev: objmgr vdev handle
  * @gtk_rsp: pmo gtk response request
@@ -1028,6 +1010,22 @@ uint16_t ucfg_pmo_get_wow_pulse_interval_high(struct wlan_objmgr_psoc *psoc);
  * Return: wow pulse interval high configuration
  */
 uint16_t ucfg_pmo_get_wow_pulse_interval_low(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_pmo_get_wow_pulse_repeat_count() - to get wow pulse repeat count
+ * @psoc: objmgr psoc handle
+ *
+ * Return: wow pulse repeat count configuration
+ */
+uint32_t ucfg_pmo_get_wow_pulse_repeat_count(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_pmo_get_wow_pulse_init_state() - to get wow pulse init state
+ * @psoc: objmgr psoc handle
+ *
+ * Return: wow pulse init state configuration
+ */
+uint32_t ucfg_pmo_get_wow_pulse_init_state(struct wlan_objmgr_psoc *psoc);
 #else
 static inline bool
 ucfg_pmo_is_wow_pulse_enabled(struct wlan_objmgr_psoc *psoc)
@@ -1043,6 +1041,18 @@ ucfg_pmo_get_wow_pulse_pin(struct wlan_objmgr_psoc *psoc)
 
 static inline uint16_t
 ucfg_pmo_get_wow_pulse_interval_high(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
+}
+
+static inline uint32_t
+ucfg_pmo_get_wow_pulse_repeat_count(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
+}
+
+static inline uint32_t
+ucfg_pmo_get_wow_pulse_init_state(struct wlan_objmgr_psoc *psoc)
 {
 	return 0;
 }

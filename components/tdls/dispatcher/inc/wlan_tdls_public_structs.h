@@ -397,6 +397,11 @@ struct tx_frame {
 	qdf_timer_t tx_timer;
 };
 
+enum tdls_configured_external_control {
+	TDLS_STRICT_EXTERNAL_CONTROL = 1,
+	TDLS_LIBERAL_EXTERNAL_CONTROL = 2,
+};
+
 /**
  * enum tdls_feature_bit
  * @TDLS_FEATURE_OFF_CHANNEL: tdls off channel
@@ -406,7 +411,8 @@ struct tx_frame {
  * @TDLS_FEATURE_SCAN: tdls scan
  * @TDLS_FEATURE_ENABLE: tdls enabled
  * @TDLS_FEAUTRE_IMPLICIT_TRIGGER: tdls implicit trigger
- * @TDLS_FEATURE_EXTERNAL_CONTROL: tdls external control
+ * @TDLS_FEATURE_EXTERNAL_CONTROL: enforce strict tdls external control
+ * @TDLS_FEATURE_LIBERAL_EXTERNAL_CONTROL: liberal external tdls control
  */
 enum tdls_feature_bit {
 	TDLS_FEATURE_OFF_CHANNEL,
@@ -416,7 +422,8 @@ enum tdls_feature_bit {
 	TDLS_FEATURE_SCAN,
 	TDLS_FEATURE_ENABLE,
 	TDLS_FEAUTRE_IMPLICIT_TRIGGER,
-	TDLS_FEATURE_EXTERNAL_CONTROL
+	TDLS_FEATURE_EXTERNAL_CONTROL,
+	TDLS_FEATURE_LIBERAL_EXTERNAL_CONTROL,
 };
 
 #define TDLS_IS_OFF_CHANNEL_ENABLED(flags) \
@@ -435,6 +442,8 @@ enum tdls_feature_bit {
 	CHECK_BIT(flags, TDLS_FEAUTRE_IMPLICIT_TRIGGER)
 #define TDLS_IS_EXTERNAL_CONTROL_ENABLED(flags) \
 	CHECK_BIT(flags, TDLS_FEATURE_EXTERNAL_CONTROL)
+#define TDLS_IS_LIBERAL_EXTERNAL_CONTROL_ENABLED(flags) \
+	CHECK_BIT(flags, TDLS_FEATURE_LIBERAL_EXTERNAL_CONTROL)
 
 /**
  * struct tdls_user_config - TDLS user configuration
@@ -495,7 +504,7 @@ struct tdls_user_config {
 	bool tdls_off_chan_enable;
 	bool tdls_off_chan_enable_orig;
 	bool tdls_wmm_mode_enable;
-	bool tdls_external_control;
+	uint8_t tdls_external_control;
 	bool tdls_implicit_trigger_enable;
 	bool tdls_scan_enable;
 	bool tdls_sleep_sta_enable;
@@ -650,7 +659,6 @@ typedef void (*tdls_vdev_deinit_cb)(struct wlan_objmgr_vdev *vdev);
  * @tdls_evt_cb_data: tdls event data
  * @tdls_peer_context: userdata for register/deregister TDLS peer
  * @tdls_reg_peer: register tdls peer with datapath
- * @tdls_dereg_peer: deregister tdls peer from datapath
  * @tdls_dp_vdev_update: update vdev flags in datapath
  * @tdls_osif_init_cb: callback to initialize the tdls priv
  * @tdls_osif_deinit_cb: callback to deinitialize the tdls priv
@@ -671,7 +679,6 @@ struct tdls_start_params {
 	void *tdls_evt_cb_data;
 	void *tdls_peer_context;
 	tdls_register_peer_callback tdls_reg_peer;
-	tdls_deregister_peer_callback tdls_dereg_peer;
 	tdls_dp_vdev_update_flags_callback tdls_dp_vdev_update;
 	tdls_vdev_init_cb tdls_osif_init_cb;
 	tdls_vdev_deinit_cb tdls_osif_deinit_cb;

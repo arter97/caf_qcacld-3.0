@@ -214,30 +214,26 @@ void pmo_core_disable_wakeup_event(struct wlan_objmgr_psoc *psoc,
 	struct wlan_objmgr_vdev *vdev;
 	uint32_t bitmap[PMO_WOW_MAX_EVENT_BM_LEN] = {0};
 
-	pmo_enter();
 	if (!psoc) {
 		pmo_err("psoc is null");
-		goto out;
+		return;
 	}
 
 	vdev = pmo_psoc_get_vdev(psoc, vdev_id);
 	if (!vdev) {
 		pmo_err("vdev is NULL");
-		goto out;
+		return;
 	}
 
 	status = pmo_vdev_get_ref(vdev);
 	if (QDF_IS_STATUS_ERROR(status))
-		goto out;
+		return;
 
 	pmo_set_wow_event_bitmap(wow_event, PMO_WOW_MAX_EVENT_BM_LEN, bitmap);
 
 	pmo_tgt_disable_wow_wakeup_event(vdev, bitmap);
 
 	pmo_vdev_put_ref(vdev);
-
-out:
-	pmo_exit();
 }
 
 /**
@@ -433,6 +429,9 @@ void pmo_set_sta_wow_bitmask(uint32_t *bitmask, uint32_t wow_bitmap_size)
 	pmo_set_wow_event_bitmap(WOW_ROAM_PMKID_REQUEST_EVENT,
 				 wow_bitmap_size,
 				 bitmask);
+	pmo_set_wow_event_bitmap(WOW_VDEV_DISCONNECT_EVENT,
+				 wow_bitmap_size,
+				 bitmask);
 }
 
 void pmo_set_sap_wow_bitmask(uint32_t *bitmask, uint32_t wow_bitmap_size)
@@ -486,3 +485,16 @@ uint8_t pmo_get_num_wow_filters(struct wlan_objmgr_psoc *psoc)
 	return PMO_WOW_FILTERS_PKT_OR_APF;
 }
 
+#ifdef WLAN_FEATURE_NAN
+void pmo_set_ndp_wow_bitmask(uint32_t *bitmask, uint32_t wow_bitmap_size)
+{
+	/* wake up host when Nan Management Frame is received */
+	pmo_set_wow_event_bitmap(WOW_NAN_DATA_EVENT,
+				 wow_bitmap_size,
+				 bitmask);
+	/* wake up host when NDP data packet is received */
+	pmo_set_wow_event_bitmap(WOW_PATTERN_MATCH_EVENT,
+				 wow_bitmap_size,
+				 bitmask);
+}
+#endif
