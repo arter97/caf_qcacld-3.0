@@ -380,6 +380,27 @@
 
 /*
  * <ini>
+ * g_runtime_pdev_suspend - Enable/disable runtime PDEV suspend
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ *
+ * Related: None
+ *
+ * Supported Feature: enable/disable runtime PDEV suspend
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_RUNTIME_PDEV_SUSPEND CFG_INI_BOOL( \
+			"g_runtime_pdev_suspend", \
+			0, \
+			"Enable/disable runtime pdev suspend")
+
+/*
+ * <ini>
  * g_wow_data_inactivity_timeout - Data activity timeout in wow mode.
  * @Min: 1
  * @Max: 255
@@ -437,6 +458,7 @@
 	CFG(CFG_PMO_ACTIVE_MODE) \
 	CFG(CFG_PMO_PWR_FAILURE) \
 	CFG(CFG_PMO_WOW_DATA_INACTIVITY_TIMEOUT) \
-	CFG(CFG_RA_RATE_LIMIT_INTERVAL)
+	CFG(CFG_RA_RATE_LIMIT_INTERVAL) \
+	CFG(CFG_RUNTIME_PDEV_SUSPEND)
 
 #endif /* WLAN_PMO_COMMON_CFG_H__ */

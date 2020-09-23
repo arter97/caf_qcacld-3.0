@@ -403,6 +403,7 @@ struct pmo_psoc_cfg {
 	enum active_apf_mode active_uc_apf_mode;
 	enum active_apf_mode active_mc_bc_apf_mode;
 	uint8_t ito_repeat_count;
+	bool runtime_pdev_suspend;
 };
 
 /**
