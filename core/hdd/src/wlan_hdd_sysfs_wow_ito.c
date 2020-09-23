@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -17,35 +17,32 @@
  */
 
 /**
- * DOC: wlan_hdd_sysfs_set_fw_mode_cfg.c
+ * DOC: wlan_hdd_sysfs_wow_ito.c
  *
- * implementation for creating sysfs file set_fw_mode_cfg
+ * implementation for creating sysfs wow_ito
  */
 
 #include <wlan_hdd_includes.h>
 #include "osif_psoc_sync.h"
 #include <wlan_hdd_sysfs.h>
-#include <wlan_hdd_sysfs_set_fw_mode_cfg.h>
-#include "wlan_policy_mgr_ucfg.h"
+#include <wlan_hdd_sysfs_wow_ito.h>
+#include "wlan_pmo_ucfg_api.h"
+#include "cfg_ucfg_api.h"
 
 static ssize_t
-__wlan_hdd_store_set_fw_mode_cfg_sysfs(struct hdd_context *hdd_ctx,
-				       struct kobj_attribute *attr,
-				       const char *buf,
-				       size_t count)
+__hdd_sysfs_wow_ito_store(struct hdd_context *hdd_ctx,
+			  struct kobj_attribute *attr,
+			  const char *buf, size_t count)
 {
-	uint8_t dual_mac_feature = DISABLE_DBS_CXN_AND_SCAN;
 	char buf_local[MAX_SYSFS_USER_COMMAND_SIZE_LENGTH + 1];
 	char *sptr, *token;
-	uint32_t val1, val2;
-	QDF_STATUS status;
+	uint8_t value;
 	int ret;
 
-	ret = wlan_hdd_validate_context(hdd_ctx);
-	if (ret != 0)
-		return ret;
-
 	if (!wlan_hdd_validate_modules_state(hdd_ctx))
+		return -EINVAL;
+
+	if (!hdd_ctx->psoc)
 		return -EINVAL;
 
 	ret = hdd_sysfs_validate_and_copy_buf(buf_local, sizeof(buf_local),
@@ -55,45 +52,31 @@ __wlan_hdd_store_set_fw_mode_cfg_sysfs(struct hdd_context *hdd_ctx,
 		return ret;
 	}
 
-	hdd_debug("set_fw_mode_cfg: count %zu buf_local:(%s)",
+	sptr = buf_local;
+	hdd_debug("wow_ito: count %zu buf_local:(%s)",
 		  count, buf_local);
 
-	sptr = buf_local;
-	/* Get val1 */
+	/* Get value */
 	token = strsep(&sptr, " ");
 	if (!token)
 		return -EINVAL;
-	if (kstrtou32(token, 0, &val1))
+	if (kstrtou8(token, 0, &value))
 		return -EINVAL;
 
-	/* Get val2 */
-	token = strsep(&sptr, " ");
-	if (!token)
+	if (!cfg_in_range(CFG_PMO_WOW_DATA_INACTIVITY_TIMEOUT, value)) {
+		hdd_err_rl("Invalid value %d", value);
 		return -EINVAL;
-	if (kstrtou32(token, 0, &val2))
-		return -EINVAL;
-
-	hdd_debug("Sysfs to set dual fw mode config");
-	status = ucfg_policy_mgr_get_dual_mac_feature(hdd_ctx->psoc,
-						      &dual_mac_feature);
-	if (status != QDF_STATUS_SUCCESS)
-		hdd_err_rl("can't get dual mac feature val, use def");
-	if (dual_mac_feature == DISABLE_DBS_CXN_AND_SCAN) {
-		hdd_err_rl("Dual mac feature is disabled from INI");
-		return -EPERM;
 	}
-	hdd_debug("%d %d", val1, val2);
-	policy_mgr_set_dual_mac_fw_mode_config(hdd_ctx->psoc,
-					       val1, val2);
+
+	ucfg_pmo_set_wow_data_inactivity_timeout(hdd_ctx->psoc, value);
 
 	return count;
 }
 
 static ssize_t
-wlan_hdd_store_set_fw_mode_cfg_sysfs(struct kobject *kobj,
-				     struct kobj_attribute *attr,
-				     const char *buf,
-				     size_t count)
+hdd_sysfs_wow_ito_store(struct kobject *kobj,
+			struct kobj_attribute *attr,
+			const char *buf, size_t count)
 {
 	struct osif_psoc_sync *psoc_sync;
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
@@ -101,7 +84,7 @@ wlan_hdd_store_set_fw_mode_cfg_sysfs(struct kobject *kobj,
 	int ret;
 
 	ret = wlan_hdd_validate_context(hdd_ctx);
-	if (ret != 0)
+	if (ret)
 		return ret;
 
 	errno_size = osif_psoc_sync_op_start(wiphy_dev(hdd_ctx->wiphy),
@@ -109,19 +92,18 @@ wlan_hdd_store_set_fw_mode_cfg_sysfs(struct kobject *kobj,
 	if (errno_size)
 		return errno_size;
 
-	errno_size = __wlan_hdd_store_set_fw_mode_cfg_sysfs(hdd_ctx, attr,
-							    buf, count);
+	errno_size = __hdd_sysfs_wow_ito_store(hdd_ctx, attr, buf, count);
 
 	osif_psoc_sync_op_stop(psoc_sync);
 
 	return errno_size;
 }
 
-static struct kobj_attribute set_fw_mode_cfg_attribute =
-	__ATTR(set_fw_mode_cfg, 0220, NULL,
-	       wlan_hdd_store_set_fw_mode_cfg_sysfs);
+static struct kobj_attribute wow_ito_attribute =
+	__ATTR(wow_ito, 0220, NULL,
+	       hdd_sysfs_wow_ito_store);
 
-int hdd_sysfs_set_fw_mode_cfg_create(struct kobject *driver_kobject)
+int hdd_sysfs_wow_ito_create(struct kobject *driver_kobject)
 {
 	int error;
 
@@ -131,19 +113,19 @@ int hdd_sysfs_set_fw_mode_cfg_create(struct kobject *driver_kobject)
 	}
 
 	error = sysfs_create_file(driver_kobject,
-				  &set_fw_mode_cfg_attribute.attr);
+				  &wow_ito_attribute.attr);
 	if (error)
-		hdd_err("could not create set_fw_mode_cfg sysfs file");
+		hdd_err("could not create wow_ito sysfs file");
 
 	return error;
 }
 
 void
-hdd_sysfs_set_fw_mode_cfg_destroy(struct kobject *driver_kobject)
+hdd_sysfs_wow_ito_destroy(struct kobject *driver_kobject)
 {
 	if (!driver_kobject) {
 		hdd_err("could not get driver kobject!");
 		return;
 	}
-	sysfs_remove_file(driver_kobject, &set_fw_mode_cfg_attribute.attr);
+	sysfs_remove_file(driver_kobject, &wow_ito_attribute.attr);
 }

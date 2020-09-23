@@ -111,9 +111,8 @@ int wlan_hdd_tdls_get_all_peers(struct hdd_adapter *adapter,
 static const struct nla_policy
 	wlan_hdd_tdls_config_enable_policy[QCA_WLAN_VENDOR_ATTR_TDLS_ENABLE_MAX +
 					   1] = {
-	[QCA_WLAN_VENDOR_ATTR_TDLS_ENABLE_MAC_ADDR] = {
-		.type = NLA_UNSPEC,
-		.len = QDF_MAC_ADDR_SIZE},
+	[QCA_WLAN_VENDOR_ATTR_TDLS_ENABLE_MAC_ADDR] =
+		VENDOR_NLA_POLICY_MAC_ADDR,
 	[QCA_WLAN_VENDOR_ATTR_TDLS_ENABLE_CHANNEL] = {.type = NLA_U32},
 	[QCA_WLAN_VENDOR_ATTR_TDLS_ENABLE_GLOBAL_OPERATING_CLASS] = {.type =
 								NLA_U32},
@@ -124,16 +123,14 @@ static const struct nla_policy
 static const struct nla_policy
 	wlan_hdd_tdls_config_disable_policy[QCA_WLAN_VENDOR_ATTR_TDLS_DISABLE_MAX +
 					    1] = {
-	[QCA_WLAN_VENDOR_ATTR_TDLS_DISABLE_MAC_ADDR] = {
-		.type = NLA_UNSPEC,
-		.len = QDF_MAC_ADDR_SIZE},
+	[QCA_WLAN_VENDOR_ATTR_TDLS_DISABLE_MAC_ADDR] =
+		VENDOR_NLA_POLICY_MAC_ADDR,
 };
 static const struct nla_policy
 	wlan_hdd_tdls_config_state_change_policy[QCA_WLAN_VENDOR_ATTR_TDLS_STATE_MAX
 						 + 1] = {
-	[QCA_WLAN_VENDOR_ATTR_TDLS_STATE_MAC_ADDR] = {
-		.type = NLA_UNSPEC,
-		.len = QDF_MAC_ADDR_SIZE},
+	[QCA_WLAN_VENDOR_ATTR_TDLS_STATE_MAC_ADDR] =
+		VENDOR_NLA_POLICY_MAC_ADDR,
 	[QCA_WLAN_VENDOR_ATTR_TDLS_NEW_STATE] = {.type = NLA_U32},
 	[QCA_WLAN_VENDOR_ATTR_TDLS_STATE_REASON] = {.type = NLA_S32},
 	[QCA_WLAN_VENDOR_ATTR_TDLS_STATE_CHANNEL] = {.type = NLA_U32},
@@ -143,9 +140,8 @@ static const struct nla_policy
 static const struct nla_policy
 	wlan_hdd_tdls_config_get_status_policy
 [QCA_WLAN_VENDOR_ATTR_TDLS_GET_STATUS_MAX + 1] = {
-	[QCA_WLAN_VENDOR_ATTR_TDLS_GET_STATUS_MAC_ADDR] = {
-		.type = NLA_UNSPEC,
-		.len = QDF_MAC_ADDR_SIZE},
+	[QCA_WLAN_VENDOR_ATTR_TDLS_GET_STATUS_MAC_ADDR] =
+		VENDOR_NLA_POLICY_MAC_ADDR,
 	[QCA_WLAN_VENDOR_ATTR_TDLS_GET_STATUS_STATE] = {.type = NLA_U32},
 	[QCA_WLAN_VENDOR_ATTR_TDLS_GET_STATUS_REASON] = {.type = NLA_S32},
 	[QCA_WLAN_VENDOR_ATTR_TDLS_GET_STATUS_CHANNEL] = {.type = NLA_U32},
@@ -879,7 +875,7 @@ void hdd_config_tdls_with_band_switch(struct hdd_context *hdd_ctx)
 {
 	struct wlan_objmgr_vdev *tdls_obj_vdev;
 	int offchmode;
-	enum band_info current_band;
+	uint32_t current_band;
 	bool tdls_off_ch;
 
 	if (!hdd_ctx) {
@@ -887,7 +883,7 @@ void hdd_config_tdls_with_band_switch(struct hdd_context *hdd_ctx)
 		return;
 	}
 
-	if (ucfg_reg_get_curr_band(hdd_ctx->pdev, &current_band) !=
+	if (ucfg_reg_get_band(hdd_ctx->pdev, &current_band) !=
 	    QDF_STATUS_SUCCESS) {
 		hdd_err("Failed to get current band config");
 		return;
@@ -902,7 +898,8 @@ void hdd_config_tdls_with_band_switch(struct hdd_context *hdd_ctx)
 	 * If 2g or 5g is not supported. Disable tdls off channel only when
 	 * tdls off channel is enabled currently.
 	 */
-	if (current_band == BAND_ALL) {
+	if ((current_band & BIT(REG_BAND_2G)) &&
+	    (current_band & BIT(REG_BAND_5G))) {
 		if (cfg_tdls_get_off_channel_enable_orig(
 			hdd_ctx->psoc, &tdls_off_ch) !=
 		    QDF_STATUS_SUCCESS) {

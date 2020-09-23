@@ -111,6 +111,10 @@ static void wlan_pmo_wow_pulse_init_cfg(struct wlan_objmgr_psoc *psoc,
 			cfg_get(psoc, CFG_PMO_WOW_PULSE_HIGH);
 	psoc_cfg->wow_pulse_interval_low =
 			cfg_get(psoc, CFG_PMO_WOW_PULSE_LOW);
+	psoc_cfg->wow_pulse_repeat_count =
+			cfg_get(psoc, CFG_PMO_WOW_PULSE_REPEAT);
+	psoc_cfg->wow_pulse_init_state =
+			cfg_get(psoc, CFG_PMO_WOW_PULSE_INIT);
 }
 #else
 static void wlan_pmo_wow_pulse_init_cfg(struct wlan_objmgr_psoc *psoc,
@@ -187,10 +191,6 @@ static void wlan_pmo_init_cfg(struct wlan_objmgr_psoc *psoc,
 	psoc_cfg->max_ps_poll = cfg_get(psoc, CFG_PMO_MAX_PS_POLL);
 
 	psoc_cfg->wow_enable = cfg_get(psoc, CFG_PMO_WOW_ENABLE);
-	psoc_cfg->wowlan_deauth_enable =
-			cfg_get(psoc, CFG_PMO_WOWLAN_DEAUTH_ENABLE);
-	psoc_cfg->wowlan_disassoc_enable =
-			cfg_get(psoc, CFG_PMO_WOWLAN_DISASSOC_ENABLE);
 
 	wlan_extwow_init_cfg(psoc, psoc_cfg);
 	psoc_cfg->apf_enable = cfg_get(psoc, CFG_PMO_APF_ENABLE);

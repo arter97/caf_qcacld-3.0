@@ -61,7 +61,6 @@ enum csr_roamcomplete_result {
 	eCsrNothingToJoin,
 	eCsrStartBssSuccess,
 	eCsrStartBssFailure,
-	eCsrSilentlyStopRoaming,
 	eCsrSilentlyStopRoamingSaveState,
 	eCsrJoinFailureDueToConcurrency,
 	eCsrStopBssSuccess,
@@ -395,33 +394,49 @@ enum csr_cfgdot11mode csr_find_best_phy_mode(struct mac_context *mac,
 void csr_copy_ssids_from_roam_params(struct roam_ext_params *roam_params,
 				     struct scan_filter *filter);
 
+#ifdef WLAN_ADAPTIVE_11R
 /*
- * csr_update_connect_n_roam_cmn_filter() - update common scan filter
- * @mac_ctx: pointer to mac context
+ * csr_update_adaptive_11r_scan_filter() - fill adaptive 11r support in filter
+ * @mac_ctx: mac ctx
  * @filter: scan filter
- * @opmode: opmode
  *
  * Return void
  */
-void csr_update_connect_n_roam_cmn_filter(struct mac_context *mac_ctx,
-					  struct scan_filter *filter,
-					  enum QDF_OPMODE opmode);
+static inline void
+csr_update_adaptive_11r_scan_filter(struct mac_context *mac_ctx,
+				    struct scan_filter *filter)
+{
+	filter->enable_adaptive_11r =
+		   mac_ctx->mlme_cfg->lfr.enable_adaptive_11r;
+}
+#else
+static inline void
+csr_update_adaptive_11r_scan_filter(struct mac_context *mac_ctx,
+				    struct scan_filter *filter)
+{
+	filter->enable_adaptive_11r = false;
+}
+#endif
 
 /*
- * csr_covert_enc_type_new() - convert csr enc type to wlan enc type
- * @enc: csr enc type
+ * csr_fill_filter_from_vdev_crypto() - fill scan filter crypto from vdev crypto
+ * @mac_ctx: csr auth type
+ * @filter: scan filter
+ * @vdev_id: vdev
  *
- * Return enum wlan_enc_type
+ * Return QDF_STATUS
  */
-enum wlan_enc_type csr_covert_enc_type_new(eCsrEncryptionType enc);
+QDF_STATUS csr_fill_filter_from_vdev_crypto(struct mac_context *mac_ctx,
+					    struct scan_filter *filter,
+					    uint8_t vdev_id);
 
 /*
- * csr_covert_auth_type_new() - convert csr auth type to wlan auth type
- * @auth: csr auth type
+ * csr_set_open_mode_in_scan_filter() - set open mode in scan filter
+ * @filter: scan filter
  *
- * Return enum wlan_auth_type
+ * Return void
  */
-enum wlan_auth_type csr_covert_auth_type_new(enum csr_akm_type auth);
+void csr_set_open_mode_in_scan_filter(struct scan_filter *filter);
 
 /**
  * csr_roam_get_scan_filter_from_profile() - prepare scan filter from
@@ -430,6 +445,7 @@ enum wlan_auth_type csr_covert_auth_type_new(enum csr_akm_type auth);
  * @profile: roam profile
  * @filter: Populated scan filter based on the connected profile
  * @is_roam: if filter is for roam
+ * @vdev_id: vdev
  *
  * This function creates a scan filter based on the roam profile. Based on this
  * filter, scan results are obtained.
@@ -440,7 +456,7 @@ QDF_STATUS
 csr_roam_get_scan_filter_from_profile(struct mac_context *mac_ctx,
 				      struct csr_roam_profile *profile,
 				      struct scan_filter *filter,
-				      bool is_roam);
+				      bool is_roam, uint8_t vdev_id);
 
 /**
  * csr_neighbor_roam_get_scan_filter_from_profile() - prepare scan filter from
@@ -463,12 +479,14 @@ csr_neighbor_roam_get_scan_filter_from_profile(struct mac_context *mac,
  * @mac: Pointer to Global MAC structure
  * @filter: If pFilter is NULL, all cached results are returned
  * @phResult: an object for the result.
+ * @scoring_required: if scoding is required for AP
  *
  * Return QDF_STATUS
  */
 QDF_STATUS csr_scan_get_result(struct mac_context *mac,
 			       struct scan_filter *filter,
-			       tScanResultHandle *phResult);
+			       tScanResultHandle *phResult,
+			       bool scoring_required);
 
 /**
  * csr_scan_get_result_for_bssid - gets the scan result from scan cache for the
@@ -589,17 +607,6 @@ void csr_get_vdev_type_nss(enum QDF_OPMODE dev_mode, uint8_t *nss_2g,
 #define WLAN_SCAN_STATUS_SUCCESS        0
 #define WLAN_SCAN_STATUS_FAILURE        1
 #define WLAN_SCAN_STATUS_ABORT          2
-
-/* Ibss */
-#define WLAN_IBSS_EVENT_START_IBSS_REQ      0
-#define WLAN_IBSS_EVENT_START_IBSS_RSP      1
-#define WLAN_IBSS_EVENT_JOIN_IBSS_REQ       2
-#define WLAN_IBSS_EVENT_JOIN_IBSS_RSP       3
-#define WLAN_IBSS_EVENT_COALESCING          4
-#define WLAN_IBSS_EVENT_PEER_JOIN           5
-#define WLAN_IBSS_EVENT_PEER_LEAVE          6
-#define WLAN_IBSS_EVENT_STOP_REQ            7
-#define WLAN_IBSS_EVENT_STOP_RSP            8
 
 #define AUTO_PICK       0
 #define SPECIFIED       1
@@ -1032,6 +1039,20 @@ bool csr_lookup_pmkid_using_bssid(struct mac_context *mac,
 					struct csr_roam_session *session,
 					tPmkidCacheInfo *pmk_cache);
 
+/**
+ * csr_lookup_fils_pmkid  - Lookup FILS PMKID using ssid and cache id
+ * @mac:       Pointer to mac context
+ * @vdev_id:   vdev id
+ * @cache_id:  FILS cache id
+ * @ssid:      SSID pointer
+ * @ssid_len:  SSID length
+ * @bssid:     Pointer to the BSSID to lookup
+ *
+ * Return: True if lookup is successful
+ */
+bool csr_lookup_fils_pmkid(struct mac_context *mac, uint8_t vdev_id,
+			   uint8_t *cache_id, uint8_t *ssid,
+			   uint8_t ssid_len, struct qdf_mac_addr *bssid);
 /**
  * csr_is_pmkid_found_for_peer() - check if pmkid sent by peer is present
 				   in PMK cache. Used in SAP mode.

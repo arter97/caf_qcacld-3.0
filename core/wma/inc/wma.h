@@ -46,6 +46,7 @@
 #include "wma_api.h"
 #include "wmi_unified_param.h"
 #include "wmi.h"
+#include "wlan_cm_roam_public_srtuct.h"
 
 /* Platform specific configuration for max. no. of fragments */
 #define QCA_OL_11AC_TX_MAX_FRAGS            2
@@ -73,18 +74,6 @@
 
 #define WMA_INVALID_VDEV_ID                             0xFF
 
-/* Deprecated logging macros, to be removed. Please do not use in new code */
-#define WMA_LOGD(params ...) \
-	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_WMA, params)
-#define WMA_LOGI(params ...) \
-	QDF_TRACE_INFO_NO_FL(QDF_MODULE_ID_WMA, params)
-#define WMA_LOGW(params ...) \
-	QDF_TRACE_WARN_NO_FL(QDF_MODULE_ID_WMA, params)
-#define WMA_LOGE(params ...) \
-	QDF_TRACE_ERROR_NO_FL(QDF_MODULE_ID_WMA, params)
-#define WMA_LOGP(params ...) \
-	QDF_TRACE_FATAL_NO_FL(QDF_MODULE_ID_WMA, params)
-
 #define wma_alert(params...) QDF_TRACE_FATAL(QDF_MODULE_ID_WMA, params)
 #define wma_err(params...) QDF_TRACE_ERROR(QDF_MODULE_ID_WMA, params)
 #define wma_warn(params...) QDF_TRACE_WARN(QDF_MODULE_ID_WMA, params)
@@ -103,15 +92,6 @@
 	QDF_TRACE_INFO_NO_FL(QDF_MODULE_ID_WMA, params)
 #define wma_nofl_debug(params...) \
 	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_WMA, params)
-
-#define WMA_DEBUG_ALWAYS
-
-#ifdef WMA_DEBUG_ALWAYS
-#define WMA_LOGA(params ...) \
-	QDF_TRACE_FATAL_NO_FL(QDF_MODULE_ID_WMA, params)
-#else
-#define WMA_LOGA(params ...)
-#endif
 
 #define WMA_WILDCARD_PDEV_ID 0x0
 
@@ -410,9 +390,6 @@
  */
 #define PROBE_REQ_TX_TIME_GAP 20
 
-typedef void (*txFailIndCallback)(uint8_t *peer_mac, uint8_t seqNo);
-
-
 /**
  * enum wma_rx_exec_ctx - wma rx execution context
  * @WMA_RX_WORK_CTX: work queue context execution
@@ -588,6 +565,10 @@ typedef struct {
  * @gtx_info: GTX offload info
  * @dcm: DCM enable/disable
  * @range_ext: HE range extension enable/disable
+ * @tx_ampdu: tx ampdu size
+ * @rx_ampdu: rx ampdu size
+ * @tx_amsdu: tx amsdu size
+ * @rx_amsdu: rx amsdu size
  *
  * This structure stores vdev parameters.
  * Some of these parameters are set in fw and some
@@ -618,6 +599,10 @@ typedef struct {
 	uint8_t dcm;
 	uint8_t range_ext;
 #endif
+	uint32_t tx_ampdu;
+	uint32_t rx_ampdu;
+	uint32_t tx_amsdu;
+	uint32_t rx_amsdu;
 } vdev_cli_config_t;
 
 /**
@@ -668,7 +653,6 @@ struct wma_invalid_peer_params {
  * @llbCoexist: 11b coexist
  * @shortSlotTimeSupported: is short slot time supported or not
  * @dtimPeriod: DTIM period
- * @mhz: channel frequency in KHz
  * @chan_width: channel bandwidth
  * @vdev_up: is vdev up or not
  * @tsfadjust: TSF adjust
@@ -692,7 +676,6 @@ struct wma_invalid_peer_params {
  * @delay_before_vdev_stop: delay
  * @tx_streams: number of tx streams can be used by the vdev
  * @mac_id: the mac on which vdev is on
- * @wep_default_key_idx: wep default index for group key
  * @arp_offload_req: cached arp offload request
  * @ns_offload_req: cached ns offload request
  * @rcpi_req: rcpi request
@@ -718,12 +701,11 @@ struct wma_txrx_node {
 	uint8_t llbCoexist;
 	uint8_t shortSlotTimeSupported;
 	uint8_t dtimPeriod;
-	A_UINT32 mhz;
 	enum phy_ch_width chan_width;
 	bool vdev_active;
 	uint64_t tsfadjust;
 	tAddStaParams *addBssStaContext;
-	uint8_t aid;
+	uint16_t aid;
 	uint8_t rmfEnabled;
 	uint32_t uapsd_cached_val;
 	void *del_staself_req;
@@ -735,7 +717,6 @@ struct wma_txrx_node {
 	uint32_t nwType;
 	tSetStaKeyParams *staKeyParams;
 	uint32_t peer_count;
-	bool roam_synch_in_progress;
 	void *plink_status_req;
 	void *psnr_req;
 	uint8_t delay_before_vdev_stop;
@@ -746,7 +727,6 @@ struct wma_txrx_node {
 	uint32_t mac_id;
 	bool roaming_in_progress;
 	int32_t roam_synch_delay;
-	uint8_t wep_default_key_idx;
 	struct sme_rcpi_req *rcpi_req;
 	bool in_bmps;
 	struct beacon_filter_param beacon_filter;
@@ -761,28 +741,6 @@ struct wma_txrx_node {
 	struct wma_invalid_peer_params invalid_peers[INVALID_PEER_MAX_NUM];
 	uint8_t invalid_peer_idx;
 };
-
-/**
- * struct ibss_power_save_params - IBSS power save parameters
- * @atimWindowLength: ATIM window length
- * @isPowerSaveAllowed: is power save allowed
- * @isPowerCollapseAllowed: is power collapsed allowed
- * @isAwakeonTxRxEnabled: is awake on tx/rx enabled
- * @inactivityCount: inactivity count
- * @txSPEndInactivityTime: tx SP end inactivity time
- * @ibssPsWarmupTime: IBSS power save warm up time
- * @ibssPs1RxChainInAtimEnable: IBSS power save rx chain in ATIM enable
- */
-typedef struct {
-	uint32_t atimWindowLength;
-	uint32_t isPowerSaveAllowed;
-	uint32_t isPowerCollapseAllowed;
-	uint32_t isAwakeonTxRxEnabled;
-	uint32_t inactivityCount;
-	uint32_t txSPEndInactivityTime;
-	uint32_t ibssPsWarmupTime;
-	uint32_t ibssPs1RxChainInAtimEnable;
-} ibss_power_save_params;
 
 /**
  * struct mac_ss_bw_info - hw_mode_list PHY/MAC params for each MAC
@@ -878,8 +836,6 @@ struct wma_wlm_stats_data {
  * @peer_macaddr: When @get_one_peer_info is true, the peer's mac address
  * @thermal_mgmt_info: Thermal mitigation related info
  * @enable_mc_list: To Check if Multicast list filtering is enabled in FW
- * @ibss_started: is IBSS started or not
- * @ibsskey_info: IBSS key info
  * @hddTxFailCb: tx fail indication callback
  * @extscan_wake_lock: extscan wake lock
  * @wow_wake_lock: wow wake lock
@@ -892,10 +848,6 @@ struct wma_wlm_stats_data {
  * @roam_ho_wl: wake lock for roam handoff req
  * @wow_nack: wow negative ack flag
  * @is_wow_bus_suspended: is wow bus suspended flag
- * @suitable_ap_hb_failure: better ap found
- * @suitable_ap_hb_failure_rssi: RSSI when suitable_ap_hb_failure
- *   triggered for later usage to report RSSI at beacon miss scenario
- * @wma_ibss_power_save_params: IBSS Power Save config Parameters
  * @IsRArateLimitEnabled: RA rate limiti s enabled or not
  * @RArateLimitInterval: RA rate limit interval
  * @is_lpass_enabled: Flag to indicate if LPASS feature is enabled or not
@@ -1005,9 +957,6 @@ typedef struct {
 	struct qdf_mac_addr peer_macaddr;
 	t_thermal_mgmt thermal_mgmt_info;
 	bool enable_mc_list;
-	uint8_t ibss_started;
-	tSetBssKeyParams ibsskey_info;
-	txFailIndCallback hddTxFailCb;
 #ifdef FEATURE_WLAN_EXTSCAN
 	qdf_wake_lock_t extscan_wake_lock;
 #endif
@@ -1022,9 +971,6 @@ typedef struct {
 	qdf_wake_lock_t roam_preauth_wl;
 	int wow_nack;
 	qdf_atomic_t is_wow_bus_suspended;
-	bool suitable_ap_hb_failure;
-	uint32_t suitable_ap_hb_failure_rssi;
-	ibss_power_save_params wma_ibss_power_save_params;
 #ifdef WLAN_FEATURE_LPSS
 	bool is_lpass_enabled;
 #endif
@@ -1213,14 +1159,6 @@ typedef struct {
  * @WMA_VDEV_TXRX_FWSTATS_RESET_CMDID: txrx firmware stats reset command
  * @WMA_VDEV_MCC_SET_TIME_LATENCY: set MCC latency time
  * @WMA_VDEV_MCC_SET_TIME_QUOTA: set MCC time quota
- * @WMA_VDEV_IBSS_SET_ATIM_WINDOW_SIZE: set IBSS ATIM window size
- * @WMA_VDEV_IBSS_SET_POWER_SAVE_ALLOWED: set IBSS enable power save
- * @WMA_VDEV_IBSS_SET_POWER_COLLAPSE_ALLOWED: set IBSS power collapse enable
- * @WMA_VDEV_IBSS_SET_AWAKE_ON_TX_RX: awake IBSS on TX/RX
- * @WMA_VDEV_IBSS_SET_INACTIVITY_TIME: set IBSS inactivity time
- * @WMA_VDEV_IBSS_SET_TXSP_END_INACTIVITY_TIME: set IBSS TXSP
- * @WMA_VDEV_IBSS_PS_SET_WARMUP_TIME_SECS: set IBSS power save warmup time
- * @WMA_VDEV_IBSS_PS_SET_1RX_CHAIN_IN_ATIM_WINDOW: set IBSS power save ATIM
  * @WMA_VDEV_TXRX_GET_IPA_UC_FW_STATS_CMDID: get IPA microcontroller fw stats
  * @WMA_VDEV_TXRX_GET_IPA_UC_SHARING_STATS_CMDID: get IPA uC wifi-sharing stats
  * @WMA_VDEV_TXRX_SET_IPA_UC_QUOTA_CMDID: set IPA uC quota limit
@@ -1233,14 +1171,6 @@ enum wma_cfg_cmd_id {
 	WMA_VDEV_TXRX_FWSTATS_RESET_CMDID,
 	WMA_VDEV_MCC_SET_TIME_LATENCY,
 	WMA_VDEV_MCC_SET_TIME_QUOTA,
-	WMA_VDEV_IBSS_SET_ATIM_WINDOW_SIZE,
-	WMA_VDEV_IBSS_SET_POWER_SAVE_ALLOWED,
-	WMA_VDEV_IBSS_SET_POWER_COLLAPSE_ALLOWED,
-	WMA_VDEV_IBSS_SET_AWAKE_ON_TX_RX,
-	WMA_VDEV_IBSS_SET_INACTIVITY_TIME,
-	WMA_VDEV_IBSS_SET_TXSP_END_INACTIVITY_TIME,
-	WMA_VDEV_IBSS_PS_SET_WARMUP_TIME_SECS,
-	WMA_VDEV_IBSS_PS_SET_1RX_CHAIN_IN_ATIM_WINDOW,
 	WMA_VDEV_TXRX_GET_IPA_UC_FW_STATS_CMDID,
 	WMA_VDEV_TXRX_GET_IPA_UC_SHARING_STATS_CMDID,
 	WMA_VDEV_TXRX_SET_IPA_UC_QUOTA_CMDID,
@@ -1536,8 +1466,16 @@ QDF_STATUS wma_set_rssi_monitoring(tp_wma_handle wma,
 }
 #endif /* FEATURE_RSSI_MONITOR */
 
-QDF_STATUS wma_send_pdev_set_pcl_cmd(tp_wma_handle wma_handle,
-				     struct set_pcl_req *msg);
+/**
+ * wma_map_pcl_weights  - Map WMA pcl weights to wmi pcl weights
+ * @pcl_weight: Input PCL weight to be converted to wmi format
+ *
+ * Return: wmi_pcl_chan_weight
+ */
+wmi_pcl_chan_weight wma_map_pcl_weights(uint32_t pcl_weight);
+
+QDF_STATUS wma_send_set_pcl_cmd(tp_wma_handle wma_handle,
+				struct set_pcl_req *msg);
 
 QDF_STATUS wma_send_pdev_set_hw_mode_cmd(tp_wma_handle wma_handle,
 		struct policy_mgr_hw_mode *msg);
@@ -1701,11 +1639,10 @@ void wma_process_set_pdev_vht_ie_req(tp_wma_handle wma,
 		struct set_ie_param *ie_params);
 
 QDF_STATUS wma_remove_peer(tp_wma_handle wma, uint8_t *mac_addr,
-			   uint8_t vdev_id, bool roam_synch_in_progress);
+			   uint8_t vdev_id);
 
 QDF_STATUS wma_create_peer(tp_wma_handle wma, uint8_t peer_addr[6],
-			   u_int32_t peer_type, u_int8_t vdev_id,
-			   bool roam_synch_in_progress);
+			   u_int32_t peer_type, u_int8_t vdev_id);
 
 QDF_STATUS wma_peer_unmap_conf_cb(uint8_t vdev_id,
 				  uint32_t peer_id_cnt,
@@ -1880,19 +1817,19 @@ void wma_vdev_update_pause_bitmap(uint8_t vdev_id, uint16_t value)
 	struct wma_txrx_node *iface;
 
 	if (!wma) {
-		WMA_LOGE("%s: WMA context is invald!", __func__);
+		wma_err("WMA context is invald!");
 		return;
 	}
 
 	if (vdev_id >= wma->max_bssid) {
-		WMA_LOGE("%s: Invalid vdev_id: %d", __func__, vdev_id);
+		wma_err("Invalid vdev_id: %d", vdev_id);
 		return;
 	}
 
 	iface = &wma->interfaces[vdev_id];
 
 	if (!iface) {
-		WMA_LOGE("%s: Interface is NULL", __func__);
+		wma_err("Interface is NULL");
 		return;
 	}
 
@@ -1912,14 +1849,14 @@ uint16_t wma_vdev_get_pause_bitmap(uint8_t vdev_id)
 	struct wma_txrx_node *iface;
 
 	if (!wma) {
-		WMA_LOGE("%s: WMA context is invald!", __func__);
+		wma_err("WMA context is invald!");
 		return 0;
 	}
 
 	iface = &wma->interfaces[vdev_id];
 
 	if (!iface) {
-		WMA_LOGE("%s: Interface is NULL", __func__);
+		wma_err("Interface is NULL");
 		return 0;
 	}
 
@@ -1938,14 +1875,14 @@ static inline bool wma_vdev_is_device_in_low_pwr_mode(uint8_t vdev_id)
 	struct wma_txrx_node *iface;
 
 	if (!wma) {
-		WMA_LOGE("%s: WMA context is invald!", __func__);
+		wma_err("WMA context is invalid!");
 		return 0;
 	}
 
 	iface = &wma->interfaces[vdev_id];
 
 	if (!iface) {
-		WMA_LOGE("%s: Interface is NULL", __func__);
+		wma_err("Interface is NULL");
 		return 0;
 	}
 
@@ -2028,13 +1965,13 @@ wma_get_vdev_rate_flag(struct wlan_objmgr_vdev *vdev, uint32_t *rate_flag)
 	struct vdev_mlme_obj *mlme_obj;
 
 	if (!vdev) {
-		WMA_LOGE("%s vdev is NULL", __func__);
+		wma_err("vdev is NULL");
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(vdev);
 	if (!mlme_obj) {
-		WMA_LOGE("%s Failed to get mlme_obj", __func__);
+		wma_err("ailed to get mlme_obj");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -2056,14 +1993,14 @@ void wma_vdev_set_pause_bit(uint8_t vdev_id, wmi_tx_pause_type bit_pos)
 	struct wma_txrx_node *iface;
 
 	if (!wma) {
-		WMA_LOGE("%s: WMA context is invald!", __func__);
+		wma_err("WMA context is invalid!");
 		return;
 	}
 
 	iface = &wma->interfaces[vdev_id];
 
 	if (!iface) {
-		WMA_LOGE("%s: Interface is NULL", __func__);
+		wma_err("Interface is NULL");
 		return;
 	}
 
@@ -2084,14 +2021,14 @@ void wma_vdev_clear_pause_bit(uint8_t vdev_id, wmi_tx_pause_type bit_pos)
 	struct wma_txrx_node *iface;
 
 	if (!wma) {
-		WMA_LOGE("%s: WMA context is invald!", __func__);
+		wma_err("WMA context is invalid!");
 		return;
 	}
 
 	iface = &wma->interfaces[vdev_id];
 
 	if (!iface) {
-		WMA_LOGE("%s: Interface is NULL", __func__);
+		wma_err("Interface is NULL");
 		return;
 	}
 
@@ -2461,8 +2398,7 @@ int wma_motion_det_base_line_host_event_handler(void *handle, u_int8_t *event,
  *
  * Return: 0 on success, else error on failure
  */
-QDF_STATUS wma_add_bss_peer_sta(uint8_t vdev_id, uint8_t *bssid,
-				bool roam_sync);
+QDF_STATUS wma_add_bss_peer_sta(uint8_t vdev_id, uint8_t *bssid);
 
 /**
  * wma_send_vdev_stop() - WMA api to send vdev stop to fw

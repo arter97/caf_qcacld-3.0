@@ -592,17 +592,6 @@ uint32_t wlan_sap_get_vht_ch_width(struct sap_context *sap_ctx)
 	return sap_ctx->ch_params.ch_width;
 }
 
-void wlan_sap_set_vht_ch_width(struct sap_context *sap_ctx,
-			       uint32_t vht_channel_width)
-{
-	if (!sap_ctx) {
-		sap_err("Invalid SAP pointer");
-		return;
-	}
-
-	sap_ctx->ch_params.ch_width = vht_channel_width;
-}
-
 bool wlan_sap_get_ch_params(struct sap_context *sap_ctx,
 			    struct ch_params *ch_params)
 {
@@ -1057,7 +1046,7 @@ QDF_STATUS wlansap_modify_acl(struct sap_context *sap_ctx,
 				/* If a client is deleted from white list and it is connected, send deauth */
 				wlansap_populate_del_sta_params(peer_sta_mac,
 					eCsrForcedDeauthSta,
-					(SIR_MAC_MGMT_DEAUTH >> 4),
+					SIR_MAC_MGMT_DEAUTH,
 					&delStaParams);
 				wlansap_deauth_sta(sap_ctx, &delStaParams);
 				QDF_TRACE(QDF_MODULE_ID_SAP,
@@ -1106,7 +1095,7 @@ QDF_STATUS wlansap_modify_acl(struct sap_context *sap_ctx,
 			/* If we are adding a client to the black list; if its connected, send deauth */
 			wlansap_populate_del_sta_params(peer_sta_mac,
 				eCsrForcedDeauthSta,
-				(SIR_MAC_MGMT_DEAUTH >> 4),
+				SIR_MAC_MGMT_DEAUTH,
 				&delStaParams);
 			wlansap_deauth_sta(sap_ctx, &delStaParams);
 			sap_info("... Now add to black list");
@@ -2165,21 +2154,21 @@ wlansap_reset_sap_config_add_ie(struct sap_config *config,
 static void wlansap_update_start_range_6ghz(
 	uint32_t *start_ch_freq, uint32_t *bandStartChannel)
 {
-	*bandStartChannel = CHAN_ENUM_5945;
+	*bandStartChannel = MIN_6GHZ_CHANNEL;
 	*start_ch_freq = (*start_ch_freq - ACS_5G_EXTEND) >
-				wlan_reg_ch_to_freq(CHAN_ENUM_5945) ?
+				wlan_reg_ch_to_freq(MIN_6GHZ_CHANNEL) ?
 			   (*start_ch_freq - ACS_5G_EXTEND) :
-				wlan_reg_ch_to_freq(CHAN_ENUM_5945);
+				wlan_reg_ch_to_freq(MIN_6GHZ_CHANNEL);
 }
 
 static void wlansap_update_end_range_6ghz(
 	uint32_t *end_ch_freq, uint32_t *bandEndChannel)
 {
-	*bandEndChannel = CHAN_ENUM_7105;
+	*bandEndChannel = MAX_6GHZ_CHANNEL;
 	*end_ch_freq = (*end_ch_freq + ACS_5G_EXTEND) <=
-			     wlan_reg_ch_to_freq(CHAN_ENUM_7105) ?
+			     wlan_reg_ch_to_freq(MAX_6GHZ_CHANNEL) ?
 			     (*end_ch_freq + ACS_5G_EXTEND) :
-			     wlan_reg_ch_to_freq(CHAN_ENUM_7105);
+			     wlan_reg_ch_to_freq(MAX_6GHZ_CHANNEL);
 }
 #else
 static void wlansap_update_start_range_6ghz(
@@ -2230,7 +2219,7 @@ void wlansap_extend_to_acs_range(mac_handle_t mac_handle,
 					wlan_reg_ch_to_freq(CHAN_ENUM_2432) ?
 					(*start_ch_freq - ACS_2G_EXTEND) :
 					wlan_reg_ch_to_freq(CHAN_ENUM_2412);
-	} else if (*start_ch_freq <= wlan_reg_ch_to_freq(CHAN_ENUM_5865)) {
+	} else if (*start_ch_freq <= wlan_reg_ch_to_freq(CHAN_ENUM_5885)) {
 		*bandStartChannel = CHAN_ENUM_5180;
 		tmp_start_ch_freq = (*start_ch_freq - ACS_5G_EXTEND) >
 					wlan_reg_ch_to_freq(CHAN_ENUM_5180) ?
@@ -2256,22 +2245,22 @@ void wlansap_extend_to_acs_range(mac_handle_t mac_handle,
 					wlan_reg_ch_to_freq(CHAN_ENUM_2484) ?
 					(*end_ch_freq + ACS_2G_EXTEND) :
 					wlan_reg_ch_to_freq(CHAN_ENUM_2484);
-	} else if (*end_ch_freq <= wlan_reg_ch_to_freq(CHAN_ENUM_5865)) {
-		*bandEndChannel = CHAN_ENUM_5865;
+	} else if (*end_ch_freq <= wlan_reg_ch_to_freq(CHAN_ENUM_5885)) {
+		*bandEndChannel = CHAN_ENUM_5885;
 		tmp_end_ch_freq = (*end_ch_freq + ACS_5G_EXTEND) <=
-				     wlan_reg_ch_to_freq(CHAN_ENUM_5865) ?
+				     wlan_reg_ch_to_freq(CHAN_ENUM_5885) ?
 				     (*end_ch_freq + ACS_5G_EXTEND) :
-				     wlan_reg_ch_to_freq(CHAN_ENUM_5865);
+				     wlan_reg_ch_to_freq(CHAN_ENUM_5885);
 	} else if (WLAN_REG_IS_6GHZ_CHAN_FREQ(*end_ch_freq)) {
 		tmp_end_ch_freq = *end_ch_freq;
 		wlansap_update_end_range_6ghz(&tmp_end_ch_freq,
 					      bandEndChannel);
 	} else {
-		*bandEndChannel = CHAN_ENUM_5865;
+		*bandEndChannel = CHAN_ENUM_5885;
 		tmp_end_ch_freq = (*end_ch_freq + ACS_5G_EXTEND) <=
-				     wlan_reg_ch_to_freq(CHAN_ENUM_5865) ?
+				     wlan_reg_ch_to_freq(CHAN_ENUM_5885) ?
 				     (*end_ch_freq + ACS_5G_EXTEND) :
-				     wlan_reg_ch_to_freq(CHAN_ENUM_5865);
+				     wlan_reg_ch_to_freq(CHAN_ENUM_5885);
 
 		sap_err("unexpected end freq %d", *end_ch_freq);
 	}
@@ -2369,11 +2358,10 @@ void wlansap_populate_del_sta_params(const uint8_t *mac,
 	else
 		params->reason_code = reason_code;
 
-	if (subtype == (SIR_MAC_MGMT_DEAUTH >> 4) ||
-	    subtype == (SIR_MAC_MGMT_DISASSOC >> 4))
+	if (subtype == SIR_MAC_MGMT_DEAUTH || subtype == SIR_MAC_MGMT_DISASSOC)
 		params->subtype = subtype;
 	else
-		params->subtype = (SIR_MAC_MGMT_DEAUTH >> 4);
+		params->subtype = SIR_MAC_MGMT_DEAUTH;
 
 	sap_debug("Delete STA with RC:%hu subtype:%hhu MAC::" QDF_MAC_ADDR_STR,
 		  params->reason_code, params->subtype,
@@ -2991,7 +2979,8 @@ err:
 	return freq;
 }
 
-qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx)
+qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
+					  enum sap_csa_reason_code *csa_reason)
 {
 	uint32_t restart_freq;
 	enum phy_ch_width restart_ch_width;
@@ -3007,6 +2996,12 @@ qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx)
 		sap_err("sap_ctx NULL parameter");
 		return 0;
 	}
+
+	if (!csa_reason) {
+		sap_err("csa_reason is NULL");
+		return 0;
+	}
+
 	if (cds_is_driver_recovering())
 		return 0;
 
@@ -3016,14 +3011,20 @@ qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx)
 		return 0;
 	}
 
-	if (ucfg_reg_get_curr_band(mac->pdev, &band) != QDF_STATUS_SUCCESS) {
+	if (wlan_reg_is_disable_for_freq(mac->pdev, sap_ctx->chan_freq)) {
+		sap_debug("channel is disabled");
+		*csa_reason = CSA_REASON_CHAN_DISABLED;
+		return wlansap_get_safe_channel_from_pcl_and_acs_range(sap_ctx);
+	}
+
+	if (ucfg_reg_get_band(mac->pdev, &band) != QDF_STATUS_SUCCESS) {
 		sap_err("Failed to get current band config");
 		return 0;
 	}
 	sap_band = wlan_reg_freq_to_band(sap_ctx->chan_freq);
 	sap_debug("SAP/Go current band: %d, pdev band capability: %d",
 		  sap_band, band);
-	if (sap_band == REG_BAND_5G && band == BAND_2G) {
+	if (sap_band == REG_BAND_5G && band == BIT(REG_BAND_2G)) {
 		sap_ctx->chan_freq_before_switch_band = sap_ctx->chan_freq;
 		sap_ctx->chan_width_before_switch_band =
 			sap_ctx->ch_params.ch_width;
@@ -3039,14 +3040,14 @@ qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx)
 			sap_debug("set 40M when switch SAP to 2G");
 			restart_ch_width = CH_WIDTH_40MHZ;
 		}
-	} else if (sap_band == REG_BAND_2G &&
-		   (band == BAND_ALL || band == BAND_5G)) {
+	} else if (sap_band == REG_BAND_2G && (band & BIT(REG_BAND_5G))) {
 		if (sap_ctx->chan_freq_before_switch_band == 0)
 			return 0;
 		restart_freq = sap_ctx->chan_freq_before_switch_band;
 		restart_ch_width = sap_ctx->chan_width_before_switch_band;
 		sap_debug("Restore chan freq: %d, width: %d",
 			  restart_freq, restart_ch_width);
+		*csa_reason = CSA_REASON_BAND_RESTRICTED;
 	} else {
 		sap_debug("No need switch SAP/Go channel");
 		return 0;

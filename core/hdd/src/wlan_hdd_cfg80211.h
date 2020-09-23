@@ -159,10 +159,17 @@ extern const struct nla_policy wlan_hdd_wisa_cmd_policy[
 #define WLAN_AKM_SUITE_DPP_RSN 0x506f9a02
 #endif
 
+#ifndef WLAN_AKM_SUITE_OWE
 #define WLAN_AKM_SUITE_OWE 0x000FAC12
-#define WLAN_AKM_SUITE_EAP_SHA256 0x000FAC0B
-#define WLAN_AKM_SUITE_EAP_SHA384 0x000FAC0C
+#endif
 
+#ifndef WLAN_AKM_SUITE_EAP_SHA256
+#define WLAN_AKM_SUITE_EAP_SHA256 0x000FAC0B
+#endif
+
+#ifndef WLAN_AKM_SUITE_EAP_SHA384
+#define WLAN_AKM_SUITE_EAP_SHA384 0x000FAC0C
+#endif
 
 #ifndef WLAN_AKM_SUITE_SAE
 #define WLAN_AKM_SUITE_SAE 0x000FAC08
@@ -468,7 +475,7 @@ int wlan_hdd_send_avoid_freq_event(struct hdd_context *hdd_ctx,
  * Return: 0 on success or failure reason
  */
 int wlan_hdd_send_hang_reason_event(struct hdd_context *hdd_ctx,
-				    uint32_t reason, void *data,
+				    uint32_t reason, uint8_t *data,
 				    size_t data_len);
 
 int wlan_hdd_send_avoid_freq_for_dnbs(struct hdd_context *hdd_ctx,
@@ -641,6 +648,16 @@ enum hdd_rate_info_bw {
 };
 
 /**
+ * hdd_chain_mode : Representation of Number of chains available.
+ * @HDD_CHAIN_MODE_1X1: Chain mask Not Configurable as only one chain available
+ * @HDD_CHAIN_MODE_2X2: Chain mask configurable as both chains available
+ */
+enum hdd_chain_mode {
+	HDD_CHAIN_MODE_1X1 = 1,
+	HDD_CHAIN_MODE_2X2 = 3,
+};
+
+/**
  * hdd_set_rate_bw(): Set the bandwidth for the given rate_info
  * @info: The rate info for which the bandwidth should be set
  * @hdd_bw: HDD representation of a rate info bandwidth
@@ -782,4 +799,56 @@ QDF_STATUS wlan_hdd_send_sta_authorized_event(
 					struct hdd_adapter *adapter,
 					struct hdd_context *hdd_ctx,
 					const struct qdf_mac_addr *mac_addr);
+
+/**
+ * wlan_hdd_set_wlm_mode() - Function to set pm_qos config in wlm mode
+ * @hdd_ctx: HDD context
+ * @latency level: latency value received
+ *
+ * Return: None
+ */
+#if defined(CLD_PM_QOS) && defined(WLAN_FEATURE_LL_MODE)
+void wlan_hdd_set_wlm_mode(struct hdd_context *hdd_ctx, uint16_t latency_level);
+#else
+static inline
+void wlan_hdd_set_wlm_mode(struct hdd_context *hdd_ctx, uint16_t latency_level)
+{
+}
+#endif
+
+/**
+ * hdd_convert_cfgdot11mode_to_80211mode() - Function to convert cfg dot11 mode
+ *  to 80211 mode
+ * @mode: cfg dot11 mode
+ *
+ * Return: 80211 mode
+ */
+enum qca_wlan_802_11_mode
+hdd_convert_cfgdot11mode_to_80211mode(enum csr_cfgdot11mode mode);
+
+/**
+ * hdd_send_update_owe_info_event - Send update OWE info event
+ * @adapter: Pointer to adapter
+ * @sta_addr: MAC address of peer STA
+ * @owe_ie: OWE IE
+ * @owe_ie_len: Length of OWE IE
+ *
+ * Send update OWE info event to hostapd
+ *
+ * Return: none
+ */
+#if defined(CFG80211_EXTERNAL_DH_UPDATE_SUPPORT) || \
+(LINUX_VERSION_CODE > KERNEL_VERSION(5, 2, 0))
+void hdd_send_update_owe_info_event(struct hdd_adapter *adapter,
+				    uint8_t sta_addr[],
+				    uint8_t *owe_ie,
+				    uint32_t owe_ie_len);
+#else
+static inline void hdd_send_update_owe_info_event(struct hdd_adapter *adapter,
+						  uint8_t sta_addr[],
+						  uint8_t *owe_ie,
+						  uint32_t owe_ie_len)
+{
+}
+#endif
 #endif

@@ -162,9 +162,9 @@ enum powersave_mode {
 	PMO_PS_ADVANCED_POWER_SAVE_ENABLE = 1
 };
 
-#define PMO_TARGET_SUSPEND_TIMEOUT   6000
+#define PMO_TARGET_SUSPEND_TIMEOUT   (4000)
 #define PMO_WAKE_LOCK_TIMEOUT        1000
-#define PMO_RESUME_TIMEOUT           6000
+#define PMO_RESUME_TIMEOUT           (4000)
 
 /**
  * struct wow_enable_params - A collection of wow enable override parameters
@@ -294,6 +294,8 @@ enum active_apf_mode {
  * @wow_pulse_pin: GPIO pin of wow pulse feature
  * @wow_pulse_interval_high: The interval of high level in the pulse
  * @wow_pulse_interval_low: The interval of low level in the pulse
+ * @wow_pulse_repeat_count: Pulse repeat count
+ * @wow_pulse_init_state: Pulse init level
  * @packet_filters_bitmap: Packet filter bitmap configuration
  * @wow_data_inactivity_timeout: power save wow data inactivity timeout
  * @ps_data_inactivity_timeout: Power save data inactivity timeout for non
@@ -325,8 +327,6 @@ struct pmo_psoc_cfg {
 	bool deauth_enable;
 	bool disassoc_enable;
 	bool lpass_enable;
-	bool wowlan_deauth_enable;
-	bool wowlan_disassoc_enable;
 	uint8_t max_ps_poll;
 	uint8_t sta_dynamic_dtim;
 	uint8_t sta_mod_dtim;
@@ -355,6 +355,8 @@ struct pmo_psoc_cfg {
 	uint8_t wow_pulse_pin;
 	uint16_t wow_pulse_interval_high;
 	uint16_t wow_pulse_interval_low;
+	uint32_t wow_pulse_repeat_count;
+	uint32_t wow_pulse_init_state;
 #endif
 #ifdef WLAN_FEATURE_PACKET_FILTERING
 	uint8_t packet_filters_bitmap;

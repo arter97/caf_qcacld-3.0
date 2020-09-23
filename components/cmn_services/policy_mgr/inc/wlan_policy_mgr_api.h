@@ -30,7 +30,9 @@
 #include "qdf_status.h"
 #include "wlan_objmgr_psoc_obj.h"
 #include "wlan_policy_mgr_public_struct.h"
+#include "wlan_cm_roam_public_srtuct.h"
 #include "wlan_utility.h"
+#include "sir_types.h"
 
 struct target_psoc_info;
 
@@ -73,6 +75,7 @@ typedef const enum policy_mgr_conc_next_action
  * @CSA_REASON_CONCURRENT_NAN_EVENT: NAN concurrency.
  * @CSA_REASON_BAND_RESTRICTED: band disabled or re-enabled
  * @CSA_REASON_DCS: DCS
+ * @CSA_REASON_CHAN_DISABLED: channel is disabled
  *
  */
 enum sap_csa_reason_code {
@@ -87,6 +90,7 @@ enum sap_csa_reason_code {
 	CSA_REASON_CONCURRENT_NAN_EVENT,
 	CSA_REASON_BAND_RESTRICTED,
 	CSA_REASON_DCS,
+	CSA_REASON_CHAN_DISABLED,
 };
 
 /**
@@ -502,6 +506,8 @@ bool policy_mgr_check_for_session_conc(struct wlan_objmgr_psoc *psoc,
  * @session_id: Session ID
  * @ch_freq: Channel frequency
  * @reason: reason for connection update
+ * @request_id: Request id provided by the requester, can be used while
+ * calling callback to the requester
  *
  * This routine will handle STA side concurrency when policy manager
  * is enabled.
@@ -511,7 +517,8 @@ bool policy_mgr_check_for_session_conc(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 policy_mgr_handle_conc_multiport(struct wlan_objmgr_psoc *psoc,
 				 uint8_t session_id, uint32_t ch_freq,
-				 enum policy_mgr_conn_update_reason reason);
+				 enum policy_mgr_conn_update_reason reason,
+				 uint32_t request_id);
 
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 /**
@@ -592,11 +599,13 @@ static inline void policy_mgr_change_sap_channel_with_csa(
  * policy_mgr_set_pcl_for_existing_combo() - SET PCL for existing combo
  * @psoc: PSOC object information
  * @mode: Adapter mode
+ * @vdev_id: Vdev Id
  *
  * Return: None
  */
 void policy_mgr_set_pcl_for_existing_combo(struct wlan_objmgr_psoc *psoc,
-					   enum policy_mgr_con_mode mode);
+					   enum policy_mgr_con_mode mode,
+					   uint8_t vdev_id);
 /**
  * policy_mgr_incr_active_session() - increments the number of active sessions
  * @psoc: PSOC object information
@@ -966,6 +975,8 @@ QDF_STATUS policy_mgr_decr_connection_count(struct wlan_objmgr_psoc *psoc,
  * @session_id: Session id
  * @ch_freq: Channel frequency on which new connection will be
  * @reason: Reason for which connection update is required
+ * @request_id: Request id provided by the requester, can be used while
+ * calling callback to the requester
  *
  * This function initiates initiates actions
  * needed on current connections once channel has been decided
@@ -976,7 +987,8 @@ QDF_STATUS policy_mgr_decr_connection_count(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 policy_mgr_current_connections_update(struct wlan_objmgr_psoc *psoc,
 				      uint32_t session_id, uint32_t ch_freq,
-				      enum policy_mgr_conn_update_reason);
+				      enum policy_mgr_conn_update_reason,
+				      uint32_t request_id);
 
 /**
  * policy_mgr_is_dbs_allowed_for_concurrency() - If dbs is allowed for current
@@ -1017,19 +1029,6 @@ policy_mgr_get_preferred_dbs_action_table(
 	uint32_t vdev_id,
 	uint32_t ch_freq,
 	enum policy_mgr_conn_update_reason reason);
-
-/**
- * policy_mgr_is_ibss_conn_exist() - to check if IBSS connection already present
- * @psoc: PSOC object information
- * @ibss_ch_freq: pointer to ibss channel which needs to be filled
- *
- * this routine will check if IBSS connection already exist or no. If it
- * exist then this routine will return true and fill the ibss_channel value.
- *
- * Return: true if ibss connection exist else false
- */
-bool policy_mgr_is_ibss_conn_exist(struct wlan_objmgr_psoc *psoc,
-				   uint32_t *ibss_ch_freq);
 
 /**
  * policy_mgr_get_conn_info() - get the current connections list
@@ -1238,6 +1237,9 @@ QDF_STATUS policy_mgr_check_n_start_opportunistic_timer(
  *		HW mode change
  * @action: action to be applied before hw mode change
  *
+ * @request_id: Request id provided by the requester, can be used while
+ * calling callback to the requester
+ *
  * Sends the set hw mode request to FW
  *
  * e.g.: To configure 2x2_80
@@ -1284,7 +1286,8 @@ QDF_STATUS policy_mgr_pdev_set_hw_mode(struct wlan_objmgr_psoc *psoc,
 		enum hw_mode_agile_dfs_capab dfs,
 		enum hw_mode_sbs_capab sbs,
 		enum policy_mgr_conn_update_reason reason,
-		uint8_t next_action, enum policy_mgr_conc_next_action action);
+		uint8_t next_action, enum policy_mgr_conc_next_action action,
+		uint32_t request_id);
 
 /**
  * policy_mgr_pdev_set_hw_mode_cback() - callback invoked by
@@ -1298,6 +1301,8 @@ QDF_STATUS policy_mgr_pdev_set_hw_mode(struct wlan_objmgr_psoc *psoc,
  * @reason: Reason for set HW mode
  * @session_id: vdev id on which the request was made
  * @context: PSOC object information
+ * @request_id: Request id provided by the requester, can be used while
+ * calling callback to the requester
  *
  * This function is the callback registered with SME at set HW
  * mode request time
@@ -1310,7 +1315,8 @@ typedef void (*policy_mgr_pdev_set_hw_mode_cback)(uint32_t status,
 				struct policy_mgr_vdev_mac_map *vdev_mac_map,
 				uint8_t next_action,
 				enum policy_mgr_conn_update_reason reason,
-				uint32_t session_id, void *context);
+				uint32_t session_id, void *context,
+				uint32_t request_id);
 
 /**
  * policy_mgr_nss_update_cback() - callback invoked by other
@@ -1344,9 +1350,11 @@ typedef void (*policy_mgr_nss_update_cback)(struct wlan_objmgr_psoc *psoc,
  * @sme_soc_set_dual_mac_config: Set the dual MAC scan & FW
  *                             config
  * @sme_pdev_set_hw_mode: Set the new HW mode to FW
- * @sme_pdev_set_pcl: Set new PCL to FW
+ * @sme_set_pcl: Set new PCL to FW
  * @sme_nss_update_request: Update NSS value to FW
  * @sme_change_mcc_beacon_interval: Set MCC beacon interval to FW
+ * @sme_rso_start_cb: Enable roaming offload callback
+ * @sme_rso_stop_cb: Disable roaming offload callback
  */
 struct policy_mgr_sme_cbacks {
 	void (*sme_get_nss_for_vdev)(enum QDF_OPMODE,
@@ -1354,7 +1362,8 @@ struct policy_mgr_sme_cbacks {
 	QDF_STATUS (*sme_soc_set_dual_mac_config)(
 		struct policy_mgr_dual_mac_config msg);
 	QDF_STATUS (*sme_pdev_set_hw_mode)(struct policy_mgr_hw_mode msg);
-	QDF_STATUS (*sme_pdev_set_pcl)(struct policy_mgr_pcl_list *msg);
+	QDF_STATUS (*sme_set_pcl)(struct policy_mgr_pcl_list *msg,
+				  uint8_t vdev_id, bool clear_vdev_pcl);
 	QDF_STATUS (*sme_nss_update_request)(uint32_t vdev_id,
 		uint8_t new_nss, uint8_t ch_width,
 		policy_mgr_nss_update_cback cback,
@@ -1365,9 +1374,15 @@ struct policy_mgr_sme_cbacks {
 	QDF_STATUS (*sme_get_ap_channel_from_scan)(
 		void *roam_profile,
 		void **scan_cache,
-		uint32_t *ch_freq);
+		uint32_t *ch_freq, uint8_t vdev_id);
 	QDF_STATUS (*sme_scan_result_purge)(
 				void *scan_result);
+	QDF_STATUS (*sme_rso_start_cb)(
+		mac_handle_t mac_handle, uint8_t vdev_id,
+		uint8_t reason, enum wlan_cm_rso_control_requestor requestor);
+	QDF_STATUS (*sme_rso_stop_cb)(
+		mac_handle_t mac_handle, uint8_t vdev_id,
+		uint8_t reason, enum wlan_cm_rso_control_requestor requestor);
 };
 
 /**
@@ -1495,6 +1510,8 @@ enum policy_mgr_conc_next_action policy_mgr_need_opportunistic_upgrade(
  * @session_id: Session id
  * @action: action to be executed
  * @reason: Reason for connection update
+ * @request_id: Request id provided by the requester, can be used while
+ * calling callback to the requester
  *
  * This function initiates initiates actions
  * needed on current connections once channel has been decided
@@ -1505,7 +1522,8 @@ enum policy_mgr_conc_next_action policy_mgr_need_opportunistic_upgrade(
 QDF_STATUS policy_mgr_next_actions(struct wlan_objmgr_psoc *psoc,
 		uint32_t session_id,
 		enum policy_mgr_conc_next_action action,
-		enum policy_mgr_conn_update_reason reason);
+		enum policy_mgr_conn_update_reason reason,
+		uint32_t request_id);
 
 /**
  * policy_mgr_validate_dbs_switch() - Check DBS action valid or not
@@ -1591,6 +1609,7 @@ bool policy_mgr_map_concurrency_mode(enum QDF_OPMODE *old_mode,
  * @psoc: PSOC object information
  * @roam_profile: pointer to roam profile
  * @ch_freq: channel frequency to be filled
+ * @vdev_id: vdev id
  *
  * This routine gets channel which most likely a candidate to which STA
  * will make connection.
@@ -1600,7 +1619,7 @@ bool policy_mgr_map_concurrency_mode(enum QDF_OPMODE *old_mode,
 QDF_STATUS
 policy_mgr_get_channel_from_scan_result(struct wlan_objmgr_psoc *psoc,
 					void *roam_profile,
-					uint32_t *ch_freq);
+					uint32_t *ch_freq, uint8_t vdev_id);
 
 /**
  * policy_mgr_mode_specific_num_open_sessions() - to get number of open sessions
@@ -2082,6 +2101,7 @@ QDF_STATUS policy_mgr_get_pcl_for_existing_conn(
  * @psoc: PSOC object information
  * @weight: Pointer to the structure containing pcl, saved channel list and
  * weighed channel list
+ * @mode: Policy manager connection mode
  *
  * Provides the weightage for all valid channels. This compares the PCL list
  * with the valid channel list. The channels present in the PCL get their
@@ -2091,7 +2111,8 @@ QDF_STATUS policy_mgr_get_pcl_for_existing_conn(
  * Return: QDF_STATUS
  */
 QDF_STATUS policy_mgr_get_valid_chan_weights(struct wlan_objmgr_psoc *psoc,
-		struct policy_mgr_pcl_chan_weights *weight);
+		struct policy_mgr_pcl_chan_weights *weight,
+		enum policy_mgr_con_mode mode);
 
 /**
  * policy_mgr_set_hw_mode_on_channel_switch() - Set hw mode
@@ -2119,31 +2140,6 @@ QDF_STATUS policy_mgr_set_hw_mode_on_channel_switch(
 QDF_STATUS policy_mgr_check_and_set_hw_mode_for_channel_switch(
 		struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		uint32_t ch_freq, enum policy_mgr_conn_update_reason reason);
-
-/**
- * policy_mgr_set_do_hw_mode_change_flag() - Set flag to indicate hw mode change
- * @psoc: PSOC object information
- * @flag: Indicate if hw mode change is required or not
- *
- * Set the flag to indicate whether a hw mode change is required after a
- * vdev up or not. Flag value of true indicates that a hw mode change is
- * required after vdev up.
- *
- * Return: None
- */
-void policy_mgr_set_do_hw_mode_change_flag(struct wlan_objmgr_psoc *psoc,
-		bool flag);
-
-/**
- * policy_mgr_is_hw_mode_change_after_vdev_up() - Check if hw
- * mode change is needed
- * @psoc: PSOC object information
- * Returns the flag which indicates if a hw mode change is required after
- * vdev up.
- *
- * Return: True if hw mode change is required, false otherwise
- */
-bool policy_mgr_is_hw_mode_change_after_vdev_up(struct wlan_objmgr_psoc *psoc);
 
 /**
  * policy_mgr_checkn_update_hw_mode_single_mac_mode() - Set hw_mode to SMM
@@ -2385,6 +2381,15 @@ bool policy_mgr_is_dbs_enable(struct wlan_objmgr_psoc *psoc);
 bool policy_mgr_is_hw_dbs_capable(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * policy_mgr_is_interband_mcc_supported() - Checks for interband MCC support
+ * @psoc: PSOC object information
+ * Checks if target supports interband MCC or not
+ *
+ * Return: True if the target supports interband MCC else False
+ */
+bool policy_mgr_is_interband_mcc_supported(struct wlan_objmgr_psoc *psoc);
+
+/**
  * policy_mgr_is_dbs_scan_allowed() - Check if DBS scan is allowed or not
  * @psoc: PSOC object information
  * Checks if the DBS scan can be performed or not
@@ -2571,12 +2576,22 @@ QDF_STATUS policy_mgr_get_dbs_hw_modes(struct wlan_objmgr_psoc *psoc,
 		bool *one_by_one_dbs, bool *two_by_two_dbs);
 
 /**
+ * policy_mgr_check_sap_restart() - Restart SAP when band/channel change
+ * @psoc: Pointer to soc
+ * @vdev_id: Vdev id
+ *
+ * Return: None
+ */
+void
+policy_mgr_check_sap_restart(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
+
+/**
  * policy_mgr_check_sta_ap_concurrent_ch_intf() - Restart SAP in STA-AP case
  * @data: Pointer to STA adapter
  *
  * Restarts the SAP interface in STA-AP concurrency scenario
  *
- * Restart: None
+ * Return: None
  */
 void policy_mgr_check_sta_ap_concurrent_ch_intf(void *data);
 
@@ -3479,5 +3494,22 @@ bool policy_mgr_is_restart_sap_required(struct wlan_objmgr_psoc *psoc,
 					uint8_t vdev_id,
 					qdf_freq_t freq,
 					tQDF_MCC_TO_SCC_SWITCH_MODE scc_mode);
+
+/**
+ * policy_mgr_get_roam_enabled_sta_session_id() - get the session id of the sta
+ * on which roaming is enabled.
+ * @psoc: pointer to psoc object
+ * @vdev_id: vdev id of the requestor
+ *
+ * The function checks if any sta(other than the provided vdev_id) is present
+ * and has roaming enabled and return the session id of the sta with roaming
+ * enabled else if roaming is not enabled on any STA return
+ * WLAN_UMAC_VDEV_ID_MAX.
+ *
+ * Return: session id of STA on which roaming is enabled
+ */
+uint8_t policy_mgr_get_roam_enabled_sta_session_id(
+						struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id);
 
 #endif /* __WLAN_POLICY_MGR_API_H */

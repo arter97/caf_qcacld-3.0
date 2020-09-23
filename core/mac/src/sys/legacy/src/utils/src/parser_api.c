@@ -713,9 +713,16 @@ populate_dot11f_ht_caps(struct mac_context *mac,
 		pDot11f->shortGI20MHz = ht_cap_info->short_gi_20_mhz;
 		pDot11f->shortGI40MHz = ht_cap_info->short_gi_40_mhz;
 	} else {
+		if (WLAN_REG_IS_24GHZ_CH_FREQ(pe_session->curr_op_freq) &&
+		    LIM_IS_STA_ROLE(pe_session) &&
+		    WNI_CFG_CHANNEL_BONDING_MODE_DISABLE !=
+		    mac->roam.configParam.channelBondingMode24GHz)
+			pDot11f->supportedChannelWidthSet = 1;
+		else
+			pDot11f->supportedChannelWidthSet =
+				pe_session->htSupportedChannelWidthSet;
+
 		pDot11f->advCodingCap = pe_session->ht_config.ht_rx_ldpc;
-		pDot11f->supportedChannelWidthSet =
-			pe_session->htSupportedChannelWidthSet;
 		pDot11f->txSTBC = pe_session->ht_config.ht_tx_stbc;
 		pDot11f->rxSTBC = pe_session->ht_config.ht_rx_stbc;
 		pDot11f->shortGI20MHz = pe_session->ht_config.ht_sgi20;
@@ -1340,17 +1347,6 @@ populate_dot11f_ht_info(struct mac_context *mac,
 
 } /* End populate_dot11f_ht_info. */
 
-void
-populate_dot11f_ibss_params(struct mac_context *mac,
-			    tDot11fIEIBSSParams *pDot11f,
-			    struct pe_session *pe_session)
-{
-	if (LIM_IS_IBSS_ROLE(pe_session)) {
-		pDot11f->atim = mac->mlme_cfg->ibss.atim_win_size;
-		pDot11f->present = 1;
-	}
-} /* End populate_dot11f_ibss_params. */
-
 #ifdef ANI_SUPPORT_11H
 QDF_STATUS
 populate_dot11f_measurement_report0(struct mac_context *mac,
@@ -1833,22 +1829,10 @@ void populate_dot11f_wmm(struct mac_context *mac,
 			 tDot11fIEWMMCaps *pCaps, struct pe_session *pe_session)
 {
 	if (pe_session->limWmeEnabled) {
-		if (LIM_IS_IBSS_ROLE(pe_session)) {
-			/* if ( ! sirIsPropCapabilityEnabled( mac, SIR_MAC_PROP_CAPABILITY_WME ) ) */
-			{
-				populate_dot11f_wmm_info_ap(mac, pInfo,
-							    pe_session);
-			}
-		} else {
-			{
-				populate_dot11f_wmm_params(mac, pParams,
-							   pe_session);
-			}
-
-			if (pe_session->limWsmEnabled) {
-				populate_dot11f_wmm_caps(pCaps);
-			}
-		}
+		populate_dot11f_wmm_params(mac, pParams,
+					   pe_session);
+		if (pe_session->limWsmEnabled)
+			populate_dot11f_wmm_caps(pCaps);
 	}
 } /* End populate_dot11f_wmm. */
 
@@ -1923,20 +1907,13 @@ void populate_dot11f_wmm_info_ap(struct mac_context *mac, tDot11fIEWMMInfoAp *pI
 {
 	pInfo->version = SIR_MAC_OUI_VERSION_1;
 
-	/* WMM Specification 3.1.3, 3.2.3
-	 * An IBSS station shall always use its default WMM parameters.
-	 */
-	if (LIM_IS_IBSS_ROLE(pe_session)) {
-		pInfo->param_set_count = 0;
-		pInfo->uapsd = 0;
-	} else {
-		pInfo->param_set_count =
-			(0xf & pe_session->gLimEdcaParamSetCount);
-		if (LIM_IS_AP_ROLE(pe_session)) {
-			pInfo->uapsd = (0x1 & pe_session->apUapsdEnable);
-		} else
-			pInfo->uapsd = (0x1 & mac->lim.gUapsdEnable);
-	}
+	/* WMM Specification 3.1.3, 3.2.3 */
+	pInfo->param_set_count = (0xf & pe_session->gLimEdcaParamSetCount);
+	if (LIM_IS_AP_ROLE(pe_session))
+		pInfo->uapsd = (0x1 & pe_session->apUapsdEnable);
+	else
+		pInfo->uapsd = (0x1 & mac->lim.gUapsdEnable);
+
 	pInfo->present = 1;
 }
 
@@ -3159,6 +3136,10 @@ sir_convert_assoc_resp_frame2_struct(struct mac_context *mac,
 		qdf_mem_copy(&pAssocRsp->HTInfo, &ar->HTInfo,
 			     sizeof(tDot11fIEHTInfo));
 	}
+	if (ar->RRMEnabledCap.present) {
+		qdf_mem_copy(&pAssocRsp->rrm_caps, &ar->RRMEnabledCap,
+			     sizeof(tDot11fIERRMEnabledCap));
+	}
 	if (ar->MobilityDomain.present) {
 		/* MobilityDomain */
 		pAssocRsp->mdiePresent = 1;
@@ -3614,13 +3595,6 @@ sir_beacon_ie_ese_bcn_report(struct mac_context *mac,
 		numBytes += 1 + 1 + WLAN_CF_PARAM_IE_MAX_LEN;
 	}
 
-	if (pBies->IBSSParams.present) {
-		eseBcnReportMandatoryIe.ibssParamPresent = 1;
-		eseBcnReportMandatoryIe.ibssParamSet.atim =
-			pBies->IBSSParams.atim;
-		numBytes += 1 + 1 + WLAN_IBSS_IE_MAX_LEN;
-	}
-
 	if (pBies->TIM.present) {
 		eseBcnReportMandatoryIe.timPresent = 1;
 		eseBcnReportMandatoryIe.tim.dtimCount = pBies->TIM.dtim_count;
@@ -3741,24 +3715,6 @@ sir_beacon_ie_ese_bcn_report(struct mac_context *mac,
 			     WLAN_CF_PARAM_IE_MAX_LEN);
 		pos += WLAN_CF_PARAM_IE_MAX_LEN;
 		freeBytes -= (1 + 1 + WLAN_CF_PARAM_IE_MAX_LEN);
-	}
-
-	/* Fill IBSS Parameter set IE */
-	if (eseBcnReportMandatoryIe.ibssParamPresent) {
-		if (freeBytes < (1 + 1 + WLAN_IBSS_IE_MAX_LEN)) {
-			pe_err("Insufficient memory to copy IBSS IE");
-			retStatus = QDF_STATUS_E_FAILURE;
-			goto err_bcnrep;
-		}
-		*pos = WLAN_ELEMID_IBSSPARMS;
-		pos++;
-		*pos = WLAN_IBSS_IE_MAX_LEN;
-		pos++;
-		qdf_mem_copy(pos,
-			     (uint8_t *) &eseBcnReportMandatoryIe.ibssParamSet.
-			     atim, WLAN_IBSS_IE_MAX_LEN);
-		pos += WLAN_IBSS_IE_MAX_LEN;
-		freeBytes -= (1 + 1 + WLAN_IBSS_IE_MAX_LEN);
 	}
 
 	/* Fill TIM IE */
@@ -4417,12 +4373,6 @@ sir_convert_beacon_frame2_struct(struct mac_context *mac,
 		qdf_mem_copy(&pBeaconStruct->WiderBWChanSwitchAnn,
 			     &pBeacon->WiderBWChanSwitchAnn,
 			     sizeof(tDot11fIEWiderBWChanSwitchAnn));
-	}
-	/* IBSS Peer Params */
-	if (pBeacon->IBSSParams.present) {
-		pBeaconStruct->IBSSParams.present = 1;
-		qdf_mem_copy(&pBeaconStruct->IBSSParams, &pBeacon->IBSSParams,
-			     sizeof(tDot11fIEIBSSParams));
 	}
 
 	pBeaconStruct->Vendor1IEPresent = pBeacon->Vendor1IE.present;
@@ -6041,7 +5991,7 @@ populate_dot11f_timing_advert_frame(struct mac_context *mac_ctx,
 	if (mac_ctx->mlme_cfg->wmm_params.qos_enabled)
 		frame->Capabilities.qos = 1;
 
-	if (mac_ctx->mlme_cfg->scoring.apsd_enabled)
+	if (mac_ctx->mlme_cfg->roam_scoring.apsd_enabled)
 		frame->Capabilities.apsd = 1;
 
 	val = mac_ctx->mlme_cfg->feature_flags.enable_block_ack;

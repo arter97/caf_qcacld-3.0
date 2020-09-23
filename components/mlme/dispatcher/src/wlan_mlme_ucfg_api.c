@@ -773,17 +773,7 @@ QDF_STATUS
 ucfg_mlme_get_roaming_offload(struct wlan_objmgr_psoc *psoc,
 			      bool *val)
 {
-	struct wlan_mlme_psoc_ext_obj *mlme_obj;
-
-	mlme_obj = mlme_get_psoc_ext_obj(psoc);
-	if (!mlme_obj) {
-		*val = cfg_default(CFG_LFR3_ROAMING_OFFLOAD);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	*val = mlme_obj->cfg.lfr.lfr3_roaming_offload;
-
-	return QDF_STATUS_SUCCESS;
+	return wlan_mlme_get_roaming_offload(psoc, val);
 }
 
 QDF_STATUS
@@ -984,34 +974,14 @@ QDF_STATUS
 ucfg_mlme_get_roam_bmiss_final_bcnt(struct wlan_objmgr_psoc *psoc,
 				    uint8_t *val)
 {
-	struct wlan_mlme_psoc_ext_obj *mlme_obj;
-
-	mlme_obj = mlme_get_psoc_ext_obj(psoc);
-	if (!mlme_obj) {
-		*val = cfg_default(CFG_LFR_ROAM_BMISS_FINAL_BCNT);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	*val = mlme_obj->cfg.lfr.roam_bmiss_final_bcnt;
-
-	return QDF_STATUS_SUCCESS;
+	return wlan_mlme_get_roam_bmiss_final_bcnt(psoc, val);
 }
 
 QDF_STATUS
 ucfg_mlme_get_roam_bmiss_first_bcnt(struct wlan_objmgr_psoc *psoc,
 				    uint8_t *val)
 {
-	struct wlan_mlme_psoc_ext_obj *mlme_obj;
-
-	mlme_obj = mlme_get_psoc_ext_obj(psoc);
-	if (!mlme_obj) {
-		*val = cfg_default(CFG_LFR_ROAM_BMISS_FIRST_BCNT);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	*val = mlme_obj->cfg.lfr.roam_bmiss_first_bcnt;
-
-	return QDF_STATUS_SUCCESS;
+	return wlan_mlme_get_roam_bmiss_first_bcnt(psoc, val);
 }
 
 QDF_STATUS
@@ -1430,38 +1400,6 @@ ucfg_mlme_get_latency_enable(struct wlan_objmgr_psoc *psoc, bool *value)
 	return QDF_STATUS_SUCCESS;
 }
 
-QDF_STATUS ucfg_mlme_get_ibss_cfg(struct wlan_objmgr_psoc *psoc,
-				  struct wlan_mlme_ibss_cfg *ibss_cfg)
-{
-	struct wlan_mlme_psoc_ext_obj *mlme_obj;
-
-	if (!ibss_cfg)
-		return QDF_STATUS_E_FAILURE;
-
-	mlme_obj = mlme_get_psoc_ext_obj(psoc);
-	if (!mlme_obj) {
-		mlme_legacy_err("MLME Obj null on get IBSS config");
-		mlme_init_ibss_cfg(psoc, ibss_cfg);
-		return QDF_STATUS_E_INVAL;
-	}
-	*ibss_cfg = mlme_obj->cfg.ibss;
-	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS ucfg_mlme_set_ibss_auto_bssid(struct wlan_objmgr_psoc *psoc,
-					 uint32_t auto_bssid)
-{
-	struct wlan_mlme_psoc_ext_obj *mlme_obj;
-
-	mlme_obj = mlme_get_psoc_ext_obj(psoc);
-	if (!mlme_obj) {
-		mlme_legacy_err("MLME Obj null on get IBSS config");
-		return QDF_STATUS_E_INVAL;
-	}
-	mlme_obj->cfg.ibss.auto_bssid = auto_bssid;
-	return QDF_STATUS_SUCCESS;
-}
-
 #ifdef MWS_COEX
 QDF_STATUS
 ucfg_mlme_get_mws_coex_4g_quick_tdm(struct wlan_objmgr_psoc *psoc,
@@ -1550,6 +1488,24 @@ ucfg_mlme_get_etsi13_srd_chan_in_master_mode(struct wlan_objmgr_psoc *psoc,
 	}
 
 	*value = mlme_obj->cfg.reg.etsi13_srd_chan_in_master_mode;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+ucfg_mlme_get_5dot9_ghz_chan_in_master_mode(struct wlan_objmgr_psoc *psoc,
+					    bool *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		*value = cfg_default(CFG_FCC_5DOT9_GHZ_CHAN_IN_MASTER_MODE);
+		mlme_legacy_err("Failed to get MLME Obj");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*value = mlme_obj->cfg.reg.fcc_5dot9_ghz_chan_in_master_mode;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1650,6 +1606,22 @@ ucfg_mlme_get_scan_11d_interval(struct wlan_objmgr_psoc *psoc,
 	}
 
 	*value = mlme_obj->cfg.reg.scan_11d_interval;
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+ucfg_mlme_get_nol_across_regdmn(struct wlan_objmgr_psoc *psoc, bool *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		*value = cfg_default(CFG_RETAIN_NOL_ACROSS_REG_DOMAIN);
+		mlme_legacy_err("Failed to get MLME Obj");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*value = mlme_obj->cfg.reg.retain_nol_across_regdmn_update;
 	return QDF_STATUS_SUCCESS;
 }
 

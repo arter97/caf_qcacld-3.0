@@ -160,44 +160,28 @@ static void lim_extract_he_op(struct pe_session *session,
 	}
 }
 
-static bool lim_check_he_80_mcs11_supp(struct pe_session *session,
-		tSirProbeRespBeacon *beacon_struct) {
-	uint8_t rx_mcs_map;
-	uint8_t tx_mcs_map;
-	rx_mcs_map = beacon_struct->he_cap.rx_he_mcs_map_lt_80;
-	tx_mcs_map = beacon_struct->he_cap.tx_he_mcs_map_lt_80;
-	if ((session->nss == NSS_1x1_MODE) &&
-		((HE_GET_MCS_4_NSS(rx_mcs_map, 1) == HE_MCS_0_11) ||
-		(HE_GET_MCS_4_NSS(tx_mcs_map, 1) == HE_MCS_0_11)))
-		return true;
-
-	if ((session->nss == NSS_2x2_MODE) &&
-		((HE_GET_MCS_4_NSS(rx_mcs_map, 2) == HE_MCS_0_11) ||
-		(HE_GET_MCS_4_NSS(tx_mcs_map, 2) == HE_MCS_0_11)))
-		return true;
-
-	return false;
-}
-
-static void lim_check_he_ldpc_cap(struct pe_session *session,
-		tSirProbeRespBeacon *beacon_struct)
+static void lim_check_is_he_mcs_valid(struct pe_session *session,
+				      tSirProbeRespBeacon *beacon_struct)
 {
-	if (session->he_capable && beacon_struct->he_cap.present) {
-		if (beacon_struct->he_cap.ldpc_coding)
+	uint8_t i;
+	uint16_t mcs_map;
+
+	if (!session->he_capable || !beacon_struct->he_cap.present)
+		return;
+
+	mcs_map = beacon_struct->he_cap.rx_he_mcs_map_lt_80;
+	for (i = 0; i < session->nss; i++) {
+		if (((mcs_map >> (i * 2)) & 0x3) != 0x3)
 			return;
-		else if ((session->ch_width == CH_WIDTH_20MHZ) &&
-				!lim_check_he_80_mcs11_supp(session,
-					beacon_struct))
-			return;
-		session->he_capable = false;
-		pe_err("LDPC check failed for HE operation");
-		if (session->vhtCapability) {
-			session->dot11mode = MLME_DOT11_MODE_11AC;
-			pe_debug("Update dot11mode to 11ac");
-		} else {
-			session->dot11mode = MLME_DOT11_MODE_11N;
-			pe_debug("Update dot11mode to 11N");
-		}
+	}
+	session->he_capable = false;
+	pe_err("AP does not have valid MCS map");
+	if (session->vhtCapability) {
+		session->dot11mode = MLME_DOT11_MODE_11AC;
+		pe_debug("Update dot11mode to 11ac");
+	} else {
+		session->dot11mode = MLME_DOT11_MODE_11N;
+		pe_debug("Update dot11mode to 11N");
 	}
 }
 
@@ -275,9 +259,10 @@ void lim_update_he_bw_cap_mcs(struct pe_session *session,
 static inline void lim_extract_he_op(struct pe_session *session,
 		tSirProbeRespBeacon *beacon_struct)
 {}
-static void lim_check_he_ldpc_cap(struct pe_session *session,
-		tSirProbeRespBeacon *beacon_struct)
-{}
+static void lim_check_is_he_mcs_valid(struct pe_session *session,
+				      tSirProbeRespBeacon *beacon_struct)
+{
+}
 #endif
 
 void lim_objmgr_update_vdev_nss(struct wlan_objmgr_psoc *psoc,
@@ -524,18 +509,39 @@ void lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 		session->gLimOperatingMode.present =
 			ext_cap->oper_mode_notification;
 		if (ext_cap->oper_mode_notification) {
+			uint8_t self_nss = 0;
+
+			if (!wlan_reg_is_24ghz_ch_freq(session->curr_op_freq))
+				self_nss = mac_ctx->vdev_type_nss_5g.sta;
+			else
+				self_nss = mac_ctx->vdev_type_nss_2g.sta;
+
 			if (CH_WIDTH_160MHZ > session->ch_width)
 				session->gLimOperatingMode.chanWidth =
 						session->ch_width;
 			else
 				session->gLimOperatingMode.chanWidth =
 					CH_WIDTH_160MHZ;
-			session->gLimOperatingMode.rxNSS = session->nss - 1;
+			/** Populate vdev nss in OMN ie of assoc requse for
+			 *  WFA CERT test scenario.
+			 */
+			if (ext_cap->beacon_protection_enable &&
+			    (session->opmode == QDF_STA_MODE) &&
+			    (!session->nss_forced_1x1) &&
+			     lim_get_nss_supported_by_ap(
+					&beacon_struct->VHTCaps,
+					&beacon_struct->HTCaps,
+					&beacon_struct->he_cap) ==
+						 NSS_1x1_MODE)
+				session->gLimOperatingMode.rxNSS = self_nss - 1;
+			else
+				session->gLimOperatingMode.rxNSS =
+							session->nss - 1;
 		} else {
 			pe_err("AP does not support op_mode rx");
 		}
 	}
-	lim_check_he_ldpc_cap(session, beacon_struct);
+	lim_check_is_he_mcs_valid(session, beacon_struct);
 	lim_extract_he_op(session, beacon_struct);
 	lim_update_he_bw_cap_mcs(session, beacon_struct);
 	/* Extract the UAPSD flag from WMM Parameter element */

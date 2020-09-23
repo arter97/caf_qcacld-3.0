@@ -17,46 +17,46 @@
  */
 
 /**
- * DOC: wlan_hdd_sysfs_set_fw_mode_cfg.h
+ * DOC: wlan_hdd_sysfs_mem_stats.h
  *
- * implementation for creating sysfs file set_fw_mode_cfg
+ * Implementation to add sysfs node wlan_mem_stats
  */
 
-#ifndef _WLAN_HDD_SYSFS_SET_FW_MODE_CFG_H
-#define _WLAN_HDD_SYSFS_SET_FW_MODE_CFG_H
+#ifndef _WLAN_HDD_SYSFS_MEM_STATS
+#define _WLAN_HDD_SYSFS_MEM_STATS
 
-#if defined(WLAN_SYSFS) && defined(CONFIG_WLAN_SET_FW_MODE_CFG)
+#if defined(WLAN_SYSFS) && defined(CONFIG_WLAN_SYSFS_MEM_STATS)
 /**
- * hdd_sysfs_set_fw_mode_cfg_create() - API to create set_fw_mode_cfg
- * @driver_kobject: sysfs driver kobject
+ * hdd_sysfs_mem_stats_create() - Function to create
+ * wlan_mem_stats sysfs node to capture host driver memory usage
+ * @wlan_kobject: sysfs wlan kobject
  *
- * file path: /sys/kernel/wifi/set_fw_mode_cfg
+ * file path: /sys/kernel/wifi/wlan/wlan_mem_stats
  *
- * usage:
- *      echo [arg_0] [arg_1] > set_fw_mode_cfg
+ * usage: cat /sys/kernel/wifi/wlan/wlan_mem_stats
  *
  * Return: 0 on success and errno on failure
  */
-int hdd_sysfs_set_fw_mode_cfg_create(struct kobject *driver_kobject);
+int hdd_sysfs_mem_stats_create(struct kobject *wlan_kobject);
 
 /**
- * hdd_sysfs_set_fw_mode_cfg_destroy() -
- *   API to destroy set_fw_mode_cfg
+ * hdd_sysfs_mem_stats_destroy() - API to destroy
+ * wlan_mem_stats
  *
  * Return: none
  */
-void
-hdd_sysfs_set_fw_mode_cfg_destroy(struct kobject *driver_kobject);
+void hdd_sysfs_mem_stats_destroy(struct kobject *wlan_kobject);
 #else
 static inline int
-hdd_sysfs_set_fw_mode_cfg_create(struct kobject *driver_kobject)
+hdd_sysfs_mem_stats_create(struct kobject *wlan_kobject)
 {
 	return 0;
 }
 
 static inline void
-hdd_sysfs_set_fw_mode_cfg_destroy(struct kobject *driver_kobject)
+hdd_sysfs_mem_stats_destroy(struct kobject *wlan_kobject)
 {
 }
-#endif
-#endif /* #ifndef _WLAN_HDD_SYSFS_SET_FW_MODE_CFG_H */
+#endif /* WLAN_SYSFS && CONFIG_WLAN_SYSFS_MEM_STATS */
+#endif /* _WLAN_HDD_SYSFS_MEM_STATS */
+

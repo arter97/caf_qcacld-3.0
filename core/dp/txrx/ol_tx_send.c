@@ -333,16 +333,17 @@ ol_tx_download_done_hl_free(void *txrx_pdev,
 	struct ol_txrx_pdev_t *pdev = txrx_pdev;
 	struct ol_tx_desc_t *tx_desc;
 	bool is_frame_freed;
+	uint8_t dp_status;
 
 	tx_desc = ol_tx_desc_find(pdev, msdu_id);
 	qdf_assert(tx_desc);
-
+	dp_status = qdf_dp_get_status_from_a_status(status);
 	DPTRACE(qdf_dp_trace_ptr(msdu,
 				 QDF_DP_TRACE_FREE_PACKET_PTR_RECORD,
 				 QDF_TRACE_DEFAULT_PDEV_ID,
 				 qdf_nbuf_data_addr(msdu),
 				 sizeof(qdf_nbuf_data(msdu)), tx_desc->id,
-				 status));
+				 dp_status));
 
 	is_frame_freed = ol_tx_download_done_base(pdev, status, msdu, msdu_id);
 
@@ -873,14 +874,16 @@ static void ol_tx_update_ack_count(struct ol_tx_desc_t *tx_desc,
  * ol_tx_notify_completion() - Notify tx completion for this desc
  * @tx_desc: tx desc
  * @netbuf:  buffer
+ * @status: tx status
  *
  * Return: none
  */
 static void ol_tx_notify_completion(struct ol_tx_desc_t *tx_desc,
-				    qdf_nbuf_t netbuf)
+				    qdf_nbuf_t netbuf, uint8_t status)
 {
 	void *osif_dev;
 	ol_txrx_completion_fp tx_compl_cbk = NULL;
+	uint16_t flag = 0;
 
 	qdf_assert(tx_desc);
 
@@ -895,8 +898,14 @@ static void ol_tx_notify_completion(struct ol_tx_desc_t *tx_desc,
 	tx_compl_cbk = tx_desc->vdev->tx_comp;
 	ol_tx_flow_pool_unlock(tx_desc);
 
+	if (status == htt_tx_status_ok)
+		flag = (BIT(QDF_TX_RX_STATUS_OK) |
+			BIT(QDF_TX_RX_STATUS_DOWNLOAD_SUCC));
+	else if (status != htt_tx_status_download_fail)
+		flag = BIT(QDF_TX_RX_STATUS_DOWNLOAD_SUCC);
+
 	if (tx_compl_cbk)
-		tx_compl_cbk(netbuf, osif_dev);
+		tx_compl_cbk(netbuf, osif_dev, flag);
 }
 
 /**
@@ -948,40 +957,6 @@ static void ol_tx_update_connectivity_stats(struct ol_tx_desc_t *tx_desc,
 }
 
 /**
- * ol_tx_update_arp_stats() - update ARP packet TX stats
- * @tx_desc: tx desc
- * @netbuf:  buffer
- * @status: htt status
- *
- *
- * Return: none
- */
-static void ol_tx_update_arp_stats(struct ol_tx_desc_t *tx_desc,
-				   qdf_nbuf_t netbuf,
-				   enum htt_tx_status status)
-{
-	uint32_t tgt_ip;
-
-	qdf_assert(tx_desc);
-
-	ol_tx_flow_pool_lock(tx_desc);
-	if (!tx_desc->vdev) {
-		ol_tx_flow_pool_unlock(tx_desc);
-		return;
-	}
-
-	tgt_ip = cds_get_arp_stats_gw_ip(tx_desc->vdev->osif_dev);
-	ol_tx_flow_pool_unlock(tx_desc);
-
-	if (tgt_ip == qdf_nbuf_get_arp_tgt_ip(netbuf)) {
-		if (status != htt_tx_status_download_fail)
-			cds_incr_arp_stats_tx_tgt_delivered();
-		if (status == htt_tx_status_ok)
-			cds_incr_arp_stats_tx_tgt_acked();
-	}
-}
-
-/**
  * WARNING: ol_tx_inspect_handler()'s behavior is similar to that of
  * ol_tx_completion_handler().
  * any change in ol_tx_completion_handler() must be mirrored in
@@ -1015,6 +990,7 @@ ol_tx_completion_handler(ol_txrx_pdev_handle pdev,
 	ol_tx_desc_list tx_descs;
 	uint64_t tx_tsf64;
 	uint8_t tid;
+	uint8_t dp_status;
 
 	TAILQ_INIT(&tx_descs);
 
@@ -1071,16 +1047,9 @@ ol_tx_completion_handler(ol_txrx_pdev_handle pdev,
 
 		QDF_NBUF_UPDATE_TX_PKT_COUNT(netbuf, QDF_NBUF_TX_PKT_FREE);
 
-		if (QDF_NBUF_CB_GET_PACKET_TYPE(netbuf) ==
-		    QDF_NBUF_CB_PACKET_TYPE_ARP) {
-			if (qdf_nbuf_data_is_arp_req(netbuf))
-				ol_tx_update_arp_stats(tx_desc, netbuf,
-						       status);
-		}
-
 		/* check tx completion notification */
 		if (QDF_NBUF_CB_TX_EXTRA_FRAG_FLAGS_NOTIFY_COMP(netbuf))
-			ol_tx_notify_completion(tx_desc, netbuf);
+			ol_tx_notify_completion(tx_desc, netbuf, status);
 
 		/* track connectivity stats */
 		ol_tx_update_connectivity_stats(tx_desc, netbuf,
@@ -1096,12 +1065,13 @@ ol_tx_completion_handler(ol_txrx_pdev_handle pdev,
 					      netbuf, status, TX_DATA_PKT);
 		}
 #endif
+		dp_status = qdf_dp_get_status_from_htt(status);
 
 		DPTRACE(qdf_dp_trace_ptr(netbuf,
 			QDF_DP_TRACE_FREE_PACKET_PTR_RECORD,
 			QDF_TRACE_DEFAULT_PDEV_ID,
 			qdf_nbuf_data_addr(netbuf),
-			sizeof(qdf_nbuf_data(netbuf)), tx_desc->id, status));
+			sizeof(qdf_nbuf_data(netbuf)), tx_desc->id, dp_status));
 		htc_pm_runtime_put(pdev->htt_pdev->htc_pdev);
 		/*
 		 * If credits are reported through credit_update_ind then do not

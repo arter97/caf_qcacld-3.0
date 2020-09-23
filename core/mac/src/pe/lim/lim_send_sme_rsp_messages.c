@@ -41,7 +41,6 @@
 #include "lim_security_utils.h"
 #include "lim_ser_des_utils.h"
 #include "lim_send_sme_rsp_messages.h"
-#include "lim_ibss_peer_mgmt.h"
 #include "lim_session_utils.h"
 #include "lim_types.h"
 #include "sir_api.h"
@@ -1168,9 +1167,6 @@ lim_send_sme_wm_status_change_ntf(struct mac_context *mac_ctx,
 	case eSIR_SME_AP_CAPS_CHANGED:
 		max_info_len = sizeof(struct ap_new_caps);
 		break;
-	case eSIR_SME_JOINED_NEW_BSS:
-		max_info_len = sizeof(struct new_bss_info);
-		break;
 	default:
 		max_info_len = sizeof(wm_status_change_ntf->statusChangeInfo);
 		break;
@@ -1414,40 +1410,6 @@ void lim_send_sme_pe_ese_tsm_rsp(struct mac_context *mac,
 
 #endif /* FEATURE_WLAN_ESE */
 
-#ifdef QCA_IBSS_SUPPORT
-void
-lim_send_sme_ibss_peer_ind(struct mac_context *mac,
-			   tSirMacAddr peerMacAddr,
-			   uint8_t *beacon,
-			   uint16_t beaconLen, uint16_t msgType, uint8_t sessionId)
-{
-	struct scheduler_msg mmhMsg = {0};
-	tSmeIbssPeerInd *pNewPeerInd;
-
-	pNewPeerInd = qdf_mem_malloc(sizeof(tSmeIbssPeerInd) + beaconLen);
-	if (!pNewPeerInd)
-		return;
-
-	qdf_mem_copy((uint8_t *) pNewPeerInd->peer_addr.bytes,
-		     peerMacAddr, QDF_MAC_ADDR_SIZE);
-	pNewPeerInd->mesgLen = sizeof(tSmeIbssPeerInd) + beaconLen;
-	pNewPeerInd->mesgType = msgType;
-	pNewPeerInd->sessionId = sessionId;
-
-	if (beacon) {
-		qdf_mem_copy((void *)((uint8_t *) pNewPeerInd +
-				      sizeof(tSmeIbssPeerInd)), (void *)beacon,
-			     beaconLen);
-	}
-
-	mmhMsg.type = msgType;
-	mmhMsg.bodyptr = pNewPeerInd;
-	MTRACE(mac_trace(mac, TRACE_CODE_TX_SME_MSG, sessionId, mmhMsg.type));
-	lim_sys_process_mmh_msg_api(mac, &mmhMsg);
-
-}
-#endif
-
 /**
  * lim_process_csa_wbw_ie() - Process CSA Wide BW IE
  * @mac_ctx:         pointer to global adapter context
@@ -1503,7 +1465,7 @@ static QDF_STATUS lim_process_csa_wbw_ie(struct mac_context *mac_ctx,
 		eLIM_CHANNEL_SWITCH_PRIMARY_AND_SECONDARY;
 	if ((ap_new_ch_width == CH_WIDTH_160MHZ) &&
 			!new_ch_width_dfn) {
-		if (csa_params->new_ch_freq_seg1 != csa_params->channel +
+		if (abs(csa_params->new_ch_freq_seg1 - csa_params->channel) !=
 				CH_TO_CNTR_FREQ_DIFF_160MHz) {
 			pe_err("CSA wide BW IE has invalid center freq");
 			return QDF_STATUS_E_INVAL;
@@ -1526,7 +1488,7 @@ static QDF_STATUS lim_process_csa_wbw_ie(struct mac_context *mac_ctx,
 				 fw_vht_ch_wd);
 			ap_new_ch_width = fw_vht_ch_wd;
 		}
-		if (csa_params->new_ch_freq_seg1 != csa_params->channel +
+		if (abs(csa_params->new_ch_freq_seg1 - csa_params->channel) !=
 				CH_TO_CNTR_FREQ_DIFF_80MHz) {
 			pe_err("CSA wide BW IE has invalid center freq");
 			return QDF_STATUS_E_INVAL;
@@ -1534,7 +1496,7 @@ static QDF_STATUS lim_process_csa_wbw_ie(struct mac_context *mac_ctx,
 		csa_params->new_ch_freq_seg2 = 0;
 	}
 	if (new_ch_width_dfn) {
-		if (csa_params->new_ch_freq_seg1 != csa_params->channel +
+		if (abs(csa_params->new_ch_freq_seg1 - csa_params->channel) !=
 				CH_TO_CNTR_FREQ_DIFF_80MHz) {
 			pe_err("CSA wide BW IE has invalid center freq");
 			return QDF_STATUS_E_INVAL;
@@ -1545,8 +1507,7 @@ static QDF_STATUS lim_process_csa_wbw_ie(struct mac_context *mac_ctx,
 			ap_new_ch_width = fw_vht_ch_wd;
 		}
 		if ((ap_new_ch_width == CH_WIDTH_160MHZ) &&
-				(csa_params->new_ch_freq_seg1 !=
-				 csa_params->channel +
+		    (abs(csa_params->new_ch_freq_seg1 - csa_params->channel) !=
 				 CH_TO_CNTR_FREQ_DIFF_160MHz)) {
 			pe_err("wide BW IE has invalid 160M center freq");
 			csa_params->new_ch_freq_seg2 = 0;
@@ -1572,6 +1533,22 @@ prnt_log:
 	return QDF_STATUS_SUCCESS;
 }
 
+static bool lim_is_csa_channel_allowed(struct mac_context *mac_ctx,
+				       qdf_freq_t ch_freq1,
+				       uint32_t ch_freq2)
+{
+	bool is_allowed = true;
+	u32 cnx_count = 0;
+
+	cnx_count = policy_mgr_get_connection_count(mac_ctx->psoc);
+	if ((cnx_count > 1) && !policy_mgr_is_hw_dbs_capable(mac_ctx->psoc) &&
+	    !policy_mgr_is_interband_mcc_supported(mac_ctx->psoc)) {
+		is_allowed = wlan_reg_is_same_band_freqs(ch_freq1, ch_freq2);
+	}
+
+	return is_allowed;
+}
+
 /**
  * lim_handle_csa_offload_msg() - Handle CSA offload message
  * @mac_ctx:         pointer to global adapter context
@@ -1591,6 +1568,7 @@ void lim_handle_csa_offload_msg(struct mac_context *mac_ctx,
 	uint16_t chan_space = 0;
 	struct ch_params ch_params = {0};
 	uint32_t channel_bonding_mode;
+	uint8_t country_code[CDS_COUNTRY_CODE_LEN + 1];
 
 	tLimWiderBWChannelSwitchInfo *chnl_switch_info = NULL;
 	tLimChannelSwitchInfo *lim_ch_switch = NULL;
@@ -1619,6 +1597,12 @@ void lim_handle_csa_offload_msg(struct mac_context *mac_ctx,
 
 	if (!LIM_IS_STA_ROLE(session_entry)) {
 		pe_debug("Invalid role to handle CSA");
+		goto err;
+	}
+
+	if (!lim_is_csa_channel_allowed(mac_ctx, session_entry->curr_op_freq,
+					csa_params->csa_chan_freq)) {
+		pe_debug("Channel switch is not allowed");
 		goto err;
 	}
 	/*
@@ -1664,7 +1648,7 @@ void lim_handle_csa_offload_msg(struct mac_context *mac_ctx,
 		 channel_bonding_mode);
 
 	session_entry->htSupportedChannelWidthSet = false;
-
+	wlan_reg_read_current_country(mac_ctx->psoc, country_code);
 	if (channel_bonding_mode &&
 	    ((session_entry->vhtCapability && session_entry->htCapability) ||
 	      lim_is_session_he_capable(session_entry))) {
@@ -1697,7 +1681,7 @@ void lim_handle_csa_offload_msg(struct mac_context *mac_ctx,
 			} else {
 				chan_space =
 				wlan_reg_dmn_get_chanwidth_from_opclass(
-						mac_ctx->scan.countryCodeCurrent,
+						country_code,
 						csa_params->channel,
 						csa_params->new_op_class);
 			}
@@ -1770,7 +1754,7 @@ void lim_handle_csa_offload_msg(struct mac_context *mac_ctx,
 				& lim_xcsa_ie_present) {
 			chan_space =
 				wlan_reg_dmn_get_chanwidth_from_opclass(
-						mac_ctx->scan.countryCodeCurrent,
+						country_code,
 						csa_params->channel,
 						csa_params->new_op_class);
 			lim_ch_switch->state =
@@ -1890,9 +1874,7 @@ void lim_handle_delete_bss_rsp(struct mac_context *mac,
 	 * not take the HO_FAIL path
 	 */
 	pe_session->process_ho_fail = false;
-	if (LIM_IS_IBSS_ROLE(pe_session))
-		lim_ibss_del_bss_rsp(mac, del_bss_rsp, pe_session);
-	else if (LIM_IS_UNKNOWN_ROLE(pe_session))
+	if (LIM_IS_UNKNOWN_ROLE(pe_session))
 		lim_process_sme_del_bss_rsp(mac, pe_session);
 	else if (LIM_IS_NDI_ROLE(pe_session))
 		lim_ndi_del_bss_rsp(mac, del_bss_rsp, pe_session);

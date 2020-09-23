@@ -27,6 +27,7 @@
 #include <wlan_utility.h>
 #include <wlan_policy_mgr_api.h>
 #include "wlan_reg_ucfg_api.h"
+#include <host_diag_core_event.h>
 
 static uint8_t calculate_hash_key(const uint8_t *macaddr)
 {
@@ -476,7 +477,7 @@ void tdls_extract_peer_state_param(struct tdls_peer_update_state *peer_param,
 	enum channel_state ch_state;
 	struct wlan_objmgr_pdev *pdev;
 	uint8_t chan_id;
-	enum band_info cur_band = BAND_ALL;
+	uint32_t cur_band;
 	qdf_freq_t ch_freq;
 
 	vdev_obj = peer->vdev_priv;
@@ -512,7 +513,7 @@ void tdls_extract_peer_state_param(struct tdls_peer_update_state *peer_param,
 		return;
 	}
 
-	if (BAND_2G == cur_band) {
+	if (BIT(REG_BAND_2G) == cur_band) {
 		tdls_err("sending the offchannel value as 0 as only 2g is supported");
 		peer_param->peer_cap.pref_off_channum = 0;
 		peer_param->peer_cap.opclass_for_prefoffchan = 0;
@@ -552,6 +553,84 @@ void tdls_extract_peer_state_param(struct tdls_peer_update_state *peer_param,
 			peer->supported_oper_classes[i];
 }
 
+#ifdef TDLS_WOW_ENABLED
+/**
+ * tdls_prevent_suspend(): Prevent suspend for TDLS
+ *
+ * Acquire wake lock and prevent suspend for TDLS
+ *
+ * Return None
+ */
+static void tdls_prevent_suspend(struct tdls_soc_priv_obj *tdls_soc)
+{
+	if (tdls_soc->is_prevent_suspend)
+		return;
+
+	qdf_wake_lock_acquire(&tdls_soc->wake_lock,
+			      WIFI_POWER_EVENT_WAKELOCK_TDLS);
+	qdf_runtime_pm_prevent_suspend(&tdls_soc->runtime_lock);
+	tdls_soc->is_prevent_suspend = true;
+}
+
+/**
+ * tdls_allow_suspend(): Allow suspend for TDLS
+ *
+ * Release wake lock and allow suspend for TDLS
+ *
+ * Return None
+ */
+static void tdls_allow_suspend(struct tdls_soc_priv_obj *tdls_soc)
+{
+	if (!tdls_soc->is_prevent_suspend)
+		return;
+
+	qdf_wake_lock_release(&tdls_soc->wake_lock,
+			      WIFI_POWER_EVENT_WAKELOCK_TDLS);
+	qdf_runtime_pm_allow_suspend(&tdls_soc->runtime_lock);
+	tdls_soc->is_prevent_suspend = false;
+}
+
+/**
+ * tdls_update_pmo_status() - Update PMO status by TDLS status
+ * @tdls_vdev: TDLS vdev object
+ * @old_status: old link status
+ * @new_status: new link status
+ *
+ * Return: None.
+ */
+static void tdls_update_pmo_status(struct tdls_vdev_priv_obj *tdls_vdev,
+				   enum tdls_link_state old_status,
+				   enum tdls_link_state new_status)
+{
+	struct tdls_soc_priv_obj *tdls_soc;
+
+	tdls_soc = wlan_vdev_get_tdls_soc_obj(tdls_vdev->vdev);
+	if (!tdls_soc) {
+		tdls_err("NULL psoc object");
+		return;
+	}
+
+	if (tdls_soc->is_drv_supported)
+		return;
+
+	if ((old_status < TDLS_LINK_CONNECTING) &&
+	    (new_status == TDLS_LINK_CONNECTING))
+		tdls_prevent_suspend(tdls_soc);
+
+	if ((old_status > TDLS_LINK_IDLE) &&
+	    (new_status == TDLS_LINK_IDLE) &&
+	    (!tdls_soc->connected_peer_count) &&
+	    (!tdls_is_progress(tdls_vdev, NULL, 0)))
+		tdls_allow_suspend(tdls_soc);
+}
+#else
+static void tdls_update_pmo_status(struct tdls_vdev_priv_obj *tdls_vdev,
+				   enum tdls_link_state old_status,
+				   enum tdls_link_state new_status)
+{
+}
+#endif
+
 /**
  * tdls_set_link_status() - set link statue for TDLS peer
  * @vdev_obj: TDLS vdev object
@@ -572,6 +651,7 @@ void tdls_set_link_status(struct tdls_vdev_priv_obj *vdev_obj,
 	uint32_t channel = 0;
 	struct tdls_peer *peer;
 	struct tdls_soc_priv_obj *soc_obj;
+	enum tdls_link_state old_status;
 
 	peer = tdls_find_peer(vdev_obj, mac);
 	if (!peer) {
@@ -580,7 +660,9 @@ void tdls_set_link_status(struct tdls_vdev_priv_obj *vdev_obj,
 		return;
 	}
 
+	old_status = peer->link_status;
 	peer->link_status = link_status;
+	tdls_update_pmo_status(vdev_obj, old_status, link_status);
 
 	if (link_status >= TDLS_LINK_DISCOVERED)
 		peer->discovery_attempt = 0;
@@ -612,11 +694,16 @@ void tdls_set_peer_link_status(struct tdls_peer *peer,
 	uint32_t channel = 0;
 	struct tdls_soc_priv_obj *soc_obj;
 	struct tdls_vdev_priv_obj *vdev_obj;
+	enum tdls_link_state old_status;
 
 	tdls_debug("state %d reason %d peer:" QDF_MAC_ADDR_STR,
 		   link_status, link_reason,
 		   QDF_MAC_ADDR_ARRAY(peer->peer_mac.bytes));
+
+	vdev_obj = peer->vdev_priv;
+	old_status = peer->link_status;
 	peer->link_status = link_status;
+	tdls_update_pmo_status(vdev_obj, old_status, link_status);
 
 	if (link_status >= TDLS_LINK_DISCOVERED)
 		peer->discovery_attempt = 0;
@@ -624,7 +711,6 @@ void tdls_set_peer_link_status(struct tdls_peer *peer,
 	if (peer->is_forced_peer && peer->state_change_notification) {
 		peer->reason = link_reason;
 
-		vdev_obj = peer->vdev_priv;
 		soc_obj = wlan_vdev_get_tdls_soc_obj(vdev_obj->vdev);
 		if (!soc_obj) {
 			tdls_err("NULL psoc object");
@@ -779,6 +865,14 @@ QDF_STATUS tdls_reset_peer(struct tdls_vdev_priv_obj *vdev_obj,
 				soc_obj, curr_peer->pref_off_chan_num,
 				soc_obj->tdls_configs.tdls_pre_off_chan_bw,
 				&reg_bw_offset);
+	}
+
+	if (curr_peer->is_peer_idle_timer_initialised) {
+		tdls_debug(QDF_MAC_ADDR_STR ": destroy  idle timer ",
+			   QDF_MAC_ADDR_ARRAY(curr_peer->peer_mac.bytes));
+		qdf_mc_timer_stop(&curr_peer->peer_idle_timer);
+		qdf_mc_timer_destroy(&curr_peer->peer_idle_timer);
+		curr_peer->is_peer_idle_timer_initialised = false;
 	}
 
 	tdls_set_peer_link_status(curr_peer, TDLS_LINK_IDLE,

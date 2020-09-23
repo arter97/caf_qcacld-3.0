@@ -298,6 +298,7 @@ typedef struct sap_StationDisassocCompleteEvent_s {
 	int tx_rate;
 	int rx_rate;
 	uint32_t rx_mc_bc_cnt;
+	uint32_t rx_retry_cnt;
 } tSap_StationDisassocCompleteEvent;
 
 typedef struct sap_StationSetKeyCompleteEvent_s {
@@ -473,6 +474,7 @@ enum  sap_acs_dfs_mode {
 
 struct sap_config {
 	tSap_SSIDInfo_t SSIDinfo;
+	eCsrPhyMode sap_orig_hw_mode;	/* Previous wireless Mode */
 	eCsrPhyMode SapHw_mode;         /* Wireless Mode */
 	eSapMacAddrACL SapMacaddr_acl;
 	struct qdf_mac_addr accept_mac[MAX_ACL_MAC_ADDRESS]; /* MAC filtering */
@@ -1227,18 +1229,6 @@ eCsrPhyMode wlan_sap_get_phymode(struct sap_context *sap_ctx);
 uint32_t wlan_sap_get_vht_ch_width(struct sap_context *sap_ctx);
 
 /**
- * wlan_sap_set_vht_ch_width() - Sets SAP VHT channel width.
- * @sap_ctx:		Pointer to Sap Context
- * @vht_channel_width:	SAP VHT channel width value.
- *
- * This function sets the SAP current VHT channel width.
- *
- * Return: None
- */
-void wlan_sap_set_vht_ch_width(struct sap_context *sap_ctx,
-			       uint32_t vht_channel_width);
-
-/**
  * wlan_sap_get_ch_params() - get ch params
  * @sap_ctx: Pointer to Sap Context
  * @ch_params: returned ch_params
@@ -1487,14 +1477,18 @@ wlansap_get_safe_channel_from_pcl_and_acs_range(struct sap_context *sap_ctx);
 /**
  * wlansap_get_chan_band_restrict() -  get new chan for band change
  * @sap_ctx: sap context pointer
+ * @csa_reason: channel switch reason to update
  *
  * Sap/p2p go channel switch from 5G to 2G by CSA when 5G band disabled to
  * avoid conflict with modem N79.
  * Sap/p2p go channel restore to 5G channel when 5G band enabled.
+ * Note: csa_reason is only updated when channel is disabled or band is
+ * restricted, so it must be initialized to a default value beforehand
  *
  * Return - restart channel in MHZ
  */
-qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx);
+qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
+					  enum sap_csa_reason_code *csa_reason);
 
 #ifdef DCS_INTERFERENCE_DETECTION
 /**
