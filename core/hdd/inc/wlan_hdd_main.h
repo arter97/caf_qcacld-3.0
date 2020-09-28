@@ -1855,6 +1855,7 @@ struct hdd_context {
 	/* Present state of driver cds modules */
 	enum driver_modules_status driver_status;
 	struct qdf_delayed_work psoc_idle_timeout_work;
+	struct completion psoc_idle_work_done;
 	bool rps;
 	bool dynamic_rps;
 	bool enable_rxthread;

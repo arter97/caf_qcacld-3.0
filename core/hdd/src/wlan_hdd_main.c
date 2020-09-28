@@ -4219,11 +4219,32 @@ static int __hdd_stop(struct net_device *dev)
 	/* DeInit the adapter. This ensures datapath cleanup as well */
 	hdd_deinit_adapter(hdd_ctx, adapter, true);
 
-	if (!hdd_is_any_interface_open(hdd_ctx))
+	if (!hdd_is_any_interface_open(hdd_ctx)) {
+		reinit_completion(&hdd_ctx->psoc_idle_work_done);
 		hdd_psoc_idle_timer_start(hdd_ctx);
+	}
 
 	hdd_exit();
 
+	return 0;
+}
+
+static int hdd_stop_wait_idle_work(struct net_device *dev)
+{
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	uint32_t timeout_ms;
+
+	if (!hdd_is_any_interface_open(hdd_ctx)) {
+		long ret;
+		timeout_ms = hdd_ctx->config->iface_change_wait_time;
+		if (timeout_ms) {
+			timeout_ms += HDD_PSOC_IDLE_SHUTDOWN_SUSPEND_DELAY + 1000;
+			ret = wait_for_completion_timeout(&hdd_ctx->psoc_idle_work_done, timeout_ms);
+			if (ret <= 0)
+				return QDF_STATUS_E_TIMEOUT;
+		}
+	}
 	return 0;
 }
 
@@ -4247,6 +4268,9 @@ static int hdd_stop(struct net_device *net_dev)
 	errno = __hdd_stop(net_dev);
 
 	osif_vdev_sync_trans_stop(vdev_sync);
+
+	if (!errno)
+		errno = hdd_stop_wait_idle_work(net_dev);
 
 	return errno;
 }
@@ -10863,6 +10887,7 @@ int hdd_psoc_idle_shutdown(struct device *dev)
 	else
 		ret =  __hdd_psoc_idle_shutdown(hdd_ctx);
 
+	complete_all(&hdd_ctx->psoc_idle_work_done);
 	return ret;
 }
 
@@ -11214,6 +11239,8 @@ struct hdd_context *hdd_context_create(struct device *dev)
 		ret = qdf_status_to_os_return(status);
 		goto wiphy_dealloc;
 	}
+
+	init_completion(&hdd_ctx->psoc_idle_work_done);
 
 	hdd_ctx->parent_dev = dev;
 	hdd_ctx->last_scan_reject_vdev_id = WLAN_UMAC_VDEV_ID_MAX;
