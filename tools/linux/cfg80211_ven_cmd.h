@@ -782,6 +782,7 @@ enum {
 	IEEE80211_PARAM_6G_HE_OP_MIN_RATE          = 713,  /* set HE sta minimum rate for its Tx PPDU in a bss */
 	IEEE80211_PARAM_6G_SECURITY_COMP           = 714, /* 6G Security Compliance on/off */
 	IEEE80211_PARAM_6G_KEYMGMT_MASK            = 715, /* 6G Key Mgmt Mask Config */
+	IEEE80211_PARAM_PRB_RETRY                  = 716,   /* Set/Get probe-response frame retry limit */
 };
 
 enum {
@@ -1500,6 +1501,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_oce_wan_mtr",       IEEE80211_PARAM_OCE_WAN_METRICS, GET_PARAM, 0},
 	{"prb_rate",            IEEE80211_PARAM_PRB_RATE, SET_PARAM, 1},
 	{"g_prb_rate",          IEEE80211_PARAM_PRB_RATE, GET_PARAM, 0},
+	{"prb_retry",           IEEE80211_PARAM_PRB_RETRY, SET_PARAM, 1},
+	{"g_prb_retry",         IEEE80211_PARAM_PRB_RETRY, GET_PARAM, 0},
 	{"oce_hlp",             IEEE80211_PARAM_OCE_HLP, SET_PARAM, 1},
 	{"g_oce_hlp",           IEEE80211_PARAM_OCE_HLP, GET_PARAM, 0},
 	{"nbr_scan_prd",        IEEE80211_PARAM_NBR_SCAN_PERIOD, SET_PARAM, 1},
