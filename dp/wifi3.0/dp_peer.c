@@ -4687,8 +4687,11 @@ uint8_t dp_mscs_get_tid(struct dp_soc *soc, struct dp_vdev *vdev,
 	if (!peer)
 		return tid;
 
-	if (peer->mscs_active == 0)
+	if (peer->mscs_active == 0) {
+		dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
 		return tid;
+
+	}
 
 	switch (qdf_ntohs(ether_type)) {
 	case QDF_NBUF_TRAC_IPV4_ETH_TYPE:
@@ -4708,6 +4711,7 @@ uint8_t dp_mscs_get_tid(struct dp_soc *soc, struct dp_vdev *vdev,
 			tid);
 		break;
 	}
+	dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
 	return tid;
 }
 
