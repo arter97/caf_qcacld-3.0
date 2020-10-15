@@ -1011,9 +1011,6 @@ QDF_STATUS vdevmgr_mlme_ext_hdl_create(struct vdev_mlme_obj *vdev_mlme)
 		return QDF_STATUS_E_NOMEM;
 	}
 
-	target_if_cm_roam_register_tx_ops(
-			&vdev_mlme->ext_vdev_ptr->cm_roam.tx_ops);
-
 	sme_get_vdev_type_nss(wlan_vdev_mlme_get_opmode(vdev_mlme->vdev),
 			      &vdev_mlme->proto.generic.nss_2g,
 			      &vdev_mlme->proto.generic.nss_5g);
