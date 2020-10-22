@@ -1819,6 +1819,47 @@ bool wlan_ipa_uc_is_loaded(struct wlan_ipa_priv *ipa_ctx)
 	return ipa_ctx->uc_loaded;
 }
 
+#ifdef INTRA_BSS_FWD_OFFLOAD
+/**
+ * wlan_ipa_intrabss_enable_disable() - wdi intrabss enable/disable notify to fw
+ * @ipa_ctx: global IPA context
+ * @offload_type: MCC or SCC
+ * @session_id: Session Id
+ * @enable: intrabss enable or disable
+ *
+ * Return: none
+ */
+static void wlan_ipa_intrabss_enable_disable(struct wlan_ipa_priv *ipa_ctx,
+					     uint8_t session_id,
+					     bool enable)
+{
+	struct ipa_intrabss_control_params intrabss_req = {0};
+	uint32_t intra_bss_fwd = 0;
+
+	if (!enable || ipa_ctx->disable_intrabss_fwd[session_id]) {
+		ipa_debug("%s: ipa_offload->enable=%d, rx_fwd_disabled=%d",
+			  __func__, enable,
+			  ipa_ctx->disable_intrabss_fwd[session_id]);
+		intra_bss_fwd = 1;
+	}
+
+	intrabss_req.vdev_id = session_id;
+	intrabss_req.enable = intra_bss_fwd;
+
+	if (QDF_STATUS_SUCCESS !=
+	    ipa_send_intrabss_enable_disable(ipa_ctx->pdev, &intrabss_req)) {
+		ipa_err("intrabss offload vdev_id=%d, enable=%d failure",
+			session_id, intra_bss_fwd);
+	}
+}
+#else
+static inline
+void wlan_ipa_intrabss_enable_disable(struct wlan_ipa_priv *ipa_ctx,
+				      uint8_t session_id,
+				      bool enable)
+{}
+#endif
+
 /**
  * wlan_ipa_uc_offload_enable_disable() - wdi enable/disable notify to fw
  * @ipa_ctx: global IPA context
@@ -1863,6 +1904,8 @@ static void wlan_ipa_uc_offload_enable_disable(struct wlan_ipa_priv *ipa_ctx,
 	} else {
 		ipa_ctx->vdev_offload_enabled[session_id] = enable;
 	}
+
+	wlan_ipa_intrabss_enable_disable(ipa_ctx, session_id, enable);
 }
 
 #ifdef WDI3_STATS_UPDATE
@@ -3459,7 +3502,7 @@ static void wlan_ipa_uc_op_cb(struct op_msg_type *op_msg,
 	struct op_msg_type *msg = op_msg;
 	struct ipa_uc_fw_stats *uc_fw_stat;
 
-	if (!op_msg) {
+	if (!ipa_ctx || !op_msg) {
 		ipa_err("INVALID ARG");
 		return;
 	}
@@ -3688,9 +3731,6 @@ QDF_STATUS wlan_ipa_uc_ol_init(struct wlan_ipa_priv *ipa_ctx,
 			ipa_err("Failed to init perf level");
 	}
 
-	cdp_ipa_register_op_cb(ipa_ctx->dp_soc, ipa_ctx->dp_pdev_id,
-			       wlan_ipa_uc_op_event_handler, (void *)ipa_ctx);
-
 	for (i = 0; i < WLAN_IPA_UC_OPCODE_MAX; i++) {
 		ipa_ctx->uc_op_work[i].osdev = osdev;
 		qdf_create_work(0, &ipa_ctx->uc_op_work[i].work,
@@ -3699,6 +3739,8 @@ QDF_STATUS wlan_ipa_uc_ol_init(struct wlan_ipa_priv *ipa_ctx,
 		ipa_ctx->uc_op_work[i].msg = NULL;
 	}
 
+	cdp_ipa_register_op_cb(ipa_ctx->dp_soc, ipa_ctx->dp_pdev_id,
+			       wlan_ipa_uc_op_event_handler, (void *)ipa_ctx);
 fail_return:
 	ipa_debug("exit: status=%d", status);
 	return status;
@@ -3746,6 +3788,8 @@ QDF_STATUS wlan_ipa_uc_ol_deinit(struct wlan_ipa_priv *ipa_ctx)
 	qdf_mutex_acquire(&ipa_ctx->ipa_lock);
 	wlan_ipa_cleanup_pending_event(ipa_ctx);
 	qdf_mutex_release(&ipa_ctx->ipa_lock);
+
+	cdp_ipa_deregister_op_cb(ipa_ctx->dp_soc, ipa_ctx->dp_pdev_id);
 
 	for (i = 0; i < WLAN_IPA_UC_OPCODE_MAX; i++) {
 		qdf_cancel_work(&ipa_ctx->uc_op_work[i].work);

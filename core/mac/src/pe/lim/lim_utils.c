@@ -6793,9 +6793,10 @@ static void lim_check_and_force_he_ldpc_cap(struct pe_session *session,
 					    tDot11fIEhe_cap *he_cap)
 {
 	if (!he_cap->ldpc_coding &&
+	    !WLAN_REG_IS_24GHZ_CH_FREQ(session->curr_op_freq) &&
 	    (session->ch_width > CH_WIDTH_20MHZ ||
-	     lim_check_he_80_mcs11_supp(session, he_cap) ||
-	     lim_check_is_bss_greater_than_4_nss_supp(session, he_cap)))
+	    lim_check_he_80_mcs11_supp(session, he_cap) ||
+	    lim_check_is_bss_greater_than_4_nss_supp(session, he_cap)))
 		he_cap->ldpc_coding = 1;
 }
 
@@ -8602,7 +8603,7 @@ QDF_STATUS lim_set_ch_phy_mode(struct wlan_objmgr_vdev *vdev, uint8_t dot11mode)
 	chan_mode = wma_chan_phy_mode(des_chan->ch_freq, ch_width,
 				      dot11mode);
 
-	if (chan_mode == MODE_UNKNOWN) {
+	if (chan_mode == WLAN_PHYMODE_AUTO || chan_mode == WLAN_PHYMODE_MAX) {
 		pe_err("Invalid phy mode!");
 		return QDF_STATUS_E_FAILURE;
 	}
