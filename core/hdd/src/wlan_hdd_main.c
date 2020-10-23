@@ -8706,7 +8706,8 @@ void hdd_indicate_mgmt_frame(tSirSmeMgmtFrameInd *frame_ind)
 						frame_ind->frameBuf,
 						frame_ind->frameType,
 						frame_ind->rxChan,
-						frame_ind->rxRssi);
+						frame_ind->rxRssi,
+						frame_ind->rx_flags);
 			}
 			status = hdd_get_next_adapter(hdd_ctx,
 						adapter_node, &next);
@@ -8725,7 +8726,8 @@ void hdd_indicate_mgmt_frame(tSirSmeMgmtFrameInd *frame_ind)
 						frame_ind->frameBuf,
 						frame_ind->frameType,
 						frame_ind->rxChan,
-						frame_ind->rxRssi);
+						frame_ind->rxRssi,
+						frame_ind->rx_flags);
 }
 
 /**
@@ -12729,7 +12731,7 @@ static ssize_t wlan_hdd_state_ctrl_param_write(struct file *filp,
 		goto exit;
 	}
 
-	if (!cds_is_driver_loaded()) {
+	if (!cds_is_driver_loaded() || cds_is_driver_recovering()) {
 		init_completion(&wlan_start_comp);
 		rc = wait_for_completion_timeout(&wlan_start_comp,
 				msecs_to_jiffies(HDD_WLAN_START_WAIT_TIME));
