@@ -4690,13 +4690,12 @@ uint8_t dp_mscs_get_tid(struct dp_soc *soc, struct dp_vdev *vdev,
 	if (peer->mscs_active == 0) {
 		dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
 		return tid;
-
 	}
 
 	switch (qdf_ntohs(ether_type)) {
 	case QDF_NBUF_TRAC_IPV4_ETH_TYPE:
 		mscs_parse_ipv4(data, &mscs_tuple.ipv4);
-			return dp_mscs_tx_get_tid_ipv4(
+		tid = dp_mscs_tx_get_tid_ipv4(
 			&peer->mscs_session_ipv4,
 			&mscs_tuple.ipv4,
 			&peer->mscs_ipv4_parameter,
@@ -4704,7 +4703,7 @@ uint8_t dp_mscs_get_tid(struct dp_soc *soc, struct dp_vdev *vdev,
 		break;
 	case QDF_NBUF_TRAC_IPV6_ETH_TYPE:
 		mscs_parse_ipv6(data, &mscs_tuple.ipv6);
-			return dp_mscs_tx_get_tid_ipv6(
+		tid = dp_mscs_tx_get_tid_ipv6(
 			&peer->mscs_session_ipv6,
 			&mscs_tuple.ipv6,
 			&peer->mscs_ipv6_parameter,
