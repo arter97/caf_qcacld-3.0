@@ -76,6 +76,13 @@ static void wlan_cfg80211_mc_cp_stats_dealloc(void *priv)
 	wlan_free_mib_stats(stats);
 }
 
+#define QCA_WLAN_VENDOR_ATTR_TOTAL_DRIVER_FW_LOCAL_WAKE \
+	QCA_WLAN_VENDOR_ATTR_WAKE_STATS_TOTAL_DRIVER_FW_LOCAL_WAKE
+#define QCA_WLAN_VENDOR_ATTR_DRIVER_FW_LOCAL_WAKE_CNT_PTR \
+	QCA_WLAN_VENDOR_ATTR_WAKE_STATS_DRIVER_FW_LOCAL_WAKE_CNT_PTR
+#define QCA_WLAN_VENDOR_ATTR_DRIVER_FW_LOCAL_WAKE_CNT_SZ \
+	QCA_WLAN_VENDOR_ATTR_WAKE_STATS_DRIVER_FW_LOCAL_WAKE_CNT_SZ
+
 /**
  * wlan_cfg80211_mc_cp_stats_send_wake_lock_stats() - API to send wakelock stats
  * @wiphy: wiphy pointer
@@ -139,62 +146,71 @@ static int wlan_cfg80211_mc_cp_stats_send_wake_lock_stats(struct wiphy *wiphy,
 	total_rx_data_wake = stats->ucast_wake_up_count +
 			stats->bcast_wake_up_count + rx_multicast_cnt;
 
-	if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_TOTAL_CMD_EVENT_WAKE, 0) ||
-	    nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_CMD_EVENT_WAKE_CNT_PTR, 0) ||
-	    nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_CMD_EVENT_WAKE_CNT_SZ, 0) ||
-	    nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_TOTAL_DRIVER_FW_LOCAL_WAKE,
-			0) ||
-	    nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_DRIVER_FW_LOCAL_WAKE_CNT_PTR,
-			0) ||
-	    nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_DRIVER_FW_LOCAL_WAKE_CNT_SZ,
+	if (nla_put_u32(skb,
+			QCA_WLAN_VENDOR_ATTR_WAKE_STATS_TOTAL_CMD_EVENT_WAKE,
 			0) ||
 	    nla_put_u32(skb,
-			QCA_WLAN_VENDOR_ATTR_TOTAL_RX_DATA_WAKE,
+			QCA_WLAN_VENDOR_ATTR_WAKE_STATS_CMD_EVENT_WAKE_CNT_PTR,
+			0) ||
+	    nla_put_u32(skb,
+			QCA_WLAN_VENDOR_ATTR_WAKE_STATS_CMD_EVENT_WAKE_CNT_SZ,
+			0) ||
+	    nla_put_u32(skb,
+			QCA_WLAN_VENDOR_ATTR_TOTAL_DRIVER_FW_LOCAL_WAKE,
+			0) ||
+	    nla_put_u32(skb,
+			QCA_WLAN_VENDOR_ATTR_DRIVER_FW_LOCAL_WAKE_CNT_PTR,
+			0) ||
+	    nla_put_u32(skb,
+			QCA_WLAN_VENDOR_ATTR_DRIVER_FW_LOCAL_WAKE_CNT_SZ,
+			0) ||
+	    nla_put_u32(skb,
+			QCA_WLAN_VENDOR_ATTR_WAKE_STATS_TOTAL_RX_DATA_WAKE,
 			total_rx_data_wake) ||
 	    nla_put_u32(skb,
-			QCA_WLAN_VENDOR_ATTR_RX_UNICAST_CNT,
+			QCA_WLAN_VENDOR_ATTR_WAKE_STATS_RX_UNICAST_CNT,
 			stats->ucast_wake_up_count) ||
 	    nla_put_u32(skb,
-			QCA_WLAN_VENDOR_ATTR_RX_MULTICAST_CNT,
+			QCA_WLAN_VENDOR_ATTR_WAKE_STATS_RX_MULTICAST_CNT,
 			rx_multicast_cnt) ||
 	    nla_put_u32(skb,
-			QCA_WLAN_VENDOR_ATTR_RX_BROADCAST_CNT,
+			QCA_WLAN_VENDOR_ATTR_WAKE_STATS_RX_BROADCAST_CNT,
 			stats->bcast_wake_up_count) ||
 	    nla_put_u32(skb,
-			QCA_WLAN_VENDOR_ATTR_ICMP_PKT,
+			QCA_WLAN_VENDOR_ATTR_WAKE_STATS_ICMP_PKT,
 			stats->icmpv4_count) ||
 	    nla_put_u32(skb,
-			QCA_WLAN_VENDOR_ATTR_ICMP6_PKT,
+			QCA_WLAN_VENDOR_ATTR_WAKE_STATS_ICMP6_PKT,
 			icmpv6_cnt) ||
 	    nla_put_u32(skb,
-			QCA_WLAN_VENDOR_ATTR_ICMP6_RA,
+			QCA_WLAN_VENDOR_ATTR_WAKE_STATS_ICMP6_RA,
 			stats->ipv6_mcast_ra_stats) ||
 	    nla_put_u32(skb,
-			QCA_WLAN_VENDOR_ATTR_ICMP6_NA,
+			QCA_WLAN_VENDOR_ATTR_WAKE_STATS_ICMP6_NA,
 			stats->ipv6_mcast_na_stats) ||
 	    nla_put_u32(skb,
-			QCA_WLAN_VENDOR_ATTR_ICMP6_NS,
+			QCA_WLAN_VENDOR_ATTR_WAKE_STATS_ICMP6_NS,
 			stats->ipv6_mcast_ns_stats) ||
 	    nla_put_u32(skb,
-			QCA_WLAN_VENDOR_ATTR_ICMP4_RX_MULTICAST_CNT,
+			QCA_WLAN_VENDOR_ATTR_WAKE_STATS_ICMP4_RX_MULTICAST_CNT,
 			stats->ipv4_mcast_wake_up_count) ||
 	    nla_put_u32(skb,
-			QCA_WLAN_VENDOR_ATTR_ICMP6_RX_MULTICAST_CNT,
+			QCA_WLAN_VENDOR_ATTR_WAKE_STATS_ICMP6_RX_MULTICAST_CNT,
 			ipv6_rx_multicast_addr_cnt) ||
 	    nla_put_u32(skb,
-			QCA_WLAN_VENDOR_ATTR_RSSI_BREACH_CNT,
+			QCA_WLAN_VENDOR_ATTR_WAKE_STATS_RSSI_BREACH_CNT,
 			stats->rssi_breach_wake_up_count) ||
 	    nla_put_u32(skb,
-			QCA_WLAN_VENDOR_ATTR_LOW_RSSI_CNT,
+			QCA_WLAN_VENDOR_ATTR_WAKE_STATS_LOW_RSSI_CNT,
 			stats->low_rssi_wake_up_count) ||
 	    nla_put_u32(skb,
-			QCA_WLAN_VENDOR_ATTR_GSCAN_CNT,
+			QCA_WLAN_VENDOR_ATTR_WAKE_STATS_GSCAN_CNT,
 			stats->gscan_wake_up_count) ||
 	    nla_put_u32(skb,
-			QCA_WLAN_VENDOR_ATTR_PNO_COMPLETE_CNT,
+			QCA_WLAN_VENDOR_ATTR_WAKE_STATS_PNO_COMPLETE_CNT,
 			stats->pno_complete_wake_up_count) ||
 	    nla_put_u32(skb,
-			QCA_WLAN_VENDOR_ATTR_PNO_MATCH_CNT,
+			QCA_WLAN_VENDOR_ATTR_WAKE_STATS_PNO_MATCH_CNT,
 			stats->pno_match_wake_up_count)) {
 		osif_err("nla put fail");
 		goto nla_put_failure;
@@ -207,6 +223,10 @@ nla_put_failure:
 	wlan_cfg80211_vendor_free_skb(skb);
 	return -EINVAL;
 }
+
+#undef QCA_WLAN_VENDOR_ATTR_TOTAL_DRIVER_FW_LOCAL_WAKE
+#undef QCA_WLAN_VENDOR_ATTR_DRIVER_FW_LOCAL_WAKE_CNT_PTR
+#undef QCA_WLAN_VENDOR_ATTR_DRIVER_FW_LOCAL_WAKE_CNT_SZ
 
 int wlan_cfg80211_mc_cp_stats_get_wakelock_stats(struct wlan_objmgr_psoc *psoc,
 						 struct wiphy *wiphy)
@@ -756,8 +776,46 @@ static void get_peer_stats_cb(struct stats_event *ev, void *cookie)
 
 	qdf_mem_copy(priv->peer_stats_info_ext, ev->peer_stats_info_ext,
 		     peer_stats_info_size);
+	priv->num_peer_stats_info_ext = ev->num_peer_stats_info_ext;
 
 peer_stats_cb_fail:
+	osif_request_complete(request);
+	osif_request_put(request);
+}
+
+/**
+ * get_station_adv_stats_cb() - get_station_adv_stats_cb callback function
+ * @ev: station stats buffer
+ * @cookie: a cookie for the request context
+ *
+ * Return: None
+ */
+static void get_station_adv_stats_cb(struct stats_event *ev, void *cookie)
+{
+	struct stats_event *priv;
+	struct osif_request *request;
+	uint32_t peer_adv_size;
+
+	request = osif_request_get(cookie);
+	if (!request) {
+		osif_err("Obsolete request");
+		return;
+	}
+
+	priv = osif_request_priv(request);
+	peer_adv_size = sizeof(*ev->peer_adv_stats) * ev->num_peer_adv_stats;
+
+	if (peer_adv_size) {
+		priv->peer_adv_stats = qdf_mem_malloc(peer_adv_size);
+		if (!priv->peer_adv_stats)
+			goto station_adv_stats_cb_fail;
+
+		qdf_mem_copy(priv->peer_adv_stats, ev->peer_adv_stats,
+			     peer_adv_size);
+	}
+	priv->num_peer_adv_stats = ev->num_peer_adv_stats;
+
+station_adv_stats_cb_fail:
 	osif_request_complete(request);
 	osif_request_put(request);
 }
@@ -827,6 +885,36 @@ wlan_cfg80211_mc_cp_stats_get_peer_stats(struct wlan_objmgr_vdev *vdev,
 	out->num_peer_stats_info_ext = priv->num_peer_stats_info_ext;
 	out->peer_stats_info_ext = priv->peer_stats_info_ext;
 	priv->peer_stats_info_ext = NULL;
+	osif_request_put(request);
+
+	request = osif_request_alloc(&params);
+	if (!request) {
+		wlan_cfg80211_mc_cp_stats_free_stats_event(out);
+		*errno = -ENOMEM;
+		return NULL;
+	}
+
+	cookie = osif_request_cookie(request);
+	priv = osif_request_priv(request);
+	info.cookie = cookie;
+	info.u.get_peer_stats_cb = get_station_adv_stats_cb;
+	status = ucfg_mc_cp_stats_send_stats_request(vdev, TYPE_STATION_STATS,
+						     &info);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		osif_err("Failed to send stats request status: %d", status);
+		*errno = qdf_status_to_os_return(status);
+		goto get_peer_stats_fail;
+	}
+
+	*errno = osif_request_wait_for_response(request);
+	if (*errno) {
+		osif_err("wait failed or timed out ret: %d", *errno);
+		goto get_peer_stats_fail;
+	}
+
+	out->num_peer_adv_stats = priv->num_peer_adv_stats;
+	out->peer_adv_stats = priv->peer_adv_stats;
+	priv->peer_adv_stats = NULL;
 	osif_request_put(request);
 
 	osif_debug("Exit");

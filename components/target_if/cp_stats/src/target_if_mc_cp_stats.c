@@ -269,7 +269,7 @@ target_if_twt_session_params_unregister_evt_hdlr(struct wlan_objmgr_psoc *psoc)
 static QDF_STATUS
 target_if_twt_session_params_register_evt_hdlr(struct wlan_objmgr_psoc *psoc)
 {
-	int ret_val;
+	QDF_STATUS ret_val;
 	struct wmi_unified *wmi_handle;
 
 	if (!psoc) {
@@ -289,10 +289,10 @@ target_if_twt_session_params_register_evt_hdlr(struct wlan_objmgr_psoc *psoc)
 			target_if_twt_session_params_event_handler,
 			WMI_RX_WORK_CTX);
 
-	if (ret_val)
+	if (QDF_IS_STATUS_ERROR(ret_val))
 		target_if_err("Failed to register twt session stats event cb");
 
-	return qdf_status_from_os_return(ret_val);
+	return ret_val;
 }
 #else
 static QDF_STATUS
@@ -340,6 +340,22 @@ static void target_if_cp_stats_free_stats_event(struct stats_event *ev)
 	ev->peer_stats_info_ext = NULL;
 }
 
+#ifdef WLAN_FEATURE_MEDIUM_ASSESS
+static void
+target_if_cp_stats_extract_congestion(struct pdev_mc_cp_stats *pdev_stats,
+				      wmi_host_pdev_stats *fw_pdev_stats)
+{
+	pdev_stats->rx_clear_count = fw_pdev_stats->rx_clear_count;
+	pdev_stats->cycle_count = fw_pdev_stats->cycle_count;
+}
+#else
+static void
+target_if_cp_stats_extract_congestion(struct pdev_mc_cp_stats *pdev_stats,
+				      wmi_host_pdev_stats *fw_pdev_stats)
+{
+}
+#endif
+
 static QDF_STATUS target_if_cp_stats_extract_pdev_stats(
 					struct wmi_unified *wmi_hdl,
 					wmi_host_stats_event *stats_param,
@@ -370,6 +386,8 @@ static QDF_STATUS target_if_cp_stats_extract_pdev_stats(
 			return status;
 		}
 		ev->pdev_stats[i].max_pwr = pdev_stats.chan_tx_pwr;
+		target_if_cp_stats_extract_congestion(&ev->pdev_stats[i],
+						      &pdev_stats);
 	}
 
 	return QDF_STATUS_SUCCESS;
@@ -1058,7 +1076,7 @@ static void target_if_cp_stats_inc_wake_lock_stats(uint32_t reason,
 static QDF_STATUS
 target_if_cp_stats_register_event_handler(struct wlan_objmgr_psoc *psoc)
 {
-	int ret_val;
+	QDF_STATUS ret_val;
 	struct wmi_unified *wmi_handle;
 
 	if (!psoc) {
@@ -1077,17 +1095,17 @@ target_if_cp_stats_register_event_handler(struct wlan_objmgr_psoc *psoc)
 			wmi_update_stats_event_id,
 			target_if_mc_cp_stats_stats_event_handler,
 			WMI_RX_WORK_CTX);
-	if (ret_val)
+	if (QDF_IS_STATUS_ERROR(ret_val))
 		cp_stats_err("Failed to register stats event cb");
 
 	ret_val = wmi_unified_register_event_handler(wmi_handle,
 			    wmi_peer_stats_info_event_id,
 			    target_if_mc_cp_stats_peer_stats_info_event_handler,
 			    WMI_RX_WORK_CTX);
-	if (ret_val)
+	if (QDF_IS_STATUS_ERROR(ret_val))
 		cp_stats_err("Failed to register peer stats info event cb");
 
-	return qdf_status_from_os_return(ret_val);
+	return ret_val;
 }
 
 static QDF_STATUS
@@ -1119,6 +1137,7 @@ static uint32_t get_stats_id(enum stats_req_type type)
 	default:
 		break;
 	case TYPE_CONNECTION_TX_POWER:
+	case TYPE_CONGESTION_STATS:
 		return WMI_REQUEST_PDEV_STAT;
 	case TYPE_PEER_STATS:
 		return WMI_REQUEST_PEER_STAT | WMI_REQUEST_PEER_EXTD_STAT;

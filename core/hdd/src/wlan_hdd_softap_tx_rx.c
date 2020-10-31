@@ -477,6 +477,7 @@ int hdd_softap_inspect_dhcp_packet(struct hdd_adapter *adapter,
 						hdd_sta_info->sta_mac.bytes,
 						WMA_DHCP_START_IND);
 			hdd_sta_info->dhcp_nego_status = DHCP_NEGO_IN_PROGRESS;
+			/* fallthrough */
 		case QDF_PROTO_DHCP_DECLINE:
 			if (dir == QDF_RX)
 				hdd_sta_info->dhcp_phase = DHCP_PHASE_REQUEST;
@@ -1296,6 +1297,7 @@ QDF_STATUS hdd_softap_register_sta(struct hdd_adapter *adapter,
 		txrx_ops.rx.rx_stack = hdd_softap_rx_packet_cbk;
 		txrx_ops.rx.rx_flush = hdd_rx_flush_packet_cbk;
 		txrx_ops.rx.rx_gro_flush = hdd_rx_thread_gro_flush_ind_cbk;
+		adapter->rx_stack = hdd_softap_rx_packet_cbk;
 	} else {
 		txrx_ops.rx.rx = hdd_softap_rx_packet_cbk;
 		txrx_ops.rx.rx_stack = NULL;

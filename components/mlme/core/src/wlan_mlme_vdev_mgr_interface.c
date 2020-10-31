@@ -28,6 +28,8 @@
 #include <../../core/src/vdev_mgr_ops.h>
 #include "wlan_psoc_mlme_api.h"
 #include "target_if_cm_roam_offload.h"
+#include "wlan_crypto_global_api.h"
+#include "target_if_wfa_testcmd.h"
 
 static struct vdev_mlme_ops sta_mlme_ops;
 static struct vdev_mlme_ops ap_mlme_ops;
@@ -586,6 +588,36 @@ QDF_STATUS mlme_set_chan_switch_in_progress(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_MSCS
+QDF_STATUS mlme_set_is_mscs_req_sent(struct wlan_objmgr_vdev *vdev, bool val)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mlme_priv->mscs_req_info.is_mscs_req_sent = val;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+bool mlme_get_is_mscs_req_sent(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return false;
+	}
+
+	return mlme_priv->mscs_req_info.is_mscs_req_sent;
+}
+#endif
+
 bool mlme_is_chan_switch_in_progress(struct wlan_objmgr_vdev *vdev)
 {
 	struct mlme_legacy_priv *mlme_priv;
@@ -743,6 +775,50 @@ bool mlme_is_connection_fail(struct wlan_objmgr_vdev *vdev)
 
 	return mlme_priv->connection_fail;
 }
+
+#ifdef FEATURE_WLAN_WAPI
+static void mlme_is_sta_vdev_wapi(struct wlan_objmgr_pdev *pdev,
+			   void *object, void *arg)
+{
+	struct wlan_objmgr_vdev *vdev = (struct wlan_objmgr_vdev *)object;
+	int32_t keymgmt;
+	bool *is_wapi_sta_exist = (bool *)arg;
+	QDF_STATUS status;
+
+	if (*is_wapi_sta_exist)
+		return;
+	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE)
+		return;
+
+	status = wlan_vdev_is_up(vdev);
+	if (QDF_IS_STATUS_ERROR(status))
+		return;
+
+	keymgmt = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_KEY_MGMT);
+	if (keymgmt < 0)
+		return;
+
+	if (keymgmt & ((1 << WLAN_CRYPTO_KEY_MGMT_WAPI_PSK) |
+		       (1 << WLAN_CRYPTO_KEY_MGMT_WAPI_CERT))) {
+		*is_wapi_sta_exist = true;
+		mlme_debug("wapi exist for Vdev: %d",
+			   wlan_vdev_get_id(vdev));
+	}
+}
+
+bool mlme_is_wapi_sta_active(struct wlan_objmgr_pdev *pdev)
+{
+	bool is_wapi_sta_exist = false;
+
+	wlan_objmgr_pdev_iterate_obj_list(pdev,
+					  WLAN_VDEV_OP,
+					  mlme_is_sta_vdev_wapi,
+					  &is_wapi_sta_exist, 0,
+					  WLAN_MLME_OBJMGR_ID);
+
+	return is_wapi_sta_exist;
+}
+#endif
 
 QDF_STATUS mlme_set_assoc_type(struct wlan_objmgr_vdev *vdev,
 			       enum vdev_assoc_type assoc_type)
@@ -1066,11 +1142,10 @@ QDF_STATUS vdevmgr_mlme_ext_hdl_create(struct vdev_mlme_obj *vdev_mlme)
 			  vdev_mlme->vdev->vdev_objmgr.vdev_id);
 	vdev_mlme->ext_vdev_ptr =
 		qdf_mem_malloc(sizeof(struct mlme_legacy_priv));
-	if (!vdev_mlme->ext_vdev_ptr) {
-		mlme_legacy_err("failed to allocate meory for ext_vdev_ptr");
+	if (!vdev_mlme->ext_vdev_ptr)
 		return QDF_STATUS_E_NOMEM;
-	}
 
+	mlme_init_rate_config(vdev_mlme);
 	vdev_mlme->ext_vdev_ptr->fils_con_info = NULL;
 
 	sme_get_vdev_type_nss(wlan_vdev_mlme_get_opmode(vdev_mlme->vdev),
@@ -1315,12 +1390,14 @@ QDF_STATUS psoc_mlme_ext_hdl_create(struct psoc_mlme_obj *psoc_mlme)
 {
 	psoc_mlme->ext_psoc_ptr =
 		qdf_mem_malloc(sizeof(struct wlan_mlme_psoc_ext_obj));
-	if (!psoc_mlme->ext_psoc_ptr) {
-		mlme_legacy_err("Failed to allocate memory");
+	if (!psoc_mlme->ext_psoc_ptr)
 		return QDF_STATUS_E_NOMEM;
-	}
+
 	target_if_cm_roam_register_tx_ops(
 			&psoc_mlme->ext_psoc_ptr->rso_tx_ops);
+
+	target_if_wfatestcmd_register_tx_ops(
+			&psoc_mlme->ext_psoc_ptr->wfa_testcmd.tx_ops);
 
 	return QDF_STATUS_SUCCESS;
 }

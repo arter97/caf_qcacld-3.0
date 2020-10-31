@@ -149,7 +149,7 @@
  *
  * @Min: 10
  * @Max: 30
- * @Default: 20
+ * @Default: 14
  *
  * Related: None
  *
@@ -164,7 +164,7 @@
 			"gNdpKeepAlivePeriod", \
 			10, \
 			30, \
-			20, \
+			14, \
 			CFG_VALUE_OR_DEFAULT, \
 			"Keep alive timeout of a peer")
 
@@ -245,7 +245,7 @@
  *
  * @Min: 0
  * @Max: 0xFFFF
- * @Default: 0x1
+ * @Default: 0
  *
  * This parameter helps to enable/disable a particular feature config by setting
  * corresponding bit and send to firmware through the VDEV param
@@ -267,7 +267,7 @@
 			"nan_feature_config", \
 			0, \
 			0xFFFF, \
-			1, \
+			0, \
 			CFG_VALUE_OR_DEFAULT, \
 			"Enable the specified NAN features in firmware")
 

@@ -420,10 +420,9 @@ QDF_STATUS ucfg_nan_req_processor(struct wlan_objmgr_vdev *vdev,
 	}
 
 	msg.bodyptr = qdf_mem_malloc(len);
-	if (!msg.bodyptr) {
-		nan_err("malloc failed");
+	if (!msg.bodyptr)
 		return QDF_STATUS_E_NOMEM;
-	}
+
 	qdf_mem_copy(msg.bodyptr, in_req, len);
 	msg.type = req_type;
 	msg.callback = nan_scheduled_msg_handler;
@@ -626,7 +625,7 @@ QDF_STATUS ucfg_nan_discovery_req(void *in_req, uint32_t req_type)
 	struct osif_request *request = NULL;
 	static const struct osif_request_params params = {
 		.priv_size = 0,
-		.timeout_ms = 1000,
+		.timeout_ms = 4000,
 	};
 	int err;
 
@@ -1260,10 +1259,9 @@ QDF_STATUS ucfg_nan_disable_ind_to_userspace(struct wlan_objmgr_psoc *psoc)
 
 	disable_ind = qdf_mem_malloc(sizeof(struct nan_event_params) +
 				     sizeof(msg));
-	if (!disable_ind) {
-		nan_err("failed to alloc disable_ind");
+	if (!disable_ind)
 		return QDF_STATUS_E_NOMEM;
-	}
+
 	disable_ind->psoc = psoc,
 	disable_ind->evt_type = nan_event_id_disable_ind;
 	disable_ind->buf_len = sizeof(msg);

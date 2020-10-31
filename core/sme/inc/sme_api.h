@@ -574,13 +574,13 @@ QDF_STATUS sme_roam_reassoc(mac_handle_t mac_handle, uint8_t sessionId,
  * @mac_handle: Opaque handle to the global MAC context
  * @session: SME session identifier
  * @reason: Reason to disconnect
- * @mac_reason: Reason to disconnect as per enum eSirMacReasonCodes
+ * @mac_reason: Reason to disconnect as per enum wlan_reason_code
  *
  * Return: QDF Status success or failure
  */
 QDF_STATUS sme_roam_disconnect(mac_handle_t mac_handle, uint8_t session,
 			       eCsrRoamDisconnectReason reason,
-			       tSirMacReasonCodes mac_reason);
+			       enum wlan_reason_code mac_reason);
 
 void sme_dhcp_done_ind(mac_handle_t mac_handle, uint8_t session_id);
 QDF_STATUS sme_roam_stop_bss(mac_handle_t mac_handle, uint8_t sessionId);
@@ -2382,14 +2382,6 @@ QDF_STATUS sme_set_sar_power_limits(mac_handle_t mac_handle,
  */
 QDF_STATUS sme_send_coex_config_cmd(struct coex_config_params *coex_cfg_params);
 
-/**
- * sme_send_ocl_cmd() - Send OCL command
- * @ocl_params: OCL command params
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS sme_send_ocl_cmd(struct ocl_cmd_params *ocl_params);
-
 void sme_set_cc_src(mac_handle_t mac_handle, enum country_src);
 
 
@@ -2748,6 +2740,18 @@ struct mac_context *sme_get_mac_context(void);
  * Return: None
  */
 void sme_display_disconnect_stats(mac_handle_t mac_handle, uint8_t session_id);
+
+#ifdef WLAN_FEATURE_MSCS
+/**
+ * sme_send_mscs_action_frame() - Send MSCS action frame
+ * @vdev_id: sme vdev_id
+ *
+ * This function is used to send down the mscs request to PE
+ *
+ * Return: None
+ */
+void sme_send_mscs_action_frame(uint8_t vdev_id);
+#endif
 
 /**
  * sme_process_msg_callback() - process callback message from LIM
@@ -3603,6 +3607,7 @@ static inline void sme_reset_he_caps(mac_handle_t mac_handle, uint8_t vdev_id)
  * sme_get_mcs_idx() - gets mcs index
  * @raw_rate: raw rate from fw
  * @rate_flags: rate flags
+ * @he_mcs_12_13_map: he mcs12/13 map
  * @nss: number of nss
  * @dcm: dcm will be calculated from rate
  * @guard_interval: guard interval info from rate
@@ -3611,6 +3616,7 @@ static inline void sme_reset_he_caps(mac_handle_t mac_handle, uint8_t vdev_id)
  * Return: return mcs index
  */
 uint8_t sme_get_mcs_idx(uint16_t raw_rate, enum tx_rate_info rate_flags,
+			uint16_t he_mcs_12_13_map,
 			uint8_t *nss, uint8_t *dcm,
 			enum txrate_gi *guard_interval,
 			enum tx_rate_info *mcs_rate_flags);

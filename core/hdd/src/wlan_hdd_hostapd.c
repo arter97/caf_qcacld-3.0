@@ -603,7 +603,6 @@ static void hdd_hostapd_uninit(struct net_device *dev)
 	hdd_deinit_adapter(hdd_ctx, adapter, true);
 
 	/* after uninit our adapter structure will no longer be valid */
-	adapter->dev = NULL;
 	adapter->magic = 0;
 
 	hdd_exit();
@@ -770,7 +769,7 @@ static void hdd_clear_sta(struct hdd_adapter *adapter,
 		return;
 
 	wlansap_populate_del_sta_params(sta_info->sta_mac.bytes,
-					eSIR_MAC_DEAUTH_LEAVING_BSS_REASON,
+					REASON_DEAUTH_NETWORK_LEAVING,
 					SIR_MAC_MGMT_DISASSOC,
 					&del_sta_params);
 
@@ -2336,10 +2335,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 			uint32_t ies_len = event->ies_len;
 
 			sta_info = qdf_mem_malloc(sizeof(*sta_info));
-			if (!sta_info) {
-				hdd_err("Failed to allocate station info");
+			if (!sta_info)
 				return QDF_STATUS_E_FAILURE;
-			}
 
 			sta_info->assoc_req_ies = event->ies;
 			sta_info->assoc_req_ies_len = ies_len;
@@ -2918,7 +2915,7 @@ static int hdd_softap_unpack_ie(mac_handle_t mac_handle,
  */
 static bool hdd_is_any_sta_connecting(struct hdd_context *hdd_ctx)
 {
-	struct hdd_adapter *adapter = NULL;
+	struct hdd_adapter *adapter = NULL, *next_adapter = NULL;
 	struct hdd_station_ctx *sta_ctx;
 
 	if (!hdd_ctx) {
@@ -2926,7 +2923,7 @@ static bool hdd_is_any_sta_connecting(struct hdd_context *hdd_ctx)
 		return false;
 	}
 
-	hdd_for_each_adapter(hdd_ctx, adapter) {
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter) {
 		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 		if ((adapter->device_mode == QDF_STA_MODE) ||
 		    (adapter->device_mode == QDF_P2P_CLIENT_MODE) ||
@@ -2935,9 +2932,13 @@ static bool hdd_is_any_sta_connecting(struct hdd_context *hdd_ctx)
 			    eConnectionState_Connecting) {
 				hdd_debug("vdev_id %d: connecting",
 					  adapter->vdev_id);
+				dev_put(adapter->dev);
+				if (next_adapter)
+					dev_put(next_adapter->dev);
 				return true;
 			}
 		}
+		dev_put(adapter->dev);
 	}
 
 	return false;
@@ -3473,7 +3474,7 @@ bool hdd_sap_destroy_ctx(struct hdd_adapter *adapter)
 
 void hdd_sap_destroy_ctx_all(struct hdd_context *hdd_ctx, bool is_ssr)
 {
-	struct hdd_adapter *adapter;
+	struct hdd_adapter *adapter, *next_adapter = NULL;
 
 	/* sap_ctx is not destroyed as it will be leveraged for sap restart */
 	if (is_ssr)
@@ -3481,9 +3482,10 @@ void hdd_sap_destroy_ctx_all(struct hdd_context *hdd_ctx, bool is_ssr)
 
 	hdd_debug("destroying all the sap context");
 
-	hdd_for_each_adapter(hdd_ctx, adapter) {
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter) {
 		if (adapter->device_mode == QDF_SAP_MODE)
 			hdd_sap_destroy_ctx(adapter);
+		dev_put(adapter->dev);
 	}
 }
 
@@ -3890,11 +3892,9 @@ int wlan_hdd_set_channel(struct wiphy *wiphy,
 			sap_config->ch_params.center_freq_seg1 = channel_seg2;
 
 			sme_config = qdf_mem_malloc(sizeof(*sme_config));
-
-			if (!sme_config) {
-				hdd_err("Unable to allocate memory for smeconfig!");
+			if (!sme_config)
 				return -ENOMEM;
-			}
+
 			sme_get_config_param(mac_handle, sme_config);
 			switch (channel_type) {
 			case NL80211_CHAN_HT20:
@@ -4195,11 +4195,9 @@ wlan_hdd_cfg80211_alloc_new_beacon(struct hdd_adapter *adapter,
 		proberesp_ies_len + assocresp_ies_len;
 
 	beacon = qdf_mem_malloc(size);
-
-	if (!beacon) {
-		hdd_err("Mem allocation for beacon failed");
+	if (!beacon)
 		return -ENOMEM;
-	}
+
 	if (dtim_period)
 		beacon->dtim_period = dtim_period;
 	else if (old)
@@ -4314,7 +4312,6 @@ int wlan_hdd_cfg80211_update_apies(struct hdd_adapter *adapter)
 	}
 
 	genie = qdf_mem_malloc(MAX_GENIE_LEN);
-
 	if (!genie)
 		return -ENOMEM;
 
@@ -4351,8 +4348,6 @@ int wlan_hdd_cfg80211_update_apies(struct hdd_adapter *adapter)
 	proberesp_ies = qdf_mem_malloc(beacon->proberesp_ies_len +
 				      MAX_GENIE_LEN);
 	if (!proberesp_ies) {
-		hdd_err("mem alloc failed for probe resp ies, size: %d",
-			beacon->proberesp_ies_len + MAX_GENIE_LEN);
 		ret = -EINVAL;
 		goto done;
 	}
@@ -4769,7 +4764,7 @@ static int wlan_hdd_setup_driver_overrides(struct hdd_adapter *ap_adapter)
 
 void
 hdd_check_and_disconnect_sta_on_invalid_channel(struct hdd_context *hdd_ctx,
-						tSirMacReasonCodes reason)
+						enum wlan_reason_code reason)
 {
 	struct hdd_adapter *sta_adapter;
 	uint32_t sta_chan_freq;
@@ -4932,9 +4927,8 @@ int wlan_hdd_disable_channels(struct hdd_context *hdd_ctx)
 	}
 
 	for (i = 0; i < cache_chann->num_channels; i++) {
-		freq = wlan_reg_chan_to_freq(hdd_ctx->pdev,
-					     cache_chann->
-						channel_info[i].channel_num);
+		freq = wlan_reg_legacy_chan_to_freq(hdd_ctx->pdev,
+						    cache_chann->channel_info[i].channel_num);
 		if (!freq)
 			continue;
 		wiphy_channel = wlan_hdd_get_wiphy_channel(wiphy, freq);
@@ -5185,7 +5179,6 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 
 	sme_config = qdf_mem_malloc(sizeof(*sme_config));
 	if (!sme_config) {
-		hdd_err("failed to allocate memory");
 		ret = -ENOMEM;
 		goto free;
 	}
@@ -5218,7 +5211,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 		if (policy_mgr_is_force_scc(hdd_ctx->psoc))
 			hdd_check_and_disconnect_sta_on_invalid_channel(
 					hdd_ctx,
-					eSIR_MAC_OPER_CHANNEL_DISABLED_INDOOR);
+					REASON_OPER_CHANNEL_DISABLED_INDOOR);
 	}
 
 	beacon = adapter->session.ap.beacon;
@@ -6740,7 +6733,6 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 			sta_inactivity_timer = qdf_mem_malloc(
 					sizeof(*sta_inactivity_timer));
 			if (!sta_inactivity_timer) {
-				hdd_err("Failed to allocate Memory");
 				status = QDF_STATUS_E_FAILURE;
 				goto err_start_bss;
 			}

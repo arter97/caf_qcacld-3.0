@@ -98,10 +98,8 @@ ipa_pdev_obj_create_notification(struct wlan_objmgr_pdev *pdev,
 	}
 
 	ipa_obj = qdf_mem_malloc(sizeof(*ipa_obj));
-	if (!ipa_obj) {
-		ipa_err("Failed to allocate memory for ipa pdev object");
+	if (!ipa_obj)
 		return QDF_STATUS_E_NOMEM;
-	}
 
 	status = wlan_objmgr_pdev_component_obj_attach(pdev,
 						       WLAN_UMAC_COMP_IPA,
@@ -115,6 +113,7 @@ ipa_pdev_obj_create_notification(struct wlan_objmgr_pdev *pdev,
 
 	ipa_obj->pdev = pdev;
 	target_if_ipa_register_tx_ops(&ipa_obj->ipa_tx_op);
+	target_if_ipa_register_intrabss_ops(&ipa_obj->ipa_intrabss_op);
 
 	ipa_debug("ipa pdev attached");
 

@@ -1442,9 +1442,6 @@ struct policy_mgr_sme_cbacks {
  * @get_mode_for_non_connected_vdev: Get the mode for a non
  *                                 connected vdev
  * @hdd_get_device_mode: Get QDF_OPMODE type for session id (vdev id)
- * @hdd_wapi_security_sta_exist: Get whether wapi encription station existing
- * or not. Some hw doesn't support WAPI encryption concurrency with other
- * encryption type.
  * @hdd_is_chan_switch_in_progress: Check if in any adater channel switch is in
  * progress
  * @wlan_hdd_set_sap_csa_reason: Set the sap csa reason in cases like NAN.
@@ -1463,7 +1460,6 @@ struct policy_mgr_hdd_cbacks {
 				struct wlan_objmgr_psoc *psoc,
 				uint8_t vdev_id);
 	enum QDF_OPMODE (*hdd_get_device_mode)(uint32_t session_id);
-	bool (*hdd_wapi_security_sta_exist)(void);
 	bool (*hdd_is_chan_switch_in_progress)(void);
 	bool (*hdd_is_cac_in_progress)(void);
 	void (*wlan_hdd_set_sap_csa_reason)(struct wlan_objmgr_psoc *psoc,
@@ -2142,6 +2138,28 @@ QDF_STATUS policy_mgr_get_pcl_for_existing_conn(
 		uint32_t *pcl_ch, uint32_t *len,
 		uint8_t *pcl_weight, uint32_t weight_len,
 		bool all_matching_cxn_to_del);
+
+/**
+ * policy_mgr_get_pcl_for_vdev_id() - Get PCL for 1 vdev
+ * @psoc: PSOC object information
+ * @mode: Connection mode of type 'policy_mgr_con_mode'
+ * @pcl_ch: Pointer to the PCL
+ * @len: Pointer to the length of the PCL
+ * @pcl_weight: Pointer to the weights of the PCL
+ * @weight_len: Max length of the weights list
+ * @vdev_id: vdev id to get PCL
+ *
+ * Get the PCL for a vdev, when vdev need move to another channel, need
+ * get PCL after remove the vdev from connection list.
+ *
+ * Return: None
+ */
+QDF_STATUS policy_mgr_get_pcl_for_vdev_id(struct wlan_objmgr_psoc *psoc,
+					  enum policy_mgr_con_mode mode,
+					  uint32_t *pcl_ch, uint32_t *len,
+					  uint8_t *pcl_weight,
+					  uint32_t weight_len,
+					  uint8_t vdev_id);
 
 /**
  * policy_mgr_get_valid_chan_weights() - Get the weightage for

@@ -260,9 +260,7 @@ QDF_STATUS hdd_update_mac_config(struct hdd_context *hdd_ctx)
 	hdd_debug("wlan_mac.bin size %zu", fw->size);
 
 	temp = qdf_mem_malloc(fw->size + 1);
-
 	if (!temp) {
-		hdd_err("fail to alloc memory");
 		qdf_status = QDF_STATUS_E_NOMEM;
 		goto config_exit;
 	}
@@ -690,10 +688,8 @@ QDF_STATUS hdd_set_policy_mgr_user_cfg(struct hdd_context *hdd_ctx)
 	struct policy_mgr_user_cfg *user_cfg;
 
 	user_cfg = qdf_mem_malloc(sizeof(*user_cfg));
-	if (!user_cfg) {
-		hdd_err("unable to allocate user_cfg");
+	if (!user_cfg)
 		return QDF_STATUS_E_NOMEM;
-	}
 
 	status = ucfg_mlme_get_vht_enable2x2(hdd_ctx->psoc,
 					     &user_cfg->enable2x2);
@@ -883,10 +879,8 @@ QDF_STATUS hdd_set_sme_config(struct hdd_context *hdd_ctx)
 	struct hdd_config *config = hdd_ctx->config;
 
 	sme_config = qdf_mem_malloc(sizeof(*sme_config));
-	if (!sme_config) {
-		hdd_err("unable to allocate sme_config");
+	if (!sme_config)
 		return QDF_STATUS_E_NOMEM;
-	}
 
 	/* Config params obtained from the registry
 	 * To Do: set regulatory information here
@@ -1339,6 +1333,12 @@ int hdd_vendor_mode_to_band(enum qca_wlan_vendor_phy_mode vendor_phy_mode,
 {
 	switch (vendor_phy_mode) {
 	case QCA_WLAN_VENDOR_PHY_MODE_AUTO:
+		if (is_6ghz_supported)
+			*supported_band = REG_BAND_MASK_ALL;
+		else
+			*supported_band =
+				BIT(REG_BAND_2G) | BIT(REG_BAND_5G);
+		break;
 	case QCA_WLAN_VENDOR_PHY_MODE_11AC_VHT20:
 	case QCA_WLAN_VENDOR_PHY_MODE_11AC_VHT40:
 	case QCA_WLAN_VENDOR_PHY_MODE_11AC_VHT40PLUS:

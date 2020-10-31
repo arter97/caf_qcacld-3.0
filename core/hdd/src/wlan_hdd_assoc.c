@@ -250,12 +250,43 @@ static inline void wlan_hdd_sae_callback(struct hdd_adapter *adapter,
 #endif
 
 /**
+ * hdd_start_powersave_timer_on_associated() - Start auto powersave timer
+ *  after associated
+ * @adapter: pointer to the adapter
+ *
+ * This function will start auto powersave timer for STA/P2P Client.
+ *
+ * Return: none
+ */
+static void hdd_start_powersave_timer_on_associated(struct hdd_adapter *adapter)
+{
+	uint32_t timeout;
+	uint32_t auto_bmps_timer_val;
+	struct hdd_station_ctx *hddstactx =
+		WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+	if (adapter->device_mode != QDF_STA_MODE &&
+	    adapter->device_mode != QDF_P2P_CLIENT_MODE)
+		return;
+	ucfg_mlme_get_auto_bmps_timer_value(hdd_ctx->psoc,
+					    &auto_bmps_timer_val);
+	timeout = hddstactx->hdd_reassoc_scenario ?
+		AUTO_PS_ENTRY_TIMER_DEFAULT_VALUE :
+		(auto_bmps_timer_val * 1000);
+	sme_ps_enable_auto_ps_timer(hdd_ctx->mac_handle,
+				    adapter->vdev_id,
+				    timeout);
+}
+
+/**
  * hdd_conn_set_authenticated() - set authentication state
  * @adapter: pointer to the adapter
  * @auth_state: authentication state
  *
  * This function updates the global HDD station context
- * authentication state.
+ * authentication state. And to start auto powersave timer
+ * if ptk installed case and open security case.
  *
  * Return: none
  */
@@ -279,7 +310,10 @@ hdd_conn_set_authenticated(struct hdd_adapter *adapter, uint8_t auth_state)
 							   time_buffer_size);
 	else
 		qdf_mem_zero(auth_time, time_buffer_size);
-
+	if (auth_state &&
+	    (sta_ctx->conn_info.ptk_installed ||
+	     sta_ctx->conn_info.uc_encrypt_type == eCSR_ENCRYPT_TYPE_NONE))
+		hdd_start_powersave_timer_on_associated(adapter);
 }
 
 void hdd_conn_set_connection_state(struct hdd_adapter *adapter,
@@ -405,7 +439,7 @@ hdd_conn_get_connected_cipher_algo(struct hdd_station_ctx *sta_ctx,
 struct hdd_adapter *hdd_get_sta_connection_in_progress(
 			struct hdd_context *hdd_ctx)
 {
-	struct hdd_adapter *adapter = NULL;
+	struct hdd_adapter *adapter = NULL, *next_adapter = NULL;
 	struct hdd_station_ctx *hdd_sta_ctx;
 
 	if (!hdd_ctx) {
@@ -413,7 +447,7 @@ struct hdd_adapter *hdd_get_sta_connection_in_progress(
 		return NULL;
 	}
 
-	hdd_for_each_adapter(hdd_ctx, adapter) {
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter) {
 		hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 		if ((QDF_STA_MODE == adapter->device_mode) ||
 		    (QDF_P2P_CLIENT_MODE == adapter->device_mode) ||
@@ -422,6 +456,9 @@ struct hdd_adapter *hdd_get_sta_connection_in_progress(
 			    hdd_sta_ctx->conn_info.conn_state) {
 				hdd_debug("vdev_id %d: Connection is in progress",
 					  adapter->vdev_id);
+				dev_put(adapter->dev);
+				if (next_adapter)
+					dev_put(next_adapter->dev);
 				return adapter;
 			} else if ((eConnectionState_Associated ==
 				   hdd_sta_ctx->conn_info.conn_state) &&
@@ -430,9 +467,13 @@ struct hdd_adapter *hdd_get_sta_connection_in_progress(
 							adapter->vdev_id)) {
 				hdd_debug("vdev_id %d: Key exchange is in progress",
 					  adapter->vdev_id);
+				dev_put(adapter->dev);
+				if (next_adapter)
+					dev_put(next_adapter->dev);
 				return adapter;
 			}
 		}
+		dev_put(adapter->dev);
 	}
 	return NULL;
 }
@@ -448,7 +489,7 @@ void hdd_abort_ongoing_sta_connection(struct hdd_context *hdd_ctx)
 			  sta_adapter->vdev_id);
 		status = wlan_hdd_disconnect(sta_adapter,
 					     eCSR_DISCONNECT_REASON_DEAUTH,
-					     eSIR_MAC_UNSPEC_FAILURE_REASON);
+					     REASON_UNSPEC_FAILURE);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			hdd_err("wlan_hdd_disconnect failed, status: %d",
 				status);
@@ -1925,8 +1966,7 @@ static QDF_STATUS hdd_dis_connect_handler(struct hdd_adapter *adapter,
 		 */
 		if (roam_info && eCSR_ROAM_LOSTLINK == roam_status) {
 			reason = roam_info->reasonCode;
-			if (reason ==
-			    eSIR_MAC_PEER_STA_REQ_LEAVING_BSS_REASON)
+			if (reason == REASON_STA_LEAVING)
 				pr_info("wlan: disconnected due to poor signal, rssi is %d dB\n",
 					roam_info->rxRssi);
 		}
@@ -2219,62 +2259,6 @@ hdd_rx_register_fisa_ops(struct ol_txrx_ops *txrx_ops)
 #endif
 
 /**
- * hdd_change_sta_state_authenticated()-
- * This function changes STA state to authenticated
- * @adapter:  pointer to the adapter structure.
- * @roaminfo: pointer to the RoamInfo structure.
- *
- * This is called from hdd_RoamSetKeyCompleteHandler
- * in context to eCSR_ROAM_SET_KEY_COMPLETE event from fw.
- * Also called for open authentication connection from
- * association_completion_handler
- *
- * Return: 0 on success and errno on failure
- */
-static int hdd_change_sta_state_authenticated(struct hdd_adapter *adapter,
-					      struct csr_roam_info *roaminfo)
-{
-	QDF_STATUS status;
-	uint8_t *mac_addr;
-	uint32_t timeout, auto_bmps_timer_val;
-	struct hdd_station_ctx *hddstactx =
-		WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	struct wlan_objmgr_vdev *vdev;
-
-	ucfg_mlme_get_auto_bmps_timer_value(hdd_ctx->psoc,
-					    &auto_bmps_timer_val);
-	timeout = hddstactx->hdd_reassoc_scenario ?
-		AUTO_PS_ENTRY_TIMER_DEFAULT_VALUE :
-		(auto_bmps_timer_val * 1000);
-
-	mac_addr = hddstactx->conn_info.bssid.bytes;
-
-	hdd_debug("Changing Peer state to AUTHENTICATED for Sta = "
-		  QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(mac_addr));
-
-	/* Change CDP Peer state to 'Authenticated' */
-	status = hdd_change_peer_state(adapter, mac_addr,
-				       OL_TXRX_PEER_STATE_AUTH);
-	hdd_conn_set_authenticated(adapter, true);
-
-	vdev = hdd_objmgr_get_vdev(adapter);
-	if (vdev) {
-		hdd_objmgr_set_peer_mlme_auth_state(vdev, true);
-		hdd_objmgr_put_vdev(vdev);
-	}
-
-	if ((adapter->device_mode == QDF_STA_MODE) ||
-	    (adapter->device_mode == QDF_P2P_CLIENT_MODE)) {
-		sme_ps_enable_auto_ps_timer(hdd_ctx->mac_handle,
-					    adapter->vdev_id,
-					    timeout);
-	}
-
-	return qdf_status_to_os_return(status);
-}
-
-/**
  * hdd_roam_register_sta() - register station
  * @adapter: pointer to adapter
  * @roam_info: pointer to roam info
@@ -2291,7 +2275,6 @@ QDF_STATUS hdd_roam_register_sta(struct hdd_adapter *adapter,
 	struct ol_txrx_desc_type txrx_desc = {0};
 	struct ol_txrx_ops txrx_ops;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
-	struct wlan_objmgr_vdev *vdev;
 
 	if (!bss_desc)
 		return QDF_STATUS_E_FAILURE;
@@ -2327,6 +2310,7 @@ QDF_STATUS hdd_roam_register_sta(struct hdd_adapter *adapter,
 		txrx_ops.rx.rx_stack = hdd_rx_packet_cbk;
 		txrx_ops.rx.rx_flush = hdd_rx_flush_packet_cbk;
 		txrx_ops.rx.rx_gro_flush = hdd_rx_thread_gro_flush_ind_cbk;
+		adapter->rx_stack = hdd_rx_packet_cbk;
 	} else {
 		txrx_ops.rx.rx = hdd_rx_packet_cbk;
 		txrx_ops.rx.rx_stack = NULL;
@@ -2361,13 +2345,18 @@ QDF_STATUS hdd_roam_register_sta(struct hdd_adapter *adapter,
 	if (!roam_info->fAuthRequired) {
 		/*
 		 * Connections that do not need Upper layer auth, transition
-		 * CDP peer state directly to 'Authenticated' state
+		 * TLSHIM directly to 'Authenticated' state
 		 */
-		hdd_change_sta_state_authenticated(adapter,
-						   roam_info);
+		qdf_status = hdd_conn_change_peer_state(
+						adapter, roam_info,
+						txrx_desc.peer_addr.bytes,
+						OL_TXRX_PEER_STATE_AUTH);
+
+		hdd_conn_set_authenticated(adapter, true);
+		hdd_objmgr_set_peer_mlme_auth_state(adapter->vdev, true);
 	} else {
 		hdd_debug("ULA auth Sta: " QDF_MAC_ADDR_FMT
-			  " Changing CDP Peer State to CONNECTED at Join time",
+			  " Changing TL state to CONNECTED at Join time",
 			  QDF_MAC_ADDR_REF(txrx_desc.peer_addr.bytes));
 
 		qdf_status = hdd_conn_change_peer_state(
@@ -2376,11 +2365,7 @@ QDF_STATUS hdd_roam_register_sta(struct hdd_adapter *adapter,
 						OL_TXRX_PEER_STATE_CONN);
 
 		hdd_conn_set_authenticated(adapter, false);
-		vdev = hdd_objmgr_get_vdev(adapter);
-		if (vdev) {
-			hdd_objmgr_set_peer_mlme_auth_state(vdev, false);
-			hdd_objmgr_put_vdev(vdev);
-		}
+		hdd_objmgr_set_peer_mlme_auth_state(adapter->vdev, false);
 	}
 	return qdf_status;
 }
@@ -2635,6 +2620,40 @@ done:
 }
 
 /**
+ * hdd_change_sta_state_authenticated()-
+ * This function changes STA state to authenticated
+ * @adapter:  pointer to the adapter structure.
+ * @roaminfo: pointer to the RoamInfo structure.
+ *
+ * This is called from hdd_RoamSetKeyCompleteHandler
+ * in context to eCSR_ROAM_SET_KEY_COMPLETE event from fw.
+ *
+ * Return: 0 on success and errno on failure
+ */
+static int hdd_change_sta_state_authenticated(struct hdd_adapter *adapter,
+					      struct csr_roam_info *roaminfo)
+{
+	QDF_STATUS status;
+	uint8_t *mac_addr;
+	struct hdd_station_ctx *hddstactx =
+		WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+
+	mac_addr = hddstactx->conn_info.bssid.bytes;
+	hdd_debug("Changing Peer state to AUTHENTICATED for Sta = "
+		  QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(mac_addr));
+
+	/* Connections that do not need Upper layer authentication,
+	 * transition TL to 'Authenticated' state after the keys are set
+	 */
+	status = hdd_change_peer_state(adapter, mac_addr,
+				       OL_TXRX_PEER_STATE_AUTH);
+	hdd_conn_set_authenticated(adapter, true);
+	hdd_objmgr_set_peer_mlme_auth_state(adapter->vdev, true);
+
+	return qdf_status_to_os_return(status);
+}
+
+/**
  * hdd_change_peer_state_after_set_key() - change the peer state on set key
  *                                         complete
  * @adapter: pointer to HDD adapter
@@ -2824,6 +2843,7 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 	struct net_device *dev = adapter->dev;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	int8_t snr = 0;
 	QDF_STATUS qdf_status = QDF_STATUS_E_FAILURE;
 	uint8_t *reqRsnIe;
 	uint32_t reqRsnLength = DOT11F_IE_RSN_MAX_LEN, ie_len;
@@ -2835,7 +2855,6 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 	mac_handle_t mac_handle;
 	uint32_t conn_info_freq;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
-	struct wlan_objmgr_vdev *vdev;
 #ifdef WLAN_FEATURE_INTERFACE_MGR
 	struct if_mgr_event_data *connect_complete;
 #endif
@@ -2850,6 +2869,23 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 		hdd_err("config is NULL");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
+
+	hdd_get_rssi_snr_by_bssid(adapter, sta_ctx->conn_info.bssid.bytes,
+				  &adapter->rssi, &snr);
+
+	/* If RSSi is reported as positive then it is invalid */
+	if (adapter->rssi > 0) {
+		hdd_debug_rl("RSSI invalid %d", adapter->rssi);
+		adapter->rssi = 0;
+	}
+
+	hdd_debug("snr: %d, rssi: %d", snr, adapter->rssi);
+
+	sta_ctx->conn_info.signal = adapter->rssi;
+	sta_ctx->conn_info.noise =
+		sta_ctx->conn_info.signal - snr;
+	sta_ctx->cache_conn_info.signal = sta_ctx->conn_info.signal;
+	sta_ctx->cache_conn_info.noise = sta_ctx->conn_info.noise;
 
 	/*
 	 * reset scan reject params if connection is success or we received
@@ -3028,7 +3064,7 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 					mac_handle,
 					adapter->vdev_id,
 					eCSR_DISCONNECT_REASON_UNSPECIFIED,
-					eSIR_MAC_UNSPEC_FAILURE_REASON);
+					REASON_UNSPEC_FAILURE);
 			}
 			return QDF_STATUS_E_FAILURE;
 		}
@@ -3090,7 +3126,7 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 					mac_handle,
 					adapter->vdev_id,
 					eCSR_DISCONNECT_REASON_UNSPECIFIED,
-					eSIR_MAC_UNSPEC_FAILURE_REASON);
+					REASON_UNSPEC_FAILURE);
 				}
 				qdf_mem_free(reqRsnIe);
 				qdf_mem_free(rsp_rsn_ie);
@@ -3325,17 +3361,22 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 						roam_info->bssid.bytes,
 						OL_TXRX_PEER_STATE_CONN);
 				hdd_conn_set_authenticated(adapter, false);
-
-				vdev = hdd_objmgr_get_vdev(adapter);
-				if (vdev) {
-					hdd_objmgr_set_peer_mlme_auth_state(
-									vdev,
-									false);
-					hdd_objmgr_put_vdev(vdev);
-				}
+				hdd_objmgr_set_peer_mlme_auth_state(
+							adapter->vdev,
+							false);
 			} else {
-				hdd_change_sta_state_authenticated(adapter,
-								   roam_info);
+				hdd_debug("sta: " QDF_MAC_ADDR_FMT
+					  "Changing TL state to AUTHENTICATED",
+					  QDF_MAC_ADDR_REF(
+					  roam_info->bssid.bytes));
+				qdf_status =
+					hdd_change_peer_state(adapter,
+						roam_info->bssid.bytes,
+						OL_TXRX_PEER_STATE_AUTH);
+				hdd_conn_set_authenticated(adapter, true);
+				hdd_objmgr_set_peer_mlme_auth_state(
+							adapter->vdev,
+							true);
 			}
 
 			if (QDF_IS_STATUS_SUCCESS(qdf_status)) {
@@ -3742,6 +3783,7 @@ QDF_STATUS hdd_roam_register_tdlssta(struct hdd_adapter *adapter,
 		txrx_ops.rx.rx_stack = hdd_rx_packet_cbk;
 		txrx_ops.rx.rx_flush = hdd_rx_flush_packet_cbk;
 		txrx_ops.rx.rx_gro_flush = hdd_rx_thread_gro_flush_ind_cbk;
+		adapter->rx_stack = hdd_rx_packet_cbk;
 	} else {
 		txrx_ops.rx.rx = hdd_rx_packet_cbk;
 		txrx_ops.rx.rx_stack = NULL;
@@ -4465,6 +4507,7 @@ hdd_sme_roam_callback(void *context, struct csr_roam_info *roam_info,
 					WLAN_CONTROL_PATH);
 			break;
 		}
+		/* fallthrough */
 	case eCSR_ROAM_DISASSOCIATED:
 	{
 		hdd_debug("****eCSR_ROAM_DISASSOCIATED****");
@@ -4496,6 +4539,12 @@ hdd_sme_roam_callback(void *context, struct csr_roam_info *roam_info,
 				WLAN_HDD_GET_STATION_CTX_PTR(adapter));
 		} else {
 			wlan_hdd_ft_set_key_delay(hdd_ctx->mac_handle, adapter);
+		}
+		if (sta_ctx->ft_carrier_on) {
+			sta_ctx->hdd_reassoc_scenario = false;
+			hdd_debug("hdd_reassoc_scenario set to: %d session: %d",
+				  sta_ctx->hdd_reassoc_scenario,
+				  adapter->vdev_id);
 		}
 		qdf_ret_status =
 			hdd_association_completion_handler(adapter, roam_info,

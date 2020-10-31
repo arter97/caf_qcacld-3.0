@@ -94,11 +94,11 @@ static void lim_process_sae_msg_sta(struct mac_context *mac,
 		if (sae_msg->sae_status == IEEE80211_STATUS_SUCCESS)
 			lim_restore_from_auth_state(mac,
 						    eSIR_SME_SUCCESS,
-						    eSIR_MAC_SUCCESS_STATUS,
+						    STATUS_SUCCESS,
 						    session);
 		else
 			lim_restore_from_auth_state(mac, eSIR_SME_AUTH_REFUSED,
-				eSIR_MAC_UNSPEC_FAILURE_STATUS, session);
+				STATUS_UNSPECIFIED_FAILURE, session);
 		break;
 	default:
 		/* SAE msg is received in unexpected state */
@@ -1742,6 +1742,7 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 	case eWNI_SME_DEAUTH_CNF:
 	case eWNI_SME_ASSOC_CNF:
 	case eWNI_SME_ADDTS_REQ:
+	case eWNI_SME_MSCS_REQ:
 	case eWNI_SME_DELTS_REQ:
 	case eWNI_SME_SESSION_UPDATE_PARAM:
 	case eWNI_SME_CHNG_MCC_BEACON_INTERVAL:
@@ -2104,6 +2105,8 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 					  msg->bodyptr);
 		qdf_mem_free((void *)msg->bodyptr);
 		msg->bodyptr = NULL;
+		break;
+	case SIR_LIM_PROCESS_DEFERRED_QUEUE:
 		break;
 	default:
 		qdf_mem_free((void *)msg->bodyptr);

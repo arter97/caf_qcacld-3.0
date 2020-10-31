@@ -34,8 +34,12 @@
 
 #define DATA_RATE_11AC_MCS_MASK    0x03
 
+#ifdef FEATURE_CLUB_LL_STATS_AND_GET_STATION
 /* LL stats get request time out value */
+#define WLAN_WAIT_TIME_LL_STATS 2000
+#else
 #define WLAN_WAIT_TIME_LL_STATS 800
+#endif
 
 #define WLAN_HDD_TGT_NOISE_FLOOR_DBM     (-96)
 
@@ -493,7 +497,7 @@ void wlan_hdd_display_txrx_stats(struct hdd_context *hdd_ctx);
 /**
  * hdd_report_max_rate() - Fill the max rate stats in the station info structure
  * to be sent to the userspace.
- *
+ * @adapter: pointer to adapter
  * @mac_handle: The mac handle
  * @rate: The station_info tx/rx rate to be filled
  * @signal: signal from station_info
@@ -504,13 +508,28 @@ void wlan_hdd_display_txrx_stats(struct hdd_context *hdd_ctx);
  *
  * Return: True if fill is successful
  */
-bool hdd_report_max_rate(mac_handle_t mac_handle,
+bool hdd_report_max_rate(struct hdd_adapter *adapter,
+			 mac_handle_t mac_handle,
 			 struct rate_info *rate,
 			 int8_t signal,
 			 enum tx_rate_info rate_flags,
 			 uint8_t mcs_index,
 			 uint16_t fw_rate, uint8_t nss);
 
+/**
+ * hdd_check_and_update_nss() - Check and update NSS as per DBS capability
+ * @hdd_ctx: HDD Context pointer
+ * @tx_nss: pointer to variable storing the tx_nss
+ * @rx_nss: pointer to variable storing the rx_nss
+ *
+ * The parameters include the NSS obtained from the FW or static NSS. This NSS
+ * could be invalid in the case the current HW mode is DBS where the connection
+ * are 1x1. Rectify these NSS values as per the current HW mode.
+ *
+ * Return: none
+ */
+void hdd_check_and_update_nss(struct hdd_context *hdd_ctx,
+			      uint8_t *tx_nss, uint8_t *rx_nss);
 #ifdef QCA_SUPPORT_CP_STATS
 /**
  * wlan_hdd_register_cp_stats_cb() - Register hdd stats specific

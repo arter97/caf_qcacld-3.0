@@ -1666,7 +1666,8 @@ static QDF_STATUS hdd_gro_rx_bh_disable(struct hdd_adapter *adapter,
 		if (HDD_IS_EXTRA_GRO_FLUSH_NECESSARY(gro_ret)) {
 			adapter->hdd_stats.tx_rx_stats.
 					rx_gro_low_tput_flush++;
-			dp_rx_napi_gro_flush(napi_to_use);
+			dp_rx_napi_gro_flush(napi_to_use,
+					     DP_RX_GRO_NORMAL_FLUSH);
 		}
 		if (!rx_aggregation)
 			hdd_ctx->dp_agg_param.gro_force_flush[rx_ctx_id] = 1;
@@ -1712,7 +1713,8 @@ static QDF_STATUS hdd_gro_rx_bh_disable(struct hdd_adapter *adapter,
 	if (hdd_get_current_throughput_level(hdd_ctx) == PLD_BUS_WIDTH_IDLE) {
 		if (HDD_IS_EXTRA_GRO_FLUSH_NECESSARY(gro_ret)) {
 			adapter->hdd_stats.tx_rx_stats.rx_gro_low_tput_flush++;
-			dp_rx_napi_gro_flush(napi_to_use);
+			dp_rx_napi_gro_flush(napi_to_use,
+					     DP_RX_GRO_NORMAL_FLUSH);
 		}
 	}
 	local_bh_enable();
@@ -1821,7 +1823,8 @@ static void hdd_rxthread_napi_gro_flush(void *data)
 	 * As we are breaking context in Rxthread mode, there is rx_thread NAPI
 	 * corresponds each hif_napi.
 	 */
-	dp_rx_napi_gro_flush(&qca_napii->rx_thread_napi);
+	dp_rx_napi_gro_flush(&qca_napii->rx_thread_napi,
+			     DP_RX_GRO_NORMAL_FLUSH);
 	local_bh_enable();
 }
 
@@ -2050,19 +2053,23 @@ static inline void hdd_tsf_timestamp_rx(struct hdd_context *hdd_ctx,
 QDF_STATUS hdd_rx_thread_gro_flush_ind_cbk(void *adapter, int rx_ctx_id)
 {
 	struct hdd_adapter *hdd_adapter = adapter;
+	enum dp_rx_gro_flush_code gro_flush_code = DP_RX_GRO_NORMAL_FLUSH;
 
 	if (qdf_unlikely((!hdd_adapter) || (!hdd_adapter->hdd_ctx))) {
 		hdd_err("Null params being passed");
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	if (hdd_adapter->runtime_disable_rx_thread)
+		return QDF_STATUS_SUCCESS;
+
 	if (hdd_is_low_tput_gro_enable(hdd_adapter->hdd_ctx)) {
 		hdd_adapter->hdd_stats.tx_rx_stats.rx_gro_flush_skip++;
-		return QDF_STATUS_SUCCESS;
+		gro_flush_code = DP_RX_GRO_LOW_TPUT_FLUSH;
 	}
 
 	return dp_rx_gro_flush_ind(cds_get_context(QDF_MODULE_ID_SOC),
-				   rx_ctx_id);
+				   rx_ctx_id, gro_flush_code);
 }
 
 QDF_STATUS hdd_rx_pkt_thread_enqueue_cbk(void *adapter,
@@ -2080,6 +2087,10 @@ QDF_STATUS hdd_rx_pkt_thread_enqueue_cbk(void *adapter,
 	hdd_adapter = (struct hdd_adapter *)adapter;
 	if (hdd_validate_adapter(hdd_adapter))
 		return QDF_STATUS_E_FAILURE;
+
+	if (hdd_adapter->runtime_disable_rx_thread &&
+	    hdd_adapter->rx_stack)
+		return hdd_adapter->rx_stack(adapter, nbuf_list);
 
 	vdev_id = hdd_adapter->vdev_id;
 	head_ptr = nbuf_list;
@@ -2223,7 +2234,8 @@ QDF_STATUS hdd_rx_deliver_to_stack(struct hdd_adapter *adapter,
 
 	if (skb_receive_offload_ok && hdd_ctx->receive_offload_cb &&
 	    !hdd_ctx->dp_agg_param.gro_force_flush[rx_ctx_id] &&
-	    !adapter->gro_flushed[rx_ctx_id]) {
+	    !adapter->gro_flushed[rx_ctx_id] &&
+	    !adapter->runtime_disable_rx_thread) {
 		status = hdd_ctx->receive_offload_cb(adapter, skb);
 
 		if (QDF_IS_STATUS_SUCCESS(status)) {
@@ -2251,8 +2263,9 @@ QDF_STATUS hdd_rx_deliver_to_stack(struct hdd_adapter *adapter,
 	/* Account for GRO/LRO ineligible packets, mostly UDP */
 	hdd_ctx->no_rx_offload_pkt_cnt++;
 
-	if (qdf_likely(hdd_ctx->enable_dp_rx_threads ||
-		       hdd_ctx->enable_rxthread)) {
+	if (qdf_likely((hdd_ctx->enable_dp_rx_threads ||
+		        hdd_ctx->enable_rxthread) &&
+		        !adapter->runtime_disable_rx_thread)) {
 		local_bh_disable();
 		netif_status = netif_receive_skb(skb);
 		local_bh_enable();
@@ -2308,8 +2321,9 @@ QDF_STATUS hdd_rx_deliver_to_stack(struct hdd_adapter *adapter,
 	/* Account for GRO/LRO ineligible packets, mostly UDP */
 	hdd_ctx->no_rx_offload_pkt_cnt++;
 
-	if (qdf_likely(hdd_ctx->enable_dp_rx_threads ||
-		       hdd_ctx->enable_rxthread)) {
+	if (qdf_likely((hdd_ctx->enable_dp_rx_threads ||
+		        hdd_ctx->enable_rxthread) &&
+		        !adapter->runtime_disable_rx_thread)) {
 		local_bh_disable();
 		netif_status = netif_receive_skb(skb);
 		local_bh_enable();
@@ -3252,6 +3266,32 @@ void hdd_send_rps_disable_ind(struct hdd_adapter *adapter)
 	cds_cfg->rps_enabled = false;
 }
 
+#ifdef IPA_LAN_RX_NAPI_SUPPORT
+void hdd_adapter_set_rps(uint8_t vdev_id, bool enable)
+{
+	struct hdd_context *hdd_ctx;
+	struct hdd_adapter *adapter;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx)
+		return;
+
+	adapter = hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
+	if (!adapter) {
+		hdd_err_rl("Adapter not found for vdev_id: %d", vdev_id);
+		return;
+	}
+
+	hdd_debug("Set RPS to %d for vdev_id %d", enable, vdev_id);
+	if (!hdd_ctx->rps) {
+		if (enable)
+			hdd_send_rps_ind(adapter);
+		else
+			hdd_send_rps_disable_ind(adapter);
+	}
+}
+#endif
+
 void hdd_tx_queue_cb(hdd_handle_t hdd_handle, uint32_t vdev_id,
 		     enum netif_action_type action,
 		     enum netif_reason_type reason)
@@ -3364,6 +3404,30 @@ static void hdd_ini_tx_flow_control(struct hdd_config *config,
 #else
 static void hdd_ini_tx_flow_control(struct hdd_config *config,
 				    struct wlan_objmgr_psoc *psoc)
+{
+}
+#endif
+
+#ifdef WLAN_FEATURE_MSCS
+/**
+ * hdd_ini_mscs_params() - Initialize INIs related to MSCS feature
+ * @config: pointer to hdd config
+ * @psoc: pointer to psoc obj
+ *
+ * Return: none
+ */
+static void hdd_ini_mscs_params(struct hdd_config *config,
+				struct wlan_objmgr_psoc *psoc)
+{
+	config->mscs_pkt_threshold =
+		cfg_get(psoc, CFG_VO_PKT_COUNT_THRESHOLD);
+	config->mscs_voice_interval =
+		cfg_get(psoc, CFG_MSCS_VOICE_INTERVAL);
+}
+
+#else
+static inline void hdd_ini_mscs_params(struct hdd_config *config,
+				       struct wlan_objmgr_psoc *psoc)
 {
 }
 #endif
@@ -3571,6 +3635,7 @@ void hdd_dp_cfg_update(struct wlan_objmgr_psoc *psoc,
 	hdd_ini_tx_flow_control(config, psoc);
 	hdd_ini_bus_bandwidth(config, psoc);
 	hdd_ini_tcp_settings(config, psoc);
+	hdd_ini_mscs_params(config, psoc);
 
 	hdd_ini_tcp_del_ack_settings(config, psoc);
 

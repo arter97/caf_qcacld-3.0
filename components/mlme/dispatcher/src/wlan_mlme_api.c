@@ -575,13 +575,15 @@ QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 	mlme_obj->cfg.he_caps.dot11_he_cap.present = 1;
 	mlme_obj->cfg.he_caps.dot11_he_cap.htc_he = he_cap->htc_he;
 
-	mlme_obj->cfg.he_caps.dot11_he_cap.twt_request =
-				he_cap->twt_request;
-	mlme_obj->cfg.he_caps.dot11_he_cap.twt_responder =
-				he_cap->twt_responder;
+	value = QDF_MIN(he_cap->twt_request,
+			mlme_obj->cfg.he_caps.dot11_he_cap.twt_request);
+	mlme_obj->cfg.he_caps.dot11_he_cap.twt_request = value;
 
-	value = QDF_MIN(
-			he_cap->fragmentation,
+	value = QDF_MIN(he_cap->twt_responder,
+			mlme_obj->cfg.he_caps.dot11_he_cap.twt_responder);
+	mlme_obj->cfg.he_caps.dot11_he_cap.twt_responder = value;
+
+	value = QDF_MIN(he_cap->fragmentation,
 			mlme_obj->cfg.he_caps.he_dynamic_fragmentation);
 
 	if (cfg_in_range(CFG_HE_FRAGMENTATION, value))
@@ -854,10 +856,16 @@ QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 		     HE_MAX_PPET_SIZE);
 
 	mlme_obj->cfg.he_caps.he_cap_orig = mlme_obj->cfg.he_caps.dot11_he_cap;
-	mlme_obj->cfg.he_caps.he_mcs_12_13_supp_2g =
-				wma_cfg->he_mcs_12_13_supp_2g;
-	mlme_obj->cfg.he_caps.he_mcs_12_13_supp_5g =
-				wma_cfg->he_mcs_12_13_supp_5g;
+	/* Take intersection of host and FW capabilities */
+	mlme_obj->cfg.he_caps.he_mcs_12_13_supp_2g &=
+						  wma_cfg->he_mcs_12_13_supp_2g;
+	mlme_obj->cfg.he_caps.he_mcs_12_13_supp_5g &=
+						  wma_cfg->he_mcs_12_13_supp_5g;
+	mlme_debug("mcs_12_13 2G: %x 5G: %x FW_cap: 2G: %x 5G: %x",
+		   mlme_obj->cfg.he_caps.he_mcs_12_13_supp_2g,
+		   mlme_obj->cfg.he_caps.he_mcs_12_13_supp_5g,
+		   wma_cfg->he_mcs_12_13_supp_2g,
+		   wma_cfg->he_mcs_12_13_supp_5g);
 
 	return status;
 }
@@ -3717,6 +3725,10 @@ void wlan_mlme_update_sae_single_pmk(struct wlan_objmgr_vdev *vdev,
 	if (keymgmt & (1 << WLAN_CRYPTO_KEY_MGMT_SAE))
 		is_sae_connection = true;
 
+	mlme_legacy_debug("SAE_SPMK: single_pmk_ap:%d, is_sae_connection:%d, pmk_len:%d",
+			  mlme_priv->mlme_roam.sae_single_pmk.sae_single_pmk_ap,
+			  is_sae_connection, sae_single_pmk->pmk_len);
+
 	if (mlme_priv->mlme_roam.sae_single_pmk.sae_single_pmk_ap &&
 	    is_sae_connection)
 		mlme_priv->mlme_roam.sae_single_pmk.pmk_info = *sae_single_pmk;
@@ -4271,6 +4283,19 @@ wlan_mlme_get_roam_bmiss_first_bcnt(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_ADAPTIVE_11R
+bool wlan_mlme_adaptive_11r_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return cfg_default(CFG_ADAPTIVE_11R);
+
+	return mlme_obj->cfg.lfr.enable_adaptive_11r;
+}
+#endif
+
 QDF_STATUS
 wlan_mlme_get_mawc_enabled(struct wlan_objmgr_psoc *psoc, bool *val)
 {
@@ -4506,6 +4531,118 @@ wlan_mlme_get_usr_disabled_roaming(struct wlan_objmgr_psoc *psoc, bool *val)
 		return QDF_STATUS_E_INVAL;
 
 	*val = mlme_obj->cfg.sta.usr_disabled_roaming;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS mlme_get_opr_rate(struct wlan_objmgr_vdev *vdev, uint8_t *dst,
+			     qdf_size_t *len)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	if (!vdev || !dst || !len) {
+		mlme_legacy_err("invalid params");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (*len < mlme_priv->opr_rate_set.len) {
+		mlme_legacy_err("Invalid len %zd, opr_rate len %zd",
+				*len, mlme_priv->opr_rate_set.len);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*len = mlme_priv->opr_rate_set.len;
+	qdf_mem_copy(dst, mlme_priv->opr_rate_set.data, *len);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS mlme_set_opr_rate(struct wlan_objmgr_vdev *vdev, uint8_t *src,
+			     qdf_size_t len)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	if (!vdev || !src) {
+		mlme_legacy_err("invalid params");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (len > mlme_priv->opr_rate_set.max_len) {
+		mlme_legacy_err("Invalid len %zd (>%zd)", len,
+				mlme_priv->opr_rate_set.max_len);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	mlme_priv->opr_rate_set.len = len;
+	qdf_mem_copy(mlme_priv->opr_rate_set.data, src, len);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS mlme_get_ext_opr_rate(struct wlan_objmgr_vdev *vdev, uint8_t *dst,
+			     qdf_size_t *len)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	if (!vdev || !dst || !len) {
+		mlme_legacy_err("invalid params");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (*len < mlme_priv->ext_opr_rate_set.len) {
+		mlme_legacy_err("Invalid len %zd, ext_opr_rate len %zd",
+				*len, mlme_priv->ext_opr_rate_set.len);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*len = mlme_priv->ext_opr_rate_set.len;
+	qdf_mem_copy(dst, mlme_priv->ext_opr_rate_set.data, *len);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS mlme_set_ext_opr_rate(struct wlan_objmgr_vdev *vdev, uint8_t *src,
+			     qdf_size_t len)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	if (!vdev || !src) {
+		mlme_legacy_err("invalid params");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (len > mlme_priv->ext_opr_rate_set.max_len) {
+		mlme_legacy_err("Invalid len %zd (>%zd)", len,
+				mlme_priv->ext_opr_rate_set.max_len);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	mlme_priv->ext_opr_rate_set.len = len;
+	qdf_mem_copy(mlme_priv->ext_opr_rate_set.data, src, len);
 
 	return QDF_STATUS_SUCCESS;
 }

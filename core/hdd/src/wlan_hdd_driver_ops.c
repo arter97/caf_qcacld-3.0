@@ -95,6 +95,55 @@ static int hdd_get_bandwidth_level(void *data)
 	return ret;
 }
 
+#ifdef DP_MEM_PRE_ALLOC
+
+/**
+ * hdd_get_consistent_mem_unaligned() - API to get consistent unaligned mem
+ * @size: Size of memory required
+ * @paddr: Pointer to paddr to be filled in by API
+ * @ring_type: Pointer to ring type for which consistent memory is needed
+ *
+ * Return: Virtual address of consistent memory on success, else null
+ */
+static
+void *hdd_get_consistent_mem_unaligned(size_t size,
+				       qdf_dma_addr_t *paddr,
+				       uint32_t ring_type)
+{
+	return dp_prealloc_get_consistent_mem_unaligned(size, paddr,
+							ring_type);
+}
+
+/**
+ * hdd_put_consistent_mem_unaligned() - API to put consistent unaligned mem
+ * @vaddr: Virtual address of memory
+ *
+ * Return: None
+ */
+static
+void hdd_put_consistent_mem_unaligned(void *vaddr)
+{
+	dp_prealloc_put_consistent_mem_unaligned(vaddr);
+}
+
+#else
+static
+void *hdd_get_consistent_mem_unaligned(size_t size,
+				       qdf_dma_addr_t *paddr,
+				       uint32_t ring_type)
+{
+	hdd_err_rl("prealloc not support!");
+
+	return NULL;
+}
+
+static
+void hdd_put_consistent_mem_unaligned(void *vaddr)
+{
+	hdd_err_rl("prealloc not support!");
+}
+#endif
+
 /**
  * hdd_set_recovery_in_progress() - API to set recovery in progress
  * @data: Context
@@ -172,6 +221,10 @@ static void hdd_hif_init_driver_state_callbacks(void *data,
 	cbk->is_driver_unloading = hdd_is_driver_unloading;
 	cbk->is_target_ready = hdd_is_target_ready;
 	cbk->get_bandwidth_level = hdd_get_bandwidth_level;
+	cbk->prealloc_get_consistent_mem_unaligned =
+		hdd_get_consistent_mem_unaligned;
+	cbk->prealloc_put_consistent_mem_unaligned =
+		hdd_put_consistent_mem_unaligned;
 }
 
 #ifdef FORCE_WAKE
@@ -666,6 +719,12 @@ static int hdd_soc_recovery_reinit(struct device *dev,
 	struct osif_psoc_sync *psoc_sync;
 	int errno;
 
+	/* if driver is unloading, there is no need to do SSR */
+	if (qdf_is_driver_unloading()) {
+		hdd_info("driver is unloading, avoid SSR");
+		return 0;
+	}
+
 	/* SSR transition is initiated at the beginning of soc shutdown */
 	errno = osif_psoc_sync_trans_resume(dev, &psoc_sync);
 	QDF_BUG(!errno);
@@ -673,12 +732,11 @@ static int hdd_soc_recovery_reinit(struct device *dev,
 		return errno;
 
 	errno = __hdd_soc_recovery_reinit(dev, bdev, bid, bus_type);
-	if (errno)
-		return errno;
+
 
 	osif_psoc_sync_trans_stop(psoc_sync);
 
-	return 0;
+	return errno;
 }
 
 static void __hdd_soc_remove(struct device *dev)
@@ -901,6 +959,12 @@ static void hdd_soc_recovery_shutdown(struct device *dev)
 {
 	struct osif_psoc_sync *psoc_sync;
 	int errno;
+
+	/* if driver is unloading, there is no need to do SSR */
+	if (qdf_is_driver_unloading()) {
+		hdd_info("driver is unloading, avoid SSR");
+		return;
+	}
 
 	errno = osif_psoc_sync_trans_start_wait(dev, &psoc_sync);
 	if (errno)
@@ -1530,6 +1594,16 @@ static int wlan_hdd_runtime_resume(struct device *dev)
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 
+	/*
+	 * In__hdd_soc_remove, runtime_sync_resume is called before setting
+	 * unload_in_progress flag. wlan_hdd_validate_context will cause
+	 * resume fail, if driver load/unload in-progress, so not doing
+	 * wlan_hdd_validate_context, have only SSR in progress check.
+	 */
+	if (!hdd_ctx) {
+		hdd_err("hdd_ctx is NULL");
+		return 0;
+	}
 	if (cds_is_driver_recovering()) {
 		hdd_debug("Recovery in progress, state:0x%x",
 			  cds_get_driver_state());

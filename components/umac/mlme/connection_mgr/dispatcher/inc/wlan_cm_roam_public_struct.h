@@ -94,6 +94,8 @@
 #define WLAN_FILS_FT_MAX_LEN          48
 
 #define WLAN_MAX_PMK_DUMP_BYTES 6
+#define DEFAULT_ROAM_SCAN_SCHEME_BITMAP 0
+#define ROAM_MAX_CFG_VALUE 0xffffffff
 
 /**
  * enum roam_cfg_param  - Type values for roaming parameters used as index
@@ -162,12 +164,16 @@ struct wlan_cm_roam_vendor_btm_params {
  *		    defined @enum roam_control_trigger_reason
  * @roam_score_delta: Value of roam score delta
  * percentage to trigger roam
+ * @roam_scan_scheme_bitmap: Bitmap of roam triggers as defined in
+ * enum roam_trigger_reason, for which the roam scan scheme should
+ * be partial scan
  * @control_param: roam trigger param
  */
 struct wlan_roam_triggers {
 	uint32_t vdev_id;
 	uint32_t trigger_bitmap;
 	uint32_t roam_score_delta;
+	uint32_t roam_scan_scheme_bitmap;
 	struct wlan_cm_roam_vendor_btm_params vendor_btm_param;
 };
 
@@ -283,8 +289,10 @@ struct scoring_param {
 #define IDLE_ROAM_TRIGGER 0
 #define BTM_ROAM_TRIGGER  1
 
+#define NUM_OF_ROAM_MIN_RSSI 3
 #define DEAUTH_MIN_RSSI 0
 #define BMISS_MIN_RSSI  1
+#define MIN_RSSI_2G_TO_5G_ROAM 2
 
 /**
  * enum roam_trigger_reason - Reason for triggering roam
@@ -375,7 +383,7 @@ struct ap_profile_params {
 	uint8_t vdev_id;
 	struct ap_profile profile;
 	struct scoring_param param;
-	struct roam_trigger_min_rssi min_rssi_params[NUM_OF_ROAM_TRIGGERS];
+	struct roam_trigger_min_rssi min_rssi_params[NUM_OF_ROAM_MIN_RSSI];
 	struct roam_trigger_score_delta score_delta_param[NUM_OF_ROAM_TRIGGERS];
 };
 
@@ -1312,12 +1320,18 @@ enum roam_scan_freq_scheme {
  * @beacon_rssi_weight: Number of beacons to be used to calculate the average
  * rssi of the AP.
  * @hi_rssi_scan_delay: Roam scan delay in ms for High RSSI roam trigger.
+ * @roam_scan_scheme_bitmap: Bitmap of roam triggers for which partial channel
+ * map scan scheme needs to be enabled. Each bit in the bitmap corresponds to
+ * the bit position in the order provided by the enum roam_trigger_reason
+ * Ex: roam_scan_scheme_bitmap - 0x00110 will enable partial scan for below
+ * triggers:
+ * ROAM_TRIGGER_REASON_PER, ROAM_TRIGGER_REASON_BMISS
  */
 struct wlan_cm_rso_configs {
 	uint8_t rescan_rssi_delta;
 	uint8_t beacon_rssi_weight;
 	uint32_t hi_rssi_scan_delay;
-
+	uint32_t roam_scan_scheme_bitmap;
 };
 
 /**

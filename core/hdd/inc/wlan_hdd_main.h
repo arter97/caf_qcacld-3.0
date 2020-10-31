@@ -112,7 +112,7 @@
 #include "qdf_periodic_work.h"
 #endif
 
-#ifdef CLD_PM_QOS
+#if defined(CLD_PM_QOS) || defined(FEATURE_RUNTIME_PM)
 #include <linux/pm_qos.h>
 #endif
 
@@ -701,6 +701,11 @@ struct hdd_stats {
 	struct hdd_eapol_stats_s hdd_eapol_stats;
 	struct hdd_dhcp_stats_s hdd_dhcp_stats;
 	struct pmf_bcn_protect_stats bcn_protect_stats;
+
+#ifdef FEATURE_CLUB_LL_STATS_AND_GET_STATION
+	uint32_t sta_stats_cached_timestamp;
+	bool is_ll_stats_req_in_progress;
+#endif
 };
 
 /**
@@ -1311,6 +1316,11 @@ struct hdd_adapter {
 	uint64_t prev_fwd_rx_packets;
 #endif /*WLAN_FEATURE_DP_BUS_BANDWIDTH*/
 
+#ifdef WLAN_FEATURE_MSCS
+	unsigned long mscs_prev_tx_vo_pkts;
+	uint32_t mscs_counter;
+#endif /* WLAN_FEATURE_MSCS */
+
 #if  defined(QCA_LL_LEGACY_TX_FLOW_CONTROL) || \
 				defined(QCA_HL_NETDEV_FLOW_CONTROL)
 	qdf_mc_timer_t tx_flow_control_timer;
@@ -1419,6 +1429,8 @@ struct hdd_adapter {
 	uint8_t gro_disallowed[DP_MAX_RX_THREADS];
 	uint8_t gro_flushed[DP_MAX_RX_THREADS];
 	bool handle_feature_update;
+	bool runtime_disable_rx_thread;
+	ol_txrx_rx_fp rx_stack;
 
 	qdf_work_t netdev_features_update_work;
 };
@@ -1739,6 +1751,7 @@ struct hdd_adapter_ops_history {
  * @qos_cpu_mask: voted cpu core mask
  * @adapter_ops_wq: High priority workqueue for handling adapter operations
  * @multi_client_thermal_mitigation: Multi client thermal mitigation by fw
+ * @is_therm_cmd_supp: get temperature command enable or disable
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -1747,6 +1760,7 @@ struct hdd_context {
 	struct wiphy *wiphy;
 	qdf_spinlock_t hdd_adapter_lock;
 	qdf_list_t hdd_adapters; /* List of adapters */
+	bool is_therm_cmd_supp;
 
 	/** Pointer for firmware image data */
 	const struct firmware *fw;
@@ -1936,7 +1950,7 @@ struct hdd_context {
 	int radio_index;
 	qdf_work_t sap_pre_cac_work;
 	bool hbw_requested;
-	bool llm_enabled;
+	bool pm_qos_request;
 	enum RX_OFFLOAD ol_enable;
 #ifdef WLAN_FEATURE_NAN
 	bool nan_datapath_enabled;
@@ -2063,6 +2077,8 @@ struct hdd_context {
 #ifdef FW_THERMAL_THROTTLE_SUPPORT
 	uint8_t dutycycle_off_percent;
 #endif
+	uint8_t pm_qos_request_flags;
+	uint8_t high_bus_bw_request;
 	qdf_work_t country_change_work;
 	struct {
 		qdf_atomic_t rx_aggregation;
@@ -2072,6 +2088,9 @@ struct hdd_context {
 	qdf_workqueue_t *adapter_ops_wq;
 	struct hdd_adapter_ops_history adapter_ops_history;
 	bool ll_stats_per_chan_rx_tx_time;
+#ifdef FEATURE_CLUB_LL_STATS_AND_GET_STATION
+	bool is_get_station_clubbed_in_ll_stats_req;
+#endif
 #ifdef FEATURE_WPSS_THERMAL_MITIGATION
 	bool multi_client_thermal_mitigation;
 #endif
@@ -2335,16 +2354,6 @@ QDF_STATUS hdd_adapter_iterate(hdd_adapter_iterate_cb cb,
 			       void *context);
 
 /**
- * hdd_for_each_adapter - adapter iterator macro
- * @hdd_ctx: the global HDD context
- * @adapter: an hdd_adapter pointer to use as a cursor
- */
-#define hdd_for_each_adapter(hdd_ctx, adapter) \
-	for (hdd_get_front_adapter(hdd_ctx, &adapter); \
-	     adapter; \
-	     hdd_get_next_adapter(hdd_ctx, adapter, &adapter))
-
-/**
  * __hdd_take_ref_and_fetch_front_adapter - Helper macro to lock, fetch front
  * adapter, take ref and unlock.
  * @hdd_ctx: the global HDD context
@@ -2354,6 +2363,22 @@ QDF_STATUS hdd_adapter_iterate(hdd_adapter_iterate_cb cb,
 	qdf_spin_lock_bh(&hdd_ctx->hdd_adapter_lock), \
 	hdd_get_front_adapter_no_lock(hdd_ctx, &adapter), \
 	(adapter) ? dev_hold(adapter->dev) : (false), \
+	qdf_spin_unlock_bh(&hdd_ctx->hdd_adapter_lock)
+
+/**
+ * __hdd_take_ref_and_fetch_front_adapter_safe - Helper macro to lock, fetch
+ * front and next adapters, take ref and unlock.
+ * @hdd_ctx: the global HDD context
+ * @adapter: an hdd_adapter pointer to use as a cursor
+ * @next_adapter: hdd_adapter pointer to next adapter
+ */
+#define __hdd_take_ref_and_fetch_front_adapter_safe(hdd_ctx, adapter, \
+						    next_adapter) \
+	qdf_spin_lock_bh(&hdd_ctx->hdd_adapter_lock), \
+	hdd_get_front_adapter_no_lock(hdd_ctx, &adapter), \
+	(adapter) ? dev_hold(adapter->dev) : (false), \
+	hdd_get_next_adapter_no_lock(hdd_ctx, adapter, &next_adapter), \
+	(next_adapter) ? dev_hold(next_adapter->dev) : (false), \
 	qdf_spin_unlock_bh(&hdd_ctx->hdd_adapter_lock)
 
 /**
@@ -2369,36 +2394,60 @@ QDF_STATUS hdd_adapter_iterate(hdd_adapter_iterate_cb cb,
 	qdf_spin_unlock_bh(&hdd_ctx->hdd_adapter_lock)
 
 /**
+ * __hdd_take_ref_and_fetch_next_adapter_safe - Helper macro to lock, fetch next
+ * adapter, take ref and unlock.
+ * @hdd_ctx: the global HDD context
+ * @adapter: hdd_adapter pointer to use as a cursor
+ * @next_adapter: hdd_adapter pointer to next adapter
+ */
+#define __hdd_take_ref_and_fetch_next_adapter_safe(hdd_ctx, adapter, \
+						   next_adapter) \
+	qdf_spin_lock_bh(&hdd_ctx->hdd_adapter_lock), \
+	adapter = next_adapter, \
+	hdd_get_next_adapter_no_lock(hdd_ctx, adapter, &next_adapter), \
+	(next_adapter) ? dev_hold(next_adapter->dev) : (false), \
+	qdf_spin_unlock_bh(&hdd_ctx->hdd_adapter_lock)
+
+/**
  * __hdd_is_adapter_valid - Helper macro to return true/false for valid adapter.
  * @adapter: an hdd_adapter pointer to use as a cursor
  */
 #define __hdd_is_adapter_valid(_adapter) !!_adapter
 
 /**
- * hdd_for_each_adapter_dev_held - Adapter iterator with dev_hold called
+ * hdd_for_each_adapter_dev_held_safe - Adapter iterator with dev_hold called
+ *                                      in a delete safe manner
  * @hdd_ctx: the global HDD context
  * @adapter: an hdd_adapter pointer to use as a cursor
+ * @next_adapter: hdd_adapter pointer to the next adapter
  *
  * This iterator will take the reference of the netdev associated with the
- * given adapter so as to prevent it from being removed in other context.
- * If the control goes inside the loop body then the dev_hold has been invoked.
+ * given adapter so as to prevent it from being removed in other context. It
+ * also takes the reference of the next adapter if exist. This avoids infinite
+ * loop due to deletion of the adapter list entry inside the loop. Deletion of
+ * list entry will make the list entry to point to self. If the control goes
+ * inside the loop body then the dev_hold has been invoked.
  *
  *                           ***** NOTE *****
  * Before the end of each iteration, dev_put(adapter->dev) must be
  * called. Not calling this will keep hold of a reference, thus preventing
- * unregister of the netdevice.
+ * unregister of the netdevice. If the loop is terminated in between with
+ * return/goto/break statements, dev_put(next_adapter->dev) must be done
+ * along with dev_put(adapter->dev) before termination of the loop.
  *
  * Usage example:
- *                 hdd_for_each_adapter_dev_held(hdd_ctx, adapter) {
- *                         <work involving adapter>
- *                         <some more work>
- *                         dev_put(adapter->dev)
- *                 }
+ *        hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter) {
+ *               <work involving adapter>
+ *               <some more work>
+ *               dev_put(adapter->dev)
+ *        }
  */
-#define hdd_for_each_adapter_dev_held(hdd_ctx, adapter) \
-	for (__hdd_take_ref_and_fetch_front_adapter(hdd_ctx, adapter); \
+#define hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter) \
+	for (__hdd_take_ref_and_fetch_front_adapter_safe(hdd_ctx, adapter, \
+							 next_adapter); \
 	     __hdd_is_adapter_valid(adapter); \
-	     __hdd_take_ref_and_fetch_next_adapter(hdd_ctx, adapter))
+	     __hdd_take_ref_and_fetch_next_adapter_safe(hdd_ctx, adapter, \
+							next_adapter))
 
 /**
  * wlan_hdd_get_adapter_by_vdev_id_from_objmgr() - Fetch adapter from objmgr
@@ -4698,6 +4747,25 @@ static inline void hdd_beacon_latency_event_cb(uint32_t latency_level)
 }
 #endif
 
+#if defined(CLD_PM_QOS) || defined(FEATURE_RUNTIME_PM)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0))
+/**
+ * wlan_hdd_get_pm_qos_cpu_latency() - get PM QOS CPU latency
+ *
+ * Return: PM QOS CPU latency value
+ */
+static inline unsigned long wlan_hdd_get_pm_qos_cpu_latency(void)
+{
+	return PM_QOS_CPU_LATENCY_DEFAULT_VALUE;
+}
+#else
+static inline unsigned long wlan_hdd_get_pm_qos_cpu_latency(void)
+{
+	return PM_QOS_CPU_DMA_LAT_DEFAULT_VALUE;
+}
+#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0) */
+#endif /* defined(CLD_PM_QOS) || defined(FEATURE_RUNTIME_PM) */
+
 /**
  * hdd_netdev_feature_update - Update the netdev features
  * @net_dev: Handle to net_device
@@ -4708,4 +4776,21 @@ static inline void hdd_beacon_latency_event_cb(uint32_t latency_level)
  */
 void hdd_netdev_update_features(struct hdd_adapter *adapter);
 
+#if defined(CLD_PM_QOS)
+/**
+ * wlan_hdd_set_pm_qos_request() - Function to set pm_qos config in wlm mode
+ * @hdd_ctx: HDD context
+ * @pm_qos_request: pm_qos_request flag
+ *
+ * Return: None
+ */
+void wlan_hdd_set_pm_qos_request(struct hdd_context *hdd_ctx,
+				 bool pm_qos_request);
+#else
+static inline
+void wlan_hdd_set_pm_qos_request(struct hdd_context *hdd_ctx,
+				 bool pm_qos_request)
+{
+}
+#endif
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

@@ -29,6 +29,9 @@
 #include <sir_api.h>
 #include "wlan_cm_roam_public_struct.h"
 
+#define OWE_TRANSITION_OUI_TYPE "\x50\x6f\x9a\x1c"
+#define OWE_TRANSITION_OUI_SIZE 4
+
 #define CFG_VALID_CHANNEL_LIST_LEN              100
 
 #define CFG_PMKID_MODES_OKC                        (0x1)
@@ -1009,8 +1012,6 @@ struct mlme_tgt_caps {
  * @disable_high_ht_mcs_2x2: disable high mcs for 2x2 info
  * @supported_11b: supported 11B rates
  * @supported_11a: supported 11A rates
- * @opr_rate_set: operational rates set
- * @ext_opr_rate_set: extended operational rates set
  * @supported_mcs_set: supported MCS set
  * @basic_mcs_set: basic MCS set
  * @current_mcs_set: current MCS set
@@ -1024,8 +1025,6 @@ struct wlan_mlme_rates {
 	uint8_t disable_high_ht_mcs_2x2;
 	struct mlme_cfg_str supported_11b;
 	struct mlme_cfg_str supported_11a;
-	struct mlme_cfg_str opr_rate_set;
-	struct mlme_cfg_str ext_opr_rate_set;
 	struct mlme_cfg_str supported_mcs_set;
 	struct mlme_cfg_str basic_mcs_set;
 	struct mlme_cfg_str current_mcs_set;
@@ -2213,11 +2212,13 @@ struct wlan_mlme_btm {
  * @latency_enable: Flag to check if latency is enabled
  * @latency_level: WLM latency level
  * @latency_flags: WLM latency flags setting
+ * @latency_host_flags: WLM latency host flags setting
  */
 struct wlan_mlme_fe_wlm {
 	bool latency_enable;
 	uint8_t latency_level;
 	uint32_t latency_flags[MLME_NUM_WLM_LATENCY_LEVEL];
+	uint32_t latency_host_flags[MLME_NUM_WLM_LATENCY_LEVEL];
 };
 
 /**
@@ -2390,7 +2391,7 @@ struct wlan_mlme_cfg {
 	struct wlan_mlme_dot11_mode dot11_mode;
 	struct wlan_mlme_reg reg;
 	struct roam_trigger_score_delta trig_score_delta[NUM_OF_ROAM_TRIGGERS];
-	struct roam_trigger_min_rssi trig_min_rssi[NUM_OF_ROAM_TRIGGERS];
+	struct roam_trigger_min_rssi trig_min_rssi[NUM_OF_ROAM_MIN_RSSI];
 	struct wlan_mlme_ratemask ratemask_cfg;
 };
 

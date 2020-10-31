@@ -476,10 +476,8 @@ hdd_parse_send_action_frame_v1_data(const uint8_t *command,
 	 * If N = 19, then we need 10 bytes, hence (19 + 1)/2 = 10 bytes
 	 */
 	*buf = qdf_mem_malloc((*buf_len + 1) / 2);
-	if (!*buf) {
-		hdd_err("qdf_mem_malloc failed");
+	if (!*buf)
 		return -ENOMEM;
-	}
 
 	/* the buffer received from the upper layer is character buffer,
 	 * we need to prepare the buffer taking 2 characters in to a U8 hex
@@ -904,7 +902,6 @@ hdd_sendactionframe(struct hdd_adapter *adapter, const uint8_t *bssid,
 	frame_len = payload_len + 24;
 	frame = qdf_mem_malloc(frame_len);
 	if (!frame) {
-		hdd_err("memory allocation failed");
 		ret = -ENOMEM;
 		goto exit;
 	}
@@ -1199,7 +1196,7 @@ hdd_parse_channellist(struct hdd_context *hdd_ctx,
 			return -EINVAL;
 		}
 		channel_freq_list[j] =
-			wlan_reg_chan_to_freq(hdd_ctx->pdev, temp_int);
+			wlan_reg_legacy_chan_to_freq(hdd_ctx->pdev, temp_int);
 
 		hdd_debug("Channel %d added to preferred channel list",
 			  channel_freq_list[j]);
@@ -2061,6 +2058,81 @@ static int hdd_parse_setmaxtxpower_command(uint8_t *command, int *tx_power)
 	return 0;
 } /* End of hdd_parse_setmaxtxpower_command */
 
+#ifdef CONFIG_BAND_6GHZ
+static int hdd_get_dwell_time_6g(struct wlan_objmgr_psoc *psoc,
+				 uint8_t *command, char *extra, uint8_t n,
+				 uint8_t *len)
+{
+	uint32_t val = 0;
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
+
+	if (strncmp(command, "GETDWELLTIME 6G MAX", 19) == 0) {
+		status = ucfg_scan_cfg_get_active_6g_dwelltime(psoc, &val);
+		if (QDF_IS_STATUS_SUCCESS(status))
+			*len = scnprintf(extra, n, "GETDWELLTIME 6G MAX %u\n",
+					 val);
+	} else if (strncmp(command, "GETDWELLTIME PASSIVE 6G MAX", 27) == 0) {
+		status = ucfg_scan_cfg_get_passive_6g_dwelltime(psoc, &val);
+		if (QDF_IS_STATUS_SUCCESS(status))
+			*len = scnprintf(extra, n,
+					 "GETDWELLTIME PASSIVE 6G MAX %u\n",
+					 val);
+	}
+
+	return qdf_status_to_os_return(status);
+}
+
+static int hdd_set_dwell_time_6g(struct wlan_objmgr_psoc *psoc,
+				 uint8_t *command)
+{
+	uint8_t *value = command;
+	int temp = 0;
+	uint32_t val = 0;
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
+
+	if (strncmp(command, "SETDWELLTIME 6G MAX", 19) == 0) {
+		if (drv_cmd_validate(command, 19))
+			return -EINVAL;
+
+		value = value + 20;
+		temp = kstrtou32(value, 10, &val);
+		if (temp || !cfg_in_range(CFG_ACTIVE_MAX_6G_CHANNEL_TIME,
+					  val)) {
+			hdd_err_rl("argument passed for SETDWELLTIME 6G MAX is incorrect");
+			return -EFAULT;
+		}
+		status = ucfg_scan_cfg_set_active_6g_dwelltime(psoc, val);
+	} else if (strncmp(command, "SETDWELLTIME PASSIVE 6G MAX", 27) == 0) {
+		if (drv_cmd_validate(command, 27))
+			return -EINVAL;
+
+		value = value + 28;
+		temp = kstrtou32(value, 10, &val);
+		if (temp || !cfg_in_range(CFG_PASSIVE_MAX_6G_CHANNEL_TIME,
+					  val)) {
+			hdd_err_rl("argument passed for SETDWELLTIME PASSIVE 6G MAX is incorrect");
+			return -EFAULT;
+		}
+		status = ucfg_scan_cfg_set_passive_6g_dwelltime(psoc, val);
+	}
+
+	return qdf_status_to_os_return(status);
+}
+#else
+static int hdd_get_dwell_time_6g(struct wlan_objmgr_psoc *psoc,
+				 uint8_t *command, char *extra, uint8_t n,
+				 uint8_t *len)
+{
+	return -EINVAL;
+}
+
+static int hdd_set_dwell_time_6g(struct wlan_objmgr_psoc *psoc,
+				 uint8_t *command)
+{
+	return -EINVAL;
+}
+#endif
+
 static int hdd_get_dwell_time(struct wlan_objmgr_psoc *psoc, uint8_t *command,
 			      char *extra, uint8_t n, uint8_t *len)
 {
@@ -2094,7 +2166,7 @@ static int hdd_get_dwell_time(struct wlan_objmgr_psoc *psoc, uint8_t *command,
 		return 0;
 	}
 
-	return -EINVAL;
+	return hdd_get_dwell_time_6g(psoc, command, extra, n, len);
 }
 
 static int hdd_set_dwell_time(struct wlan_objmgr_psoc *psoc, uint8_t *command)
@@ -2154,7 +2226,7 @@ static int hdd_set_dwell_time(struct wlan_objmgr_psoc *psoc, uint8_t *command)
 		}
 		ucfg_scan_cfg_set_active_dwelltime(psoc, val);
 	} else {
-		retval = -EINVAL;
+		retval = hdd_set_dwell_time_6g(psoc, command);
 	}
 
 	return retval;
@@ -2526,10 +2598,9 @@ static int hdd_parse_get_cckm_ie(uint8_t *command, uint8_t **cckm_ie,
 	 * If N = 19, then we need 10 bytes, hence (19 + 1) / 2 = 10 bytes
 	 */
 	*cckm_ie = qdf_mem_malloc((*cckm_ie_len + 1) / 2);
-	if (!*cckm_ie) {
-		hdd_err("qdf_mem_malloc failed");
+	if (!*cckm_ie)
 		return -ENOMEM;
-	}
+
 	/*
 	 * the buffer received from the upper layer is character buffer,
 	 * we need to prepare the buffer taking 2 characters in to a U8 hex
@@ -3321,11 +3392,9 @@ void hdd_get_roam_scan_ch_cb(hdd_handle_t hdd_handle,
 			return;
 		}
 		event = (uint8_t *)qdf_mem_malloc(len);
-		if (!event) {
-			hdd_err("Failed to alloc event response buf vdev_id: %d",
-				roam_ch->vdev_id);
+		if (!event)
 			return;
-		}
+
 		freq = (uint32_t *)event;
 		for (i = 0; i < roam_ch->num_channels &&
 		     i < WNI_CFG_VALID_CHANNEL_LIST_LEN; i++) {
@@ -5085,6 +5154,7 @@ static int drv_cmd_max_tx_power(struct hdd_adapter *adapter,
 	uint8_t *value = command;
 	struct qdf_mac_addr bssid = QDF_MAC_ADDR_BCAST_INIT;
 	struct qdf_mac_addr selfmac = QDF_MAC_ADDR_BCAST_INIT;
+	struct hdd_adapter *next_adapter = NULL;
 
 	ret = hdd_parse_setmaxtxpower_command(value, &tx_power);
 	if (ret) {
@@ -5092,7 +5162,7 @@ static int drv_cmd_max_tx_power(struct hdd_adapter *adapter,
 		return ret;
 	}
 
-	hdd_for_each_adapter(hdd_ctx, adapter) {
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter) {
 		/* Assign correct self MAC address */
 		qdf_copy_macaddr(&bssid,
 				 &adapter->mac_addr);
@@ -5110,9 +5180,13 @@ static int drv_cmd_max_tx_power(struct hdd_adapter *adapter,
 		if (QDF_STATUS_SUCCESS != status) {
 			hdd_err("Set max tx power failed");
 			ret = -EINVAL;
+			dev_put(adapter->dev);
+			if (next_adapter)
+				dev_put(next_adapter->dev);
 			goto exit;
 		}
 		hdd_debug("Set max tx power success");
+		dev_put(adapter->dev);
 	}
 
 exit:
@@ -5543,10 +5617,9 @@ static int hdd_set_rx_filter(struct hdd_adapter *adapter, bool action,
 
 
 		filter = qdf_mem_malloc(sizeof(*filter));
-		if (!filter) {
-			hdd_err("Could not allocate Memory");
+		if (!filter)
 			return -ENOMEM;
-		}
+
 		filter->action = action;
 		for (i = 0, j = 0; i < adapter->mc_addr_list.mc_cnt; i++) {
 			if (!memcmp(adapter->mc_addr_list.addr[i],
@@ -6290,16 +6363,14 @@ static int hdd_alloc_chan_cache(struct hdd_context *hdd_ctx, int num_chan)
 {
 	hdd_ctx->original_channels =
 			qdf_mem_malloc(sizeof(struct hdd_cache_channels));
-	if (!hdd_ctx->original_channels) {
-		hdd_err("QDF_MALLOC_ERR");
+	if (!hdd_ctx->original_channels)
 		return -ENOMEM;
-	}
+
 	hdd_ctx->original_channels->num_channels = num_chan;
 	hdd_ctx->original_channels->channel_info =
 					qdf_mem_malloc(num_chan *
 					sizeof(struct hdd_cache_channel_info));
 	if (!hdd_ctx->original_channels->channel_info) {
-		hdd_err("QDF_MALLOC_ERR");
 		hdd_ctx->original_channels->num_channels = 0;
 		qdf_mem_free(hdd_ctx->original_channels);
 		hdd_ctx->original_channels = NULL;
@@ -6339,7 +6410,7 @@ static bool check_disable_channels(struct hdd_context *hdd_ctx,
  * disconnect_sta_and_stop_sap() - Disconnect STA and stop SAP
  *
  * @hdd_ctx: Pointer to hdd context
- * @reason: Disconnect reason code as per @enum eSirMacReasonCodes
+ * @reason: Disconnect reason code as per @enum wlan_reason_code
  *
  * Disable channels provided by user and disconnect STA if it is
  * connected to any AP, stop SAP and send deauthentication request
@@ -6348,7 +6419,7 @@ static bool check_disable_channels(struct hdd_context *hdd_ctx,
  * Return: None
  */
 static void disconnect_sta_and_stop_sap(struct hdd_context *hdd_ctx,
-					enum eSirMacReasonCodes reason)
+					enum wlan_reason_code reason)
 {
 	struct hdd_adapter *adapter, *next = NULL;
 	QDF_STATUS status;
@@ -6555,7 +6626,7 @@ mem_alloc_failed:
 		if (ret)
 			return ret;
 		disconnect_sta_and_stop_sap(hdd_ctx,
-					    eSIR_MAC_OPER_CHANNEL_BAND_CHANGE);
+					    REASON_OPER_CHANNEL_BAND_CHANGE);
 	}
 
 	hdd_exit();
@@ -6779,7 +6850,6 @@ static int drv_cmd_get_ani_level(struct hdd_adapter *adapter,
 
 	extra = qdf_mem_malloc(user_size);
 	if (!extra) {
-		hdd_err("memory allocation failed");
 		ret = -ENOMEM;
 		goto parse_failed;
 	}
@@ -7126,7 +7196,6 @@ static int hdd_driver_command(struct hdd_adapter *adapter,
 	/* Allocate +1 for '\0' */
 	command = qdf_mem_malloc(priv_data->total_len + 1);
 	if (!command) {
-		hdd_err("failed to allocate memory");
 		ret = -ENOMEM;
 		goto exit;
 	}

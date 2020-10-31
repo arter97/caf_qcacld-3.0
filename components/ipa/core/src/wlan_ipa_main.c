@@ -47,10 +47,8 @@ QDF_STATUS ipa_config_mem_alloc(void)
 		return QDF_STATUS_SUCCESS;
 
 	ipa_cfg = qdf_mem_malloc(sizeof(*ipa_cfg));
-	if (!ipa_cfg) {
-		ipa_err("Failed to allocate memory for ipa config");
+	if (!ipa_cfg)
 		return QDF_STATUS_E_NOMEM;
-	}
 
 	g_ipa_config = ipa_cfg;
 
@@ -97,6 +95,13 @@ QDF_STATUS ipa_send_uc_offload_enable_disable(struct wlan_objmgr_pdev *pdev,
 				struct ipa_uc_offload_control_params *req)
 {
 	return tgt_ipa_uc_offload_enable_disable(pdev, req);
+}
+
+QDF_STATUS
+ipa_send_intrabss_enable_disable(struct wlan_objmgr_pdev *pdev,
+				 struct ipa_intrabss_control_params *req)
+{
+	return tgt_ipa_intrabss_enable_disable(pdev, req);
 }
 
 void ipa_set_dp_handle(struct wlan_objmgr_psoc *psoc, void *dp_soc)
@@ -348,6 +353,30 @@ void ipa_reg_send_to_nw_cb(struct wlan_objmgr_pdev *pdev,
 
 	return wlan_ipa_reg_send_to_nw_cb(ipa_obj, cb);
 }
+
+#ifdef IPA_LAN_RX_NAPI_SUPPORT
+void ipa_reg_rps_enable_cb(struct wlan_objmgr_pdev *pdev,
+			   wlan_ipa_rps_enable cb)
+{
+	struct wlan_ipa_priv *ipa_obj;
+
+	if (!ipa_config_is_enabled()) {
+		ipa_debug("ipa is disabled");
+		return;
+	}
+
+	if (!ipa_is_ready())
+		return;
+
+	ipa_obj = ipa_pdev_get_priv_obj(pdev);
+	if (!ipa_obj) {
+		ipa_err("IPA object is NULL");
+		return;
+	}
+
+	return wlan_ipa_reg_rps_enable_cb(ipa_obj, cb);
+}
+#endif
 
 void ipa_set_mcc_mode(struct wlan_objmgr_pdev *pdev, bool mcc_mode)
 {

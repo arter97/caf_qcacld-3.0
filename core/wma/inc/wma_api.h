@@ -152,13 +152,13 @@ void wma_get_fw_phy_mode_for_freq_cb(uint32_t freq, uint32_t chan_width,
 				     uint32_t  *phy_mode);
 /**
  * wma_get_phy_mode_cb() - Callback to get current PHY Mode.
- * @chan: channel number
+ * @freq: channel frequency
  * @chan_width: maximum channel width possible
  * @phy_mode: PHY Mode
  *
  * Return: None
  */
-void wma_get_phy_mode_cb(uint8_t chan, uint32_t chan_width,
+void wma_get_phy_mode_cb(qdf_freq_t freq, uint32_t chan_width,
 			 enum wlan_phymode  *phy_mode);
 
 QDF_STATUS wma_set_htconfig(uint8_t vdev_id, uint16_t ht_capab, int value);
@@ -427,17 +427,6 @@ QDF_STATUS wma_send_coex_config_cmd(WMA_HANDLE wma_handle,
 				    struct coex_config_params *coex_cfg_params);
 
 /**
- * wma_send_ocl_cmd() - Send OCL command
- * @wma_handle: wma handle
- * @ocl_params: OCL command params
- *
- * This function sends WMI command to send OCL mode configuration
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS wma_send_ocl_cmd(WMA_HANDLE wma_handle,
-			    struct ocl_cmd_params *ocl_params);
-/**
  * wma_set_power_config() - update power config in wma
  * @vdev_id:	the Id of the vdev to configure
  * @power:	new power value
@@ -519,6 +508,7 @@ void wma_wmi_stop(void);
  * wma_get_mcs_idx() - get mcs index
  * @raw_rate: raw rate from fw
  * @rate_flags: rate flags
+ * @he_mcs_12_13_map: he mcs12/13 map
  * @nss: nss
  * @dcm: dcm
  * @guard_interval: guard interval
@@ -527,6 +517,7 @@ void wma_wmi_stop(void);
  *  Return: mcs index
  */
 uint8_t wma_get_mcs_idx(uint16_t raw_rate, enum tx_rate_info rate_flags,
+			uint16_t he_mcs_12_13_map,
 			uint8_t *nss, uint8_t *dcm,
 			enum txrate_gi *guard_interval,
 			enum tx_rate_info *mcs_rate_flag);

@@ -343,8 +343,8 @@ static void wma_handle_disconnect_reason(tp_wma_handle wma_handle,
 		     (void *)del_sta_ctx, 0);
 }
 
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
 #ifndef ROAM_OFFLOAD_V1
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
  * wma_roam_scan_offload_set_params() - Set roam scan offload params
  * @wma_handle: pointer to wma context
@@ -408,8 +408,16 @@ static void wma_roam_scan_offload_set_params(
 		 params->roam_offload_params.roam_preauth_no_ack_timeout,
 		 params->is_sae_same_pmk);
 }
+#else
+static inline void
+wma_roam_scan_offload_set_params(tp_wma_handle wma_handle,
+				 struct roam_offload_scan_params *params,
+				 struct roam_offload_scan_req *roam_req)
+{}
+#endif
 #endif
 
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
 int wma_roam_vdev_disconnect_event_handler(void *handle, uint8_t *event,
 					   uint32_t len)
 {
@@ -452,12 +460,6 @@ int wma_roam_vdev_disconnect_event_handler(void *handle, uint8_t *event,
 
 	return 0;
 }
-#else
-static inline void
-wma_roam_scan_offload_set_params(tp_wma_handle wma_handle,
-				 struct roam_offload_scan_params *params,
-				 struct roam_offload_scan_req *roam_req)
-{}
 #endif
 
 #ifndef ROAM_OFFLOAD_V1
@@ -1418,6 +1420,9 @@ static QDF_STATUS wma_roam_scan_offload_ap_profile(tp_wma_handle wma_handle,
 			roam_req->min_rssi_params[DEAUTH_MIN_RSSI];
 	ap_profile.min_rssi_params[BMISS_MIN_RSSI] =
 			roam_req->min_rssi_params[BMISS_MIN_RSSI];
+	ap_profile.min_rssi_params[MIN_RSSI_2G_TO_5G_ROAM] =
+			roam_req->min_rssi_params[MIN_RSSI_2G_TO_5G_ROAM];
+
 	if (!db2dbm_enabled) {
 		ap_profile.min_rssi_params[DEAUTH_MIN_RSSI].min_rssi -=
 				       WMA_NOISE_FLOOR_DBM_DEFAULT;
@@ -1427,6 +1432,11 @@ static QDF_STATUS wma_roam_scan_offload_ap_profile(tp_wma_handle wma_handle,
 		ap_profile.min_rssi_params[BMISS_MIN_RSSI].min_rssi -=
 			       WMA_NOISE_FLOOR_DBM_DEFAULT;
 		ap_profile.min_rssi_params[BMISS_MIN_RSSI].min_rssi &=
+				0x000000ff;
+
+		ap_profile.min_rssi_params[MIN_RSSI_2G_TO_5G_ROAM].min_rssi -=
+				   WMA_NOISE_FLOOR_DBM_DEFAULT;
+		ap_profile.min_rssi_params[MIN_RSSI_2G_TO_5G_ROAM].min_rssi &=
 				0x000000ff;
 	}
 
@@ -2190,6 +2200,7 @@ QDF_STATUS wma_process_roaming_config(tp_wma_handle wma_handle,
 
 			roam_triggers.vdev_id = roam_req->sessionId;
 			roam_triggers.trigger_bitmap = 0;
+			roam_triggers.roam_scan_scheme_bitmap = 0;
 			wma_set_roam_triggers(wma_handle, &roam_triggers);
 		}
 
@@ -2903,7 +2914,8 @@ static void wma_update_phymode_on_roam(tp_wma_handle wma, uint8_t *bssid,
 		bss_phymode =
 			wma_fw_to_host_phymode(WMI_GET_CHANNEL_MODE(chan));
 	else
-		wma_get_phy_mode_cb(channel, iface->chan_width, &bss_phymode);
+		wma_get_phy_mode_cb(iface->ch_freq,
+				    iface->chan_width, &bss_phymode);
 
 	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(iface->vdev);
 	/* Update vdev mlme channel info after roaming */
@@ -3496,10 +3508,8 @@ int wma_roam_scan_chan_list_event_handler(WMA_HANDLE handle,
 
 	resp = qdf_mem_malloc(sizeof(struct roam_scan_ch_resp) +
 		num_ch * sizeof(param_buf->channel_list[0]));
-	if (!resp) {
-		wma_err_rl("Failed to alloc resp message");
+	if (!resp)
 		return -EINVAL;
-	}
 
 	resp->chan_list = (uint32_t *)(resp + 1);
 	resp->vdev_id = vdev_id;
@@ -5751,7 +5761,6 @@ int wma_passpoint_match_event_handler(void *handle,
 	}
 
 	dest_match = qdf_mem_malloc(sizeof(*dest_match) + buf_len);
-
 	if (!dest_match)
 		return -EINVAL;
 

@@ -190,7 +190,7 @@ static void send_oem_reg_rsp_nlink_msg(void)
 	uint8_t *num_interfaces;
 	uint8_t *device_mode;
 	uint8_t *vdev_id;
-	struct hdd_adapter *adapter;
+	struct hdd_adapter *adapter, *next_adapter = NULL;
 
 	/* OEM msg is always to a specific process & cannot be a broadcast */
 	if (p_hdd_ctx->oem_pid == 0) {
@@ -221,7 +221,7 @@ static void send_oem_reg_rsp_nlink_msg(void)
 	*num_interfaces = 0;
 
 	/* Iterate through each adapter and fill device mode and vdev id */
-	hdd_for_each_adapter(p_hdd_ctx, adapter) {
+	hdd_for_each_adapter_dev_held_safe(p_hdd_ctx, adapter, next_adapter) {
 		device_mode = buf++;
 		vdev_id = buf++;
 		*device_mode = adapter->device_mode;
@@ -230,6 +230,7 @@ static void send_oem_reg_rsp_nlink_msg(void)
 		hdd_debug("num_interfaces: %d, device_mode: %d, vdev_id: %d",
 			  *num_interfaces, *device_mode,
 			  *vdev_id);
+		dev_put(adapter->dev);
 	}
 
 	ani_hdr->length =
@@ -369,10 +370,8 @@ static QDF_STATUS oem_process_data_req_msg(int oem_data_len, char *oem_data)
 	qdf_mem_zero(&oem_data_req, sizeof(oem_data_req));
 
 	oem_data_req.data = qdf_mem_malloc(oem_data_len);
-	if (!oem_data_req.data) {
-		hdd_err("malloc failed for data req buffer");
+	if (!oem_data_req.data)
 		return QDF_STATUS_E_NOMEM;
-	}
 
 	oem_data_req.data_len = oem_data_len;
 	qdf_mem_copy(oem_data_req.data, oem_data, oem_data_len);
@@ -1166,10 +1165,9 @@ void hdd_oem_event_handler_cb(const struct oem_data *oem_event_data,
 		oem_data = osif_request_priv(request);
 		oem_data->data_len = oem_event_data->data_len;
 		oem_data->data = qdf_mem_malloc(oem_data->data_len);
-		if (!oem_data->data) {
-			hdd_err("Memory allocation failure");
+		if (!oem_data->data)
 			return;
-		}
+
 		qdf_mem_copy(oem_data->data, oem_event_data->data,
 			     oem_data->data_len);
 		oem_data->vdev_id = hdd_adapter->vdev_id;

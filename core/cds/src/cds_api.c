@@ -124,7 +124,9 @@ static struct ol_if_ops  dp_ol_if_ops = {
 	.dp_rx_get_pending = dp_rx_tm_get_pending,
 #ifdef DP_MEM_PRE_ALLOC
 	.dp_prealloc_get_consistent = dp_prealloc_get_coherent,
-	.dp_prealloc_put_consistent = dp_prealloc_put_coherent
+	.dp_prealloc_put_consistent = dp_prealloc_put_coherent,
+	.dp_get_multi_pages = dp_prealloc_get_multi_pages,
+	.dp_put_multi_pages = dp_prealloc_put_multi_pages
 #endif
     /* TODO: Add any other control path calls required to OL_IF/WMA layer */
 };
@@ -1398,25 +1400,12 @@ QDF_STATUS cds_dp_close(struct wlan_objmgr_psoc *psoc)
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * cds_get_context() - get context data area
- *
- * @module_id: ID of the module who's context data is being retrieved.
- *
- * Each module in the system has a context / data area that is allocated
- * and managed by CDS.  This API allows any user to get a pointer to its
- * allocated context data area from the CDS global context.
- *
- * Return: pointer to the context data area of the module ID
- *	   specified, or NULL if the context data is not allocated for
- *	   the module ID specified
- */
-void *cds_get_context(QDF_MODULE_ID module_id)
+void *__cds_get_context(QDF_MODULE_ID module_id, const char *func)
 {
 	void *context = NULL;
 
 	if (!gp_cds_context) {
-		cds_err("cds context pointer is null");
+		cds_err("cds context pointer is null (via %s)", func);
 		return NULL;
 	}
 
@@ -1487,15 +1476,16 @@ void *cds_get_context(QDF_MODULE_ID module_id)
 
 	default:
 	{
-		cds_err("Module ID %i does not have its context maintained by CDS",
-			module_id);
+		cds_err("Module ID %d does not have its context maintained by CDS (via %s)",
+			module_id, func);
 		QDF_ASSERT(0);
 		return NULL;
 	}
 	}
 
 	if (!context)
-		cds_err("Module ID %i context is Null", module_id);
+		cds_err("Module ID %d context is Null (via %s)",
+			module_id, func);
 
 	return context;
 } /* cds_get_context() */
@@ -1915,10 +1905,11 @@ static void cds_trigger_recovery_handler(const char *func, const uint32_t line)
 	}
 
 	/*
-	 * if *wlan* recovery is disabled, crash here for debugging  for snoc
-	 * targets.
+	 * if *wlan* recovery is disabled, crash here for debugging  for
+	 * snoc/IPCI targets.
 	 */
-	if (qdf->bus_type == QDF_BUS_TYPE_SNOC && !ssr_ini_enabled) {
+	if ((qdf->bus_type == QDF_BUS_TYPE_SNOC ||
+	     qdf->bus_type == QDF_BUS_TYPE_IPCI) && !ssr_ini_enabled) {
 		QDF_DEBUG_PANIC("WLAN recovery is not enabled (via %s:%d)",
 				func, line);
 		return;
@@ -1944,7 +1935,8 @@ static void cds_trigger_recovery_handler(const char *func, const uint32_t line)
 
 	cds_set_recovery_in_progress(true);
 	cds_set_assert_target_in_progress(true);
-	cds_force_assert_target(qdf);
+	if (pld_force_collect_target_dump(qdf->dev))
+		cds_force_assert_target(qdf);
 	cds_set_assert_target_in_progress(false);
 
 	/*
@@ -1973,8 +1965,6 @@ static void cds_trigger_recovery_work(void *context)
 void __cds_trigger_recovery(enum qdf_hang_reason reason, const char *func,
 			    const uint32_t line)
 {
-	bool is_work_queue_needed = false;
-
 	if (!gp_cds_context) {
 		cds_err("gp_cds_context is null");
 		return;
@@ -1982,19 +1972,10 @@ void __cds_trigger_recovery(enum qdf_hang_reason reason, const char *func,
 
 	gp_cds_context->recovery_reason = reason;
 
-	if (in_atomic() ||
-	    (QDF_RESUME_TIMEOUT == reason || QDF_SUSPEND_TIMEOUT == reason))
-		is_work_queue_needed = true;
-
-	if (is_work_queue_needed) {
-		__cds_recovery_caller.func = func;
-		__cds_recovery_caller.line = line;
-		qdf_queue_work(0, gp_cds_context->cds_recovery_wq,
-			       &gp_cds_context->cds_recovery_work);
-		return;
-	}
-
-	cds_trigger_recovery_handler(func, line);
+	__cds_recovery_caller.func = func;
+	__cds_recovery_caller.line = line;
+	qdf_queue_work(0, gp_cds_context->cds_recovery_wq,
+		       &gp_cds_context->cds_recovery_work);
 }
 
 void cds_trigger_recovery_psoc(void *psoc, enum qdf_hang_reason reason,

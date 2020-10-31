@@ -642,6 +642,24 @@ void lim_send_delts_req_action_frame(struct mac_context *mac, tSirMacAddr peer,
 void lim_send_addts_req_action_frame(struct mac_context *mac, tSirMacAddr peerMacAddr,
 				     tSirAddtsReqInfo *addts, struct pe_session *);
 
+#ifdef WLAN_FEATURE_MSCS
+/**
+ * lim_send_mscs_req_action_frame() - Send mscs req
+ * @mac_ctx: Handle for mac context
+ * @peer_mac: Mac address of requesting peer
+ * @mscs_req: mscs request buffer
+ * @pe_session: PE session id.
+ *
+ * Builds and sends mscs action frame to the peer.
+ *
+ * Return: void
+ */
+void lim_send_mscs_req_action_frame(struct mac_context *mac,
+				    struct qdf_mac_addr peer_mac,
+				    struct mscs_req_info *mscs_req,
+				    struct pe_session *pe_session);
+#endif
+
 /**
  * lim_send_assoc_rsp_mgmt_frame() - Send assoc response
  * @mac_ctx: Handle for mac context
@@ -820,7 +838,7 @@ void lim_handle_heart_beat_failure(struct mac_context *, struct pe_session *);
  * lim_tear_down_link_with_ap() - Tear down link with AP
  * @mac: mac context
  * @session_id: PE session id
- * @reason_code: Disconnect reason code as per emun eSirMacReasonCodes
+ * @reason_code: Disconnect reason code as per emun wlan_reason_code
  * @trigger: Disconnect trigger as per enum eLimDisassocTrigger
  *
  * Function that triggers link tear down with AP upon HB failure
@@ -829,7 +847,7 @@ void lim_handle_heart_beat_failure(struct mac_context *, struct pe_session *);
  */
 void lim_tear_down_link_with_ap(struct mac_context *mac,
 				uint8_t session_id,
-				tSirMacReasonCodes reason_code,
+				enum wlan_reason_code reason_code,
 				enum eLimDisassocTrigger trigger);
 
 /* / Function that defers the messages received */

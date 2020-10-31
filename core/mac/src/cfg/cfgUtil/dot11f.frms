@@ -99,6 +99,7 @@ const EID_20_40_BSS_COEXISTENCE      =  72;
 const EID_20_40_BSS_INTOLERANT_REPORT=  73;
 const EID_OBSS_SCAN_PARAMETERS       =  74;
 const EID_FT_RIC_DESCRIPTOR          =  75;
+const EID_MSCS_STATUS                =  76;
 const EID_LINK_IDENTIFIER            = 101;
 const EID_PTI_CONTROL                = 105;
 const EID_PU_BUFFER_STATUS           = 106;
@@ -2360,6 +2361,13 @@ IE PTIControl (EID_PTI_CONTROL)                 // 7.3.2.65
     sequence_control,     2;
 }
 
+IE oci (EID_EXTN_ID_ELEMENT) OUI ( 0x36 )
+{
+    op_class, 1;
+    prim_ch_num, 1;
+    freq_seg_1_ch_num, 1;
+}
+
 IE PUBufferStatus (EID_PU_BUFFER_STATUS)        // 7.3.2.66
 {
     {
@@ -2613,27 +2621,74 @@ IE TimeAdvertisement (EID_TIME_ADVERTISEMENT)   // 8.4.2.63
     time_error[5];
 }
 
-const QTI_VERSION_ATTR_ID = 1;
-const QTI_VHT_MCS_10_11_ATTR_ID = 2;
-const QTI_HE_MCS_11_12_ATTR_ID = 9;
+const TLV_VERSION_ATTR_ID                 = 1;
+const TLV_VHT_MCS_10_11_ATTR_ID           = 2;
+const TLV_HE_400NS_SGI_SUPP_ATTR_ID       = 3;
+const TLV_HE_2XLTF_160_80P80_SUPP_ATTR_ID = 4;
+const TLV_HE_DL_OFDMA_SUPPP_ATTR_ID       = 5;
+const TLV_TRANSITION_REASONP_ATTR_ID      = 6;
+const TLV_TRANSITION_REJECTIONP_ATTR_ID   = 7;
+const TLV_HE_DL_MUMIMO_SUPPP_ATTR_ID      = 8;
+const TLV_HE_MCS_11_12_ATTR_ID            = 9;
 
-IE qcn_ie (EID_VENDOR_SPECIFIC) OUI ( 0x8C, 0xFD, 0xF0, 0x01 )
+TLV qcn_version(TLV_VERSION_ATTR_ID) ( 1 : 1 ) LSB
 {
-   OPTIE IE version_attr (QTI_VERSION_ATTR_ID)
-   {
-      version, 1;
-      sub_version, 1;
-   }
-
-   OPTIE IE vht_mcs11_attr (QTI_VHT_MCS_10_11_ATTR_ID)
-   {
+	version, 1;
+	sub_version, 1;
+}
+TLV vht_mcs11_attr (TLV_VHT_MCS_10_11_ATTR_ID) ( 1 : 1 ) LSB
+{
       vht_mcs_10_11_supp, 1;
-   }
+}
+TLV he_400ns_sgi_attr (TLV_HE_400NS_SGI_SUPP_ATTR_ID) ( 1 : 1 ) LSB
+{
+   he_ltf1x_400ns_sgi, 1;
+   he_ltf2x_400ns_sgi, 1;
+   he_ltf4x_400ns_sgi, 1;
+}
 
-   OPTIE IE he_mcs13_attr (QTI_HE_MCS_11_12_ATTR_ID)
-   {
-      he_mcs_12_13_supp, 2;
-   }
+TLV he_2xltf_160mhz_supp (TLV_HE_2XLTF_160_80P80_SUPP_ATTR_ID) ( 1 : 1 ) LSB
+{
+   he_2xltf_160MHz_supp, 1;
+}
+
+TLV he_dl_ofdma_attr (TLV_HE_DL_OFDMA_SUPPP_ATTR_ID) ( 1 : 1 ) LSB
+{
+   he_dl_ofdma_supp, 1;
+}
+
+TLV trans_reasonp_attr (TLV_TRANSITION_REASONP_ATTR_ID) ( 1 : 1 ) LSB
+{
+   transition_reasonp, 1;
+}
+
+TLV trans_rejectp_attr (TLV_TRANSITION_REJECTIONP_ATTR_ID) ( 1 : 1 ) LSB
+{
+   transition_rejp, 1;
+}
+
+TLV he_dl_mumimo_attr (TLV_HE_DL_MUMIMO_SUPPP_ATTR_ID) ( 1 : 1 ) LSB
+{
+   he_dl_mumimo_supp, 1;
+}
+
+TLV he_mcs13_attr (TLV_HE_MCS_11_12_ATTR_ID) ( 1 : 1 ) LSB
+{
+   he_mcs_12_13_supp_80,  1;
+   he_mcs_12_13_supp_160, 1;
+}
+
+MULTIIE qcn_ie (EID_VENDOR_SPECIFIC) OUI ( 0x8C, 0xFD, 0xF0, 0x01 )
+{
+   OPTIONALTLV qcn_version;
+   OPTIONALTLV vht_mcs11_attr;
+   OPTIONALTLV he_400ns_sgi_attr;
+   OPTIONALTLV he_2xltf_160mhz_supp;
+   OPTIONALTLV he_dl_ofdma_attr;
+   OPTIONALTLV trans_reasonp_attr;
+   OPTIONALTLV trans_rejectp_attr;
+   OPTIONALTLV he_dl_mumimo_attr;
+   OPTIONALTLV he_mcs13_attr;
 }
 
 IE esp_information (EID_EXTN_ID_ELEMENT) OUI ( 0x0B )
@@ -2861,6 +2916,57 @@ IE MeasurementRequest (EID_MEAS_REQUEST)  // 7.3.2.21
        }
 
     };
+}
+
+IE tclas_mask (EID_EXTN_ID_ELEMENT) OUI (0x59)
+{
+    classifier_type, 1;
+    classifier_mask, 1;
+    UNION info (DISCRIMINATOR classifier_type)
+    {
+        IpParams (classifier_type IS 4)
+        {
+            version, 1;
+            UNION params (DISCRIMINATOR version)
+            {
+                IpV4Params (version IS 4)
+                {
+                    source[4];
+                    dest[4];
+                    src_port, 2;
+                    dest_port, 2;
+                    DSCP, 1;
+                    proto, 1;
+                    reserved, 1;
+                }
+                IpV6Params (version IS 6)
+                {
+                    source[16];
+                    dest[16];
+                    src_port, 2;
+                    dest_port, 2;
+                    DSCP, 1;
+                    next_header, 1;
+                    flow_label[3];
+                }
+            };
+        }
+    };
+}
+
+IE mscs_status (EID_MSCS_STATUS)
+{
+     status_code,        1;
+}
+
+IE decriptor_element (EID_EXTN_ID_ELEMENT) OUI (0x58)
+{
+     request_type,                1;
+     user_priority_control,       2;
+     stream_timeout,              4;
+     OPTIE IE tclas_mask;
+     OPTIE IE mscs_status;
+     //Optional Vendor specific IEs ... ignoring
 }
 
 IE he_cap (EID_EXTN_ID_ELEMENT) OUI (0x23)
@@ -4307,6 +4413,7 @@ FRAME SaQueryReq
     FF     Category;
     FF     Action;
     FF     TransactionId;
+    OPTIE  oci;
 }
 
 FRAME SaQueryRsp
@@ -4314,6 +4421,7 @@ FRAME SaQueryRsp
     FF     Category;
     FF     Action;
     FF     TransactionId;
+    OPTIE  oci;
 }
 
 FRAME QosMapConfigure
@@ -4405,6 +4513,14 @@ FRAME vendor_action_frame
     FF    Category;
     FF    vendor_oui;
     FF    vendor_action_subtype;
+}
+
+FRAME mscs_request_action_frame
+{
+    FF     Category;
+    FF     Action;
+    FF     DialogToken;
+    MANDIE decriptor_element;
 }
 
 // Local Variables:
