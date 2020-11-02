@@ -110,4 +110,13 @@ static inline uint16_t qdf_nbuf_get_rx_flow_tag(qdf_nbuf_t buf)
 	return __qdf_nbuf_get_rx_flow_tag(buf);
 }
 
+static inline void qdf_nbuf_tx_notify_comp_set(qdf_nbuf_t buf, uint8_t val)
+{
+}
+
+static inline uint8_t qdf_nbuf_tx_notify_comp_get(qdf_nbuf_t buf)
+{
+	return 0;
+}
+
 #endif /* _QDF_NBUF_W_H */
