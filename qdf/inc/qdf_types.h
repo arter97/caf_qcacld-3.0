@@ -363,7 +363,6 @@ typedef bool (*qdf_irqlocked_func_t)(void *);
  * @QDF_MODULE_ID_DISA: DISA (encryption test) module ID
  * @QDF_MODULE_ID_GREEN_AP: Green AP related logging
  * @QDF_MODULE_ID_FTM: FTM module ID
- * @QDF_MODULE_ID_EXTAP: Extender AP module ID
  * @QDF_MODULE_ID_FD: FILS discovery logging
  * @QDF_MODULE_ID_OCB: OCB module ID
  * @QDF_MODULE_ID_IPA: IPA module ID
@@ -391,6 +390,25 @@ typedef bool (*qdf_irqlocked_func_t)(void *);
  * @QDF_MODULE_ID_IFMGR: Interface Manager feature ID
  * @QDF_MODULE_ID_MSCS: MSCS feature ID
  * @QDF_MODULE_ID_GPIO: GPIO configuration module ID
+ * @QDF_MODULE_ID_DP_INIT: INIT/DEINIT path of datapath module ID
+ * @QDF_MODULE_ID_DP_TX: TX path of datapath module ID
+ * @QDF_MODULE_ID_DP_RX: RX path of datapath module ID
+ * @QDF_MODULE_ID_DP_STATS: TX/RX stats, AST stats module ID
+ * @QDF_MODULE_ID_DP_HTT: Firmware to host DP event handling module ID
+ * @QDF_MODULE_ID_DP_PEER: DP peer module ID
+ * @QDF_MODULE_ID_DP_RX_ERROR: Packet handling from WBM release ring module ID
+ * @QDF_MODULE_ID_DP_HTT_TX_STATS: FW to host Tx  PPDU stats module ID
+ * @QDF_MODULE_ID_DP_RX_MON_STATUS: RX mon status ring module ID
+ * @QDF_MODULE_ID_DP_RX_MON_DEST: Monitor ode processing module ID
+ * @QDF_MODULE_ID_DP_REO: REO command status module ID
+ * @QDF_MODULE_ID_DP_TX_COMP: TX completion module ID
+ * @QDF_MODULE_ID_DP_VDEV: DP Vdev module ID
+ * @QDF_MODULE_ID_DP_CDP: Configuration module ID
+ * @QDF_MODULE_ID_TSO: TSO module ID
+ * @QDF_MODULE_ID_ME: Multicast Enhancement module ID
+ * @QDF_MODULE_ID_QWRAP: QWRAP module ID
+ * @QDF_MODULE_ID_DBDC_REP: DBDC repeater module ID
+ * @QDF_MODULE_ID_EXT_AP: Extended AP module ID
  * @QDF_MODULE_ID_ANY: anything
  * @QDF_MODULE_ID_MAX: Max place holder module ID
  *
@@ -493,7 +511,6 @@ typedef enum {
 	QDF_MODULE_ID_DISA,
 	QDF_MODULE_ID_GREEN_AP,
 	QDF_MODULE_ID_FTM,
-	QDF_MODULE_ID_EXTAP,
 	QDF_MODULE_ID_FD,
 	QDF_MODULE_ID_OCB,
 	QDF_MODULE_ID_IPA,
@@ -522,6 +539,25 @@ typedef enum {
 	QDF_MODULE_ID_IFMGR,
 	QDF_MODULE_ID_MSCS,
 	QDF_MODULE_ID_GPIO,
+	QDF_MODULE_ID_DP_INIT,
+	QDF_MODULE_ID_DP_TX,
+	QDF_MODULE_ID_DP_RX,
+	QDF_MODULE_ID_DP_STATS,
+	QDF_MODULE_ID_DP_HTT,
+	QDF_MODULE_ID_DP_PEER,
+	QDF_MODULE_ID_DP_RX_ERROR,
+	QDF_MODULE_ID_DP_HTT_TX_STATS,
+	QDF_MODULE_ID_DP_RX_MON_STATUS,
+	QDF_MODULE_ID_DP_RX_MON_DEST,
+	QDF_MODULE_ID_DP_REO,
+	QDF_MODULE_ID_DP_TX_COMP,
+	QDF_MODULE_ID_DP_VDEV,
+	QDF_MODULE_ID_DP_CDP,
+	QDF_MODULE_ID_TSO,
+	QDF_MODULE_ID_ME,
+	QDF_MODULE_ID_QWRAP,
+	QDF_MODULE_ID_DBDC_REP,
+	QDF_MODULE_ID_EXT_AP,
 	QDF_MODULE_ID_ANY,
 	QDF_MODULE_ID_MAX,
 } QDF_MODULE_ID;
