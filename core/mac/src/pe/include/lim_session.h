@@ -304,7 +304,6 @@ struct pe_session {
 	uint8_t limWmeEnabled:1;        /* WME */
 	uint8_t limWsmEnabled:1;        /* WSM */
 	uint8_t limHcfEnabled:1;
-	uint8_t lim11dEnabled:1;
 #ifdef WLAN_FEATURE_11W
 	uint8_t limRmfEnabled:1;        /* 11W */
 #endif
@@ -522,7 +521,6 @@ struct pe_session {
 	uint16_t beacon_tx_rate;
 	uint8_t *access_policy_vendor_ie;
 	uint8_t access_policy;
-	bool ignore_assoc_disallowed;
 	bool send_p2p_conf_frame;
 	bool process_ho_fail;
 	/* Number of STAs that do not support ECSA capability */
@@ -539,6 +537,7 @@ struct pe_session {
 	uint8_t bss_color_changing;
 #endif
 #endif
+	struct deauth_retry_params deauth_retry;
 	bool enable_bcast_probe_rsp;
 	uint8_t ht_client_cnt;
 	bool force_24ghz_in_ht20;

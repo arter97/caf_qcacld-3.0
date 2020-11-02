@@ -46,7 +46,7 @@
 #include "wma_api.h"
 #include "wmi_unified_param.h"
 #include "wmi.h"
-#include "wlan_cm_roam_public_srtuct.h"
+#include "wlan_cm_roam_public_struct.h"
 
 /* Platform specific configuration for max. no. of fragments */
 #define QCA_OL_11AC_TX_MAX_FRAGS            2
@@ -667,7 +667,6 @@ struct wma_invalid_peer_params {
  * @is_channel_switch: is channel switch
  * @pause_bitmap: pause bitmap
  * @nwType: network type (802.11a/b/g/n/ac)
- * @staKeyParams: sta key parameters
  * @ps_enabled: is powersave enable/disable
  * @peer_count: peer count
  * @roam_synch_in_progress: flag is in progress or not
@@ -715,7 +714,6 @@ struct wma_txrx_node {
 	uint8_t nss;
 	uint16_t pause_bitmap;
 	uint32_t nwType;
-	tSetStaKeyParams *staKeyParams;
 	uint32_t peer_count;
 	void *plink_status_req;
 	void *psnr_req;
@@ -1146,11 +1144,13 @@ struct wma_set_key_params {
  * @minTemp: minimum temprature
  * @maxTemp: maximum temprature
  * @thermalEnable: thermal enable
+ * @thermal_action: thermal action
  */
 typedef struct {
 	uint16_t minTemp;
 	uint16_t maxTemp;
 	uint8_t thermalEnable;
+	enum thermal_mgmt_action_code thermal_action;
 } t_thermal_cmd_params, *tp_thermal_cmd_params;
 
 /**
@@ -1639,7 +1639,7 @@ void wma_process_set_pdev_vht_ie_req(tp_wma_handle wma,
 		struct set_ie_param *ie_params);
 
 QDF_STATUS wma_remove_peer(tp_wma_handle wma, uint8_t *mac_addr,
-			   uint8_t vdev_id);
+			   uint8_t vdev_id, bool no_fw_peer_delete);
 
 QDF_STATUS wma_create_peer(tp_wma_handle wma, uint8_t peer_addr[6],
 			   u_int32_t peer_type, u_int8_t vdev_id);
@@ -2035,6 +2035,7 @@ void wma_vdev_clear_pause_bit(uint8_t vdev_id, wmi_tx_pause_type bit_pos)
 	iface->pause_bitmap &= ~(1 << bit_pos);
 }
 
+#ifndef ROAM_OFFLOAD_V1
 /**
  * wma_process_roaming_config() - process roam request
  * @wma_handle: wma handle
@@ -2046,7 +2047,7 @@ void wma_vdev_clear_pause_bit(uint8_t vdev_id, wmi_tx_pause_type bit_pos)
  */
 QDF_STATUS wma_process_roaming_config(tp_wma_handle wma_handle,
 				     struct roam_offload_scan_req *roam_req);
-
+#endif
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
  * wma_send_roam_preauth_status() - Send the preauth status to wmi

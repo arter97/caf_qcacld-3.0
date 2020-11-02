@@ -557,7 +557,6 @@ QDF_STATUS ucfg_tdls_add_peer(struct wlan_objmgr_vdev *vdev,
 
 	req = qdf_mem_malloc(sizeof(*req));
 	if (!req) {
-		tdls_err("mem allocate fail");
 		status = QDF_STATUS_E_NOMEM;
 		goto dec_ref;
 	}
@@ -605,7 +604,6 @@ QDF_STATUS ucfg_tdls_update_peer(struct wlan_objmgr_vdev *vdev,
 	}
 	req = qdf_mem_malloc(sizeof(*req));
 	if (!req) {
-		tdls_err("mem allocate fail");
 		status = QDF_STATUS_E_NOMEM;
 		goto dec_ref;
 	}
@@ -659,15 +657,13 @@ QDF_STATUS ucfg_tdls_oper(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	tdls_debug("%s for peer " QDF_MAC_ADDR_STR,
+	tdls_debug("%s for peer " QDF_MAC_ADDR_FMT,
 		   tdls_get_oper_str(cmd),
-		   QDF_MAC_ADDR_ARRAY(macaddr));
+		   QDF_MAC_ADDR_REF(macaddr));
 
 	req = qdf_mem_malloc(sizeof(*req));
-	if (!req) {
-		tdls_err("%s: mem allocate fail", tdls_get_oper_str(cmd));
+	if (!req)
 		return QDF_STATUS_E_NOMEM;
-	}
 
 	status = wlan_objmgr_vdev_try_get_ref(vdev, WLAN_TDLS_NB_ID);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -706,11 +702,8 @@ QDF_STATUS ucfg_tdls_get_all_peers(struct wlan_objmgr_vdev *vdev,
 	QDF_STATUS status;
 
 	tdls_peers = qdf_mem_malloc(sizeof(*tdls_peers));
-
-	if (!tdls_peers) {
-		tdls_err("mem allocate fail");
+	if (!tdls_peers)
 		return QDF_STATUS_E_NOMEM;
-	}
 
 	tdls_peers->vdev = vdev;
 	tdls_peers->buf_len = buflen;
@@ -759,10 +752,8 @@ QDF_STATUS ucfg_tdls_send_mgmt_frame(
 
 	mgmt_req = qdf_mem_malloc(sizeof(*mgmt_req) +
 					req->len);
-	if (!mgmt_req) {
-		tdls_err("mem allocate fail");
+	if (!mgmt_req)
 		return QDF_STATUS_E_NOMEM;
-	}
 
 	qdf_mem_copy(mgmt_req, req, sizeof(*req));
 
@@ -966,10 +957,8 @@ QDF_STATUS ucfg_tdls_set_operating_mode(
 	tdls_debug("Enter ");
 
 	set_mode = qdf_mem_malloc(sizeof(*set_mode));
-	if (!set_mode) {
-		tdls_err("memory allocate fail");
+	if (!set_mode)
 		return QDF_STATUS_E_NULL_VALUE;
-	}
 
 	status = wlan_objmgr_vdev_try_get_ref(set_mode->vdev, WLAN_TDLS_NB_ID);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -1022,10 +1011,8 @@ QDF_STATUS ucfg_tdls_antenna_switch(struct wlan_objmgr_vdev *vdev,
 	struct scheduler_msg msg = {0, };
 
 	req = qdf_mem_malloc(sizeof(*req));
-	if (!req) {
-		tdls_err("mem allocate fail");
+	if (!req)
 		return QDF_STATUS_E_NOMEM;
-	}
 
 	status = wlan_objmgr_vdev_try_get_ref(vdev, WLAN_TDLS_NB_ID);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -1065,10 +1052,8 @@ QDF_STATUS ucfg_set_tdls_offchannel(struct wlan_objmgr_vdev *vdev,
 	struct tdls_set_offchannel *req;
 
 	req = qdf_mem_malloc(sizeof(*req));
-	if (!req) {
-		tdls_err("mem allocate fail");
+	if (!req)
 		return QDF_STATUS_E_NOMEM;
-	}
 
 	status = wlan_objmgr_vdev_try_get_ref(vdev, WLAN_TDLS_NB_ID);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -1108,10 +1093,8 @@ QDF_STATUS ucfg_set_tdls_offchan_mode(struct wlan_objmgr_vdev *vdev,
 	struct tdls_set_offchanmode *req;
 
 	req = qdf_mem_malloc(sizeof(*req));
-	if (!req) {
-		tdls_err("mem allocate fail");
+	if (!req)
 		return QDF_STATUS_E_NOMEM;
-	}
 
 	status = wlan_objmgr_vdev_try_get_ref(vdev, WLAN_TDLS_NB_ID);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -1151,10 +1134,8 @@ QDF_STATUS ucfg_set_tdls_secoffchanneloffset(struct wlan_objmgr_vdev *vdev,
 	struct tdls_set_secoffchanneloffset *req;
 
 	req = qdf_mem_malloc(sizeof(*req));
-	if (!req) {
-		tdls_err("mem allocate fail");
+	if (!req)
 		return QDF_STATUS_E_NOMEM;
-	}
 
 	status = wlan_objmgr_vdev_try_get_ref(vdev, WLAN_TDLS_NB_ID);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -1191,9 +1172,23 @@ QDF_STATUS ucfg_tdls_set_rssi(struct wlan_objmgr_vdev *vdev,
 	return tdls_set_rssi(vdev, mac, rssi);
 }
 
-void ucfg_tdls_notify_connect_failure(struct wlan_objmgr_psoc *psoc)
+/**
+ * wlan_tdls_notify_connect_failure() - This api is called if STA/P2P
+ * connection fails on one iface and to enable/disable TDLS on the other
+ * STA/P2P iface which is already connected.
+ * @psoc: psoc object
+ *
+ * Return: void
+ */
+static inline
+void  wlan_tdls_notify_connect_failure(struct wlan_objmgr_psoc *psoc)
 {
 	return tdls_notify_decrement_session(psoc);
+}
+
+void ucfg_tdls_notify_connect_failure(struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_tdls_notify_connect_failure(psoc);
 }
 
 struct wlan_objmgr_vdev *ucfg_get_tdls_vdev(struct wlan_objmgr_psoc *psoc,

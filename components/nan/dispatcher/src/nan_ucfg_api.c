@@ -32,6 +32,7 @@
 #include "wlan_policy_mgr_api.h"
 #include "cfg_ucfg_api.h"
 #include "cfg_nan.h"
+#include "wlan_mlme_api.h"
 
 struct wlan_objmgr_psoc;
 struct wlan_objmgr_vdev;
@@ -419,10 +420,9 @@ QDF_STATUS ucfg_nan_req_processor(struct wlan_objmgr_vdev *vdev,
 	}
 
 	msg.bodyptr = qdf_mem_malloc(len);
-	if (!msg.bodyptr) {
-		nan_err("malloc failed");
+	if (!msg.bodyptr)
 		return QDF_STATUS_E_NOMEM;
-	}
+
 	qdf_mem_copy(msg.bodyptr, in_req, len);
 	msg.type = req_type;
 	msg.callback = nan_scheduled_msg_handler;
@@ -625,7 +625,7 @@ QDF_STATUS ucfg_nan_discovery_req(void *in_req, uint32_t req_type)
 	struct osif_request *request = NULL;
 	static const struct osif_request_params params = {
 		.priv_size = 0,
-		.timeout_ms = 1000,
+		.timeout_ms = 4000,
 	};
 	int err;
 
@@ -1129,11 +1129,29 @@ ucfg_nan_is_vdev_creation_supp_by_host(struct nan_psoc_priv_obj *nan_obj)
 	return nan_obj->cfg_param.nan_separate_iface_support;
 }
 
+static void ucfg_nan_cleanup_all_ndps(struct wlan_objmgr_psoc *psoc)
+{
+	QDF_STATUS status;
+	uint32_t ndi_count, vdev_id, i;
+
+	ndi_count = policy_mgr_mode_specific_connection_count(psoc, PM_NDI_MODE,
+							      NULL);
+	for (i = 0; i < ndi_count; i++) {
+		vdev_id = policy_mgr_mode_specific_vdev_id(psoc, PM_NDI_MODE);
+		status = ucfg_nan_disable_ndi(psoc, vdev_id);
+		if (status == QDF_STATUS_E_TIMEOUT)
+			policy_mgr_decr_session_set_pcl(psoc, QDF_NDI_MODE,
+							vdev_id);
+	}
+}
+
 QDF_STATUS ucfg_disable_nan_discovery(struct wlan_objmgr_psoc *psoc,
 				      uint8_t *data, uint32_t data_len)
 {
 	struct nan_disable_req *nan_req;
 	QDF_STATUS status;
+
+	ucfg_nan_cleanup_all_ndps(psoc);
 
 	nan_req = qdf_mem_malloc(sizeof(*nan_req) + data_len);
 	if (!nan_req)
@@ -1241,10 +1259,9 @@ QDF_STATUS ucfg_nan_disable_ind_to_userspace(struct wlan_objmgr_psoc *psoc)
 
 	disable_ind = qdf_mem_malloc(sizeof(struct nan_event_params) +
 				     sizeof(msg));
-	if (!disable_ind) {
-		nan_err("failed to alloc disable_ind");
+	if (!disable_ind)
 		return QDF_STATUS_E_NOMEM;
-	}
+
 	disable_ind->psoc = psoc,
 	disable_ind->evt_type = nan_event_id_disable_ind;
 	disable_ind->buf_len = sizeof(msg);
@@ -1254,4 +1271,19 @@ QDF_STATUS ucfg_nan_disable_ind_to_userspace(struct wlan_objmgr_psoc *psoc)
 
 	qdf_mem_free(disable_ind);
 	return QDF_STATUS_SUCCESS;
+}
+
+bool ucfg_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev, uint32_t freq)
+{
+	bool nan_allowed = false;
+
+	/* Check for SRD channels only */
+	if (!wlan_reg_is_etsi13_srd_chan_for_freq(pdev, freq))
+		return true;
+
+	wlan_mlme_get_srd_master_mode_for_vdev(wlan_pdev_get_psoc(pdev),
+					       QDF_NAN_DISC_MODE,
+					       &nan_allowed);
+
+	return nan_allowed;
 }

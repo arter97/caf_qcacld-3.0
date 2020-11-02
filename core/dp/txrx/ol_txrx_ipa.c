@@ -280,6 +280,94 @@ QDF_STATUS ol_txrx_ipa_disable_autonomy(struct cdp_soc_t *soc_hdl,
 	return QDF_STATUS_SUCCESS;
 }
 
+static QDF_STATUS __ol_txrx_ipa_tx_buf_smmu_mapping(struct ol_txrx_pdev_t *pdev,
+						    bool create)
+{
+	uint32_t index;
+	uint32_t unmap_cnt = 0;
+	uint32_t tx_buffer_cnt;
+	QDF_STATUS ret = QDF_STATUS_SUCCESS;
+	struct htt_pdev_t *htt_pdev = pdev->htt_pdev;
+	qdf_mem_info_t *mem_map_table = NULL, *mem_info = NULL;
+
+	if (!htt_pdev) {
+		ol_txrx_err("htt_pdev is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!qdf_mem_smmu_s1_enabled(htt_pdev->osdev)) {
+		ol_txrx_info("SMMU-S1 mapping is disabled");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	tx_buffer_cnt = htt_pdev->ipa_uc_tx_rsc.alloc_tx_buf_cnt;
+	mem_map_table = qdf_mem_map_table_alloc(tx_buffer_cnt);
+	if (!mem_map_table) {
+		ol_txrx_err("Failed to allocate memory");
+		return QDF_STATUS_E_FAILURE;
+	}
+	mem_info = mem_map_table;
+
+	for (index = 0; index < tx_buffer_cnt; index++) {
+		if (htt_pdev->ipa_uc_tx_rsc.tx_buf_pool_strg[index]) {
+			*mem_info = htt_pdev->ipa_uc_tx_rsc.
+					tx_buf_pool_strg[index]->mem_info;
+			mem_info++;
+			unmap_cnt++;
+		}
+	}
+
+	ret = cds_smmu_map_unmap(create, unmap_cnt, mem_map_table);
+	qdf_assert_always(!ret);
+	qdf_mem_free(mem_map_table);
+	htt_pdev->ipa_uc_tx_rsc.ipa_smmu_mapped = create;
+	ol_txrx_info("smmu_map_unmap:%d of %d Tx buffers", create, unmap_cnt);
+
+	return ret;
+}
+
+QDF_STATUS ol_txrx_ipa_tx_buf_smmu_mapping(struct cdp_soc_t *soc_hdl,
+					   uint8_t pdev_id)
+{
+	QDF_STATUS ret;
+	struct ol_txrx_soc_t *soc = cdp_soc_t_to_ol_txrx_soc_t(soc_hdl);
+	ol_txrx_pdev_handle pdev = ol_txrx_get_pdev_from_pdev_id(soc, pdev_id);
+
+	if (!pdev) {
+		ol_txrx_err("invalid instance");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!qdf_mem_smmu_s1_enabled(pdev->htt_pdev->osdev)) {
+		ol_txrx_err("SMMU S1 disabled");
+		return QDF_STATUS_SUCCESS;
+	}
+	ret = __ol_txrx_ipa_tx_buf_smmu_mapping(pdev, true);
+
+	return ret;
+}
+
+QDF_STATUS ol_txrx_ipa_tx_buf_smmu_unmapping(struct cdp_soc_t *soc_hdl,
+					     uint8_t pdev_id)
+{
+	QDF_STATUS ret;
+	struct ol_txrx_soc_t *soc = cdp_soc_t_to_ol_txrx_soc_t(soc_hdl);
+	ol_txrx_pdev_handle pdev = ol_txrx_get_pdev_from_pdev_id(soc, pdev_id);
+
+	if (!pdev) {
+		ol_txrx_err("invalid instance");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!qdf_mem_smmu_s1_enabled(pdev->htt_pdev->osdev)) {
+		ol_txrx_err("SMMU S1 disabled");
+		return QDF_STATUS_SUCCESS;
+	}
+	ret = __ol_txrx_ipa_tx_buf_smmu_mapping(pdev, false);
+
+	return ret;
+}
+
 #ifdef CONFIG_IPA_WDI_UNIFIED_API
 
 #ifndef QCA_LL_TX_FLOW_CONTROL_V2
@@ -387,7 +475,7 @@ static inline void ol_txrx_ipa_wdi_tx_smmu_params(
 				bool over_gsi)
 {
 	QDF_IPA_WDI_SETUP_INFO_SMMU_CLIENT(tx_smmu) =
-		IPA_CLIENT_WLAN1_CONS;
+		QDF_IPA_CLIENT_WLAN_LEGACY_CONS;
 	qdf_mem_copy(&QDF_IPA_WDI_SETUP_INFO_SMMU_TRANSFER_RING_BASE(
 				tx_smmu),
 		     &ipa_res->tx_comp_ring->sgtable,
@@ -413,7 +501,7 @@ static inline void ol_txrx_ipa_wdi_rx_smmu_params(
 				bool over_gsi)
 {
 	QDF_IPA_WDI_SETUP_INFO_SMMU_CLIENT(rx_smmu) =
-		IPA_CLIENT_WLAN1_PROD;
+		QDF_IPA_CLIENT_WLAN_LEGACY_PROD;
 	qdf_mem_copy(&QDF_IPA_WDI_SETUP_INFO_SMMU_TRANSFER_RING_BASE(
 				rx_smmu),
 		     &ipa_res->rx_rdy_ring->sgtable,
@@ -531,7 +619,7 @@ static inline void ol_txrx_ipa_wdi_tx_params(
 		return;
 	}
 
-	QDF_IPA_WDI_SETUP_INFO_CLIENT(tx) = IPA_CLIENT_WLAN1_CONS;
+	QDF_IPA_WDI_SETUP_INFO_CLIENT(tx) = QDF_IPA_CLIENT_WLAN_LEGACY_CONS;
 	QDF_IPA_WDI_SETUP_INFO_TRANSFER_RING_BASE_PA(tx) =
 		qdf_mem_get_dma_addr(osdev,
 				&ipa_res->tx_comp_ring->mem_info);
@@ -554,7 +642,7 @@ static inline void ol_txrx_ipa_wdi_rx_params(
 				qdf_ipa_wdi_pipe_setup_info_t *rx,
 				bool over_gsi)
 {
-	QDF_IPA_WDI_SETUP_INFO_CLIENT(rx) = IPA_CLIENT_WLAN1_PROD;
+	QDF_IPA_WDI_SETUP_INFO_CLIENT(rx) = QDF_IPA_CLIENT_WLAN_LEGACY_PROD;
 	QDF_IPA_WDI_SETUP_INFO_TRANSFER_RING_BASE_PA(rx) =
 		ipa_res->rx_rdy_ring->mem_info.pa;
 	QDF_IPA_WDI_SETUP_INFO_TRANSFER_RING_SIZE(rx) =
@@ -602,10 +690,8 @@ QDF_STATUS ol_txrx_ipa_setup(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 	}
 
 	pipe_in = qdf_mem_malloc(sizeof(*pipe_in));
-	if (!pipe_in) {
-		ol_txrx_err("pipe_in allocation failed");
+	if (!pipe_in)
 		return QDF_STATUS_E_NOMEM;
-	}
 
 	ipa_res = &pdev->ipa_resource;
 	qdf_mem_zero(pipe_in, sizeof(*pipe_in));
@@ -706,22 +792,31 @@ QDF_STATUS ol_txrx_ipa_setup(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 
 /**
  * ol_txrx_ipa_cleanup() - Disconnect IPA pipes
+ * @soc_hdl: soc handle
+ * @pdev_id: pdev id
  * @tx_pipe_handle: Tx pipe handle
  * @rx_pipe_handle: Rx pipe handle
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS ol_txrx_ipa_cleanup(uint32_t tx_pipe_handle, uint32_t rx_pipe_handle)
+QDF_STATUS ol_txrx_ipa_cleanup(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
+			       uint32_t tx_pipe_handle,
+			       uint32_t rx_pipe_handle)
 {
 	int ret;
 	struct ol_txrx_ipa_resources *ipa_res;
 	struct ol_txrx_soc_t *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	qdf_device_t osdev = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
-	ol_txrx_pdev_handle pdev =
-		ol_txrx_get_pdev_from_pdev_id(soc, OL_TXRX_PDEV_ID);
+	ol_txrx_pdev_handle pdev;
 
-	if (!pdev || !osdev) {
+	if (!soc || !osdev) {
 		ol_txrx_err("%s invalid instance", __func__);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	pdev = ol_txrx_get_pdev_from_pdev_id(soc, OL_TXRX_PDEV_ID);
+	if (!pdev) {
+		ol_txrx_err("%s NULL pdev invalid instance", __func__);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -775,8 +870,8 @@ QDF_STATUS ol_txrx_ipa_setup_iface(char *ifname, uint8_t *mac_addr,
 	int ret = -EINVAL;
 
 	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_DEBUG,
-		  "%s: Add Partial hdr: %s, %pM",
-		  __func__, ifname, mac_addr);
+		  "%s: Add Partial hdr: %s, "QDF_MAC_ADDR_FMT,
+		  __func__, ifname, QDF_MAC_ADDR_REF(mac_addr));
 
 	qdf_mem_zero(&hdr_info, sizeof(qdf_ipa_wdi_hdr_info_t));
 	memcpy(&uc_tx_hdr, &ipa_uc_tx_hdr, OL_TXRX_IPA_UC_WLAN_TX_HDR_LEN);
@@ -1210,12 +1305,16 @@ QDF_STATUS ol_txrx_ipa_setup(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 
 /**
  * ol_txrx_ipa_cleanup() - Disconnect IPA pipes
+ * @soc_hdl: soc handle
+ * @pdev_id: pdev id
  * @tx_pipe_handle: Tx pipe handle
  * @rx_pipe_handle: Rx pipe handle
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS ol_txrx_ipa_cleanup(uint32_t tx_pipe_handle, uint32_t rx_pipe_handle)
+QDF_STATUS ol_txrx_ipa_cleanup(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
+			       uint32_t tx_pipe_handle,
+			       uint32_t rx_pipe_handle)
 {
 	int ret;
 
@@ -1304,7 +1403,8 @@ static int ol_txrx_ipa_add_header_info(char *ifname, uint8_t *mac_addr,
 	struct ol_txrx_ipa_uc_tx_hdr *uc_tx_hdr = NULL;
 
 	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_DEBUG,
-		  "Add Partial hdr: %s, %pM", ifname, mac_addr);
+		  "Add Partial hdr: %s, "QDF_MAC_ADDR_FMT, ifname,
+		  QDF_MAC_ADDR_REF(mac_addr));
 
 	/* dynamically allocate the memory to add the hdrs */
 	ipa_hdr = qdf_mem_malloc(sizeof(qdf_ipa_ioc_add_hdr_t)

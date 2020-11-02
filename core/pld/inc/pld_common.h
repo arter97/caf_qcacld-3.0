@@ -385,6 +385,11 @@ enum pld_wlan_time_sync_trigger_type {
  *                  hardware or at the request of software.
  * @suspend_noirq: optional operation, complete the actions started by suspend()
  * @resume_noirq: optional operation, prepare for the execution of resume()
+ * @set_curr_therm_cdev_state: optional operation, will be called when there is
+ *                        change in the thermal level triggered by the thermal
+ *                        subsystem thus requiring mitigation actions. This will
+ *                        be called every time there is a change in the state
+ *                        and after driver load.
  */
 struct pld_driver_ops {
 	int (*probe)(struct device *dev,
@@ -422,10 +427,22 @@ struct pld_driver_ops {
 			     enum pld_bus_type bus_type);
 	int (*resume_noirq)(struct device *dev,
 			    enum pld_bus_type bus_type);
+	int (*set_curr_therm_cdev_state)(struct device *dev,
+					 unsigned long state,
+					 int mon_id);
 };
 
 int pld_init(void);
 void pld_deinit(void);
+
+/**
+ * pld_set_mode() - set driver mode in PLD module
+ * @mode: driver mode
+ *
+ * Return: 0 for success
+ *         Non zero failure code for errors
+ */
+int pld_set_mode(u8 mode);
 
 int pld_register_driver(struct pld_driver_ops *ops);
 void pld_unregister_driver(void);
@@ -440,6 +457,18 @@ int pld_get_fw_files_for_target(struct device *dev,
 				u32 target_type, u32 target_version);
 int pld_prevent_l1(struct device *dev);
 void pld_allow_l1(struct device *dev);
+
+/**
+ * pld_set_pcie_gen_speed() - Set PCIE gen speed
+ * @dev: device
+ * @pcie_gen_speed: Required PCIE gen speed
+ *
+ * Send required PCIE Gen speed to platform driver
+ *
+ * Return: 0 for success. Negative error codes.
+ */
+int pld_set_pcie_gen_speed(struct device *dev, u8 pcie_gen_speed);
+
 void pld_is_pci_link_down(struct device *dev);
 int pld_shadow_control(struct device *dev, bool enable);
 void pld_schedule_recovery_work(struct device *dev,
@@ -656,6 +685,15 @@ int pld_force_wake_request(struct device *dev);
  *         Non zero failure code for errors
  */
 int pld_force_wake_request_sync(struct device *dev, int timeout_us);
+
+/**
+ * pld_exit_power_save() - Send EXIT_POWER_SAVE QMI to FW
+ * @dev: device
+ *
+ * Return: 0 for success
+ *         Non zero failure code for errors
+ */
+int pld_exit_power_save(struct device *dev);
 int pld_is_device_awake(struct device *dev);
 int pld_force_wake_release(struct device *dev);
 int pld_ce_request_irq(struct device *dev, unsigned int ce_id,
@@ -850,6 +888,37 @@ int pld_pci_read_config_dword(struct pci_dev *pdev, int offset, uint32_t *val);
  *         Non zero failure code for errors
  */
 int pld_pci_write_config_dword(struct pci_dev *pdev, int offset, uint32_t val);
+
+/**
+ * pld_thermal_register() - Register the thermal device with the thermal system
+ * @dev: The device structure
+ * @state: The max state to be configured on registration
+ * @mon_id: Thermal cooling device ID
+ *
+ * Return: Error code on error
+ */
+int pld_thermal_register(struct device *dev, unsigned long state, int mon_id);
+
+/**
+ * pld_thermal_unregister() - Unregister the device with the thermal system
+ * @dev: The device structure
+ * @mon_id: Thermal cooling device ID
+ *
+ * Return: None
+ */
+void pld_thermal_unregister(struct device *dev, int mon_id);
+
+/**
+ * pld_get_thermal_state() - Get the current thermal state from the PLD
+ * @dev: The device structure
+ * @thermal_state: param to store the current thermal state
+ * @mon_id: Thermal cooling device ID
+ *
+ * Return: Non-zero code for error; zero for success
+ */
+int pld_get_thermal_state(struct device *dev, unsigned long *thermal_state,
+			  int mon_id);
+
 #if IS_ENABLED(CONFIG_WCNSS_MEM_PRE_ALLOC) && defined(FEATURE_SKB_PRE_ALLOC)
 
 /**

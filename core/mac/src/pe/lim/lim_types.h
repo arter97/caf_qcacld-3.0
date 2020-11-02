@@ -51,36 +51,38 @@
 #define TRACE_EVENT_AUTH_RSP_TIMER_ACT     0x6603
 
 /* MLM message types */
-#define LIM_MLM_MSG_START           1000
-#define LIM_MLM_SCAN_REQ            LIM_MLM_MSG_START
-#define LIM_MLM_SCAN_CNF            (LIM_MLM_MSG_START + 1)
-#define LIM_MLM_START_CNF           (LIM_MLM_MSG_START + 3)
-#define LIM_MLM_JOIN_REQ            (LIM_MLM_MSG_START + 4)
-#define LIM_MLM_JOIN_CNF            (LIM_MLM_MSG_START + 5)
-#define LIM_MLM_AUTH_REQ            (LIM_MLM_MSG_START + 6)
-#define LIM_MLM_AUTH_CNF            (LIM_MLM_MSG_START + 7)
-#define LIM_MLM_AUTH_IND            (LIM_MLM_MSG_START + 8)
-#define LIM_MLM_ASSOC_REQ           (LIM_MLM_MSG_START + 9)
-#define LIM_MLM_ASSOC_CNF           (LIM_MLM_MSG_START + 10)
-#define LIM_MLM_ASSOC_IND           (LIM_MLM_MSG_START + 11)
-#define LIM_MLM_DISASSOC_REQ        (LIM_MLM_MSG_START + 12)
-#define LIM_MLM_DISASSOC_CNF        (LIM_MLM_MSG_START + 13)
-#define LIM_MLM_DISASSOC_IND        (LIM_MLM_MSG_START + 14)
-#define LIM_MLM_REASSOC_CNF         (LIM_MLM_MSG_START + 15)
-#define LIM_MLM_REASSOC_IND         (LIM_MLM_MSG_START + 16)
-#define LIM_MLM_DEAUTH_REQ          (LIM_MLM_MSG_START + 17)
-#define LIM_MLM_DEAUTH_CNF          (LIM_MLM_MSG_START + 18)
-#define LIM_MLM_DEAUTH_IND          (LIM_MLM_MSG_START + 19)
-#define LIM_MLM_TSPEC_REQ           (LIM_MLM_MSG_START + 20)
-#define LIM_MLM_TSPEC_CNF           (LIM_MLM_MSG_START + 21)
-#define LIM_MLM_TSPEC_IND           (LIM_MLM_MSG_START + 22)
-#define LIM_MLM_SETKEYS_CNF         (LIM_MLM_MSG_START + 24)
-#define LIM_MLM_LINK_TEST_STOP_REQ  (LIM_MLM_MSG_START + 30)
-#define LIM_MLM_PURGE_STA_IND       (LIM_MLM_MSG_START + 31)
-/*
- * Values (LIM_MLM_MSG_START + 32) through
- * (LIM_MLM_MSG_START + 40) are unused.
- */
+enum mlmmsgtype {
+	LIM_MLM_MSG_START = 1000,
+	LIM_MLM_SCAN_REQ = LIM_MLM_MSG_START,
+	LIM_MLM_SCAN_CNF = (LIM_MLM_MSG_START + 1),
+	LIM_MLM_START_CNF  = (LIM_MLM_MSG_START + 3),
+	LIM_MLM_JOIN_REQ = (LIM_MLM_MSG_START + 4),
+	LIM_MLM_JOIN_CNF = (LIM_MLM_MSG_START + 5),
+	LIM_MLM_AUTH_REQ = (LIM_MLM_MSG_START + 6),
+	LIM_MLM_AUTH_CNF = (LIM_MLM_MSG_START + 7),
+	LIM_MLM_AUTH_IND = (LIM_MLM_MSG_START + 8),
+	LIM_MLM_ASSOC_REQ = (LIM_MLM_MSG_START + 9),
+	LIM_MLM_ASSOC_CNF = (LIM_MLM_MSG_START + 10),
+	LIM_MLM_ASSOC_IND = (LIM_MLM_MSG_START + 11),
+	LIM_MLM_DISASSOC_REQ = (LIM_MLM_MSG_START + 12),
+	LIM_MLM_DISASSOC_CNF = (LIM_MLM_MSG_START + 13),
+	LIM_MLM_DISASSOC_IND = (LIM_MLM_MSG_START + 14),
+	LIM_MLM_REASSOC_CNF = (LIM_MLM_MSG_START + 15),
+	LIM_MLM_REASSOC_IND = (LIM_MLM_MSG_START + 16),
+	LIM_MLM_DEAUTH_REQ = (LIM_MLM_MSG_START + 17),
+	LIM_MLM_DEAUTH_CNF = (LIM_MLM_MSG_START + 18),
+	LIM_MLM_DEAUTH_IND = (LIM_MLM_MSG_START + 19),
+	LIM_MLM_TSPEC_REQ = (LIM_MLM_MSG_START + 20),
+	LIM_MLM_TSPEC_CNF = (LIM_MLM_MSG_START + 21),
+	LIM_MLM_TSPEC_IND = (LIM_MLM_MSG_START + 22),
+	LIM_MLM_SETKEYS_CNF  =  LIM_MLM_MSG_START + 24,
+	LIM_MLM_LINK_TEST_STOP_REQ  =  LIM_MLM_MSG_START + 30,
+	LIM_MLM_PURGE_STA_IND = (LIM_MLM_MSG_START + 31),
+	/*
+	 * Values (LIM_MLM_MSG_START + 32) through
+	 * (LIM_MLM_MSG_START + 40) are unused.
+	 */
+};
 
 #define LIM_WEP_IN_FC           1
 #define LIM_NO_WEP_IN_FC        0
@@ -640,6 +642,24 @@ void lim_send_delts_req_action_frame(struct mac_context *mac, tSirMacAddr peer,
 void lim_send_addts_req_action_frame(struct mac_context *mac, tSirMacAddr peerMacAddr,
 				     tSirAddtsReqInfo *addts, struct pe_session *);
 
+#ifdef WLAN_FEATURE_MSCS
+/**
+ * lim_send_mscs_req_action_frame() - Send mscs req
+ * @mac_ctx: Handle for mac context
+ * @peer_mac: Mac address of requesting peer
+ * @mscs_req: mscs request buffer
+ * @pe_session: PE session id.
+ *
+ * Builds and sends mscs action frame to the peer.
+ *
+ * Return: void
+ */
+void lim_send_mscs_req_action_frame(struct mac_context *mac,
+				    struct qdf_mac_addr peer_mac,
+				    struct mscs_req_info *mscs_req,
+				    struct pe_session *pe_session);
+#endif
+
 /**
  * lim_send_assoc_rsp_mgmt_frame() - Send assoc response
  * @mac_ctx: Handle for mac context
@@ -818,7 +838,7 @@ void lim_handle_heart_beat_failure(struct mac_context *, struct pe_session *);
  * lim_tear_down_link_with_ap() - Tear down link with AP
  * @mac: mac context
  * @session_id: PE session id
- * @reason_code: Disconnect reason code as per emun eSirMacReasonCodes
+ * @reason_code: Disconnect reason code as per emun wlan_reason_code
  * @trigger: Disconnect trigger as per enum eLimDisassocTrigger
  *
  * Function that triggers link tear down with AP upon HB failure
@@ -827,7 +847,7 @@ void lim_handle_heart_beat_failure(struct mac_context *, struct pe_session *);
  */
 void lim_tear_down_link_with_ap(struct mac_context *mac,
 				uint8_t session_id,
-				tSirMacReasonCodes reason_code,
+				enum wlan_reason_code reason_code,
 				enum eLimDisassocTrigger trigger);
 
 /* / Function that defers the messages received */

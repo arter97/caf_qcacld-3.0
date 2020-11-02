@@ -136,9 +136,9 @@ static void lim_process_auth_shared_system_algo(struct mac_context *mac_ctx,
 	cfg_privacy_opt_imp = (uint8_t) val;
 	if (!cfg_privacy_opt_imp) {
 		pe_err("rx Auth frame for unsupported auth algorithm %d "
-			QDF_MAC_ADDR_STR,
+			QDF_MAC_ADDR_FMT,
 			rx_auth_frm_body->authAlgoNumber,
-			QDF_MAC_ADDR_ARRAY(mac_hdr->sa));
+			QDF_MAC_ADDR_REF(mac_hdr->sa));
 
 		/*
 		 * Authenticator does not have WEP
@@ -151,7 +151,7 @@ static void lim_process_auth_shared_system_algo(struct mac_context *mac_ctx,
 		auth_frame->authTransactionSeqNumber =
 			rx_auth_frm_body->authTransactionSeqNumber + 1;
 		auth_frame->authStatusCode =
-			eSIR_MAC_AUTH_ALGO_NOT_SUPPORTED_STATUS;
+			STATUS_NOT_SUPPORTED_AUTH_ALG;
 
 		lim_send_auth_mgmt_frame(mac_ctx, auth_frame,
 				mac_hdr->sa, LIM_NO_WEP_IN_FC,
@@ -198,7 +198,7 @@ static void lim_process_auth_shared_system_algo(struct mac_context *mac_ctx,
 			auth_frame->authTransactionSeqNumber =
 				rx_auth_frm_body->authTransactionSeqNumber + 1;
 			auth_frame->authStatusCode =
-				eSIR_MAC_UNSPEC_FAILURE_STATUS;
+				STATUS_UNSPECIFIED_FAILURE;
 
 			lim_send_auth_mgmt_frame(mac_ctx, auth_frame,
 				mac_hdr->sa, LIM_NO_WEP_IN_FC,
@@ -223,7 +223,8 @@ static void lim_process_auth_shared_system_algo(struct mac_context *mac_ctx,
 				rx_auth_frm_body->authAlgoNumber;
 			auth_frame->authTransactionSeqNumber =
 				rx_auth_frm_body->authTransactionSeqNumber + 1;
-			auth_frame->authStatusCode = eSIR_MAC_TRY_AGAIN_LATER;
+			auth_frame->authStatusCode =
+				STATUS_ASSOC_REJECTED_TEMPORARILY;
 			lim_send_auth_mgmt_frame(mac_ctx,
 						 auth_frame,
 						 mac_hdr->sa,
@@ -245,7 +246,7 @@ static void lim_process_auth_shared_system_algo(struct mac_context *mac_ctx,
 		auth_frame->authAlgoNumber = rx_auth_frm_body->authAlgoNumber;
 		auth_frame->authTransactionSeqNumber =
 			rx_auth_frm_body->authTransactionSeqNumber + 1;
-		auth_frame->authStatusCode = eSIR_MAC_SUCCESS_STATUS;
+		auth_frame->authStatusCode = STATUS_SUCCESS;
 		auth_frame->type = WLAN_ELEMID_CHALLENGE;
 		auth_frame->length = SIR_MAC_SAP_AUTH_CHALLENGE_LENGTH;
 		qdf_mem_copy(auth_frame->challengeText,
@@ -293,7 +294,7 @@ static void lim_process_auth_open_system_algo(struct mac_context *mac_ctx,
 	auth_frame->authAlgoNumber = rx_auth_frm_body->authAlgoNumber;
 	auth_frame->authTransactionSeqNumber =
 			rx_auth_frm_body->authTransactionSeqNumber + 1;
-	auth_frame->authStatusCode = eSIR_MAC_SUCCESS_STATUS;
+	auth_frame->authStatusCode = STATUS_SUCCESS;
 	lim_send_auth_mgmt_frame(mac_ctx, auth_frame, mac_hdr->sa,
 					LIM_NO_WEP_IN_FC,
 					pe_session);
@@ -321,12 +322,12 @@ static void lim_external_auth_add_pre_auth_node(struct mac_context *mac_ctx,
 	/* Create entry for this STA in pre-auth list */
 	auth_node = lim_acquire_free_pre_auth_node(mac_ctx, preauth_table);
 	if (!auth_node) {
-		pe_debug("Max pre-auth nodes reached " QDF_MAC_ADDR_STR,
-			 QDF_MAC_ADDR_ARRAY(mac_hdr->sa));
+		pe_debug("Max pre-auth nodes reached " QDF_MAC_ADDR_FMT,
+			 QDF_MAC_ADDR_REF(mac_hdr->sa));
 		return;
 	}
-	pe_debug("Creating preauth node for SAE peer " QDF_MAC_ADDR_STR,
-		 QDF_MAC_ADDR_ARRAY(mac_hdr->sa));
+	pe_debug("Creating preauth node for SAE peer " QDF_MAC_ADDR_FMT,
+		 QDF_MAC_ADDR_REF(mac_hdr->sa));
 	qdf_mem_copy((uint8_t *)auth_node->peerMacAddr,
 		     mac_hdr->sa, sizeof(tSirMacAddr));
 	auth_node->mlmState = mlm_state;
@@ -417,9 +418,9 @@ static void lim_process_sae_auth_frame(struct mac_context *mac_ctx,
 	body_ptr = WMA_GET_RX_MPDU_DATA(rx_pkt_info);
 	frame_len = WMA_GET_RX_PAYLOAD_LEN(rx_pkt_info);
 
-	pe_nofl_info("SAE Auth RX type %d subtype %d from %pM",
+	pe_nofl_info("SAE Auth RX type %d subtype %d from "QDF_MAC_ADDR_FMT,
 		     mac_hdr->fc.type, mac_hdr->fc.subType,
-		     mac_hdr->sa);
+		     QDF_MAC_ADDR_REF(mac_hdr->sa));
 
 	if (LIM_IS_STA_ROLE(pe_session) &&
 	    pe_session->limMlmState != eLIM_MLM_WT_SAE_AUTH_STATE)
@@ -497,8 +498,8 @@ static void lim_process_auth_frame_type1(struct mac_context *mac_ctx,
 				&pMlmDisassocReq->peer_macaddr.bytes,
 				QDF_MAC_ADDR_SIZE))) {
 			pe_debug("TODO:Ack for disassoc frame is pending Issue delsta for "
-				QDF_MAC_ADDR_STR,
-				QDF_MAC_ADDR_ARRAY(
+				QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(
 					pMlmDisassocReq->peer_macaddr.bytes));
 			lim_process_disassoc_ack_timeout(mac_ctx);
 			is_connected = false;
@@ -510,8 +511,8 @@ static void lim_process_auth_frame_type1(struct mac_context *mac_ctx,
 				&pMlmDeauthReq->peer_macaddr.bytes,
 				QDF_MAC_ADDR_SIZE))) {
 			pe_debug("TODO:Ack for deauth frame is pending Issue delsta for "
-				QDF_MAC_ADDR_STR,
-				QDF_MAC_ADDR_ARRAY(
+				QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(
 					pMlmDeauthReq->peer_macaddr.bytes));
 			lim_process_deauth_ack_timeout(mac_ctx);
 			is_connected = false;
@@ -538,10 +539,10 @@ static void lim_process_auth_frame_type1(struct mac_context *mac_ctx,
 		   ) {
 			pe_err("STA is already connected but received auth frame"
 			       "Send the Deauth and lim Delete Station Context"
-			       "(associd: %d) sta mac" QDF_MAC_ADDR_STR,
-			       associd, QDF_MAC_ADDR_ARRAY(mac_hdr->sa));
+			       "(associd: %d) sta mac" QDF_MAC_ADDR_FMT,
+			       associd, QDF_MAC_ADDR_REF(mac_hdr->sa));
 			lim_send_deauth_mgmt_frame(mac_ctx,
-				eSIR_MAC_UNSPEC_FAILURE_REASON,
+				REASON_UNSPEC_FAILURE,
 				(uint8_t *) mac_hdr->sa,
 				pe_session, false);
 			lim_trigger_sta_deletion(mac_ctx, sta_ds_ptr,
@@ -602,10 +603,10 @@ static void lim_process_auth_frame_type1(struct mac_context *mac_ctx,
 #endif
 		   ) {
 			pe_debug("lim Del Sta Ctx associd: %d sta mac"
-				 QDF_MAC_ADDR_STR, associd,
-				 QDF_MAC_ADDR_ARRAY(sta_ds_ptr->staAddr));
+				 QDF_MAC_ADDR_FMT, associd,
+				 QDF_MAC_ADDR_REF(sta_ds_ptr->staAddr));
 			lim_send_deauth_mgmt_frame(mac_ctx,
-				eSIR_MAC_UNSPEC_FAILURE_REASON,
+				REASON_UNSPEC_FAILURE,
 				(uint8_t *)auth_node->peerMacAddr,
 				pe_session, false);
 			lim_trigger_sta_deletion(mac_ctx, sta_ds_ptr,
@@ -625,7 +626,7 @@ static void lim_process_auth_frame_type1(struct mac_context *mac_ctx,
 		auth_frame->authTransactionSeqNumber =
 			rx_auth_frm_body->authTransactionSeqNumber + 1;
 		auth_frame->authStatusCode =
-			eSIR_MAC_UNSPEC_FAILURE_STATUS;
+			STATUS_UNSPECIFIED_FAILURE;
 
 		lim_send_auth_mgmt_frame(mac_ctx, auth_frame,
 				mac_hdr->sa, LIM_NO_WEP_IN_FC,
@@ -650,7 +651,7 @@ static void lim_process_auth_frame_type1(struct mac_context *mac_ctx,
 			auth_frame->authTransactionSeqNumber =
 				rx_auth_frm_body->authTransactionSeqNumber + 1;
 			auth_frame->authStatusCode =
-				eSIR_MAC_WME_INVALID_PARAMS_STATUS;
+				STATUS_UNSPECIFIED_FAILURE;
 
 			lim_send_auth_mgmt_frame(mac_ctx, auth_frame,
 				mac_hdr->sa, LIM_NO_WEP_IN_FC,
@@ -670,9 +671,9 @@ static void lim_process_auth_frame_type1(struct mac_context *mac_ctx,
 			break;
 		default:
 			pe_err("rx Auth frm for unsupported auth algo %d "
-				QDF_MAC_ADDR_STR,
+				QDF_MAC_ADDR_FMT,
 				rx_auth_frm_body->authAlgoNumber,
-				QDF_MAC_ADDR_ARRAY(mac_hdr->sa));
+				QDF_MAC_ADDR_REF(mac_hdr->sa));
 
 			/*
 			 * Responding party does not support the
@@ -686,7 +687,7 @@ static void lim_process_auth_frame_type1(struct mac_context *mac_ctx,
 			auth_frame->authTransactionSeqNumber =
 				rx_auth_frm_body->authTransactionSeqNumber + 1;
 			auth_frame->authStatusCode =
-				eSIR_MAC_AUTH_ALGO_NOT_SUPPORTED_STATUS;
+				STATUS_NOT_SUPPORTED_AUTH_ALG;
 			lim_send_auth_mgmt_frame(mac_ctx, auth_frame,
 				mac_hdr->sa, LIM_NO_WEP_IN_FC,
 				pe_session);
@@ -694,9 +695,9 @@ static void lim_process_auth_frame_type1(struct mac_context *mac_ctx,
 		}
 	} else {
 		pe_err("received Authentication frame for unsupported auth algorithm %d "
-			QDF_MAC_ADDR_STR,
+			QDF_MAC_ADDR_FMT,
 			rx_auth_frm_body->authAlgoNumber,
-			QDF_MAC_ADDR_ARRAY(mac_hdr->sa));
+			QDF_MAC_ADDR_REF(mac_hdr->sa));
 
 		/*
 		 * Responding party does not support the
@@ -707,7 +708,7 @@ static void lim_process_auth_frame_type1(struct mac_context *mac_ctx,
 		auth_frame->authTransactionSeqNumber =
 			rx_auth_frm_body->authTransactionSeqNumber + 1;
 		auth_frame->authStatusCode =
-			eSIR_MAC_AUTH_ALGO_NOT_SUPPORTED_STATUS;
+			STATUS_NOT_SUPPORTED_AUTH_ALG;
 
 		lim_send_auth_mgmt_frame(mac_ctx, auth_frame,
 				mac_hdr->sa,
@@ -742,16 +743,16 @@ static void lim_process_auth_frame_type2(struct mac_context *mac_ctx,
 		 */
 		if (LIM_IS_STA_ROLE(pe_session) &&
 		    (pe_session->limSmeState == eLIM_SME_WT_REASSOC_STATE) &&
-		    (rx_auth_frm_body->authStatusCode ==
-				eSIR_MAC_SUCCESS_STATUS) &&
+		    (rx_auth_frm_body->authStatusCode == STATUS_SUCCESS) &&
 		    (pe_session->ftPEContext.pFTPreAuthReq) &&
 		    (!qdf_mem_cmp(
 			pe_session->ftPEContext.pFTPreAuthReq->preAuthbssId,
 			mac_hdr->sa, sizeof(tSirMacAddr)))) {
 
 			/* Update the FTIEs in the saved auth response */
-			pe_warn("rx PreAuth frm2 in smestate: %d from: %pM",
-				pe_session->limSmeState, mac_hdr->sa);
+			pe_warn("rx PreAuth frm2 in smestate: %d from: "QDF_MAC_ADDR_FMT,
+				pe_session->limSmeState,
+				QDF_MAC_ADDR_REF(mac_hdr->sa));
 			pe_session->ftPEContext.saved_auth_rsp_length = 0;
 
 			if ((body_ptr) && (frame_len < MAX_FTIE_SIZE)) {
@@ -783,12 +784,12 @@ static void lim_process_auth_frame_type2(struct mac_context *mac_ctx,
 		 */
 
 		pe_warn("received Auth frame2 from unexpected peer"
-			QDF_MAC_ADDR_STR, QDF_MAC_ADDR_ARRAY(mac_hdr->sa));
+			QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(mac_hdr->sa));
 		return;
 	}
 
 	if (rx_auth_frm_body->authStatusCode ==
-			eSIR_MAC_AUTH_ALGO_NOT_SUPPORTED_STATUS) {
+			STATUS_NOT_SUPPORTED_AUTH_ALG) {
 		/*
 		 * Interoperability workaround: Linksys WAP4400N is returning
 		 * wrong authType in OpenAuth response in case of
@@ -822,22 +823,22 @@ static void lim_process_auth_frame_type2(struct mac_context *mac_ctx,
 			 */
 
 			pe_warn("rx Auth frame2 for unexpected auth algo %d"
-				QDF_MAC_ADDR_STR,
+				QDF_MAC_ADDR_FMT,
 				rx_auth_frm_body->authAlgoNumber,
-				QDF_MAC_ADDR_ARRAY(mac_hdr->sa));
+				QDF_MAC_ADDR_REF(mac_hdr->sa));
 			return;
 		}
 	}
 
-	if (rx_auth_frm_body->authStatusCode != eSIR_MAC_SUCCESS_STATUS) {
+	if (rx_auth_frm_body->authStatusCode != STATUS_SUCCESS) {
 		/*
 		 * Authentication failure.
 		 * Return Auth confirm with received failure code to SME
 		 */
 		pe_err("rx Auth frame from peer with failure code %d "
-			QDF_MAC_ADDR_STR,
+			QDF_MAC_ADDR_FMT,
 			rx_auth_frm_body->authStatusCode,
-			QDF_MAC_ADDR_ARRAY(mac_hdr->sa));
+			QDF_MAC_ADDR_REF(mac_hdr->sa));
 		lim_restore_from_auth_state(mac_ctx, eSIR_SME_AUTH_REFUSED,
 			rx_auth_frm_body->authStatusCode,
 			pe_session);
@@ -861,7 +862,8 @@ static void lim_process_auth_frame_type2(struct mac_context *mac_ctx,
 			return;
 		}
 
-		pe_debug("add new auth node: for %pM", mac_hdr->sa);
+		pe_debug("add new auth node: for "QDF_MAC_ADDR_FMT,
+			 QDF_MAC_ADDR_REF(mac_hdr->sa));
 		qdf_mem_copy((uint8_t *) auth_node->peerMacAddr,
 				mac_ctx->lim.gpLimMlmAuthReq->peerMacAddr,
 				sizeof(tSirMacAddr));
@@ -890,16 +892,16 @@ static void lim_process_auth_frame_type2(struct mac_context *mac_ctx,
 			 */
 
 			pe_err("rx Auth frm from peer for unsupported auth algo %d "
-						QDF_MAC_ADDR_STR,
+						QDF_MAC_ADDR_FMT,
 					rx_auth_frm_body->authAlgoNumber,
-					QDF_MAC_ADDR_ARRAY(mac_hdr->sa));
+					QDF_MAC_ADDR_REF(mac_hdr->sa));
 
 			auth_frame->authAlgoNumber =
 				rx_auth_frm_body->authAlgoNumber;
 			auth_frame->authTransactionSeqNumber =
 				rx_auth_frm_body->authTransactionSeqNumber + 1;
 			auth_frame->authStatusCode =
-				eSIR_MAC_AUTH_ALGO_NOT_SUPPORTED_STATUS;
+				STATUS_NOT_SUPPORTED_AUTH_ALG;
 			lim_send_auth_mgmt_frame(mac_ctx, auth_frame,
 					mac_hdr->sa, LIM_NO_WEP_IN_FC,
 					pe_session);
@@ -933,7 +935,7 @@ static void lim_process_auth_frame_type2(struct mac_context *mac_ctx,
 				rx_auth_frm_body->authTransactionSeqNumber + 1;
 
 				auth_frame->authStatusCode =
-					eSIR_MAC_CHALLENGE_FAILURE_STATUS;
+					STATUS_CHALLENGE_FAIL;
 
 				lim_send_auth_mgmt_frame(mac_ctx, auth_frame,
 							 mac_hdr->sa,
@@ -941,7 +943,7 @@ static void lim_process_auth_frame_type2(struct mac_context *mac_ctx,
 							 pe_session);
 				lim_restore_from_auth_state(mac_ctx,
 					eSIR_SME_INVALID_WEP_DEFAULT_KEY,
-					eSIR_MAC_UNSPEC_FAILURE_REASON,
+					REASON_UNSPEC_FAILURE,
 					pe_session);
 				return;
 			}
@@ -954,7 +956,7 @@ static void lim_process_auth_frame_type2(struct mac_context *mac_ctx,
 				rx_auth_frm_body->authTransactionSeqNumber
 				+ 1));
 		((tpSirMacAuthFrameBody)plainbody)->authStatusCode =
-			eSIR_MAC_SUCCESS_STATUS;
+			STATUS_SUCCESS;
 		((tpSirMacAuthFrameBody)plainbody)->type =
 			WLAN_ELEMID_CHALLENGE;
 		((tpSirMacAuthFrameBody)plainbody)->length =
@@ -994,9 +996,9 @@ static void lim_process_auth_frame_type3(struct mac_context *mac_ctx,
 	/* AuthFrame 3 */
 	if (rx_auth_frm_body->authAlgoNumber != eSIR_SHARED_KEY) {
 		pe_err("rx Auth frame3 from peer with auth algo number %d "
-			QDF_MAC_ADDR_STR,
+			QDF_MAC_ADDR_FMT,
 			rx_auth_frm_body->authAlgoNumber,
-			QDF_MAC_ADDR_ARRAY(mac_hdr->sa));
+			QDF_MAC_ADDR_REF(mac_hdr->sa));
 		/*
 		 * Received Authentication frame3 with algorithm other than
 		 * Shared Key authentication type. Reject with Auth frame4
@@ -1005,7 +1007,7 @@ static void lim_process_auth_frame_type3(struct mac_context *mac_ctx,
 		auth_frame->authAlgoNumber = eSIR_SHARED_KEY;
 		auth_frame->authTransactionSeqNumber = SIR_MAC_AUTH_FRAME_4;
 		auth_frame->authStatusCode =
-			eSIR_MAC_AUTH_FRAME_OUT_OF_SEQ_STATUS;
+			STATUS_UNKNOWN_AUTH_TRANSACTION;
 		lim_send_auth_mgmt_frame(mac_ctx, auth_frame,
 			mac_hdr->sa, LIM_NO_WEP_IN_FC,
 			pe_session);
@@ -1020,14 +1022,14 @@ static void lim_process_auth_frame_type3(struct mac_context *mac_ctx,
 		 */
 		if (!mac_hdr->fc.wep) {
 			pe_err("received Auth frame3 from peer with no WEP bit set "
-				QDF_MAC_ADDR_STR,
-				QDF_MAC_ADDR_ARRAY(mac_hdr->sa));
+				QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(mac_hdr->sa));
 			/* WEP bit is not set in FC of Auth Frame3 */
 			auth_frame->authAlgoNumber = eSIR_SHARED_KEY;
 			auth_frame->authTransactionSeqNumber =
 				SIR_MAC_AUTH_FRAME_4;
 			auth_frame->authStatusCode =
-				eSIR_MAC_CHALLENGE_FAILURE_STATUS;
+				STATUS_CHALLENGE_FAIL;
 			lim_send_auth_mgmt_frame(mac_ctx, auth_frame,
 					mac_hdr->sa,
 					LIM_NO_WEP_IN_FC,
@@ -1038,8 +1040,8 @@ static void lim_process_auth_frame_type3(struct mac_context *mac_ctx,
 		auth_node = lim_search_pre_auth_list(mac_ctx, mac_hdr->sa);
 		if (!auth_node) {
 			pe_warn("received AuthFrame3 from peer that has no preauth context "
-				QDF_MAC_ADDR_STR,
-				QDF_MAC_ADDR_ARRAY(mac_hdr->sa));
+				QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(mac_hdr->sa));
 			/*
 			 * No 'pre-auth' context exists for this STA that sent
 			 * an Authentication frame3. Send Auth frame4 with
@@ -1049,7 +1051,7 @@ static void lim_process_auth_frame_type3(struct mac_context *mac_ctx,
 			auth_frame->authTransactionSeqNumber =
 				SIR_MAC_AUTH_FRAME_4;
 			auth_frame->authStatusCode =
-				eSIR_MAC_AUTH_FRAME_OUT_OF_SEQ_STATUS;
+				STATUS_UNKNOWN_AUTH_TRANSACTION;
 			lim_send_auth_mgmt_frame(mac_ctx, auth_frame,
 				mac_hdr->sa, LIM_NO_WEP_IN_FC,
 				pe_session);
@@ -1058,8 +1060,8 @@ static void lim_process_auth_frame_type3(struct mac_context *mac_ctx,
 
 		if (auth_node->mlmState == eLIM_MLM_AUTH_RSP_TIMEOUT_STATE) {
 			pe_warn("auth response timer timedout for peer "
-				QDF_MAC_ADDR_STR,
-				QDF_MAC_ADDR_ARRAY(mac_hdr->sa));
+				QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(mac_hdr->sa));
 			/*
 			 * Received Auth Frame3 after Auth Response timeout.
 			 * Reject by sending Auth Frame4 with
@@ -1069,7 +1071,7 @@ static void lim_process_auth_frame_type3(struct mac_context *mac_ctx,
 			auth_frame->authTransactionSeqNumber =
 				SIR_MAC_AUTH_FRAME_4;
 			auth_frame->authStatusCode =
-				eSIR_MAC_AUTH_RSP_TIMEOUT_STATUS;
+				STATUS_AUTH_TIMEOUT;
 
 			lim_send_auth_mgmt_frame(mac_ctx, auth_frame,
 				mac_hdr->sa, LIM_NO_WEP_IN_FC,
@@ -1079,16 +1081,16 @@ static void lim_process_auth_frame_type3(struct mac_context *mac_ctx,
 			return;
 		}
 		if (rx_auth_frm_body->authStatusCode !=
-				eSIR_MAC_SUCCESS_STATUS) {
+				STATUS_SUCCESS) {
 			/*
 			 * Received Authenetication Frame 3 with status code
 			 * other than success. Wait until Auth response timeout
 			 * to delete STA context.
 			 */
 			pe_err("rx Auth frm3 from peer with status code %d "
-				QDF_MAC_ADDR_STR,
+				QDF_MAC_ADDR_FMT,
 				rx_auth_frm_body->authStatusCode,
-				QDF_MAC_ADDR_ARRAY(mac_hdr->sa));
+				QDF_MAC_ADDR_REF(mac_hdr->sa));
 				return;
 		}
 		/*
@@ -1115,14 +1117,14 @@ static void lim_process_auth_frame_type3(struct mac_context *mac_ctx,
 			auth_frame->authTransactionSeqNumber =
 				SIR_MAC_AUTH_FRAME_4;
 			auth_frame->authStatusCode =
-				eSIR_MAC_SUCCESS_STATUS;
+				STATUS_SUCCESS;
 			lim_send_auth_mgmt_frame(mac_ctx, auth_frame,
 				mac_hdr->sa, LIM_NO_WEP_IN_FC,
 				pe_session);
 			return;
 		} else {
-			pe_warn("Challenge failure for peer "QDF_MAC_ADDR_STR,
-				QDF_MAC_ADDR_ARRAY(mac_hdr->sa));
+			pe_warn("Challenge failure for peer "QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(mac_hdr->sa));
 			/*
 			 * Challenge Failure.
 			 * Send Authentication frame4 with 'challenge failure'
@@ -1134,7 +1136,7 @@ static void lim_process_auth_frame_type3(struct mac_context *mac_ctx,
 			auth_frame->authTransactionSeqNumber =
 				SIR_MAC_AUTH_FRAME_4;
 			auth_frame->authStatusCode =
-				eSIR_MAC_CHALLENGE_FAILURE_STATUS;
+				STATUS_CHALLENGE_FAIL;
 			lim_send_auth_mgmt_frame(mac_ctx, auth_frame,
 				mac_hdr->sa, LIM_NO_WEP_IN_FC,
 				pe_session);
@@ -1156,9 +1158,9 @@ static void lim_process_auth_frame_type4(struct mac_context *mac_ctx,
 		 * Log error and ignore the frame.
 		 */
 		pe_warn("received unexpected Auth frame4 from peer in state %d, addr "
-			QDF_MAC_ADDR_STR,
+			QDF_MAC_ADDR_FMT,
 			pe_session->limMlmState,
-			QDF_MAC_ADDR_ARRAY(mac_hdr->sa));
+			QDF_MAC_ADDR_REF(mac_hdr->sa));
 		return;
 	}
 
@@ -1170,9 +1172,9 @@ static void lim_process_auth_frame_type4(struct mac_context *mac_ctx,
 		 * failure to SME.
 		 */
 		pe_err("received Auth frame4 from peer with invalid auth algo %d"
-			QDF_MAC_ADDR_STR,
+			QDF_MAC_ADDR_FMT,
 			rx_auth_frm_body->authAlgoNumber,
-			QDF_MAC_ADDR_ARRAY(mac_hdr->sa));
+			QDF_MAC_ADDR_REF(mac_hdr->sa));
 		return;
 	}
 
@@ -1185,8 +1187,8 @@ static void lim_process_auth_frame_type4(struct mac_context *mac_ctx,
 		 * Wait until Authentication Failure Timeout.
 		 */
 
-		pe_warn("received Auth frame4 from unexpected peer "QDF_MAC_ADDR_STR,
-			QDF_MAC_ADDR_ARRAY(mac_hdr->sa));
+		pe_warn("received Auth frame4 from unexpected peer "QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(mac_hdr->sa));
 		return;
 	}
 
@@ -1199,13 +1201,13 @@ static void lim_process_auth_frame_type4(struct mac_context *mac_ctx,
 		 */
 
 		pe_err("received Authentication frame from peer with invalid auth seq number %d "
-			QDF_MAC_ADDR_STR,
+			QDF_MAC_ADDR_FMT,
 			rx_auth_frm_body->authTransactionSeqNumber,
-			QDF_MAC_ADDR_ARRAY(mac_hdr->sa));
+			QDF_MAC_ADDR_REF(mac_hdr->sa));
 		return;
 	}
 
-	if (rx_auth_frm_body->authStatusCode == eSIR_MAC_SUCCESS_STATUS) {
+	if (rx_auth_frm_body->authStatusCode == STATUS_SUCCESS) {
 		/*
 		 * Authentication Success, Inform SME of same.
 		 */
@@ -1235,8 +1237,8 @@ static void lim_process_auth_frame_type4(struct mac_context *mac_ctx,
 		 * Authentication failure.
 		 * Return Auth confirm with received failure code to SME
 		 */
-		pe_err("Authentication failure from peer "QDF_MAC_ADDR_STR,
-			QDF_MAC_ADDR_ARRAY(mac_hdr->sa));
+		pe_err("Authentication failure from peer "QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(mac_hdr->sa));
 		lim_restore_from_auth_state(mac_ctx, eSIR_SME_AUTH_REFUSED,
 				rx_auth_frm_body->authStatusCode,
 				pe_session);
@@ -1299,8 +1301,8 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 
 	if (!frame_len) {
 		/* Log error */
-		pe_err("received Auth frame with no body from: %pM",
-			mac_hdr->sa);
+		pe_err("received Auth frame with no body from: "QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(mac_hdr->sa));
 		return;
 	}
 
@@ -1309,8 +1311,8 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		 * Received Auth frame from a BC/MC address
 		 * Log error and ignore it
 		 */
-		pe_err("received Auth frame from a BC/MC addr: %pM",
-			mac_hdr->sa);
+		pe_err("received Auth frame from a BC/MC addr: "QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(mac_hdr->sa));
 		return;
 	}
 	curr_seq_num = (mac_hdr->seqControl.seqNumHi << 4) |
@@ -1334,10 +1336,10 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	}
 	auth_alg = *(uint16_t *) body_ptr;
 
-	pe_nofl_info("Auth RX: vdev %d sys role %d lim_state %d from " QDF_MAC_ADDR_STR " rssi %d auth_alg %d seq %d",
+	pe_nofl_info("Auth RX: vdev %d sys role %d lim_state %d from " QDF_MAC_ADDR_FMT " rssi %d auth_alg %d seq %d",
 		     pe_session->vdev_id, GET_LIM_SYSTEM_ROLE(pe_session),
 		     pe_session->limMlmState,
-		     QDF_MAC_ADDR_ARRAY(mac_hdr->sa),
+		     QDF_MAC_ADDR_REF(mac_hdr->sa),
 		     WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info),
 		     auth_alg, curr_seq_num);
 
@@ -1396,10 +1398,11 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			auth_frame->authTransactionSeqNumber =
 				SIR_MAC_AUTH_FRAME_4;
 			auth_frame->authStatusCode =
-				eSIR_MAC_CHALLENGE_FAILURE_STATUS;
+				STATUS_CHALLENGE_FAIL;
 			/* Log error */
-			pe_err("rx Auth frm with wep bit set role: %d %pM",
-				GET_LIM_SYSTEM_ROLE(pe_session), mac_hdr->sa);
+			pe_err("rx Auth frm with wep bit set role: %d "QDF_MAC_ADDR_FMT,
+				GET_LIM_SYSTEM_ROLE(pe_session),
+				QDF_MAC_ADDR_REF(mac_hdr->sa));
 			lim_send_auth_mgmt_frame(mac_ctx, auth_frame,
 				mac_hdr->sa, LIM_NO_WEP_IN_FC,
 				pe_session);
@@ -1426,8 +1429,8 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 
 		if (!cfg_privacy_opt_imp) {
 			pe_err("received Authentication frame3 from peer that while privacy option is turned OFF "
-				QDF_MAC_ADDR_STR,
-				QDF_MAC_ADDR_ARRAY(mac_hdr->sa));
+				QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(mac_hdr->sa));
 			/*
 			 * Privacy option is not implemented.
 			 * So reject Authentication frame received with
@@ -1440,7 +1443,7 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			auth_frame->authTransactionSeqNumber =
 				SIR_MAC_AUTH_FRAME_4;
 			auth_frame->authStatusCode =
-				eSIR_MAC_CHALLENGE_FAILURE_STATUS;
+				STATUS_CHALLENGE_FAIL;
 			lim_send_auth_mgmt_frame(mac_ctx, auth_frame,
 				mac_hdr->sa, LIM_NO_WEP_IN_FC,
 				pe_session);
@@ -1455,8 +1458,8 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		auth_node = lim_search_pre_auth_list(mac_ctx, mac_hdr->sa);
 		if (!auth_node) {
 			pe_err("rx Auth frame with no preauth ctx with WEP bit set "
-				QDF_MAC_ADDR_STR,
-				QDF_MAC_ADDR_ARRAY(mac_hdr->sa));
+				QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(mac_hdr->sa));
 			/*
 			 * No 'pre-auth' context exists for this STA
 			 * that sent an Authentication frame with FC
@@ -1467,7 +1470,7 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			auth_frame->authTransactionSeqNumber =
 				SIR_MAC_AUTH_FRAME_4;
 			auth_frame->authStatusCode =
-				eSIR_MAC_AUTH_FRAME_OUT_OF_SEQ_STATUS;
+				STATUS_UNKNOWN_AUTH_TRANSACTION;
 			lim_send_auth_mgmt_frame(mac_ctx, auth_frame,
 				mac_hdr->sa, LIM_NO_WEP_IN_FC,
 				pe_session);
@@ -1482,9 +1485,9 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			(auth_node->mlmState !=
 				eLIM_MLM_AUTH_RSP_TIMEOUT_STATE)) {
 			pe_err("received Authentication frame from peer that is in state %d "
-				QDF_MAC_ADDR_STR,
+				QDF_MAC_ADDR_FMT,
 				auth_node->mlmState,
-				QDF_MAC_ADDR_ARRAY(mac_hdr->sa));
+				QDF_MAC_ADDR_REF(mac_hdr->sa));
 			/*
 			 * Should not have received Authentication frame
 			 * with WEP bit set in FC in other states.
@@ -1495,7 +1498,7 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			auth_frame->authTransactionSeqNumber =
 				SIR_MAC_AUTH_FRAME_4;
 			auth_frame->authStatusCode =
-				eSIR_MAC_AUTH_FRAME_OUT_OF_SEQ_STATUS;
+				STATUS_UNKNOWN_AUTH_TRANSACTION;
 
 			lim_send_auth_mgmt_frame(mac_ctx, auth_frame,
 				mac_hdr->sa, LIM_NO_WEP_IN_FC,
@@ -1528,7 +1531,7 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 				auth_frame->authTransactionSeqNumber =
 							SIR_MAC_AUTH_FRAME_4;
 				auth_frame->authStatusCode =
-					eSIR_MAC_CHALLENGE_FAILURE_STATUS;
+					STATUS_CHALLENGE_FAIL;
 				lim_send_auth_mgmt_frame(mac_ctx, auth_frame,
 						mac_hdr->sa, LIM_NO_WEP_IN_FC,
 						pe_session);
@@ -1543,15 +1546,14 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 							SIR_MAC_WEP_IV_LENGTH));
 		if (decrypt_result == LIM_DECRYPT_ICV_FAIL) {
 			pe_err("received Authentication frame from peer that failed decryption: "
-				QDF_MAC_ADDR_STR,
-				QDF_MAC_ADDR_ARRAY(mac_hdr->sa));
+				QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(mac_hdr->sa));
 			/* ICV failure */
 			lim_delete_pre_auth_node(mac_ctx, mac_hdr->sa);
 			auth_frame->authAlgoNumber = eSIR_SHARED_KEY;
 			auth_frame->authTransactionSeqNumber =
 				SIR_MAC_AUTH_FRAME_4;
-			auth_frame->authStatusCode =
-				eSIR_MAC_CHALLENGE_FAILURE_STATUS;
+			auth_frame->authStatusCode = STATUS_CHALLENGE_FAIL;
 
 			lim_send_auth_mgmt_frame(mac_ctx, auth_frame,
 				mac_hdr->sa, LIM_NO_WEP_IN_FC,
@@ -1630,9 +1632,9 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		break;
 	default:
 		/* Invalid Authentication Frame received. Ignore it. */
-		pe_warn("rx auth frm with invalid authseq no: %d from: %pM",
+		pe_warn("rx auth frm with invalid authseq no: %d from: "QDF_MAC_ADDR_FMT,
 			rx_auth_frm_body->authTransactionSeqNumber,
-			mac_hdr->sa);
+			QDF_MAC_ADDR_REF(mac_hdr->sa));
 		break;
 	}
 free:
@@ -1723,8 +1725,8 @@ QDF_STATUS lim_process_auth_frame_no_session(struct mac_context *mac, uint8_t *p
 	pBody = WMA_GET_RX_MPDU_DATA(pBd);
 	frameLen = WMA_GET_RX_PAYLOAD_LEN(pBd);
 
-	pe_debug("Auth Frame Received: BSSID " QDF_MAC_ADDR_STR " (RSSI %d)",
-		 QDF_MAC_ADDR_ARRAY(pHdr->bssId),
+	pe_debug("Auth Frame Received: BSSID " QDF_MAC_ADDR_FMT " (RSSI %d)",
+		 QDF_MAC_ADDR_REF(pHdr->bssId),
 		 (uint) abs((int8_t) WMA_GET_RX_RSSI_NORMALIZED(pBd)));
 
 	if (frameLen == 0) {
@@ -1833,10 +1835,10 @@ QDF_STATUS lim_process_auth_frame_no_session(struct mac_context *mac, uint8_t *p
 		       (uint32_t) mac->lim.gLimNumPreAuthContexts);
 	switch (pRxAuthFrameBody->authTransactionSeqNumber) {
 	case SIR_MAC_AUTH_FRAME_2:
-		if (pRxAuthFrameBody->authStatusCode != eSIR_MAC_SUCCESS_STATUS) {
+		if (pRxAuthFrameBody->authStatusCode != STATUS_SUCCESS) {
 			pe_err("Auth status code received is %d",
 				(uint32_t) pRxAuthFrameBody->authStatusCode);
-			if (eSIR_MAC_MAX_ASSOC_STA_REACHED_STATUS ==
+			if (STATUS_AP_UNABLE_TO_HANDLE_NEW_STA ==
 			    pRxAuthFrameBody->authStatusCode)
 				ret_status = QDF_STATUS_E_NOSPC;
 		} else {

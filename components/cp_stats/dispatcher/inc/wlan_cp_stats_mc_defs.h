@@ -56,6 +56,7 @@
  * @TYPE_PEER_STATS: peer stats was requested
  * @TYPE_MIB_STATS: MIB stats was requested
  * @TYPE_PEER_STATS_INFO_EXT: peer stats info ext was requested
+ * @TYPE_CONGESTION_STATS: congestion stats was requested
  */
 enum stats_req_type {
 	TYPE_CONNECTION_TX_POWER = 0,
@@ -63,6 +64,7 @@ enum stats_req_type {
 	TYPE_PEER_STATS,
 	TYPE_MIB_STATS,
 	TYPE_PEER_STATS_INFO_EXT,
+	TYPE_CONGESTION_STATS,
 	TYPE_MAX,
 };
 
@@ -174,7 +176,8 @@ struct stats_event;
  * struct request_info: details of each request
  * @cookie: identifier for os_if request
  * @u: unified data type for callback to process tx power/peer rssi/
- *     station stats/mib stats request when response comes.
+ *     station stats/mib stats/peer stats request when response comes and
+ *     notification callback when congestion is detected.
  * @vdev_id: vdev_id of request
  * @pdev_id: pdev_id of request
  * @peer_mac_addr: peer mac address
@@ -190,6 +193,7 @@ struct request_info {
 					 void *cookie);
 		void (*get_peer_stats_cb)(struct stats_event *ev,
 					  void *cookie);
+		void (*congestion_notif_cb)(uint8_t congestion);
 	} u;
 	uint32_t vdev_id;
 	uint32_t pdev_id;
@@ -232,10 +236,20 @@ struct psoc_mc_cp_stats {
 
 /**
  * struct pdev_mc_cp_stats: pdev specific stats
- * @max_pwr: max tx power for vdev
+ * @max_pwr: max tx power for pdev
+ * @congestion: percentage of congestion = (busy_time / total_time) * 100
+ * @congestion_threshold: threshold for congestion precentage of pdev
+ * @rx_clear_count: accumulative rx clear count (busy time) of pdev
+ * @cycle_count: accumulative cycle count (total time) of pdev
  */
 struct pdev_mc_cp_stats {
 	int32_t max_pwr;
+#ifdef WLAN_FEATURE_MEDIUM_ASSESS
+	uint8_t congestion;
+	uint8_t congestion_threshold;
+	uint32_t rx_clear_count;
+	uint32_t cycle_count;
+#endif
 };
 
 /**
@@ -271,17 +285,35 @@ struct summary_stats {
 };
 
 /**
+ * struct pmf_bcn_protect_stats - pmf bcn protect stats param
+ * @pmf_bcn_stats_valid: bcn protect stats received from fw are valid or not
+ * @igtk_mic_fail_cnt: MIC failure count of management packets using IGTK
+ * @igtk_replay_cnt: Replay detection count of management packets using IGTK
+ * @bcn_mic_fail_cnt: MIC failure count of beacon packets using BIGTK
+ * @bcn_replay_cnt: Replay detection count of beacon packets using BIGTK
+ */
+struct pmf_bcn_protect_stats {
+	bool pmf_bcn_stats_valid;
+	uint32_t igtk_mic_fail_cnt;
+	uint32_t igtk_replay_cnt;
+	uint32_t bcn_mic_fail_cnt;
+	uint32_t bcn_replay_cnt;
+};
+
+/**
  * struct vdev_mc_cp_stats - vdev specific stats
  * @cca: cca stats
  * @tx_rate_flags: tx rate flags (enum tx_rate_info)
  * @chain_rssi: chain rssi
  * @vdev_summary_stats: vdev's summary stats
+ * @pmf_bcn_stats: pmf beacon protect stats
  */
 struct vdev_mc_cp_stats {
 	struct cca_stats cca;
 	uint32_t tx_rate_flags;
 	int8_t chain_rssi[MAX_NUM_CHAINS];
 	struct summary_stats vdev_summary_stats;
+	struct pmf_bcn_protect_stats pmf_bcn_stats;
 };
 
 /**
@@ -560,6 +592,7 @@ struct peer_stats_info_ext_event {
  *              MSB indicates if this feature is supported by FW or not.
  * @num_peer_stats_info_ext: number of peer extended stats info
  * @peer_stats_info_ext: peer extended stats info
+ * @pmf_bcn_protect_stats: pmf bcn protect stats
  */
 struct stats_event {
 	uint32_t num_pdev_stats;
@@ -585,6 +618,7 @@ struct stats_event {
 	uint32_t last_event;
 	uint32_t num_peer_stats_info_ext;
 	struct peer_stats_info_ext_event *peer_stats_info_ext;
+	struct pmf_bcn_protect_stats bcn_protect_stats;
 };
 
 /**

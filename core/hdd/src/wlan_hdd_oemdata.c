@@ -369,10 +369,8 @@ static QDF_STATUS oem_process_data_req_msg(int oem_data_len, char *oem_data)
 	qdf_mem_zero(&oem_data_req, sizeof(oem_data_req));
 
 	oem_data_req.data = qdf_mem_malloc(oem_data_len);
-	if (!oem_data_req.data) {
-		hdd_err("malloc failed for data req buffer");
+	if (!oem_data_req.data)
 		return QDF_STATUS_E_NOMEM;
-	}
 
 	oem_data_req.data_len = oem_data_len;
 	qdf_mem_copy(oem_data_req.data, oem_data, oem_data_len);
@@ -725,12 +723,12 @@ void hdd_send_peer_status_ind_to_oem_app(struct qdf_mac_addr *peer_mac,
 	}
 	skb_put(skb, NLMSG_SPACE((sizeof(tAniMsgHdr) + ani_hdr->length)));
 
-	hdd_info("sending peer " QDF_MAC_ADDR_STR
+	hdd_info("sending peer " QDF_MAC_ADDR_FMT
 		  " status(%d), peer_capability(%d), vdev_id(%d),"
 		  " to oem app pid(%d), center freq 1 (%d), center freq 2 (%d),"
 		  " info (0x%x), frequency (%d),reg info 1 (0x%x),"
 		  " reg info 2 (0x%x)",
-		  QDF_MAC_ADDR_ARRAY(peer_mac->bytes),
+		  QDF_MAC_ADDR_REF(peer_mac->bytes),
 		  peer_status, peer_capability,
 		  vdev_id, p_hdd_ctx->oem_pid,
 		  peer_info->peer_chan_info.band_center_freq1,
@@ -978,10 +976,8 @@ static void oem_cmd_handler(const void *data, int data_len, void *ctx, int pid)
 	struct nlattr *tb[CLD80211_ATTR_MAX + 1];
 
 	ret = wlan_hdd_validate_context(p_hdd_ctx);
-	if (ret) {
-		hdd_err("hdd ctx validate fails");
+	if (ret)
 		return;
-	}
 
 	/*
 	 * audit note: it is ok to pass a NULL policy here since only
@@ -1168,10 +1164,9 @@ void hdd_oem_event_handler_cb(const struct oem_data *oem_event_data,
 		oem_data = osif_request_priv(request);
 		oem_data->data_len = oem_event_data->data_len;
 		oem_data->data = qdf_mem_malloc(oem_data->data_len);
-		if (!oem_data->data) {
-			hdd_err("Memory allocation failure");
+		if (!oem_data->data)
 			return;
-		}
+
 		qdf_mem_copy(oem_data->data, oem_event_data->data,
 			     oem_data->data_len);
 		oem_data->vdev_id = hdd_adapter->vdev_id;

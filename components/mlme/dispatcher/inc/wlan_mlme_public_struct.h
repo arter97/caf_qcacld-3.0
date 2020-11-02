@@ -27,6 +27,12 @@
 #include <reg_services_public_struct.h>
 #include <wmi_unified_param.h>
 #include <sir_api.h>
+#include "wlan_cm_roam_public_struct.h"
+
+#define OWE_TRANSITION_OUI_TYPE "\x50\x6f\x9a\x1c"
+#define OWE_TRANSITION_OUI_SIZE 4
+
+#define CFG_VALID_CHANNEL_LIST_LEN              100
 
 #define CFG_PMKID_MODES_OKC                        (0x1)
 #define CFG_PMKID_MODES_PMKSA_CACHING              (0x2)
@@ -40,6 +46,13 @@
 #define CFG_VHT_TX_MCS_MAP_STAMIN    0
 #define CFG_VHT_TX_MCS_MAP_STAMAX    0xFFFF
 #define CFG_VHT_TX_MCS_MAP_STADEF    0xFFFE
+
+#define STA_DOT11_MODE_INDX       0
+#define P2P_DEV_DOT11_MODE_INDX   4
+#define NAN_DISC_DOT11_MODE_INDX  8
+#define OCB_DOT11_MODE_INDX       12
+#define TDLS_DOT11_MODE_INDX      16
+#define NDI_DOT11_MODE_INDX       20
 
 /* Roam debugging related macro defines */
 #define MAX_ROAM_DEBUG_BUF_SIZE    250
@@ -194,12 +207,28 @@ enum mlme_dot11_mode {
 };
 
 /**
+ * enum mlme_vdev_dot11_mode - Dot11 mode of the vdev
+ * MLME_VDEV_DOT11_MODE_AUTO: vdev uses mlme_dot11_mode
+ * MLME_VDEV_DOT11_MODE_11N: vdev supports 11N mode
+ * MLME_VDEV_DOT11_MODE_11AC: vdev supports 11AC mode
+ * MLME_VDEV_DOT11_MODE_11AX: vdev supports 11AX mode
+ */
+enum mlme_vdev_dot11_mode {
+	MLME_VDEV_DOT11_MODE_AUTO,
+	MLME_VDEV_DOT11_MODE_11N,
+	MLME_VDEV_DOT11_MODE_11AC,
+	MLME_VDEV_DOT11_MODE_11AX,
+};
+
+/**
  * struct wlan_mlme_dot11_mode - dot11 mode
  *
  * @dot11_mode: dot11 mode supported
+ * @vdev_type_dot11_mode: dot11 mode supported by different vdev types
  */
 struct wlan_mlme_dot11_mode {
 	enum mlme_dot11_mode dot11_mode;
+	uint32_t vdev_type_dot11_mode;
 };
 
 /**
@@ -496,6 +525,50 @@ struct mlme_ht_info_field_2 {
 	uint16_t obss_non_ht_sta_present:1;
 	uint16_t reserved:11;
 } qdf_packed;
+#endif
+
+#ifdef WLAN_FEATURE_FILS_SK
+
+/**
+ * struct wlan_fils_connection_info  - Fils connection parameters
+ * @is_fils_connection: flag to indicate if the connection is done using
+ * authentication algorithm as 4
+ * @keyname_nai: key name network access identifier
+ * @key_nai_length:  key name network access identifier length
+ * @erp_sequence_number: FILS ERP sequence number
+ * @r_rk: re-authentication Root Key length
+ * @r_rk_length: reauthentication root keys length
+ * @rik: Re-authentication integrity key
+ * @rik_length: Re-Authentication integrity key length
+ * @realm: Realm name
+ * @realm_len: Realm length
+ * @akm_type: FILS connection akm
+ * @auth_type: FILS Authentication Algorithm
+ * @pmk: Pairwise master key
+ * @pmk_len: Pairwise master key length
+ * @pmkid: Pairwise master key ID
+ * @fils_ft: FILS FT key
+ * @fils_ft_len: Length of FILS FT
+ */
+struct wlan_fils_connection_info {
+	bool is_fils_connection;
+	uint8_t keyname_nai[FILS_MAX_KEYNAME_NAI_LENGTH];
+	uint32_t key_nai_length;
+	uint32_t erp_sequence_number;
+	uint8_t r_rk[WLAN_FILS_MAX_RRK_LENGTH];
+	uint32_t r_rk_length;
+	uint8_t rik[WLAN_FILS_MAX_RIK_LENGTH];
+	uint32_t rik_length;
+	uint8_t realm[WLAN_FILS_MAX_REALM_LEN];
+	uint32_t realm_len;
+	uint8_t akm_type;
+	uint8_t auth_type;
+	uint8_t pmk[MAX_PMK_LEN];
+	uint8_t pmk_len;
+	uint8_t pmkid[PMKID_LEN];
+	uint8_t fils_ft[WLAN_FILS_FT_MAX_LEN];
+	uint8_t fils_ft_len;
+};
 #endif
 
 /**
@@ -939,8 +1012,6 @@ struct mlme_tgt_caps {
  * @disable_high_ht_mcs_2x2: disable high mcs for 2x2 info
  * @supported_11b: supported 11B rates
  * @supported_11a: supported 11A rates
- * @opr_rate_set: operational rates set
- * @ext_opr_rate_set: extended operational rates set
  * @supported_mcs_set: supported MCS set
  * @basic_mcs_set: basic MCS set
  * @current_mcs_set: current MCS set
@@ -954,8 +1025,6 @@ struct wlan_mlme_rates {
 	uint8_t disable_high_ht_mcs_2x2;
 	struct mlme_cfg_str supported_11b;
 	struct mlme_cfg_str supported_11a;
-	struct mlme_cfg_str opr_rate_set;
-	struct mlme_cfg_str ext_opr_rate_set;
 	struct mlme_cfg_str supported_mcs_set;
 	struct mlme_cfg_str basic_mcs_set;
 	struct mlme_cfg_str current_mcs_set;
@@ -1064,6 +1133,42 @@ struct wlan_mlme_chainmask {
 	uint8_t tx_chain_mask_5g;
 	uint8_t rx_chain_mask_5g;
 	bool enable_bt_chain_separation;
+};
+
+/**
+ * enum wlan_mlme_ratemask_type: Type of PHY for ratemask
+ * @WLAN_MLME_RATEMASK_TYPE_NO_MASK: no ratemask set
+ * @WLAN_MLME_RATEMASK_TYPE_CCK: CCK/OFDM rate
+ * @WLAN_MLEM_RATEMASK_TYPE_HT: HT rate
+ * @WLAN_MLME_RATEMASK_TYPE_VHT: VHT rate
+ * @WLAN_MLME_RATEMASK_TYPE_HE: HE rate
+ *
+ * This is used for 'type' values in wlan_mlme_ratemask
+ */
+enum wlan_mlme_ratemask_type {
+	WLAN_MLME_RATEMASK_TYPE_NO_MASK  =  0,
+	WLAN_MLME_RATEMASK_TYPE_CCK      =  1,
+	WLAN_MLME_RATEMASK_TYPE_HT       =  2,
+	WLAN_MLME_RATEMASK_TYPE_VHT      =  3,
+	WLAN_MLME_RATEMASK_TYPE_HE       =  4,
+	/* keep this last */
+	WLAN_MLME_RATEMASK_TYPE_MAX,
+};
+
+/**
+ * struct wlan_mlme_ratemask - ratemask config parameters
+ * @type:       Type of PHY the mask to be applied
+ * @lower32:    Lower 32 bits in the 1st 64-bit value
+ * @higher32:   Higher 32 bits in the 1st 64-bit value
+ * @lower32_2:  Lower 32 bits in the 2nd 64-bit value
+ * @higher32_2: Higher 32 bits in the 2nd 64-bit value
+ */
+struct wlan_mlme_ratemask {
+	enum wlan_mlme_ratemask_type type;
+	uint32_t lower32;
+	uint32_t higher32;
+	uint32_t lower32_2;
+	uint32_t higher32_2;
 };
 
 /* struct wlan_mlme_generic - Generic CFG config items
@@ -1331,6 +1436,7 @@ enum station_keepalive_method {
  * @dot11p_mode:                    Set 802.11p mode
  * @fils_max_chan_guard_time:       Set maximum channel guard time
  * @current_rssi:                   Current rssi
+ * @deauth_retry_cnt:               Deauth retry count
  * @ignore_peer_erp_info:           Ignore peer infrormation
  * @sta_prefer_80mhz_over_160mhz:   Set Sta preference to connect in 80HZ/160HZ
  * @enable_5g_ebt:                  Set default 5G early beacon termination
@@ -1351,6 +1457,7 @@ struct wlan_mlme_sta_cfg {
 	enum dot11p_mode dot11p_mode;
 	uint8_t fils_max_chan_guard_time;
 	uint8_t current_rssi;
+	uint8_t deauth_retry_cnt;
 	bool ignore_peer_erp_info;
 	bool sta_prefer_80mhz_over_160mhz;
 	bool enable_5g_ebt;
@@ -1471,13 +1578,16 @@ struct fw_scan_channels {
  * @rssi_threshold_offset_5g:       Lookup threshold offset for 5G band
  * @early_stop_scan_min_threshold:  Set early stop scan min
  * @early_stop_scan_max_threshold:  Set early stop scan max
- * @first_scan_bucket_threshold:    Set first scan bucket
  * @roam_dense_traffic_threshold:   Dense traffic threshold
  * @roam_dense_rssi_thre_offset:    Sets dense roam RSSI threshold diff
  * @roam_dense_min_aps:             Sets minimum number of AP for dense roam
  * @roam_bg_scan_bad_rssi_threshold:RSSI threshold for background roam
  * @roam_bg_scan_client_bitmap:     Bitmap used to identify the scan clients
  * @roam_bg_scan_bad_rssi_offset_2g:RSSI threshold offset for 2G to 5G roam
+ * @roam_data_rssi_threshold_triggers: triggers of bad data RSSI threshold to
+ *                                  roam
+ * @roam_data_rssi_threshold: Bad data RSSI threshold to roam
+ * @rx_data_inactivity_time: Rx duration to check data RSSI
  * @adaptive_roamscan_dwell_mode:   Sets dwell time adaptive mode
  * @per_roam_enable:                To enabled/disable PER based roaming in FW
  * @per_roam_config_high_rate_th:   Rate at which PER based roam will stop
@@ -1577,19 +1687,21 @@ struct wlan_mlme_lfr_cfg {
 	bool wes_mode_enabled;
 	uint32_t mawc_roam_traffic_threshold;
 	uint32_t mawc_roam_ap_rssi_threshold;
-	uint32_t mawc_roam_rssi_high_adjust;
-	uint32_t mawc_roam_rssi_low_adjust;
+	uint8_t mawc_roam_rssi_high_adjust;
+	uint8_t mawc_roam_rssi_low_adjust;
 	uint32_t roam_rssi_abs_threshold;
 	uint8_t rssi_threshold_offset_5g;
 	uint8_t early_stop_scan_min_threshold;
 	uint8_t early_stop_scan_max_threshold;
-	uint8_t first_scan_bucket_threshold;
 	uint32_t roam_dense_traffic_threshold;
 	uint32_t roam_dense_rssi_thre_offset;
 	uint32_t roam_dense_min_aps;
 	uint32_t roam_bg_scan_bad_rssi_threshold;
 	uint32_t roam_bg_scan_client_bitmap;
 	uint32_t roam_bg_scan_bad_rssi_offset_2g;
+	uint32_t roam_data_rssi_threshold_triggers;
+	int32_t roam_data_rssi_threshold;
+	uint32_t rx_data_inactivity_time;
 	uint32_t adaptive_roamscan_dwell_mode;
 	uint32_t per_roam_enable;
 	uint32_t per_roam_config_high_rate_th;
@@ -1611,6 +1723,7 @@ struct wlan_mlme_lfr_cfg {
 	uint32_t roam_preauth_retry_count;
 	uint32_t roam_preauth_no_ack_timeout;
 	uint8_t roam_rssi_diff;
+	uint8_t bg_rssi_threshold;
 	bool roam_scan_offload_enabled;
 	uint32_t neighbor_scan_timer_period;
 	uint32_t neighbor_scan_min_timer_period;
@@ -1623,7 +1736,6 @@ struct wlan_mlme_lfr_cfg {
 	uint32_t empty_scan_refresh_period;
 	uint8_t roam_bmiss_first_bcnt;
 	uint8_t roam_bmiss_final_bcnt;
-	uint32_t roam_beacon_rssi_weight;
 	enum roaming_dfs_channel_type roaming_dfs_channel;
 	uint32_t roam_scan_hi_rssi_maxcount;
 	uint32_t roam_scan_hi_rssi_delta;
@@ -1825,6 +1937,7 @@ struct wlan_mlme_wmm_params {
  * @oce_wan_weightage: OCE WAN metrics weightage
  * @oce_ap_tx_pwr_weightage: weightage based on ap tx power
  * @oce_subnet_id_weightage: weightage based on subnet id
+ * @sae_pk_ap_weightage:SAE-PK AP weightage
  */
 struct  wlan_mlme_weight_config {
 	uint8_t rssi_weightage;
@@ -1840,6 +1953,7 @@ struct  wlan_mlme_weight_config {
 	uint8_t oce_wan_weightage;
 	uint8_t oce_ap_tx_pwr_weightage;
 	uint8_t oce_subnet_id_weightage;
+	uint8_t sae_pk_ap_weightage;
 };
 
 /**
@@ -2098,11 +2212,13 @@ struct wlan_mlme_btm {
  * @latency_enable: Flag to check if latency is enabled
  * @latency_level: WLM latency level
  * @latency_flags: WLM latency flags setting
+ * @latency_host_flags: WLM latency host flags setting
  */
 struct wlan_mlme_fe_wlm {
 	bool latency_enable;
 	uint8_t latency_level;
 	uint32_t latency_flags[MLME_NUM_WLM_LATENCY_LEVEL];
+	uint32_t latency_host_flags[MLME_NUM_WLM_LATENCY_LEVEL];
 };
 
 /**
@@ -2139,10 +2255,22 @@ struct wlan_mlme_mwc {
 #endif
 
 /**
+ * enum mlme_reg_srd_master_modes  - Bitmap of SRD master modes supported
+ * @MLME_SRD_MASTER_MODE_SAP: SRD master mode for SAP
+ * @MLME_SRD_MASTER_MODE_P2P_GO: SRD master mode for P2P-GO
+ * @MLME_SRD_MASTER_MODE_NAN: SRD master mode for NAN
+ */
+enum mlme_reg_srd_master_modes {
+	MLME_SRD_MASTER_MODE_SAP = 1,
+	MLME_SRD_MASTER_MODE_P2P_GO = 2,
+	MLME_SRD_MASTER_MODE_NAN = 4,
+};
+
+/**
  * struct wlan_mlme_reg - REG related configs
  * @self_gen_frm_pwr: self-generated frame power in tx chain mask
  * for CCK rates
- * @etsi13_srd_chan_in_master_mode: etsi13 srd chan in master mode
+ * @etsi_srd_chan_in_master_mode: etsi srd chan in master mode
  * @fcc_5dot9_ghz_chan_in_master_mode: fcc 5.9 GHz chan in master mode
  * @restart_beaconing_on_ch_avoid: restart beaconing on ch avoid
  * @indoor_channel_support: indoor channel support
@@ -2160,7 +2288,7 @@ struct wlan_mlme_mwc {
  */
 struct wlan_mlme_reg {
 	uint32_t self_gen_frm_pwr;
-	bool etsi13_srd_chan_in_master_mode;
+	uint8_t etsi_srd_chan_in_master_mode;
 	bool fcc_5dot9_ghz_chan_in_master_mode;
 	enum restart_beaconing_on_ch_avoid_rule
 		restart_beaconing_on_ch_avoid;
@@ -2264,6 +2392,7 @@ struct wlan_mlme_cfg {
 	struct wlan_mlme_reg reg;
 	struct roam_trigger_score_delta trig_score_delta[NUM_OF_ROAM_TRIGGERS];
 	struct roam_trigger_min_rssi trig_min_rssi[NUM_OF_ROAM_TRIGGERS];
+	struct wlan_mlme_ratemask ratemask_cfg;
 };
 
 enum pkt_origin {

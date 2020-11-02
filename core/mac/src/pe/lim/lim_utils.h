@@ -137,7 +137,6 @@ bool lim_is_valid_frame(last_processed_msg *last_processed_frm,
 void lim_update_last_processed_frame(last_processed_msg *last_processed_frm,
 		uint8_t *pRxPacketInfo);
 
-char *lim_dot11_reason_str(uint16_t reasonCode);
 char *lim_mlm_state_str(tLimMlmStates state);
 char *lim_sme_state_str(tLimSmeStates state);
 char *lim_msg_str(uint32_t msgType);
@@ -862,8 +861,23 @@ void lim_check_and_reset_protection_params(struct mac_context *mac_ctx);
 QDF_STATUS lim_send_ext_cap_ie(struct mac_context *mac_ctx, uint32_t session_id,
 			       tDot11fIEExtCap *extracted_extcap, bool merge);
 
+/**
+ * lim_send_ies_per_band() - gets ht and vht capability and send to firmware via
+ * wma
+ * @mac_ctx: global mac context
+ * @session: pe session. This can be NULL. In that case self cap will be sent
+ * @vdev_id: vdev for which IE is targeted
+ * @dot11_mode: vdev dot11 mode
+ * @device_mode: device mode
+ *
+ * This funciton gets ht and vht capability and send to firmware via wma
+ *
+ * Return: status of operation
+ */
 QDF_STATUS lim_send_ies_per_band(struct mac_context *mac_ctx,
-				 struct pe_session *session, uint8_t vdev_id);
+				 struct pe_session *session, uint8_t vdev_id,
+				 enum csr_cfgdot11mode dot11_mode,
+				 enum QDF_OPMODE device_mode);
 
 /**
  * lim_send_action_frm_tb_ppdu_cfg() - sets action frame in TB PPDU cfg to FW

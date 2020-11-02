@@ -162,16 +162,6 @@ enum sir_roam_op_code {
 	SIR_ROAMING_INVOKE_FAIL,
 	SIR_ROAMING_DEAUTH,
 };
-/**
- * Module ID definitions.
- */
-enum {
-	SIR_HAL_MODULE_ID = 0x10,
-	SIR_LIM_MODULE_ID = 0x13,
-	SIR_SME_MODULE_ID,
-};
-
-#define SIR_WMA_MODULE_ID SIR_HAL_MODULE_ID
 
 /* Type declarations used by Firmware and Host software */
 
@@ -1051,9 +1041,6 @@ struct join_req {
 	struct power_cap_info powerCap;
 	struct supported_channels supportedChannels;
 	bool enable_bcast_probe_rsp;
-#ifdef WLAN_FEATURE_FILS_SK
-	struct cds_fils_connection_info fils_con_info;
-#endif
 	bool sae_pmk_cached;
 	/* Pls make this as last variable in struct */
 	bool force_24ghz_in_ht20;
@@ -1226,7 +1213,7 @@ struct assoc_cnf {
 	struct qdf_mac_addr bssid;      /* Self BSSID */
 	struct qdf_mac_addr peer_macaddr;
 	uint16_t aid;
-	enum mac_status_code mac_status_code;
+	enum wlan_status_code mac_status_code;
 	uint8_t *owe_ie;
 	uint32_t owe_ie_len;
 	bool need_assoc_rsp_tx_cb;
@@ -1364,6 +1351,18 @@ struct deauth_req {
 	struct qdf_mac_addr bssid;      /* AP BSSID */
 	struct qdf_mac_addr peer_macaddr;
 	uint16_t reasonCode;
+};
+
+/**
+ * struct deauth_retry_params - deauth retry params
+ * @peer_mac: peer mac
+ * @reason_code: reason for disconnect indication
+ * @retry_cnt: retry count
+ */
+struct deauth_retry_params {
+	struct qdf_mac_addr peer_macaddr;
+	uint16_t reason_code;
+	uint8_t retry_cnt;
 };
 
 /* / Definition for Deauthetication response */
@@ -1560,7 +1559,7 @@ typedef struct sSirAddtsReqInfo {
 
 typedef struct sSirAddtsRspInfo {
 	uint8_t dialogToken;
-	enum mac_status_code status;
+	enum wlan_status_code status;
 	tSirMacTsDelayIE delay;
 
 	struct mac_tspec_ie tspec;
@@ -1831,11 +1830,9 @@ struct update_config {
 /*
  * enum sir_update_session_param_type - session param type
  * @SIR_PARAM_SSID_HIDDEN: ssidHidden parameter
- * @SIR_PARAM_IGNORE_ASSOC_DISALLOWED: ignore_assoc_disallowed parameter
  */
 enum sir_update_session_param_type {
 	SIR_PARAM_SSID_HIDDEN,
-	SIR_PARAM_IGNORE_ASSOC_DISALLOWED,
 };
 
 /*
@@ -2141,6 +2138,9 @@ typedef enum {
  * @bg_scan_bad_rssi_thresh:    Bad RSSI threshold to perform bg scan.
  * @bad_rssi_thresh_offset_2g:  Offset from Bad RSSI threshold for 2G to 5G Roam
  * @bg_scan_client_bitmap:      Bitmap to identify the client scans to snoop.
+ * @roam_data_rssi_threshold_triggers:    Bad data RSSI threshold to roam
+ * @roam_data_rssi_threshold:    Bad data RSSI threshold to roam
+ * @rx_data_inactivity_time:    rx duration to check data RSSI
  *
  * This structure holds all the key parameters related to
  * initial connection and also roaming connections.
@@ -2174,6 +2174,9 @@ struct roam_ext_params {
 	int8_t bg_scan_bad_rssi_thresh;
 	uint8_t roam_bad_rssi_thresh_offset_2g;
 	uint32_t bg_scan_client_bitmap;
+	uint32_t roam_data_rssi_threshold_triggers;
+	int32_t roam_data_rssi_threshold;
+	uint32_t rx_data_inactivity_time;
 };
 
 /**
@@ -2249,6 +2252,7 @@ struct roam_offload_scan_req {
 	uint8_t OpportunisticScanThresholdDiff;
 	uint8_t RoamRescanRssiDiff;
 	uint8_t RoamRssiDiff;
+	uint8_t bg_rssi_threshold;
 	struct rsn_caps rsn_caps;
 	int32_t rssi_abs_thresh;
 	uint8_t ChannelCacheType;
@@ -2268,7 +2272,6 @@ struct roam_offload_scan_req {
 	uint8_t sessionId;
 	uint8_t RoamBmissFirstBcnt;
 	uint8_t RoamBmissFinalBcnt;
-	uint8_t RoamBeaconRssiWeight;
 	eSirDFSRoamScanMode allowDFSChannelRoam;
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 	uint8_t roam_offload_enabled;
@@ -2309,7 +2312,9 @@ struct roam_offload_scan_req {
 	struct scoring_param score_params;
 #ifdef WLAN_FEATURE_FILS_SK
 	bool is_fils_connection;
+#ifndef ROAM_OFFLOAD_V1
 	struct roam_fils_params roam_fils_params;
+#endif
 #endif
 	uint32_t btm_offload_config;
 	uint32_t btm_solicited_timeout;
@@ -2327,7 +2332,7 @@ struct roam_offload_scan_req {
 	bool roam_force_rssi_trigger;
 	/* bss load triggered roam related params */
 	bool bss_load_trig_enabled;
-	struct wmi_bss_load_config bss_load_config;
+	struct wlan_roam_bss_load_config bss_load_config;
 	bool roaming_scan_policy;
 	uint32_t roam_scan_inactivity_time;
 	uint32_t roam_inactive_data_packet_count;
@@ -2576,6 +2581,7 @@ typedef struct sSirScanOffloadEvent {
  * @dfsSet: is dfs supported or not
  * @half_rate: is the channel operating at 10MHz
  * @quarter_rate: is the channel operating at 5MHz
+ * @nan_disabled: is NAN disabled on @freq
  */
 typedef struct sSirUpdateChanParam {
 	uint32_t freq;
@@ -2583,6 +2589,7 @@ typedef struct sSirUpdateChanParam {
 	bool dfsSet;
 	bool half_rate;
 	bool quarter_rate;
+	bool nan_disabled;
 } tSirUpdateChanParam, *tpSirUpdateChanParam;
 
 typedef struct sSirUpdateChan {
@@ -2837,6 +2844,7 @@ typedef struct {
 	uint8_t thermalMgmtEnabled;
 	uint32_t throttlePeriod;
 	uint8_t throttle_duty_cycle_tbl[WLAN_THROTTLE_DUTY_CYCLE_LEVEL_MAX];
+	enum thermal_mgmt_action_code thermal_action;
 } t_thermal_mgmt, *tp_thermal_mgmt;
 
 struct tx_power_limit {
@@ -3347,6 +3355,8 @@ struct sir_set_vdev_ies_per_band {
 	uint16_t msg_type;
 	uint16_t len;
 	uint32_t vdev_id;
+	uint16_t dot11_mode;
+	enum QDF_OPMODE device_mode;
 };
 
 /**
@@ -3516,12 +3526,17 @@ struct wifi_rate_info {
  * struct wifi_channel_stats - channel statistics
  * @channel: channel for which the stats are applicable
  * @on_time: msecs the radio is awake
- * @cca_busy_time: secs the CCA register is busy
+ * @cca_busy_time: secs the CCA register is busy excluding own tx_time
+ * @tx_time: msecs the radio is transmitting on this channel
+ * @rx_time: msecs the radio is in active receive on this channel
  */
 struct wifi_channel_stats {
 	struct wifi_channel_info channel;
 	uint32_t on_time;
 	uint32_t cca_busy_time;
+	uint32_t tx_time;
+	uint32_t rx_time;
+
 };
 
 /**
@@ -3540,6 +3555,7 @@ struct wifi_channel_stats {
  * @on_time_lpi_scan: msecs the radio is awake due to LPI scan
  * @total_num_tx_power_levels: @tx_time_per_power_level record count
  * @tx_time_per_power_level:  tx time (in milliseconds) per TPC level (0.5 dBm)
+ * @more_channels: If more channels are there and will come in next event
  * @num_channels: @channels record count
  * @channels: per-channel statistics
  */
@@ -3558,6 +3574,7 @@ struct wifi_radio_stats {
 	uint32_t on_time_lpi_scan;
 	uint32_t total_num_tx_power_levels;
 	uint32_t *tx_time_per_power_level;
+	uint32_t more_channels;
 	uint32_t num_channels;
 	struct wifi_channel_stats *channels;
 };

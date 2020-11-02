@@ -76,6 +76,7 @@
 #include <wlan_hdd_lro.h>
 #include "cdp_txrx_flow_ctrl_legacy.h"
 #include <cdp_txrx_peer_ops.h>
+#include <cdp_txrx_misc.h>
 #include "wlan_hdd_nan_datapath.h"
 #if defined(CONFIG_HL_SUPPORT)
 #include "wlan_tgt_def_config_hl.h"
@@ -105,13 +106,13 @@
 #include "wlan_mlme_ucfg_api.h"
 #include "pld_common.h"
 #include <dp_txrx.h>
-#include "wlan_cm_roam_public_srtuct.h"
+#include "wlan_cm_roam_public_struct.h"
 
 #ifdef WLAN_FEATURE_DP_BUS_BANDWIDTH
 #include "qdf_periodic_work.h"
 #endif
 
-#ifdef CLD_PM_QOS
+#if defined(CLD_PM_QOS) || defined(FEATURE_RUNTIME_PM)
 #include <linux/pm_qos.h>
 #endif
 
@@ -699,6 +700,12 @@ struct hdd_stats {
 #endif
 	struct hdd_eapol_stats_s hdd_eapol_stats;
 	struct hdd_dhcp_stats_s hdd_dhcp_stats;
+	struct pmf_bcn_protect_stats bcn_protect_stats;
+
+#ifdef FEATURE_CLUB_LL_STATS_AND_GET_STATION
+	uint32_t sta_stats_cached_timestamp;
+	bool is_ll_stats_req_in_progress;
+#endif
 };
 
 /**
@@ -1116,6 +1123,10 @@ struct hdd_context;
 			       any UDP packet.
  * @gro_disallowed: Flag to check if GRO is enabled or disable for adapter
  * @gro_flushed: Flag to indicate if GRO explicit flush is done or not
+ * @handle_feature_update: Handle feature update only if it is triggered
+ *			   by hdd_netdev_feature_update
+ * @netdev_features_update_work: work for handling the netdev features update
+				 for the adapter.
  */
 struct hdd_adapter {
 	/* Magic cookie for adapter sanity verification.  Note that this
@@ -1305,6 +1316,11 @@ struct hdd_adapter {
 	uint64_t prev_fwd_rx_packets;
 #endif /*WLAN_FEATURE_DP_BUS_BANDWIDTH*/
 
+#ifdef WLAN_FEATURE_MSCS
+	unsigned long mscs_prev_tx_vo_pkts;
+	uint32_t mscs_counter;
+#endif /* WLAN_FEATURE_MSCS */
+
 #if  defined(QCA_LL_LEGACY_TX_FLOW_CONTROL) || \
 				defined(QCA_HL_NETDEV_FLOW_CONTROL)
 	qdf_mc_timer_t tx_flow_control_timer;
@@ -1412,6 +1428,11 @@ struct hdd_adapter {
 #endif
 	uint8_t gro_disallowed[DP_MAX_RX_THREADS];
 	uint8_t gro_flushed[DP_MAX_RX_THREADS];
+	bool handle_feature_update;
+	bool runtime_disable_rx_thread;
+	ol_txrx_rx_fp rx_stack;
+
+	qdf_work_t netdev_features_update_work;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(adapter) (&(adapter)->session.station)
@@ -1670,6 +1691,47 @@ struct hdd_fw_ver_info {
 };
 
 /**
+ * The logic for get current index of history is dependent on this
+ * value being power of 2.
+ */
+#define WLAN_HDD_ADAPTER_OPS_HISTORY_MAX 4
+QDF_COMPILE_TIME_ASSERT(adapter_ops_history_size,
+			(WLAN_HDD_ADAPTER_OPS_HISTORY_MAX &
+			 (WLAN_HDD_ADAPTER_OPS_HISTORY_MAX - 1)) == 0);
+
+/**
+ * enum hdd_adapter_ops_event - events for adapter ops history
+ * @WLAN_HDD_ADAPTER_OPS_WORK_POST: adapter ops work posted
+ * @WLAN_HDD_ADAPTER_OPS_WORK_SCHED: adapter ops work scheduled
+ */
+enum hdd_adapter_ops_event {
+	WLAN_HDD_ADAPTER_OPS_WORK_POST,
+	WLAN_HDD_ADAPTER_OPS_WORK_SCHED,
+};
+
+/**
+ * struct hdd_adapter_ops_record - record of adapter ops history
+ * @timestamp: time of the occurrence of event
+ * @event: event
+ * @vdev_id: vdev id corresponding to the event
+ */
+struct hdd_adapter_ops_record {
+	uint64_t timestamp;
+	enum hdd_adapter_ops_event event;
+	int vdev_id;
+};
+
+/**
+ * struct hdd_adapter_ops_history - history of adapter ops
+ * @index: index to store the next event
+ * @entry: array of events
+ */
+struct hdd_adapter_ops_history {
+	qdf_atomic_t index;
+	struct hdd_adapter_ops_record entry[WLAN_HDD_ADAPTER_OPS_HISTORY_MAX];
+};
+
+/**
  * struct hdd_context - hdd shared driver and psoc/device context
  * @psoc: object manager psoc context
  * @pdev: object manager pdev context
@@ -1687,6 +1749,8 @@ struct hdd_fw_ver_info {
  * @current_pcie_gen_speed: current pcie gen speed
  * @pm_qos_req: pm_qos request for all cpu cores
  * @qos_cpu_mask: voted cpu core mask
+ * @adapter_ops_wq: High priority workqueue for handling adapter operations
+ * @multi_client_thermal_mitigation: Multi client thermal mitigation by fw
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -1884,7 +1948,7 @@ struct hdd_context {
 	int radio_index;
 	qdf_work_t sap_pre_cac_work;
 	bool hbw_requested;
-	bool llm_enabled;
+	bool pm_qos_request;
 	enum RX_OFFLOAD ol_enable;
 #ifdef WLAN_FEATURE_NAN
 	bool nan_datapath_enabled;
@@ -1902,7 +1966,6 @@ struct hdd_context {
 	uint16_t wmi_max_len;
 	struct suspend_resume_stats suspend_resume_stats;
 	struct hdd_runtime_pm_context runtime_context;
-	bool roaming_in_progress;
 	struct scan_chan_info *chan_info;
 	struct mutex chan_info_lock;
 	/* bit map to set/reset TDLS by different sources */
@@ -2012,12 +2075,23 @@ struct hdd_context {
 #ifdef FW_THERMAL_THROTTLE_SUPPORT
 	uint8_t dutycycle_off_percent;
 #endif
+	uint8_t pm_qos_request_flags;
+	uint8_t high_bus_bw_request;
 	qdf_work_t country_change_work;
 	struct {
 		qdf_atomic_t rx_aggregation;
 		uint8_t gro_force_flush[DP_MAX_RX_THREADS];
 	} dp_agg_param;
 	int current_pcie_gen_speed;
+	qdf_workqueue_t *adapter_ops_wq;
+	struct hdd_adapter_ops_history adapter_ops_history;
+	bool ll_stats_per_chan_rx_tx_time;
+#ifdef FEATURE_CLUB_LL_STATS_AND_GET_STATION
+	bool is_get_station_clubbed_in_ll_stats_req;
+#endif
+#ifdef FEATURE_WPSS_THERMAL_MITIGATION
+	bool multi_client_thermal_mitigation;
+#endif
 };
 
 /**
@@ -2091,6 +2165,50 @@ struct hdd_channel_info {
 /*
  * Function declarations and documentation
  */
+
+/**
+ * wlan_hdd_history_get_next_index() - get next index to store the history
+				       entry
+ * @curr_idx: current index
+ * @max_entries: max entries in the history
+ *
+ * Returns: The index at which record is to be stored in history
+ */
+static inline uint32_t wlan_hdd_history_get_next_index(qdf_atomic_t *curr_idx,
+						       uint32_t max_entries)
+{
+	uint32_t idx = qdf_atomic_inc_return(curr_idx);
+
+	return idx & (max_entries - 1);
+}
+
+/**
+ * hdd_adapter_ops_record_event() - record an entry in the adapter ops history
+ * @hdd_ctx: pointer to hdd context
+ * @event: event
+ * @vdev_id: vdev id corresponding to event
+ *
+ * Returns: None
+ */
+static inline void
+hdd_adapter_ops_record_event(struct hdd_context *hdd_ctx,
+			     enum hdd_adapter_ops_event event,
+			     int vdev_id)
+{
+	struct hdd_adapter_ops_history *adapter_hist;
+	struct hdd_adapter_ops_record *record;
+	uint32_t idx;
+
+	adapter_hist = &hdd_ctx->adapter_ops_history;
+
+	idx = wlan_hdd_history_get_next_index(&adapter_hist->index,
+					      WLAN_HDD_ADAPTER_OPS_HISTORY_MAX);
+
+	record = &adapter_hist->entry[idx];
+	record->event = event;
+	record->vdev_id = vdev_id;
+	record->timestamp = qdf_get_log_timestamp();
+}
 
 /**
  * hdd_validate_channel_and_bandwidth() - Validate the channel-bandwidth combo
@@ -2587,22 +2705,32 @@ bool hdd_is_any_adapter_connected(struct hdd_context *hdd_ctx);
 
 /**
  * hdd_add_latency_critical_client() - Add latency critical client
- * @hdd_ctx: Global HDD context
+ * @adapter: adapter handle (Should not be NULL)
  * @phymode: the phymode of the connected adapter
  *
- * This function adds to the latency critical count if the present
- * connection is also a latency critical one.
+ * This function checks if the present connection is latency critical
+ * and adds to the latency critical clients count and informs the
+ * datapath about this connection being latency critical.
  *
  * Returns: None
  */
 static inline void
-hdd_add_latency_critical_client(struct hdd_context *hdd_ctx,
+hdd_add_latency_critical_client(struct hdd_adapter *adapter,
 				enum qca_wlan_802_11_mode phymode)
 {
+	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
+
 	switch (phymode) {
 	case QCA_WLAN_802_11_MODE_11A:
 	case QCA_WLAN_802_11_MODE_11G:
-		qdf_atomic_inc(&hdd_ctx->num_latency_critical_clients);
+		if (adapter->device_mode == QDF_STA_MODE)
+			qdf_atomic_inc(&hdd_ctx->num_latency_critical_clients);
+
+		hdd_info("Adding latency critical connection for vdev %d",
+			 adapter->vdev_id);
+		cdp_vdev_inform_ll_conn(cds_get_context(QDF_MODULE_ID_SOC),
+					adapter->vdev_id,
+					CDP_VDEV_LL_CONN_ADD);
 		break;
 	default:
 		break;
@@ -2611,22 +2739,32 @@ hdd_add_latency_critical_client(struct hdd_context *hdd_ctx,
 
 /**
  * hdd_del_latency_critical_client() - Add tlatency critical client
- * @hdd_ctx: Global HDD context
+ * @adapter: adapter handle (Should not be NULL)
  * @phymode: the phymode of the connected adapter
  *
- * This function removes from the latency critical count if the present
- * connection is also a latency critical one.
+ * This function checks if the present connection was latency critical
+ * and removes from the latency critical clients count and informs the
+ * datapath about the removed connection being latency critical.
  *
  * Returns: None
  */
 static inline void
-hdd_del_latency_critical_client(struct hdd_context *hdd_ctx,
+hdd_del_latency_critical_client(struct hdd_adapter *adapter,
 				enum qca_wlan_802_11_mode phymode)
 {
+	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
+
 	switch (phymode) {
 	case QCA_WLAN_802_11_MODE_11A:
 	case QCA_WLAN_802_11_MODE_11G:
-		qdf_atomic_dec(&hdd_ctx->num_latency_critical_clients);
+		if (adapter->device_mode == QDF_STA_MODE)
+			qdf_atomic_dec(&hdd_ctx->num_latency_critical_clients);
+
+		hdd_info("Removing latency critical connection for vdev %d",
+			 adapter->vdev_id);
+		cdp_vdev_inform_ll_conn(cds_get_context(QDF_MODULE_ID_SOC),
+					adapter->vdev_id,
+					CDP_VDEV_LL_CONN_DEL);
 		break;
 	default:
 		break;
@@ -2810,6 +2948,41 @@ hdd_is_low_tput_gro_enable(struct hdd_context *hdd_ctx)
 #define GET_BW_COMPUTE_INTV(config) 0
 
 #endif /*WLAN_FEATURE_DP_BUS_BANDWIDTH*/
+
+/**
+ * hdd_init_adapter_ops_wq() - Init global workqueue for adapter operations.
+ * @hdd_ctx: pointer to HDD context
+ *
+ * Return: QDF_STATUS_SUCCESS if workqueue is allocated,
+ *	   QDF_STATUS_E_NOMEM if workqueue aloocation fails.
+ */
+QDF_STATUS hdd_init_adapter_ops_wq(struct hdd_context *hdd_ctx);
+
+/**
+ * hdd_deinit_adapter_ops_wq() - Deinit global workqueue for adapter operations.
+ * @hdd_ctx: pointer to HDD context
+ *
+ * Return: None
+ */
+void hdd_deinit_adapter_ops_wq(struct hdd_context *hdd_ctx);
+
+/**
+ * hdd_adapter_feature_update_work_init() - Init per adapter work for netdev
+ *					    feature update
+ * @adapter: pointer to adapter structure
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_adapter_feature_update_work_init(struct hdd_adapter *adapter);
+
+/**
+ * hdd_adapter_feature_update_work_deinit() - Deinit per adapter work for
+ *					      netdev feature update
+ * @adapter: pointer to adapter structure
+ *
+ * Return: QDF_STATUS
+ */
+void hdd_adapter_feature_update_work_deinit(struct hdd_adapter *adapter);
 
 int hdd_qdf_trace_enable(QDF_MODULE_ID module_id, uint32_t bitmask);
 
@@ -3305,6 +3478,36 @@ void hdd_set_netdev_flags(struct hdd_adapter *adapter);
 
 #ifdef FEATURE_TSO
 /**
+ * hdd_get_tso_csum_feature_flags() - Return TSO and csum flags if enabled
+ *
+ * Return: Enabled feature flags set, 0 on failure
+ */
+static inline netdev_features_t hdd_get_tso_csum_feature_flags(void)
+{
+	netdev_features_t netdev_features = 0;
+	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
+
+	if (!soc) {
+		hdd_err("soc handle is NULL");
+		return 0;
+	}
+
+	if (cdp_cfg_get(soc, cfg_dp_enable_ip_tcp_udp_checksum_offload)) {
+		netdev_features = NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM;
+
+		if (cdp_cfg_get(soc, cfg_dp_tso_enable)) {
+			/*
+			 * Enable TSO only if IP/UDP/TCP TX checksum flag is
+			 * enabled.
+			 */
+			netdev_features |= NETIF_F_TSO | NETIF_F_TSO6 |
+					   NETIF_F_SG;
+		}
+	}
+	return netdev_features;
+}
+
+/**
  * hdd_set_tso_flags() - enable TSO flags in the network device
  * @hdd_ctx: HDD context
  * @wlan_dev: network device structure
@@ -3317,25 +3520,20 @@ void hdd_set_netdev_flags(struct hdd_adapter *adapter);
 static inline void hdd_set_tso_flags(struct hdd_context *hdd_ctx,
 	 struct net_device *wlan_dev)
 {
-	if (cdp_cfg_get(cds_get_context(QDF_MODULE_ID_SOC),
-			cfg_dp_tso_enable) &&
-			cdp_cfg_get(cds_get_context(QDF_MODULE_ID_SOC),
-				    cfg_dp_enable_ip_tcp_udp_checksum_offload)){
-	    /*
-	     * We want to enable TSO only if IP/UDP/TCP TX checksum flag is
-	     * enabled.
-	     */
-		hdd_debug("TSO Enabled");
-		wlan_dev->features |=
-			 NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM |
-			 NETIF_F_TSO | NETIF_F_TSO6 | NETIF_F_SG;
-	}
+	hdd_debug("TSO Enabled");
+
+	wlan_dev->features |= hdd_get_tso_csum_feature_flags();
 }
 #else
 static inline void hdd_set_tso_flags(struct hdd_context *hdd_ctx,
 	 struct net_device *wlan_dev)
 {
 	hdd_set_sg_flags(hdd_ctx, wlan_dev);
+}
+
+static inline netdev_features_t hdd_get_tso_csum_feature_flags(void)
+{
+	return 0;
 }
 #endif /* FEATURE_TSO */
 
@@ -4517,4 +4715,50 @@ static inline void hdd_beacon_latency_event_cb(uint32_t latency_level)
 }
 #endif
 
+#if defined(CLD_PM_QOS) || defined(FEATURE_RUNTIME_PM)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0))
+/**
+ * wlan_hdd_get_pm_qos_cpu_latency() - get PM QOS CPU latency
+ *
+ * Return: PM QOS CPU latency value
+ */
+static inline unsigned long wlan_hdd_get_pm_qos_cpu_latency(void)
+{
+	return PM_QOS_CPU_LATENCY_DEFAULT_VALUE;
+}
+#else
+static inline unsigned long wlan_hdd_get_pm_qos_cpu_latency(void)
+{
+	return PM_QOS_CPU_DMA_LAT_DEFAULT_VALUE;
+}
+#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0) */
+#endif /* defined(CLD_PM_QOS) || defined(FEATURE_RUNTIME_PM) */
+
+/**
+ * hdd_netdev_feature_update - Update the netdev features
+ * @net_dev: Handle to net_device
+ *
+ * This func holds the rtnl_lock. Do not call with rtnl_lock held.
+ *
+ * Return: None
+ */
+void hdd_netdev_update_features(struct hdd_adapter *adapter);
+
+#if defined(CLD_PM_QOS)
+/**
+ * wlan_hdd_set_pm_qos_request() - Function to set pm_qos config in wlm mode
+ * @hdd_ctx: HDD context
+ * @pm_qos_request: pm_qos_request flag
+ *
+ * Return: None
+ */
+void wlan_hdd_set_pm_qos_request(struct hdd_context *hdd_ctx,
+				 bool pm_qos_request);
+#else
+static inline
+void wlan_hdd_set_pm_qos_request(struct hdd_context *hdd_ctx,
+				 bool pm_qos_request)
+{
+}
+#endif
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

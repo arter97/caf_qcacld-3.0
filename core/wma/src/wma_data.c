@@ -804,6 +804,25 @@ static bool wma_get_bss_he_capable(struct bss_params *add_bss)
 }
 #endif
 
+enum tx_rate_info wma_get_vht_rate_flags(enum phy_ch_width ch_width)
+{
+	enum tx_rate_info rate_flags = 0;
+
+	if (ch_width == CH_WIDTH_80P80MHZ)
+		rate_flags |= TX_RATE_VHT160 | TX_RATE_VHT80 | TX_RATE_VHT40 |
+				TX_RATE_VHT20;
+	if (ch_width == CH_WIDTH_160MHZ)
+		rate_flags |= TX_RATE_VHT160 | TX_RATE_VHT80 | TX_RATE_VHT40 |
+				TX_RATE_VHT20;
+	if (ch_width == CH_WIDTH_80MHZ)
+		rate_flags |= TX_RATE_VHT80 | TX_RATE_VHT40 | TX_RATE_VHT20;
+	else if (ch_width)
+		rate_flags |= TX_RATE_VHT40 | TX_RATE_VHT20;
+	else
+		rate_flags |= TX_RATE_VHT20;
+	return rate_flags;
+}
+
 void wma_set_bss_rate_flags(tp_wma_handle wma, uint8_t vdev_id,
 			    struct bss_params *add_bss)
 {
@@ -823,16 +842,7 @@ void wma_set_bss_rate_flags(tp_wma_handle wma, uint8_t vdev_id,
 	if (QDF_STATUS_SUCCESS !=
 		wma_set_bss_rate_flags_he(rate_flags, add_bss)) {
 		if (add_bss->vhtCapable) {
-			if (add_bss->ch_width == CH_WIDTH_80P80MHZ)
-				*rate_flags |= TX_RATE_VHT160;
-			if (add_bss->ch_width == CH_WIDTH_160MHZ)
-				*rate_flags |= TX_RATE_VHT160;
-			if (add_bss->ch_width == CH_WIDTH_80MHZ)
-				*rate_flags |= TX_RATE_VHT80;
-			else if (add_bss->ch_width)
-				*rate_flags |= TX_RATE_VHT40;
-			else
-				*rate_flags |= TX_RATE_VHT20;
+			*rate_flags = wma_get_vht_rate_flags(add_bss->ch_width);
 		}
 		/* avoid to conflict with htCapable flag */
 		else if (add_bss->htCapable) {
@@ -1223,8 +1233,8 @@ QDF_STATUS wma_process_rate_update_indicate(tp_wma_handle wma,
 	/* Get the vdev id */
 	if (wma_find_vdev_id_by_addr(wma, pRateUpdateParams->bssid.bytes,
 				     &vdev_id)) {
-		wma_err("vdev handle is invalid for %pM",
-			 pRateUpdateParams->bssid.bytes);
+		wma_err("vdev handle is invalid for "QDF_MAC_ADDR_FMT,
+			 QDF_MAC_ADDR_REF(pRateUpdateParams->bssid.bytes));
 		qdf_mem_free(pRateUpdateParams);
 		return QDF_STATUS_E_INVAL;
 	}
@@ -1261,8 +1271,8 @@ QDF_STATUS wma_process_rate_update_indicate(tp_wma_handle wma,
 	wma_debug("dev_id = %d, dev_type = %d, dev_mode = %d,",
 		 vdev_id, intr[vdev_id].type,
 		 pRateUpdateParams->dev_mode);
-	wma_debug("mac = %pM, config.shortgi = %d, rate_flags = 0x%x",
-		 pRateUpdateParams->bssid.bytes,
+	wma_debug("mac = "QDF_MAC_ADDR_FMT", config.shortgi = %d, rate_flags = 0x%x",
+		 QDF_MAC_ADDR_REF(pRateUpdateParams->bssid.bytes),
 		 intr[vdev_id].config.shortgi, rate_flag);
 	ret = wma_encode_mc_rate(short_gi, intr[vdev_id].config.chwidth,
 				 intr[vdev_id].ch_freq, mbpsx10_rate,
@@ -1701,7 +1711,7 @@ static QDF_STATUS wma_update_thermal_mitigation_to_fw(tp_wma_handle wma,
  */
 static QDF_STATUS wma_update_thermal_cfg_to_fw(tp_wma_handle wma)
 {
-	t_thermal_cmd_params thermal_params;
+	t_thermal_cmd_params thermal_params = {0};
 
 	/* Get the temperature thresholds to set in firmware */
 	thermal_params.minTemp =
@@ -1712,10 +1722,11 @@ static QDF_STATUS wma_update_thermal_cfg_to_fw(tp_wma_handle wma)
 		maxTempThreshold;
 	thermal_params.thermalEnable =
 		wma->thermal_mgmt_info.thermalMgmtEnabled;
+	thermal_params.thermal_action = wma->thermal_mgmt_info.thermal_action;
 
-	wma_debug("TM sending to fw: min_temp %d max_temp %d enable %d",
-		 thermal_params.minTemp, thermal_params.maxTemp,
-		 thermal_params.thermalEnable);
+	wma_debug("TM sending to fw: min_temp %d max_temp %d enable %d act %d",
+		  thermal_params.minTemp, thermal_params.maxTemp,
+		  thermal_params.thermalEnable, thermal_params.thermal_action);
 
 	return wma_set_thermal_mgmt(wma, thermal_params);
 }
@@ -1744,8 +1755,10 @@ QDF_STATUS wma_process_init_thermal_info(tp_wma_handle wma,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	wma_debug("TM enable %d period %d", pThermalParams->thermalMgmtEnabled,
-		 pThermalParams->throttlePeriod);
+	wma_debug("TM enable %d period %d action %d",
+		  pThermalParams->thermalMgmtEnabled,
+		  pThermalParams->throttlePeriod,
+		  pThermalParams->thermal_action);
 
 	wma_nofl_debug("Throttle Duty Cycle Level in percentage:\n"
 		 "0 %d\n"
@@ -1776,7 +1789,7 @@ QDF_STATUS wma_process_init_thermal_info(tp_wma_handle wma,
 	wma->thermal_mgmt_info.thermalLevels[3].maxTempThreshold =
 		pThermalParams->thermalLevels[3].maxTempThreshold;
 	wma->thermal_mgmt_info.thermalCurrLevel = WLAN_WMA_THERMAL_LEVEL_0;
-
+	wma->thermal_mgmt_info.thermal_action = pThermalParams->thermal_action;
 	wma_nofl_debug("TM level min max:\n"
 		 "0 %d   %d\n"
 		 "1 %d   %d\n"
@@ -1914,6 +1927,7 @@ QDF_STATUS wma_set_thermal_mgmt(tp_wma_handle wma_handle,
 	mgmt_thermal_info.min_temp = thermal_info.minTemp;
 	mgmt_thermal_info.max_temp = thermal_info.maxTemp;
 	mgmt_thermal_info.thermal_enable = thermal_info.thermalEnable;
+	mgmt_thermal_info.thermal_action = thermal_info.thermal_action;
 
 	return wmi_unified_set_thermal_mgmt_cmd(wma_handle->wmi_handle,
 						&mgmt_thermal_info);
@@ -1970,7 +1984,7 @@ int wma_thermal_mgmt_evt_handler(void *handle, uint8_t *event, uint32_t len)
 	tp_wma_handle wma;
 	wmi_thermal_mgmt_event_fixed_param *tm_event;
 	uint8_t thermal_level;
-	t_thermal_cmd_params thermal_params;
+	t_thermal_cmd_params thermal_params = {0};
 	WMI_THERMAL_MGMT_EVENTID_param_tlvs *param_buf;
 
 	if (!event || !handle) {
@@ -2035,6 +2049,7 @@ int wma_thermal_mgmt_evt_handler(void *handle, uint8_t *event, uint32_t len)
 		maxTempThreshold;
 	thermal_params.thermalEnable =
 		wma->thermal_mgmt_info.thermalMgmtEnabled;
+	thermal_params.thermal_action = wma->thermal_mgmt_info.thermal_action;
 
 	if (QDF_STATUS_SUCCESS != wma_set_thermal_mgmt(wma, thermal_params)) {
 		wma_err("Could not send thermal mgmt command to the firmware!");
@@ -2893,7 +2908,8 @@ void wma_tx_abort(uint8_t vdev_id)
 		return;
 	}
 
-	wma_debug("vdevid %d bssid %pM", vdev_id, bssid);
+	wma_debug("vdevid %d bssid "QDF_MAC_ADDR_FMT, vdev_id,
+		  QDF_MAC_ADDR_REF(bssid));
 	wma_vdev_set_pause_bit(vdev_id, PAUSE_TYPE_HOST);
 	cdp_fc_vdev_pause(cds_get_context(QDF_MODULE_ID_SOC), vdev_id,
 			  OL_TXQ_PAUSE_REASON_TX_ABORT, 0);
@@ -2967,7 +2983,8 @@ void wma_delete_invalid_peer_entries(uint8_t vdev_id, uint8_t *peer_mac_addr)
 			}
 		}
 		if (i == INVALID_PEER_MAX_NUM)
-			wma_debug("peer_mac_addr %pM is not found", peer_mac_addr);
+			wma_debug("peer_mac_addr "QDF_MAC_ADDR_FMT" is not found",
+				  QDF_MAC_ADDR_REF(peer_mac_addr));
 	} else {
 		qdf_mem_zero(iface->invalid_peers,
 			     sizeof(iface->invalid_peers));
@@ -3019,19 +3036,17 @@ uint8_t wma_rx_invalid_peer_ind(uint8_t vdev_id, void *wh)
 			(index + 1) % INVALID_PEER_MAX_NUM;
 
 		/* send deauth */
-		wma_debug("vdev_id %d", vdev_id);
-		wma_debug(" RA: " QDF_MAC_ADDR_STR,
-			  QDF_MAC_ADDR_ARRAY(rx_inv_msg->ra));
-		wma_debug(" TA: " QDF_MAC_ADDR_STR,
-			  QDF_MAC_ADDR_ARRAY(rx_inv_msg->ta));
+		wma_debug("vdev_id: %d RA: "QDF_MAC_ADDR_FMT" TA: "QDF_MAC_ADDR_FMT,
+			  vdev_id, QDF_MAC_ADDR_REF(rx_inv_msg->ra),
+			  QDF_MAC_ADDR_REF(rx_inv_msg->ta));
 
 		wma_send_msg(wma,
 			     SIR_LIM_RX_INVALID_PEER,
 			     (void *)rx_inv_msg, 0);
 	} else {
 		wma_debug_rl("Ignore invalid peer indication as received more than once "
-			QDF_MAC_ADDR_STR,
-			QDF_MAC_ADDR_ARRAY(rx_inv_msg->ta));
+			QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(rx_inv_msg->ta));
 		qdf_mem_free(rx_inv_msg);
 	}
 
@@ -3055,8 +3070,8 @@ int wma_dp_send_delba_ind(uint8_t vdev_id, uint8_t *peer_macaddr,
 	qdf_mem_copy(req->peer_macaddr, peer_macaddr, QDF_MAC_ADDR_SIZE);
 	req->tid = tid;
 	req->reason_code = reason_code;
-	wma_debug("req delba_ind vdev %d %pM tid %d reason %d",
-		 vdev_id, peer_macaddr, tid, reason_code);
+	wma_debug("req delba_ind vdev %d "QDF_MAC_ADDR_FMT" tid %d reason %d",
+		 vdev_id, QDF_MAC_ADDR_REF(peer_macaddr), tid, reason_code);
 	wma_send_msg_high_priority(wma, SIR_HAL_REQ_SEND_DELBA_REQ_IND,
 				   (void *)req, 0);
 

@@ -29,6 +29,11 @@ bool ucfg_ipa_is_present(void)
 	return ipa_is_hw_support();
 }
 
+bool ucfg_ipa_is_ready(void)
+{
+	return ipa_is_ready();
+}
+
 bool ucfg_ipa_is_enabled(void)
 {
 	return ipa_config_is_enabled();
@@ -99,8 +104,15 @@ void ucfg_ipa_reg_send_to_nw_cb(struct wlan_objmgr_pdev *pdev,
 				wlan_ipa_send_to_nw cb)
 {
 	return ipa_reg_send_to_nw_cb(pdev, cb);
-
 }
+
+#ifdef IPA_LAN_RX_NAPI_SUPPORT
+void ucfg_ipa_reg_rps_enable_cb(struct wlan_objmgr_pdev *pdev,
+				wlan_ipa_rps_enable cb)
+{
+	return ipa_reg_rps_enable_cb(pdev, cb);
+}
+#endif
 
 void ucfg_ipa_set_mcc_mode(struct wlan_objmgr_pdev *pdev, bool mcc_mode)
 {
@@ -211,6 +223,11 @@ void ucfg_ipa_fw_rejuvenate_send_msg(struct wlan_objmgr_pdev *pdev)
 void ucfg_ipa_component_config_update(struct wlan_objmgr_psoc *psoc)
 {
 	ipa_component_config_update(psoc);
+}
+
+void ucfg_ipa_component_config_free(void)
+{
+	ipa_component_config_free();
 }
 
 uint32_t ucfg_ipa_get_tx_buf_count(void)

@@ -27,6 +27,7 @@
 #define CSR_NEIGHBOR_ROAM_H
 
 #include "sme_api.h"
+#include "wlan_cm_roam_api.h"
 
 #define ROAM_AP_AGE_LIMIT_MS                     10000
 
@@ -57,7 +58,6 @@ typedef struct sCsrNeighborRoamCfgParams {
 	uint8_t nRoamRescanRssiDiff;
 	uint8_t nRoamBmissFirstBcnt;
 	uint8_t nRoamBmissFinalBcnt;
-	uint8_t nRoamBeaconRssiWeight;
 	uint8_t delay_before_vdev_stop;
 	uint32_t hi_rssi_scan_max_count;
 	uint32_t hi_rssi_scan_rssi_delta;
@@ -67,6 +67,7 @@ typedef struct sCsrNeighborRoamCfgParams {
 	uint32_t full_roam_scan_period;
 	bool enable_scoring_for_roam;
 	uint8_t roam_rssi_diff;
+	uint8_t bg_rssi_threshold;
 	uint16_t roam_scan_home_away_time;
 	uint8_t roam_scan_n_probes;
 	uint32_t roam_scan_inactivity_time;
@@ -151,7 +152,6 @@ typedef struct sCsrNeighborRoamControlInfo {
 	tCsrHandoffRequest handoffReqInfo;
 	uint8_t currentRoamBmissFirstBcnt;
 	uint8_t currentRoamBmissFinalBcnt;
-	uint8_t currentRoamBeaconRssiWeight;
 	uint8_t last_sent_cmd;
 	struct scan_result_list *scan_res_lfr2_roam_ap;
 	bool roam_control_enable;
@@ -227,6 +227,7 @@ QDF_STATUS csr_post_roam_state_change(struct mac_context *mac, uint8_t vdev_id,
 				      enum roam_offload_state state,
 				      uint8_t reason);
 
+#ifndef ROAM_OFFLOAD_V1
 /**
  * csr_post_rso_stop() - Post RSO stop message to WMA
  * @mac: mac context
@@ -237,7 +238,7 @@ QDF_STATUS csr_post_roam_state_change(struct mac_context *mac, uint8_t vdev_id,
  */
 QDF_STATUS
 csr_post_rso_stop(struct mac_context *mac, uint8_t vdev_id, uint16_t reason);
-
+#endif
 /**
  * csr_enable_roaming_on_connected_sta() - Enable roaming on other connected
  *  sta vdev
@@ -275,11 +276,13 @@ QDF_STATUS csr_post_roam_state_change(struct mac_context *mac, uint8_t vdev_id,
 	return QDF_STATUS_E_NOSUPPORT;
 }
 
+#ifndef ROAM_OFFLOAD_V1
 static inline
 csr_post_rso_stop(struct mac_context *mac, uint8_t vdev_id, uint16_t reason)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
+#endif
 
 static inline QDF_STATUS
 csr_enable_roaming_on_connected_sta(struct mac_context *mac, uint8_t vdev_id)

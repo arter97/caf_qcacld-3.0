@@ -199,8 +199,8 @@ static int target_if_twt_session_params_event_handler(ol_scn_t scn,
 						       WLAN_CP_STATS_ID);
 		if (!peer_obj) {
 			target_if_err("peer obj not found for "
-				      QDF_MAC_ADDR_STR,
-				      QDF_MAC_ADDR_ARRAY(twt_params.peer_mac));
+				      QDF_MAC_ADDR_FMT,
+				      QDF_MAC_ADDR_REF(twt_params.peer_mac));
 			continue;
 		}
 
@@ -213,8 +213,8 @@ static int target_if_twt_session_params_event_handler(ol_scn_t scn,
 		mc_cp_stats = target_if_obtain_mc_cp_stat_obj(peer_obj);
 		if (!mc_cp_stats) {
 			target_if_err("Unable to retrieve mc cp stats obj for "
-				      QDF_MAC_ADDR_STR,
-				      QDF_MAC_ADDR_ARRAY(twt_params.peer_mac));
+				      QDF_MAC_ADDR_FMT,
+				      QDF_MAC_ADDR_REF(twt_params.peer_mac));
 			wlan_objmgr_peer_release_ref(peer_obj,
 						     WLAN_CP_STATS_ID);
 			continue;
@@ -340,6 +340,22 @@ static void target_if_cp_stats_free_stats_event(struct stats_event *ev)
 	ev->peer_stats_info_ext = NULL;
 }
 
+#ifdef WLAN_FEATURE_MEDIUM_ASSESS
+static void
+target_if_cp_stats_extract_congestion(struct pdev_mc_cp_stats *pdev_stats,
+				      wmi_host_pdev_stats *fw_pdev_stats)
+{
+	pdev_stats->rx_clear_count = fw_pdev_stats->rx_clear_count;
+	pdev_stats->cycle_count = fw_pdev_stats->cycle_count;
+}
+#else
+static void
+target_if_cp_stats_extract_congestion(struct pdev_mc_cp_stats *pdev_stats,
+				      wmi_host_pdev_stats *fw_pdev_stats)
+{
+}
+#endif
+
 static QDF_STATUS target_if_cp_stats_extract_pdev_stats(
 					struct wmi_unified *wmi_hdl,
 					wmi_host_stats_event *stats_param,
@@ -370,7 +386,41 @@ static QDF_STATUS target_if_cp_stats_extract_pdev_stats(
 			return status;
 		}
 		ev->pdev_stats[i].max_pwr = pdev_stats.chan_tx_pwr;
+		target_if_cp_stats_extract_congestion(&ev->pdev_stats[i],
+						      &pdev_stats);
 	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS target_if_cp_stats_extract_pmf_bcn_protect_stats(
+					struct wmi_unified *wmi_hdl,
+					wmi_host_stats_event *stats_param,
+					struct stats_event *ev, uint8_t *data)
+{
+	QDF_STATUS status;
+	wmi_host_pmf_bcn_protect_stats pmf_bcn_stats = {0};
+
+	if (!(stats_param->stats_id & WMI_HOST_REQUEST_PMF_BCN_PROTECT_STAT))
+		return QDF_STATUS_SUCCESS;
+
+	qdf_mem_zero(&ev->bcn_protect_stats, sizeof(ev->bcn_protect_stats));
+	status = wmi_extract_pmf_bcn_protect_stats(wmi_hdl, data,
+						   &pmf_bcn_stats);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		cp_stats_err("wmi_extract_pmf_bcn_protect_stats failed");
+		return status;
+	}
+
+	ev->bcn_protect_stats.pmf_bcn_stats_valid = true;
+	ev->bcn_protect_stats.igtk_mic_fail_cnt =
+			pmf_bcn_stats.igtk_mic_fail_cnt;
+	ev->bcn_protect_stats.igtk_replay_cnt =
+			pmf_bcn_stats.igtk_replay_cnt;
+	ev->bcn_protect_stats.bcn_mic_fail_cnt =
+			pmf_bcn_stats.bcn_mic_fail_cnt;
+	ev->bcn_protect_stats.bcn_replay_cnt =
+			pmf_bcn_stats.bcn_replay_cnt;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -709,7 +759,7 @@ static QDF_STATUS target_if_cp_stats_extract_event(struct wmi_unified *wmi_hdl,
 	cp_stats_nofl_debug("num: pdev: %d, pdev_extd: %d, vdev: %d, peer: %d,"
 			    "peer_extd: %d rssi: %d, mib %d, mib_extd %d, "
 			    "bcnflt: %d, channel: %d, bcn: %d, peer_extd2: %d,"
-			    "last_event: %x",
+			    "last_event: %x, stats id: %d",
 			    stats_param.num_pdev_stats,
 			    stats_param.num_pdev_ext_stats,
 			    stats_param.num_vdev_stats,
@@ -721,7 +771,9 @@ static QDF_STATUS target_if_cp_stats_extract_event(struct wmi_unified *wmi_hdl,
 			    stats_param.num_bcnflt_stats,
 			    stats_param.num_chan_stats,
 			    stats_param.num_bcn_stats,
-			    stats_param.num_peer_adv_stats, stats_param.last_event);
+			    stats_param.num_peer_adv_stats,
+			    stats_param.last_event,
+			    stats_param.stats_id);
 
 	ev->last_event = stats_param.last_event;
 	status = target_if_cp_stats_extract_pdev_stats(wmi_hdl, &stats_param,
@@ -757,7 +809,11 @@ static QDF_STATUS target_if_cp_stats_extract_event(struct wmi_unified *wmi_hdl,
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
 
-	return QDF_STATUS_SUCCESS;
+	status = target_if_cp_stats_extract_pmf_bcn_protect_stats(wmi_hdl,
+								  &stats_param,
+								  ev, data);
+
+	return status;
 }
 
 /**
@@ -1081,6 +1137,7 @@ static uint32_t get_stats_id(enum stats_req_type type)
 	default:
 		break;
 	case TYPE_CONNECTION_TX_POWER:
+	case TYPE_CONGESTION_STATS:
 		return WMI_REQUEST_PDEV_STAT;
 	case TYPE_PEER_STATS:
 		return WMI_REQUEST_PEER_STAT | WMI_REQUEST_PEER_EXTD_STAT;
@@ -1090,7 +1147,8 @@ static uint32_t get_stats_id(enum stats_req_type type)
 			WMI_REQUEST_VDEV_STAT |
 			WMI_REQUEST_PDEV_STAT |
 			WMI_REQUEST_PEER_EXTD2_STAT |
-			WMI_REQUEST_RSSI_PER_CHAIN_STAT);
+			WMI_REQUEST_RSSI_PER_CHAIN_STAT |
+			WMI_REQUEST_PMF_BCN_PROTECT_STAT);
 	case TYPE_MIB_STATS:
 		return (WMI_REQUEST_MIB_STAT | WMI_REQUEST_MIB_EXTD_STAT);
 	}

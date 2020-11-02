@@ -64,6 +64,37 @@ QDF_STATUS mlme_unregister_vdev_mgr_ops(struct vdev_mlme_obj *vdev_mlme);
 QDF_STATUS mlme_set_chan_switch_in_progress(struct wlan_objmgr_vdev *vdev,
 					       bool val);
 
+#ifdef WLAN_FEATURE_MSCS
+/**
+ * mlme_set_is_mscs_req_sent() - set mscs frame req flag
+ * @vdev: vdev pointer
+ * @val: value to be set
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS mlme_set_is_mscs_req_sent(struct wlan_objmgr_vdev *vdev, bool val);
+
+/**
+ * mlme_get_is_mscs_req_sent() - get mscs frame req flag
+ * @vdev: vdev pointer
+ *
+ * Return: value of mscs flag
+ */
+bool mlme_get_is_mscs_req_sent(struct wlan_objmgr_vdev *vdev);
+#else
+static inline
+QDF_STATUS mlme_set_is_mscs_req_sent(struct wlan_objmgr_vdev *vdev, bool val)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static inline
+bool mlme_get_is_mscs_req_sent(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
+}
+#endif
+
 /**
  * mlme_is_chan_switch_in_progress() - get mlme priv restart in progress
  * @vdev: vdev pointer
@@ -110,6 +141,21 @@ mlme_set_vdev_start_failed(struct wlan_objmgr_vdev *vdev, bool val);
  * Return: value of vdev connection failure flag
  */
 bool mlme_is_connection_fail(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * mlme_is_wapi_sta_active() - check sta with wapi security exists and is active
+ * @pdev: pdev pointer
+ *
+ * Return: true if sta with wapi security exists
+ */
+#ifdef FEATURE_WLAN_WAPI
+bool mlme_is_wapi_sta_active(struct wlan_objmgr_pdev *pdev);
+#else
+static inline bool mlme_is_wapi_sta_active(struct wlan_objmgr_pdev *pdev)
+{
+	return false;
+}
+#endif
 
 QDF_STATUS mlme_set_bigtk_support(struct wlan_objmgr_vdev *vdev, bool val);
 

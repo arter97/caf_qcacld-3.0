@@ -30,7 +30,7 @@
 #include "qdf_status.h"
 #include "wlan_objmgr_psoc_obj.h"
 #include "wlan_policy_mgr_public_struct.h"
-#include "wlan_cm_roam_public_srtuct.h"
+#include "wlan_cm_roam_public_struct.h"
 #include "wlan_utility.h"
 #include "sir_types.h"
 
@@ -606,6 +606,40 @@ static inline void policy_mgr_change_sap_channel_with_csa(
 void policy_mgr_set_pcl_for_existing_combo(struct wlan_objmgr_psoc *psoc,
 					   enum policy_mgr_con_mode mode,
 					   uint8_t vdev_id);
+
+/**
+ * policy_mgr_set_pcl_for_connected_vdev() - Set the PCL for connected vdevs
+ * @psoc: PSOC object information
+ * @vdev_id: Vdev Id
+ * @clear_pcl: option to clear the PCL first before setting the new one
+ *
+ * This API will set the preferred channel list for other connected vdevs aside
+ * from the calling function's vdev
+ *
+ * Context: Any kernel thread
+ * Return: None
+ */
+void policy_mgr_set_pcl_for_connected_vdev(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id, bool clear_pcl);
+
+/**
+ * policy_mgr_set_pcl() - Set preferred channel list in the FW
+ * @psoc: PSOC object information
+ * @msg: message containing preferred channel list information
+ * @vdev_id: Vdev Id
+ * @clear_vdev_pcl: clear PCL flag
+ *
+ * Sends the set pcl command and PCL info to FW
+ *
+ * Context: Any kernel thread
+ * Return: QDF_STATUS_SUCCESS on successful posting, fail status in any other
+ *	   case
+ */
+QDF_STATUS policy_mgr_set_pcl(struct wlan_objmgr_psoc *psoc,
+			      struct policy_mgr_pcl_list *msg,
+			      uint8_t vdev_id,
+			      bool clear_vdev_pcl);
+
 /**
  * policy_mgr_incr_active_session() - increments the number of active sessions
  * @psoc: PSOC object information
@@ -991,6 +1025,23 @@ policy_mgr_current_connections_update(struct wlan_objmgr_psoc *psoc,
 				      uint32_t request_id);
 
 /**
+ * policy_mgr_change_hw_mode_sta_connect() - Change HW mode for STA connect
+ * @psoc: psoc object
+ * @scan_list: candidates for conenction
+ * @vdev_id: vdev id for STA/CLI
+ * @connect_id: connect id of the conenct request
+ *
+ * When a new connection is about to come up, change hw mode for STA/CLI
+ * based upon the scan results and hw type.
+ *
+ * Return: status ifset HW mode is fail or already taken care of.
+ */
+QDF_STATUS
+policy_mgr_change_hw_mode_sta_connect(struct wlan_objmgr_psoc *psoc,
+				      qdf_list_t *scan_list, uint8_t vdev_id,
+				      uint32_t connect_id);
+
+/**
  * policy_mgr_is_dbs_allowed_for_concurrency() - If dbs is allowed for current
  * concurreny
  * @new_conn_mode: new connection mode
@@ -1350,7 +1401,6 @@ typedef void (*policy_mgr_nss_update_cback)(struct wlan_objmgr_psoc *psoc,
  * @sme_soc_set_dual_mac_config: Set the dual MAC scan & FW
  *                             config
  * @sme_pdev_set_hw_mode: Set the new HW mode to FW
- * @sme_set_pcl: Set new PCL to FW
  * @sme_nss_update_request: Update NSS value to FW
  * @sme_change_mcc_beacon_interval: Set MCC beacon interval to FW
  * @sme_rso_start_cb: Enable roaming offload callback
@@ -1362,8 +1412,6 @@ struct policy_mgr_sme_cbacks {
 	QDF_STATUS (*sme_soc_set_dual_mac_config)(
 		struct policy_mgr_dual_mac_config msg);
 	QDF_STATUS (*sme_pdev_set_hw_mode)(struct policy_mgr_hw_mode msg);
-	QDF_STATUS (*sme_set_pcl)(struct policy_mgr_pcl_list *msg,
-				  uint8_t vdev_id, bool clear_vdev_pcl);
 	QDF_STATUS (*sme_nss_update_request)(uint32_t vdev_id,
 		uint8_t new_nss, uint8_t ch_width,
 		policy_mgr_nss_update_cback cback,
@@ -1394,9 +1442,6 @@ struct policy_mgr_sme_cbacks {
  * @get_mode_for_non_connected_vdev: Get the mode for a non
  *                                 connected vdev
  * @hdd_get_device_mode: Get QDF_OPMODE type for session id (vdev id)
- * @hdd_wapi_security_sta_exist: Get whether wapi encription station existing
- * or not. Some hw doesn't support WAPI encryption concurrency with other
- * encryption type.
  * @hdd_is_chan_switch_in_progress: Check if in any adater channel switch is in
  * progress
  * @wlan_hdd_set_sap_csa_reason: Set the sap csa reason in cases like NAN.
@@ -1415,7 +1460,6 @@ struct policy_mgr_hdd_cbacks {
 				struct wlan_objmgr_psoc *psoc,
 				uint8_t vdev_id);
 	enum QDF_OPMODE (*hdd_get_device_mode)(uint32_t session_id);
-	bool (*hdd_wapi_security_sta_exist)(void);
 	bool (*hdd_is_chan_switch_in_progress)(void);
 	bool (*hdd_is_cac_in_progress)(void);
 	void (*wlan_hdd_set_sap_csa_reason)(struct wlan_objmgr_psoc *psoc,
@@ -2094,6 +2138,28 @@ QDF_STATUS policy_mgr_get_pcl_for_existing_conn(
 		uint32_t *pcl_ch, uint32_t *len,
 		uint8_t *pcl_weight, uint32_t weight_len,
 		bool all_matching_cxn_to_del);
+
+/**
+ * policy_mgr_get_pcl_for_vdev_id() - Get PCL for 1 vdev
+ * @psoc: PSOC object information
+ * @mode: Connection mode of type 'policy_mgr_con_mode'
+ * @pcl_ch: Pointer to the PCL
+ * @len: Pointer to the length of the PCL
+ * @pcl_weight: Pointer to the weights of the PCL
+ * @weight_len: Max length of the weights list
+ * @vdev_id: vdev id to get PCL
+ *
+ * Get the PCL for a vdev, when vdev need move to another channel, need
+ * get PCL after remove the vdev from connection list.
+ *
+ * Return: None
+ */
+QDF_STATUS policy_mgr_get_pcl_for_vdev_id(struct wlan_objmgr_psoc *psoc,
+					  enum policy_mgr_con_mode mode,
+					  uint32_t *pcl_ch, uint32_t *len,
+					  uint8_t *pcl_weight,
+					  uint32_t weight_len,
+					  uint8_t vdev_id);
 
 /**
  * policy_mgr_get_valid_chan_weights() - Get the weightage for
@@ -2928,6 +2994,7 @@ bool policy_mgr_go_scc_enforced(struct wlan_objmgr_psoc *psoc);
  * @con_ch_freq: pointer to the chan freq on which sap will come up
  * @sap_ch_freq: initial channel frequency for SAP
  * @sap_vdev_id: sap vdev id.
+ * @ch_params: sap channel parameters
  *
  * This function checks & updates the channel SAP to come up on in
  * case of STA+SAP concurrency
@@ -2935,7 +3002,8 @@ bool policy_mgr_go_scc_enforced(struct wlan_objmgr_psoc *psoc);
  */
 QDF_STATUS policy_mgr_valid_sap_conc_channel_check(
 	struct wlan_objmgr_psoc *psoc, uint32_t *con_ch_freq,
-	uint32_t sap_ch_freq, uint8_t sap_vdev_id);
+	uint32_t sap_ch_freq, uint8_t sap_vdev_id,
+	struct ch_params *ch_params);
 
 /**
  * policy_mgr_get_alternate_channel_for_sap() - Get an alternate

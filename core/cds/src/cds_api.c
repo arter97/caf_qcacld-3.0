@@ -121,6 +121,13 @@ static struct ol_if_ops  dp_ol_if_ops = {
 	.is_roam_inprogress = wma_is_roam_in_progress,
 	.get_con_mode = cds_get_conparam,
 	.send_delba = cds_send_delba,
+	.dp_rx_get_pending = dp_rx_tm_get_pending,
+#ifdef DP_MEM_PRE_ALLOC
+	.dp_prealloc_get_consistent = dp_prealloc_get_coherent,
+	.dp_prealloc_put_consistent = dp_prealloc_put_coherent,
+	.dp_get_multi_pages = dp_prealloc_get_multi_pages,
+	.dp_put_multi_pages = dp_prealloc_put_multi_pages
+#endif
     /* TODO: Add any other control path calls required to OL_IF/WMA layer */
 };
 #else
@@ -427,6 +434,8 @@ static void cds_cdp_cfg_attach(struct wlan_objmgr_psoc *psoc)
 		cfg_get(psoc, CFG_DP_NAN_TCP_UDP_CKSUM_OFFLOAD);
 	cdp_cfg.p2p_ip_tcp_udp_checksum_offload =
 		cfg_get(psoc, CFG_DP_P2P_TCP_UDP_CKSUM_OFFLOAD);
+	cdp_cfg.legacy_mode_csum_disable =
+		cfg_get(psoc, CFG_DP_LEGACY_MODE_CSUM_DISABLE);
 	cdp_cfg.ce_classify_enabled =
 		cfg_get(psoc, CFG_DP_CE_CLASSIFY_ENABLE);
 	cdp_cfg.tso_enable = cfg_get(psoc, CFG_DP_TSO);
@@ -1059,12 +1068,12 @@ stop_wmi:
 
 	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
 	if (!hif_ctx)
-		cds_err("%s: Failed to get hif_handle!", __func__);
+		cds_err("Failed to get hif_handle!");
 
 	wma_wmi_stop();
 
 	if (hif_ctx) {
-		cds_err("%s: Disable the isr & reset the soc!", __func__);
+		cds_err("Disable the isr & reset the soc!");
 		hif_disable_isr(hif_ctx);
 		hif_reset_soc(hif_ctx);
 	}
@@ -1908,10 +1917,11 @@ static void cds_trigger_recovery_handler(const char *func, const uint32_t line)
 	}
 
 	/*
-	 * if *wlan* recovery is disabled, crash here for debugging  for snoc
-	 * targets.
+	 * if *wlan* recovery is disabled, crash here for debugging  for
+	 * snoc/IPCI targets.
 	 */
-	if (qdf->bus_type == QDF_BUS_TYPE_SNOC && !ssr_ini_enabled) {
+	if ((qdf->bus_type == QDF_BUS_TYPE_SNOC ||
+	     qdf->bus_type == QDF_BUS_TYPE_IPCI) && !ssr_ini_enabled) {
 		QDF_DEBUG_PANIC("WLAN recovery is not enabled (via %s:%d)",
 				func, line);
 		return;
@@ -1966,8 +1976,6 @@ static void cds_trigger_recovery_work(void *context)
 void __cds_trigger_recovery(enum qdf_hang_reason reason, const char *func,
 			    const uint32_t line)
 {
-	bool is_work_queue_needed = false;
-
 	if (!gp_cds_context) {
 		cds_err("gp_cds_context is null");
 		return;
@@ -1975,19 +1983,10 @@ void __cds_trigger_recovery(enum qdf_hang_reason reason, const char *func,
 
 	gp_cds_context->recovery_reason = reason;
 
-	if (in_atomic() ||
-	    (QDF_RESUME_TIMEOUT == reason || QDF_SUSPEND_TIMEOUT == reason))
-		is_work_queue_needed = true;
-
-	if (is_work_queue_needed) {
-		__cds_recovery_caller.func = func;
-		__cds_recovery_caller.line = line;
-		qdf_queue_work(0, gp_cds_context->cds_recovery_wq,
-			       &gp_cds_context->cds_recovery_work);
-		return;
-	}
-
-	cds_trigger_recovery_handler(func, line);
+	__cds_recovery_caller.func = func;
+	__cds_recovery_caller.line = line;
+	qdf_queue_work(0, gp_cds_context->cds_recovery_wq,
+		       &gp_cds_context->cds_recovery_work);
 }
 
 void cds_trigger_recovery_psoc(void *psoc, enum qdf_hang_reason reason,
@@ -2631,7 +2630,7 @@ bool cds_is_5_mhz_enabled(void)
 
 	p_cds_context = cds_get_context(QDF_MODULE_ID_QDF);
 	if (!p_cds_context) {
-		cds_err("%s: cds context is invalid", __func__);
+		cds_err("cds context is invalid");
 		return false;
 	}
 
@@ -2653,7 +2652,7 @@ bool cds_is_10_mhz_enabled(void)
 
 	p_cds_context = cds_get_context(QDF_MODULE_ID_QDF);
 	if (!p_cds_context) {
-		cds_err("%s: cds context is invalid", __func__);
+		cds_err("cds context is invalid");
 		return false;
 	}
 
@@ -2675,7 +2674,7 @@ bool cds_is_sub_20_mhz_enabled(void)
 
 	p_cds_context = cds_get_context(QDF_MODULE_ID_QDF);
 	if (!p_cds_context) {
-		cds_err("%s: cds context is invalid", __func__);
+		cds_err("cds context is invalid");
 		return false;
 	}
 
@@ -2696,7 +2695,7 @@ bool cds_is_self_recovery_enabled(void)
 
 	p_cds_context = cds_get_context(QDF_MODULE_ID_QDF);
 	if (!p_cds_context) {
-		cds_err("%s: cds context is invalid", __func__);
+		cds_err("cds context is invalid");
 		return false;
 	}
 

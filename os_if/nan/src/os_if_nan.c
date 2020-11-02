@@ -1627,9 +1627,9 @@ os_if_ndp_confirm_ind_handler(struct wlan_objmgr_vdev *vdev,
 			goto ndp_confirm_nla_failed;
 
 	cfg80211_vendor_event(vendor_event, GFP_ATOMIC);
-	osif_debug("NDP confim sent, ndp instance id: %d, peer addr: %pM rsp_code: %d, reason_code: %d",
+	osif_debug("NDP confim sent, ndp instance id: %d, peer addr: "QDF_MAC_ADDR_FMT" rsp_code: %d, reason_code: %d",
 		   ndp_confirm->ndp_instance_id,
-		   ndp_confirm->peer_ndi_mac_addr.bytes,
+		   QDF_MAC_ADDR_REF(ndp_confirm->peer_ndi_mac_addr.bytes),
 		   ndp_confirm->rsp_code, ndp_confirm->reason_code);
 
 	return;
@@ -1759,10 +1759,9 @@ static void os_if_ndp_end_ind_handler(struct wlan_objmgr_vdev *vdev,
 
 	ndp_instance_array = qdf_mem_malloc(end_ind->num_ndp_ids *
 		sizeof(*ndp_instance_array));
-	if (!ndp_instance_array) {
-		osif_err("Failed to allocate ndp_instance_array");
+	if (!ndp_instance_array)
 		return;
-	}
+
 	for (i = 0; i < end_ind->num_ndp_ids; i++)
 		ndp_instance_array[i] = end_ind->ndp_map[i].ndp_instance_id;
 
@@ -1823,8 +1822,8 @@ static void os_if_new_peer_ind_handler(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
-	osif_debug("vdev_id: %d, peer_mac: %pM",
-		   vdev_id, peer_ind->peer_mac_addr.bytes);
+	osif_debug("vdev_id: %d, peer_mac: "QDF_MAC_ADDR_FMT,
+		   vdev_id, QDF_MAC_ADDR_REF(peer_ind->peer_mac_addr.bytes));
 	ret = cb_obj.new_peer_ind(vdev_id, peer_ind->sta_id,
 				&peer_ind->peer_mac_addr,
 				(active_peers == 0 ? true : false));
@@ -1864,8 +1863,8 @@ static void os_if_peer_departed_ind_handler(struct wlan_objmgr_vdev *vdev,
 		osif_err("Invalid new NDP peer params");
 		return;
 	}
-	osif_debug("vdev_id: %d, peer_mac: %pM",
-		   vdev_id, peer_ind->peer_mac_addr.bytes);
+	osif_debug("vdev_id: %d, peer_mac: "QDF_MAC_ADDR_FMT,
+		   vdev_id, QDF_MAC_ADDR_REF(peer_ind->peer_mac_addr.bytes));
 	active_peers--;
 	ucfg_nan_set_active_peers(vdev, active_peers);
 	cb_obj.peer_departed_ind(vdev_id, peer_ind->sta_id,
@@ -2502,10 +2501,8 @@ static int os_if_nan_generic_req(struct wlan_objmgr_psoc *psoc,
 	buf_len = nla_len(tb[QCA_WLAN_VENDOR_ATTR_NAN_CMD_DATA]);
 
 	nan_req = qdf_mem_malloc(sizeof(*nan_req) +  buf_len);
-	if (!nan_req) {
-		osif_err("Request allocation failure");
+	if (!nan_req)
 		return -ENOMEM;
-	}
 
 	nan_req->psoc = psoc;
 	nan_req->params.request_data_len = buf_len;
@@ -2568,11 +2565,9 @@ static int os_if_process_nan_enable_req(struct wlan_objmgr_psoc *psoc,
 	buf_len = nla_len(tb[QCA_WLAN_VENDOR_ATTR_NAN_CMD_DATA]);
 
 	nan_req = qdf_mem_malloc(sizeof(*nan_req) + buf_len);
-
-	if (!nan_req) {
-		osif_err("Request allocation failure");
+	if (!nan_req)
 		return -ENOMEM;
-	}
+
 	nan_req->social_chan_2g_freq = chan_freq_2g;
 	if (chan_freq_5g)
 		nan_req->social_chan_5g_freq = chan_freq_5g;

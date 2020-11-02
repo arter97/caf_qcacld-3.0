@@ -424,22 +424,32 @@ static uint8_t lim_calculate_dot11_mode(struct mac_context *mac_ctx,
 	case MLME_DOT11_MODE_ALL:
 		if (bcn->he_cap.present)
 			return MLME_DOT11_MODE_11AX;
-		else if (bcn->VHTCaps.present ||
-			 bcn->vendor_vht_ie.present)
+		else if ((bcn->VHTCaps.present ||
+			  bcn->vendor_vht_ie.present) &&
+			 (!(band == REG_BAND_2G &&
+			  !mac_ctx->mlme_cfg->vht_caps.vht_cap_info.b24ghz_band)
+			 ))
+
 			return MLME_DOT11_MODE_11AC;
 		else if (bcn->HTCaps.present)
 			return MLME_DOT11_MODE_11N;
+		/* fallthrough */
 	case MLME_DOT11_MODE_11AC:
 	case MLME_DOT11_MODE_11AC_ONLY:
-		if (bcn->VHTCaps.present ||
-		    bcn->vendor_vht_ie.present)
+		if ((bcn->VHTCaps.present ||
+		     bcn->vendor_vht_ie.present) &&
+		   (!(band == REG_BAND_2G &&
+		    !mac_ctx->mlme_cfg->vht_caps.vht_cap_info.b24ghz_band)
+		   ))
 			return MLME_DOT11_MODE_11AC;
 		else if (bcn->HTCaps.present)
 			return MLME_DOT11_MODE_11N;
+		/* fallthrough */
 	case MLME_DOT11_MODE_11N:
 	case MLME_DOT11_MODE_11N_ONLY:
 		if (bcn->HTCaps.present)
 			return MLME_DOT11_MODE_11N;
+		/* fallthrough */
 	default:
 			return new_dot11_mode;
 	}
@@ -777,10 +787,10 @@ lim_ft_send_aggr_qos_rsp(struct mac_context *mac, uint8_t rspReqd,
 		if ((1 << i) & aggrQosRsp->tspecIdx) {
 			if (QDF_IS_STATUS_SUCCESS(aggrQosRsp->status[i]))
 				rsp->aggrInfo.aggrRsp[i].status =
-					eSIR_MAC_SUCCESS_STATUS;
+					STATUS_SUCCESS;
 			else
 				rsp->aggrInfo.aggrRsp[i].status =
-					eSIR_MAC_UNSPEC_FAILURE_STATUS;
+					STATUS_UNSPECIFIED_FAILURE;
 			rsp->aggrInfo.aggrRsp[i].tspec = aggrQosRsp->tspec[i];
 		}
 	}
@@ -810,7 +820,7 @@ void lim_process_ft_aggr_qos_rsp(struct mac_context *mac,
 	pe_session =
 		pe_find_session_by_session_id(mac, pAggrQosRspMsg->sessionId);
 	if (!pe_session) {
-		pe_err("Cant find session entry for %s", __func__);
+		pe_err("Cant find session entry");
 		if (pAggrQosRspMsg) {
 			qdf_mem_free(pAggrQosRspMsg);
 		}

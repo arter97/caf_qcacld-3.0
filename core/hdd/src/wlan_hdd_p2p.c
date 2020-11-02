@@ -322,10 +322,8 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 		return -EINVAL;
 
 	ret = wlan_hdd_validate_context(hdd_ctx);
-	if (ret) {
-		hdd_err("wlan_hdd_validate_context return:%d", ret);
+	if (ret)
 		return ret;
-	}
 
 	type = WLAN_HDD_GET_TYPE_FRM_FC(buf[0]);
 	sub_type = WLAN_HDD_GET_SUBTYPE_FRM_FC(buf[0]);
@@ -1072,7 +1070,7 @@ __hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
 			 * we are dropping action frame
 			 */
 			hdd_err("adapter for action frame is NULL Macaddr = "
-				QDF_MAC_ADDR_STR, QDF_MAC_ADDR_ARRAY(dest_addr));
+				QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(dest_addr));
 			hdd_debug("Frame Type = %d Frame Length = %d subType = %d",
 				  frame_type, frm_len, sub_type);
 			/*

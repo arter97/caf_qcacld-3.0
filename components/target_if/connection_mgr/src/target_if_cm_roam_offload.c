@@ -127,6 +127,14 @@ target_if_vdev_set_param(wmi_unified_t wmi_handle, uint32_t vdev_id,
 	return wmi_unified_vdev_set_param_send(wmi_handle, &param);
 }
 
+static QDF_STATUS target_if_cm_roam_scan_offload_mode(
+			wmi_unified_t wmi_handle,
+			struct wlan_roam_scan_offload_params *rso_mode_cfg)
+{
+	return wmi_unified_roam_scan_offload_mode_cmd(wmi_handle,
+						      rso_mode_cfg);
+}
+
 /**
  * target_if_cm_roam_scan_bmiss_cnt() - set bmiss count to fw
  * @wmi_handle: wmi handle
@@ -149,7 +157,7 @@ target_if_cm_roam_scan_bmiss_cnt(wmi_unified_t wmi_handle,
 	first_bcnt = req->roam_bmiss_first_bcnt;
 	final_bcnt = req->roam_bmiss_final_bcnt;
 
-	target_if_debug("first_bcnt: %d, final_bcnt: %d",
+	target_if_debug("vdev_id %d first_bcnt: %d, final_bcnt: %d", vdev_id,
 			first_bcnt, final_bcnt);
 
 	status = target_if_vdev_set_param(wmi_handle, vdev_id,
@@ -199,15 +207,21 @@ target_if_cm_roam_reason_vsie(wmi_unified_t wmi_handle,
 }
 
 /* target_if_cm_roam_triggers(): send roam triggers to WMI
- * @wmi_handle: handle to WMI
+ * @vdev: vdev
  * @req: roam triggers parameters
  *
  * Return: QDF status
  */
 static QDF_STATUS
-target_if_cm_roam_triggers(wmi_unified_t wmi_handle,
+target_if_cm_roam_triggers(struct wlan_objmgr_vdev *vdev,
 			   struct wlan_roam_triggers *req)
 {
+	wmi_unified_t wmi_handle;
+
+	wmi_handle = target_if_cm_roam_get_wmi_handle_from_vdev(vdev);
+	if (!wmi_handle)
+		return QDF_STATUS_E_FAILURE;
+
 	if (!target_if_is_vdev_valid(req->vdev_id))
 		return QDF_STATUS_E_INVAL;
 
@@ -322,7 +336,7 @@ target_if_cm_roam_reason_vsie(wmi_unified_t wmi_handle,
 }
 
 static QDF_STATUS
-target_if_cm_roam_triggers(wmi_unified_t wmi_handle,
+target_if_cm_roam_triggers(struct wlan_objmgr_vdev *vdev,
 			   struct wlan_roam_triggers *req)
 {
 	return QDF_STATUS_E_NOSUPPORT;
@@ -347,6 +361,7 @@ target_if_cm_roam_idle_params(wmi_unified_t wmi_handle, uint8_t command,
 {
 }
 #endif
+
 /**
  * target_if_cm_roam_scan_offload_rssi_thresh() - Send roam scan rssi threshold
  * commands to wmi
@@ -373,6 +388,7 @@ target_if_cm_roam_scan_offload_rssi_thresh(
 		req->rssi_thresh &= 0x000000ff;
 		req->hi_rssi_scan_rssi_ub -= NOISE_FLOOR_DBM_DEFAULT;
 		req->bg_scan_bad_rssi_thresh -= NOISE_FLOOR_DBM_DEFAULT;
+		req->roam_data_rssi_threshold -= NOISE_FLOOR_DBM_DEFAULT;
 		req->good_rssi_threshold -= NOISE_FLOOR_DBM_DEFAULT;
 		req->good_rssi_threshold &= 0x000000ff;
 	}
@@ -434,12 +450,13 @@ target_if_cm_roam_scan_offload_rssi_thresh(
 		}
 	}
 
-	target_if_debug("good_rssi_threshold %d, early_stop_thresholds en=%d, min=%d, max=%d roam_scan_rssi_thresh=%d, roam_rssi_thresh_diff=%d",
-			req->good_rssi_threshold, req->early_stop_scan_enable,
+	target_if_debug("RSO_CFG: vdev %d: db2dbm enabled:%d, good_rssi_threshold:%d, early_stop_thresholds en:%d, min:%d, max:%d, roam_scan_rssi_thresh:%d, roam_rssi_thresh_diff:%d",
+			req->vdev_id, db2dbm_enabled, req->good_rssi_threshold,
+			req->early_stop_scan_enable,
 			req->roam_earlystop_thres_min,
 			req->roam_earlystop_thres_max, req->rssi_thresh,
 			req->rssi_thresh_diff);
-	target_if_debug("hirssi max cnt %d, delta %d, hirssi upper bound %d dense rssi thresh offset %d, dense min aps cnt %d, traffic_threshold %d dense_status=%d",
+	target_if_debug("RSO_CFG: hirssi max cnt:%d, delta:%d, hirssi upper bound:%d, dense rssi thresh offset:%d, dense min aps cnt:%d, traffic_threshold:%d, dense_status:%d",
 			req->hi_rssi_scan_max_count,
 			req->hi_rssi_scan_rssi_delta,
 			req->hi_rssi_scan_rssi_ub,
@@ -447,10 +464,25 @@ target_if_cm_roam_scan_offload_rssi_thresh(
 			req->dense_min_aps_cnt,
 			req->traffic_threshold,
 			req->initial_dense_status);
-	target_if_debug("BG Scan Bad RSSI:%d, bitmap:0x%x Offset for 2G to 5G Roam:%d",
+	target_if_debug("RSO_CFG: raise rssi threshold 5g:%d, drop rssi threshold 5g:%d, penalty threshold 5g:%d, boost threshold 5g:%d",
+			req->raise_rssi_thresh_5g,
+			req->drop_rssi_thresh_5g,
+			req->penalty_threshold_5g,
+			req->boost_threshold_5g);
+	target_if_debug("RSO_CFG: raise factor 5g:%d, drop factor 5g:%d, max raise rssi 5g:%d, max drop rssi 5g:%d, rssi threshold offset 5g:%d",
+			req->raise_factor_5g,
+			req->raise_factor_5g,
+			req->max_raise_rssi_5g,
+			req->max_drop_rssi_5g,
+			req->rssi_thresh_offset_5g);
+	target_if_debug("RSO_CFG: BG Scan Bad RSSI:%d, bitmap:0x%x Offset for 2G to 5G Roam:%d",
 			req->bg_scan_bad_rssi_thresh,
 			req->bg_scan_client_bitmap,
 			req->roam_bad_rssi_thresh_offset_2g);
+	target_if_debug("RSO_CFG: Roam data rssi triggers:0x%x, threshold:%d, rx time:%d",
+			req->roam_data_rssi_threshold_triggers,
+			req->roam_data_rssi_threshold,
+			req->rx_data_inactivity_time);
 
 	status = wmi_unified_roam_scan_offload_rssi_thresh_cmd(wmi_handle, req);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -601,6 +633,26 @@ target_if_cm_roam_scan_offload_ap_profile(
 }
 
 /**
+ * target_if_cm_roam_scan_mawc_params() - send roam macw to
+ * firmware
+ * @wmi_handle: wmi handle
+ * @req: roam macw parameters
+ *
+ * Send WMI_ROAM_CONFIGURE_MAWC_CMDID parameters to firmware
+ *
+ * Return: QDF status
+ */
+static QDF_STATUS
+target_if_cm_roam_scan_mawc_params(wmi_unified_t wmi_handle,
+				   struct wlan_roam_mawc_params *req)
+{
+	if (!wmi_service_enabled(wmi_handle, wmi_service_hw_db2dbm_support))
+		req->best_ap_rssi_threshold -= NOISE_FLOOR_DBM_DEFAULT;
+
+	return wmi_unified_roam_mawc_params_cmd(wmi_handle, req);
+}
+
+/**
  * target_if_cm_roam_scan_filter() - send roam scan filter to firmware
  * @wmi_handle: wmi handle
  * @command: rso command
@@ -644,6 +696,11 @@ target_if_cm_roam_scan_filter(wmi_unified_t wmi_handle, uint8_t command,
 		}
 	}
 
+	target_if_debug("RSO_CFG: vdev %d op_bitmap:0x%x num_rssi_rejection_ap:%d delta_rssi:%d",
+			req->filter_params.vdev_id,
+			req->filter_params.op_bitmap,
+			req->filter_params.num_rssi_rejection_ap,
+			req->filter_params.delta_rssi);
 	status = wmi_unified_roam_scan_filter_cmd(wmi_handle,
 						  &req->filter_params);
 	return status;
@@ -662,10 +719,6 @@ static QDF_STATUS
 target_if_cm_roam_scan_btm_offload(wmi_unified_t wmi_handle,
 				   struct wlan_roam_btm_config *req)
 {
-	target_if_debug("vdev %u btm_offload:%u btm_query_bitmask:%u btm_candidate_min_score:%d",
-			req->vdev_id, req->btm_offload_config,
-			req->btm_query_bitmask, req->btm_candidate_min_score);
-
 	return wmi_unified_send_btm_config(wmi_handle, req);
 }
 
@@ -703,6 +756,42 @@ target_if_cm_roam_offload_11k_params(wmi_unified_t wmi_handle,
 		target_if_err("failed to send 11k offload command");
 
 	return status;
+}
+
+/**
+ * target_if_cm_roam_bss_load_config() - send bss load config params to firmware
+ * @wmi_handle: wmi handle
+ * @req: bss load config parameters
+ *
+ * Send WMI_ROAM_BSS_LOAD_CONFIG_CMDID parameters to firmware
+ *
+ * Return: QDF status
+ */
+static void
+target_if_cm_roam_bss_load_config(wmi_unified_t wmi_handle,
+				  struct wlan_roam_bss_load_config *req)
+{
+	QDF_STATUS status;
+	bool db2dbm_enabled;
+
+	db2dbm_enabled = wmi_service_enabled(wmi_handle,
+					     wmi_service_hw_db2dbm_support);
+	if (!db2dbm_enabled) {
+		req->rssi_threshold_5ghz -= NOISE_FLOOR_DBM_DEFAULT;
+		req->rssi_threshold_5ghz &= 0x000000ff;
+
+		req->rssi_threshold_24ghz -= NOISE_FLOOR_DBM_DEFAULT;
+		req->rssi_threshold_24ghz &= 0x000000ff;
+	}
+
+	target_if_debug("RSO_CFG: bss load trig params vdev_id:%u threshold:%u sample_time:%u 5Ghz RSSI threshold:%d 2.4G rssi threshold:%d",
+			req->vdev_id, req->bss_load_threshold,
+			req->bss_load_sample_time, req->rssi_threshold_5ghz,
+			req->rssi_threshold_24ghz);
+
+	status = wmi_unified_send_bss_load_config(wmi_handle, req);
+	if (QDF_IS_STATUS_ERROR(status))
+		target_if_err("failed to send bss load trigger config command");
 }
 
 static uint32_t
@@ -753,6 +842,44 @@ target_if_cm_roam_send_roam_init(struct wlan_objmgr_vdev *vdev,
 }
 
 /**
+ * target_if_cm_roam_scan_rssi_change_cmd()  - Send WMI_ROAM_SCAN_RSSI_CHANGE
+ * command to firmware
+ * @vdev:  Vdev object
+ * @params: RSSI change parameters
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS target_if_cm_roam_scan_rssi_change_cmd(
+			wmi_unified_t wmi_handle,
+			struct wlan_roam_rssi_change_params *params)
+{
+	/*
+	 * Start new rssi triggered scan only if it changes by
+	 * RoamRssiDiff value. Beacon weight of 14 means average rssi
+	 * is taken over 14 previous samples + 2 times the current
+	 * beacon's rssi.
+	 */
+	return wmi_unified_roam_scan_offload_rssi_change_cmd(wmi_handle,
+							     params);
+}
+
+/**
+ * target_if_cm_roam_offload_chan_list  - Send WMI_ROAM_CHAN_LIST command to
+ * firmware
+ * @wmi_handle: Pointer to wmi handle
+ * @rso_chan_info: RSO channel list info
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS target_if_cm_roam_offload_chan_list(
+		wmi_unified_t wmi_handle,
+		struct wlan_roam_scan_channel_list *rso_chan_info)
+{
+	return wmi_unified_roam_scan_offload_chan_list_cmd(wmi_handle,
+							   rso_chan_info);
+}
+
+/**
  * target_if_cm_roam_send_start() - Send roam start related commands
  * to wmi
  * @vdev: vdev object
@@ -768,6 +895,8 @@ target_if_cm_roam_send_start(struct wlan_objmgr_vdev *vdev,
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	wmi_unified_t wmi_handle;
+	struct wlan_objmgr_psoc *psoc;
+	bool bss_load_enabled;
 
 	wmi_handle = target_if_cm_roam_get_wmi_handle_from_vdev(vdev);
 	if (!wmi_handle)
@@ -790,7 +919,7 @@ target_if_cm_roam_send_start(struct wlan_objmgr_vdev *vdev,
 
 	target_if_cm_roam_reason_vsie(wmi_handle, &req->reason_vsie_enable);
 
-	target_if_cm_roam_triggers(wmi_handle, &req->roam_triggers);
+	target_if_cm_roam_triggers(vdev, &req->roam_triggers);
 
 	/* Opportunistic scan runs on a timer, value set by
 	 * empty_scan_refresh_period. Age out the entries after 3 such
@@ -804,11 +933,46 @@ target_if_cm_roam_send_start(struct wlan_objmgr_vdev *vdev,
 			goto end;
 	}
 
+	status = target_if_cm_roam_scan_rssi_change_cmd(
+			wmi_handle, &req->rssi_change_params);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		target_if_err("vdev:%d Sending rssi change threshold failed",
+			      req->rssi_change_params.vdev_id);
+		goto end;
+	}
+
 	status = target_if_cm_roam_scan_offload_ap_profile(
 							vdev, wmi_handle,
 							&req->profile_params);
 	if (QDF_IS_STATUS_ERROR(status))
 		goto end;
+
+	status = target_if_cm_roam_offload_chan_list(wmi_handle,
+						     &req->rso_chan_info);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		target_if_err("vdev:%d Send channel list command failed",
+			      req->rso_chan_info.vdev_id);
+		goto end;
+	}
+
+	if (wmi_service_enabled(wmi_handle, wmi_service_mawc_support)) {
+		status = target_if_cm_roam_scan_mawc_params(wmi_handle,
+							    &req->mawc_params);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			target_if_err("Sending roaming MAWC params failed");
+			goto end;
+		}
+	} else {
+		target_if_debug("MAWC roaming not supported by firmware");
+	}
+
+	status = target_if_cm_roam_scan_offload_mode(wmi_handle,
+						     &req->rso_config);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		target_if_err("vdev:%d Send RSO mode cmd failed",
+			      req->rso_config.vdev_id);
+		goto end;
+	}
 
 	status = target_if_cm_roam_scan_filter(wmi_handle,
 					       ROAM_SCAN_OFFLOAD_START,
@@ -835,6 +999,17 @@ target_if_cm_roam_send_start(struct wlan_objmgr_vdev *vdev,
 		target_if_err("11k offload enable not sent, status %d", status);
 		goto end;
 	}
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		target_if_err("psoc handle is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	wlan_mlme_get_bss_load_enabled(psoc, &bss_load_enabled);
+	if (bss_load_enabled)
+		target_if_cm_roam_bss_load_config(wmi_handle,
+						  &req->bss_load_config);
 
 	target_if_cm_roam_disconnect_params(wmi_handle, ROAM_SCAN_OFFLOAD_START,
 					    &req->disconnect_params);
@@ -908,6 +1083,14 @@ target_if_cm_roam_send_stop(struct wlan_objmgr_vdev *vdev,
 			mode = WMI_ROAM_SCAN_MODE_NONE;
 	}
 
+	status = target_if_cm_roam_scan_offload_mode(wmi_handle,
+						     &req->rso_config);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		target_if_err("vdev:%d Send RSO mode cmd failed",
+			      req->rso_config.vdev_id);
+		goto end;
+	}
+
 	/*
 	 * After sending the roam scan mode because of a disconnect,
 	 * clear the scan bitmap client as well by sending
@@ -945,7 +1128,8 @@ target_if_cm_roam_send_stop(struct wlan_objmgr_vdev *vdev,
 	if (mode == WMI_ROAM_SCAN_MODE_NONE) {
 		req->roam_triggers.vdev_id = vdev_id;
 		req->roam_triggers.trigger_bitmap = 0;
-		target_if_cm_roam_triggers(wmi_handle, &req->roam_triggers);
+		req->roam_triggers.roam_scan_scheme_bitmap = 0;
+		target_if_cm_roam_triggers(vdev, &req->roam_triggers);
 	}
 end:
 	return status;
@@ -1003,18 +1187,44 @@ target_if_cm_roam_send_update_config(struct wlan_objmgr_vdev *vdev,
 			goto end;
 	}
 
+	status = target_if_cm_roam_scan_rssi_change_cmd(
+			wmi_handle, &req->rssi_change_params);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		target_if_err("vdev:%d Sending rssi change threshold failed",
+			      req->rssi_change_params.vdev_id);
+		goto end;
+	}
+
 	status = target_if_cm_roam_scan_offload_ap_profile(
 							vdev, wmi_handle,
 							&req->profile_params);
 	if (QDF_IS_STATUS_ERROR(status))
 		goto end;
+
+	status = target_if_cm_roam_offload_chan_list(wmi_handle,
+						     &req->rso_chan_info);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		target_if_err("vdev:%d Send channel list command failed",
+			      req->rso_chan_info.vdev_id);
+		goto end;
+	}
+
 	psoc = wlan_vdev_get_psoc(vdev);
 	if (!psoc) {
 		target_if_err("psoc handle is NULL");
 		return QDF_STATUS_E_INVAL;
 	}
 	vdev_id = wlan_vdev_get_id(vdev);
-	if (!MLME_IS_ROAM_STATE_RSO_ENABLED(psoc, vdev_id)) {
+
+	if (MLME_IS_ROAM_STATE_RSO_ENABLED(psoc, vdev_id)) {
+		status = target_if_cm_roam_scan_offload_mode(wmi_handle,
+							     &req->rso_config);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			target_if_err("vdev:%d Send RSO mode cmd failed",
+				      req->rso_config.vdev_id);
+			goto end;
+		}
+
 		target_if_cm_roam_disconnect_params(
 				wmi_handle, ROAM_SCAN_OFFLOAD_UPDATE_CFG,
 				&req->disconnect_params);
@@ -1022,7 +1232,7 @@ target_if_cm_roam_send_update_config(struct wlan_objmgr_vdev *vdev,
 		target_if_cm_roam_idle_params(
 				wmi_handle, ROAM_SCAN_OFFLOAD_UPDATE_CFG,
 				&req->idle_params);
-		target_if_cm_roam_triggers(wmi_handle, &req->roam_triggers);
+		target_if_cm_roam_triggers(vdev, &req->roam_triggers);
 	}
 end:
 	return status;
@@ -1075,6 +1285,51 @@ target_if_cm_roam_per_config(struct wlan_objmgr_vdev *vdev,
 }
 
 /**
+ * target_if_cm_roam_send_disable_config() - Send roam disable config related
+ * commands to wmi
+ * @vdev: vdev object
+ * @req: roam disable config parameters
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+target_if_cm_roam_send_disable_config(struct wlan_objmgr_vdev *vdev,
+				      struct roam_disable_cfg *req)
+{
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	wmi_unified_t wmi_handle;
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme) {
+		target_if_err("Failed to get vdev mlme obj!");
+		goto end;
+	}
+
+	if (vdev_mlme->mgmt.generic.type != WMI_VDEV_TYPE_STA ||
+	    vdev_mlme->mgmt.generic.subtype != 0) {
+		target_if_err("This isn't a STA: %d", req->vdev_id);
+		goto end;
+	}
+
+	wmi_handle = target_if_cm_roam_get_wmi_handle_from_vdev(vdev);
+	if (!wmi_handle)
+		goto end;
+
+	status = target_if_vdev_set_param(
+				wmi_handle,
+				req->vdev_id,
+				WMI_VDEV_PARAM_ROAM_11KV_CTRL,
+				req->cfg);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		target_if_err("Failed to set WMI_VDEV_PARAM_ROAM_11KV_CTRL");
+
+end:
+	return status;
+}
+
+/**
  * target_if_cm_roam_register_rso_req_ops() - Register rso req tx ops fucntions
  * @tx_ops: tx ops
  *
@@ -1091,6 +1346,9 @@ target_if_cm_roam_register_rso_req_ops(struct wlan_cm_roam_tx_ops *tx_ops)
 	tx_ops->send_roam_update_config = target_if_cm_roam_send_update_config;
 	tx_ops->send_roam_abort = target_if_cm_roam_abort;
 	tx_ops->send_roam_per_config = target_if_cm_roam_per_config;
+	tx_ops->send_roam_triggers = target_if_cm_roam_triggers;
+	tx_ops->send_roam_disable_config =
+					target_if_cm_roam_send_disable_config;
 }
 #else
 static void
