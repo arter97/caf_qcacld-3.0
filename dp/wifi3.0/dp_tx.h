@@ -25,15 +25,21 @@
 
 #define DP_TX_MAX_NUM_FRAGS 6
 
-#define DP_TX_DESC_FLAG_ALLOCATED	0x1
+/*
+ * DP_TX_DESC_FLAG_FRAG flags should always be defined to 0x1
+ * please do not change this flag's definition
+ */
+#define DP_TX_DESC_FLAG_FRAG		0x1
 #define DP_TX_DESC_FLAG_TO_FW		0x2
-#define DP_TX_DESC_FLAG_FRAG		0x4
+#define DP_TX_DESC_FLAG_ALLOCATED	0x4
 #define DP_TX_DESC_FLAG_RAW		0x8
 #define DP_TX_DESC_FLAG_MESH		0x10
 #define DP_TX_DESC_FLAG_QUEUED_TX	0x20
 #define DP_TX_DESC_FLAG_COMPLETED_TX	0x40
 #define DP_TX_DESC_FLAG_ME		0x80
 #define DP_TX_DESC_FLAG_TDLS_FRAME	0x100
+
+#define DP_TX_EXT_DESC_FLAG_METADATA_VALID 0x1
 
 #define DP_TX_FREE_SINGLE_BUF(soc, buf)                  \
 do {                                                           \

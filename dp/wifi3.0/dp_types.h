@@ -307,6 +307,7 @@ struct dp_tx_ext_desc_elem_s {
 	struct dp_tx_ext_desc_elem_s *next;
 	void *vaddr;
 	qdf_dma_addr_t paddr;
+	uint16_t flags;
 };
 
 /**
@@ -356,20 +357,22 @@ struct dp_tx_ext_desc_pool_s {
 struct dp_tx_desc_s {
 	struct dp_tx_desc_s *next;
 	qdf_nbuf_t nbuf;
-	struct dp_tx_ext_desc_elem_s *msdu_ext_desc;
+	uint16_t length;
+	uint16_t flags;
 	uint32_t  id;
+	qdf_dma_addr_t dma_addr;
+	struct dp_tx_ext_desc_elem_s *msdu_ext_desc;
 	struct dp_vdev *vdev;
 	struct dp_pdev *pdev;
 	uint8_t  pool_id;
-	uint16_t flags;
-	struct hal_tx_desc_comp_s comp;
-	uint16_t tx_encap_type;
+	uint8_t tx_encap_type;
 	uint8_t frm_type;
 	uint8_t pkt_offset;
 	void *me_buffer;
 	void *tso_desc;
 	void *tso_num_desc;
 	uint64_t timestamp;
+	struct hal_tx_desc_comp_s comp;
 };
 
 /**
