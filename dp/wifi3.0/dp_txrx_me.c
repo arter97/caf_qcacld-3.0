@@ -454,7 +454,6 @@ dp_tx_me_send_convert_ucast(struct cdp_soc_t *soc, uint8_t vdev_id,
 	}
 	qdf_mem_free(seg_info_head);
 
-	qdf_nbuf_unmap(pdev->soc->osdev, nbuf, QDF_DMA_TO_DEVICE);
 	qdf_nbuf_free(nbuf);
 	return new_mac_cnt;
 
