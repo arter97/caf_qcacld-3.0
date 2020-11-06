@@ -82,6 +82,10 @@
 #include "wlan_mlme_api.h"
 #include "wlan_mlme_main.h"
 
+#ifdef FEATURE_STA_MODE_VOTE_LINK
+#include "wlan_ipa_ucfg_api.h"
+#endif
+
 /**
  * wma_find_vdev_by_addr() - find vdev_id from mac address
  * @wma: wma handle
@@ -5948,6 +5952,19 @@ static void wma_sap_allow_runtime_pm(tp_wma_handle wma)
 	qdf_runtime_pm_allow_suspend(&wma->sap_prevent_runtime_pm_lock);
 }
 
+#ifdef FEATURE_STA_MODE_VOTE_LINK
+static bool wma_add_sta_allow_sta_mode_vote_link(uint8_t oper_mode)
+{
+	return ucfg_ipa_is_enabled();
+
+}
+#else /* !FEATURE_STA_MODE_VOTE_LINK */
+static bool wma_add_sta_allow_sta_mode_vote_link(uint8_t oper_mode)
+{
+	return false;
+}
+#endif /* FEATURE_STA_MODE_VOTE_LINK */
+
 /**
  * wma_add_sta() - process add sta request as per opmode
  * @wma: wma handle
@@ -5981,6 +5998,10 @@ void wma_add_sta(tp_wma_handle wma, tpAddStaParams add_sta)
 		oper_mode = BSS_OPERATIONAL_MODE_NDI;
 	switch (oper_mode) {
 	case BSS_OPERATIONAL_MODE_STA:
+		if (wma_add_sta_allow_sta_mode_vote_link(oper_mode) &&
+		    !qdf_is_drv_connected())
+			htc_vote_link_up(htc_handle);
+
 		wma_add_sta_req_sta_mode(wma, add_sta);
 		break;
 
@@ -6044,6 +6065,10 @@ void wma_delete_sta(tp_wma_handle wma, tpDeleteStaParams del_sta)
 
 	switch (oper_mode) {
 	case BSS_OPERATIONAL_MODE_STA:
+		if (wma_add_sta_allow_sta_mode_vote_link(oper_mode) &&
+		    !qdf_is_drv_connected())
+			htc_vote_link_down(htc_handle);
+
 		wma_delete_sta_req_sta_mode(wma, del_sta);
 		if (wma_is_roam_synch_in_progress(wma, smesession_id)) {
 			WMA_LOGD(FL("LFR3: Del STA on vdev_id %d"),
