@@ -4960,26 +4960,6 @@ static QDF_STATUS sap_get_channel_list(ptSapContext sap_ctx,
 				  cds_disallow_mcc(CDS_CHANNEL_NUM(loop_count)))
 			continue;
 
-		/*
-		 * If we have any 5Ghz channel in the channel list
-		 * and bw is 40/80/160 Mhz then we don't want SAP to
-		 * come up in 2.4Ghz as for 40Mhz, 2.4Ghz channel is
-		 * not preferred and 80/160Mhz is not allowed for 2.4Ghz
-		 * band. So, don't even scan on 2.4Ghz channels if bw is
-		 * 40/80/160Mhz and channel list has any 5Ghz channel.
-		 */
-		if (end_ch_num >= CDS_CHANNEL_NUM(CHAN_ENUM_36) &&
-		    ((ch_width == CH_WIDTH_40MHZ) ||
-		     (ch_width == CH_WIDTH_80MHZ) ||
-		     (ch_width == CH_WIDTH_80P80MHZ) ||
-		     (ch_width == CH_WIDTH_160MHZ))) {
-			if (CDS_CHANNEL_NUM(loop_count) >=
-			    CDS_CHANNEL_NUM(CHAN_ENUM_1) &&
-			    CDS_CHANNEL_NUM(loop_count) <=
-			    CDS_CHANNEL_NUM(CHAN_ENUM_14))
-				continue;
-		}
-
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
 		uint8_t ch;
 
