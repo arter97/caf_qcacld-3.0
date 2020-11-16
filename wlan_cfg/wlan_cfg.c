@@ -1481,3 +1481,15 @@ uint8_t wlan_cfg_radio2_default_reo_get(struct wlan_cfg_dp_soc_ctxt *cfg)
 {
 	return cfg->radio2_rx_default_reo;
 }
+
+#ifdef QCA_LOWMEM_CONFIG
+void wlan_cfg_set_rxdma1_enable(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	cfg->rxdma1_enable = false;
+}
+#else
+void wlan_cfg_set_rxdma1_enable(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	cfg->rxdma1_enable = true;
+}
+#endif
