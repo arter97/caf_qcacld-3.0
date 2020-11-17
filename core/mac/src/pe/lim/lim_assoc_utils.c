@@ -2098,9 +2098,20 @@ static void lim_update_he_stbc_capable(tpAddStaParams add_sta_params)
 		add_sta_params->stbc_capable =
 			add_sta_params->he_config.rx_stbc_lt_80mhz;
 }
+
+static bool lim_is_add_sta_params_he_capable(tpAddStaParams add_sta_params)
+{
+	return add_sta_params->he_capable;
+}
+
 #else
 static void lim_update_he_stbc_capable(tpAddStaParams add_sta_params)
 {}
+
+static bool lim_is_add_sta_params_he_capable(tpAddStaParams add_sta_params)
+{
+	return false;
+}
 #endif
 
 /**
@@ -2508,7 +2519,8 @@ lim_add_sta(struct mac_context *mac_ctx,
 
 	add_sta_params->nwType = session_entry->nwType;
 
-	if (!(add_sta_params->htCapable || add_sta_params->vhtCapable)) {
+	if (!(add_sta_params->htCapable || add_sta_params->vhtCapable ||
+	    lim_is_add_sta_params_he_capable(add_sta_params))) {
 		nw_type_11b = 1;
 		for (i = 0; i < SIR_NUM_11A_RATES; i++) {
 			if (sirIsArate(sta_ds->supportedRates.llaRates[i] &
