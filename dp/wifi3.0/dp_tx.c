@@ -3316,7 +3316,7 @@ dp_tx_comp_process_desc_list(struct dp_soc *soc,
 
 		netbuf = desc->nbuf;
 		/* check tx complete notification */
-		if (QDF_NBUF_CB_TX_EXTRA_FRAG_FLAGS_NOTIFY_COMP(netbuf))
+		if (peer && qdf_nbuf_tx_notify_comp_get(netbuf))
 			dp_tx_notify_completion(soc, desc, netbuf);
 
 		dp_tx_comp_process_desc(soc, desc, &ts, peer);
