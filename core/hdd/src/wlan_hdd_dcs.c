@@ -55,6 +55,8 @@ static void hdd_dcs_cb(struct wlan_objmgr_psoc *psoc, uint8_t mac_id,
 
 	if (policy_mgr_is_force_scc(psoc) &&
 	    policy_mgr_is_sta_gc_active_on_mac(psoc, mac_id)) {
+		ucfg_config_dcs_event_data(psoc, mac_id, true);
+
 		hdd_debug("force scc %d, mac id %d sta gc count %d",
 			  policy_mgr_is_force_scc(psoc), mac_id,
 			  policy_mgr_is_sta_gc_active_on_mac(psoc, mac_id));
@@ -182,8 +184,7 @@ static void hdd_dcs_hostapd_enable_wlan_interference_mitigation(
 	if (wlansap_dcs_is_wlan_interference_mitigation_enabled(
 			WLAN_HDD_GET_SAP_CTX_PTR(adapter)) &&
 	    wlan_reg_is_5ghz_ch_freq(adapter->session.ap.operating_chan_freq))
-		ucfg_config_dcs_enable(hdd_ctx->psoc, mac_id, CAP_DCS_WLANIM);
-	ucfg_wlan_dcs_cmd(hdd_ctx->psoc, mac_id, true);
+		ucfg_config_dcs_event_data(hdd_ctx->psoc, mac_id, true);
 }
 
 void hdd_dcs_chan_select_complete(struct hdd_adapter *adapter)
@@ -222,16 +223,18 @@ void hdd_dcs_clear(struct hdd_adapter *adapter)
 
 	psoc = hdd_ctx->psoc;
 
-	if (wlansap_dcs_is_wlan_interference_mitigation_enabled(
-				WLAN_HDD_GET_SAP_CTX_PTR(adapter))) {
-		status = policy_mgr_get_mac_id_by_session_id(psoc,
-							     adapter->vdev_id,
-							     &mac_id);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			hdd_err("get mac id failed");
-			return;
-		}
-		if (policy_mgr_get_sap_go_count_on_mac(psoc, list, mac_id) <= 1)
+	status = policy_mgr_get_mac_id_by_session_id(psoc, adapter->vdev_id,
+						     &mac_id);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("get mac id failed");
+		return;
+	}
+
+	if (policy_mgr_get_sap_go_count_on_mac(psoc, list, mac_id) <= 1) {
+		ucfg_config_dcs_disable(psoc, mac_id, CAP_DCS_WLANIM);
+		ucfg_wlan_dcs_cmd(psoc, mac_id, true);
+		if (wlansap_dcs_is_wlan_interference_mitigation_enabled(
+					WLAN_HDD_GET_SAP_CTX_PTR(adapter)))
 			ucfg_dcs_clear(psoc, mac_id);
 	}
 
