@@ -6630,6 +6630,10 @@ dp_print_soc_rx_stats(struct dp_soc *soc)
 	DP_PRINT_STATS("REO Error(0-14):%s", reo_error);
 	DP_PRINT_STATS("REO CMD SEND FAIL: %d",
 		       soc->stats.rx.err.reo_cmd_send_fail);
+	DP_PRINT_STATS("Rxdma2rel route drop:%d",
+		       soc->stats.rx.rxdma2rel_route_drop);
+	DP_PRINT_STATS("Reo2rel route drop:%d",
+		       soc->stats.rx.reo2rel_route_drop);
 }
 
 #ifdef FEATURE_TSO_STATS
