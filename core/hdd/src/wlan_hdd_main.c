@@ -3049,8 +3049,6 @@ static bool hdd_max_sta_interface_up_count_reached(struct hdd_adapter *adapter)
 		    ((temp_adapter->device_mode == QDF_STA_MODE) ||
 		     (temp_adapter->device_mode == QDF_P2P_CLIENT_MODE)))
 			intf_count++;
-
-		dev_put(temp_adapter->dev);
 	}
 
 	if (intf_count >= CFG_TGT_DEFAULT_MAX_STA_VDEVS) {
