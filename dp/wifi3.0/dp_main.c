@@ -9923,6 +9923,7 @@ int dp_set_pktlog_wifi3(struct dp_pdev *pdev, uint32_t event,
 				/* Nothing needs to be done if monitor mode is
 				 * enabled
 				 */
+				pdev->rx_pktlog_mode = DP_RX_PKTLOG_FULL;
 				return 0;
 			}
 			if (pdev->rx_pktlog_mode != DP_RX_PKTLOG_FULL) {
@@ -9974,6 +9975,7 @@ int dp_set_pktlog_wifi3(struct dp_pdev *pdev, uint32_t event,
 				/* Nothing needs to be done if monitor mode is
 				 * enabled
 				 */
+				pdev->rx_pktlog_mode = DP_RX_PKTLOG_LITE;
 				return 0;
 			}
 
@@ -10017,13 +10019,6 @@ int dp_set_pktlog_wifi3(struct dp_pdev *pdev, uint32_t event,
 			break;
 
 		case WDI_EVENT_LITE_T2H:
-			if (pdev->monitor_vdev) {
-				/* Nothing needs to be done if monitor mode is
-				 * enabled
-				 */
-				return 0;
-			}
-
 			for (mac_id = 0; mac_id < max_mac_rings; mac_id++) {
 				int mac_for_pdev = dp_get_mac_id_for_pdev(
 							mac_id,	pdev->pdev_id);
@@ -10047,6 +10042,7 @@ int dp_set_pktlog_wifi3(struct dp_pdev *pdev, uint32_t event,
 				/* Nothing needs to be done if monitor mode is
 				 * enabled
 				 */
+				pdev->rx_pktlog_mode = DP_RX_PKTLOG_DISABLED;
 				return 0;
 			}
 			if (pdev->rx_pktlog_mode != DP_RX_PKTLOG_DISABLED) {
@@ -10072,12 +10068,6 @@ int dp_set_pktlog_wifi3(struct dp_pdev *pdev, uint32_t event,
 			}
 			break;
 		case WDI_EVENT_LITE_T2H:
-			if (pdev->monitor_vdev) {
-				/* Nothing needs to be done if monitor mode is
-				 * enabled
-				 */
-				return 0;
-			}
 			/* To disable HTT_H2T_MSG_TYPE_PPDU_STATS_CFG in FW
 			 * passing value 0. Once these macros will define in htt
 			 * header file will use proper macros
