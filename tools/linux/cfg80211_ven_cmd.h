@@ -783,6 +783,7 @@ enum {
 	IEEE80211_PARAM_DISABLE_INACT_PROBING      = 722, /* Disable FW inactivity Probing behavior */
 	IEEE80211_PARAM_PRB_RETRY                  = 723,   /* Set/Get probe-response frame retry limit */
 	IEEE80211_PARAM_PEER_AUTHORIZE             = 724, /* Enable port authorization */
+	IEEE80211_PARAM_RTS                        = 725,   /* Vdev specific minimum packet size setting for which RTS/CTS is used */
 };
 
 enum {
@@ -2252,6 +2253,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_disable_fw_inact_probe",  IEEE80211_PARAM_DISABLE_INACT_PROBING, GET_PARAM, 0},
 	{"peer_authorize ",     IEEE80211_PARAM_PEER_AUTHORIZE, SET_PARAM, 1},
 	{"g_peer_authorize ",     IEEE80211_PARAM_PEER_AUTHORIZE, GET_PARAM, 0},
+	{"rts",                       IEEE80211_PARAM_RTS, SET_PARAM, 1},
+	{"get_rts",                   IEEE80211_PARAM_RTS, GET_PARAM, 0},
 };
 
 struct vendor_commands radio_vendor_cmds[] = {
