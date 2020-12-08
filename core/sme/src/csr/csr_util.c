@@ -1077,7 +1077,7 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 
 	sme_debug("intf_ch:%d sap_ch:%d cc_switch_mode:%d, dbs:%d",
 		  intf_ch_freq, sap_ch_freq, cc_switch_mode,
-		  policy_mgr_is_dbs_enable(mac_ctx->psoc));
+		  policy_mgr_is_hw_dbs_capable(mac_ctx->psoc));
 
 	if (intf_ch_freq && sap_ch_freq != intf_ch_freq &&
 	    !policy_mgr_is_force_scc(mac_ctx->psoc)) {
@@ -1102,7 +1102,7 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 		       sap_ch_freq <= wlan_reg_ch_to_freq(CHAN_ENUM_2484)) ||
 		     (intf_ch_freq > wlan_reg_ch_to_freq(CHAN_ENUM_2484) &&
 		      sap_ch_freq > wlan_reg_ch_to_freq(CHAN_ENUM_2484)))) {
-			if (policy_mgr_is_dbs_enable(mac_ctx->psoc) ||
+			if (policy_mgr_is_hw_dbs_capable(mac_ctx->psoc) ||
 			    cc_switch_mode ==
 			    QDF_MCC_TO_SCC_WITH_PREFERRED_BAND)
 				intf_ch_freq = 0;
@@ -1166,7 +1166,6 @@ uint8_t csr_get_connected_infra(struct mac_context *mac_ctx)
 
 	return connected_session;
 }
-
 
 bool csr_is_concurrent_session_running(struct mac_context *mac)
 {
@@ -1414,19 +1413,7 @@ QDF_STATUS csr_parse_bss_description_ies(struct mac_context *mac_ctx,
 					 struct bss_description *bss_desc,
 					 tDot11fBeaconIEs *pIEStruct)
 {
-	QDF_STATUS status = QDF_STATUS_E_FAILURE;
-	int ieLen =
-		(int)(bss_desc->length + sizeof(bss_desc->length) -
-		      GET_FIELD_OFFSET(struct bss_description, ieFields));
-
-	if (ieLen > 0 && pIEStruct) {
-		if (!DOT11F_FAILED(dot11f_unpack_beacon_i_es
-				    (mac_ctx, (uint8_t *)bss_desc->ieFields,
-				    ieLen, pIEStruct, false)))
-		status = QDF_STATUS_SUCCESS;
-	}
-
-	return status;
+	return wlan_parse_bss_description_ies(mac_ctx, bss_desc, pIEStruct);
 }
 
 /* This function will allocate memory for the parsed IEs to the caller.
@@ -1437,26 +1424,8 @@ QDF_STATUS csr_get_parsed_bss_description_ies(struct mac_context *mac_ctx,
 					      struct bss_description *bss_desc,
 					      tDot11fBeaconIEs **ppIEStruct)
 {
-	QDF_STATUS status = QDF_STATUS_E_INVAL;
-
-	if (bss_desc && ppIEStruct) {
-		*ppIEStruct = qdf_mem_malloc(sizeof(tDot11fBeaconIEs));
-		if ((*ppIEStruct) != NULL) {
-			status = csr_parse_bss_description_ies(mac_ctx,
-							       bss_desc,
-							       *ppIEStruct);
-			if (!QDF_IS_STATUS_SUCCESS(status)) {
-				qdf_mem_free(*ppIEStruct);
-				*ppIEStruct = NULL;
-			}
-		} else {
-			sme_err("failed to allocate memory");
-			QDF_ASSERT(0);
-			return QDF_STATUS_E_NOMEM;
-		}
-	}
-
-	return status;
+	return wlan_get_parsed_bss_description_ies(mac_ctx, bss_desc,
+						   ppIEStruct);
 }
 
 bool csr_is_nullssid(uint8_t *pBssSsid, uint8_t len)

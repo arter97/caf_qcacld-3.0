@@ -197,6 +197,7 @@
 #include "qdf_lock.h"
 #include "wlan_hdd_thermal.h"
 #include "osif_cm_util.h"
+#include "wlan_hdd_gpio_wakeup.h"
 
 #ifdef MODULE
 #define WLAN_MODULE_NAME  module_name(THIS_MODULE)
@@ -224,6 +225,12 @@
 
 /* PCIe gen speed change idle shutdown timer 100 milliseconds */
 #define HDD_PCIE_GEN_SPEED_CHANGE_TIMEOUT_MS (100)
+
+#ifdef FEATURE_TSO
+#define TSO_FEATURE_FLAGS (NETIF_F_TSO | NETIF_F_TSO6 | NETIF_F_SG)
+#else
+#define TSO_FEATURE_FLAGS 0
+#endif
 
 int wlan_start_ret_val;
 static DECLARE_COMPLETION(wlan_start_comp);
@@ -1428,6 +1435,7 @@ static void hdd_runtime_suspend_context_init(struct hdd_context *hdd_ctx)
 	qdf_runtime_lock_init(&ctx->dfs);
 	qdf_runtime_lock_init(&ctx->connect);
 	qdf_runtime_lock_init(&ctx->user);
+	qdf_runtime_lock_init(&ctx->monitor_mode);
 
 	ctx->is_user_wakelock_acquired = false;
 
@@ -1447,6 +1455,7 @@ static void hdd_runtime_suspend_context_deinit(struct hdd_context *hdd_ctx)
 	if (ctx->is_user_wakelock_acquired)
 		qdf_runtime_pm_allow_suspend(&ctx->user);
 
+	qdf_runtime_lock_deinit(&ctx->monitor_mode);
 	qdf_runtime_lock_deinit(&ctx->user);
 	qdf_runtime_lock_deinit(&ctx->connect);
 	qdf_runtime_lock_deinit(&ctx->dfs);
@@ -2746,7 +2755,8 @@ static int __hdd_mon_open(struct net_device *dev)
 
 	hdd_mon_mode_ether_setup(dev);
 
-	if (con_mode == QDF_GLOBAL_MONITOR_MODE) {
+	if (con_mode == QDF_GLOBAL_MONITOR_MODE ||
+	    ucfg_mlme_is_sta_mon_conc_supported(hdd_ctx->psoc)) {
 		ret = hdd_trigger_psoc_idle_restart(hdd_ctx);
 		if (ret) {
 			hdd_err("Failed to start WLAN modules return");
@@ -2754,7 +2764,8 @@ static int __hdd_mon_open(struct net_device *dev)
 		}
 		hdd_err("hdd_wlan_start_modules() successful !");
 
-		if (!test_bit(SME_SESSION_OPENED, &adapter->event_flags)) {
+		if ((!test_bit(SME_SESSION_OPENED, &adapter->event_flags)) ||
+		    (policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc))) {
 			ret = hdd_start_adapter(adapter);
 			if (ret) {
 				hdd_err("Failed to start adapter :%d",
@@ -2765,6 +2776,15 @@ static int __hdd_mon_open(struct net_device *dev)
 		}
 		hdd_mon_turn_off_ps_and_wow(hdd_ctx);
 		set_bit(DEVICE_IFACE_OPENED, &adapter->event_flags);
+	}
+
+	if (con_mode != QDF_GLOBAL_MONITOR_MODE &&
+	    ucfg_mlme_is_sta_mon_conc_supported(hdd_ctx->psoc)) {
+		hdd_info("Acquire wakelock for STA + monitor mode");
+		qdf_wake_lock_acquire(&hdd_ctx->monitor_mode_wakelock,
+				      WIFI_POWER_EVENT_WAKELOCK_MONITOR_MODE);
+		qdf_runtime_pm_prevent_suspend(
+			&hdd_ctx->runtime_context.monitor_mode);
 	}
 
 	ret = hdd_set_mon_rx_cb(dev);
@@ -3028,6 +3048,44 @@ wlan_hdd_update_dbs_scan_and_fw_mode_config(void)
 }
 
 /**
+ * hdd_max_sta_interface_up_count_reached() - check sta/p2p_cli vdev count
+ * @adapter: HDD adapter
+ *
+ * Return: true if vdev limit reached
+ */
+static bool hdd_max_sta_interface_up_count_reached(struct hdd_adapter *adapter)
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_adapter *temp_adapter = NULL, *next_adapter = NULL;
+	uint8_t intf_count = 0;
+
+	if (0 == CFG_TGT_DEFAULT_MAX_STA_VDEVS)
+		return false;
+
+	/*
+	 * Check for max no of supported STA/P2PCLI VDEVs before
+	 * creating another one.
+	 */
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, temp_adapter,
+					   next_adapter) {
+		if ((temp_adapter != adapter) &&
+		    (temp_adapter->dev->flags & IFF_UP) &&
+		    ((temp_adapter->device_mode == QDF_STA_MODE) ||
+		     (temp_adapter->device_mode == QDF_P2P_CLIENT_MODE)))
+			intf_count++;
+
+		dev_put(temp_adapter->dev);
+	}
+
+	if (intf_count >= CFG_TGT_DEFAULT_MAX_STA_VDEVS) {
+		hdd_err("Max limit reached sta vdev-current %d max %d",
+			intf_count, CFG_TGT_DEFAULT_MAX_STA_VDEVS);
+		return true;
+	}
+	return false;
+}
+
+/**
  * hdd_start_adapter() - Wrapper function for device specific adapter
  * @adapter: pointer to HDD adapter
  *
@@ -3046,10 +3104,14 @@ int hdd_start_adapter(struct hdd_adapter *adapter)
 	hdd_debug("Start_adapter for mode : %d", adapter->device_mode);
 
 	switch (device_mode) {
+	case QDF_STA_MODE:
 	case QDF_P2P_CLIENT_MODE:
+		if (hdd_max_sta_interface_up_count_reached(adapter))
+			goto err_start_adapter;
+
+	/* fall through */
 	case QDF_P2P_DEVICE_MODE:
 	case QDF_OCB_MODE:
-	case QDF_STA_MODE:
 	case QDF_MONITOR_MODE:
 	case QDF_NAN_DISC_MODE:
 		ret = hdd_start_station_adapter(adapter);
@@ -4349,12 +4411,15 @@ static int __hdd_stop(struct net_device *dev)
 	if (adapter->device_mode == QDF_STA_MODE) {
 		hdd_lpass_notify_stop(hdd_ctx);
 
-		if (ucfg_pkt_capture_get_mode(hdd_ctx->psoc))
+		if (ucfg_pkt_capture_get_mode(hdd_ctx->psoc) !=
+						PACKET_CAPTURE_MODE_DISABLE)
 			hdd_close_monitor_interface(hdd_ctx);
 	}
 
 	if (wlan_hdd_is_session_type_monitor(adapter->device_mode) &&
-	    adapter->vdev) {
+	    adapter->vdev &&
+	    ucfg_pkt_capture_get_mode(hdd_ctx->psoc) !=
+						PACKET_CAPTURE_MODE_DISABLE) {
 		ucfg_pkt_capture_deregister_callbacks(adapter->vdev);
 		hdd_objmgr_put_vdev(adapter->vdev);
 		adapter->vdev = NULL;
@@ -5031,16 +5096,21 @@ static const struct net_device_ops wlan_mon_drv_ops = {
 	.ndo_get_stats = hdd_get_stats,
 };
 
-#ifdef WLAN_FEATURE_TSF_PTP
 /**
- * hdd_set_station_ops() - update net_device ops for monitor mode
+ * hdd_set_mon_ops() - update net_device ops for monitor mode
  * @dev: Handle to struct net_device to be updated.
  * Return: None
  */
+static void hdd_set_mon_ops(struct net_device *dev)
+{
+	dev->netdev_ops = &wlan_mon_drv_ops;
+}
+
+#ifdef WLAN_FEATURE_TSF_PTP
 void hdd_set_station_ops(struct net_device *dev)
 {
 	if (cds_get_conparam() == QDF_GLOBAL_MONITOR_MODE) {
-		dev->netdev_ops = &wlan_mon_drv_ops;
+		hdd_set_mon_ops(dev);
 	} else {
 		dev->netdev_ops = &wlan_drv_ops;
 		dev->ethtool_ops = &wlan_ethtool_ops;
@@ -5050,7 +5120,7 @@ void hdd_set_station_ops(struct net_device *dev)
 void hdd_set_station_ops(struct net_device *dev)
 {
 	if (cds_get_conparam() == QDF_GLOBAL_MONITOR_MODE)
-		dev->netdev_ops = &wlan_mon_drv_ops;
+		hdd_set_mon_ops(dev);
 	else
 		dev->netdev_ops = &wlan_drv_ops;
 }
@@ -5069,6 +5139,9 @@ void hdd_set_station_ops(struct net_device *dev)
 	dev->netdev_ops = &wlan_drv_ops;
 }
 #endif
+static void hdd_set_mon_ops(struct net_device *dev)
+{
+}
 #endif
 
 #ifdef WLAN_FEATURE_PKT_CAPTURE
@@ -5164,10 +5237,15 @@ hdd_alloc_station_adapter(struct hdd_context *hdd_ctx, tSirMacAddr mac_addr,
 	qdf_mem_copy(adapter->mac_addr.bytes, mac_addr, sizeof(tSirMacAddr));
 	dev->watchdog_timeo = HDD_TX_TIMEOUT;
 
-	if (wlan_hdd_is_session_type_monitor(session_type))
-		hdd_set_pktcapture_ops(adapter->dev);
-	else
+	if (wlan_hdd_is_session_type_monitor(session_type)) {
+		if (ucfg_pkt_capture_get_mode(hdd_ctx->psoc) !=
+						PACKET_CAPTURE_MODE_DISABLE)
+			hdd_set_pktcapture_ops(adapter->dev);
+		if (ucfg_mlme_is_sta_mon_conc_supported(hdd_ctx->psoc))
+			hdd_set_mon_ops(adapter->dev);
+	} else {
 		hdd_set_station_ops(adapter->dev);
+	}
 
 	hdd_dev_setup_destructor(dev);
 	dev->ieee80211_ptr = &adapter->wdev;
@@ -5274,19 +5352,19 @@ int hdd_vdev_ready(struct hdd_adapter *adapter)
 	struct wlan_objmgr_vdev *vdev;
 	QDF_STATUS status;
 
-	vdev = hdd_objmgr_get_vdev(adapter);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
 	if (!vdev)
 		return -EINVAL;
 
 	status = pmo_vdev_ready(vdev);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_objmgr_put_vdev(vdev);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 		return qdf_status_to_os_return(status);
 	}
 
 	status = ucfg_reg_11d_vdev_created_update(vdev);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_objmgr_put_vdev(vdev);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 		return qdf_status_to_os_return(status);
 	}
 
@@ -5295,7 +5373,7 @@ int hdd_vdev_ready(struct hdd_adapter *adapter)
 	else
 		status = ucfg_pmo_enhanced_mc_filter_disable(vdev);
 
-	hdd_objmgr_put_vdev(vdev);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 
 	return qdf_status_to_os_return(status);
 }
@@ -6339,42 +6417,6 @@ static void wlan_hdd_cfg80211_scan_block_cb(struct work_struct *work)
 	osif_vdev_sync_op_stop(vdev_sync);
 }
 
-static u8 hdd_get_mode_specific_interface_count(struct hdd_context *hdd_ctx,
-						enum QDF_OPMODE mode)
-{
-	struct hdd_adapter *adapter = NULL, *next_adapter = NULL;
-	u8 intf_count = 0;
-
-	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter) {
-		if (adapter->device_mode == mode)
-			intf_count++;
-
-		dev_put(adapter->dev);
-	}
-	return intf_count;
-}
-
-bool hdd_max_sta_vdev_count_reached(struct hdd_context *hdd_ctx)
-{
-	u8 intf_count;
-
-	/*
-	 * Check for max no of supported STA/P2PCLI VDEVs before
-	 * creating another one.
-	 */
-	intf_count = hdd_get_mode_specific_interface_count(hdd_ctx,
-							   QDF_STA_MODE);
-	intf_count += hdd_get_mode_specific_interface_count(hdd_ctx,
-						QDF_P2P_CLIENT_MODE);
-	if (CFG_TGT_DEFAULT_MAX_STA_VDEVS &&
-	    (intf_count >= CFG_TGT_DEFAULT_MAX_STA_VDEVS)) {
-		hdd_err("Max limit reached sta vdev-current %d max %d",
-			intf_count, CFG_TGT_DEFAULT_MAX_STA_VDEVS);
-		return true;
-	}
-	return false;
-}
-
 /**
  * hdd_open_adapter() - open and setup the hdd adatper
  * @hdd_ctx: global hdd context
@@ -6445,11 +6487,6 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx, uint8_t sessio
 
 	/* fall through */
 	case QDF_P2P_CLIENT_MODE:
-
-		if (hdd_max_sta_vdev_count_reached(hdd_ctx))
-			return NULL;
-
-	/* fall through */
 	case QDF_P2P_DEVICE_MODE:
 	case QDF_OCB_MODE:
 	case QDF_NDI_MODE:
@@ -6597,7 +6634,7 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx, uint8_t sessio
 	if (QDF_IS_STATUS_ERROR(status))
 		goto err_cleanup_adapter;
 
-	adapter->upgrade_udp_qos_threshold = QCA_WLAN_AC_BE;
+	adapter->upgrade_udp_qos_threshold = QCA_WLAN_AC_BK;
 	qdf_spinlock_create(&adapter->vdev_lock);
 	qdf_atomic_init(&hdd_ctx->num_latency_critical_clients);
 
@@ -6852,7 +6889,8 @@ QDF_STATUS hdd_stop_adapter(struct hdd_context *hdd_ctx,
 	hdd_destroy_adapter_sysfs_files(adapter);
 
 	if (adapter->device_mode == QDF_STA_MODE &&
-	    ucfg_pkt_capture_get_mode(hdd_ctx->psoc))
+	    ucfg_pkt_capture_get_mode(hdd_ctx->psoc) !=
+						PACKET_CAPTURE_MODE_DISABLE)
 		hdd_del_monitor_interface(hdd_ctx);
 
 	if (adapter->vdev_id != WLAN_UMAC_VDEV_ID_MAX)
@@ -6983,14 +7021,28 @@ QDF_STATUS hdd_stop_adapter(struct hdd_context *hdd_ctx,
 
 	case QDF_MONITOR_MODE:
 		if (wlan_hdd_is_session_type_monitor(QDF_MONITOR_MODE) &&
-		    adapter->vdev) {
+		    adapter->vdev &&
+		    ucfg_pkt_capture_get_mode(hdd_ctx->psoc) !=
+						PACKET_CAPTURE_MODE_DISABLE) {
 			ucfg_pkt_capture_deregister_callbacks(adapter->vdev);
 			hdd_objmgr_put_vdev(adapter->vdev);
 			adapter->vdev = NULL;
 		}
+		if (wlan_hdd_is_session_type_monitor(QDF_MONITOR_MODE) &&
+		    ucfg_mlme_is_sta_mon_conc_supported(hdd_ctx->psoc)) {
+			hdd_info("Release wakelock for STA + monitor mode!");
+			qdf_runtime_pm_allow_suspend(
+				&hdd_ctx->runtime_context.monitor_mode);
+			qdf_wake_lock_release(&hdd_ctx->monitor_mode_wakelock,
+				WIFI_POWER_EVENT_WAKELOCK_MONITOR_MODE);
+		}
 		wlan_hdd_scan_abort(adapter);
 		hdd_deregister_hl_netdev_fc_timer(adapter);
 		hdd_deregister_tx_flow_control(adapter);
+		status = hdd_disable_monitor_mode();
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_err_rl("datapath reset failed for montior mode");
+		hdd_set_idle_ps_config(hdd_ctx, true);
 		status = hdd_monitor_mode_vdev_status(adapter);
 		if (QDF_IS_STATUS_ERROR(status))
 			hdd_err_rl("stop failed montior mode");
@@ -7261,8 +7313,10 @@ void hdd_set_netdev_flags(struct hdd_adapter *adapter)
 			(NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM);
 
 	if (cdp_cfg_get(soc, cfg_dp_tso_enable) && enable_csum)
-		adapter->dev->features |=
-			 (NETIF_F_TSO | NETIF_F_TSO6 | NETIF_F_SG);
+		adapter->dev->features |= TSO_FEATURE_FLAGS;
+
+	if (cdp_cfg_get(soc, cfg_dp_sg_enable))
+		adapter->dev->features |= NETIF_F_SG;
 
 	adapter->dev->features |= NETIF_F_RXCSUM;
 	temp = (uint64_t)adapter->dev->features;
@@ -7283,10 +7337,12 @@ static void hdd_reset_scan_operation(struct hdd_context *hdd_ctx,
 		if (adapter->device_mode == QDF_STA_MODE) {
 			struct wlan_objmgr_vdev *vdev;
 
-			vdev = hdd_objmgr_get_vdev(adapter);
+			vdev = hdd_objmgr_get_vdev_by_user(adapter,
+							   WLAN_OSIF_SCAN_ID);
 			if (vdev) {
 				wlan_cfg80211_sched_scan_stop(vdev);
-				hdd_objmgr_put_vdev(vdev);
+				hdd_objmgr_put_vdev_by_user(vdev,
+							    WLAN_OSIF_SCAN_ID);
 			}
 		}
 		break;
@@ -7948,7 +8004,8 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter, qdf_freq_t freq,
 	enum phy_ch_width ch_width;
 	int ret;
 
-	if (hdd_get_conparam() != QDF_GLOBAL_MONITOR_MODE) {
+	if ((hdd_get_conparam() != QDF_GLOBAL_MONITOR_MODE) &&
+	    (!policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc))) {
 		hdd_err("Not supported, device is not in monitor mode");
 		return -EINVAL;
 	}
@@ -8208,7 +8265,8 @@ QDF_STATUS hdd_start_all_adapters(struct hdd_context *hdd_ctx)
 		case QDF_MONITOR_MODE:
 			if (wlan_hdd_is_session_type_monitor(
 			    QDF_MONITOR_MODE) &&
-			    ucfg_pkt_capture_get_mode(hdd_ctx->psoc)) {
+			    ucfg_pkt_capture_get_mode(hdd_ctx->psoc) !=
+						PACKET_CAPTURE_MODE_DISABLE) {
 				vdev = hdd_objmgr_get_vdev(adapter);
 				if (vdev) {
 					ucfg_pkt_capture_register_callbacks(
@@ -8466,6 +8524,7 @@ struct hdd_adapter *hdd_get_adapter_by_rand_macaddr(
 				dev_put(next_adapter->dev);
 			return adapter;
 		}
+		dev_put(adapter->dev);
 	}
 
 	return NULL;
@@ -12093,6 +12152,7 @@ struct hdd_context *hdd_context_create(struct device *dev)
 	}
 
 	status = cfg_parse(WLAN_INI_FILE);
+	QDF_BUG(QDF_IS_STATUS_SUCCESS(status));
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Failed to parse cfg %s; status:%d\n",
 			WLAN_INI_FILE, status);
@@ -13486,6 +13546,7 @@ static int hdd_features_init(struct hdd_context *hdd_ctx)
 
 	wlan_hdd_init_chan_info(hdd_ctx);
 	wlan_hdd_twt_init(hdd_ctx);
+	wlan_hdd_gpio_wakeup_init(hdd_ctx);
 
 	hdd_exit();
 	return 0;
@@ -13501,6 +13562,7 @@ static int hdd_features_init(struct hdd_context *hdd_ctx)
  */
 static void hdd_features_deinit(struct hdd_context *hdd_ctx)
 {
+	wlan_hdd_gpio_wakeup_deinit(hdd_ctx);
 	wlan_hdd_twt_deinit(hdd_ctx);
 	wlan_hdd_deinit_chan_info(hdd_ctx);
 	wlan_hdd_tsf_deinit(hdd_ctx);
@@ -15481,6 +15543,32 @@ void hdd_bus_bw_compute_reset_prev_txrx_stats(struct hdd_adapter *adapter)
 
 #endif /*WLAN_FEATURE_DP_BUS_BANDWIDTH*/
 
+#if defined MSM_PLATFORM && (LINUX_VERSION_CODE <= KERNEL_VERSION(4, 19, 0))
+/**
+ * hdd_inform_stop_sap() - call cfg80211 API to stop SAP
+ * @adapter: pointer to adapter
+ *
+ * This function calls cfg80211 API to stop SAP
+ *
+ * Return: None
+ */
+static void hdd_inform_stop_sap(struct hdd_adapter *adapter)
+{
+	hdd_debug("SAP stopped due to invalid channel vdev id %d",
+		  wlan_vdev_get_id(adapter->vdev));
+	cfg80211_ap_stopped(adapter->dev, GFP_KERNEL);
+}
+
+#else
+static void hdd_inform_stop_sap(struct hdd_adapter *adapter)
+{
+	hdd_debug("SAP stopped due to invalid channel vdev id %d",
+		  wlan_vdev_get_id(adapter->vdev));
+	cfg80211_stop_iface(adapter->hdd_ctx->wiphy, &adapter->wdev,
+			    GFP_KERNEL);
+}
+#endif
+
 /**
  * wlan_hdd_stop_sap() - This function stops bss of SAP.
  * @ap_adapter: SAP adapter
@@ -15529,6 +15617,7 @@ void wlan_hdd_stop_sap(struct hdd_adapter *ap_adapter)
 						ap_adapter->vdev_id);
 		hdd_green_ap_start_state_mc(hdd_ctx, ap_adapter->device_mode,
 					    false);
+		hdd_inform_stop_sap(ap_adapter);
 		hdd_debug("SAP Stop Success");
 	} else {
 		hdd_err("Can't stop ap because its not started");
@@ -18099,45 +18188,15 @@ void hdd_hidden_ssid_enable_roaming(hdd_handle_t hdd_handle, uint8_t vdev_id)
 }
 
 #ifdef WLAN_FEATURE_PKT_CAPTURE
-
-/**
- * wlan_hdd_is_session_type_monitor() - check if session type is MONITOR
- * @session_type: session type
- *
- * Return: True - if session type for adapter is monitor, else False
- *
- */
-bool wlan_hdd_is_session_type_monitor(uint8_t session_type)
-{
-	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-
-	if (!hdd_ctx)
-		return false;
-
-	if (ucfg_pkt_capture_get_mode(hdd_ctx->psoc) &&
-	    cds_get_conparam() != QDF_GLOBAL_MONITOR_MODE &&
-	    session_type == QDF_MONITOR_MODE)
-		return true;
-	else
-		return false;
-}
-
-/**
- * wlan_hdd_check_mon_concurrency() - check if MONITOR and STA concurrency
- * is UP when packet capture mode is enabled.
- * @void
- *
- * Return: True - if STA and monitor concurrency is there, else False
- *
- */
-bool wlan_hdd_check_mon_concurrency(void)
+bool wlan_hdd_is_mon_concurrency(void)
 {
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 
 	if (!hdd_ctx)
 		return -EINVAL;
 
-	if (ucfg_pkt_capture_get_mode(hdd_ctx->psoc)) {
+	if (ucfg_pkt_capture_get_mode(hdd_ctx->psoc) !=
+						PACKET_CAPTURE_MODE_DISABLE) {
 		if (policy_mgr_get_concurrency_mode(hdd_ctx->psoc) ==
 		    (QDF_STA_MASK | QDF_MONITOR_MASK)) {
 			hdd_err("STA + MON mode is UP");
@@ -18147,16 +18206,6 @@ bool wlan_hdd_check_mon_concurrency(void)
 	return false;
 }
 
-/**
- * wlan_hdd_del_monitor() - delete monitor interface
- * @hdd_ctx: pointer to hdd context
- * @adapter: adapter to be deleted
- * @rtnl_held: rtnl lock held
- *
- * This function is invoked to delete monitor interface.
- *
- * Return: None
- */
 void wlan_hdd_del_monitor(struct hdd_context *hdd_ctx,
 			  struct hdd_adapter *adapter, bool rtnl_held)
 {
@@ -18173,17 +18222,47 @@ void wlan_hdd_del_monitor(struct hdd_context *hdd_ctx,
 	hdd_open_p2p_interface(hdd_ctx);
 }
 
-/**
- * wlan_hdd_add_monitor_check() - check for monitor intf and add if needed
- * @hdd_ctx: pointer to hdd context
- * @adapter: output pointer to hold created monitor adapter
- * @name: name of the interface
- * @rtnl_held: True if RTNL lock is held
- * @name_assign_type: the name of assign type of the netdev
- *
- * Return: 0 - on success
- *         err code - on failure
- */
+void
+wlan_hdd_del_p2p_interface(struct hdd_context *hdd_ctx)
+{
+	struct hdd_adapter *adapter = NULL, *next_adapter = NULL;
+	struct osif_vdev_sync *vdev_sync;
+
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter) {
+		if (adapter->device_mode == QDF_P2P_CLIENT_MODE ||
+		    adapter->device_mode == QDF_P2P_DEVICE_MODE ||
+		    adapter->device_mode == QDF_P2P_GO_MODE) {
+			vdev_sync = osif_vdev_sync_unregister(adapter->dev);
+			if (vdev_sync)
+				osif_vdev_sync_wait_for_ops(vdev_sync);
+
+			hdd_clean_up_interface(hdd_ctx, adapter);
+
+			if (vdev_sync)
+				osif_vdev_sync_destroy(vdev_sync);
+		}
+		dev_put(adapter->dev);
+	}
+}
+
+#endif /* WLAN_FEATURE_PKT_CAPTURE */
+
+bool wlan_hdd_is_session_type_monitor(uint8_t session_type)
+{
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	if (!hdd_ctx) {
+		cds_err("HDD context is NULL");
+		return false;
+	}
+
+	if (cds_get_conparam() != QDF_GLOBAL_MONITOR_MODE &&
+	    session_type == QDF_MONITOR_MODE)
+		return true;
+	else
+		return false;
+}
+
 int
 wlan_hdd_add_monitor_check(struct hdd_context *hdd_ctx,
 			   struct hdd_adapter **adapter,
@@ -18192,41 +18271,13 @@ wlan_hdd_add_monitor_check(struct hdd_context *hdd_ctx,
 {
 	struct hdd_adapter *sta_adapter;
 	struct hdd_adapter *mon_adapter;
-	uint32_t mode;
+	int errno;
 	uint8_t num_open_session = 0;
+	QDF_STATUS status;
 
 	/* if no interface is up do not add monitor mode */
 	if (!hdd_is_any_interface_open(hdd_ctx))
 		return -EINVAL;
-
-	/*
-	 * If add interface request is for monitor mode, then it can run in
-	 * parallel with only one station interface.
-	 * If there is no existing station interface return error
-	 */
-	if (QDF_STATUS_SUCCESS != policy_mgr_mode_specific_num_open_sessions(
-						hdd_ctx->psoc,
-						QDF_MONITOR_MODE,
-						&num_open_session))
-		return -EINVAL;
-
-	if (num_open_session) {
-		hdd_err("monitor mode already exists, only one is possible");
-		return -EBUSY;
-	}
-
-	/* Ensure there is only one station interface */
-	if (QDF_STATUS_SUCCESS != policy_mgr_mode_specific_num_open_sessions(
-						hdd_ctx->psoc,
-						QDF_STA_MODE,
-						&num_open_session))
-		return -EINVAL;
-
-	if (num_open_session != 1) {
-		hdd_err("cannot add monitor mode, due to %u sta interfaces",
-			num_open_session);
-		return -EINVAL;
-	}
 
 	sta_adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
 	if (!sta_adapter) {
@@ -18234,43 +18285,35 @@ wlan_hdd_add_monitor_check(struct hdd_context *hdd_ctx,
 		return -EINVAL;
 	}
 
-	if (QDF_STATUS_SUCCESS != policy_mgr_mode_specific_num_open_sessions(
-						hdd_ctx->psoc,
-						QDF_SAP_MODE,
-						&num_open_session))
+	status = policy_mgr_check_mon_concurrency(hdd_ctx->psoc);
+
+	if (QDF_IS_STATUS_ERROR(status))
 		return -EINVAL;
 
-	if (num_open_session) {
-		hdd_err("cannot add monitor mode, due to SAP concurrency");
+	if (hdd_is_connection_in_progress(NULL, NULL)) {
+		hdd_err("cannot add monitor mode, Connection in progress");
 		return -EINVAL;
 	}
 
-	/* delete p2p interface */
-	for (mode = QDF_P2P_CLIENT_MODE; mode <= QDF_P2P_DEVICE_MODE; mode++) {
-		struct hdd_adapter *adapter;
+	num_open_session = policy_mgr_mode_specific_connection_count(
+					hdd_ctx->psoc,
+					PM_STA_MODE,
+					NULL);
 
-		if (mode == QDF_FTM_MODE ||
-		    mode == QDF_MONITOR_MODE)
-			continue;
-
-		adapter = hdd_get_adapter(hdd_ctx, mode);
-		if (adapter) {
-			struct osif_vdev_sync *vdev_sync;
-
-			vdev_sync = osif_vdev_sync_unregister(adapter->dev);
-			if (vdev_sync)
-				osif_vdev_sync_wait_for_ops(vdev_sync);
-
-			wlan_hdd_release_intf_addr(hdd_ctx,
-						   adapter->mac_addr.bytes);
-			hdd_stop_adapter(hdd_ctx, adapter);
-			hdd_deinit_adapter(hdd_ctx, adapter, true);
-			hdd_close_adapter(hdd_ctx, adapter, rtnl_held);
-
-			if (vdev_sync)
-				osif_vdev_sync_destroy(vdev_sync);
+	if (num_open_session == 1) {
+		hdd_ctx->disconnect_for_sta_mon_conc = true;
+		/* Try disconnecting if already in connected state */
+		errno = wlan_hdd_try_disconnect(sta_adapter,
+						REASON_UNSPEC_FAILURE);
+		if (errno > 0) {
+			hdd_err("Failed to disconnect the existing connection");
+			return -EALREADY;
 		}
 	}
+
+	if (ucfg_pkt_capture_get_mode(hdd_ctx->psoc) !=
+						PACKET_CAPTURE_MODE_DISABLE)
+		wlan_hdd_del_p2p_interface(hdd_ctx);
 
 	mon_adapter = hdd_open_adapter(hdd_ctx, QDF_MONITOR_MODE, name,
 				       wlan_hdd_get_intf_addr(
@@ -18279,15 +18322,18 @@ wlan_hdd_add_monitor_check(struct hdd_context *hdd_ctx,
 				       name_assign_type, rtnl_held);
 	if (!mon_adapter) {
 		hdd_err("hdd_open_adapter failed");
-		hdd_open_p2p_interface(hdd_ctx);
+		if (ucfg_pkt_capture_get_mode(hdd_ctx->psoc) !=
+						PACKET_CAPTURE_MODE_DISABLE)
+			hdd_open_p2p_interface(hdd_ctx);
 		return -EINVAL;
 	}
+
+	if (mon_adapter)
+		hdd_set_idle_ps_config(hdd_ctx, false);
 
 	*adapter = mon_adapter;
 	return 0;
 }
-#endif /* WLAN_FEATURE_PKT_CAPTURE */
-
 
 #ifdef FEATURE_MONITOR_MODE_SUPPORT
 

@@ -81,9 +81,11 @@ typedef uint8_t tSirVersionString[SIR_VERSION_STRING_LEN];
 
 #ifdef FEATURE_RUNTIME_PM
 /* Add extra PMO_RESUME_TIMEOUT for runtime PM resume timeout */
+#define SIR_PEER_CREATE_RESPONSE_TIMEOUT (4000 + PMO_RESUME_TIMEOUT)
 #define SIR_DELETE_STA_TIMEOUT           (4000 + PMO_RESUME_TIMEOUT)
 #define SIR_VDEV_PLCY_MGR_TIMEOUT        (2000 + PMO_RESUME_TIMEOUT)
 #else
+#define SIR_PEER_CREATE_RESPONSE_TIMEOUT (4000)
 #define SIR_DELETE_STA_TIMEOUT           (4000) /* 4 seconds */
 #define SIR_VDEV_PLCY_MGR_TIMEOUT        (2000)
 #endif
@@ -908,7 +910,6 @@ struct join_req {
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 	uint8_t cc_switch_mode;
 #endif
-	enum QDF_OPMODE staPersona;       /* Persona */
 	bool wps_registration;
 	ePhyChanBondState cbMode;       /* Pass CB mode value in Join. */
 
@@ -947,35 +948,16 @@ struct join_req {
 	bool isESEconnection;
 	tESETspecInfo eseTspecInfo;
 #endif
-
-	bool isFastTransitionEnabled;
-	bool isFastRoamIniFeatureEnabled;
-
-	uint8_t txLdpcIniFeatureEnabled;
-	uint8_t enableVhtpAid;
-	uint8_t enableVhtGid;
-	uint8_t enableAmpduPs;
-	uint8_t enableHtSmps;
-	uint8_t htSmps;
-	bool send_smps_action;
 	bool he_with_wep_tkip;
-	uint8_t max_amsdu_num;
-	bool isWMEenabled;
-	bool isQosEnabled;
 	bool isOSENConnection;
-	struct rrm_config_param rrm_config;
 	bool spectrumMgtIndicator;
 	struct power_cap_info powerCap;
 	struct supported_channels supportedChannels;
-	bool enable_bcast_probe_rsp;
 	bool sae_pmk_cached;
 	/* Pls make this as last variable in struct */
 	bool force_24ghz_in_ht20;
 	bool force_rsne_override;
 	bool supported_nss_1x1;
-	uint8_t vdev_nss;
-	uint8_t nss;
-	bool nss_forced_1x1;
 	bool enable_session_twt_support;
 	struct bss_description bssDescription;
 	/*

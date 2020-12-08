@@ -472,8 +472,6 @@ wlan_mlme_update_cfg_with_tgt_caps(struct wlan_objmgr_psoc *psoc,
 	mlme_obj->cfg.gen.bigtk_support = tgt_caps->bigtk_support;
 	mlme_obj->cfg.gen.stop_all_host_scan_support =
 			tgt_caps->stop_all_host_scan_support;
-	mlme_obj->cfg.gen.peer_create_conf_support =
-			tgt_caps->peer_create_conf_support;
 	mlme_obj->cfg.gen.dual_sta_roam_fw_support =
 			tgt_caps->dual_sta_roam_fw_support;
 
@@ -2097,16 +2095,6 @@ bool wlan_mlme_get_host_scan_abort_support(struct wlan_objmgr_psoc *psoc)
 	return mlme_obj->cfg.gen.stop_all_host_scan_support;
 }
 
-bool wlan_mlme_get_peer_create_conf_support(struct wlan_objmgr_psoc *psoc)
-{
-	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
-
-	if (!mlme_obj)
-		return false;
-
-	return mlme_obj->cfg.gen.peer_create_conf_support;
-}
-
 bool wlan_mlme_get_dual_sta_roam_support(struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
@@ -2274,10 +2262,8 @@ QDF_STATUS wlan_mlme_set_rts_threshold(struct wlan_objmgr_psoc *psoc,
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
 
-	if (!wma_handle) {
-		wma_err("wma_handle is NULL");
+	if (!wma_handle)
 		return QDF_STATUS_E_INVAL;
-	}
 
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 
@@ -2312,10 +2298,8 @@ QDF_STATUS wlan_mlme_set_frag_threshold(struct wlan_objmgr_psoc *psoc,
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
 
-	if (!wma_handle) {
-		wma_err("wma_handle is NULL");
+	if (!wma_handle)
 		return QDF_STATUS_E_INVAL;
-	}
 
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 
@@ -4673,4 +4657,25 @@ QDF_STATUS mlme_set_ext_opr_rate(struct wlan_objmgr_vdev *vdev, uint8_t *src,
 	qdf_mem_copy(mlme_priv->ext_opr_rate_set.data, src, len);
 
 	return QDF_STATUS_SUCCESS;
+}
+
+static enum monitor_mode_concurrency
+wlan_mlme_get_monitor_mode_concurrency(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return cfg_default(CFG_MONITOR_MODE_CONCURRENCY);
+
+	return mlme_obj->cfg.gen.monitor_mode_concurrency;
+}
+
+bool wlan_mlme_is_sta_mon_conc_supported(struct wlan_objmgr_psoc *psoc)
+{
+	if (wlan_mlme_get_monitor_mode_concurrency(psoc) ==
+						MONITOR_MODE_CONC_STA_SCAN_MON)
+		return true;
+
+	return false;
 }

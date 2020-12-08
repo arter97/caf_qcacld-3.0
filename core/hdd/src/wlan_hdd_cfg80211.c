@@ -110,6 +110,7 @@
 #include <wlan_cfg80211_mc_cp_stats.h>
 #include <wlan_cp_stats_mc_ucfg_api.h>
 #include "wlan_tdls_cfg_api.h"
+#include "wlan_tdls_ucfg_api.h"
 #include <wlan_hdd_bss_transition.h>
 #include <wlan_hdd_concurrency_matrix.h>
 #include <wlan_hdd_p2p_listen_offload.h>
@@ -214,11 +215,7 @@
 
 #define IS_DFS_MODE_VALID(mode) ((mode >= DFS_MODE_NONE && \
 			mode <= DFS_MODE_DEPRIORITIZE))
-/*
- * Number of DPTRACE records to dump when a cfg80211 disconnect with reason
- * WLAN_REASON_DEAUTH_LEAVING DEAUTH is received from user-space.
- */
-#define WLAN_DEAUTH_DPTRACE_DUMP_COUNT 100
+
 #ifndef WLAN_CIPHER_SUITE_GCMP
 #define WLAN_CIPHER_SUITE_GCMP 0x000FAC08
 #endif
@@ -4006,6 +4003,16 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 		wlan_hdd_cfg80211_set_feature(feature_flags,
 					  QCA_WLAN_VENDOR_FEATURE_OCE_STA_CFON);
 
+	value = false;
+	status = ucfg_mlme_get_adaptive11r_enabled(hdd_ctx->psoc, &value);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err("could not get FT-Adaptive 11R info");
+	if (value) {
+		hdd_debug("FT-Adaptive 11R is Enabled");
+		wlan_hdd_cfg80211_set_feature(feature_flags,
+					  QCA_WLAN_VENDOR_FEATURE_ADAPTIVE_11R);
+	}
+
 	ucfg_mlme_get_twt_requestor(hdd_ctx->psoc, &twt_req);
 	ucfg_mlme_get_twt_responder(hdd_ctx->psoc, &twt_res);
 
@@ -6543,11 +6550,11 @@ void wlan_hdd_save_gtk_offload_params(struct hdd_adapter *adapter,
 	for (i = 0; i < 8; i++)
 		buf[7 - i] = replay_ctr[i];
 
-	vdev = hdd_objmgr_get_vdev(adapter);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
 	if (!vdev)
 		goto end;
 	status = ucfg_pmo_cache_gtk_offload_req(vdev, gtk_req);
-	hdd_objmgr_put_vdev(vdev);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 	if (status != QDF_STATUS_SUCCESS)
 		hdd_err("Failed to cache GTK Offload");
 
@@ -7060,6 +7067,8 @@ wlan_hdd_wifi_test_config_policy[
 		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_IGNORE_SA_QUERY_TIMEOUT] = {
 			.type = NLA_U8},
 		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_FILS_DISCOVERY_FRAMES_TX] = {
+			.type = NLA_U8},
+		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_FULL_BW_UL_MU_MIMO] = {
 			.type = NLA_U8},
 };
 
@@ -9683,6 +9692,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_MAX + 1];
 	int ret_val = 0;
 	uint8_t cfg_val = 0;
+	uint8_t ini_val = 0;
 	uint8_t set_val = 0;
 	struct sme_config_params *sme_config;
 	bool update_sme_cfg = false;
@@ -10157,6 +10167,39 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		ret_val = sme_update_he_twt_req_support(hdd_ctx->mac_handle,
 							adapter->vdev_id,
 							cfg_val);
+	}
+
+	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_FULL_BW_UL_MU_MIMO;
+	if (tb[cmd_id]) {
+		cfg_val = nla_get_u8(tb[cmd_id]);
+		ini_val = cfg_get(hdd_ctx->psoc, CFG_HE_UL_MUMIMO);
+		hdd_debug("fullbw_ulmumimo: cfg %d, ini %d", cfg_val, ini_val);
+		if (cfg_val) {
+			switch (ini_val) {
+			case CFG_NO_SUPPORT_UL_MUMIMO:
+			case CFG_FULL_BW_SUPPORT_UL_MUMIMO:
+				cfg_val = CFG_FULL_BW_SUPPORT_UL_MUMIMO;
+				break;
+			case CFG_PARTIAL_BW_SUPPORT_UL_MUMIMO:
+			case CFG_FULL_PARTIAL_BW_SUPPORT_UL_MUMIMO:
+				cfg_val = CFG_FULL_PARTIAL_BW_SUPPORT_UL_MUMIMO;
+				break;
+			}
+		} else {
+			switch (ini_val) {
+			case CFG_NO_SUPPORT_UL_MUMIMO:
+			case CFG_FULL_BW_SUPPORT_UL_MUMIMO:
+				cfg_val = CFG_NO_SUPPORT_UL_MUMIMO;
+				break;
+			case CFG_PARTIAL_BW_SUPPORT_UL_MUMIMO:
+			case CFG_FULL_PARTIAL_BW_SUPPORT_UL_MUMIMO:
+				cfg_val = CFG_PARTIAL_BW_SUPPORT_UL_MUMIMO;
+				break;
+			}
+		}
+		ret_val = sme_update_he_full_ul_mumimo(hdd_ctx->mac_handle,
+						       adapter->vdev_id,
+						       cfg_val);
 	}
 
 	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_PMF_PROTECTION;
@@ -12511,6 +12554,8 @@ wlan_vendor_bitmap_to_reg_wifi_band_bitmap(uint32_t vendor_bitmap)
 {
 	uint32_t reg_bitmap = 0;
 
+	if (vendor_bitmap == QCA_SETBAND_AUTO)
+		reg_bitmap |= REG_BAND_MASK_ALL;
 	if (vendor_bitmap & QCA_SETBAND_2G)
 		reg_bitmap |= BIT(REG_BAND_2G);
 	if (vendor_bitmap & QCA_SETBAND_5G)
@@ -17040,7 +17085,10 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
 	if (errno)
 		return errno;
 
-	if (wlan_hdd_check_mon_concurrency())
+	if (wlan_hdd_is_mon_concurrency())
+		return -EINVAL;
+
+	if (policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc))
 		return -EINVAL;
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
@@ -17064,13 +17112,6 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
 		  ndev->name,
 		  qdf_opmode_str(adapter->device_mode),
 		  qdf_opmode_str(new_mode));
-
-	if ((new_mode == QDF_STA_MODE || new_mode == QDF_P2P_CLIENT_MODE) &&
-	    (adapter->device_mode != QDF_STA_MODE &&
-	    adapter->device_mode != QDF_P2P_CLIENT_MODE)) {
-		if (hdd_max_sta_vdev_count_reached(adapter->hdd_ctx))
-			return -EINVAL;
-	}
 
 	errno = hdd_trigger_psoc_idle_restart(hdd_ctx);
 	if (errno) {
@@ -18420,7 +18461,8 @@ void hdd_select_cbmode(struct hdd_adapter *adapter, qdf_freq_t oper_freq,
 	wlan_reg_set_channel_params_for_freq(hdd_ctx->pdev, oper_freq,
 					     sec_ch_freq, ch_params);
 
-	if (cds_get_conparam() == QDF_GLOBAL_MONITOR_MODE)
+	if (cds_get_conparam() == QDF_GLOBAL_MONITOR_MODE ||
+	    policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc))
 		hdd_mon_select_cbmode(adapter, oper_freq, ch_params);
 }
 
@@ -18628,11 +18670,24 @@ static int wlan_hdd_cfg80211_connect_start(struct hdd_adapter *adapter,
 		goto ret_status;
 	}
 
+	/**
+	 * Following code will be cleaned once the interface manager
+	 * module is enabled.
+	 */
+#ifdef WLAN_FEATURE_INTERFACE_MGR
+	vdev = hdd_objmgr_get_vdev(adapter);
+	if (!vdev)
+		return -EINVAL;
+
+	ucfg_if_mgr_deliver_event(vdev, WLAN_IF_MGR_EV_CONNECT_START, NULL);
+
+	hdd_objmgr_put_vdev(vdev);
+#else
 	/* Disable roaming on all other adapters before connect start */
 	wlan_hdd_disable_roaming(adapter, RSO_CONNECT_START);
 
-	hdd_notify_teardown_tdls_links(hdd_ctx->psoc);
-
+	ucfg_tdls_teardown_links_sync(hdd_ctx->psoc);
+#endif
 	qdf_mem_zero(&hdd_sta_ctx->conn_info.conn_flag,
 		     sizeof(hdd_sta_ctx->conn_info.conn_flag));
 
@@ -18766,13 +18821,14 @@ static int wlan_hdd_cfg80211_connect_start(struct hdd_adapter *adapter,
 			}
 		}
 #endif
-		vdev = hdd_objmgr_get_vdev(adapter);
+		vdev = hdd_objmgr_get_vdev_by_user(adapter,
+						   WLAN_OSIF_POWER_ID);
 		if (!vdev) {
 			status = -EINVAL;
 			goto conn_failure;
 		}
 		ucfg_pmo_flush_gtk_offload_req(vdev);
-		hdd_objmgr_put_vdev(vdev);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 		roam_profile->csrPersona = adapter->device_mode;
 
 		if (oper_freq) {
@@ -18815,18 +18871,17 @@ static int wlan_hdd_cfg80211_connect_start(struct hdd_adapter *adapter,
 		 */
 		if (adapter->device_mode == QDF_STA_MODE &&
 		    (adapter->scan_info.default_scan_ies ||
-		     adapter->scan_info.scan_add_ie.length) &&
-		    !roam_profile->nAddIEScanLength) {
-			if (adapter->scan_info.default_scan_ies) {
-				roam_profile->pAddIEScan =
-					adapter->scan_info.default_scan_ies;
-				roam_profile->nAddIEScanLength =
-					adapter->scan_info.default_scan_ies_len;
-			} else if (adapter->scan_info.scan_add_ie.length) {
+		     adapter->scan_info.scan_add_ie.length)) {
+			if (adapter->scan_info.scan_add_ie.length) {
 				roam_profile->pAddIEScan =
 					adapter->scan_info.scan_add_ie.addIEdata;
 				roam_profile->nAddIEScanLength =
 					adapter->scan_info.scan_add_ie.length;
+			} else if (adapter->scan_info.default_scan_ies) {
+				roam_profile->pAddIEScan =
+					adapter->scan_info.default_scan_ies;
+				roam_profile->nAddIEScanLength =
+					adapter->scan_info.default_scan_ies_len;
 			}
 		}
 
@@ -19868,6 +19923,7 @@ static int wlan_hdd_cfg80211_set_ie(struct hdd_adapter *adapter,
 					assoc_add_ie->addIEdata;
 				roam_profile->nAddIEAssocLength =
 					assoc_add_ie->length;
+				roam_profile->is_hs_20_ap = true;
 			}
 			/* Appending OSEN Information  Element in Assiciation Request */
 			else if ((0 == memcmp(&genie[0], OSEN_OUI_TYPE,
@@ -20637,6 +20693,9 @@ static int __wlan_hdd_cfg80211_connect(struct wiphy *wiphy,
 	if (0 != status)
 		return status;
 
+	if (policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc))
+		return -EINVAL;
+
 	if (req->bssid)
 		bssid = req->bssid;
 	else if (bssid_hint)
@@ -20654,10 +20713,7 @@ static int __wlan_hdd_cfg80211_connect(struct wiphy *wiphy,
 	 * Following code will be cleaned up once the interface manager
 	 * module is enabled
 	 */
-#ifdef WLAN_FEATURE_INTERFACE_MGR
-	ucfg_if_mgr_deliver_event(adapter->vdev, WLAN_IF_MGR_EV_CONNECT_START,
-				  NULL);
-#else
+#ifndef WLAN_FEATURE_INTERFACE_MGR
 	/*
 	 * Disable NAN Discovery if incoming connection is P2P or if a STA
 	 * connection already exists and if this is a case of STA+STA
@@ -20743,112 +20799,6 @@ static int __wlan_hdd_cfg80211_connect(struct wiphy *wiphy,
 
 	return status;
 }
-
-#ifdef FEATURE_CM_ENABLE
-static void hdd_update_scan_ie_for_connect(struct hdd_adapter *adapter,
-					   struct osif_connect_params *params)
-{
-	if (adapter->device_mode == QDF_P2P_CLIENT_MODE) {
-		params->scan_ie.ptr =
-			&adapter->scan_info.scan_add_ie.addIEdata[0];
-		params->scan_ie.len = adapter->scan_info.scan_add_ie.length;
-	} else if (adapter->scan_info.default_scan_ies) {
-		params->scan_ie.ptr = adapter->scan_info.default_scan_ies;
-		params->scan_ie.len = adapter->scan_info.default_scan_ies_len;
-	} else if (adapter->scan_info.scan_add_ie.length) {
-		params->scan_ie.ptr = adapter->scan_info.scan_add_ie.addIEdata;
-		params->scan_ie.len = adapter->scan_info.scan_add_ie.length;
-	}
-}
-
-/**
- * hdd_get_dot11mode_filter() - Get dot11 mode filter
- * @hdd_ctx: HDD context
- *
- * This function is used to get the dot11 mode filter
- *
- * Context: Any Context.
- * Return: dot11_mode_filter
- */
-static enum dot11_mode_filter
-hdd_get_dot11mode_filter(struct hdd_context *hdd_ctx)
-{
-	struct hdd_config *config = hdd_ctx->config;
-
-	if (config->dot11Mode == eHDD_DOT11_MODE_11n_ONLY)
-		return ALLOW_11N_ONLY;
-	else if (config->dot11Mode == eHDD_DOT11_MODE_11ac_ONLY)
-		return ALLOW_11AC_ONLY;
-	else if (config->dot11Mode == eHDD_DOT11_MODE_11ax_ONLY)
-		return ALLOW_11AX_ONLY;
-	else
-		return ALLOW_ALL;
-}
-
-int wlan_hdd_cm_connect(struct wiphy *wiphy,
-			struct net_device *ndev,
-			struct cfg80211_connect_params *req)
-{
-	int status;
-	struct wlan_objmgr_vdev *vdev;
-	struct osif_connect_params params;
-	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(ndev);
-	struct hdd_context *hdd_ctx;
-
-	hdd_enter();
-
-	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
-		hdd_err("Command not allowed in FTM mode");
-		return -EINVAL;
-	}
-
-	if (wlan_hdd_validate_vdev_id(adapter->vdev_id))
-		return -EINVAL;
-
-	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
-		   TRACE_CODE_HDD_CFG80211_CONNECT,
-		   adapter->vdev_id, adapter->device_mode);
-
-	if (adapter->device_mode != QDF_STA_MODE &&
-	    adapter->device_mode != QDF_P2P_CLIENT_MODE) {
-		hdd_err("Device_mode %s(%d) is not supported",
-			qdf_opmode_str(adapter->device_mode),
-			adapter->device_mode);
-		return -EINVAL;
-	}
-
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-
-	status = wlan_hdd_validate_context(hdd_ctx);
-	if (status)
-		return status;
-
-	vdev = hdd_objmgr_get_vdev(adapter);
-
-	ucfg_pmo_flush_gtk_offload_req(vdev);
-
-	qdf_runtime_pm_prevent_suspend(&hdd_ctx->runtime_context.connect);
-	hdd_prevent_suspend_timeout(HDD_WAKELOCK_CONNECT_COMPLETE,
-				    WIFI_POWER_EVENT_WAKELOCK_CONNECT);
-
-	params.force_rsne_override = hdd_ctx->force_rsne_override;
-	params.dot11mode_filter = hdd_get_dot11mode_filter(hdd_ctx);
-
-	hdd_update_scan_ie_for_connect(adapter, &params);
-
-	status = osif_cm_connect(ndev, vdev, req, &params);
-
-	if (status) {
-		hdd_err("Vdev %d connect failed status %d",
-			adapter->vdev_id, status);
-		qdf_runtime_pm_allow_suspend(&hdd_ctx->runtime_context.connect);
-		hdd_allow_suspend(WIFI_POWER_EVENT_WAKELOCK_CONNECT);
-	}
-
-	hdd_objmgr_put_vdev(vdev);
-	return status;
-}
-#endif
 
 /**
  * wlan_hdd_cfg80211_connect() - cfg80211 connect api
@@ -21201,48 +21151,6 @@ static int __wlan_hdd_cfg80211_disconnect(struct wiphy *wiphy,
 
 	return status;
 }
-
-#ifdef FEATURE_CM_ENABLE
-int wlan_hdd_cm_disconnect(struct wiphy *wiphy,
-			   struct net_device *dev, u16 reason)
-{
-	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
-	int status;
-	struct wlan_objmgr_vdev *vdev;
-
-	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
-		hdd_err("Command not allowed in FTM mode");
-		return -EINVAL;
-	}
-
-	if (wlan_hdd_validate_vdev_id(adapter->vdev_id))
-		return -EINVAL;
-
-	vdev = hdd_objmgr_get_vdev(adapter);
-	if (!vdev)
-		return -EINVAL;
-
-	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
-		   TRACE_CODE_HDD_CFG80211_DISCONNECT,
-		   adapter->vdev_id, reason);
-
-	hdd_print_netdev_txq_status(dev);
-
-	if (reason == WLAN_REASON_DEAUTH_LEAVING)
-		qdf_dp_trace_dump_all(
-				WLAN_DEAUTH_DPTRACE_DUMP_COUNT,
-				QDF_TRACE_DEFAULT_PDEV_ID);
-
-	reset_mscs_params(adapter);
-	wlan_hdd_netif_queue_control(adapter,
-				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
-				     WLAN_CONTROL_PATH);
-	status = osif_cm_disconnect(dev, vdev, reason);
-	hdd_objmgr_put_vdev(vdev);
-
-	return status;
-}
-#endif
 
 /**
  * wlan_hdd_cfg80211_disconnect() - cfg80211 disconnect api
@@ -22682,13 +22590,13 @@ int __wlan_hdd_cfg80211_set_rekey_data(struct wiphy *wiphy,
 		gtk_req->kck_len = NL80211_KCK_LEN;
 	}
 	gtk_req->is_fils_connection = hdd_is_fils_connection(adapter);
-	vdev = hdd_objmgr_get_vdev(adapter);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
 	if (!vdev) {
 		result = -EINVAL;
 		goto out;
 	}
 	status = ucfg_pmo_cache_gtk_offload_req(vdev, gtk_req);
-	hdd_objmgr_put_vdev(vdev);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 	if (status != QDF_STATUS_SUCCESS) {
 		hdd_err("Failed to cache GTK Offload");
 		result = qdf_status_to_os_return(status);

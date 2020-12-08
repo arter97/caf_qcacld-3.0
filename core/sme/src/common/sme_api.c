@@ -5368,6 +5368,7 @@ sme_handle_generic_change_country_code(struct mac_context *mac_ctx,
 
 	/* reset info based on new cc, and we are done */
 	csr_apply_channel_power_info_wrapper(mac_ctx);
+	csr_update_beacon(mac_ctx);
 
 	csr_scan_filter_results(mac_ctx);
 
@@ -11894,6 +11895,25 @@ int sme_update_he_twt_req_support(mac_handle_t mac_handle, uint8_t session_id,
 
 	return 0;
 }
+
+int sme_update_he_full_ul_mumimo(mac_handle_t mac_handle, uint8_t session_id,
+				 uint8_t cfg_val)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	struct csr_roam_session *session;
+
+	session = CSR_GET_SESSION(mac_ctx, session_id);
+
+	if (!session) {
+		sme_err("No session for id %d", session_id);
+		return -EINVAL;
+	}
+	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.ul_mu = cfg_val;
+
+	csr_update_session_he_cap(mac_ctx, session);
+
+	return 0;
+}
 #endif
 
 QDF_STATUS
@@ -12236,10 +12256,10 @@ QDF_STATUS sme_soc_set_dual_mac_config(struct policy_mgr_dual_mac_config msg)
 	sme_debug("set_dual_mac_config scan_config: %x fw_mode_config: %x",
 		cmd->u.set_dual_mac_cmd.scan_config,
 		cmd->u.set_dual_mac_cmd.fw_mode_config);
-	csr_queue_sme_command(mac, cmd, false);
+	status = csr_queue_sme_command(mac, cmd, false);
 
 	sme_release_global_lock(&mac->sme);
-	return QDF_STATUS_SUCCESS;
+	return status;
 }
 
 #ifdef FEATURE_LFR_SUBNET_DETECTION
@@ -15252,7 +15272,7 @@ void sme_set_he_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id)
 	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.dl_mu_mimo_part_bw = 0;
 	csr_update_session_he_cap(mac_ctx, session);
 
-	mac_ctx->mlme_cfg->he_caps.enable_6g_sec_check = true;
+	wlan_cm_set_check_6ghz_security(mac_ctx->psoc, true);
 	status = ucfg_mlme_set_enable_bcast_probe_rsp(mac_ctx->psoc, false);
 	if (QDF_IS_STATUS_ERROR(status))
 		sme_err("Failed not set enable bcast probe resp info, %d",
@@ -15285,7 +15305,7 @@ void sme_reset_he_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 		mac_ctx->mlme_cfg->he_caps.he_cap_orig;
 	csr_update_session_he_cap(mac_ctx, session);
 
-	mac_ctx->mlme_cfg->he_caps.enable_6g_sec_check = true;
+	wlan_cm_reset_check_6ghz_security(mac_ctx->psoc);
 	status = ucfg_mlme_set_enable_bcast_probe_rsp(mac_ctx->psoc, true);
 	if (QDF_IS_STATUS_ERROR(status))
 		sme_err("Failed not set enable bcast probe resp info, %d",

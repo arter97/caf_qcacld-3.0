@@ -410,6 +410,8 @@ static void mlme_init_generic_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_DFS_CHAN_AGEOUT_TIME);
 	gen->sae_connect_retries =
 		cfg_get(psoc, CFG_SAE_CONNECION_RETRIES);
+	gen->monitor_mode_concurrency =
+		cfg_get(psoc, CFG_MONITOR_MODE_CONCURRENCY);
 }
 
 static void mlme_init_edca_ani_cfg(struct wlan_mlme_edca_params *edca_params)
@@ -1180,8 +1182,6 @@ static void mlme_init_he_cap_in_cfg(struct wlan_objmgr_psoc *psoc,
 		QDF_GET_BITS(mcs_12_13,
 			     HE_MCS12_13_5G_INDEX * HE_MCS12_13_BITS,
 			     HE_MCS12_13_BITS);
-
-	mlme_cfg->he_caps.enable_6g_sec_check = false;
 }
 #else
 static void mlme_init_he_cap_in_cfg(struct wlan_objmgr_psoc *psoc,

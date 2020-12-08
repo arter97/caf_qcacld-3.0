@@ -277,6 +277,11 @@ typedef enum {
 #define CFG_PROPAGATION_DELAY_BASE             (64)
 #define CFG_AGG_RETRY_MIN                      (5)
 
+#define CFG_NO_SUPPORT_UL_MUMIMO		(0)
+#define CFG_FULL_BW_SUPPORT_UL_MUMIMO		(1)
+#define CFG_PARTIAL_BW_SUPPORT_UL_MUMIMO	(2)
+#define CFG_FULL_PARTIAL_BW_SUPPORT_UL_MUMIMO	(3)
+
 #define PCL_CHANNEL_SUPPORT_GO			BIT(0)
 #define PCL_CHANNEL_SUPPORT_CLI			BIT(1)
 #define PCL_CHANNEL_EXCLUDE_IN_GO_NEG		BIT(3)
@@ -863,35 +868,5 @@ static inline void hdd_send_update_owe_info_event(struct hdd_adapter *adapter,
  * Return: true if connection mode is legacy, false otherwise.
  */
 bool hdd_is_legacy_connection(struct hdd_adapter *adapter);
-
-#ifdef FEATURE_CM_ENABLE
-/**
- * wlan_hdd_cm_connect() - cfg80211 connect api
- * @wiphy: Pointer to wiphy
- * @dev: Pointer to network device
- * @req: Pointer to cfg80211 connect request
- *
- * This function is used to issue connect request to connection manager
- *
- * Context: Any context.
- * Return: 0 for success, non-zero for failure
- */
-int wlan_hdd_cm_connect(struct wiphy *wiphy,
-			struct net_device *ndev,
-			struct cfg80211_connect_params *req);
-
-/**
- * wlan_hdd_cm_disconnect() - cfg80211 disconnect api
- * @wiphy: Pointer to wiphy
- * @dev: Pointer to network device
- * @reason: Disconnect reason code
- *
- * This function is used to issue disconnect request to conection manager
- *
- * Return: 0 for success, non-zero for failure
- */
-int wlan_hdd_cm_disconnect(struct wiphy *wiphy,
-			   struct net_device *dev, u16 reason);
-#endif
 
 #endif

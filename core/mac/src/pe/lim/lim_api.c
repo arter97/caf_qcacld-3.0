@@ -1210,7 +1210,7 @@ static QDF_STATUS pe_handle_mgmt_frame(struct wlan_objmgr_psoc *psoc,
 	int ret;
 
 	/* skip offload packets */
-	if (ucfg_pkt_capture_get_mode(psoc) &&
+	if ((ucfg_pkt_capture_get_mode(psoc) != PACKET_CAPTURE_MODE_DISABLE) &&
 	    mgmt_rx_params->status & WMI_RX_OFFLOAD_MON_MODE) {
 		qdf_nbuf_free(buf);
 		return QDF_STATUS_SUCCESS;
@@ -2512,8 +2512,7 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 					   &session_id,
 					   mac_ctx->lim.max_sta_of_pe_session,
 					   session_ptr->bssType,
-					   session_ptr->vdev_id,
-					   session_ptr->opmode);
+					   session_ptr->vdev_id);
 	if (!ft_session_ptr) {
 		pe_err("LFR3:Cannot create PE Session");
 		lim_print_mac_addr(mac_ctx, bss_desc->bssId, LOGE);
@@ -2851,8 +2850,7 @@ void lim_mon_init_session(struct mac_context *mac_ptr,
 					   &session_id,
 					   mac_ptr->lim.max_sta_of_pe_session,
 					   eSIR_MONITOR_MODE,
-					   msg->vdev_id,
-					   QDF_MONITOR_MODE);
+					   msg->vdev_id);
 	if (!psession_entry) {
 		pe_err("Monitor mode: Session Can not be created");
 		lim_print_mac_addr(mac_ptr, msg->bss_id.bytes, LOGE);
@@ -2866,7 +2864,7 @@ void lim_mon_deinit_session(struct mac_context *mac_ptr,
 {
 	struct pe_session *session;
 
-	session = pe_find_session_by_session_id(mac_ptr, msg->vdev_id);
+	session = pe_find_session_by_vdev_id(mac_ptr, msg->vdev_id);
 
 	if (session && session->bssType == eSIR_MONITOR_MODE)
 		pe_delete_session(mac_ptr, session);

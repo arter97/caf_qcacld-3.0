@@ -1257,10 +1257,9 @@ QDF_STATUS lim_sta_handle_connect_fail(join_params *param)
 	}
 
 	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
-	if (!mac_ctx) {
-		pe_err("Mac context is NULL");
+	if (!mac_ctx)
 		return QDF_STATUS_E_INVAL;
-	}
+
 	session = pe_find_session_by_session_id(mac_ctx, param->pe_session_id);
 	if (!session) {
 		pe_err("session is NULL");
@@ -1702,10 +1701,8 @@ lim_process_mlm_del_all_sta_rsp(struct vdev_mlme_obj *vdev_mlme,
 	vdev_id = wlan_vdev_get_id(vdev);
 
 	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
-	if (!mac_ctx) {
-		pe_err("mac_ctx is NULL");
+	if (!mac_ctx)
 		return QDF_STATUS_E_INVAL;
-	}
 
 	SET_LIM_PROCESS_DEFD_MESGS(mac_ctx, true);
 
@@ -2019,7 +2016,8 @@ static void lim_process_ap_mlm_add_bss_rsp(struct mac_context *mac,
 		pe_session->limSystemRole = eLIM_AP_ROLE;
 
 		sch_edca_profile_update(mac, pe_session);
-		lim_init_pre_auth_list(mac);
+		/* For dual AP case, delete pre auth node if any */
+		lim_delete_pre_auth_list(mac);
 		/* Check the SAP security configuration.If configured to
 		 * WEP then max clients supported is 16
 		 */
@@ -2848,6 +2846,7 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 	QDF_STATUS status;
 	uint16_t channelChangeReasonCode;
 	struct pe_session *pe_session;
+	struct wlan_channel *vdev_chan;
 	/* we need to process the deferred message since the initiating req. there might be nested request. */
 	/* in the case of nested request the new request initiated from the response will take care of resetting */
 	/* the deffered flag. */
@@ -2865,6 +2864,18 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 	pe_session->chainMask = rsp->chain_mask;
 	pe_session->smpsMode = rsp->smps_mode;
 	pe_session->channelChangeReasonCode = 0xBAD;
+
+	vdev_chan = wlan_vdev_mlme_get_des_chan(pe_session->vdev);
+
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(vdev_chan->ch_freq)) {
+		if (vdev_chan->ch_phymode == WLAN_PHYMODE_11B)
+			pe_session->nwType = eSIR_11B_NW_TYPE;
+		else
+			pe_session->nwType = eSIR_11G_NW_TYPE;
+	} else {
+		pe_session->nwType = eSIR_11A_NW_TYPE;
+	}
+	pe_debug("new network type for peer: %d", pe_session->nwType);
 	switch (channelChangeReasonCode) {
 	case LIM_SWITCH_CHANNEL_REASSOC:
 		lim_process_switch_channel_re_assoc_req(mac, pe_session, status);

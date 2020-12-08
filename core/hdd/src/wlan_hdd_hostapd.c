@@ -94,6 +94,7 @@
 #include "wlan_hdd_sta_info.h"
 #include "ftm_time_sync_ucfg_api.h"
 #include <wlan_hdd_dcs.h>
+#include "wlan_tdls_ucfg_api.h"
 #ifdef WLAN_FEATURE_INTERFACE_MGR
 #include "wlan_if_mgr_ucfg_api.h"
 #include "wlan_if_mgr_public_struct.h"
@@ -3300,8 +3301,9 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(
 		    policy_mgr_valid_sap_conc_channel_check(
 		    hdd_ctx->psoc, &intf_ch_freq, sap_ch_freq, vdev_id,
 		    &ch_params))) {
+			schedule_work(&ap_adapter->sap_stop_bss_work);
 			wlansap_context_put(sap_context);
-			hdd_debug("can't move sap to chan(freq): %u",
+			hdd_debug("can't move sap to chan(freq): %u, stopping SAP",
 				  intf_ch_freq);
 			return QDF_STATUS_E_FAILURE;
 		}
@@ -5146,8 +5148,20 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 
 	hdd_enter();
 
-	hdd_notify_teardown_tdls_links(hdd_ctx->psoc);
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret != 0)
+		return ret;
 
+	if (policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc))
+		return -EINVAL;
+
+	/**
+	 * Following code will be cleaned once the interface manager
+	 * module is enabled.
+	 */
+#ifndef WLAN_FEATURE_INTERFACE_MGR
+	ucfg_tdls_teardown_links_sync(hdd_ctx->psoc);
+#endif
 	ucfg_mlme_get_sap_force_11n_for_11ac(hdd_ctx->psoc,
 					     &sap_force_11n_for_11ac);
 	ucfg_mlme_get_go_force_11n_for_11ac(hdd_ctx->psoc,

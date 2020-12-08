@@ -28,6 +28,7 @@
 #include <wmi_unified_param.h>
 #include <sir_api.h>
 #include "wlan_cm_roam_public_struct.h"
+#include "cfg_mlme_generic.h"
 
 #define OWE_TRANSITION_OUI_TYPE "\x50\x6f\x9a\x1c"
 #define OWE_TRANSITION_OUI_SIZE 4
@@ -1024,7 +1025,6 @@ struct wlan_mlme_he_caps {
 	uint32_t he_sta_obsspd;
 	uint16_t he_mcs_12_13_supp_2g;
 	uint16_t he_mcs_12_13_supp_5g;
-	bool enable_6g_sec_check;
 };
 #endif
 
@@ -1272,10 +1272,10 @@ struct wlan_mlme_ratemask {
  * @bigtk_support: Whether BIGTK is supported or not
  * @stop_all_host_scan_support: Target capability that indicates if the target
  * supports stop all host scan request type.
- * @peer_create_conf_support: Peer create confirmation command support
  * @dual_sta_roam_fw_support: Firmware support for dual sta roaming feature
  * @sae_connect_retries: sae connect retry bitmask
  * @wls_6ghz_capable: wifi location service(WLS) is 6ghz capable
+ * @monitor_mode_concurrency: Monitor mode concurrency supported
  */
 struct wlan_mlme_generic {
 	uint32_t band_capability;
@@ -1314,10 +1314,10 @@ struct wlan_mlme_generic {
 	uint8_t dfs_chan_ageout_time;
 	bool bigtk_support;
 	bool stop_all_host_scan_support;
-	bool peer_create_conf_support;
 	bool dual_sta_roam_fw_support;
 	uint32_t sae_connect_retries;
 	bool wls_6ghz_capable;
+	enum monitor_mode_concurrency monitor_mode_concurrency;
 };
 
 /*

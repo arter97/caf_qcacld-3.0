@@ -216,10 +216,9 @@ fwol_set_adaptive_dwelltime_config(
 	QDF_STATUS status;
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma_handle) {
-		fwol_err("wma handle is null");
+	if (!wma_handle)
 		return QDF_STATUS_E_FAILURE;
-	}
+
 	status = wma_send_adapt_dwelltime_params(wma_handle,
 						 dwelltime_params);
 	return status;
@@ -556,6 +555,7 @@ QDF_STATUS fwol_cfg_on_psoc_enable(struct wlan_objmgr_psoc *psoc)
 	ucfg_fwol_fetch_dhcp_server_settings(psoc, fwol_cfg);
 	fwol_cfg->sap_xlna_bypass = cfg_get(psoc, CFG_SET_SAP_XLNA_BYPASS);
 	fwol_cfg->enable_ilp = cfg_get(psoc, CFG_SET_ENABLE_ILP);
+	fwol_cfg->sap_sho = cfg_get(psoc, CFG_SAP_SHO_CONFIG);
 
 	return status;
 }
@@ -671,6 +671,23 @@ QDF_STATUS fwol_set_ilp_config(struct wlan_objmgr_pdev *pdev, bool enable_ilp)
 	status = tgt_fwol_pdev_param_send(pdev, pdev_param);
 	if (QDF_IS_STATUS_ERROR(status))
 		fwol_err("WMI_PDEV_PARAM_PCIE_HW_ILP failed %d", status);
+
+	return status;
+}
+
+QDF_STATUS fwol_set_sap_sho(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			    uint32_t sap_sho)
+{
+	QDF_STATUS status;
+	struct vdev_set_params vdev_param;
+
+	vdev_param.vdev_id = vdev_id;
+	vdev_param.param_id = WMI_VDEV_PARAM_SHO_CONFIG;
+	vdev_param.param_value = sap_sho;
+
+	status = tgt_fwol_vdev_param_send(psoc, vdev_param);
+	if (QDF_IS_STATUS_ERROR(status))
+		fwol_err("WMI_VDEV_PARAM_SHO_CONFIG failed %d", status);
 
 	return status;
 }

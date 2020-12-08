@@ -1082,28 +1082,7 @@ lim_post_mlm_message(struct mac_context *mac, uint32_t msgType,
 static inline uint16_t
 lim_get_ielen_from_bss_description(struct bss_description *pBssDescr)
 {
-	uint16_t ielen;
-
-	if (!pBssDescr)
-		return 0;
-
-	/*
-	 * Length of BSS desription is without length of
-	 * length itself and length of pointer
-	 * that holds ieFields
-	 *
-	 * <------------sizeof(struct bss_description)-------------------->
-	 * +--------+---------------------------------+---------------+
-	 * | length | other fields                    | pointer to IEs|
-	 * +--------+---------------------------------+---------------+
-	 *                                            ^
-	 *                                            ieFields
-	 */
-
-	ielen = (uint16_t)(pBssDescr->length + sizeof(pBssDescr->length) -
-			   GET_FIELD_OFFSET(struct bss_description, ieFields));
-
-	return ielen;
+	return wlan_get_ielen_from_bss_description(pBssDescr);
 } /*** end lim_get_ielen_from_bss_description() ***/
 
 /**
@@ -1366,6 +1345,22 @@ void lim_process_mlm_start_req(struct mac_context *mac_ctx,
  */
 void lim_process_mlm_join_req(struct mac_context *mac_ctx,
 			      tLimMlmJoinReq *mlm_join_req);
+
+/**
+ * lim_post_join_set_link_state_callback()- registered callback to perform post
+ * peer creation operations
+ * @mac: pointer to global mac structure
+ * @callback_arg: registered callback argument
+ * @status: peer creation status
+ *
+ * This is registered callback function during association to perform
+ * post peer creation operation based on the peer creation status
+ *
+ * Return: none
+ */
+void
+lim_post_join_set_link_state_callback(struct mac_context *mac, uint32_t vdev_id,
+				      QDF_STATUS status);
 
 /*
  * lim_process_mlm_deauth_req() - This function is called to process

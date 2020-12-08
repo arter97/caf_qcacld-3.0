@@ -1895,11 +1895,16 @@ static QDF_STATUS lim_assoc_tx_complete_cnf(void *context,
 		assoc_ack_status = ACKED;
 		reason_code = QDF_STATUS_SUCCESS;
 		mac_ctx->assoc_ack_status = LIM_ACK_RCD_SUCCESS;
-	} else {
+	} else if (tx_complete == WMI_MGMT_TX_COMP_TYPE_COMPLETE_NO_ACK) {
 		assoc_ack_status = NOT_ACKED;
 		reason_code = QDF_STATUS_E_FAILURE;
 		mac_ctx->assoc_ack_status = LIM_ACK_RCD_FAILURE;
+	} else {
+		assoc_ack_status = SENT_FAIL;
+		reason_code = QDF_STATUS_E_FAILURE;
+		mac_ctx->assoc_ack_status = LIM_TX_FAILED;
 	}
+
 	if (buf)
 		qdf_nbuf_free(buf);
 
@@ -2776,9 +2781,13 @@ static QDF_STATUS lim_auth_tx_complete_cnf(void *context,
 		if (!sae_auth_acked)
 			lim_deactivate_and_change_timer(mac_ctx,
 							eLIM_AUTH_RETRY_TIMER);
-	} else {
+	} else if (tx_complete == WMI_MGMT_TX_COMP_TYPE_COMPLETE_NO_ACK) {
 		mac_ctx->auth_ack_status = LIM_ACK_RCD_FAILURE;
 		auth_ack_status = NOT_ACKED;
+		reason_code = QDF_STATUS_E_FAILURE;
+	} else {
+		mac_ctx->auth_ack_status = LIM_TX_FAILED;
+		auth_ack_status = SENT_FAIL;
 		reason_code = QDF_STATUS_E_FAILURE;
 	}
 
@@ -3577,6 +3586,12 @@ lim_send_disassoc_mgmt_frame(struct mac_context *mac,
 		MTRACE(qdf_trace
 			       (QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 			       pe_session->peSessionId, qdf_status));
+
+		if (QDF_IS_STATUS_ERROR(qdf_status)) {
+			pe_err("Failed to send disassoc frame");
+			lim_send_disassoc_cnf(mac);
+			return;
+		}
 
 		val = SYS_MS_TO_TICKS(LIM_DISASSOC_DEAUTH_ACK_TIMEOUT);
 

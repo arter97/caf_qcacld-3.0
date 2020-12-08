@@ -419,6 +419,15 @@ ifeq ($(CONFIG_WLAN_FEATURE_MEDIUM_ASSESS), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_medium_assess.o
 endif
 
+ifeq ($(CONFIG_WLAN_ENABLE_GPIO_WAKEUP),y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_gpio_wakeup.o
+endif
+
+ifeq ($(CONFIG_CM_ENABLE), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_cm_connect.o \
+	    $(HDD_SRC_DIR)/wlan_hdd_cm_disconnect.o
+endif
+
 ###### OSIF_SYNC ########
 SYNC_DIR := os_if/sync
 SYNC_INC_DIR := $(SYNC_DIR)/inc
@@ -1468,6 +1477,7 @@ TDLS_OBJS := $(TDLS_DIR)/core/src/wlan_tdls_main.o \
        $(TDLS_DIR)/dispatcher/src/wlan_tdls_ucfg_api.o \
        $(TDLS_DIR)/dispatcher/src/wlan_tdls_utils_api.o \
        $(TDLS_DIR)/dispatcher/src/wlan_tdls_cfg.o \
+       $(TDLS_DIR)/dispatcher/src/wlan_tdls_api.o \
        $(TDLS_OS_IF_SRC)/wlan_cfg80211_tdls.o \
        $(TDLS_TARGET_IF_SRC)/target_if_tdls.o
 endif
@@ -1974,15 +1984,15 @@ endif
 #######################################################
 
 ###### COEX ########
-COEX_OS_IF_SRC      := $(WLAN_COMMON_ROOT)/os_if/linux/coex/src
-COEX_TGT_SRC        := $(WLAN_COMMON_ROOT)/target_if/coex/src
-COEX_CORE_SRC       := $(WLAN_COMMON_ROOT)/umac/coex/core/src
-COEX_DISPATCHER_SRC := $(WLAN_COMMON_ROOT)/umac/coex/dispatcher/src
+COEX_OS_IF_SRC      := os_if/coex/src
+COEX_TGT_SRC        := components/target_if/coex/src
+COEX_CORE_SRC       := components/coex/core/src
+COEX_DISPATCHER_SRC := components/coex/dispatcher/src
 
-COEX_OS_IF_INC      := -I$(WLAN_COMMON_INC)/os_if/linux/coex/inc
-COEX_TGT_INC        := -I$(WLAN_COMMON_INC)/target_if/coex/inc
-COEX_DISPATCHER_INC := -I$(WLAN_COMMON_INC)/umac/coex/dispatcher/inc
-COEX_CORE_INC       := -I$(WLAN_COMMON_INC)/umac/coex/core/inc
+COEX_OS_IF_INC      := -I$(WLAN_ROOT)/os_if/coex/inc
+COEX_TGT_INC        := -I$(WLAN_ROOT)/components/target_if/coex/inc
+COEX_DISPATCHER_INC := -I$(WLAN_ROOT)/components/coex/dispatcher/inc
+COEX_CORE_INC       := -I$(WLAN_ROOT)/components/coex/core/inc
 
 ifeq ($(CONFIG_FEATURE_COEX), y)
 COEX_OBJS := $(COEX_TGT_SRC)/target_if_coex.o                 \
@@ -3289,6 +3299,7 @@ cppflags-y += -DENABLE_HAL_SOC_STATS
 cppflags-y += -DENABLE_HAL_REG_WR_HISTORY
 cppflags-y += -DDP_RX_DESC_COOKIE_INVALIDATE
 cppflags-y += -DMON_ENABLE_DROP_FOR_MAC
+cppflags-y += -DPCI_LINK_STATUS_SANITY
 endif
 
 # Enable Low latency optimisation mode
@@ -3471,6 +3482,7 @@ cppflags-$(CONFIG_WLAN_SUPPORT_DATA_STALL) += -DWLAN_SUPPORT_DATA_STALL
 cppflags-$(CONFIG_WLAN_SUPPORT_TXRX_HL_BUNDLE) += -DWLAN_SUPPORT_TXRX_HL_BUNDLE
 cppflags-$(CONFIG_QCN7605_PCIE_SHADOW_REG_SUPPORT) += -DQCN7605_PCIE_SHADOW_REG_SUPPORT
 cppflags-$(CONFIG_QCN7605_PCIE_GOLBAL_RESET_SUPPORT) += -DQCN7605_PCIE_GOLBAL_RESET_SUPPORT
+cppflags-$(CONFIG_MARK_ICMP_REQ_TO_FW) += -DWLAN_DP_FEATURE_MARK_ICMP_REQ_TO_FW
 
 ifdef CONFIG_MAX_LOGS_PER_SEC
 ccflags-y += -DWLAN_MAX_LOGS_PER_SEC=$(CONFIG_MAX_LOGS_PER_SEC)
@@ -3618,6 +3630,14 @@ ccflags-y += -DSCAN_CHAN_STATS_EVENT_ENAB=$(CONFIG_SCAN_CHAN_STATS_EVENT_ENAB)
 CONFIG_MAX_BCN_PROBE_IN_SCAN_QUEUE ?= 150
 ccflags-y += -DMAX_BCN_PROBE_IN_SCAN_QUEUE=$(CONFIG_MAX_BCN_PROBE_IN_SCAN_QUEUE)
 
+#CONFIG_RX_DIAG_WQ_MAX_SIZE maximum number FW diag events that can be queued in
+#FW diag events work queue. Host driver will discard the all diag events after
+#this limit is reached.
+#
+# Value 0 represents no limit and any non zero value represents the maximum
+# size of the work queue.
+CONFIG_RX_DIAG_WQ_MAX_SIZE ?= 1000
+ccflags-y += -DRX_DIAG_WQ_MAX_SIZE=$(CONFIG_RX_DIAG_WQ_MAX_SIZE)
 
 CONFIG_MGMT_DESC_POOL_MAX ?= 64
 ccflags-y += -DMGMT_DESC_POOL_MAX=$(CONFIG_MGMT_DESC_POOL_MAX)
@@ -3713,6 +3733,9 @@ ccflags-$(CONFIG_GET_DRIVER_MODE) += -DFEATURE_GET_DRIVER_MODE
 ifeq ($(CONFIG_FEATURE_IPA_PIPE_CHANGE_WDI1), y)
 cppflags-y += -DFEATURE_IPA_PIPE_CHANGE_WDI1
 endif
+
+cppflags-$(CONFIG_FEATURE_STA_MODE_VOTE_LINK) += -DFEATURE_STA_MODE_VOTE_LINK
+cppflags-$(CONFIG_WLAN_ENABLE_GPIO_WAKEUP) += -DWLAN_ENABLE_GPIO_WAKEUP
 
 KBUILD_CPPFLAGS += $(cppflags-y)
 

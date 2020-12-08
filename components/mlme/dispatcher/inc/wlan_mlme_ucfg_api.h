@@ -1195,11 +1195,29 @@ ucfg_mlme_is_roam_scan_offload_enabled(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 ucfg_mlme_set_tgt_adaptive_11r_cap(struct wlan_objmgr_psoc *psoc,
 				   bool val);
+/**
+ * ucfg_mlme_get_adaptive11r_enabled() - get adaptive 11R enabled status
+ * @psoc:   pointer to psoc object
+ * @value:  pointer to the value which will be filled for the caller
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+ucfg_mlme_get_adaptive11r_enabled(struct wlan_objmgr_psoc *psoc,
+				  bool *value);
 #else
 static inline QDF_STATUS
 ucfg_mlme_set_tgt_adaptive_11r_cap(struct wlan_objmgr_psoc *psoc,
 				   bool val)
 {
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+ucfg_mlme_get_adaptive11r_enabled(struct wlan_objmgr_psoc *psoc,
+				  bool *value)
+{
+	*value = false;
 	return QDF_STATUS_SUCCESS;
 }
 #endif
@@ -4176,4 +4194,18 @@ ucfg_mlme_set_roam_reason_vsie_status(struct wlan_objmgr_psoc *psoc,
 }
 
 #endif
+
+/**
+ * ucfg_mlme_is_sta_mon_conc_supported() - Check if STA + Monitor mode
+ * concurrency is supported
+ * @psoc: pointer to psoc object
+ *
+ * Return: True if supported, else false.
+ */
+static inline bool
+ucfg_mlme_is_sta_mon_conc_supported(struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_mlme_is_sta_mon_conc_supported(psoc);
+}
+
 #endif /* _WLAN_MLME_UCFG_API_H_ */
