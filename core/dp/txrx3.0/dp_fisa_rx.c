@@ -25,8 +25,11 @@
 
 static void dp_rx_fisa_flush_flow_wrap(struct dp_fisa_rx_sw_ft *sw_ft);
 
-/** REO will push frame into REO2FW RING */
-#define REO_DESTINATION_FW 6
+/*
+ * Used by FW to route RX packets to host REO2SW1 ring if IPA hit
+ * RX back pressure.
+ */
+#define REO_DEST_IND_IPA_REROUTE 2
 
 #if defined(FISA_DEBUG_ENABLE)
 /**
@@ -145,6 +148,18 @@ static void print_flow_tuple(struct cdp_rx_flow_tuple_info *flow_tuple)
 	dp_info("l4_protocol 0x%x", flow_tuple->l4_protocol);
 }
 
+static bool
+dp_fisa_is_ipsec_connection(struct cdp_rx_flow_tuple_info *flow_tuple_info)
+{
+	if (flow_tuple_info->dest_port == IPSEC_PORT ||
+	    flow_tuple_info->dest_port == IPSEC_NAT_PORT ||
+	    flow_tuple_info->src_port == IPSEC_PORT ||
+	    flow_tuple_info->src_port == IPSEC_NAT_PORT)
+		return true;
+
+	return false;
+}
+
 /**
  * get_flow_tuple_from_nbuf() - Get the flow tuple from msdu
  * @hal_soc_hdl: Handle to hal soc
@@ -188,6 +203,11 @@ get_flow_tuple_from_nbuf(hal_soc_handle_t hal_soc_hdl,
 
 	flow_tuple_info->dest_port = qdf_ntohs(tcph->dest);
 	flow_tuple_info->src_port = qdf_ntohs(tcph->source);
+	if (dp_fisa_is_ipsec_connection(flow_tuple_info))
+		flow_tuple_info->is_exception = 1;
+	else
+		flow_tuple_info->is_exception = 0;
+
 	flow_tuple_info->l4_protocol = iph->protocol;
 	dp_fisa_debug("l4_protocol %d", flow_tuple_info->l4_protocol);
 
@@ -911,7 +931,8 @@ dp_rx_get_fisa_flow(struct dp_rx_fst *fisa_hdl, struct dp_vdev *vdev,
 {
 	uint8_t *rx_tlv_hdr;
 	uint32_t flow_idx;
-	uint32_t reo_destination_indication;
+	uint32_t tlv_reo_dest_ind;
+	uint8_t  ring_reo_dest_ind;
 	bool flow_invalid, flow_timeout, flow_idx_valid;
 	struct dp_fisa_rx_sw_ft *sw_ft_entry = NULL;
 	hal_soc_handle_t hal_soc_hdl = fisa_hdl->soc_hdl->hal_soc;
@@ -920,18 +941,17 @@ dp_rx_get_fisa_flow(struct dp_rx_fst *fisa_hdl, struct dp_vdev *vdev,
 		return sw_ft_entry;
 
 	rx_tlv_hdr = qdf_nbuf_data(nbuf);
-	/*
-	 * Get reo_destination_indication from RX_PKT_TLV-->msdu_end,
-	 * if reo_destination_indication == 6, it means this frame is
-	 * reinjected by FW offload module, these frames should not go to FISA
-	 * since REO2SW1 will be selected by FW offload module. If same flow
-	 * frames hash select other REO2SW rings, same flow UDP frames will go
-	 * to different REO2SW ring.
-	 */
 	hal_rx_msdu_get_reo_destination_indication(hal_soc_hdl, rx_tlv_hdr,
-						   &reo_destination_indication);
-
-	if (qdf_unlikely(reo_destination_indication == REO_DESTINATION_FW))
+						   &tlv_reo_dest_ind);
+	ring_reo_dest_ind = qdf_nbuf_get_rx_reo_dest_ind(nbuf);
+	/*
+	 * Compare reo_destination_indication between reo ring descriptor
+	 * and rx_pkt_tlvs, if they are different, then likely these kind
+	 * of frames re-injected by FW or touched by other module already,
+	 * skip FISA to avoid REO2SW ring mismatch issue for same flow.
+	 */
+	if (tlv_reo_dest_ind != ring_reo_dest_ind ||
+	    REO_DEST_IND_IPA_REROUTE == ring_reo_dest_ind)
 		return sw_ft_entry;
 
 	hal_rx_msdu_get_flow_params(hal_soc_hdl, rx_tlv_hdr, &flow_invalid,
@@ -954,7 +974,7 @@ dp_rx_get_fisa_flow(struct dp_rx_fst *fisa_hdl, struct dp_vdev *vdev,
 
 	sw_ft_entry = dp_rx_fisa_add_ft_entry(fisa_hdl, flow_idx, nbuf, vdev,
 					      rx_tlv_hdr,
-					      reo_destination_indication);
+					      tlv_reo_dest_ind);
 
 	return sw_ft_entry;
 }
@@ -1289,6 +1309,7 @@ dp_rx_fisa_flush_udp_flow(struct dp_vdev *vdev,
 	}
 
 	qdf_nbuf_set_next(fisa_flow->head_skb, NULL);
+	QDF_NBUF_CB_RX_NUM_ELEMENTS_IN_LIST(fisa_flow->head_skb) = 1;
 	if (fisa_flow->last_skb)
 		qdf_nbuf_set_next(fisa_flow->last_skb, NULL);
 
@@ -1726,6 +1747,11 @@ QDF_STATUS dp_fisa_rx(struct dp_soc *soc, struct dp_vdev *vdev,
 		fisa_flow = dp_rx_get_fisa_flow(dp_fisa_rx_hdl, vdev,
 						head_nbuf);
 
+		/* Do not FISA aggregate IPSec packets */
+		if (fisa_flow &&
+		    fisa_flow->rx_flow_tuple_info.is_exception)
+			goto pull_nbuf;
+
 		/* Fragmented skb do not handle via fisa
 		 * get that flow and deliver that flow to rx_thread
 		 */
@@ -1754,6 +1780,7 @@ pull_nbuf:
 				     head_nbuf);
 
 deliver_nbuf: /* Deliver without FISA */
+		QDF_NBUF_CB_RX_NUM_ELEMENTS_IN_LIST(head_nbuf) = 1;
 		qdf_nbuf_set_next(head_nbuf, NULL);
 		hex_dump_skb_data(head_nbuf, false);
 		if (!vdev->osif_rx || QDF_STATUS_SUCCESS !=

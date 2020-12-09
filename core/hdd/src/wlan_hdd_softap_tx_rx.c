@@ -547,7 +547,8 @@ static void __hdd_softap_hard_start_xmit(struct sk_buff *skb,
 	 */
 	if (cds_is_driver_recovering() || cds_is_driver_in_bad_state() ||
 	    cds_is_load_or_unload_in_progress()) {
-		QDF_TRACE(QDF_MODULE_ID_HDD_SAP_DATA, QDF_TRACE_LEVEL_INFO_HIGH,
+		QDF_TRACE_DEBUG_RL(
+			  QDF_MODULE_ID_HDD_SAP_DATA,
 			  "%s: Recovery/(Un)load in Progress. Ignore!!!",
 			  __func__);
 		goto drop_pkt;
@@ -565,10 +566,10 @@ static void __hdd_softap_hard_start_xmit(struct sk_buff *skb,
 		goto drop_pkt;
 
 	if (ap_ctx->hostapd_state.bss_state != BSS_START) {
-		QDF_TRACE(QDF_MODULE_ID_HDD_SAP_DATA, QDF_TRACE_LEVEL_INFO_HIGH,
-			  "%s: SAP is not in START state (%d). Ignore!!!",
-			  __func__,
-			  ap_ctx->hostapd_state.bss_state);
+		QDF_TRACE_DEBUG_RL(
+			QDF_MODULE_ID_HDD_SAP_DATA,
+			"%s: SAP is not in START state (%d). Ignore!!!",
+			__func__, ap_ctx->hostapd_state.bss_state);
 		goto drop_pkt;
 	}
 
@@ -576,7 +577,8 @@ static void __hdd_softap_hard_start_xmit(struct sk_buff *skb,
 	 * If a transmit function is not registered, drop packet
 	 */
 	if (!adapter->tx_fn) {
-		QDF_TRACE(QDF_MODULE_ID_HDD_SAP_DATA, QDF_TRACE_LEVEL_INFO_HIGH,
+		QDF_TRACE_DEBUG_RL(
+			 QDF_MODULE_ID_HDD_SAP_DATA,
 			 "%s: TX function not registered by the data path",
 			 __func__);
 		goto drop_pkt;
@@ -598,15 +600,15 @@ static void __hdd_softap_hard_start_xmit(struct sk_buff *skb,
 
 	if (!QDF_NBUF_CB_GET_IS_BCAST(skb) && !QDF_NBUF_CB_GET_IS_MCAST(skb)) {
 		if (!sta_info) {
-			QDF_TRACE(QDF_MODULE_ID_HDD_SAP_DATA,
-				  QDF_TRACE_LEVEL_INFO_HIGH,
-				  "%s: Failed to find right station", __func__);
+			QDF_TRACE_DEBUG_RL(QDF_MODULE_ID_HDD_SAP_DATA,
+					   "%s: Failed to find right station",
+					   __func__);
 			goto drop_pkt;
 		}
 
 		if (sta_info->is_deauth_in_progress) {
-			QDF_TRACE(QDF_MODULE_ID_HDD_SAP_DATA,
-				  QDF_TRACE_LEVEL_INFO_HIGH,
+			QDF_TRACE_DEBUG_RL(
+				  QDF_MODULE_ID_HDD_SAP_DATA,
 				  "%s: STA " QDF_MAC_ADDR_FMT
 				  "deauth in progress", __func__,
 				  QDF_MAC_ADDR_REF(sta_info->sta_mac.bytes));
@@ -615,16 +617,16 @@ static void __hdd_softap_hard_start_xmit(struct sk_buff *skb,
 
 		if (sta_info->peer_state != OL_TXRX_PEER_STATE_CONN &&
 		    sta_info->peer_state != OL_TXRX_PEER_STATE_AUTH) {
-			QDF_TRACE(QDF_MODULE_ID_HDD_SAP_DATA,
-				  QDF_TRACE_LEVEL_INFO_HIGH,
-				  "%s: Station not connected yet", __func__);
+			QDF_TRACE_DEBUG_RL(
+				QDF_MODULE_ID_HDD_SAP_DATA,
+				"%s: Station not connected yet", __func__);
 			goto drop_pkt;
 		}
 
 		if (sta_info->peer_state == OL_TXRX_PEER_STATE_CONN) {
 			if (ntohs(skb->protocol) != HDD_ETHERTYPE_802_1_X) {
-				QDF_TRACE(QDF_MODULE_ID_HDD_SAP_DATA,
-					  QDF_TRACE_LEVEL_INFO_HIGH,
+				QDF_TRACE_DEBUG_RL(
+					  QDF_MODULE_ID_HDD_SAP_DATA,
 					  "%s: NON-EAPOL packet in non-Authenticated state",
 					  __func__);
 				goto drop_pkt;
@@ -702,19 +704,18 @@ static void __hdd_softap_hard_start_xmit(struct sk_buff *skb,
 
 	/* check whether need to linearize skb, like non-linear udp data */
 	if (hdd_skb_nontso_linearize(skb) != QDF_STATUS_SUCCESS) {
-		QDF_TRACE(QDF_MODULE_ID_HDD_DATA,
-			  QDF_TRACE_LEVEL_INFO_HIGH,
-			  "%s: skb %pK linearize failed. drop the pkt",
-			  __func__, skb);
+		QDF_TRACE_DEBUG_RL(QDF_MODULE_ID_HDD_DATA,
+				   "%s: skb %pK linearize failed. drop the pkt",
+				   __func__, skb);
 		++adapter->hdd_stats.tx_rx_stats.tx_dropped_ac[ac];
 		goto drop_pkt_and_release_skb;
 	}
 
 	if (adapter->tx_fn(soc, adapter->vdev_id, (qdf_nbuf_t)skb)) {
-		QDF_TRACE(QDF_MODULE_ID_HDD_SAP_DATA, QDF_TRACE_LEVEL_INFO_HIGH,
-			  "%s: Failed to send packet to txrx for sta: "
-			  QDF_MAC_ADDR_FMT, __func__,
-			  QDF_MAC_ADDR_REF(dest_mac_addr->bytes));
+		QDF_TRACE_DEBUG_RL(QDF_MODULE_ID_HDD_SAP_DATA,
+				   "%s: Failed to send packet to txrx for sta: "
+				   QDF_MAC_ADDR_FMT, __func__,
+				   QDF_MAC_ADDR_REF(dest_mac_addr->bytes));
 		++adapter->hdd_stats.tx_rx_stats.tx_dropped_ac[ac];
 		goto drop_pkt_and_release_skb;
 	}
@@ -1191,6 +1192,7 @@ QDF_STATUS hdd_softap_deregister_sta(struct hdd_adapter *adapter,
 	struct hdd_context *hdd_ctx;
 	struct qdf_mac_addr *mac_addr;
 	struct hdd_station_info *sta = *sta_info;
+	struct hdd_ap_ctx *ap_ctx;
 
 	if (!adapter) {
 		hdd_err("NULL adapter");
@@ -1233,6 +1235,12 @@ QDF_STATUS hdd_softap_deregister_sta(struct hdd_adapter *adapter,
 	}
 
 	hdd_del_latency_critical_client(adapter, sta->dot11_mode);
+
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+	if (!QDF_IS_ADDR_BROADCAST(sta->sta_mac.bytes) &&
+	    sta->dot11_mode < QCA_WLAN_802_11_MODE_INVALID)
+		ap_ctx->client_count[sta->dot11_mode]--;
+
 	hdd_sta_info_detach(&adapter->sta_info_list, &sta);
 
 	ucfg_mlme_update_oce_flags(hdd_ctx->pdev);
@@ -1267,7 +1275,7 @@ QDF_STATUS hdd_softap_register_sta(struct hdd_adapter *adapter,
 	 * If the address is a broadcast address, then provide the self mac addr
 	 * to the data path. Else provide the mac address of the connected peer.
 	 */
-	if (qdf_is_macaddr_broadcast(sta_mac) && ap_ctx)
+	if (qdf_is_macaddr_broadcast(sta_mac))
 		qdf_mem_copy(&txrx_desc.peer_addr, &adapter->mac_addr,
 			     QDF_MAC_ADDR_SIZE);
 	else
@@ -1357,6 +1365,9 @@ QDF_STATUS hdd_softap_register_sta(struct hdd_adapter *adapter,
 		sta_info->peer_state = OL_TXRX_PEER_STATE_CONN;
 	}
 
+	if (!qdf_is_macaddr_broadcast(sta_mac) &&
+	    dot11mode < QCA_WLAN_802_11_MODE_INVALID)
+		ap_ctx->client_count[dot11mode]++;
 	hdd_put_sta_info_ref(&adapter->sta_info_list, &sta_info, true,
 			     STA_INFO_SOFTAP_REGISTER_STA);
 	hdd_debug("Enabling queues");

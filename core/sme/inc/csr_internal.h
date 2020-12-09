@@ -593,16 +593,9 @@ struct csr_roam_session {
 	tCsrEseCckmIe suppCckmIeInfo;
 #endif
 	uint8_t bRefAssocStartCnt;      /* Tracking assoc start indication */
-	struct ht_config ht_config;
-	struct sir_vht_config vht_config;
-#ifdef WLAN_FEATURE_11AX
-	tDot11fIEhe_cap he_config;
-	uint32_t he_sta_obsspd;
-#endif
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 	uint8_t psk_pmk[SIR_ROAM_SCAN_PSK_SIZE];
 	size_t pmk_len;
-	uint8_t RoamKeyMgmtOffloadEnabled;
 	struct roam_offload_synch_ind *roam_synch_data;
 	struct pmkid_mode_bits pmkid_modes;
 #endif
@@ -614,7 +607,6 @@ struct csr_roam_session {
 	bool supported_nss_1x1;
 	uint8_t vdev_nss;
 	uint8_t nss;
-	bool nss_forced_1x1;
 	bool disable_hi_rssi;
 	bool dhcp_done;
 	enum wlan_reason_code disconnect_reason;

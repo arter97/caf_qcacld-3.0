@@ -492,7 +492,7 @@ static QDF_STATUS target_if_cp_stats_extract_peer_stats(
 
 	/* Extract peer_stats */
 	if (!stats_param->num_peer_stats)
-		return QDF_STATUS_SUCCESS;
+		goto adv_stats;
 
 	ev->peer_stats = qdf_mem_malloc(sizeof(*ev->peer_stats) *
 						stats_param->num_peer_stats);
@@ -519,6 +519,7 @@ static QDF_STATUS target_if_cp_stats_extract_peer_stats(
 							TGT_NOISE_FLOOR_DBM;
 	}
 
+adv_stats:
 	target_if_cp_stats_extract_peer_extd_stats(wmi_hdl, stats_param, ev,
 						   data);
 
@@ -1066,6 +1067,10 @@ static void target_if_cp_stats_inc_wake_lock_stats(uint32_t reason,
 
 	case WOW_REASON_CHIP_POWER_FAILURE_DETECT:
 		stats->pwr_save_fail_detected++;
+		break;
+
+	case WOW_REASON_LOCAL_DATA_UC_DROP:
+		stats->uc_drop_wake_up_count++;
 		break;
 
 	default:

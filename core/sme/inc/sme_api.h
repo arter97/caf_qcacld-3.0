@@ -984,10 +984,6 @@ QDF_STATUS sme_update_is_fast_roam_ini_feature_enabled(mac_handle_t mac_handle,
 		const bool
 		isFastRoamIniFeatureEnabled);
 
-#ifndef ROAM_OFFLOAD_V1
-QDF_STATUS sme_config_fast_roaming(mac_handle_t mac_handle, uint8_t session_id,
-				   const bool is_fast_roam_enabled);
-#endif
 QDF_STATUS sme_stop_roaming(mac_handle_t mac_handle, uint8_t sessionId,
 			    uint8_t reason,
 			    enum wlan_cm_rso_control_requestor requestor);
@@ -1635,10 +1631,6 @@ QDF_STATUS sme_ext_scan_register_callback(mac_handle_t mac_handle,
 }
 #endif /* FEATURE_WLAN_EXTSCAN */
 
-#ifndef ROAM_OFFLOAD_V1
-QDF_STATUS sme_abort_roam_scan(mac_handle_t mac_handle, uint8_t sessionId);
-#endif
-
 /**
  * sme_get_vht_ch_width() - SME API to get the max supported FW chan width
  *
@@ -1708,10 +1700,10 @@ sme_reset_link_layer_stats_ind_cb(mac_handle_t mac_handle)
 QDF_STATUS sme_set_wisa_params(mac_handle_t mac_handle,
 			       struct sir_wisa_params *wisa_params);
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
-QDF_STATUS sme_update_roam_key_mgmt_offload_enabled(mac_handle_t mac_handle,
-		uint8_t session_id,
-		bool key_mgmt_offload_enabled,
-		struct pmkid_mode_bits *pmkid_modes);
+QDF_STATUS
+sme_update_roam_key_mgmt_offload_enabled(mac_handle_t mac_handle,
+					 uint8_t session_id,
+					 struct pmkid_mode_bits *pmkid_modes);
 #endif
 QDF_STATUS sme_get_link_status(mac_handle_t mac_handle,
 			       csr_link_status_callback callback,
@@ -3399,6 +3391,17 @@ int sme_update_he_ldpc_supp(mac_handle_t mac_handle, uint8_t session_id,
  */
 int sme_update_he_twt_req_support(mac_handle_t mac_handle, uint8_t session_id,
 				  uint8_t cfg_val);
+
+/**
+ * sme_update_he_full_ul_mumimo() - Configure full bandwidth of ul mu-mimo
+ * @mac_handle: Opaque handle to the global MAC context
+ * @session_id: SME session id
+ * @value: set value
+ *
+ * Return: 0 on success else err code
+ */
+int sme_update_he_full_ul_mumimo(mac_handle_t mac_handle, uint8_t session_id,
+				 uint8_t cfg_val);
 #else
 static inline void sme_update_tgt_he_cap(mac_handle_t mac_handle,
 					 struct wma_tgt_cfg *cfg,
@@ -3526,6 +3529,13 @@ static inline void sme_config_su_ppdu_queue(uint8_t session_id, bool enable)
 static inline int sme_update_he_twt_req_support(mac_handle_t mac_handle,
 						uint8_t session_id,
 						uint8_t cfg_val)
+{
+	return 0;
+}
+
+static inline int sme_update_he_full_ul_mumimo(mac_handle_t mac_handle,
+					       uint8_t session_id,
+					       uint8_t cfg_val)
 {
 	return 0;
 }
@@ -4139,23 +4149,6 @@ void sme_chan_to_freq_list(
 			uint32_t *freq_list,
 			const uint8_t *chan_list,
 			uint32_t chan_list_len);
-
-#ifndef ROAM_OFFLOAD_V1
-/**
- * sme_set_roam_triggers() - Send roam trigger bitmap to WMA
- * @mac_handle: Opaque handle to the MAC context
- * @triggers: Carries pointer of the object containing vdev id and
- *	      roam_trigger_bitmap.
- *
- * Send the roam trigger bitmap received to WMA/WMI. WMI converts
- * the bitmap to firmware compatible bitmap as per reasons
- * defined @WMI_ROAM_TRIGGER_REASON_ID
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS sme_set_roam_triggers(mac_handle_t mac_handle,
-				 struct wlan_roam_triggers *triggers);
-#endif
 
 /**
  * sme_set_roam_config_enable() - Cache roam config status in SME

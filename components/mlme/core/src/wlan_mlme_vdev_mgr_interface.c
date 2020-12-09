@@ -30,6 +30,7 @@
 #include "target_if_cm_roam_offload.h"
 #include "wlan_crypto_global_api.h"
 #include "target_if_wfa_testcmd.h"
+#include <../../core/src/wlan_cm_vdev_api.h>
 
 static struct vdev_mlme_ops sta_mlme_ops;
 static struct vdev_mlme_ops ap_mlme_ops;
@@ -1157,6 +1158,7 @@ QDF_STATUS vdevmgr_mlme_ext_hdl_create(struct vdev_mlme_obj *vdev_mlme)
 				     &vdev_mlme->mgmt.generic.subtype);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mlme_err("Get vdev type failed; status:%d", status);
+		qdf_mem_free(vdev_mlme->ext_vdev_ptr);
 		return status;
 	}
 
@@ -1164,6 +1166,7 @@ QDF_STATUS vdevmgr_mlme_ext_hdl_create(struct vdev_mlme_obj *vdev_mlme)
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mlme_err("Failed to create vdev for vdev id %d",
 			 wlan_vdev_get_id(vdev_mlme->vdev));
+		qdf_mem_free(vdev_mlme->ext_vdev_ptr);
 		return status;
 	}
 
@@ -1663,4 +1666,13 @@ static struct mlme_ext_ops ext_ops = {
 	.mlme_vdev_ext_hdl_destroy = vdevmgr_mlme_ext_hdl_destroy,
 	.mlme_vdev_ext_hdl_post_create = vdevmgr_mlme_ext_post_hdl_create,
 	.mlme_vdev_ext_delete_rsp = vdevmgr_vdev_delete_rsp_handle,
+#ifdef FEATURE_CM_ENABLE
+	.mlme_cm_ext_connect_req_cb = cm_handle_connect_req,
+	.mlme_cm_ext_bss_peer_create_req_cb = cm_send_bss_peer_create_req,
+	.mlme_cm_ext_connect_complete_ind_cb = cm_handle_connect_complete,
+	.mlme_cm_ext_disconnect_req_cb = cm_handle_disconnect_req,
+	.mlme_cm_ext_bss_peer_delete_req_cb = cm_send_bss_peer_delete_req,
+	.mlme_cm_ext_disconnect_complete_ind_cb = cm_disconnect_complete_ind,
+	.mlme_cm_ext_vdev_down_req_cb = cm_send_vdev_down_req,
+#endif
 };

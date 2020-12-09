@@ -1116,12 +1116,10 @@ void lim_add_bss_he_cfg(struct bss_params *add_bss, struct pe_session *session);
 /**
  * lim_copy_bss_he_cap() - Copy HE capability into PE session from start bss
  * @session: pointer to PE session
- * @sme_start_bss_req: pointer to start BSS request
  *
  * Return: None
  */
-void lim_copy_bss_he_cap(struct pe_session *session,
-			 struct start_bss_req *sme_start_bss_req);
+void lim_copy_bss_he_cap(struct pe_session *session);
 
 /**
  * lim_update_he_6gop_assoc_resp() - Update HE 6GHz op info to BSS params
@@ -1138,12 +1136,10 @@ void lim_update_he_6gop_assoc_resp(struct bss_params *pAddBssParams,
  * lim_copy_join_req_he_cap() - Copy HE capability to PE session from Join req
  * and update as per bandwidth supported
  * @session: pointer to PE session
- * @sme_join_req: pointer to SME join request
  *
  * Return: None
  */
-void lim_copy_join_req_he_cap(struct pe_session *session,
-			      struct join_req *sme_join_req);
+void lim_copy_join_req_he_cap(struct pe_session *session);
 
 /**
  * lim_log_he_6g_cap() - Print HE 6G cap IE
@@ -1196,6 +1192,16 @@ void lim_log_he_bss_color(struct mac_context *mac,
  * Return: None
  */
 void lim_log_he_cap(struct mac_context *mac, tDot11fIEhe_cap *he_cap);
+
+/**
+ * lim_check_he_80_mcs11_supp() - Check whether MCS 0-11 rates are supported
+ * @session: pointer to PE session
+ * @he_cap: pointer to HE capabilities
+ *
+ * Return: true if MCS 0-11 rates are supported
+ */
+bool lim_check_he_80_mcs11_supp(struct pe_session *session,
+				       tDot11fIEhe_cap *he_cap);
 
 /**
  * lim_update_stads_he_caps() - Copy HE capability into STA DPH hash table entry
@@ -1462,13 +1468,11 @@ static inline void lim_decide_he_op(struct mac_context *mac_ctx,
 }
 
 static inline
-void lim_copy_bss_he_cap(struct pe_session *session,
-			 struct start_bss_req *sme_start_bss_req)
+void lim_copy_bss_he_cap(struct pe_session *session)
 {
 }
 
-static inline void lim_copy_join_req_he_cap(struct pe_session *session,
-			struct join_req *sme_join_req)
+static inline void lim_copy_join_req_he_cap(struct pe_session *session)
 {
 }
 

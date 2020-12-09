@@ -138,7 +138,8 @@ int ol_peer_recovery_notifier_cb(struct notifier_block *block,
 	if (!peer)
 		return -EINVAL;
 
-	if (notif_data->offset >= QDF_WLAN_MAX_HOST_OFFSET)
+	if (notif_data->offset + sizeof(struct peer_hang_data) >
+			QDF_WLAN_HANG_FW_OFFSET)
 		return NOTIFY_STOP_MASK;
 
 	QDF_HANG_EVT_SET_HDR(&hang_data.tlv_header,
@@ -225,10 +226,8 @@ void ol_tx_set_is_mgmt_over_wmi_enabled(uint8_t value)
 	struct ol_txrx_soc_t *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	ol_txrx_pdev_handle pdev;
 
-	if (qdf_unlikely(!soc)) {
-		ol_txrx_err("soc is NULL");
+	if (qdf_unlikely(!soc))
 		return;
-	}
 
 	pdev = ol_txrx_get_pdev_from_pdev_id(soc, OL_TXRX_PDEV_ID);
 	if (!pdev) {
@@ -249,10 +248,8 @@ uint8_t ol_tx_get_is_mgmt_over_wmi_enabled(void)
 	struct ol_txrx_soc_t *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	ol_txrx_pdev_handle pdev;
 
-	if (qdf_unlikely(!soc)) {
-		ol_txrx_err("soc is NULL");
+	if (qdf_unlikely(!soc))
 		return 0;
-	}
 
 	pdev = ol_txrx_get_pdev_from_pdev_id(soc, OL_TXRX_PDEV_ID);
 	if (!pdev) {
@@ -2329,10 +2326,8 @@ static void ol_txrx_flush_cache_rx_queue(void)
 	struct ol_txrx_vdev_t *vdev;
 	ol_txrx_pdev_handle pdev;
 
-	if (qdf_unlikely(!soc)) {
-		ol_txrx_err("soc is NULL");
+	if (qdf_unlikely(!soc))
 		return;
-	}
 
 	pdev = ol_txrx_get_pdev_from_pdev_id(soc, OL_TXRX_PDEV_ID);
 	if (!pdev)
@@ -3692,10 +3687,8 @@ static QDF_STATUS ol_txrx_wait_for_pending_tx(int timeout)
 	struct ol_txrx_soc_t *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	struct ol_txrx_pdev_t *txrx_pdev;
 
-	if (qdf_unlikely(!soc)) {
-		ol_txrx_err("soc is NULL");
+	if (qdf_unlikely(!soc))
 		return QDF_STATUS_E_FAULT;
-	}
 
 	txrx_pdev = ol_txrx_get_pdev_from_pdev_id(soc, OL_TXRX_PDEV_ID);
 	if (!txrx_pdev) {
@@ -4891,10 +4884,8 @@ static inline int ol_txrx_drop_nbuf_list(qdf_nbuf_t buf_list)
 	int num_dropped = 0;
 	qdf_nbuf_t buf, next_buf;
 
-	if (qdf_unlikely(!soc)) {
-		ol_txrx_err("soc is NULL");
+	if (qdf_unlikely(!soc))
 		return 0;
-	}
 
 	pdev = ol_txrx_get_pdev_from_pdev_id(soc, OL_TXRX_PDEV_ID);
 	if (!pdev) {
@@ -5097,10 +5088,8 @@ void ol_rx_data_process(struct ol_txrx_peer_t *peer,
 	 */
 	ol_txrx_rx_fp data_rx = NULL;
 
-	if (qdf_unlikely(!soc)) {
-		ol_txrx_err("soc is NULL");
+	if (qdf_unlikely(!soc))
 		goto drop_rx_buf;
-	}
 
 	pdev = ol_txrx_get_pdev_from_pdev_id(soc, OL_TXRX_PDEV_ID);
 	if ((!peer) || (!pdev)) {
@@ -5174,10 +5163,16 @@ static QDF_STATUS ol_txrx_register_peer(struct ol_txrx_desc_type *sta_desc)
 {
 	struct ol_txrx_peer_t *peer;
 	struct ol_txrx_soc_t *soc = cds_get_context(QDF_MODULE_ID_SOC);
-	ol_txrx_pdev_handle pdev =
-		ol_txrx_get_pdev_from_pdev_id(soc, OL_TXRX_PDEV_ID);
+	ol_txrx_pdev_handle pdev;
 	union ol_txrx_peer_update_param_t param;
 	struct privacy_exemption privacy_filter;
+
+	if (!soc) {
+		ol_txrx_err("Soc is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	pdev = ol_txrx_get_pdev_from_pdev_id(soc, OL_TXRX_PDEV_ID);
 
 	if (!pdev) {
 		ol_txrx_err("Pdev is NULL");
@@ -5219,12 +5214,18 @@ static QDF_STATUS ol_txrx_register_peer(struct ol_txrx_desc_type *sta_desc)
 static QDF_STATUS ol_txrx_register_ocb_peer(uint8_t *mac_addr)
 {
 	struct ol_txrx_soc_t *soc = cds_get_context(QDF_MODULE_ID_SOC);
-	ol_txrx_pdev_handle pdev =
-		ol_txrx_get_pdev_from_pdev_id(soc, OL_TXRX_PDEV_ID);
+	ol_txrx_pdev_handle pdev;
 	ol_txrx_peer_handle peer;
 
-	if (!pdev || !soc) {
-		ol_txrx_err("Unable to find pdev or soc!");
+	if (!soc) {
+		ol_txrx_err("Unable to find soc!");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	pdev = ol_txrx_get_pdev_from_pdev_id(soc, OL_TXRX_PDEV_ID);
+
+	if (!pdev) {
+		ol_txrx_err("Unable to find pdev!");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -5330,7 +5331,6 @@ static void ol_txrx_offld_flush_handler(void *context,
 	ol_txrx_pdev_handle pdev;
 
 	if (qdf_unlikely(!soc)) {
-		ol_txrx_err("Invalid soc context");
 		qdf_assert(0);
 		return;
 	}
@@ -5367,10 +5367,8 @@ static void ol_txrx_offld_flush(void *data)
 	if (qdf_unlikely(!sched_ctx))
 		return;
 
-	if (qdf_unlikely(!soc)) {
-		ol_txrx_err("soc is NULL");
+	if (qdf_unlikely(!soc))
 		return;
-	}
 
 	pdev = ol_txrx_get_pdev_from_pdev_id(soc, OL_TXRX_PDEV_ID);
 	if (qdf_unlikely(!pdev)) {
@@ -5410,7 +5408,6 @@ static void ol_register_offld_flush_cb(void (offld_flush_cb)(void *))
 	ol_txrx_pdev_handle pdev;
 
 	if (qdf_unlikely(!soc)) {
-		ol_txrx_err("soc NULL!");
 		TXRX_ASSERT2(0);
 		goto out;
 	}
@@ -5435,7 +5432,6 @@ static void ol_register_offld_flush_cb(void (offld_flush_cb)(void *))
 	hif_device = cds_get_context(QDF_MODULE_ID_HIF);
 
 	if (qdf_unlikely(!hif_device)) {
-		ol_txrx_err("hif_device NULL!");
 		qdf_assert(0);
 		goto out;
 	}
@@ -5460,10 +5456,8 @@ static void ol_deregister_offld_flush_cb(void)
 	struct ol_txrx_soc_t *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	ol_txrx_pdev_handle pdev;
 
-	if (qdf_unlikely(!soc)) {
-		ol_txrx_err("soc is NULL");
+	if (qdf_unlikely(!soc))
 		return;
-	}
 
 	pdev = ol_txrx_get_pdev_from_pdev_id(soc, OL_TXRX_PDEV_ID);
 	if (!pdev) {
@@ -5473,7 +5467,6 @@ static void ol_deregister_offld_flush_cb(void)
 	hif_device = cds_get_context(QDF_MODULE_ID_HIF);
 
 	if (qdf_unlikely(!hif_device)) {
-		ol_txrx_err("hif_device NULL!");
 		qdf_assert(0);
 		return;
 	}
@@ -5604,10 +5597,8 @@ struct cdp_vdev *ol_txrx_get_vdev_from_vdev_id(uint8_t vdev_id)
 	struct ol_txrx_soc_t *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	ol_txrx_vdev_handle vdev = NULL;
 
-	if (qdf_unlikely(!soc)) {
-		ol_txrx_err("soc is NULL");
+	if (qdf_unlikely(!soc))
 		return NULL;
-	}
 
 	vdev = ol_txrx_get_vdev_from_soc_vdev_id(soc, vdev_id);
 
@@ -5868,11 +5859,17 @@ static uint32_t ol_txrx_get_cfg(struct cdp_soc_t *soc_hdl, enum cdp_dp_cfg cfg)
 	case cfg_dp_enable_p2p_ip_tcp_udp_checksum_offload:
 		value = cfg_ctx->p2p_ip_tcp_udp_checksum_offload;
 		break;
+	case cfg_dp_enable_nan_ip_tcp_udp_checksum_offload:
+		value = cfg_ctx->nan_tcp_udp_checksumoffload;
+		break;
 	case cfg_dp_tso_enable:
 		value = cfg_ctx->tso_enable;
 		break;
 	case cfg_dp_lro_enable:
 		value = cfg_ctx->lro_enable;
+		break;
+	case cfg_dp_sg_enable:
+		value = cfg_ctx->sg_enable;
 		break;
 	case cfg_dp_gro_enable:
 		value = cfg_ctx->gro_enable;
@@ -6380,10 +6377,8 @@ bool ol_txrx_get_peer_unmap_conf_support(void)
 	struct ol_txrx_soc_t *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	ol_txrx_pdev_handle pdev;
 
-	if (qdf_unlikely(!soc)) {
-		ol_txrx_err("soc is NULL");
+	if (qdf_unlikely(!soc))
 		return false;
-	}
 
 	pdev = ol_txrx_get_pdev_from_pdev_id(soc, OL_TXRX_PDEV_ID);
 	if (!pdev) {
@@ -6398,10 +6393,8 @@ void ol_txrx_set_peer_unmap_conf_support(bool val)
 	struct ol_txrx_soc_t *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	ol_txrx_pdev_handle pdev;
 
-	if (qdf_unlikely(!soc)) {
-		ol_txrx_err("soc is NULL");
+	if (qdf_unlikely(!soc))
 		return;
-	}
 
 	pdev = ol_txrx_get_pdev_from_pdev_id(soc, OL_TXRX_PDEV_ID);
 	if (!pdev) {
@@ -6417,10 +6410,8 @@ bool ol_txrx_get_tx_compl_tsf64(void)
 	struct ol_txrx_soc_t *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	ol_txrx_pdev_handle pdev;
 
-	if (qdf_unlikely(!soc)) {
-		ol_txrx_err("soc is NULL");
+	if (qdf_unlikely(!soc))
 		return false;
-	}
 
 	pdev = ol_txrx_get_pdev_from_pdev_id(soc, OL_TXRX_PDEV_ID);
 	if (!pdev) {
@@ -6435,10 +6426,8 @@ void ol_txrx_set_tx_compl_tsf64(bool val)
 	struct ol_txrx_soc_t *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	ol_txrx_pdev_handle pdev;
 
-	if (qdf_unlikely(!soc)) {
-		ol_txrx_err("soc is NULL");
+	if (qdf_unlikely(!soc))
 		return;
-	}
 
 	pdev = ol_txrx_get_pdev_from_pdev_id(soc, OL_TXRX_PDEV_ID);
 	if (!pdev) {

@@ -26,7 +26,6 @@
 #include "wlan_policy_mgr_api.h"
 #include <wmi_unified_priv.h>
 
-#ifdef ROAM_OFFLOAD_V1
 #if defined(WLAN_FEATURE_HOST_ROAM) || defined(WLAN_FEATURE_ROAM_OFFLOAD)
 QDF_STATUS
 wlan_cm_enable_roaming_on_connected_sta(struct wlan_objmgr_pdev *pdev,
@@ -145,7 +144,7 @@ QDF_STATUS wlan_cm_enable_rso(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
 	QDF_STATUS status;
 
-	if (reason == REASON_DRIVER_DISABLED && requestor)
+	if (reason == REASON_DRIVER_ENABLED && requestor)
 		mlme_set_operations_bitmap(psoc, vdev_id, requestor, true);
 
 	status = cm_roam_acquire_lock();
@@ -229,7 +228,6 @@ QDF_STATUS wlan_cm_roam_stop_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 {
 	return cm_roam_stop_req(psoc, vdev_id, reason);
 }
-#endif
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 QDF_STATUS
@@ -468,7 +466,6 @@ wlan_cm_roam_get_vendor_btm_params(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
-#ifdef ROAM_OFFLOAD_V1
 QDF_STATUS wlan_cm_roam_cfg_get_value(struct wlan_objmgr_psoc *psoc,
 				      uint8_t vdev_id,
 				      enum roam_cfg_param roam_cfg_type,
@@ -560,7 +557,6 @@ wlan_cm_roam_cfg_set_value(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 
 	return status;
 }
-#endif
 
 #ifdef WLAN_FEATURE_FILS_SK
 QDF_STATUS wlan_cm_update_mlme_fils_connection_info(

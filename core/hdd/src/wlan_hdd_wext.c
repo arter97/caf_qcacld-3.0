@@ -6309,10 +6309,8 @@ static int __iw_get_char_setnone(struct net_device *dev,
 		enum qca_wlan_ac_type duration[QCA_WLAN_AC_ALL];
 		void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 
-		if (!soc) {
-			hdd_err("Invalid SOC handle");
+		if (!soc)
 			break;
-		}
 
 		for (i = 0; i < QCA_WLAN_AC_ALL; i++)
 			cdp_get_ba_timeout(soc, i, &duration[i]);
@@ -7105,22 +7103,29 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
 		conn_info = policy_mgr_get_conn_info(&len);
 		pr_info("+--------------------------+\n");
 		for (i = 0; i < len; i++) {
+			if (!conn_info->in_use)
+				continue;
+
 			pr_info("|table_index[%d]\t\t\n", i);
 			pr_info("|\t|vdev_id - %-10d|\n", conn_info->vdev_id);
 			pr_info("|\t|freq    - %-10d|\n", conn_info->freq);
 			pr_info("|\t|bw      - %-10d|\n", conn_info->bw);
 			pr_info("|\t|mode    - %-10d|\n", conn_info->mode);
-			pr_info("|\t|mac     - %-10d|\n", conn_info->mac);
+			pr_info("|\t|mac_id  - %-10d|\n", conn_info->mac);
 			pr_info("|\t|in_use  - %-10d|\n", conn_info->in_use);
 			pr_info("+--------------------------+\n");
 			conn_info++;
 		}
+
+		pr_info("|\t|current state dbs - %-10d|\n",
+			policy_mgr_is_current_hwmode_dbs(hdd_ctx->psoc));
 	}
 	break;
 
 	case WE_UNIT_TEST_CMD:
 	{
 		QDF_STATUS status;
+		uint8_t vdev_id = 0;
 
 		if ((apps_args[0] < WLAN_MODULE_ID_MIN) ||
 		    (apps_args[0] >= WLAN_MODULE_ID_MAX)) {
@@ -7133,12 +7138,17 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
 			return -EINVAL;
 		}
 
+		if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam())
+			vdev_id = 0;
+		else
+			vdev_id = adapter->vdev_id;
+
 		if (adapter->vdev_id >= WLAN_MAX_VDEVS) {
 			hdd_err_rl("Invalid vdev id");
 			return -EINVAL;
 		}
 
-		status = sme_send_unit_test_cmd(adapter->vdev_id,
+		status = sme_send_unit_test_cmd(vdev_id,
 						apps_args[0],
 						apps_args[1],
 						&apps_args[2]);
@@ -8500,7 +8510,7 @@ static int __iw_set_pno(struct net_device *dev,
 
 	vdev = wlan_objmgr_get_vdev_by_macaddr_from_pdev(hdd_ctx->pdev,
 							 dev->dev_addr,
-							 WLAN_OSIF_ID);
+							 WLAN_OSIF_SCAN_ID);
 	if (!vdev) {
 		hdd_err("vdev object is NULL");
 		return -EIO;
@@ -8711,7 +8721,7 @@ static int __iw_set_pno(struct net_device *dev,
 	}
 
 exit:
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_ID);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_SCAN_ID);
 
 	qdf_mem_free(data);
 	return ret;
@@ -8938,10 +8948,9 @@ static int __iw_set_two_ints_getnone(struct net_device *dev,
 	{
 		void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 
-		if (!soc) {
-			hdd_err("Invalid handles");
+		if (!soc)
 			break;
-		}
+
 		cdp_set_ba_timeout(soc, value[1], value[2]);
 		break;
 	}

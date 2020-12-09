@@ -68,8 +68,6 @@
 #define WMA_MAC_TO_PDEV_MAP(x) ((x) + (1))
 #define WMA_PDEV_TO_MAC_MAP(x) ((x) - (1))
 
-#define WMA_MAX_MGMT_MPDU_LEN 2000
-
 #define MAX_PRINT_FAILURE_CNT 50
 
 #define WMA_INVALID_VDEV_ID                             0xFF
@@ -165,6 +163,9 @@
 
 #define WMA_PDEV_SET_HW_MODE_RESP 0x06
 #define WMA_PDEV_MAC_CFG_RESP 0x07
+
+#define WMA_PEER_CREATE_RESPONSE 0x08
+#define WMA_PEER_CREATE_RESPONSE_TIMEOUT SIR_PEER_CREATE_RESPONSE_TIMEOUT
 
 /* FW response timeout values in milli seconds */
 #define WMA_VDEV_PLCY_MGR_TIMEOUT        SIR_VDEV_PLCY_MGR_TIMEOUT
@@ -1641,7 +1642,18 @@ void wma_process_set_pdev_vht_ie_req(tp_wma_handle wma,
 QDF_STATUS wma_remove_peer(tp_wma_handle wma, uint8_t *mac_addr,
 			   uint8_t vdev_id, bool no_fw_peer_delete);
 
-QDF_STATUS wma_create_peer(tp_wma_handle wma, uint8_t peer_addr[6],
+/**
+ * wma_create_peer() - Call wma_add_peer() to send peer create command to fw
+ * and setup cdp peer
+ * @wma: wma handle
+ * @peer_addr: peer mac address
+ * @peer_type: peer type
+ * @vdev_id: vdev id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wma_create_peer(tp_wma_handle wma,
+			   uint8_t peer_addr[QDF_MAC_ADDR_SIZE],
 			   u_int32_t peer_type, u_int8_t vdev_id);
 
 QDF_STATUS wma_peer_unmap_conf_cb(uint8_t vdev_id,
@@ -1816,10 +1828,8 @@ void wma_vdev_update_pause_bitmap(uint8_t vdev_id, uint16_t value)
 	tp_wma_handle wma = (tp_wma_handle)cds_get_context(QDF_MODULE_ID_WMA);
 	struct wma_txrx_node *iface;
 
-	if (!wma) {
-		wma_err("WMA context is invald!");
+	if (!wma)
 		return;
-	}
 
 	if (vdev_id >= wma->max_bssid) {
 		wma_err("Invalid vdev_id: %d", vdev_id);
@@ -1848,10 +1858,8 @@ uint16_t wma_vdev_get_pause_bitmap(uint8_t vdev_id)
 	tp_wma_handle wma = (tp_wma_handle)cds_get_context(QDF_MODULE_ID_WMA);
 	struct wma_txrx_node *iface;
 
-	if (!wma) {
-		wma_err("WMA context is invald!");
+	if (!wma)
 		return 0;
-	}
 
 	iface = &wma->interfaces[vdev_id];
 
@@ -1874,10 +1882,8 @@ static inline bool wma_vdev_is_device_in_low_pwr_mode(uint8_t vdev_id)
 	tp_wma_handle wma = (tp_wma_handle)cds_get_context(QDF_MODULE_ID_WMA);
 	struct wma_txrx_node *iface;
 
-	if (!wma) {
-		wma_err("WMA context is invalid!");
+	if (!wma)
 		return 0;
-	}
 
 	iface = &wma->interfaces[vdev_id];
 
@@ -1992,10 +1998,8 @@ void wma_vdev_set_pause_bit(uint8_t vdev_id, wmi_tx_pause_type bit_pos)
 	tp_wma_handle wma = (tp_wma_handle)cds_get_context(QDF_MODULE_ID_WMA);
 	struct wma_txrx_node *iface;
 
-	if (!wma) {
-		wma_err("WMA context is invalid!");
+	if (!wma)
 		return;
-	}
 
 	iface = &wma->interfaces[vdev_id];
 
@@ -2020,10 +2024,8 @@ void wma_vdev_clear_pause_bit(uint8_t vdev_id, wmi_tx_pause_type bit_pos)
 	tp_wma_handle wma = (tp_wma_handle)cds_get_context(QDF_MODULE_ID_WMA);
 	struct wma_txrx_node *iface;
 
-	if (!wma) {
-		wma_err("WMA context is invalid!");
+	if (!wma)
 		return;
-	}
 
 	iface = &wma->interfaces[vdev_id];
 
@@ -2035,19 +2037,6 @@ void wma_vdev_clear_pause_bit(uint8_t vdev_id, wmi_tx_pause_type bit_pos)
 	iface->pause_bitmap &= ~(1 << bit_pos);
 }
 
-#ifndef ROAM_OFFLOAD_V1
-/**
- * wma_process_roaming_config() - process roam request
- * @wma_handle: wma handle
- * @roam_req: roam request parameters
- *
- * Main routine to handle ROAM commands coming from CSR module.
- *
- * Return: QDF status
- */
-QDF_STATUS wma_process_roaming_config(tp_wma_handle wma_handle,
-				     struct roam_offload_scan_req *roam_req);
-#endif
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
  * wma_send_roam_preauth_status() - Send the preauth status to wmi

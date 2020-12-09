@@ -60,6 +60,9 @@ static uint8_t re_init_fail_cnt, probe_fail_cnt;
 /* An atomic flag to check if SSR cleanup has been done or not */
 static qdf_atomic_t is_recovery_cleanup_done;
 
+/* firmware/host hang event data */
+static uint8_t g_fw_host_hang_event[QDF_HANG_EVENT_DATA_SIZE];
+
 /*
  * In BMI Phase we are only sending small chunk (256 bytes) of the FW image at
  * a time, and wait for the completion interrupt to start the next transfer.
@@ -339,10 +342,8 @@ int hdd_hif_open(struct device *dev, void *bdev, const struct hif_bus_id *bid,
 	uint32_t mode = cds_get_conparam();
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 
-	if (!hdd_ctx) {
-		hdd_err("hdd_ctx error");
+	if (!hdd_ctx)
 		return -EFAULT;
-	}
 
 	hdd_hif_init_driver_state_callbacks(dev, &cbk);
 
@@ -448,10 +449,8 @@ static int hdd_init_qdf_ctx(struct device *dev, void *bdev,
 {
 	qdf_device_t qdf_dev = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
 
-	if (!qdf_dev) {
-		hdd_err("Invalid QDF device");
+	if (!qdf_dev)
 		return -EINVAL;
-	}
 
 	qdf_dev->dev = dev;
 	qdf_dev->drv_hdl = bdev;
@@ -461,7 +460,6 @@ static int hdd_init_qdf_ctx(struct device *dev, void *bdev,
 	if (cds_smmu_mem_map_setup(qdf_dev, ucfg_ipa_is_ready()) !=
 		QDF_STATUS_SUCCESS) {
 		hdd_err("cds_smmu_mem_map_setup() failed");
-		return -EFAULT;
 	}
 
 	return 0;
@@ -876,10 +874,8 @@ static void hdd_soc_recovery_cleanup(void)
 	struct hdd_context *hdd_ctx;
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	if (!hdd_ctx) {
-		hdd_err("hdd_ctx is null");
+	if (!hdd_ctx)
 		return;
-	}
 
 	/* cancel/flush any pending/active idle shutdown work */
 	hdd_psoc_idle_timer_stop(hdd_ctx);
@@ -909,10 +905,8 @@ static void __hdd_soc_recovery_shutdown(void)
 	hdd_init_start_completion();
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	if (!hdd_ctx) {
-		hdd_err("hdd_ctx is null");
+	if (!hdd_ctx)
 		return;
-	}
 
 	/*
 	 * Perform SSR related cleanup if it has not already been done as a
@@ -927,10 +921,8 @@ static void __hdd_soc_recovery_shutdown(void)
 		hdd_err("Debufs threads are still pending, attempting SSR anyway");
 
 	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
-	if (!hif_ctx) {
-		hdd_err("Failed to get HIF context, ignore SSR shutdown");
+	if (!hif_ctx)
 		return;
-	}
 
 	/* mask the host controller interrupts */
 	hif_mask_interrupt_call(hif_ctx);
@@ -990,10 +982,8 @@ static void wlan_hdd_crash_shutdown(void)
 	QDF_STATUS ret;
 	WMA_HANDLE wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
 
-	if (!wma_handle) {
-		hdd_err("wma_handle is null");
+	if (!wma_handle)
 		return;
-	}
 
 	/*
 	 * When kernel panic happen, if WiFi FW is still active
@@ -1128,10 +1118,8 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params)
 	hdd_info("starting bus suspend");
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	if (!hdd_ctx) {
-		hdd_err_rl("hdd context is NULL");
+	if (!hdd_ctx)
 		return -ENODEV;
-	}
 
 	/* If Wifi is off, return success for system suspend */
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
@@ -1144,10 +1132,8 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params)
 		return err;
 
 	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
-	if (!hif_ctx) {
-		hdd_err("Failed to get hif context");
+	if (!hif_ctx)
 		return -EINVAL;
-	}
 
 	err = hdd_to_pmo_wow_enable_params(&wow_params, &pmo_params);
 	if (err) {
@@ -1258,10 +1244,8 @@ int wlan_hdd_bus_suspend_noirq(void)
 
 	hdd_debug("start bus_suspend_noirq");
 
-	if (!hdd_ctx) {
-		hdd_err_rl("hdd context is NULL");
+	if (!hdd_ctx)
 		return -ENODEV;
-	}
 
 	/* If Wifi is off, return success for system suspend */
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
@@ -1274,10 +1258,8 @@ int wlan_hdd_bus_suspend_noirq(void)
 		return errno;
 
 	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
-	if (!hif_ctx) {
-		hdd_err("hif_ctx is null");
+	if (!hif_ctx)
 		return -EINVAL;
-	}
 
 	errno = hif_bus_suspend_noirq(hif_ctx);
 	if (errno)
@@ -1340,10 +1322,8 @@ int wlan_hdd_bus_resume(void)
 
 	hdd_info("starting bus resume");
 
-	if (!hdd_ctx) {
-		hdd_err_rl("hdd context is NULL");
+	if (!hdd_ctx)
 		return -ENODEV;
-	}
 
 	/* If Wifi is off, return success for system resume */
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
@@ -1356,10 +1336,8 @@ int wlan_hdd_bus_resume(void)
 		return status;
 
 	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
-	if (!hif_ctx) {
-		hdd_err("Failed to get hif context");
+	if (!hif_ctx)
 		return -EINVAL;
-	}
 
 	/*
 	 * Add bus votes at the beginning, before making sure there are any
@@ -1434,10 +1412,8 @@ int wlan_hdd_bus_resume_noirq(void)
 	if (cds_is_driver_recovering())
 		return 0;
 
-	if (!hdd_ctx) {
-		hdd_err_rl("hdd context is NULL");
+	if (!hdd_ctx)
 		return -ENODEV;
-	}
 
 	/* If Wifi is off, return success for system resume */
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
@@ -1477,10 +1453,8 @@ static int wlan_hdd_bus_reset_resume(void)
 {
 	struct hif_opaque_softc *scn = cds_get_context(QDF_MODULE_ID_HIF);
 
-	if (!scn) {
-		hdd_err("Failed to get HIF context");
+	if (!scn)
 		return -EFAULT;
-	}
 
 	return hif_bus_reset_resume(scn);
 }
@@ -1495,10 +1469,8 @@ static int hdd_pld_runtime_suspend_cb(void)
 {
 	qdf_device_t qdf_dev = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
 
-	if (!qdf_dev) {
-		hdd_err("Invalid context");
+	if (!qdf_dev)
 		return -EINVAL;
-	}
 
 	return pld_auto_suspend(qdf_dev->dev);
 }
@@ -1568,10 +1540,8 @@ static int hdd_pld_runtime_resume_cb(void)
 {
 	qdf_device_t qdf_dev = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
 
-	if (!qdf_dev) {
-		hdd_err("Invalid context");
+	if (!qdf_dev)
 		return -EINVAL;
-	}
 
 	return pld_auto_resume(qdf_dev->dev);
 }
@@ -1600,10 +1570,9 @@ static int wlan_hdd_runtime_resume(struct device *dev)
 	 * resume fail, if driver load/unload in-progress, so not doing
 	 * wlan_hdd_validate_context, have only SSR in progress check.
 	 */
-	if (!hdd_ctx) {
-		hdd_err("hdd_ctx is NULL");
+	if (!hdd_ctx)
 		return 0;
-	}
+
 	if (cds_is_driver_recovering()) {
 		hdd_debug("Recovery in progress, state:0x%x",
 			  cds_get_driver_state());
@@ -1977,10 +1946,8 @@ wlan_hdd_pld_uevent(struct device *dev, struct pld_uevent_data *event_data)
 	case PLD_FW_HANG_EVENT:
 		hdd_info("Received firmware hang event");
 		cds_get_recovery_reason(&reason);
-		hang_evt_data.hang_data =
-				qdf_mem_malloc(QDF_HANG_EVENT_DATA_SIZE);
-		if (!hang_evt_data.hang_data)
-			return;
+		qdf_mem_zero(&g_fw_host_hang_event, QDF_HANG_EVENT_DATA_SIZE);
+		hang_evt_data.hang_data = g_fw_host_hang_event;
 		hang_evt_data.offset = 0;
 		qdf_hang_event_notifier_call(reason, &hang_evt_data);
 		hang_evt_data.offset = QDF_WLAN_HANG_FW_OFFSET;
@@ -1997,8 +1964,6 @@ wlan_hdd_pld_uevent(struct device *dev, struct pld_uevent_data *event_data)
 
 		hdd_send_hang_data(hang_evt_data.hang_data,
 				   QDF_HANG_EVENT_DATA_SIZE);
-		qdf_mem_free(hang_evt_data.hang_data);
-
 		break;
 	default:
 		/* other events intentionally not handled */

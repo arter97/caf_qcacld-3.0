@@ -59,10 +59,8 @@ static void hdd_init_psoc_qdf_ctx(struct wlan_objmgr_psoc *psoc)
 	qdf_device_t qdf_ctx;
 
 	qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
-	if (!qdf_ctx) {
-		hdd_err("qdf ctx is null, can't set to soc object");
+	if (!qdf_ctx)
 		return;
-	}
 
 	wlan_psoc_set_qdf_dev(psoc, qdf_ctx);
 }
@@ -220,6 +218,46 @@ int hdd_objmgr_release_and_destroy_pdev(struct hdd_context *hdd_ctx)
 	return qdf_status_to_os_return(status);
 }
 
+#ifdef WLAN_OBJMGR_REF_ID_TRACE
+struct wlan_objmgr_vdev *__hdd_objmgr_get_vdev(struct hdd_adapter *adapter,
+					       const char *func,
+					       int line)
+{
+	struct wlan_objmgr_vdev *vdev = NULL;
+	QDF_STATUS status;
+
+	if (!adapter) {
+		hdd_err("Adapter is NULL (via %s)", func);
+		return NULL;
+	}
+
+	qdf_spin_lock_bh(&adapter->vdev_lock);
+	vdev = adapter->vdev;
+	if (vdev) {
+		status = wlan_objmgr_vdev_try_get_ref_debug(vdev, WLAN_OSIF_ID,
+							    func, line);
+		if (QDF_IS_STATUS_ERROR(status))
+			vdev = NULL;
+	}
+	qdf_spin_unlock_bh(&adapter->vdev_lock);
+
+	if (!vdev)
+		hdd_debug("VDEV is NULL (via %s)", func);
+
+	return vdev;
+}
+
+void __hdd_objmgr_put_vdev(struct wlan_objmgr_vdev *vdev, const char *func,
+			   int line)
+{
+	if (!vdev) {
+		hdd_err("VDEV is NULL (via %s)", func);
+		return;
+	}
+
+	wlan_objmgr_vdev_release_ref_debug(vdev, WLAN_OSIF_ID, func, line);
+}
+#else
 struct wlan_objmgr_vdev *__hdd_objmgr_get_vdev(struct hdd_adapter *adapter,
 					       const char *func)
 {
@@ -255,6 +293,7 @@ void __hdd_objmgr_put_vdev(struct wlan_objmgr_vdev *vdev, const char *func)
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_ID);
 }
+#endif
 
 int hdd_objmgr_set_peer_mlme_auth_state(struct wlan_objmgr_vdev *vdev,
 					bool is_authenticated)
@@ -294,3 +333,88 @@ int hdd_objmgr_set_peer_mlme_state(struct wlan_objmgr_vdev *vdev,
 	return 0;
 }
 
+#ifdef WLAN_OBJMGR_REF_ID_TRACE
+struct wlan_objmgr_vdev *
+__hdd_objmgr_get_vdev_by_user(struct hdd_adapter *adapter,
+			      wlan_objmgr_ref_dbgid id,
+			      const char *func, int line)
+{
+	struct wlan_objmgr_vdev *vdev;
+	QDF_STATUS status;
+
+	if (!adapter) {
+		hdd_err("Adapter is NULL (via %s, id %d)", func, id);
+		return NULL;
+	}
+
+	qdf_spin_lock_bh(&adapter->vdev_lock);
+	vdev = adapter->vdev;
+	if (vdev) {
+		status = wlan_objmgr_vdev_try_get_ref_debug(vdev, id, func,
+							    line);
+		if (QDF_IS_STATUS_ERROR(status))
+			vdev = NULL;
+	}
+	qdf_spin_unlock_bh(&adapter->vdev_lock);
+
+	if (!vdev)
+		hdd_debug("VDEV is NULL (via %s, id %d)", func, id);
+
+	return vdev;
+}
+#else
+struct wlan_objmgr_vdev *
+__hdd_objmgr_get_vdev_by_user(struct hdd_adapter *adapter,
+			      wlan_objmgr_ref_dbgid id,
+			      const char *func)
+{
+	struct wlan_objmgr_vdev *vdev;
+	QDF_STATUS status;
+
+	if (!adapter) {
+		hdd_err("Adapter is NULL (via %s, id %d)", func, id);
+		return NULL;
+	}
+
+	qdf_spin_lock_bh(&adapter->vdev_lock);
+	vdev = adapter->vdev;
+	if (vdev) {
+		status = wlan_objmgr_vdev_try_get_ref(vdev, id);
+		if (QDF_IS_STATUS_ERROR(status))
+			vdev = NULL;
+	}
+	qdf_spin_unlock_bh(&adapter->vdev_lock);
+
+	if (!vdev)
+		hdd_debug("VDEV is NULL (via %s, id %d)", func, id);
+
+	return vdev;
+}
+#endif
+
+#ifdef WLAN_OBJMGR_REF_ID_TRACE
+void
+__hdd_objmgr_put_vdev_by_user(struct wlan_objmgr_vdev *vdev,
+			      wlan_objmgr_ref_dbgid id, const char *func,
+			      int line)
+{
+	if (!vdev) {
+		hdd_err("VDEV is NULL (via %s, id %d)", func, id);
+		return;
+	}
+
+	wlan_objmgr_vdev_release_ref_debug(vdev, id, func, line);
+}
+#else
+void
+__hdd_objmgr_put_vdev_by_user(struct wlan_objmgr_vdev *vdev,
+			      wlan_objmgr_ref_dbgid id, const char *func)
+{
+	if (!vdev) {
+		hdd_err("VDEV is NULL (via %s, id %d)", func, id);
+		return;
+	}
+
+	wlan_objmgr_vdev_release_ref(vdev, id);
+}
+#endif

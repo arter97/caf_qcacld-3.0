@@ -1231,6 +1231,25 @@ struct csr_roam_profile *wlan_sap_get_roam_profile(struct sap_context *sap_ctx);
 eCsrPhyMode wlan_sap_get_phymode(struct sap_context *sap_ctx);
 
 /**
+ * wlan_sap_get_concurrent_bw() - Returns SAP BW based on concurrent channel &
+ *                                STA DFS channel
+ * @pdev: Pointer to Pdev
+ * @psoc: Pointer to Psoc
+ * @con_ch_freq: interfering concurrent channel
+ * @channel_width: Channel width
+ *
+ * Return: Channel width. If STA is not present on con_ch_freq, it returns
+ *        max of STA BW and 80 Mhz. If STA is not connected in dfs chan or STA
+ *........BW is not 160 Mhz (which includes DFS channel), then it will return
+ *        BW maximum of STA BW and 80 Mhz. If DFS STA is present, then return
+ *        BW as min of 80 and STA BW.
+ */
+enum phy_ch_width wlan_sap_get_concurrent_bw(struct wlan_objmgr_pdev *pdev,
+					     struct wlan_objmgr_psoc *psoc,
+					     qdf_freq_t con_ch_freq,
+					     enum phy_ch_width channel_width);
+
+/**
  * wlan_sap_get_vht_ch_width() - Returns SAP VHT channel width.
  * @sap_ctx:	Pointer to Sap Context
  *
@@ -1485,6 +1504,19 @@ bool wlansap_is_6ghz_included_in_acs_range(struct sap_context *sap_ctx);
  */
 uint32_t
 wlansap_get_safe_channel_from_pcl_and_acs_range(struct sap_context *sap_ctx);
+
+/**
+ * wlansap_get_safe_channel_from_pcl_for_sap() - Get safe and active channel
+ * for SAP restart
+ * @sap_ctx: sap context
+ *
+ * Get a safe and active channel to restart SAP. PCL already takes into account
+ * the unsafe channels.
+ *
+ * Return: Chan freq num to restart SAP in case of success. In case of any
+ * failure, the channel number returned is zero.
+ */
+uint32_t wlansap_get_safe_channel_from_pcl_for_sap(struct sap_context *sap_ctx);
 
 /**
  * wlansap_get_chan_band_restrict() -  get new chan for band change

@@ -722,6 +722,7 @@ struct csr_roam_profile {
 	struct wlan_fils_connection_info *fils_con_info;
 #endif
 	bool force_rsne_override;
+	bool is_hs_20_ap;
 };
 
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
@@ -1407,31 +1408,6 @@ void csr_clear_channel_status(struct mac_context *mac);
 QDF_STATUS csr_update_owe_info(struct mac_context *mac,
 			       struct assoc_ind *assoc_ind);
 
-/**
- * csr_send_roam_offload_init_msg() - Send roam enable/disable flag to fw
- * @mac: mac context
- * @vdev_id: vdev id
- * @enable: enable/disable roam flag
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-csr_send_roam_offload_init_msg(struct mac_context *mac, uint32_t vdev_id,
-			       bool enable);
-
-#ifndef ROAM_OFFLOAD_V1
-/**
- * csr_send_roam_disable_cfg_msg() - Send roam module enable/disable cfg to fw
- * @mac: mac context
- * @vdev_id: vdev id
- * @cfg: roaming enable/disable cfg
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS csr_send_roam_disable_cfg_msg(struct mac_context *mac,
-					 uint32_t vdev_id, uint8_t cfg);
-#endif
-
 typedef void (*csr_ani_callback)(int8_t *ani, void *context);
 
 #ifdef WLAN_FEATURE_11W
@@ -1475,4 +1451,13 @@ enum reg_phymode csr_convert_to_reg_phy_mode(eCsrPhyMode csr_phy_mode,
  */
 eCsrPhyMode csr_convert_from_reg_phy_mode(enum reg_phymode phymode);
 
+/*
+ * csr_update_beacon() - CSR API to update beacon template
+ * @mac: mac context
+ *
+ * This API is used to update beacon template to FW
+ *
+ * Return: None
+ */
+void csr_update_beacon(struct mac_context *mac);
 #endif

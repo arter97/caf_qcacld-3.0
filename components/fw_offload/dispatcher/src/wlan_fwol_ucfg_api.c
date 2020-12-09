@@ -359,6 +359,21 @@ static QDF_STATUS ucfg_fwol_get_ilp_config(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+static QDF_STATUS ucfg_fwol_get_sap_sho(struct wlan_objmgr_psoc *psoc,
+					uint32_t *sap_sho)
+{
+	struct wlan_fwol_psoc_obj *fwol_obj;
+
+	fwol_obj = fwol_get_psoc_obj(psoc);
+	if (!fwol_obj) {
+		fwol_err("Failed to get FWOL obj");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	*sap_sho = fwol_obj->cfg.sap_sho;
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS ucfg_get_enable_rts_sifsbursting(struct wlan_objmgr_psoc *psoc,
 					    bool *enable_rts_sifsbursting)
 {
@@ -574,6 +589,26 @@ QDF_STATUS ucfg_fwol_get_enable_fw_module_log_level(
 	*enable_fw_module_log_level = fwol_obj->cfg.enable_fw_module_log_level;
 	*enable_fw_module_log_level_num =
 				fwol_obj->cfg.enable_fw_module_log_level_num;
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS ucfg_fwol_wow_get_enable_fw_module_log_level(
+				struct wlan_objmgr_psoc *psoc,
+				uint8_t **enable_fw_wow_module_log_level,
+				uint8_t *enable_fw_wow_module_log_level_num)
+{
+	struct wlan_fwol_psoc_obj *fwol_obj;
+
+	fwol_obj = fwol_get_psoc_obj(psoc);
+	if (!fwol_obj) {
+		fwol_err("Failed to get FWOL obj");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	*enable_fw_wow_module_log_level =
+				fwol_obj->cfg.enable_fw_mod_wow_log_level;
+	*enable_fw_wow_module_log_level_num =
+				fwol_obj->cfg.enable_fw_mod_wow_log_level_num;
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -1038,5 +1073,18 @@ QDF_STATUS ucfg_fwol_configure_vdev_params(struct wlan_objmgr_psoc *psoc,
 					   enum QDF_OPMODE device_mode,
 					   uint8_t vdev_id)
 {
-	return QDF_STATUS_SUCCESS;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint32_t value;
+
+	if (device_mode == QDF_SAP_MODE) {
+		status = ucfg_fwol_get_sap_sho(psoc, &value);
+		if (QDF_IS_STATUS_ERROR(status))
+			return status;
+
+		status = fwol_set_sap_sho(psoc, vdev_id, value);
+		if (QDF_IS_STATUS_ERROR(status))
+			return status;
+	}
+
+	return status;
 }

@@ -209,7 +209,7 @@ ol_tx_send(struct ol_txrx_pdev_t *pdev,
 				QDF_TRACE_DEFAULT_PDEV_ID,
 				qdf_nbuf_data_addr(msdu),
 				sizeof(qdf_nbuf_data(msdu)), tx_desc->id,
-				vdev_id));
+				vdev_id, 0));
 	failed = htt_tx_send_std(pdev->htt_pdev, msdu, id);
 	if (qdf_unlikely(failed)) {
 		ol_tx_target_credit_incr_int(pdev, msdu_credit_consumed);
@@ -343,7 +343,7 @@ ol_tx_download_done_hl_free(void *txrx_pdev,
 				 QDF_TRACE_DEFAULT_PDEV_ID,
 				 qdf_nbuf_data_addr(msdu),
 				 sizeof(qdf_nbuf_data(msdu)), tx_desc->id,
-				 dp_status));
+				 dp_status, 0));
 
 	is_frame_freed = ol_tx_download_done_base(pdev, status, msdu, msdu_id);
 
@@ -1005,8 +1005,8 @@ ol_tx_completion_handler(ol_txrx_pdev_handle pdev,
 				msg_word_header, &msg_word_payload, num_msdus);
 	}
 
-	if ((ucfg_pkt_capture_get_mode((void *)soc->psoc) &
-	     PKT_CAPTURE_MODE_DATA_ONLY))
+	if ((ucfg_pkt_capture_get_mode((void *)soc->psoc) ==
+						PACKET_CAPTURE_MODE_DATA_ONLY))
 		pkt_capture_txcomp_hdr_list =
 				ucfg_pkt_capture_tx_get_txcomplete_data_hdr(
 								msg_word,
@@ -1065,13 +1065,14 @@ ol_tx_completion_handler(ol_txrx_pdev_handle pdev,
 					      netbuf, status, TX_DATA_PKT);
 		}
 #endif
-		dp_status = qdf_dp_get_status_from_htt(status);
+		dp_status = ol_tx_comp_hw_to_qdf_status(status);
 
 		DPTRACE(qdf_dp_trace_ptr(netbuf,
 			QDF_DP_TRACE_FREE_PACKET_PTR_RECORD,
 			QDF_TRACE_DEFAULT_PDEV_ID,
 			qdf_nbuf_data_addr(netbuf),
-			sizeof(qdf_nbuf_data(netbuf)), tx_desc->id, dp_status));
+			sizeof(qdf_nbuf_data(netbuf)), tx_desc->id, status,
+			dp_status));
 		htc_pm_runtime_put(pdev->htt_pdev->htc_pdev);
 		/*
 		 * If credits are reported through credit_update_ind then do not
@@ -1797,10 +1798,8 @@ void ol_register_timestamp_callback(tp_ol_timestamp_cb ol_tx_timestamp_cb)
 	struct ol_txrx_soc_t *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	ol_txrx_pdev_handle pdev;
 
-	if (qdf_unlikely(!soc)) {
-		ol_txrx_err("soc is NULL");
+	if (qdf_unlikely(!soc))
 		return;
-	}
 
 	pdev = ol_txrx_get_pdev_from_pdev_id(soc, OL_TXRX_PDEV_ID);
 	if (!pdev) {

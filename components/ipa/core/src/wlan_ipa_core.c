@@ -168,7 +168,13 @@ static void wlan_ipa_uc_loaded_uc_cb(void *priv_ctxt)
 		goto done;
 
 	uc_op_work->msg = msg;
-	qdf_sched_work(0, &uc_op_work->work);
+
+	if (!qdf_atomic_read(&ipa_ctx->deinit_in_prog)) {
+		qdf_sched_work(0, &uc_op_work->work);
+	} else {
+		uc_op_work->msg = NULL;
+		goto done;
+	}
 
 	/* work handler will free the msg buffer */
 	return;
@@ -1622,7 +1628,7 @@ static QDF_STATUS wlan_ipa_uc_handle_first_con(struct wlan_ipa_priv *ipa_ctx)
 {
 	ipa_debug("enter");
 
-	if (ipa_ctx->num_sap_connected > 1) {
+	if (qdf_ipa_get_lan_rx_napi() && (ipa_ctx->num_sap_connected > 1)) {
 		ipa_debug("Multiple SAP connected. Not enabling pipes. Exit");
 		return QDF_STATUS_E_PERM;
 	}
@@ -1982,17 +1988,7 @@ static QDF_STATUS wlan_ipa_send_msg(qdf_netdev_t net_dev,
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * wlan_ipa_handle_multiple_sap_evt() - Handle multiple SAP connect/disconnect
- * @ipa_ctx: IPA global context
- * @type: IPA event type.
- *
- * This function is used to disable pipes when multiple SAP are connected and
- * enable pipes back when only one SAP is connected.
- *
- * Return: None
- */
-static inline
+#ifdef IPA_LAN_RX_NAPI_SUPPORT
 void wlan_ipa_handle_multiple_sap_evt(struct wlan_ipa_priv *ipa_ctx,
 				      qdf_ipa_wlan_event type)
 {
@@ -2034,6 +2030,7 @@ void wlan_ipa_handle_multiple_sap_evt(struct wlan_ipa_priv *ipa_ctx,
 			wlan_ipa_uc_disable_pipes(ipa_ctx, true);
 	}
 }
+#endif
 
 /**
  * __wlan_ipa_wlan_evt() - IPA event handler
@@ -2184,7 +2181,8 @@ static QDF_STATUS __wlan_ipa_wlan_evt(qdf_netdev_t net_dev, uint8_t device_mode,
 					}
 				}
 
-				if (ipa_ctx->num_sap_connected == 1) {
+				if (qdf_ipa_get_lan_rx_napi() &&
+				    ipa_ctx->num_sap_connected == 1) {
 					wlan_ipa_handle_multiple_sap_evt(ipa_ctx,
 									 type);
 				}
@@ -2305,12 +2303,13 @@ static QDF_STATUS __wlan_ipa_wlan_evt(qdf_netdev_t net_dev, uint8_t device_mode,
 
 		if (wlan_ipa_uc_is_enabled(ipa_ctx->config)) {
 			qdf_mutex_release(&ipa_ctx->event_lock);
-			if (ipa_ctx->num_sap_connected == 1) {
+			if (qdf_ipa_get_lan_rx_napi() &&
+			    (ipa_ctx->num_sap_connected > 1)) {
+				wlan_ipa_handle_multiple_sap_evt(ipa_ctx, type);
+			} else {
 				wlan_ipa_uc_offload_enable_disable(ipa_ctx,
 							SIR_AP_RX_DATA_OFFLOAD,
 							session_id, true);
-			} else {
-				wlan_ipa_handle_multiple_sap_evt(ipa_ctx, type);
 			}
 			qdf_mutex_acquire(&ipa_ctx->event_lock);
 		}
@@ -2451,7 +2450,8 @@ static QDF_STATUS __wlan_ipa_wlan_evt(qdf_netdev_t net_dev, uint8_t device_mode,
 			}
 		}
 
-		if (ipa_ctx->num_sap_connected == 1)
+		if (qdf_ipa_get_lan_rx_napi() &&
+		    (ipa_ctx->num_sap_connected == 1))
 			wlan_ipa_handle_multiple_sap_evt(ipa_ctx, type);
 
 		qdf_mutex_release(&ipa_ctx->event_lock);
@@ -3216,6 +3216,7 @@ QDF_STATUS wlan_ipa_setup(struct wlan_ipa_priv *ipa_ctx,
 	qdf_list_create(&ipa_ctx->pending_event, 1000);
 	qdf_mutex_create(&ipa_ctx->event_lock);
 	qdf_mutex_create(&ipa_ctx->ipa_lock);
+	qdf_atomic_init(&ipa_ctx->deinit_in_prog);
 
 	status = wlan_ipa_wdi_setup_rm(ipa_ctx);
 	if (status != QDF_STATUS_SUCCESS)
@@ -3339,7 +3340,8 @@ QDF_STATUS wlan_ipa_cleanup(struct wlan_ipa_priv *ipa_ctx)
 	/* Teardown IPA sys_pipe for MCC */
 	if (wlan_ipa_uc_sta_is_enabled(ipa_ctx->config)) {
 		wlan_ipa_teardown_sys_pipe(ipa_ctx);
-		qdf_cancel_work(&ipa_ctx->mcc_work);
+		if (ipa_ctx->uc_loaded)
+			qdf_cancel_work(&ipa_ctx->mcc_work);
 	}
 
 	wlan_ipa_wdi_destroy_rm(ipa_ctx);
@@ -3773,6 +3775,15 @@ QDF_STATUS wlan_ipa_uc_ol_deinit(struct wlan_ipa_priv *ipa_ctx)
 
 	wlan_ipa_uc_disable_pipes(ipa_ctx, true);
 
+	cdp_ipa_deregister_op_cb(ipa_ctx->dp_soc, ipa_ctx->dp_pdev_id);
+	qdf_atomic_set(&ipa_ctx->deinit_in_prog, 1);
+
+	for (i = 0; i < WLAN_IPA_UC_OPCODE_MAX; i++) {
+		qdf_cancel_work(&ipa_ctx->uc_op_work[i].work);
+		qdf_mem_free(ipa_ctx->uc_op_work[i].msg);
+		ipa_ctx->uc_op_work[i].msg = NULL;
+	}
+
 	if (true == ipa_ctx->uc_loaded) {
 		cdp_ipa_tx_buf_smmu_unmapping(ipa_ctx->dp_soc,
 					      ipa_ctx->dp_pdev_id);
@@ -3788,14 +3799,6 @@ QDF_STATUS wlan_ipa_uc_ol_deinit(struct wlan_ipa_priv *ipa_ctx)
 	qdf_mutex_acquire(&ipa_ctx->ipa_lock);
 	wlan_ipa_cleanup_pending_event(ipa_ctx);
 	qdf_mutex_release(&ipa_ctx->ipa_lock);
-
-	cdp_ipa_deregister_op_cb(ipa_ctx->dp_soc, ipa_ctx->dp_pdev_id);
-
-	for (i = 0; i < WLAN_IPA_UC_OPCODE_MAX; i++) {
-		qdf_cancel_work(&ipa_ctx->uc_op_work[i].work);
-		qdf_mem_free(ipa_ctx->uc_op_work[i].msg);
-		ipa_ctx->uc_op_work[i].msg = NULL;
-	}
 
 	ipa_debug("exit: ret=%d", status);
 	return status;

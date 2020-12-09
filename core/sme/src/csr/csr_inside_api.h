@@ -250,9 +250,6 @@ QDF_STATUS csr_roam_issue_disassociate_cmd(struct mac_context *mac,
 					   uint32_t sessionId,
 					   eCsrRoamDisconnectReason reason,
 					   enum wlan_reason_code mac_reason);
-QDF_STATUS csr_roam_disconnect_internal(struct mac_context *mac, uint32_t sessionId,
-					eCsrRoamDisconnectReason reason,
-					enum wlan_reason_code mac_reason);
 /* pCommand may be NULL */
 void csr_roam_remove_duplicate_command(struct mac_context *mac, uint32_t sessionId,
 				       tSmeCmd *pCommand,
@@ -675,6 +672,28 @@ QDF_STATUS csr_scan_result_purge(struct mac_context *mac,
 /* /////////////////////////////////////////Common Scan ends */
 
 /*
+ * csr_connect_security_valid_for_6ghz() - check if profile is vlid fro 6Ghz
+ * @psoc: psoc pointer
+ * @vdev_id: vdev id
+ * @profile: connect profile
+ *
+ * Return bool
+ */
+#ifdef CONFIG_BAND_6GHZ
+bool csr_connect_security_valid_for_6ghz(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id,
+					 struct csr_roam_profile *profile);
+#else
+static inline bool
+csr_connect_security_valid_for_6ghz(struct wlan_objmgr_psoc *psoc,
+				    uint8_t vdev_id,
+				    struct csr_roam_profile *profile)
+{
+	return true;
+}
+#endif
+
+/*
  * csr_roam_connect() -
  * To inititiate an association
  * pProfile - can be NULL to join to any open ones
@@ -734,7 +753,6 @@ QDF_STATUS csr_roam_set_psk_pmk(struct mac_context *mac, uint32_t sessionId,
 
 QDF_STATUS csr_roam_set_key_mgmt_offload(struct mac_context *mac_ctx,
 					 uint32_t session_id,
-					 bool roam_key_mgmt_offload_enabled,
 					 struct pmkid_mode_bits *pmkid_modes);
 #endif
 /*
@@ -894,6 +912,16 @@ QDF_STATUS csr_roam_del_pmkid_from_cache(struct mac_context *mac,
 					 uint32_t sessionId,
 					 tPmkidCacheInfo *pmksa,
 					 bool flush_cache);
+
+/**
+ * csr_update_pmk_cache_ft - API to update MDID in PMKSA cache entry
+ * @session_id: session ID
+ * @session: sme session pointer
+ *
+ * Return: None
+ */
+void csr_update_pmk_cache_ft(struct mac_context *mac, uint32_t session_id,
+			     struct csr_roam_session *session);
 
 #if defined(WLAN_SAE_SINGLE_PMK) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
 /**
@@ -1058,16 +1086,9 @@ bool csr_is_pmkid_found_for_peer(struct mac_context *mac,
 #ifdef WLAN_FEATURE_11AX
 void csr_update_session_he_cap(struct mac_context *mac_ctx,
 			struct csr_roam_session *session);
-void csr_init_session_twt_cap(struct csr_roam_session *session,
-			      uint32_t type_of_persona);
 #else
 static inline void csr_update_session_he_cap(struct mac_context *mac_ctx,
 			struct csr_roam_session *session)
-{
-}
-
-static inline void csr_init_session_twt_cap(struct csr_roam_session *session,
-					    uint32_t type_of_persona)
 {
 }
 #endif

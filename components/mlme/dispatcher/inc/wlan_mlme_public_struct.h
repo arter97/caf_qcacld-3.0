@@ -28,6 +28,7 @@
 #include <wmi_unified_param.h>
 #include <sir_api.h>
 #include "wlan_cm_roam_public_struct.h"
+#include "cfg_mlme_generic.h"
 
 #define OWE_TRANSITION_OUI_TYPE "\x50\x6f\x9a\x1c"
 #define OWE_TRANSITION_OUI_SIZE 4
@@ -429,6 +430,18 @@ struct mlme_ht_capabilities_info {
 	uint16_t l_sig_tx_op_protection:1;
 } qdf_packed;
 #endif
+
+/**
+ * struct wlan_ht_config - HT capabilities
+ * @ht_info: ht caps in bitwise
+ * @caps: uint32 caps
+ */
+struct wlan_ht_config {
+	union {
+		struct mlme_ht_capabilities_info ht_caps;
+		uint32_t caps;
+	};
+};
 
 /**
  * struct mlme_ht_param_info - HT AMPDU Parameters Info
@@ -903,6 +916,54 @@ struct wlan_mlme_vht_caps {
 };
 
 /**
+ * struct wlan_vht_config - VHT capabilities
+ * @max_mpdu_len: MPDU length
+ * @supported_channel_widthset: channel width set
+ * @ldpc_coding: LDPC coding capability
+ * @shortgi80: short GI 80 support
+ * @shortgi160and80plus80: short Gi 160 & 80+80 support
+ * @tx_stbc; Tx STBC cap
+ * @tx_stbc: Rx STBC cap
+ * @su_beam_former: SU beam former cap
+ * @su_beam_formee: SU beam formee cap
+ * @csnof_beamformer_antSup: Antenna support for beamforming
+ * @num_soundingdim: Sound dimensions
+ * @mu_beam_former: MU beam former cap
+ * @mu_beam_formee: MU beam formee cap
+ * @vht_txops: TXOP power save
+ * @htc_vhtcap: HTC VHT capability
+ * @max_ampdu_lenexp: AMPDU length
+ * @vht_link_adapt: VHT link adapatation capable
+ */
+struct wlan_vht_config {
+	union {
+		struct {
+			uint32_t           max_mpdu_len:2;
+			uint32_t supported_channel_widthset:2;
+			uint32_t        ldpc_coding:1;
+			uint32_t         shortgi80:1;
+			uint32_t shortgi160and80plus80:1;
+			uint32_t               tx_stbc:1;
+			uint32_t               rx_stbc:3;
+			uint32_t      su_beam_former:1;
+			uint32_t      su_beam_formee:1;
+			uint32_t csnof_beamformer_antSup:3;
+			uint32_t       num_soundingdim:3;
+			uint32_t      mu_beam_former:1;
+			uint32_t      mu_beam_formee:1;
+			uint32_t            vht_txops:1;
+			uint32_t            htc_vhtcap:1;
+			uint32_t       max_ampdu_lenexp:3;
+			uint32_t        vht_link_adapt:2;
+			uint32_t         rx_antpattern:1;
+			uint32_t         tx_antpattern:1;
+			uint32_t  extended_nss_bw_supp:2;
+		};
+		uint32_t caps;
+	};
+};
+
+/**
  * struct wlan_mlme_qos - QOS TX/RX aggregation related CFG items
  * @tx_aggregation_size: TX aggr size in number of MPDUs
  * @tx_aggregation_size_be: No. of MPDUs for BE queue for TX aggr
@@ -964,7 +1025,6 @@ struct wlan_mlme_he_caps {
 	uint32_t he_sta_obsspd;
 	uint16_t he_mcs_12_13_supp_2g;
 	uint16_t he_mcs_12_13_supp_5g;
-	bool enable_6g_sec_check;
 };
 #endif
 
@@ -1212,10 +1272,10 @@ struct wlan_mlme_ratemask {
  * @bigtk_support: Whether BIGTK is supported or not
  * @stop_all_host_scan_support: Target capability that indicates if the target
  * supports stop all host scan request type.
- * @peer_create_conf_support: Peer create confirmation command support
  * @dual_sta_roam_fw_support: Firmware support for dual sta roaming feature
  * @sae_connect_retries: sae connect retry bitmask
  * @wls_6ghz_capable: wifi location service(WLS) is 6ghz capable
+ * @monitor_mode_concurrency: Monitor mode concurrency supported
  */
 struct wlan_mlme_generic {
 	uint32_t band_capability;
@@ -1254,10 +1314,10 @@ struct wlan_mlme_generic {
 	uint8_t dfs_chan_ageout_time;
 	bool bigtk_support;
 	bool stop_all_host_scan_support;
-	bool peer_create_conf_support;
 	bool dual_sta_roam_fw_support;
 	uint32_t sae_connect_retries;
 	bool wls_6ghz_capable;
+	enum monitor_mode_concurrency monitor_mode_concurrency;
 };
 
 /*
@@ -1985,7 +2045,6 @@ struct wlan_mlme_rssi_cfg_score  {
  * @roam_trigger_bitmap: bitmap for various roam triggers
  * @roam_score_delta: percentage delta in roam score
  * @apsd_enabled: Enable automatic power save delivery
- * @vendor_roam_score_algorithm: Preferred vendor roam score algorithm
  * @min_roam_score_delta: Minimum difference between connected AP's and
  *			candidate AP's roam score to start roaming.
  */
@@ -1994,7 +2053,6 @@ struct wlan_mlme_roam_scoring_cfg {
 	uint32_t roam_trigger_bitmap;
 	uint32_t roam_score_delta;
 	bool apsd_enabled;
-	uint32_t vendor_roam_score_algorithm;
 	uint32_t min_roam_score_delta;
 };
 

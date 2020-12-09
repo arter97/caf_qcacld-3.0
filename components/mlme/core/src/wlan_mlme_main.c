@@ -410,6 +410,8 @@ static void mlme_init_generic_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_DFS_CHAN_AGEOUT_TIME);
 	gen->sae_connect_retries =
 		cfg_get(psoc, CFG_SAE_CONNECION_RETRIES);
+	gen->monitor_mode_concurrency =
+		cfg_get(psoc, CFG_MONITOR_MODE_CONCURRENCY);
 }
 
 static void mlme_init_edca_ani_cfg(struct wlan_mlme_edca_params *edca_params)
@@ -1180,8 +1182,6 @@ static void mlme_init_he_cap_in_cfg(struct wlan_objmgr_psoc *psoc,
 		QDF_GET_BITS(mcs_12_13,
 			     HE_MCS12_13_5G_INDEX * HE_MCS12_13_BITS,
 			     HE_MCS12_13_BITS);
-
-	mlme_cfg->he_caps.enable_6g_sec_check = false;
 }
 #else
 static void mlme_init_he_cap_in_cfg(struct wlan_objmgr_psoc *psoc,
@@ -1833,8 +1833,6 @@ static void mlme_init_power_cfg(struct wlan_objmgr_psoc *psoc,
 static void mlme_init_roam_scoring_cfg(struct wlan_objmgr_psoc *psoc,
 				struct wlan_mlme_roam_scoring_cfg *scoring_cfg)
 {
-	scoring_cfg->vendor_roam_score_algorithm =
-		cfg_get(psoc, CFG_VENDOR_ROAM_SCORE_ALGORITHM);
 	scoring_cfg->enable_scoring_for_roam =
 		cfg_get(psoc, CFG_ENABLE_SCORING_FOR_ROAM);
 	scoring_cfg->roam_trigger_bitmap =

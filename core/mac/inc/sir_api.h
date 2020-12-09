@@ -81,9 +81,11 @@ typedef uint8_t tSirVersionString[SIR_VERSION_STRING_LEN];
 
 #ifdef FEATURE_RUNTIME_PM
 /* Add extra PMO_RESUME_TIMEOUT for runtime PM resume timeout */
+#define SIR_PEER_CREATE_RESPONSE_TIMEOUT (4000 + PMO_RESUME_TIMEOUT)
 #define SIR_DELETE_STA_TIMEOUT           (4000 + PMO_RESUME_TIMEOUT)
 #define SIR_VDEV_PLCY_MGR_TIMEOUT        (2000 + PMO_RESUME_TIMEOUT)
 #else
+#define SIR_PEER_CREATE_RESPONSE_TIMEOUT (4000)
 #define SIR_DELETE_STA_TIMEOUT           (4000) /* 4 seconds */
 #define SIR_VDEV_PLCY_MGR_TIMEOUT        (2000)
 #endif
@@ -139,6 +141,9 @@ typedef uint8_t tSirVersionString[SIR_VERSION_STRING_LEN];
 #define SIR_UAPSD_GET(ac, mask)      (((mask) & (SIR_UAPSD_FLAG_ ## ac)) >> SIR_UAPSD_BITOFFSET_ ## ac)
 
 #endif
+
+/* Maximum management packet data unit length */
+#define MAX_MGMT_MPDU_LEN 2304
 
 struct scheduler_msg;
 
@@ -568,68 +573,6 @@ typedef enum eSirNwType {
 	eSIR_DONOT_USE_NW_TYPE = SIR_MAX_ENUM_SIZE
 } tSirNwType;
 
-/* HT configuration values */
-struct ht_config {
-	/* Enable/Disable receiving LDPC coded packets */
-	uint32_t ht_rx_ldpc:1;
-	/* Enable/Disable TX STBC */
-	uint32_t ht_tx_stbc:1;
-	/* Enable/Disable RX STBC */
-	uint32_t ht_rx_stbc:2;
-	/* Enable/Disable SGI */
-	uint32_t ht_sgi20:1;
-	uint32_t ht_sgi40:1;
-	uint32_t unused:27;
-};
-
-/**
- * struct sir_vht_config - VHT capabilities
- * @max_mpdu_len: MPDU length
- * @supported_channel_widthset: channel width set
- * @ldpc_coding: LDPC coding capability
- * @shortgi80: short GI 80 support
- * @shortgi160and80plus80: short Gi 160 & 80+80 support
- * @tx_stbc; Tx STBC cap
- * @tx_stbc: Rx STBC cap
- * @su_beam_former: SU beam former cap
- * @su_beam_formee: SU beam formee cap
- * @csnof_beamformer_antSup: Antenna support for beamforming
- * @num_soundingdim: Sound dimensions
- * @mu_beam_former: MU beam former cap
- * @mu_beam_formee: MU beam formee cap
- * @vht_txops: TXOP power save
- * @htc_vhtcap: HTC VHT capability
- * @max_ampdu_lenexp: AMPDU length
- * @vht_link_adapt: VHT link adapatation capable
- * @rx_antpattern: Rx Antenna pattern
- * @tx_antpattern: Tx Antenna pattern
- */
-struct sir_vht_config {
-	uint32_t           max_mpdu_len:2;
-	uint32_t supported_channel_widthset:2;
-	uint32_t        ldpc_coding:1;
-	uint32_t         shortgi80:1;
-	uint32_t shortgi160and80plus80:1;
-	uint32_t               tx_stbc:1;
-	uint32_t               rx_stbc:3;
-	uint32_t      su_beam_former:1;
-	uint32_t      su_beam_formee:1;
-	uint32_t csnof_beamformer_antSup:3;
-	uint32_t       num_soundingdim:3;
-	uint32_t      mu_beam_former:1;
-	uint32_t      mu_beam_formee:1;
-	uint32_t            vht_txops:1;
-	uint32_t            htc_vhtcap:1;
-	uint32_t       max_ampdu_lenexp:3;
-	uint32_t        vht_link_adapt:2;
-	uint32_t         rx_antpattern:1;
-	uint32_t         tx_antpattern:1;
-	uint32_t  extended_nss_bw_supp:2;
-	uint8_t  max_nsts_total:2;
-	uint8_t  vht_extended_nss_bw_cap:1;
-};
-
-
 struct add_ie_params {
 	uint16_t probeRespDataLen;
 	uint8_t *probeRespData_buff;
@@ -696,11 +639,6 @@ struct start_bss_req {
 	tSirNwType nwType;      /* Indicates 11a/b/g */
 	tSirMacRateSet operationalRateSet;      /* Has 11a or 11b rates */
 	tSirMacRateSet extendedRateSet; /* Has 11g rates */
-	struct ht_config ht_config;
-	struct sir_vht_config vht_config;
-#ifdef WLAN_FEATURE_11AX
-	tDot11fIEhe_cap he_config;
-#endif
 #ifdef WLAN_FEATURE_11W
 	bool pmfCapable;
 	bool pmfRequired;
@@ -971,12 +909,10 @@ struct join_req {
 	uint8_t vdev_id;
 	tSirMacSSid ssId;
 	tSirMacAddr self_mac_addr;        /* self Mac address */
-	enum bss_type bsstype;    /* add new type for BT-AMP STA and AP Modules */
 	uint8_t dot11mode;      /* to support BT-AMP */
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 	uint8_t cc_switch_mode;
 #endif
-	enum QDF_OPMODE staPersona;       /* Persona */
 	bool wps_registration;
 	ePhyChanBondState cbMode;       /* Pass CB mode value in Join. */
 
@@ -1015,40 +951,16 @@ struct join_req {
 	bool isESEconnection;
 	tESETspecInfo eseTspecInfo;
 #endif
-
-	bool isFastTransitionEnabled;
-	bool isFastRoamIniFeatureEnabled;
-
-	uint8_t txLdpcIniFeatureEnabled;
-	struct ht_config ht_config;
-	struct sir_vht_config vht_config;
-#ifdef WLAN_FEATURE_11AX
-	tDot11fIEhe_cap he_config;
-#endif
-	uint8_t enableVhtpAid;
-	uint8_t enableVhtGid;
-	uint8_t enableAmpduPs;
-	uint8_t enableHtSmps;
-	uint8_t htSmps;
-	bool send_smps_action;
 	bool he_with_wep_tkip;
-	uint8_t max_amsdu_num;
-	bool isWMEenabled;
-	bool isQosEnabled;
 	bool isOSENConnection;
-	struct rrm_config_param rrm_config;
 	bool spectrumMgtIndicator;
 	struct power_cap_info powerCap;
 	struct supported_channels supportedChannels;
-	bool enable_bcast_probe_rsp;
 	bool sae_pmk_cached;
 	/* Pls make this as last variable in struct */
 	bool force_24ghz_in_ht20;
 	bool force_rsne_override;
 	bool supported_nss_1x1;
-	uint8_t vdev_nss;
-	uint8_t nss;
-	bool nss_forced_1x1;
 	bool enable_session_twt_support;
 	struct bss_description bssDescription;
 	/*
@@ -2312,9 +2224,6 @@ struct roam_offload_scan_req {
 	struct scoring_param score_params;
 #ifdef WLAN_FEATURE_FILS_SK
 	bool is_fils_connection;
-#ifndef ROAM_OFFLOAD_V1
-	struct roam_fils_params roam_fils_params;
-#endif
 #endif
 	uint32_t btm_offload_config;
 	uint32_t btm_solicited_timeout;

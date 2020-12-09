@@ -19,6 +19,7 @@
 #if !defined(__LIM_SESSION_H)
 #define __LIM_SESSION_H
 
+#include "wlan_cm_public_struct.h"
 /**=========================================================================
 
    \file  lim_session.h
@@ -136,10 +137,16 @@ struct obss_detection_cfg {
  * @ap_ecsa_wakelock: wakelock to complete CSA operation.
  * @ap_ecsa_runtime_lock: runtime lock to complete SAP CSA operation.
  * to Adaptive 11R network
+ * @prev_auth_seq_num: Sequence number of previously received auth frame to
+ * detect duplicate frames.
+ * @prev_auth_mac_addr: mac_addr of the sta correspond to @prev_auth_seq_num
  */
 struct pe_session {
 	/* To check session table is in use or free */
 	uint8_t available;
+#ifdef FEATURE_CM_ENABLE
+	wlan_cm_id cm_id;
+#endif
 	uint16_t peSessionId;
 	union {
 		uint8_t smeSessionId;
@@ -394,8 +401,8 @@ struct pe_session {
 	int8_t rssi;
 #endif
 	uint8_t max_amsdu_num;
-	struct ht_config ht_config;
-	struct sir_vht_config vht_config;
+	struct mlme_ht_capabilities_info ht_config;
+	struct wlan_vht_config vht_config;
 	/*
 	 * Place holder for StartBssReq message
 	 * received by SME state machine
@@ -548,6 +555,7 @@ struct pe_session {
 #endif
 	/* previous auth frame's sequence number */
 	uint16_t prev_auth_seq_num;
+	tSirMacAddr prev_auth_mac_addr;
 	struct obss_detection_cfg obss_offload_cfg;
 	struct obss_detection_cfg current_obss_detection;
 	bool is_session_obss_offload_enabled;
@@ -613,7 +621,6 @@ static inline void pe_free_dph_node_array_buffer(void)
  * @numSta: number of stations
  * @bssType: bss type of new session to do conditional memory allocation.
  * @vdev_id: vdev_id
- * @opmode: operating mode
  *
  * This function returns the session context and the session ID if the session
  * corresponding to the passed BSSID is found in the PE session table.
@@ -623,7 +630,7 @@ static inline void pe_free_dph_node_array_buffer(void)
 struct pe_session *pe_create_session(struct mac_context *mac,
 				     uint8_t *bssid, uint8_t *sessionId,
 				     uint16_t numSta, enum bss_type bssType,
-				     uint8_t vdev_id, enum QDF_OPMODE opmode);
+				     uint8_t vdev_id);
 
 /**
  * pe_find_session_by_bssid() - looks up the PE session given the BSSID.

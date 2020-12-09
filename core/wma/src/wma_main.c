@@ -154,18 +154,8 @@ void wma_set_fw_wlan_feat_caps(enum cap_bitmap feature)
  */
 static void wma_service_ready_ext_evt_timeout(void *data)
 {
-	tp_wma_handle wma_handle;
-
 	wma_alert("Timeout waiting for WMI_SERVICE_READY_EXT_EVENT");
 
-	wma_handle = (tp_wma_handle) data;
-
-	if (!wma_handle) {
-		wma_err("Invalid WMA handle");
-		goto end;
-	}
-
-end:
 	/* Assert here. Panic is being called in insmod thread */
 	QDF_ASSERT(0);
 }
@@ -676,8 +666,10 @@ QDF_STATUS wma_form_unit_test_cmd_and_send(uint32_t vdev_id,
 
 	wma_debug("enter");
 
-	if (!wma_is_vdev_valid(vdev_id))
-		return QDF_STATUS_E_FAILURE;
+	if (QDF_GLOBAL_FTM_MODE != cds_get_conparam()) {
+		if (!wma_is_vdev_valid(vdev_id))
+			return QDF_STATUS_E_FAILURE;
+	}
 
 	if (arg_count > WMA_MAX_NUM_ARGS) {
 		wma_err("arg_count is crossed the boundary");
@@ -1014,6 +1006,13 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 						       privcmd->param_value);
 			if (ret)
 				wma_err("dbglog_module_log_enable failed ret %d",
+					ret);
+			break;
+		case WMI_DBGLOG_MOD_WOW_LOG_LEVEL:
+			ret = dbglog_set_mod_wow_log_lvl(wma->wmi_handle,
+							 privcmd->param_value);
+			if (ret)
+				wma_err("WMI_DBGLOG_MOD_WOW_LOG_LEVEL failed ret %d",
 					ret);
 			break;
 		case WMI_DBGLOG_TYPE:
@@ -1804,6 +1803,7 @@ static void wma_state_info_dump(char **buf_ptr, uint16_t *size)
 			"\tipv6_mcast_ns %u\n"
 			"\tipv6_mcast_na %u\n"
 			"\toem_response %u\n"
+			"\tuc_drop %u\n"
 			"dtimPeriod %d\n"
 			"chan_width %d\n"
 			"vdev_active %d\n"
@@ -1829,6 +1829,7 @@ static void wma_state_info_dump(char **buf_ptr, uint16_t *size)
 			stats.ipv6_mcast_ns_stats,
 			stats.ipv6_mcast_na_stats,
 			stats.oem_response_wake_up_count,
+			stats.uc_drop_wake_up_count,
 			iface->dtimPeriod,
 			iface->chan_width,
 			iface->vdev_active,
@@ -2747,6 +2748,18 @@ void wma_get_fw_phy_mode_for_freq_cb(uint32_t freq, uint32_t chan_width,
 	}
 
 	dot11_mode = mac->mlme_cfg->dot11_mode.dot11_mode;
+
+	/* Update invalid dot11 modes to valid dot11 modes */
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(freq) &&
+	    dot11_mode == MLME_DOT11_MODE_11A)
+		dot11_mode = MLME_DOT11_MODE_11G;
+
+	if (WLAN_REG_IS_5GHZ_CH_FREQ(freq) &&
+	    (dot11_mode == MLME_DOT11_MODE_11B ||
+	     dot11_mode == MLME_DOT11_MODE_11G ||
+	     dot11_mode == MLME_DOT11_MODE_11G_ONLY))
+		dot11_mode = MLME_DOT11_MODE_11A;
+
 	host_phy_mode = wma_chan_phy_mode(freq, chan_width, dot11_mode);
 	*phy_mode = wma_host_to_fw_phymode(host_phy_mode);
 }
@@ -2867,6 +2880,7 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 	target_resource_config *wlan_res_cfg;
 	uint8_t delay_before_vdev_stop;
 	uint32_t self_gen_frm_pwr = 0;
+	uint32_t device_mode = cds_get_conparam();
 
 	wma_debug("Enter");
 
@@ -2906,7 +2920,7 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 		goto err_free_wma_handle;
 	}
 
-	if (cds_get_conparam() != QDF_GLOBAL_FTM_MODE) {
+	if (device_mode != QDF_GLOBAL_FTM_MODE) {
 #ifdef FEATURE_WLAN_EXTSCAN
 		qdf_wake_lock_create(&wma_handle->extscan_wake_lock,
 					"wlan_extscan_wl");
@@ -2977,6 +2991,7 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 	tgt_psoc_info = wlan_psoc_get_tgt_if_handle(psoc);
 
 	target_psoc_set_target_type(tgt_psoc_info, target_type);
+	target_psoc_set_device_mode(tgt_psoc_info, device_mode);
 	/* Save the WMI & HTC handle */
 	target_psoc_set_wmi_hdl(tgt_psoc_info, wmi_handle);
 	wma_handle->wmi_handle = wmi_handle;
@@ -3301,6 +3316,10 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 	wmi_unified_register_event_handler(wma_handle->wmi_handle,
 					   wmi_peer_assoc_conf_event_id,
 					   wma_peer_assoc_conf_handler,
+					   WMA_RX_SERIALIZER_CTX);
+	wmi_unified_register_event_handler(wma_handle->wmi_handle,
+					   wmi_peer_create_conf_event_id,
+					   wma_peer_create_confirm_handler,
 					   WMA_RX_SERIALIZER_CTX);
 	wmi_unified_register_event_handler(wma_handle->wmi_handle,
 					   wmi_peer_delete_response_event_id,
@@ -5363,9 +5382,6 @@ static void wma_update_mlme_related_tgt_caps(struct wlan_objmgr_psoc *psoc,
 	mlme_tgt_cfg.stop_all_host_scan_support =
 		wmi_service_enabled(wmi_handle,
 				    wmi_service_host_scan_stop_vdev_all);
-	mlme_tgt_cfg.peer_create_conf_support =
-		wmi_service_enabled(wmi_handle,
-				    wmi_service_peer_create_conf);
 	mlme_tgt_cfg.dual_sta_roam_fw_support =
 		wmi_service_enabled(wmi_handle,
 				    wmi_service_dual_sta_roam_support);
@@ -5457,6 +5473,11 @@ static int wma_update_hdd_cfg(tp_wma_handle wma_handle)
 	}
 
 	wma_update_mlme_related_tgt_caps(wma_handle->psoc, wmi_handle);
+
+	if (wmi_service_enabled(wmi_handle, wmi_service_peer_create_conf))
+		wlan_psoc_nif_fw_ext_cap_set(wma_handle->psoc,
+					     WLAN_SOC_F_PEER_CREATE_RESP);
+
 	qdf_mem_zero(&tgt_cfg, sizeof(struct wma_tgt_cfg));
 
 	tgt_cfg.sub_20_support = wma_handle->sub_20_support;
@@ -6677,6 +6698,7 @@ int wma_rx_service_ready_ext_event(void *handle, uint8_t *event,
 	struct wmi_unified *wmi_handle;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	target_resource_config *wlan_res_cfg;
+	uint8_t sta_sap_scc_on_dfs_chnl;
 
 	wma_debug("Enter");
 
@@ -6739,6 +6761,18 @@ int wma_rx_service_ready_ext_event(void *handle, uint8_t *event,
 	}
 	wma_init_scan_fw_mode_config(wma_handle->psoc, conc_scan_config_bits,
 				     fw_config_bits);
+
+	policy_mgr_get_sta_sap_scc_on_dfs_chnl(wma_handle->psoc,
+					       &sta_sap_scc_on_dfs_chnl);
+
+	/*
+	 * For non-dbs HW, disallow sta+sap on DFS channel as if SAP comes
+	 * on DFS master mode enable (sta_sap_scc_on_dfs_chnl = 2), scan will
+	 * be disabled and STA cannot connect to any other channel
+	 */
+	if (!policy_mgr_is_hw_dbs_capable(wma_handle->psoc) &&
+	    sta_sap_scc_on_dfs_chnl == 2)
+		policy_mgr_set_sta_sap_scc_on_dfs_chnl(wma_handle->psoc, 1);
 
 	target_psoc_set_num_radios(tgt_hdl, 1);
 
@@ -6809,7 +6843,8 @@ int wma_rx_service_ready_ext_event(void *handle, uint8_t *event,
 		wma_update_num_peers_tids(wma_handle, wlan_res_cfg);
 	}
 
-	if (ucfg_pkt_capture_get_mode(wma_handle->psoc) &&
+	if ((ucfg_pkt_capture_get_mode(wma_handle->psoc) !=
+						PACKET_CAPTURE_MODE_DISABLE) &&
 	    wmi_service_enabled(wmi_handle,
 				wmi_service_packet_capture_support))
 		wlan_res_cfg->pktcapture_support = true;
@@ -8470,9 +8505,6 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 		wma_set_max_tx_power(wma_handle,
 				     (tpMaxTxPowerParams) msg->bodyptr);
 		break;
-	case WMA_SEND_MAX_TX_POWER:
-		wma_send_max_tx_pwrlmt(wma_handle, msg->bodyval);
-		break;
 	case WMA_SET_KEEP_ALIVE:
 		wma_set_keepalive_req(wma_handle, msg->bodyptr);
 		break;
@@ -8524,12 +8556,7 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 				(tpSirRcvFltMcAddrList) msg->bodyptr);
 		qdf_mem_free(msg->bodyptr);
 		break;
-#ifndef ROAM_OFFLOAD_V1
-	/* this is temp will be removed once ROAM_OFFLOAD_V1 is enabled */
-	case WMA_ROAM_SCAN_OFFLOAD_REQ:
-		wma_process_roaming_config(wma_handle, msg->bodyptr);
-		break;
-#endif
+
 	case WMA_ROAM_PRE_AUTH_STATUS:
 		wma_send_roam_preauth_status(wma_handle, msg->bodyptr);
 		qdf_mem_free(msg->bodyptr);
@@ -8696,13 +8723,6 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 		qdf_mem_free(msg->bodyptr);
 		break;
 #endif /* FEATURE_WLAN_EXTSCAN */
-#ifndef ROAM_OFFLOAD_V1
-	case WMA_SET_PER_ROAM_CONFIG_CMD:
-		wma_update_per_roam_config(wma_handle,
-			(struct wlan_per_roam_config_req *)msg->bodyptr);
-		qdf_mem_free(msg->bodyptr);
-		break;
-#endif
 	case WMA_SET_SCAN_MAC_OUI_REQ:
 		wma_scan_probe_setoui(wma_handle, msg->bodyptr);
 		qdf_mem_free(msg->bodyptr);
@@ -9007,21 +9027,6 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 		qdf_mem_free(msg->bodyptr);
 		break;
 #endif
-#ifndef ROAM_OFFLOAD_V1
-	/* This code will be removed once ROAM_OFFLOAD_V1 is enabled */
-	case WMA_SET_ROAM_TRIGGERS:
-		wma_set_roam_triggers(wma_handle, msg->bodyptr);
-		qdf_mem_free(msg->bodyptr);
-		break;
-	case WMA_ROAM_INIT_PARAM:
-		wma_update_roam_offload_flag(wma_handle, msg->bodyptr);
-		qdf_mem_free(msg->bodyptr);
-		break;
-	case WMA_ROAM_DISABLE_CFG:
-		wma_set_roam_disable_cfg(wma_handle, msg->bodyptr);
-		qdf_mem_free(msg->bodyptr);
-		break;
-#endif
 	case WMA_ROAM_SCAN_CH_REQ:
 		wma_get_roam_scan_ch(wma_handle->wmi_handle, msg->bodyval);
 		break;
@@ -9065,13 +9070,7 @@ QDF_STATUS wma_mc_process_handler(struct scheduler_msg *msg)
  */
 void wma_log_completion_timeout(void *data)
 {
-	tp_wma_handle wma_handle;
-
 	wma_debug("Timeout occurred for log completion command");
-
-	wma_handle = (tp_wma_handle) data;
-	if (!wma_handle)
-		wma_err("Invalid WMA handle");
 
 	/* Though we did not receive any event from FW,
 	 * we can flush whatever logs we have with us

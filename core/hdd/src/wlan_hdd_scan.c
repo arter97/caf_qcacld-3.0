@@ -459,7 +459,7 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 	int status;
 	struct hdd_scan_info *scan_info = NULL;
 	struct hdd_adapter *con_sap_adapter;
-	uint32_t con_dfs_ch_freq;
+	qdf_freq_t con_dfs_ch_freq;
 	uint8_t curr_vdev_id;
 	enum scan_reject_states curr_reason;
 	static uint32_t scan_ebusy_cnt;
@@ -468,6 +468,7 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 	struct wlan_objmgr_vdev *vdev;
 	QDF_STATUS qdf_status;
 	bool enable_connected_scan;
+	enum phy_ch_width con_dfs_ch_width;
 
 	if (cds_is_fw_down()) {
 		hdd_err("firmware is down, scan cmd cannot be processed");
@@ -525,18 +526,23 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 	scan_info = &adapter->scan_info;
 
 	/* Block All Scan during DFS operation and send null scan result */
+
 	con_sap_adapter = hdd_get_con_sap_adapter(adapter, true);
 	if (con_sap_adapter) {
 		con_dfs_ch_freq =
 			con_sap_adapter->session.ap.sap_config.chan_freq;
+		con_dfs_ch_width =
+		      con_sap_adapter->session.ap.sap_config.ch_params.ch_width;
 		if (con_dfs_ch_freq == AUTO_CHANNEL_SELECT)
 			con_dfs_ch_freq =
 				con_sap_adapter->session.ap.operating_chan_freq;
 
 		if (!policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc) &&
-		    wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, con_dfs_ch_freq) &&
 		    !policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(
-			hdd_ctx->psoc)) {
+		    hdd_ctx->psoc) &&
+		    (wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, con_dfs_ch_freq) ||
+		    (wlan_reg_is_5ghz_ch_freq(con_dfs_ch_freq) &&
+		     con_dfs_ch_width == CH_WIDTH_160MHZ))) {
 			/* Provide empty scan result during DFS operation since
 			 * scanning not supported during DFS. Reason is
 			 * following case:
@@ -667,7 +673,7 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 		ucfg_nan_disable_concurrency(hdd_ctx->psoc);
 	}
 
-	vdev = hdd_objmgr_get_vdev(adapter);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_SCAN_ID);
 	if (!vdev) {
 		status = -EINVAL;
 		goto error;
@@ -686,7 +692,7 @@ static int __wlan_hdd_cfg80211_scan(struct wiphy *wiphy,
 		params.priority = SCAN_PRIORITY_COUNT;
 
 	status = wlan_cfg80211_scan(vdev, request, &params);
-	hdd_objmgr_put_vdev(vdev);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_SCAN_ID);
 error:
 	if (params.default_ie.ptr)
 		qdf_mem_free(params.default_ie.ptr);
@@ -1324,7 +1330,7 @@ static int __wlan_hdd_cfg80211_sched_scan_start(struct wiphy *wiphy,
 		return -EBUSY;
 	}
 
-	vdev = hdd_objmgr_get_vdev(adapter);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_SCAN_ID);
 	if (!vdev)
 		return -EINVAL;
 
@@ -1332,7 +1338,7 @@ static int __wlan_hdd_cfg80211_sched_scan_start(struct wiphy *wiphy,
 			ucfg_get_scan_backoff_multiplier(hdd_ctx->psoc);
 	ret = wlan_cfg80211_sched_scan_start(vdev, request,
 					     scan_backoff_multiplier);
-	hdd_objmgr_put_vdev(vdev);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_SCAN_ID);
 
 	return ret;
 }
@@ -1392,11 +1398,11 @@ int wlan_hdd_sched_scan_stop(struct net_device *dev)
 		return -EINVAL;
 	}
 
-	vdev = hdd_objmgr_get_vdev(adapter);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_SCAN_ID);
 	if (!vdev)
 		return -EINVAL;
 	ret = wlan_cfg80211_sched_scan_stop(vdev);
-	hdd_objmgr_put_vdev(vdev);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_SCAN_ID);
 
 	return ret;
 }
