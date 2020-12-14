@@ -158,6 +158,22 @@ mlme_set_mbssid_info(struct wlan_objmgr_vdev *vdev,
 		     struct scan_mbssid_info *mbssid_info);
 
 /**
+ * mlme_is_wapi_sta_active() - check sta with wapi security exists and is active
+ * @pdev: pdev pointer
+ *
+ * Return: true if sta with wapi security exists
+ */
+#ifdef FEATURE_WLAN_WAPI
+bool mlme_is_wapi_sta_active(struct wlan_objmgr_pdev *pdev);
+#else
+static inline bool mlme_is_wapi_sta_active(
+					   struct wlan_objmgr_pdev *pdev)
+{
+	return false;
+}
+#endif
+
+/**
  * mlme_get_mbssid_info() - get mbssid info
  * @vdev: vdev pointer
  * @mbss_11ax: mbss 11ax info

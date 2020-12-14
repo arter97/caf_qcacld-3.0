@@ -70,6 +70,7 @@
 #include <wlan_scan_ucfg_api.h>
 #include <wlan_blm_api.h>
 #include <lim_assoc_utils.h>
+#include "wlan_mlme_ucfg_api.h"
 
 #define ASCII_SPACE_CHARACTER 0x20
 
@@ -7159,8 +7160,8 @@ void lim_update_chan_he_capable(struct mac_context *mac, tpSwitchChannelParams c
 	pe_debug("he_capable: %d", chan->he_capable);
 }
 
-void lim_set_he_caps(struct mac_context *mac, struct pe_session *session, uint8_t *ie_start,
-		     uint32_t num_bytes)
+void lim_set_he_caps(struct mac_context *mac, struct pe_session *session,
+		     uint8_t *ie_start, uint32_t num_bytes)
 {
 	const uint8_t *ie = NULL;
 	tDot11fIEhe_cap dot11_cap;
@@ -7267,25 +7268,88 @@ void lim_set_he_caps(struct mac_context *mac, struct pe_session *session, uint8_
 
 		he_cap->rx_he_mcs_map_lt_80 = dot11_cap.rx_he_mcs_map_lt_80;
 		he_cap->tx_he_mcs_map_lt_80 = dot11_cap.tx_he_mcs_map_lt_80;
-		he_cap->rx_he_mcs_map_160 =
+		if (dot11_cap.chan_width_2) {
+			he_cap->rx_he_mcs_map_160 =
 				*((uint16_t *)dot11_cap.rx_he_mcs_map_160);
-		he_cap->tx_he_mcs_map_160 =
+			he_cap->tx_he_mcs_map_160 =
 				*((uint16_t *)dot11_cap.tx_he_mcs_map_160);
-		he_cap->rx_he_mcs_map_80_80 =
+			ie_start[1] += HE_CAP_160M_MCS_MAP_LEN;
+		}
+		if (dot11_cap.chan_width_3) {
+			he_cap->rx_he_mcs_map_80_80 =
 				*((uint16_t *)dot11_cap.rx_he_mcs_map_80_80);
-		he_cap->tx_he_mcs_map_80_80 =
+			he_cap->tx_he_mcs_map_80_80 =
 				*((uint16_t *)dot11_cap.tx_he_mcs_map_80_80);
+			ie_start[1] += HE_CAP_80P80_MCS_MAP_LEN;
+		}
 	}
 }
 
-QDF_STATUS lim_send_he_caps_ie(struct mac_context *mac_ctx, struct pe_session *session,
-			       uint8_t vdev_id)
+static void lim_intersect_he_ch_width_2g(struct mac_context *mac,
+					 struct he_capability_info *he_cap)
 {
-	uint8_t he_caps[SIR_MAC_HE_CAP_MIN_LEN + 3];
+	struct wlan_objmgr_psoc *psoc;
+	uint32_t cbm_24ghz;
+	QDF_STATUS ret;
+
+	psoc = mac->psoc;
+	if (!psoc)
+		return;
+
+	ret = ucfg_mlme_get_channel_bonding_24ghz(psoc, &cbm_24ghz);
+	if (QDF_IS_STATUS_ERROR(ret))
+		return;
+
+	pe_debug("channel bonding mode 2.4GHz %d", cbm_24ghz);
+
+	if (!cbm_24ghz) {
+		/* B0: 40Mhz channel width in the 2.4GHz band */
+		he_cap->chan_width = HE_CH_WIDTH_CLR_BIT(he_cap->chan_width, 0);
+		he_cap->he_ppdu_20_in_40Mhz_2G = 0;
+	}
+
+	pe_debug("HE cap: chan_width: 0x%07x he_ppdu_20_in_40Mhz_2G %d",
+		 he_cap->chan_width, he_cap->he_ppdu_20_in_40Mhz_2G);
+}
+
+static uint8_t lim_set_he_caps_ppet(struct mac_context *mac, uint8_t *ie,
+				    enum cds_band_type band)
+{
+	uint8_t ppe_th[WNI_CFG_HE_PPET_LEN] = {0};
+	/* Append at the end after ID + LEN + OUI + IE_Data */
+	uint8_t offset = ie[1] + 1 + 1 + 1;
+	uint8_t num_ppe_th;
+
+	if (band == CDS_BAND_2GHZ)
+		qdf_mem_copy(ppe_th, mac->mlme_cfg->he_caps.he_ppet_2g,
+			     WNI_CFG_HE_PPET_LEN);
+	else if (band == CDS_BAND_5GHZ)
+		qdf_mem_copy(ppe_th, mac->mlme_cfg->he_caps.he_ppet_5g,
+			     WNI_CFG_HE_PPET_LEN);
+	else
+		return 0;
+
+	num_ppe_th = lim_truncate_ppet(ppe_th, WNI_CFG_HE_PPET_LEN);
+
+	qdf_mem_copy(ie + offset, ppe_th, num_ppe_th);
+
+	return num_ppe_th;
+}
+
+QDF_STATUS lim_send_he_caps_ie(struct mac_context *mac_ctx,
+			       struct pe_session *session, uint8_t vdev_id)
+{
+	uint8_t he_caps[SIR_MAC_HE_CAP_MIN_LEN + HE_CAP_OUI_LEN +
+			HE_CAP_160M_MCS_MAP_LEN + HE_CAP_80P80_MCS_MAP_LEN +
+			WNI_CFG_HE_PPET_LEN];
 	struct he_capability_info *he_cap;
 	QDF_STATUS status_5g, status_2g;
 	struct wlan_objmgr_vdev *vdev;
 	enum QDF_OPMODE device_mode;
+	uint8_t he_cap_total_len = SIR_MAC_HE_CAP_MIN_LEN + HE_CAP_OUI_LEN +
+				   HE_CAP_160M_MCS_MAP_LEN +
+				   HE_CAP_80P80_MCS_MAP_LEN;
+	uint8_t num_ppe_th = 0;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
 			mac_ctx->psoc, vdev_id,
@@ -7298,14 +7362,12 @@ QDF_STATUS lim_send_he_caps_ie(struct mac_context *mac_ctx, struct pe_session *s
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 
 	/* Sending only minimal info(no PPET) to FW now, update if required */
-	qdf_mem_zero(he_caps, SIR_MAC_HE_CAP_MIN_LEN + 3);
+	qdf_mem_zero(he_caps, he_cap_total_len);
 	he_caps[0] = DOT11F_EID_HE_CAP;
 	he_caps[1] = SIR_MAC_HE_CAP_MIN_LEN;
 	qdf_mem_copy(&he_caps[2], HE_CAP_OUI_TYPE, HE_CAP_OUI_SIZE);
-	lim_set_he_caps(mac_ctx, session, he_caps,
-			SIR_MAC_HE_CAP_MIN_LEN + 3);
+	lim_set_he_caps(mac_ctx, session, he_caps, he_cap_total_len);
 	he_cap = (struct he_capability_info *) (&he_caps[2 + HE_CAP_OUI_SIZE]);
-	he_cap->ppet_present = 0;
 	if(device_mode == QDF_NDI_MODE) {
 		he_cap->su_beamformee = 0;
 		he_cap->su_beamformer = 0;
@@ -7317,16 +7379,27 @@ QDF_STATUS lim_send_he_caps_ie(struct mac_context *mac_ctx, struct pe_session *s
 		he_cap->su_feedback_tone16 = 0;
 		he_cap->mu_feedback_tone16 = 0;
 	}
+
+	if (he_cap->ppet_present)
+		num_ppe_th = lim_set_he_caps_ppet(mac_ctx, he_caps,
+						  CDS_BAND_5GHZ);
+
 	status_5g = lim_send_ie(mac_ctx, vdev_id, DOT11F_EID_HE_CAP,
 			CDS_BAND_5GHZ, &he_caps[2],
-			SIR_MAC_HE_CAP_MIN_LEN + 1);
+			he_caps[1] + 1 + num_ppe_th);
 	if (QDF_IS_STATUS_ERROR(status_5g))
 		pe_err("Unable send HE Cap IE for 5GHZ band, status: %d",
 			status_5g);
 
+	lim_intersect_he_ch_width_2g(mac_ctx, he_cap);
+
+	if (he_cap->ppet_present)
+		num_ppe_th = lim_set_he_caps_ppet(mac_ctx, he_caps,
+						  CDS_BAND_2GHZ);
+
 	status_2g = lim_send_ie(mac_ctx, vdev_id, DOT11F_EID_HE_CAP,
 			CDS_BAND_2GHZ, &he_caps[2],
-			SIR_MAC_HE_CAP_MIN_LEN + 1);
+			he_caps[1] + 1 + num_ppe_th);
 	if (QDF_IS_STATUS_ERROR(status_2g))
 		pe_err("Unable send HE Cap IE for 2GHZ band, status: %d",
 			status_2g);
