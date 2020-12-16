@@ -8529,7 +8529,8 @@ static void dp_peer_teardown_wifi3(struct cdp_vdev *vdev_hdl, void *peer_hdl)
 	 * for bss_peer, unless only 2 reference remains (peer map reference
 	 * and peer hash table reference).
 	 */
-	if (peer->bss_peer && (qdf_atomic_read(&peer->ref_cnt) > 2))
+	if ((peer->vdev->opmode == wlan_op_mode_ap) && peer->bss_peer &&
+	    (qdf_atomic_read(&peer->ref_cnt) > 2))
 		return;
 
 	qdf_spin_lock_bh(&soc->ast_lock);
