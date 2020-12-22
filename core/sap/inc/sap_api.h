@@ -1151,6 +1151,18 @@ QDF_STATUS wlansap_set_dfs_ignore_cac(mac_handle_t mac_handle,
 QDF_STATUS wlansap_get_dfs_cac_state(mac_handle_t mac_handle,
 				     eSapDfsCACState_t *cac_state);
 
+/**
+ * wlansap_get_csa_chanwidth_from_phymode() - function to populate
+ * channel width from user configured phymode for csa
+ * @sap_context: sap adapter context
+ * @chan_freq: target channel frequency (MHz)
+ *
+ * Return: phy_ch_width
+ */
+enum phy_ch_width
+wlansap_get_csa_chanwidth_from_phymode(struct sap_context *sap_context,
+				       uint32_t chan_freq);
+
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE
 QDF_STATUS
 wlan_sap_set_channel_avoidance(mac_handle_t mac_handle,
@@ -1217,6 +1229,25 @@ struct csr_roam_profile *wlan_sap_get_roam_profile(struct sap_context *sap_ctx);
  * Return: phymode
  */
 eCsrPhyMode wlan_sap_get_phymode(struct sap_context *sap_ctx);
+
+/**
+ * wlan_sap_get_concurrent_bw() - Returns SAP BW based on concurrent channel &
+ *                                STA DFS channel
+ * @pdev: Pointer to Pdev
+ * @psoc: Pointer to Psoc
+ * @con_ch_freq: interfering concurrent channel
+ * @channel_width: Channel width
+ *
+ * Return: Channel width. If STA is not present on con_ch_freq, it returns
+ *        max of STA BW and 80 Mhz. If STA is not connected in dfs chan or STA
+ *........BW is not 160 Mhz (which includes DFS channel), then it will return
+ *        BW maximum of STA BW and 80 Mhz. If DFS STA is present, then return
+ *        BW as min of 80 and STA BW.
+ */
+enum phy_ch_width wlan_sap_get_concurrent_bw(struct wlan_objmgr_pdev *pdev,
+					     struct wlan_objmgr_psoc *psoc,
+					     qdf_freq_t con_ch_freq,
+					     enum phy_ch_width channel_width);
 
 /**
  * wlan_sap_get_vht_ch_width() - Returns SAP VHT channel width.
@@ -1475,16 +1506,33 @@ uint32_t
 wlansap_get_safe_channel_from_pcl_and_acs_range(struct sap_context *sap_ctx);
 
 /**
+ * wlansap_get_safe_channel_from_pcl_for_sap() - Get safe and active channel
+ * for SAP restart
+ * @sap_ctx: sap context
+ *
+ * Get a safe and active channel to restart SAP. PCL already takes into account
+ * the unsafe channels.
+ *
+ * Return: Chan freq num to restart SAP in case of success. In case of any
+ * failure, the channel number returned is zero.
+ */
+uint32_t wlansap_get_safe_channel_from_pcl_for_sap(struct sap_context *sap_ctx);
+
+/**
  * wlansap_get_chan_band_restrict() -  get new chan for band change
  * @sap_ctx: sap context pointer
+ * @csa_reason: channel switch reason to update
  *
  * Sap/p2p go channel switch from 5G to 2G by CSA when 5G band disabled to
  * avoid conflict with modem N79.
  * Sap/p2p go channel restore to 5G channel when 5G band enabled.
+ * Note: csa_reason is only updated when channel is disabled or band is
+ * restricted, so it must be initialized to a default value beforehand
  *
  * Return - restart channel in MHZ
  */
-qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx);
+qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
+					  enum sap_csa_reason_code *csa_reason);
 
 #ifdef DCS_INTERFERENCE_DETECTION
 /**

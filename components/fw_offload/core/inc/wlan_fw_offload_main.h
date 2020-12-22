@@ -109,6 +109,10 @@ struct wlan_fwol_coex_config {
  * @throttle_period: Thermal throttle period value
  * @throttle_dutycycle_level: Array of throttle duty cycle levels
  * @thermal_sampling_time: sampling time for thermal mitigation in ms
+ * @mon_id: Monitor client id either the wpps or apps
+ * @priority_apps: Priority of the apps mitigation to consider by fw
+ * @priority_wpps: Priority of the wpps mitigation to consider by fw
+ * @thermal_action: thermal action as defined enum thermal_mgmt_action_code
  */
 struct wlan_fwol_thermal_temp {
 	bool     thermal_mitigation_enable;
@@ -117,6 +121,10 @@ struct wlan_fwol_thermal_temp {
 	uint16_t thermal_temp_max_level[FWOL_THERMAL_LEVEL_MAX];
 	uint32_t throttle_dutycycle_level[FWOL_THERMAL_THROTTLE_LEVEL_MAX];
 	uint16_t thermal_sampling_time;
+	uint8_t mon_id;
+	uint8_t priority_apps;
+	uint8_t priority_wpps;
+	enum thermal_mgmt_action_code thermal_action;
 };
 
 /**
@@ -189,7 +197,9 @@ struct wlan_fwol_neighbor_report_cfg {
  * @enable_fw_log_level: Set the FW log level
  * @enable_fw_log_type: Set the FW log type
  * @enable_fw_module_log_level: enable fw module log level
- * @enable_fw_module_log_level_num: enablefw module log level num
+ * @enable_fw_module_log_level_num: enable fw module log level num
+ * @enable_fw_mod_wow_log_level: enable fw wow module log level
+ * @enable_fw_mod_wow_log_level_num: enable fw wow module log level num
  * @sap_xlna_bypass: bypass SAP xLNA
  * @is_rate_limit_enabled: Enable/disable RA rate limited
  * @tsf_gpio_pin: TSF GPIO Pin config
@@ -204,7 +214,8 @@ struct wlan_fwol_neighbor_report_cfg {
  * @enable_dhcp_server_offload: DHCP Offload is enabled or not
  * @dhcp_max_num_clients: Max number of DHCP client supported
  * @dwelltime_params: adaptive dwell time parameters
- * @ocl_cfg: OCL mode configuration
+ * @enable_ilp: ILP HW block configuration
+ * @sap_sho: SAP SHO HW offload configuration
  */
 struct wlan_fwol_cfg {
 	/* Add CFG and INI items here */
@@ -227,6 +238,8 @@ struct wlan_fwol_cfg {
 	uint16_t enable_fw_log_type;
 	uint8_t enable_fw_module_log_level[FW_MODULE_LOG_LEVEL_STRING_LENGTH];
 	uint8_t enable_fw_module_log_level_num;
+	uint8_t enable_fw_mod_wow_log_level[FW_MODULE_LOG_LEVEL_STRING_LENGTH];
+	uint8_t enable_fw_mod_wow_log_level_num;
 	bool sap_xlna_bypass;
 #ifdef FEATURE_WLAN_RA_FILTERING
 	bool is_rate_limit_enabled;
@@ -255,7 +268,16 @@ struct wlan_fwol_cfg {
 	uint32_t dhcp_max_num_clients;
 #endif
 	struct adaptive_dwelltime_params dwelltime_params;
-	uint32_t ocl_cfg;
+	bool enable_ilp;
+	uint32_t sap_sho;
+};
+
+/**
+ * struct wlan_fwol_thermal_throttle_info - FW offload thermal throttle info
+ * @level: thermal throttle level
+ */
+struct wlan_fwol_thermal_throttle_info {
+	enum thermal_throttle_level level;
 };
 
 /**
@@ -264,12 +286,18 @@ struct wlan_fwol_cfg {
  * @cbs:     callback functions
  * @tx_ops: tx operations for target interface
  * @rx_ops: rx operations for target interface
+ * @thermal_throttle: cached target thermal stats information
+ * @thermal_cbs: thermal notification callbacks to hdd layer
  */
 struct wlan_fwol_psoc_obj {
 	struct wlan_fwol_cfg cfg;
 	struct wlan_fwol_callbacks cbs;
 	struct wlan_fwol_tx_ops tx_ops;
 	struct wlan_fwol_rx_ops rx_ops;
+#ifdef FW_THERMAL_THROTTLE_SUPPORT
+	struct wlan_fwol_thermal_throttle_info thermal_throttle;
+	struct fwol_thermal_callbacks thermal_cbs;
+#endif
 };
 
 /**
@@ -367,4 +395,27 @@ fwol_init_adapt_dwelltime_in_cfg(
 QDF_STATUS
 fwol_set_adaptive_dwelltime_config(
 			struct adaptive_dwelltime_params *dwelltime_params);
+
+/**
+ * fwol_set_ilp_config() - API to set ILP HW block config
+ * @pdev: pointer to the pdev object
+ * @enable_ilp: enable/disable config for ILP
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS fwol_set_ilp_config(struct wlan_objmgr_pdev *pdev,
+			       bool enable_ilp);
+
+/**
+ * fwol_set_sap_sho() - API to set SAP SHO config
+ * @psoc: pointer to the psoc object
+ * @vdev_id: vdev id
+ * @sap_sho: enable/disable config for SAP SHO
+ * SHO- SoftAP hardware offload – When enabled the beacon/probe resp
+ * will be offloaded to HW.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS fwol_set_sap_sho(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			    uint32_t sap_sho);
 #endif

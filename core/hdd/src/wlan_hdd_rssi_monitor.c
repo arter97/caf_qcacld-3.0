@@ -77,10 +77,8 @@ __wlan_hdd_cfg80211_monitor_rssi(struct wiphy *wiphy,
 
 	hdd_enter_dev(dev);
 
-	if (wlan_hdd_validate_vdev_id(adapter->vdev_id)) {
-		hdd_err("invalid session id: %d", adapter->vdev_id);
+	if (wlan_hdd_validate_vdev_id(adapter->vdev_id))
 		return -EINVAL;
-	}
 
 	ret = wlan_hdd_validate_context(hdd_ctx);
 	if (ret)
@@ -209,8 +207,8 @@ void hdd_rssi_threshold_breached(hdd_handle_t hdd_handle,
 
 	hdd_debug("Req Id: %u Current rssi: %d",
 		  data->request_id, data->curr_rssi);
-	hdd_debug("Current BSSID: "QDF_MAC_ADDR_STR,
-		  QDF_MAC_ADDR_ARRAY(data->curr_bssid.bytes));
+	hdd_debug("Current BSSID: "QDF_MAC_ADDR_FMT,
+		  QDF_MAC_ADDR_REF(data->curr_bssid.bytes));
 
 	if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_RSSI_MONITORING_REQUEST_ID,
 			data->request_id) ||

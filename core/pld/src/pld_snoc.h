@@ -20,7 +20,11 @@
 #define __PLD_SNOC_H__
 
 #ifdef CONFIG_PLD_SNOC_ICNSS
+#ifdef CONFIG_PLD_SNOC_ICNSS2
+#include <soc/qcom/icnss2.h>
+#else
 #include <soc/qcom/icnss.h>
+#endif
 #endif
 #include "pld_internal.h"
 
@@ -108,6 +112,16 @@ static inline void *pld_snoc_smmu_get_mapping(struct device *dev)
 	return NULL;
 }
 #endif
+
+static inline int pld_snoc_idle_restart(struct device *dev)
+{
+	return 0;
+}
+
+static inline int pld_snoc_idle_shutdown(struct device *dev)
+{
+	return 0;
+}
 
 static inline int pld_snoc_smmu_map(struct device *dev, phys_addr_t paddr,
 				    uint32_t *iova_addr, size_t size)
@@ -349,6 +363,16 @@ static inline int pld_snoc_is_fw_rejuvenate(void)
 static inline void pld_snoc_block_shutdown(bool status)
 {
 	icnss_block_shutdown(status);
+}
+
+static inline int pld_snoc_idle_restart(struct device *dev)
+{
+	return icnss_idle_restart(dev);
+}
+
+static inline int pld_snoc_idle_shutdown(struct device *dev)
+{
+	return icnss_idle_shutdown(dev);
 }
 #endif
 #endif

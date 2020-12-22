@@ -41,10 +41,8 @@ static ssize_t __hdd_sysfs_modify_acl_store(
 	int ret, i;
 	QDF_STATUS qdf_status;
 
-	if (hdd_validate_adapter(adapter)) {
-		hdd_err_rl("adapter validate fail");
+	if (hdd_validate_adapter(adapter))
 		return -EINVAL;
-	}
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -92,8 +90,8 @@ static ssize_t __hdd_sysfs_modify_acl_store(
 	if (kstrtou32(token, 0, &cmd_type))
 		return -EINVAL;
 
-	hdd_debug("Modify ACL mac:" QDF_MAC_ADDR_STR " type: %d cmd: %d",
-		  QDF_MAC_ADDR_ARRAY(peer_mac), list_type, cmd_type);
+	hdd_debug("Modify ACL mac:" QDF_MAC_ADDR_FMT " type: %d cmd: %d",
+		  QDF_MAC_ADDR_REF(peer_mac), list_type, cmd_type);
 
 	qdf_status = wlansap_modify_acl(
 		WLAN_HDD_GET_SAP_CTX_PTR(adapter),

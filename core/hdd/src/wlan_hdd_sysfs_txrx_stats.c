@@ -44,10 +44,8 @@ __hdd_sysfs_txrx_stats_store(struct net_device *net_dev,
 	uint8_t val2;
 	int ret;
 
-	if (hdd_validate_adapter(adapter)) {
-		hdd_err_rl("adapter validate fail");
+	if (hdd_validate_adapter(adapter))
 		return -EINVAL;
-	}
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -90,10 +88,8 @@ __hdd_sysfs_txrx_stats_store(struct net_device *net_dev,
 
 	hdd_debug("WE_SET_TXRX_STATS stats cmd: %d mac_id: %d",
 		  req.stats, req.mac_id);
-	if (qdf_unlikely(!soc)) {
-		hdd_err("soc is NULL");
+	if (qdf_unlikely(!soc))
 		return -EINVAL;
-	}
 
 	if (val1 == CDP_TXRX_STATS_28) {
 		if (sta_ctx->conn_info.is_authenticated) {

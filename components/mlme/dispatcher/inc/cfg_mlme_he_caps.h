@@ -28,14 +28,48 @@
 				0, \
 				"HE Control")
 
-#define CFG_HE_TWT_REQUESTOR CFG_BOOL( \
+/*
+ * <ini>
+ * he_twt_requestor- Enable HE TWT requestor.
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to enable or disable HE TWT requestor.
+ *
+ * Related: NA
+ *
+ * Supported Feature: 11AX
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_HE_TWT_REQUESTOR CFG_INI_BOOL( \
 				"he_twt_requestor", \
-				0, \
+				1, \
 				"HE Twt Requestor")
 
-#define CFG_HE_TWT_RESPONDER CFG_BOOL( \
+/*
+ * <ini>
+ * he_twt_responder- Enable HE TWT responder.
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to enable or disable HE TWT responder.
+ *
+ * Related: NA
+ *
+ * Supported Feature: 11AX
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_HE_TWT_RESPONDER CFG_INI_BOOL( \
 				"he_twt_responder", \
-				0, \
+				1, \
 				"HE Twt Responder")
 
 #define CFG_HE_FRAGMENTATION CFG_UINT( \
@@ -696,7 +730,57 @@
 				CFG_VALUE_OR_DEFAULT, \
 				"He Mu Bfee Sts Gt80")
 
- #define CFG_HE_CAPS_ALL \
+/*
+ * <ini>
+ * he_mcs_12_13_support - Bit mask to enable MCS 12 and 13 support
+ * @Min: 0x0
+ * @Max: 0xffffffff
+ * @Default: 0xffffffff
+ *
+ * This ini is used to set MCS 12 and 13 for 2.4Ghz and 5Ghz. first 16
+ * bits(0-15) is for 2.4ghz and next 16 bits is for 5Ghz. Of 16 bits the lower
+ * 8 bits represent BW less than or equal 80Mhz (<= 80Mhz) and higher 8 bits
+ * represent BW greater than 80Mhz (> 80Mhz). nth bit in octet represent support
+ * for nth NSS [n=1:8]. Def value is 0xFFFFFFFF which enable MCS 12 and 13 for
+ * all NSS and BW.
+ *
+ * Bits         Band
+ * BIT[0:15]    2.4Ghz support for MCS 12 and 13, for NSS n[1:8] and BW <= 80Mhz
+ *              first 8 bits should be used (0-7) and for NSS n[1:8] and BW >
+ *              80 Mhz, next 8 bits (8-15) should be used.
+ *
+ * BIT[16:31]   5Ghz support for MCS 12 and 13, for NSS n[1:8] and BW < 80Mhz,
+ *              bits 16-23 should be used and for BW > 80Mhz, next 8 bits
+ *              (24-31)
+ *
+ * Some Possible values are as below
+ * 0          - MCS 12 and 13 disabled for 2.4Ghz and 5Ghz for all nss and
+ *              BW > 80Mz and <= 80Mhz
+ * 0x3030303  - MCS 12 and 13 enabled for 2.4Ghz and 5Ghz for NSS 1 and 2 for
+ *              BW > 80Mhz and <= 80Mhz
+ * 0x0303     - MCS 12 and 13 enabled for 2.4Ghz NSS 1 and 2 for BW > 80Mhz and
+ *              <= 80Mhz but disabled for 5Ghz
+ * 0x3030000  - MCS 12 and 13 enabled for 5Ghz NSS 1 and 2 for BW > 80Mhz and
+ *              <= 80Mhz but disabled for 2.4Ghz
+ * 0x30000    - MCS 12 and 13 enabled for 5Ghz NSS 1 and 2 for BW <= 80Mhz and
+ *              disabled for BW > 80Mhz. And disabled for 2.4Ghz
+ * 0x3          MCS 12 and 13 enabled for 2.4Ghz NSS 1 and 2 for BW <= 80Mhz and
+ *              disabled for all
+ *
+ * Related: None
+ *
+ * Supported Feature: HE MCS 12 and 13
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_HE_MCS_12_13_SUPPORT CFG_INI_UINT("he_mcs_12_13_support", \
+				0, 0xffffffff, 0xffffffff, \
+				CFG_VALUE_OR_DEFAULT, \
+				"He Configure MCS_12_13 bits")
+
+#define CFG_HE_CAPS_ALL \
 	CFG(CFG_HE_CONTROL) \
 	CFG(CFG_HE_TWT_REQUESTOR) \
 	CFG(CFG_HE_TWT_RESPONDER) \
@@ -788,7 +872,8 @@
 	CFG(CFG_HE_DYNAMIC_FRAGMENTATION) \
 	CFG(CFG_ENABLE_UL_MIMO) \
 	CFG(CFG_ENABLE_UL_OFDMA) \
-	CFG(CFG_HE_STA_OBSSPD)
+	CFG(CFG_HE_STA_OBSSPD) \
+	CFG(CFG_HE_MCS_12_13_SUPPORT)
 
 #endif /* __CFG_MLME_HE_CAPS_H */
 

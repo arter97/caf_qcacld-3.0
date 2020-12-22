@@ -46,6 +46,7 @@
 #include "wma_api.h"
 #include "wmi_unified_param.h"
 #include "wmi.h"
+#include "wlan_cm_roam_public_struct.h"
 
 /* Platform specific configuration for max. no. of fragments */
 #define QCA_OL_11AC_TX_MAX_FRAGS            2
@@ -67,23 +68,9 @@
 #define WMA_MAC_TO_PDEV_MAP(x) ((x) + (1))
 #define WMA_PDEV_TO_MAC_MAP(x) ((x) - (1))
 
-#define WMA_MAX_MGMT_MPDU_LEN 2000
-
 #define MAX_PRINT_FAILURE_CNT 50
 
 #define WMA_INVALID_VDEV_ID                             0xFF
-
-/* Deprecated logging macros, to be removed. Please do not use in new code */
-#define WMA_LOGD(params ...) \
-	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_WMA, params)
-#define WMA_LOGI(params ...) \
-	QDF_TRACE_INFO_NO_FL(QDF_MODULE_ID_WMA, params)
-#define WMA_LOGW(params ...) \
-	QDF_TRACE_WARN_NO_FL(QDF_MODULE_ID_WMA, params)
-#define WMA_LOGE(params ...) \
-	QDF_TRACE_ERROR_NO_FL(QDF_MODULE_ID_WMA, params)
-#define WMA_LOGP(params ...) \
-	QDF_TRACE_FATAL_NO_FL(QDF_MODULE_ID_WMA, params)
 
 #define wma_alert(params...) QDF_TRACE_FATAL(QDF_MODULE_ID_WMA, params)
 #define wma_err(params...) QDF_TRACE_ERROR(QDF_MODULE_ID_WMA, params)
@@ -103,15 +90,6 @@
 	QDF_TRACE_INFO_NO_FL(QDF_MODULE_ID_WMA, params)
 #define wma_nofl_debug(params...) \
 	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_WMA, params)
-
-#define WMA_DEBUG_ALWAYS
-
-#ifdef WMA_DEBUG_ALWAYS
-#define WMA_LOGA(params ...) \
-	QDF_TRACE_FATAL_NO_FL(QDF_MODULE_ID_WMA, params)
-#else
-#define WMA_LOGA(params ...)
-#endif
 
 #define WMA_WILDCARD_PDEV_ID 0x0
 
@@ -185,6 +163,9 @@
 
 #define WMA_PDEV_SET_HW_MODE_RESP 0x06
 #define WMA_PDEV_MAC_CFG_RESP 0x07
+
+#define WMA_PEER_CREATE_RESPONSE 0x08
+#define WMA_PEER_CREATE_RESPONSE_TIMEOUT SIR_PEER_CREATE_RESPONSE_TIMEOUT
 
 /* FW response timeout values in milli seconds */
 #define WMA_VDEV_PLCY_MGR_TIMEOUT        SIR_VDEV_PLCY_MGR_TIMEOUT
@@ -724,7 +705,7 @@ struct wma_txrx_node {
 	bool vdev_active;
 	uint64_t tsfadjust;
 	tAddStaParams *addBssStaContext;
-	uint8_t aid;
+	uint16_t aid;
 	uint8_t rmfEnabled;
 	uint32_t uapsd_cached_val;
 	void *del_staself_req;
@@ -735,7 +716,6 @@ struct wma_txrx_node {
 	uint16_t pause_bitmap;
 	uint32_t nwType;
 	uint32_t peer_count;
-	bool roam_synch_in_progress;
 	void *plink_status_req;
 	void *psnr_req;
 	uint8_t delay_before_vdev_stop;
@@ -867,9 +847,6 @@ struct wma_wlm_stats_data {
  * @roam_ho_wl: wake lock for roam handoff req
  * @wow_nack: wow negative ack flag
  * @is_wow_bus_suspended: is wow bus suspended flag
- * @suitable_ap_hb_failure: better ap found
- * @suitable_ap_hb_failure_rssi: RSSI when suitable_ap_hb_failure
- *   triggered for later usage to report RSSI at beacon miss scenario
  * @IsRArateLimitEnabled: RA rate limiti s enabled or not
  * @RArateLimitInterval: RA rate limit interval
  * @is_lpass_enabled: Flag to indicate if LPASS feature is enabled or not
@@ -993,8 +970,6 @@ typedef struct {
 	qdf_wake_lock_t roam_preauth_wl;
 	int wow_nack;
 	qdf_atomic_t is_wow_bus_suspended;
-	bool suitable_ap_hb_failure;
-	uint32_t suitable_ap_hb_failure_rssi;
 #ifdef WLAN_FEATURE_LPSS
 	bool is_lpass_enabled;
 #endif
@@ -1064,6 +1039,18 @@ typedef struct {
 	bool fw_therm_throt_support;
 	bool enable_tx_compl_tsf64;
 } t_wma_handle, *tp_wma_handle;
+
+/**
+ * wma_validate_handle() - Validate WMA handle
+ * @wma_handle: wma handle
+ *
+ * This function will log on error and hence caller should not log on error
+ *
+ * Return: errno if WMA handle is NULL; 0 otherwise
+ */
+#define wma_validate_handle(wma_handle) \
+        __wma_validate_handle(wma_handle, __func__)
+int __wma_validate_handle(tp_wma_handle wma_handle, const char *func);
 
 /**
  * wma_vdev_nss_chain_params_send() - send vdev nss chain params to fw.
@@ -1170,11 +1157,13 @@ struct wma_set_key_params {
  * @minTemp: minimum temprature
  * @maxTemp: maximum temprature
  * @thermalEnable: thermal enable
+ * @thermal_action: thermal action
  */
 typedef struct {
 	uint16_t minTemp;
 	uint16_t maxTemp;
 	uint8_t thermalEnable;
+	enum thermal_mgmt_action_code thermal_action;
 } t_thermal_cmd_params, *tp_thermal_cmd_params;
 
 /**
@@ -1490,8 +1479,16 @@ QDF_STATUS wma_set_rssi_monitoring(tp_wma_handle wma,
 }
 #endif /* FEATURE_RSSI_MONITOR */
 
-QDF_STATUS wma_send_pdev_set_pcl_cmd(tp_wma_handle wma_handle,
-				     struct set_pcl_req *msg);
+/**
+ * wma_map_pcl_weights  - Map WMA pcl weights to wmi pcl weights
+ * @pcl_weight: Input PCL weight to be converted to wmi format
+ *
+ * Return: wmi_pcl_chan_weight
+ */
+wmi_pcl_chan_weight wma_map_pcl_weights(uint32_t pcl_weight);
+
+QDF_STATUS wma_send_set_pcl_cmd(tp_wma_handle wma_handle,
+				struct set_pcl_req *msg);
 
 QDF_STATUS wma_send_pdev_set_hw_mode_cmd(tp_wma_handle wma_handle,
 		struct policy_mgr_hw_mode *msg);
@@ -1655,11 +1652,21 @@ void wma_process_set_pdev_vht_ie_req(tp_wma_handle wma,
 		struct set_ie_param *ie_params);
 
 QDF_STATUS wma_remove_peer(tp_wma_handle wma, uint8_t *mac_addr,
-			   uint8_t vdev_id, bool roam_synch_in_progress);
+			   uint8_t vdev_id, bool no_fw_peer_delete);
 
-QDF_STATUS wma_create_peer(tp_wma_handle wma, uint8_t peer_addr[6],
-			   u_int32_t peer_type, u_int8_t vdev_id,
-			   bool roam_synch_in_progress);
+/**
+ * wma_create_peer() - Call wma_add_peer() to send peer create command to fw
+ * and setup cdp peer
+ * @wma: wma handle
+ * @peer_addr: peer mac address
+ * @peer_type: peer type
+ * @vdev_id: vdev id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wma_create_peer(tp_wma_handle wma,
+			   uint8_t peer_addr[QDF_MAC_ADDR_SIZE],
+			   u_int32_t peer_type, u_int8_t vdev_id);
 
 QDF_STATUS wma_peer_unmap_conf_cb(uint8_t vdev_id,
 				  uint32_t peer_id_cnt,
@@ -1833,20 +1840,18 @@ void wma_vdev_update_pause_bitmap(uint8_t vdev_id, uint16_t value)
 	tp_wma_handle wma = (tp_wma_handle)cds_get_context(QDF_MODULE_ID_WMA);
 	struct wma_txrx_node *iface;
 
-	if (!wma) {
-		WMA_LOGE("%s: WMA context is invald!", __func__);
+	if (!wma)
 		return;
-	}
 
 	if (vdev_id >= wma->max_bssid) {
-		WMA_LOGE("%s: Invalid vdev_id: %d", __func__, vdev_id);
+		wma_err("Invalid vdev_id: %d", vdev_id);
 		return;
 	}
 
 	iface = &wma->interfaces[vdev_id];
 
 	if (!iface) {
-		WMA_LOGE("%s: Interface is NULL", __func__);
+		wma_err("Interface is NULL");
 		return;
 	}
 
@@ -1865,15 +1870,13 @@ uint16_t wma_vdev_get_pause_bitmap(uint8_t vdev_id)
 	tp_wma_handle wma = (tp_wma_handle)cds_get_context(QDF_MODULE_ID_WMA);
 	struct wma_txrx_node *iface;
 
-	if (!wma) {
-		WMA_LOGE("%s: WMA context is invald!", __func__);
+	if (!wma)
 		return 0;
-	}
 
 	iface = &wma->interfaces[vdev_id];
 
 	if (!iface) {
-		WMA_LOGE("%s: Interface is NULL", __func__);
+		wma_err("Interface is NULL");
 		return 0;
 	}
 
@@ -1891,15 +1894,13 @@ static inline bool wma_vdev_is_device_in_low_pwr_mode(uint8_t vdev_id)
 	tp_wma_handle wma = (tp_wma_handle)cds_get_context(QDF_MODULE_ID_WMA);
 	struct wma_txrx_node *iface;
 
-	if (!wma) {
-		WMA_LOGE("%s: WMA context is invald!", __func__);
+	if (!wma)
 		return 0;
-	}
 
 	iface = &wma->interfaces[vdev_id];
 
 	if (!iface) {
-		WMA_LOGE("%s: Interface is NULL", __func__);
+		wma_err("Interface is NULL");
 		return 0;
 	}
 
@@ -1982,13 +1983,13 @@ wma_get_vdev_rate_flag(struct wlan_objmgr_vdev *vdev, uint32_t *rate_flag)
 	struct vdev_mlme_obj *mlme_obj;
 
 	if (!vdev) {
-		WMA_LOGE("%s vdev is NULL", __func__);
+		wma_err("vdev is NULL");
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(vdev);
 	if (!mlme_obj) {
-		WMA_LOGE("%s Failed to get mlme_obj", __func__);
+		wma_err("ailed to get mlme_obj");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -2009,15 +2010,13 @@ void wma_vdev_set_pause_bit(uint8_t vdev_id, wmi_tx_pause_type bit_pos)
 	tp_wma_handle wma = (tp_wma_handle)cds_get_context(QDF_MODULE_ID_WMA);
 	struct wma_txrx_node *iface;
 
-	if (!wma) {
-		WMA_LOGE("%s: WMA context is invald!", __func__);
+	if (!wma)
 		return;
-	}
 
 	iface = &wma->interfaces[vdev_id];
 
 	if (!iface) {
-		WMA_LOGE("%s: Interface is NULL", __func__);
+		wma_err("Interface is NULL");
 		return;
 	}
 
@@ -2037,32 +2036,18 @@ void wma_vdev_clear_pause_bit(uint8_t vdev_id, wmi_tx_pause_type bit_pos)
 	tp_wma_handle wma = (tp_wma_handle)cds_get_context(QDF_MODULE_ID_WMA);
 	struct wma_txrx_node *iface;
 
-	if (!wma) {
-		WMA_LOGE("%s: WMA context is invald!", __func__);
+	if (!wma)
 		return;
-	}
 
 	iface = &wma->interfaces[vdev_id];
 
 	if (!iface) {
-		WMA_LOGE("%s: Interface is NULL", __func__);
+		wma_err("Interface is NULL");
 		return;
 	}
 
 	iface->pause_bitmap &= ~(1 << bit_pos);
 }
-
-/**
- * wma_process_roaming_config() - process roam request
- * @wma_handle: wma handle
- * @roam_req: roam request parameters
- *
- * Main routine to handle ROAM commands coming from CSR module.
- *
- * Return: QDF status
- */
-QDF_STATUS wma_process_roaming_config(tp_wma_handle wma_handle,
-				     struct roam_offload_scan_req *roam_req);
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
@@ -2415,8 +2400,7 @@ int wma_motion_det_base_line_host_event_handler(void *handle, u_int8_t *event,
  *
  * Return: 0 on success, else error on failure
  */
-QDF_STATUS wma_add_bss_peer_sta(uint8_t vdev_id, uint8_t *bssid,
-				bool roam_sync);
+QDF_STATUS wma_add_bss_peer_sta(uint8_t vdev_id, uint8_t *bssid);
 
 /**
  * wma_send_vdev_stop() - WMA api to send vdev stop to fw

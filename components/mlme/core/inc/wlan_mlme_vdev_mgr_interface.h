@@ -64,6 +64,37 @@ QDF_STATUS mlme_unregister_vdev_mgr_ops(struct vdev_mlme_obj *vdev_mlme);
 QDF_STATUS mlme_set_chan_switch_in_progress(struct wlan_objmgr_vdev *vdev,
 					       bool val);
 
+#ifdef WLAN_FEATURE_MSCS
+/**
+ * mlme_set_is_mscs_req_sent() - set mscs frame req flag
+ * @vdev: vdev pointer
+ * @val: value to be set
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS mlme_set_is_mscs_req_sent(struct wlan_objmgr_vdev *vdev, bool val);
+
+/**
+ * mlme_get_is_mscs_req_sent() - get mscs frame req flag
+ * @vdev: vdev pointer
+ *
+ * Return: value of mscs flag
+ */
+bool mlme_get_is_mscs_req_sent(struct wlan_objmgr_vdev *vdev);
+#else
+static inline
+QDF_STATUS mlme_set_is_mscs_req_sent(struct wlan_objmgr_vdev *vdev, bool val)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static inline
+bool mlme_get_is_mscs_req_sent(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
+}
+#endif
+
 /**
  * mlme_is_chan_switch_in_progress() - get mlme priv restart in progress
  * @vdev: vdev pointer
@@ -111,9 +142,59 @@ mlme_set_vdev_start_failed(struct wlan_objmgr_vdev *vdev, bool val);
  */
 bool mlme_is_connection_fail(struct wlan_objmgr_vdev *vdev);
 
+/**
+ * mlme_is_wapi_sta_active() - check sta with wapi security exists and is active
+ * @pdev: pdev pointer
+ *
+ * Return: true if sta with wapi security exists
+ */
+#ifdef FEATURE_WLAN_WAPI
+bool mlme_is_wapi_sta_active(struct wlan_objmgr_pdev *pdev);
+#else
+static inline bool mlme_is_wapi_sta_active(struct wlan_objmgr_pdev *pdev)
+{
+	return false;
+}
+#endif
+
 QDF_STATUS mlme_set_bigtk_support(struct wlan_objmgr_vdev *vdev, bool val);
 
 bool mlme_get_bigtk_support(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * mlme_set_roam_reason_better_ap() - set roam reason better AP
+ * @vdev: vdev pointer
+ * @val: value to be set
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+mlme_set_roam_reason_better_ap(struct wlan_objmgr_vdev *vdev, bool val);
+
+/**
+ * mlme_get_roam_reason_better_ap() - get roam reason better AP
+ * @vdev: vdev pointer
+ *
+ * Return: bool
+ */
+bool mlme_get_roam_reason_better_ap(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * mlme_set_hb_ap_rssi() - set hb ap RSSI
+ * @vdev: vdev pointer
+ * @val: value to be set
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS mlme_set_hb_ap_rssi(struct wlan_objmgr_vdev *vdev, uint32_t val);
+
+/**
+ * mlme_get_hb_ap_rssi() - get HB AP RSSIc
+ * @vdev: vdev pointer
+ *
+ * Return: rssi value
+ */
+uint32_t mlme_get_hb_ap_rssi(struct wlan_objmgr_vdev *vdev);
 
 /**
  * mlme_set_connection_fail() - set connection failure flag
@@ -228,19 +309,6 @@ bool mlme_is_vdev_in_beaconning_mode(enum QDF_OPMODE vdev_opmode);
  */
 QDF_STATUS mlme_set_assoc_type(struct wlan_objmgr_vdev *vdev,
 			       enum vdev_assoc_type assoc_type);
-
-/**
- * mlme_get_vdev_bss_peer_mac_addr() - to get peer mac address
- * @vdev: pointer to vdev
- * @bss_peer_mac_address: pointer to bss_peer_mac_address
- *
- * This API is used to get mac address of peer.
- *
- * Return: QDF_STATUS based on overall success
- */
-QDF_STATUS mlme_get_vdev_bss_peer_mac_addr(
-		struct wlan_objmgr_vdev *vdev,
-		struct qdf_mac_addr *bss_peer_mac_address);
 
 /**
  * mlme_get_vdev_stop_type() - to get vdev stop type

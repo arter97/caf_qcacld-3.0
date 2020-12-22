@@ -44,9 +44,9 @@ static int wlan_cfg80211_tdls_validate_mac_addr(const uint8_t *mac)
 	static const uint8_t temp_mac[QDF_MAC_ADDR_SIZE] = {0};
 
 	if (!qdf_mem_cmp(mac, temp_mac, QDF_MAC_ADDR_SIZE)) {
-		osif_debug("Invalid Mac address " QDF_MAC_ADDR_STR
+		osif_debug("Invalid Mac address " QDF_MAC_ADDR_FMT
 			   " cmd declined.",
-			   QDF_MAC_ADDR_ARRAY(mac));
+			   QDF_MAC_ADDR_REF(mac));
 		return -EINVAL;
 	}
 
@@ -66,10 +66,9 @@ QDF_STATUS wlan_cfg80211_tdls_osif_priv_init(struct wlan_objmgr_vdev *vdev)
 
 	osif_debug("initialize tdls os if layer private structure");
 	tdls_priv = qdf_mem_malloc(sizeof(*tdls_priv));
-	if (!tdls_priv) {
-		osif_err("failed to allocate memory for tdls_priv");
+	if (!tdls_priv)
 		return QDF_STATUS_E_NOMEM;
-	}
+
 	init_completion(&tdls_priv->tdls_add_peer_comp);
 	init_completion(&tdls_priv->tdls_del_peer_comp);
 	init_completion(&tdls_priv->tdls_mgmt_comp);
@@ -97,52 +96,6 @@ void wlan_cfg80211_tdls_osif_priv_deinit(struct wlan_objmgr_vdev *vdev)
 	if (osif_priv->osif_tdls)
 		qdf_mem_free(osif_priv->osif_tdls);
 	osif_priv->osif_tdls = NULL;
-}
-
-void hdd_notify_teardown_tdls_links(struct wlan_objmgr_psoc *psoc)
-{
-	struct vdev_osif_priv *osif_priv;
-	struct osif_tdls_vdev *tdls_priv;
-	QDF_STATUS status;
-	unsigned long rc;
-	struct wlan_objmgr_vdev *vdev;
-
-	vdev = ucfg_get_tdls_vdev(psoc, WLAN_OSIF_ID);
-	if (!vdev)
-		return;
-
-	osif_priv = wlan_vdev_get_ospriv(vdev);
-
-	if (!osif_priv || !osif_priv->osif_tdls) {
-		osif_err("osif priv or tdls priv is NULL");
-		goto release_ref;
-	}
-	tdls_priv = osif_priv->osif_tdls;
-
-	reinit_completion(&tdls_priv->tdls_teardown_comp);
-	status = ucfg_tdls_teardown_links(psoc);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		osif_err("ucfg_tdls_teardown_links failed err %d", status);
-		goto release_ref;
-	}
-
-	osif_debug("Wait for tdls teardown completion. Timeout %u ms",
-		   WAIT_TIME_FOR_TDLS_TEARDOWN_LINKS);
-
-	rc = wait_for_completion_timeout(
-		&tdls_priv->tdls_teardown_comp,
-		msecs_to_jiffies(WAIT_TIME_FOR_TDLS_TEARDOWN_LINKS));
-
-	if (0 == rc) {
-		osif_err(" Teardown Completion timed out rc: %ld", rc);
-		goto release_ref;
-	}
-
-	osif_debug("TDLS teardown completion status %ld ", rc);
-
-release_ref:
-	wlan_objmgr_vdev_release_ref(vdev,
-				     WLAN_OSIF_ID);
 }
 
 void hdd_notify_tdls_reset_adapter(struct wlan_objmgr_vdev *vdev)
@@ -218,14 +171,12 @@ int wlan_cfg80211_tdls_add_peer(struct wlan_objmgr_vdev *vdev,
 	if (status)
 		return status;
 
-	osif_debug("Add TDLS peer " QDF_MAC_ADDR_STR,
-		   QDF_MAC_ADDR_ARRAY(mac));
+	osif_debug("Add TDLS peer " QDF_MAC_ADDR_FMT,
+		   QDF_MAC_ADDR_REF(mac));
 
 	add_peer_req = qdf_mem_malloc(sizeof(*add_peer_req));
-	if (!add_peer_req) {
-		osif_err("Failed to allocate tdls add peer request mem");
+	if (!add_peer_req)
 		return -EINVAL;
-	}
 
 	osif_priv = wlan_vdev_get_ospriv(vdev);
 	if (!osif_priv || !osif_priv->osif_tdls) {
@@ -439,14 +390,13 @@ int wlan_cfg80211_tdls_update_peer(struct wlan_objmgr_vdev *vdev,
 	if (status)
 		return status;
 
-	osif_debug("Update TDLS peer " QDF_MAC_ADDR_STR,
-		   QDF_MAC_ADDR_ARRAY(mac));
+	osif_debug("Update TDLS peer " QDF_MAC_ADDR_FMT,
+		   QDF_MAC_ADDR_REF(mac));
 
 	req_info = qdf_mem_malloc(sizeof(*req_info));
-	if (!req_info) {
-		osif_err("Failed to allocate tdls add peer request mem");
+	if (!req_info)
 		return -EINVAL;
-	}
+
 	wlan_cfg80211_tdls_extract_params(req_info, params);
 
 	osif_priv = wlan_vdev_get_ospriv(vdev);
@@ -772,8 +722,8 @@ int wlan_cfg80211_tdls_mgmt(struct wlan_objmgr_vdev *vdev,
 
 	/* make sure doesn't call send_mgmt() while it is pending */
 	if (TDLS_VDEV_MAGIC == tdls_priv->mgmt_tx_completion_status) {
-		osif_err(QDF_MAC_ADDR_STR " action %d couldn't sent, as one is pending. return EBUSY",
-			 QDF_MAC_ADDR_ARRAY(peer_mac), action_code);
+		osif_err(QDF_MAC_ADDR_FMT " action %d couldn't sent, as one is pending. return EBUSY",
+			 QDF_MAC_ADDR_REF(peer_mac), action_code);
 		return -EBUSY;
 	}
 
@@ -975,9 +925,6 @@ void wlan_cfg80211_tdls_event_callback(void *user_data,
 		break;
 	case TDLS_EVENT_SETUP_REQ:
 		wlan_cfg80211_tdls_indicate_setup(ind);
-		break;
-	case TDLS_EVENT_TEARDOWN_LINKS_DONE:
-		complete(&tdls_priv->tdls_teardown_comp);
 		break;
 	case TDLS_EVENT_USER_CMD:
 		tdls_priv->tdls_user_cmd_len = ind->status;

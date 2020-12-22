@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2016, 2018-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2016, 2018-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -42,10 +42,8 @@ void wma_set_dbs_capability_ut(uint32_t dbs)
 	uint32_t i;
 
 	wma = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma) {
-		WMA_LOGE("%s: Invalid WMA handle", __func__);
+	if (!wma)
 		return;
-	}
 
 	/* DBS list was not configured by the FW, so
 	 * for UT, we can configure a single entry

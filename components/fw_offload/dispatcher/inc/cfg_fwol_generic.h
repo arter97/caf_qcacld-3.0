@@ -390,9 +390,47 @@
 	"gFwDebugModuleLoglevel", \
 	0, \
 	FW_MODULE_LOG_LEVEL_STRING_LENGTH, \
-	"2,1,3,1,5,1,9,1,13,1,14,1,18,1,19,1,26,1,28,1,29,1,31,1,36,1,38,1,"\
-	"46,1,47,1,50,1,52,1,53,1,56,1,60,1,61,1,4,1", \
+	"1,1,2,1,3,1,4,1,5,1,8,1,9,1,13,1,14,1,17,1,18,1,19,1,22,1,26,1,28,1," \
+	"29,1,31,1,36,1,38,1,46,1,47,1,50,1,52,1,53,1,56,1,60,1,61,1", \
 	"Set modulized firmware debug log level")
+
+/*
+ * <ini>
+ * gFwDebugWowModuleLoglevel - modulized firmware wow debug log level
+ * @Min: N/A
+ * @Max: N/A
+ * @Default: N/A
+ *
+ * This ini is used to set modulized firmware wow debug log level.
+ * FW module log level input string format looks like below:
+ * gFwDebugWowModuleLoglevel="<FW Module ID>,<Log Level>,..."
+ * For example:
+ * gFwDebugWowModuleLoglevel="1,0,2,1,3,2,4,3,5,4,6,5,7,6"
+ * The above input string means:
+ * For FW module ID 1 enable log level 0
+ * For FW module ID 2 enable log level 1
+ * For FW module ID 3 enable log level 2
+ * For FW module ID 4 enable log level 3
+ * For FW module ID 5 enable log level 4
+ * For FW module ID 6 enable log level 5
+ * For FW module ID 7 enable log level 6
+ * For valid values of log levels check enum DBGLOG_LOG_LVL and
+ * for valid values of module ids check enum WLAN_MODULE_ID.
+ *
+ * Related: None
+ *
+ * Supported Feature: Debugging
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_FW_WOW_MODULE_LOG_LEVEL CFG_INI_STRING( \
+	"gFwDebugWowModuleLoglevel", \
+	0, \
+	FW_MODULE_LOG_LEVEL_STRING_LENGTH, \
+	"5,3,18,3,31,3,36,3", \
+	"Set modulized firmware wow debug log level")
 
 #ifdef FEATURE_WLAN_RA_FILTERING
 /* <ini>
@@ -730,33 +768,53 @@
 
 /*
  * <ini>
- * gOclCfg - Enable/Disable OCL mode
- * @Min: 0
- * @Max: 2
- * @Default: 2
+ * g_enable_ilp - Enable/Disable ILP HW Block
+ * @Default: 1
  *
- * This ini is used to set one chain listen (OCL) mode to static or dynamic
- * enable/disable during bootup. value 0 disables both static/dynamic OCL.
- * value 1 enables static OCL. Once its enabled it stays enabled. value 2
- * enables dynamic OCL. In dynamic OCL mode one chain listen will be
- * enabled/disabled by firmware during runtime based on RSSI.
+ * This ini is used to enable/disable the ILP HW block
  *
- * Related: None
+ * Related: none
  *
- * Supported Feature: OCL
+ * Supported Feature: STA/SAP
  *
  * Usage: Internal
  *
- * </ini>
+ * <ini>
  */
 
-#define CFG_SET_OCL_CFG CFG_INI_UINT( \
-		"gOclCfg", \
+#define CFG_SET_ENABLE_ILP CFG_INI_BOOL( \
+		"g_enable_ilp", \
+		1, \
+		"ILP configuration")
+
+/*
+ *
+ * <ini>
+ * sap_sho_config - Bitmap to Enable/Disable SAP HW offload
+ * @Min: 0
+ * @Max: 3
+ * @Default: 0
+ *
+ * This INI is used to configure sap hw offload.
+ *
+ * bit-0: enable/disable SHO
+ * bit-1: enable for Sta connected state as well.
+ * bit-2 to bit-31: Reserved
+ *
+ * Related: None
+ *
+ * Supported Feature: SAP
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_SAP_SHO_CONFIG CFG_INI_UINT(\
+		"sap_sho_config", \
 		0, \
-		2, \
-		2, \
+		3, \
+		1, \
 		CFG_VALUE_OR_DEFAULT, \
-		"OCL configuration")
+		"enable SHO config")
 
 #define CFG_FWOL_GENERIC_ALL \
 	CFG_FWOL_DHCP \
@@ -785,6 +843,8 @@
 	CFG(CFG_TX_SCH_DELAY) \
 	CFG(CFG_ENABLE_SECONDARY_RATE) \
 	CFG(CFG_SET_SAP_XLNA_BYPASS) \
-	CFG(CFG_SET_OCL_CFG)
+	CFG(CFG_SET_ENABLE_ILP) \
+	CFG(CFG_ENABLE_FW_WOW_MODULE_LOG_LEVEL) \
+	CFG(CFG_SAP_SHO_CONFIG)
 
 #endif

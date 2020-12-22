@@ -36,7 +36,7 @@
  *
  * Supported Feature: ACS
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
@@ -58,7 +58,7 @@
  *
  * Supported Feature: ACS
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * bits 0-3:   rssi weight
  * bits 4-7:   bss count weight
@@ -92,7 +92,7 @@
  *
  * Supported Feature: ACS
  *
- * Usage: External/Internal
+ * Usage: External
  *
  * </ini>
  */
@@ -145,7 +145,7 @@
  *
  * Supported Feature: ACS
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
@@ -176,7 +176,7 @@
 		"normalize_acs_weight", \
 		0, \
 		ACS_WEIGHT_MAX_STR_LEN, \
-		"5940-7105=0, 5965=100, 6045=100, 6125=100, 6205=100, 6285=100, 6365=100, 6605=100, 6685=100, 6765=100, 6845=100", \
+		"5945-7125=0, 5975=100, 6055=100, 6135=100, 6215=100, 6295=100, 6375=100, 6615=100, 6695=100, 6775=100, 6855=100", \
 		"Used to specify the channel weights")
 
 /*

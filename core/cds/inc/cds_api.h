@@ -354,7 +354,21 @@ QDF_STATUS cds_close(struct wlan_objmgr_psoc *psoc);
  */
 QDF_STATUS cds_dp_close(struct wlan_objmgr_psoc *psoc);
 
-void *cds_get_context(QDF_MODULE_ID module_id);
+/**
+ * cds_get_context() - get context data area
+ * @module_id: ID of the module who's context data is being retrieved.
+ *
+ * Each module in the system has a context/data area that is allocated
+ * and managed by CDS.  This API allows any user to get a pointer to its
+ * allocated context data area from the CDS global context.
+ *
+ * Return: pointer to the context data area of the module ID
+ *	   specified, or NULL if the context data is not allocated for
+ *	   the module ID specified.
+ */
+#define cds_get_context(module_id) \
+	__cds_get_context(module_id, __func__)
+void *__cds_get_context(QDF_MODULE_ID module_id, const char *func);
 
 void *cds_get_global_context(void);
 
@@ -526,21 +540,12 @@ bool cds_is_group_addr(uint8_t *mac_addr)
 }
 
 /**
- * cds_get_arp_stats_gw_ip() - get arp stats track IP
- * @context: osif dev
- *
- * Return: ARP stats IP to track.
- */
-uint32_t cds_get_arp_stats_gw_ip(void *context);
-/**
  * cds_get_connectivity_stats_pkt_bitmap() - get pkt-type bitmap
  * @context: osif dev context
  *
  * Return: pkt bitmap to track
  */
 uint32_t cds_get_connectivity_stats_pkt_bitmap(void *context);
-void cds_incr_arp_stats_tx_tgt_delivered(void);
-void cds_incr_arp_stats_tx_tgt_acked(void);
 
 #ifdef FEATURE_ALIGN_STATS_FROM_DP
 /**

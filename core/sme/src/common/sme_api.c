@@ -45,6 +45,7 @@
 #include "cds_regdomain.h"
 #include "sme_power_save_api.h"
 #include "wma.h"
+#include "wma_twt.h"
 #include "sch_api.h"
 #include "sme_nan_datapath.h"
 #include "csr_api.h"
@@ -62,11 +63,16 @@
 #include <wlan_coex_ucfg_api.h>
 #include "wlan_crypto_global_api.h"
 #include "wlan_mlme_ucfg_api.h"
+#include "wlan_psoc_mlme_api.h"
+#include "mac_init_api.h"
+#include "wlan_cm_roam_api.h"
+#include "wlan_cm_tgt_if_tx_api.h"
+#include "wlan_cm_api.h"
 
 static QDF_STATUS init_sme_cmd_list(struct mac_context *mac);
 
 static void sme_disconnect_connected_sessions(struct mac_context *mac,
-					      enum eSirMacReasonCodes reason);
+					      enum wlan_reason_code reason);
 
 static QDF_STATUS sme_handle_generic_change_country_code(struct mac_context *mac,
 						  void *msg_buf);
@@ -99,17 +105,34 @@ QDF_STATUS sme_release_global_lock(struct sme_context *sme)
 	return qdf_mutex_release(&sme->sme_global_lock);
 }
 
+QDF_STATUS cm_roam_acquire_lock(void)
+{
+	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_SME);
+
+	if (!mac)
+		return QDF_STATUS_E_FAILURE;
+
+	return sme_acquire_global_lock(&mac->sme);
+}
+
+QDF_STATUS cm_roam_release_lock(void)
+{
+	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_SME);
+
+	if (!mac)
+		return QDF_STATUS_E_FAILURE;
+
+	return sme_release_global_lock(&mac->sme);
+}
+
 struct mac_context *sme_get_mac_context(void)
 {
 	struct mac_context *mac_ctx;
 	mac_handle_t mac_handle;
 
 	mac_handle = cds_get_context(QDF_MODULE_ID_SME);
-	if (!mac_handle) {
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_FATAL,
-		FL("invalid mac_handle"));
+	if (!mac_handle)
 		return NULL;
-	}
 
 	mac_ctx = MAC_CONTEXT(mac_handle);
 
@@ -134,6 +157,7 @@ static QDF_STATUS sme_process_set_hw_mode_resp(struct mac_context *mac, uint8_t 
 	enum policy_mgr_conn_update_reason reason;
 	struct csr_roam_session *session;
 	uint32_t session_id;
+	uint32_t request_id;
 
 	param = (struct sir_set_hw_mode_resp *)msg;
 	if (!param) {
@@ -163,6 +187,7 @@ static QDF_STATUS sme_process_set_hw_mode_resp(struct mac_context *mac, uint8_t 
 	callback = command->u.set_hw_mode_cmd.set_hw_mode_cb;
 	reason = command->u.set_hw_mode_cmd.reason;
 	session_id = command->u.set_hw_mode_cmd.session_id;
+	request_id = command->u.set_hw_mode_cmd.request_id;
 
 	sme_debug("reason: %d session: %d",
 		command->u.set_hw_mode_cmd.reason,
@@ -217,18 +242,30 @@ static QDF_STATUS sme_process_set_hw_mode_resp(struct mac_context *mac, uint8_t 
 		csr_saved_scan_cmd_free_fields(mac, session);
 	}
 	if (reason == POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH_STA) {
-		sme_info("Continue channel switch for STA on vdev %d",
-			 session_id);
+		sme_debug("Continue channel switch for STA on vdev %d",
+			  session_id);
 		csr_sta_continue_csa(mac, session_id);
 	}
 
 	if (reason == POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH_SAP) {
-		sme_info("Continue channel switch for SAP on vdev %d",
-			 session_id);
+		sme_debug("Continue channel switch for SAP on vdev %d",
+			  session_id);
 		csr_csa_restart(mac, session_id);
 	}
 	if (reason == POLICY_MGR_UPDATE_REASON_LFR2_ROAM)
 		csr_continue_lfr2_connect(mac, session_id);
+
+	if (reason == POLICY_MGR_UPDATE_REASON_STA_CONNECT) {
+		QDF_STATUS status = QDF_STATUS_E_FAILURE;
+
+		sme_debug("Continue connect on vdev %d", session_id);
+		if (param->status == SET_HW_MODE_STATUS_OK ||
+		    param->status == SET_HW_MODE_STATUS_ALREADY)
+			status = QDF_STATUS_SUCCESS;
+
+		wlan_cm_hw_mode_change_resp(mac->pdev, session_id, request_id,
+					    status);
+	}
 
 end:
 	found = csr_nonscan_active_ll_remove_entry(mac, entry,
@@ -499,12 +536,11 @@ QDF_STATUS sme_ser_handle_active_cmd(struct wlan_serialization_command *cmd)
 	}
 
 	mac_handle = cds_get_context(QDF_MODULE_ID_SME);
-	if (mac_handle) {
+	if (mac_handle)
 		mac_ctx = MAC_CONTEXT(mac_handle);
-	} else {
-		sme_err("No mac_handle found");
+	else
 		return QDF_STATUS_E_FAILURE;
-	}
+
 	sme_cmd = cmd->umac_cmd;
 	if (!sme_cmd) {
 		sme_err("No SME command found");
@@ -562,12 +598,11 @@ QDF_STATUS sme_ser_cmd_callback(struct wlan_serialization_command *cmd,
 	tSmeCmd *sme_cmd;
 
 	mac_handle = cds_get_context(QDF_MODULE_ID_SME);
-	if (mac_handle) {
+	if (mac_handle)
 		mac_ctx = MAC_CONTEXT(mac_handle);
-	} else {
-		sme_err("mac_handle is null");
+	else
 		return QDF_STATUS_E_FAILURE;
-	}
+
 	/*
 	 * Do not acquire lock here as sme global lock is already acquired in
 	 * caller or MC thread context
@@ -1116,17 +1151,19 @@ QDF_STATUS sme_hdd_ready_ind(mac_handle_t mac_handle)
 QDF_STATUS
 sme_register_bcn_report_pe_cb(mac_handle_t mac_handle, beacon_report_cb cb)
 {
-	struct scheduler_msg msg = {0};
 	QDF_STATUS status;
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
 
-	msg.type = WNI_SME_REGISTER_BCN_REPORT_SEND_CB;
-	msg.callback = cb;
+	if (!mac) {
+		sme_err("Invalid mac context");
+		return QDF_STATUS_E_INVAL;
+	}
 
-	status = scheduler_post_message(QDF_MODULE_ID_SME,
-					QDF_MODULE_ID_PE,
-					QDF_MODULE_ID_PE, &msg);
-	if (QDF_IS_STATUS_ERROR(status))
-		sme_err("Failed to post message to LIM");
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		mac_register_bcn_report_send_cb(mac, cb);
+		sme_release_global_lock(&mac->sme);
+	}
 
 	return status;
 }
@@ -1164,7 +1201,7 @@ QDF_STATUS sme_get_valid_channels(uint32_t *ch_freq_list, uint32_t *list_len)
 #ifdef WLAN_CONV_SPECTRAL_ENABLE
 static QDF_STATUS sme_register_spectral_cb(struct mac_context *mac_ctx)
 {
-	struct spectral_legacy_cbacks spectral_cb;
+	struct spectral_legacy_cbacks spectral_cb = {0};
 	QDF_STATUS status;
 
 	spectral_cb.vdev_get_chan_freq = sme_get_oper_chan_freq;
@@ -1205,7 +1242,6 @@ QDF_STATUS sme_start(mac_handle_t mac_handle)
 		sme_cbacks.sme_get_nss_for_vdev = sme_get_vdev_type_nss;
 		sme_cbacks.sme_nss_update_request = sme_nss_update_request;
 		sme_cbacks.sme_pdev_set_hw_mode = sme_pdev_set_hw_mode;
-		sme_cbacks.sme_pdev_set_pcl = sme_pdev_set_pcl;
 		sme_cbacks.sme_soc_set_dual_mac_config =
 			sme_soc_set_dual_mac_config;
 		sme_cbacks.sme_change_mcc_beacon_interval =
@@ -1213,6 +1249,8 @@ QDF_STATUS sme_start(mac_handle_t mac_handle)
 		sme_cbacks.sme_get_ap_channel_from_scan =
 			sme_get_ap_channel_from_scan;
 		sme_cbacks.sme_scan_result_purge = sme_scan_result_purge;
+		sme_cbacks.sme_rso_start_cb = sme_start_roaming;
+		sme_cbacks.sme_rso_stop_cb = sme_stop_roaming;
 		status = policy_mgr_register_sme_cb(mac->psoc, &sme_cbacks);
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			sme_err("Failed to register sme cb with Policy Manager: %d",
@@ -1400,6 +1438,7 @@ static QDF_STATUS sme_extended_change_channel_ind(struct mac_context *mac_ctx,
 	roam_info = qdf_mem_malloc(sizeof(*roam_info));
 	if (!roam_info)
 		return QDF_STATUS_E_NOMEM;
+
 	session_id = ext_chan_ind->session_id;
 	roam_info->target_chan_freq = ext_chan_ind->new_chan_freq;
 	roam_status = eCSR_ROAM_EXT_CHG_CHNL_IND;
@@ -1755,6 +1794,7 @@ QDF_STATUS sme_set_ese_roam_scan_channel_list(mac_handle_t mac_handle,
 	uint8_t newChannelList[CFG_VALID_CHANNEL_LIST_LEN * 5] = { 0 };
 	uint8_t i = 0, j = 0;
 	enum band_info band = -1;
+	uint32_t band_bitmap;
 
 	if (sessionId >= WLAN_MAX_VDEVS) {
 		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
@@ -1777,7 +1817,8 @@ QDF_STATUS sme_set_ese_roam_scan_channel_list(mac_handle_t mac_handle,
 				curchnl_list_info->freq_list[i]);
 		}
 	}
-        ucfg_reg_get_band(mac->pdev, &band);
+	ucfg_reg_get_band(mac->pdev, &band_bitmap);
+	band = wlan_reg_band_bitmap_to_band_info(band_bitmap);
 	status = csr_create_roam_scan_channel_list(mac, sessionId,
 				chan_freq_list, numChannels,
 				band);
@@ -2013,6 +2054,121 @@ static QDF_STATUS sme_process_antenna_mode_resp(struct mac_context *mac,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_SUPPORT_TWT
+/**
+ * sme_process_twt_add_dialog_event() - Process twt add dialog event
+ * response from firmware
+ * @mac: Global MAC pointer
+ * @add_dialog_event: pointer to event buf containing twt response parameters
+ *
+ * Return: None
+ */
+static void
+sme_process_twt_add_dialog_event(struct mac_context *mac,
+				 struct twt_add_dialog_complete_event *add_dialog_event)
+{
+	twt_add_dialog_cb callback;
+	void *context;
+
+	callback = mac->sme.twt_add_dialog_cb;
+	context = mac->sme.twt_add_dialog_context;
+	mac->sme.twt_add_dialog_cb = NULL;
+	if (callback)
+		callback(context, add_dialog_event);
+}
+
+/**
+ * sme_process_twt_del_dialog_event() - Process twt del dialog event
+ * response from firmware
+ * @mac: Global MAC pointer
+ * @param: pointer to wmi_twt_del_dialog_complete_event_param buffer
+ *
+ * Return: None
+ */
+static void
+sme_process_twt_del_dialog_event(struct mac_context *mac,
+				 struct wmi_twt_del_dialog_complete_event_param *param)
+{
+	twt_del_dialog_cb callback;
+	void *context;
+
+	callback = mac->sme.twt_del_dialog_cb;
+	context = mac->sme.twt_del_dialog_context;
+	mac->sme.twt_del_dialog_cb = NULL;
+	if (callback)
+		callback(context, param);
+}
+
+/**
+ * sme_process_twt_pause_dialog_event() - Process twt pause dialog event
+ * response from firmware
+ * @mac: Global MAC pointer
+ * @param: pointer to wmi_twt_pause_dialog_complete_event_param buffer
+ *
+ * Return: None
+ */
+static void
+sme_process_twt_pause_dialog_event(struct mac_context *mac,
+				   struct wmi_twt_pause_dialog_complete_event_param *param)
+{
+	twt_pause_dialog_cb callback;
+	void *context;
+
+	callback = mac->sme.twt_pause_dialog_cb;
+	context = mac->sme.twt_pause_dialog_context;
+	mac->sme.twt_pause_dialog_cb = NULL;
+	if (callback)
+		callback(context, param);
+}
+
+/**
+ * sme_process_twt_resume_dialog_event() - Process twt resume dialog event
+ * response from firmware
+ * @mac: Global MAC pointer
+ * @param: pointer to wmi_twt_resume_dialog_complete_event_param buffer
+ *
+ * Return: None
+ */
+static void
+sme_process_twt_resume_dialog_event(struct mac_context *mac,
+				    struct wmi_twt_resume_dialog_complete_event_param *param)
+{
+	twt_resume_dialog_cb callback;
+	void *context;
+
+	callback = mac->sme.twt_resume_dialog_cb;
+	context = mac->sme.twt_resume_dialog_context;
+	mac->sme.twt_resume_dialog_cb = NULL;
+	if (callback)
+		callback(context, param);
+}
+#else
+
+static void
+sme_process_twt_add_dialog_event(struct mac_context *mac,
+				 struct twt_add_dialog_complete_event *add_dialog_event)
+{
+}
+
+static void
+sme_process_twt_del_dialog_event(struct mac_context *mac,
+				 struct wmi_twt_del_dialog_complete_event_param *param)
+{
+}
+
+static void
+sme_process_twt_pause_dialog_event(struct mac_context *mac,
+				   struct wmi_twt_pause_dialog_complete_event_param *param)
+{
+}
+
+static void
+sme_process_twt_resume_dialog_event(struct mac_context *mac,
+				    struct wmi_twt_resume_dialog_complete_event_param *param)
+{
+}
+#endif
+
 QDF_STATUS sme_process_msg(struct mac_context *mac, struct scheduler_msg *pMsg)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
@@ -2143,12 +2299,6 @@ QDF_STATUS sme_process_msg(struct mac_context *mac, struct scheduler_msg *pMsg)
 		break;
 	case eWNI_SME_STATS_EXT_EVENT:
 		status = sme_stats_ext_event(mac, pMsg->bodyptr);
-		qdf_mem_free(pMsg->bodyptr);
-		break;
-	case eWNI_SME_GET_PEER_INFO_EXT_IND:
-		if (mac->sme.pget_peer_info_ext_ind_cb)
-			mac->sme.pget_peer_info_ext_ind_cb(pMsg->bodyptr,
-				mac->sme.pget_peer_info_ext_cb_context);
 		qdf_mem_free(pMsg->bodyptr);
 		break;
 	case eWNI_SME_FW_STATUS_IND:
@@ -2321,6 +2471,22 @@ QDF_STATUS sme_process_msg(struct mac_context *mac, struct scheduler_msg *pMsg)
 		break;
 	case eWNI_SME_MONITOR_MODE_VDEV_UP:
 		status = sme_process_monitor_mode_vdev_up_evt(pMsg->bodyval);
+		break;
+	case eWNI_SME_TWT_ADD_DIALOG_EVENT:
+		sme_process_twt_add_dialog_event(mac, pMsg->bodyptr);
+		qdf_mem_free(pMsg->bodyptr);
+		break;
+	case eWNI_SME_TWT_DEL_DIALOG_EVENT:
+		sme_process_twt_del_dialog_event(mac, pMsg->bodyptr);
+		qdf_mem_free(pMsg->bodyptr);
+		break;
+	case eWNI_SME_TWT_PAUSE_DIALOG_EVENT:
+		sme_process_twt_pause_dialog_event(mac, pMsg->bodyptr);
+		qdf_mem_free(pMsg->bodyptr);
+		break;
+	case eWNI_SME_TWT_RESUME_DIALOG_EVENT:
+		sme_process_twt_resume_dialog_event(mac, pMsg->bodyptr);
+		qdf_mem_free(pMsg->bodyptr);
 		break;
 	default:
 
@@ -2542,7 +2708,7 @@ QDF_STATUS sme_scan_get_result(mac_handle_t mac_handle, uint8_t vdev_id,
 			 0));
 	status = sme_acquire_global_lock(&mac->sme);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
-		status = csr_scan_get_result(mac, filter, phResult);
+		status = csr_scan_get_result(mac, filter, phResult, false);
 		sme_release_global_lock(&mac->sme);
 	}
 
@@ -2567,33 +2733,21 @@ QDF_STATUS sme_scan_get_result_for_bssid(mac_handle_t mac_handle,
 
 QDF_STATUS sme_get_ap_channel_from_scan(void *profile,
 					tScanResultHandle *scan_cache,
-					uint32_t *ap_ch_freq)
+					uint32_t *ap_ch_freq,
+					uint8_t vdev_id)
 {
 	QDF_STATUS status;
 
 	status = sme_get_ap_channel_from_scan_cache((struct csr_roam_profile *)
 						  profile,
 						  scan_cache,
-						  ap_ch_freq);
+						  ap_ch_freq, vdev_id);
 	return status;
 }
 
-/**
- * sme_get_ap_channel_from_scan_cache() - a wrapper function to get AP's
- *                                        channel id from CSR by filtering the
- *                                        result which matches our roam profile.
- * @profile: SAP adapter
- * @ap_ch_freq: pointer to channel freq of SAP. Fill the value after finding the
- *              best ap from scan cache.
- *
- * This function is written to get AP's channel id from CSR by filtering
- * the result which matches our roam profile. This is a synchronous call.
- *
- * Return: QDF_STATUS.
- */
 QDF_STATUS sme_get_ap_channel_from_scan_cache(
 	struct csr_roam_profile *profile, tScanResultHandle *scan_cache,
-	uint32_t *ap_ch_freq)
+	uint32_t *ap_ch_freq, uint8_t vdev_id)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct mac_context *mac_ctx = sme_get_mac_context();
@@ -2612,15 +2766,12 @@ QDF_STATUS sme_get_ap_channel_from_scan_cache(
 
 	qdf_mem_zero(&first_ap_profile, sizeof(struct bss_description));
 	if (!profile) {
-		/* No encryption */
-		scan_filter->num_of_enc_type = 1;
-		scan_filter->enc_type[0] = WLAN_ENCRYPT_TYPE_NONE;
+		csr_set_open_mode_in_scan_filter(scan_filter);
 	} else {
 		/* Here is the profile we need to connect to */
-		status = csr_roam_get_scan_filter_from_profile(mac_ctx,
-							       profile,
+		status = csr_roam_get_scan_filter_from_profile(mac_ctx, profile,
 							       scan_filter,
-							       false);
+							       false, vdev_id);
 	}
 
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -2632,7 +2783,7 @@ QDF_STATUS sme_get_ap_channel_from_scan_cache(
 	status = sme_acquire_global_lock(&mac_ctx->sme);
 	if (QDF_STATUS_SUCCESS == status) {
 		status = csr_scan_get_result(mac_ctx, scan_filter,
-					  &filtered_scan_result);
+					  &filtered_scan_result, false);
 		if (QDF_STATUS_SUCCESS == status) {
 			csr_get_bssdescr_from_scan_handle(filtered_scan_result,
 					&first_ap_profile);
@@ -2863,7 +3014,7 @@ QDF_STATUS sme_roam_reassoc(mac_handle_t mac_handle, uint8_t sessionId,
 
 QDF_STATUS sme_roam_disconnect(mac_handle_t mac_handle, uint8_t session_id,
 			       eCsrRoamDisconnectReason reason,
-			       tSirMacReasonCodes mac_reason)
+			       enum wlan_reason_code mac_reason)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
@@ -3149,26 +3300,6 @@ QDF_STATUS sme_roam_get_wpa_rsn_req_ie(mac_handle_t mac_handle,
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 		if (CSR_IS_SESSION_VALID(mac, session_id))
 			status = csr_roam_get_wpa_rsn_req_ie(mac, session_id,
-							     len, buf);
-		else
-			status = QDF_STATUS_E_INVAL;
-		sme_release_global_lock(&mac->sme);
-	}
-
-	return status;
-}
-
-QDF_STATUS sme_roam_get_wpa_rsn_rsp_ie(mac_handle_t mac_handle,
-				       uint8_t session_id,
-				       uint32_t *len, uint8_t *buf)
-{
-	QDF_STATUS status;
-	struct mac_context *mac = MAC_CONTEXT(mac_handle);
-
-	status = sme_acquire_global_lock(&mac->sme);
-	if (QDF_IS_STATUS_SUCCESS(status)) {
-		if (CSR_IS_SESSION_VALID(mac, session_id))
-			status = csr_roam_get_wpa_rsn_rsp_ie(mac, session_id,
 							     len, buf);
 		else
 			status = QDF_STATUS_E_INVAL;
@@ -3663,10 +3794,8 @@ QDF_STATUS sme_oem_req_cmd(mac_handle_t mac_handle,
 
 	SME_ENTER();
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma_handle) {
-		sme_err("wma_handle is NULL");
+	if (!wma_handle)
 		return QDF_STATUS_E_FAILURE;
-	}
 
 	oem_data_req = qdf_mem_malloc(sizeof(*oem_data_req));
 	if (!oem_data_req)
@@ -3713,10 +3842,8 @@ QDF_STATUS sme_oem_data_cmd(mac_handle_t mac_handle,
 
 	SME_ENTER();
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma_handle) {
-		sme_err("wma_handle is NULL");
+	if (!wma_handle)
 		return QDF_STATUS_E_FAILURE;
-	}
 
 	status = sme_acquire_global_lock(&mac->sme);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
@@ -4361,7 +4488,8 @@ struct wlan_objmgr_vdev
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 	struct wlan_objmgr_vdev *vdev;
 
-	sme_debug("addr:%pM opmode:%d", vdev_params->macaddr,
+	sme_debug("addr:"QDF_MAC_ADDR_FMT" opmode:%d",
+		  QDF_MAC_ADDR_REF(vdev_params->macaddr),
 		  vdev_params->opmode);
 
 	vdev = wlan_objmgr_vdev_obj_create(mac_ctx->pdev, vdev_params);
@@ -5015,8 +5143,8 @@ uint32_t sme_get_beaconing_concurrent_operation_channel(mac_handle_t mac_handle,
 
 		chan_freq = csr_get_beaconing_concurrent_channel(mac,
 							       vdev_id_to_skip);
-		sme_info("Other Concurrent Chan_freq: %d skipped vdev_id %d",
-			 chan_freq, vdev_id_to_skip);
+		sme_debug("Other Concurrent Chan_freq: %d skipped vdev_id %d",
+			  chan_freq, vdev_id_to_skip);
 		sme_release_global_lock(&mac->sme);
 	}
 
@@ -5209,45 +5337,6 @@ sme_handle_generic_change_country_code(struct mac_context *mac_ctx,
 				       void *msg_buf)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	v_REGDOMAIN_t reg_domain_id = 0;
-	bool user_ctry_priority =
-		mac_ctx->mlme_cfg->sap_cfg.country_code_priority;
-	tAniGenericChangeCountryCodeReq *msg = msg_buf;
-
-	if (SOURCE_11D != mac_ctx->reg_hint_src) {
-		if (SOURCE_DRIVER != mac_ctx->reg_hint_src) {
-			if (user_ctry_priority)
-				mac_ctx->mlme_cfg->gen.enabled_11d = false;
-			else {
-				if (mac_ctx->mlme_cfg->gen.enabled_11d &&
-				    mac_ctx->scan.countryCode11d[0] != 0) {
-
-					sme_debug("restore 11d");
-
-					status =
-					csr_get_regulatory_domain_for_country(
-						mac_ctx,
-						mac_ctx->scan.countryCode11d,
-						&reg_domain_id,
-						SOURCE_11D);
-					return QDF_STATUS_E_FAILURE;
-				}
-			}
-		}
-	} else {
-		/* if kernel gets invalid country code; it
-		 *  resets the country code to world
-		 */
-		if (('0' != msg->countryCode[0]) ||
-		    ('0' != msg->countryCode[1]))
-			qdf_mem_copy(mac_ctx->scan.countryCode11d,
-				     msg->countryCode,
-				     REG_ALPHA2_LEN + 1);
-	}
-
-	qdf_mem_copy(mac_ctx->scan.countryCodeCurrent,
-		     msg->countryCode,
-		     REG_ALPHA2_LEN + 1);
 
 	/* get the channels based on new cc */
 	status = csr_get_channel_and_power_list(mac_ctx);
@@ -5259,15 +5348,9 @@ sme_handle_generic_change_country_code(struct mac_context *mac_ctx,
 
 	/* reset info based on new cc, and we are done */
 	csr_apply_channel_power_info_wrapper(mac_ctx);
+	csr_update_beacon(mac_ctx);
 
 	csr_scan_filter_results(mac_ctx);
-
-	/* scans after the country is set by User hints or
-	 * Country IE
-	 */
-	mac_ctx->scan.curScanType = eSIR_ACTIVE_SCAN;
-
-	mac_ctx->reg_hint_src = SOURCE_UNKNOWN;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -5290,7 +5373,7 @@ QDF_STATUS sme_update_channel_list(mac_handle_t mac_handle)
 		csr_apply_channel_power_info_wrapper(mac_ctx);
 		csr_scan_filter_results(mac_ctx);
 		sme_disconnect_connected_sessions(mac_ctx,
-					eSIR_MAC_OPER_CHANNEL_USER_DISABLED);
+					REASON_OPER_CHANNEL_USER_DISABLED);
 		sme_release_global_lock(&mac_ctx->sme);
 	}
 
@@ -5323,7 +5406,7 @@ static bool sme_search_in_base_ch_freq_lst(
  * sme_disconnect_connected_sessions() - Disconnect STA and P2P client session
  * if channel is not supported
  * @mac_ctx: mac global context
- * @reason: Mac Disconnect reason code as per @enum eSirMacReasonCodes
+ * @reason: Mac Disconnect reason code as per @enum wlan_reason_code
  *
  * If new country code does not support the channel on which STA/P2P client
  * is connetced, it sends the disconnect to the AP/P2P GO
@@ -5331,7 +5414,7 @@ static bool sme_search_in_base_ch_freq_lst(
  * Return: void
  */
 static void sme_disconnect_connected_sessions(struct mac_context *mac_ctx,
-					      enum eSirMacReasonCodes reason)
+					      enum wlan_reason_code reason)
 {
 	uint8_t session_id, found = false;
 	uint32_t chan_freq;
@@ -5610,6 +5693,23 @@ QDF_STATUS sme_set_tx_power(mac_handle_t mac_handle, uint8_t sessionId,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS sme_set_check_assoc_disallowed(mac_handle_t mac_handle,
+					  bool check_assoc_disallowed)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	QDF_STATUS status;
+
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		sme_err("Failed to acquire sme lock; status: %d", status);
+		return status;
+	}
+	wlan_cm_set_check_assoc_disallowed(mac->psoc, check_assoc_disallowed);
+	sme_release_global_lock(&mac->sme);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS sme_update_session_param(mac_handle_t mac_handle, uint8_t session_id,
 				    uint32_t param_type, uint32_t param_val)
 {
@@ -5628,9 +5728,6 @@ QDF_STATUS sme_update_session_param(mac_handle_t mac_handle, uint8_t session_id,
 			sme_release_global_lock(&mac_ctx->sme);
 			return status;
 		}
-
-		if (param_type == SIR_PARAM_IGNORE_ASSOC_DISALLOWED)
-			mac_ctx->ignore_assoc_disallowed = param_val;
 
 		if (!session->sessionActive)
 			QDF_ASSERT(0);
@@ -5918,8 +6015,8 @@ QDF_STATUS sme_send_rso_connect_params(mac_handle_t mac_handle,
 	if (!mac->mlme_cfg->lfr.lfr_enabled ||
 	    (neighbor_roam_info->neighborRoamState !=
 	     eCSR_NEIGHBOR_ROAM_STATE_CONNECTED)) {
-		sme_info("Fast roam is disabled or not connected(%d)",
-			 neighbor_roam_info->neighborRoamState);
+		sme_debug("Fast roam is disabled or not connected(%d)",
+			  neighbor_roam_info->neighborRoamState);
 		return QDF_STATUS_E_PERM;
 	}
 
@@ -5934,7 +6031,7 @@ QDF_STATUS sme_send_rso_connect_params(mac_handle_t mac_handle,
 			sme_err("Failed to acquire SME lock");
 		}
 	} else {
-		sme_info("LFR3 not enabled");
+		sme_debug("LFR3 not enabled");
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -6193,56 +6290,6 @@ QDF_STATUS sme_update_is_fast_roam_ini_feature_enabled(mac_handle_t mac_handle,
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * sme_config_fast_roaming() - enable/disable LFR support at runtime
- * @mac_handle - The handle returned by macOpen.
- * @session_id - Session Identifier
- * @is_fast_roam_enabled - flag to enable/disable roaming
- *
- * When Supplicant issues enabled/disable fast roaming on the basis
- * of the Bssid modification in network block (e.g. AutoJoin mode N/W block)
- *
- * Return: QDF_STATUS
- */
-
-QDF_STATUS sme_config_fast_roaming(mac_handle_t mac_handle, uint8_t session_id,
-				   const bool is_fast_roam_enabled)
-{
-	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
-	enum roam_offload_state state;
-	QDF_STATUS status;
-
-	/*
-	 * supplicant_disabled_roaming flag is altered when supplicant sends
-	 * vendor command to enable/disable roaming after association.
-	 *
-	 * This request from wpa_supplicant will be skipped in this function
-	 * if roaming is disabled using driver command or INI and
-	 * supplicant_disabled_roaming flag remains set. So make sure to set
-	 * supplicant_disabled_roaming flag as per wpa_supplicant even if roam
-	 * request from wpa_supplicant ignored.
-	 */
-	if (!mac_ctx->mlme_cfg->lfr.lfr_enabled) {
-		sme_debug("ROAM: Fast roam is disabled through ini");
-		if (!is_fast_roam_enabled)
-			return QDF_STATUS_SUCCESS;
-		return  QDF_STATUS_E_FAILURE;
-	}
-
-	mlme_set_supplicant_disabled_roaming(mac_ctx->psoc, session_id,
-					     !is_fast_roam_enabled);
-
-	state = (is_fast_roam_enabled) ? ROAM_RSO_STARTED : ROAM_RSO_STOPPED;
-	status = csr_post_roam_state_change(mac_ctx, session_id, state,
-					    REASON_SUPPLICANT_DISABLED_ROAMING);
-	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		sme_err("ROAM: update fast roaming failed. status: %d", status);
-		return  QDF_STATUS_E_FAILURE;
-	}
-
-	return QDF_STATUS_SUCCESS;
-}
-
 #ifdef FEATURE_WLAN_ESE
 int sme_add_key_krk(mac_handle_t mac_handle, uint8_t session_id,
 		    const uint8_t *key, const int key_len)
@@ -6300,72 +6347,57 @@ int sme_add_key_btk(mac_handle_t mac_handle, uint8_t session_id,
 }
 #endif
 
-/**
- * sme_stop_roaming() - Stop roaming for a given sessionId
- *  This is a synchronous call
- *
- * @mac_handle      - The handle returned by mac_open
- * @sessionId - Session Identifier
- *
- * Return QDF_STATUS_SUCCESS on success
- *	   Other status on failure
- */
-QDF_STATUS sme_stop_roaming(mac_handle_t mac_handle, uint8_t session_id,
-			    uint8_t reason, uint32_t requestor)
-{
-	QDF_STATUS status;
-	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
-	struct csr_roam_session *session;
-
-	session = CSR_GET_SESSION(mac_ctx, session_id);
-
-	if (!session) {
-		sme_err("ROAM: incorrect vdev ID %d", session_id);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	if (reason == REASON_DRIVER_DISABLED && requestor)
-		mlme_set_operations_bitmap(mac_ctx->psoc, session_id,
-					   requestor, false);
-
-	status = csr_post_roam_state_change(mac_ctx, session_id,
-					    ROAM_RSO_STOPPED,
-					    REASON_DRIVER_DISABLED);
-
-	return status;
-}
-
-/*
- * sme_start_roaming() - Start roaming for a given sessionId
- *  This is a synchronous call
- *
- * mac_handle      - The handle returned by mac_open
- * sessionId - Session Identifier
- * Return QDF_STATUS_SUCCESS on success
- *	Other status on failure
- */
-QDF_STATUS sme_start_roaming(mac_handle_t mac_handle, uint8_t sessionId,
-			     uint8_t reason, uint32_t requestor)
+QDF_STATUS sme_stop_roaming(mac_handle_t mac_handle, uint8_t vdev_id,
+			    uint8_t reason,
+			    enum wlan_cm_rso_control_requestor requestor)
 {
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct csr_roam_session *session;
 
-	if (reason == REASON_DRIVER_ENABLED && requestor) {
-		mlme_set_operations_bitmap(mac->psoc, sessionId, requestor,
-					   true);
+	session = CSR_GET_SESSION(mac, vdev_id);
+	if (!session) {
+		sme_err("ROAM: incorrect vdev ID %d", vdev_id);
+		return QDF_STATUS_E_FAILURE;
 	}
 
-	status = sme_acquire_global_lock(&mac->sme);
+	return wlan_cm_disable_rso(mac->pdev, vdev_id, requestor, reason);
+}
 
-	if (QDF_IS_STATUS_ERROR(status))
+QDF_STATUS sme_start_roaming(mac_handle_t mac_handle, uint8_t vdev_id,
+			     uint8_t reason,
+			     enum wlan_cm_rso_control_requestor requestor)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+
+	return wlan_cm_enable_rso(mac->pdev, vdev_id, requestor, reason);
+}
+
+QDF_STATUS sme_abort_roaming(mac_handle_t mac_handle, uint8_t vdev_id)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct csr_roam_session *session;
+
+	session = CSR_GET_SESSION(mac, vdev_id);
+	if (!session) {
+		sme_err("ROAM: incorrect vdev ID %d", vdev_id);
 		return QDF_STATUS_E_FAILURE;
+	}
 
-	status = csr_post_roam_state_change(mac, sessionId, ROAM_RSO_STARTED,
-					    REASON_DRIVER_ENABLED);
+	return wlan_cm_abort_rso(mac->pdev, vdev_id);
+}
 
-	sme_release_global_lock(&mac->sme);
+bool sme_roaming_in_progress(mac_handle_t mac_handle, uint8_t vdev_id)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct csr_roam_session *session;
 
-	return status;
+	session = CSR_GET_SESSION(mac, vdev_id);
+	if (!session) {
+		sme_err("ROAM: incorrect vdev ID %d", vdev_id);
+		return false;
+	}
+
+	return wlan_cm_roaming_in_progress(mac->pdev, vdev_id);
 }
 
 /*
@@ -6804,7 +6836,7 @@ sme_restore_default_roaming_params(struct mac_context *mac,
 				   tCsrNeighborRoamControlInfo *roam_info)
 {
 	roam_info->cfgParams.enable_scoring_for_roam =
-			mac->mlme_cfg->scoring.enable_scoring_for_roam;
+			mac->mlme_cfg->roam_scoring.enable_scoring_for_roam;
 	roam_info->cfgParams.emptyScanRefreshPeriod =
 			mac->mlme_cfg->lfr.empty_scan_refresh_period;
 	roam_info->cfgParams.full_roam_scan_period =
@@ -6817,6 +6849,9 @@ sme_restore_default_roaming_params(struct mac_context *mac,
 			mac->mlme_cfg->lfr.neighbor_lookup_rssi_threshold;
 	roam_info->cfgParams.roam_rssi_diff =
 			mac->mlme_cfg->lfr.roam_rssi_diff;
+	roam_info->cfgParams.bg_rssi_threshold =
+			mac->mlme_cfg->lfr.bg_rssi_threshold;
+
 	roam_info->cfgParams.maxChannelScanTime =
 			mac->mlme_cfg->lfr.neighbor_scan_max_chan_time;
 	roam_info->cfgParams.roam_scan_home_away_time =
@@ -7487,23 +7522,23 @@ sme_update_roam_scan_freq_list(mac_handle_t mac_handle, uint8_t vdev_id,
 	}
 
 	neighbor_roam_info = &mac->roam.neighborRoamInfo[vdev_id];
-	if (neighbor_roam_info->cfgParams.specific_chan_info.numOfChannels) {
+	if (neighbor_roam_info->cfgParams.specific_chan_info.numOfChannels &&
+	    freq_list_type == QCA_PREFERRED_SCAN_FREQ_LIST) {
 		sme_err("Specific channel list is already configured");
 		sme_release_global_lock(&mac->sme);
 		return QDF_STATUS_E_INVAL;
 	}
 
+	sme_debug("frequency list type %d", freq_list_type);
 	if (freq_list_type == QCA_PREFERRED_SCAN_FREQ_LIST) {
-		sme_debug("Preferred frequency list: ");
 		channel_info = &neighbor_roam_info->cfgParams.pref_chan_info;
+		status = sme_update_roam_scan_channel_list(
+					mac_handle, vdev_id, channel_info,
+					freq_list, num_chan);
 	} else {
-		goto out;
+		status = sme_change_roam_scan_channel_list(mac_handle, vdev_id,
+							   freq_list, num_chan);
 	}
-
-	status = sme_update_roam_scan_channel_list(mac_handle, vdev_id,
-						   channel_info, freq_list,
-						   num_chan);
-out:
 	sme_release_global_lock(&mac->sme);
 
 	return status;
@@ -7685,11 +7720,8 @@ QDF_STATUS sme_get_link_speed(mac_handle_t mac_handle,
 	}
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma_handle) {
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
-				"wma handle is NULL");
+	if (!wma_handle)
 		return QDF_STATUS_E_FAILURE;
-	}
 
 	mac = MAC_CONTEXT(mac_handle);
 	status = sme_acquire_global_lock(&mac->sme);
@@ -7702,56 +7734,6 @@ QDF_STATUS sme_get_link_speed(mac_handle_t mac_handle,
 	mac->sme.link_speed_cb = cb;
 	status = wma_get_link_speed(wma_handle, req);
 	sme_release_global_lock(&mac->sme);
-	return status;
-}
-
-QDF_STATUS sme_get_peer_info_ext(mac_handle_t mac_handle,
-		struct sir_peer_info_ext_req *req,
-		void *context,
-		void (*callbackfn)(struct sir_peer_info_ext_resp *param,
-			void *pcontext))
-{
-	QDF_STATUS status;
-	QDF_STATUS qdf_status;
-	struct mac_context *mac = MAC_CONTEXT(mac_handle);
-	struct scheduler_msg message = {0};
-
-	status = sme_acquire_global_lock(&mac->sme);
-	if (QDF_STATUS_SUCCESS == status) {
-		if (!callbackfn) {
-			QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
-				"%s: Indication Call back is NULL",
-				__func__);
-			sme_release_global_lock(&mac->sme);
-			return QDF_STATUS_E_FAILURE;
-		}
-
-		mac->sme.pget_peer_info_ext_ind_cb = callbackfn;
-		mac->sme.pget_peer_info_ext_cb_context = context;
-
-		/* serialize the req through MC thread */
-		message.bodyptr =
-			qdf_mem_malloc(sizeof(struct sir_peer_info_ext_req));
-		if (!message.bodyptr) {
-			sme_release_global_lock(&mac->sme);
-			return QDF_STATUS_E_NOMEM;
-		}
-		qdf_mem_copy(message.bodyptr,
-				req,
-				sizeof(struct sir_peer_info_ext_req));
-		message.type = WMA_GET_PEER_INFO_EXT;
-		qdf_status = scheduler_post_message(QDF_MODULE_ID_SME,
-						    QDF_MODULE_ID_WMA,
-						    QDF_MODULE_ID_WMA,
-						    &message);
-		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
-			QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
-				"%s: Post get rssi msg fail", __func__);
-			qdf_mem_free(message.bodyptr);
-			status = QDF_STATUS_E_FAILURE;
-		}
-		sme_release_global_lock(&mac->sme);
-	}
 	return status;
 }
 
@@ -7971,13 +7953,13 @@ void sme_get_command_q_status(mac_handle_t mac_handle)
 
 	mac = MAC_CONTEXT(mac_handle);
 
-	sme_info("smeCmdPendingList has %d commands",
-		 wlan_serialization_get_pending_list_count(mac->psoc, false));
+	sme_debug("smeCmdPendingList has %d commands",
+		  wlan_serialization_get_pending_list_count(mac->psoc, false));
 	cmd = wlan_serialization_peek_head_active_cmd_using_psoc(mac->psoc,
 								 false);
 	if (cmd)
-		sme_info("Active commaned is %d cmd id %d source %d",
-			 cmd->cmd_type, cmd->cmd_id, cmd->source);
+		sme_debug("Active commaned is %d cmd id %d source %d",
+			  cmd->cmd_type, cmd->cmd_id, cmd->source);
 	if (!cmd || cmd->source != WLAN_UMAC_COMP_MLME)
 		return;
 
@@ -8173,11 +8155,9 @@ QDF_STATUS sme_set_idle_powersave_config(bool value)
 {
 	void *wmaContext = cds_get_context(QDF_MODULE_ID_WMA);
 
-	if (!wmaContext) {
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
-			  "%s: wmaContext is NULL", __func__);
+	if (!wmaContext)
 		return QDF_STATUS_E_FAILURE;
-	}
+
 	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
 		  " Idle Ps Set Value %d", value);
 
@@ -8190,28 +8170,43 @@ QDF_STATUS sme_set_idle_powersave_config(bool value)
 	return QDF_STATUS_SUCCESS;
 }
 
-int16_t sme_get_ht_config(mac_handle_t mac_handle, uint8_t session_id,
+int16_t sme_get_ht_config(mac_handle_t mac_handle, uint8_t vdev_id,
 			  uint16_t ht_capab)
 {
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
-	struct csr_roam_session *pSession = CSR_GET_SESSION(mac, session_id);
+	struct csr_roam_session *pSession = CSR_GET_SESSION(mac, vdev_id);
+	struct wlan_objmgr_vdev *vdev;
+	struct vdev_mlme_obj *vdev_mlme;
+	struct wlan_ht_config ht_cap_info;
 
 	if (!pSession) {
 		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
 			  "%s: pSession is NULL", __func__);
 		return -EIO;
 	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac->psoc, vdev_id,
+						    WLAN_LEGACY_SME_ID);
+	if (!vdev)
+		return -EIO;
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+		return -EIO;
+	}
+	ht_cap_info.caps = vdev_mlme->proto.ht_info.ht_caps;
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 	switch (ht_capab) {
 	case WNI_CFG_HT_CAP_INFO_ADVANCE_CODING:
-		return pSession->ht_config.ht_rx_ldpc;
+		return ht_cap_info.ht_caps.adv_coding_cap;
 	case WNI_CFG_HT_CAP_INFO_TX_STBC:
-		return pSession->ht_config.ht_tx_stbc;
+		return ht_cap_info.ht_caps.tx_stbc;
 	case WNI_CFG_HT_CAP_INFO_RX_STBC:
-		return pSession->ht_config.ht_rx_stbc;
+		return ht_cap_info.ht_caps.rx_stbc;
 	case WNI_CFG_HT_CAP_INFO_SHORT_GI_20MHZ:
-		return pSession->ht_config.ht_sgi20;
+		return ht_cap_info.ht_caps.short_gi_20_mhz;
 	case WNI_CFG_HT_CAP_INFO_SHORT_GI_40MHZ:
-		return pSession->ht_config.ht_sgi40;
+		return ht_cap_info.ht_caps.short_gi_40_mhz;
 	default:
 		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
 			  "invalid ht capability");
@@ -8219,11 +8214,14 @@ int16_t sme_get_ht_config(mac_handle_t mac_handle, uint8_t session_id,
 	}
 }
 
-int sme_update_ht_config(mac_handle_t mac_handle, uint8_t sessionId,
+int sme_update_ht_config(mac_handle_t mac_handle, uint8_t vdev_id,
 			 uint16_t htCapab, int value)
 {
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
-	struct csr_roam_session *pSession = CSR_GET_SESSION(mac, sessionId);
+	struct csr_roam_session *pSession = CSR_GET_SESSION(mac, vdev_id);
+	struct wlan_ht_config ht_cap_info;
+	struct wlan_objmgr_vdev *vdev;
+	struct vdev_mlme_obj *vdev_mlme;
 
 	if (!pSession) {
 		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
@@ -8231,33 +8229,45 @@ int sme_update_ht_config(mac_handle_t mac_handle, uint8_t sessionId,
 		return -EIO;
 	}
 
-	if (QDF_STATUS_SUCCESS != wma_set_htconfig(sessionId, htCapab, value)) {
+	if (QDF_STATUS_SUCCESS != wma_set_htconfig(vdev_id, htCapab, value)) {
 		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
 			  "Failed to set ht capability in target");
 		return -EIO;
 	}
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac->psoc, vdev_id,
+						    WLAN_LEGACY_SME_ID);
+	if (!vdev)
+		return -EIO;
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+		return -EIO;
+	}
+	ht_cap_info.caps = vdev_mlme->proto.ht_info.ht_caps;
 
 	switch (htCapab) {
 	case WNI_CFG_HT_CAP_INFO_ADVANCE_CODING:
-		pSession->ht_config.ht_rx_ldpc = value;
+		ht_cap_info.ht_caps.adv_coding_cap = value;
 		break;
 	case WNI_CFG_HT_CAP_INFO_TX_STBC:
-		pSession->ht_config.ht_tx_stbc = value;
+		ht_cap_info.ht_caps.tx_stbc = value;
 		break;
 	case WNI_CFG_HT_CAP_INFO_RX_STBC:
-		pSession->ht_config.ht_rx_stbc = value;
+		ht_cap_info.ht_caps.rx_stbc = value;
 		break;
 	case WNI_CFG_HT_CAP_INFO_SHORT_GI_20MHZ:
 		value = value ? 1 : 0; /* HT SGI can be only 1 or 0 */
-		pSession->ht_config.ht_sgi20 = value;
+		ht_cap_info.ht_caps.short_gi_20_mhz = value;
 		break;
 	case WNI_CFG_HT_CAP_INFO_SHORT_GI_40MHZ:
 		value = value ? 1 : 0; /* HT SGI can be only 1 or 0 */
-		pSession->ht_config.ht_sgi40 = value;
+		ht_cap_info.ht_caps.short_gi_40_mhz = value;
 		break;
 	}
+	vdev_mlme->proto.ht_info.ht_caps = ht_cap_info.caps;
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 
-	csr_roam_update_config(mac, sessionId, htCapab, value);
+	csr_roam_update_config(mac, vdev_id, htCapab, value);
 	return 0;
 }
 
@@ -9045,7 +9055,7 @@ QDF_STATUS sme_init_thermal_info(mac_handle_t mac_handle)
 				thermal_temp.thermal_temp_min_level[3];
 	pWmaParam->thermalLevels[3].maxTempThreshold =
 				thermal_temp.thermal_temp_max_level[3];
-
+	pWmaParam->thermal_action = thermal_temp.thermal_action;
 	if (QDF_STATUS_SUCCESS == sme_acquire_global_lock(&mac->sme)) {
 		msg.type = WMA_INIT_THERMAL_INFO_CMD;
 		msg.bodyptr = pWmaParam;
@@ -9195,10 +9205,8 @@ QDF_STATUS sme_ap_disable_intra_bss_fwd(mac_handle_t mac_handle,
 
 	/* Prepare the request to send to SME. */
 	pSapDisableIntraFwd = qdf_mem_malloc(sizeof(tDisableIntraBssFwd));
-	if (!pSapDisableIntraFwd) {
-		sme_err("Memory Allocation Failure!!!");
+	if (!pSapDisableIntraFwd)
 		return QDF_STATUS_E_NOMEM;
-	}
 
 	pSapDisableIntraFwd->sessionId = sessionId;
 	pSapDisableIntraFwd->disableintrabssfwd = disablefwd;
@@ -9561,35 +9569,6 @@ QDF_STATUS sme_update_dsc_pto_up_mapping(mac_handle_t mac_handle,
 	return status;
 }
 
-/*
- * sme_abort_roam_scan() -
- * API to abort current roam scan cycle by roam scan offload module.
- *
- * mac_handle - The handle returned by mac_open.
- * sessionId - Session Identifier
- * Return QDF_STATUS
- */
-
-QDF_STATUS sme_abort_roam_scan(mac_handle_t mac_handle, uint8_t sessionId)
-{
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	struct mac_context *mac = MAC_CONTEXT(mac_handle);
-
-	if (mac->mlme_cfg->lfr.roam_scan_offload_enabled) {
-		/* acquire the lock for the sme object */
-		status = sme_acquire_global_lock(&mac->sme);
-		if (QDF_IS_STATUS_SUCCESS(status)) {
-			csr_roam_offload_scan(mac, sessionId,
-					      ROAM_SCAN_OFFLOAD_ABORT_SCAN,
-					      REASON_ROAM_ABORT_ROAM_SCAN);
-			/* release the lock for the sme object */
-			sme_release_global_lock(&mac->sme);
-		}
-	}
-
-	return status;
-}
-
 QDF_STATUS sme_get_valid_channels_by_band(mac_handle_t mac_handle,
 					  uint8_t wifi_band,
 					  uint32_t *valid_chan_list,
@@ -9714,6 +9693,7 @@ sme_ext_scan_get_capabilities(mac_handle_t mac_handle,
 	bodyptr = qdf_mem_malloc(sizeof(*bodyptr));
 	if (!bodyptr)
 		return QDF_STATUS_E_NOMEM;
+
 	*bodyptr = *params;
 
 	status = sme_acquire_global_lock(&mac->sme);
@@ -9750,6 +9730,7 @@ sme_ext_scan_start(mac_handle_t mac_handle,
 	bodyptr = qdf_mem_malloc(sizeof(*bodyptr));
 	if (!bodyptr)
 		return QDF_STATUS_E_NOMEM;
+
 	*bodyptr = *params;
 
 	status = sme_acquire_global_lock(&mac->sme);
@@ -9785,6 +9766,7 @@ QDF_STATUS sme_ext_scan_stop(mac_handle_t mac_handle,
 	bodyptr = qdf_mem_malloc(sizeof(*bodyptr));
 	if (!bodyptr)
 		return QDF_STATUS_E_NOMEM;
+
 	*bodyptr = *params;
 
 	status = sme_acquire_global_lock(&mac->sme);
@@ -9964,6 +9946,7 @@ sme_get_cached_results(mac_handle_t mac_handle,
 	bodyptr = qdf_mem_malloc(sizeof(*bodyptr));
 	if (!bodyptr)
 		return QDF_STATUS_E_NOMEM;
+
 	*bodyptr = *params;
 
 	status = sme_acquire_global_lock(&mac->sme);
@@ -10005,6 +9988,7 @@ QDF_STATUS sme_set_epno_list(mac_handle_t mac_handle,
 	req_msg = qdf_mem_malloc(len);
 	if (!req_msg)
 		return QDF_STATUS_E_NOMEM;
+
 	qdf_mem_copy(req_msg, params, len);
 
 	status = sme_acquire_global_lock(&mac->sme);
@@ -10046,6 +10030,7 @@ QDF_STATUS sme_set_passpoint_list(mac_handle_t mac_handle,
 	req_msg = qdf_mem_malloc(len);
 	if (!req_msg)
 		return QDF_STATUS_E_NOMEM;
+
 	qdf_mem_copy(req_msg, params, len);
 
 	status = sme_acquire_global_lock(&mac->sme);
@@ -10084,6 +10069,7 @@ QDF_STATUS sme_reset_passpoint_list(mac_handle_t mac_handle,
 	req_msg = qdf_mem_malloc(sizeof(*req_msg));
 	if (!req_msg)
 		return QDF_STATUS_E_NOMEM;
+
 	*req_msg = *params;
 
 	status = sme_acquire_global_lock(&mac->sme);
@@ -10562,7 +10548,6 @@ QDF_STATUS sme_beacon_debug_stats_req(
  * This is a synchronous call
  * @mac_handle: The handle returned by mac_open.
  * @session_id: Session Identifier
- * @key_mgmt_offload_enabled: key mgmt enable/disable flag
  * @pmkid_modes: PMKID modes of PMKSA caching and OKC
  * Return: QDF_STATUS_SUCCESS - SME updated config successfully.
  * Other status means SME is failed to update.
@@ -10570,7 +10555,6 @@ QDF_STATUS sme_beacon_debug_stats_req(
 
 QDF_STATUS sme_update_roam_key_mgmt_offload_enabled(mac_handle_t mac_handle,
 					uint8_t session_id,
-					bool key_mgmt_offload_enabled,
 					struct pmkid_mode_bits *pmkid_modes)
 {
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
@@ -10579,12 +10563,8 @@ QDF_STATUS sme_update_roam_key_mgmt_offload_enabled(mac_handle_t mac_handle,
 	status = sme_acquire_global_lock(&mac_ctx->sme);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 		if (CSR_IS_SESSION_VALID(mac_ctx, session_id)) {
-			QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
-				"%s: LFR3: key_mgmt_offload_enabled changed to %d",
-				  __func__, key_mgmt_offload_enabled);
 			status = csr_roam_set_key_mgmt_offload(mac_ctx,
 						session_id,
-						key_mgmt_offload_enabled,
 						pmkid_modes);
 		} else
 			status = QDF_STATUS_E_INVAL;
@@ -11074,11 +11054,8 @@ QDF_STATUS sme_enable_uapsd_for_ac(sme_ac_enum_type ac, uint8_t tid,
 	}
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma_handle) {
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
-					"wma_handle is NULL");
+	if (!wma_handle)
 		return QDF_STATUS_E_FAILURE;
-	}
 
 	switch (ac) {
 	case SME_AC_BK:
@@ -11136,11 +11113,9 @@ QDF_STATUS sme_disable_uapsd_for_ac(sme_ac_enum_type ac, uint32_t sessionId)
 	}
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma_handle) {
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
-				"wma handle is NULL");
+	if (!wma_handle)
 		return QDF_STATUS_E_FAILURE;
-	}
+
 	if (QDF_STATUS_SUCCESS !=
 	    wma_disable_uapsd_per_ac(wma_handle, sessionId, access_category)) {
 		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
@@ -11149,6 +11124,29 @@ QDF_STATUS sme_disable_uapsd_for_ac(sme_ac_enum_type ac, uint32_t sessionId)
 		return QDF_STATUS_E_FAILURE;
 	}
 	return QDF_STATUS_SUCCESS;
+}
+
+static void sme_vdev_ht_tx_stbc(struct mac_context *mac_ctx,
+				bool ht_tx_stbc, uint8_t vdev_id)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct vdev_mlme_obj *vdev_mlme;
+	struct wlan_ht_config ht_cap_info;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc, vdev_id,
+						    WLAN_LEGACY_SME_ID);
+	if (!vdev)
+		return;
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+		return;
+	}
+	ht_cap_info.caps = vdev_mlme->proto.ht_info.ht_caps;
+
+	ht_cap_info.ht_caps.tx_stbc = ht_tx_stbc;
+	vdev_mlme->proto.ht_info.ht_caps = ht_cap_info.caps;
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 }
 
 /**
@@ -11168,7 +11166,6 @@ QDF_STATUS sme_update_nss(mac_handle_t mac_handle, uint8_t nss)
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 	uint32_t i;
 	struct mlme_ht_capabilities_info *ht_cap_info;
-	struct csr_roam_session *csr_session;
 	struct mlme_vht_capabilities_info *vht_cap_info;
 
 	vht_cap_info = &mac_ctx->mlme_cfg->vht_caps.vht_cap_info;
@@ -11183,9 +11180,8 @@ QDF_STATUS sme_update_nss(mac_handle_t mac_handle, uint8_t nss)
 
 		for (i = 0; i < WLAN_MAX_VDEVS; i++) {
 			if (CSR_IS_SESSION_VALID(mac_ctx, i)) {
-				csr_session = &mac_ctx->roam.roamSession[i];
-				csr_session->ht_config.ht_tx_stbc =
-					ht_cap_info->tx_stbc;
+				sme_vdev_ht_tx_stbc(mac_ctx,
+						    ht_cap_info->tx_stbc, i);
 			}
 		}
 
@@ -11274,7 +11270,8 @@ void sme_update_he_cap_nss(mac_handle_t mac_handle, uint8_t session_id,
 	uint32_t mcs_map = 0;
 
 	if (!nss || (nss > 2)) {
-		sme_err("invalid Nss value %d", nss);
+		sme_err("invalid Nss value nss %d", nss);
+		return;
 	}
 	csr_session = CSR_GET_SESSION(mac_ctx, session_id);
 	if (!csr_session) {
@@ -11294,8 +11291,8 @@ void sme_update_he_cap_nss(mac_handle_t mac_handle, uint8_t session_id,
 		tx_mcs_map = HE_SET_MCS_4_NSS(tx_mcs_map, mcs_map, 2);
 		rx_mcs_map = HE_SET_MCS_4_NSS(rx_mcs_map, mcs_map, 2);
 	}
-	sme_info("new HE Nss MCS MAP: Rx 0x%0X, Tx: 0x%0X",
-			rx_mcs_map, tx_mcs_map);
+	sme_debug("new HE Nss MCS MAP: Rx 0x%0X, Tx: 0x%0X",
+		  rx_mcs_map, tx_mcs_map);
 	if (cfg_in_range(CFG_HE_RX_MCS_MAP_LT_80, rx_mcs_map))
 		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.rx_he_mcs_map_lt_80 =
 		rx_mcs_map;
@@ -11321,7 +11318,7 @@ int sme_update_he_mcs(mac_handle_t mac_handle, uint8_t session_id,
 	}
 	if ((he_mcs & 0x3) == HE_MCS_DISABLE) {
 		sme_err("Invalid HE MCS 0x%0x, can't disable 0-7 for 1ss",
-				he_mcs);
+			he_mcs);
 		return -EINVAL;
 	}
 	mcs_val = he_mcs & 0x3;
@@ -11375,7 +11372,7 @@ int sme_update_he_mcs(mac_handle_t mac_handle, uint8_t session_id,
 		sme_err("Invalid HE MCS 0x%0x", he_mcs);
 		return -EINVAL;
 	}
-	sme_info("new HE MCS 0x%0x", mcs_map);
+	sme_debug("new HE MCS 0x%0x", mcs_map);
 	csr_update_session_he_cap(mac_ctx, csr_session);
 
 	return 0;
@@ -11518,7 +11515,7 @@ sme_validate_session_for_cap_update(struct mac_context *mac_ctx,
 		return QDF_STATUS_E_INVAL;
 	}
 	if (!csr_is_conn_state_connected_infra(mac_ctx, session_id)) {
-		sme_info("STA is not connected, Session_id: %d", session_id);
+		sme_debug("STA is not connected, Session_id: %d", session_id);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -11535,10 +11532,8 @@ int sme_send_he_om_ctrl_update(mac_handle_t mac_handle, uint8_t session_id)
 	uint32_t param_val = 0;
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma_handle) {
-		sme_err("wma handle is NULL");
+	if (!wma_handle)
 		return -EIO;
-	}
 
 	status = sme_validate_session_for_cap_update(mac_ctx, session_id,
 						     session);
@@ -11567,12 +11562,12 @@ int sme_send_he_om_ctrl_update(mac_handle_t mac_handle, uint8_t session_id)
 	omi_data.omi_in_vht = 0x1;
 	omi_data.omi_in_he = 0x1;
 
-	sme_info("OMI: BW %d TxNSTS %d RxNSS %d ULMU %d, OMI_VHT %d, OMI_HE %d",
-		 omi_data.ch_bw, omi_data.tx_nsts, omi_data.rx_nss,
-		 omi_data.ul_mu_dis, omi_data.omi_in_vht, omi_data.omi_in_he);
+	sme_debug("OMI: BW %d TxNSTS %d RxNSS %d ULMU %d, OMI_VHT %d, OMI_HE %d",
+		  omi_data.ch_bw, omi_data.tx_nsts, omi_data.rx_nss,
+		  omi_data.ul_mu_dis, omi_data.omi_in_vht, omi_data.omi_in_he);
 	qdf_mem_copy(&param_val, &omi_data, sizeof(omi_data));
-	sme_debug("param val %08X, bssid:"QDF_MAC_ADDR_STR, param_val,
-		  QDF_MAC_ADDR_ARRAY(session->connectedProfile.bssid.bytes));
+	sme_debug("param val %08X, bssid:"QDF_MAC_ADDR_FMT, param_val,
+		  QDF_MAC_ADDR_REF(session->connectedProfile.bssid.bytes));
 	status = wma_set_peer_param(wma_handle,
 				    session->connectedProfile.bssid.bytes,
 				    WMI_PEER_PARAM_XMIT_OMI,
@@ -11617,10 +11612,10 @@ int sme_set_he_om_ctrl_param(mac_handle_t mac_handle, uint8_t session_id,
 		case QCA_WLAN_VENDOR_ATTR_HE_OMI_CH_BW:
 			if (cfg_val >
 			    session->connectedProfile.vht_channel_width) {
-				sme_info("OMI BW %d is > connected BW %d",
-					 cfg_val,
-					 session->connectedProfile.
-					 vht_channel_width);
+				sme_debug
+				  ("OMI BW %d is > connected BW %d",
+				   cfg_val,
+				   session->connectedProfile.vht_channel_width);
 				mac_ctx->he_om_ctrl_cfg_bw_set = false;
 				return 0;
 			}
@@ -11674,13 +11669,12 @@ int sme_config_action_tx_in_tb_ppdu(mac_handle_t mac_handle, uint8_t session_id,
 	struct sir_cfg_action_frm_tb_ppdu *cfg_msg;
 
 	if (!csr_is_conn_state_connected_infra(mac_ctx, session_id)) {
-		sme_info("STA not in connected state Session_id: %d",
-			 session_id);
+		sme_debug("STA not in connected state Session_id: %d",
+			  session_id);
 		return -EINVAL;
 	}
 
 	cfg_msg = qdf_mem_malloc(sizeof(*cfg_msg));
-
 	if (!cfg_msg)
 		return -EIO;
 
@@ -11882,6 +11876,25 @@ int sme_update_he_twt_req_support(mac_handle_t mac_handle, uint8_t session_id,
 
 	return 0;
 }
+
+int sme_update_he_full_ul_mumimo(mac_handle_t mac_handle, uint8_t session_id,
+				 uint8_t cfg_val)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	struct csr_roam_session *session;
+
+	session = CSR_GET_SESSION(mac_ctx, session_id);
+
+	if (!session) {
+		sme_err("No session for id %d", session_id);
+		return -EINVAL;
+	}
+	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.ul_mu = cfg_val;
+
+	csr_update_session_he_cap(mac_ctx, session);
+
+	return 0;
+}
 #endif
 
 QDF_STATUS
@@ -12074,102 +12087,6 @@ QDF_STATUS sme_reset_rssi_threshold_breached_cb(mac_handle_t mac_handle)
 	return sme_set_rssi_threshold_breached_cb(mac_handle, NULL);
 }
 
-/**
- * sme_get_connected_roaming_vdev_band_mask() - get connected vdev band mask
- *
- * Return: reg wifi band mask
- */
-static uint32_t sme_get_connected_roaming_vdev_band_mask(void)
-{
-	uint32_t band_mask = REG_BAND_MASK_ALL;
-	struct mac_context *mac = sme_get_mac_context();
-	struct csr_roam_session *session;
-	uint8_t session_id;
-
-	if (!mac) {
-		sme_debug("MAC Context is NULL");
-		return band_mask;
-	}
-	session_id = csr_get_roam_enabled_sta_sessionid(mac);
-	if (session_id != WLAN_UMAC_VDEV_ID_MAX) {
-		session = CSR_GET_SESSION(mac, session_id);
-		if (!session) {
-			sme_err("Session not found for session_id:%d", session_id);
-			return band_mask;
-		}
-		band_mask = BIT(wlan_reg_freq_to_band(
-					session->connectedProfile.op_freq));
-		return band_mask;
-	}
-
-	return band_mask;
-}
-
-/*
- * sme_pdev_set_pcl() - Send WMI_PDEV_SET_PCL_CMDID to the WMA
- * @mac_handle: Handle returned by macOpen
- * @msg: PCL channel list and length structure
- *
- * Sends the command to WMA to send WMI_PDEV_SET_PCL_CMDID to FW
- * Return: QDF_STATUS_SUCCESS on successful posting
- */
-QDF_STATUS sme_pdev_set_pcl(struct policy_mgr_pcl_list *msg)
-{
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	struct mac_context *mac   = sme_get_mac_context();
-	struct scheduler_msg message = {0};
-	struct set_pcl_req *req_msg;
-	uint32_t i;
-
-	if (!mac) {
-		sme_err("mac is NULL");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	if (!msg) {
-		sme_err("msg is NULL");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	req_msg = qdf_mem_malloc(sizeof(*req_msg));
-	if (!req_msg)
-		return QDF_STATUS_E_NOMEM;
-
-	req_msg->band_mask = REG_BAND_MASK_ALL;
-	if (CSR_IS_ROAM_INTRA_BAND_ENABLED(mac)) {
-		req_msg->band_mask = sme_get_connected_roaming_vdev_band_mask();
-		sme_debug("Connected STA band mask%d", req_msg->band_mask);
-	}
-	for (i = 0; i < msg->pcl_len; i++) {
-		req_msg->chan_weights.pcl_list[i] =  msg->pcl_list[i];
-		req_msg->chan_weights.weight_list[i] =  msg->weight_list[i];
-	}
-
-	req_msg->chan_weights.pcl_len = msg->pcl_len;
-
-	status = sme_acquire_global_lock(&mac->sme);
-	if (status != QDF_STATUS_SUCCESS) {
-		sme_err("sme_acquire_global_lock failed!(status=%d)", status);
-		qdf_mem_free(req_msg);
-		return status;
-	}
-
-	/* Serialize the req through MC thread */
-	message.bodyptr = req_msg;
-	message.type    = SIR_HAL_PDEV_SET_PCL_TO_FW;
-	status = scheduler_post_message(QDF_MODULE_ID_SME,
-					QDF_MODULE_ID_WMA,
-					QDF_MODULE_ID_WMA, &message);
-	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		sme_err("scheduler_post_msg failed!(err=%d)", status);
-		qdf_mem_free(req_msg);
-		status = QDF_STATUS_E_FAILURE;
-	}
-	sme_release_global_lock(&mac->sme);
-
-	return status;
-}
-
 /*
  * sme_pdev_set_hw_mode() - Send WMI_PDEV_SET_HW_MODE_CMDID to the WMA
  * @mac_handle: Handle returned by macOpen
@@ -12320,10 +12237,10 @@ QDF_STATUS sme_soc_set_dual_mac_config(struct policy_mgr_dual_mac_config msg)
 	sme_debug("set_dual_mac_config scan_config: %x fw_mode_config: %x",
 		cmd->u.set_dual_mac_cmd.scan_config,
 		cmd->u.set_dual_mac_cmd.fw_mode_config);
-	csr_queue_sme_command(mac, cmd, false);
+	status = csr_queue_sme_command(mac, cmd, false);
 
 	sme_release_global_lock(&mac->sme);
-	return QDF_STATUS_SUCCESS;
+	return status;
 }
 
 #ifdef FEATURE_LFR_SUBNET_DETECTION
@@ -12429,11 +12346,8 @@ QDF_STATUS sme_set_peer_authorized(uint8_t *peer_addr,
 	void *wma_handle;
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma_handle) {
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
-				"wma handle is NULL");
+	if (!wma_handle)
 		return QDF_STATUS_E_FAILURE;
-	}
 
 	wma_set_peer_authorized_cb(wma_handle, auth_cb);
 	return wma_set_peer_param(wma_handle, peer_addr, WMI_PEER_AUTHORIZE,
@@ -12568,11 +12482,8 @@ QDF_STATUS sme_set_fw_test(struct set_fwtest_params *fw_test)
 	void *wma_handle;
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma_handle) {
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
-				"wma handle is NULL");
+	if (!wma_handle)
 		return QDF_STATUS_E_FAILURE;
-	}
 
 	return wma_process_fw_test_cmd(wma_handle, fw_test);
 }
@@ -12589,11 +12500,9 @@ QDF_STATUS sme_ht40_stop_obss_scan(mac_handle_t mac_handle, uint32_t vdev_id)
 	void *wma_handle;
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma_handle) {
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
-				"wma handle is NULL");
+	if (!wma_handle)
 		return QDF_STATUS_E_FAILURE;
-	}
+
 	wma_ht40_stop_obss_scan(wma_handle, vdev_id);
 	return QDF_STATUS_SUCCESS;
 }
@@ -12915,11 +12824,8 @@ QDF_STATUS sme_set_apf_instructions(mac_handle_t mac_handle,
 	void *wma_handle;
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma_handle) {
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
-				"wma handle is NULL");
+	if (!wma_handle)
 		return QDF_STATUS_E_FAILURE;
-	}
 
 	return wma_set_apf_instructions(wma_handle, req);
 }
@@ -12930,11 +12836,8 @@ QDF_STATUS sme_set_apf_enable_disable(mac_handle_t mac_handle, uint8_t vdev_id,
 	void *wma_handle;
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma_handle) {
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
-				"wma handle is NULL");
+	if (!wma_handle)
 		return QDF_STATUS_E_FAILURE;
-	}
 
 	return wma_send_apf_enable_cmd(wma_handle, vdev_id, apf_enable);
 }
@@ -12946,11 +12849,8 @@ sme_apf_write_work_memory(mac_handle_t mac_handle,
 	void *wma_handle;
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma_handle) {
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
-				"wma handle is NULL");
+	if (!wma_handle)
 		return QDF_STATUS_E_FAILURE;
-	}
 
 	return wma_send_apf_write_work_memory_cmd(wma_handle, write_params);
 }
@@ -12974,11 +12874,8 @@ sme_apf_read_work_memory(mac_handle_t mac_handle,
 	}
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma_handle) {
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
-				"wma handle is NULL");
+	if (!wma_handle)
 		return QDF_STATUS_E_FAILURE;
-	}
 
 	return wma_send_apf_read_work_memory_cmd(wma_handle, read_params);
 }
@@ -13040,6 +12937,21 @@ QDF_STATUS sme_delete_mon_session(mac_handle_t mac_handle, uint8_t vdev_id)
 	return status;
 }
 
+void
+sme_set_del_peers_ind_callback(mac_handle_t mac_handle,
+			       void (*callback)(struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id))
+{
+	struct mac_context *mac;
+
+	if (!mac_handle) {
+		QDF_ASSERT(0);
+		return;
+	}
+	mac = MAC_CONTEXT(mac_handle);
+	mac->del_peers_ind_cb = callback;
+}
+
 void sme_set_chan_info_callback(mac_handle_t mac_handle,
 			void (*callback)(struct scan_chan_info *chan_info))
 {
@@ -13053,27 +12965,28 @@ void sme_set_chan_info_callback(mac_handle_t mac_handle,
 	mac->chan_info_cb = callback;
 }
 
-/**
- * sme_set_vdev_ies_per_band() - sends the per band IEs to vdev
- * @mac_handle: Opaque handle to the global MAC context
- * @vdev_id: vdev_id for which IE is targeted
- *
- * Return: None
- */
-void sme_set_vdev_ies_per_band(mac_handle_t mac_handle, uint8_t vdev_id)
+void sme_set_vdev_ies_per_band(mac_handle_t mac_handle, uint8_t vdev_id,
+			       enum QDF_OPMODE device_mode)
 {
 	struct sir_set_vdev_ies_per_band *p_msg;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	enum csr_cfgdot11mode curr_dot11_mode =
+				mac_ctx->roam.configParam.uCfgDot11Mode;
 
 	p_msg = qdf_mem_malloc(sizeof(*p_msg));
 	if (!p_msg)
 		return;
 
+
 	p_msg->vdev_id = vdev_id;
+	p_msg->device_mode = device_mode;
+	p_msg->dot11_mode = csr_get_vdev_dot11_mode(mac_ctx, device_mode,
+						    curr_dot11_mode);
 	p_msg->msg_type = eWNI_SME_SET_VDEV_IES_PER_BAND;
 	p_msg->len = sizeof(*p_msg);
-	sme_debug("sending eWNI_SME_SET_VDEV_IES_PER_BAND: vdev_id: %d",
-		vdev_id);
+	sme_debug("SET_VDEV_IES_PER_BAND: vdev_id %d dot11mode %d dev_mode %d",
+		  vdev_id, p_msg->dot11_mode, device_mode);
 	status = umac_send_mb_message_to_mac(p_msg);
 	if (QDF_STATUS_SUCCESS != status)
 		sme_err("Send eWNI_SME_SET_VDEV_IES_PER_BAND fail");
@@ -13464,11 +13377,8 @@ QDF_STATUS sme_get_sar_power_limits(mac_handle_t mac_handle,
 	void *wma_handle;
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma_handle) {
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
-				"wma handle is NULL");
+	if (!wma_handle)
 		return QDF_STATUS_E_FAILURE;
-	}
 
 	return wma_get_sar_limit(wma_handle, callback, context);
 }
@@ -13479,11 +13389,8 @@ QDF_STATUS sme_set_sar_power_limits(mac_handle_t mac_handle,
 	void *wma_handle;
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma_handle) {
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
-				"wma handle is NULL");
+	if (!wma_handle)
 		return QDF_STATUS_E_FAILURE;
-	}
 
 	return wma_set_sar_limit(wma_handle, sar_limit_cmd);
 }
@@ -13493,23 +13400,10 @@ QDF_STATUS sme_send_coex_config_cmd(struct coex_config_params *coex_cfg_params)
 	void *wma_handle;
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma_handle) {
-		sme_err("wma handle is NULL");
+	if (!wma_handle)
 		return QDF_STATUS_E_FAILURE;
-	}
+
 	return wma_send_coex_config_cmd(wma_handle, coex_cfg_params);
-}
-
-QDF_STATUS sme_send_ocl_cmd(struct ocl_cmd_params *ocl_params)
-{
-	void *wma_handle;
-
-	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma_handle) {
-		sme_err("wma handle is NULL");
-		return QDF_STATUS_E_FAILURE;
-	}
-	return wma_send_ocl_cmd(wma_handle, ocl_params);
 }
 
 #ifdef WLAN_FEATURE_FIPS
@@ -13519,10 +13413,8 @@ QDF_STATUS sme_fips_request(mac_handle_t mac_handle, struct fips_params *param,
 	void *wma_handle;
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma_handle) {
-		sme_err("wma handle is NULL");
+	if (!wma_handle)
 		return QDF_STATUS_E_FAILURE;
-	}
 
 	return wma_fips_request(wma_handle, param, callback, context);
 }
@@ -13533,11 +13425,9 @@ QDF_STATUS sme_set_cts2self_for_p2p_go(mac_handle_t mac_handle)
 	void *wma_handle;
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma_handle) {
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
-				"wma_handle is NULL");
+	if (!wma_handle)
 		return QDF_STATUS_E_FAILURE;
-	}
+
 	if (QDF_STATUS_SUCCESS !=
 		wma_set_cts2self_for_p2p_go(wma_handle, true)) {
 		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
@@ -13715,7 +13605,8 @@ static void sme_prepare_beacon_from_bss_descp(uint8_t *frame_buf,
 QDF_STATUS sme_get_rssi_snr_by_bssid(mac_handle_t mac_handle,
 				     struct csr_roam_profile *profile,
 				     const uint8_t *bssid,
-				     int8_t *rssi, int8_t *snr)
+				     int8_t *rssi, int8_t *snr,
+				     uint8_t vdev_id)
 {
 	struct bss_description *bss_descp;
 	struct scan_filter *scan_filter;
@@ -13732,7 +13623,7 @@ QDF_STATUS sme_get_rssi_snr_by_bssid(mac_handle_t mac_handle,
 
 	status = csr_roam_get_scan_filter_from_profile(mac_ctx,
 						       profile, scan_filter,
-						       false);
+						       false, vdev_id);
 	if (QDF_STATUS_SUCCESS != status) {
 		sme_err("prepare_filter failed");
 		qdf_mem_free(scan_filter);
@@ -13744,7 +13635,8 @@ QDF_STATUS sme_get_rssi_snr_by_bssid(mac_handle_t mac_handle,
 	qdf_mem_copy(scan_filter->bssid_list[0].bytes,
 		     bssid, sizeof(struct qdf_mac_addr));
 
-	status = csr_scan_get_result(mac_ctx, scan_filter, &result_handle);
+	status = csr_scan_get_result(mac_ctx, scan_filter, &result_handle,
+				     false);
 	qdf_mem_free(scan_filter);
 	if (QDF_STATUS_SUCCESS != status) {
 		sme_debug("parse_scan_result failed");
@@ -13778,7 +13670,7 @@ QDF_STATUS sme_get_beacon_frm(mac_handle_t mac_handle,
 			      struct csr_roam_profile *profile,
 			      const tSirMacAddr bssid,
 			      uint8_t **frame_buf, uint32_t *frame_len,
-			      uint32_t *ch_freq)
+			      uint32_t *ch_freq, uint8_t vdev_id)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	tScanResultHandle result_handle = NULL;
@@ -13795,7 +13687,7 @@ QDF_STATUS sme_get_beacon_frm(mac_handle_t mac_handle,
 	}
 	status = csr_roam_get_scan_filter_from_profile(mac_ctx,
 						       profile, scan_filter,
-						       false);
+						       false, vdev_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		sme_err("prepare_filter failed");
 		status = QDF_STATUS_E_FAULT;
@@ -13808,7 +13700,8 @@ QDF_STATUS sme_get_beacon_frm(mac_handle_t mac_handle,
 	qdf_mem_copy(scan_filter->bssid_list[0].bytes,
 		     bssid, sizeof(struct qdf_mac_addr));
 
-	status = csr_scan_get_result(mac_ctx, scan_filter, &result_handle);
+	status = csr_scan_get_result(mac_ctx, scan_filter, &result_handle,
+				     false);
 	qdf_mem_free(scan_filter);
 	if (QDF_STATUS_SUCCESS != status) {
 		sme_err("parse_scan_result failed");
@@ -13881,12 +13774,16 @@ QDF_STATUS sme_roam_invoke_nud_fail(mac_handle_t mac_handle, uint8_t vdev_id)
 		sme_err("session %d not found", vdev_id);
 		return QDF_STATUS_E_FAILURE;
 	}
+	status = sme_acquire_global_lock(&mac_ctx->sme);
+	if (!QDF_IS_STATUS_SUCCESS(status))
+		return status;
 
 	control_bitmap = mlme_get_operations_bitmap(mac_ctx->psoc, vdev_id);
 	if (control_bitmap ||
 	    !MLME_IS_ROAM_INITIALIZED(mac_ctx->psoc, vdev_id)) {
 		sme_debug("ROAM: RSO Disabled internaly: vdev[%d] bitmap[0x%x]",
 			  vdev_id, control_bitmap);
+		sme_release_global_lock(&mac_ctx->sme);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -13895,6 +13792,7 @@ QDF_STATUS sme_roam_invoke_nud_fail(mac_handle_t mac_handle, uint8_t vdev_id)
 
 	if (!vdev) {
 		sme_err("vdev is NULL, aborting roam invoke");
+		sme_release_global_lock(&mac_ctx->sme);
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
@@ -13903,6 +13801,7 @@ QDF_STATUS sme_roam_invoke_nud_fail(mac_handle_t mac_handle, uint8_t vdev_id)
 	if (!vdev_roam_params) {
 		sme_err("Invalid vdev roam params, aborting roam invoke");
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+		sme_release_global_lock(&mac_ctx->sme);
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
@@ -13910,12 +13809,14 @@ QDF_STATUS sme_roam_invoke_nud_fail(mac_handle_t mac_handle, uint8_t vdev_id)
 		sme_debug("Roaming already initiated by %d source",
 			  vdev_roam_params->source);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+		sme_release_global_lock(&mac_ctx->sme);
 		return QDF_STATUS_E_BUSY;
 	}
 
 	roam_invoke_params = qdf_mem_malloc(sizeof(*roam_invoke_params));
 	if (!roam_invoke_params) {
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+		sme_release_global_lock(&mac_ctx->sme);
 		return QDF_STATUS_E_NOMEM;
 	}
 	roam_invoke_params->vdev_id = vdev_id;
@@ -13937,6 +13838,7 @@ QDF_STATUS sme_roam_invoke_nud_fail(mac_handle_t mac_handle, uint8_t vdev_id)
 	}
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+	sme_release_global_lock(&mac_ctx->sme);
 
 	return status;
 }
@@ -14025,7 +13927,7 @@ QDF_STATUS sme_set_del_pmkid_cache(struct wlan_objmgr_psoc *psoc,
 	} else {
 		pmk_cache->cat_flag = WMI_PMK_CACHE_CAT_FLAG_SSID_CACHE_ID;
 		pmk_cache->ssid.length = pmk_cache_info->ssid_len;
-		qdf_mem_copy(pmk_cache->ssid.mac_ssid,
+		qdf_mem_copy(pmk_cache->ssid.ssid,
 			     pmk_cache_info->ssid,
 			     pmk_cache->ssid.length);
 	}
@@ -14144,10 +14046,8 @@ QDF_STATUS sme_set_peer_param(uint8_t *peer_addr, uint32_t param_id,
 	void *wma_handle;
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma_handle) {
-		sme_err("wma handle is NULL");
+	if (!wma_handle)
 		return QDF_STATUS_E_FAILURE;
-	}
 
 	return wma_set_peer_param(wma_handle, peer_addr, param_id,
 				  param_value, vdev_id);
@@ -14266,11 +14166,9 @@ void sme_store_pdev(mac_handle_t mac_handle, struct wlan_objmgr_pdev *pdev)
 	}
 	mac_ctx->pdev = pdev;
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma_handle) {
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
-				FL("wma handle is NULL"));
+	if (!wma_handle)
 		return;
-	}
+
 	wma_store_pdev(wma_handle, pdev);
 	pdev->pdev_nif.pdev_fw_caps |= SUPPORTED_CRYPTO_CAPS;
 }
@@ -14297,6 +14195,49 @@ QDF_STATUS sme_deregister_tx_queue_cb(mac_handle_t mac_handle)
 }
 
 #ifdef WLAN_SUPPORT_TWT
+
+QDF_STATUS sme_test_config_twt_setup(struct wmi_twt_add_dialog_param *params)
+{
+	t_wma_handle *wma_handle;
+
+	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+	if (!wma_handle)
+		return QDF_STATUS_E_FAILURE;
+
+	return wma_twt_process_add_dialog(wma_handle, params);
+}
+
+QDF_STATUS
+sme_test_config_twt_terminate(struct wmi_twt_del_dialog_param *params)
+{
+	t_wma_handle *wma_handle;
+
+	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+	if (!wma_handle)
+		return QDF_STATUS_E_FAILURE;
+
+	return wma_twt_process_del_dialog(wma_handle, params);
+}
+
+QDF_STATUS sme_init_twt_complete_cb(mac_handle_t mac_handle)
+{
+	QDF_STATUS status;
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		mac->sme.twt_add_dialog_cb = NULL;
+		mac->sme.twt_del_dialog_cb = NULL;
+		mac->sme.twt_pause_dialog_cb = NULL;
+		mac->sme.twt_resume_dialog_cb = NULL;
+		sme_release_global_lock(&mac->sme);
+
+		sme_debug("TWT: callbacks Initialized");
+	}
+
+	return status;
+}
+
 QDF_STATUS sme_register_twt_enable_complete_cb(mac_handle_t mac_handle,
 					       twt_enable_cb twt_enable_cb)
 {
@@ -14337,6 +14278,240 @@ QDF_STATUS sme_deregister_twt_enable_complete_cb(mac_handle_t mac_handle)
 QDF_STATUS sme_deregister_twt_disable_complete_cb(mac_handle_t mac_handle)
 {
 	return sme_register_twt_disable_complete_cb(mac_handle, NULL);
+}
+
+QDF_STATUS sme_add_dialog_cmd(mac_handle_t mac_handle,
+			      twt_add_dialog_cb twt_add_dialog_cb,
+			      struct wmi_twt_add_dialog_param *twt_params,
+			      void *context)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct scheduler_msg twt_msg = {0};
+	QDF_STATUS status;
+	void *wma_handle;
+	struct wmi_twt_add_dialog_param *cmd_params;
+
+	SME_ENTER();
+	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+	if (!wma_handle)
+		return QDF_STATUS_E_FAILURE;
+
+	/*bodyptr should be freeable*/
+	cmd_params = qdf_mem_malloc(sizeof(*cmd_params));
+	if (!cmd_params)
+		return QDF_STATUS_E_NOMEM;
+
+	qdf_mem_copy(cmd_params, twt_params, sizeof(*cmd_params));
+
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		sme_err("failed to register add dialog callback");
+		qdf_mem_free(cmd_params);
+		return status;
+	}
+
+	if (mac->sme.twt_add_dialog_cb) {
+		sme_release_global_lock(&mac->sme);
+		qdf_mem_free(cmd_params);
+		sme_err_rl("TWT: Command in progress - STATUS E_BUSY");
+		return QDF_STATUS_E_BUSY;
+	}
+
+	/* Serialize the req through MC thread */
+	mac->sme.twt_add_dialog_cb = twt_add_dialog_cb;
+	mac->sme.twt_add_dialog_context = context;
+	twt_msg.bodyptr = cmd_params;
+	twt_msg.type = WMA_TWT_ADD_DIALOG_REQUEST;
+	sme_release_global_lock(&mac->sme);
+
+	status = scheduler_post_message(QDF_MODULE_ID_SME,
+					QDF_MODULE_ID_WMA,
+					QDF_MODULE_ID_WMA, &twt_msg);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
+			  FL("Post twt add dialog msg fail"));
+		qdf_mem_free(cmd_params);
+	}
+
+	SME_EXIT();
+	return status;
+}
+
+QDF_STATUS sme_del_dialog_cmd(mac_handle_t mac_handle,
+			      twt_del_dialog_cb del_dialog_cb,
+			      struct wmi_twt_del_dialog_param *twt_params,
+			      void *context)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct scheduler_msg twt_msg = {0};
+	QDF_STATUS status;
+	void *wma_handle;
+	struct wmi_twt_del_dialog_param *cmd_params;
+
+	SME_ENTER();
+	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+	if (!wma_handle)
+		return QDF_STATUS_E_FAILURE;
+
+	/*bodyptr should be freeable*/
+	cmd_params = qdf_mem_malloc(sizeof(*cmd_params));
+	if (!cmd_params)
+		return QDF_STATUS_E_NOMEM;
+
+	qdf_mem_copy(cmd_params, twt_params, sizeof(*cmd_params));
+
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		sme_err("failed to register del dialog callback");
+		qdf_mem_free(cmd_params);
+		return status;
+	}
+
+	if (mac->sme.twt_del_dialog_cb) {
+		sme_release_global_lock(&mac->sme);
+		qdf_mem_free(cmd_params);
+		sme_err_rl("TWT: Command in progress - STATUS E_BUSY");
+		return QDF_STATUS_E_BUSY;
+	}
+
+	/* Serialize the req through MC thread */
+	mac->sme.twt_del_dialog_cb = del_dialog_cb;
+	mac->sme.twt_del_dialog_context = context;
+	twt_msg.bodyptr = cmd_params;
+	twt_msg.type = WMA_TWT_DEL_DIALOG_REQUEST;
+	sme_release_global_lock(&mac->sme);
+
+	status = scheduler_post_message(QDF_MODULE_ID_SME,
+					QDF_MODULE_ID_WMA,
+					QDF_MODULE_ID_WMA, &twt_msg);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
+			  FL("Post twt del dialog msg fail"));
+		qdf_mem_free(cmd_params);
+	}
+
+	SME_EXIT();
+	return status;
+}
+
+QDF_STATUS
+sme_pause_dialog_cmd(mac_handle_t mac_handle,
+		     twt_pause_dialog_cb pause_dialog_cb,
+		     struct wmi_twt_pause_dialog_cmd_param *twt_params,
+		     void *context)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct wmi_twt_pause_dialog_cmd_param *cmd_params;
+	struct scheduler_msg twt_msg = {0};
+	QDF_STATUS status;
+	void *wma_handle;
+
+	SME_ENTER();
+	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+	if (!wma_handle)
+		return QDF_STATUS_E_FAILURE;
+
+	/*bodyptr should be freeable*/
+	cmd_params = qdf_mem_malloc(sizeof(*cmd_params));
+	if (!cmd_params)
+		return QDF_STATUS_E_NOMEM;
+
+	qdf_mem_copy(cmd_params, twt_params, sizeof(*cmd_params));
+
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		sme_err("failed to register pause dialog callback");
+		qdf_mem_free(cmd_params);
+		return status;
+	}
+
+	if (mac->sme.twt_pause_dialog_cb) {
+		sme_release_global_lock(&mac->sme);
+		qdf_mem_free(cmd_params);
+		sme_err_rl("TWT: Command in progress - STATUS E_BUSY");
+		return QDF_STATUS_E_BUSY;
+	}
+
+	/* Serialize the req through MC thread */
+	mac->sme.twt_pause_dialog_cb = pause_dialog_cb;
+	mac->sme.twt_pause_dialog_context = context;
+	twt_msg.bodyptr = cmd_params;
+	twt_msg.type = WMA_TWT_PAUSE_DIALOG_REQUEST;
+	sme_release_global_lock(&mac->sme);
+
+	status = scheduler_post_message(QDF_MODULE_ID_SME,
+					QDF_MODULE_ID_WMA,
+					QDF_MODULE_ID_WMA, &twt_msg);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
+			  FL("Post twt pause dialog msg fail"));
+		qdf_mem_free(cmd_params);
+	}
+
+	SME_EXIT();
+	return status;
+}
+
+QDF_STATUS
+sme_resume_dialog_cmd(mac_handle_t mac_handle,
+		      twt_resume_dialog_cb resume_dialog_cb,
+		      struct wmi_twt_resume_dialog_cmd_param *twt_params,
+		      void *context)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct wmi_twt_resume_dialog_cmd_param *cmd_params;
+	struct scheduler_msg twt_msg = {0};
+	QDF_STATUS status;
+	void *wma_handle;
+
+	SME_ENTER();
+	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+	if (!wma_handle)
+		return QDF_STATUS_E_FAILURE;
+
+	/*bodyptr should be freeable*/
+	cmd_params = qdf_mem_malloc(sizeof(*cmd_params));
+	if (!cmd_params)
+		return QDF_STATUS_E_NOMEM;
+
+	qdf_mem_copy(cmd_params, twt_params, sizeof(*cmd_params));
+
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		sme_err("failed to register resume dialog callback");
+		qdf_mem_free(cmd_params);
+		return status;
+	}
+
+	if (mac->sme.twt_resume_dialog_cb) {
+		sme_release_global_lock(&mac->sme);
+		qdf_mem_free(cmd_params);
+		sme_err_rl("TWT: Command in progress - STATUS E_BUSY");
+		return QDF_STATUS_E_BUSY;
+	}
+
+	/* Serialize the req through MC thread */
+	mac->sme.twt_resume_dialog_cb = resume_dialog_cb;
+	mac->sme.twt_resume_dialog_context = context;
+	twt_msg.bodyptr = cmd_params;
+	twt_msg.type = WMA_TWT_RESUME_DIALOG_REQUEST;
+	sme_release_global_lock(&mac->sme);
+
+	status = scheduler_post_message(QDF_MODULE_ID_SME,
+					QDF_MODULE_ID_WMA,
+					QDF_MODULE_ID_WMA, &twt_msg);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
+			  FL("Post twt resume dialog msg fail"));
+		qdf_mem_free(cmd_params);
+	}
+
+	SME_EXIT();
+	return status;
 }
 #endif
 
@@ -14497,11 +14672,9 @@ QDF_STATUS sme_set_vc_mode_config(uint32_t vc_bitmap)
 	void *wma_handle;
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma_handle) {
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
-				"wma_handle is NULL");
+	if (!wma_handle)
 		return QDF_STATUS_E_FAILURE;
-	}
+
 	if (QDF_STATUS_SUCCESS !=
 		wma_set_vc_mode_config(wma_handle, vc_bitmap)) {
 		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
@@ -14637,8 +14810,8 @@ static bool sme_get_status_for_candidate(mac_handle_t mac_handle,
 	 */
 	if ((bss_desc->rssi < mbo_cfg->mbo_candidate_rssi_thres) &&
 	    (conn_bss_desc->rssi > mbo_cfg->mbo_current_rssi_thres)) {
-		sme_err("Candidate BSS "QDF_MAC_ADDR_STR" has LOW RSSI(%d), hence reject",
-			QDF_MAC_ADDR_ARRAY(bss_desc->bssId), bss_desc->rssi);
+		sme_err("Candidate BSS "QDF_MAC_ADDR_FMT" has LOW RSSI(%d), hence reject",
+			QDF_MAC_ADDR_REF(bss_desc->bssId), bss_desc->rssi);
 		info->status = QCA_STATUS_REJECT_LOW_RSSI;
 		return true;
 	}
@@ -14657,8 +14830,8 @@ static bool sme_get_status_for_candidate(mac_handle_t mac_handle,
 		current_rssi_mcc_thres = mbo_cfg->mbo_current_rssi_mcc_thres;
 		if ((conn_bss_desc->rssi > current_rssi_mcc_thres) &&
 		    csr_is_mcc_channel(mac_ctx, bss_chan_freq)) {
-			sme_err("Candidate BSS "QDF_MAC_ADDR_STR" causes MCC, hence reject",
-				QDF_MAC_ADDR_ARRAY(bss_desc->bssId));
+			sme_err("Candidate BSS "QDF_MAC_ADDR_FMT" causes MCC, hence reject",
+				QDF_MAC_ADDR_REF(bss_desc->bssId));
 			info->status =
 				QCA_STATUS_REJECT_INSUFFICIENT_QOS_CAPACITY;
 			return true;
@@ -14675,8 +14848,8 @@ static bool sme_get_status_for_candidate(mac_handle_t mac_handle,
 		    WLAN_REG_IS_24GHZ_CH_FREQ(bss_chan_freq) &&
 		    is_bt_in_progress &&
 		    (bss_desc->rssi < mbo_cfg->mbo_candidate_rssi_btc_thres)) {
-			sme_err("Candidate BSS "QDF_MAC_ADDR_STR" causes BT coex, hence reject",
-				QDF_MAC_ADDR_ARRAY(bss_desc->bssId));
+			sme_err("Candidate BSS "QDF_MAC_ADDR_FMT" causes BT coex, hence reject",
+				QDF_MAC_ADDR_REF(bss_desc->bssId));
 			info->status =
 				QCA_STATUS_REJECT_EXCESSIVE_DELAY_EXPECTED;
 			return true;
@@ -14694,8 +14867,8 @@ static bool sme_get_status_for_candidate(mac_handle_t mac_handle,
 
 		if (conn_bss_chan_safe && !bss_chan_safe) {
 			sme_err("High interference expected if transitioned to BSS "
-				QDF_MAC_ADDR_STR" hence reject",
-				QDF_MAC_ADDR_ARRAY(bss_desc->bssId));
+				QDF_MAC_ADDR_FMT" hence reject",
+				QDF_MAC_ADDR_REF(bss_desc->bssId));
 			info->status =
 				QCA_STATUS_REJECT_HIGH_INTERFERENCE;
 			return true;
@@ -14746,8 +14919,8 @@ QDF_STATUS sme_get_bss_transition_status(mac_handle_t mac_handle,
 						       &info[i].bssid,
 						       res);
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
-			sme_err("BSS "QDF_MAC_ADDR_STR" not present in scan list",
-				QDF_MAC_ADDR_ARRAY(info[i].bssid.bytes));
+			sme_err("BSS "QDF_MAC_ADDR_FMT" not present in scan list",
+				QDF_MAC_ADDR_REF(info[i].bssid.bytes));
 			info[i].status = QCA_STATUS_REJECT_UNKNOWN;
 			continue;
 		}
@@ -14813,10 +14986,9 @@ int16_t sme_get_oper_chan_freq(struct wlan_objmgr_vdev *vdev)
 	}
 
 	mac_handle = cds_get_context(QDF_MODULE_ID_SME);
-	if (!mac_handle) {
-		sme_err("mac_handle is null");
+	if (!mac_handle)
 		return 0;
-	}
+
 	mac_ctx = MAC_CONTEXT(mac_handle);
 	vdev_id = wlan_vdev_get_id(vdev);
 	if (!CSR_IS_SESSION_VALID(mac_ctx, vdev_id)) {
@@ -14843,10 +15015,9 @@ enum phy_ch_width sme_get_oper_ch_width(struct wlan_objmgr_vdev *vdev)
 	}
 
 	mac_handle = cds_get_context(QDF_MODULE_ID_SME);
-	if (!mac_handle) {
-		sme_err("mac_handle is null");
+	if (!mac_handle)
 		return CH_WIDTH_INVALID;
-	}
+
 	mac_ctx = MAC_CONTEXT(mac_handle);
 	vdev_id = wlan_vdev_get_id(vdev);
 	if (!CSR_IS_SESSION_VALID(mac_ctx, vdev_id)) {
@@ -14921,9 +15092,9 @@ QDF_STATUS sme_handle_sae_msg(mac_handle_t mac_handle,
 			     peer_mac_addr.bytes,
 			     QDF_MAC_ADDR_SIZE);
 		sme_debug("SAE: sae_status %d vdev_id %d Peer: "
-			  QDF_MAC_ADDR_STR, sae_msg->sae_status,
+			  QDF_MAC_ADDR_FMT, sae_msg->sae_status,
 			  sae_msg->vdev_id,
-			  QDF_MAC_ADDR_ARRAY(sae_msg->peer_mac_addr));
+			  QDF_MAC_ADDR_REF(sae_msg->peer_mac_addr));
 
 		sch_msg.type = eWNI_SME_SEND_SAE_MSG;
 		sch_msg.bodyptr = sae_msg;
@@ -15032,6 +15203,13 @@ bool sme_validate_channel_list(mac_handle_t mac_handle,
 	return true;
 }
 
+void sme_set_pmf_wep_cfg(mac_handle_t mac_handle, uint8_t pmf_wep)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+
+	mac_ctx->is_usr_cfg_pmf_wep = pmf_wep;
+}
+
 void sme_set_amsdu(mac_handle_t mac_handle, bool enable)
 {
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
@@ -15099,6 +15277,7 @@ void sme_set_he_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id)
 	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.dl_mu_mimo_part_bw = 0;
 	csr_update_session_he_cap(mac_ctx, session);
 
+	wlan_cm_set_check_6ghz_security(mac_ctx->psoc, true);
 	status = ucfg_mlme_set_enable_bcast_probe_rsp(mac_ctx->psoc, false);
 	if (QDF_IS_STATUS_ERROR(status))
 		sme_err("Failed not set enable bcast probe resp info, %d",
@@ -15110,6 +15289,8 @@ void sme_set_he_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id)
 	if (QDF_IS_STATUS_ERROR(status))
 		sme_err("Failed to set enable bcast probe resp in FW, %d",
 			status);
+
+	mac_ctx->mlme_cfg->sta.usr_disabled_roaming = true;
 }
 
 void sme_reset_he_caps(mac_handle_t mac_handle, uint8_t vdev_id)
@@ -15129,6 +15310,7 @@ void sme_reset_he_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 		mac_ctx->mlme_cfg->he_caps.he_cap_orig;
 	csr_update_session_he_cap(mac_ctx, session);
 
+	wlan_cm_reset_check_6ghz_security(mac_ctx->psoc);
 	status = ucfg_mlme_set_enable_bcast_probe_rsp(mac_ctx->psoc, true);
 	if (QDF_IS_STATUS_ERROR(status))
 		sme_err("Failed not set enable bcast probe resp info, %d",
@@ -15140,15 +15322,17 @@ void sme_reset_he_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 	if (QDF_IS_STATUS_ERROR(status))
 		sme_err("Failed to set enable bcast probe resp in FW, %d",
 			status);
+	mac_ctx->is_usr_cfg_pmf_wep = PMF_CORRECT_KEY;
 }
 #endif
 
 uint8_t sme_get_mcs_idx(uint16_t raw_rate, enum tx_rate_info rate_flags,
+			bool is_he_mcs_12_13_supported,
 			uint8_t *nss, uint8_t *dcm,
 			enum txrate_gi *guard_interval,
 			enum tx_rate_info *mcs_rate_flags)
 {
-	return wma_get_mcs_idx(raw_rate, rate_flags,
+	return wma_get_mcs_idx(raw_rate, rate_flags, is_he_mcs_12_13_supported,
 			       nss, dcm, guard_interval, mcs_rate_flags);
 }
 
@@ -15221,103 +15405,76 @@ sme_get_roam_scan_stats(mac_handle_t mac_handle,
 	return status;
 }
 
-void sme_update_score_config(mac_handle_t mac_handle,
-			     struct scoring_config *score_config)
+void sme_update_score_config(mac_handle_t mac_handle, eCsrPhyMode phy_mode,
+			     uint8_t num_rf_chains)
 {
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
-	struct wlan_mlme_scoring_cfg *mlme_scoring_cfg;
+	struct wlan_mlme_nss_chains vdev_ini_cfg;
+	bool bval = false;
+	uint32_t channel_bonding_mode;
+	QDF_STATUS status;
+	struct psoc_phy_config config = {0};
 
-	mlme_scoring_cfg = &mac_ctx->mlme_cfg->scoring;
+	qdf_mem_zero(&vdev_ini_cfg, sizeof(struct wlan_mlme_nss_chains));
+	/* Populate the nss chain params from ini for this vdev type */
+	sme_populate_nss_chain_params(mac_handle, &vdev_ini_cfg,
+				      QDF_STA_MODE, num_rf_chains);
 
-	score_config->weight_cfg.rssi_weightage =
-		mlme_scoring_cfg->weight_cfg.rssi_weightage;
-	score_config->weight_cfg.ht_caps_weightage =
-		mlme_scoring_cfg->weight_cfg.ht_caps_weightage;
-	score_config->weight_cfg.vht_caps_weightage =
-		mlme_scoring_cfg->weight_cfg.vht_caps_weightage;
-	score_config->weight_cfg.he_caps_weightage =
-		mlme_scoring_cfg->weight_cfg.he_caps_weightage;
-	score_config->weight_cfg.chan_width_weightage =
-		mlme_scoring_cfg->weight_cfg.chan_width_weightage;
-	score_config->weight_cfg.chan_band_weightage =
-		mlme_scoring_cfg->weight_cfg.chan_band_weightage;
-	score_config->weight_cfg.nss_weightage =
-		mlme_scoring_cfg->weight_cfg.nss_weightage;
-	score_config->weight_cfg.beamforming_cap_weightage =
-		mlme_scoring_cfg->weight_cfg.beamforming_cap_weightage;
-	score_config->weight_cfg.pcl_weightage =
-		mlme_scoring_cfg->weight_cfg.pcl_weightage;
-	score_config->weight_cfg.channel_congestion_weightage =
-		mlme_scoring_cfg->weight_cfg.channel_congestion_weightage;
-	score_config->weight_cfg.oce_wan_weightage =
-		mlme_scoring_cfg->weight_cfg.oce_wan_weightage;
-	score_config->weight_cfg.oce_ap_tx_pwr_weightage =
-		mlme_scoring_cfg->weight_cfg.oce_ap_tx_pwr_weightage;
-	score_config->weight_cfg.oce_subnet_id_weightage =
-		mlme_scoring_cfg->weight_cfg.oce_subnet_id_weightage;
+	config.vdev_nss_24g = vdev_ini_cfg.rx_nss[NSS_CHAINS_BAND_2GHZ];
+	config.vdev_nss_5g = vdev_ini_cfg.rx_nss[NSS_CHAINS_BAND_5GHZ];
 
-	score_config->bandwidth_weight_per_index =
-		mlme_scoring_cfg->bandwidth_weight_per_index;
-	score_config->nss_weight_per_index =
-		mlme_scoring_cfg->nss_weight_per_index;
-	score_config->band_weight_per_index =
-		mlme_scoring_cfg->band_weight_per_index;
+	if (phy_mode == eCSR_DOT11_MODE_AUTO ||
+	    phy_mode == eCSR_DOT11_MODE_11ax ||
+	    phy_mode == eCSR_DOT11_MODE_11ax_ONLY)
+		config.he_cap = 1;
 
-	score_config->rssi_score.best_rssi_threshold =
-		mlme_scoring_cfg->rssi_score.best_rssi_threshold;
-	score_config->rssi_score.good_rssi_threshold =
-		mlme_scoring_cfg->rssi_score.good_rssi_threshold;
-	score_config->rssi_score.bad_rssi_threshold =
-		mlme_scoring_cfg->rssi_score.bad_rssi_threshold;
-	score_config->rssi_score.good_rssi_pcnt =
-		mlme_scoring_cfg->rssi_score.good_rssi_pcnt;
-	score_config->rssi_score.bad_rssi_pcnt =
-		mlme_scoring_cfg->rssi_score.bad_rssi_pcnt;
-	score_config->rssi_score.good_rssi_bucket_size =
-		mlme_scoring_cfg->rssi_score.good_rssi_bucket_size;
-	score_config->rssi_score.bad_rssi_bucket_size =
-		mlme_scoring_cfg->rssi_score.bad_rssi_bucket_size;
-	score_config->rssi_score.rssi_pref_5g_rssi_thresh =
-		mlme_scoring_cfg->rssi_score.rssi_pref_5g_rssi_thresh;
+	if (config.he_cap ||
+	    phy_mode == eCSR_DOT11_MODE_11ac ||
+	    phy_mode == eCSR_DOT11_MODE_11ac_ONLY)
+		config.vht_cap = 1;
 
-	score_config->esp_qbss_scoring.num_slot =
-		mlme_scoring_cfg->esp_qbss_scoring.num_slot;
-	score_config->esp_qbss_scoring.score_pcnt3_to_0 =
-		mlme_scoring_cfg->esp_qbss_scoring.score_pcnt3_to_0;
-	score_config->esp_qbss_scoring.score_pcnt7_to_4 =
-		mlme_scoring_cfg->esp_qbss_scoring.score_pcnt7_to_4;
-	score_config->esp_qbss_scoring.score_pcnt11_to_8 =
-		mlme_scoring_cfg->esp_qbss_scoring.score_pcnt11_to_8;
-	score_config->esp_qbss_scoring.score_pcnt15_to_12 =
-		mlme_scoring_cfg->esp_qbss_scoring.score_pcnt15_to_12;
+	if (config.vht_cap || phy_mode == eCSR_DOT11_MODE_11n ||
+	    phy_mode == eCSR_DOT11_MODE_11n_ONLY)
+		config.ht_cap = 1;
 
-	score_config->oce_wan_scoring.num_slot =
-		mlme_scoring_cfg->oce_wan_scoring.num_slot;
-	score_config->oce_wan_scoring.score_pcnt3_to_0 =
-		mlme_scoring_cfg->oce_wan_scoring.score_pcnt3_to_0;
-	score_config->oce_wan_scoring.score_pcnt7_to_4 =
-		mlme_scoring_cfg->oce_wan_scoring.score_pcnt7_to_4;
-	score_config->oce_wan_scoring.score_pcnt11_to_8 =
-		mlme_scoring_cfg->oce_wan_scoring.score_pcnt11_to_8;
-	score_config->oce_wan_scoring.score_pcnt15_to_12 =
-		mlme_scoring_cfg->oce_wan_scoring.score_pcnt15_to_12;
+	if (!IS_FEATURE_SUPPORTED_BY_FW(DOT11AX))
+		config.he_cap = 0;
+
+	if (!IS_FEATURE_SUPPORTED_BY_FW(DOT11AC))
+		config.vht_cap = 0;
+
+	status = wlan_mlme_get_vht_for_24ghz(mac_ctx->psoc, &bval);
+	if (!QDF_IS_STATUS_SUCCESS(status))
+		sme_err("Failed to get vht_for_24ghz");
+	if (config.vht_cap && bval)
+		config.vht_24G_cap = 1;
+
+	status = wlan_mlme_get_vht_enable_tx_bf(mac_ctx->psoc,
+						&bval);
+	if (!QDF_IS_STATUS_SUCCESS(status))
+		sme_err("unable to get vht_enable_tx_bf");
+
+	if (bval)
+		config.beamformee_cap = 1;
+
+	ucfg_mlme_get_channel_bonding_24ghz(mac_ctx->psoc,
+					    &channel_bonding_mode);
+	config.bw_above_20_24ghz = channel_bonding_mode;
+	ucfg_mlme_get_channel_bonding_5ghz(mac_ctx->psoc,
+					   &channel_bonding_mode);
+	config.bw_above_20_5ghz = channel_bonding_mode;
+
+	wlan_psoc_set_phy_config(mac_ctx->psoc, &config);
 }
 
-void sme_enable_fw_module_log_level(mac_handle_t mac_handle, int vdev_id)
+static void
+__sme_enable_fw_module_log_level(uint8_t *enable_fw_module_log_level,
+				 uint8_t enable_fw_module_log_level_num,
+				 int vdev_id, int param_id)
 {
-	QDF_STATUS status;
-	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
-	uint8_t *enable_fw_module_log_level;
-	uint8_t enable_fw_module_log_level_num;
 	uint8_t count = 0;
 	uint32_t value = 0;
 	int ret;
-
-	status = ucfg_fwol_get_enable_fw_module_log_level(
-			mac_ctx->psoc, &enable_fw_module_log_level,
-			&enable_fw_module_log_level_num);
-	if (QDF_IS_STATUS_ERROR(status))
-		return;
 
 	while (count < enable_fw_module_log_level_num) {
 		/*
@@ -15349,15 +15506,42 @@ void sme_enable_fw_module_log_level(mac_handle_t mac_handle, int vdev_id)
 
 		value = enable_fw_module_log_level[count] << 16;
 		value |= enable_fw_module_log_level[count + 1];
-		ret = sme_cli_set_command(vdev_id,
-					  WMI_DBGLOG_MOD_LOG_LEVEL,
-					  value, DBG_CMD);
+		ret = sme_cli_set_command(vdev_id, param_id, value, DBG_CMD);
 		if (ret != 0)
 			sme_err("Failed to enable FW module log level %d ret %d",
 				value, ret);
 
 		count += 2;
 	}
+}
+
+void sme_enable_fw_module_log_level(mac_handle_t mac_handle, int vdev_id)
+{
+	QDF_STATUS status;
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	uint8_t *enable_fw_module_log_level;
+	uint8_t enable_fw_module_log_level_num;
+
+	status = ucfg_fwol_get_enable_fw_module_log_level(
+			mac_ctx->psoc, &enable_fw_module_log_level,
+			&enable_fw_module_log_level_num);
+	if (QDF_IS_STATUS_ERROR(status))
+		return;
+	__sme_enable_fw_module_log_level(enable_fw_module_log_level,
+					 enable_fw_module_log_level_num,
+					 vdev_id,
+					 WMI_DBGLOG_MOD_LOG_LEVEL);
+
+	enable_fw_module_log_level_num = 0;
+	status = ucfg_fwol_wow_get_enable_fw_module_log_level(
+			mac_ctx->psoc, &enable_fw_module_log_level,
+			&enable_fw_module_log_level_num);
+	if (QDF_IS_STATUS_ERROR(status))
+		return;
+	__sme_enable_fw_module_log_level(enable_fw_module_log_level,
+					 enable_fw_module_log_level_num,
+					 vdev_id,
+					 WMI_DBGLOG_MOD_WOW_LOG_LEVEL);
 }
 
 #ifdef WLAN_FEATURE_MOTION_DETECTION
@@ -15595,55 +15779,42 @@ QDF_STATUS sme_motion_det_base_line_enable(
  * sme_set_thermal_throttle_cfg() - SME API to set the thermal throttle
  * configuration parameters
  * @mac_handle: Opaque handle to the global MAC context
- * @enable: Enable Throttle
- * @dc: duty cycle in msecs
- * @dc_off_percent: duty cycle off percentage
- * @prio: Disables the transmit queues in fw that have lower priority
- * than value defined by prio
- * @target_temp: Target temperature
+ * @therm_params: structure of thermal configuration parameters
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS sme_set_thermal_throttle_cfg(mac_handle_t mac_handle, bool enable,
-					uint32_t dc, uint32_t dc_off_percent,
-					uint32_t prio, uint32_t target_temp)
+QDF_STATUS sme_set_thermal_throttle_cfg(mac_handle_t mac_handle,
+			struct thermal_mitigation_params *therm_params)
+
 {
 	struct scheduler_msg msg;
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
 	struct thermal_mitigation_params *therm_cfg_params;
 
+	therm_cfg_params = qdf_mem_malloc(sizeof(*therm_cfg_params));
+	if (!therm_cfg_params)
+		return QDF_STATUS_E_NOMEM;
+
+	qdf_mem_set(therm_cfg_params, sizeof(*therm_cfg_params), 0);
+	qdf_mem_copy(therm_cfg_params, therm_params, sizeof(*therm_cfg_params));
+
+	qdf_mem_set(&msg, sizeof(msg), 0);
+	msg.type = WMA_SET_THERMAL_THROTTLE_CFG;
+	msg.reserved = 0;
+	msg.bodyptr = therm_cfg_params;
+
 	qdf_status = sme_acquire_global_lock(&mac->sme);
-	if (QDF_STATUS_SUCCESS == qdf_status) {
-		therm_cfg_params = qdf_mem_malloc(sizeof(*therm_cfg_params));
-		if (!therm_cfg_params) {
-			sme_release_global_lock(&mac->sme);
-			return QDF_STATUS_E_NOMEM;
-		}
-
-		therm_cfg_params->enable = enable;
-		therm_cfg_params->dc = dc;
-		therm_cfg_params->levelconf[0].dcoffpercent = dc_off_percent;
-		therm_cfg_params->levelconf[0].priority = prio;
-		therm_cfg_params->levelconf[0].tmplwm = target_temp;
-		therm_cfg_params->num_thermal_conf = 1;
-
-		qdf_mem_set(&msg, sizeof(msg), 0);
-		msg.type = WMA_SET_THERMAL_THROTTLE_CFG;
-		msg.reserved = 0;
-		msg.bodyptr = therm_cfg_params;
-
-		qdf_status =  scheduler_post_message(QDF_MODULE_ID_SME,
-						     QDF_MODULE_ID_WMA,
-						     QDF_MODULE_ID_WMA, &msg);
-		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
-			sme_err("failed to schedule throttle config req %d",
-				qdf_status);
-			qdf_mem_free(therm_cfg_params);
-			qdf_status = QDF_STATUS_E_FAILURE;
-		}
-		sme_release_global_lock(&mac->sme);
+	qdf_status =  scheduler_post_message(QDF_MODULE_ID_SME,
+					     QDF_MODULE_ID_WMA,
+					     QDF_MODULE_ID_WMA, &msg);
+	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
+		sme_err("failed to schedule throttle config req %d",
+			qdf_status);
+		qdf_mem_free(therm_cfg_params);
+		qdf_status = QDF_STATUS_E_FAILURE;
 	}
+	sme_release_global_lock(&mac->sme);
 	return qdf_status;
 }
 
@@ -15738,10 +15909,8 @@ sme_get_mws_coex_info(mac_handle_t mac_handle, uint32_t vdev_id,
 	struct sir_get_mws_coex_info *req;
 
 	req = qdf_mem_malloc(sizeof(*req));
-	if (!req) {
-		sme_err("Failed allocate memory for MWS coex info req");
+	if (!req)
 		return QDF_STATUS_E_NOMEM;
-	}
 
 	req->vdev_id = vdev_id;
 	req->cmd_id  = cmd_id;
@@ -15885,77 +16054,24 @@ void sme_chan_to_freq_list(
 			wlan_reg_chan_to_freq(pdev, (uint32_t)chan_list[count]);
 }
 
-static QDF_STATUS sme_enable_roaming(struct mac_context *mac, uint32_t vdev_id,
-				     bool enable)
+QDF_STATUS
+sme_send_vendor_btm_params(mac_handle_t mac_handle, uint8_t vdev_id)
 {
-	struct csr_roam_session *session = CSR_GET_SESSION(mac, vdev_id);
-	QDF_STATUS status;
-	uint8_t reason = REASON_SUPPLICANT_DE_INIT_ROAMING;
-
-	if (!session) {
-		sme_err("Roam session is NULL for vdev %d", vdev_id);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	status = sme_acquire_global_lock(&mac->sme);
-	if (QDF_IS_STATUS_ERROR(status))
-		return status;
-
-	if (enable)
-		reason = REASON_SUPPLICANT_INIT_ROAMING;
-
-	csr_post_roam_state_change(mac, vdev_id,
-				   enable ? ROAM_RSO_STARTED : ROAM_DEINIT,
-				   reason);
-
-	sme_release_global_lock(&mac->sme);
-
-	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS sme_set_roam_triggers(mac_handle_t mac_handle,
-				 struct roam_triggers *triggers)
-{
-	QDF_STATUS status;
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
-	struct scheduler_msg message = {0};
-	struct roam_triggers *roam_trigger_data;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
-	mlme_set_roam_trigger_bitmap(mac->psoc, triggers->vdev_id,
-				     triggers->trigger_bitmap);
-	if (!triggers->trigger_bitmap)
-		status = sme_enable_roaming(mac, triggers->vdev_id,
-					    false);
-	else
-		status = sme_enable_roaming(mac, triggers->vdev_id,
-					    true);
-
-	if (QDF_IS_STATUS_ERROR(status))
-		return status;
-
-	/* per contract must make a copy of the params when messaging */
-	roam_trigger_data = qdf_mem_malloc(sizeof(*roam_trigger_data));
-	if (!roam_trigger_data)
-		return QDF_STATUS_E_NOMEM;
-	*roam_trigger_data = *triggers;
-
-	status = sme_acquire_global_lock(&mac->sme);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		qdf_mem_free(roam_trigger_data);
-		return status;
+	if (vdev_id >= WLAN_MAX_VDEVS) {
+		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
+			  FL("Invalid sme session id: %d"), vdev_id);
+		return QDF_STATUS_E_INVAL;
 	}
 
-	/* Serialize the req through MC thread */
-	message.bodyptr = roam_trigger_data;
-	message.type = SIR_HAL_SET_ROAM_TRIGGERS;
-	status = scheduler_post_message(QDF_MODULE_ID_SME,
-					QDF_MODULE_ID_WMA,
-					QDF_MODULE_ID_WMA,
-					&message);
-	sme_release_global_lock(&mac->sme);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		sme_err("failed to post ROAM_TRIGGERS msg");
-		qdf_mem_free(roam_trigger_data);
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		if (mac->mlme_cfg->lfr.roam_scan_offload_enabled)
+			csr_roam_update_cfg(mac, vdev_id,
+					    REASON_ROAM_CONTROL_CONFIG_CHANGED);
+		sme_release_global_lock(&mac->sme);
 	}
 
 	return status;
@@ -16065,10 +16181,8 @@ QDF_STATUS sme_check_for_duplicate_session(mac_handle_t mac_handle,
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 
-	if (!soc) {
-		sme_err("Failed to get soc handle");
+	if (!soc)
 		return QDF_STATUS_E_INVAL;
-	}
 
 	if (QDF_STATUS_SUCCESS != sme_acquire_global_lock(&mac_ctx->sme))
 		return status;
@@ -16096,10 +16210,8 @@ QDF_STATUS sme_get_ani_level(mac_handle_t mac_handle, uint32_t *freqs,
 	void *wma_handle;
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma_handle) {
-		sme_err("wma handle is NULL");
+	if (!wma_handle)
 		return QDF_STATUS_E_FAILURE;
-	}
 
 	mac->ani_params.ani_level_cb = callback;
 	mac->ani_params.context = context;
@@ -16181,10 +16293,8 @@ QDF_STATUS sme_process_monitor_mode_vdev_up_evt(uint8_t vdev_id)
 	struct mac_context *mac;
 
 	mac_handle = cds_get_context(QDF_MODULE_ID_SME);
-	if (!mac_handle) {
-		sme_err("mac_handle is not valid");
+	if (!mac_handle)
 		return QDF_STATUS_E_INVAL;
-	}
 
 	mac = MAC_CONTEXT(mac_handle);
 
@@ -16196,5 +16306,26 @@ QDF_STATUS sme_process_monitor_mode_vdev_up_evt(uint8_t vdev_id)
 	}
 
 	return QDF_STATUS_SUCCESS;
+}
+#endif
+
+#if defined(CLD_PM_QOS) && defined(WLAN_FEATURE_LL_MODE)
+QDF_STATUS
+sme_set_beacon_latency_event_cb(mac_handle_t mac_handle,
+				void (*beacon_latency_event_cb)
+				(uint32_t latency_level))
+{
+	QDF_STATUS qdf_status;
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+
+	qdf_status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		sme_err("Failed to acquire sme lock; status: %d", qdf_status);
+		return qdf_status;
+	}
+	mac->sme.beacon_latency_event_cb = beacon_latency_event_cb;
+	sme_release_global_lock(&mac->sme);
+
+	return qdf_status;
 }
 #endif

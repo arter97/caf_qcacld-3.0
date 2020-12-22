@@ -54,6 +54,9 @@
 ** OL Rx thread.
 */
 #define CDS_MAX_OL_RX_PKT 4000
+
+#define CDS_ACTIVE_STAID_CLEANUP_DELAY	10
+#define CDS_ACTIVE_STAID_CLEANUP_TIMEOUT	200
 #endif
 
 typedef void (*cds_ol_rx_thread_cb)(void *context,
@@ -140,6 +143,9 @@ typedef struct _cds_sched_context {
 	/* affinity requied during uplink traffic*/
 	bool rx_affinity_required;
 	uint8_t conf_rx_thread_ul_affinity;
+
+	/* sta id packets under processing in thread context*/
+	uint16_t active_staid;
 #endif
 } cds_sched_context, *p_cds_sched_context;
 
@@ -191,6 +197,8 @@ struct cds_context {
 	qdf_device_t qdf_ctx;
 
 	void *dp_soc;
+
+	void *dp_mem_pre_alloc_ctx;
 
 	/* Configuration handle used to get system configuration */
 	struct cdp_cfg *cfg_ctx;

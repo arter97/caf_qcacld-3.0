@@ -149,6 +149,37 @@ static inline int pld_ipci_athdiag_write(struct device *dev, uint32_t offset,
 	return 0;
 }
 
+static inline int
+pld_ipci_qmi_send(struct device *dev, int type, void *cmd,
+		  int cmd_len, void *cb_ctx,
+		  int (*cb)(void *ctx, void *event, int event_len))
+{
+	return 0;
+}
+
+static inline int pld_ipci_thermal_register(struct device *dev,
+					    unsigned long max_state,
+					    int mon_id)
+{
+	return 0;
+}
+
+static inline void pld_ipci_thermal_unregister(struct device *dev,
+					       int mon_id)
+{
+}
+
+static inline int pld_ipci_get_thermal_state(struct device *dev,
+					     unsigned long *thermal_state,
+					     int mon_id)
+{
+	return 0;
+}
+
+static inline int pld_ipci_exit_power_save(struct device *dev)
+{
+	return 0;
+}
 #else
 int pld_ipci_register_driver(void);
 void pld_ipci_unregister_driver(void);
@@ -253,6 +284,39 @@ static inline int pld_ipci_athdiag_write(struct device *dev, uint32_t offset,
 					 uint8_t *input)
 {
 	return icnss_athdiag_write(dev, offset, memtype, datalen, input);
+}
+
+static inline int
+pld_ipci_qmi_send(struct device *dev, int type, void *cmd,
+		  int cmd_len, void *cb_ctx,
+		  int (*cb)(void *ctx, void *event, int event_len))
+{
+	return icnss_qmi_send(dev, type, cmd, cmd_len, cb_ctx, cb);
+}
+
+static inline int pld_ipci_thermal_register(struct device *dev,
+					    unsigned long max_state,
+					    int mon_id)
+{
+	return icnss_thermal_cdev_register(dev, max_state, mon_id);
+}
+
+static inline void pld_ipci_thermal_unregister(struct device *dev,
+					       int mon_id)
+{
+	icnss_thermal_cdev_unregister(dev, mon_id);
+}
+
+static inline int pld_ipci_get_thermal_state(struct device *dev,
+					     unsigned long *thermal_state,
+					     int mon_id)
+{
+	return icnss_get_curr_therm_cdev_state(dev, thermal_state, mon_id);
+}
+
+static inline int pld_ipci_exit_power_save(struct device *dev)
+{
+	return icnss_exit_power_save(dev);
 }
 #endif
 #endif

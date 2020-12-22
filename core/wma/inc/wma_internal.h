@@ -52,6 +52,7 @@
 #define MAX_VHT_MCS_IDX 10
 #ifdef WLAN_FEATURE_11AX
 #define MAX_HE_MCS_IDX 12
+#define MAX_HE_MCS12_13_IDX 14
 #endif
 #define INVALID_MCS_IDX 255
 
@@ -179,6 +180,15 @@ void wma_process_roam_synch_fail(WMA_HANDLE handle,
 int wma_roam_synch_event_handler(void *handle, uint8_t *event,
 					uint32_t len);
 
+/**
+ * wma_register_roam_vdev_disc_event_handler() - API to register handler for
+ * roam vdev disconnect event id
+ * @wma_handle: wma handle
+ *
+ * Return: void
+ */
+void wma_register_roam_vdev_disc_event_handler(tp_wma_handle wma_handle);
+
 #ifdef WLAN_FEATURE_FIPS
 /**
  * wma_register_pmkid_req_event_handler() - Register pmkid request event handler
@@ -270,10 +280,29 @@ int wma_mlme_roam_synch_event_handler_cb(void *handle, uint8_t *event,
  */
 int wma_roam_synch_frame_event_handler(void *handle, uint8_t *event,
 					uint32_t len);
+
+/**
+ * wma_roam_vdev_disconnect_event_handler() - Handles roam vdev disconnect event
+ * @handle: wma_handle
+ * @event: pmkid request event data pointer
+ * @len: length of the data
+ *
+ * @Return: 0 on sucees else error code
+ */
+int wma_roam_vdev_disconnect_event_handler(void *handle, uint8_t *event,
+					   uint32_t len);
+
 #else
 static inline int wma_mlme_roam_synch_event_handler_cb(void *handle,
 						       uint8_t *event,
 						       uint32_t len)
+{
+	return 0;
+}
+
+static inline int
+wma_roam_vdev_disconnect_event_handler(void *handle, uint8_t *event,
+				       uint32_t len)
 {
 	return 0;
 }
@@ -315,90 +344,17 @@ wma_roam_scan_chan_list_event_handler(WMA_HANDLE handle, uint8_t *event,
 }
 #endif
 
-/**
- * wma_update_per_roam_config() -per roam config parameter updation to FW
- * @handle: wma handle
- * @req_buf: per roam config parameters
- *
- * Return: none
- */
-void wma_update_per_roam_config(WMA_HANDLE handle,
-				 struct wmi_per_roam_config_req *req_buf);
-
 QDF_STATUS wma_update_channel_list(WMA_HANDLE handle,
 				   tSirUpdateChanList *chan_list);
-
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
-QDF_STATUS wma_roam_scan_fill_self_caps(tp_wma_handle wma_handle,
-					roam_offload_param *
-					roam_offload_params,
-					struct roam_offload_scan_req *roam_req);
-#endif
-
-QDF_STATUS wma_roam_scan_offload_mode(tp_wma_handle wma_handle,
-				      wmi_start_scan_cmd_fixed_param *
-				      scan_cmd_fp,
-				      struct roam_offload_scan_req *roam_req,
-				      uint32_t mode, uint32_t vdev_id);
-
-/**
- * wma_roam_scan_mawc_params() - send roam scan mode request to fw
- * @wma_handle: wma handle
- * @roam_req: roam request param
- *
- * Fill the MAWC roaming parameters and send
- * WMI_ROAM_CONFIGURE_MAWC_CMDID TLV to firmware.
- *
- * Return: QDF status
- */
-QDF_STATUS wma_roam_scan_mawc_params(tp_wma_handle wma_handle,
-		struct roam_offload_scan_req *roam_req);
-
-/**
- * wma_roam_scan_offload_rssi_threshold() - set scan offload rssi threashold
- * @wma_handle: wma handle
- * @roam_req:   Roaming request buffer
- *
- * Send WMI_ROAM_SCAN_RSSI_THRESHOLD TLV to firmware
- *
- * Return: QDF status
- */
-QDF_STATUS
-wma_roam_scan_offload_rssi_thresh(tp_wma_handle wma_handle,
-				  struct roam_offload_scan_req *roam_req);
-
-QDF_STATUS
-wma_roam_scan_offload_scan_period(tp_wma_handle wma_handle,
-				  struct roam_offload_scan_req *roam_req);
-
-QDF_STATUS wma_roam_scan_offload_rssi_change(tp_wma_handle wma_handle,
-					     uint32_t vdev_id,
-					     int32_t rssi_change_thresh,
-					     uint32_t bcn_rssi_weight,
-					     uint32_t hirssi_delay_btw_scans);
-
-QDF_STATUS wma_roam_scan_offload_chan_list(tp_wma_handle wma_handle,
-					   uint8_t chan_count,
-					   uint32_t *chan_freq_list,
-					   uint8_t list_type, uint32_t vdev_id);
 
 A_UINT32 e_csr_auth_type_to_rsn_authmode(enum csr_akm_type authtype,
 					 eCsrEncryptionType encr);
 
 A_UINT32 e_csr_encryption_type_to_rsn_cipherset(eCsrEncryptionType encr);
 
-void wma_roam_scan_fill_scan_params(tp_wma_handle wma_handle,
-				    struct mac_context *mac,
-				    struct roam_offload_scan_req *roam_req,
-				    wmi_start_scan_cmd_fixed_param *
-				    scan_params);
-
 QDF_STATUS wma_roam_scan_bmiss_cnt(tp_wma_handle wma_handle,
 				   A_INT32 first_bcnt,
 				   A_UINT32 final_bcnt, uint32_t vdev_id);
-
-QDF_STATUS wma_roam_scan_offload_command(tp_wma_handle wma_handle,
-					 uint32_t command, uint32_t vdev_id);
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 void wma_set_ric_req(tp_wma_handle wma, void *msg, uint8_t is_add_ts);
@@ -608,17 +564,6 @@ int wma_roam_event_callback(WMA_HANDLE handle, uint8_t *event_buf,
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 void wma_process_roam_synch_complete(WMA_HANDLE handle, uint8_t vdev_id);
-static inline bool wma_is_roam_synch_in_progress(tp_wma_handle wma,
-		uint8_t vdev_id)
-{
-	return wma->interfaces[vdev_id].roam_synch_in_progress;
-}
-#else
-static inline bool wma_is_roam_synch_in_progress(tp_wma_handle wma,
-		uint8_t vdev_id)
-{
-	return false;
-}
 #endif
 
 /*
@@ -680,15 +625,10 @@ QDF_STATUS wma_vdev_set_param(wmi_unified_t wmi_handle, uint32_t if_id,
 				uint32_t param_id, uint32_t param_value);
 
 QDF_STATUS wma_remove_peer(tp_wma_handle wma, uint8_t *mac_addr,
-			   uint8_t vdev_id, bool roam_synch_in_progress);
+			   uint8_t vdev_id, bool no_fw_peer_delete);
 
 QDF_STATUS wma_peer_unmap_conf_send(tp_wma_handle wma,
 				    struct send_peer_unmap_conf_params *msg);
-
-QDF_STATUS wma_create_peer(tp_wma_handle wma,
-			   uint8_t peer_addr[QDF_MAC_ADDR_SIZE],
-			   uint32_t peer_type, uint8_t vdev_id,
-			   bool roam_synch_in_progress);
 
 /**
  * wma_send_del_bss_response() - send delete bss resp
@@ -954,15 +894,6 @@ void wma_set_max_tx_power(WMA_HANDLE handle,
 void wma_disable_sta_ps_mode(tpDisablePsParams ps_req);
 
 /**
- * wma_send_max_tx_pwrlmt() - send max tx power limit to fw
- * @handle: wma handle
- * @vdev_id: vdev id
- *
- * Return: none
- */
-void wma_send_max_tx_pwrlmt(WMA_HANDLE handle, uint8_t vdev_id);
-
-/**
  * wma_enable_uapsd_mode() - enable uapsd mode in fw
  * @wma: wma handle
  * @ps_req: power save request
@@ -1011,6 +942,14 @@ QDF_STATUS wma_set_smps_params(tp_wma_handle wma, uint8_t vdev_id,
  */
 void wma_set_bss_rate_flags(tp_wma_handle wma, uint8_t vdev_id,
 			    struct bss_params *add_bss);
+
+/**
+ * wma_get_vht_rate_flags() - Return the VHT rate flags corresponding to the BW
+ * @ch_width: BW for which rate flags is required
+ *
+ * Return: Rate flags corresponding to ch_width
+ */
+enum tx_rate_info wma_get_vht_rate_flags(enum phy_ch_width ch_width);
 
 int32_t wmi_unified_send_txbf(tp_wma_handle wma, tpAddStaParams params);
 
@@ -1230,18 +1169,6 @@ void wma_process_link_status_req(tp_wma_handle wma,
 				 tAniGetLinkStatus *pGetLinkStatus);
 
 /**
- * wma_get_peer_info_ext() - get peer info
- * @handle: wma interface
- * @peer_info_req: get peer info request information
- *
- * This function will send WMI_REQUEST_PEER_STATS_INFO_CMDID to FW
- *
- * Return: 0 on success, otherwise error value
- */
-QDF_STATUS wma_get_peer_info_ext(WMA_HANDLE handle,
-				struct sir_peer_info_ext_req *peer_info_req);
-
-/**
  * wma_get_isolation() - get antenna isolation
  * @handle: wma interface
  *
@@ -1250,19 +1177,6 @@ QDF_STATUS wma_get_peer_info_ext(WMA_HANDLE handle,
  * Return: 0 on success, otherwise error value
  */
 QDF_STATUS wma_get_isolation(tp_wma_handle wma);
-
-/**
- * wma_peer_info_event_handler() - Handler for WMI_PEER_STATS_INFO_EVENTID
- * @handle: WMA global handle
- * @cmd_param_info: Command event data
- * @len: Length of cmd_param_info
- *
- * This function will handle WMI_PEER_STATS_INFO_EVENTID
- *
- * Return: 0 on success, error code otherwise
- */
-int wma_peer_info_event_handler(void *handle, u_int8_t *cmd_param_info,
-				   u_int32_t len);
 
 int wma_profile_data_report_event_handler(void *handle, uint8_t *event_buf,
 				       uint32_t len);
@@ -1459,6 +1373,18 @@ QDF_STATUS wma_process_set_ie_info(tp_wma_handle wma,
 int wma_peer_assoc_conf_handler(void *handle, uint8_t *cmd_param_info,
 				uint32_t len);
 
+/**
+ * wma_peer_create_confirm_handler  - Handle peer create confirmation
+ * result
+ * @handle: wma_handle
+ * @evt_param_info: event data
+ * @len: event length
+ *
+ * Return: 0 on success. Error value on failure
+ */
+int wma_peer_create_confirm_handler(void *handle, uint8_t *evt_param_info,
+				    uint32_t len);
+
 int wma_peer_delete_handler(void *handle, uint8_t *cmd_param_info,
 				uint32_t len);
 void wma_remove_req(tp_wma_handle wma, uint8_t vdev_id,
@@ -1491,6 +1417,26 @@ int wma_unified_power_debug_stats_event_handler(void *handle,
 int wma_unified_beacon_debug_stats_event_handler(void *handle,
 						 uint8_t *cmd_param_info,
 						 uint32_t len);
+
+#if defined(CLD_PM_QOS) && defined(WLAN_FEATURE_LL_MODE)
+/**
+ * wma_vdev_bcn_latency_event_handler() - Get the latency info received in bcn
+ * @handle: WMA handle
+ * @event: data in event
+ * @len: length
+ *
+ * Return: 0 for success or error code
+ */
+int wma_vdev_bcn_latency_event_handler(void *handle, uint8_t *event,
+				       uint32_t len);
+#else
+static inline int wma_vdev_bcn_latency_event_handler(void *handle,
+						     uint8_t *event,
+						     uint32_t len)
+{
+	return 0;
+}
+#endif
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
 /**
@@ -1695,40 +1641,12 @@ int wma_vdev_bss_color_collision_info_handler(void *handle,
 
 #ifdef WLAN_SUPPORT_TWT
 /**
- * wma_twt_en_complete_event_handler - TWT enable complete event handler
+ * wma_register_twt_events - Register TWT wmi event handlers
  * @handle: wma handle
- * @event: buffer with event
- * @len: buffer length
  *
- * Return: 0 on success
+ * Return: None
  */
-int wma_twt_en_complete_event_handler(void *handle,
-				      uint8_t *event, uint32_t len);
-
-/**
- * wma_twt_disable_comp_event_handler- TWT disable complete event handler
- * @handle: wma handle
- * @event: buffer with event
- * @len: buffer length
- *
- * Return: 0 on success
- */
-int wma_twt_disable_comp_event_handler(void *handle, uint8_t *event,
-				       uint32_t len);
-#else
-static inline int wma_twt_en_complete_event_handler(void *handle,
-						    uint8_t *event,
-						    uint32_t len)
-{
-	return 0;
-}
-
-static inline int wma_twt_disable_comp_event_handler(void *handle,
-						     uint8_t *event,
-						     uint32_t len)
-{
-	return 0;
-}
+void wma_register_twt_events(tp_wma_handle wma_handle);
 #endif
 
 /**
@@ -1785,16 +1703,6 @@ int wma_cold_boot_cal_event_handler(void *wma_ctx, uint8_t *event_buff,
  */
 int wma_oem_event_handler(void *wma_ctx, uint8_t *event_buff, uint32_t len);
 #endif
-
-/**
- * wma_set_roam_triggers() - Send roam trigger bitmap to WMI
- * @wma_handle: wma handle
- * @triggers: Carries vdev id and roam trigger bitmap.
- *
- * Return: Success or Failure status
- */
-QDF_STATUS wma_set_roam_triggers(tp_wma_handle wma_handle,
-				 struct roam_triggers *triggers);
 
 /**
  * wma_get_ani_level_evt_handler - event handler to fetch ani level

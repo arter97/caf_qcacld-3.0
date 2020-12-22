@@ -141,9 +141,9 @@ static QDF_STATUS pmo_core_is_gtk_enabled_in_fwr(
 	if (qdf_mem_cmp(&vdev_ctx->vdev_gtk_req.bssid,
 		&peer_bssid, QDF_MAC_ADDR_SIZE)) {
 		qdf_spin_unlock_bh(&vdev_ctx->pmo_vdev_lock);
-		pmo_err("cache request mac:%pM, peer mac:%pM are not same",
-			vdev_ctx->vdev_gtk_req.bssid.bytes,
-			peer_bssid.bytes);
+		pmo_err("cache request mac:"QDF_MAC_ADDR_FMT", peer mac:"QDF_MAC_ADDR_FMT" are not same",
+			QDF_MAC_ADDR_REF(vdev_ctx->vdev_gtk_req.bssid.bytes),
+			QDF_MAC_ADDR_REF(peer_bssid.bytes));
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -216,7 +216,7 @@ QDF_STATUS pmo_core_cache_gtk_offload_req(struct wlan_objmgr_vdev *vdev,
 
 	status = pmo_core_cache_gtk_req_in_vdev_priv(vdev, gtk_req);
 dec_ref:
-	pmo_vdev_put_ref(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_PMO_ID);
 out:
 
 	return status;
@@ -250,7 +250,7 @@ QDF_STATUS pmo_core_flush_gtk_offload_req(struct wlan_objmgr_vdev *vdev)
 
 	status = pmo_core_flush_gtk_req_from_vdev_priv(vdev);
 dec_ref:
-	pmo_vdev_put_ref(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_PMO_ID);
 out:
 
 	return status;
@@ -277,13 +277,12 @@ QDF_STATUS pmo_core_enable_gtk_offload_in_fwr(struct wlan_objmgr_vdev *vdev)
 
 	op_gtk_req = qdf_mem_malloc(sizeof(*op_gtk_req));
 	if (!op_gtk_req) {
-		pmo_err("op_gtk_req is NULL");
 		status = QDF_STATUS_E_INVAL;
 		goto dec_ref;
 	}
 	status = pmo_core_do_enable_gtk_offload(vdev, vdev_ctx, op_gtk_req);
 dec_ref:
-	pmo_vdev_put_ref(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_PMO_ID);
 out:
 	if (op_gtk_req)
 		qdf_mem_free(op_gtk_req);
@@ -313,14 +312,13 @@ QDF_STATUS pmo_core_disable_gtk_offload_in_fwr(struct wlan_objmgr_vdev *vdev)
 
 	op_gtk_req = qdf_mem_malloc(sizeof(*op_gtk_req));
 	if (!op_gtk_req) {
-		pmo_err("op_gtk_req is NULL");
 		status = QDF_STATUS_E_NOMEM;
 		goto dec_ref;
 	}
 
 	status = pmo_core_do_disable_gtk_offload(vdev, vdev_ctx, op_gtk_req);
 dec_ref:
-	pmo_vdev_put_ref(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_PMO_ID);
 out:
 	if (op_gtk_req)
 		qdf_mem_free(op_gtk_req);
@@ -360,7 +358,7 @@ QDF_STATUS pmo_core_get_gtk_rsp(struct wlan_objmgr_vdev *vdev,
 	/* send cmd to fwr */
 	status = pmo_tgt_get_gtk_rsp(vdev);
 dec_ref:
-	pmo_vdev_put_ref(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_PMO_ID);
 out:
 	pmo_exit();
 

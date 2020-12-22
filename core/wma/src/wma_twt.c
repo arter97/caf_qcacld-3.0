@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2019-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -21,60 +21,68 @@
  *
  * WLAN Host Device Driver TWT - Target Wake Time Implementation
  */
-
 #include "wma_twt.h"
 #include "wmi_unified_twt_api.h"
 #include "wma_internal.h"
 #include "wmi_unified_priv.h"
 
 void wma_send_twt_enable_cmd(uint32_t pdev_id,
-			     uint32_t congestion_timeout, bool bcast_val)
+			     struct twt_enable_disable_conf *conf)
 {
 	t_wma_handle *wma = cds_get_context(QDF_MODULE_ID_WMA);
 	struct wmi_twt_enable_param twt_enable_params = {0};
 	int32_t ret;
 
-	if (!wma) {
-		WMA_LOGE("Invalid WMA context, enable TWT failed");
+	if (!wma)
 		return;
-	}
+
 	twt_enable_params.pdev_id = pdev_id;
-	twt_enable_params.sta_cong_timer_ms = congestion_timeout;
-	TWT_EN_DIS_FLAGS_SET_BTWT(twt_enable_params.flags, bcast_val);
+	twt_enable_params.sta_cong_timer_ms = conf->congestion_timeout;
+	twt_enable_params.b_twt_enable = conf->bcast_en;
+	twt_enable_params.ext_conf_present = conf->ext_conf_present;
+	twt_enable_params.twt_role = conf->role;
+	twt_enable_params.twt_oper = conf->oper;
 	ret = wmi_unified_twt_enable_cmd(wma->wmi_handle, &twt_enable_params);
 
 	if (ret)
-		WMA_LOGE("Failed to enable TWT");
+		wma_err("Failed to enable TWT");
 }
 
+/**
+ * wma_twt_en_complete_event_handler - TWT enable complete event handler
+ * @handle: wma handle
+ * @event: buffer with event
+ * @len: buffer length
+ *
+ * Return: 0 on success, negative value on failure
+ */
+static
 int wma_twt_en_complete_event_handler(void *handle,
 				      uint8_t *event, uint32_t len)
 {
 	struct wmi_twt_enable_complete_event_param param;
-	tp_wma_handle wma_handle = (tp_wma_handle) handle;
+	tp_wma_handle wma_handle = handle;
 	wmi_unified_t wmi_handle;
-	struct mac_context *mac = (struct mac_context *)cds_get_context(QDF_MODULE_ID_PE);
+	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
 	int status = -EINVAL;
 
-	if (!wma_handle) {
-		WMA_LOGE("Invalid wma handle for TWT complete");
+	if (wma_validate_handle(wma_handle))
 		return status;
-	}
+
 	wmi_handle = (wmi_unified_t)wma_handle->wmi_handle;
 	if (!wmi_handle) {
-		WMA_LOGE("Invalid wmi handle for TWT complete");
+		wma_err("Invalid wmi handle for TWT complete");
 		return status;
 	}
-	if (!mac) {
-		WMA_LOGE("Invalid MAC context");
+	if (!mac)
 		return status;
-	}
+
 	if (wmi_handle->ops->extract_twt_enable_comp_event)
 		status = wmi_handle->ops->extract_twt_enable_comp_event(
 								wmi_handle,
 								event,
 								&param);
-	WMA_LOGD("TWT: Received TWT enable comp event, status:%d", status);
+	wma_debug("TWT: Received TWT enable comp event, status:%d", status);
 
 	if (mac->sme.twt_enable_cb)
 		mac->sme.twt_enable_cb(mac->hdd_handle, &param);
@@ -82,23 +90,36 @@ int wma_twt_en_complete_event_handler(void *handle,
 	return status;
 }
 
-void wma_send_twt_disable_cmd(uint32_t pdev_id)
+void wma_send_twt_disable_cmd(uint32_t pdev_id,
+			      struct twt_enable_disable_conf *conf)
 {
 	t_wma_handle *wma = cds_get_context(QDF_MODULE_ID_WMA);
 	struct wmi_twt_disable_param twt_disable_params = {0};
 	int32_t ret;
 
-	if (!wma) {
-		WMA_LOGE("Invalid WMA context, Disable TWT failed");
+	if (!wma)
 		return;
-	}
+
 	twt_disable_params.pdev_id = pdev_id;
+	twt_disable_params.ext_conf_present = conf->ext_conf_present;
+	twt_disable_params.twt_role = conf->role;
+	twt_disable_params.twt_oper = conf->oper;
+
 	ret = wmi_unified_twt_disable_cmd(wma->wmi_handle, &twt_disable_params);
 
 	if (ret)
-		WMA_LOGE("Failed to disable TWT");
+		wma_err("Failed to disable TWT");
 }
 
+/**
+ * wma_twt_disable_comp_event_handler- TWT disable complete event handler
+ * @handle: wma handle
+ * @event: buffer with event
+ * @len: buffer length
+ *
+ * Return: 0 on success, negative value on failure
+ */
+static
 int wma_twt_disable_comp_event_handler(void *handle, uint8_t *event,
 				       uint32_t len)
 {
@@ -106,11 +127,11 @@ int wma_twt_disable_comp_event_handler(void *handle, uint8_t *event,
 
 	mac = (struct mac_context *)cds_get_context(QDF_MODULE_ID_PE);
 	if (!mac) {
-		WMA_LOGE("Invalid MAC context");
+		wma_err("Invalid MAC context");
 		return -EINVAL;
 	}
 
-	WMA_LOGD("TWT: Rcvd TWT disable comp event");
+	wma_debug("TWT: Rcvd TWT disable comp event");
 
 	if (mac->sme.twt_disable_cb)
 		mac->sme.twt_disable_cb(mac->hdd_handle);
@@ -126,43 +147,360 @@ void wma_set_twt_peer_caps(tpAddStaParams params, struct peer_assoc_params *cmd)
 		cmd->twt_responder = 1;
 }
 
-QDF_STATUS wma_twt_process_add_dialog(
-		struct wmi_twt_add_dialog_param *params)
+QDF_STATUS wma_twt_process_add_dialog(t_wma_handle *wma_handle,
+				      struct wmi_twt_add_dialog_param *params)
 {
-	t_wma_handle *wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
 	wmi_unified_t wmi_handle;
 
-	if (!wma_handle) {
-		WMA_LOGE("Invalid WMA context, twt add dialog failed");
+	if (wma_validate_handle(wma_handle))
 		return QDF_STATUS_E_INVAL;
-	}
 
 	wmi_handle = (wmi_unified_t)wma_handle->wmi_handle;
 	if (!wmi_handle) {
-		WMA_LOGE("Invalid wmi handle, twt add dialog failed");
+		wma_err("Invalid wmi handle, twt add dialog failed");
 		return QDF_STATUS_E_INVAL;
 	}
 
 	return wmi_unified_twt_add_dialog_cmd(wmi_handle, params);
 }
 
-QDF_STATUS wma_twt_process_del_dialog(
-		struct wmi_twt_del_dialog_param *params)
+/**
+ * wma_twt_add_dialog_complete_event_handler - TWT add dialog complete event
+ * handler
+ * @handle: wma handle
+ * @event: buffer with event
+ * @len: buffer length
+ *
+ * Return: 0 on success, negative value on failure
+ */
+static
+int wma_twt_add_dialog_complete_event_handler(void *handle,
+					      uint8_t *event, uint32_t len)
 {
-	t_wma_handle *wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+	struct twt_add_dialog_complete_event *add_dialog_event;
+	struct scheduler_msg sme_msg = {0};
+	tp_wma_handle wma_handle = handle;
 	wmi_unified_t wmi_handle;
+	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
+	int status = -EINVAL;
 
-	if (!wma_handle) {
-		WMA_LOGE("Invalid WMA context, twt del dialog failed");
-		return QDF_STATUS_E_INVAL;
-	}
+	if (wma_validate_handle(wma_handle))
+		return -EINVAL;
+
+	if (!mac)
+		return -EINVAL;
 
 	wmi_handle = (wmi_unified_t)wma_handle->wmi_handle;
 	if (!wmi_handle) {
-		WMA_LOGE("Invalid wmi handle, twt del dialog failed");
+		wma_err("Invalid wma handle for TWT add dialog complete");
+		return -EINVAL;
+	}
+
+	add_dialog_event = qdf_mem_malloc(sizeof(*add_dialog_event));
+	if (!add_dialog_event)
+		return -ENOMEM;
+
+	status = wmi_extract_twt_add_dialog_comp_event(wmi_handle, event,
+						       &add_dialog_event->params);
+	if (QDF_IS_STATUS_ERROR(status))
+		return qdf_status_to_os_return(status);
+
+	if (add_dialog_event->params.num_additional_twt_params) {
+		status = wmi_extract_twt_add_dialog_comp_additional_params(wmi_handle,
+									   event,
+									   len, 0,
+									   &add_dialog_event->additional_params);
+		if (QDF_IS_STATUS_ERROR(status))
+			return qdf_status_to_os_return(status);
+	}
+
+	wma_debug("TWT: Extract TWT add dialog event :%d", status);
+
+	sme_msg.type = eWNI_SME_TWT_ADD_DIALOG_EVENT;
+	sme_msg.bodyptr = add_dialog_event;
+	sme_msg.bodyval = 0;
+	status = scheduler_post_message(QDF_MODULE_ID_WMA,
+					QDF_MODULE_ID_SME,
+					QDF_MODULE_ID_SME, &sme_msg);
+	if (QDF_IS_STATUS_ERROR(status))
+		return -EINVAL;
+
+	return status;
+}
+
+QDF_STATUS
+wma_twt_process_del_dialog(t_wma_handle *wma_handle,
+			   struct wmi_twt_del_dialog_param *params)
+{
+	wmi_unified_t wmi_handle;
+
+	if (wma_validate_handle(wma_handle))
+		return QDF_STATUS_E_INVAL;
+
+	wmi_handle = (wmi_unified_t)wma_handle->wmi_handle;
+	if (!wmi_handle) {
+		wma_err("Invalid wmi handle, twt del dialog failed");
 		return QDF_STATUS_E_INVAL;
 	}
 
 	return wmi_unified_twt_del_dialog_cmd(wmi_handle, params);
 }
 
+/**
+ * wma_twt_del_dialog_complete_event_handler - TWT del dialog complete event
+ * handler
+ * @handle: wma handle
+ * @event: buffer with event
+ * @len: buffer length
+ *
+ * Return: 0 on success, negative value on failure
+ */
+static
+int wma_twt_del_dialog_complete_event_handler(void *handle,
+					      uint8_t *event, uint32_t len)
+{
+	struct wmi_twt_del_dialog_complete_event_param *param;
+	struct scheduler_msg sme_msg = {0};
+	tp_wma_handle wma_handle = handle;
+	wmi_unified_t wmi_handle;
+	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
+	int status = -EINVAL;
+
+	if (wma_validate_handle(wma_handle))
+		return status;
+
+	wmi_handle = (wmi_unified_t)wma_handle->wmi_handle;
+	if (!wmi_handle) {
+		wma_err("Invalid wma handle for TWT del dialog complete");
+		return status;
+	}
+	if (!mac)
+		return status;
+
+	param = qdf_mem_malloc(sizeof(*param));
+	if (!param)
+		return -ENOMEM;
+
+	status = wmi_extract_twt_del_dialog_comp_event(wmi_handle, event,
+						       param);
+	wma_debug("TWT: Extract TWT del dlg comp event, status:%d", status);
+
+	sme_msg.type = eWNI_SME_TWT_DEL_DIALOG_EVENT;
+	sme_msg.bodyptr = param;
+	sme_msg.bodyval = 0;
+	status = scheduler_post_message(QDF_MODULE_ID_WMA,
+					QDF_MODULE_ID_SME,
+					QDF_MODULE_ID_SME, &sme_msg);
+	if (QDF_IS_STATUS_ERROR(status))
+		return -EINVAL;
+
+	return status;
+}
+
+QDF_STATUS
+wma_twt_process_pause_dialog(t_wma_handle *wma_handle,
+			     struct wmi_twt_pause_dialog_cmd_param *params)
+{
+	wmi_unified_t wmi_handle;
+
+	if (wma_validate_handle(wma_handle))
+		return QDF_STATUS_E_INVAL;
+
+	wmi_handle = (wmi_unified_t)wma_handle->wmi_handle;
+	if (!wmi_handle) {
+		wma_err("Invalid wmi handle, twt pause dialog failed");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return wmi_unified_twt_pause_dialog_cmd(wmi_handle, params);
+}
+
+/**
+ * wma_twt_pause_dialog_complete_event_handler - TWT pause dlg complete evt
+ * handler
+ * @handle: wma handle
+ * @event: buffer with event
+ * @len: buffer length
+ *
+ * Return: 0 on success, negative value on failure
+ */
+static
+int wma_twt_pause_dialog_complete_event_handler(void *handle, uint8_t *event,
+						uint32_t len)
+{
+	struct wmi_twt_pause_dialog_complete_event_param *param;
+	struct scheduler_msg sme_msg = {0};
+	tp_wma_handle wma_handle = handle;
+	wmi_unified_t wmi_handle;
+	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
+	int status = -EINVAL;
+
+	if (!mac)
+		return status;
+
+	if (wma_validate_handle(wma_handle))
+		return status;
+
+	wmi_handle = (wmi_unified_t)wma_handle->wmi_handle;
+	if (!wmi_handle) {
+		wma_err("Invalid wmi handle for TWT pause dialog complete");
+		return status;
+	}
+
+	param = qdf_mem_malloc(sizeof(*param));
+	if (!param)
+		return -ENOMEM;
+
+	if (wmi_handle->ops->extract_twt_pause_dialog_comp_event)
+		status = wmi_handle->ops->extract_twt_pause_dialog_comp_event(wmi_handle,
+									      event,
+									      param);
+	wma_debug("TWT: Extract pause dialog comp event status:%d", status);
+
+	sme_msg.type = eWNI_SME_TWT_PAUSE_DIALOG_EVENT;
+	sme_msg.bodyptr = param;
+	sme_msg.bodyval = 0;
+	status = scheduler_post_message(QDF_MODULE_ID_WMA,
+					QDF_MODULE_ID_SME,
+					QDF_MODULE_ID_SME, &sme_msg);
+	if (QDF_IS_STATUS_ERROR(status))
+		return -EINVAL;
+
+	return status;
+}
+
+QDF_STATUS
+wma_twt_process_resume_dialog(t_wma_handle *wma_handle,
+			      struct wmi_twt_resume_dialog_cmd_param *params)
+{
+	wmi_unified_t wmi_handle;
+
+	if (wma_validate_handle(wma_handle))
+		return QDF_STATUS_E_INVAL;
+
+	wmi_handle = (wmi_unified_t)wma_handle->wmi_handle;
+	if (!wmi_handle) {
+		wma_err("Invalid wmi handle, twt resume dialog failed");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return wmi_unified_twt_resume_dialog_cmd(wmi_handle, params);
+}
+
+/**
+ * wma_twt_resume_dialog_complete_event_handler - TWT resume dlg complete evt
+ * handler
+ * @handle: wma handle
+ * @event: buffer with event
+ * @len: buffer length
+ *
+ * Return: 0 on success, negative value on failure
+ */
+static
+int wma_twt_resume_dialog_complete_event_handler(void *handle, uint8_t *event,
+						 uint32_t len)
+{
+	struct wmi_twt_resume_dialog_complete_event_param *param;
+	struct scheduler_msg sme_msg = {0};
+	tp_wma_handle wma_handle = handle;
+	wmi_unified_t wmi_handle;
+	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
+	int status = -EINVAL;
+
+	if (!mac)
+		return status;
+
+	if (wma_validate_handle(wma_handle))
+		return status;
+
+	wmi_handle = (wmi_unified_t)wma_handle->wmi_handle;
+	if (!wmi_handle) {
+		wma_err("Invalid wmi handle for TWT resume dialog complete");
+		return status;
+	}
+
+	param = qdf_mem_malloc(sizeof(*param));
+	if (!param)
+		return -ENOMEM;
+
+	if (wmi_handle->ops->extract_twt_resume_dialog_comp_event)
+		status = wmi_handle->ops->extract_twt_resume_dialog_comp_event(wmi_handle,
+									       event,
+									       param);
+	wma_debug("TWT: Extract resume dialog comp event status:%d", status);
+
+	sme_msg.type = eWNI_SME_TWT_RESUME_DIALOG_EVENT;
+	sme_msg.bodyptr = param;
+	sme_msg.bodyval = 0;
+	status = scheduler_post_message(QDF_MODULE_ID_WMA,
+					QDF_MODULE_ID_SME,
+					QDF_MODULE_ID_SME, &sme_msg);
+	if (QDF_IS_STATUS_ERROR(status))
+		return -EINVAL;
+
+	return status;
+}
+
+/**
+ * wma_update_bcast_twt_support() - update bcost twt support
+ * @wh: wma handle
+ * @tgt_cfg: target configuration to be updated
+ *
+ * Update braodcast twt support based on service bit.
+ *
+ * Return: None
+ */
+void wma_update_bcast_twt_support(tp_wma_handle wh,
+				  struct wma_tgt_cfg *tgt_cfg)
+{
+	if (wmi_service_enabled(wh->wmi_handle,
+				wmi_service_bcast_twt_support))
+		tgt_cfg->bcast_twt_support = true;
+	else
+		tgt_cfg->bcast_twt_support = false;
+
+	if (wmi_service_enabled(wh->wmi_handle,
+				wmi_service_twt_bcast_req_support))
+		tgt_cfg->twt_bcast_req_support = true;
+	else
+		tgt_cfg->twt_bcast_req_support = false;
+
+	if (wmi_service_enabled(wh->wmi_handle,
+				wmi_service_twt_bcast_resp_support))
+		tgt_cfg->twt_bcast_res_support = true;
+	else
+		tgt_cfg->twt_bcast_res_support = false;
+}
+
+void wma_register_twt_events(tp_wma_handle wma_handle)
+{
+	wmi_unified_register_event_handler(wma_handle->wmi_handle,
+					   wmi_twt_enable_complete_event_id,
+					   wma_twt_en_complete_event_handler,
+					   WMA_RX_SERIALIZER_CTX);
+	wmi_unified_register_event_handler(wma_handle->wmi_handle,
+					   wmi_twt_disable_complete_event_id,
+					   wma_twt_disable_comp_event_handler,
+					   WMA_RX_SERIALIZER_CTX);
+	wmi_unified_register_event_handler
+				(wma_handle->wmi_handle,
+				 wmi_twt_add_dialog_complete_event_id,
+				 wma_twt_add_dialog_complete_event_handler,
+				 WMA_RX_SERIALIZER_CTX);
+	wmi_unified_register_event_handler
+				(wma_handle->wmi_handle,
+				 wmi_twt_del_dialog_complete_event_id,
+				 wma_twt_del_dialog_complete_event_handler,
+				 WMA_RX_SERIALIZER_CTX);
+
+	wmi_unified_register_event_handler
+				(wma_handle->wmi_handle,
+				 wmi_twt_pause_dialog_complete_event_id,
+				 wma_twt_pause_dialog_complete_event_handler,
+				 WMA_RX_SERIALIZER_CTX);
+	wmi_unified_register_event_handler
+				(wma_handle->wmi_handle,
+				 wmi_twt_resume_dialog_complete_event_id,
+				 wma_twt_resume_dialog_complete_event_handler,
+				 WMA_RX_SERIALIZER_CTX);
+}

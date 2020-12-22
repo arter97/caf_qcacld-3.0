@@ -137,7 +137,7 @@ struct hdd_config {
 #ifdef WLAN_LOGGING_SOCK_SVC_ENABLE
 	/* WLAN Logging */
 	bool wlan_logging_enable;
-	bool wlan_logging_to_console;
+	uint32_t wlan_console_log_levels;
 	uint8_t host_log_custom_nl_proto;
 #endif /* WLAN_LOGGING_SOCK_SVC_ENABLE */
 
@@ -174,6 +174,11 @@ struct hdd_config {
 	uint32_t bus_low_cnt_threshold;
 	bool enable_latency_crit_clients;
 #endif /*WLAN_FEATURE_DP_BUS_BANDWIDTH*/
+
+#ifdef WLAN_FEATURE_MSCS
+	uint32_t mscs_pkt_threshold;
+	uint32_t mscs_voice_interval;
+#endif /* WLAN_FEATURE_MSCS */
 
 #ifdef QCA_SUPPORT_TXRX_DRIVER_TCP_DEL_ACK
 	bool del_ack_enable;
@@ -214,6 +219,9 @@ struct hdd_config {
 #ifdef FEATURE_RUNTIME_PM
 	uint8_t runtime_pm;
 #endif
+#ifdef WLAN_FEATURE_WMI_SEND_RECV_QMI
+	bool is_qmi_stats_enabled;
+#endif
 	uint8_t inform_bss_rssi_raw;
 
 	bool mac_provision;
@@ -253,6 +261,12 @@ struct hdd_config {
 	/* Duration for which periodic logging should be done */
 	uint32_t periodic_stats_timer_duration;
 #endif /* WLAN_FEATURE_PERIODIC_STA_STATS */
+	uint8_t nb_commands_interval;
+
+#ifdef FEATURE_CLUB_LL_STATS_AND_GET_STATION
+	uint32_t sta_stats_cache_expiry_time;
+#endif
+	int icmp_req_to_fw_mark_interval;
 };
 
 /**
@@ -300,7 +314,61 @@ QDF_STATUS hdd_hex_string_to_u16_array(char *str, uint16_t *int_array,
 
 void hdd_cfg_print_global_config(struct hdd_context *hdd_ctx);
 
-QDF_STATUS hdd_update_nss(struct hdd_adapter *adapter, uint8_t nss);
+/**
+ * hdd_update_nss() - Update the number of spatial streams supported.
+ *
+ * @adapter: the pointer to adapter
+ * @tx_nss: the number of Tx spatial streams to be updated
+ * @rx_nss: the number of Rx spatial streams to be updated
+ *
+ * This function is used to modify the number of spatial streams
+ * supported when not in connected state.
+ *
+ * Return: QDF_STATUS_SUCCESS if nss is correctly updated,
+ *              otherwise QDF_STATUS_E_FAILURE would be returned
+ */
+QDF_STATUS hdd_update_nss(struct hdd_adapter *adapter, uint8_t tx_nss,
+			  uint8_t rx_nss);
+
+/**
+ * hdd_get_nss() - Get the number of spatial streams supported by the adapter
+ *
+ * @adapter: the pointer to adapter
+ * @nss: the number of spatial streams supported by the adapter
+ *
+ * This function is used to get the number of spatial streams supported by
+ * the adapter.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_get_nss(struct hdd_adapter *adapter, uint8_t *nss);
+
+/**
+ * hdd_get_tx_nss() - Get the number of spatial streams supported by the adapter
+ *
+ * @adapter: the pointer to adapter
+ * @tx_nss: the number Tx of spatial streams supported by the adapter
+ *
+ * This function is used to get the number of Tx spatial streams supported by
+ * the adapter.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_get_tx_nss(struct hdd_adapter *adapter, uint8_t *tx_nss);
+
+/**
+ * hdd_get_rx_nss() - Get the number of spatial streams supported by the adapter
+ *
+ * @adapter: the pointer to adapter
+ * @rx_nss: the number Rx of spatial streams supported by the adapter
+ *
+ * This function is used to get the number of Rx spatial streams supported by
+ * the adapter.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_get_rx_nss(struct hdd_adapter *adapter, uint8_t *rx_nss);
+
 
 /**
  * hdd_dfs_indicate_radar() - Block tx as radar found on the channel
@@ -317,6 +385,15 @@ QDF_STATUS hdd_update_nss(struct hdd_adapter *adapter, uint8_t nss);
 bool hdd_dfs_indicate_radar(struct hdd_context *hdd_ctx);
 
 /**
+ * hdd_restore_all_ps() - Restore all the powersave configuration overwritten
+ * by hdd_override_all_ps.
+ * @hdd_ctx: Pointer to HDD context.
+ *
+ * Return: None
+ */
+void hdd_restore_all_ps(struct hdd_context *hdd_ctx);
+
+/**
  * hdd_override_all_ps() - overrides to disables all the powersave features.
  * @hdd_ctx: Pointer to HDD context.
  * Overrides below powersave ini configurations.
@@ -330,6 +407,57 @@ bool hdd_dfs_indicate_radar(struct hdd_context *hdd_ctx);
  * Return: None
  */
 void hdd_override_all_ps(struct hdd_context *hdd_ctx);
+
+/**
+ * hdd_vendor_mode_to_phymode() - Get eCsrPhyMode according to vendor phy mode
+ * @vendor_phy_mode: vendor phy mode
+ * @crs_phy_mode: phy mode of eCsrPhyMode
+ *
+ * Return: 0 on success, negative errno value on error
+ */
+int hdd_vendor_mode_to_phymode(enum qca_wlan_vendor_phy_mode vendor_phy_mode,
+			       eCsrPhyMode *csr_phy_mode);
+
+/**
+ * hdd_vendor_mode_to_band() - Get band_info according to vendor phy mode
+ * @vendor_phy_mode: vendor phy mode
+ * @supported_band: supported band bitmap
+ * @is_6ghz_supported: whether 6ghz is supported
+ *
+ * Return: 0 on success, negative errno value on error
+ */
+int hdd_vendor_mode_to_band(enum qca_wlan_vendor_phy_mode vendor_phy_mode,
+			    uint8_t *supported_band, bool is_6ghz_supported);
+
+/**
+ * hdd_vendor_mode_to_bonding_mode() - Get channel bonding mode according to
+ * vendor phy mode
+ * @vendor_phy_mode: vendor phy mode
+ * @bonding_mode: channel bonding mode
+ *
+ * Return: 0 on success, negative errno value on error
+ */
+int
+hdd_vendor_mode_to_bonding_mode(enum qca_wlan_vendor_phy_mode vendor_phy_mode,
+				uint32_t *bonding_mode);
+
+/**
+ * hdd_update_phymode() - update the PHY mode of the adapter
+ * @adapter: adapter being modified
+ * @phymode: new PHY mode for the adapter
+ * @supported_band: supported band bitmap for the adapter
+ * @bonding_mode: new channel bonding mode for the adapter
+ *
+ * This function is called when the adapter is set to a new PHY mode.
+ * It takes a holistic look at the desired PHY mode along with the
+ * configured capabilities of the driver and the reported capabilities
+ * of the hardware in order to correctly configure all PHY-related
+ * parameters.
+ *
+ * Return: 0 on success, negative errno value on error
+ */
+int hdd_update_phymode(struct hdd_adapter *adapter, eCsrPhyMode phymode,
+		       uint8_t supported_band, uint32_t bonding_mode);
 
 /**
  * hdd_get_ldpc() - Get adapter LDPC

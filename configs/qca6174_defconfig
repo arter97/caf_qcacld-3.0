@@ -63,7 +63,7 @@ ifeq ($(CONFIG_ARCH_SDX20), y)
 CONFIG_MOBILE_ROUTER := y
 endif
 
-ifeq ($(CONFIG_ARCH_SDXPRAIRIE), y)
+ifeq (y, $(filter y, $(CONFIG_ARCH_SDXPRAIRIE), $(CONFIG_ARCH_SA515)))
 CONFIG_MOBILE_ROUTER := y
 endif
 
@@ -478,11 +478,6 @@ CONFIG_CHECKSUM_OFFLOAD := y
 #Enable GTK offload
 CONFIG_GTK_OFFLOAD := y
 
-#Enable EXT WOW
-ifeq ($(CONFIG_HIF_PCI), y)
-	CONFIG_EXT_WOW := y
-endif
-
 #Set this to 1 to catch erroneous Target accesses during debug.
 CONFIG_ATH_PCIE_ACCESS_DEBUG := n
 
@@ -751,4 +746,6 @@ CONFIG_SAP_DHCP_FW_IND := y
 
 #Enable FW Offload
 CONFIG_WLAN_FW_OFFLOAD := y
+
+CONFIG_FEATURE_SG := y
 

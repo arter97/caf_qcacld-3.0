@@ -50,6 +50,22 @@ QDF_STATUS ucfg_fwol_psoc_open(struct wlan_objmgr_psoc *psoc);
 void ucfg_fwol_psoc_close(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * ucfg_fwol_psoc_enable() - FWOL component enable
+ * @psoc: pointer to psoc object
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS ucfg_fwol_psoc_enable(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_fwol_psoc_close() - FWOL component disable
+ * @psoc: pointer to psoc object
+ *
+ * Return: None
+ */
+void ucfg_fwol_psoc_disable(struct wlan_objmgr_psoc *psoc);
+
+/**
  * ucfg_fwol_init() - initialize fwol_ctx context.
  *
  * This function initializes the fwol context.
@@ -66,6 +82,66 @@ QDF_STATUS ucfg_fwol_init(void);
  * Return: QDF_STATUS_SUCCESS - in case of success else return error
  */
 void ucfg_fwol_deinit(void);
+
+#ifdef FW_THERMAL_THROTTLE_SUPPORT
+/**
+ * ucfg_fwol_thermal_register_callbacks() - Register thermal callbacks
+ * to be called by fwol thermal
+ * @psoc: psoc object
+ * @cb: callback functions
+ *
+ * Currently only one callback notify_thermal_throttle_handler can be
+ * registered to fwol thermal core. The client will be notified by the callback
+ * when new thermal throttle level is changed in target.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_fwol_thermal_register_callbacks(
+				struct wlan_objmgr_psoc *psoc,
+				struct fwol_thermal_callbacks *cb);
+
+/**
+ * ucfg_fwol_thermal_unregister_callbacks() - unregister thermal callbacks
+ * @psoc: psoc object
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_fwol_thermal_unregister_callbacks(
+				struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_fwol_thermal_get_target_level() - get thermal level based on cached
+ *  target thermal throttle level
+ * @psoc: psoc object
+ * @level: target thermal throttle level info
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ucfg_fwol_thermal_get_target_level(struct wlan_objmgr_psoc *psoc,
+				   enum thermal_throttle_level *level);
+#else
+static inline QDF_STATUS ucfg_fwol_thermal_register_callbacks(
+				struct wlan_objmgr_psoc *psoc,
+				struct fwol_thermal_callbacks *cb)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS ucfg_fwol_thermal_unregister_callbacks(
+				struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+ucfg_fwol_thermal_get_target_level(struct wlan_objmgr_psoc *psoc,
+				   enum thermal_throttle_level *level)
+
+{
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
 
 /**
  * ucfg_fwol_get_coex_config_params() - Get coex config params
@@ -267,7 +343,7 @@ QDF_STATUS ucfg_fwol_get_enable_fw_log_type(struct wlan_objmgr_psoc *psoc,
  * @enable_fw_module_log_level:
  * pointer to enable_fw_module_log_level array
  * @enable_fw_module_log_level_num:
- * pointer to enable_fw_module_log_leve array element num
+ * pointer to enable_fw_module_log_level array element num
  *
  * Return: QDF Status
  */
@@ -275,6 +351,23 @@ QDF_STATUS ucfg_fwol_get_enable_fw_module_log_level(
 				struct wlan_objmgr_psoc *psoc,
 				uint8_t **enable_fw_module_log_level,
 				uint8_t *enable_fw_module_log_level_num);
+
+/**
+ * ucfg_fwol_wow_get_enable_fw_module_log_level() - Assigns
+ * enable_fw_module_log_level string
+ *
+ * @psoc: pointer to the psoc object
+ * @enable_fw_wow_module_log_level:
+ * pointer to enable_fw_wow_module_log_level array
+ * @enable_fw_wow_module_log_level_num:
+ * pointer to enable_fw_wow_module_log_level array element num
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS ucfg_fwol_wow_get_enable_fw_module_log_level(
+				struct wlan_objmgr_psoc *psoc,
+				uint8_t **enable_fw_wow_module_log_level,
+				uint8_t *enable_fw_wow_module_log_level_num);
 
 /**
  * ucfg_fwol_get_sap_xlna_bypass() - Assigns sap_xlna_bypass value
@@ -285,16 +378,6 @@ QDF_STATUS ucfg_fwol_get_enable_fw_module_log_level(
  */
 QDF_STATUS ucfg_fwol_get_sap_xlna_bypass(struct wlan_objmgr_psoc *psoc,
 					 bool *sap_xlna_bypass);
-
-/**
- * ucfg_fwol_get_ocl_cfg() - Assigns ocl_cfg value
- * @psoc: pointer to the psoc object
- * @ocl_cfg: pointer to return ocl_cfg
- *
- * Return: QDF Status
- */
-QDF_STATUS ucfg_fwol_get_ocl_cfg(struct wlan_objmgr_psoc *psoc,
-				 uint32_t *ocl_cfg);
 
 #ifdef FEATURE_WLAN_RA_FILTERING
 /**
@@ -624,6 +707,15 @@ static inline void ucfg_fwol_psoc_close(struct wlan_objmgr_psoc *psoc)
 {
 }
 
+static inline QDF_STATUS ucfg_fwol_psoc_enable(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline void ucfg_fwol_psoc_disable(struct wlan_objmgr_psoc *psoc)
+{
+}
+
 static inline QDF_STATUS ucfg_fwol_init(void)
 {
 	return QDF_STATUS_SUCCESS;
@@ -631,6 +723,26 @@ static inline QDF_STATUS ucfg_fwol_init(void)
 
 static inline void ucfg_fwol_deinit(void)
 {
+}
+
+static inline QDF_STATUS ucfg_fwol_thermal_register_callbacks(
+				struct wlan_objmgr_psoc *psoc,
+				struct fwol_thermal_callbacks *cb)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS ucfg_fwol_thermal_unregister_callbacks(
+				struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+ucfg_fwol_thermal_get_target_level(struct wlan_objmgr_psoc *psoc,
+				   enum thermal_throttle_level *level)
+{
+	return QDF_STATUS_E_FAILURE;
 }
 
 static inline QDF_STATUS
@@ -777,12 +889,6 @@ ucfg_fwol_get_enable_fw_module_log_level(
 static inline QDF_STATUS
 ucfg_fwol_get_sap_xlna_bypass(struct wlan_objmgr_psoc *psoc,
 			      uint8_t *sap_xlna_bypass)
-{
-	return QDF_STATUS_E_FAILURE;
-}
-
-static inline QDF_STATUS
-ucfg_fwol_get_ocl_cfg(struct wlan_objmgr_psoc *psoc, uint32_t *ocl_cfg)
 {
 	return QDF_STATUS_E_FAILURE;
 }

@@ -29,6 +29,7 @@
 #include "sir_mac_prot_def.h"
 #include "csr_link_list.h"
 #include "wlan_scan_public_structs.h"
+#include "wlan_mlme_public_struct.h"
 
 #define CSR_INVALID_SCANRESULT_HANDLE       (NULL)
 
@@ -378,8 +379,6 @@ typedef enum {
 	eCSR_ROAM_CHANNEL_COMPLETE_IND,
 	eCSR_ROAM_CAC_COMPLETE_IND,
 	eCSR_ROAM_SAE_COMPUTE,
-	/* LFR3 Roam sync complete */
-	eCSR_ROAM_SYNCH_COMPLETE,
 	eCSR_ROAM_FIPS_PMK_REQUEST,
 } eRoamCmdStatus;
 
@@ -720,9 +719,10 @@ struct csr_roam_profile {
 #ifdef WLAN_FEATURE_FILS_SK
 	uint8_t *hlp_ie;
 	uint32_t hlp_ie_len;
-	struct cds_fils_connection_info *fils_con_info;
+	struct wlan_fils_connection_info *fils_con_info;
 #endif
 	bool force_rsne_override;
+	bool is_hs_20_ap;
 };
 
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
@@ -902,6 +902,9 @@ struct csr_config_params {
 	uint32_t roam_dense_min_aps;
 	int8_t roam_bg_scan_bad_rssi_thresh;
 	uint8_t roam_bad_rssi_thresh_offset_2g;
+	uint32_t roam_data_rssi_threshold_triggers;
+	int32_t roam_data_rssi_threshold;
+	uint32_t rx_data_inactivity_time;
 	struct csr_sta_roam_policy_params sta_roam_policy_params;
 	enum force_1x1_type is_force_1x1;
 	uint32_t offload_11k_enable_bitmask;
@@ -1351,6 +1354,8 @@ typedef void (*sme_get_raom_scan_ch_callback)(
 				struct roam_scan_ch_resp *roam_ch,
 				void *context);
 
+#if defined(WLAN_LOGGING_SOCK_SVC_ENABLE) && \
+	defined(FEATURE_PKTLOG) && !defined(REMOVE_PKT_LOG)
 /**
  * csr_packetdump_timer_stop() - stops packet dump timer
  *
@@ -1360,6 +1365,20 @@ typedef void (*sme_get_raom_scan_ch_callback)(
  *
  */
 void csr_packetdump_timer_stop(void);
+
+/**
+ * csr_packetdump_timer_start() - start packet dump timer
+ *
+ * This function is used to start packet dump timer
+ *
+ * Return: None
+ *
+ */
+void csr_packetdump_timer_start(void);
+#else
+static inline void csr_packetdump_timer_stop(void) {}
+static inline void csr_packetdump_timer_start(void) {}
+#endif
 
 /**
  * csr_get_channel_status() - get chan info via channel number
@@ -1388,18 +1407,6 @@ void csr_clear_channel_status(struct mac_context *mac);
  */
 QDF_STATUS csr_update_owe_info(struct mac_context *mac,
 			       struct assoc_ind *assoc_ind);
-
-/**
- * csr_send_roam_offload_init_msg() - Send roam enable/disable flag to fw
- * @mac: mac context
- * @vdev_id: vdev id
- * @enable: enable/disable roam flag
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-csr_send_roam_offload_init_msg(struct mac_context *mac, uint32_t vdev_id,
-			       bool enable);
 
 typedef void (*csr_ani_callback)(int8_t *ani, void *context);
 
@@ -1444,4 +1451,13 @@ enum reg_phymode csr_convert_to_reg_phy_mode(eCsrPhyMode csr_phy_mode,
  */
 eCsrPhyMode csr_convert_from_reg_phy_mode(enum reg_phymode phymode);
 
+/*
+ * csr_update_beacon() - CSR API to update beacon template
+ * @mac: mac context
+ *
+ * This API is used to update beacon template to FW
+ *
+ * Return: None
+ */
+void csr_update_beacon(struct mac_context *mac);
 #endif

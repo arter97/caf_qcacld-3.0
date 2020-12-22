@@ -50,24 +50,26 @@ QDF_STATUS sys_build_message_header(SYS_MSG_ID msg_id,
 
 /**
  * umac_stop_complete_cb() - a callback when system stop completes
- * @user_data: pointer to user provided data context
+ * @msg: pointer to actual message being handled
  *
  * this callback is used once system stop is completed.
  *
- * Return: none
+ * Return: QDF_STATUS
  */
 #ifdef QDF_ENABLE_TRACING
-static void umac_stop_complete_cb(void *user_data)
+static QDF_STATUS umac_stop_complete_cb(struct scheduler_msg *msg)
 {
-	qdf_event_t *stop_evt = (qdf_event_t *) user_data;
+	qdf_event_t *stop_evt = msg->bodyptr;
 	QDF_STATUS qdf_status = qdf_event_set(stop_evt);
 
 	QDF_ASSERT(QDF_IS_STATUS_SUCCESS(qdf_status));
+
+	return qdf_status;
 }
 #else
-static void umac_stop_complete_cb(void *user_data)
+static QDF_STATUS umac_stop_complete_cb(struct scheduler_msg *msg)
 {
-	return;
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 
@@ -129,7 +131,6 @@ QDF_STATUS umac_stop(void)
 static QDF_STATUS sys_mc_process_msg(struct scheduler_msg *pMsg)
 {
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
-	data_stall_detect_cb data_stall_detect_callback;
 	mac_handle_t mac_handle;
 
 	if (!pMsg) {
@@ -153,24 +154,19 @@ static QDF_STATUS sys_mc_process_msg(struct scheduler_msg *pMsg)
 			QDF_TRACE(QDF_MODULE_ID_SYS, QDF_TRACE_LEVEL_ERROR,
 				"Processing SYS MC STOP");
 			mac_handle = cds_get_context(QDF_MODULE_ID_PE);
-			if (!mac_handle) {
-				QDF_TRACE(QDF_MODULE_ID_SYS,
-					QDF_TRACE_LEVEL_ERROR,
-					"%s: Invalid mac_handle", __func__);
+			if (!mac_handle)
 				break;
-			}
+
 			qdf_status = sme_stop(mac_handle);
 			QDF_ASSERT(QDF_IS_STATUS_SUCCESS(qdf_status));
 			qdf_status = mac_stop(mac_handle);
 			QDF_ASSERT(QDF_IS_STATUS_SUCCESS(qdf_status));
-			((sys_rsp_cb) pMsg->callback)(pMsg->bodyptr);
-			qdf_status = QDF_STATUS_SUCCESS;
+			qdf_status = pMsg->callback(pMsg);
 			break;
-
 		case SYS_MSG_ID_DATA_STALL_MSG:
-			data_stall_detect_callback = pMsg->callback;
-			if (data_stall_detect_callback)
-				data_stall_detect_callback(pMsg->bodyptr);
+			if (pMsg->callback)
+				qdf_status = pMsg->callback(pMsg);
+
 			qdf_mem_free(pMsg->bodyptr);
 			break;
 		default:

@@ -70,14 +70,18 @@
 #endif /* QCA_WIFI_3_0 */
 
 #if HTT_PADDR64
-#define HTT_TX_DESC_FRAG_FIELD_HI_UPDATE(frag_filed_ptr)                       \
+#define HTT_TX_DESC_FRAG_FIELD_UPDATE(frag_filed_ptr, frag_desc_addr)          \
 do {                                                                           \
+	*frag_filed_ptr = qdf_get_lower_32_bits(frag_desc_addr);               \
 	frag_filed_ptr++;                                                      \
 	/* frags_desc_ptr.hi */                                                \
-	*frag_filed_ptr = 0;                                                   \
+	*frag_filed_ptr = qdf_get_upper_32_bits(frag_desc_addr) & 0x1F;        \
 } while (0)
 #else
-#define HTT_TX_DESC_FRAG_FIELD_HI_UPDATE(frag_filed_ptr) {}
+#define HTT_TX_DESC_FRAG_FIELD_UPDATE(frag_filed_ptr, frag_desc_addr)          \
+do {                                                                           \
+	*frag_filed_ptr = qdf_get_lower_32_bits(frag_desc_addr);               \
+} while (0)
 #endif
 
 /*--- setup / tear-down functions -------------------------------------------*/
@@ -134,13 +138,14 @@ static void htt_tx_frag_desc_field_update(struct htt_pdev_t *pdev,
 	unsigned int target_page;
 	unsigned int offset;
 	struct qdf_mem_dma_page_t *dma_page;
+	qdf_dma_addr_t frag_desc_addr;
 
 	target_page = index / pdev->frag_descs.desc_pages.num_element_per_page;
 	offset = index % pdev->frag_descs.desc_pages.num_element_per_page;
 	dma_page = &pdev->frag_descs.desc_pages.dma_pages[target_page];
-	*fptr = (uint32_t)(dma_page->page_p_addr +
+	frag_desc_addr = (dma_page->page_p_addr +
 		offset * pdev->frag_descs.size);
-	HTT_TX_DESC_FRAG_FIELD_HI_UPDATE(fptr);
+	HTT_TX_DESC_FRAG_FIELD_UPDATE(fptr, frag_desc_addr);
 }
 
 /**
@@ -1131,18 +1136,9 @@ static int htt_tx_ipa_uc_wdi_tx_buf_alloc(struct htt_pdev_t *pdev,
 	qdf_dma_addr_t buffer_paddr;
 	uint32_t *header_ptr;
 	target_paddr_t *ring_vaddr;
-	qdf_mem_info_t *mem_map_table = NULL, *mem_info = NULL;
 	qdf_shared_mem_t *shared_tx_buffer;
 
 	ring_vaddr = (target_paddr_t *)pdev->ipa_uc_tx_rsc.tx_comp_ring->vaddr;
-	if (qdf_mem_smmu_s1_enabled(pdev->osdev)) {
-		mem_map_table = qdf_mem_map_table_alloc(uc_tx_buf_cnt);
-		if (!mem_map_table) {
-			qdf_print("Failed to allocate memory");
-			return 0;
-		}
-		mem_info = mem_map_table;
-	}
 
 	/* Allocate TX buffers as many as possible */
 	for (tx_buffer_count = 0;
@@ -1197,19 +1193,9 @@ static int htt_tx_ipa_uc_wdi_tx_buf_alloc(struct htt_pdev_t *pdev,
 		/* Memory barrier to ensure actual value updated */
 
 		ring_vaddr++;
-		if (qdf_mem_smmu_s1_enabled(pdev->osdev)) {
-			*mem_info = pdev->ipa_uc_tx_rsc.tx_buf_pool_strg[
-						tx_buffer_count]->mem_info;
-			 mem_info++;
-		}
 	}
 
 out:
-	if (qdf_mem_smmu_s1_enabled(pdev->osdev)) {
-		cds_smmu_map_unmap(true, tx_buffer_count,
-				   mem_map_table);
-		qdf_mem_free(mem_map_table);
-	}
 
 	return tx_buffer_count;
 }
@@ -1225,38 +1211,14 @@ out:
 static void htt_tx_buf_pool_free(struct htt_pdev_t *pdev)
 {
 	uint16_t idx;
-	qdf_mem_info_t *mem_map_table = NULL, *mem_info = NULL;
-	uint32_t num_unmapped = 0;
-
-	if (qdf_mem_smmu_s1_enabled(pdev->osdev)) {
-		mem_map_table = qdf_mem_map_table_alloc(
-					pdev->ipa_uc_tx_rsc.alloc_tx_buf_cnt);
-		if (!mem_map_table) {
-			qdf_print("Failed to allocate memory");
-			return;
-		}
-		mem_info = mem_map_table;
-	}
 
 	for (idx = 0; idx < pdev->ipa_uc_tx_rsc.alloc_tx_buf_cnt; idx++) {
 		if (pdev->ipa_uc_tx_rsc.tx_buf_pool_strg[idx]) {
-			if (qdf_mem_smmu_s1_enabled(pdev->osdev)) {
-				*mem_info = pdev->ipa_uc_tx_rsc.
-					      tx_buf_pool_strg[idx]->mem_info;
-				mem_info++;
-				num_unmapped++;
-			}
 			qdf_mem_shared_mem_free(pdev->osdev,
 						pdev->ipa_uc_tx_rsc.
 							tx_buf_pool_strg[idx]);
 			pdev->ipa_uc_tx_rsc.tx_buf_pool_strg[idx] = NULL;
 		}
-	}
-
-	if (qdf_mem_smmu_s1_enabled(pdev->osdev)) {
-		if (num_unmapped)
-			cds_smmu_map_unmap(false, num_unmapped, mem_map_table);
-		qdf_mem_free(mem_map_table);
 	}
 }
 #else
@@ -1276,18 +1238,9 @@ static int htt_tx_ipa_uc_wdi_tx_buf_alloc(struct htt_pdev_t *pdev,
 	uint32_t *header_ptr;
 	uint32_t *ring_vaddr;
 	uint16_t idx;
-	qdf_mem_info_t *mem_map_table = NULL, *mem_info = NULL;
 	qdf_shared_mem_t *shared_tx_buffer;
 
 	ring_vaddr = pdev->ipa_uc_tx_rsc.tx_comp_ring->vaddr;
-	if (qdf_mem_smmu_s1_enabled(pdev->osdev)) {
-		mem_map_table = qdf_mem_map_table_alloc(uc_tx_buf_cnt);
-		if (!mem_map_table) {
-			qdf_print("Failed to allocate memory");
-			return 0;
-		}
-		mem_info = mem_map_table;
-	}
 
 	/* Allocate TX buffers as many as possible */
 	for (tx_buffer_count = 0;
@@ -1331,11 +1284,6 @@ static int htt_tx_ipa_uc_wdi_tx_buf_alloc(struct htt_pdev_t *pdev,
 		/* Memory barrier to ensure actual value updated */
 
 		ring_vaddr++;
-		if (qdf_mem_smmu_s1_enabled(pdev->osdev)) {
-			*mem_info = pdev->ipa_uc_tx_rsc.tx_buf_pool_strg[
-						tx_buffer_count]->mem_info;
-			 mem_info++;
-		}
 	}
 
 pwr2:
@@ -1363,50 +1311,20 @@ pwr2:
 		}
 	}
 
-	if (qdf_mem_smmu_s1_enabled(pdev->osdev)) {
-		cds_smmu_map_unmap(true, tx_buffer_count_pwr2,
-				   mem_map_table);
-		qdf_mem_free(mem_map_table);
-	}
-
 	return tx_buffer_count_pwr2;
 }
 
 static void htt_tx_buf_pool_free(struct htt_pdev_t *pdev)
 {
 	uint16_t idx;
-	qdf_mem_info_t *mem_map_table = NULL, *mem_info = NULL;
-	uint32_t num_unmapped = 0;
-
-	if (qdf_mem_smmu_s1_enabled(pdev->osdev)) {
-		mem_map_table = qdf_mem_map_table_alloc(
-					pdev->ipa_uc_tx_rsc.alloc_tx_buf_cnt);
-		if (!mem_map_table) {
-			qdf_print("Failed to allocate memory");
-			return;
-		}
-		mem_info = mem_map_table;
-	}
 
 	for (idx = 0; idx < pdev->ipa_uc_tx_rsc.alloc_tx_buf_cnt; idx++) {
 		if (pdev->ipa_uc_tx_rsc.tx_buf_pool_strg[idx]) {
-			if (qdf_mem_smmu_s1_enabled(pdev->osdev)) {
-				*mem_info = pdev->ipa_uc_tx_rsc.
-					      tx_buf_pool_strg[idx]->mem_info;
-				mem_info++;
-				num_unmapped++;
-			}
 			qdf_mem_shared_mem_free(pdev->osdev,
 						pdev->ipa_uc_tx_rsc.
 							tx_buf_pool_strg[idx]);
 			pdev->ipa_uc_tx_rsc.tx_buf_pool_strg[idx] = NULL;
 		}
-	}
-
-	if (qdf_mem_smmu_s1_enabled(pdev->osdev)) {
-		if (num_unmapped)
-			cds_smmu_map_unmap(false, num_unmapped, mem_map_table);
-		qdf_mem_free(mem_map_table);
 	}
 }
 #endif
@@ -1465,6 +1383,8 @@ int htt_tx_ipa_uc_attach(struct htt_pdev_t *pdev,
 
 	pdev->ipa_uc_tx_rsc.alloc_tx_buf_cnt = htt_tx_ipa_uc_wdi_tx_buf_alloc(
 		pdev, uc_tx_buf_sz, uc_tx_buf_cnt, uc_tx_partition_base);
+
+	pdev->ipa_uc_tx_rsc.ipa_smmu_mapped = false;
 
 
 	return 0;
@@ -1677,11 +1597,8 @@ void htt_fill_wisa_ext_header(qdf_nbuf_t msdu,
 	void *qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
 	QDF_STATUS status;
 
-	if (!qdf_ctx) {
-		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			"%s: qdf_ctx is NULL", __func__);
+	if (!qdf_ctx)
 		return;
-	}
 
 	local_desc_ext->valid_mcs_mask = 1;
 	if (WISA_MODE_EXT_HEADER_6MBPS == type)
@@ -1777,11 +1694,9 @@ htt_tx_desc_init(htt_pdev_handle pdev,
 	qdf_dma_dir_t dir;
 	QDF_STATUS status;
 
-	if (qdf_unlikely(!qdf_ctx)) {
-		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			"%s: qdf_ctx is NULL", __func__);
+	if (qdf_unlikely(!qdf_ctx))
 		return QDF_STATUS_E_FAILURE;
-	}
+
 	if (qdf_unlikely(!msdu_info)) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 			"%s: bad arg: msdu_info is NULL", __func__);

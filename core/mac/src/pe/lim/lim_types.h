@@ -51,36 +51,38 @@
 #define TRACE_EVENT_AUTH_RSP_TIMER_ACT     0x6603
 
 /* MLM message types */
-#define LIM_MLM_MSG_START           1000
-#define LIM_MLM_SCAN_REQ            LIM_MLM_MSG_START
-#define LIM_MLM_SCAN_CNF            (LIM_MLM_MSG_START + 1)
-#define LIM_MLM_START_CNF           (LIM_MLM_MSG_START + 3)
-#define LIM_MLM_JOIN_REQ            (LIM_MLM_MSG_START + 4)
-#define LIM_MLM_JOIN_CNF            (LIM_MLM_MSG_START + 5)
-#define LIM_MLM_AUTH_REQ            (LIM_MLM_MSG_START + 6)
-#define LIM_MLM_AUTH_CNF            (LIM_MLM_MSG_START + 7)
-#define LIM_MLM_AUTH_IND            (LIM_MLM_MSG_START + 8)
-#define LIM_MLM_ASSOC_REQ           (LIM_MLM_MSG_START + 9)
-#define LIM_MLM_ASSOC_CNF           (LIM_MLM_MSG_START + 10)
-#define LIM_MLM_ASSOC_IND           (LIM_MLM_MSG_START + 11)
-#define LIM_MLM_DISASSOC_REQ        (LIM_MLM_MSG_START + 12)
-#define LIM_MLM_DISASSOC_CNF        (LIM_MLM_MSG_START + 13)
-#define LIM_MLM_DISASSOC_IND        (LIM_MLM_MSG_START + 14)
-#define LIM_MLM_REASSOC_CNF         (LIM_MLM_MSG_START + 15)
-#define LIM_MLM_REASSOC_IND         (LIM_MLM_MSG_START + 16)
-#define LIM_MLM_DEAUTH_REQ          (LIM_MLM_MSG_START + 17)
-#define LIM_MLM_DEAUTH_CNF          (LIM_MLM_MSG_START + 18)
-#define LIM_MLM_DEAUTH_IND          (LIM_MLM_MSG_START + 19)
-#define LIM_MLM_TSPEC_REQ           (LIM_MLM_MSG_START + 20)
-#define LIM_MLM_TSPEC_CNF           (LIM_MLM_MSG_START + 21)
-#define LIM_MLM_TSPEC_IND           (LIM_MLM_MSG_START + 22)
-#define LIM_MLM_SETKEYS_CNF         (LIM_MLM_MSG_START + 24)
-#define LIM_MLM_LINK_TEST_STOP_REQ  (LIM_MLM_MSG_START + 30)
-#define LIM_MLM_PURGE_STA_IND       (LIM_MLM_MSG_START + 31)
-/*
- * Values (LIM_MLM_MSG_START + 32) through
- * (LIM_MLM_MSG_START + 40) are unused.
- */
+enum mlmmsgtype {
+	LIM_MLM_MSG_START = 1000,
+	LIM_MLM_SCAN_REQ = LIM_MLM_MSG_START,
+	LIM_MLM_SCAN_CNF = (LIM_MLM_MSG_START + 1),
+	LIM_MLM_START_CNF  = (LIM_MLM_MSG_START + 3),
+	LIM_MLM_JOIN_REQ = (LIM_MLM_MSG_START + 4),
+	LIM_MLM_JOIN_CNF = (LIM_MLM_MSG_START + 5),
+	LIM_MLM_AUTH_REQ = (LIM_MLM_MSG_START + 6),
+	LIM_MLM_AUTH_CNF = (LIM_MLM_MSG_START + 7),
+	LIM_MLM_AUTH_IND = (LIM_MLM_MSG_START + 8),
+	LIM_MLM_ASSOC_REQ = (LIM_MLM_MSG_START + 9),
+	LIM_MLM_ASSOC_CNF = (LIM_MLM_MSG_START + 10),
+	LIM_MLM_ASSOC_IND = (LIM_MLM_MSG_START + 11),
+	LIM_MLM_DISASSOC_REQ = (LIM_MLM_MSG_START + 12),
+	LIM_MLM_DISASSOC_CNF = (LIM_MLM_MSG_START + 13),
+	LIM_MLM_DISASSOC_IND = (LIM_MLM_MSG_START + 14),
+	LIM_MLM_REASSOC_CNF = (LIM_MLM_MSG_START + 15),
+	LIM_MLM_REASSOC_IND = (LIM_MLM_MSG_START + 16),
+	LIM_MLM_DEAUTH_REQ = (LIM_MLM_MSG_START + 17),
+	LIM_MLM_DEAUTH_CNF = (LIM_MLM_MSG_START + 18),
+	LIM_MLM_DEAUTH_IND = (LIM_MLM_MSG_START + 19),
+	LIM_MLM_TSPEC_REQ = (LIM_MLM_MSG_START + 20),
+	LIM_MLM_TSPEC_CNF = (LIM_MLM_MSG_START + 21),
+	LIM_MLM_TSPEC_IND = (LIM_MLM_MSG_START + 22),
+	LIM_MLM_SETKEYS_CNF  =  LIM_MLM_MSG_START + 24,
+	LIM_MLM_LINK_TEST_STOP_REQ  =  LIM_MLM_MSG_START + 30,
+	LIM_MLM_PURGE_STA_IND = (LIM_MLM_MSG_START + 31),
+	/*
+	 * Values (LIM_MLM_MSG_START + 32) through
+	 * (LIM_MLM_MSG_START + 40) are unused.
+	 */
+};
 
 #define LIM_WEP_IN_FC           1
 #define LIM_NO_WEP_IN_FC        0
@@ -113,6 +115,9 @@
 #define HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME 0x40      /* Bit 6 will be used to control BD rate for Management frames */
 #define HAL_USE_PEER_STA_REQUESTED_MASK   0x80  /* bit 7 will be used to control frames for p2p interface */
 #define HAL_USE_PMF   0x20
+#define HAL_USE_INCORRECT_KEY_PMF   0x10
+
+#define MGMT_TX_USE_INCORRECT_KEY   BIT(0)
 
 #define LIM_DOS_PROTECTION_TIME 1000 //1000ms
 #define LIM_MIN_RSSI 0 /* 0dbm */
@@ -421,6 +426,17 @@ bool lim_fill_lim_assoc_ind_params(
 		struct pe_session *session_entry);
 
 /**
+ * lim_sae_auth_cleanup_retry() - API to cleanup sae auth frmae stored
+ * and deactivate the timer
+ * @mac_ctx: Pointer to mac context
+ * @vdev_id: vdev id
+ *
+ * Return: none
+ */
+void lim_sae_auth_cleanup_retry(struct mac_context *mac_ctx,
+				uint8_t vdev_id);
+
+/**
  * lim_fill_sme_assoc_ind_params() - Initialize association indication
  * @mac_ctx: Pointer to Global MAC structure
  * @assoc_ind: PE association indication structure
@@ -438,8 +454,38 @@ lim_fill_sme_assoc_ind_params(
 void lim_send_mlm_assoc_ind(struct mac_context *mac, tpDphHashNode sta,
 			    struct pe_session *pe_session);
 
-void lim_process_assoc_rsp_frame(struct mac_context *, uint8_t *, uint8_t, struct pe_session *);
+#define ASSOC_FRAME_LEN 0
+/**
+ * lim_process_assoc_rsp_frame() - Processes assoc response
+ * @mac_ctx:              Pointer to Global MAC structure
+ * @rx_packet_info:       A pointer to Rx packet info structure
+ * @reassoc_frame_length: Valid frame length if its a reassoc response frame
+ * else 0
+ * @sub_type: Indicates whether it is Association Response (=0) or
+ *             Reassociation Response (=1) frame
+ *
+ * This function is called by lim_handle80211_frames() or
+ * pe_roam_synch_callback() upon Re/Association Response frame reception or
+ * roam synch indication with reassociation response frame is received.
+ *
+ * Return: None
+ */
+void lim_process_assoc_rsp_frame(struct mac_context *mac, uint8_t *rx_pkt_info,
+				 uint32_t reassoc_frame_len, uint8_t subtype,
+				 struct pe_session *pe_session);
+
 void lim_process_disassoc_frame(struct mac_context *, uint8_t *, struct pe_session *);
+
+/**
+ * lim_get_nss_supported_by_ap() - finds out nss from AP's beacons
+ * @vht_caps: VHT capabilities
+ * @ht_caps: HT capabilities
+ *
+ * Return: nss advertised by AP in beacon
+ */
+uint8_t lim_get_nss_supported_by_ap(tDot11fIEVHTCaps *vht_caps,
+				    tDot11fIEHTCaps *ht_caps,
+				    tDot11fIEhe_cap *he_caps);
 /*
  * lim_perform_disassoc() - Actual action taken after receiving disassoc
  * @mac_ctx: Global MAC context
@@ -595,6 +641,24 @@ void lim_send_delts_req_action_frame(struct mac_context *mac, tSirMacAddr peer,
 				     struct pe_session *pe_session);
 void lim_send_addts_req_action_frame(struct mac_context *mac, tSirMacAddr peerMacAddr,
 				     tSirAddtsReqInfo *addts, struct pe_session *);
+
+#ifdef WLAN_FEATURE_MSCS
+/**
+ * lim_send_mscs_req_action_frame() - Send mscs req
+ * @mac_ctx: Handle for mac context
+ * @peer_mac: Mac address of requesting peer
+ * @mscs_req: mscs request buffer
+ * @pe_session: PE session id.
+ *
+ * Builds and sends mscs action frame to the peer.
+ *
+ * Return: void
+ */
+void lim_send_mscs_req_action_frame(struct mac_context *mac,
+				    struct qdf_mac_addr peer_mac,
+				    struct mscs_req_info *mscs_req,
+				    struct pe_session *pe_session);
+#endif
 
 /**
  * lim_send_assoc_rsp_mgmt_frame() - Send assoc response
@@ -774,7 +838,7 @@ void lim_handle_heart_beat_failure(struct mac_context *, struct pe_session *);
  * lim_tear_down_link_with_ap() - Tear down link with AP
  * @mac: mac context
  * @session_id: PE session id
- * @reason_code: Disconnect reason code as per emun eSirMacReasonCodes
+ * @reason_code: Disconnect reason code as per emun wlan_reason_code
  * @trigger: Disconnect trigger as per enum eLimDisassocTrigger
  *
  * Function that triggers link tear down with AP upon HB failure
@@ -783,7 +847,7 @@ void lim_handle_heart_beat_failure(struct mac_context *, struct pe_session *);
  */
 void lim_tear_down_link_with_ap(struct mac_context *mac,
 				uint8_t session_id,
-				tSirMacReasonCodes reason_code,
+				enum wlan_reason_code reason_code,
 				enum eLimDisassocTrigger trigger);
 
 /* / Function that defers the messages received */
@@ -1018,28 +1082,7 @@ lim_post_mlm_message(struct mac_context *mac, uint32_t msgType,
 static inline uint16_t
 lim_get_ielen_from_bss_description(struct bss_description *pBssDescr)
 {
-	uint16_t ielen;
-
-	if (!pBssDescr)
-		return 0;
-
-	/*
-	 * Length of BSS desription is without length of
-	 * length itself and length of pointer
-	 * that holds ieFields
-	 *
-	 * <------------sizeof(struct bss_description)-------------------->
-	 * +--------+---------------------------------+---------------+
-	 * | length | other fields                    | pointer to IEs|
-	 * +--------+---------------------------------+---------------+
-	 *                                            ^
-	 *                                            ieFields
-	 */
-
-	ielen = (uint16_t)(pBssDescr->length + sizeof(pBssDescr->length) -
-			   GET_FIELD_OFFSET(struct bss_description, ieFields));
-
-	return ielen;
+	return wlan_get_ielen_from_bss_description(pBssDescr);
 } /*** end lim_get_ielen_from_bss_description() ***/
 
 /**
@@ -1221,6 +1264,18 @@ void lim_process_assoc_failure_timeout(struct mac_context *mac_ctx,
 				       uint32_t msg_type);
 
 /**
+ * lim_send_frame() - API to send frame
+ * @mac_ctx Pointer to Global MAC structure
+ * @vdev_id: vdev id
+ * @buf: Pointer to SAE auth retry frame
+ * @buf_len: length of frame
+ *
+ * Return: None
+ */
+void lim_send_frame(struct mac_context *mac_ctx, uint8_t vdev_id, uint8_t *buf,
+		    uint16_t buf_len);
+
+/**
  * lim_send_mgmt_frame_tx() - Sends mgmt frame
  * @mac_ctx Pointer to Global MAC structure
  * @msg: Received message info
@@ -1291,6 +1346,24 @@ void lim_process_mlm_start_req(struct mac_context *mac_ctx,
 void lim_process_mlm_join_req(struct mac_context *mac_ctx,
 			      tLimMlmJoinReq *mlm_join_req);
 
+/**
+ * lim_post_join_set_link_state_callback()- registered callback to perform post
+ * peer creation operations
+ * @mac: pointer to global mac structure
+ * @callback_arg: registered callback argument
+ * @status: peer creation status
+ *
+ * This is registered callback function during association to perform
+ * post peer creation operation based on the peer creation status
+ *
+ * Return: none
+ */
+void
+lim_post_join_set_link_state_callback(struct mac_context *mac, uint32_t vdev_id,
+				      QDF_STATUS status);
+
+void lim_send_peer_create_resp(struct mac_context *mac, uint8_t vdev_id,
+			       QDF_STATUS status, uint8_t *peer_mac);
 /*
  * lim_process_mlm_deauth_req() - This function is called to process
  * MLM_DEAUTH_REQ message from SME

@@ -33,7 +33,7 @@
 
 void hdd_ipa_set_tx_flow_info(void)
 {
-	struct hdd_adapter *adapter;
+	struct hdd_adapter *adapter, *next_adapter = NULL;
 	struct hdd_station_ctx *sta_ctx;
 	struct hdd_ap_ctx *hdd_ap_ctx;
 	struct hdd_hostapd_state *hostapd_state;
@@ -55,22 +55,20 @@ void hdd_ipa_set_tx_flow_info(void)
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 #endif /* QCA_LL_LEGACY_TX_FLOW_CONTROL */
 	struct wlan_objmgr_psoc *psoc;
+	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_IPA_SET_TX_FLOW_INFO;
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	if (!hdd_ctx) {
-		hdd_err("HDD context is NULL");
+	if (!hdd_ctx)
 		return;
-	}
 
 	cds_ctx = cds_get_context(QDF_MODULE_ID_QDF);
-	if (!cds_ctx) {
-		hdd_err("Invalid CDS Context");
+	if (!cds_ctx)
 		return;
-	}
 
 	psoc = hdd_ctx->psoc;
 
-	hdd_for_each_adapter(hdd_ctx, adapter) {
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
+					   dbgid) {
 		switch (adapter->device_mode) {
 		case QDF_STA_MODE:
 			sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
@@ -207,6 +205,8 @@ void hdd_ipa_set_tx_flow_info(void)
 
 					if (!preAdapterContext) {
 						hdd_err("SCC: Previous adapter context NULL");
+						hdd_adapter_dev_put_debug(
+								adapter, dbgid);
 						continue;
 					}
 
@@ -255,6 +255,8 @@ void hdd_ipa_set_tx_flow_info(void)
 
 					if (!adapter5) {
 						hdd_err("MCC: 5GHz adapter context NULL");
+						hdd_adapter_dev_put_debug(
+								adapter, dbgid);
 						continue;
 					}
 					adapter5->tx_flow_low_watermark =
@@ -283,6 +285,8 @@ void hdd_ipa_set_tx_flow_info(void)
 
 					if (!adapter2_4) {
 						hdd_err("MCC: 2.4GHz adapter context NULL");
+						hdd_adapter_dev_put_debug(
+								adapter, dbgid);
 						continue;
 					}
 					adapter2_4->tx_flow_low_watermark =
@@ -315,6 +319,7 @@ void hdd_ipa_set_tx_flow_info(void)
 		}
 		targetChannel = 0;
 #endif /* QCA_LL_LEGACY_TX_FLOW_CONTROL */
+		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
 }
 
@@ -512,10 +517,8 @@ void hdd_ipa_set_mcc_mode(bool mcc_mode)
 	struct hdd_context *hdd_ctx;
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	if (!hdd_ctx) {
-		hdd_err("HDD context is NULL");
+	if (!hdd_ctx)
 		return;
-	}
 
 	ucfg_ipa_set_mcc_mode(hdd_ctx->pdev, mcc_mode);
 }

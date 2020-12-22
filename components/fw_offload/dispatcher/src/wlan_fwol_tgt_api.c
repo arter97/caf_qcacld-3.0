@@ -166,9 +166,61 @@ static void tgt_fwol_register_elna_rx_ops(struct wlan_fwol_rx_ops *rx_ops)
 }
 #endif /* WLAN_FEATURE_ELNA */
 
+#ifdef FW_THERMAL_THROTTLE_SUPPORT
+/**
+ * notify_thermal_throttle_handler() - Thermal throttle stats event handler
+ * @psoc: psoc object
+ * @info: thermal throttle stats info from target if layer
+ *
+ * The handle will be registered to target if layer. Target if layer
+ * will notify the new level from firmware thermal stats event.
+ *
+ * Return: QDF_STATUS_SUCCESS for success
+ */
+static QDF_STATUS
+notify_thermal_throttle_handler(struct wlan_objmgr_psoc *psoc,
+				struct thermal_throttle_info *info)
+{
+	struct wlan_fwol_psoc_obj *fwol_obj;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	struct fwol_thermal_callbacks *thermal_cbs;
+
+	if (!psoc) {
+		fwol_err("NULL psoc handle");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	fwol_obj = fwol_get_psoc_obj(psoc);
+	if (!fwol_obj) {
+		fwol_err("Failed to get FWOL Obj");
+		return QDF_STATUS_E_INVAL;
+	}
+	thermal_cbs = &fwol_obj->thermal_cbs;
+	fwol_obj->thermal_throttle.level = info->level;
+	if (thermal_cbs->notify_thermal_throttle_handler)
+		status = thermal_cbs->notify_thermal_throttle_handler(psoc,
+								      info);
+	else
+		fwol_debug("no thermal throttle handler");
+
+	return status;
+}
+
+static void tgt_fwol_register_thermal_rx_ops(struct wlan_fwol_rx_ops *rx_ops)
+{
+	rx_ops->notify_thermal_throttle_handler =
+					notify_thermal_throttle_handler;
+}
+#else
+static void tgt_fwol_register_thermal_rx_ops(struct wlan_fwol_rx_ops *rx_ops)
+{
+}
+#endif
+
 QDF_STATUS tgt_fwol_register_rx_ops(struct wlan_fwol_rx_ops *rx_ops)
 {
 	tgt_fwol_register_elna_rx_ops(rx_ops);
+	tgt_fwol_register_thermal_rx_ops(rx_ops);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -183,4 +235,15 @@ QDF_STATUS tgt_fwol_pdev_param_send(struct wlan_objmgr_pdev *pdev,
 
 	return wmi_unified_pdev_param_send(wmi_handle, &pdev_param,
 					   FWOL_WILDCARD_PDEV_ID);
+}
+
+QDF_STATUS tgt_fwol_vdev_param_send(struct wlan_objmgr_psoc *psoc,
+				    struct vdev_set_params vdev_param)
+{
+	wmi_unified_t wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+
+	if (!wmi_handle)
+		return QDF_STATUS_E_FAILURE;
+
+	return wmi_unified_vdev_set_param_send(wmi_handle, &vdev_param);
 }

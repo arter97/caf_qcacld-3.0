@@ -22,6 +22,7 @@
 #include "wlan_fw_offload_main.h"
 #include "cds_api.h"
 #include "wma.h"
+#include "wlan_fwol_tgt_api.h"
 
 struct wlan_fwol_psoc_obj *fwol_get_psoc_obj(struct wlan_objmgr_psoc *psoc)
 {
@@ -146,6 +147,13 @@ fwol_init_thermal_temp_in_cfg(struct wlan_objmgr_psoc *psoc,
 				cfg_get(psoc, CFG_THROTTLE_DUTY_CYCLE_LEVEL4);
 	thermal_temp->throttle_dutycycle_level[5] =
 				cfg_get(psoc, CFG_THROTTLE_DUTY_CYCLE_LEVEL5);
+	thermal_temp->priority_apps =
+				cfg_get(psoc, CFG_THERMAL_APPS_PRIORITY);
+	thermal_temp->priority_wpps =
+				cfg_get(psoc, CFG_THERMAL_WPPS_PRIOITY);
+	thermal_temp->thermal_action =
+				cfg_get(psoc, CFG_THERMAL_MGMT_ACTION);
+
 }
 
 QDF_STATUS fwol_init_neighbor_report_cfg(struct wlan_objmgr_psoc *psoc,
@@ -208,10 +216,9 @@ fwol_set_adaptive_dwelltime_config(
 	QDF_STATUS status;
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma_handle) {
-		fwol_err("wma handle is null");
+	if (!wma_handle)
 		return QDF_STATUS_E_FAILURE;
-	}
+
 	status = wma_send_adapt_dwelltime_params(wma_handle,
 						 dwelltime_params);
 	return status;
@@ -490,6 +497,7 @@ QDF_STATUS fwol_cfg_on_psoc_enable(struct wlan_objmgr_psoc *psoc)
 	struct wlan_fwol_psoc_obj *fwol_obj;
 	struct wlan_fwol_cfg *fwol_cfg;
 	qdf_size_t enable_fw_module_log_level_num;
+	qdf_size_t enable_fw_wow_mod_log_level_num;
 
 	fwol_obj = fwol_get_psoc_obj(psoc);
 	if (!fwol_obj) {
@@ -526,6 +534,12 @@ QDF_STATUS fwol_cfg_on_psoc_enable(struct wlan_objmgr_psoc *psoc)
 			      &enable_fw_module_log_level_num);
 	fwol_cfg->enable_fw_module_log_level_num =
 				(uint8_t)enable_fw_module_log_level_num;
+	qdf_uint8_array_parse(cfg_get(psoc, CFG_ENABLE_FW_WOW_MODULE_LOG_LEVEL),
+			      fwol_cfg->enable_fw_mod_wow_log_level,
+			      FW_MODULE_LOG_LEVEL_STRING_LENGTH,
+			      &enable_fw_wow_mod_log_level_num);
+	fwol_cfg->enable_fw_mod_wow_log_level_num =
+				(uint8_t)enable_fw_wow_mod_log_level_num;
 	ucfg_fwol_init_tsf_ptp_options(psoc, fwol_cfg);
 	ucfg_fwol_init_sae_cfg(psoc, fwol_cfg);
 	fwol_cfg->lprx_enable = cfg_get(psoc, CFG_LPRX);
@@ -540,7 +554,8 @@ QDF_STATUS fwol_cfg_on_psoc_enable(struct wlan_objmgr_psoc *psoc)
 	ucfg_fwol_fetch_tsf_sync_host_gpio_pin(psoc, fwol_cfg);
 	ucfg_fwol_fetch_dhcp_server_settings(psoc, fwol_cfg);
 	fwol_cfg->sap_xlna_bypass = cfg_get(psoc, CFG_SET_SAP_XLNA_BYPASS);
-	fwol_cfg->ocl_cfg = cfg_get(psoc, CFG_SET_OCL_CFG);
+	fwol_cfg->enable_ilp = cfg_get(psoc, CFG_SET_ENABLE_ILP);
+	fwol_cfg->sap_sho = cfg_get(psoc, CFG_SAP_SHO_CONFIG);
 
 	return status;
 }
@@ -643,4 +658,36 @@ void fwol_release_rx_event(struct wlan_fwol_rx_event *event)
 	if (event->psoc)
 		wlan_objmgr_psoc_release_ref(event->psoc, WLAN_FWOL_SB_ID);
 	qdf_mem_free(event);
+}
+
+QDF_STATUS fwol_set_ilp_config(struct wlan_objmgr_pdev *pdev, bool enable_ilp)
+{
+	QDF_STATUS status;
+	struct pdev_params pdev_param;
+
+	pdev_param.param_id = WMI_PDEV_PARAM_PCIE_HW_ILP;
+	pdev_param.param_value = enable_ilp;
+
+	status = tgt_fwol_pdev_param_send(pdev, pdev_param);
+	if (QDF_IS_STATUS_ERROR(status))
+		fwol_err("WMI_PDEV_PARAM_PCIE_HW_ILP failed %d", status);
+
+	return status;
+}
+
+QDF_STATUS fwol_set_sap_sho(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			    uint32_t sap_sho)
+{
+	QDF_STATUS status;
+	struct vdev_set_params vdev_param;
+
+	vdev_param.vdev_id = vdev_id;
+	vdev_param.param_id = WMI_VDEV_PARAM_SHO_CONFIG;
+	vdev_param.param_value = sap_sho;
+
+	status = tgt_fwol_vdev_param_send(psoc, vdev_param);
+	if (QDF_IS_STATUS_ERROR(status))
+		fwol_err("WMI_VDEV_PARAM_SHO_CONFIG failed %d", status);
+
+	return status;
 }

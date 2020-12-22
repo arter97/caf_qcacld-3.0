@@ -104,6 +104,10 @@ static inline mac_handle_t MAC_HANDLE(struct mac_context *mac)
 #define HIGH_SEQ_NUM_OFFSET                             4
 #define DEF_HE_AUTO_SGI_LTF                             0x0F07
 
+#define PMF_WEP_DISABLE 2
+#define PMF_INCORRECT_KEY 1
+#define PMF_CORRECT_KEY 0
+
 /**
  * enum log_event_type - Type of event initiating bug report
  * @WLAN_LOG_TYPE_NON_FATAL: Non fatal event
@@ -514,6 +518,9 @@ typedef struct sAniSirLim {
 	tCacheParams protStaOverlapCache[LIM_PROT_STA_OVERLAP_CACHE_SIZE];
 	tCacheParams protStaCache[LIM_PROT_STA_CACHE_SIZE];
 
+	/* Peer RSSI value */
+	int8_t bss_rssi;
+
 	/* ASSOC RELATED END */
 
 	/* //////////////////////////////  HT RELATED           ////////////////////////////////////////// */
@@ -640,9 +647,7 @@ typedef struct sAniSirLim {
 
 	QDF_STATUS(*sme_msg_callback)
 		(struct mac_context *mac, struct scheduler_msg *msg);
-	QDF_STATUS(*stop_roaming_callback)
-		(mac_handle_t mac, uint8_t session_id, uint8_t reason,
-		 uint32_t requestor);
+	stop_roaming_fn_t stop_roaming_callback;
 	uint8_t retry_packet_cnt;
 	uint8_t beacon_probe_rsp_cnt_per_scan;
 	wlan_scan_requester req_id;
@@ -665,19 +670,22 @@ typedef struct sRrmContext {
 } tRrmContext, *tpRrmContext;
 
 /**
- * enum auth_tx_ack_status - Indicate TX status of AUTH
- * @LIM_AUTH_ACK_NOT_RCD : Default status while waiting for ack status.
- * @LIM_AUTH_ACK_RCD_SUCCESS : Ack is received.
- * @LIM_AUTH_ACK_RCD_FAILURE : No Ack received.
+ * enum tx_ack_status - Indicate TX status
+ * @LIM_ACK_NOT_RCD: Default status while waiting for ack status.
+ * @LIM_ACK_RCD_SUCCESS: Ack is received.
+ * @LIM_ACK_RCD_FAILURE: No Ack received.
+ * @LIM_TX_FAILED: Failed to TX
  *
  * Indicate if driver is waiting for ACK status of auth or ACK received for AUTH
  * OR NO ACK is received for the auth sent.
  */
-enum auth_tx_ack_status {
-	LIM_AUTH_ACK_NOT_RCD,
-	LIM_AUTH_ACK_RCD_SUCCESS,
-	LIM_AUTH_ACK_RCD_FAILURE,
+enum tx_ack_status {
+	LIM_ACK_NOT_RCD,
+	LIM_ACK_RCD_SUCCESS,
+	LIM_ACK_RCD_FAILURE,
+	LIM_TX_FAILED,
 };
+
 /**
  * struct vdev_type_nss - vdev type nss structure
  * @sta: STA Nss value.
@@ -767,11 +775,13 @@ struct mac_context {
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_pdev *pdev;
 	void (*chan_info_cb)(struct scan_chan_info *chan_info);
+	void (*del_peers_ind_cb)(struct wlan_objmgr_psoc *psoc,
+				 uint8_t vdev_id);
 	enum  country_src reg_hint_src;
 	uint32_t rx_packet_drop_counter;
-	enum auth_tx_ack_status auth_ack_status;
+	enum tx_ack_status auth_ack_status;
+	enum tx_ack_status assoc_ack_status;
 	uint8_t user_configured_nss;
-	bool ignore_assoc_disallowed;
 	uint32_t peer_rssi;
 	uint32_t peer_txrate;
 	uint32_t peer_rxrate;
@@ -797,6 +807,7 @@ struct mac_context {
 	bool he_om_ctrl_cfg_tx_nsts_set;
 	uint8_t he_om_ctrl_cfg_tx_nsts;
 	bool he_om_ctrl_ul_mu_data_dis;
+	uint8_t is_usr_cfg_pmf_wep;
 #ifdef WLAN_FEATURE_11AX
 	tDot11fIEhe_cap he_cap_2g;
 	tDot11fIEhe_cap he_cap_5g;

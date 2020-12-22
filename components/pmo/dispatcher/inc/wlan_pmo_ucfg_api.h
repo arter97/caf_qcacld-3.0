@@ -217,6 +217,16 @@ enum powersave_mode
 ucfg_pmo_get_power_save_mode(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * ucfg_pmo_get_default_power_save_mode() - Get default power save mode
+ * from ini config
+ * @psoc: pointer to psoc object
+ *
+ * Return: power save mode
+ */
+enum powersave_mode
+ucfg_pmo_get_default_power_save_mode(struct wlan_objmgr_psoc *psoc);
+
+/**
  * ucfg_pmo_set_power_save_mode() - Set power save mode
  * @psoc: pointer to psoc object
  * @val:  power save mode
@@ -1010,6 +1020,22 @@ uint16_t ucfg_pmo_get_wow_pulse_interval_high(struct wlan_objmgr_psoc *psoc);
  * Return: wow pulse interval high configuration
  */
 uint16_t ucfg_pmo_get_wow_pulse_interval_low(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_pmo_get_wow_pulse_repeat_count() - to get wow pulse repeat count
+ * @psoc: objmgr psoc handle
+ *
+ * Return: wow pulse repeat count configuration
+ */
+uint32_t ucfg_pmo_get_wow_pulse_repeat_count(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_pmo_get_wow_pulse_init_state() - to get wow pulse init state
+ * @psoc: objmgr psoc handle
+ *
+ * Return: wow pulse init state configuration
+ */
+uint32_t ucfg_pmo_get_wow_pulse_init_state(struct wlan_objmgr_psoc *psoc);
 #else
 static inline bool
 ucfg_pmo_is_wow_pulse_enabled(struct wlan_objmgr_psoc *psoc)
@@ -1025,6 +1051,18 @@ ucfg_pmo_get_wow_pulse_pin(struct wlan_objmgr_psoc *psoc)
 
 static inline uint16_t
 ucfg_pmo_get_wow_pulse_interval_high(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
+}
+
+static inline uint32_t
+ucfg_pmo_get_wow_pulse_repeat_count(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
+}
+
+static inline uint32_t
+ucfg_pmo_get_wow_pulse_init_state(struct wlan_objmgr_psoc *psoc)
 {
 	return 0;
 }
@@ -1097,6 +1135,51 @@ bool ucfg_pmo_is_apf_enabled(struct wlan_objmgr_psoc *psoc);
 static inline bool ucfg_pmo_is_apf_enabled(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
+}
+#endif
+
+#ifdef WLAN_ENABLE_GPIO_WAKEUP
+/**
+ * ucfg_pmo_get_enable_gpio_wakeup() - to get gpio wakeup enable configuration
+ * @psoc: objmgr psoc handle
+ *
+ * Return: gpio wakeup enable configuration
+ */
+bool ucfg_pmo_is_gpio_wakeup_enabled(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_pmo_get_gpio_wakeup_pin() - to get gpio wakeup pin number
+ * @psoc: objmgr psoc handle
+ *
+ * Return: gpio wakeup pin number
+ */
+uint32_t ucfg_pmo_get_gpio_wakeup_pin(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_pmo_get_gpio_wakeup_mode() - to get gpio wakeup interrupt mode
+ * @psoc: objmgr psoc handle
+ *
+ * Return: gpio wakeup mode
+ */
+enum pmo_gpio_wakeup_mode
+ucfg_pmo_get_gpio_wakeup_mode(struct wlan_objmgr_psoc *psoc);
+#else
+static inline bool
+ucfg_pmo_is_gpio_wakeup_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline uint32_t
+ucfg_pmo_get_gpio_wakeup_pin(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
+}
+
+static inline enum pmo_gpio_wakeup_mode
+ucfg_pmo_get_gpio_wakeup_mode(struct wlan_objmgr_psoc *psoc)
+{
+	return PMO_GPIO_WAKEUP_MODE_INVALID;
 }
 #endif
 
@@ -1700,6 +1783,12 @@ static inline enum powersave_mode
 ucfg_pmo_get_power_save_mode(struct wlan_objmgr_psoc *psoc)
 {
 	return 0;
+}
+
+static inline enum powersave_mode
+ucfg_pmo_get_default_power_save_mode(struct wlan_objmgr_psoc *psoc)
+{
+	return PMO_PS_ADVANCED_POWER_SAVE_DISABLE;
 }
 
 static inline void

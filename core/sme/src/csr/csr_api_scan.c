@@ -53,6 +53,7 @@
 #include "qdf_crypto.h"
 #include <wlan_crypto_global_api.h>
 #include "wlan_reg_ucfg_api.h"
+#include "wlan_cm_bss_score_param.h"
 
 static void csr_set_cfg_valid_channel_list(struct mac_context *mac,
 					   uint32_t *pchan_freq_list,
@@ -158,12 +159,16 @@ QDF_STATUS csr_scan_handle_search_for_ssid(struct mac_context *mac_ctx,
 			break;
 		}
 		status = csr_roam_get_scan_filter_from_profile(mac_ctx, profile,
-							       filter, false);
+							       filter, false,
+							       session_id);
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			qdf_mem_free(filter);
 			break;
 		}
-		status = csr_scan_get_result(mac_ctx, filter, &hBSSList);
+		if (!csr_connect_security_valid_for_6ghz(mac_ctx->psoc,
+							 session_id, profile))
+			filter->ignore_6ghz_channel = true;
+		status = csr_scan_get_result(mac_ctx, filter, &hBSSList, true);
 		qdf_mem_free(filter);
 		if (!QDF_IS_STATUS_SUCCESS(status))
 			break;
@@ -211,10 +216,10 @@ csr_handle_fils_scan_for_ssid_failure(struct csr_roam_profile *roam_profile,
 	if (roam_profile && roam_profile->fils_con_info &&
 	    roam_profile->fils_con_info->is_fils_connection) {
 		sme_debug("send roam_info for FILS connection failure, seq %d",
-			  roam_profile->fils_con_info->sequence_number);
+			  roam_profile->fils_con_info->erp_sequence_number);
 		roam_info->is_fils_connection = true;
 		roam_info->fils_seq_num =
-				roam_profile->fils_con_info->sequence_number;
+			roam_profile->fils_con_info->erp_sequence_number;
 		return true;
 	}
 
@@ -614,11 +619,7 @@ static void csr_diag_reset_country_information(struct mac_context *mac)
 				mac->scan.defaultPowerTable[Index].tx_power;
 		}
 	}
-	if (!mac->mlme_cfg->gen.enabled_11d)
-		p11dLog->supportMultipleDomain = WLAN_80211D_DISABLED;
-	else
-		p11dLog->supportMultipleDomain =
-			WLAN_80211D_SUPPORT_MULTI_DOMAIN;
+
 	WLAN_HOST_DIAG_LOG_REPORT(p11dLog);
 }
 #endif /* FEATURE_WLAN_DIAG_SUPPORT_CSR */
@@ -1330,7 +1331,7 @@ QDF_STATUS csr_scan_for_ssid(struct mac_context *mac_ctx, uint32_t session_id,
 	else
 		status = csr_roam_copy_profile(mac_ctx,
 					session->scan_info.profile,
-					profile);
+					profile, session_id);
 	if (QDF_IS_STATUS_ERROR(status))
 		goto error;
 	scan_id = ucfg_scan_get_scan_id(mac_ctx->psoc);
@@ -1641,10 +1642,10 @@ QDF_STATUS csr_scan_create_entry_in_scan_cache(struct mac_context *mac,
 	if (!pSession) {
 		return QDF_STATUS_E_FAILURE;
 	}
-	sme_debug("Current bssid::"QDF_MAC_ADDR_STR,
-		QDF_MAC_ADDR_ARRAY(pSession->pConnectBssDesc->bssId));
-	sme_debug("My bssid::"QDF_MAC_ADDR_STR" ch_freq %d",
-		QDF_MAC_ADDR_ARRAY(bssid.bytes), ch_freq);
+	sme_debug("Current bssid::"QDF_MAC_ADDR_FMT,
+		QDF_MAC_ADDR_REF(pSession->pConnectBssDesc->bssId));
+	sme_debug("My bssid::"QDF_MAC_ADDR_FMT" ch_freq %d",
+		QDF_MAC_ADDR_REF(bssid.bytes), ch_freq);
 
 	size = pSession->pConnectBssDesc->length +
 		sizeof(pSession->pConnectBssDesc->length);
@@ -1708,8 +1709,8 @@ csr_rso_save_ap_to_scan_cache(struct mac_context *mac,
 			bss_desc_ptr,
 			(sizeof(struct bss_description) + length));
 
-	sme_debug("LFR3:Add BSSID to scan cache" QDF_MAC_ADDR_STR,
-		QDF_MAC_ADDR_ARRAY(scan_res_ptr->Result.BssDescriptor.bssId));
+	sme_debug("LFR3:Add BSSID to scan cache" QDF_MAC_ADDR_FMT,
+		QDF_MAC_ADDR_REF(scan_res_ptr->Result.BssDescriptor.bssId));
 	csr_scan_add_result(mac, scan_res_ptr);
 	csr_free_scan_result_entry(mac, scan_res_ptr);
 	return QDF_STATUS_SUCCESS;
@@ -1887,7 +1888,8 @@ csr_scan_get_channel_for_hw_mode_change(struct mac_context *mac_ctx,
 	uint32_t first_ap_ch_freq = 0, candidate_ch_freq;
 
 	status = sme_get_ap_channel_from_scan_cache(profile, &result_handle,
-						    &first_ap_ch_freq);
+						    &first_ap_ch_freq,
+						    session_id);
 	if (status != QDF_STATUS_SUCCESS || !result_handle ||
 	    !first_ap_ch_freq) {
 		if (result_handle)
@@ -1916,314 +1918,178 @@ csr_scan_get_channel_for_hw_mode_change(struct mac_context *mac_ctx,
 	return candidate_ch_freq;
 }
 
-enum wlan_auth_type csr_covert_auth_type_new(enum csr_akm_type auth)
+static void csr_fill_rsn_auth_type(enum csr_akm_type *auth_type, uint32_t akm)
 {
-	switch (auth) {
-	case eCSR_AUTH_TYPE_NONE:
-	case eCSR_AUTH_TYPE_OPEN_SYSTEM:
-		return WLAN_AUTH_TYPE_OPEN_SYSTEM;
-	case eCSR_AUTH_TYPE_SHARED_KEY:
-		return WLAN_AUTH_TYPE_SHARED_KEY;
-	case eCSR_AUTH_TYPE_AUTOSWITCH:
-		return WLAN_AUTH_TYPE_AUTOSWITCH;
-	case eCSR_AUTH_TYPE_WPA:
-		return WLAN_AUTH_TYPE_WPA;
-	case eCSR_AUTH_TYPE_WPA_PSK:
-		return WLAN_AUTH_TYPE_WPA_PSK;
-	case eCSR_AUTH_TYPE_WPA_NONE:
-		return WLAN_AUTH_TYPE_WPA_NONE;
-	case eCSR_AUTH_TYPE_RSN:
-		return WLAN_AUTH_TYPE_RSN;
-	case eCSR_AUTH_TYPE_RSN_PSK:
-		return WLAN_AUTH_TYPE_RSN_PSK;
-	case eCSR_AUTH_TYPE_FT_RSN:
-		return WLAN_AUTH_TYPE_FT_RSN;
-	case eCSR_AUTH_TYPE_FT_RSN_PSK:
-		return WLAN_AUTH_TYPE_FT_RSN_PSK;
-	case eCSR_AUTH_TYPE_WAPI_WAI_CERTIFICATE:
-		return WLAN_AUTH_TYPE_WAPI_WAI_CERTIFICATE;
-	case eCSR_AUTH_TYPE_WAPI_WAI_PSK:
-		return WLAN_AUTH_TYPE_WAPI_WAI_PSK;
-	case eCSR_AUTH_TYPE_CCKM_WPA:
-		return WLAN_AUTH_TYPE_CCKM_WPA;
-	case eCSR_AUTH_TYPE_CCKM_RSN:
-		return WLAN_AUTH_TYPE_CCKM_RSN;
-	case eCSR_AUTH_TYPE_RSN_PSK_SHA256:
-		return WLAN_AUTH_TYPE_RSN_PSK_SHA256;
-	case eCSR_AUTH_TYPE_RSN_8021X_SHA256:
-		return WLAN_AUTH_TYPE_RSN_8021X_SHA256;
-	case eCSR_AUTH_TYPE_FILS_SHA256:
-		return WLAN_AUTH_TYPE_FILS_SHA256;
-	case eCSR_AUTH_TYPE_FILS_SHA384:
-		return WLAN_AUTH_TYPE_FILS_SHA384;
-	case eCSR_AUTH_TYPE_FT_FILS_SHA256:
-		return WLAN_AUTH_TYPE_FT_FILS_SHA256;
-	case eCSR_AUTH_TYPE_FT_FILS_SHA384:
-		return WLAN_AUTH_TYPE_FT_FILS_SHA384;
-	case eCSR_AUTH_TYPE_DPP_RSN:
-		return WLAN_AUTH_TYPE_DPP_RSN;
-	case eCSR_AUTH_TYPE_OWE:
-		return WLAN_AUTH_TYPE_OWE;
-	case eCSR_AUTH_TYPE_SUITEB_EAP_SHA256:
-		return WLAN_AUTH_TYPE_SUITEB_EAP_SHA256;
-	case eCSR_AUTH_TYPE_SUITEB_EAP_SHA384:
-		return WLAN_AUTH_TYPE_SUITEB_EAP_SHA384;
-	case eCSR_AUTH_TYPE_SAE:
-		return WLAN_AUTH_TYPE_SAE;
-	case eCSR_AUTH_TYPE_OSEN:
-		return WLAN_AUTH_TYPE_OSEN;
-	case eCSR_AUTH_TYPE_FT_SAE:
-		return WLAN_AUTH_TYPE_FT_SAE;
-	case eCSR_AUTH_TYPE_FT_SUITEB_EAP_SHA384:
-		return WLAN_AUTH_TYPE_FT_SUITEB_EAP_SHA384;
-	case eCSR_NUM_OF_SUPPORT_AUTH_TYPE:
-	default:
-		return WLAN_AUTH_TYPE_OPEN_SYSTEM;
-	}
+	/* Try the more preferred ones first. */
+	if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_FILS_SHA384))
+		*auth_type = eCSR_AUTH_TYPE_FT_FILS_SHA384;
+	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_FILS_SHA256))
+		*auth_type = eCSR_AUTH_TYPE_FT_FILS_SHA256;
+	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FILS_SHA384))
+		*auth_type = eCSR_AUTH_TYPE_FILS_SHA384;
+	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FILS_SHA256))
+		*auth_type = eCSR_AUTH_TYPE_FILS_SHA256;
+	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_SAE))
+		*auth_type = eCSR_AUTH_TYPE_FT_SAE;
+	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE))
+		*auth_type = eCSR_AUTH_TYPE_SAE;
+	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_DPP))
+		*auth_type = eCSR_AUTH_TYPE_DPP_RSN;
+	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_OSEN))
+		*auth_type = eCSR_AUTH_TYPE_OSEN;
+	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_OWE))
+		*auth_type = eCSR_AUTH_TYPE_OWE;
+	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_IEEE8021X))
+		*auth_type = eCSR_AUTH_TYPE_FT_RSN;
+	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_PSK))
+		*auth_type = eCSR_AUTH_TYPE_FT_RSN_PSK;
+	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_IEEE8021X))
+		*auth_type = eCSR_AUTH_TYPE_RSN;
+	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_PSK))
+		*auth_type = eCSR_AUTH_TYPE_RSN_PSK;
+	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_CCKM))
+		*auth_type = eCSR_AUTH_TYPE_CCKM_RSN;
+	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_PSK_SHA256))
+		*auth_type = eCSR_AUTH_TYPE_RSN_PSK_SHA256;
+	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SHA256))
+		*auth_type = eCSR_AUTH_TYPE_RSN_8021X_SHA256;
+	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SUITE_B))
+		*auth_type = eCSR_AUTH_TYPE_SUITEB_EAP_SHA256;
+	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SUITE_B_192))
+		*auth_type = eCSR_AUTH_TYPE_SUITEB_EAP_SHA384;
+	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_IEEE8021X_SHA384))
+		*auth_type = eCSR_AUTH_TYPE_FT_SUITEB_EAP_SHA384;
+	else
+		*auth_type = eCSR_AUTH_TYPE_NONE;
 }
 
-static enum csr_akm_type csr_covert_auth_type_old(enum wlan_auth_type auth)
+static void csr_fill_wpa_auth_type(enum csr_akm_type *auth_type, uint32_t akm)
 {
-	switch (auth) {
-	case WLAN_AUTH_TYPE_OPEN_SYSTEM:
-		return eCSR_AUTH_TYPE_OPEN_SYSTEM;
-	case WLAN_AUTH_TYPE_SHARED_KEY:
-		return eCSR_AUTH_TYPE_SHARED_KEY;
-	case WLAN_AUTH_TYPE_AUTOSWITCH:
-		return eCSR_AUTH_TYPE_AUTOSWITCH;
-	case WLAN_AUTH_TYPE_WPA:
-		return eCSR_AUTH_TYPE_WPA;
-	case WLAN_AUTH_TYPE_WPA_PSK:
-		return eCSR_AUTH_TYPE_WPA_PSK;
-	case WLAN_AUTH_TYPE_WPA_NONE:
-		return eCSR_AUTH_TYPE_WPA_NONE;
-	case WLAN_AUTH_TYPE_RSN:
-		return eCSR_AUTH_TYPE_RSN;
-	case WLAN_AUTH_TYPE_RSN_PSK:
-		return eCSR_AUTH_TYPE_RSN_PSK;
-	case WLAN_AUTH_TYPE_FT_RSN:
-		return eCSR_AUTH_TYPE_FT_RSN;
-	case WLAN_AUTH_TYPE_FT_RSN_PSK:
-		return eCSR_AUTH_TYPE_FT_RSN_PSK;
-	case WLAN_AUTH_TYPE_WAPI_WAI_CERTIFICATE:
-		return eCSR_AUTH_TYPE_WAPI_WAI_CERTIFICATE;
-	case WLAN_AUTH_TYPE_WAPI_WAI_PSK:
-		return eCSR_AUTH_TYPE_WAPI_WAI_PSK;
-	case WLAN_AUTH_TYPE_CCKM_WPA:
-		return eCSR_AUTH_TYPE_CCKM_WPA;
-	case WLAN_AUTH_TYPE_CCKM_RSN:
-		return eCSR_AUTH_TYPE_CCKM_RSN;
-	case WLAN_AUTH_TYPE_RSN_PSK_SHA256:
-		return eCSR_AUTH_TYPE_RSN_PSK_SHA256;
-	case WLAN_AUTH_TYPE_RSN_8021X_SHA256:
-		return eCSR_AUTH_TYPE_RSN_8021X_SHA256;
-	case WLAN_AUTH_TYPE_FILS_SHA256:
-		return eCSR_AUTH_TYPE_FILS_SHA256;
-	case WLAN_AUTH_TYPE_FILS_SHA384:
-		return eCSR_AUTH_TYPE_FILS_SHA384;
-	case WLAN_AUTH_TYPE_FT_FILS_SHA256:
-		return eCSR_AUTH_TYPE_FT_FILS_SHA256;
-	case WLAN_AUTH_TYPE_FT_FILS_SHA384:
-		return eCSR_AUTH_TYPE_FT_FILS_SHA384;
-	case WLAN_AUTH_TYPE_DPP_RSN:
-		return eCSR_AUTH_TYPE_DPP_RSN;
-	case WLAN_AUTH_TYPE_OWE:
-		return eCSR_AUTH_TYPE_OWE;
-	case WLAN_AUTH_TYPE_SUITEB_EAP_SHA256:
-		return eCSR_AUTH_TYPE_SUITEB_EAP_SHA256;
-	case WLAN_AUTH_TYPE_SUITEB_EAP_SHA384:
-		return eCSR_AUTH_TYPE_SUITEB_EAP_SHA384;
-	case WLAN_AUTH_TYPE_SAE:
-		return eCSR_AUTH_TYPE_SAE;
-	case WLAN_AUTH_TYPE_OSEN:
-		return eCSR_AUTH_TYPE_OSEN;
-	case WLAN_AUTH_TYPE_FT_SAE:
-		return eCSR_AUTH_TYPE_FT_SAE;
-	case WLAN_AUTH_TYPE_FT_SUITEB_EAP_SHA384:
-		return eCSR_AUTH_TYPE_FT_SUITEB_EAP_SHA384;
-	case WLAN_NUM_OF_SUPPORT_AUTH_TYPE:
-	default:
-		return eCSR_AUTH_TYPE_OPEN_SYSTEM;
-	}
+	/* Try the more preferred ones first. */
+	if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_IEEE8021X))
+		*auth_type = eCSR_AUTH_TYPE_WPA;
+	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_PSK))
+		*auth_type = eCSR_AUTH_TYPE_WPA_PSK;
+	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_CCKM))
+		*auth_type = eCSR_AUTH_TYPE_CCKM_WPA;
+	else
+		*auth_type = eCSR_AUTH_TYPE_WPA_NONE;
 }
 
-enum wlan_enc_type csr_covert_enc_type_new(eCsrEncryptionType enc)
+static void csr_fill_wapi_auth_type(enum csr_akm_type *auth_type, uint32_t akm)
 {
-	switch (enc) {
-	case eCSR_ENCRYPT_TYPE_NONE:
-		return WLAN_ENCRYPT_TYPE_NONE;
-	case eCSR_ENCRYPT_TYPE_WEP40_STATICKEY:
-		return WLAN_ENCRYPT_TYPE_WEP40_STATICKEY;
-	case eCSR_ENCRYPT_TYPE_WEP104_STATICKEY:
-		return WLAN_ENCRYPT_TYPE_WEP104_STATICKEY;
-	case eCSR_ENCRYPT_TYPE_WEP40:
-		return WLAN_ENCRYPT_TYPE_WEP40;
-	case eCSR_ENCRYPT_TYPE_WEP104:
-		return WLAN_ENCRYPT_TYPE_WEP104;
-	case eCSR_ENCRYPT_TYPE_TKIP:
-		return WLAN_ENCRYPT_TYPE_TKIP;
-	case eCSR_ENCRYPT_TYPE_AES:
-		return WLAN_ENCRYPT_TYPE_AES;
-	case eCSR_ENCRYPT_TYPE_WPI:
-		return WLAN_ENCRYPT_TYPE_WPI;
-	case eCSR_ENCRYPT_TYPE_KRK:
-		return WLAN_ENCRYPT_TYPE_KRK;
-	case eCSR_ENCRYPT_TYPE_BTK:
-		return WLAN_ENCRYPT_TYPE_BTK;
-	case eCSR_ENCRYPT_TYPE_AES_CMAC:
-		return WLAN_ENCRYPT_TYPE_AES_CMAC;
-	case eCSR_ENCRYPT_TYPE_AES_GCMP:
-		return WLAN_ENCRYPT_TYPE_AES_GCMP;
-	case eCSR_ENCRYPT_TYPE_AES_GCMP_256:
-		return WLAN_ENCRYPT_TYPE_AES_GCMP_256;
-	case eCSR_ENCRYPT_TYPE_ANY:
-	default:
-		return WLAN_ENCRYPT_TYPE_NONE;
-	}
+	/* Try the more preferred ones first. */
+	if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_WAPI_CERT))
+		*auth_type = eCSR_AUTH_TYPE_WAPI_WAI_CERTIFICATE;
+	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_WAPI_PSK))
+		*auth_type = eCSR_AUTH_TYPE_WAPI_WAI_PSK;
+	else
+		*auth_type = eCSR_AUTH_TYPE_NONE;
 }
 
-static eCsrEncryptionType csr_covert_enc_type_old(enum wlan_enc_type enc)
+static void csr_fill_auth_type(enum csr_akm_type *auth_type,
+			       uint32_t authmodeset, uint32_t akm,
+			       uint32_t ucastcipherset)
 {
-	switch (enc) {
-	case WLAN_ENCRYPT_TYPE_NONE:
-		return eCSR_ENCRYPT_TYPE_NONE;
-	case WLAN_ENCRYPT_TYPE_WEP40_STATICKEY:
-		return eCSR_ENCRYPT_TYPE_WEP40_STATICKEY;
-	case WLAN_ENCRYPT_TYPE_WEP104_STATICKEY:
-		return eCSR_ENCRYPT_TYPE_WEP104_STATICKEY;
-	case WLAN_ENCRYPT_TYPE_WEP40:
-		return eCSR_ENCRYPT_TYPE_WEP40;
-	case WLAN_ENCRYPT_TYPE_WEP104:
-		return eCSR_ENCRYPT_TYPE_WEP104;
-	case WLAN_ENCRYPT_TYPE_TKIP:
-		return eCSR_ENCRYPT_TYPE_TKIP;
-	case WLAN_ENCRYPT_TYPE_AES:
-		return eCSR_ENCRYPT_TYPE_AES;
-	case WLAN_ENCRYPT_TYPE_WPI:
-		return eCSR_ENCRYPT_TYPE_WPI;
-	case WLAN_ENCRYPT_TYPE_KRK:
-		return eCSR_ENCRYPT_TYPE_KRK;
-	case WLAN_ENCRYPT_TYPE_BTK:
-		return eCSR_ENCRYPT_TYPE_BTK;
-	case WLAN_ENCRYPT_TYPE_AES_CMAC:
-		return eCSR_ENCRYPT_TYPE_AES_CMAC;
-	case WLAN_ENCRYPT_TYPE_AES_GCMP:
-		return eCSR_ENCRYPT_TYPE_AES_GCMP;
-	case WLAN_ENCRYPT_TYPE_AES_GCMP_256:
-		return eCSR_ENCRYPT_TYPE_AES_GCMP_256;
-	case WLAN_ENCRYPT_TYPE_ANY:
-	default:
-		return eCSR_ENCRYPT_TYPE_NONE;
-	}
-}
-
-#ifdef WLAN_FEATURE_FILS_SK
-/**
- * csr_update_bss_with_fils_data: Fill FILS params in bss desc from scan entry
- * @mac_ctx: mac context
- * @scan_entry: scan entry
- * @bss_descr: bss description
- */
-static void csr_update_bss_with_fils_data(struct mac_context *mac_ctx,
-					  struct scan_cache_entry *scan_entry,
-					  struct bss_description *bss_descr)
-{
-	int ret;
-	tDot11fIEfils_indication fils_indication = {0};
-	struct sir_fils_indication fils_ind;
-
-	if (!scan_entry->ie_list.fils_indication)
-		return;
-
-	ret = dot11f_unpack_ie_fils_indication(mac_ctx,
-				scan_entry->ie_list.fils_indication +
-				SIR_FILS_IND_ELEM_OFFSET,
-				*(scan_entry->ie_list.fils_indication + 1),
-				&fils_indication, false);
-	if (DOT11F_FAILED(ret)) {
-		sme_err("unpack failed ret: 0x%x", ret);
+	if (!authmodeset) {
+		*auth_type = eCSR_AUTH_TYPE_OPEN_SYSTEM;
 		return;
 	}
 
-	update_fils_data(&fils_ind, &fils_indication);
-	if (fils_ind.realm_identifier.realm_cnt > SIR_MAX_REALM_COUNT)
-		fils_ind.realm_identifier.realm_cnt = SIR_MAX_REALM_COUNT;
-
-	bss_descr->fils_info_element.realm_cnt =
-		fils_ind.realm_identifier.realm_cnt;
-	qdf_mem_copy(bss_descr->fils_info_element.realm,
-			fils_ind.realm_identifier.realm,
-			bss_descr->fils_info_element.realm_cnt * SIR_REALM_LEN);
-	if (fils_ind.cache_identifier.is_present) {
-		bss_descr->fils_info_element.is_cache_id_present = true;
-		qdf_mem_copy(bss_descr->fils_info_element.cache_id,
-			fils_ind.cache_identifier.identifier, CACHE_ID_LEN);
-	}
-	if (fils_ind.is_fils_sk_auth_supported)
-		bss_descr->fils_info_element.is_fils_sk_supported = true;
-}
-#else
-static void csr_update_bss_with_fils_data(struct mac_context *mac_ctx,
-					  struct scan_cache_entry *scan_entry,
-					  struct bss_description *bss_descr)
-{ }
-#endif
-
-/**
- * csr_is_assoc_disallowed() - Find if assoc disallowed
- * bit is set in AP's beacon or probe response
- * @mac_ctx: mac context
- * @scan_entry: scan entry
- *
- * Return: True if assoc disallowed is set else false
- */
-static bool csr_is_assoc_disallowed(struct mac_context *mac_ctx,
-				    struct scan_cache_entry *scan_entry)
-{
-	int ret;
-	tDot11fIEMBO_IE mbo_ie = {0};
-	uint8_t *mbo_oce;
-
-	mbo_oce = util_scan_entry_mbo_oce(scan_entry);
-
-	if (!mbo_oce)
-		return false;
-
-	ret = dot11f_unpack_ie_MBO_IE(mac_ctx, mbo_oce + SIR_MBO_ELEM_OFFSET,
-				      *(mbo_oce + 1) - SIR_MAC_MBO_OUI_SIZE,
-				      &mbo_ie, false);
-
-	if (DOT11F_FAILED(ret)) {
-		sme_err("unpack failed ret: 0x%x", ret);
-		return false;
+	if (QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_NONE) ||
+	    QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_OPEN)) {
+		*auth_type = eCSR_AUTH_TYPE_OPEN_SYSTEM;
+		return;
 	}
 
-	return mbo_ie.assoc_disallowed.present;
+	if (QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_AUTO)) {
+		if ((QDF_HAS_PARAM(ucastcipherset, WLAN_CRYPTO_CIPHER_WEP) ||
+		     QDF_HAS_PARAM(ucastcipherset, WLAN_CRYPTO_CIPHER_WEP_40) ||
+		     QDF_HAS_PARAM(ucastcipherset, WLAN_CRYPTO_CIPHER_WEP_104)))
+			*auth_type = eCSR_AUTH_TYPE_AUTOSWITCH;
+		else
+			*auth_type = eCSR_AUTH_TYPE_OPEN_SYSTEM;
+
+		return;
+	}
+
+	if (QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_SHARED)) {
+		*auth_type = eCSR_AUTH_TYPE_SHARED_KEY;
+		return;
+	}
+
+	if (QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_8021X) ||
+	    QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_RSNA) ||
+	    QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_CCKM) ||
+	    QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_SAE) ||
+	    QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_FILS_SK)) {
+		csr_fill_rsn_auth_type(auth_type, akm);
+		return;
+	}
+
+	if (QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_WPA)) {
+		csr_fill_wpa_auth_type(auth_type, akm);
+		return;
+	}
+
+	if (QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_WAPI)) {
+		csr_fill_wapi_auth_type(auth_type, akm);
+		return;
+	}
+
+	*auth_type = eCSR_AUTH_TYPE_OPEN_SYSTEM;
 }
 
-#if defined(WLAN_SAE_SINGLE_PMK) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
-/**
- * csr_fill_single_pmk_ap_cap_from_scan_entry() - WAP3_SPMK VSIE from scan
- * entry
- * @bss_desc: BSS Descriptor
- * @scan_entry: scan entry
- *
- * Return: None
- */
-static void
-csr_fill_single_pmk_ap_cap_from_scan_entry(struct bss_description *bss_desc,
-					   struct scan_cache_entry *scan_entry)
+static void csr_fill_enc_type(eCsrEncryptionType *cipher_type,
+			      uint32_t cipherset)
 {
-	bss_desc->is_single_pmk = util_scan_entry_single_pmk(scan_entry);
+	if (!cipherset) {
+		*cipher_type = eCSR_ENCRYPT_TYPE_NONE;
+		return;
+	}
+	if (QDF_HAS_PARAM(cipherset, WLAN_CRYPTO_CIPHER_AES_GCM_256))
+		*cipher_type = eCSR_ENCRYPT_TYPE_AES_GCMP_256;
+	else if (QDF_HAS_PARAM(cipherset, WLAN_CRYPTO_CIPHER_AES_GCM))
+		*cipher_type = eCSR_ENCRYPT_TYPE_AES_GCMP;
+	else if (QDF_HAS_PARAM(cipherset, WLAN_CRYPTO_CIPHER_AES_CCM) ||
+		 QDF_HAS_PARAM(cipherset, WLAN_CRYPTO_CIPHER_AES_OCB) ||
+		 QDF_HAS_PARAM(cipherset, WLAN_CRYPTO_CIPHER_AES_CCM_256))
+		*cipher_type = eCSR_ENCRYPT_TYPE_AES;
+	else if (QDF_HAS_PARAM(cipherset, WLAN_CRYPTO_CIPHER_TKIP))
+		*cipher_type = eCSR_ENCRYPT_TYPE_TKIP;
+	else if (QDF_HAS_PARAM(cipherset, WLAN_CRYPTO_CIPHER_AES_CMAC) ||
+		 QDF_HAS_PARAM(cipherset, WLAN_CRYPTO_CIPHER_AES_CMAC_256))
+		*cipher_type = eCSR_ENCRYPT_TYPE_AES_CMAC;
+	else if (QDF_HAS_PARAM(cipherset, WLAN_CRYPTO_CIPHER_WAPI_GCM4) ||
+		 QDF_HAS_PARAM(cipherset, WLAN_CRYPTO_CIPHER_WAPI_SMS4))
+		*cipher_type = eCSR_ENCRYPT_TYPE_WPI;
+	else if (QDF_HAS_PARAM(cipherset, WLAN_CRYPTO_CIPHER_AES_GMAC))
+		*cipher_type = eCSR_ENCRYPT_TYPE_AES_GMAC_128;
+	else if (QDF_HAS_PARAM(cipherset, WLAN_CRYPTO_CIPHER_AES_GMAC_256))
+		*cipher_type = eCSR_ENCRYPT_TYPE_AES_GMAC_256;
+	else if (QDF_HAS_PARAM(cipherset, WLAN_CRYPTO_CIPHER_WEP))
+		*cipher_type = eCSR_ENCRYPT_TYPE_WEP40;
+	else if (QDF_HAS_PARAM(cipherset, WLAN_CRYPTO_CIPHER_WEP_40))
+		*cipher_type = eCSR_ENCRYPT_TYPE_WEP40;
+	else if (QDF_HAS_PARAM(cipherset, WLAN_CRYPTO_CIPHER_WEP_104))
+		*cipher_type = eCSR_ENCRYPT_TYPE_WEP104;
+	else
+		*cipher_type = eCSR_ENCRYPT_TYPE_NONE;
 }
 
-#else
-static inline void
-csr_fill_single_pmk_ap_cap_from_scan_entry(struct bss_description *bss_desc,
-					   struct scan_cache_entry *scan_entry)
+static void csr_fill_neg_crypto_info(struct tag_csrscan_result *bss,
+				     struct security_info *sec_info)
 {
+	csr_fill_enc_type(&bss->ucEncryptionType, sec_info->ucastcipherset);
+	csr_fill_enc_type(&bss->mcEncryptionType, sec_info->mcastcipherset);
+	csr_fill_auth_type(&bss->authType, sec_info->authmodeset,
+			   sec_info->key_mgmt, sec_info->ucastcipherset);
+	sme_debug("Authmode %x, AKM %x, Cipher Uc %x Mc %x CSR: Auth %d, Cipher Uc %d Mc %d",
+		  sec_info->authmodeset, sec_info->key_mgmt,
+		  sec_info->ucastcipherset, sec_info->mcastcipherset,
+		  bss->authType, bss->ucEncryptionType, bss->mcEncryptionType);
 }
-#endif
+
 static QDF_STATUS csr_fill_bss_from_scan_entry(struct mac_context *mac_ctx,
 					struct scan_cache_entry *scan_entry,
 					struct tag_csrscan_result **p_result)
@@ -2231,7 +2097,6 @@ static QDF_STATUS csr_fill_bss_from_scan_entry(struct mac_context *mac_ctx,
 	tDot11fBeaconIEs *bcn_ies;
 	struct bss_description *bss_desc;
 	tCsrScanResultInfo *result_info;
-	tpSirMacMgmtHdr hdr;
 	uint8_t *ie_ptr;
 	struct tag_csrscan_result *bss;
 	uint32_t bss_len, alloc_len, ie_len;
@@ -2244,15 +2109,14 @@ static QDF_STATUS csr_fill_bss_from_scan_entry(struct mac_context *mac_ctx,
 				scan_entry->channel.chan_freq);
 	if (ap_channel_state == CHANNEL_STATE_DISABLE ||
 	    ap_channel_state == CHANNEL_STATE_INVALID) {
-		sme_err("BSS %pM channel %d invalid, not populating this BSSID",
-			scan_entry->bssid.bytes, scan_entry->channel.chan_freq);
+		sme_err("BSS "QDF_MAC_ADDR_FMT" channel %d invalid, not populating this BSSID",
+			QDF_MAC_ADDR_REF(scan_entry->bssid.bytes),
+			scan_entry->channel.chan_freq);
 		return QDF_STATUS_E_INVAL;
 	}
 
 	ie_len = util_scan_entry_ie_len(scan_entry);
 	ie_ptr = util_scan_entry_ie_data(scan_entry);
-
-	hdr = (tpSirMacMgmtHdr)scan_entry->raw_frame.ptr;
 
 	bss_len = (uint16_t)(offsetof(struct bss_description,
 			   ieFields[0]) + ie_len);
@@ -2261,12 +2125,7 @@ static QDF_STATUS csr_fill_bss_from_scan_entry(struct mac_context *mac_ctx,
 	if (!bss)
 		return QDF_STATUS_E_NOMEM;
 
-	bss->ucEncryptionType =
-		csr_covert_enc_type_old(scan_entry->neg_sec_info.uc_enc);
-	bss->mcEncryptionType =
-		csr_covert_enc_type_old(scan_entry->neg_sec_info.mc_enc);
-	bss->authType =
-		csr_covert_auth_type_old(scan_entry->neg_sec_info.auth_type);
+	csr_fill_neg_crypto_info(bss, &scan_entry->neg_sec_info);
 	bss->bss_score = scan_entry->bss_score;
 
 	result_info = &bss->Result;
@@ -2278,84 +2137,15 @@ static QDF_STATUS csr_fill_bss_from_scan_entry(struct mac_context *mac_ctx,
 
 	bss_desc = &result_info->BssDescriptor;
 
-	bss_desc->length = (uint16_t) (offsetof(struct bss_description,
-			   ieFields[0]) - sizeof(bss_desc->length) + ie_len);
+	wlan_fill_bss_desc_from_scan_entry(mac_ctx, bss_desc, scan_entry);
 
-	qdf_mem_copy(bss_desc->bssId,
-			scan_entry->bssid.bytes,
-			QDF_MAC_ADDR_SIZE);
-	bss_desc->scansystimensec = scan_entry->scan_entry_time;
-	qdf_mem_copy(bss_desc->timeStamp,
-		scan_entry->tsf_info.data, 8);
-
-	bss_desc->beaconInterval = scan_entry->bcn_int;
-	bss_desc->capabilityInfo = scan_entry->cap_info.value;
-
-	if (WLAN_REG_IS_5GHZ_CH_FREQ(scan_entry->channel.chan_freq) ||
-	    WLAN_REG_IS_6GHZ_CHAN_FREQ(scan_entry->channel.chan_freq))
-		bss_desc->nwType = eSIR_11A_NW_TYPE;
-	else if (scan_entry->phy_mode == WLAN_PHYMODE_11B)
-		bss_desc->nwType = eSIR_11B_NW_TYPE;
-	else
-		bss_desc->nwType = eSIR_11G_NW_TYPE;
-
-	bss_desc->rssi = scan_entry->rssi_raw;
-	bss_desc->rssi_raw = scan_entry->rssi_raw;
-
-	/* channel frequency what peer sent in beacon/probersp. */
-	bss_desc->chan_freq = scan_entry->channel.chan_freq;
-	bss_desc->received_time =
-		scan_entry->scan_entry_time;
-	bss_desc->startTSF[0] =
-		mac_ctx->rrm.rrmPEContext.startTSF[0];
-	bss_desc->startTSF[1] =
-		mac_ctx->rrm.rrmPEContext.startTSF[1];
-	bss_desc->parentTSF =
-		scan_entry->rrm_parent_tsf;
-	bss_desc->fProbeRsp = (scan_entry->frm_subtype ==
-			  MGMT_SUBTYPE_PROBE_RESP);
-	bss_desc->seq_ctrl = hdr->seqControl;
-	bss_desc->tsf_delta = scan_entry->tsf_delta;
-	bss_desc->assoc_disallowed = csr_is_assoc_disallowed(mac_ctx,
-							     scan_entry);
-	bss_desc->adaptive_11r_ap = scan_entry->adaptive_11r_ap;
-
-	bss_desc->mbo_oce_enabled_ap =
-			util_scan_entry_mbo_oce(scan_entry) ? true : false;
-
-	csr_fill_single_pmk_ap_cap_from_scan_entry(bss_desc, scan_entry);
-
-	qdf_mem_copy(&bss_desc->mbssid_info, &scan_entry->mbssid_info,
-		     sizeof(struct scan_mbssid_info));
-
-	qdf_mem_copy((uint8_t *) &bss_desc->ieFields,
-		ie_ptr, ie_len);
-
-	status = csr_get_parsed_bss_description_ies(mac_ctx,
-			  bss_desc, &bcn_ies);
+	status = wlan_get_parsed_bss_description_ies(mac_ctx, bss_desc,
+						     &bcn_ies);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		qdf_mem_free(bss);
 		return status;
 	}
 	result_info->pvIes = bcn_ies;
-
-	if (bcn_ies->MobilityDomain.present) {
-		bss_desc->mdiePresent = true;
-		qdf_mem_copy((uint8_t *)&(bss_desc->mdie[0]),
-			     (uint8_t *)&(bcn_ies->MobilityDomain.MDID),
-			     sizeof(uint16_t));
-		bss_desc->mdie[2] =
-			((bcn_ies->MobilityDomain.overDSCap << 0) |
-			(bcn_ies->MobilityDomain.resourceReqCap << 1));
-	}
-#ifdef FEATURE_WLAN_ESE
-	if (bcn_ies->QBSSLoad.present) {
-		bss_desc->QBSSLoad_present = true;
-		bss_desc->QBSSLoad_avail =
-			bcn_ies->QBSSLoad.avail;
-	}
-#endif
-	csr_update_bss_with_fils_data(mac_ctx, scan_entry, bss_desc);
 
 	*p_result = bss;
 	return QDF_STATUS_SUCCESS;
@@ -2387,45 +2177,52 @@ static QDF_STATUS csr_parse_scan_list(struct mac_context *mac_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * csr_remove_ap_with_assoc_disallowed() - Remove APs with assoc
- * disallowed bit set
- * @mac_ctx: mac context
- * @scan_list: candidate list for the connection
- *
- * Return: None
- */
-static void csr_remove_ap_with_assoc_disallowed(struct mac_context *mac_ctx,
-					     struct scan_result_list *scan_list)
+static void csr_get_pcl_chan_weigtage_for_sta(struct mac_context *mac_ctx,
+					struct pcl_freq_weight_list *pcl_lst)
 {
-	tListElem *cur_entry;
-	tListElem *next_entry;
-	struct tag_csrscan_result *scan_res;
+	enum QDF_OPMODE opmode = QDF_STA_MODE;
+	enum policy_mgr_con_mode pm_mode;
+	uint32_t num_entries = 0;
+	QDF_STATUS status;
 
-	if (!scan_list)
+	if (!pcl_lst)
 		return;
 
-	cur_entry = csr_ll_peek_head(&scan_list->List, LL_ACCESS_NOLOCK);
-	while (cur_entry) {
-		scan_res = GET_BASE_ADDR(cur_entry, struct tag_csrscan_result,
-					 Link);
-		next_entry = csr_ll_next(&scan_list->List, cur_entry,
-					 LL_ACCESS_NOLOCK);
-
-		if (!mac_ctx->ignore_assoc_disallowed &&
-		    scan_res->Result.BssDescriptor.assoc_disallowed) {
-			csr_ll_remove_entry(&scan_list->List, cur_entry,
-					    LL_ACCESS_NOLOCK);
-			csr_free_scan_result_entry(mac_ctx, scan_res);
-		}
-		cur_entry = next_entry;
-		next_entry = NULL;
+	if (policy_mgr_map_concurrency_mode(&opmode, &pm_mode)) {
+		status = policy_mgr_get_pcl(mac_ctx->psoc, pm_mode,
+					    pcl_lst->pcl_freq_list,
+					    &num_entries,
+					    pcl_lst->pcl_weight_list,
+					    NUM_CHANNELS);
+		if (QDF_IS_STATUS_ERROR(status))
+			return;
+		pcl_lst->num_of_pcl_channels = num_entries;
 	}
+}
+
+static void csr_calculate_scores(struct mac_context *mac_ctx,
+				 struct scan_filter *filter, qdf_list_t *list)
+{
+	struct pcl_freq_weight_list *pcl_lst = NULL;
+
+	if (!filter->num_of_bssid) {
+		pcl_lst = qdf_mem_malloc(sizeof(*pcl_lst));
+		csr_get_pcl_chan_weigtage_for_sta(mac_ctx, pcl_lst);
+		if (pcl_lst && !pcl_lst->num_of_pcl_channels) {
+			qdf_mem_free(pcl_lst);
+			pcl_lst = NULL;
+		}
+	}
+	wlan_cm_calculate_bss_score(mac_ctx->pdev, pcl_lst, list,
+				    &filter->bssid_hint);
+	if (pcl_lst)
+		qdf_mem_free(pcl_lst);
 }
 
 QDF_STATUS csr_scan_get_result(struct mac_context *mac_ctx,
 			       struct scan_filter *filter,
-			       tScanResultHandle *results)
+			       tScanResultHandle *results,
+			       bool scoring_required)
 {
 	QDF_STATUS status;
 	struct scan_result_list *ret_list = NULL;
@@ -2449,9 +2246,8 @@ QDF_STATUS csr_scan_get_result(struct mac_context *mac_ctx,
 		sme_debug("num_entries %d", num_bss);
 	}
 
-	/* Filter the scan list with the blacklist, rssi reject, avoided APs */
-	if (filter && filter->bss_scoring_required)
-		wlan_blm_filter_bssid(pdev, list);
+	if (num_bss && filter && scoring_required)
+		csr_calculate_scores(mac_ctx, filter, list);
 
 	if (!list || (list && !qdf_list_size(list))) {
 		sme_debug("scan list empty");
@@ -2475,9 +2271,6 @@ QDF_STATUS csr_scan_get_result(struct mac_context *mac_ctx,
 		/* Fail or No one wants the result. */
 		csr_scan_result_purge(mac_ctx, (tScanResultHandle) ret_list);
 	else {
-		if (filter && filter->bss_scoring_required)
-			csr_remove_ap_with_assoc_disallowed(mac_ctx, ret_list);
-
 		if (!csr_ll_count(&ret_list->List)) {
 			/* This mean that there is no match */
 			csr_ll_close(&ret_list->List);
@@ -2529,7 +2322,7 @@ QDF_STATUS csr_scan_get_result_for_bssid(struct mac_context *mac_ctx,
 		     QDF_MAC_ADDR_SIZE);
 
 	status = csr_scan_get_result(mac_ctx, scan_filter,
-				&filtered_scan_result);
+				&filtered_scan_result, false);
 
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		sme_err("Failed to get scan result");
@@ -2593,7 +2386,8 @@ static inline void csr_flush_bssid(struct mac_context *mac_ctx,
 		     bssid, QDF_MAC_ADDR_SIZE);
 
 	csr_flush_scan_results(mac_ctx, filter);
-	sme_debug("Removed BSS entry:%pM", bssid);
+	sme_debug("Removed BSS entry:"QDF_MAC_ADDR_FMT,
+		   QDF_MAC_ADDR_REF(bssid));
 	if (filter)
 		qdf_mem_free(filter);
 }
@@ -2625,6 +2419,39 @@ static void csr_dump_occupied_chan_list(struct csr_channel *occupied_ch)
 
 	qdf_mem_free(chan_buff);
 }
+
+/**
+ * csr_should_add_to_occupied_channels() - validates bands of active_ch_freq and
+ * curr node freq before addition of curr node freq to occupied channels
+ *
+ * @active_ch_freq: active channel frequency
+ * @cur_node_chan_freq: curr channel frequency
+ * @dual_sta_roam_active: dual sta roam active
+ *
+ * Return: True if active_ch_freq and cur_node_chan_freq belongs to same
+ * bands else false
+ **/
+static bool csr_should_add_to_occupied_channels(uint16_t active_ch_freq,
+						uint16_t cur_node_chan_freq,
+						bool dual_sta_roam_active)
+{
+	/* all channels can be added if dual STA roam is not active */
+	if (!dual_sta_roam_active)
+		return true;
+
+	/* when dual STA roam is active, channels must be in the same band */
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(active_ch_freq) &&
+	    WLAN_REG_IS_24GHZ_CH_FREQ(cur_node_chan_freq))
+		return true;
+
+	if (!WLAN_REG_IS_24GHZ_CH_FREQ(active_ch_freq) &&
+	    !WLAN_REG_IS_24GHZ_CH_FREQ(cur_node_chan_freq))
+		return true;
+
+	/* not in same band */
+	return false;
+}
+
 void csr_init_occupied_channels_list(struct mac_context *mac_ctx,
 				     uint8_t sessionId)
 {
@@ -2634,9 +2461,14 @@ void csr_init_occupied_channels_list(struct mac_context *mac_ctx,
 	qdf_list_node_t *next_lst = NULL;
 	struct scan_cache_node *cur_node = NULL;
 	struct scan_filter *filter;
+	bool dual_sta_roam_active;
+	struct wlan_channel *chan;
+	struct wlan_objmgr_vdev *vdev;
+
 	tpCsrNeighborRoamControlInfo neighbor_roam_info =
 		&mac_ctx->roam.neighborRoamInfo[sessionId];
 	tCsrRoamConnectedProfile *profile = NULL;
+	QDF_STATUS status;
 
 	if (!(mac_ctx && mac_ctx->roam.roamSession &&
 	      CSR_IS_SESSION_VALID(mac_ctx, sessionId))) {
@@ -2657,18 +2489,15 @@ void csr_init_occupied_channels_list(struct mac_context *mac_ctx,
 		return;
 
 	filter = qdf_mem_malloc(sizeof(*filter));
-	if (!filter) {
-		sme_err("filter is NULL");
+	if (!filter)
+		return;
+
+	status = csr_fill_filter_from_vdev_crypto(mac_ctx, filter, sessionId);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		sme_err("fail to fill filter crypto");
+		qdf_mem_free(filter);
 		return;
 	}
-
-	filter->num_of_auth = 1;
-	filter->auth_type[0] = csr_covert_auth_type_new(profile->AuthType);
-	filter->num_of_enc_type = 1;
-	filter->enc_type[0] = csr_covert_enc_type_new(profile->EncryptionType);
-	filter->num_of_mc_enc_type = 1;
-	filter->mc_enc_type[0] =
-		csr_covert_enc_type_new(profile->mcEncryptionType);
 	filter->num_of_ssid = 1;
 	filter->ssid_list[0].length = profile->SSID.length;
 	qdf_mem_copy(filter->ssid_list[0].ssid, profile->SSID.ssId,
@@ -2697,33 +2526,53 @@ void csr_init_occupied_channels_list(struct mac_context *mac_ctx,
 	if (list)
 		sme_debug("num_entries %d", qdf_list_size(list));
 	if (!list || (list && !qdf_list_size(list))) {
-		wlan_objmgr_pdev_release_ref(pdev, WLAN_LEGACY_MAC_ID);
-		qdf_mem_free(filter);
-		if (list)
-			ucfg_scan_purge_results(list);
-		csr_dump_occupied_chan_list(
-			&mac_ctx->scan.occupiedChannels[sessionId]);
-		return;
+		goto err;
 	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc, sessionId,
+						    WLAN_LEGACY_MAC_ID);
+	if (!vdev) {
+		sme_err("vdev null");
+		goto err;
+	}
+
+	chan = wlan_vdev_get_active_channel(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+	if (!chan) {
+		sme_err("no active channel");
+		goto err;
+	}
+
+	dual_sta_roam_active =
+			wlan_mlme_get_dual_sta_roaming_enabled(mac_ctx->psoc);
 
 	qdf_list_peek_front(list, &cur_lst);
 	while (cur_lst) {
 		cur_node = qdf_container_of(cur_lst, struct scan_cache_node,
 					    node);
-		csr_add_to_occupied_channels(
-				mac_ctx, cur_node->entry->channel.chan_freq,
-				sessionId,
-				&mac_ctx->scan.occupiedChannels[sessionId],
-				true);
+
+		if (csr_should_add_to_occupied_channels
+					(chan->ch_freq,
+					 cur_node->entry->channel.chan_freq,
+					 dual_sta_roam_active))
+
+			csr_add_to_occupied_channels
+				   (mac_ctx, cur_node->entry->channel.chan_freq,
+				    sessionId,
+				    &mac_ctx->scan.occupiedChannels[sessionId],
+				    true);
+
 		qdf_list_peek_next(list, cur_lst, &next_lst);
 		cur_lst = next_lst;
 		next_lst = NULL;
 	}
+err:
 	csr_dump_occupied_chan_list(&mac_ctx->scan.occupiedChannels[sessionId]);
-
 	qdf_mem_free(filter);
-	ucfg_scan_purge_results(list);
+	if (list)
+		ucfg_scan_purge_results(list);
 	wlan_objmgr_pdev_release_ref(pdev, WLAN_LEGACY_MAC_ID);
+	return;
 }
 
 /**
@@ -2775,4 +2624,16 @@ QDF_STATUS csr_scan_filter_results(struct mac_context *mac_ctx)
 
 	wlan_objmgr_pdev_release_ref(pdev, WLAN_LEGACY_MAC_ID);
 	return QDF_STATUS_SUCCESS;
+}
+
+void csr_update_beacon(struct mac_context *mac)
+{
+	struct scheduler_msg msg = { 0 };
+	QDF_STATUS status;
+
+	msg.type = SIR_LIM_UPDATE_BEACON;
+	status = scheduler_post_message(QDF_MODULE_ID_SME, QDF_MODULE_ID_PE,
+					QDF_MODULE_ID_PE, &msg);
+	if (status != QDF_STATUS_SUCCESS)
+		sme_err("scheduler_post_message failed, status = %u", status);
 }

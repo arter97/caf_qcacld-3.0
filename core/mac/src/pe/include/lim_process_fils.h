@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -102,8 +102,10 @@ void lim_update_fils_config(struct mac_context *mac_ctx,
  *
  * Return: length of fils data
  */
-uint32_t lim_create_fils_auth_data(struct mac_context *mac_ctx,
-		tpSirMacAuthFrameBody auth_frame, struct pe_session *session);
+QDF_STATUS lim_create_fils_auth_data(struct mac_context *mac_ctx,
+				     tpSirMacAuthFrameBody auth_frame,
+				     struct pe_session *session,
+				     uint32_t *frame_len);
 
 /**
  * lim_increase_fils_sequence_number: this API increases fils sequence number in
@@ -215,19 +217,6 @@ bool lim_verify_fils_params_assoc_rsp(struct mac_context *mac_ctx,
 				      struct pe_session *session_entry,
 				      tpSirAssocRsp assoc_rsp,
 				      tLimMlmAssocCnf * assoc_cnf);
-
-/**
- * lim_update_fils_rik() - API to update FILS RIK in RSO
- * @pe_session: PE Session
- * @req_buffer: Pointer to RSO request
- *
- * This API is used to calculate(if required) RIK and fill
- * the same in RSO request to fw.
- *
- * Return: None
- */
-void lim_update_fils_rik(struct pe_session *pe_session,
-			 struct roam_offload_scan_req *req_buffer);
 #else
 static inline bool lim_process_fils_auth_frame2(struct mac_context *mac_ctx,
 		struct pe_session *pe_session, tSirMacAuthFrameBody *rx_auth_frm_body)
@@ -256,10 +245,13 @@ void lim_update_fils_config(struct mac_context *mac_ctx,
 			    struct join_req *sme_join_req)
 { }
 
-static inline uint32_t lim_create_fils_auth_data(struct mac_context *mac_ctx,
-		tpSirMacAuthFrameBody auth_frame, struct pe_session *session)
+static inline
+QDF_STATUS lim_create_fils_auth_data(struct mac_context *mac_ctx,
+				     tpSirMacAuthFrameBody auth_frame,
+				     struct pe_session *session,
+				     uint32_t *frame_len);
 {
-	return 0;
+	return QDF_STATUS_SUCCESS;
 }
 
 static inline bool lim_is_fils_connection(struct pe_session *pe_session)

@@ -226,7 +226,11 @@ void lim_process_mlm_start_cnf(struct mac_context *mac, uint32_t *msg_buf)
 		if (!LIM_IS_AP_ROLE(pe_session))
 			return;
 		if (pe_session->ch_width == CH_WIDTH_160MHZ) {
-			send_bcon_ind = false;
+			if (wlan_reg_get_bonded_channel_state_for_freq(
+					mac->pdev, chan_freq,
+					pe_session->ch_width, 0) !=
+					CHANNEL_STATE_DFS)
+				send_bcon_ind = true;
 		} else if (pe_session->ch_width == CH_WIDTH_80P80MHZ) {
 			if ((wlan_reg_get_channel_state_for_freq(
 					mac->pdev, chan_freq) !=
@@ -416,6 +420,38 @@ static void lim_send_mlm_assoc_req(struct mac_context *mac_ctx,
 		(uint32_t *) assoc_req);
 }
 
+#ifdef WLAN_FEATURE_11W
+/**
+ * lim_pmf_comeback_timer_callback() -PMF callback handler
+ * @context: Timer context
+ *
+ * This function is called to processes the PMF comeback
+ * callback
+ *
+ * Return: None
+ */
+void lim_pmf_comeback_timer_callback(void *context)
+{
+	struct comeback_timer_info *info =
+			(struct comeback_timer_info *)context;
+	struct mac_context *mac_ctx = info->mac;
+	struct pe_session *session;
+
+	session = pe_find_session_by_vdev_id(mac_ctx, info->vdev_id);
+	if (!session) {
+		pe_err("no session found for vdev %d", info->vdev_id);
+		return;
+	}
+
+	pe_info("comeback later timer expired. sending MLM ASSOC req for vdev %d",
+		session->vdev_id);
+	/* set MLM state such that ASSOC REQ packet will be sent out */
+	session->limPrevMlmState = info->lim_prev_mlm_state;
+	session->limMlmState = info->lim_mlm_state;
+	lim_send_mlm_assoc_req(mac_ctx, session);
+}
+#endif /* WLAN_FEATURE_11W */
+
 /**
  * lim_process_mlm_auth_cnf()-Process Auth confirmation
  * @mac_ctx:  Pointer to Global MAC structure
@@ -488,8 +524,7 @@ void lim_process_mlm_auth_cnf(struct mac_context *mac_ctx, uint32_t *msg)
 
 	if ((auth_type == eSIR_AUTO_SWITCH) &&
 		(auth_cnf->authType == eSIR_SHARED_KEY) &&
-		((eSIR_MAC_AUTH_ALGO_NOT_SUPPORTED_STATUS ==
-			auth_cnf->protStatusCode) ||
+		((auth_cnf->protStatusCode == STATUS_NOT_SUPPORTED_AUTH_ALG) ||
 		(auth_cnf->resultCode == eSIR_SME_AUTH_TIMEOUT_RESULT_CODE))) {
 		/*
 		 * When shared authentication fails with reason
@@ -963,8 +998,8 @@ static void lim_process_mlm_deauth_ind(struct mac_context *mac_ctx,
 					   deauth_ind->peerMacAddr,
 					   &session_id);
 	if (!session) {
-		pe_err("session does not exist for Addr:" QDF_MAC_ADDR_STR,
-		       QDF_MAC_ADDR_ARRAY(deauth_ind->peerMacAddr));
+		pe_err("session does not exist for Addr:" QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(deauth_ind->peerMacAddr));
 		return;
 	}
 	role = GET_LIM_SYSTEM_ROLE(session);
@@ -1222,10 +1257,9 @@ QDF_STATUS lim_sta_handle_connect_fail(join_params *param)
 	}
 
 	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
-	if (!mac_ctx) {
-		pe_err("Mac context is NULL");
+	if (!mac_ctx)
 		return QDF_STATUS_E_INVAL;
-	}
+
 	session = pe_find_session_by_session_id(mac_ctx, param->pe_session_id);
 	if (!session) {
 		pe_err("session is NULL");
@@ -1236,7 +1270,7 @@ QDF_STATUS lim_sta_handle_connect_fail(join_params *param)
 				    &session->dph.dphHashTable);
 	if (sta_ds) {
 		sta_ds->mlmStaContext.disassocReason =
-			eSIR_MAC_UNSPEC_FAILURE_REASON;
+			REASON_UNSPEC_FAILURE;
 		sta_ds->mlmStaContext.cleanupTrigger =
 			eLIM_JOIN_FAILURE;
 		sta_ds->mlmStaContext.resultCode = param->result_code;
@@ -1415,9 +1449,9 @@ void lim_process_sta_mlm_add_sta_rsp(struct mac_context *mac_ctx,
 	if (true == session_entry->fDeauthReceived) {
 		pe_err("Received Deauth frame in ADD_STA_RESP state");
 		if (QDF_STATUS_SUCCESS == add_sta_params->status) {
-			pe_err("ADD_STA success, send update result code with eSIR_SME_JOIN_DEAUTH_FROM_AP_DURING_ADD_STA limMlmState: %d bssid %pM",
+			pe_err("ADD_STA success, send update result code with eSIR_SME_JOIN_DEAUTH_FROM_AP_DURING_ADD_STA limMlmState: %d bssid "QDF_MAC_ADDR_FMT,
 				session_entry->limMlmState,
-				add_sta_params->staMac);
+				QDF_MAC_ADDR_REF(add_sta_params->staMac));
 
 			if (session_entry->limSmeState ==
 					eLIM_SME_WT_REASSOC_STATE)
@@ -1431,7 +1465,7 @@ void lim_process_sta_mlm_add_sta_rsp(struct mac_context *mac_ctx,
 			mlm_assoc_cnf.resultCode =
 				eSIR_SME_JOIN_DEAUTH_FROM_AP_DURING_ADD_STA;
 			mlm_assoc_cnf.protStatusCode =
-					   eSIR_MAC_UNSPEC_FAILURE_STATUS;
+					   STATUS_UNSPECIFIED_FAILURE;
 			goto end;
 		}
 	}
@@ -1500,7 +1534,7 @@ void lim_process_sta_mlm_add_sta_rsp(struct mac_context *mac_ctx,
 		else
 			mlm_assoc_cnf.resultCode =
 				(tSirResultCodes) eSIR_SME_REFUSED;
-		mlm_assoc_cnf.protStatusCode = eSIR_MAC_UNSPEC_FAILURE_STATUS;
+		mlm_assoc_cnf.protStatusCode = STATUS_UNSPECIFIED_FAILURE;
 	}
 end:
 	if (msg->bodyptr) {
@@ -1568,7 +1602,8 @@ void lim_process_sta_mlm_del_bss_rsp(struct mac_context *mac,
 			status_code = eSIR_SME_REFUSED;
 			goto end;
 		}
-		pe_debug("STA AssocID %d MAC %pM", sta->assocId, sta->staAddr);
+		pe_debug("STA AssocID %d MAC "QDF_MAC_ADDR_FMT, sta->assocId,
+			 QDF_MAC_ADDR_REF(sta->staAddr));
 	} else {
 		pe_err("DEL BSS failed!");
 		status_code = eSIR_SME_STOP_BSS_FAILURE;
@@ -1666,10 +1701,8 @@ lim_process_mlm_del_all_sta_rsp(struct vdev_mlme_obj *vdev_mlme,
 	vdev_id = wlan_vdev_get_id(vdev);
 
 	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
-	if (!mac_ctx) {
-		pe_err("mac_ctx is NULL");
+	if (!mac_ctx)
 		return QDF_STATUS_E_INVAL;
-	}
 
 	SET_LIM_PROCESS_DEFD_MESGS(mac_ctx, true);
 
@@ -1779,8 +1812,8 @@ void lim_process_ap_mlm_del_sta_rsp(struct mac_context *mac_ctx,
 	}
 
 	pe_debug("AP received the DEL_STA_RSP for assocID: %X sta mac "
-		QDF_MAC_ADDR_STR, del_sta_params->assocId,
-		QDF_MAC_ADDR_ARRAY(sta_ds->staAddr));
+		QDF_MAC_ADDR_FMT, del_sta_params->assocId,
+		QDF_MAC_ADDR_REF(sta_ds->staAddr));
 	if ((eLIM_MLM_WT_DEL_STA_RSP_STATE != sta_ds->mlmStaContext.mlmState) &&
 	    (eLIM_MLM_WT_ASSOC_DEL_STA_RSP_STATE !=
 	     sta_ds->mlmStaContext.mlmState)) {
@@ -1825,7 +1858,7 @@ void lim_process_ap_mlm_del_sta_rsp(struct mac_context *mac_ctx,
 				sta_ds->mlmStaContext.subType, true,
 				sta_ds->mlmStaContext.authType, sta_ds->assocId,
 				true,
-				eSIR_MAC_UNSPEC_FAILURE_STATUS,
+				STATUS_UNSPECIFIED_FAILURE,
 				session_entry);
 		}
 		return;
@@ -1924,7 +1957,7 @@ void lim_process_ap_mlm_add_sta_rsp(struct mac_context *mac,
 				       sta->mlmStaContext.subType,
 				       true, sta->mlmStaContext.authType,
 				       sta->assocId, true,
-				       eSIR_MAC_UNSPEC_FAILURE_STATUS,
+				       STATUS_UNSPECIFIED_FAILURE,
 				       pe_session);
 		goto end;
 	}
@@ -1932,8 +1965,8 @@ void lim_process_ap_mlm_add_sta_rsp(struct mac_context *mac,
 	/* if the AssocRsp frame is not acknowledged, then keep alive timer will take care of the state */
 	sta->valid = 1;
 	sta->mlmStaContext.mlmState = eLIM_MLM_WT_ASSOC_CNF_STATE;
-	pe_debug("AddStaRsp Success.STA AssocID %d sta mac" QDF_MAC_ADDR_STR,
-		 sta->assocId, QDF_MAC_ADDR_ARRAY(sta->staAddr));
+	pe_debug("AddStaRsp Success.STA AssocID %d sta mac" QDF_MAC_ADDR_FMT,
+		 sta->assocId, QDF_MAC_ADDR_REF(sta->staAddr));
 	lim_print_mac_addr(mac, sta->staAddr, LOGD);
 
 	/* For BTAMP-AP, the flow sequence shall be:
@@ -1983,7 +2016,8 @@ static void lim_process_ap_mlm_add_bss_rsp(struct mac_context *mac,
 		pe_session->limSystemRole = eLIM_AP_ROLE;
 
 		sch_edca_profile_update(mac, pe_session);
-		lim_init_pre_auth_list(mac);
+		/* For dual AP case, delete pre auth node if any */
+		lim_delete_pre_auth_list(mac);
 		/* Check the SAP security configuration.If configured to
 		 * WEP then max clients supported is 16
 		 */
@@ -2124,7 +2158,7 @@ joinFailure:
 
 		/* Send Join response to Host */
 		lim_handle_sme_join_result(mac_ctx, eSIR_SME_REFUSED,
-			eSIR_MAC_UNSPEC_FAILURE_STATUS, session_entry);
+			STATUS_UNSPECIFIED_FAILURE, session_entry);
 	}
 
 }
@@ -2207,7 +2241,7 @@ static void lim_process_sta_mlm_add_bss_rsp(struct mac_context *mac_ctx,
 	} else {
 		pe_err("SessionId: %d ADD_BSS failed!",
 			session_entry->peSessionId);
-		mlm_assoc_cnf.protStatusCode = eSIR_MAC_UNSPEC_FAILURE_STATUS;
+		mlm_assoc_cnf.protStatusCode = STATUS_UNSPECIFIED_FAILURE;
 		/* Return Assoc confirm to SME with failure */
 		if (eLIM_MLM_WT_ADD_BSS_RSP_FT_REASSOC_STATE ==
 				session_entry->limMlmState)
@@ -2590,7 +2624,7 @@ end:
 		mlmReassocCnf.sessionId = 0;
 	}
 
-	mlmReassocCnf.protStatusCode = eSIR_MAC_UNSPEC_FAILURE_STATUS;
+	mlmReassocCnf.protStatusCode = STATUS_UNSPECIFIED_FAILURE;
 	/* Update PE sessio Id */
 	mlmReassocCnf.sessionId = pe_session->peSessionId;
 
@@ -2653,14 +2687,14 @@ static void lim_process_switch_channel_join_req(
 				mac_ctx->lim.gLimHeartBeatApMac[apCount], sizeof(tSirMacAddr))) {
 
 				pe_err("Index %d Sessionid: %d Send deauth on "
-				"channel freq %d to BSSID: " QDF_MAC_ADDR_STR,
+				"channel freq %d to BSSID: " QDF_MAC_ADDR_FMT,
 				apCount,
 				session_entry->peSessionId,
 				session_entry->curr_op_freq,
-				QDF_MAC_ADDR_ARRAY(
+				QDF_MAC_ADDR_REF(
 				session_entry->pLimMlmJoinReq->bssDescription.bssId));
 
-				lim_send_deauth_mgmt_frame(mac_ctx, eSIR_MAC_UNSPEC_FAILURE_REASON,
+				lim_send_deauth_mgmt_frame(mac_ctx, REASON_UNSPEC_FAILURE,
 					session_entry->pLimMlmJoinReq->bssDescription.bssId,
 					session_entry, false);
 
@@ -2680,7 +2714,7 @@ static void lim_process_switch_channel_join_req(
 		session_entry->limMlmState = eLIM_MLM_JOINED_STATE;
 		join_cnf.sessionId = session_entry->peSessionId;
 		join_cnf.resultCode = eSIR_SME_SUCCESS;
-		join_cnf.protStatusCode = eSIR_MAC_SUCCESS_STATUS;
+		join_cnf.protStatusCode = STATUS_SUCCESS;
 		lim_post_sme_message(mac_ctx, LIM_MLM_JOIN_CNF,
 				     (uint32_t *)&join_cnf);
 		return;
@@ -2697,9 +2731,9 @@ static void lim_process_switch_channel_join_req(
 	/* assign appropriate sessionId to the timer object */
 	mac_ctx->lim.lim_timers.gLimPeriodicJoinProbeReqTimer.sessionId =
 		session_entry->peSessionId;
-	pe_debug("vdev %d Send Probe req on freq %d %.*s  " QDF_MAC_ADDR_STR, session_entry->vdev_id,
+	pe_debug("vdev %d Send Probe req on freq %d %.*s  " QDF_MAC_ADDR_FMT, session_entry->vdev_id,
 		 session_entry->curr_op_freq, ssId.length, ssId.ssId,
-		 QDF_MAC_ADDR_ARRAY(
+		 QDF_MAC_ADDR_REF(
 		 session_entry->pLimMlmJoinReq->bssDescription.bssId));
 
 	/*
@@ -2728,14 +2762,12 @@ static void lim_process_switch_channel_join_req(
 		&session_entry->lim_join_req->addIEScan.length,
 		session_entry->lim_join_req->addIEScan.addIEdata);
 
-	if (session_entry->opmode == QDF_P2P_CLIENT_MODE) {
-		/* Activate Join Periodic Probe Req timer */
-		if (tx_timer_activate
-			(&mac_ctx->lim.lim_timers.gLimPeriodicJoinProbeReqTimer)
-			!= TX_SUCCESS) {
-			pe_err("Periodic JoinReq timer activate failed");
-			goto error;
-		}
+	/* Activate Join Periodic Probe Req timer */
+	if (tx_timer_activate
+		(&mac_ctx->lim.lim_timers.gLimPeriodicJoinProbeReqTimer)
+		!= TX_SUCCESS) {
+		pe_err("Periodic JoinReq timer activate failed");
+		goto error;
 	}
 
 	return;
@@ -2754,7 +2786,7 @@ error:
 		join_cnf.sessionId = 0;
 	}
 	join_cnf.resultCode = eSIR_SME_RESOURCES_UNAVAILABLE;
-	join_cnf.protStatusCode = eSIR_MAC_UNSPEC_FAILURE_STATUS;
+	join_cnf.protStatusCode = STATUS_UNSPECIFIED_FAILURE;
 	lim_post_sme_message(mac_ctx, LIM_MLM_JOIN_CNF, (uint32_t *)&join_cnf);
 }
 
@@ -2814,6 +2846,7 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 	QDF_STATUS status;
 	uint16_t channelChangeReasonCode;
 	struct pe_session *pe_session;
+	struct wlan_channel *vdev_chan;
 	/* we need to process the deferred message since the initiating req. there might be nested request. */
 	/* in the case of nested request the new request initiated from the response will take care of resetting */
 	/* the deffered flag. */
@@ -2831,6 +2864,18 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 	pe_session->chainMask = rsp->chain_mask;
 	pe_session->smpsMode = rsp->smps_mode;
 	pe_session->channelChangeReasonCode = 0xBAD;
+
+	vdev_chan = wlan_vdev_mlme_get_des_chan(pe_session->vdev);
+
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(vdev_chan->ch_freq)) {
+		if (vdev_chan->ch_phymode == WLAN_PHYMODE_11B)
+			pe_session->nwType = eSIR_11B_NW_TYPE;
+		else
+			pe_session->nwType = eSIR_11G_NW_TYPE;
+	} else {
+		pe_session->nwType = eSIR_11A_NW_TYPE;
+	}
+	pe_debug("new network type for peer: %d", pe_session->nwType);
 	switch (channelChangeReasonCode) {
 	case LIM_SWITCH_CHANNEL_REASSOC:
 		lim_process_switch_channel_re_assoc_req(mac, pe_session, status);
@@ -2881,7 +2926,6 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 		 */
 		policy_mgr_update_connection_info(mac->psoc,
 						pe_session->smeSessionId);
-		policy_mgr_set_do_hw_mode_change_flag(mac->psoc, true);
 		break;
 	case LIM_SWITCH_CHANNEL_MONITOR:
 		lim_handle_mon_switch_channel_rsp(pe_session, status);
