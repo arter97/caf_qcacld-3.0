@@ -2185,18 +2185,7 @@ static void lim_fill_assoc_ind_vht_info(tpAniSirGlobal mac_ctx,
 	return;
 }
 
-/**
- * lim_send_mlm_assoc_ind() - Sends assoc indication to SME
- * @mac_ctx: Global Mac context
- * @sta_ds: Station DPH hash entry
- * @session_entry: PE session entry
- *
- * This function sends either LIM_MLM_ASSOC_IND
- * or LIM_MLM_REASSOC_IND to SME.
- *
- * Return: None
- */
-void lim_send_mlm_assoc_ind(tpAniSirGlobal mac_ctx,
+QDF_STATUS lim_send_mlm_assoc_ind(tpAniSirGlobal mac_ctx,
 	tpDphHashNode sta_ds, tpPESession session_entry)
 {
 	tpLimMlmAssocInd assoc_ind = NULL;
@@ -2235,7 +2224,7 @@ void lim_send_mlm_assoc_ind(tpAniSirGlobal mac_ctx,
 				session_entry);
 			lim_log(mac_ctx, LOGP,
 				FL("AllocateMemory failed for assoc_ind"));
-			return;
+			return QDF_STATUS_E_NOMEM;
 		}
 		qdf_mem_copy((uint8_t *) assoc_ind->peerMacAddr,
 			(uint8_t *) sta_ds->staAddr, sizeof(tSirMacAddr));
@@ -2289,7 +2278,7 @@ void lim_send_mlm_assoc_ind(tpAniSirGlobal mac_ctx,
 					FL("rsnIEdata index out of bounds %d"),
 					rsn_len);
 				qdf_mem_free(assoc_ind);
-				return;
+				return QDF_STATUS_E_INVAL;
 			}
 			assoc_ind->rsnIE.rsnIEdata[rsn_len] =
 				SIR_MAC_WPA_EID;
@@ -2387,5 +2376,5 @@ void lim_send_mlm_assoc_ind(tpAniSirGlobal mac_ctx,
 			 (uint32_t *) assoc_ind);
 		qdf_mem_free(assoc_ind);
 	}
-	return;
+	return QDF_STATUS_SUCCESS;
 }
