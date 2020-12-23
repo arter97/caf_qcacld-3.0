@@ -451,8 +451,9 @@ lim_fill_sme_assoc_ind_params(
 	struct mac_context *mac_ctx,
 	tpLimMlmAssocInd assoc_ind, struct assoc_ind *sme_assoc_ind,
 	struct pe_session *session_entry, bool assoc_req_alloc);
-void lim_send_mlm_assoc_ind(struct mac_context *mac, tpDphHashNode sta,
-			    struct pe_session *pe_session);
+QDF_STATUS lim_send_mlm_assoc_ind(struct mac_context *mac_ctx,
+				  tpDphHashNode sta_ds,
+			          struct pe_session *session_entry);
 
 #define ASSOC_FRAME_LEN 0
 /**
