@@ -4693,14 +4693,6 @@ void hdd_driver_unload(void);
  */
 void hdd_init_start_completion(void);
 
-/**
- * hdd_max_sta_vdev_count_reached() - check sta vdev count
- * @hdd_ctx: global hdd context
- *
- * Return: true if vdev limit reached
- */
-bool hdd_max_sta_vdev_count_reached(struct hdd_context *hdd_ctx);
-
 #if defined(CLD_PM_QOS) && defined(WLAN_FEATURE_LL_MODE)
 /**
  * hdd_beacon_latency_event_cb() - Callback function to get latency level
