@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -728,6 +728,27 @@ ht_vht_done:
 	return ret;
 }
 
+tTxrateinfoflags wma_get_vht_rate_flags(enum phy_ch_width ch_width)
+{
+	tTxrateinfoflags rate_flags = 0;
+
+	if (ch_width == CH_WIDTH_80P80MHZ)
+		rate_flags |= eHAL_TX_RATE_VHT80 | eHAL_TX_RATE_VHT40 |
+				eHAL_TX_RATE_VHT20;
+	if (ch_width == CH_WIDTH_160MHZ)
+		rate_flags |= eHAL_TX_RATE_VHT80 | eHAL_TX_RATE_VHT40 |
+				eHAL_TX_RATE_VHT20;
+	if (ch_width == CH_WIDTH_80MHZ)
+		rate_flags |= eHAL_TX_RATE_VHT80 | eHAL_TX_RATE_VHT40 |
+				eHAL_TX_RATE_VHT20;
+	else if (ch_width)
+		rate_flags |= eHAL_TX_RATE_VHT40 | eHAL_TX_RATE_VHT20;
+	else
+		rate_flags |= eHAL_TX_RATE_VHT20;
+
+	return rate_flags;
+}
+
 /**
  * wma_set_bss_rate_flags() - set rate flags based on BSS capability
  * @iface: txrx_node ctx
@@ -741,16 +762,7 @@ void wma_set_bss_rate_flags(struct wma_txrx_node *iface,
 	iface->rate_flags = 0;
 
 	if (add_bss->vhtCapable) {
-		if (add_bss->ch_width == CH_WIDTH_80P80MHZ)
-			iface->rate_flags |= eHAL_TX_RATE_VHT80;
-		if (add_bss->ch_width == CH_WIDTH_160MHZ)
-			iface->rate_flags |= eHAL_TX_RATE_VHT80;
-		if (add_bss->ch_width == CH_WIDTH_80MHZ)
-			iface->rate_flags |= eHAL_TX_RATE_VHT80;
-		else if (add_bss->ch_width)
-			iface->rate_flags |= eHAL_TX_RATE_VHT40;
-		else
-			iface->rate_flags |= eHAL_TX_RATE_VHT20;
+		iface->rate_flags = wma_get_vht_rate_flags(add_bss->ch_width);
 	}
 	/* avoid to conflict with htCapable flag */
 	else if (add_bss->htCapable) {

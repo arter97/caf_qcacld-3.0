@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3379,7 +3379,7 @@ static int __wlan_hdd_cfg80211_sched_scan_start(struct wiphy *wiphy,
 	uint32_t num_ignore_dfs_ch = 0;
 	hdd_station_ctx_t *station_ctx = WLAN_HDD_GET_STATION_CTX_PTR(pAdapter);
 
-	ENTER();
+	ENTER_DEV(dev);
 
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
 		hdd_err("Command not allowed in FTM mode");
@@ -3391,8 +3391,8 @@ static int __wlan_hdd_cfg80211_sched_scan_start(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	if (QDF_NDI_MODE == pAdapter->device_mode) {
-		hdd_err("Command not allowed for NDI interface");
+	if (pAdapter->device_mode != QDF_STA_MODE) {
+		hdd_info("Sched scans only supported on STA ifaces");
 		return -EINVAL;
 	}
 
@@ -3787,6 +3787,7 @@ exit:
  */
 static int __wlan_hdd_cfg80211_sched_scan_stop(struct net_device *dev)
 {
+	hdd_adapter_t *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	int err;
 
 	ENTER_DEV(dev);
@@ -3808,9 +3809,18 @@ static int __wlan_hdd_cfg80211_sched_scan_stop(struct net_device *dev)
 	}
 
 	if (cds_is_load_or_unload_in_progress()) {
-		hdd_info("Unload/Load in Progress, state: 0x%x.  Ignore!!!",
-			cds_get_driver_state());
+		hdd_info("Unload/Load in Progress, state: 0x%x. Ignore!!!",
+			 cds_get_driver_state());
 		return 0;
+	}
+
+	err = hdd_validate_adapter(adapter);
+	if (err)
+		return err;
+
+	if (adapter->device_mode != QDF_STA_MODE) {
+		hdd_info("Sched scans only supported on STA ifaces");
+		return -EINVAL;
 	}
 
 	err = wlan_hdd_sched_scan_stop(dev);
