@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2019, 2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -475,6 +475,11 @@ static int spectral_scan_msg_callback(struct sk_buff *skb)
 	}
 
 	msg = NLMSG_DATA(nlh);
+
+	if (nlh->nlmsg_len < NLMSG_HDRLEN + sizeof(struct spectral_scan_msg)) {
+		hdd_err("Invalid nlmsg length %d", nlh->nlmsg_len);
+		return -EINVAL;
+	}
 
 	ss_msg = (struct spectral_scan_msg *)msg;
 	switch (ss_msg->msg_type) {
