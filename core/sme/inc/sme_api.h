@@ -2123,6 +2123,19 @@ void sme_set_vdev_ies_per_band(mac_handle_t mac_handle, uint8_t vdev_id,
 void sme_set_pdev_ht_vht_ies(mac_handle_t mac_handle, bool enable2x2);
 
 /**
+ * sme_get_sap_vdev_type_nss() - get the sap nss per vdev type
+ * @mac_handle: Opaque handle to the global MAC context
+ * @vdev_nss: Pointer to vdev_nss
+ * @band: 5G or 2.4G band
+ *
+ * Get SAP vdev nss
+ *
+ * Return: None
+ */
+void sme_get_sap_vdev_type_nss(mac_handle_t mac_handle, uint8_t *vdev_nss,
+			       enum band_info band);
+
+/**
  * sme_update_vdev_type_nss() - sets the nss per vdev type
  * @mac_handle: Opaque handle to the global MAC context
  * @max_supp_nss: max_supported Nss
@@ -3722,6 +3735,23 @@ QDF_STATUS
 sme_pause_dialog_cmd(mac_handle_t mac_handle,
 		     twt_pause_dialog_cb pause_dialog_cb,
 		     struct wmi_twt_pause_dialog_cmd_param *twt_params,
+		     void *context);
+
+/**
+ * sme_nudge_dialog_cmd() - Register callback and send TWT nudge dialog
+ * command to firmware
+ * @mac_handle: MAC handle
+ * @twt_nudge_dialog_cb: Function callback to handle nudge_dialog event
+ * @twt_params: TWT nudge dialog parameters
+ * @context: os_if_request cookie
+ *
+ * Return: QDF_STATUS_SUCCESS on Success, other QDF_STATUS error codes
+ * on failure
+ */
+QDF_STATUS
+sme_nudge_dialog_cmd(mac_handle_t mac_handle,
+		     twt_nudge_dialog_cb nudge_dialog_cb,
+		     struct wmi_twt_nudge_dialog_cmd_param *twt_params,
 		     void *context);
 
 /**

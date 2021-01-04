@@ -175,25 +175,33 @@ static int hdd_medium_assess_cca(struct hdd_context *hdd_ctx,
 {
 	struct wlan_objmgr_vdev *vdev;
 	uint32_t cca_period = DEFAULT_CCA_PERIOD;
-	uint8_t pdev_id, dcs_enable;
-	int status = 0;
+	uint8_t mac_id, dcs_enable;
+	QDF_STATUS status;
+	int errno = 0;
 
-	vdev = hdd_objmgr_get_vdev(adapter);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DCS_ID);
 	if (!vdev)
 		return -EINVAL;
 
-	pdev_id = wlan_objmgr_pdev_get_pdev_id(wlan_vdev_get_pdev(vdev));
+	status = policy_mgr_get_mac_id_by_session_id(hdd_ctx->psoc,
+						     adapter->vdev_id,
+						     &mac_id);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err_rl("Failed to get mac_id");
+		errno = -EINVAL;
+		goto out;
+	}
 
-	dcs_enable = ucfg_get_dcs_enable(hdd_ctx->psoc, pdev_id);
+	dcs_enable = ucfg_get_dcs_enable(hdd_ctx->psoc, mac_id);
 	if (!(dcs_enable & CAP_DCS_WLANIM)) {
 		hdd_err_rl("DCS_WLANIM is not enabled");
-		status = -EINVAL;
+		errno = -EINVAL;
 		goto out;
 	}
 
 	if (qdf_atomic_read(&adapter->session.ap.acs_in_progress)) {
 		hdd_err_rl("ACS is in progress");
-		status = -EBUSY;
+		errno = -EBUSY;
 		goto out;
 	}
 
@@ -202,17 +210,17 @@ static int hdd_medium_assess_cca(struct hdd_context *hdd_ctx,
 	if (cca_period == 0)
 		cca_period = DEFAULT_CCA_PERIOD;
 
-	ucfg_dcs_reset_user_stats(hdd_ctx->psoc, pdev_id);
-	ucfg_dcs_register_user_cb(hdd_ctx->psoc, pdev_id, adapter->vdev_id,
+	ucfg_dcs_reset_user_stats(hdd_ctx->psoc, mac_id);
+	ucfg_dcs_register_user_cb(hdd_ctx->psoc, mac_id, adapter->vdev_id,
 				  hdd_cca_notification_cb);
 	/* dcs is already enabled and dcs event is reported every second
 	 * set the user request counter to collect user stats
 	 */
-	ucfg_dcs_set_user_request(hdd_ctx->psoc, pdev_id, cca_period);
+	ucfg_dcs_set_user_request(hdd_ctx->psoc, mac_id, cca_period);
 
 out:
-	hdd_objmgr_put_vdev(vdev);
-	return status;
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_DCS_ID);
+	return errno;
 }
 
 /*
@@ -292,16 +300,16 @@ static int hdd_medium_assess_congestion_report(struct hdd_context *hdd_ctx,
 	uint8_t enable, threshold, interval = 1;
 	struct request_info info = {0};
 	bool pending = false;
-	QDF_STATUS qdf_status;
-	int status = 0;
+	QDF_STATUS status;
+	int errno = 0;
 
-	vdev = hdd_objmgr_get_vdev(adapter);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_CP_STATS_ID);
 	if (!vdev)
 		return -EINVAL;
 
 	if (!tb[CONGESTION_REPORT_ENABLE]) {
 		hdd_err_rl("Congestion report enable is not present");
-		status = -EINVAL;
+		errno = -EINVAL;
 		goto out;
 	}
 	enable = nla_get_u8(tb[CONGESTION_REPORT_ENABLE]);
@@ -318,41 +326,41 @@ static int hdd_medium_assess_congestion_report(struct hdd_context *hdd_ctx,
 	case REPORT_ENABLE:
 		if (!tb[CONGESTION_REPORT_THRESHOLD]) {
 			hdd_err_rl("Congestion threshold is not present");
-			status = -EINVAL;
+			errno = -EINVAL;
 			goto out;
 		}
 		threshold = nla_get_u8(tb[CONGESTION_REPORT_THRESHOLD]);
 		if (threshold > MAX_CONGESTION_THRESHOLD) {
 			hdd_err_rl("Invalid threshold %d", threshold);
-			status = -EINVAL;
+			errno = -EINVAL;
 			goto out;
 		}
 		if (tb[CONGESTION_REPORT_INTERVAL])
 			interval = nla_get_u8(tb[CONGESTION_REPORT_INTERVAL]);
-		qdf_status = ucfg_mc_cp_stats_reset_congestion_counter(vdev);
-		if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		status = ucfg_mc_cp_stats_reset_congestion_counter(vdev);
+		if (QDF_IS_STATUS_ERROR(status)) {
 			hdd_err("Failed to set threshold");
-			status = qdf_status_to_os_return(qdf_status);
+			errno = qdf_status_to_os_return(status);
 			goto out;
 		}
 		break;
 	default:
 		hdd_err_rl("Invalid enable: %d", enable);
-		status = -EINVAL;
+		errno = -EINVAL;
 		goto out;
 	}
 
-	qdf_status = ucfg_mc_cp_stats_set_congestion_threshold(vdev, threshold);
-	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+	status = ucfg_mc_cp_stats_set_congestion_threshold(vdev, threshold);
+	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Failed to set threshold");
-		status = qdf_status_to_os_return(qdf_status);
+		errno = qdf_status_to_os_return(status);
 		goto out;
 	}
 
-	status = sme_cli_set_command(adapter->vdev_id,
-				     WMI_PDEV_PARAM_PDEV_STATS_UPDATE_PERIOD,
-				     interval * 1000, PDEV_CMD);
-	if (status) {
+	errno = sme_cli_set_command(adapter->vdev_id,
+				    WMI_PDEV_PARAM_PDEV_STATS_UPDATE_PERIOD,
+				    interval * 1000, PDEV_CMD);
+	if (errno) {
 		hdd_err("Failed to set interval");
 		goto out;
 	}
@@ -362,14 +370,14 @@ static int hdd_medium_assess_congestion_report(struct hdd_context *hdd_ctx,
 		info.pdev_id =
 			wlan_objmgr_pdev_get_pdev_id(wlan_vdev_get_pdev(vdev));
 		info.u.congestion_notif_cb = hdd_congestion_notification_cb;
-		status = ucfg_mc_cp_stats_send_stats_request(vdev,
+		errno = ucfg_mc_cp_stats_send_stats_request(vdev,
 							  TYPE_CONGESTION_STATS,
 							  &info);
 	}
 
 out:
-	hdd_objmgr_put_vdev(vdev);
-	return status;
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_CP_STATS_ID);
+	return errno;
 }
 
 /**
@@ -392,7 +400,7 @@ static int __hdd_cfg80211_medium_assess(struct wiphy *wiphy,
 	enum QDF_GLOBAL_MODE driver_mode = hdd_get_conparam();
 	struct nlattr *tb[MEDIUM_ASSESS_MAX + 1];
 	uint8_t type;
-	int status;
+	int errno;
 
 	hdd_enter_dev(dev);
 
@@ -402,15 +410,15 @@ static int __hdd_cfg80211_medium_assess(struct wiphy *wiphy,
 		return -EPERM;
 	}
 
-	status = wlan_hdd_validate_context(hdd_ctx);
-	if (status != 0)
-		return status;
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno)
+		return errno;
 
-	status = wlan_cfg80211_nla_parse(tb, MEDIUM_ASSESS_MAX, data, data_len,
-					 hdd_medium_assess_policy);
-	if (status) {
+	errno = wlan_cfg80211_nla_parse(tb, MEDIUM_ASSESS_MAX, data, data_len,
+					hdd_medium_assess_policy);
+	if (errno) {
 		hdd_err_rl("Invalid ATTR");
-		return status;
+		return errno;
 	}
 
 	if (!tb[MEDIUM_ASSESS_TYPE]) {
@@ -421,10 +429,10 @@ static int __hdd_cfg80211_medium_assess(struct wiphy *wiphy,
 
 	switch (type) {
 	case QCA_WLAN_MEDIUM_ASSESS_CCA:
-		status = hdd_medium_assess_cca(hdd_ctx, adapter, tb);
+		errno = hdd_medium_assess_cca(hdd_ctx, adapter, tb);
 		break;
 	case QCA_WLAN_MEDIUM_ASSESS_CONGESTION_REPORT:
-		status = hdd_medium_assess_congestion_report(hdd_ctx, adapter,
+		errno = hdd_medium_assess_congestion_report(hdd_ctx, adapter,
 							     tb);
 		break;
 	default:
@@ -434,7 +442,7 @@ static int __hdd_cfg80211_medium_assess(struct wiphy *wiphy,
 
 	hdd_exit();
 
-	return status;
+	return errno;
 }
 
 int hdd_cfg80211_medium_assess(struct wiphy *wiphy,

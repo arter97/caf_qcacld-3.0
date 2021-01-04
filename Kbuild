@@ -424,9 +424,10 @@ HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_gpio_wakeup.o
 endif
 
 ifeq ($(CONFIG_CM_ENABLE), y)
-HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_cm_connect.o \
-	    $(HDD_SRC_DIR)/wlan_hdd_cm_disconnect.o
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_cm_connect.o
 endif
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_cm_disconnect.o
+
 
 ifeq ($(CONFIG_WLAN_BOOTUP_MARKER), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_bootup_marker.o
@@ -637,8 +638,7 @@ DFS_OBJS :=	$(DFS_CORE_SRC_DIR)/misc/dfs.o \
 		$(WLAN_COMMON_ROOT)/target_if/dfs/src/target_if_dfs.o
 
 ifeq ($(CONFIG_WLAN_FEATURE_DFS_OFFLOAD), y)
-DFS_OBJS +=	$(WLAN_COMMON_ROOT)/target_if/dfs/src/target_if_dfs_full_offload.o \
-		$(DFS_CORE_SRC_DIR)/misc/dfs_full_offload.o
+DFS_OBJS +=	$(WLAN_COMMON_ROOT)/target_if/dfs/src/target_if_dfs_full_offload.o
 else
 DFS_OBJS +=	$(WLAN_COMMON_ROOT)/target_if/dfs/src/target_if_dfs_partial_offload.o \
 		$(DFS_CORE_SRC_DIR)/filtering/dfs_fcc_bin5.o \
@@ -3003,6 +3003,7 @@ endif
 endif
 
 cppflags-$(CONFIG_FEATURE_SKB_PRE_ALLOC) += -DFEATURE_SKB_PRE_ALLOC
+cppflags-$(CONFIG_WCNSS_MEM_PRE_ALLOC) += -DCONFIG_WCNSS_MEM_PRE_ALLOC
 
 #Enable USB specific APIS
 ifeq ($(CONFIG_HIF_USB), y)

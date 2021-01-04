@@ -2999,6 +2999,11 @@ wlan_hdd_update_dbs_scan_and_fw_mode_config(void)
 	if (!policy_mgr_find_if_fw_supports_dbs(hdd_ctx->psoc))
 		return QDF_STATUS_SUCCESS;
 
+	if (hdd_ctx->is_dual_mac_cfg_updated) {
+		hdd_debug("dual mac config has already been updated, skip");
+		return QDF_STATUS_SUCCESS;
+	}
+
 	cfg.scan_config = 0;
 	cfg.fw_mode_config = 0;
 	cfg.set_dual_mac_cb = policy_mgr_soc_set_dual_mac_cfg_cb;
@@ -3045,6 +3050,8 @@ wlan_hdd_update_dbs_scan_and_fw_mode_config(void)
 		/* wait for sme_soc_set_dual_mac_config to complete */
 		status =
 		    policy_mgr_wait_for_dual_mac_configuration(hdd_ctx->psoc);
+		if (QDF_IS_STATUS_SUCCESS(status))
+			hdd_ctx->is_dual_mac_cfg_updated = true;
 	} else {
 		hdd_err("sme_soc_set_dual_mac_config failed %d", status);
 		return status;
@@ -6783,6 +6790,8 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx, uint8_t sessio
 
 	hdd_periodic_sta_stats_init(adapter);
 
+	adapter->is_pre_cac_adapter = false;
+
 	return adapter;
 
 err_destroy_adapter_features_update_work:
@@ -6974,6 +6983,32 @@ static inline void hdd_dump_func_call_map(void)
 {
 }
 #endif
+
+static void hdd_close_pre_cac_adapter(struct hdd_context *hdd_ctx)
+{
+	struct hdd_adapter *pre_cac_adapter;
+	struct osif_vdev_sync *vdev_sync;
+	int errno;
+
+	pre_cac_adapter = hdd_get_adapter_by_iface_name(hdd_ctx,
+							SAP_PRE_CAC_IFNAME);
+	if (!pre_cac_adapter)
+		return;
+
+	errno = osif_vdev_sync_trans_start_wait(pre_cac_adapter->dev,
+						&vdev_sync);
+	if (errno)
+		return;
+
+	osif_vdev_sync_unregister(pre_cac_adapter->dev);
+	osif_vdev_sync_wait_for_ops(vdev_sync);
+
+	wlan_hdd_release_intf_addr(hdd_ctx, pre_cac_adapter->mac_addr.bytes);
+	hdd_close_adapter(hdd_ctx, pre_cac_adapter, true);
+
+	osif_vdev_sync_trans_stop(vdev_sync);
+	osif_vdev_sync_destroy(vdev_sync);
+}
 
 QDF_STATUS hdd_stop_adapter(struct hdd_context *hdd_ctx,
 			    struct hdd_adapter *adapter)
@@ -7172,11 +7207,23 @@ QDF_STATUS hdd_stop_adapter(struct hdd_context *hdd_ctx,
 
 		ucfg_ipa_flush(hdd_ctx->pdev);
 
-		/* don't flush pre-cac destroy if we are destroying pre-cac */
-		sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
-		if (!wlan_sap_is_pre_cac_context(sap_ctx) &&
-		    (hdd_ctx->sap_pre_cac_work.fn))
-			cds_flush_work(&hdd_ctx->sap_pre_cac_work);
+		if (!adapter->is_pre_cac_adapter) {
+			/**
+			 * don't flush pre-cac destroy if we are destroying
+			 * pre-cac adapter
+			 */
+			sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
+			if (!wlan_sap_is_pre_cac_context(sap_ctx) &&
+			    (hdd_ctx->sap_pre_cac_work.fn))
+				cds_flush_work(&hdd_ctx->sap_pre_cac_work);
+
+			hdd_close_pre_cac_adapter(hdd_ctx);
+
+		} else {
+			if (wlan_sap_set_pre_cac_status(
+				   WLAN_HDD_GET_SAP_CTX_PTR(adapter), false))
+				hdd_err("Failed to set is_pre_cac_on to false");
+		}
 
 		/* fallthrough */
 
@@ -14362,6 +14409,7 @@ int hdd_wlan_stop_modules(struct hdd_context *hdd_ctx, bool ftm_mode)
 
 	/* Once the firmware sequence is completed reset this flag */
 	hdd_ctx->imps_enabled = false;
+	hdd_ctx->is_dual_mac_cfg_updated = false;
 	hdd_ctx->driver_status = DRIVER_MODULES_CLOSED;
 	hdd_debug("Wlan transitioned (now CLOSED)");
 
@@ -16103,7 +16151,7 @@ static ssize_t wlan_hdd_state_ctrl_param_write(struct file *filp,
 	static const char wlan_on_str[] = "ON";
 	int ret;
 	unsigned long rc;
-	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	struct hdd_context *hdd_ctx;
 
 	if (copy_from_user(buf, user_buf, 3)) {
 		pr_err("Failed to read buffer\n");
@@ -16138,6 +16186,7 @@ static ssize_t wlan_hdd_state_ctrl_param_write(struct file *filp,
 	 * Flush idle shutdown work for cases to synchronize the wifi on
 	 * during the idle shutdown.
 	 */
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	if (hdd_ctx)
 		hdd_psoc_idle_timer_stop(hdd_ctx);
 

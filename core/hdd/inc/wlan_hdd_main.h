@@ -1521,6 +1521,8 @@ struct hdd_adapter {
 
 	qdf_work_t netdev_features_update_work;
 	uint8_t net_dev_hold_ref_count[NET_DEV_HOLD_ID_MAX];
+	/* Flag to indicate whether it is a pre cac adapter or not */
+	bool is_pre_cac_adapter;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(adapter) (&(adapter)->session.station)
@@ -1842,6 +1844,7 @@ struct hdd_adapter_ops_history {
  * @is_therm_cmd_supp: get temperature command enable or disable
  * @disconnect_for_sta_mon_conc: disconnect if sta monitor intf concurrency
  * @bbm_ctx: bus bandwidth manager context
+ * @is_dual_mac_cfg_updated: indicate whether dual mac cfg has been updated
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -2188,6 +2191,7 @@ struct hdd_context {
 #ifdef FEATURE_BUS_BANDWIDTH_MGR
 	struct bbm_context *bbm_ctx;
 #endif
+	bool is_dual_mac_cfg_updated;
 };
 
 /**
