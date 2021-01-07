@@ -423,9 +423,7 @@ ifeq ($(CONFIG_WLAN_ENABLE_GPIO_WAKEUP),y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_gpio_wakeup.o
 endif
 
-ifeq ($(CONFIG_CM_ENABLE), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_cm_connect.o
-endif
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_cm_disconnect.o
 
 
@@ -624,7 +622,6 @@ DFS_INC :=	-I$(WLAN_ROOT)/$(DFS_DISP_INC_DIR) \
 		-I$(WLAN_ROOT)/$(DFS_CMN_SERVICES_INC_DIR)
 
 DFS_OBJS :=	$(DFS_CORE_SRC_DIR)/misc/dfs.o \
-		$(DFS_CORE_SRC_DIR)/misc/dfs_cac.o \
 		$(DFS_CORE_SRC_DIR)/misc/dfs_nol.o \
 		$(DFS_CORE_SRC_DIR)/misc/dfs_random_chan_sel.o \
 		$(DFS_CORE_SRC_DIR)/misc/dfs_process_radar_found_ind.o \

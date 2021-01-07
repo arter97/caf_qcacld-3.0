@@ -47,6 +47,7 @@
 #include <qdf_notifier.h>
 #include <qdf_hang_event_notifier.h>
 #include "wlan_hdd_thermal.h"
+#include "wlan_hdd_bus_bandwidth.h"
 
 #ifdef MODULE
 #define WLAN_MODULE_NAME  module_name(THIS_MODULE)
@@ -523,6 +524,26 @@ static void hdd_soc_load_unlock(struct device *dev)
 	hdd_allow_suspend(WIFI_POWER_EVENT_WAKELOCK_DRIVER_INIT);
 }
 
+#ifdef DP_MEM_PRE_ALLOC
+/**
+ * hdd_init_dma_mask() - Set the DMA mask for dma memory pre-allocation
+ * @dev: device handle
+ * @bus_type: Bus type for which init is being done
+ *
+ * Return: 0 - success, non-zero on failure
+ */
+static int hdd_init_dma_mask(struct device *dev, enum qdf_bus_type bus_type)
+{
+	return hif_init_dma_mask(dev, bus_type);
+}
+#else
+static inline int
+hdd_init_dma_mask(struct device *dev, enum qdf_bus_type bus_type)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 static int __hdd_soc_probe(struct device *dev,
 			   void *bdev,
 			   const struct hif_bus_id *bid,
@@ -540,6 +561,10 @@ static int __hdd_soc_probe(struct device *dev,
 	cds_set_recovery_in_progress(false);
 
 	errno = hdd_init_qdf_ctx(dev, bdev, bus_type, bid);
+	if (errno)
+		goto unlock;
+
+	errno = hdd_init_dma_mask(dev, bus_type);
 	if (errno)
 		goto unlock;
 
@@ -1114,6 +1139,7 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params)
 	void *dp_soc;
 	struct pmo_wow_enable_params pmo_params;
 	int pending;
+	struct bbm_params param = {0};
 
 	hdd_info("starting bus suspend");
 
@@ -1188,7 +1214,9 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params)
 	 * Remove bus votes at the very end, after making sure there are no
 	 * pending bus transactions from WLAN SOC for TX/RX.
 	 */
-	pld_request_bus_bandwidth(hdd_ctx->parent_dev, PLD_BUS_WIDTH_NONE);
+	param.policy = BBM_NON_PERSISTENT_POLICY;
+	param.policy_info.flag = BBM_APPS_SUSPEND;
+	hdd_bbm_apply_independent_policy(hdd_ctx, &param);
 
 	hdd_info("bus suspend succeeded");
 	return 0;
@@ -1318,6 +1346,7 @@ int wlan_hdd_bus_resume(void)
 	int status;
 	QDF_STATUS qdf_status;
 	void *dp_soc;
+	struct bbm_params param = {0};
 
 	if (cds_is_driver_recovering())
 		return 0;
@@ -1345,13 +1374,9 @@ int wlan_hdd_bus_resume(void)
 	 * Add bus votes at the beginning, before making sure there are any
 	 * bus transactions from WLAN SOC for TX/RX.
 	 */
-	if (hdd_is_any_adapter_connected(hdd_ctx)) {
-		pld_request_bus_bandwidth(hdd_ctx->parent_dev,
-					  PLD_BUS_WIDTH_MEDIUM);
-	} else {
-		pld_request_bus_bandwidth(hdd_ctx->parent_dev,
-					  PLD_BUS_WIDTH_NONE);
-	}
+	param.policy = BBM_NON_PERSISTENT_POLICY;
+	param.policy_info.flag = BBM_APPS_RESUME;
+	hdd_bbm_apply_independent_policy(hdd_ctx, &param);
 
 	status = hif_bus_resume(hif_ctx);
 	if (status) {
