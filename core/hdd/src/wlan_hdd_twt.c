@@ -33,12 +33,14 @@
 #include "wma_twt.h"
 #include "osif_sync.h"
 #include "wlan_osif_request_manager.h"
+#include "cfg_ucfg_api.h"
 #include <wlan_cp_stats_mc_ucfg_api.h>
 
 #define TWT_SETUP_COMPLETE_TIMEOUT 4000
 #define TWT_DISABLE_COMPLETE_TIMEOUT 4000
 #define TWT_TERMINATE_COMPLETE_TIMEOUT 4000
 #define TWT_PAUSE_COMPLETE_TIMEOUT 4000
+#define TWT_NUDGE_COMPLETE_TIMEOUT 4000
 #define TWT_RESUME_COMPLETE_TIMEOUT 4000
 
 #define TWT_FLOW_TYPE_ANNOUNCED 0
@@ -59,6 +61,18 @@
  */
 struct twt_pause_dialog_comp_ev_priv {
 	struct wmi_twt_pause_dialog_complete_event_param pause_dialog_comp_ev_buf;
+};
+
+/**
+ * struct twt_nudge_dialog_comp_ev_priv - private struct for twt nudge dialog
+ * @nudge_dialog_comp_ev_buf: buffer from TWT nudge dialog complete_event
+ *
+ * This TWT nudge dialog private structure is registered with os_if to
+ * retrieve the TWT nudge dialog response event buffer.
+ */
+struct twt_nudge_dialog_comp_ev_priv {
+	struct wmi_twt_nudge_dialog_complete_event_param
+						nudge_dialog_comp_ev_buf;
 };
 
 /**
@@ -123,6 +137,14 @@ wlan_hdd_wifi_twt_config_policy[
 			.type = NLA_U8},
 		[QCA_WLAN_VENDOR_ATTR_CONFIG_TWT_PARAMS] = {
 			.type = NLA_NESTED},
+};
+
+static const struct nla_policy
+qca_wlan_vendor_twt_nudge_dialog_policy[QCA_WLAN_VENDOR_ATTR_TWT_NUDGE_MAX + 1] = {
+	[QCA_WLAN_VENDOR_ATTR_TWT_NUDGE_FLOW_ID] = {.type = NLA_U8 },
+	[QCA_WLAN_VENDOR_ATTR_TWT_NUDGE_WAKE_TIME] = {.type = NLA_U32 },
+	[QCA_WLAN_VENDOR_ATTR_TWT_NUDGE_NEXT_TWT_SIZE] = {.type = NLA_U32 },
+	[QCA_WLAN_VENDOR_ATTR_TWT_NUDGE_MAC_ADDR] = VENDOR_NLA_POLICY_MAC_ADDR,
 };
 
 /**
@@ -778,6 +800,37 @@ wmi_twt_pause_status_to_vendor_twt_status(enum WMI_HOST_PAUSE_TWT_STATUS status)
 	case WMI_HOST_PAUSE_TWT_STATUS_NO_ACK:
 		return QCA_WLAN_VENDOR_TWT_STATUS_NO_ACK;
 	case WMI_HOST_PAUSE_TWT_STATUS_UNKNOWN_ERROR:
+		return QCA_WLAN_VENDOR_TWT_STATUS_UNKNOWN_ERROR;
+	default:
+		return QCA_WLAN_VENDOR_TWT_STATUS_UNKNOWN_ERROR;
+	}
+}
+
+/**
+ * wmi_twt_nudge_status_to_vendor_twt_status() - convert from
+ * WMI_HOST_NUDGE_TWT_STATUS to qca_wlan_vendor_twt_status
+ * @status: WMI_HOST_NUDGE_TWT_STATUS value from firmware
+ *
+ * Return: qca_wlan_vendor_twt_status values corresponding
+ * to the firmware failure status
+ */
+static int
+wmi_twt_nudge_status_to_vendor_twt_status(enum WMI_HOST_NUDGE_TWT_STATUS status)
+{
+	switch (status) {
+	case WMI_HOST_NUDGE_TWT_STATUS_OK:
+		return QCA_WLAN_VENDOR_TWT_STATUS_OK;
+	case WMI_HOST_NUDGE_TWT_STATUS_DIALOG_ID_NOT_EXIST:
+		return QCA_WLAN_VENDOR_TWT_STATUS_SESSION_NOT_EXIST;
+	case WMI_HOST_NUDGE_TWT_STATUS_INVALID_PARAM:
+		return QCA_WLAN_VENDOR_TWT_STATUS_INVALID_PARAM;
+	case WMI_HOST_NUDGE_TWT_STATUS_DIALOG_ID_BUSY:
+		return QCA_WLAN_VENDOR_TWT_STATUS_SESSION_BUSY;
+	case WMI_HOST_NUDGE_TWT_STATUS_NO_RESOURCE:
+		return QCA_WLAN_VENDOR_TWT_STATUS_NO_RESOURCE;
+	case WMI_HOST_NUDGE_TWT_STATUS_NO_ACK:
+		return QCA_WLAN_VENDOR_TWT_STATUS_NO_ACK;
+	case WMI_HOST_NUDGE_TWT_STATUS_UNKNOWN_ERROR:
 		return QCA_WLAN_VENDOR_TWT_STATUS_UNKNOWN_ERROR;
 	default:
 		return QCA_WLAN_VENDOR_TWT_STATUS_UNKNOWN_ERROR;
@@ -1468,6 +1521,43 @@ hdd_twt_pause_dialog_comp_cb(void *context,
 }
 
 /**
+ * hdd_twt_nudge_dialog_comp_cb() - callback function
+ * to get twt nudge command complete event
+ * @context: private context
+ * @params: Pointer to nudge dialog complete event buffer
+ *
+ * Return: None
+ */
+static void
+hdd_twt_nudge_dialog_comp_cb(void *context,
+		       struct wmi_twt_nudge_dialog_complete_event_param *params)
+{
+	struct osif_request *request;
+	struct twt_nudge_dialog_comp_ev_priv *priv;
+
+	hdd_enter();
+
+	request = osif_request_get(context);
+	if (!request) {
+		hdd_err("Obsolete request");
+		return;
+	}
+
+	priv = osif_request_priv(request);
+
+	priv->nudge_dialog_comp_ev_buf = *params;
+	osif_request_complete(request);
+	osif_request_put(request);
+
+	hdd_debug("TWT: nudge dialog_id:%d, status:%d vdev_id %d peer mac_addr "
+		  QDF_MAC_ADDR_FMT, params->dialog_id,
+		  params->status, params->vdev_id,
+		  QDF_MAC_ADDR_REF(params->peer_macaddr));
+
+	hdd_exit();
+}
+
+/**
  * hdd_twt_pause_pack_resp_nlmsg() - pack the skb with
  * firmware response for twt pause command
  * @reply_skb: skb to store the response
@@ -1492,6 +1582,38 @@ hdd_twt_pause_pack_resp_nlmsg(struct sk_buff *reply_skb,
 	if (nla_put_u8(reply_skb, QCA_WLAN_VENDOR_ATTR_TWT_SETUP_STATUS,
 		       vendor_status)) {
 		hdd_err("TWT: Failed to put QCA_WLAN_TWT_PAUSE status");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * hdd_twt_nudge_pack_resp_nlmsg() - pack the skb with
+ * firmware response for twt nudge command
+ * @reply_skb: skb to store the response
+ * @params: Pointer to nudge dialog complete event buffer
+ *
+ * Return: QDF_STATUS_SUCCESS on Success, QDF_STATUS_E_FAILURE
+ * on failure
+ */
+static QDF_STATUS
+hdd_twt_nudge_pack_resp_nlmsg(struct sk_buff *reply_skb,
+		      struct wmi_twt_nudge_dialog_complete_event_param *params)
+{
+	int vendor_status;
+
+	if (nla_put_u8(reply_skb, QCA_WLAN_VENDOR_ATTR_TWT_NUDGE_FLOW_ID,
+		       params->dialog_id)) {
+		hdd_debug("TWT: Failed to put dialog_id");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	vendor_status =
+		     wmi_twt_nudge_status_to_vendor_twt_status(params->status);
+	if (nla_put_u8(reply_skb, QCA_WLAN_VENDOR_ATTR_TWT_SETUP_STATUS,
+		       vendor_status)) {
+		hdd_err("TWT: Failed to put QCA_WLAN_TWT_NUDGE status");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -1633,6 +1755,164 @@ static int hdd_twt_pause_session(struct hdd_adapter *adapter,
 		  QDF_MAC_ADDR_REF(params.peer_macaddr));
 
 	ret = hdd_send_twt_pause_dialog_cmd(adapter->hdd_ctx, &params);
+
+	return ret;
+}
+
+/**
+ * hdd_send_twt_nudge_dialog_cmd() - Send TWT nudge dialog command to target
+ * @hdd_ctx: HDD Context
+ * @twt_params: Pointer to nudge dialog cmd params structure
+ *
+ * Return: 0 on success, negative value on failure
+ */
+static
+int hdd_send_twt_nudge_dialog_cmd(struct hdd_context *hdd_ctx,
+			struct wmi_twt_nudge_dialog_cmd_param *twt_params)
+{
+	struct wmi_twt_nudge_dialog_complete_event_param *comp_ev_params;
+	struct twt_nudge_dialog_comp_ev_priv *priv;
+	static const struct osif_request_params osif_req_params = {
+		.priv_size = sizeof(*priv),
+		.timeout_ms = TWT_NUDGE_COMPLETE_TIMEOUT,
+		.dealloc = NULL,
+	};
+	struct osif_request *request;
+	struct sk_buff *reply_skb = NULL;
+	QDF_STATUS status;
+	void *cookie;
+	int skb_len;
+	int ret;
+
+	request = osif_request_alloc(&osif_req_params);
+	if (!request) {
+		hdd_err("twt osif request allocation failure");
+		ret = -ENOMEM;
+		goto err;
+	}
+
+	cookie = osif_request_cookie(request);
+
+	status = sme_nudge_dialog_cmd(hdd_ctx->mac_handle,
+				      hdd_twt_nudge_dialog_comp_cb,
+				      twt_params, cookie);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to send nudge dialog command");
+		ret = qdf_status_to_os_return(status);
+		goto err;
+	}
+
+	ret = osif_request_wait_for_response(request);
+	if (ret) {
+		hdd_err("twt: nudge dialog req timedout");
+		ret = -ETIMEDOUT;
+		goto err;
+	}
+
+	priv = osif_request_priv(request);
+	comp_ev_params = &priv->nudge_dialog_comp_ev_buf;
+
+	skb_len = hdd_get_twt_event_len();
+	reply_skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy,
+							     skb_len);
+	if (!reply_skb) {
+		hdd_err("cfg80211_vendor_cmd_alloc_reply_skb failed");
+		ret = -ENOMEM;
+		goto err;
+	}
+
+	status = hdd_twt_nudge_pack_resp_nlmsg(reply_skb, comp_ev_params);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to pack nl nudge dialog response");
+		ret = qdf_status_to_os_return(status);
+		goto err;
+	}
+
+	ret = wlan_cfg80211_vendor_cmd_reply(reply_skb);
+
+err:
+	if (request)
+		osif_request_put(request);
+	if (ret && reply_skb)
+		kfree_skb(reply_skb);
+	return ret;
+}
+
+/**
+ * hdd_twt_nudge_session - Process TWT nudge operation
+ * in the received vendor command and send it to firmware
+ * @adapter: adapter pointer
+ * @twt_param_attr: nl attributes
+ *
+ * Handles QCA_WLAN_TWT_NUDGE
+ *
+ * Return: 0 on success, negative value on failure
+ */
+static int hdd_twt_nudge_session(struct hdd_adapter *adapter,
+				 struct nlattr *twt_param_attr)
+{
+	struct hdd_station_ctx *hdd_sta_ctx;
+	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_TWT_NUDGE_MAX + 1];
+	struct wmi_twt_nudge_dialog_cmd_param params = {0};
+	int id;
+	int ret;
+
+	if (adapter->device_mode != QDF_STA_MODE &&
+	    adapter->device_mode != QDF_P2P_CLIENT_MODE) {
+		return -EOPNOTSUPP;
+	}
+
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	if (hdd_sta_ctx->conn_info.conn_state != eConnectionState_Associated) {
+		hdd_err_rl("Invalid state, vdev %d mode %d state %d",
+			   adapter->vdev_id, adapter->device_mode,
+			   hdd_sta_ctx->conn_info.conn_state);
+		return -EINVAL;
+	}
+
+	params.vdev_id = adapter->vdev_id;
+
+	ret = wlan_cfg80211_nla_parse_nested(tb,
+				      QCA_WLAN_VENDOR_ATTR_TWT_NUDGE_MAX,
+				      twt_param_attr,
+				      qca_wlan_vendor_twt_nudge_dialog_policy);
+	if (ret)
+		return ret;
+
+	id = QCA_WLAN_VENDOR_ATTR_TWT_NUDGE_MAC_ADDR;
+	if (tb[id]) {
+		nla_memcpy(params.peer_macaddr, tb[id], QDF_MAC_ADDR_SIZE);
+		hdd_debug("peer mac_addr "QDF_MAC_ADDR_FMT,
+			  QDF_MAC_ADDR_REF(params.peer_macaddr));
+	}
+
+	id = QCA_WLAN_VENDOR_ATTR_TWT_NUDGE_FLOW_ID;
+	if (!tb[id]) {
+		hdd_debug("TWT: FLOW_ID not specified.");
+		return -EINVAL;
+	}
+	params.dialog_id = nla_get_u8(tb[id]);
+
+	id = QCA_WLAN_VENDOR_ATTR_TWT_NUDGE_WAKE_TIME;
+	if (!tb[id]) {
+		hdd_debug("TWT: WAKE_TIME not specified.");
+		return -EINVAL;
+	}
+	params.suspend_duration = nla_get_u32(tb[id]);
+
+	id = QCA_WLAN_VENDOR_ATTR_TWT_NUDGE_NEXT_TWT_SIZE;
+	if (!tb[id]) {
+		hdd_debug("TWT: NEXT_TWT_SIZE not specified.");
+		return -EINVAL;
+	}
+	params.next_twt_size = nla_get_u32(tb[id]);
+
+	hdd_debug("twt_nudge: vdev_id %d dialog_id %d ", params.vdev_id,
+		  params.dialog_id);
+	hdd_debug("twt_nudge: suspend_duration %d next_twt_size %d",
+		  params.suspend_duration, params.next_twt_size);
+
+	ret = hdd_send_twt_nudge_dialog_cmd(adapter->hdd_ctx, &params);
 
 	return ret;
 }
@@ -1917,6 +2197,9 @@ static int hdd_twt_configure(struct hdd_adapter *adapter,
 	case QCA_WLAN_TWT_RESUME:
 		ret = hdd_twt_resume_session(adapter, twt_param_attr);
 		break;
+	case QCA_WLAN_TWT_NUDGE:
+		ret = hdd_twt_nudge_session(adapter, twt_param_attr);
+		break;
 	default:
 		hdd_err("Invalid TWT Operation");
 		ret = -EINVAL;
@@ -1998,51 +2281,134 @@ void hdd_update_tgt_twt_cap(struct hdd_context *hdd_ctx,
 			    struct wma_tgt_cfg *cfg)
 {
 	struct wma_tgt_services *services = &cfg->services;
-	bool enable_twt = false;
+	bool twt_bcast_req;
+	bool twt_bcast_res;
+	bool enable_twt;
+	bool twt_req;
+	bool twt_res;
 
 	ucfg_mlme_get_enable_twt(hdd_ctx->psoc, &enable_twt);
-	hdd_debug("TWT: enable_twt=%d, tgt Req=%d, Res=%d",
-		  enable_twt, services->twt_requestor,
-		  services->twt_responder);
+
+	ucfg_mlme_get_twt_requestor(hdd_ctx->psoc, &twt_req);
+
+	ucfg_mlme_get_twt_responder(hdd_ctx->psoc, &twt_res);
+
+	ucfg_mlme_get_twt_bcast_requestor(hdd_ctx->psoc,
+					  &twt_bcast_req);
+
+	ucfg_mlme_get_twt_bcast_responder(hdd_ctx->psoc,
+					  &twt_bcast_res);
+
+	hdd_debug("ini: enable_twt=%d, bcast_req=%d, bcast_res=%d",
+		  enable_twt, twt_bcast_req, twt_bcast_res);
+	hdd_debug("ini: twt_req=%d, twt_res=%d", twt_req, twt_res);
+	hdd_debug("svc:  req=%d, res=%d, bcast_req=%d, bcast_res=%d",
+		  services->twt_requestor, services->twt_responder,
+		  cfg->twt_bcast_req_support, cfg->twt_bcast_res_support);
 
 	ucfg_mlme_set_twt_requestor(hdd_ctx->psoc,
 				    QDF_MIN(services->twt_requestor,
-					    enable_twt));
+					    (enable_twt && twt_req)));
 
 	ucfg_mlme_set_twt_responder(hdd_ctx->psoc,
 				    QDF_MIN(services->twt_responder,
-					    enable_twt));
+					    (enable_twt && twt_res)));
+
+	twt_req = enable_twt && twt_bcast_req;
+	ucfg_mlme_set_twt_bcast_requestor(hdd_ctx->psoc,
+					  QDF_MIN(cfg->twt_bcast_req_support,
+						  twt_req));
+
+	twt_res = enable_twt && twt_bcast_res;
+	ucfg_mlme_set_twt_bcast_responder(hdd_ctx->psoc,
+					  QDF_MIN(cfg->twt_bcast_res_support,
+						  twt_res));
 }
 
 void hdd_send_twt_enable_cmd(struct hdd_context *hdd_ctx)
 {
 	uint8_t pdev_id = hdd_ctx->pdev->pdev_objmgr.wlan_pdev_id;
-	bool req_val = 0, resp_val = 0, bcast_val = 0;
-	uint32_t congestion_timeout = 0;
+	struct twt_enable_disable_conf twt_en_dis = {0};
+	bool is_requestor_en;
+	bool is_responder_en;
+	bool twt_bcast_en;
 
-	ucfg_mlme_get_twt_requestor(hdd_ctx->psoc, &req_val);
-	ucfg_mlme_get_twt_responder(hdd_ctx->psoc, &resp_val);
-	ucfg_mlme_get_bcast_twt(hdd_ctx->psoc, &bcast_val);
+	/* Get MLME TWT config */
+	ucfg_mlme_get_twt_requestor(hdd_ctx->psoc, &is_requestor_en);
+	ucfg_mlme_get_twt_responder(hdd_ctx->psoc, &is_responder_en);
+	ucfg_mlme_get_bcast_twt(hdd_ctx->psoc, &twt_en_dis.bcast_en);
 	ucfg_mlme_get_twt_congestion_timeout(hdd_ctx->psoc,
-					     &congestion_timeout);
+					     &twt_en_dis.congestion_timeout);
+	hdd_debug("TWT mlme cfg:req: %d, res:%d, bcast:%d, cong:%d, pdev:%d",
+		  is_requestor_en, is_responder_en, twt_en_dis.bcast_en,
+		   twt_en_dis.congestion_timeout, pdev_id);
 
-	hdd_debug("TWT cfg req:%d, responder:%d, bcast:%d, pdev:%d, cong:%d",
-		  req_val, resp_val, bcast_val, pdev_id, congestion_timeout);
+	/* The below code takes care of the following :
+	 * If user wants to separately enable requestor and responder roles,
+	 * and also the broadcast TWT capaibilities separately for each role.
+	 * This is done by reusing the INI configuration to indicate the user
+	 * preference and sending the command accordingly.
+	 * Legacy targets did not provide this. Newer targets provide this.
+	 *
+	 * 1. The MLME config holds the intersection of fw cap and user config
+	 * 2. This may result in two enable commands sent for legacy, but
+	 *    that's fine, since the firmware returns harmlessly for the
+	 *    second command.
+	 * 3. The new two parameters in the enable command are ignored
+	 *    by legacy targets, and honored by new targets.
+	 */
 
-	if (req_val || resp_val || bcast_val)
-		wma_send_twt_enable_cmd(pdev_id, congestion_timeout, bcast_val);
+	/* If requestor configured, send requestor bcast/ucast config */
+	if (is_requestor_en) {
+		twt_en_dis.role = WMI_TWT_ROLE_REQUESTOR;
+		twt_en_dis.ext_conf_present = true;
+		ucfg_mlme_get_twt_bcast_requestor(hdd_ctx->psoc, &twt_bcast_en);
+		if (twt_bcast_en)
+			twt_en_dis.oper = WMI_TWT_OPERATION_BROADCAST;
+		else
+			twt_en_dis.oper = WMI_TWT_OPERATION_INDIVIDUAL;
+
+		wma_send_twt_enable_cmd(pdev_id, &twt_en_dis);
+	}
+
+	/* If responder configured, send responder bcast/ucast config */
+	if (is_responder_en) {
+		twt_en_dis.role = WMI_TWT_ROLE_RESPONDER;
+		twt_en_dis.ext_conf_present = true;
+		ucfg_mlme_get_twt_bcast_responder(hdd_ctx->psoc, &twt_bcast_en);
+		if (twt_bcast_en)
+			twt_en_dis.oper = WMI_TWT_OPERATION_BROADCAST;
+		else
+			twt_en_dis.oper = WMI_TWT_OPERATION_INDIVIDUAL;
+
+		wma_send_twt_enable_cmd(pdev_id, &twt_en_dis);
+	}
+
+	return;
 }
 
 QDF_STATUS hdd_send_twt_disable_cmd(struct hdd_context *hdd_ctx)
 {
 	uint8_t pdev_id = hdd_ctx->pdev->pdev_objmgr.wlan_pdev_id;
+	struct twt_enable_disable_conf twt_en_dis = {0};
+	QDF_STATUS status;
 
 	hdd_debug("TWT disable cmd :pdev:%d", pdev_id);
 
-	wma_send_twt_disable_cmd(pdev_id);
+	/* One disable should be fine, with extended configuration
+	 * set to false, and extended arguments will be ignored by target
+	 */
+	hdd_ctx->twt_state = TWT_DISABLE_REQUESTED;
+	twt_en_dis.ext_conf_present = false;
+	wma_send_twt_disable_cmd(pdev_id, &twt_en_dis);
 
-	return qdf_wait_single_event(&hdd_ctx->twt_disable_comp_evt,
-				     TWT_DISABLE_COMPLETE_TIMEOUT);
+	status = qdf_wait_single_event(&hdd_ctx->twt_disable_comp_evt,
+				       TWT_DISABLE_COMPLETE_TIMEOUT);
+
+	if (!QDF_IS_STATUS_SUCCESS(status))
+		hdd_warn("TWT Responder disable timedout");
+
+	return status;
 }
 
 /**
@@ -2103,8 +2469,12 @@ hdd_twt_disable_comp_cb(hdd_handle_t hdd_handle)
 		hdd_err("TWT: Invalid HDD Context");
 		return;
 	}
+
 	prev_state = hdd_ctx->twt_state;
-	hdd_ctx->twt_state = TWT_DISABLED;
+	/* Do not change the state for role specific disables */
+	if (hdd_ctx->twt_state == TWT_DISABLE_REQUESTED) {
+		hdd_ctx->twt_state = TWT_DISABLED;
+	}
 
 	hdd_debug("TWT: State transitioned from %d to %d",
 		  prev_state, hdd_ctx->twt_state);
@@ -2112,6 +2482,52 @@ hdd_twt_disable_comp_cb(hdd_handle_t hdd_handle)
 	status = qdf_event_set(&hdd_ctx->twt_disable_comp_evt);
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		hdd_err("Failed to set twt_disable_comp_evt");
+}
+
+void hdd_send_twt_role_disable_cmd(struct hdd_context *hdd_ctx,
+				   enum twt_role role)
+{
+	uint8_t pdev_id = hdd_ctx->pdev->pdev_objmgr.wlan_pdev_id;
+	struct twt_enable_disable_conf twt_en_dis = {0};
+	QDF_STATUS status;
+
+	hdd_debug("TWT disable cmd :pdev:%d : %d", pdev_id, role);
+
+	if ((role == TWT_REQUESTOR) || (role == TWT_REQUESTOR_INDV)) {
+		twt_en_dis.ext_conf_present = true;
+		twt_en_dis.role = WMI_TWT_ROLE_REQUESTOR;
+		twt_en_dis.oper = WMI_TWT_OPERATION_INDIVIDUAL;
+		wma_send_twt_disable_cmd(pdev_id, &twt_en_dis);
+	}
+
+	if (role == TWT_REQUESTOR_BCAST) {
+		twt_en_dis.ext_conf_present = true;
+		twt_en_dis.role = WMI_TWT_ROLE_REQUESTOR;
+		twt_en_dis.oper = WMI_TWT_OPERATION_BROADCAST;
+		wma_send_twt_disable_cmd(pdev_id, &twt_en_dis);
+	}
+
+	if ((role == TWT_RESPONDER) || (role == TWT_RESPONDER_INDV)) {
+		twt_en_dis.ext_conf_present = true;
+		twt_en_dis.role = WMI_TWT_ROLE_RESPONDER;
+		twt_en_dis.oper = WMI_TWT_OPERATION_INDIVIDUAL;
+		wma_send_twt_disable_cmd(pdev_id, &twt_en_dis);
+	}
+
+	if (role == TWT_RESPONDER_BCAST) {
+		twt_en_dis.ext_conf_present = true;
+		twt_en_dis.role = WMI_TWT_ROLE_RESPONDER;
+		twt_en_dis.oper = WMI_TWT_OPERATION_BROADCAST;
+		wma_send_twt_disable_cmd(pdev_id, &twt_en_dis);
+	}
+
+	status = qdf_wait_single_event(&hdd_ctx->twt_disable_comp_evt,
+				       TWT_DISABLE_COMPLETE_TIMEOUT);
+
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		hdd_warn("TWT request disable timedout");
+		return;
+	}
 }
 
 void wlan_hdd_twt_init(struct hdd_context *hdd_ctx)

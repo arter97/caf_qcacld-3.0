@@ -50,6 +50,31 @@ struct cm_vdev_join_req {
 };
 
 /**
+ * struct wlan_cm_discon_ind - disconnect ind from VDEV mgr and will be sent to
+ * SME
+ * @vdev_id: vdev id
+ * @source: source of disconnection
+ * @reason_code: reason of disconnection
+ * @bssid: BSSID of AP
+ */
+struct wlan_cm_discon_ind {
+	uint8_t vdev_id;
+	enum wlan_cm_source source;
+	enum wlan_reason_code reason_code;
+	struct qdf_mac_addr bssid;
+};
+
+/**
+ * struct cm_vdev_discon_ind - disconnect ind from vdev mgr to connection mgr
+ * @psoc: psoc object
+ * @disconnect_param: DisConnect indication to be sent to CM
+ */
+struct cm_vdev_discon_ind {
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_cm_discon_ind disconnect_param;
+};
+
+/**
  * struct cm_vdev_join_rsp - connect rsp from vdev mgr to connection mgr
  * @psoc: psoc object
  * @connect_rsp: Connect response to be sent to CM
@@ -57,6 +82,16 @@ struct cm_vdev_join_req {
 struct cm_vdev_join_rsp {
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_cm_connect_resp connect_rsp;
+};
+
+/**
+ * struct cm_peer_create_req - bss peer create req
+ * @vdev_id: vdev_id
+ * @peer_mac: peer mac to create
+ */
+struct cm_peer_create_req {
+	uint8_t vdev_id;
+	struct qdf_mac_addr peer_mac;
 };
 
 /**
@@ -157,6 +192,14 @@ void cm_free_join_req(struct cm_vdev_join_req *join_req);
 QDF_STATUS cm_process_join_req(struct scheduler_msg *msg);
 
 /**
+ * cm_process_peer_create() - Process bss peer create req
+ * @msg: scheduler message
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS cm_process_peer_create(struct scheduler_msg *msg);
+
+/**
  * cm_process_disconnect_req() - Process vdev disconnect request
  * @msg: scheduler message
  *
@@ -165,6 +208,16 @@ QDF_STATUS cm_process_join_req(struct scheduler_msg *msg);
  * Return: QDF_STATUS
  */
 QDF_STATUS cm_process_disconnect_req(struct scheduler_msg *msg);
+
+/**
+ * cm_disconnect_indication() - Process vdev discon ind and send to CM
+ * @msg: scheduler message
+ *
+ * Process disconnect indication and send it to CM SM.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS cm_disconnect_indication(struct scheduler_msg *msg);
 
 /**
  * wlan_cm_send_connect_rsp() - Process vdev join rsp and send to CM

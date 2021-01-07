@@ -183,6 +183,21 @@ static int rssi_mcs_tbl[][14] = {
 	{-76, -73, -71, -68, -64, -60, -59, -58, -53, -51, -46, -42, -46, -36}
 };
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+static bool wlan_hdd_is_he_mcs_12_13_supported(uint16_t he_mcs_12_13_map)
+{
+	if (he_mcs_12_13_map)
+		return true;
+	else
+		return false;
+}
+#else
+static bool wlan_hdd_is_he_mcs_12_13_supported(uint16_t he_mcs_12_13_map)
+{
+	return false;
+}
+#endif
+
 static bool get_station_fw_request_needed = true;
 
 /*
@@ -200,8 +215,9 @@ static int copy_station_stats_to_adapter(struct hdd_adapter *adapter,
 	uint32_t tx_nss, rx_nss;
 	struct wlan_objmgr_vdev *vdev;
 	uint16_t he_mcs_12_13_map;
+	bool is_he_mcs_12_13_supported;
 
-	vdev = hdd_objmgr_get_vdev(adapter);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_STATS_ID);
 	if (!vdev)
 		return -EINVAL;
 
@@ -280,9 +296,11 @@ static int copy_station_stats_to_adapter(struct hdd_adapter *adapter,
 	adapter->hdd_stats.class_a_stat.tx_rx_rate_flags = stats->tx_rate_flags;
 
 	he_mcs_12_13_map = wlan_vdev_mlme_get_he_mcs_12_13_map(vdev);
+	is_he_mcs_12_13_supported =
+			wlan_hdd_is_he_mcs_12_13_supported(he_mcs_12_13_map);
 	adapter->hdd_stats.class_a_stat.tx_mcs_index =
 		sme_get_mcs_idx(stats->tx_rate, stats->tx_rate_flags,
-				he_mcs_12_13_map,
+				is_he_mcs_12_13_supported,
 				&adapter->hdd_stats.class_a_stat.tx_nss,
 				&adapter->hdd_stats.class_a_stat.tx_dcm,
 				&adapter->hdd_stats.class_a_stat.tx_gi,
@@ -290,7 +308,7 @@ static int copy_station_stats_to_adapter(struct hdd_adapter *adapter,
 				tx_mcs_rate_flags);
 	adapter->hdd_stats.class_a_stat.rx_mcs_index =
 		sme_get_mcs_idx(stats->rx_rate, stats->tx_rate_flags,
-				he_mcs_12_13_map,
+				is_he_mcs_12_13_supported,
 				&adapter->hdd_stats.class_a_stat.rx_nss,
 				&adapter->hdd_stats.class_a_stat.rx_dcm,
 				&adapter->hdd_stats.class_a_stat.rx_gi,
@@ -303,9 +321,23 @@ static int copy_station_stats_to_adapter(struct hdd_adapter *adapter,
 		     sizeof(stats->vdev_chain_rssi[0].chain_rssi));
 	adapter->hdd_stats.bcn_protect_stats = stats->bcn_protect_stats;
 out:
-	hdd_objmgr_put_vdev(vdev);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
 	return ret;
 }
+
+#ifdef FEATURE_CLUB_LL_STATS_AND_GET_STATION
+static void
+hdd_update_station_stats_cached_timestamp(struct hdd_adapter *adapter)
+{
+	adapter->hdd_stats.sta_stats_cached_timestamp =
+				qdf_system_ticks_to_msecs(qdf_system_ticks());
+}
+#else
+static void
+hdd_update_station_stats_cached_timestamp(struct hdd_adapter *adapter)
+{
+}
+#endif /* FEATURE_CLUB_LL_STATS_AND_GET_STATION */
 
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS
 
@@ -1702,20 +1734,6 @@ static void wlan_hdd_dealloc_ll_stats(void *priv)
 }
 
 #ifdef FEATURE_CLUB_LL_STATS_AND_GET_STATION
-static void
-hdd_update_station_stats_cached_timestamp(struct hdd_adapter *adapter)
-{
-	adapter->hdd_stats.sta_stats_cached_timestamp =
-				qdf_system_ticks_to_msecs(qdf_system_ticks());
-}
-#else
-static void
-hdd_update_station_stats_cached_timestamp(struct hdd_adapter *adapter)
-{
-}
-#endif /* FEATURE_CLUB_LL_STATS_AND_GET_STATION */
-
-#ifdef FEATURE_CLUB_LL_STATS_AND_GET_STATION
 /**
  * cache_station_stats_cb() - cache_station_stats_cb callback function
  * @ev: station stats buffer
@@ -1729,17 +1747,20 @@ static void cache_station_stats_cb(struct stats_event *ev, void *cookie)
 	struct hdd_adapter *adapter = cookie, *next_adapter = NULL;
 	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
 	uint8_t vdev_id = adapter->vdev_id;
+	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_DISPLAY_TXRX_STATS;
 
-	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter) {
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
+					   dbgid) {
 		if (adapter->vdev_id != vdev_id) {
-			dev_put(adapter->dev);
+			hdd_adapter_dev_put_debug(adapter, dbgid);
 			continue;
 		}
 		copy_station_stats_to_adapter(adapter, ev);
 		/* dev_put has to be done here */
-		dev_put(adapter->dev);
+		hdd_adapter_dev_put_debug(adapter, dbgid);
 		if (next_adapter)
-			dev_put(next_adapter->dev);
+			hdd_adapter_dev_put_debug(next_adapter,
+						  dbgid);
 		break;
 	}
 }
@@ -6459,6 +6480,8 @@ int wlan_hdd_get_station_stats(struct hdd_adapter *adapter)
 		goto out;
 	}
 
+	/* update get stats cached time stamp */
+	hdd_update_station_stats_cached_timestamp(adapter);
 	copy_station_stats_to_adapter(adapter, stats);
 	wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
 
@@ -6566,8 +6589,10 @@ void wlan_hdd_display_txrx_stats(struct hdd_context *ctx)
 	int i = 0;
 	uint32_t total_rx_pkt, total_rx_dropped,
 		 total_rx_delv, total_rx_refused;
+	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_CACHE_STATION_STATS_CB;
 
-	hdd_for_each_adapter_dev_held_safe(ctx, adapter, next_adapter) {
+	hdd_for_each_adapter_dev_held_safe(ctx, adapter, next_adapter,
+					   dbgid) {
 		total_rx_pkt = 0;
 		total_rx_dropped = 0;
 		total_rx_delv = 0;
@@ -6575,7 +6600,7 @@ void wlan_hdd_display_txrx_stats(struct hdd_context *ctx)
 		stats = &adapter->hdd_stats.tx_rx_stats;
 
 		if (adapter->vdev_id == INVAL_VDEV_ID) {
-			dev_put(adapter->dev);
+			hdd_adapter_dev_put_debug(adapter, dbgid);
 			continue;
 		}
 
@@ -6588,7 +6613,7 @@ void wlan_hdd_display_txrx_stats(struct hdd_context *ctx)
 		}
 
 		/* dev_put has to be done here */
-		dev_put(adapter->dev);
+		hdd_adapter_dev_put_debug(adapter, dbgid);
 
 		hdd_debug("TX - called %u, dropped %u orphan %u",
 			  stats->tx_called, stats->tx_dropped,

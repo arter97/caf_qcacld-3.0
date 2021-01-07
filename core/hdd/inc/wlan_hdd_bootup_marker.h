@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -16,25 +16,35 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef QWLAN_VERSION_H
-#define QWLAN_VERSION_H
-/*===========================================================================
+#ifndef WLAN_HDD_BOOTUP_MARKER_H
+#define WLAN_HDD_BOOTUP_MARKER_H
 
-   FILE:
-   qwlan_version.h
+/**
+ * DOC: wlan_hdd_bootup_marker.h
+ *
+ * WLAN Host Device Driver Bootup Marker header file
+ */
 
-   BRIEF DESCRIPTION:
-   WLAN Host Version file.
-   Build number automatically updated by build scripts.
+#include "wlan_hdd_main.h"
 
-   ===========================================================================*/
-
-#define QWLAN_VERSION_MAJOR            5
-#define QWLAN_VERSION_MINOR            2
-#define QWLAN_VERSION_PATCH            0
-#define QWLAN_VERSION_EXTRA            "U"
-#define QWLAN_VERSION_BUILD            215
-
-#define QWLAN_VERSIONSTR               "5.2.0.215U"
-
-#endif /* QWLAN_VERSION_H */
+#ifdef WLAN_BOOTUP_MARKER
+/**
+ * hdd_place_marker() - record bootup marker for some events
+ * @adapter: hdd adapter pointer
+ * @format: The strings of the events
+ * @mac: mac address of peer device
+ *
+ * Return: None
+ */
+void hdd_place_marker(struct hdd_adapter *adapter,
+		      const char *format,
+		      uint8_t *mac);
+#else
+static inline
+void hdd_place_marker(struct hdd_adapter *adapter,
+		      const char *format,
+		      uint8_t *mac)
+{
+}
+#endif
+#endif /* WLAN_HDD_BOOTUP_MARKER_H */

@@ -158,28 +158,8 @@ struct tclas_mask {
 	uint8_t classifier_mask;
 	union {
 		struct {
-			uint8_t version;
-			union {
-				struct {
-					uint8_t source[4];
-					uint8_t dest[4];
-					uint16_t src_port;
-					uint16_t dest_port;
-					uint8_t dscp;
-					uint8_t proto;
-					uint8_t reserved;
-				} ip_v4_params;
-				struct {
-					uint8_t source[16];
-					uint8_t dest[16];
-					uint16_t src_port;
-					uint16_t dest_port;
-					uint8_t DSCP;
-					uint8_t next_header;
-					uint8_t flow_label[3];
-				} ip_v6_params;
-			} params;
-		} ip_params; /* classifier_type = 4 */
+			uint8_t reserved[16];
+		} ip_param; /* classifier_type = 4 */
 	} info;
 };
 
@@ -231,6 +211,17 @@ struct mscs_req_info {
 	bool is_mscs_req_sent;
 };
 #endif
+
+/**
+ * struct mlme_connect_info - mlme connect information
+ * @timing_meas_cap: Timing meas cap
+ * @oem_channel_info: oem channel info
+ */
+
+struct mlme_connect_info {
+	uint8_t timing_meas_cap;
+	struct oem_channel_info chan_info;
+};
 
 /**
  * struct mlme_legacy_priv - VDEV MLME legacy priv object
@@ -295,8 +286,18 @@ struct mlme_legacy_priv {
 	tDot11fIEhe_cap he_config;
 	uint32_t he_sta_obsspd;
 #endif
+	struct mlme_connect_info connect_info;
 };
 
+/**
+ * struct del_bss_resp - params required for del bss response
+ * @status: QDF status
+ * @vdev_id: vdev_id
+ */
+struct del_bss_resp {
+	QDF_STATUS status;
+	uint8_t vdev_id;
+};
 
 /**
  * mlme_init_rate_config() - initialize rate configuration of vdev
@@ -672,11 +673,21 @@ mlme_get_operations_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
  * @reqs: RSO stop requestor
  * @clear: clear bit if true else set bit
  *
- * Return: bitmap value
+ * Return: None
  */
 void
 mlme_set_operations_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			   enum wlan_cm_rso_control_requestor reqs, bool clear);
+/**
+ * mlme_clear_operations_bitmap() - Clear mlme operations bitmap which
+ *  indicates what mlme operations are in progress
+ * @psoc: PSOC pointer
+ * @vdev_id: vdev for which the mlme operation bitmap is requested
+ *
+ * Return: None
+ */
+void
+mlme_clear_operations_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
 
 #define MLME_IS_ROAM_STATE_RSO_ENABLED(psoc, vdev_id) \
 	(mlme_get_roam_state(psoc, vdev_id) == WLAN_ROAM_RSO_ENABLED)

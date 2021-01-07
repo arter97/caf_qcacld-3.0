@@ -451,8 +451,21 @@ lim_fill_sme_assoc_ind_params(
 	struct mac_context *mac_ctx,
 	tpLimMlmAssocInd assoc_ind, struct assoc_ind *sme_assoc_ind,
 	struct pe_session *session_entry, bool assoc_req_alloc);
-void lim_send_mlm_assoc_ind(struct mac_context *mac, tpDphHashNode sta,
-			    struct pe_session *pe_session);
+
+/**
+ * lim_send_mlm_assoc_ind() - Sends assoc indication to SME
+ * @mac_ctx: Global Mac context
+ * @sta_ds: Station DPH hash entry
+ * @session_entry: PE session entry
+ *
+ * This function sends either LIM_MLM_ASSOC_IND
+ * or LIM_MLM_REASSOC_IND to SME.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS lim_send_mlm_assoc_ind(struct mac_context *mac,
+				  tpDphHashNode sta,
+				  struct pe_session *pe_session);
 
 #define ASSOC_FRAME_LEN 0
 /**
@@ -1362,6 +1375,8 @@ void
 lim_post_join_set_link_state_callback(struct mac_context *mac, uint32_t vdev_id,
 				      QDF_STATUS status);
 
+void lim_send_peer_create_resp(struct mac_context *mac, uint8_t vdev_id,
+			       QDF_STATUS status, uint8_t *peer_mac);
 /*
  * lim_process_mlm_deauth_req() - This function is called to process
  * MLM_DEAUTH_REQ message from SME

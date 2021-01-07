@@ -1396,6 +1396,8 @@ struct wlan_mlme_acs {
  * @is_twt_enabled: global twt configuration
  * @is_twt_responder_enabled: twt responder
  * @is_twt_requestor_enabled: twt requestor
+ * @is_bcast_responder_enabled: bcast responder enable/disable
+ * @is_bcast_requestor_enabled: bcast requestor enable/disable
  * @twt_congestion_timeout: congestion timeout value
  */
 struct wlan_mlme_cfg_twt {
@@ -1403,6 +1405,8 @@ struct wlan_mlme_cfg_twt {
 	bool is_twt_enabled;
 	bool is_twt_responder_enabled;
 	bool is_twt_requestor_enabled;
+	bool is_bcast_responder_enabled;
+	bool is_bcast_requestor_enabled;
 	uint32_t twt_congestion_timeout;
 };
 
@@ -2487,6 +2491,7 @@ struct wlan_mlme_sae_single_pmk {
  * @data_11kv:          Neighbor report/BTM parameters.
  * @btm_rsp:            BTM response information
  * @roam_init_info:     Roam initial info
+ * @roam_msg_info:      roam related message information
  */
 struct mlme_roam_debug_info {
 	struct wmi_roam_trigger_info trigger;
@@ -2495,6 +2500,7 @@ struct mlme_roam_debug_info {
 	struct wmi_neighbor_report_data data_11kv;
 	struct roam_btm_response_data btm_rsp;
 	struct roam_initial_data roam_init_info;
+	struct roam_msg_info roam_msg_info;
 };
 
 /**

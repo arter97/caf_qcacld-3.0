@@ -112,7 +112,6 @@ static void dp_fisa_fse_cache_flush_timer(void *arg)
 	dp_info("FSE cache flush for %d flows",
 		fse_cache_flush_rec->flows_added);
 
-	qdf_atomic_set(&fisa_hdl->fse_cache_flush_posted, 0);
 	status =
 	 dp_rx_flow_send_htt_operation_cmd(soc->pdev_list[0],
 					   DP_HTT_FST_CACHE_INVALIDATE_FULL,
@@ -123,6 +122,8 @@ static void dp_fisa_fse_cache_flush_timer(void *arg)
 		 * Not big impact cache entry gets updated later
 		 */
 	}
+
+	qdf_atomic_set(&fisa_hdl->fse_cache_flush_posted, 0);
 }
 
 /**
@@ -133,13 +134,24 @@ static void dp_fisa_fse_cache_flush_timer(void *arg)
  */
 static void dp_rx_fst_cmem_deinit(struct dp_rx_fst *fst)
 {
+	struct dp_fisa_rx_fst_update_elem *elem;
+	qdf_list_node_t *node;
 	int i;
 
 	qdf_cancel_work(&fst->fst_update_work);
 	qdf_flush_work(&fst->fst_update_work);
 	qdf_flush_workqueue(0, fst->fst_update_wq);
-
 	qdf_destroy_workqueue(0, fst->fst_update_wq);
+
+	qdf_spin_lock_bh(&fst->dp_rx_fst_lock);
+	while (qdf_list_peek_front(&fst->fst_update_list, &node) ==
+	       QDF_STATUS_SUCCESS) {
+		elem = (struct dp_fisa_rx_fst_update_elem *)node;
+		qdf_list_remove_front(&fst->fst_update_list, &node);
+		qdf_mem_free(elem);
+	}
+	qdf_spin_unlock_bh(&fst->dp_rx_fst_lock);
+
 	qdf_list_destroy(&fst->fst_update_list);
 	qdf_event_destroy(&fst->cmem_resp_event);
 
@@ -255,6 +267,7 @@ QDF_STATUS dp_rx_fst_attach(struct dp_soc *soc, struct dp_pdev *pdev)
 
 	qdf_atomic_init(&fst->fse_cache_flush_posted);
 
+	fst->fse_cache_flush_allow = true;
 	fst->soc_hdl = soc;
 	soc->rx_fst = fst;
 	soc->fisa_enable = true;

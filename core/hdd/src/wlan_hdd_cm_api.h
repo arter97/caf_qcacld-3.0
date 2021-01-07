@@ -82,4 +82,52 @@ wlan_hdd_cm_disconnect(struct wiphy *wiphy, struct net_device *dev, u16 reason)
 	return 0;
 }
 #endif
+
+/**
+ * hdd_handle_disassociation_event() - Handle disassociation event
+ * @adapter: Pointer to adapter
+ * @peer_macaddr: Pointer to peer mac address
+ *
+ * Return: None
+ */
+void hdd_handle_disassociation_event(struct hdd_adapter *adapter,
+				     struct qdf_mac_addr *peer_macaddr);
+
+/**
+ * __hdd_cm_disconnect_handler_pre_user_update() - Handle disconnect indication
+ * before updating to user space
+ * @adapter: Pointer to adapter
+ *
+ * Return: None
+ */
+void __hdd_cm_disconnect_handler_pre_user_update(struct hdd_adapter *adapter);
+
+/**
+ * __hdd_cm_disconnect_handler_post_user_update() - Handle disconnect indication
+ * after updating to user space
+ * @adapter: Pointer to adapter
+ *
+ * Return: None
+ */
+void __hdd_cm_disconnect_handler_post_user_update(struct hdd_adapter *adapter);
+
+/**
+ * hdd_cm_update_rssi_snr_by_bssid() - update rsi and snr into adapter
+ * @adapter: Pointer to adapter
+ *
+ * Return: None
+ */
+void hdd_cm_update_rssi_snr_by_bssid(struct hdd_adapter *adapter);
+
+/**
+ *  hdd_cm_handle_assoc_event() - Send disassociation indication to oem
+ * app
+ * @vdev: Pointer to adapter
+ * @peer_mac: Pointer to peer mac address
+ *
+ * Return: None
+ */
+void hdd_cm_handle_assoc_event(struct wlan_objmgr_vdev *vdev,
+			       uint8_t *peer_mac);
+
 #endif

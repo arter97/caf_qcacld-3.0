@@ -423,9 +423,16 @@ ifeq ($(CONFIG_WLAN_ENABLE_GPIO_WAKEUP),y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_gpio_wakeup.o
 endif
 
-ifeq ($(CONFIG_CM_ENABLE), y)
-HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_cm_connect.o \
-	    $(HDD_SRC_DIR)/wlan_hdd_cm_disconnect.o
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_cm_connect.o
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_cm_disconnect.o
+
+
+ifeq ($(CONFIG_WLAN_BOOTUP_MARKER), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_bootup_marker.o
+endif
+
+ifeq ($(CONFIG_FEATURE_BUS_BANDWIDTH_MGR),y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_bus_bandwidth.o
 endif
 
 ###### OSIF_SYNC ########
@@ -615,7 +622,6 @@ DFS_INC :=	-I$(WLAN_ROOT)/$(DFS_DISP_INC_DIR) \
 		-I$(WLAN_ROOT)/$(DFS_CMN_SERVICES_INC_DIR)
 
 DFS_OBJS :=	$(DFS_CORE_SRC_DIR)/misc/dfs.o \
-		$(DFS_CORE_SRC_DIR)/misc/dfs_cac.o \
 		$(DFS_CORE_SRC_DIR)/misc/dfs_nol.o \
 		$(DFS_CORE_SRC_DIR)/misc/dfs_random_chan_sel.o \
 		$(DFS_CORE_SRC_DIR)/misc/dfs_process_radar_found_ind.o \
@@ -629,8 +635,7 @@ DFS_OBJS :=	$(DFS_CORE_SRC_DIR)/misc/dfs.o \
 		$(WLAN_COMMON_ROOT)/target_if/dfs/src/target_if_dfs.o
 
 ifeq ($(CONFIG_WLAN_FEATURE_DFS_OFFLOAD), y)
-DFS_OBJS +=	$(WLAN_COMMON_ROOT)/target_if/dfs/src/target_if_dfs_full_offload.o \
-		$(DFS_CORE_SRC_DIR)/misc/dfs_full_offload.o
+DFS_OBJS +=	$(WLAN_COMMON_ROOT)/target_if/dfs/src/target_if_dfs_full_offload.o
 else
 DFS_OBJS +=	$(WLAN_COMMON_ROOT)/target_if/dfs/src/target_if_dfs_partial_offload.o \
 		$(DFS_CORE_SRC_DIR)/filtering/dfs_fcc_bin5.o \
@@ -2636,9 +2641,12 @@ cppflags-$(CONFIG_DIRECT_BUF_RX_ENABLE) += -DDBR_MULTI_SRNG_ENABLE
 endif
 cppflags-$(CONFIG_WMI_CMD_STRINGS) += -DWMI_CMD_STRINGS
 cppflags-$(CONFIG_WLAN_FEATURE_TWT) += -DWLAN_SUPPORT_TWT
+
 ifdef CONFIG_WLAN_TWT_SAP_STA_COUNT
-ccflags-y += -DWLAN_TWT_SAP_STA_COUNT=$(CONFIG_WLAN_TWT_SAP_STA_COUNT)
+WLAN_TWT_SAP_STA_COUNT ?= 32
+ccflags-y += -DWLAN_TWT_SAP_STA_COUNT=$(WLAN_TWT_SAP_STA_COUNT)
 endif
+
 cppflags-$(CONFIG_WLAN_TWT_SAP_PDEV_COUNT) += -DWLAN_TWT_AP_PDEV_COUNT_NUM_PHY
 cppflags-$(CONFIG_WLAN_DISABLE_EXPORT_SYMBOL) += -DWLAN_DISABLE_EXPORT_SYMBOL
 cppflags-$(CONFIG_WIFI_POS_CONVERGED) += -DWIFI_POS_CONVERGED
@@ -2667,6 +2675,7 @@ cppflags-$(CONFIG_PLD_IPCI_ICNSS_FLAG) += -DCONFIG_PLD_IPCI_ICNSS
 cppflags-$(CONFIG_PLD_SDIO_CNSS_FLAG) += -DCONFIG_PLD_SDIO_CNSS
 cppflags-$(CONFIG_WLAN_RESIDENT_DRIVER) += -DFEATURE_WLAN_RESIDENT_DRIVER
 cppflags-$(CONFIG_FEATURE_GPIO_CFG) += -DWLAN_FEATURE_GPIO_CFG
+cppflags-$(CONFIG_FEATURE_BUS_BANDWIDTH_MGR) += -DFEATURE_BUS_BANDWIDTH_MGR
 
 ifeq ($(CONFIG_IPCIE_FW_SIM), y)
 cppflags-y += -DCONFIG_PLD_IPCIE_FW_SIM
@@ -2991,6 +3000,7 @@ endif
 endif
 
 cppflags-$(CONFIG_FEATURE_SKB_PRE_ALLOC) += -DFEATURE_SKB_PRE_ALLOC
+cppflags-$(CONFIG_WCNSS_MEM_PRE_ALLOC) += -DCONFIG_WCNSS_MEM_PRE_ALLOC
 
 #Enable USB specific APIS
 ifeq ($(CONFIG_HIF_USB), y)
@@ -3217,6 +3227,9 @@ cppflags-$(CONFIG_HTT_PADDR64) += -DHTT_PADDR64
 cppflags-$(CONFIG_OL_RX_INDICATION_RECORD) += -DOL_RX_INDICATION_RECORD
 cppflags-$(CONFIG_TSOSEG_DEBUG) += -DTSOSEG_DEBUG
 cppflags-$(CONFIG_ALLOW_PKT_DROPPING) += -DFEATURE_ALLOW_PKT_DROPPING
+
+# Enable feature for athdiag live debug mode
+cppflags-$(CONFIG_ATH_DIAG_EXT_DIRECT) += -DATH_DIAG_EXT_DIRECT
 
 cppflags-$(CONFIG_ENABLE_DEBUG_ADDRESS_MARKING) += -DENABLE_DEBUG_ADDRESS_MARKING
 cppflags-$(CONFIG_FEATURE_TSO) += -DFEATURE_TSO
@@ -3732,6 +3745,11 @@ ccflags-$(CONFIG_GET_DRIVER_MODE) += -DFEATURE_GET_DRIVER_MODE
 
 ifeq ($(CONFIG_FEATURE_IPA_PIPE_CHANGE_WDI1), y)
 cppflags-y += -DFEATURE_IPA_PIPE_CHANGE_WDI1
+endif
+
+cppflags-$(CONFIG_WLAN_BOOTUP_MARKER) += -DWLAN_BOOTUP_MARKER
+ifdef CONFIG_WLAN_PLACEMARKER_PREFIX
+ccflags-y += -DWLAN_PLACEMARKER_PREFIX=\"$(CONFIG_WLAN_PLACEMARKER_PREFIX)\"
 endif
 
 cppflags-$(CONFIG_FEATURE_STA_MODE_VOTE_LINK) += -DFEATURE_STA_MODE_VOTE_LINK

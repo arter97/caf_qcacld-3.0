@@ -429,6 +429,8 @@ static void lim_update_stads_ext_cap(struct mac_context *mac_ctx,
 	tpDphHashNode sta_ds)
 {
 	struct s_ext_cap *ext_cap;
+	struct wlan_objmgr_vdev *vdev;
+	struct vdev_mlme_obj *mlme_obj;
 
 	if (!assoc_rsp->ExtCap.present) {
 		sta_ds->timingMeasCap = 0;
@@ -442,6 +444,17 @@ static void lim_update_stads_ext_cap(struct mac_context *mac_ctx,
 
 	ext_cap = (struct s_ext_cap *)assoc_rsp->ExtCap.bytes;
 	lim_set_stads_rtt_cap(sta_ds, ext_cap, mac_ctx);
+
+	vdev = session_entry->vdev;
+	if (vdev) {
+		mlme_obj = wlan_vdev_mlme_get_cmpt_obj(vdev);
+		if (!mlme_obj)
+			pe_err("vdev component object is NULL");
+		else
+			mlme_obj->ext_vdev_ptr->connect_info.timing_meas_cap =
+							sta_ds->timingMeasCap;
+	}
+
 #ifdef FEATURE_WLAN_TDLS
 	session_entry->tdls_prohibited = ext_cap->tdls_prohibited;
 	session_entry->tdls_chan_swit_prohibited =
@@ -1017,8 +1030,8 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			session_entry->gUapsdPerAcDeliveryEnableMask = 0;
 			session_entry->gUapsdPerAcTriggerEnableMask = 0;
 
-			if (lim_cleanup_rx_path(mac_ctx, sta_ds, session_entry)
-				!= QDF_STATUS_SUCCESS) {
+			if (lim_cleanup_rx_path(mac_ctx, sta_ds, session_entry,
+						true) != QDF_STATUS_SUCCESS) {
 				pe_err("Could not cleanup the rx path");
 				goto assocReject;
 			}
