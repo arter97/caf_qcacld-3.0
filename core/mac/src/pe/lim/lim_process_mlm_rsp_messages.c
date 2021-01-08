@@ -1914,7 +1914,7 @@ void lim_process_ap_mlm_add_sta_rsp(struct mac_context *mac,
 				       sta->mlmStaContext.subType,
 				       true, sta->mlmStaContext.authType,
 				       sta->assocId, true,
-				       STATUS_UNSPECIFIED_FAILURE,
+				       eSIR_MAC_UNSPEC_FAILURE_STATUS,
 				       pe_session);
 
 	/* fall though to reclaim the original Add STA Response message */
