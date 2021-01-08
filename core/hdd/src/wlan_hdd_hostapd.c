@@ -6588,7 +6588,7 @@ QDF_STATUS hdd_init_ap_mode(hdd_adapter_t *pAdapter, bool reinit)
 
 	ret = wma_cli_set_command(pAdapter->sessionId,
 				  WMI_PDEV_PARAM_BURST_ENABLE,
-				  HDD_ENABLE_SIFS_BURST_DEFAULT,
+				  pHddCtx->config->enable_sifs_burst,
 				  PDEV_CMD);
 
 	if (0 != ret)

@@ -3664,7 +3664,7 @@ QDF_STATUS hdd_init_station_mode(hdd_adapter_t *adapter)
 
 	ret_val = sme_cli_set_command(adapter->sessionId,
 				      WMI_PDEV_PARAM_BURST_ENABLE,
-				      HDD_ENABLE_SIFS_BURST_DEFAULT,
+				      hdd_ctx->config->enable_sifs_burst,
 				      PDEV_CMD);
 
 	if (0 != ret_val) {

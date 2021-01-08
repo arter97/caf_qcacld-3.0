@@ -12849,6 +12849,24 @@ enum hw_filter_mode {
 
 /**
  * <ini>
+ * gEnableSifsBurst - Enable SIFS burst
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini enable sifs bursting
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_SIFS_BURST           "gEnableSifsBurst"
+#define CFG_ENABLE_SIFS_BURST_MIN       (0)
+#define CFG_ENABLE_SIFS_BURST_MAX       (1)
+#define CFG_ENABLE_SIFS_BURST_DEFAULT   (1)
+
+/**
+ * <ini>
  * gMaxMPDUsInAMPDU - max mpdus in ampdu
  * @Min: 0
  * @Max: 64
@@ -16381,6 +16399,7 @@ struct hdd_config {
 	uint16_t reduced_beacon_interval;
 	bool ani_enabled;
 	uint8_t enable_rts_sifsbursting;
+	uint8_t enable_sifs_burst;
 	uint8_t max_mpdus_inampdu;
 	uint16_t sap_max_mcs_txdata;
 	bool is_bssid_hint_priority;
