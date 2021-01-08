@@ -767,6 +767,7 @@ enum {
 	IEEE80211_PARAM_EHT_TX_MCSMAP = 738,   /* set 11be - EHT TX MCSMAP */
 	IEEE80211_PARAM_EHT_RX_MCSMAP = 739,   /* set 11be - EHT RX MCSMAP */
 #endif /* WLAN_FEATURE_11BE */
+	IEEE80211_PARAM_ENABLE_SCS                 = 740,   /* Enable SCS Procedures */
 };
 
 enum {
@@ -2186,6 +2187,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 #endif
 	{"mscs",                IEEE80211_PARAM_ENABLE_MSCS, SET_PARAM, 1},
 	{"g_mscs",              IEEE80211_PARAM_ENABLE_MSCS, GET_PARAM, 0},
+	{"scs",                 IEEE80211_PARAM_ENABLE_SCS, SET_PARAM, 1},
+	{"g_scs",               IEEE80211_PARAM_ENABLE_SCS, GET_PARAM, 0},
 	{"mbss_tx_vdev",        IEEE80211_PARAM_MBSS_TXVDEV, SET_PARAM, 1},
 	{"g_mbss_tx_vdev",      IEEE80211_PARAM_MBSS_TXVDEV, GET_PARAM, 0},
 	{"setiebuf",            35828, SET_PARAM, 1},
