@@ -14782,6 +14782,38 @@ csr_roam_diag_set_pmkid(tCsrRoamSession *pSession)
 }
 #endif /* FEATURE_WLAN_DIAG_SUPPORT_CSR */
 
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+/**
+ * csr_update_session_psk_pmk - API to update PMK in csr session
+ * @pSession: pointer to session
+ * @pmksa: pointer to PMKSA struct
+ *
+ * Return : None
+ */
+static void
+csr_update_session_psk_pmk(tCsrRoamSession *pSession,
+			   tPmkidCacheInfo *pmksa)
+{
+	/* For SAE authentication, pmk will be sent over the
+	 * set PMKSA vendor command. The set PMKSA command is sent
+	 * after SAE authentication is complete, before association
+	 * completion itself. So csr_roam_session will not be having
+	 * any parameters at this point. This pmk received is not
+	 * updated to csr session and when RSO update command is sent,
+	 * empty pmk will be sent, resulting in SAE roming failure. So
+	 * copy the pmk into csr session so that correct pmk will be
+	 * sent in RSO command.
+	 */
+	qdf_mem_copy(pSession->psk_pmk, pmksa->pmk, pmksa->pmk_len);
+	pSession->pmk_len = pmksa->pmk_len;
+}
+#else
+static inline void
+csr_update_session_psk_pmk(tCsrRoamSession *pSession,
+			   tPmkidCacheInfo *pmksa)
+{}
+#endif
+
 static void csr_update_pmk_cache(tCsrRoamSession *pSession,
 			tPmkidCacheInfo *pmksa)
 {
@@ -14806,9 +14838,11 @@ static void csr_update_pmk_cache(tCsrRoamSession *pSession,
 	    pSession->PmkidCacheInfo[cache_idx].PMKID,
 	    pmksa->PMKID, CSR_RSN_PMKID_SIZE);
 
-	if (pmksa->pmk_len)
+	if (pmksa->pmk_len) {
 		qdf_mem_copy(pSession->PmkidCacheInfo[cache_idx].pmk,
 				pmksa->pmk, pmksa->pmk_len);
+		csr_update_session_psk_pmk(pSession, pmksa);
+	}
 
 	pSession->PmkidCacheInfo[cache_idx].pmk_len = pmksa->pmk_len;
 
