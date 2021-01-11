@@ -129,7 +129,7 @@ void lim_handle_del_bss_in_re_assoc_context(struct mac_context *mac,
 			mlmReassocCnf.resultCode =
 					eSIR_SME_RESOURCES_UNAVAILABLE;
 			mlmReassocCnf.protStatusCode =
-					eSIR_MAC_UNSPEC_FAILURE_STATUS;
+					STATUS_UNSPECIFIED_FAILURE;
 			lim_delete_dph_hash_entry(mac, pe_session->bssId,
 				DPH_STA_HASH_INDEX_PEER, pe_session);
 			goto error;
@@ -162,14 +162,16 @@ void lim_handle_del_bss_in_re_assoc_context(struct mac_context *mac,
 		 */
 		assocRsp =
 			(tpSirAssocRsp) pe_session->limAssocResponseData;
-		lim_update_assoc_sta_datas(mac, sta, assocRsp,
-			pe_session);
-		lim_update_re_assoc_globals(mac, assocRsp, pe_session);
+
 		bss_desc = &pe_session->pLimReAssocReq->bssDescription;
 		lim_extract_ap_capabilities(mac,
-			(uint8_t *) bss_desc->ieFields,
+			(uint8_t *)bss_desc->ieFields,
 			lim_get_ielen_from_bss_description(bss_desc),
 			beacon_struct);
+
+		lim_update_assoc_sta_datas(mac, sta, assocRsp,
+			pe_session, beacon_struct);
+		lim_update_re_assoc_globals(mac, assocRsp, pe_session);
 		if (mac->lim.gLimProtectionControl !=
 		    MLME_FORCE_POLICY_PROTECTION_DISABLE)
 			lim_decide_sta_protection_on_assoc(mac,
@@ -196,12 +198,14 @@ void lim_handle_del_bss_in_re_assoc_context(struct mac_context *mac,
 			mlmReassocCnf.resultCode =
 				eSIR_SME_RESOURCES_UNAVAILABLE;
 			mlmReassocCnf.protStatusCode =
-				eSIR_MAC_UNSPEC_FAILURE_STATUS;
+				STATUS_UNSPECIFIED_FAILURE;
 			qdf_mem_free(assocRsp);
 			mac->lim.gLimAssocResponseData = NULL;
 			qdf_mem_free(beacon_struct);
 			goto error;
 		}
+		qdf_mem_free(assocRsp->sha384_ft_subelem.gtk);
+		qdf_mem_free(assocRsp->sha384_ft_subelem.igtk);
 		qdf_mem_free(assocRsp);
 		qdf_mem_free(beacon_struct);
 		pe_session->limAssocResponseData = NULL;
@@ -281,18 +285,14 @@ void lim_handle_add_bss_in_re_assoc_context(struct mac_context *mac,
 		 */
 		assocRsp =
 			(tpSirAssocRsp) pe_session->limAssocResponseData;
-		lim_update_assoc_sta_datas(mac, sta, assocRsp,
-					   pe_session);
-		lim_update_re_assoc_globals(mac, assocRsp, pe_session);
 		lim_extract_ap_capabilities(mac,
-					    (uint8_t *) pe_session->
-					    pLimReAssocReq->bssDescription.
-					    ieFields,
-					    lim_get_ielen_from_bss_description
-						    (&pe_session->
-						    pLimReAssocReq->
-						    bssDescription),
-					    pBeaconStruct);
+				(uint8_t *)pe_session->pLimReAssocReq->bssDescription.ieFields,
+				lim_get_ielen_from_bss_description
+				(&pe_session->pLimReAssocReq->bssDescription),
+				pBeaconStruct);
+		lim_update_assoc_sta_datas(mac, sta, assocRsp,
+					   pe_session, pBeaconStruct);
+		lim_update_re_assoc_globals(mac, assocRsp, pe_session);
 		if (mac->lim.gLimProtectionControl !=
 		    MLME_FORCE_POLICY_PROTECTION_DISABLE)
 			lim_decide_sta_protection_on_assoc(mac,
@@ -321,12 +321,14 @@ void lim_handle_add_bss_in_re_assoc_context(struct mac_context *mac,
 			mlmReassocCnf.resultCode =
 				eSIR_SME_RESOURCES_UNAVAILABLE;
 			mlmReassocCnf.protStatusCode =
-				eSIR_MAC_UNSPEC_FAILURE_STATUS;
+				STATUS_UNSPECIFIED_FAILURE;
 			qdf_mem_free(assocRsp);
 			mac->lim.gLimAssocResponseData = NULL;
 			qdf_mem_free(pBeaconStruct);
 			goto Error;
 		}
+		qdf_mem_free(assocRsp->sha384_ft_subelem.gtk);
+		qdf_mem_free(assocRsp->sha384_ft_subelem.igtk);
 		qdf_mem_free(assocRsp);
 		pe_session->limAssocResponseData = NULL;
 		qdf_mem_free(pBeaconStruct);

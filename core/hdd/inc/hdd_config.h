@@ -339,16 +339,33 @@ enum hdd_dot11_mode {
 
 /*
  * <ini>
- * wlanLoggingToConsole - Wlan logging to console
- * @Min: 0
- * @Max: 1
- * @Default: 1
+ * wlanConsoleLogLevelsBitmap - Bitmap to enable/disable console log levels
+ * @Min: 0x00000000
+ * @Max: 0x000003ff
+ * @Default: 0x0000001e
+ *
+ * This INI is used to enable/disable console logs for specific log level.
+ *
+ * bit-0: Reserved
+ * bit-1: QDF_TRACE_LEVEL_FATAL
+ * bit-2: QDF_TRACE_LEVEL_ERROR
+ * bit-3: QDF_TRACE_LEVEL_WARN
+ * bit-4: QDF_TRACE_LEVEL_INFO
+ * bit-5: QDF_TRACE_LEVEL_INFO_HIGH
+ * bit-6: QDF_TRACE_LEVEL_INFO_MED
+ * bit-7: QDF_TRACE_LEVEL_INFO_LOW
+ * bit-8: QDF_TRACE_LEVEL_DEBUG
+ * bit-9: QDF_TRACE_LEVEL_TRACE
+ * bit-10 to bit-31: Reserved
  *
  * </ini>
  */
-#define CFG_WLAN_LOGGING_CONSOLE_SUPPORT CFG_INI_BOOL( \
-				"wlanLoggingToConsole", \
-				1, \
+#define CFG_WLAN_LOGGING_CONSOLE_SUPPORT CFG_INI_UINT( \
+				"wlanConsoleLogLevelsBitmap", \
+				0x00000000, \
+				0x000003ff, \
+				0x0000001e, \
+				CFG_VALUE_OR_DEFAULT, \
 				"Wlan logging to console")
 
 #define CFG_WLAN_LOGGING_SUPPORT_ALL \
@@ -495,6 +512,41 @@ enum hdd_runtime_pm_cfg {
 	CFG(CFG_ENABLE_RUNTIME_PM)
 #else
 #define CFG_ENABLE_RUNTIME_PM_ALL
+#endif
+
+#ifdef WLAN_FEATURE_WMI_SEND_RECV_QMI
+/*
+ * <ini>
+ * enable_qmi_stats - enable periodic stats over qmi
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to enable periodic stats over qmi if DUT is
+ * in RTPM suspended state to avoid WoW enter/exit for every stats
+ * request.
+ *
+ * 0: Periodic stats over QMI is disabled
+ * 1: Periodic stats over QMI is enabled
+ * Related: None
+ *
+ * Supported Feature: Power Save
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_QMI_STATS CFG_INI_UINT( \
+		"enable_qmi_stats", \
+		0, \
+		1, \
+		1, \
+		CFG_VALUE_OR_DEFAULT, \
+		"This ini is used to enable periodic stats over qmi")
+#define CFG_ENABLE_QMI_STATS_ALL \
+	CFG(CFG_ENABLE_QMI_STATS)
+#else
+#define CFG_ENABLE_QMI_STATS_ALL
 #endif
 
 /*
@@ -1395,6 +1447,31 @@ struct dhcp_server {
 			CFG_VALUE_OR_DEFAULT, \
 			"Disable wow feature")
 
+/*
+ * <ini>
+ * nb_commands_interval - Used to rate limit nb commands from userspace
+ *
+ * @Min: 0
+ * @Max: 10
+ * Default: 3
+ *
+ * This ini is used to specify the duration in which any supp. nb command from
+ * userspace will not be processed completely in driver. For ex, the default
+ * value of 3 seconds signifies that consecutive commands within that
+ * time will not be processed fully.
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_NB_COMMANDS_RATE_LIMIT CFG_INI_UINT( \
+			"nb_commands_interval", \
+			0, \
+			10, \
+			3, \
+			CFG_VALUE_OR_DEFAULT, \
+			"Rate limiting for nb commands")
+
 #ifdef WLAN_FEATURE_PERIODIC_STA_STATS
 /*
  * <ini>
@@ -1458,6 +1535,88 @@ struct dhcp_server {
 #else
 #define CFG_WLAN_STA_PERIODIC_STATS
 #endif /* WLAN_FEATURE_PERIODIC_STA_STATS */
+
+#ifdef FEATURE_CLUB_LL_STATS_AND_GET_STATION
+/*
+ * <ini>
+ * club_get_sta_in_ll_stats_req - Flag used to club ll_stats and get_station
+ *                                requests in the driver
+ *
+ * @Min: 0
+ * @Max: 1
+ * Default: 1
+ *
+ * This ini param is used to enable/disable the feature for clubbing ll stats
+ * and get station requests.
+ *
+ * Supported Feature: STA
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_CLUB_LL_STA_AND_GET_STATION  CFG_INI_BOOL( \
+			"club_get_sta_in_ll_stats_req", \
+			1, \
+			"Club ll_stats and get station requests")
+
+/*
+ * <ini>
+ * sta_stats_cache_expiry_time - Expiry time for cached station stats
+ *
+ * @Min: 0
+ * @Max: 5000
+ * Default: 200
+ *
+ * This ini is used as duration in milliseconds for which cached station stats
+ * are valid. Driver sends the cached information as response, if it gets the
+ * get_station request with in this duration. Otherwise driver sends new
+ * request to the firmware to get the updated stats.
+ *
+ * Supported Feature: STA
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_STA_STATS_CACHE_EXPIRY  CFG_INI_UINT( \
+			"sta_stats_cache_expiry_time", \
+			0, \
+			5000, \
+			200, \
+			CFG_VALUE_OR_DEFAULT, \
+			"Station stats cache expiry")
+
+/*
+ * <ini>
+ * send_ll_and_get_station_stats_over_qmi - Flag to send clubbed ll_stats and
+ *                                          get_station request over qmi
+ *
+ * @Min: 0
+ * @Max: 1
+ * Default: 0
+ *
+ * This ini param is used to send the unified ll_stats and get_station request
+ * over qmi.
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_SEND_LL_AND_GET_STATION_STATS_OVER_QMI CFG_INI_BOOL( \
+			"send_ll_and_get_station_stats_over_qmi", \
+			0, \
+			"send ll and get station stats over qmi")
+
+#define CFG_WLAN_CLUB_GET_STA_IN_LL_STA_REQ \
+	 CFG(CFG_CLUB_LL_STA_AND_GET_STATION) \
+	 CFG(CFG_STA_STATS_CACHE_EXPIRY) \
+	 CFG(CFG_SEND_LL_AND_GET_STATION_STATS_OVER_QMI)
+#else
+#define CFG_WLAN_CLUB_GET_STA_IN_LL_STA_REQ
+#endif /* FEATURE_CLUB_LL_STATS_AND_GET_STATION */
 
 /**
  * enum host_log_level - Debug verbose level imposed by user
@@ -1572,8 +1731,10 @@ enum host_log_level {
 #define CFG_HDD_ALL \
 	CFG_ENABLE_PACKET_LOG_ALL \
 	CFG_ENABLE_RUNTIME_PM_ALL \
+	CFG_ENABLE_QMI_STATS_ALL \
 	CFG_VC_MODE_BITMAP_ALL \
 	CFG_WLAN_AUTO_SHUTDOWN_ALL \
+	CFG_WLAN_CLUB_GET_STA_IN_LL_STA_REQ \
 	CFG_WLAN_LOGGING_SUPPORT_ALL \
 	CFG_WLAN_STA_PERIODIC_STATS \
 	CFG(CFG_ACTION_OUI_CCKM_1X1) \
@@ -1606,6 +1767,7 @@ enum host_log_level {
 	CFG(CFG_PRIVATE_WEXT_CONTROL) \
 	CFG(CFG_PROVISION_INTERFACE_POOL) \
 	CFG(CFG_TIMER_MULTIPLIER) \
+	CFG(CFG_NB_COMMANDS_RATE_LIMIT) \
 	CFG(CFG_HDD_DOT11_MODE) \
 	CFG(CFG_ENABLE_DISABLE_CHANNEL) \
 	CFG(CFG_SAR_CONVERSION) \

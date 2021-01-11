@@ -57,6 +57,7 @@
 #include <pld_common.h>
 #include <htt_internal.h>
 #include <wlan_pkt_capture_ucfg_api.h>
+#include <wlan_cfr_ucfg_api.h>
 
 #ifndef OL_RX_INDICATION_MAX_RECORDS
 #define OL_RX_INDICATION_MAX_RECORDS 2048
@@ -810,9 +811,9 @@ ol_rx_sec_ind_handler(ol_txrx_pdev_handle pdev,
 		return;
 	}
 	ol_txrx_dbg(
-		"sec spec for peer %pK ("QDF_MAC_ADDR_STR"): %s key of type %d\n",
+		"sec spec for peer %pK ("QDF_MAC_ADDR_FMT"): %s key of type %d\n",
 		peer,
-		QDF_MAC_ADDR_ARRAY(peer->mac_addr.raw),
+		QDF_MAC_ADDR_REF(peer->mac_addr.raw),
 		is_unicast ? "ucast" : "mcast", sec_type);
 	sec_index = is_unicast ? txrx_sec_ucast : txrx_sec_mcast;
 	peer->security[sec_index].sec_type = sec_type;
@@ -1413,9 +1414,9 @@ ol_rx_deliver(struct ol_txrx_vdev_t *vdev,
 		if (OL_RX_DECAP(vdev, peer, msdu, &info) != A_OK) {
 			discard = 1;
 			ol_txrx_dbg(
-				"decap error %pK from peer %pK ("QDF_MAC_ADDR_STR") len %d\n",
+				"decap error %pK from peer %pK ("QDF_MAC_ADDR_FMT") len %d\n",
 				msdu, peer,
-				QDF_MAC_ADDR_ARRAY(peer->mac_addr.raw),
+				QDF_MAC_ADDR_REF(peer->mac_addr.raw),
 				qdf_nbuf_len(msdu));
 			goto DONE;
 		}
@@ -2002,11 +2003,12 @@ void ol_ath_add_vow_extstats(htt_pdev_handle pdev, qdf_nbuf_t msdu)
 #ifdef WLAN_CFR_ENABLE
 void ol_rx_cfr_capture_msg_handler(qdf_nbuf_t htt_t2h_msg)
 {
+	struct ol_txrx_soc_t *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	HTT_PEER_CFR_CAPTURE_MSG_TYPE cfr_type;
 	struct htt_cfr_dump_compl_ind *cfr_dump;
 	struct htt_cfr_dump_ind_type_1 cfr_ind;
 	struct csi_cfr_header cfr_hdr = {};
-	uint32_t mem_index, vdev_id;
+	uint32_t mem_index, req_id, vdev_id;
 	uint32_t *msg_word;
 	uint8_t *mac_addr;
 
@@ -2023,6 +2025,11 @@ void ol_rx_cfr_capture_msg_handler(qdf_nbuf_t htt_t2h_msg)
 
 	/* Second payload word */
 	msg_word++;
+	req_id = HTT_T2H_CFR_DUMP_TYPE1_MEM_REQ_ID_GET(*msg_word);
+	if (req_id != CFR_CAPTURE_HOST_MEM_REQ_ID) {
+		ol_txrx_err("Invalid req id in cfr capture msg");
+		return;
+	}
 	cfr_hdr.start_magic_num = 0xDEADBEAF;
 	cfr_hdr.u.meta_v1.status = HTT_T2H_CFR_DUMP_TYPE1_STATUS_GET(
 					*msg_word);
@@ -2052,5 +2059,7 @@ void ol_rx_cfr_capture_msg_handler(qdf_nbuf_t htt_t2h_msg)
 	cfr_hdr.u.meta_v1.timestamp = cfr_ind.timestamp;
 
 	mem_index = cfr_ind.index;
+
+	ucfg_cfr_capture_data((void *)soc->psoc, vdev_id, &cfr_hdr, mem_index);
 }
 #endif

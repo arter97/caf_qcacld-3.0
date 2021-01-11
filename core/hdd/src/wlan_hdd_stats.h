@@ -34,8 +34,12 @@
 
 #define DATA_RATE_11AC_MCS_MASK    0x03
 
+#ifdef FEATURE_CLUB_LL_STATS_AND_GET_STATION
 /* LL stats get request time out value */
+#define WLAN_WAIT_TIME_LL_STATS 2000
+#else
 #define WLAN_WAIT_TIME_LL_STATS 800
+#endif
 
 #define WLAN_HDD_TGT_NOISE_FLOOR_DBM     (-96)
 
@@ -462,19 +466,6 @@ int wlan_hdd_get_linkspeed_for_peermac(struct hdd_adapter *adapter,
 int wlan_hdd_get_link_speed(struct hdd_adapter *adapter, uint32_t *link_speed);
 
 /**
- * wlan_hdd_get_peer_info() - get peer info
- * @adapter: hostapd interface
- * @macaddress: request peer mac address
- * @peer_info_ext: one peer extended info retrieved
- *
- * This function will call sme_get_peer_info_ext to get peer info
- *
- * Return: 0 on success, otherwise error value
- */
-int wlan_hdd_get_peer_info(struct hdd_adapter *adapter,
-			   struct qdf_mac_addr macaddress,
-			   struct sir_peer_info_ext *peer_info_ext);
-/**
  * wlan_hdd_get_station_stats() - Get station statistics
  * @adapter: adapter for which statistics are desired
  *
@@ -506,7 +497,7 @@ void wlan_hdd_display_txrx_stats(struct hdd_context *hdd_ctx);
 /**
  * hdd_report_max_rate() - Fill the max rate stats in the station info structure
  * to be sent to the userspace.
- *
+ * @adapter: pointer to adapter
  * @mac_handle: The mac handle
  * @rate: The station_info tx/rx rate to be filled
  * @signal: signal from station_info
@@ -517,7 +508,8 @@ void wlan_hdd_display_txrx_stats(struct hdd_context *hdd_ctx);
  *
  * Return: True if fill is successful
  */
-bool hdd_report_max_rate(mac_handle_t mac_handle,
+bool hdd_report_max_rate(struct hdd_adapter *adapter,
+			 mac_handle_t mac_handle,
 			 struct rate_info *rate,
 			 int8_t signal,
 			 enum tx_rate_info rate_flags,
@@ -537,12 +529,4 @@ void wlan_hdd_register_cp_stats_cb(struct hdd_context *hdd_ctx);
 #else
 static inline void wlan_hdd_register_cp_stats_cb(struct hdd_context *hdd_ctx) {}
 #endif
-
-/**
- * hdd_update_sta_arp_stats() - update arp stats
- * @adapter: adapter context
- *
- * Return: An error code or 0 on success.
- */
-QDF_STATUS hdd_update_sta_arp_stats(struct hdd_adapter *adapter);
 #endif /* end #if !defined(WLAN_HDD_STATS_H) */

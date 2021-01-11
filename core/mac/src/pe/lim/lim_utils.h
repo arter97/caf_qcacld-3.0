@@ -137,7 +137,6 @@ bool lim_is_valid_frame(last_processed_msg *last_processed_frm,
 void lim_update_last_processed_frame(last_processed_msg *last_processed_frm,
 		uint8_t *pRxPacketInfo);
 
-char *lim_dot11_reason_str(uint16_t reasonCode);
 char *lim_mlm_state_str(tLimMlmStates state);
 char *lim_sme_state_str(tLimSmeStates state);
 char *lim_msg_str(uint32_t msgType);
@@ -833,6 +832,7 @@ bool lim_check_disassoc_deauth_ack_pending(struct mac_context *mac,
 
 #ifdef WLAN_FEATURE_11W
 void lim_pmf_sa_query_timer_handler(void *pMacGlobal, uint32_t param);
+void lim_pmf_comeback_timer_callback(void *context);
 void lim_set_protected_bit(struct mac_context *mac,
 	struct pe_session *pe_session,
 	tSirMacAddr peer, tpSirMacMgmtHdr pMacHdr);
@@ -861,8 +861,23 @@ void lim_check_and_reset_protection_params(struct mac_context *mac_ctx);
 QDF_STATUS lim_send_ext_cap_ie(struct mac_context *mac_ctx, uint32_t session_id,
 			       tDot11fIEExtCap *extracted_extcap, bool merge);
 
+/**
+ * lim_send_ies_per_band() - gets ht and vht capability and send to firmware via
+ * wma
+ * @mac_ctx: global mac context
+ * @session: pe session. This can be NULL. In that case self cap will be sent
+ * @vdev_id: vdev for which IE is targeted
+ * @dot11_mode: vdev dot11 mode
+ * @device_mode: device mode
+ *
+ * This funciton gets ht and vht capability and send to firmware via wma
+ *
+ * Return: status of operation
+ */
 QDF_STATUS lim_send_ies_per_band(struct mac_context *mac_ctx,
-				 struct pe_session *session, uint8_t vdev_id);
+				 struct pe_session *session, uint8_t vdev_id,
+				 enum csr_cfgdot11mode dot11_mode,
+				 enum QDF_OPMODE device_mode);
 
 /**
  * lim_send_action_frm_tb_ppdu_cfg() - sets action frame in TB PPDU cfg to FW
@@ -1188,12 +1203,14 @@ void lim_log_he_cap(struct mac_context *mac, tDot11fIEhe_cap *he_cap);
  * @sta_ds: pointer to sta dph hash table entry
  * @assoc_rsp: pointer to assoc response
  * @session_entry: pointer to PE session
+ * @beacon: pointer to beacon
  *
  * Return: None
  */
 void lim_update_stads_he_caps(struct mac_context *mac_ctx,
 			      tpDphHashNode sta_ds, tpSirAssocRsp assoc_rsp,
-			      struct pe_session *session_entry);
+			      struct pe_session *session_entry,
+			      tSchBeaconStruct *beacon);
 
 /**
  * lim_update_usr_he_cap() - Update HE capability based on userspace
@@ -1324,13 +1341,16 @@ void lim_set_he_caps(struct mac_context *mac, struct pe_session *session,
  * lim_send_he_caps_ie() - gets HE capability and send to firmware via wma
  * @mac_ctx: global mac context
  * @session: pe session. This can be NULL. In that case self cap will be sent
+ * @device_mode: VDEV op mode
  * @vdev_id: vdev for which IE is targeted
  *
  * This function gets HE capability and send to firmware via wma
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS lim_send_he_caps_ie(struct mac_context *mac_ctx, struct pe_session *session,
+QDF_STATUS lim_send_he_caps_ie(struct mac_context *mac_ctx,
+			       struct pe_session *session,
+			       enum QDF_OPMODE device_mode,
 			       uint8_t vdev_id);
 
 /**
@@ -1425,7 +1445,8 @@ static inline void lim_intersect_sta_he_caps(struct mac_context *mac_ctx,
 static inline void lim_update_stads_he_caps(struct mac_context *mac_ctx,
 					    tpDphHashNode sta_ds,
 					    tpSirAssocRsp assoc_rsp,
-					    struct pe_session *session_entry)
+					    struct pe_session *session_entry,
+					    tSchBeaconStruct *beacon)
 {
 	return;
 }
@@ -1522,6 +1543,7 @@ static inline void lim_set_he_caps(struct mac_context *mac, struct pe_session *s
 
 static inline QDF_STATUS lim_send_he_caps_ie(struct mac_context *mac_ctx,
 					     struct pe_session *session,
+					     enum QDF_OPMODE device_mode,
 					     uint8_t vdev_id)
 {
 	return QDF_STATUS_SUCCESS;

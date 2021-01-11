@@ -397,6 +397,25 @@ QDF_STATUS hdd_mon_rx_packet_cbk(void *context, qdf_nbuf_t rxbuf)
 
 void hdd_send_rps_ind(struct hdd_adapter *adapter);
 void hdd_send_rps_disable_ind(struct hdd_adapter *adapter);
+
+/**
+ * hdd_adapter_set_rps() - Enable/disable RPS for mode specified
+ * @vdev_id: vdev id of adapter for which RPS needs to be enabled
+ * @enable: Set true to enable RPS in SAP mode
+ *
+ * Callback function registered with ipa
+ *
+ * Return: none
+ */
+#ifdef IPA_LAN_RX_NAPI_SUPPORT
+void hdd_adapter_set_rps(uint8_t vdev_id, bool enable);
+#else
+static inline
+void hdd_adapter_set_rps(uint8_t vdev_id, bool enable)
+{
+}
+#endif
+
 void wlan_hdd_classify_pkt(struct sk_buff *skb);
 
 #ifdef WLAN_FEATURE_DP_BUS_BANDWIDTH
@@ -437,6 +456,17 @@ static inline
 void hdd_event_eapol_log(struct sk_buff *skb, enum qdf_proto_dir dir)
 {}
 #endif
+
+/**
+ * hdd_set_udp_qos_upgrade_config() - Set the threshold for UDP packet
+ *				      QoS upgrade.
+ * @adapter: adapter for which this configuration is to be applied
+ * @priority: the threshold priority
+ *
+ * Returns: 0 on success, -EINVAL on failure
+ */
+int hdd_set_udp_qos_upgrade_config(struct hdd_adapter *adapter,
+				   uint8_t priority);
 
 /*
  * As of the 4.7 kernel, net_device->trans_start is removed. Create shims to
@@ -541,4 +571,13 @@ wlan_hdd_dump_queue_history_state(struct hdd_netif_queue_history *q_hist,
 bool wlan_hdd_rx_rpm_mark_last_busy(struct hdd_context *hdd_ctx,
 				    void *hif_ctx);
 
+/**
+ * hdd_sta_notify_tx_comp_cb() - notify tx comp callback registered with dp
+ * @skb: pointer to skb
+ * @ctx: osif context
+ * @flag: tx status flag
+ *
+ * Return: None
+ */
+void hdd_sta_notify_tx_comp_cb(qdf_nbuf_t skb, void *ctx, uint16_t flag);
 #endif /* end #if !defined(WLAN_HDD_TX_RX_H) */

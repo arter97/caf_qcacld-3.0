@@ -430,19 +430,26 @@ pkt_capture_mgmt_rx_data_cb(struct wlan_objmgr_psoc *psoc,
 	tpSirMacFrameCtl pfc;
 	qdf_nbuf_t nbuf;
 	int buf_len;
+	struct wlan_objmgr_vdev *vdev;
 
-	if (!(pkt_capture_get_pktcap_mode(psoc) & PKT_CAPTURE_MODE_MGMT_ONLY))
+	if (!(pkt_capture_get_pktcap_mode(psoc) & PKT_CAPTURE_MODE_MGMT_ONLY)) {
+		qdf_nbuf_free(wbuf);
 		return QDF_STATUS_E_FAILURE;
+	}
 
 	buf_len = qdf_nbuf_len(wbuf);
 	nbuf = qdf_nbuf_alloc(NULL, roundup(
 				  buf_len + RESERVE_BYTES, 4),
 				  RESERVE_BYTES, 4, false);
-	if (!nbuf)
+	if (!nbuf) {
+		qdf_nbuf_free(wbuf);
 		return QDF_STATUS_E_FAILURE;
+	}
 
 	qdf_nbuf_put_tail(nbuf, buf_len);
 	qdf_mem_copy(qdf_nbuf_data(nbuf), qdf_nbuf_data(wbuf), buf_len);
+
+	qdf_nbuf_free(wbuf);
 
 	pfc = (tpSirMacFrameCtl)(qdf_nbuf_data(nbuf));
 	wh = (struct ieee80211_frame *)qdf_nbuf_data(nbuf);
@@ -453,7 +460,8 @@ pkt_capture_mgmt_rx_data_cb(struct wlan_objmgr_psoc *psoc,
 	     pfc->subType == SIR_MAC_MGMT_ACTION)) {
 		struct wlan_objmgr_pdev *pdev;
 
-		pdev = wlan_vdev_get_pdev(peer->peer_objmgr.vdev);
+		vdev = pkt_capture_get_vdev();
+		pdev = wlan_vdev_get_pdev(vdev);
 		if (pkt_capture_is_rmf_enabled(pdev, psoc, wh->i_addr1)) {
 			QDF_STATUS status;
 

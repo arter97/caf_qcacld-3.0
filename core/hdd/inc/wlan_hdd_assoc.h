@@ -33,14 +33,6 @@
 
 #define HDD_TIME_STRING_LEN 24
 
-/* Preprocessor Definitions and Constants */
-#ifdef FEATURE_WLAN_TDLS
-#define HDD_MAX_NUM_TDLS_STA          8
-#define HDD_MAX_NUM_TDLS_STA_P_UAPSD_OFFCHAN  1
-#else
-#define HDD_MAX_NUM_TDLS_STA          0
-
-#endif
 /* Timeout (in ms) for Link to Up before Registering Station */
 #define ASSOC_LINKUP_TIMEOUT 60
 
@@ -358,23 +350,12 @@ hdd_indicate_ese_bcn_report_no_results(const struct hdd_adapter *adapter,
  * @adapter: HDD adapter
  * @peer_mac_addr: Peer MAC address
  * @sta_state: peer state
- * @roam_synch_in_progress: roam synch in progress
  *
  * Return: QDF status
  */
 QDF_STATUS hdd_change_peer_state(struct hdd_adapter *adapter,
 				 uint8_t *peer_mac_addr,
-				 enum ol_txrx_peer_state sta_state,
-				 bool roam_synch_in_progress);
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
-bool hdd_is_roam_sync_in_progress(struct csr_roam_info *roaminfo);
-#else
-static inline bool hdd_is_roam_sync_in_progress(struct csr_roam_info *roaminfo)
-{
-	return false;
-}
-#endif
-
+				 enum ol_txrx_peer_state sta_state);
 /**
  * hdd_update_dp_vdev_flags() - update datapath vdev flags
  * @cbk_data: callback data

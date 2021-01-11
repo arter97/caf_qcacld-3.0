@@ -37,7 +37,8 @@ typedef struct sPowersaveoffloadInfo {
 #ifdef WLAN_FEATURE_11W
 struct comeback_timer_info {
 	struct mac_context *mac;
-	uint8_t session_id;
+	uint8_t vdev_id;
+	uint8_t retried;
 	tLimMlmStates lim_prev_mlm_state;  /* Previous MLM State */
 	tLimMlmStates lim_mlm_state;       /* MLM State */
 };
@@ -303,7 +304,6 @@ struct pe_session {
 	uint8_t limWmeEnabled:1;        /* WME */
 	uint8_t limWsmEnabled:1;        /* WSM */
 	uint8_t limHcfEnabled:1;
-	uint8_t lim11dEnabled:1;
 #ifdef WLAN_FEATURE_11W
 	uint8_t limRmfEnabled:1;        /* 11W */
 #endif
@@ -476,6 +476,10 @@ struct pe_session {
 	/* Fast Transition (FT) */
 	tftPEContext ftPEContext;
 	bool isNonRoamReassoc;
+#ifdef WLAN_FEATURE_11W
+	qdf_mc_timer_t pmf_retry_timer;
+	struct comeback_timer_info pmf_retry_timer_info;
+#endif /* WLAN_FEATURE_11W */
 	uint8_t  is_key_installed;
 	/* timer for resetting protection fileds at regular intervals */
 	qdf_mc_timer_t protection_fields_reset_timer;
@@ -517,7 +521,6 @@ struct pe_session {
 	uint16_t beacon_tx_rate;
 	uint8_t *access_policy_vendor_ie;
 	uint8_t access_policy;
-	bool ignore_assoc_disallowed;
 	bool send_p2p_conf_frame;
 	bool process_ho_fail;
 	/* Number of STAs that do not support ECSA capability */
@@ -534,6 +537,7 @@ struct pe_session {
 	uint8_t bss_color_changing;
 #endif
 #endif
+	struct deauth_retry_params deauth_retry;
 	bool enable_bcast_probe_rsp;
 	uint8_t ht_client_cnt;
 	bool force_24ghz_in_ht20;
@@ -549,7 +553,6 @@ struct pe_session {
 	bool is_session_obss_offload_enabled;
 	bool is_obss_reset_timer_initialized;
 	bool sae_pmk_cached;
-	bool fw_roaming_started;
 	bool recvd_deauth_while_roaming;
 	bool recvd_disassoc_while_roaming;
 	bool deauth_disassoc_rc;

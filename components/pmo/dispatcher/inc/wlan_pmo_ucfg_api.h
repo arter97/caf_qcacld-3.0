@@ -217,6 +217,16 @@ enum powersave_mode
 ucfg_pmo_get_power_save_mode(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * ucfg_pmo_get_default_power_save_mode() - Get default power save mode
+ * from ini config
+ * @psoc: pointer to psoc object
+ *
+ * Return: power save mode
+ */
+enum powersave_mode
+ucfg_pmo_get_default_power_save_mode(struct wlan_objmgr_psoc *psoc);
+
+/**
  * ucfg_pmo_set_power_save_mode() - Set power save mode
  * @psoc: pointer to psoc object
  * @val:  power save mode
@@ -1010,6 +1020,22 @@ uint16_t ucfg_pmo_get_wow_pulse_interval_high(struct wlan_objmgr_psoc *psoc);
  * Return: wow pulse interval high configuration
  */
 uint16_t ucfg_pmo_get_wow_pulse_interval_low(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_pmo_get_wow_pulse_repeat_count() - to get wow pulse repeat count
+ * @psoc: objmgr psoc handle
+ *
+ * Return: wow pulse repeat count configuration
+ */
+uint32_t ucfg_pmo_get_wow_pulse_repeat_count(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_pmo_get_wow_pulse_init_state() - to get wow pulse init state
+ * @psoc: objmgr psoc handle
+ *
+ * Return: wow pulse init state configuration
+ */
+uint32_t ucfg_pmo_get_wow_pulse_init_state(struct wlan_objmgr_psoc *psoc);
 #else
 static inline bool
 ucfg_pmo_is_wow_pulse_enabled(struct wlan_objmgr_psoc *psoc)
@@ -1025,6 +1051,18 @@ ucfg_pmo_get_wow_pulse_pin(struct wlan_objmgr_psoc *psoc)
 
 static inline uint16_t
 ucfg_pmo_get_wow_pulse_interval_high(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
+}
+
+static inline uint32_t
+ucfg_pmo_get_wow_pulse_repeat_count(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
+}
+
+static inline uint32_t
+ucfg_pmo_get_wow_pulse_init_state(struct wlan_objmgr_psoc *psoc)
 {
 	return 0;
 }
@@ -1700,6 +1738,12 @@ static inline enum powersave_mode
 ucfg_pmo_get_power_save_mode(struct wlan_objmgr_psoc *psoc)
 {
 	return 0;
+}
+
+static inline enum powersave_mode
+ucfg_pmo_get_default_power_save_mode(struct wlan_objmgr_psoc *psoc)
+{
+	return PMO_PS_ADVANCED_POWER_SAVE_DISABLE;
 }
 
 static inline void

@@ -155,6 +155,17 @@ QDF_STATUS ipa_send_uc_offload_enable_disable(struct wlan_objmgr_pdev *pdev,
 				struct ipa_uc_offload_control_params *req);
 
 /**
+ * ipa_send_intrabss_enable_disable() - wdi intrabss enable/disable notify to fw
+ * @pdev: objmgr pdev object
+ * @req: ipa intrabss control request
+ *
+ * Return: QDF status success or failure
+ */
+QDF_STATUS
+ipa_send_intrabss_enable_disable(struct wlan_objmgr_pdev *pdev,
+				 struct ipa_intrabss_control_params *req);
+
+/**
  * ipa_set_dp_handle() - set dp soc handle
  * @psoc: psoc handle
  * @dp_soc: dp soc handle
@@ -255,6 +266,18 @@ void ipa_reg_sap_xmit_cb(struct wlan_objmgr_pdev *pdev,
  */
 void ipa_reg_send_to_nw_cb(struct wlan_objmgr_pdev *pdev,
 			   wlan_ipa_send_to_nw cb);
+
+#ifdef IPA_LAN_RX_NAPI_SUPPORT
+/**
+ * ipa_reg_rps_enable_cb() - Register cb to enable RPS
+ * @pdev: pdev obj
+ * @cb: callback
+ *
+ * Return: None
+ */
+void ipa_reg_rps_enable_cb(struct wlan_objmgr_pdev *pdev,
+			   wlan_ipa_rps_enable cb);
+#endif
 
 /**
  * ipa_set_mcc_mode() - Set MCC mode
@@ -447,6 +470,13 @@ void ipa_fw_rejuvenate_send_msg(struct wlan_objmgr_pdev *pdev);
 void ipa_component_config_update(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * ipa_component_config_free() - Free ipa config
+ *
+ * Return: None
+ */
+void ipa_component_config_free(void);
+
+/**
  * ipa_get_tx_buf_count() - get IPA config tx buffer count
  *
  * Return: IPA config tx buffer count
@@ -474,9 +504,18 @@ void ipa_update_tx_stats(struct wlan_objmgr_pdev *pdev, uint64_t sta_tx,
 void ipa_flush_pending_vdev_events(struct wlan_objmgr_pdev *pdev,
 				   uint8_t vdev_id);
 
+/**
+ * ipa_is_ready() - Is IPA register callback is invoked
+ *
+ * Return: true if IPA register callback is invoked or false
+ * otherwise
+ */
+bool ipa_is_ready(void);
+
 #else /* Not IPA_OFFLOAD */
 typedef QDF_STATUS (*wlan_ipa_softap_xmit)(qdf_nbuf_t nbuf, qdf_netdev_t dev);
 typedef void (*wlan_ipa_send_to_nw)(qdf_nbuf_t nbuf, qdf_netdev_t dev);
+typedef void (*wlan_ipa_rps_enable)(uint8_t vdev_id, bool enable);
 
 #endif /* IPA_OFFLOAD */
 #endif /* end  of _WLAN_IPA_MAIN_H_ */

@@ -112,6 +112,7 @@
 #include "dp_txrx.h"
 #include "wlan_fwol_ucfg_api.h"
 #include "wlan_hdd_unit_test.h"
+#include "wlan_hdd_thermal.h"
 
 /* Private ioctls and their sub-ioctls */
 #define WLAN_PRIV_SET_INT_GET_NONE    (SIOCIWFIRSTPRIV + 0)
@@ -2933,10 +2934,8 @@ void *mem_alloc_copy_from_user_helper(const __user void *wrqu_data, size_t len)
 	}
 
 	ptr = qdf_mem_malloc(len + 1);
-	if (!ptr) {
-		hdd_err("unable to allocate memory");
+	if (!ptr)
 		return NULL;
-	}
 
 	if (copy_from_user(ptr, wrqu_data, len)) {
 		hdd_err("failed to copy data to user buffer");
@@ -3415,82 +3414,76 @@ static int iw_get_wlm_stats(struct net_device *net_dev,
 }
 #endif /* FEATURE_WLM_STATS */
 
-static eCsrPhyMode hdd_we_ieee_to_phymode(int ieee_mode)
+static int hdd_we_ieee_to_phymode(int ieee_mode, eCsrPhyMode *csr_phy_mode)
 {
-	eCsrPhyMode phymode;
-
 	switch (ieee_mode) {
 	case IEEE80211_MODE_AUTO:
 	case IEEE80211_MODE_2G_AUTO:
 	case IEEE80211_MODE_5G_AUTO:
-		phymode = eCSR_DOT11_MODE_AUTO;
+		*csr_phy_mode = eCSR_DOT11_MODE_AUTO;
 		break;
 	case IEEE80211_MODE_11A:
-		phymode = eCSR_DOT11_MODE_11a;
+		*csr_phy_mode = eCSR_DOT11_MODE_11a;
 		break;
 	case IEEE80211_MODE_11B:
-		phymode = eCSR_DOT11_MODE_11b;
+		*csr_phy_mode = eCSR_DOT11_MODE_11b;
 		break;
 	case IEEE80211_MODE_11G:
-		phymode = eCSR_DOT11_MODE_11g;
+		*csr_phy_mode = eCSR_DOT11_MODE_11g;
 		break;
 	case IEEE80211_MODE_11NA_HT20:
 	case IEEE80211_MODE_11NA_HT40:
 	case IEEE80211_MODE_11NG_HT20:
 	case IEEE80211_MODE_11NG_HT40:
 	case IEEE80211_MODE_11AGN:
-		phymode = eCSR_DOT11_MODE_11n;
+		*csr_phy_mode = eCSR_DOT11_MODE_11n;
 		break;
 	case IEEE80211_MODE_11AC_VHT20:
 	case IEEE80211_MODE_11AC_VHT40:
 	case IEEE80211_MODE_11AC_VHT80:
-		phymode = eCSR_DOT11_MODE_11ac;
+		*csr_phy_mode = eCSR_DOT11_MODE_11ac;
 		break;
 	default:
 		hdd_err("Not supported mode %d", ieee_mode);
-		phymode = -EINVAL;
+		return -EINVAL;
 	}
 
-	return phymode;
+	return 0;
 }
 
-static enum band_info hdd_we_ieee_to_band(int ieee_mode)
+static int hdd_we_ieee_to_band(int ieee_mode, uint8_t *supported_band)
 {
-	enum band_info band;
-
 	switch (ieee_mode) {
 	case IEEE80211_MODE_AUTO:
 	case IEEE80211_MODE_11AC_VHT20:
 	case IEEE80211_MODE_11AC_VHT40:
 	case IEEE80211_MODE_11AC_VHT80:
 	case IEEE80211_MODE_11AGN:
-		band = BAND_ALL;
+		*supported_band = BIT(REG_BAND_2G) | BIT(REG_BAND_5G);
 		break;
 	case IEEE80211_MODE_11A:
 	case IEEE80211_MODE_11NA_HT20:
 	case IEEE80211_MODE_11NA_HT40:
 	case IEEE80211_MODE_5G_AUTO:
-		band = BAND_5G;
+		*supported_band = BIT(REG_BAND_5G);
 		break;
 	case IEEE80211_MODE_11B:
 	case IEEE80211_MODE_11G:
 	case IEEE80211_MODE_11NG_HT20:
 	case IEEE80211_MODE_11NG_HT40:
 	case IEEE80211_MODE_2G_AUTO:
-		band = BAND_2G;
+		*supported_band = BIT(REG_BAND_2G);
 		break;
 	default:
 		hdd_err("Not supported mode %d", ieee_mode);
-		band = -EINVAL;
+		return -EINVAL;
 	}
 
-	return band;
+	return 0;
 }
 
-static uint32_t hdd_we_ieee_to_chwidth(int ieee_mode)
+static int hdd_we_ieee_to_bonding_mode(int ieee_mode, uint32_t *bonding_mode)
 {
-	uint32_t chwidth;
-
 	switch (ieee_mode) {
 	case IEEE80211_MODE_AUTO:
 	case IEEE80211_MODE_11NA_HT40:
@@ -3500,7 +3493,7 @@ static uint32_t hdd_we_ieee_to_chwidth(int ieee_mode)
 	case IEEE80211_MODE_2G_AUTO:
 	case IEEE80211_MODE_5G_AUTO:
 	case IEEE80211_MODE_11AGN:
-		chwidth = WNI_CFG_CHANNEL_BONDING_MODE_ENABLE;
+		*bonding_mode = WNI_CFG_CHANNEL_BONDING_MODE_ENABLE;
 		break;
 	case IEEE80211_MODE_11A:
 	case IEEE80211_MODE_11B:
@@ -3508,35 +3501,37 @@ static uint32_t hdd_we_ieee_to_chwidth(int ieee_mode)
 	case IEEE80211_MODE_11NA_HT20:
 	case IEEE80211_MODE_11NG_HT20:
 	case IEEE80211_MODE_11AC_VHT20:
-		chwidth = WNI_CFG_CHANNEL_BONDING_MODE_DISABLE;
+		*bonding_mode = WNI_CFG_CHANNEL_BONDING_MODE_DISABLE;
 		break;
 	default:
 		hdd_err("Not supported mode %d", ieee_mode);
-		chwidth = -EINVAL;
+		return -EINVAL;
 	}
 
-	return chwidth;
+	return 0;
 }
 
 int hdd_we_update_phymode(struct hdd_adapter *adapter, int new_phymode)
 {
 	eCsrPhyMode phymode;
-	enum band_info band;
-	uint32_t chwidth;
+	uint8_t supported_band;
+	uint32_t bonding_mode;
+	int ret;
 
-	phymode = hdd_we_ieee_to_phymode(new_phymode);
-	if (phymode < 0)
+	ret = hdd_we_ieee_to_phymode(new_phymode, &phymode);
+	if (ret < 0)
 		return -EINVAL;
 
-	band = hdd_we_ieee_to_band(new_phymode);
-	if (band < 0)
-		return -EINVAL;
+	ret = hdd_we_ieee_to_band(new_phymode, &supported_band);
+	if (ret < 0)
+		return ret;
 
-	chwidth = hdd_we_ieee_to_chwidth(new_phymode);
-	if (chwidth < 0)
-		return -EINVAL;
+	ret = hdd_we_ieee_to_bonding_mode(new_phymode, &bonding_mode);
+	if (ret < 0)
+		return ret;
 
-	return hdd_update_phymode(adapter, phymode, band, chwidth);
+	return hdd_update_phymode(adapter, phymode, supported_band,
+				  bonding_mode);
 }
 
 static int hdd_validate_pdev_reset(int value)
@@ -5341,10 +5336,8 @@ static int __iw_setnone_getint(struct net_device *dev,
 		return ret;
 
 	sme_config = qdf_mem_malloc(sizeof(*sme_config));
-	if (!sme_config) {
-		hdd_err("failed to allocate memory for sme_config");
+	if (!sme_config)
 		return -ENOMEM;
-	}
 
 	mac_handle = hdd_ctx->mac_handle;
 	switch (value[0]) {
@@ -5386,14 +5379,15 @@ static int __iw_setnone_getint(struct net_device *dev,
 
 	case WE_GET_NSS:
 	{
-		sme_get_config_param(mac_handle, sme_config);
-		status = ucfg_mlme_get_vht_enable2x2(hdd_ctx->psoc, &bval);
-		if (!QDF_IS_STATUS_SUCCESS(status))
+		uint8_t nss;
+
+		status = hdd_get_nss(adapter, &nss);
+		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			hdd_err("unable to get vht_enable2x2");
-		*value = (bval == 0) ? 1 : 2;
-		if (!policy_mgr_is_hw_dbs_2x2_capable(hdd_ctx->psoc) &&
-		    policy_mgr_is_current_hwmode_dbs(hdd_ctx->psoc))
-			*value = *value - 1;
+			ret = -EIO;
+			break;
+		}
+		*value = nss;
 
 		hdd_debug("GET_NSS: Current NSS:%d", *value);
 		break;
@@ -5845,10 +5839,9 @@ static int hdd_set_fwtest(int argc, int cmd, int value)
 		return -EINVAL;
 	}
 	fw_test = qdf_mem_malloc(sizeof(*fw_test));
-	if (!fw_test) {
-		hdd_err("qdf_mem_malloc failed for fw_test");
+	if (!fw_test)
 		return -ENOMEM;
-	}
+
 	fw_test->arg = cmd;
 	fw_test->value = value;
 	if (QDF_STATUS_SUCCESS != sme_set_fw_test(fw_test)) {
@@ -6396,7 +6389,6 @@ static int __iw_get_char_setnone(struct net_device *dev,
 
 		sme_config = qdf_mem_malloc(sizeof(*sme_config));
 		if (!sme_config) {
-			hdd_err("Out of memory");
 			ret = -ENOMEM;
 			break;
 		}
@@ -7270,8 +7262,8 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
 
 		if (apps_args[0] == CDP_TXRX_STATS_28) {
 			if (sta_ctx->conn_info.is_authenticated) {
-				hdd_debug("ap mac addr: %pM",
-					  (void *)&sta_ctx->conn_info.bssid);
+				hdd_debug("ap mac addr: "QDF_MAC_ADDR_FMT,
+					  QDF_MAC_ADDR_REF(sta_ctx->conn_info.bssid.bytes));
 				req.peer_addr =
 					(char *)&sta_ctx->conn_info.bssid;
 			}
@@ -7332,10 +7324,17 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
 	case WE_SET_THERMAL_THROTTLE_CFG:
 	{
 		QDF_STATUS status;
-
+		struct thermal_mitigation_params therm_cfg_params;
+		struct wlan_fwol_thermal_temp thermal_temp = {0};
 		if (num_args != 7) {
 			hdd_err_rl("set_thermal_cfg: Invalid no of args");
 			return -EINVAL;
+		}
+		status = ucfg_fwol_get_thermal_temp(hdd_ctx->psoc,
+						    &thermal_temp);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err_rl("Failed to get fwol thermal obj");
+			return qdf_status_to_os_return(status);
 		}
 
 		/* Check for valid inputs */
@@ -7346,12 +7345,18 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
 		    apps_args[5] <= apps_args[4])
 			return -EINVAL;
 
+		therm_cfg_params.enable = apps_args[0];
+		therm_cfg_params.dc = apps_args[1];
+		therm_cfg_params.levelconf[0].dcoffpercent = apps_args[2];
+		therm_cfg_params.levelconf[0].priority = apps_args[3];
+		therm_cfg_params.levelconf[0].tmplwm = apps_args[6];
+		hdd_thermal_fill_clientid_priority(THERMAL_MONITOR_APPS,
+						   thermal_temp.priority_apps,
+						   thermal_temp.priority_wpps,
+						   &therm_cfg_params);
+		therm_cfg_params.num_thermal_conf = 1;
 		status = sme_set_thermal_throttle_cfg(hdd_ctx->mac_handle,
-						      apps_args[0],
-						      apps_args[1],
-						      apps_args[2],
-						      apps_args[3],
-						      apps_args[6]);
+						      &therm_cfg_params);
 		if (QDF_IS_STATUS_ERROR(status))
 			return qdf_status_to_os_return(status);
 
@@ -8045,8 +8050,8 @@ static int __iw_set_keepalive_params(struct net_device *dev,
 		       request->destIpv4Addr[0], request->destIpv4Addr[1],
 		       request->destIpv4Addr[2], request->destIpv4Addr[3]);
 
-		hdd_debug("Dest MAC address: "QDF_MAC_ADDR_STR,
-		       QDF_MAC_ADDR_ARRAY(request->dest_macaddr.bytes));
+		hdd_debug("Dest MAC address: "QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(request->dest_macaddr.bytes));
 		break;
 	}
 
@@ -8505,10 +8510,10 @@ static int __iw_set_pno(struct net_device *dev,
 	len = (wrqu->data.length + 1);
 	data = qdf_mem_malloc(len);
 	if (!data) {
-		hdd_err("fail to allocate memory %zu", len);
 		ret = -EINVAL;
 		goto exit;
 	}
+
 	qdf_mem_copy(data, extra, (len-1));
 	ptr = data;
 

@@ -33,7 +33,7 @@
 #include "wlan_serialization_legacy_api.h"
 #include "wlan_reg_services_api.h"
 #include "wlan_crypto_global_api.h"
-
+#include "wlan_cm_roam_api.h"
 
 uint8_t csr_wpa_oui[][CSR_WPA_OUI_SIZE] = {
 	{0x00, 0x50, 0xf2, 0x00}
@@ -597,6 +597,66 @@ bool csr_is_conn_state_wds(struct mac_context *mac, uint32_t sessionId)
 {
 	return csr_is_conn_state_connected_wds(mac, sessionId) ||
 	       csr_is_conn_state_disconnected_wds(mac, sessionId);
+}
+
+enum csr_cfgdot11mode
+csr_get_vdev_dot11_mode(struct mac_context *mac,
+			enum QDF_OPMODE device_mode,
+			enum csr_cfgdot11mode curr_dot11_mode)
+{
+	enum mlme_vdev_dot11_mode vdev_dot11_mode;
+	uint8_t dot11_mode_indx;
+	enum csr_cfgdot11mode dot11_mode = curr_dot11_mode;
+	uint32_t vdev_type_dot11_mode =
+				mac->mlme_cfg->dot11_mode.vdev_type_dot11_mode;
+
+	sme_debug("curr_dot11_mode %d, vdev_dot11 %08X, dev_mode %d",
+		  curr_dot11_mode, vdev_type_dot11_mode, device_mode);
+
+	switch (device_mode) {
+	case QDF_STA_MODE:
+		dot11_mode_indx = STA_DOT11_MODE_INDX;
+		break;
+	case QDF_P2P_CLIENT_MODE:
+	case QDF_P2P_DEVICE_MODE:
+		dot11_mode_indx = P2P_DEV_DOT11_MODE_INDX;
+		break;
+	case QDF_TDLS_MODE:
+		dot11_mode_indx = TDLS_DOT11_MODE_INDX;
+		break;
+	case QDF_NAN_DISC_MODE:
+		dot11_mode_indx = NAN_DISC_DOT11_MODE_INDX;
+		break;
+	case QDF_NDI_MODE:
+		dot11_mode_indx = NDI_DOT11_MODE_INDX;
+		break;
+	case QDF_OCB_MODE:
+		dot11_mode_indx = OCB_DOT11_MODE_INDX;
+		break;
+	default:
+		return dot11_mode;
+	}
+	vdev_dot11_mode = QDF_GET_BITS(vdev_type_dot11_mode,
+				       dot11_mode_indx, 4);
+	if (vdev_dot11_mode == MLME_VDEV_DOT11_MODE_AUTO)
+		dot11_mode = curr_dot11_mode;
+
+	if (CSR_IS_DOT11_MODE_11N(curr_dot11_mode) &&
+	    vdev_dot11_mode == MLME_VDEV_DOT11_MODE_11N)
+		dot11_mode = eCSR_CFG_DOT11_MODE_11N;
+
+	if (CSR_IS_DOT11_MODE_11AC(curr_dot11_mode) &&
+	    vdev_dot11_mode == MLME_VDEV_DOT11_MODE_11AC)
+		dot11_mode = eCSR_CFG_DOT11_MODE_11AC;
+
+	if (CSR_IS_DOT11_MODE_11AX(curr_dot11_mode) &&
+	    vdev_dot11_mode == MLME_VDEV_DOT11_MODE_11AX)
+		dot11_mode = eCSR_CFG_DOT11_MODE_11AX;
+
+	sme_debug("INI vdev_dot11_mode %d new dot11_mode %d",
+		  vdev_dot11_mode, dot11_mode);
+
+	return dot11_mode;
 }
 
 static bool csr_is_conn_state_ap(struct mac_context *mac, uint32_t sessionId)
@@ -1603,7 +1663,8 @@ QDF_STATUS csr_get_phy_mode_from_bss(struct mac_context *mac,
 				phyMode = eCSR_DOT11_MODE_11ax;
 			else
 				sme_debug("Warning - 6Ghz AP no he cap");
-		}
+		} else if (pIes->he_cap.present)
+			phyMode = eCSR_DOT11_MODE_11ax;
 
 		*pPhyMode = phyMode;
 	}
@@ -1850,6 +1911,11 @@ bool csr_is_phy_mode_match(struct mac_context *mac, uint32_t phyMode,
 	uint32_t bitMask, loopCount;
 	uint32_t bss_chan_freq;
 
+	if (!pProfile) {
+		sme_err("profile not found");
+		return fMatch;
+	}
+
 	if (!QDF_IS_STATUS_SUCCESS(csr_get_phy_mode_from_bss(mac, pSirBssDesc,
 					&phyModeInBssDesc, pIes)))
 		return fMatch;
@@ -1908,31 +1974,32 @@ bool csr_is_phy_mode_match(struct mac_context *mac, uint32_t phyMode,
 			}
 		}
 	}
+
+	cfgDot11ModeToUse = csr_get_vdev_dot11_mode(mac, pProfile->csrPersona,
+						    cfgDot11ModeToUse);
 	if (fMatch && pReturnCfgDot11Mode) {
-		if (pProfile) {
-			/*
-			 * IEEE 11n spec (8.4.3): HT STA shall
-			 * eliminate TKIP as a choice for the pairwise
-			 * cipher suite if CCMP is advertised by the AP
-			 * or if the AP included an HT capabilities
-			 * element in its Beacons and Probe Response.
-			 */
-			if ((!CSR_IS_11n_ALLOWED(
-					pProfile->negotiatedUCEncryptionType))
-					&& ((eCSR_CFG_DOT11_MODE_11N ==
-						cfgDot11ModeToUse) ||
-					(eCSR_CFG_DOT11_MODE_11AC ==
-						cfgDot11ModeToUse) ||
-					(eCSR_CFG_DOT11_MODE_11AX ==
-						cfgDot11ModeToUse))) {
-				/* We cannot do 11n here */
-				if (WLAN_REG_IS_24GHZ_CH_FREQ(bss_chan_freq)) {
-					cfgDot11ModeToUse =
-						eCSR_CFG_DOT11_MODE_11G;
-				} else {
-					cfgDot11ModeToUse =
-						eCSR_CFG_DOT11_MODE_11A;
-				}
+		/*
+		 * IEEE 11n spec (8.4.3): HT STA shall
+		 * eliminate TKIP as a choice for the pairwise
+		 * cipher suite if CCMP is advertised by the AP
+		 * or if the AP included an HT capabilities
+		 * element in its Beacons and Probe Response.
+		 */
+		if ((!CSR_IS_11n_ALLOWED(
+				pProfile->negotiatedUCEncryptionType))
+				&& ((eCSR_CFG_DOT11_MODE_11N ==
+					cfgDot11ModeToUse) ||
+				(eCSR_CFG_DOT11_MODE_11AC ==
+					cfgDot11ModeToUse) ||
+				(eCSR_CFG_DOT11_MODE_11AX ==
+					cfgDot11ModeToUse))) {
+			/* We cannot do 11n here */
+			if (WLAN_REG_IS_24GHZ_CH_FREQ(bss_chan_freq)) {
+				cfgDot11ModeToUse =
+					eCSR_CFG_DOT11_MODE_11G;
+			} else {
+				cfgDot11ModeToUse =
+					eCSR_CFG_DOT11_MODE_11A;
 			}
 		}
 		*pReturnCfgDot11Mode = cfgDot11ModeToUse;
@@ -2693,6 +2760,34 @@ bool csr_lookup_pmkid_using_bssid(struct mac_context *mac,
 	return true;
 }
 
+bool csr_lookup_fils_pmkid(struct mac_context *mac,
+			   uint8_t vdev_id, uint8_t *cache_id,
+			   uint8_t *ssid, uint8_t ssid_len,
+			   struct qdf_mac_addr *bssid)
+{
+	struct wlan_crypto_pmksa *fils_ssid_pmksa, *bssid_lookup_pmksa;
+	struct wlan_objmgr_vdev *vdev;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac->psoc, vdev_id,
+						    WLAN_LEGACY_SME_ID);
+	if (!vdev) {
+		sme_err("Invalid vdev");
+		return false;
+	}
+
+	bssid_lookup_pmksa = wlan_crypto_get_pmksa(vdev, bssid);
+	fils_ssid_pmksa =
+		wlan_crypto_get_fils_pmksa(vdev, cache_id, ssid, ssid_len);
+	if (!fils_ssid_pmksa && !bssid_lookup_pmksa) {
+		sme_err("FILS_PMKSA: Lookup failed");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+		return false;
+	}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+
+	return true;
+}
+
 /**
  * csr_update_session_pmk() - Update the pmk len and pmk in the roam session
  * @session: pointer to the CSR Roam session
@@ -2754,6 +2849,7 @@ uint8_t csr_construct_rsn_ie(struct mac_context *mac, uint32_t sessionId,
 	uint8_t ie_len = 0;
 	tDot11fBeaconIEs *local_ap_ie = ap_ie;
 	uint16_t rsn_cap = 0, self_rsn_cap;
+	int32_t rsn_val;
 	struct wlan_crypto_pmksa pmksa, *pmksa_peer;
 	struct csr_roam_session *session = &mac->roam.roamSession[sessionId];
 
@@ -2775,8 +2871,14 @@ uint8_t csr_construct_rsn_ie(struct mac_context *mac, uint32_t sessionId,
 		return ie_len;
 	}
 
-	self_rsn_cap = (uint16_t)wlan_crypto_get_param(vdev,
-						   WLAN_CRYPTO_PARAM_RSN_CAP);
+	rsn_val = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_RSN_CAP);
+	if (rsn_val < 0) {
+		sme_err("Invalid mgmt cipher");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+		return ie_len;
+	}
+	self_rsn_cap = (uint16_t)rsn_val;
+
 	/* If AP is capable then use self capability else set PMF as 0 */
 	if (rsn_cap & WLAN_CRYPTO_RSN_CAP_MFP_ENABLED &&
 	    pProfile->MFPCapable) {
@@ -2786,6 +2888,7 @@ uint8_t csr_construct_rsn_ie(struct mac_context *mac, uint32_t sessionId,
 	} else {
 		self_rsn_cap &= ~WLAN_CRYPTO_RSN_CAP_MFP_ENABLED;
 		self_rsn_cap &= ~WLAN_CRYPTO_RSN_CAP_MFP_REQUIRED;
+		self_rsn_cap &= ~WLAN_CRYPTO_RSN_CAP_OCV_SUPPORTED;
 	}
 	wlan_crypto_set_vdev_param(vdev, WLAN_CRYPTO_PARAM_RSN_CAP,
 				   self_rsn_cap);
@@ -3461,7 +3564,9 @@ bool csr_rates_is_dot11_rate_supported(struct mac_context *mac_ctx, uint8_t rate
 }
 
 #ifdef WLAN_FEATURE_FILS_SK
-static inline void csr_free_fils_profile_info(struct csr_roam_profile *profile)
+static inline
+void csr_free_fils_profile_info(struct mac_context *mac,
+				struct csr_roam_profile *profile)
 {
 	if (profile->fils_con_info) {
 		qdf_mem_free(profile->fils_con_info);
@@ -3475,11 +3580,13 @@ static inline void csr_free_fils_profile_info(struct csr_roam_profile *profile)
 	}
 }
 #else
-static inline void csr_free_fils_profile_info(struct csr_roam_profile *profile)
+static inline void csr_free_fils_profile_info(struct mac_context *mac,
+					      struct csr_roam_profile *profile)
 { }
 #endif
 
-void csr_release_profile(struct mac_context *mac, struct csr_roam_profile *pProfile)
+void csr_release_profile(struct mac_context *mac,
+			 struct csr_roam_profile *pProfile)
 {
 	if (pProfile) {
 		if (pProfile->BSSIDs.bssid) {
@@ -3518,7 +3625,7 @@ void csr_release_profile(struct mac_context *mac, struct csr_roam_profile *pProf
 			qdf_mem_free(pProfile->ChannelInfo.freq_list);
 			pProfile->ChannelInfo.freq_list = NULL;
 		}
-		csr_free_fils_profile_info(pProfile);
+		csr_free_fils_profile_info(mac, pProfile);
 		qdf_mem_zero(pProfile, sizeof(struct csr_roam_profile));
 	}
 }

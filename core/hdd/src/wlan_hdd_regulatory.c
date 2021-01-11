@@ -211,11 +211,12 @@ void hdd_reset_global_reg_params(void)
 static void reg_program_config_vars(struct hdd_context *hdd_ctx,
 				    struct reg_config_vars *config_vars)
 {
-	uint8_t band_capability = 0, indoor_chnl_marking = 0;
-	uint32_t scan_11d_interval = 0;
+	uint8_t indoor_chnl_marking = 0;
+	uint32_t band_capability = 0, scan_11d_interval = 0;
 	bool indoor_chan_enabled = false;
 	uint32_t restart_beaconing = 0;
-	bool enable_srd_chan = false;
+	uint8_t enable_srd_chan;
+	bool enable_5dot9_ghz_chan;
 	QDF_STATUS status;
 	bool country_priority = 0;
 	bool value = false;
@@ -234,6 +235,9 @@ static void reg_program_config_vars(struct hdd_context *hdd_ctx,
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		hdd_err("Invalid 11d_enable flag");
 	config_vars->enable_11d_support = value;
+
+	ucfg_mlme_get_nol_across_regdmn(hdd_ctx->psoc, &value);
+	config_vars->retain_nol_across_regdmn_update = value;
 
 	ucfg_mlme_get_scan_11d_interval(hdd_ctx->psoc, &scan_11d_interval);
 	config_vars->scan_11d_interval = scan_11d_interval;
@@ -258,12 +262,17 @@ static void reg_program_config_vars(struct hdd_context *hdd_ctx,
 						    &restart_beaconing);
 	config_vars->restart_beaconing = restart_beaconing;
 
-	ucfg_mlme_get_etsi13_srd_chan_in_master_mode(hdd_ctx->psoc,
-						     &enable_srd_chan);
+	ucfg_mlme_get_etsi_srd_chan_in_master_mode(hdd_ctx->psoc,
+						   &enable_srd_chan);
 	config_vars->enable_srd_chan_in_master_mode = enable_srd_chan;
 
 	ucfg_mlme_get_11d_in_world_mode(hdd_ctx->psoc,
 					&config_vars->enable_11d_in_world_mode);
+
+	ucfg_mlme_get_5dot9_ghz_chan_in_master_mode(hdd_ctx->psoc,
+						    &enable_5dot9_ghz_chan);
+	config_vars->enable_5dot9_ghz_chan_in_master_mode =
+						enable_5dot9_ghz_chan;
 }
 
 /**
@@ -749,92 +758,60 @@ int hdd_reg_set_country(struct hdd_context *hdd_ctx, char *country_code)
 	return qdf_status_to_os_return(status);
 }
 
-int hdd_reg_set_band(struct net_device *dev, u8 ui_band)
+uint32_t hdd_reg_legacy_setband_to_reg_wifi_band_bitmap(uint8_t qca_setband)
+{
+	uint32_t band_bitmap = 0;
+
+	switch (qca_setband) {
+	case QCA_SETBAND_AUTO:
+		band_bitmap |= (BIT(REG_BAND_2G) | BIT(REG_BAND_5G));
+		break;
+	case QCA_SETBAND_5G:
+		band_bitmap |= BIT(REG_BAND_5G);
+		break;
+	case QCA_SETBAND_2G:
+		band_bitmap |= BIT(REG_BAND_2G);
+		break;
+	default:
+		hdd_err("Invalid band value %u", qca_setband);
+		return 0;
+	}
+
+	return band_bitmap;
+}
+
+int hdd_reg_set_band(struct net_device *dev, uint32_t band_bitmap)
 {
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
-	mac_handle_t mac_handle;
-	enum band_info band;
-	QDF_STATUS status;
 	struct hdd_context *hdd_ctx;
-	enum band_info current_band;
-	enum band_info connected_band;
+	uint32_t current_band;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
-	switch (ui_band) {
-	case WLAN_HDD_UI_BAND_AUTO:
-		band = BAND_ALL;
-		break;
-	case WLAN_HDD_UI_BAND_5_GHZ:
-		band = BAND_5G;
-		break;
-	case WLAN_HDD_UI_BAND_2_4_GHZ:
-		band = BAND_2G;
-		break;
-	default:
-		hdd_err("Invalid band value %u", ui_band);
+	if (!band_bitmap) {
+		hdd_err("Can't disable all bands");
 		return -EINVAL;
 	}
 
-	hdd_debug("change band to %u", band);
+	hdd_debug("change band to %u", band_bitmap);
 
-	if (ucfg_reg_get_curr_band(hdd_ctx->pdev, &current_band) !=
+	if (ucfg_reg_get_band(hdd_ctx->pdev, &current_band) !=
 	    QDF_STATUS_SUCCESS) {
 		hdd_debug("Failed to get current band config");
 		return -EIO;
 	}
 
-	if (current_band == band)
+	if (current_band == band_bitmap) {
+		hdd_debug("band is the same so not updating");
 		return 0;
-
-	hdd_ctx->curr_band = band;
-
-	/* Change band request received.
-	 * Abort pending scan requests, flush the existing scan results,
-	 * and change the band capability
-	 */
-	hdd_debug("Current band value = %u, new setting %u ",
-			current_band, band);
-
-	mac_handle = hdd_ctx->mac_handle;
-	hdd_for_each_adapter(hdd_ctx, adapter) {
-		wlan_abort_scan(hdd_ctx->pdev, INVAL_PDEV_ID,
-				adapter->vdev_id, INVALID_SCAN_ID, false);
-		connected_band = hdd_conn_get_connected_band(
-				WLAN_HDD_GET_STATION_CTX_PTR(adapter));
-
-		/* Handling is done only for STA and P2P */
-		if (band != BAND_ALL &&
-		    ((adapter->device_mode == QDF_STA_MODE) ||
-		     (adapter->device_mode == QDF_P2P_CLIENT_MODE)) &&
-		    (hdd_conn_is_connected(
-				WLAN_HDD_GET_STATION_CTX_PTR(adapter)))
-			&& (connected_band != band)) {
-			status = QDF_STATUS_SUCCESS;
-
-			/* STA already connected on current
-			 * band, So issue disconnect first,
-			 * then change the band
-			 */
-
-			hdd_debug("STA (Device mode %s(%d)) connected in band %u, Changing band to %u, Issuing Disconnect",
-				  qdf_opmode_str(adapter->device_mode),
-				  adapter->device_mode, current_band, band);
-
-			status = wlan_hdd_disconnect(adapter,
-					eCSR_DISCONNECT_REASON_UNSPECIFIED,
-					eSIR_MAC_OPER_CHANNEL_BAND_CHANGE);
-			if (status) {
-				hdd_err("Hdd disconnect failed, status: %d",
-					status);
-				return -EINVAL;
-			}
-		}
-		ucfg_scan_flush_results(hdd_ctx->pdev, NULL);
 	}
 
-	if (QDF_IS_STATUS_ERROR(ucfg_reg_set_band(hdd_ctx->pdev, band))) {
-		hdd_err("Failed to set the band value to %u", band);
+	hdd_ctx->curr_band = wlan_reg_band_bitmap_to_band_info(band_bitmap);
+
+	if (QDF_IS_STATUS_ERROR(ucfg_reg_set_band(hdd_ctx->pdev,
+						  band_bitmap))) {
+		hdd_err("Failed to set the band bitmap value to %u",
+			band_bitmap);
 		return -EINVAL;
 	}
 
@@ -970,8 +947,7 @@ void hdd_reg_notifier(struct wiphy *wiphy,
 
 	if (cds_is_driver_unloading() || cds_is_driver_recovering() ||
 	    cds_is_driver_in_bad_state()) {
-		hdd_err("%s: unloading or ssr in progress, ignore",
-			__func__);
+		hdd_err("unloading or ssr in progress, ignore");
 		return;
 	}
 
@@ -981,7 +957,7 @@ void hdd_reg_notifier(struct wiphy *wiphy,
 	}
 
 	if (hdd_ctx->is_wiphy_suspended == true) {
-		hdd_err("%s: system/cfg80211 is already suspend", __func__);
+		hdd_err("system/cfg80211 is already suspend");
 		return;
 	}
 
@@ -1306,10 +1282,8 @@ void hdd_send_wiphy_regd_sync_event(struct hdd_context *hdd_ctx)
 
 	regd = qdf_mem_malloc((reg_rules->num_of_reg_rules *
 				sizeof(*regd_rules) + sizeof(*regd)));
-	if (!regd) {
-		hdd_err("mem alloc failed for reg rules");
+	if (!regd)
 		return;
-	}
 
 	regd->n_reg_rules = reg_rules->num_of_reg_rules;
 	qdf_mem_copy(regd->alpha2, reg_rules->alpha2, REG_ALPHA2_LEN + 1);
@@ -1451,7 +1425,7 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 					hdd_ctx->mac_handle,
 					adapter->vdev_id,
 					eCSR_DISCONNECT_REASON_UNSPECIFIED,
-					eSIR_MAC_UNSPEC_FAILURE_REASON);
+					REASON_UNSPEC_FAILURE);
 				roam_profile->phyMode = csr_phy_mode;
 			}
 			break;
@@ -1469,7 +1443,6 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
  * @adapter: HDD vdev context
  * @sap_config: sap configuration pointer
  * @csr_phy_mode: phymode to restart SAP with
- * @freq_changed: flag to set freq update on restart
  *
  * This function handles the stop/start/restart of SAP/P2P_GO adapters when the
  * country code changes
@@ -1479,8 +1452,7 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 static void hdd_restart_sap_with_new_phymode(struct hdd_context *hdd_ctx,
 					     struct hdd_adapter *adapter,
 					     struct sap_config *sap_config,
-					     eCsrPhyMode csr_phy_mode,
-					     bool freq_changed)
+					     eCsrPhyMode csr_phy_mode)
 {
 	struct hdd_hostapd_state *hostapd_state = NULL;
 	struct sap_context *sap_ctx = NULL;
@@ -1488,6 +1460,13 @@ static void hdd_restart_sap_with_new_phymode(struct hdd_context *hdd_ctx,
 
 	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
 	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
+
+	if (!test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
+		sap_config->sap_orig_hw_mode = sap_config->SapHw_mode;
+		sap_config->SapHw_mode = csr_phy_mode;
+		hdd_err("Can't restart AP because it is not started");
+		return;
+	}
 
 	qdf_event_reset(&hostapd_state->qdf_stop_bss_event);
 	status = wlansap_stop_bss(sap_ctx);
@@ -1503,10 +1482,8 @@ static void hdd_restart_sap_with_new_phymode(struct hdd_context *hdd_ctx,
 		return;
 	}
 
-	if (freq_changed) {
-		sap_config->chan_freq =
+	sap_config->chan_freq =
 		wlansap_get_safe_channel_from_pcl_and_acs_range(sap_ctx);
-	}
 
 	sap_config->sap_orig_hw_mode = sap_config->SapHw_mode;
 	sap_config->SapHw_mode = csr_phy_mode;
@@ -1543,29 +1520,21 @@ static void hdd_country_change_update_sap(struct hdd_context *hdd_ctx)
 {
 	struct hdd_adapter *adapter = NULL;
 	struct sap_config *sap_config = NULL;
-	struct sap_context *sap_ctx = NULL;
 	struct wlan_objmgr_pdev *pdev = NULL;
 	uint32_t reg_phy_mode, new_phy_mode;
-	bool freq_changed, phy_changed;
+	bool phy_changed;
 	qdf_freq_t oper_freq;
 	eCsrPhyMode csr_phy_mode;
-	struct sta_ap_intf_check_work_ctx intf_work;
-	QDF_STATUS status;
 
 	pdev = hdd_ctx->pdev;
 
 	hdd_for_each_adapter_dev_held(hdd_ctx, adapter) {
 		oper_freq = hdd_get_adapter_home_channel(adapter);
-		freq_changed = wlan_reg_is_disable_for_freq(pdev, oper_freq);
 
 		switch (adapter->device_mode) {
 		case QDF_P2P_GO_MODE:
-			sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
-			if (freq_changed) {
-				status = wlansap_stop_bss(sap_ctx);
-				if (QDF_IS_STATUS_SUCCESS(status))
-					hdd_debug("Deleting SAP/P2P link!!");
-			}
+			policy_mgr_check_sap_restart(hdd_ctx->psoc,
+						     adapter->vdev_id);
 			break;
 		case QDF_SAP_MODE:
 			sap_config = &adapter->session.ap.sap_config;
@@ -1578,18 +1547,15 @@ static void hdd_country_change_update_sap(struct hdd_context *hdd_ctx)
 			csr_phy_mode =
 				csr_convert_from_reg_phy_mode(new_phy_mode);
 			phy_changed = (csr_phy_mode != sap_config->SapHw_mode);
-			if (freq_changed) {
-				intf_work.psoc = wlan_pdev_get_psoc(pdev);
-				policy_mgr_check_sta_ap_concurrent_ch_intf(
-								&intf_work);
-			}
 
 			if (phy_changed)
 				hdd_restart_sap_with_new_phymode(hdd_ctx,
 								 adapter,
 								 sap_config,
-								 csr_phy_mode,
-								 freq_changed);
+								 csr_phy_mode);
+			else
+				policy_mgr_check_sap_restart(hdd_ctx->psoc,
+							     adapter->vdev_id);
 			break;
 		default:
 			break;
@@ -1779,11 +1745,9 @@ void hdd_regulatory_deinit(struct hdd_context *hdd_ctx)
 
 void hdd_update_regdb_offload_config(struct hdd_context *hdd_ctx)
 {
-	QDF_STATUS status;
 	bool ignore_fw_reg_offload_ind = false;
 
-	status = ucfg_mlme_get_ignore_fw_reg_offload_ind(
-						hdd_ctx->psoc,
+	ucfg_mlme_get_ignore_fw_reg_offload_ind(hdd_ctx->psoc,
 						&ignore_fw_reg_offload_ind);
 	if (!ignore_fw_reg_offload_ind) {
 		hdd_debug("regdb offload is based on firmware capability");

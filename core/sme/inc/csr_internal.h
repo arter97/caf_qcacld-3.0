@@ -42,6 +42,8 @@
 /* No of sessions to be supported, and a session is for Infra, BT-AMP */
 #define CSR_IS_SESSION_VALID(mac, sessionId) \
 	((sessionId) < WLAN_MAX_VDEVS && \
+	 (mac != NULL) && \
+	 ((mac)->roam.roamSession != NULL) && \
 	 (mac)->roam.roamSession[(sessionId)].sessionActive)
 
 #define CSR_GET_SESSION(mac, sessionId) \
@@ -283,8 +285,8 @@ struct roam_cmd {
 
 	bool fStopWds;
 	tSirMacAddr peerMac;
-	tSirMacReasonCodes reason;
-	tSirMacReasonCodes disconnect_reason;
+	enum wlan_reason_code reason;
+	enum wlan_reason_code disconnect_reason;
 };
 
 struct setkey_cmd {
@@ -516,7 +518,6 @@ struct csr_roam_session {
 	struct qdf_mac_addr self_mac_addr;
 
 	eCsrConnectState connectState;
-	struct rsn_caps rsn_caps;
 	tCsrRoamConnectedProfile connectedProfile;
 	struct csr_roam_connectedinfo connectedInfo;
 	struct csr_roam_connectedinfo prev_assoc_ap_info;
@@ -610,14 +611,13 @@ struct csr_roam_session {
 	uint8_t join_bssid_count;
 	struct csr_roam_stored_profile stored_roam_profile;
 	bool ch_switch_in_progress;
-	bool roam_synch_in_progress;
 	bool supported_nss_1x1;
 	uint8_t vdev_nss;
 	uint8_t nss;
 	bool nss_forced_1x1;
 	bool disable_hi_rssi;
 	bool dhcp_done;
-	tSirMacReasonCodes disconnect_reason;
+	enum wlan_reason_code disconnect_reason;
 	uint8_t uapsd_mask;
 	struct scan_cmd_info scan_info;
 	qdf_mc_timer_t roaming_offload_timer;
@@ -626,6 +626,7 @@ struct csr_roam_session {
 	bool discon_in_progress;
 	bool is_adaptive_11r_connection;
 	struct csr_disconnect_stats disconnect_stats;
+	qdf_mc_timer_t join_retry_timer;
 };
 
 struct csr_roamstruct {
@@ -651,9 +652,10 @@ struct csr_roamstruct {
 	uint8_t RoamRssiDiff;
 	bool isWESModeEnabled;
 	uint32_t deauthRspStatus;
-	uint8_t *pReassocResp;          /* reassociation response from new AP */
-	uint16_t reassocRespLen;        /* length of reassociation response */
+#if defined(WLAN_LOGGING_SOCK_SVC_ENABLE) && \
+	defined(FEATURE_PKTLOG) && !defined(REMOVE_PKT_LOG)
 	qdf_mc_timer_t packetdump_timer;
+#endif
 	spinlock_t roam_state_lock;
 };
 
@@ -749,21 +751,42 @@ struct csr_roamstruct {
 	((eCSR_DOT11_MODE_11ac == phy_mode) || \
 	 (eCSR_DOT11_MODE_11ac_ONLY == phy_mode))
 
+#define CSR_IS_DOT11_MODE_11N(dot11mode) \
+	((dot11mode == eCSR_CFG_DOT11_MODE_AUTO) || \
+	 (dot11mode == eCSR_CFG_DOT11_MODE_11N) || \
+	 (dot11mode == eCSR_CFG_DOT11_MODE_11AC) || \
+	 (dot11mode == eCSR_CFG_DOT11_MODE_11N_ONLY) || \
+	 (dot11mode == eCSR_CFG_DOT11_MODE_11AC_ONLY) || \
+	 (dot11mode == eCSR_CFG_DOT11_MODE_11AX) || \
+	 (dot11mode == eCSR_CFG_DOT11_MODE_11AX_ONLY))
+
+#define CSR_IS_DOT11_MODE_11AC(dot11mode) \
+	((dot11mode == eCSR_CFG_DOT11_MODE_AUTO) || \
+	 (dot11mode == eCSR_CFG_DOT11_MODE_11AC) || \
+	 (dot11mode == eCSR_CFG_DOT11_MODE_11AC_ONLY) || \
+	 (dot11mode == eCSR_CFG_DOT11_MODE_11AX) || \
+	 (dot11mode == eCSR_CFG_DOT11_MODE_11AX_ONLY))
+
+#define CSR_IS_DOT11_MODE_11AX(dot11mode) \
+	((dot11mode == eCSR_CFG_DOT11_MODE_AUTO) || \
+	 (dot11mode == eCSR_CFG_DOT11_MODE_11AX) || \
+	 (dot11mode == eCSR_CFG_DOT11_MODE_11AX_ONLY))
 /*
  * this function returns true if the NIC is operating exclusively in
  * the 2.4 GHz band, meaning. it is NOT operating in the 5.0 GHz band.
  */
 #define CSR_IS_24_BAND_ONLY(mac) \
-	(BAND_2G == (mac)->mlme_cfg->gen.band)
+	(BIT(REG_BAND_2G) == (mac)->mlme_cfg->gen.band)
 
 #define CSR_IS_5G_BAND_ONLY(mac) \
-	(BAND_5G == (mac)->mlme_cfg->gen.band)
+	(BIT(REG_BAND_5G) == (mac)->mlme_cfg->gen.band)
 
 #define CSR_IS_RADIO_DUAL_BAND(mac) \
-	(BAND_ALL == (mac)->mlme_cfg->gen.band_capability)
+	((BIT(REG_BAND_2G) | BIT(REG_BAND_5G)) == \
+		(mac)->mlme_cfg->gen.band_capability)
 
 #define CSR_IS_RADIO_BG_ONLY(mac) \
-	(BAND_2G == (mac)->mlme_cfg->gen.band_capability)
+	(BIT(REG_BAND_2G) == (mac)->mlme_cfg->gen.band_capability)
 
 /*
  * this function returns true if the NIC is operating exclusively in the 5.0 GHz
@@ -807,6 +830,22 @@ struct csr_roamstruct {
 #else
 #define CSR_GET_SUBNET_STATUS(roam_reason) (0)
 #endif
+
+/**
+ * csr_get_vdev_dot11_mode() - get the supported dot11mode by vdev
+ * @mac_ctx:  pointer to global mac structure
+ * @device_mode: vdev mode
+ * @curr_dot11_mode: Current dot11 mode
+ *
+ * The function return the min of supported dot11 mode and vdev type dot11mode
+ * for given vdev type.
+ *
+ * Return:csr_cfgdot11mode
+ */
+enum csr_cfgdot11mode
+csr_get_vdev_dot11_mode(struct mac_context *mac,
+			enum QDF_OPMODE device_mode,
+			enum csr_cfgdot11mode curr_dot11_mode);
 
 QDF_STATUS csr_get_channel_and_power_list(struct mac_context *mac);
 
@@ -1006,6 +1045,15 @@ csr_rso_save_ap_to_scan_cache(struct mac_context *mac,
 			      struct roam_offload_synch_ind *roam_synch_ind,
 			      struct bss_description *bss_desc_ptr);
 
+/**
+ * csr_process_ho_fail_ind  - This function will process the Hand Off Failure
+ * indication received from the firmware. It will trigger a disconnect on
+ * the session which the firmware reported a hand off failure.
+ * @mac:     Pointer to global Mac
+ * @msg_buf: Pointer to wma Ho fail indication message
+ *
+ * Return: None
+ */
 void csr_process_ho_fail_ind(struct mac_context *mac, void *msg_buf);
 #endif
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_CSR

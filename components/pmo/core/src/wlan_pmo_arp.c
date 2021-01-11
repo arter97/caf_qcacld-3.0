@@ -38,7 +38,6 @@ static QDF_STATUS pmo_core_cache_arp_in_vdev_priv(
 
 	request = qdf_mem_malloc(sizeof(*request));
 	if (!request) {
-		pmo_err("cannot allocate arp request");
 		status = QDF_STATUS_E_NOMEM;
 		goto exit_with_status;
 	}
@@ -49,9 +48,9 @@ static QDF_STATUS pmo_core_cache_arp_in_vdev_priv(
 
 	qdf_mem_copy(&request->bssid.bytes, &peer_bssid.bytes,
 			QDF_MAC_ADDR_SIZE);
-	pmo_debug("vdev self mac addr: %pM bss peer mac addr: %pM",
-		wlan_vdev_mlme_get_macaddr(vdev),
-		peer_bssid.bytes);
+	pmo_debug("vdev self mac addr: "QDF_MAC_ADDR_FMT" bss peer mac addr: "QDF_MAC_ADDR_FMT,
+		QDF_MAC_ADDR_REF(wlan_vdev_mlme_get_macaddr(vdev)),
+		QDF_MAC_ADDR_REF(peer_bssid.bytes));
 
 	request->enable = PMO_OFFLOAD_ENABLE;
 	request->is_offload_applied = false;

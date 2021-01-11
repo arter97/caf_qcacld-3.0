@@ -34,10 +34,10 @@
 #ifdef CONFIG_BAND_6GHZ
 #define HIGH_5GHZ_FREQ 7200
 #else
-#define HIGH_5GHZ_FREQ 5930
+#define HIGH_5GHZ_FREQ 5920
 #endif
 
-#define HIGH_5GHZ_FREQ_NO_6GHZ 5930
+#define HIGH_5GHZ_FREQ_NO_6GHZ 5920
 
 static void hdd_init_pdev_os_priv(struct hdd_context *hdd_ctx,
 	struct pdev_osif_priv *os_priv)
@@ -141,10 +141,8 @@ int hdd_objmgr_create_and_store_pdev(struct hdd_context *hdd_ctx)
 	}
 
 	priv = qdf_mem_malloc(sizeof(*priv));
-	if (!priv) {
-		hdd_err("pdev os obj create failed");
+	if (!priv)
 		return -ENOMEM;
-	}
 
 	reg_cap_ptr = ucfg_reg_get_hal_reg_cap(psoc);
 	if (!reg_cap_ptr) {

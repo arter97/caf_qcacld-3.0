@@ -322,6 +322,7 @@ const struct nla_policy
 wlan_hdd_sar_limits_policy[SAR_LIMITS_MAX + 1] = {
 	[SAR_LIMITS_SAR_ENABLE] = {.type = NLA_U32},
 	[SAR_LIMITS_NUM_SPECS] = {.type = NLA_U32},
+	[SAR_LIMITS_SPEC] = {.type = NLA_NESTED},
 	[SAR_LIMITS_SPEC_BAND] = {.type = NLA_U32},
 	[SAR_LIMITS_SPEC_CHAIN] = {.type = NLA_U32},
 	[SAR_LIMITS_SPEC_MODULATION] = {.type = NLA_U32},
@@ -705,10 +706,8 @@ static int __wlan_hdd_set_sar_power_limits(struct wiphy *wiphy,
 		goto send_sar_limits;
 
 	row = qdf_mem_malloc(sizeof(*row) * num_limit_rows);
-	if (!row) {
-		hdd_err("Failed to allocate memory for sar_limit_row_list");
+	if (!row)
 		goto fail;
-	}
 
 	sar_limit_cmd->num_limit_rows = num_limit_rows;
 	sar_limit_cmd->sar_limit_row_list = row;

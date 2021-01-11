@@ -362,7 +362,6 @@ __ol_transfer_bin_file(struct ol_context *ol_ctx, enum ATH_BIN_FILE file,
 
 		temp_eeprom = qdf_mem_malloc(fw_entry_size);
 		if (!temp_eeprom) {
-			BMI_ERR("%s: Memory allocation failed", __func__);
 			status = -ENOMEM;
 			goto release_fw;
 		}
@@ -594,10 +593,8 @@ int ol_copy_ramdump(struct hif_opaque_softc *scn)
 		return 0;
 	}
 	info = qdf_mem_malloc(sizeof(struct ramdump_info));
-	if (!info) {
-		BMI_ERR("%s Memory for Ramdump Allocation failed", __func__);
+	if (!info)
 		return -ENOMEM;
-	}
 
 	ol_get_ramdump_mem(qdf_dev->dev, info);
 
@@ -625,6 +622,7 @@ static void __ramdump_work_handler(void *data)
 	struct hif_opaque_softc *ramdump_scn = ol_ctx->scn;
 	qdf_device_t qdf_dev = ol_ctx->qdf_dev;
 	struct ol_config_info *ini_cfg = ol_get_ini_handle(ol_ctx);
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
 
 	if (!ramdump_scn) {
 		BMI_ERR("%s:Ramdump_scn is null:", __func__);
@@ -671,6 +669,7 @@ static void __ramdump_work_handler(void *data)
 		goto out_fail;
 
 	BMI_ERR("%s: RAM dump collecting completed!", __func__);
+	qdf_event_set(&wma->recovery_event);
 
 	/*
 	 * if unloading is in progress, then skip SSR,
@@ -685,6 +684,7 @@ static void __ramdump_work_handler(void *data)
 	return;
 
 out_fail:
+	qdf_event_set(&wma->recovery_event);
 	/* Silent SSR on dump failure */
 	if (ini_cfg->enable_self_recovery)
 		pld_device_self_recovery(qdf_dev->dev,
@@ -738,11 +738,9 @@ void ol_target_failure(void *instance, QDF_STATUS status)
 	if (cds_is_target_asserting())
 		skip_recovering_check = true;
 
-	qdf_event_set(&wma->recovery_event);
-
 	if (TARGET_STATUS_RESET == target_status) {
 		BMI_ERR("Target is already asserted, ignore!");
-		return;
+		goto out;
 	}
 
 	hif_set_target_status(scn, TARGET_STATUS_RESET);
@@ -750,7 +748,7 @@ void ol_target_failure(void *instance, QDF_STATUS status)
 	if (hif_get_bus_type(scn) == QDF_BUS_TYPE_USB) {
 		if (status == QDF_STATUS_E_USB_ERROR)
 			hif_ramdump_handler(scn);
-		return;
+		goto out;
 	}
 
 	if (!skip_recovering_check && cds_is_driver_recovering()) {
@@ -760,13 +758,13 @@ void ol_target_failure(void *instance, QDF_STATUS status)
 
 	if (cds_is_driver_in_bad_state()) {
 		BMI_ERR("%s: Driver in bad state, ignore!\n", __func__);
-		return;
+		goto out;
 	}
 
 	if (cds_is_load_or_unload_in_progress()) {
 		BMI_ERR("%s: Loading/Unloading is in progress, ignore!",
 		       __func__);
-		return;
+		goto out;
 	}
 	cds_set_target_ready(false);
 	cds_set_recovery_in_progress(true);
@@ -775,20 +773,27 @@ void ol_target_failure(void *instance, QDF_STATUS status)
 	if (0 == ret) {
 		if (ini_cfg->enable_self_recovery) {
 			qdf_sched_work(0, &ol_ctx->fw_indication_work);
-			return;
+			goto out;
 		}
 	} else if (-1 == ret) {
-		return;
+		goto out;
 	}
 
 	BMI_ERR("XXX TARGET ASSERTED XXX");
 
 	cds_svc_fw_shutdown_ind(qdf_dev->dev);
 	/* Collect the RAM dump through a workqueue */
-	if (ini_cfg->enable_ramdump_collection)
+	if (ini_cfg->enable_ramdump_collection) {
 		qdf_sched_work(0, &ol_ctx->ramdump_work);
-	else
+	} else {
 		pr_debug("%s: athdiag read for target reg\n", __func__);
+		qdf_event_set(&wma->recovery_event);
+	}
+
+	return;
+out:
+	qdf_event_set(&wma->recovery_event);
+	return;
 }
 
 #ifdef CONFIG_DISABLE_CDC_MAX_PERF_WAR

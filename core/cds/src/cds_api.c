@@ -92,11 +92,14 @@ static struct __qdf_device g_qdf_ctx;
 
 static uint8_t cds_multicast_logging;
 
+#define DRIVER_VER_LEN (11)
+#define HANG_EVENT_VER_LEN (1)
+
 struct cds_hang_event_fixed_param {
-	uint32_t tlv_header;
-	uint32_t recovery_reason;
-	char driver_version[11];
-	char hang_event_version[3];
+	uint16_t tlv_header;
+	uint8_t recovery_reason;
+	char driver_version[DRIVER_VER_LEN];
+	char hang_event_version[HANG_EVENT_VER_LEN];
 } qdf_packed;
 
 #ifdef QCA_WIFI_QCA8074
@@ -118,6 +121,13 @@ static struct ol_if_ops  dp_ol_if_ops = {
 	.is_roam_inprogress = wma_is_roam_in_progress,
 	.get_con_mode = cds_get_conparam,
 	.send_delba = cds_send_delba,
+	.dp_rx_get_pending = dp_rx_tm_get_pending,
+#ifdef DP_MEM_PRE_ALLOC
+	.dp_prealloc_get_consistent = dp_prealloc_get_coherent,
+	.dp_prealloc_put_consistent = dp_prealloc_put_coherent,
+	.dp_get_multi_pages = dp_prealloc_get_multi_pages,
+	.dp_put_multi_pages = dp_prealloc_put_multi_pages
+#endif
     /* TODO: Add any other control path calls required to OL_IF/WMA layer */
 };
 #else
@@ -184,6 +194,22 @@ static bool cds_is_drv_connected(void)
 	return ((ret > 0) ? true : false);
 }
 
+static bool cds_is_drv_supported(void)
+{
+	qdf_device_t qdf_ctx;
+	struct pld_platform_cap cap = {0};
+
+	qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
+	if (!qdf_ctx) {
+		cds_err("cds context is invalid");
+		return false;
+	}
+
+	pld_get_platform_cap(qdf_ctx->dev, &cap);
+
+	return ((cap.cap_flag & PLD_HAS_DRV_SUPPORT) ? true : false);
+}
+
 static QDF_STATUS cds_wmi_send_recv_qmi(void *buf, uint32_t len, void * cb_ctx,
 					qdf_wmi_recv_qmi_cb wmi_rx_cb)
 {
@@ -222,6 +248,7 @@ QDF_STATUS cds_init(void)
 	qdf_register_is_driver_unloading_callback(cds_is_driver_unloading);
 	qdf_register_recovering_state_query_callback(cds_is_driver_recovering);
 	qdf_register_drv_connected_callback(cds_is_drv_connected);
+	qdf_register_drv_supported_callback(cds_is_drv_supported);
 	qdf_register_wmi_send_recv_qmi_callback(cds_wmi_send_recv_qmi);
 
 	return QDF_STATUS_SUCCESS;
@@ -403,10 +430,17 @@ static void cds_cdp_cfg_attach(struct wlan_objmgr_psoc *psoc)
 	cdp_cfg.enable_rxthread = hdd_ctx->enable_rxthread;
 	cdp_cfg.ip_tcp_udp_checksum_offload =
 		cfg_get(psoc, CFG_DP_TCP_UDP_CKSUM_OFFLOAD);
+	cdp_cfg.nan_ip_tcp_udp_checksum_offload =
+		cfg_get(psoc, CFG_DP_NAN_TCP_UDP_CKSUM_OFFLOAD);
+	cdp_cfg.p2p_ip_tcp_udp_checksum_offload =
+		cfg_get(psoc, CFG_DP_P2P_TCP_UDP_CKSUM_OFFLOAD);
+	cdp_cfg.legacy_mode_csum_disable =
+		cfg_get(psoc, CFG_DP_LEGACY_MODE_CSUM_DISABLE);
 	cdp_cfg.ce_classify_enabled =
 		cfg_get(psoc, CFG_DP_CE_CLASSIFY_ENABLE);
 	cdp_cfg.tso_enable = cfg_get(psoc, CFG_DP_TSO);
 	cdp_cfg.lro_enable = cfg_get(psoc, CFG_DP_LRO);
+	cdp_cfg.sg_enable = cfg_get(psoc, CFG_DP_SG);
 	cdp_cfg.enable_data_stall_detection =
 		cfg_get(psoc, CFG_DP_ENABLE_DATA_STALL_DETECTION);
 	cdp_cfg.gro_enable = cfg_get(psoc, CFG_DP_GRO);
@@ -424,7 +458,7 @@ static void cds_cdp_cfg_attach(struct wlan_objmgr_psoc *psoc)
 	gp_cds_context->cfg_ctx = cdp_cfg_attach(soc, gp_cds_context->qdf_ctx,
 					(void *)(&cdp_cfg));
 	if (!gp_cds_context->cfg_ctx) {
-		WMA_LOGD("%s: failed to init cfg handle", __func__);
+		cds_debug("failed to init cfg handle");
 		return;
 	}
 
@@ -556,10 +590,10 @@ static int cds_hang_event_notifier_call(struct notifier_block *block,
 	cmd->recovery_reason = gp_cds_context->recovery_reason;
 
 	qdf_mem_copy(&cmd->driver_version, QWLAN_VERSIONSTR,
-		     sizeof(QWLAN_VERSIONSTR));
+		     DRIVER_VER_LEN);
 
 	qdf_mem_copy(&cmd->hang_event_version, QDF_HANG_EVENT_VERSION,
-		     sizeof(QDF_HANG_EVENT_VERSION));
+		     HANG_EVENT_VER_LEN);
 
 	cds_hang_data->offset += total_len;
 	return NOTIFY_OK;
@@ -1035,12 +1069,12 @@ stop_wmi:
 
 	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
 	if (!hif_ctx)
-		cds_err("%s: Failed to get hif_handle!", __func__);
+		cds_err("Failed to get hif_handle!");
 
 	wma_wmi_stop();
 
 	if (hif_ctx) {
-		cds_err("%s: Disable the isr & reset the soc!", __func__);
+		cds_err("Disable the isr & reset the soc!");
 		hif_disable_isr(hif_ctx);
 		hif_reset_soc(hif_ctx);
 	}
@@ -1285,6 +1319,10 @@ QDF_STATUS cds_close(struct wlan_objmgr_psoc *psoc)
 
 	dispatcher_psoc_close(psoc);
 
+	qdf_flush_work(&gp_cds_context->cds_recovery_work);
+
+	cds_shutdown_notifier_purge();
+
 	qdf_status = wma_wmi_work_close();
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		cds_err("Failed to close wma_wmi_work");
@@ -1317,8 +1355,6 @@ QDF_STATUS cds_close(struct wlan_objmgr_psoc *psoc)
 
 	ucfg_pmo_psoc_update_dp_handle(psoc, NULL);
 	wlan_psoc_set_dp_handle(psoc, NULL);
-
-	cds_shutdown_notifier_purge();
 
 	if (true == wma_needshutdown()) {
 		cds_err("Failed to shutdown wma");
@@ -1853,6 +1889,7 @@ static void cds_trigger_recovery_handler(const char *func, const uint32_t line)
 	QDF_STATUS status;
 	qdf_runtime_lock_t rtl;
 	qdf_device_t qdf;
+	bool ssr_ini_enabled = cds_is_self_recovery_enabled();
 
 	/* NOTE! This code path is delicate! Think very carefully before
 	 * modifying the content or order of the following. Please review any
@@ -1880,8 +1917,12 @@ static void cds_trigger_recovery_handler(const char *func, const uint32_t line)
 		return;
 	}
 
-	/* if *wlan* recovery is disabled, crash here for debugging */
-	if (!cds_is_self_recovery_enabled()) {
+	/*
+	 * if *wlan* recovery is disabled, crash here for debugging  for
+	 * snoc/IPCI targets.
+	 */
+	if ((qdf->bus_type == QDF_BUS_TYPE_SNOC ||
+	     qdf->bus_type == QDF_BUS_TYPE_IPCI) && !ssr_ini_enabled) {
 		QDF_DEBUG_PANIC("WLAN recovery is not enabled (via %s:%d)",
 				func, line);
 		return;
@@ -1910,6 +1951,14 @@ static void cds_trigger_recovery_handler(const char *func, const uint32_t line)
 	cds_force_assert_target(qdf);
 	cds_set_assert_target_in_progress(false);
 
+	/*
+	 * if *wlan* recovery is disabled, once all the required registers are
+	 * read via the platform driver check and crash the system.
+	 */
+	if (qdf->bus_type == QDF_BUS_TYPE_PCI && !ssr_ini_enabled)
+		QDF_DEBUG_PANIC("WLAN recovery is not enabled (via %s:%d)",
+				func, line);
+
 	status = qdf_runtime_pm_allow_suspend(&rtl);
 	if (QDF_IS_STATUS_ERROR(status))
 		cds_err("Failed to release runtime pm lock");
@@ -1928,8 +1977,6 @@ static void cds_trigger_recovery_work(void *context)
 void __cds_trigger_recovery(enum qdf_hang_reason reason, const char *func,
 			    const uint32_t line)
 {
-	bool is_work_queue_needed = false;
-
 	if (!gp_cds_context) {
 		cds_err("gp_cds_context is null");
 		return;
@@ -1937,19 +1984,10 @@ void __cds_trigger_recovery(enum qdf_hang_reason reason, const char *func,
 
 	gp_cds_context->recovery_reason = reason;
 
-	if (in_atomic() ||
-	    (QDF_RESUME_TIMEOUT == reason || QDF_SUSPEND_TIMEOUT == reason))
-		is_work_queue_needed = true;
-
-	if (is_work_queue_needed) {
-		__cds_recovery_caller.func = func;
-		__cds_recovery_caller.line = line;
-		qdf_queue_work(0, gp_cds_context->cds_recovery_wq,
-			       &gp_cds_context->cds_recovery_work);
-		return;
-	}
-
-	cds_trigger_recovery_handler(func, line);
+	__cds_recovery_caller.func = func;
+	__cds_recovery_caller.line = line;
+	qdf_queue_work(0, gp_cds_context->cds_recovery_wq,
+		       &gp_cds_context->cds_recovery_work);
 }
 
 void cds_trigger_recovery_psoc(void *psoc, enum qdf_hang_reason reason,
@@ -2593,7 +2631,7 @@ bool cds_is_5_mhz_enabled(void)
 
 	p_cds_context = cds_get_context(QDF_MODULE_ID_QDF);
 	if (!p_cds_context) {
-		cds_err("%s: cds context is invalid", __func__);
+		cds_err("cds context is invalid");
 		return false;
 	}
 
@@ -2615,7 +2653,7 @@ bool cds_is_10_mhz_enabled(void)
 
 	p_cds_context = cds_get_context(QDF_MODULE_ID_QDF);
 	if (!p_cds_context) {
-		cds_err("%s: cds context is invalid", __func__);
+		cds_err("cds context is invalid");
 		return false;
 	}
 
@@ -2637,7 +2675,7 @@ bool cds_is_sub_20_mhz_enabled(void)
 
 	p_cds_context = cds_get_context(QDF_MODULE_ID_QDF);
 	if (!p_cds_context) {
-		cds_err("%s: cds context is invalid", __func__);
+		cds_err("cds context is invalid");
 		return false;
 	}
 
@@ -2658,7 +2696,7 @@ bool cds_is_self_recovery_enabled(void)
 
 	p_cds_context = cds_get_context(QDF_MODULE_ID_QDF);
 	if (!p_cds_context) {
-		cds_err("%s: cds context is invalid", __func__);
+		cds_err("cds context is invalid");
 		return false;
 	}
 
@@ -2761,79 +2799,6 @@ uint32_t cds_get_connectivity_stats_pkt_bitmap(void *context)
 		return 0;
 	}
 	return adapter->pkt_type_bitmap;
-}
-
-/**
- * cds_get_arp_stats_gw_ip() - get arp stats track IP
- *
- * Return: ARP stats IP to track
- */
-uint32_t cds_get_arp_stats_gw_ip(void *context)
-{
-	struct hdd_adapter *adapter = NULL;
-
-	if (!context)
-		return 0;
-
-	adapter = (struct hdd_adapter *)context;
-
-	if (unlikely(adapter->magic != WLAN_HDD_ADAPTER_MAGIC)) {
-		cds_err("Magic cookie(%x) for adapter sanity verification is invalid",
-			adapter->magic);
-		return 0;
-	}
-
-	return adapter->track_arp_ip;
-}
-
-/**
- * cds_incr_arp_stats_tx_tgt_delivered() - increment ARP stats
- *
- * Return: none
- */
-void cds_incr_arp_stats_tx_tgt_delivered(void)
-{
-	struct hdd_context *hdd_ctx;
-	struct hdd_adapter *adapter = NULL;
-
-	hdd_ctx = gp_cds_context->hdd_context;
-	if (!hdd_ctx) {
-		cds_err("Hdd Context is Null");
-		return;
-	}
-
-	hdd_for_each_adapter(hdd_ctx, adapter) {
-		if (QDF_STA_MODE == adapter->device_mode)
-			break;
-	}
-
-	if (adapter)
-		adapter->hdd_stats.hdd_arp_stats.tx_host_fw_sent++;
-}
-
-/**
- * cds_incr_arp_stats_tx_tgt_acked() - increment ARP stats
- *
- * Return: none
- */
-void cds_incr_arp_stats_tx_tgt_acked(void)
-{
-	struct hdd_context *hdd_ctx;
-	struct hdd_adapter *adapter = NULL;
-
-	hdd_ctx = gp_cds_context->hdd_context;
-	if (!hdd_ctx) {
-		cds_err("Hdd Context is Null");
-		return;
-	}
-
-	hdd_for_each_adapter(hdd_ctx, adapter) {
-		if (QDF_STA_MODE == adapter->device_mode)
-			break;
-	}
-
-	if (adapter)
-		adapter->hdd_stats.hdd_arp_stats.tx_ack_cnt++;
 }
 
 #ifdef FEATURE_ALIGN_STATS_FROM_DP
