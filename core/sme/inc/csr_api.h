@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -461,14 +461,18 @@ typedef enum {
 } eCsrRoamResult;
 
 typedef enum {
+#ifndef FEATURE_CM_ENABLE
 	eCSR_DISCONNECT_REASON_UNSPECIFIED = 0,
 	eCSR_DISCONNECT_REASON_MIC_ERROR,
 	eCSR_DISCONNECT_REASON_DISASSOC,
 	eCSR_DISCONNECT_REASON_DEAUTH,
 	eCSR_DISCONNECT_REASON_HANDOFF,
 	eCSR_DISCONNECT_REASON_STA_HAS_LEFT,
-	eCSR_DISCONNECT_REASON_NDI_DELETE,
+#endif
+	eCSR_DISCONNECT_REASON_NDI_DELETE = 6,
+#ifndef FEATURE_CM_ENABLE
 	eCSR_DISCONNECT_REASON_ROAM_HO_FAIL,
+#endif
 } eCsrRoamDisconnectReason;
 
 typedef enum {
@@ -985,8 +989,6 @@ struct csr_roam_info {
 	bool tdls_chan_swit_prohibited; /* per ExtCap in Assoc/Reassoc resp */
 #endif
 	/* Required for indicating the frames to upper layer */
-	uint32_t beaconLength;
-	uint8_t *beaconPtr;
 	uint32_t assocReqLength;
 	uint8_t *assocReqPtr;
 	int8_t rxRssi;
@@ -1057,7 +1059,7 @@ struct csr_roam_info {
 #endif
 	struct assoc_ind *owe_pending_assoc_ind;
 	uint16_t roam_reason;
-	struct wlan_ies *disconnect_ies;
+	struct element_info *disconnect_ies;
 };
 
 typedef struct sSirSmeAssocIndToUpperLayerCnf {

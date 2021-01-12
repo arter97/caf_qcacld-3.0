@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -102,20 +102,24 @@ enum csr_scan_reason {
 enum csr_roam_reason {
 	/* Roaming because we've not established the initial connection. */
 	eCsrNoConnection,
-	/* roaming because LIM reported a cap change in the associated AP. */
-	eCsrCapsChange,
+#ifndef FEATURE_CM_ENABLE
 	/* roaming because someone asked us to Disassoc & stay disassociated. */
 	eCsrForcedDisassoc,
+#endif
 	/* roaming because an 802.11 request was issued to the driver. */
 	eCsrHddIssued,
+#ifndef FEATURE_CM_ENABLE
 	/* roaming because we need to force a Disassoc due to MIC failure */
 	eCsrForcedDisassocMICFailure,
+#endif
 	eCsrHddIssuedReassocToSameAP,
 	eCsrSmeIssuedReassocToSameAP,
+#ifndef FEATURE_CM_ENABLE
 	/* roaming because someone asked us to deauth and stay disassociated. */
 	eCsrForcedDeauth,
 	/* will be issued by Handoff logic to disconect from current AP */
 	eCsrSmeIssuedDisassocForHandoff,
+#endif
 	/* will be issued by Handoff logic to join a new AP with same profile */
 	eCsrSmeIssuedAssocToSimilarAP,
 	eCsrStopBss,
@@ -602,7 +606,9 @@ struct csr_roam_session {
 	uint8_t nss;
 	bool disable_hi_rssi;
 	bool dhcp_done;
+#ifndef FEATURE_CM_ENABLE
 	enum wlan_reason_code disconnect_reason;
+#endif
 	uint8_t uapsd_mask;
 	struct scan_cmd_info scan_info;
 	qdf_mc_timer_t roaming_offload_timer;
@@ -846,13 +852,14 @@ void csr_set_global_cfgs(struct mac_context *mac);
 void csr_set_default_dot11_mode(struct mac_context *mac);
 bool csr_is_conn_state_disconnected(struct mac_context *mac,
 						   uint32_t sessionId);
-bool csr_is_conn_state_connected_infra(struct mac_context *mac,
-							uint32_t sessionId);
 bool csr_is_conn_state_connected(struct mac_context *mac,
 					       uint32_t sessionId);
+#ifndef FEATURE_CM_ENABLE
+bool csr_is_conn_state_connected_infra(struct mac_context *mac,
+							uint32_t sessionId);
 bool csr_is_conn_state_infra(struct mac_context *mac,
 					uint32_t sessionId);
-
+#endif
 bool csr_is_conn_state_wds(struct mac_context *mac, uint32_t sessionId);
 bool csr_is_conn_state_connected_wds(struct mac_context *mac,
 						    uint32_t sessionId);
@@ -861,17 +868,6 @@ bool csr_is_conn_state_disconnected_wds(struct mac_context *mac,
 bool csr_is_any_session_in_connect_state(struct mac_context *mac);
 bool csr_is_all_session_disconnected(struct mac_context *mac);
 
-/**
- * csr_get_connected_infra() - get the session id of the connected infra
- * @mac_ctx:  pointer to global mac structure
- *
- * The function check if any infra is present in connected state and if present
- * return the session id of the connected infra else if no infra is in connected
- * state return WLAN_UMAC_VDEV_ID_MAX
- *
- * Return: session id of the connected infra
- */
-uint8_t csr_get_connected_infra(struct mac_context *mac_ctx);
 bool csr_is_concurrent_session_running(struct mac_context *mac);
 bool csr_is_infra_ap_started(struct mac_context *mac);
 bool csr_is_valid_mc_concurrent_session(struct mac_context *mac,
@@ -905,18 +901,18 @@ void csr_set_cfg_privacy(struct mac_context *mac,
 			 bool fPrivacy);
 
 /**
- * csr_get_infra_operation_chan_freq() - get operating chan freq of
+ * csr_get_operation_chan_freq() - get operating chan freq of
  * given vdev id
  * @mac_ctx: Pointer to mac context
+ * @vdev: vdev
  * @vdev_id: vdev id
  *
  * Return: chan freq of given vdev id
  */
-uint32_t csr_get_infra_operation_chan_freq(
-	struct mac_context *mac, uint8_t vdev_id);
+qdf_freq_t csr_get_operation_chan_freq(struct mac_context *mac,
+				       struct wlan_objmgr_vdev *vdev,
+				       uint8_t vdev_id);
 
-bool csr_is_session_client_and_connected(struct mac_context *mac,
-		uint8_t sessionId);
 /**
  * csr_get_concurrent_operation_freq() - To get concurrent operating freq
  * @mac_ctx: Pointer to mac context

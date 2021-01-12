@@ -44,6 +44,20 @@ int wlan_hdd_cm_connect(struct wiphy *wiphy,
 			struct cfg80211_connect_params *req);
 
 /**
+ * wlan_hdd_cm_issue_disconnect() - initiate disconnect from osif
+ * @adapter: Pointer to adapter
+ * @reason: Disconnect reason code
+ * @sync: true if wait for disconnect to complete is required.
+ *
+ * This function is used to issue disconnect request to conection manager
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_hdd_cm_issue_disconnect(struct hdd_adapter *adapter,
+					enum wlan_reason_code reason,
+					bool sync);
+
+/**
  * wlan_hdd_cm_disconnect() - cfg80211 disconnect api
  * @wiphy: Pointer to wiphy
  * @dev: Pointer to network device
@@ -67,21 +81,32 @@ QDF_STATUS hdd_cm_netif_queue_control(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS hdd_cm_connect_complete(struct wlan_objmgr_vdev *vdev,
 				   struct wlan_cm_connect_resp *rsp,
 				   enum osif_cb_type type);
+#endif
 
+#ifdef WLAN_FEATURE_MSCS
+/**
+ * reset_mscs_params() - Reset mscs parameters
+ * @adapter: pointer to adapter structure
+ *
+ * Reset mscs parameters whils disconnection
+ *
+ * Return: None
+ */
+void reset_mscs_params(struct hdd_adapter *adapter);
 #else
-static inline int
-wlan_hdd_cm_connect(struct wiphy *wiphy, struct net_device *ndev,
-		    struct cfg80211_connect_params *req)
+static inline
+void reset_mscs_params(struct hdd_adapter *adapter)
 {
-	return 0;
-}
-
-static inline int
-wlan_hdd_cm_disconnect(struct wiphy *wiphy, struct net_device *dev, u16 reason)
-{
-	return 0;
+	return;
 }
 #endif
+
+static const uint8_t acm_mask_bit[WLAN_MAX_AC] = {
+	0x4,                    /* SME_AC_BK */
+	0x8,                    /* SME_AC_BE */
+	0x2,                    /* SME_AC_VI */
+	0x1                     /* SME_AC_VO */
+};
 
 /**
  * hdd_handle_disassociation_event() - Handle disassociation event
@@ -129,5 +154,44 @@ void hdd_cm_update_rssi_snr_by_bssid(struct hdd_adapter *adapter);
  */
 void hdd_cm_handle_assoc_event(struct wlan_objmgr_vdev *vdev,
 			       uint8_t *peer_mac);
+
+/**
+ * hdd_cm_netif_queue_enable() - Enable the network queue for a
+ *			      particular adapter.
+ * @adapter: pointer to the adapter structure
+ *
+ * This function schedules a work to update the netdev features
+ * and enable the network queue if the feature "disable checksum/tso
+ * for legacy connections" is enabled via INI. If not, it will
+ * retain the existing behavior by just enabling the network queues.
+ *
+ * Returns: none
+ */
+void hdd_cm_netif_queue_enable(struct hdd_adapter *adapter);
+
+#ifdef WLAN_FEATURE_11W
+/**
+ * hdd_cm_clear_pmf_stats() - Clear pmf stats
+ * @adapter: pointer to the adapter structure
+ *
+ * Returns: None
+ */
+
+void hdd_cm_clear_pmf_stats(struct hdd_adapter *adapter);
+#else
+static inline void hdd_cm_clear_pmf_stats(struct hdd_adapter *adapter)
+{
+}
+#endif
+
+/**
+ * hdd_cm_save_connect_status() - Save connect status
+ * @adapter: pointer to the adapter structure
+ * @reason_code: IEE80211 wlan status code
+ *
+ * Returns: None
+ */
+void hdd_cm_save_connect_status(struct hdd_adapter *adapter,
+				uint32_t reason_code);
 
 #endif

@@ -223,8 +223,6 @@ typedef struct sLimMlmAssocInd {
 	bool WmmStaInfoPresent;
 
 	/* Required for indicating the frames to upper layer */
-	uint32_t beaconLength;
-	uint8_t *beaconPtr;
 	uint32_t assocReqLength;
 	uint8_t *assocReqPtr;
 	struct oem_channel_info chan_info;
@@ -1149,6 +1147,17 @@ QDF_STATUS lim_disassoc_tx_complete_cnf(void *context,
 QDF_STATUS lim_deauth_tx_complete_cnf(void *context,
 				      uint32_t txCompleteSuccess,
 				      void *params);
+
+#ifdef FEATURE_CM_ENABLE
+/**
+ * lim_cm_send_disconnect_rsp() - To send disconnect rsp to CM
+ * @ctx: pointer to mac structure
+ * @vdev_id: vdev id
+ *
+ * return: None
+ */
+void lim_cm_send_disconnect_rsp(struct mac_context *mac_ctx, uint8_t vdev_id);
+#endif
 
 void lim_send_sme_disassoc_deauth_ntf(struct mac_context *mac_ctx,
 				QDF_STATUS status, uint32_t *ctx);

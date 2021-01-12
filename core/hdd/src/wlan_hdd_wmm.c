@@ -58,6 +58,7 @@
 #include "wlan_mlme_ucfg_api.h"
 #include "cfg_ucfg_api.h"
 #include "wlan_hdd_object_manager.h"
+#include "wlan_hdd_cm_api.h"
 
 #define HDD_WMM_UP_TO_AC_MAP_SIZE 8
 #define DSCP(x)	x
@@ -2204,21 +2205,9 @@ QDF_STATUS hdd_wmm_acquire_access(struct hdd_adapter *adapter,
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * hdd_wmm_assoc() - Function which will handle the housekeeping
- * required by WMM when association takes place
- *
- * @adapter: [in]  pointer to adapter context
- * @roam_info: [in]  pointer to roam information
- * @bss_type: [in]  type of BSS
- *
- * Return: QDF_STATUS enumeration
- */
 QDF_STATUS hdd_wmm_assoc(struct hdd_adapter *adapter,
-			 struct csr_roam_info *roam_info,
-			 eCsrRoamBssType bss_type)
+			 bool is_reassoc, uint8_t uapsd_mask)
 {
-	uint8_t uapsd_mask;
 	QDF_STATUS status;
 	uint32_t srv_value = 0;
 	uint32_t sus_value = 0;
@@ -2231,7 +2220,7 @@ QDF_STATUS hdd_wmm_assoc(struct hdd_adapter *adapter,
 
 	hdd_enter();
 
-	if (roam_info->fReassocReq) {
+	if (is_reassoc) {
 		/* when we reassociate we should continue to use
 		 * whatever parameters were previously established.
 		 * if we are reassociating due to a U-APSD change for
@@ -2245,9 +2234,6 @@ QDF_STATUS hdd_wmm_assoc(struct hdd_adapter *adapter,
 
 		return QDF_STATUS_SUCCESS;
 	}
-	/* get the negotiated UAPSD Mask */
-	uapsd_mask =
-		roam_info->u.pConnectedProfile->modifyProfileFields.uapsd_mask;
 
 	hdd_debug("U-APSD mask is 0x%02x", (int)uapsd_mask);
 
@@ -2357,13 +2343,6 @@ QDF_STATUS hdd_wmm_assoc(struct hdd_adapter *adapter,
 
 	return QDF_STATUS_SUCCESS;
 }
-
-static const uint8_t acm_mask_bit[WLAN_MAX_AC] = {
-	0x4,                    /* SME_AC_BK */
-	0x8,                    /* SME_AC_BE */
-	0x2,                    /* SME_AC_VI */
-	0x1                     /* SME_AC_VO */
-};
 
 /**
  * hdd_wmm_connect() - Function which will handle the housekeeping

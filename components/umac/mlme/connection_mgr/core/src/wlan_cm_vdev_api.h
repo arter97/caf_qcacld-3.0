@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015, 2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015, 2020-2021, The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -27,6 +27,7 @@
 #ifdef FEATURE_CM_ENABLE
 #include <wlan_cm_public_struct.h>
 #include "scheduler_api.h"
+#include "connection_mgr/core/src/wlan_cm_main_api.h"
 
 /**
  * struct cm_vdev_join_req - connect req from legacy CM to vdev manager
@@ -75,6 +76,16 @@ struct cm_vdev_discon_ind {
 };
 
 /**
+ * struct cm_vdev_disconnect_rsp - disconnect rsp from vdev mgr to CM
+ * @vdev_id: vdev id
+ * @psoc: psoc object
+ */
+struct cm_vdev_disconnect_rsp {
+	uint8_t vdev_id;
+	struct wlan_objmgr_psoc *psoc;
+};
+
+/**
  * struct cm_vdev_join_rsp - connect rsp from vdev mgr to connection mgr
  * @psoc: psoc object
  * @connect_rsp: Connect response to be sent to CM
@@ -93,6 +104,31 @@ struct cm_peer_create_req {
 	uint8_t vdev_id;
 	struct qdf_mac_addr peer_mac;
 };
+
+/**
+ * cm_connect_start_ind() - Connection manager ext connect start indication
+ * vdev and peer assoc state machine
+ * @vdev: VDEV object
+ * @req: connect request
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS cm_connect_start_ind(struct wlan_objmgr_vdev *vdev,
+				struct wlan_cm_connect_req *req);
+
+/**
+ * cm_csr_handle_connect_req() - Connection manager cb to csr to fill csr
+ * session and update join req from legacy structures
+ * @vdev: VDEV object
+ * @req: Vdev connect request
+ * @join_req: join req to be sent to LIM
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+cm_csr_handle_connect_req(struct wlan_objmgr_vdev *vdev,
+			  struct wlan_cm_vdev_connect_req *req,
+			  struct cm_vdev_join_req *join_req);
 
 /**
  * cm_handle_connect_req() - Connection manager ext connect request to start
@@ -119,7 +155,7 @@ cm_send_bss_peer_create_req(struct wlan_objmgr_vdev *vdev,
 			    struct qdf_mac_addr *peer_mac);
 
 /**
- * cm_handle_connect_complete() - Connection manager ext connect complete
+ * cm_connect_complete_ind() - Connection manager ext connect complete
  * indication
  * @vdev: VDEV object
  * @rsp: Connection manager connect response
@@ -127,8 +163,40 @@ cm_send_bss_peer_create_req(struct wlan_objmgr_vdev *vdev,
  * Return: QDF_STATUS
  */
 QDF_STATUS
-cm_handle_connect_complete(struct wlan_objmgr_vdev *vdev,
-			   struct wlan_cm_connect_resp *rsp);
+cm_connect_complete_ind(struct wlan_objmgr_vdev *vdev,
+			struct wlan_cm_connect_resp *rsp);
+
+/**
+ * cm_csr_connect_done_ind() - Connection manager call to csr to update
+ * legacy structures on connect complete
+ * @vdev: VDEV object
+ * @rsp: Connection manager connect response
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+cm_csr_connect_done_ind(struct wlan_objmgr_vdev *vdev,
+			struct wlan_cm_connect_resp *rsp);
+
+/**
+ * cm_is_vdevid_connected() - check if vdev_id is in conneted state
+ * @vdev: vdev pointer
+ *
+ * Return: bool
+ */
+bool cm_is_vdevid_connected(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id);
+
+/**
+ * cm_disconnect_start_ind() - Connection manager ext disconnect start
+ * indication
+ * vdev and peer assoc state machine
+ * @vdev: VDEV object
+ * @req: disconnect request
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS cm_disconnect_start_ind(struct wlan_objmgr_vdev *vdev,
+				   struct wlan_cm_disconnect_req *req);
 
 /**
  * cm_handle_disconnect_req() - Connection manager ext disconnect
@@ -141,6 +209,18 @@ cm_handle_connect_complete(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS
 cm_handle_disconnect_req(struct wlan_objmgr_vdev *vdev,
 			 struct wlan_cm_vdev_discon_req *req);
+
+/**
+ * cm_csr_handle_diconnect_req() - Connection manager cb to csr to update legacy
+ * structures on disconnect
+ * @vdev: VDEV object
+ * @req: vdev disconnect request
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+cm_csr_handle_diconnect_req(struct wlan_objmgr_vdev *vdev,
+			    struct wlan_cm_vdev_discon_req *req);
 
 /**
  * cm_send_bss_peer_delete_req() - Connection manager ext bss peer delete
@@ -163,6 +243,18 @@ cm_send_bss_peer_delete_req(struct wlan_objmgr_vdev *vdev);
 QDF_STATUS
 cm_disconnect_complete_ind(struct wlan_objmgr_vdev *vdev,
 			   struct wlan_cm_discon_rsp *rsp);
+
+/**
+ * cm_csr_diconnect_done_ind() - Connection manager call to csr to update
+ * legacy structures on disconnect complete
+ * @vdev: VDEV object
+ * @rsp: Connection manager disconnect response
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+cm_csr_diconnect_done_ind(struct wlan_objmgr_vdev *vdev,
+			  struct wlan_cm_discon_rsp *rsp);
 
 /**
  * cm_send_vdev_down_req() - Connection manager ext req to send vdev down
@@ -210,14 +302,41 @@ QDF_STATUS cm_process_peer_create(struct scheduler_msg *msg);
 QDF_STATUS cm_process_disconnect_req(struct scheduler_msg *msg);
 
 /**
- * cm_disconnect_indication() - Process vdev discon ind and send to CM
+ * cm_disconnect() - disconnect start request
+ * @psoc: psoc pointer
+ * @vdev_id: vdev id
+ * @source: disconnect source
+ * @reason_code: disconnect reason
+ * @bssid: bssid of AP to disconnect, can be null if not known
+ *
+ * Context: can be called from any context
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS cm_disconnect(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			 enum wlan_cm_source source,
+			 enum wlan_reason_code reason_code,
+			 struct qdf_mac_addr *bssid);
+
+/**
+ * cm_send_sb_disconnect_req() - Process vdev discon ind from sb and send to CM
  * @msg: scheduler message
  *
  * Process disconnect indication and send it to CM SM.
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS cm_disconnect_indication(struct scheduler_msg *msg);
+QDF_STATUS cm_send_sb_disconnect_req(struct scheduler_msg *msg);
+
+/**
+ * cm_handle_disconnect_resp() - Process vdev discon rsp and send to CM
+ * @msg: scheduler message
+ *
+ * Process disconnect rsp and send it to CM SM.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS cm_handle_disconnect_resp(struct scheduler_msg *msg);
 
 /**
  * wlan_cm_send_connect_rsp() - Process vdev join rsp and send to CM

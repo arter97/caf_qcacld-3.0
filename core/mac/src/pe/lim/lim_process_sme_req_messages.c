@@ -1272,138 +1272,6 @@ lim_get_vdev_rmf_capable(struct mac_context *mac, struct pe_session *session)
 #endif
 
 #ifdef FEATURE_CM_ENABLE
-static QDF_STATUS
-lim_cm_prepare_join_rsp_from_pe_session(struct pe_session *pe_session,
-				        struct cm_vdev_join_rsp *rsp,
-				        enum wlan_cm_connect_fail_reason reason,
-				        QDF_STATUS connect_status,
-				        enum wlan_status_code status_code)
-{
-	struct wlan_cm_connect_resp *connect_rsp = &rsp->connect_rsp;
-	struct wlan_connect_rsp_ies *connect_ie = &rsp->connect_rsp.connect_ies;
-
-	connect_rsp->cm_id = pe_session->cm_id;
-	connect_rsp->vdev_id = pe_session->vdev_id;
-	qdf_mem_copy(connect_rsp->bssid.bytes, pe_session->bssId,
-		     QDF_MAC_ADDR_SIZE);
-
-	connect_rsp->freq = pe_session->curr_op_freq;
-	connect_rsp->connect_status = connect_status;
-	connect_rsp->reason = reason;
-	connect_rsp->status_code = status_code;
-	connect_rsp->ssid.length =
-			QDF_MIN(WLAN_SSID_MAX_LEN, pe_session->ssId.length);
-	qdf_mem_copy(connect_rsp->ssid.ssid, pe_session->ssId.ssId,
-		     connect_rsp->ssid.length);
-	connect_rsp->aid = pe_session->limAID;
-
-	if (pe_session->assoc_req) {
-		connect_ie->assoc_req.len = pe_session->assocReqLen;
-		connect_ie->assoc_req.ptr =
-			qdf_mem_malloc(sizeof(connect_ie->assoc_req.len));
-		if (!connect_ie->assoc_req.ptr)
-			return QDF_STATUS_E_NOMEM;
-
-		qdf_mem_copy(connect_ie->assoc_req.ptr, pe_session->assoc_req,
-			     connect_ie->assoc_req.len);
-	}
-
-	if (pe_session->assocRsp) {
-		connect_ie->assoc_rsp.len = pe_session->assocRspLen;
-		connect_ie->assoc_rsp.ptr =
-			qdf_mem_malloc(sizeof(connect_ie->assoc_rsp.len));
-		if (!connect_ie->assoc_rsp.ptr)
-			return QDF_STATUS_E_NOMEM;
-
-		qdf_mem_copy(connect_ie->assoc_rsp.ptr, pe_session->assocRsp,
-			     connect_ie->assoc_rsp.len);
-	}
-
-	return QDF_STATUS_SUCCESS;
-}
-
-static void
-lim_cm_fill_join_rsp_from_connect_req(struct cm_vdev_join_req *req,
-				      struct cm_vdev_join_rsp *rsp,
-				      enum wlan_cm_connect_fail_reason reason)
-{
-	struct wlan_cm_connect_resp *connect_rsp = &rsp->connect_rsp;
-
-	connect_rsp->cm_id = req->cm_id;
-	connect_rsp->vdev_id = req->vdev_id;
-	qdf_copy_macaddr(&connect_rsp->bssid, &req->entry->bssid);
-	connect_rsp->freq = req->entry->channel.chan_freq;
-	connect_rsp->connect_status = QDF_STATUS_E_FAILURE;
-	connect_rsp->reason = reason;
-	connect_rsp->ssid = req->entry->ssid;
-}
-
-static QDF_STATUS lim_cm_flush_connect_rsp(struct scheduler_msg *msg)
-{
-	struct cm_vdev_join_rsp *rsp;
-
-	if (!msg || !msg->bodyptr)
-		return QDF_STATUS_E_INVAL;
-
-	rsp = msg->bodyptr;
-	wlan_cm_free_connect_rsp(rsp);
-
-	return QDF_STATUS_SUCCESS;
-}
-
-static void
-lim_cm_send_connect_rsp(struct mac_context *mac_ctx,
-		        struct pe_session *pe_session,
-		        struct cm_vdev_join_req *req,
-		        enum wlan_cm_connect_fail_reason reason,
-		        QDF_STATUS connect_status,
-		        enum wlan_status_code status_code)
-{
-	struct cm_vdev_join_rsp *rsp;
-	QDF_STATUS status;
-	struct scheduler_msg msg;
-
-	if (!pe_session && !req)
-		return;
-
-	rsp = qdf_mem_malloc(sizeof(*rsp));
-	if (!rsp)
-		return;
-
-	rsp->psoc = mac_ctx->psoc;
-
-	if (!pe_session) {
-		lim_cm_fill_join_rsp_from_connect_req(req, rsp, reason);
-	} else {
-		status =
-			lim_cm_prepare_join_rsp_from_pe_session(pe_session,
-								rsp,
-								reason,
-								connect_status,
-								status_code);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			wlan_cm_free_connect_rsp(rsp);
-			return;
-		}
-	}
-
-	qdf_mem_zero(&msg, sizeof(msg));
-
-	msg.bodyptr = rsp;
-	msg.callback = wlan_cm_send_connect_rsp;
-	msg.flush_callback = lim_cm_flush_connect_rsp;
-
-	status = scheduler_post_message(QDF_MODULE_ID_PE,
-					QDF_MODULE_ID_SME,
-					QDF_MODULE_ID_SME, &msg);
-
-	if (QDF_IS_STATUS_ERROR(status)) {
-		pe_err("vdev_id: %d cm_id 0x%x : msg post fails",
-			rsp->connect_rsp.vdev_id, rsp->connect_rsp.cm_id);
-		wlan_cm_free_connect_rsp(rsp);
-	}
-}
-
 static struct pe_session *
 lim_cm_create_session(struct mac_context *mac_ctx, struct cm_vdev_join_req *req)
 {
@@ -1573,6 +1441,16 @@ static void lim_process_nb_disconnect_req(struct mac_context *mac_ctx,
 	reason_code = req->req.reason_code;
 
 	switch (reason_code) {
+	case REASON_IFACE_DOWN:
+	case REASON_DEVICE_RECOVERY:
+	case REASON_OPER_CHANNEL_BAND_CHANGE:
+	case REASON_USER_TRIGGERED_ROAM_FAILURE:
+	case REASON_CHANNEL_SWITCH_FAILED:
+	case REASON_GATEWAY_REACHABILITY_FAILURE:
+	case REASON_OPER_CHANNEL_DISABLED_INDOOR:
+		/* Set reason REASON_DEAUTH_NETWORK_LEAVING for prop deauth */
+		req->req.reason_code = REASON_DEAUTH_NETWORK_LEAVING;
+		/* fallthrough */
 	case REASON_PREV_AUTH_NOT_VALID:
 	case REASON_CLASS2_FRAME_FROM_NON_AUTH_STA:
 		lim_prepare_and_send_deauth(mac_ctx, req);
@@ -1588,6 +1466,9 @@ static void lim_process_nb_disconnect_req(struct mac_context *mac_ctx,
 		lim_prepare_and_send_deauth(mac_ctx, req);
 		break;
 	default:
+		/* Set reason REASON_UNSPEC_FAILURE for prop disassoc */
+		if (reason_code >= REASON_PROP_START)
+			req->req.reason_code = REASON_UNSPEC_FAILURE;
 		lim_prepare_and_send_disassoc(mac_ctx, req);
 	}
 }
@@ -1608,10 +1489,10 @@ lim_cm_handle_disconnect_req(struct wlan_cm_vdev_discon_req *req)
 	pe_session = pe_find_session_by_bssid(mac_ctx, req->req.bssid.bytes,
 					      &req->req.vdev_id);
 	if (!pe_session) {
-		/*
-		 * TODO: Send disconnect resp from here while adding disconnect
-		 * resp handeling.
-		 */
+		pe_err("Session not found for vdev_id %d, cm_id %d, bssid",
+		       QDF_MAC_ADDR_FMT, req->cm_id, req->req.vdev_id,
+		       req->req.bssid.bytes);
+		lim_cm_send_disconnect_rsp(mac_ctx, req->req.vdev_id);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -2048,6 +1929,7 @@ __lim_process_sme_join_req(struct mac_context *mac_ctx, void *msg_buf)
 	struct bss_description *bss_desc;
 	QDF_STATUS status;
 	struct lim_max_tx_pwr_attr tx_pwr_attr = {0};
+	struct vdev_mlme_obj *mlme_obj;
 
 	if (!mac_ctx || !msg_buf) {
 		QDF_TRACE(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_ERROR,
@@ -2183,6 +2065,15 @@ __lim_process_sme_join_req(struct mac_context *mac_ctx, void *msg_buf)
 			session->limQosEnabled = true;
 		else
 			session->limQosEnabled = false;
+
+
+		mlme_obj = wlan_vdev_mlme_get_cmpt_obj(session->vdev);
+		if (!mlme_obj) {
+			pe_err("vdev component object is NULL");
+		} else {
+			mlme_obj->ext_vdev_ptr->connect_info.qos_enabled =
+							session->limQosEnabled;
+		}
 
 		session->wps_registration = sme_join_req->wps_registration;
 		session->he_with_wep_tkip = sme_join_req->he_with_wep_tkip;
