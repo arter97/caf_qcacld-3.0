@@ -1115,12 +1115,6 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			session_entry->beaconParams.fShortPreamble = true;
 	}
 
-	if (assoc_rsp->rrm_caps.present) {
-		rrm_caps->nonOperatingChanMax =
-					assoc_rsp->rrm_caps.nonOperatinChanMax;
-		rrm_caps->operatingChanMax =
-					assoc_rsp->rrm_caps.operatingChanMax;
-	}
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
 	lim_diag_event_report(mac_ctx, WLAN_PE_DIAG_CONNECTED, session_entry,
 			      QDF_STATUS_SUCCESS, QDF_STATUS_SUCCESS);
