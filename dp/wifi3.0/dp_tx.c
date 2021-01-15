@@ -2004,10 +2004,11 @@ dp_tx_send_msdu_single(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 		goto release_desc;
 	}
 
+	tid = dp_scs_get_tid(soc, vdev, qdf_nbuf_data(nbuf), tid);
+	msdu_info->tid = tid;
 	tx_desc->dma_addr = qdf_nbuf_mapped_paddr_get(tx_desc->nbuf);
 	dp_tx_desc_history_add(soc, tx_desc->dma_addr, nbuf,
 			       tx_desc->id, DP_TX_DESC_MAP);
-	tid = dp_mscs_get_tid(soc, vdev, qdf_nbuf_data(nbuf), tid);
 	/* Enqueue the Tx MSDU descriptor to HW for transmit */
 	status = soc->arch_ops.tx_hw_enqueue(soc, vdev, tx_desc,
 					     htt_tcl_metadata,

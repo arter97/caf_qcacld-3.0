@@ -217,6 +217,7 @@ enum dp_mod_id {
 	DP_MOD_ID_MSCS = 21,
 	DP_MOD_ID_TX = 22,
 	DP_MOD_ID_MAX = 23,
+	DP_MOD_ID_SCS = 24,
 };
 
 #define DP_PDEV_ITERATE_VDEV_LIST(_pdev, _vdev) \
@@ -3078,6 +3079,23 @@ struct dp_peer_ast_params {
  * classification.
  */
 #define IEEE80211_SCS_MAX_NO_OF_ELEM 10
+#define IEEE80211_SCS_TID_MASK 0x07
+#define IEEE80211_TCLAS_TYPE_4 4
+#define IEEE80211_TCLAS_TYPE_10 10
+/* Defining protocol types */
+#define PROTO_TCP 6
+#define PROTO_UDP 17
+#define PROTO_ESP 50
+#define VERSION_IPV4 4
+
+/* Defining offsets */
+#define IEEE80211_SCS_DP_SRC_IP            0x02
+#define IEEE80211_SCS_DP_DST_IP            (IEEE80211_SCS_DP_SRC_IP << 1)
+#define IEEE80211_SCS_DP_SRC_PORT         (IEEE80211_SCS_DP_DST_IP << 1)
+#define IEEE80211_SCS_DP_DST_PORT         (IEEE80211_SCS_DP_SRC_PORT << 1)
+#define IEEE80211_SCS_DP_DSCP            (IEEE80211_SCS_DP_DST_PORT << 1)
+#define IEEE80211_SCS_DP_PROTO            (IEEE80211_SCS_DP_DSCP << 1)
+#define IEEE80211_SCS_DP_FLOW_LABEL      (IEEE80211_SCS_DP_PROTO << 1)
 #endif
 
 #ifdef WLAN_SUPPORT_MSCS

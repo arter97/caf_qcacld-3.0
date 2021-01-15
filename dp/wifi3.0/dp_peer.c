@@ -5025,7 +5025,7 @@ uint8_t dp_mscs_get_tid(struct dp_soc *soc, struct dp_vdev *vdev,
 	mac = eh->ether_dhost;
 
 	ether_type = (uint16_t)(*(uint16_t *)(data +
-	QDF_NBUF_TRAC_ETH_TYPE_OFFSET));
+		QDF_NBUF_TRAC_ETH_TYPE_OFFSET));
 
 	peer = dp_peer_find_hash_find(soc, mac, 0, vdev->vdev_id,
 				      DP_MOD_ID_CDP);
@@ -5107,6 +5107,440 @@ void dp_mscs_set_tid(struct dp_peer *peer, uint8_t *data, uint8_t tid)
 			return;
 		break;
 	}
+}
+#endif
+
+#ifdef WLAN_SUPPORT_SCS
+union dp_peer_scs_tuple {
+	struct cdp_tclas_tuple_ipv4 ipv4;
+	struct cdp_tclas_tuple_ipv6 ipv6;
+};
+
+/*
+ * dp_scs_get_tid_type10 - Used in TX operation, to
+ * compare the given MSDU params with the SCS data
+ * entry for TCLAS type 10.
+ * The AP will look into the MSDU that is to be sent
+ * and match the parameters specified in the Filter
+ * Mask that was sent as a part of the SCS request by the STA,
+ * with the Filter value of every entry of the SCS tuple
+ * and then either uses the default DSCP to UP mapping,
+ * if one or more masked parameters don't match, or retrives
+ * the tid value present
+ * inside the table if the parameters match
+ * the SCS entry.
+ * @peer - Peer Data struct
+ * @data - MSDU Data buffer (the hexdump data)
+ * @tid - Default TID
+ * @ver - Type of payload - IPv4 or IPv6 based
+ */
+
+uint8_t
+dp_scs_get_tid_type10(struct dp_peer *peer, uint8_t *data,
+		      uint8_t tid, uint8_t ver)
+{
+	uint8_t *tcp_udp_ptr;
+	uint8_t ip_header_len;
+	bool flag = true;
+	uint8_t tid_val, filter_len, tidx,
+			scs_sessions, ptrx, tclas_elements, proto;
+	uint8_t type, idx;
+
+	if (ver == VERSION_IPV4) {
+		ip_header_len =
+		    ((*(data +
+			QDF_NBUF_TRAC_IPV4_OFFSET)) & 0x0F) * 4;
+
+		proto = *((uint32_t *)(data +
+		    QDF_NBUF_TRAC_IPV4_PROTO_TYPE_OFFSET));
+		tcp_udp_ptr = data + ip_header_len +
+		       QDF_NBUF_TRAC_IPV4_OFFSET;
+	} else {
+		tcp_udp_ptr = data + QDF_NBUF_TRAC_IPV6_HEADER_SIZE +
+		       QDF_NBUF_TRAC_IPV6_OFFSET;
+		proto = *(data + QDF_NBUF_TRAC_IPV6_NH_OFFSET);
+	}
+
+	/* Data is pointing to UDP/ESP */
+	scs_sessions = peer->no_of_scs_sessions;
+	for (idx = 0; idx < scs_sessions; idx++) {
+		tid_val = peer->scs[idx].access_priority;
+		flag = true;
+		tclas_elements = peer->scs[idx].tclas_elements;
+		for (tidx = 0; tidx < tclas_elements; tidx++) {
+			type = peer->scs[idx].tclas[tidx].type;
+			if (type != 10)
+				continue;
+			if (proto !=
+				    peer->scs[idx].tclas[tidx].
+				    tclas.ips.protocol_number)
+				continue;
+			filter_len =
+				peer->scs[idx].tclas[tidx].
+				tclas.ips.filter_len;
+			while (ptrx != filter_len) {
+				if ((tcp_udp_ptr[ptrx] &
+					peer->scs[idx].tclas[tidx].
+					tclas.ips.filter_mask[ptrx]) !=
+						peer->scs[idx].
+						tclas[tidx].tclas.
+						ips.filter_val[ptrx]) {
+					flag = false;
+					break;
+				}
+				ptrx++;
+			}
+			if (ptrx == filter_len && (flag == true))
+				return tid_val;
+			ptrx = 0;
+		}
+	}
+	return tid;
+}
+
+/*
+ * dp_scs_get_tid_ipv4 - Used in TX operation, to
+ * compare the given MSDU params with the SCS data
+ * entry specific to IPv4.
+ * The AP will look into the MSDU that is to be sent
+ * and match the IPv4 parameters in the MSDU with TCLAS type4
+ * parameters that was sent as a part of the SCS request by the STA,
+ * and then either uses the default DSCP to UP mapping,
+ * if one or more masked parameters don't match, or retrives
+ * the tid value present
+ * inside the table if the parameters match
+ * the SCS entry/all SCS entries.
+ * @peer - Peer Data struct
+ * @ipv4_params - MSDU Data params
+ * @tid - Default TID
+ * @data - Raw MSDU data for type 10 comparison
+ */
+uint8_t
+dp_scs_get_tid_ipv4(struct dp_peer *peer,
+		    struct cdp_tclas_tuple_ipv4
+		    *ipv4_params, uint8_t tid, uint8_t *data)
+{
+	uint8_t idx, modified_tid,
+	tid_val, tidx, processing,
+	no_match, tclas_elements, cla_mask, tclas_type;
+	uint8_t sessions = peer->no_of_scs_sessions;
+
+	for (idx = 0; idx < sessions; idx++) {
+		tid_val = peer->scs[idx].access_priority
+			& IEEE80211_SCS_TID_MASK;
+		tclas_elements =
+			peer->scs[idx].tclas_elements;
+		processing =
+			peer->scs[idx].tclas_process;
+		no_match = 0;
+		for (tidx = 0; tidx < tclas_elements; tidx++) {
+			cla_mask =
+				peer->scs[idx].tclas[tidx].mask;
+			tclas_type =
+				peer->scs[idx].tclas[tidx].type;
+			if (tclas_type == 10) {
+				/* CLA 10 mask */
+				modified_tid =
+					dp_scs_get_tid_type10(peer,
+							      data,
+							      tid,
+							      VERSION_IPV4);
+				if (modified_tid == tid) {
+					/* Match did not occur */
+					no_match += 1;
+					continue;
+				} else {
+					return modified_tid;
+				}
+			}
+			if (!cla_mask)
+				continue;
+			if ((cla_mask & IEEE80211_SCS_DP_SRC_IP) &&
+			    (qdf_mem_cmp(
+					 peer->scs[idx].tclas[tidx].
+					 tclas.type4.v4.src_ip
+					 , ipv4_params->src_ip,
+					 QDF_NET_IPV4_LEN) != 0)) {
+				no_match += 1;
+				continue;
+			} else if ((cla_mask & IEEE80211_SCS_DP_DST_IP) &&
+				   (qdf_mem_cmp(
+						peer->scs[idx].tclas[tidx].
+						tclas.type4.v4.dst_ip
+						, ipv4_params->dst_ip,
+						QDF_NET_IPV4_LEN) != 0)) {
+				no_match += 1;
+				continue;
+			} else if (((ipv4_params->protocol == PROTO_TCP) ||
+				    (ipv4_params->protocol == PROTO_UDP)) &&
+				    (cla_mask & IEEE80211_SCS_DP_SRC_PORT) &&
+				    peer->scs[idx].tclas[tidx].tclas.
+				    type4.v4.src_port
+				    !=
+				    qdf_cpu_to_be16(ipv4_params->src_port)) {
+				no_match += 1;
+				continue;
+			} else if (((ipv4_params->protocol == PROTO_TCP) ||
+				    (ipv4_params->protocol == PROTO_UDP)) &&
+				    (cla_mask & IEEE80211_SCS_DP_DST_PORT) &&
+				    peer->scs[idx].tclas[tidx].tclas.
+				    type4.v4.dst_port
+				    !=
+				    qdf_cpu_to_be16(ipv4_params->dst_port)) {
+				no_match += 1;
+				continue;
+			} else if ((cla_mask & IEEE80211_SCS_DP_PROTO) &&
+				    peer->scs[idx].tclas[tidx].
+				    tclas.type4.v4.protocol
+				    != ipv4_params->protocol) {
+				no_match += 1;
+				continue;
+			}
+			if (!processing && no_match)
+				return tid;
+		}
+		if (!processing && !no_match)
+			return tid_val;
+	}
+	return tid;
+}
+
+/*
+ * dp_scs_get_tid_ipv6 - Used in TX operation, to
+ * compare the given MSDU params with the SCS data
+ * entry specific to IPv6.
+ * The AP will look into the MSDU that is to be sent
+ * and match the IPv6 parameters in the MSDU with TCLAS type4
+ * parameters that was sent as a part of the SCS request by the STA,
+ * and then either uses the default DSCP to UP mapping,
+ * if one or more masked parameters don't match, or retrives
+ * the tid value present
+ * inside the table if the parameters match
+ * the SCS entry/all SCS entries.
+ * @peer - Peer Data struct
+ * @ipv6_params - MSDU Data params
+ * @tid - Default TID
+ * @data - Raw MSDU data for type 10 comparison
+ */
+uint8_t
+dp_scs_get_tid_ipv6(struct dp_peer *peer,
+		    struct cdp_tclas_tuple_ipv6
+		    *ipv6_params, uint8_t tid, uint8_t *data)
+{
+	uint8_t idx, tid_val,
+	processing, no_match,
+	modified_tid, tidx, tclas_elements, cla_mask,
+	tclas_type;
+	uint8_t sessions = peer->no_of_scs_sessions;
+
+	for (idx = 0; idx < sessions; idx++) {
+		tid_val = peer->scs[idx].access_priority
+			& IEEE80211_SCS_TID_MASK;
+		tclas_elements =
+			peer->scs[idx].tclas_elements;
+		processing =
+			peer->scs[idx].tclas_process;
+		no_match = 0;
+		for (tidx = 0; tidx < tclas_elements; tidx++) {
+			cla_mask =
+				peer->scs[idx].tclas[tidx].mask;
+			tclas_type =
+				peer->scs[idx].tclas[tidx].type;
+			if (tclas_type == 10) {
+				/* CLA 10 mask */
+				modified_tid =
+					dp_scs_get_tid_type10(peer,
+							      data, tid,
+							      0);
+				if (modified_tid == tid) {
+					no_match += 1;
+					continue;
+				} else {
+					return modified_tid;
+				}
+			}
+			if (!cla_mask)
+				continue;
+			if ((cla_mask & IEEE80211_SCS_DP_SRC_IP) &&
+			    (qdf_mem_cmp(
+					 peer->scs[idx].tclas[tidx].
+					 tclas.type4.v6.src_ip
+					 , ipv6_params->src_ip, 16) != 0)) {
+				no_match += 1;
+				continue;
+			} else if ((cla_mask & IEEE80211_SCS_DP_DST_IP) &&
+				   (qdf_mem_cmp(
+						peer->scs[idx].tclas[tidx].
+						tclas.type4.v6.dst_ip
+						, ipv6_params->dst_ip,
+						16) != 0)) {
+				no_match += 1;
+				continue;
+			} else if (((ipv6_params->next_header ==
+				    PROTO_TCP) ||
+				    (ipv6_params->next_header ==
+				    PROTO_UDP)) &&
+				    (cla_mask & IEEE80211_SCS_DP_SRC_PORT) &&
+				    peer->scs[idx].tclas[tidx].
+				    tclas.type4.v6.src_port
+				    !=
+				    qdf_cpu_to_be16(ipv6_params->src_port)) {
+				no_match += 1;
+				continue;
+			} else if (((ipv6_params->next_header ==
+				     PROTO_TCP) ||
+				    (ipv6_params->next_header ==
+				     PROTO_UDP)) &&
+				    (cla_mask & IEEE80211_SCS_DP_DST_PORT) &&
+				    peer->scs[idx].tclas[tidx].
+				    tclas.type4.v6.dst_port
+				    !=
+				    qdf_cpu_to_be16(ipv6_params->dst_port)) {
+				no_match += 1;
+				continue;
+			} else if ((cla_mask & IEEE80211_SCS_DP_PROTO) &&
+				    peer->scs[idx].tclas[tidx].
+				    tclas.type4.v6.next_header
+				    != ipv6_params->next_header) {
+				no_match += 1;
+				continue;
+			}
+			if (!processing && no_match)
+				return tid;
+		}
+		if (!processing && !no_match)
+			return tid_val;
+	}
+	return tid;
+}
+
+/*
+ * scs_parse_ipv4 - Function to parse IPv4
+ * params from an MSDU.
+ * @data - MSDU obtained
+ * @scs_tuple - IPV4 data structure to be
+ * used for SCS Procedures
+ */
+void
+scs_parse_ipv4(uint8_t *data,
+	       struct cdp_tclas_tuple_ipv4
+	       *scs_tuple)
+{
+	uint8_t *tcp_udp_ptr;
+	uint8_t ip_header_len;
+
+	qdf_mem_copy(scs_tuple->src_ip, (data +
+		    QDF_NBUF_TRAC_IPV4_SRC_ADDR_OFFSET), QDF_NET_IPV4_LEN);
+	qdf_mem_copy(scs_tuple->dst_ip, (data +
+		    QDF_NBUF_TRAC_IPV4_DEST_ADDR_OFFSET), QDF_NET_IPV4_LEN);
+	scs_tuple->dscp =   *((uint32_t *)(data +
+		    QDF_NBUF_TRAC_IPV4_DSCP_OFFSET));
+	scs_tuple->dscp &= 0xFC;
+	scs_tuple->dscp >>= 2;
+	scs_tuple->protocol = *((uint32_t *)(data +
+		    QDF_NBUF_TRAC_IPV4_PROTO_TYPE_OFFSET));
+	ip_header_len = ((*(data + QDF_NBUF_TRAC_IPV4_OFFSET)) & 0x0F) * 4;
+
+	tcp_udp_ptr = data + ip_header_len +
+		       QDF_NBUF_TRAC_IPV4_OFFSET;
+	scs_tuple->src_port = *((uint16_t *)(tcp_udp_ptr +
+			   QDF_NBUF_TRAC_TCP_SPORT_OFFSET));
+	scs_tuple->dst_port = *((uint16_t *)(tcp_udp_ptr +
+			   QDF_NBUF_TRAC_TCP_DPORT_OFFSET));
+}
+
+/*
+ * scs_parse_ipv6 - Function to parse IPv4
+ * params from an MSDU.
+ * @data - MSDU obtained
+ * @scs_tuple - IPV4 data structure to be
+ * used for SCS Procedures
+ */
+void
+scs_parse_ipv6(uint8_t *data,
+	       struct cdp_tclas_tuple_ipv6
+	       *scs_tuple)
+{
+	uint8_t *tcp_udp_ptr;
+
+	scs_tuple->next_header = *(data + QDF_NBUF_TRAC_IPV6_NH_OFFSET);
+
+	qdf_mem_copy(scs_tuple->src_ip, (data +
+				QDF_NBUF_TRAC_IPV6_SRC_IP_OFFSET),
+				QDF_IPV6_ADDR_SIZE);
+	qdf_mem_copy(scs_tuple->dst_ip, (data +
+				QDF_NBUF_TRAC_IPV6_DEST_ADDR_OFFSET),
+				QDF_IPV6_ADDR_SIZE);
+
+	tcp_udp_ptr = data + QDF_NBUF_TRAC_IPV6_OFFSET +
+		QDF_NBUF_TRAC_IPV6_HEADER_SIZE;
+
+	scs_tuple->src_port = *((uint16_t *)(tcp_udp_ptr +
+		QDF_NBUF_TRAC_TCP_SPORT_OFFSET));
+	scs_tuple->dst_port = *((uint16_t *)(tcp_udp_ptr +
+				QDF_NBUF_TRAC_TCP_DPORT_OFFSET));
+}
+
+/*
+ * dp_scs_get_tid - This function is used in
+ * TX side, to get the correct TID value for
+ * the downlink traffic
+ * designated to a particular STA.
+ * In the TX side, the AP compares the Downlink MSDU params
+ * with the entry/entries present inside the SCS table and gets the
+ * TID value stored and sends the MSDU with this value.
+ * @soc - Datapath soc handle
+ * @vdev - Datapath vdev handle
+ * @data - MSDU sent/received
+ * @tid - TID of the MSDU
+ */
+uint8_t
+dp_scs_get_tid(struct dp_soc *soc, struct dp_vdev *vdev,
+	       uint8_t *data, uint8_t tid)
+{
+	union dp_peer_scs_tuple scs_tuple;
+	uint16_t ether_type;
+	struct dp_peer *peer;
+	struct ether_header *eh;
+	char *mac;
+
+	eh = (struct ether_header *)data;
+	mac = eh->ether_dhost;
+
+	ether_type = (uint16_t)(*(uint16_t *)(data +
+		QDF_NBUF_TRAC_ETH_TYPE_OFFSET));
+
+	peer = dp_peer_find_hash_find(soc, mac, 0, vdev->vdev_id,
+				      DP_MOD_ID_CDP);
+
+	if (!peer)
+		goto fail;
+
+	if (peer->scs_is_active == 0)
+		goto fail;
+
+	switch (qdf_ntohs(ether_type)) {
+	case QDF_NBUF_TRAC_IPV4_ETH_TYPE:
+		scs_parse_ipv4(data, &scs_tuple.ipv4);
+		tid =  dp_scs_get_tid_ipv4(
+					peer,
+					&scs_tuple.ipv4,
+					tid, data);
+	break;
+
+	case QDF_NBUF_TRAC_IPV6_ETH_TYPE:
+		scs_parse_ipv6(data, &scs_tuple.ipv6);
+		tid =  dp_scs_get_tid_ipv6(
+					peer,
+					&scs_tuple.ipv6,
+					tid, data);
+	break;
+	}
+
+fail:
+	if (peer)
+		dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
+	return tid;
 }
 #endif
 

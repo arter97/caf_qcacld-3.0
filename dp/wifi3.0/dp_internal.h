@@ -2268,6 +2268,28 @@ void dp_rx_fst_detach(struct dp_soc *soc, struct dp_pdev *pdev)
 }
 #endif
 
+#ifdef WLAN_SUPPORT_SCS
+uint8_t
+dp_scs_get_tid_ipv4(struct dp_peer *peer,
+		    struct cdp_tclas_tuple_ipv4
+		    *ipv4_params, uint8_t tid, uint8_t *data);
+
+void scs_parse_ipv4(uint8_t *data,
+		    struct cdp_tclas_tuple_ipv4
+		    *scs_tuple);
+
+uint8_t
+dp_scs_get_tid(struct dp_soc *soc, struct dp_vdev *vdev,
+	       uint8_t *data, uint8_t tid);
+#else
+static inline uint8_t
+dp_scs_get_tid(struct dp_soc *soc, struct dp_vdev *vdev,
+	       uint8_t *data, uint8_t tid)
+{
+	return tid;
+}
+#endif
+
 /**
  * dp_vdev_get_ref() - API to take a reference for VDEV object
  *
@@ -2416,7 +2438,6 @@ dp_mscs_set_tid(struct dp_peer *peer, uint8_t *data, uint8_t tid)
 {
 }
 #endif
-
 #if defined(WLAN_SUPPORT_RX_FISA)
 void dp_rx_dump_fisa_table(struct dp_soc *soc);
 

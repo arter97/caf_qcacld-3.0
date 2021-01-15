@@ -93,6 +93,7 @@
 #define QDF_NBUF_TRAC_IP_OFFSET		14
 #define QDF_NBUF_TRAC_VLAN_IP_OFFSET		18
 #define QDF_NBUF_TRAC_DOUBLE_VLAN_IP_OFFSET	22
+#define QDF_NBUF_IPSEC_PORT     4500
 /* One dword for IPv4 header size unit */
 #define QDF_NBUF_IPV4_HDR_SIZE_UNIT	4
 
