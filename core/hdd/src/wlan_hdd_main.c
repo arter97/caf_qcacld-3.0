@@ -181,6 +181,7 @@
 #include "cfg_nan_api.h"
 #include "wlan_hdd_btc_chain_mode.h"
 #include <wlan_hdd_dcs.h>
+#include "wlan_coex_ucfg_api.h"
 
 #ifdef MODULE
 #define WLAN_MODULE_NAME  module_name(THIS_MODULE)
@@ -5383,6 +5384,7 @@ static int hdd_send_coex_config_params(struct hdd_context *hdd_ctx,
 	struct coex_config_params coex_cfg_params = {0};
 	struct wlan_fwol_coex_config config = {0};
 	struct wlan_objmgr_psoc *psoc = hdd_ctx->psoc;
+	uint8_t btc_chain_mode;
 	QDF_STATUS status;
 
 	if (!hdd_ctx) {
@@ -5426,8 +5428,26 @@ static int hdd_send_coex_config_params(struct hdd_context *hdd_ctx,
 	}
 
 	coex_cfg_params.config_type = WMI_COEX_CONFIG_BTC_MODE;
-	coex_cfg_params.config_arg1 = config.btc_mode;
 
+	/* Modify BTC_MODE according to BTC_CHAIN_MODE */
+	status = ucfg_coex_psoc_get_btc_chain_mode(psoc, &btc_chain_mode);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to get btc chain mode");
+		btc_chain_mode = WLAN_COEX_BTC_CHAIN_MODE_UNSETTLED;
+	}
+	switch (btc_chain_mode) {
+	case WLAN_COEX_BTC_CHAIN_MODE_SHARED:
+		coex_cfg_params.config_arg1 = 0;
+		break;
+	case WLAN_COEX_BTC_CHAIN_MODE_SEPARATED:
+		coex_cfg_params.config_arg1 = 2;
+		break;
+	default:
+		coex_cfg_params.config_arg1 = config.btc_mode;
+	}
+	hdd_debug("Configured BTC mode is %d, BTC chain mode is 0x%x, set BTC mode to %d",
+		  config.btc_mode, btc_chain_mode,
+		  coex_cfg_params.config_arg1);
 	status = sme_send_coex_config_cmd(&coex_cfg_params);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Failed to send coex BTC mode");
